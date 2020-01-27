@@ -1325,6 +1325,31 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
       case HAlign.justify : hideBothSpaces; break;
     }
   }
+
+  /// functions for text selections
+  int selectNearestGap(float x){ //x: local x coordinate. (innerPos.x = 0)
+    if(cells.empty) return 0;
+    foreach(int i, c; cells) if(x<c.outerPos.x + c.outerWidth*.5f) return i;
+    return cells.length.to!int;
+  }
+
+  int selectNearestCell(float x){ //always select something on either side
+    if(cells.empty) return 0;
+    foreach_reverse(i, c; cells) if(x >= c.outerPos.x) return i.to!int;
+    return 0;
+  }
+
+  auto selectCellsInRange(float x0, float x1){ //cell only need to touch the range
+    int lo = 0, hi = 0;
+    sort(x0, x1);
+    if(cells.empty || x1<cells[0].outerPos.x || x0>cells[$-1].outerRight) return tuple(lo, hi); //no intersection
+
+    foreach(i, c; cells) if(x0 <= c.outerRight){ lo = i.to!int; break; }
+    foreach_reverse(i, c; cells) if(x1 >= c.outerPos.x){ hi = i.to!int+1; break; }
+
+    return tuple(lo, hi);
+  }
+
 }
 
 private{ //wrappedLine[] functionality
