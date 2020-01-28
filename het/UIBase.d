@@ -11,7 +11,7 @@ import het.utils, het.geometry, het.draw2d, het.image, het.win,
 //adjust the size of the original Tab character
 enum
   VisualizeContainers   = 0,
-  VisualizeGlyphs       = 0,
+  VisualizeGlyphs       = 1,
   VisualizeTabColors    = 0;
 
 enum
@@ -1000,7 +1000,7 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
   int stIdx;
 
   int fontFlags; //todo: compress information
-  bool isWhite, isTab; //needed for wordwrap and elastic tabs
+  bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
   RGB fontColor, bkColor;
 
 
@@ -1008,6 +1008,15 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
     //tab is the isSame as a space
     isTab = ch==9;
     isWhite = isTab || ch==32;
+    isNewLine = ch==10;
+    isReturn = ch==13;         //todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. ossz 16byte all rendelkezeser ugyis.
+
+    if(VisualizeGlyphs){
+      if(isReturn) ch = 0x240D;else
+      if(isNewLine) ch = 0x240A; //0x23CE;
+    }else{
+      if(isReturn || isNewLine) ch = ' ';
+    }
 
     string glyphSpec = `font:\`~ts.font~`\72\x3\?`~[ch].toUTF8;
 
@@ -1017,6 +1026,8 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
     bkColor = ts.bkColor;
 
     innerSize = calcGlyphSize_clearType(ts, stIdx);
+
+    if(!VisualizeGlyphs) if(isReturn || isNewLine) innerWidth = 0;
   }
 
   override void draw(ref Drawing dr){
@@ -1224,7 +1235,7 @@ void appendMarkupLine(Row row, string s, ref TextStyle ts){
   int inCommand;
   string commandLine;
 
-  foreach(ch; s.byDchar){
+  foreach(ch; s.byDchar){ //todo: dchar ch;s test
 
 //    ushort dynChar = dcm.encode(ch); //dr.textOut(x+i*lineSpacing/2, y, [ch].toUTF8);  //todo: process the compressed thing
 
@@ -1501,6 +1512,7 @@ class Row : Container { // Row ////////////////////////////////////
     }
 
     const limit = innerWidth + AlignEpsilon;
+    bool isNewLine;
     for(size_t i=0; i<subCells.length; i++){ auto subCell = subCells[i];
       //It is illegal to use \n here. Make a new Row instead!
 
@@ -1519,11 +1531,15 @@ class Row : Container { // Row ////////////////////////////////////
         }
 
         lineEnd(i);
+      }else if(isNewLine){
+        lineEnd(i);
       }
 
       subCell.outerPos = cursor;
       cursor.x += subCell.outerWidth;
       maxLineHeight.maximize(subCell.outerHeight);
+
+      if(auto g = cast(Glyph)subCell) isNewLine = g.isNewLine; else isNewLine = false;
     }
     if(subCells.length) lineEnd(subCells.length);
 

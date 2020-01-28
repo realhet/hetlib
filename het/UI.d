@@ -1407,7 +1407,7 @@ struct im{ static:
     static foreach(a; args){{
       alias t = typeof(a);
       static if(isSomeString!t){
-        auto lines = a.split('\n').map!(a => a.withoutTrailing('\r')).array;
+        /*auto lines = a.split('\n').map!(a => a.withoutTrailing('\r')).array;
         if(!lines.empty){
           .Row row = cast(.Row)actContainer;
           if(row){
@@ -1424,6 +1424,13 @@ struct im{ static:
               append(new .Row(line, textStyle)); //todo: not clear how it works with multiple parameters. All arg strings should be packed in one string and then processed by lines.
             }
           }
+        }*/
+
+        //this variant gives \n to the row
+        if(.Row row = cast(.Row)actContainer){
+          row.appendMarkupLine(a, textStyle);
+        }else{
+          Row({ Text(a); });
         }
       }else static if(is(Unqual!t == _FlexValue)){ //nasty workaround for flex() and flex property
         append(new FlexRow("", style));
@@ -1942,7 +1949,7 @@ For more complex cells, meta information (tags) can be inserted along with the t
 
 void uiContainerAlignTest(){ with(im){
   Column({
-    enum lorem = "In publishing and graphic design, lorem ipsum is a placeholder text commonly used to demonstrate(...)";
+    enum lorem = "In\r\npublishing and graphic design, lorem ipsum is a placeholder text commonly used to demonstrate(...)";
 
     void TestFlag(T)(T[] items, void delegate(T) fun, string lorem){
       Row({ foreach(i; items){ Row({
