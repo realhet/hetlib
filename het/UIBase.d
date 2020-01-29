@@ -10,9 +10,11 @@ import het.utils, het.geometry, het.draw2d, het.image, het.win,
 
 //adjust the size of the original Tab character
 enum
-  VisualizeContainers   = 0,
-  VisualizeGlyphs       = 1,
-  VisualizeTabColors    = 0;
+  VisualizeContainers      = 1,
+  VisualizeGlyphs          = 1,
+  VisualizeTabColors       = 0,
+  VisualizeHitStack        = 1,
+  VisualizeSelectionCursor = 1;
 
 enum
   NormalFontHeight = 18;
@@ -274,6 +276,21 @@ struct HitTestManager{
     h.released = checkReleased(id);
     h.hitBounds = checkHitBounds(id);
     return h;
+  }
+
+  void draw(ref Drawing dr){
+    if(VisualizeHitStack){
+      dr.lineWidth = (QPS*3).fract;
+      dr.color = clFuchsia;
+
+      foreach(hr; hitStack){
+        dr.drawRect(hr.hitBounds);
+        print(hr);
+      }
+
+      dr.lineWidth = 1;
+      dr.lineStipple = lsNormal;
+    }
   }
 
 }
@@ -1057,17 +1074,34 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 
 
 union ContainerFlags{
-  ubyte _data = 0b0_01_00_00_1;
+  ushort _data = 0b0_0_0_01_00_00_1;
   mixin(bitfields!(
     bool          , "canWrap"         , 1,
     HAlign        , "hAlign"          , 2,
     VAlign        , "vAlign"          , 2,
     YAlign        , "yAlign"          , 2,
     bool          , "dontHideSpaces"  , 1,  //useful for active edit mode
+    bool          , "canSelect"       , 1,
+    bool          , "focused"         , 1,  //maintained by system, not by user
     //int, "_dummy"       , 1,
   ));
 
   //todo: setProps, mint a margin-nal
+}
+
+
+struct Selection{ //selection of cells in a container.
+  int[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
+
+  void clear(){ sel = []; }
+
+  bool isSelected(i idx){ //is a cell selected?
+    return sel.map!(s => s[0]<=i && i<s[1]).any;
+  }
+
+  bool isCaret(int i){ //is there a caret on the left?
+    return sel.map!(s => s[0]==i && s[0]==s[1]).any;
+  }
 }
 
 
@@ -1090,6 +1124,7 @@ class Container : Cell { // Container ////////////////////////////////////
 
   RGB bkColor=clWhite; //todo: background struct
   ContainerFlags flags;
+  Selection selection; //1 value is a caret, 2 is a range, 4, 6...: 2, 3... ranges
 
   override void setProps(string[string] p){
     super.setProps(p);
@@ -1610,9 +1645,9 @@ class Row : Container { // Row ////////////////////////////////////
         case YAlign.baseline    : wl.alignY(0.8); break;
       }
     }
-
-
   }
+
+
 
 }
 

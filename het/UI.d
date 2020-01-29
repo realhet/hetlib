@@ -1529,6 +1529,7 @@ struct im{ static:
 
     Row({
       hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
+      flags.focused = focused;
 
       style   = tsNormal;
 
@@ -1570,7 +1571,7 @@ struct im{ static:
   }
 
   auto IncBtn(string file=__FILE__, int line=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0){ //IncBtn /////////////////////////////////
-    mixin(range.M);
+    mixin(id.M ~ enable.M ~ range.M);
 
     auto capt = symbol(`Calculator` ~ (sign>0 ? `Addition` : `Subtract`));
     enum isInt = isIntegral!T0;
@@ -1602,7 +1603,7 @@ struct im{ static:
 
   auto IncDec(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
     auto oldValue = value;
-    Edit!(file, line)(value, { width = 2*fh; }, args, id(9)); //todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
+    Edit!(file, line)(value, { width = 2*fh; }, args); //todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
     IncDecBtn(value, args);
     return oldValue != value;
   }
@@ -1959,6 +1960,7 @@ void uiContainerAlignTest(){ with(im){
         padding = "1";
         fun(i);
         Text(bold(T.stringof~"."~i.text), " ", "\U0001F4A1", lorem);
+        flags.canSelectCells = true;
       }); }
       Spacer(.5*fh);
     }); }

@@ -626,6 +626,7 @@ T avg(T)(in T a, in T b) if(isFloatingPoint!T) { return (a+b)*0.5f; }
 
 T absDiff(T)(in T a, in T b) { return abs(a-b); }
 
+
 T fract(T)(in T x) { return x-floor(x); }
 
 int alignUp  (int p, int align_) { return (p+align_-1)/align_*align_; }
