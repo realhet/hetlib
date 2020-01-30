@@ -285,7 +285,7 @@ struct HitTestManager{
 
       foreach(hr; hitStack){
         dr.drawRect(hr.hitBounds);
-        print(hr);
+//        print(hr);
       }
 
       dr.lineWidth = 1;
@@ -1090,7 +1090,26 @@ union ContainerFlags{
 }
 
 
-// TextPoint struct ///////////////////////////////////////////////////
+// TextPosition struct ///////////////////////////////////////////////////
+
+/*
+Text editing.
+
+Problemas dolgok:
+- wrapping
+- 3 fele pozicio meghatarozas szovegen belul:
+
+  TextPosition{
+    TextIndex     : int
+    TextLineCol   : { int line, int col; }
+    TextXY        : { float x, float y0, float y1; }  //y0 and y1 covers the whole wrappedLine.height
+  }
+
+  TextRange{ TextPosition p0, p1; }
+
+*/
+
+
 
 struct TextPoint{
   int line, col;
@@ -1276,16 +1295,29 @@ private void processMarkupCommandLine(C:Container)(C container, string cmdLine, 
   }
 }
 
+
 void appendMarkupLine(Row row, string s, ref TextStyle ts){
+  int[] dummy;
+  appendMarkupLine!(false)(row, s, ts, dummy);
+}
+
+void appendMarkupLine(bool returnSubCellStrOfs=true)(Row row, string s, ref TextStyle ts, ref int[] subCellStrOfs){
   enum CommandStartMarker = '\u00B6',
        CommandEndMarker   = '\u00A7';
 
   int inCommand;
   string commandLine;
 
-  foreach(ch; s.byDchar){ //todo: dchar ch;s test
+  static if(returnSubCellStrOfs) subCellStrOfs = [0]; //the first implicit offset.
 
-//    ushort dynChar = dcm.encode(ch); //dr.textOut(x+i*lineSpacing/2, y, [ch].toUTF8);  //todo: process the compressed thing
+  //foreach(ch; s.byDchar){ //todo: dchar ch;s test
+  int currentOfs;
+  size_t numCodeUnits;
+
+  while(s.length){
+    auto ch = s.decodeFront!(Yes.useReplacementDchar)(numCodeUnits);
+
+    static if(returnSubCellStrOfs) currentOfs += cast(int)numCodeUnits;
 
     if(ch==CommandStartMarker){ //handle start marker
       if(inCommand) commandLine ~= ch; //only if already in a command, not the first one
@@ -1296,6 +1328,8 @@ void appendMarkupLine(Row row, string s, ref TextStyle ts){
       if(!(--inCommand)){
         row.processMarkupCommandLine(commandLine, ts);
         commandLine = "";
+
+        static if(returnSubCellStrOfs) while(subCellStrOfs.length <= row.subCells.length) subCellStrOfs ~= currentOfs; //COPY!
       }
     }else{
       if(inCommand){ //collect command
@@ -1303,6 +1337,8 @@ void appendMarkupLine(Row row, string s, ref TextStyle ts){
       }else{ //process text
         if(ch==9) row.tabIdxInternal ~= row.subCells.length.to!int; //Elastic Tabs
         row.appendg(ch, ts);
+
+        static if(returnSubCellStrOfs) while(subCellStrOfs.length <= row.subCells.length) subCellStrOfs ~= currentOfs; //PASTE!!!
       }
     }
 
