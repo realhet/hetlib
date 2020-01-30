@@ -1148,8 +1148,49 @@ auto testWin(ref Drawing dr, V2f mouse, float pixelSize){ // testWin() /////////
 struct im{ static:
   import std.traits;
 
-  uint focusedId; //globally store the current hash
-  string focusedText; //when editing something, this stores the string, and it is converted/validated and copied to the value when it's ok.
+  // Focus handling /////////////////////////////////
+  struct FocusedState{
+    uint id;              //globally store the current hash
+    Container container;  //this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
+
+    string text;          //for edit controls
+    Selection selection;
+
+    void reset(){ this = typeof(this).init; }
+  }
+  FocusedState focusedState;
+
+  bool focusUpdate(Container container, uint id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
+    if(focusedState.id==id){
+      if(!canFocus || exitFocusNow){ //not enabled anymore: exit focus
+        if(onExit) onExit();
+        focusedState.reset;
+      }
+    }else{
+      if(canFocus && enterFocusNow){ //newly enter the focus
+        focusedState.id = id;
+        focusedState.container = container;
+        if(onEnter) onEnter();
+      }
+    }
+
+    bool res = focusedState.id==id;
+    if(res) focusedState.container = container;
+    container.flags.focused = res;
+
+    if(res && onFocused) onFocused();
+
+    return res;
+  }
+
+  bool isFocused(uint id)               { return focusedState.id                 && focusedState.id == id; }
+  bool isFocused(Container container)   { return focusedState.container !is null && focusedState.container == container; }
+
+//  void focusExit(uint id)               { if(isFocused(id)) focusedState.reset; }
+//  void focusExit(Container container)   { if(isFocused(container)) focusedState.reset; }
+//  void focusExit()                      { focusedState.reset; }
+
+  //////////////////////////////////////////////////////////////////
 
   Cell[] root; //when containerStack is empty, this is the container
 
@@ -1484,52 +1525,46 @@ struct im{ static:
     });
   }
 
+
+  private void _EditHandleInput(T0)(ref T0 value, ref string str, ref bool chg){ //handles e
+    import het.win;
+    if(mainWindow.inputChars.empty) return;
+
+    foreach(ch; mainWindow.inputChars.unTag) switch(ch){
+      case 8:{ //backSpace
+        try{
+          str = str[0..$-str.strideBack];
+        }catch{
+          beep;
+        }
+      break;}
+      case 13, 27: break;
+      default: str ~= ch;
+    }
+
+    try{
+      auto newValue = str.to!T0; //write back value
+      //todo: validate/clamp
+      chg = value != newValue;
+      if(chg) value = newValue;
+    }catch(Throwable){}
+  }
+
   auto Edit(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
     mixin(id.M ~ enable.M);
-    const isToolBtn = theme=="tool";
-    auto hit = hitTestManager.check(_id); //get the hittert from the last frame
     bool chg;
-    bool focused(){ return focusedId==_id; }
-
-    //enter focused mode
-    if(!focused && enabled && hit.pressed){
-      print("focus acquired");
-      focusedId = _id;
-      focusedText = value.text;
-    }
-
-    //when in focused mode
-    if(focused){
-      if(inputs["Esc"].pressed || inputs["Enter"].pressed) focusedId = 0; //lose focus
-      //todo: loce focus moves to next ctrl
-      //todo: lose focus on control edit destroy (lost in the next frame)
-    }
-
-    if(focused){ //still focused
-      import het.win;
-      foreach(ch; mainWindow.inputChars.unTag) switch(ch){
-        case 8:{ //backSpace
-          try{
-            focusedText = focusedText[0..$-focusedText.strideBack];
-          }catch{
-            beep;
-          }
-        break;}
-        case 13, 27: break;
-        default: focusedText ~= ch;
-      }
-
-      try{
-        auto newValue = focusedText.to!T0; //write back value
-        //todo: validate/clamp
-        chg = value != newValue;
-        if(chg) value = newValue;
-      }catch(Throwable){}
-    }
 
     Row({
+
+      auto hit = hitTestManager.check(_id); //get the hittert from the last frame
       hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
-      flags.focused = focused;
+
+      bool focused = focusUpdate(actContainer, _id,
+        enabled, hit.pressed, false,  //enabled, enter, exit
+        /* onEnter */ { focusedState.text = value.text; },
+        /* onFocus */ { _EditHandleInput(value, focusedState.text, chg); },
+        /* onExit  */ { }
+      );
 
       style   = tsNormal;
 
@@ -1545,7 +1580,7 @@ struct im{ static:
         border.color    = lerp(clWinBtn       , style.bkColor, 0.5);
       }
 
-      if(isToolBtn){ //todo: refactor as this is same as in Btn
+      if(theme=="tool"){ //todo: refactor as this is same as in Btn
         style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
         border.width    = 1;
         border.inset    = true;
@@ -1561,9 +1596,14 @@ struct im{ static:
       static foreach(a; args) static if(__traits(compiles, a())){ a(); }
 
       //put the text out
-      auto s = focused ? focusedText ~ (QPS.fract<.5 ? "|" : ""): value.text;
+      auto s = focused ? focusedState.text : value.text; // ~ (QPS.fract<.5 ? "|" : ""): value.text;
       if(s.empty) s = " "; //empty Container has no height, so display a space at least.
       Text(s);
+
+      if(focused){
+        auto tp = TextPoint(0, s.length.to!int);
+        actContainer.selection = Selection([[tp, tp]]);
+      }
 
     });
 
@@ -1617,6 +1657,13 @@ struct im{ static:
     auto hit = hitTestManager.check(_id); //get the hittert from the last frame
     Row({
       hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
+
+      bool focused = focusUpdate(actContainer, _id,
+        enabled, hit.pressed, false,  //enabled, enter, exit
+        /* onEnter */ { },
+        /* onFocus */ { },
+        /* onExit  */ { }
+      );
 
       //flags.canWrap = false;
       flags.hAlign = HAlign.center;
@@ -1960,7 +2007,7 @@ void uiContainerAlignTest(){ with(im){
         padding = "1";
         fun(i);
         Text(bold(T.stringof~"."~i.text), " ", "\U0001F4A1", lorem);
-        flags.canSelectCells = true;
+        //flags.canSelectCells = true;
       }); }
       Spacer(.5*fh);
     }); }

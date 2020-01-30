@@ -1083,25 +1083,38 @@ union ContainerFlags{
     bool          , "dontHideSpaces"  , 1,  //useful for active edit mode
     bool          , "canSelect"       , 1,
     bool          , "focused"         , 1,  //maintained by system, not by user
-    //int, "_dummy"       , 1,
+    int, "_dummy"       , 6,
   ));
 
   //todo: setProps, mint a margin-nal
 }
 
 
+// TextPoint struct ///////////////////////////////////////////////////
+
+struct TextPoint{
+  int line, col;
+}
+
+int opCmp(in TextPoint a, in TextPoint b){   //b-a
+  auto l = b.line-a.line;
+  return l ? l : b.col-a.col;
+}
+
+// Selection struct ///////////////////////////////////////////////////
+
 struct Selection{ //selection of cells in a container.
-  int[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
+  TextPoint[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
 
   void clear(){ sel = []; }
 
-  bool isSelected(i idx){ //is a cell selected?
+/*todo:  bool isSelected(in TextPoint i){ //is a cell selected?
     return sel.map!(s => s[0]<=i && i<s[1]).any;
   }
 
-  bool isCaret(int i){ //is there a caret on the left?
+  bool isCaret(in TextPoint i){ //is there a caret on the left?
     return sel.map!(s => s[0]==i && s[0]==s[1]).any;
-  }
+  }*/
 }
 
 
