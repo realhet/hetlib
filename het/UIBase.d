@@ -1114,10 +1114,27 @@ Problemas dolgok:
 struct TextPos{
   bool isIdx;  int idx;
   bool isLC;   int line, column;
-  bool isXY;   V2f p;
+  bool isXY;   V2f point;
 
   bool valid(){ return isIdx || isLC || isXY; }
+
+  this(T)(T i) if(isIntegral!T){
+    isIdx = true;
+    idx = idx.to!int;
+  }
+
+  this(T0, T1)(T0 line, T1 column) if(isIntegral!T0 && isIntegral!T1){
+    isLC = true;
+    this.line = line.to!int; this.column = column.to!int;
+  }
+
+  this(in V2f point){
+    isXY = true;
+    this.point = point;
+  }
 }
+
+
 
 /// a linearly selected range of text.
 struct TextRange{
@@ -1164,17 +1181,119 @@ auto editCmd(T...)(EditCmd.Cmd cmd, T args){
 /// All the information needed for a text editor
 struct TextEditorState{
   string str;                   //the string being edited
-  WrappedLine[] lines;          //the formatted glyphs
+  Row container;                //editor container. Must be a row
+  WrappedLine[] wrappedLines;   //formatted glyphs
   int[] cellStrOfs;             //mapping petween glyphs and string ranges
-
   TextPos caret;                //first there is only one caret, no selection
 
   EditCmd[] cmdQueue;           //commands waiting for execution
 
-  string execute(EditCmd cmd){  //returs: "" success:  "error msg" when fail
+  //access helpers
+  auto cells()                  { return container.subCells; }
+  int cellCount()               { return cells.length.to!int; }
+  int wrappedLineCount()        { return wrappedLines.length.to!int; }
+  int clampIdx(int idx)         { return idx.clamp(0, cellCount); }
+
+  private int lc2idx(int line, int col){
+    if(line<0) return 0; //above first line
+    if(line>=wrappedLines.length) return cellCount; //below last line
+
+    int baseIdx = wrappedLines[0..line].map!(l => l.cellCount).sum; //todo: opt
+    int clampedColumn = col.clamp(0, wrappedLines[line].cellCount);
+    return clampIdx(baseIdx + clampedColumn);
+  }
+
+  private int lc2idx(in V2i colLine){ with(colLine) return lc2idx(y, x); }
+
+  private V2i xy2lc(in V2f point){
+    if(wrappedLines.empty) return V2i.Null;
+
+    float yMin = wrappedLines[0].top,
+          yMax = wrappedLines[$-1].bottom,
+          y = point.y;
+
+    static if(1){ //above or below: snap to first/last line or start/end of the whole text.
+      if(y<yMin) return V2i.Null;
+      if(y>yMax) return V2i(wrappedLineCount-1, wrappedLines[wrappedLineCount-1].cellCount);
+    }else{
+      y = tp.point.y.clamp(yMin, yMax);
+    }
+
+    //search the line
+    int line; //opt: binary search? (not important: only 1 screen of information)
+    foreach_reverse(int i; 0..wrappedLineCount-1) if(y >= wrappedLines[i].y0){ line = i; break; }
+    auto wl = &wrappedLines[line];
+
+    float xMin = wl.left,
+          xMax = wl.right,
+          x = point.x;
+
+    x = x.clamp(xMin, xMax); //always clamp x coordinate
+
+    //search the column in the line
+    int column;
+    foreach_reverse(int i; 0..-1) if(x >= wl.cells[i].outerPos.x){ column = i; break; }
+
+    return V2i(column, line);
+  }
+
+  private int xy2idx(in V2f point){ return lc2idx(xy2lc(point)); }
+
+  string execute(EditCmd eCmd){  //returs: "" success:  "error msg" when fail
     string err;
 
-    print("Executing: ", cmd);
+    void checkConsistency(){
+      enum e0 = "textEditorState consistency check fail: ";
+      enforce(container !is null                                        , e0~"container is null"   );
+      enforce(cellStrOfs.length == cellCount+1                          , e0~"invalid cellStrOfs"  );
+      enforce(wrappedLines.map!(l => l.cellCount).sum == cellCount      , e0~"invalid wrappedLines");
+    }
+
+    print("Executing: ", eCmd);
+    checkConsistency;
+
+    int toIdx(in TextPos tp){
+      if(!cellCount) return 0;                          // empty
+      if(tp.isIdx  ) return clampIdx(tp.idx);           // no need to convert, only clamp the idx.
+      if(tp.isLC   ) return lc2idx(tp.line, tp.column); //
+      if(tp.isXY   ) return xy2idx(tp.point);           // first convert to the nearest LC, then that to Idx
+      return 0;                                         // when all fails
+    }
+
+    void caretRestrict(){
+      //todo: this should work all the 3 types of carets: idx, lc and xy
+      int i  = toIdx(caret),
+          mi = 0,
+          ma = cellCount;
+
+      bool wrong = i<mi || i>ma;
+      if(wrong) caret = TextPos(i<mi ? mi : ma);
+    }
+
+    void caretMove(int delta){
+      print("  caretmove", delta);
+
+      //todo: this must retain the caret's type
+      caret = TextPos(toIdx(caret) + delta);
+      caretRestrict;
+    }
+
+    void caretDelete(bool isBackSpace){
+      print("  caretDelete", isBackSpace);
+
+
+    }
+
+    with(eCmd) final switch(cmd){
+      case Cmd.nop: break;
+      case Cmd.cInsert: break;
+      case Cmd.cDelete          : caretDelete(false); break;
+      case Cmd.cDeleteBack      : caretDelete(true ); break;
+      case Cmd.cLeft            : caretMove( intParam(1)); break;
+      case Cmd.cRight           : caretMove(-intParam(1)); break;
+      case Cmd.cHome            : caretMove(0           ); break;
+      case Cmd.cEnd             : caretMove(int.max     ); break;
+    }
 
     return err;
   }
@@ -1422,6 +1541,8 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
     auto left(){ return cells.length ? cells[0].outerPos.x : 0; }
     auto calcWidth(){ assert(left==0); return right; } //todo: assume left is 0
   //}
+
+  int cellCount() const{ return cells.length.to!int; }
 
   void translateX(float dx){ if(!dx) return; foreach(c; cells) c.outerPos.x += dx; }
   void translateY(float dy){ if(!dy) return; foreach(c; cells) c.outerPos.y += dy; y0 += dy; }
