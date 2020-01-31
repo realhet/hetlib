@@ -1110,18 +1110,84 @@ Problemas dolgok:
 */
 
 
+/// TextPos marks a specific place inside a text.
+struct TextPos{
+  bool isIdx;  int idx;
+  bool isLC;   int line, column;
+  bool isXY;   V2f p;
 
-struct TextPoint{
-  int line, col;
+  bool valid(){ return isIdx || isLC || isXY; }
 }
 
-int opCmp(in TextPoint a, in TextPoint b){   //b-a
+/// a linearly selected range of text.
+struct TextRange{
+  TextPos st, en;
+}
+
+struct EditCmd{
+  private enum _intParamDefault = int.min+1;
+
+  enum Cmd {
+    //caret commands              //parameters
+    nop,
+    cInsert,                      //text to insert
+    cDelete, cDeleteBack,         //number of glyphs to delete. Default 1
+    cLeft, cRight,                //number of repetitions. Default 1
+    cHome, cEnd
+  }
+  alias cmd this;
+
+  Cmd cmd;
+  int _intParam = _intParamDefault;
+
+  //parameter access
+  string strParam;
+  int intParam(int def=0) const{ return _intParam==_intParam.init ? def : _intParam; }
+
+  auto toString() const{
+    auto s = format!"EditCmd(%s"(cmd);
+    if(_intParam != _intParam.init) s ~= " " ~ _intParam.text;
+    if(strParam.length) s ~= " " ~ strParam.text;
+    return s ~ ")";
+  }
+}
+
+auto editCmd(T...)(EditCmd.Cmd cmd, T args){
+  auto e = EditCmd(cmd);
+  static foreach(a; args){
+    static if(isSomeString!(typeof(a))) e.strParam = a;
+    static if(isIntegral  !(typeof(a))) e.intParam = a;
+  }
+  return e;
+}
+
+/// All the information needed for a text editor
+struct TextEditorState{
+  string str;                   //the string being edited
+  WrappedLine[] lines;          //the formatted glyphs
+  int[] cellStrOfs;             //mapping petween glyphs and string ranges
+
+  TextPos caret;                //first there is only one caret, no selection
+
+  EditCmd[] cmdQueue;           //commands waiting for execution
+
+  string execute(EditCmd cmd){  //returs: "" success:  "error msg" when fail
+    string err;
+
+    print("Executing: ", cmd);
+
+    return err;
+  }
+}
+
+
+/*int opCmp(in TextPoint a, in TextPoint b){   //b-a
   auto l = b.line-a.line;
   return l ? l : b.col-a.col;
-}
+}*/
 
 // Selection struct ///////////////////////////////////////////////////
-
+/+
 struct Selection{ //selection of cells in a container.
   TextPoint[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
 
@@ -1134,7 +1200,7 @@ struct Selection{ //selection of cells in a container.
   bool isCaret(in TextPoint i){ //is there a caret on the left?
     return sel.map!(s => s[0]==i && s[0]==s[1]).any;
   }*/
-}
+}+/
 
 
 class Container : Cell { // Container ////////////////////////////////////
@@ -1156,7 +1222,6 @@ class Container : Cell { // Container ////////////////////////////////////
 
   RGB bkColor=clWhite; //todo: background struct
   ContainerFlags flags;
-  Selection selection; //1 value is a caret, 2 is a range, 4, 6...: 2, 3... ranges
 
   override void setProps(string[string] p){
     super.setProps(p);
