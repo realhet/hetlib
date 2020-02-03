@@ -10,11 +10,10 @@ import het.utils, het.geometry, het.draw2d, het.image, het.win,
 
 //adjust the size of the original Tab character
 enum
-  VisualizeContainers      = 1,
+  VisualizeContainers      = 0,
   VisualizeGlyphs          = 1,
   VisualizeTabColors       = 0,
-  VisualizeHitStack        = 1,
-  VisualizeSelectionCursor = 1;
+  VisualizeHitStack        = 0;
 
 enum
   NormalFontHeight = 18;
@@ -1090,7 +1089,7 @@ union ContainerFlags{
 }
 
 
-// TextPosition struct ///////////////////////////////////////////////////
+// TextPos struct ///////////////////////////////////////////////////
 
 /*
 Text editing.
@@ -1118,9 +1117,9 @@ struct TextPos{
 
   bool valid(){ return isIdx || isLC || isXY; }
 
-  this(T)(T i) if(isIntegral!T){
+  this(T)(T idx) if(isIntegral!T){
     isIdx = true;
-    idx = idx.to!int;
+    this.idx = idx.to!int;
   }
 
   this(T0, T1)(T0 line, T1 column) if(isIntegral!T0 && isIntegral!T1){
@@ -1141,7 +1140,7 @@ struct TextRange{
   TextPos st, en;
 }
 
-struct EditCmd{
+struct EditCmd{ // EditCmd ////////////////////////////////////////
   private enum _intParamDefault = int.min+1;
 
   enum Cmd {
@@ -1150,7 +1149,8 @@ struct EditCmd{
     cInsert,                      //text to insert
     cDelete, cDeleteBack,         //number of glyphs to delete. Default 1
     cLeft, cRight,                //number of repetitions. Default 1
-    cHome, cEnd
+    cHome, cEnd,
+    cMouse                        //caret goes to mouse
   }
   alias cmd this;
 
@@ -1161,35 +1161,39 @@ struct EditCmd{
   string strParam;
   int intParam(int def=0) const{ return _intParam==_intParam.init ? def : _intParam; }
 
+  this(T...)(Cmd cmd, T args){
+    this.cmd = cmd;
+    static foreach(a; args){
+      static if(isSomeString!(typeof(a))) strParam = a;
+      static if(isIntegral  !(typeof(a))) intParam = a;
+    }
+  }
+
   auto toString() const{
     auto s = format!"EditCmd(%s"(cmd);
-    if(_intParam != _intParam.init) s ~= " " ~ _intParam.text;
+    if(_intParam != _intParamDefault) s ~= " " ~ _intParam.text;
     if(strParam.length) s ~= " " ~ strParam.text;
     return s ~ ")";
   }
 }
 
-auto editCmd(T...)(EditCmd.Cmd cmd, T args){
-  auto e = EditCmd(cmd);
-  static foreach(a; args){
-    static if(isSomeString!(typeof(a))) e.strParam = a;
-    static if(isIntegral  !(typeof(a))) e.intParam = a;
-  }
-  return e;
-}
-
 /// All the information needed for a text editor
-struct TextEditorState{
-  string str;                   //the string being edited
-  Row container;                //editor container. Must be a row
-  WrappedLine[] wrappedLines;   //formatted glyphs
-  int[] cellStrOfs;             //mapping petween glyphs and string ranges
-  TextPos caret;                //first there is only one caret, no selection
+struct TextEditorState{ // TextEditorState /////////////////////////////////////
+  string str;                   //the string being edited                       Edit() fills it
+  int[] cellStrOfs;             //mapping petween glyphs and string ranges      Edit() fills it
 
-  EditCmd[] cmdQueue;           //commands waiting for execution
+  Row row;                      //editor container. Must be a row.              Edit() fills it
+  WrappedLine[] wrappedLines;   //formatted glyphs                              Measure fills it when edit is same as wrappedLines
+
+  bool strModified;             //string is modified, and it is needed to reformat.
+                                //cellStrOfs and wrappedLines are invalid.
+
+  TextPos caret;                //first there is only one caret, no selection   persistent
+
+  EditCmd[] cmdQueue;           //commands waiting for execution                Edit() fills, it is proecessed after the hittest
 
   //access helpers
-  auto cells()                  { return container.subCells; }
+  auto cells()                  { return row.subCells; }
   int cellCount()               { return cells.length.to!int; }
   int wrappedLineCount()        { return wrappedLines.length.to!int; }
   int clampIdx(int idx)         { return idx.clamp(0, cellCount); }
@@ -1239,18 +1243,19 @@ struct TextEditorState{
 
   private int xy2idx(in V2f point){ return lc2idx(xy2lc(point)); }
 
+  private V2i idx2lc(int idx){
+    if(idx<=0) return
+    itt folyt kov
+  }
+
   string execute(EditCmd eCmd){  //returs: "" success:  "error msg" when fail
-    string err;
 
     void checkConsistency(){
       enum e0 = "textEditorState consistency check fail: ";
-      enforce(container !is null                                        , e0~"container is null"   );
+      enforce(row !is null                                              , e0~"row is null"   );
       enforce(cellStrOfs.length == cellCount+1                          , e0~"invalid cellStrOfs"  );
       enforce(wrappedLines.map!(l => l.cellCount).sum == cellCount      , e0~"invalid wrappedLines");
     }
-
-    print("Executing: ", eCmd);
-    checkConsistency;
 
     int toIdx(in TextPos tp){
       if(!cellCount) return 0;                          // empty
@@ -1270,32 +1275,112 @@ struct TextEditorState{
       if(wrong) caret = TextPos(i<mi ? mi : ma);
     }
 
-    void caretMove(int delta){
-      print("  caretmove", delta);
-
-      //todo: this must retain the caret's type
-      caret = TextPos(toIdx(caret) + delta);
+    void caretMoveAbs(int idx){
+      caret = TextPos(idx);
       caretRestrict;
     }
 
-    void caretDelete(bool isBackSpace){
-      print("  caretDelete", isBackSpace);
-
-
+    void caretMoveRel(int delta){
+      caretMoveAbs(toIdx(caret) + delta);
     }
+
+    void caretAdjust(ref TextPos caret, int idx, int delLen, int insLen, int insOffset=0){ //insOffset is 1 for selection.left
+      auto cIdx = toIdx(caret);
+
+      //adjust for deletion.
+      //if it is right of idx, then it goes left by delLen, towards idx
+      if(cIdx > idx) cIdx = max(cIdx-delLen, idx);
+
+      //adjust for insertion
+      if(cIdx >= idx+insOffset) cIdx += insLen;
+
+      caret = TextPos(cIdx);
+      caretRestrict; //failsafe
+    }
+
+    void modify(int idx, int delLen, string ins){
+//print("  modify", idx, delLen, ins);
+
+      int fullLen = cellCount;
+
+      //if idx is after the end, pull it back
+      idx.minimize(fullLen);
+
+      //if idx is below the start, move it to 0, also make the deleteCount smaller
+      if(idx<0){ delLen -= idx; idx = 0; }
+
+      //clamp delLen
+      int maxDelLen = fullLen-idx;
+      delLen.minimize(maxDelLen);
+      delLen.maximize(0);
+
+      if(delLen<=0 && ins=="") return; //exit if nothing happens
+
+      auto insLen = countMarkupLineCells(ins); //cellcount can be adjusted by this, but the wrappedLines is ruined now.
+
+      //adjust the caret
+      caretAdjust(caret, idx, delLen, insLen);
+
+      //make the new modified string
+      auto left  = str[0..cellStrOfs[idx]],
+           right = str[cellStrOfs[idx+delLen]..$];
+      str = left ~ ins ~ right;
+
+      //invalidate the formatted data
+      strModified = true;
+    }
+
+    void deleteAtCaret(bool isBackSpace){
+      caretRestrict;
+      int i = toIdx(caret);
+
+      modify(i-isBackSpace, 1, "");
+    }
+
+    //---------------------------------------------
+    string err;
+
+//print("Executing: ", eCmd);
+    checkConsistency;
 
     with(eCmd) final switch(cmd){
       case Cmd.nop: break;
-      case Cmd.cInsert: break;
-      case Cmd.cDelete          : caretDelete(false); break;
-      case Cmd.cDeleteBack      : caretDelete(true ); break;
-      case Cmd.cLeft            : caretMove( intParam(1)); break;
-      case Cmd.cRight           : caretMove(-intParam(1)); break;
-      case Cmd.cHome            : caretMove(0           ); break;
-      case Cmd.cEnd             : caretMove(int.max     ); break;
+      case Cmd.cInsert          : caretRestrict; modify(toIdx(caret), 0, strParam); break;
+      case Cmd.cDelete          : deleteAtCaret(false); break;
+      case Cmd.cDeleteBack      : deleteAtCaret(true ); break;
+      case Cmd.cLeft            : caretMoveRel( intParam(1)); break;
+      case Cmd.cRight           : caretMoveRel(-intParam(1)); break;
+      case Cmd.cHome            : caretMoveAbs(        0); break;
+      case Cmd.cEnd             : caretMoveAbs(cellCount); break;
+      case Cmd.cMouse           : writeln("Cmd.cMouse : todo"); break; //todo:Cmd.cMouse
     }
 
     return err;
+  }
+
+  string processQueue(){
+    string err;
+
+    while(cmdQueue.length){
+      //check if the command can be executed.
+      if(strModified) break; //string is modified, needs to reformat first.
+
+      auto cmd = cmdQueue.front;
+      cmdQueue.popFront;
+
+      print("before", str, caret, cmd);
+
+      err ~= execute(cmd);
+
+      print("after", str, caret);
+
+    }
+
+    return err;
+  }
+
+  void drawOverlay(ref Drawing dr){
+
   }
 }
 
@@ -1305,7 +1390,7 @@ struct TextEditorState{
   return l ? l : b.col-a.col;
 }*/
 
-// Selection struct ///////////////////////////////////////////////////
+// Selection struct //
 /+
 struct Selection{ //selection of cells in a container.
   TextPoint[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
@@ -1422,7 +1507,6 @@ class Container : Cell { // Container ////////////////////////////////////
 
 private void processMarkupCommandLine(C:Container)(C container, string cmdLine, ref TextStyle ts){
   import het.ui; //can spawn controls
-
   if(cmdLine==""){
     ts = tsNormal;
   }else if(auto t = cmdLine in textStyles){ //standard style.  Should be mentioned by an index
@@ -1432,13 +1516,16 @@ private void processMarkupCommandLine(C:Container)(C container, string cmdLine, 
       auto params = cmdLine.commandLineToMap;
       auto cmd = params.get("0", "");
 
-            if(cmd=="row"   ){ auto a = new Row   (params["1"], tsNormal); a.setProps(params); container.append(a);
-//      }else if(cmd=="column"){ auto a = new Column(params["1"], tsNormal); a.setProps(params); append(a);
+      if(cmd=="row"   ){
+        auto a = new Row(params["1"], tsNormal);
+        a.setProps(params);
+        container.append(a);
       }else if(cmd=="img"){
         auto img = new Img(File(params["1"]), ts);
         img.setProps(params);
         container.append(img);
-      }else if(cmd=="char"   ){ container.appendg(dchar(params["1"].toInt), ts);
+      }else if(cmd=="char"   ){
+        container.appendg(dchar(params["1"].toInt), ts);
       }else if(cmd=="symbol"    ){
         auto name = params["1"];
         auto ch = segoeSymbolByName(name);
@@ -1479,6 +1566,14 @@ private void processMarkupCommandLine(C:Container)(C container, string cmdLine, 
   }
 }
 
+int countMarkupLineCells(string markup){
+  try{
+    auto cntr = new Row(markup);
+    return cntr.subCells.length.to!int;
+  }catch{
+    return 0;
+  }
+}
 
 void appendMarkupLine(Row row, string s, ref TextStyle ts){
   int[] dummy;
@@ -1880,9 +1975,17 @@ class Row : Container { // Row ////////////////////////////////////
         case YAlign.baseline    : wl.alignY(0.8); break;
       }
     }
+
+    //remember the contents of the edited row
+    import het.ui: im;  if(im.textEditorState.row is this) im.textEditorState.wrappedLines = wrappedLines;
   }
 
+  override draw(ref Drawing dr){
+    super(dr);
 
+    //draw the carets and selection of the editor
+    import het.ui: im;  if(im.textEditorState.row is this) im.textEditorState.drawOverlay(dr);
+  }
 
 }
 
