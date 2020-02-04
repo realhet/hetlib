@@ -1165,6 +1165,8 @@ struct im{ static:
     //clear last frame's object references
     focusedState.container = null;
     textEditorState.row = null;
+    textEditorState.wrappedLines = null;
+    textEditorState.cellStrOfs = null;
   }
 
   private Container screenDoc(){
@@ -1181,13 +1183,7 @@ struct im{ static:
     screenDoc.hitTest(currentMouse);
 
     if(textEditorState.row){ //an edit control is active.
-
       auto err = textEditorState.processQueue;
-
-      //cleanup
-      textEditorState.cmdQueue = null;
-      textEditorState.row = null;
-      textEditorState.wrappedLines = null;
     }
 
     //update building/measuring/drawing state
@@ -1659,16 +1655,23 @@ struct im{ static:
         //process input
         string unprocessed;
         import het.win: mainWindow;
-        with(textEditorState) with(EditCmd) foreach(ch; mainWindow.inputChars.unTag.byDchar){ //todo: with(a, b) -> with(a)with(b)
-          switch(ch){
-            case 8:  cmdQueue ~= EditCmd(cDeleteBack);  break;
-            default:
-              if(ch>=32){
-                cmdQueue ~= EditCmd(cInsert, [ch].to!string);
-              }else{
-                unprocessed ~= ch;
-              }
-          }  //jajj de korulmenyes ez a switch case fos....
+        with(textEditorState) with(EditCmd){
+          foreach(ch; mainWindow.inputChars.unTag.byDchar){ //todo: with(a, b) -> with(a)with(b)
+            switch(ch){
+              case 8:  cmdQueue ~= EditCmd(cDeleteBack);  break;
+              default:
+                if(ch>=32){
+                  cmdQueue ~= EditCmd(cInsert, [ch].to!string);
+                }else{
+                  unprocessed ~= ch;
+                }
+            }  //jajj de korulmenyes ez a switch case fos....
+          }
+
+          if(het.inputs.KeyCombo("Left" ).typed) cmdQueue ~= EditCmd(cLeft );
+          if(het.inputs.KeyCombo("Right").typed) cmdQueue ~= EditCmd(cRight);
+          //todo: A KeyCombo az nem ho, ha control is meg az input beli is.
+
         }
         mainWindow.inputChars = unprocessed;
       }

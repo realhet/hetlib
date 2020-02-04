@@ -673,6 +673,8 @@ int nearest2NSize(int size)
                 : 0;
 }
 
+auto sqr(T)(T a){ return a*a; }
+
 T sgnSqr(T)(T x){ return x<0 ? -(x*x) : x*x; }
 
 bool isPrime(uint num){

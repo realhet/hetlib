@@ -1113,7 +1113,7 @@ Problemas dolgok:
 struct TextPos{
   bool isIdx;  int idx;
   bool isLC;   int line, column;
-  bool isXY;   V2f point;
+  bool isXY;   V2f point; float height=0;
 
   bool valid(){ return isIdx || isLC || isXY; }
 
@@ -1127,9 +1127,10 @@ struct TextPos{
     this.line = line.to!int; this.column = column.to!int;
   }
 
-  this(in V2f point){
+  this(in V2f point, float height){
     isXY = true;
     this.point = point;
+    this.height = height;
   }
 }
 
@@ -1198,6 +1199,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   int wrappedLineCount()        { return wrappedLines.length.to!int; }
   int clampIdx(int idx)         { return idx.clamp(0, cellCount); }
 
+  // raw caret conversion routines
+
   private int lc2idx(int line, int col){
     if(line<0) return 0; //above first line
     if(line>=wrappedLines.length) return cellCount; //below last line
@@ -1244,8 +1247,54 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   private int xy2idx(in V2f point){ return lc2idx(xy2lc(point)); }
 
   private V2i idx2lc(int idx){
-    if(idx<=0) return
-    itt folyt kov
+    if(idx<=0 || cellCount==0) return V2i(0, 0);
+
+    int col = idx;
+    if(idx < cellCount) foreach(int line; 0..wrappedLineCount){
+      const count = wrappedLines[line].cellCount;
+      if(col < count)
+        return V2i(col, line);
+      col -= count;
+    }
+
+    return V2i(wrappedLines[$-1].cellCount, wrappedLineCount); //The cell after the last.
+  }
+
+  int toIdx(in TextPos tp){
+    if(!cellCount) return 0;                          // empty
+    if(tp.isIdx  ) return clampIdx(tp.idx);           // no need to convert, only clamp the idx.
+    if(tp.isLC   ) return lc2idx(tp.line, tp.column); //
+    if(tp.isXY   ) return xy2idx(tp.point);           // first convert to the nearest LC, then that to Idx
+    return 0;                                         // when all fails
+  }
+
+  TextPos toLC(in TextPos tp){
+    if(!cellCount) return TextPos(0, 0);
+    if(tp.isLC   ) return tp;
+    if(tp.isIdx  ) with(idx2lc(tp.idx)) return TextPos(y, x);
+    if(tp.isXY   ) with(idx2lc(xy2idx(tp.point))) return TextPos(y, x);
+    return TextPos(0, 0); //when all fails
+  }
+
+  TextPos toXY(in TextPos tp){
+    if(!cellCount) return TextPos(V2f(0, 0), NormalFontHeight);
+    if(tp.isXY   ) return tp;
+
+    TextPos lc;
+    if(tp.isIdx  ) lc = toLC(tp);
+    if(tp.isLC   ) lc = tp;    //todo: more error checking
+
+    int line = lc.line.clamp(0, wrappedLineCount-1);
+    int col = lc.column.clamp(0, wrappedLines[line].cellCount);
+    bool isRight;
+    if(col == wrappedLines[line].cellCount){
+      col--;
+      isRight = true;
+    }
+
+    auto cell = wrappedLines[line].cells[col];  //todo: refactor
+    auto pos = V2f(cell.outerPos.x + (isRight ? cell.outerWidth : 0), wrappedLines[line].top);
+    return TextPos(pos, wrappedLines[line].height);
   }
 
   string execute(EditCmd eCmd){  //returs: "" success:  "error msg" when fail
@@ -1255,14 +1304,6 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
       enforce(row !is null                                              , e0~"row is null"   );
       enforce(cellStrOfs.length == cellCount+1                          , e0~"invalid cellStrOfs"  );
       enforce(wrappedLines.map!(l => l.cellCount).sum == cellCount      , e0~"invalid wrappedLines");
-    }
-
-    int toIdx(in TextPos tp){
-      if(!cellCount) return 0;                          // empty
-      if(tp.isIdx  ) return clampIdx(tp.idx);           // no need to convert, only clamp the idx.
-      if(tp.isLC   ) return lc2idx(tp.line, tp.column); //
-      if(tp.isXY   ) return xy2idx(tp.point);           // first convert to the nearest LC, then that to Idx
-      return 0;                                         // when all fails
     }
 
     void caretRestrict(){
@@ -1368,19 +1409,23 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
       auto cmd = cmdQueue.front;
       cmdQueue.popFront;
 
-      print("before", str, caret, cmd);
+//print("before", str, caret, cmd);
 
       err ~= execute(cmd);
 
-      print("after", str, caret);
+//print("after", str, caret);
 
     }
 
     return err;
   }
 
-  void drawOverlay(ref Drawing dr){
+  void drawOverlay(ref Drawing dr, RGB color){
+    auto c = toXY(caret);
+    dr.color = color;
+    dr.lineWidth = sqr(1-(QPS*1.5).fract)*2.5;//sin((QPS*1.5).fract*PI*2).remap(-1, 1, 0.1, 2);
 
+    dr.vLine(c.point.x, c.point.y, c.height);
   }
 }
 
@@ -1980,11 +2025,15 @@ class Row : Container { // Row ////////////////////////////////////
     import het.ui: im;  if(im.textEditorState.row is this) im.textEditorState.wrappedLines = wrappedLines;
   }
 
-  override draw(ref Drawing dr){
-    super(dr);
+  override void draw(ref Drawing dr){
+    super.draw(dr);
 
     //draw the carets and selection of the editor
-    import het.ui: im;  if(im.textEditorState.row is this) im.textEditorState.drawOverlay(dr);
+    import het.ui: im;  if(im.textEditorState.row is this){
+      dr.translate(innerPos);
+      im.textEditorState.drawOverlay(dr, bkColor.inverse);
+      dr.pop;
+    }
   }
 
 }
