@@ -1181,6 +1181,7 @@ struct EditCmd{ // EditCmd ////////////////////////////////////////
 /// All the information needed for a text editor
 struct TextEditorState{ // TextEditorState /////////////////////////////////////
   string str;                   //the string being edited                       Edit() fills it
+  float defaultFontHeight;      //used when there's no text to display 0 -> uibase.NortmalFontHeight
   int[] cellStrOfs;             //mapping petween glyphs and string ranges      Edit() fills it
 
   Row row;                      //editor container. Must be a row.              Edit() fills it
@@ -1192,6 +1193,15 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   TextPos caret;                //first there is only one caret, no selection   persistent
 
   EditCmd[] cmdQueue;           //commands waiting for execution                Edit() fills, it is proecessed after the hittest
+
+  /// Must be called before a new frame. Clears data that isn't safe to keep from the last frame.
+  void beginFrame(){
+    row = null;
+    wrappedLines = null;
+    cellStrOfs = null;
+    defaultFontHeight = NormalFontHeight;
+  }
+
 
   //access helpers
   auto cells()                  { return row.subCells; }
@@ -1277,7 +1287,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   }
 
   TextPos toXY(in TextPos tp){
-    if(!cellCount) return TextPos(V2f(0, 0), NormalFontHeight);
+    if(!cellCount) return TextPos(V2f(0, 0), defaultFontHeight);
     if(tp.isXY   ) return tp;
 
     TextPos lc;

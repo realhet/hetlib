@@ -1164,9 +1164,7 @@ struct im{ static:
 
     //clear last frame's object references
     focusedState.container = null;
-    textEditorState.row = null;
-    textEditorState.wrappedLines = null;
-    textEditorState.cellStrOfs = null;
+    textEditorState.beginFrame;
   }
 
   private Container screenDoc(){
@@ -1649,10 +1647,14 @@ struct im{ static:
 
       //text editor functionality
       if(focused){
+        //get the modified string
+        //if(strModified) editor2value; //only when changed?
         editor2value; //todo: when to write back? always / only when change/exit?
-        textEditorState.row = row;
 
-        //process input
+        textEditorState.row = row;
+        textEditorState.strModified = false; //ready for next modifications
+
+        //fetch and queue input
         string unprocessed;
         import het.win: mainWindow;
         with(textEditorState) with(EditCmd){
@@ -1709,18 +1711,21 @@ struct im{ static:
       //put the text out
       if(focused){
         row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs);
-        textEditorState.strModified = false; //string will be reformatted, ready to process cueued commands
       }else{
         row.appendMarkupLine(value.text         , textStyle);
       }
 
-      //empty row, just put a space in it, so it will not collapse
-      if(row.subCells.empty){
-        //row.appendMarkupLine(" ", textStyle);  //this is bad, the editor becomes inconsistent.
-        if(innerHeight<style.fontHeight)
-          innerHeight = style.fontHeight; //This is better, but later 'flex' can set is smaller. Need something like innerSizeMin...
-      }
+      //get default fontheight for the editor after the (possibly empty) string was displayed
+      auto defaultFontHeight = style.fontHeight;
 
+      //set editor's defaultFontHeight for the caret when the string is empty
+      if(focused) textEditorState.defaultFontHeight = defaultFontHeight;
+
+      //set minimal height for the control
+      if(row.subCells.empty){
+        if(innerHeight<style.fontHeight)
+          innerHeight = style.fontHeight; //todo: Container.minInnerSize
+      }
 
     });
 
