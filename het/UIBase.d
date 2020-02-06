@@ -11,7 +11,7 @@ import het.utils, het.geometry, het.draw2d, het.image, het.win,
 //adjust the size of the original Tab character
 enum
   VisualizeContainers      = 0,
-  VisualizeGlyphs          = 1,
+  VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0;
 
@@ -1089,7 +1089,7 @@ union ContainerFlags{
 }
 
 
-// TextPos struct ///////////////////////////////////////////////////
+// TextPos ///////////////////////////////////////////////////
 
 /*
 Text editing.
@@ -1110,31 +1110,47 @@ Problemas dolgok:
 
 
 /// TextPos marks a specific place inside a text.
+
 struct TextPos{
-  bool isIdx;  int idx;
-  bool isLC;   int line, column;
-  bool isXY;   V2f point; float height=0;
+  enum Type { none, idx, lc, xy }
 
-  bool valid(){ return isIdx || isLC || isXY; }
+  private{
+    Type type;
+    int fIdx, fLine, fColumn; //todo: union
+    V2f fPoint;
+    float fHeight=0;
 
-  this(T)(T idx) if(isIntegral!T){
-    isIdx = true;
-    this.idx = idx.to!int;
+    void enforceType(string file = __FILE__, int line = __LINE__)(Type t) const{
+      if(t!=type) throw new Exception("TextPos type mismatch error. %s required.".format(t), file, line);
+    }
   }
 
-  this(T0, T1)(T0 line, T1 column) if(isIntegral!T0 && isIntegral!T1){
-    isLC = true;
-    this.line = line.to!int; this.column = column.to!int;
-  }
+  this(int idx                   ){ type = Type.idx ;  fIdx   = idx  ;                     }
+  this(int line, int column      ){ type = Type.lc  ;  fLine  = line ;  fColumn = column; }
+  this(in V2f point, float height){ type = Type.xy  ;  fPoint = point;  fHeight = height;  }
 
-  this(in V2f point, float height){
-    isXY = true;
-    this.point = point;
-    this.height = height;
+  bool valid() const{ return type != Type.none; }
+  bool isIdx() const{ return type == Type.idx ; }
+  bool isLC () const{ return type == Type.lc  ; }
+  bool isXY () const{ return type == Type.xy  ; }
+
+  auto idx   (string file = __FILE__, int line = __LINE__)() const{ enforceType!(file, line)(Type.idx); return fIdx   ; }
+  auto line  (string file = __FILE__, int lin_ = __LINE__)() const{ enforceType!(file, lin_)(Type.lc ); return fLine  ; }
+  auto column(string file = __FILE__, int line = __LINE__)() const{ enforceType!(file, line)(Type.lc ); return fColumn; }
+  auto point (string file = __FILE__, int line = __LINE__)() const{ enforceType!(file, line)(Type.xy ); return fPoint ; }
+  auto height(string file = __FILE__, int line = __LINE__)() const{ enforceType!(file, line)(Type.xy ); return fHeight; }
+
+  string toString() const{
+    string s;
+    with(Type) final switch(type){
+      case none: s = "none"; break;
+      case idx : s = format!"idx = %s"(idx); break;
+      case lc  : s = format!"line = %s, column = %s"(line, column); break;
+      case xy  : s = format!"point = (%.1f, %.1f), height = %.1f"(point.x, point.y, height); break;
+    }
+    return Unqual!(typeof(this)).stringof ~ "(" ~ s ~ ")";
   }
 }
-
-
 
 /// a linearly selected range of text.
 struct TextRange{
@@ -1142,7 +1158,8 @@ struct TextRange{
 }
 
 struct EditCmd{ // EditCmd ////////////////////////////////////////
-  private enum _intParamDefault = int.min+1;
+  private enum _intParamDefault = int.min+1,
+               _pointParamDefault = V2f(-999999999, -999999999);
 
   enum Cmd {
     //caret commands              //parameters
@@ -1150,6 +1167,7 @@ struct EditCmd{ // EditCmd ////////////////////////////////////////
     cInsert,                      //text to insert
     cDelete, cDeleteBack,         //number of glyphs to delete. Default 1
     cLeft, cRight,                //number of repetitions. Default 1
+    cUp, cDown,
     cHome, cEnd,
     cMouse                        //caret goes to mouse
   }
@@ -1157,16 +1175,19 @@ struct EditCmd{ // EditCmd ////////////////////////////////////////
 
   Cmd cmd;
   int _intParam = _intParamDefault;
+  V2f _pointParam = _pointParamDefault;
 
   //parameter access
   string strParam;
-  int intParam(int def=0) const{ return _intParam==_intParam.init ? def : _intParam; }
+  int intParam(int def=0) const{ return _intParam==_intParamDefault ? def : _intParam; }
+  V2f pointParam(in V2f def=V2f.Null) const{ return _pointParam==_pointParamDefault ? def : _pointParam; }
 
   this(T...)(Cmd cmd, T args){
     this.cmd = cmd;
     static foreach(a; args){
       static if(isSomeString!(typeof(a))) strParam = a;
-      static if(isIntegral  !(typeof(a))) intParam = a;
+      static if(isIntegral  !(typeof(a))) _intParam = a;
+      static if(is(const typeof(a) == ConstOf!V2f)) _pointParam = a;
     }
   }
 
@@ -1174,6 +1195,7 @@ struct EditCmd{ // EditCmd ////////////////////////////////////////
     auto s = format!"EditCmd(%s"(cmd);
     if(_intParam != _intParamDefault) s ~= " " ~ _intParam.text;
     if(strParam.length) s ~= " " ~ strParam.text;
+    if(_pointParam != _pointParamDefault) s ~= " " ~ format!"(%.1f, %.1f)"(pointParam.x, pointParam.y);
     return s ~ ")";
   }
 }
@@ -1193,6 +1215,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   TextPos caret;                //first there is only one caret, no selection   persistent
 
   EditCmd[] cmdQueue;           //commands waiting for execution                Edit() fills, it is proecessed after the hittest
+
+  string dbg;
 
   /// Must be called before a new frame. Clears data that isn't safe to keep from the last frame.
   void beginFrame(){
@@ -1223,6 +1247,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   private int lc2idx(in V2i colLine){ with(colLine) return lc2idx(y, x); }
 
   private V2i xy2lc(in V2f point){
+
+print("xy2lc");
     if(wrappedLines.empty) return V2i.Null;
 
     float yMin = wrappedLines[0].top,
@@ -1232,13 +1258,16 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     static if(1){ //above or below: snap to first/last line or start/end of the whole text.
       if(y<yMin) return V2i.Null;
       if(y>yMax) return V2i(wrappedLineCount-1, wrappedLines[wrappedLineCount-1].cellCount);
-    }else{
+    }else{ //other version: just clamp it to the nearest
       y = tp.point.y.clamp(yMin, yMax);
     }
 
     //search the line
     int line; //opt: binary search? (not important: only 1 screen of information)
-    foreach_reverse(int i; 0..wrappedLineCount-1) if(y >= wrappedLines[i].y0){ line = i; break; }
+    foreach_reverse(int i; 0..wrappedLineCount){
+      if(y >= wrappedLines[i].y0){ line = i; break; }
+    }
+
     auto wl = &wrappedLines[line];
 
     float xMin = wl.left,
@@ -1247,10 +1276,23 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
     x = x.clamp(xMin, xMax); //always clamp x coordinate
 
-    //search the column in the line
     int column;
-    foreach_reverse(int i; 0..-1) if(x >= wl.cells[i].outerPos.x){ column = i; break; }
 
+/*    if(x >= xMax){
+      column = wl.cellCount; //last char past 1
+    }else if(x <= xMin){
+      column = 0;
+    }else{
+      //search the column in the line
+      foreach_reverse(int i; 0..wl.cellCount){
+        if(x >= wl.cells[i].outerPos.x){ column = i; break; }
+      }
+    }*/
+
+    column = wl.selectNearestGap(x);
+
+
+//print(column, line);
     return V2i(column, line);
   }
 
@@ -1270,15 +1312,19 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     return V2i(wrappedLines[$-1].cellCount, wrappedLineCount); //The cell after the last.
   }
 
-  int toIdx(in TextPos tp){
-    if(!cellCount) return 0;                          // empty
-    if(tp.isIdx  ) return clampIdx(tp.idx);           // no need to convert, only clamp the idx.
-    if(tp.isLC   ) return lc2idx(tp.line, tp.column); //
-    if(tp.isXY   ) return xy2idx(tp.point);           // first convert to the nearest LC, then that to Idx
-    return 0;                                         // when all fails
+  TextPos toIdx(in TextPos tp){
+    if(!tp.valid) return tp;
+
+    if(!cellCount) return TextPos(0);                          // empty
+    if(tp.isIdx  ) return TextPos(clampIdx(tp.idx));           // no need to convert, only clamp the idx.
+    if(tp.isLC   ) return TextPos(lc2idx(tp.line, tp.column)); //
+    if(tp.isXY   ) return TextPos(xy2idx(tp.point));           // first convert to the nearest LC, then that to Idx
+    return TextPos(0);                                         // when all fails
   }
 
   TextPos toLC(in TextPos tp){
+    if(!tp.valid) return tp;
+
     if(!cellCount) return TextPos(0, 0);
     if(tp.isLC   ) return tp;
     if(tp.isIdx  ) with(idx2lc(tp.idx)) return TextPos(y, x);
@@ -1287,6 +1333,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   }
 
   TextPos toXY(in TextPos tp){
+    if(!tp.valid) return tp;
+
     if(!cellCount) return TextPos(V2f(0, 0), defaultFontHeight);
     if(tp.isXY   ) return tp;
 
@@ -1318,7 +1366,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
     void caretRestrict(){
       //todo: this should work all the 3 types of carets: idx, lc and xy
-      int i  = toIdx(caret),
+      int i  = toIdx(caret).idx,
           mi = 0,
           ma = cellCount;
 
@@ -1332,11 +1380,19 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     }
 
     void caretMoveRel(int delta){
-      caretMoveAbs(toIdx(caret) + delta);
+      caretMoveAbs(toIdx(caret).idx + delta);
+    }
+
+    void caretMoveVert(int delta){
+      if(!delta) return;
+      auto c = toXY(caret);
+
+      caret = toIdx(TextPos(V2f(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); //todo: it only works for the same fontHeight and  monospaced stuff
+      caretRestrict;
     }
 
     void caretAdjust(ref TextPos caret, int idx, int delLen, int insLen, int insOffset=0){ //insOffset is 1 for selection.left
-      auto cIdx = toIdx(caret);
+      int cIdx = toIdx(caret).idx;
 
       //adjust for deletion.
       //if it is right of idx, then it goes left by delLen, towards idx
@@ -1350,7 +1406,6 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     }
 
     void modify(int idx, int delLen, string ins){
-//print("  modify", idx, delLen, ins);
 
       int fullLen = cellCount;
 
@@ -1383,7 +1438,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
     void deleteAtCaret(bool isBackSpace){
       caretRestrict;
-      int i = toIdx(caret);
+      int i = toIdx(caret).idx;
 
       modify(i-isBackSpace, 1, "");
     }
@@ -1391,19 +1446,22 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     //---------------------------------------------
     string err;
 
-//print("Executing: ", eCmd);
     checkConsistency;
 
     with(eCmd) final switch(cmd){
       case Cmd.nop: break;
-      case Cmd.cInsert          : caretRestrict; modify(toIdx(caret), 0, strParam); break;
+      case Cmd.cInsert          : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
       case Cmd.cDelete          : deleteAtCaret(false); break;
       case Cmd.cDeleteBack      : deleteAtCaret(true ); break;
-      case Cmd.cLeft            : caretMoveRel( intParam(1)); break;
-      case Cmd.cRight           : caretMoveRel(-intParam(1)); break;
+      case Cmd.cLeft            : caretMoveRel(-intParam(1)); break;
+      case Cmd.cRight           : caretMoveRel( intParam(1)); break;
+      case Cmd.cUp              : caretMoveVert(-intParam(1)); break;
+      case Cmd.cDown            : caretMoveVert( intParam(1)); break;
       case Cmd.cHome            : caretMoveAbs(        0); break;
       case Cmd.cEnd             : caretMoveAbs(cellCount); break;
-      case Cmd.cMouse           : writeln("Cmd.cMouse : todo"); break; //todo:Cmd.cMouse
+      case Cmd.cMouse           : caret = toIdx(TextPos(pointParam, 0)); break;
+      //todo: cMouse pontatlan.
+      //todo: minden cursor valtozaskor a caret legyen teljesen fekete
     }
 
     return err;
@@ -1419,23 +1477,23 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
       auto cmd = cmdQueue.front;
       cmdQueue.popFront;
 
-//print("before", str, caret, cmd);
-
       err ~= execute(cmd);
-
-//print("after", str, caret);
-
     }
+
+    dbg = format("caret: %s  %s  %s\n", toIdx(caret), toLC(caret), toXY(caret))
+        ~ wrappedLines.map!(l => l.text).join("\n");
 
     return err;
   }
 
   void drawOverlay(ref Drawing dr, RGB color){
     auto c = toXY(caret);
-    dr.color = color;
-    dr.lineWidth = sqr(1-(QPS*1.5).fract)*2.5;//sin((QPS*1.5).fract*PI*2).remap(-1, 1, 0.1, 2);
+    if(c.valid){
+      dr.color = color;
+      dr.lineWidth = sqr(1-(QPS*1.5).fract)*2.5;//sin((QPS*1.5).fract*PI*2).remap(-1, 1, 0.1, 2);
 
-    dr.vLine(c.point.x, c.point.y, c.height);
+      dr.vLine(c.point.x, c.point.y, c.point.y+c.height);
+    }
   }
 }
 
@@ -1761,7 +1819,7 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
   int selectNearestGap(float x){ //x: local x coordinate. (innerPos.x = 0)
     if(cells.empty) return 0;
     foreach(int i, c; cells) if(x<c.outerPos.x + c.outerWidth*.5f) return i;
-    return cells.length.to!int;
+    return cellCount;
   }
 
   int selectNearestCell(float x){ //always select something on either side

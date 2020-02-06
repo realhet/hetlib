@@ -803,7 +803,7 @@ private: //original opengl api calls, private helpers
     }
   }
 
-  void glChk(string file = __FILE__, int line = __LINE__){
+  void glChk(string file = __FILE__, int line = __LINE__){  //todo: utils. customEnforce() template
     int err = glGetError();
     if(err) throw new Exception("GLError: "~glErrorStr(err), file, line);
   }

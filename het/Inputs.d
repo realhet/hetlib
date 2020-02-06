@@ -140,7 +140,7 @@ struct KeyCombo{
 
   string toString() const { return combos.map!text.join('+'); }
 
-  bool active  () { return combos.any!"a.active"; }
+  bool active  () { return combos.any!"a.active"; }  alias hold = active; alias down = active;
   bool pressed () { return combos.any!"a.pressed"; }
   bool typed   () { return combos.any!"a.typed"; }
   bool released() { return combos.any!"a.released"; }
@@ -217,18 +217,15 @@ class InputEntry{
   bool repeated()const { return repeated_; }
 
   void _updateRepeated(double now){
-    const delay1 = 0.5,
-          delay2 = 0.1;
-
     repeated_ = false;
     if(value){
       if(pressed){
         repeated_ = true;
-        repeatNextTime = now+delay1;
+        repeatNextTime = now+repeatDelay1;
       }else{
         if(now>=repeatNextTime){
           repeated_ = true;
-          repeatNextTime = now+delay2;
+          repeatNextTime = now+repeatDelay2;
         }
       }
     }
@@ -284,7 +281,7 @@ public:
     clearDeltas;
     foreach(h; handlers) h.update;
 
-    getKeyboardDelays(InputEntry.repeatDelay1, InputEntry.repeatDelay2);
+    getKeyboardDelays(InputEntry.repeatDelay1, InputEntry.repeatDelay2); //todo: this is only needed once a sec, dunno how slow it is.
     foreach(e; entries){
       if(e.pressed) e.pressedTime = now;
       e._updateRepeated(now);
