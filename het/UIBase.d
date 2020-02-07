@@ -1247,8 +1247,6 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   private int lc2idx(in V2i colLine){ with(colLine) return lc2idx(y, x); }
 
   private V2i xy2lc(in V2f point){
-
-print("xy2lc");
     if(wrappedLines.empty) return V2i.Null;
 
     float yMin = wrappedLines[0].top,
@@ -1439,6 +1437,8 @@ print("xy2lc");
     void deleteAtCaret(bool isBackSpace){
       caretRestrict;
       int i = toIdx(caret).idx;
+
+      if(isBackSpace && i<=0) return; //nothing to delete
 
       modify(i-isBackSpace, 1, "");
     }

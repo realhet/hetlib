@@ -1666,7 +1666,7 @@ struct im{ static:
         with(textEditorState) with(EditCmd){
           foreach(ch; mainWindow.inputChars.unTag.byDchar){ //todo: preprocess: with(a, b) -> with(a)with(b)
             switch(ch){
-              case 8:  cmdQueue ~= EditCmd(cDeleteBack);  break; //todo: bug: ha caret.idx=0, akkor benazik.
+              //case 8:  cmdQueue ~= EditCmd(cDeleteBack);  break; //todo: bug: ha caret.idx=0, akkor benazik.
               default:
                 if(ch>=32){
                   cmdQueue ~= EditCmd(cInsert, [ch].to!string);
@@ -1676,13 +1676,17 @@ struct im{ static:
             }  //jajj de korulmenyes ez a switch case fos....
           }
 
-          if(het.inputs.KeyCombo("LMB"  ).hold ){ cmdQueue ~= EditCmd(cMouse, localMouse); }
-          if(het.inputs.KeyCombo("Left" ).typed) cmdQueue ~= EditCmd(cLeft );
-          if(het.inputs.KeyCombo("Right").typed) cmdQueue ~= EditCmd(cRight);
-          if(het.inputs.KeyCombo("Home" ).typed) cmdQueue ~= EditCmd(cHome ); //todo: When the edit is focused, don't let the view to zoom home. Problem: Editor has a priority here, but the view is checked first.
-          if(het.inputs.KeyCombo("End"  ).typed) cmdQueue ~= EditCmd(cEnd  );
-          if(het.inputs.KeyCombo("Up"   ).typed) cmdQueue ~= EditCmd(cUp   );
-          if(het.inputs.KeyCombo("Down" ).typed) cmdQueue ~= EditCmd(cDown );
+          with(het.inputs){
+            if(KeyCombo("LMB"      ).hold ) cmdQueue ~= EditCmd(cMouse, localMouse);
+            if(KeyCombo("Backspace").typed) cmdQueue ~= EditCmd(cDeleteBack       );
+            if(KeyCombo("Del"      ).typed) cmdQueue ~= EditCmd(cDelete           );
+            if(KeyCombo("Left"     ).typed) cmdQueue ~= EditCmd(cLeft             );
+            if(KeyCombo("Right"    ).typed) cmdQueue ~= EditCmd(cRight            );
+            if(KeyCombo("Home"     ).typed) cmdQueue ~= EditCmd(cHome             ); //todo: When the edit is focused, don't let the view to zoom home. Problem: Editor has a priority here, but the view is checked first.
+            if(KeyCombo("End"      ).typed) cmdQueue ~= EditCmd(cEnd              );
+            if(KeyCombo("Up"       ).typed) cmdQueue ~= EditCmd(cUp               );
+            if(KeyCombo("Down"     ).typed) cmdQueue ~= EditCmd(cDown             );
+          }
           //todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.
 
         }

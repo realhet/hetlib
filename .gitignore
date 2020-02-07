@@ -1,2 +1,9 @@
 _*
 *.obj
+.idea*
+*.exe
+*.obj
+*.map
+*.lst
+$run.bat
+config.txt
