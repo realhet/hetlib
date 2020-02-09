@@ -521,6 +521,10 @@ T invokePrimitiveCtor(T, P)(JSONValue json, P parent) {
   assert(0, "No primitive ctor for type " ~ T.stringof);
 }
 
+public void populate(T)(ref T obj, string jsonStr, in JsonizeOptions opt) { //modified: 200209, string input, so no std.json is needed in app
+  populate!(T)(obj, parseJSON(jsonStr), opt);
+}
+
 public void populate(T)(ref T obj, JSONValue json, in JsonizeOptions opt) {
   string[] missingKeys;
   uint fieldsFound = 0;
