@@ -1657,6 +1657,11 @@ auto lc(dchar s) pure{ return s.toLower; }
 string uc(string s) pure{ return s.toUpper; }
 string lc(string s) pure{ return s.toLower; }
 
+///generates D source string format from values
+string escape(T)(T s){
+  return format!"%(%s%)"([s]);
+}
+
 string capitalize(alias fv = toUpper)(string s){
   if(!s.empty){
     char u = fv([s[0]])[0];
