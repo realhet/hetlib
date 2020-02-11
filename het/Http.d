@@ -130,11 +130,11 @@ public:
       sleep(1);
   }
 
-  void request(T)(in T owner, string url, string category=""){ //owner="" means, only a send without waiting for the response
+  void request(T)(in T owner, string url, string category=""){
     inbox.push(Request(url, identityStr(owner), category));
   }
 
-  void post(string url, string category=""){ //owner="" means, only a send without waiting for the response
+  void post(string url, string category=""){
     request(null, url, category);
   }
 
