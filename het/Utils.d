@@ -1906,14 +1906,17 @@ struct WildResult{ static:
     }catch(Throwable){ return def; }
   }
 
-  auto ints(size_t i, int def = 0)      { return to!int(i, def); }
-  auto floats(size_t i, float def = 0)  { return to!float(i, def); }
+  auto ints(size_t i, int def = 0)      { try return to!int  (i); catch return def; }
+  auto floats(size_t i, float def = 0)  { try return to!float(i); catch return def; }
+
+  void stripAll(){
+    foreach(ref s; p) s = s.strip;
+  }
 }
 
 alias wild = WildResult;
 
 bool isWild(bool ignoreCase = true, char chAny = '*', char chOne = '?')(string input, string wildStr){
-
   //bool cmp(char a, char b){ return ignoreCase ? a.toLower==b.toLower : a==b; }
   const cs = ignoreCase ? No.caseSensitive : Yes.caseSensitive;   //kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.
   if(1) wild._reset;
@@ -3597,7 +3600,7 @@ struct DateTime{
       auto parts = str.split(' '); //dateTime
       this(Date(parts[0]), Time(parts[1]));
     }else{
-      if(str.isWild("??????-??????_???")){ //timestamp
+      if(str.isWild("??????-??????-???")){ //timestamp
         this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int,
              str[7..9].to!int, str[9..11].to!int, str[11..13].to!int, str[14..17].to!int);
       }else{
@@ -3635,7 +3638,7 @@ struct DateTime{
   }
 
   string timeStamp()const {
-    return format("%.2d%.2d%.2d-%.2d%.2d%.2d_%.3d", year%100, month, day, hour, min, sec, ms);
+    return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
   }
 
   int opCmp(ref const DateTime dt) const { return dblCmp(raw, dt.raw); }

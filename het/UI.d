@@ -1625,7 +1625,7 @@ struct im{ static:
     bool chg;
 
     void value2editor(){ textEditorState.str = value.text; }
-    void editor2value(){ value = textEditorState.str.to!T0; } //todo: range clamp
+    void editor2value(){ try value = textEditorState.str.to!T0; catch{} } //todo: range clamp
 
     Row({
       auto row = cast(.Row)actContainer;

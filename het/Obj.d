@@ -120,8 +120,10 @@ mixin template HETOBJ(){ mixin JsonizeMe;
     // https://forum.dlang.org/post/hhtshvhiqrwxwqqoemeu@forum.dlang.org
     static foreach(i, field; typeof(this).tupleof) {{
       // force compile-time evaluation:
-      enum initValue = (new typeof(this)).tupleof[i];
-      field = initValue;
+      static if(!is(typeof(field) == class)){ //todo: subClass reinitialization
+        enum initValue = (new typeof(this)).tupleof[i];
+        field = initValue;
+      }
     }}
   }
 

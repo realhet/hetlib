@@ -18,7 +18,7 @@ auto curlGet_noThrow(string url){
   }
 }
 
-struct Request{
+struct Request{ //this is also the response
   string query;
   string owner;    //every client is filtered by this. Can get one with identityStr()
   string category; //if not empty, then only the last of this kind is served
