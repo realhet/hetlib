@@ -781,7 +781,10 @@ struct Border{
   float width = 0;
   BorderStyle style = BorderStyle.normal;  //todo: too many bits
   RGB color = clBlack;
-  bool inset = false; // put inside the padding or have it's own place
+
+  bool inset;  //border has a size inside gap and margin
+  float ofs = 0; //border is offsetted by ofs*width
+  bool extendBottomRight; //for grid cells
 
   float gapWidth() const{ return inset ? 0 : width; } //effective borderWidth
 
@@ -823,6 +826,13 @@ struct Border{
     p.setParam(prefix~".width", (string a){ width = a.toWidthHeight(actFontHeight); });
     p.setParam(prefix~".color", (RGB    a){ color = a; });
     p.setParam(prefix~".style", (string a){ style = a.toBorderStyle; });
+  }
+
+
+  Bounds2f adjustBounds(in Bounds2f bb){
+    Bounds2f res = bb;
+    if(extendBottomRight)with(res.bMax){ x += width; y += width; }
+    return res;
   }
 }
 
@@ -938,7 +948,7 @@ class Cell{ // Cell ////////////////////////////////////
 
   bool hitTest(in V2f mouse, V2f ofs=V2f.Null){ //todo: only check when the hitTest flag is true
     auto bnd = getHitBounds.translated(ofs);
-    if(bnd.checkInside(mouse)){
+    if(bnd.checkInsideRect(mouse)){
       hitTestManager.addHitRect(this, bnd, mouse-outerPos);
       return true;
     }else{
@@ -949,10 +959,13 @@ class Cell{ // Cell ////////////////////////////////////
   final void drawBorder(ref Drawing dr){
     if(!border.width || border.style == BorderStyle.none) return;
 
-    const bw = border.width, bb = borderBounds;
+    auto bw = border.width, bb = borderBounds;
     dr.lineStipple = border.style.toLineStipple;
     dr.color = border.color;
     dr.lineWidth = bw * (border.style==BorderStyle.double_ ? 0.33f : 1);
+
+    if(border.ofs){ auto o = border.ofs *= bw; bb = bb.inflated(o, o); }
+    bb = border.adjustBounds(bb);
 
     void doit(float sh=0){
       const m = bw*sh;
@@ -1589,8 +1602,8 @@ class Container : Cell { // Container ////////////////////////////////////
     //if(chkSet(measured)) measure;
 
     //autofill background
-    dr.color = bkColor;
-    dr.fillRect(borderBounds_inner);
+    dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
+    dr.fillRect(border.adjustBounds(borderBounds_inner));
 
     dr.translate(innerPos);
 
@@ -1661,7 +1674,7 @@ private void processMarkupCommandLine(C:Container)(C container, string cmdLine, 
         btn.setProps(params);
         append(btn);*/
       }else if(cmd=="key" || cmd=="keyCombo"  ){
-        auto kc = new KeyCombo(params["1"]);
+        auto kc = new KeyComboOld(params["1"]);
         kc.setProps(params);
         container.append(kc);
       }else if(cmd=="style"){ //textStyle

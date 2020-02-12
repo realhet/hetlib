@@ -3060,6 +3060,7 @@ struct File{
 private static{/////////////////////////////////////////////////////////////////
   bool fileExists(string fn)
   {
+    if(fn.empty) return false;
     try{
       auto f = StdFile(fn, "rb");
       return true;

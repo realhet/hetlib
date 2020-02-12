@@ -423,7 +423,7 @@ class Clickable : Row{ //Clickable / ChkBox / RadioBtn /////////////////////////
   }
 }
 
-class KeyCombo : Row{ //KeyCombo ///////////////////////////////
+class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
 
   this(string markup, TextStyle ts = tsKey){
     auto allKeys = inputs.entries.values.filter!(e => e.isButton && e.value).array.sort!((a,b)=>a.pressedTime<b.pressedTime, SwapStrategy.stable).map!"a.name".array;
@@ -781,7 +781,7 @@ struct ContainerBuilder{ //ContainerBuilder //////////////////////////////
     if(key=="*SUBMENU*"){
       r.append(new Row(tag("symbol ChevronRight"), ts));
     }else{
-      if(key.length) r.append(new KeyCombo(key));
+      if(key.length) r.append(new KeyComboOld(key));
     }
 
 
@@ -1710,7 +1710,7 @@ struct im{ static:
       if(theme=="tool"){ //todo: refactor as this is same as in Btn
         style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
         border.width    = 1;
-        border.inset    = true;
+//        border.location = BorderLocation.inside;
         margin .top = margin .bottom = 0;
         padding.top = padding.bottom = 0;
       }
@@ -1785,12 +1785,25 @@ struct im{ static:
     return oldValue != value;
   }
 
+  void applyBtnBorder(in RGB bColor = clWinBtn){ //todo: use it for edit as well
+    margin  = Margin(2, 2, 2, 2);
+    border  = Border(2, BorderStyle.normal, bColor);
+    padding = Padding(2, 2, 2, 2);
+    if(theme=="tool"){
+      border.width    = 1;
+      border.inset = true;
+      margin .top = margin .bottom = 0;
+      padding.top = padding.bottom = 0;
+    }
+  }
 
   auto Btn(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
     mixin(id.M ~ enable.M ~ selected.M);
+
     const isToolBtn = theme=="tool";
+
     auto hit = hitTestManager.check(_id); //get the hittert from the last frame
     Row({
       hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
@@ -1806,9 +1819,8 @@ struct im{ static:
       flags.hAlign = HAlign.center;
 
       style   = tsBtn;
-      margin  = Margin(2, 2, 2, 2);
-      border  = Border(2, BorderStyle.normal, lerp(style.bkColor, clWinBtnHoverBorder, hit.hover_smooth));
-      padding = Padding(2, 2, 2, 2);
+      auto bColor = lerp(style.bkColor, clWinBtnHoverBorder, hit.hover_smooth);
+      applyBtnBorder(bColor);
 
       if(!enabled){
         style.fontColor = clWinBtnDisabledText;
@@ -1820,10 +1832,7 @@ struct im{ static:
 
       if(isToolBtn){ //every appearance is lighter on a toolBtn
         style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
-        border.width    = hit.captured && enabled ? 0 : 1;
-        border.inset    = true;
-        margin .top = margin .bottom = 0;
-        padding.top = padding.bottom = 0;
+        if(hit.captured && enabled) border.width = 0; //this if() makes the edge squareish
       }
 
       if(_selected){
@@ -1845,6 +1854,47 @@ struct im{ static:
     auto old = theme; theme = "tool"; scope(exit) theme = old;
     return Btn!(file, line)(text, args);
   }
+
+  auto ListItem(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // ListItem //////////////////////////////
+  if(isSomeString!T0 || __traits(compiles, text()) )
+  {
+    mixin(id.M ~ enable.M ~ selected.M);
+
+    //todo: This is only the base of a listitem. Later it must communicate with a container
+
+    auto hit = hitTestManager.check(_id); //get the hittert from the last frame
+    Row({
+      hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
+
+      style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
+
+      margin = "0";
+      auto bcolor = lerp(style.fontColor, style.bkColor, .5);
+      border       = Border(1, BorderStyle.normal, lerp(bcolor, style.fontColor, hit.hover_smooth));
+      border.inset = true;
+      border.extendBottomRight = true;
+      padding = Padding(0, 2, 0, 2);
+
+      style.bkColor = lerp(style.bkColor, clGray, hit.hover_smooth*.16);
+
+      if(!enabled){
+        style.fontColor = lerp(style.fontColor, clGray, 0.5); //todo: rather use an 50% overlay for disabled?
+      }
+
+      if(_selected){
+        style.bkColor = lerp(style.bkColor, clAccent, .5);
+        border.color  = lerp(border.color , clAccent, .5);
+      }
+
+      bkColor = style.bkColor; //todo: update the backgroundColor of the container. Should be automatic, but how?...
+
+      static if(isSomeString!T0) Text(text); //centered text
+                            else text(); //delegate
+    });
+
+    return hit;
+  }
+
 
   //ChkBox //////////////////////////////
   auto ChkBox(string file=__FILE__, int line=__LINE__, string chkBoxStyle="chk", T...)(ref bool state, string caption, T args){
