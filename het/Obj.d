@@ -101,6 +101,10 @@ class HetObj {
 
   //void dump(){ print(typeof(this).stringof); }
 
+  void update(){ //centralized update for all hetObjs
+    //currently every object are responsible to resresh its subObjects.
+  }
+
   abstract{
     string dump();
     void initFields();

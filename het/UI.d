@@ -1955,6 +1955,25 @@ struct im{ static:
     return Node(state, { Text(title); }, contents);
   }
 
+  /// A node header that usually connects to a server, can have an error message and a state of refreshing. It can has a refresh button too
+  void RefreshableNodeHeader(THeader)(THeader header, string error, bool refreshing, void delegate() onRefresh){ // RefreshableNodeHeader ////////////////////////////
+    static if(isSomeString!THeader) Text(header);
+                               else header();
+    //todo: node header click = open/close node
+
+    if(refreshing) { Text(" "); ProgressSpinner(1); }
+
+    if(error.length) Text(" \u26a0"); //warning symbol
+    //todo: warning symbol click = open node
+    //todo: warning symbol hint: error message
+
+    Flex;
+    if(onRefresh !is null){
+      if(ToolBtn(symbol("Refresh"), enable(!refreshing))) onRefresh();
+    }
+  }
+
+
   // Document ////////////////////////
   void Document(void delegate() contents = null){ Document("", contents); }
 

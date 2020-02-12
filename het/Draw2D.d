@@ -1315,6 +1315,7 @@ struct Drawing {
       gl.enable(GL_ALPHA_TEST);   gl.alphaFunc(GL_GREATER, 0);
       gl.disable(GL_DEPTH_TEST);
 
+      //gl.polygonMode(GL_FRONT_AND_BACK, GL_LINE);
       vbo.draw(GL_POINTS);
     }
 

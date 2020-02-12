@@ -1007,13 +1007,19 @@ auto makeArray3(T, size_t N, size_t M, size_t O, T val)()
 }
 
 
-// safely get an array element
+// safely get a copy of and array element
 T get(T)(in T[] arr, size_t idx, T def = T.init){
   return idx<arr.length ? arr[idx]
                         : def;
 }
 
-// safely access and element, putting default valies in front of it when needed
+// safely get an element ptr
+T* getp(T)(T[] arr, size_t idx, T* def = null){
+  return idx<arr.length ? &arr[idx]
+                        : def;
+}
+
+// safely access and element, putting default values in front of it when needed
 ref T access(T)(ref T[] arr, size_t idx, T def = T.init){
   while(idx>=arr.length) arr ~= def; //optional extend
   return arr[idx];
@@ -3239,7 +3245,7 @@ public:
   void writeStr(const string data, ulong offset = 0)const { write(data, offset); }
   void appendStr(const string data) { append(data); }
 
-  int opCmp(ref const File b) const { return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
+  int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
 
   size_t toHash() const{
     return fullName.xxh;
@@ -3533,8 +3539,8 @@ struct Date{
     with(st) return format("%.4d.%.2d.%.2d", wYear, wMonth, wDay);
   }
 
-  int opCmp(ref const Date d)      const { return dblCmp(raw, d.raw); }
-  int opCmp(ref const DateTime dt) const { return dblCmp(raw, dt.raw); }
+  int opCmp(const Date d)      const { return dblCmp(raw, d.raw); }
+  int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
 }
 
 struct Time{
@@ -3580,7 +3586,7 @@ struct Time{
     }
   }
 
-  int opCmp(ref const Time t) const { return dblCmp(raw, t.raw); }
+  int opCmp(const Time t) const { return dblCmp(raw, t.raw); }
 }
 
 struct DateTime{
@@ -3641,8 +3647,8 @@ struct DateTime{
     return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
   }
 
-  int opCmp(ref const DateTime dt) const { return dblCmp(raw, dt.raw); }
-  int opCmp(ref const Date     d ) const { return dblCmp(raw, d .raw); }
+  int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
+  int opCmp(const Date     d ) const { return dblCmp(raw, d .raw); }
 }
 
 Time     time () { return Time    .current; } //0 = midnight  1 = 24hours
