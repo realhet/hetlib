@@ -1494,6 +1494,9 @@ struct im{ static:
 
   //Text /////////////////////////////////
   void Text(string file=__FILE__, int line=__LINE__, T...)(T args){ //todo: not multiline yet
+
+    //todo: ugy nez ki, hogy nem kell ide a file, line.
+
     //multiline behaviour:
     //  parent is Row: if multiline -> make a column around it
     //  parent is column: multiline is ok. Multiple row emit
@@ -1551,9 +1554,14 @@ struct im{ static:
      else Row({ Text(text); });*/
   }
 
+  void Comment(string file=__FILE__, int line=__LINE__, T...)(T args){
+    // It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...
+    Text!(file, line)(tsComment, args);
+  }
+
   //ListItem ///////////////////////////////////
   void Bullet(){
-    Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; });
+    Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); //todo: no flex needed, -> center aligned. Constant width is needed however, for different bullet styles.
   }
 
   void ListItem(void delegate() contents = null){
