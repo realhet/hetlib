@@ -865,7 +865,7 @@ struct _FlexValue{ float val=0; alias val this; } //ganyolas
 
 class Cell{ // Cell ////////////////////////////////////
 
-  static int[string] objCnt;
+  static shared int[string] objCnt;  //todo: ha ez nem shared, akkor beszarik a hatterben betolto jpeg. Miert?
   this(){
 //    auto n = this.classinfo.name;
 //    if(n !in objCnt) objCnt[n]=0;
@@ -875,6 +875,8 @@ class Cell{ // Cell ////////////////////////////////////
   ~this(){
 //    auto n = this.classinfo.name;
 //    objCnt[n]--;
+    //ennek qrvara sharednek kell lennie, mert a gc akarmelyik threadbol mehet.
+    //egy atomic lenne a legjobb
   }
 
   V2f outerPos, innerSize;

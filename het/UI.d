@@ -1176,6 +1176,7 @@ struct im{ static:
 
   private void endFrame(){
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
+    enforce(stack.length==1, "im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 
     screenDoc.measure;
     screenDoc.hitTest(currentMouse);
@@ -1312,7 +1313,7 @@ static cnt=0;
   }
 
   private void pop(){
-    enforce(!stack.empty);
+    enforce(stack.length>1); //stack[0] is always null and it is never popped.
 
     //restore the last textStyle & theme. Changes inside a subHierarchy doesn't count.
     baseId    = stack.back.baseId;
@@ -1324,6 +1325,7 @@ static cnt=0;
 
     //actContainer is the top of the stack or null
     actContainer = stack.empty ? null : stack.back.container;
+    //todo: the first stack container is always 0.
   }
 
   void dump(){
