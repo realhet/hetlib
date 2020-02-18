@@ -292,6 +292,10 @@ struct HitTestManager{
     }
   }
 
+  auto stats(){
+    return format("HitTest lengths: hitStack:%s, lastHitStack::%s, cellHashMap:%s, smoothHover::%s", hitStack.length, lastHitStack.length, cellHashMap.length, smoothHover.length);
+  }
+
 }
 
 __gshared HitTestManager hitTestManager;
@@ -860,6 +864,19 @@ struct _FlexValue{ float val=0; alias val this; } //ganyolas
 
 
 class Cell{ // Cell ////////////////////////////////////
+
+  static int[string] objCnt;
+  this(){
+//    auto n = this.classinfo.name;
+//    if(n !in objCnt) objCnt[n]=0;
+//    objCnt[n]++;
+  }
+
+  ~this(){
+//    auto n = this.classinfo.name;
+//    objCnt[n]--;
+  }
+
   V2f outerPos, innerSize;
 
   ref _FlexValue flex() { static _FlexValue nullFlex; return nullFlex   ; } //todo: this is bad, but fast. maybe do it with a setter and const ref.

@@ -1194,13 +1194,15 @@ struct im{ static:
 
     if(screenDoc) screenDoc.draw(dr);
     hitTestManager.draw(dr);
+
+    //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
   }
 
   void Panel(void delegate() fun){ //todo: multiple Panels, but not call them frames...
     import het.win;
+auto t0=QPS;
     im.beginFrame(mainWindow.mouse.act.screen.toF);
-    scope(exit) im.endFrame;
-
+auto t1=QPS;
     Document({
       padding = "4";
       border = "1 normal silver";
@@ -1208,6 +1210,20 @@ struct im{ static:
       if(fun) fun();
 
     });
+auto t2=QPS;
+    im.endFrame;
+auto t3=QPS;
+
+static cnt=0;
+    if(((cnt++)&31)==0){
+    //todo: ezeket a performance adatokat egy uira kirakni.
+//      writefln("begin: %5.3f  build:  %5.3f  end: %5.3f", t1-t0, t2-t1, t3-t2);
+//      writeln(mainWindow.lastFrameStats);
+//      import het.opengl;
+//      glHandleStats.print;
+//      hitTestManager.stats.print;
+//      Cell.objCnt.print;
+    }
   }
 
   // Focus handling /////////////////////////////////
@@ -1256,7 +1272,8 @@ struct im{ static:
 
   Cell[] root; //when containerStack is empty, this is the container
 
-  double QPS, lastQPS, dt;
+  //double QPS=0, lastQPS=0, dt=0;
+  //todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
 
   //todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
   Container actContainer; //top of the containerStack for faster access
@@ -1277,12 +1294,14 @@ struct im{ static:
     theme = "";
 
     root = [];
-    push!Container(null, 0);
+    stack = [];
+    push!Container(null, 0); //null meaning -> root[] is the container
 
     //time calculation
-    QPS = .QPS;
-    dt = lastQPS.isNaN ? 1.0f/60 : QPS-lastQPS;
-    lastQPS = QPS;
+    //todo: jobb neveket kell kitalalni erre
+    //QPS = .QPS;
+    //dt = lastQPS.isNaN ? 1.0f/60 : QPS-lastQPS;
+    //lastQPS = QPS;
   }
 
   private void push(T : Container)(T c, uint newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
