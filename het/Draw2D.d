@@ -503,6 +503,10 @@ struct Drawing {
     drawGlyph(textures[fileName], b, bkColor);
   }
 
+  void drawGlyph(in File fileName, in V2f p, in RGB8 bkColor = clBlack){
+    drawGlyph(textures[fileName], p, bkColor);
+  }
+
   void drawGlyph(int idx, in V2f p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
     auto info = textures.accessInfo(idx);
     drawGlyph(idx, Bounds2f(p.x, p.y, p.x+info.width, p.y+info.height), bkColor);

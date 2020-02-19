@@ -1149,6 +1149,7 @@ struct im{ static:
   import std.traits;
 
   //Frame handling
+  bool mouseOverUI;
   private bool inFrame, canDraw;
 
   private void beginFrame(in V2f mousePos){
@@ -1179,7 +1180,29 @@ struct im{ static:
     enforce(stack.length==1, "im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 
     screenDoc.measure;
-    screenDoc.hitTest(currentMouse);
+
+    static float scrollY = 0;
+    static float actScrollY = 0;
+    screenDoc.outerPos.y = actScrollY;
+
+    mouseOverUI = screenDoc.hitTest(currentMouse);
+
+    //todo: fake scrolling just for the karc demo
+    if(1){
+      import het.win;
+      float screenHeight = mainWindow.clientHeight;
+      float docHeight = screenDoc.outerHeight;
+      if(mouseOverUI){
+        scrollY += mainWindow.mouse.delta.wheel*120;
+      }
+
+      scrollY = scrollY.clamp(min(0, screenHeight-docHeight), 0);
+
+      actScrollY = lerp(actScrollY, scrollY, 0.25);
+
+      actScrollY = actScrollY.clamp(min(0, screenHeight-docHeight), 0);
+    }
+
 
     if(textEditorState.row){ //an edit control is active.
       auto err = textEditorState.processQueue;
