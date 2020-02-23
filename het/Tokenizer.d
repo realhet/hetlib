@@ -1,5 +1,5 @@
-module hetlib.tokenizer;
-import hetlib.utils, hetlib.keywords, std.variant;
+module het.tokenizer;
+import het.utils, het.keywords, std.variant;
                                           //todo: size_t-re atallni
 
 const CompilerVersion = 100;
@@ -14,6 +14,7 @@ const CompilerVersion = 100;
 
 //refactor to anonym -> ebben elvileg a delphi jobb.
 
+//todo: camelCase
 enum TokenKind {Unknown, Comment, Identifier, Keyword, Special, Operator, LiteralString, LiteralChar, LiteralInt, LiteralFloat};
 
 @trusted string tokenize(string fileName, string text, out Token[] tokens)
@@ -40,9 +41,15 @@ struct Token{
   bool isTokenString; //it is inside the outermost tokenstring. Calculated in Parser.tokenize.BracketHierarchy, not in tokenizer.
   bool isBuildMacro; // //@ comments right after a newline or at the beginning of the file. Calculated in parser.collectBuildMacros
 
-  string toString() const{
+  /*string toString() const{
     return "%-20s: %s %s".format(kind, level, source);//~" "~(!data ? "" : data.text);
+  }*/
+
+  void toString(scope void delegate(const(char)[]) sink, FormatSpec!char fmt){
+    if(fmt.spec == 't') put(sink, format!"%s\t%s\t%s"(kind, level, source));
+                   else put(sink, format!"%-20s: %s %s"(kind, level, source));
   }
+
   bool isOperator(int op)       const { return id==op && kind==TokenKind.Operator; }
   bool isKeyword (int kw)       const { return id==kw && kind==TokenKind.Keyword ; }
   bool isIdentifier()           const { return kind==TokenKind.Identifier; }
@@ -50,7 +57,7 @@ struct Token{
   bool isComment()              const { return kind==TokenKind.Comment; }
 }
 
-struct Tokenizer{
+class Tokenizer{
 public:
   string fileName;
   string text;

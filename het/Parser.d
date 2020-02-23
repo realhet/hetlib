@@ -1,6 +1,6 @@
-module hetlib.parser;
+module het.parser;
 
-import hetlib.utils, hetlib.tokenizer, hetlib.keywords, std.regex;
+import het.utils, het.tokenizer, het.keywords, std.regex;
 
 //todo: editor: mouse back/fwd navigalas, mint delphiben
 
@@ -90,7 +90,7 @@ private:
       }
     }
 
-    t.level = queue.length;
+    t.level = queue.length.to!int;
     t.isTokenString = tokenStringLevel>0;
 
     if(int eb = endingBracketOf(t)){
@@ -166,7 +166,7 @@ struct ImportDecl{
   bool isUserModule() const { return !isStdModule && !isCoreModule; }
 
   string resolveFileName(string mainPath, string baseFileName, bool mustExists) const //returns "" if not found. Must handle outside.
-  { //todo: FileName, FilePath
+  { //todo: use FileName, FilePath
     const fn = name.fileName;
     string[] paths = isStdModule  ? [ DPaths.stdPath ] :
                      isEtcModule  ? [ DPaths.etcPath ] :
@@ -175,9 +175,9 @@ struct ImportDecl{
     string s;
     foreach(p; paths){
       s = includeTrailingPathDelimiter(p)~fn;
-      if(FileName(s).exists) return s; //it's a module
-      s = FileName(s).otherExt("").fullName ~ `\package.d`;
-      if(FileName(s).exists) return s; //it's a module
+      if(File(s).exists) return s; //it's a module
+      s = File(s).otherExt("").fullName ~ `\package.d`;
+      if(File(s).exists) return s; //it's a module
     }
 
     if(mustExists) throw new Exception("Module not found: "~fn~"  referenced from: "~baseFileName);
@@ -189,7 +189,7 @@ struct ImportDecl{
 //  Parser                                                                  //
 //////////////////////////////////////////////////////////////////////////////
 
-struct Parser{
+class Parser{
   string fileName, source;
   Token[] tokens;
 
@@ -206,7 +206,7 @@ struct Parser{
   int sourceLines()     { return tokens.empty ? 0 : tokens[$-1].line+1; }
 
   //1. Tokenize
-  void tokenize(string fileName){ tokenize(fileName, FileName(fileName).readStr); }
+  void tokenize(string fileName){ tokenize(fileName, File(fileName).readText); }
   void tokenize(string fileName, string source){
     this.fileName = fileName;
     this.source = source;
@@ -214,7 +214,7 @@ struct Parser{
     this.todos.clear;
 
     //Toenizing
-    Tokenizer tokenizer;
+    auto tokenizer = scoped!Tokenizer;
     string tokenizerError = tokenizer.tokenize(fileName, source, tokens);
     if(tokenizerError!="") error(tokenizerError);
 
@@ -270,8 +270,8 @@ private: /////////////////////////////////////////////////////////////////////
           auto line = cmt.source[3..$];
 
           //extract command word
-          int i = line.indexOf(' ');
-          if(i<0) i = line.length;
+          int i = line.indexOf(' ').to!int;
+          if(i<0) i = line.length.to!int;
           string command = lc(line[0..i]);
 
           //check if command is valid

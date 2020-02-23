@@ -1,11 +1,12 @@
-module hetlib.keywords;
+module het.keywords;
 
-import hetlib.utils;
+import het.utils;
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Basic Types                                                             ///
 ////////////////////////////////////////////////////////////////////////////////
 
+//todo: some types are no more. Complex numbers for example.
                      //        |---> maps exactly to kwEnums
 enum BasicType:byte  {Unknown, Byte, UByte, Short, UShort, Int, UInt, Long, ULong, Cent, UCent, Float, Double, Real, IFloat, IDouble, IReal, CFloat, CDouble, CReal, Bool, Char, WChar, DChar, Void }
 auto BasicTypeBytes  =[     0,    1,     1,     2,      2,   4,    4,    8,     8,   16,    16,     4,      8,   10,      4,       8,    10,      8,      16,    20,    1,    1,     2,     4,    0];
@@ -24,7 +25,7 @@ bool isVoid     (BasicType b) { return b==BasicType.Void; }
 ///  Keywords                                                                ///
 ////////////////////////////////////////////////////////////////////////////////
 
-private immutable string[] _keywordStrs = [ //last items of categories must be untouched!!!
+private enum _keywordStrs = [ //last items of categories must be untouched!!!
 //attributes
   //TypeCTors
     "const","immutable","inout","shared",
@@ -138,7 +139,7 @@ string kwStr(int kw) { return tdKeywords.keyOf(kw); }
 // ?
 // in is new delete
 
-private immutable auto _operatorStrs =[   //TODO: make it a Map, after it has a working static initializer.
+private enum _operatorStrs = [   //TODO: make it a Map, after it has a working static initializer.
   "."        ,"dot",                 ".."       ,"dotDot",               "..."      ,"dotDotDot",
   "?"        ,"question",            ","        ,"comma",                ";"        ,"semiColon",
   ":"        ,"colon",               "$"        ,"dollar",               "@"        ,"atSign",
