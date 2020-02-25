@@ -104,7 +104,10 @@ public:
   }
   void zoomAroundMouse(float amount) { zoomAround(mouseAct, amount); }
 
-  private bool updateActions(){
+
+  // navigate 2D view with the keyboard and the mouse
+  // it optionally calls invalidate
+  bool navigate(bool keyboardEnabled, bool mouseEnabled){
     auto oldOrigin = origin;
     auto oldScale = scale;
 
@@ -114,16 +117,20 @@ public:
             wheelSpeed  = 0.375f;
 
       group("View controls");          ////todo: ctrl+s es s (mint move osszeakad!)
-      onActive  ("Scroll"              , "MMB RMB"     , { scroll(inputs.mouseDelta); }         );
-      onActive  ("Scroll left"         , "A"           , { scrollH( scrollSpeed); }             );
-      onActive  ("Scroll right"        , "D"           , { scrollH(-scrollSpeed); }             );
-      onActive  ("Scroll up"           , "W"           , { scrollV( scrollSpeed); }             );
-      onActive  ("Scroll down"         , "S"           , { scrollV(-scrollSpeed); }             );
-      onDelta   ("Zoom"                , "MW"          , x => zoomAroundMouse(x*wheelSpeed)     );
-      onActive  ("Zoom in"             , "PgUp"        , { zoom( zoomSpeed); }                  );
-      onActive  ("Zoom out"            , "PgDn"        , { zoom(-zoomSpeed); }                  );
-      onModifier("Scroll/Zoom slower"  , "Shift"       , scrollSlower                           );
-      onPressed ("Zoom all"            , "Home"        , { zoomBounds(workArea); }              );
+
+      bool en = mouseEnabled;   //todo: actions are deprecated. This view.navigate function should be replaced with az IMGUI enable flag and a hidden window.
+      onActive  ("Scroll"              , "MMB RMB"     , { if(en) scroll(inputs.mouseDelta); }         );
+      onDelta   ("Zoom"                , "MW"          , (x){ if(en) zoomAroundMouse(x*wheelSpeed); }  );
+
+      en = keyboardEnabled;
+      onActive  ("Scroll left"         , "A"           , { if(en) scrollH( scrollSpeed); }             );
+      onActive  ("Scroll right"        , "D"           , { if(en) scrollH(-scrollSpeed); }             );
+      onActive  ("Scroll up"           , "W"           , { if(en) scrollV( scrollSpeed); }             );
+      onActive  ("Scroll down"         , "S"           , { if(en) scrollV(-scrollSpeed); }             );
+      onActive  ("Zoom in"             , "PgUp"        , { if(en) zoom( zoomSpeed); }                  );
+      onActive  ("Zoom out"            , "PgDn"        , { if(en) zoom(-zoomSpeed); }                  );
+      onModifier("Scroll/Zoom slower"  , "Shift"       , scrollSlower                                  );
+      onPressed ("Zoom all"            , "Home"        , { if(en) zoomBounds(workArea); }              );
     }
 
     bool res = origin!=oldOrigin || scale!=oldScale;
@@ -143,16 +150,18 @@ public:
     return res;
   }
 
+  //skips the animated moves to their destination immediately
   void skipAnimation(){
     updateAnimation(9999, false);
   }
 
-  bool _updateInternal(bool processActions){
+  //update smooth navigation. invalidates automatically
+  /*bool _updateInternal(bool processActions){
     bool res;
-    if(processActions) res |= updateActions;
+    //if(processActions) res |= updateActions; -> call it manually with navigate()
     res |= updateAnimation(owner.deltaTime, true);
     return res;
-  }
+  }*/
 
   @property string config() {
     return format("%f %f %f", logScale, origin.x, origin.y);
@@ -167,7 +176,6 @@ public:
       }
     }catch(Throwable){}
   }
-
 
 }
 

@@ -16,7 +16,7 @@ enum
   VisualizeHitStack        = 0;
 
 enum
-  NormalFontHeight = 18;
+  NormalFontHeight = 18;   //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 
 const
   InternalTabScale = 0.1,   //around 0.15
@@ -1258,6 +1258,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     defaultFontHeight = NormalFontHeight;
   }
 
+  bool active()                 const { return row !is null; }
 
   //access helpers
   auto cells()                  { return row.subCells; }

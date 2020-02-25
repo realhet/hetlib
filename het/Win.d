@@ -231,7 +231,7 @@ extern(Windows) int main(string[] args)
       }
 
       foreach(w; Window.windowList.values){
-        w.internalUpdate; //todo: az autoUpdate-t megjavitani. Ez itt az onIdle megfeleloje.
+        w.internalUpdate; //todo: az autoUpdate-t megjavitani. Ez itt az onIdle megfeleloje. Update: az autoUpdate az egy deprecated cucc, csak a Win.upUpdate defaultbol volt meghivva.
       }
     }
 
@@ -368,7 +368,7 @@ public:
   MouseState mouse;
   string inputChars; //aaccumulated WM_CHAR input flushed in update()
   string lastFrameStats;
-  bool autoUpdate;
+  //bool autoUpdate;  deprecated: es csak a
 
   private View2D viewGUI_;
   ref viewGUI() {
@@ -690,29 +690,46 @@ public:
     mouse.worldRect = Bounds2f(view.invTrans(mouse.screenRect.topLeft.toF), view.invTrans(mouse.screenRect.bottomRight.toF));
   }
 
-  public void updateView(bool processActions, bool processMouse){
+/*
+  This is deprecated now.
+  call view.navigate!
+
+  private void updateView(bool processActions, bool processMouse){
     if(processMouse) doMouseUpdate;
     view._updateInternal(processActions);
 //megy a paint-ba.    if(textures.update) invalidate;
-  }
+  }*/
 
   private void updateWithActionManager() {
+    //this calls the update on every window. But right now it is only for one window.
+
+    //timing
     auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS);
 
-    //this calls the update on every window
-    onWglMakeCurrent(true);
-    actions.beginUpdate;
+    //flush the keyboard input queue (WM_CHAR event)
+    scope(exit) inputChars = "";
+
+    //make openGL accessible
+    onWglMakeCurrent(true);   scope(exit){ onWglMakeCurrent(false); }
+
+    //prepare/finalize the old, immediate mode keyboard 'actions' interface (inputs.d)
+    actions.beginUpdate;      scope(exit){ if(actions.changed) invalidate;  actions.endUpdate; }
+
+    //update the local mouse struct
+    doMouseUpdate;
+
+    //update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
+    view.updateAnimation(deltaTime, true/*invalidate*/);
+
+    //prepare and finalize the IMGUI for every frame
+    import het.ui: im;
+    im._beginFrame(mouse.act.screen.toF);       scope(exit) im._endFrame;
+
+    //call the user overridden update method for the window
     try{
       onUpdate;
-
-      inputChars = ""; //flush the keyboard input queue
     }catch(Throwable t){
       showException(t);
-    }finally{
-      actions.endUpdate;
-      if(actions.changed)
-        invalidate;
-      onWglMakeCurrent(false);
     }
   }
 
@@ -783,15 +800,15 @@ public:
     }
   }
 
-  void onUpdate(){
-    updateView(true, true);
+  void onUpdate(){ //this is just an example
+    /*updateView(true, true);
 
     with(actions){
       group("Basic commands");
       onPressed("Help"                  , "F1"                  , { writeln(actions); });
     }
 
-    if(autoUpdate) invalidate;
+    if(autoUpdate) invalidate;*/
   }
 
 }

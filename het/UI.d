@@ -1149,10 +1149,11 @@ struct im{ static:
   import std.traits;
 
   //Frame handling
-  bool mouseOverUI;
+  bool mouseOverUI, wantMouse, wantKeys;
   private bool inFrame, canDraw;
 
-  private void beginFrame(in V2f mousePos){
+  //todo: package visibility is not working as it should -> remains public
+  void _beginFrame(in V2f mousePos){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
 
     //update building/measuring/drawing state
@@ -1166,28 +1167,39 @@ struct im{ static:
     //clear last frame's object references
     focusedState.container = null;
     textEditorState.beginFrame;
+
   }
 
-  private Container screenDoc(){
-    enforce(root.length==1, "im.screenDoc: root[] must contain exactly one Container.");
+  /*private Container screenDoc(){
+    enforce(root.length == 1, "im.screenDoc: root[] must contain exactly one Container.");
     auto cntr = cast(Container)root[0];
-    enforce(root.length==1, "im.screenDoc: root[0] must be a Container, not a Cell.");
+    enforce(cntr !is null, "im.screenDoc: root[0] must be a Container (not any other type of Cell)");
     return cntr;
-  }
+  }*/
 
-  private void endFrame(){
+  void _endFrame(){ //called from end of update
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
-    enforce(stack.length==1, "im.endFrame(): stack is corrupted. 1!="~stack.length.text);
+    enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 
-    screenDoc.measure;
+    auto rc = rootContainers(true);
 
-    static float scrollY = 0;
+    //measure
+    foreach(a; rc) a.measure;
+
+    //hittest in zOrder (currently in reverse creation order)
+    mouseOverUI = false;
+    foreach_reverse(a; rc)
+      if(a.hitTest(currentMouse))
+        mouseOverUI = true;
+
+    //the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
+    wantMouse = mouseOverUI;
+
+    //todo: fake scrolling just for the karc demo
+/*    static float scrollY = 0;
     static float actScrollY = 0;
     screenDoc.outerPos.y = actScrollY;
 
-    mouseOverUI = screenDoc.hitTest(currentMouse);
-
-    //todo: fake scrolling just for the karc demo
     if(1){
       import het.win;
       float screenHeight = mainWindow.clientHeight;
@@ -1201,12 +1213,14 @@ struct im{ static:
       actScrollY = lerp(actScrollY, scrollY, 0.25);
 
       actScrollY = actScrollY.clamp(min(0, screenHeight-docHeight), 0);
-    }
+    }*/
 
 
-    if(textEditorState.row){ //an edit control is active.
+    if(textEditorState.active){ //an edit control is active.
       auto err = textEditorState.processQueue;
     }
+
+    wantKeys = textEditorState.active;
 
     //update building/measuring/drawing state
     canDraw = true;
@@ -1216,7 +1230,8 @@ struct im{ static:
   void draw(ref Drawing dr){
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
-    if(screenDoc) screenDoc.draw(dr);
+    foreach(r; root) r.draw(dr); //draw in zOrder
+
     hitTestManager.draw(dr);
 
     //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
@@ -1225,7 +1240,7 @@ struct im{ static:
   void Panel(void delegate() fun){ //todo: multiple Panels, but not call them frames...
     import het.win;
 auto t0=QPS;
-    im.beginFrame(mainWindow.mouse.act.screen.toF);
+    //im.beginFrame(mainWindow.mouse.act.screen.toF);  called from winMain update
 auto t1=QPS;
     Document({
       padding = "4";
@@ -1235,7 +1250,7 @@ auto t1=QPS;
 
     });
 auto t2=QPS;
-    im.endFrame;
+    //im.endFrame;  //called from winMain update
 auto t3=QPS;
 
 static cnt=0;
@@ -1295,6 +1310,14 @@ static cnt=0;
   //////////////////////////////////////////////////////////////////
 
   Cell[] root; //when containerStack is empty, this is the container
+
+  auto rootContainers(bool forceAll){
+    auto res = root.map!(c => cast(Container)c)
+                   .filter!"a"
+                   .array;
+    if(forceAll) enforce(root.length == res.length, "FATAL ERROR: All of root[] must be a descendant of Container.");
+    return res;
+  }
 
   //double QPS=0, lastQPS=0, dt=0;
   //todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
