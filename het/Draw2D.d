@@ -62,6 +62,8 @@ enum HAlign { left, center, right, justify }  //when the container width is fixe
 enum VAlign { top, center, bottom, justify }  //when the container height is fixed
 enum YAlign { top, center, bottom, baseline } //this aligns the y position of each cell in a line. baseline is 0.7ish
 
+
+
 struct RectAlign{align(1): import std.bitmanip;
   mixin(bitfields!(
     HAlign, "hAlign"    , 2,
@@ -111,7 +113,7 @@ struct RectAlign{align(1): import std.bitmanip;
         b1 = a1/max(0.000001f,r2);
         final switch(vAlign.to!int){
           case 0:rdst2.top = rdst.top;                          break;
-          case 1, 3:rdst2.top = (rdst.top+rdst.bottom-b1)*.5;      break;
+          case 1, 3:rdst2.top = (rdst.top+rdst.bottom-b1)*.5;   break;
           case 2:rdst2.top = rdst.bottom-b1;                    break;
         }
         rdst2.bottom = rdst2.top+b1;
@@ -120,7 +122,7 @@ struct RectAlign{align(1): import std.bitmanip;
         a1 = b1*r2;
         final switch(hAlign.to!int){
           case 0:rdst2.left = rdst.left;                        break;
-          case 1, 3:rdst2.left = (rdst.left+rdst.right-a1)*.5;     break;
+          case 1, 3:rdst2.left = (rdst.left+rdst.right-a1)*.5;  break;
           case 2:rdst2.left = rdst.right-a1;                    break;
         }
         rdst2.right = rdst2.left+a1;

@@ -1177,7 +1177,7 @@ struct im{ static:
     return cntr;
   }*/
 
-  void _endFrame(){ //called from end of update
+  void _endFrame(in Bounds2f screenBounds){ //called from end of update
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
     enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 
@@ -1185,6 +1185,10 @@ struct im{ static:
 
     //measure
     foreach(a; rc) a.measure;
+
+    //align
+    foreach(a; rc) a.applyPanelPosition(screenBounds);
+
 
     //hittest in zOrder (currently in reverse creation order)
     mouseOverUI = false;
@@ -1237,7 +1241,7 @@ struct im{ static:
     //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
   }
 
-  void Panel(void delegate() fun){ //todo: multiple Panels, but not call them frames...
+  void Panel(T...)(T args){ //todo: multiple Panels, but not call them frames...
     import het.win;
 auto t0=QPS;
     //im.beginFrame(mainWindow.mouse.act.screen.toF);  called from winMain update
@@ -1246,7 +1250,11 @@ auto t1=QPS;
       padding = "4";
       border = "1 normal silver";
 
-      if(fun) fun();
+      static foreach(a; args){{
+        alias t = Unqual!(typeof(a));
+        static if(is(t == PanelPosition)) flags.panelPosition = a; //PanelPosition
+        static if(__traits(compiles, a())) if(a) a(); //delegate/function
+      }}
 
     });
 auto t2=QPS;

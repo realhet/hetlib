@@ -1103,18 +1103,21 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 
 enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
 
+enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{
-  ushort _data = 0b0_0_0_01_00_00_1;
+  ushort _data = 0b0000_0_0_0_01_00_00_1;
   mixin(bitfields!(
     bool          , "canWrap"         , 1,
-    HAlign        , "hAlign"          , 2,
+    HAlign        , "hAlign"          , 2,  //alignment for all subCells
     VAlign        , "vAlign"          , 2,
     YAlign        , "yAlign"          , 2,
     bool          , "dontHideSpaces"  , 1,  //useful for active edit mode
     bool          , "canSelect"       , 1,
     bool          , "focused"         , 1,  //maintained by system, not by user
-    int, "_dummy"       , 6,
+    PanelPosition , "panelPosition"   , 4,  //only for desktop
+
+    int, "_dummy"       , 2,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1646,6 +1649,20 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
+  //aligns the container on the screen
+  void applyPanelPosition(in Bounds2f bnd){ with(PanelPosition){
+    const pp = flags.panelPosition;
+    if(pp == none) return;
+
+    V2i p; divMod(cast(int)pp-1, 3, p.y, p.x);
+    if(p.x.inRange(0, 2) && p.y.inRange(0, 2)){
+      auto t = p.toF*.5,
+           u = V2f(1, 1)-t;
+
+      outerPos = bnd.topLeft*u + bnd.bottomRight*t //todo: bug: fucking V2f.lerp is broken again
+               - outerSize*t;
+    }
+  }}
 }
 
 

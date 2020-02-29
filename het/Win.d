@@ -723,7 +723,7 @@ public:
 
     //prepare and finalize the IMGUI for every frame
     import het.ui: im;
-    im._beginFrame(mouse.act.screen.toF);       scope(exit) im._endFrame;
+    im._beginFrame(mouse.act.screen.toF);       scope(exit) im._endFrame(clientBounds.toF);
 
     //call the user overridden update method for the window
     try{
