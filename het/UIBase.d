@@ -1106,7 +1106,7 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{
-  ushort _data = 0b0000_0_0_0_01_00_00_1;
+  ushort _data = 0b0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"         , 1,
     HAlign        , "hAlign"          , 2,  //alignment for all subCells
@@ -1115,9 +1115,10 @@ union ContainerFlags{
     bool          , "dontHideSpaces"  , 1,  //useful for active edit mode
     bool          , "canSelect"       , 1,
     bool          , "focused"         , 1,  //maintained by system, not by user
+    bool          , "hovered"         , 1,  //maintained by system, not by user
     PanelPosition , "panelPosition"   , 4,  //only for desktop
 
-    int, "_dummy"       , 2,
+    int, "_dummy"       , 1,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1613,8 +1614,10 @@ class Container : Cell { // Container ////////////////////////////////////
     if(super.hitTest(mouse, ofs)){
       ofs += innerPos;
       foreach(sc; subCells) sc.hitTest(mouse, ofs); //recursive
+      flags.hovered = true;
       return true;
     }else{
+      flags.hovered = false;
       return false;
     }
   }

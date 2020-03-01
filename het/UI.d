@@ -1150,7 +1150,7 @@ struct im{ static:
 
   //Frame handling
   bool mouseOverUI, wantMouse, wantKeys;
-  private bool inFrame, canDraw;
+  private bool inFrame, canDraw; //synchronization for internal methods
 
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(in V2f mousePos){ //called from mainform.update
@@ -1167,7 +1167,6 @@ struct im{ static:
     //clear last frame's object references
     focusedState.container = null;
     textEditorState.beginFrame;
-
   }
 
   /*private Container screenDoc(){
@@ -1189,6 +1188,9 @@ struct im{ static:
     //align
     foreach(a; rc) a.applyPanelPosition(screenBounds);
 
+    applyScrollers(screenBounds);
+
+    //from here, all positions are valid
 
     //hittest in zOrder (currently in reverse creation order)
     mouseOverUI = false;
@@ -1199,26 +1201,8 @@ struct im{ static:
     //the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
     wantMouse = mouseOverUI;
 
-    //todo: fake scrolling just for the karc demo
-/*    static float scrollY = 0;
-    static float actScrollY = 0;
-    screenDoc.outerPos.y = actScrollY;
-
-    if(1){
-      import het.win;
-      float screenHeight = mainWindow.clientHeight;
-      float docHeight = screenDoc.outerHeight;
-      if(mouseOverUI){
-        scrollY += mainWindow.mouse.delta.wheel*120;
-      }
-
-      scrollY = scrollY.clamp(min(0, screenHeight-docHeight), 0);
-
-      actScrollY = lerp(actScrollY, scrollY, 0.25);
-
-      actScrollY = actScrollY.clamp(min(0, screenHeight-docHeight), 0);
-    }*/
-
+    updateScrollers(screenBounds);
+    resetScrollers; //needed no more
 
     if(textEditorState.active){ //an edit control is active.
       auto err = textEditorState.processQueue;
@@ -1314,6 +1298,94 @@ static cnt=0;
 //  void focusExit(uint id)               { if(isFocused(id)) focusedState.reset; }
 //  void focusExit(Container container)   { if(isFocused(container)) focusedState.reset; }
 //  void focusExit()                      { focusedState.reset; }
+
+
+// ScrollState, scroller ////////////////////////////////////////////////
+  struct ScrollState{ //currently it's for y only
+    float scrollY = 0;
+    float scrollY_smooth = 0;
+  }
+
+  class Scroller{
+    Container container, parent;
+    ScrollState* state;
+
+    this(Container container, Container parent, ref ScrollState state){
+      this.container = container;
+      this.parent = parent;
+      this.state = &state;
+    }
+
+    void apply(in Bounds2f screenBounds){ //must be called first, before update, so the positions are calculated well
+      if(state) with(*state){
+        float totalHeight = parent ? parent.innerHeight : screenBounds.height;
+        float docHeight = container.outerHeight;  //todo: COPY
+
+        if(totalHeight<docHeight){
+          container.outerPos.y = scrollY_smooth;
+        } //otherwise assume it's aligned properly. Only change the position when it doesn't fit in.
+      }
+    }
+
+    void update(in Bounds2f screenBounds){
+      if(state) with(*state){
+        float totalHeight = parent ? parent.innerHeight : screenBounds.height;
+        float docHeight = container.outerHeight; //todo: PASTE
+
+        if(container.flags.hovered){ //todo: overlapping Panels not handled properly (all of them are scrolling, not just the topmost)
+          import het.win;
+          scrollY += mainWindow.mouse.delta.wheel*120; //todo: Window/mouse should it should come from outside
+        }
+
+        scrollY = scrollY.clamp(min(0, totalHeight-docHeight), 0);
+        scrollY_smooth = lerp(scrollY_smooth, scrollY, 0.25);
+        scrollY_smooth = scrollY_smooth.clamp(min(0, totalHeight-docHeight), 0);
+      }
+    }
+
+  }
+
+  Scroller[] scrollers;
+
+  auto vScroll(ref ScrollState state){
+    enforce(stack.length>=2);
+    //todo: get the bounds from the previous container on the stack
+    //todo: handle PanelPosition center/bottom
+    //todo: hscroll
+
+    //scroller workflow:
+    //1. build: make the scrolling list -> scroll(myScrollState)
+    //2. measure
+    //3. scrollers.update
+
+    auto idx = scrollers.map!(s => s.container).countUntil(actContainer);
+    enforce(idx<0, "Scroller already defined");
+
+    scrollers ~= new Scroller(actContainer, stack[$-2].container, state);
+
+    return scrollers[$-1];
+  }
+
+  auto vScroll(string file=__FILE__ , int line=__LINE__, T...)(T args){ //todo: this is only good for unique panels
+    mixin(id.M);
+    __gshared static ScrollState[uint] cache;
+
+    if(id_ !in cache) cache[id_] = ScrollState();
+
+    return vScroll(cache[id_]);
+  }
+
+  private void applyScrollers(in Bounds2f screenBounds){
+    foreach(sc; scrollers) sc.apply(screenBounds);
+  }
+
+  private void updateScrollers(in Bounds2f screenBounds){
+    foreach(sc; scrollers) sc.update(screenBounds);
+  }
+
+  private void resetScrollers(){
+    scrollers = [];
+  }
 
   //////////////////////////////////////////////////////////////////
 
@@ -1432,7 +1504,7 @@ static cnt=0;
   );
 
   //Parameter structs ///////////////////////////////////
-  struct id      { uint val;  private enum M = q{ auto _id = file.xxh(line)^baseId;                              static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) _id       = [a.val].xxh(_id); }; }
+  struct id      { uint val;  private enum M = q{ auto id_ = file.xxh(line)^baseId;                              static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
   struct enable  { bool val;  private enum M = q{ auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;   static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled   = enabled && a.val; }; }
   struct selected{ bool val;  private enum M = q{ auto _selected = false;                                        static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected = a.val;            }; }
 
@@ -1713,11 +1785,11 @@ static cnt=0;
     Row({
       auto row = cast(.Row)actContainer;
 
-      auto hit = hitTestManager.check(_id); //get the hittert from the last frame
+      auto hit = hitTestManager.check(id_); //get the hittert from the last frame
       auto localMouse = currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize;
-      hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
+      hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
 
-      bool focused = focusUpdate(actContainer, _id,
+      bool focused = focusUpdate(actContainer, id_,
         enabled,
         hit.pressed, //enter
         inputs["Esc"].pressed,  //exit
@@ -1887,11 +1959,11 @@ static cnt=0;
 
     const isToolBtn = theme=="tool";
 
-    auto hit = hitTestManager.check(_id); //get the hittert from the last frame
+    auto hit = hitTestManager.check(id_); //get the hittert from the last frame
     Row({
-      hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
+      hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
 
-      bool focused = focusUpdate(actContainer, _id,
+      bool focused = focusUpdate(actContainer, id_,
         enabled, hit.pressed, false,  //enabled, enter, exit
         /* onEnter */ { },
         /* onFocus */ { },
@@ -1945,9 +2017,9 @@ static cnt=0;
 
     //todo: This is only the base of a listitem. Later it must communicate with a container
 
-    auto hit = hitTestManager.check(_id); //get the hittert from the last frame
+    auto hit = hitTestManager.check(id_); //get the hittert from the last frame
     Row({
-      hitTestManager.addHash(actContainer, _id); //save the rect of this container for the next frame
+      hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
 
       style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
 
@@ -1982,7 +2054,7 @@ static cnt=0;
   //ChkBox //////////////////////////////
   auto ChkBox(string file=__FILE__, int line=__LINE__, string chkBoxStyle="chk", T...)(ref bool state, string caption, T args){
     mixin(id.M ~ enable.M ~ selected.M);
-    auto hit = hitTestManager.check(_id);
+    auto hit = hitTestManager.check(id_);
 
     //update checkbox state
     if(enabled && hit.clicked) state.toggle;
@@ -2000,7 +2072,7 @@ static cnt=0;
                                        : tag(`symbol Checkbox`~(state?"CompositeReversed":""));
 
     auto ts = style;
-    auto ctrl = new Clickable(_id, format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor), ts, (string[string]).init);
+    auto ctrl = new Clickable(id_, format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor), ts, (string[string]).init);
 
     append(ctrl);
     return hit;
@@ -2043,7 +2115,7 @@ static cnt=0;
     }
 
     bool userModified;
-    auto sl = new Slider(_id, normValue, _range, userModified);
+    auto sl = new Slider(id_, normValue, _range, userModified);
     sl.setProps(props);
     append(sl);
 
