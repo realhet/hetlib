@@ -566,7 +566,9 @@ public:
   void hide()             { ShowWindow(hwnd, SW_HIDE); }
   void maximizeWin()      { ShowWindow(hwnd, SW_MAXIMIZE); }
   void minimizeWin()      { ShowWindow(hwnd, SW_MINIMIZE); }
-  void setFocus()         { SetFocus(hwnd); }
+  void setFocus()         { SetFocus(hwnd); } //it's only keyboard focus
+  bool isForeground()     { return GetForegroundWindow == hwnd; }
+
 
   RECT clientRect()       { RECT r; GetClientRect(hwnd, &r); return r; }
   Bounds2i clientBounds() { with(clientRect) return Bounds2i(left, top, right, bottom); }

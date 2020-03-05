@@ -590,6 +590,11 @@ const clChapter                 = RGB(221,   3,  48),
       clWinBtnPressed           = clWinBtnHoverBorder,
       clWinBtnDisabledText      = clWinBtnHoverBorder,
 
+      clHintText                = clWinText,
+      clHintBk                  = RGB(236, 233, 216),
+      clHintDetailsText         = clWinText,
+      clHintDetailsBk           = clWhite,
+
       clSliderLine              = clLinkPressed,
       clSliderLineHover         = clLinkHover,
       clSliderLinePressed       = clLinkPressed,

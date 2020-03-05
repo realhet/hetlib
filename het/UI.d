@@ -1152,6 +1152,8 @@ struct im{ static:
   bool mouseOverUI, wantMouse, wantKeys;
   private bool inFrame, canDraw; //synchronization for internal methods
 
+  float deltaTime=0;
+
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(in V2f mousePos){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
@@ -1167,14 +1169,10 @@ struct im{ static:
     //clear last frame's object references
     focusedState.container = null;
     textEditorState.beginFrame;
-  }
 
-  /*private Container screenDoc(){
-    enforce(root.length == 1, "im.screenDoc: root[] must contain exactly one Container.");
-    auto cntr = cast(Container)root[0];
-    enforce(cntr !is null, "im.screenDoc: root[0] must be a Container (not any other type of Cell)");
-    return cntr;
-  }*/
+    static DeltaTimer dt;
+    deltaTime = dt.update;
+  }
 
   void _endFrame(in Bounds2f screenBounds){ //called from end of update
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
@@ -1205,10 +1203,12 @@ struct im{ static:
     resetScrollers; //needed no more
 
     if(textEditorState.active){ //an edit control is active.
+      //todo: mainWindow.isForeground check
       auto err = textEditorState.processQueue;
     }
-
     wantKeys = textEditorState.active;
+
+    generateHints(screenBounds);
 
     //update building/measuring/drawing state
     canDraw = true;
@@ -1306,7 +1306,7 @@ static cnt=0;
     float scrollY_smooth = 0;
   }
 
-  class Scroller{
+  class Scroller{   //todo: kinetic scrolling
     Container container, parent;
     ScrollState* state;
 
@@ -1387,7 +1387,117 @@ static cnt=0;
     scrollers = [];
   }
 
-  //////////////////////////////////////////////////////////////////
+  // hints /////////////////////////////////////////////////////////////////
+
+  const float HintActivate_sec  = 0.5,
+              HintDetails_sec   = 2.5,
+              HintRelease_sec   = 1  ;
+
+  private struct HintRec{
+    Container owner;
+    Bounds2f bounds;
+    string markup, markupDetails; //todo: support delegates too
+  }
+  private HintRec[] hints;
+
+  enum HintState { idle, active, details }
+  static hintState = HintState.idle;
+
+  /// This can be used to inject a hint into the parameters of a Control
+  auto hint(string markup, string markupDetails=""){ //todo: delegate too
+    return HintRec(null, Bounds2f.Null, markup, markupDetails); //todo: lazyness
+  }
+
+  void addHint(HintRec hr){ hints ~= hr; }
+
+  void hideHints(){ hintState = HintState.idle; }
+
+  private enum hintHandler = q{
+    static foreach(a; args) static if(is(Unqual!(typeof(a)) == HintRec)){
+      if(hit.hover){
+        HintRec hr = a;
+        hr.owner = actContainer;
+        hr.bounds = hit.hitBounds;
+        addHint(hr);
+      }
+    }
+  };
+
+  private void generateHints(in Bounds2f screenBounds){ //called on the end of the frame
+    static float mouseStopped_secs = 0;
+    static float noHint_secs = 0;
+
+    const userBlocking = "Esc,Enter,LMB,RMB,MMB,Space".split(",").map!(k => inputs[k].active).any;
+
+    if(inputs.MX.delta==0 && inputs.MY.delta==0) mouseStopped_secs += deltaTime;
+                                            else mouseStopped_secs = 0;
+
+    if(hints.empty) noHint_secs += deltaTime;
+               else noHint_secs = 0;
+
+    //enter hint mode
+    if(!hints.empty && !userBlocking){
+      if(hintState == HintState.idle   && mouseStopped_secs>HintActivate_sec) hintState = HintState.active ;
+      if(hintState == HintState.active && mouseStopped_secs>HintDetails_sec ) hintState = HintState.details;
+    }
+
+    //exit hint mode
+    if(hintState != HintState.idle){
+      //immediately hide on particular user events
+      if(userBlocking) hideHints;
+
+      //hide after no hints to display for a while
+      if(noHint_secs>HintRelease_sec) hideHints;
+    }
+
+    PING(hintState.to!int);
+
+    //actual hint generation
+    HintRec lastHint;
+    if(hints.length) lastHint = hints[$-1];
+    auto hintOwner = lastHint.owner;
+
+    if(hintState != HintState.idle && hintOwner){
+      Container hintContainer;
+
+      Panel({
+        hintContainer = actContainer;
+        padding = "0";
+        border.color = clGray;
+
+        if(lastHint.markup!="") Row({ //todo: row kell?
+          padding = "4";
+          style.fontColor = clHintText;
+          style.bkColor = bkColor = clHintBk;
+
+          Text(lastHint.markup);
+        });
+        if(hintState == HintState.details && lastHint.markupDetails!="") Row({
+          padding = "4";
+          style.fontColor = clHintDetailsText;
+          style.bkColor = bkColor = clHintDetailsBk;
+
+          Text(lastHint.markupDetails);
+        });
+
+      });
+
+      hintContainer.measure;
+
+      //align the hint
+      hintContainer.outerPos = lastHint.bounds.bottomCenter //Bounds.bottomCenter
+                             + V2f(-hintContainer.outerWidth*.5, 5);
+
+      //clamp horizontaly
+      hintContainer.outerPos.x = clamp(hintContainer.outerPos.x, 0, max(0, screenBounds.width-hintContainer.outerWidth));
+
+      //todo: HintSettings: on/off, hintLocation:nextTo/statusBar/bottomRight, save to ini
+    }
+
+    hints = [];
+  }
+
+  //! im internal state ////////////////////////////////////////////////////////////////
 
   Cell[] root; //when containerStack is empty, this is the container
 
@@ -1789,6 +1899,8 @@ static cnt=0;
       auto localMouse = currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize;
       hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
 
+      mixin(hintHandler);
+
       bool focused = focusUpdate(actContainer, id_,
         enabled,
         hit.pressed, //enter
@@ -1959,9 +2071,12 @@ static cnt=0;
 
     const isToolBtn = theme=="tool";
 
-    auto hit = hitTestManager.check(id_); //get the hittert from the last frame
+    auto hit = hitTestManager.check(id_); //get the hittest from the last frame
+
     Row({
       hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
+
+      mixin(hintHandler);
 
       bool focused = focusUpdate(actContainer, id_,
         enabled, hit.pressed, false,  //enabled, enter, exit

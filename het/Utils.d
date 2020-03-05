@@ -3661,7 +3661,6 @@ double QPS() //it's in seconds and synchronized with now() only at the start
 {
   long cntr;
   QueryPerformanceCounter(&cntr);
-
   static __gshared double timeBase;
   static __gshared long   cntrBase;
   static __gshared double invFreq;
@@ -3677,47 +3676,41 @@ double QPS() //it's in seconds and synchronized with now() only at the start
   return cast(double)(cntr-cntrBase)*invFreq + timeBase; //cntr has to be 'normalized' before multiplication to preserve precision
 }
 
-float QPS_local(){
+float QPS_local(){ //todo: mi a faszom kurvaannya ez is... 0-tol indulo QPS bazzz
   __gshared static double firstQPS = 0;
   if(!firstQPS) firstQPS = QPS;
   return QPS-firstQPS;
 }
 
-class DeltaTime {
-  double t0 = 0;
-  float _elapsed = 0;
+struct DeltaTimer {
+  double tLast = 0;
 public:
-  float seconds = 0;
-
-  this() { reset; }
+  float total = 0;
+  float delta = 0; //the time from the last update
 
   void reset() //resets the total elapsed time
   {
-    _elapsed = 0;
-    t0 = QPS;
+    total = 0;
+    tLast = QPS;
   }
 
   float update() {  //returns time since last update
-    double t1 = QPS;
-    seconds = t1-t0;
-    _elapsed += seconds;
-    t0 = t1; //restart
-    return seconds;
+    double tAct = QPS;
+    if(tLast==0) tLast = tAct;
+    delta = tAct-tLast;
+    total += delta;
+    tLast = tAct; //restart
+    return delta;
   }
 
-  float elapsed() { //returns total elapsed time
-    update();
-    return _elapsed;
-  }
-
-  bool periodic(float secs, bool enableOverflow) //enableOF: false for user-interface, true for physics simulations
+  bool update_periodic(float secs, bool enableOverflow) //enableOF: false for user-interface, true for physics simulations
   {
     update();
-    bool res = _elapsed>=secs;
+    bool res = total>=secs;
     if(res){
-      _elapsed -= secs;
+      total -= secs;
       if(!enableOverflow){
-        if(_elapsed>=secs) _elapsed = 0;
+        if(total>=secs) total = 0;
       }
     }
     return res;

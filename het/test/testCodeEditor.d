@@ -7,12 +7,79 @@
 
 import het, het.ui, het.keywords, het.tokenizer, het.parser;
 
+import io3 = std.stdio, u3 = het.utils : iow = indexOfWord, il = isLetter, isHexDigit;
+
 //todo: commentek hozzacsapasa a tokenekhez. Ha a comment soraban van token, akkor ahhoz, ha nincs akkor meg a kovetkezo tokenhez, kiveve ha a legvegen van. De mi van, ha tobb comment van egymas mellett??
 
 //todo: a sebesseghez a tokenizernek meg az utana kovetkezo lepeseknek is range-knak kell lenniuk.
 
 enum testCase = q{
 import std.stdio, het.utils;
+import io = std.stdio, u = het.utils;
+import io2 = std.stdio, u2 = het.utils : indexOfWord, isLetter;
+import io3 = std.stdio, u3 = het.utils : iow = indexOfWord, il = isLetter;
+
+public align(8){
+
+extern(C++, NameSpace)   //LinkageAttribute   C C++ D Windows System Objective-C
+align(4)          //AlignAttribute
+deprecated(["Hello", "World"].join(" "))
+export              //VisibilityAttribute
+
+static if(1){
+//private
+//package(IdentifierList)
+//protected
+//public
+//export          //VisibilityAttribute end
+pragma(inline, true)
+static
+//abstract
+final
+//override
+synchronized
+//auto
+//scope
+//const
+//immutable
+//inout
+//shared
+__gshared
+nothrow
+pure
+ref
+//return
+//@disable
+@nogc
+@ property
+@safe
+//@system
+//@trusted
+
+@  uda
+@uda ()
+@(5, uda()):
+}
+int a();
+
+}
+pragma(msg, typeof(a));
+
+int test(int x)
+{
+    int r = -1;
+    Lswitch: switch(x)
+    {
+        static foreach(i; 0 .. 100)
+        {
+            case i:
+                r = i;
+                break Lswitch;
+        }
+        default: break;
+    }
+    return r;
+}
 
 void main() {
     foreach (value; [ 1, 2, 3, 10, 20 ]) {
@@ -54,7 +121,7 @@ void main() {
 
 
 
-auto noComments(Token[] t){ return t.filter!(t => !t.isComment).array; }
+auto withoutComments(Token[] t){ return t.filter!(t => !t.isComment).array; }
 
 Token[][] splitToSentences(Token[] tokens){
   if(tokens.empty) return [];
@@ -84,6 +151,107 @@ Token[][] splitToSentences(Token[] tokens){
 }
 
 
+class BaseNode{ //BaseNode /////////////////////////////
+  abstract void ui();
+
+  protected void uiHeader(RGB color, string title){ with(im){
+    theme = "tool";
+    padding = "2 2 2 2";
+    margin = "2";
+    border = "1 normal";
+    //border.extendBottomRight = true;
+    bkColor = lerp(color, clWhite, .5);
+    border.color = lerp(bkColor, clBlack, .25);
+    style.bkColor = bkColor;
+    if(title.length) Text(bold(title~" "));
+  }}
+}
+
+class UnknownNode : BaseNode{ //UnknownNode //////////////////////////
+  Token[] seq;
+
+  this(Token[] seq){
+    this.seq = seq;
+  }
+
+  override void ui(){ with(im){
+    Column({
+      border = "normal";
+      foreach(ref t; seq)
+        Row({ Text("%t".format(t), "\n"); });
+    });
+  }}
+}
+
+class ImportNode : BaseNode{ // import ////////////////////////////////
+  Token[] seq;
+
+  this(Token[] seq){
+    this.seq = seq;
+  }
+
+  override void ui(){ with(im){
+    Row({
+      uiHeader(clRainbowYellow, "import");
+      Row({
+        string name;
+
+        foreach(ref t; seq[1..$]){
+          if(t.kind==TokenKind.Identifier || t.source.among(".", "=", ":")) name ~= t.source;
+          if(t.source.among(",", ":")) { Edit(name, { bkColor = style.bkColor; }); name = ""; }
+        }
+
+        if(!name.empty){
+          Edit(name, { bkColor = style.bkColor; }); name = "";
+        }
+      });
+    });
+  }}
+}
+
+class AttributeNode : BaseNode{
+  Token[] seq;
+
+  this(Token[] seq){
+    this.seq = seq;
+  }
+
+
+}
+
+
+Attributes parseAttribute(ref Token[] tokens){
+  BaseNode[] res;
+
+  if(tokens.empty) return [];
+
+
+
+}
+
+
+BaseNode[] parseDeclDefs(ref Token[] tokens){
+  BaseNode[] res = [];
+
+  if(tokens.empty) res;
+
+  while(
+
+
+  if(tokens[0].
+
+
+}
+
+
+BaseNode newNode(Token[] seq){
+  enforce(seq.length);
+
+  if(seq[0].isKeyword(kwimport)) return new ImportNode(seq);
+
+  return new UnknownNode(seq);
+}
+
 
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
 
@@ -102,7 +270,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     auto f = File(`..\Dialogs.d`);
     parser.tokenize(f.fullName, testCase);
 
-    parser.tokens = parser.tokens.noComments; //todo: deal with tokens later
+    parser.tokens = parser.tokens.withoutComments; //todo: deal with tokens later
 
     tokenSentences = parser.tokens.splitToSentences; //todo: input ranges
   }
@@ -115,13 +283,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
   override void onUpdate(){ // update ////////////////////////////////
     invalidate; //todo: opt
 
-    //scroll the ui... fucking lame, must rethink
-    bool processMouse = true;
-    if(im.mouseOverUI){ //it's bad.
-      processMouse = false;
-    }
-
-    updateView(processMouse, true);
+    view.navigate(!im.wantKeys, !im.wantMouse);
 
     caption = FPS.text;
 
@@ -157,23 +319,13 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
       void uiTokenSentences(Token[][] sentences){
 
         foreach(ts; sentences){
-          if(ts[0].source=="import"){
-            Row({
-              header(clRainbowYellow, "import");
-              Row({
-                string name;
+          auto node = newNode(ts);
+          node.ui;
 
-                foreach(ref t; ts[1..$]){
-                  if(t.kind==TokenKind.Identifier || t.source.among(".", "=", ":")) name ~= t.source;
-                  if(t.source.among(",", ":")) { Edit(name, { bkColor = style.bkColor; }); name = ""; }
-                }
 
-                if(!name.empty){
-                  Edit(name, { bkColor = style.bkColor; }); name = "";
-                }
-              });
-            });
-
+/*          if(ts[0].source=="import"){
+            auto node = newNode(ts);
+            node.ui;
           }else if(ts[$-1].source=="}"){ //block thing
 
             //search the start of the block
@@ -268,7 +420,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
                 Row({ Text("%t".format(t), "\n"); });
               }
             });
-          }
+          }*/
         }
 
       }
