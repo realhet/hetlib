@@ -785,20 +785,27 @@ struct Drawing {
     } //just shovels the data through
 
     @geometry:////////////////////////////////////////////////////////////////////////
-    #define maxVertices 64
+    #define MaxArrowVertices 12
+    #define MaxCurveVertices 27
+    #define TotalVertices 39
+    // TotalVertices = MaxCurveVertices + MaxArrowVertices
+
+    //NV GTX650 384core 1GB 128bit    totalVertices = 39
+    //AMD R9 Fury X 4096core 4GB HBM  totalVertices = 84
+
     layout(points) in;
-    layout(triangle_strip, max_vertices = 84) out; //Extra vertices are there for arrowheads
+    layout(triangle_strip, max_vertices = TotalVertices) out; //Extra vertices are there for arrowheads
 
     in float Type[]; in vec2 A[], B[], C[], D[]; in vec4 Color[], Color2[];
     flat out vec4 fColor;
-    varying out vec2 fStipple; //type, phase:
+    out vec2 fStipple; //type, phase:    //note: it was "varying out", but NVidia don't like it, just "out"
 
     //transformation
     uniform vec2 uShift, uScale, uViewPortSize;
 
     //glyph only
     flat out vec4 fColor2; //alpha holds special stuff
-    varying out vec2 fTexCoord; //todo: osszevonhato lenne az fStipple-vel
+    out vec2 fTexCoord; //todo: osszevonhato lenne az fStipple-vel
 
     flat out ivec2 stPos, stSize;
     flat out int stConfig, stIdx;
@@ -825,8 +832,10 @@ struct Drawing {
       ivec4 i1 = ivec4(round(p[0]*255.0));
       ivec4 i2 = ivec4(round(p[1]*255.0));
 
-      int[4] tmp = { i1.x + (i1.y<<8), i1.z + (i1.w<<8),
-                     i2.x + (i2.y<<8), i2.z + (i2.w<<8) };
+      /*int[4] tmp = { i1.x + (i1.y<<8), i1.z + (i1.w<<8),
+                       i2.x + (i2.y<<8), i2.z + (i2.w<<8) };*/ //NV error: error C7549: OpenGL does not allow C style initializers
+      int[4] tmp = int[4]( i1.x + (i1.y<<8), i1.z + (i1.w<<8),
+                           i2.x + (i2.y<<8), i2.z + (i2.w<<8) );
 
       info.pos.x  = fetchBits(tmp[0], 14)<<SubTexCellBits;
       info.pos.y  = fetchBits(tmp[1], 14)<<SubTexCellBits;
@@ -1004,12 +1013,12 @@ struct Drawing {
 
       int t = int(Type[0]);
       if(t==1){ //Point
-        emitEllipse(trans(A[0]), calcRadius(C[0].x), maxVertices);
+        emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices);
       }else if(t==2){ //Point2
-        emitEllipse(trans(A[0]), calcRadius(C[0].x), maxVertices/2);
-        emitEllipse(trans(B[0]), calcRadius(C[0].y), maxVertices/2);
+        emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices/2);
+        emitEllipse(trans(B[0]), calcRadius(C[0].y), MaxCurveVertices/2);
       }else if(t>=3 && t<=3+63){
-        emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, maxVertices, float(t-3));
+        emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, MaxCurveVertices, float(t-3));
       }else if(t==67){ //filled rect
         emitRect(trans(A[0]), trans(B[0]));
       }else if(t==68){ //triangle
@@ -1078,6 +1087,8 @@ struct Drawing {
     flat in vec2 texelPerPixel;
     flat in float boldTexelOffset;
     flat in int fontFlags;
+
+    out vec4 FragColor; //NV compatibility: gl_FragColor is deprecated
 
     uniform sampler2D smpMega[MegaTexMaxCnt];
 
@@ -1217,7 +1228,7 @@ struct Drawing {
           color.a *= a;
         }
 
-        gl_FragColor = color;
+        FragColor = color;
 
       }else{ //!----------------> glyph fragment shader /////////////////////////////
         vec4 bkColor = fColor2;
@@ -1270,7 +1281,7 @@ struct Drawing {
           else if(stConfig==0)  finalColor = clearTypeMix(bkColor, fontColor             , alpha);
         }
 
-        gl_FragColor = finalColor;
+        FragColor = finalColor;
       }
     }
   };

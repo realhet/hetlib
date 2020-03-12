@@ -2,6 +2,8 @@ module het.http;
 
 import het.utils;
 
+//todo: libCUrl dll-t statikusan linkelni! Jelenleg az ldc2\bin-ben levo van hasznalva
+
 enum _log = false; //todo: ezt a logolast kozpontositani
 
 auto curlGet(string url){
