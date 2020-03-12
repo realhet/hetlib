@@ -13,6 +13,82 @@ import io3 = std.stdio, u3 = het.utils : iow = indexOfWord, il = isLetter, isHex
 
 //todo: a sebesseghez a tokenizernek meg az utana kovetkezo lepeseknek is range-knak kell lenniuk.
 
+enum test1 = q{
+
+linkage          //https://dlang.org/spec/attribute.html#linkage
+  [ ] extern          //https://dlang.org/spec/declaration.html#extern
+
+  ( ) extern(C)
+  ( ) extern(C++ opt(, IdentifierList))
+  ( ) extern(D)
+  ( ) extern(Windows)
+  ( ) extern(System)
+  ( ) extern(Objective-C)
+
+visibility    //https://dlang.org/spec/attribute.html#VisibilityAttribute
+  ( ) public
+  ( ) private
+  ( ) protected
+  ( ) export
+  ( ) package opt(ModuleFullyQualifiedName)
+
+  [ ] static       //functs, data   https://dlang.org/spec/attribute.html#static
+
+inheritance
+  ( ) override     //virtual functs                         https://dlang.org/spec/attribute.html#override
+  ( ) final        //virtual functs, classes
+  ( ) abstract     //virtual functs, classes                https://dlang.org/spec/attribute.html#abstract
+
+other
+  [ ] align opt(AssignExpression)             //data             https://dlang.org/spec/attribute.html#align
+  [ ] deprecated opt(AssignExpression)                         //https://dlang.org/spec/attribute.html#deprecated
+  [+] pragma(identifier opt(, ArgumentList))
+
+  [ ] synchronized   //classes, structs, functs
+
+
+storage types / type qualifiers
+  //TypeCtor s
+  ( ) immutable //data                                                    //https://dlang.org/spec/const3.html#immutable_storage_class
+  ( ) const //data funct                                                    https://dlang.org/spec/const3.html#const_storage_class
+  ( ) shared        //https://dlang.org/spec/attribute.html#shared
+  ( ) inout     //param, result
+
+  ( ) shared const
+  ( ) inout const
+  ( ) inout shared
+  ( ) inout shared const
+  ( ) __gshared     //https://dlang.org/spec/attribute.html#gshared
+
+  [.] auto  //functs, data, if no attribute but type inference is needed    https://dlang.org/spec/attribute.html#auto
+  [ ] scope //auto destructors                                              https://dlang.org/spec/attribute.html#scope
+
+  ( ) ref          //param
+  ( ) return ref   //param
+  ( ) auto ref     //param
+
+functions
+  [ ] @property
+  [ ] @disable                //https://dlang.org/spec/attribute.html#disable
+  [ ] @nogc
+  [ ] nothrow
+  [ ] pure
+  [ ] @safe
+  [ ] @trusted
+  [ ] @system
+
+
+
+
+
+
+
+
+ , *
+};
+
+
+
 enum testCase = q{
 import std.stdio, het.utils;
 import io = std.stdio, u = het.utils;
@@ -233,13 +309,9 @@ Attributes parseAttribute(ref Token[] tokens){
 BaseNode[] parseDeclDefs(ref Token[] tokens){
   BaseNode[] res = [];
 
-  if(tokens.empty) res;
+  if(tokens.empty) return res;
 
-  while(
-
-
-  if(tokens[0].
-
+  attributes = parseAttributes;
 
 }
 
