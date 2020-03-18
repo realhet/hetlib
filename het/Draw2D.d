@@ -759,6 +759,10 @@ struct Drawing {
 
 
   //todo: megaTexMaxCount-ot meg a tobbi konstanst kivulrol szedni
+  //todo: arrowless curves could use max vertices
+  //todo: arrows -> triangles instead of trapezoids
+  //todo: arrows: no curcature needed
+  //todo: compress geom shader output size
   immutable shaderCode = q{
     #version 150
 

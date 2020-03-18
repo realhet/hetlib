@@ -10,8 +10,8 @@ import het.utils, het.geometry, het.draw2d, het.image, het.win,
 
 //adjust the size of the original Tab character
 enum
-  VisualizeContainers      = 0,
-  VisualizeGlyphs          = 0,
+  VisualizeContainers      = 1,
+  VisualizeGlyphs          = 1,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0;
 
@@ -955,7 +955,7 @@ class Cell{ // Cell ////////////////////////////////////
   void draw(ref Drawing dr) { }
 
   //append Glyphs
-  void appendg(File  fn, in TextStyle ts){ append(new Img(fn, ts)); }
+  void appendg(File  fn, in TextStyle ts){ append(new Img(fn, ts)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
   void appendg(dchar ch, in TextStyle ts){ append(new Glyph(ch, ts)); }
   void appendg(string s, in TextStyle ts){ foreach(ch; s.byDchar) appendg(ch, ts); }
 
@@ -1024,7 +1024,8 @@ shared static this(){
 class Img : Container { // Img ////////////////////////////////////
   int stIdx;
 
-  this(File fn, in TextStyle ts){
+  this(File fn, in TextStyle ts=tsNormal){
+    super(ts);
     stIdx = textures[fn];
   }
 
@@ -1084,7 +1085,7 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
   }
 
   override void draw(ref Drawing dr){
-    drawBorder(dr);
+    drawBorder(dr); //todo: csak a containernek kell border elvileg
     dr.color = fontColor;
     dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags);
 
@@ -1563,6 +1564,10 @@ struct Selection{ //selection of cells in a container.
 
 
 class Container : Cell { // Container ////////////////////////////////////
+  this(in TextStyle ts){
+    bkColor = ts.bkColor;
+  }
+
   private{
     Cell[] subCells_;
     public{ //todo: ezt a publicot leszedni es megoldani szepen
@@ -1608,7 +1613,13 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   void measure(){
-    enforce("not impl");
+    bool autoWidth  = innerSize.x==0;
+    bool autoHeight = innerSize.y==0;
+
+    measureSubCells;
+
+    if(autoWidth ) innerWidth  = subCells.map!(c => c.outerRight ).maxElement(0);
+    if(autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);
   }
 
   private void measureSubCells(){
@@ -1634,7 +1645,9 @@ class Container : Cell { // Container ////////////////////////////////////
 
     //autofill background
     dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
+    //dr.alpha = 0.1;
     dr.fillRect(border.adjustBounds(borderBounds_inner));
+    //dr.alpha = 1;
 
     dr.translate(innerPos);
 
@@ -1676,8 +1689,7 @@ class Container : Cell { // Container ////////////////////////////////////
 
 // markup parser /////////////////////////////////////////
 
-private void processMarkupCommandLine(C:Container)(C container, string cmdLine, ref TextStyle ts){
-  import het.ui; //can spawn controls
+void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle ts){
   if(cmdLine==""){
     ts = tsNormal;
   }else if(auto t = cmdLine in textStyles){ //standard style.  Should be mentioned by an index
@@ -1713,12 +1725,14 @@ private void processMarkupCommandLine(C:Container)(C container, string cmdLine, 
       }else if(cmd=="flex"  ){
         container.append(new Row(tag("prop flex=1"), ts));
       }else if(cmd=="link"   ){
+        import het.ui: Link;
         container.append(new Link(params["1"], 0, false, null));
 /*      }else if(cmd=="btn" || cmd=="button"   ){
         auto btn = new Clickable(params["1"], 0, false, null);
         btn.setProps(params);
         append(btn);*/
       }else if(cmd=="key" || cmd=="keyCombo"  ){
+        import het.ui: KeyComboOld;
         auto kc = new KeyComboOld(params["1"]);
         kc.setProps(params);
         container.append(kc);
@@ -1746,12 +1760,12 @@ int countMarkupLineCells(string markup){
   }
 }
 
-void appendMarkupLine(Row row, string s, ref TextStyle ts){
+void appendMarkupLine(TC:Container)(TC cntr, string s, ref TextStyle ts){
   int[] dummy;
-  appendMarkupLine!(false)(row, s, ts, dummy);
+  appendMarkupLine!(false, TC)(cntr, s, ts, dummy);
 }
 
-void appendMarkupLine(bool returnSubCellStrOfs=true)(Row row, string s, ref TextStyle ts, ref int[] subCellStrOfs){
+void appendMarkupLine(bool returnSubCellStrOfs=true, TC:Container)(TC cntr, string s, ref TextStyle ts, ref int[] subCellStrOfs){
   enum CommandStartMarker = '\u00B6',
        CommandEndMarker   = '\u00A7';
 
@@ -1776,19 +1790,22 @@ void appendMarkupLine(bool returnSubCellStrOfs=true)(Row row, string s, ref Text
       enforce(inCommand>0, "Unexpected command end marker");
       if(inCommand>1) commandLine ~= ch; //dont append level 1 end marker
       if(!(--inCommand)){
-        row.processMarkupCommandLine(commandLine, ts);
+        cntr.processMarkupCommandLine(commandLine, ts);
         commandLine = "";
 
-        static if(returnSubCellStrOfs) while(subCellStrOfs.length <= row.subCells.length) subCellStrOfs ~= currentOfs; //COPY!
+        static if(returnSubCellStrOfs) while(subCellStrOfs.length <= cntr.subCells.length) subCellStrOfs ~= currentOfs; //COPY!
       }
     }else{
       if(inCommand){ //collect command
         commandLine ~= ch;
       }else{ //process text
-        if(ch==9) row.tabIdxInternal ~= row.subCells.length.to!int; //Elastic Tabs
-        row.appendg(ch, ts);
+        static if(is(TC == Row)){
+          if(ch==9) cntr.tabIdxInternal ~= cntr.subCells.length.to!int; //Elastic Tabs
+        }
 
-        static if(returnSubCellStrOfs) while(subCellStrOfs.length <= row.subCells.length) subCellStrOfs ~= currentOfs; //PASTE!!!
+        cntr.appendg(ch, ts);
+
+        static if(returnSubCellStrOfs) while(subCellStrOfs.length <= cntr.subCells.length) subCellStrOfs ~= currentOfs; //PASTE!!!
       }
     }
 
@@ -1982,18 +1999,20 @@ class Row : Container { // Row ////////////////////////////////////
 
   override int[] tabIdx() { return tabIdxInternal; }
 
-  this(T:Cell)(T[] cells){
-    append(cast(Cell[])cells);
+  this(in TextStyle ts){
+    super(ts);
   }
 
   this(string markup, TextStyle ts = tsNormal){
-    bkColor = ts.bkColor;
+    super(ts);
     this.appendMarkupLine(markup, ts);
   }
 
-  this(in TextStyle ts){
-    bkColor = ts.bkColor;
+  this(T:Cell)(T[] cells,in TextStyle ts){
+    super(ts);
+    append(cast(Cell[])cells);
   }
+
 
   private void solveFlexAndMeasureAll(bool autoWidth){
     //print("solveFlex ", subCells.count, autoWidth);
@@ -2166,7 +2185,11 @@ class Row : Container { // Row ////////////////////////////////////
 
 class Column : Container { // Column ////////////////////////////////////
 
-  override void parse(string s, TextStyle ts = tsNormal){
+  this(in TextStyle ts){
+    super(ts);
+  }
+
+/*  override void parse(string s, TextStyle ts = tsNormal){   //todo: I guess it's deprecated
     beep;
     if(s.startsWithTag("li")){ //lame
       import het.ui;
@@ -2174,7 +2197,7 @@ class Column : Container { // Column ////////////////////////////////////
     }else{
       append(new Row(s, ts));
     }
-  }
+  }*/
 
   override void measure(){
     bool autoWidth  = innerSize.x==0;
@@ -2220,3 +2243,4 @@ class Column : Container { // Column ////////////////////////////////////
     innerSize = subCells.maxOuterSize;
   }
 }
+

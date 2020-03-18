@@ -317,6 +317,10 @@ class Slider : Cell { // Slider //////////////////////////////////
 }
 
 class Document : Column { // Document /////////////////////////////////
+  this(){
+    super(tsNormal);
+  }
+
   string title;
   string[] chapters;
   int[3] actChapterIdx;
@@ -368,7 +372,7 @@ Row newListItem(string s, TextStyle ts = tsNormal){
   left.subCells = new FlexRow("", ts) ~ left.subCells ~ new FlexRow("", ts);
 
   auto right = new Row(s, ts); right.flex_=1;
-  auto act   = new Row([left, right]);
+  auto act   = new Row([left, right], ts);
 
   act.bkColor = ts.bkColor;
   return act;
@@ -453,13 +457,14 @@ class WinRow : Row{ //WinRow ///////////////////////////////
   this(Cell[] cells, TextStyle ts = tsNormal){
     padding_ = Padding(4, 16, 4, 16);
 
-    super(cells);
+    super(cells, ts);
   }
 
   override{
   }
 }
 
+/+
 ContainerBuilder builder(Container cntr){
   return ContainerBuilder(cntr);
 }
@@ -859,7 +864,7 @@ struct ContainerBuilder{ //ContainerBuilder //////////////////////////////
   }
 
 
-}
+} +/
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -997,7 +1002,7 @@ class ImWin{ // ImWin //////////////////////////////////
     dr.scale(ctx.pixelSize); scope(exit) dr.pop;
 
     perf("capt", {
-      auto doc = scoped!Column;
+      auto doc = scoped!Column(tsNormal);
       doc.innerWidth = size.x/dr.scaleFactor.x;
       auto icon = "\U0001F4F9";
       auto rIcon = new Row(" "~icon~" ");
@@ -1260,7 +1265,7 @@ static cnt=0;
   // Focus handling /////////////////////////////////
   struct FocusedState{
     uint id;              //globally store the current hash
-    Container container;  //this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
+    .Container container;  //this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
 
     void reset(){ this = typeof(this).init; }
   }
@@ -1269,7 +1274,7 @@ static cnt=0;
   TextEditorState textEditorState; //maintained by edit control
 
 
-  bool focusUpdate(Container container, uint id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
+  bool focusUpdate(.Container container, uint id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
     if(focusedState.id==id){
       if(!canFocus || exitFocusNow){ //not enabled anymore: exit focus
         if(onExit) onExit();
@@ -1293,7 +1298,7 @@ static cnt=0;
   }
 
   bool isFocused(uint id)               { return focusedState.id                 && focusedState.id == id; }
-  bool isFocused(Container container)   { return focusedState.container !is null && focusedState.container == container; }
+  bool isFocused(.Container container)  { return focusedState.container !is null && focusedState.container == container; }
 
 //  void focusExit(uint id)               { if(isFocused(id)) focusedState.reset; }
 //  void focusExit(Container container)   { if(isFocused(container)) focusedState.reset; }
@@ -1307,10 +1312,10 @@ static cnt=0;
   }
 
   class Scroller{   //todo: kinetic scrolling
-    Container container, parent;
+    .Container container, parent;
     ScrollState* state;
 
-    this(Container container, Container parent, ref ScrollState state){
+    this(.Container container, .Container parent, ref ScrollState state){
       this.container = container;
       this.parent = parent;
       this.state = &state;
@@ -1394,7 +1399,7 @@ static cnt=0;
               HintRelease_sec   = 1  ;
 
   private struct HintRec{
-    Container owner;
+    .Container owner;
     Bounds2f bounds;
     string markup, markupDetails; //todo: support delegates too
   }
@@ -1458,7 +1463,7 @@ static cnt=0;
     auto hintOwner = lastHint.owner;
 
     if(hintState != HintState.idle && hintOwner){
-      Container hintContainer;
+      .Container hintContainer;
 
       Panel({
         hintContainer = actContainer;
@@ -1502,7 +1507,7 @@ static cnt=0;
   Cell[] root; //when containerStack is empty, this is the container
 
   auto rootContainers(bool forceAll){
-    auto res = root.map!(c => cast(Container)c)
+    auto res = root.map!(c => cast(.Container)c)
                    .filter!"a"
                    .array;
     if(forceAll) enforce(root.length == res.length, "FATAL ERROR: All of root[] must be a descendant of Container.");
@@ -1513,14 +1518,14 @@ static cnt=0;
   //todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
 
   //todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
-  Container actContainer; //top of the containerStack for faster access
+  .Container actContainer; //top of the containerStack for faster access
   bool enabled;
   uint baseId;
   TextStyle textStyle;   alias style = textStyle; //todo: style.opDispatch("fontHeight=0.5x")
   string theme; //for now it's a str, later it will be much more complex
   //valid valus: "", "tool"
 
-  private struct StackEntry{ Container container; uint baseId; bool enabled; TextStyle textStyle; string theme; }
+  private struct StackEntry{ .Container container; uint baseId; bool enabled; TextStyle textStyle; string theme; }
   private StackEntry[] stack;
 
   void reset(){
@@ -1532,7 +1537,7 @@ static cnt=0;
 
     root = [];
     stack = [];
-    push!Container(null, 0); //null meaning -> root[] is the container
+    push!(.Container)(null, 0); //null meaning -> root[] is the container
 
     //time calculation
     //todo: jobb neveket kell kitalalni erre
@@ -1541,7 +1546,7 @@ static cnt=0;
     //lastQPS = QPS;
   }
 
-  private void push(T : Container)(T c, uint newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
+  private void push(T : .Container)(T c, uint newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
     stack ~= StackEntry(c, [newId].xxh(baseId), enabled, textStyle, theme);
 
     //actContainer is the top of the stack or null
@@ -1566,7 +1571,7 @@ static cnt=0;
 
   void dump(){
     void doit(Cell cell, int indent=0){
-      print("  ".replicate(indent), cell.classinfo.name.split('.')[$-1], " ", cell.outerPos, cell.innerSize, cell.flex, cast(Container)cell ? (cast(Container)cell).flags.text : "");
+      print("  ".replicate(indent), cell.classinfo.name.split('.')[$-1], " ", cell.outerPos, cell.innerSize, cell.flex, cast(.Container)cell ? (cast(.Container)cell).flags.text : "");
       foreach(subCell; cell.subCells)
         doit(subCell, indent+1);
     }
@@ -1576,7 +1581,7 @@ static cnt=0;
     writeln("---- End of IM dump -------------------------");
   }
 
-  private auto find(C:Container)(){
+  private auto find(C:.Container)(){
     foreach_reverse(ref s;stack)
       if(auto r = cast(C)(s.container))
         return r;
@@ -1591,6 +1596,9 @@ static cnt=0;
   //easy access
 
   float fh(){ return textStyle.fontHeight; }
+
+  auto subCells(){ return actContainer.subCells; }
+  auto subCells(T : .Cell)(){ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); }
 
   //container delegates
   //void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
@@ -1669,7 +1677,7 @@ static cnt=0;
 
 
   void Column(string file=__FILE__, int line=__LINE__, T...)(T args){  // Column //////////////////////////////
-    auto column = new .Column;
+    auto column = new .Column(style);
     append(column); push(column, file.xxh(line)); scope(exit) pop;
 
     static foreach(a; args){{ alias t = typeof(a);
@@ -1684,6 +1692,23 @@ static cnt=0;
   void Row(string file=__FILE__, int line=__LINE__, T...)(T args){  // Row //////////////////////////////
     auto row = new .Row("", textStyle);
     append(row); push(row, file.xxh(line)); scope(exit) pop;
+
+    static foreach(a; args){{ alias t = typeof(a);
+      static if(isFunctionPointer!a){
+        a();
+      }else static if(isDelegate!a){
+        a();
+      }else static if(isSomeString!t){
+        Text(a);
+      }else{
+        static assert(false, "Unsupported type: "~t.stringof);
+      }
+    }}
+  }
+
+  void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Composite //////////////////////////////
+    auto cntr = new .Container(style);
+    append(cntr); push(cntr, file.xxh(line)); scope(exit) pop;
 
     static foreach(a; args){{ alias t = typeof(a);
       static if(isFunctionPointer!a){
@@ -1790,10 +1815,12 @@ static cnt=0;
         }*/
 
         //this variant gives \n to the row
-        if(.Row row = cast(.Row)actContainer){
+        if(.Column col = cast(.Column)actContainer){
+          Row({ Text(a); });  //implicit Rows for Column
+        }else if(.Row row = cast(.Row)actContainer){
           row.appendMarkupLine(a, textStyle);
-        }else{
-          Row({ Text(a); });
+        }else {
+          actContainer.appendMarkupLine(a, textStyle);
         }
       }else static if(is(Unqual!t == _FlexValue)){ //nasty workaround for flex() and flex property
         append(new FlexRow("", style));
@@ -1829,10 +1856,7 @@ static cnt=0;
   }
 
   void ListItem(string text){
-    Row({
-      Bullet;
-      Text(text);
-    });
+    ListItem({ Text(text); });
   }
 
   //Spacer //////////////////////////
@@ -2191,18 +2215,18 @@ static cnt=0;
 
     append(ctrl);
     return hit;
+  }
 
-    //todo: megcsinalni composable modszerrel. A new Clickable kezeli a hit-rect-et.
-    /*Row({
-      Row({
-        style.fontColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor);
-        Text(bullet);
-      });
-      Row({
-        style.fontColor = hoverColor(style.fontColor, style.bkColor);
-        Text(bullet);
-      });
-    });*/
+  auto Led(string file=__FILE__, int line=__LINE__, T, Ta...)(T value, Ta args){
+    mixin(id.M);
+    auto hit = hitTestManager.check(id_);
+
+    Composite({
+      style.fontColor = clLime;
+      Text(tag(`symbol StatusCircleInner`));
+      style.fontColor = clGray;
+      Text(tag(`symbol StatusCircleRing`));
+    });
   }
 
   // RadioBtn //////////////////////////
