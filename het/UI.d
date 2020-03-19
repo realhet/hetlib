@@ -181,7 +181,7 @@ class Slider : Cell { // Slider //////////////////////////////////
     return innerBounds;
   }
 
-  override void draw(ref Drawing dr){
+  override void draw(Drawing dr){
     const mod_update = !hitBounds.isNull && !inputs.LMB.value;
 
     dr.color = bkColor; dr.fillRect(borderBounds_inner);
@@ -269,7 +269,7 @@ class Slider : Cell { // Slider //////////////////////////////////
   }
 
   // Draw Rulers
-  protected void drawStraightRuler(ref Drawing dr, in Bounds2f r, int cnt, int cnt2=-1, bool topleft=true){
+  protected void drawStraightRuler(Drawing dr, in Bounds2f r, int cnt, int cnt2=-1, bool topleft=true){
     cnt--;
     if(cnt<=0) return;
     if(cnt2<0) cnt2 = cnt;
@@ -299,7 +299,7 @@ class Slider : Cell { // Slider //////////////////////////////////
     }
   }
 
-  protected void drawRoundRuler(ref Drawing dr, in V2f center, float radius, int cnt, int cnt2=-1, bool endless=false){
+  protected void drawRoundRuler(Drawing dr, in V2f center, float radius, int cnt, int cnt2=-1, bool endless=false){
     cnt--;
     if(cnt<=0) return;
     if(cnt2<0) cnt2 = cnt;
@@ -906,7 +906,7 @@ struct WinContext{ //WinContext /////////////////////////////
       clAccent = ub.clAccent;//ub.clAccent;
 
   //runtime updated stuff
-  Drawing* dr;
+  Drawing dr;
   float pixelSize;
   int pass;
   V2f mouse;
@@ -992,7 +992,7 @@ class ImWin{ // ImWin //////////////////////////////////
   V2f placementBase;
   float placementStep = 0;
 
-  void draw(ref Drawing dr, in V2f size){
+  void draw(Drawing dr, in V2f size){
     dr.color = clGray;
 //    dr.fillRect(V2f(0, 0), size);
 
@@ -1097,7 +1097,7 @@ class ImWin{ // ImWin //////////////////////////////////
 
       //draw contents
       dr.translate(bounds.topLeft);
-      draw(*dr, bounds.size);
+      draw(dr, bounds.size);
       dr.pop;
 
       if(focused){
@@ -1124,7 +1124,7 @@ class ImWin{ // ImWin //////////////////////////////////
 
 }
 
-auto testWin(ref Drawing dr, V2f mouse, float pixelSize){ // testWin() ///////////////////////////////////////
+auto testWin(Drawing dr, V2f mouse, float pixelSize){ // testWin() ///////////////////////////////////////
 
   static wins = [
     new ImWin("win1", Rect2f(0  ,   0, 640, 480)),
@@ -1134,7 +1134,7 @@ auto testWin(ref Drawing dr, V2f mouse, float pixelSize){ // testWin() /////////
 
   ImWin hovered;
 
-  ImWin.ctx.dr = &dr;
+  ImWin.ctx.dr = dr;
   ImWin.ctx.mouse = mouse;
   ImWin.ctx.pixelSize = pixelSize;
 
@@ -1220,7 +1220,7 @@ struct im{ static:
     inFrame = false;
   }
 
-  void draw(ref Drawing dr){
+  void draw(Drawing dr){
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
     foreach(r; root) r.draw(dr); //draw in zOrder

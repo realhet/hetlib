@@ -20,7 +20,7 @@ static:
   float textHeight(float scale, string text) { return fontHeight*scale; }
   V2f textExtent  (float scale, bool monoSpace, string text) { return V2f(textWidth(scale, monoSpace, text), textHeight(scale, text)); }
 
-  void drawText(ref Drawing dr, V2f pos, float scale, bool monoSpace, bool italic, string text, bool vertFlip){
+  void drawText(Drawing dr, V2f pos, float scale, bool monoSpace, bool italic, string text, bool vertFlip){
     pos.y += scale*fontYAdjust;
     foreach(ch; text){
       auto cg = charMap[cast(int)ch].gfx;

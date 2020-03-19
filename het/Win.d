@@ -440,7 +440,9 @@ public:
 
     onInitializeGLWindow;
 
-    //init view, mouse
+    //init drawing, view, mouse
+    dr = new Drawing;
+    drGUI  = new Drawing;
     view = View2D(this);  view.centerCorrection = true;
     viewGUI_ = View2D(this);
     mouse = new MouseState;

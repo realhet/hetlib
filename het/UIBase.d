@@ -277,7 +277,7 @@ struct HitTestManager{
     return h;
   }
 
-  void draw(ref Drawing dr){
+  void draw(Drawing dr){
     if(VisualizeHitStack){
       dr.lineWidth = (QPS*3).fract;
       dr.color = clFuchsia;
@@ -952,7 +952,7 @@ class Cell{ // Cell ////////////////////////////////////
   void append(Cell   c){ notImpl("append()"); }
   void append(Cell[] a){ notImpl("append()"); }
 
-  void draw(ref Drawing dr) { }
+  void draw(Drawing dr) { }
 
   //append Glyphs
   void appendg(File  fn, in TextStyle ts){ append(new Img(fn, ts)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
@@ -980,7 +980,7 @@ class Cell{ // Cell ////////////////////////////////////
     }
   }
 
-  final void drawBorder(ref Drawing dr){
+  final void drawBorder(Drawing dr){
     if(!border.width || border.style == BorderStyle.none) return;
 
     auto bw = border.width, bb = borderBounds;
@@ -1029,7 +1029,7 @@ class Img : Container { // Img ////////////////////////////////////
     stIdx = textures[fn];
   }
 
-  override void draw(ref Drawing dr){
+  override void draw(Drawing dr){
     drawBorder(dr);
 
     dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
@@ -1084,7 +1084,7 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
     if(!VisualizeGlyphs) if(isReturn || isNewLine) innerWidth = 0;
   }
 
-  override void draw(ref Drawing dr){
+  override void draw(Drawing dr){
     drawBorder(dr); //todo: csak a containernek kell border elvileg
     dr.color = fontColor;
     dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags);
@@ -1529,7 +1529,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     return err;
   }
 
-  void drawOverlay(ref Drawing dr, RGB color){
+  void drawOverlay(Drawing dr, RGB color){
     auto c = toXY(caret);
     if(c.valid){
       dr.color = color;
@@ -1638,7 +1638,7 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-  override void draw(ref Drawing dr){
+  override void draw(Drawing dr){
 
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
     //if(chkSet(measured)) measure;
@@ -2170,7 +2170,7 @@ class Row : Container { // Row ////////////////////////////////////
     import het.ui: im;  if(im.textEditorState.row is this) im.textEditorState.wrappedLines = wrappedLines;
   }
 
-  override void draw(ref Drawing dr){
+  override void draw(Drawing dr){
     super.draw(dr);
 
     //draw the carets and selection of the editor

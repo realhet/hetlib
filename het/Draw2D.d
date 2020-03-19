@@ -153,7 +153,7 @@ enum asNoArrow       = ArrowStyle(0,0,0),
      asNormalRight   = ArrowStyle(0,0,2),
      asVector        = ArrowStyle(1,2,0);
 
-struct Drawing {
+class Drawing {
   private static Shader shader;
 
   private VBO[] vboList;
@@ -167,7 +167,7 @@ struct Drawing {
     totalDrawObj; //total DrawingObjects on GPU
 
   ~this(){
-    destroyVboList;
+    //destroyVboList; //gc will release it anyways
   }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -329,7 +329,11 @@ struct Drawing {
     boundsEmpty = true;
     markDirty;
 
-    this = Drawing.init; //todo: clear alone is not ok
+    actState = DrawState.init;
+    stateStack.clear;
+    stack.clear;
+
+    //this = Drawing.init; //todo: clear alone is not ok
   }
 
   void clear(RGB background){
@@ -1350,11 +1354,11 @@ struct Drawing {
 ////////////////////////////////////////////////////////////////////////////////
 
 class Logger{
-  Drawing* dr; //graphic log
+  Drawing dr; //graphic log
   bool wr;     //writeln log
 
-  this(bool dump=false, Drawing* dr=null) { this.dr = dr; wr = dump; }
-  this(ref Drawing dr, bool dump=false)   { this.dr = &dr; wr = dump; }
+  this(bool dump=false, Drawing dr=null) { this.dr = dr; wr = dump; }
+  this(Drawing dr, bool dump=false)      { this.dr = dr; wr = dump; }
 
   void opCall(string s){ log(s); }
 

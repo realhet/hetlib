@@ -282,7 +282,7 @@ public:
   }
 
 
-  static string test(Drawing* dr){ //test /////////////////////////////////
+  static string test(Drawing dr){ //test /////////////////////////////////
     auto mrb = new MaxRectsBin(0, 0, 1024, 1024);
     V2i[] adds = [{1,1}, {2,2}, {7,3}, {3,7}, {1,1}, {1,1}];
 

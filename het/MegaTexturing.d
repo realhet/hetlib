@@ -152,7 +152,7 @@ public:
     bin.dump;
   }
 
-  void drawMaxRects(ref Drawing dr){
+  void drawMaxRects(Drawing dr){
     dr.scale(SubTexCellSize); scope(exit) dr.pop;
 
     foreach(r; bin.freeRects){

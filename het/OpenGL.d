@@ -1410,9 +1410,13 @@ public:
     gl.drawArrays(primitive, start, end-start);
   }
 
+  /*void release(){
+    buffer.release;
+  } */
+
   ~this(){
     //bug: ha ez itt van, akkor beszarik az egesz fos szajbakurt geci.
-    buffer.release;
+    buffer.release; //elvileg nem volna szabad hivatkozni erre a member classra
   }
 
 }
