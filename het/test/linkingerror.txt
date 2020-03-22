@@ -1,0 +1,99 @@
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\jsonize.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\bitmap.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\common.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\webp\encode.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\webp\decode.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\tojson.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\package.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\tga.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\bmp.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\jpeg.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\package.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\png.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\color.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\fromjson.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\draw2d.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\obj.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\megatexturing.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\D\libs\het\test\DJM.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\uibase.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\package.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\opengl.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\exceptions.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\geometry.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\binpacker.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\view.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\ui.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\win.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\fonts.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\inputs.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\image.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\utils.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\debugclient.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\jsonize.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\bitmap.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\common.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\webp\encode.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\webp\decode.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\tojson.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\package.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\tga.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\bmp.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\jpeg.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\package.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\imageformats\png.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\color.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\fromjson.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\draw2d.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\obj.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\megatexturing.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\D\libs\het\test\DJM.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\uibase.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\package.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\opengl.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\jsonizer\exceptions.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\geometry.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\binpacker.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\view.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\ui.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\win.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\fonts.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\inputs.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\image.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\utils.d
+COMPILING: ldmd2 -vcolumns -c -op -allinst -Ic:\d\libs\ -m64 -mcpu=athlon64-sse3 -mattr=+ssse3 c:\d\libs\het\debugclient.d
+
+'-sse4' is not a recognized feature for this target (ignoring feature)
+
+STORING OBJ -> CACHE: DJM, het.package, het.opengl, het.utils, het.debugclient, het.color, jsonizer.package, jsonizer.tojson, jsonizer.common, jsonizer.jsonize, jsonizer.fromjson, jsonizer.exceptions, het.inputs, het.geometry, het.win, het.draw2d, het.fonts, het.image, imageformats.package, imageformats.png, imageformats.tga, imageformats.bmp, imageformats.jpeg, webp.decode, webp.encode, het.megatexturing, het.binpacker, het.view, het.ui, het.uibase, het.bitmap, het.obj
+
+LINKING: link 
+  /LIBPATH:c:\D\ldc2\lib64 
+  /OUT:c:\D\libs\het\test\DJM.exe 
+  /MACHINE:X64 
+  kernel32.lib 
+  user32.lib 
+  legacy_stdio_definitions.lib 
+  
+  c:\D\libs\het\test\DJM.obj c:\d\libs\het\package.obj c:\d\libs\het\opengl.obj c:\d\libs\het\utils.obj c:\d\libs\het\debugclient.obj 
+  c:\d\libs\het\color.obj c:\d\libs\jsonizer\package.obj c:\d\libs\jsonizer\tojson.obj c:\d\libs\jsonizer\common.obj 
+  c:\d\libs\jsonizer\jsonize.obj c:\d\libs\jsonizer\fromjson.obj c:\d\libs\jsonizer\exceptions.obj c:\d\libs\het\inputs.obj 
+  c:\d\libs\het\geometry.obj c:\d\libs\het\win.obj c:\d\libs\het\draw2d.obj c:\d\libs\het\fonts.obj c:\d\libs\het\image.obj 
+  c:\d\libs\imageformats\package.obj c:\d\libs\imageformats\png.obj c:\d\libs\imageformats\tga.obj c:\d\libs\imageformats\bmp.obj 
+  c:\d\libs\imageformats\jpeg.obj c:\d\libs\webp\decode.obj c:\d\libs\webp\encode.obj c:\d\libs\het\megatexturing.obj 
+  c:\d\libs\het\binpacker.obj c:\d\libs\het\view.obj c:\d\libs\het\ui.obj c:\d\libs\het\uibase.obj c:\d\libs\het\bitmap.obj c:\d\libs\het\obj.obj 
+  
+  druntime-ldc.lib 
+  phobos2-ldc.lib 
+  msvcrt.lib
+  
+--------------------------------------  
+Microsoft (R) Incremental Linker Version 14.23.28105.4
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+   Creating library c:\D\libs\het\test\DJM.lib and object c:\D\libs\het\test\DJM.exp
+msvcrt.lib(initializers.obj) : warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
+exceptions.obj : error LNK2019: unresolved external symbol _D3std6format__T11hasToStringTSQBd4json9JSONValueTaZ9__lambda2MFZ1S3putMFNaNbNiNfaZv referenced in function _D3std5range10primitives__T5doPutTSQBh6format__T11hasToStringTSQCj4json9JSONValueTaZ9__lambda2MFZ1STaZQCxFNaNbNiNfKQDdKaZv
+megatexturing.obj : error LNK2019: unresolved external symbol _D3std6format__T11hasToStringTSQBd8typecons__T5TupleTmVAyaa5_696e646578TxS3het13megatexturing10SubTexInfoVQBza5_76616c7565ZQCzTaZ9__lambda1MFZ1S3putMFNaNbNiNfaZv referenced in function _D3std5range10primitives__T5doPutTSQBh6format__T11hasToStringTSQCj8typecons__T5TupleTmVAyaa5_696e646578TxS3het13megatexturing10SubTexInfoVQBza5_76616c7565ZQCzTaZ9__lambda1MFZ1STxaZQFxFNaNbNiNfKQGdKxaZv
+megatexturing.obj : error LNK2019: unresolved external symbol _D3std6format__T11hasToStringTSQBd8typecons__T5TupleTmVAyaa5_696e646578TxS3het13megatexturing10SubTexInfoVQBza5_76616c7565ZQCzTaZ9__lambda2MFZ1S3putMFNaNbNiNfaZv referenced in function _D3std5range10primitives__T5doPutTSQBh6format__T11hasToStringTSQCj8typecons__T5TupleTmVAyaa5_696e646578TxS3het13megatexturing10SubTexInfoVQBza5_76616c7565ZQCzTaZ9__lambda2MFZ1STxaZQFxFNaNbNiNfKQGdKxaZv
+c:\D\libs\het\test\DJM.exe : fatal error LNK1120: 3 unresolved externals
