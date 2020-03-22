@@ -10,8 +10,8 @@ import het.utils, het.geometry, het.draw2d, het.image, het.win,
 
 //adjust the size of the original Tab character
 enum
-  VisualizeContainers      = 1,
-  VisualizeGlyphs          = 1,
+  VisualizeContainers      = 0,
+  VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0;
 
@@ -924,6 +924,7 @@ class Cell{ // Cell ////////////////////////////////////
     auto outerHeight() { return innerSize.y+gapSize.y; } void outerHeight(float v) { innerSize.y = v-gapSize.y; }
     auto outerRight () { return outerX+outerWidth; }
     auto outerBottom() { return outerY+outerHeight; }
+    auto innerCenter() { return innerPos + innerSize*.5; }
 
     alias size = innerSize;
     alias width = innerWidth;
@@ -1046,6 +1047,37 @@ class Img : Container { // Img ////////////////////////////////////
       innerSize.y = innerSize.x/max(siz.x, 1)*siz.y;
     }else if(autoWidth){
       innerSize.x = innerSize.y/max(siz.y, 1)*siz.x;
+    }
+  }
+}
+
+enum ShapeType{ led }
+
+class Shape : Cell{ // Shape /////////////////////////////////////
+  ShapeType type;
+  RGB color;
+
+/*  this(T)(ShapeType shapeType, RGB color, T state, float fontHeight){
+    this.type = shapeType;
+    this.color = color;
+    innerSize = V2f(fontHeight*.5, fontHeight);
+  }*/
+
+  override void draw(Drawing dr){
+    final switch(type){
+      case ShapeType.led:{
+        auto r = min(innerWidth, innerHeight)*0.92;
+
+
+        auto p = innerCenter;
+
+        dr.pointSize = r;       dr.color = RGB(.3, .3, .3);  dr.point(p);
+        dr.pointSize = r*.8;    dr.color = color;   dr.point(p);
+        dr.pointSize = r*0.4;   dr.alpha = 0.4; dr.color = clWhite; dr.point(p-V2f(1,1)*(r*0.15));
+        dr.pointSize = r*0.2;   dr.alpha = 0.4; dr.color = clWhite; dr.point(p-V2f(1,1)*(r*0.18));
+        dr.alpha = 1;
+
+      break;}
     }
   }
 }

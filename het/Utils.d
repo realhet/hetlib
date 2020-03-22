@@ -939,7 +939,7 @@ struct UpdateInterval{
     return res;
   }
 
-  private static void _testRepeater(/*Drawing* dr = null*/){
+  private static void _testRepeater(/*Drawing dr = null*/){
     float tBase = 3, tDelta = 1, tFirstDelta = 5;
     uint h;
     foreach(i; 1..25){
@@ -1177,6 +1177,37 @@ typeof(T.init/1) mean(T)(in T[] a){
 
 auto auto mean(R, E) (R r, E seed) if(isInputRange!R && !isInfinite!R && is(typeof(seed = seed + r.front))){
 }*/
+
+
+//Signal smoothing /////////////////////////////
+
+struct BinarySignalSmoother{
+    private{
+        int outSameCnt;
+      bool actOut, lastOut, lastIn;
+    }
+
+    bool process(bool actIn, int N=2){
+        if(outSameCnt>=N-1)
+            actOut = lastIn!=actIn ? !actOut : actIn;
+
+        outSameCnt = lastOut==actOut ? outSameCnt+1 : 0;
+    lastOut = actOut;
+        lastIn   = actIn;
+        return actOut;
+    }
+
+    @property bool output() const{ return actOut; }
+
+    static void selfTest(){
+      BinarySignalSmoother bss;
+        const input = "..1.1.1..1.1.11.1.1..111111..11..111..111.1........1...11...1.11111111.1111.1";
+    auto output = input.map!(c => bss.process(c=='1', 2) ? '1' : '.').array;
+
+    writeln(input);
+    writeln(output);
+    }
+}
 
 // SparseArray ///////////////////////////////////////////////////////////
 

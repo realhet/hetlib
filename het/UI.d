@@ -2217,16 +2217,37 @@ static cnt=0;
     return hit;
   }
 
-  auto Led(string file=__FILE__, int line=__LINE__, T, Ta...)(T value, Ta args){
+  auto Led(string file=__FILE__, int line=__LINE__, T, Ta...)(T param, Ta args){
     mixin(id.M);
     auto hit = hitTestManager.check(id_);
 
-    Composite({
+    float state = 0;
+
+    static if(is(Unqual!T==bool))       state = param ? 1 : 0;
+    else static if(isIntegral!T)        state = param ? 1 : 0;
+    else static if(isFloatingPoint!T)   state = param.clamp(0, 1);
+    else enforce(0, "im.Led() Unhandled param type: " ~ T.stringof);
+
+    auto shp = new .Shape;
+    //set defaults
+    shp.innerSize = V2f(0.7, 1)*style.fontHeight;
+    shp.color = clRainbowRed;
+
+    static foreach(a; args){{ alias t = Unqual!(typeof(a));
+      static if(is(t==RGB)) shp.color = a;
+      static if(is(t==V2f)) shp.innerSize = a;
+    }}
+
+    shp.color = lerp(clBlack, shp.color, state.remap(0, 1, 0.2, 1));
+
+    actContainer.append(cast(.Cell)shp);
+
+    /*Composite({
       style.fontColor = clLime;
       Text(tag(`symbol StatusCircleInner`));
       style.fontColor = clGray;
       Text(tag(`symbol StatusCircleRing`));
-    });
+    });*/
   }
 
   // RadioBtn //////////////////////////
