@@ -384,7 +384,7 @@ fontName.writeln;
 
     if(gs.flAccel|GS_8BIT_INDICES){
       auto ranges = gs.ranges.ptr[0..gs.cRanges];
-      foreach(int idx, r; ranges){
+      foreach(idx, r; ranges){
         "%4d %.4X:%.4X".writefln(idx, r.wcLow, r.wcLow+r.cGlyphs-1);
       }
     }else{

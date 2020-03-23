@@ -1326,8 +1326,8 @@ class Drawing {
       shader.uniform("uViewPortSize", vpSize.toF);
 
       //map all megaTextures
-      foreach(int i, t; textures.getGLTextures){
-        t.bind(i, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
+      foreach(i, t; textures.getGLTextures){
+        t.bind(i.to!int, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
         auto name = i==0 ? "smpInfo" : "smpMega[%d]".format(i-1);
         shader.uniform(name, i, false);
       }

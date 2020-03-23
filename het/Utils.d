@@ -330,7 +330,9 @@ void parseOptions(T)(string[] args, ref T options){
 
 // Exception handling ///////////////////////////////////////
 
-import std.exception : stdEnforce = enforce, Exception, Throwable;
+//import object: Exception, Throwable;
+
+import std.exception : stdEnforce = enforce;
 
 T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
 {
@@ -1497,8 +1499,8 @@ public:
 
   Slice opSlice(int idx)(size_t st, size_t en)const { return Slice(st, en); }
 
-  private int findBlock(size_t idx)const {
-    foreach(int i, const b; blocks)
+  private auto findBlock(size_t idx)const {
+    foreach(i, const b; blocks)
       if(idx>=b.idxSt && idx<b.idxEn)
         return i;
     return -1;
@@ -1520,7 +1522,7 @@ public:
     res.reserve(s.en-s.st);
 
     size_t i = s.st; while(i<s.en){
-      int bi = findBlock(i);
+      auto bi = findBlock(i);
       with(blocks[bi]){
         auto st = i-idxSt;
         auto en = min(s.en-idxSt, data.length);
@@ -1943,8 +1945,8 @@ struct WildResult{ static:
     }catch(Throwable){ return def; }
   }
 
-  auto ints(size_t i, int def = 0)      { try return to!int  (i); catch return def; }
-  auto floats(size_t i, float def = 0)  { try return to!float(i); catch return def; }
+  auto ints(size_t i, int def = 0)      { try return to!int  (i); catch(Throwable) return def; }
+  auto floats(size_t i, float def = 0)  { try return to!float(i); catch(Throwable) return def; }
 
   void stripAll(){
     foreach(ref s; p) s = s.strip;
@@ -2057,7 +2059,7 @@ auto commandLineToMap(string line){
 
     //try to split at '='
     bool keyValueFound;
-    foreach(int i, ch; s){
+    foreach(i, ch; s){
       if(ch=='"') break;
       if(ch=='='){
         key = s[0..i];
@@ -3767,7 +3769,9 @@ synchronized class Perf {
 
   string report(){
     if(actName!="") end;
-    auto r = table.byKeyValue.map!(kv => "%-30s:%9.3f ms\n".format(kv.key, kv.value*1e3)).join;
+    //pragma(msg, typeof(table));
+    auto r = (cast(float[string])table).byKeyValue.map!(kv => "%-30s:%9.3f ms\n".format(kv.key, kv.value*1e3)).join;
+           //^^^^^^^^^^^^^^^^^^^^ ez egy uj ldc 2020-as buzisag miatt kell....
     reset;
     return r;
   }

@@ -1383,10 +1383,12 @@ version(D2D_FONT_RENDERER){ private:
 
         //ha ide betuk keverednek, akkor aszoknak zajos lesz a konturjuk ugyanis nem csak a hatterszin valtozik,
         //hanem az eloteszin is. Az mar duplaannyi, mint kene.
-        foreach(int idx, ref p2; d2){
+        foreach(idx, ref p2; d2){
           auto p1 = d1[idx];
 
-          p2.a = ~cast(ubyte)(p2.r-p1.r);
+          //p2.a = ~cast(ubyte)(p2.r-p1.r);
+          p2.a = cast(ubyte)(~(p2.r-p1.r));
+
           if(p2.a<0xff) p2.l = 0;
                    else p2.rbSwap;
         }

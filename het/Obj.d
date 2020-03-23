@@ -116,6 +116,7 @@ class HetObj {
 mixin template HETOBJ(){ mixin JsonizeMe;
 
   override void initFields(){ // reInitialize class fields
+    import std.traits;
     /*alias T = typeof(this);
     static foreach(n; FieldNameTuple!T){{
       mixin("enum def = (new T).@; @ = def;".replace("@", n));
@@ -123,9 +124,23 @@ mixin template HETOBJ(){ mixin JsonizeMe;
 
     // https://forum.dlang.org/post/hhtshvhiqrwxwqqoemeu@forum.dlang.org
     static foreach(i, field; typeof(this).tupleof) {{
+      alias t = typeof(field);
       // force compile-time evaluation:
-      static if(!is(typeof(field) == class)){ //todo: subClass reinitialization
-        enum initValue = (new typeof(this)).tupleof[i];
+      static if(is(t == class)){
+        //subClass
+        //initialization
+//        enfocre(0, "notimpl");
+      }else static if(isStaticArray!t){
+
+        //static array of classes
+/*        alias et = typeof(field[0]);
+        static if(is(et == class))
+          foreach(ref e; field) e = new et; //default constructor*/
+
+      }else static if(isDynamicArray!t){
+        field = [];
+      }else{
+        enum initValue = (new typeof(this)).tupleof[i]; //get the default struct/class initializer
         field = initValue;
       }
     }}

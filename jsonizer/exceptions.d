@@ -8,7 +8,7 @@
   */
 module jsonizer.exceptions;
 
-import std.json      : JSONValue, JSON_TYPE;
+import std.json      : JSONValue, JSONType = JSON_TYPE;  //het: deprecation: JSON_TYPE is no more
 import std.string    : format, join;
 import std.traits    : ParameterTypeTuple, ParameterIdentifierTuple;
 import std.meta      : aliasSeqOf;
@@ -30,10 +30,10 @@ class JsonizeTypeException : Exception {
   const {
     TypeInfo targetType;  /// Type jsonizer was attempting to deserialize to.
     JSONValue json;       /// The json value that was being deserialized
-    JSON_TYPE[] expected; /// The JSON_TYPEs that would have been acceptable
+    JSONType[] expected;  /// The JSON_TYPEs that would have been acceptable
   }
 
-  this(TypeInfo targetType, JSONValue json, JSON_TYPE[] expected ...) {
+  this(TypeInfo targetType, JSONValue json, JSONType[] expected ...) {
     super(fmt.format(targetType, expected, json.type, json));
 
     this.targetType = targetType;

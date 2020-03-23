@@ -116,7 +116,7 @@ void registerWindowClass(string className, wchar* icon = IDI_APPLICATION)
 void unregisterWindowClass(string className)
 {
   if(!_registeredClasses.canFind(className)) return;
-  _registeredClasses = _registeredClasses.remove(className);
+  _registeredClasses = _registeredClasses.remove(_registeredClasses.countUntil(className));
   UnregisterClass(toPWChar(className), GetModuleHandleW(NULL));
 }
 

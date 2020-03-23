@@ -160,8 +160,8 @@ public:
       dr.drawRect(r.bounds.toF.inflated(-0.125));
     }
 
-    foreach(int j, r; bin.rects){
-      dr.color = clVga[(j%($-1))+1];
+    foreach(j, r; bin.rects){
+      dr.color = clVga[(cast(int)j % ($-1))+1];
       dr.alpha = 0.5;
       dr.fillRect(r.bounds);
       dr.drawRect(r.bounds);
@@ -272,7 +272,7 @@ public:
   }
 
 
-  void dump() const{ return infoArray.enumerate.each!writeln; }
+  void dump() const{ infoArray.enumerate.each!writeln; }
 }
 
 //todo: texture class

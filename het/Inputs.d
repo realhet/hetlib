@@ -68,9 +68,9 @@ immutable keyModifiers = ["Ctrl", "Shift", "Alt", "Win"];
 
 int keyModifierCode(string key){
   if(key.empty) return 0;
-  foreach(int i, a; keyModifiers){
+  foreach(i, a; keyModifiers){
     if(key==a || key[0].among('L', 'R') && key[1..$]==a){
-      return 1<<i;
+      return 1<<cast(int)i;
     }
   }
   return 0;
@@ -82,8 +82,8 @@ int keyModifierMask(in string[] keys){
 
 auto keyModifierMaskToStrings(int mask){
   string[] res;
-  foreach(int i, s; keyModifiers)
-    if(mask & (1<<i)) res ~= s;
+  foreach(i, s; keyModifiers)
+    if(mask & (1<<cast(int)i)) res ~= s;
   return res;
 }
 
@@ -345,7 +345,7 @@ public: //standard stuff
 
   int keyModifierMask() {
     int res;
-    foreach(int i, s; keyModifiers) if(entries[s].active) res += 1<<i;
+    foreach(i, s; keyModifiers) if(entries[s].active) res += 1<<i;
     return res;
   };
   alias modifiers = keyModifierMask;

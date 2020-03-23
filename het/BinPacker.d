@@ -293,7 +293,7 @@ public:
     foreach(i; 0..550)
       adds ~= V2i(rng.random(2)+1,rng.random(2)+1);
 
-    foreach(int i, a; adds){
+    foreach(i, a; adds){
       mrb.add(a.x, a.y);
 
       if((i&3)==3){
@@ -301,7 +301,7 @@ public:
       }
 
       if(dr){
-        dr.translate(i*65, 0);
+        dr.translate(cast(int)i * 65, 0);
 
         foreach(r; mrb.freeRects){
           dr.color = clGray;
@@ -310,8 +310,8 @@ public:
 
         dr.color = clWhite;  dr.drawRect(0, 0, mrb.width, mrb.height);
 
-        foreach(int j, r; mrb.rects){
-          dr.color = clVga[(j%($-1))+1];
+        foreach(j, r; mrb.rects){
+          dr.color = clVga[(cast(int)j % ($-1))+1];
           dr.fillRect(r.bounds);
         }
 

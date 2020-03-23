@@ -1732,7 +1732,7 @@ static cnt=0;
       const bkColors = [0.06, 0.12].map!(t => lerp(textStyle.bkColor, textStyle.fontColor, t)).array;
       border = "1 single gray";
 
-      foreach(int idx, line; src.split('\n')){
+      foreach(idx, line; src.split('\n')){
         style.bkColor = bkColors[idx&1]; //alternated bkColor
         line = line.withoutTrailing('\r');
         Text(line);
@@ -2254,12 +2254,12 @@ static cnt=0;
   auto RadioBtn(string file=__FILE__, uint line=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
 
   // HSlider ///////////////////////////
-  auto HSlider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
+  auto Slider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
   if(isFloatingPoint!V || isIntegral!V)
   {
     mixin(id.M ~ enable.M ~ selected.M ~ range.M);
 
-    float customWidth_;
+//    float customWidth_;
     string props;
     static foreach(a; args){{ alias t = Unqual!(typeof(a));
       static if(isFloatingPoint!t || isIntegral!t) customWidth = a; //todo: ennek delegatenek kene lennie
@@ -2275,7 +2275,7 @@ static cnt=0;
     }
 
     bool userModified;
-    auto sl = new Slider(id_, normValue, _range, userModified);
+    auto sl = new .Slider(id_, normValue, _range, userModified);
     sl.setProps(props);
     append(sl);
 

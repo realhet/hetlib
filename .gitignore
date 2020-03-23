@@ -9,6 +9,7 @@
 #included directories
 !het/
 !het/test/
+!het/hdmd/
 !gl3n/
 !gl3n/ext
 !imageformats/

@@ -1233,7 +1233,7 @@ struct TextRange{
 
 struct EditCmd{ // EditCmd ////////////////////////////////////////
   private enum _intParamDefault = int.min+1,
-               _pointParamDefault = V2f(-999999999, -999999999);
+               _pointParamDefault = V2f(-1e30, -1e30);
 
   enum Cmd {
     //caret commands              //parameters
@@ -1787,7 +1787,7 @@ int countMarkupLineCells(string markup){
   try{
     auto cntr = new Row(markup);
     return cntr.subCells.length.to!int;
-  }catch{
+  }catch(Throwable){
     return 0;
   }
 }
@@ -1925,13 +1925,13 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
   /// functions for text selections
   int selectNearestGap(float x){ //x: local x coordinate. (innerPos.x = 0)
     if(cells.empty) return 0;
-    foreach(int i, c; cells) if(x<c.outerPos.x + c.outerWidth*.5f) return i;
+    foreach(i, c; cells) if(x<c.outerPos.x + c.outerWidth*.5f) return cast(int)i;
     return cellCount;
   }
 
   int selectNearestCell(float x){ //always select something on either side
     if(cells.empty) return 0;
-    foreach_reverse(i, c; cells) if(x >= c.outerPos.x) return i.to!int;
+    foreach_reverse(i, c; cells) if(x >= c.outerPos.x) return cast(int)i;
     return 0;
   }
 
@@ -1973,7 +1973,7 @@ private{ //wrappedLine[] functionality
 
     if(step<=0) return; //todo: shrink?
 
-    foreach(int i, ref l; lines){
+    foreach(ref l; lines){
       l.translateY(act);
       act += step;
     }
@@ -2142,7 +2142,7 @@ class Row : Container { // Row ////////////////////////////////////
     //scope(exit) print("  rm end", subCells.length, innerSize, "flex:", flex, flags.canWrap, doWrap);
 
     //adjust length of leading and internal tabs
-    foreach(int idx, tIdx; tabIdx){
+    foreach(idx, tIdx; tabIdx){
       const isLeading = idx==tIdx;
       subCells[tIdx].innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);
     }
