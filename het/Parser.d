@@ -251,9 +251,9 @@ private: /////////////////////////////////////////////////////////////////////
 
   auto findAllKeywordIndices(int kw, bool insideTokenStringsToo = false){
     int[] res;
-    foreach(int i, ref t; tokens){
+    foreach(i, ref t; tokens){
       if(t.isTokenString && !insideTokenStringsToo) continue;
-      if(t.isKeyword(kw)) res ~= i;
+      if(t.isKeyword(kw)) res ~= i.to!int;
     }
     return res;
   }

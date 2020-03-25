@@ -1,4 +1,4 @@
-/**
+﻿/**
   * Contains functions for deserializing JSON data.
   *
   * Authors: <a href="https://github.com/rcorre">rcorre</a>
@@ -20,6 +20,12 @@ import std.exception;
 import std.typecons;
 import jsonizer.exceptions;
 import jsonizer.common;
+
+//het: 200209, string input, so no std.json is needed in the app
+public void populate(T)(ref T obj, string jsonStr, in JsonizeOptions opt) {
+  populate!(T)(obj, parseJSON(jsonStr), opt);
+}
+
 
 // HACK: this is a hack to allow referencing this particular overload using
 // &fromJSON!T in the JsonizeMe mixin
@@ -47,51 +53,51 @@ T fromJSON(T)(JSONValue json,
 
   // enumeration
   else static if (is(T == enum)) {
-    enforceJsonType!T(json, JSONType.STRING);
+    enforceJsonType!T(json, JSONType.string);
     return to!T(json.str);
   }
 
   // boolean
   else static if (is(T : bool)) {
-    if (json.type == JSONType.TRUE)
+    if (json.type == JSONType.true_)
       return true;
-    else if (json.type == JSONType.FALSE)
+    else if (json.type == JSONType.false_)
       return false;
 
     // expected 'true' or 'false'
-    throw new JsonizeTypeException(typeid(bool), json, JSONType.TRUE, JSONType.FALSE);
+    throw new JsonizeTypeException(typeid(bool), json, JSONType.true_, JSONType.false_);
   }
 
   // string
   else static if (is(T : string)) {
-    if (json.type == JSONType.NULL) { return null; }
-    enforceJsonType!T(json, JSONType.STRING);
+    if (json.type == JSONType.null_) { return null; }
+    enforceJsonType!T(json, JSONType.string);
     return cast(T) json.str;
   }
 
   // numeric
   else static if (is(T : real)) {
     switch(json.type) {
-      case JSONType.FLOAT:
+      case JSONType.float_:
         return cast(T) json.floating;
-      case JSONType.INTEGER:
+      case JSONType.integer:
         return cast(T) json.integer;
-      case JSONType.UINTEGER:
+      case JSONType.uinteger:
         return cast(T) json.uinteger;
-      case JSONType.STRING:
+      case JSONType.string:
         enforce(json.str.isNumeric, format("tried to extract %s from json string %s", T.stringof, json.str));
         return to!T(json.str); // try to parse string as int
       default:
     }
 
     throw new JsonizeTypeException(typeid(bool), json,
-                                   JSONType.FLOAT, JSONType.INTEGER, JSONType.UINTEGER, JSONType.STRING);
+                                   JSONType.float_, JSONType.integer, JSONType.uinteger, JSONType.string);
   }
 
   // array
   else static if (isArray!T) {
-    if (json.type == JSONType.NULL) { return T.init; }
-    enforceJsonType!T(json, JSONType.ARRAY);
+    if (json.type == JSONType.null_) { return T.init; }
+    enforceJsonType!T(json, JSONType.array);
     alias ElementType = ForeachType!T;
     T vals;
     foreach(idx, val ; json.array) {
@@ -108,8 +114,8 @@ T fromJSON(T)(JSONValue json,
   // associative array
   else static if (isAssociativeArray!T) {
     static assert(is(KeyType!T : string), "toJSON requires string keys for associative array");
-    if (json.type == JSONType.NULL) { return null; }
-    enforceJsonType!T(json, JSONType.OBJECT);
+    if (json.type == JSONType.null_) { return null; }
+    enforceJsonType!T(json, JSONType.object);
     alias ValType = ValueType!T;
     T map;
     foreach(key, val ; json.object) {
@@ -189,7 +195,7 @@ unittest {
 /**
  * Extract a value from a json object by its key.
  *
- * Throws if `json` is not of `JSONType.OBJECT` or the key does not exist.
+ * Throws if `json` is not of `JSONType.object` or the key does not exist.
  *
  * Params:
  *  T       = Target type. can be any primitive/builtin D type, or any
@@ -202,7 +208,7 @@ T fromJSON(T)(JSONValue json,
               string key,
               in ref JsonizeOptions options = JsonizeOptions.defaults)
 {
-  enforceJsonType!T(json, JSONType.OBJECT);
+  enforceJsonType!T(json, JSONType.object);
   enforce(key in json.object, "tried to extract non-existent key " ~ key ~ " from JSONValue");
   return fromJSON!T(json.object[key], options);
 }
@@ -232,7 +238,7 @@ unittest {
 /**
  * Extract a value from a json object by its key.
  *
- * Throws if `json` is not of `JSONType.OBJECT`.
+ * Throws if `json` is not of `JSONType.object`.
  * Return `defaultVal` if the key does not exist.
  *
  * Params:
@@ -248,7 +254,7 @@ T fromJSON(T)(JSONValue json,
               T defaultVal,
               in ref JsonizeOptions options = JsonizeOptions.defaults)
 {
-  enforceJsonType!T(json, JSONType.OBJECT);
+  enforceJsonType!T(json, JSONType.object);
   return (key in json.object) ? fromJSON!T(json.object[key]) : defaultVal;
 }
 
@@ -354,10 +360,10 @@ void enforceJsonType(T)(JSONValue json, JSONType[] expected ...) {
 unittest {
   import std.exception : assertThrown, assertNotThrown;
   with (JSONType) {
-    assertThrown!JsonizeTypeException(enforceJsonType!int(JSONValue("hi"), INTEGER, UINTEGER));
-    assertThrown!JsonizeTypeException(enforceJsonType!(bool[string])(JSONValue([ 5 ]), OBJECT));
-    assertNotThrown(enforceJsonType!int(JSONValue(5), INTEGER, UINTEGER));
-    assertNotThrown(enforceJsonType!(bool[string])(JSONValue(["key": true]), OBJECT));
+    assertThrown!JsonizeTypeException(enforceJsonType!int(JSONValue("hi"), integer, uinteger));
+    assertThrown!JsonizeTypeException(enforceJsonType!(bool[string])(JSONValue([ 5 ]), object));
+    assertNotThrown(enforceJsonType!int(JSONValue(5), integer, uinteger));
+    assertNotThrown(enforceJsonType!(bool[string])(JSONValue(["key": true]), object));
   }
 }
 
@@ -366,11 +372,11 @@ unittest {
 // otherwise pass null for the parent
 T fromJSONImpl(T, P)(JSONValue json, P parent, in ref JsonizeOptions options) {
   static if (is(typeof(null) : T)) {
-    if (json.type == JSONType.NULL) { return null; }
+    if (json.type == JSONType.null_) { return null; }
   }
 
   // try constructing from a primitive type using a single-param constructor
-  if (json.type != JSONType.OBJECT) {
+  if (json.type != JSONType.object) {
     return invokePrimitiveCtor!T(json, parent);
   }
 
@@ -521,11 +527,7 @@ T invokePrimitiveCtor(T, P)(JSONValue json, P parent) {
   assert(0, "No primitive ctor for type " ~ T.stringof);
 }
 
-public void populate(T)(ref T obj, string jsonStr, in JsonizeOptions opt) { //modified: 200209, string input, so no std.json is needed in app
-  populate!(T)(obj, parseJSON(jsonStr), opt);
-}
-
-public void populate(T)(ref T obj, JSONValue json, in JsonizeOptions opt) {
+void populate(T)(ref T obj, JSONValue json, in JsonizeOptions opt) {
   string[] missingKeys;
   uint fieldsFound = 0;
 

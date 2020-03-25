@@ -8,17 +8,17 @@ module buildsys;
 //TODO: invalid //@ direktivaknal error
 //TODO: a dll kilepeskor takaritsa el az obj fileokat
 
-import hetlib.utils, parser, std.file, std.digest.sha, std.regex, std.path, std.process;
+import het.utils, het.parser, std.file, std.digest.sha, std.regex, std.path, std.process;
 
 //////////////////////////////////////////////////////////////////////////////
 //  Builder help text                                                       //
 //////////////////////////////////////////////////////////////////////////////
 
 immutable
-  versionStr = "1.00",
+  versionStr = "1.01",
   helpStr =  //todo: ehhez edditort csinalni
-  "\33\16HDMD\33\7 "~versionStr~" - A full automatic build tool for the \33\17DMD\33\7 compiler.
-by \33\xC0re\33\xF0al\33\xA0het\33\7 2016
+  "\33\16HDMD\33\7 "~versionStr~" - An automatic build tool for the \33\17DMD\33\7 and \33\17LDC\33\7 compilers.
+by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2020
 
 \33\17Usage:\33\7    hdmd.exe <mainSourceFile.d> [options]
 
@@ -153,29 +153,29 @@ private string calcHash(string data, string data2 = "") //todo: XXH-ra atirni ez
 private struct BuildCache{
 private:
   //first look inside this
-  EditorFile[FileName] editorFiles;
+  EditorFile[File] editorFiles;
 
   //then look into the filesystem
   struct Content{
-    FileName fileName;
+    File fileName;
     string source;
     DateTime dateTime;
     string hash;
 
-    void unProcess(){
-      processed = false;
-      parser = Parser();
-    }
-
-    bool processed;
     //processed things
     Parser parser;
+    bool processed;
+
+    void unProcess(){
+      processed = false;
+      parser = new Parser();
+    }
 
     void process(){
       parser.tokenize(fileName.fullName, source); //todo: fileName-t tovabb vinni
     }
   }
-  Content[FileName] cache;
+  Content[File] cache;
 
 public:
   void reset() { cache.clear; }
@@ -185,13 +185,13 @@ public:
   void setEditorFiles(int count, EditorFile* data){
     editorFiles.clear;
     foreach(i; 0..count){
-      auto fn = FileName(to!string(data[i].fileName));
+      auto fn = File(to!string(data[i].fileName));
       editorFiles[fn] = data[i];
     }
     editorFiles.rehash;
   }
 
-  Content* access(FileName fileName){
+  Content* access(File fileName){
     //id  cache editor what_to_do_with_cache
     //0   0     0      load from file
     //1   0     1      load from editor
@@ -242,10 +242,10 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 class ModuleInfo{
-  FileName fileName;
+  File fileName;
   string fileHash;
-  FileName[] imports;
-  FileName[] deps; //dependencies
+  File[] imports;
+  File[] deps; //dependencies
   string objHash; //calculated by hashing the dependencies and the compiler flags
 
   int sourceLines, sourceBytes; //stats
@@ -254,7 +254,7 @@ class ModuleInfo{
     fileName = content.fileName;
     fileHash = content.hash;
     sourceLines = content.parser.sourceLines;
-    sourceBytes = content.source.length;
+    sourceBytes = content.source.length.to!int;
   }
 }
 
@@ -353,26 +353,26 @@ private: //current build
   static perf(string f){ return "auto _perfMeasurerStruct = Perf(times."~f~");"; }
 
   //internal data.
-  FileName mainFileName;
-  FilePath mainPath;
+  File mainFileName;
+  Path mainPath;
   bool isExe, isDll, hasCoreModule;
-  FileName targetFileName;
+  File targetFileName;
   string[] compileArgs, linkArgs, runLines, defLines, importPaths;
-  FileName[string] resFiles;
+  File[string] resFiles;
   ModuleInfo[] modules;
   string[] todos;
-  FileName mapFileName, defFileName, resFileName;
+  File mapFileName, defFileName, resFileName;
 
   void prepareMapResDef(){
     //mapFile
-    FileName mf = targetFileName.otherExt(".map");
+    File mf = targetFileName.otherExt(".map");
     mf.remove;
     if(generateMap){
       mapFileName = mf;
     }
 
     //defFile
-    FileName df = targetFileName.otherExt(".def"); //todo:redundant
+    File df = targetFileName.otherExt(".def"); //todo:redundant
     df.remove;
     if(!defLines.empty){
       defFileName = df;
@@ -385,11 +385,11 @@ private: //current build
     if(resFiles.length>0) resFileName = targetFileName.otherExt(".res"); //todo:redundant
   }
 
-  void initData(FileName mainFileName_){ //clears the above
+  void initData(File mainFileName_){ //clears the above
     mainFileName = mainFileName_;
     mainPath = mainFileName.path;
     isExe = isDll = hasCoreModule = false;
-    targetFileName = FileName("");
+    targetFileName = File("");
     compileArgs .clear;
     linkArgs    .clear;
     runLines    .clear;
@@ -400,16 +400,16 @@ private: //current build
     todos       .clear;
   }
 
-  static bool removePath(ref FileName fn, FilePath path){ //todo: belerakni az utils-ba, megcsinalni path-osra a DPath-ot.
+  static bool removePath(ref File fn, Path path){ //todo: belerakni az utils-ba, megcsinalni path-osra a DPath-ot.
     bool res = fn.fullName.startsWith(path.fullPath);
     if(res) fn.fullName = fn.fullName[path.fullPath.length..$];
     return res;
   }
-  static bool removePath(ref FileName fn, string path){ return removePath(fn, FilePath(path)); }
+  static bool removePath(ref File fn, string path){ return removePath(fn, Path(path)); }
 
   static string bold(string s) { return "\33\17"~s~"\33\7"; }
 
-  string smallName(FileName fn){ //strips down extension, removes filePath
+  string smallName(File fn){ //strips down extension, removes filePath
     fn.ext = "";
 
     if(!removePath(fn, mainPath) && !removePath(fn, DPaths.stdPath) && !removePath(fn, DPaths.etcPath) && !removePath(fn, DPaths.corePath)){
@@ -445,7 +445,7 @@ private: //current build
 
         auto ext = "."~cmd;
         targetFileName = param1.empty ? mainFileName.otherExt(ext)
-                                      : FileName(mainPath, param1~ext); //todo: pathosra
+                                      : File(mainPath, param1~ext); //todo: pathosra
 
         if(isDll){ //add implicit macros for DLL
           compileArgs ~= "-shared";
@@ -459,7 +459,7 @@ private: //current build
       }
       case "res":{
         string id = args.length>2 ? args[2] : "";
-        auto src = FileName(param1);
+        auto src = File(param1);
 
         if(!src.isAbsolute) src.path = mainPath; //all resources are relative to the project, unless they as absolute.
 
@@ -474,7 +474,7 @@ private: //current build
           try{
             //todo: filekeresest belerakni a filePath-ba.
             foreach(f; dirEntries(src.path.fullPath, pattern, SpanMode.shallow)){ //many files
-              auto fn = FileName(f.name);
+              auto fn = File(f.name);
               if(fn.exists){
                 resFiles[id ~ fn.name] = fn;
                 any = true;
@@ -500,7 +500,7 @@ private: //current build
   }
 
   //process source files recursively
-  void processSourceFile(FileName fileName){
+  void processSourceFile(File fileName){
     if(modules.canFind!(a => a.fileName==fileName)) return;
 
     enforce(fileName.exists, format(`File not found: "%s"`, fileName));
@@ -529,7 +529,7 @@ private: //current build
 
     //collect imports NEW
     act.parser.importDecls.filter!q{a.isUserModule}
-                          .each!(a => mAct.imports.addIfCan(FileName(a.resolveFileName(mainPath.fullPath, fileName.fullName, true))) );
+                          .each!(a => mAct.imports.addIfCan(File(a.resolveFileName(mainPath.fullPath, fileName.fullName, true))) );
 
     //reqursive walk on imports
     foreach(imp; mAct.imports) processSourceFile(imp);
@@ -563,12 +563,12 @@ private: //current build
     return list.join;
   }
 
-  ModuleInfo* findModule(FileName fn){
+  ModuleInfo* findModule(File fn){
     foreach(ref m; modules) if(m.fileName==fn) return &m;
     return null;
   }
 
-  auto objFileNameOf(FileName srcFileName)
+  auto objFileNameOf(File srcFileName)
   {
     //for incremental builds: main file is OBJ, all others are LIBs
     //auto ext = srcFileName==mainFileName ? ".obj" : ".lib";
@@ -579,7 +579,7 @@ private: //current build
   bool is64bit(){ return compileArgs.canFind("-m64"); }
   bool isOptimized(){ return compileArgs.canFind("-O"); }
 
-  void compile(FileName[] srcFiles, string[] compileArgs, bool multi) // Compile ////////////////////////
+  void compile(File[] srcFiles, string[] compileArgs, bool multi) // Compile ////////////////////////
   {
     mixin(perf("compile"));
     if(srcFiles.empty) return;
@@ -614,7 +614,7 @@ private: //current build
       if(resFileName.fullName!="") c ~= resFileName.fullName;
 
       string[] libFileNames;
-      foreach(fn; linkArgs) switch(lc(FileName(fn).ext)){ //todo: ezt osszevonni a linkerrel
+      foreach(fn; linkArgs) switch(lc(File(fn).ext)){ //todo: ezt osszevonni a linkerrel
         case ".lib": libFileNames ~= fn; break;
         default: break;
       }
@@ -645,7 +645,7 @@ private: //current build
 
     //store freshly compiled obj files for later use
     if(multi){
-      FileName[] objStored;
+      File[] objStored;
       foreach(fn; srcFiles){
         auto objFn = objFileNameOf(fn);
         objCache[findModule(fn).objHash] = objFn.read;
@@ -656,9 +656,9 @@ private: //current build
     }
   }
 
-  void overwriteObjsFromCache(FileName[] filesInCache)
+  void overwriteObjsFromCache(File[] filesInCache)
   {
-    FileName[] objWritten;
+    File[] objWritten;
     foreach(fn; filesInCache){ //provide files already in cache
       auto data = objCache[findModule(fn).objHash];
       auto objFn = objFileNameOf(fn);
@@ -671,7 +671,7 @@ private: //current build
       logln(bold("WRITING CACHE -> OBJ: "), objWritten.map!(a=>smallName(a)).join(", "));
   }
 
-  void resCompile(FileName resFileName, string resHash) //todo: ez igy csunya, ahogy at van passzolva
+  void resCompile(File resFileName, string resHash) //todo: ez igy csunya, ahogy at van passzolva
   {
     mixin(perf("res"));
     resFileName.remove;
@@ -686,7 +686,7 @@ private: //current build
       }else{ //recompiling
         auto rcFileName = resFileName.otherExt(".rc");
 
-        string toCString(FileName s) { return `"`~s.fullName.replace(`\`, `\\`).replace(`"`, `\"`)~`"`; }
+        string toCString(File s) { return `"`~s.fullName.replace(`\`, `\\`).replace(`"`, `\"`)~`"`; }
 
         //create rc content
         auto rcContent = resFiles.byKeyValue
@@ -727,10 +727,10 @@ private: //current build
 
     if(generateMap) addIfCan(linkOpts, useMSLink ? "/MAP" : "/DETAILEDMAP");
 
-    foreach(fn; linkArgs) switch(lc(FileName(fn).ext)){ //sort out different link commandline parts
+    foreach(fn; linkArgs) switch(lc(File(fn).ext)){ //sort out different link commandline parts
       case ".obj": objFileNames ~= fn; break;
       case ".lib": libFileNames ~= fn; break;
-      case ".map": mapFileName = FileName(fn); break;
+      case ".map": mapFileName = File(fn); break;
       default: linkOpts ~= fn; //treat as an option
     }
 
@@ -782,7 +782,7 @@ public:
     resCache.clear;
   };
 
-  bool killDeleteExe(FileName fileName){
+  bool killDeleteExe(File fileName){
     const killTimeOut   = 1.0,//sec
           deleteTimeOut = 1.0;//sec
 
@@ -808,7 +808,7 @@ public:
   }
 
   // Errors returned in exceptions
-  void build(FileName mainFileName_, BuildSettings bs = BuildSettings.init) // Build //////////////////////
+  void build(File mainFileName_, BuildSettings bs = BuildSettings.init) // Build //////////////////////
   {
     {
       times = times.init;
@@ -850,7 +850,7 @@ public:
           `It is forbidden to recompile an std/etc/core module.`);
 
       //select files for compilation
-      FileName[] filesToCompile, filesInCache;
+      File[] filesToCompile, filesInCache;
       foreach(ref m; modules) ((m.objHash !in objCache) ? filesToCompile : filesInCache) ~= m.fileName;
 
       //print out information
@@ -932,7 +932,7 @@ public:
     /////////////////////////////////////////////////////////////////////////////////////
     // run
     if(!compileOnly){
-      const batFileName = FileName(targetFileName.path, "$run.bat");
+      const batFileName = File(targetFileName.path, "$run.bat");
       batFileName.remove;
 
       auto runCmd = runLines.join("\r\n");
@@ -960,7 +960,7 @@ public:
     try{
       sLog = sError = sOutput = "";
 
-      FileName mainFileName;
+      File mainFileName;
       bool help = false;
 
       BuildSettings settings;
@@ -989,7 +989,7 @@ public:
         verbose = true;
         logln(helpStr.replace(`$$$OPTS$$$`, s));
       }else{
-        mainFileName = FileName(absolutePath(args[1]));
+        mainFileName = File(absolutePath(args[1]));
         enforce(mainFileName.exists, "Error: File not found: "~mainFileName.fullName);
         build(mainFileName, settings);
       }

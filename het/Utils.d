@@ -2019,7 +2019,7 @@ auto strToMap(const string str)
   string[string] map;
   try{
     auto j = str.parseJSON;
-    if(j.type==JSON_TYPE.OBJECT)
+    if(j.type==JSONType.OBJECT)
       foreach(string key, ref val; j)
         map[key] = val.str;
   }catch(Throwable){}
@@ -2396,7 +2396,7 @@ auto byLineBlock(File file, size_t maxBlockSize=DefaultLineBlockSize){
 
   auto res = TextFileBlockRange(file, maxBlockSize);
   if(file.exists){
-    res.size = file.size;
+    res.size = cast(size_t)(file.size);
   }else{
     WARN("File not found ", file);
   }
@@ -3891,8 +3891,8 @@ string computerName(){
 
 string targetFeatures(){
   string res = format("Target CPU: %s", __traits(targetCPU));
-  static foreach(f; ["sse", "sse2", "sse3", "ssse3", "sse4", "sse4.1", "sse4.2"])
-    if(__traits(targetHasFeature, f)) res ~= " "~f;
+  static foreach(f; ["sse", "sse2", "sse3", "ssse3", /*"sse4",*/ "sse4.1", "sse4.2"])
+    static if(__traits(targetHasFeature, f)) res ~= " "~f;
   return res;
 }
 

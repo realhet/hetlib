@@ -572,5 +572,5 @@ RGB  opBinary(string op : "*")(in RGB a , in RGB b )     { return RGB (a.r*b.r>>
 RGBA opBinary(string op : "*")(in RGBA a, in RGBA b)     { return RGBA(a.r*b.r>>8, a.g*b.g>>8, a.b*b.b>>8, a.a*b.a>>8); }
 
 
-import std.traits;
-pragma(msg, "Megcsinalni a szinek listazasat traits-al." ~ [__traits(allMembers, het.color)].filter!(s => s.startsWith("cl")).array);
+//import std.traits;
+//todo: pragma(msg, "Megcsinalni a szinek listazasat traits-al." ~ [__traits(allMembers, het.color)].filter!(s => s.startsWith("cl")).array);

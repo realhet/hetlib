@@ -170,7 +170,7 @@ void testHttpQueue(){
   const urls = ["google.com", "https://www.w3.org/MarkUp/Test/xhtml-print/20050519/tests/jpeg444.jpg", "https://www.youtube.com/", "will not access because of category"],
         categories = ["", "", "1", "1"];
 
-  foreach(int i, url; urls)
+  foreach(i, url; urls)
     httpRequest("testHttpQueue", url, categories[i]);
 
   int cnt=0;

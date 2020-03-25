@@ -76,7 +76,7 @@ public:
     }
   }
 
-  void fetch(int n){ for(int i=0; i<n; ++i) fetch; }
+  void fetch(int n){ for(int i=0; i<n; ++i) fetch; } //todo: atirni ezeket az int-eket size_t-re es benchmarkolni.
 
   char peek(int n=1){
     if(pos+n>=text.length) return 0;
@@ -414,7 +414,7 @@ public:
         if(isNewLine(ch)){
           skipNewLine;
 
-          bool found = true;  foreach(int idx, c; ending) if(peek(idx)!=c){ found = false; break; }
+          bool found = true;  foreach(idx, c; ending) if(peek(idx.to!int)!=c){ found = false; break; }
           if(found){
             fetch(cast(int)ending.length);
             break;
@@ -820,7 +820,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     return s.strip;
   }
 
-  foreach(int idx, ref t; tokens)with(TokenKind){
+  foreach(idx, ref t; tokens)with(TokenKind){
     ubyte cl;
 
     //detect big comments
@@ -841,7 +841,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     if(t.kind==Operator){
       if(["{","[","(","q{"].canFind(t.source)){
         nesting ~= t.source;
-        nestingOpeningIdx ~= idx; //todo: normalis nevet talalni ennek, vagy bele egy structba
+        nestingOpeningIdx ~= idx.to!int; //todo: normalis nevet talalni ennek, vagy bele egy structba
       }
     }
 

@@ -1986,8 +1986,8 @@ static cnt=0;
 
       style   = tsNormal;
 
-      static if(isNumeric!T0) flags.hAlign = HAlign.right;
-                         else flags.hAlign = HAlign.left;
+      static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
+                                    else flags.hAlign = HAlign.left;
 
       margin  = Margin(2, 2, 2, 2);
       border  = Border(2, BorderStyle.normal, lerp(clWinBtn, clWinBtnHoverBorder, hit.hover_smooth));

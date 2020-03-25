@@ -39,7 +39,7 @@ struct jsonize {
         key = param;
       }
       else {
-        static assert(0, "invalid @jsonize parameter of type " ~ typeid(type));
+        assert(0, "invalid @jsonize parameter of type " ~ typeid(type));
       }
     }
   }
