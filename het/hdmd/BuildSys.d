@@ -760,7 +760,13 @@ private: //current build
                   ~`legacy_stdio_definitions.lib`
                   ~objFileNames;
 
-      if(useLDC) cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", "msvcrt.lib"];
+      if(useLDC){
+        cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
+        /+note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
+          https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
+            libcmt.lib: static CRT link library for a release build (/MT)
+            msvcrt.lib: import library for the release DLL version of the CRT (/MD) +/
+      }
 
       auto line = joinCommandLine(cmd);
       logln(bold("LINKING: "), line);

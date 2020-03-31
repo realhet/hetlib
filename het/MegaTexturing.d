@@ -50,7 +50,7 @@ enum SubTexChannelConfig{
   RGBA, unknown3, unknown4, RGBA_ClearType,
 }
 
-struct SubTexInfo{ align(1): import std.bitmanip;
+private struct SubTexInfo{ align(1): import std.bitmanip;
   mixin(bitfields!(
     uint, "cellX",    14,      uint, "texIdx_lo", 2,
     uint, "cellY",    14,      uint, "texIdx_hi", 2, //texIdxHi = 3-x, to be likely visible
@@ -272,7 +272,18 @@ public:
   }
 
 
-  void dump() const{ infoArray.enumerate.each!writeln; }
+  void dump() const{
+    //infoArray.enumerate.each!writeln;
+    //!!! LDC 1.20.0 win64 linker bug when using enumerate here!!!!!
+
+    //foreach(i, a; infoArray) writeln(tuple(i, a));
+    //!!! linker error as well
+
+    //foreach(i, a; infoArray) writeln(tuple(i, i+1));
+    //!!! this is bad as well, the problem is not related to own structs, just to tuples
+
+    foreach(i, a; infoArray) writefln("(%s, %s)", i, a);  //this works
+  }
 }
 
 //todo: texture class
