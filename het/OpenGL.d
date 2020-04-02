@@ -1277,11 +1277,17 @@ public:
   void uniform(T)(string name, T val, bool mustSucceed=true, string file=__FILE__, int line=__LINE__){
     use;
     int loc = gl.getUniformLocation(programObject.handle, name);
+
     if(loc<0){ //what if not found:
       if(mustSucceed) error(`Uniform not found: "`~name~`"`);
                  else return; //just hide the error
     }
-    gl.uniform(loc, val);
+
+    try{
+      gl.uniform(loc, val);
+    }catch(Throwable t){
+      throw new Exception("Error setting uniform: %s.%s = %s %s raised %s".format(this.name, name, T.stringof, val, t.msg), file, line);
+    }
   }
 
   //TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!

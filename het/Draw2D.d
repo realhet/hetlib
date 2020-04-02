@@ -1329,9 +1329,7 @@ class Drawing {
       foreach(i, t; textures.getGLTextures){
         t.bind(i.to!int, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
         auto name = i==0 ? "smpInfo" : "smpMega[%d]".format(i-1);
-        print("111, ", name);
-        shader.uniform(name, i, false);
-        print("222");
+        shader.uniform(name, i.to!int, false);
       }
 
       shader.attrib(vbo);
