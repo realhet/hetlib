@@ -1917,6 +1917,7 @@ static cnt=0;
     void editor2value(){ try value = textEditorState.str.to!T0; catch{} } //todo: range clamp
 
     Row({
+      flags.clipChildren = true;
       auto row = cast(.Row)actContainer;
 
       auto hit = hitTestManager.check(id_); //get the hittert from the last frame

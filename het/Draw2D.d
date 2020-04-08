@@ -276,13 +276,15 @@ class Drawing {
 ////////////////////////////////////////////////////////////////////////////////
 
   struct DrawingObj {
-    float aType;
-    V2f aA, aB, aC;
-    uint aColor;
+    float aType;        //4
+    V2f aA, aB, aC;     //24
+    uint aColor;        //4
 
     //drawGlyph obly
-    V2f aD;
-    uint aColor2;
+    V2f aD;             //8
+    uint aColor2;       //4
+
+    V2f aClipMin, aClipMax; //16  clipping rect. Terribly unoptimal
 
     void expandBounds(ref Bounds2f b, ref bool isFirst) const {   //opt: ez az isFirst megneheziti a dolgokat. Kene valami jobb jelzes a bounds uressegre, pl. NAN bounds.
       auto t = aType.iRound;
@@ -299,12 +301,14 @@ class Drawing {
 
   const bool empty() { return buffers.empty && vboList.empty; }
 
-  private void append(const DrawingObj o){
+  private void append(DrawingObj o){
     if(buffers.empty || buffers[$-1].length>=bufferMax){
       DrawingObj[] act;
       act.reserve(bufferMax);
       buffers ~= act;
     }
+    o.aClipMin = clipBounds.bMin;
+    o.aClipMax = clipBounds.bMax;
     buffers[$-1] ~= o;
     o.expandBounds(bounds_, boundsEmpty);
   }
@@ -322,12 +326,30 @@ class Drawing {
   V2f inverseInputTransform(in V2f v) { return v/actState.drawScale-actState.drawOrigin; } //todo: slow divide
   Bounds2f inverseInputTransform(in Bounds2f b) { return Bounds2f(inverseInputTransform(b.bMin), inverseInputTransform(b.bMax)); }
 
+  Bounds2f clipBounds;
+  private Bounds2f[] clipBoundsStack;
+
+  void pushClipBounds(Bounds2f bnd){ //bnd is in local coords
+    clipBoundsStack ~= clipBounds;
+    clipBounds = inputTransform(bnd);
+  }
+
+  void popClipBounds(){
+    if(clipBoundsStack.length){
+      clipBounds = clipBoundsStack[$-1];
+      clipBoundsStack = clipBoundsStack[0..$-1];
+    }
+  }
+
   void clear(){
     destroyVboList;
     destroy(buffers);
     bounds_ = Bounds2f.init;
     boundsEmpty = true;
     markDirty;
+
+    clipBounds = Bounds2f(-1e30, -1e30, 1e30, 1e30);
+    clipBoundsStack = [];
 
     actState = DrawState.init;
     stateStack.clear;
@@ -782,14 +804,18 @@ class Drawing {
     }
 
     @vertex://////////////////////////////////////////////////////////////////////////
-    in  float aType; in  vec2 aA, aB, aC, aD; in  vec4 aColor, aColor2;
-    out float Type; out vec2  A,  B,  C,  D; out vec4  Color,  Color2;
+    in  float aType; in  vec2 aA, aB, aC, aD; in  vec4 aColor, aColor2; in  vec2 aClipMin, aClipMax;
+    out float Type; out vec2  A,  B,  C,  D; out vec4  Color,  Color2 ; out vec2 ClipMin , ClipMax ;
     void main() {
       A=aA; B=aB; C=aC; Color=aColor; Type=aType;
 
       //glyph only
       D=aD;
       Color2=aColor2;
+
+      //all
+      ClipMin = aClipMin;
+      ClipMax = aClipMax;
     } //just shovels the data through
 
     @geometry:////////////////////////////////////////////////////////////////////////
@@ -804,7 +830,7 @@ class Drawing {
     layout(points) in;
     layout(triangle_strip, max_vertices = TotalVertices) out; //Extra vertices are there for arrowheads
 
-    in float Type[]; in vec2 A[], B[], C[], D[]; in vec4 Color[], Color2[];
+    in float Type[]; in vec2 A[], B[], C[], D[]; in vec4 Color[], Color2[]; in vec2 ClipMin[], ClipMax[];
     flat out vec4 fColor;
     out vec2 fStipple; //type, phase:    //note: it was "varying out", but NVidia don't like it, just "out"
 
@@ -820,6 +846,7 @@ class Drawing {
     flat out vec2 texelPerPixel;
     flat out float boldTexelOffset;
     flat out int fontFlags;
+    flat out vec2 fClipMin, fClipMax;
 
 
     uniform sampler2D smpInfo;
@@ -867,7 +894,7 @@ class Drawing {
       return outp;
     }
 
-    //Transforms into screenScape. uScale means the pixelsize.
+    //Transforms into screenSpace. uScale means the pixelsize.
     vec2 trans(vec2 p) { return (p+uShift)*uScale; }
     vec2 invTrans(vec2 p) { return (p/uScale)-uShift; }
     //Transforms into normalized view coordinates for opengl.
@@ -1018,6 +1045,8 @@ class Drawing {
       fStipple = vec2(0, 0);
       boldTexelOffset = 0;
       fontFlags = 0;
+      fClipMin = trans(ClipMin[0]) + uViewPortSize*0.5;
+      fClipMax = trans(ClipMax[0]) + uViewPortSize*0.5; //todo:trans
 
       int t = int(Type[0]);
       if(t==1){ //Point
@@ -1081,6 +1110,8 @@ class Drawing {
     }
 
     @fragment:
+    layout(origin_upper_left) in vec4 gl_FragCoord;
+
     flat in vec4 fColor;
     in vec2 fStipple; //type, phase
 
@@ -1095,6 +1126,8 @@ class Drawing {
     flat in vec2 texelPerPixel;
     flat in float boldTexelOffset;
     flat in int fontFlags;
+
+    flat in vec2 fClipMin, fClipMax;
 
     out vec4 FragColor; //NV compatibility: gl_FragColor is deprecated
 
@@ -1212,7 +1245,14 @@ class Drawing {
       return vec4(c, 1);
     }
 
+    bool chkClip(in vec2 mi, in vec2 ma){
+      return gl_FragCoord.x>ma.x || gl_FragCoord.x<mi.x
+          || gl_FragCoord.y>ma.y || gl_FragCoord.y<mi.y;
+    }
+
     void main(){
+      if(chkClip(fClipMin, fClipMax)) discard;
+
       if(fColor2.w==0){ // plain color stuff
 
         vec4 color = fColor;
@@ -1301,6 +1341,7 @@ class Drawing {
 
   void glDraw(const V2f center, float scale, const V2f translate=V2f.Null) {
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));
+    enforce(clipBoundsStack.empty, "Drawing.glDraw() clipBounds stack is not empty.  It has %d items.".format(clipBoundsStack.length));
 
     drawCnt++;
 

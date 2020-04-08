@@ -1143,8 +1143,8 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
-union ContainerFlags{
-  ushort _data = 0b0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
+union ContainerFlags{ //todo: do this nicer with a table
+  ushort _data = 0b0_0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"         , 1,
     HAlign        , "hAlign"          , 2,  //alignment for all subCells
@@ -1155,8 +1155,9 @@ union ContainerFlags{
     bool          , "focused"         , 1,  //maintained by system, not by user
     bool          , "hovered"         , 1,  //maintained by system, not by user
     PanelPosition , "panelPosition"   , 4,  //only for desktop
+    bool          , "clipChildren"    , 1,
 
-    int, "_dummy"       , 1,
+//    int, "_dummy"       , 0,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1682,11 +1683,13 @@ class Container : Cell { // Container ////////////////////////////////////
     //dr.alpha = 1;
 
     dr.translate(innerPos);
+    if(flags.clipChildren) dr.pushClipBounds(Bounds2f(0, 0, innerWidth, innerHeight));
 
     foreach(sc; subCells){
       sc.draw(dr); //recursive
     }
 
+    if(flags.clipChildren) dr.popClipBounds;
     dr.pop;
 
     drawBorder(dr); //border is the last

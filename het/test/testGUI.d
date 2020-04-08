@@ -105,7 +105,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
 
   override void onUpdate(){ // update ////////////////////////////////
     invalidate; //todo: opt
-    updateView(1, 1);
+    view.navigate(!im.wantKeys, !im.wantMouse);
 
     caption = FPS.text;
 
@@ -117,7 +117,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
       static s = "Hello\r\nWorld!",
              editWidth = 100;
 
-      Row({  Text("Test control  ");  HSlider(editWidth, range(1, 300));  });
+      Row({  Text("Test control  ");  Slider(editWidth, range(1, 300));  });
       Row({  foreach(i; 0..2) Edit(s, id(i), { width = editWidth; style.fontHeight = 40; });  });
       Text(im.textEditorState.dbg);
 
@@ -126,6 +126,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     if(inputs.F1.pressed){
       textures.dump;
     }
+
    }
 
   override void onPaint(){ // paint //////////////////////////////////////

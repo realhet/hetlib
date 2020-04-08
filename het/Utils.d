@@ -4171,7 +4171,6 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
 }
 
 private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
-
   //cleanup
   ini.saveIni;
   CoUninitialize;

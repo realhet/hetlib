@@ -590,14 +590,8 @@ auto cl() //global access
 {
   if(!clf) clf = new CLFuncts;
   return clf;
-}
 
-private class clFinalizer{
-  static ~this(){
-    if(clf){
-      clf.destroy;
-    }
-  }
+  //Note: clf must not be freed up with a finalizer, because GC can call it from the cl objects.
 }
 
 class CLFuncts{
@@ -676,7 +670,8 @@ public:
   }
 
   ~this(){
-    foreach(d; devices_) d.destroy;
+    foreach(ref d; devices_) d.destroy;
+    devices_ = [];
   }
 
   private bool initialized;
@@ -687,7 +682,7 @@ public:
       foreach(plt; getPlatformIDs(1)){
         auto devs = getDeviceIDs(plt, CL_DEVICE_TYPE_GPU);
         if(!devs.empty){ //got the gpu category
-          foreach(int idx, id; devs) devices_ ~= new CLDevice(idx, id);
+          foreach(idx, id; devs) devices_ ~= new CLDevice(idx.to!int, id);
           devices_ = devices_.sort!"a.info.vendorID<b.info.vendorID".array;
           break;
         }
@@ -696,9 +691,8 @@ public:
     return devices_;
   }
 
-  void clChk(int err, lazy string name = __FUNCTION__){
-//    name.writeln;
-    enforce(!err, name~": "~clErrorStr(err));
+  void clChk(string file = __FILE__, int line = __LINE__)(int err){
+    if(err) throw new Exception(clErrorStr(err), file, line);
   }
 
   cl_platform_id[] getPlatformIDs(uint nMax=8){
@@ -755,19 +749,23 @@ public:
     return p;
   }
 
-  void buildProgram(const cl_program program, cl_device_id[] devices, string options){
+  void buildProgram(string file=__FILE__, int line=__LINE__)(const cl_program program, cl_device_id[] devices, string options){
     int err = clBuildProgram(program, devices.length, devices.ptr, cast(char*)options.toStringz, null, null);
     if(err==CL_SUCCESS) return;
     if(err==CL_BUILD_PROGRAM_FAILURE){
-      enforce(0, "CL_BUILD_PROGRAM_FAILURE\r\n"~getBuildProgramInfo(program, devices[0], CL_PROGRAM_BUILD_LOG));
+      string info = getProgramBuildInfo!(file, line)(program, devices[0], CL_PROGRAM_BUILD_LOG);
+      enum maxLen = 8192;
+      if(info.length>maxLen) info = info[0..maxLen]~"...";
+      throw new Exception("CL_BUILD_PROGRAM_FAILURE\r\n"~info, file, line);
     }
-    clChk(err);
+    clChk!(file, line)(err);
   }
 
-  string getBuildProgramInfo(const cl_program program, cl_device_id device, int name){
-    auto buf = new char[0x8000];
+  string getProgramBuildInfo(string file=__FILE__, int line=__LINE__)(const cl_program program, cl_device_id device, int name){
     size_t len;
-    clChk(clGetProgramBuildInfo(program, device, name, buf.length, buf.ptr, &len));
+    clChk!(file, line)(clGetProgramBuildInfo(program, device, name, 0, null, &len));
+    auto buf = new char[len];
+    clChk!(file, line)(clGetProgramBuildInfo(program, device, name, buf.length, buf.ptr, &len));
     return buf[0..max(len, 1)-1].to!string;
   }
 
@@ -1280,7 +1278,7 @@ class CLKernel:CLObject{ // CLKernel /////////////////////////////////
     int findSourceLine(int idx2){
       auto chk(string s1, string s2){ return isWild!(false, '\x01', '\x02')(s1, s2); }
       int[] idx1List;
-      foreach(int i, s1; src1) if(chk(s1, src2[idx2])) idx1List ~= i;
+      foreach(i, s1; src1) if(chk(s1, src2[idx2])) idx1List ~= i.to!int;
 
       if(idx1List.empty) return -1;
       if(idx1List.length==1) return idx1List[0];
@@ -1429,7 +1427,7 @@ private:
   Reg[] regs;
 
   int findReg(char type, int idx){
-    foreach(int i, r; regs) if(r.type==type && r.idx==idx) return i;
+    foreach(i, r; regs) if(r.type==type && r.idx==idx) return i.to!int;
     return -1;
   }
 
@@ -1444,9 +1442,9 @@ public:
 
     int i = findReg(type, idx);
     if(i>=0 && regs[i..i+count].all!(r => r.type==type && r.allocatedName.empty)){
-      foreach(int j, ref s; regs[i..i+count]){
+      foreach(j, ref s; regs[i..i+count]){
         s.allocatedName = name;
-        s.allocatedIdx = j;
+        s.allocatedIdx = j.to!int;
         s.isArray = count>1;
       }
       return true;
@@ -1505,10 +1503,9 @@ public:
       }
 
       int count = 1;
-      string[] ss;
-      if(s.isWild("?*[?*]", &ss)){
-        s = ss[0].strip;
-        count = ss[1].strip.to!int;
+      if(s.isWild("?*[?*]")){
+        s = wild[0].strip;
+        count = wild[1].strip.to!int;
       }
 
       enforce(isIdentifier(s), `RegPool error: invalid identifier name "%s"`.format(s));
@@ -1890,17 +1887,16 @@ string gcnMake(GCNString[] parts_...){
   string[] options, main, allocS, allocV, routineDefs, startup;
 
   foreach(p; parts)if(!p.empty){ //first is always empty
-    string[] a;
-    if(p.isWild("*"~gcnTokenMarkerEnd~"*", &a)){
-      switch(a[0]){
-        case "Options": options ~= a[1]; break;
-        case "Header": onlyOnce(header, "header");header = a[1]; break;
-        case "AllocS": allocS ~= a[1]; break;
-        case "AllocV": allocV ~= a[1]; break;
-        case "LoadParams": onlyOnce(loadParams, "params"); loadParams = a[1]; break;
-        case "Routine": routineDefs ~= a[1]; break;
-        case "Code": main ~= a[1]; break;
-        default: enforce(false, `gcnMake: invalid gcnToken:"%s"`.format(a[0]));
+    if(p.isWild("*"~gcnTokenMarkerEnd~"*")){
+      switch(wild[0]){
+        case "Options": options ~= wild[1]; break;
+        case "Header": onlyOnce(header, "header");header = wild[1]; break;
+        case "AllocS": allocS ~= wild[1]; break;
+        case "AllocV": allocV ~= wild[1]; break;
+        case "LoadParams": onlyOnce(loadParams, "params"); loadParams = wild[1]; break;
+        case "Routine": routineDefs ~= wild[1]; break;
+        case "Code": main ~= wild[1]; break;
+        default: enforce(false, `gcnMake: invalid gcnToken:"%s"`.format(wild[0]));
       }
     }else{
       enforce(false, `gcnMake: unable to decode token: "%s"...`.format(p[0..min($, 50)]));
@@ -1915,9 +1911,8 @@ string gcnMake(GCNString[] parts_...){
 
   // Create regpool
   int sCnt = 96, vCnt = 256; //default values are max
-  string[] s;
-  if(header.isWild("*.sgprsnum *\r*", &s)) sCnt = s[1].to!int;
-  if(header.isWild("*.vgprsnum *\r*", &s)) vCnt = s[1].to!int;
+  if(header.isWild("*.sgprsnum *\r*")) sCnt = wild[1].to!int;
+  if(header.isWild("*.vgprsnum *\r*")) vCnt = wild[1].to!int;
 
   auto pool = new GcnRegPool(sCnt, vCnt);
 
