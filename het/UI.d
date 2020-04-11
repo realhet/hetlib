@@ -1,4 +1,4 @@
-module ui;
+module het.ui;
 
 import het.utils, het.geometry, het.draw2d, het.inputs, std.traits;
 
@@ -1454,8 +1454,6 @@ static cnt=0;
       //hide after no hints to display for a while
       if(noHint_secs>HintRelease_sec) hideHints;
     }
-
-    PING(hintState.to!int);
 
     //actual hint generation
     HintRec lastHint;

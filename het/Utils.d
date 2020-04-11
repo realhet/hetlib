@@ -2019,7 +2019,7 @@ auto strToMap(const string str)
   string[string] map;
   try{
     auto j = str.parseJSON;
-    if(j.type==JSONType.OBJECT)
+    if(j.type==JSON_TYPE.OBJECT)
       foreach(string key, ref val; j)
         map[key] = val.str;
   }catch(Throwable){}
@@ -3047,17 +3047,27 @@ public:
     return remove!rmdirRecurse(mustSucceed);
   }
 
-  File[] files(string pattern="*.*", bool recursive=false) const{
+  private static void preparePattern(ref string pattern){
     //convert multiple filters to globMatch's format
     if(pattern.canFind(';'))
       pattern = pattern.replace(";", ",");
 
     if(pattern.canFind(',') && !pattern.startsWith('{'))
       pattern = '{'~pattern~'}';
+  }
 
+  File[] files(string pattern="*", bool recursive=false) const{
+    preparePattern(pattern);
     return dirEntries(fullPath, pattern, recursive ? SpanMode.depth : SpanMode.shallow)
       .filter!isFile
       .map!(e => File(e.name)).array;
+  }
+
+  Path[] paths(string pattern="*", bool recursive=false) const{
+    preparePattern(pattern);
+    return dirEntries(fullPath, pattern, recursive ? SpanMode.depth : SpanMode.shallow)
+      .filter!(e => !e.isFile)
+      .map!(e => Path(e.name)).array;
   }
 
   Path opBinary(string op:"~")(string p2){

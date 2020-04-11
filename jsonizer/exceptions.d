@@ -8,12 +8,14 @@
   */
 module jsonizer.exceptions;
 
-import std.json      : JSONValue, JSONType;
+import std.json;
 import std.string    : format, join;
 import std.traits    : ParameterTypeTuple, ParameterIdentifierTuple;
 import std.meta      : aliasSeqOf;
 import std.range     : iota;
 import std.typetuple : staticMap;
+
+//alias JSONType = JSON_TYPE;
 
 /// Base class of any exception thrown by `jsonizer`.
 class JsonizeException : Exception {

@@ -109,7 +109,7 @@ class Camera{ //! Camera //////////////////////////////////////
     j["fovy" ] = fovy        .text;
     j["near" ] = near        .text;
     j["far"  ] = far         .text;
-    return j.text;
+    return j.toString;
   }
 
   void load(ref string s){

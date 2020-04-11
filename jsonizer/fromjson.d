@@ -1,4 +1,4 @@
-﻿/**
+/**
   * Contains functions for deserializing JSON data.
   *
   * Authors: <a href="https://github.com/rcorre">rcorre</a>
@@ -59,45 +59,45 @@ T fromJSON(T)(JSONValue json,
 
   // boolean
   else static if (is(T : bool)) {
-    if (json.type == JSONType.true_)
+    if (json.type == JSONType.TRUE)
       return true;
-    else if (json.type == JSONType.false_)
+    else if (json.type == JSONType.FALSE)
       return false;
 
     // expected 'true' or 'false'
-    throw new JsonizeTypeException(typeid(bool), json, JSONType.true_, JSONType.false_);
+    throw new JsonizeTypeException(typeid(bool), json, JSONType.TRUE, JSONType.FALSE);
   }
 
   // string
   else static if (is(T : string)) {
-    if (json.type == JSONType.null_) { return null; }
-    enforceJsonType!T(json, JSONType.string);
+    if (json.type == JSONType.NULL) { return null; }
+    enforceJsonType!T(json, JSONType.STRING);
     return cast(T) json.str;
   }
 
   // numeric
   else static if (is(T : real)) {
     switch(json.type) {
-      case JSONType.float_:
+      case JSONType.FLOAT:
         return cast(T) json.floating;
-      case JSONType.integer:
+      case JSONType.INTEGER:
         return cast(T) json.integer;
-      case JSONType.uinteger:
+      case JSONType.UINTEGER:
         return cast(T) json.uinteger;
-      case JSONType.string:
+      case JSONType.STRING:
         enforce(json.str.isNumeric, format("tried to extract %s from json string %s", T.stringof, json.str));
         return to!T(json.str); // try to parse string as int
       default:
     }
 
     throw new JsonizeTypeException(typeid(bool), json,
-                                   JSONType.float_, JSONType.integer, JSONType.uinteger, JSONType.string);
+                                   JSONType.FLOAT, JSONType.INTEGER, JSONType.UINTEGER, JSONType.STRING);
   }
 
   // array
   else static if (isArray!T) {
-    if (json.type == JSONType.null_) { return T.init; }
-    enforceJsonType!T(json, JSONType.array);
+    if (json.type == JSONType.NULL) { return T.init; }
+    enforceJsonType!T(json, JSONType.ARRAY);
     alias ElementType = ForeachType!T;
     T vals;
     foreach(idx, val ; json.array) {
@@ -114,8 +114,8 @@ T fromJSON(T)(JSONValue json,
   // associative array
   else static if (isAssociativeArray!T) {
     static assert(is(KeyType!T : string), "toJSON requires string keys for associative array");
-    if (json.type == JSONType.null_) { return null; }
-    enforceJsonType!T(json, JSONType.object);
+    if (json.type == JSONType.NULL) { return null; }
+    enforceJsonType!T(json, JSONType.OBJECT);
     alias ValType = ValueType!T;
     T map;
     foreach(key, val ; json.object) {
@@ -195,7 +195,7 @@ unittest {
 /**
  * Extract a value from a json object by its key.
  *
- * Throws if `json` is not of `JSONType.object` or the key does not exist.
+ * Throws if `json` is not of `JSONType.OBJECT` or the key does not exist.
  *
  * Params:
  *  T       = Target type. can be any primitive/builtin D type, or any
@@ -208,7 +208,7 @@ T fromJSON(T)(JSONValue json,
               string key,
               in ref JsonizeOptions options = JsonizeOptions.defaults)
 {
-  enforceJsonType!T(json, JSONType.object);
+  enforceJsonType!T(json, JSONType.OBJECT);
   enforce(key in json.object, "tried to extract non-existent key " ~ key ~ " from JSONValue");
   return fromJSON!T(json.object[key], options);
 }
@@ -238,7 +238,7 @@ unittest {
 /**
  * Extract a value from a json object by its key.
  *
- * Throws if `json` is not of `JSONType.object`.
+ * Throws if `json` is not of `JSONType.OBJECT`.
  * Return `defaultVal` if the key does not exist.
  *
  * Params:
@@ -254,7 +254,7 @@ T fromJSON(T)(JSONValue json,
               T defaultVal,
               in ref JsonizeOptions options = JsonizeOptions.defaults)
 {
-  enforceJsonType!T(json, JSONType.object);
+  enforceJsonType!T(json, JSONType.OBJECT);
   return (key in json.object) ? fromJSON!T(json.object[key]) : defaultVal;
 }
 
@@ -372,11 +372,11 @@ unittest {
 // otherwise pass null for the parent
 T fromJSONImpl(T, P)(JSONValue json, P parent, in ref JsonizeOptions options) {
   static if (is(typeof(null) : T)) {
-    if (json.type == JSONType.null_) { return null; }
+    if (json.type == JSONType.NULL) { return null; }
   }
 
   // try constructing from a primitive type using a single-param constructor
-  if (json.type != JSONType.object) {
+  if (json.type != JSONType.OBJECT) {
     return invokePrimitiveCtor!T(json, parent);
   }
 
