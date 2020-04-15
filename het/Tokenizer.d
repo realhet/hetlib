@@ -17,8 +17,10 @@ const CompilerVersion = 100;
 //todo: camelCase
 enum TokenKind {Unknown, Comment, Identifier, Keyword, Special, Operator, LiteralString, LiteralChar, LiteralInt, LiteralFloat};
 
-@trusted string tokenize(string fileName, string text, out Token[] tokens)
-{ Tokenizer t;  return t.tokenize(fileName, text, tokens); }
+@trusted string tokenize(string fileName, string text, out Token[] tokens) //returns error of any
+{
+  auto t = scoped!Tokenizer;  return t.tokenize(fileName, text, tokens);
+}
 
 Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen)
 {
@@ -67,7 +69,7 @@ public:
 
   void error(string s){ throw new Exception(format("%s(%d:%d): Tokenizer error: %s", fileName, line, posInLine, s)); }
 
-  void fetch(){
+  void fetch(){       //dchar
     pos++; posInLine++;
     if(pos>=text.length){
       ch=0;  //eof is ch
@@ -78,7 +80,7 @@ public:
 
   void fetch(int n){ for(int i=0; i<n; ++i) fetch; } //todo: atirni ezeket az int-eket size_t-re es benchmarkolni.
 
-  char peek(int n=1){
+  char peek(int n=1){ //dchar
     if(pos+n>=text.length) return 0;
                       else return text[pos+n];
   }
@@ -621,7 +623,10 @@ public:
 
 public:
   //returns the error or ""
-  string tokenize(const string fileName, const string text, out Token[] tokens){
+  string tokenize(in string fileName, in string text, out Token[] tokens){
+    auto enc = encodingOf(text);
+    enforce(enc==TextEncoding.UTF8, "Tokenizer only works on UTF8 input. ("~enc.text~")");
+
     this.fileName = fileName;
     this.text = text;
     line = 0;
@@ -1004,3 +1009,37 @@ AHH"
 //todo: optional string postfixes
 }
 +/
+
+// Big test //////////////////////////////////////////////
+
+void testTokenizer(){
+  double tTokenize = 0, tFull = 0;
+  int size;
+
+  string test(File f){
+    Token[] tokens;
+    auto s = f.readText;
+    size += s.length.to!int;
+
+    double t0 = QPS;
+    tokenize(f.fullName, s, tokens);
+    tTokenize += QPS-t0;
+
+    t0 = QPS;
+    auto res = tokenize2(s, f.fullName);
+    tFull += QPS-t0;
+
+    return res.text;
+  }
+
+  print("\n\nTesting tokenizer & syntax highlighter...");
+
+  auto path = Path(`c:\d\libs\het\test\testTokenizerData`);
+  auto s = path.files(`*.d`).map!(f => test(f)).join;
+
+  File(path, `result.txt`).write(s);
+  print("tokenizer time:", tTokenize, "size:", size, "MB/s:", size/1024.0/1024.0/tTokenize);
+  print("full time:", tFull    , "size:", size, "MB/s:", size/1024.0/1024.0/tFull    );
+  enforce(File(path, `reference200415.txt`).readText == s, "Tokenizer correctness test failed.");
+  print("\33\12Tokenizer works correctly\33\7");
+}
