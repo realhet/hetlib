@@ -1767,7 +1767,7 @@ private{
   TessVertex*[] tessVertices;
 
   auto addVertex(in V2f v){
-    auto r = new TessVertex(tessVertices.length.to!int, v);
+    auto r = new TessVertex(cast(int)tessVertices.length, v);
     tessVertices ~= r;
     return r;
   }

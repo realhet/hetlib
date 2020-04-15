@@ -40,10 +40,31 @@ struct DataStruct{
   @STORED{
     ubyte[] compressedArr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   }
+
+  void clear(){
+    auto arr = cast(ubyte*)(&this);
+    arr[0..typeof(this).sizeof] = 0;
+  }
 }
 
 
+import std.variant;
+
+/*class JsonNode{
+}
+
+class JsonValue{
+}
+
+class JsonArray{
+}
+
+class JsonField{
+}*/
+
 void test(){
+  string original, restored;
+
   DataStruct data;
 
   data.vectArray = [V2f(1,2), V2f(1,3), V2f(6,4)];
@@ -51,35 +72,31 @@ void test(){
   data.class1 = new MyClass;
   data.class1.a = 42;
 
-  string st0; st0.streamAppend_json!false(data);
-  string st1; st1.streamAppend_json!true(data);
 
-  st0.writeln;
-  st1.writeln;
+  writeln("\n\n saved values ---------------------------");
+  original ~= data.text;
+  data.writeln;
+  string st0 = data.toJson;
+  //st0.writeln;
+  writeln("\n\n saved zeroes ---------------------------");
+  data.clear;
+  original ~= data.text;
+  data.writeln;
+  string st1 = data.toJson;
+  //st1.writeln;
 
-  import het.tokenizer;
+  writeln("\n\n restored values ---------------------------");
+  data.fromJson(st0);
+  restored ~= data.text;
+  data.writeln;
 
-  writeln("\n\nDecoding");
-  Token[] tokens;
-  auto error = tokenize("JSON decode", st0, tokens);
-  enforce(error=="", error);
+  writeln("\n\n restored zeroes ---------------------------");
+  data.fromJson(st1);
+  restored ~= data.text;
+  data.writeln;
 
-  //tokens.each!writeln;
-
-
-
-  {
-    auto s = "a\u2022\U0001F7D0z"; //4 chars total
-    write("unicode char test: ");
-    foreach(dchar ch; s){
-      write(" ", ch.to!uint.to!string(16), ",");
-    }
-    writeln;
-  }
-
-  testTokenizer;
-
-  writeln("Done");
+  enforce(original == restored, "Json is fucked up. original!=restored.");
+  print("\33\12JSON test successful.\33\7");
 }
 
 

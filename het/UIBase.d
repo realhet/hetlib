@@ -962,7 +962,7 @@ class Cell{ // Cell ////////////////////////////////////
 
   //elastic tabs
   int[] tabIdx() { return []; }
-  int tabCnt() { return tabIdx.length.to!int; } //todo: int -> size_t
+  int tabCnt() { return cast(int)tabIdx.length; } //todo: int -> size_t
   float tabPos(int i) { with(subCells[tabIdx[i]]) return outerRight; }
 
 /* advanced insert delete. Not needed for IMGUI
@@ -1305,8 +1305,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
   //access helpers
   auto cells()                  { return row.subCells; }
-  int cellCount()               { return cells.length.to!int; }
-  int wrappedLineCount()        { return wrappedLines.length.to!int; }
+  int cellCount()               { return cast(int)cells.length; }
+  int wrappedLineCount()        { return cast(int)wrappedLines.length; }
   int clampIdx(int idx)         { return idx.clamp(0, cellCount); }
 
   // raw caret conversion routines
@@ -1789,7 +1789,7 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
 int countMarkupLineCells(string markup){
   try{
     auto cntr = new Row(markup);
-    return cntr.subCells.length.to!int;
+    return cast(int)cntr.subCells.length;
   }catch(Throwable){
     return 0;
   }
@@ -1835,7 +1835,7 @@ void appendMarkupLine(bool returnSubCellStrOfs=true, TC:Container)(TC cntr, stri
         commandLine ~= ch;
       }else{ //process text
         static if(is(TC == Row)){
-          if(ch==9) cntr.tabIdxInternal ~= cntr.subCells.length.to!int; //Elastic Tabs
+          if(ch==9) cntr.tabIdxInternal ~= cast(int)cntr.subCells.length; //Elastic Tabs
         }
 
         cntr.appendg(ch, ts);
@@ -1860,7 +1860,7 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
     auto calcWidth(){ assert(left==0); return right; } //todo: assume left is 0
   //}
 
-  int cellCount() const{ return cells.length.to!int; }
+  int cellCount() const{ return cast(int)cells.length; }
 
   void translateX(float dx){ if(!dx) return; foreach(c; cells) c.outerPos.x += dx; }
   void translateY(float dy){ if(!dy) return; foreach(c; cells) c.outerPos.y += dy; y0 += dy; }
@@ -1943,8 +1943,8 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
     sort(x0, x1);
     if(cells.empty || x1<cells[0].outerPos.x || x0>cells[$-1].outerRight) return tuple(lo, hi); //no intersection
 
-    foreach(i, c; cells) if(x0 <= c.outerRight){ lo = i.to!int; break; }
-    foreach_reverse(i, c; cells) if(x1 >= c.outerPos.x){ hi = i.to!int+1; break; }
+    foreach(i, c; cells) if(x0 <= c.outerRight){ lo = cast(int)i; break; }
+    foreach_reverse(i, c; cells) if(x1 >= c.outerPos.x){ hi = cast(int)i+1; break; }
 
     return tuple(lo, hi);
   }

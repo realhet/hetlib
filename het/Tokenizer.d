@@ -2,6 +2,8 @@ module het.tokenizer;
 import het.utils, het.keywords, std.variant;
                                           //todo: size_t-re atallni
 
+//TEST: testTokenizer()
+
 const CompilerVersion = 100;
 
 //TODO: DIDE jegyezze meg a file kurzor/ablak-poziciokat is
@@ -35,7 +37,8 @@ Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarc
 struct Token{
   Variant data;
   int id; //emuns: operator, keyword
-  int pos, length, line, posInLine;
+  int pos, length;
+  int line, posInLine;
   int level; //hiehrarchy level in [] () {} q{}
   string source;
 
@@ -57,44 +60,87 @@ struct Token{
   bool isIdentifier()           const { return kind==TokenKind.Identifier; }
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
   bool isComment()              const { return kind==TokenKind.Comment; }
+
+  void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line, posInLine, source, msg)); }
 }
 
 class Tokenizer{
 public:
   string fileName;
   string text;
-  int pos, line, posInLine;
-  char ch; //actual character
+  int pos, textLength, line, posInLine;
+  dchar ch; //actual character
+  int skipCh; //size oh ch (1..4)
   Token[] res;   //should rename to tokens
 
   void error(string s){ throw new Exception(format("%s(%d:%d): Tokenizer error: %s", fileName, line, posInLine, s)); }
 
-  void fetch(){       //dchar
-    pos++; posInLine++;
-    if(pos>=text.length){
+  static bool isEOF      (dchar ch) { return ch==0 || ch=='\x1A'; }
+  static bool isNewLine  (dchar ch) { return ch=='\r' || ch=='\n'; }
+  static bool isLetter   (dchar ch) { import std.uni; return isAlpha(ch) || ch=='_'; }//ch>='a' && ch<='z' || ch>='A' && ch<='Z' || ch=='_'; }
+  static bool isDigit    (dchar ch) { return ch>='0' && ch<='9'; }
+  static bool isOctDigit (dchar ch) { return ch>='0' && ch<='7'; }
+  static bool isHexDigit (dchar ch) { return ch>='0' && ch<='9' || ch>='a' && ch<='f' || ch>='A' && ch<='F'; }
+
+  void initFetch(){
+    /*line = 0;
+    pos = posInLine = -1;
+    fetch; //fetch the first char*/
+
+    pos = posInLine = line = skipCh = 0;
+    textLength = text.length.to!int;
+
+    fetch;
+  }
+
+  void fetch(){
+    /*pos ++; posInLine++;
+    if(pos>=textLength){
       ch=0;  //eof is ch
     }else{
       ch = text[pos];
+    }*/
+
+    pos += skipCh; posInLine += skipCh;
+    if(pos<textLength){
+      size_t nextPos = pos;
+      ch = decode!(Yes.useReplacementDchar)(text, nextPos);
+      skipCh = cast(int)nextPos - pos;
+    }else{
+      ch = 0;  //eof is ch
     }
   }
 
   void fetch(int n){ for(int i=0; i<n; ++i) fetch; } //todo: atirni ezeket az int-eket size_t-re es benchmarkolni.
 
-  char peek(int n=1){ //dchar
-    if(pos+n>=text.length) return 0;
-                      else return text[pos+n];
+  dchar peek(uint n=1){
+    /*if(pos+n < textLength) return text[pos+n];
+                      else return 0;*/
+
+    size_t p = pos;
+    dchar res = 0;
+    foreach(i; 0..n+1){
+      if(p<text.length){
+        res = decode!(Yes.useReplacementDchar)(text, p);
+      }else
+        break;
+    }
+    return res;
+  }
+
+  string fetchIdentifier() {
+    string s;
+    if(isLetter(ch)){
+      s ~= ch; fetch;
+      while(isLetter(ch) || isDigit(ch)){ s ~= ch; fetch; }
+    }
+    return s;
   }
 
   void incLine() { line++;  posInLine = 0; }
 
-  static bool isEOF      (char ch) { return ch==0 || ch=='\x1A'; }
-  static bool isNewLine  (char ch) { return ch=='\r' || ch=='\n'; }
-  static bool isLetter   (char ch) { return ch>='a' && ch<='z' || ch>='A' && ch<='Z' || ch=='_'; }
-  static bool isDigit    (char ch) { return ch>='0' && ch<='9'; }
-  static bool isOctDigit (char ch) { return ch>='0' && ch<='7'; }
-  static bool isHexDigit (char ch) { return ch>='0' && ch<='9' || ch>='a' && ch<='f' || ch>='A' && ch<='F'; }
-  int  expectHexDigit(char ch) { if(isDigit(ch)) return ch-'0'; if(ch>='a' && ch<='f') return ch-'a'; if(ch>='A' && ch<='F') return ch-'A'; error(`Hex digit expected instead of "`~ch~`".`); return -1; }
-  int  expectOctDigit(char ch) { if(isOctDigit(ch)) return ch-'0'; error(`Octal digit expected instead of "`~ch~`".`); return -1; }
+  int  expectHexDigit(dchar ch) { if(isDigit(ch)) return ch-'0'; if(ch>='a' && ch<='f') return ch-'a'; if(ch>='A' && ch<='F') return ch-'A'; error(`Hex digit expected instead of "%s".`.format(ch)); return -1; }
+  int  expectOctDigit(dchar ch) { if(isOctDigit(ch)) return ch-'0'; error(`Octal digit expected instead of "%s".`.format(ch)); return -1; }
 
   bool isKeyword(string s) {
     return kwLookup(s)>=0;
@@ -216,29 +262,7 @@ public:
 
   void removeLastToken() { res.length--; }
 
-  void seekToEOF() { pos = cast(int)text.length; ch = 0; }
-
-  string fetchIdentifier() {
-    string s;
-    if(isLetter(ch)){
-      s ~= ch; fetch;
-      while(isLetter(ch) || isDigit(ch)){ s ~= ch; fetch; }
-    }
-    return s;
-  }
-
-  string peekIdentifier(int pos) {
-    string s;
-    char ch = peek(pos++);
-    if(!isLetter(ch)) return s;
-    s ~= ch;
-    while(1){
-      ch = peek(pos++);
-      if(!isLetter(ch) && !isDigit(ch)) break;
-      s ~= ch;
-    }
-    return s;
-  }
+  void seekToEOF() { pos = textLength; ch = 0; }
 
   void revealSpecialTokens(){
     with(lastToken){
@@ -351,7 +375,7 @@ public:
 
   void parseWysiwygString(bool handleEscapes=false, bool onlyOneChar=false){
     newToken(TokenKind.LiteralString);
-    char ending;
+    dchar ending;
     if(ch=='r'){ ending = '"'; fetch; fetch; }
           else { ending = ch; fetch; }
     string s;
@@ -393,7 +417,7 @@ public:
         phase = !phase;
         continue;
       }
-      error("Invalid char in hex string literal: ["~ch~"]");
+      error(`Invalid char in hex string literal: "%s"`.format(ch));
     }
     if(phase) error("HexString must contain an even number of digits.");
     parseStringPosFix;
@@ -416,7 +440,7 @@ public:
         if(isNewLine(ch)){
           skipNewLine;
 
-          bool found = true;  foreach(idx, c; ending) if(peek(idx.to!int)!=c){ found = false; break; }
+          bool found = true;  foreach(idx, c; ending) if(peek(cast(int)idx)!=c){ found = false; break; }
           if(found){
             fetch(cast(int)ending.length);
             break;
@@ -428,13 +452,16 @@ public:
         s ~= ch;  fetch;
       }
     }else{ //single char ending
-      char ending;
-           if(ch=='[') ending = ']';
-      else if(ch=='<') ending = '>';
-      else if(ch=='(') ending = ')';
-      else if(ch=='{') ending = '}';
-      else if(ch>=' ' || ch<='~') ending = ch;
-      else error(`Invalid char "`~ch~`" used as delimiter in a delimited string`);
+      dchar ending;
+      switch(ch){
+        case '[': ending = ']'; break;
+        case '<': ending = '>'; break;
+        case '(': ending = ')'; break;
+        case '{': ending = '}'; break;
+        default:
+          if(ch.inRange(' ', '~')) ending = ch;
+                              else error(`Invalid char "%s" used as delimiter in a DelimitedString`.format(ch));
+      }
       fetch;
 
       while(1){
@@ -445,7 +472,7 @@ public:
       }
     }
 
-    if(ch!='"') error(`Expecting an " at the end of a DelimitedString instead of "`~ch~`".`);
+    if(ch!='"') error(`Expecting an " at the end of a DelimitedString instead of "%s".`.format(ch));
     fetch;
 
     parseStringPosFix;
@@ -509,7 +536,7 @@ public:
 
     //parse float header
     if(ch=='0'){
-      char ch1 = peek;
+      dchar ch1 = peek;
       if(ch1=='x' || ch1=='X') base = 16; else
       if(ch1=='b' || ch1=='B') base = 2;
       if(base!=10) fetch(2);//skip the header
@@ -629,9 +656,10 @@ public:
 
     this.fileName = fileName;
     this.text = text;
-    line = 0;
-    pos = posInLine = -1; fetch; //fetch the first char
-    res = null;
+
+    initFetch;
+
+    res = [];
     string errorStr;
     try{
       while(1){
@@ -643,7 +671,7 @@ public:
             error(format("Invalid character [%s] hex:%x", ch, ch)); break;
           }
           case 'a':..case 'z': case 'A':..case 'Z': case '_':{
-            char nc = peek;
+            dchar nc = peek;
             if(nc=='"'){
               if(ch=='r'){ parseWysiwygString; break; }
               if(ch=='q'){ parseDelimitedString; break; }
@@ -663,9 +691,8 @@ public:
             goto default; //operator
           }
           case '#':{ //Special token sequences
-            auto s = peekIdentifier(1);
-            if(s=="line"){ //lineNumber/fileName override
-              fetch(1+line.sizeof);  skipSpaces;
+            if(text[pos..$].startsWith("#line")){ //lineNumber/fileName override
+              fetch("#line".length.to!int);  skipSpaces;
               this.line = to!int(expectInteger(10))-2;  skipSpaces;
               if(ch=='"'){ this.fileName = parseFilespec;  skipSpaces;  }
               if(!isNewLine(ch)) error("NewLine character expected after #line SpecialTokenSequence.");
@@ -846,7 +873,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     if(t.kind==Operator){
       if(["{","[","(","q{"].canFind(t.source)){
         nesting ~= t.source;
-        nestingOpeningIdx ~= idx.to!int; //todo: normalis nevet talalni ennek, vagy bele egy structba
+        nestingOpeningIdx ~= cast(int)idx; //todo: normalis nevet talalni ennek, vagy bele egy structba
       }
     }
 
@@ -1010,6 +1037,54 @@ AHH"
 }
 +/
 
+// JSON Support //////////////////////////////////////////////////
+
+//discovers field, the start of each element in a json array or a json map
+void discoverJsonHierarchy(ref Token[] tokens, string fileName="json_text"){
+  if(tokens.empty) return;
+
+  int level = 0;
+  int[] expectStack;
+
+  foreach(ref t; tokens){
+    if(t.kind == TokenKind.Operator){
+      switch(t.id){
+        case opsquareBracketOpen: case opcurlyBracketOpen:{
+          t.level = level;
+          level += 1;
+
+          expectStack ~= t.id + 1; //closer op == opener op + 1
+        break; }
+        case opsquareBracketClose: case opcurlyBracketClose:{
+          if(expectStack.empty) t.raiseError("Unexpected closing token.", fileName);
+          if(expectStack[$-1] != t.id) t.raiseError("Mismatched closing token.", fileName);
+          expectStack.popBack;
+
+          level -= 1;
+          t.level = level;
+        break; }
+        case opcomma:{
+          t.level = level - 1;
+        break; }
+        case opcolon: case opsub:{
+          t.level = level;
+        break; }
+        default: t.raiseError("Invalid symbol", fileName);
+      }
+    }else{
+      if(t.kind.among(TokenKind.LiteralString, TokenKind.LiteralInt, TokenKind.LiteralFloat)
+      ||(t.kind==TokenKind.Keyword && t.id.among(kwfalse, kwtrue, kwnull))){
+        t.level = level;
+      }else{
+        t.raiseError("Unknown token", fileName);
+      }
+    }
+  }
+
+  if(expectStack.length) tokens[$-1].raiseError("Expecting closing tokens. (%s)".format(expectStack.length), fileName);
+  enforce(level==0, "Fatal error: JsonHierarchy level!=0");
+}
+
 // Big test //////////////////////////////////////////////
 
 void testTokenizer(){
@@ -1019,7 +1094,7 @@ void testTokenizer(){
   string test(File f){
     Token[] tokens;
     auto s = f.readText;
-    size += s.length.to!int;
+    size += s.length;
 
     double t0 = QPS;
     tokenize(f.fullName, s, tokens);
@@ -1040,6 +1115,16 @@ void testTokenizer(){
   File(path, `result.txt`).write(s);
   print("tokenizer time:", tTokenize, "size:", size, "MB/s:", size/1024.0/1024.0/tTokenize);
   print("full time:", tFull    , "size:", size, "MB/s:", size/1024.0/1024.0/tFull    );
-  enforce(File(path, `reference200415.txt`).readText == s, "Tokenizer correctness test failed.");
+  enforce(File(path, `reference.txt`).readText == s, "Tokenizer correctness test failed.");
   print("\33\12Tokenizer works correctly\33\7");
+
+  /* Known results:
+    200415:
+      tokenizer time: 0.0538597 size: 1104899 MB/s: 19.564
+      full time: 0.126472 size: 1104899 MB/s: 8.3316
+    200415: unicode support: std.uni works well
+      tokenizer time: 0.0707722 size: 1447158 MB/s: 19.5008
+      full time: 0.165943 size: 1447158 MB/s: 8.31683
+  */
+
 }

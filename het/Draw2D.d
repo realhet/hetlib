@@ -103,15 +103,15 @@ struct RectAlign{align(1): import std.bitmanip;
     }
 
     Bounds2f rdst = rCanvas, rdst2 = rdst, rsrc = rImage;
-    alignOne(rdst2.left, rdst2.right, rsrc.left, rsrc.right, canShrink, canEnlarge, hAlign.to!int);
-    alignOne(rdst2.top, rdst2.bottom, rsrc.top, rsrc.bottom, canShrink, canEnlarge, vAlign.to!int);
+    alignOne(rdst2.left, rdst2.right, rsrc.left, rsrc.right, canShrink, canEnlarge, cast(int)hAlign);
+    alignOne(rdst2.top, rdst2.bottom, rsrc.top, rsrc.bottom, canShrink, canEnlarge, cast(int)vAlign);
     if(keepAspect){
       float a1 = rdst2.right-rdst2.left  , b1 = rdst2.bottom-rdst2.top  ,
             a2 = rImage.right-rImage.left, b2 = rImage.bottom-rImage.top,
             r1 = a1/max(1, b1)           , r2 = a2/max(1, b2)           ;
       if(r1<r2){
         b1 = a1/max(0.000001f,r2);
-        final switch(vAlign.to!int){
+        final switch(cast(int)vAlign){
           case 0:rdst2.top = rdst.top;                          break;
           case 1, 3:rdst2.top = (rdst.top+rdst.bottom-b1)*.5;   break;
           case 2:rdst2.top = rdst.bottom-b1;                    break;
@@ -120,7 +120,7 @@ struct RectAlign{align(1): import std.bitmanip;
         rsrc.top = 0; rsrc.bottom = rImage.bottom-rImage.top;
       }else if(r1>r2){
         a1 = b1*r2;
-        final switch(hAlign.to!int){
+        final switch(cast(int)hAlign){
           case 0:rdst2.left = rdst.left;                        break;
           case 1, 3:rdst2.left = (rdst.left+rdst.right-a1)*.5;  break;
           case 2:rdst2.left = rdst.right-a1;                    break;
@@ -1368,9 +1368,9 @@ class Drawing {
 
       //map all megaTextures
       foreach(i, t; textures.getGLTextures){
-        t.bind(i.to!int, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
+        t.bind(cast(int)i, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
         auto name = i==0 ? "smpInfo" : "smpMega[%d]".format(i-1);
-        shader.uniform(name, i.to!int, false);
+        shader.uniform(name, cast(int)i, false);
       }
 
       shader.attrib(vbo);
