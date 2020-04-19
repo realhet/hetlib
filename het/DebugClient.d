@@ -2,6 +2,61 @@ module het.debugclient;
 
 import het.utils, core.sys.windows.windows, std.regex, std.demangle;
 
+// LOGGER /////////////////////////////////////////////////////////////
+
+__gshared int
+  LOG_console = 0,
+  LOG_dide = 0,
+  LOG_throw = 100;
+
+private template LOGLevelString(int level){
+  enum levelIdx = ((level+1)/10-1).clamp(0, 4),
+       subLevelDiff = level - levelIdx*10-10;
+
+  enum LOGLevelString = ["\33\13DBG_", "\33\17LOG_", "\33\16WARN", "\33\14ERR_", "\33\14CRIT"][levelIdx]
+                      ~ (subLevelDiff ? subLevelDiff.text : "");
+}
+
+private string makeSourceLocation(string file, string funct, int line){
+  auto fi = file.split(`\`),
+       fu = funct.split(`.`);
+
+  //ignore extension
+  if(fi.length) fi[$-1] = fi[$-1].withoutTrailing(".d");
+
+  foreach_reverse(i;  1..min(fi.length, fu.length)){
+    if(fi[$-i..$].equal(fu[0..i])){
+      funct = fu[i..$].join('.');
+      break;
+    }
+  }
+
+  auto res = format!"%s(%d):"(file, line);
+  if(funct!="") res ~= " @"~funct;
+
+  return res;
+}
+
+void DBG (int level = 10, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){
+
+  enum location = makeSourceLocation(file, funct, line);
+  //format colorful message
+  string s = format!"%s\33\7: T%0.4f: C%x: %s:  "(LOGLevelString!level, QPS-QPS0, GetCurrentProcessorNumber, location);
+  static foreach(idx, a; args){ if(idx) s ~= " "; s ~= a.text; }
+  s ~= "\33\7";
+
+  if(level>=LOG_console) synchronized(dbg) writeln(s);
+//  if(level>=LOG_dide   ) synchronized(dbg) dbg.sendLog(s);
+  if(level>=LOG_throw  ) throw new Exception(s);
+}
+
+void LOG (string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(20, file, line, funct)(args); }
+void WARN(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(30, file, line, funct)(args); }
+void ERR (string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(40, file, line, funct)(args); }
+void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(50, file, line, funct)(args); }
+
+///////////////////////////////////////////////////////////////////////////////////
+
 void PING(int index = 0) { dbg.ping(index); }
 void PING0(){ PING(0); };
 void PING1(){ PING(1); };
@@ -14,9 +69,9 @@ void PING7(){ PING(7); };
 
 //todo: (forceExit) a thread which kills the process. for example when readln is active.
 
-void log(string s, string f = __FUNCTION__){
+/*void log(string s, string f = __FUNCTION__){
   StdFile(`c:\dl\a.txt`, "a").writeln(f, " ", s);
-}
+}*/
 
 
 DebugLogClient dbg() { //global access
@@ -248,7 +303,7 @@ string processExceptionMsg(string msg)
         string fileName = m[2],
                line = m[3];
         if(fileName.empty) { fileName = appFileName.otherExt(".d").fullName; line = "1"; }
-        s = format(`%s(%s,1): Exception: %s: %s`, fileName, line, m[1], m[4]);
+        s = format(`%s(%s,1): Exception(%s): %s`, fileName, line, m[1], m[4]);
       }
     }
 

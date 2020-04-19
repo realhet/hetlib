@@ -438,35 +438,6 @@ void ignoreExceptions(void delegate() dg){
   }catch(Throwable){}
 }
 
-
-// LOGGER /////////////////////////////////////////////////////////////
-
-enum LOG_MinLevel = 0;
-
-private template LOGLevelString(int level){
-  enum levelIdx = ((level+1)/10-1).clamp(0, 4),
-        subLevelDiff = level - levelIdx*10+10;
-
-  enum LOGLevelString = ["DBG", "INFO", "WARN", "ERR", "CRIT"][levelIdx]
-                      ~ (subLevelDiff ? subLevelDiff.text : "");
-}
-
-void LOG(int level = 20, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){
-  synchronized{
-    string s = format!"%5s @%x %8.3f %s@%d:\33\17"(LOGLevelString!level, GetCurrentProcessorNumber, QPS-QPS0, funct, line);
-    static foreach(a; args) s = s~" "~a.text;
-
-    writeln(s~"\33\7");
-  }
-}
-
-void DBG (string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ LOG!(10, file, line, funct)(args); }
-void INFO(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ LOG!(20, file, line, funct)(args); }
-void WARN(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ LOG!(30, file, line, funct)(args); }
-void ERR (string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ LOG!(40, file, line, funct)(args); }
-void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ LOG!(50, file, line, funct)(args); }
-
-
 // KillerThread //////////////////////////////////////////////////////////////
 
 //Lets the executable stopped from DIDE when the windows message loop is not responding.
@@ -526,9 +497,10 @@ bool maximize(T)(ref T what, const T val) { if(val>what) { what = val; return tr
 bool minimize(T)(ref T what, const T val) { if(val<what) { what = val; return true; }else return false; }
 
 @safe{
-bool inRange(const int val, const int mi, const size_t ma) pure{ return val>=mi && val<=cast(int)ma; } //size_t is uint
-bool inRange(T)(const T val, const T mi, const T ma) pure{ return val>=mi && val<=ma; }
-bool inRange_sorted(T)(const T val, const T a, const T b) pure{ return a<b ? (val>=a && val<=b) : (val>=b && val<=a); }
+  bool inRange(const int val, const int mi, const size_t ma) pure{ return val>=mi && val<=cast(int)ma; } //size_t is uint
+  bool inRange(T)(const T val, const T mi, const T ma) pure{ return val>=mi && val<=ma; }
+  bool inRange_sorted(T)(const T val, const T a, const T b) pure{ return a<b ? (val>=a && val<=b) : (val>=b && val<=a); }
+  bool inRange(T, U)(const T val, auto ref const U[] array) pure{ return val>=0 && val<array.length; }
 }
 
 float wrapInRange(ref float p, float pMin, float pMax){
@@ -2019,7 +1991,7 @@ auto strToMap(const string str)
   string[string] map;
   try{
     auto j = str.parseJSON;
-    if(j.type==JSON_TYPE.OBJECT)
+    if(j.type==JSONType.OBJECT)
       foreach(string key, ref val; j)
         map[key] = val.str;
   }catch(Throwable){}
@@ -2082,9 +2054,13 @@ auto commandLineToMap(string line){
   return map;
 }
 
-string quoted(char quote='"')(string text){
-  return quote~text.replace([quote], [quote, quote])~quote;
+string quoted(char quote='"')(string text){ //todo: replace it with a less lame solution
+  return quote ~ text.replace([quote], [quote, quote])~quote;
 }
+
+/*string quoteForDos(){
+
+}*/
 
 
 auto joinCommandLine(string[] cmd)//todo: handling quotes
@@ -4155,6 +4131,7 @@ template uuid(T, string g) {
 
 private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
                                  //todo: a unittest alatt nem indul ez el.
+  DBG("initialization starts", __FUNCTION__, __FILE__, __LINE__);
 
   //todo: functional tests: nem ide kene
   //functional tests
@@ -4176,8 +4153,10 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   UpdateInterval()._testRepeater;
 
   //startup
-  CoInitialize(null);
-  ini.loadIni;
+  CoInitialize(null);   DBG("coinitialize done");
+  ini.loadIni;          DBG("ini loaded");
+
+  DBG("initialization successful");
 }
 
 private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
