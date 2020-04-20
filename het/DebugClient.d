@@ -17,7 +17,7 @@ private template LOGLevelString(int level){
                       ~ (subLevelDiff ? subLevelDiff.text : "");
 }
 
-private string makeSourceLocation(string file, string funct, int line){
+string makeSrcLocation(string file, string funct, int line){
   auto fi = file.split(`\`),
        fu = funct.split(`.`);
 
@@ -39,7 +39,7 @@ private string makeSourceLocation(string file, string funct, int line){
 
 void DBG (int level = 10, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){
 
-  enum location = makeSourceLocation(file, funct, line);
+  enum location = makeSrcLocation(file, funct, line);
   //format colorful message
   string s = format!"%s\33\7: T%0.4f: C%x: %s:  "(LOGLevelString!level, QPS-QPS0, GetCurrentProcessorNumber, location);
   static foreach(idx, a; args){ if(idx) s ~= " "; s ~= a.text; }
@@ -274,7 +274,7 @@ private ref ProjectMapFile projectMapFile(){
   return pmf;
 }
 
-string processExceptionMsg(string msg)
+string simplifyExceptionMsg(string msg)
 {
   bool wasThereNonApiCall;
 

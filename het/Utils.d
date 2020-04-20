@@ -378,7 +378,7 @@ void beep(int MBType = MB_OK){
 void showException(string s) nothrow
 {
   try{
-    string err = processExceptionMsg(s);
+    string err = simplifyExceptionMsg(s);
     if(dbg.isActive){
       dbg.handleException(err);
     }else{

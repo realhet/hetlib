@@ -63,40 +63,33 @@ class JsonField{
 }*/
 
 void test(){
-  string original, restored;
+  DataStruct[2] data;
+  data[0].vectArray = [V2f(1,2), V2f(1,3), V2f(6,4)];
+  data[0].class1 = new MyClass;
+  data[0].class1.a = 42;
+  data[1].clear;
 
-  DataStruct data;
+  LOG("Original data:",
+    "\nFilled:", data[0],
+    "\nCleared:", data[1]);
 
-  data.vectArray = [V2f(1,2), V2f(1,3), V2f(6,4)];
+  string original;
+  original ~= data[0].text;  string st0 = data[0].toJson;
+  original ~= data[1].text;  string st1 = data[1].toJson;
 
-  data.class1 = new MyClass;
-  data.class1.a = 42;
+  DataStruct[2] rdata;
+  string restored;
+  rdata[0].fromJson_raise(st0);  restored ~= rdata[0].text;
+  rdata[1].fromJson_raise(st1);  restored ~= rdata[1].text;
 
-
-  writeln("\n\n saved values ---------------------------");
-  original ~= data.text;
-  data.writeln;
-  string st0 = data.toJson;
-  //st0.writeln;
-  writeln("\n\n saved zeroes ---------------------------");
-  data.clear;
-  original ~= data.text;
-  data.writeln;
-  string st1 = data.toJson;
-  //st1.writeln;
-
-  writeln("\n\n restored values ---------------------------");
-  data.fromJson(st0);
-  restored ~= data.text;
-  data.writeln;
-
-  writeln("\n\n restored zeroes ---------------------------");
-  data.fromJson(st1);
-  restored ~= data.text;
-  data.writeln;
+  LOG("Restored data:",
+    "\nFilled:", rdata[0],
+    "\nCleared:", rdata[1]);
 
   enforce(original == restored, "Json is fucked up. original!=restored.");
-  print("\33\12JSON test successful.\33\7");
+  LOG("\33\12JSON test successful.\33\7");
+
+  rdata[0].fromJson_track(`{ "byteVal" = 300 }`).writeln;
 }
 
 
