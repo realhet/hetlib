@@ -7,7 +7,7 @@ import het.utils, core.sys.windows.windows, std.regex, std.demangle;
 __gshared int
   LOG_console = 0,
   LOG_dide = 0,
-  LOG_throw = 100;
+  LOG_throw = 50;
 
 private template LOGLevelString(int level){
   enum levelIdx = ((level+1)/10-1).clamp(0, 4),

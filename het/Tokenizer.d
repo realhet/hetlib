@@ -34,6 +34,55 @@ Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarc
   return tokens;
 }
 
+auto decodeBigComments(char[] raw){
+  string[int] res;
+  foreach(s; raw.toStr.split("\n")){
+    string p0, p1;
+    s.split2(":", p0, p1);
+    res[p0.to!int] = p1;
+  }
+  return res;
+}
+
+struct SyntaxResult{
+  string fileName;
+  string text;
+
+  Token[] tokens;
+  string error;
+
+  ubyte[] syntax;
+  ushort[] hierarchy;
+  string[int] bigComments;
+
+  void clearResult(){
+    tokens.clear; error = ""; hierarchy = []; syntax = [];
+    bigComments.clear;
+  }
+
+  void process(){
+    clearResult;
+
+    hierarchy.length = syntax.length = text.length;
+
+    error = tokenize(fileName, text, tokens);
+
+    if(error == ""){
+      auto bigc = new char[0x10000];
+      syntaxHighLight(fileName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
+      bigComments = decodeBigComments(bigc);
+    }
+  }
+}
+
+auto syntaxHighLight(string fileName, string source){
+  auto res = SyntaxResult(fileName, source);
+  res.process;
+  return res;
+}
+
+
+
 struct Token{
   Variant data;
   int id; //emuns: operator, keyword
@@ -61,7 +110,7 @@ struct Token{
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
   bool isComment()              const { return kind==TokenKind.Comment; }
 
-  void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line, posInLine, source, msg)); }
+  void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
 
 class Tokenizer{

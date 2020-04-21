@@ -629,7 +629,7 @@ public:
     try{
       onPaint;
     }catch(Throwable o){
-      auto s = processExceptionMsg(o.toString);
+      auto s = simplifyExceptionMsg(o.toString);
       if(dbg.isActive){
         dbg.handleException(s);
       }else{

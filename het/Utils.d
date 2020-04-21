@@ -143,6 +143,8 @@ __gshared static public:////////////////////////////////////////////////////////
     if(arg_.empty) initArgs;
     if(idx<argc)return arg_[idx]; else return "";
   }
+  alias args = arg;
+
 
   void exit(int code=0){ //immediate exit
     try{ finalize; }catch(Throwable){}
@@ -1762,7 +1764,7 @@ in{
   dst[sLen] = 0; //zero terminated
 }
 
-string dataToStr(const(void)* src, size_t len){
+string dataToStr(const(void)* src, size_t len){ //todo: this is ultra-lame:  (cast(char[])src)[0..len].to!string
   char[] s;
   s.length = len;
   memcpy(s.ptr, src, len);
@@ -1778,21 +1780,27 @@ string dataToStr(T)(const T src){
 }
 
 
-string toStr(const(char)* s){
-  if(!s) return "";
-  int cnt; for(auto t=s; *t; t++, cnt++) {}
-  return to!string(s[0..cnt]);
+string toStr(T)(const(T)* s){ return s.to!string; }
+
+string toStr(T)(const(T)* s, size_t maxLen){ return toStr(s[0..maxLen]); }
+
+string toStr(const char[] s){ //safe version, handles well without zero too
+  auto e = (cast(ubyte[])s).countUntil(0);
+  if(e<0) e = s.length;
+  return s[0..e].to!string;
 }
 
-string toStr(const(wchar)* s){
-  if(!s) return "";
-  int cnt; for(auto t=s; *t; t++, cnt++) {}
-  return to!string(s[0..cnt]);
+string toStr(const wchar[] s){ //safe version, handles well without zero too
+  auto e = (cast(ushort[])s).countUntil(0);
+  if(e<0) e = s.length;
+  return s[0..e].to!string;
 }
 
-string toStr(int N)(const(char[N]) s){ return s.ptr.toStr; }
-string toStr(int N)(const(wchar[N]) s){ return s.ptr.toStr; }
-
+string toStr(const dchar[] s){ //safe version, handles well without zero too
+  auto e = (cast(uint[])s).countUntil(0);
+  if(e<0) e = s.length;
+  return s[0..e].to!string;
+}
 
 string binToHex(in void[] input){
   return toHexString!(LetterCase.upper)(cast(ubyte[])input);
@@ -3757,7 +3765,7 @@ synchronized class Perf {
     if(actName!="") end;
     //pragma(msg, typeof(table));
     auto r = (cast(float[string])table).byKeyValue.map!(kv => "%-30s:%9.3f ms\n".format(kv.key, kv.value*1e3)).join;
-           //^^^^^^^^^^^^^^^^^^^^ ez egy uj ldc 2020-as buzisag miatt kell....
+           //^^^^^^^^^^^^^^^^^^^^ ez egy uj ldc 2020-as buzisag miatt kell, nem megy sharedre....
     reset;
     return r;
   }
@@ -3785,7 +3793,7 @@ synchronized class Perf {
   }
 }
 
-shared perf = new shared Perf;
+shared PERF = new shared Perf;
 
 //TODO: strToDateTime, creators
 

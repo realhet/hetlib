@@ -89,7 +89,11 @@ void test(){
   enforce(original == restored, "Json is fucked up. original!=restored.");
   LOG("\33\12JSON test successful.\33\7");
 
-  rdata[0].fromJson_track(`{ "byteVal" = 300 }`).writeln;
+/*  enforce(0, " Error: FUCK");
+  raise("FUCK");
+  throw new Exception("FUCK");*/
+
+  rdata[0].fromJson_raise(`{ "byteVal" : 300 }`);
 }
 
 

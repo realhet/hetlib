@@ -26,12 +26,12 @@ struct JsonDecoderState{
     string location;
     if(tokenIdx.inRange(tokens)){
       auto t = &tokens[tokenIdx];
-      location = format!`%s(%s,%s): `(quoteIfNeeded(moduleName), t.line+1, t.posInLine+1);
+      location = format!`%s(%s:%s): `(quoteIfNeeded(moduleName), t.line+1, t.posInLine+1);
     }else if(moduleName!=""){
       location = quoteIfNeeded(moduleName) ~ ": ";
     }
 
-    return "Error: " ~ location ~ "fromJson: " ~ msg;
+    return (location ~ " " ~ msg).strip;
   }
 
   void raise(string msg, int tokenIdx=-1){
@@ -48,35 +48,26 @@ struct JsonDecoderState{
     }
   }
 
-  void handleErrors(void delegate() dlg){
-    try{
-      dlg();
-    }catch(Throwable t){
-      onError(t.text);
-    }
-  }
 }
 
 //Default version, errors are ignored.
 alias fromJson = fromJson_ignore;
-string[] fromJson_ignore(Type)(ref Type data, string st, string moduleName="", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
+string[] fromJson_ignore(Type)(ref Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
   auto state = JsonDecoderState(st, moduleName, errorHandling, srcFile, srcFunct, srcLine);
 
-  //1. tokenize
-  auto err = tokenize(state.moduleName, state.stream, state.tokens); //todo: tokenize throw errors
-  if(err!="") state.raise(err);
-  if(state.tokens.length){
-    try{
-      //2. hierarchy
-      discoverJsonHierarchy(state.tokens);
+  try{
+    //1. tokenize
+    auto err = tokenize(state.moduleName, state.stream, state.tokens); //todo: tokenize throw errors
+    if(err!="") throw new Exception(err);
+    if(state.tokens.empty) throw new Exception("Empty json document.");
 
-      //3. jsonParse
-      streamDecode_json(state, 0, data);
-    }catch(Throwable e){
-      state.raise(e.text);
-    }
-  }else{
-    state.raise("Empty json document.");
+    //2. hierarchy
+    discoverJsonHierarchy(state.tokens);
+
+    //3. jsonParse
+    streamDecode_json(state, 0, data);
+  }catch(Throwable e){
+    state.onError(e.msg);
   }
 
   return state.errors;
@@ -331,6 +322,6 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     }
 
   }catch(Throwable t){
-    state.onError(t.msg);
+    state.onError(t.msg, idx);
   }
 }

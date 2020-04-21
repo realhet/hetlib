@@ -1001,7 +1001,7 @@ class ImWin{ // ImWin //////////////////////////////////
 
     dr.scale(ctx.pixelSize); scope(exit) dr.pop;
 
-    perf("capt", {
+    PERF("capt", {
       auto doc = scoped!Column(tsNormal);
       doc.innerWidth = size.x/dr.scaleFactor.x;
       auto icon = "\U0001F4F9";
