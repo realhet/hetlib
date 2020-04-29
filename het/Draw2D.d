@@ -164,7 +164,37 @@ class Drawing {
   }
 
   uint drawCnt, //GLWindow will use it for automatic display
-    totalDrawObj; //total DrawingObjects on GPU
+       totalDrawObj; //total DrawingObjects on GPU
+  const bool isClone;
+
+  this(){
+    isClone = false;
+  }
+
+  this(Drawing src){ //make a clone
+    if(src.isClone) CRIT("It is invalid to clone a clone");
+    isClone = true;
+    actState = src.actState;
+  }
+
+  Drawing clone(){
+    return new Drawing(this);
+  }
+
+  private Drawing[] subDrawings; //clones to draw at the very end
+
+  void draw(Drawing src){
+    if(!src.isClone) CRIT("src must be a clone (at least for now.)");
+
+    LOG("queued subDrawing", cast(void*) src, src.totalDrawObj);
+    subDrawings ~= src;
+    LOG("bounds before", bounds_);
+    if(!src.boundsEmpty){
+      bounds_.expandTo(src.bounds_, boundsEmpty);
+      boundsEmpty = false;
+    }
+    LOG("bounds after", bounds_);
+  }
 
   ~this(){
     //destroyVboList; //gc will release it anyways
@@ -198,8 +228,13 @@ class Drawing {
     auto drawScale = V2f(1, 1);
     auto drawOrigin = V2f(0, 0);
   }
+
   private DrawState actState;
   private DrawState[] stateStack;
+
+  //todo: Examine push VS saveState, seems redundant. UI uses only translate() and pop()
+  private V2f[2][] stack; //matrix stack
+
 
   @property float alpha()       { return (actState.alpha>>24)*(1.0f/255); }
   @property void alpha(float a) { actState.alpha = cast(uint)clamp(iRound(a*255), 0, 255)<<24; } //todo: clamp bugos?
@@ -219,32 +254,6 @@ class Drawing {
 
   ref scaleFactor() { return actState.drawScale; }
   ref origin()      { return actState.drawOrigin; }
-
-  private V2f[2][] stack;
-  void push() {
-    enforce(stack.length<1024, "Drawing.glDraw() matrix stack is too big.  It has %d items.".format(stack.length));
-    stack ~= [origin, scaleFactor];
-  }
-  void pop() {
-    enforce(!stack.empty, "Drawing.pop() stack is empty");
-    auto a = stack.popLast;
-    origin = a[0];
-    scaleFactor = a[1];
-  }
-  void translate(float dx, float dy){
-    push;                //seems like origin is in scale units, not in screen units.
-    origin.x = origin.x + dx;//*scaleFactor.x;
-    origin.y = origin.y + dy;//*scaleFactor.y;
-  }
-  void translate(in V2f d){ translate(d.x, d.y); }
-  void translate(in V2i d){ translate(d.x, d.y); }
-
-  void scale(float s){ //todo: ezt meg kell csinalni matrixosra.
-    push;
-    origin *= scaleFactor;
-    scaleFactor *= s;
-    origin /= scaleFactor;
-  }
 
   ref fontHeight      () { return actState.fontHeight           ; }
   ref fontMonoSpace   () { return actState.fontMonoSpace        ; }
@@ -266,10 +275,36 @@ class Drawing {
   alias pushState = saveState;
   alias popState = restoreState;
 
-
   //access combined colors
   private uint realDrawColor()  { return actState.drawColor.raw | actState.alpha; }
   private uint realFillColor()  { return actState.fillColor.raw | actState.alpha; }
+
+  void push() {
+    enforce(stack.length<1024, "Drawing.glDraw() matrix stack is too big.  It has %d items.".format(stack.length));
+    stack ~= [origin, scaleFactor];
+  }
+
+  void pop() {
+    enforce(!stack.empty, "Drawing.pop() stack is empty");
+    auto a = stack.popLast;
+    origin = a[0];
+    scaleFactor = a[1];
+  }
+
+  void translate(float dx, float dy){
+    push;                //seems like origin is in scale units, not in screen units.
+    origin.x = origin.x + dx;//*scaleFactor.x;
+    origin.y = origin.y + dy;//*scaleFactor.y;
+  }
+  void translate(in V2f d){ translate(d.x, d.y); }
+  void translate(in V2i d){ translate(d.x, d.y); }
+
+  void scale(float s){ //todo: ezt meg kell csinalni matrixosra.
+    push;
+    origin *= scaleFactor;
+    scaleFactor *= s;
+    origin /= scaleFactor;
+  }
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Draw primitives                                                           //
@@ -352,9 +387,10 @@ class Drawing {
     clipBoundsStack = [];
 
     actState = DrawState.init;
-    stateStack.clear;
+    stateStack = [];
     stack.clear;
 
+    subDrawings = [];
     //this = Drawing.init; //todo: clear alone is not ok
   }
 
@@ -1382,9 +1418,13 @@ class Drawing {
       gl.disable(GL_DEPTH_TEST);
 
       //gl.polygonMode(GL_FRONT_AND_BACK, GL_LINE);
-      vbo.draw(GL_POINTS);
+      if(totalDrawObj>1000) vbo.draw(GL_POINTS);
+      LOG("vbo drawn", cast(void*) this, vbo.handle, totalDrawObj);
     }
 
+    foreach(sd; subDrawings){
+      sd.glDraw(center, scale, translate);
+    }
   }
   //todo: A binaris konstansokat is szemleltethetne az ide!
   //todo: az IDE automatikusan irhatna a bezaro } jelek utan, hogy mit zar az be. Csak annak a scopenak, amiben a cursor van.

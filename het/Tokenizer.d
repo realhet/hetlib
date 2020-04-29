@@ -28,7 +28,6 @@ Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarc
 {
   Token[] tokens;
   tokenize("", src, tokens);    //todo: nem jo, nincs error visszaadas
-
   syntaxHighLight(fileName, tokens, src.length, res, hierarchy, bigComments, bigCommentsLen);
 
   return tokens;
@@ -44,43 +43,144 @@ auto decodeBigComments(char[] raw){
   return res;
 }
 
-struct SyntaxResult{
-  string fileName;
+struct SourceLine{
+  string text;
+  ubyte[] syntax;
+  ushort[] hierarchy;
+}
+
+class SourceCode{
+  File file;
   string text;
 
+  //results after process:
   Token[] tokens;
   string error;
-
   ubyte[] syntax;
   ushort[] hierarchy;
   string[int] bigComments;
 
-  void clearResult(){
-    tokens.clear; error = ""; hierarchy = []; syntax = [];
+  void checkConsistency(){
+//    enforce(text.length == lines.map!"a.length".sum + (max(lines.length.to!int-1, 0)), "text <> lines");
+//    enforce(text.length == syntax.length, "text <> syntax");
+//    enforce(text.length == hierarchy.length, "text <> hierarchy");
+  }
+
+  private void clearResult(){
+    tokens = [];
+    error = ``;
+    syntax.clear;
+    hierarchy.clear;
     bigComments.clear;
   }
+
+  int lineCount(){
+    if(tokens.empty) return text.count('\n').to!int+1;
+    return tokens[$-1].line + text[tokens[$-1].pos..$].count('\n').to!int + 1;
+  }
+
+  auto seekLine(int lineDst){
+    int pos, line;
+    if(lineDst<=0) return pos;
+    if(!tokens.empty){
+      auto tokenIdx = tokens.map!"a.line".assumeSorted.lowerBound(lineDst-1).length.to!int-1;
+      if(tokenIdx>0){
+        pos  = tokens[tokenIdx].pos ;
+        line = tokens[tokenIdx].line;
+      }
+/*      //seek back a bit if needed
+      while(line>=lineDst){
+        if(tokenIdx>0){
+          tokenIdx--;
+          pos  = tokens[tokenIdx].pos ;
+          line = tokens[tokenIdx].line;
+        }else{
+          line=pos=0;
+          break;
+        }
+      }*/
+    }
+
+//    pos=0; line=0;
+
+
+/*    while(line>lineDst){
+      while(pos>0 && text[pos-1]!='\n') pos--;
+      line--;
+      if(pos>0){
+        pos--;
+      }else break;
+    }*/
+
+    if(line==lineDst) while(pos>0 && text[pos-1]!='\n') pos--;
+
+    while(line<lineDst){
+      auto i = text[pos..$].indexOf('\n');
+      if(i<0) return text.length.to!int;
+
+      pos += i+1;
+      line++;
+    }
+
+    return pos;
+  }
+
+  int[2] getLineRange(int i){
+    if(i<0 || i>=lineCount) return (int[2]).init;
+    int pos = seekLine(i);
+    auto j = text[pos..$].indexOf('\n');
+    int pos2;
+    if(j<0) pos2 = text.length.to!int;
+       else pos2 = pos + j.to!int;
+    return [pos, pos2];
+  }
+
+  auto getLine(int i){
+    SourceLine res;
+
+    auto r = getLineRange(i);
+    if(r[0] < r[1]){
+      res.text      = text     [r[0]..r[1]];
+      res.syntax    = syntax   [r[0]..r[1]];
+      res.hierarchy = hierarchy[r[0]..r[1]];
+    }
+
+    return res;
+  }
+
+  auto getLineText     (int i){ return getLine(i).text     ; }
+  auto getLineSyntax   (int i){ return getLine(i).syntax   ; }
+  auto getLineHierarchy(int i){ return getLine(i).hierarchy; }
+
+  this(string text, File file){
+    //lineOfs = chain([-1], lines.map!"cast(int)a.length".cumulativeFold!"a+b+1").array;
+
+    this.text = text;
+    this.file = file;
+
+    process;
+  }
+
+  this(string text){ this(text, File("")); }
+  this(File file){ this(file.readText, file); }
 
   void process(){
     clearResult;
 
     hierarchy.length = syntax.length = text.length;
 
-    error = tokenize(fileName, text, tokens);
+    error = tokenize(file.fullName, text, tokens);
 
     if(error == ""){
       auto bigc = new char[0x10000];
-      syntaxHighLight(fileName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
+      syntaxHighLight(file.fullName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
       bigComments = decodeBigComments(bigc);
     }
+
+    checkConsistency;
   }
-}
 
-auto syntaxHighLight(string fileName, string source){
-  auto res = SyntaxResult(fileName, source);
-  res.process;
-  return res;
 }
-
 
 
 struct Token{
@@ -132,10 +232,6 @@ public:
   static bool isHexDigit (dchar ch) { return ch>='0' && ch<='9' || ch>='a' && ch<='f' || ch>='A' && ch<='F'; }
 
   void initFetch(){
-    /*line = 0;
-    pos = posInLine = -1;
-    fetch; //fetch the first char*/
-
     pos = posInLine = line = skipCh = 0;
     textLength = text.length.to!int;
 
@@ -143,18 +239,13 @@ public:
   }
 
   void fetch(){
-    /*pos ++; posInLine++;
-    if(pos>=textLength){
-      ch=0;  //eof is ch
-    }else{
-      ch = text[pos];
-    }*/
-
     pos += skipCh; posInLine += skipCh;
     if(pos<textLength){
       size_t nextPos = pos;
+      //print("decoding at", pos);
       ch = decode!(Yes.useReplacementDchar)(text, nextPos);
       skipCh = cast(int)nextPos - pos;
+      //print(">pos", pos, "char", ch, "skipCh", skipCh);
     }else{
       ch = 0;  //eof is ch
     }
@@ -163,9 +254,6 @@ public:
   void fetch(int n){ for(int i=0; i<n; ++i) fetch; } //todo: atirni ezeket az int-eket size_t-re es benchmarkolni.
 
   dchar peek(uint n=1){
-    /*if(pos+n < textLength) return text[pos+n];
-                      else return 0;*/
-
     size_t p = pos;
     dchar res = 0;
     foreach(i; 0..n+1){
@@ -204,13 +292,28 @@ public:
     }
   }
 
+  void skipNewLineOnce()
+  {
+         if(ch=='\r'){ fetch; if(ch=='\n') fetch; incLine; }
+    else if(ch=='\n'){ fetch; if(ch=='\r') fetch; incLine; }
+  }
+
+  void skipNewLineMulti()
+  {
+    while(1){
+           if(ch=='\r'){ fetch; if(ch=='\n') fetch; incLine; }
+      else if(ch=='\n'){ fetch; if(ch=='\r') fetch; incLine; }
+      else break;
+    }
+  }
+
   void skipBlockComment()
   {
     fetch;
     while(1){
       fetch;
       if(isEOF(ch)) return;//error("BlockComment is not closed properly."); //EOF
-      skipNewLine;
+      skipNewLineMulti;
       if(ch=='*' && peek=='/'){
         fetch; fetch;
         break;
@@ -225,7 +328,7 @@ public:
     while(1){
       fetch;
       if(isEOF(ch)) return;//error("NestedComment is not closed properly."); //EOF
-      skipNewLine;
+      skipNewLineMulti;
       if(ch=='/' && peek=='+'){
         fetch; cnt++;
       }else if(ch=='+' && peek=='/'){
@@ -233,12 +336,6 @@ public:
         if(cnt<=0) { fetch; break; }
       }
     }
-  }
-
-  void skipNewLine()
-  {
-         if(ch=='\r'){ fetch; if(ch=='\n') fetch; incLine; }
-    else if(ch=='\n'){ fetch; if(ch=='\r') fetch; incLine; }
   }
 
   void skipSpaces()
@@ -433,7 +530,7 @@ public:
       cnt++;
       if(isEOF(ch)) error("Unexpected EOF in a WysiwygString.");
       if(ch==ending) { fetch; break; }
-      if(isNewLine(ch)) { s ~= '\n'; skipNewLine; continue; }
+      if(isNewLine(ch)) { s ~= '\n'; skipNewLineOnce; continue; }
       if(handleEscapes && ch=='\\'){ s ~= parseEscapeChar; continue; }
       s ~= ch;  fetch;
     }
@@ -480,24 +577,27 @@ public:
 
     string s;
     if(isLetter(ch)){ //identifier ending
-      string ending = fetchIdentifier;
+      string ending = fetchIdentifier ~ `"`;
       if(!isNewLine(ch)) error("Delimited string: there must be a NewLine right after the identifier.");
-      skipNewLine;
+      skipNewLineOnce;
 
       while(1){
         if(isEOF(ch)) error("Unexpected EOF in a DelimitedString.");
+
         if(isNewLine(ch)){
-          skipNewLine;
-
-          bool found = true;  foreach(idx, c; ending) if(peek(cast(int)idx)!=c){ found = false; break; }
-          if(found){
-            fetch(cast(int)ending.length);
-            break;
-          }
-
+          skipNewLineOnce;
           s ~= '\n';
           continue;
         }
+
+        if(posInLine==0){
+          bool found = true;  foreach(idx, c; ending) if(peek(cast(int)idx)!=c){ found = false; break; }
+          if(found){
+            fetch(cast(int)ending.length-1); //not including ending "
+            break;
+          }
+        }
+
         s ~= ch;  fetch;
       }
     }else{ //single char ending
@@ -516,7 +616,7 @@ public:
       while(1){
         if(isEOF(ch)) error("Unexpected EOF in a DelimitedString.");
         if(ch==ending && peek=='"') { fetch; break; }
-        if(isNewLine(ch)) { s ~= '\n'; skipNewLine;  continue; }
+        if(isNewLine(ch)) { s ~= '\n'; skipNewLineOnce;  continue; }
         s ~= ch;  fetch;
       }
     }
@@ -701,7 +801,7 @@ public:
   //returns the error or ""
   string tokenize(in string fileName, in string text, out Token[] tokens){
     auto enc = encodingOf(text);
-    enforce(enc==TextEncoding.UTF8, "Tokenizer only works on UTF8 input. ("~enc.text~")");
+    enforce(enc==TextEncoding.UTF8, "Tokenizer only works on UTF8 input. ("~enc.text~" detected)");
 
     this.fileName = fileName;
     this.text = text;
@@ -714,11 +814,6 @@ public:
       while(1){
         if(skipWhiteSpaceAndComments) break; //eof reached
         switch(ch){
-          default:{
-            if(tryParseOperator) continue;
-            //cannot identify it at all
-            error(format("Invalid character [%s] hex:%x", ch, ch)); break;
-          }
           case 'a':..case 'z': case 'A':..case 'Z': case '_':{
             dchar nc = peek;
             if(nc=='"'){
@@ -740,6 +835,8 @@ public:
             goto default; //operator
           }
           case '#':{ //Special token sequences
+
+            /* This #line can broke the codeeditor. Rather disable it
             if(text[pos..$].startsWith("#line")){ //lineNumber/fileName override
               fetch("#line".length.to!int);  skipSpaces;
               this.line = to!int(expectInteger(10))-2;  skipSpaces;
@@ -747,8 +844,17 @@ public:
               if(!isNewLine(ch)) error("NewLine character expected after #line SpecialTokenSequence.");
 
               break;
+            }*/
+            if(text[pos..$].startsWith("#define")){ //todo: highlight #define macros
             }
+
             goto default; //operator
+          }
+          default:{
+            if(tryParseOperator) continue;
+            if(isLetter(ch)){ parseIdentifier; continue; } //identifier with special letters
+            //cannot identify it at all
+            error(format("Invalid character [%s] hex:%x", ch, ch)); break;
           }
         }
       }

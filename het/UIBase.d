@@ -16,10 +16,10 @@ enum
   VisualizeHitStack        = 0;
 
 enum
-  NormalFontHeight = 18;   //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
+  NormalFontHeight = 22;   //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 
 const
-  InternalTabScale = 0.1,   //around 0.15
+  InternalTabScale = 0.11,   //around 0.15
   LeadingTabScale  = 0.31;  //for programming
 
 enum
@@ -1834,16 +1834,38 @@ void appendMarkupLine(bool returnSubCellStrOfs=true, TC:Container)(TC cntr, stri
       if(inCommand){ //collect command
         commandLine ~= ch;
       }else{ //process text
-        static if(is(TC == Row)){
-          if(ch==9) cntr.tabIdxInternal ~= cast(int)cntr.subCells.length; //Elastic Tabs
-        }
-
         cntr.appendg(ch, ts);
 
         static if(returnSubCellStrOfs) while(subCellStrOfs.length <= cntr.subCells.length) subCellStrOfs ~= currentOfs; //PASTE!!!
       }
     }
 
+  }
+}
+
+/**
+Append syntax highlighted source code to a container (normally a Row).
+Params:
+        cntr =          the container being updated
+        text =          the input text
+        syntax =        byte array of syntax indices
+        applySyntax =   delegate to apply a syntax index to the TextStyle
+        ts =            reference to the TextStyle used while appending all the characters
+ */
+void appendCode(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts)
+in(text.length == syntax.length)
+{
+  size_t numCodeUnits, currentOfs;
+  ubyte lastSyntax = 255;
+
+  while(text.length){
+    auto actSyntax = syntax[currentOfs];
+    auto ch = text.decodeFront!(Yes.useReplacementDchar)(numCodeUnits);
+    currentOfs += numCodeUnits;
+
+    if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
+
+    cntr.appendg(ch, ts);
   }
 }
 
@@ -1988,7 +2010,7 @@ private{ //wrappedLine[] functionality
 
 
 // Elastic Tabs //////////////////////////////////////////
-private void processElasticTabs(Cell[] rows, int level=0){ //todo
+void processElasticTabs(Cell[] rows, int level=0){
   bool tabCntGood(Cell c){ return c.tabCnt>level; }
 //"processElasticTabs".print;
   while(1){
@@ -2048,6 +2070,10 @@ class Row : Container { // Row ////////////////////////////////////
     append(cast(Cell[])cells);
   }
 
+  override void appendg(dchar ch, in TextStyle ts){
+    if(ch==9) tabIdxInternal ~= cast(int)subCells.length; //Elastic Tabs
+    super.appendg(ch, ts);
+  }
 
   private void solveFlexAndMeasureAll(bool autoWidth){
     //print("solveFlex ", subCells.count, autoWidth);
@@ -2146,7 +2172,7 @@ class Row : Container { // Row ////////////////////////////////////
 
     //adjust length of leading and internal tabs
     foreach(idx, tIdx; tabIdx){
-      const isLeading = idx==tIdx;
+      const isLeading = idx==tIdx; //it's not good for multiline!!!
       subCells[tIdx].innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);
     }
 
@@ -2206,7 +2232,7 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   override void draw(Drawing dr){
-    super.draw(dr);
+    super.draw(dr); //draw frame, bkgnd and subCells
 
     //draw the carets and selection of the editor
     import het.ui: im;  if(im.textEditorState.row is this){

@@ -1793,7 +1793,9 @@ static cnt=0;
     static foreach(a; args){{
       alias t = typeof(a);
       static if(isSomeString!t){
-        /*auto lines = a.split('\n').map!(a => a.withoutTrailing('\r')).array;
+
+        /* mar nem ez tordel, hanem a Row.
+        auto lines = a.split('\n').map!(a => a.withoutTrailing('\r')).array;
         if(!lines.empty){
           .Row row = cast(.Row)actContainer;
           if(row){

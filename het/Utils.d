@@ -94,7 +94,7 @@ import std.windows.registry, core.sys.windows.winreg, core.thread, std.file,
   std.path, std.json, std.digest.digest, std.parallelism, core.runtime, std.traits, std.meta;
 
 import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, STD_OUTPUT_HANDLE, HMODULE,
-  GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, ShowWindow, SetFocus,
+  GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow, SetFocus,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
   GetStdHandle, GetTempPathW, GetFileTime,
   FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
@@ -238,7 +238,13 @@ static private:
 static public:
   void flush(){ stdout.flush; }
 
-  void show()                    { if(chkSet  (visible_)) ShowWindow (hwnd, SW_SHOW); }
+  void setUTF8(){
+    const cp = 65001;
+    SetConsoleCP(cp);
+    SetConsoleOutputCP(cp);
+  }
+
+  void show()                    { if(chkSet  (visible_)){ ShowWindow (hwnd, SW_SHOW); } }
   void hide(bool forced=false)   { if(chkClear(visible_) || forced) ShowWindow (hwnd, SW_HIDE); }
   void showAndFocus()            { show; SetFocus(hwnd); }
 
@@ -338,7 +344,7 @@ import std.exception : stdEnforce = enforce;
 
 T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
 {
-  if(!value) stdEnforce(0, "["~fn~"()] "~str, file, line);
+  if(!value) stdEnforce(0, "Error: "~str, file, line);
   return value;
 }
 
@@ -350,7 +356,9 @@ template CustomEnforce(string prefix){
   }
 }
 
-void raise(string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__){ enforce(0, str, file, line, fn); }
+void raise(string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__){
+  enforce(0, str, file, line, fn);
+}
 
 void hrChk(HRESULT res, lazy string str = "", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__){
   if(res==0) return;
@@ -4163,6 +4171,8 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   //startup
   CoInitialize(null);   DBG("coinitialize done");
   ini.loadIni;          DBG("ini loaded");
+
+  console.setUTF8;
 
   DBG("initialization successful");
 }

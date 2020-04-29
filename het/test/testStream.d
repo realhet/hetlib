@@ -87,13 +87,18 @@ void test(){
     "\nCleared:", rdata[1]);
 
   enforce(original == restored, "Json is fucked up. original!=restored.");
-  LOG("\33\12JSON test successful.\33\7");
+  LOG("\33\12JSON test successful.");
 
 /*  enforce(0, " Error: FUCK");
   raise("FUCK");
   throw new Exception("FUCK");*/
 
-  rdata[0].fromJson_raise(`{ "byteVal" : 300 }`);
+  try{
+    rdata[0].fromJson_raise(`{ "byteVal" : 300 }`);
+    raise("Overflow test failed");
+  }catch(Throwable){
+    LOG("\33\12Overflow test successful.");
+  }
 }
 
 

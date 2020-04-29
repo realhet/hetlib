@@ -1383,6 +1383,8 @@ private:
   string elementType;
 
 public:
+  @property auto handle(){ return buffer.handle; }
+
   const string attrName; //if only if VBO is not a struct
 
   this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW){
@@ -2067,7 +2069,7 @@ public:
   }
 
   override void onEndPaint(){
-    if(!dr   .drawCnt){
+    if(!dr.drawCnt){
       tryInitialZoomAll; //if dr has a painting
       dr.glDraw(view   );
     }
@@ -2089,7 +2091,10 @@ public:
   }
 
   void drawFpsTimeLine(){
-    with(drGUI){
+    auto dr = scoped!Drawing;
+    //auto dr = drGUI;
+    scope(exit) dr.glDraw(viewGUI);
+    with(dr){
       lineWidth = 1;
       lineStipple = lsNormal;
 
