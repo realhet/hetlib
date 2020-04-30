@@ -2,6 +2,9 @@ module het.opengl;
 
 pragma(lib, "opengl32.lib"); //a wgl cuccok static linkelve vannak.
 
+__gshared{
+  bool logVBO = 0;
+}
 
 enum UseOldTexImage2D = false; //otherwise use TexStorage2D instead!
 
@@ -1383,16 +1386,22 @@ private:
   string elementType;
 
 public:
-  @property auto handle(){ return buffer.handle; }
+  @property auto handle() const { return buffer.handle; }
+  @property auto shortName() const { return format!"VBO(%d)"(handle); }
+  @property auto logName() const { return "\33\13"~shortName~"\33\7"; }
 
-  const string attrName; //if only if VBO is not a struct
+  const string attrName; //only if VBO is not a struct
 
   this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW){
     this.stride = recordSize;
     this.count = count;
     this.attrName = attrName;
     buffer = new Handle(resName, resSize);
+    if(logVBO) LOG(logName, "created", "resSize:", resSize);
+
     bind;
+
+    //if(logVBO) LOG("bufferData", "count:", count, "stride:", stride, "fields:", "["~elementFields.map!"a.name".join(", ")~"]");
     gl.bufferData(GL_ARRAY_BUFFER, count*stride, data, accessType);
   }
 
@@ -1409,7 +1418,8 @@ public:
   }
 
   void bind(){
-    gl.bindBuffer(GL_ARRAY_BUFFER, buffer.handle); //TODO: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
+    //if(logVBO) LOG("bind");
+    gl.bindBuffer(GL_ARRAY_BUFFER, handle); //TODO: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
   }
 
   void draw(int primitive, int start = 0, int end = int.max){
@@ -1417,16 +1427,15 @@ public:
     if(start<0) start = 0;
     if(end>count) end = count;
     if(end<=start) return;
+
     bind;
+
+    //if(logVBO) LOG("drawArrays", primitive.to!string(16), "[%d..%d]".format(start, end), "cnt:", end-start);
     gl.drawArrays(primitive, start, end-start);
   }
 
-  /*void release(){
-    buffer.release;
-  } */
-
   ~this(){
-    //bug: ha ez itt van, akkor beszarik az egesz fos szajbakurt geci.
+    //if(logVBO) LOG("release (destroy)");
     buffer.release; //elvileg nem volna szabad hivatkozni erre a member classra
   }
 
@@ -2090,10 +2099,9 @@ public:
     super.onEndPaint;
   }
 
-  void drawFpsTimeLine(){
-    auto dr = scoped!Drawing;
-    //auto dr = drGUI;
-    scope(exit) dr.glDraw(viewGUI);
+  void drawFpsTimeLine(Drawing dr){
+    //auto dr = scoped!Drawing;
+    //scope(exit) dr.glDraw(viewGUI);
     with(dr){
       lineWidth = 1;
       lineStipple = lsNormal;

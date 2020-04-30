@@ -4,10 +4,13 @@
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
 //@release
 ///@debug
-///@run $ c:\d\libs\het\utils.d
+//@run $ c:\d\libs\het\utils.d
 ///@run $ c:\d\libs\het\draw3d.d
 ///@run $ c:\D\ldc2\import\std\format.d
-//@run $ c:\d\libs\het\test\syntaxTestText.d
+///@run $ c:\D\ldc2\import\std\uni.d
+///@run $ c:\d\libs\het\test\syntaxTestText.d
+///@run $ c:\D\ldc2\import\std\datetime\systime.d
+
 
 import het, het.ui, het.tokenizer;
 
@@ -164,7 +167,7 @@ class CodeColumn : Column { //CodeColumn
   }
 
   override void draw(Drawing dr){
-    if(1){
+    if(0){
       super.draw(dr);
     }else{
       if(cachedDrawing is null){
@@ -213,16 +216,16 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
 
   override void onUpdate(){ // update ////////////////////////////////
     invalidate; //todo: opt
-    //view.navigate(!im.wantKeys, !im.wantMouse);
-
+    view.navigate(!im.wantKeys, !im.wantMouse);
 
     caption = FPS.text;
 
     with(im) Panel({
-      width = clientWidth;
-      vScroll;
+      //width = clientWidth;
+      //vScroll;
 
       style.applySyntax(0);
+      Row({ style.fontHeight=50; Text("FUCK"); });
 
       actContainer.append(codeColumn);
     });
@@ -236,19 +239,16 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
   }
 
   override void onPaint(){ // paint //////////////////////////////////////
-    dr.clear(clFuchsia);
+    dr.clear(clBlack);
     drGUI.clear;
 
-    auto mydr = scoped!Drawing;
+    im.draw(dr);
 
-    im.draw(drGUI);
-    //drGUI.color = clRed;
-    //drGUI.line(0, 0, 500, 300);
+    //drGUI.glDraw(viewGUI);
+    //drGUI.clear;
 
-    //mydr.glDraw(viewGUI);
-
-    drawFpsTimeLine;
-//    drGUI.glDraw(viewGUI);
+    drawFpsTimeLine(drGUI);
+    /*drGUI.glDraw(viewGUI);*/
   }
 
 }

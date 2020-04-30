@@ -6,6 +6,9 @@ public import het.geometry;
 public import het.megatexturing : textures;
 
 
+__gshared bool logDrawing = 0;
+
+
 enum InvBoldOffset = 40; //relative to height: texel offset is 1/N
 enum BoldOffset = 1.0f/InvBoldOffset;
 
@@ -154,6 +157,9 @@ enum asNoArrow       = ArrowStyle(0,0,0),
      asVector        = ArrowStyle(1,2,0);
 
 class Drawing {
+
+  auto shortName() const { return "Drawing("~(cast(void*)this).text~")"; }
+
   private static Shader shader;
 
   private VBO[] vboList;
@@ -173,8 +179,10 @@ class Drawing {
 
   this(Drawing src){ //make a clone
     if(src.isClone) CRIT("It is invalid to clone a clone");
+    if(logDrawing) LOG(shortName, "cloning", cast(void*) src);
     isClone = true;
     actState = src.actState;
+    clipBounds = src.clipBounds;
   }
 
   Drawing clone(){
@@ -186,19 +194,20 @@ class Drawing {
   void draw(Drawing src){
     if(!src.isClone) CRIT("src must be a clone (at least for now.)");
 
-    LOG("queued subDrawing", cast(void*) src, src.totalDrawObj);
+    if(logDrawing) LOG(shortName, "queued subDrawing", cast(void*) src, src.totalDrawObj);
     subDrawings ~= src;
-    LOG("bounds before", bounds_);
+
     if(!src.boundsEmpty){
       bounds_.expandTo(src.bounds_, boundsEmpty);
       boundsEmpty = false;
     }
-    LOG("bounds after", bounds_);
   }
 
   ~this(){
-    //destroyVboList; //gc will release it anyways
+    //destroyVboList; //not needed: gc will release it anyways
   }
+
+  string stats(){ return format!"(total:%d pending:%d vbo:[%s])"(totalDrawObj, buffers.map!"a.length".sum, vboList.map!(a => a.handle).array.text); }
 
 ////////////////////////////////////////////////////////////////////////////////
 //  State variables                                                           //
@@ -377,6 +386,7 @@ class Drawing {
   }
 
   void clear(){
+    if(logDrawing) LOG(shortName, "clearing", stats);
     destroyVboList;
     destroy(buffers);
     bounds_ = Bounds2f.init;
@@ -1379,6 +1389,8 @@ class Drawing {
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));
     enforce(clipBoundsStack.empty, "Drawing.glDraw() clipBounds stack is not empty.  It has %d items.".format(clipBoundsStack.length));
 
+    if(logDrawing) LOG(shortName, "drawing", stats, "center:", center, "scale:", scale, "translate:", translate);
+
     drawCnt++;
 
     //transfer buffers into vboes
@@ -1418,8 +1430,7 @@ class Drawing {
       gl.disable(GL_DEPTH_TEST);
 
       //gl.polygonMode(GL_FRONT_AND_BACK, GL_LINE);
-      if(totalDrawObj>1000) vbo.draw(GL_POINTS);
-      LOG("vbo drawn", cast(void*) this, vbo.handle, totalDrawObj);
+      vbo.draw(GL_POINTS);
     }
 
     foreach(sd; subDrawings){
@@ -1434,7 +1445,7 @@ class Drawing {
 //  Logger                                                                    //
 ////////////////////////////////////////////////////////////////////////////////
 
-class Logger{
+deprecated class Logger{
   Drawing dr; //graphic log
   bool wr;     //writeln log
 
