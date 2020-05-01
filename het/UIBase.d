@@ -947,6 +947,7 @@ class Cell{ // Cell ////////////////////////////////////
   final void setProps(string cmdLine){ setProps(cmdLine.commandLineToMap); }
 
   //subCells
+  void clearSubCells() { }
   @property Cell[] subCells() { return []; }
   @property void subCells(Cell[] cells) { notImpl("setSubCells"); }
 
@@ -1638,6 +1639,7 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   override{
+    void clearSubCells(){ subCells_ = []; }
     @property Cell[] subCells() { return subCells_; }
     @property void subCells(Cell[] cells) { subCells_ = cells; }
 
@@ -1672,15 +1674,16 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   override void draw(Drawing dr){
-
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
     //if(chkSet(measured)) measure;
 
     //autofill background
     dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
     //dr.alpha = 0.1;
+
     dr.fillRect(border.adjustBounds(borderBounds_inner));
     //dr.alpha = 1;
+
 
     dr.translate(innerPos);
     if(flags.clipChildren) dr.pushClipBounds(Bounds2f(0, 0, innerWidth, innerHeight));
@@ -1703,6 +1706,8 @@ class Container : Cell { // Container ////////////////////////////////////
       dr.lineStipple = lsNormal;
       dr.drawRect(outerBounds.inflated(-1.5));
     }
+
+
   }
 
   //aligns the container on the screen

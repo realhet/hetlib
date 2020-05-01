@@ -51,9 +51,10 @@ private enum _keywordStrs = [ //last items of categories must be untouched!!!
 //program keywords
   "asm"/*,"body" deprecated */,"break","case","catch","continue","default","do","else","finally","for","foreach","foreach_reverse","goto",
   "if","invariant","module","return","switch","template","throw","try","unittest","while","with",
+  "debug","import","mixin","version",
 
 //special functions
-  "assert","cast","debug","import","mixin","pragma","typeid","typeof","version","__traits","__parameters","__vector",
+  "assert","cast","pragma","typeid","typeof","__traits","__parameters","__vector",
 
 //special keywords
   "__EOF__","__DATE__","__TIME__","__TIMESTAMP__","__DATETIME__"/+//EXTRA+/,"__VENDOR__","__VERSION__",
@@ -75,7 +76,7 @@ KeywordCat kwCatOf(int k)
   if(k<=kwsuper                 ) return Value              ;
   if(k<=kwvoid                  ) return BasicType          ;
   if(k<=kwfunction              ) return UserDefiniedType   ;
-  if(k<=kwwith                  ) return Keyword            ;
+  if(k<=kwversion               ) return Keyword            ;
   if(k<=kw__vector              ) return SpecialFunct       ;
   if(k<=kw__PRETTY_FUNCTION__   ) return SpecialKeyword     ;
   if(k<=kwdelete                ) return Operator           ;

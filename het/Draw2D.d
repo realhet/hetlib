@@ -1400,8 +1400,6 @@ class Drawing {
     }
     buffers.clear;
 
-    if(vboList.empty) return;
-
     foreach(vbo; vboList){
       if(!shader) shader = new Shader("DrawingShader", shaderCode);
 

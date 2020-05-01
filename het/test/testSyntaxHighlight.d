@@ -4,13 +4,13 @@
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
 //@release
 ///@debug
-//@run $ c:\d\libs\het\utils.d
+///@run $ c:\d\libs\het\utils.d
 ///@run $ c:\d\libs\het\draw3d.d
 ///@run $ c:\D\ldc2\import\std\format.d
 ///@run $ c:\D\ldc2\import\std\uni.d
-///@run $ c:\d\libs\het\test\syntaxTestText.d
+//@run $ c:\d\libs\het\test\syntaxTestText.d
 ///@run $ c:\D\ldc2\import\std\datetime\systime.d
-
+                          oacute bug
 
 import het, het.ui, het.tokenizer;
 
@@ -120,31 +120,10 @@ class CodeRow: Row{ //CodeRow //////////////////////////////////////
     }
   }
 
-  override void measure(){
-    if(measured.chkSet)
-      super.measure;
-  }
-
-//  void refresh(SyntaxPreset preset = SyntaxPreset.Dark){
-    /*bkColor = syntaxTable[0].bkColor;
-
-    cubCells.clear;
-
-    const lineCount  = code.lineCount,
-          lineDigits = iCeil(log10(lineCount+1)),
-          valid      = lineIdx>=0 && lineIdx<code.lineCount;
-
-    if(valid){
-      auto text      = code.getLine     (lineIdx),
-           syntax    = code.getSyntax   (lineIdx),
-           hierarchy = code.getHierarchy(lineIdx);
-    }*/
-
-//      indent = hierarchy.
-//  }
+  override void measure(){ if(measured.chkSet) super.measure; }
 }
 
-class CodeColumn : Column { //CodeColumn
+class CodeBlock : Column { //CodeBlock /////////////////////////////////////
   SourceCode code;
   bool measured;
   Drawing cachedDrawing;
@@ -173,37 +152,91 @@ class CodeColumn : Column { //CodeColumn
       if(cachedDrawing is null){
         cachedDrawing = dr.clone;
         super.draw(cachedDrawing);
+        //clearSubCells;
+
       }
       dr.draw(cachedDrawing);
     }
   }
 }
 
+/*class Comment: Row{ //CommentRow //////////////////////////////////////
+  bool measured;
+
+  this(){
+    auto ts = tsComment;
+    super
+  }
+} */
+
+
+
+/+void parseDeclarations(Cell parent, SourceCode code){
+  tokens = code.tokens;
+
+  string[] attributes;
+
+  bool lastAttrIsStatic(){ return attributes.
+
+  while(tokens.length){
+    alias t = tokens[0];
+
+    if(t.isComment){
+      parent.append(new CommentBlock(t.source));
+      //comments ~= t.source;
+      tokens.popFront; continue;
+    }
+
+/*    if(t.kind == TokenKind.Keyword){
+      if(t.id.among(kwmodule)){
+
+
+      }else if(t.id.among(kwstruct, ksclass, ksunion, ksinterface)){ //Aggregate stuff
+
+
+        }
+
+        default:
+      }
+
+
+      tokens.popFront;
+      continue;
+    }*/
+  }
+}+/
+
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
   SourceCode code;
-  CodeColumn codeColumn;
+  CodeBlock codeBlock;
 
   void reload(){
     auto file = File(application.args(1));
     string text;
 
-    PERF("load, syntaxHighLight", {
-      text = file.readText;
-    });
-    PERF("processLeadingSpaces", {
-      text = text.transformLeadingSpacesToTabs;
-    });
-    PERF("tokenize/syntaxHighlight", {
-      code = new SourceCode(text, file);
-    });
-    PERF("create codeColumn", {
-      codeColumn = new CodeColumn(code);
-    });
-    PERF("codeColumn.measure", {
-      codeColumn.measure;
-    });
 
-    PERF.report.writeln;
+    foreach(batch; 0..2){
+      print("------------------batch #", batch);
+      PERF("load, syntaxHighLight", {
+        text = file.readText;
+      });
+      PERF("processLeadingSpaces", {
+        text = text.transformLeadingSpacesToTabs;
+      });
+      PERF("tokenize/syntaxHighlight", {
+        code = new SourceCode(text, file);
+      });
+      PERF("create CodeBlock", {
+        codeBlock = new CodeBlock(code);
+      });
+      PERF("CodeBlock.measure", {
+        codeBlock.measure;
+      });
+
+      PERF.report.writeln;
+    }
+
+    //parseDeclarations(code);
 
   }
 
@@ -225,9 +258,9 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
       //vScroll;
 
       style.applySyntax(0);
-      Row({ style.fontHeight=50; Text("FUCK"); });
+//      Row({ style.fontHeight=50; Text("FUCK"); });
 
-      actContainer.append(codeColumn);
+      actContainer.append(codeBlock);
     });
 
     if(inputs.Space.pressed){
@@ -239,6 +272,8 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
   }
 
   override void onPaint(){ // paint //////////////////////////////////////
+    //auto t0 = QPS;
+
     dr.clear(clBlack);
     drGUI.clear;
 
@@ -247,8 +282,14 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     //drGUI.glDraw(viewGUI);
     //drGUI.clear;
 
+
+    //update, beginPaint, paint   , endPaint, swapBuffers
+    //clBlue, clLime    , clYellow, clRed   , clGray
     drawFpsTimeLine(drGUI);
+
+
     /*drGUI.glDraw(viewGUI);*/
+    //{ auto t = ((QPS-t0)*1000).to!int; if(t) writefln("%s %3d ms", this.classinfo.name, t); }
   }
 
 }

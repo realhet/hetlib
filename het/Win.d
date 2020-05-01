@@ -30,12 +30,12 @@ public import core.sys.windows.winuser:
 struct TimeLine{
 
   struct Event{
-    enum Type { update, beginPaint, paint, endPaint, swapBuffers };
+    enum Type {update, beginPaint, paint, endPaint, swapBuffers};
     Type type;
     double t0, t1;
 
     auto color(){
-      enum typeColors = [ clBlue, clLime, clYellow, clRed, clGray];
+      enum typeColors = [clBlue, clLime, clYellow, clRed, clGray];
       return typeColors[cast(int)type];
     }
   }

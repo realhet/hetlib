@@ -1,11 +1,13 @@
-﻿Éô
-/*
+﻿/*
+Éô
 🖐⏲
 
 🙈🙉🙊
 
 💑🏾
 */
+const s = "mill\&oacute;n";
+
 struct Token{
   Variant data;
   int id; //emuns: operator, keyword
@@ -187,3 +189,165 @@ void main()
     writeln(commonPrefix("hello, world"d,
                          "hello, there"d));
 }
+
+#define blabla
+#ifdef
+#elif
+
+//extern
+  [ ] extern          //https://dlang.org/spec/declaration.html#extern
+
+  ( ) extern(C)
+  ( ) extern(C++)
+  ( ) extern(C++, namespace.namespace)
+  ( ) extern(D)
+  ( ) extern(Windows)
+  ( ) extern(System)
+  ( ) extern(Objective-C)
+
+//visibility    //https://dlang.org/spec/attribute.html#VisibilityAttribute
+  ( ) public
+  ( ) private
+  ( ) protected
+  ( ) export
+  ( ) package
+  ( ) package(package.module)
+
+  [ ] static       //functs, data   https://dlang.org/spec/attribute.html#static
+
+//inheritance
+  ( ) override     //virtual functs                         https://dlang.org/spec/attribute.html#override
+  ( ) final        //virtual functs, classes
+  ( ) abstract     //virtual functs, classes                https://dlang.org/spec/attribute.html#abstract
+
+//other
+  [ ] align opt(AssignExpression)             //data             https://dlang.org/spec/attribute.html#align
+  [ ] deprecated opt(AssignExpression)                         //https://dlang.org/spec/attribute.html#deprecated
+  [+] pragma(identifier, optArgumentList))
+
+  [ ] synchronized   //classes, structs, functs
+
+
+//storage types / type qualifiers
+  //TypeCtor s
+  ( ) immutable	//data                                                    //https://dlang.org/spec/const3.html#immutable_storage_class
+  ( ) const	//data funct                                                    https://dlang.org/spec/const3.html#const_storage_class
+  ( ) shared	//https://dlang.org/spec/attribute.html#shared
+  ( ) inout	//param, result
+
+  ( ) shared const
+  ( ) inout const
+  ( ) inout shared
+  ( ) inout shared const
+  ( ) __gshared     //https://dlang.org/spec/attribute.html#gshared
+
+  [.] auto  //functs, data, if no attribute but type inference is needed    https://dlang.org/spec/attribute.html#auto
+  [ ] scope //auto destructors                                              https://dlang.org/spec/attribute.html#scope
+
+  ( ) ref          //param
+  ( ) return ref   //param
+  ( ) auto ref     //param
+
+//functions
+  [ ] @property
+  [ ] @disable                //https://dlang.org/spec/attribute.html#disable
+  [ ] @nogc
+  [ ] nothrow
+  [ ] pure
+  [ ] @safe
+  [ ] @trusted
+  [ ] @system
+
+//UDA
+
+@Type
+@Type(123)
+@("hello") struct SSS { }
+@(3) { @(4) @EEE @SSS int foo; }
+
+
+
+//other embedded languages
+const blabla = q{  void prepare(){ //prepare the shader and the VBO
+    shader = new Shader("Test shader", q{
+      uniform vec2 uShift;
+      varying vec3 vColor;
+
+      @vertex:
+      attribute vec2 aPosition;
+      attribute vec3 aColor;
+      void main()
+      {
+        gl_Position = vec4(aPosition+uShift, 0, 1);
+        vColor = aColor;
+      }
+
+      @fragment:
+      void main()
+      {
+        gl_FragColor = vec4(vColor, 0);
+      }
+    });
+
+    //create Vertex Buffer Object
+    vbo = new VBO(vVertices);
+    vbo2 = new VBO(vVertices);
+
+  }
+}
+
+
+const gcnCode = q{
+  vKeccakSt  = %vPool[0:49]
+  vKeccakAux = %vPool[50:59] /* A keccak-nak csak 60 reg kell. */
+
+  vDaggerMix = %vPool[16:47] /* a daggernek meg 64, de az elso 16 reg nem lehet atlapolva, emiatt 80 kell mindkettonek. */
+  vDagTmp    = %vPool[48:63]
+  vDagData   = %vPool[64:79]
+
+  vMixDigest = %vPool[64:71] /* ez a 8 reg mar akkor kell, amikor mar nincs dagger es egy keccak-ot kell tulelnie */
+
+  /*note: ahhoz, hogy egymas utan menjen a keccak->dagger->keccak, a keccak[0..15]-be nem loghat bele egyik dag terulet sem! */
+
+  /* lds */
+  _ldsSize = 0; /* todo: gcnAllocL */
+  .macro ldsAlloc name, size
+    name = _ldsSize
+    _ldsSize = _ldsSize+(size)
+  .endm
+
+  ldsAlloc ldsOfs_DIn   , 4<<10
+  ldsAlloc ldsOfs_DOut  , 2<<10
+  ldsAlloc ldsOfs_S0    , 256
+  ldsAlloc ldsOfs_Synch , 256
+  ldsAlloc ldsOfs_DagOfs, 1<<10
+
+/*  ldsOfs_DIn   = 0
+  ldsOfs_DOut  = (4<<10)
+  ldsOfs_S0    = (6<<10)
+  ldsOfs_Synch = (6<<10)+256
+  ldsOfs_DagOfs = (6<<10)+256+256 /*1K needed ..8<<10*/
+
+  /* total lds size = 6<<10+256 bytes = 6400 */
+}),
+gcnCode(q{
+  /* initialize probe */
+  PROBECNT = }~ProbeCnt.text~q{
+  s_mov_b32 sProbeOfs, 0
+  .macro probe what; .scope
+    .if(PROBECNT>0)
+      s_cmp_eq_u32 sGroupIdx, 0; s_cbranch_scc0 .skip
+      s_cmp_lt_u32 sProbeOfs, PROBECNT*4; s_cbranch_scc0 .skip
+        s_mov_b64 exec, 1<<15
+        v_readfirstlane_b32 sTmp0, what
+        v_seek0 ofs_probe
+        v_seek_rel sProbeOfs
+        v_write sTmp0
+        s_add_u32 sProbeOfs, sProbeOfs, 4
+        s_mov_b64 exec, -1
+      .skip:
+    .endif
+  .ends; .endm
+  .macro ProbeNL; probe 0x00dd00aa; .endm
+};
+

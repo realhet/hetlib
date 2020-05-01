@@ -43,13 +43,13 @@ auto decodeBigComments(char[] raw){
   return res;
 }
 
-struct SourceLine{
+struct SourceLine{ //SourceLine ///////////////////////////////
   string text;
   ubyte[] syntax;
   ushort[] hierarchy;
 }
 
-class SourceCode{
+class SourceCode{ // SourceCode ///////////////////////////////
   File file;
   string text;
 
@@ -175,6 +175,8 @@ class SourceCode{
       auto bigc = new char[0x10000];
       syntaxHighLight(file.fullName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
       bigComments = decodeBigComments(bigc);
+    }else{
+      WARN(error);
     }
 
     checkConsistency;
@@ -183,7 +185,7 @@ class SourceCode{
 }
 
 
-struct Token{
+struct Token{ // Token //////////////////////////////
   Variant data;
   int id; //emuns: operator, keyword
   int pos, length;
@@ -213,7 +215,7 @@ struct Token{
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
 
-class Tokenizer{
+class Tokenizer{ // Tokenizer ///////////////////////////////
 public:
   string fileName;
   string text;
@@ -402,6 +404,8 @@ public:
     Token *t = &res[$-1];
     t.length = pos-t.pos;
     t.source = text[t.pos..pos];
+
+    print(t.line+1, t.posInLine+1);
   }
 
   ref Token lastToken() { return res[$-1]; }
@@ -944,7 +948,7 @@ auto tokenize2(string src, string fileName="", bool raiseError=true){ //it does 
 
 
 
-void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen)
+void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen) // SyntaxHighlight ////////////////////////////
 {
   //todo: a delphis } bracket pa'rkereso is bugos: a stringekben levo {-en is megall.
 
@@ -1035,7 +1039,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     t.level = cast(int)nesting.length;
 
     if(chkClear(nextIdIsAttrib) && t.kind==Identifier){
-      cl = skSymbol;
+      cl = skAttribute;
     }else switch(t.kind){
       default: break;
       case Unknown      : cl = skError; break;
@@ -1043,19 +1047,20 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
       case Identifier   : cl = skIdentifier1; break;
       case Keyword      : {
         with(KeywordCat) switch(kwCatOf(t.source)){
-          default                : cl = skKeyword; break;
           case Attribute         : cl = skAttribute; break;
           case Value             : cl = skBasicType; break;
           case BasicType         : cl = skBasicType; break;
           case UserDefiniedType  : cl = skKeyword; break;
           case SpecialFunct      : cl = skAttribute; break;
           case SpecialKeyword    : cl = skKeyword; break;
+          default                : cl = skKeyword; break;
         }
         break;
       }
       case Special      : break;
       case Operator     :{
-             if(t.source=="@") { cl = skSymbol; nextIdIsAttrib = true; }
+             if(t.source=="@") { cl = skAttribute; nextIdIsAttrib = true; }
+        else if(t.source=="#") { cl = skAttribute; nextIdIsAttrib = true; }
         else if(t.source=="q{") cl = skString;
         else if(t.source[0]>='a' && t.source[0]<='z') cl = skKeyword;
         else cl = skSymbol;
