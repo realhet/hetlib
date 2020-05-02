@@ -545,30 +545,6 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
   return ts;
 }
 
-/*  hlDefault:TTextFormats=(
-{skWhitespace}  (FontColor:clBlack    ;BackColor:clWhite      ;Style:[]             ),
-{skSelected}    (FontColor:clWhite    ;BackColor:10841427     ;Style:[]             ),
-{skFoundAct}    (FontColor:$FCFDCD    ;BackColor:clBlack      ;Style:[]             ),
-{skFoundAlso}   (FontColor:clBlack    ;BackColor:$78AAFF      ;Style:[]             ),
-{skNavLink}     (FontColor:clBlue     ;BackColor:clWhite      ;Style:[fsUnderline]  ),
-{skNumber}      (FontColor:clBlue     ;BackColor:clWhite      ;Style:[]             ),
-{skString}      (FontColor:clBlue     ;BackColor:clSkyBlue    ;Style:[]             ),
-{skKeyword}     (FontColor:clNavy     ;BackColor:clWhite      ;Style:[fsBold]       ),
-{skSymbol}      (FontColor:clBlack    ;BackColor:clWhite      ;Style:[]             ),
-{skComment}     (FontColor:clNavy     ;BackColor:clYellow     ;Style:[fsItalic]     ),
-{skDirective}   (FontColor:clTeal     ;BackColor:clWhite      ;Style:[]             ),
-{skIdentifier1} (FontColor:clBlack    ;BackColor:clWhite      ;Style:[]             ),
-{skIdentifier2} (FontColor:clGreen    ;BackColor:clWhite      ;Style:[]             ),
-{skIdentifier3} (FontColor:clTeal     ;BackColor:clWhite      ;Style:[]             ),
-{skIdentifier4} (FontColor:clPurple   ;BackColor:clWhite      ;Style:[]             ),
-{skIdentifier5} (FontColor:$0040b0    ;BackColor:clWhite      ;Style:[]             ),
-{skIdentifier6} (FontColor:$b04000    ;BackColor:clWhite      ;Style:[]             ),
-{skLabel}       (FontColor:clBlack    ;BackColor:$DDFFEE      ;Style:[fsUnderline]  ),
-{skAttribute}   (FontColor:clPurple   ;BackColor:clWhite      ;Style:[fsBold]       ),
-{skBasicType}   (FontColor:clTeal     ;BackColor:clWhite      ;Style:[fsBold]       ),
-{skError}       (FontColor:clRed      ;BackColor:clWhite      ;Style:[fsUnderline]  ),
-{skBinary1}     (FontColor:clWhite    ;BackColor:clBlue       ;Style:[]             )
-);*/
 
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const clChapter                 = RGB(221,   3,  48),
@@ -625,7 +601,7 @@ void initTextStyles(){
   a(  "bold"      , tsBold    , tsNormal, { tsBold.bold = true; });
   a(    "bold2"   , tsBold2   , tsBold  , { tsBold2.fontColor = clChapter; });
   a(  "quote"     , tsQuote   , tsNormal, { tsQuote.italic = true; });
-  a(  "code"      , tsCode    , tsNormal, { tsCode.font = "Courier New"; tsCode.fontHeight = rfh(18); tsCode.bold = true; });
+  a(  "code"      , tsCode    , tsNormal, { tsCode.font = "Consolas"; tsCode.fontHeight = rfh(18); tsCode.bold = true; });
   a(  "link"      , tsLink    , tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; });
   a(  "title"     , tsTitle   , tsNormal, { tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); });
   a(    "chapter" , tsChapter , tsTitle , { tsChapter.fontHeight = rfh(40); });

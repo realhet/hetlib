@@ -51,10 +51,10 @@ private enum _keywordStrs = [ //last items of categories must be untouched!!!
 //program keywords
   "asm"/*,"body" deprecated */,"break","case","catch","continue","default","do","else","finally","for","foreach","foreach_reverse","goto",
   "if","invariant","module","return","switch","template","throw","try","unittest","while","with",
-  "debug","import","mixin","version",
+  "assert","debug","import","mixin","version",
 
 //special functions
-  "assert","cast","pragma","typeid","typeof","__traits","__parameters","__vector",
+  "cast","pragma","typeid","typeof","__traits","__parameters","__vector",
 
 //special keywords
   "__EOF__","__DATE__","__TIME__","__TIMESTAMP__","__DATETIME__"/+//EXTRA+/,"__VENDOR__","__VERSION__",
@@ -214,7 +214,7 @@ string opStr(int op) { return tdOperators.keyOf(op); }
 dchar nceLookup(string s)
 {
   auto p = tdNamedCharEntries.lookup(s);
-  return p ? cast(dchar)(p) : 0;
+  return p ? *cast(dchar*)(p) : replacementDchar;
 }
 
 

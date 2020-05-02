@@ -1,4 +1,10 @@
-﻿/*
+﻿
+@(blah, 4) @hello public:
+static class B : C{
+  int blabla;
+}
+
+/*
 Éô
 🖐⏲
 
@@ -223,7 +229,7 @@ void main()
 //other
   [ ] align opt(AssignExpression)             //data             https://dlang.org/spec/attribute.html#align
   [ ] deprecated opt(AssignExpression)                         //https://dlang.org/spec/attribute.html#deprecated
-  [+] pragma(identifier, optArgumentList))
+  [+] pragma(identifier, optArgumentList)
 
   [ ] synchronized   //classes, structs, functs
 
@@ -263,8 +269,9 @@ void main()
 @Type
 @Type(123)
 @("hello") struct SSS { }
-@(3) { @(4) @EEE @SSS int foo; }
-
+public @(3) { 
+  @(4) @EEE @SSS int foo; 
+}
 
 
 //other embedded languages
@@ -294,8 +301,7 @@ const blabla = q{  void prepare(){ //prepare the shader and the VBO
     vbo2 = new VBO(vVertices);
 
   }
-}
-
+};
 
 const gcnCode = q{
   vKeccakSt  = %vPool[0:49]
@@ -329,8 +335,8 @@ const gcnCode = q{
   ldsOfs_DagOfs = (6<<10)+256+256 /*1K needed ..8<<10*/
 
   /* total lds size = 6<<10+256 bytes = 6400 */
-}),
-gcnCode(q{
+};
+immutable xyz = gcnCode(q{
   /* initialize probe */
   PROBECNT = }~ProbeCnt.text~q{
   s_mov_b32 sProbeOfs, 0
@@ -349,5 +355,5 @@ gcnCode(q{
     .endif
   .ends; .endm
   .macro ProbeNL; probe 0x00dd00aa; .endm
-};
+});
 

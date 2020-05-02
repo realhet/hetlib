@@ -992,7 +992,7 @@ auto makeArray3(T, size_t N, size_t M, size_t O, T val)()
 
 
 // safely get a copy of and array element
-T get(T)(in T[] arr, size_t idx, T def = T.init){
+T get(T)(T[] arr, size_t idx, T def = T.init){
   return idx<arr.length ? arr[idx]
                         : def;
 }

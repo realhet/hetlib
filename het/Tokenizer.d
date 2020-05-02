@@ -17,7 +17,14 @@ const CompilerVersion = 100;
 //refactor to anonym -> ebben elvileg a delphi jobb.
 
 //todo: camelCase
-enum TokenKind {Unknown, Comment, Identifier, Keyword, Special, Operator, LiteralString, LiteralChar, LiteralInt, LiteralFloat};
+
+//todo: highlight escaped strings
+//todo: highlight regex strings
+//todo: nem kell a token.data-t azonnal kiszamolni. Csak lazy modon.
+//todo: TokenKind. camelCase
+
+
+enum TokenKind {unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat};
 
 @trusted string tokenize(string fileName, string text, out Token[] tokens) //returns error of any
 {
@@ -206,11 +213,11 @@ struct Token{ // Token //////////////////////////////
                    else put(sink, format!"%-20s: %s %s"(kind, level, source));
   }
 
-  bool isOperator(int op)       const { return id==op && kind==TokenKind.Operator; }
-  bool isKeyword (int kw)       const { return id==kw && kind==TokenKind.Keyword ; }
-  bool isIdentifier()           const { return kind==TokenKind.Identifier; }
+  bool isOperator(int op)       const { return id==op && kind==TokenKind.operator; }
+  bool isKeyword (int kw)       const { return id==kw && kind==TokenKind.keyword ; }
+  bool isIdentifier()           const { return kind==TokenKind.identifier; }
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
-  bool isComment()              const { return kind==TokenKind.Comment; }
+  bool isComment()              const { return kind==TokenKind.comment; }
 
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
@@ -379,9 +386,9 @@ public:
         case '/':{ //comment
           switch(peek){
             default: return false;
-            case '/': newToken(TokenKind.Comment); skipLineComment  ; finalizeToken; break;
-            case '*': newToken(TokenKind.Comment); skipBlockComment ; finalizeToken; break;
-            case '+': newToken(TokenKind.Comment); skipNestedComment; finalizeToken; break;
+            case '/': newToken(TokenKind.comment); skipLineComment  ; finalizeToken; break;
+            case '*': newToken(TokenKind.comment); skipBlockComment ; finalizeToken; break;
+            case '+': newToken(TokenKind.comment); skipNestedComment; finalizeToken; break;
           }
           break;
         }
@@ -405,7 +412,7 @@ public:
     t.length = pos-t.pos;
     t.source = text[t.pos..pos];
 
-    print(t.line+1, t.posInLine+1);
+    //print(t.line+1, t.posInLine+1);
   }
 
   ref Token lastToken() { return res[$-1]; }
@@ -420,25 +427,25 @@ public:
         switch(id){
           default                     :{ error("Unhandled keyword specialtoken: "~source); break; }
           case kw__EOF__              :{ seekToEOF; removeLastToken; break; }
-          case kw__TIMESTAMP__        :{ kind = TokenKind.LiteralString; data = now.text; break; }
-          case kw__DATE__             :{ kind = TokenKind.LiteralString; data = today.text; break; }
-          case kw__TIME__             :{ kind = TokenKind.LiteralString; data = time.text; break; }
-          case kw__VENDOR__           :{ kind = TokenKind.LiteralString; data = "realhet"; break; }
-          case kw__VERSION__          :{ kind = TokenKind.LiteralInt   ; data = CompilerVersion;break; }
-          case kw__FILE__             :{ import std.path; kind = TokenKind.LiteralString; data = baseName(fileName); break; }
-          case kw__FILE_FULL_PATH__   :{ kind = TokenKind.LiteralString; data = fileName; break; }
+          case kw__TIMESTAMP__        :{ kind = TokenKind.literalString; data = now.text; break; }
+          case kw__DATE__             :{ kind = TokenKind.literalString; data = today.text; break; }
+          case kw__TIME__             :{ kind = TokenKind.literalString; data = time.text; break; }
+          case kw__VENDOR__           :{ kind = TokenKind.literalString; data = "realhet"; break; }
+          case kw__VERSION__          :{ kind = TokenKind.literalInt   ; data = CompilerVersion;break; }
+          case kw__FILE__             :{ import std.path; kind = TokenKind.literalString; data = baseName(fileName); break; }
+          case kw__FILE_FULL_PATH__   :{ kind = TokenKind.literalString; data = fileName; break; }
 
 //TODO: Ez kurvara nem igy megy: A function helyen kell ezt meghivni.
-          case kw__LINE__             :{ kind = TokenKind.LiteralInt   ; data = line+1; break; }
-          case kw__MODULE__           :{ kind = TokenKind.LiteralString; data = "module"; break; } //TODO
-          case kw__FUNCTION__         :{ kind = TokenKind.LiteralString; data = "function"; break; } //TODO
-          case kw__PRETTY_FUNCTION__  :{ kind = TokenKind.LiteralString; data = "pretty_function"; break; } //TODO
+          case kw__LINE__             :{ kind = TokenKind.literalInt   ; data = line+1; break; }
+          case kw__MODULE__           :{ kind = TokenKind.literalString; data = "module"; break; } //TODO
+          case kw__FUNCTION__         :{ kind = TokenKind.literalString; data = "function"; break; } //TODO
+          case kw__PRETTY_FUNCTION__  :{ kind = TokenKind.literalString; data = "pretty_function"; break; } //TODO
         }
       }else if(kwIsOperator(id)){
         switch(id){
           default: { error("Unhandled keyword operator: "~source); break; }
           case kwin: case kwis: case kwnew: case kwdelete:{
-            kind = TokenKind.Operator;
+            kind = TokenKind.operator;
             id = opParse(source);
             if(!id) error("Cannot lookup keyword operator.");
           break; }
@@ -448,7 +455,7 @@ public:
   }
 
   void parseIdentifier() {
-    newToken(TokenKind.Identifier);
+    newToken(TokenKind.identifier);
 
     fetch;
     while(isLetter(ch) || isDigit(ch)) fetch;
@@ -460,7 +467,7 @@ public:
       //is it a keyword?
       int kw = kwLookup(source);
       if(kw){
-        kind = TokenKind.Keyword;
+        kind = TokenKind.keyword;
         id = kw;
         revealSpecialTokens; //is it a special keyword of operator?
       }
@@ -510,9 +517,8 @@ public:
         auto s = fetchIdentifier;
         if(ch!=';') error(`NamedCharacterEntry must be closed with ";".`);
         fetch;
-
         auto u = nceLookup(s);
-        if(!u) error(`Unknown NamedCharacterEntry "`~s~`".`);
+        if(!u) error(`Unknown NamedCharacterEntry "`~s~`".`); //todo: this should be only a warning, not a complete failure
 
         return to!string(u);
       }
@@ -524,7 +530,7 @@ public:
   }
 
   void parseWysiwygString(bool handleEscapes=false, bool onlyOneChar=false){
-    newToken(TokenKind.LiteralString);
+    newToken(TokenKind.literalString);
     dchar ending;
     if(ch=='r'){ ending = '"'; fetch; fetch; }
           else { ending = ch; fetch; }
@@ -549,7 +555,7 @@ public:
   void parseLiteralChar(){ parseWysiwygString(true, true); }
 
   void parseHexString(){
-    newToken(TokenKind.LiteralString);
+    newToken(TokenKind.literalString);
     fetch; fetch;
     bool phase;  string s;  int act;
     while(1){
@@ -576,7 +582,7 @@ public:
   }
 
   void parseDelimitedString(){
-    newToken(TokenKind.LiteralString);
+    newToken(TokenKind.literalString);
     fetch; fetch; //q"..."
 
     string s;
@@ -680,7 +686,7 @@ public:
       return a;
     }
 
-    newToken(TokenKind.LiteralInt);
+    newToken(TokenKind.literalInt);
 
     bool isFloat = false;
     int base = 10; //get base
@@ -785,7 +791,7 @@ public:
     auto opId = opParse(text[pos..$], len);
     if(!opId) return false;
 
-    newToken(TokenKind.Operator);
+    newToken(TokenKind.operator);
     fetch(len);
     finalizeToken;
     lastToken.id = opId;
@@ -951,7 +957,7 @@ auto tokenize2(string src, string fileName="", bool raiseError=true){ //it does 
 void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen) // SyntaxHighlight ////////////////////////////
 {
   //todo: a delphis } bracket pa'rkereso is bugos: a stringekben levo {-en is megall.
-
+  //todo: ezt az enumot kivinni es ubye tipusuva tenni, osszevonni
   enum { skWhiteSpace, skSelected, skFoundAct, skFoundAlso, skNavLink, skNumber, skString, skKeyword, skSymbol, skComment,
     skDirective, skIdentifier1, skIdentifier2, skIdentifier3, skIdentifier4, skIdentifier5, skIdentifier6, skLabel,
     skAttribute, skBasicType, skError, skBinary1 }
@@ -974,7 +980,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     //detect language
     string lang;
     foreach(t; tokens){
-      if(t.kind==TokenKind.Identifier){
+      if(t.kind==TokenKind.identifier){
         if(isGLSLInstruction(t.source)){ lang="GLSL"; break; }
         if(isGCNInstruction (t.source)){ lang="GCN"; break; }
       }
@@ -1029,7 +1035,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     }
 
     //nesting level calculation
-    if(t.kind==Operator){
+    if(t.kind==operator){
       if(["{","[","(","q{"].canFind(t.source)){
         nesting ~= t.source;
         nestingOpeningIdx ~= cast(int)idx; //todo: normalis nevet talalni ennek, vagy bele egy structba
@@ -1038,14 +1044,14 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
 
     t.level = cast(int)nesting.length;
 
-    if(chkClear(nextIdIsAttrib) && t.kind==Identifier){
+    if(chkClear(nextIdIsAttrib) && t.kind==identifier){
       cl = skAttribute;
     }else switch(t.kind){
       default: break;
-      case Unknown      : cl = skError; break;
-      case Comment      : cl = skComment; break;
-      case Identifier   : cl = skIdentifier1; break;
-      case Keyword      : {
+      case unknown      : cl = skError; break;
+      case comment      : cl = skComment; break;
+      case identifier   : cl = skIdentifier1; break;
+      case keyword      : {
         with(KeywordCat) switch(kwCatOf(t.source)){
           case Attribute         : cl = skAttribute; break;
           case Value             : cl = skBasicType; break;
@@ -1057,8 +1063,8 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
         }
         break;
       }
-      case Special      : break;
-      case Operator     :{
+      case special      : break;
+      case operator     :{
              if(t.source=="@") { cl = skAttribute; nextIdIsAttrib = true; }
         else if(t.source=="#") { cl = skAttribute; nextIdIsAttrib = true; }
         else if(t.source=="q{") cl = skString;
@@ -1068,12 +1074,12 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
         break;
       }
 
-      case LiteralString: case LiteralChar: cl = skString; break;
-      case LiteralInt: case LiteralFloat: cl = skNumber; break;
+      case literalString, literalChar: cl = skString; break;
+      case literalInt, literalFloat: cl = skNumber; break;
     }
 
     //process nesting.closing errors
-    if(t.kind==Operator){
+    if(t.kind==operator){
       if(["}","]",")"].canFind(t.source)){
         string opening, closing;
         if(!nesting.empty) opening = nesting[$-1];
@@ -1207,7 +1213,7 @@ void discoverJsonHierarchy(ref Token[] tokens, string fileName="json_text"){
   int[] expectStack;
 
   foreach(ref t; tokens){
-    if(t.kind == TokenKind.Operator){
+    if(t.kind == TokenKind.operator){
       switch(t.id){
         case opsquareBracketOpen: case opcurlyBracketOpen:{
           t.level = level;
@@ -1232,8 +1238,8 @@ void discoverJsonHierarchy(ref Token[] tokens, string fileName="json_text"){
         default: t.raiseError("Invalid symbol", fileName);
       }
     }else{
-      if(t.kind.among(TokenKind.LiteralString, TokenKind.LiteralInt, TokenKind.LiteralFloat)
-      ||(t.kind==TokenKind.Keyword && t.id.among(kwfalse, kwtrue, kwnull))){
+      if(t.kind.among(TokenKind.literalString, TokenKind.literalInt, TokenKind.literalFloat)
+      ||(t.kind==TokenKind.keyword && t.id.among(kwfalse, kwtrue, kwnull))){
         t.level = level;
       }else{
         t.raiseError("Unknown token", fileName);
