@@ -273,25 +273,25 @@ static public:
   }
 }
 
-void write(T...)(T args)
+void write(T...)(auto ref T args)
 {
   console.show;
   foreach(const s; args)
     console.myWrite(to!string(s)); //calls own write with coloring
 }
 
-void writeln (T...)(T args){ write(args, '\n'); }
-void writef  (T...)(string fmt, T args){ write(format(fmt, args)); }
-void writefln(T...)(string fmt, T args){ write(format(fmt, args), '\n'); }
+void writeln (T...)(auto ref T args){ write(args, '\n'); }
+void writef  (T...)(string fmt, auto ref T args){ write(format(fmt, args)); }
+void writefln(T...)(string fmt, auto ref T args){ write(format(fmt, args), '\n'); }
 
-void print(T...)(T args){ //like in python
+void print(T...)(auto ref T args){ //like in python
   static foreach(a; args){
     write(a, " ");
   }
   writeln;
 }
 
-void safePrint(T...)(T args){ //todo: ez nem safe, mert a T...-tol is fugg.
+void safePrint(T...)(auto ref T args){ //todo: ez nem safe, mert a T...-tol is fugg.
   synchronized
     print(args);
 }

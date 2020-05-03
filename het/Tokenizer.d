@@ -195,10 +195,12 @@ class SourceCode{ // SourceCode ///////////////////////////////
 struct Token{ // Token //////////////////////////////
   Variant data;
   int id; //emuns: operator, keyword
-  int pos, length;
+  int pos, length; //todo: length OR source is redundant
   int line, posInLine;
   int level; //hiehrarchy level in [] () {} q{}
   string source;
+
+  @property int endPos() const{ return pos+length; }
 
   TokenKind kind;
   bool isTokenString; //it is inside the outermost tokenstring. Calculated in Parser.tokenize.BracketHierarchy, not in tokenizer.
@@ -218,6 +220,9 @@ struct Token{ // Token //////////////////////////////
   bool isIdentifier()           const { return kind==TokenKind.identifier; }
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
   bool isComment()              const { return kind==TokenKind.comment; }
+
+  bool isKeyword (in int[] kw)  const { return kind==TokenKind.keyword  && kw.map!(k => id==k).any; }
+  bool isOperator(in int[] op)  const { return kind==TokenKind.operator && op.map!(o => id==o).any; }
 
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }

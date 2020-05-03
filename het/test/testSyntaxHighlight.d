@@ -8,8 +8,8 @@
 ///@run $ c:\d\libs\het\draw3d.d
 ///@run $ c:\D\ldc2\import\std\format.d
 ///@run $ c:\D\ldc2\import\std\uni.d
-//@run $ c:\d\libs\het\test\syntaxTestText.d
-///@run $ c:\D\ldc2\import\std\datetime\systime.d
+///@run $ c:\d\libs\het\test\syntaxTestText.d
+//@run $ c:\D\ldc2\import\std\datetime\systime.d
 
 
 /*
@@ -18,7 +18,7 @@
 [ ] Consolas font for decimals and for escaped strings
 */
 
-import het, het.ui, het.tokenizer;
+import het, het.ui, het.tokenizer, het.keywords;
 
 
 string transformLeadingSpacesToTabs(string original, int spacesPerTab=2){
@@ -129,6 +129,7 @@ struct CodeMarker{
   int line, col;
 }
 
+/// A block of codeRows or codeBlocks aligned like a Column
 class CodeBlock : Column { //CodeBlock /////////////////////////////////////
   SourceCode code;
 
@@ -198,57 +199,227 @@ class CodeBlock : Column { //CodeBlock /////////////////////////////////////
       dr.draw(cachedDrawing);
     }
 
-    auto dr2 = dr.clone;
-    drawMarkers(dr2);
-    dr.draw(dr2);
+    if(markers.length){
+      auto dr2 = dr.clone;
+      drawMarkers(dr2);
+      dr.draw(dr2);
+    }
   }
 }
 
-/*class Comment: Row{ //CommentRow //////////////////////////////////////
-  bool measured;
 
-  this(){
-    auto ts = tsComment;
-    super
+
+// Experimental parseModule ////////////////////////////////
+
+
+/+
+//extern
+  [ ] extern          //https://dlang.org/spec/declaration.html#extern
+
+  ( ) extern(C)
+  ( ) extern(C++)
+  ( ) extern(C++, namespace.namespace)
+  ( ) extern(D)
+  ( ) extern(Windows)
+  ( ) extern(System)
+  ( ) extern(Objective-C)
+
+//visibility    //https://dlang.org/spec/attribute.html#VisibilityAttribute
+  ( ) public
+  ( ) private
+  ( ) protected
+  ( ) export
+  ( ) package
+  ( ) package(package.module)
+
+  [ ] static       //functs, data   https://dlang.org/spec/attribute.html#static
+
+//inheritance
+  ( ) override     //virtual functs                         https://dlang.org/spec/attribute.html#override
+  ( ) final        //virtual functs, classes
+  ( ) abstract     //virtual functs, classes                https://dlang.org/spec/attribute.html#abstract
+
+//other
+  [ ] align opt(AssignExpression)             //data             https://dlang.org/spec/attribute.html#align
+  [ ] deprecated opt(AssignExpression)                         //https://dlang.org/spec/attribute.html#deprecated
+  [+] pragma(identifier, optArgumentList)
+
+  [ ] synchronized   //classes, structs, functs
+
+
+//storage types / type qualifiers
+  //TypeCtor s
+  ( ) immutable  //data                                                    //https://dlang.org/spec/const3.html#immutable_storage_class
+  ( ) const  //data funct                                                    https://dlang.org/spec/const3.html#const_storage_class
+  ( ) shared  //https://dlang.org/spec/attribute.html#shared
+  ( ) inout  //param, result
+
+  ( ) shared const
+  ( ) inout const
+  ( ) inout shared
+  ( ) inout shared const
+  ( ) __gshared     //https://dlang.org/spec/attribute.html#gshared
+
+  [.] auto  //functs, data, if no attribute but type inference is needed    https://dlang.org/spec/attribute.html#auto
+  [ ] scope //auto destructors                                              https://dlang.org/spec/attribute.html#scope
+
+  ( ) ref          //param
+  ( ) return ref   //param
+  ( ) auto ref     //param
+
+//functions
+  [ ] @property
+  [ ] @disable                //https://dlang.org/spec/attribute.html#disable
+  [ ] @nogc
+  [ ] nothrow
+  [ ] pure
+  [ ] @safe
+  [ ] @trusted
+  [ ] @system
+
+//UDA
+@Type
+@Type(123)
+@("hello") struct SSS { }
+public @(3) {
+  @(4) @EEE @SSS int foo;
+}
++/
+
+void parseAggregate(Token[] tokens, SourceCode code, int level){
+  void print(T...)(auto ref T args){ .print("  ".replicate(level+1), args); }
+
+  level--; print("parsing aggregate at level", level+1); level++;
+  if(tokens.empty) return;
+
+  Token nullToken;
+  nullToken.pos = tokens[$-1].endPos;
+
+  bool eof(){ return tokens.empty; }
+  ref t(size_t idx=0){ return idx<tokens.length ? tokens[idx] : nullToken; }
+  void advance(size_t n=1){ tokens = tokens[n..$]; }
+
+  bool advanceUntilOperator(int op, int level){
+    while(!eof){
+      if(t.isOperator(op) && (level<0 || t.level==level)){ return true; }
+      advance;
+    }
+    return false;
   }
-} */
+
+  bool advancePastOperator(int op, int level){
+    auto a = advanceUntilOperator(op, level);
+    if(a) advance;
+    return a;
+  }
+
+  //must be on a { when called
+  Token[] advanceBlock(int closingOp){
+    auto baseLevel = t.level;
+    auto cnt = tokens.countUntil!(t => t.level==baseLevel && t.isOperator(closingOp));
+    enforce(cnt>0);
+    auto res = tokens[1..cnt];
+    tokens = tokens[cnt+1..$];
+    return res;
+  }
 
 
+  //Skip and combine multiple comments, keeping the newlines between them.
+  string parseComments(){
+    string res; if(eof) return res;
 
-/+void parseDeclarations(Cell parent, SourceCode code){
-  tokens = code.tokens;
-
-  string[] attributes;
-
-  bool lastAttrIsStatic(){ return attributes.
-
-  while(tokens.length){
-    alias t = tokens[0];
-
-    if(t.isComment){
-      parent.append(new CommentBlock(t.source));
-      //comments ~= t.source;
-      tokens.popFront; continue;
+    int lastLine = t.line;
+    while(t.isComment){
+      res ~= "\n".replicate(t.line-lastLine) ~ t.source;
+      lastLine = t.line + cast(int) t.source.count('\n');
+      advance;
     }
 
-/*    if(t.kind == TokenKind.Keyword){
-      if(t.id.among(kwmodule)){
-
-
-      }else if(t.id.among(kwstruct, ksclass, ksunion, ksinterface)){ //Aggregate stuff
-
-
-        }
-
-        default:
-      }
-
-
-      tokens.popFront;
-      continue;
-    }*/
+    return res;
   }
-}+/
+
+  string parseAttributesAndComments(){
+    string res; if(eof) return res;
+
+    immutable allAttributes = [
+      kwextern, kwpublic, kwprivate, kwprotected, kwexport, kwpackage,
+      kwstatic,
+      kwoverride, kwfinal, kwabstract,
+      kwalign, kwdeprecated, kwpragma,
+      kwsynchronized,
+      kwimmutable, kwconst, kwshared, kwinout, kw__gshared,
+      kwauto, kwscope,
+      kwref, kwreturn, /* return must handled manually inside statement blocks*/
+      kwnothrow,
+      kwpure,
+    ];
+
+    size_t startPos = t.pos;
+
+    while(!eof){
+      if(t.isComment){                                  // comments
+        advance;
+      }else if(t.isOperator(opatSign)){                 // @
+        advance;
+        if(t.isIdentifier){                             // @UDA
+          advance;
+          if(t.isOperator(oproundBracketOpen)){         // @UDA(params)
+            advancePastOperator(oproundBracketClose, t.level);
+          }
+        }else if(t.isOperator(oproundBracketOpen)){     //@(params)
+          advancePastOperator(oproundBracketClose, t.level);
+        }else{
+          WARN("Garbage after @"); //todo: it is some garbage, what to do with the error
+          break;
+        }
+      }else if(t.isKeyword(allAttributes)){             //attribute
+        advance;
+        if(t.isOperator(oproundBracketOpen)){           //(params)
+          advancePastOperator(oproundBracketClose, t.level);
+        }
+      }else{
+        break; //reached the end normally
+      }
+    }
+
+    size_t endPos = eof ? code.text.length : t.pos;
+
+    return code.text[startPos..endPos].strip;
+  }
+
+  bool parseDeclaration(){
+    auto comments = parseComments,
+         attributes = parseAttributesAndComments;
+
+    if(comments.length) print("comment:", comments);
+
+    if(t.isOperator(opcolon)){ //AttributeSpecifier
+      advance;
+
+      print("attribute specifier:", attributes);
+      return true;
+    }else if(t.isOperator(opcurlyBracketOpen)){ //AttributeSpecifier block
+      print("attribute  block:", attributes);
+
+      auto block = advanceBlock(opcurlyBracketClose);
+      parseAggregate(block, code, level+1);
+      return true;
+    }else if(t.isKeyword(kwimport)){
+      auto block = advanceBlock(opsemiColon);
+      auto s = code.text[block[0].pos .. block[$-1].endPos];
+      print("import:", s);
+      return true;
+    }
+
+    return false;
+  }
+
+  while(parseDeclaration){}
+}
+
+
+
+
 
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
   SourceCode code;
@@ -298,6 +469,26 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
   }
 
   override void onCreate(){ // create /////////////////////////////////
+    auto code = new SourceCode(q{
+/*comment1*//*comment2*/
+/+/+comment3
+end+/+/ //hello
+//last
+
+import m1 = het.utils, std.stdio : a = func1, c = func2,
+       f3, f4;
+
+@hello @(1,2,3) align/*pragma comment*/ pragma(4) : //attribute specifier
+@attr2 { /*body*/ @another(params): /*last comment*/ } //attributed block
+
+import m1 = het.utils, std.stdio : a = func1, c = func2,
+       f3, f4;
+
+});
+
+    parseAggregate(code.tokens, code, 0);
+    readln;
+
     reload;
   }
 
