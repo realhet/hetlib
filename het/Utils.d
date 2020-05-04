@@ -285,10 +285,11 @@ void writef  (T...)(string fmt, auto ref T args){ write(format(fmt, args)); }
 void writefln(T...)(string fmt, auto ref T args){ write(format(fmt, args), '\n'); }
 
 void print(T...)(auto ref T args){ //like in python
-  static foreach(a; args){
-    write(a, " ");
-  }
-  writeln;
+  string[] s;
+  static foreach(a; args){{
+    s ~= a.text;
+  }}
+  writeln(s.filter!(s => s.length).join(' '));
 }
 
 void safePrint(T...)(auto ref T args){ //todo: ez nem safe, mert a T...-tol is fugg.

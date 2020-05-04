@@ -293,6 +293,7 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
   if(tokens.empty) return;
 
   Token nullToken;
+  nullToken.source = "EOF";
   nullToken.pos = tokens[$-1].endPos;
 
   bool eof(){ return tokens.empty; }
@@ -323,6 +324,46 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
     return res;
   }
 
+  int findOp(int op, int levelDelta=0){
+    auto baseLevel = t.level + levelDelta;
+    return cast(int) tokens.countUntil!(t => t.level==baseLevel && t.isOperator(op));
+  }
+
+  auto nearest(T...)(auto ref T args){
+    int res = -1;
+    foreach(a; args) if(a>=0 && (res<0 || a<res)) res = a;
+    return res;
+  }
+
+  auto parseEnum(){
+    assert(t.isKeyword(kwenum));
+    struct Res{ string name, items; }
+    Res res;
+
+    auto idx = nearest(findOp(opcurlyBracketOpen, 1), findOp(opsemiColon)); //todo: needs a special parser here for smaller memory usage
+
+    if(idx<0){
+      advance;
+      WARN("Incomplete enum structure"); //todo: what's with fatal structural errors?
+      return res;
+    }
+
+    const anonym = tokens[idx].isOperator(opsemiColon),
+          s1     = res.items = code.text[tokens[1].pos .. tokens[idx-1].endPos];
+
+    if(anonym){
+      res.items = s1;
+      tokens = tokens[idx+1 .. $];
+    }else{
+      res.name = s1;
+      tokens = tokens[idx..$];
+
+      auto block = advanceBlock(opcurlyBracketClose);
+      if(block.length){ res.items = code.text[block[0].pos .. block[$-1].endPos]; }
+    }
+
+    return res;
+  }
 
   //Skip and combine multiple comments, keeping the newlines between them.
   string parseComments(){
@@ -388,28 +429,48 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
   }
 
   bool parseDeclaration(){
-    auto comments = parseComments,
-         attributes = parseAttributesAndComments;
+
+    string getBlockStr(int closingOp){
+      auto block = advanceBlock(closingOp);
+      return code.text[block[0].pos .. block[$-1].endPos];
+    }
+
+    auto comments = parseComments,    //todo: standalone comments if there is more that one \n in between the thing and the comment
+         attrs = parseAttributesAndComments;
 
     if(comments.length) print("comment:", comments);
 
-    if(t.isOperator(opcolon)){ //AttributeSpecifier
+    if(eof) return false;
+
+    if(t.isOperator(opcolon)){                  //AttributeSpecifier :
       advance;
 
-      print("attribute specifier:", attributes);
+      print("attribute specifier:", attrs);
       return true;
-    }else if(t.isOperator(opcurlyBracketOpen)){ //AttributeSpecifier block
-      print("attribute  block:", attributes);
-
+    }else if(t.isOperator(opcurlyBracketOpen)){ //AttributeSpecifier { }
+      print("attribute block:", attrs);
       auto block = advanceBlock(opcurlyBracketClose);
       parseAggregate(block, code, level+1);
       return true;
-    }else if(t.isKeyword(kwimport)){
-      auto block = advanceBlock(opsemiColon);
-      auto s = code.text[block[0].pos .. block[$-1].endPos];
-      print("import:", s);
+    }else if(t.isKeyword(kwmodule)){            //ModuleDeclaration
+      auto s = getBlockStr(opsemiColon);
+      print(attrs, "module:", s);
+      return true;
+    }else if(t.isKeyword(kwimport)){            //ImportDeclaration
+      auto s = getBlockStr(opsemiColon);
+      print(attrs, "import:", s);
+      return true;
+    }else if(t.isKeyword(kwalias)){
+      auto s = getBlockStr(opsemiColon);
+      print(attrs, "alias:", s);  //there should be no alias 'though'
+      return true;
+    }else if(t.isKeyword(kwenum)){              //EnumDeclaration
+      auto e = parseEnum;
+      print(attrs, "enum:", e);
       return true;
     }
+
+    WARN("Don't know what to do with token:", escape(t.source));
 
     return false;
   }
@@ -470,19 +531,63 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
 
   override void onCreate(){ // create /////////////////////////////////
     auto code = new SourceCode(q{
+//ModuleDeclaration
+
+deprecated("just a test") module test.modul;
+
 /*comment1*//*comment2*/
 /+/+comment3
-end+/+/ //hello
+end+/
++/ //hello
 //last
 
-import m1 = het.utils, std.stdio : a = func1, c = func2,
-       f3, f4;
+extern extern(C) extern(C++) extern(C++, name.space) extern(D) extern(Windows) extern(System) extern(Objective-C)
+public private protected export package package(pkg.mod)
+static override final abstract align(4) deprecated ("because") pragma(id, args)
+synchronized immutable const shared inout __gshared
+auto scope ref return ref auto ref
+@property @nogc nothrow pure @safe @trusted @system @disable
+{
+  //all the possible attributes
 
-@hello @(1,2,3) align/*pragma comment*/ pragma(4) : //attribute specifier
-@attr2 { /*body*/ @another(params): /*last comment*/ } //attributed block
+  //here's some more
+  @hello @(1,2,3) align/*pragma comment*/ pragma(4) : //attribute specifier
+  @attr2 { /*body*/ @another(params): /*last comment*/ } //attributed block
+}
 
-import m1 = het.utils, std.stdio : a = func1, c = func2,
+//ImportDeclaration
+
+import fmt = std.format, std.stdio : a = func1, c = func2,
        f3, f4;
+static import m1 = het.utils, std.stdio : a = func1, c = func2, f3, f4;
+public import std.exception;
+
+//alias declarations
+
+alias myint = int,
+      mybytearray = byte[];
+alias int(string p) Fun;   //old alias format without =
+
+//enums
+
+enum F;
+enum A = 3;
+enum B
+{
+    A = A // error, circular reference
+}
+enum C
+{
+    A = B,  // A = 4
+    B = D,  // B = 4
+    C = 3,  // C = 3
+    D       // D = 4
+}
+enum E : C
+{
+    E1 = C.D,
+    E2      // error, C.D is C.max
+}
 
 });
 
