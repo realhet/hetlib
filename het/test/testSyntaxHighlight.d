@@ -20,7 +20,6 @@
 
 import het, het.ui, het.tokenizer, het.keywords;
 
-
 string transformLeadingSpacesToTabs(string original, int spacesPerTab=2){
 
   string process(string s){
@@ -288,6 +287,8 @@ public @(3) {
 
 void parseAggregate(Token[] tokens, SourceCode code, int level){
   void print(T...)(auto ref T args){ .print("  ".replicate(level+1), args); }
+  string hl(int color, string title){ return "\33" ~ (cast(char) color) ~ title ~ "\33\7"; }
+  enum { gray=8, blue, green, aqua, red, purple, yellow, white }
 
   level--; print("parsing aggregate at level", level+1); level++;
   if(tokens.empty) return;
@@ -332,36 +333,6 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
   auto nearest(T...)(auto ref T args){
     int res = -1;
     foreach(a; args) if(a>=0 && (res<0 || a<res)) res = a;
-    return res;
-  }
-
-  auto parseEnum(){
-    assert(t.isKeyword(kwenum));
-    struct Res{ string name, items; }
-    Res res;
-
-    auto idx = nearest(findOp(opcurlyBracketOpen, 1), findOp(opsemiColon)); //todo: needs a special parser here for smaller memory usage
-
-    if(idx<0){
-      advance;
-      WARN("Incomplete enum structure"); //todo: what's with fatal structural errors?
-      return res;
-    }
-
-    const anonym = tokens[idx].isOperator(opsemiColon),
-          s1     = res.items = code.text[tokens[1].pos .. tokens[idx-1].endPos];
-
-    if(anonym){
-      res.items = s1;
-      tokens = tokens[idx+1 .. $];
-    }else{
-      res.name = s1;
-      tokens = tokens[idx..$];
-
-      auto block = advanceBlock(opcurlyBracketClose);
-      if(block.length){ res.items = code.text[block[0].pos .. block[$-1].endPos]; }
-    }
-
     return res;
   }
 
@@ -428,6 +399,96 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
     return code.text[startPos..endPos].strip;
   }
 
+  auto parseEnum(){
+    assert(t.isKeyword(kwenum));
+    struct EnumDecl{ string name, values; }
+    EnumDecl res;
+
+    auto idx = nearest(findOp(opcurlyBracketOpen, 1), findOp(opsemiColon)); //todo: needs a special parser here for smaller memory usage
+
+    if(idx<0){
+      advance;
+      WARN("Incomplete enum structure"); //todo: what's with fatal structural errors?
+      return res;
+    }
+
+    const anonym = tokens[idx].isOperator(opsemiColon),
+          s1     = res.values = code.text[tokens[1].pos .. tokens[idx-1].endPos];
+
+    if(anonym){
+      res.values = s1;
+      tokens = tokens[idx+1 .. $];
+    }else{
+      res.name = s1;
+      tokens = tokens[idx..$];
+
+      auto block = advanceBlock(opcurlyBracketClose);
+      if(block.length){ res.values = code.text[block[0].pos .. block[$-1].endPos]; }
+    }
+
+    return res;
+  }
+
+  auto parseFunctionDecl(){
+    //cursor is on the identifier
+    struct FuncDecl{
+      string header, body;
+      bool forward;
+    }
+    FuncDecl res;
+
+    auto startPos = t.pos;
+    auto baseLevel = t.level;
+
+    while(!eof){
+      //LOG(t);
+
+      if(t.level == baseLevel && t.isOperator(opsemiColon)){ //only a forward declaration
+        res.header = code.text[startPos .. t.pos].strip;
+        res.forward = true;
+        advance;
+        return res;
+      }
+
+      if(t.level == baseLevel && t.isOperator(opin)){ //constraint: in
+        advance;
+        if(t.level == baseLevel+1 && t.isOperator(opcurlyBracketOpen)){
+          advance;
+          //LOG("skipping in {}");
+        }
+        continue;
+      }
+
+      if(t.level == baseLevel && t.isKeyword(kwout)){ //constraint: out
+        advance;
+        if(t.level == baseLevel+1 && t.isOperator(oproundBracketOpen)){ //()
+          advanceBlock(oproundBracketClose);
+          //LOG("skipping out ()");
+        }
+        if(t.level == baseLevel+1 && t.isOperator(opcurlyBracketOpen)){  // optional {}
+          advance;
+          //LOG("skipping out {}");
+        }
+        continue;
+      }
+
+      if(t.level == baseLevel+1 && t.isOperator(opcurlyBracketOpen)){ //statement block {}
+        res.header = code.text[startPos .. t.pos].strip;
+
+        auto block = advanceBlock(opcurlyBracketClose);
+        if(block.length){ res.body = code.text[block[0].pos .. block[$-1].endPos]; }
+
+        return res;
+      }
+
+      advance;
+    }
+
+    WARN("Incomplete function declaration");
+    return res;
+  }
+
+
   bool parseDeclaration(){
 
     string getBlockStr(int closingOp){
@@ -438,36 +499,54 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
     auto comments = parseComments,    //todo: standalone comments if there is more that one \n in between the thing and the comment
          attrs = parseAttributesAndComments;
 
-    if(comments.length) print("comment:", comments);
+    if(comments.length) print(hl(gray, comments));
 
     if(eof) return false;
 
     if(t.isOperator(opcolon)){                  //AttributeSpecifier :
       advance;
 
-      print("attribute specifier:", attrs);
+      print(hl(red, "AttributeSpecifier begin:"), hl(aqua, attrs));
       return true;
     }else if(t.isOperator(opcurlyBracketOpen)){ //AttributeSpecifier { }
-      print("attribute block:", attrs);
+      print(hl(red, "AttributeSpecifier block:"), hl(aqua, attrs));
       auto block = advanceBlock(opcurlyBracketClose);
       parseAggregate(block, code, level+1);
       return true;
     }else if(t.isKeyword(kwmodule)){            //ModuleDeclaration
       auto s = getBlockStr(opsemiColon);
-      print(attrs, "module:", s);
+      print(hl(aqua, attrs), hl(red, "module"), s);
       return true;
     }else if(t.isKeyword(kwimport)){            //ImportDeclaration
       auto s = getBlockStr(opsemiColon);
-      print(attrs, "import:", s);
+      print(hl(aqua, attrs), hl(red, "import"), s);
       return true;
     }else if(t.isKeyword(kwalias)){
       auto s = getBlockStr(opsemiColon);
-      print(attrs, "alias:", s);  //there should be no alias 'though'
+      print(hl(aqua, attrs), hl(red, "alias"), s);  //there should be no alias 'though'
       return true;
-    }else if(t.isKeyword(kwenum)){              //EnumDeclaration
+    }else if(t.isKeyword(kwenum)){                      //EnumDeclaration
       auto e = parseEnum;
-      print(attrs, "enum:", e);
+      print(hl(aqua, attrs), hl(red, "enum"), e.name, hl(red, "values"), e.values);
       return true;
+    }else if(t.isKeyword(kwthis)
+          || t.isOperator(opcomplement) && tokens.length>=2 && tokens[1].isKeyword(kwthis)
+          || t.isOperator(opnew)
+          || t.isOperator(opdelete)){                   //Constructor/Destructor/Postblit/Allocator/Deallocator
+      const isDestructor = t.isOperator([opcomplement, opdelete]);
+      auto f = parseFunctionDecl;
+      print(hl(aqua, attrs), hl(red, isDestructor ? "destructor" : "costructor"), f.header, hl(red, f.forward ? ";" : "body"), f.body);
+      return true;
+    }else if(t.isKeyword(kwunittest)){                  //Unittest
+      advance;
+      if(t.isOperator(opcurlyBracketOpen)){
+        auto block = advanceBlock(opcurlyBracketClose);
+        auto s = block.length ? code.text[block[0].pos .. block[$-1].endPos] : "";
+        print(hl(aqua, attrs), hl(red, "unittest"), s);
+        return true;
+      }else{
+        WARN(`{ expected after "unittest"`);
+      }
     }
 
     WARN("Don't know what to do with token:", escape(t.source));
@@ -531,6 +610,7 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
 
   override void onCreate(){ // create /////////////////////////////////
     auto code = new SourceCode(q{
+
 //ModuleDeclaration
 
 deprecated("just a test") module test.modul;
@@ -541,54 +621,74 @@ end+/
 +/ //hello
 //last
 
-extern extern(C) extern(C++) extern(C++, name.space) extern(D) extern(Windows) extern(System) extern(Objective-C)
-public private protected export package package(pkg.mod)
-static override final abstract align(4) deprecated ("because") pragma(id, args)
-synchronized immutable const shared inout __gshared
-auto scope ref return ref auto ref
-@property @nogc nothrow pure @safe @trusted @system @disable
-{
-  //all the possible attributes
+// AttributeSpecifier
 
-  //here's some more
-  @hello @(1,2,3) align/*pragma comment*/ pragma(4) : //attribute specifier
-  @attr2 { /*body*/ @another(params): /*last comment*/ } //attributed block
-}
+  extern extern(C) extern(C++) extern(C++, name.space) extern(D) extern(Windows) extern(System) extern(Objective-C)
+  public private protected export package package(pkg.mod)
+  static override final abstract align(4) deprecated ("because") pragma(id, args)
+  synchronized immutable const shared inout __gshared
+  auto scope ref return ref auto ref
+  @property @nogc nothrow pure @safe @trusted @system @disable
+  {
+    //all the possible attributes
 
-//ImportDeclaration
+    //here's some more
+    @hello @(1,2,3) align/*pragma comment*/ pragma(4) : //attribute specifier
+    @attr2 { /*body*/ @another(params): /*last comment*/ } //attributed block
+  }
 
-import fmt = std.format, std.stdio : a = func1, c = func2,
-       f3, f4;
-static import m1 = het.utils, std.stdio : a = func1, c = func2, f3, f4;
-public import std.exception;
+// Declaration.ImportDeclaration
 
-//alias declarations
+  import fmt = std.format, std.stdio : a = func1, c = func2,
+         f3, f4;
+  static import m1 = het.utils, std.stdio : a = func1, c = func2, f3, f4;
+  public import std.exception;
 
-alias myint = int,
-      mybytearray = byte[];
-alias int(string p) Fun;   //old alias format without =
+// Declaration.AliasDeclaration
 
-//enums
+  alias myint = int,
+        mybytearray = byte[];
+  alias int(string p) Fun;   //old alias format without =
 
-enum F;
-enum A = 3;
-enum B
-{
-    A = A // error, circular reference
-}
-enum C
-{
-    A = B,  // A = 4
-    B = D,  // B = 4
-    C = 3,  // C = 3
-    D       // D = 4
-}
-enum E : C
-{
-    E1 = C.D,
-    E2      // error, C.D is C.max
-}
+// AliasThis
 
+  alias blabla this;
+
+// Declaration.EnumDeclaration
+
+  enum F;
+  enum A = 3;
+  enum B
+  {
+      A = A // error, circular reference
+  }
+  enum C
+  {
+      A = B,  // A = 4
+      B = D,  // B = 4
+      C = 3,  // C = 3
+      D       // D = 4
+  }
+  enum E : C
+  {
+      E1 = C.D,
+      E2      // error, C.D is C.max
+  }
+
+// Constructor/Destructor
+
+  static shared this(int param1, int param2=5) const immutable inout return shared nothrow pure @property{ statement1; statement2; }
+  this(); //just a forward declaration
+  static ~this() if(blabla) { /*destructor*/ }
+  this(templateParam)() const if(constraint) if(constraint2) in{ blabla; } out(val){ blabla; } do{ /+constructor template+/ }
+
+// postblit / allocator / deallocator (all deprecated)
+
+  deprecated this(this){ a = a.dup; /*postblit*/ }
+  deprecated new(){}
+  deprecated delete(){}
+
+  @("unittest UDA") unittest{ hello; }
 });
 
     parseAggregate(code.tokens, code, 0);
