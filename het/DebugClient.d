@@ -22,7 +22,7 @@ string makeSrcLocation(string file, string funct, int line){
        fu = funct.split(`.`);
 
   //ignore extension
-  if(fi.length) fi[$-1] = fi[$-1].withoutTrailing(".d");
+  if(fi.length) fi[$-1] = fi[$-1].withoutEnding(".d");
 
   foreach_reverse(i;  1..min(fi.length, fu.length)){
     if(fi[$-i..$].equal(fu[0..i])){

@@ -220,6 +220,8 @@ struct Token{ // Token //////////////////////////////
   bool isIdentifier()           const { return kind==TokenKind.identifier; }
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
   bool isComment()              const { return kind==TokenKind.comment; }
+  bool isSlashSlasComment()     const { return isComment && source.startsWith("//"); }
+  bool isDoxigenComment()       const { return isComment && ["///", "/**", "/++"].map!(a => source.startsWith(a)).any; }
 
   bool isKeyword (in int[] kw)  const { return kind==TokenKind.keyword  && kw.map!(k => id==k).any; }
   bool isOperator(in int[] op)  const { return kind==TokenKind.operator && op.map!(o => id==o).any; }
@@ -1026,16 +1028,18 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     ubyte cl;
 
     //detect big comments
-    const bigCommentMinLength = 30;
-    const bigCommentMinSlashCount = 20;
+    enum bigCommentMinLength = 30;
+    enum bigCommentMinSlashCount = 20;
+    enum bigCommentEnding = "/".replicate(bigCommentMinSlashCount);
     if(t.isComment && t.source.length>bigCommentMinLength && t.source.startsWith("//")){
-      if(t.source.strip.all!q{a=='/'}){
+      auto s = t.source.strip;
+      if(s.all!q{a=='/'}){
         lastBigCommentHeaderLine = t.line;
-      }else if(t.source.strip.endsWith("/".replicate(bigCommentMinSlashCount))){
+      }else if(s.endsWith(bigCommentEnding)){
         //take '/'s off of both sides
-        bigCommentsMap[t.line] = stripSlashes(t.source);
-      }else if(t.line==lastBigCommentHeaderLine+1 && t.source.startsWith("//") && t.source.endsWith("//")){
-        bigCommentsMap[t.line] = "!"~stripSlashes(t.source);
+        bigCommentsMap[t.line] = stripSlashes(s);
+      }else if(t.line==lastBigCommentHeaderLine+1 && s.startsWith("//") && s.endsWith("//")){
+        bigCommentsMap[t.line] = "!"~stripSlashes(s);
       }
     }
 

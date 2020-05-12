@@ -217,16 +217,60 @@ static private:
     SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), cast(ushort)attr);
   }
 
+  void indentAdjust(int param){
+    switch(param){
+      case 0: indent = 0; break;
+      case 1: indent++; break;
+      case 2: indent--; break;
+      default:
+    }
+    //stdWrite("[INDENT <- %d]".format(indent));
+  }
+
+  struct Recorder{
+    string recordedStr;
+    bool recording;
+
+    // recording ------------------
+    void start(){
+      if(recording) WARN("Already recording.");
+      recording = true;
+    }
+
+    string stop(){
+      if(!recording) WARN("Did not started recording.");
+      recording = false;
+      auto a = recordedStr; //todo: sync fails here
+      recordedStr = "";
+      return a;
+    }
+  }
+  __gshared Recorder recorder;
+
   void myWrite(string s){
-    void wr(string s) { /*if(stdout.windowsHandle !is null)*/ stdWrite(s); }
+
+    void wr(string s) {
+      if(indent>0){
+        auto si = "\n" ~ "    ".replicate(indent.min(20));
+        s = s.replace("\n", si);
+      }
+
+      stdWrite(s);
+      if(recorder.recording) synchronized recorder.recordedStr ~= s;
+    }
 
     while(!s.empty){
-      auto i = s.indexOf('\33'); //escape
+      auto i = s.countUntil!"a>='\33' && a<='\34'";
       if(i<0) { wr(s); break; } //no escapes at all
       if(i>0) { wr(s[0..i]); s = s[i..$]; } //write test before the escape
       //here comes a code
       if(s.length>1){
-        textAttr(cast(int)s[1]);
+        auto param = cast(int)s[1];
+        switch(s[0]){
+          case '\33': textAttr(param); break;
+          case '\34': indentAdjust(param); break;
+          default:
+        }
         s = s[2..$];
       }else{
         s = s[1..$]; //bad code, do nothing
@@ -236,6 +280,8 @@ static private:
   }
 
 static public:
+  __gshared int indent = 0;
+
   void flush(){ stdout.flush; }
 
   void setUTF8(){
@@ -1719,25 +1765,34 @@ string strip2(string s, string start, string end){
     return s;
 }
 
-S withoutLeading(S, T)(in S s, in T end) if(isSomeString!S){
+private S _withoutStarting(bool start, bool remove, S, T)(in S s, in T end){
+  static if(start) alias fv = startsWith;
+              else alias fv = endsWith;
   const e = end.to!S;
-  if(e != "" && s.startsWith(e)) return s[e.length..$];
-                            else return s;
+  if(e != "" && fv(s, e) == remove){
+    return remove ? start ? s[e.length..$]
+                          : s[0..$-e.length]
+                  : start ? e ~ s
+                          : s ~ e;
+  }else return s;
 }
 
-S withoutTrailing(S, T)(in S s, in T end) if(isSomeString!S){
-  const e = end.to!S;
-  if(e != "" && s.endsWith(e)) return s[0..$-e.length];
-                          else return s;
-}
+S withoutStarting(S, T)(in S s, in T end){ return _withoutStarting!(1, 1)(s, end); }
+S withoutEnding  (S, T)(in S s, in T end){ return _withoutStarting!(0, 1)(s, end); }
+S withStarting   (S, T)(in S s, in T end){ return _withoutStarting!(1, 0)(s, end); }
+S withEnding     (S, T)(in S s, in T end){ return _withoutStarting!(0, 0)(s, end); }
 
-/*string withoutStarting(string s, string a){ return s.startsWith(a) ? s[a.length..$] : s; }
-string withoutEnding  (string s, string a){ return s.endsWith  (a) ? s[0..$-a.length] : s; }
-string withoutStarting(string s, char a){ return s.length && s[0  ]==a ? s[1..$  ] : s; }
-string withoutEnding  (string s, char a){ return s.length && s[$-1]==a ? s[0..$-1] : s; }*/
+//todo: unittest
+/*    assert("a/".withoutEnding("/") == .print;
+    "a/b".withoutEnding("/").print;
+    "a/".withoutStarting("/").print;
+    "/a".withoutStarting("/").print;
 
-alias withoutStarting = withoutLeading;
-alias withoutEnding = withoutTrailing;
+a
+a/b
+a/
+a*/
+
 
 string[] withoutLastEmpty(string[] lines){
   if(!lines.empty && lines[$-1].strip.empty) return lines[0..$-1];
@@ -2108,7 +2163,7 @@ unittest{
 
 public import std.net.isemail : isEmail;
 
-string indent(int cnt, char space = ' ') @safe                 { return [space].replicate(cnt); }
+string indent(int cnt, char space = ' ') @safe { return [space].replicate(cnt); }
 string indent(string s, int cnt, char space = ' ') @safe {
   string id = indent(cnt, space);
   return s.split('\n')
@@ -2209,6 +2264,11 @@ auto splitSections(string sectionNameMarker="*")(ubyte[] data, string sectionDel
   }
 
   return res;
+}
+
+/// Because the one in std is bugging
+string outdent(string s){
+  return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n');
 }
 
 // structs to text /////////////////////////////////////

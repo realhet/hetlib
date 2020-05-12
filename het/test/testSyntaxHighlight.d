@@ -2,8 +2,8 @@
 //@import c:\d\libs
 //@ldc
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-//@release
-///@debug
+///@release
+//@debug
 ///@run $ c:\d\libs\het\utils.d
 ///@run $ c:\d\libs\het\draw3d.d
 ///@run $ c:\D\ldc2\import\std\format.d
@@ -285,21 +285,228 @@ public @(3) {
 }
 +/
 
-void parseAggregate(Token[] tokens, SourceCode code, int level){
-  void print(T...)(auto ref T args){ .print("  ".replicate(level+1), args); }
-  string hl(int color, string title){ return "\33" ~ (cast(char) color) ~ title ~ "\33\7"; }
-  enum { gray=8, blue, green, aqua, red, purple, yellow, white }
+// token array helper functs ///////////////////////////////////////////////////////////////////////////
 
-  level--; print("parsing aggregate at level", level+1); level++;
-  if(tokens.empty) return;
+/// Returns a null token positioned on to the end of the token array
+ref Token getNullToken(ref Token[] tokens){
+  static Token nullToken;
+  nullToken.source = "<NULL>";
+  nullToken.pos = tokens.length ? tokens[$-1].endPos : 0;
+  return nullToken;
+}
 
-  Token nullToken;
-  nullToken.source = "EOF";
-  nullToken.pos = tokens[$-1].endPos;
+/// Safely access a token in an array
+ref Token getAny(ref Token[] tokens, size_t idx){
+  return idx<tokens.length ? tokens[idx]
+                           : tokens.getNullToken;
+}
 
+/// Safely access a token, skip comments
+ref Token getNC(ref Token[] tokens, size_t idx){ //no comment version
+  foreach(ref t; tokens){
+    if(t.isComment) continue;
+    if(!idx) return t;
+    idx--;
+  }
+  return tokens.getNullToken;
+}
+
+bool isAttribute(ref Token t){
+  immutable allAttributes = [
+    kwextern, kwpublic, kwprivate, kwprotected, kwexport, kwpackage,
+    kwstatic,
+    kwoverride, kwfinal, kwabstract,
+    kwalign, kwdeprecated, kwpragma,
+    kwsynchronized,
+    kwimmutable, kwconst, kwshared, kwinout, kw__gshared,
+    kwauto, kwscope,
+    kwref, kwreturn, /* return must handled manually inside statement blocks*/
+    kwnothrow,
+    kwpure,
+  ];
+  return t.isKeyword(allAttributes);
+}
+
+/// helper template to check various things easily
+bool isOp(string what)(ref Token[] tokens){
+  auto t(size_t idx=0){ return tokens.getAny(idx); }
+  auto tNC(size_t idx=0){ return tokens.getNC(idx); }
+
+  //check keywords
+  enum keywords = ["module", "import", "alias", "enum", "unittest", "this", "out", "struct", "union", "interface", "class"];
+  static foreach(k; keywords)
+    static if(k == what) mixin( q{ return t.isKeyword(kw$); }.replace("$", k) );
+
+  //check operators
+  enum operators = [
+    "{" : "curlyBracketOpen" , "(" : "roundBracketOpen" , "[" : "squareBracketOpen" ,
+    "}" : "curlyBracketClose", ")" : "roundBracketClose", "]" : "squareBracketClose",
+    ";" : "semiColon", ":" : "colon", "," : "coma", "@" : "atSign", "~" : "complement",
+    "is" : "is", "in" : "in", "new" : "new", "delete" : "delete" ];
+
+  static foreach(k, v; operators)
+    static if(what == k) mixin( q{ return t.isOperator(op$); }.replace("$", v) );
+
+  //combinations
+  static if(what.among("//", "/+", "/*")) return t.isComment;
+  static if(what == "@("   ) return tIs!"@" && tNC(1).isOperator(opCurlyBracketOpen);
+  static if(what == "~this") return tIs!"~" && tNC(1).isKeyword(kwThis);
+
+  static if(what == "attribute") return t.isAttribute;
+}
+
+// Node hierarchy ///////////////////////////////////
+
+
+class Node{
+  Node[] subNodes() { return []; }
+  string id() { return ""; }
+
+  // syntax highlighted output
+  __gshared static ColoredOutput = true; //controls how toString works
+  private{
+    static string hl(int color)(string s){
+      if(s=="") return s;
+      if(ColoredOutput){
+        const nl = s.endsWith('\n'); //take the last newline out
+        if(nl) s = s.chomp;
+        s = "\33" ~ (cast(char) color) ~ s ~ "\33\7" ~ (nl ? "\n" : "");
+      }
+      return s;
+    }
+    static string ind(string s){
+      if(s=="") return s;
+      if(ColoredOutput){
+        const nl = s.endsWith('\n'); //take the last newline out
+        if(nl) s = s.chomp;
+        s = "\34\1" ~ s ~ "\34\2" ~ (nl ? "\n" : "");
+      }
+      return s;
+    }
+    static string blk(string s){
+      if(s=="") return "{}";
+
+      s = chomp(s); //one less newline is needed because the closing block will add it automatically
+
+      if(ColoredOutput) s = "{\34\1\n" ~ s ~ "\34\2\n}";
+                   else s = "{\n"      ~ s ~      "\n}";
+
+      return s;
+    }
+    enum { gray=8, blue, green, aqua, red, purple, yellow, white }
+  }
+}
+
+class Comment : Node {
+  //todo: doxigen
+  //todo: linked to Node
+  string text;
+
+  this(string text){ this.text = text; }
+
+  override string toString() const { return hl!gray(text)/+ ~ (text.startsWith("//") ? "\n" : "")+/; }
+}
+
+class Attributes : Node {
+  string attrs;
+
+  this(string attrs){ this.attrs = attrs; }
+
+  override string toString() const { return hl!aqua(attrs)~ " :"; }
+}
+
+class Import : Node {
+  string attrs, text;
+
+  this(string attrs, string text){ this.attrs = attrs; this.text = text; }
+
+  override string toString() const {
+    auto s = hl!red("import") ~ " " ~ ind(text) ~ ";";
+    if(attrs.length) s = hl!aqua(attrs) ~ " " ~ s; //todo: this is too redundant
+    return s;
+  }
+}
+
+class Alias : Node {
+  string text;
+
+  this(string text){ this.text = text; }
+
+  override string toString() const {
+    return hl!red("alias") ~ " " ~ text ~ ";";
+  }
+}
+
+class Enum : Node {
+  string attrs, name, type, values;
+
+  this(string attrs, string name, string type, string values){
+    this.attrs = attrs; this.name = name; this.type = type; this.values = values;
+  }
+
+  string nameType() const{ return name ~ (type.length ? " : "~type : ""); }
+
+  override string id(){ return name; }
+
+  override string toString(){
+    auto s = hl!red("enum ");
+    if(attrs.length) s = hl!aqua(attrs) ~ " " ~ s;
+    if(nameType.length) s ~= [nameType, blk(values)].join(' ');
+                   else s ~= values ~ ";";
+    return s;
+  }
+}
+
+class Aggregate : Node {
+  enum Kind { group_, module_, class_, struct_, interface_, union_, unittest_ }
+
+  Kind kind; //class, struct, module,
+  string attrs, name, type;
+
+  Node[] _subNodes;
+  override Node[] subNodes(){ return _subNodes; }
+
+  void append(N : Node)(N node){
+    if(node !is null) _subNodes ~= node;
+  }
+
+  string kindStr() const pure { return kind == Kind.group_ ? "" : kind.text[0..$-1]; }
+  string nameType() const{ return name ~ (type.length ? " : "~type : ""); }
+
+  override string toString(){
+    string s;
+    if(attrs    != "") s ~= hl!aqua(attrs.chomp);
+    if(kindStr  != "") s ~= " " ~ hl!red(kindStr) ;
+    if(nameType != "") s ~= " " ~ nameType;
+
+    auto contents = "\n"~subNodes.map!text.join("\n");
+
+    if(kind == Kind.module_) s ~= ";" ~ contents;
+                        else s = s.chomp ~ "\n{" ~ ind(contents.chomp) ~ "\n}";
+
+    return s;
+  }
+}
+
+Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCode code, int level, string outerAttrs=""){  // parseAggregate //////////////////////////////
+  Aggregate res = new Aggregate;
+
+  res.kind = aggregateKind;
+  res.attrs = outerAttrs;
+
+  if(tokens.empty) return res;
+
+  //fast access
   bool eof(){ return tokens.empty; }
-  ref t(size_t idx=0){ return idx<tokens.length ? tokens[idx] : nullToken; }
-  void advance(size_t n=1){ tokens = tokens[n..$]; }
+  ref t  (size_t idx=0){ return tokens.getAny(idx); }
+  ref tNC(size_t idx=0){ return tokens.getNC (idx); }
+  bool isOp(string what)(){ return tokens.isOp!what; }
+  void advance(size_t n=1){ tokens.popFrontN(n); } //opt: popFrontExactly?
+
+  int findOp(int op, int levelDelta=0){
+    auto baseLevel = t.level + levelDelta;
+    return cast(int) tokens.countUntil!(t => t.level==baseLevel && t.isOperator(op));
+  }
 
   bool advanceUntilOperator(int op, int level){
     while(!eof){
@@ -315,28 +522,51 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
     return a;
   }
 
-  //must be on a { when called
-  Token[] advanceBlock(int closingOp){
-    auto baseLevel = t.level;
-    auto cnt = tokens.countUntil!(t => t.level==baseLevel && t.isOperator(closingOp));
-    enforce(cnt>0);
-    auto res = tokens[1..cnt];
-    tokens = tokens[cnt+1..$];
+  //must be on a { or at the start of a statement when called
+  Token[] extractBlock(){
+    //detect matching bracket
+    int ending;
+         if(isOp!"{") ending = opcurlyBracketClose;
+    else if(isOp!"(") ending = oproundBracketClose;
+    else if(isOp!"[") ending = opsquareBracketClose;
+    else enforce(0, "Must be on a block opener token {[("); //todo: assert
+
+    auto i = findOp(ending);
+    enforce(i>=0); //todo: assert
+
+    auto res = tokens[1..i];
+    advance(i+1);
+
     return res;
   }
 
-  int findOp(int op, int levelDelta=0){
-    auto baseLevel = t.level + levelDelta;
-    return cast(int) tokens.countUntil!(t => t.level==baseLevel && t.isOperator(op));
+  Token[] extractStatement(){
+    enforce(!isOp!"{"); //todo: assert
+    auto i = findOp(opsemiColon);
+    enforce(i>=0); //todo: assert
+    auto res = tokens[0..i];
+    advance(i+1);
+    return res;
   }
 
+  string tokensToStr(Token[] tokens){
+    if(tokens.empty) return "";
+    auto s = code.text[tokens[0].pos .. tokens[$-1].endPos];
+    if(tokens[$-1].isSlashSlasComment) s ~= "\n"; //Add a newline if the last comment needs it
+    return s;
+  }
+
+  string extractBlockStr    (){ return tokensToStr(extractBlock    ); }
+  string extractStatementStr(){ return tokensToStr(extractStatement); }
+
+  ///decide which is better from 2 filter operations
   auto nearest(T...)(auto ref T args){
     int res = -1;
     foreach(a; args) if(a>=0 && (res<0 || a<res)) res = a;
     return res;
   }
 
-  //Skip and combine multiple comments, keeping the newlines between them.
+  ///Skip and combine multiple comments, keeping the newlines between them.
   string parseComments(){
     string res; if(eof) return res;
 
@@ -350,87 +580,72 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
     return res;
   }
 
+  void skipComments(){ while(t.isComment) advance; }
+
   string parseAttributesAndComments(){
     string res; if(eof) return res;
 
-    immutable allAttributes = [
-      kwextern, kwpublic, kwprivate, kwprotected, kwexport, kwpackage,
-      kwstatic,
-      kwoverride, kwfinal, kwabstract,
-      kwalign, kwdeprecated, kwpragma,
-      kwsynchronized,
-      kwimmutable, kwconst, kwshared, kwinout, kw__gshared,
-      kwauto, kwscope,
-      kwref, kwreturn, /* return must handled manually inside statement blocks*/
-      kwnothrow,
-      kwpure,
-    ];
-
-    size_t startPos = t.pos;
+    auto orig = tokens;
 
     while(!eof){
-      if(t.isComment){                                  // comments
+      if(t.isComment){              //comments
         advance;
-      }else if(t.isOperator(opatSign)){                 // @
-        advance;
-        if(t.isIdentifier){                             // @UDA
-          advance;
-          if(t.isOperator(oproundBracketOpen)){         // @UDA(params)
-            advancePastOperator(oproundBracketClose, t.level);
-          }
-        }else if(t.isOperator(oproundBracketOpen)){     //@(params)
-          advancePastOperator(oproundBracketClose, t.level);
+      }else if(isOp!"@"){
+        advance; skipComments;
+        if(t.isIdentifier){         //@UDA
+          advance; skipComments;
+          if(isOp!"(") extractBlock;//@UDA(params)
+        }else if(isOp!"("){         //@(params)
+          extractBlock;
         }else{
-          WARN("Garbage after @"); //todo: it is some garbage, what to do with the error
+          WARN("Garbage after @");  //todo: it is some garbage, what to do with the error
           break;
         }
-      }else if(t.isKeyword(allAttributes)){             //attribute
-        advance;
-        if(t.isOperator(oproundBracketOpen)){           //(params)
-          advancePastOperator(oproundBracketClose, t.level);
-        }
+      }else if(t.isAttribute){      //attr
+        advance; skipComments;
+        if(isOp!"(") extractBlock;  //attr(params)
       }else{
         break; //reached the end normally
       }
     }
 
-    size_t endPos = eof ? code.text.length : t.pos;
-
-    return code.text[startPos..endPos].strip;
+    auto block = orig[0..$-tokens.length];
+    return tokensToStr(block);
   }
 
-  auto parseEnum(){
-    assert(t.isKeyword(kwenum));
-    struct EnumDecl{ string name, values; }
-    EnumDecl res;
+  Enum parseEnum(string attrs)
+  in(t.isKeyword(kwenum))
+  {
+    string name, type, values;
 
     auto idx = nearest(findOp(opcurlyBracketOpen, 1), findOp(opsemiColon)); //todo: needs a special parser here for smaller memory usage
 
     if(idx<0){
       advance;
       WARN("Incomplete enum structure"); //todo: what's with fatal structural errors?
-      return res;
+      return null;
     }
 
     const anonym = tokens[idx].isOperator(opsemiColon),
-          s1     = res.values = code.text[tokens[1].pos .. tokens[idx-1].endPos];
+          s1     = tokensToStr(tokens[1..idx]);
 
     if(anonym){
-      res.values = s1;
-      tokens = tokens[idx+1 .. $];
+      values = s1;
+      advance(idx+1);
     }else{
-      res.name = s1;
-      tokens = tokens[idx..$];
-
-      auto block = advanceBlock(opcurlyBracketClose);
-      if(block.length){ res.values = code.text[block[0].pos .. block[$-1].endPos]; }
+      name = s1;
+      advance(idx);
+      values = extractBlockStr.outdent;
     }
 
-    return res;
+    //split nameType
+    name.split2(":", name, type, true);
+
+    return new Enum(attrs, name, type, values);
   }
 
   auto parseFunctionDecl(){
-    //cursor is on the identifier
+    //cursor is on the identifier or this or ~this
     struct FuncDecl{
       string header, body;
       bool forward;
@@ -462,7 +677,8 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
       if(t.level == baseLevel && t.isKeyword(kwout)){ //constraint: out
         advance;
         if(t.level == baseLevel+1 && t.isOperator(oproundBracketOpen)){ //()
-          advanceBlock(oproundBracketClose);
+          //advanceBlock(oproundBracketClose);
+          advance;
           //LOG("skipping out ()");
         }
         if(t.level == baseLevel+1 && t.isOperator(opcurlyBracketOpen)){  // optional {}
@@ -475,8 +691,7 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
       if(t.level == baseLevel+1 && t.isOperator(opcurlyBracketOpen)){ //statement block {}
         res.header = code.text[startPos .. t.pos].strip;
 
-        auto block = advanceBlock(opcurlyBracketClose);
-        if(block.length){ res.body = code.text[block[0].pos .. block[$-1].endPos]; }
+        res.body = extractBlockStr;
 
         return res;
       }
@@ -490,44 +705,37 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
 
 
   bool parseDeclaration(){
+    auto comments = parseComments.outdent,    //todo: standalone comments if there is more that one \n in between the thing and the comment
+         attrs = parseAttributesAndComments.outdent;
 
-    string getBlockStr(int closingOp){
-      auto block = advanceBlock(closingOp);
-      return code.text[block[0].pos .. block[$-1].endPos];
-    }
-
-    auto comments = parseComments,    //todo: standalone comments if there is more that one \n in between the thing and the comment
-         attrs = parseAttributesAndComments;
-
-    if(comments.length) print(hl(gray, comments));
+    //foreach(s; comments) res.append(new Comment(s));
+    if(comments.length) res.append(new Comment(comments));
 
     if(eof) return false;
 
     if(t.isOperator(opcolon)){                  //AttributeSpecifier :
       advance;
-
-      print(hl(red, "AttributeSpecifier begin:"), hl(aqua, attrs));
+      res.append(new Attributes(attrs));
       return true;
     }else if(t.isOperator(opcurlyBracketOpen)){ //AttributeSpecifier { }
-      print(hl(red, "AttributeSpecifier block:"), hl(aqua, attrs));
-      auto block = advanceBlock(opcurlyBracketClose);
-      parseAggregate(block, code, level+1);
+      res.append(parseAggregate(Aggregate.Kind.group_, extractBlock, code, level+1, attrs));
       return true;
     }else if(t.isKeyword(kwmodule)){            //ModuleDeclaration
-      auto s = getBlockStr(opsemiColon);
-      print(hl(aqua, attrs), hl(red, "module"), s);
+      if(res.kind == Aggregate.Kind.module_){
+        res.attrs = attrs; //ignores outerAttrs
+        res.name = extractStatementStr.outdent;
+      }else{
+        WARN(`Can't declare a module here.`);
+      }
       return true;
     }else if(t.isKeyword(kwimport)){            //ImportDeclaration
-      auto s = getBlockStr(opsemiColon);
-      print(hl(aqua, attrs), hl(red, "import"), s);
+      res.append(new Import(attrs, extractStatementStr.outdent));
       return true;
     }else if(t.isKeyword(kwalias)){
-      auto s = getBlockStr(opsemiColon);
-      print(hl(aqua, attrs), hl(red, "alias"), s);  //there should be no alias 'though'
+      res.append(new Alias(extractStatementStr.outdent)); //discard attrs
       return true;
-    }else if(t.isKeyword(kwenum)){                      //EnumDeclaration
-      auto e = parseEnum;
-      print(hl(aqua, attrs), hl(red, "enum"), e.name, hl(red, "values"), e.values);
+    }else if(t.isKeyword(kwenum)){              //EnumDeclaration
+      res.append(parseEnum(attrs));
       return true;
     }else if(t.isKeyword(kwthis)
           || t.isOperator(opcomplement) && tokens.length>=2 && tokens[1].isKeyword(kwthis)
@@ -535,14 +743,15 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
           || t.isOperator(opdelete)){                   //Constructor/Destructor/Postblit/Allocator/Deallocator
       const isDestructor = t.isOperator([opcomplement, opdelete]);
       auto f = parseFunctionDecl;
-      print(hl(aqua, attrs), hl(red, isDestructor ? "destructor" : "costructor"), f.header, hl(red, f.forward ? ";" : "body"), f.body);
+      //print(hl(aqua, attrs), hl(red, isDestructor ? "destructor" : "costructor"), f.header, hl(red, f.forward ? ";" : "body"), f.body);
+      //todo
       return true;
     }else if(t.isKeyword(kwunittest)){                  //Unittest
       advance;
+      skipComments; //todo: keep the comments
       if(t.isOperator(opcurlyBracketOpen)){
-        auto block = advanceBlock(opcurlyBracketClose);
-        auto s = block.length ? code.text[block[0].pos .. block[$-1].endPos] : "";
-        print(hl(aqua, attrs), hl(red, "unittest"), s);
+        auto a = parseAggregate(Aggregate.Kind.unittest_, extractBlock, code, level+1, attrs);
+        res.append(a);
         return true;
       }else{
         WARN(`{ expected after "unittest"`);
@@ -554,7 +763,10 @@ void parseAggregate(Token[] tokens, SourceCode code, int level){
     return false;
   }
 
+  // do the actual parsing
   while(parseDeclaration){}
+
+  return res;
 }
 
 
@@ -609,90 +821,18 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
   }
 
   override void onCreate(){ // create /////////////////////////////////
-    auto code = new SourceCode(q{
+    auto code = new SourceCode(File("parserTestText.d"));
 
-//ModuleDeclaration
+/*    foreach(ref t; code.tokens)
+      if(t.isComment && t.source.startsWith("//"))
+        t.source = t.source[2..$];*/
 
-deprecated("just a test") module test.modul;
+    auto root = parseAggregate(Aggregate.Kind.module_, code.tokens, code, 0);
 
-/*comment1*//*comment2*/
-/+/+comment3
-end+/
-+/ //hello
-//last
-
-// AttributeSpecifier
-
-  extern extern(C) extern(C++) extern(C++, name.space) extern(D) extern(Windows) extern(System) extern(Objective-C)
-  public private protected export package package(pkg.mod)
-  static override final abstract align(4) deprecated ("because") pragma(id, args)
-  synchronized immutable const shared inout __gshared
-  auto scope ref return ref auto ref
-  @property @nogc nothrow pure @safe @trusted @system @disable
-  {
-    //all the possible attributes
-
-    //here's some more
-    @hello @(1,2,3) align/*pragma comment*/ pragma(4) : //attribute specifier
-    @attr2 { /*body*/ @another(params): /*last comment*/ } //attributed block
-  }
-
-// Declaration.ImportDeclaration
-
-  import fmt = std.format, std.stdio : a = func1, c = func2,
-         f3, f4;
-  static import m1 = het.utils, std.stdio : a = func1, c = func2, f3, f4;
-  public import std.exception;
-
-// Declaration.AliasDeclaration
-
-  alias myint = int,
-        mybytearray = byte[];
-  alias int(string p) Fun;   //old alias format without =
-
-// AliasThis
-
-  alias blabla this;
-
-// Declaration.EnumDeclaration
-
-  enum F;
-  enum A = 3;
-  enum B
-  {
-      A = A // error, circular reference
-  }
-  enum C
-  {
-      A = B,  // A = 4
-      B = D,  // B = 4
-      C = 3,  // C = 3
-      D       // D = 4
-  }
-  enum E : C
-  {
-      E1 = C.D,
-      E2      // error, C.D is C.max
-  }
-
-// Constructor/Destructor
-
-  static shared this(int param1, int param2=5) const immutable inout return shared nothrow pure @property{ statement1; statement2; }
-  this(); //just a forward declaration
-  static ~this() if(blabla) { /*destructor*/ }
-  this(templateParam)() const if(constraint) if(constraint2) in{ blabla; } out(val){ blabla; } do{ /+constructor template+/ }
-
-// postblit / allocator / deallocator (all deprecated)
-
-  deprecated this(this){ a = a.dup; /*postblit*/ }
-  deprecated new(){}
-  deprecated delete(){}
-
-  @("unittest UDA") unittest{ hello; }
-});
-
-    parseAggregate(code.tokens, code, 0);
+    root.writeln;
     readln;
+
+    application.exit;
 
     reload;
   }

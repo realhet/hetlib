@@ -1732,7 +1732,7 @@ static cnt=0;
 
       foreach(idx, line; src.split('\n')){
         style.bkColor = bkColors[idx&1]; //alternated bkColor
-        line = line.withoutTrailing('\r');
+        line = line.withoutEnding('\r');
         Text(line);
       }
     });
