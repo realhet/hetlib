@@ -349,8 +349,8 @@ bool isOp(string what)(ref Token[] tokens){
 
   //combinations
   static if(what.among("//", "/+", "/*")) return t.isComment;
-  static if(what == "@("   ) return tIs!"@" && tNC(1).isOperator(opCurlyBracketOpen);
-  static if(what == "~this") return tIs!"~" && tNC(1).isKeyword(kwThis);
+  static if(what == "@("   ) return tokens.isOp!"@" && tNC(1).isOperator(opcurlyBracketOpen);
+  static if(what == "~this") return tokens.isOp!"~" && tNC(1).isKeyword(kwthis);
 
   static if(what == "attribute") return t.isAttribute;
 }
@@ -365,6 +365,7 @@ class Node{
   // syntax highlighted output
   __gshared static ColoredOutput = true; //controls how toString works
   private{
+
     static string hl(int color)(string s){
       if(s=="") return s;
       if(ColoredOutput){
@@ -374,6 +375,7 @@ class Node{
       }
       return s;
     }
+
     static string ind(string s){
       if(s=="") return s;
       if(ColoredOutput){
@@ -383,6 +385,7 @@ class Node{
       }
       return s;
     }
+
     static string blk(string s){
       if(s=="") return "{}";
 
@@ -393,7 +396,26 @@ class Node{
 
       return s;
     }
+
     enum { gray=8, blue, green, aqua, red, purple, yellow, white }
+
+    static string joinParts(T...)(T args){
+      string res;
+      foreach(a; args){
+        string s = a.text.strip;
+
+        if(s.empty) continue;
+
+        const ch = res.length ? res[$-1] : ' ',
+              nl = ch.among('\n', '\r'),
+              wh = nl || ch.among(' ' , '\t');
+
+        if(!wh) res ~= " ";
+        res ~= s;
+      }
+      return res;
+    }
+
   }
 }
 
@@ -433,7 +455,7 @@ class Alias : Node {
   this(string text){ this.text = text; }
 
   override string toString() const {
-    return hl!red("alias") ~ " " ~ text ~ ";";
+    return hl!red("alias") ~ " " ~ ind(text) ~ ";";
   }
 }
 
@@ -474,10 +496,7 @@ class Aggregate : Node {
   string nameType() const{ return name ~ (type.length ? " : "~type : ""); }
 
   override string toString(){
-    string s;
-    if(attrs    != "") s ~= hl!aqua(attrs.chomp);
-    if(kindStr  != "") s ~= " " ~ hl!red(kindStr) ;
-    if(nameType != "") s ~= " " ~ nameType;
+    auto s = joinParts(hl!aqua(attrs.chomp), hl!red(kindStr), nameType);
 
     auto contents = "\n"~subNodes.map!text.join("\n");
 
@@ -503,9 +522,16 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
   bool isOp(string what)(){ return tokens.isOp!what; }
   void advance(size_t n=1){ tokens.popFrontN(n); } //opt: popFrontExactly?
 
-  int findOp(int op, int levelDelta=0){
-    auto baseLevel = t.level + levelDelta;
-    return cast(int) tokens.countUntil!(t => t.level==baseLevel && t.isOperator(op));
+  int findOp(string op)(int levelDelta=0){
+    const minLevel = t.level,
+          opLevel = minLevel + levelDelta;
+    int i;
+    for(auto act = tokens; !act.empty; act.popFront, i++){
+      auto l = act[0].level;
+      if(l<minLevel) break;
+      if(l==opLevel && act.isOp!op) return cast(int) i;
+    }
+    return -1;
   }
 
   bool advanceUntilOperator(int op, int level){
@@ -525,14 +551,11 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
   //must be on a { or at the start of a statement when called
   Token[] extractBlock(){
     //detect matching bracket
-    int ending;
-         if(isOp!"{") ending = opcurlyBracketClose;
-    else if(isOp!"(") ending = oproundBracketClose;
-    else if(isOp!"[") ending = opsquareBracketClose;
-    else enforce(0, "Must be on a block opener token {[("); //todo: assert
+    int i = isOp!"{" ? findOp!"}" :
+            isOp!"(" ? findOp!")" :
+            isOp!"[" ? findOp!"]" : -1;
 
-    auto i = findOp(ending);
-    enforce(i>=0); //todo: assert
+    enforce(i>=0, "Unable to find block ending token."); //todo: assert
 
     auto res = tokens[1..i];
     advance(i+1);
@@ -542,7 +565,7 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
 
   Token[] extractStatement(){
     enforce(!isOp!"{"); //todo: assert
-    auto i = findOp(opsemiColon);
+    auto i = findOp!";";
     enforce(i>=0); //todo: assert
     auto res = tokens[0..i];
     advance(i+1);
@@ -618,7 +641,7 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
   {
     string name, type, values;
 
-    auto idx = nearest(findOp(opcurlyBracketOpen, 1), findOp(opsemiColon)); //todo: needs a special parser here for smaller memory usage
+    auto idx = nearest(findOp!"{"(1), findOp!";"); //todo: needs a special parser here for smaller memory usage
 
     if(idx<0){
       advance;
@@ -713,14 +736,14 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
 
     if(eof) return false;
 
-    if(t.isOperator(opcolon)){                  //AttributeSpecifier :
+    if(isOp!":"){                       //AttributeSpecifier :
       advance;
       res.append(new Attributes(attrs));
       return true;
-    }else if(t.isOperator(opcurlyBracketOpen)){ //AttributeSpecifier { }
+    }else if(isOp!"{"){                 //AttributeSpecifier { }
       res.append(parseAggregate(Aggregate.Kind.group_, extractBlock, code, level+1, attrs));
       return true;
-    }else if(t.isKeyword(kwmodule)){            //ModuleDeclaration
+    }else if(isOp!"module"){            //ModuleDeclaration
       if(res.kind == Aggregate.Kind.module_){
         res.attrs = attrs; //ignores outerAttrs
         res.name = extractStatementStr.outdent;
@@ -728,34 +751,31 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
         WARN(`Can't declare a module here.`);
       }
       return true;
-    }else if(t.isKeyword(kwimport)){            //ImportDeclaration
+    }else if(isOp!"import"){            //ImportDeclaration
       res.append(new Import(attrs, extractStatementStr.outdent));
       return true;
-    }else if(t.isKeyword(kwalias)){
+    }else if(isOp!"alias"){
       res.append(new Alias(extractStatementStr.outdent)); //discard attrs
       return true;
-    }else if(t.isKeyword(kwenum)){              //EnumDeclaration
+    }else if(isOp!"enum"){              //EnumDeclaration
       res.append(parseEnum(attrs));
       return true;
-    }else if(t.isKeyword(kwthis)
-          || t.isOperator(opcomplement) && tokens.length>=2 && tokens[1].isKeyword(kwthis)
-          || t.isOperator(opnew)
-          || t.isOperator(opdelete)){                   //Constructor/Destructor/Postblit/Allocator/Deallocator
-      const isDestructor = t.isOperator([opcomplement, opdelete]);
-      auto f = parseFunctionDecl;
-      //print(hl(aqua, attrs), hl(red, isDestructor ? "destructor" : "costructor"), f.header, hl(red, f.forward ? ";" : "body"), f.body);
-      //todo
-      return true;
-    }else if(t.isKeyword(kwunittest)){                  //Unittest
+    }else if(isOp!"unittest"){          //Unittest
       advance;
       skipComments; //todo: keep the comments
-      if(t.isOperator(opcurlyBracketOpen)){
+      if(isOp!"{"){
         auto a = parseAggregate(Aggregate.Kind.unittest_, extractBlock, code, level+1, attrs);
         res.append(a);
         return true;
       }else{
         WARN(`{ expected after "unittest"`);
       }
+    }else if(isOp!"this" || isOp!"~this" || isOp!"new" || isOp!"delete"){ //Constructor/Destructor/Postblit/Allocator/Deallocator
+      const isDestructor = t.isOperator([opcomplement, opdelete]);
+      auto f = parseFunctionDecl;
+      //print(hl(aqua, attrs), hl(red, isDestructor ? "destructor" : "costructor"), f.header, hl(red, f.forward ? ";" : "body"), f.body);
+      //todo
+      return true;
     }
 
     WARN("Don't know what to do with token:", escape(t.source));
@@ -764,7 +784,7 @@ Aggregate parseAggregate(Aggregate.Kind aggregateKind, Token[] tokens, SourceCod
   }
 
   // do the actual parsing
-  while(parseDeclaration){}
+  while(parseDeclaration){} //todo: do the append here
 
   return res;
 }

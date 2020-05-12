@@ -63,6 +63,8 @@ pragma(lib, "ole32.lib"); //COM initialization is in utils.d, not in win.d
 //todo: az uj tokenizerben meg syntax highlighterben az x"string"-et hexString-et jelolni.
 //todo: View2D: zoom to cursort es a nemlinearis follow()-ot osszehozni.
 
+//todo: IDE: ha nem release build van forditva, akkor az assert/in/out/invariant legyen jelolve szurkevel!
+
 public import std.string, std.array, std.algorithm, std.conv, std.typecons, std.range, std.functional,
   std.format, std.math, core.stdc.string, het.debugclient;
 

@@ -71,6 +71,8 @@ end+/
   enum X=5, Y=10, Z="hello"//comment
   ;
 
+  @uda unittest{ hello; }
+
 // Constructor/Destructor
 
   static shared this(int param1, int param2=5) const immutable inout return shared nothrow pure @property{ statement1; statement2; }
@@ -83,5 +85,3 @@ end+/
   deprecated this(this){ a = a.dup; /*postblit*/ }
   deprecated new(){}
   deprecated delete(){}
-
-  @uda unittest{ hello; }
