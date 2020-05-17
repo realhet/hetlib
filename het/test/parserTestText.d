@@ -71,7 +71,35 @@ end+/
   enum X=5, Y=10, Z="hello"//comment
   ;
 
-  @uda unittest{ hello; }
+  @uda unittest{ /*helloFunct;*/ }
+
+// template
+template TAbc(D, U : D[]) if(N & 1) {
+  enum X;
+  mixin template Foo(T){}
+
+  @uda("hello") mixin TemplateID;
+  mixin TemplateID!(param1, 2);
+  mixin TemplateID!(param1, 2) identifier;
+  mixin("hello mixin"~"!");
+}
+
+
+//mixin template
+//  mixin template TAbc(D, U : D[]) { }
+
+// contract test
+  ~this()
+  in (expression)
+  in (expression, "failure string" ~ "aaa")
+  out (identifier; expression + 5)
+  out (identifier; expression, "failure string")
+  out (; expression)
+  out (; expression, "failure string")
+  in{ block; }
+  out{ block; }
+  out(identifier*4){ block; }
+  if(blablabla)
 
 // Constructor/Destructor
 
@@ -85,3 +113,5 @@ end+/
   deprecated this(this){ a = a.dup; /*postblit*/ }
   deprecated new(){}
   deprecated delete(){}
+
+//do{}

@@ -95,29 +95,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
         pos  = tokens[tokenIdx].pos ;
         line = tokens[tokenIdx].line;
       }
-/*      //seek back a bit if needed
-      while(line>=lineDst){
-        if(tokenIdx>0){
-          tokenIdx--;
-          pos  = tokens[tokenIdx].pos ;
-          line = tokens[tokenIdx].line;
-        }else{
-          line=pos=0;
-          break;
-        }
-      }*/
     }
-
-//    pos=0; line=0;
-
-
-/*    while(line>lineDst){
-      while(pos>0 && text[pos-1]!='\n') pos--;
-      line--;
-      if(pos>0){
-        pos--;
-      }else break;
-    }*/
 
     if(line==lineDst) while(pos>0 && text[pos-1]!='\n') pos--;
 
@@ -211,8 +189,9 @@ struct Token{ // Token //////////////////////////////
   }*/
 
   void toString(scope void delegate(const(char)[]) sink, FormatSpec!char fmt){
-    if(fmt.spec == 't') put(sink, format!"%s\t%s\t%s"(kind, level, source));
-                   else put(sink, format!"%-20s: %s %s"(kind, level, source));
+         if(fmt.spec == 'u') put(sink, format!"%-20s: %s %s"(kind, level, source));
+    else if(fmt.spec == 't') put(sink, format!"%s\t%s\t%s"(kind, level, source));
+    else put(sink, source ~ "("~level.text~")");
   }
 
   bool isOperator(int op)       const { return id==op && kind==TokenKind.operator; }
@@ -226,8 +205,92 @@ struct Token{ // Token //////////////////////////////
   bool isKeyword (in int[] kw)  const { return kind==TokenKind.keyword  && kw.map!(k => id==k).any; }
   bool isOperator(in int[] op)  const { return kind==TokenKind.operator && op.map!(o => id==o).any; }
 
+  bool isAttribute() const {
+    immutable allAttributes = [
+      kwextern, kwpublic, kwprivate, kwprotected, kwexport, kwpackage,
+      kwstatic,
+      kwoverride, kwfinal, kwabstract,
+      kwalign, kwdeprecated, kwpragma,
+      kwsynchronized,
+      kwimmutable, kwconst, kwshared, kwinout, kw__gshared,
+      kwauto, kwscope,
+      kwref, kwreturn, /* return must handled manually inside statement blocks*/
+      kwnothrow,
+      kwpure,
+    ];
+    return isKeyword(allAttributes);
+  }
+
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
+
+
+// token array helper functs ///////////////////////////////////////////////////////////////////////////
+
+/// Returns a null token positioned on to the end of the token array
+ref Token getNullToken(ref Token[] tokens){
+  static Token nullToken;
+  nullToken.source = "<NULL>";
+  nullToken.pos = tokens.length ? tokens[$-1].endPos : 0;
+  return nullToken;
+}
+
+/// Safely access a token in an array
+ref Token getAny(ref Token[] tokens, size_t idx){
+  return idx<tokens.length ? tokens[idx]
+                           : tokens.getNullToken;
+}
+
+/// Safely access a token, skip comments
+ref Token getNonComment(ref Token[] tokens, size_t idx){ //no comment version
+  foreach(ref t; tokens){
+    if(t.isComment) continue;
+    if(!idx) return t;
+    idx--;
+  }
+  return tokens.getNullToken;
+}
+
+/// helper template to check various things easily
+bool isOp(string what)(ref Token[] tokens){
+  auto t(size_t idx=0){ return tokens.getAny(idx); }
+  auto tNC(size_t idx=0){ return tokens.getNonComment(idx); }
+
+  //first check the combinations with the reduntant first part
+  static if(what == "mixin template") return tokens.isOp!"mixin" && tNC(1).isKeyword(kwtemplate); //todo: op es kw legyen enum vagy legyen osszevonva. Bugoskohoz vezet, mert atfedesben van.
+
+  //check keywords
+  enum keywords = ["module", "import", "alias", "enum", "unittest", "this", "out", "struct", "union", "interface", "class", "if", "mixin", "template"];
+  static foreach(k; keywords)
+    static if(k == what) mixin( q{ return t.isKeyword(kw$); }.replace("$", k) );
+
+  //check operators
+  enum operators = [
+    "{" : "curlyBracketOpen" , "(" : "roundBracketOpen" , "[" : "squareBracketOpen" ,
+    "}" : "curlyBracketClose", ")" : "roundBracketClose", "]" : "squareBracketClose",
+    ";" : "semiColon", ":" : "colon", "," : "coma", "@" : "atSign", "~" : "complement", "!" : "not",
+    "is" : "is", "in" : "in", "new" : "new", "delete" : "delete" ];
+
+  static foreach(k, v; operators)
+    static if(what == k) mixin( q{ return t.isOperator(op$); }.replace("$", v) );
+
+  //combinations
+  static if(what.among("//", "/+", "/*")) return t.isComment;
+  static if(what == "@("   ) return tokens.isOp!"@" && tNC(1).isOperator(opcurlyBracketOpen);
+  static if(what == "~this") return tokens.isOp!"~" && tNC(1).isKeyword(kwthis);
+
+  static if(what == "attribute") return t.isAttribute;
+}
+
+Token[][] splitTokens(string delim)(Token[] tokens, int level){
+  if(tokens.empty) return [];
+
+  enum delimMap = ["," : opcomma, ";" : opsemiColon, ":" : opcolon, "=" : opassign];
+  enum op = delimMap[delim]; //todo: ezt az egeszet lehuzni a token beazonositas gyokereig
+
+  return tokens.split!((in t) => t.level == level && t.isOperator(op));
+}
+
 
 class Tokenizer{ // Tokenizer ///////////////////////////////
 public:

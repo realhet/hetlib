@@ -7,7 +7,7 @@ import het.utils, het.tokenizer, het.keywords, std.regex;
 //global thing to share compiler specific paths stuff
 struct DPaths{   //todo: Path-osra atirni
 static __gshared:
-  string installPath = `c:\D\dmd2\`;
+  string installPath = `c:\D\dmd2\`; //todo: it's not good for LDC2
   string stdPath()      { return installPath~`src\phobos\`; };
   string etcPath()      { return installPath~`src\phobos\`; };
   string corePath()     { return installPath~`src\druntime\src\`; };
@@ -213,7 +213,7 @@ class Parser{
     this.buildMacros.clear;
     this.todos.clear;
 
-    //Toenizing
+    //Tokenizing
     auto tokenizer = scoped!Tokenizer;
     string tokenizerError = tokenizer.tokenize(fileName, source, tokens);
     if(tokenizerError!="") error(tokenizerError);
