@@ -202,7 +202,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       if(s.length!=1) throw new ConvException("Expecting 1 char only.");
       data = s[0].to!Type;
     }else static if(is(T == bool)         ){
-      if(actToken.kind.among(TokenKind.LiteralInt, TokenKind.LiteralFloat))
+      if(actToken.kind.among(TokenKind.literalInt, TokenKind.literalFloat))
         data = actToken.data != 0;
       else if(actToken.isKeyword(kwfalse)) data = false;
       else if(actToken.isKeyword(kwtrue)) data = true;
@@ -235,7 +235,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       while(1){
         if(isOp!'}') break; //"}" right after "," or "{"
 
-        if(actToken.kind != TokenKind.LiteralString) throw new Exception("Field name string literal expected.");
+        if(actToken.kind != TokenKind.literalString) throw new Exception("Field name string literal expected.");
         auto fieldName = actToken.data.to!string;
         idx++;
 
