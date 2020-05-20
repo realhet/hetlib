@@ -18,18 +18,20 @@ void registerStoredClass(T)(){
   classSaverFunc [fullyQualifiedName!T] = cast(SaverFunc ) (&streamAppend_json!T);
 }
 
+
+///helper templates to get all the inherited class fields, works for structs as well
+template AllClasses(T){
+  static if(is(T == class)) alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
+                       else alias AllClasses = T;
+}
+alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); ///ditto
+
 //UDAs
 struct STORED{}
 struct HEX{}
 struct BASE64{}
 
 enum ErrorHandling { ignore, raise, track }
-
-private template FieldNameTuple2(T) {
-//  enum FieldNameTuple2 = BaseClassesTuple!T.map!(S => FieldNameTuple!S).join;
-
-  enum FieldNameTuple2 = FieldNameTuple!T;
-}
 
 private auto quoteIfNeeded(string s){ return s.canFind(" ") ? quoted(s) : s; } //todo: this is lame, must make it better in utils/filename routines
 
@@ -195,6 +197,9 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
           if(classFullName.length && fullyQualifiedName!Type != classFullName){
 //            print("Calling appropriate loader");
 
+            //todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
+            //todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
+
             auto fv = classLoaderFunc[classFullName];
             fv(state, idx, &data);
             return;
@@ -232,7 +237,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
         expect!':';
 
         //remember the start of the element
-        elementMap[fieldName] = idx;
+        elementMap[fieldName] = idx;              //opt: ez a megoldas igy qrvalassu
         if(log) write(fieldName, " ", idx, " ");
 
         //skip until the next '}' or ','
@@ -249,7 +254,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 
       //select fields to store (all fields except if specified with STORED uda)
       enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
-      enum fields = FieldNameTuple2!T;
+      enum fields = AllFieldNames!T;
       static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
                                            else enum storedFields = fields;
       //recursive call for each field
@@ -379,7 +384,7 @@ void streamAppend_json(Type)(ref string st, ref in Type data, bool dense=false, 
 
     //select fields to store (all fields except if specified with STORED uda)
     enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
-    enum fields = FieldNameTuple2!T;
+    enum fields = AllFieldNames!T;
     static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
                                          else enum storedFields = fields;
     //recursive call for each field

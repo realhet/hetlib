@@ -2,8 +2,8 @@
 //@import c:\d\libs
 //@ldc
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-///@release
-//@debug
+//@release
+///@debug
 
 import het.utils, het.stream, het.geometry;
 
@@ -172,7 +172,28 @@ void testProperty(){
   Property[] props;
   props.fromJson_ignore(File(`c:\dl\props.json`).readText);
 
-  print(props.toJson);
+  string reference = props.toJson;
+  print(reference);
+
+  PERF("Json speed", {   //todo: ez qrvalassu: encode+decode = 6MB/sec
+    enum N = 10000;
+    print("testing batch size = ", N, "data size = ", reference.length, "total size [MB] = ", reference.length*N/1024.0/1024);
+    string temp = reference;
+    foreach(i; 0..N){
+      props.clear;
+      props.fromJson_ignore(temp);
+      auto result = props.toJson;
+
+      enforce(result == temp, "Json codec sucks ass");
+
+      temp = result;
+
+      if(!(i & 0xFF)) write("\b".replicate(20), i, "/", N);
+    }
+    writeln;
+  });
+  PERF.report.writeln;
+
 
 }
 
