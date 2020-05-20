@@ -3,6 +3,21 @@ module het.stream;
 import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 
 
+private __gshared string[string] classFullNameMap;
+
+private alias LoaderFunc = void function(ref JsonDecoderState state, int idx, void*);
+private alias SaverFunc = void function(ref string st, void* data, bool dense=false, bool hex=false, string thisName="", string indent="");
+
+private __gshared LoaderFunc[string] classLoaderFunc;
+private __gshared SaverFunc [string] classSaverFunc ;
+
+void registerStoredClass(T)(){
+  classFullNameMap[T.stringof] = fullyQualifiedName!T;
+
+  classLoaderFunc[fullyQualifiedName!T] = cast(LoaderFunc) (&streamDecode_json!T);
+  classSaverFunc [fullyQualifiedName!T] = cast(SaverFunc ) (&streamAppend_json!T);
+}
+
 //UDAs
 struct STORED{}
 struct HEX{}
@@ -10,9 +25,15 @@ struct BASE64{}
 
 enum ErrorHandling { ignore, raise, track }
 
+private template FieldNameTuple2(T) {
+//  enum FieldNameTuple2 = BaseClassesTuple!T.map!(S => FieldNameTuple!S).join;
+
+  enum FieldNameTuple2 = FieldNameTuple!T;
+}
+
 private auto quoteIfNeeded(string s){ return s.canFind(" ") ? quoted(s) : s; } //todo: this is lame, must make it better in utils/filename routines
 
-struct JsonDecoderState{
+struct JsonDecoderState{ // JsonDecoderState
   string stream;
   string moduleName;
   ErrorHandling errorHandling;
@@ -50,6 +71,8 @@ struct JsonDecoderState{
 
 }
 
+//! fromJson ///////////////////////////////////
+
 //Default version, errors are ignored.
 alias fromJson = fromJson_ignore;
 string[] fromJson_ignore(Type)(ref Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
@@ -79,78 +102,6 @@ auto fromJson_raise(Type)(ref Type data, string st, string moduleName="", string
 auto fromJson_track(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
   return fromJson!(Type)(data, st, moduleName, ErrorHandling.track, srcFile, srcFunct, srcLine); }
 
-
-string toJson(bool dense=false, bool hex=false, string thisName="", Type)(auto ref in Type data){
-  string st;
-  streamAppend_json!(dense, hex, thisName, Type)(st, data);
-  return st;
-}
-
-private string quote(string s){ return format!"%(%s%)"([s]); }
-template isSomeChar(T){ enum isSomeChar = is(T == char) || is(T == wchar) || is(T == dchar); }
-
-
-void streamAppend_json(bool dense=false, bool hex=false, string thisName="", Type)(ref string st, auto ref in Type data, string indent=""){
-  //append ',' and newline(dense only) if needed
-  static if(dense){
-    if(st.length && !st[$-1].among('{', '[')) st ~= ",";
-  }else{
-    if(st.length && st[$-1]!='\n') st ~= ",\n";
-    st ~= indent;
-  }
-
-  //append the associative name if there is one
-  static if(thisName!=""){
-    enum s = quote(thisName)~(dense ? ":" : ": ");
-    st ~= s;
-  }
-
-  //switch all possible types
-  alias T = Unqual!Type;
-        static if(isFloatingPoint!T     ){ static if(T.sizeof>=8) st ~= format!"%.15g"(data); else st ~= format!"%.7g" (data);
-  }else static if(is(T == enum)         ){ st ~= quote(data.text);
-  }else static if(isIntegral!T          ){ static if(hex) st ~= format!"0x%X"(data); else st ~= data.text;
-  }else static if(isSomeString!T        ){ st ~= quote(data);
-  }else static if(isSomeChar!T          ){ st ~= quote([data]);
-  }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
-  }else static if(isAggregateType!T     ){ // Struct, Class
-    //handle null for class
-    static if(is(T == class)){
-      if(data is null){ st ~= "null"; return; }
-    }
-
-    st ~= dense ? "{" : "{\n";                  //opening bracket {
-    const nextIndent = dense ? "" : indent~"  ";
-
-    //select fields to store (all fields except if specified with STORED uda)
-    enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
-    enum fields = FieldNameTuple!T;
-    static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
-                                         else enum storedFields = fields;
-    //recursive call for each field
-    static foreach (fieldName; storedFields){{
-      enum hasHex = hasUDA!(__traits(getMember, T, fieldName), HEX);
-      streamAppend_json!(dense, hex || hasHex, fieldName)(st, __traits(getMember, data, fieldName), nextIndent);
-    }}
-
-    st ~= dense ? "}" : "\n"~indent~"}";        //closing bracket }
-  }else static if(isArray!T){ // Array
-    if(data.empty){ st ~= "[]"; return; }
-
-    st ~= dense ? "[" : "[\n";                  //opening bracket [
-    const nextIndent = dense ? "" : indent~"  ";
-
-    enum actHex = hex || hasUDA!(data, HEX);
-    foreach(const val; data)
-      streamAppend_json!(dense, actHex)(st, val, nextIndent);
-
-    st ~= dense ? "]" : "\n"~indent~"]";        //closing bracket ]
-  }else{
-    static assert(0, "Unhandled type: "~T.stringof);
-  }
-}
-
-
 //errorHandling: 0: no errors, 1:just collect the errors, 2:raise
 
 void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data){
@@ -166,6 +117,19 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     else static if(b==':') return actToken.isOperator(opcolon);
     else static if(b=='-') return actToken.isOperator(opsub);
     else static assert(0, `Unhandled op "%s"`.format(b));
+  }
+
+  string peekClassName()
+  in(isOp!'{') //must be at the start of a class
+  {
+    if(idx+3 < state.tokens.length
+    && state.tokens[idx+1].kind == TokenKind.literalString
+    && state.tokens[idx+1].data == "class"
+    && state.tokens[idx+2].isOperator(opcolon)
+    && state.tokens[idx+3].kind == TokenKind.literalString)
+      return state.tokens[idx+3].data.to!string;
+    else
+      return "";
   }
 
   void expect(char b)(){
@@ -216,8 +180,34 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
           //create a new instance with the default creator if needed
           //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           //Ezt at kell gondolni es a linkelt classt is meg kell tudni csinalni
+
+          //peek className   "class" : "name"
+          auto className = peekClassName,
+               p = className in classFullNameMap,
+               classFullName = p ? *p : "",
+               currentClassFullName = data !is null ? typeid(data).to!string : "";
+
+//          print("Trying to load class:", classFullName);
+//          print("Currently in Loader:", fullyQualifiedName!Type);
+//          print("Current Instance:", currentClassFullName);
+
+          //call a different loader if needed
+          if(classFullName.length && fullyQualifiedName!Type != classFullName){
+//            print("Calling appropriate loader");
+
+            auto fv = classLoaderFunc[classFullName];
+            fv(state, idx, &data);
+            return;
+          }
+
+          //free if the class type is different.
+          if(data !is null && classFullName.length && currentClassFullName != classFullName){
+            data.free;
+          }
+
+          //create if null
           if(data is null){
-            data = new Type; //continue with loading fields
+            data = new Type;
           }
         }else{
           throw new Exception("Class expected for \"null\" token.");
@@ -259,7 +249,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 
       //select fields to store (all fields except if specified with STORED uda)
       enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
-      enum fields = FieldNameTuple!T;
+      enum fields = FieldNameTuple2!T;
       static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
                                            else enum storedFields = fields;
       //recursive call for each field
@@ -325,3 +315,93 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     state.onError(t.msg, idx);
   }
 }
+
+
+//! toJson ///////////////////////////////////
+string toJson(Type)(ref in Type data, bool dense=false, bool hex=false, string thisName=""){
+  string st;
+  streamAppend_json!(Type)(st, data, dense, hex, thisName);
+  return st;
+}
+
+private string quote(string s){ return format!"%(%s%)"([s]); }
+template isSomeChar(T){ enum isSomeChar = is(T == char) || is(T == wchar) || is(T == dchar); }
+
+void streamAppend_json(Type)(ref string st, ref in Type data, bool dense=false, bool hex=false, string thisName="", string indent=""){
+  alias T = Unqual!Type;
+
+  //call dynamic class writer
+  static if(is(T == class)){
+    if(data !is null){
+      const currentFullName = typeid(data).to!string;
+      if(currentFullName != fullyQualifiedName!T){ //use a different writer if needed
+        auto p = currentFullName in classSaverFunc;
+        if(p){
+          (*p)(st, cast(void*) &data, dense, hex, thisName, indent);
+          return;
+        }
+      }
+    }
+  }
+
+  //append ',' and newline(dense only) if needed
+  if(dense){
+    if(st.length && !st[$-1].among('{', '[')) st ~= ",";
+  }else{
+    if(st.length && st[$-1]!='\n') st ~= ",\n";
+    st ~= indent;
+  }
+
+  //append the associative name if there is one
+  if(thisName!="")
+    st ~= quote(thisName)~(dense ? ":" : ": ");
+
+  //switch all possible types
+        static if(isFloatingPoint!T     ){ static if(T.sizeof>=8) st ~= format!"%.15g"(data); else st ~= format!"%.7g" (data);
+  }else static if(is(T == enum)         ){ st ~= quote(data.text);
+  }else static if(isIntegral!T          ){ if(hex) st ~= format!"0x%X"(data); else st ~= data.text;
+  }else static if(isSomeString!T        ){ st ~= quote(data);
+  }else static if(isSomeChar!T          ){ st ~= quote([data]);
+  }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
+  }else static if(isAggregateType!T     ){ // Struct, Class
+    //handle null for class
+    static if(is(T == class)){
+      if(data is null){ st ~= "null"; return; }
+    }
+
+    st ~= dense ? "{" : "{\n";                  //opening bracket {
+    const nextIndent = dense ? "" : indent~"  ";
+
+    static if(is(T == class)){ //write class type name
+      string s = T.stringof;
+      streamAppend_json(st, s, dense, hex, thisName="class", nextIndent);
+    }
+
+    //select fields to store (all fields except if specified with STORED uda)
+    enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
+    enum fields = FieldNameTuple2!T;
+    static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
+                                         else enum storedFields = fields;
+    //recursive call for each field
+    static foreach (fieldName; storedFields){{
+      enum hasHex = hasUDA!(__traits(getMember, T, fieldName), HEX);
+      streamAppend_json(st, __traits(getMember, data, fieldName), dense, hex || hasHex, fieldName, nextIndent);
+    }}
+
+    st ~= dense ? "}" : "\n"~indent~"}";        //closing bracket }
+  }else static if(isArray!T){ // Array
+    if(data.empty){ st ~= "[]"; return; }
+
+    st ~= dense ? "[" : "[\n";                  //opening bracket [
+    const nextIndent = dense ? "" : indent~"  ";
+
+    const actHex = hex || hasUDA!(data, HEX);
+    foreach(const val; data)
+      streamAppend_json(st, val, dense, actHex, "", nextIndent);
+
+    st ~= dense ? "]" : "\n"~indent~"]";        //closing bracket ]
+  }else{
+    static assert(0, "Unhandled type: "~T.stringof);
+  }
+}
+

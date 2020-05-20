@@ -2,12 +2,10 @@
 //@import c:\d\libs
 //@ldc
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-//@release
-///@debug
+///@release
+//@debug
 
 import het.utils, het.stream, het.geometry;
-
-void main(){ application.runConsole({ test; }); }
 
 class MyClass{
   int a;
@@ -102,3 +100,83 @@ void test(){
 }
 
 
+
+class Property{
+  @STORED string name, caption, hint;
+
+  this(){}
+  //this(string name, string caption, string hint){ this.name = name; this.caption = caption; this.hint = hint; }
+
+}
+
+class StringProperty : Property {
+  @STORED{
+    string act, def;
+    string[] choices;
+  }
+  shared static this(){ registerStoredClass!(typeof(this)); }
+}
+
+class IntProperty : Property {
+  @STORED int act, def, min, max, step=0;
+  shared static this(){ registerStoredClass!(typeof(this)); }
+}
+
+class FloatProperty : Property {
+  @STORED float act=0, def=0, min=0, max=0, step=0;
+  shared static this(){ registerStoredClass!(typeof(this)); }
+}
+
+
+
+/*struct Property { @STORED:
+  string name, caption, hint;
+  Variant act, def, min, max;
+  string[] choices;
+}*/
+
+void testProperty(){
+/*  auto intProp = Property("cap.width", "caption", "hint", Variant(640), Variant(640), Variant(32), Variant(8192));
+  auto floatProp = Property("floatprop", "", "", Variant(0.15), Variant(0.5), Variant(0.001), Variant(2));
+  auto stringProp = Property("fileName", "", "", Variant(`c:\file.name`));
+  auto choiceProp = Property("choices", "", "", Variant("yes"), Variant("no"), Variant(""), Variant(""), ["yes", "no", "maybe"]);*/
+
+  auto s = q{{
+        "class": "StringProperty",
+        "name": "cap.type",
+        "hint": "Type of capture source.",
+        "act": "file",
+        "def": "auto",
+        "choices": [
+            "auto",
+            "file",
+            "dshow",
+            "gstreamer",
+            "v4l2",
+            "ueye",
+            "any"
+        ]
+    }};
+
+  Property prop;
+
+  print("load 1");
+  prop.fromJson_raise(s);
+  print("load 2");
+  prop.fromJson_raise(s);
+
+  print(prop.toJson);
+
+  print("-----------------------");
+
+  Property[] props;
+  props.fromJson_ignore(File(`c:\dl\props.json`).readText);
+
+  print(props.toJson);
+
+}
+
+void main(){ application.runConsole({
+  test;
+  testProperty;
+}); }
