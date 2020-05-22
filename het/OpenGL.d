@@ -2100,16 +2100,16 @@ public:
   }
 
   void drawFpsTimeLine(Drawing dr){
-    //auto dr = scoped!Drawing;
-    //scope(exit) dr.glDraw(viewGUI);
     with(dr){
+      //FPS graph
+      translate(V2f(0, 64+4));
+
       lineWidth = 1;
       lineStipple = lsNormal;
-
       auto groups = timeLine.getGroups;
       foreach(int idx; 1..groups.length.to!int){
         auto group = groups[idx], prevGroup = groups[idx-1];
-        const scale = V2f(5000.0f, 6);
+        const scale = V2f(5000.0f, 4);
         const origin = V2f(clientWidth-2, 2);
 
         auto rect(double t0, double t1){
@@ -2146,6 +2146,8 @@ public:
 
         mark(60); mark(30);
       }
+
+      pop;
 
     }
   }

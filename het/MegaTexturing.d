@@ -317,6 +317,9 @@ private:
   int[File] byFileName;
   bool mustRehash;
 
+  private bool[int] pendingIndices; //files being loaded by a worker thread
+  private bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
+
   void enforceSize(const V2i size){
     enforce(size.x<=SubTexMaxSize     && size.y<=SubTexMaxSize    , "Texture too big (%s)"                                 .format(size));
     enforce(size.x<=gl.maxTextureSize && size.y<=gl.maxTextureSize, "Texture too big on current opengl implementation (%s)".format(size));
@@ -354,25 +357,27 @@ private:
     return info;
   }
 
-  void uploadData(SubTexInfo info, Bitmap bmp){
+  void uploadData(SubTexInfo info, Bitmap bmp, bool dontUploadData=false){
     auto mtIdx = info.texIdx;
 
     enforce(mtIdx>=0 && mtIdx<megaTextures.length, "mtIdx out of range (%s)".format(mtIdx));
     auto mt = megaTextures[mtIdx];
 
-    mt.glTexture.fastBind;
+    if(!dontUploadData){
+      mt.glTexture.fastBind;
 
-    //todo: this is wasting ram and not work with custom non 4ch bitmaps
-    //note: temporary solution: there is a nondestructive converter inside
-    //bmp.channels = 4;
+      //todo: this is wasting ram and not work with custom non 4ch bitmaps
+      //note: temporary solution: there is a nondestructive converter inside
+      //bmp.channels = 4;
 
-    mt.glTexture.upload(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
+      mt.glTexture.upload(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
+    }
   }
 
-  void uploadSubTex(int idx, Bitmap bmp){ //it has an existing id
+  void uploadSubTex(int idx, Bitmap bmp, bool dontUploadData=false){ //it has an existing id
     auto info = allocSpace(idx, bmp);
     infoTexture.modify(idx, info);
-    uploadData(info, bmp);
+    uploadData(info, bmp, dontUploadData);
   }
 
   int createSubTex(Bitmap bmp){ //creates a new one, returns the idx
@@ -393,7 +398,6 @@ private:
     auto mtIdx = info.texIdx;
 
     enforce(mtIdx>=0 && mtIdx<megaTextures.length, "mtIdx out of range (%s)".format(mtIdx));
-    megaTextures[mtIdx].remove(idx);
 
     //clear the area
     if(1) with(megaTextures[mtIdx].glTexture){
@@ -401,6 +405,7 @@ private:
       fill(0xFFFF00FF, info.pos.x, info.pos.y, info.size.x, info.size.y);
     }
 
+    megaTextures[mtIdx].remove(idx);
     infoTexture.remove(idx);
   }
 
@@ -426,12 +431,43 @@ public:
 
       if(!bmp) break;
 
-      uploadSubTex(bmp.tag, bmp);
+      auto idx = bmp.tag;
+
+      pendingIndices.remove(idx); //not pending anymore so it can be reinvalidated
+
+      if(idx in invalidateAgain){
+        //WARN("Delayed loaded bmp is in invalidateAgain.", idx);
+
+        uploadSubTex(idx, bmp, true); //this is here to finalize the allocation of the texture before the invalidation
+        //opt: disable the upload of this texture data
+
+        invalidateAgain.remove(idx);
+        foreach(f, i; byFileName) if(i == idx){ //opt: slow linear search
+          //WARN("Reinvalidating", f, idx);
+          invalidate(f);
+          break;
+        }
+      }else{
+        uploadSubTex(idx, bmp);
+      }
+
       inv = true;
 
     }while(QPS-t0<UploadTextureMaxTime/*sec*/);
 
     return inv;
+  }
+
+  void invalidate(in File fileName){
+    if(auto idx = (fileName in byFileName)){
+      if(*idx in pendingIndices){
+        //WARN("Texture loader is pending", fileName, *idx);
+        invalidateAgain[*idx] = true;
+        return;
+      }
+      byFileName.remove(fileName);
+      removeSubTex(*idx);
+    }
   }
 
   int access(in File fileName, bool delayed = true){
@@ -442,6 +478,7 @@ public:
       if(delayed){
         auto idx = allocSubTexInfo;
 
+        pendingIndices[idx] = true;
         byFileName[fileName] = idx;
         mustRehash = true;
 
@@ -467,7 +504,7 @@ public:
 
           synchronized(textures){
             textures.bmpQueue ~= bmp;
-            mainWindow.invalidate;
+            mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
           }
 
         }
@@ -527,7 +564,7 @@ if(log) "Found subtex %s:".writefln(fileName);
       }
     }else{
       if(bmp is null){
-        bmp = new Bitmap(8, 8, 4);
+        bmp = new Bitmap(8, 8, 4);  //just create a purple placeholder
         bmp.rgba.clear(clFuchsia);
       }
       auto idx = createSubTex(bmp);
@@ -536,6 +573,10 @@ if(log) "Found subtex %s:".writefln(fileName);
 if(log) "Created subtex %s:".writefln(fileName);
       return idx;
     }
+  }
+
+  int custom(string name, ubyte[] data){
+    return custom(name, new Bitmap(data));
   }
 
 

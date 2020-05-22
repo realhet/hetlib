@@ -1722,6 +1722,7 @@ static cnt=0;
   }
 
   void Code(string src){ // Code /////////////////////////////
+    //todo: syntax highlight
     //Spacer(0.5*fh);
     Column({
       margin = Margin(0.5*fh, 0.5*fh, 0.5*fh, 0.5*fh);

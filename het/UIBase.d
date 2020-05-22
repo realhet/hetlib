@@ -15,8 +15,9 @@ enum
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0;
 
+//todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 enum
-  NormalFontHeight = 22;   //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
+  NormalFontHeight = 18;  //fucking keep it on 18!!!!
 
 const
   InternalTabScale = 0.11,   //around 0.15

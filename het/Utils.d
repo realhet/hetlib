@@ -2245,7 +2245,7 @@ string skipOver_ci(string s, string w) pure{
 
 auto splitSections(string sectionNameMarker="*")(ubyte[] data, string sectionDelim){
   //example of a section delimiter: "\n\n$$$SECTION:*\n\n"
-  static struct SectionRec{
+  struct SectionRec{
     string key;
     ubyte[] value;
   }
