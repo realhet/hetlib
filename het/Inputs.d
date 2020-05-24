@@ -35,6 +35,7 @@ Ctrl+U&K     //2nd modifier: if not present then can be nothing, or the same as 
 
 //TODO: atnevezni het.inputs-ra;
 //TODO: tesztelni, hogy 'F5' es 'Shift F5' jol mukodik-e egyutt.
+//TODO: improve mousewheel precision: it is only giving 1's and 2's on 60FPS.
 
 import het.utils, het.geometry,
        core.sys.windows.windows, core.sys.windows.winuser, std.json;
@@ -1176,6 +1177,7 @@ private:
   char type; //a = active, p = pressed, g = group, m = modifier
   string name;
   string key;
+  bool enabled;
   void delegate() task;
   void delegate(float) task2;
   bool* modifier;
@@ -1186,7 +1188,6 @@ private:
 
 //-----------------------------------------
   string fullName() const { return group.name~`\`~name; }
-  bool enabled() const { return true; }
   private bool execute() {
     bool res;
     if(enabled) switch(type){
@@ -1210,6 +1211,7 @@ private:
                 }
                 break;
       case 'd': if(task2 && inputs[key].changed) {
+print("OnDelta", inputs[key].delta, enabled);
                   task2(inputs[key].delta);
                   res = true;
                 }
@@ -1343,6 +1345,9 @@ private:
       defaultKeyMap[ac.fullName] = ac.key;
     }
 
+    //copy enabledness
+    ac.enabled = action.enabled;
+
     //load pending config
     auto name = ac.fullName;
     if(auto k=name in pendingKeyMap){
@@ -1393,12 +1398,12 @@ public:
 
   //shortcuts creating new actions (in doUpdate also)
   void group(string name)                                               { actGroup = findAddGroup(name); }
-  void onActive  (string name, string key, void delegate() task)        { processAction(Action(actGroup, 'a', name, key, task)); }
-  void onPressed (string name, string key, void delegate() task)        { processAction(Action(actGroup, 'p', name, key, task)); }
-  void onTyped   (string name, string key, void delegate() task)        { processAction(Action(actGroup, 't', name, key, task)); }
-  void onModifier(string name, string key, ref bool modifier)           { processAction(Action(actGroup, 'm', name, key, null, null, &modifier)); }
-  void onDelta   (string name, string key, void delegate(float) task2)  { processAction(Action(actGroup, 'd', name, key, null, task2)); }
-  void onValue   (string name, string key, void delegate(float) task2)  { processAction(Action(actGroup, 'v', name, key, null, task2)); }
+  void onActive  (string name, string key, bool en, void delegate() task)        { processAction(Action(actGroup, 'a', name, key, en, task)); }
+  void onPressed (string name, string key, bool en, void delegate() task)        { processAction(Action(actGroup, 'p', name, key, en, task)); }
+  void onTyped   (string name, string key, bool en, void delegate() task)        { processAction(Action(actGroup, 't', name, key, en, task)); }
+  void onModifier(string name, string key, bool en, ref bool modifier)           { processAction(Action(actGroup, 'm', name, key, en, null, null, &modifier)); }
+  void onDelta   (string name, string key, bool en, void delegate(float) task2)  { processAction(Action(actGroup, 'd', name, key, en, null, task2)); }
+  void onValue   (string name, string key, bool en, void delegate(float) task2)  { processAction(Action(actGroup, 'v', name, key, en, null, task2)); }
 
   bool enabled() const { return true; }
 

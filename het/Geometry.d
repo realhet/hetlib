@@ -271,6 +271,7 @@ mixin template B2Members(B, V, E){ //BoundsType, VectorType, ElementType
   bool opEquals()(const B b) const  { return b.bMin==bMin && b.bMax==bMax; }
 
   bool empty() const                { return bMin.x==bMax.x || bMin.y==bMax.y; }
+  bool valid() const                { return bMin.x< bMax.x || bMin.y< bMax.y; }
 
   enum Null = typeof(this).init;
   bool isNull() const{ return this == typeof(this).init; }

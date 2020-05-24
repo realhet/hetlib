@@ -30,6 +30,8 @@ public:
     void workArea(const Bounds2i b) { workArea_ = b.toF; } //that's retarded, Bounds2f should accept Bounds2i
   }
 
+  auto subScreenArea = Bounds2f(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
+
   @disable this();
   this(Window owner) {
     this.owner = owner;
@@ -78,15 +80,20 @@ public:
 
   void zoom(float amount)       { scale = pow(2, log2(scale)+amount*scrollRate); }
 
-  void zoomBounds(const Bounds2f bb){
-    if(bb.isNull) return;
+  void zoomBounds(const Bounds2f bb, float overZoomPercent = 3){
+    if(!bb.valid || !subScreenArea.valid) return;
+    //corrigate according to subScreenArea
+    auto realClientSize = clientSize * subScreenArea.size; //in pixels
+    auto subScreenShift = clientSize * (subScreenArea.center - V2f(.5, .5)); //in pixels
+
     origin = bb.center;
     auto s = bb.size;
-    if(s.len_prec==0) return;
-    maximize(s.x, .001f);
-    maximize(s.y, .001f);
-    auto sc = clientSize/bb.size;
-    scale = min(sc.x, sc.y)*.97f; //overzoom a bit
+    //maximize(s.x, .001f); maximize(s.y, .001f);
+    auto sc = realClientSize/bb.size;
+    scale = min(sc.x, sc.y)*(1 - overZoomPercent*.01); //overzoom a bit
+
+    //corrigate according to subScreenArea: shift
+    origin -= subScreenShift * invScale;
   }
 
   void zoomAll() {
@@ -99,8 +106,6 @@ public:
     origin += sh*invScale;
     zoom(amount);
     origin -= sh*invScale;
-
-
   }
   void zoomAroundMouse(float amount) { zoomAround(mouseAct, amount); }
 
@@ -118,19 +123,19 @@ public:
 
       group("View controls");          ////todo: ctrl+s es s (mint move osszeakad!)
 
-      bool en = mouseEnabled;   //todo: actions are deprecated. This view.navigate function should be replaced with az IMGUI enable flag and a hidden window.
-      onActive  ("Scroll"              , "MMB RMB"     , { if(en) scroll(inputs.mouseDelta); }         );
-      onDelta   ("Zoom"                , "MW"          , (x){ if(en) zoomAroundMouse(x*wheelSpeed); }  );
+      const enm = mouseEnabled;   //todo: actions are deprecated. This view.navigate function should be replaced with az IMGUI enable flag and a hidden window.
+      onActive  ("Scroll"              , "MMB RMB"     , enm, { scroll(inputs.mouseDelta); }         );
+      onDelta   ("Zoom"                , "MW"          , enm, (x){ zoomAroundMouse(x*wheelSpeed); }  );
 
-      en = keyboardEnabled;
-      onActive  ("Scroll left"         , "A"           , { if(en) scrollH( scrollSpeed); }             );
-      onActive  ("Scroll right"        , "D"           , { if(en) scrollH(-scrollSpeed); }             );
-      onActive  ("Scroll up"           , "W"           , { if(en) scrollV( scrollSpeed); }             );
-      onActive  ("Scroll down"         , "S"           , { if(en) scrollV(-scrollSpeed); }             );
-      onActive  ("Zoom in"             , "PgUp"        , { if(en) zoom( zoomSpeed); }                  );
-      onActive  ("Zoom out"            , "PgDn"        , { if(en) zoom(-zoomSpeed); }                  );
-      onModifier("Scroll/Zoom slower"  , "Shift"       , scrollSlower                                  );
-      onPressed ("Zoom all"            , "Home"        , { if(en) zoomBounds(workArea); }              );
+      const enk = keyboardEnabled;
+      onActive  ("Scroll left"         , "A"           , enk, { scrollH( scrollSpeed); }             );
+      onActive  ("Scroll right"        , "D"           , enk, { scrollH(-scrollSpeed); }             );
+      onActive  ("Scroll up"           , "W"           , enk, { scrollV( scrollSpeed); }             );
+      onActive  ("Scroll down"         , "S"           , enk, { scrollV(-scrollSpeed); }             );
+      onActive  ("Zoom in"             , "PgUp"        , enk, { zoom( zoomSpeed); }                  );
+      onActive  ("Zoom out"            , "PgDn"        , enk, { zoom(-zoomSpeed); }                  );
+      onModifier("Scroll/Zoom slower"  , "Shift"       , enk, scrollSlower                           );
+      onPressed ("Zoom all"            , "Home"        , enk, { zoomBounds(workArea); }              );
     }
 
     bool res = origin!=oldOrigin || scale!=oldScale;

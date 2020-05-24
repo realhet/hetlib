@@ -196,8 +196,10 @@ public  SubTexInfo[] infoArray;
     glTexture.resize(TexWidth, glTexture.height*2); //exponential grow
   }
 
-  void checkValidIdx(int idx){
-    enforce(idx>=0 && idx<cast(int)infoArray.length, "subTexIdx out of range (%s)".format(idx));
+  bool isValidIdx(int idx) const{ return idx.inRange(infoArray); }
+
+  void checkValidIdx(int idx) const{ //todo: refactor to isValidIdx
+    enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx));
     //ez nem kell, mert a delayed loader null-t allokal eloszor. enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
   }
 
@@ -286,7 +288,7 @@ public:
   }
 }
 
-//todo: texture class
+//todo: make the texture class
 class Texture{ // Texture class /////////////////////////////////
 //this holds all the info to access a subTexture
 private:
@@ -596,7 +598,15 @@ if(log) "Created subtex %s:".writefln(fileName);
     infoTexture.dump;
   }
 
-  auto getGLTextures(){ return infoTexture.glTexture ~ megaTextures.map!(a => a.glTexture).array; }
+  GLTexture[] getGLTextures(){ return infoTexture.glTexture ~ megaTextures.map!(a => a.glTexture).array; }
 
+  V2i textureSize(int idx){
+    return infoTexture.isValidIdx(idx) ? accessInfo(idx).size
+                                       : V2i.Null;
+  }
+
+  V2i textureSize(File file){
+    return textureSize(access(file));
+  }
 }
 
