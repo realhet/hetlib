@@ -1211,7 +1211,6 @@ private:
                 }
                 break;
       case 'd': if(task2 && inputs[key].changed) {
-print("OnDelta", inputs[key].delta, enabled);
                   task2(inputs[key].delta);
                   res = true;
                 }

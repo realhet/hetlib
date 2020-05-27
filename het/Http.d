@@ -102,13 +102,18 @@ private:
   shared int terminated = 0; // 1= terminate, 2 = ack
 
   static void httpWorker(shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated){
+    enum log = true;
+
     while(*terminated == 0){
       auto r = inbox.pop;
       if(r.valid){
-//        print(">>> httpWorker fetching: ", r.query);
+        if(log) LOG("httpWorker fetching: ", r.query);
+        const t0 = QPS;
         try{
           r.response = curlGet(r.query);
+          if(log) print("Done fetching: ", r.query, QPS-t0);
         }catch(Exception e){
+          if(log) WARN("ERROR fetching: ", r.query, QPS-t0, e.msg);
           r.error = e.msg;
         }
         if(r.owner ~= "")

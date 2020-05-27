@@ -4,6 +4,8 @@ import het.utils, het.geometry, het.draw2d, het.inputs, std.traits;
 
 public import het.uibase;
 
+//todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
+
 // utility stuff ////////////////////////////////
 
 

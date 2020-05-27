@@ -2,6 +2,8 @@ module het.utils;
 
 pragma(lib, "ole32.lib"); //COM initialization is in utils.d, not in win.d
 
+
+//todo: IDE: % as postFix operator: 25% -> (25)*.01
 //todo: IDE: visszajatszo debugger/logger
 //todo: IDE syntax highlight control chars in "" and ''. Also format %f in format strings
 
