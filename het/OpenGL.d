@@ -20,7 +20,7 @@ Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  t
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //todo: nincs doUpdate formresize kozben
 
-public import het.utils, het.geometry, het.win, het.view, het.draw2d, het.bitmap, het.image;
+public import het.utils, het.geometry, het.win, het.view, het.draw2d, het.image;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
 
 //Turn on high performance GPUs on some laptops

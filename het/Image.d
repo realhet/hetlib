@@ -573,6 +573,31 @@ bool isPeak(T)(Image!T img, int o){ with(img){
 }}
 
 
+/// Calculates sum of vertical and horicontal derivates of the green channel. 0..255
+float measureContrast(T)(Image!T img, Bounds2i b){ with(img){
+  with(bounds.clamp(b)){
+    if(isNull) return 0;
+
+    long total = long(max(0, b.width-1)) * max(0, b.height-1) * 2;
+    if(total<=0) return 0;
+
+    long diffSum;
+    foreach(int y; bMin.y..bMax.y-1){
+      int o0 = y*width_;
+      foreach(int o; o0+bMin.x..o0+bMax.x-1){
+        int p(int ofs){ return (data_[o+ofs] & 0xff00)>>8; }
+        auto center = p(0);
+        diffSum += (center - p(1     ))^^2+
+                   (center - p(width_))^^2;
+         //todo: this is kinda lame and slow
+      }
+    }
+
+    return float(diffSum) / total;
+  }
+}}
+
+
 // Bitmap Detection ///////////////////////////////////
 
 immutable supportedBitmapExts = ["webp", "png", "jpg", "jpeg", "bmp", "tga"];

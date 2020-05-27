@@ -1085,8 +1085,11 @@ template isVec4     (T){ enum isVec4 = is(T==V4f) || is(T==V4f) || is(T==V4i) ||
 template isVec2     (T){ enum isVec2 = is(T==V2f) || is(T==V2d) || is(T==V2i); }
 template isVec3     (T){ enum isVec3 = is(T==V3f) || is(T==V3d) || is(T==V3i); }
 
+/*
+This fucks up things
 import std.math: sqrt;
 float sqrt(int a){ return sqrt(float(a)); } //dlang patch: (int) matches both: (float), (real)
+*/
 
 auto dot(V)(in V p) if(isVec2!V){ return p.x*p.x + p.y*p.y; }
 auto dot(V)(in V p) if(isVec3!V){ return p.x*p.x + p.y*p.y + p.z*p.z; }
