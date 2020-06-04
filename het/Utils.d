@@ -583,8 +583,12 @@ float wrapInRange(ref float p, float pMin, float pMax, ref int wrapCnt){ //speci
 
 int iClamp(T)(const T val, const T mi, const T ma) { return cast(int)clamp(val, mi, ma); }
 
-T toRad(T)(T d){ return d*(PI/180); }
-T toDeg(T)(T d){ return d*(180/PI); }
+auto toRad(T)(T d){ return d*(PI/180); }
+auto toDeg(T)(T d){ return d*(180/PI); }
+
+auto sinD(T)(T a){ return a.toRad.sin; }
+auto cosD(T)(T a){ return a.toRad.cos; }
+
 
 T rcpf_fast(T)(const T x)if(__traits(isFloating, T)){
   return 1.0f/x; //todo: Ezt megcsinalni SSE-vel
@@ -2275,6 +2279,33 @@ string outdent(string s){
   return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n');
 }
 
+/// makes "Hello world" from "helloWorld"
+string camelToCaption(string s){
+  import std.uni;
+  if(s=="") return s; //empty
+  if(s[0].isUpper) return s; //starts with uppercase
+
+  //fetch a word
+  auto popWord(){
+    string word;
+    while(s.length){
+      char ch = s[0]; //no unicode support
+      if(!word.empty && ch.isUpper) break;
+      s = s[1..$];
+      word ~= ch;
+    }
+    return word;
+  }
+
+  string[] res;
+  while(s.length){ res ~= popWord; }
+
+  foreach(idx, ref w; res) w = idx ? w.toLower : w.capitalize;
+
+  return res.join(' ');
+}
+
+
 // structs to text /////////////////////////////////////
 
 string toString2(T)(const T o)
@@ -2293,6 +2324,23 @@ if(isAggregateType!T)
 
   return "%s(%s)".format(T.stringof, parts.join(", "));
 }
+
+// Meta helpers ///////////////////////////
+
+import std.traits, std.meta;
+
+template getUDA(alias a, U){
+  static if(hasUDA!(a, U)) enum getUDA = getUDAs!(a, U)[0];
+                      else enum getUDA = U.init;
+}
+
+///helper templates to get all the inherited class fields, works for structs as well
+template AllClasses(T){
+  static if(is(T == class)) alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
+                       else alias AllClasses = T;
+}
+alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); ///ditto
+
 
 // hexDump ///////////////////////////
 //import std.algorithm, std.stdio, std.file, std.range;
@@ -2745,6 +2793,10 @@ struct RNG {
     return (ulong(seed)*n)>>32;
   }
 
+  int random(int n){
+    return int(random(uint(n)));
+  }
+
   //uint opCall(uint n){ return random(n); }
 
   static uint nextRandom(uint i){ //get the next 32bit random in the sequence
@@ -2803,8 +2855,7 @@ struct RNG {
     seed = oldSeed;
   }
 
-
-  int opCall(int max){ return random(max); }
+  // not good: disables default constructor. int opCall(int max){ return random(max); }
 }
 
 RNG defaultRng;

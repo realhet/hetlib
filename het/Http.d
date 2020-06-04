@@ -90,32 +90,107 @@ synchronized class ResponseQueue{
   }
 }
 
+struct DigitalSignal{
+  private{
+    ubyte _raw;
+    import std.bitmanip; mixin(bitfields!(
+          bool, "current"  , 1,
+          bool, "changed"  , 1,
+          bool, "displayed", 1,
+          int , "_dummy"   , 5));
+  }
+
+  void pulse(bool value){
+    current = value;
+    changed = true;
+  }
+
+  void set(bool value){
+    if(value != current) pulse(value);
+  }
+
+  void opAssign(in bool rhs){ set(rhs); }
+
+  bool get(){
+    displayed = !displayed;
+
+/*    if(changed){ displayed = !displayed; changed = false; }
+           else displayed = current;*/
+
+    return displayed;
+  }
+}
+
+struct DigitalSignal_smoothed{
+  float minDeltaTime = 0.3; //sec
+
+  private DigitalSignal ds;
+  private float lastDisplayChanged = 0;
+  private bool lastDisplayed;
+
+  void pulse    (bool after)  { ds.pulse(after); }
+  void set      (bool value)  { ds.set(value); }
+  void opAssign (in bool rhs) { set(rhs); }
+
+  bool get(float now){
+    const dt = now-lastDisplayChanged;
+
+    if(dt >= minDeltaTime){
+      const act  = ds.get;
+      if(lastDisplayed != act){
+        lastDisplayed = act;
+        lastDisplayChanged = now;
+      }
+    }
+
+    return lastDisplayed;
+  }
+
+  bool get(){ return get(QPS); }
+}
+
 
 class HttpQueue{  //must be freed, otherwise the thread will stuck.
 public:
   string getImplementation(string q){
     return curlGet(q.urlEncode);
   }
+
+  struct Status{
+    DigitalSignal comm, error;
+  }
+
 private:
   auto inbox = new shared RequestQueue;
   auto outbox = new shared ResponseQueue;
   shared int terminated = 0; // 1= terminate, 2 = ack
 
-  static void httpWorker(shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated){
+  shared Status status_;
+
+  static void httpWorker(shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared Status* status_){
     enum log = false;
+
+    auto st = cast(Status*) status_; //trick to avoud synchronization
 
     while(*terminated == 0){
       auto r = inbox.pop;
       if(r.valid){
+
         if(log) LOG("httpWorker fetching: ", r.query);
-        const t0 = QPS;
+        double t0 = 0; if(log) t0 = QPS;
+
+        st.comm = true;
         try{
           r.response = curlGet(r.query);
           if(log) LOG("Done fetching: ", r.query, QPS-t0);
+          st.error = false;
         }catch(Exception e){
           if(log) WARN("ERROR fetching: ", r.query, QPS-t0, e.msg);
           r.error = e.msg;
+          st.error.pulse(true);
         }
+        st.comm = false;
+
         if(r.owner ~= "")
           outbox.push(r);
       }else{
@@ -128,7 +203,7 @@ private:
 public:
   this(){
     import std.concurrency;
-    spawn(&httpWorker, inbox, outbox, &terminated);
+    spawn(&httpWorker, inbox, outbox, &terminated, &status_);
   }
 
   ~this(){ //must be called manually, or the class must be allocated with scoped!
@@ -152,6 +227,10 @@ public:
   Request[] receive(T)(in T owner){
     auto res = outbox.popAll(owner.identityStr);
     return res;
+  }
+
+  Status status(){
+    return status_;
   }
 }
 

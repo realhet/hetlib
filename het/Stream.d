@@ -18,14 +18,6 @@ void registerStoredClass(T)(){
   classSaverFunc [fullyQualifiedName!T] = cast(SaverFunc ) (&streamAppend_json!T);
 }
 
-
-///helper templates to get all the inherited class fields, works for structs as well
-template AllClasses(T){
-  static if(is(T == class)) alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
-                       else alias AllClasses = T;
-}
-alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); ///ditto
-
 //UDAs
 struct STORED{}
 struct HEX{}

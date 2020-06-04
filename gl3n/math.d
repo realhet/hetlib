@@ -213,8 +213,9 @@ unittest {
     /+static+/ assert(almost_equal(cradians!180, PI));
 }
 
+//het: not needed: it's in std.algorithm
 /// Returns min(max(x, min_val), max_val), Results are undefined if min_val > max_val.
-CommonType!(T1, T2, T3) clamp(T1, T2, T3)(T1 x, T2 min_val, T3 max_val) {
+/+ CommonType!(T1, T2, T3) clamp(T1, T2, T3)(T1 x, T2 min_val, T3 max_val) {
     return min(max(x, min_val), max_val);
 }
 
@@ -224,7 +225,7 @@ unittest {
     assert(clamp(1, 0, 2) == 1);
     assert(clamp(2, 0, 2) == 2);
     assert(clamp(3, 0, 2) == 2);
-}
+} +/
 
 /// Returns 0.0 if x < edge, otherwise it returns 1.0.
 float step(T1, T2)(T1 edge, T2 x) {

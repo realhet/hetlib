@@ -25,8 +25,8 @@ private {
     import std.traits : isIntegral, isFloatingPoint, isStaticArray, isDynamicArray, isImplicitlyConvertible, isArray;
     import std.string : format, rightJustify;
     import std.array : join;
-    import std.algorithm : max, min, reduce;
-    import gl3n.math : clamp, PI, sqrt, sin, cos, acos, tan, asin, atan2, almost_equal;
+    import std.algorithm : max, min, reduce, clamp; //het: clamp
+    import gl3n.math : PI, sqrt, sin, cos, acos, tan, asin, atan2, almost_equal;
     import gl3n.util : is_vector, is_matrix, is_quaternion, TupleRange;
 }
 

@@ -2077,15 +2077,21 @@ public:
     gl.clear(GL_COLOR_BUFFER_BIT);
   }
 
+  private bool firstPaint;
+
   override void onEndPaint(){
+    if(chkClear(view._mustZoomAll)) view.zoomAll;
+
     if(!dr.drawCnt){
-      tryInitialZoomAll; //if dr has a painting
+      if(!firstPaint) tryInitialZoomAll; //if dr has a painting
       dr.glDraw(view   );
     }
     if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
 
     lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
     lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);
+
+    firstPaint = true;
   }
 
   override void onSwapBuffers(){

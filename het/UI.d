@@ -2257,7 +2257,7 @@ static cnt=0;
   // RadioBtn //////////////////////////
   auto RadioBtn(string file=__FILE__, uint line=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
 
-  // HSlider ///////////////////////////
+  // Slider ///////////////////////////
   auto Slider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
   if(isFloatingPoint!V || isIntegral!V)
   {
@@ -2279,7 +2279,13 @@ static cnt=0;
     }
 
     bool userModified;
-    auto sl = new .Slider(id_, normValue, _range, userModified);
+    auto oldFh = style.fontHeight;
+    if(theme != "tool") style.fontHeight = (fh*1.4).to!ubyte;
+
+    auto sl = new .Slider(id_, normValue, _range, userModified, style);
+
+    style.fontHeight = oldFh;
+
     sl.setProps(props);
     append(sl);
 
@@ -2378,6 +2384,106 @@ static cnt=0;
   }
 
 }
+
+//! FieldProps stdUI /////////////////////////////
+
+struct CAPTION{ string text; }
+struct UNIT{ string text; }
+struct RANGE{ float low, high; bool valid()const{ return !low.isNaN && !high.isNaN; } }
+struct INDENT{ }
+struct HIDDEN{ }
+
+struct FieldProps{
+  string fullName, name, caption, unit;
+  RANGE range;
+  bool indent;
+
+  string getCaption() const{
+    auto s = caption!="" ? caption : camelToCaption(name);
+    if(s.length && indent) s = "      "~s;
+    return s;
+  }
+
+  auto hash() const{ return fullName.xxh; }
+}
+
+FieldProps getFieldProps(T, string fieldName)(string parentFullName){
+  alias f = __traits(getMember, T, fieldName);
+  return FieldProps(
+    [parentFullName, fieldName].filter!(not!empty).join('.'),
+    fieldName,
+    getUDA!(f, CAPTION).text,
+    getUDA!(f, UNIT   ).text,
+    getUDA!(f, RANGE),
+    hasUDA!(f, INDENT)
+  );
+}
+
+void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init){ with(im){
+  //print("generating UI for ", T.stringof, thisName);
+
+
+  /* */ static if(isFloatingPoint!T     ){
+    Row({
+      Text(thisFieldProps.getCaption, "\t");
+      auto s = format("%.2f", data);
+      Edit(s, id(thisFieldProps.hash), { width = fh*3; });
+      try{ data = s.to!T; }catch(Throwable){}
+      Text(thisFieldProps.unit, "\t");
+      if(thisFieldProps.range.valid) //todo: im.range() conflict
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
+      //todo: Bigger slider height when (theme!="tool")
+    });
+  }else static if(isIntegral!T          ){
+    Row({
+      Text(thisFieldProps.getCaption, "\t");
+      auto s = data.text;
+      Edit(s, id(thisFieldProps.hash), { width = fh*3; });
+      try{ data = s.to!T; }catch(Throwable){}
+      Text(thisFieldProps.unit, "\t");
+      if(thisFieldProps.range.valid) //todo: im.range() conflict
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
+    });
+  }else static if(isSomeString!T        ){
+    Row({
+      Text(thisFieldProps.getCaption, "\t");
+      Edit(data, id(thisFieldProps.hash), { width = fh*10; });
+    });
+  }else static if(is(T == bool)         ){
+    Row({
+      Text(thisFieldProps.getCaption, "\t");
+      ChkBox(data, "", id(thisFieldProps.hash));
+      Text("\t");
+    });
+  }else static if(isAggregateType!T     ){ // Struct, Class
+
+    enum bool notHidden(string fieldName) = !hasUDA!(__traits(getMember, T, fieldName), HIDDEN);
+    import std.meta;
+    enum visibleFields = Filter!(notHidden, AllFieldNames!T);
+
+    Column({
+      const caption = thisFieldProps.getCaption;
+      if(caption!=""){
+        Row({ Text(tsBold, caption); });
+
+        border = "1 normal black";
+        padding = "2";
+        margin = "2";
+      }
+      //recursive call for each field
+      foreach (fieldName; visibleFields){{
+          auto fp = getFieldProps!(T, fieldName)(thisFieldProps.fullName);
+
+          //stdUI(__traits(getMember, data, fieldName), fp);
+          stdUI(mixin("data.", fieldName), fp);
+      }}
+
+    });
+  }else{
+    static assert(0 ,"Unhandle type: "~T.stringof);
+  }
+}}
+
 
 //Test ///////////////////////////////////
 

@@ -96,8 +96,15 @@ public:
     origin -= subScreenShift * invScale;
   }
 
-  void zoomAll() {
-    zoomBounds(workArea);
+  bool _mustZoomAll; //schedule zoom all on the next draw
+
+  void zoomAll_later(){ _mustZoomAll = true; }
+
+  void zoomAll(){ zoomBounds(workArea); }
+
+  void zoomAll_immediate(){
+    zoomAll;
+    skipAnimation;
   }
 
   void zoomAround(const V2f point, float amount) {
@@ -135,7 +142,7 @@ public:
       onActive  ("Zoom in"             , "PgUp"        , enk, { zoom( zoomSpeed); }                  );
       onActive  ("Zoom out"            , "PgDn"        , enk, { zoom(-zoomSpeed); }                  );
       onModifier("Scroll/Zoom slower"  , "Shift"       , enk, scrollSlower                           );
-      onPressed ("Zoom all"            , "Home"        , enk, { zoomBounds(workArea); }              );
+      onPressed ("Zoom all"            , "Home"        , enk, { zoomAll; }                           );
     }
 
     bool res = origin!=oldOrigin || scale!=oldScale;

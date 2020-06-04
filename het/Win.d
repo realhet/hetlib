@@ -404,10 +404,14 @@ public:
   }
 
   protected void tryInitialZoomAll(){ //todo: tryInitialZoom should work with the registry also
-    if(view.workArea.isNull && !dr.getBounds.isNull){
+    if(!view.workArea.isNull){ //workarea already set
+      view.zoomAll_immediate;
+      return;
+    }
+
+    if(view.workArea.isNull && !dr.getBounds.isNull){ //get the workarea from the drawing
       view.workArea = dr.getBounds;
-      view.zoomAll;
-      view.skipAnimation;
+      view.zoomAll_immediate;
     }
   }
 
