@@ -444,15 +444,26 @@ enum{//ARB_vertex_shader////////////////////////
   GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS           = 0x8B4D,
   GL_OBJECT_ACTIVE_ATTRIBUTES                   = 0x8B89,
   GL_OBJECT_ACTIVE_ATTRIBUTE_MAX_LENGTH         = 0x8B8A,
+  GL_MAX_VERTEX_OUTPUT_COMPONENTS               = 0x9122,
 }
 
 enum{//ARB_fragment_shader////////////////////////
   GL_FRAGMENT_SHADER                            = 0x8B30,
   GL_MAX_FRAGMENT_UNIFORM_COMPONENTS            = 0x8B49,
+  GL_MAX_FRAGMENT_INPUT_COMPONENTS              = 0x9125,
 }
 
 enum{//ARB_geometry_shader////////////////////////
   GL_GEOMETRY_SHADER                            = 36313,
+  GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS           = 0x8C29,
+  GL_GEOMETRY_VERTICES_OUT                      = 0x8916,
+  GL_GEOMETRY_INPUT_TYPE                        = 0x8917,
+  GL_GEOMETRY_OUTPUT_TYPE                       = 0x8918,
+  GL_MAX_GEOMETRY_UNIFORM_COMPONENTS            = 0x8DDF,
+  GL_MAX_GEOMETRY_OUTPUT_VERTICES               = 0x8DE0,
+  GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS       = 0x8DE1,
+  GL_MAX_GEOMETRY_INPUT_COMPONENTS              = 0x9123,
+  GL_MAX_GEOMETRY_OUTPUT_COMPONENTS             = 0x9124,
 }
 
 enum{//other////////////////////////
@@ -1365,6 +1376,18 @@ public:
     if(fragmentShader) fragmentShader.release;
     if(programObject ) programObject .release;
   }
+}
+
+
+/// load a shader and cache it for frequent access.
+auto loadShader(File file){
+
+  static Shader shaderFromText(string text){
+    text = text.strip.strip2("q{", "}"); //put in a q{} string for the syntaxt highlighter. Quite lame... Ide should know how to deal with .glsl file.
+    return new Shader("unnamed/cached", text);
+  }
+
+  return loadCachedFile!shaderFromText(file);
 }
 
 

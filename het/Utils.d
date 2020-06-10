@@ -459,7 +459,15 @@ void showException(Throwable o) nothrow
   showException(s);
 }
 
-
+//cuts off traqce info
+string simplifiedMsg(Throwable t){
+  string[] s;
+  foreach(line; t.msg.split("\n").map!strip){ //todo: use countUntil here!
+    if(line == "") break;
+    s ~= line;
+  }
+  return s.join("\n");
+}
 
 void selftest(T)(lazy const T a, uint xb, string name, string notes="", string file=__FILE__, int line=__LINE__){
 version(disableselftest){ return; }else{
@@ -3472,6 +3480,62 @@ void stWrite(T)(ref ubyte[] st, const T[] data)
 
 
 //todo: DIDE GotoError must show 5 lines up and down around the error.
+
+
+// loadCachedFile /////////////////////////////////////////////////////
+
+auto loadCachedFile(alias fun)(File file)
+if(__traits(isStaticFunction, fun))
+{
+  alias T = ReturnType!fun;
+
+  pragma(msg, T);
+
+  static struct Rec{
+    File file;
+    DateTime modified;
+    T payload; //todo: tesztelni, hogy a Shader-eket felszabaditja-e es mikor. Elvileg onalloan jol fog mukodni.
+    string error;
+  }
+
+  static Rec[File] loaded;
+
+  auto p = file in loaded,
+       actModified = file.modified;
+
+  //found but too old.
+  if(p !is null && file.modified != p.modified){
+    loaded.remove(file);
+    p = null;
+  }//p is valid
+
+  if(p is null){
+    //1. load
+    string text;
+    try{
+      text = file.readStr;
+    }catch{
+      throw new Exception("Unable to load cached file: "~file.fullName);
+    } //it will try again later
+
+    //2. create
+    T obj;  string error;
+    try{
+      obj = fun(text);
+    }catch(Throwable t){
+      error = t.simplifiedMsg;
+    }
+
+    loaded[file] = Rec(file, actModified, obj, error); //todo: fileRead and getDate should be system-wide-atomic
+    p = &loaded[file];
+  }//p is valid
+
+  //return the latest object if can
+  assert(p !is null);
+  if(p.payload !is null) return p.payload;
+                    else throw new Exception(p.error);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 /// Ini/Registry                                                                 ///

@@ -23,7 +23,7 @@ public {
 //    alias round roundEven;
 //!!!!!!!!!!!!!!!!!!!!!!!!! this is so wrong!    alias floor fract;
     //import core.stdc.math : fmodf;
-    import std.algorithm : min, max;
+    //import std.algorithm : min, max;
 }
 
 private {
