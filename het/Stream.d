@@ -23,6 +23,8 @@ struct STORED{}
 struct HEX{}
 struct BASE64{}
 
+struct UNIFORM{ string name; } //for gl.Shader
+
 enum ErrorHandling { ignore, raise, track }
 
 private auto quoteIfNeeded(string s){ return s.canFind(" ") ? quoted(s) : s; } //todo: this is lame, must make it better in utils/filename routines
@@ -245,8 +247,23 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       if(log) writeln;
 
       //select fields to store (all fields except if specified with STORED uda)
-      enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
+
+      template FieldNamesWithUDA(T, U, bool allIfNone){
+        enum fields = AllFieldNames!T;
+        enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U);
+
+        static if(allIfNone){
+          static if(anySatisfy!(hasThisUda, fields))
+            enum FieldNamesWithUDA = Filter!(hasThisUda, fields);
+          else
+            enum storedFields = fields;
+        }else{
+          enum FieldNamesWithUDA = Filter!(hasThisUda, fields);
+        }
+      }
+
       enum fields = AllFieldNames!T;
+      enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
       static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
                                            else enum storedFields = fields;
       //recursive call for each field
