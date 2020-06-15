@@ -23,7 +23,7 @@ struct STORED{}
 struct HEX{}
 struct BASE64{}
 
-struct UNIFORM{ string name; } //for gl.Shader
+struct UNIFORM{ string name=""; } //for gl.Shader
 
 enum ErrorHandling { ignore, raise, track }
 
@@ -246,28 +246,8 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       }
       if(log) writeln;
 
-      //select fields to store (all fields except if specified with STORED uda)
-
-      template FieldNamesWithUDA(T, U, bool allIfNone){
-        enum fields = AllFieldNames!T;
-        enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U);
-
-        static if(allIfNone){
-          static if(anySatisfy!(hasThisUda, fields))
-            enum FieldNamesWithUDA = Filter!(hasThisUda, fields);
-          else
-            enum storedFields = fields;
-        }else{
-          enum FieldNamesWithUDA = Filter!(hasThisUda, fields);
-        }
-      }
-
-      enum fields = AllFieldNames!T;
-      enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
-      static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
-                                           else enum storedFields = fields;
       //recursive call for each field
-      static foreach (fieldName; storedFields){{
+      static foreach (fieldName; FieldNamesWithUDA!(T, STORED, true)){{
         if(auto p = fieldName in elementMap){
           streamDecode_json(state, *p, __traits(getMember, data, fieldName));
         }
@@ -391,13 +371,8 @@ void streamAppend_json(Type)(ref string st, ref in Type data, bool dense=false, 
       streamAppend_json(st, s, dense, hex, thisName="class", nextIndent);
     }
 
-    //select fields to store (all fields except if specified with STORED uda)
-    enum bool hasStored(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), STORED);
-    enum fields = AllFieldNames!T;
-    static if(anySatisfy!(hasStored, fields)) enum storedFields = Filter!(hasStored, fields);
-                                         else enum storedFields = fields;
     //recursive call for each field
-    static foreach (fieldName; storedFields){{
+    static foreach (fieldName; FieldNamesWithUDA!(T, STORED, true)){{
       enum hasHex = hasUDA!(__traits(getMember, T, fieldName), HEX);
       streamAppend_json(st, __traits(getMember, data, fieldName), dense, hex || hasHex, fieldName, nextIndent);
     }}

@@ -2338,8 +2338,11 @@ if(isAggregateType!T)
 import std.traits, std.meta;
 
 template getUDA(alias a, U){
-  static if(hasUDA!(a, U)) enum getUDA = getUDAs!(a, U)[0];
-                      else enum getUDA = U.init;
+  enum u = q{ getUDAs!(a, U)[$-1] };
+    static if(hasUDA!(a, U) && !is(mixin(u)))
+      enum getUDA = mixin(u);
+    else
+      enum getUDA = U.init;
 }
 
 ///helper templates to get all the inherited class fields, works for structs as well
@@ -2348,6 +2351,22 @@ template AllClasses(T){
                        else alias AllClasses = T;
 }
 alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); ///ditto
+
+template FieldNamesWithUDA(T, U, bool allIfNone){
+  enum fields = AllFieldNames!T;
+  enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U);
+
+  static if(allIfNone){
+    static if(anySatisfy!(hasThisUDA, fields))
+      enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
+    else
+      enum storedFields = fields;
+  }else{
+    enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
+  }
+}
+
+
 
 
 // hexDump ///////////////////////////

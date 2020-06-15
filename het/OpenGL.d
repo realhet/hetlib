@@ -20,7 +20,7 @@ Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  t
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //todo: nincs doUpdate formresize kozben
 
-public import het.utils, het.geometry, het.win, het.view, het.draw2d, het.image;
+public import het.utils, het.geometry, het.win, het.view, het.draw2d, het.image, het.stream;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
 
 //Turn on high performance GPUs on some laptops
@@ -1305,9 +1305,12 @@ public:
   }
 
   //TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
-  void uniform(T)(T val, bool mustSucceed=true){
-    foreach(name; FieldNameTuple!T)
-      uniform(name, __traits(getMember, val, name), mustSucceed);
+  void uniform(T)(in T val, bool mustSucceed=true){
+    foreach(name; FieldNamesWithUDA!(T, UNIFORM, true)){
+      auto u = getUDA!(mixin("T.", name), UNIFORM);
+      if(u.name == "") u.name = name;
+      uniform(u.name, __traits(getMember, val, name), mustSucceed);
+    }
   }
 
   int getAttribLocation(string name){
