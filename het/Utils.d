@@ -2360,7 +2360,7 @@ template FieldNamesWithUDA(T, U, bool allIfNone){
     static if(anySatisfy!(hasThisUDA, fields))
       enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
     else
-      enum storedFields = fields;
+      enum FieldNamesWithUDA = fields;
   }else{
     enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
   }
