@@ -399,6 +399,17 @@ T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __L
   return value;
 }
 
+///this version compares 2 values and shows the difference too
+void enforceDiff(T)(in T expected, in T actual, lazy string caption="", string file = __FILE__, int line = __LINE__){
+  if(expected == actual) return;
+
+  auto exp  = expected.text,
+       act  = actual.text,
+       diff = strDiff(exp, act),
+       capt = caption=="" ? "Test failed:" : caption;
+  enforce(0, format!"%s\n  Exp : %s\n  Act : %s\n  Diff: %s"(capt, exp, act, diff), file, line);
+}
+
 template CustomEnforce(string prefix){
   T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
   {
@@ -1770,8 +1781,16 @@ string truncate(string ellipsis="...")(string s, size_t maxLen){ //todo: string.
 
 string decapitalize()(string s){ return s.capitalize!toLower; }
 
-bool sameString(const string a, const string b) { return a==b; }
-bool sameText(const string a, const string b) { return uc(a)==uc(b); }
+bool sameString(string a, string b) { return a==b; }
+bool sameText(string a, string b) { return uc(a)==uc(b); }
+
+/// Show the differences in 2 strings
+string strDiff(char diffChar='^', char sameChar='_')(string a, string b){
+  string res;
+  foreach(i; 0..min(a.length, b.length)) res ~= a[i]==b[i] ? sameChar : diffChar;
+  res ~= [diffChar].replicate(a.length>b.length ? a.length-b.length : b.length>a.length);
+  return res;
+}
 
 //strips specific strings at both ends.
 string strip2(string s, string start, string end){
@@ -2927,13 +2946,15 @@ string identityStr(T)(in T a){ // identityStr /////////////////////////
 //Source: https://github.com/repeatedly/xxhash-d/blob/master/src/xxhash.d
 //        https://code.google.com/p/xxhash/
 // Copyright: Masahiro Nakagawa 2014-.
+// above 8MB it is unofficially parallel
 @trusted
 uint xxh(bool enableParallel=true)(in void[] source, uint seed = 0){
-  if(source.length <= 8<<20){    //Dont change it from 8<<20, otherwise the hash is broken
+  if(source.length <= 1<<19){    //Dont change it from 1<<19, otherwise the hash is broken   (was 8<<20)
     return xxh_internal(source, seed);
   }else{
-    const chunkSh = 20;  //Dont change it from 20, otherwise the hash is broken
-    const chunkSize = 1<<chunkSh;
+    enum chunkSh   = 16,  //Dont change it from 16, otherwise the hash is broken   (was 20)
+         chunkSize = 1<<chunkSh;
+
     auto hlist = new uint[(source.length+chunkSize-1)>>chunkSh];
 
     auto ch(size_t i){ return source[i<<chunkSh .. min((i+1)<<chunkSh, $)]; }//todo: megcsinalni ezt funkcionalisra
@@ -2954,41 +2975,88 @@ uint xxh(bool enableParallel=true)(in void[] source, uint seed = 0){
 private @trusted pure nothrow
 uint xxh_internal(in void[] source, uint seed = 0)   //todo: it must run at compile time too
 {
+    enum Prime32_1 = 2654435761U,
+         Prime32_2 = 2246822519U,
+         Prime32_3 = 3266489917U,
+         Prime32_4 = 668265263U,
+         Prime32_5 = 374761393U;
+
     enum UpdateValuesRound = q{
-        v1 += loadUint(srcPtr) * Prime32_2; v1 = rotateLeft(v1, 13);
-        v1 *= Prime32_1; srcPtr++;
-        v2 += loadUint(srcPtr) * Prime32_2; v2 = rotateLeft(v2, 13);
-        v2 *= Prime32_1; srcPtr++;
-        v3 += loadUint(srcPtr) * Prime32_2; v3 = rotateLeft(v3, 13);
-        v3 *= Prime32_1; srcPtr++;
-        v4 += loadUint(srcPtr) * Prime32_2; v4 = rotateLeft(v4, 13);
-        v4 *= Prime32_1; srcPtr++;
+        v1 += loadUint(srcPtr) * Prime32_2;  v1 = rol(v1, 13);  v1 *= Prime32_1;  srcPtr++;
+        v2 += loadUint(srcPtr) * Prime32_2;  v2 = rol(v2, 13);  v2 *= Prime32_1;  srcPtr++;
+        v3 += loadUint(srcPtr) * Prime32_2;  v3 = rol(v3, 13);  v3 *= Prime32_1;  srcPtr++;
+        v4 += loadUint(srcPtr) * Prime32_2;  v4 = rol(v4, 13);  v4 *= Prime32_1;  srcPtr++;
     };
+
+    static void xxh_rounds(ref const(uint)* src, const(uint)* limit, uint* v) nothrow{
+                         //                 RCX,                RDX,      R8
+      //Intel byteorder only!
+      if(1){
+        do {
+          v[0] += *(src  ) * Prime32_2;  v[0] = rol(v[0], 13);  v[0] *= Prime32_1;
+          v[1] += *(src+1) * Prime32_2;  v[1] = rol(v[1], 13);  v[1] *= Prime32_1;
+          v[2] += *(src+2) * Prime32_2;  v[2] = rol(v[2], 13);  v[2] *= Prime32_1;
+          v[3] += *(src+3) * Prime32_2;  v[3] = rol(v[3], 13);  v[3] *= Prime32_1;  src+=4;
+        } while (src <= limit);
+      }else{  //todo: this is not working
+        asm{
+          mov EAX, 2246822519;    //XMM4 : Prime2
+          movd XMM4, EAX;
+          pshufd XMM4, XMM4, 0;
+
+          mov EAX, 2654435761;    //XMM5 : Prime1
+          movd XMM5, EAX;
+          pshufd XMM5, XMM5, 0;
+
+          movdqu XMM0, [R8];      //XMM0 : v
+
+          mov RAX, [RCX];         //RAX : src
+                                  //RDX : limit
+
+        loop:
+          movdqu XMM1, [RAX];  add RAX, 16;  //load src
+
+          movdqa XMM2, XMM1;                  //mul with Prime2
+          punpckldq XMM1, XMM1;
+          punpckldq XMM2, XMM2;
+          pmuludq XMM1, XMM4;
+          pmuludq XMM2, XMM4;
+          pshufd XMM1, XMM2, 0x88;
+
+          paddd XMM0, XMM1;                   //add to v
+
+          movdqa XMM2, XMM0;
+          pslld XMM2, 13;              //rol(v, 13)
+          psrld XMM0, 32-13;
+          por XMM0, XMM2;
+
+          movdqa XMM2, XMM0;                  //mul with Prime1
+          punpckldq XMM0, XMM0;
+          punpckldq XMM2, XMM2;
+          pmuludq XMM0, XMM5;
+          pmuludq XMM2, XMM5;
+          pshufd XMM0, XMM2, 0x88;
+
+          cmp RAX, RDX;
+          jbe loop;
+
+          mov [RCX], RAX;      //write back src
+
+          movdqu [R8], XMM0;   //write back state
+        }
+      }
+    }
 
     enum FinishRound = q{
         while (ptr < end) {
             result += *ptr * Prime32_5;
-            result = rotateLeft(result, 11) * Prime32_1 ;
+            result = rol(result, 11) * Prime32_1 ;
             ptr++;
         }
-        result ^= result >> 15;
-        result *= Prime32_2;
-        result ^= result >> 13;
-        result *= Prime32_3;
+        result ^= result >> 15;  result *= Prime32_2;
+        result ^= result >> 13;  result *= Prime32_3;
         result ^= result >> 16;
     };
-
-    enum Prime32_1 = 2654435761U;
-    enum Prime32_2 = 2246822519U;
-    enum Prime32_3 = 3266489917U;
-    enum Prime32_4 = 668265263U;
-    enum Prime32_5 = 374761393U;
-
-    @safe pure nothrow
-    uint rotateLeft(in uint x, in uint n)
-    {
-        return (x << n) | (x >> (32 - n));
-    }
 
     @safe pure nothrow
     uint loadUint(in uint* source)
@@ -3005,16 +3073,14 @@ uint xxh_internal(in void[] source, uint seed = 0)   //todo: it must run at comp
 
     if (source.length >= 16) {
         auto limit = srcEnd - 4;
-        uint v1 = seed + Prime32_1 + Prime32_2;
-        uint v2 = seed + Prime32_2;
-        uint v3 = seed;
-        uint v4 = seed - Prime32_1;
+        auto v = [seed + Prime32_1 + Prime32_2,
+                  seed + Prime32_2,
+                  seed,
+                  seed - Prime32_1];
 
-        do {
-            mixin(UpdateValuesRound);
-        } while (srcPtr <= limit);
+        xxh_rounds(srcPtr, limit, v.ptr);
 
-        result = rotateLeft(v1, 1) + rotateLeft(v2, 7) + rotateLeft(v3, 12) + rotateLeft(v4, 18);
+        result = rol(v[0], 1) + rol(v[1], 7) + rol(v[2], 12) + rol(v[3], 18);
     } else {
         result = seed + Prime32_5;
     }
@@ -3023,7 +3089,7 @@ uint xxh_internal(in void[] source, uint seed = 0)   //todo: it must run at comp
 
     while (srcPtr+1 <= srcEnd) {
         result += loadUint(srcPtr) * Prime32_3;
-        result = rotateLeft(result, 17) * Prime32_4;
+        result = rol(result, 17) * Prime32_4;
         srcPtr++;
     }
 
@@ -3039,6 +3105,21 @@ uint xxhuc(in void[] source, uint seed = 0)
 {
   return xxh(uc(cast(string)source));
 }
+
+void benchmark_xxh(){
+  size_t len = 1;
+  while(len<2_000_000_000){
+    auto data = new ubyte[len];
+    auto t0 = QPS;
+    xxh(data);
+    auto t1 = QPS;
+
+    writefln("len = %10d   time = %6.3f   MB/s = %9.3f", len, t1-t0, len/(t1-t0)/1024/1024);
+
+    len = iCeil(len*1.5);
+  }
+}
+
 
 // crc32 //////////////////////////////////////////////////////////////////
 
@@ -3108,6 +3189,299 @@ enum bigPrime = 1515485863;
 uint hashCombine(uint c1, uint c2)
 {
   return c1*bigPrime+c2;
+}
+
+//! norx /////////////////////////////////////
+
+struct norx(int w/*wordSize*/, int l/*loopCnt*/, int p/*parallelCnt*/)
+if(w.among(32, 64) && l.inRange(1, 63) && p==1)
+{
+private static:
+                  //word type         ror offsets
+  static if(w==32){ alias T = uint ;  enum sh = [8, 11, 16, 31];  }
+  static if(w==64){ alias T = ulong;  enum sh = [8, 19, 40, 63];  }
+
+  enum t = w*4;         //tagSize in bits
+  enum r = T.sizeof*12; //S[0..12] size in bytes
+
+  enum instance = format!"NORX%d-%d-%d"(w, l, p);
+
+  //some utils
+
+  void fill(T)(T[] arr, T base=0){ foreach(i, ref a; arr) a = cast(T)(i+base); }
+  string dump(in T[16] s){ return format!"%(%.8X %)"(s); }
+
+
+  //low level functions
+
+  void G(ref T a, ref T b, ref T c, ref T d){
+    import core.bitop : ror;
+
+    static T H(in T x, in T y){  return (x^y)^((x&y)<<1);  }
+
+    a = H(a, b);  d = ror((d^a), sh[0]);  //aabdda
+    c = H(c, d);  b = ror((b^c), sh[1]);  //ccdbbc
+    a = H(a, b);  d = ror((d^a), sh[2]);  //aabdda
+    c = H(c, d);  b = ror((b^c), sh[3]);  //ccdbbc
+  }
+
+  void col(ref T[16] S){
+    static foreach(i; 0..4)
+      G(S[0+i], S[4+i], S[8+i], S[12+i]);
+  }
+
+  void diag(ref T[16] S){
+    G(S[0], S[5], S[10], S[15]);
+    G(S[1], S[6], S[11], S[12]);
+    G(S[2], S[7], S[ 8], S[13]);
+    G(S[3], S[4], S[ 9], S[14]);
+  }
+
+  void F(int l, ref T[16] S){
+    foreach(i; 0..l){
+      col(S); diag(S);
+    }
+  }
+
+  enum u = uCalc;  auto uCalc(){ T[16] S;  fill(S);  F(2, S);  return S; }
+
+  static assert(u[15] == (w==32 ? 0xD7C49104 : 0x86026AE8536F1501), "norx%d F() test failed".format(w));
+
+  // high level functions
+
+  const(void)[] pad(size_t len)(const(void)[] arr){
+    if(arr.length >= len) return arr;
+    ubyte[] e; e.length = len-arr.length;
+    e[0  ] |= 0x01;
+    e[$-1] |= 0x80;
+    return arr ~ e;
+  }
+
+  T[4] prepareKey(in void[] K){
+    enum byteCnt = T[4].sizeof;
+
+    const(void)[] arr = K; //work on this slice
+
+    if(arr.length > byteCnt){ //longer than needed: set the last dword to the hast of the remaining part.
+      uint hash = arr[byteCnt-4..$].xxh; //todo: ellenorizni ezt es az xxh-t is. Lehet, hogy le kene cserelni norx-ra.
+      arr = arr[0..byteCnt-4] ~ cast(void[])[hash];
+    }
+
+    arr = pad!byteCnt(arr); //pad if smaller
+
+    T[4] key;  key[] = (cast(T[])arr)[0..4];
+    return key;
+  }
+
+  T[16] initialize(in T[4] k, in T[4] n){
+    T[16] S = n ~ k ~ u[8..16];
+    S[12..16] ^= [w, l, p, t].to!(T[])[];
+    F(l, S);
+    S[12..16] ^= k[];
+    return S;
+  }
+
+  void absorb(ref T[16] S, const(void)[] X, in T v/*domain constant*/){
+    for(; X.length; X = X[r..$]){
+      X = pad!r(X);
+
+      S[15] ^= v;
+      F(l, S);
+      S[0..12] ^= (cast(T[]) X[0..r])[];
+    }
+  }
+
+  ubyte[] encrypt(ref T[16] S, const(void)[] M, in T v/*domain constant*/){
+    void[] C; //ciphertext
+    C.reserve(M.length);
+
+    for(; M.length; M = M[r..$]){
+      const blockLen = min(M.length, r);
+      S[15] ^= v; F(l, S);
+
+      if(blockLen == r){
+        S[0..12] ^= (cast(T[]) M[0..r])[];
+        C ~= (cast(void[]) S)[0..r];
+      }else{
+        M = pad!r(M);
+        S[0..12] ^= (cast(T[]) M[0..r])[];
+        C ~= (cast(void[]) S)[0..blockLen];
+      }
+    }
+
+    return cast(ubyte[])C;
+  }
+
+  ubyte[] decrypt(ref T[16] S, const(void)[] C, in T v/*domain constant*/){
+    enum r = T.sizeof*12;
+
+    void[] M; //reconstructed message
+    M.reserve(C.length);
+
+    while(C.length){
+      const blockLen = min(C.length, r);
+      S[15] ^= v; F(l, S);
+
+      if(blockLen == r){ //full block
+        S[0..12] ^= (cast(T[])C[0..r])[];
+        M ~= S[0..12];
+        S[0..12] = (cast(T[])C[0..r])[];
+      }else{
+        auto MLast = (cast(ubyte[]) S[])[0..blockLen].dup;  //todo: ez qrvalassu
+        MLast[] ^= (cast(ubyte[])C)[0..blockLen];
+        M ~= MLast;
+        S[0..12] ^= (cast(T[]) pad!r(MLast))[];
+      }
+
+      C = C[blockLen..$];
+    }
+
+    return cast(ubyte[])M;
+  }
+
+  ubyte[] finalize(ref T[16] S, in T[4] k, in T v/*domain constant*/){
+    S[15] ^= v;
+    F(l, S);
+    S[12..16] ^= k[];
+    F(l, S);
+    S[12..16] ^= k[];
+    return (cast(ubyte[]) S)[$-(t/8)..$].dup;  //kibaszott dup nagyon kell ide
+  }
+
+  auto testVector(){
+    struct Res{
+      ubyte[4*T.sizeof] K, N;
+      ubyte[128] A, M, Z;
+    }
+    Res res;
+    with(res){
+      fill(K);
+      fill(N, 0x20);
+      fill(A);
+      fill(M);
+      fill(Z);
+    }
+    return res;
+  }
+
+  auto crypt(bool doTests=false, bool doDecrypt=false)(const(void)[] K, const(void)[] N, const(void)[] A, const(void)[] M, const(void)[] Z){
+
+    static void test(int idx, string caption, T, string file=__FILE__, int line=__LINE__)(const T[] a){
+      static if(doTests){
+        string expected;
+        static if(instance=="NORX32-4-1"){
+          expected = [
+            "7DD54975 C374FFC8 1DF66F83 08CEF7E9 CA5295E8 8E1E6324 538244DA 3091DC5D 5288E900 EDDAFB81 1A345AE0 933EC3AB BED76EB5 8B64D948 A59BD31B 6BBBD034",
+            "2DFDA46B 956D99E2 DE62A45D 59A4AD56 F9A5411A 759C0658 45CF1EA3 A9515464 60CCA3C1 A29F076D FAA12E42 EA22ED90 7D10BA9D 407E2C5B 97DC4FA4 80401262",
+            "9769850C 41240274 A264E03A B808815A 9285A6D3 8665C774 ED279CE2 9571FB11 F39624ED 3DCE8561 81879FF2 45B5E234 10D6694E AFF8A691 9991AECE BFFA4576",
+            "BBAB2C4A 42BF34A5 3AD53DFA AF184F4D 66A33356 481AAE25 471E110F 9FBC7740 33A4CBDB 5CA77A41 ABCDF216 1A213FE2 353816EC 8EFF5ABE 3FB2298B E4A9EC82",
+            "97537D63 63AC168C 6CEF0F5B EC0114E9 D6A022EC FF4395E0 4F29B8B5 B8CC8998 D92C5C49 74BA3CEF 964EEDD3 23DF1024 BCE454D5 89B75B6B EA597754 47CFFFCD",
+            "6C E9 4C B5 48 B2 0F ED 7B 68 C6 AC 60 AC 4C B5 EB B1 F0 9A EC 5A 75 0E CF 50 EC 0E 64 93 8B F2 40 17 A4 FF 06 84 F8 08 A6 7C 19 6C 31 A0 AF 12 56 9B E5 F7 C5 6A D3 BC AC 88 DA 36 86 57 5F 93 43 96 8D A2 20 77 EE CC E7 D6 63 17 49 08 A3 F7 3C 9E 9A C1 49 B5 CE 6B E6 9C 9E 31 7C D7 E7 E8 0C 85 69 97 74 02 24 41 3A E0 64 A2 5A 81 08 B8 D3 A6 85 92 74 C7 65 86 E2 9C 27 ED 11 FB 71 95",
+            "D5 54 E4 BC 6B 5B B7 89 54 77 59 EA CD FF CF 47"][idx];
+        }else static if(instance=="NORX64-4-1"){
+          expected = [
+            "ED1C05E4E034B18B A98C191C6015FA6D 288C3313ACF5E185 94E37DCA8C2B520F 841D5FBE319581DE 6BA9AE4E997C10DF 9ACC31C63498AAB8 BC4F4AA085B8FAD9 24A958D377B4FBBF 8DDB5DC488A3A710 7F776980AAA321EF 4D4C321A44EE66D9 C6439632673FBDC2 950244CDFEAEA45E EB8B0AFF16BEDBE0 68A7A80B2838111F",
+            "07D9A7A131D4D6E0 5B60B0B0847E0416 57F3CB734EC314B3 F9CFDC4B605A6CCC 5E3F25A15BF57819 3501EA9EDDF5CC6C 69BAAF08D99F96C2 CF86E9721020F64E 3352D33F5677CBC4 331C29A0674FEF14 CB74AFFFA9BD69D9 5810E32F833F0370 44C3442263959E68 522FC8BBFE971C48 4EC92E818EA35AD3 BB223CBC51462414",
+            "A4461CDB6586E74B BDDF7652BF4F1AB0 DCF86684B8BFEB30 D870D0D016787A89 C5DC8F2CC92A2D60 404DE2D5457A5178 8A2475887B1ABF74 AD5BEFE2F99B111F D258C60C34FC528A 69C0DA88A6C5CD25 3328D007C5C35CC3 3744B8E898EC83DD 70AB4D51F1570C40 5E3331A6663C18EE BA01BA7CFDF2C4BF 36FA274968BF8B0A",
+            "B1B64376441A2AB0 2F5BE2578863D5EC 66F953E878E37E6B EEE236C48DEDFFEE 6778F573276FDF5F E3C3E60EDC6DB52D B0AAEFFFF4764978 2A0F46F39ED63CF1 A9C34DCB7057873C 594CC2D6E926D398 D85F144A45107F10 EE584A7C1D80E6D3 7B763E9FCBB1F9D3 9A55D3CAC654F97A 9308DF76F6D7995E 6D9E59C21CC59E3B",
+            "45D70450C188B282 44CB44A8ACC7D823 6CF99985A76DD706 F76D93B792F90C83 BCB8EC0B3370F727 011728D02D035E19 CC7972F3E89E595A A75510060F10F800 D3314C7CDF7C4C99 52A16E0D4BD61F3C 4EA70ACD1A1F1D3A B56927EF60BB58D4 7623A30533FAF2D1 3F3089C9D1613AE2 E4175BA55A93BDBF 8E4073C4334725E7",
+            "C0 81 6E 50 8A E4 A0 50 0B 93 38 7B BB AB C2 41 AC 42 38 7E F5 E8 BF 0E C3 82 6C ED E1 66 A1 D5 CA A3 E8 D6 2C D6 41 B3 FA F2 AA 2A DD E3 E5 ED 0A 13 BD 8B 96 D5 F0 FB 7F E3 9C A7 80 95 31 75 E2 45 BC 3E 53 4B 80 0E 96 46 77 1F 13 EA 40 85 CB 3E 26 7F 10 6F 5F 17 A0 64 FF 23 4A 02 7C 64 4B E7 86 65 DB 1C 46 A4 B0 1A 4F BF 52 76 DF BD 30 EB BF B8 84 66 F8 DC 89 7A 78 16 D0 D0 70 D8",
+            "D1 F2 FA 33 05 A3 23 76 E2 3A 61 D1 C9 89 30 3F BF BD 93 5A A5 5B 17 E4 E7 25 47 33 C4 73 40 8E"][idx];
+        }else{
+          WARN(instance ~ " is not covered by tests.");
+          return;
+        }
+        auto actual = format("%(%."~(T.sizeof*2).text~"X %)", a);
+
+        enforceDiff(expected, actual, format!"Test failed %s %s"(instance, caption), file, line);
+      }
+    }
+
+    struct Res{
+      ubyte[] data;
+      ubyte[] tag;
+      alias data this;
+    }
+    Res res;
+
+    const k = prepareKey(K),
+          n = prepareKey(N);
+    auto S = initialize(k, n);   test!(0, "S after initialize")(S);
+             absorb  (S, A, 1);  test!(1, "S after header"    )(S);
+
+    static if(doDecrypt){
+      res.data  = decrypt (S, M, 2);
+    }else{
+      res.data  = encrypt (S, M, 2);  test!(2, "S after message"   )(S);
+    }
+
+               absorb  (S, Z, 4);  test!(3, "S after trailer"   )(S);
+    res.tag  = finalize(S, k, 8);  test!(4, "S after finalize"  )(S);
+
+    if(doTests){
+      test!(5, "cipherText")(res.data);
+      test!(6, "tag"       )(res.tag);
+    }
+
+    return res;
+  }
+
+public static: // public declarations ////////////////////////////////////
+
+  auto encrypt(in void[] key, in void[] nonce, in void[] header, in void[] message, in void[] trailer){ return crypt!(false, false)(key, nonce, header, message, trailer); } //todo: tag checking
+  auto decrypt(in void[] key, in void[] nonce, in void[] header, in void[] crypted, in void[] trailer){ return crypt!(false, true )(key, nonce, header, crypted, trailer); } //todo: tag checking
+
+  //shorthands without header and trailer
+  auto encrypt(in void[] key, in void[] nonce, in void[] message){ return encrypt(key, nonce, [], message, []); }
+  auto decrypt(in void[] key, in void[] nonce, in void[] crypted){ return decrypt(key, nonce, [], crypted, []); }
+
+  bool test(){
+    const tv = testVector;
+    with(tv){
+      //do the detailed tests
+      crypt!(true, false)(K, N, A, M, Z);
+
+      foreach(len; [48, 0, 128, 47, 49]){
+        const X = M[0..len];
+        auto enc = encrypt(K, N, X, X, X);
+        const Y = enc.data;
+        auto dec = decrypt(K, N, X, Y, X);
+
+        auto expected = format("%(%.2X %)", X),
+             actual   = format("%(%.2X %)", dec.data);
+        enforceDiff(expected, actual, "Encrypt/Decrypt test failed. len=%d".format(len));
+      }
+
+    }
+
+    LOG("All tests \33\12passed\33\7.");
+    return true;
+  }
+
+  shared static this(){
+    test;
+  }
+}
+
+void benchmark_norx(){
+  const MB = 100;
+  auto plainText = iota((1<<(20-2))*MB).array;
+  print("generated %d MiB data".format((plainText.length*plainText[0].sizeof) >> 20));
+  auto t0 = QPS;
+  print("encoding");
+  auto enc = norx!(64, 4, 1).encrypt("1234", "nonce", plainText);
+  auto t1 = QPS;
+  print("decoding");
+  auto dec = norx!(64, 4, 1).decrypt("1234", "nonce", enc);
+  auto t2 = QPS;
+  print(plainText.xxh);
+  auto t3 = QPS;
+  print(plainText.crc32);
+  auto t4 = QPS;
+  print("comparing");
+  enforce(cast(ubyte[])plainText == cast(ubyte[])dec);
+
+  print("MB/s: enc:", MB/(t1-t0), "dec:", MB/(t2-t1), "xxh:", MB/(t3-t2), "crc32:", MB/(t4-t3));
 }
 
 
@@ -4351,7 +4725,9 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   //todo: functional tests: nem ide kene
   //functional tests
   enforce(xxh("hello")==0xfb0077f9);
+  enforce(xxh("Nobody inspects the spammish repetition", 123456) == 0xc2845cee);
   enforce(crc32("Hello")==0xf7d18982);
+  enforce(crc32("Nobody inspects the spammish repetition") == 0xAD4270ED);
 
   enforce(maskLowBits(0)==0);
   enforce(maskLowBits(1)==1);
