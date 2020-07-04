@@ -16,6 +16,19 @@ Bitmap newBitmap(in File file, bool mustExist=true){
   return newBitmap(file.fullName, mustExist);
 }
 
+
+private __gshared Bitmap function(string)[string] customBitmapLoaders;
+
+void registerCustomBitmapLoader(string prefix, Bitmap function(string) loader)
+in(prefix.length>=2, "invalid prefix string")
+{
+  prefix = prefix.lc;
+  enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
+
+  customBitmapLoaders[prefix] = loader;
+}
+
+
 Bitmap newBitmap(string fn, bool mustExist=true){
   // split prefix:\line
   auto prefix = fn.until!(not!isAlphaNum).text;
@@ -45,26 +58,13 @@ Bitmap newBitmap(string fn, bool mustExist=true){
 
     tmp.rgba.clear(RGBA(0xFF000000 | color));
     return tmp;
-  }else if(prefix=="colormap"){
-    auto width = 128;
-    //auto raw = colorMaps[line].toArray!RGBA(width);
-    auto raw = [RGBA(255, 0, 128, 255)].replicate(width);
-    //return new Bitmap(File(`c:\dl\transgendha.webp`).read);
-
-//DEBUGIMG = true;
-//LOG(fn, "GECI");
-    auto img = new Image!RGBA(raw, width/4, 4);
-//1.print;readln;
-    auto bmp = new Bitmap(img);
-//2.print;readln;
-//    bmp.saveTo(File(`c:\dl\a.bmp`));
-//DEBUGIMG = false;
-    return bmp;
-//    return null;
   }else{
-    raise("Unknown prefix: "~prefix~`:\`);
+    auto loader = prefix in customBitmapLoaders;
+    if(loader)
+      return (*loader)(line);
   }
 
+  raise("Unknown prefix: "~prefix~`:\`);
   return null; //raise is not enough
 
 //  if(fn.startsWith(`screenShot:\`)){

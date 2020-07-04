@@ -18,7 +18,8 @@ class ColorMap{
   abstract RGB eval(float x);
 
   T[] toArray(T=RGB)(int len){
-    float invLen = 1.0f/std.algorithm.max(len-1, 1);  //todo: import std.algorithm : fuckmin=min, fuckmax=max; //todo: ezt a max/min problemat egyszer s mindenkorra megoldani
+    import std.algorithm: max;
+    float invLen = 1.0f/max(len-1, 1);  //todo: import std.algorithm : fuckmin=min, fuckmax=max; //todo: ezt a max/min problemat egyszer s mindenkorra megoldani
     return iota(len).map!(i => eval(i*invLen).to!T).array;
   }
 
@@ -229,6 +230,8 @@ class ColorMaps{
 
   auto opDispatch(string name)(){ return byName[name]; }
 
+  bool opBinaryRight(string op)(string lhs) const if(op=="in") { return (lhs in byName) !is null; }
+
   int opApply(int delegate(ColorMap) dg){
     int result = 0;
     foreach(c; byIndex){
@@ -239,10 +242,23 @@ class ColorMaps{
   }
 }
 
+Bitmap colorMapBitmapLoader(string def){
+  auto name = def;
+  enforce(name in colorMaps);
+  auto width = 128;
+  auto raw = colorMaps[name].toArray!RGBA(width);
+  auto img = new Image!RGBA(raw, width, 1);
+  auto bmp = new Bitmap(img);
+  return bmp;
+}
+
 
 ColorMaps colorMaps(){ //not threadsafe, but wathever..
   __gshared static ColorMaps maps;
-  if(maps is null) maps = new ColorMaps(true);
+  if(maps is null){
+    maps = new ColorMaps(true);
+    registerCustomBitmapLoader("colormap", &colorMapBitmapLoader);
+  }
   return maps;
 }
 
@@ -294,6 +310,12 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     with(im) Panel(PanelPosition.topLeft, {
       width = PanelWidth;
       vScroll;
+
+      try{
+        if(Btn("int 3")){ asm{ int 3; } }
+      }catch(Throwable){
+        beep;
+      }
 
       void toolHeader(){
         theme = "tool";
