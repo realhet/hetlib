@@ -1,6 +1,6 @@
 module het.image;
 
-import het.utils, het.geometry, jsonizer, core.sys.windows.windows;
+import het.utils, het.geometry, jsonizer, core.sys.windows.windows, std.uni;
 
 import imageformats; //external package
 
@@ -17,16 +17,57 @@ Bitmap newBitmap(in File file, bool mustExist=true){
 }
 
 Bitmap newBitmap(string fn, bool mustExist=true){
-  //FontDeclaration
-  if(fn.isFontDeclaration){
+  // split prefix:\line
+  auto prefix = fn.until!(not!isAlphaNum).text;
+  auto line = fn;
+  if(prefix.length>1 && fn[prefix.length..$].startsWith(`:\`)){
+    line = fn[prefix.length+2..$];
+    prefix = prefix.lc;
+  }else{
+    prefix = "";
+  }
+
+  if(prefix==""){ //threat it as a simple filename
+    return new Bitmap(File(fn).read(mustExist));
+  }else if(prefix=="font"){
     version(D2D_FONT_RENDERER){
       return bitmapFontRenderer.renderDecl(fn); //todo: error handling, mustExists
     }else{
       enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!");
     }
+  }else if(prefix=="screen"){
+    raise("screen(shot) is not implemented");
+  }else if(prefix=="debug"){ //debug images
+    auto tmp = new Bitmap(1600, 1200, 4);
+
+    uint color = (line.to!int)>>1;
+    color = color | (255-color)<<8;
+
+    tmp.rgba.clear(RGBA(0xFF000000 | color));
+    return tmp;
+  }else if(prefix=="colormap"){
+    auto width = 128;
+    //auto raw = colorMaps[line].toArray!RGBA(width);
+    auto raw = [RGBA(255, 0, 128, 255)].replicate(width);
+    //return new Bitmap(File(`c:\dl\transgendha.webp`).read);
+
+//DEBUGIMG = true;
+//LOG(fn, "GECI");
+    auto img = new Image!RGBA(raw, width/4, 4);
+//1.print;readln;
+    auto bmp = new Bitmap(img);
+//2.print;readln;
+//    bmp.saveTo(File(`c:\dl\a.bmp`));
+//DEBUGIMG = false;
+    return bmp;
+//    return null;
+  }else{
+    raise("Unknown prefix: "~prefix~`:\`);
   }
 
-  if(fn.startsWith(`screenShot:\`)){
+  return null; //raise is not enough
+
+//  if(fn.startsWith(`screenShot:\`)){
     //todo: screenshot implementalasa
 
 /*   auto gBmp = new GdiBitmap(V2i(screenWidth, screenHeight), 4);
@@ -58,21 +99,12 @@ Bitmap newBitmap(string fn, bool mustExist=true){
     DeleteDC(hDC);
     ReleaseDC(NULL, hScreen);
     DeleteObject(hBitmap);*/
-  }
+//  }
 
   //debug images
-  if(fn.startsWith(`debug:\`)){
-    auto tmp = new Bitmap(1600, 1200, 4);
-
-    uint color = (fn[7..$].to!int)>>1;
-    color = color | (255-color)<<8;
-
-    tmp.rgba.clear(RGBA(0xFF000000 | color));
-    return tmp;
-  }
 
   //otherwise File
-  return new Bitmap(File(fn).read(mustExist));
+//  return new Bitmap(File(fn).read(mustExist));
 }
 
 // utility stuff //////////////////////////////////////////////////////////
@@ -363,11 +395,22 @@ public:
   }
 
   @jsonize this(T[] data=null, int width=0, int height=0, int pitch=-1, bool dup=false){
+
+LOG("IMAGE THIS1");
     acquire(data, width, height, pitch, dup);
   }
 
   this(void[] data=null, int width=0, int height=0, int pitch=-1, bool dup=false){
-    acquire(cast(T[])data, width, height, pitch, dup);
+LOG("IMAGE THIS2", data.length, data.length&4, T.sizeof);
+    T[] ca;
+    try{ //todo: ha nem try-except-elek, akkor ez az egesz lenyelodik valahogy feldolgozas NELKUL
+      ca = cast(T[])data; //todo: itt egy convert error van: 512byte RGBA-t akar RGB-re castolni a geci.
+    }catch(Throwable t){
+      auto s = t.text[0..4]; //todo: ha az egesz t.msg textet adom at az ERR-nek, akkor elbaszodik az ERR-en belul.
+      ERR(s);
+    }
+LOG("IMAGE THIS2 CAST SUCCESS", ca);
+    acquire(ca, width, height, pitch, dup);
   }
 
   this(Image!T src, bool dup=false){
@@ -450,6 +493,11 @@ public:
   ref T pix_safe(in V2i p){ return data_[ofs_safe(p)]; }
 
   void acquire(void[] src, int width, int height, int pitch=-1, bool dup=false){
+
+//if(DEBUGIMG){
+  LOG("IMG.ACQUIRE", cast(T[])src, width, height);
+//}
+
     if(src is null){
       realloc(width, height);
       return;

@@ -2,6 +2,8 @@ module het.obj;
 
 import het.utils, std.traits;
 
+// from here it is deprecated ---->8----->8----->8----->8----->8-----
+
 public import jsonizer; //todo: own system for serialization
 
 /*
