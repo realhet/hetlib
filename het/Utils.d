@@ -1859,7 +1859,7 @@ in{
   assert(dstLen>1);
 }body{
   int sLen = min(dstLen-1, src.length);
-  memcpy(dst, src.ptr, sLen);
+  memcpy(dst, src.ptr, sLen);           //todo: this is so naive. Must revisit...
   dst[sLen] = 0; //zero terminated
 }
 

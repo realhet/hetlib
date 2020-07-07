@@ -289,6 +289,12 @@ void ui(ColorMapCategory cat){
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
+pragma(lib, "Psapi.lib");
+
+
+void violate(){
+  asm{ mov RAX,0x123A; mov [RAX], RAX; /*int 3;*/ }
+}
 
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
 
@@ -312,7 +318,72 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
       vScroll;
 
       try{
-        if(Btn("int 3")){ asm{ int 3; } }
+        static installed = false;
+        if(chkSet(installed)){
+
+          import core.sys.windows.windows;
+
+          static exceptionCodeToStr(uint code){
+            enum names = ["ACCESS_VIOLATION", "DATATYPE_MISALIGNMENT", "BREAKPOINT", "SINGLE_STEP", "ARRAY_BOUNDS_EXCEEDED",
+              "FLT_DENORMAL_OPERAND", "FLT_DIVIDE_BY_ZERO", "FLT_INEXACT_RESULT", "FLT_INVALID_OPERATION", "FLT_OVERFLOW",
+              "FLT_STACK_CHECK", "FLT_UNDERFLOW", "INT_DIVIDE_BY_ZERO", "INT_OVERFLOW", "PRIV_INSTRUCTION", "IN_PAGE_ERROR",
+              "ILLEGAL_INSTRUCTION", "NONCONTINUABLE_EXCEPTION", "STACK_OVERFLOW", "INVALID_DISPOSITION", "GUARD_PAGE", "INVALID_HANDLE"];
+            switch(code){
+              static foreach(s ;names) mixin(q{ case EXCEPTION_*: return "*"; }.replace('*', s));
+              default: return format!"%X"(code);
+            }
+          }
+
+          static extern(Windows) LONG filter(EXCEPTION_POINTERS* p){
+            beep;
+            with(p.ExceptionRecord){
+              HMODULE hModule;
+              string moduleFileName;
+              void* moduleBase;
+
+              if(GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, cast(wchar*)ExceptionAddress, &hModule)){
+                wchar[256] tmp;
+                if(GetModuleFileNameW(hModule, tmp.ptr, 256))
+                  moduleFileName = tmp.toStr;
+
+                import core.sys.windows.psapi;
+                MODULEINFO mi;
+                if(GetModuleInformation(GetCurrentProcess, hModule, &mi, mi.sizeof)){
+                  moduleBase = mi.lpBaseOfDll;
+                }
+              }
+
+              string excInfo;
+              if(NumberParameters) excInfo = "info: " ~ ExceptionInformation[0..NumberParameters].map!(a => a.format!"%X").join(", ");
+
+              print("\n\33\14OS Exception:\33\17", exceptionCodeToStr(ExceptionCode), "\33\7at", ExceptionAddress, excInfo);
+
+              if(moduleFileName.length)
+                print("module:", moduleFileName.quoted, "base:", moduleBase, "rel_addr:\33\17", format("%X",ExceptionAddress-moduleBase), "\33\7");
+            }
+
+            if(1){
+              import core.sys.windows.stacktrace;
+              auto st = new StackTrace(0/*skip*/, p.ContextRecord);
+              print(st);
+            }
+
+            print("press any key");
+            auto s = readln;
+
+            return
+              EXCEPTION_EXECUTE_HANDLER;    //exits because probably D runtime has no registered handler
+              //EXCEPTION_CONTINUE_SEARCH;    //exits, because no other exception filters are registered
+              //EXCEPTION_CONTINUE_EXECUTION; //continues, but it becomes an endless as it retriggers an exception on the same error
+          }
+
+          print("Setting up exception filter: ", SetUnhandledExceptionFilter(&filter));
+        }
+
+        if(Btn("int 3")){
+          static bool first;
+          if(chkSet(first)) violate;
+        }
       }catch(Throwable){
         beep;
       }
