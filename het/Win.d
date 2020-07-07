@@ -568,12 +568,13 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
   //window management
-  void show()             { ShowWindow(hwnd, SW_SHOW); }
-  void hide()             { ShowWindow(hwnd, SW_HIDE); }
-  void maximizeWin()      { ShowWindow(hwnd, SW_MAXIMIZE); }
-  void minimizeWin()      { ShowWindow(hwnd, SW_MINIMIZE); }
-  void setFocus()         { SetFocus(hwnd); } //it's only keyboard focus
-  bool isForeground()     { return GetForegroundWindow == hwnd; }
+  void show()                   { ShowWindow(hwnd, SW_SHOW); }
+  void hide()                   { ShowWindow(hwnd, SW_HIDE); }
+  void maximizeWin()            { ShowWindow(hwnd, SW_MAXIMIZE); }
+  void minimizeWin()            { ShowWindow(hwnd, SW_MINIMIZE); }
+  void setFocus()               { SetFocus(hwnd); } //it's only keyboard focus
+  void setForegroundWindow()    { show; SetForegroundWindow(hwnd); }
+  bool isForeground()           { return GetForegroundWindow == hwnd; }
 
 
   RECT clientRect()       { RECT r; GetClientRect(hwnd, &r); return r; }

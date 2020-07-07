@@ -65,9 +65,12 @@ enum {
 }
 
 uint messageBox(HWND hwnd, string text, string caption, uint flags){ //todo:!!!!!!!!!!!!!! zero terminate strings!!!
-  return MessageBoxW(hwnd, text.to!wstring.ptr, caption.to!wstring.ptr, flags);
+  return MessageBoxW(hwnd, text.toUTF16z, caption.toUTF16z, flags);
 }
 
+void showMessage(string text){
+  messageBox(null, text, "", MB_OK);
+}
 
 // browseForFolder /////////////////////////////////////////////////////////////////////////
 

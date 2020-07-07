@@ -98,7 +98,7 @@ import std.windows.registry, core.sys.windows.winreg, core.thread, std.file,
   std.path, std.json, std.digest.digest, std.parallelism, core.runtime, std.traits, std.meta;
 
 import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, STD_OUTPUT_HANDLE, HMODULE,
-  GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow, SetFocus,
+  GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow, SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
   GetStdHandle, GetTempPathW, GetFileTime,
   FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
@@ -294,9 +294,12 @@ static public:
     SetConsoleOutputCP(cp);
   }
 
-  void show()                    { if(chkSet  (visible_)){ ShowWindow (hwnd, SW_SHOW); } }
-  void hide(bool forced=false)   { if(chkClear(visible_) || forced) ShowWindow (hwnd, SW_HIDE); }
-  void showAndFocus()            { show; SetFocus(hwnd); }
+  void show()                   { if(chkSet  (visible_)){ ShowWindow (hwnd, SW_SHOW); } }
+  void hide(bool forced=false)  { if(chkClear(visible_) || forced) ShowWindow (hwnd, SW_HIDE); }
+
+  void setFocus()               { SetFocus(hwnd); } //it's only keyboard focus
+  void setForegroundWindow()    { show; SetForegroundWindow(hwnd); }
+  bool isForeground()           { return GetForegroundWindow == hwnd; }   //this 3 funct is the same in Win class too.
 
   void setPos(int x, int y, int w, int h){ SetWindowPos(hwnd, null, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER); }
 
