@@ -398,7 +398,7 @@ import std.exception : stdEnforce = enforce;
 
 T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
 {
-  if(!value) stdEnforce(0, "Error: "~str, file, line);
+  if(!value) stdEnforce(0, str, file, line);
   return value;
 }
 
@@ -450,18 +450,47 @@ void beep(int MBType = MB_OK){
   MessageBeep(MBType);
 }
 
+string extendExceptionMsg(string lines){
+
+  static string processLine(string line){
+    if(line.isWild("0x????????????????")){
+      auto addr = cast(void*) line[2..$].to!ulong(16);
+      auto mi = getModuleInfoByAddr(addr);
+      line ~= " " ~ mi.location;
+
+      if(line.isWild(`*"*.d", *`)){ //search src line locations in the parameters
+        auto fn = wild[1]~".d";
+        int srcLine;
+        try{ auto tmp = wild[2]; srcLine = parse!int(tmp); }catch(Throwable){}
+        if(srcLine>0 && File(fn).exists)
+          line = format!"%s(%s,1): Error: %s"(fn, srcLine, line);
+      }
+      return line;
+    }
+    if(line.isWild("*@*.d(*): *")){ //exception
+      return format!"%s.d(%s,1): Error: %s: %s"(wild[1], wild[2], wild[0], wild[3]);
+    }
+    return line;
+  }
+
+  return lines.split("\n").map!processLine.filter!(not!empty).join("\n");
+}
+
 void showException(string s) nothrow
 {
   try{
-    string err = simplifyExceptionMsg(s);
+    string err = extendExceptionMsg(s);
+
     if(dbg.isActive){
       dbg.handleException(err);
     }else{
-      console.show;
-//      MessageBeep(MB_ICONERROR); //idegesit :D
+      import core.sys.windows.windows;
+      MessageBeep(MB_ICONERROR); //idegesit :D
       writeln("\33\14"~err~"\33\7");
       writeln("Press Enter to continue...");
+      console.setForegroundWindow;
       readln;
+      application.exit;
     }
   }catch(Throwable o){}
 }
@@ -482,6 +511,194 @@ string simplifiedMsg(Throwable t){
   }
   return s.join("\n");
 }
+
+// Filter for OS exceptions //////////////////////////
+
+pragma(lib, "Psapi.lib");
+
+class ExeMapFile{
+  ulong baseAddr;
+
+  struct Rec{
+    string mangledName;
+    ulong addr;
+    string objName;
+
+    string name(){
+      import std.demangle;
+      return demangle(mangledName);
+    }
+  }
+
+  Rec[] list;
+
+  this(File fn){
+    foreach(line; fn.readLines(false)){
+      auto p = line.split.array;
+      switch(p.length){
+        case 5:{
+          if(p[0]=="Preferred") baseAddr = p[4].to!ulong(16);
+        } break;
+        case 6:{
+          if(p[0].isWild("0001:*")){
+            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
+          }
+        } break;
+        /*case 4:{ //this is DATA, not CODE
+          if(p[0].isWild("0002:*") && !p[2].startsWith(".")){
+            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
+          }
+        } break;*/
+        default:
+      }
+    }
+
+    list = list.sort!"a.addr < b.addr".array; //not sure if already sorted
+  }
+
+  string locate(ulong relAddr){
+    foreach(idx; 1..list.length)
+      if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
+        return list[idx-1].name;
+    return "";
+  }
+}
+
+
+ExeMapFile exeMapFile(){
+  __gshared static ExeMapFile map;
+  if(map is null)
+    map = new ExeMapFile(appFileName.otherExt("map"));
+  return map;
+}
+
+
+auto exceptionCodeToStr(uint code){
+  import core.sys.windows.windows;
+  enum names = ["ACCESS_VIOLATION", "DATATYPE_MISALIGNMENT", "BREAKPOINT", "SINGLE_STEP", "ARRAY_BOUNDS_EXCEEDED",
+    "FLT_DENORMAL_OPERAND", "FLT_DIVIDE_BY_ZERO", "FLT_INEXACT_RESULT", "FLT_INVALID_OPERATION", "FLT_OVERFLOW",
+    "FLT_STACK_CHECK", "FLT_UNDERFLOW", "INT_DIVIDE_BY_ZERO", "INT_OVERFLOW", "PRIV_INSTRUCTION", "IN_PAGE_ERROR",
+    "ILLEGAL_INSTRUCTION", "NONCONTINUABLE_EXCEPTION", "STACK_OVERFLOW", "INVALID_DISPOSITION", "GUARD_PAGE", "INVALID_HANDLE"];
+  switch(code){
+    static foreach(s ;names) mixin(q{ case EXCEPTION_*: return "*"; }.replace('*', s));
+    default: return format!"%X"(code);
+  }
+}
+
+auto getModuleInfoByAddr(void* addr){
+  struct Res{
+    HMODULE handle;
+    File fileName;
+    void* base;
+    size_t size;
+    string location;
+  }
+
+  Res res; with(res){
+    import core.sys.windows.windows;
+    if(GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                         GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, cast(wchar*)addr, &handle)){
+      wchar[256] tmp;
+      if(GetModuleFileNameW(handle, tmp.ptr, 256))
+        fileName = File(tmp.toStr);
+
+      import core.sys.windows.psapi;
+      MODULEINFO mi;
+      if(GetModuleInformation(GetCurrentProcess, handle, &mi, mi.sizeof)){
+        base = mi.lpBaseOfDll;
+        size = mi.SizeOfImage;
+
+        if(fileName==appFileName)
+          res.location = exeMapFile.locate(addr-base);
+
+        if(location.empty)
+          location = fileName.fullName.quoted;
+      }
+    }
+
+  }
+
+  return res;
+}
+
+void installExceptionFilter(){
+
+  __gshared static installed = false;
+  if(!chkSet(installed)) return;
+
+  import core.sys.windows.windows;
+
+  static extern(Windows) LONG filter(EXCEPTION_POINTERS* p){
+    string msg;
+    with(p.ExceptionRecord){
+
+      auto mi = getModuleInfoByAddr(ExceptionAddress);
+
+      string excInfo;
+      if(NumberParameters) excInfo = "info: " ~ ExceptionInformation[0..NumberParameters].map!(a => a.format!"%X").join(", ");
+
+      //print("\n\33\14OS Exception:\33\17", exceptionCodeToStr(ExceptionCode), "\33\7at", ExceptionAddress, excInfo);
+      msg = format!"Error: OS Exception: %s at %s %s"(exceptionCodeToStr(ExceptionCode), ExceptionAddress, excInfo);
+
+      //if(mi.handle){
+        //print("module:", mi.fileName.fullName.quoted, "base:", mi.base, "rel_addr:\33\17", format("%X",ExceptionAddress-mi.base), mi.location, "\33\7");
+        //msg ~= "\n" ~ mi.location;  //not needed, already in stack trace
+      //}
+    }
+
+    if(1){ //stacktrace
+      import core.sys.windows.stacktrace;
+      auto st = new StackTrace(0/*skip frames*/, p.ContextRecord);
+      msg ~= "\n----------------\n"~st.text;
+      /*foreach(s; st.text.splitLines){
+        write(s, " ");
+
+        if(s.isWild("0x????????????????")){
+          auto addr = cast(void*) s[2..$].to!ulong(16);
+          write(addr, " \33\13");
+          auto mi = getModuleInfoByAddr(addr);
+          if(mi.handle){
+            auto relAddr = cast(ulong) (addr-mi.base);
+            write(mi.fileName.name, ":", relAddr.format!"%X");
+
+            write(" ", mi.location);
+          }
+        }
+
+        writeln("\33\7");
+      }*/
+      //print(st);
+    }
+
+    //if(0) print((*(p.ContextRecord)).toJson);
+
+    //todo: Break point handling
+    // Decide what to do. On BREAKPOINT it is possible to continue.
+    /*if(p.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT){
+      console.setForegroundWindow;
+      write("Continue (y/n) ? ");
+      auto s = readln;
+      if(s.lc.strip == "y"){
+        if(mainWindow) mainWindow.setForegroundWindow;
+
+        p.ContextRecord.Rip ++; //advance IP
+        return EXCEPTION_CONTINUE_EXECUTION;
+      }
+    }else{
+      write("Press enter to exit..."); readln;
+    }*/
+
+    showException(msg);
+
+    return
+      EXCEPTION_EXECUTE_HANDLER;    //exits because D runtime has no registered handler
+      //EXCEPTION_CONTINUE_SEARCH;    //exits, unhandled by this filter.
+      //EXCEPTION_CONTINUE_EXECUTION; //continues, but it becomes an endless as it retriggers an exception on the same error
+  }
+
+  LOG("Setting up exception filter: ", SetUnhandledExceptionFilter(&filter));
+}
+
 
 void selftest(T)(lazy const T a, uint xb, string name, string notes="", string file=__FILE__, int line=__LINE__){
 version(disableselftest){ return; }else{
@@ -3919,7 +4136,7 @@ if(__traits(isStaticFunction, fun))
     try{
       obj = fun(text);
     }catch(Throwable t){
-      error = t.simplifiedMsg;
+      error = simplifiedMsg(t);
     }
 
     loaded[file] = Rec(file, actModified, obj, error); //todo: fileRead and getDate should be system-wide-atomic

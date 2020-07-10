@@ -634,12 +634,14 @@ public:
     try{
       onPaint;
     }catch(Throwable o){
-      auto s = simplifyExceptionMsg(o.toString);
-      if(dbg.isActive){
-        dbg.handleException(s);
+
+      /*if(dbg.isActive){
+        dbg.handleException(extendExceptionMsg(o.text));
       }else{
-        paintErrorStr = s;
-      }
+        paintErrorStr = simplifiedMsg(o);  // <- this is meaningless. Must handle all the exceptions!!!
+      }*/
+
+      showException(o);
     }
   }
 

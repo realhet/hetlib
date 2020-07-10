@@ -219,6 +219,8 @@ string _DATABRKMIXIN(string p) {
   return `_DATALOGMIXINFUNCT(`~p~`, q{`~p~`})`;
 }
 
+// deprecated map file handling
+/+
 private struct ProjectMapFile{
   struct Entry{
     uint min, max;
@@ -312,3 +314,5 @@ string simplifyExceptionMsg(string msg)
 
   return msg.split("\n").map!(x => findMapFunct(x)).filter!q{!a.empty}.join("\r\n");
 }
++/
+

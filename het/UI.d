@@ -1830,6 +1830,8 @@ static cnt=0;
       }else static if(is(Unqual!t == TextStyle)){
         if(chkSet(restoreTextStyle)) oldTextStyle = textStyle;
         textStyle = a;
+      }else static if(is(Unqual!t == RGB)){
+        textStyle.fontColor = a;
       }
     }}
 

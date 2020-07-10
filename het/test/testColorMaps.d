@@ -22,13 +22,6 @@ class ColorMap{
     float invLen = 1.0f/max(len-1, 1);  //todo: import std.algorithm : fuckmin=min, fuckmax=max; //todo: ezt a max/min problemat egyszer s mindenkorra megoldani
     return iota(len).map!(i => eval(i*invLen).to!T).array;
   }
-
-//todo: bitmapot nem lehet csinalni, mert ha includeolom a het.image-t, akkor circular module initializationnal beszarik az exe
-/*  Bitmap toBitmap(int width){
-    auto data = toArray!RGBA8(width);
-    auto img = new Image!RGBA8(data, width, 1);
-    return new Bitmap(img);
-  }*/
 }
 
 
@@ -288,187 +281,6 @@ void ui(ColorMapCategory cat){
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-
-pragma(lib, "Psapi.lib");
-
-class ExeMapFile{
-  ulong baseAddr;
-
-  struct Rec{
-    string mangledName;
-    ulong addr;
-    string objName;
-
-    string name(){
-      import std.demangle;
-      return demangle(mangledName);
-    }
-  }
-
-  Rec[] list;
-
-  this(File fn){
-    foreach(line; fn.readLines(false)){
-      auto p = line.split.array;
-      switch(p.length){
-        case 5:{
-          if(p[0]=="Preferred") baseAddr = p[4].to!ulong(16);
-        } break;
-        case 6:{
-          if(p[0].isWild("0001:*")){
-            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
-          }
-        } break;
-        /*case 4:{ //this is DATA, not CODE
-          if(p[0].isWild("0002:*") && !p[2].startsWith(".")){
-            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
-          }
-        } break;*/
-        default:
-      }
-    }
-
-    //list = list.sort!"a.addr < b.addr".array; //already sorted
-  }
-
-  string locate(ulong relAddr){
-    auto idx = list.map!(r => relAddr < r.addr).countUntil(true);
-    return idx>=0 ? list[idx].name
-                  : "";
-  }
-}
-
-
-ExeMapFile exeMapFile(){
-  __gshared static ExeMapFile map;
-  if(map is null)
-    map = new ExeMapFile(appFileName.otherExt("map"));
-  return map;
-}
-
-
-void installExceptionFilter(){
-
-  __gshared static installed = false;
-  if(!chkSet(installed)) return;
-
-  import core.sys.windows.windows;
-
-  static exceptionCodeToStr(uint code){
-    enum names = ["ACCESS_VIOLATION", "DATATYPE_MISALIGNMENT", "BREAKPOINT", "SINGLE_STEP", "ARRAY_BOUNDS_EXCEEDED",
-      "FLT_DENORMAL_OPERAND", "FLT_DIVIDE_BY_ZERO", "FLT_INEXACT_RESULT", "FLT_INVALID_OPERATION", "FLT_OVERFLOW",
-      "FLT_STACK_CHECK", "FLT_UNDERFLOW", "INT_DIVIDE_BY_ZERO", "INT_OVERFLOW", "PRIV_INSTRUCTION", "IN_PAGE_ERROR",
-      "ILLEGAL_INSTRUCTION", "NONCONTINUABLE_EXCEPTION", "STACK_OVERFLOW", "INVALID_DISPOSITION", "GUARD_PAGE", "INVALID_HANDLE"];
-    switch(code){
-      static foreach(s ;names) mixin(q{ case EXCEPTION_*: return "*"; }.replace('*', s));
-      default: return format!"%X"(code);
-    }
-  }
-
-  static auto getModuleInfoByAddr(void* addr){
-    struct Res{
-      HMODULE handle;
-      File fileName;
-      void* base;
-      size_t size;
-      string location;
-    }
-
-    Res res; with(res){
-
-      if(GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                           GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, cast(wchar*)addr, &handle)){
-        wchar[256] tmp;
-        if(GetModuleFileNameW(handle, tmp.ptr, 256))
-          fileName = File(tmp.toStr);
-
-        import core.sys.windows.psapi;
-        MODULEINFO mi;
-        if(GetModuleInformation(GetCurrentProcess, handle, &mi, mi.sizeof)){
-          base = mi.lpBaseOfDll;
-          size = mi.SizeOfImage;
-
-          if(fileName==appFileName){
-
-            res.location = exeMapFile.locate(addr-base);
-            //auto map = exeMapFile;
-
-
-            //__gshared static
-          }
-
-        }
-      }
-
-    }
-
-    return res;
-  }
-
-  static extern(Windows) LONG filter(EXCEPTION_POINTERS* p){
-    beep;
-    with(p.ExceptionRecord){
-
-      auto mi = getModuleInfoByAddr(ExceptionAddress);
-
-      string excInfo;
-      if(NumberParameters) excInfo = "info: " ~ ExceptionInformation[0..NumberParameters].map!(a => a.format!"%X").join(", ");
-
-      print("\n\33\14OS Exception:\33\17", exceptionCodeToStr(ExceptionCode), "\33\7at", ExceptionAddress, excInfo);
-
-      if(mi.handle)
-        print("module:", mi.fileName.fullName.quoted, "base:", mi.base, "rel_addr:\33\17", format("%X",ExceptionAddress-mi.base), mi.location, "\33\7");
-    }
-
-    if(1){
-      import core.sys.windows.stacktrace;
-      auto st = new StackTrace(0/*skip*/, p.ContextRecord);
-      foreach(s; st.text.splitLines){
-        write(s, " ");
-
-        if(s.isWild("0x????????????????")){
-          auto addr = cast(void*) s[2..$].to!ulong(16);
-          write(addr, " \33\13");
-          auto mi = getModuleInfoByAddr(addr);
-          if(mi.handle){
-            auto relAddr = cast(ulong) (addr-mi.base);
-            write(mi.fileName.name, ":", relAddr.format!"%X");
-
-            write(" ", mi.location);
-          }
-        }
-
-        writeln("\33\7");
-      }
-      //print(st);
-    }
-
-    if(0) print((*(p.ContextRecord)).toJson);
-
-    // Decide what to do. On BREAKPOINT it is possible to continue.
-    if(p.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT){
-      console.setForegroundWindow;
-      write("Continue (y/n) ? ");
-      auto s = readln;
-      if(s.lc.strip == "y"){
-        if(mainWindow) mainWindow.setForegroundWindow;
-
-        p.ContextRecord.Rip ++; //advance IP
-        return EXCEPTION_CONTINUE_EXECUTION;
-      }
-    }else{
-      write("Press enter to exit..."); readln;
-    }
-
-    return
-      EXCEPTION_EXECUTE_HANDLER;    //exits because D runtime has no registered handler
-      //EXCEPTION_CONTINUE_SEARCH;    //exits, unhandled by this filter.
-      //EXCEPTION_CONTINUE_EXECUTION; //continues, but it becomes an endless as it retriggers an exception on the same error
-  }
-
-  LOG("Setting up exception filter: ", SetUnhandledExceptionFilter(&filter));
-}
 
 
 void violate(){
@@ -497,16 +309,16 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
       width = PanelWidth;
       vScroll;
 
-      try{
+      //try{
         installExceptionFilter;
         Row({
           if(Btn("int 3")) asm{ int 3; }
           if(Btn("accessv write")) asm{ mov RAX,0x1234; mov [RAX], RAX; }
           if(Btn("accessv read" )) asm{ mov RAX,0x1234; mov RAX, [RAX]; }
+          if(Btn("raise" )) raise("custom exception");
+          if(Btn("throw" )) throw new Exception("custom exception");
         });
-      }catch(Throwable){
-
-      }
+      //}catch(Throwable){ }
 
       void toolHeader(){
         theme = "tool";

@@ -395,22 +395,11 @@ public:
   }
 
   @jsonize this(T[] data=null, int width=0, int height=0, int pitch=-1, bool dup=false){
-
-LOG("IMAGE THIS1");
     acquire(data, width, height, pitch, dup);
   }
 
   this(void[] data=null, int width=0, int height=0, int pitch=-1, bool dup=false){
-LOG("IMAGE THIS2", data.length, data.length&4, T.sizeof);
-    T[] ca;
-    try{ //todo: ha nem try-except-elek, akkor ez az egesz lenyelodik valahogy feldolgozas NELKUL
-      ca = cast(T[])data; //todo: itt egy convert error van: 512byte RGBA-t akar RGB-re castolni a geci.
-    }catch(Throwable t){
-      auto s = t.text[0..4]; //todo: ha az egesz t.msg textet adom at az ERR-nek, akkor elbaszodik az ERR-en belul.
-      ERR(s);
-    }
-LOG("IMAGE THIS2 CAST SUCCESS", ca);
-    acquire(ca, width, height, pitch, dup);
+    acquire(data, width, height, pitch, dup);
   }
 
   this(Image!T src, bool dup=false){
@@ -493,11 +482,6 @@ LOG("IMAGE THIS2 CAST SUCCESS", ca);
   ref T pix_safe(in V2i p){ return data_[ofs_safe(p)]; }
 
   void acquire(void[] src, int width, int height, int pitch=-1, bool dup=false){
-
-//if(DEBUGIMG){
-  LOG("IMG.ACQUIRE", cast(T[])src, width, height);
-//}
-
     if(src is null){
       realloc(width, height);
       return;
