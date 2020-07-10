@@ -292,6 +292,62 @@ void ui(ColorMapCategory cat){
 
 pragma(lib, "Psapi.lib");
 
+class ExeMapFile{
+  ulong baseAddr;
+
+  struct Rec{
+    string mangledName;
+    ulong addr;
+    string objName;
+
+    string name(){
+      import std.demangle;
+      return demangle(mangledName);
+    }
+  }
+
+  Rec[] list;
+
+  this(File fn){
+    foreach(line; fn.readLines(false)){
+      auto p = line.split.array;
+      switch(p.length){
+        case 5:{
+          if(p[0]=="Preferred") baseAddr = p[4].to!ulong(16);
+        } break;
+        case 6:{
+          if(p[0].isWild("0001:*")){
+            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
+          }
+        } break;
+        /*case 4:{ //this is DATA, not CODE
+          if(p[0].isWild("0002:*") && !p[2].startsWith(".")){
+            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
+          }
+        } break;*/
+        default:
+      }
+    }
+
+    //list = list.sort!"a.addr < b.addr".array; //already sorted
+  }
+
+  string locate(ulong relAddr){
+    auto idx = list.map!(r => relAddr < r.addr).countUntil(true);
+    return idx>=0 ? list[idx].name
+                  : "";
+  }
+}
+
+
+ExeMapFile exeMapFile(){
+  __gshared static ExeMapFile map;
+  if(map is null)
+    map = new ExeMapFile(appFileName.otherExt("map"));
+  return map;
+}
+
+
 void installExceptionFilter(){
 
   __gshared static installed = false;
@@ -334,7 +390,12 @@ void installExceptionFilter(){
           size = mi.SizeOfImage;
 
           if(fileName==appFileName){
-            __gshared static
+
+            res.location = exeMapFile.locate(addr-base);
+            //auto map = exeMapFile;
+
+
+            //__gshared static
           }
 
         }
