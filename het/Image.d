@@ -33,6 +33,15 @@ in(prefix.length>=2, "invalid prefix string")
   customBitmapLoaders[prefix] = loader;
 }
 
+Bitmap colorMapBitmapLoader(string def){
+  auto name = def;
+  enforce(name in colorMaps);
+  auto width = 128;
+  auto raw = colorMaps[name].toArray!RGBA(width);
+  auto img = new Image!RGBA(raw, width, 1);
+  auto bmp = new Bitmap(img);
+  return bmp;
+}
 
 Bitmap newBitmap(string fn, bool mustSucceed=true){
   // split prefix:\line
@@ -1778,3 +1787,7 @@ dchar segoeSymbolByName(string name){
   readln;
   application.exit;
 }*/
+
+shared static this(){
+  registerCustomBitmapLoader("colormap", &colorMapBitmapLoader);
+}
