@@ -1136,6 +1136,10 @@ class Drawing {
         vec2 t0 = info.pos;
         vec2 t1 = info.pos+info.size;
 
+        //adjust to the textel centers
+        t0 += vec2(.5, .5);
+        t1 -= vec2(.5, .5);
+
         //enlarge for boldness
         if(isBold){
           float o = info.size.y*BoldOffset;

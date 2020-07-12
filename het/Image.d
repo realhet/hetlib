@@ -12,10 +12,15 @@ version = D2D_FONT_RENDERER;
 //todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
 auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
 
-Bitmap newBitmap(in File file, bool mustExist=true){
-  return newBitmap(file.fullName, mustExist);
+Bitmap errorBitmap(){
+//  __gshared static Bitmap b;
+//  if(b is null) b =
+  return new Bitmap(new Image!RGBA([0xFFFF00FF], 1, 1));
 }
 
+Bitmap newBitmap(in File file, bool mustSucceed=true){ //todo: what if cant load the bitmap? raise, null or replacement image?
+  return newBitmap(file.fullName, mustSucceed);
+}
 
 private __gshared Bitmap function(string)[string] customBitmapLoaders;
 
@@ -29,7 +34,7 @@ in(prefix.length>=2, "invalid prefix string")
 }
 
 
-Bitmap newBitmap(string fn, bool mustExist=true){
+Bitmap newBitmap(string fn, bool mustSucceed=true){
   // split prefix:\line
   auto prefix = fn.until!(not!isAlphaNum).text;
   auto line = fn;
@@ -41,7 +46,7 @@ Bitmap newBitmap(string fn, bool mustExist=true){
   }
 
   if(prefix==""){ //threat it as a simple filename
-    return new Bitmap(File(fn).read(mustExist));
+    return new Bitmap(File(fn).read(mustSucceed));
   }else if(prefix=="font"){
     version(D2D_FONT_RENDERER){
       return bitmapFontRenderer.renderDecl(fn); //todo: error handling, mustExists

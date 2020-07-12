@@ -14,8 +14,8 @@ RGBA BGRA(uint a){ auto c = RGBA(a); c.rbSwap; return c; }
 auto inverse(in RGB  a){ return RGB (a.r^255, a.g^255, a.b^255     ); }
 auto inverse(in RGBA a){ return RGBA(a.r^255, a.g^255, a.b^255, a.a); }
 
-private ubyte f2b(float f){ return cast(ubyte)(f*255.0f).iRound.clamp(0, 255); }
-private float b2f(int b){ return b*(1.0f/255.0f); }
+private ubyte f2b(float f){ return cast(ubyte)((f.clamp(0, 1)*255.0f).iRound); }
+private float b2f(int b){ return b*(1/255.0f); }
 private ubyte _rgb_to_l_fast(in ubyte[3] rgb)       { return cast(ubyte)((rgb[0]+(rgb[1]<<1)+rgb[2])>>2); }
 private float _rgbf_to_l(in float[3] comp)      { return comp[0]*0.299f + comp[1]*0.586f + comp[2]*0.114f; }
 

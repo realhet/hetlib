@@ -26,9 +26,9 @@ class ColorMap{
 
 
 class RegressionColorMap: ColorMap{
-  float[][3] polys;
+  double[][3] polys;
 
-  this(string name, string category, float[][3] polys){
+  this(string name, string category, double[][3] polys){
     this.name = name;
     this.category = category;
     this.polys = polys;
@@ -45,7 +45,7 @@ class DistinctColorMap: ColorMap{
   RGB[] pal;
   bool isLinear;
 
-  this(string name, string category, float[3][] pal, bool isLinear=true){
+  this(string name, string category, int[3][] pal, bool isLinear=false){
     this.name = name;
     this.category = category;
     this.pal = pal.map!(c => RGB(c[0], c[1], c[2])).array;
@@ -343,6 +343,39 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     drGUI.clear;
 
     im.draw(drGUI);
+
+    foreach(i; 0..255){
+      double[][] polys = [[ 4.05630748e+08, -3.66095716e+09,  1.51615212e+10, -3.81828926e+10,
+        6.53317418e+10, -8.03730609e+10,  7.33860595e+10, -5.06166218e+10,
+        2.65914471e+10, -1.06520321e+10,  3.23641170e+09, -7.36971932e+08,
+        1.23274026e+08, -1.46738185e+07,  1.18204597e+06, -5.94177597e+04,
+        1.61707665e+03, -1.72898199e+01,  1.00033755e+00], [-1.51179197e+08,  1.37938243e+09, -5.76440368e+09,  1.46071494e+10,
+       -2.50433806e+10,  3.06871998e+10, -2.76738851e+10,  1.86286652e+10,
+       -9.39074432e+09,  3.52217569e+09, -9.66080635e+08,  1.87624857e+08,
+       -2.43287811e+07,  1.86144473e+06, -5.42686597e+04, -2.42351728e+03,
+        2.10192687e+02,  1.91883026e+00,  1.10139693e-04], [ 6.65510667e+07, -5.76177131e+08,  2.30327215e+09, -5.64007560e+09,
+        9.45792554e+09, -1.14928583e+10,  1.04345228e+10, -7.18700315e+09,
+        3.77215622e+09, -1.50236911e+09,  4.48660921e+08, -9.85111390e+07,
+        1.54619595e+07, -1.66870040e+06,  1.17245909e+05, -4.94371133e+03,
+        1.09130190e+02, -9.30975417e-01, -5.83318400e-05]];
+
+      foreach(j; 0..3){
+        dr.pointSize = -3;
+        dr.color = [clRed, clLime, clBlue][j];
+
+        static poly2(float x, float[] p){
+          float x0 = 1, sum=0;
+          foreach(pp; p){
+            sum += x0*pp;
+            x0 *= x;
+          }
+          return sum;
+        }
+
+
+        dr.point(i, 255-colorMaps["viridis"].eval(i/255.0).comp[j]);
+      }
+    }
 
     drawFpsTimeLine(drGUI);
   }

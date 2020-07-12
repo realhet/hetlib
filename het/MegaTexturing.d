@@ -497,8 +497,16 @@ public:
           /*if(GetCurrentProcessorNumber==mainThreadProcessorNumber) */
 
 //          sleep(100);
+          Bitmap bmp;
+          try{
+            bmp = newBitmap(fileName); // <- this takes time. This should be delayed
+          }catch(Throwable){
+            //bmp = new Bitmap(new Image!RGBA([RGBA(0xFFFF00FF)], 1, 1));
+            //bmp = newBitmap(`font:\Segoe MDL2 Assets\16?`~"\uE783");
+            WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
+            bmp = errorBitmap;
+          }
 
-          auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed
           //bmp.channels = 4; //todo: not just 4 chn bitmap support
           bmp.tag = idx; //tag = SubTexIdx
 
@@ -533,7 +541,15 @@ public:
         }
 
       }else{ //immediate loader
-        auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed
+        Bitmap bmp;
+        try{
+          bmp = newBitmap(fileName); // <- this takes time. This should be delayed
+        }catch(Throwable){
+          WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
+          bmp = errorBitmap;
+        }
+
+        //auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed
         //bmp.channels = 4; //todo: not just 4 chn bitmap support
 
         auto idx = createSubTex(bmp); //it uploads immediatelly
