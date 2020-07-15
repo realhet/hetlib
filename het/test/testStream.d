@@ -7,17 +7,17 @@
 
 import het.utils, het.stream, het.geometry;
 
-class MyClass{
+class TestClass{
   int a;
 }
 
-struct DataStruct{
+struct TestDataStruct{
   enum MyEnum:ubyte { Enum0, Enum1, Enum5=5 }
   @STORED:
   int intValue = 42;
   @(STORED){
-    MyClass class0;
-    MyClass class1;
+    TestClass class0;
+    TestClass class1;
     ulong ulongVal = 0xFFFF_FFFF_FFFF_FFFF;
     @HEX uint uintVal = 0x12345678;
     byte byteVal = -128;
@@ -45,25 +45,10 @@ struct DataStruct{
   }
 }
 
-
-import std.variant;
-
-/*class JsonNode{
-}
-
-class JsonValue{
-}
-
-class JsonArray{
-}
-
-class JsonField{
-}*/
-
 void test(){
-  DataStruct[2] data;
+  TestDataStruct[2] data;
   data[0].vectArray = [V2f(1,2), V2f(1,3), V2f(6,4)];
-  data[0].class1 = new MyClass;
+  data[0].class1 = new TestClass;
   data[0].class1.a = 42;
   data[1].clear;
 
@@ -75,7 +60,7 @@ void test(){
   original ~= data[0].text;  string st0 = data[0].toJson;
   original ~= data[1].text;  string st1 = data[1].toJson;
 
-  DataStruct[2] rdata;
+  TestDataStruct[2] rdata;
   string restored;
   rdata[0].fromJson_raise(st0);  restored ~= rdata[0].text;
   rdata[1].fromJson_raise(st1);  restored ~= rdata[1].text;
@@ -101,41 +86,7 @@ void test(){
 
 
 
-class Property{
-  @STORED string name, caption, hint;
-
-  this(){}
-  //this(string name, string caption, string hint){ this.name = name; this.caption = caption; this.hint = hint; }
-
-}
-
-class StringProperty : Property {
-  @STORED{
-    string act, def;
-    string[] choices;
-  }
-  shared static this(){ registerStoredClass!(typeof(this)); }
-}
-
-class IntProperty : Property {
-  @STORED int act, def, min, max, step=0;
-  shared static this(){ registerStoredClass!(typeof(this)); }
-}
-
-class FloatProperty : Property {
-  @STORED float act=0, def=0, min=0, max=0, step=0;
-  shared static this(){ registerStoredClass!(typeof(this)); }
-}
-
-
-
-/*struct Property { @STORED:
-  string name, caption, hint;
-  Variant act, def, min, max;
-  string[] choices;
-}*/
-
-void testProperty(){
+void testProperty(int N=100){
 /*  auto intProp = Property("cap.width", "caption", "hint", Variant(640), Variant(640), Variant(32), Variant(8192));
   auto floatProp = Property("floatprop", "", "", Variant(0.15), Variant(0.5), Variant(0.001), Variant(2));
   auto stringProp = Property("fileName", "", "", Variant(`c:\file.name`));
@@ -172,21 +123,27 @@ void testProperty(){
   Property[] props;
   props.fromJson_ignore(File(`c:\dl\props.json`).readText);
 
+  //test save of a property set
+  auto propSet = new PropertySet;
+  propSet.name = "Test property set";
+  propSet.properties = props;
+
+  propSet.toJson.saveTo(File(`c:\dl\propsOut.json`));
+
+
   string reference = props.toJson;
   print(reference);
 
   PERF("Json speed", {   //todo: ez qrvalassu: encode+decode = 6MB/sec
-    enum N = 10000;
+    enum N = 100;
     print("testing batch size = ", N, "data size = ", reference.length, "total size [MB] = ", reference.length*N/1024.0/1024);
-    string temp = reference;
+    //string temp = reference;
     foreach(i; 0..N){
       props.clear;
-      props.fromJson_ignore(temp);
+      props.fromJson_ignore(reference);
       auto result = props.toJson;
 
-      enforce(result == temp, "Json codec sucks ass");
-
-      temp = result;
+      enforce(result == reference, "Json codec sucks ass");
 
       if(!(i & 0xFF)) write("\b".replicate(20), i, "/", N);
     }
@@ -201,3 +158,4 @@ void main(){ application.runConsole({
   test;
   testProperty;
 }); }
+

@@ -183,6 +183,8 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
                classFullName = p ? *p : "",
                currentClassFullName = data !is null ? typeid(data).to!string : "";
 
+          //todo: error handling when there is no classloader for the class in json
+
 //          print("Trying to load class:", classFullName);
 //          print("Currently in Loader:", fullyQualifiedName!Type);
 //          print("Current Instance:", currentClassFullName);
@@ -327,13 +329,13 @@ void streamAppend_json(Type)(ref string st, ref in Type data, bool dense=false, 
   //call dynamic class writer
   static if(is(T == class)){
     if(data !is null){
-      const currentFullName = typeid(data).to!string;
+      const currentFullName = typeid(data).to!string; //todo: try to understand this
       if(currentFullName != fullyQualifiedName!T){ //use a different writer if needed
         auto p = currentFullName in classSaverFunc;
         if(p){
           (*p)(st, cast(void*) &data, dense, hex, thisName, indent);
           return;
-        }
+        } //todo: error if there is no classSaver, throw error
       }
     }
   }
@@ -394,3 +396,36 @@ void streamAppend_json(Type)(ref string st, ref in Type data, bool dense=false, 
   }
 }
 
+
+//! Properties //////////////////////////////////////////
+
+class Property{
+  @STORED string name, caption, hint;  //todo: replace "act" with value
+}
+
+class StringProperty : Property {
+  shared static this(){ registerStoredClass!(typeof(this)); }
+
+  @STORED{
+    string act, def;
+    string[] choices;
+  }
+}
+
+class IntProperty : Property {
+  shared static this(){ registerStoredClass!(typeof(this)); }
+
+  @STORED int act, def, min, max, step=0;
+}
+
+class FloatProperty : Property {
+  shared static this(){ registerStoredClass!(typeof(this)); }
+
+  @STORED float act=0, def=0, min=0, max=0, step=0;
+}
+
+class PropertySet : Property {
+  shared static this(){ registerStoredClass!(typeof(this)); }
+
+  @STORED Property[] properties;
+}

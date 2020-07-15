@@ -1,6 +1,6 @@
 module het.ui;
 
-import het.utils, het.geometry, het.draw2d, het.inputs, std.traits;
+import het.utils, het.geometry, het.draw2d, het.inputs, std.traits, het.stream;
 
 public import het.uibase;
 
@@ -2400,6 +2400,10 @@ struct FieldProps{
   RANGE range;
   bool indent;
 
+  static string makeFullName(string parentFullName, string fieldName){
+    return [parentFullName, fieldName].filter!(not!empty).join('.');
+  }
+
   string getCaption() const{
     auto s = caption!="" ? caption : camelToCaption(name);
     if(s.length && indent) s = "      "~s;
@@ -2412,7 +2416,7 @@ struct FieldProps{
 FieldProps getFieldProps(T, string fieldName)(string parentFullName){
   alias f = __traits(getMember, T, fieldName);
   return FieldProps(
-    [parentFullName, fieldName].filter!(not!empty).join('.'),
+    makeFullNape(parentFullName, fieldName),
     fieldName,
     getUDA!(f, CAPTION).text,
     getUDA!(f, UNIT   ).text,
@@ -2421,9 +2425,23 @@ FieldProps getFieldProps(T, string fieldName)(string parentFullName){
   );
 }
 
-void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init){ with(im){
-  //print("generating UI for ", T.stringof, thisName);
+void stdStructFrame(string caption, void delegate() contents){ with(im){
+  Column({
+    if(caption!=""){
+      border = "1 normal black";
+      padding = "2";
+      margin = "2";
 
+      Row({ Text(tsBold, caption); });
+    }
+
+    contents();
+  });
+}}
+
+void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
+{ with(im){
+  //print("generating UI for ", T.stringof, thisFieldProps.name);
 
   /* */ static if(isFloatingPoint!T     ){
     Row({
@@ -2463,28 +2481,39 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init){ with(im
     import std.meta;
     enum visibleFields = Filter!(notHidden, AllFieldNames!T);
 
-    Column({
-      const caption = thisFieldProps.getCaption;
-      if(caption!=""){
-        Row({ Text(tsBold, caption); });
-
-        border = "1 normal black";
-        padding = "2";
-        margin = "2";
-      }
+    stdStructFrame(thisFieldProps.getCaption, {
       //recursive call for each field
       foreach (fieldName; visibleFields){{
-          auto fp = getFieldProps!(T, fieldName)(thisFieldProps.fullName);
-
-          //stdUI(__traits(getMember, data, fieldName), fp);
-          stdUI(mixin("data.", fieldName), fp);
+        auto fp = getFieldProps!(T, fieldName)(thisFieldProps.fullName);
+        stdUI(mixin("data.", fieldName), fp);
       }}
-
     });
+
   }else{
     static assert(0 ,"Unhandle type: "~T.stringof);
   }
 }}
+
+void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne kene lennie a Property class-ban...
+  if(prop is null) return;
+  auto fp = FieldProps(FieldProps.makeFullName(parentFullName, prop.name), prop.name, prop.caption);
+
+  if(auto p = cast(IntProperty)prop){
+    fp.range.low = p.min;
+    fp.range.high = p.max;
+    stdUI(p.act, fp);
+  }else if(auto p = cast(FloatProperty)prop){
+    fp.range.low = p.min;
+    fp.range.high = p.max;
+    stdUI(p.act, fp);
+  }else if(auto p = cast(StringProperty)prop){
+    stdUI(p.act, fp);
+  }else if(auto p = cast(PropertySet)prop){
+    stdStructFrame(fp.getCaption, {
+      p.properties.each!stdUI;
+    });
+  }
+}
 
 
 //Test ///////////////////////////////////

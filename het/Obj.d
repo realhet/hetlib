@@ -185,3 +185,45 @@ mixin template HETOBJ(){ mixin JsonizeMe;
   }
 }
 
+/+
+
+class C1{ }
+class C2{ }
+
+class HetList(C) if(is(C == class)){
+    enum itemHasName = is(C.name) && isSomeString!(typeof(C.name));
+
+    C[] items;
+    shared static this(){ register!(typeof(this)); }
+
+    int indexByName(string name) {
+      static if(itemHasName)
+          foreach(i, item; items)
+              if(item.name==name)
+                return cast(int)i;
+        return -1;
+    }
+
+    C byName(string name) {
+      auto i = indexByName(name);
+        return i<0 ? null : items[i];
+    }
+
+}
+
+private void register(C)(){
+    writeln("registered: ", C.stringof);
+}
+
+private void main___(){
+  auto list1 = new HetList!C1;
+  auto list2 = new HetList!C2;
+
+    writeln(list1.items.length);
+    writeln(list2.items.length);
+
+    wild("*.*").opBinaryRight!"in"("Hello").writeln;
+    ("Hello" in wild("*.*")).writeln;
+}
+
++/
