@@ -2606,6 +2606,10 @@ template FieldNamesWithUDA(T, U, bool allIfNone){
 }
 
 
+string[] getEnumMembers(T)(){
+  static if(is(T == enum)) return [__traits(allMembers, T)];
+  else return [];
+}
 
 
 // hexDump ///////////////////////////

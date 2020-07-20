@@ -258,6 +258,7 @@ struct HitTestManager{
   bool checkReleased(uint h){ return releasedHash==h; }
 
   struct HitInfo{ //Btn returns it
+    uint id;
     bool hover, captured, clicked, pressed, released;
     float hover_smooth, captured_smooth;
     Bounds2f hitBounds;
@@ -267,6 +268,7 @@ struct HitTestManager{
 
   auto check(uint id){
     HitInfo h;
+    h.id = id;
     h.hover = checkHover(id);
     h.hover_smooth = checkHover_smooth(id);
     h.captured = checkCaptured(id);
@@ -1122,7 +1124,7 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{ //todo: do this nicer with a table
-  ushort _data = 0b0_0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
+  ulong _data = 0b0_0_0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"         , 1,
     HAlign        , "hAlign"          , 2,  //alignment for all subCells
@@ -1134,8 +1136,9 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "hovered"         , 1,  //maintained by system, not by user
     PanelPosition , "panelPosition"   , 4,  //only for desktop
     bool          , "clipChildren"    , 1,
+    bool          , "_saveComboBounds", 1,  //marks the container to save the absolute bounds to align the popup window to.
 
-//    int, "_dummy"       , 0,
+    int, "_dummy"       , 15,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1588,6 +1591,14 @@ class Container : Cell { // Container ////////////////////////////////////
       Border  border_ ;
     }
   }
+
+  Cell removeLast() {
+    enforce(subCells_.length);
+    auto res = subCells_[$-1];
+    subCells_ = subCells_[0..$-1];
+    return res;
+  }
+
   final override{
     ref _FlexValue flex() { return flex_   ; }
     ref Margin  margin () { return margin_ ; } //todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
@@ -1650,6 +1661,8 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
+  static Bounds2f _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
+
   override void draw(Drawing dr){
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
     //if(chkSet(measured)) measure;
@@ -1661,6 +1674,7 @@ class Container : Cell { // Container ////////////////////////////////////
     dr.fillRect(border.adjustBounds(borderBounds_inner));
     //dr.alpha = 1;
 
+    if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
 
     dr.translate(innerPos);
     if(flags.clipChildren) dr.pushClipBounds(Bounds2f(0, 0, innerWidth, innerHeight));

@@ -1161,6 +1161,11 @@ struct im{ static:
 
   float deltaTime=0;
 
+  bool comboState; //automatically cleared on focus.change
+  bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
+  uint comboId;    //when the focus of this is lost, comboState goes false
+
+
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(in V2f mousePos){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
@@ -1177,6 +1182,9 @@ struct im{ static:
     focusedState.container = null;
     textEditorState.beginFrame;
 
+    popupState.reset;
+    comboOpening = false;
+
     static DeltaTimer dt;
     deltaTime = dt.update;
   }
@@ -1191,17 +1199,33 @@ struct im{ static:
     foreach(a; rc) a.measure;
 
     //align
-    foreach(a; rc) a.applyPanelPosition(screenBounds);
+    foreach(a; rc){ a.applyPanelPosition(screenBounds); }
 
     applyScrollers(screenBounds);
+
+    popupState.doAlign; //todo: fuck! Relative coords /sigh
 
     //from here, all positions are valid
 
     //hittest in zOrder (currently in reverse creation order)
     mouseOverUI = false;
-    foreach_reverse(a; rc)
-      if(a.hitTest(currentMouse))
+    bool mouseOverPopup;
+    foreach_reverse(a; rc){
+      if(a.hitTest(currentMouse)){
         mouseOverUI = true;
+
+        if(popupState.cell==a)
+          mouseOverPopup = true;
+
+        break; //got a hit, so escape now
+      }
+    }
+
+    if(mouseOverPopup) PING1;
+
+    //clicking away from popup closes the popup
+    if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
+      comboState = false;
 
     //the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
     wantMouse = mouseOverUI;
@@ -1275,16 +1299,27 @@ static cnt=0;
 
   TextEditorState textEditorState; //maintained by edit control
 
+  void onFocusLost(uint oldId){
+    if(comboId && oldId==comboId){
+      comboState = false;
+      comboId = 0;
+    }
+  }
 
   bool focusUpdate(.Container container, uint id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
     if(focusedState.id==id){
       if(!canFocus || exitFocusNow){ //not enabled anymore: exit focus
         if(onExit) onExit();
         focusedState.reset;
+
+        onFocusLost(id);
       }
     }else{
       if(canFocus && enterFocusNow){ //newly enter the focus
-        focusedState.id = id;
+        onFocusLost(focusedState.id);
+
+        focusedState.reset;
+        focusedState.id = id;     //todo: ez bugos, mert nem hivodik meg a focusExit, amikor ez elveszi a focust
         focusedState.container = container;
         if(onEnter) onEnter();
       }
@@ -1622,7 +1657,7 @@ static cnt=0;
   );
 
   //Parameter structs ///////////////////////////////////
-  struct id      { uint val;  private enum M = q{ auto id_ = file.xxh(line)^baseId;                              static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+  struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                              static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
   struct enable  { bool val;  private enum M = q{ auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;   static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled   = enabled && a.val; }; }
   struct selected{ bool val;  private enum M = q{ auto _selected = false;                                        static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected = a.val;            }; }
 
@@ -1722,6 +1757,61 @@ static cnt=0;
       }
     }}
   }
+
+  // popup state
+  struct PopupState{
+    Cell cell; // the popup itself
+    Cell parent; // the initiator of the popup
+
+    HAlign hAlign;
+    VAlign vAlign;
+
+    void reset(){
+      hAlign = HAlign.left;
+      vAlign = VAlign.bottom;
+      cell = null;
+      parent = null;
+    }
+
+    void doAlign(){
+      // must be called after measure
+      /*
+      if(cell && parent){
+        switch(hAlign){
+          case HAlign.right: cell.outerPos.x = parent.outerRight-cell.outerWidth; break;
+          default: cell.outerPos.x = parent.outerPos.x;
+        }
+        switch(vAlign){
+          case VAlign.top: cell.outerY = parent.outerBottom-cell.outerHeight; break;
+          default: cell.outerY = parent.outerY; break;
+        }
+      }*/
+
+      if(cell && parent){
+        auto bnd = het.uibase.Container._savedComboBounds;
+        cell.outerPos = V2f(bnd.left+2, bnd.bottom-2);
+      }
+    }
+  }
+  PopupState popupState;
+
+  void Popup(Cell parent, void delegate() contents){ // Popup ////////////////////////////////////
+    enforce(popupState.cell is null, "im.Popup() already called.");
+
+    auto oldLen = actContainer.subCells.length;
+    contents();
+    auto extraLen = actContainer.subCells.length-oldLen;
+
+    if(extraLen==0) return;
+    if(extraLen>1) raise("Popup must contain only one Cell");
+
+    auto popup = actContainer.removeLast;
+    root ~= popup;
+
+    popupState.cell = popup;
+    popupState.parent = parent;
+  }
+
 
   void Code(string src){ // Code /////////////////////////////
     //todo: syntax highlight
@@ -1848,20 +1938,20 @@ static cnt=0;
     Text!(file, line)(tsComment, args);
   }
 
-  //ListItem ///////////////////////////////////
+  //Bullet ///////////////////////////////////
   void Bullet(){
     Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); //todo: no flex needed, -> center aligned. Constant width is needed however, for different bullet styles.
   }
 
-  void ListItem(void delegate() contents = null){
+  void Bullet(void delegate() contents){
     Row({
       Bullet;
       if(contents) contents();
     });
   }
 
-  void ListItem(string text){
-    ListItem({ Text(text); });
+  void Bullet(string text){
+    Bullet({ Text(text); });
   }
 
   //Spacer //////////////////////////
@@ -1990,10 +2080,10 @@ static cnt=0;
         mainWindow.inputChars = unprocessed;
       }
 
-      style   = tsNormal;
-
       static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
                                     else flags.hAlign = HAlign.left;
+
+      style   = tsNormal;
 
       margin  = Margin(2, 2, 2, 2);
       border  = Border(2, BorderStyle.normal, lerp(clWinBtn, clWinBtnHoverBorder, hit.hover_smooth));
@@ -2145,6 +2235,7 @@ static cnt=0;
       static if(isSomeString!T0) Text(text); //centered text
                             else text(); //delegate
 
+      static foreach(a; args) static if(__traits(compiles, a())) a();
     });
 
     return hit;
@@ -2399,6 +2490,7 @@ struct FieldProps{
   string fullName, name, caption, unit;
   RANGE range;
   bool indent;
+  string[] choices;
 
   static string makeFullName(string parentFullName, string fieldName){
     return [parentFullName, fieldName].filter!(not!empty).join('.');
@@ -2415,14 +2507,17 @@ struct FieldProps{
 
 FieldProps getFieldProps(T, string fieldName)(string parentFullName){
   alias f = __traits(getMember, T, fieldName);
-  return FieldProps(
-    makeFullNape(parentFullName, fieldName),
-    fieldName,
-    getUDA!(f, CAPTION).text,
-    getUDA!(f, UNIT   ).text,
-    getUDA!(f, RANGE),
-    hasUDA!(f, INDENT)
-  );
+  Fieldprops p;
+
+  p.fullName    = FieldProps.makeFullName(parentFullName, fieldName);
+  p.name        = fieldName;
+  p.caption     = getUDA!(f, CAPTION).text;
+  p.unit        = getUDA!(f, UNIT   ).text;
+  p.range       = getUDA!(f, RANGE);
+  p.indent      = hasUDA!(f, INDENT);
+  p.choices     = getEnumMembers!T;
+
+  return p;
 }
 
 void stdStructFrame(string caption, void delegate() contents){ with(im){
@@ -2443,7 +2538,17 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
 { with(im){
   //print("generating UI for ", T.stringof, thisFieldProps.name);
 
-  /* */ static if(isFloatingPoint!T     ){
+  static if(is(T==enum)){
+    Row({
+      Text(thisFieldProps.getCaption, "\t");
+
+    });
+  }else static if(isSomeString!T        ){
+    Row({
+      Text(thisFieldProps.getCaption, "\t");
+      Edit(data, id(thisFieldProps.hash), { width = fh*10; });
+    });
+  }else static if(isFloatingPoint!T     ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = format("%.2f", data);
@@ -2463,11 +2568,6 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
         Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
-    });
-  }else static if(isSomeString!T        ){
-    Row({
-      Text(thisFieldProps.getCaption, "\t");
-      Edit(data, id(thisFieldProps.hash), { width = fh*10; });
     });
   }else static if(is(T == bool)         ){
     Row({

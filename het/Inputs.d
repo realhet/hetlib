@@ -204,6 +204,9 @@ class InputEntry{
   bool pressed() const { return active && !lastActive; }
   bool released()const { return !active && lastActive; }
 
+  bool down() const { return  active; }
+  bool up() const { return !active; }
+
   float pressedTime = 0;
 
   // repeat support, for typing emulation
