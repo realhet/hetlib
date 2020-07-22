@@ -1884,8 +1884,16 @@ static cnt=0;
     bool restoreTextStyle = false;
     TextStyle oldTextStyle;
     static foreach(a; args){{
-      alias t = typeof(a);
-      static if(isSomeString!t){
+      alias t = Unqual!(typeof(a));
+
+      static if(is(t == _FlexValue)){ //nasty workaround for flex() and flex property
+        append(new FlexRow("", style));
+      }else static if(is(t == TextStyle)){
+        if(chkSet(restoreTextStyle)) oldTextStyle = textStyle;
+        textStyle = a;
+      }else static if(is(t == RGB)){
+        textStyle.fontColor = a;
+      }else /*static if(isSomeString!t)*/{   //general case, handles as string
 
         /* mar nem ez tordel, hanem a Row.
         auto lines = a.split('\n').map!(a => a.withoutTrailing('\r')).array;
@@ -1908,20 +1916,14 @@ static cnt=0;
         }*/
 
         //this variant gives \n to the row
+        auto s = a.text;
         if(.Column col = cast(.Column)actContainer){
-          Row({ Text(a); });  //implicit Rows for Column
+          Row({ Text(s); });  //implicit Rows for Column
         }else if(.Row row = cast(.Row)actContainer){
-          row.appendMarkupLine(a, textStyle);
+          row.appendMarkupLine(s, textStyle);
         }else {
-          actContainer.appendMarkupLine(a, textStyle);
+          actContainer.appendMarkupLine(s, textStyle);
         }
-      }else static if(is(Unqual!t == _FlexValue)){ //nasty workaround for flex() and flex property
-        append(new FlexRow("", style));
-      }else static if(is(Unqual!t == TextStyle)){
-        if(chkSet(restoreTextStyle)) oldTextStyle = textStyle;
-        textStyle = a;
-      }else static if(is(Unqual!t == RGB)){
-        textStyle.fontColor = a;
       }
     }}
 
@@ -2396,7 +2398,7 @@ static cnt=0;
   }
 
   auto Node(ref bool state, void delegate() title, void delegate() contents){ // Node ////////////////////////////
-    HitTestManager.HitInfo hit;
+    HitInfo hit;
     Column({
       border.width = 1; //todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
       border.color = lerp(style.bkColor, style.fontColor, state ? .1 : 0);

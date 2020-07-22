@@ -512,6 +512,8 @@ string simplifiedMsg(Throwable t){
   return s.join("\n");
 }
 
+
+
 // Filter for OS exceptions //////////////////////////
 
 pragma(lib, "Psapi.lib");
@@ -732,10 +734,14 @@ version(disableselftest){ return; }else{
 }}
 
 
-void ignoreExceptions(void delegate() dg){
+bool ignoreExceptions(void delegate() f){
+  bool res;
   try{
-    dg();
-  }catch(Throwable){}
+    f();
+  }catch(Throwable){
+    res = true;
+  }
+  return res;
 }
 
 // KillerThread //////////////////////////////////////////////////////////////

@@ -128,6 +128,15 @@ struct ImStorage(T){
 
 // HitTest ///////////////////////////////
 
+struct HitInfo{ //Btn returns it
+  uint id;
+  bool hover, captured, clicked, pressed, released;
+  float hover_smooth, captured_smooth;
+  Bounds2f hitBounds;
+
+  alias clicked this;
+}
+
 struct HitTestManager{
 
   struct HitTestRec{
@@ -256,15 +265,6 @@ struct HitTestManager{
   bool checkClicked(uint h){ return clickedHash==h; }
   bool checkPressed(uint h){ return pressedHash==h; }
   bool checkReleased(uint h){ return releasedHash==h; }
-
-  struct HitInfo{ //Btn returns it
-    uint id;
-    bool hover, captured, clicked, pressed, released;
-    float hover_smooth, captured_smooth;
-    Bounds2f hitBounds;
-
-    alias clicked this;
-  }
 
   auto check(uint id){
     HitInfo h;

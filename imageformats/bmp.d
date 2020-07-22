@@ -284,9 +284,9 @@ package IFImage read_bmp(Reader stream, long req_chans = 0) {
     size_t redi = 2;
     size_t greeni = 1;
     size_t bluei = 0;
-    if (rgb_masked) {
+    if (rgb_masked && hdr.dib_version>1) { //het: version 1 has no specific masks
         if (hdr.dib_version < 2)
-            throw new ImageIOException("invalid format");
+          throw new ImageIOException("invalid format");
         redi = mask_to_idx(hdr.dib_v2.red_mask);
         greeni = mask_to_idx(hdr.dib_v2.green_mask);
         bluei = mask_to_idx(hdr.dib_v2.blue_mask);
@@ -420,7 +420,7 @@ void write_bmp(Writer stream, long w, long h, in ubyte[] data, long tgt_chans = 
     if (tgt_chans == 3) {
         hdr[54..70] = 0;    // dib v2 and v3
     } else {
-        static immutable ubyte[16] b = 
+        static immutable ubyte[16] b =
         [
             0, 0, 0xff, 0,
             0, 0xff, 0, 0,

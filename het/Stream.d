@@ -314,7 +314,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 
 
 //! toJson ///////////////////////////////////
-string toJson(Type)(ref in Type data, bool dense=false, bool hex=false, string thisName=""){
+string toJson(Type)(in Type data, bool dense=false, bool hex=false, string thisName=""){
   string st;
   streamAppend_json!(Type)(st, data, dense, hex, thisName);
   return st;
@@ -323,7 +323,7 @@ string toJson(Type)(ref in Type data, bool dense=false, bool hex=false, string t
 private string quote(string s){ return format!"%(%s%)"([s]); }
 template isSomeChar(T){ enum isSomeChar = is(T == char) || is(T == wchar) || is(T == dchar); }
 
-void streamAppend_json(Type)(ref string st, ref in Type data, bool dense=false, bool hex=false, string thisName="", string indent=""){
+void streamAppend_json(Type)(ref string st, in Type data, bool dense=false, bool hex=false, string thisName="", string indent=""){
   alias T = Unqual!Type;
 
   //call dynamic class writer
