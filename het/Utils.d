@@ -3684,7 +3684,7 @@ public static: // public declarations ////////////////////////////////////
 
     }
 
-    LOG("All tests \33\12passed\33\7.");
+    //LOG("All tests \33\12passed\33\7.");
     return true;
   }
 
@@ -4950,8 +4950,6 @@ template uuid(T, string g) {
 
 private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
                                  //todo: a unittest alatt nem indul ez el.
-  DBG("initialization starts", __FUNCTION__, __FILE__, __LINE__);
-
   //todo: functional tests: nem ide kene
   //functional tests
   enforce(xxh("hello")==0xfb0077f9);
@@ -4974,12 +4972,10 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   UpdateInterval()._testRepeater;
 
   //startup
-  CoInitialize(null);   DBG("coinitialize done");
-  ini.loadIni;          DBG("ini loaded");
+  CoInitialize(null);
+  ini.loadIni;
 
   console.setUTF8;
-
-  DBG("initialization successful");
 }
 
 private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.

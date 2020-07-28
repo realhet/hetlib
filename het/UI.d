@@ -1203,7 +1203,7 @@ struct im{ static:
 
     applyScrollers(screenBounds);
 
-    popupState.doAlign; //todo: fuck! Relative coords /sigh
+    popupState.doAlign;
 
     //from here, all positions are valid
 

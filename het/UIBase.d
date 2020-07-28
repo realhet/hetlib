@@ -988,20 +988,6 @@ class Cell{ // Cell ////////////////////////////////////
 }
 
 
-class TestClass{ ubyte x; }
-
-shared static this(){
-  import std.stdio;
-  writeln(__traits(classInstanceSize, TestClass).stringof);
-  writeln(TestClass.x.offsetof);
-
-  auto c = new TestClass;
-  synchronized(c){
-    writeln("hello");
-  }
-}
-
-
 class Img : Container { // Img ////////////////////////////////////
   int stIdx;
 
