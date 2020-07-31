@@ -254,7 +254,7 @@ struct TokenDictionary(T){
 __gshared TokenDictionary!(int) tdKeywords, tdOperators, tdNamedCharEntries;
 
 struct moduleInit{
-  __gshared static this(){
+  shared static this(){
     //initKeywords;
     foreach(idx, s; _keywordStrs) tdKeywords.arr[s] = idx.to!int;
     tdKeywords.postInit;

@@ -2,6 +2,8 @@ module het.stream;
 
 import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 
+//todo: auto ref parameters.
+//todo: srcFunct seems obsolete.
 
 private __gshared string[string] classFullNameMap;
 
@@ -171,7 +173,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       //handle null for class
       static if(is(T == class)){
         if(actToken.isKeyword(kwnull)){
-          data = null; return;
+          data = null; return; //todo: what happens with old instance???!!!
         }else if(isOp!'{'){
           //create a new instance with the default creator if needed
           //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -394,6 +396,26 @@ void streamAppend_json(Type)(ref string st, in Type data, bool dense=false, bool
   }else{
     static assert(0, "Unhandled type: "~T.stringof);
   }
+}
+
+
+//! clearFields /////////////////////////////////////////
+
+void clearFields(Type)(auto ref Type data)
+if(is(Type==class) || __traits(isRef, data)) //only let classes not to be references  (auto ref template parameter)
+{
+  static if(is(Type==class)) if(data is null) return; //ignore empty null instances
+
+  static string savedData = "\0"; //todo: use binaryJson
+  if(savedData=="\0"){
+    static Type temp;
+    static if(is(Type==class)) temp = new Type;
+    savedData = temp.toJson;
+
+    print("Generate defaults for ", Type.stringof, "\n", savedData);
+  }
+
+  data.fromJson(savedData);
 }
 
 

@@ -174,14 +174,6 @@ __gshared static public:////////////////////////////////////////////////////////
     }else{ enforce(false, "Application is already finalized"); }
   }
 
-  __gshared static this(){
-    //initialize;  BUGFIX: memory errors will occur if initialized from here. Must be initialized form WinMain() or runConsole!
-  }
-
-  __gshared static ~this(){
-    //if(initialized && !finalized) finalize; //ez qrvara nem ide
-  }
-
   int runConsole(void delegate() dg){
     return runConsole(null, dg);
 
@@ -698,7 +690,8 @@ void installExceptionFilter(){
       //EXCEPTION_CONTINUE_EXECUTION; //continues, but it becomes an endless as it retriggers an exception on the same error
   }
 
-  LOG("Setting up exception filter: ", SetUnhandledExceptionFilter(&filter));
+  auto res = SetUnhandledExceptionFilter(&filter);
+  //LOG("Exception filter installed: ", res);
 }
 
 
@@ -1466,31 +1459,65 @@ auto auto mean(R, E) (R r, E seed) if(isInputRange!R && !isInfinite!R && is(type
 //Signal smoothing /////////////////////////////
 
 struct BinarySignalSmoother{
-    private{
-        int outSameCnt;
-      bool actOut, lastOut, lastIn;
-    }
+  private{
+    int outSameCnt;
+    bool actOut, lastOut, lastIn;
+  }
 
-    bool process(bool actIn, int N=2){
-        if(outSameCnt>=N-1)
-            actOut = lastIn!=actIn ? !actOut : actIn;
+  bool process(bool actIn, int N=2){
+    if(outSameCnt>=N-1)
+      actOut = lastIn!=actIn ? !actOut : actIn;
 
-        outSameCnt = lastOut==actOut ? outSameCnt+1 : 0;
+    outSameCnt = lastOut==actOut ? outSameCnt+1 : 0;
     lastOut = actOut;
-        lastIn   = actIn;
-        return actOut;
-    }
+    lastIn   = actIn;
+    return actOut;
+  }
 
-    @property bool output() const{ return actOut; }
+  @property bool output() const{ return actOut; }
 
-    static void selfTest(){
-      BinarySignalSmoother bss;
-        const input = "..1.1.1..1.1.11.1.1..111111..11..111..111.1........1...11...1.11111111.1111.1";
-    auto output = input.map!(c => bss.process(c=='1', 2) ? '1' : '.').array;
+  static void selfTest(int N=2)(){
+    BinarySignalSmoother bss;
 
+    const input = "..1.1.1..1.1.11.1.1..111111..11..111..111.1........1...11...1.11111111.1111.1";
+    auto output = input.map!(c => bss.process(c=='1', N) ? '1' : '.').array;
+
+    writeln("----");
     writeln(input);
     writeln(output);
+
+    BinarySignalSmootherNew!N bss2;
+    auto output2 = input.map!(c => bss2.process(c=='1') ? '1' : '.').array;
+    writeln(output2);
+  }
+}
+
+
+struct BinarySignalSmootherNew(int N){  //different algo, also slower
+  private bool[N] input, output;
+
+  bool process(bool newInput){
+
+    enum N = 15;
+
+    input[] = newInput ~ input[0..$-1];
+
+    const o1 = output[].all, o0 = !output[].any, oStable = o0 || o1;
+
+    bool newOutput;
+    if(oStable){ //output is stable so it's possible to change it now
+      const i1 = input[].all, i0 = !input[].any, iStable = i0 || i1;
+      newOutput = iStable ? i1          //input is stable, so update output
+                          : !output[0]; //input is diverging, just toggle the output on and off
+    }else{
+      newOutput = output[0];
     }
+
+    output[] = newOutput ~ output[0..$-1];
+
+    return newOutput;
+  }
+
 }
 
 // SparseArray ///////////////////////////////////////////////////////////
@@ -4952,6 +4979,9 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
                                  //todo: a unittest alatt nem indul ez el.
   //todo: functional tests: nem ide kene
   //functional tests
+
+  installExceptionFilter;
+
   enforce(xxh("hello")==0xfb0077f9);
   enforce(xxh("Nobody inspects the spammish repetition", 123456) == 0xc2845cee);
   enforce(crc32("Hello")==0xf7d18982);

@@ -86,7 +86,7 @@ void testJetson(){
 */
 
 
-class HetObj {
+deprecated class HetObj {
   //UDA to declare serializable data
   enum STORED;
   //alias STORED = jsonize; //later it will be own stuff
@@ -115,7 +115,7 @@ class HetObj {
   }
 }
 
-mixin template HETOBJ(){ mixin JsonizeMe;
+deprecated mixin template HETOBJ(){ mixin JsonizeMe;
 
   override void initFields(){ // reInitialize class fields
     import std.traits;
@@ -184,6 +184,37 @@ mixin template HETOBJ(){ mixin JsonizeMe;
 
   }
 }
+
+// hetObj testing //////////////////////////
+
+struct MyUda{
+  string s;
+}
+
+class MyObj: HetObj { mixin HETOBJ;
+  @jsonize:
+    int _id = 42;
+    int int2 = 25;
+  /*@im.hint("This is a hint for the field 'str'")*/  string str = "hello";
+}
+
+void testHetObj(){
+  auto o = new MyObj;
+
+  print(o.saveToJSON);
+
+  o._id  = -1;
+  o.int2 = -1;
+
+  o.dump.print;
+  o.saveToJSON.print;
+  o.initFields;
+  o.dump.print;
+
+
+  "press a key".print; readln;
+}
+
 
 /+
 

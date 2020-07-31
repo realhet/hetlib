@@ -472,7 +472,10 @@ public:
     }
   }
 
-  int access(in File fileName, bool delayed = true){
+  int access(in File fileName, bool delayed = true){ //todo: bugos a delayed leader
+
+    //delayed = false;
+
     if(!(fileName in byFileName)){
 
       if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false; //todo: delayed restriction. should refactor this nicely

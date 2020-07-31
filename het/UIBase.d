@@ -604,7 +604,7 @@ void initTextStyles(){
   a(  "bold"      , tsBold    , tsNormal, { tsBold.bold = true; });
   a(    "bold2"   , tsBold2   , tsBold  , { tsBold2.fontColor = clChapter; });
   a(  "quote"     , tsQuote   , tsNormal, { tsQuote.italic = true; });
-  a(  "code"      , tsCode    , tsNormal, { tsCode.font = "Consolas"; tsCode.fontHeight = rfh(18); tsCode.bold = true; });
+  a(  "code"      , tsCode    , tsNormal, { tsCode.font = "Consolas"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //todo: should be half bold?
   a(  "link"      , tsLink    , tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; });
   a(  "title"     , tsTitle   , tsNormal, { tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); });
   a(    "chapter" , tsChapter , tsTitle , { tsChapter.fontHeight = rfh(40); });

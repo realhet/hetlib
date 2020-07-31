@@ -1820,7 +1820,7 @@ static cnt=0;
       margin = Margin(0.5*fh, 0.5*fh, 0.5*fh, 0.5*fh);
 
       style = tsCode;
-      const bkColors = [0.06, 0.12].map!(t => lerp(textStyle.bkColor, textStyle.fontColor, t)).array;
+      const bkColors = [0.06, 0.09].map!(t => lerp(textStyle.bkColor, textStyle.fontColor, t)).array;
       border = "1 single gray";
 
       foreach(idx, line; src.split('\n')){
@@ -1828,6 +1828,10 @@ static cnt=0;
         line = line.withoutEnding('\r');
         Text(line);
       }
+
+      //don't hide any spaces
+      foreach(r; actContainer.subCells)
+        (cast(.Container)r).flags.dontHideSpaces = true;
     });
     //Spacer(0.5*fh);
   }
