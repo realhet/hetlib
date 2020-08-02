@@ -25,7 +25,7 @@ struct STORED{}
 struct HEX{}
 struct BASE64{}
 
-struct UNIFORM{ string name=""; } //for gl.Shader
+struct UNIFORM{ string name=""; } //for gl.Shader attribute
 
 enum ErrorHandling { ignore, raise, track }
 
@@ -421,8 +421,10 @@ if(is(Type==class) || __traits(isRef, data)) //only let classes not to be refere
 
 //! Properties //////////////////////////////////////////
 
+
 class Property{
-  @STORED string name, caption, hint;  //todo: replace "act" with value
+  @STORED string name, caption, hint;
+  bool uiChanged; //stdUi sets this to true
 }
 
 class StringProperty : Property {

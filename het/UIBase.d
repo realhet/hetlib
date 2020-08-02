@@ -598,7 +598,7 @@ void initTextStyles(){
   a("normal"      , tsNormal  , TextStyle("Segoe UI", rfh(18), false, false, false, false, clBlack, clWhite));
   a(  "larger"    , tsLarger  , tsNormal, { tsLarger.fontHeight = rfh(22); });
   a(  "smaller"   , tsSmaller , tsNormal, { tsSmaller.fontHeight = rfh(14); });
-  a(  "half"      , tsHalf    , tsNormal, { tsSmaller.fontHeight = rfh(9); });
+  a(  "half"      , tsHalf    , tsNormal, { tsHalf.fontHeight = rfh(9); });
   a(  "comment"   , tsComment , tsNormal, { tsComment.fontHeight = rfh(12); });
   a(  "error"     , tsError   , tsNormal, { tsError.bold = tsError.underline = true; tsError.bkColor = clRed; tsError.fontColor = clYellow; });
   a(  "bold"      , tsBold    , tsNormal, { tsBold.bold = true; });
@@ -1124,7 +1124,7 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "clipChildren"    , 1,
     bool          , "_saveComboBounds", 1,  //marks the container to save the absolute bounds to align the popup window to.
 
-    int, "_dummy"       , 15,
+    int           , ""                , 15,
   ));
 
   //todo: setProps, mint a margin-nal

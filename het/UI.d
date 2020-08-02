@@ -1,6 +1,6 @@
 module het.ui;
 
-import het.utils, het.geometry, het.draw2d, het.inputs, std.traits, het.stream;
+import het.utils, het.geometry, het.draw2d, het.inputs, std.traits, het.stream, std.meta;
 
 public import het.uibase;
 
@@ -1456,8 +1456,8 @@ static cnt=0;
 
   private enum hintHandler = q{
     static foreach(a; args) static if(is(Unqual!(typeof(a)) == HintRec)){
-      if(hit.hover){
-        HintRec hr = a;
+      if(a.markup.length && hit.hover){
+        auto hr = a;
         hr.owner = actContainer;
         hr.bounds = hit.hitBounds;
         addHint(hr);
@@ -1961,7 +1961,8 @@ static cnt=0;
   }
 
   //Spacer //////////////////////////
-  void Spacer(float size){
+  void Spacer(float size=float.init){
+    if(size.isNaN) size = fh*.5f;
     const vertical = cast(.Row)actContainer !is null;
 
 /*    auto r = new .Row("", textStyle);
@@ -2190,7 +2191,11 @@ static cnt=0;
     }
   }
 
-  auto Btn(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
+  auto WhiteBtn(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args){
+    return Btn!(file, line, true, T0, T)(text, args);
+  }
+
+  auto Btn(string file=__FILE__, int line=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
     mixin(id.M ~ enable.M ~ selected.M);
@@ -2215,6 +2220,7 @@ static cnt=0;
       flags.hAlign = HAlign.center;
 
       style   = tsBtn;
+
       auto bColor = lerp(style.bkColor, clWinBtnHoverBorder, hit.hover_smooth);
       applyBtnBorder(bColor);
 
@@ -2224,6 +2230,11 @@ static cnt=0;
       }else if(hit.captured){
         border.style    = BorderStyle.none;
         style.bkColor   = clWinBtnPressed;
+      }
+
+      if(isWhite){
+        if(hit.captured) style.bkColor = lerp(clWinBackground, clWinBtnPressed, .5);
+                    else style.bkColor = clWinBackground;
       }
 
       if(isToolBtn){ //every appearance is lighter on a toolBtn
@@ -2252,7 +2263,7 @@ static cnt=0;
     return Btn!(file, line)(text, args);
   }
 
-  auto ListItem(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // ListItem //////////////////////////////
+  auto OldListItem(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // OldListItem //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
     mixin(id.M ~ enable.M ~ selected.M);
@@ -2355,6 +2366,158 @@ static cnt=0;
 
   // RadioBtn //////////////////////////
   auto RadioBtn(string file=__FILE__, uint line=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
+
+  auto ListBoxItem(C)(ref bool isSelected, C s, int itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
+    auto hit = hitTestManager.check(itemId);
+    Row({
+      hitTestManager.addHash(actContainer, itemId);
+
+      if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down)) isSelected = true; //mosue down left or right
+
+      padding = "2 2";
+      bkColor = lerp(bkColor, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33));
+      style.bkColor = bkColor;
+
+      static if(__traits(compiles, s())) s();
+                                    else Text(s.text);
+    });
+
+    return hit;
+  }}
+
+
+  struct ListBoxResult{
+    HitInfo hit;
+    bool changed;
+    alias changed this;
+  }
+
+  auto ListBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // LixtBox ///////////////////////////////
+    mixin(id.M); //todo: enabled, tool theme
+
+    //find translator function . This translates data to gui.
+    enum isTranslator(T) = __traits(compiles, T.init(A.init)); //is(T==void delegate(in A)) || is(T==void delegate(A)) || is(T==void function(in A)) || is(T==void function(A));
+    enum translated = anySatisfy!(isTranslator, Args);
+
+    auto hit = hitTestManager.check(id_);
+    bool changed;
+    Column({
+      hitTestManager.addHash(actContainer, id_);
+      border = "1 normal gray";
+
+      foreach(i, s; items){
+        auto itemId = id_ + cast(int) i + 1;
+        auto selected = idx==i, oldSelected = selected;
+
+        static if(translated){
+          static foreach(f; args) static if(isTranslator!(typeof(f)))
+            auto hit = ListBoxItem(selected, { f(s); }, itemId);
+        }else{
+          auto hit = ListBoxItem(selected, s, itemId);
+        }
+        if(!oldSelected && selected){
+          idx = cast(int) i;
+          changed = true;
+        }
+      }
+
+      static foreach(a; args) static if(__traits(compiles, a())) a();
+    });
+    return ListBoxResult(hit, changed);
+  }
+
+  auto ListBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+    auto idx = cast(int) items.countUntil(value); //opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
+    auto res = ListBox!(file, line)(idx, items, args);
+    if(res) value = items[idx];
+    return res;
+  }
+
+  auto ListBox(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum)){
+    auto s = e.text;
+    auto res = ListBox!(file, line)(s, getEnumMembers!E, args);
+    if(res) ignoreExceptions({ e = s.to!E; });
+    return res;
+  }
+
+  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // ComboBox ////////////////////////////////
+    mixin(id.M); //todo: enabled
+
+    //find translator function . This translates data to gui.
+    enum isTranslator(T) = __traits(compiles, T.init(A.init));
+    enum translated = anySatisfy!(isTranslator, Args);
+
+    Cell btn;
+    auto hit = WhiteBtn({
+      btn = actContainer;
+      flags.hAlign = HAlign.left;
+
+      Row({
+        if(idx.inRange(items)){
+          static if(translated){
+            static foreach(f; args) static if(isTranslator!(typeof(f)))
+              f(items[idx]);
+          }else{
+            Text(items[idx].text);
+          }
+        }else{
+          Text(clGray, "none");
+          //null value
+        }
+      });
+
+      Flex;
+      Row({ Text(" ", symbol("ChevronDown"), " "); });
+    }, args);
+
+    if(isFocused(hit.id)) (cast(het.uibase.Container)btn).flags._saveComboBounds = true; //notifies glDraw to place the popup
+
+    if(hit.pressed){
+      comboId = hit.id;
+      comboState.toggle;
+      comboOpening = true; //ignore this mousepress when closing popup
+    }
+
+    ListBoxResult res;
+
+    if(isFocused(hit.id) && comboState){
+      Popup(btn, {
+
+        void inheritComboWidth(){
+          if(btn.innerWidth>0)
+            innerWidth = btn.innerWidth+6; //todo: tool theme*/
+        }
+
+        static if(translated){
+          static foreach(f; args) static if(isTranslator!(typeof(f)))
+            res = ListBox(idx, items, id(id_+1), &inheritComboWidth, f); //todo: this translator appending is a big mess
+        }else{
+          res = ListBox(idx, items, id(id_+1), &inheritComboWidth);
+        }
+
+        if(res.hit.hover && inputs.LMB.released){
+          comboState = false; //close the box
+        }
+      });
+    }
+
+    return res;
+  }
+
+  //todo: redundancy: these are the same for ListBox
+  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+    auto idx = cast(int) items.countUntil(value);
+    auto res = ComboBox!(file, line)(idx, items, args);
+    if(res) value = items[idx];
+    return res;
+  }
+
+  auto ComboBox(string file=__FILE__, int line=__LINE__, E, T...)(ref E e, T args) if(is(E==enum)){
+    auto s = e.text;
+    auto res = ComboBox!(file, line)(s, getEnumMembers!E, args);
+    if(res) ignoreExceptions({ e = s.to!E; });
+    return res;
+  }
 
   // Slider ///////////////////////////
   auto Slider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
@@ -2487,13 +2650,14 @@ static cnt=0;
 //! FieldProps stdUI /////////////////////////////
 
 struct CAPTION{ string text; }
+struct HINT{ string text; }
 struct UNIT{ string text; }
 struct RANGE{ float low, high; bool valid()const{ return !low.isNaN && !high.isNaN; } }
 struct INDENT{ }
 struct HIDDEN{ }
 
 struct FieldProps{
-  string fullName, name, caption, unit;
+  string fullName, name, caption, hint, unit;
   RANGE range;
   bool indent;
   string[] choices;
@@ -2513,11 +2677,12 @@ struct FieldProps{
 
 FieldProps getFieldProps(T, string fieldName)(string parentFullName){
   alias f = __traits(getMember, T, fieldName);
-  Fieldprops p;
+  FieldProps p;
 
   p.fullName    = FieldProps.makeFullName(parentFullName, fieldName);
   p.name        = fieldName;
   p.caption     = getUDA!(f, CAPTION).text;
+  p.hint        = getUDA!(f, HINT   ).text;
   p.unit        = getUDA!(f, UNIT   ).text;
   p.range       = getUDA!(f, RANGE);
   p.indent      = hasUDA!(f, INDENT);
@@ -2540,19 +2705,22 @@ void stdStructFrame(string caption, void delegate() contents){ with(im){
   });
 }}
 
+
 void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
 { with(im){
   //print("generating UI for ", T.stringof, thisFieldProps.name);
 
-  static if(is(T==enum)){
+  /*static if(is(T==enum)){ //todo: ComboBox
     Row({
       Text(thisFieldProps.getCaption, "\t");
 
     });
-  }else static if(isSomeString!T        ){
+  }else*/
+
+  static if(isSomeString!T){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      Edit(data, id(thisFieldProps.hash), { width = fh*10; });
+      Edit(data, id(thisFieldProps.hash), hint(thisFieldProps.hint), { width = fh*10; });
     });
   }else static if(isFloatingPoint!T     ){
     Row({
@@ -2562,7 +2730,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
+        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
       //todo: Bigger slider height when (theme!="tool")
     });
   }else static if(isIntegral!T          ){
@@ -2573,12 +2741,12 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), hint(thisFieldProps.hint), "width=180"); //todo: rightclick
     });
   }else static if(is(T == bool)         ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      ChkBox(data, "", id(thisFieldProps.hash));
+      ChkBox(data, "", id(thisFieldProps.hash), hint(thisFieldProps.hint));
       Text("\t");
     });
   }else static if(isAggregateType!T     ){ // Struct, Class
@@ -2602,18 +2770,33 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
 
 void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne kene lennie a Property class-ban...
   if(prop is null) return;
-  auto fp = FieldProps(FieldProps.makeFullName(parentFullName, prop.name), prop.name, prop.caption);
+  auto fp = FieldProps(FieldProps.makeFullName(parentFullName, prop.name), prop.name, prop.caption, prop.hint);
+
+  void doit(T)(ref T act){
+    immutable old = act;
+    stdUI(act, fp);
+    prop.uiChanged |= old != act;
+  }
 
   if(auto p = cast(IntProperty)prop){
     fp.range.low = p.min;
     fp.range.high = p.max;
-    stdUI(p.act, fp);
+    doit(p.act);
   }else if(auto p = cast(FloatProperty)prop){
     fp.range.low = p.min;
     fp.range.high = p.max;
-    stdUI(p.act, fp);
+    doit(p.act);
   }else if(auto p = cast(StringProperty)prop){
-    stdUI(p.act, fp);
+    if(p.choices.length){
+      with(im) Row({             //todo: move it into stdUI
+        Text(fp.getCaption, "\t");
+        immutable old = p.act;
+        ListBox(p.act, p.choices, id(fp.hash), { width = fh*10; });
+        prop.uiChanged |= old != p.act;
+      });
+    }else{
+      doit(p.act);
+    }
   }else if(auto p = cast(PropertySet)prop){
     stdStructFrame(fp.getCaption, {
       p.properties.each!stdUI;
@@ -2628,7 +2811,7 @@ void uiCellDocumentation(){ with(im){
   Document(`CELL Documentation`, {
   //  Toc;
 
-    void LI(string capt, string text){ ListItem(bold(capt) ~ "\t\t\t\t" ~ text); }
+    void LI(string capt, string text){ OldListItem(bold(capt) ~ "\t\t\t\t" ~ text); }
 
     Chapter(`Markup text format`, {
       Text(`The preferred text format is UTF8.
@@ -2662,7 +2845,7 @@ For more complex cells, meta information (tags) can be inserted along with the t
          `fontColor=0xFF0080|Sets the @color of the font`,
          `bkColor=lime|Sets the @color of the font background`].each!((s){
            s.isWild("*=*|*");
-           ListItem( format("%s=%s\t\t\t\t%s", bold(wild[0]), wild[1], wild[2].replace("@", tag("style "~wild[0]~"="~wild[1]))) );
+           OldListItem( format("%s=%s\t\t\t\t%s", bold(wild[0]), wild[1], wild[2].replace("@", tag("style "~wild[0]~"="~wild[1]))) );
         }); //todo: minTabSize a \t\t\t\t halmozas helyett. Ehhez kell egy theme is valoszinuleg.
         Text("Note: Valid color formats are the following: 0xFF00FF, rgb(255, 0, 255), fuchsia");
         Chapter(`Predefined text formats`, {
@@ -2671,7 +2854,7 @@ For more complex cells, meta information (tags) can be inserted along with the t
 
           auto styles = ["normal, n", "larger", "smaller", "half", "comment", "error", "bold, b", "bold2, b2", "quote, q", "code, c", "link", "title", "chapter", "chapter2", "chapter3"];
           foreach(s; styles)
-            ListItem(s ~ "\t\t\t\t" ~ tag(s.split(",")[0])~"Demo");
+            OldListItem(s ~ "\t\t\t\t" ~ tag(s.split(",")[0])~"Demo");
         });
       });
       Chapter(`Properties`, {
@@ -2792,3 +2975,52 @@ void uiContainerAlignTest(){ with(im){
   });
 
 }}
+
+
+// PropertySet tests ///////////////////////////////
+
+/+
+      // PropertySet test -----------------------------------------------------------
+      Row({ toolHeader;
+        Text(bold("PropertySet test:  "));
+      });
+
+      {// test a single property
+        auto ip = new IntProperty;
+        ip.name = "intProp";
+        ip.caption = "Integer property";
+        ip.min = 1;
+        ip.max = 10;
+        stdUI(ip);
+      }
+
+      {// test a property loaded from json
+        auto str = q{
+          {
+            "class": "PropertySet",
+            "name": "Test property set",
+            "properties": [
+              {
+                "class": "StringProperty",
+                "name": "cap.type",
+                "caption": "",
+                "hint": "Type of capture source.",
+                "act": "file",
+                "def": "auto",
+                "choices": [ "auto", "file", "dshow", "gstreamer", "v4l2", "ueye", "any" ]
+              },
+              {
+                "class": "IntProperty",
+                "name": "cap.width",
+                "caption": "",
+                "hint": "Desired image width",
+                "act": 640,
+                "def": 640,
+                "min": 0,
+                "max": 8192,
+                "step": 0
+              }
+            ]
+          }
+        };
++/
