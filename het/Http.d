@@ -153,11 +153,13 @@ struct DigitalSignal_smoothed{
 class HttpQueue{  //must be freed, otherwise the thread will stuck.
 public:
   string getImplementation(string q){
-    return curlGet(q.urlEncode);
+    return curlGet(q.urlEncode); //todo: this is bad because of query handling "?&=" chars
   }
 
-  struct Status{
-    DigitalSignal comm, error;
+  struct State{
+    int commCnt, errorCnt;
+    bool comm, error, idle;
+    double alive; //for timeout checking
   }
 
 private:
@@ -165,21 +167,24 @@ private:
   auto outbox = new shared ResponseQueue;
   shared int terminated = 0; // 1= terminate, 2 = ack
 
-  shared Status status_;
+  shared State state_;
 
-  static void httpWorker(shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared Status* status_){
+  static void httpWorker(const string name, shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared State* state_){
     enum log = false;
 
-    auto st = cast(Status*) status_; //trick to avoud synchronization
-
+    auto st = cast(State*) state_;
     while(*terminated == 0){
+      st.alive = QPS;
       auto r = inbox.pop;
       if(r.valid){
+        st.idle = false;
 
         if(log) LOG("httpWorker fetching: ", r.query);
         double t0 = 0; if(log) t0 = QPS;
 
         st.comm = true;
+        st.commCnt++;
+
         try{
           r.response = curlGet(r.query);
           if(log) LOG("Done fetching: ", r.query, QPS-t0);
@@ -187,13 +192,16 @@ private:
         }catch(Exception e){
           if(log) WARN("ERROR fetching: ", r.query, QPS-t0, e.msg);
           r.error = e.msg;
-          st.error.pulse(true);
+          st.error = true;
+          st.errorCnt++;
         }
-        st.comm = false;
 
         if(r.owner ~= "")
           outbox.push(r);
+
+        st.comm = false;
       }else{
+        st.idle = true;
         sleep(1);
       }
     }
@@ -201,9 +209,9 @@ private:
   }
 
 public:
-  this(){
+  this(string name){
     import std.concurrency;
-    spawn(&httpWorker, inbox, outbox, &terminated, &status_);
+    spawn(&httpWorker, name, inbox, outbox, &terminated, &state_);
   }
 
   ~this(){ //must be called manually, or the class must be allocated with scoped!
@@ -229,8 +237,8 @@ public:
     return res;
   }
 
-  Status status(){
-    return status_;
+  State state(){
+    return state_;
   }
 }
 
@@ -238,15 +246,15 @@ public:
 //easy global access for a queue
 HttpQueue globalHttpQueue(){
   __gshared static HttpQueue que;
-  if(que is null) que = new HttpQueue;
+  if(que is null) que = new HttpQueue("globalHttpQueue");
   return que;
 }
 
-void httpRequest(T)(in T owner, string url, string category=""){
+void globalHttpRequest(T)(in T owner, string url, string category=""){
   globalHttpQueue.request(owner, url, category);
 }
 
-auto httpReceive(T)(in T owner){
+auto globalHttpReceive(T)(in T owner){
   return globalHttpQueue.receive(owner);
 }
 
@@ -255,10 +263,10 @@ void testHttpQueue(){
         categories = ["", "", "1", "1"];
 
   foreach(i, url; urls)
-    httpRequest("testHttpQueue", url, categories[i]);
+    globalHttpRequest("testHttpQueue", url, categories[i]);
 
   int cnt=0;
-  while(1) foreach(r; httpReceive("testHttpQueue")){
+  while(1) foreach(r; globalHttpReceive("testHttpQueue")){
     cnt++;
     print(r.owner, r.query, r.category, r.error, r.response.length);
 

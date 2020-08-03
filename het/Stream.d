@@ -425,6 +425,8 @@ if(is(Type==class) || __traits(isRef, data)) //only let classes not to be refere
 class Property{
   @STORED string name, caption, hint;
   bool uiChanged; //stdUi sets this to true
+
+  string asText() { return ""; }
 }
 
 class StringProperty : Property {
@@ -434,22 +436,30 @@ class StringProperty : Property {
     string act, def;
     string[] choices;
   }
+
+  override string asText(){ return act; }
 }
 
 class IntProperty : Property {
   shared static this(){ registerStoredClass!(typeof(this)); }
 
   @STORED int act, def, min, max, step=0;
+
+  override string asText(){ return act.text; }
 }
 
 class FloatProperty : Property {
   shared static this(){ registerStoredClass!(typeof(this)); }
 
   @STORED float act=0, def=0, min=0, max=0, step=0;
+
+  override string asText(){ return act.text; }
 }
 
 class PropertySet : Property {
   shared static this(){ registerStoredClass!(typeof(this)); }
 
   @STORED Property[] properties;
+
+  override string asText(){ return ""; }
 }

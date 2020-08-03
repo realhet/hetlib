@@ -2452,19 +2452,17 @@ static cnt=0;
       btn = actContainer;
       flags.hAlign = HAlign.left;
 
-      Row({
-        if(idx.inRange(items)){
-          static if(translated){
-            static foreach(f; args) static if(isTranslator!(typeof(f)))
-              f(items[idx]);
-          }else{
-            Text(items[idx].text);
-          }
+      if(idx.inRange(items)){
+        static if(translated){
+          static foreach(f; args) static if(isTranslator!(typeof(f)))
+            f(items[idx]);
         }else{
-          Text(clGray, "none");
-          //null value
+          Text(items[idx].text);
         }
-      });
+      }else{
+        Text(clGray, "none");
+        //null value
+      }
 
       Flex;
       Row({ Text(" ", symbol("ChevronDown"), " "); });
@@ -2725,7 +2723,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
   }else static if(isFloatingPoint!T     ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      auto s = format("%.2f", data);
+      auto s = format("%f", data);
       Edit(s, id(thisFieldProps.hash), { width = fh*3; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
@@ -2791,7 +2789,7 @@ void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne 
       with(im) Row({             //todo: move it into stdUI
         Text(fp.getCaption, "\t");
         immutable old = p.act;
-        ListBox(p.act, p.choices, id(fp.hash), { width = fh*10; });
+        ComboBox(p.act, p.choices, id(fp.hash), { width = fh*10; });
         prop.uiChanged |= old != p.act;
       });
     }else{
