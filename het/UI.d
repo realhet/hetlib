@@ -2724,7 +2724,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = format("%f", data);
-      Edit(s, id(thisFieldProps.hash), { width = fh*3; });
+      Edit(s, id(thisFieldProps.hash), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
@@ -2735,7 +2735,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = data.text;
-      Edit(s, id(thisFieldProps.hash), { width = fh*3; });
+      Edit(s, id(thisFieldProps.hash), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
