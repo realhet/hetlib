@@ -463,3 +463,34 @@ class PropertySet : Property {
 
   override string asText(){ return ""; }
 }
+
+void expandPropertySets(char sep='.')(ref Property[] props){ //creates propertySets from properties named like "set.name"
+  Property[] res;
+  PropertySet[string] sets;
+
+  foreach(prop; props){
+    auto dir = prop.name.getFirstDir!sep;
+
+    if(dir.length){
+      auto set = dir in sets;  //todo: associativearray.update
+      if(!set){
+        auto ps = new PropertySet;
+        ps.name = dir;
+        res ~= ps;
+        sets[dir] = ps;
+        set = dir in sets;
+      }
+      set.properties ~= prop;
+    }else{
+      res ~= prop;
+    }
+
+    prop.name = prop.name.withoutFirstDir!sep;
+  }
+
+  //apply recursively
+  foreach(ps; sets.values)
+    ps.properties.expandPropertySets!sep;
+
+  props = res;
+}

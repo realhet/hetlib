@@ -2081,6 +2081,17 @@ a/b
 a/
 a*/
 
+string getFirstDir(char sep='\\')(string s){
+  auto i = s.indexOf(sep);
+    return i<0 ? "" : s[0..i];
+}
+
+string withoutFirstDir(char sep='\\')(string s){
+  auto i = s.indexOf(sep);
+    if(i<0) return s;
+    return i<0 ? s : s[i+1..$];
+}
+
 
 string[] withoutLastEmpty(string[] lines){
   if(!lines.empty && lines[$-1].strip.empty) return lines[0..$-1];
