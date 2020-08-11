@@ -550,14 +550,16 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 
 
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
-const clChapter                 = RGB(221,   3,  48),
+const
+      clChapter                 = RGB(221,   3,  48),
       clAccent                  = RGB(0  , 120, 215),
       clMenuBk                  = RGB(240, 240, 241),
       clMenuHover               = RGB(222, 222, 222),
       clLink                    = RGB(0  , 120, 215),
+
       clLinkHover               = RGB(102, 102, 102),
       clLinkPressed             = RGB(153, 153, 153),
-      clLinkDisabled            = clWinBtnHoverBorder,
+      clLinkDisabled            = RGB(122, 122, 122), // clWinBtnHoverBorder
 
       clWinRed                  = RGB(232,17,35),
 
@@ -708,7 +710,7 @@ bool isWhite(const Cell c){ auto g = cast(const Glyph)c; return g && g.isWhite; 
 
 
 struct Padding{  //Padding, Margin ///////////////////////////////////////////////////
-  alias all this;
+  //alias all this; not working that way
 
   float top=0, right=0, bottom=0, left=0;
   @property{

@@ -1630,7 +1630,10 @@ static cnt=0;
 
   //easy access
 
-  float fh(){ return textStyle.fontHeight; }
+  @property{
+    float fh(){ return textStyle.fontHeight; }
+    void fh(float v){ textStyle.fontHeight = cast(ubyte)(v.iRound); }
+  }
 
   auto subCells(){ return actContainer.subCells; }
   auto subCells(T : .Cell)(){ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); }
