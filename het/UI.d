@@ -61,8 +61,8 @@ class Slider : Cell { // Slider //////////////////////////////////
 
   this(uint id, ref float nPos_, in im.range range_, ref bool userModified, TextStyle ts=tsNormal){
     this.id = id;
-    hitTestManager.addHash(this, id);
-    auto hit = hitTestManager.check(id);
+
+    auto hit = im.hitTest(this, id);
 
     hitBounds = hit.hitBounds;
 
@@ -391,7 +391,7 @@ class Link : Row{ //Link ///////////////////////////////
 
   this(string cmdLine, uint hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
 
-    auto hit = hitTestManager.check(hash);
+    auto hit = im.hitTest(this, hash);
 
     if(enabled && onClick !is null && hit.clicked){
       onClick();
@@ -407,8 +407,6 @@ class Link : Row{ //Link ///////////////////////////////
       ts.underline = hit.hover;
     }
 
-    hitTestManager.addHash(this, hash); //register this hash for this cell
-
     flags.canWrap = false;
 
     auto params = cmdLine.commandLineToMap;
@@ -417,7 +415,7 @@ class Link : Row{ //Link ///////////////////////////////
   }
 }
 
-class Clickable : Row{ //Clickable / ChkBox / RadioBtn ///////////////////////////////
+/*class Clickable : Row{ //Clickable / ChkBox / RadioBtn ///////////////////////////////
 
   this(uint id, string markup, TextStyle ts, string[string] params){
     hitTestManager.addHash(this, id);
@@ -427,7 +425,7 @@ class Clickable : Row{ //Clickable / ChkBox / RadioBtn /////////////////////////
     super(markup, ts);
     setProps(params);
   }
-}
+} */
 
 class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
 
@@ -1211,7 +1209,7 @@ struct im{ static:
     mouseOverUI = false;
     bool mouseOverPopup;
     foreach_reverse(a; rc){
-      if(a.hitTest(currentMouse)){
+      if(a.internal_hitTest(currentMouse)){
         mouseOverUI = true;
 
         if(popupState.cell==a)
@@ -1710,6 +1708,18 @@ static cnt=0;
   auto endlessRange (float min, float max, float step=1){ return range(min, max, step, RangeType.endless ); }
 
 
+  static auto hitTest(Cell cell, uint id){
+    assert(cell !is null);
+    auto res = hitTestManager.check(id);
+    hitTestManager.addHash(actContainer, id);
+    return res;
+  }
+
+  auto hitTest(uint id){
+    return hitTest(actContainer, id);
+  }
+
+
   string symbol(string def){ return tag(`symbol `~def); }
   void Symbol(string def){ Text(symbol(def)); }
 
@@ -1873,9 +1883,7 @@ static cnt=0;
 //  string flex(float value){ return flex(value.text); } //kinda lame to do it with texts
 
   //Text /////////////////////////////////
-  void Text(string file=__FILE__, int line=__LINE__, T...)(T args){ //todo: not multiline yet
-
-    //todo: ugy nez ki, hogy nem kell ide a file, line.
+  void Text(/*string file=__FILE__, int line=__LINE__,*/ T...)(T args){ //todo: not multiline yet
 
     //multiline behaviour:
     //  parent is Row: if multiline -> make a column around it
@@ -1884,7 +1892,7 @@ static cnt=0;
 
     //Text is always making one line, even in a container. Use \n for multiple rows
     if(args.length>1 &&(actContainer is null || cast(.Column)actContainer !is null)){ //implicit row
-      Row({ Text!(file, line)(args); });
+      Row({ Text/*!(file, line)*/(args); });
       return;
     }
 
@@ -1942,9 +1950,9 @@ static cnt=0;
      else Row({ Text(text); });*/
   }
 
-  void Comment(string file=__FILE__, int line=__LINE__, T...)(T args){
+  void Comment(/*string file=__FILE__, int line=__LINE__, */T...)(T args){
     // It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...
-    Text!(file, line)(tsComment, args);
+    Text/*!(file, line)*/(tsComment, args);
   }
 
   //Bullet ///////////////////////////////////
@@ -2014,20 +2022,34 @@ static cnt=0;
     }catch(Throwable){}
   }+/
 
+  struct EditResult{
+    HitInfo hit;
+    bool changed;
+    alias changed this;
+  }
+
   auto Edit(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
     mixin(id.M ~ enable.M);
-    bool chg;
+
+    EditResult res;
 
     void value2editor(){ textEditorState.str = value.text; }
-    void editor2value(){ try value = textEditorState.str.to!T0; catch{} } //todo: range clamp
+    void editor2value(){
+      try{
+        auto newValue = textEditorState.str.to!T0;  //todo: range clamp
+        res.changed = newValue != value;
+        value = newValue;
+      }catch{}
+    }
 
     Row({
+      auto ref hit(){ return res.hit; }
+
       flags.clipChildren = true;
       auto row = cast(.Row)actContainer;
 
-      auto hit = hitTestManager.check(id_); //get the hittert from the last frame
-      auto localMouse = currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize;
-      hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
+      hit = hitTest(id_);
+      auto localMouse = currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 
       mixin(hintHandler);
 
@@ -2087,6 +2109,7 @@ static cnt=0;
           //todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.
 
         }
+
         mainWindow.inputChars = unprocessed;
       }
 
@@ -2141,7 +2164,7 @@ static cnt=0;
 
     });
 
-    return chg; //a hit testet vissza kene adni im.valtozoban
+    return res; //a hit testet vissza kene adni im.valtozoban
   }
 
   auto IncBtn(string file=__FILE__, int line=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0){ //IncBtn /////////////////////////////////
@@ -2205,10 +2228,10 @@ static cnt=0;
 
     const isToolBtn = theme=="tool";
 
-    auto hit = hitTestManager.check(id_); //get the hittest from the last frame
+    HitInfo hit;
 
     Row({
-      hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
+      hit = hitTest(id_);
 
       mixin(hintHandler);
 
@@ -2273,9 +2296,9 @@ static cnt=0;
 
     //todo: This is only the base of a listitem. Later it must communicate with a container
 
-    auto hit = hitTestManager.check(id_); //get the hittert from the last frame
+    HitInfo hit;
     Row({
-      hitTestManager.addHash(actContainer, id_); //save the rect of this container for the next frame
+      hit = hitTest(id_);
 
       style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
 
@@ -2310,27 +2333,34 @@ static cnt=0;
   //ChkBox //////////////////////////////
   auto ChkBox(string file=__FILE__, int line=__LINE__, string chkBoxStyle="chk", T...)(ref bool state, string caption, T args){
     mixin(id.M ~ enable.M ~ selected.M);
-    auto hit = hitTestManager.check(id_);
 
-    //update checkbox state
-    if(enabled && hit.clicked) state.toggle;
+    HitInfo hit;
+    Row({
+      flags.canWrap = false;
 
-    //mixin GetChkBoxColors;
-    RGB hoverColor(RGB baseColor, RGB bkColor) {
-      return !enabled ? clWinBtnDisabledText
-                      : lerp(baseColor, bkColor, hit.captured ? 0.5 : hit.hover_smooth*0.3);
-    }
+      hit = hitTest(id_);
 
-    auto markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor);
-    auto textColor = hoverColor(style.fontColor, style.bkColor);
+      //update checkbox state
+      if(enabled && hit.clicked) state.toggle;
 
-    auto bullet = chkBoxStyle=="radio" ? tag(`symbol RadioBtn`~(state?"On":"Off"))
-                                       : tag(`symbol Checkbox`~(state?"CompositeReversed":""));
+      //mixin GetChkBoxColors;
+      RGB hoverColor(RGB baseColor, RGB bkColor) {
+        return !enabled ? clWinBtnDisabledText
+                        : lerp(baseColor, bkColor, hit.captured ? 0.5 : hit.hover_smooth*0.3);
+      }
 
-    auto ts = style;
-    auto ctrl = new Clickable(id_, format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor), ts, (string[string]).init);
+      auto markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor);
+      auto textColor = hoverColor(style.fontColor, style.bkColor);
 
-    append(ctrl);
+      auto bullet = chkBoxStyle=="radio" ? tag(`symbol RadioBtn`~(state?"On":"Off"))
+                                         : tag(`symbol Checkbox`~(state?"CompositeReversed":""));
+
+      //Text(format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor));
+      Text(markColor, bullet~" ", textColor, caption);
+
+      foreach(a; args) if(__traits(compiles, a())) a();
+    });
+
     return hit;
   }
 
@@ -2370,10 +2400,10 @@ static cnt=0;
   // RadioBtn //////////////////////////
   auto RadioBtn(string file=__FILE__, uint line=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
 
-  auto ListBoxItem(C)(ref bool isSelected, C s, int itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
-    auto hit = hitTestManager.check(itemId);
+  auto ListBoxItem(C)(ref bool isSelected, C s, uint itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
+    HitInfo hit;
     Row({
-      hitTestManager.addHash(actContainer, itemId);
+      hit = hitTest(itemId);
 
       if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down)) isSelected = true; //mosue down left or right
 
@@ -2402,10 +2432,10 @@ static cnt=0;
     enum isTranslator(T) = __traits(compiles, T.init(A.init)); //is(T==void delegate(in A)) || is(T==void delegate(A)) || is(T==void function(in A)) || is(T==void function(A));
     enum translated = anySatisfy!(isTranslator, Args);
 
-    auto hit = hitTestManager.check(id_);
+    HitInfo hit;
     bool changed;
     Column({
-      hitTestManager.addHash(actContainer, id_);
+      hit = hitTest(id_);
       border = "1 normal gray";
 
       foreach(i, s; items){

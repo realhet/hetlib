@@ -2496,6 +2496,12 @@ string[] split2(string s, string delim, bool doStrip = true){
   return [s1, s2];
 }
 
+string join2(string a, string delim, string b){
+  if(a.length && b.length) return a ~ delim ~ b;
+  if(a.length) return a;
+  return b;
+}
+
 string capitalizeFirstLetter(string s){
   if(s.empty) return s;
   return s[0..1].uc ~ s[1..$];

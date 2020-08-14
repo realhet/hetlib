@@ -494,3 +494,22 @@ void expandPropertySets(char sep='.')(ref Property[] props){ //creates propertyS
 
   props = res;
 }
+
+string[] getPropertyValues(string filter = "true")(Property[] props, string rootPath=""){
+  string[] res;
+  foreach(a; props){
+    auto fullName = join2(rootPath, ".", a.name);
+    if(auto ps = cast(PropertySet)a){
+      res ~= getChangedPropertyValues(ps.properties, fullName);
+    }else{
+      if(mixin(filter)){
+        res ~= fullName ~ '=' ~ a.asText;
+      }
+    }
+  }
+  return res;
+}
+
+string[] getChangedPropertyValues(Property[] props, string rootPath=""){
+  return getPropertyValues!"chkClear(a.uiChanged)"(props, rootPath);
+}

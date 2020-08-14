@@ -953,7 +953,7 @@ class Cell{ // Cell ////////////////////////////////////
   void delete_(int at, int cnt) { insert([], at, cnt); }
   Cell[] cut(int at, int cnt)   { Cell[] res; insert([], at, cnt, &res); }*/
 
-  bool hitTest(in V2f mouse, V2f ofs=V2f.Null){ //todo: only check when the hitTest flag is true
+  bool internal_hitTest(in V2f mouse, V2f ofs=V2f.Null){ //todo: only check when the hitTest flag is true
     auto bnd = getHitBounds.translated(ofs);
     if(bnd.checkInsideRect(mouse)){
       hitTestManager.addHitRect(this, bnd, mouse-outerPos);
@@ -1637,10 +1637,10 @@ class Container : Cell { // Container ////////////////////////////////////
     foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure(); //recursive in the front
   }
 
-  override bool hitTest(in V2f mouse, V2f ofs=V2f.Null){
-    if(super.hitTest(mouse, ofs)){
+  override bool internal_hitTest(in V2f mouse, V2f ofs=V2f.Null){
+    if(super.internal_hitTest(mouse, ofs)){
       ofs += innerPos;
-      foreach(sc; subCells) sc.hitTest(mouse, ofs); //recursive
+      foreach(sc; subCells) sc.internal_hitTest(mouse, ofs); //recursive
       flags.hovered = true;
       return true;
     }else{
