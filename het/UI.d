@@ -2022,6 +2022,69 @@ static cnt=0;
     }catch(Throwable){}
   }+/
 
+  // apply Btn and Edit style////////////////////////////////////
+
+  void applyBtnBorder(in RGB bColor = clWinBtn){ //todo: use it for edit as well
+    margin  = Margin(2, 2, 2, 2);
+    border  = Border(2, BorderStyle.normal, bColor);
+    padding = Padding(2, 2, 2, 2);
+    if(theme=="tool"){
+      border.width    = 1;
+      border.inset = true;
+      margin .top = margin .bottom = 0;
+      padding.top = padding.bottom = 0;
+    }
+  }
+
+  void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover){
+    style = tsBtn;
+
+    auto bColor = lerp(style.bkColor, clWinBtnHoverBorder, hover);
+
+    applyBtnBorder(bColor);
+
+    if(!enabled){
+      style.fontColor = clWinBtnDisabledText;
+      border.color    = style.bkColor;
+    }else if(captured){
+      border.style    = BorderStyle.none;
+      style.bkColor   = clWinBtnPressed;
+    }
+
+    if(isWhite){
+      if(captured) style.bkColor = lerp(clWinBackground, clWinBtnPressed, .5);
+              else style.bkColor = clWinBackground; //todo: ez felulirja a
+    }
+
+    if(theme == "tool"){ //every appearance is lighter on a toolBtn
+      style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
+      if(captured && enabled) border.width = 0; //this if() makes the edge squareish
+    }
+
+    if(selected){
+      style.bkColor = lerp(style.bkColor, clAccent, .5);
+      border.color  = lerp(border.color , clAccent, .5);
+    }
+
+    bkColor = style.bkColor; //todo: update the backgroundColor of the container. Should be automatic, but how?...
+  }
+
+  void applyEditStyle(bool enabled, bool focused, float hover){
+    style   = tsNormal;
+
+    auto bColor = focused  ? clBlack :
+                  !enabled ? lerp(clWinBtn       , style.bkColor, 0.5)
+                           : lerp(clWinBtn, clWinBtnHoverBorder, hover);
+
+    applyBtnBorder(bColor);
+
+    if(!enabled){
+      style.fontColor = lerp(style.fontColor, style.bkColor, 0.5);
+    }
+
+    bkColor = style.bkColor;
+  }
+
   struct EditResult{
     HitInfo hit;
     bool changed;
@@ -2116,29 +2179,11 @@ static cnt=0;
       static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
                                     else flags.hAlign = HAlign.left;
 
-      style   = tsNormal;
+      applyEditStyle(enabled, focused, hit.hover_smooth);
 
-      margin  = Margin(2, 2, 2, 2);
-      border  = Border(2, BorderStyle.normal, lerp(clWinBtn, clWinBtnHoverBorder, hit.hover_smooth));
-      padding = Padding(2, 2, 2, 2);
-
-      if(!enabled){
-        style.fontColor = lerp(style.fontColor, style.bkColor, 0.5);
-        border.color    = lerp(clWinBtn       , style.bkColor, 0.5);
-      }
-
-      if(theme=="tool"){ //todo: refactor as this is same as in Btn
-        style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
-        border.width    = 1;
-//        border.location = BorderLocation.inside;
-        margin .top = margin .bottom = 0;
-        padding.top = padding.bottom = 0;
-      }
-
-      if(focused){
-        border.color = clBlack;
+      if(focused)
         flags.dontHideSpaces = true;
-      }
+
 
       //execute the delegate funct parameters
       static foreach(a; args) static if(__traits(compiles, a())){ a(); }
@@ -2205,18 +2250,6 @@ static cnt=0;
     return oldValue != value;
   }
 
-  void applyBtnBorder(in RGB bColor = clWinBtn){ //todo: use it for edit as well
-    margin  = Margin(2, 2, 2, 2);
-    border  = Border(2, BorderStyle.normal, bColor);
-    padding = Padding(2, 2, 2, 2);
-    if(theme=="tool"){
-      border.width    = 1;
-      border.inset = true;
-      margin .top = margin .bottom = 0;
-      padding.top = padding.bottom = 0;
-    }
-  }
-
   auto WhiteBtn(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args){
     return Btn!(file, line, true, T0, T)(text, args);
   }
@@ -2245,35 +2278,7 @@ static cnt=0;
       //flags.canWrap = false;
       flags.hAlign = HAlign.center;
 
-      style   = tsBtn;
-
-      auto bColor = lerp(style.bkColor, clWinBtnHoverBorder, hit.hover_smooth);
-      applyBtnBorder(bColor);
-
-      if(!enabled){
-        style.fontColor = clWinBtnDisabledText;
-        border.color    = style.bkColor;
-      }else if(hit.captured){
-        border.style    = BorderStyle.none;
-        style.bkColor   = clWinBtnPressed;
-      }
-
-      if(isWhite){
-        if(hit.captured) style.bkColor = lerp(clWinBackground, clWinBtnPressed, .5);
-                    else style.bkColor = clWinBackground;
-      }
-
-      if(isToolBtn){ //every appearance is lighter on a toolBtn
-        style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
-        if(hit.captured && enabled) border.width = 0; //this if() makes the edge squareish
-      }
-
-      if(_selected){
-        style.bkColor = lerp(style.bkColor, clAccent, .5);
-        border.color  = lerp(border.color , clAccent, .5);
-      }
-
-      bkColor = style.bkColor; //todo: update the backgroundColor of the container. Should be automatic, but how?...
+      applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth);
 
       static if(isSomeString!T0) Text(text); //centered text
                             else text(); //delegate
