@@ -191,7 +191,7 @@ class Drawing {
 
   private Drawing[] subDrawings; //clones to draw at the very end
 
-  void draw(Drawing src){
+  void subDraw(Drawing src){ //todo: revisit this subdrawing thing
     if(!src.isClone) CRIT("src must be a clone (at least for now.)");
 
     if(logDrawing) LOG(shortName, "queued subDrawing", cast(void*) src, src.totalDrawObj);
@@ -200,6 +200,15 @@ class Drawing {
     if(!src.boundsEmpty){
       bounds_.expandTo(src.bounds_, boundsEmpty);
       boundsEmpty = false;
+    }
+  }
+
+  void copyFrom(Drawing src){
+    if(src is null) return;
+
+    foreach(obj; src.exportDrawingObjs){
+      obj.applyTransform(&inputTransform);
+      append(obj); //todo: this is a terrible slow copy
     }
   }
 
@@ -339,6 +348,16 @@ class Drawing {
       else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) { x(aA); x(aB); } //Point2, Line, rect, glyph
       else raise("aType %s not impl".format(aType));
     }
+
+    void applyTransform(V2f delegate(in V2f) tr){
+      auto t = aType.iRound;
+
+      void x(ref V2f v){ v = tr(v); }
+
+      if(t==1) x(aA); //Point
+      else if(t==68){ x(aA); x(aB); x(aC); } //Tri
+      else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) { x(aA); x(aB); } //Point2, Line, rect, glyph
+    }
   };
   private const bufferMax = (2<<20)/DrawingObj.sizeof;
   private DrawingObj[][] buffers;
@@ -355,6 +374,10 @@ class Drawing {
     o.aClipMax = clipBounds.bMax;
     buffers[$-1] ~= o;
     o.expandBounds(bounds_, boundsEmpty);
+  }
+
+  private auto exportDrawingObjs(){
+    return buffers.join;
   }
 
 //  private int dirty = -1; //must set to -1 data[] is changed. bit0 = VBO, bit1 = bounds

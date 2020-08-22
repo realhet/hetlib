@@ -325,19 +325,22 @@ string toJson(Type)(in Type data, bool dense=false, bool hex=false, string thisN
 private string quote(string s){ return format!"%(%s%)"([s]); }
 template isSomeChar(T){ enum isSomeChar = is(T == char) || is(T == wchar) || is(T == dchar); }
 
-void streamAppend_json(Type)(ref string st, in Type data, bool dense=false, bool hex=false, string thisName="", string indent=""){
+void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=false, bool hex=false, string thisName="", string indent=""){
   alias T = Unqual!Type;
 
-  //call dynamic class writer
+  //call dynamic class writer. For example Type==Property and the actual class in data is StringProperty
   static if(is(T == class)){
     if(data !is null){
       const currentFullName = typeid(data).to!string; //todo: try to understand this
       if(currentFullName != fullyQualifiedName!T){ //use a different writer if needed
         auto p = currentFullName in classSaverFunc;
         if(p){
-          (*p)(st, cast(void*) &data, dense, hex, thisName, indent);
+          (*p)(st, /*!!!!!*/cast(void*) data, dense, hex, thisName, indent);
           return;
-        } //todo: error if there is no classSaver, throw error
+        }else{
+          //todo: error if there is no classSaver, throw error
+          raise("toJson: unregisteded inherited class. Must call registerStoredClass!%s".format(currentFullName));
+        }
       }
     }
   }
@@ -423,7 +426,11 @@ if(is(Type==class) || __traits(isRef, data)) //only let classes not to be refere
 
 
 class Property{
-  @STORED string name, caption, hint;
+  @STORED{
+    string name, caption, hint;
+    bool isReadOnly;
+  }
+
   bool uiChanged; //stdUi sets this to true
 
   string asText() { return ""; }
@@ -509,6 +516,31 @@ string[] getPropertyValues(string filter = "true")(Property[] props, string root
   }
   return res;
 }
+
+Property findProperty(Property[] props, string nameFilter, string rootPath=""){
+  foreach(a; props){
+    auto fullName = join2(rootPath, ".", a.name);
+    if(fullName.isWild(nameFilter)) return a;
+    if(auto ps = cast(PropertySet)a){
+      auto res = ps.properties.findProperty(nameFilter, fullName);
+      if(res) return res;
+    }
+  }
+  return null;
+}
+
+
+Property[] findProperties(Property[] props, string nameFilter, string rootPath=""){
+  Property[] res;
+  foreach(a; props){
+    auto fullName = join2(rootPath, ".", a.name);
+    if(fullName.isWild(nameFilter)) res ~= a;
+    if(auto ps = cast(PropertySet)a)
+      res ~= ps.properties.findProperties(nameFilter, fullName);
+  }
+  return res;
+}
+
 
 string[] getChangedPropertyValues(Property[] props, string rootPath=""){
   return getPropertyValues!"chkClear(a.uiChanged)"(props, rootPath);

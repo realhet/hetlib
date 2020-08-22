@@ -871,6 +871,13 @@ int iRemap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo
 
 int cmp(T)(in T a, in T b) { if(a<b) return -1; if(a>b) return 1; return 0; }
 
+bool isAscending (T0, T1)(in T0 a, in T1 b){ return a < b; }
+bool isDescending(T0, T1)(in T0 a, in T1 b){ return a > b; }
+
+bool isAscending (T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b ? chain : a < b; }
+bool isDescending(T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b ? chain : a > b; }
+
+
 public import std.algorithm: swap;
 //void swap(T)(ref T a, ref T b) { T c=a; a=b; b=c; }
 
@@ -2376,23 +2383,28 @@ string withoutQuotes(string s, char q){
 }
 
 
-auto splitCommandLine(string line)
-{
+auto splitQuotedStr(string line, char delim, char quote){
   auto s = line.dup;
 
   //mark non-quoted spaces
   bool inQuote;
-  foreach(ref ch; s){
-    if(ch=='\"') inQuote = !inQuote;
-    if(!inQuote && ch==' ') ch = '\1'; //use #1 as a marker for splitting
+  foreach(ref char ch; s){
+    if(ch==quote) inQuote = !inQuote;
+    if(!inQuote && ch==delim) ch = '\1'; //use #1 as a marker for splitting
   }
 
-  //split, convert, strip, filter empries
-  return s.split('\1')
-          .map!(a => a.strip.to!string.withoutQuotes('"'))
-          .filter!(a => !a.empty)
-          .array;
+  return s.split('\1').to!(string[]);
 }
+
+
+auto splitCommandLine(string line){
+  //split, convert, strip, filter empries
+  return line.splitQuotedStr(' ', '"')
+             .map!(a => a.strip.to!string.withoutQuotes('"'))
+             .filter!(a => !a.empty)
+             .array;
+}
+
 
 auto commandLineToMap(string line){
   string[string] map;

@@ -1572,6 +1572,9 @@ static cnt=0;
     stack = [];
     push!(.Container)(null, 0); //null meaning -> root[] is the container
 
+    overlayDrawings.clear;
+
+
     //time calculation
     //todo: jobb neveket kell kitalalni erre
     //QPS = .QPS;
@@ -1625,6 +1628,18 @@ static cnt=0;
     if(actContainer !is null) actContainer.append(c);
                          else root ~= c;
   }
+
+  // overlay drawing //////////////////////////
+  Drawing[.Container] overlayDrawings;
+
+  void addOverlayDrawing(Drawing dr){
+    enforce(actContainer !is null);
+    enforce(!actContainer.flags._hasOverlayDrawing, "Container already has an overlay drawing.");
+
+    actContainer.flags._hasOverlayDrawing = true;
+    overlayDrawings[actContainer] = dr;
+  }
+
 
   //easy access
 
@@ -2697,6 +2712,7 @@ struct FieldProps{
   RANGE range;
   bool indent;
   string[] choices;
+  bool isReadOnly;
 
   static string makeFullName(string parentFullName, string fieldName){
     return [parentFullName, fieldName].filter!(not!empty).join('.');
@@ -2719,6 +2735,7 @@ FieldProps getFieldProps(T, string fieldName)(string parentFullName){
   p.name        = fieldName;
   p.caption     = getUDA!(f, CAPTION).text;
   p.hint        = getUDA!(f, HINT   ).text;
+  //todo: readonly
   p.unit        = getUDA!(f, UNIT   ).text;
   p.range       = getUDA!(f, RANGE);
   p.indent      = hasUDA!(f, INDENT);
@@ -2756,13 +2773,17 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
   static if(isSomeString!T){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      Edit(data, id(thisFieldProps.hash), hint(thisFieldProps.hint), { width = fh*10; });
+      if(thisFieldProps.choices.length){
+        ComboBox(data, thisFieldProps.choices, hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
+      }else{
+        Edit(data, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
+      }
     });
   }else static if(isFloatingPoint!T     ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = format("%f", data);
-      Edit(s, id(thisFieldProps.hash), { width = fh*4; });
+      Edit(s, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
@@ -2773,16 +2794,16 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = data.text;
-      Edit(s, id(thisFieldProps.hash), { width = fh*4; });
+      Edit(s, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), hint(thisFieldProps.hint), "width=180"); //todo: rightclick
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), "width=180"); //todo: rightclick
     });
   }else static if(is(T == bool)         ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      ChkBox(data, "", id(thisFieldProps.hash), hint(thisFieldProps.hint));
+      ChkBox(data, "", id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly));
       Text("\t");
     });
   }else static if(isAggregateType!T     ){ // Struct, Class
@@ -2807,6 +2828,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
 void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne kene lennie a Property class-ban...
   if(prop is null) return;
   auto fp = FieldProps(FieldProps.makeFullName(parentFullName, prop.name), prop.name, prop.caption, prop.hint);
+  fp.isReadOnly = prop.isReadOnly;
 
   void doit(T)(ref T act){
     immutable old = act;
@@ -2823,16 +2845,8 @@ void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne 
     fp.range.high = p.max;
     doit(p.act);
   }else if(auto p = cast(StringProperty)prop){
-    if(p.choices.length){
-      with(im) Row({             //todo: move it into stdUI
-        Text(fp.getCaption, "\t");
-        immutable old = p.act;
-        ComboBox(p.act, p.choices, id(fp.hash), { width = fh*10; });
-        prop.uiChanged |= old != p.act;
-      });
-    }else{
-      doit(p.act);
-    }
+    fp.choices = p.choices;
+    doit(p.act);
   }else if(auto p = cast(PropertySet)prop){
     stdStructFrame(fp.getCaption, {
       p.properties.each!stdUI;

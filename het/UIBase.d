@@ -1125,8 +1125,9 @@ union ContainerFlags{ //todo: do this nicer with a table
     PanelPosition , "panelPosition"   , 4,  //only for desktop
     bool          , "clipChildren"    , 1,
     bool          , "_saveComboBounds", 1,  //marks the container to save the absolute bounds to align the popup window to.
+    bool          , "_hasOverlayDrawing", 1,
 
-    int           , ""                , 15,
+    int           , ""                , 14,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1669,6 +1670,12 @@ class Container : Cell { // Container ////////////////////////////////////
 
     foreach(sc; subCells){
       sc.draw(dr); //recursive
+    }
+
+    if(flags._hasOverlayDrawing){
+      import het.ui;
+      if(auto drOverlay = this in het.ui.im.overlayDrawings)
+        dr.copyFrom(*drOverlay);
     }
 
     if(flags.clipChildren) dr.popClipBounds;
