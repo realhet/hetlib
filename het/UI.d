@@ -2254,8 +2254,8 @@ static cnt=0;
   }
 
   auto IncDecBtn(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
-    return IncBtn!(file, line)(value, args)
-        || DecBtn!(file, line)(value, args);
+    return DecBtn!(file, line)(value, args)
+        || IncBtn!(file, line)(value, args);
   }
 
   auto IncDec(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
