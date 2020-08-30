@@ -1634,7 +1634,7 @@ class Container : Cell { // Container ////////////////////////////////////
     if(autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);
   }
 
-  private void measureSubCells(){
+  protected void measureSubCells(){
     foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure(); //recursive in the front
   }
 
@@ -2269,7 +2269,9 @@ class Column : Container { // Column ////////////////////////////////////
       if(auto co = cast(Container)sc) co.measure; //width changed, need a new measure
     }
 
-    //process flexible items
+    processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.
+
+    //process vertically flexible items
     if(!autoHeight){
       auto flexSum = subCells.calcFlexSum;
 
@@ -2289,8 +2291,6 @@ class Column : Container { // Column ////////////////////////////////////
     }
 
     subCells.spreadV;
-
-    processElasticTabs(subCells);
 
     innerSize = subCells.maxOuterSize;
   }

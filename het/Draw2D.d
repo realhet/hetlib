@@ -510,6 +510,20 @@ class Drawing {
   void vLine(in V2f p0, float y1)                       { line(p0.x, p0.y, p0.x, y1); }
   void vLine(float x, float y0, float y1)               { line(x, y0, x, y1); }
 
+  void line2(T...)(in args T){
+    foreach(a; args){
+      alias A = unqual!(typeof(a));
+      static if(is(A == V2f)) lineTo(a);
+      static if(is(A == V2i)) lineTo(a);
+      static if(is(A == V2f[])) lineTo(a);
+      static if(is(A == V2i[])) lineTo(a);
+      static if(is(A == RGB )){ color = a;        alpha = 1;          }
+      static if(is(A == RGBA)){ color = a.to!RGB; alpha = a.a/255.0f; }
+      static if(isIntegral!A || isFloatingPoint!A) lineWidth = a;
+      //todo: static if(is(A == LineStyle)) lineStyle = a;
+    }
+  }
+
   protected static auto genRgbGraph(string fv)(){
     return q{
       auto oldColor = color;

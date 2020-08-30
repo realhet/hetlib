@@ -2227,6 +2227,26 @@ static cnt=0;
     return res; //a hit testet vissza kene adni im.valtozoban
   }
 
+  auto Static(string file=__FILE__, int line=__LINE__, T0, T...)(in T0 value, T args){ // Static /////////////////////////////////
+    mixin(id.M ~ enable.M);
+
+    Row({
+      applyEditStyle(enabled, false, 0);
+
+      static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
+                                    else flags.hAlign = HAlign.left;
+
+      static if(__traits(compiles, value())) value();
+                                        else Text(value.text);
+
+      foreach(a; args) if(__traits(compiles, a())) a();
+
+      //set minimal height for the control if empty
+      if(actContainer.subCells.empty && innerHeight==0)
+          innerHeight = fh;
+    });
+  }
+
   auto IncBtn(string file=__FILE__, int line=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0){ //IncBtn /////////////////////////////////
     mixin(id.M ~ enable.M ~ range.M);
 
