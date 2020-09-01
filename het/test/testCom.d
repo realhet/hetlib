@@ -13,13 +13,17 @@ enum Parity { none, odd, even, mark, space}  enum ParityLetters = ["N","O","E","
 enum StopBits { one, onePointFive, two }     enum StopBitStrings = ["1", "1.5", "2"];
 enum ComPortState { offline, online, createError, writeError }
 
-class ComPort{
-  static private string READONLYPROP(T, string name, string _default="$.init")(){ return "private $ _*=#; @property auto *(){ return _*; }".replace('#', _default).replace('$', T.stringof).replace('*', name); }
+mixin template ReadonlyField(T, string name, string _default="$.init"){
+  mixin( "private $ _*=#; @property auto *() const{ return _*; }".replace('#', _default).replace('$', T.stringof).replace('*', name) );
+}
 
-  mixin(READONLYPROP!(int, "id"));
-  mixin(READONLYPROP!(bool, "exists"));
-  mixin(READONLYPROP!(string, "description"));
-  mixin(READONLYPROP!(int, "iconIndex"));
+class ComPort{
+  //static private string READONLYPROP(T, string name, string _default="$.init")(){ return ; }
+
+  mixin ReadonlyField!(int      , "id");
+  mixin ReadonlyField!(bool     , "exists");
+  mixin ReadonlyField!(string   , "description");
+  mixin ReadonlyField!(int      , "iconIndex");
 
   enum defaultBaud = 9600, defaultBits = 8;
 
@@ -31,12 +35,10 @@ class ComPort{
 
   Parity parity;
   StopBits stopBits;
+  ComPortState state;
 
-  bool active = false;
-
-  private string configInRegistry;
   @property{
-    auto config(){
+    auto config() const{
       return format!"%s %s%s%s"(baud, bits, ParityLetters.get(cast(int) parity), StopBitStrings.get(cast(int) stopBits));
     }
 
@@ -78,26 +80,34 @@ class ComPort{
       enforce(id.inRange(1, ComPorts.totalPorts));
       _id = id;
 
-      readPortConfig;
+      readConfigFromRegistry;
     }
 
-    private void readPortConfig(){
+    private void readConfigFromRegistry(){
       try{
-        string s = comPorts.regKeyPortConfig_read.getValue("COM"~text(id)~":").value_SZ;
+        auto key = comPorts.regKeyPortConfig_read;
+        if(key is null) return;
+        string s = key.getValue("COM"~text(id)~":").value_SZ;
         if(isWild(s, "*,*,*,*")){ //baud,parity,bits,stopBits
           string configInRegistry = format!"%s %s%s%s"(wild[0], wild[2], wild[1].uc, wild[3]);
-          print("COM"~id.text~":", "Reading portConfig from registry:", s, configInRegistry);
+          //print("COM"~id.text~":", "Reading portConfig from registry:", s, configInRegistry);
           config = configInRegistry;
         }
       }catch(Throwable){}
     }
 
-    private void writePortConfig(){
+    private void writeConfigToRegistry(){
       try{
         auto s = format!"%s,%s,%s,%s"(baud, (parity.text)[0], bits, StopBitStrings[cast(int)stopBits]);
-        comPorts.regKeyPortConfig_write.setValue("COM"~text(id)~":", s);
-        print("COM"~id.text~":", "Written portConfig to registry:", s);
+        auto key = comPorts.regKeyPortConfig_write;
+        if(key is null) return;
+        key.setValue("COM"~text(id)~":", s);
+        //print("COM"~id.text~":", "Written portConfig to registry:", s);
       }catch(Throwable){}
+    }
+
+    override string toString() const{
+      return format!`ComPort(COM%s, %s, %s, config="%s", descr="%s")`(id, exists ? "exists" : "absent", state.text, config, description);
     }
 
   }
@@ -148,7 +158,7 @@ class ComPorts{
   private Key regKeyPortConfig_read, regKeyPortConfig_write;
   private void _initRegKeys(){
     try{
-      auto base = Registry.localMachine.getKey("Software").getKey("Microsoft").getKey("Windows NT").getKey("CurrentVersion");
+      auto base = Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion`);
       regKeyPortConfig_read  = base.getKey("Ports");
       regKeyPortConfig_write = base.getKey("Ports", REGSAM.KEY_ALL_ACCESS);
     }catch(Throwable){}
@@ -162,13 +172,123 @@ class ComPorts{
     ports = iota(totalPorts).map!(i => new ComPort(i+1)).array;  //takes 2.2 millisecs for 32 ports
   }
 
+  private void updateDeviceInfo(){
+
+    bool decodePortIdx(string name, out int com){
+      if(name.isWild("COM?*")){
+        com = wild.ints(0);
+        return this[com] !is null;
+      }else{
+        return false;
+      }
+    }
+
+    struct PortDecl{ string name, deviceId; }
+
+    PortDecl[int] portMap;
+
+    void updatePortDecl(int idx, Key key){
+      try{
+        string devId;
+        try{ devId = key.getValue("MatchingDeviceId").value_SZ; }catch(Throwable){}
+        portMap[idx] = PortDecl(key.getValue("DriverDesc").value_SZ, devId);
+      }catch(Throwable){}
+    }
+
+    void findExistingPorts(){
+      try{
+        auto baseKey = Registry.localMachine.getKey(`HARDWARE\DEVICEMAP\SERIALCOMM`);
+        foreach(a; baseKey.values) try{
+          int idx;
+          if(decodePortIdx(a.value_SZ, idx)){
+            portMap[idx] = PortDecl(a.name.withoutStarting(`\Device\`));
+
+            //try to get comport info
+            if(a.name.isWild(`\Device\Serial?*`)){
+              const serialIdx = wild.ints(0, -1);
+              if(serialIdx>=0){
+                auto key = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Control\Class\{4D36E978-E325-11CE-BFC1-08002BE10318}\` ~ format!"%.4d"(serialIdx));
+                updatePortDecl(idx, key);
+              }
+            }
+
+          }
+        }catch(Throwable){}
+      }catch(Throwable){}
+    }
+
+    void findModems(){
+      try{
+        auto baseKey = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Control\Class\{4D36E96D-E325-11CE-BFC1-08002BE10318}`);
+        foreach(k; baseKey.keys) try{
+          int idx;
+          if(decodePortIdx(k.getValue("AttachedTo").value_SZ, idx))
+            if(idx in portMap)
+              updatePortDecl(idx, k);
+        }catch(Throwable){}
+      }catch(Throwable){}
+    }
+
+    void findUsbSerials(string vid, string pid){
+      try{
+        auto baseKey = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Enum\USB\VID_`~vid~`&PID_`~pid);
+        foreach(k; baseKey.keys) try{
+          int idx;
+          auto kdp = k.getKey("Device Parameters");
+          if(decodePortIdx(kdp.getValue("PortName").value_SZ, idx)){
+            //print("USBSER found", idx);
+            if(idx in portMap) try{
+              portMap[idx].deviceId = kdp.getValue("SymbolicName").value_SZ.withoutStarting(`\??\`).withoutEnding(`#{a5dcbf10-6530-11d2-901f-00c04fb951ed}`);
+            }catch(Throwable){}
+          }
+        }catch(Throwable){}
+      }catch(Throwable){}
+    }
+
+    //print("Finding existing COM ports in Registry...");
+
+    findExistingPorts; //1.4 msec
+    findModems;
+    findUsbSerials("04D8", "000A"); //CraftBot std Microsoft Serial
+    findUsbSerials("1A86", "7523"); //Arduino CH34
+    //14 msec
+
+    //unplugged ports
+    int[] unplugged;
+    foreach(p; ports){
+      if(p.id !in portMap){
+        unplugged ~= p.id;
+        p._exists = false;
+        p._description = "";
+      }
+    }
+
+    int[] plugged, replugged;
+    foreach(i; portMap.keys){
+      auto p = ports[i-1];
+      auto descr = [portMap[i].name, portMap[i].deviceId].join("\t");
+      if(!p.exists){
+        p._exists = true;
+        p._description = descr;
+        plugged ~= i;
+      }else if(p.description != descr){
+        p._description = descr;
+        replugged ~= i;
+      }
+    }
+
+    auto changed = plugged.length || unplugged.length || replugged.length;
+    //todo: process changes
+  }
+
 }
 
 auto comPorts(){
   __gshared static ComPorts _comPorts;
   if(_comPorts is null){
     _comPorts = new ComPorts;
-    _comPorts._createPorts;
+    _comPorts._createPorts; //must be called here because ComPort instances need an instance of "comPorts".
+    _comPorts.updateDeviceInfo;
   }
   return _comPorts;
 }
@@ -181,9 +301,13 @@ class FrmMain: GLWindow { mixin autoCreate; // FrmMain /////////////////////////
       new Thread(&doException).start;
     }*/
 
-    auto port = comPorts[9];
-    port.baud = 14400;
-    port.writePortConfig;
+    while(true){
+      auto t0=QPS; comPorts.updateDeviceInfo; print(QPS-t0);
+      foreach(i; 1..20){
+        print(comPorts[i]);
+      }
+      sleep(1000);
+    }
   }
 
   override void onUpdate(){

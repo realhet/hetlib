@@ -7,30 +7,20 @@
 
 import het, het.ui;
 
-enum Unit{ pcs, g, kg, l }
+enum Unit{ db, g, kg, l }
 
-struct ProductPrice{
+struct Price{
+  DateTime when;
+  string where;
   float quantity=0;
-  Unit unit;
   float price=0;
-
-  auto nominal() const{
-    struct Res{
-      float price;
-      Unit unit;
-    }
-    final switch(unit){
-      case(Unit.kg ): return Res(price*1   /quantity, Unit.kg );
-      case(Unit.g  ): return Res(price*1000/quantity, Unit.kg );
-      case(Unit.l  ): return Res(price*1   /quantity, Unit.l  );
-      case(Unit.pcs): return Res(price*1   /quantity, Unit.pcs);
-    }
-  }
+  bool isPurchased;
 }
 
 class Product{
   string name;
-  ProductPrice[2] prices;
+  Unit unit;
+  Price[] prices;
 }
 
 
@@ -57,21 +47,27 @@ class FrmDemo: GLWindow { mixin autoCreate; // FrmDemo /////////////////////////
       margin = "0"; padding = "0";
       vScroll;
 
-      Row({
-        if(Btn("Add product")){
-          products ~= new Product;
-        }
-      });
-
-      Spacer;
-
+      sizediff_t removeProductIdx = -1,
+                 insertProductIdx = -1;
       foreach(productIdx, product; products) with(product){
         Row({
-          Edit(name, { width = 12*fh; });
+          if(Btn(symbol("Add"))) insertProductIdx = productIdx;
+          Edit(name, { width = 20*fh; });
+          ComboBox(unit, { width = 3*fh; });
+          if(Btn({ style.fontColor = clRed; Symbol("Remove"); })) removeProductIdx = productIdx;
+
           Spacer;
+
+
         });
       }
+      Row({
+        if(Btn(symbol("Add"))) insertProductIdx = products.length;
+        Spacer; Text("Add new product");
+      });
 
+      if(removeProductIdx >= 0) products = products.remove(removeProductIdx);
+      if(insertProductIdx >= 0) products.insertInPlace(insertProductIdx, new Product);
 
 
     });
@@ -79,7 +75,7 @@ class FrmDemo: GLWindow { mixin autoCreate; // FrmDemo /////////////////////////
   }
 
   override void onPaint(){
-    dr.clear;
+    dr.clear(clSilver);
     drGUI.clear; //todo: why is this mandatory
     im.draw(drGUI);
   }
