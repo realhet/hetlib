@@ -525,7 +525,11 @@ class ExeMapFile{
 
   Rec[] list;
 
-  this(File fn){
+  this(File fn = File("$ThisExeFile$")){
+
+    if(fn.fullName == "$ThisExeFile$")
+      fn = appFileName.otherExt("map");
+
     foreach(line; fn.readLines(false)){
       auto p = line.split.array;
       switch(p.length){
@@ -558,13 +562,7 @@ class ExeMapFile{
 }
 
 
-ExeMapFile exeMapFile(){
-  __gshared static ExeMapFile map;
-  if(map is null)
-    map = new ExeMapFile(appFileName.otherExt("map"));
-  return map;
-}
-
+alias exeMapFile = Singleton!ExeMapFile;
 
 auto exceptionCodeToStr(uint code){
   import core.sys.windows.windows;
@@ -2673,6 +2671,35 @@ string[] getEnumMembers(T)(){
 }
 
 
+static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////
+  import std.traits : SharedOf;
+  enum isShared = is(SharedOf!T == T);
+  enum log = true;
+
+  static if(isShared){
+    static T instance;
+    static bool initialized;
+    if(!initialized){
+      synchronized{
+        if(instance is null){
+          instance = new T;
+          if(log) LOG(`created.`);
+        }
+      }
+      initialized = true;
+    }
+  }else{
+    __gshared static T instance;
+    if(instance is null){
+      instance = new T;
+      if(log) LOG(`created.`);
+    }
+  }
+
+  return instance;
+}
+
+
 // hexDump ///////////////////////////
 //import std.algorithm, std.stdio, std.file, std.range;
 
@@ -3874,7 +3901,7 @@ Path tempPath() {
   if(!s){
     wchar[512] buf;
     GetTempPathW(buf.length, buf.ptr);
-    s = buf.toStr;
+    s = includeTrailingPathDelimiter(buf.toStr);
   }
   return Path(s);
 }

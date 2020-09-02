@@ -63,14 +63,8 @@ struct libvlc{
 
 public:
 
-VlcInstance vlc(){ //global entry point for the lib
-  __gshared static VlcInstance ins;
-  if(!ins){
-    ins = new VlcInstance;
-  }
-  return ins;
-}
-
+//global entry point for the lib
+alias vcl = Singleton!VlcInstance;
 
 class VlcInstance{
 private:

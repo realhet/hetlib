@@ -4,11 +4,7 @@ import het.opengl, het.binpacker;
 
 // Global access ///////////////////////////////
 
-TextureManager textures(){
-  __gshared static TextureManager t;
-  if(!t) t = new TextureManager;
-  return t;
-}
+alias textures = Singleton!TextureManager;
 
 // MegaTexturing constants ///////////////////////////////
 

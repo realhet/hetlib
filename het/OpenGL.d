@@ -27,21 +27,7 @@ import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.trai
 export extern (Windows) int NvOptimusEnablement = 1;
 export extern (Windows) int AmdPowerXpressRequestHighPerformance = 1;
 
-//global access for all OpenGL functionality
-auto gl() //global access
-{
-  static __gshared GLFuncts f;
-  if(!f) f = new GLFuncts;
-  return f;
-}
-
-//deprecated. use gl.counters
-/*auto glResources() //global access
-{
-  static __gshared GLResourceManager r;
-  if(!r) r = new GLResourceManager;
-  return r;
-}*/
+alias gl = Singleton!GLFuncts;
 
 //! GL enums///////////////////////////////////////////////////////////
 

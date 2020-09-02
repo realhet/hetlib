@@ -583,16 +583,9 @@ private string clErrorStr(int e){ //todo: erre csinalni egy automata formazot
 
 // CL class /////////////////////////////////////////////////////////
 
-//global access for all OpenGL functionality
-private __gshared CLFuncts clf;
-
-auto cl() //global access
-{
-  if(!clf) clf = new CLFuncts;
-  return clf;
-
-  //Note: clf must not be freed up with a finalizer, because GC can call it from the cl objects.
-}
+//global access for all OpenCL functionality
+alias cl = Singleton!CLFuncts;
+//Note: clf must not be freed up with a finalizer, because GC can call it from the cl objects.
 
 class CLFuncts{
 private: //original opengl api calls, private helpers

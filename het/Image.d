@@ -1548,12 +1548,7 @@ version(D2D_FONT_RENDERER){ private:
     }
   }
 
-  auto bitmapFontRenderer(){
-    __gshared static BitmapFontRenderer r;
-    if(!r) r = new BitmapFontRenderer();
-    return r;
-  }
-
+  alias bitmapFontRenderer = Singleton!BitmapFontRenderer;
 }//version(D2D_FONT_RENDERER)
 
 //Segoe Symbol database ////////////////////////////////

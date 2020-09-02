@@ -209,8 +209,8 @@ private:
   }
 
 public:
-  this(string name){
-    import std.concurrency;
+  this(string name = ""){
+    import std.concurrency : spawn;
     spawn(&httpWorker, name, inbox, outbox, &terminated, &state_);
   }
 
@@ -242,13 +242,9 @@ public:
   }
 }
 
+class GlobalHttpQueue : HttpQueue{ this(){ super("globalHttpQueue"); } }
 
-//easy global access for a queue
-HttpQueue globalHttpQueue(){
-  __gshared static HttpQueue que;
-  if(que is null) que = new HttpQueue("globalHttpQueue");
-  return que;
-}
+alias globalHttpQueue = Singleton!GlobalHttpQueue;
 
 void globalHttpRequest(T)(in T owner, string url, string category=""){
   globalHttpQueue.request(owner, url, category);

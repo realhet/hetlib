@@ -85,7 +85,7 @@ class ComPort{
 
     private void readConfigFromRegistry(){
       try{
-        auto key = comPorts.regKeyPortConfig_read;
+        auto key = ComPorts.regKeyPortConfig;
         if(key is null) return;
         string s = key.getValue("COM"~text(id)~":").value_SZ;
         if(isWild(s, "*,*,*,*")){ //baud,parity,bits,stopBits
@@ -99,7 +99,7 @@ class ComPort{
     private void writeConfigToRegistry(){
       try{
         auto s = format!"%s,%s,%s,%s"(baud, (parity.text)[0], bits, StopBitStrings[cast(int)stopBits]);
-        auto key = comPorts.regKeyPortConfig_write;
+        auto key = ComPorts.regKeyPortConfig_write;
         if(key is null) return;
         key.setValue("COM"~text(id)~":", s);
         //print("COM"~id.text~":", "Written portConfig to registry:", s);
@@ -154,22 +154,18 @@ class ComPorts{
 
   auto opIndex(int idx){ return ports.get(idx-1); }
 
-  //get and cache some registry keys
-  private Key regKeyPortConfig_read, regKeyPortConfig_write;
-  private void _initRegKeys(){
-    try{
-      auto base = Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion`);
-      regKeyPortConfig_read  = base.getKey("Ports");
-      regKeyPortConfig_write = base.getKey("Ports", REGSAM.KEY_ALL_ACCESS);
-    }catch(Throwable){}
-  }
+  //cache some registry keys
+  //private __gshared static Key regKeyPortConfig_read, regKeyPortConfig_write;
+
+  static Key regKeyPortConfig      (){ return Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion\Ports`); }
+  static Key regKeyPortConfig_write(){ return Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion\Ports`, REGSAM.KEY_ALL_ACCESS); }
+
 
   this(){
-    _initRegKeys;
-  }
+    //create ports
+    ports = iota(totalPorts).map!(i => new ComPort(i+1)).array;
 
-  private void _createPorts(){
-    ports = iota(totalPorts).map!(i => new ComPort(i+1)).array;  //takes 2.2 millisecs for 32 ports
+    updateDeviceInfo;
   }
 
   private void updateDeviceInfo(){
@@ -283,15 +279,15 @@ class ComPorts{
 
 }
 
-auto comPorts(){
+alias comPorts = Singleton!ComPorts;
+
+/*auto comPorts(){
   __gshared static ComPorts _comPorts;
   if(_comPorts is null){
     _comPorts = new ComPorts;
-    _comPorts._createPorts; //must be called here because ComPort instances need an instance of "comPorts".
-    _comPorts.updateDeviceInfo;
   }
   return _comPorts;
-}
+}*/
 
 class FrmMain: GLWindow { mixin autoCreate; // FrmMain ////////////////////////////
 
@@ -300,6 +296,10 @@ class FrmMain: GLWindow { mixin autoCreate; // FrmMain /////////////////////////
       import core.thread;
       new Thread(&doException).start;
     }*/
+
+    import het.http;
+    testHttpQueue;
+
 
     while(true){
       auto t0=QPS; comPorts.updateDeviceInfo; print(QPS-t0);

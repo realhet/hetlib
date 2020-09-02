@@ -155,17 +155,7 @@ struct KeyCombo{
 ///  InputHandler base classes                                            ///
 /////////////////////////////////////////////////////////////////////////////
 
-InputManager inputs(){ //global access point
-  __gshared static InputManager _inputs;
-  if(!_inputs){ //Create the first inputManager and initialize
-    _inputs = new InputManager();
-    _inputs.registerInputHandler(new KeyboardInputHandler);
-    _inputs.registerInputHandler(new MouseInputHandler);
-    _inputs.registerInputHandler(new PotiInputHandler);
-    _inputs.registerInputHandler(new XInputInputHandler);
-  }
-  return _inputs;
-};
+alias inputs = Singleton!InputManager;
 
 enum InputEntryType{ //Operation      Examples
   digitalState,   //=0 Off, !=0 On.        a switch
@@ -262,6 +252,12 @@ public:
     //add the nullEntry
     nullEntry = new InputEntry(null, InputEntryType.digitalState, "null");
     entries [nullEntry.name] = nullEntry;
+
+    //register common handlers
+    registerInputHandler(new KeyboardInputHandler);
+    registerInputHandler(new MouseInputHandler);
+    registerInputHandler(new PotiInputHandler);
+    registerInputHandler(new XInputInputHandler);
   }
 
   void registerInputHandler(InputHandlerBase h){
@@ -777,13 +773,7 @@ private{
   }
 
 
-  //global access for all DInput functionality
-  public auto DInput(){ //global access
-    static __gshared DInputWrapper f;
-    if(!f) f = new DInputWrapper;
-    return f;
-  }
-
+  alias DInput = Singleton!DInputWrapper;
 }
 
 
@@ -1073,13 +1063,7 @@ public:
 ///  XInput haldler                                                       ///
 /////////////////////////////////////////////////////////////////////////////
 
-//global access for all XInput functionality
-auto XInput() //global access
-{
-  static __gshared XInputFuncts f;
-  if(!f) f = new XInputFuncts;
-  return f;
-}
+alias XInput = Singleton!XInputFuncts;
 
 class XInputFuncts{
 private:

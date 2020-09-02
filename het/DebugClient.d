@@ -73,12 +73,7 @@ void PING7(){ PING(7); };
   StdFile(`c:\dl\a.txt`, "a").writeln(f, " ", s);
 }*/
 
-
-DebugLogClient dbg() { //global access
-  __gshared static DebugLogClient instance;
-  if(!instance) instance = new DebugLogClient;
-  return instance;
-}
+alias dbg = Singleton!DebugLogClient;
 
 //todo: ha relativ a hibauzenetben a filename, akkor egeszitse ki! hdmd!
 
@@ -129,12 +124,12 @@ private:
     //ensure(data, "DebugLogClient: Can't open mapFile.");
   }
 
+public:
   this(){
     tryOpen;
     sendLog("START:"~appFileName.toString);
   }
 
-public:
   void ping(int index = 0){
     if(!data) return;
     data.ping |= 1<<index;
