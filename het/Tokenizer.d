@@ -205,6 +205,7 @@ struct Token{ // Token //////////////////////////////
   bool isChar()                 const { return kind==TokenKind.literalChar; }
   bool isInt()                  const { return kind==TokenKind.literalInt; }
   bool isFloat()                const { return kind==TokenKind.literalFloat; }
+  bool isNumeric()               const { return isInt || isFloat; }
   bool isLiteral()              const { return isString || isChar || isInt || isFloat; }
 
   bool isKeyword (in int[] kw)  const { return kind==TokenKind.keyword  && kw.map!(k => id==k).any; }

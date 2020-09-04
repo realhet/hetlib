@@ -2645,10 +2645,14 @@ template getUDA(alias a, U){
 
 ///helper templates to get all the inherited class fields, works for structs as well
 template AllClasses(T){
-  static if(is(T == class)) alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
-                       else alias AllClasses = T;
+       static if(is(T == Object)) alias AllClasses = AliasSeq!();
+  else static if(is(T == class )) alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
+  else                            alias AllClasses = T;
 }
-alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); ///ditto
+
+alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T);
+
+alias AllFields(T) = staticMap!(tupleof, AllClasses!T);
 
 template FieldNamesWithUDA(T, U, bool allIfNone){
   enum fields = AllFieldNames!T;
