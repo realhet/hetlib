@@ -23,7 +23,7 @@ class ComPort{
   mixin ReadonlyField!(int      , "id");
   mixin ReadonlyField!(bool     , "exists");
   mixin ReadonlyField!(string   , "description");
-  mixin ReadonlyField!(int      , "iconIndex");
+  mixin ReadonlyField!(string   , "deviceId");
 
   enum defaultBaud = 9600, defaultBits = 8;
 
@@ -107,7 +107,7 @@ class ComPort{
     }
 
     override string toString() const{
-      return format!`ComPort(COM%s, %s, %s, config="%s", descr="%s")`(id, exists ? "exists" : "absent", state.text, config, description);
+      return format!`ComPort(COM%s, %s, %s, config="%s", description="%s", deviceId="%s")`(id, exists ? "exists" : "absent", state.text, config, description, deviceId);
     }
 
   }
@@ -166,6 +166,22 @@ class ComPorts{
     ports = iota(totalPorts).map!(i => new ComPort(i+1)).array;
 
     updateDeviceInfo;
+
+    import std.concurrency : spawn;
+    spawn(&worker);
+  }
+
+  override string toString() const{
+    return ports.map!text.join("\n");
+  }
+
+  static void worker(){
+    enum log = false;
+
+    while(1){
+      sleep(1000);
+      comPorts.updateDeviceInfo;
+    }
   }
 
   private void updateDeviceInfo(){
@@ -249,26 +265,30 @@ class ComPorts{
     findUsbSerials("1A86", "7523"); //Arduino CH34
     //14 msec
 
+    static void set(ComPort p, bool exists, string description="", string deviceId=""){
+      p._exists      = exists     ;
+      p._description = description;
+      p._deviceId    = deviceId   ;
+    }
+
     //unplugged ports
     int[] unplugged;
     foreach(p; ports){
       if(p.id !in portMap){
         unplugged ~= p.id;
-        p._exists = false;
-        p._description = "";
+        set(p, false);
       }
     }
 
     int[] plugged, replugged;
     foreach(i; portMap.keys){
       auto p = ports[i-1];
-      auto descr = [portMap[i].name, portMap[i].deviceId].join("\t");
+      auto pd = portMap[i];
       if(!p.exists){
-        p._exists = true;
-        p._description = descr;
+        set(p, true, pd.name, pd.deviceId);
         plugged ~= i;
-      }else if(p.description != descr){
-        p._description = descr;
+      }else if(p.description != pd.name || p.deviceId != pd.deviceId){
+        set(p, true, pd.name, pd.deviceId);
         replugged ~= i;
       }
     }
@@ -302,10 +322,7 @@ class FrmMain: GLWindow { mixin autoCreate; // FrmMain /////////////////////////
 
 
     while(true){
-      auto t0=QPS; comPorts.updateDeviceInfo; print(QPS-t0);
-      foreach(i; 1..20){
-        print(comPorts[i]);
-      }
+      print(comPorts);
       sleep(1000);
     }
   }

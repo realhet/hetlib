@@ -166,7 +166,6 @@ class SourceCode{ // SourceCode ///////////////////////////////
 
     checkConsistency;
   }
-
 }
 
 
@@ -202,6 +201,12 @@ struct Token{ // Token //////////////////////////////
   bool isSlashSlasComment()     const { return isComment && source.startsWith("//"); }
   bool isDoxigenComment()       const { return isComment && ["///", "/**", "/++"].map!(a => source.startsWith(a)).any; }
 
+  bool isString()               const { return kind==TokenKind.literalString; }
+  bool isChar()                 const { return kind==TokenKind.literalChar; }
+  bool isInt()                  const { return kind==TokenKind.literalInt; }
+  bool isFloat()                const { return kind==TokenKind.literalFloat; }
+  bool isLiteral()              const { return isString || isChar || isInt || isFloat; }
+
   bool isKeyword (in int[] kw)  const { return kind==TokenKind.keyword  && kw.map!(k => id==k).any; }
   bool isOperator(in int[] op)  const { return kind==TokenKind.operator && op.map!(o => id==o).any; }
 
@@ -220,6 +225,9 @@ struct Token{ // Token //////////////////////////////
     ];
     return isKeyword(allAttributes);
   }
+
+  //shorthand
+  bool opEquals()(string s) const { return source==s; }
 
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
