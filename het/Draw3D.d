@@ -160,12 +160,12 @@ class Camera{ //! Camera //////////////////////////////////////
     zoomSpeed = 0.0025f*40,
     zoomMax = 1600.0f,
     panMin = 0.003f,
-    panMax = 0.5f;
+    panMax = 0.5f*50;
 
   /// pans view and pivot. Speed is taken from pivotDistance by default.
   void pan(in vec2 v, float speed = float.nan){
     if(!v.length) return;
-    if(speed.isNaN) speed = het.utils.clamp(pivotDistance*0.003f, panMin, panMax); //todo: ambiguous het.utils.clamp
+    if(speed.isNaN) speed = het.utils.clamp(pivotDistance*(0.003f), panMin, panMax); //todo: ambiguous het.utils.clamp
     vec3 delta = (right*v.x + up*v.y) * speed;
     eye.translate(delta);
     pivot += delta;     //todo: a panningot megcsinalni ugy, hogy a mousecursornal levo elmozdulas pixelpontos legyen. Ezt a speedet a lenyomaskor kell meghatarozni.
@@ -332,8 +332,8 @@ vec3[] loadBinStl(string s){
 
   auto res = (cast(const STLTri*)(s.ptr+84))[0..cnt].map!(t => t.v.dup).join;
 
-  const doFlip = s.startsWith("solid ");
-  if(doFlip) foreach(ref v; res) v.z = -v.z;
+  /+const doFlip = s.startsWith("solid "); //note: 200907 a solid4-hez nem kell, mert valami total kaosz jon abbol
+  if(doFlip) foreach(ref v; res) { v.z = -v.z; }+/
 
   foreach(ref v; res){ swap(v.z, v.y); v.z = -v.z; }
 
@@ -513,7 +513,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
       flat in vec3 wc_normal;
       varying vec3 wc_position;
 
-      uniform sampler2D smpSilicon; //temporal sampler test
+//      uniform sampler2D smpSilicon; //temporal sampler test
 
       void main(void) {
         float diffuse = dot(normalize(wc_light-wc_position), normalize(wc_normal));
@@ -522,10 +522,10 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
         vec3 diffuseColor = color.rgb*(diffuse*0.85);
 
         //experimental silicon wafer shader
-        float side = fract(wc_position.x*0.1) > 0.5 ? 1 : -1;
+/*        float side = fract(wc_position.x*0.1) > 0.5 ? 1 : -1;
         vec2 tc = vec2(0.8, 0.5 + diffuse*0.5*side);
         vec3 silicon = texture(smpSilicon, tc).rgb + vec3(0.4, 0.4, 0.4);
-        diffuseColor *= silicon;
+        diffuseColor *= silicon;*/
 
         gl_FragColor = vec4(ambientColor+diffuseColor ,0);
       }
@@ -546,7 +546,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     sh.uniform("m_matrix"       , (m).matrix, false);
     sh.uniform("color"          , color.rgbaf.comp);
 
-    static GLTexture tSilicon;
+/*    static GLTexture tSilicon;
     if(tSilicon is null){
       auto b = newBitmap(`c:\dl\siliconWaferColorTexture.png`);
       tSilicon = new GLTexture("siliconWafer", b.width, b.height, GLTextureType.RGBA8, false);
@@ -554,7 +554,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
       tSilicon.upload(b); //todo: ha nincs bind, akkor itt nincs exception, csak crash van. Kideriteni, hogy mi a gecikurvaisten kibaszott faszaert van ez?
     }
     tSilicon.bind(0, GLTextureFilter.Linear, true);
-    sh.uniform("smpSilicon", 0);
+    sh.uniform("smpSilicon", 0);*/
 
     auto wc_light = vec3(v.inverse * vec4(0,0,0,1)); //light from camera
     sh.uniform("wc_light"       , wc_light.vector);
@@ -570,7 +570,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     if(node is null) return;
 
     pushMatrix; scope(exit) popMatrix;
-    mModel = mModel*node.mTransform*node.mTransform2;
+    mModel = mModel * node.mTransform * mat4.translation(node.joint.rotCenter) * node.joint.matrix * mat4.translation(-node.joint.rotCenter) *node.mTransform2;
 
     if(node.object !is null){
       draw(node.object.vbo, opBinary!"*"(node.object.color, color)); //todo: nem jo a color szorzas, mert implicit uint konverzio van
@@ -914,12 +914,17 @@ struct Chunk{ align(1):
 }
 
 class MeshObject{   //! MeshObject ///////////////////////////////
+  alias Index = uint; //ushort;
+
   string name;
   mat4 mTransform_import = mat4.identity; //todo: redundant. only needed for loading.
   RGBA color = clWhite;
   vec3[] vertices;
   vec2[] texCoords;
-  ushort[4][] faces;  //last is 3x edge flag
+  Index[4][] faces;  //last is 3x edge flag for wireframe
+
+  //todo: optimize mesh,
+  //todo: automatic ushort/uint vertex indices
 
   private VBO vbo_;  //todo: VBO leak, mert a glResourcemanager fogja!!!!!!!!
 
@@ -954,7 +959,7 @@ class MeshObject{   //! MeshObject ///////////////////////////////
   }
 
   private static{
-    auto u4(size_t a, size_t b, size_t c) { ushort[4] f = [cast(ushort)(a), cast(ushort)(b  ), cast(ushort)(c  ), 7]; return f; }
+    auto u4(size_t a, size_t b, size_t c) { Index[4] f = [cast(Index)(a), cast(Index)(b  ), cast(Index)(c  ), 7]; return f; }
     auto u4(size_t i) { return u4(i, i+1, i+2); }
   }
 
@@ -973,7 +978,6 @@ class MeshObject{   //! MeshObject ///////////////////////////////
     faces ~= iota(idx.length/3).map!(i => u4(idx[i*3], idx[i*3+1], idx[i*3+2])).array;
   }
 
-
   Bounds3f calcBounds() const{
     return Bounds3f(vertices.map!(v=>V3f(v.x, v.y, v.z)).array);
   }
@@ -984,7 +988,7 @@ protected:
   void setBase()                        { int base = vertices.length.to!int; }
   void v(in vec3 a)                     { vertices ~= a; if(!texCoords.empty) texCoords ~= vec2(0); }
   void v(float x, float y, float z)     { v(vec3(x, y, z)); }
-  void f(int a, int b, int c)           { ushort[4] r = [(base+a).to!ushort, (base+b).to!ushort, (base+c).to!ushort, 0]; faces ~= r; }
+  void f(int a, int b, int c)           { Index[4] r = [(base+a).to!Index, (base+b).to!Index, (base+c).to!Index, 0]; faces ~= r; }
   void q(int a, int b, int c, int d)    { f(a, b, c);  f(c, b, d); }
 
   void addBox(Bounds3f bnd) { setBase;
@@ -1037,6 +1041,14 @@ protected:
 
 }
 
+void filterTrimesh(alias pred)(MeshObject obj){ with(obj){
+  auto newTrimesh = trimesh.filter!pred.array;
+  assert(newTrimesh.length % 3 == 0);
+  faces.clear;  vertices.clear;  texCoords.clear;
+  appendTrimesh(newTrimesh);
+}}
+
+
 class Material{ //! Material ///////////////////////////////
   string name, matFileName;
   RGBA ambient, diffuse, specular;
@@ -1051,6 +1063,39 @@ class Material{ //! Material ///////////////////////////////
   override string toString() const{
     return this.toString2;
     //return "Material(%s, amb:%s, diff:%s, spec:%s, shin:%s, bumpa:%s, maps:%s)".format(name, ambient, diffuse, specular, shininess, bumpAmount, [texMap, opacMap, bumpMap, specMap, reflMap]);
+  }
+}
+
+
+struct Joint{ //Joint ////////////////////////////////////////
+  Type type;  enum Type { fixed, linear, rotational }
+  vec3 axis;
+  float minValue = 0,
+        maxValue = 0,
+        offset = 0,
+        value = 0;
+
+  vec3 rotCenter;
+
+  mat4 matrix(){
+    with(Type) final switch(type){
+      case fixed     : return mat4.identity;
+      case linear    : return mat4.translation(axis * (value + offset));
+      case rotational: return mat4.rotation((value + offset).toRad, axis);
+    }
+  }
+
+  void apply(ref mat4 m){
+    if(type == Joint.Type.fixed) return;
+    m = m * matrix;
+  }
+
+  void testAnimate(float speed){
+    if(minValue==0 && maxValue==0 && type==Joint.Type.rotational){
+      value = QPS*speed;
+    }else{
+      value = sin(QPS*speed).remap(-1, 1, minValue, maxValue);
+    }
   }
 }
 
@@ -1070,6 +1115,8 @@ class MeshNode{ //! MeshNode ///////////////////////////////
 
   MeshNode parent;
   MeshNode[] subNodes;
+
+  Joint joint;
 
   static int instanceCount;
 
@@ -1122,7 +1169,7 @@ class MeshNode{ //! MeshNode ///////////////////////////////
   auto opIndex(size_t idx){ return(subNodes.length<idx) ? subNodes[idx] : null; }
 
   auto opIndex(string name){ return findByName(name); }
-  auto opDispatch(string name)(){ return opIndex(name); }
+  //auto opDispatch(string name)(){ return opIndex(name); }
 
   override string toString() const{
     return "MeshNode(%d, \"%s\", pivot:%s, %s)".format(kfId, pivot, object ? object.name : "$$$DUMMY", subNodes);
@@ -1158,6 +1205,8 @@ class ModelPrototype{ //! ModelPrototype ///////////////////////////////////////
       root = new MeshNode(obj, null);
     }else if(fn.extIs("x3d")){
       import_x3d(fn);
+    }else{
+      enforce(0, "Unknown 3D model extension: ", fn.ext);
     }
   }
 
@@ -1250,6 +1299,15 @@ private:
       return v;
     }
 
+    static auto import3dsFace(in ushort[4] i){
+      MeshObject.Index[4] r;
+      r[0] = i[0];
+      r[1] = i[1];
+      r[2] = i[2];
+      r[3] = i[3];
+      return r;
+    }
+
     void processMap(ref string mapName){ processChunkArray; mapName = lastMapName; }
 
 
@@ -1265,7 +1323,7 @@ private:
       case     NAMED_OBJECT         : newObject(fetch!string); if(dump) actObject.name.write; processChunkArray; break;
       case       N_TRI_OBJECT       : processChunkArray; break;
       case         POINT_ARRAY      : fetchCnt; actObject.vertices = (cast(vec3[])(chunk.data[0..cnt*12])).map!import3dsVector.array; break;
-      case         FACE_ARRAY       : fetchCnt; actObject.faces = cast(ushort[4][])(chunk.data[0..cnt*8]); chunk.data = chunk.data[cnt*8..$]; processChunkArray; break;
+      case         FACE_ARRAY       : fetchCnt; actObject.faces = (cast(ushort[4][])(chunk.data[0..cnt*8])).map!import3dsFace.array; chunk.data = chunk.data[cnt*8..$]; processChunkArray; break;
       case           MSH_MAT_GROUP  : todo; break;
       case           SMOOTH_GROUP   : todo; break;
       case         TEX_VERTS        : fetchCnt; actObject.texCoords = cast(vec2[])(chunk.data[0..cnt*8]); break;
@@ -1499,7 +1557,7 @@ class Model{ //! Model /////////////////////////
   }
 
   MeshNode opIndex(string name){ return nodeByName(name, true); }
-  MeshNode opDispatch(string name)(){ return opIndex(name); }
+  //MeshNode opDispatch(string name)(){ return opIndex(name); }
 
 
 // new basic objects //////////////////////////////////////////////////////

@@ -1094,6 +1094,8 @@ int boolMask(in bool[] arr...){
 
 bool toggle(ref bool b){ b = !b; return b; }
 
+T negate(T)(ref T a){ a = -a; return a; }
+
 // Animation timing /////////////////////////////////////
 
 bool follow(T)(ref T act, const T target, const T t, const T maxd)
@@ -4070,6 +4072,8 @@ public:
     }catch(Throwable){
       enforce(!mustExists, format(`Can't read file: "%s"`, fullName)); //todo: egysegesiteni a file hibauzeneteket
     }
+
+    LOG(fullName);
     return data;
   }
 
