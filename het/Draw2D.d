@@ -903,34 +903,45 @@ class Drawing {
 
     @geometry:////////////////////////////////////////////////////////////////////////
     #define MaxArrowVertices 12
-    #define MaxCurveVertices 27
-    #define TotalVertices 39
+    #define MaxCurveVertices 22
+    #define TotalVertices 34
     // TotalVertices = MaxCurveVertices + MaxArrowVertices
 
-    //NV GTX650 384core 1GB 128bit    totalVertices = 39
-    //AMD R9 Fury X 4096core 4GB HBM  totalVertices = 84
+    //NV GTX650 384core 1GB 128bit    totalVertices = 39     GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS = 1K
+    //AMD R9 Fury X 4096core 4GB HBM  totalVertices = 84     GL_MAX_GEOMETRY_TOTAL_OUTPUT_COMPONENTS = 4K
+
+    // GL_MAX_GEOMETRY_OUTPUT_VERTICES
+    // GL_MAX_GEOMETRY_OUTPUT_COMPONENTS
+
+    //todo: 200909 Csobi kartyajan nem megy az uj vertex attribok miatt. -> attribok tomoritese -> MaxCurveRertices hardvertol fuggo szamitasa.
 
     layout(points) in;
     layout(triangle_strip, max_vertices = TotalVertices) out; //Extra vertices are there for arrowheads
 
+    //inputs ---------------------------------------------------------------------
+
     in float Type[]; in vec2 A[], B[], C[], D[]; in vec4 Color[], Color2[]; in vec2 ClipMin[], ClipMax[];
-    flat out vec4 fColor;
-    out vec2 fStipple; //type, phase:    //note: it was "varying out", but NVidia don't like it, just "out"
+
+    //outputs ---------------------------------------------------------------------
+                                                                                                                // 4 gl_Position
+    flat out vec4 fColor;                                                                                       // 4
+    out vec2 fStipple; //type, phase:    //note: it was "varying out", but NVidia don't like it, just "out"     // 2
+
+    //glyph only
+    flat out vec4 fColor2; //alpha holds special stuff                                                          // 4
+    out vec2 fTexCoord; //todo: osszevonhato lenne az fStipple-vel                                              // 2
+
+    flat out ivec2 stPos, stSize;                                                                               // 4
+    flat out int stConfig, stIdx;                                                                               // 2
+    flat out vec2 texelPerPixel;                                                                                // 2
+    flat out float boldTexelOffset;                                                                             // 1
+    flat out int fontFlags;                                                                                     // 1
+    flat out vec2 fClipMin, fClipMax;                                                                           // 4
+                                                                                                                // sum = 30,   1024/30 = 34    GTX650: 1024 components max
+    //uniforms ---------------------------------------------------------------------
 
     //transformation
     uniform vec2 uShift, uScale, uViewPortSize;
-
-    //glyph only
-    flat out vec4 fColor2; //alpha holds special stuff
-    out vec2 fTexCoord; //todo: osszevonhato lenne az fStipple-vel
-
-    flat out ivec2 stPos, stSize;
-    flat out int stConfig, stIdx;
-    flat out vec2 texelPerPixel;
-    flat out float boldTexelOffset;
-    flat out int fontFlags;
-    flat out vec2 fClipMin, fClipMax;
-
 
     uniform sampler2D smpInfo;
 

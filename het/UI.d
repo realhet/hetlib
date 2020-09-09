@@ -2398,7 +2398,7 @@ static cnt=0;
       //Text(format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor));
       Text(markColor, bullet~" ", textColor, caption);
 
-      foreach(a; args) if(__traits(compiles, a())) a();
+      foreach(a; args) static if(isDelegate!a || isFunction!a) a();
     });
 
     return hit;
