@@ -1673,7 +1673,7 @@ static cnt=0;
   );
 
   //Parameter structs ///////////////////////////////////
-  struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                              static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+  struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
   struct enable  { bool val;  private enum M = q{ auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;   static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled   = enabled && a.val; }; }
   struct selected{ bool val;  private enum M = q{ auto _selected = false;                                        static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected = a.val;            }; }
 
@@ -2720,12 +2720,8 @@ static cnt=0;
 
 //! FieldProps stdUI /////////////////////////////
 
-struct CAPTION{ string text; }
-struct HINT{ string text; }
-struct UNIT{ string text; }
-struct RANGE{ float low, high; bool valid()const{ return !low.isNaN && !high.isNaN; } }
-struct INDENT{ }
-struct HIDDEN{ }
+
+// USA declarations in het.utils
 
 struct FieldProps{
   string fullName, name, caption, hint, unit;

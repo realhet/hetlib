@@ -4920,6 +4920,29 @@ void listModuiles(){
 }
 */
 
+///////////////////////////////////////////////////////////////////////////
+/// UDAs                                                                ///
+///////////////////////////////////////////////////////////////////////////
+
+struct UDA{}
+
+@UDA{
+  // het.stream
+  struct STORED{}
+  struct HEX{}
+  struct BASE64{}
+
+  //het.opengl
+  struct UNIFORM{ string name=""; } //marks a variable as gl.Shader attribute
+
+  // het.ui
+  struct CAPTION{ string text; }
+  struct HINT{ string text; }
+  struct UNIT{ string text; }
+  struct RANGE{ float low, high; bool valid()const{ return !low.isNaN && !high.isNaN; } }
+  struct INDENT{ }
+  struct HIDDEN{ }
+}
 
 ///////////////////////////////////////////////////////////////////////////
 /// Executing / System                                                  ///

@@ -20,13 +20,6 @@ void registerStoredClass(T)(){
   classSaverFunc [fullyQualifiedName!T] = cast(SaverFunc ) (&streamAppend_json!T);
 }
 
-//UDAs
-struct STORED{}
-struct HEX{}
-struct BASE64{}
-
-struct UNIFORM{ string name=""; } //for gl.Shader attribute
-
 enum ErrorHandling { ignore, raise, track }
 
 private auto quoteIfNeeded(string s){ return s.canFind(" ") ? quoted(s) : s; } //todo: this is lame, must make it better in utils/filename routines
