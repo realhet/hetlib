@@ -2102,7 +2102,7 @@ static cnt=0;
 
   struct EditResult{
     HitInfo hit;
-    bool changed;
+    bool changed, focused;
     alias changed this;
   }
 
@@ -2131,7 +2131,7 @@ static cnt=0;
 
       mixin(hintHandler);
 
-      bool focused = focusUpdate(actContainer, id_,
+      const focused = focusUpdate(actContainer, id_,
         enabled,
         hit.pressed, //enter
         inputs["Esc"].pressed,  //exit
@@ -2147,6 +2147,7 @@ static cnt=0;
         /* onFocus */ { /*_EditHandleInput(value, textEditorState.str, chg);*/ },
         /* onExit  */ { }
       );
+      res.focused = focused;
 
       //text editor functionality
       if(focused){

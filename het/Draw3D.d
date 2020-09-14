@@ -96,13 +96,19 @@ struct Cursor3D{
 }
 
 class Camera{ //! Camera //////////////////////////////////////
-  mat4 eye;
-  vec3 pivot;
-  float fovy;
-  float perspective = 1; //0 = orthographic
-  float near = 1, far = 10000;
+  @STORED{
+    mat4 eye;       //contains viewing position, rotation and zoom
+    vec3 pivot;     //rotation center
+    @RANGE(40, 130) float fovy;
+    @RANGE(0, 1)    float perspective = 1; //0 = orthographic
+    float near = 1, //in ortho near is -far
+          far = 10000,
+          scale = 1;
+  }
 
-  string save(){
+// load/save deprecated. Use toJson/fromJson
+/*  string save(){
+    return this.toJson;
     JSONValue j;
     j["eye"  ] = eye.matrix  .text;
     j["pivot"] = pivot.vector.text,
@@ -112,7 +118,7 @@ class Camera{ //! Camera //////////////////////////////////////
     return j.toString;
   }
 
-  void load(ref string s){
+  void load(string s){
     //reset(true); everything is loaded anyways
     auto j = s.parseJSON;
     eye.matrix   = j["eye"  ].str.to!(typeof(eye.matrix  ));
@@ -120,12 +126,13 @@ class Camera{ //! Camera //////////////////////////////////////
     fovy         = j["fovy" ].str.to!(typeof(fovy        ));
     near         = j["near" ].str.to!(typeof(near        ));
     far          = j["far"  ].str.to!(typeof(far         ));
-  }
+  }*/
+//  this(string json){ load(json); }
 
-  void dump(){ save.writeln; }
 
   this(){ reset; }
-  this(string json){ load(json); }
+
+  void dump(){ this.toJson.writeln; }
 
   vec3 axis(int n) const { vec3 v; foreach(int i; 0..3) v.vector[i] = eye.matrix[i][n]; return v; }
   vec3 right() const { return axis(0); }
@@ -204,6 +211,7 @@ class Camera{ //! Camera //////////////////////////////////////
 
 
   void roll(float v){
+    raise("not impl");
   }
 
   void lookFrom(const vec3 target, const vec3 dir, float dist){
@@ -566,7 +574,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     draw(mesh.vbo, color);
   }
 
-  void draw(MeshNode node, RGBA color){
+  void draw(MeshNode node, RGBA color, bool onlyThisObject = false){
     if(node is null) return;
 
     pushMatrix; scope(exit) popMatrix;
@@ -575,6 +583,8 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     if(node.object !is null){
       draw(node.object.vbo, opBinary!"*"(node.object.color, color)); //todo: nem jo a color szorzas, mert implicit uint konverzio van
     }
+
+    if(onlyThisObject) return;
 
     mModel = mModel*mat4.identity.translate(node.pivot);
 

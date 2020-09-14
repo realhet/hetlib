@@ -774,7 +774,7 @@ public:
 ///  Numeric                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-enum PIf = 3.14159265358979323846f;
+enum PIf = 3.14159265358979323846f;  //todo: not sure about where is it used or not used. If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete.
 
 //it replaces the exception with a default value.
 T safeConv(T, U)(const U src, lazy const T def){
@@ -787,6 +787,12 @@ T safeConv(T, U)(const U src, lazy const T def){
 
 T safeDiv(T)(T a, T b, T def=0){
   return b==0 ? def : a/b;
+}
+
+auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){
+  auto c = a%b;
+  if(c<0) c += b;
+  return c;
 }
 
 bool maximize(T)(ref T what, const T val) { if(val>what) { what = val; return true; }else return false; }
@@ -4307,8 +4313,12 @@ public:
   static void remove(string name)    { map.remove(name); }
   static void removeAll()            { map = null; }
 
-  static string read(string name, string def = "") { if(auto x = name in map) return *x; else return def; }
-  static void write(string name, string value) { map[name] = value; }
+  static void write(T)(string name, in T value) { map[name] = value.to!string; }
+
+  static T read(T)(string name, in T def = T.init) {
+    if(auto x = name in map) try{ return (*x).to!T; }catch(Throwable){}
+    return def;
+  }
 }
 
 /////////////////////////////////////////////////////////////////////////////////

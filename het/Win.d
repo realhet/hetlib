@@ -452,7 +452,7 @@ public:
     mouse = new MouseState;
 
     //load configs from ini
-    actions.config = ini.read(name~".actions");
+    actions.config = ini.read(name~".actions", "");
 
     //call the user defined creator
     {

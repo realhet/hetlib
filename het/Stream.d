@@ -98,7 +98,7 @@ auto fromJson_track(Type)(ref Type data, string st, string moduleName="", string
 void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data){
   ref Token actToken(){ return state.tokens[idx]; }
 
-  //this mapping is lame
+  //todo: this mapping is lame
   bool isOp(char b)(){
          static if(b=='[') return actToken.isOperator(opsquareBracketOpen);
     else static if(b==']') return actToken.isOperator(opsquareBracketClose);
@@ -201,7 +201,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
             data.free;
           }
 
-          //create if null
+          //create only if original is null
           if(data is null){
             data = new Type;
           }

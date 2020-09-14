@@ -498,7 +498,11 @@ immutable RGB8
   clSolViolet       = 0xc4716c,
   clSolBlue         = 0xd28b26,
   clSolCyan         = 0x98a12a,
-  clSolGreen        = 0x009985;
+  clSolGreen        = 0x009985,
+
+  clAxisX           = RGB(213, 40, 40), //todo: belerakni a listaba
+  clAxisY           = RGB(40, 166, 40), //todo: belerakni a listaba
+  clAxisZ           = RGB(40, 40, 215); //todo: belerakni a listaba
 
 enum clOrange = clRainbowOrange; //todo: belerakni a listaba
 
@@ -510,6 +514,7 @@ immutable{
   RGB8[10] clVim     = [clVimBlack, clVimBlue, clVimGreen, clVimTeal, clVimRed, clVimPurple, clVimYellow, clVimWhite, clVimGray, clVimOrange];
   RGB8[ 8] clRainbow = [clRainbowRed, clRainbowOrange, clRainbowYellow, clRainbowGreen, clRainbowAqua, clRainbowBlue, clRainbowPurple, clRainbowPink];
   RGB8[16] clSol     = [clSolBase03, clSolBase02, clSolBase01, clSolBase00, clSolBase0, clSolBase1, clSolBase2, clSolBase3, clSolYellow, clSolOrange, clSolRed, clSolMagenta, clSolViolet, clSolBlue, clSolCyan, clSolGreen];
+  RGB8[ 3] clAxis    = [clAxisX, clAxisY, clAxisZ];
   RGB8[] clAll = clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol;
 }
 
