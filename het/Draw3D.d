@@ -82,23 +82,28 @@ struct Cursor3D{
     depth = 1;
   }
 
-  /// read depth, and unproject
-  void glProcess(in mat4 mInverse){
+  void readDepth(){
     if(inScreen){
       auto d = [.5f];
       gl.readPixels(screen.x, invy, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, d);
       depth = d[0];
+    }else{
+      depth = 1;
     }
-    device.z = 2*depth-1;
+  }
 
+  /// read depth, and unproject
+  void glProcess(in mat4 mInverse){
+    readDepth;
+    device.z = 2*depth-1;
     world = mInverse.project(device);
   }
 }
 
 class Camera{ //! Camera //////////////////////////////////////
   @STORED{
-    mat4 eye;       //contains viewing position, rotation and zoom
-    vec3 pivot;     //rotation center
+    @HIDDEN mat4 eye;       //contains viewing position, rotation and zoom
+    @HIDDEN vec3 pivot;     //rotation center
     @RANGE(40, 130) float fovy;
     @RANGE(0, 1)    float perspective = 1; //0 = orthographic
     float near = 1, //in ortho near is -far
@@ -162,7 +167,7 @@ class Camera{ //! Camera //////////////////////////////////////
     fovy = 60;
   }
 
-  private const float
+  @HIDDEN private const float
     rotSpeed = 1/250.0f,
     zoomSpeed = 0.0025f*40,
     zoomMax = 1600.0f,
@@ -237,14 +242,21 @@ class Camera{ //! Camera //////////////////////////////////////
          right  = top*aspect,
          left   = -right;
 
+    void mp(float l, float r, float b, float t, float n, float f){
+      if(perspective>.5){
+        mProjection = mat4.perspective(l, r, b, t, n, f);
+      }else{
+        auto s = 1/scale;
+        mProjection = mat4.orthographic(l*s, r*s, b*s, t*s, -f, f);
+      }
+    }
+
     if(subRect){
       auto xRemap(int x){ return remap(x, 0, width , left, right ); }
       auto yRemap(int y){ return remap(y, 0, height, top , bottom); }
-      mProjection = mat4.perspective(xRemap(x0), xRemap(x1),
-                                     yRemap(y1), yRemap(y0),
-                                     near, far);
+      mp(xRemap(x0), xRemap(x1), yRemap(y1), yRemap(y0), near, far);
     }else{
-      mProjection = mat4.perspective(left, right, bottom, top, near, far);
+      mp(left, right, bottom, top, near, far);
     }
 
     mView = lookAt(origin, origin+axis(2), axis(1));
@@ -394,15 +406,34 @@ mixin template FIELD_protected(T, string name){
   mixin("protected T $_; auto $() const{ return $_; }".replace("$", name));
 }
 
-
 class Draw3D{ //!Draw3D ////////////////////////////////////////
   Camera cam;
 
   Bounds2i viewport;
+  Cursor3D cursor;
 
   //Model matrices, transformations
   mat4 mModel = mat4.identity;
   mat4[] mStack;
+
+  //debug aids
+  struct Options{
+    bool
+      showAxes,
+      showTranslations,
+      showBB,
+      showJoints;
+
+    bool showAny() {
+      static assert(typeof(this).sizeof==4);
+      return *(cast(uint*)(&this)) != 0;
+    }
+  }
+
+  Options options;
+
+  struct DrawnNode{ MeshNode node; mat4 matrix; }
+  DrawnNode[] drawnNodes; //collects all nodes drawn on screen for debug
 
   //calculated from cal
 //  protected mat4 mView_, mProjection_, mInverse_; //calculated
@@ -420,10 +451,18 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
 
   private bool inFrame;
 
-  void beginFrame(){
+  float pickedZ;
+  MeshNode pickedNode;
+
+
+  void beginFrame(V2i screenMousePos){
     enforce(!inFrame, "already in beginFrame()");
 
     viewport = gl.getViewport; //todo: proper viewport handling, not just the full window
+    cursor.setup(screenMousePos, viewport);
+
+    pickedZ = 1;
+    pickedNode = null;
 
     cam.setupCameraMatrices(viewport.width, viewport.height, false, 0,0,0,0, mView_, mProjection_);
     mInverse_ = (mProjection*mView).inverse;
@@ -435,13 +474,18 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     gl.disable(GL_BLEND);
     gl.disable(GL_ALPHA_TEST);
 
+    drawnNodes = [];
+
     inFrame = true;
   }
 
   void endFrame(){
     enforce(inFrame, "endFrame() without beginFrame()");
 
+    if(options.showAny) drawDebugStuff;
+    drawnNodes = [];
 
+    cursor.glProcess(mInverse); //get the world cursor from depth
 
     inFrame = false;
   }
@@ -463,15 +507,6 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   void rotatey(float f){ /*pushMatrix;*/ mModel.rotatey(f); }
   void rotatez(float f){ /*pushMatrix;*/ mModel.rotatez(f); }
   void rotate(float f, in vec3 a){ /*pushMatrix;*/ mModel.rotate(f, a); }
-
-  //Access a 3D cursor in the scene form a 2D screen position.
-  auto getCursor(in V2i screenPos){
-    enforce(inFrame, "can't call out of frame");
-    Cursor3D c;
-    c.setup(screenPos, viewport);
-    c.glProcess(mInverse);
-    return c;
-  }
 
   struct VRecord {
     V3f aPosition;
@@ -580,13 +615,20 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     pushMatrix; scope(exit) popMatrix;
     mModel = mModel * node.mTransform * mat4.translation(node.joint.rotCenter) * node.joint.matrix * mat4.translation(-node.joint.rotCenter) *node.mTransform2;
 
+    if(options.showAny)
+      drawnNodes ~= DrawnNode(node, mModel);
+
     if(node.object !is null){
       draw(node.object.vbo, opBinary!"*"(node.object.color, color)); //todo: nem jo a color szorzas, mert implicit uint konverzio van
     }
 
+    //experimental picking
+    cursor.readDepth;
+    if(chkSet(pickedZ, cursor.depth)) pickedNode = node; //todo: ez a modszer kurvalassu, mert allando ketiranyu kommunikaciot igenyel a kartyatol.
+
     if(onlyThisObject) return;
 
-    mModel = mModel*mat4.identity.translate(node.pivot);
+    mModel = mModel*mat4.identity.translate(node.pivot); //todo: this should be a pre-translation, not a post-translation which is the same for every children.
 
     foreach(sn; node.subNodes) draw(sn, color);
   }
@@ -595,6 +637,113 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     draw(model.root, opBinary!"*"(model.color, color));
   }
 
+  void drawDebugStuff(){
+    if(!options.showAny) return;
+
+    struct VRecord {
+      V3f aPosition;  //*** the fieldnames must match the name of the shader attributes!
+      uint aColor;
+    }
+
+    static Shader shader;   //! Line Debug Shader ///////////////////////////////////////////
+    if(!shader) shader = new Shader("LineShader", q{
+      #version 150
+
+      @vertex:
+      in vec3 aPosition;
+      in vec3 aColor;
+
+      out vec3 fColor;
+
+      uniform mat4 vp_matrix;
+
+      void main()
+      {
+        gl_Position = vp_matrix * vec4(aPosition, 1);
+        fColor = aColor;
+      }
+
+      @fragment:
+      in vec3 fColor;
+
+      void main()
+      {
+        gl_FragColor = vec4(fColor, 0);
+      }
+    });
+
+    VRecord[] vertices;
+
+    void addLine2(in V3f p0, in V3f p1, in RGB cl0, in RGB cl1){ vertices ~= [ VRecord(p0, cl0), VRecord(p1, cl1) ]; }
+    void addLine(in V3f p0, in V3f p1, in RGB cl){ addLine2(p0, p1, cl, cl); }
+
+    void addAxes(mat4 m){
+      V3f v(int n)(){ return V3f(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); }
+      enum axisScale = 500;
+      addLine(v!3, v!3+v!0*axisScale, clAxisX);
+      addLine(v!3, v!3+v!1*axisScale, clAxisY);
+      addLine(v!3, v!3+v!2*axisScale, clAxisZ);
+    }
+
+    void addBB(in Bounds3f bb, mat4 m, RGB cl = clSilver){
+      void a(string s)(){
+        auto q0 = m * vec4(s[0]=='0' ? bb.bMin.x : bb.bMax.x, s[1]=='0' ? bb.bMin.y : bb.bMax.y, s[2]=='0' ? bb.bMin.z : bb.bMax.z, 1); //todo: vec3 V3f interop suxxx
+        auto q1 = m * vec4(s[3]=='0' ? bb.bMin.x : bb.bMax.x, s[4]=='0' ? bb.bMin.y : bb.bMax.y, s[5]=='0' ? bb.bMin.z : bb.bMax.z, 1);
+        addLine(V3f(q0.x, q0.y, q0.z), V3f(q1.x, q1.y, q1.z), cl);
+      }
+      a!"000100"; a!"000010"; a!"000001";
+      a!"010110"; a!"100110"; a!"100101";
+      a!"001101"; a!"001011"; a!"010011";
+      a!"011111"; a!"101111"; a!"110111";
+    }
+
+
+    addAxes(mat4.identity);
+
+    foreach(dn; drawnNodes) with(dn) with(options) {
+      if(showAxes) addAxes(matrix);
+      if(showBB){ addBB(node.object.bounds, matrix, pickedNode==node ? clFuchsia : clWhite); }
+    }
+
+    auto vbo = new VBO(vertices);
+
+    shader.uniform("vp_matrix", (mProjection*mView).matrix);
+    shader.attrib(vbo);
+
+    gl.lineWidth(1);
+    gl.depthMask(false);
+    gl.enable(GL_DEPTH_TEST);
+    gl.depthFunc(GL_GEQUAL);
+
+    gl.enable(GL_BLEND);
+    gl.blendFunc(GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA);
+    gl.blendColor(0, 0, 0, .25);
+
+    vbo.draw(GL_LINES); //draw hidden
+
+    gl.disable(GL_BLEND);
+    gl.depthFunc(GL_LESS);  //this is the normal
+
+    vbo.draw(GL_LINES); //draw foreground ones
+
+    gl.enable(GL_DEPTH_TEST);
+    gl.depthMask(true);
+
+
+
+
+/*    struct Line{ V3f p0; V3f p1; RGB color }
+
+    enum axeScale = 1000;
+
+    foreach(dn; drawnNodes){
+      if(showAxes){
+        V3f mat4
+
+      }
+
+    }*/
+  }
 }
 
 
@@ -936,8 +1085,6 @@ class MeshObject{   //! MeshObject ///////////////////////////////
   //todo: optimize mesh,
   //todo: automatic ushort/uint vertex indices
 
-  private VBO vbo_;  //todo: VBO leak, mert a glResourcemanager fogja!!!!!!!!
-
   import core.atomic;
   shared static int instanceCount;
 
@@ -953,15 +1100,23 @@ class MeshObject{   //! MeshObject ///////////////////////////////
     instanceCount.atomicOp!"-="(1);
   }
 
-  VBO vbo(){
-    if(vbo_ is null)
-      vbo_ = new VBO(cast(VertexRec[])(trimesh));
-
-    return vbo_;
+  void geometryChanged(){
+    boundsValid = false;
+    vboValid = false;
   }
 
-  override string toString() const{
-    return "MeshObject(%s, v:%s, t:%s, f:%s,\n mTrans:%s, \n%s)".format(name, vertices.length, texCoords.length, faces.length, mTransform_import, calcBounds);
+  private bool vboValid;
+  private VBO cachedVbo;
+
+  VBO vbo(){
+    if(chkSet(vboValid))
+      cachedVbo = new VBO(cast(VertexRec[])(trimesh));
+
+    return cachedVbo;
+  }
+
+  override string toString(){
+    return "MeshObject(%s, v:%s, t:%s, f:%s,\n mTrans:%s, \n%s)".format(name, vertices.length, texCoords.length, faces.length, mTransform_import, bounds);
   }
 
   vec3[] trimesh(){
@@ -979,6 +1134,8 @@ class MeshObject{   //! MeshObject ///////////////////////////////
     vertices ~= v;
 
     faces ~= iota(v.length/3).map!(i => u4(i*3+vBase)).array;
+
+    geometryChanged;
   }
 
   void appendTrimesh(float[] v, int[] idx){
@@ -986,10 +1143,17 @@ class MeshObject{   //! MeshObject ///////////////////////////////
 
     vertices ~= cast(vec3[])v;
     faces ~= iota(idx.length/3).map!(i => u4(idx[i*3], idx[i*3+1], idx[i*3+2])).array;
+
+    geometryChanged;
   }
 
-  Bounds3f calcBounds() const{
-    return Bounds3f(vertices.map!(v=>V3f(v.x, v.y, v.z)).array);
+  private bool boundsValid;
+  private Bounds3f cachedBounds;
+
+  Bounds3f bounds(){
+    if(chkSet(boundsValid))
+      cachedBounds = Bounds3f(vertices.map!(v=>V3f(v.x, v.y, v.z)).array);
+    return cachedBounds;
   }
 
 protected:

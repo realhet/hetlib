@@ -675,6 +675,8 @@ private: //original opengl api calls, private helpers
     void function(int what)                                               glFrontFace;
     void function(int what)                                               glCullFace;
     void function(int face, int what)                                     glPolygonMode;
+    void function(float width)                                            glLineWidth;
+    void function(int what)                                               glDepthFunc;
 
     void function(bool)                                                   glDepthMask;
     void function(bool, bool, bool, bool)                                 glColorMask;
@@ -881,6 +883,8 @@ public://///////////////////////////////////////////////////////
   void frontFace(int what) { glFrontFace(what); glChk; }
   void cullFace (int what) { glCullFace (what); glChk; }
   void polygonMode(int face, int what) { glPolygonMode(face, what); glChk; }
+  void lineWidth(float width) { glLineWidth(width); glChk; }
+  void depthFunc(int what) { glDepthFunc(what); glChk; }
 
   void depthMask(bool d) { glDepthMask(d); }
   void colorMask(bool r, bool g, bool b, bool a) { glColorMask(r, g, b, a); }
