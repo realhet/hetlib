@@ -2,6 +2,8 @@ module het.utils;
 
 pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 
+mixin("private alias XMLTEST = uint;");
+
 //todo: IDE: % as postFix operator: 25% -> (25)*.01
 //todo: IDE: visszajatszo debugger/logger
 //todo: IDE syntax highlight control chars in "" and ''. Also format %f in format strings
@@ -4208,8 +4210,6 @@ if(__traits(isStaticFunction, fun))
 {
   alias T = ReturnType!fun;
 
-  pragma(msg, T);
-
   static struct Rec{
     File file;
     DateTime modified;
@@ -4982,7 +4982,7 @@ string genLoadLibraryFuncts(T, alias hMod = "hModule", alias prefix=T.stringof ~
   static foreach(f; __traits(allMembers, T))with(T){
     mixin(q{
       static if(typeof($).stringof.startsWith("extern"))
-        append(hMod~`.getProcAddress("`~prefix~`" ~ withoutTrailingUnderscore("$"), $);`);
+        append(hMod~`.getProcAddress("`~prefix~`" ~ "$".withoutEnding('_'), $);`);
     }.replace("$", f));
   }
 

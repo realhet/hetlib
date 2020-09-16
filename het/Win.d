@@ -204,13 +204,14 @@ private void initWglChoosePixelFormat() //gets it with a dummy window, so the fi
 ///  WINDOWS ENTRY POINT                                                     ///
 ////////////////////////////////////////////////////////////////////////////////
 
-//Note: main() used here instead of WinMain() to tell the linker to act like a console app in order to have a working stdoit.
+//Note: main() used here instead of WinMain() to tell the linker to act like a console app in order to have a working stdout.
 ///@compile -L/SUBSYSTEM:console -L/ENTRY:WinMainCRTStartup
 ///@link /SUBSYSTEM:console /ENTRY:WinMainCRTStartup
 
 //extern(Windows) int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 
-extern(Windows) int main(string[] args)
+//this main() is recognized by druntime.
+int main(string[] args)
 {
   MSG  msg;
   Runtime.initialize;

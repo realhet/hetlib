@@ -110,17 +110,58 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     else static assert(0, `Unhandled op "%s"`.format(b));
   }
 
-  string peekClassName()
-  in(isOp!'{') //must be at the start of a class
-  {
-    if(idx+3 < state.tokens.length
-    && state.tokens[idx+1].kind == TokenKind.literalString
-    && state.tokens[idx+1].data == "class"
-    && state.tokens[idx+2].isOperator(opcolon)
-    && state.tokens[idx+3].kind == TokenKind.literalString)
-      return state.tokens[idx+3].data.to!string;
-    else
-      return "";
+  /* old shit
+  string peekClassName(){
+    enum log = true;
+    if(log) print("peekClassName------------");
+
+    enforce(isOp!'{'); //must be at the start of a class
+    const level = state.tokens[idx].level+1;
+
+    string res;
+
+    bool peekAt(int i, string cn){
+      if(log) print("looking for:", cn, "level:", level, "in:", state.tokens[i..$].take(3));
+
+      if(i+2 < state.tokens.length
+      && state.tokens[i+0].level==level
+      && state.tokens[i+1].isOperator(opcolon)
+      && state.tokens[i+0].kind == TokenKind.literalString
+      && state.tokens[i+2].kind == TokenKind.literalString
+      && state.tokens[i+0].data == cn){
+        res = state.tokens[i+2].data.to!string;
+        if(log) print("found class declaration:", res);
+        return true;
+      }
+      return false;
+    }
+
+    if(peekAt(idx+1, "class")) return res;
+
+    if(peekAt(idx+1, "kind")) return res;
+    if(peekAt(idx+3, "kind")) return res;
+
+    return "";
+  }*/
+
+  string peekClassName(int[string] elementMap){
+    string res;
+
+    bool check(string cn){
+      if(auto p = cn in elementMap){
+        auto idx = *p;
+        if(state.tokens[idx].isString){
+          res = state.tokens[idx].data.to!string;
+          //print("Json className found:", res);
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if(check("class")) return res;
+
+    return res;
   }
 
   void expect(char b)(){
@@ -131,6 +172,43 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
   bool isNegative; //opt: is multiply with 1/-1 better?
   void getSign(){
     if(isOp!'-'){ isNegative = true; idx++; }
+  }
+
+  auto extractElements(){
+    int[string] elementMap;
+
+    enum log = false;
+    if(log) write("JSON discover fields: ");
+
+    const level = actToken.level;
+    expect!'{';
+
+    while(1){
+      if(isOp!'}') break; //"}" right after "," or "{"
+
+      if(actToken.kind != TokenKind.literalString) throw new Exception("Field name string literal expected.");
+      auto fieldName = actToken.data.to!string;
+      idx++;
+
+      expect!':';
+
+      //remember the start of the element
+      elementMap[fieldName] = idx;              //opt: ez a megoldas igy qrvalassu
+      if(log) write(fieldName, " ", idx, " ");
+
+      //skip until the next '}' or ','
+      int idx0 = idx;
+      while(actToken.level>level) idx++; //skip to next thing. No error checking because validiti is already checked in the hierarchy building process.
+      if(idx==idx0) throw new Exception("Value expected");
+
+      if(isOp!'}') break; //"}" at the end
+
+      if(!isOp!',') throw new Exception(`"}" or "," expected.`);
+      idx++;
+    }
+    if(log) writeln;
+
+    return elementMap;
   }
 
   alias T = Unqual!Type;
@@ -163,88 +241,62 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       else if(actToken.isKeyword(kwtrue)) data = true;
       else throw new ConvException(`Invalid bool value`);
     }else static if(isAggregateType!T     ){ // Struct, Class
-      //handle null for class
-      static if(is(T == class)){
-        if(actToken.isKeyword(kwnull)){
+
+      //handle null
+      if(actToken.isKeyword(kwnull)){
+        static if(is(T == class)){ //null class found
           data = null; return; //todo: what happens with old instance???!!!
-        }else if(isOp!'{'){
-          //create a new instance with the default creator if needed
-          //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          //Ezt at kell gondolni es a linkelt classt is meg kell tudni csinalni
-
-          //peek className   "class" : "name"
-          auto className = peekClassName,
-               p = className in classFullNameMap,
-               classFullName = p ? *p : "",
-               currentClassFullName = data !is null ? typeid(data).to!string : "";
-
-          //todo: error handling when there is no classloader for the class in json
-
-//          print("Trying to load class:", classFullName);
-//          print("Currently in Loader:", fullyQualifiedName!Type);
-//          print("Current Instance:", currentClassFullName);
-
-          //call a different loader if needed
-          if(classFullName.length && fullyQualifiedName!Type != classFullName){
-//            print("Calling appropriate loader");
-
-            //todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
-            //todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
-
-            auto fv = classLoaderFunc[classFullName];
-            fv(state, idx, &data);
-            return;
-          }
-
-          //free if the class type is different.
-          if(data !is null && classFullName.length && currentClassFullName != classFullName){
-            data.free;
-          }
-
-          //create only if original is null
-          if(data is null){
-            data = new Type;
-          }
         }else{
-          throw new Exception("Class expected for \"null\" token.");
+          data = T.init; //if it's a struct, reset it
         }
+        return; //nothing else to expect after null
       }
 
-      int[string] elementMap; //opt: at first, do it with a linear list. when it fails, do a map.
+      auto elementMap = extractElements; //opt: at first, do it with a linear list. when it fails, do a map.
 
-      enum log = false;
-      if(log) write("JSON discover fields: ");
+      //handle null for class
+      static if(is(T == class)){{
+        //create a new instance with the default creator if needed
+        //TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        //Ezt at kell gondolni es a linkelt classt is meg kell tudni csinalni
 
-      const level = actToken.level;
-      expect!'{';
+        //peek className   "class" : "name"
+        auto className = peekClassName(elementMap),
+             p = className in classFullNameMap,
+             classFullName = p ? *p : "",
+             currentClassFullName = data !is null ? typeid(data).to!string : "";
 
-      while(1){
-        if(isOp!'}') break; //"}" right after "," or "{"
+        //todo: error handling when there is no classloader for the class in json
 
-        if(actToken.kind != TokenKind.literalString) throw new Exception("Field name string literal expected.");
-        auto fieldName = actToken.data.to!string;
-        idx++;
+//        print("Trying to load class:", classFullName);
+//        print("Currently in Loader:", fullyQualifiedName!Type);
+//        print("Current Instance:", currentClassFullName);
 
-        expect!':';
+        //call a different loader if needed
+        if(classFullName.length && fullyQualifiedName!Type != classFullName){
+//          print("Calling appropriate loader");
 
-        //remember the start of the element
-        elementMap[fieldName] = idx;              //opt: ez a megoldas igy qrvalassu
-        if(log) write(fieldName, " ", idx, " ");
+          //todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
+          //todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
 
-        //skip until the next '}' or ','
-        int idx0 = idx;
-        while(actToken.level>level) idx++; //skip to next thing. No error checking because validiti is already checked in the hierarchy building process.
-        if(idx==idx0) throw new Exception("Value expected");
+          auto fv = classLoaderFunc[classFullName];
+          fv(state, idx, &data);
+          return;
+        }
 
-        if(isOp!'}') break; //"}" at the end
+        //free if the class type is different.
+        if(data !is null && classFullName.length && currentClassFullName != classFullName){
+          data.free;
+        }
 
-        if(!isOp!',') throw new Exception(`"}" or "," expected.`);
-        idx++;
-      }
-      if(log) writeln;
+        //create only if original is null
+        if(data is null){
+          data = new Type;
+        }
+      }}
 
       //recursive call for each field
-      static foreach (fieldName; FieldNamesWithUDA!(T, STORED, true)){{
+      static foreach(fieldName; FieldNamesWithUDA!(T, STORED, true)){{
         if(auto p = fieldName in elementMap){
           streamDecode_json(state, *p, __traits(getMember, data, fieldName));
         }
