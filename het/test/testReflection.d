@@ -114,9 +114,46 @@ mixin template ReflBase() {
     Member[] members;
   }
 
+  class Parameter{ mixin ReflBase;
+    string name;
+    string kind; //template
+    string deco;
+    string default_;
+    string[] storageClass;
+  }
+
   class Member{ mixin ReflBase;
     string kind;
+    string name;
+    string file;
+    int line;
+    int char_;
+    int endline;
+    int endchar;
+    string protection;
+    string constraint;
+    string[] storageClass;
+    string linkage;
+    string base; //baseclass
+    string[] interfaces;
+    string deco;
+    string type;
+    string originalType;
+    string overrides;
+    string init;
+    int offset, align_;
+    Member[] members;
+    Parameter[] parameters;
+
+    string[] selective;
+    //string[string] renamed; //todo: map
   }
+
+/*  class Import: Member { mixin ReflBase;
+    string name;
+    int line; //todo: int char; keyword, FUCK!
+    string protection;
+  }*/
 
 }
 
@@ -144,11 +181,16 @@ void main(){ application.runConsole({
 
   foreach(sym; getSymbolsByUDA!(mixin(__MODULE__), "REFL")) registerStoredClass!sym;
 
+  readln;
+
   Module[] modules;
 
-  modules.fromJson(str);
+  auto t0 = QPS;
+  modules.fromJson(str, "LDCXJSON");
+  print("time:", QPS-t0);
+  readln;
 
-//  modules.toJson.print;
+  modules.toJson.print;
 
 /*
   module 25

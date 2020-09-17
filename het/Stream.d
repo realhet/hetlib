@@ -30,6 +30,8 @@ struct JsonDecoderState{ // JsonDecoderState
   ErrorHandling errorHandling;
   string srcFile, srcFunct; int srcLine;
 
+  bool ldcXJsonImport; //if moduleName=="LDCXJSON", then it is set to true
+
   Token[] tokens;
   string[] errors;
 
@@ -68,6 +70,7 @@ struct JsonDecoderState{ // JsonDecoderState
 alias fromJson = fromJson_ignore;
 string[] fromJson_ignore(Type)(ref Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
   auto state = JsonDecoderState(st, moduleName, errorHandling, srcFile, srcFunct, srcLine);
+  state.ldcXJsonImport = moduleName=="LDCXJSON";
 
   try{
     //1. tokenize
@@ -159,7 +162,14 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       return false;
     }
 
-    if(check("class")) return res;
+    if(state.ldcXJsonImport){
+      if(check("kind")){
+        res = res.split(' ').map!capitalize.join;
+        //print("Found class kind:", res);
+      }
+    }else{
+      if(check("class")) return res;
+    }
 
     return res;
   }
@@ -297,7 +307,14 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 
       //recursive call for each field
       static foreach(fieldName; FieldNamesWithUDA!(T, STORED, true)){{
-        if(auto p = fieldName in elementMap){
+
+        //dirty fix for LDCXJSON reading. (not writing)
+             static if(fieldName=="char_"   ) enum fn = "char"   ;
+        else static if(fieldName=="align_"  ) enum fn = "align"  ;
+        else static if(fieldName=="default_") enum fn = "default";
+        else                                  enum fn = fieldName;
+
+        if(auto p = fn in elementMap){
           streamDecode_json(state, *p, __traits(getMember, data, fieldName));
         }
       }}
