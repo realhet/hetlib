@@ -6,7 +6,7 @@ it also publically imports other useful functions (from std.math, core.stdc.math
 so you only have to import this file to get all mathematical functions you need.
 
 Publically imports: PI, sin, cos, tan, asin, acos, atan, atan2, sinh, cosh, tanh,
-asinh, acosh, atanh, pow, exp, log, exp2, log2, sqrt, abs, floor, trunc, round, ceil, modf,
+asinh, acosh, atanh, pow, exp, log, exp2, log2, sqrt, abs, floor, trun9c, round, ceil, modf,
 fmodf, min, max.
 
 Authors: David Herberth

@@ -800,7 +800,7 @@ auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){
 bool maximize(T)(ref T what, const T val) { if(val>what) { what = val; return true; }else return false; }
 bool minimize(T)(ref T what, const T val) { if(val<what) { what = val; return true; }else return false; }
 
-@safe{
+@safe{ //todo: this is lame
   bool inRange(const int val, const int mi, const size_t ma) pure{ return val>=mi && val<=cast(int)ma; } //size_t is uint
   bool inRange(T)(const T val, const T mi, const T ma) pure{ return val>=mi && val<=ma; }
   bool inRange_sorted(T)(const T val, const T a, const T b) pure{ return a<b ? (val>=a && val<=b) : (val>=b && val<=a); }

@@ -6,6 +6,8 @@ import het.utils, het.keywords, std.variant;
 
 const CompilerVersion = 100;
 
+//TODO: __EOF__ means end of file , must work inside a comment as well
+
 //TODO: DIDE jegyezze meg a file kurzor/ablak-poziciokat is
 //TODO: kulon kezelni az in-t, mint operator es mint type modifier
 //TODO: ha elbaszott string van, a parsolas addigi eredmenye ne vesszen el, hogy a syntaxHighlighter tudjon vele mit kezdeni

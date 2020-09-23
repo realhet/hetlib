@@ -56,6 +56,32 @@ void repairRotation(ref mat4 m, bool doNormalize){
              else foreach(i; 0..3) setCol(i, r[i]*len[i]);
 }
 
+//struct Ray(CT, int N){ Vec!(CT, N) origin, direction; }
+//struct Plane(CT, int N){ Vec!(CT, N) origin, normal; }
+
+struct Ray{ vec3 origin, direction; }
+struct Plane{ vec3 origin, normal; }
+//auto ray(in vec3 origin, in vec3 direction){ return Ray!(float, 3)(origin, direction); }
+//auto plane(in vec3 origin, in vec3 normal){ return Plane!(float, 3)(origin, normal); }
+
+auto intersect(in Plane plane, in Ray ray)
+{
+  import std.typecons;
+  Nullable!vec3 res;
+
+  auto e = 1e-6f;
+  auto d = dot(plane.normal, ray.direction);
+
+  if(!d.inRange(-e, e)){
+    float distance = dot(plane.normal, (plane.origin-ray.origin)) / d;
+    res = (ray.origin + ( ray.direction * distance )).nullable;
+  }
+  return res;
+}
+
+auto intersect(in Ray ray, in Plane plane){ return intersect(plane, ray); }
+
+
 
 // Cursor3D //////////////////////////////////
 
@@ -87,6 +113,8 @@ struct Cursor3D{
       auto d = [.5f];
       gl.readPixels(screen.x, invy, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, d);
       depth = d[0];
+
+print(depth);
     }else{
       depth = 1;
     }
@@ -100,40 +128,173 @@ struct Cursor3D{
   }
 }
 
+
+// CubicOrientation /////////////////////////////////
+
+struct CubeOrientation{
+private:
+
+  static auto axisVector(int n){
+    auto e = vec3(0,0,0);
+    e.vector[n.cyclicMod(3)] = 1;
+    return e;
+  }
+
+  static int idxEncode(int delegate(int) axisIndex, int delegate(int) axisNegative){
+    return 1*axisNegative(0)  // negativeness mask 3 bits
+         | 2*axisNegative(1)
+         | 4*axisNegative(2)
+         | 8*(axisIndex(1) > axisIndex(2) ? 1:0)  //relation of the 2nd and the 3rd axis: 1 bit
+         |16*axisIndex(0); // first axis, 0..2
+         //total range = 48
+  }
+
+  static auto mat2idx(in mat4 m){
+    auto axis        (int n) { return [m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]]; }
+    auto axisIndex   (int n) { return cast(int) axis(n).map!(a => a<0 ? -a : a).maxIndex; }  //note: abs suxx, it is declared in gl3n and makes utils. abs obsolete
+    auto axisNegative(int n) { return axis(n)[axisIndex(n)]<0 ? 1 : 0; }
+    return idxEncode(&axisIndex, &axisNegative);
+  }
+
+  static auto str2idx(string s){
+    auto axisIndex   (int n) { return (cast(int)(s.get(n).lc-'x')).cyclicMod(3); }
+    auto axisNegative(int n) { auto ch = s.get(n); return ch == ch.lc ? 0 : 1; }
+    return idxEncode(&axisIndex, &axisNegative);
+  }
+
+  static void idxDecode(int val, void delegate(int n, int idx, int neg) setAxis){
+    int ax0 = (val>>4).cyclicMod(3);
+    setAxis(0, ax0, val.getBit(0));
+
+    int[] ax = iota(3).filter!(i => i!=ax0).array;
+    if(val.getBit(3)) swap(ax[0], ax[1]);
+
+    setAxis(1, ax[0], val.getBit(1));
+    setAxis(2, ax[1], val.getBit(2));
+  }
+
+  static auto idx2mat(int val){
+    auto m = mat4(0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1);
+    void setAxis(int n, int idx, int neg){ m.matrix[idx][n] = neg ? -1 : 1; }
+    idxDecode(val, &setAxis);
+    return m;
+  }
+
+  static auto idx2str(int val){
+    string[3] res;
+    void setAxis(int n, int idx, int neg){ res[n] = (cast(char)('x' + idx + (neg ? -32 : 0))).to!string; }
+    idxDecode(val, &setAxis);
+    return res[].join;
+  }
+
+public:
+  @RANGE(0, 24) ubyte idx;
+
+  this(string s)                        { asString = s; }
+  this(int i)                           { idx = cast(ubyte) i.cyclicMod(48); }
+
+  auto opCmp(in CubeOrientation other)  { return idx - other.idx; }
+
+  string toString() const               { return idx2str(idx); }
+  bool validateString(string s) const   { return s.length==3 && s.map!(a => "xyz".canFind(a.lc)).all; }
+  void fromString(string s)             { if(validateString(s)) idx = cast(ubyte)str2idx(s); }
+
+  @property{
+    auto matrix() const                 { return idx2mat(idx); }
+    void matrix(in mat4 m)              { idx = cast(ubyte) mat2idx(m); }
+
+    auto asString() const               { return toString; }
+    void asString(string s)             { fromString(s); }
+  }
+
+  void spin(int axis, int cnt){
+    matrix = matrix * mat4.rotation(PI/2*cnt.cyclicMod(4), axisVector(axis));
+  }
+
+  void mirror(int axis){
+    int i = axis.cyclicMod(3);
+    auto s = asString.to!(char[]);
+    s[i] = cast(char) (s[i].lc == s[i] ? s[i].uc : s[i].lc);
+    asString = s.to!string;
+  }
+
+  void spinRandom(uint seed){
+    enum N = 5;
+    foreach(i; 0..N) spin(seed.getBits(i*4, 2), seed.getBits(i*4+2, 2));
+  }
+
+  void spinRandom(RNG* rng = null){
+    if(!rng) rng = &defaultRng;
+    spinRandom(rng.randomU);
+  }
+
+  static void selfTest(){
+    foreach(i; 0..3) foreach(dir; [-1, 1]){
+      writef("Rotating around axis %s dir %2d:", i, dir);
+      CubeOrientation o; write(" ", o);
+      foreach(j; 0..4){ o.spin(i, dir); write(" ", o); }
+      writeln;
+    }
+
+    foreach(i; 0..3){
+      CubeOrientation o;
+      writef("Mirroring around axis %s:", i);
+      write(" ", o);
+      foreach(k; 0..2){ o.mirror(i); write(" ", o); }
+      writeln;
+    }
+
+    enforce(CubeOrientation(0)<CubeOrientation(1), "opCmp failed");
+
+    auto getAllSpins(bool mirror){
+      RNG rng;
+      auto a = iota(200).map!((i){ CubeOrientation o; if(mirror) o.mirror(rng.random(3)); o.spinRandom(&rng); return o; }).array.sort.uniq.array;
+      writefln("All spins, mirror=%d length=%d: %s", mirror.to!int, a.length, a);
+      enforce(a.length==24, "CubeOrientation big fail");
+      return a;
+    }
+
+    auto spins = (getAllSpins(false) ~ getAllSpins(true)).sort.uniq.array;
+    writeln("Total spins with both mirrors: ", spins.length);
+    enforce(spins.length==48, "CubeOrientation big fail");
+
+    //conversion tests
+    foreach(o; iota(48).map!CubeOrientation){
+      { CubeOrientation o2; o2.asString = o.asString;   enforce(o==o2, "sttring conversion fail"); }
+      { CubeOrientation o2; o2.matrix   = o.matrix  ;   enforce(o==o2, "sttring conversion fail"); }
+    }
+    writeln("Conversion tests passed.");
+  }
+
+}
+
+
+/// Do a swizzle and negate the coords marked with a capital letter
+/// Example: code="Zyx"
+/// Similar to swizzle
+vec3 axisTransform(string code)(in vec3 v){
+  vec3 u;
+  u.x = v.vector[(((cast(ubyte) code[0])-88) & 31) % 3]; if(code[0]<'a') u.x.negate;
+  u.y = v.vector[(((cast(ubyte) code[1])-88) & 31) % 3]; if(code[1]<'a') u.y.negate;
+  u.z = v.vector[(((cast(ubyte) code[2])-88) & 31) % 3]; if(code[2]<'a') u.z.negate;
+  return u;
+
+  //these 2 are compatible
+/*  static matrix = CubeOrientation(code).matrix.get_rotation;
+  return v * matrix;*/
+}
+
+
 class Camera{ //! Camera //////////////////////////////////////
   @STORED{
     @HIDDEN mat4 eye;       //contains viewing position, rotation and zoom
     @HIDDEN vec3 pivot;     //rotation center
-    @RANGE(40, 130) float fovy;
-    @RANGE(0, 1)    float perspective = 1; //0 = orthographic
-    float near = 1, //in ortho near is -far
+    @RANGE(30, 140) float fovY;
+    bool isPerspective = true;
+    float near = 10, //in ortho near is -far
           far = 10000,
           scale = 1;
   }
-
-// load/save deprecated. Use toJson/fromJson
-/*  string save(){
-    return this.toJson;
-    JSONValue j;
-    j["eye"  ] = eye.matrix  .text;
-    j["pivot"] = pivot.vector.text,
-    j["fovy" ] = fovy        .text;
-    j["near" ] = near        .text;
-    j["far"  ] = far         .text;
-    return j.toString;
-  }
-
-  void load(string s){
-    //reset(true); everything is loaded anyways
-    auto j = s.parseJSON;
-    eye.matrix   = j["eye"  ].str.to!(typeof(eye.matrix  ));
-    pivot.vector = j["pivot"].str.to!(typeof(pivot.vector));
-    fovy         = j["fovy" ].str.to!(typeof(fovy        ));
-    near         = j["near" ].str.to!(typeof(near        ));
-    far          = j["far"  ].str.to!(typeof(far         ));
-  }*/
-//  this(string json){ load(json); }
-
 
   this(){ reset; }
 
@@ -146,16 +307,21 @@ class Camera{ //! Camera //////////////////////////////////////
   vec3 origin()    const { return axis(3); }
 
   float pivotDistance() const{ return (origin-pivot).length; }
+  auto pivotPlane() const{ return Plane(pivot, forward); }
+  vec3 pivotPlaneCenter() const{ return intersect(pivotPlane, Ray(origin, forward)).get(vec3(0,0,0)); }
+  float pivotPlaneCenterDistance() const{ return (origin-pivotPlaneCenter).length; }
 
-  void adjustFovY(float deg){
-    if(!deg) return;
-    float oldTop = tan(fovy/360*PIf);
-    fovy += deg;
-    fovy = het.utils.clamp(fovy, 5, 160);
-    float newTop = tan(fovy/360*PIf);
+  float tanFovY()const{ return tan(fovY/360*PIf); }
 
-    float dist = pivotDistance;
-    eye.translate(0, 0, 50/*dist - dist/oldTop*newTop*/);
+  void adjustFovY(float degIncrement){
+    if(!degIncrement) return;
+    float oldTop = pivotDistance*tanFovY;
+    fovY += degIncrement;
+    fovY = het.utils.clamp(fovY, 30, 140);
+    float newTop = pivotDistance*tanFovY;
+
+//    float dist = pivotDistance;
+    eye = eye * mat4.translation(0, 0, newTop-oldTop);
   }
 
   //camera controls
@@ -164,7 +330,7 @@ class Camera{ //! Camera //////////////////////////////////////
 
     pivot = vec3(0, 0, 0);
 
-    fovy = 60;
+    fovY = 60;
   }
 
   @HIDDEN private const float
@@ -187,11 +353,16 @@ class Camera{ //! Camera //////////////////////////////////////
     if(!v) return;
     v *= rotSpeed;
     auto d = origin;
+
+    auto ec_pivot = eye.inverse * vec4(pivot, 1); //save pivot
+
     with(eye){  translate(-d);  rotate(v.y, right);  rotatey(v.x);  translate(d);  }
     repairRotation(eye, true);
+
+    pivot = (eye * ec_pivot).xyz; //restore pivot in world space
   }
 
-  void rotate(vec2 v){
+  void rotate(vec2 v){ //rotetes around pivot
     if(!v) return;
     v *= rotSpeed;
     with(eye){  translate(-pivot);  rotate(-v.y, right);  rotatey(-v.x);  translate(pivot);  }
@@ -201,14 +372,18 @@ class Camera{ //! Camera //////////////////////////////////////
   void zoom(float v, bool mouseInScreen, in vec3 mousePos, float mouseDepth){
     if(!v) return;
     if(mouseInScreen){
-      if(mouseDepth<1) pivot = mousePos; //set pivot
-      auto d = pivot-origin;
+      const mouseOnObject = mouseDepth < 1;
+
+      if(mouseOnObject) pivot = mousePos; //update pivot
+                   else if(auto its = intersect(pivotPlane, Ray(origin, mousePos-origin))) pivot = its.get;
+
+      auto d = pivot - origin;
       float L = d.length*v*zoomSpeed;
       L = het.utils.clamp(L, -zoomMax, zoomMax);
       d = d.normalized*L;
       eye.translate(d);
     }
-  }            //todo: ha a vegtelenbe zoomolink, akkor az valojaban a pivot-nak a sikja legyen!
+  }
 
   void zoom(float v, in Cursor3D mousePos){
     with(mousePos) zoom(v, inScreen, world, depth);
@@ -236,19 +411,24 @@ class Camera{ //! Camera //////////////////////////////////////
 //  bool updateAnimation(float dt);
 
   void setupCameraMatrices   (int width, int height, bool subRect, int x0, int y0, int x1, int y1, out mat4 mView, out mat4 mProjection){
-    auto top    = near*tan((fovy/360*PIf)),
+    auto top    = near*tan((fovY/360*PIf)),
          bottom = -top,
          aspect = (cast(float)width)/(height>1 ? height : 1),  //todo: itt meg a max()-ot bassza el a gl3n...
          right  = top*aspect,
          left   = -right;
 
     void mp(float l, float r, float b, float t, float n, float f){
-      if(perspective>.5){
-        mProjection = mat4.perspective(l, r, b, t, n, f);
+      auto persp(){ return mat4.perspective(l, r, b, t, n, f); }
+      auto ortho(){ auto s = 1/scale; return mat4.orthographic(l*s, r*s, b*s, t*s, -f, f); }
+
+      /*if(perspective.inRange(0.01, 0.99)){
+        auto p = persp, o = ortho, a = pow(perspective.remap(0, 1, 0.49, 0.81), 20);
+        foreach(i; 0..4) foreach(j; 0..4) mProjection.matrix[i][j] = lerp(o.matrix[i][j], p.matrix[i][j], a);
       }else{
-        auto s = 1/scale;
-        mProjection = mat4.orthographic(l*s, r*s, b*s, t*s, -f, f);
-      }
+        mProjection = perspective>=.5 ? persp : ortho;
+      }*/
+
+      mProjection = isPerspective ? persp : ortho;
     }
 
     if(subRect){
@@ -397,8 +577,58 @@ vec3[] loadStl(string s)
 
 vec3[] loadStl(File f){ return f.readStr.loadStl;}
 
-// 3ds loader ///////////////////////////////////////////////////////
 
+// 3d line drawing ///////////////////////////////////////////////////////
+
+class LineDrawing {
+  struct LineVertex {
+    V3f aPosition;  //*** the fieldnames must match the name of the shader attributes!
+    uint aColor;
+  }
+
+  private LineVertex[] vertices;
+  private VBO vbo_;
+  private bool vboValid;
+
+  VBO vbo(){
+    if(chkSet(vboValid)) vbo_ = null;
+    if(vbo_ is null && vertices.length) vbo_ = new VBO(vertices);
+    return vbo_;
+  }
+
+  void addLine(in V3f p0, in V3f p1, in RGB cl0, in RGB cl1){ vertices ~= [ LineVertex(p0, cl0), LineVertex(p1, cl1) ]; vboValid = false; }
+  void addLine(in V3f p0, in V3f p1, in RGB cl){ addLine(p0, p1, cl, cl); }
+
+  void addAxes(mat4 m, float scale = 1){
+    V3f v(int n)(){ return V3f(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); }
+    addLine(v!3, v!3+v!0*scale, clAxisX);
+    addLine(v!3, v!3+v!1*scale, clAxisY);
+    addLine(v!3, v!3+v!2*scale, clAxisZ);
+  }
+
+  void addCross(V3f center, float size, RGB col){
+    addLine(center-V3f(size, 0, 0), center+V3f(size, 0, 0), col);
+    addLine(center-V3f(0, size, 0), center+V3f(0, size, 0), col);
+    addLine(center-V3f(0, 0, size), center+V3f(0, 0, size), col);
+  }
+
+  void addBB(in Bounds3f bb, mat4 m, RGB cl = clWhite){
+    void a(string s)(){
+      auto q0 = m * vec4(s[0]=='0' ? bb.bMin.x : bb.bMax.x, s[1]=='0' ? bb.bMin.y : bb.bMax.y, s[2]=='0' ? bb.bMin.z : bb.bMax.z, 1); //todo: vec3 V3f interop suxxx
+      auto q1 = m * vec4(s[3]=='0' ? bb.bMin.x : bb.bMax.x, s[4]=='0' ? bb.bMin.y : bb.bMax.y, s[5]=='0' ? bb.bMin.z : bb.bMax.z, 1);
+      addLine(V3f(q0.x, q0.y, q0.z), V3f(q1.x, q1.y, q1.z), cl);
+    }
+    a!"000100"; a!"000010"; a!"000001";
+    a!"010110"; a!"100110"; a!"100101";
+    a!"001101"; a!"001011"; a!"010011";
+    a!"011111"; a!"101111"; a!"110111";
+  }
+
+}
+
+
+
+// 3ds loader ///////////////////////////////////////////////////////
 
 //todo: IDE: warningok ne szamitsanak error-nak.
 
@@ -416,17 +646,16 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   mat4 mModel = mat4.identity;
   mat4[] mStack;
 
-  //debug aids
+  //debug drawings
   struct Options{
     bool
-      showAxes,
-      showTranslations,
-      showBB,
-      showJoints;
-
+      showWorldAxes,
+      showCameraPivot,
+      showObjectAxes,
+      showObjectBounds;
+      float axisLength = 250;
     bool showAny() {
-      static assert(typeof(this).sizeof==4);
-      return *(cast(uint*)(&this)) != 0;
+      return this != typeof(this).init;
     }
   }
 
@@ -613,7 +842,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     if(node is null) return;
 
     pushMatrix; scope(exit) popMatrix;
-    mModel = mModel * node.mTransform * mat4.translation(node.joint.rotCenter) * node.joint.matrix * mat4.translation(-node.joint.rotCenter) *node.mTransform2;
+    mModel = mModel * node.fullTransform;
 
     if(options.showAny)
       drawnNodes ~= DrawnNode(node, mModel);
@@ -637,13 +866,10 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     draw(model.root, opBinary!"*"(model.color, color));
   }
 
-  void drawDebugStuff(){
-    if(!options.showAny) return;
 
-    struct VRecord {
-      V3f aPosition;  //*** the fieldnames must match the name of the shader attributes!
-      uint aColor;
-    }
+  void draw(LineDrawing ld){
+    auto vbo = ld.vbo;
+    if(vbo is null) return;
 
     static Shader shader;   //! Line Debug Shader ///////////////////////////////////////////
     if(!shader) shader = new Shader("LineShader", q{
@@ -672,52 +898,16 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
       }
     });
 
-    VRecord[] vertices;
-
-    void addLine2(in V3f p0, in V3f p1, in RGB cl0, in RGB cl1){ vertices ~= [ VRecord(p0, cl0), VRecord(p1, cl1) ]; }
-    void addLine(in V3f p0, in V3f p1, in RGB cl){ addLine2(p0, p1, cl, cl); }
-
-    void addAxes(mat4 m){
-      V3f v(int n)(){ return V3f(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); }
-      enum axisScale = 500;
-      addLine(v!3, v!3+v!0*axisScale, clAxisX);
-      addLine(v!3, v!3+v!1*axisScale, clAxisY);
-      addLine(v!3, v!3+v!2*axisScale, clAxisZ);
-    }
-
-    void addBB(in Bounds3f bb, mat4 m, RGB cl = clSilver){
-      void a(string s)(){
-        auto q0 = m * vec4(s[0]=='0' ? bb.bMin.x : bb.bMax.x, s[1]=='0' ? bb.bMin.y : bb.bMax.y, s[2]=='0' ? bb.bMin.z : bb.bMax.z, 1); //todo: vec3 V3f interop suxxx
-        auto q1 = m * vec4(s[3]=='0' ? bb.bMin.x : bb.bMax.x, s[4]=='0' ? bb.bMin.y : bb.bMax.y, s[5]=='0' ? bb.bMin.z : bb.bMax.z, 1);
-        addLine(V3f(q0.x, q0.y, q0.z), V3f(q1.x, q1.y, q1.z), cl);
-      }
-      a!"000100"; a!"000010"; a!"000001";
-      a!"010110"; a!"100110"; a!"100101";
-      a!"001101"; a!"001011"; a!"010011";
-      a!"011111"; a!"101111"; a!"110111";
-    }
-
-
-    addAxes(mat4.identity);
-
-    foreach(dn; drawnNodes) with(dn) with(options) {
-      if(showAxes) addAxes(matrix);
-      if(showBB){ addBB(node.object.bounds, matrix, pickedNode==node ? clFuchsia : clWhite); }
-    }
-
-    auto vbo = new VBO(vertices);
-
     shader.uniform("vp_matrix", (mProjection*mView).matrix);
     shader.attrib(vbo);
 
-    gl.lineWidth(1);
     gl.depthMask(false);
     gl.enable(GL_DEPTH_TEST);
     gl.depthFunc(GL_GEQUAL);
 
     gl.enable(GL_BLEND);
     gl.blendFunc(GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA);
-    gl.blendColor(0, 0, 0, .25);
+    gl.blendColor(0, 0, 0, .33);
 
     vbo.draw(GL_LINES); //draw hidden
 
@@ -729,21 +919,43 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     gl.enable(GL_DEPTH_TEST);
     gl.depthMask(true);
 
-
-
-
-/*    struct Line{ V3f p0; V3f p1; RGB color }
-
-    enum axeScale = 1000;
-
-    foreach(dn; drawnNodes){
-      if(showAxes){
-        V3f mat4
-
-      }
-
-    }*/
   }
+
+  void drawDebugStuff(){
+    if(!options.showAny) return;
+    gl.lineWidth(1);
+
+    if(options.showObjectBounds){ auto ld = new LineDrawing;
+      foreach(dn; drawnNodes) ld.addBB(dn.node.object.bounds, dn.matrix, pickedNode==dn.node ? clFuchsia : clWhite);
+      draw(ld);
+    }
+
+    if(options.showWorldAxes){ auto ld = new LineDrawing;
+      ld.addAxes(mat4.identity, cam.far);
+      draw(ld);
+    }
+
+    if(options.showCameraPivot){ auto ld = new LineDrawing;
+      auto c = V3f(cam.pivot.x, cam.pivot.y, cam.pivot.z),
+           d = V3f(cam.pivotPlaneCenter.x, cam.pivotPlaneCenter.y, cam.pivotPlaneCenter.z),
+           a = options.axisLength/3;
+
+      auto c1 = clFuchsia, c2 = clWhite;
+      ld.addCross(c, a, c1);
+      ld.addLine(c, d, c1, c2); ld.addCross(d, a, c2);  //pivotPlaneCenter
+
+      draw(ld);
+    }
+
+    if(options.showObjectAxes){ auto ld = new LineDrawing;
+      foreach(dn; drawnNodes) ld.addAxes(dn.matrix, options.axisLength);
+      gl.lineWidth(3);
+      draw(ld);
+    }
+
+    gl.lineWidth(1);
+  }
+
 }
 
 
@@ -1156,6 +1368,11 @@ class MeshObject{   //! MeshObject ///////////////////////////////
     return cachedBounds;
   }
 
+  void transformVertices(in mat4 m){
+    foreach(ref v; vertices) v = (m * vec4(v, 1)).xyz;
+    geometryChanged;
+  }
+
 protected:
   //mesh building functions
   static int base;
@@ -1349,9 +1566,22 @@ class MeshNode{ //! MeshNode ///////////////////////////////
     return "MeshNode(%d, \"%s\", pivot:%s, %s)".format(kfId, pivot, object ? object.name : "$$$DUMMY", subNodes);
   }
 
+  mat4 fullTransform(){
+    //todo: this is a big fucking mess
+    return mTransform * mat4.translation(joint.rotCenter) * joint.matrix * mat4.translation(-joint.rotCenter) *mTransform2;
+  }
+
   void dump(int level=0){
     //"%s%d \"%s\" piv:%s tran:%s".writefln("  ".replicate(level), kfId, object ? object.name : "$$$DUMMY", pivot, mTransform);
     subNodes.each!((n){ n.dump(level+1); });
+  }
+
+  void transformOrigin(in mat4 m){
+    auto mi = m.inverse;
+    if(object) object.transformVertices(mi);
+
+    mTransform = mTransform * m;
+    foreach(sn; subNodes) sn.mTransform = sn.mTransform * mi;
   }
 }
 

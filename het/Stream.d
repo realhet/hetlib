@@ -262,7 +262,9 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
         return; //nothing else to expect after null
       }
 
-      auto elementMap = extractElements; //opt: at first, do it with a linear list. when it fails, do a map.
+      auto oldIdx = idx;
+      auto elementMap = extractElements; //opt: with inherited classes it seeks twice. If the tokenizer would be hierarchical then it wouldn't take any time to extract.
+      idx = oldIdx; //keep idx on the class instance,
 
       //handle null for class
       static if(is(T == class)){{
@@ -278,18 +280,19 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 
         //todo: error handling when there is no classloader for the class in json
 
-//        print("Trying to load class:", classFullName);
-//        print("Currently in Loader:", fullyQualifiedName!Type);
-//        print("Current Instance:", currentClassFullName);
+        /*print("className in Json:", className);
+        print("Trying to load class:", classFullName);
+        print("Currently in Loader:", fullyQualifiedName!Type);
+        print("Current Instance:", currentClassFullName);*/
 
         //call a different loader if needed
         if(classFullName.length && fullyQualifiedName!Type != classFullName){
-//          print("Calling appropriate loader");
+          //print("Calling appropriate loader", classFullName);
 
           //todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
           //todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
 
-          auto fv = classLoaderFunc[classFullName];
+          auto fv = classLoaderFunc[classFullName]; //opt: inside here, elementMap is extracted once more
           fv(state, idx, &data);
           return;
         }
@@ -463,6 +466,36 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
   }
 }
 
+
+// tests /////////////////////////////////////////////////
+
+void test_JsonClassInheritance(){
+
+  static class A{ int id; }
+  static class B:A{ string bStr; }
+  static class C:A{ string cStr;  }
+
+  registerStoredClass!A;
+  registerStoredClass!B;
+  registerStoredClass!C;
+
+  A[] arr;
+  { auto a = new A; a.id = 9;               arr ~= a; }
+  { auto b = new B; b.id = 1; b.bStr = "b"; arr ~= b; }
+  { auto c = new C; c.id = 2; c.cStr = "c"; arr ~= c; }
+  arr ~= null;
+
+  auto json1 = arr.toJson;
+  json1.print;
+
+  arr.clear;
+
+  arr.fromJson(json1);
+  auto json2 = arr.toJson;
+  json2.print;
+
+  enforce(json1 == json2, "fromJson inherited classes fail.");
+}
 
 //! clearFields /////////////////////////////////////////
 

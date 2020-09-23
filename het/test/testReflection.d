@@ -147,6 +147,24 @@ mixin template ReflBase() {
 
     string[] selective;
     //string[string] renamed; //todo: map
+
+    void dump(string prefix){
+      write(prefix);
+
+      writec(int c, string s){ write("\33"~hfdsghfew
+
+      switch(kind){
+        case "import": case "static import":{
+          write("\33\11"~kind~"\33\7 ", toString);
+
+        break; }
+
+        default:
+      }
+
+
+      writeln;
+    }
   }
 
 /*  class Import: Member { mixin ReflBase;
@@ -181,16 +199,28 @@ void main(){ application.runConsole({
 
   foreach(sym; getSymbolsByUDA!(mixin(__MODULE__), "REFL")) registerStoredClass!sym;
 
-  readln;
-
   Module[] modules;
 
   auto t0 = QPS;
   modules.fromJson(str, "LDCXJSON");
-  print("time:", QPS-t0);
-  readln;
+  print("LDCXJSON fromJson time:", QPS-t0);
 
-  modules.toJson.print;
+  int[string] unhandledKinds;
+  foreach(module_; modules){
+    print("\33\14module\33\7", module_.name, module_.file);
+
+    foreach(member; module_.members){
+      member.dump("  ");
+    }
+
+    //break;
+  }
+
+  unhandledKinds.print;
+
+
+
+  //modules.toJson.print;
 
 /*
   module 25
