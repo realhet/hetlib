@@ -113,8 +113,6 @@ struct Cursor3D{
       auto d = [.5f];
       gl.readPixels(screen.x, invy, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, d);
       depth = d[0];
-
-print(depth);
     }else{
       depth = 1;
     }
@@ -289,64 +287,86 @@ class Camera{ //! Camera //////////////////////////////////////
   @STORED{
     @HIDDEN mat4 eye;       //contains viewing position, rotation and zoom
     @HIDDEN vec3 pivot;     //rotation center
-    @RANGE(30, 140) float fovY;
+
     bool isPerspective = true;
+    @RANGE(30, 140) float verticalFov;
+    float verticalVisibleUnits = 1000;
+
     float near = 10, //in ortho near is -far
-          far = 10000,
-          scale = 1;
+          far = 10000;
   }
+
+  string unit;
 
   this(){ reset; }
 
   void dump(){ this.toJson.writeln; }
 
-  vec3 axis(int n) const { vec3 v; foreach(int i; 0..3) v.vector[i] = eye.matrix[i][n]; return v; }
+  private vec3 axis(int n) const { vec3 v; foreach(i; 0..3) v.vector[i] = eye.matrix[i][n]; return v; } //todo: the matric row/column majority is not good here
+  private void setAxis(int n, vec3 v) { foreach(i; 0..3) eye.matrix[i][n] = v.vector[i]; }
+
   vec3 right() const { return axis(0); }
   vec3 up() const { return axis(1); }
   vec3 forward() const { return axis(2); }
-  vec3 origin()    const { return axis(3); }
+  @property vec3 origin()    const { return axis(3); }
+  @property void origin(in vec3 v) { setAxis(3, v); }
 
   float pivotDistance() const{ return (origin-pivot).length; }
   auto pivotPlane() const{ return Plane(pivot, forward); }
   vec3 pivotPlaneCenter() const{ return intersect(pivotPlane, Ray(origin, forward)).get(vec3(0,0,0)); }
-  float pivotPlaneCenterDistance() const{ return (origin-pivotPlaneCenter).length; }
+  float pivotPlaneDistance() const{ return (origin-pivotPlaneCenter).length; }
 
-  float tanFovY()const{ return tan(fovY/360*PIf); }
+  float tanFovY()const{ return tan(verticalFov/360*PIf); } //todo: use PI instead of PIf and check the assembli for single precision arithmetic.
 
+  float calcVerticalVisibleUnits() const{ return pivotPlaneDistance   * (tanFovY*2); } // *2 because tanFovY is just a half angle
+  float calcPivotPlaneDistance()   const{ return verticalVisibleUnits / (tanFovY*2); } // inverse of calcVerticalVisibleUnits
+
+  /// Synchronizes verticalVisibleUnits and origin distance from pivotPlane
+  /// Must be called after change of: verticalVisibleUnits, origin, pivot
+  void synch(){
+    if(isPerspective){
+      verticalVisibleUnits = pivotPlaneDistance * (tanFovY*2);
+    }else{
+      origin = pivotPlaneCenter - forward * (verticalVisibleUnits / (tanFovY*2));
+    }
+  }
+
+  /// increments verticalFov and moves camera back/forth
   void adjustFovY(float degIncrement){
     if(!degIncrement) return;
-    float oldTop = pivotDistance*tanFovY;
-    fovY += degIncrement;
-    fovY = het.utils.clamp(fovY, 30, 140);
-    float newTop = pivotDistance*tanFovY;
+    float oldTop = pivotPlaneDistance*tanFovY;
+    verticalFov += degIncrement;
+    verticalFov = het.utils.clamp(verticalFov, 30, 140);
+    float newTop = pivotPlaneDistance*tanFovY;
 
-//    float dist = pivotDistance;
     eye = eye * mat4.translation(0, 0, newTop-oldTop);
+    synch;
   }
 
   //camera controls
   void reset(){
     eye = mat4.identity.rotatey(PI).translate(0,30*4,270*4).rotatex(-PIf/6);
-
     pivot = vec3(0, 0, 0);
-
-    fovY = 60;
+    //verticalFov = 60;
+    synch;
   }
 
   @HIDDEN private const float
     rotSpeed = 1/250.0f,
     zoomSpeed = 0.0025f*40,
-    zoomMax = 1600.0f,
-    panMin = 0.003f,
-    panMax = 0.5f*50;
+    zoomMax = 1600.0f;
 
   /// pans view and pivot. Speed is taken from pivotDistance by default.
-  void pan(in vec2 v, float speed = float.nan){
+  void pan(in vec2 v, float viewHeight, float speed = 1){
     if(!v.length) return;
-    if(speed.isNaN) speed = het.utils.clamp(pivotDistance*(0.003f), panMin, panMax); //todo: ambiguous het.utils.clamp
+
+    speed *= (isPerspective ? calcVerticalVisibleUnits : verticalVisibleUnits)/viewHeight;
+
     vec3 delta = (right*v.x + up*v.y) * speed;
     eye.translate(delta);
-    pivot += delta;     //todo: a panningot megcsinalni ugy, hogy a mousecursornal levo elmozdulas pixelpontos legyen. Ezt a speedet a lenyomaskor kell meghatarozni.
+
+    //pivot += delta;   //it's better to leave the pivot where it is. So the scene will rotate around the released mouse after panning.
+    synch;
   }
 
   void look(vec2 v){
@@ -356,32 +376,77 @@ class Camera{ //! Camera //////////////////////////////////////
 
     auto ec_pivot = eye.inverse * vec4(pivot, 1); //save pivot
 
-    with(eye){  translate(-d);  rotate(v.y, right);  rotatey(v.x);  translate(d);  }
+    with(eye){  translate(-d);  rotate(-v.x, up); rotate(v.y, right);  /*rotatey(v.x);*/  translate(d);  }
     repairRotation(eye, true);
 
     pivot = (eye * ec_pivot).xyz; //restore pivot in world space
+    synch;
   }
 
-  void rotate(vec2 v){ //rotetes around pivot
-    if(!v) return;
-    v *= rotSpeed;
-    with(eye){  translate(-pivot);  rotate(-v.y, right);  rotatey(-v.x);  translate(pivot);  }
+
+  void rotateAround(mat3 rotation, vec3 center){
+    eye.translate(-center);
+    mat4 m; m.set_rotation(rotation);
+    eye = m * eye;
+    eye.translate(center);
     eye.repairRotation(true);
+    synch;
+  }
+
+  void rotateAroundPivot(mat3 rotation){ rotateAround(rotation, pivot); }
+
+  void rotateAround(vec3 angles, vec3 center){
+    if(!angles) return;
+    angles *= rotSpeed;
+    mat3 m;
+
+    if(angles.z) m.rotate(angles.z, forward);
+    if(angles.y) m.rotate(-angles.y, right);
+
+    if(angles.x) m.rotatey(-angles.x);
+    //if(angles.x) m.rotate(-angles.x, up);  //ez jobb, ha roll != 0, de rosszabb, ha korbejaras van
+
+    rotateAround(m, center);
+  }
+
+  void rotateAround(vec2 angles, vec3 center){ rotateAround(vec3(angles, 0), center); }
+
+  void rotateAroundPivot(vec3 angles){ rotateAround(angles, pivot); }
+
+  void rotateAroundPivot(vec2 angles){ rotateAroundPivot(vec3(angles, 0)); }
+
+  void updatePivot(bool mouseInScreen, in vec3 mousePos, float mouseDepth){
+    const mouseOnObject = mouseDepth < 1;
+    if(mouseOnObject){
+      pivot = mousePos; //update pivot
+    }else{
+      auto ray = isPerspective ? Ray(origin  , mousePos-origin)
+                               : Ray(mousePos, -forward       );
+      if(auto its = intersect(pivotPlane, ray)) pivot = its.get;
+    }
+    synch;
+  }
+
+  void updatePivot(in Cursor3D mousePos){
+    with(mousePos) updatePivot(inScreen, world, depth);
   }
 
   void zoom(float v, bool mouseInScreen, in vec3 mousePos, float mouseDepth){
     if(!v) return;
     if(mouseInScreen){
-      const mouseOnObject = mouseDepth < 1;
-
-      if(mouseOnObject) pivot = mousePos; //update pivot
-                   else if(auto its = intersect(pivotPlane, Ray(origin, mousePos-origin))) pivot = its.get;
+      updatePivot(mouseInScreen, mousePos, mouseDepth);
 
       auto d = pivot - origin;
       float L = d.length*v*zoomSpeed;
       L = het.utils.clamp(L, -zoomMax, zoomMax);
       d = d.normalized*L;
       eye.translate(d);
+
+      if(!isPerspective){ //synch verticalVisibleUnits from origin
+        isPerspective = true;
+        synch;
+        isPerspective = false;
+      }
     }
   }
 
@@ -389,10 +454,6 @@ class Camera{ //! Camera //////////////////////////////////////
     with(mousePos) zoom(v, inScreen, world, depth);
   }
 
-
-  void roll(float v){
-    raise("not impl");
-  }
 
   void lookFrom(const vec3 target, const vec3 dir, float dist){
     auto d = -dir.normalized,
@@ -403,6 +464,7 @@ class Camera{ //! Camera //////////////////////////////////////
     eye = mat4(vec4(l, 0), vec4(u, 0), vec4(d, 0), vec4(e, 1)).transposed;
 
     pivot = target;
+    synch;
   }
 
 //  void lookFrom(const vec3 target_, const vec3 dir, const AABB3   aabb , int width, int height, float step=1, float scale=1.15f);
@@ -411,15 +473,25 @@ class Camera{ //! Camera //////////////////////////////////////
 //  bool updateAnimation(float dt);
 
   void setupCameraMatrices   (int width, int height, bool subRect, int x0, int y0, int x1, int y1, out mat4 mView, out mat4 mProjection){
-    auto top    = near*tan((fovY/360*PIf)),
+    synch; //just to make sure
+
+    auto top    = near*tanFovY,
          bottom = -top,
          aspect = (cast(float)width)/(height>1 ? height : 1),  //todo: itt meg a max()-ot bassza el a gl3n...
          right  = top*aspect,
          left   = -right;
 
-    void mp(float l, float r, float b, float t, float n, float f){
+    void mp(float l, float r, float b, float t, float n, float f){  //todo: refactor this big mess
       auto persp(){ return mat4.perspective(l, r, b, t, n, f); }
-      auto ortho(){ auto s = 1/scale; return mat4.orthographic(l*s, r*s, b*s, t*s, -f, f); }
+      auto ortho(){
+        //print(top-bottom, top, bottom);
+        //auto s = /*1/(scale)*/ (173.042616451f/1000)*2000;
+        //ha s = 173.042616451f, akkor az ablak fuggoleges iranyaban 1000 egyseg latszik.
+
+        auto s = verticalVisibleUnits/(t-b);
+
+        return mat4.orthographic(l*s, r*s, b*s, t*s, -f, f);
+      }
 
       /*if(perspective.inRange(0.01, 0.99)){
         auto p = persp, o = ortho, a = pow(perspective.remap(0, 1, 0.49, 0.81), 20);
@@ -828,7 +900,9 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     tSilicon.bind(0, GLTextureFilter.Linear, true);
     sh.uniform("smpSilicon", 0);*/
 
-    auto wc_light = vec3(v.inverse * vec4(0,0,0,1)); //light from camera
+    const isPerspective = p.matrix[3][3] == 0;
+
+    auto wc_light = vec3(v.inverse * vec4(0, 0, isPerspective ? 0 : 2*cam.far, 1)); //light from camera or behind camera in axonometric view.  *2 because (near plane = -far)
     sh.uniform("wc_light"       , wc_light.vector);
 
     vbo.draw(GL_TRIANGLES);

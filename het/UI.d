@@ -2799,7 +2799,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
   }else static if(isFloatingPoint!T     ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      auto s = format("%f", data);
+      auto s = format("%g", data);
       Edit(s, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
