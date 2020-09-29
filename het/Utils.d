@@ -2,8 +2,11 @@ module het.utils;
 
 pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 
-mixin("private alias XMLTEST = uint;");
+//todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
+     //https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
 
+//todo: UTILS lots of todes commented out, because of the compile log is small
+/+
 //todo: IDE: % as postFix operator: 25% -> (25)*.01
 //todo: IDE: visszajatszo debugger/logger
 //todo: IDE syntax highlight control chars in "" and ''. Also format %f in format strings
@@ -52,7 +55,7 @@ mixin("private alias XMLTEST = uint;");
 //todo: editor: accumulation clipboard: hozzacsapja a kijelolest a clipboard vegehez. Amikor sok szirszard szedek ossze es egy helyre akarom azokat rakni.
 //todo: linker errort detektalni: Kell hozza csinalni egy classt, aminek csak forwardolva vannak a dolgai. " Error " a trigger. Elozo sor is kell. OPTLINK, Copyright, http://www.digitalmars kezdetu sorokkal nem foglalkozni.
 //todo: preprocess: implement with(a,b,c,...)
-//todo: multiline todo /* es /+ commentekre
+//todo: multiline todo /* es / + commentekre
 
 //todo: logging automatizalasa class osszes functionjara
 
@@ -67,6 +70,7 @@ mixin("private alias XMLTEST = uint;");
 //todo: View2D: zoom to cursort es a nemlinearis follow()-ot osszehozni.
 
 //todo: IDE: ha nem release build van forditva, akkor az assert/in/out/invariant legyen jelolve szurkevel!
++/
 
 public import std.string, std.array, std.algorithm, std.conv, std.typecons, std.range, std.functional,
   std.format, std.math, core.stdc.string, het.debugclient;

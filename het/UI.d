@@ -2722,7 +2722,7 @@ static cnt=0;
 //! FieldProps stdUI /////////////////////////////
 
 
-// USA declarations in het.utils
+// UDA declarations in het.utils
 
 struct FieldProps{
   string fullName, name, caption, hint, unit;
@@ -2742,6 +2742,33 @@ struct FieldProps{
   }
 
   auto hash() const{ return fullName.xxh; }
+
+  //todo: compile time flexible struct builder. Eg.: FieldProps().caption("Capt").unit("mm").logRange(0.1, 1000)
+  /+
+  https://forum.dlang.org/post/etgucrtletedjssysqqu@forum.dlang.org
+  struct S{
+      private int _a, _b;
+
+      auto opDispatch(string name)(int value)
+      if (name.among("a", "b"))
+      {
+          mixin("_", name, "= value;");
+          return this;
+      }
+
+      auto opDispatch(string name)()
+      if (name.among("a", "b"))
+      {
+           mixin("return _", name, ";");
+      }
+  }
+
+  void main(){
+      S.init.a(123).b(456).writeln;
+      S().b(456).a(123).writeln;  // Alternative syntax, may not work if opCall is defined
+  }
+  +/
+
 }
 
 FieldProps getFieldProps(T, string fieldName)(string parentFullName){

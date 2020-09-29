@@ -1658,7 +1658,7 @@ struct Matrix(type, int rows_, int cols_) if((rows_ > 0) && (cols_ > 0)) {
         }
 
         /// Returns an identity matrix with the current translation applied (nxn matrices, n >= 3)..
-        Matrix get_translation() {
+        Matrix get_translation() const {
             Matrix ret = Matrix.identity;
 
             foreach(r; TupleRange!(0, rows-1)) {

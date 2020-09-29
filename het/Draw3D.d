@@ -4,8 +4,8 @@ module het.draw3d;
 //http://read.pudn.com/downloads70/sourcecode/windows/opengl/253342/INC/3DSFTK.H__.htm
 
 import het.utils, het.geometry, het.opengl;
-import gl3n.linalg, gl3n.math, gl3n.aabb;
-import std.json;
+
+import gl3n.linalg;
 
 enum DUMP_3DS_IMPORT = false;
 
@@ -22,7 +22,7 @@ alias ivec2 = Vector!(int, 2);
 
 // utils /////////////////////////////////////////////////
 
-vec3 project(in mat4 m, in vec3 v){
+auto project(in mat4 m, in vec3 v){
   auto p = m*vec4(v, 1),
        w = 1/p.w;
   return p.xyz*w;
@@ -515,6 +515,25 @@ class Camera{ //! Camera //////////////////////////////////////
   }
 
 
+  void navigate(bool keysEnabled, bool mouseEnabled, float clientHeight, in Cursor3D cursor){
+    if(keysEnabled) if(inputs.Home.pressed) reset;
+
+    if(mouseEnabled){ //todo: implement system-wide mouse capture
+      vec2 md = vec2(inputs.MX.delta, inputs.MY.delta);
+
+      if(inputs.MMB.pressed) updatePivot(cursor); //right before panning
+
+      if(inputs.MMB.active ) pan(md, clientHeight);
+      if(inputs.RMB.active ){
+             if(inputs.Ctrl .active) look(md*-.5);
+        else if(inputs.Shift.active) rotateAroundPivot(vec3(0, 0, md.x));
+        else                         rotateAroundPivot(md);
+      }
+      zoom(inputs.MW.delta*2, cursor);
+    }
+  }
+
+
 /*  void glSetupCamera         (int width, int height, float _far, bool subRect=false, int x0=0, int y0=0, int x1=0, int y1=0);
   void glSetupCamera_animated(int width, int height, float _far, bool subRect=false, int x0=0, int y0=0, int x1=0, int y1=0);*/
 
@@ -789,6 +808,10 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     cursor.glProcess(mInverse); //get the world cursor from depth
 
     inFrame = false;
+  }
+
+  void navigate(bool keysEnabled, bool mouseEnabled){
+    cam.navigate(keysEnabled, mouseEnabled, viewport.height, cursor);
   }
 
 
@@ -1542,6 +1565,8 @@ struct Joint{ //Joint ////////////////////////////////////////
 
   vec3 rotCenter;
 
+  float middle() const{ return avg(minValue, maxValue); }
+
   mat4 matrix(){
     with(Type) final switch(type){
       case fixed     : return mat4.identity;
@@ -1582,6 +1607,8 @@ class MeshNode{ //! MeshNode ///////////////////////////////
   MeshNode[] subNodes;
 
   Joint joint;
+
+  string objectName() const { return object ? object.name : ""; }
 
   static int instanceCount;
 
@@ -1650,13 +1677,39 @@ class MeshNode{ //! MeshNode ///////////////////////////////
     subNodes.each!((n){ n.dump(level+1); });
   }
 
-  void transformOrigin(in mat4 m){
+  void transformOrigin(in mat4 m){ //relocates the origin and transforms all vertices, in a way that the geometry don't change at al. Only the origin (mTransfiorm).
     auto mi = m.inverse;
     if(object) object.transformVertices(mi);
 
     mTransform = mTransform * m;
     foreach(sn; subNodes) sn.mTransform = sn.mTransform * mi;
   }
+
+  void walk(void delegate(MeshNode) fv){ //recursive walk on this and all subNodes
+    fv(this);
+    foreach(n; subNodes) fv(n);
+  }
+
+  void transformedWalk(void delegate(MeshNode, in mat4) fv, in mat4 mModel = mat4.identity){ //recursive transformed walk
+    auto m = mModel * fullTransform;
+    fv(this, m);
+
+    if(subNodes.length){
+      m = m * mat4.identity.translate(pivot);
+      foreach(n; subNodes) n.transformedWalk(fv, m);
+    }
+  }
+
+  float[] savePose(){
+    float[] data;
+    walk((n){ data ~= n.joint.value; });
+    return data;
+  }
+
+  void loadPose(float[] data){
+    walk((n){ n.joint.value = data[0]; data = data[1..$]; });
+  }
+
 }
 
 __gshared ModelPrototype[File] modelPrototypes;
