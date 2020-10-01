@@ -949,8 +949,10 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     }
 
     //experimental picking
-    cursor.readDepth;
-    if(chkSet(pickedZ, cursor.depth)) pickedNode = node; //todo: ez a modszer kurvalassu, mert allando ketiranyu kommunikaciot igenyel a kartyatol.
+    if(0){
+      cursor.readDepth;
+      if(chkSet(pickedZ, cursor.depth)) pickedNode = node; //todo: ez a modszer kurvalassu, mert allando ketiranyu kommunikaciot igenyel a kartyatol.
+    }
 
     if(onlyThisObject) return;
 

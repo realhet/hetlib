@@ -591,7 +591,7 @@ public:
     //todo: if this is called always, disable the resizeableness of the window
   }
 
-  V2i clientPos()         { with(clientRect) return V2i(left, top); }
+  @property V2i clientPos()         { with(clientRect) return V2i(left, top); }
   V2f clientSizeHalf()    { return clientSize.toF*0.5f;  }
   int clientWidth()       { return clientSize.x; }
   int clientHeight()      { return clientSize.y; }

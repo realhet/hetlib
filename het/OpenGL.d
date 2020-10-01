@@ -1219,8 +1219,11 @@ private:
     try{
       gl.shaderSource(shader.handle, source);
       gl.compileShader(shader.handle);
-      if(!gl.getShaderCompiled(shader.handle))
-        error("Compile error:\r\n"~gl.getShaderInfoLog(shader.handle));
+      if(!gl.getShaderCompiled(shader.handle)){
+        auto err = gl.getShaderInfoLog(shader.handle);
+        File(appPath, "shader.error").writeStr(source~"\n=============================================\n"~err);
+        error("Compile error:\n"~err);
+      }
       return shader;
     }catch(Throwable o){
       shader.release;
@@ -1407,6 +1410,8 @@ public:
   @property auto logName() const { return "\33\13"~shortName~"\33\7"; }
 
   const string attrName; //only if VBO is not a struct
+
+  int getCount() const { return count; }
 
   this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW){
     this.stride = recordSize;

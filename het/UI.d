@@ -112,8 +112,9 @@ class Slider : Cell { // Slider //////////////////////////////////
           if(currentMouse.x>mod_p1.x) mod_ofs.x = mod_p1.x-currentMouse.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
         }else if(mod_ori==SliderOrientation.vert){
           nPos = remap_clamp(currentMouse.y, mod_p0.y, mod_p1.y, 0, 1);
-          if(currentMouse.y<mod_p0.y) mod_ofs.y = mod_p0.y-currentMouse.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
-          if(currentMouse.y>mod_p1.y) mod_ofs.y = mod_p1.y-currentMouse.y - (range_.isEndless ? 1 : 0);
+          //note: p1 and p0 are intentionally swapped!!!
+          if(currentMouse.y<mod_p1.y) mod_ofs.y = mod_p1.y-currentMouse.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+          if(currentMouse.y>mod_p0.y) mod_ofs.y = mod_p0.y-currentMouse.y - (range_.isEndless ? 1 : 0);
         }
       }
 

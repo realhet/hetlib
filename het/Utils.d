@@ -2312,6 +2312,8 @@ struct WildResult{ static:
   void stripAll(){
     foreach(ref s; p) s = s.strip;
   }
+
+  string toString() { return p.text; }
 }
 
 alias wild = WildResult;

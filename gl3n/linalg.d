@@ -768,13 +768,13 @@ alias Vector!(ubyte, 4) vec4ub;*/
 /// alias Matrix!(double, 3, 4) mat34d;
 /// alias Matrix!(real, 2, 2) mat2r;
 /// ---
-struct Matrix(type, int rows_, int cols_) if((rows_ > 0) && (cols_ > 0)) {
+struct Matrix(type, int rows_, int cols_) if((rows_ > 0) && (cols_ > 0)) { //het: exactly the opposite order of cols/rows
     alias type mt; /// Holds the internal type of the matrix;
     static const int rows = rows_; /// Holds the number of rows;
     static const int cols = cols_; /// Holds the number of columns;
 
     /// Holds the matrix $(RED row-major) in memory.
-    mt[cols][rows] matrix = makeIdentity!(type, cols, rows); //het
+    mt[cols][rows] matrix = makeIdentity!(type, cols, rows); //het : matrix[row][col] : opposite!!!
     // In C it would be mt[rows][cols], D does it like this: (mt[foo])[bar]
     alias matrix this;
 
