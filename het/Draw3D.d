@@ -856,7 +856,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
 
       in vec3 gPosition[];
       flat out vec3 wc_normal;
-      varying out vec3 wc_position;
+      out vec3 wc_position;
 
       uniform mat4 mvp_matrix;
       uniform mat4 m_matrix;
@@ -878,7 +878,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
       uniform vec3 wc_light;  //central lighting
 
       flat in vec3 wc_normal;
-      varying vec3 wc_position;
+      in vec3 wc_position;
 
 //      uniform sampler2D smpSilicon; //temporal sampler test
 
@@ -980,11 +980,11 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
 
       out vec3 fColor;
 
-      uniform mat4 vp_matrix;
+      uniform mat4 mvp_matrix;
 
       void main()
       {
-        gl_Position = vp_matrix * vec4(aPosition, 1);
+        gl_Position = mvp_matrix * vec4(aPosition, 1);
         fColor = aColor;
       }
 
@@ -997,7 +997,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
       }
     });
 
-    shader.uniform("vp_matrix", (mProjection*mView).matrix);
+    shader.uniform("mvp_matrix", (mProjection*mView*mModel).matrix);
     shader.attrib(vbo);
 
     gl.depthMask(false);
@@ -1023,6 +1023,10 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   void drawDebugStuff(){
     if(!options.showAny) return;
     gl.lineWidth(1);
+
+    //everything here is in world coords
+    pushMatrix; scope(exit) popMatrix;
+    mModel = mat4.identity;
 
     if(options.showObjectBounds){ auto ld = new LineDrawing;
       foreach(dn; drawnNodes) ld.addBB(dn.node.object.bounds, dn.matrix, pickedNode==dn.node ? clFuchsia : clWhite);
@@ -1689,7 +1693,7 @@ class MeshNode{ //! MeshNode ///////////////////////////////
 
   void walk(void delegate(MeshNode) fv){ //recursive walk on this and all subNodes
     fv(this);
-    foreach(n; subNodes) fv(n);
+    foreach(n; subNodes) n.walk(fv);
   }
 
   void transformedWalk(void delegate(MeshNode, in mat4) fv, in mat4 mModel = mat4.identity){ //recursive transformed walk
@@ -1703,13 +1707,14 @@ class MeshNode{ //! MeshNode ///////////////////////////////
   }
 
   float[] savePose(){
-    float[] data;
-    walk((n){ data ~= n.joint.value; });
-    return data;
+    float[] res;
+    walk((n){ res ~= n.joint.value; });
+    return res;
   }
 
-  void loadPose(float[] data){
-    walk((n){ n.joint.value = data[0]; data = data[1..$]; });
+  void loadPose(in float[] data){
+    int idx;
+    walk((n){ n.joint.value = data[idx++]; });
   }
 
 }

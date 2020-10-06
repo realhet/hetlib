@@ -146,17 +146,11 @@ class Slider : Cell { // Slider //////////////////////////////////
         if(range_.isClamped) nPos = nPos.clamp(0, 1);
       }else{
         auto diff = rawMousePos-mod_mouseBase;
-
         auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2;
-
         if(mod_dir==0 && diff.len_prec>=3) mod_dir = act_dir;
-
-        auto delta = (mod_dir ? mod_dir : act_dir)==1 ? inputs.MXraw.delta : inputs.MYraw.delta;
-
+        auto delta = (mod_dir ? mod_dir : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
         mod_nPosBase += delta*(precise*(1.0f/180));
-
         mod_nPosBase = mod_nPosBase.clamp(0, 1);
-
         nPos = mod_nPosBase;
           //todo: endless????
           //todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
@@ -1164,7 +1158,6 @@ struct im{ static:
   bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
   uint comboId;    //when the focus of this is lost, comboState goes false
 
-
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(in V2f mousePos){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
@@ -1824,7 +1817,7 @@ static cnt=0;
   }
   PopupState popupState;
 
-  void Popup(Cell parent, void delegate() contents){ // Popup ////////////////////////////////////
+  private void Popup(Cell parent, void delegate() contents){ // Popup for combobox only ////////////////////////////////////
     enforce(popupState.cell is null, "im.Popup() already called.");
 
     auto oldLen = actContainer.subCells.length;
@@ -2514,6 +2507,68 @@ static cnt=0;
     if(res) ignoreExceptions({ e = s.to!E; });
     return res;
   }
+
+/+  auto Btn(string file=__FILE__, int line=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
+  if(isSomeString!T0 || __traits(compiles, text()) )
+  {
+    mixin(id.M ~ enable.M ~ selected.M);
+
+    const isToolBtn = theme=="tool";
+
+    HitInfo hit;
+
+    Row({
+      hit = hitTest(id_);
+
+      mixin(hintHandler);
+
+      bool focused = focusUpdate(actContainer, id_,
+        enabled, hit.pressed, false,  //enabled, enter, exit
+        /* onEnter */ { },
+        /* onFocus */ { },
+        /* onExit  */ { }
+      );
+
+      //flags.canWrap = false;
+      flags.hAlign = HAlign.center;
+
+      applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth);
+
+      static if(isSomeString!T0) Text(text); //centered text
+                            else text(); //delegate
+
+      static foreach(a; args) static if(__traits(compiles, a())) a();
+    });
+
+    return hit;
+  }         +/
+
+
+  auto PopupBtn(string file=__FILE__, int line=__LINE__, T0, Args...)(T0 text, Args args) // PopupBtn ////////////////////////////////
+  if((isSomeString!T0 || __traits(compiles, text())) && Args.length>=1 && __traits(compiles, args[$-1]()) )
+  {
+    Cell btn;
+    auto hit = Btn(text, args[0..$-1], { btn = actContainer; });
+
+    if(isFocused(hit.id)) (cast(het.uibase.Container)btn).flags._saveComboBounds = true; //notifies glDraw to place the popup
+
+    if(hit.pressed){
+      comboId = hit.id;
+      comboState.toggle;
+      comboOpening = true; //ignore this mousepress when closing popup
+    }
+
+    const popupVisible = isFocused(hit.id) && comboState;
+    if(popupVisible){
+      Popup(btn, { Column({
+        args[$-1]();
+      }); });
+    }
+    return popupVisible;
+    //callee must handle the if and optionally set "comboState" to false
+    //todo: what if callee don't handle it????
+  }
+
 
   auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // ComboBox ////////////////////////////////
     mixin(id.M); //todo: enabled

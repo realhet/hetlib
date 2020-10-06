@@ -1033,6 +1033,7 @@ public://///////////////////////////////////////////////////////
 
   void uniform(int loc, float v ){ glUniform1fv(loc, 1, &v  ); glChk; }
   void uniform(int loc, in V2f v){ glUniform2fv(loc, 1, &v.x); glChk; }
+  void uniform(int loc, in V3f v){ glUniform3fv(loc, 1, &v.x); glChk; }
 
   void uniform(int loc, int v      ){ glUniform1iv(loc, 1, &v  ); glChk; }
   void uniform(int loc, in V2i v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, &v.x); glChk(file, line); }

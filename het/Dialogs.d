@@ -1,11 +1,11 @@
 module het.dialogs;
 
-import het.utils, core.sys.windows.windows, core.sys.windows.shlobj;
+import het.utils, het.color, core.sys.windows.windows, core.sys.windows.shlobj;
 
 pragma(lib, "comdlg32.lib");
 pragma(lib, "ole32.lib");  //CoTaskMemFree needs it
 
-//copy paste from winuser.d to be faster
+//copy paste from winuser.d to compile faster
 enum {
     MB_OK                        = 0,
     MB_OKCANCEL,
@@ -230,7 +230,7 @@ private:
 }
 
 
-private: //private utility stuff ///////////////////////////////////////////////////////////////////////////////
+//utility stuff ///////////////////////////////////////////////////////////////////////////////
 
 /************************************
  * Input special chars: "(" ")" brackets creating groups.
@@ -238,7 +238,7 @@ private: //private utility stuff ///////////////////////////////////////////////
  * Example input: "All files(Pictures(*.bmp;*.jpg),Sound files(*.wav;*.mp3))"
  * Returns: double zero terminated list of (filterName, filterExtList) pairs later used by getOpenFileName and others.
  */
-string processExtFilter(string filter, bool includeExts){
+private string processExtFilter(string filter, bool includeExts){
   void enforce(bool b, lazy string s){ if(!b) .enforce(b, "processExtFilter(): "~s); }
 
   //test filter=`All Files(Program files(Sources(*.d),Executables(*.exe;*.com;*.bat)),Graphic Files(Bitmaps(*.bmp),Jpeg files(*.jpg;*.jpeg))))`;
@@ -294,7 +294,7 @@ string processExtFilter(string filter, bool includeExts){
   return filterStr;
 }
 
-string checkCommDlgError(int res){
+private string checkCommDlgError(int res){
 
   if(res) return ""; //no error
 
@@ -327,3 +327,30 @@ string checkCommDlgError(int res){
 }
 
 
+// chooseColor /////////////////////////////////
+
+RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen){
+  import core.sys.windows.commdlg;
+  static uint[16] customColors; //todo: save/load ini
+  CHOOSECOLOR cc = {
+    hwndOwner: hwnd,
+    rgbResult: cast(uint)(color.to!RGBA8) & 0xFFFFFF,
+    lpCustColors: customColors.ptr,
+    Flags: CC_RGBINIT | CC_ANYCOLOR | (fullOpen ? CC_FULLOPEN : 0)
+  };
+  RGB8 res = color;
+  if(ChooseColor(&cc)) res = RGB8(cc.rgbResult);
+  return res;
+}
+
+
+// testing /////////////////////////////////
+
+void testDialogs()    {
+  print(browseForFolder(null, "title", appPath));
+
+  print(new FileDialog(null, "Dlang source file", ".d", "Sources(*.d)", appPath).open);
+
+  print(chooseColor(null, clBlue, false));
+  print(chooseColor(null, clAqua, true ));
+}

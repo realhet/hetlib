@@ -73,7 +73,7 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 +/
 
 public import std.string, std.array, std.algorithm, std.conv, std.typecons, std.range, std.functional,
-  std.format, std.math, core.stdc.string, het.debugclient;
+  std.format, std.math, std.traits, std.meta, core.stdc.string, het.debugclient;
 
 //unicode stuff
 import std.encoding : transcode, Windows1252String;
@@ -100,7 +100,7 @@ public import core.sys.windows.windows : SetPriorityClass, HIGH_PRIORITY_CLASS, 
   GUID;
 
 import std.windows.registry, core.sys.windows.winreg, core.thread, std.file,
-  std.path, std.json, std.digest.digest, std.parallelism, core.runtime, std.traits, std.meta;
+  std.path, std.json, std.digest.digest, std.parallelism, core.runtime;
 
 import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, STD_OUTPUT_HANDLE, HMODULE,
   GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow, SetFocus, SetForegroundWindow, GetForegroundWindow,
@@ -2649,7 +2649,12 @@ if(isAggregateType!T)
 
 // Meta helpers ///////////////////////////
 
-import std.traits, std.meta;
+auto getSymbolNamesByUDA(T, string uda)(){
+  string[] res;
+  static foreach(a; getSymbolsByUDA!(T, uda)) res ~= a.stringof;
+  return res;
+}
+
 
 template getUDA(alias a, U){
   enum u = q{ getUDAs!(a, U)[$-1] };

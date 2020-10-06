@@ -67,8 +67,8 @@ struct JsonDecoderState{ // JsonDecoderState
 //! fromJson ///////////////////////////////////
 
 //Default version, errors are ignored.
-alias fromJson = fromJson_ignore;
-string[] fromJson_ignore(Type)(ref Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
+//alias fromJson = fromJson_ignore;
+string[] fromJson/*_ignore*/(Type)(ref Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
   auto state = JsonDecoderState(st, moduleName, errorHandling, srcFile, srcFunct, srcLine);
   state.ldcXJsonImport = moduleName=="LDCXJSON";
 
@@ -90,11 +90,24 @@ string[] fromJson_ignore(Type)(ref Type data, string st, string moduleName="unna
   return state.errors;
 }
 
-auto fromJson_raise(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
-  fromJson!(Type)(data, st, moduleName, ErrorHandling.raise, srcFile, srcFunct, srcLine); }
+//auto fromJson_raise(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){        fromJson!(Type)(data, st, moduleName, ErrorHandling.raise, srcFile, srcFunct, srcLine); }
+//auto fromJson_track(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){ return fromJson!(Type)(data, st, moduleName, ErrorHandling.track, srcFile, srcFunct, srcLine); }
 
-auto fromJson_track(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){
-  return fromJson!(Type)(data, st, moduleName, ErrorHandling.track, srcFile, srcFunct, srcLine); }
+auto fromJsonProps(Type)(Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__)
+if(is(Type == class))
+{
+  auto tmp = data;
+  auto errors = fromJson(data, st, moduleName, errorHandling, srcFile, srcFunct, srcLine);
+
+  if(data is null){
+    auto msg = "fromJsonProps: Object was set to null. Did nothing..."; //todo: null should reset all fields
+    with(ErrorHandling) final switch(errorHandling){
+      case ignore: return;
+      case raise: .raise(msg); break;
+      case track: errors ~= msg;
+    }
+  }
+}
 
 //errorHandling: 0: no errors, 1:just collect the errors, 2:raise
 
@@ -304,7 +317,11 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 
         //create only if original is null
         if(data is null){
-          data = new Type;
+          static if(__traits(compiles, new Type)){
+            data = new Type;
+          }else{
+            raise("fromJson: Unable to construct new instance of: "~Type.stringof);
+          }
         }
       }}
 

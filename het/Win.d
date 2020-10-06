@@ -24,6 +24,34 @@ public import core.sys.windows.winuser:
   WS_EX_NOPARENTNOTIFY, WS_EX_OVERLAPPEDWINDOW, WS_EX_PALETTEWINDOW, WS_EX_RIGHT, WS_EX_RIGHTSCROLLBAR, WS_EX_RTLREADING, WS_EX_STATICEDGE,
   WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_EX_WINDOWEDGE;
 
+// windows message decoding //////////////////////////////////////////////
+
+string winMsgToString(uint msg){
+  enum list = ["CREATE", "DESTROY", "MOVE", "SIZE", "ACTIVATE", "SETFOCUS", "KILLFOCUS", "ENABLE", "SETREDRAW", "SETTEXT", "GETTEXT",
+    "GETTEXTLENGTH", "PAINT", "CLOSE", "QUERYENDSESSION", "QUIT", "QUERYOPEN", "ERASEBKGND", "SYSCOLORCHANGE", "ENDSESSION", "SHOWWINDOW",
+    "CTLCOLORMSGBOX", "CTLCOLOREDIT", "CTLCOLORLISTBOX", "CTLCOLORBTN", "CTLCOLORDLG", "CTLCOLORSCROLLBAR", "CTLCOLORSTATIC", "WININICHANGE",
+    "SETTINGCHANGE", "DEVMODECHANGE", "ACTIVATEAPP", "FONTCHANGE", "TIMECHANGE", "CANCELMODE", "SETCURSOR", "MOUSEACTIVATE", "CHILDACTIVATE",
+    "QUEUESYNC", "GETMINMAXINFO", "ICONERASEBKGND", "NEXTDLGCTL", "SPOOLERSTATUS", "DRAWITEM", "MEASUREITEM", "DELETEITEM", "VKEYTOITEM", "CHARTOITEM",
+    "SETFONT", "GETFONT", "QUERYDRAGICON", "COMPAREITEM", "COMPACTING", "NCCREATE", "NCDESTROY", "NCCALCSIZE", "NCHITTEST", "NCPAINT", "NCACTIVATE",
+    "GETDLGCODE", "NCMOUSEMOVE", "NCLBUTTONDOWN", "NCLBUTTONUP", "NCLBUTTONDBLCLK", "NCRBUTTONDOWN", "NCRBUTTONUP", "NCRBUTTONDBLCLK",
+    "NCMBUTTONDOWN", "NCMBUTTONUP", "NCMBUTTONDBLCLK", "KEYDOWN", "KEYUP", "CHAR", "DEADCHAR", "SYSKEYDOWN", "SYSKEYUP", "SYSCHAR", "SYSDEADCHAR",
+    "KEYLAST", "INITDIALOG", "COMMAND", "SYSCOMMAND", "TIMER", "HSCROLL", "VSCROLL", "INITMENU", "INITMENUPOPUP", "MENUSELECT", "MENUCHAR", "ENTERIDLE",
+    "MOUSEWHEEL", "MOUSEMOVE", "LBUTTONDOWN", "LBUTTONUP", "LBUTTONDBLCLK", "RBUTTONDOWN", "RBUTTONUP", "RBUTTONDBLCLK", "MBUTTONDOWN", "MBUTTONUP",
+    "MBUTTONDBLCLK", "PARENTNOTIFY", "MDICREATE", "MDIDESTROY", "MDIACTIVATE", "MDIRESTORE", "MDINEXT", "MDIMAXIMIZE", "MDITILE", "MDICASCADE",
+    "MDIICONARRANGE", "MDIGETACTIVE", "MDISETMENU", "CUT", "COPYDATA", "COPY", "PASTE", "CLEAR", "UNDO", "RENDERFORMAT", "RENDERALLFORMATS",
+    "DESTROYCLIPBOARD", "DRAWCLIPBOARD", "PAINTCLIPBOARD", "VSCROLLCLIPBOARD", "SIZECLIPBOARD", "ASKCBFORMATNAME", "CHANGECBCHAIN", "HSCROLLCLIPBOARD",
+    "QUERYNEWPALETTE", "PALETTEISCHANGING", "PALETTECHANGED", "DROPFILES", "POWER", "WINDOWPOSCHANGED", "WINDOWPOSCHANGING", "HELP", "NOTIFY", "CONTEXTMENU", "TCARD", "MDIREFRESHMENU",
+    "MOVING", "STYLECHANGED", "STYLECHANGING", "SIZING", "SETHOTKEY", "PRINT", "PRINTCLIENT", "POWERBROADCAST", "HOTKEY", "GETICON", "EXITMENULOOP",
+    "ENTERMENULOOP", "DISPLAYCHANGE", "STYLECHANGED", "STYLECHANGING", "GETICON", "SETICON", "SIZING", "MOVING", "CAPTURECHANGED", "DEVICECHANGE",
+    "PRINT", "PRINTCLIENT"];
+
+  static string[uint] map;
+  if(map.empty) static foreach(s; list) map[mixin("WM_", s)] = s;
+
+  if(auto a = msg in map) return "WM_" ~ *a;
+                     else return "WM_0x"~format!"%X"(msg);
+}
+
 
 //timeLine //////////////////////////////
 
@@ -516,7 +544,12 @@ public:
 
 //  static bool wasUpdateAfterPaint;
 
+  enum dontUpdate = false, dontPaint = false; //replace "enum" with "auto", and it can be modified...
+
   protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam){
+
+    if(0) LOG(message.winMsgToString, wParam, lParam);
+
     switch (message){
 
       case WM_ERASEBKGND: return 1;
@@ -532,16 +565,18 @@ public:
           //todo: window resize eseten nincs update, csak paint. Emiatt az UI szarul frissul.
           //if(!wasUpdateAfterPaint) internalUpdate;  // <--- Ez meg mouse input bugokat okoz.
 
-          auto t0 = QPS;
-          onBeginPaint;
-          timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0);  t0 = QPS;
-          internalPaint;
-          timeLine.addEvent(TimeLine.Event.Type.paint      , t0);  t0 = QPS;
-          onEndPaint;
-          timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0);  t0 = QPS;
-          onSwapBuffers;
-          timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0);  //t0 = QPS;
-          timeLine.restrictSize(60);
+          if(!dontPaint){
+            auto t0 = QPS;
+            onBeginPaint;
+            timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0);  t0 = QPS;
+            internalPaint;
+            timeLine.addEvent(TimeLine.Event.Type.paint      , t0);  t0 = QPS;
+            onEndPaint;
+            timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0);  t0 = QPS;
+            onSwapBuffers;
+            timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0);  //t0 = QPS;
+            timeLine.restrictSize(60);
+          }
 
           //wasUpdateAfterPaint = false;
         }
@@ -552,7 +587,7 @@ public:
       case WM_DESTROY   : destroy; if(isMain) PostQuitMessage(0); return 0;
 
       case WM_MyStartup : if(isMain) SetTimer(hwnd, 999, 10, null); return 0; //this is a good time to launch the timer. Called by a delayed PostMessage
-      case WM_TIMER     : if(wParam==999) internalUpdate; return 0;
+      case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; return 0;
 
       case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); break;
       case WM_CHAR      : inputChars ~= cast(wchar)wParam; return 0; //WM_UNICHAR nem hivoduk magatol...
