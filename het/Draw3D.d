@@ -774,10 +774,12 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   float pickedZ;
   MeshNode pickedNode;
 
+  V2i screenMousePos;
 
   void beginFrame(V2i screenMousePos){
     enforce(!inFrame, "already in beginFrame()");
 
+    this.screenMousePos = screenMousePos;
     viewport = gl.getViewport; //todo: proper viewport handling, not just the full window
     cursor.setup(screenMousePos, viewport);
 
@@ -814,6 +816,15 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     cam.navigate(keysEnabled, mouseEnabled, viewport.height, cursor);
   }
 
+  /// gets a cursor at a specific moment. Slow because of depth read.
+  auto getCursor(V2i screenMousePos){
+    Cursor3D res;
+    viewport = gl.getViewport; //todo: proper viewport handling, not just the full window
+    res.setup(screenMousePos, viewport);
+    res.glProcess(mInverse);
+    return res;
+  }
+  auto getCursor(){ return getCursor(screenMousePos); }
 
   void pushMatrix(){
     mStack ~= mModel;
@@ -1563,6 +1574,11 @@ class Material{ //! Material ///////////////////////////////
 
 struct Joint{ //Joint ////////////////////////////////////////
   Type type;  enum Type { fixed, linear, rotational }
+
+  bool isFixed     () const{ return type == Type.fixed     ; }
+  bool isLinear    () const{ return type == Type.linear    ; }
+  bool isRotational() const{ return type == Type.rotational; }
+
   vec3 axis;
   float minValue = 0,
         maxValue = 0,
@@ -1570,6 +1586,20 @@ struct Joint{ //Joint ////////////////////////////////////////
         value = 0;
 
   vec3 rotCenter;
+
+  bool isAtMinimum(){ return isLinear && value <= minValue; }
+  bool isAtMaximum(){ return isLinear && value >= maxValue; }
+
+  private float restrict(float v){
+    if(isLinear) return v.clamp(minValue, maxValue);
+    else if(isRotational) return v.cyclicMod(360);
+    else return 0;
+  }
+
+  void set(float v){ value = restrict(v); }
+  float get(){ return restrict(value); }
+
+  void adjust(float delta){ set(value+delta); }
 
   float middle() const{ return avg(minValue, maxValue); }
 

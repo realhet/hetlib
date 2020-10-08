@@ -404,7 +404,6 @@ string toJson(Type)(in Type data, bool dense=false, bool hex=false, string thisN
   return st;
 }
 
-private string quote(string s){ return format!"%(%s%)"([s]); }
 template isSomeChar(T){ enum isSomeChar = is(T == char) || is(T == wchar) || is(T == dchar); }
 
 void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=false, bool hex=false, string thisName="", string indent=""){
@@ -437,14 +436,14 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
 
   //append the associative name if there is one
   if(thisName!="")
-    st ~= quote(thisName)~(dense ? ":" : ": ");
+    st ~= quoted(thisName)~(dense ? ":" : ": ");
 
   //switch all possible types
         static if(isFloatingPoint!T     ){ static if(T.sizeof>=8) st ~= format!"%.15g"(data); else st ~= format!"%.7g" (data);
-  }else static if(is(T == enum)         ){ st ~= quote(data.text);
+  }else static if(is(T == enum)         ){ st ~= quoted(data.text);
   }else static if(isIntegral!T          ){ if(hex) st ~= format!"0x%X"(data); else st ~= data.text;
-  }else static if(isSomeString!T        ){ st ~= quote(data);
-  }else static if(isSomeChar!T          ){ st ~= quote([data]);
+  }else static if(isSomeString!T        ){ st ~= quoted(data);
+  }else static if(isSomeChar!T          ){ st ~= quoted([data]);
   }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
   }else static if(isAggregateType!T     ){ // Struct, Class
     //handle null for class
@@ -457,7 +456,7 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
 
     static if(is(T == class)){ //write class type name
       string s = T.stringof;
-      streamAppend_json(st, s, dense, hex, thisName="class", nextIndent);
+      streamAppend_json(st, s, dense, hex, "class", nextIndent);
     }
 
     //recursive call for each field

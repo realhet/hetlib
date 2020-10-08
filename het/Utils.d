@@ -2135,14 +2135,18 @@ auto toPWChar(S)(S s) nothrow { //converts to Windows' widestring
 }
 
 //builds c zterminated string
-void strMake(string src, char* dst, int dstLen)
+void strMake(string src, char* dst, size_t dstLen)
 in{
   assert(dst !is null);
-  assert(dstLen>1);
+  assert(dstLen>=1);
 }body{
-  int sLen = min(dstLen-1, src.length);
+  size_t sLen = min(dstLen-1, src.length);
   memcpy(dst, src.ptr, sLen);           //todo: this is so naive. Must revisit...
   dst[sLen] = 0; //zero terminated
+}
+
+void strMake(string src, char[] dst){
+  strMake(src, dst.ptr, dst.length);
 }
 
 string dataToStr(const(void)* src, size_t len){ //todo: this is ultra-lame:  (cast(char[])src)[0..len].to!string
@@ -2450,8 +2454,8 @@ auto commandLineToMap(string line){
   return map;
 }
 
-string quoted(char quote='"')(string text){ //todo: replace it with a less lame solution
-  return quote ~ text.replace([quote], [quote, quote])~quote;
+string quoted(string s){
+  return format!"%(%s%)"([s]);
 }
 
 /*string quoteForDos(){
@@ -4265,6 +4269,48 @@ if(__traits(isStaticFunction, fun))
   if(p.payload !is null) return p.payload;
                     else throw new Exception(p.error);
 }
+
+
+// Shared Memory /////////////////////////////////////////////////////
+
+class SharedMem(SharedDataType, string sharedFileName, bool isServer) {
+  HANDLE sharedFileHandle;
+  SharedDataType* sharedData;
+
+  void initialize() {
+    if(isActive) return;
+
+    import core.sys.windows.windows;
+    sharedFileHandle = isServer ? CreateFileMappingW(INVALID_HANDLE_VALUE,          // use paging file
+                                            null,                          // default security
+                                            PAGE_READWRITE,                // read/write access
+                                            0,                             // maximum object size (high)
+                                            SharedDataType.sizeof.to!uint, // maximum object size (low)
+                                            sharedFileName.toPWChar)       // name of mapping object
+
+                                :  OpenFileMappingW(FILE_MAP_ALL_ACCESS,     // read/write access
+                                            false,                   // do not inherit the name
+                                            sharedFileName.toPWChar);  // name of mapping object
+
+    sharedData = cast(SharedDataType*) MapViewOfFile(sharedFileHandle, // handle to map object
+                 FILE_MAP_ALL_ACCESS,       // read/write permission
+                 0,
+                 0,
+                 SharedDataType.sizeof);
+    //ensure(data, "DebugLogClient: Can't open mapFile.");
+
+    LOG(sharedData);
+  }
+
+public:
+  alias sharedData this;
+  bool isActive() { return sharedData !is null; }
+
+  this(){ initialize; }
+}
+
+alias SharedMemServer(SharedDataType, string sharedFileName) = SharedMem!(SharedDataType, sharedFileName, true );
+alias SharedMemClient(SharedDataType, string sharedFileName) = SharedMem!(SharedDataType, sharedFileName, false);
 
 
 ////////////////////////////////////////////////////////////////////////////////////

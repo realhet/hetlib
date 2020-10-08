@@ -546,8 +546,11 @@ public:
 
   enum dontUpdate = false, dontPaint = false; //replace "enum" with "auto", and it can be modified...
 
-  protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam){
+  LRESULT onWmUser(UINT message, WPARAM wParam, LPARAM lParam){
+    return 0;
+  }
 
+  protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam){
     if(0) LOG(message.winMsgToString, wParam, lParam);
 
     switch (message){
@@ -589,11 +592,11 @@ public:
       case WM_MyStartup : if(isMain) SetTimer(hwnd, 999, 10, null); return 0; //this is a good time to launch the timer. Called by a delayed PostMessage
       case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; return 0;
 
-      case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); break;
-      case WM_CHAR      : inputChars ~= cast(wchar)wParam; return 0; //WM_UNICHAR nem hivoduk magatol...
-
+      case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
+      case WM_CHAR      : inputChars ~= cast(wchar)wParam; return 0; //WM_UNICHAR nem hivodik magatol...
 
       default:
+        if(message.inRange(WM_USER, 0x7FFF)) return onWmUser(message-WM_USER, wParam, lParam);
     }
     return DefWindowProc(hwnd, message, wParam, lParam);
   }
