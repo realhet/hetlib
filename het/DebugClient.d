@@ -77,7 +77,7 @@ alias dbg = Singleton!DebugLogClient;
 
 //todo: ha relativ a hibauzenetben a filename, akkor egeszitse ki! hdmd!
 
-class DebugLogClient{
+class DebugLogClient{ //todo: rewrite it with utils.sharedMemClient
 public:
   enum potiCount = 8;
 private:

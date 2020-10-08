@@ -2689,7 +2689,7 @@ static cnt=0;
     }
 
     //todo: what to return on from slider
-    //return sl;
+    return userModified;
   }
 
   auto Node(ref bool state, void delegate() title, void delegate() contents){ // Node ////////////////////////////
