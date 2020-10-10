@@ -510,6 +510,9 @@ string simplifiedMsg(Throwable t){
 }
 
 
+void forceAssertions(string file=__FILE__, int line=__LINE__)(){ //todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
+  enforce(ignoreExceptions({ assert(false); }), "Enable DEBUG compiler output! %s(%s)".format(file, line));
+}
 
 // Filter for OS exceptions //////////////////////////
 
@@ -2659,6 +2662,20 @@ auto getSymbolNamesByUDA(T, string uda)(){
   return res;
 }
 
+/*
+// this is a __traits only version for string UDAs
+auto getSymbolNamesByUDA(T, string uda)(){
+  string[] res;
+  static foreach(n; __traits(allMembers, T)) {
+    // static, but don't use static foreach so you can break
+    foreach(u; __traits(getAttributes, __traits(getMember, T, n)))
+      static if(is(typeof(u) == string) && u == uda) {
+        res ~= n;
+        break;
+      }
+   }
+  return res;
+}*/
 
 template getUDA(alias a, U){
   enum u = q{ getUDAs!(a, U)[$-1] };
@@ -2698,6 +2715,57 @@ string[] getEnumMembers(T)(){
   static if(is(T == enum)) return [__traits(allMembers, T)];
   else return [];
 }
+
+
+alias toAlias(alias T) = T;
+
+void inspectSymbol(alias T)(string before="", int level=0) {
+  enum maxInspectLevel = 10;
+
+  // step 2
+  foreach(memberName; __traits(allMembers, T)) {
+    // step 3
+    alias member = toAlias!(__traits(getMember, T, memberName));
+    // step 4 - inspecting types
+    static if(is(member)) {
+      string specifically;
+      static if(is(member == struct))
+        specifically = "struct";
+      else static if(is(member == class))
+        specifically = "class";
+      else static if(is(member == enum))
+        specifically = "enum";
+      writeln(before, fullyQualifiedName!member, " is a type (", specifically, ")");
+      // drill down (step 1 again)
+      static if(is(member == struct) || is(member == class) || is(member == enum)){
+        if(level<maxInspectLevel) //no recursion
+          inspectSymbol!member(before ~ "\t", level+1);
+      }else{
+        writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof);
+      }
+    } else static if(is(typeof(member) == function)) {
+      // step 5, inspecting functions
+      writeln(before, fullyQualifiedName!member, " is a function typed ", typeof(member).stringof);
+    } else {
+      // step 6, everything else
+
+        static if(__traits(compiles, member.stringof)) enum s = member.stringof; else enum s = "";
+
+        static if(s.startsWith("module "))
+          writeln(before, fullyQualifiedName!member, " is a module");
+        else static if(s.startsWith("package "))
+          writeln(before, fullyQualifiedName!member, " is a package");
+        else static if(is(typeof(member.init)))
+          writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof);
+        else{
+          string fn = memberName;
+          static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member;
+          writeln(before, fn, " is template ", s);
+        }
+    }
+  }
+}
+
 
 
 static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////

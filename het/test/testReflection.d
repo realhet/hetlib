@@ -9,61 +9,10 @@
 
 import het.utils;
 
-
-// the helper for easier aliasing we'll need in step 3
-alias helper(alias T) = T;
-// This function writes details about all members of what it
-// is passed. The string before argument is related to
-// indenting the data it prints.
-
 import std.traits;
-private enum maxInspectLevel = 10;
 
-void inspect(alias T)(string before="", int level=0) {
-  // step 2
-  foreach(memberName; __traits(allMembers, T)) {
-    // step 3
-    alias member = helper!(__traits(getMember, T, memberName));
-    // step 4 - inspecting types
-    static if(is(member)) {
-      string specifically;
-      static if(is(member == struct))
-        specifically = "struct";
-      else static if(is(member == class))
-        specifically = "class";
-      else static if(is(member == enum))
-        specifically = "enum";
-      writeln(before, fullyQualifiedName!member, " is a type (", specifically, ")");
-      // drill down (step 1 again)
-      static if(is(member == struct) || is(member == class) || is(member == enum)){
-        if(level<maxInspectLevel) //no recursion
-          inspect!member(before ~ "\t", level+1);
-      }else{
-        writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof);
-      }
-    } else static if(is(typeof(member) == function)) {
-      // step 5, inspecting functions
-      writeln(before, fullyQualifiedName!member, " is a function typed ", typeof(member).stringof);
-    } else {
-      // step 6, everything else
 
-        static if(__traits(compiles, member.stringof)) enum s = member.stringof; else enum s = "";
-
-        static if(s.startsWith("module "))
-          writeln(before, fullyQualifiedName!member, " is a module");
-        else static if(s.startsWith("package "))
-          writeln(before, fullyQualifiedName!member, " is a package");
-        else static if(is(typeof(member.init)))
-          writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof);
-        else{
-          string fn = memberName;
-          static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member;
-          writeln(before, fn, " is template ", s);
-        }
-    }
-  }
-}
-
+//note inspectSymbol is in het.utils.
 void inspect2(alias T)(string before="", int level=0) {
   foreach(memberName; __traits(allMembers, T)) {
     print(memberName);
@@ -151,7 +100,7 @@ mixin template ReflBase() {
     void dump(string prefix){
       write(prefix);
 
-      writec(int c, string s){ write("\33"~hfdsghfew
+      //writec(int c, string s){ write("\33"~hfdsghfew
 
       switch(kind){
         case "import": case "static import":{
