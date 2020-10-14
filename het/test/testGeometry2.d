@@ -37,7 +37,7 @@ private int FirstVectorLength(T...)(){
   return 0;
 }
 
-/// T is a mixture of vector and scalar parameters
+/// T is a combination of vector and scalar parameters
 /// returns the common vector length if there is one, otherwise stops with an assert;
 private int CommonVectorLength(T...)(){
   static if(!T.length) return 0;
@@ -48,19 +48,19 @@ private int CommonVectorLength(T...)(){
   return len;
 }
 
-template ScalarType(T){
+private template ScalarType(T){
   static if(isVector!T) alias A = T.ComponentType;
                    else alias A = T;
   alias ScalarType = Unqual!A;
 }
 
-template CommonScalarType(T...){
+private template CommonScalarType(T...){
   static assert(T.length>=1);
   static if(T.length==1) alias CommonScalarType = ScalarType!(T[0]);
                     else alias CommonScalarType = CommonType!(ScalarType!(T[0]), CommonScalarType!(T[1..$]));
 }
 
-alias CommonVectorType(Types...) = Vector!(CommonScalarType!Types, CommonVectorLength!Types);
+private alias CommonVectorType(Types...) = Vector!(CommonScalarType!Types, CommonVectorLength!Types);
 
 /// helper to access scalar and vector components in arguments.
 private auto vectorAccess(int idx, T)(in T a){
@@ -110,7 +110,7 @@ if(N.inRange(2, 4)){
   }
 
   private void construct(int i)() {
-    static assert(i == length, "Vector constructor: Not enough arguments");
+    static assert(i == length, "Vector constructor: Not enough arguments"); //todo: show the error's place in source: __ctor!(int, int, int)
   }
 
   this(A...)(in A args){
@@ -218,7 +218,7 @@ if(N.inRange(2, 4)){
   }
 
   bool approxEqual(T)(in T other, float maxDiff = 1e-3) const{
-    static assert(other.length==length);
+    static assert(isVector!T && T.length==length);
     static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false;
     return true;
   }
@@ -363,8 +363,8 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
   }
 
   bool approxEqual(T)(in T other, float maxDiff = 1e-3) const{
-    static assert(other.length==length);
-    static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false;
+    static assert(isMatrix!T && T.width==width && T.height==height);
+    static foreach(j; 0..height)static foreach(i; 0..width) if(abs(this[i][j]-other[i][j]) > maxDiff) return false;
     return true;
   }
 }
@@ -372,13 +372,15 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
 private alias matrixElementTypes = AliasSeq!(float, double);
 private enum matrixSizes = [2, 3, 4];
 
-static foreach(T; matrixElementTypes )
-  static foreach(N; matrixSizes)
+static foreach(T; matrixElementTypes){
+  static foreach(N; matrixSizes){
     static foreach(M; matrixSizes)
       mixin(format!q{alias %smat%sx%s = Matrix!(%s, %s, %s);}(ComponentTypePrefix!T, N, M, T.stringof, N, M));
 
-static foreach(N; matrixSizes)
-  mixin(format!q{alias mat%s = mat%sx%s;}(N, N, N));
+    //symmetric matrices
+    mixin(format!q{alias %smat%s = mat%sx%s;}(ComponentTypePrefix!T, N, N, N));
+  }
+}
 
 
 // Functons /////////////////////////////////////
@@ -393,22 +395,56 @@ auto matrixCompMult(T, U)(in T a, in U b){
   return res;
 }
 
+auto outerProduct(U, V)(in U u, in V v) if(isVector!U && isVector!V){
+  //https://www.chegg.com/homework-help/definitions/outer-product-33
+  Matrix!(CommonType!(U.ComponentType, V.ComponentType), V.length, U.length) res;
+  static foreach(i; 0..V.length) res[i] = u*v[i];
+  return res;
+}
+
 auto transpose(CT, int M, int N)(in Matrix!(CT, N, M) m){
   Matrix!(CT, M, N) a;
   foreach(i; 0..M) foreach(j; 0..N) a[i][j] = m[j][i];
   return a;
 }
 
-auto determinant(CT, int N)(in Matrix!(CT, N, N) m){
-  static CT det(CT a, CT b, CT c, CT d){ return a*b - b*c; }
+auto determinant(CT, int N)(in Matrix!(CT, N, N) m){ //todo: check mat4.det in asm
+  // https://www.mathsisfun.com/algebra/matrix-determinant.html
+  static if(N==2){
+    return m[0][0]*m[1][1] - m[0][1]*m[1][0];
+  }else static if(N==3){
+    return + m[0][0] * determinant(mat2(m[1].yz, m[2].yz))
+           - m[1][0] * determinant(mat2(m[0].yz, m[2].yz))
+           + m[2][0] * determinant(mat2(m[0].yz, m[1].yz));
+  }else static if(N==4){
+    return + m[0][0] * determinant(mat3(m[1].yzw, m[2].yzw, m[3].yzw))
+           - m[1][0] * determinant(mat3(m[0].yzw, m[2].yzw, m[3].yzw))
+           + m[2][0] * determinant(mat3(m[0].yzw, m[1].yzw, m[3].yzw))
+           - m[3][0] * determinant(mat3(m[0].yzw, m[1].yzw, m[2].yzw));
+  }else static assert("Invalid matrix dimension");
+}
+
+auto inverse(CT, int N)(in Matrix!(CT, N, N) m){  alias Mat = Matrix!(CT, N, N);
+  // https://www.mathsisfun.com/algebra/matrix-inverse.html
+  // https://www.mathsisfun.com/algebra/matrix-inverse-minors-cofactors-adjugate.html
+
+  const d = determinant(m);
+  if(d==0) return Mat(0); //return 0 matrix if determinant is zero
 
   static if(N==2){
-    return det(m[0][0], m[1][0], m[0][1], m[1][1]);
+    auto minors = Mat( m[1][1], -m[0][1], -m[1][0], m[0][0] );
   }else static if(N==3){
-    static assert("NotImpl");
+    auto minors = Mat( determinant(mat2(m[1].yz, m[2].yz)), -determinant(mat2(m[0].yz, m[2].yz)),  determinant(mat2(m[0].yz, m[1].yz)),
+                      -determinant(mat2(m[1].xz, m[2].xz)),  determinant(mat2(m[0].xz, m[2].xz)), -determinant(mat2(m[0].xz, m[1].xz)),
+                       determinant(mat2(m[1].xy, m[2].xy)), -determinant(mat2(m[0].xy, m[2].xy)),  determinant(mat2(m[0].xy, m[1].xy)) );
   }else static if(N==4){
-    static assert("NotImpl");
-  }else static assert("Invalid value: N="~N.text);
+    auto minors = Mat( determinant(mat3(m[1].yzw, m[2].yzw, m[3].yzw)), -determinant(mat3(m[0].yzw, m[2].yzw, m[3].yzw)),  determinant(mat3(m[0].yzw, m[1].yzw, m[3].yzw)), -determinant(mat3(m[0].yzw, m[1].yzw, m[2].yzw)),
+                      -determinant(mat3(m[1].xzw, m[2].xzw, m[3].xzw)),  determinant(mat3(m[0].xzw, m[2].xzw, m[3].xzw)), -determinant(mat3(m[0].xzw, m[1].xzw, m[3].xzw)),  determinant(mat3(m[0].xzw, m[1].xzw, m[2].xzw)),
+                       determinant(mat3(m[1].xyw, m[2].xyw, m[3].xyw)), -determinant(mat3(m[0].xyw, m[2].xyw, m[3].xyw)),  determinant(mat3(m[0].xyw, m[1].xyw, m[3].xyw)), -determinant(mat3(m[0].xyw, m[1].xyw, m[2].xyw)),
+                      -determinant(mat3(m[1].xyz, m[2].xyz, m[3].xyz)),  determinant(mat3(m[0].xyz, m[2].xyz, m[3].xyz)), -determinant(mat3(m[0].xyz, m[1].xyz, m[3].xyz)),  determinant(mat3(m[0].xyz, m[1].xyz, m[2].xyz)) );
+  }else static assert("Invalid matrix dimension");
+
+  return minors * (1.0f/d);
 }
 
 private auto minMax(bool isMin, T, U)(in T a, in U b){
@@ -649,12 +685,41 @@ void testVectorsAndMatrices(){
     va ~= vec3(6);
     assert(va == [vec3(4), vec3(5), vec3(6)]);
 
-    assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose == mat3x2(1,4,2,5,3,6));
-    assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose.transpose == mat2x3(vec3(1,2,3),vec3(4,5,6)));
+    assert(3*mat2(2) == mat2(6, 0, 0, 6));
+    assert(mat2(1)+mat2(2) == mat2(3, 0, 0, 3));
+    assert(matrixCompMult(mat2(1, 2, 3, 4), mat2(vec4(2))) == mat2(2, 4, 6, 8));
 
     assert(mat2x3(vec2(1,2), 3, 4, vec2(5,6)) == mat2x3(1,2,3,4,5,6));
     assert(mat2(vec4(3)) == mat2(3,3,3,3));
 
+    //transpose
+    assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose == mat3x2(1,4,2,5,3,6));
+    assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose.transpose == mat2x3(vec3(1,2,3),vec3(4,5,6)));
+
+    //outer product
+    assert(outerProduct(vec3(3,2,1), vec4(7,2,3,1)) == mat4x3(21,14,7, 6,4,2, 9,6,3, 3,2,1));
+
+    //determinant
+    assert(determinant(mat2(4, 3, 6, 8)) == 14);
+    assert(mat3(6,4,2,1,-2,8,1,5,7).determinant == -306);
+    assert(mat4(4,0,0,0, 3,1,-1,3, 2,-3,3,1, 2,3,3,1).determinant == -240);
+
+    //inverse
+    assert(mat2(4,2,7,6).inverse.approxEqual( mat2(.6, -.2, -.7, .4) ));
+    assert(mat3(3,2,0, 0,0,1, 2,-2,1).inverse.approxEqual( mat3(.2,-.2,.2, .2,.3,-.3, 0,1,0) ));
+    assert(mat4(-3,-3,-2,1, -1,1,3,-2, 2,2,0,-3, -3,-2,1,1).inverse.approxEqual(mat4(-1.571, -2.142, 2, 3.285,  2,3,-3,-5, -1,-1,1,2, 0.285,0.571,-1,-1.142)));
+  }
+
+  { // implicit conversions
+    uvec2 a0 = ivec2(1, 2);
+    uvec3 a1 = ivec3(1, 2, 3);
+    uvec4 a2 = ivec4(1, 2, 3, 4);
+    vec2 a3 = ivec2(1, 2);
+    vec2 a4 = uvec2(1, 2);
+    dvec2 a5 = ivec2(1, 2);
+    dvec2 a6 = uvec2(1, 2);
+    dvec2 a7 = vec2(1, 2);
+    dmat2 m1 = mat2(vec4(1));
   }
 
   { // common function tests
