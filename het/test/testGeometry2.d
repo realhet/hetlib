@@ -77,7 +77,7 @@ if(N.inRange(2, 4)){
   alias ComponentType = CT;
   enum VectorTypeName = ComponentTypePrefix!CT ~ "vec" ~ N.text;
 
-  CT[N] array = [0].replicate(N).array; //default is 0,0,0, not NaN.  Just like in GLSL.
+  CT[N] array = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
   enum length = N;
 
   alias array this;
@@ -134,7 +134,7 @@ if(N.inRange(2, 4)){
   enum Null = typeof(this).init;
   enum NaN (){ return Vector!(CT, N)(float.init); }
   bool isNull() const { return this == Null; }
-  bool isNaN() const { static if(is(CT==bool) || isIntegral!CT) return false; else { return std.math.isNaN(array[0]); } }
+  bool isNaN() const { static if(__traits(compiles, std.math.isNaN(array[0]))) static foreach(i; 0..N) if(std.math.isNaN(array[i])) return true; return false; }
 
   bool opEquals(T)(in T other) const { return other.array == array; }
 
@@ -383,45 +383,81 @@ static foreach(T; matrixElementTypes){
 }
 
 
-//! Functons /////////////////////////////////////////////////
+//! Functions /////////////////////////////////////////////////
 
-//auto toRad(T)(T d){ return d*(PI/180); }
-//auto toDeg(T)(T d){ return d*(180/PI); }
-
-bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = 1e-3) { //this is my approxEqual. The one in std.math is too complicated
+/// this is my approxEqual. The one in std.math is too complicated
+bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = 1e-3) {
   return abs(a-b) <= maxDiff;
 }
 
-
-// todo: implement this
-mixin template UnaryVectorCreate(CT, int N, string fun){
-  enum _f(int i) = fun.replace("#", i.text);
-  //StaticRange(0, N).StaticMap!(_f).stringof
-  static if(N==2) mixin("Vector!(Unqual!CT, N)(%s, %s)"        .format(_f!0, _f!1            ));
-  static if(N==3) mixin("Vector!(Unqual!CT, N)(%s, %s, %s)"    .format(_f!0, _f!1, _f!2      ));
-  static if(N==4) mixin("Vector!(Unqual!CT, N)(%s, %s, %s, %s)".format(_f!0, _f!1, _f!2, _f!3));
-}
-
-// return mixin UnaryVectorCreate!(CT, A.length, "radians(a[#])");
-
-private auto vectorScale(real factor, A)(in A a){  //scales a vector or scalar with factor on the input's precision
-  static if(isVector!A){
-    Vector!(typeof(vectorScale!factor(a[0])), A.length) res;
-    static foreach(i; 0..A.length) res[i] = vectorScale!factor(a[i]);
+/// generates a vector or scalar from a function that can have any number of vector/scalar parameters
+private auto generateVector(CT, alias fun, T...)(in T args){
+  static if(anyVector!T){
+    Vector!(CT, CommonVectorLength!T) res;
+    static foreach(i; 0..res.length) res[i] = mixin("fun(", T.length.iota.map!(j => "args["~j.text~"].vectorAccess!i").join(','), ")");
     return res;
   }else{
-    return a * cast(CommonType!(A, float)) factor;
+    return fun(args);
   }
 }
 
-auto radians(A)(in A a){ return vectorScale!(PI/180)(a); }
-auto degrees(A)(in A a){ return vectorScale!(180/PI)(a); }
 
 // Angle & Trig. functions ///////////////////////////////////
 
+auto radians(real scale = PI/180, A)(in A a){
+  alias CT = CommonType!(ScalarType!A, float);  //common type is at least float
+  alias fun = a => a * cast(CT)scale;         //degrade the real enum if needed
+  return a.generateVector!(CT, fun);
+}
+auto degrees(A)(in A a){ return radians!(180/PI)(a); }
+
+private auto _UnaryVectorFunct(string name){
+  return q{
+    auto #(A)(in A a){
+      alias CT = CommonType!(ScalarType!A, float);
+      alias fun = a => std.math.#(cast(CT) a);
+      return a.generateVector!(CT, fun);
+    }
+  }.replace('#', name);
+}
+
+static foreach(s; "sin cos tan asin acos sinh cosh tanh asinh acosh atan".split(' ')) mixin(_UnaryVectorFunct(s));
+
+auto atan2(A, B)(in A a, in B b){
+  alias CT = CommonType!(ScalarType!A, ScalarType!B, float);
+  alias fun = (a, b) => std.math.atan2(cast(CT) a, cast(CT) b);
+  return generateVector!(CT, fun)(a, b);
+}
+
+auto atan(A, B)(in A a, in B b){ return atan2(a, b); } //atan is the overload for 2 params in GLSL
+
 // Exponential functions /////////////////////////////////////
 
-// Common functionc //////////////////////////////////////////
+auto pow(A, B)(in A a, in B b){
+  alias CT = typeof(ScalarType!A.init ^^ ScalarType!B.init);
+  alias fun = (a, b) => a ^^ b;
+  return generateVector!(CT, fun)(a, b);
+}
+
+static foreach(s; "exp exp2 log log2 log10 sqrt".split(' ')) mixin(_UnaryVectorFunct(s));
+
+auto exp10(A)(in A a){ //because dlang has log10, but no exp10
+  alias CT = CommonType!(ScalarType!A, float);
+  return a.generateVector!(CT, a => 10 ^^ a);
+}
+
+auto sqr(A)(in A a){
+  alias CT = CommonType!(ScalarType!A.init ^^ 2);
+  return a.generateVector!(CT, a => a ^^ 2);
+}
+
+auto inversesqrt(A)(in A a){
+  alias CT = CommonType!(ScalarType!A, float);
+  return a.generateVector!(CT, a => 1 / sqrt(a));
+}
+
+
+// Common functions //////////////////////////////////////////
 
 private auto minMax(bool isMin, T, U)(in T a, in U b){
 
@@ -490,7 +526,7 @@ auto mix(A, B, T)(in A a, in B b, in T t){
 }
 
 
-// Matrix functionc //////////////////////////////////////////
+// Matrix functions //////////////////////////////////////////
 
 auto matrixCompMult(T, U)(in T a, in U b){
   static assert(isMatrix!T && isMatrix!U);
@@ -748,10 +784,32 @@ void testVectorsAndMatrices(){
     assert(vec2(180, 360).radians.approxEqual(vec2(6.28319/2, 6.28319), 1e-5));
     assert(PI.degrees == 180 && is(typeof(PI.degrees)==real));
 
-
+    assert(sin(5).approxEqual(-0.95892));
+    static assert(is( typeof(cos(dvec2(1, 2))) == dvec2 ));
+    assert(cos(dvec2(1, 2.5)).approxEqual(vec2(0.5403, -0.8011)));
+    assert(tan(ivec2(1, 2)).approxEqual(vec2(1.5574, -2.1850)));
+    assert(asin(.5).approxEqual(PI/6));
+    assert(acos(vec2(0, .5)).approxEqual(vec2(1.570, PI/3)));
+    // hiperbolic functions are skipped, those are mixins anyways
+    assert(atan(sqrt(3.0)).approxEqual(PI/3));
+    assert(atan(ivec2(1,2)).approxEqual(vec2(0.7853, 1.1071)));
+    assert(atan2(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
+    assert(atan2(vec2(1,2), 3) == atan(vec2(1,2), 3)); //atan is the overload in GLSL, not atan2
   }
   { // Exponential functions
+    static assert(is( typeof(pow(ivec2(2, 10), 2)) == ivec2 ));
+    assert(pow(ivec2(2, 10), 2) == ivec2(4, 100));
+    assert(pow(vec2(2.5, 10), 2) == vec2(6.25, 100));
+    assert(exp(0)==1 && exp2(2)==4 && exp10(3)==1000);
+    assert(log(5).approxEqual(1.6094) && log2(8)==3 && log10(1000)==3);
 
+    static assert(is( typeof(sqr(5))==int ));
+    static assert(is( typeof(sqr(5.0))==double ));
+    assert(sqr(5)==25 && sqr(vec2(2, 3))==vec2(4, 9));
+
+    assert(sqrt(4)==2);
+    assert(inversesqrt(4)==.5);
+    static assert(is( typeof(inversesqrt(4))==float ));
   }
   { // Common functions
     auto a = vec3(1, 2, 3);
