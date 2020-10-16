@@ -9,18 +9,35 @@
 ///@compile --unittest  //this is broken because of my shitty linker usage
 
 // publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
-public import std.algorithm, std.math;
+public import std.algorithm;
+
+// This module replaces and extends the interface of std.math.
+// Anything usefull in std.math should wrapped here to support vector/scalar operations.
+// This is to ensure, that there will be no conflicting orevload sets between this module and std.math.
+static import std.math;
+
+// important constants from std.math
+public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI);
+public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly;
+
+// probably usefull stuff in std.math
+//   nextPow2  truncPow2  nextDown  nextUp  nextafter isPowerOf2
 
 // import locally used things.     //must not import het.utils to keep it simle and standalone
 import std.format : format;
-import std.conv : text, to;
+import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
 import std.range : iota;
-import std.traits : isDynamicArray, isStaticArray, isNumeric, CommonType, Unqual;
+import std.traits : isDynamicArray, isStaticArray, isNumeric, isFloatingPoint, CommonType, Unqual;
+import std.meta : AliasSeq;
 
 import std.exception : enforce;
 import std.stdio : writeln;
+
+//todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
+alias myto(T) = stdto!T;
+//auto myto(T)(in T a){ return cast(T) a; }
 
 bool inRange(V, L, H)(in V value, in L lower, in H higher){ return value>=lower && value<=higher; } //todo: comine with het.utils.
 
@@ -110,15 +127,15 @@ if(N.inRange(2, 4)){
     }else static if(isDynamicArray!T) {
       static assert((Tail.length == 0), "Vector constructor: Dynamic array can only be the last argument");
       enforce(i+head.length <= array.length, "Vector constructor: Dynamic array too large");
-      array[i..i+head.length] = head[].to!(CT[]);
+      array[i..i+head.length] = head[].myto!(CT[]);
       //further construction stops
     }else static if(isStaticArray!T){
-      static foreach(j; 0..head.length) array[i+j] = head[j].to!CT;
+      static foreach(j; 0..head.length) array[i+j] = head[j].myto!CT;
       construct!(i + head.length)(tail);
     }else static if(isVector!T){ //another vec
       construct!i(head.array, tail);
     }else static if(isNumeric!T){
-      array[i] = head.to!CT;
+      array[i] = head.myto!CT;
       construct!(i+1)(tail);
     }else static if(is(T==bool)){
       array[i] = head ? 1 : 0;
@@ -135,14 +152,14 @@ if(N.inRange(2, 4)){
 
   this(A...)(in A args){
 
-    void setAll(T)(in T a){ array[] = a.to!CT; }
+    void setAll(T)(in T a){ array[] = a.myto!CT; }
 
     static if(args.length==1 && __traits(compiles, setAll(args[0]))){
       //One can also use one number in the constructor to set all components to the same value
       setAll(args[0]);
     }else static if(args.length==1 && isVector!(A[0]) && A[0].length>=length){
       //Casting a higher-dimensional vector to a lower-dimensional vector is also achieved with these constructors:
-      static foreach(i; 0..length) array[i] = args[0].array[i];
+      static foreach(i; 0..length) array[i] = args[0].array[i].myto!CT;
     }else{
       construct!0(args);
     }
@@ -155,7 +172,7 @@ if(N.inRange(2, 4)){
 
   bool opEquals(T)(in T other) const { return other.array == array; }
 
-  static auto basis(int n){ VectorType v;  v[n] = 1.to!ComponentType;  return v; }
+  static auto basis(int n){ VectorType v;  v[n] = 1.myto!ComponentType;  return v; }
 
   // swizzling ///////////////////////
 
@@ -364,11 +381,11 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
     static if(i >= M*N) {
       static assert(false, "Matrix constructor: Too many arguments passed to constructor");
     }else static if(isNumeric!T) {
-      columns[i / M][i % M] = head.to!CT;
+      columns[i / M][i % M] = head.myto!CT;
       construct!(i + 1)(tail);
     }else static if(isVector!T && i+head.length<=N*M) {
       static foreach(j; 0..head.length) //just inject the vector
-        columns[(i+j) / M][(i+j) % M] = head[j].to!CT;
+        columns[(i+j) / M][(i+j) % M] = head[j].myto!CT;
       construct!(i + T.length)(tail);
     }else static if(isDynamicArray!T) {
       foreach(j; 0..N*M)
@@ -387,7 +404,7 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
 
     void setIdentity(T)(in T val){
       static foreach(i; 0 .. min(N, M))
-        this[i][i] = val.to!CT;
+        this[i][i] = val.myto!CT;
     }
 
     static if(Args.length==1 && isNumeric!(Args[0])){ // Identity matrix
@@ -396,8 +413,8 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
       enum N2 = Args[0].width, M2 = Args[0].height; //cast matrices
       static foreach(i; 0..N)
         static foreach(j; 0..M)
-          static if(i<N2 && j<M2) this[i][j] = args[0][i][j].to!CT;
-                             else this[i][j] = (i==j ? 1 : 0).to!CT;
+          static if(i<N2 && j<M2) this[i][j] = args[0][i][j].myto!CT;
+                             else this[i][j] = (i==j ? 1 : 0).myto!CT;
     }else{
       construct!0(args);
     }
@@ -594,10 +611,10 @@ bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = 1e-3) {
 private auto generateVector(CT, alias fun, T...)(in T args){
   static if(anyVector!T){
     Vector!(CT, CommonVectorLength!T) res;
-    static foreach(i; 0..res.length) res[i] = mixin("fun(", T.length.iota.map!(j => "args["~j.text~"].vectorAccess!i").join(','), ")");
+    static foreach(i; 0..res.length) res[i] = cast(CT) mixin("fun(", T.length.iota.map!(j => "args["~j.text~"].vectorAccess!i").join(','), ")");
     return res;
   }else{
-    return fun(args);
+    return cast(CT) fun(args);
   }
 }
 
@@ -605,8 +622,8 @@ private auto generateVector(CT, alias fun, T...)(in T args){
 // Angle & Trig. functions ///////////////////////////////////
 
 auto radians(real scale = PI/180, A)(in A a){
-  alias CT = CommonType!(ScalarType!A, float);  //common type is at least float
-  alias fun = a => a * cast(CT)scale;         //degrade the real enum if needed
+  alias CT = CommonScalarType!(A, float);  //common type is at least float
+  alias fun = a => a * cast(CT) scale;         //degrade the real enum if needed
   return a.generateVector!(CT, fun);
 }
 auto degrees(A)(in A a){ return radians!(180/PI)(a); }
@@ -614,7 +631,7 @@ auto degrees(A)(in A a){ return radians!(180/PI)(a); }
 /// Mixins an std.math funct that works on scalar or vector data. Cast the parameter at least to a float and calls fun()
 private enum UnaryStdMathFunct(string name) = q{
   auto #(A)(in A a){
-    alias CT = CommonType!(ScalarType!A, float);
+    alias CT = CommonScalarType!(A, float);
     alias fun = a => std.math.#(cast(CT) a);
     return a.generateVector!(CT, fun);
   }
@@ -623,13 +640,13 @@ private enum UnaryStdMathFunct(string name) = q{
 static foreach(s; "sin cos tan asin acos sinh cosh tanh asinh acosh atan".split(' ')) mixin(UnaryStdMathFunct!s);
 
 auto atan(A, B)(in A a, in B b){ //atan is GLSL
-  alias CT = CommonType!(ScalarType!A, ScalarType!B, float);
+  alias CT = CommonScalarType!(A, B, float);
   alias fun = (a, b) => std.math.atan2(cast(CT) a, cast(CT) b);
   return generateVector!(CT, fun)(a, b);
 }
 
-auto atan2(A, B)(in A a, in B b){ return atan(a, b); } //this improves std.math.atan2
-
+//auto atan2(A, B)(in A a, in B b){ return atan(a, b); }
+//this improves std.math.atan2. No, rather stick to GLSL compatibility to force GLSL-DLang compatibility more
 
 private void unittest_AngleAndTrigFunctions() {
   static assert(is(typeof(radians(1   ))==float ));
@@ -652,8 +669,8 @@ private void unittest_AngleAndTrigFunctions() {
   // hiperbolic functions are skipped, those are mixins anyways
   assert(atan(sqrt(3.0)).approxEqual(PI/3));
   assert(atan(ivec2(1,2)).approxEqual(vec2(0.7853, 1.1071)));
-  assert(atan2(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
-  assert(atan2(vec2(1,2), 3) == atan(vec2(1,2), 3)); //atan is the overload in GLSL, not atan2
+  assert(atan(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
+  assert(atan(vec2(1,2), 3) == atan(vec2(1,2), 3)); //atan is the overload in GLSL, not atan2
 }
 
 
@@ -665,20 +682,23 @@ auto pow(A, B)(in A a, in B b){
   return generateVector!(CT, fun)(a, b);
 }
 
-static foreach(s; "exp exp2 log log2 log10 sqrt".split(' ')) mixin(UnaryStdMathFunct!s);
+static foreach(s; "exp log log2 log10 sqrt".split(' ')) mixin(UnaryStdMathFunct!s);
 
-auto exp10(A)(in A a){ //because dlang has log10, but no exp10
-  alias CT = CommonType!(ScalarType!A, float);
-  return a.generateVector!(CT, a => 10 ^^ a);
-}
+auto exp2 (A)(in A a){ return pow( 2, a); }
+auto exp10(A)(in A a){ return pow(10, a); }
 
 auto sqr(A)(in A a){
-  alias CT = CommonType!(ScalarType!A.init ^^ 2);
+  alias CT = typeof(ScalarType!A.init ^^ 2);
   return a.generateVector!(CT, a => a ^^ 2);
 }
 
+auto signedsqr(A)(in A a){
+  alias CT = typeof(- ScalarType!A.init ^^ 2);
+  return a.generateVector!(CT, a => a<0 ? -(a ^^ 2) : a ^^ 2);
+}
+
 auto inversesqrt(A)(in A a){
-  alias CT = CommonType!(ScalarType!A, float);
+  alias CT = CommonScalarType!(A, float);
   return a.generateVector!(CT, a => 1 / sqrt(a));
 }
 
@@ -692,7 +712,9 @@ private void unittest_ExponentialFunctions(){
 
   static assert(is( typeof(sqr(5))==int ));
   static assert(is( typeof(sqr(5.0))==double ));
+
   assert(sqr(5)==25 && sqr(vec2(2, 3))==vec2(4, 9));
+  assert(signedsqr(vec2(-5, 3))==vec2(-25, 9));
 
   assert(sqrt(4)==2);
   assert(inversesqrt(4)==.5);
@@ -702,24 +724,59 @@ private void unittest_ExponentialFunctions(){
 
 // Common functions //////////////////////////////////////////
 
+auto abs    (A)(in A a) { return a.generateVector!(ScalarType!A, a => a<0 ? -a : a ); }
+auto sign   (A)(in A a) { alias CT = ScalarType!A; return a.generateVector!(CT, a => a==0 ? 0 : a<0 ? -1 : 1 ); }
+
+private auto floatReductionOp(alias fun, CT, A)(in A a){
+  static assert(isFloatingPoint!(ScalarType!A));
+  return a.generateVector!(CT, fun);
+}
+
+auto floor    (A, CT=ScalarType!A)(in A a) { return a.floatReductionOp!(std.math.floor, CT, A); }
+auto ceil     (A, CT=ScalarType!A)(in A a) { return a.floatReductionOp!(std.math.ceil , CT, A); }
+auto trunc    (A, CT=ScalarType!A)(in A a) { return a.floatReductionOp!(std.math.trunc, CT, A); }
+auto round    (A, CT=ScalarType!A)(in A a) { return a.floatReductionOp!(std.math.round, CT, A); }
+auto roundEven(A, CT=ScalarType!A)(in A a) { return a.floatReductionOp!(std.math.lrint, CT, A); } //note: depens on roundingMode: default is even
+
+// generate int, and long versions
+static foreach(T; AliasSeq!(int, long))
+  static foreach(F; AliasSeq!(floor, ceil, trunc, round, roundEven))
+    mixin(q{ auto %s(A)(in A a) { return a.%s!(A, %s); } }.format(T.stringof[0]~__traits(identifier, F), __traits(identifier, F), T.stringof));
+
+auto fract(A)(in A a) { static assert(isFloatingPoint!(ScalarType!A)); return a-floor(a); }
+
+auto mod(A, B)(in A x, in B y) {
+  // this is the cyclic modulo.  (% is the symmetric)
+  alias CT = CommonScalarType!(A, B);
+  static if(isFloatingPoint!CT) return x - y * floor(x*(1.0f/y));
+                           else return cast(CT) (x - y*(x/y));
+}
+
+auto modf(A, B)(in A a, out B b) {
+  const floora = floor(a);
+  b = cast(Unqual!B) floora;
+  return a-floora;
+}
+
 private auto minMax(bool isMin, T, U)(in T a, in U b){
 
-  auto comp(T, U)(in T a, in U b){
+  auto doit(T, U)(in T a, in U b){
+    //it uses std.algorithm, maybe it's better than a tenary ?: operation.
     return isMin ? std.algorithm.min(a, b) : std.algorithm.max(a, b);
   }
 
   static if(isNumeric!T && isNumeric!U){
-    return comp(a, b);
+    return doit(a, b);
   }else static if(isVector!T && isNumeric!U){
     CommonVectorType!(T, U) res;
-    static foreach(i; 0..T.length) res.array[i] = comp(a.array[i], b);
+    static foreach(i; 0..T.length) res.array[i] = doit(a.array[i], b);
     return res;
   }else static if(isNumeric!T && isVector!U){
     return minMax!isMin(b, a); //same but different order
   }else static if(isVector!T && isVector!U){
     static assert(T.length == U.length, "vector dimension mismatch");
     CommonVectorType!(T, U) res;
-    static foreach(i; 0..T.length) res.array[i] = comp(a.array[i], b.array[i]);
+    static foreach(i; 0..T.length) res.array[i] = doit(a.array[i], b.array[i]);
     return res;
   }else{
     static assert("Invalid operation");
@@ -766,10 +823,59 @@ auto mix(A, B, T)(in A a, in B b, in T t){
   }else return a*(1-t) + b*t;
 }
 
+auto step(A, B)(in A edge, in B x){
+  alias CT = CommonScalarType!(A, B);
+  return generateVector!(CT, (edge, x) => x<edge ? 0 : 1 )(edge, x);
+}
+
+auto smoothstep(A, B, C)(in A edge0, in B edge1, in C x){
+  alias CT = CommonScalarType!(A, B, C, float); //result is at least float. In the range: 0..1
+  return generateVector!(CT, (edge0, edge1, x){
+    auto t = clamp(((x - edge0)*1.0f) / (edge1 - edge0), 0, 1); //difision is forced to float with that *1.0f
+    return t * t * (3 - 2 * t);
+  })(edge0, edge1, x);
+}
+
+auto isnan(A)(in A a){ return a.generateVector!(bool, a => std.math.isNaN     (a) ); }
+auto isinf(A)(in A a){ return a.generateVector!(bool, a => std.math.isInfinity(a) ); }
+auto isfin(A)(in A a){ return a.generateVector!(bool, a => std.math.isFinite  (a) ); }
+
 
 private void unittest_CommonFunctions(){
-  auto a = vec3(1, 2, 3);
-  auto b = vec3(4, 0, 6);
+  assert(abs(vec2(-5, 5))==vec2(5, 5));
+  assert(sign(Vector!(byte, 3)(-5, 0, 5)) == vec3(-1, 0, 1));
+
+  static assert(is(typeof(iceil (5.4 )) == int   ));
+  static assert(is(typeof(lfloor(5.4 )) == long  ));
+  static assert(is(typeof(floor (5.4f)) == float ));
+  static assert(is(typeof(floor (5.0 )) == double));
+  auto vf = vec4(0.1, -.5, 1.5, 1.6);
+  assert(vf.floor     == vec4(0, -1, 1, 1));
+  assert(vf.iceil     == ivec4(1, 0, 2, 2));
+  assert(vf.ltrunc    == uvec4(0, 0, 1, 1));
+  assert(vf.round     == vec4(0, -1, 2, 2));
+  assert(vf.roundEven == vec4(0, 0, 2, 2));
+  assert(vf.fract.approxEqual( vf-floor(vf) ));
+
+  { // modulo tests
+    const m = .7f;
+    assert((vf % m).approxEqual(vec4(0.1, -0.5, 0.1, 0.2))); //%:   symmetric mod
+    assert(vf.mod(m).approxEqual(vf-m*floor(vf/m)));      //mod: cyclic mod
+    assert(vf.mod(m).approxEqual(vec4(0.1, 0.2, 0.1, 0.2)));
+
+    const a = 4.1f;
+    const r1 = vec4(0.41, 0.95, 0.15, 0.56), r2 = ivec4(0, -3, 6, 6);
+    ivec4 ires;  assert(modf(vf*a, ires).approxEqual(r1) && ires==r2);
+    vec4  fres;  assert(modf(vf*a, fres).approxEqual(r1) && fres==r2);
+  }
+
+  assert(cmp("abc", "abc")==0 && cmp("abc", "abcd")<0 && cmp("bbc", "abc"w)>0 && cmp([1L, 2, 3], [1, 2])>0 && cmp!"a<b"([1L, 2, 3], [1, 2])>0);
+  assert(cmp(-100.0, -0.5) < 0);
+  assert((cmp(1, 2)>0)==(std.math.cmp(1.0,2.0)>0));
+  assert(cmp(vec2(1),1)==vec2(cmp(1,1)) && cmp(vec2(1),2)==vec2(cmp(1,2)) && cmp(vec2(2),1)==vec2(cmp(2,1)));
+
+  assert(min(1, 2.0)==1 && max(1, 2)==2);
+  const a = vec3(1, 2, 3), b = vec3(4, 0, 6);
   assert(min(a, b) == vec3(1, 0, 3));
   assert(min(a, 2) == vec3(1, 2, 2));
   assert(min(b, 5) == vec3(4, 0, 5));
@@ -783,15 +889,25 @@ private void unittest_CommonFunctions(){
 
   assert(mix(vec2(1,2), vec2(2, 4), 0.5f) == vec2(1.5, 3));
   assert(mix(vec2(1,2), 2, 0.5) == vec2(1.5, 2));
-
   assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), false) == vec2(2, 3));
   assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), true ) == vec2(4, 5));
 
-  assert(cmp("abc", "abc")==0 && cmp("abc", "abcd")<0 && cmp("bbc", "abc"w)>0 && cmp([1L, 2, 3], [1, 2])>0 && cmp!"a<b"([1L, 2, 3], [1, 2])>0);
-  assert((cmp(1, 2)>0)==(std.math.cmp(1.0,2.0)>0));
-  assert(cmp(vec2(1),1)==vec2(cmp(1,1)) && cmp(vec2(1),2)==vec2(cmp(1,2)) && cmp(vec2(2),1)==vec2(cmp(2,1)));
+  assert(step(vec3(1, 2, 3), 2) == vec3(1, 1, 0));
+  assert(is(typeof(step(1,2 ))==int));
+  assert(is(typeof(step(vec2(1), 2.))==dvec2));
 
-  //assert(step(vec2(1, 2, 3), 2) == vec2(0, 1, 1));
+  assert(8.iota.map!(i => (smoothstep(ivec2(0, 2), 9, i)*100).iround ).equal(
+    [ivec2(0, 0), ivec2(3, 0), ivec2(13, 0), ivec2(26, 6), ivec2(42, 20), ivec2(58, 39), ivec2(74, 61), ivec2(87, 80)] ));
+
+  {// nan, inf handling
+    assert(float.init.isnan);
+    assert(!float.init.isfin);
+    const n = vec4(1, NaN(5421), -float.infinity, float.init);
+    assert(n.isnan == bvec4(0, 1, 0, 1));
+    assert(n.isinf == bvec4(0, 0, 1, 0));
+    assert(n.isfin == bvec4(1, 0, 0, 0));
+  }
+
 }
 
 
@@ -884,8 +1000,7 @@ private void unittest_MatrixFunctions(){
 
 
 void unittest_main(){
-
-  { bool assertsPresent; try{ assert(0); }catch(Throwable){ assertsPresent = true; } enforce(assertsPresent, "Turn on debug for assert()."); }
+  version(assert){}else enforce(0, "Turn on debug build for asserts.");
 
   unittest_Vectors;
   unittest_Matrices;
@@ -897,9 +1012,12 @@ void unittest_main(){
   //https://www.shadertoy.com/view/XsjGDt
 }
 
-void main(){
-  import het.utils; application.runConsole({
+version(unittest){
+  unittest{ unittest_main; }
+  void main(){}
+}else{
+  void main(){ import het.utils; application.runConsole({
     unittest_main;
     writeln("done main");
-  });
+  }); }
 }
