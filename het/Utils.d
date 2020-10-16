@@ -2723,9 +2723,9 @@ void inspectSymbol(alias T)(string before="", int level=0) {
   enum maxInspectLevel = 10;
 
   // step 2
-  foreach(memberName; __traits(allMembers, T)) {
+  foreach(memberName; __traits(allMembers, T)) static if(__traits(compiles, toAlias!(__traits(getMember, T, memberName)))) {
     // step 3
-    alias member = toAlias!(__traits(getMember, T, memberName));
+    alias member = toAlias!(__traits(getMember, T, memberName));  //sometimes this alias declaration fails.
     // step 4 - inspecting types
     static if(is(member)) {
       string specifically;
@@ -2738,8 +2738,11 @@ void inspectSymbol(alias T)(string before="", int level=0) {
       writeln(before, fullyQualifiedName!member, " is a type (", specifically, ")");
       // drill down (step 1 again)
       static if(is(member == struct) || is(member == class) || is(member == enum)){
-        if(level<maxInspectLevel) //no recursion
-          inspectSymbol!member(before ~ "\t", level+1);
+        static if(!is(T) || !is(member == T)){ //ignore types that contain an alias for typeof(this)
+          if(level<maxInspectLevel){ //limit recursion
+            inspectSymbol!member(before ~ "\t", level+1);
+          }
+        }
       }else{
         writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof);
       }
@@ -2763,9 +2766,10 @@ void inspectSymbol(alias T)(string before="", int level=0) {
           writeln(before, fn, " is template ", s);
         }
     }
+  }else{
+    print("!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", T.stringof ~ "." ~ memberName);
   }
 }
-
 
 
 static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////
@@ -3025,7 +3029,7 @@ auto byLineBlock(string str, size_t maxBlockSize=DefaultLineBlockSize){  //todo:
   return res;
 }
 
-unittest{
+/*void testByLineBlock(){
   auto file = File(tempPath, `testByLineBlocks.tmp`);
   scope(exit) file.remove;
 
@@ -3050,7 +3054,7 @@ unittest{
   enum h = 3496071129;
   enforce(a.join('|').xxh == h, "file.byLineBlocks fail2");
   enforce(b.join('|').xxh == h, "string.byLineBlocks fail2");
-}
+}*/
 
 enum TextEncoding               { ANSI, UTF8          ,            UTF32BE,            UTF32LE,    UTF16BE, UTF16LE   } //UTF32 must be checked BEFORE UTF16
 private const encodingHeaders = [""   , "\xEF\xBB\xBF", "\x00\x00\xFE\xFF", "\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"];

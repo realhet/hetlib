@@ -11,19 +11,7 @@ import het.utils;
 
 import std.traits;
 
-
-//note inspectSymbol is in het.utils.
-void inspect2(alias T)(string before="", int level=0) {
-  foreach(memberName; __traits(allMembers, T)) {
-    print(memberName);
-//    alias member = helper!(__traits(getMember, T, memberName));
-
-  //  string name; static if(__traits(compiles, member.stringof)) name = member.stringof;
-  //  string fullName; static if(__traits(compiles, fullyQualifiedName!member)) fullName = fullyQualifiedName!member;
-
-  //  print(format("%-50s| %s", fullName, name));
-  }
-}
+// inspectSymbol moved into het.utils
 
 /*mixin(`
 void inspectModule(string moduleName)(){
@@ -128,8 +116,9 @@ import het.stream;
 
 
 void main(){ application.runConsole({
-  //import gl3n.linalg; inspect!(gl3n.linalg);
-  //import het.geometry; inspect!(het.geometry);
+  //import gl3n.linalg; het.utils.inspectSymbol!(gl3n.linalg);
+  import het.geometry; inspectSymbol!(het.geometry);
+  readln; application.exit;
 
   auto str = File(`c:\Users\backup\temp\Animacio.json`).readText;
 
@@ -198,3 +187,4 @@ void main(){ application.runConsole({
 
   readln;
 });}
+

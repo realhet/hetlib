@@ -5,20 +5,37 @@
 ///@release
 //@debug
 
-import het.utils, std.traits;
+//module testGeometry2;
+///@compile --unittest  //this is broken because of my shitty linker usage
 
-// publicly import std modules whose functions are gonna be overloaded here.
+// publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
 public import std.algorithm, std.math;
 
+// import locally used things.     //must not import het.utils to keep it simle and standalone
+import std.format : format;
+import std.conv : text, to;
+import std.uni : toLower;
+import std.array : replicate, split, replace, join;
+import std.range : iota;
+import std.traits : isDynamicArray, isStaticArray, isNumeric, CommonType, Unqual;
+
+import std.exception : enforce;
+import std.stdio : writeln;
+
+bool inRange(V, L, H)(in V value, in L lower, in H higher){ return value>=lower && value<=higher; } //todo: comine with het.utils.
+
 private enum swizzleRegs = ["xyzw", "rgba", "stpq"];
-private bool validLvalueSwizzle(string def){ return swizzleRegs.map!(r => canFind(r, def)).any; }
 private enum ComponentTypePrefix(CT) = is(CT==float) ? "" : is(CT==double) ? "d" : is(CT==bool) ? "b" : is(CT==int) ? "i" : is(CT==uint) ? "u" : CT.stringof;
 
 private bool validRvalueSwizzle(string def){
-  if(def.startsWith('_')) def = def[1..$]; //_ is allowed at the start because of the constants 0 and 1
-  if(!def.length.inRange(1, 4) || validLvalueSwizzle(def)) return false;
+  if(def.startsWith('_')) return validRvalueSwizzle(def[1..$]); //_ is allowed at the start because of the constants 0 and 1
 
-  return swizzleRegs.map!(r => def.map!(ch => "01".canFind(ch) || r.canFind(ch.lc)).all).any;
+  if(!def.length.inRange(1, 4)) return false; //too small or too long
+
+  //LvalueSwizzles are not included. Those are midex in.  (LValue swizzle examples: x, xy, yzw, those that stay on a contiguous memory area)
+  if(swizzleRegs.map!(r => r.canFind(def)).any) return false;
+
+  return swizzleRegs.map!(r => def.map!(ch => "01".canFind(ch) || r.canFind(ch.toLower)).all).any;
 }
 
 
@@ -164,7 +181,7 @@ if(N.inRange(2, 4)){
       }else{
         Vector!(CT, mixin(def.length)) res;
         static foreach(i, ch; def)
-          res[i] = mixin(ch==ch.lc ? "" : "-", ch.lc);
+          res[i] = mixin(ch==ch.toLower ? "" : "-", ch.toLower);
         return res;
       }
     }
@@ -231,6 +248,93 @@ static foreach(T; vectorElementTypes)
   static foreach(N; vectorElementCounts)
     mixin(format!q{alias %s = %s;}(Vector!(T, N).VectorTypeName, Vector!(T, N).stringof));
 
+
+private void unittest_Vectors(){
+  { // various tests of mine
+    immutable v1 = vec4(1,2,3,0);
+    Unqual!(typeof(v1)) v2 = v1;  assert(v1.z == 3);
+    v2.z++;                       assert(v2.b == 4);
+    assert(v1.gb == vec2(2, 3));
+    assert(v2 == vec4(1, 2, 4, 0));
+    v2.gba = vec3(10, [119, 12]);
+    auto f = dvec4(vec2([1,2]).yx, vec2(5, 6).y1);
+    assert(f == dvec4(2, 1, 6, 1));
+    assert(v2.rR01 == vec4(1, -1, 0, 1)); //Capital letter means negative
+    assert(vec3(1,2,3)+dvec3(5,6,7) == dvec3(6, 8, 10));
+    assert(vec3(1,2,3)*10.5f == vec3(10.5, 21, 31.5));
+    assert(10.5*vec3(1,2,3) == vec3(10.5, 21, 31.5));
+    assert(bvec3.basis(2) == bvec3(false, false, true)); // bool basis vector test
+
+    vec4 b;  b.yz = [5, 6];    assert(b == vec4(0, 5, 6, 0));
+    b.yz = 55;                 assert(b == vec4(0, 55, 55, 0));  //side effect: b.y and b.y both = 55
+    b *= vec4(5)._11xx;        assert(b == vec4(0, 55, 275, 0)); //55*5 = 275
+
+    auto i1 = ivec2(2, 3);  i1 <<= 3;  i1 = -i1 + 5;  i1 = ++i1;  i1 = ~i1;  i1++;
+    assert(i1 == ivec2(10, 18));
+
+    vec3[] va = [vec3(4)] ~ [vec3(5)]; //always have to use [], because of alias this
+    va ~= vec3(6);
+    assert(va == [vec3(4), vec3(5), vec3(6)]);
+  }
+  { // implicit conversions
+    uvec2 a0 = ivec2(1, 2);
+    uvec3 a1 = ivec3(1, 2, 3);
+    uvec4 a2 = ivec4(1, 2, 3, 4);
+    vec2 a3 = ivec2(1, 2);
+    vec2 a4 = uvec2(1, 2);
+    dvec2 a5 = ivec2(1, 2);
+    dvec2 a6 = uvec2(1, 2);
+    dvec2 a7 = vec2(1, 2);
+  }
+
+  // https://en.wikibooks.org/wiki/GLSL_Programming/Vector_and_Matrix_Operations
+  { // Vectors can be initialized and converted by constructors of the same name as the data type:
+    vec2 a = vec2(1.0, 2.0);
+    vec3 b = vec3(-1.0, 0.0, 0.0);
+    vec4 c = vec4(0.0, 0.0, 0.0, 1.0);
+    assert(a==vec2(1, 2) && b==vec3(-1, 0, 0) && c==vec4(0, 0, 0, 1));
+  }
+  { // One can also use one floating-point number in the constructor to set all components to the same value:
+    vec4 a = vec4(4.0);
+    assert(a == vec4(4, 4, 4, 4));
+  }
+  { // Casting a higher-dimensional vector to a lower-dimensional vector is also achieved with these constructors:
+    vec4 a = vec4(-1.0, 2.5, 4.0, 1.0);
+    vec3 b = vec3(a); // = vec3(-1.0, 2.5, 4.0)
+    vec2 c = vec2(b); // = vec2(-1.0, 2.5)
+    assert(c == b.xy && b == a.rgb && a==vec4(-1, 2.5, 4, 1) && b==vec3(-1, 2.5, 4) && c==vec2(-1, 2.5));
+  }
+  { // Casting a lower-dimensional vector to a higher-dimensional vector is achieved by supplying
+    // these constructors with the correct number of components:
+    vec2 a = vec2(0.1, 0.2);
+    vec3 b = vec3(0.0, a); // = vec3(0.0, 0.1, 0.2)
+    vec4 c = vec4(b, 1.0); // = vec4(0.0, 0.1, 0.2, 1.0)
+    assert(b == a._0xy && c == b.stp1 && a==vec2(0.1, 0.2) && b==vec3(0, 0.1, 0.2) && c==vec4(0, 0.1, 0.2, 1));
+  }
+  { // Components of vectors are accessed by array indexing with the []-operator (indexing starts with 0)
+    // or with the .-operator and the element names x, y, z, w or r, g, b, a or s, t, p, q
+    vec4 v = vec4(1.1, 2.2, 3.3, 4.4);
+    float a = v[3]; // = 4.4
+    float b = v.w; // = 4.4
+    float c = v.a; // = 4.4
+    float d = v.q; // = 4.4
+    assert([a,b,c,d].map!"a==4.4f".all);
+  }
+  { // It is also possible to construct new vectors by extending the .-notation ("swizzling"):
+    vec4 v = vec4(1.1, 2.2, 3.3, 4.4);
+    vec3 a = v.xyz; // = vec3(1.1, 2.2, 3.3)
+    vec3 b = v.bgr; // = vec3(3.3, 2.2, 1.1)
+    vec2 c = v.tt; // = vec2(2.2, 2.2)
+    assert(a==vec3(1.1, 2.2, 3.3) && b==vec3(3.3, 2.2, 1.1) && c==vec2(2.2, 2.2));
+  }
+  { // Operators: If the binary operators *, /, +, -, =, *=, /=, +=, -= are used between vectors of the same type, they just work component-wise:
+    vec3 a = vec3(1.0, 2.0, 3.0);
+    vec3 b = vec3(0.1, 0.2, 0.3);
+    vec3 c = a + b; // = vec3(1.1, 2.2, 3.3)
+    vec3 d = a * b; // = vec3(0.1, 0.4, 0.9)
+    assert(c == vec3(1.1, 2.2, 3.3) && d.approxEqual(vec3(0.1, 0.4, 0.9)));
+  }
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Matrix                                                                  ///
@@ -383,6 +487,102 @@ static foreach(T; matrixElementTypes){
 }
 
 
+private void unittest_Matrices(){
+  { // Similarly, matrices can be initialized and constructed. Note that the values specified in
+    // a matrix constructor are consumed to fill the first column, then the second column, etc.:
+    mat3 m = mat3(
+       1.1, 2.1, 3.1, // first column (not row!)
+       1.2, 2.2, 3.2, // second column
+       1.3, 2.3, 3.3  // third column
+    );
+    assert(m == mat3(vec3(1.1, 2.1, 3.1), vec3(1.2, 2.2, 3.2), vec3(1.3, 2.3, 3.3)));
+
+    mat3 id = mat3(1.0); // puts 1.0 on the diagonal, all other components are 0.0
+    assert(id == mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)));
+
+    vec3 column0 = vec3(1.1, 2.1, 3.1);
+    vec3 column1 = vec3(1.2, 2.2, 3.2);
+    vec3 column2 = vec3(1.3, 2.3, 3.3);
+    mat3 n = mat3(column0, column1, column2); // sets columns of matrix n
+    assert(m == n);
+  }
+  { // If a larger matrix is constructed from a smaller matrix, the additional rows and columns are
+    // set to the values they would have in an identity matrix:
+    mat2 m2x2 = mat2(
+      1.1, 2.1,
+      1.2, 2.2
+    );
+    mat3 m3x3 = mat3(m2x2); // = mat3(
+    assert(m3x3 == mat3(vec3(1.1, 2.1, 0), vec3(1.2, 2.2, 0), vec3(0, 0, 1)));
+    mat2 mm2x2 = mat2(m3x3); // = m2x2
+    assert(mm2x2 == m2x2);
+  }
+  { // Matrices are considered to consist of column vectors, which are accessed by array indexing with the []-operator.
+    // Elements of the resulting (column) vector can be accessed as discussed above:
+    mat3 m = mat3(
+      1.1, 2.1, 3.1, // first column
+      1.2, 2.2, 3.2, // second column
+      1.3, 2.3, 3.3  // third column
+    );
+    vec3 column3 = m[2]; // = vec3(1.3, 2.3, 3.3)
+    float m20 = m[2][0]; // = 1.3
+    float m21 = m[2].y; // = 2.3
+    assert(column3 == vec3(1.3, 2.3, 3.3) && m20==1.3f && m21==2.3f);
+  }
+  { // Operators: For matrices, these operators also work component-wise, except for the *-operator, which represents a matrix-matrix product
+    mat2 a = mat2(1., 2.,  3., 4.);
+    mat2 b = mat2(10., 20.,  30., 40.);
+    mat2 c = a * b;
+    mat2 expected = mat2(
+      1. * 10. + 3. * 20., 2. * 10. + 4. * 20.,
+      1. * 30. + 3. * 40., 2. * 30. + 4. * 40.
+    );
+    assert(c == expected);
+  }
+  { // For a component-wise matrix product, the built-in function matrixCompMult is provided.
+    auto a = mat2x3(vec3(1,2,3), vec3(4,5,6));
+    auto b = mat2x3(vec3(10,20,30), vec3(40,50,60));
+    assert(matrixCompMult(a, b) == mat2x3(vec3(10, 40, 90), vec3(160, 250, 360)));
+  }
+  { // The *-operator can also be used to multiply a floating-point value (i.e. a scalar) to all components of a vector or matrix (from left or right):
+    vec3 a = vec3(1.0, 2.0, 3.0);
+    mat3 m = mat3(1.0);
+    float s = 10.0;
+    vec3 b = s * a;   assert(b == vec3(10.0, 20.0, 30.0));
+    vec3 c = a * s;   assert(c == vec3(10.0, 20.0, 30.0));
+    mat3 m2 = s * m;  assert(m2 == mat3(10.0));
+    mat3 m3 = m * s;  assert(m3 == mat3(10.0));
+  }
+  { // more complex matrix multiplication test from https://people.richland.edu/james/lecture/m116/matrices/multiplication.html
+    auto a = mat3x2(1, 4, -2, 5, 3, -2),
+         b = mat4x3(vec3(1, -3, 6), vec3(-8, 6, 5), 4, 7, -1, vec3(-3, 2, 4));
+    assert(a*b == mat4x2(vec2(25, -23), vec2(-5, -12), vec2(-13, 53), vec2(5, -10)));
+  }
+  { // Furthermore, the *-operator can be used for matrix-vector products of the corresponding dimension
+    vec2 v = vec2(10., 20.);
+    mat2 m = mat2(1., 2.,  3., 4.);
+    assert(m*v == vec2(1. * 10. + 3. * 20., 2. * 10. + 4. * 20.));
+    assert(v*m == vec2(1. * 10. + 2. * 20., 3. * 10. + 4. * 20.)); //multiplying a vector from the left to a matrix corresponds to multiplying it from the right to the transposed matrix:
+  }
+  { // https://www.varsitytutors.com/hotmath/hotmath_help/topics/multiplying-vector-by-a-matrix#:~:text=Example%20%3A,number%20of%20rows%20in%20y%20.&text=First%2C%20multiply%20Row%201%20of,Column%201%20of%20the%20vector.
+    auto m = mat3(1, 4, 7, 2, 5, 8, 3, 6, 9);
+    auto v = vec3(2, 1, 3);
+    assert(m*v == vec3(13, 31, 49));
+  }
+
+  { // Various tests of mine
+    assert(3*mat2(2) == mat2(6, 0, 0, 6));
+    assert(mat2(1)+mat2(2) == mat2(3, 0, 0, 3));
+
+    assert(mat2x3(vec2(1,2), 3, 4, vec2(5,6)) == mat2x3(1,2,3,4,5,6));
+    assert(mat2(vec4(3)) == mat2(3,3,3,3));
+
+    dmat2 m1 = mat2(vec4(1));
+    assert(m1 == mat2(1,1,1,1));
+  }
+}
+
+
 //! Functions /////////////////////////////////////////////////
 
 /// this is my approxEqual. The one in std.math is too complicated
@@ -411,25 +611,51 @@ auto radians(real scale = PI/180, A)(in A a){
 }
 auto degrees(A)(in A a){ return radians!(180/PI)(a); }
 
-private auto _UnaryVectorFunct(string name){
-  return q{
-    auto #(A)(in A a){
-      alias CT = CommonType!(ScalarType!A, float);
-      alias fun = a => std.math.#(cast(CT) a);
-      return a.generateVector!(CT, fun);
-    }
-  }.replace('#', name);
-}
+/// Mixins an std.math funct that works on scalar or vector data. Cast the parameter at least to a float and calls fun()
+private enum UnaryStdMathFunct(string name) = q{
+  auto #(A)(in A a){
+    alias CT = CommonType!(ScalarType!A, float);
+    alias fun = a => std.math.#(cast(CT) a);
+    return a.generateVector!(CT, fun);
+  }
+}.replace('#', name);
 
-static foreach(s; "sin cos tan asin acos sinh cosh tanh asinh acosh atan".split(' ')) mixin(_UnaryVectorFunct(s));
+static foreach(s; "sin cos tan asin acos sinh cosh tanh asinh acosh atan".split(' ')) mixin(UnaryStdMathFunct!s);
 
-auto atan2(A, B)(in A a, in B b){
+auto atan(A, B)(in A a, in B b){ //atan is GLSL
   alias CT = CommonType!(ScalarType!A, ScalarType!B, float);
   alias fun = (a, b) => std.math.atan2(cast(CT) a, cast(CT) b);
   return generateVector!(CT, fun)(a, b);
 }
 
-auto atan(A, B)(in A a, in B b){ return atan2(a, b); } //atan is the overload for 2 params in GLSL
+auto atan2(A, B)(in A a, in B b){ return atan(a, b); } //this improves std.math.atan2
+
+
+private void unittest_AngleAndTrigFunctions() {
+  static assert(is(typeof(radians(1   ))==float ));
+  static assert(is(typeof(radians(1.0f))==float ));
+  static assert(is(typeof(radians(1.0 ))==double));
+  static assert(is(typeof(radians(1.0L))==real  ));
+
+  assert(format!"%.15f"(PI) == "3.141592653589793"); //check PI for at least double precision
+  assert(360.radians.approxEqual(6.28319, 1e-5));
+  assert(7592.radians.degrees.approxEqual(7592));
+  assert(vec2(180, 360).radians.approxEqual(vec2(6.28319/2, 6.28319), 1e-5));
+  assert(PI.degrees == 180 && is(typeof(PI.degrees)==real));
+
+  assert(sin(5).approxEqual(-0.95892));
+  static assert(is( typeof(cos(dvec2(1, 2))) == dvec2 ));
+  assert(cos(dvec2(1, 2.5)).approxEqual(vec2(0.5403, -0.8011)));
+  assert(tan(ivec2(1, 2)).approxEqual(vec2(1.5574, -2.1850)));
+  assert(asin(.5).approxEqual(PI/6));
+  assert(acos(vec2(0, .5)).approxEqual(vec2(1.570, PI/3)));
+  // hiperbolic functions are skipped, those are mixins anyways
+  assert(atan(sqrt(3.0)).approxEqual(PI/3));
+  assert(atan(ivec2(1,2)).approxEqual(vec2(0.7853, 1.1071)));
+  assert(atan2(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
+  assert(atan2(vec2(1,2), 3) == atan(vec2(1,2), 3)); //atan is the overload in GLSL, not atan2
+}
+
 
 // Exponential functions /////////////////////////////////////
 
@@ -439,7 +665,7 @@ auto pow(A, B)(in A a, in B b){
   return generateVector!(CT, fun)(a, b);
 }
 
-static foreach(s; "exp exp2 log log2 log10 sqrt".split(' ')) mixin(_UnaryVectorFunct(s));
+static foreach(s; "exp exp2 log log2 log10 sqrt".split(' ')) mixin(UnaryStdMathFunct!s);
 
 auto exp10(A)(in A a){ //because dlang has log10, but no exp10
   alias CT = CommonType!(ScalarType!A, float);
@@ -454,6 +680,23 @@ auto sqr(A)(in A a){
 auto inversesqrt(A)(in A a){
   alias CT = CommonType!(ScalarType!A, float);
   return a.generateVector!(CT, a => 1 / sqrt(a));
+}
+
+
+private void unittest_ExponentialFunctions(){
+  static assert(is( typeof(pow(ivec2(2, 10), 2)) == ivec2 ));
+  assert(pow(ivec2(2, 10), 2) == ivec2(4, 100));
+  assert(pow(vec2(2.5, 10), 2) == vec2(6.25, 100));
+  assert(exp(0)==1 && exp2(2)==4 && exp10(3)==1000);
+  assert(log(5).approxEqual(1.6094) && log2(8)==3 && log10(1000)==3);
+
+  static assert(is( typeof(sqr(5))==int ));
+  static assert(is( typeof(sqr(5.0))==double ));
+  assert(sqr(5)==25 && sqr(vec2(2, 3))==vec2(4, 9));
+
+  assert(sqrt(4)==2);
+  assert(inversesqrt(4)==.5);
+  static assert(is( typeof(inversesqrt(4))==float ));
 }
 
 
@@ -483,8 +726,6 @@ private auto minMax(bool isMin, T, U)(in T a, in U b){
   }
 }
 
-// this is how to overload std stuff
-
 auto min(T...)(in T args){ //note: std.algorithm.min is (T t)
   static if(anyVector!T)
     static if(T.length==2) return minMax!1(args[0], args[1]);
@@ -507,7 +748,7 @@ auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
 auto cmp(string pred, A, B)(in A a, in B b){ return std.algorithm.cmp!pred(a, b); }
 
 auto cmp(A, B)(in A a, in B b){
-  static if((std.traits.isNumeric!A || isVector!A) && (std.traits.isNumeric!B || isVector!B)){
+  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){
     static if(anyVector!(A, B)){
       Vector!(int, CommonVectorLength!(A, B)) res;
       static foreach(i; 0..res.length) res[i] = cmp(a.vectorAccess!i, b.vectorAccess!i);
@@ -523,6 +764,34 @@ auto mix(A, B, T)(in A a, in B b, in T t){
     static foreach(i; 0..res.length) res[i] = mix(vectorAccess!i(a), vectorAccess!i(b), vectorAccess!i(t));
     return res;
   }else return a*(1-t) + b*t;
+}
+
+
+private void unittest_CommonFunctions(){
+  auto a = vec3(1, 2, 3);
+  auto b = vec3(4, 0, 6);
+  assert(min(a, b) == vec3(1, 0, 3));
+  assert(min(a, 2) == vec3(1, 2, 2));
+  assert(min(b, 5) == vec3(4, 0, 5));
+  assert(max(b, 5) == vec3(5, 5, 6));
+  assert(min(2, a) == vec3(1, 2, 2));
+  assert(min(5, b) == vec3(4, 0, 5));
+  assert(max(5, b) == vec3(5, 5, 6));
+
+  assert(vec3(1,2,3).clamp(1.5, 2.5) == vec3(1.5, 2, 2.5));
+  assert(ivec3(8).clamp(1.5, vec3(4, 5, 6)) == vec3(4, 5, 6));
+
+  assert(mix(vec2(1,2), vec2(2, 4), 0.5f) == vec2(1.5, 3));
+  assert(mix(vec2(1,2), 2, 0.5) == vec2(1.5, 2));
+
+  assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), false) == vec2(2, 3));
+  assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), true ) == vec2(4, 5));
+
+  assert(cmp("abc", "abc")==0 && cmp("abc", "abcd")<0 && cmp("bbc", "abc"w)>0 && cmp([1L, 2, 3], [1, 2])>0 && cmp!"a<b"([1L, 2, 3], [1, 2])>0);
+  assert((cmp(1, 2)>0)==(std.math.cmp(1.0,2.0)>0));
+  assert(cmp(vec2(1),1)==vec2(cmp(1,1)) && cmp(vec2(1),2)==vec2(cmp(1,2)) && cmp(vec2(2),1)==vec2(cmp(2,1)));
+
+  //assert(step(vec2(1, 2, 3), 2) == vec2(0, 1, 1));
 }
 
 
@@ -587,284 +856,50 @@ auto inverse(T)(in T m) if(isMatrix!T && T.width==T.height){ enum N = T.width;
 }
 
 
+private void unittest_MatrixFunctions(){
+  assert(matrixCompMult(mat2(1, 2, 3, 4), mat2(vec4(2))) == mat2(2, 4, 6, 8));
+
+  //transpose
+  assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose == mat3x2(1,4,2,5,3,6));
+  assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose.transpose == mat2x3(vec3(1,2,3),vec3(4,5,6)));
+
+  //outer product
+  assert(outerProduct(vec3(3,2,1), vec4(7,2,3,1)) == mat4x3(21,14,7, 6,4,2, 9,6,3, 3,2,1));
+
+  //determinant
+  assert(determinant(mat2(4, 3, 6, 8)) == 14);
+  assert(mat3(6,4,2,1,-2,8,1,5,7).determinant == -306);
+  assert(mat4(4,0,0,0, 3,1,-1,3, 2,-3,3,1, 2,3,3,1).determinant == -240);
+
+  //inverse
+  assert(mat2(4,2,7,6).inverse.approxEqual( mat2(.6, -.2, -.7, .4) ));
+  assert(mat3(3,2,0, 0,0,1, 2,-2,1).inverse.approxEqual( mat3(.2,-.2,.2, .2,.3,-.3, 0,1,0) ));
+  assert(mat4(-3,-3,-2,1, -1,1,3,-2, 2,2,0,-3, -3,-2,1,1).inverse.approxEqual(mat4(-1.571, -2.142, 2, 3.285,  2,3,-3,-5, -1,-1,1,2, 0.285,0.571,-1,-1.142)));
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 ///  Tests                                                                   ///
 ////////////////////////////////////////////////////////////////////////////////
 
 
-void testVectorsAndMatrices(){
-  // https://en.wikibooks.org/wiki/GLSL_Programming/Vector_and_Matrix_Operations
+void unittest_main(){
 
-  forceAssertions;
+  { bool assertsPresent; try{ assert(0); }catch(Throwable){ assertsPresent = true; } enforce(assertsPresent, "Turn on debug for assert()."); }
 
-  { // Vectors can be initialized and converted by constructors of the same name as the data type:
-    vec2 a = vec2(1.0, 2.0);
-    vec3 b = vec3(-1.0, 0.0, 0.0);
-    vec4 c = vec4(0.0, 0.0, 0.0, 1.0);
-    assert(a==vec2(1, 2) && b==vec3(-1, 0, 0) && c==vec4(0, 0, 0, 1));
-  }
-  { // One can also use one floating-point number in the constructor to set all components to the same value:
-    vec4 a = vec4(4.0);
-    assert(a == vec4(4, 4, 4, 4));
-  }
-  { // Casting a higher-dimensional vector to a lower-dimensional vector is also achieved with these constructors:
-    vec4 a = vec4(-1.0, 2.5, 4.0, 1.0);
-    vec3 b = vec3(a); // = vec3(-1.0, 2.5, 4.0)
-    vec2 c = vec2(b); // = vec2(-1.0, 2.5)
-    assert(c == b.xy && b == a.rgb && a==vec4(-1, 2.5, 4, 1) && b==vec3(-1, 2.5, 4) && c==vec2(-1, 2.5));
-  }
-  { // Casting a lower-dimensional vector to a higher-dimensional vector is achieved by supplying
-    // these constructors with the correct number of components:
-    vec2 a = vec2(0.1, 0.2);
-    vec3 b = vec3(0.0, a); // = vec3(0.0, 0.1, 0.2)
-    vec4 c = vec4(b, 1.0); // = vec4(0.0, 0.1, 0.2, 1.0)
-    assert(b == a._0xy && c == b.stp1 && a==vec2(0.1, 0.2) && b==vec3(0, 0.1, 0.2) && c==vec4(0, 0.1, 0.2, 1));
-  }
-
-  { // Similarly, matrices can be initialized and constructed. Note that the values specified in
-    // a matrix constructor are consumed to fill the first column, then the second column, etc.:
-    mat3 m = mat3(
-       1.1, 2.1, 3.1, // first column (not row!)
-       1.2, 2.2, 3.2, // second column
-       1.3, 2.3, 3.3  // third column
-    );
-    assert(m == mat3(vec3(1.1, 2.1, 3.1), vec3(1.2, 2.2, 3.2), vec3(1.3, 2.3, 3.3)));
-
-    mat3 id = mat3(1.0); // puts 1.0 on the diagonal, all other components are 0.0
-    assert(id == mat3(vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)));
-
-    vec3 column0 = vec3(1.1, 2.1, 3.1);
-    vec3 column1 = vec3(1.2, 2.2, 3.2);
-    vec3 column2 = vec3(1.3, 2.3, 3.3);
-    mat3 n = mat3(column0, column1, column2); // sets columns of matrix n
-    assert(m == n);
-  }
-  { // If a larger matrix is constructed from a smaller matrix, the additional rows and columns are
-    // set to the values they would have in an identity matrix:
-    mat2 m2x2 = mat2(
-      1.1, 2.1,
-      1.2, 2.2
-    );
-    mat3 m3x3 = mat3(m2x2); // = mat3(
-    assert(m3x3 == mat3(vec3(1.1, 2.1, 0), vec3(1.2, 2.2, 0), vec3(0, 0, 1)));
-    mat2 mm2x2 = mat2(m3x3); // = m2x2
-    assert(mm2x2 == m2x2);
-  }
-
-  { // Components of vectors are accessed by array indexing with the []-operator (indexing starts with 0)
-    // or with the .-operator and the element names x, y, z, w or r, g, b, a or s, t, p, q
-    vec4 v = vec4(1.1, 2.2, 3.3, 4.4);
-    float a = v[3]; // = 4.4
-    float b = v.w; // = 4.4
-    float c = v.a; // = 4.4
-    float d = v.q; // = 4.4
-    assert([a,b,c,d].map!"a==4.4f".all);
-  }
-  { // It is also possible to construct new vectors by extending the .-notation ("swizzling"):
-    vec4 v = vec4(1.1, 2.2, 3.3, 4.4);
-    vec3 a = v.xyz; // = vec3(1.1, 2.2, 3.3)
-    vec3 b = v.bgr; // = vec3(3.3, 2.2, 1.1)
-    vec2 c = v.tt; // = vec2(2.2, 2.2)
-    assert(a==vec3(1.1, 2.2, 3.3) && b==vec3(3.3, 2.2, 1.1) && c==vec2(2.2, 2.2));
-  }
-  { // Matrices are considered to consist of column vectors, which are accessed by array indexing with the []-operator.
-    // Elements of the resulting (column) vector can be accessed as discussed above:
-    mat3 m = mat3(
-      1.1, 2.1, 3.1, // first column
-      1.2, 2.2, 3.2, // second column
-      1.3, 2.3, 3.3  // third column
-    );
-    vec3 column3 = m[2]; // = vec3(1.3, 2.3, 3.3)
-    float m20 = m[2][0]; // = 1.3
-    float m21 = m[2].y; // = 2.3
-    assert(column3 == vec3(1.3, 2.3, 3.3) && m20==1.3f && m21==2.3f);
-  }
-
-  { // Operators: If the binary operators *, /, +, -, =, *=, /=, +=, -= are used between vectors of the same type, they just work component-wise:
-    vec3 a = vec3(1.0, 2.0, 3.0);
-    vec3 b = vec3(0.1, 0.2, 0.3);
-    vec3 c = a + b; // = vec3(1.1, 2.2, 3.3)
-    vec3 d = a * b; // = vec3(0.1, 0.4, 0.9)
-    assert(c == vec3(1.1, 2.2, 3.3) && d.approxEqual(vec3(0.1, 0.4, 0.9)));
-  }
-  { // For matrices, these operators also work component-wise, except for the *-operator, which represents a matrix-matrix product
-    mat2 a = mat2(1., 2.,  3., 4.);
-    mat2 b = mat2(10., 20.,  30., 40.);
-    mat2 c = a * b;
-    mat2 expected = mat2(
-      1. * 10. + 3. * 20., 2. * 10. + 4. * 20.,
-      1. * 30. + 3. * 40., 2. * 30. + 4. * 40.
-    );
-    assert(c == expected);
-  }
-  { // For a component-wise matrix product, the built-in function matrixCompMult is provided.
-    auto a = mat2x3(vec3(1,2,3), vec3(4,5,6));
-    auto b = mat2x3(vec3(10,20,30), vec3(40,50,60));
-    assert(matrixCompMult(a, b) == mat2x3(vec3(10, 40, 90), vec3(160, 250, 360)));
-  }
-  { // The *-operator can also be used to multiply a floating-point value (i.e. a scalar) to all components of a vector or matrix (from left or right):
-    vec3 a = vec3(1.0, 2.0, 3.0);
-    mat3 m = mat3(1.0);
-    float s = 10.0;
-    vec3 b = s * a;   assert(b == vec3(10.0, 20.0, 30.0));
-    vec3 c = a * s;   assert(c == vec3(10.0, 20.0, 30.0));
-    mat3 m2 = s * m;  assert(m2 == mat3(10.0));
-    mat3 m3 = m * s;  assert(m3 == mat3(10.0));
-  }
-  { // more complex matrix multiplication test from https://people.richland.edu/james/lecture/m116/matrices/multiplication.html
-    auto a = mat3x2(1, 4, -2, 5, 3, -2),
-         b = mat4x3(vec3(1, -3, 6), vec3(-8, 6, 5), 4, 7, -1, vec3(-3, 2, 4));
-    assert(a*b == mat4x2(vec2(25, -23), vec2(-5, -12), vec2(-13, 53), vec2(5, -10)));
-  }
-  { // Furthermore, the *-operator can be used for matrix-vector products of the corresponding dimension
-    vec2 v = vec2(10., 20.);
-    mat2 m = mat2(1., 2.,  3., 4.);
-    assert(m*v == vec2(1. * 10. + 3. * 20., 2. * 10. + 4. * 20.));
-    assert(v*m == vec2(1. * 10. + 2. * 20., 3. * 10. + 4. * 20.)); //multiplying a vector from the left to a matrix corresponds to multiplying it from the right to the transposed matrix:
-  }
-  { // https://www.varsitytutors.com/hotmath/hotmath_help/topics/multiplying-vector-by-a-matrix#:~:text=Example%20%3A,number%20of%20rows%20in%20y%20.&text=First%2C%20multiply%20Row%201%20of,Column%201%20of%20the%20vector.
-    auto m = mat3(1, 4, 7, 2, 5, 8, 3, 6, 9);
-    auto v = vec3(2, 1, 3);
-    assert(m*v == vec3(13, 31, 49));
-  }
-
-  { // various tests of mine
-    immutable v1 = vec4(1,2,3,0);
-    Unqual!(typeof(v1)) v2 = v1;  assert(v1.z == 3);
-    v2.z++;                       assert(v2.b == 4);
-    assert(v1.gb == vec2(2, 3));
-    assert(v2 == vec4(1, 2, 4, 0));
-    v2.gba = vec3(10, [119, 12]);
-    auto f = dvec4(vec2([1,2]).yx, vec2(5, 6).y1);
-    assert(f == dvec4(2, 1, 6, 1));
-    assert(v2.rR01 == vec4(1, -1, 0, 1)); //Capital letter means negative
-    assert(vec3(1,2,3)+dvec3(5,6,7) == dvec3(6, 8, 10));
-    assert(vec3(1,2,3)*10.5f == vec3(10.5, 21, 31.5));
-    assert(10.5*vec3(1,2,3) == vec3(10.5, 21, 31.5));
-    assert(bvec3.basis(2) == bvec3(false, false, true)); // bool basis vector test
-
-    vec4 b;  b.yz = [5, 6];    assert(b == vec4(0, 5, 6, 0));
-    b.yz = 55;                 assert(b == vec4(0, 55, 55, 0));  //side effect: b.y and b.y both = 55
-    b *= vec4(5)._11xx;        assert(b == vec4(0, 55, 275, 0)); //55*5 = 275
-
-    auto i1 = ivec2(2, 3);  i1 <<= 3;  i1 = -i1 + 5;  i1 = ++i1;  i1 = ~i1;  i1++;
-    assert(i1 == ivec2(10, 18));
-
-    vec3[] va = [vec3(4)] ~ [vec3(5)]; //always have to use [], because of alias this
-    va ~= vec3(6);
-    assert(va == [vec3(4), vec3(5), vec3(6)]);
-
-    assert(3*mat2(2) == mat2(6, 0, 0, 6));
-    assert(mat2(1)+mat2(2) == mat2(3, 0, 0, 3));
-
-    assert(mat2x3(vec2(1,2), 3, 4, vec2(5,6)) == mat2x3(1,2,3,4,5,6));
-    assert(mat2(vec4(3)) == mat2(3,3,3,3));
-  }
-
-  { // implicit conversions
-    uvec2 a0 = ivec2(1, 2);
-    uvec3 a1 = ivec3(1, 2, 3);
-    uvec4 a2 = ivec4(1, 2, 3, 4);
-    vec2 a3 = ivec2(1, 2);
-    vec2 a4 = uvec2(1, 2);
-    dvec2 a5 = ivec2(1, 2);
-    dvec2 a6 = uvec2(1, 2);
-    dvec2 a7 = vec2(1, 2);
-    dmat2 m1 = mat2(vec4(1));
-  }
-  { // Angle & Trig. functions
-    static assert(is(typeof(radians(1   ))==float ));
-    static assert(is(typeof(radians(1.0f))==float ));
-    static assert(is(typeof(radians(1.0 ))==double));
-    static assert(is(typeof(radians(1.0L))==real  ));
-
-    assert(format!"%.15f"(PI) == "3.141592653589793"); //check PI for at least double precision
-    assert(360.radians.approxEqual(6.28319, 1e-5));
-    assert(7592.radians.degrees.approxEqual(7592));
-    assert(vec2(180, 360).radians.approxEqual(vec2(6.28319/2, 6.28319), 1e-5));
-    assert(PI.degrees == 180 && is(typeof(PI.degrees)==real));
-
-    assert(sin(5).approxEqual(-0.95892));
-    static assert(is( typeof(cos(dvec2(1, 2))) == dvec2 ));
-    assert(cos(dvec2(1, 2.5)).approxEqual(vec2(0.5403, -0.8011)));
-    assert(tan(ivec2(1, 2)).approxEqual(vec2(1.5574, -2.1850)));
-    assert(asin(.5).approxEqual(PI/6));
-    assert(acos(vec2(0, .5)).approxEqual(vec2(1.570, PI/3)));
-    // hiperbolic functions are skipped, those are mixins anyways
-    assert(atan(sqrt(3.0)).approxEqual(PI/3));
-    assert(atan(ivec2(1,2)).approxEqual(vec2(0.7853, 1.1071)));
-    assert(atan2(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
-    assert(atan2(vec2(1,2), 3) == atan(vec2(1,2), 3)); //atan is the overload in GLSL, not atan2
-  }
-  { // Exponential functions
-    static assert(is( typeof(pow(ivec2(2, 10), 2)) == ivec2 ));
-    assert(pow(ivec2(2, 10), 2) == ivec2(4, 100));
-    assert(pow(vec2(2.5, 10), 2) == vec2(6.25, 100));
-    assert(exp(0)==1 && exp2(2)==4 && exp10(3)==1000);
-    assert(log(5).approxEqual(1.6094) && log2(8)==3 && log10(1000)==3);
-
-    static assert(is( typeof(sqr(5))==int ));
-    static assert(is( typeof(sqr(5.0))==double ));
-    assert(sqr(5)==25 && sqr(vec2(2, 3))==vec2(4, 9));
-
-    assert(sqrt(4)==2);
-    assert(inversesqrt(4)==.5);
-    static assert(is( typeof(inversesqrt(4))==float ));
-  }
-  { // Common functions
-    auto a = vec3(1, 2, 3);
-    auto b = vec3(4, 0, 6);
-    assert(min(a, b) == vec3(1, 0, 3));
-    assert(min(a, 2) == vec3(1, 2, 2));
-    assert(min(b, 5) == vec3(4, 0, 5));
-    assert(max(b, 5) == vec3(5, 5, 6));
-    assert(min(2, a) == vec3(1, 2, 2));
-    assert(min(5, b) == vec3(4, 0, 5));
-    assert(max(5, b) == vec3(5, 5, 6));
-
-    assert(vec3(1,2,3).clamp(1.5, 2.5) == vec3(1.5, 2, 2.5));
-    assert(ivec3(8).clamp(1.5, vec3(4, 5, 6)) == vec3(4, 5, 6));
-
-    assert(mix(vec2(1,2), vec2(2, 4), 0.5f) == vec2(1.5, 3));
-    assert(mix(vec2(1,2), 2, 0.5) == vec2(1.5, 2));
-
-    assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), false) == vec2(2, 3));
-    assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), true ) == vec2(4, 5));
-
-    assert(cmp("abc", "abc")==0 && cmp("abc", "abcd")<0 && cmp("bbc", "abc"w)>0 && cmp([1L, 2, 3], [1, 2])>0 && cmp!"a<b"([1L, 2, 3], [1, 2])>0);
-    assert((cmp(1, 2)>0)==(std.math.cmp(1.0,2.0)>0));
-    assert(cmp(vec2(1),1)==vec2(cmp(1,1)) && cmp(vec2(1),2)==vec2(cmp(1,2)) && cmp(vec2(2),1)==vec2(cmp(2,1)));
-
-    //assert(step(vec2(1, 2, 3), 2) == vec2(0, 1, 1));
-  }
-  { // Matrix functions
-    assert(matrixCompMult(mat2(1, 2, 3, 4), mat2(vec4(2))) == mat2(2, 4, 6, 8));
-
-    //transpose
-    assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose == mat3x2(1,4,2,5,3,6));
-    assert(mat2x3(vec3(1,2,3),vec3(4,5,6)).transpose.transpose == mat2x3(vec3(1,2,3),vec3(4,5,6)));
-
-    //outer product
-    assert(outerProduct(vec3(3,2,1), vec4(7,2,3,1)) == mat4x3(21,14,7, 6,4,2, 9,6,3, 3,2,1));
-
-    //determinant
-    assert(determinant(mat2(4, 3, 6, 8)) == 14);
-    assert(mat3(6,4,2,1,-2,8,1,5,7).determinant == -306);
-    assert(mat4(4,0,0,0, 3,1,-1,3, 2,-3,3,1, 2,3,3,1).determinant == -240);
-
-    //inverse
-    assert(mat2(4,2,7,6).inverse.approxEqual( mat2(.6, -.2, -.7, .4) ));
-    assert(mat3(3,2,0, 0,0,1, 2,-2,1).inverse.approxEqual( mat3(.2,-.2,.2, .2,.3,-.3, 0,1,0) ));
-    assert(mat4(-3,-3,-2,1, -1,1,3,-2, 2,2,0,-3, -3,-2,1,1).inverse.approxEqual(mat4(-1.571, -2.142, 2, 3.285,  2,3,-3,-5, -1,-1,1,2, 0.285,0.571,-1,-1.142)));
-  }
+  unittest_Vectors;
+  unittest_Matrices;
+  unittest_AngleAndTrigFunctions;
+  unittest_ExponentialFunctions;
+  unittest_CommonFunctions;
+  unittest_MatrixFunctions;
 
   //https://www.shadertoy.com/view/XsjGDt
-
 }
 
-void main(){ application.runConsole({
-  //__traits(allMembers, vec4).stringof.print;
-
-  testVectorsAndMatrices;
-
-}); }
+void main(){
+  import het.utils; application.runConsole({
+    unittest_main;
+    writeln("done main");
+  });
+}
