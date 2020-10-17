@@ -8,6 +8,9 @@ module het.math;
 // Avoid importing std.moth in projects, or else it will lead to ambiguity errors because the function names are the same.
 // Don't use het.utils in this module, het.utils will use this and publicly import this.
 
+// imports ///////////////////////////////////////////
+
+// static import because all imported and extended names must be fully qualified.
 static import std.math;
 
 // important constants from std.math
@@ -28,6 +31,9 @@ import std.meta : AliasSeq;
 
 import std.exception : enforce;
 import std.stdio : writeln;
+
+
+// utility stuff ////////////////////////////////////////////////////
 
 //todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 alias myto(T) = stdto!T;
@@ -622,7 +628,7 @@ auto radians(real scale = PI/180, A)(in A a){
 }
 auto degrees(A)(in A a){ return radians!(180/PI)(a); }
 
-/// Mixins an std.math funct that works on scalar or vector data. Cast the parameter at least to a float and calls fun()
+/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 private enum UnaryStdMathFunct(string name) = q{
   auto #(A)(in A a){
     alias CT = CommonScalarType!(A, float);
@@ -661,7 +667,6 @@ private void unittest_AngleAndTrigFunctions() {
   assert(asin(.5).approxEqual(PI/6));
   assert(acos(vec2(0, .5)).approxEqual(vec2(1.570, PI/3)));
   // hiperbolic functions are skipped, those are mixins anyways
-  assert(atan(sqrt(3.0)).approxEqual(PI/3));
   assert(atan(ivec2(1,2)).approxEqual(vec2(0.7853, 1.1071)));
   assert(atan(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
   assert(atan(vec2(1,2), 3) == atan(vec2(1,2), 3)); //atan is the overload in GLSL, not atan2
@@ -706,6 +711,9 @@ private void unittest_ExponentialFunctions(){
 
   static assert(is( typeof(sqr(5))==int ));
   static assert(is( typeof(sqr(5.0))==double ));
+
+  assert(atan(sqrt(3.0)).approxEqual(PI/3));
+  assert(atan(sqrt(3)).approxEqual(PI/3));
 
   assert(sqr(5)==25 && sqr(vec2(2, 3))==vec2(4, 9));
   assert(signedsqr(vec2(-5, 3))==vec2(-25, 9));
@@ -937,6 +945,11 @@ private void unittest_CommonFunctions(){
 }
 
 // Geometric functions ///////////////////////////////////////
+
+//todo: check these in asm and learn about the compiler.
+auto sqrLength          (T, int N)(in Vector!(T, N) a) { return (a^^2).array[].sum;    }
+auto length             (T, int N)(in Vector!(T, N) a) { return sqrt(sqrLength(a));    }
+auto manhattanLength    (T, int N)(in Vector!(T, N) a) { return a.array[].map!abs.sum; }
 
 // Removes vector component i
 auto minorVector(int i, T, int N)(in Vector!(T, N) v){
