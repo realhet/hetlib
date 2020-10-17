@@ -1,12 +1,4 @@
-//@exe
-//@import c:\d\libs
-//@ldc
-//@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-///@release
-//@debug
-
-//module testGeometry2;
-///@compile --unittest  //this is broken because of my shitty linker usage
+module het.math;
 
 // This module replaces and extends the interface of std.math.
 // Anything usefull in std.math should wrapped here to support vector/scalar operations.
@@ -1045,6 +1037,7 @@ private void unittest_MatrixFunctions(){
 ////////////////////////////////////////////////////////////////////////////////
 
 
+//todo: when the ide supports unit testing, this should be private. Also needs real unittest{} blocks.
 void unittest_main(){
   version(assert){}else enforce(0, "Turn on debug build for asserts.");
 
@@ -1060,12 +1053,3 @@ void unittest_main(){
 }
 
 unittest{ unittest_main; }
-
-version(unittest){
-  void main(){}
-}else{
-  void main(){ import het.utils; application.runConsole({
-    unittest_main;
-    writeln("done main");
-  }); }
-}
