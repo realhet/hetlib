@@ -18,7 +18,9 @@ public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI);
 public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly;
 
 // publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
-public import std.algorithm;
+public import std.algorithm; //extends: cmp, any, all, equal, min, max
+
+public import std.functional; //extends: lessThan, greaterThan, not
 
 // import locally used things.     //must not import het.utils to keep it simle and standalone
 import std.format : format;
@@ -34,6 +36,8 @@ import std.stdio : writeln;
 
 
 // utility stuff ////////////////////////////////////////////////////
+
+enum approxEqualDefaultDiff = 1e-3f;
 
 //todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 alias myto(T) = stdto!T;
@@ -260,7 +264,7 @@ if(N.inRange(2, 4)){
     return this;
   }
 
-  bool approxEqual(T)(in T other, float maxDiff = 1e-3) const{
+  bool approxEqual(T)(in T other, float maxDiff = approxEqualDefaultDiff) const{
     static assert(isVector!T && T.length==length);
     static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false; //todo: refact
     return true;
@@ -492,7 +496,7 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
     return this;
   }
 
-  bool approxEqual(T)(in T other, float maxDiff = 1e-3) const{
+  bool approxEqual(T)(in T other, float maxDiff = approxEqualDefaultDiff) const{
     static assert(isMatrix!T && T.width==width && T.height==height);
     static foreach(j; 0..height)static foreach(i; 0..width)
       if(abs(this[i][j]-other[i][j]) > maxDiff) return false;  //todo: verify abs
@@ -613,7 +617,7 @@ private void unittest_Matrices(){
 //! Functions /////////////////////////////////////////////////
 
 /// this is my approxEqual. The one in std.math is too complicated
-bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = 1e-3) {
+bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = approxEqualDefaultDiff) {
   return abs(a-b) <= maxDiff;
 }
 
@@ -675,7 +679,7 @@ private void unittest_AngleAndTrigFunctions() {
   assert(cos(dvec2(1, 2.5)).approxEqual(vec2(0.5403, -0.8011)));
   assert(tan(ivec2(1, 2)).approxEqual(vec2(1.5574, -2.1850)));
   assert(asin(.5).approxEqual(PI/6));
-  assert(acos(vec2(0, .5)).approxEqual(vec2(1.570, PI/3)));
+  assert(acos(vec2(0, .5)).approxEqual(vec2(1.5707, PI/3)));
   // hiperbolic functions are skipped, those are mixins anyways
   assert(atan(ivec2(1,2)).approxEqual(vec2(0.7853, 1.1071)));
   assert(atan(vec2(1,2), 3).approxEqual(vec2(.3217, .588)));
@@ -796,12 +800,11 @@ auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
 }
 
 //note: cmp is extending/hijacking std.algorihtm.cmp's functionality with vector/scalar mode.
-auto cmp(string pred, A, B)(in A a, in B b){ return std.algorithm.cmp!pred(a, b); } //explicit predicate
-
-auto cmp(A, B)(in A a, in B b){ //no predicate, optional vector/scalar mode
-  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){ // scalar vector combo? This function will serve it.
+public import std.algorithm: cmp;
+auto cmp(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)) { //no predicate, optional vector/scalar mode
+//  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){ // scalar vector combo? This function will serve it.
     return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b); // std.math.cmp(a, b) can only work on the excat same type.
-  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
+//  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
 }
 
 auto mix(A, B, T)(in A a, in B b, in T t){
@@ -891,6 +894,8 @@ private void unittest_CommonFunctions(){
   }
 
   assert(cmp("abc", "abc")==0 && cmp("abc", "abcd")<0 && cmp("bbc", "abc"w)>0 && cmp([1L, 2, 3], [1, 2])>0 && cmp!"a<b"([1L, 2, 3], [1, 2])>0);
+  assert(cmp([1,2,3], [1,2]) > 0);
+  assert(cmp([1,2], [1,2,3]) < 0);
   assert(cmp(-100.0, -0.5) < 0);
   assert((cmp(1, 2)>0)==(std.math.cmp(1.0,2.0)>0));
   assert(cmp(1, 1)==0);
@@ -988,6 +993,24 @@ auto normalize(A)(in A a){
   return a*(1.0f/length(a));
 }
 
+/// Orients a vector to point away from a surface as defined by its normal.
+auto faceforward(A, B, C)(in A N, in B I, in C Nref){ return dot(Nref, I) < 0 ? N : -N; }
+
+/// For a given incident vector I and surface normal N reflect returns the reflection direction.
+/// N should be normalized in order to achieve the desired result.
+auto reflect(A, B)(in A I, in B N){
+  return I - 2 * dot(N, I) * N;
+}
+
+/// For a given incident vector I, surface normal N and ratio of indices of refraction, eta, refract returns the refraction vector, R.
+/// The input parameters I and N should be normalized in order to achieve the desired result.
+auto reflect(A, B)(in A I, in B N){
+  const dotNI = dot(N, I),
+        k = 1 - eta * eta * (1 - dotNI^^2);
+  return k < 0.0 ? CommonVectorType!(A, B).Null
+                 : eta * I - (eta * dotNI + sqrt(k)) * N;
+}
+
 // Removes vector component i
 auto minorVector(int i, T, int N)(in Vector!(T, N) v){
   Vector!(T, N-1) res;
@@ -995,7 +1018,34 @@ auto minorVector(int i, T, int N)(in Vector!(T, N) v){
   return res;
 }
 
+
 private void unittest_GeometricFunctions(){
+  // length()
+  auto v = [vec2(1,2), vec2(-2, -1), vec2(5, 0)];
+  static assert(vec2.length == 2 && v[0].length == 2); //length property of static arrays
+
+  //dynamic array length must ONLY returned as a property, not as a function()
+  static assert(!__traits(compiles, length(v)) && __traits(compiles, v.length));
+
+  assert(v.length == 3); //dynamic length test
+  assert(v[0].length == 2); //static vector length
+  assert(length(v[0]).approxEqual(sqrt(1^^2 + 2^^2)) && length(v[0])==length(v[1]) && length(v[2])==5); //veryfy length calculations
+  assert(v.map!manhattanLength.equal([3, 3, 5]));
+
+  // distance()
+  const a = ivec2(1, -4), b = vec2(12.5, 73.4);
+  assert(distance         (a, b) == length         (a-b));
+  assert(sqrDistance      (a, b) == sqrLength      (b-a));
+  assert(manhattanDistance(a, b) == manhattanLength(a-b));
+
+  assert(dot(vec2(3, 7), 2) == 3*2 + 7*2);
+
+  assert(cross(a, b) == vec3(0, 0, determinant(mat2(a, b))));
+  assert(cross(vec3(3,-3,1), vec3(4,9,2)) == vec3(-15,-2,39));
+
+  assert(normalize(vec2(-0.5, 2)).approxEqual(vec2(-0.242536, 0.970143)));
+
+  //todo: faceforward, reflect, refract
 
   //minorVector
   assert(vec3(1,2,3).minorVector!0 == vec2(2,3));
@@ -1081,6 +1131,83 @@ private void unittest_MatrixFunctions(){
   assert(mat4(-3,-3,-2,1, -1,1,3,-2, 2,2,0,-3, -3,-2,1,1).inverse.approxEqual(mat4(-1.571, -2.142, 2, 3.285,  2,3,-3,-5, -1,-1,1,2, 0.285,0.571,-1,-1.142)));
 }
 
+// Vector relational functions //////////////////////////////////////////
+
+//todo: !!!!!!!!!!!!!!! atirni az osszes in-t auto ref-re es merni a sebesseget egy reprezentativ teszt segitsegevel.
+//A lessThan-ra eleg az in is. nem kell a safeOp!">"-ban levo auto ref.
+//Asm-ban a lessThan-t megneztem: azt szanaszet optimizalta, nem is volt lessThan a belso loopban.
+//de lehet, hogy az auto ref valamiert jobb. Nem veletlenul azt hasznaljak az std.functional.safeOp-ban.
+
+/// this is an extension to std.functional.safeOp. (lessThan, greaterThan, etc.)
+private auto mySafeOp(string op, A, B)(in A a, in B b){
+  static if(anyVector!(A, B)) return generateVector!(bool, (a, b) => mixin("a"~op~"b") )(a, b);
+                         else return std.functional.safeOp!op(a, b);
+}
+
+auto lessThan        (A, B)(in A a, in B b){ return mySafeOp!"<" (a, b); }
+auto lessThanEqual   (A, B)(in A a, in B b){ return mySafeOp!"<="(a, b); }
+auto greaterThan     (A, B)(in A a, in B b){ return mySafeOp!">" (a, b); }
+auto greaterThanEqual(A, B)(in A a, in B b){ return mySafeOp!">="(a, b); }
+
+public import std.algorithm : equal;
+auto equal(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) || (isNumeric!B || isVector!B)) { return a == b; }
+
+auto notEqual(A, B)(in A a, in B b){ return !equal(a, b); }
+
+public import std.algorithm: all;
+auto all(T, int N)(in Vector!(T, N) a){ return std.algorithm.all(a[]); }
+
+public import std.algorithm: any;
+auto any(T, int N)(in Vector!(T, N) a){ return std.algorithm.any(a[]); }
+
+public import std.functional: not;
+auto not(int N)(in Vector!(bool, N) a){ return a.generateVector!(float, a => !a); }
+
+private void unittest_originalEqual(){ // copied from Dlang documentation
+  int[4] a = [ 1, 2, 4, 3 ];
+  assert(!equal(a[], a[1..$]));
+  assert(equal(a[], a[]));
+  assert(equal!((a, b) => a == b)(a[], a[]));
+
+  // different types
+  double[4] b = [ 1.0, 2, 4, 3];
+  assert(!equal(a[], b[1..$]));
+  assert(equal(a[], b[]));
+}
+
+private void unittest_VectorRelationalFunctions(){
+  assert(lessThan   (1, 2)); //original functionality
+  assert(greaterThan(2, 1));
+
+  assert([3,1,2].sort!lessThan   .equal([1,2,3])); //lessThan    as a predicate in sort()
+  assert([3,1,2].sort!greaterThan.equal([3,2,1])); //greaterThan as a predicate in sort()
+  const a = vec3(1,2,3), b = uvec3(3,2,1);
+  assert(lessThan        (a, b) == bvec3(true, false, false));
+  assert(lessThanEqual   (a, b) == bvec3(true, true , false));
+  assert(greaterThan     (b, a) == bvec3(true, false, false));
+  assert(greaterThanEqual(b, a) == bvec3(true, true , false));
+
+  unittest_originalEqual;
+
+  assert(!equal(1,2) && equal(2,2)); //extended functionality: works for scalar too
+  assert(equal([1,2],[1.0,2])); //but it works well for ranges.
+  assert(equal(vec2(2,2), 2) && equal(2, vec2(2,2)));
+  assert(equal(vec2(1,3), uvec2(1,3)));
+  assert(!notEqual(vec2(1,3), uvec2(1,3)));
+  assert(notEqual(vec2(0,3), uvec2(1,3)));
+
+  assert([true, true].all);
+  assert([false, false].all!"!a");
+  assert(![true, false].all);
+  assert(all(bvec3(1)) && !all(vec2(0,1)));
+
+  assert([9, 0].any!"a==9");
+  assert([true, false].any && !([0].any));
+  assert(any(bvec3(0,1,0)) && !any(vec2(0)));
+
+  assert("   H".find!(not!(unaryFun!`a==' '`)) == "H"); // original std.functional.not functionality
+  assert(bvec3(0,1,0).not == bvec3(1,0,1));
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Tests                                                                   ///
@@ -1098,6 +1225,7 @@ void unittest_main(){
   unittest_CommonFunctions;
   unittest_GeometricFunctions;
   unittest_MatrixFunctions;
+  unittest_VectorRelationalFunctions;
 
   //https://www.shadertoy.com/view/XsjGDt
 }
