@@ -8,20 +8,22 @@
 //module testGeometry2;
 ///@compile --unittest  //this is broken because of my shitty linker usage
 
-// publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
-public import std.algorithm;
-
 // This module replaces and extends the interface of std.math.
 // Anything usefull in std.math should wrapped here to support vector/scalar operations.
 // This is to ensure, that there will be no conflicting orevload sets between this module and std.math.
+//
+// Notes:
+// Avoid importing std.moth in projects, or else it will lead to ambiguity errors because the function names are the same.
+// Don't use het.utils in this module, het.utils will use this and publicly import this.
+
 static import std.math;
 
 // important constants from std.math
 public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI);
 public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly;
 
-// probably usefull stuff in std.math
-//   nextPow2  truncPow2  nextDown  nextUp  nextafter isPowerOf2
+// publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
+public import std.algorithm;
 
 // import locally used things.     //must not import het.utils to keep it simle and standalone
 import std.format : format;
@@ -759,28 +761,9 @@ auto modf(A, B)(in A a, out B b) {
 }
 
 private auto minMax(bool isMin, T, U)(in T a, in U b){
-
-  auto doit(T, U)(in T a, in U b){
-    //it uses std.algorithm, maybe it's better than a tenary ?: operation.
-    return isMin ? std.algorithm.min(a, b) : std.algorithm.max(a, b);
-  }
-
-  static if(isNumeric!T && isNumeric!U){
-    return doit(a, b);
-  }else static if(isVector!T && isNumeric!U){
-    CommonVectorType!(T, U) res;
-    static foreach(i; 0..T.length) res.array[i] = doit(a.array[i], b);
-    return res;
-  }else static if(isNumeric!T && isVector!U){
-    return minMax!isMin(b, a); //same but different order
-  }else static if(isVector!T && isVector!U){
-    static assert(T.length == U.length, "vector dimension mismatch");
-    CommonVectorType!(T, U) res;
-    static foreach(i; 0..T.length) res.array[i] = doit(a.array[i], b.array[i]);
-    return res;
-  }else{
-    static assert("Invalid operation");
-  }
+  return generateVector!(CommonScalarType!(T, U),
+    (a, b) => isMin ? std.algorithm.min(a, b) : std.algorithm.max(a, b)
+  )(a, b); //maybe it's better than a tenary ?: operation.
 }
 
 auto min(T...)(in T args){ //note: std.algorithm.min is (T t)
@@ -802,25 +785,18 @@ auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
                                else return std.algorithm.clamp(val, lower, upper);
 }
 
-auto cmp(string pred, A, B)(in A a, in B b){ return std.algorithm.cmp!pred(a, b); }
+//note: cmp is extending/hijacking std.algorihtm.cmp's functionality with vector/scalar mode.
+auto cmp(string pred, A, B)(in A a, in B b){ return std.algorithm.cmp!pred(a, b); } //explicit predicate
 
-auto cmp(A, B)(in A a, in B b){
-  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){
-    static if(anyVector!(A, B)){
-      Vector!(int, CommonVectorLength!(A, B)) res;
-      static foreach(i; 0..res.length) res[i] = cmp(a.vectorAccess!i, b.vectorAccess!i);
-      return res;
-    }else return a==b ? 0 : a<b ? -1 : 1;   //std.math.cmp(a, b); can only work on the excat same type.
-  }else return std.algorithm.cmp(a, b);
+auto cmp(A, B)(in A a, in B b){ //no predicate, optional vector/scalar mode
+  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){ // scalar vector combo? This function will serve it.
+    return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b); // std.math.cmp(a, b) can only work on the excat same type.
+  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
 }
 
 auto mix(A, B, T)(in A a, in B b, in T t){
   static if(is(Unqual!T==bool)) return mix(a, b, int(t));
-  static if(anyVector!(A, B, T)){
-    CommonVectorType!(A, B, T) res;
-    static foreach(i; 0..res.length) res[i] = mix(vectorAccess!i(a), vectorAccess!i(b), vectorAccess!i(t));
-    return res;
-  }else return a*(1-t) + b*t;
+  return generateVector!(CommonScalarType!(A, B, T), (a, b, t) => a*(1-t) + b*t)(a, b, t);
 }
 
 auto step(A, B)(in A edge, in B x){
@@ -840,6 +816,41 @@ auto isnan(A)(in A a){ return a.generateVector!(bool, a => std.math.isNaN     (a
 auto isinf(A)(in A a){ return a.generateVector!(bool, a => std.math.isInfinity(a) ); }
 auto isfin(A)(in A a){ return a.generateVector!(bool, a => std.math.isFinite  (a) ); }
 
+auto isPowerOf2(A)(in A a){ return a.generateVector!(bool, a => std.math.isPowerOf2(a) ); }
+
+auto nextPow2 (A)(in A a){ return a.generateVector!(ScalarType!A, a => std.math.nextPow2 (a) ); }
+auto truncPow2(A)(in A a){ return a.generateVector!(ScalarType!A, a => std.math.truncPow2(a) ); }
+auto prevPow2 (A)(in A a){ return a.generateVector!(ScalarType!A, a => isPowerOf2(a) ? a/2 : std.math.truncPow2(a) ); }
+
+auto nextUp   (A)(in A a){ static assert(isFloatingPoint!(ScalarType!A)); return a.generateVector!(A, a => std.math.nextUp  (a) ); }
+auto nextDown (A)(in A a){ static assert(isFloatingPoint!(ScalarType!A)); return a.generateVector!(A, a => std.math.nextDown(a) ); }
+
+auto nextAfter(A, B)(in A a, in B b){ //a goes towads b
+  static assert(isFloatingPoint!(ScalarType!A));
+  return generateVector!(A, (a, b) => std.math.nextafter(a, cast(A) b) )(a, b);
+}
+
+private auto floatBitsTo(T, A)(in A a){
+  static assert(is(ScalarType!A==float), "Unsupported type. float expected.");
+  static if(isVector!A) return *(cast(Vector!(T, A.length)*) (&a));
+                   else return *(cast(T*) (&a));
+}
+
+auto floatBitsToInt (A)(in A a){ return floatBitsTo!int (a); }
+auto floatBitsToUint(A)(in A a){ return floatBitsTo!uint(a); }
+
+private auto bitsToFloat(T, A)(in A a){
+  static assert(is(ScalarType!A==T), "Unsupported type. "~T.stringof~" expected.");
+  static if(isVector!A) return *(cast(Vector!(float, A.length)*) (&a));
+                   else return *(cast(float*) (&a));
+}
+
+auto intBitsToFloat (A)(in A a){ return bitsToFloat!int (a); }
+auto uintBitsToFloat(A)(in A a){ return bitsToFloat!uint(a); }
+
+auto fma(A, B, C)(in A a, in B b, in C c){ // no extra precision. it's just here for compatibility.
+  return generateVector!(CommonScalarType!(A, B, C), (a, b, c) => a * b + c)(a, b, c);
+}
 
 private void unittest_CommonFunctions(){
   assert(abs(vec2(-5, 5))==vec2(5, 5));
@@ -872,6 +883,8 @@ private void unittest_CommonFunctions(){
   assert(cmp("abc", "abc")==0 && cmp("abc", "abcd")<0 && cmp("bbc", "abc"w)>0 && cmp([1L, 2, 3], [1, 2])>0 && cmp!"a<b"([1L, 2, 3], [1, 2])>0);
   assert(cmp(-100.0, -0.5) < 0);
   assert((cmp(1, 2)>0)==(std.math.cmp(1.0,2.0)>0));
+  assert(cmp(1, 1)==0);
+  assert((cmp(2, 1)>0)==(std.math.cmp(2.0,1.0)>0));
   assert(cmp(vec2(1),1)==vec2(cmp(1,1)) && cmp(vec2(1),2)==vec2(cmp(1,2)) && cmp(vec2(2),1)==vec2(cmp(2,1)));
 
   assert(min(1, 2.0)==1 && max(1, 2)==2);
@@ -883,6 +896,8 @@ private void unittest_CommonFunctions(){
   assert(min(2, a) == vec3(1, 2, 2));
   assert(min(5, b) == vec3(4, 0, 5));
   assert(max(5, b) == vec3(5, 5, 6));
+  assert(max(a, b, 3) == vec3(4, 3, 6));
+  assert(min(a, b, 2) == vec3(1, 0, 2));
 
   assert(vec3(1,2,3).clamp(1.5, 2.5) == vec3(1.5, 2, 2.5));
   assert(ivec3(8).clamp(1.5, vec3(4, 5, 6)) == vec3(4, 5, 6));
@@ -908,8 +923,43 @@ private void unittest_CommonFunctions(){
     assert(n.isfin == bvec4(1, 0, 0, 0));
   }
 
+  {// std.math only things
+    assert(isPowerOf2(vec4(1,2,3,4))==bvec4(true, true, false, true));
+    static assert(is(typeof(nextPow2(2))==int));
+    static assert(is(typeof(truncPow2(2.5L))==real));
+    assert(nextPow2(2)==4 && nextPow2(3.5)==4);
+    assert(prevPow2(2)==1 && prevPow2(2.5)==2);
+    assert(truncPow2(3.5)==2 && truncPow2(2)==2);
+    assert(nextUp(1.0f)>1 && nextDown(1.0)<1);
+    assert(nextAfter(5.0, 6)>5 && nextAfter(5.0, 4)<5);
+  }
+  {// Bit conversions
+    const v = vec4(1, -2, 3, PI);
+    assert(v.floatBitsToInt  == ivec4(1065353216, -1073741824, 1077936128, 1078530011));
+    assert(-2.0f.floatBitsToUint == 3221225472);
+    assert(1078530011.intBitsToFloat.approxEqual(PI));
+    assert(uvec2(1077936128, 1078530011).uintBitsToFloat.approxEqual(vec2(3, PI)));
+  }
+
+  assert(fma(2, 3, vec2(10, 20))==vec2(16, 26));
 }
 
+// Geometric functions ///////////////////////////////////////
+
+// Removes vector component i
+auto minorVector(int i, T, int N)(in Vector!(T, N) v){
+  Vector!(T, N-1) res;
+  foreach(k; 0..N) if(k!=i) res[k<i ? k : k-1] = v[k];
+  return res;
+}
+
+private void unittest_GeometricFunctions(){
+
+  //minorVector
+  assert(vec3(1,2,3).minorVector!0 == vec2(2,3));
+  assert(vec3(1,2,3).minorVector!1 == vec2(1,3));
+  assert(vec3(1,2,3).minorVector!2 == vec2(1,2));
+}
 
 // Matrix functions //////////////////////////////////////////
 
@@ -918,7 +968,7 @@ auto matrixCompMult(T, U)(in T a, in U b){
   static assert(T.width==U.width && T.height==U.height);
   Matrix!(CommonType!(T.ComponentType, U.ComponentType), T.width, T.height) res;
   static foreach(i; 0..T.width) static foreach(j; 0..T.height)
-      res[i][j] = a[i][j] * b[i][j];
+    res[i][j] = a[i][j] * b[i][j];
   return res;
 }
 
@@ -933,13 +983,6 @@ auto transpose(CT, int M, int N)(in Matrix!(CT, N, M) m){
   Matrix!(CT, M, N) a;
   foreach(i; 0..M) foreach(j; 0..N) a[i][j] = m[j][i];
   return a;
-}
-
-// Removes element i
-auto minorVector(int i, T, int N)(in Vector!(T, N) v){
-  Vector!(T, N-1) res;
-  foreach(k; 0..N) if(k!=i) res[k<i ? k : k-1] = v[k];
-  return res;
 }
 
 /// Removes the column i and row j
@@ -982,6 +1025,9 @@ private void unittest_MatrixFunctions(){
   //outer product
   assert(outerProduct(vec3(3,2,1), vec4(7,2,3,1)) == mat4x3(21,14,7, 6,4,2, 9,6,3, 3,2,1));
 
+  //minorMatrix (no GLSL)
+  assert(mat3(1,2,3,4,5,6,7,8,9).minorMatrix!(1,1) == mat2(1,3,7,9));
+
   //determinant
   assert(determinant(mat2(4, 3, 6, 8)) == 14);
   assert(mat3(6,4,2,1,-2,8,1,5,7).determinant == -306);
@@ -1007,13 +1053,15 @@ void unittest_main(){
   unittest_AngleAndTrigFunctions;
   unittest_ExponentialFunctions;
   unittest_CommonFunctions;
+  unittest_GeometricFunctions;
   unittest_MatrixFunctions;
 
   //https://www.shadertoy.com/view/XsjGDt
 }
 
+unittest{ unittest_main; }
+
 version(unittest){
-  unittest{ unittest_main; }
   void main(){}
 }else{
   void main(){ import het.utils; application.runConsole({
