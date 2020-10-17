@@ -170,7 +170,17 @@ if(N.inRange(2, 4)){
   bool isNull() const { return this == Null; }
   bool isNaN() const { static if(__traits(compiles, std.math.isNaN(array[0]))) static foreach(i; 0..N) if(std.math.isNaN(array[i])) return true; return false; }
 
-  bool opEquals(T)(in T other) const { return other.array == array; }
+  bool opEquals(T)(in T other) const {
+    static if(isVector!T){ // vector==vector
+      static assert(T.length == length);
+      static if(__traits(compiles, array==other.array))
+        return other.array == array;
+      else
+        return array.equal(other.array);
+    }else static if(__traits(compiles, array[0]==other)){ // vector==scalar
+      return array[0]==other;
+    }else static assert("Incompatible types: "~typeof(this).stringof~" and "~T.stringof);
+  }
 
   static auto basis(int n){ VectorType v;  v[n] = 1.myto!ComponentType;  return v; }
 
@@ -947,9 +957,36 @@ private void unittest_CommonFunctions(){
 // Geometric functions ///////////////////////////////////////
 
 //todo: check these in asm and learn about the compiler.
-auto sqrLength          (T, int N)(in Vector!(T, N) a) { return (a^^2).array[].sum;    }
-auto length             (T, int N)(in Vector!(T, N) a) { return sqrt(sqrLength(a));    }
-auto manhattanLength    (T, int N)(in Vector!(T, N) a) { return a.array[].map!abs.sum; }
+auto length             (T, int N)(in Vector!(T, N) a) { return sqrt(sqrLength(a)); }
+auto sqrLength          (T, int N)(in Vector!(T, N) a) { return (a^^2)[].sum;       }
+auto manhattanLength    (T, int N)(in Vector!(T, N) a) { return a[].map!abs.sum;    }
+
+auto distance           (A, B)(in A a, in B b) { return length         (a-b); }
+auto sqrDistance        (A, B)(in A a, in B b) { return sqrLength      (a-b); }
+auto manhattanDistance  (A, B)(in A a, in B b) { return manhattanLength(a-b); }
+
+auto dot(A, B)(in A a, in B b) {
+  //todo: make prettier errors, this needs more IDE integration
+  static assert(CommonVectorLength!(A, B) > 1, "Dot product needs at least 1 vector argument.");
+  return (a*b)[].sum;
+}
+
+auto cross(A, B)(in A a, in B b) {
+  alias len = CommonVectorLength!(A, B);
+  static if(len==2){
+    return cross(a.xy0, b.xy0);
+  }else static if(len==3){
+    alias V = Vector!(CommonScalarType!(A, B), 3);
+    return V(a.y*b.z - b.y*a.z,
+             a.z*b.x - b.z*a.x,
+             a.x*b.y - b.x*a.y);
+  }else static assert(0, "Cross product needs at least on 2D or 3D vector argument.");
+}
+
+auto normalize(A)(in A a){
+  static assert(isVector!A, "Normalize needs a vector argument.");
+  return a*(1.0f/length(a));
+}
 
 // Removes vector component i
 auto minorVector(int i, T, int N)(in Vector!(T, N) v){
