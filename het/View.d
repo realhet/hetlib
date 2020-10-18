@@ -53,8 +53,8 @@ public:
     V2f res = animated ? origin_anim : origin;
     if(centerCorrection){
       with(clientSize){
-        if(x.iRound&1) res.x += 0.5/getScale(animated);  //opt:fucking slow, need to be cached
-        if(y.iRound&1) res.y += 0.5/getScale(animated);
+        if(x.iround&1) res.x += 0.5/getScale(animated);  //opt:fucking slow, need to be cached
+        if(y.iround&1) res.y += 0.5/getScale(animated);
       }
     }
     return res;

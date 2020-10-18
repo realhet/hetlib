@@ -3,22 +3,18 @@ module het.draw3d;
 //http://faydoc.tripod.com/formats/3ds.htm
 //http://read.pudn.com/downloads70/sourcecode/windows/opengl/253342/INC/3DSFTK.H__.htm
 
-import het.utils, het.geometry, het.opengl;
-
-import gl3n.linalg;
+import het.utils, het.opengl;
 
 enum DUMP_3DS_IMPORT = false;
 
-//enforce my modifications for gl3n
-static assert(vec3.init==vec3(0), "gl3n.Vector.init is nan");
-static assert(mat4.init==mat4.identity, "gl3n.Matrix.init is nan");
+//enforce my modifications for gl3n... update: FUCK gl3n! :D
+//static assert(vec3.init==vec3(0), "gl3n.Vector.init is nan");
+//static assert(mat4.init==mat4.identity, "gl3n.Matrix.init is nan");
 
 
 struct VertexRec{
   V3f aPosition;
 }
-
-alias ivec2 = Vector!(int, 2);
 
 // utils /////////////////////////////////////////////////
 
@@ -173,7 +169,7 @@ private:
 
   static auto idx2mat(int val){
     auto m = mat4(0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1);
-    void setAxis(int n, int idx, int neg){ m.matrix[idx][n] = neg ? -1 : 1; }
+    void setAxis(int n, int idx, int neg){ m[idx][n] = neg ? -1 : 1; } //rowcol
     idxDecode(val, &setAxis);
     return m;
   }

@@ -917,7 +917,7 @@ void mouseMoveRel(float dx, float dy){
     slowMousePos += V2f(dx, dy);
   }else{
     POINT p; GetCursorPos(&p);
-    SetCursorPos(p.x+dx.iRound, p.y+dy.iRound);
+    SetCursorPos(p.x+dx.iround, p.y+dy.iround);
   }
 }
 

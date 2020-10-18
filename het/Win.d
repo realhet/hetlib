@@ -732,7 +732,7 @@ public:
       ctrl   = k("Ctrl" );
       screen = vRound(screenToClient(inputs.mouseAct));
       world  = view.invTrans(screen.toF);
-      wheel  = iRound(inputs["MW"].delta);
+      wheel  = iround(inputs["MW"].delta);
     }
     mouse._updateInternal(a);
 
@@ -817,7 +817,7 @@ public:
       deltaTime = timeTarget;
     }
 
-    int updateCnt = iRound(deltaTime/timeTarget).clamp(0, 1);
+    int updateCnt = iround(deltaTime/timeTarget).clamp(0, 1);
 
     deltaTime /= updateCnt;
 
@@ -840,7 +840,7 @@ public:
         UPSCnt++;
 
         //update FPS, UPS
-        if(chkSet(PSSec, lTrunc(totalTime))){
+        if(chkSet(PSSec, ltrunc(totalTime))){
           FPS = FPSCnt;  FPSCnt = 0;
           UPS = UPSCnt;  UPSCnt = 0;
         }

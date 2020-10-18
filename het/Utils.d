@@ -72,8 +72,9 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 //todo: IDE: ha nem release build van forditva, akkor az assert/in/out/invariant legyen jelolve szurkevel!
 +/
 
-public import std.string, std.array, std.algorithm, std.conv, std.typecons, std.range, std.functional,
-  std.format, std.math, std.traits, std.meta, core.stdc.string, het.debugclient;
+public import het.math; //het.math also imports std.algorithm, std.functional
+
+public import std.string, std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta, core.stdc.string, het.debugclient;
 
 //unicode stuff
 import std.encoding : transcode, Windows1252String;
@@ -90,9 +91,9 @@ public import std.bitmanip : swapEndian;
 
 //make oveload sets for colors
 public import het.color;
-public import std.math : abs, trunc, floor;
-public import std.algorithm : min, max;
-public import het.color : lerp, min, max, avg, absDiff;
+// bad public import std.math : abs, trunc, floor;
+// bad public import std.algorithm : min, max;
+// bad public import het.color : lerp, min, max, avg, absDiff;
 
 public import core.sys.windows.windows : SetPriorityClass, HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
   BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
@@ -831,13 +832,7 @@ float wrapInRange(ref float p, float pMin, float pMax, ref int wrapCnt){ //speci
 
 
 
-int iClamp(T)(const T val, const T mi, const T ma) { return cast(int)clamp(val, mi, ma); }
-
-auto toRad(T)(T d){ return d*(PI/180); }
-auto toDeg(T)(T d){ return d*(180/PI); }
-
-auto sinD(T)(T a){ return a.toRad.sin; }
-auto cosD(T)(T a){ return a.toRad.cos; }
+int iclamp(T)(const T val, const T mi, const T ma) { return cast(int)clamp(val, mi, ma); }
 
 
 T rcpf_fast(T)(const T x)if(__traits(isFloating, T)){
@@ -881,8 +876,7 @@ int iRemap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo
   return cast(int)remap_clamp(src, srcFrom, srcTo, dstFrom, dstTo);
 }
 
-int cmp(T)(in T a, in T b) { if(a<b) return -1; if(a>b) return 1; return 0; }
-
+//todo: rewrite to greaterThan, lessThan
 bool isAscending (T0, T1)(in T0 a, in T1 b){ return a < b; }
 bool isDescending(T0, T1)(in T0 a, in T1 b){ return a > b; }
 
@@ -906,25 +900,6 @@ void sort(T)(ref T a, ref T b, ref T c){
   sort(b, c);
 }
 
-//todo: ezek borzalmasan lassuak, tovabba a sima round() is gecilassu, szoval kell egy nap, amikor ezeket leoptimizalom teljesen.
-auto iRound(T)(in T x)if(isFloatingPoint!T) { return cast(int)round(x); }
-auto iTrunc(T)(in T x)if(isFloatingPoint!T) { return cast(int)trunc(x); }
-auto iFloor(T)(in T x)if(isFloatingPoint!T) { return cast(int)floor(x); }
-auto iCeil (T)(in T x)if(isFloatingPoint!T) { return cast(int) ceil(x); }
-
-auto lRound(T)(in T x)if(isFloatingPoint!T) { return cast(long)round(x); }
-auto lTrunc(T)(in T x)if(isFloatingPoint!T) { return cast(long)trunc(x); }
-auto lFloor(T)(in T x)if(isFloatingPoint!T) { return cast(long)floor(x); }
-auto lCeil (T)(in T x)if(isFloatingPoint!T) { return cast(long) ceil(x); }
-
-T avg(T)(in T a, in T b) if(isIntegral!T) { return (a+b)/2; }
-T avg(T)(in T a, in T b) if(isFloatingPoint!T) { return (a+b)*0.5f; }
-
-T absDiff(T)(in T a, in T b) { return abs(a-b); }
-
-
-T fract(T)(in T x) { return x-floor(x); }
-
 int alignUp  (int p, int align_) { return (p+align_-1)/align_*align_; }
 int alignDown(int p, int align_) { return p/align_*align_; }
 
@@ -932,12 +907,6 @@ bool chkSet  (ref bool b) { if( b) return false; else { b = true ; return true; 
 bool chkClear(ref bool b) { if(!b) return false; else { b = false; return true; } }
 
 bool chkSet(T)(ref T a, in T b) { if(a==b) return false; else { a = b; return true; } }
-
-T lerp(T)(in T a, in T b, in float t) if(isIntegral!T || isFloatingPoint!T) { return cast(T)(a+(b-a)*t); }
-
-int iLerp(T)(in T a, in T b, in float t) { return iRound(lerp(a, b, t)); }
-
-T unLerp(T)(in T a, in T b, in T r){ return a==b ? 0 : (r-a)/(b-a); }
 
 void divMod(T)(in T a, in T b, out T div, out T mod){
   div = a/b;
@@ -965,13 +934,9 @@ T aSinCos(T)(T x, T y)
 
 int nearest2NSize(int size)
 {
-  return size>0 ? 2^^iCeil(log2(size)) //todo: slow
+  return size>0 ? 2^^iceil(log2(size)) //todo: slow
                 : 0;
 }
-
-auto sqr(T)(T a){ return a*a; }
-
-T sgnSqr(T)(T x){ return x<0 ? -(x*x) : x*x; }
 
 bool isPrime(uint num){
   if (num == 2) return true;
@@ -1007,7 +972,6 @@ float ease(float in_=2, float out_=2)(float x){
   return (x^^in_)*(1-x)+(1-(1-x)^^out_)*x;
 }
 
-
 float peakLocation(float a, float b, float c, float* y=null){
   //https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
   auto d = (a-2*b+c),
@@ -1015,14 +979,6 @@ float peakLocation(float a, float b, float c, float* y=null){
   if(y) *y = b-0.25f*(a-c)*p;
   return p;
 }
-
-float det(float a, float b, float c, float d){ return a*d-c*b; }
-float det(float a, float b, float c, float d, float e, float f, float g, float h, float i){
-  return +a*det(e, f, h, i)
-         -d*det(b, c, h, i)
-         +g*det(b, c, e, f);
-}
-
 
 //https://www.desmos.com/calculator/otwqwldvpj
 auto logCodec(bool encode, T, float digits, int max)(float x){
@@ -1116,18 +1072,18 @@ T negate(T)(ref T a){ a = -a; return a; }
 bool follow(T)(ref T act, const T target, const T t, const T maxd)
 {
   T last = act;
-  act = lerp(act, target, t);
-  if(absDiff(act, target)<=maxd) act = target;
+  act = mix(act, target, t);
+  if(abs(act-target)<=maxd) act = target;
   return (act!=last);
 }
 
-bool followRGB(ref RGB act, RGB target, float t, int maxd)
+/*bool followRGB(ref RGB act, RGB target, float t, int maxd)
 {
   act = het.color.lerp(act, target, t);
   bool res = sad(target, act)>maxd;
   if(!res) act = target;
   return res;
-}
+}*/
 
 float animationT(float dt, float speed, float maxDt = 0.1f)
 {
@@ -1166,8 +1122,8 @@ struct Interval(T){
     IntInterval toIntInterval()const {
       const mi = int.min+1, ma = int.max-1;
       int lo, hi;
-      if(min<mi) lo = mi;else if(min>ma) lo = ma;else lo = iFloor(min);
-      if(max<mi) hi = mi;else if(max>ma) hi = ma;else hi = iCeil (max);
+      if(min<mi) lo = mi;else if(min>ma) lo = ma;else lo = ifloor(min);
+      if(max<mi) hi = mi;else if(max>ma) hi = ma;else hi = iceil (max);
       return IntInterval(lo, hi);
     }
   }
@@ -1219,8 +1175,8 @@ struct UpdateInterval{
       float idt = 1/dt;
 
       //simple & stupid: foreach(i; max(1, iFloor((tLast-tBase)*idt))..1+iCeil((tAct-tBase)*idt)) res += chk(tBase+i*dt);
-      int st = max(1, iFloor((tLast-tBase)*idt)); //inclusive  0th is the base
-      int en = iFloor((tAct-tBase)*idt)+1;        //exclusive
+      int st = max(1, ifloor((tLast-tBase)*idt)); //inclusive  0th is the base
+      int en = ifloor((tAct-tBase)*idt)+1;        //exclusive
 
       //simple loop: foreach(i; st..en) res += test(tBase+i*dt);
 
@@ -3529,7 +3485,7 @@ void benchmark_xxh(){
 
     writefln("len = %10d   time = %6.3f   MB/s = %9.3f", len, t1-t0, len/(t1-t0)/1024/1024);
 
-    len = iCeil(len*1.5);
+    len = iceil(len*1.5);
   }
 }
 
@@ -4499,8 +4455,8 @@ private{
          D400 = D100 * 4 + 1;
 
     SYSTEMTIME result;
-    if(isNaN(dateTime)) return result;
-    int D, I, T = iFloor(dateTime)+dateReference;
+    if(isnan(dateTime)) return result;
+    int D, I, T = ifloor(dateTime)+dateReference;
     if(T<=0) return result;
 
     result.wDayOfWeek = cast(ushort)(T%7 + 1);
@@ -4542,8 +4498,8 @@ private{
   SYSTEMTIME decodeTime(double dateTime)
   {
     SYSTEMTIME result;
-    if(isNaN(dateTime))return result;
-    int M, I = iFloor(fract(dateTime)*msecsInDay);
+    if(isnan(dateTime))return result;
+    int M, I = ifloor(fract(dateTime)*msecsInDay);
     with(result){
       divMod(I, 1000, I, M); wMilliseconds = cast(ushort)M;
       divMod(I,   60, I, M); wSecond       = cast(ushort)M;
@@ -4577,7 +4533,7 @@ struct Date{
   private int raw;
   this(int year, int month, int day){
     double a = encodeDate(year, month, day);
-    if(isNaN(a)) raw = 0;
+    if(isnan(a)) raw = 0;
             else raw = cast(int)a;
   }
   this(const SYSTEMTIME st){
@@ -4705,8 +4661,8 @@ struct DateTime{
   @property void ms   (ushort x) { auto st = decodeDateTime(raw); st.wMilliseconds = x; this = DateTime(st); }
 
   string toString()const {
-    if(isNaN(raw)) return "[NULL DateTime]";
-    Date d; d.raw = iFloor(raw);
+    if(isnan(raw)) return "[NULL DateTime]";
+    Date d; d.raw = ifloor(raw);
     Time t; t.raw = fract(raw);
     return d.toString ~ ' ' ~ t.toString;
   }
@@ -5078,7 +5034,7 @@ struct UDA{}
   struct CAPTION{ string text; }
   struct HINT{ string text; }
   struct UNIT{ string text; }
-  struct RANGE{ float low, high; bool valid()const{ return !low.isNaN && !high.isNaN; } }
+  struct RANGE{ float low, high; bool valid()const{ return !low.isnan && !high.isnan; } }
   struct INDENT{ }
   struct HIDDEN{ }
 }

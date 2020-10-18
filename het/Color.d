@@ -14,7 +14,7 @@ RGBA BGRA(uint a){ auto c = RGBA(a); c.rbSwap; return c; }
 auto inverse(in RGB  a){ return RGB (a.r^255, a.g^255, a.b^255     ); }
 auto inverse(in RGBA a){ return RGBA(a.r^255, a.g^255, a.b^255, a.a); }
 
-private ubyte f2b(float f){ return cast(ubyte)((f.clamp(0, 1)*255.0f).iRound); }
+private ubyte f2b(float f){ return cast(ubyte)((f.clamp(0, 1)*255.0f).iround); }
 private float b2f(int b){ return b*(1/255.0f); }
 private ubyte _rgb_to_l_fast(in ubyte[3] rgb)       { return cast(ubyte)((rgb[0]+(rgb[1]<<1)+rgb[2])>>2); }
 private float _rgbf_to_l(in float[3] comp)      { return comp[0]*0.299f + comp[1]*0.586f + comp[2]*0.114f; }
@@ -200,7 +200,7 @@ auto lerp(T, U)(in T a, in T b, U t)if(isColor8!T && isIntegral!U){
 }
 
 auto lerp(T, U)(in T a, in T b, U tf)if(isColor8!T && isFloatingPoint!U){
-  T res; int t = iRound(tf*255),  it = (255-t);
+  T res; int t = iround(tf*255),  it = (255-t);
   foreach(i; 0..a.comp.length)
     res.comp[i] = cast(ubyte)((a.comp[i]*it + b.comp[i]*t)>>8);
   return res;
@@ -266,7 +266,7 @@ RGBf HSVToRGBf(float H, float S, float V)
   if(!V) return RGBf(0,0,0);
 
   auto Hval = H * 6,
-       sel = iFloor(Hval),
+       sel = ifloor(Hval),
        mod = Hval - sel,
        v1 = V * (1 - S),
        v2 = V * (1 - S * mod),
@@ -612,7 +612,7 @@ class RegressionColorMap: ColorMap{
 
   override RGB eval(float x){
     x = x.clamp(0, 1);
-    return RGBf(poly(x, polys[0]), poly(x, polys[1]), poly(x, polys[2])).to!RGB;
+    return RGBf(evalPoly(x, polys[0]), evalPoly(x, polys[1]), evalPoly(x, polys[2])).to!RGB;
   }
 }
 
@@ -634,11 +634,11 @@ class DistinctColorMap: ColorMap{
 
     if(isLinear){
       x *= pal.length-1;
-      const i = x.iFloor, fr = x.fract;
+      const i = x.ifloor, fr = x.fract;
       return lerp(pal[i], pal[i+1], fr);
     }else{ // nearest
       x *= pal.length;
-      return pal[x.iFloor];
+      return pal[x.ifloor];
     }
   }
 }

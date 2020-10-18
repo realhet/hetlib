@@ -6,16 +6,16 @@ import het.utils, jsonizer;
 //todo: migrate with gl3n
 //todo: sortBounds() ez nem tul jo nev
 
-alias Point = V2f;
+alias Point = vec2;
 alias Rect = Bounds2f;
-alias Size = Typedef!(V2f, V2f.init, "Size");
+alias Size = Typedef!(vec2, vec2.init, "Size");
 
 //todo: a Rect az size-t kap, a bounds csak bound-okat.
 auto Rect2f(float x0, float y0, float xs, float ys){ return Bounds2f(x0, y0, x0+xs, y0+ys); }
 auto Rect2i(int   x0, int   y0, int   xs, int   ys){ return Bounds2i(x0, y0, x0+xs, y0+ys); }
 
-auto Rect2f(in V2f topLeft, in V2f size){ return Bounds2f(topLeft, topLeft+size); }
-auto Rect2i(in V2i topLeft, in V2i size){ return Bounds2i(topLeft, topLeft+size); }
+auto Rect2f(in vec2  topLeft, in vec2  size){ return Bounds2f(topLeft, topLeft+size); }
+auto Rect2i(in ivec2 topLeft, in ivec2 size){ return Bounds2i(topLeft, topLeft+size); }
 
 
 bool isVectorType(T)() { return is(T==V2i) || is(T==V2f) || is(T==V2d) || is(T==V3i) || is(T==V3f) || is(T==V3d); }
@@ -168,7 +168,7 @@ mixin template V2IntFuncts(V, E){ //only for floats
   V vRot(const V v, float rad) {
     float s = sin(rad), c = cos(rad);
     auto f = v.toF;
-    return V(iRound(c*f.x -s*f.y), iRound(s*f.x +c*f.y));
+    return V(iround(c*f.x -s*f.y), iround(s*f.x +c*f.y));
   }
 
   V alignUp(const V v, E align_)     { return V(het.utils.alignUp(v.x, align_), het.utils.alignUp(v.y, align_)); }
@@ -198,10 +198,10 @@ mixin template V2FloatFuncts(V, E){ //only for floats
   V vAvg    (const V a, const V b)           { return (a+b)*0.5f; }
   E vDist_prec(in V a, in V b)               { return (a-b).len_prec; }
   E vDist_fast(in V a, in V b)               { return (a-b).len_fast; }
-  auto vRound  (const V a)                   { return V2i(iRound(a.x), iRound(a.y)); } //todo: a vFloor-t meg az iFloor-t egy kalap ala hozni.
-  auto vTrunc  (const V a)                   { return V2i(iTrunc(a.x), iTrunc(a.y)); }
-  auto vFloor  (const V a)                   { return V2i(iFloor(a.x), iFloor(a.y)); }
-  auto vCeil   (const V a)                   { return V2i(iCeil (a.x), iCeil (a.y)); }
+  auto vRound  (const V a)                   { return V2i(iround(a.x), iround(a.y)); } //todo: a vFloor-t meg az iFloor-t egy kalap ala hozni.
+  auto vTrunc  (const V a)                   { return V2i(itrunc(a.x), itrunc(a.y)); }
+  auto vFloor  (const V a)                   { return V2i(ifloor(a.x), ifloor(a.y)); }
+  auto vCeil   (const V a)                   { return V2i(iceil (a.x), iceil (a.y)); }
   V vRot(const V v, E rad) {
     E s = sin(rad), c = cos(rad);
     return V(c*v.x -s*v.y, s*v.x +c*v.y);
@@ -230,10 +230,10 @@ mixin template V3FloatFuncts(V, E){ //only for floats
   V vAvg    (const V a, const V b)           { return (a+b)*0.5f; }
   E vDist_prec(const V a, const V b)         { return (a-b).len_prec; }
   E vDist_fast(const V a, const V b)         { return (a-b).len_fast; }
-  auto vRound  (const V a)                   { return V3i(iRound(a.x), iRound(a.y), iRound(a.z)); }
-  auto vTrunc  (const V a)                   { return V3i(iTrunc(a.x), iTrunc(a.y), iTrunc(a.z)); }
-  auto vFloor  (const V a)                   { return V3i(iFloor(a.x), iFloor(a.y), iFloor(a.z)); }
-  auto vCeil   (const V a)                   { return V3i(iCeil (a.x), iCeil (a.y), iCeil (a.z)); }
+  auto vRound  (const V a)                   { return V3i(iround(a.x), iround(a.y), iround(a.z)); }
+  auto vTrunc  (const V a)                   { return V3i(itrunc(a.x), itrunc(a.y), itrunc(a.z)); }
+  auto vFloor  (const V a)                   { return V3i(ifloor(a.x), ifloor(a.y), ifloor(a.z)); }
+  auto vCeil   (const V a)                   { return V3i(iceil (a.x), iceil (a.y), iceil (a.z)); }
 /*  V vRot(const V v, E rad) {
     E s = sin(rad), c = cos(rad);
     return V(c*v.x -s*v.y, s*v.x +c*v.y);
@@ -619,7 +619,7 @@ mixin template B3Members(B, V, E){ //BoundsType, VectorType, ElementType
 }
 
 mixin template B2FMembers(B, V, E){ //BoundsType, VectorType, ElementType
-  auto toI() const { return Bounds2i(iFloor(bMin.x), iFloor(bMin.y), iCeil(bMax.x), iCeil(bMax.y)); }
+  auto toI() const { return Bounds2i(ifloor(bMin.x), ifloor(bMin.y), iceil(bMax.x), iceil(bMax.y)); }
 }
 
 mixin template B2IMembers(B, V, E){ //BoundsType, VectorType, ElementType
@@ -628,7 +628,7 @@ mixin template B2IMembers(B, V, E){ //BoundsType, VectorType, ElementType
 }
 
 mixin template B3FMembers(B, V, E){ //BoundsType, VectorType, ElementType
-  auto toI() const { return Bounds3i(iFloor(bMin.x), iFloor(bMin.y), iFloor(bMin.z), iCeil(bMax.x), iCeil(bMax.y), iCeil(bMax.z)); }
+  auto toI() const { return Bounds3i(ifloor(bMin.x), ifloor(bMin.y), ifloor(bMin.z), iceil(bMax.x), iceil(bMax.y), iceil(bMax.z)); }
 }
 
 mixin template B3IMembers(B, V, E){ //BoundsType, VectorType, ElementType
@@ -1017,6 +1017,13 @@ struct QuadraticFitResult{    //todo: combine Quadratic and linear fitter
   bool isNull() const{ return !a && !b && !c; }
 
   float y(float x){ return a*x^^2 + b*x + c; }
+}
+
+private float det(float a, float b, float c, float d){ return a*d-c*b; }
+private float det(float a, float b, float c, float d, float e, float f, float g, float h, float i){
+  return +a*det(e, f, h, i)
+         -d*det(b, c, h, i)
+         +g*det(b, c, e, f);
 }
 
 auto quadraticFit(in V2f[] data){

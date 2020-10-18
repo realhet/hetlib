@@ -1,6 +1,6 @@
 module het.ui;
 
-import het.utils, het.geometry, het.draw2d, het.inputs, std.traits, het.stream, std.meta;
+import het.utils, het.draw2d, het.inputs, std.traits, het.stream, std.meta;
 
 public import het.uibase;
 
@@ -2664,7 +2664,7 @@ static cnt=0;
 
     int wrapCnt;
     if(_range.isEndless){
-      wrapCnt = normValue.floor.iRound;  //todo: refactor endless wrapCnt stuff
+      wrapCnt = normValue.floor.iround;  //todo: refactor endless wrapCnt stuff
       normValue = normValue-normValue.floor;
     }
 

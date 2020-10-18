@@ -37,7 +37,7 @@ import std.stdio : writeln;
 
 // utility stuff ////////////////////////////////////////////////////
 
-enum approxEqualDefaultDiff = 1e-3f;
+private enum approxEqualDefaultDiff = 1e-3f;
 
 //todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 alias myto(T) = stdto!T;
@@ -385,6 +385,10 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
   enum length = N;
 
   alias columns this;
+
+  // legendary matrices
+  static auto identity(){ return typeof(this)(1); }
+  static auto translation(CT)(in Vector!(CT, N-1) v) if(N>2) { auto res = identity; res[N-1][0..$-1] = v[]; return res; }
 
   //note : alias this enables inplicit conversion, but fucks up the ~ concat operator
   //ref auto opIndex(size_t i){ return columns[i]; } const opIndex(size_t i){ return columns[i]; }
@@ -812,6 +816,10 @@ auto mix(A, B, T)(in A a, in B b, in T t){
   return generateVector!(CommonScalarType!(A, B, T), (a, b, t) => a*(1-t) + b*t)(a, b, t);
 }
 
+auto unmix(A, B, T)(in A a, in B b, in T t){
+  return generateVector!(CommonScalarType!(A, B, T), (a, b, t) => (t-a)/(b-a) );
+}
+
 auto step(A, B)(in A edge, in B x){
   alias CT = CommonScalarType!(A, B);
   return generateVector!(CT, (edge, x) => x<edge ? 0 : 1 )(edge, x);
@@ -961,10 +969,19 @@ private void unittest_CommonFunctions(){
 
 // Geometric functions ///////////////////////////////////////
 
+// need a new sum because the original is summing with double, not float. The vector module is mainly float.
+auto sum(R)(R r){
+  import std.range : ElementType;
+  alias T = ElementType!R;
+  typeof(T(0)*2) sum = 0;  //the initial value is Type*2
+  foreach(a; r) sum += a;
+  return sum;
+}
+
 //todo: check these in asm and learn about the compiler.
 auto length             (T, int N)(in Vector!(T, N) a) { return sqrt(sqrLength(a)); }
-auto sqrLength          (T, int N)(in Vector!(T, N) a) { return (a^^2)[].sum;       }
-auto manhattanLength    (T, int N)(in Vector!(T, N) a) { return a[].map!abs.sum;    }
+auto sqrLength          (T, int N)(in Vector!(T, N) a) { return (a^^2)[].sum; }
+auto manhattanLength    (T, int N)(in Vector!(T, N) a) { return a[].map!abs.sum; }
 
 auto distance           (A, B)(in A a, in B b) { return length         (a-b); }
 auto sqrDistance        (A, B)(in A a, in B b) { return sqrLength      (a-b); }
@@ -1027,6 +1044,13 @@ private void unittest_GeometricFunctions(){
   //dynamic array length must ONLY returned as a property, not as a function()
   static assert(!__traits(compiles, length(v)) && __traits(compiles, v.length));
 
+  // my custom sum()
+  static assert(is(typeof([1   ].sum)==int   ));
+  static assert(is(typeof([0.5f].sum)==float )); // std.sum would return a double here.
+  static assert(is(typeof([0.5 ].sum)==double));
+  static assert(is(typeof([0.5L].sum)==real  ));
+
+  static assert(is(typeof(length(vec2(1,2)))==float)); // std.algorithm.sum would return a double. My sum is just summing floats as floats.
   assert(v.length == 3); //dynamic length test
   assert(v[0].length == 2); //static vector length
   assert(length(v[0]).approxEqual(sqrt(1^^2 + 2^^2)) && length(v[0])==length(v[1]) && length(v[2])==5); //veryfy length calculations

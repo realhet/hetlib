@@ -131,7 +131,7 @@ float cubicInterpolate(float[4] p, float x) { //http://www.paulinternet.nl/?page
 
 T cubicInterpolate(T)(T[4] p, float x) if(__traits(isIntegral, T)){ //http://www.paulinternet.nl/?page=bicubic
   float f = (p[1] + 0.5f * x*(p[2] - p[0] + x*(2*p[0] - 5*p[1] + 4*p[2] - p[3] + x*(3*(p[1] - p[2]) + p[3] - p[0]))));
-  return cast(T)f.iRound.clamp(T.min, T.max);
+  return cast(T) f.iround.clamp(T.min, T.max);
 }
 
 T bicubicInterpolate (T)(T[4][4] p, float x, float y) { //unoptimized recursive version
@@ -178,7 +178,7 @@ float linearInterpolate(float[2] p, float x) { //http://www.paulinternet.nl/?pag
 
 T linearInterpolate(T)(T[2] p, float x) if(__traits(isIntegral, T)){ //http://www.paulinternet.nl/?page=bicubic
   float f = p[1]*x + p[0]*(1-x);
-  return cast(T)f.iRound.clamp(T.min, T.max);
+  return cast(T) f.iround.clamp(T.min, T.max);
 }
 
 T bilinearInterpolate (T)(T[2][2] p, float x, float y) { //unoptimized recursive version
@@ -218,12 +218,12 @@ Image!T extract_nearest(T)(Image!T iSrc, float x0, float y0, int w, int h, float
   auto x00 = x0;
 
   foreach(int y; 0..h){
-    auto yt = y0.iFloor,
+    auto yt = y0.ifloor,
          yf = y0-yt;
 
     x0 = x00; //advance row
     foreach(int x; 0..w){
-      auto xt = x0.iFloor,
+      auto xt = x0.ifloor,
            xf = x0-xt;
 
       res[x, y] = iSrc[iSrc.ofs_safe(xt, yt)];
@@ -243,12 +243,12 @@ Image!uint extract_bilinear_rg00(Image!uint iSrc, float x0, float y0, int w, int
   auto x00 = x0;
 
   foreach(int y; 0..h){
-    auto yt = y0.iFloor,
+    auto yt = y0.ifloor,
          yf = y0-yt;
 
     x0 = x00; //advance row
     foreach(int x; 0..w){
-      auto xt = x0.iFloor,
+      auto xt = x0.ifloor,
            xf = x0-xt;
 
       //get a sample form x0, y0
@@ -276,12 +276,12 @@ Image!uint extract_bicubic_rg00(Image!uint iSrc, float x0, float y0, int w, int 
   auto x00 = x0;
 
   foreach(int y; 0..h){
-    auto yt = y0.iFloor,
+    auto yt = y0.ifloor,
          yf = y0-yt;
 
     x0 = x00; //advance row
     foreach(int x; 0..w){
-      auto xt = x0.iFloor,
+      auto xt = x0.ifloor,
            xf = x0-xt;
 
       //get a sample form x0, y0
@@ -1493,7 +1493,7 @@ version(D2D_FONT_RENDERER){ private:
       DWRITE_TEXT_METRICS metrics;
       textLayout.GetMetrics(metrics).hrChk("GetMetrics");
 
-      auto bmpSize(){ return V2i((metrics.width*props.xScale).iRound, props.height); }
+      auto bmpSize(){ return V2i((metrics.width*props.xScale).iround, props.height); }
 
       if(isSpace){
         return new Bitmap(bmpSize, 1);
@@ -1539,7 +1539,7 @@ version(D2D_FONT_RENDERER){ private:
       }
 
       if(isSegoeAssets){ //align the assets font with letters
-        int ysh = iRound(res.height*0.16f);
+        int ysh = iround(res.height*0.16f);
         res = res.extract_nearest(0, -ysh, res.width, res.height);
         res.data[0..res.width*ysh] = 0;
       }

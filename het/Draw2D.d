@@ -255,7 +255,7 @@ class Drawing {
 
 
   @property float alpha()       { return (actState.alpha>>24)*(1.0f/255); }
-  @property void alpha(float a) { actState.alpha = cast(uint)clamp(iRound(a*255), 0, 255)<<24; } //todo: clamp bugos?
+  @property void alpha(float a) { actState.alpha = cast(uint)clamp(iround(a*255), 0, 255)<<24; } //todo: clamp bugos?
 
   @property RGB color()        { return actState.drawColor; }
   @property void color(RGB c)  { actState.drawColor = c; }
@@ -340,7 +340,7 @@ class Drawing {
     V2f aClipMin, aClipMax; //16  clipping rect. Terribly unoptimal
 
     void expandBounds(ref Bounds2f b, ref bool isFirst) const {   //opt: ez az isFirst megneheziti a dolgokat. Kene valami jobb jelzes a bounds uressegre, pl. NAN bounds.
-      auto t = aType.iRound;
+      auto t = aType.iround;
       void x(in V2f v){ b.expandTo(v, isFirst); } //jobb modszer kene a bounds szamitasra...
 
       if(t==1) x(aA); //Point
@@ -350,7 +350,7 @@ class Drawing {
     }
 
     void applyTransform(V2f delegate(in V2f) tr){
-      auto t = aType.iRound;
+      auto t = aType.iround;
 
       void x(ref V2f v){ v = tr(v); }
 
@@ -724,7 +724,7 @@ class Drawing {
     while(arc0>arc1) arc1 += 2*PI; //todo: lame
 
     float rounds = (arc1-arc0)*(0.5f/PI);
-    int cnt = iRound(rounds*64);  //resolution  //todo: it should be done in the shader
+    int cnt = iround(rounds*64);  //resolution  //todo: it should be done in the shader
     float incr = cnt ? (arc1-arc0)/cnt : 0;
     foreach(i; 0..cnt+1){
       float a = arc0+incr*i;
@@ -792,8 +792,8 @@ class Drawing {
 // Draw Bitmap ////////////////////////////////////
 
   void fillRectClearType(float x0, float y0, float x1, float y1){
-    auto xa = lerp(x0, x1, 0.333333);
-    auto xb = lerp(x0, x1, 0.666666);
+    auto xa = mix(x0, x1, 0.333333);
+    auto xb = mix(x0, x1, 0.666666);
     auto oldc = color;
     color = RGB8(oldc.raw & 0x0000FF); fillRect(x0, y0, xa, y1);
     color = RGB8(oldc.raw & 0x00FF00); fillRect(xa, y0, xb, y1);
