@@ -7,7 +7,7 @@
 
 ///@compile --unittest  //this is broken because of my shitty linker usage
 
-import het.math, std.stdio : writeln;
+import het.math, std.stdio : write, writeln;
 
 // ShaderToy inputs
 vec2 iResolution;
@@ -34,9 +34,9 @@ vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {
   return vec4(color, 1.0 - t);
 }
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
-
+void mainImage(out vec4 fragColor, in vec2 fragCoord ) {
   vec2 uv = fragCoord.xy;
+
   vec2 center = iResolution.xy * 0.5;
   float radius = 0.25 * iResolution.y;
 
@@ -49,14 +49,24 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 
   // Blend the two
   fragColor = mix(layer1, layer2, layer2.a);
-
 }
 
 
-void main(){ static import het.utils; het.utils.application.runConsole({
+void main(){ //static import het.utils; het.utils.application.runConsole({
   unittest_main;
   writeln("done main");
 
-  import std.traits;
-  pragma(msg, fullyQualifiedName!sum);
-}); }
+  iResolution = vec2(80, 50);
+  foreach(y; 0..iResolution.y){
+    foreach(x; 0..iResolution.x){
+      vec2 fragCoord = vec2(x, y);
+      vec4 fragColor;
+      mainImage(fragColor, fragCoord);
+
+//      writeln(fragColor);
+//      write(fragColor.g>50 ? "#" : ".");
+    }
+    writeln;
+  }
+
+}

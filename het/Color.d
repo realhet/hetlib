@@ -1,8 +1,6 @@
 module het.color;
 
-import het.utils, jsonizer, std.traits;
-
-//todo: throw out jsonizer
+import het.utils;
 
 // RGB formats ////////////////////////////////////////////////
 

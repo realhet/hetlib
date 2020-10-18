@@ -37,7 +37,7 @@ Ctrl+U&K     //2nd modifier: if not present then can be nothing, or the same as 
 //TODO: tesztelni, hogy 'F5' es 'Shift F5' jol mukodik-e egyutt.
 //TODO: improve mousewheel precision: it is only giving 1's and 2's on 60FPS.
 
-import het.utils, het.geometry,
+import het.utils,
        core.sys.windows.windows, core.sys.windows.winuser, std.json;
 
 __gshared int[] virtualKeysDown;
@@ -338,8 +338,8 @@ public:
 //  bool released(string keys) { return _query(keys, QueryMode.Released ); }
 
 public: //standard stuff
-  V2f mouseAct()    const { return V2f(entries["MX"].value, entries["MY"].value); }
-  V2f mouseDelta()  const { return V2f(entries["MX"].delta, entries["MY"].delta); }
+  auto mouseAct()   const { return vec2(entries["MX"].value, entries["MY"].value); }
+  auto mouseDelta() const { return vec2(entries["MX"].delta, entries["MY"].delta); }
   bool mouseMoved() const { return entries["MX"].changed || entries["MY"].changed; }
   float mouseWheelDelta() const { return entries["MW"].delta; }
 
@@ -883,7 +883,7 @@ public:
 auto rawMousePos  (){ return V2f(inputs.MXraw.value, inputs.MYraw.value); };
 auto rawMouseDelta(){ return V2f(inputs.MXraw.delta, inputs.MYraw.delta); };
 
-void mouseLock(V2i pos){ with(pos){
+void mouseLock(ivec2 pos){ with(pos){
   //clamp to the screen, otherwise winapi will unlock the mouse
   RECT r;
   GetWindowRect(GetDesktopWindow, &r);
@@ -894,7 +894,7 @@ void mouseLock(V2i pos){ with(pos){
   ClipCursor(&r);
 }}
 
-void mouseLock(in V2f pos){ mouseLock(pos.vFloor); }
+void mouseLock(in vec2 pos){ mouseLock(pos.vfloor); }
 
 void mouseLock(){ mouseLock(winMousePos); }
 
@@ -921,14 +921,14 @@ void mouseMoveRel(float dx, float dy){
   }
 }
 
-void mouseMoveRel(V2f d){ mouseMoveRel(d.x, d.y); }
+void mouseMoveRel(in vec2 d){ mouseMoveRel(d.x, d.y); }
 void mouseMoveRelX(float dx){ mouseMoveRel(dx, 0); }
 void mouseMoveRelY(float dy){ mouseMoveRel(0, dy); }
 
 private __gshared{
   bool slowMouseEnabled;
   float slowMouseSpeed;
-  V2f slowMousePos;
+  vec2 slowMousePos;
 
   void slowMouseUpdate(){
     if(slowMouseEnabled){
@@ -947,9 +947,9 @@ private __gshared{
   }
 
   //winapi mouse get/set
-  V2i winMousePos(){
+  auto winMousePos(){
     POINT p; GetCursorPos(&p);
-    return V2i(p.x, p.y);
+    return ivec2(p.x, p.y);
   }
 }
 
@@ -958,16 +958,16 @@ private __gshared{
 class MouseState{
 public:
   struct MSRelative{
-    V2i screen = V2i.Null;
-    V2f world = V2f.Null;
+    ivec2 screen;
+    vec2 world;
     int wheel;
 
     float screenDist=0, worldDist=0;
   }
   struct MSAbsolute{
     bool LMB, RMB, MMB, shift, alt, ctrl;
-    V2i screen = V2i.Null;
-    V2f world = V2f.Null;
+    ivec2 screen;
+    vec2 world;
     int wheel;
   }
 

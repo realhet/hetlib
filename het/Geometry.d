@@ -1,6 +1,6 @@
-module het.geometry;
+deprecated module het.geometry;
 
-import het.utils, jsonizer;
+import het.utils;
 
 //TODO: implement fast sse approximations
 //todo: migrate with gl3n

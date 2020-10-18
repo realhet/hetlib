@@ -90,7 +90,7 @@ public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrit
 public import std.bitmanip : swapEndian;
 
 //make oveload sets for colors
-public import het.color;
+// public import het.color;
 // bad public import std.math : abs, trunc, floor;
 // bad public import std.algorithm : min, max;
 // bad public import het.color : lerp, min, max, avg, absDiff;
