@@ -56,15 +56,14 @@ void main(){ //static import het.utils; het.utils.application.runConsole({
   unittest_main;
   writeln("done main");
 
-  iResolution = vec2(80, 50);
+  iResolution = vec2(40, 25);
   foreach(y; 0..iResolution.y){
     foreach(x; 0..iResolution.x){
       vec2 fragCoord = vec2(x, y);
       vec4 fragColor;
       mainImage(fragColor, fragCoord);
 
-//      writeln(fragColor);
-//      write(fragColor.g>50 ? "#" : ".");
+      write(fragColor.g>50 ? "#" : ".");
     }
     writeln;
   }
