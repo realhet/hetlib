@@ -28,7 +28,7 @@ import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
 import std.range : iota;
-import std.traits : isDynamicArray, isStaticArray, isNumeric, isFloatingPoint, CommonType, Unqual;
+import std.traits : isDynamicArray, isStaticArray, isNumeric, isIntegral, isFloatingPoint, stdCommonType = CommonType, Unqual;
 import std.meta : AliasSeq;
 
 import std.exception : enforce;
@@ -46,7 +46,13 @@ alias myto(T) = stdto!T;
 bool inRange(V, L, H)(in V value, in L lower, in H higher){ return value>=lower && value<=higher; } //todo: comine with het.utils.
 
 private enum swizzleRegs = ["xyzw", "rgba", "stpq"];
-private enum ComponentTypePrefix(CT) = is(CT==float) ? "" : is(CT==double) ? "d" : is(CT==bool) ? "b" : is(CT==int) ? "i" : is(CT==uint) ? "u" : CT.stringof;
+
+private enum ComponentTypePrefix(CT) = is(CT==float ) ? "" :  //rgb and rgba handled specially
+                                       is(CT==double) ? "d" :
+                                       is(CT==bool  ) ? "b" :
+                                       is(CT==int   ) ? "i" :
+                                       is(CT==uint  ) ? "u" :
+                                       "UNDEF";
 
 private bool validRvalueSwizzle(string def){
   if(def.startsWith('_')) return validRvalueSwizzle(def[1..$]); //_ is allowed at the start because of the constants 0 and 1
@@ -78,6 +84,16 @@ private int FirstVectorLength(T...)(){
   return 0;
 }
 
+private template CommonType(A, B){
+  //todo: ubyte + ushort should be ushort, not int
+  alias CommonType = stdCommonType!(A, B);
+}
+
+private template OperationResultType(string op, A, B){
+  static if(op.among("<<", ">>", ">>>")) alias OperationResultType = A; //for shift operation only the left operand counts
+  else alias OperationResultType = CommonType!(A, B);
+}
+
 /// T is a combination of vector and scalar parameters
 /// returns the common vector length if there is one, otherwise stops with an assert;
 private int CommonVectorLength(T...)(){
@@ -90,8 +106,10 @@ private int CommonVectorLength(T...)(){
 }
 
 private template ScalarType(T){
-  static if(isVector!T) alias A = T.ComponentType;
-                   else alias A = T;
+       static if(isVector!T) alias A = T.ComponentType;
+  else static if(isMatrix!T) alias A = T.ComponentType;
+  else                       alias A = T;
+
   alias ScalarType = Unqual!A;
 }
 
@@ -113,36 +131,39 @@ struct Vector(CT, int N)
 if(N.inRange(2, 4)){
   alias VectorType = typeof(this);
   alias ComponentType = CT;
-  enum VectorTypeName = ComponentTypePrefix!CT ~ "vec" ~ N.text;
+  enum VectorTypeName = is(VectorType==Vector!(ubyte, 3)) ? "RGB" :
+                        is(VectorType==Vector!(ubyte, 4)) ? "RGBA" :
+                        ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "vec" ~ N.text
+                                                          : VectorType.stringof;
 
-  CT[N] array = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
+  CT[N] components = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
   enum length = N;
 
-  alias array this;
+  alias components this;
 
   //note : alias this enables inplicit conversion, but fucks up the ~ concat operator
-  //ref auto opIndex(size_t i){ return array[i]; } const opIndex(size_t i){ return array[i]; }
+  //ref auto opIndex(size_t i){ return components[i]; } const opIndex(size_t i){ return components[i]; }
 
-  string toString() const { return VectorTypeName ~ "(" ~ array[].map!text.join(", ") ~ ")"; }
+  string toString() const { return VectorTypeName ~ "(" ~ components[].map!text.join(", ") ~ ")"; }
 
   private void construct(int i, T, Tail...)(in T head, in Tail tail){ // this is based on the gl3n package
     static if(i >= length){
       static assert(false, "Vector constructor: Too many arguments");
     }else static if(isDynamicArray!T) {
       static assert((Tail.length == 0), "Vector constructor: Dynamic array can only be the last argument");
-      enforce(i+head.length <= array.length, "Vector constructor: Dynamic array too large");
-      array[i..i+head.length] = head[].myto!(CT[]);
+      enforce(i+head.length <= components.length, "Vector constructor: Dynamic array too large");
+      components[i..i+head.length] = head[].myto!(CT[]);
       //further construction stops
     }else static if(isStaticArray!T){
-      static foreach(j; 0..head.length) array[i+j] = head[j].myto!CT;
+      static foreach(j; 0..head.length) components[i+j] = head[j].myto!CT;
       construct!(i + head.length)(tail);
     }else static if(isVector!T){ //another vec
-      construct!i(head.array, tail);
+      construct!i(head.components, tail);
     }else static if(isNumeric!T){
-      array[i] = head.myto!CT;
+      components[i] = head.myto!CT;
       construct!(i+1)(tail);
     }else static if(is(T==bool)){
-      array[i] = head ? 1 : 0;
+      components[i] = head ? 1 : 0;
       construct!(i+1)(tail);
     }else{
       //todo: it sometimes give this as false error
@@ -156,37 +177,32 @@ if(N.inRange(2, 4)){
 
   this(A...)(in A args){
 
-    void setAll(T)(in T a){ array[] = a.myto!CT; }
+    void setAll(T)(in T a){ components[] = a.myto!CT; }
 
     static if(args.length==1 && __traits(compiles, setAll(args[0]))){
       //One can also use one number in the constructor to set all components to the same value
       setAll(args[0]);
     }else static if(args.length==1 && isVector!(A[0]) && A[0].length>=length){
       //Casting a higher-dimensional vector to a lower-dimensional vector is also achieved with these constructors:
-      static foreach(i; 0..length) array[i] = args[0].array[i].myto!CT;
+      static foreach(i; 0..length) components[i] = args[0].components[i].myto!CT;
     }else{
       construct!0(args);
     }
   }
 
-  enum Null = typeof(this).init;
-  enum NaN (){ return Vector!(CT, N)(float.init); }
-  bool isNull() const { return this == Null; }
-  bool isNaN() const { static if(__traits(compiles, std.math.isNaN(array[0]))) static foreach(i; 0..N) if(std.math.isNaN(array[i])) return true; return false; }
-
   bool opEquals(T)(in T other) const {
     static if(isVector!T){ // vector==vector
       static assert(T.length == length);
-      static if(__traits(compiles, array==other.array))
-        return other.array == array;
+      static if(__traits(compiles, components==other.components))
+        return other.components == components;
       else
-        return array.equal(other.array);
-    }else static if(__traits(compiles, array[0]==other)){ // vector==scalar
-      return array[0]==other;
+        return components.equal(other.components);
+    }else static if(__traits(compiles, components[0]==other)){ // vector==scalar
+      return components[0]==other;
     }else static assert("Incompatible types: "~typeof(this).stringof~" and "~T.stringof);
   }
 
-  static auto basis(int n){ VectorType v;  v[n] = 1.myto!ComponentType;  return v; }
+  static auto basis(int n){ VectorType v;  v[n] = ComponentType(1);  return v; }
 
   // swizzling ///////////////////////
 
@@ -194,11 +210,11 @@ if(N.inRange(2, 4)){
     static foreach(len; 1..N+1)
       static foreach(i; 0..N-len+1)
         static if(len==1){
-          mixin(format!q{auto %s() const { return array[%s]; }}(regs[i], i));
-          mixin(format!q{ref  %s()       { return array[%s]; }}(regs[i], i));
+          mixin(format!q{auto %s() const { return components[%s]; }}(regs[i], i));
+          mixin(format!q{ref  %s()       { return components[%s]; }}(regs[i], i));
         }else{
-          mixin(format!q{auto %s() const { return        Vector!(CT, %s)   (array[%s..%s]) ; }}(regs[i..i+len], len, i, i+len));
-          mixin(format!q{ref  %s()       { return *(cast(Vector!(CT, %s)*) (array[%s..%s])); }}(regs[i..i+len], len, i, i+len));
+          mixin(format!q{auto %s() const { return        Vector!(CT, %s)   (components[%s..%s]) ; }}(regs[i..i+len], len, i, i+len));
+          mixin(format!q{ref  %s()       { return *(cast(Vector!(CT, %s)*) (components[%s..%s])); }}(regs[i..i+len], len, i, i+len));
         }
 
   auto opDispatch(string def)() const
@@ -218,45 +234,39 @@ if(N.inRange(2, 4)){
     }
   }
 
-  auto opUnary(string op)() if(op.among("++", "--")) {
+  auto opUnary(string op)() const{
     VectorType res;
-    static foreach(i; 0..length) mixin(format!"res[%s] = %s array[%s];"(i, op, i));
+    static foreach(i; 0..length) mixin(format!"res[%s] = %s this[%s];"(i, op, i));
     return res;
   }
 
-  auto opUnary(string op)() const{
+  auto opUnary(string op)() if(op.among("++", "--")) {  //this one is NOT const
     VectorType res;
-    static foreach(i; 0..length) mixin(format!"res[%s] = %s array[%s];"(i, op, i));
+    static foreach(i; 0..length) mixin(format!"res[%s] = %s this[%s];"(i, op, i));
     return res;
+  }
+
+  private static binaryVectorScalarOp(string op, A, B)(in A a, in B b){
+    alias CT = OperationResultType!(op, ScalarType!A, ScalarType!B);
+    return generateVector!(CT, (a, b) => mixin("a", op, "b") )(a, b);
   }
 
   auto opBinary(string op, T)(in T other) const{
-    static if(op=="~"){ //concat
-      return [this] ~ other; //todo: this fails
+    static if(isNumeric!T || isVector!T){ // vector * (vector/scalar)
+      return binaryVectorScalarOp!op(this, other);
+    }else static if(op=="*" && isMatrix!T && T.height==length){ // vector * matrix
+      return other.transpose * this;
     }else{
-      static if(isNumeric!T){
-        CommonVectorType!(VectorType, T) res;
-        static foreach(i; 0..length) res[i] = mixin(format!"this[%d] %s other"(i, op));
-      }else static if(isVector!T){
-        CommonVectorType!(VectorType, T) res;
-        static foreach(i; 0..length) res[i] = mixin(format!"this[%d] %s other[%s]"(i, op, i));
-      }else static if(op=="*" && isMatrix!T && T.height==length){ // vector * matrix
-        auto res = other.transpose * this;
-      }else{
-        static assert(false, "invalid operation");
-      }
-      return res;
+      static assert(false, "invalid operation");
     }
   }
 
   auto opBinaryRight(string op, T)(in T other) const{
     static if(isNumeric!T){
-      CommonVectorType!(VectorType, T) res;
-      static foreach(i; 0..length) res[i] = mixin(format!"other %s this[%d]"(op, i));
+      return generateVector!(CommonScalarType!(VectorType, T), (a, b) => mixin("a", op, "b") )(other, this);
     }else{
       static assert(false, "invalid operation");
     }
-    return res;
   }
 
   auto opOpAssign(string op, T)(in T other){
@@ -302,10 +312,18 @@ private void unittest_Vectors(){
 
     auto i1 = ivec2(2, 3);  i1 <<= 3;  i1 = -i1 + 5;  i1 = ++i1;  i1 = ~i1;  i1++;
     assert(i1 == ivec2(10, 18));
+    const i2 = i1;
+    assert(-i2 == ivec2(-10, -18));
+    assert(!__traits(compiles, ++i2) && __traits(compiles, ++i1)); //const and nonconst
 
     vec3[] va = [vec3(4)] ~ [vec3(5)]; //always have to use [], because of alias this
     va ~= vec3(6);
     assert(va == [vec3(4), vec3(5), vec3(6)]);
+
+    // the result type for shifting
+    assert(is(typeof(ubyte(1) << ubyte(2)) == int));  //Dlang: is int at minimum
+    assert(is(typeof(ubyte(1) << 2) == int));
+    assert(is(typeof(Vector!(ubyte, 2)(1, 2)<<2) == Vector!(ubyte, 2) )); // with vectors: it preserves the type of the left hand operand.
   }
   { // implicit conversions
     uvec2 a0 = ivec2(1, 2);
@@ -377,7 +395,8 @@ struct Matrix(CT, int N, int M)
 if(N.inRange(2, 4) && M.inRange(2, 4)){
   alias MatrixType = typeof(this);
   alias ComponentType = CT;
-  enum MatrixTypeName = "mat" ~ (N==M ? N.text : N.text ~ 'x' ~ M.text);
+  enum MatrixTypeName = ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "mat" ~ (N==M ? N.text : N.text ~ 'x' ~ M.text)
+                                                          : MatrixType.stringof;
 
   //mat N x M: A matrix with N columns and M rows. OpenGL uses column-major matrices, which is standard for mathematics users.
   Vector!(CT, M)[N] columns;
@@ -450,12 +469,16 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
     foreach(j; 0..M) foreach(i; 0..N) this[i][j] = arr[idx++];
   }
 
+  private static auto generateBinaryOpMatrix(string op, string payload, A, B)(in A a, in B b){
+    Matrix!(OperationResultType!(op, ScalarType!A, ScalarType!B), N, M) res;
+    static foreach(i; 0..N) res[i] = mixin(payload);
+    return res;
+  }
 
   auto opBinary(string op, T)(in T other) const{
-    static if(isNumeric!T){
-      Matrix!(CommonType!(ComponentType, T), N, M) res;
-      static foreach(i; 0..N) static foreach(j; 0..M) res[i][j] = mixin(format!"this[%d][%d] %s other"(i, j, op));
-    }else static if(isMatrix!T){
+    static if(isNumeric!T){ // Matrix op Scalar
+      return generateBinaryOpMatrix!(op, "a[i]" ~ op ~ "b")(this, other);
+    }else static if(isMatrix!T){ // Matrix * Matrix
       static if(op=="*"){
         static assert(T.height==width, "Incompatible matrices for multiplication. "~typeof(this).stringof~" * "~T.stringof);
         Matrix!(CommonType!(ComponentType, T.ComponentType), T.width, height) res;
@@ -465,31 +488,29 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
             sum += this[k][i] * other[j][k];
           res[j][i] = sum;
         }}
-      }else{
+        return res;
+      }else{ // op!="*"    Matrix op Matrix
         static assert(T.width==width && T.height==height, "Size of matrices must be the same.");
-        Matrix!(CommonType!(ComponentType, T.ComponentType), N, M) res;
-        static foreach(i; 0..N) static foreach(j; 0..M) res[i][j] = mixin(format!"this[%d][%d] %s other[%d][%d]"(i, j, op, i, j));
+        return generateBinaryOpMatrix!(op, "a[i]" ~ op ~ "b[i]")(this, other);
       }
-    }else static if(isVector!T&& op=="*"){
+    }else static if(isVector!T&& op=="*"){  // Matrix op Vector
       static assert(T.length==width, "Incompatible matrix-vector for multiplication. "~typeof(this).stringof~" * "~T.stringof);
       Vector!(CommonType!(ComponentType, T.ComponentType), T.length) res;
       static foreach(i; 0..width){{
         typeof(res).ComponentType sum = 0;
         static foreach(k; 0..height)
           sum += columns[k][i] * other[k];
-        res.array[i] = sum;
+        res.components[i] = sum;
       }}
+      return res;
     }else{
       static assert(false, "invalid operation");
     }
-    return res;
   }
 
   auto opBinaryRight(string op, T)(in T other) const{
-    static if(isNumeric!T){
-      Matrix!(CommonType!(ComponentType, T), N, M) res;
-      static foreach(i; 0..N) static foreach(j; 0..M) res[i][j] = mixin(format!"other %s this[%d][%d]"(op, i, j));
-      return res;
+    static if(isNumeric!T){ // Scalar op Matrix
+      return generateBinaryOpMatrix!(op, "a" ~ op ~ "b[i]")(other, this); //input arguments must be in computational order!!!
     }else{
       static assert(false, "invalid operation");
     }
@@ -636,7 +657,6 @@ private auto generateVector(CT, alias fun, T...)(in T args){
   }
 }
 
-
 // Angle & Trig. functions ///////////////////////////////////
 
 auto radians(real scale = PI/180, A)(in A a){
@@ -745,6 +765,7 @@ private void unittest_ExponentialFunctions(){
 // Common functions //////////////////////////////////////////
 
 auto abs    (A)(in A a) { return a.generateVector!(ScalarType!A, a => a<0 ? -a : a ); }
+
 auto sign   (A)(in A a) { alias CT = ScalarType!A; return a.generateVector!(CT, a => a==0 ? 0 : a<0 ? -1 : 1 ); }
 
 private auto floatReductionOp(alias fun, CT, A)(in A a){
@@ -813,11 +834,13 @@ auto cmp(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) && (isNumeric!B ||
 
 auto mix(A, B, T)(in A a, in B b, in T t){
   static if(is(Unqual!T==bool)) return mix(a, b, int(t));
-  return generateVector!(CommonScalarType!(A, B, T), (a, b, t) => a*(1-t) + b*t)(a, b, t);
+  alias CT = CommonScalarType!(A, B); //type of result NOT depends on t
+  return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t);
 }
 
-auto unmix(A, B, T)(in A a, in B b, in T t){
-  return generateVector!(CommonScalarType!(A, B, T), (a, b, t) => (t-a)/(b-a) );
+auto unmix(A, B, T)(in A a, in B b, in X x){ //inverse of mix
+  alias CT = CommonScalarType!(A, B); //type of result NOT depends on x
+  return generateVector!(CT, (a, b, x) => (x-a)/(b-a) );
 }
 
 auto step(A, B)(in A edge, in B x){
@@ -836,6 +859,8 @@ auto smoothstep(A, B, C)(in A edge0, in B edge1, in C x){
 auto isnan(A)(in A a){ return a.generateVector!(bool, a => std.math.isNaN     (a) ); }
 auto isinf(A)(in A a){ return a.generateVector!(bool, a => std.math.isInfinity(a) ); }
 auto isfin(A)(in A a){ return a.generateVector!(bool, a => std.math.isFinite  (a) ); }
+
+auto isnull(A)(in A a){ return a == A(0); }
 
 auto isPowerOf2(A)(in A a){ return a.generateVector!(bool, a => std.math.isPowerOf2(a) ); }
 
@@ -872,6 +897,10 @@ auto uintBitsToFloat(A)(in A a){ return bitsToFloat!uint(a); }
 auto fma(A, B, C)(in A a, in B b, in C c){ // no extra precision. it's just here for compatibility.
   return generateVector!(CommonScalarType!(A, B, C), (a, b, c) => a * b + c)(a, b, c);
 }
+
+auto absDiff(A, B)(in A a, in B b) { return abs(a-b); }
+
+auto sad    (A, B)(in A a, in B b) { return absDiff(a, b)[].sum; }
 
 private void unittest_CommonFunctions(){
   assert(abs(vec2(-5, 5))==vec2(5, 5));
@@ -930,6 +959,8 @@ private void unittest_CommonFunctions(){
   assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), false) == vec2(2, 3));
   assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), true ) == vec2(4, 5));
 
+  assert(is(typeof(mix(ubyte.init, ubyte.init, 0.0)) == ubyte)); // result type depends only on the first 2 parameters
+
   assert(step(vec3(1, 2, 3), 2) == vec3(1, 1, 0));
   assert(is(typeof(step(1,2 ))==int));
   assert(is(typeof(step(vec2(1), 2.))==dvec2));
@@ -965,6 +996,8 @@ private void unittest_CommonFunctions(){
   }
 
   assert(fma(2, 3, vec2(10, 20))==vec2(16, 26));
+  assert(absDiff(vec2(1, 15), 10) == vec2(9, 5));
+  assert(sad(vec2(1, 15), 10) == 9+5);
 }
 
 // Geometric functions ///////////////////////////////////////

@@ -1,6 +1,6 @@
 module het.color;
 
-import het.utils;
+import het.math;
 
 // RGB formats ////////////////////////////////////////////////
 
@@ -54,7 +54,7 @@ private mixin template ColorFMembers(){
   mixin ColorMembers;
 }
 
-struct L8{ align(1): @jsonize ubyte[1] comp; mixin Color8Members;
+/*struct L8{ align(1): @jsonize ubyte[1] comp; mixin Color8Members;
   @jsonize this(in typeof(comp) array){ comp = array; }
   this(in float[comp.length] a){ this(a[0]); }
   this(in float[] a){ enforce(a.length==comp.length); this(a[0]); }
@@ -253,12 +253,12 @@ float sad(T)(in T a, in T b)if(isColorF!T){
   foreach(i; 0..a.comp.length)
     res += abs(a.comp[i]-b.comp[i]);
   return res;
-}
+} */
 
 
-RGB HSVToRGB(float H, float S, float V){ return HSVToRGBf(H, S, V).rgb8; }
+/*RGB HSVToRGB(float H, float S, float V){ return RGB(HSVToRGBf(H, S, V)); }
 
-RGBf HSVToRGBf(float H, float S, float V)
+RGBf HSVToRGBf(float H, float S, float V) //0..1 range
 {
   if(!S) return RGBf(V,V,V);
   if(!V) return RGBf(0,0,0);
@@ -280,7 +280,7 @@ RGBf HSVToRGBf(float H, float S, float V)
     case 6: return RGBf(V , v3, v1);
     default: return RGBf(1, 0, 1); //impossible
   }
-}
+} */
 
 
 //const test = lerp(RGB8(1,2,3), RGB8(0x808080), 128);
@@ -290,7 +290,7 @@ RGBf HSVToRGBf(float H, float S, float V)
 //auto lerp(T)(in T a, in T b, int t)if(is(T==RGBA8)){ T res; int it = (255-i); foreach(i; 0..a.comp.length) res.comp[i] = (a.comp[i]*t + b.comp[i]*it)>>8; return res; }
 
 /*
-
+//this was commented out long ago
 
 struct RGB{
   align(1):
@@ -814,4 +814,5 @@ class StandardColorMaps : ColorMaps {
 
 }
 
-alias colorMaps = Singleton!StandardColorMaps;
+//alias colorMaps = Singleton!StandardColorMaps;
+//temporarily remove it, so it can compile without het.utils.
