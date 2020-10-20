@@ -28,7 +28,7 @@ import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
 import std.range : iota;
-import std.traits : isDynamicArray, isStaticArray, isNumeric, isIntegral, isFloatingPoint, stdCommonType = CommonType, Unqual;
+import std.traits : isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isFloatingPoint, stdCommonType = CommonType, Unqual;
 import std.meta : AliasSeq;
 
 import std.exception : enforce;
@@ -179,7 +179,26 @@ if(N.inRange(2, 4)){
 
     void setAll(T)(in T a){ components[] = a.myto!CT; }
 
-    static if(args.length==1 && __traits(compiles, setAll(args[0]))){
+    static if(is(ComponentType==ubyte) && args.length==1 && (is(A[0]==int) || is(A[0]==uint) || isSomeString!(A[0]))){
+      //special case for RG, RGB and RGBA: decodes it from one value
+      static if(isSomeString!(A[0])){
+        static assert("not impl");
+      }else static if(is(A[0]==int) || is(A[0]==uint)){
+        // raw data copy
+        //todo: kulonvalasztani a compile time es a runtime konvertalast. Ha egyaltalan lehet.
+        //runtime: components = *(cast(typeof(components)*) &(args[0]));
+
+        //CTFE version
+        //todo: put this in a loop
+        //static foreach(i; 0..length) components[i] == 128;//cast(ubyte)(((args[0]>>(i*8)) & 0xFF));
+        static if(length==2){ components = [args[0]&0xFF, (args[0]>>>8)&0xFF]; }
+        static if(length==3){ components = [args[0]&0xFF, (args[0]>>>8)&0xFF, (args[0]>>>16)&0xFF]; }
+        static if(length==4){ components = [args[0]&0xFF, (args[0]>>>8)&0xFF, (args[0]>>>16)&0xFF, args[0]>>>24]; }
+      }else{
+        static assert(0, "unhandler type: "~(A[0]).stringof);
+      }
+      // if the above version would be not ok... -> static foreach(i; 0..length) components[i] = cast(ubyte) args[0]>>(i*8);
+    }else static if(args.length==1 && __traits(compiles, setAll(args[0]))){
       //One can also use one number in the constructor to set all components to the same value
       setAll(args[0]);
     }else static if(args.length==1 && isVector!(A[0]) && A[0].length>=length){
@@ -202,6 +221,28 @@ if(N.inRange(2, 4)){
     }else static assert("Incompatible types: "~typeof(this).stringof~" and "~T.stringof);
   }
 
+  // raw data access for ubyte vectors.
+  static if(is(ComponentType==ubyte)){
+    static if(length==3){
+
+      @property uint raw() const{
+        uint data = 0x00000000;
+        *(cast(Unqual!(typeof(components))*) &data) = components;
+        return data;
+      }
+
+      @property void raw(uint data){
+        components = *(cast(Unqual!(typeof(components))*) &data);
+      }
+
+    }else static if(length==4){
+
+          uint raw() const { return *(cast(uint*) &components); }
+      ref uint raw()       { return *(cast(uint*) &components); }
+
+    }
+  }
+
   static auto basis(int n){ VectorType v;  v[n] = ComponentType(1);  return v; }
 
   // swizzling ///////////////////////
@@ -217,18 +258,29 @@ if(N.inRange(2, 4)){
           mixin(format!q{ref  %s()       { return *(cast(Vector!(CT, %s)*) (components[%s..%s])); }}(regs[i..i+len], len, i, i+len));
         }
 
+  private static auto swizzleDecode(char ch)(){
+    enum lowerCh = ch.toLower;
+    enum isLower = ch==lowerCh;
+    static if(is(ComponentType==ubyte)){
+      //for ubyte: 1 means 255, UpperCase means 255^
+      return ch=='1' ? "255" : cast(string)[lowerCh] ~ (isLower ? "" : "^255");
+    }else{
+      return (isLower ? "" : "-") ~ cast(string)[lowerCh];
+    }
+  }
+
   auto opDispatch(string def)() const
   if(validRvalueSwizzle(def))
   {
     static if(def.startsWith('_')){
       return opDispatch!(def[1..$]);
     }else{
-      static if(def.length==1){
-        return mixin(def[0]);
+      static if(def.length==1){ // Scalar value output
+        return mixin( swizzleDecode!(def[0]) );
       }else{
-        Vector!(CT, mixin(def.length)) res;
+        Vector!(CT, mixin(def.length)) res; // vector output
         static foreach(i, ch; def)
-          res[i] = mixin(ch==ch.toLower ? "" : "-", ch.toLower);
+          res[i] = mixin( swizzleDecode!ch );
         return res;
       }
     }
@@ -301,6 +353,8 @@ private void unittest_Vectors(){
     auto f = dvec4(vec2([1,2]).yx, vec2(5, 6).y1);
     assert(f == dvec4(2, 1, 6, 1));
     assert(v2.rR01 == vec4(1, -1, 0, 1)); //Capital letter means negative
+    assert(vec2(4, 5).Y == -5); //Scalar swizzle result
+    assert(Vector!(ubyte, 2)(4, 5).rG01 == vec4(4, 255-5, 0, 255)); //special '255' rules for RGB swizzles
     assert(vec3(1,2,3)+dvec3(5,6,7) == dvec3(6, 8, 10));
     assert(vec3(1,2,3)*10.5f == vec3(10.5, 21, 31.5));
     assert(10.5*vec3(1,2,3) == vec3(10.5, 21, 31.5));

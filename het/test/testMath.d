@@ -54,61 +54,33 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord ) {
 +/
 
 
-alias RGB8 = Vector!(ubyte, 3),  RGB  = RGB8;
-alias RGBA8 = Vector!(ubyte, 4),  RGBA  = RGBA8;
-
-enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float));
-
-auto floatToRgb(T, int N)(in Vector!(T, N) x)  if(is(T == float)) { return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255));  }
-auto rgbToFloat(T, int N)(in Vector!(T, N) x)  if(is(T == ubyte)) { return x * (1.0f/255);                                }
-
-auto hsvToRgb(A)(in A val) if(isColor!A){
-  static if(A.length==4){
-    return A(val.rgb.hsvToRgb, val.a); // preserve alpha
-  }else{
-    static if(is(A.ComponentType == float)) return hsvToRgb(val.x, val.y, val.z);
-                                       else return val.rgbToFloat.hsvToRgb.floatToRgb;
-  }
-}
-
-auto hsvToRgb(float H, float S, float V){ //0..1 range
-  int sel;
-  auto mod = modf(H * 6, sel),
-       a = vec4(V,
-                V * (1 - S),
-                V * (1 - S * mod),
-                V * (1 - S * (1 - mod)));
-  switch(sel){
-    case  0: return a.xwy;
-    case  1: return a.zxy;
-    case  2: return a.yxw;
-    case  3: return a.yzx;
-    case  4: return a.wyx;
-    case  5: return a.xyz;
-    default: return a.xwy;
-  }
-}
-
 void main(){ //static import het.utils; het.utils.application.runConsole({
   het.math.unittest_main;
 
-//  alias RGB8 = Vector!(ubyte, 3);
+  import het.color;
 
   RGB a = RGB(40, 80, 250);
   RGB b = RGB(1, 0, 1);
 
-  import std.conv;
-
   writeln(a+b);
   writeln(mix(a, b, .5f)>>3);
-
-  //import het.color;
 
   foreach(i; 0..30){
     //writeln(hsvToRgb(RGBA(i*255/30, 255, 255, 128)));
     auto c = hsvToRgb(vec4(i/30.0f, 1, 1, .5).floatToRgb);
     writeln(c, "  ", c ^ 255);
   }
+
+  const RGB
+    clRed             = 0x0000FF,
+    clLime            = 0x00FF00,
+    clYellow          = 0x00FFFF,
+    clBlue            = 0xFF0000,
+    clFuchsia         = 0xFF00FF;
+
+  writeln(clRed.rgb1, clBlue.rgb1.bgra);
+
+  writeln(colorByName("fuchsia"));
 
   writeln("done main");
 

@@ -2,9 +2,47 @@ module het.color;
 
 import het.math;
 
+alias RGB8 = Vector!(ubyte, 3),  RGB  = RGB8;
+alias RGBA8 = Vector!(ubyte, 4),  RGBA  = RGBA8;
+
+enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float));
+
+auto floatToRgb(T, int N)(in Vector!(T, N) x)  if(is(T == float)) { return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255));  }
+auto rgbToFloat(T, int N)(in Vector!(T, N) x)  if(is(T == ubyte)) { return x * (1.0f/255);                                }
+
+auto hsvToRgb(A)(in A val) if(isColor!A){
+  static if(A.length==4){
+    return A(val.rgb.hsvToRgb, val.a); // preserve alpha
+  }else{
+    static if(is(A.ComponentType == float)) return hsvToRgb(val.x, val.y, val.z);
+                                       else return val.rgbToFloat.hsvToRgb.floatToRgb;
+  }
+}
+
+auto hsvToRgb(float H, float S, float V){ //0..1 range
+  int sel;
+  auto mod = modf(H * 6, sel),
+       a = vec4(V,
+                V * (1 - S),
+                V * (1 - S * mod),
+                V * (1 - S * (1 - mod)));
+  switch(sel){
+    case  0: return a.xwy;
+    case  1: return a.zxy;
+    case  2: return a.yxw;
+    case  3: return a.yzx;
+    case  4: return a.wyx;
+    case  5: return a.xyz;
+    default: return a.xwy;
+  }
+}
+
+
+const grayscaleWeights = vec3(0.299f, 0.586f, 0.114f);
+
 // RGB formats ////////////////////////////////////////////////
 
-alias RGB = RGB8, RGBA = RGBA8;
+/+alias RGB = RGB8, RGBA = RGBA8;
 
 RGB  BGR (uint a){ auto c = RGB (a); c.rbSwap; return c; }
 RGBA BGRA(uint a){ auto c = RGBA(a); c.rbSwap; return c; }
@@ -282,6 +320,7 @@ RGBf HSVToRGBf(float H, float S, float V) //0..1 range
   }
 } */
 
++/
 
 //const test = lerp(RGB8(1,2,3), RGB8(0x808080), 128);
 
@@ -379,7 +418,7 @@ enforce(false, "HSVToRGB_rainbow() ez total fos");
 
 // color constants ////////////////////////////////////////////////////////////////////////////////////
 
-immutable RGB8
+immutable RGB
 //classic delphi palette
   clBlack           = 0x000000,
   clMaroon          = 0x000080,
@@ -498,58 +537,41 @@ immutable RGB8
   clSolCyan         = 0x98a12a,
   clSolGreen        = 0x009985,
 
-  clAxisX           = RGB(213, 40, 40), //todo: belerakni a listaba
-  clAxisY           = RGB(40, 166, 40), //todo: belerakni a listaba
-  clAxisZ           = RGB(40, 40, 215); //todo: belerakni a listaba
+  clAxisX           = RGB(213, 40, 40),
+  clAxisY           = RGB(40, 166, 40),
+  clAxisZ           = RGB(40, 40, 215),
 
-enum clOrange = clRainbowOrange; //todo: belerakni a listaba
+  clOrange          = clRainbowOrange;
 
-immutable{
-  RGB8[18] clDelphi  = [clBlack, clMaroon, clGreen, clOlive, clNavy, clPurple, clTeal, clGray, clSilver, clRed, clLime, clYellow, clBlue, clFuchsia, clAqua, clLtGray, clDkGray, clWhite];
-  RGB8[16] clVga     = [clVgaBlack, clVgaLowBlue, clVgaLowGreen, clVgaLowCyan, clVgaLowRed, clVgaLowMagenta, clVgaBrown, clVgaLightGray, clVgaDarkGray, clVgaHighBlue, clVgaHighGreen, clVgaHighCyan, clVgaHighRed, clVgaHighMagenta, clVgaYellow, clVgaWhite];
-  RGB8[16] clC64     = [clC64Black, clC64White, clC64Red, clC64Cyan, clC64Purple, clC64Green, clC64Blue, clC64Yellow, clC64Orange, clC64Brown, clC64Pink, clC64DGrey, clC64Grey, clC64LGreen, clC64LBlue, clC64LGrey];
-  RGB8[ 8] clWow     = [clBlack, clWowGrey, clWowWhite, clWowGreen, clWowBlue, clWowPurple, clWowRed, clWowRed2];
-  RGB8[10] clVim     = [clVimBlack, clVimBlue, clVimGreen, clVimTeal, clVimRed, clVimPurple, clVimYellow, clVimWhite, clVimGray, clVimOrange];
-  RGB8[ 8] clRainbow = [clRainbowRed, clRainbowOrange, clRainbowYellow, clRainbowGreen, clRainbowAqua, clRainbowBlue, clRainbowPurple, clRainbowPink];
-  RGB8[16] clSol     = [clSolBase03, clSolBase02, clSolBase01, clSolBase00, clSolBase0, clSolBase1, clSolBase2, clSolBase3, clSolYellow, clSolOrange, clSolRed, clSolMagenta, clSolViolet, clSolBlue, clSolCyan, clSolGreen];
-  RGB8[ 3] clAxis    = [clAxisX, clAxisY, clAxisZ];
-  RGB8[] clAll = clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol;
-}
+immutable RGB8[]
+  clDelphi  = [clBlack, clMaroon, clGreen, clOlive, clNavy, clPurple, clTeal, clGray, clSilver, clRed, clLime, clYellow, clBlue, clFuchsia, clAqua, clLtGray, clDkGray, clWhite],
+  clVga     = [clVgaBlack, clVgaLowBlue, clVgaLowGreen, clVgaLowCyan, clVgaLowRed, clVgaLowMagenta, clVgaBrown, clVgaLightGray, clVgaDarkGray, clVgaHighBlue, clVgaHighGreen, clVgaHighCyan, clVgaHighRed, clVgaHighMagenta, clVgaYellow, clVgaWhite],
+  clC64     = [clC64Black, clC64White, clC64Red, clC64Cyan, clC64Purple, clC64Green, clC64Blue, clC64Yellow, clC64Orange, clC64Brown, clC64Pink, clC64DGrey, clC64Grey, clC64LGreen, clC64LBlue, clC64LGrey],
+  clWow     = [clBlack, clWowGrey, clWowWhite, clWowGreen, clWowBlue, clWowPurple, clWowRed, clWowRed2],
+  clVim     = [clVimBlack, clVimBlue, clVimGreen, clVimTeal, clVimRed, clVimPurple, clVimYellow, clVimWhite, clVimGray, clVimOrange],
+  clRainbow = [clRainbowRed, clRainbowOrange, clRainbowYellow, clRainbowGreen, clRainbowAqua, clRainbowBlue, clRainbowPurple, clRainbowPink],
+  clSol     = [clSolBase03, clSolBase02, clSolBase01, clSolBase00, clSolBase0, clSolBase1, clSolBase2, clSolBase3, clSolYellow, clSolOrange, clSolRed, clSolMagenta, clSolViolet, clSolBlue, clSolCyan, clSolGreen],
+  clAxis    = [clAxisX, clAxisY, clAxisZ],
+  clAll     = clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol;
+
 
 RGB colorByName(string name, bool mustExists=false){
 
   __gshared static RGB[string] map;
 
   if(map is null){ //todo: user driendly editing of all the colors
-
-    enum data = "clBlack=000000,clMaroon=000080,clGreen=008000,clOlive=008080,clNavy=800000,clPurple=800080,clTeal=808000,clGray=808080,clSilver=C0C0C0,
-      clRed=0000FF,clLime=00FF00,clYellow=00FFFF,clBlue=FF0000,clFuchsia=FF00FF,clAqua=FFFF00,clLtGray=C0C0C0,clDkGray=808080,clWhite=FFFFFF,
-      clSkyBlue=F0CAA6,clMoneyGreen=C0DCC0,clVgaBlack=000000,clVgaDarkGray=555555,clVgaLowBlue=AA0000,clVgaHighBlue=FF5555,clVgaLowGreen=00AA00,
-      clVgaHighGreen=55FF55,clVgaLowCyan=AAAA00,clVgaHighCyan=FFFF55,clVgaLowRed=0000AA,clVgaHighRed=5555FF,clVgaLowMagenta=AA00AA,clVgaHighMagenta=FF55FF,
-      clVgaBrown=0055AA,clVgaYellow=55FFFF,clVgaLightGray=AAAAAA,clVgaWhite=FFFFFF,clC64Black=000000,clC64White=FFFFFF,clC64Red=354374,clC64Cyan=BAAC7C,
-      clC64Purple=90487B,clC64Green=4F9764,clC64Blue=853240,clC64Yellow=7ACDBF,clC64Orange=2F5B7B,clC64Brown=00454f,clC64Pink=6572a3,clC64DGrey=505050,
-      clC64Grey=787878,clC64LGreen=8ed7a4,clC64LBlue=bd6a78,clC64LGrey=9f9f9f,clWowGrey=9d9d9d,clWowWhite=ffffff,clWowGreen=00ff1e,clWowBlue=dd7000,
-      clWowPurple=ee35a3,clWowRed=0080ff,clWowRed2=80cce5,clVimBlack=141312,clVimBlue=DAA669,clVimGreen=4ACAB9,clVimTeal=B1C070,clVimRed=534ED5,
-      clVimPurple=D897C3,clVimYellow=47C5E7,clVimWhite=FFFFFF,clVimGray=9FA19E,clVimOrange=458CE7,clRainbowRed=0000FF,clRainbowOrange=0088FF,
-      clRainbowYellow=00EEEE,clRainbowGreen=00FF00,clRainbowAqua=CCCC00,clRainbowBlue=FF0000,clRainbowPurple=FF0088,clRainbowPink=8800FF,clSolBase03=362b00,
-      clSolBase02=423607,clSolBase01=756e58,clSolBase00=837b65,clSolBase0=969483,clSolBase1=a1a193,clSolBase2=d5e8ee,clSolBase3=e3f6fd,clSolYellow=0089b5,
-      clSolOrange=164bcb,clSolRed=2f32dc,clSolMagenta=8236d3,clSolViolet=c4716c,clSolBlue=d28b26,clSolCyan=98a12a,clSolGreen=009985";
-
-    foreach(l; data.split(',')){
-      auto p = l.strip.split('=');
-
-      //preprocess name: take off cl, lowercase first letter
-      auto n = p[0].withoutStarting("cl").decapitalize;
-
-      map[n] = RGB(p[1].to!uint(16));
-    }
+    import std.traits;
+    static foreach(member; __traits(allMembers, mixin(__MODULE__)))
+      static if(is(Unqual!(typeof(mixin(member)))==RGB))
+        map[member/*.withoutStarting("cl").decapitalize*/] = mixin(member);  //todo: utils
 
     map.rehash;
   }
 
-  auto a = name.decapitalize in map;
+  //todo: decapitalize, enforce
+  auto a = name/*.decapitalize*/ in map;
   if(a is null){
-    enforce(!mustExists, `Unknown color name "%s"`.format(name));
+    //enforce(!mustExists, `Unknown color name "%s"`.format(name));
     return clFuchsia;
   }
   return *a;
@@ -557,7 +579,7 @@ RGB colorByName(string name, bool mustExists=false){
 
 //toRGB //////////////////////////////////
 
-RGB toRGB(string s){
+/*RGB toRGB(string s){
   s = s.strip;
   enforce(!s.empty, `Empty RGB literal.`);
 
@@ -570,12 +592,12 @@ RGB toRGB(string s){
   }
 
   return colorByName(s, true);
-}
+}*/
 
 //operations //////////////////////////////
 
-RGB  opBinary(string op : "*")(in RGB a , in RGB b )     { return RGB (a.r*b.r>>8, a.g*b.g>>8, a.b*b.b>>8); }    //todo: nem jo a color szorzas, mert implicit uint konverzio van
-RGBA opBinary(string op : "*")(in RGBA a, in RGBA b)     { return RGBA(a.r*b.r>>8, a.g*b.g>>8, a.b*b.b>>8, a.a*b.a>>8); }
+//RGB  opBinary(string op : "*")(in RGB a , in RGB b )     { return RGB (a.r*b.r>>8, a.g*b.g>>8, a.b*b.b>>8); }    //todo: nem jo a color szorzas, mert implicit uint konverzio van
+//RGBA opBinary(string op : "*")(in RGBA a, in RGBA b)     { return RGBA(a.r*b.r>>8, a.g*b.g>>8, a.b*b.b>>8, a.a*b.a>>8); }
 
 
 //import std.traits;
@@ -592,8 +614,7 @@ class ColorMap{
   abstract RGB eval(float x);
 
   T[] toArray(T=RGB)(int len){
-    import std.algorithm: max;
-    float invLen = 1.0f/max(len-1, 1);  //todo: import std.algorithm : fuckmin=min, fuckmax=max; //todo: ezt a max/min problemat egyszer s mindenkorra megoldani
+    float invLen = 1.0f/max(len-1, 1);
     return iota(len).map!(i => eval(i*invLen).to!T).array;
   }
 }
@@ -610,7 +631,7 @@ class RegressionColorMap: ColorMap{
 
   override RGB eval(float x){
     x = x.clamp(0, 1);
-    return RGBf(evalPoly(x, polys[0]), evalPoly(x, polys[1]), evalPoly(x, polys[2])).to!RGB;
+    return vec3(evalPoly(x, polys[0]), evalPoly(x, polys[1]), evalPoly(x, polys[2])).floatToRgb;
   }
 }
 
@@ -622,6 +643,7 @@ class DistinctColorMap: ColorMap{
   this(string name, string category, int[3][] pal, bool isLinear=false){
     this.name = name;
     this.category = category;
+    import std.array : array; import std.algorithm : map; //todo:utils
     this.pal = pal.map!(c => RGB(c[0], c[1], c[2])).array;
     this.isLinear = isLinear;
   }
@@ -632,8 +654,8 @@ class DistinctColorMap: ColorMap{
 
     if(isLinear){
       x *= pal.length-1;
-      const i = x.ifloor, fr = x.fract;
-      return lerp(pal[i], pal[i+1], fr);
+      const i = x.ifloor, fr = x.fract; //todo: modf
+      return mix(pal[i], pal[i+1], fr);
     }else{ // nearest
       x *= pal.length;
       return pal[x.ifloor];
@@ -690,6 +712,7 @@ class ColorMaps{
   ColorMapCategories categories;
 
   private void add(ColorMap m){
+    import std.conv; //utils
     m.index = byIndex.length.to!int;
     byIndex ~= m;
     byName[m.name] = m;
