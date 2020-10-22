@@ -72,29 +72,26 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 //todo: IDE: ha nem release build van forditva, akkor az assert/in/out/invariant legyen jelolve szurkevel!
 +/
 
-public import het.math; //het.math also imports std.algorithm, std.functional
+// Imports /////////////////////////////
 
-public import std.string, std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta, core.stdc.string, het.debugclient;
-
-//unicode stuff
-import std.encoding : transcode, Windows1252String;
-
+// std imports
+public import std.string, std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta, core.stdc.string; //het.math also imports std.algorithm, std.functional
 public import std.utf;
-
 public import std.uri: urlEncode = encode, urlDecode = decode;
-
 public import std.process : environment;
 public import std.zlib : compress, uncompress;
-
 public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write;
 public import std.bitmanip : swapEndian;
 
-//make oveload sets for colors
-// public import het.color;
-// bad public import std.math : abs, trunc, floor;
-// bad public import std.algorithm : min, max;
-// bad public import het.color : lerp, min, max, avg, absDiff;
+import std.encoding : transcode, Windows1252String;
+import std.exception : stdEnforce = enforce;
 
+// hetlib imports
+public import het.debugclient;
+public import het.math;
+public import het.color;
+
+// Windows imports
 public import core.sys.windows.windows : SetPriorityClass, HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
   BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
   GetCurrentProcess,
@@ -110,16 +107,16 @@ import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, ST
   FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS;
 
-// Obj.Destroy is not clearing shit
+public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
+
+// Obj.Destroy is not clearing shit
 void free(T)(ref T o)if(is(T==class)){
   if(o !is null){
     o.destroy;
     o = null;
   }
 }
-
-public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
 void SafeRelease(T:IUnknown)(ref T i){
   if (i !is null){
@@ -389,10 +386,6 @@ void parseOptions(T)(string[] args, ref T options){
 }
 
 // Exception handling ///////////////////////////////////////
-
-//import object: Exception, Throwable;
-
-import std.exception : stdEnforce = enforce;
 
 T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
 {
@@ -784,7 +777,7 @@ public:
 ///  Numeric                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////
 
-enum PIf = 3.14159265358979323846f;  //todo: not sure about where is it used or not used. If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete.
+//enum PIf = 3.14159265358979323846f;  //todo: not sure about where is it used or not used. If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete.
 
 //it replaces the exception with a default value.
 T safeConv(T, U)(const U src, lazy const T def){
@@ -799,21 +792,12 @@ T safeDiv(T)(T a, T b, T def=0){
   return b==0 ? def : a/b;
 }
 
-auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){
+/*  it's het.math.mod auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){
   auto c = a%b;
   if(c<0) c += b;
   return c;
-}
+}*/
 
-bool maximize(T)(ref T what, const T val) { if(val>what) { what = val; return true; }else return false; }
-bool minimize(T)(ref T what, const T val) { if(val<what) { what = val; return true; }else return false; }
-
-@safe{ //todo: this is lame
-  bool inRange(const int val, const int mi, const size_t ma) pure{ return val>=mi && val<=cast(int)ma; } //size_t is uint
-  bool inRange(T)(const T val, const T mi, const T ma) pure{ return val>=mi && val<=ma; }
-  bool inRange_sorted(T)(const T val, const T a, const T b) pure{ return a<b ? (val>=a && val<=b) : (val>=b && val<=a); }
-  bool inRange(T, U)(const T val, auto ref const U[] array) pure{ return val>=0 && val<array.length; }
-}
 
 float wrapInRange(ref float p, float pMin, float pMax){
   float len = pMax-pMin, pOld = p;
@@ -829,10 +813,6 @@ float wrapInRange(ref float p, float pMin, float pMax, ref int wrapCnt){ //speci
   while(p>pMax){ p -= len; wrapCnt--; }
   return p-pOld;
 }
-
-
-
-int iclamp(T)(const T val, const T mi, const T ma) { return cast(int)clamp(val, mi, ma); }
 
 
 T rcpf_fast(T)(const T x)if(__traits(isFloating, T)){
@@ -856,6 +836,7 @@ struct percent{
 //todo: 'in' operator piros, de annak ciankeiknek kene lennie, mint az out-nak. Azazhogy helyzettol figg annak a szine
 
 
+//todo: remap goes to math
 T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 {
   float s = srcTo-srcFrom;
@@ -883,12 +864,7 @@ bool isDescending(T0, T1)(in T0 a, in T1 b){ return a > b; }
 bool isAscending (T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b ? chain : a < b; }
 bool isDescending(T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b ? chain : a > b; }
 
-
-public import std.algorithm: swap;
-//void swap(T)(ref T a, ref T b) { T c=a; a=b; b=c; }
-
-//import std.algorithm : sort; //have to import this way, so the original is also visible through an alias
-public import std.algorithm: sort;
+public import std.algorithm: sort, swap;
 
 void sort(T)(ref T a, ref T b){
   if(a>b) swap(a,b);
@@ -950,7 +926,7 @@ bool isPrime(uint num){
 }
 
 // max |error| > 0.01
-float fast_atan2f(float x, float y)
+float atan_fast(float x, float y)
 {
   const float ONEQTR_PI = PIf / 4.0f;
   const float THRQTR_PI = 3.0f * PIf / 4.0f;
@@ -1077,13 +1053,13 @@ bool follow(T)(ref T act, const T target, const T t, const T maxd)
   return (act!=last);
 }
 
-/*bool followRGB(ref RGB act, RGB target, float t, int maxd)
+bool followRGB(ref RGB act, RGB target, float t, int maxd)
 {
-  act = het.color.lerp(act, target, t);
+  act = mix(act, target, t);
   bool res = sad(target, act)>maxd;
   if(!res) act = target;
   return res;
-}*/
+}
 
 float animationT(float dt, float speed, float maxDt = 0.1f)
 {
@@ -1101,11 +1077,11 @@ float easeInOutQuad(float t, float b, float c, float d) {
   return -c/2 * ((--t)*(t-2) - 1) + b;
 }
 
-// Interval class ////////////////////////////////////////
-// Interval class: Keeps an integer or float range. It can clamp values using that range,
+// Interval ////////////////////////////////////////
+// Interval: Keeps an integer or float range. It can clamp values using that range,
 // and can easily extend the range. Also manages the validity of the range (NULL range).
 // There are 2 specializations: some FloatInterval/IntInterval.
-struct Interval(T){
+/+ this in in math now. struct Interval(T){
   static if(__traits(isFloating, T)){ T min = T.max,  max = -T.max; }
                                 else{ T min = T.max,  max =  T.min; }
 

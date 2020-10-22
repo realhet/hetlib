@@ -55,36 +55,12 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord ) {
 
 
 void main(){ //static import het.utils; het.utils.application.runConsole({
-  het.math.unittest_main;
+//  import het.utils;
 
+  het.math.unittest_main;
   import het.color;
 
-  RGB a = RGB(40, 80, 250);
-  RGB b = RGB(1, 0, 1);
-
-  writeln(a+b);
-  writeln(mix(a, b, .5f)>>3);
-
-  foreach(i; 0..30){
-    //writeln(hsvToRgb(RGBA(i*255/30, 255, 255, 128)));
-    auto c = hsvToRgb(vec4(i/30.0f, 1, 1, .5).floatToRgb);
-    writeln(c, "  ", c ^ 255);
-  }
-
-  const RGB
-    clRed             = 0x0000FF,
-    clLime            = 0x00FF00,
-    clYellow          = 0x00FFFF,
-    clBlue            = 0xFF0000,
-    clFuchsia         = 0xFF00FF;
-
-  writeln(clRed.rgb1, clBlue.rgb1.bgra);
-
-  writeln(colorByName("fuchsia"));
-
   writeln("done main");
-
-
 
 
 /+  iResolution = vec2(40, 25);

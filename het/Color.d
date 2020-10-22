@@ -2,11 +2,6 @@ module het.color;
 
 import het.math;
 
-alias RGB8 = Vector!(ubyte, 3),  RGB  = RGB8;
-alias RGBA8 = Vector!(ubyte, 4),  RGBA  = RGBA8;
-
-enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float));
-
 auto floatToRgb(T, int N)(in Vector!(T, N) x)  if(is(T == float)) { return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255));  }
 auto rgbToFloat(T, int N)(in Vector!(T, N) x)  if(is(T == ubyte)) { return x * (1.0f/255);                                }
 

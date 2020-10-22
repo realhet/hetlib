@@ -28,7 +28,7 @@ import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
 import std.range : iota;
-import std.traits : isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isFloatingPoint, stdCommonType = CommonType, Unqual;
+import std.traits : isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType, Unqual;
 import std.meta : AliasSeq;
 
 import std.exception : enforce;
@@ -42,8 +42,6 @@ private enum approxEqualDefaultDiff = 1e-3f;
 //todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 alias myto(T) = stdto!T;
 //auto myto(T)(in T a){ return cast(T) a; }
-
-bool inRange(V, L, H)(in V value, in L lower, in H higher){ return value>=lower && value<=higher; } //todo: comine with het.utils.
 
 private enum swizzleRegs = ["xyzw", "rgba", "stpq"];
 
@@ -66,10 +64,6 @@ private bool validRvalueSwizzle(string def){
 }
 
 
-////////////////////////////////////////////////////////////////////////////////
-///  Vector                                                                  ///
-////////////////////////////////////////////////////////////////////////////////
-
 enum isVector(T) = is(T.VectorType);
 
 private bool anyVector(T...)(){
@@ -84,9 +78,9 @@ private int FirstVectorLength(T...)(){
   return 0;
 }
 
-private template CommonType(A, B){
+private template CommonType(A...){
   //todo: ubyte + ushort should be ushort, not int
-  alias CommonType = stdCommonType!(A, B);
+  alias CommonType = stdCommonType!(A);
 }
 
 private template OperationResultType(string op, A, B){
@@ -126,6 +120,24 @@ private auto vectorAccess(int idx, T)(in T a){
   static if(isVector!T) return a[idx];
                    else return a;
 }
+
+private void unittest_utilityStuff(){
+  assert(validRvalueSwizzle("_01yx") && validRvalueSwizzle("bgr1"));
+  assert(!validRvalueSwizzle("xy")); //false: this is Lvalue swizzle
+  assert(!validRvalueSwizzle("xa")); //false: mixture of divverent swizzle variables
+
+  assert(!anyVector!(int, float) && anyVector!(float, vec2));
+  assert(FirstVectorLength!(float, vec3)==3 && FirstVectorLength!(float, int)==0);
+  assert(CommonVectorLength!()==0 && CommonVectorLength!(int)==1 && CommonVectorLength!(int, vec3)==3);
+
+  assert(is(CommonScalarType!(int, float, dvec3, mat2)==double));
+
+  assert(vectorAccess!2(5)==5 && vectorAccess!2(vec3(1,2,3))==3);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+///  Vector                                                                  ///
+////////////////////////////////////////////////////////////////////////////////
 
 struct Vector(CT, int N)
 if(N.inRange(2, 4)){
@@ -223,7 +235,12 @@ if(N.inRange(2, 4)){
 
   // raw data access for ubyte vectors.
   static if(is(ComponentType==ubyte)){
-    static if(length==3){
+    static if(length==4){
+
+          uint raw() const { return *(cast(uint*) &components); }
+      ref uint raw()       { return *(cast(uint*) &components); }
+
+    }else{
 
       @property uint raw() const{
         uint data = 0x00000000;
@@ -234,11 +251,6 @@ if(N.inRange(2, 4)){
       @property void raw(uint data){
         components = *(cast(Unqual!(typeof(components))*) &data);
       }
-
-    }else static if(length==4){
-
-          uint raw() const { return *(cast(uint*) &components); }
-      ref uint raw()       { return *(cast(uint*) &components); }
 
     }
   }
@@ -313,13 +325,18 @@ if(N.inRange(2, 4)){
     }
   }
 
-  auto opBinaryRight(string op, T)(in T other) const{
-    static if(isNumeric!T){
+  auto opBinaryRight(string op, T)(in T other) const
+  {
+    static if(isNumeric!T)
       return generateVector!(CommonScalarType!(VectorType, T), (a, b) => mixin("a", op, "b") )(other, this);
+    else static if(isBounds!T && op.among("+", "-", "*", "/")){
+      //I don't understand whi is it needed to be here. Inside Bounds it doesn't works.
+      return mixin("bounds(other.low $ this, other.high $ this)".replace('$', op));
     }else{
-      static assert(false, "invalid operation");
+      static assert(0, "invalid operation");
     }
   }
+
 
   auto opOpAssign(string op, T)(in T other){
     this = mixin("this", op, "other");
@@ -341,10 +358,17 @@ static foreach(T; vectorElementTypes)
   static foreach(N; vectorElementCounts)
     mixin(format!q{alias %s = %s;}(Vector!(T, N).VectorTypeName, Vector!(T, N).stringof));
 
+// define aliases for colors
+
+alias RGB8 = Vector!(ubyte, 3),  RGB  = RGB8;
+alias RGBA8 = Vector!(ubyte, 4),  RGBA  = RGBA8;
+
+enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float));
 
 private void unittest_Vectors(){
   { // various tests of mine
     immutable v1 = vec4(1,2,3,0);
+    assert(v1.text == "vec4(1, 2, 3, 0)");
     Unqual!(typeof(v1)) v2 = v1;  assert(v1.z == 3);
     v2.z++;                       assert(v2.b == 4);
     assert(v1.gb == vec2(2, 3));
@@ -378,6 +402,23 @@ private void unittest_Vectors(){
     assert(is(typeof(ubyte(1) << ubyte(2)) == int));  //Dlang: is int at minimum
     assert(is(typeof(ubyte(1) << 2) == int));
     assert(is(typeof(Vector!(ubyte, 2)(1, 2)<<2) == Vector!(ubyte, 2) )); // with vectors: it preserves the type of the left hand operand.
+  }
+  { // color vector tests
+    RGB a = RGB(40, 80, 250);
+    RGB b = RGB(1, 0, 1);
+    static assert(is(typeof(a-b)==typeof(a))); // no int promotion, it stays byte
+    assert(absDiff(a, b) == a-b && absDiff(a, b) == absDiff(b, a)); //absDifference works well
+    assert(a-b != abs(b-a)); //no automatic int promotion for ubyte
+    assert(a-b == abs(ivec3(b)-a)); //with manual int promotion it works
+
+    //RGB raw(uint) access
+    assert(RGB(0x30, 0x40, 0x55)==RGB(0x554030));
+    a.raw = 0x554030;  assert(a.raw == 0x554030);
+    RGBA d = 0xFF028801; assert(d.raw == 0xFF028801);
+    d.raw = 0xF0605040; assert(d.raw == 0xF0605040);
+
+    //Special RGB swizzling
+    assert(RGB(0x10).rR10 == RGBA(0x10, 255-0x10, 255, 0)); // -x -> 255-x  ;  1 -> 255
   }
   { // implicit conversions
     uvec2 a0 = ivec2(1, 2);
@@ -511,16 +552,16 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
     }
   }
 
-  //set or get as consequtive array. Automatically transposes back and forth.
+  //set or get as consequtive array. Column-mayor order, just like OpenGL.
   @property auto asArray() const {
-    CT[] res;  res.reserve(N*M);
-    foreach(j; 0..M) foreach(i; 0..N) res ~= this[i][j];
+    CT[] res; res.reserve(N*M);
+    foreach(i; 0..N) foreach(j; 0..M) res ~= this[i][j];
     return res;
   }
 
   @property void asArray(in CT[] arr) {
     int idx;
-    foreach(j; 0..M) foreach(i; 0..N) this[i][j] = arr[idx++];
+    foreach(i; 0..N) foreach(j; 0..M) this[i][j] = arr[idx++];
   }
 
   private static auto generateBinaryOpMatrix(string op, string payload, A, B)(in A a, in B b){
@@ -592,7 +633,7 @@ static foreach(T; matrixElementTypes){
       mixin(format!q{alias %smat%sx%s = Matrix!(%s, %s, %s);}(ComponentTypePrefix!T, N, M, T.stringof, N, M));
 
     //symmetric matrices
-    mixin(format!q{alias %smat%s = mat%sx%s;}(ComponentTypePrefix!T, N, N, N));
+    mixin(format!q{alias %smat%s = %smat%sx%s;}(ComponentTypePrefix!T, N, ComponentTypePrefix!T, N, N));
   }
 }
 
@@ -681,6 +722,8 @@ private void unittest_Matrices(){
   }
 
   { // Various tests of mine
+    static assert(is(dmat2 == Matrix!(double, 2, 2)));
+
     assert(3*mat2(2) == mat2(6, 0, 0, 6));
     assert(mat2(1)+mat2(2) == mat2(3, 0, 0, 3));
 
@@ -689,9 +732,14 @@ private void unittest_Matrices(){
 
     dmat2 m1 = mat2(vec4(1));
     assert(m1 == mat2(1,1,1,1));
+
+    assert(mat2(1,2,3,4).asArray.equal([1,2,3,4]));
+    m1.asArray = [9,2,3,4];  assert(m1 == mat2(9,2,3,4));
+
+    assert(mat2(1,2,3,4).text == "mat2(vec2(1, 2), vec2(3, 4))");
+    assert(mat2(1) == mat2.identity);
   }
 }
-
 
 //! Functions /////////////////////////////////////////////////
 
@@ -818,7 +866,21 @@ private void unittest_ExponentialFunctions(){
 
 // Common functions //////////////////////////////////////////
 
-auto abs    (A)(in A a) { return a.generateVector!(ScalarType!A, a => a<0 ? -a : a ); }
+bool inRange(V, L, H)(in V value, in L lower, in H higher){ return value>=lower && value<=higher; }
+
+/// bounds can be unsorted
+bool inRange_sorted(V, L, H)(in V value, in L r1, in H r2){ return value>=min(r1, r2) && value<=max(r1, r2); }
+
+/// checking for valid index in arrays
+bool inRange(V, A)(in V intex, in A[] arr){ return index>=0 && index<arr.length; }
+
+// apply it to intervals
+bool inRange(V, I)(in V value, in I interval) if(__traits(compiles, (value in interval))){ return value in interval; }
+
+auto abs    (A)(in A a) {
+  static if(is(ScalarType!A==ubyte)) return a.generateVector!(ScalarType!A, a => a<0 ? -cast(int)a : a ); //note: this eliminates an annoying Deprecation: integral promotion not done for '-a'
+                                else return a.generateVector!(ScalarType!A, a => a<0 ? -a : a );
+}
 
 auto sign   (A)(in A a) { alias CT = ScalarType!A; return a.generateVector!(CT, a => a==0 ? 0 : a<0 ? -1 : 1 ); }
 
@@ -872,6 +934,9 @@ auto max(T...)(in T args){ //note: std.algorithm.max is (T t)
                       else return max(max(args[0..$-1]), args[$-1]);
   else return std.algorithm.max(args);
 }
+
+bool minimize(A, B)(ref A a, in B b) { const n = min(a, b), res = a != n; a = n; return res; }
+bool maximize(A, B)(ref A a, in B b) { const n = max(a, b), res = a != n; a = n; return res; }
 
 auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
   static if(anyVector!(T1, T2, T3)) return max(lower, min(upper,val));
@@ -952,9 +1017,13 @@ auto fma(A, B, C)(in A a, in B b, in C c){ // no extra precision. it's just here
   return generateVector!(CommonScalarType!(A, B, C), (a, b, c) => a * b + c)(a, b, c);
 }
 
-auto absDiff(A, B)(in A a, in B b) { return abs(a-b); }
+auto absDiff(A, B)(in A a, in B b) {
+  alias CT = CommonScalarType!(A, B);
+  static if(isUnsigned!CT) return max(a, b)-min(a, b);
+                      else return abs(a-b);
+}
 
-auto sad    (A, B)(in A a, in B b) { return absDiff(a, b)[].sum; }
+auto sad(A, B)(in A a, in B b) { return absDiff(a, b)[].sum; }
 
 private void unittest_CommonFunctions(){
   assert(abs(vec2(-5, 5))==vec2(5, 5));
@@ -993,17 +1062,25 @@ private void unittest_CommonFunctions(){
   assert((cmp(2, 1)>0)==(std.math.cmp(2.0,1.0)>0));
   assert(cmp(vec2(1),1)==vec2(cmp(1,1)) && cmp(vec2(1),2)==vec2(cmp(1,2)) && cmp(vec2(2),1)==vec2(cmp(2,1)));
 
-  assert(min(1, 2.0)==1 && max(1, 2)==2);
-  const a = vec3(1, 2, 3), b = vec3(4, 0, 6);
-  assert(min(a, b) == vec3(1, 0, 3));
-  assert(min(a, 2) == vec3(1, 2, 2));
-  assert(min(b, 5) == vec3(4, 0, 5));
-  assert(max(b, 5) == vec3(5, 5, 6));
-  assert(min(2, a) == vec3(1, 2, 2));
-  assert(min(5, b) == vec3(4, 0, 5));
-  assert(max(5, b) == vec3(5, 5, 6));
-  assert(max(a, b, 3) == vec3(4, 3, 6));
-  assert(min(a, b, 2) == vec3(1, 0, 2));
+  {
+    assert(min(1, 2.0)==1 && max(1, 2)==2);
+    const a = vec3(1, 2, 3), b = vec3(4, 0, 6);
+    assert(min(a, b) == vec3(1, 0, 3));
+    assert(min(a, 2) == vec3(1, 2, 2));
+    assert(min(b, 5) == vec3(4, 0, 5));
+    assert(max(b, 5) == vec3(5, 5, 6));
+    assert(min(2, a) == vec3(1, 2, 2));
+    assert(min(5, b) == vec3(4, 0, 5));
+    assert(max(5, b) == vec3(5, 5, 6));
+    assert(max(a, b, 3) == vec3(4, 3, 6));
+    assert(min(a, b, 2) == vec3(1, 0, 2));
+  }
+
+  { auto a = vec2(1,2);
+    assert(maximize(a, vec2(3, 4)) && a==vec2(3, 4));
+    assert(minimize(a, 3) && a==vec2(3, 3));
+    assert(!maximize(a, 2) && a==3);
+  }
 
   assert(vec3(1,2,3).clamp(1.5, 2.5) == vec3(1.5, 2, 2.5));
   assert(ivec3(8).clamp(1.5, vec3(4, 5, 6)) == vec3(4, 5, 6));
@@ -1051,7 +1128,8 @@ private void unittest_CommonFunctions(){
 
   assert(fma(2, 3, vec2(10, 20))==vec2(16, 26));
   assert(absDiff(vec2(1, 15), 10) == vec2(9, 5));
-  assert(sad(vec2(1, 15), 10) == 9+5);
+  assert(absDiff(Vector!(ushort, 3)(1, 2, 3), Vector!(ushort, 3)(3, 2, 1)) == Vector!(ushort, 3)(2, 0, 2)); //must work with unsigneds too
+  assert(sad(Vector!(ubyte, 2)(250, 240), 10) == 240+230); //must not summarize on ubyte, but int.
 }
 
 // Geometric functions ///////////////////////////////////////
@@ -1274,6 +1352,12 @@ auto any(T, int N)(in Vector!(T, N) a){ return std.algorithm.any(a[]); }
 public import std.functional: not;
 auto not(int N)(in Vector!(bool, N) a){ return a.generateVector!(float, a => !a); }
 
+// These work for a single bool too. Used in Bounds, which is 1D..3D
+// Conflicing with the std.algorithm versions.
+bool _all(A)(in A a){ static if(isVector!A) return all(a); else return a; }
+bool _any(A)(in A a){ static if(isVector!A) return any(a); else return a; }
+bool _not(A)(in A a){ static if(isVector!A) return not(a); else return !a; }
+
 private void unittest_originalEqual(){ // copied from Dlang documentation
   int[4] a = [ 1, 2, 4, 3 ];
   assert(!equal(a[], a[1..$]));
@@ -1307,7 +1391,7 @@ private void unittest_VectorRelationalFunctions(){
   assert(!notEqual(vec2(1,3), uvec2(1,3)));
   assert(notEqual(vec2(0,3), uvec2(1,3)));
 
-  assert([true, true].all);
+  assert([true, true, true].all);
   assert([false, false].all!"!a");
   assert(![true, false].all);
   assert(all(bvec3(1)) && !all(vec2(0,1)));
@@ -1320,6 +1404,104 @@ private void unittest_VectorRelationalFunctions(){
   assert(bvec3(0,1,0).not == bvec3(1,0,1));
 }
 
+
+////////////////////////////////////////////////////////////////////////////////
+///  Bounds                                                                  ///
+////////////////////////////////////////////////////////////////////////////////
+
+
+auto bounds(A...)(in A a){
+  static if(anyVector!A){
+    static assert(A.length==2, "invalid number of arguments");
+    return Bounds!(CommonVectorType!(A[0], A[1]))(a);
+  }else static if(A.length==2){
+    return Bounds!(CommonType!A)(a);
+  }else static if(A.length==4){
+    alias VT = Vector!(CommonType!A, 2);
+    return Bounds!VT(VT(a[0], a[1]), VT(a[2], a[3]));
+  }else static if(A.length==6){
+    alias VT = Vector!(CommonType!A, 3);
+    return Bounds!VT(VT(a[0], a[1], a[2]), VT(a[3], a[4], a[5]));
+  }else{
+    static assert(0, "invalid arguments: " ~ A.stringof);
+  }
+}
+
+enum isBounds(T) = is(T) && __traits(compiles, T.low, T.high);
+
+template CommonBoundsType(A...){
+  static if(CommonVectorLength!A > 1) alias CommonBoundsType = Bounds!(CommonVectorType!A);
+                                 else alias CommonBoundsType = Bounds!(CommonScalarType!A);
+}
+
+struct Bounds(T/*, bool lowClosed=true, bool highClosed=true*/){
+  T low = 0, high = -1;
+
+  string toString() const {
+    return format!"bounds(%s, %s)"(low, high);
+  }
+
+  bool valid() const{
+    return _all(lessThanEqual(low, high));
+  }
+
+  auto opBinary(string op)(in T other) const
+  {
+    static if(op=="in"){ //componentwise check unside
+      return valid && all(lessThanEqual(low, other) & lessThanEqual(other, high));
+    }else static if(op=="|"){ // extend
+      static if(isBounds!T){
+        return other.valid ? this | other.low | other.high
+                           : typeof(this | other.low).init;
+      }else{
+        Bounds!(CommonVectorType!(typeof(low), T)) res;
+        if(valid){
+          res.low  = min(low , other),
+          res.high = max(high, other);
+        }else{
+          res.low = res.high = other;
+        }
+        return res;
+      }
+    }else static if(op=="&"){ // union
+pragma(msg, "FUCK");
+      static assert(isBounds!T);
+      Bounds!(CommonVectorType!(typeof(low), T)) res;
+      if(valid && other.valid){
+        res.low  = max(low , other.low );
+        res.high = min(high, other.high);
+      }
+      return res;
+    }else static if(op.among("+", "-", "*", "/")){ //shift, scale
+      CommonBoundsType!(typeof(low), T) res;
+      if(valid){
+        res.low  = mixin("low" , op, "other");
+        res.high = mixin("high", op, "other");
+      }
+      return res;
+    }else{
+      static assert(0, "invalid operation");
+    }
+  }
+
+  bool opEquals(T)(in T other) const {
+    return (low==other.low && high==other.high && valid) || (!valid && !other.valid);
+  }
+
+}
+
+
+private void unittest_Bounds(){
+  auto b1 = bounds(1, 2, 3, 4);
+  static assert(isBounds!(typeof(b1)));
+  assert(b1.text == "bounds(ivec2(1, 2), ivec2(3, 4))");
+  assert(b1 + ivec2(100, 200) == bounds(101, 202, 103, 204));
+  assert(b1 * vec2(1000, 1000)== bounds(1000, 2000, 3000, 4000));
+
+  writeln(ivec2(3, 5) & ivec2(2));
+//  writeln(bounds(1, 5) & bounds(3, 20));
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ///  Tests                                                                   ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -1329,6 +1511,7 @@ private void unittest_VectorRelationalFunctions(){
 void unittest_main(){
   version(assert){}else enforce(0, "Turn on debug build for asserts.");
 
+  unittest_utilityStuff;
   unittest_Vectors;
   unittest_Matrices;
   unittest_AngleAndTrigFunctions;
@@ -1337,6 +1520,7 @@ void unittest_main(){
   unittest_GeometricFunctions;
   unittest_MatrixFunctions;
   unittest_VectorRelationalFunctions;
+  unittest_Bounds;
 
   //https://www.shadertoy.com/view/XsjGDt
 }
