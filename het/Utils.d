@@ -1133,6 +1133,7 @@ float easeInOutQuad(float t, float b, float c, float d) {
 
 alias IntInterval   = Interval!int  ;
 alias FloatInterval = Interval!float;
++/
 
 struct UpdateInterval{
   float tLast, tAct;

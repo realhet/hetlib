@@ -27,8 +27,8 @@ import std.format : format;
 import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
-import std.range : iota;
-import std.traits : isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType, Unqual;
+import std.range : iota, isInputRange, ElementType;
+import std.traits : Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType;
 import std.meta : AliasSeq;
 
 import std.exception : enforce;
@@ -64,7 +64,7 @@ private bool validRvalueSwizzle(string def){
 }
 
 
-enum isVector(T) = is(T.VectorType);
+enum isVector(T) = is(T) && is(T.VectorType);
 
 private bool anyVector(T...)(){
   static foreach(t; T)
@@ -270,14 +270,14 @@ if(N.inRange(2, 4)){
           mixin(format!q{ref  %s()       { return *(cast(Vector!(CT, %s)*) (components[%s..%s])); }}(regs[i..i+len], len, i, i+len));
         }
 
-  private static auto swizzleDecode(char ch)(){
+  private template swizzleDecode(char ch){
     enum lowerCh = ch.toLower;
     enum isLower = ch==lowerCh;
     static if(is(ComponentType==ubyte)){
       //for ubyte: 1 means 255, UpperCase means 255^
-      return ch=='1' ? "255" : cast(string)[lowerCh] ~ (isLower ? "" : "^255");
+      enum swizzleDecode = ch=='1' ? "255" : cast(string)[lowerCh] ~ (isLower ? "" : "^255");
     }else{
-      return (isLower ? "" : "-") ~ cast(string)[lowerCh];
+      enum swizzleDecode = (isLower ? "" : "-") ~ cast(string)[lowerCh];
     }
   }
 
@@ -315,7 +315,8 @@ if(N.inRange(2, 4)){
     return generateVector!(CT, (a, b) => mixin("a", op, "b") )(a, b);
   }
 
-  auto opBinary(string op, T)(in T other) const{
+  auto opBinary(string op, T)(in T other) const
+  {
     static if(isNumeric!T || isVector!T){ // vector * (vector/scalar)
       return binaryVectorScalarOp!op(this, other);
     }else static if(op=="*" && isMatrix!T && T.height==length){ // vector * matrix
@@ -327,16 +328,9 @@ if(N.inRange(2, 4)){
 
   auto opBinaryRight(string op, T)(in T other) const
   {
-    static if(isNumeric!T)
-      return generateVector!(CommonScalarType!(VectorType, T), (a, b) => mixin("a", op, "b") )(other, this);
-    else static if(isBounds!T && op.among("+", "-", "*", "/")){
-      //I don't understand whi is it needed to be here. Inside Bounds it doesn't works.
-      return mixin("bounds(other.low $ this, other.high $ this)".replace('$', op));
-    }else{
-      static assert(0, "invalid operation");
-    }
+    static if(isNumeric!T) return generateVector!(CommonScalarType!(VectorType, T), (a, b) => mixin("a", op, "b") )(other, this);
+                      else static assert(0, "invalid operation");
   }
-
 
   auto opOpAssign(string op, T)(in T other){
     this = mixin("this", op, "other");
@@ -398,10 +392,16 @@ private void unittest_Vectors(){
     va ~= vec3(6);
     assert(va == [vec3(4), vec3(5), vec3(6)]);
 
+    //bitwise ops
+    assert((ivec2(3, 5) & ivec2(2)) == ivec2(3&2, 5&2));
+    assert(~RGB(0, 1, 255) == RGB(255, 254, 0));
+
     // the result type for shifting
     assert(is(typeof(ubyte(1) << ubyte(2)) == int));  //Dlang: is int at minimum
     assert(is(typeof(ubyte(1) << 2) == int));
     assert(is(typeof(Vector!(ubyte, 2)(1, 2)<<2) == Vector!(ubyte, 2) )); // with vectors: it preserves the type of the left hand operand.
+
+    assert(~RGB(1,2,3) == RGB(254, 253, 252)); //unary ~
   }
   { // color vector tests
     RGB a = RGB(40, 80, 250);
@@ -416,6 +416,7 @@ private void unittest_Vectors(){
     a.raw = 0x554030;  assert(a.raw == 0x554030);
     RGBA d = 0xFF028801; assert(d.raw == 0xFF028801);
     d.raw = 0xF0605040; assert(d.raw == 0xF0605040);
+    const e = d; static assert(!__traits(compiles, e.raw = 1)); assert(e.raw == 0xF0605040);
 
     //Special RGB swizzling
     assert(RGB(0x10).rR10 == RGBA(0x10, 255-0x10, 255, 0)); // -x -> 255-x  ;  1 -> 255
@@ -866,21 +867,7 @@ private void unittest_ExponentialFunctions(){
 
 // Common functions //////////////////////////////////////////
 
-bool inRange(V, L, H)(in V value, in L lower, in H higher){ return value>=lower && value<=higher; }
-
-/// bounds can be unsorted
-bool inRange_sorted(V, L, H)(in V value, in L r1, in H r2){ return value>=min(r1, r2) && value<=max(r1, r2); }
-
-/// checking for valid index in arrays
-bool inRange(V, A)(in V intex, in A[] arr){ return index>=0 && index<arr.length; }
-
-// apply it to intervals
-bool inRange(V, I)(in V value, in I interval) if(__traits(compiles, (value in interval))){ return value in interval; }
-
-auto abs    (A)(in A a) {
-  static if(is(ScalarType!A==ubyte)) return a.generateVector!(ScalarType!A, a => a<0 ? -cast(int)a : a ); //note: this eliminates an annoying Deprecation: integral promotion not done for '-a'
-                                else return a.generateVector!(ScalarType!A, a => a<0 ? -a : a );
-}
+auto abs    (A)(in A a) { return max(a, -a); }
 
 auto sign   (A)(in A a) { alias CT = ScalarType!A; return a.generateVector!(CT, a => a==0 ? 0 : a<0 ? -1 : 1 ); }
 
@@ -922,21 +909,39 @@ private auto minMax(bool isMin, T, U)(in T a, in U b){
 }
 
 auto min(T...)(in T args){ //note: std.algorithm.min is (T t)
-  static if(anyVector!T)
+  static if(T.length==1 && isInputRange!(T[0])){
+    return args[0].fold!((a, b) => min(a, b));
+  }else static if(anyVector!T){
     static if(T.length==2) return minMax!1(args[0], args[1]);
                       else return min(min(args[0..$-1]), args[$-1]);
-  else return std.algorithm.min(args);
+  }else return std.algorithm.min(args);
 }
 
 auto max(T...)(in T args){ //note: std.algorithm.max is (T t)
-  static if(anyVector!T)
+  static if(T.length==1 && isInputRange!(T[0])){
+    return args[0].fold!((a, b) => max(a, b));
+  }else static if(anyVector!T){
     static if(T.length==2) return minMax!0(args[0], args[1]);
                       else return max(max(args[0..$-1]), args[$-1]);
-  else return std.algorithm.max(args);
+  }else return std.algorithm.max(args);
 }
 
 bool minimize(A, B)(ref A a, in B b) { const n = min(a, b), res = a != n; a = n; return res; }
 bool maximize(A, B)(ref A a, in B b) { const n = max(a, b), res = a != n; a = n; return res; }
+
+bool inRange(V, L, H)(in V value, in L lower, in H higher){
+  static if(CommonVectorLength!(V, V, H)==1) return value>=lower && value<=higher;
+                                        else return all(greaterThanEqual(value, lower)) && all(lessThanEqual(value, higher));
+}
+
+/// bounds can be unsorted
+bool inRange_sorted(V, L, H)(in V value, in L r1, in H r2){ return inRange(value, min(r1, r2), max(r1, r2)); }
+
+/// checking for valid index in arrays
+bool inRange(V, A)(in V index, in A[] arr){ return index>=0 && index<arr.length; }
+
+// apply it to intervals
+bool inRange(V, I)(in V value, in I bounds) if(__traits(compiles, (value in bounds))){ return value in bounds; }
 
 auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
   static if(anyVector!(T1, T2, T3)) return max(lower, min(upper,val));
@@ -1074,6 +1079,13 @@ private void unittest_CommonFunctions(){
     assert(max(5, b) == vec3(5, 5, 6));
     assert(max(a, b, 3) == vec3(4, 3, 6));
     assert(min(a, b, 2) == vec3(1, 0, 2));
+
+    // min()/max() works for ranges too (unlike std.min. It's the reasonable way to do minEpement on vectors.
+    // MinElement uses componentwise opCmp, it's just for sorting.
+    alias arr = AliasSeq!(vec2(3, 4), vec2(9, 11), vec2(14, 2));
+    static assert(is(typeof([arr]) == vec2[]));
+    assert(min([arr]) == min(arr));
+    assert(max([arr]) == max(arr));
   }
 
   { auto a = vec2(1,2);
@@ -1084,6 +1096,10 @@ private void unittest_CommonFunctions(){
 
   assert(vec3(1,2,3).clamp(1.5, 2.5) == vec3(1.5, 2, 2.5));
   assert(ivec3(8).clamp(1.5, vec3(4, 5, 6)) == vec3(4, 5, 6));
+
+  assert(inRange(1,1,1) && !inRange(0, 1, 2) && inRange(1, 0, 2));
+  assert(inRange_sorted(1, 3, 0));
+  assert(inRange(1,[0, 1]) && !inRange(-1, [0, 1]) && !inRange(2L, [0, 1]));
 
   assert(mix(vec2(1,2), vec2(2, 4), 0.5f) == vec2(1.5, 3));
   assert(mix(vec2(1,2), 2, 0.5) == vec2(1.5, 2));
@@ -1344,45 +1360,53 @@ auto equal(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) || (isNumeric!B 
 auto notEqual(A, B)(in A a, in B b){ return !equal(a, b); }
 
 public import std.algorithm: all;
-auto all(T, int N)(in Vector!(T, N) a){ return std.algorithm.all(a[]); }
+bool all(alias pred = "a", A)(in A a)
+if(is(Unqual!A == bool) || isVector!A)
+{
+  static if(isVector!A) return std.algorithm.all!pred(a[]);
+                   else return std.algorithm.all!pred([a]);
+}
 
 public import std.algorithm: any;
-auto any(T, int N)(in Vector!(T, N) a){ return std.algorithm.any(a[]); }
+bool any(alias pred = "a", A)(in A a)
+if(is(Unqual!A == bool) || isVector!A)
+{
+  static if(isVector!A) return std.algorithm.any!pred(a[]);
+                   else return std.algorithm.any!pred([a]);
+}
 
 public import std.functional: not;
-auto not(int N)(in Vector!(bool, N) a){ return a.generateVector!(float, a => !a); }
-
-// These work for a single bool too. Used in Bounds, which is 1D..3D
-// Conflicing with the std.algorithm versions.
-bool _all(A)(in A a){ static if(isVector!A) return all(a); else return a; }
-bool _any(A)(in A a){ static if(isVector!A) return any(a); else return a; }
-bool _not(A)(in A a){ static if(isVector!A) return not(a); else return !a; }
-
-private void unittest_originalEqual(){ // copied from Dlang documentation
-  int[4] a = [ 1, 2, 4, 3 ];
-  assert(!equal(a[], a[1..$]));
-  assert(equal(a[], a[]));
-  assert(equal!((a, b) => a == b)(a[], a[]));
-
-  // different types
-  double[4] b = [ 1.0, 2, 4, 3];
-  assert(!equal(a[], b[1..$]));
-  assert(equal(a[], b[]));
+auto not(alias pred = "a", A)(in A a)
+if(is(Unqual!A == bool) || isVector!A)
+{
+  static if(isVector!A) return a.generateVector!(bool, a => !a); //returns bvec, not vec, like in opengl
+                   else return !a;
 }
 
 private void unittest_VectorRelationalFunctions(){
-  assert(lessThan   (1, 2)); //original functionality
-  assert(greaterThan(2, 1));
+  {
+    assert(lessThan   (1, 2)); //original functionality
+    assert(greaterThan(2, 1));
 
-  assert([3,1,2].sort!lessThan   .equal([1,2,3])); //lessThan    as a predicate in sort()
-  assert([3,1,2].sort!greaterThan.equal([3,2,1])); //greaterThan as a predicate in sort()
-  const a = vec3(1,2,3), b = uvec3(3,2,1);
-  assert(lessThan        (a, b) == bvec3(true, false, false));
-  assert(lessThanEqual   (a, b) == bvec3(true, true , false));
-  assert(greaterThan     (b, a) == bvec3(true, false, false));
-  assert(greaterThanEqual(b, a) == bvec3(true, true , false));
+    assert([3,1,2].sort!lessThan   .equal([1,2,3])); //lessThan    as a predicate in sort()
+    assert([3,1,2].sort!greaterThan.equal([3,2,1])); //greaterThan as a predicate in sort()
+    const a = vec3(1,2,3), b = uvec3(3,2,1);
+    assert(lessThan        (a, b) == bvec3(true, false, false));
+    assert(lessThanEqual   (a, b) == bvec3(true, true , false));
+    assert(greaterThan     (b, a) == bvec3(true, false, false));
+    assert(greaterThanEqual(b, a) == bvec3(true, true , false));
+  }
+  { // original equal. Copied from Dlang documentation
+    int[4] a = [ 1, 2, 4, 3 ];
+    assert(!equal(a[], a[1..$]));
+    assert(equal(a[], a[]));
+    assert(equal!((a, b) => a == b)(a[], a[]));
 
-  unittest_originalEqual;
+    // different types
+    double[4] b = [ 1.0, 2, 4, 3];
+    assert(!equal(a[], b[1..$]));
+    assert(equal(a[], b[]));
+  }
 
   assert(!equal(1,2) && equal(2,2)); //extended functionality: works for scalar too
   assert(equal([1,2],[1.0,2])); //but it works well for ranges.
@@ -1395,6 +1419,7 @@ private void unittest_VectorRelationalFunctions(){
   assert([false, false].all!"!a");
   assert(![true, false].all);
   assert(all(bvec3(1)) && !all(vec2(0,1)));
+  assert(all(true)); //new functionality to enable vectorScalar usage
 
   assert([9, 0].any!"a==9");
   assert([true, false].any && !([0].any));
@@ -1402,6 +1427,9 @@ private void unittest_VectorRelationalFunctions(){
 
   assert("   H".find!(not!(unaryFun!`a==' '`)) == "H"); // original std.functional.not functionality
   assert(bvec3(0,1,0).not == bvec3(1,0,1));
+  assert( vec3(0,1,0).not == bvec3(1,0,1)); // vec -> bvec
+  assert( vec3(vec3(0,1,0).not) == bvec3(1,0,1)); //casts bool -> vec
+  assert(not(true) == false);
 }
 
 
@@ -1410,22 +1438,9 @@ private void unittest_VectorRelationalFunctions(){
 ////////////////////////////////////////////////////////////////////////////////
 
 
-auto bounds(A...)(in A a){
-  static if(anyVector!A){
-    static assert(A.length==2, "invalid number of arguments");
-    return Bounds!(CommonVectorType!(A[0], A[1]))(a);
-  }else static if(A.length==2){
-    return Bounds!(CommonType!A)(a);
-  }else static if(A.length==4){
-    alias VT = Vector!(CommonType!A, 2);
-    return Bounds!VT(VT(a[0], a[1]), VT(a[2], a[3]));
-  }else static if(A.length==6){
-    alias VT = Vector!(CommonType!A, 3);
-    return Bounds!VT(VT(a[0], a[1], a[2]), VT(a[3], a[4], a[5]));
-  }else{
-    static assert(0, "invalid arguments: " ~ A.stringof);
-  }
-}
+alias bounds  = Bounds!float,  ibounds  = Bounds!int;
+alias bounds2 = Bounds!vec2 ,  ibounds2 = Bounds!ivec2;
+alias bounds3 = Bounds!vec3 ,  ibounds3 = Bounds!ivec3;
 
 enum isBounds(T) = is(T) && __traits(compiles, T.low, T.high);
 
@@ -1434,26 +1449,69 @@ template CommonBoundsType(A...){
                                  else alias CommonBoundsType = Bounds!(CommonScalarType!A);
 }
 
-struct Bounds(T/*, bool lowClosed=true, bool highClosed=true*/){
-  T low = 0, high = -1;
+struct Bounds(VT){
+  VT low = 0, high = -1;
+
+  this(A...)(in A a){
+
+      todo....  implement this
+
+    auto bounds(A...)(in A a){
+      static if(anyVector!A){
+        static assert(A.length==2, "invalid number of arguments");
+        return Bounds!(CommonVectorType!(A[0], A[1]))(a);
+      }else static if(A.length==2){
+        return Bounds!(CommonType!A)(a);
+      }else static if(A.length==4){
+        alias VT = Vector!(CommonType!A, 2);
+        return Bounds!VT(VT(a[0], a[1]), VT(a[2], a[3]));
+      }else static if(A.length==6){
+        alias VT = Vector!(CommonType!A, 3);
+        return Bounds!VT(VT(a[0], a[1], a[2]), VT(a[3], a[4], a[5]));
+      }else{
+        static assert(0, "invalid arguments: " ~ A.stringof);
+      }
+    }
+
+    static if(A.length==0){
+      //default
+    }else static if(A.length==1 && isBounds!(A[0])){ //other bounds
+      this.low  = a[0].low;
+      this.high = a[1].high;
+    }else static if(A.length==2){ //2 vectors
+      static assert(is(A[0]==A[1]) && is(Unqual!(A[0])==Unqual!VT));
+      this.low  = a[0];
+      this.high = a[1];
+    }else{
+      //otherwise create a flexible one with the universal bounds()
+      auto b = bounds(a);
+      static assert(CommonVectorLength!(typeof(this.low), typeof(b.low)), "incompatible bounds dimension");
+      this.low  = b.low;
+      this.high = b.high;
+    }
+  }
 
   string toString() const {
     return format!"bounds(%s, %s)"(low, high);
   }
 
   bool valid() const{
-    return _all(lessThanEqual(low, high));
+    return all(lessThanEqual(low, high));
   }
 
-  auto opBinary(string op)(in T other) const
+  auto opBinary(string op, T)(in T other) const
   {
     static if(op=="in"){ //componentwise check unside
       return valid && all(lessThanEqual(low, other) & lessThanEqual(other, high));
-    }else static if(op=="|"){ // extend
+    }else static if(op=="|"){ // extend with other bounds
       static if(isBounds!T){
         return other.valid ? this | other.low | other.high
                            : typeof(this | other.low).init;
-      }else{
+      }static if(isInputRange!T){ //extend to array elements
+        Unqual!(typeof(this)) bnd = this;
+        other.each!(a => bnd|=a); //opt: can be optimized for valid() checking
+        return bnd;
+      }else{ //extend with a single element
         Bounds!(CommonVectorType!(typeof(low), T)) res;
         if(valid){
           res.low  = min(low , other),
@@ -1464,7 +1522,6 @@ struct Bounds(T/*, bool lowClosed=true, bool highClosed=true*/){
         return res;
       }
     }else static if(op=="&"){ // union
-pragma(msg, "FUCK");
       static assert(isBounds!T);
       Bounds!(CommonVectorType!(typeof(low), T)) res;
       if(valid && other.valid){
@@ -1484,22 +1541,48 @@ pragma(msg, "FUCK");
     }
   }
 
+  auto opOpAssign(string op, T)(in T other){
+    this = mixin("this", op, "other");
+    return this;
+  }
+
   bool opEquals(T)(in T other) const {
     return (low==other.low && high==other.high && valid) || (!valid && !other.valid);
   }
 
+  bool approxEqual(T)(in T other, float maxDiff = approxEqualDefaultDiff) const{
+    static assert(isBounds!T && __traits(compiles, low == other.low));
+    return low.approxEqual(other.low) && high.approxEqual(other.high);
+  }
 }
 
 
 private void unittest_Bounds(){
+  static assert(!__traits(compiles, bounds3(1, 2)));
+  static assert(!__traits(compiles, bounds2(1, 2)));
+  static assert(__traits(compiles, bounds3(1, 2, 3, 4, 5, 6)));
+
   auto b1 = bounds(1, 2, 3, 4);
   static assert(isBounds!(typeof(b1)));
   assert(b1.text == "bounds(ivec2(1, 2), ivec2(3, 4))");
-  assert(b1 + ivec2(100, 200) == bounds(101, 202, 103, 204));
+
+  assert(ivec2(2, 4)/2 == ivec2(1, 2));
+
+  assert(b1 + ivec2(100, 200) == bounds2(101, 202, 103, 204));
+  assert(b1 - ivec2(100, 200) == bounds2(-99, -198, -97, -196));
+  assert(b1 / 2 == bounds(0, 1, 1, 2));
   assert(b1 * vec2(1000, 1000)== bounds(1000, 2000, 3000, 4000));
 
-  writeln(ivec2(3, 5) & ivec2(2));
-//  writeln(bounds(1, 5) & bounds(3, 20));
+  assert(bounds(1, 2, 3, 4) == bounds(1.0, 2, 3, 4));
+  assert(bounds(1, 2, 3, 4).approxEqual(bounds(1.0001, 2, 3, 4.0001)));
+
+  {//extend tests   op=="|"
+    bounds2 bnd;
+    vec2[] arr = [vec2(3, 4), vec2(9, 11), vec2(14, 2)];
+    arr.each!(a => bnd|=a);
+    assert(bnd == bounds(min(arr), max(arr))); //this also tests min[] for ranges
+    assert((bounds2.init | arr) == bnd); // | operator for ranges
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

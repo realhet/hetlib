@@ -60,6 +60,15 @@ void main(){ //static import het.utils; het.utils.application.runConsole({
   het.math.unittest_main;
   import het.color;
 
+  writeln("starting");
+
+  import std.range;
+
+  auto range = 10.iota.map!(i => vec2(cos(i), sin(i)));
+
+  { bounds2 bnd;  range.each!(v => bnd |= v);  bnd.writeln; }
+  { bounds(range).writeln; }
+
   writeln("done main");
 
 
