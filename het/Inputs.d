@@ -880,8 +880,8 @@ public:
 
 // Slow/Locked Mouse, pos get/set //////////////////////////////////////////////////////////
 
-auto rawMousePos  (){ return V2f(inputs.MXraw.value, inputs.MYraw.value); };
-auto rawMouseDelta(){ return V2f(inputs.MXraw.delta, inputs.MYraw.delta); };
+auto rawMousePos  (){ return vec2(inputs.MXraw.value, inputs.MYraw.value); };
+auto rawMouseDelta(){ return vec2(inputs.MXraw.delta, inputs.MYraw.delta); };
 
 void mouseLock(ivec2 pos){ with(pos){
   //clamp to the screen, otherwise winapi will unlock the mouse
@@ -894,7 +894,7 @@ void mouseLock(ivec2 pos){ with(pos){
   ClipCursor(&r);
 }}
 
-void mouseLock(in vec2 pos){ mouseLock(pos.vfloor); }
+void mouseLock(in vec2 pos){ mouseLock(pos.ifloor); }
 
 void mouseLock(){ mouseLock(winMousePos); }
 
@@ -905,7 +905,7 @@ void slowMouse(bool enabled, float speed=0.25f){
 
   if(slowMouseEnabled==enabled) return;
   slowMouseEnabled = enabled;
-  slowMousePos = winMousePos.toF+V2f(0.5f, 0.5f);
+  slowMousePos = winMousePos + vec2(0.5, 0.5);
   if(enabled) mouseLock(winMousePos);
          else mouseUnlock;
 }
@@ -914,7 +914,7 @@ void mouseMoveRel(float dx, float dy){
   if(!dx && !dy) return;
 
   if(slowMouseEnabled){
-    slowMousePos += V2f(dx, dy);
+    slowMousePos += vec2(dx, dy);
   }else{
     POINT p; GetCursorPos(&p);
     SetCursorPos(p.x+dx.iround, p.y+dy.iround);
@@ -942,7 +942,7 @@ private __gshared{
 
       mouseLock(slowMousePos);
     }else{
-      slowMousePos = winMousePos.toF+V2f(0.5f, 0.5f);
+      slowMousePos = winMousePos + vec2(.5, .5);
     }
   }
 
@@ -975,8 +975,8 @@ public:
   MSAbsolute act, last, pressed;
   MSRelative delta, hover, hoverMax;
   bool justPressed, justReleased, LMB, MMB, RMB;
-  Bounds2i screenRect, screenSelectionRect;
-  Bounds2f worldRect, worldSelectionRect;
+  ibounds2 screenRect, screenSelectionRect;
+  bounds2 worldRect, worldSelectionRect;
   bool moving;
 
   void _updateInternal(MSAbsolute next){
@@ -1008,13 +1008,13 @@ public:
     diff(delta, act, last   );
     diff(hover, act, pressed);
 
-    maximize(hoverMax.screen, vAbs(hover.screen));
-    maximize(hoverMax.world , vAbs(hover.world ));
+    maximize(hoverMax.screen, abs(hover.screen));
+    maximize(hoverMax.world , abs(hover.world ));
 
     //calc distances
     void dist(ref MSRelative res){
-      res.screenDist = res.screen.toF.len_prec;
-      res.worldDist  = res.world.len_prec;
+      res.screenDist = length(res.screen);
+      res.worldDist  = length(res.world);
     }
 
     dist(delta);
@@ -1025,14 +1025,14 @@ public:
     MMB = pressed.MMB && act.MMB;
     RMB = pressed.RMB && act.RMB;
 
-    screenSelectionRect = Bounds2i(pressed.screen, act.screen, true);
-    worldSelectionRect = Bounds2f(pressed.world, act.world, true);
+    screenSelectionRect = ibounds2(pressed.screen, act.screen).sorted;
+    worldSelectionRect = bounds2(pressed.world, act.world).sorted;
 
-    moving = !delta.world.isNull;
+    moving = !delta.world.isnull;
   }
 
-  bool inWorld () const { return worldRect .checkInsideRect(act.world ); }
-  bool inScreen() const { return screenRect.checkInsideRect(act.screen); }
+  bool inWorld () const { return worldRect .contain!"[)"(act.world ); }
+  bool inScreen() const { return screenRect.contain!"[)"(act.screen); }
 }
 
 /////////////////////////////////////////////////////////////////////////////

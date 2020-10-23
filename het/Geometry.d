@@ -1116,6 +1116,7 @@ auto distance(in Seg2f s, in V2f p){ return segmentPointDistance_prec(s.p[0], s.
 auto distance(in Seg2f[] a, in V2f p){ return a.map!(s => distance(s, p)).minElement; }
   auto distance(in V2f p, in Seg2f[] a){ return distance(a, p); }
 
+
 float rectPointSignedDistance(in V2f tl, in V2f br, in V2f uv){ //https://stackoverflow.com/questions/30545052/calculate-signed-distance-between-point-and-rectangle
   auto d = vMax(tl-uv, uv-br);
   return length(vMax(V2f(0, 0), d)) + min(0.0, max(d.x, d.y));

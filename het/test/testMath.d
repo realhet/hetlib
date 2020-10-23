@@ -7,7 +7,7 @@
 
 ///@compile --unittest  //this is broken because of my shitty linker usage
 
-import het.math, /*het.color, */std.stdio : write, writeln;
+import het.utils;
 
 
 // ShaderToy inputs
@@ -260,16 +260,8 @@ static if(1){
 }
 
 void main(){ //static import het.utils; het.utils.application.runConsole({
-//  import het.utils;
-
   het.math.unittest_main;
-  import het.color;
-
-  writeln("starting");
-
-  import std.range, std.stdio, std.format;
-
-  writeln("done main");
+  import het.image;
 
   if(0){
     foreach(i; 0..100){

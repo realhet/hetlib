@@ -322,7 +322,7 @@ if(N.inRange(2, 4)){
     }else static if(op=="*" && isMatrix!T && T.height==length){ // vector * matrix
       return other.transpose * this;
     }else static if(op=="in" && isBounds!T && T.VectorLength == length){
-      return other.checkInside(this);
+      return other.contain(this);
     }else{
       static assert(false, "invalid operation");
     }
@@ -988,7 +988,7 @@ auto isfin(A)(in A a){ return a.generateVector!(bool, a => std.math.isFinite  (a
 
 auto isnull(A)(in A a){
   static if(isBounds!A) return !a.valid;
-  else static if(isVecotr!A){ return a == A(0); }
+  else static if(isVector!A){ return a == A(0); }
   else static if(isMatrix!A){ return a == A(0); }
   else static assert("invalid argument type");
 }
@@ -1490,6 +1490,15 @@ struct Bounds(VT){
     this = bnd;
   }
 
+  auto sorted(){
+    typeof(this) res;
+    if(valid){
+      res.low  = min(low, high);
+      res.high = max(low, high);
+    }
+    return res;
+  }
+
   string toString() const {
     static if(VectorLength==1) return format!"%s(%s, %s)"(BoundsTypeName, low, high);
                           else return format!"%s(%(%s, %))"(BoundsTypeName, low[]~high[]);
@@ -1498,6 +1507,12 @@ struct Bounds(VT){
   bool valid() const{
     return all(lessThanEqual(low, high)); // a zero size bounds is valid because it contains the first point of expansion
   }
+
+  // multidimensional size
+  auto size() const{ return max(high-low, 0); }
+
+  static if(VectorLength==2) auto area  () const{ with(size) return x*y; }
+  static if(VectorLength==3) auto volume() const{ with(size) return x*y*z; }
 
   auto opBinary(string op, T)(in T other) const
   {
@@ -1555,9 +1570,16 @@ struct Bounds(VT){
     return low.approxEqual(other.low) && high.approxEqual(other.high);
   }
 
-  bool checkInside(T)(in T other) const{
-    return all(lessThanEqual(low, other) & lessThanEqual(other, high));
+  bool contain(string cfg = "[]", T)(in T other) const{ //closed closed
+    static assert(cfg.length==2 && "[(".canFind(cfg[0]) && "])".canFind(cfg[1]), "invalid open/close config. // [] closed, () open");
+
+    static if(cfg[0]=='[') alias f1 = greaterThanEqual; else alias f1 = greaterThan;
+    static if(cfg[1]==']') alias f2 = lessThanEqual   ; else alias f2 = lessThan   ;
+
+    static if(isBounds!T) return contain!cfg(other.low) && contain!cfg(other.high);
+                     else return all(f1(other, low) & f2(other, high));
   }
+
 }
 
 static foreach(T; AliasSeq!(float, double, int))

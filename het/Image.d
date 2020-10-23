@@ -1,6 +1,6 @@
 module het.image;
 
-import het.utils, het.geometry, jsonizer, core.sys.windows.windows, std.uni;
+import het.utils, het.geometry, core.sys.windows.windows, std.uni;
 
 import imageformats; //external package
 
