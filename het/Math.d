@@ -27,12 +27,12 @@ import std.format : format;
 import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
-import std.range : iota, isInputRange, ElementType;
+import std.range : iota, isInputRange, ElementType, front;
 import std.traits : Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType;
 import std.meta : AliasSeq;
 
 import std.exception : enforce;
-import std.stdio : writeln;
+import std.stdio : write, writeln;
 
 
 // utility stuff ////////////////////////////////////////////////////
@@ -145,7 +145,7 @@ if(N.inRange(2, 4)){
   alias ComponentType = CT;
   enum VectorTypeName = is(VectorType==Vector!(ubyte, 3)) ? "RGB" :
                         is(VectorType==Vector!(ubyte, 4)) ? "RGBA" :
-                        ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "vec" ~ N.text
+                        ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "vec" ~ N.stringof
                                                           : VectorType.stringof;
 
   CT[N] components = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
@@ -321,6 +321,8 @@ if(N.inRange(2, 4)){
       return binaryVectorScalarOp!op(this, other);
     }else static if(op=="*" && isMatrix!T && T.height==length){ // vector * matrix
       return other.transpose * this;
+    }else static if(op=="in" && isBounds!T && T.VectorLength == length){
+      return other.checkInside(this);
     }else{
       static assert(false, "invalid operation");
     }
@@ -984,7 +986,12 @@ auto isnan(A)(in A a){ return a.generateVector!(bool, a => std.math.isNaN     (a
 auto isinf(A)(in A a){ return a.generateVector!(bool, a => std.math.isInfinity(a) ); }
 auto isfin(A)(in A a){ return a.generateVector!(bool, a => std.math.isFinite  (a) ); }
 
-auto isnull(A)(in A a){ return a == A(0); }
+auto isnull(A)(in A a){
+  static if(isBounds!A) return !a.valid;
+  else static if(isVecotr!A){ return a == A(0); }
+  else static if(isMatrix!A){ return a == A(0); }
+  else static assert("invalid argument type");
+}
 
 auto isPowerOf2(A)(in A a){ return a.generateVector!(bool, a => std.math.isPowerOf2(a) ); }
 
@@ -1202,7 +1209,7 @@ auto reflect(A, B)(in A I, in B N){
 
 /// For a given incident vector I, surface normal N and ratio of indices of refraction, eta, refract returns the refraction vector, R.
 /// The input parameters I and N should be normalized in order to achieve the desired result.
-auto reflect(A, B)(in A I, in B N){
+auto refract(A, B)(in A I, in B N){
   const dotNI = dot(N, I),
         k = 1 - eta * eta * (1 - dotNI^^2);
   return k < 0.0 ? CommonVectorType!(A, B).Null
@@ -1438,11 +1445,7 @@ private void unittest_VectorRelationalFunctions(){
 ////////////////////////////////////////////////////////////////////////////////
 
 
-alias bounds  = Bounds!float,  ibounds  = Bounds!int;
-alias bounds2 = Bounds!vec2 ,  ibounds2 = Bounds!ivec2;
-alias bounds3 = Bounds!vec3 ,  ibounds3 = Bounds!ivec3;
-
-enum isBounds(T) = is(T) && __traits(compiles, T.low, T.high);
+enum isBounds(T) = is(T) && __traits(compiles, T.low, T.high, T.VectorLength);
 
 template CommonBoundsType(A...){
   static if(CommonVectorLength!A > 1) alias CommonBoundsType = Bounds!(CommonVectorType!A);
@@ -1452,58 +1455,53 @@ template CommonBoundsType(A...){
 struct Bounds(VT){
   VT low = 0, high = -1;
 
+  enum VectorLength = CommonVectorLength!VT;
+  alias ComponentType = ScalarType!VT;
+  enum BoundsTypeName = (ComponentTypePrefix!ComponentType.among("UNDEF", "u", "b")) ? VT.stringof
+                      : ComponentTypePrefix!ComponentType ~ "bounds" ~ (VectorLength>1 ? VectorLength.stringof : "");
+  enum Null = Bounds!VT.init;
+
   this(A...)(in A a){
-
-      todo....  implement this
-
-    auto bounds(A...)(in A a){
-      static if(anyVector!A){
-        static assert(A.length==2, "invalid number of arguments");
-        return Bounds!(CommonVectorType!(A[0], A[1]))(a);
-      }else static if(A.length==2){
-        return Bounds!(CommonType!A)(a);
-      }else static if(A.length==4){
-        alias VT = Vector!(CommonType!A, 2);
-        return Bounds!VT(VT(a[0], a[1]), VT(a[2], a[3]));
-      }else static if(A.length==6){
-        alias VT = Vector!(CommonType!A, 3);
-        return Bounds!VT(VT(a[0], a[1], a[2]), VT(a[3], a[4], a[5]));
-      }else{
-        static assert(0, "invalid arguments: " ~ A.stringof);
-      }
-    }
-
     static if(A.length==0){
-      //default
-    }else static if(A.length==1 && isBounds!(A[0])){ //other bounds
-      this.low  = a[0].low;
-      this.high = a[1].high;
-    }else static if(A.length==2){ //2 vectors
-      static assert(is(A[0]==A[1]) && is(Unqual!(A[0])==Unqual!VT));
-      this.low  = a[0];
-      this.high = a[1];
+      //default invalid bounds
+    }else static if(A.length==1 && isBounds!(A[0])){ //another Bounds
+      static assert(VectorLength == A[0].VectorLength, "dimension mismatch");
+      low  = a[0].low ;
+      high = a[0].high;
+    }else static if(A.length==2){ //2 vectors or scalars
+      low  = a[0];
+      high = a[1];
+    }else static if(A.length==4 && VectorLength==2){ // 4 scalars
+      low [0] = a[0]; low [1] = a[1];
+      high[0] = a[2]; high[1] = a[3];
+    }else static if(A.length==6 && VectorLength==3){ // 6 scalars
+      low [0] = a[0]; low [1] = a[1]; low [2] = a[2];
+      high[0] = a[3]; high[1] = a[4]; high[2] = a[5];
     }else{
-      //otherwise create a flexible one with the universal bounds()
-      auto b = bounds(a);
-      static assert(CommonVectorLength!(typeof(this.low), typeof(b.low)), "incompatible bounds dimension");
-      this.low  = b.low;
-      this.high = b.high;
+      static assert(0, "invalid arguments");
     }
+  }
+
+  this(R)(R r)
+  if(isInputRange!R)
+  {
+    Bounds!(typeof(r.front)) bnd;
+    r.each!(v => bnd |= v);
+    this = bnd;
   }
 
   string toString() const {
-    return format!"bounds(%s, %s)"(low, high);
+    static if(VectorLength==1) return format!"%s(%s, %s)"(BoundsTypeName, low, high);
+                          else return format!"%s(%(%s, %))"(BoundsTypeName, low[]~high[]);
   }
 
   bool valid() const{
-    return all(lessThanEqual(low, high));
+    return all(lessThanEqual(low, high)); // a zero size bounds is valid because it contains the first point of expansion
   }
 
   auto opBinary(string op, T)(in T other) const
   {
-    static if(op=="in"){ //componentwise check unside
-      return valid && all(lessThanEqual(low, other) & lessThanEqual(other, high));
-    }else static if(op=="|"){ // extend with other bounds
+    static if(op=="|"){ // extend with other bounds
       static if(isBounds!T){
         return other.valid ? this | other.low | other.high
                            : typeof(this | other.low).init;
@@ -1523,10 +1521,11 @@ struct Bounds(VT){
       }
     }else static if(op=="&"){ // union
       static assert(isBounds!T);
-      Bounds!(CommonVectorType!(typeof(low), T)) res;
+      Bounds!(CommonVectorType!(typeof(low), typeof(T.low))) res;
       if(valid && other.valid){
         res.low  = max(low , other.low );
         res.high = min(high, other.high);
+        if(any(greaterThanEqual(res.low, res.high))) res = typeof(res).init;
       }
       return res;
     }else static if(op.among("+", "-", "*", "/")){ //shift, scale
@@ -1547,41 +1546,64 @@ struct Bounds(VT){
   }
 
   bool opEquals(T)(in T other) const {
-    return (low==other.low && high==other.high && valid) || (!valid && !other.valid);
+    return valid ? low==other.low && high==other.high
+                 : !other.valid;
   }
 
   bool approxEqual(T)(in T other, float maxDiff = approxEqualDefaultDiff) const{
     static assert(isBounds!T && __traits(compiles, low == other.low));
     return low.approxEqual(other.low) && high.approxEqual(other.high);
   }
+
+  bool checkInside(T)(in T other) const{
+    return all(lessThanEqual(low, other) & lessThanEqual(other, high));
+  }
 }
 
+static foreach(T; AliasSeq!(float, double, int))
+  static foreach(N; [1, 2, 3])
+    static if(N==1) mixin(format!q{alias %sbounds = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
+               else mixin(format!q{alias %sbounds%s = %s;}(ComponentTypePrefix!T, N, Bounds!(Vector!(T, N)).stringof));
 
 private void unittest_Bounds(){
-  static assert(!__traits(compiles, bounds3(1, 2)));
-  static assert(!__traits(compiles, bounds2(1, 2)));
+  static assert(__traits(compiles, bounds3(1, 2)) && bounds3(1, 2)==bounds3(vec3(1), vec3(2)) );
+  static assert(!__traits(compiles, bounds3(1, 2, 3, 4)));
   static assert(__traits(compiles, bounds3(1, 2, 3, 4, 5, 6)));
 
-  auto b1 = bounds(1, 2, 3, 4);
-  static assert(isBounds!(typeof(b1)));
-  assert(b1.text == "bounds(ivec2(1, 2), ivec2(3, 4))");
+  auto b1 = bounds(1, 2);
+  assert(b1.text == "bounds(1, 2)");
+
+  auto b3 = ibounds3(1, 2, 3, 4, 5, 6);
+  assert(b3.text == "ibounds3(1, 2, 3, 4, 5, 6)");
+
+  auto b2 = dbounds2(1, 2, 3, 4);
+  static assert(isBounds!(typeof(b2)));
+  assert(b2.text == "dbounds2(1, 2, 3, 4)");
 
   assert(ivec2(2, 4)/2 == ivec2(1, 2));
 
-  assert(b1 + ivec2(100, 200) == bounds2(101, 202, 103, 204));
-  assert(b1 - ivec2(100, 200) == bounds2(-99, -198, -97, -196));
-  assert(b1 / 2 == bounds(0, 1, 1, 2));
-  assert(b1 * vec2(1000, 1000)== bounds(1000, 2000, 3000, 4000));
+  assert(b2 + ivec2(100, 200) == bounds2(101, 202, 103, 204));
+  assert(b2 - ivec2(100, 200) == bounds2(-99, -198, -97, -196));
+  assert(b2 / 2 == bounds2(vec2(0.5, 1), vec2(1.5, 2)));
+  assert(b2 * vec2(1000, 1000)== bounds2(1000, 2000, 3000, 4000));
 
-  assert(bounds(1, 2, 3, 4) == bounds(1.0, 2, 3, 4));
-  assert(bounds(1, 2, 3, 4).approxEqual(bounds(1.0001, 2, 3, 4.0001)));
+  assert(bounds2(1, 2, 3, 4) == bounds2(1.0, 2, 3, 4));
+  assert(bounds2(1, 2, 3, 4).approxEqual(bounds2(1.0001, 2, 3, 4.0001)));
 
-  {//extend tests   op=="|"
+  {// extend tests   op=="|"
     bounds2 bnd;
     vec2[] arr = [vec2(3, 4), vec2(9, 11), vec2(14, 2)];
     arr.each!(a => bnd|=a);
-    assert(bnd == bounds(min(arr), max(arr))); //this also tests min[] for ranges
+    assert(bnd == bounds2(min(arr), max(arr))); //this also tests min[] for ranges
     assert((bounds2.init | arr) == bnd); // | operator for ranges
+    assert(bounds2(arr) == bnd); // constructor
+  }
+  {// intersection test  op=="&"
+    assert((ibounds2(9, 19, 15, 25) & ibounds2(9, 19, 15, 25)) == ibounds2(9, 19, 15, 25));
+    assert((ibounds2(11, 19, 17, 25) & ibounds2(12, 18, 18, 24)) == ibounds2(12, 19, 17, 24));
+    assert((ibounds2(19, 4, 25, 10) & ibounds2(18, 0, 24, 6)) == ibounds2(19, 4, 24, 6));
+    assert((ibounds2(-1, 4, 5, 10) & ibounds2(0, -1, 6, 5)) == ibounds2(0, 4, 5, 5));
+    assert(!(ibounds2(16, 13, 22, 19) & ibounds2(18, 5, 24, 11)).valid);
   }
 }
 
@@ -1604,8 +1626,6 @@ void unittest_main(){
   unittest_MatrixFunctions;
   unittest_VectorRelationalFunctions;
   unittest_Bounds;
-
-  //https://www.shadertoy.com/view/XsjGDt
 }
 
 unittest{ unittest_main; }
