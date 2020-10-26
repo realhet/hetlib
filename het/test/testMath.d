@@ -10,136 +10,13 @@
 import het.utils;
 
 
-// ShaderToy inputs
+//! ShaderToy tests ///////////////////////////////////////////////////////////////////
+
 vec2 iResolution;
-float iTime = 0.86;
+float iTime = 0;
 
-
-static if(0){
-
-  /**
-   * @author jonobr1 / http://jonobr1.com/
-   */
-
-  /**
-   * Convert r, g, b to normalized vec3
-   */
-  vec3 rgb(float r, float g, float b) {
-    return vec3(r / 255.0, g / 255.0, b / 255.0);
-  }
-
-  /**
-   * Draw a circle at vec2 `pos` with radius `rad` and
-   * color `color`.
-   */
-  vec4 circle(vec2 uv, vec2 pos, float rad, vec3 color) {
-    float d = length(pos - uv) - rad;
-    float t = clamp(d, 0.0, 1.0);
-    return vec4(color, 1.0 - t);
-  }
-
-  void mainImage(out vec4 fragColor, in vec2 fragCoord ) {
-    vec2 uv = fragCoord.xy;
-
-    vec2 center = iResolution.xy * 0.5;
-    float radius = 0.25 * iResolution.y;
-
-      // Background layer
-    vec4 layer1 = vec4(rgb(210.0, 222.0, 228.0), 1.0);
-
-    // Circle
-    vec3 red = rgb(225.0, 95.0, 60.0);
-    vec4 layer2 = circle(uv, center, radius, red);
-
-    // Blend the two
-    fragColor = mix(layer1, layer2, layer2.a);
-  }
-
-}
-
-static if(0){
-    // https://www.shadertoy.com/view/lsX3W4
-    // Created by inigo quilez - iq/2013
-    // License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-
-
-    // This shader computes the distance to the Mandelbrot Set for everypixel, and colorizes
-    // it accoringly.
-    //
-    // Z -> Z^^2+c, Z0 = 0.
-    // therefore Z' -> 2 dot Z dot Z' + 1
-    //
-    // The Hubbard-Douady potential G(c) is G(c) = log Z/2^n
-    // G'(c) = Z'/Z/2^n
-    //
-    // So the distance is |G(c)|/|G'(c)| = |Z| dot log|Z|/|Z'|
-    //
-    // More info here: http://www.iquilezles.org/www/articles/distancefractals/distancefractals.htm
-
-
-    float distanceToMandelbrot( in vec2 c )
-    {
-        //#if 1
-        {
-            float c2 = dot(c, c);
-            // skip computation inside M1 - http://iquilezles.org/www/articles/mset_1bulb/mset1bulb.htm
-            if( 256.0*c2*c2 - 96.0*c2 + 32.0*c.x - 3.0 < 0.0 ) return 0.0;
-            // skip computation inside M2 - http://iquilezles.org/www/articles/mset_2bulb/mset2bulb.htm
-            if( 16.0*(c2+2.0*c.x+1.0) - 1.0 < 0.0 ) return 0.0;
-        }
-        //#endif
-
-        // iterate
-        float di =  1.0;
-        vec2 z  = vec2(0.0);
-        float m2 = 0.0;
-        vec2 dz = vec2(0.0);
-        for( int i=0; i<300; i++ )
-        {
-            if( m2>1024.0 ) { di=0.0; break; }
-
-        // Z' -> 2*Z*Z' + 1
-            dz = 2.0f*vec2(z.x*dz.x-z.y*dz.y, z.x*dz.y + z.y*dz.x) + vec2(1.0,0.0);
-
-            // Z -> Z^^2 + c
-            z = vec2( z.x*z.x - z.y*z.y, 2.0*z.x*z.y ) + c;
-
-            m2 = dot(z,z);
-        }
-
-        // distance
-      // d(c) = |Z|*log|Z|/|Z'|
-      float d = 0.5*sqrt(dot(z,z)/dot(dz,dz))*log(dot(z,z));
-        if( di>0.5 ) d=0.0;
-
-        return d;
-    }
-
-    void mainImage( out vec4 fragColor, in vec2 fragCoord )
-    {
-        vec2 p = (2.0*fragCoord-iResolution.xy)/iResolution.y;
-
-        // animation
-      float tz = 0.5 - 0.5*cos(0.225*iTime);
-        float zoo = pow( 0.5, 13.0*tz );
-      vec2 c = vec2(-0.05,.6805) + p*zoo;
-
-        // distance to Mandelbrot
-        float d = distanceToMandelbrot(c);
-
-        // do some soft coloring based on distance
-      d = clamp( pow(4.0*d/zoo,0.2), 0.0, 1.0 );
-
-        vec3 col = vec3(d);
-
-        fragColor = vec4( col, 1.0 );
-    }
-
-}
-
-static if(1){
-  //https://www.shadertoy.com/view/MtfGWM
-
+static if(1){ // 3D Julia ////////////////////////////////////////////////
+  // https://www.shadertoy.com/view/MtfGWM
   //another holy grail candidate from msltoe found here:
   //http://www.fractalforums.com/theory/choosing-the-squaring-formula-by-location
 
@@ -259,43 +136,234 @@ static if(1){
 
 }
 
-void main(){ //static import het.utils; het.utils.application.runConsole({
-  het.math.unittest_main;
-  import het.image;
+//! Image2D (new image) ///////////////////////////////////////////////////////////////
 
-  if(0){
-    foreach(i; 0..100){
-      auto p1 = iround(vec2(sin(i*0.2), cos(i*0.3))*10+12),  bnd1 = ibounds2(p1-3, p1+3);
-      auto p2 = iround(vec2(sin(i*0.3), cos(i*0.5))*10+12),  bnd2 = ibounds2(p2-3, p2+3);
+enum isImage2D(A) = is(A == Image2D!_, _);
 
-      auto bnd12 = bnd1 & bnd2;
-      writeln("assert((%s & %s) == %s);".format(bnd1, bnd2, bnd12));
+struct Image2D(E)  // copied from dlang opSlice() documentation
+{
+  alias ElementType = E;
 
-      foreach(y; 0..24){
-        foreach(x; 0..24){
-          auto p = ivec2(x, y);
-          write(p in bnd12 ? '$' : ".abC"[(p in bnd1 ? 1 : 0) + (p in bnd2 ? 2 : 0)]);
-        }
-        writeln;
+  E[] impl;
+  int stride;
+  ivec2 size;
+
+  ref auto width (){ return size.x; }  auto width () const { return size.x; }
+  ref auto height(){ return size.y; }  auto height() const { return size.y; }
+
+  this(in ivec2 size, E[] initialData = []){
+    this.size = size;
+    stride = size.x;
+    impl = initialData;
+    impl.length = size.x * size.y;
+  }
+
+  this(in ivec2 size, E delegate(ivec2) generator)            { this(size, size.iota2.map!generator.array); }
+
+  this(int width, int height, E[] initialData = [])           { this(ivec2(width, height), initialData); }
+  this(int width, int height, E delegate(ivec2) generator)    { this(ivec2(width, height), generator); }
+
+  auto rows()       { return height.iota.map!(i => impl[stride*i .. stride*i + width]);  }
+  auto rows() const { return height.iota.map!(i => cast(const E[]) impl[stride*i .. stride*i + width]);  }
+
+  void regenerate(E delegate(ivec2) generator)                { impl = size.iota2.map!generator.array; }
+
+  auto dup(string op="")() const{ return Image2D!E(width, height, rows.map!(r => mixin(op, "(r.dup[])")).join); }
+
+  // Index a single element, e.g., arr[0, 1]
+  ref E opIndex(int i, int j) { return impl[i + stride*j]; }
+
+  // Array slicing, e.g., arr[1..2, 1..2], arr[2, 0..$], arr[0..$, 1].
+  Image2D opIndex(int[2] r1, int[2] r2){
+    Image2D result;
+
+    auto startOffset = r1[0] + r2[0]*stride;
+    auto endOffset = r1[1] + (r2[1] - 1)*stride;
+    result.impl = this.impl[startOffset .. endOffset];
+
+    result.stride = this.stride;
+    result.width  = r1[1] - r1[0];
+    result.height = r2[1] - r2[0];
+
+    return result;
+  }
+  auto opIndex(int[2] r1, int j) { return opIndex(r1, [j, j+1]); }
+  auto opIndex(int i, int[2] r2) { return opIndex([i, i+1], r2); }
+
+  // Support for `x..y` notation in slicing operator for the given dimension.
+  int[2] opSlice(size_t dim)(int start, int end) if (dim >= 0 && dim < 2)
+  in { assert(start >= 0 && end <= this.opDollar!dim); }
+  body {
+    return [start, end];
+  }
+
+  // Support `$` in slicing notation, e.g., arr[1..$, 0..$-1].
+  @property int opDollar(size_t dim : 0)() { return width; }
+  @property int opDollar(size_t dim : 1)() { return height; }
+
+  // Index/Slice assign
+
+  private void assignHorizontal(string op, A)(A a, int[2] r1, int j) { // todo: tesztelni az optimizalt eredmenyt, ha ezt kivaltom az assignRectangular-al.
+    const ofs = j*stride;
+    static if(!isInputRange!A) const casted = cast(E) a;
+    foreach(ref val; impl[ofs+r1[0]..ofs+r1[1]]){
+      static if(!isInputRange!A){
+        mixin("val", op, "= casted;");
+      }else{
+        if(a.empty) return;
+        mixin("val", op, "= cast(E) a.front;");
+        a.popFront;
       }
-      readln;
     }
   }
 
+  private void assignVertical(string op, A)(A a, int i, int[2] r2) {
+    auto ofs = i + r2[0]*stride;
+    static if(!isInputRange!A) const casted = cast(E) a;
+    foreach(_; r2[0]..r2[1]){
+      static if(!isInputRange!A){
+        mixin("impl[ofs]", op, "= casted;");
+      }else{
+        if(a.empty) return;
+        mixin("impl[ofs]", op, "= cast(E) a.front;");
+        a.popFront;
+      }
+      ofs += stride;
+    }
+  }
+
+  /*private void clampx(ref int x){ x = x.clamp(0, width -1); }
+  private void clampy(ref int y){ y = y.clamp(0, height-1); }
+  private void clampx(ref int[2] x){ x[0].clampx; x[1].clampx; }
+  private void clampy(ref int[2] y){ y[0].clampy; y[1].clampy; }*/
+
+  private void assignRectangular(string op, A)(A a, int[2] r1, int[2] r2){
+    static if(isImage2D!A){
+      minimize(r1[1], r1[0]+a.width );  const w = r1[1]-r1[0]; //adjust slice to topLeft if the source is smaller
+      minimize(r2[1], r2[0]+a.height);  const h = r2[1]-r2[0];
+
+      auto dstOfs = r1[0] + r2[0]*stride,  srcOfs = 0;
+
+      foreach(j; 0..h){
+        foreach(i; 0..w)
+          mixin("impl[dstOfs+i]", op, "= cast(E) a.impl[srcOfs+i];");
+
+        srcOfs += a.stride;  dstOfs += stride;
+      }
+    }else static if(isInputRange!A){ //fill with continuous range. Break on empty.
+      const w = r1[1]-r1[0];
+      const h = r2[1]-r2[0];
+
+      auto dstOfs = r1[0] + r2[0]*stride;
+
+      foreach(j; 0..h){
+        foreach(i; 0..w){
+          if(a.empty) return;
+          mixin("impl[dstOfs+i]", op, "= cast(E) a.front;");
+          a.popFront;
+        }
+        dstOfs += stride;
+      }
+
+    }else{ // single value
+      foreach(j; r2[0]..r2[1])
+        assignHorizontal!op(a, r1, j);
+    }
+  }
+
+  void opIndexAssign(A)(in A a, int i, int j){
+    static if(isImage2D!A){ //simplified way to copy an image. dst[3, 5] = src.
+      this[i..min($, i+a.width), j..min($, j+a.height)] = a;
+    }else{
+      opIndex(i, j) = cast(E) a;
+    }
+  }
+
+  void opIndexAssign(A)(in A a, int[2] r1, int     j){ assignHorizontal !""(a, r1,  j); }
+  void opIndexAssign(A)(in A a, int     i, int[2] r2){ assignVertical   !""(a,  i, r2); }
+  void opIndexAssign(A)(in A a, int[2] r1, int[2] r2){ assignRectangular!""(a, r1, r2); }
+  void opIndexAssign(A)(in A a                      ){ this[0..$, 0..$] = a; }
+
+  void opIndexAssign(string op, A)(in A a, int     i, int     j){ mixin("this[i, j]", op, "= a;"); }
+  void opIndexAssign(string op, A)(in A a, int[2] r1, int     j){ assignHorizontal !op(a, r1,  j); }
+  void opIndexAssign(string op, A)(in A a, int     i, int[2] r2){ assignVertical   !op(a,  i, r2); }
+  void opIndexAssign(string op, A)(in A a, int[2] r1, int[2] r2){ assignRectangular!op(a, r1, r2); }
+  void opIndexAssign(string op, A)(in A a                      ){ mixin("this[0..$, 0..$]", op, "= a;"); }
+
+  // Index/Slice unary ops. All const, so no ++ and -- support.
+  auto opIndexUnary(string op)(int     i, int     j) const { return mixin(op, "this[i, j]"); }
+  auto opIndexUnary(string op)(int[2] r1, int     j) const { return this[r1[0]..r1[1], j           ].dup!op; }
+  auto opIndexUnary(string op)(int     i, int[2] r2) const { return this[i           , r2[0]..r2[1]].dup!op; }
+  auto opIndexUnary(string op)(int[2] r1, int[2] r2) const { return this[r1[0]..r1[1], r2[0]..r2[1]].dup!op; }
+  auto opIndexUnary(string op)() const { return mixin(op, "this[0..$, 0..$]"); }
+}
 
 
-  iResolution = vec2(76, 50);
-  foreach_reverse(y; 0..iResolution.y){
-    foreach(x; iota(0, iResolution.x, 0.5)){
-      vec2 fragCoord = vec2(x, y);
+// 2D iota()
+auto iota2(B, E, S)(in B b, in E e, in S s){
+  alias CT = CommonScalarType!(B, E, S);
+  return cartesianProduct(
+    iota(b.vectorAccess!1, e.vectorAccess!1, s.vectorAccess!1),
+    iota(b.vectorAccess!0, e.vectorAccess!0, s.vectorAccess!0)
+  ).map!(a => Vector!(CT, 2)(a[1], a[0]));
+}
+
+auto iota2(B, E)(in B b, in E e){ return iota2(b, e, 1); }
+
+auto iota2(E)(in E e){ return iota2(0, e); }
+
+unittest{
+  assert(iota2(ivec2(3, 2)).equal([ivec2(0, 0), ivec2(1, 0), ivec2(2, 0), ivec2(0, 1), ivec2(1, 1), ivec2(2, 1)]));
+}
+
+char toGrayscaleAscii(A)(in A color){
+  immutable charMap = " .:-=+*#%@";
+  return charMap[color.rgb.grayscale.quantize!(charMap.length)];
+}
+
+void main(){ import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
+  het.math.unittest_main;
+
+  foreach(frame; 0..100000){
+    writeln;
+
+    iTime = frame*0.1;
+
+    iResolution = vec2(80, 60);
+    auto invAspect = vec2(.5, 1); // textmode chars are 2x taller
+
+    // create the image in memory
+    auto img = Image2D!char((iResolution / invAspect).itrunc, (p){
+      // call the shadertoy shader
+      vec2 fragCoord = p * invAspect;
       vec4 fragColor;
       mainImage(fragColor, fragCoord);
 
-      auto ch = " .+%@"[((fragColor.rgb*grayscaleWeights).sum*5).ifloor.clamp(0, 4)]; //todo: quantize
-      write(ch);
-    }
-    writeln;
+      // transform color to grayscale ascii
+      return fragColor.toGrayscaleAscii;
+    });
+
+    auto subImg = img[5..20, 10..30];
+    foreach(y; 0..subImg.height)
+      foreach(x; 0..subImg.width)
+        subImg[x, y] = (x^y)&4 ? '.' : ' ';
+
+    //draw a border
+    subImg[0  , 0..$] = '|'; subImg[$-1, 0..$] = '|';
+    subImg[0..$, 0  ] = '-'; subImg[0..$, $-1] = '-';
+
+    //fill a subRect
+    subImg[2..$-2, 2..5] = '@';
+    subImg[4..$, 2] = "Hello World...";
+    subImg[2, 4..$] = "Hello World...";
+
+    subImg[3..6, 4..6] = "123456";  // contiguous fill
+    subImg[10..13, 4..6] = '~';     // constant fill
+    subImg[10..15, 15..20] = subImg[0..5-1, 0..5+1]; //copy rectangle
+    subImg[10, 10] = subImg[0..4, 0..5]; // also copy rectangle. Size is taken form source image
+
+    // display the image (it's upside down)
+    img.rows.retro.each!writeln;
   }
 
-
-}
+}); }

@@ -64,7 +64,7 @@ private bool validRvalueSwizzle(string def){
 }
 
 
-enum isVector(T) = is(T) && is(T.VectorType);
+enum isVector(T) = is(T.VectorType);
 
 private bool anyVector(T...)(){
   static foreach(t; T)
@@ -107,7 +107,7 @@ private template ScalarType(T){
   alias ScalarType = Unqual!A;
 }
 
-private template CommonScalarType(T...){
+template CommonScalarType(T...){
   static assert(T.length>=1);
   static if(T.length==1) alias CommonScalarType = ScalarType!(T[0]);
                     else alias CommonScalarType = CommonType!(ScalarType!(T[0]), CommonScalarType!(T[1..$]));
@@ -116,7 +116,7 @@ private template CommonScalarType(T...){
 private alias CommonVectorType(Types...) = Vector!(CommonScalarType!Types, CommonVectorLength!Types);
 
 /// helper to access scalar and vector components in arguments.
-private auto vectorAccess(int idx, T)(in T a){
+auto vectorAccess(int idx, T)(in T a){
   static if(isVector!T) return a[idx];
                    else return a;
 }
@@ -1037,6 +1037,17 @@ auto absDiff(A, B)(in A a, in B b) {
 
 auto sad(A, B)(in A a, in B b) { return absDiff(a, b)[].sum; }
 
+auto quantize(int levels, A)(in A a){
+  static assert(levels>=1);
+  return (a*levels).ifloor.clamp(0, levels-1);
+}
+
+auto dequantize(int levels, A)(in A a){
+  static assert(levels>=1);
+  return a*(1.0f/(levels-1));
+}
+
+
 private void unittest_CommonFunctions(){
   assert(abs(vec2(-5, 5))==vec2(5, 5));
   assert(sign(Vector!(byte, 3)(-5, 0, 5)) == vec3(-1, 0, 1));
@@ -1153,6 +1164,10 @@ private void unittest_CommonFunctions(){
   assert(absDiff(vec2(1, 15), 10) == vec2(9, 5));
   assert(absDiff(Vector!(ushort, 3)(1, 2, 3), Vector!(ushort, 3)(3, 2, 1)) == Vector!(ushort, 3)(2, 0, 2)); //must work with unsigneds too
   assert(sad(Vector!(ubyte, 2)(250, 240), 10) == 240+230); //must not summarize on ubyte, but int.
+
+  assert(vec4(-1, 0.4, 0.6, 2).quantize!3 == ivec4(0, 1, 1, 2));
+  assert(RGBA(0, 1, 2, 3).dequantize!4 .approxEqual(vec4(0, 0.333, 0.666, 1)));
+  assert(Vector!(ubyte, 2)(0, 255).dequantize!256 .approxEqual(vec2(0, 1)));
 }
 
 // Geometric functions ///////////////////////////////////////
@@ -1445,7 +1460,7 @@ private void unittest_VectorRelationalFunctions(){
 ////////////////////////////////////////////////////////////////////////////////
 
 
-enum isBounds(T) = is(T) && __traits(compiles, T.low, T.high, T.VectorLength);
+enum isBounds(T) = is(T.BoundsType);
 
 template CommonBoundsType(A...){
   static if(CommonVectorLength!A > 1) alias CommonBoundsType = Bounds!(CommonVectorType!A);
@@ -1455,8 +1470,9 @@ template CommonBoundsType(A...){
 struct Bounds(VT){
   VT low = 0, high = -1;
 
-  enum VectorLength = CommonVectorLength!VT;
+  alias BoundsType = typeof(this);
   alias ComponentType = ScalarType!VT;
+  enum VectorLength = CommonVectorLength!VT;
   enum BoundsTypeName = (ComponentTypePrefix!ComponentType.among("UNDEF", "u", "b")) ? VT.stringof
                       : ComponentTypePrefix!ComponentType ~ "bounds" ~ (VectorLength>1 ? VectorLength.stringof : "");
   enum Null = Bounds!VT.init;

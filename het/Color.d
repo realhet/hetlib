@@ -1,6 +1,6 @@
 module het.color;
 
-import het.math;
+import het.utils;
 
 auto floatToRgb(T, int N)(in Vector!(T, N) x)  if(is(T == float)) { return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255));  }
 auto rgbToFloat(T, int N)(in Vector!(T, N) x)  if(is(T == ubyte)) { return x * (1.0f/255);                                }
@@ -33,7 +33,13 @@ auto hsvToRgb(float H, float S, float V){ //0..1 range
 }
 
 
-const grayscaleWeights = vec3(0.299f, 0.586f, 0.114f);
+immutable grayscaleWeights = vec3(0.299f, 0.586f, 0.114f);
+
+auto grayscale(A)(in A a)
+if(isVector!A && A.length==3)
+{
+  return (a * grayscaleWeights).sum;
+}
 
 // RGB formats ////////////////////////////////////////////////
 
@@ -550,7 +556,7 @@ immutable RGB8[]
   clAll     = clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol;
 
 
-RGB colorByName(string name, bool mustExists=false){
+private RGB colorByName(string name, bool mustExists=false){
 
   __gshared static RGB[string] map;
 
@@ -558,15 +564,15 @@ RGB colorByName(string name, bool mustExists=false){
     import std.traits;
     static foreach(member; __traits(allMembers, mixin(__MODULE__)))
       static if(is(Unqual!(typeof(mixin(member)))==RGB))
-        map[member/*.withoutStarting("cl").decapitalize*/] = mixin(member);  //todo: utils
+        map[member.withoutStarting("cl").decapitalize] = mixin(member);  //todo: utils
 
     map.rehash;
   }
 
   //todo: decapitalize, enforce
-  auto a = name/*.decapitalize*/ in map;
+  auto a = name.decapitalize in map;
   if(a is null){
-    //enforce(!mustExists, `Unknown color name "%s"`.format(name));
+    enforce(!mustExists, `Unknown color name "%s"`.format(name));
     return clFuchsia;
   }
   return *a;
@@ -574,7 +580,7 @@ RGB colorByName(string name, bool mustExists=false){
 
 //toRGB //////////////////////////////////
 
-/*RGB toRGB(string s){
+RGB toRGB(string s, bool mustExists=false){
   s = s.strip;
   enforce(!s.empty, `Empty RGB literal.`);
 
@@ -582,12 +588,17 @@ RGB colorByName(string name, bool mustExists=false){
   if(s[0].inRange('0', '9')) return RGB(s.toInt);
 
   //rgb(0,0,255)
-  if(s.isWild("rgb(?*,?*,?*)") || s.isWild("RGB8([?*,?*,?*])")){
-    return RGB(wild.ints(0), wild.ints(1), wild.ints(2));
-  }
+  if(s.isWild("*?(*?,*?,*?)"))
+    if(wild[0].toUpper.among("RGB", "RGB8"))
+      return RGB(wild.ints(1), wild.ints(2), wild.ints(3));
 
-  return colorByName(s, true);
-}*/
+  return colorByName(s, mustExists);
+}
+
+unittest{
+  assert(toRGB("blue")==RGB(0, 0, 255));
+  assert(toRGB("Red").rgbToFloat==vec3(1, 0, 0));
+}
 
 //operations //////////////////////////////
 
@@ -832,5 +843,5 @@ class StandardColorMaps : ColorMaps {
 
 }
 
-//alias colorMaps = Singleton!StandardColorMaps;
-//temporarily remove it, so it can compile without het.utils.
+alias colorMaps = Singleton!StandardColorMaps;
+
