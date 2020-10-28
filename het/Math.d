@@ -27,7 +27,7 @@ import std.format : format;
 import std.conv : text, stdto = to;
 import std.uni : toLower;
 import std.array : replicate, split, replace, join;
-import std.range : iota, isInputRange, ElementType, front;
+import std.range : iota, isInputRange, ElementType, empty, front, popFront;
 import std.traits : Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType;
 import std.meta : AliasSeq;
 
@@ -1047,6 +1047,29 @@ auto dequantize(int levels, A)(in A a){
   return a*(1.0f/(levels-1));
 }
 
+auto product(A)(A a) if(isInputRange!A) // similar to std.sum()
+{
+  Unqual!(ElementType!A) tmp;
+  if(a.empty) return tmp;
+  tmp = a.front; a.popFront;
+  foreach(x; a) tmp *= x;
+  return tmp;
+}
+
+
+// 2D iota()
+auto iota2(B, E, S)(in B b, in E e, in S s){
+  alias CT = CommonScalarType!(B, E, S);
+  return cartesianProduct(
+    iota(b.vectorAccess!1, e.vectorAccess!1, s.vectorAccess!1),
+    iota(b.vectorAccess!0, e.vectorAccess!0, s.vectorAccess!0)
+  ).map!(a => Vector!(CT, 2)(a[1], a[0]));
+}
+
+auto iota2(B, E)(in B b, in E e){ return iota2(b, e, 1); }
+
+auto iota2(E)(in E e){ return iota2(0, e); }
+
 
 private void unittest_CommonFunctions(){
   assert(abs(vec2(-5, 5))==vec2(5, 5));
@@ -1168,6 +1191,12 @@ private void unittest_CommonFunctions(){
   assert(vec4(-1, 0.4, 0.6, 2).quantize!3 == ivec4(0, 1, 1, 2));
   assert(RGBA(0, 1, 2, 3).dequantize!4 .approxEqual(vec4(0, 0.333, 0.666, 1)));
   assert(Vector!(ubyte, 2)(0, 255).dequantize!256 .approxEqual(vec2(0, 1)));
+
+  assert([2      ].product == 2    );
+  assert([2, 3   ].product == 2*3  );
+  assert([2, 3, 4].product == 2*3*4);
+
+  assert(iota2(ivec2(3, 2)).equal([ivec2(0, 0), ivec2(1, 0), ivec2(2, 0), ivec2(0, 1), ivec2(1, 1), ivec2(2, 1)]));
 }
 
 // Geometric functions ///////////////////////////////////////

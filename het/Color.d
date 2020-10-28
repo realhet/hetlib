@@ -41,6 +41,12 @@ if(isVector!A && A.length==3)
   return (a * grayscaleWeights).sum;
 }
 
+char toGrayscaleAscii(A)(in A color){
+  immutable charMap = " .:-=+*#%@";
+  return charMap[color.rgb.grayscale.quantize!(charMap.length)];
+}
+
+
 // RGB formats ////////////////////////////////////////////////
 
 /+alias RGB = RGB8, RGBA = RGBA8;

@@ -5,10 +5,9 @@
 ///@release
 //@debug
 
-///@compile --unittest  //this is broken because of my shitty linker usage
+//@compile --cov
 
 import het.utils;
-
 
 //! ShaderToy tests ///////////////////////////////////////////////////////////////////
 
@@ -138,44 +137,106 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 
 //! Image2D (new image) ///////////////////////////////////////////////////////////////
 
-enum isImage2D(A) = is(A == Image2D!_, _);
+enum isImage(A) = is(A.ImageType);
 
-struct Image2D(E)  // copied from dlang opSlice() documentation
+template isImage2D(A){
+  static if(isImage!A) enum isImage2D = A.Dimension == 2;
+                  else enum isImage2D = false;
+}
+
+// universal constructor for images
+
+// multidimensional elementtype. The index is just the maximum limit of recusrion. Returns the first non-range type.
+private template ElementType1(R) {
+  static if(isInputRange!R) alias ElementType1 = ElementType!R;
+                       else alias ElementType1 = R;
+}
+private alias ElementType2(R) = ElementType1!(ElementType1!R);
+private alias ElementType3(R) = ElementType1!(ElementType2!R);
+
+private enum isInputRange2(R) = isInputRange !R && isInputRange!(ElementType!R);
+private enum isInputRange3(R) = isInputRange2!R && isInputRange!(ElementType!(ElementType!R));
+
+auto image2D(R, T = ElementType3!R)(in ivec2 size, R r, in T def = 0) if(isInputRange!R){
+  static if(isInputRange2!R){ // 2D range
+    const castedDef = cast(T) def;
+    auto arr = std.range.join( r.take(size.y).map!(a => a.padRight(castedDef, size.x).array) );
+    arr = arr.padRight(def, size[].product).array;
+    return Image!(T, 2)(size, arr);
+  }else static if(isInputRange!R){ // 1D range: linear data
+    auto arr = r.array;
+    arr = arr.padRight(def, size[].product).array.to!(T[]);
+    return Image!(T, 2)(size, arr);
+  }else{
+    static assert(0, "invalid args");
+  }
+}
+
+auto image2D(R, T = ElementType3!R)(int width, int height, R r, in T def = 0) if(isInputRange!R){
+  return image2D(ivec2(width, height), r, def);
+}
+
+auto image2D(R, T = ElementType3!R)(R r, in T def = 0) if(isInputRange!R){
+  static if(isInputRange2!R){ // 2D range
+    const size = ivec2(r.map!(a => a.length.to!int).maxElement, r.length);
+    return image2D(size, r, def);
+  }else{
+    static assert(0, "invalid args: unable to decide 2D image size");
+  }
+}
+
+auto image2D(T)(in ivec2 size        , T delegate(ivec2) generator){ return image2D(size, size.iota2.map!generator); }
+auto image2D(T)(int width, int height, T delegate(ivec2) generator){ return image2D(ivec2(width, height), generator); }
+
+
+struct Image(E, int N)  // copied from dlang opSlice() documentation
 {
+  static assert(N == 2);
+
+  alias ImageType = typeof(this);
   alias ElementType = E;
+  enum Dimension = N;
 
-  E[] impl;
+  static if(N>1) Vector!(int, N) size; //todo: it's not 1D compatible.  Vector!(T, 1) should be equal to an alias=T.  In Bounds as well.
+            else int size;
+
   int stride;
-  ivec2 size;
+  // here 4 bytes extra data can fit: a change-hash for example
+  E[] impl;
 
-  ref auto width (){ return size.x; }  auto width () const { return size.x; }
-  ref auto height(){ return size.y; }  auto height() const { return size.y; }
+  // size properties
+  static foreach(i, name; ["width", "height", "depth"].take(N))
+    mixin("ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
+          .replace("@", name).replace("#", i.text) );
 
-  this(in ivec2 size, E[] initialData = []){
+  this(in ivec2 size, E[] initialData = []) { //from array
     this.size = size;
     stride = size.x;
     impl = initialData;
-    impl.length = size.x * size.y;
+    impl.length = size[].product;
   }
 
-  this(in ivec2 size, E delegate(ivec2) generator)            { this(size, size.iota2.map!generator.array); }
+  // these returning single arrays / maps of arrays
+  auto row(int y)   { return impl[stride*y .. stride*y + width]; }
+  auto rows()       { return height.iota.map!(y => row(y)); }
 
-  this(int width, int height, E[] initialData = [])           { this(ivec2(width, height), initialData); }
-  this(int width, int height, E delegate(ivec2) generator)    { this(ivec2(width, height), generator); }
+  auto column(int x) const { return height.iota.map!(y => cast(E)(impl[stride*y + x])).array; } //cast needed to remove constness
+  auto columns() const { return width.iota.map!(x => column(x)); }
 
-  auto rows()       { return height.iota.map!(i => impl[stride*i .. stride*i + width]);  }
-  auto rows() const { return height.iota.map!(i => cast(const E[]) impl[stride*i .. stride*i + width]);  }
+  void regenerate(E delegate(ivec2) generator){ impl = size.iota2.map!generator.array; }
 
-  void regenerate(E delegate(ivec2) generator)                { impl = size.iota2.map!generator.array; }
-
-  auto dup(string op="")() const{ return Image2D!E(width, height, rows.map!(r => mixin(op, "(r.dup[])")).join); }
+  auto dup(string op="")() const{
+    return Image!(E, N)(size, height.iota.map!(i => mixin(op, "impl[i*stride..i*stride+width].dup[]")).join); //todo:2D only
+    //todo: optimize for stride==width case
+    //todo: check if dup.join copies 2x or not.
+  }
 
   // Index a single element, e.g., arr[0, 1]
   ref E opIndex(int i, int j) { return impl[i + stride*j]; }
 
   // Array slicing, e.g., arr[1..2, 1..2], arr[2, 0..$], arr[0..$, 1].
-  Image2D opIndex(int[2] r1, int[2] r2){
-    Image2D result;
+  auto opIndex(int[2] r1, int[2] r2){
+    ImageType result;
 
     auto startOffset = r1[0] + r2[0]*stride;
     auto endOffset = r1[1] + (r2[1] - 1)*stride;
@@ -299,32 +360,79 @@ struct Image2D(E)  // copied from dlang opSlice() documentation
 }
 
 
-// 2D iota()
-auto iota2(B, E, S)(in B b, in E e, in S s){
-  alias CT = CommonScalarType!(B, E, S);
-  return cartesianProduct(
-    iota(b.vectorAccess!1, e.vectorAccess!1, s.vectorAccess!1),
-    iota(b.vectorAccess!0, e.vectorAccess!0, s.vectorAccess!0)
-  ).map!(a => Vector!(CT, 2)(a[1], a[0]));
-}
+private void unittest_Image(){
+  {// various image constructors
+    assert(image2D(2, 2, [1, 2, 3], -1).rows.equal([[1,2],[3,-1]])); //size = 2x2, default fill value = -1
+    assert(__traits(compiles, image2D(2, 2, [clRed, clGreen, clBlue].dup, clYellow)));
+  }
 
-auto iota2(B, E)(in B b, in E e){ return iota2(b, e, 1); }
+  auto img = image2D(4, 3, [ 0, 1,  2,  3,
+                             4, 5,  6,  7,
+                             8, 9, 10, 11 ]);
 
-auto iota2(E)(in E e){ return iota2(0, e); }
+  assert(img.width == 4 && img.height == 3);
 
-unittest{
-  assert(iota2(ivec2(3, 2)).equal([ivec2(0, 0), ivec2(1, 0), ivec2(2, 0), ivec2(0, 1), ivec2(1, 1), ivec2(2, 1)]));
-}
+  // indexing: img[x, y]
+  assert([img[0,0], img[$-1, 0], img[$-1, $-1]] == [0, 3, 11]);
 
-char toGrayscaleAscii(A)(in A color){
-  immutable charMap = " .:-=+*#%@";
-  return charMap[color.rgb.grayscale.quantize!(charMap.length)];
+  // slicing, rows(), columns() access
+  assert(img[1, 1..$].rows.array == [[5], [9]] && img[0..$, 2].rows.equal([[8, 9, 10, 11]])); //vert/horz slice
+  assert(img[2..$, 1..$].rows.join == [6, 7, 10, 11]); // rectangular slice
+  assert(img[2..3, 0..$].columns.array == [[2, 6, 10]]);
+
+  // some calculations on arrays:
+  assert(img.columns.map!sum.equal([12, 15, 18, 21]));
+  assert(img.rows.map!sum.equal([6, 22, 38]));
+
+  // opIndexAssign tests
+  auto saved = img.dup; //dup test
+  img[0, 0..$] = 0;  img[$-1, 0..$] = 0; //columns
+  img[0..$, 0] = 0;  img[0..$, $-1] = 0; //rows
+  img[0..2, 0..3] = 9; //rect
+  img[$-1, $-1] = 8; //point
+  assert(img.rows.equal([[9,9,0,0], [9,9,6,0], [9,9,0,8]]));
+  img = saved;
+
+  // various flips
+  assert(image2D(img.columns).rows.equal([[0,4,8],[1,5,9],[2,6,10],[3,7,11]])); //diagonal flip
+  assert(image2D(img.rows.map!retro).rows[0].equal([3,2,1,0])); //horizontal flip
+  assert(image2D(img.rows.retro).columns[0].equal([8,4,0])); //vertical flip
+
+  // updating slices with slices
+
+
+/*
+
+
+    auto subImg = img[5..20, 10..30];
+    foreach(y; 0..subImg.height)
+      foreach(x; 0..subImg.width)
+        subImg[x, y] = (x^y)&4 ? '.' : ' ';
+
+    //draw a border
+    subImg[0  , 0..$] = '|'; subImg[$-1, 0..$] = '|';
+    subImg[0..$, 0  ] = '-'; subImg[0..$, $-1] = '-';
+
+    //fill a subRect
+    subImg[2..$-2, 2..5] = '@';
+    subImg[4..$, 2] = "Hello World...";
+    subImg[2, 4..$] = "Hello World...";
+
+    subImg[3..6, 4..6] = "123456";  // contiguous fill
+    subImg[10..13, 4..6] = '~';     // constant fill
+    subImg[10..15, 15..20] = subImg[0..5-1, 0..5+1]; //copy rectangle
+    subImg[10, 10] = subImg[0..4, 0..5]; // also copy rectangle. Size is taken form source image
+
+    // display the image (it's upside down)
+    img.rows.retro.each!writeln;   */
+
 }
 
 void main(){ import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
+  unittest_Image;
 
-  foreach(frame; 0..100000){
+  if(1) foreach(frame; 0..100000){
     writeln;
 
     iTime = frame*0.1;
@@ -333,7 +441,7 @@ void main(){ import het.utils; het.utils.application.runConsole({ //! Main /////
     auto invAspect = vec2(.5, 1); // textmode chars are 2x taller
 
     // create the image in memory
-    auto img = Image2D!char((iResolution / invAspect).itrunc, (p){
+    auto img = image2D((iResolution / invAspect).itrunc, (p){
       // call the shadertoy shader
       vec2 fragCoord = p * invAspect;
       vec4 fragColor;
@@ -364,6 +472,8 @@ void main(){ import het.utils; het.utils.application.runConsole({ //! Main /////
 
     // display the image (it's upside down)
     img.rows.retro.each!writeln;
+
+    break;
   }
 
 }); }
