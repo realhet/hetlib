@@ -752,7 +752,7 @@ bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = approxEqualDefaultDiff)
 }
 
 /// generates a vector or scalar from a function that can have any number of vector/scalar parameters
-private auto generateVector(CT, alias fun, T...)(in T args){
+auto generateVector(CT, alias fun, T...)(in T args){
   static if(anyVector!T){
     Vector!(CT, CommonVectorLength!T) res;
     static foreach(i; 0..res.length) res[i] = cast(CT) mixin("fun(", T.length.iota.map!(j => "args["~j.text~"].vectorAccess!i").join(','), ")");

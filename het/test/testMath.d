@@ -139,55 +139,181 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 
 enum isImage(A) = is(A.ImageType);
 
-template isImage2D(A){
-  static if(isImage!A) enum isImage2D = A.Dimension == 2;
-                  else enum isImage2D = false;
+template ImageDimension(A){
+  static if(isImage!A) enum ImageDimension = A.Dimension;
+  else                 enum ImageDimension = 0;
 }
+
+enum isImage1D(A) = ImageDimension!A == 1;
+enum isImage2D(A) = ImageDimension!A == 2;
+enum isImage3D(A) = ImageDimension!A == 3;
 
 // universal constructor for images
 
 // multidimensional elementtype. The index is just the maximum limit of recusrion. Returns the first non-range type.
-private template ElementType1(R) {
+/*private template ElementType1(R) {
   static if(isInputRange!R) alias ElementType1 = ElementType!R;
                        else alias ElementType1 = R;
+}*/
+//private alias ElementType2(R) = ElementType1!(ElementType1!R);
+//private alias ElementType3(R) = ElementType1!(ElementType2!R);
+
+//private enum isInputRange2(R) = isInputRange !R && !isVector!(ElementType!R)               && isInputRange!(ElementType!R);
+//private enum isInputRange3(R) = isInputRange2!R && !isVector!(ElementType!(ElementType!R)) && isInputRange!(ElementType!(ElementType!R));
+
+
+// tells the elementType of an 1D range.  Returns void if can't.
+template ElementType1D(R){
+  static if(!isVector!R) alias ElementType1D = ElementType!R;
+                    else alias ElementType1D = void;
 }
-private alias ElementType2(R) = ElementType1!(ElementType1!R);
-private alias ElementType3(R) = ElementType1!(ElementType2!R);
 
-private enum isInputRange2(R) = isInputRange !R && isInputRange!(ElementType!R);
-private enum isInputRange3(R) = isInputRange2!R && isInputRange!(ElementType!(ElementType!R));
+template ElementType2D(R){
+  alias T = ElementType1D!R;
+  static if(!is(T==void) && !isVector!T) alias ElementType2D = ElementType!T;
+                                    else alias ElementType2D = void;
+}
 
-auto image2D(R, T = ElementType3!R)(in ivec2 size, R r, in T def = 0) if(isInputRange!R){
-  static if(isInputRange2!R){ // 2D range
-    const castedDef = cast(T) def;
-    auto arr = std.range.join( r.take(size.y).map!(a => a.padRight(castedDef, size.x).array) );
-    arr = arr.padRight(def, size[].product).array;
-    return Image!(T, 2)(size, arr);
-  }else static if(isInputRange!R){ // 1D range: linear data
-    auto arr = r.array;
-    arr = arr.padRight(def, size[].product).array.to!(T[]);
-    return Image!(T, 2)(size, arr);
-  }else{
-    static assert(0, "invalid args");
+template ElementType3D(R){
+  alias T = ElementType2D!R;
+  static if(!is(T==void) && !isVector!T) alias ElementType3D = ElementType!T;
+                                    else alias ElementType3D = void;
+}
+
+template RangeDimension(R){
+       static if(!is(ElementType3D!R == void)) enum RangeDimension = 3;
+  else static if(!is(ElementType2D!R == void)) enum RangeDimension = 2;
+  else static if(!is(ElementType1D!R == void)) enum RangeDimension = 1;
+  else                                         enum RangeDimension = 0;
+}
+
+template InnerElementType(R){
+       static if(RangeDimension!R==3) alias InnerElementType = ElementType3D!R;
+  else static if(RangeDimension!R==2) alias InnerElementType = ElementType2D!R;
+  else static if(RangeDimension!R==1) alias InnerElementType = ElementType1D!R;
+  else                                alias InnerElementType = R;
+}
+
+private void unittest_ImageElementType() {
+  static assert(is(ElementType1D!(RGB  ) == void));
+  static assert(is(ElementType1D!(RGB[]) == RGB));
+
+  static assert(is(ElementType2D!(RGB[]  ) == void));
+  static assert(is(ElementType2D!(RGB[][]) == RGB));
+
+  static assert(is(ElementType3D!(RGB[][]  ) == void));
+  static assert(is(ElementType3D!(RGB[][][]) == RGB));
+
+  alias Types = AliasSeq!(RGB, RGB[], RGB[][], RGB[][][]);
+  static foreach(i, T; Types){
+    static assert(RangeDimension!T == i);
+    static assert(is(InnerElementType!T == RGB));
   }
 }
 
-auto image2D(R, T = ElementType3!R)(int width, int height, R r, in T def = 0) if(isInputRange!R){
-  return image2D(ivec2(width, height), r, def);
+private auto maxImageSize2D(A...)(A args){
+  auto res = ivec2(0);
+  void extendSize(ivec2 act){ maximize(res, act); }
+
+  static foreach(a; args){{
+    alias T = Unqual!(typeof(a));
+    alias E = ElementType2D!T;
+    static if(isImage2D!T){ //an actual 2D image
+      extendSize(a.size);
+    }else static if(!is(E==void)){ //nested 2D array
+      extendSize(ivec2(a.map!(a => a.length.to!int).maxElement, a.length));
+    }else{
+      extendSize(ivec2(1)); // a single pixel
+    }
+  }}
+  return res;
 }
 
-auto image2D(R, T = ElementType3!R)(R r, in T def = 0) if(isInputRange!R){
-  static if(isInputRange2!R){ // 2D range
-    const size = ivec2(r.map!(a => a.length.to!int).maxElement, r.length);
-    return image2D(size, r, def);
-  }else{
-    static assert(0, "invalid args: unable to decide 2D image size");
+private void enforceImageSize2D(A...)(in ivec2 size, A args){
+  static foreach(a; args){{
+    alias T = Unqual!(typeof(a));
+    static if(isImage2D!T){ //an actual 2D image
+      enforce(a.size == size, "Image size mismatch");
+    } //other types are clipped or used as uniform
+  }}
+}
+
+private auto getDefaultArg(T, A...)(A a){ //gets a default if can, ensures that the type is T
+  static if(A.length>=1) return cast(T) a[0];
+                    else return T.init;
+}
+
+private auto image2DfromRanges(R, D...)(in ivec2 size, R range, D def){
+  static assert(D.length<=1, "too many args. Expected a multidimensional range and optionally a default.");
+
+  // try to get an image from 1D or 2D ranges
+  enum Dim = RangeDimension!R;
+  static if(Dim.among(1, 2)){
+    alias T = InnerElementType!R;
+    Unqual!T filler = getDefaultArg!T(def); //Unqual needed for padRight
+    static if(Dim == 2) auto arr = std.range.join( range.take(size.y).map!(a => a.padRight(filler, size.x).array) );
+                   else auto arr = range.array;
+    arr = arr.padRight(filler, size[].product).array;
+    return Image!(T, 2)(size, arr);
+  }else static assert(0, "invalid args");
+}
+
+auto image2D(alias fun="", A...)(A args){
+  //pragma(msg, ">>>> ", A);
+
+  static assert(A.length>0, "invalid args");
+
+  static if(A.length>=2 && is(Unqual!(A[0])==int) && is(Unqual!(A[1])==int)){ // Starts with 2 ints: width, height
+    return image2D!fun(ivec2(args[0], args[1]), args[2..$]);
+
+  }else static if(is(Unqual!(A[0])==ivec2)){ // Starts with known ivec2 size
+    ivec2 size = args[0];
+
+    static assert(A.length>1, "not enough args");
+
+    alias funIsStr = isSomeString!(typeof(fun));
+
+    static if(funIsStr && fun==""){ //default behaviour: one bitmap, optional default
+      alias R = A[1];
+      static if(RangeDimension!R.among(1, 2)){
+        return image2DfromRanges(size, args[1..$]); //1D, 2D range
+      }else{
+        static assert(A.length<=2, "too many args");
+        static if(isDelegate!R || isFunction!R){ // generator delegate or function
+          static assert(__traits(compiles, args[1](size)), "invalid image delegate: "~(A[1]).stringof);
+          return Image!(ReturnType!R, 2)(size, size.iota2.map!(p => args[1](p)).array);
+        }else{
+          return Image!(R, 2)(size, [cast()(args[1])].replicate(size[].product)); // one pixel stretched all over the size
+        }
+      }
+    }else{
+      enforceImageSize2D(size, args[1..$]);
+
+      return image2D(size, (ivec2 pos){
+
+        // generate all the access functions
+        static auto importArg(T)(int i){
+          string index;
+          static if(isImage2D!T) index = "[pos.x, pos.y]";
+          return format!"auto %s(){ return args[i+1]%s; }"(cast(char)('a'+i), index);
+        }
+        static foreach(i, T; A[1..$]) mixin( importArg!T(i) );
+
+        static if(funIsStr){
+          return mixin(fun);
+        }else{
+          return mixin("fun(", (A.length-1).iota.map!(i => (cast(char)('a'+i)).to!string).join(","), ")");
+        }
+      });
+    }
+
+  }else{ // automatically calculate size from args
+    return image2D!fun(maxImageSize2D(args), args);
   }
 }
 
-auto image2D(T)(in ivec2 size        , T delegate(ivec2) generator){ return image2D(size, size.iota2.map!generator); }
-auto image2D(T)(int width, int height, T delegate(ivec2) generator){ return image2D(ivec2(width, height), generator); }
 
+private struct SliceAll{};
 
 struct Image(E, int N)  // copied from dlang opSlice() documentation
 {
@@ -216,19 +342,34 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
     impl.length = size[].product;
   }
 
+  auto toString() const{
+    static if(N==1) return format!"image1D(%s)"(impl);
+    else static if(N==2) return "image2D([\n" ~ rows.map!(r => "  " ~ r.text).join(",\n") ~ "\n])";
+    else static assert(0, "not impl");
+  }
+
   // these returning single arrays / maps of arrays
-  auto row(int y)   { return impl[stride*y .. stride*y + width]; }
-  auto rows()       { return height.iota.map!(y => row(y)); }
+  auto row(int y)    const { return impl[stride*y .. stride*y + width]; }
+  auto row(int y)          { return impl[stride*y .. stride*y + width]; }
+
+  auto rows()        const { return height.iota.map!(y => row(y)); }
+  auto rows()              { return height.iota.map!(y => row(y)); }
 
   auto column(int x) const { return height.iota.map!(y => cast(E)(impl[stride*y + x])).array; } //cast needed to remove constness
-  auto columns() const { return width.iota.map!(x => column(x)); }
+  auto columns()     const { return width.iota.map!(x => column(x)); }
 
   void regenerate(E delegate(ivec2) generator){ impl = size.iota2.map!generator.array; }
 
-  auto dup(string op="")() const{
-    return Image!(E, N)(size, height.iota.map!(i => mixin(op, "impl[i*stride..i*stride+width].dup[]")).join); //todo:2D only
-    //todo: optimize for stride==width case
-    //todo: check if dup.join copies 2x or not.
+  auto dup(string op="")() const { //optional predfix op
+    static if(op==""){
+      return Image!(E, N)(size, height.iota.map!(i => impl[i*stride..i*stride+width].dup).join); //todo:2D only
+      //todo: optimize for stride==width case
+      //todo: check if dup.join copies 2x or not.
+    }else{
+      auto tmp = this.dup;
+      foreach(ref a; tmp.impl) a = cast(E) (mixin(op, "a")); //transform all the elements manually
+      return tmp;
+    }
   }
 
   // Index a single element, e.g., arr[0, 1]
@@ -258,45 +399,61 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
     return [start, end];
   }
 
+  auto opSlice(){ return this; }
+
   // Support `$` in slicing notation, e.g., arr[1..$, 0..$-1].
-  @property int opDollar(size_t dim : 0)() { return width; }
-  @property int opDollar(size_t dim : 1)() { return height; }
+  @property {
+    static if(N==1) int opDollar(size_t dim : 0)() { return size;    }
+               else int opDollar(size_t dim : 0)() { return size[0]; }
+    static if(N>=2) int opDollar(size_t dim : 1)() { return size[1]; }
+    static if(N>=3) int opDollar(size_t dim : 2)() { return size[2]; }
+  }
 
   // Index/Slice assign
-
-  private void assignHorizontal(string op, A)(A a, int[2] r1, int j) { // todo: tesztelni az optimizalt eredmenyt, ha ezt kivaltom az assignRectangular-al.
-    const ofs = j*stride;
-    static if(!isInputRange!A) const casted = cast(E) a;
-    foreach(ref val; impl[ofs+r1[0]..ofs+r1[1]]){
-      static if(!isInputRange!A){
-        mixin("val", op, "= casted;");
-      }else{
-        if(a.empty) return;
-        mixin("val", op, "= cast(E) a.front;");
-        a.popFront;
-      }
-    }
-  }
-
-  private void assignVertical(string op, A)(A a, int i, int[2] r2) {
-    auto ofs = i + r2[0]*stride;
-    static if(!isInputRange!A) const casted = cast(E) a;
-    foreach(_; r2[0]..r2[1]){
-      static if(!isInputRange!A){
-        mixin("impl[ofs]", op, "= casted;");
-      }else{
-        if(a.empty) return;
-        mixin("impl[ofs]", op, "= cast(E) a.front;");
-        a.popFront;
-      }
-      ofs += stride;
-    }
-  }
 
   /*private void clampx(ref int x){ x = x.clamp(0, width -1); }
   private void clampy(ref int y){ y = y.clamp(0, height-1); }
   private void clampx(ref int[2] x){ x[0].clampx; x[1].clampx; }
   private void clampy(ref int[2] y){ y[0].clampy; y[1].clampy; }*/
+
+
+  private void assignHorizontal(string op, A)(A a, int[2] r1, int j) { // todo: optimizalasi kiserlet: tesztelni az optimizalt eredmenyt, ha ezt kivaltom az assignRectangular-al.
+    static if(isImage2D!A){
+      return assignHorizontal!op(a.rows.join, r1, j);
+    }else{
+      const ofs = j*stride;
+      static if(!isInputRange!A) const casted = cast(E) a;
+      foreach(ref val; impl[ofs+r1[0]..ofs+r1[1]]){
+        static if(!isInputRange!A){
+          mixin("val", op, "= casted;");
+        }else{
+          if(a.empty) return;
+          mixin("val", op, "= cast(E) a.front;");
+          a.popFront;
+        }
+      }
+    }
+  }
+
+  private void assignVertical(string op, A)(A a, int i, int[2] r2) {
+    static if(isImage2D!A){
+      return assignVertical!op(a.rows.join, i, r2);
+    }else{
+
+      auto ofs = i + r2[0]*stride;
+      static if(!isInputRange!A) const casted = cast(E) a;
+      foreach(_; r2[0]..r2[1]){
+        static if(!isInputRange!A){
+          mixin("impl[ofs]", op, "= casted;");
+        }else{
+          if(a.empty) return;
+          mixin("impl[ofs]", op, "= cast(E) a.front;");
+          a.popFront;
+        }
+        ofs += stride;
+      }
+    }
+  }
 
   private void assignRectangular(string op, A)(A a, int[2] r1, int[2] r2){
     static if(isImage2D!A){
@@ -351,18 +508,62 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
   void opIndexAssign(string op, A)(in A a, int[2] r1, int[2] r2){ assignRectangular!op(a, r1, r2); }
   void opIndexAssign(string op, A)(in A a                      ){ mixin("this[0..$, 0..$]", op, "= a;"); }
 
-  // Index/Slice unary ops. All const, so no ++ and -- support.
-  auto opIndexUnary(string op)(int     i, int     j) const { return mixin(op, "this[i, j]"); }
-  auto opIndexUnary(string op)(int[2] r1, int     j) const { return this[r1[0]..r1[1], j           ].dup!op; }
-  auto opIndexUnary(string op)(int     i, int[2] r2) const { return this[i           , r2[0]..r2[1]].dup!op; }
-  auto opIndexUnary(string op)(int[2] r1, int[2] r2) const { return this[r1[0]..r1[1], r2[0]..r2[1]].dup!op; }
-  auto opIndexUnary(string op)() const { return mixin(op, "this[0..$, 0..$]"); }
-}
+  // Index/Slice unary ops. All non-const, I don't wanna suck with constness
+  auto opIndexUnary(string op)(int     i, int     j) { return mixin(op, "this[i, j]"); }
+  auto opIndexUnary(string op)(int[2] r1, int     j) { return this[r1[0]..r1[1], j           ].dup!op; }
+  auto opIndexUnary(string op)(int     i, int[2] r2) { return this[i           , r2[0]..r2[1]].dup!op; }
+  auto opIndexUnary(string op)(int[2] r1, int[2] r2) { return this[r1[0]..r1[1], r2[0]..r2[1]].dup!op; }
+  auto opIndexUnary(string op)(                    ) { return mixin(op, "this[0..$, 0..$]"); }
 
+  auto opIndexBinary(string op, A)(other A) { return mixin(op, "this[0..$, 0..$]"); }
+
+  // operations on the whole image
+  auto opUnary(string op)(){ return mixin(op, "this[]"); }
+
+  auto opBinary(string op, bool reverse=false, A)(A a){ //todo: refactor this in the same way as generateVector()
+    static if(isImage2D!A){
+      alias T = Unqual!(typeof(mixin("this[0,0]", op, "a[0,0]")));
+      if(a.size == size){ // elementwise operations
+        return image2D(size, (ivec2 p){
+          return reverse ? mixin("a   [p.x, p.y]", op, "this[p.x, p.y]")
+                         : mixin("this[p.x, p.y]", op, "a   [p.x, p.y]"); //opt: too much index calculations
+        });
+      }else enforce(0, "incompatible image size");
+    }else{ //single element
+      alias T = Unqual!(typeof(mixin("this[0,0]", op, "a")));
+      return image2D(size, (ivec2 p){
+        return reverse ? mixin("a"             , op, "this[p.x, p.y]")
+                       : mixin("this[p.x, p.y]", op, "a"             ); //opt: too much index calculations
+      });
+    }
+  }
+
+  auto opBinaryRight(string op, A)(A a){ return opBinary!(op, true)(a); }
+
+  private int myOpApply(string payload, DG)(DG dg){
+    int result = 0, lineOfs = 0;
+    outer: foreach(y; 0..height){
+      foreach(x; 0..width){
+        result = mixin(payload);
+        if (result) break outer;
+      }
+      lineOfs += stride;
+    }
+    return result;
+  }
+
+  int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
+  int opApply(int delegate(ivec2 pos   , ref E) dg)  { return myOpApply!"dg(ivec2(x, y), impl[lineOfs+x])"(dg); }
+  int opApply(int delegate(ref E) dg)                { return myOpApply!"dg(impl[lineOfs+x])"(dg); }
+  /+int opApply(int delegate(E) dg) const              { return myOpApply!"dg(impl[lineOfs+x])"(dg); }+/ //todo: Not gonna suck with constness now...
+}
 
 private void unittest_Image(){
   {// various image constructors
     assert(image2D(2, 2, [1, 2, 3], -1).rows.equal([[1,2],[3,-1]])); //size = 2x2, default fill value = -1
+    assert(image2D(2, 2, [[1, 2], [3,-1]]).rows.equal([[1,2],[3,-1]])); //size = 2x2, 2D range
+    assert(image2D([[1, 2], [3]], -1).rows.equal([[1,2],[3,-1]])); //size = automatic, 2D range, default fill value = -1
+    assert(image2D(2, 1, clRed) == image2D(2, 1, [clRed], clRed));
     assert(__traits(compiles, image2D(2, 2, [clRed, clGreen, clBlue].dup, clYellow)));
   }
 
@@ -399,38 +600,51 @@ private void unittest_Image(){
   assert(image2D(img.rows.retro).columns[0].equal([8,4,0])); //vertical flip
 
   // updating slices with slices
+  img[] = 1; //fill all
+  img[0..$, $-1] = [1, 2, 3, 4]; //set the bottom line to an array
+  img[2, 0..$] = -img[2, 0..$]; //flip the sign of 3rd column
+  img[0..$, 2] = -img[0..$, 2]; //flip the sign of last row
+  img[0..2, 0..2] = -img[0..2, 0..2]; //flip a rectangular area
+  img = -img[];
+  assert(img == image2D([ [1, 1, 1, -1], [1, 1, 1, -1], [1, 2, -3, 4] ]));
+
+  // test opBinary
+  img[0,0..$] = img[0,0..$] + 10;
+  img = img + 100;
+  img[0,0] = -img[2..4, 1..3]/2; //copy subimage. The destination can be a point too, not just a slice
+  img = 500-img;
+  assert(img == image2D([ [550, 549, 399, 401], [548, 552, 399, 401], [389, 398, 403, 396] ]));
+  assert(img[0..1, 0..1]*0.25f == image2D(1, 1, (float[]).init, 137.5f));
+
+  writeln(img);
+  writeln(img[0..1, 0..1]*0.25f);
+
+//  image2D(img.size, img.map!"a = a/10".array).writeln;
+  img.each!(a => a.writeln);
+
+  foreach(x, y, ref v; img[0..2, 1])
+    writef("(%s, %s) = %s; ", x, y, v);
 
 
-/*
 
+  {
+    auto im1 = image2D([[1, 2],[3, 4]]);
+    auto im2 = image2D([[4, 3],[2, 1]]);
 
-    auto subImg = img[5..20, 10..30];
-    foreach(y; 0..subImg.height)
-      foreach(x; 0..subImg.width)
-        subImg[x, y] = (x^y)&4 ? '.' : ' ';
+    image2D!"min(a, b)+c"(im1, im2, 10).writeln;
 
-    //draw a border
-    subImg[0  , 0..$] = '|'; subImg[$-1, 0..$] = '|';
-    subImg[0..$, 0  ] = '-'; subImg[0..$, $-1] = '-';
-
-    //fill a subRect
-    subImg[2..$-2, 2..5] = '@';
-    subImg[4..$, 2] = "Hello World...";
-    subImg[2, 4..$] = "Hello World...";
-
-    subImg[3..6, 4..6] = "123456";  // contiguous fill
-    subImg[10..13, 4..6] = '~';     // constant fill
-    subImg[10..15, 15..20] = subImg[0..5-1, 0..5+1]; //copy rectangle
-    subImg[10, 10] = subImg[0..4, 0..5]; // also copy rectangle. Size is taken form source image
-
-    // display the image (it's upside down)
-    img.rows.retro.each!writeln;   */
+    const increment = 10;
+    image2D!( (a,b) => min(a, b)+increment )(im1, im2).writeln;
+  }
+  application.exit;
 
 }
 
 void main(){ import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
+
   unittest_Image;
+  unittest_ImageElementType;
 
   if(1) foreach(frame; 0..100000){
     writeln;
@@ -441,7 +655,7 @@ void main(){ import het.utils; het.utils.application.runConsole({ //! Main /////
     auto invAspect = vec2(.5, 1); // textmode chars are 2x taller
 
     // create the image in memory
-    auto img = image2D((iResolution / invAspect).itrunc, (p){
+    auto img = image2D((iResolution / invAspect).itrunc, (ivec2 p){
       // call the shadertoy shader
       vec2 fragCoord = p * invAspect;
       vec4 fragColor;
