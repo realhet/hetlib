@@ -1,6 +1,6 @@
 module het.opengl;
 
-pragma(lib, "opengl32.lib"); //a wgl cuccok static linkelve vannak.
+pragma(lib, "opengl32.lib");
 
 __gshared{
   bool logVBO = 0;
@@ -20,7 +20,7 @@ Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  t
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //todo: nincs doUpdate formresize kozben
 
-public import het.utils, het.geometry, het.win, het.view, het.draw2d, het.image, het.stream;
+public import het.utils, het.geometry, het.win; //later: , het.view, het.draw2d, het.image, het.stream;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
 
 //Turn on high performance GPUs on some laptops
@@ -1129,7 +1129,6 @@ alias GLTextureHandle = GLHandle!("Texture", "gl.genTexture"         , "gl.delet
 alias GLProgramHandle = GLHandle!("Program", "gl.createProgram"      , "gl.deleteProgram");
 alias GLShaderHandle  = GLHandle!("Shader" , "gl.createShader(param)", "gl.deleteShader" );
 
-import std.meta;
 alias GLAllHandles = AliasSeq!(GLBufferHandle, GLTextureHandle, GLProgramHandle, GLShaderHandle);
 
 private void updateGLHandles(){
@@ -1986,6 +1985,18 @@ class GLWindow: Window{
 private:
   HGLRC frc;
 
+  Drawing dr, drGUI;
+  View2D view;
+  MouseState mouse;
+  private View2D viewGUI_;
+
+  ref viewGUI() {
+    viewGUI_.scale = 1;
+    viewGUI_.origin = clientSizeHalf;
+    viewGUI_.skipAnimation;
+    return viewGUI_;
+  }
+
   void oldSetPixelFormat(HDC dc)
   {
     PIXELFORMATDESCRIPTOR pfd;
@@ -2060,6 +2071,13 @@ private:
 protected:
   override void onInitializeGLWindow(){
     createRenderingContext;
+
+    //init drawing, view, mouse
+    dr = new Drawing;
+    drGUI  = new Drawing;
+    view = View2D(this);  view.centerCorrection = true;
+    viewGUI_ = View2D(this);
+    mouse = new MouseState;
   }
 
   override void onWglMakeCurrent(bool state){
@@ -2073,6 +2091,46 @@ protected:
     enforce(wglDeleteContext(rc));
     frc = null;
   }
+
+  override void onInitialZoomAll(){
+    //called right after onCreate
+    //todo: tryInitialZoom should work with the registry also
+    if(!view.workArea.isNull){ //workarea already set
+      view.zoomAll_immediate;
+      return;
+    }
+
+    if(view.workArea.isNull && !dr.getBounds.isNull){ //get the workarea from the drawing
+      view.workArea = dr.getBounds;
+      view.zoomAll_immediate;
+    }
+  }
+
+  override void onMouseUpdate(){
+    bool k(const string n) { return inputs[n].value!=0; }
+
+    MouseState.MSAbsolute a;
+    with(a){
+      LMB    = k("LMB"  );
+      RMB    = k("RMB"  );
+      MMB    = k("MMB"  );
+      shift  = k("Shift");
+      alt    = k("Alt"  );
+      ctrl   = k("Ctrl" );
+      screen = vRound(screenToClient(inputs.mouseAct));
+      world  = view.invTrans(screen.toF);
+      wheel  = iround(inputs["MW"].delta);
+    }
+    mouse._updateInternal(a);
+
+    mouse.screenRect = clientBounds;
+    mouse.worldRect = Bounds2f(view.invTrans(mouse.screenRect.topLeft.toF), view.invTrans(mouse.screenRect.bottomRight.toF));
+  }
+
+  override void onUpdateViewAnimation(){
+    view.updateAnimation(deltaTime, true/*invalidate*/);
+  }
+
 
 public:
   HGLRC rc() { return frc; }

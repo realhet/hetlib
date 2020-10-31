@@ -5,8 +5,11 @@ module het.win;
 
 pragma(lib, "gdi32.lib");
 pragma(lib, "winmm.lib");
+pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 
-public import het.utils, het.geometry, het.inputs, het.draw2d;
+public import het.utils, het.geometry, het.inputs;
+
+// het.draw2d
 
 import core.runtime,
        core.sys.windows.windows,
@@ -14,8 +17,7 @@ import core.runtime,
        core.sys.windows.winuser,
        core.sys.windows.wingdi,
        core.sys.windows.wincon,
-       core.sys.windows.mmsystem,
-       het.view;
+       core.sys.windows.mmsystem;
 
 public import core.sys.windows.winuser:
   WS_OVERLAPPED, WS_TILED, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_TABSTOP, WS_GROUP, WS_THICKFRAME, WS_SIZEBOX, WS_SYSMENU, WS_HSCROLL, WS_VSCROLL,
@@ -394,20 +396,9 @@ public:
 
   HWND hwnd()   { return fhwnd; }
   HDC hdc()     { return fhdc; }
-  Drawing dr, drGUI;   //this is opengl stuff but maybe later I can write a GDI output for it...
-  View2D view;
-  MouseState mouse;
   string inputChars; //aaccumulated WM_CHAR input flushed in update()
   string lastFrameStats;
   //bool autoUpdate;  deprecated: es csak a
-
-  private View2D viewGUI_;
-  ref viewGUI() {
-    viewGUI_.scale = 1;
-    viewGUI_.origin = clientSizeHalf;
-    viewGUI_.skipAnimation;
-    return viewGUI_;
-  }
 
   @property string name() { return fName; }
   @property void name(string name_) {
@@ -434,18 +425,7 @@ public:
     }
   }
 
-  protected void tryInitialZoomAll(){ //todo: tryInitialZoom should work with the registry also
-    if(!view.workArea.isNull){ //workarea already set
-      view.zoomAll_immediate;
-      return;
-    }
-
-    if(view.workArea.isNull && !dr.getBounds.isNull){ //get the workarea from the drawing
-      view.workArea = dr.getBounds;
-      view.zoomAll_immediate;
-    }
-  }
-
+  protected void onInitialZoomAll(){ }
   protected void onInitializeGLWindow(){ }
   protected void onFinalizeGLWindow(){ }
   protected void onWglMakeCurrent(bool activate){ }
@@ -475,13 +455,6 @@ public:
 
     onInitializeGLWindow;
 
-    //init drawing, view, mouse
-    dr = new Drawing;
-    drGUI  = new Drawing;
-    view = View2D(this);  view.centerCorrection = true;
-    viewGUI_ = View2D(this);
-    mouse = new MouseState;
-
     //load configs from ini
     actions.config = ini.read(name~".actions", "");
 
@@ -490,7 +463,7 @@ public:
       onWglMakeCurrent(true); scope(exit) onWglMakeCurrent(false);
 
       onCreate;
-      tryInitialZoomAll; //if there is a drawing
+      onInitialZoomAll; //it zooms if there is a drawing that was made in the onCreate... From now it is handled by GlWindow
     }
 
     if(isMain){
@@ -618,30 +591,28 @@ public:
   bool isForeground()           { return GetForegroundWindow == hwnd; }
 
 
-  RECT clientRect()       { RECT r; GetClientRect(hwnd, &r); return r; }
-  Bounds2i clientBounds() { with(clientRect) return Bounds2i(left, top, right, bottom); }
+  RECT clientRect()   { RECT r; GetClientRect(hwnd, &r); return r; }
+  auto clientBounds() { with(clientRect) return ibounds2(left, top, right, bottom); }
 
-  @property V2i clientSize() { with(clientRect) return V2i(right-left, bottom-top); }
-  @property void clientSize(in V2i newSize){
+  @property auto clientSize() { return clientBounds.size; }
+  @property void clientSize(in ivec2 newSize){
     auto r = RECT(0, 0, newSize.x, newSize.y);
     AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, false); //todo: popup window
 
-    auto adjustedSize = V2i(r.right-r.left, r.bottom-r.top);
+    auto adjustedSize = ivec2(r.right-r.left, r.bottom-r.top);
     SetWindowPos(hwnd, null, 0, 0, adjustedSize.x, adjustedSize.y, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW);
-    //todo: if this is called always, disable the resizeableness of the window
+    //todo: if this is called always, disable the resizeableness of the window automatically
   }
 
-  @property V2i clientPos()         { with(clientRect) return V2i(left, top); }
-  V2f clientSizeHalf()    { return clientSize.toF*0.5f;  }
-  int clientWidth()       { return clientSize.x; }
-  int clientHeight()      { return clientSize.y; }
+  @property auto clientPos() { with(clientRect) return ivec2(left, top); }
+  auto clientSizeHalf()      { return clientSize * 0.5f;  }
+  int clientWidth()          { return clientSize.x; }
+  int clientHeight()         { return clientSize.y; }
 
   //matches both error! Bounds2f clientBounds() { with(clientRect) return Bounds2f(left, top, right, bottom); }
-  V2i screenPos()       { V2i p; MapWindowPoints(hwnd, null, cast(LPPOINT)&p, 1); return p; }
-  V2i screenToClient(V2i p)   { return p-screenPos; }
-  V2f screenToClient(V2f p)   { return p-screenPos.toF; }
-  V2i clientToScreen(V2i p)   { return p+screenPos; }
-  V2f clientToScreen(V2f p)   { return p+screenPos.toF; }
+  auto screenPos()             { ivec2 p; MapWindowPoints(hwnd, null, cast(LPPOINT)&p, 1); return p; }
+  auto screenToClient(T)(in T p)   { return p-screenPos; }
+  auto clientToScreen(T)(in T p)   { return p+screenPos; }
 
   void invalidate()     { if(chkSet(pendingInvalidate)) { auto r = clientRect; InvalidateRect(hwnd, &r, 0); } }
 
@@ -721,36 +692,8 @@ public:
   double totalTime=0, deltaTime=0, lagTime=0; //
   int FPS, UPS, lagCnt; //FramesPerSec, UpdatePerSec
 
-  private void doMouseUpdate(){ //should be called right after view.update
-    bool k(const string n) { return inputs[n].value!=0; }
-
-    MouseState.MSAbsolute a;
-    with(a){
-      LMB    = k("LMB"  );
-      RMB    = k("RMB"  );
-      MMB    = k("MMB"  );
-      shift  = k("Shift");
-      alt    = k("Alt"  );
-      ctrl   = k("Ctrl" );
-      screen = vRound(screenToClient(inputs.mouseAct));
-      world  = view.invTrans(screen.toF);
-      wheel  = iround(inputs["MW"].delta);
-    }
-    mouse._updateInternal(a);
-
-    mouse.screenRect = clientBounds;
-    mouse.worldRect = Bounds2f(view.invTrans(mouse.screenRect.topLeft.toF), view.invTrans(mouse.screenRect.bottomRight.toF));
-  }
-
-/*
-  This is deprecated now.
-  call view.navigate!
-
-  private void updateView(bool processActions, bool processMouse){
-    if(processMouse) doMouseUpdate;
-    view._updateInternal(processActions);
-//megy a paint-ba.    if(textures.update) invalidate;
-  }*/
+  protected void onMouseUpdate(){ } //forwarded to GLWindow. Must be called right after view.update
+  protected void onUpdateViewAnimation() { } //forwarded to GLWindow
 
   private void updateWithActionManager() {
     //this calls the update on every window. But right now it is only for one window.
@@ -768,14 +711,14 @@ public:
     actions.beginUpdate;      scope(exit){ if(actions.changed) invalidate;  actions.endUpdate; }
 
     //update the local mouse struct
-    doMouseUpdate;
+    onMouseUpdate;
 
     //update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
-    view.updateAnimation(deltaTime, true/*invalidate*/);
+    onUpdateViewAnimation;
 
     //prepare and finalize the IMGUI for every frame
-    import het.ui: im;
-    im._beginFrame(mouse.act.screen.toF);       scope(exit) im._endFrame(clientBounds.toF);
+    //import het.ui: im;  im._beginFrame(mouse.act.screen.toF);  scope(exit) im._endFrame(clientBounds.toF);
+    //note: this is turned off to be able to do early tests. Later it must be enabled
 
     //call the user overridden update method for the window
     try{

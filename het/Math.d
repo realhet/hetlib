@@ -305,7 +305,7 @@ if(N.inRange(2, 4)){
     return res;
   }
 
-  auto opUnary(string op)() if(op.among("++", "--")) {  //this one is NOT const
+  auto opUnary(string op)() if(op.among("++", "--")) {  //same as above but NOT const
     VectorType res;
     static foreach(i; 0..length) mixin(format!"res[%s] = %s this[%s];"(i, op, i));
     return res;
@@ -965,6 +965,19 @@ auto mix(A, B, T)(in A a, in B b, in T t){
   return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t);
 }
 
+auto avg(A...)(in A a){
+  static assert(A.length>0);
+  static if(isInputRange!(A[0]) && !isVector!(A[0]) && !isMatrix!(A[0])){ //an array
+    assert(A.length == 1);
+    return a[0][].sum * (1.0f / a[0].length);
+  }else{  // arguments
+    alias T = Unqual!(typeof(CommonVectorType!A(0) * 1.0f));
+    T res = a[0];
+    static foreach(i; 1..a.length) res += a[i];
+    return res * (1.0f / A.length);
+  }
+}
+
 auto unmix(A, B, T)(in A a, in B b, in X x){ //inverse of mix
   alias CT = CommonScalarType!(A, B); //type of result NOT depends on x
   return generateVector!(CT, (a, b, x) => (x-a)/(b-a) );
@@ -1148,6 +1161,9 @@ private void unittest_CommonFunctions(){
   assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), false) == vec2(2, 3));
   assert(mix(Vector!(ubyte, 2)(2,3), Vector!(ubyte, 2)(4,5), true ) == vec2(4, 5));
 
+  assert(avg( vec2(1,2), vec2(3,4), vec2(5) ).approxEqual(vec2(1+3+5, 2+4+5)/3.0));
+  assert(avg([vec2(1,2), vec2(3,4), vec2(5)]).approxEqual(vec2(1+3+5, 2+4+5)/3.0));
+
   assert(is(typeof(mix(ubyte.init, ubyte.init, 0.0)) == ubyte)); // result type depends only on the first 2 parameters
 
   assert(step(vec3(1, 2, 3), 2) == vec3(1, 1, 0));
@@ -1216,9 +1232,9 @@ auto length             (T, int N)(in Vector!(T, N) a) { return sqrt(sqrLength(a
 auto sqrLength          (T, int N)(in Vector!(T, N) a) { return (a^^2)[].sum; }
 auto manhattanLength    (T, int N)(in Vector!(T, N) a) { return a[].map!abs.sum; }
 
-auto distance           (A, B)(in A a, in B b) { return length         (a-b); }
-auto sqrDistance        (A, B)(in A a, in B b) { return sqrLength      (a-b); }
-auto manhattanDistance  (A, B)(in A a, in B b) { return manhattanLength(a-b); }
+auto distance           (A, B)(in A a, in B b) if(isVector!A && isVector!B) { return length         (a-b); }
+auto sqrDistance        (A, B)(in A a, in B b) if(isVector!A && isVector!B) { return sqrLength      (a-b); }
+auto manhattanDistance  (A, B)(in A a, in B b) if(isVector!A && isVector!B) { return manhattanLength(a-b); }
 
 auto dot(A, B)(in A a, in B b) {
   //todo: make prettier errors, this needs more IDE integration
@@ -1236,6 +1252,10 @@ auto cross(A, B)(in A a, in B b) {
              a.z*b.x - b.z*a.x,
              a.x*b.y - b.x*a.y);
   }else static assert(0, "Cross product needs at least on 2D or 3D vector argument.");
+}
+
+auto crossZ(A, B)(in A a, in B b){
+  return cross(a.xy0, b.xy0).z;
 }
 
 auto normalize(A)(in A a){
@@ -1299,6 +1319,7 @@ private void unittest_GeometricFunctions(){
 
   assert(cross(a, b) == vec3(0, 0, determinant(mat2(a, b))));
   assert(cross(vec3(3,-3,1), vec3(4,9,2)) == vec3(-15,-2,39));
+  assert(crossZ(vec2(1, 0), vec2(0, 1)) == 1);
 
   assert(normalize(vec2(-0.5, 2)).approxEqual(vec2(-0.242536, 0.970143)));
 
@@ -1536,6 +1557,33 @@ struct Bounds(VT){
     this = bnd;
   }
 
+  static if(VectorLength==2){
+    auto width () const    { return high.x-low.x; }         auto halfWidth()  const{ return width *0.5f; }
+    auto height() const    { return high.y-low.y; }         auto halfHeight() const{ return height*0.5f; }
+
+    auto center() const    { return avg(low, high); }
+    auto area  () const    { return size.x*size.y; }
+
+    auto smallDiameter() const { return min(width, height); }   auto smallRadius() const { return smallDiameter*0.5f; }
+    auto largeDiameter() const { return max(width, height); }   auto largeRadius() const { return largeDiameter*0.5f; }
+
+    auto left  () const { return low .x; }  ref left  () { return low .x; }  alias x0 = left;
+    auto right () const { return high.x; }  ref right () { return high.x; }  alias y0 = top;
+    auto top   () const { return low .y; }  ref top   () { return low .y; }  alias x1 = right;
+    auto bottom() const { return high.y; }  ref bottom() { return high.y; }  alias y1 = bottom;
+
+    auto topLeft    ()  const { return low ; }              ref topLeft()     { return low ; }  alias v0 = low ;
+    auto topRight   ()  const { return VT(high.x, low .y); }
+    auto bottomLeft ()  const { return VT(low .x, high.y); }
+    auto bottomRight()  const { return high; }              ref bottomRight() { return high; }  alias v1 = high;
+
+    auto topCenter   () const { return VT(center.x, top   ); }
+    auto bottomCenter() const { return VT(center.x, bottom); }
+    auto leftCenter  () const { return VT(left ,  center.y); }
+    auto rightCenter () const { return VT(right,  center.y); }
+  }
+
+
   auto sorted(){
     typeof(this) res;
     if(valid){
@@ -1632,6 +1680,12 @@ static foreach(T; AliasSeq!(float, double, int))
   static foreach(N; [1, 2, 3])
     static if(N==1) mixin(format!q{alias %sbounds = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
                else mixin(format!q{alias %sbounds%s = %s;}(ComponentTypePrefix!T, N, Bounds!(Vector!(T, N)).stringof));
+
+// functions with bounds ////////////////////////////////
+
+auto manhattanDistance(B, V)(in B bnd, in V v) if(isBounds!B && isVector!V){
+
+}
 
 private void unittest_Bounds(){
   static assert(__traits(compiles, bounds3(1, 2)) && bounds3(1, 2)==bounds3(vec3(1), vec3(2)) );

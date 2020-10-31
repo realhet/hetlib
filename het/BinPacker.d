@@ -1,6 +1,6 @@
 module het.binpacker;
 
-import het.utils, het.geometry, het.draw2d;
+import het.utils, het.geometry;
 
 /* 2D MaxRects Bin Packer
 
@@ -283,6 +283,8 @@ public:
 
 
   static string test(Drawing dr){ //test /////////////////////////////////
+    import het.draw2d;
+
     auto mrb = new MaxRectsBin(0, 0, 1024, 1024);
     V2i[] adds = [{1,1}, {2,2}, {7,3}, {3,7}, {1,1}, {1,1}];
 

@@ -136,10 +136,16 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 }
 
 
-void main(){ import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
+void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
 
+  import het.geometry;
+  import het.win;
+//  import het.view;
+
   //application.exit;
+
+//  lineBreshenham test.
 
   if(1) foreach(frame; 0..100000){
     writeln;
@@ -185,4 +191,30 @@ void main(){ import het.utils; het.utils.application.runConsole({ //! Main /////
     break;
   }
 
-}); }
+}//); }
+
+import het.win;
+
+class MyWin: Window{
+  mixin autoCreate;  //automatically creates an instance of this form ath startup
+
+  override void onCreate(){
+    maintest;
+  }
+
+  override void onPaint(){
+    import core.sys.windows.windows;
+
+    auto rect = clientRect;
+    FillRect(hdc, &rect, cast(HBRUSH) (COLOR_WINDOW+2));
+
+    iResolution = vec2(320, 240);
+    foreach(p; iResolution.itrunc.iota2){
+      vec2 fragCoord = p;
+      vec4 fragColor;
+      mainImage(fragColor, fragCoord);
+      SetPixel(hdc, p.x, p.y, fragColor.rgb.floatToRgb.raw);
+    }
+  }
+
+}

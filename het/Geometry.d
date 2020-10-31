@@ -1,10 +1,11 @@
-deprecated module het.geometry;
+module het.geometry;
 
 import het.utils;
 
 //TODO: implement fast sse approximations
 //todo: migrate with gl3n
 //todo: sortBounds() ez nem tul jo nev
+/+
 
 alias Point = vec2;
 alias Rect = Bounds2f;
@@ -657,47 +658,44 @@ struct Bounds3d { mixin B3Members!(Bounds3d, V3d, double); mixin B3FMembers!(Bou
 
 
 V2f xy(in V3f v){ return V2f(v.x, v.y); } //swizzles
++/
 
+struct seg2 { //todo: make a Segment template struct
+  vec2[2] p;
 
-struct Seg2f {
-  V2f[2] p;
+  this(in vec2 a, in vec2 b) { p = [a, b]; }
+  this(float x0, float y0, float x1, float y1) { this(vec2(x0, y0), vec2(x1, y1)); }
 
-  this(in V2f a, in V2f b) { p = [a, b]; }
-  this(float x0, float y0, float x1, float y1) { this(V2f(x0, y0), V2f(x1, y1)); }
-
-  V2f diff() const { return p[1]-p[0]; }
-  float len_prec() const { return diff.len_prec; }
-  V2f dir_prec() const { return diff/len_prec; } //todo: slow AF
+  vec2 diff() const { return p[1]-p[0]; }
+  float length() const { return .length(diff); }
+  vec2 dir() const { return diff*(1/length); }
 }
 
-auto toSegs(in V2f[] p, bool circular){
-  Seg2f[] res;
+auto toSegs(in vec2[] p, bool circular){ //todo: rewrite with functional.slide
+  seg2[] res;
   res.reserve(p.length);
   if(p.length<=1) return res;
   foreach(i; 0..p.length-1+(circular ? 1 : 0)){
     auto j = i+1;
     if(j == p.length) j = 0;
-    res ~= Seg2f(p[i], p[j]);
+    res ~= seg2(p[i], p[j]);
   }
   return res;
 }
 
-auto toPoints(in Bounds2f bnd, bool clockwise=true){ with(bnd){
-  alias V = typeof(bMin);
-  V[] v = [bMin, V(bMax.x, bMin.y), bMax, V(bMin.x, bMax.y)];
-  if(!clockwise) v.retro;
-  return v;
+auto toPoints(in bounds2 bnd, bool clockwise=true){ with(bnd){
+  auto res = [low, vec2(high.x, low.y), high, vec2(low.x, high.y)];
+  return clockwise ? res
+                   : res.retro.array;
 }}
 
-auto toSegs(in Bounds2f bnd, bool clockwise=true) { return bnd.toPoints(clockwise).toSegs(true); }
+auto toSegs(in bounds2 bnd, bool clockwise=true) { return bnd.toPoints(clockwise).toSegs(true); }
 
-/*struct V3f { //kezdemeny
-  float x, y, z;
-  static V3f Null() { return V3f(0, 0, 0); }
-} */
+bounds2 inflated(in bounds2 b, in vec2 v){  return bounds2(b.low-v, b.high+v); } //todo: support this for all bounds
+bounds2 inflated(in bounds2 b, in float x, in float y){  return b.inflated(vec2(x, y)); }
 
-auto fittingSquare(in Bounds2f b){
-  auto diff = (b.width-b.height)*0.5f;
+auto fittingSquare(in bounds2 b){
+  auto diff = (b.size.x-b.size.y)*0.5f;
   if(diff<0) return b.inflated(0    , diff);
         else return b.inflated(-diff,    0);
 }
@@ -710,27 +708,27 @@ auto fittingSquare(in Bounds2f b){
 
 ///  Intersections, primitive distances  ///////////////////////////////////////////////////
 
-V2f intersectLines_noParallel_prec(const Seg2f S0, const Seg2f S1)
+vec2 intersectLines_noParallel_prec(in seg2 S0, in seg2 S1)  //todo: all of these variation should be refactored with static ifs.
 {
   auto S     = S1.p[0]-S0.p[0],
        T     = S0.p[1]-S0.p[0],
        U     = S1.p[0]-S1.p[1],
-       det   = vCrossZ(T, U),
-       detA  = vCrossZ(S, U),
+       det   = crossZ(T, U),
+       detA  = crossZ(S, U),
        alpha = detA/det;        //opt: alpha = detA*rcpf_fast(det);
 
   return S0.p[0]+T*alpha;
 }
 
-bool intersectSegs_noParallel_prec(const Seg2f S0, const Seg2f S1, ref V2f P){
-  V2f S = S1.p[0]-S0.p[0],
+bool intersectSegs_noParallel_prec(in seg2 S0, in seg2 S1, ref vec2 P){
+  vec2 S = S1.p[0]-S0.p[0],
       T = S0.p[1]-S0.p[0],
       U = S1.p[0]-S1.p[1];
-  float det  = vCrossZ(T, U),
-        detA = vCrossZ(S, U);
+  float det  = crossZ(T, U),
+        detA = crossZ(S, U);
 
   if(inRange_sorted(detA, 0.0f, det)){  //have one intersection
-    float detB = vCrossZ(T, S);
+    float detB = crossZ(T, S);
     if(inRange_sorted(detB, 0.0f, det)){
 
       float alpha = detA/det;
@@ -743,15 +741,15 @@ bool intersectSegs_noParallel_prec(const Seg2f S0, const Seg2f S1, ref V2f P){
   return false;
 }
 
-bool intersectSegs_noParallel_prec(const Seg2f S0, const Seg2f S1){
-  V2f S = S1.p[0]-S0.p[0],
+bool intersectSegs_noParallel_prec(in seg2 S0, in seg2 S1){
+  vec2 S = S1.p[0]-S0.p[0],
       T = S0.p[1]-S0.p[0],
       U = S1.p[0]-S1.p[1];
-  float det  = vCrossZ(T, U),
-        detA = vCrossZ(S, U);
+  float det  = crossZ(T, U),
+        detA = crossZ(S, U);
 
   if(inRange_sorted(detA, 0.0f, det)){  //have one intersection
-    float detB = vCrossZ(T, S);
+    float detB = crossZ(T, S);
     if(inRange_sorted(detB, 0.0f, det)){
       float alpha = detA/det;
       return true;
@@ -760,18 +758,18 @@ bool intersectSegs_noParallel_prec(const Seg2f S0, const Seg2f S1){
   return false;
 }
 
-bool intersectSegs_falseParallel_prec(const Seg2f S0, const Seg2f S1){
-  V2f S = S1.p[0]-S0.p[0],
+bool intersectSegs_falseParallel_prec(in seg2 S0, in seg2 S1){
+  vec2 S = S1.p[0]-S0.p[0],
       T = S0.p[1]-S0.p[0],
       U = S1.p[0]-S1.p[1];
-  float det  = vCrossZ(T, U);
+  float det  = crossZ(T, U);
 
   if(abs(det)<0.001f) return false;  //todo: this is lame
 
-  float detA = vCrossZ(S, U);
+  float detA = crossZ(S, U);
 
   if(inRange_sorted(detA, 0.0f, det)){  //have one intersection
-    float detB = vCrossZ(T, S);
+    float detB = crossZ(T, S);
     if(inRange_sorted(detB, 0.0f, det)){
       float alpha = detA/det;
       return true;
@@ -780,17 +778,17 @@ bool intersectSegs_falseParallel_prec(const Seg2f S0, const Seg2f S1){
   return false;
 }
 
-float segmentPointDistance_prec(const V2f v, const V2f w, const V2f p){
+float segmentPointDistance_prec(const vec2 v, const vec2 w, const vec2 p){
   // Return minimum distance between line segment vw and point p
-  const l2 = (v-w).lenSq;    // i.e. |w-v|^2 -  avoid a sqrt
-  if (!l2) return vDist_prec(p, v); // v == w case
+  const l2 = sqrLength(v-w);    // i.e. |w-v|^2 -  avoid a sqrt
+  if (!l2) return distance(p, v); // v == w case
   // Consider the line extending the segment, parameterized as v + t (w - v).
   // We find projection of point p onto the line.
   // It falls where t = [(p-v) . (w-v)] / |w-v|^2
   // We clamp t from [0,1] to handle points outside the segment vw.
-  const t = max(0, min(1, vDot(p - v, w - v) / l2));
+  const t = max(0, min(1, dot(p - v, w - v) / l2));
   const projection = v + (w - v)*t;  // Projection falls on the segment
-  return vDist_prec(p, projection);
+  return distance(p, projection);
 }
 
 //todo: segmentPointDistance 3d
@@ -816,12 +814,12 @@ float segmentPointDistance_prec(const V2f v, const V2f w, const V2f p){
   }
 */
 
-///  CohenSutherlandClipping ///////////////////////////////////////////////////////////////
+///  Cohen Sutherland line-rect Clipping ///////////////////////////////////////////////////////////////
 ///  Ported to Delphi from wikipedia C code by Omar Reis - 2012                          ///
 ///  Ported back to C by realhet 2013, lol                                               ///
 ///  Ported finally to D by realhet 2016, lol**2                                         ///
 
-bool _lineClip(V, E, F)(const V bMin, const V bMax, ref V a, ref V b)
+bool _lineClip(V, E, F)(in V bMin, in V bMax, ref V a, ref V b)
 {
   const INSIDE = 0, // 0000
         LEFT   = 1, // 0001
@@ -890,19 +888,19 @@ bool _lineClip(V, E, F)(const V bMin, const V bMax, ref V a, ref V b)
   }
 }//lineClip()
 
-///  Bresenham  /////////////////////////////////////////////////////////////////////
+///  Bresenham line drawing /////////////////////////////////////////////////////////////////////
 
-void line_bresenham(const V2i a, const V2i b, bool skipFirst, void delegate(const V2i) dot){
+void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ivec2) dot){
   auto d = b-a,
-       d1 = vAbs(d),
-       p = V2i(2*d1.y-d1.x,
-               2*d1.x-d1.y),
+       d1 = abs(d),
+       p = ivec2(2*d1.y-d1.x,
+                 2*d1.x-d1.y),
        i = (d.x<0)==(d.y<0) ? 1 : -1;
   d1 *= 2;
 
-  void dot2(const V2i p){ if(!skipFirst || p!=a) dot(p); }
+  void dot2(in ivec2 p){ if(!skipFirst || p!=a) dot(p); }
 
-  int e; V2i v;
+  int e; ivec2 v;
   if(d1.y<=d1.x){
     if(d.x>=0){ v=a; e=b.x; }
           else{ v=b; e=a.x; }
@@ -928,29 +926,33 @@ void line_bresenham(const V2i a, const V2i b, bool skipFirst, void delegate(cons
 
 /// Nearest finders ///////////////////////////////////////////////////////////////
 
-auto findNearestManh(Bounds2i[] b, V2i p){
+int distManh(in ibounds2 b, in ivec2 p){
+  with(b) return max(max(left-p.x, p.x-right, 0), max(top-p.y, p.y-bottom, 0));
+}
+
+auto findNearestManh(in ibounds2[] b, in ivec2 p){
   auto idx = b.map!(r => r.distManh(p)).array.minIndex;
-  if(idx<0) return Bounds2i();
+  if(idx<0) return ibounds2();
        else return b[idx];
 }
 
-auto findNearestManh(Bounds2i[] b, V2i p, int maxDist, int* actDist=null){
+auto findNearestManh(ibounds2[] b, in ivec2 p, int maxDist, int* actDist=null){
   auto idx = b.map!(r => r.distManh(p)).array.minIndex;
   if(idx<0){
     if(actDist) *actDist = int.max;
-    return Bounds2i();
+    return ibounds2();
   }else{
     int d = b[idx].distManh(p);
     if(actDist) *actDist = d;
-    if(d>maxDist) return Bounds2i();
-              else return b[idx];
+    if(d>maxDist) return ibounds2();
+             else return b[idx];
   }
 }
 
 // Linear fit ///////////////////////////////////////////////////////////////////////
 
 struct LinearFitResult{
-  V2f[] points;
+  vec2[] points;
   float slope=0;
   float intercept=0;
 
@@ -963,7 +965,7 @@ struct LinearFitResult{
   float y(float x){ return intercept+x*slope; }
 }
 
-auto linearFit(in V2f[] data){
+auto linearFit(in vec2[] data){
   auto xSum  = data.map!"a.x".sum,
        ySum  = data.map!"a.y".sum,
        xxSum = data.map!"a.x*a.x".sum,
@@ -984,14 +986,14 @@ auto linearFit(in V2f[] data){
     }
   }
 
-  auto error(in V2f p){ return res.y(p.x)-p.y; }
+  auto error(in vec2 p){ return res.y(p.x)-p.y; }
   res.deviation = sqrt(data.map!(p => error(p)^^2).sum/(data.length.to!int-1));
   res.worstIdx = data.map!(p => abs(error(p))).maxIndex.to!int;
 
   return res;
 }
 
-auto linearFit(in V2f[] data, int requiredPoints, float maxDeviation){
+auto linearFit(in vec2[] data, int requiredPoints, float maxDeviation){
   auto fit = linearFit(data);
 
   while(1){
@@ -1007,7 +1009,7 @@ auto linearFit(in V2f[] data, int requiredPoints, float maxDeviation){
 // Quadratic fit ///////////////////////////////////////////////////////////////////////
 
 struct QuadraticFitResult{    //todo: combine Quadratic and linear fitter
-  V2f[] points;
+  vec2[] points;
   float a=0, b=0, c=0;
 
   float deviation = 0;
@@ -1026,7 +1028,7 @@ private float det(float a, float b, float c, float d, float e, float f, float g,
          +g*det(b, c, e, f);
 }
 
-auto quadraticFit(in V2f[] data){
+auto quadraticFit(in vec2[] data){
   QuadraticFitResult res;
   if(data.length<3){
     if(data.length==2){
@@ -1067,7 +1069,7 @@ auto quadraticFit(in V2f[] data){
   res.points = data.dup;
 
   //copied from lin
-  auto error(in V2f p){ return res.y(p.x)-p.y; }
+  auto error(in vec2 p){ return res.y(p.x)-p.y; }
   res.deviation = sqrt(data.map!(p => error(p)^^2).sum/(data.length.to!int-1));
   res.worstIdx = data.map!(p => abs(error(p))).maxIndex.to!int;
 
@@ -1078,7 +1080,7 @@ auto quadraticFit(in V2f[] data){
 ////////////////////////////////////////////////
 ///  GLSL compatible stuff                   ///
 ////////////////////////////////////////////////
-
+/+
 /*template isFloadVec (T){ enum isFloatVec  = is(T==V2f) || is(T==V3f) || is(T==V4f); }
 template isDoubleVec(T){ enum isDoubleVec = is(T==V2d) || is(T==V3d) || is(T==V4d); }
 template isIntVec   (T){ enum isIntVec    = is(T==V2i) || is(T==V3i) || is(T==V4i); }
@@ -1126,3 +1128,4 @@ auto distance(in Bounds2f b, in V2f p){ return rectPointSignedDistance(b.bMin, b
   auto distance(in V2f p, in Bounds2f b){ return distance(b, p); }
 
 
+  +/
