@@ -7,7 +7,7 @@
 ///@compile -L/SUBSYSTEM:console -L/ENTRY:WinMainCRTStartup
 ///@link /SUBSYSTEM:console /ENTRY:WinMainCRTStartup
 
-import het;
+import het.;
 
 class MyWin: GLWindow{
   mixin autoCreate;  //automatically creates an instance of this form ath startup

@@ -135,7 +135,7 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 
 }
 
-//! Image2D (new image) ///////////////////////////////////////////////////////////////
+//! Image ///////////////////////////////////////////////////////////////
 
 enum isImage(A) = is(A.ImageType);
 
@@ -147,20 +147,6 @@ template ImageDimension(A){
 enum isImage1D(A) = ImageDimension!A == 1;
 enum isImage2D(A) = ImageDimension!A == 2;
 enum isImage3D(A) = ImageDimension!A == 3;
-
-// universal constructor for images
-
-// multidimensional elementtype. The index is just the maximum limit of recusrion. Returns the first non-range type.
-/*private template ElementType1(R) {
-  static if(isInputRange!R) alias ElementType1 = ElementType!R;
-                       else alias ElementType1 = R;
-}*/
-//private alias ElementType2(R) = ElementType1!(ElementType1!R);
-//private alias ElementType3(R) = ElementType1!(ElementType2!R);
-
-//private enum isInputRange2(R) = isInputRange !R && !isVector!(ElementType!R)               && isInputRange!(ElementType!R);
-//private enum isInputRange3(R) = isInputRange2!R && !isVector!(ElementType!(ElementType!R)) && isInputRange!(ElementType!(ElementType!R));
-
 
 // tells the elementType of an 1D range.  Returns void if can't.
 template ElementType1D(R){
@@ -258,9 +244,7 @@ private auto image2DfromRanges(R, D...)(in ivec2 size, R range, D def){
   }else static assert(0, "invalid args");
 }
 
-auto image2D(alias fun="", A...)(A args){
-  //pragma(msg, ">>>> ", A);
-
+auto image2D(alias fun="", A...)(A args){  // image2D constructor //////////////////////////////////
   static assert(A.length>0, "invalid args");
 
   static if(A.length>=2 && is(Unqual!(A[0])==int) && is(Unqual!(A[1])==int)){ // Starts with 2 ints: width, height
@@ -279,14 +263,19 @@ auto image2D(alias fun="", A...)(A args){
         return image2DfromRanges(size, args[1..$]); //1D, 2D range
       }else{
         static assert(A.length<=2, "too many args");
-        static if(isDelegate!R || isFunction!R){ // generator delegate or function
-          static assert(__traits(compiles, args[1](size)), "invalid image delegate: "~(A[1]).stringof);
-          return Image!(ReturnType!R, 2)(size, size.iota2.map!(p => args[1](p)).array);
-        }else{
+        static if(__traits(compiles, args[1](size))){ // delegate or function (ivec2)
+          alias RT = ReturnType!R;
+          static if(is(RT == void)){ //return is void, just call the delegate.
+            foreach(pos; size.iota2) args[1](pos);
+            return; // the result is void
+          }else{
+            return Image!(RT, 2)(size, size.iota2.map!(p => args[1](p)).array); //return tupe is something, make an Image out of it.
+          }
+        }else{ // non-callable
           return Image!(R, 2)(size, [cast()(args[1])].replicate(size[].product)); // one pixel stretched all over the size
         }
       }
-    }else{
+    }else{ // fun is specified
       enforceImageSize2D(size, args[1..$]);
 
       return image2D(size, (ivec2 pos){
@@ -295,12 +284,17 @@ auto image2D(alias fun="", A...)(A args){
         static auto importArg(T)(int i){
           string index;
           static if(isImage2D!T) index = "[pos.x, pos.y]";
-          return format!"auto %s(){ return args[i+1]%s; }"(cast(char)('a'+i), index);
+          return format!"auto ref %s(){ return args[i+1]%s; }"(cast(char)('a'+i), index);
         }
         static foreach(i, T; A[1..$]) mixin( importArg!T(i) );
 
         static if(funIsStr){
-          return mixin(fun);
+          enum isStatement = fun.strip.endsWith(';');
+          static if(isStatement){
+            mixin(fun); //note: if the fun has a return statement, it will make an image. Otherwise return void.
+          }else{
+            return mixin(fun);
+          }
         }else{
           return mixin("fun(", (A.length-1).iota.map!(i => (cast(char)('a'+i)).to!string).join(","), ")");
         }
@@ -313,10 +307,8 @@ auto image2D(alias fun="", A...)(A args){
 }
 
 
-private struct SliceAll{};
-
-struct Image(E, int N)  // copied from dlang opSlice() documentation
-{
+struct Image(E, int N)  // Image struct //////////////////////////////////
+{ //copied from dlang opSlice() documentation
   static assert(N == 2);
 
   alias ImageType = typeof(this);
@@ -360,6 +352,15 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
 
   void regenerate(E delegate(ivec2) generator){ impl = size.iota2.map!generator.array; }
 
+  @property auto asArray(){
+    if(size.x==stride) return impl[];
+                  else return rows.array.join;
+  }
+
+  @property void asArray(A)(A a){
+    this[0, 0] = image2D(size, a); //creates a same size image from 'a' and copies it into itself.
+  }
+
   auto dup(string op="")() const { //optional predfix op
     static if(op==""){
       return Image!(E, N)(size, height.iota.map!(i => impl[i*stride..i*stride+width].dup).join); //todo:2D only
@@ -374,6 +375,7 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
 
   // Index a single element, e.g., arr[0, 1]
   ref E opIndex(int i, int j) { return impl[i + stride*j]; }
+  E opIndex(int i, int j) const { return impl[i + stride*j]; }
 
   // Array slicing, e.g., arr[1..2, 1..2], arr[2, 0..$], arr[0..$, 1].
   auto opIndex(int[2] r1, int[2] r2){
@@ -489,10 +491,16 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
     }
   }
 
-  void opIndexAssign(A)(in A a, int i, int j){
+  void opIndexAssign(A)(A a, int i, int j){
     static if(isImage2D!A){ //simplified way to copy an image. dst[3, 5] = src.
       this[i..min($, i+a.width), j..min($, j+a.height)] = a;
-    }else{
+    }else static if(RangeDimension!A == 1){ // insert a line
+      foreach(x; i..width){
+        if(a.empty) break;
+        opIndex(x, j) = cast(E) a.front;
+        a.popFront;
+      }
+    }else{ // set a pixel
       opIndex(i, j) = cast(E) a;
     }
   }
@@ -540,6 +548,11 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
 
   auto opBinaryRight(string op, A)(A a){ return opBinary!(op, true)(a); }
 
+  bool opEquals(A)(in A a) const{
+    static assert(isImage2D!A);
+    return (size == a.size) && size.iota2.map!(p => this[p.x, p.y] == a[p.x, p.y]).all;
+  }
+
   private int myOpApply(string payload, DG)(DG dg){
     int result = 0, lineOfs = 0;
     outer: foreach(y; 0..height){
@@ -558,7 +571,8 @@ struct Image(E, int N)  // copied from dlang opSlice() documentation
   /+int opApply(int delegate(E) dg) const              { return myOpApply!"dg(impl[lineOfs+x])"(dg); }+/ //todo: Not gonna suck with constness now...
 }
 
-private void unittest_Image(){
+
+private void unittest_Image(){  // image2D tests /////////////////////////////////
   {// various image constructors
     assert(image2D(2, 2, [1, 2, 3], -1).rows.equal([[1,2],[3,-1]])); //size = 2x2, default fill value = -1
     assert(image2D(2, 2, [[1, 2], [3,-1]]).rows.equal([[1,2],[3,-1]])); //size = 2x2, 2D range
@@ -616,35 +630,71 @@ private void unittest_Image(){
   assert(img == image2D([ [550, 549, 399, 401], [548, 552, 399, 401], [389, 398, 403, 396] ]));
   assert(img[0..1, 0..1]*0.25f == image2D(1, 1, (float[]).init, 137.5f));
 
-  writeln(img);
-  writeln(img[0..1, 0..1]*0.25f);
+  { //insert rows/columns at a specific location
+    auto i1 = image2D(2, 2, [1, 2, 3, 4]);
+    i1[0, 0] = [5, 6];                  assert(i1 == image2D(2, 2, [5, 6, 3, 4]));
+    i1[1, 0] = image2D(1, 2, [7, 8]);   assert(i1 == image2D(2, 2, [5, 7, 3, 8]));
+    i1[0, 0] = image2D(2, 2, 3);        assert(i1 == image2D(2, 2, 3));
 
-//  image2D(img.size, img.map!"a = a/10".array).writeln;
-  img.each!(a => a.writeln);
+    //access/modify as array
+    assert(i1.asArray.equal([3,3,3,3]));
+    i1.asArray[1..3] = [4, 5];    assert(i1.asArray.equal([3,4,5,3])); //if stride==width, it elements can be modified too.
+    i1.asArray = [1, 2, 3];       assert(i1.asArray.equal([1,2,3,0])); //set the first 3 elements. The remaining elements will be cleared with T.init.
+  }
 
-  foreach(x, y, ref v; img[0..2, 1])
-    writef("(%s, %s) = %s; ", x, y, v);
+  assert(is(typeof(img[0..1, 0..1]*0.25f) == Image!(float, 2))); // float promotion
+  assert( (){ auto sum = 0; img.each!(a => sum += a); return sum; }() == 5385 ); // .each test
 
+  { //foreach tests
+    int sum1; foreach(x, y, ref v; img) sum1 += v+x+y;         assert(sum1 == 5415);
+    int sum2; foreach(pos , ref v; img) sum2 += v+pos.x+pos.y; assert(sum2 == 5415);
+    int sum3; foreach(      ref v; img) sum3 += v;             assert(sum3 == 5385);
+  }
 
-
-  {
+  { // image2D operations
     auto im1 = image2D([[1, 2],[3, 4]]);
     auto im2 = image2D([[4, 3],[2, 1]]);
+    const target = image2D([ [11, 12], [12, 11] ]);
 
-    image2D!"min(a, b)+c"(im1, im2, 10).writeln;
+    assert(image2D!"min(a, b)+c"(im1, im2, 10) == target); // mixin string function
 
     const increment = 10;
-    image2D!( (a,b) => min(a, b)+increment )(im1, im2).writeln;
-  }
-  application.exit;
+    assert(image2D!( (a,b) => min(a, b)+increment)(im1, im2) == target); // delegate
+    assert(image2D!( (a) => 123)(im1) == image2D(2, 2, 123) ); //return is a const
 
+    //check simple function and delegate
+    auto del = (ivec2 pos) { return increment; };
+    auto fun = (ivec2 pos) { return cast(const)10; }; //cast because increment is const too
+    assert( [image2D(2, 2, fun), image2D(2, 2, del)].map!(i => i == image2D(2,2,10)).all );
+  }
+
+  {// delegate with void result: operation on Images
+    static assert(is(typeof(image2D(2, 2, (ivec2 pos){ })) == void)); //inside image2D() it produces void results
+
+    auto im1 = image2D(2, 2, (ivec2 p) => (p.x+1) + 10*(p.y+1) );
+    auto im3 = im1.dup;
+    const im2 = image2D(2, 2, 10 );
+    const target = image2D([ [115, 125], [215, 225] ]);
+
+    // minimal delegate form
+    image2D!( (ref a, b, c){ a = a*b+c; } ) (im1, im2, 5);  assert(im1 == target);
+
+    // string form, but with an extra return statement.
+    assert( image2D!q{ a = a*b+c; return clWhite; } (im3, im2, 5) == image2D(2, 2, clWhite) && im3 == target);
+  }
+
+}
+
+void unittest_main(){
+  unittest_Image;
+  unittest_ImageElementType;
 }
 
 void main(){ import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
+  unittest_main;
 
-  unittest_Image;
-  unittest_ImageElementType;
+  //application.exit;
 
   if(1) foreach(frame; 0..100000){
     writeln;

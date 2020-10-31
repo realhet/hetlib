@@ -1,6 +1,8 @@
 module het.win;
 
+//The next @comment is important: It marks the app as a windowed app.
 //@win
+
 pragma(lib, "gdi32.lib");
 pragma(lib, "winmm.lib");
 
