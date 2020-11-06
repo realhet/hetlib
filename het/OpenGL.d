@@ -20,7 +20,7 @@ Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  t
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //todo: nincs doUpdate formresize kozben
 
-public import het.utils, het.geometry, het.win; //later: , het.view, het.draw2d, het.image, het.stream;
+public import het.utils, het.win; //later: , het.geometry, het.view, het.draw2d, het.image, het.stream;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
 
 //Turn on high performance GPUs on some laptops
@@ -1032,11 +1032,11 @@ public://///////////////////////////////////////////////////////
   }
 
   void uniform(int loc, float v ){ glUniform1fv(loc, 1, &v  ); glChk; }
-  void uniform(int loc, in V2f v){ glUniform2fv(loc, 1, &v.x); glChk; }
-  void uniform(int loc, in V3f v){ glUniform3fv(loc, 1, &v.x); glChk; }
+  void uniform(int loc, in vec2 v){ glUniform2fv(loc, 1, &v.x); glChk; }
+  void uniform(int loc, in vec3 v){ glUniform3fv(loc, 1, &v.x); glChk; }
 
   void uniform(int loc, int v      ){ glUniform1iv(loc, 1, &v  ); glChk; }
-  void uniform(int loc, in V2i v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, &v.x); glChk(file, line); }
+  void uniform(int loc, in ivec2 v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, &v.x); glChk(file, line); }
 
   void uniform(int loc, in float[4][4] v){ glUniformMatrix4fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
   void uniform(int loc, in float[3][3] v){ glUniformMatrix3fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
@@ -1341,9 +1341,9 @@ public:
 
     if(dst.count!=1) error("attrib("~name~") array attribs not supported yet.");
 
-         if((srcType=="V2f"   || srcType=="float[2]") && (dst.type==GL_FLOAT_VEC2  )) attrib (vbo, dst.loc, GL_FLOAT        , 2, false, offset);
-    else if((srcType=="V3f"   || srcType=="float[3]") && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_FLOAT        , 3, false, offset);
-    else if((srcType=="V4f"   || srcType=="float[4]") && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_FLOAT        , 4, false, offset);
+         if((srcType=="vec2"   || srcType=="float[2]") && (dst.type==GL_FLOAT_VEC2  )) attrib (vbo, dst.loc, GL_FLOAT        , 2, false, offset);
+    else if((srcType=="vec3"   || srcType=="float[3]") && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_FLOAT        , 3, false, offset);
+    else if((srcType=="vec4"   || srcType=="float[4]") && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_FLOAT        , 4, false, offset);
     else if((srcType=="int"   || srcType=="uint"    ) && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 3, true , offset);
     else if((srcType=="int"   || srcType=="uint"    ) && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 4, true , offset);
     else if((srcType=="float"                       ) && (dst.type==GL_FLOAT       )) attrib (vbo, dst.loc, GL_FLOAT        , 1, false, offset);
@@ -1534,7 +1534,7 @@ public:
   immutable string name;
   @property width ()const { return width_ ; }
   @property height()const { return height_; }
-  @property size  ()const { return V2i(width, height); }
+  @property size  ()const { return ivec2(width, height); }
   @property type  ()const { return type_  ; }
 
   override string toString()const{ return `Texture("%s", %s, %s, mipmap(en=%s, built=%s), handle=%X)`.format(name, size, type, mipmapEnabled.to!int, mipmapBuilt.to!int, handle ? handle.handle : 0); }
@@ -1559,11 +1559,6 @@ public:
 
   int texelSize()const{ return GL_TEXELSIZE(type); }
 
-  bool isCompatibleWith(in Bitmap bmp)const {
-    return bmp.channels==4 && type==GLTextureType.RGBA8
-        || bmp.channels==1 && type==GLTextureType.L8;
-  }
-
   private bool prepareInputRect(int x, int y, ref int sx, ref int sy){
     //set default size to texture.size
     if(sx==int.min) sx = width -x;
@@ -1574,6 +1569,8 @@ public:
 
     return sx>0 && sy>0;
   }
+
+  //todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
 
   void upload(const(void)[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     if(!prepareInputRect(x, y, xs, ys)) return;
@@ -1590,7 +1587,6 @@ public:
     mipmapBuilt = false; //todo: rebuild mipmap
   }
 
-  //todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
   void fill(T)(const T data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     if(!prepareInputRect(x, y, xs, ys)) return;
     int bytes = (stride ? stride : xs)*ys*texelSize;
@@ -1599,6 +1595,15 @@ public:
     auto byteArr = cast(ubyte[])dataArr;
     auto tmp = byteArr.replicate(bytes/byteArr.length.to!int).array;
     upload(tmp, x, y, xs, ys, stride);
+  }
+
+// !TODO: Bitmap specific upload/download functs ///////////////////////////////
+/+
+
+  bool isCompatibleWith(in Bitmap bmp)const {
+    assert(0, "notimpl");
+    return bmp.channels==4 && type==GLTextureType.RGBA8
+        || bmp.channels==1 && type==GLTextureType.L8;
   }
 
   Bitmap download(int x=0, int y=0, int xs=int.min, int ys=int.min){
@@ -1641,6 +1646,8 @@ writeln("convEnd");
       default: enforce(0, "Bitmap incompatible with texture "~bmp.text);
     }
   }
+
++/
 
   void uploadRows(const(void)[] data, int startRow, int numRows){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     upload(data, 0, startRow, width, numRows);
@@ -1793,18 +1800,18 @@ private{
 
   struct TessVertex{
     int idx;
-    V2f v;
+    vec2 v;
   }
 
   TessVertex*[] tessVertices;
 
-  auto addVertex(in V2f v){
+  auto addVertex(in vec2 v){
     auto r = new TessVertex(cast(int)tessVertices.length, v);
     tessVertices ~= r;
     return r;
   }
 
-  auto findAddVertex(in V2f v){
+  auto findAddVertex(in vec2 v){
     foreach(i; tessBaseVertexCount..tessVertices.length)
       if(tessVertices[i].v==v)
         return tessVertices[i];
@@ -1813,7 +1820,7 @@ private{
   }
 
   public struct TessResult{
-    V2f[] vertices;
+    vec2[] vertices;
     int[3][] triangles;
     int[2][] lines;
     string error;
@@ -1894,7 +1901,7 @@ private{
     }
 
     void cbCombine(double* coords, double* orig, float* weight, out TessVertex* dataOut){
-      auto v = V2f(coords[0], coords[1]);
+      auto v = vec2(coords[0], coords[1]);
       if(tessBoundaryPass) dataOut = findAddVertex(v);
                       else dataOut = addVertex    (v);
 
@@ -1929,7 +1936,7 @@ private{
   }
 }
 
-TessResult tesselate(in V2f[][] contours, TessWinding winding = TessWinding.nonZero, bool boundary = true){ with(gl){
+TessResult tesselate(in vec2[][] contours, TessWinding winding = TessWinding.nonZero, bool boundary = true){ with(gl){
   tessInit;
   double[3] dv = [0, 0, 0];
 
@@ -1976,7 +1983,7 @@ TessResult tesselate(in V2f[][] contours, TessWinding winding = TessWinding.nonZ
   return tessResult;
 }}
 
-TessResult tesselate(in V2f[] contour, TessWinding winding = TessWinding.nonZero, bool boundary = true){ return tesselate([contour], winding, boundary); }
+TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZero, bool boundary = true){ return tesselate([contour], winding, boundary); }
 
 
 /// GLWindow class //////////////////////////////////////////////////////////////////////////
@@ -2188,15 +2195,15 @@ public:
   void drawFpsTimeLine(Drawing dr){
     with(dr){
       //FPS graph
-      translate(V2f(0, 64+4));
+      translate(vec2(0, 64+4));
 
       lineWidth = 1;
       lineStipple = lsNormal;
       auto groups = timeLine.getGroups;
       foreach(int idx; 1..groups.length.to!int){
         auto group = groups[idx], prevGroup = groups[idx-1];
-        const scale = V2f(5000.0f, 4);
-        const origin = V2f(clientWidth-2, 2);
+        const scale = vec2(5000.0f, 4);
+        const origin = vec2(clientWidth-2, 2);
 
         auto rect(double t0, double t1){
           Bounds2f b;

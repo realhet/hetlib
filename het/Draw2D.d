@@ -229,7 +229,7 @@ class Drawing {
     float  pointSize = -1,
            lineWidth = -1;
     int lineStipple = 0;
-    auto arrowSize = V2f(8, 2.5);
+    auto arrowSize = vec2(8, 2.5);
     ArrowStyle arrowStyle = asNoArrow;
 
     float fontHeight = 18;
@@ -243,15 +243,15 @@ class Drawing {
     @property bool fontBold()           { return fontWeight> (fontWeightBold+1)*.5f; }
     @property void fontBold(bool b)     { fontWeight = b ? fontWeightBold : 1; }
 
-    auto drawScale = V2f(1, 1);
-    auto drawOrigin = V2f(0, 0);
+    auto drawScale = vec2(1, 1);
+    auto drawOrigin = vec2(0, 0);
   }
 
   private DrawState actState;
   private DrawState[] stateStack;
 
   //todo: Examine push VS saveState, seems redundant. UI uses only translate() and pop()
-  private V2f[2][] stack; //matrix stack
+  private vec2[2][] stack; //matrix stack
 
 
   @property float alpha()       { return (actState.alpha>>24)*(1.0f/255); }
@@ -314,8 +314,8 @@ class Drawing {
     origin.x = origin.x + dx;//*scaleFactor.x;
     origin.y = origin.y + dy;//*scaleFactor.y;
   }
-  void translate(in V2f d){ translate(d.x, d.y); }
-  void translate(in V2i d){ translate(d.x, d.y); }
+  void translate(in vec2 d){ translate(d.x, d.y); }
+  void translate(in ivec2 d){ translate(d.x, d.y); }
 
   void scale(float s){ //todo: ezt meg kell csinalni matrixosra.
     push;
@@ -330,18 +330,18 @@ class Drawing {
 
   struct DrawingObj {
     float aType;        //4
-    V2f aA, aB, aC;     //24
+    vec2 aA, aB, aC;     //24
     uint aColor;        //4
 
     //drawGlyph obly
-    V2f aD;             //8
+    vec2 aD;             //8
     uint aColor2;       //4
 
-    V2f aClipMin, aClipMax; //16  clipping rect. Terribly unoptimal
+    vec2 aClipMin, aClipMax; //16  clipping rect. Terribly unoptimal
 
     void expandBounds(ref Bounds2f b, ref bool isFirst) const {   //opt: ez az isFirst megneheziti a dolgokat. Kene valami jobb jelzes a bounds uressegre, pl. NAN bounds.
       auto t = aType.iround;
-      void x(in V2f v){ b.expandTo(v, isFirst); } //jobb modszer kene a bounds szamitasra...
+      void x(in vec2 v){ b.expandTo(v, isFirst); } //jobb modszer kene a bounds szamitasra...
 
       if(t==1) x(aA); //Point
       else if(t==68){ x(aA); x(aB); x(aC); } //Tri
@@ -349,10 +349,10 @@ class Drawing {
       else raise("aType %s not impl".format(aType));
     }
 
-    void applyTransform(V2f delegate(in V2f) tr){
+    void applyTransform(vec2 delegate(in vec2) tr){
       auto t = aType.iround;
 
-      void x(ref V2f v){ v = tr(v); }
+      void x(ref vec2 v){ v = tr(v); }
 
       if(t==1) x(aA); //Point
       else if(t==68){ x(aA); x(aB); x(aC); } //Tri
@@ -387,10 +387,10 @@ class Drawing {
   Bounds2f getBounds()const { return bounds_; }
   private bool boundsEmpty = true;
 
-  V2f inputTransform(in V2f p) { return (p+actState.drawOrigin)*actState.drawScale; }
+  vec2 inputTransform(in vec2 p) { return (p+actState.drawOrigin)*actState.drawScale; }
   Bounds2f inputTransform(in Bounds2f b) { return Bounds2f(inputTransform(b.bMin), inputTransform(b.bMax)); }
 
-  V2f inverseInputTransform(in V2f v) { return v/actState.drawScale-actState.drawOrigin; } //todo: slow divide
+  vec2 inverseInputTransform(in vec2 v) { return v/actState.drawScale-actState.drawOrigin; } //todo: slow divide
   Bounds2f inverseInputTransform(in Bounds2f b) { return Bounds2f(inverseInputTransform(b.bMin), inverseInputTransform(b.bMax)); }
 
   Bounds2f clipBounds;
@@ -434,7 +434,7 @@ class Drawing {
 
 // Points //////////////////////////////////////////////////////////////////////
 
-  void point(in V2f p) {
+  void point(in vec2 p) {
     markDirty;
     auto c = realDrawColor, s = pointSize;
 /*    if(data_.length) with(data[$-1]) if(aType==1 && aColor==c) {//extend the last Point1 to Point2
@@ -442,17 +442,17 @@ class Drawing {
       aB = inputTransform(p);
       aC.y = s;
       return;
-    }*/ //todo: point2 is not working with appender. should use V2f[]
+    }*/ //todo: point2 is not working with appender. should use vec2[]
 
     //Create a new Point1
-    append(DrawingObj(1, inputTransform(p), V2f.Null, V2f(s, 0), c));
+    append(DrawingObj(1, inputTransform(p), vec2.Null, vec2(s, 0), c));
   }
 
-  void point(float x, float y) { point(V2f(x, y)); }
+  void point(float x, float y) { point(vec2(x, y)); }
 
-  void point(in V2i p) { point(p.x, p.y); }
+  void point(in ivec2 p) { point(p.x, p.y); }
 
-  void point(in V2f[] p) {
+  void point(in vec2[] p) {
     if(p.length==0) return;
     markDirty;
     auto c = realDrawColor, s = pointSize;
@@ -463,60 +463,60 @@ class Drawing {
     }
     //from now process 2 points at a time
     while(idx<p.length) {
-      append(DrawingObj(2, inputTransform(p[idx]), inputTransform(p[idx+1]), V2f(s, s), c));
+      append(DrawingObj(2, inputTransform(p[idx]), inputTransform(p[idx+1]), vec2(s, s), c));
       idx += 2;
     }
   }
 
 // Lines ///////////////////////////////////////////////////////////////////////
 
-  private V2f lineCursor = V2f.Null;
+  private vec2 lineCursor = vec2.Null;
 
-  void lineTo(const V2f p_) { //todo: const struct->in struct
-    V2f p = inputTransform(p_);
+  void lineTo(const vec2 p_) { //todo: const struct->in struct
+    vec2 p = inputTransform(p_);
     markDirty;
     auto c = realDrawColor, w = lineWidth;
-    append(DrawingObj(3+actState.arrowStyle.encode, lineCursor, p, V2f(w, lineStipple), c));
+    append(DrawingObj(3+actState.arrowStyle.encode, lineCursor, p, vec2(w, lineStipple), c));
     lineCursor = p;
   }
-  void lineTo(in V2f p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
+  void lineTo(in vec2 p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
 
-  void lineTo(in V2i p)                                 { lineTo(p.toF); }
-  void lineTo(in V2i p, bool isMove)                    { lineTo(p.toF, isMove); }
+  void lineTo(in ivec2 p)                                 { lineTo(p.toF); }
+  void lineTo(in ivec2 p, bool isMove)                    { lineTo(p.toF, isMove); }
 
-  void moveTo(in V2f p)                                 { lineCursor = inputTransform(p); }
-  void moveTo(in V2i p)                                 { moveTo(p.toF); }
+  void moveTo(in vec2 p)                                 { lineCursor = inputTransform(p); }
+  void moveTo(in ivec2 p)                                 { moveTo(p.toF); }
 
-  void lineRel(in V2f p)                                { lineTo(lineCursor+inputTransform(p)); }
-  void moveRel(in V2f p)                                { moveTo(lineCursor+inputTransform(p)); }
-  void line(in V2f p0, in V2f p1)                       { lineCursor = inputTransform(p0); lineTo(p1); }
+  void lineRel(in vec2 p)                                { lineTo(lineCursor+inputTransform(p)); }
+  void moveRel(in vec2 p)                                { moveTo(lineCursor+inputTransform(p)); }
+  void line(in vec2 p0, in vec2 p1)                       { lineCursor = inputTransform(p0); lineTo(p1); }
 
-  void line(in V2i p0, in V2i p1)                       { line(p0.toF, p1.toF); } //todo: az integerre mukodjon mar a floatos a geometryben!
+  void line(in ivec2 p0, in ivec2 p1)                       { line(p0.toF, p1.toF); } //todo: az integerre mukodjon mar a floatos a geometryben!
   void line(in Seg2f s)                                 { line(s.p[0], s.p[1]); }
   void line(in Seg2f[] a)                               { foreach(const s; a) line(s); }
 
-  void lineTo(float x, float y)                         { lineTo(V2f(x, y)); }
-  void lineTo(float x, float y, bool isMove)            { lineTo(V2f(x, y), isMove); }
-  void moveTo(float x, float y)                         { moveTo(V2f(x, y)); }
-  void lineRel(float x, float y)                        { lineRel(V2f(x, y)); }
-  void moveRel(float x, float y)                        { moveRel(V2f(x, y)); }
-  void line(float x0, float y0, float x1, float y1)     { line(V2f(x0, y0), V2f(x1, y1)); }
+  void lineTo(float x, float y)                         { lineTo(vec2(x, y)); }
+  void lineTo(float x, float y, bool isMove)            { lineTo(vec2(x, y), isMove); }
+  void moveTo(float x, float y)                         { moveTo(vec2(x, y)); }
+  void lineRel(float x, float y)                        { lineRel(vec2(x, y)); }
+  void moveRel(float x, float y)                        { moveRel(vec2(x, y)); }
+  void line(float x0, float y0, float x1, float y1)     { line(vec2(x0, y0), vec2(x1, y1)); }
 
   void line(T)(in T[] points)                           { if(points.length>1){ moveto(points[0]); foreach(const p; points[1..$]) lineto(p); } }
   void lineLoop(T)(in T[] points)                       { if(points.length>1){ line(points); lineto(points[0]); } }
 
-  void hLine(in V2f p0, float x1)                       { line(p0.x, p0.y, x1, p0.y); }
+  void hLine(in vec2 p0, float x1)                       { line(p0.x, p0.y, x1, p0.y); }
   void hLine(float x0, float y, float x1)               { line(x0, y, x1, y); }
-  void vLine(in V2f p0, float y1)                       { line(p0.x, p0.y, p0.x, y1); }
+  void vLine(in vec2 p0, float y1)                       { line(p0.x, p0.y, p0.x, y1); }
   void vLine(float x, float y0, float y1)               { line(x, y0, x, y1); }
 
   void line2(T...)(in args T){
     foreach(a; args){
       alias A = unqual!(typeof(a));
-      static if(is(A == V2f)) lineTo(a);
-      static if(is(A == V2i)) lineTo(a);
-      static if(is(A == V2f[])) lineTo(a);
-      static if(is(A == V2i[])) lineTo(a);
+      static if(is(A == vec2)) lineTo(a);
+      static if(is(A == ivec2)) lineTo(a);
+      static if(is(A == vec2[])) lineTo(a);
+      static if(is(A == ivec2[])) lineTo(a);
       static if(is(A == RGB )){ color = a;        alpha = 1;          }
       static if(is(A == RGBA)){ color = a.to!RGB; alpha = a.a/255.0f; }
       static if(isIntegral!A || isFloatingPoint!A) lineWidth = a;
@@ -540,7 +540,7 @@ class Drawing {
     if(data.empty) return;
     static if(is(T==RGB8)||is(T==RGBf)||is(T==RGBA8)||is(T==RGBAf)){
       mixin(genRgbGraph!"vGraph");
-    }else static if(is(T==V2f) || is(T==V2i)){
+    }else static if(is(T==vec2) || is(T==ivec2)){
       foreach(i, const v; data) lineTo(x0+v.y*xScale, y0+v.x*yScale, !i);
     }else{
       moveTo(x0+data[0]*xScale, y0);
@@ -555,7 +555,7 @@ class Drawing {
     if(data.empty) return;
     static if(is(T==RGB8)||is(T==RGBf)||is(T==RGBA8)||is(T==RGBAf)){
       mixin(genRgbGraph!"hGraph");
-    }else static if(is(T==V2f) || is(T==V2i)){
+    }else static if(is(T==vec2) || is(T==ivec2)){
       foreach(i, const v; data) lineTo(x0+v.x*xScale, y0+v.y*yScale, !i);
     }else{
       moveTo(x0, y0+data[0]*yScale);
@@ -567,29 +567,29 @@ class Drawing {
   }
 
 
-  void vGraph(T)(in V2f v0, in T[] data, float xScale=1, float yScale=1){ vGraph(v0.x, v0.y, data, xScale, yScale); }
-  void hGraph(T)(in V2f v0, in T[] data, float xScale=1, float yScale=1){ hGraph(v0.x, v0.y, data, xScale, yScale); }
+  void vGraph(T)(in vec2 v0, in T[] data, float xScale=1, float yScale=1){ vGraph(v0.x, v0.y, data, xScale, yScale); }
+  void hGraph(T)(in vec2 v0, in T[] data, float xScale=1, float yScale=1){ hGraph(v0.x, v0.y, data, xScale, yScale); }
 
-  void vGraph(T)(in V2i v0, in T[] data, float xScale=1, float yScale=1){ vGraph(v0.x, v0.y, data, xScale, yScale); }
-  void hGraph(T)(in V2i v0, in T[] data, float xScale=1, float yScale=1){ hGraph(v0.x, v0.y, data, xScale, yScale); }
+  void vGraph(T)(in ivec2 v0, in T[] data, float xScale=1, float yScale=1){ vGraph(v0.x, v0.y, data, xScale, yScale); }
+  void hGraph(T)(in ivec2 v0, in T[] data, float xScale=1, float yScale=1){ hGraph(v0.x, v0.y, data, xScale, yScale); }
 
   alias vline = vLine, hline = hLine, moveto = moveTo, lineto = lineTo;
 
   void drawRect(float x0, float y0, float x1, float y1) { hLine(x0, y0, x1); hLine(x0, y1, x1); vLine(x0, y0, y1); vLine(x1, y0, y1); }
-  void drawRect(const V2f a, const V2f b)               { drawRect(a.x, a.y, b.x, b.y); }
+  void drawRect(const vec2 a, const vec2 b)               { drawRect(a.x, a.y, b.x, b.y); }
   void drawRect(const Bounds2f b)                       { drawRect(b.bMin, b.bMax); }
   void drawRect(const Bounds2i b)                       { drawRect(b.toF); }
 
   void drawX(float x0, float y0, float x1, float y1)    { line(x0, y0, x1, y1); line(x0, y1, x1, y0); }
-  void drawX(const V2f a, const V2f b)                  { drawX(a.x, a.y, b.x, b.y); }
+  void drawX(const vec2 a, const vec2 b)                  { drawX(a.x, a.y, b.x, b.y); }
   void drawX(const Bounds2f b)                          { drawX(b.bMin, b.bMax); }
   void drawX(const Bounds2i b)                          { drawX(b.toF); }
 
   void fillRect(float x0, float y0, float x1, float y1) {
     auto c = realDrawColor;
-    append(DrawingObj(67, inputTransform(V2f(x0, y0)), inputTransform(V2f(x1,y1)), V2f(0, 0), c));
+    append(DrawingObj(67, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c));
   }
-  void fillRect(const V2f a, const V2f b)               { fillRect(a.x, a.y, b.x, b.y); }
+  void fillRect(const vec2 a, const vec2 b)               { fillRect(a.x, a.y, b.x, b.y); }
   void fillRect(const Bounds2f b)                       { fillRect(b.bMin, b.bMax); }
   void fillRect(const Bounds2i b)                       { fillRect(b.toF); } //todo: Bounds2i automatikusan atalakulhasson Bounds2f-re
 
@@ -597,8 +597,8 @@ class Drawing {
     auto c = realDrawColor;
     auto c2 = bkColor.to!RGBA8;
 
-    auto tx0 = V2f(16/*fontflag=image*/, 0),
-         tx1 = V2f(1, 1);
+    auto tx0 = vec2(16/*fontflag=image*/, 0),
+         tx1 = vec2(1, 1);
 
     //align proportiolally
     auto al = RectAlign(HAlign.center, VAlign.center, true, false, true); //shrink, enlarge, aspect
@@ -614,25 +614,25 @@ class Drawing {
     drawGlyph(textures[fileName], b, bkColor);
   }
 
-  void drawGlyph(in File fileName, in V2f p, in RGB8 bkColor = clBlack){
+  void drawGlyph(in File fileName, in vec2 p, in RGB8 bkColor = clBlack){
     drawGlyph(textures[fileName], p, bkColor);
   }
 
-  void drawGlyph(int idx, in V2f p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
+  void drawGlyph(int idx, in vec2 p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
     auto info = textures.accessInfo(idx);
     drawGlyph(idx, Bounds2f(p.x, p.y, p.x+info.width, p.y+info.height), bkColor);
   }
 
   void drawGlyph(int idx, float x=0, float y=0, in RGB8 bkColor = clBlack){
-    drawGlyph(idx, V2f(x, y), bkColor);
+    drawGlyph(idx, vec2(x, y), bkColor);
   }
 
   void drawFontGlyph(int idx, in Bounds2f b, in RGB8 bkColor = clBlack, in int fontFlags = 0){   //bit0:bold
     auto c = realDrawColor;
     auto c2 = bkColor.to!RGBA8;
 
-    auto tx0 = V2f(fontFlags, 0),
-         tx1 = V2f(0, 0);
+    auto tx0 = vec2(fontFlags, 0),
+         tx1 = vec2(0, 0);
 
     //align proportiolally
 //    auto al = RectAlign(HAlign.center, VAlign.center, true, true, false); //shrink, enlarge, aspect
@@ -646,11 +646,11 @@ class Drawing {
 
   void fillTriangle(float x0, float y0, float x1, float y1, float x2, float y2){
     auto c = realDrawColor;
-    append(DrawingObj(68, inputTransform(V2f(x0, y0)), inputTransform(V2f(x1,y1)), inputTransform(V2f(x2,y2)), c));
+    append(DrawingObj(68, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), inputTransform(vec2(x2,y2)), c));
   }
-  void fillTriangle(const V2f a, const V2f b, const V2f c){ fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y); }
+  void fillTriangle(const vec2 a, const vec2 b, const vec2 c){ fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y); }
 
-  void fillConvexPoly(const V2f[] p){
+  void fillConvexPoly(const vec2[] p){
     foreach(i; 2..p.length) fillTriangle(p[0], p[i], p[i-1]);
   }
 
@@ -659,15 +659,15 @@ class Drawing {
          y1 = (y0+y2)*0.5f;
     moveTo(x0, y1); lineTo(x1, y0); lineTo(x2, y1); lineTo(x1, y2); lineTo(x0, y1);
   }
-  void drawRombus(const V2f a, const V2f b)               { drawRombus(a.x, a.y, b.x, b.y); }
+  void drawRombus(const vec2 a, const vec2 b)               { drawRombus(a.x, a.y, b.x, b.y); }
   void drawRombus(const Bounds2f b)                       { drawRombus(b.bMin, b.bMax); }
 
   void fillRombus(float x0, float y0, float x2, float y2){
     auto x1 = (x0+x2)*0.5f,
          y1 = (y0+y2)*0.5f;
-    fillConvexPoly([V2f(x0,y1), V2f(x1, y0), V2f(x2, y1), V2f(x1, y2)]);
+    fillConvexPoly([vec2(x0,y1), vec2(x1, y0), vec2(x2, y1), vec2(x1, y2)]);
   }
-  void fillRombus(const V2f a, const V2f b)               { fillRombus(a.x, a.y, b.x, b.y); }
+  void fillRombus(const vec2 a, const vec2 b)               { fillRombus(a.x, a.y, b.x, b.y); }
   void fillRombus(const Bounds2f b)                       { fillRombus(b.bMin, b.bMax); }
 
 // gridLines ////////////////////////////////////////////////////
@@ -684,8 +684,8 @@ class Drawing {
     lineStipple = stipple;
 
     auto vis = view.visibleArea;
-    vis.bMin = vFloor(vis.bMin/dist-V2f(1,1)).toF*dist;
-    vis.bMax = vCeil (vis.bMax/dist+V2f(1,1)).toF*dist;
+    vis.bMin = vFloor(vis.bMin/dist-vec2(1,1)).toF*dist;
+    vis.bMax = vCeil (vis.bMax/dist+vec2(1,1)).toF*dist;
     auto cnt = vis.size/dist,
          siz = view.clientSize/cnt;
 
@@ -731,11 +731,11 @@ class Drawing {
       lineTo(x+sin(a)*ra, y+cos(a)*rb, !i);
     }
   }
-  void ellipse(const V2f p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
-  void ellipse(const V2f p, const V2f r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r.x, r.y, arc0, arc1); }
+  void ellipse(const vec2 p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
+  void ellipse(const vec2 p, const vec2 r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r.x, r.y, arc0, arc1); }
 
   void circle(float x, float y, float r, float arc0=0, float arc1=2*PI) { ellipse(x, y, r, r, arc0, arc1); }
-  void circle(const V2f p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
+  void circle(const vec2 p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
 
 // Text ////////////////////////////////////////////////////////////////////////
 
@@ -744,7 +744,7 @@ class Drawing {
     return plotFont.textWidth(scale, fontMonoSpace, text);
   }
 
-  void textOut(V2f p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
+  void textOut(vec2 p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
     saveState; scope(exit) restoreState; //opt:slow
 
     auto scale = fontHeight*(1.0f/40);         //todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
@@ -760,13 +760,13 @@ class Drawing {
     plotFont.drawText(this, p, scale, fontMonoSpace, fontItalic, text, vertFlip);
   }
   void textOut(float x, float y, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
-    textOut(V2f(x, y), text, width, align_, vertFlip);
+    textOut(vec2(x, y), text, width, align_, vertFlip);
   }
-  void textOut(const V2i p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
+  void textOut(const ivec2 p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
     textOut(p.toF, text, width, align_, vertFlip);
   }
 
-  void textOut(V2f p, string[] lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
+  void textOut(vec2 p, string[] lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
     foreach(s; lines){
       textOut(p, s, width, align_, vertFlip);
       p.y += fontHeight;
@@ -775,14 +775,14 @@ class Drawing {
   }
 
   void textOut(float x, float y, string[] lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
-    textOut(V2f(x, y), lines, width, align_, vertFlip);
+    textOut(vec2(x, y), lines, width, align_, vertFlip);
   }
 
   void textOutMulti(float x, float y, string lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
     textOut(x, y, lines.splitLines, width, align_, vertFlip);
   }
 
-  void textOutMulti(V2f p, string lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
+  void textOutMulti(vec2 p, string lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
     textOut(p, lines.splitLines, width, align_, vertFlip);
   }
 
@@ -1435,9 +1435,9 @@ class Drawing {
 
 // Draw the objects on GPU  /////////////////////////////
 
-  void glDraw(ref View2D view, const V2f translate = V2f.Null) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
+  void glDraw(ref View2D view, const vec2 translate = vec2.Null) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
 
-  void glDraw(const V2f center, float scale, const V2f translate=V2f.Null) {
+  void glDraw(const vec2 center, float scale, const vec2 translate=vec2.Null) {
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));
     enforce(clipBoundsStack.empty, "Drawing.glDraw() clipBounds stack is not empty.  It has %d items.".format(clipBoundsStack.length));
 
@@ -1457,7 +1457,7 @@ class Drawing {
 
       auto vpSize = gl.getViewport.size;  //todo: ezek a vbo hivas elott mehetnek kifele
 
-      auto uScale = V2f(scale, scale),
+      auto uScale = vec2(scale, scale),
            uShift = -center;
 
       shader.uniform("uScale", uScale);
@@ -1519,7 +1519,7 @@ deprecated class Logger{
       auto oldFontMonoSpace = dr.fontMonoSpace;     dr.fontMonoSpace = type!=LogType.Text;
 
       dr.textOut(0, 0, s);
-      dr.origin = dr.origin+V2f(0, 1);
+      dr.origin = dr.origin+vec2(0, 1);
 
       dr.color         = oldc            ;
       dr.fontHeight    = oldfh           ;
@@ -1577,7 +1577,7 @@ deprecated class Logger{
       auto oldfh = dr.fontHeight;       dr.fontHeight = 3;
 
       dr.textOut(0, 2, s);
-      dr.origin = dr.origin+V2f(0, 6);
+      dr.origin = dr.origin+vec2(0, 6);
 
       dr.color = oldc;
       dr.fontHeight = oldfh;

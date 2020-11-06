@@ -53,7 +53,7 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
     uint, "width1",   14,      uint, "texChn_lo", 2,
     uint, "height1",  14,      uint, "texChn_hi", 2));
 
-  this(in V2i pos, in V2i size, int texIdx, in SubTexChannelConfig texChn)   //pos and size is in pixels
+  this(in ivec2 pos, in ivec2 size, int texIdx, in SubTexChannelConfig texChn)   //pos and size is in pixels
   {
     enforce((pos.x & SubTexCellMask)==0
          && (pos.y & SubTexCellMask)==0, "unaligned pos");
@@ -70,11 +70,11 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
   }
 
   bool isNull() const{ return this==typeof(this).init; }
-  V2i pos   () const{ return V2i(cellX, cellY)<<SubTexCellBits; }
+  ivec2 pos   () const{ return ivec2(cellX, cellY)<<SubTexCellBits; }
 
   int width() const{ return width1+1; }
   int height() const{ return height1+1; }
-  V2i size  () const{ return V2i(width, height); }
+  ivec2 size  () const{ return ivec2(width, height); }
 
   int texIdx() const{ return texIdx_lo | texIdx_hi<<2; }
 
@@ -123,7 +123,7 @@ public:
 
   override string toString(){ return "MegaTexture(%s)".format(glTexture); }
 
-  bool add(in V2i size, int channels, int data/*subTexIdx*/, out SubTexInfo info){
+  bool add(in ivec2 size, int channels, int data/*subTexIdx*/, out SubTexInfo info){
     auto cellSize = (size+SubTexCellMask)>>SubTexCellBits,
          rect = bin.add(cellSize.x, cellSize.y, data);
 
@@ -134,7 +134,7 @@ public:
 
     resizeGLTexture;//apply the possible binSize change
 
-    auto pos = V2i(rect.x, rect.y)<<SubTexCellBits;
+    auto pos = ivec2(rect.x, rect.y)<<SubTexCellBits;
     info = SubTexInfo(pos, size, texIdx, cast(SubTexChannelConfig)((channels-1)*4)); //todo: MegaTexture.channels = 1, 2, 3, not just 4
 
     return true;
@@ -318,7 +318,7 @@ private:
   private bool[int] pendingIndices; //files being loaded by a worker thread
   private bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
 
-  void enforceSize(const V2i size){
+  void enforceSize(const ivec2 size){
     enforce(size.x<=SubTexMaxSize     && size.y<=SubTexMaxSize    , "Texture too big (%s)"                                 .format(size));
     enforce(size.x<=gl.maxTextureSize && size.y<=gl.maxTextureSize, "Texture too big on current opengl implementation (%s)".format(size));
   }
@@ -615,12 +615,12 @@ if(log) "Created subtex %s:".writefln(fileName);
 
   GLTexture[] getGLTextures(){ return infoTexture.glTexture ~ megaTextures.map!(a => a.glTexture).array; }
 
-  V2i textureSize(int idx){
+  ivec2 textureSize(int idx){
     return infoTexture.isValidIdx(idx) ? accessInfo(idx).size
-                                       : V2i.Null;
+                                       : ivec2.Null;
   }
 
-  V2i textureSize(File file){
+  ivec2 textureSize(File file){
     return textureSize(access(file));
   }
 }

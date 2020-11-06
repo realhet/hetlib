@@ -1,4 +1,4 @@
-module het.image;
+deprecated module het.image;
 
 import het.utils, het.geometry, core.sys.windows.windows, std.uni;
 
@@ -84,7 +84,7 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
 //  if(fn.startsWith(`screenShot:\`)){
     //todo: screenshot implementalasa
 
-/*   auto gBmp = new GdiBitmap(V2i(screenWidth, screenHeight), 4);
+/*   auto gBmp = new GdiBitmap(ivec2(screenWidth, screenHeight), 4);
   BitBlt(gBmp.hdcMem, 0, 0, gBmp.size.x, gBmp.size.y, GetDC(NULL), 0, 0, SRCCOPY).writeln;
 */
 
@@ -146,8 +146,8 @@ T bicubicInterpolate (T)(T[4][4] p, float x, float y) { //unoptimized recursive 
 //x,y :    top, left coordinate of the rect
 //w,h :    size of the output image
 //xs, ys:  stepSize int x, y directions  <1 means magnification
-Image!T extract_bicubic(T)(Image!T iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  auto res = new Image!T(w, h);
+Image!(T, 2) extract_bicubic(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
+  auto res = image2D(w, h, T.init);
   auto x00 = x0;
 
   foreach(int y; 0..h){
@@ -187,8 +187,8 @@ T bilinearInterpolate (T)(T[2][2] p, float x, float y) { //unoptimized recursive
   return linearInterpolate(a, y);
 }
 
-Image!T extract_bilinear(T)(Image!T iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  auto res = new Image!T(w, h);
+Image!(T, 2) extract_bilinear(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
+  auto res = image2D(w, h, T.init);
   auto x00 = x0;
 
   foreach(int y; 0..h){
@@ -213,8 +213,8 @@ Image!T extract_bilinear(T)(Image!T iSrc, float x0, float y0, int w, int h, floa
   return res;
 }
 
-Image!T extract_nearest(T)(Image!T iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  auto res = new Image!T(w, h);
+Image!(T, 2) extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
+  auto res = image2D(w, h, T.init);
   auto x00 = x0;
 
   foreach(int y; 0..h){
@@ -238,8 +238,8 @@ Image!T extract_nearest(T)(Image!T iSrc, float x0, float y0, int w, int h, float
 
 //This is a special one: it only processes the first 2 ubytes of an uint
 //todo: should be refactored to an image that handles RGBA types
-Image!uint extract_bilinear_rg00(Image!uint iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  auto res = new Image!uint(w, h);
+Image!(uint, 2) extract_bilinear_rg00(Image!(uint, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
+  auto res = image2D(w, h, 0u);
   auto x00 = x0;
 
   foreach(int y; 0..h){
@@ -271,8 +271,8 @@ Image!uint extract_bilinear_rg00(Image!uint iSrc, float x0, float y0, int w, int
 }
 
 
-Image!uint extract_bicubic_rg00(Image!uint iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  auto res = new Image!uint(w, h);
+Image!(uint, 2) extract_bicubic_rg00(Image!(uint, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
+  auto res = image2D(w, h, 0u);
   auto x00 = x0;
 
   foreach(int y; 0..h){
@@ -302,7 +302,7 @@ Image!uint extract_bicubic_rg00(Image!uint iSrc, float x0, float y0, int w, int 
 }
 
 
-//todo: implement PPM image codec
+// todo: implement PPM image codec /////////////////////////////////
 /*
 class Bitmap {
   int width;
@@ -375,7 +375,6 @@ class Bitmap {
 }
   */
 
-// Bitmap image processing //////////////////////////
 
 /*if(calculateAvgAlpha) foreach(ref p; img.data) p.a = ((p.r+p.g+p.b)*85)>>8; //alpha = rgb average. can be used as grayscale
 ezt a feldolgozast kell kiboviteni:
@@ -384,7 +383,8 @@ ezt a feldolgozast kell kiboviteni:
 - Ha tenyleg szines, akkor fekete es feher hatter segitsegevel meg kell hatarozni a maszkot.
 - a BGR-t is meg lehet forditani, esetleg a shaderbe kene azt beleintegralni. Az +1 bit. */
 
-
+//! Deprecated Image(T) class /////////////////////////////////////////
+/+
 class Image(T){ // Image class //////////////////////
   mixin JsonizeMe;
 private:
@@ -432,8 +432,8 @@ public:
   }
 
   //vector variants
-  this(in V2i size, T delegate(int x, int y) generator){ this(size.x, size.y, generator); }
-  this(in V2i size){ this(size.x, size.y); }
+  this(in ivec2 size, T delegate(int x, int y) generator){ this(size.x, size.y, generator); }
+  this(in ivec2 size){ this(size.x, size.y); }
 
   //fixme: even with an empty destructor it is a crash
   //~this(){ realloc(0, 0);  }
@@ -464,8 +464,8 @@ public:
 
   alias xs = width, ys = height;
 
-  @property V2i size() const { return V2i(width_, height_); }
-  @property void size(const V2i s) { realloc(s.x, s.y); }
+  @property ivec2 size() const { return ivec2(width_, height_); }
+  @property void size(const ivec2 s) { realloc(s.x, s.y); }
   int area() const { return width*height; }
 
   final bool empty() const { return (this is null) || !size.x || !size.y; } //final, so it is not virtual
@@ -476,24 +476,24 @@ public:
   const(T)[] cdata()const { return cast(const(T)[])data_; }
 
   int ofs(int x, int y) const { return y*width + x; }
-  int ofs(in V2i v) const { return ofs(v.x, v.y); }
+  int ofs(in ivec2 v) const { return ofs(v.x, v.y); }
 
   int ofs_safe(int x, int y) const {
     x = min(x, width -1); x = max(x, 0);
     y = min(y, height-1); y = max(y, 0);
     return ofs(x, y);
   }
-  int ofs_safe(in V2i v) const { return ofs_safe(v.x, v.y); }
+  int ofs_safe(in ivec2 v) const { return ofs_safe(v.x, v.y); }
 
   ref T opIndex(int o) { return data_[o]; }
   ref T opIndex(int x, int y){ return data_[ofs(x, y)]; }
-  ref T opIndex(in V2i v) { return opIndex(v.x, v.y); }
+  ref T opIndex(in ivec2 v) { return opIndex(v.x, v.y); }
 
   ref T pix(int x, int y){ return data_[ofs(x, y)]; }
   ref T pix_safe(int x, int y){ return data_[ofs_safe(x, y)]; }
 
-  ref T pix(in V2i p){ return data_[ofs(p)]; }
-  ref T pix_safe(in V2i p){ return data_[ofs_safe(p)]; }
+  ref T pix(in ivec2 p){ return data_[ofs(p)]; }
+  ref T pix_safe(in ivec2 p){ return data_[ofs_safe(p)]; }
 
   void acquire(void[] src, int width, int height, int pitch=-1, bool dup=false){
     if(src is null){
@@ -563,14 +563,16 @@ public:
 
 }
 
++/
+
 //utility functions
 
 auto peakDetect(T)(Image!T img, int border=1, T minValue=T.min){ with(img){
-  V2i[] peaks;
+  ivec2[] peaks;
   foreach(int y; border..height-border){ int o0 = y*width;
     foreach(int x; border..width-border){ auto o = o0+x, val = data[o];
       if(val>minValue && img.isPeak(o))
-        peaks ~= V2i(x, y);
+        peaks ~= ivec2(x, y);
     }
   }
   return peaks;
@@ -655,7 +657,7 @@ File[] imageFiles(in Path p){
 
 struct BitmapInfo{
   string format;
-  V2i size;
+  ivec2 size;
   int chn;
 
   bool valid() const{ return supportedBitmapExts.canFind(format) && chn.inRange(1, 4); }
@@ -712,7 +714,7 @@ private:
 
       WebPBitstreamFeatures features;
       if(WebPGetFeatures(stream.ptr, stream.length, &features)==VP8StatusCode.VP8_STATUS_OK){
-        size = V2i(features.width, features.height);
+        size = ivec2(features.width, features.height);
         chn = features.has_alpha ? 4 : 3;
       }
     }else if(supportedBitmapExts.canFind(format)){ //use imageFormats package
@@ -744,18 +746,8 @@ public:
 
 // Bitmap class //////////////////////////////////////////////////////////////////////////////
 
-class Bitmap{    //todo: jsonize
-private:
-  Image!L8    i1; //todo: algebraic
-  Image!LA8   i2;
-  Image!RGB8  i3;
-  Image!RGBA8 i4;
-
-  void freeAll(){ i1.free; i2.free; i3.free; i4.free; }
-
-  void chkChannels(int cnt){ enforce(cnt.inRange(1, 4), "channelCnt out of range ("~cnt.text~")"); }
-public:
-  int tag;
+...
+  @property channels() return channels_
 
   override string toString() const { return format("Bitmap[%d*%d %dchn]", width, height, channels); }
 
@@ -775,23 +767,23 @@ public:
   }
 
   @property {
-    V2i size() const{
-      return i4 ? i4.size : i3 ? i3.size : i2 ? i2.size : i1 ? i1.size : V2i.Null;
+    ivec2 size() const{
+      return i4 ? i4.size : i3 ? i3.size : i2 ? i2.size : i1 ? i1.size : ivec2.Null;
     }
 
-    void size(in V2i s){
+    void size(in ivec2 s){
       if(i4) i4.size = s; else if(i3) i3.size = s; else if(i2) i2.size = s; else if(i1) i1.size = s;
     }
   }
 
-  @property { int width () const { return size.x; } void width (int w){ size = V2i(w    , height); } }
-  @property { int height() const { return size.y; } void height(int h){ size = V2i(width,      h); } }
+  @property { int width () const { return size.x; } void width (int w){ size = ivec2(w    , height); } }
+  @property { int height() const { return size.y; } void height(int h){ size = ivec2(width,      h); } }
 
-  auto bounds() const { return Bounds2i(V2i.Null, size); }
+  auto bounds() const { return Bounds2i(ivec2.Null, size); }
 
   final bool empty() const { return (this is null) || !size.x || !size.y; } //final, so it is not virtual
 
-  void realloc(in V2i size, int chn){ chkChannels(chn);
+  void realloc(in ivec2 size, int chn){ chkChannels(chn);
     freeAll;
     if(chn==1) i1 = new typeof(i1)(size);else
     if(chn==2) i2 = new typeof(i2)(size);else
@@ -800,12 +792,12 @@ public:
     this.size = size;
   }
 
-  this(in V2i size, int chn = 4){
+  this(in ivec2 size, int chn = 4){
     realloc(size, chn);
   }
 
   this(int width, int height, int chn = 4){
-    this(V2i(width, height), chn);
+    this(ivec2(width, height), chn);
   }
 
   this(T)(Image!T src)if(isColor8!T){
@@ -820,7 +812,7 @@ public:
   }
 
   ~this(){
-    size = V2i(0, 0); //release memory
+    size = ivec2(0, 0); //release memory
   }
 
   int changedCnt() const{
@@ -1027,12 +1019,12 @@ public:
 // GdiBitmap class ////////////////////////////////////
 
 class GdiBitmap{
-  V2i size;
+  ivec2 size;
   HBITMAP hBitmap;
   static HDC hdcMem; //needs only one of this
   BITMAPINFO bmi;
 
-  this(in V2i size, int channels=4){
+  this(in ivec2 size, int channels=4){
     enforce(channels==4, "Only 32bit windows bitmaps supported");
 
     this.size = size;
@@ -1042,7 +1034,7 @@ class GdiBitmap{
     if(!hdcMem) hdcMem  = CreateCompatibleDC(hdcScreen);
 
     hBitmap = CreateCompatibleBitmap(hdcScreen, size.x, size.y);
-                                   //^^^^^^^^^ mest be hdcScreen, otherwise 1bit monochrome
+                                   //^^^^^^^^^ must be hdcScreen, otherwise 1bit monochrome
 
     SelectObject(hdcMem, hBitmap);
 
@@ -1057,7 +1049,7 @@ class GdiBitmap{
     }
   }
 
-  this(int width, int height, int channels=4){ this(V2i(width, height), channels); }
+  this(int width, int height, int channels=4){ this(ivec2(width, height), channels); }
 
   ~this(){
     DeleteObject(hBitmap);
@@ -1493,7 +1485,7 @@ version(D2D_FONT_RENDERER){ private:
       DWRITE_TEXT_METRICS metrics;
       textLayout.GetMetrics(metrics).hrChk("GetMetrics");
 
-      auto bmpSize(){ return V2i((metrics.width*props.xScale).iround, props.height); }
+      auto bmpSize(){ return ivec2((metrics.width*props.xScale).iround, props.height); }
 
       if(isSpace){
         return new Bitmap(bmpSize, 1);

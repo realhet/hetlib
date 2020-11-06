@@ -135,61 +135,126 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 
 }
 
+auto convertColorComponentType(CT, A)(auto ref A a){
+  alias ST = ScalarType!A;
+
+       static if(is(ST == ubyte) && is(CT == float)) return a.generateVector!(CT, a => a * (1.0f/255));
+  else static if(is(ST == float) && is(CT == ubyte)) return a.generateVector!(CT, a => a * 255       );
+  else                                               return a.generateVector!(CT, a => a             );
+}
+
+auto convertColorChannels(int DstLen, A)(auto ref A a){
+  alias SrcLen = VectorLength!A,
+        T      = ScalarType  !A,
+        VT     = Vector!(T, DstLen);
+  //              Src: L              LA        RGB       RGBA         Dst:
+  immutable table = [["a          ", "a.r   ", "a.l   ", "a.l  "],  // L
+                     ["VT(a,1)    ", "a     ", "a.l1  ", "a.la "],  // LA
+                     ["VT(a,a,a)  ", "a.rrr ", "a     ", "a.rgb"],  // RGB
+                     ["VT(a,a,a,1)", "a.rrrg", "a.rgb1", "a    "]]; // RGBA
+
+  static foreach(i; 1..5) static if(DstLen == i)
+    static foreach(j; 1..5) static if(SrcLen == j)
+      return mixin(table[i-1][j-1]);
+
+  static assert(VectorLength!(typeof(return)) == DstLen, "DstLen mismatch");
+}
+
+auto convertColor(B, A)(auto ref A a){
+  alias DstType = ScalarType  !B,
+        DstLen  = VectorLength!B;
+
+  return a.convertColorComponentType!DstType     // 2 step conversion: type and channels
+          .convertColorChannels!DstLen;
+}
+
+
+class Bitmap{
+private:
+  void[] data_;
+  int width_, height_, channels_=4;
+  string type_ = "ubyte";
+public:
+  int tag;     // can be an external id
+  int counter; // can notify of cnahges
+
+  @property width   () const{ return width_   ; }
+  @property height  () const{ return height_  ; }
+  @property channels() const{ return channels_; }
+  @property type    () const{ return type_    ; }
+
+  void set(E)(Image!(E, 2) im){
+    counter++;
+    width_      = im.width ;
+    height_     = im.height;
+    channels_   = VectorLength!E;
+    type_       = (ScalarType!E).stringof;
+    data_       = im.asArray;
+  }
+
+  auto castedImage(E)(){
+    return image2D(width_, height_, cast(Unqual!E[]) data_);
+  }
+
+  auto access(E)(){
+    enforce(VectorLength!E == channels, "channel mismatch");
+    enforce((ScalarType!E).stringof == type, "type mismatch");
+    return castedImage!E;
+  }
+
+  auto get(E)(){ //it converts
+    static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
+      alias CT = ScalarType!T;
+      alias len = VectorLength!T;
+      if(CT.stringof == type && len==channels)
+        return mixin("access!(", T.stringof, ").image2D!(a => a.convertColor!(", E.stringof, "))");
+    }}
+
+    enforce(0, "invalid bitmap format");
+    assert(0);
+  }
+
+
+  override string toString() const { return format("Bitmap(%d, %d, %d, \"%s\")", width, height, channels, type); }
+
+
+  // Bitmap Stream Encode ///////////////////////////////////
+  import imageformats;
+
+  ubyte[] toPng(){ return write_png_to_mem(width, height, cast(ubyte[])data_); }
+  ubyte[] toBmp(){ enforce(channels.among(3, 4), "8/16bit bmp not supported"); return write_bmp_to_mem(width, height, cast(ubyte[])data_); }
+  ubyte[] toTga(){ enforce(channels.among(1, 3, 4), "16bit tga not supported"); return write_tga_to_mem(width, height, cast(ubyte[])data_); }
+  //ubyte[] toJpg(int quality = DefaultQuality){ raise("encoding to jpg not supported"); return []; }
+
+}
 
 void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
 
   import het.geometry;
   import het.win;
-//  import het.view;
 
-  //application.exit;
 
-//  lineBreshenham test.
+//  writeln("4.5".to!float);
 
-  if(1) foreach(frame; 0..100000){
-    writeln;
+  auto bmp = new Bitmap;
+  bmp.writeln;
+  bmp.set(image2D(8, 8, clRed)); // 8x8 RGB
 
-    iTime = frame*0.1;
+  bmp.toPng.saveTo(File(`c:\test\a.png`));
+  bmp.get!RGB.toBmp.saveTo(File(`c:\test\rgb.bmp`));
+  bmp.get!RGBA.toBmp.saveTo(File(`c:\test\rgba.bmp`));
+  bmp.get!ubyte.toTga.saveTo(File(`c:\test\gray.bmp`));
 
-    iResolution = vec2(80, 60);
-    auto invAspect = vec2(.5, 1); // textmode chars are 2x taller
+  bmp.writeln;
+  bmp.set(bmp.access!RGB.image2D!(a => a.convertColor!vec4)); //access as RGB and convert to vec4  (RGBA32F, set alpha to 1)
+  bmp.set(bmp.get!vec2); //get as whatever and convert to vec2  (RG32F, RGB->grayscale, Alpha remains unchanged)
+  bmp.writeln;
+  bmp.access!vec2.rows.writeln;
 
-    // create the image in memory
-    auto img = image2D((iResolution / invAspect).itrunc, (ivec2 p){
-      // call the shadertoy shader
-      vec2 fragCoord = p * invAspect;
-      vec4 fragColor;
-      mainImage(fragColor, fragCoord);
 
-      // transform color to grayscale ascii
-      return fragColor.toGrayscaleAscii;
-    });
-
-    auto subImg = img[5..20, 10..30];
-    foreach(y; 0..subImg.height)
-      foreach(x; 0..subImg.width)
-        subImg[x, y] = (x^y)&4 ? '.' : ' ';
-
-    //draw a border
-    subImg[0  , 0..$] = '|'; subImg[$-1, 0..$] = '|';
-    subImg[0..$, 0  ] = '-'; subImg[0..$, $-1] = '-';
-
-    //fill a subRect
-    subImg[2..$-2, 2..5] = '@';
-    subImg[4..$, 2] = "Hello World...";
-    subImg[2, 4..$] = "Hello World...";
-
-    subImg[3..6, 4..6] = "123456";  // contiguous fill
-    subImg[10..13, 4..6] = '~';     // constant fill
-    subImg[10..15, 15..20] = subImg[0..5-1, 0..5+1]; //copy rectangle
-    subImg[10, 10] = subImg[0..4, 0..5]; // also copy rectangle. Size is taken form source image
-
-    // display the image (it's upside down)
-    img.rows.retro.each!writeln;
-
-    break;
-  }
+  writeln("done");
+  readln;
 
 }//); }
 
@@ -213,7 +278,7 @@ class MyWin: Window{
       vec2 fragCoord = p;
       vec4 fragColor;
       mainImage(fragColor, fragCoord);
-      SetPixel(hdc, p.x, p.y, fragColor.rgb.floatToRgb.raw);
+      SetPixel(hdc, p.x, p.y, fragColor.floatToRgb.lll.raw);
     }
   }
 

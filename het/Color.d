@@ -33,17 +33,16 @@ auto hsvToRgb(float H, float S, float V){ //0..1 range
 }
 
 
-immutable grayscaleWeights = vec3(0.299f, 0.586f, 0.114f);
-
-auto grayscale(A)(in A a)
-if(isVector!A && A.length==3)
+auto toGrayscale(T, N)(in Vector!(T, N) x)
 {
-  return (a * grayscaleWeights).sum;
+       static if(N==3) return x.lll;
+  else static if(N==4) return x.llla;
+  else                 return x;
 }
 
-char toGrayscaleAscii(A)(in A color){
+char toGrayscaleAscii(float luma){
   immutable charMap = " .:-=+*#%@";
-  return charMap[color.rgb.grayscale.quantize!(charMap.length)];
+  return charMap[luma.quantize!(charMap.length)];
 }
 
 

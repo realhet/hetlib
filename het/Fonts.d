@@ -1,6 +1,6 @@
 module het.fonts;
 
-import het.utils, het.geometry, het.image, het.draw2d;
+import het.utils;
 
 // plotFont: Simpe vector font //////////////////////////////
 
@@ -18,16 +18,16 @@ static:
   }
 
   float textHeight(float scale, string text) { return fontHeight*scale; }
-  V2f textExtent  (float scale, bool monoSpace, string text) { return V2f(textWidth(scale, monoSpace, text), textHeight(scale, text)); }
+  vec2 textExtent  (float scale, bool monoSpace, string text) { return vec2(textWidth(scale, monoSpace, text), textHeight(scale, text)); }
 
-  void drawText(Drawing dr, V2f pos, float scale, bool monoSpace, bool italic, string text, bool vertFlip){
+  void drawText(Drawing dr, vec2 pos, float scale, bool monoSpace, bool italic, string text, bool vertFlip){
     pos.y += scale*fontYAdjust;
     foreach(ch; text){
       auto cg = charMap[cast(int)ch].gfx;
 
       foreach(const poly; cg.points)
         foreach(i, const p; poly){
-          V2f v = p;
+          vec2 v = p;
           if(!vertFlip) v.y = fontHeight-v.y;
           if(monoSpace) v.x += (fontMonoWidth-cg.width)*0.5;
           if(italic) v.x += 4 - v.y*0.25;
@@ -38,8 +38,8 @@ static:
     }
   }
 
-  auto drawTextStrokes(V2f pos, string text, float scale=1, DrawTextOption[] options=[]){
-    V2f[][] res;    //todo: refactor this funct
+  auto drawTextStrokes(vec2 pos, string text, float scale=1, DrawTextOption[] options=[]){
+    vec2[][] res;    //todo: refactor this funct
     pos.y += scale*fontYAdjust;
 
     const monoSpace = options.canFind(DrawTextOption.monoSpace);
@@ -51,7 +51,7 @@ static:
 
       foreach(const poly; cg.points)
         foreach(i, const p; poly){
-          V2f v = p;
+          vec2 v = p;
           if(!vertFlip) v.y = fontHeight-v.y;
           if(monoSpace) v.x += (fontMonoWidth-cg.width)*0.5;
           if(italic) v.x += 4 - v.y*0.25;
@@ -75,7 +75,7 @@ static:
     foreach(ref m; charMap) if(!m) m = charMap[cast(int)'?'];
   }
 
-  struct CharGfx{ float width; V2f[][] points; }
+  struct CharGfx{ float width; vec2[][] points; }
   struct CharRec{ char ch; CharGfx gfx; }
   //data source: https://hackage.haskell.org/package/plotfont
   //todo: Editor: linkek highlightolasa es raugras.
@@ -303,8 +303,8 @@ static:
        ];
 }
 
-// GDI Font /////////////////////////////////
-
+// ! Deprecated: GDI Font /////////////////////////////////
+/+
 enum FontQuality {standard, smooth, clearType}
 
 class GDIFont{
@@ -511,7 +511,7 @@ auto renderFont(dchar ch, string fontName, int height, bool clearType){
   return renderFont([ch], fontName, height, clearType)[0];
 }
 
-
++/
 
 // Programming-font : DEPRECATED //////////////////////////////
 

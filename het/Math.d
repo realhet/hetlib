@@ -61,7 +61,7 @@ private bool validRvalueSwizzle(string def){
   //LvalueSwizzles are not included. Those are midex in.  (LValue swizzle examples: x, xy, yzw, those that stay on a contiguous memory area)
   if(swizzleRegs.map!(r => r.canFind(def)).any) return false;
 
-  return swizzleRegs.map!(r => def.map!(ch => "01".canFind(ch) || r.canFind(ch.toLower)).all).any;
+  return swizzleRegs.map!(r => def.map!(ch => "01lL".canFind(ch) || r.canFind(ch.toLower)).all).any;
 }
 
 
@@ -91,7 +91,7 @@ private template OperationResultType(string op, A, B){
 
 /// T is a combination of vector and scalar parameters
 /// returns the common vector length if there is one, otherwise stops with an assert;
-private int CommonVectorLength(T...)(){
+int CommonVectorLength(T...)(){
   static if(!T.length) return 0;
   static if(!anyVector!T) return 1; // assume all are scalar
   enum len = FirstVectorLength!T;
@@ -100,7 +100,9 @@ private int CommonVectorLength(T...)(){
   return len;
 }
 
-private template ScalarType(T){
+alias VectorLength = CommonVectorLength;
+
+template ScalarType(T){
        static if(isVector!T) alias A = T.ComponentType;
   else static if(isMatrix!T) alias A = T.ComponentType;
   else                       alias A = T;
@@ -144,7 +146,8 @@ struct Vector(CT, int N)
 if(N.inRange(2, 4)){
   alias VectorType = typeof(this);
   alias ComponentType = CT;
-  enum VectorTypeName = is(VectorType==Vector!(ubyte, 3)) ? "RGB" :
+  enum VectorTypeName = is(VectorType==Vector!(ubyte, 2)) ? "RG" :
+                        is(VectorType==Vector!(ubyte, 3)) ? "RGB" :
                         is(VectorType==Vector!(ubyte, 4)) ? "RGBA" :
                         ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "vec" ~ N.stringof
                                                           : VectorType.stringof;
@@ -271,6 +274,20 @@ if(N.inRange(2, 4)){
           mixin(format!q{ref  %s()       { return *(cast(Vector!(CT, %s)*) (components[%s..%s])); }}(regs[i..i+len], len, i, i+len));
         }
 
+  // lumonosity swizzle
+  @property auto l() const {
+    static if(N>=3) return cast(CT) dot(rgb, grayscaleWeights);
+    else return r;
+  }
+
+  @property void l(A)(in A x){
+    r = x;
+    static if(N>=3){
+      g = r;
+      b = r;
+    }
+  }
+
   private template swizzleDecode(char ch){
     enum lowerCh = ch.toLower;
     enum isLower = ch==lowerCh;
@@ -357,8 +374,9 @@ static foreach(T; vectorElementTypes)
 
 // define aliases for colors
 
-alias RGB8 = Vector!(ubyte, 3),  RGB  = RGB8;
-alias RGBA8 = Vector!(ubyte, 4),  RGBA  = RGBA8;
+alias RG8   = Vector!(ubyte, 2),  RG   = RG8;
+alias RGB8  = Vector!(ubyte, 3),  RGB  = RGB8;
+alias RGBA8 = Vector!(ubyte, 4),  RGBA = RGBA8;
 
 enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float));
 
@@ -744,6 +762,10 @@ private void unittest_Matrices(){
     assert(mat2(1) == mat2.identity);
   }
 }
+
+//! Constants /////////////////////////////////////////////////
+
+immutable grayscaleWeights = vec3(0.299, 0.586, 1-(0.299+0.586));
 
 //! Functions /////////////////////////////////////////////////
 
@@ -1870,7 +1892,8 @@ auto image2D(alias fun="", A...)(A args){  // image2D constructor //////////////
             return Image!(RT, 2)(size, size.iota2.map!(p => args[1](p)).array); //return tupe is something, make an Image out of it.
           }
         }else{ // non-callable
-          return Image!(R, 2)(size, [cast()(args[1])].replicate(size[].product)); // one pixel stretched all over the size
+          Unqual!R tmp = args[1];
+          return Image!(Unqual!R, 2)(size, [tmp].replicate(size[].product)); // one pixel stretched all over the size
         }
       }
     }else{ // fun is specified
@@ -2281,6 +2304,31 @@ private void unittest_Image(){  // image2D tests ///////////////////////////////
 
     // string form, but with an extra return statement.
     assert( image2D!q{ a = a*b+c; return vec2(1,2); } (im3, im2, 5) == image2D(2, 2, vec2(1, 2)) && im3 == target);
+  }
+
+  { // complex image text with char type
+    auto subImg = image2D(15, 20, '.');//img[5..20, 10..30];
+    foreach(y; 0..subImg.height)
+      foreach(x; 0..subImg.width)
+        subImg[x, y] = (x^y)&4 ? '.' : ' ';
+
+    //draw a border
+    subImg[0  , 0..$] = '|'; subImg[$-1, 0..$] = '|';
+    subImg[0..$, 0  ] = '-'; subImg[0..$, $-1] = '-';
+
+    //fill a subRect
+    subImg[2..$-2, 2..5] = '@';
+    subImg[4..$, 2] = "Hello World...";
+    subImg[2, 4..$] = "Hello World...";
+
+    subImg[3..6, 4..6] = "123456";  // contiguous fill
+    subImg[10..13, 4..6] = '~';     // constant fill
+    subImg[10..15, 15..20] = subImg[0..5-1, 0..5+1]; //copy rectangle
+    subImg[10, 10] = subImg[0..4, 0..5]; // also copy rectangle. Size is taken form source image
+
+    // display the image (it's upside down)
+    import het.utils : xxh;
+    assert(subImg.asArray.xxh == 478208559);
   }
 
 }
