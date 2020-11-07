@@ -168,8 +168,7 @@ auto convertColor(B, A)(auto ref A a){
           .convertColorChannels!DstLen;
 }
 
-
-class Bitmap{
+class Bitmap{ // Bitmap class /////////////////////////////////////////////
 private:
   void[] data_;
   int width_, height_, channels_=4;
@@ -204,29 +203,111 @@ public:
 
   auto get(E)(){ //it converts
     static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
-      alias CT = ScalarType!T;
-      alias len = VectorLength!T;
+      alias CT = ScalarType   !T,
+            len = VectorLength!T;
       if(CT.stringof == type && len==channels)
         return mixin("access!(", T.stringof, ").image2D!(a => a.convertColor!(", E.stringof, "))");
     }}
 
-    enforce(0, "invalid bitmap format");
-    assert(0);
+    raise("invalid bitmap format"); assert(0);
   }
 
 
   override string toString() const { return format("Bitmap(%d, %d, %d, \"%s\")", width, height, channels, type); }
+}
 
+// Bitmap/Image serializer //////////////////////////////////////////
 
-  // Bitmap Stream Encode ///////////////////////////////////
+__gshared serializeImage_defaultFormat = "png"; // png is the best because it knows 1..4 components and it's moderately compressed.
+
+auto convertImage(Dst, T)(Image!(T, 2) src){ //compile time image convert
+  scope auto bmp = new Bitmap;
+  bmp.set(src);
+  return bmp.get!(Dst);
+}
+
+/// converts it to ubyte and remaps chn using a chn expression string
+private auto convertImage_ubyte_chnRemap(int[4] chnRemap, T)(Image!(T, 2) a){
+  enum chn = VectorLength!T,
+       newChn = chnRemap[chn-1];
+  static assert(newChn.inRange(1,4));
+
+  static if(is(ScalarType!T == ubyte) && chn == newChn) return a;
+  else return a.convertImage!(Vector!(ubyte, newChn));
+}
+
+private static ubyte[] write_webp_to_mem(int width, int height, ubyte[] data, int quality){  //Reasonable quality = 95,  lossless = 100
+  //note: the header is in the same syntax like in the imageformats module.
+  import webp.encode, core.stdc.stdlib : free;
+
+  ubyte* output;
+  size_t size;
+  const lossy = quality<100; //100 means lossless
+  const channels = data.length.to!int/(width*height);
+  enforce(data.length = width*height*channels, "invalid image data");
+  switch(channels){
+    case 4: size = lossy ? WebPEncodeRGBA        (data.ptr, width, height, width*channels, quality, &output)
+                         : WebPEncodeLosslessRGBA(data.ptr, width, height, width*channels,          &output);  break;
+    case 3: size = lossy ? WebPEncodeRGB         (data.ptr, width, height, width*channels, quality, &output)
+                         : WebPEncodeLosslessRGB (data.ptr, width, height, width*channels,          &output);  break;
+    default: enforce(0, "8/16bit webp not supported"); //todo: Y, YA plane-kkal megoldani ezeket is
+  }
+
+  //todo: tovabbi info a webp-rol: az alpha az csak lossless modon van tomoritve. Lehet, hogy azt is egy Y-al kene megoldani...
+
+  enforce(size, "WebPEncode failed.");
+
+  ubyte[] res = output[0..size].dup; //unoptimal copy
+  free(output);
+  return res;
+}
+
+private void[] serializeImage(T)(Image!(T, 2) img, string format=""){ // compile time version
   import imageformats;
 
-  ubyte[] toPng(){ return write_png_to_mem(width, height, cast(ubyte[])data_); }
-  ubyte[] toBmp(){ enforce(channels.among(3, 4), "8/16bit bmp not supported"); return write_bmp_to_mem(width, height, cast(ubyte[])data_); }
-  ubyte[] toTga(){ enforce(channels.among(1, 3, 4), "16bit tga not supported"); return write_tga_to_mem(width, height, cast(ubyte[])data_); }
-  //ubyte[] toJpg(int quality = DefaultQuality){ raise("encoding to jpg not supported"); return []; }
+  enum chn = VectorLength!T,
+       type = (ScalarType!T).stringof;
+  if(format=="") format = serializeImage_defaultFormat;
+  auto fmt = format.commandLineToMap;
 
+  auto getQuality(){
+    return ("quality" in fmt) ? fmt["quality"].to!int.clamp(0, 100)
+                              : 95; //Default quality for jpeg and webp
+  }
+
+  switch(fmt["0"]){
+    case "bmp":  return write_bmp_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([3,4,3,4]).asArray); //only 3 and 4 chn supported
+    case "png":  return write_png_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,2,3,4]).asArray); //all chn supported
+    case "tga":  return write_tga_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,4,3,4]).asArray); //all except 2 chn supported
+    case "webp": return write_webp_to_mem(img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([3,4,3,4]).asArray, getQuality); //only 3 and 4 chn
+    case "jpg": raise("encoding to jpg not supported"); return [];
+    default: raise("invalid image compression format: "~format); return [];
+  }
 }
+
+immutable serializeImage_supportedFormats   = ["webp", "png", "bmp", "tga"];
+
+private void[] serializeImage(Bitmap bmp, string format=""){ // runtime version
+
+  // todo: this runtime code generator should be centralized in Bitmap
+  static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
+    alias CT = ScalarType   !T,
+          len = VectorLength!T;
+    if(CT.stringof == bmp.type && len==bmp.channels)
+      return mixin("serializeImage(bmp.access!(", T.stringof, "), format)");
+  }}
+
+  raise("invalid bitmap format"); assert(0);
+}
+
+
+//combined compress function
+void[] serialize(A)(A a, string format=""){
+       static if(is(A==Bitmap)  ) return a.serializeImage(format);        // Bitmap
+  else static if(isImage2D!A    ) return a.serializeImage(format);        // 2D Image
+  else static assert(0, "invalid arg");
+}
+
 
 void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
@@ -239,10 +320,17 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
 
   auto bmp = new Bitmap;
   bmp.writeln;
-  bmp.set(image2D(8, 8, clRed)); // 8x8 RGB
+  bmp.set(image2D(32, 32, (ivec2 p)=> mix( mix(RGBA(clRed, 255), RGBA(clGreen, 255), p.x/32.0f),
+                                           mix(RGBA(clBlue,255), RGBA(clWhite,   0), p.x/32.0f), p.y/32.0f) ));
 
-  bmp.toPng.saveTo(File(`c:\test\a.png`));
-  bmp.get!RGB.toBmp.saveTo(File(`c:\test\rgb.bmp`));
+  serializeImage_supportedFormats.writeln;
+  foreach(ext; serializeImage_supportedFormats)
+    static foreach(Type; AliasSeq!(ubyte, RG, RGB, RGBA))
+      bmp.get!Type.serialize(ext).saveTo(File(`c:\dl\a`~(Type.sizeof*8).text~`.`~ext));
+
+  //bmp.toPng.saveTo(File(`c:\test\a.png`));
+
+/*  bmp.get!RGB.toBmp.saveTo(File(`c:\test\rgb.bmp`));
   bmp.get!RGBA.toBmp.saveTo(File(`c:\test\rgba.bmp`));
   bmp.get!ubyte.toTga.saveTo(File(`c:\test\gray.bmp`));
 
@@ -250,7 +338,7 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
   bmp.set(bmp.access!RGB.image2D!(a => a.convertColor!vec4)); //access as RGB and convert to vec4  (RGBA32F, set alpha to 1)
   bmp.set(bmp.get!vec2); //get as whatever and convert to vec2  (RG32F, RGB->grayscale, Alpha remains unchanged)
   bmp.writeln;
-  bmp.access!vec2.rows.writeln;
+  bmp.access!vec2.rows.writeln;*/
 
 
   writeln("done");

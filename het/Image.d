@@ -746,7 +746,7 @@ public:
 
 // Bitmap class //////////////////////////////////////////////////////////////////////////////
 
-...
+
   @property channels() return channels_
 
   override string toString() const { return format("Bitmap[%d*%d %dchn]", width, height, channels); }

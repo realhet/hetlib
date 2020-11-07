@@ -142,8 +142,15 @@ private void unittest_utilityStuff(){
 ///  Vector                                                                  ///
 ////////////////////////////////////////////////////////////////////////////////
 
+template Vector(CT, int N) //this template enables 1 element vectors.  Those are the type itself.
+if(N == 1)
+{
+  alias Vector = CT;
+}
+
 struct Vector(CT, int N)
-if(N.inRange(2, 4)){
+if(N.inRange(2, 4))
+{
   alias VectorType = typeof(this);
   alias ComponentType = CT;
   enum VectorTypeName = is(VectorType==Vector!(ubyte, 2)) ? "RG" :
@@ -362,7 +369,6 @@ if(N.inRange(2, 4)){
     static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false; //todo: refact
     return true;
   }
-
 }
 
 private alias vectorElementTypes = AliasSeq!(float, double, bool, int, uint);

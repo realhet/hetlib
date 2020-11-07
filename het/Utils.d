@@ -2351,7 +2351,7 @@ auto splitQuotedStr(string line, char delim, char quote){
 
 
 auto splitCommandLine(string line){
-  //split, convert, strip, filter empries
+  //split, convert, strip, filter empties
   return line.splitQuotedStr(' ', '"')
              .map!(a => a.strip.to!string.withoutQuotes('"'))
              .filter!(a => !a.empty)
