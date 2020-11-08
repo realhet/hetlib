@@ -136,16 +136,16 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 }
 
 
-import het.bitmap;
-import het.color;
-
-
 void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
 
+  import het.utils;
   import het.geometry;
+  import het.color;
+  import het.bitmap;
   import het.win;
-//  import het.view;
+  import het.view;
+  import het.opengl;
 
   auto name = "brg";
   enforce(name in colorMaps);

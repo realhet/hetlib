@@ -1084,7 +1084,7 @@ class GdiBitmap{ //holds a windows gdi bitmap and makes it accessible as a norma
   }
 
   auto toImage(){
-    auto img = image2D(size, RGBA(0, 0, 0, 255));
+    auto img = image2D(size, RGBA(0));
     if(!img.empty)
       if(!GetDIBits(hdcMem, hBitmap, 0, size.y, img.asArray.ptr, &bmi, DIB_RGB_COLORS)) raiseLastError;
     return img;

@@ -15,13 +15,13 @@ class MyWin: GLWindow{
   float phase = 0;  //animated position
 
   struct VRecord {
-    V2f aPosition;  //*** the fieldnames must match the name of the shader attributes!
-    uint aColor;
+    vec2 aPosition;  //*** the fieldnames must match the name of the shader attributes!
+    RGB  aColor;
   };
-  immutable VRecord[] vVertices = [ {{ 0.5,  0.5}, clRed   },
-                                    {{-0.5,  0.5}, clLime  },
-                                    {{ 0.5, -0.5}, clBlue  },
-                                    {{-0.5, -0.5}, clYellow} ];
+  immutable VRecord[] vVertices = [ {vec2( 0.5,  0.5), clRed   },
+                                    {vec2(-0.5,  0.5), clLime  },
+                                    {vec2( 0.5, -0.5), clBlue  },
+                                    {vec2(-0.5, -0.5), clYellow} ];
 
   override void onUpdate(){
     targetUpdateRate = 125;
@@ -55,7 +55,7 @@ class MyWin: GLWindow{
     });
 
     //create Vertex Buffer Object
-    vbo = new VBO(vVertices);
+    vbo  = new VBO(vVertices);
     vbo2 = new VBO(vVertices);
 
   }
@@ -66,13 +66,13 @@ class MyWin: GLWindow{
     gl.clearColor(RGB(0x201010));
     gl.clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    shader.uniform("uShift", V2f(cos(phase)*0.4f, sin(phase*0.92f)*0.4f));
+    shader.uniform("uShift", vec2(cos(phase)*0.4f, sin(phase*0.92f)*0.4f));
     shader.attrib(vbo);
 
     vbo.draw(GL_TRIANGLE_STRIP);
 
 
-    shader.uniform("uShift", V2f(cos(phase*1.1)*0.4f, sin(phase*0.82f)*0.4f));
+    shader.uniform("uShift", vec2(cos(phase*1.1)*0.4f, sin(phase*0.82f)*0.4f));
     shader.attrib(vbo2);
     vbo2.draw(GL_TRIANGLE_STRIP);
   }

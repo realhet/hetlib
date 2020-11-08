@@ -1043,30 +1043,6 @@ bool toggle(ref bool b){ b = !b; return b; }
 
 T negate(T)(ref T a){ a = -a; return a; }
 
-// Animation timing /////////////////////////////////////
-
-bool follow(T)(ref T act, const T target, const T t, const T maxd)
-{
-  T last = act;
-  act = mix(act, target, t);
-  if(abs(act-target)<=maxd) act = target;
-  return (act!=last);
-}
-
-bool followRGB(ref RGB act, RGB target, float t, int maxd)
-{
-  act = mix(act, target, t);
-  bool res = sad(target, act)>maxd;
-  if(!res) act = target;
-  return res;
-}
-
-float animationT(float dt, float speed, float maxDt = 0.1f)
-{
-  return dt<maxDt ? 1-pow(speed, dt*30)
-                  : 1;
-}
-
 T binaryToGray(T)(T x){ return x ^ (x >> 1); }
 
 //http://kodhus.com/easings/

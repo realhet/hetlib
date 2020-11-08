@@ -195,7 +195,10 @@ if(N.inRange(2, 4))
   }
 
   private void construct(int i)() {
-    static assert(i == length, "Vector constructor: Not enough arguments"); //todo: show the error's place in source: __ctor!(int, int, int)
+    //handle the rare case of RGB -> RGBA conversion:
+    static if(is(CT==ubyte) && i==3 && length==4){
+      a = 255; // set default opaque alpha
+    }else static assert(i == length, "Vector constructor: Not enough arguments"); //todo: show the error's place in source: __ctor!(int, int, int)
   }
 
   this(A...)(in A args){
@@ -1112,6 +1115,56 @@ auto iota2(B, E)(in B b, in E e){ return iota2(b, e, 1); }
 
 auto iota2(E)(in E e){ return iota2(0, e); }
 
+/***********************************
+ * Calculates an interpolating constant 't' from a deltaTime.
+ * Its aim is to provide similar animation smoothess at different FPS.
+ * Params:
+ *      dt =    Delta time in seconds
+ *      speed = speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.
+ *      maxDt = Maximum allowed deltaTime. Above this, the smhooth animation is disabled, restulting a value of 1.0.
+ * Returns:
+ *      Interpolation constant used in follow() functions.
+ * See_Also:
+ *      follow
+ */
+
+float calcAnimationT(float dt, float speed, float maxDt = 0.1f){
+  return dt<maxDt ? 1-pow(speed, dt*30)
+                  : 1;
+}
+
+/***********************************
+ * Interpolate smooth animation between act and target positions.
+ * Params:
+ *      act =           Actual position.
+ *      target =        Target position, act will go towards that.
+ *      t =             Interpolation constant. 1.0 means immediate transition to target.
+ *                      Use calcAnimationT() to calculate it from deltaTime.
+ *      snapDistance =  Below this distance, act will immediatelly snap to target.
+ *
+ * Returns:             True if the act is still not reached target, so more animation
+ *                      frames will needed in the future.
+ *
+ * See_Also:            calcAnimationT
+ */
+
+bool follow(A)(ref A act, in A target, float t, float snapDistance){
+  if(act==target) return false; // fast path, nothing to do
+
+  static if(isFloatingPoint!A){ // scalar
+    auto last = act;
+    act = mix(act, target, t);
+    if(absDiff(act, target) <= snapDistance) act = target;
+    return act != last;
+  }else static if(isVector!A){ // vector, including colors. Works with RGB(ubyte) too because absDiff
+    bool res;
+    static foreach(i; 0..A.length) if(follow(act[i], target[i], t, snapDistance)) res |= true; //no escape here, must do all the interpolations!
+    return res;
+  }else static if(isMatrix!A){
+    static assert(0, "not impl");
+  }else static assert(0, "unhandled type: "~A.stringof);
+}
+
 
 private void unittest_CommonFunctions(){
   assert(abs(vec2(-5, 5))==vec2(5, 5));
@@ -1635,8 +1688,7 @@ struct Bounds(VT){
   // multidimensional size
   auto size() const{ return max(high-low, 0); }
 
-  static if(VectorLength==2) auto area  () const{ with(size) return x*y; }
-  static if(VectorLength==3) auto volume() const{ with(size) return x*y*z; }
+  bool empty() const{ return size.lessThanEqual(0).any; }
 
   auto opBinary(string op, T)(in T other) const
   {
@@ -1984,7 +2036,7 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
   void regenerate(E delegate(ivec2) generator){ impl = size.iota2.map!generator.array; }
 
   @property auto asArray(){
-    if(size.x==stride) return impl[];
+    if(size.x==stride) return impl;
                   else return rows.array.join;
   }
 

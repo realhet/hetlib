@@ -3,8 +3,15 @@ module het.view;
 import het.win, het.inputs;
 
 struct View2D {
+public:
+  private Window owner_;
+  @property auto owner(){
+    enforce(owner_ !is null, "Forgot to set View2D.owner");
+    return owner_;
+  }
+  @property void owner(Window w){ owner_ = w; }
+
 private:
-  Window owner;
   float m_logScale = 0, //base value. all others are derived from it
         m_scale = 1, m_invScale = 1; //1 -> 1unit = pixel on screen
 
@@ -31,11 +38,6 @@ public:
   }
 
   auto subScreenArea = bounds2(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
-
-  @disable this();
-  this(Window owner) {
-    this.owner = owner;
-  }
 
   vec2 clientSize()                { return vec2(owner.clientSize); }
   vec2 clientSizeHalf()            { return clientSize*0.5f; } //floor because otherwise it would make aliasing in the center of the view
@@ -151,7 +153,7 @@ public:
   }
 
   bool updateAnimation(float deltaTime, bool callInvalidate){
-    float at = animationT(deltaTime, animSpeed);
+    float at = calcAnimationT(deltaTime, animSpeed);
     if(chkSet(animStarted)) at = 1;
 
     bool res;

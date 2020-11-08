@@ -20,7 +20,7 @@ Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  t
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //todo: nincs doUpdate formresize kozben
 
-public import het.utils, het.win; //later: , het.geometry, het.view, het.draw2d, het.image, het.stream;
+public import het.utils, het.win, het.geometry, het.view, het.bitmap; // later: het.draw2d, het.stream;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
 
 //Turn on high performance GPUs on some laptops
@@ -841,7 +841,7 @@ public://///////////////////////////////////////////////////////
 
   auto getViewport() {
     auto vp = getIntegerv(GL_VIEWPORT, 4);
-    return Bounds2i(V2i(vp[0], vp[1]), V2i(vp[0]+vp[2], vp[1]+vp[3]));
+    return ibounds2(vp[0], vp[1], vp[0]+vp[2], vp[1]+vp[3]);
   }
 
   auto maxTextureSize() {
@@ -874,7 +874,7 @@ public://///////////////////////////////////////////////////////
   }
 
   void clearColor(float r, float g, float b, float a)   { glClearColor(r, g, b, a); }
-  void clearColor(T)(in T color)if(isColor!T) { with(color.rgbaf) clearColor(comp[0], comp[1], comp[2], comp[3]); }
+  void clearColor(T)(in T color)                        { with(color.convertPixel!vec4) clearColor(r, g, b, a); }
   void clearDepth(float depth)                          { glClearDepth(depth); }
   void clear(int mask)                                  { glClear(mask); glChk; }
 
@@ -890,7 +890,7 @@ public://///////////////////////////////////////////////////////
   void colorMask(bool r, bool g, bool b, bool a) { glColorMask(r, g, b, a); }
   void blendFunc(int sfactor, int dfactor) { glBlendFunc(sfactor, dfactor); glChk; }
   void blendColor(float r, float g, float b, float a)   { glBlendColor(r, g, b, a); }
-  void blendColor(T)(in T color)if(isColor!T) { with(color.rgbaf) blendColor(comp[0..4]); }
+  void blendColor(T)(in T color)                        { with(color.convertPixel!vec4) blendColor(r, g, b, a); }
   void alphaFunc(int func, float reference) { glAlphaFunc(func, reference); glChk; }
 
   void viewport(int x, int y, int width, int height)    { glViewport(x, y, width, height); glChk; }
@@ -1032,11 +1032,11 @@ public://///////////////////////////////////////////////////////
   }
 
   void uniform(int loc, float v ){ glUniform1fv(loc, 1, &v  ); glChk; }
-  void uniform(int loc, in vec2 v){ glUniform2fv(loc, 1, &v.x); glChk; }
-  void uniform(int loc, in vec3 v){ glUniform3fv(loc, 1, &v.x); glChk; }
+  void uniform(int loc, in vec2 v){ glUniform2fv(loc, 1, v.array.ptr); glChk; }
+  void uniform(int loc, in vec3 v){ glUniform3fv(loc, 1, v.array.ptr); glChk; }
 
   void uniform(int loc, int v      ){ glUniform1iv(loc, 1, &v  ); glChk; }
-  void uniform(int loc, in ivec2 v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, &v.x); glChk(file, line); }
+  void uniform(int loc, in ivec2 v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, v.array.ptr); glChk(file, line); }
 
   void uniform(int loc, in float[4][4] v){ glUniformMatrix4fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
   void uniform(int loc, in float[3][3] v){ glUniformMatrix3fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
@@ -1341,14 +1341,15 @@ public:
 
     if(dst.count!=1) error("attrib("~name~") array attribs not supported yet.");
 
-         if((srcType=="vec2"   || srcType=="float[2]") && (dst.type==GL_FLOAT_VEC2  )) attrib (vbo, dst.loc, GL_FLOAT        , 2, false, offset);
-    else if((srcType=="vec3"   || srcType=="float[3]") && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_FLOAT        , 3, false, offset);
-    else if((srcType=="vec4"   || srcType=="float[4]") && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_FLOAT        , 4, false, offset);
-    else if((srcType=="int"   || srcType=="uint"    ) && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 3, true , offset);
-    else if((srcType=="int"   || srcType=="uint"    ) && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 4, true , offset);
-    else if((srcType=="float"                       ) && (dst.type==GL_FLOAT       )) attrib (vbo, dst.loc, GL_FLOAT        , 1, false, offset);
-    else if((srcType=="int"                         ) && (dst.type==GL_INT         )) attribI(vbo, dst.loc, GL_INT          , 1,        offset);
-    else if((srcType=="uint"                        ) && (dst.type==GL_UNSIGNED_INT)) attribI(vbo, dst.loc, GL_UNSIGNED_INT , 1,        offset);
+    //todo: working with typenames is compiler-implementation dependent.
+         if(srcType.among("Vector!(float, 2)", "float[2]"   ) && (dst.type==GL_FLOAT_VEC2  )) attrib (vbo, dst.loc, GL_FLOAT        , 2, false, offset);
+    else if(srcType.among("Vector!(float, 3)", "float[3]"   ) && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_FLOAT        , 3, false, offset);
+    else if(srcType.among("Vector!(float, 4)", "float[4]"   ) && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_FLOAT        , 4, false, offset);
+    else if(srcType.among("int", "uint", "Vector!(ubyte, 3)") && (dst.type==GL_FLOAT_VEC3  )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 3, true , offset);
+    else if(srcType.among("int", "uint", "Vector!(ubyte, 4)") && (dst.type==GL_FLOAT_VEC4  )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 4, true , offset);
+    else if(srcType.among("float"                           ) && (dst.type==GL_FLOAT       )) attrib (vbo, dst.loc, GL_FLOAT        , 1, false, offset);
+    else if(srcType.among("int"                             ) && (dst.type==GL_INT         )) attribI(vbo, dst.loc, GL_INT          , 1,        offset);
+    else if(srcType.among("uint"                            ) && (dst.type==GL_UNSIGNED_INT)) attribI(vbo, dst.loc, GL_UNSIGNED_INT , 1,        offset);
     else error("attrib("~name~") unable to convert "~srcType~"->"~text(dst.type));
 
     return true;
@@ -1428,7 +1429,7 @@ public:
 
   this(T)(const(T)[] data, string attrName="", int accessType = GL_STATIC_DRAW){
     elementType = T.stringof;
-    static if(!isVectorType!T && !isMatrixType!T){
+    static if(!isVector!T && !isMatrix!T){
       //search struct fields
       foreach(i, n; FieldNameTuple!T){
         static if(!n.empty) elementFields ~= Field(n, FieldTypeTuple!T[i].stringof, __traits(getMember, T, n).offsetof);
@@ -1465,8 +1466,10 @@ public:
 
 /// GLTexture class ////////////////////////////////////////////////////////////////////////////
 
-enum GLTextureType   { Unknown, RGBA8, RGBA16, L8}
 enum GLTextureFilter { Nearest, Linear, Mipmapped }
+
+// todo: this shit must be rethinked
+enum GLTextureType   { Unknown, RGBA8, RGBA16, L8}
 
 int GL_FORMAT(GLTextureType type){ with(GLTextureType)final switch(type){
     case RGBA8  : return GL_RGBA  ;
@@ -1570,6 +1573,22 @@ public:
     return sx>0 && sy>0;
   }
 
+  bool isCompatibleWith(in Bitmap bmp)const {
+    assert(0, "notimpl");
+    return bmp.channels==4 && type==GLTextureType.RGBA8
+        || bmp.channels==1 && type==GLTextureType.L8;
+  }
+
+  bool isCompatibleType(T)(){ //todo: more texture type support
+         static if(is(T==ubyte)) return type==GLTextureType.L8;
+    else static if(is(T==RGBA )) return type==GLTextureType.RGBA8;
+    else static assert(0, "unhandled textureType");
+  }
+
+  void enforceType(T)(){
+    enforce(isCompatibleType!T, "incompatible texture type "~T.stringof~" and "~type.text);
+  }
+
   //todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
 
   void upload(const(void)[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
@@ -1588,6 +1607,7 @@ public:
   }
 
   void fill(T)(const T data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+    enforceType!T;
     if(!prepareInputRect(x, y, xs, ys)) return;
     int bytes = (stride ? stride : xs)*ys*texelSize;
 
@@ -1597,58 +1617,28 @@ public:
     upload(tmp, x, y, xs, ys, stride);
   }
 
-// !TODO: Bitmap specific upload/download functs ///////////////////////////////
-/+
+  //upload a subrect from an image2D
+  void upload(T)(Image!(T, 2) img, int x=0, int y=0, int sx=int.min, int sy=int.min){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+    if(!isCompatibleType!T){ // incompatible format?
+      upload(new Bitmap(img), x, y, sx, sy); // Bitmap will automatically convert
+    }else{ // compatible
+      //adjust size to image dimensions also, not just to the texture
+      if(sx==int.min) sx = min(width -x, img.width );
+      if(sy==int.min) sy = min(height-y, img.height);
 
-  bool isCompatibleWith(in Bitmap bmp)const {
-    assert(0, "notimpl");
-    return bmp.channels==4 && type==GLTextureType.RGBA8
-        || bmp.channels==1 && type==GLTextureType.L8;
-  }
-
-  Bitmap download(int x=0, int y=0, int xs=int.min, int ys=int.min){
-    enforce(GL_COMPONENTSIZE(type)==1, "Only 8bit/channels supported");
-    if(!prepareInputRect(x, y, xs, ys))
-      return null; //nothing to copy
-
-    //copy the whole image
-    auto res = new Bitmap(width, height, texelSize); //!!! only for 8 bit
-    checkBinding;
-    gl.pixelStore(GL_UNPACK_ROW_LENGTH, 0);
-    gl.getTexImage(GL_TEXTURE_2D, 0, GL_FORMAT(type), GL_DATATYPE(type), res.data);
-
-    if(width==xs && height==ys) return res;
-
-    return res.copyRect(x, y, xs, ys);
-  }
-
-  void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
-    if(bmp is null || bmp.empty) return;
-
-    //adjust size to bitmap dimensions also, not just to the texture
-    if(sx==int.min) sx = min(width -x, bmp.width );
-    if(sy==int.min) sy = min(height-y, bmp.height);
-
-//todo: ezek a Bitmap konverzios total lefagyast okoznak.
-/*writeln("convBegin0");
-    if(bmp.channels==3 && type==GLTextureType.RGBA8){
-writeln("convBegin");
-      bmp = new Bitmap(bmp.rgb.to!RGBA8);
-writeln("convEnd");
-    }*/
-
-    void u(in void[] data){ upload(data, x, y, sx, sy, bmp.width); }
-
-    switch(bmp.channels){ //opt: measure and optimize these conversions if needed
-      case 1: u(bmp.cdata.map!(a=> 0xFF000000 | (a*0x10101)).array); break;
-      case 3: u(bmp.cdata.chunks(3).map!(a=> 0xFF000000 | a[0] | (a[1]<<8) | (a[2]<<16)).array); break;
-      case 4: u(bmp.cdata); break;
-      default: enforce(0, "Bitmap incompatible with texture "~bmp.text);
+      upload(img.impl, x, y, sx, sy, img.stride);
     }
   }
 
-+/
+  void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min){
+    switch(type){
+      case GLTextureType.L8   : upload(bmp.get!ubyte, x, y, sx,sy); break;
+      case GLTextureType.RGBA8: upload(bmp.get!RGBA , x, y, sx,sy); break;
+      default: raise("unhandled texture type: "~type.text);
+    }
+  }
 
+  // specual uploads for textures holding sequential data. Consider using 1D textures in the future?
   void uploadRows(const(void)[] data, int startRow, int numRows){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     upload(data, 0, startRow, width, numRows);
   }
@@ -1686,6 +1676,35 @@ writeln("convEnd");
     upload(data, 0, y, cast(int)data.length/ts, 1); //last row
   }
 
+
+  // download a subrect from the texture. It's unsafe with the format!
+  auto downloadImage(T)(int x=0, int y=0, int xs=int.min, int ys=int.min){
+    enforceType!T;
+
+    if(!prepareInputRect(x, y, xs, ys))
+      return image2D(0, 0, T.init); //nothing to copy
+
+    auto img = image2D(size, T(0)); //!!! only for 8 bit
+    checkBinding;
+    gl.pixelStore(GL_UNPACK_ROW_LENGTH, 0);
+    gl.getTexImage(GL_TEXTURE_2D, 0, GL_FORMAT(type), GL_DATATYPE(type), img.asArray);
+
+    // note: there is no such thing as glGetTexSubimage2D(), sigh...
+    if(ivec2(xs, ys) != size)
+      img = img[x..x+xs, y..y+ys]; // subrect emulation. Fucking ineffective, had to load the whole tedture....
+
+    return img;
+  }
+
+  Bitmap downloadBitmap(int x=0, int y=0, int xs=int.min, int ys=int.min){
+    auto doit(T)(){ return new Bitmap(downloadImage!T(x, y, xs, ys)); }
+    switch(type){
+      case GLTextureType.L8     : return doit!ubyte;
+      case GLTextureType.RGBA8  : return doit!RGBA;
+      default: raise("unsupported TextureType: "~type.text); assert(0);
+    }
+  }
+
   int mipmapLevels() const{ return mipmapEnabled ? 1 : 1; } //todo: mipmaps
 
   void resize(int xs, int ys, bool preserve=true){
@@ -1695,7 +1714,7 @@ writeln("convEnd");
     enforce(xs.inRange(1, maxs) && ys.inRange(1, maxs), "Out of range");
 
     Bitmap bmp;
-    if(preserve) bmp = download(0, 0, min(xs, width ), min(ys, height));
+    if(preserve) bmp = downloadBitmap(0, 0, min(xs, width ), min(ys, height));
 
     checkBinding;
     width_ = xs; height_ = ys; mipmapBuilt = false;
@@ -1988,11 +2007,13 @@ TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZer
 
 /// GLWindow class //////////////////////////////////////////////////////////////////////////
 
+// temporarily disabled parts are marked with /+
+
 class GLWindow: Window{
 private:
   HGLRC frc;
 
-  Drawing dr, drGUI;
+/+  Drawing dr, drGUI; +/
   View2D view;
   MouseState mouse;
   private View2D viewGUI_;
@@ -2080,10 +2101,10 @@ protected:
     createRenderingContext;
 
     //init drawing, view, mouse
-    dr = new Drawing;
-    drGUI  = new Drawing;
-    view = View2D(this);  view.centerCorrection = true;
-    viewGUI_ = View2D(this);
+/+    dr = new Drawing;
+    drGUI  = new Drawing; +/
+    view.owner = this;  view.centerCorrection = true;
+    viewGUI_.owner = this;
     mouse = new MouseState;
   }
 
@@ -2102,15 +2123,15 @@ protected:
   override void onInitialZoomAll(){
     //called right after onCreate
     //todo: tryInitialZoom should work with the registry also
-    if(!view.workArea.isNull){ //workarea already set
+    if(!view.workArea.empty){ //workarea already set
       view.zoomAll_immediate;
       return;
     }
 
-    if(view.workArea.isNull && !dr.getBounds.isNull){ //get the workarea from the drawing
+/+    if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
       view.workArea = dr.getBounds;
       view.zoomAll_immediate;
-    }
+    } +/
   }
 
   override void onMouseUpdate(){
@@ -2124,14 +2145,14 @@ protected:
       shift  = k("Shift");
       alt    = k("Alt"  );
       ctrl   = k("Ctrl" );
-      screen = vRound(screenToClient(inputs.mouseAct));
-      world  = view.invTrans(screen.toF);
-      wheel  = iround(inputs["MW"].delta);
+      screen = screenToClient(inputs.mouseAct).iround;
+      world  = view.invTrans(vec2(screen));
+      wheel  = inputs["MW"].delta.iround;
     }
     mouse._updateInternal(a);
 
     mouse.screenRect = clientBounds;
-    mouse.worldRect = Bounds2f(view.invTrans(mouse.screenRect.topLeft.toF), view.invTrans(mouse.screenRect.bottomRight.toF));
+    mouse.worldRect = bounds2(view.invTrans(vec2(mouse.screenRect.topLeft)), view.invTrans(vec2(mouse.screenRect.bottomRight)));
   }
 
   override void onUpdateViewAnimation(){
@@ -2149,12 +2170,12 @@ public:
     super.onBeginPaint;
     onWglMakeCurrent(true);
 
-    dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not.
+/+    dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not. +/
 
     with(clientRect) gl.viewport(left, top, right-left, bottom-top);
     gl.disable(GL_DEPTH_TEST); //no zbuffering by default
 
-    textures.update; //upload pending textures.
+/+    textures.update; //upload pending textures.  +/
   }
 
   override void onPaint()
@@ -2169,14 +2190,14 @@ public:
   override void onEndPaint(){
     if(chkClear(view._mustZoomAll)) view.zoomAll;
 
-    if(!dr.drawCnt){
+/+    if(!dr.drawCnt){
       if(!firstPaint) tryInitialZoomAll; //if dr has a painting
       dr.glDraw(view   );
     }
     if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
 
     lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
-    lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);
+    lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);  +/
 
     firstPaint = true;
   }
@@ -2192,7 +2213,7 @@ public:
     super.onEndPaint;
   }
 
-  void drawFpsTimeLine(Drawing dr){
+  /+void drawFpsTimeLine(Drawing dr){
     with(dr){
       //FPS graph
       translate(vec2(0, 64+4));
@@ -2243,5 +2264,6 @@ public:
       pop;
 
     }
-  }
+  } +/
+
 }
