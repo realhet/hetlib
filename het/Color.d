@@ -5,6 +5,44 @@ import het.utils;
 auto floatToRgb(T, int N)(in Vector!(T, N) x)  if(is(T == float)) { return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255));  }
 auto rgbToFloat(T, int N)(in Vector!(T, N) x)  if(is(T == ubyte)) { return x * (1.0f/255);                                }
 
+/// changes/converts the ComponentType of a color  support float and ubyte, ignores others.
+auto convertPixelComponentType(CT, A)(auto ref A a){
+  alias ST = ScalarType!A;
+
+       static if(is(ST == ubyte) && is(CT == float)) return a.generateVector!(CT, a => a * (1.0f/255));
+  else static if(is(ST == float) && is(CT == ubyte)) return a.generateVector!(CT, a => a * 255       );
+  else                                               return a.generateVector!(CT, a => a             );
+}
+
+/// converts between different number of color components
+auto convertPixelChannels(int DstLen, A)(auto ref A a){
+  alias SrcLen = VectorLength!A,
+        T      = ScalarType  !A,
+        VT     = Vector!(T, DstLen);
+  //              Src: L              LA        RGB       RGBA         Dst:
+  immutable table = [["a          ", "a.r   ", "a.l   ", "a.l  "],  // L
+                     ["VT(a,*)    ", "a     ", "a.l1  ", "a.la "],  // LA
+                     ["VT(a,a,a)  ", "a.rrr ", "a     ", "a.rgb"],  // RGB
+                     ["VT(a,a,a,*)", "a.rrrg", "a.rgb1", "a    "]]; // RGBA
+
+  enum one = is(T==ubyte) ? "255" : "1"; // * : ubyte alpha, and float alpha is different!!!
+
+  static foreach(i; 1..5) static if(DstLen == i)
+    static foreach(j; 1..5) static if(SrcLen == j)
+      return mixin(table[i-1][j-1].replace("*", one));
+
+  static assert(VectorLength!(typeof(return)) == DstLen, "DstLen mismatch");
+}
+
+// converts a color to another color type (different channels and type)
+auto convertPixel(B, A)(auto ref A a){
+  alias DstType = ScalarType  !B,
+        DstLen  = VectorLength!B;
+
+  return a.convertPixelComponentType!DstType     // 2 step conversion: type and channels
+          .convertPixelChannels!DstLen;
+}
+
 auto hsvToRgb(A)(in A val) if(isColor!A){
   static if(A.length==4){
     return A(val.rgb.hsvToRgb, val.a); // preserve alpha
@@ -44,6 +82,7 @@ char toGrayscaleAscii(float luma){
   immutable charMap = " .:-=+*#%@";
   return charMap[luma.quantize!(charMap.length)];
 }
+
 
 
 // RGB formats ////////////////////////////////////////////////
@@ -626,7 +665,7 @@ class ColorMap{
 
   T[] toArray(T=RGB)(int len){
     float invLen = 1.0f/max(len-1, 1);
-    return iota(len).map!(i => eval(i*invLen).to!T).array;
+    return iota(len).map!(i => eval(i*invLen).convertPixel!T).array;
   }
 }
 

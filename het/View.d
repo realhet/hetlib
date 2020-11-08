@@ -9,11 +9,11 @@ private:
         m_scale = 1, m_invScale = 1; //1 -> 1unit = pixel on screen
 
   float m_logScale_anim = 0;
-  V2f m_origin_anim = V2f.Null;
+  vec2 m_origin_anim;
 
   bool animStarted;
 public:
-  V2f origin = V2f.Null;
+  vec2 origin;
 
   @property{ float logScale() const { return m_logScale; }  void  logScale(float s){ m_logScale = s; m_scale = pow(2, logScale); m_invScale = 1/scale; }  }
   @property{ float scale   () const { return m_scale;    }  void  scale   (float s){ logScale = log2(s); }                                                }
@@ -23,38 +23,38 @@ public:
   auto origin_anim()  const { return m_origin_anim; }
   auto scale_anim()   const { return pow(2, m_logScale_anim); }
 
-  private Bounds2f workArea_;
+  private bounds2 workArea_;
   @property{
     auto workArea() const { return workArea_; }
-    void workArea(const Bounds2f b) { workArea_ = b; }
-    void workArea(const Bounds2i b) { workArea_ = b.toF; } //that's retarded, Bounds2f should accept Bounds2i
+    void workArea(const bounds2  b) { workArea_ = b; }
+    void workArea(const ibounds2 b) { workArea_ = bounds2(b); }
   }
 
-  auto subScreenArea = Bounds2f(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
+  auto subScreenArea = bounds2(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
 
   @disable this();
   this(Window owner) {
     this.owner = owner;
   }
 
-  V2f clientSize()                { return owner.clientSize.toF; }
-  V2f clientSizeHalf()            { return clientSize*0.5; } //floor because otherwise it would make aliasing in the center of the view
+  vec2 clientSize()                { return vec2(owner.clientSize); }
+  vec2 clientSizeHalf()            { return clientSize*0.5f; } //floor because otherwise it would make aliasing in the center of the view
 
-  Bounds2f visibleArea(bool animated = true)
+  bounds2 visibleArea(bool animated = true)
   {
-    V2f mi = invTrans(V2f(0,0), animated),
-        ma = invTrans(clientSize, animated);
-    return Bounds2f(mi, ma, true);
+    vec2 mi = invTrans(vec2(0)   , animated),
+         ma = invTrans(clientSize, animated);
+    return bounds2(mi, ma).sorted;
   }
 
   bool centerCorrection; //it is needed for center aligned images. Prevents aliasing effect on odd client widths/heights.
 
   auto getOrigin(bool animated){
-    V2f res = animated ? origin_anim : origin;
+    vec2 res = animated ? origin_anim : origin;
     if(centerCorrection){
       with(clientSize){
-        if(x.iround&1) res.x += 0.5/getScale(animated);  //opt:fucking slow, need to be cached
-        if(y.iround&1) res.y += 0.5/getScale(animated);
+        if(x.iround&1) res.x += 0.5f/getScale(animated);  //opt:fucking slow, need to be cached
+        if(y.iround&1) res.y += 0.5f/getScale(animated);
       }
     }
     return res;
@@ -65,32 +65,32 @@ public:
   }
 
   //todo: make this transformation cached and fast!
-  V2f trans(const V2f world, bool animated=true)     { return ((world-getOrigin(animated))*getScale(animated)+clientSizeHalf); }  //opt: fucking slow, need to be cached
-  V2f invTrans(const V2f client, bool animated=true) { return (client-clientSizeHalf)/getScale(animated) + getOrigin(animated); }
+  vec2 trans(in vec2 world, bool animated=true)     { return ((world-getOrigin(animated))*getScale(animated)+clientSizeHalf); }  //opt: fucking slow, need to be cached
+  vec2 invTrans(in vec2 client, bool animated=true) { return (client-clientSizeHalf)/getScale(animated) + getOrigin(animated); }
 
-  V2f mouseAct()                { return owner.screenToClient(inputs.mouseAct); }
+  vec2 mouseAct()                { return owner.screenToClient(inputs.mouseAct); }
 
   //Scroll/Zoom User controls
   bool scrollSlower;       //also affects zoom
   float scrollRate() const      { return scrollSlower ? 0.125f : 1; }
 
-  void scroll(const V2f delta)  { origin -= delta*(scrollRate*invScale); }
-  void scrollH(float delta)     { scroll(V2f(delta, 0)); }
-  void scrollV(float delta)     { scroll(V2f(0, delta)); }
+  void scroll(in vec2 delta)    { origin -= delta*(scrollRate*invScale); }
+  void scrollH(float delta)     { scroll(vec2(delta, 0)); }
+  void scrollV(float delta)     { scroll(vec2(0, delta)); }
 
   void zoom(float amount)       { scale = pow(2, log2(scale)+amount*scrollRate); }
 
-  void zoomBounds(const Bounds2f bb, float overZoomPercent = 3){
+  void zoomBounds(in bounds2 bb, float overZoomPercent = 3){
     if(!bb.valid || !subScreenArea.valid) return;
     //corrigate according to subScreenArea
     auto realClientSize = clientSize * subScreenArea.size; //in pixels
-    auto subScreenShift = clientSize * (subScreenArea.center - V2f(.5, .5)); //in pixels
+    auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
 
     origin = bb.center;
     auto s = bb.size;
     //maximize(s.x, .001f); maximize(s.y, .001f);
     auto sc = realClientSize/bb.size;
-    scale = min(sc.x, sc.y)*(1 - overZoomPercent*.01); //overzoom a bit
+    scale = min(sc.x, sc.y)*(1 - overZoomPercent*.01f); //overzoom a bit
 
     //corrigate according to subScreenArea: shift
     origin -= subScreenShift * invScale;
@@ -107,7 +107,7 @@ public:
     skipAnimation;
   }
 
-  void zoomAround(const V2f point, float amount) {
+  void zoomAround(in vec2 point, float amount) {  //todo: the zoom and the translation amount is not proportional. Fast zooming to the side looks bad. Zoom in center is ok.
     if(!amount) return;
     auto sh = point-clientSizeHalf;
     origin += sh*invScale;

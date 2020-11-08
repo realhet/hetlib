@@ -288,7 +288,7 @@ if(N.inRange(2, 4))
   }
 
   @property void l(A)(in A x){
-    r = x;
+    r = cast(CT)x;
     static if(N>=3){
       g = r;
       b = r;
@@ -1557,21 +1557,23 @@ struct Bounds(VT){
   enum Null = Bounds!VT.init;
 
   this(A...)(in A a){
+    alias CT = ComponentType;
+
     static if(A.length==0){
       //default invalid bounds
     }else static if(A.length==1 && isBounds!(A[0])){ //another Bounds
-      static assert(VectorLength == A[0].VectorLength, "dimension mismatch");
+      static assert(VectorLength == A[0].VectorLength, "dimension mismatch "~VectorLength.text~" != "~A[0].VectorLength.text);
       low  = a[0].low ;
       high = a[0].high;
     }else static if(A.length==2){ //2 vectors or scalars
       low  = a[0];
       high = a[1];
     }else static if(A.length==4 && VectorLength==2){ // 4 scalars
-      low [0] = a[0]; low [1] = a[1];
-      high[0] = a[2]; high[1] = a[3];
+      low [0] = cast(CT)a[0]; low [1] = cast(CT)a[1];             //cast is needed to be able to pass foreach index variables (long)
+      high[0] = cast(CT)a[2]; high[1] = cast(CT)a[3];
     }else static if(A.length==6 && VectorLength==3){ // 6 scalars
-      low [0] = a[0]; low [1] = a[1]; low [2] = a[2];
-      high[0] = a[3]; high[1] = a[4]; high[2] = a[5];
+      low [0] = cast(CT)a[0]; low [1] = cast(CT)a[1]; low [2] = cast(CT)a[2];
+      high[0] = cast(CT)a[3]; high[1] = cast(CT)a[4]; high[2] = cast(CT)a[5];
     }else{
       static assert(0, "invalid arguments");
     }
@@ -1961,6 +1963,8 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     impl.length = size[].product;
   }
 
+  bool empty(){ return size.lessThanEqual(0).any; }
+
   auto toString() const{
     static if(N==1) return format!"image1D(%s)"(impl);
     else static if(N==2) return "image2D([\n" ~ rows.map!(r => "  " ~ r.text).join(",\n") ~ "\n])";
@@ -2001,8 +2005,11 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
   }
 
   // Index a single element, e.g., arr[0, 1]
-  ref E opIndex(int i, int j) { return impl[i + stride*j]; }
-  E opIndex(int i, int j) const { return impl[i + stride*j]; }
+  ref E opIndex(int i, int j)       { return impl[i + stride*j]; }
+      E opIndex(int i, int j) const { return impl[i + stride*j]; }
+
+  ref E opIndex(in ivec2 p)       { return this[p.x, p.y]; }
+      E opIndex(in ivec2 p) const { return this[p.x, p.y]; }
 
   // Array slicing, e.g., arr[1..2, 1..2], arr[2, 0..$], arr[0..$, 1].
   auto opIndex(int[2] r1, int[2] r2){
@@ -2020,6 +2027,10 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
   }
   auto opIndex(int[2] r1, int j) { return opIndex(r1, [j, j+1]); }
   auto opIndex(int i, int[2] r2) { return opIndex([i, i+1], r2); }
+
+  //ivec and ibounds slicing
+  auto opIndex(in ivec2 mi, in ivec2 ma){ return opIndex([mi.x, ma.x], [mi.y, ma.y]); }
+  auto opIndex(in ibounds2 b           ){ return opIndex(b.low, b.high); }
 
   // Support for `x..y` notation in slicing operator for the given dimension.
   int[2] opSlice(size_t dim)(int start, int end) if (dim >= 0 && dim < 2)
@@ -2192,10 +2203,13 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     return result;
   }
 
-  int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
+//  int opApply(int delegate(int x, int y       ) dg)  { return myOpApply!"dg(x, y)"(dg); }  it maches 2 declarations
+//  int opApply(int delegate(ivec2 pos          ) dg)  { return myOpApply!"dg(ivec2(x, y)"(dg); }
+
+  //only able to support 1, 2 or 3 param versions.
+  int opApply(int delegate(ref E              ) dg)  { return myOpApply!"dg(impl[lineOfs+x])"(dg); }
   int opApply(int delegate(ivec2 pos   , ref E) dg)  { return myOpApply!"dg(ivec2(x, y), impl[lineOfs+x])"(dg); }
-  int opApply(int delegate(ref E) dg)                { return myOpApply!"dg(impl[lineOfs+x])"(dg); }
-  /+int opApply(int delegate(E) dg) const              { return myOpApply!"dg(impl[lineOfs+x])"(dg); }+/ //todo: Not gonna suck with constness now...
+  int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
 }
 
 

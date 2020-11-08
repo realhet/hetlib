@@ -3949,7 +3949,7 @@ Path programFilesPath() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-///  File                                                                ///
+///  File                                                                    ///
 ////////////////////////////////////////////////////////////////////////////////
 
 private bool isAbsolutePath(const string fn) { return fn.startsWith(`\\`) || fn.indexOf(`:\`)==1; }
@@ -4154,9 +4154,12 @@ public:
 }
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File fileName)if( is(T == char))                               { fileName. writeStr(cast(string)data); }
-void saveTo(T)(const T[] data, const File fileName)if(!is(T == char))                               { fileName. write(data); }
-void saveTo(T)(const T data, const File fileName)if(!isDynamicArray!T)                              { fileName .write([data]); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))                               { file. writeStr(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))                               { file. write(data); }
+void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)                              { file .write([data]); }
+
+void saveTo(T)(const T[] data, const string fileName)                                           { data.saveTo(File(fileName)); }
+void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)                        { [data].saveTo(File(fileName)); }
 
 void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))          { data = fileName.readStr(mustExists); }
 void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))          { data = cast(T[])fileName.read(mustExists); }
