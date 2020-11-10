@@ -334,7 +334,7 @@ RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen){
   static uint[16] customColors; //todo: save/load ini
   CHOOSECOLOR cc = {
     hwndOwner: hwnd,
-    rgbResult: cast(uint)(color.to!RGBA8) & 0xFFFFFF,
+    rgbResult: color.raw,
     lpCustColors: customColors.ptr,
     Flags: CC_RGBINIT | CC_ANYCOLOR | (fullOpen ? CC_FULLOPEN : 0)
   };

@@ -139,17 +139,23 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
 
-  import het.utils;
-  import het.geometry;
-  import het.color;
-  import het.bitmap;
-  import het.win;
-  import het.view;
-  import het.opengl;
-  import het.binpacker;
-  import het.megatexturing;
-  import het.fonts;
-  import het.draw2d;
+  import het.math, het.utils, het.debugclient, het.geometry, het.color, het.bitmap, het.win, het.view, het.opengl, het.binpacker, het.megatexturing,
+    het.fonts, het.draw2d, het.dialogs, het.keywords, het.tokenizer;
+
+  import het.libvlc, het.fileops, het.http, het.parser, het.stream;
+
+  dvec3 v = dvec3(1,2,3.5543234215e5);
+
+  format!"[%(%.*g, %)]"(typeof(v).ComponentType.dig, v.components).print;
+
+  v.z.to!string(15).print;
+  print(format("[%(%.7g, %)]", v.components)); //todo: ezt megcsinalni a vectorban meg a stream-ban is. Hogy megfelelo pontossaggal irja ki.
+
+  typeof(v).stringof.print;
+  v.toJson.print;
+  vec4 v2;
+  v2.fromJson(v.toJson);
+  v2.print;
 
   auto name = "brg";
   enforce(name in colorMaps);

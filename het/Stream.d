@@ -263,6 +263,8 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       else if(actToken.isKeyword(kwfalse)) data = false;
       else if(actToken.isKeyword(kwtrue)) data = true;
       else throw new ConvException(`Invalid bool value`);
+    }else static if(isVector!T){
+      streamDecode_json(state, idx, data.components);
     }else static if(isAggregateType!T     ){ // Struct, Class
 
       //handle null
@@ -445,6 +447,7 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
   }else static if(isSomeString!T        ){ st ~= quoted(data);
   }else static if(isSomeChar!T          ){ st ~= quoted([data]);
   }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
+  }else static if(isVector!T            ){ st ~= data.components.text; //todo: only 6 digit precision
   }else static if(isAggregateType!T     ){ // Struct, Class
     //handle null for class
     static if(is(T == class)){

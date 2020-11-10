@@ -2038,11 +2038,14 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     mixin("ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
           .replace("@", name).replace("#", i.text) );
 
-  this(in ivec2 size, E[] initialData = []) { //from array
+  this(in ivec2 size, E[] initialData = [], int stride=0) { //from array. stride is optional
+    if(stride<=0) stride = size.x;
+             else enforce(stride>=size.x);
+
     this.size = size;
-    stride = size.x;
+    this.stride = stride;
     impl = initialData;
-    impl.length = size[].product;
+    impl.length = stride * size.y;
   }
 
   bool empty(){ return size.lessThanEqual(0).any; }
@@ -2076,7 +2079,8 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
 
   auto dup(string op="")() const { //optional predfix op
     static if(op==""){
-      return Image!(E, N)(size, height.iota.map!(i => impl[i*stride..i*stride+width].dup).join); //todo:2D only
+      //return Image!(E, N)(size, height.iota.map!(i => impl[i*stride..i*stride+width].dup).join); //todo:2D only
+      return Image!(E, N)(size, rows.map!(r => r.dup).join); //todo:2D only
       //todo: optimize for stride==width case
       //todo: check if dup.join copies 2x or not.
     }else{

@@ -29,9 +29,9 @@ struct TestDataStruct{
   char charValue = 'C';
   bool boolvalue = true;
   MyEnum enumValue = MyEnum.Enum5;
-  @STORED V3f vect;
-  V2f[] vectArray;
-  @STORED Bounds2f bounds2d;
+  @STORED vec3 vect;
+  vec2[] vectArray;
+  @STORED bounds2 bounds2d;
   @STORED @HEX ubyte[3] ubyteStaticArray = [1, 2, 255];
   string[3][2] stringArray2D;
   float[] emptyArray1, emptyArray2;
@@ -47,7 +47,7 @@ struct TestDataStruct{
 
 void test(){
   TestDataStruct[2] data;
-  data[0].vectArray = [V2f(1,2), V2f(1,3), V2f(6,4)];
+  data[0].vectArray = [vec2(1,2), vec2(1,3), vec2(6,4)];
   data[0].class1 = new TestClass;
   data[0].class1.a = 42;
   data[1].clear;

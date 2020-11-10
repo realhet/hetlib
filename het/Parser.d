@@ -107,14 +107,14 @@ private:
   }
 
   static bool isClosingBracket(ref Token t){
-    if(t.kind!=TokenKind.Operator) return false;
+    if(t.kind!=TokenKind.operator) return false;
     switch(t.id){
       case oproundBracketClose: case opsquareBracketClose: case opcurlyBracketClose: return true;
       default: return false;
     }
   }
   static int endingBracketOf(ref Token t) {
-    if(t.kind!=TokenKind.Operator) return 0;
+    if(t.kind!=TokenKind.operator) return 0;
     switch(t.id){
       case oproundBracketOpen : return oproundBracketClose;
       case opsquareBracketOpen: return opsquareBracketClose;
@@ -330,7 +330,7 @@ private: /////////////////////////////////////////////////////////////////////
   void expectOp(int op){ if(sym.isOperator(op)) nextSym; else error(format(`"%s" expected.`, opStr(op))); }
 
   auto expectIdentifier() {
-    if(sym.kind!=TokenKind.Identifier) error("Identifier expected.");
+    if(sym.kind!=TokenKind.identifier) error("Identifier expected.");
     string s = sym.source;  nextSym;
     return s;
   }

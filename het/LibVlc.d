@@ -1,6 +1,6 @@
-module libvlc;
+module het.libvlc;
 
-import het.utils, het.image, het.geometry, core.sync.rwmutex;
+import het.utils, het.bitmap, het.geometry, core.sync.rwmutex;
 
 private:
 
@@ -102,7 +102,7 @@ public:
 
   VlcPlayer[] players;
 
-  VlcPlayer newPlayer(const string uri, const V2i size=V2i.Null){
+  VlcPlayer newPlayer(const string uri, const ivec2 size=0){
     auto p = new VlcPlayer(this, uri, size);
     players ~= p;
     return p;
@@ -119,24 +119,26 @@ private:
   enum maxWidth = 4096, //todo: memory footprint: pool is allovating 4K for all the time. pool must be locked properly with the dimensons.
        maxHeight = maxWidth*2/3;
 
-  V2i size;
+  ivec2 size;
 
 private: //resource
   ReadWriteMutex mutex;
   uint width, height;
   ubyte[] pool;
+  int counter_;
 public:
   //getters
-  int changedCnt;
 
-  bool canGet(ref Image!ubyte dst) const {
+  auto counter() const { return counter_; } //counts the accessed frames
+
+  bool canGet(ref Bitmap dst) const {
     if(uri=="" || width==0 || height==0) return false; //nothing to get
 
     //only get if dst is not in synch
-    return dst is null || dst.changedCnt!=changedCnt;
+    return dst is null || dst.counter!=counter;
   }
 
-  bool get(ref Image!ubyte dst, string components){
+  bool get(ref Bitmap dst, string components){
     if(!canGet(dst)) return false;
 
     int w = width, h = height, p = width, o = 0;
@@ -150,17 +152,18 @@ public:
       default: enforce(0, "VlcPlayer.get: invalid components: \"%s\"".format(components));
     }
 
+    if(dst is null) dst = new Bitmap;
+
     synchronized(mutex.reader){
-      dst = new Image!ubyte(null, 0, 0);
-      dst.acquire(pool[o..$], w, h, p, true);
-      dst.setChangedCnt(changedCnt);
+      dst.set(Image!(ubyte, 2)(ivec2(w, h), pool[o..$], p).dup);
+      dst.counter = counter;
     }
 
     return true;
   }
 
-  bool getY  (ref Image!ubyte dst){ return get(dst, "Y"  ); }
-  bool getYUV(ref Image!ubyte dst){ return get(dst, "YUV"); }
+  bool getY  (ref Bitmap dst){ return get(dst, "Y"  ); }
+  bool getYUV(ref Bitmap dst){ return get(dst, "YUV"); }
 
 private:
   @safe @nogc void*[3] planes () { return [&pool[0], &pool[width*height], &pool[width*height+width/2]]; }
@@ -209,12 +212,12 @@ private:
     void my_video_display_cb(void* opaque, void* picture){
       auto pl = cast(VlcPlayer)opaque;
       //writeln("my_video_display_cb ", pl.uri);
-      pl.changedCnt ++;
+      pl.counter_ ++;
     }
   }
 
 public:
-  this(VlcInstance owner, string uri, V2i size){
+  this(VlcInstance owner, string uri, ivec2 size){
     this.owner = owner;
     this.size = size;
 

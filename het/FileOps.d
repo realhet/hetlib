@@ -100,7 +100,8 @@ public:
     void clickUndo(){
       if(!canUndo) return;
       redoBuf ~= UndoRec(lastData, "");
-      lastData = takeLast(undoBuf).data;
+      lastData = undoBuf.back.data;
+      undoBuf.popBack;
       contentLoad(lastData, false);
       savedCnt--;
     }
@@ -109,7 +110,8 @@ public:
     void clickRedo(){
       if(!canRedo) return;
       undoBuf ~= UndoRec(lastData, "");
-      lastData = takeLast(redoBuf).data;
+      lastData = redoBuf.back.data;
+      redoBuf.popBack;
       contentLoad(lastData, false);
       savedCnt++;
     }

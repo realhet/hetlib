@@ -1,7 +1,6 @@
 module het.tokenizer;
 import het.utils, het.keywords, std.variant;
                                           //todo: size_t-re atallni
-
 //TEST: testTokenizer()
 
 const CompilerVersion = 100;
@@ -230,7 +229,7 @@ struct Token{ // Token //////////////////////////////
   }
 
   //shorthand
-  bool opEquals()(string s) const { return source==s; }
+  //bool opEquals(string s) const { return source==s; } //note this conflicted with the linker when importing het.parser.
 
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
