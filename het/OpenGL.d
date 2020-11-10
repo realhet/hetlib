@@ -2219,7 +2219,7 @@ public:
       translate(vec2(0, 64+4));
 
       lineWidth = 1;
-      lineStipple = lsNormal;
+      lineStyle = LineStyle.normal;
       auto groups = timeLine.getGroups;
       foreach(int idx; 1..groups.length.to!int){
         auto group = groups[idx], prevGroup = groups[idx-1];

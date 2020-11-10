@@ -38,7 +38,7 @@ Data record:
        Ax   Ay   Bx   By  Cx    Cy      Col   Typ     Dx  Dy  col2
 Point: X    Y             Siz           Col   1    //-Siz = screen_relative
 Point2:X1   Y1   X2  Y2   Siz1  Siz2    Col   2    //-Siz = screen_relative
-Line : X1   Y1   X1, Y1,  Width Stipple Col   3..3+63   //arrowStyle
+Line : X1   Y1   X1, Y1,  Width L.Style Col   3..3+63   //arrowStyle
 Rect : X1   Y1   X2, Y2,                Col   67   //Id: symbol id in texture  sc:symScale(1 = (xs, ys))
 
 Tri  : X0   Y0   X1, Y1, X2     Y2      col,  68
@@ -52,13 +52,15 @@ Text:  x0,  y0,  sf, c4,  c4,  c4,      c4 ,  69,     c4,  c4,  c4   //sf = size
 
 //Todo: Appendert kell hasznalni!
 
-//Standard LineStipples
-enum lsNormal=0,
-     lsDot=2,
-     lsDash=19,
-     lsDashDot=29,
-     lsDash2=35,
-     lsDashDot2=44;
+//Standard LineStyles
+enum LineStyle {
+  normal        =  0,
+  dot           =  2,
+  dash          = 19,
+  dashDot       = 29,
+  dash2         = 35,
+  dashDot2      = 44
+}
 
 //these are also used in ui.d
 enum HAlign { left, center, right, justify }  //when the container width is fixed
@@ -137,8 +139,6 @@ struct RectAlign{align(1): import std.bitmanip;
   }
 
 }
-
-immutable LineStipples = [lsNormal, lsDot, lsDash, lsDashDot, lsDash2, lsDashDot2]; //Todo: ez jobb delphiben, erre kene vmit kitalalni...
 
 struct ArrowStyle {
   int headArrow, tailArrow; //1:arrow, 2:bar
@@ -225,7 +225,7 @@ class Drawing {
     uint alpha = 0xFF000000;
     float  pointSize = -1,
            lineWidth = -1;
-    int lineStipple = 0;
+    LineStyle lineStyle;
     auto arrowSize = vec2(8, 2.5);
     ArrowStyle arrowStyle = asNoArrow;
 
@@ -262,7 +262,7 @@ class Drawing {
 
   ref float pointSize()         { return actState.pointSize; }
   ref float lineWidth()         { return actState.lineWidth; }
-  ref int lineStipple()         { return actState.lineStipple; }
+  ref int lineStyle()           { return actState.lineStyle; }
 
   ref arrowSize()  { return actState.arrowSize;  }
   ref arrowStyle() { return actState.arrowStyle; }
@@ -471,7 +471,7 @@ class Drawing {
     vec2 p = inputTransform(p_);
     markDirty;
     auto c = realDrawColor, w = lineWidth;
-    append(DrawingObj(3+actState.arrowStyle.encode, lineCursor, p, vec2(w, lineStipple), c));
+    append(DrawingObj(3+actState.arrowStyle.encode, lineCursor, p, vec2(w, lineStyle), c));
     lineCursor = p;
   }
   void lineTo(in vec2 p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
@@ -667,8 +667,9 @@ class Drawing {
 
 // gridLines ////////////////////////////////////////////////////
 
-  void gridLines(ref View2D view, float dist, RGB color=clGray, float width=-1, int stipple=0, string hv = "hv")
+  void gridLines(ref View2D view, float dist, RGB color=clGray, float width=-1, LineStyle style = LineStyle.normal, string hv = "hv")
   {
+    //todo: this is not working with translate()
     auto horz = hv.canFind('h'), vert = hv.canFind('v');
     if(!horz && !vert) return;
 
@@ -676,7 +677,7 @@ class Drawing {
 
     this.color = color;
     lineWidth = width;
-    lineStipple = stipple;
+    lineStyle = style;
 
     auto vis = view.visibleArea;
     vis.low  = (vis.low /dist-vec2(1,1)).floor*dist;
@@ -744,7 +745,7 @@ class Drawing {
 
     auto scale = fontHeight*(1.0f/40);         //todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
     lineWidth = 3*scale*fontWeight;
-    lineStipple = 0;
+    lineStyle = LineStyle.normal;
 
     //align
     with(HAlign) if(align_!=left){
@@ -838,14 +839,13 @@ class Drawing {
     import std.traits;
     lineWidth = 1;
     moveTo(0, 50);
-    foreach (ls; LineStipples){
-      lineStipple = ls;
+    foreach (ls; EnumMembers!LineStyle){
+      lineStyle = ls;
       lineRel(200, 0);  moveRel(-200, 10);
     }
-    lineStipple = 0;
+    lineStyle = LineStyle.normal;
 
     lineWidth = 2;
-    lineStipple = 0;
     color = clYellow;
     drawRect(-10, -10, 210, 110);
   }

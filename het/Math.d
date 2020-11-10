@@ -43,8 +43,21 @@ import std.stdio : write, writeln;
 private enum approxEqualDefaultDiff = 1e-3f;
 
 //todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
+
+/// myTo: scalar conversion used in smart-constructors
 alias myto(T) = stdto!T;
 //auto myto(T)(in T a){ return cast(T) a; }
+
+/// converts numbers to text, includes all the digits stored in the original type.
+string text_precise(T)(in T a){
+  static if(isFloatingPoint!T){
+    //note: Dlang .dig property reports less digits than actually needed to cover all mantissa bits.
+    static if(is(Unqual!T == float )) return a.format!"%.8g";
+                                 else return a.format!"%.17g";
+  }else static if(isIntegral!T){
+    return a.text;
+  }else static assert(0, "invalid type");
+}
 
 private enum swizzleRegs = ["xyzw", "rgba", "stpq"];
 

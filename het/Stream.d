@@ -264,7 +264,9 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       else if(actToken.isKeyword(kwtrue)) data = true;
       else throw new ConvException(`Invalid bool value`);
     }else static if(isVector!T){
-      streamDecode_json(state, idx, data.components);
+      streamDecode_json(state, idx, data.components); //just forward reading the field: Vector.components
+    }else static if(isMatrix!T){
+      streamDecode_json(state, idx, data.columns); //just forward it to its internal array
     }else static if(isAggregateType!T     ){ // Struct, Class
 
       //handle null
@@ -441,13 +443,14 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
     st ~= quoted(thisName)~(dense ? ":" : ": ");
 
   //switch all possible types
-        static if(isFloatingPoint!T     ){ static if(T.sizeof>=8) st ~= format!"%.15g"(data); else st ~= format!"%.7g" (data);
+        static if(isFloatingPoint!T     ){ st ~= data.text_precise;
   }else static if(is(T == enum)         ){ st ~= quoted(data.text);
   }else static if(isIntegral!T          ){ if(hex) st ~= format!"0x%X"(data); else st ~= data.text;
   }else static if(isSomeString!T        ){ st ~= quoted(data);
   }else static if(isSomeChar!T          ){ st ~= quoted([data]);
   }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
-  }else static if(isVector!T            ){ st ~= data.components.text; //todo: only 6 digit precision
+  }else static if(isVector!T            ){ streamAppend_json(st, data.components, dense || false, hex, "", indent);
+  }else static if(isMatrix!T            ){ streamAppend_json(st, data.columns   , dense || false, hex, "", indent);
   }else static if(isAggregateType!T     ){ // Struct, Class
     //handle null for class
     static if(is(T == class)){

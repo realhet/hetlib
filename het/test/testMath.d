@@ -144,18 +144,24 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
 
   import het.libvlc, het.fileops, het.http, het.parser, het.stream;
 
-  dvec3 v = dvec3(1,2,3.5543234215e5);
+  // check the precision of vectors
+  foreach(T; AliasSeq!(float, double, real)){
+    auto v = vec3(1,2,3)*T(PI);
+    auto s = v.toJson;
+    Vector!(T, 3) v2; v2.fromJson(s);
+    print(v, s, v2);
+    assert(v2 == v);
+  }
 
-  format!"[%(%.*g, %)]"(typeof(v).ComponentType.dig, v.components).print;
+  [[1,2],[3,4],[5,6]].toJson(true).print;
+  auto sm = mat3x2(1,2,3,4,5,6).toJson; //bug here!!!
+  mat3x2 m2;
+  m2.fromJson(sm);
+  print(sm, m2);
 
-  v.z.to!string(15).print;
-  print(format("[%(%.7g, %)]", v.components)); //todo: ezt megcsinalni a vectorban meg a stream-ban is. Hogy megfelelo pontossaggal irja ki.
 
-  typeof(v).stringof.print;
-  v.toJson.print;
-  vec4 v2;
-  v2.fromJson(v.toJson);
-  v2.print;
+readln;
+application.exit;
 
   auto name = "brg";
   enforce(name in colorMaps);

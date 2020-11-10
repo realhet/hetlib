@@ -128,6 +128,8 @@ class FrmClock: GLWindow{
       drawHand(   60, 60);
       drawHand(60*60, 12);
       drawHand(    1, 60);
+
+      debugDrawings(view);
     }
 
   }
