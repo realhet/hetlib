@@ -1,5 +1,7 @@
 module het.math;
 
+//todo: vec2 lvalue-be lehessen assignolni ivec2 rvalue-t!
+
 // This module replaces and extends the interface of std.math.
 // Anything usefull in std.math should wrapped here to support vector/scalar operations.
 // This is to ensure, that there will be no conflicting orevload sets between this module and std.math.
@@ -159,7 +161,12 @@ if(N.inRange(2, 4))
                         ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "vec" ~ N.stringof
                                                           : VectorType.stringof;
 
-  CT[N] components = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
+  static if(isFloatingPoint!CT){
+    CT[N] components = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
+  }else{
+    CT[N] components;
+  }
+
   enum length = N;
 
   alias components this;
@@ -653,6 +660,19 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
       if(abs(this[i][j]-other[i][j]) > maxDiff) return false;  //todo: verify abs
     return true;
   }
+
+  // create special matrices
+
+  static if(N==2 && M==2){
+
+    static auto rotation(CommonType!(CT, float) rad){
+      auto c = cos(rad), s = sin(rad);
+      return MatrixType(c, s, -s, c);
+    }
+
+    static auto rotation90 ()   { return MatrixType(0, -1, 1, 0); }
+    static auto rotation270()   { return MatrixType(0, 1, 0, -1); }
+  }
 }
 
 private alias matrixElementTypes = AliasSeq!(float, double);
@@ -948,7 +968,7 @@ auto min(T...)(in T args){ //note: std.algorithm.min is (T t)
   }else static if(anyVector!T){
     static if(T.length==2) return minMax!1(args[0], args[1]);
                       else return min(min(args[0..$-1]), args[$-1]);
-  }else return std.algorithm.min(args);
+  }else return cast()std.algorithm.min(args);
 }
 
 auto max(T...)(in T args){ //note: std.algorithm.max is (T t)
@@ -957,7 +977,7 @@ auto max(T...)(in T args){ //note: std.algorithm.max is (T t)
   }else static if(anyVector!T){
     static if(T.length==2) return minMax!0(args[0], args[1]);
                       else return max(max(args[0..$-1]), args[$-1]);
-  }else return std.algorithm.max(args);
+  }else return cast()std.algorithm.max(args);
 }
 
 bool minimize(A, B)(ref A a, in B b) { const n = min(a, b), res = a != n; a = n; return res; }
@@ -1370,6 +1390,16 @@ auto minorVector(int i, T, int N)(in Vector!(T, N) v){
 }
 
 
+// 2D rotation
+
+auto rotate(T, U)(in Vector!(T, 2) v, U rad) {
+  auto m = Matrix!(T, 2, 2).rotation(rad);
+  return m * v;
+}
+
+auto rotate90 (T)(in Vector!(T, 2) v) { return v.Yx; }
+auto rotate270(T)(in Vector!(T, 2) v) { return v.yX; }  //todo: unittest this with mat2.rotation270*v
+
 private void unittest_GeometricFunctions(){
   // length()
   auto v = [vec2(1,2), vec2(-2, -1), vec2(5, 0)];
@@ -1600,7 +1630,7 @@ template CommonBoundsType(A...){
 }
 
 struct Bounds(VT){
-  VT low = 0, high = -1;
+  VT low = 0, high = -1; // A bounds is invalid when high<low. And empty when high==low. The extend operator '|' handles these cases accordingly.
 
   alias BoundsType = typeof(this);
   alias ComponentType = ScalarType!VT;
@@ -1695,8 +1725,8 @@ struct Bounds(VT){
     static if(op=="|"){ // extend with other bounds
       static if(isBounds!T){
         return other.valid ? this | other.low | other.high
-                           : typeof(this | other.low).init;
-      }static if(isInputRange!T){ //extend to array elements
+                           : this;
+      }else static if(isInputRange!T){ //extend to array elements
         Unqual!(typeof(this)) bnd = this;
         other.each!(a => bnd|=a); //opt: can be optimized for valid() checking
         return bnd;

@@ -2,6 +2,8 @@ module het.binpacker;
 
 import het.utils, het.geometry;
 
+import het.draw2d; //for testing only
+
 /* 2D MaxRects Bin Packer
 
 Copyright (c) 2017 Shen Yiming
@@ -41,7 +43,7 @@ class Rectangle{
 
   int area() const { return this.width * this.height; }
 
-  auto bounds() const { return Bounds2i(x, y, x+width, y+height); }
+  auto bounds() const { return ibounds2(x, y, x+width, y+height); }
 
   bool collide(Rectangle rect){ //intersection.area > 0
     return !(rect.x >= this.x + this.width || rect.x + rect.width <= this.x ||
@@ -286,14 +288,14 @@ public:
     import het.draw2d;
 
     auto mrb = new MaxRectsBin(0, 0, 1024, 1024);
-    V2i[] adds = [{1,1}, {2,2}, {7,3}, {3,7}, {1,1}, {1,1}];
+    ivec2[] adds = [ivec2(1,1), ivec2(2,2), ivec2(7,3), ivec2(3,7), ivec2(1,1), ivec2(1,1)];
 
     RNG rng; rng.seed = 123;
     foreach(i; 0..60)
-      adds ~= V2i(rng.random(24)+1,rng.random(8)+1);
+      adds ~= ivec2(rng.random(24)+1,rng.random(8)+1);
 
     foreach(i; 0..550)
-      adds ~= V2i(rng.random(2)+1,rng.random(2)+1);
+      adds ~= ivec2(rng.random(2)+1,rng.random(2)+1);
 
     foreach(i, a; adds){
       mrb.add(a.x, a.y);
@@ -307,7 +309,7 @@ public:
 
         foreach(r; mrb.freeRects){
           dr.color = clGray;
-          dr.drawRect(r.bounds.toF.inflated(-0.125));
+          dr.drawRect(bounds2(r.bounds).inflated(-0.125));
         }
 
         dr.color = clWhite;  dr.drawRect(0, 0, mrb.width, mrb.height);

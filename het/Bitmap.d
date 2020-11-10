@@ -756,6 +756,7 @@ public:
 
   @property width   () const{ return width_   ; }
   @property height  () const{ return height_  ; }
+  @property size    () const{ return ivec2(width, height); }
   @property channels() const{ return channels_; }
   @property type    () const{ return type_    ; }
 

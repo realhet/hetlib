@@ -2,8 +2,8 @@
 //@import c:\d\libs
 //@ldc
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-//@release
-///@debug
+///@release
+//@debug
 
 //todo: ez nem megy 64 biten
 
@@ -15,41 +15,23 @@ import het; //publicly imports all the other necessary modules (win, geometry, u
 class FrmClock: GLWindow{
   mixin autoCreate; //automatically creates an instance of this window at startup
 
-  Drawing drClockFace;
+//  Drawing drClockFace;
   double seconds = 0; //this value will smoothly follow the actual SecondOfDay value.
                       //It counts the seconds since around 1900.01.01
 
   const rClock = 100, rBig = 90, rSmall = 60; //some constants
 
-  V2f clockPoint(float a, float r){ //returns a point on the clock. a==1 -> 360deg
-    return vRot(-V2f.axis(1), a*PI*2)*r;
+  auto clockPoint(float a, float r){ //returns a point on the clock. a==1 -> 360deg
+    return rotate(-vec2.basis(1), a*PI*2)*r;
   }
 
   override void onCreate(){
-    //draw the static clock face
-    with(drClockFace){
-      circle(0, 0, rClock*1.08);
-      foreach(i; 0..60){
-        V2f p = clockPoint(i/60.0, rClock); //calculate the point
-        if(i%5){ //Draw the small lines
-          color = clWhite;  lineWidth = 1;  line(p*1.04, p*0.96);
-        }else{ //Draw the points at every 5 seconds
-          color = clWhite;  pointSize = 8;  point(p);
-          color = clLime;   pointSize = 4;  point(p);
-        }
-      }
-    }
-
-    //set the view focus on the clock.
-    view.workArea = drClockFace.getBounds;
-    view.zoomAll;
-
-    seconds = iTrunc(QPS); //initialize the secondOfDay
+    seconds = itrunc(QPS); //initialize the secondOfDay
   }
 
   override void onUpdate(){
     //update the clock
-    if(follow(seconds, iTrunc(QPS), 0.1, 0.01)){
+    if(follow(seconds, itrunc(QPS), 0.1, 0.01)){
       //follow() is LERP-ing the value of 'seconds' towards rounded QPS.
       //         The lerp parameter is 0.1, and if the value reaches within 0.01
       //         range it will snap to it, and returning with false.
@@ -61,24 +43,35 @@ class FrmClock: GLWindow{
     }
 
     //update the 2D view
-    updateView(true, true);  //View has a smooth pan/zoom featue, it must be updated
+    view.navigate(true, true);  //View has a smooth pan/zoom featue, it must be updated
     //Also then the parameter is true, you can navigate in the view with the middle mouse, and with ASDW keys
 
     //Demonstrating how to add a keyboard action.
     with(actions){
       group("Common controls");
-      onPressed("Close window", "Alt X|Ctrl Q", { destroy; } );
+      onPressed("Close window", "Alt+X Ctrl+Q", true, { destroy; } );  // alt+X bugos! Az alt-nal mar bejelez, nem varja meg az X-et.
     }
   }
 
   override void onPaint(){ //the paint event
-    gl.clearColor(clBlack);  gl.clear(GL_COLOR_BUFFER_BIT);
+    gl.disable(GL_DEPTH_TEST);
 
-    //draw the static clockFace.
-    drClockFace.glDraw(view);
+    dr.clear(clBlack); drGUI.clear;
 
-    //draw the dynamic things
-    Drawing drClockHands;  with(drClockHands){
+    //draw the static clock face
+    with(dr){
+      circle(0, 0, rClock*1.08);
+      foreach(i; 0..60){
+        auto p = clockPoint(i/60.0, rClock); //calculate the point
+        if(i%5){ //Draw the small lines
+          color = clWhite;  lineWidth = 1;  line(p*1.04f, p*0.96f);
+        }else{ //Draw the points at every 5 seconds
+          color = clWhite;  pointSize = 8;  point(p);
+          color = clLime;   pointSize = 4;  point(p);
+        }
+      }
+
+      //draw the dynamic things
                        // :  9   8   7   6   5   4   3   2   1   0
       immutable font = [0b0_111_111_111_111_111_101_111_111_001_111,
                         0b1_101_101_001_100_100_101_001_001_001_101,
@@ -89,8 +82,8 @@ class FrmClock: GLWindow{
       void drawDigitColumn(float x, int fontCol){ //Draws one column from the font[]
         foreach(y, mask; font){
           color = (mask>>fontCol)&1 ? clYellow : RGB(0x404040);
-          auto p = V2f(x-8, y+4.5)*6; //digit positioning and spacing
-          foreach(xx; 0..2) foreach(yy; 0..2) point(p+V2f(xx, yy)*3); //Each pixel is a 2x2 led matrix
+          auto p = vec2(x-8, y+4.5)*6; //digit positioning and spacing
+          foreach(xx; 0..2) foreach(yy; 0..2) point(p+vec2(xx, yy)*3); //Each pixel is a 2x2 led matrix
         }
       }
 
@@ -102,7 +95,7 @@ class FrmClock: GLWindow{
         drawDigitColumn(x+3, 31); //empty column at the end
       }
 
-      auto secs = iFloor(seconds);
+      auto secs = seconds.ifloor;
 
       foreach(idx, ch; format("%.2d%.2d", secs/60/60%24, secs/60%60))
         drawDigit([0, 4, 9, 13][idx], ch); //display the four digits at specific positions
@@ -111,7 +104,7 @@ class FrmClock: GLWindow{
 
       //function to draw a specific clock hand
       void drawHand(int div, int mod){
-        V2f dir = clockPoint((cast(float)seconds/div%mod)/mod, 1);
+        vec2 dir = clockPoint((cast(float)seconds/div%mod)/mod, 1);
 
         //decide the color and the width
         if(div==1){ color = clRed;   lineWidth = 4; }
@@ -136,8 +129,8 @@ class FrmClock: GLWindow{
       drawHand(60*60, 12);
       drawHand(    1, 60);
     }
-    //draw it on the actual window
-    drClockHands.glDraw(view);
+
   }
+
 }
 

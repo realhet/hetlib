@@ -146,6 +146,10 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
   import het.win;
   import het.view;
   import het.opengl;
+  import het.binpacker;
+  import het.megatexturing;
+  import het.fonts;
+  import het.draw2d;
 
   auto name = "brg";
   enforce(name in colorMaps);
@@ -163,7 +167,7 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
 
   writeln("done");
   readln;
-  application.exit;
+  //application.exit;
 
 }//); }
 

@@ -119,7 +119,6 @@ struct KeyComboEntry{ //a single keycombo like F1, LShift+RShift, Ctrl+Alt, Ctrl
   int keyModifierMask() const { return keys.keyModifierMask; }
 
   bool pressed ()  {
-
     return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).pressed;
   }
 
@@ -315,17 +314,17 @@ public:
 
       //all key must be down
       bool allDown = true;
-      auto k = keys.split('+').map!strip.array;
-      if(k.empty) allDown = false; //empty combo
+      auto keyList = keys.split('+').map!strip.array;
+      if(keyList.empty) allDown = false; //empty combo
 
-      foreach(key; k) if(!this[key].value){ allDown = false; break; }
+      foreach(key; keyList) if(!this[key].value){ allDown = false; break; }
 
       if(!allDown) return false; //not this key combo
 
       final switch(mode){
         case QueryMode.Active : return true;
-        case QueryMode.Pressed: return this[k[$-1]].pressed; //todo: wrong
-        case QueryMode.Typed  : return this[k[$-1]].repeated; //todo: wrong
+        case QueryMode.Pressed: return this[keyList[$-1]].pressed; //todo: wrong
+        case QueryMode.Typed  : return this[keyList[$-1]].repeated; //todo: wrong
 //        case QueryMode.Released:return this[k[$-1]].released; //todo: wrong
       }
     }

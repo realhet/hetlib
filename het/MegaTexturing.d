@@ -2,9 +2,14 @@ module het.megatexturing;
 
 import het.opengl, het.binpacker;
 
+// imports for debug
+import het.draw2d;
+
 // Global access ///////////////////////////////
 
 alias textures = Singleton!TextureManager;
+
+__gshared DEBUG_clearRemovedSubtexArea = false; // marks the free'd parts with fuchsia
 
 // MegaTexturing constants ///////////////////////////////
 
@@ -153,7 +158,7 @@ public:
 
     foreach(r; bin.freeRects){
       dr.color = clGray;
-      dr.drawRect(r.bounds.toF.inflated(-0.125));
+      dr.drawRect(r.bounds.inflated(-0.125));
     }
 
     foreach(j, r; bin.rects){
@@ -397,10 +402,10 @@ private:
 
     enforce(mtIdx>=0 && mtIdx<megaTextures.length, "mtIdx out of range (%s)".format(mtIdx));
 
-    //clear the area
-    if(1) with(megaTextures[mtIdx].glTexture){
+    //clear the area with clFuchsia for debug
+    if(DEBUG_clearRemovedSubtexArea) with(megaTextures[mtIdx].glTexture){
       fastBind;
-      fill(0xFFFF00FF, info.pos.x, info.pos.y, info.size.x, info.size.y);
+      fill(RGBA(0xFFFF00FF), info.pos.x, info.pos.y, info.size.x, info.size.y);
     }
 
     megaTextures[mtIdx].remove(idx);
@@ -581,8 +586,7 @@ if(log) "Found subtex %s:".writefln(fileName);
       }
     }else{
       if(bmp is null){
-        bmp = new Bitmap(8, 8, 4);  //just create a purple placeholder
-        bmp.rgba.clear(clFuchsia);
+        bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));  //just create a purple placeholder
       }
       auto idx = createSubTex(bmp);
       byFileName[fileName] = idx;
@@ -591,11 +595,6 @@ if(log) "Created subtex %s:".writefln(fileName);
       return idx;
     }
   }
-
-  int custom(string name, ubyte[] data){
-    return custom(name, new Bitmap(data));
-  }
-
 
   int opIndex(File fileName){
     return access(fileName);
@@ -617,7 +616,7 @@ if(log) "Created subtex %s:".writefln(fileName);
 
   ivec2 textureSize(int idx){
     return infoTexture.isValidIdx(idx) ? accessInfo(idx).size
-                                       : ivec2.Null;
+                                       : ivec2(0);
   }
 
   ivec2 textureSize(File file){

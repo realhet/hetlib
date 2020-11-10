@@ -1,6 +1,6 @@
 module het.fonts;
 
-import het.utils;
+import het.utils, het.draw2d;
 
 // plotFont: Simpe vector font //////////////////////////////
 
@@ -27,7 +27,7 @@ static:
 
       foreach(const poly; cg.points)
         foreach(i, const p; poly){
-          vec2 v = p;
+          vec2 v = vec2(p.x, p.y);
           if(!vertFlip) v.y = fontHeight-v.y;
           if(monoSpace) v.x += (fontMonoWidth-cg.width)*0.5;
           if(italic) v.x += 4 - v.y*0.25;
@@ -51,7 +51,7 @@ static:
 
       foreach(const poly; cg.points)
         foreach(i, const p; poly){
-          vec2 v = p;
+          auto v = vec2(p.x, p.y);
           if(!vertFlip) v.y = fontHeight-v.y;
           if(monoSpace) v.x += (fontMonoWidth-cg.width)*0.5;
           if(italic) v.x += 4 - v.y*0.25;
@@ -75,7 +75,8 @@ static:
     foreach(ref m; charMap) if(!m) m = charMap[cast(int)'?'];
   }
 
-  struct CharGfx{ float width; vec2[][] points; }
+  struct CharPoint{ int x, y; }
+  struct CharGfx{ float width; CharPoint[][] points; }
   struct CharRec{ char ch; CharGfx gfx; }
   //data source: https://hackage.haskell.org/package/plotfont
   //todo: Editor: linkek highlightolasa es raugras.

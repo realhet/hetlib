@@ -1,10 +1,11 @@
 //@exe
-///@compile -O -release -inline -boundscheck=off
+//@import c:\d\libs
+//@ldc
+//@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
+///@release
+//@debug
 
-//@import c:\d
-//todo: //@import c:\d kiszedni
-
-import hetlib; //publicly imports all the other necessary modules (win, geometry, utils, view, etc...)
+import het; //publicly imports all the other necessary modules (win, geometry, utils, view, etc...)
 
 class FrmMain: GLWindow{
   mixin autoCreate; //automatically creates an instance of this window at startup
@@ -19,41 +20,41 @@ class FrmMain: GLWindow{
   }
 
   //colors
-  immutable
+  immutable RGB
     clFrame       = 0x30e0e0   ,
     clBackground  = 0x109010   ,
     clTableText   = 0xd0d0d0   ,
     clTableBlack  = 0x101010   ,
     clTableRed    = 0x2010c0   ;
 
-  void drawFrame(Drawing dr, const Bounds2f r){ with(dr){
+  void drawFrame(Drawing dr, in bounds2 r){ with(dr){
     color = clFrame;
     lineWidth = 0.04f;
     drawRect(r);
   }}
 
-  void drawFramedText(Drawing dr, const Bounds2f rect, string text, float fonth){ with(dr){
+  void drawFramedText(Drawing dr, in bounds2 rect, string text, float fonth){ with(dr){
     drawFrame(dr, rect);
     color = clTableText;
     fontHeight = fonth;
-    textOut(rect.center-V2f(0, fonth*0.38f), text, 0, HAlign.Center);
+    textOut(rect.center-vec2(0, fonth*0.38f), text, 0, HAlign.center);
   }}
 
-  V2f numberPos(int n){
-    return n>=1 ? V2f((n-1)/3, 2-(n-1)%3)
-                : V2f(-1, n==0 ? 1.5 : 0);
+  vec2 numberPos(int n){
+    return n>=1 ? vec2((n-1)/3, 2-(n-1)%3)
+                : vec2(-1, n==0 ? 1.5 : 0);
   }
 
-  V2f numberSize(int n){
-    return V2f(1, n>0 ? 1 : 1.5);
+  vec2 numberSize(int n){
+    return vec2(1, n>0 ? 1 : 1.5);
   }
 
-  Bounds2f numberRect(int n){
+  bounds2 numberRect(int n){
     auto p = numberPos(n);
-    return Bounds2f(p, p+numberSize(n));
+    return bounds2(p, p+numberSize(n));
   }
 
-  V2f numberCenter(int n){
+  vec2 numberCenter(int n){
     return numberRect(n).center;
   }
 
@@ -66,7 +67,7 @@ class FrmMain: GLWindow{
       string caption();
       bool check(int n); //checks if number N is a win or not
       float winRate();
-      V2f coinPos();
+      vec2 coinPos();
       float coinWidth();
       void draw(Drawing dr);
     }
@@ -88,7 +89,7 @@ class FrmMain: GLWindow{
     override string caption()   { return "One number: " ~ text; }
     override bool check(int n)  { return number==n; }
     override float winRate()    { return 35; }
-    override V2f coinPos()      { return numberCenter(number); }
+    override vec2 coinPos()      { return numberCenter(number); }
     override float coinWidth()  { return 1; }
 
     override void draw(Drawing dr){with(dr){
@@ -98,7 +99,7 @@ class FrmMain: GLWindow{
       if(number>0){ //draw red/black circles
         color = isBlack(number) ? clTableBlack : clTableRed;
         pointSize = 0.8;
-        point(pos+V2f(0.5, 0.5));
+        point(pos+vec2(0.5, 0.5));
       }
 
       drawFramedText(dr, rect, text, 0.6);
@@ -126,18 +127,18 @@ class FrmMain: GLWindow{
         default: return 0;
       }
     }
-    override V2f coinPos(){
-      V2f avg = V2f.Null;
+    override vec2 coinPos(){
+      vec2 avg = vec2(0);
       foreach(n; numbers) avg += numberCenter(n);
       avg /= numbers.count;
 
       switch(numbers.length){
         case 2: return avg;
-        case 3: return numbers.canFind(0) ? V2f(0, 1.5)
-                                          : V2f(numberCenter(numbers[0]).x, 3);
+        case 3: return numbers.canFind(0) ? vec2(0, 1.5)
+                                          : vec2(numberCenter(numbers[0]).x, 3);
         case 4: return avg;
-        case 5: return V2f(0, 3);
-        case 6: return V2f(avg.x, 3);
+        case 5: return vec2(0, 3);
+        case 6: return vec2(avg.x, 3);
         default: assert(false);
       }
     }
@@ -158,12 +159,12 @@ class FrmMain: GLWindow{
     override string caption()   { return "Dozen: " ~ ["1st", "2nd", "3rd"][third]; }
     override bool check(int n)  { return inRange(n, third*12+1, (third+1)*12); }
     override float winRate()    { return 2; }
-    override V2f coinPos()      { return V2f(third*4+2, 3.5); }
+    override vec2 coinPos()      { return vec2(third*4+2, 3.5); }
     override float coinWidth()  { return 4; }
 
     override void draw(Drawing dr){with(dr){
-      auto pos = V2f(third*4, 3);
-      auto rect = Bounds2f(pos, pos+V2f(4, 1));
+      auto pos = vec2(third*4, 3);
+      auto rect = bounds2(pos, pos+vec2(4, 1));
 
       drawFramedText(dr, rect, text, 0.8);
     }}
@@ -188,7 +189,7 @@ class FrmMain: GLWindow{
       }
     }
     override float winRate()    { return 0.5; }
-    override V2f coinPos()      { return [V2f(4,3.5), V2f(8,3.5), V2f(12.5,1), V2f(12.5, 2)][idx]; }
+    override vec2 coinPos()      { return [vec2(4,3.5), vec2(8,3.5), vec2(12.5,1), vec2(12.5, 2)][idx]; }
     override float coinWidth()  { return 1; }
 
     override void draw(Drawing dr){ }
@@ -206,12 +207,12 @@ class FrmMain: GLWindow{
     override string caption()   { return "Column: " ~ ["1", "2", "3"][idx]; }
     override bool check(int n)  { return n>0 && (n-1)%3==idx; }
     override float winRate()    { return 2; }
-    override V2f coinPos()      { return V2f(12, idx)+V2f(0.5, 0.5); }
+    override vec2 coinPos()      { return vec2(12, idx)+vec2(0.5, 0.5); }
     override float coinWidth()  { return 1; }
 
     override void draw(Drawing dr){with(dr){
-      auto pos = V2f(12, idx);
-      auto rect = Bounds2f(pos, pos+V2f(1, 1));
+      auto pos = vec2(12, idx);
+      auto rect = bounds2(pos, pos+vec2(1, 1));
 
       drawFramedText(dr, rect, text, 0.6);
     }}
@@ -240,12 +241,12 @@ class FrmMain: GLWindow{
     }
 
     override bool check(int n)  { return inRange(n, idx*18+1, (idx+1)*18); }
-    override V2f coinPos()      { return V2f(idx*10+1, 4.5); }
+    override vec2 coinPos()      { return vec2(idx*10+1, 4.5); }
     override float coinWidth()  { return 2; }
 
     override void draw(Drawing dr){
-      auto pos = V2f(idx*10, 4),
-           rect = Bounds2f(pos, pos+V2f(2, 1));
+      auto pos = vec2(idx*10, 4),
+           rect = bounds2(pos, pos+vec2(2, 1));
       drawFramedText(dr, rect, texts[idx], 0.45);
     }
   }
@@ -258,12 +259,12 @@ class FrmMain: GLWindow{
     }
 
     override bool check(int n)  { return n>0 && (n&1)==idx; }
-    override V2f coinPos()      { return V2f(idx*6+3, 4.5); }
+    override vec2 coinPos()      { return vec2(idx*6+3, 4.5); }
     override float coinWidth()  { return 2; }
 
     override void draw(Drawing dr){with(dr){
-      auto pos = V2f(2+idx*6, 4);
-      auto rect = Bounds2f(pos, pos+V2f(2, 1));
+      auto pos = vec2(2+idx*6, 4);
+      auto rect = bounds2(pos, pos+vec2(2, 1));
 
       drawFramedText(dr, rect, texts[idx], 0.45);
     }}
@@ -278,15 +279,15 @@ class FrmMain: GLWindow{
     }
 
     override bool check(int n)  { return idx ? isBlack(n) : isRed(n); }
-    override V2f coinPos()      { return V2f(idx*2+5, 4.5); }
+    override vec2 coinPos()      { return vec2(idx*2+5, 4.5); }
     override float coinWidth()  { return 2; }
 
     override void draw(Drawing dr){with(dr){
-      auto pos = V2f(4+idx*2, 4),
-           rect = Bounds2f(pos, pos+V2f(2, 1)),
+      auto pos = vec2(4+idx*2, 4),
+           rect = bounds2(pos, pos+vec2(2, 1)),
            r2 = rect;
 
-      r2.inflate(-0.3);
+      r2 = r2.inflated(-0.3);
       color = idx ? clTableBlack : clTableRed;
       fillRombus(r2);
       drawFrame (dr, rect);
@@ -296,7 +297,7 @@ class FrmMain: GLWindow{
   }
 
 
-  class Table{
+  class Table{ // Table class /////////////////////////////////
   private:
     Area[] areas;
     Drawing drawing;
@@ -306,7 +307,7 @@ class FrmMain: GLWindow{
         color = clAqua;
         lineWidth = 0.1;
         auto cp = a.coinPos,
-             cw = V2f(a.coinWidth/2-0.5, 0);
+             cw = vec2(a.coinWidth/2-0.5, 0);
         line(cp-cw, cp+cw+0.001f);
       }}
     }
@@ -328,12 +329,15 @@ class FrmMain: GLWindow{
     }
 
     void glDraw(ref View2D view){
-      if(drawing.empty)with(drawing){
-        clear;
-        color = clBackground;
-        fillRect(-1.5, -0.5, 13.5, 5.5);
-        foreach(a; areas) a.draw(drawing);
-        //drawCoinLines(drawing); //debug
+      if(drawing is null){
+        drawing = new Drawing;
+        with(drawing){
+          clear;
+          color = clBackground;
+          fillRect(-1.5, -0.5, 13.5, 5.5);
+          foreach(a; areas) a.draw(drawing);
+          //drawCoinLines(drawing); //debug
+        }
       }
       drawing.glDraw(view);
     }
@@ -345,15 +349,15 @@ class FrmMain: GLWindow{
   private:
     static immutable coinValues = [1, 5, 10, 25, 50, 100];
     static Drawing[coinValues.length] drawings;
-    static int indexOf(int value){ return coinValues.countUntil(value); }
-    uint color(){ return [clSilver, clWowGreen, clWowBlue, clWowPurple, 0x3030ff, clWowRed][indexOf(value)]; }
+    static auto indexOf(int value){ return coinValues.countUntil(value); }
+    RGB color(){ return [clSilver, clWowGreen, clWowBlue, clWowPurple, RGB(0x3030ff), clWowRed][indexOf(value)]; }
   public:
     static int findSuitableCoinValue(int total){ foreach_reverse(v; coinValues)if(v<=total) return v; return 0; }
 
     int value;
-    V2f pos, target;
+    vec2 pos, target;
 
-    this(int v, V2f p = V2f.Null){
+    this(int v, vec2 p = vec2(0)){
       value = v;
       pos = p;
       target = pos;
@@ -361,15 +365,16 @@ class FrmMain: GLWindow{
     }
 
     void glDraw(View2D view){ //not ref because it will be transformed
-      int id = indexOf(value);
-      with(drawings[id]){
-        if(empty){
-          const pos = V2f.Null;
+      auto id = indexOf(value);
+      if(drawings[id] is null){
+        drawings[id] = new Drawing;
+        with(drawings[id]){
+          const pos = vec2(0);
 
           lineWidth = 0.08f;
           pointSize = 0.3*2;
 
-          color = 0x505050;
+          color = RGB(0x505050);
           circle(pos, 0.32);
 
           color = this.color;
@@ -380,24 +385,23 @@ class FrmMain: GLWindow{
 
           lineWidth = 0.05f;
           foreach(i; 0..24){
-            auto a = vRot(V2f(0.315f, 0), i*(1.0f/12)*PI);
+            auto a = rotate(vec2(0.315f, 0), i*(1.0f/12)*PI);
             color = this.color;
-            line(pos+a, pos+a*0.8);
+            line(pos+a, pos+a*0.8f);
           }
 
           color = clBlack;
           auto text = value.to!string;
           fontHeight = text.length==1 ? 0.5f :
                        text.length==2 ? 0.4f : 0.3f;
-          textOut(pos-V2f(0, fontHeight*0.38f), text, 0, HAlign.Center);
+          textOut(pos-vec2(0, fontHeight*0.38f), text, 0, HAlign.center);
         }
-
-        glDraw(view, pos);
       }
+      drawings[id].glDraw(view, pos);
     }
 
     bool update(){
-      float at = animationT(deltaTime, 0.5f);
+      float at = calcAnimationT(deltaTime, 0.5f);
       return follow(pos, target, at, 0.01f);
     }
   }
@@ -405,7 +409,7 @@ class FrmMain: GLWindow{
   class Coins{
   private:
     Coin[] coins;
-    immutable startPos = V2f(6, -3);
+    immutable startPos = vec2(6, -3);
 
     void rearrange(){
       //calculates positions for each type of coins
@@ -414,12 +418,12 @@ class FrmMain: GLWindow{
       int[] counts; counts.length = vals.length;
 
       foreach(c; coins){
-        int idx = vals.countUntil(c.value);
+        auto idx = vals.countUntil(c.value);
         assert(idx>=0);
         int cnt = counts[idx]++;
 
         const stackWidth = 5;
-        c.target = V2f(idx*2+(cnt%stackWidth)*0.3, 6+(cnt/stackWidth)*0.6);
+        c.target = vec2(idx*2+(cnt%stackWidth)*0.3, 6+(cnt/stackWidth)*0.6);
       }
     }
 
@@ -468,36 +472,39 @@ class FrmMain: GLWindow{
   Table table;
   Coins coins;
 
-  override void doCreate(){//CREATE ////////////////////////////////////////////////////////////////////////
+  override void onCreate(){//CREATE ////////////////////////////////////////////////////////////////////////
     table = new Table;
     coins = new Coins;
 //    wheel = new Wheel;
-    view.workArea = Bounds2f(-2,-1, 14, 7);
+    view.workArea = bounds2(-2,-1, 14, 7);
     view.zoomAll;
 
     coins.earn(  1, 10);
     coins.earn(  5, 10);
-/*    coins.earn( 10, 10);
+    coins.earn( 10, 10);
     coins.earn( 25, 10);
     coins.earn( 50, 10);
-    coins.earn(100, 10);*/
+    coins.earn(100, 10);
   }
 
-  override void doUpdate(){//UPDATE ////////////////////////////////////////////////////////////////////////
-    view.update(true);
+  override void onUpdate(){//UPDATE ////////////////////////////////////////////////////////////////////////
+    if(view.navigate(true, true)) invalidate;;
 
-//    mouseCoin = coin.at(mousePos);
-//    mouseNumber = table.at(mousePos);
+    //mouseCoin = coin.at(mousePos);
+    //mouseNumber = table.at(mousePos);
 
     if(coins.update) invalidate;
   }
 
-  override void doPaint(){with(gl){//PAINT //////////////////////////////////////////////////////////////////////////
+  override void onPaint(){with(gl){//PAINT //////////////////////////////////////////////////////////////////////////
+    dr.clear; drGUI.clear;
+
     clearColor(0);  gl.clear(GL_COLOR_BUFFER_BIT);
     disable(GL_DEPTH_TEST);
 
     table.glDraw(view);
     coins.glDraw(view);
 
+    //drawFPS(drGUI);
   }}
 }

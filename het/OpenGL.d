@@ -20,7 +20,7 @@ Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  t
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //todo: nincs doUpdate formresize kozben
 
-public import het.utils, het.win, het.geometry, het.view, het.bitmap; // later: het.draw2d, het.stream;
+public import het.utils, het.win, het.geometry, het.view, het.bitmap, het.draw2d;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
 
 //Turn on high performance GPUs on some laptops
@@ -2007,13 +2007,10 @@ TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZer
 
 /// GLWindow class //////////////////////////////////////////////////////////////////////////
 
-// temporarily disabled parts are marked with /+
-
 class GLWindow: Window{
-private:
-  HGLRC frc;
+public:
 
-/+  Drawing dr, drGUI; +/
+  Drawing dr, drGUI;
   View2D view;
   MouseState mouse;
   private View2D viewGUI_;
@@ -2024,6 +2021,9 @@ private:
     viewGUI_.skipAnimation;
     return viewGUI_;
   }
+
+private:
+  HGLRC frc;
 
   void oldSetPixelFormat(HDC dc)
   {
@@ -2101,8 +2101,8 @@ protected:
     createRenderingContext;
 
     //init drawing, view, mouse
-/+    dr = new Drawing;
-    drGUI  = new Drawing; +/
+    dr = new Drawing;
+    drGUI  = new Drawing;
     view.owner = this;  view.centerCorrection = true;
     viewGUI_.owner = this;
     mouse = new MouseState;
@@ -2128,10 +2128,10 @@ protected:
       return;
     }
 
-/+    if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
+    if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
       view.workArea = dr.getBounds;
       view.zoomAll_immediate;
-    } +/
+    }
   }
 
   override void onMouseUpdate(){
@@ -2170,12 +2170,12 @@ public:
     super.onBeginPaint;
     onWglMakeCurrent(true);
 
-/+    dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not. +/
+    dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not.
 
     with(clientRect) gl.viewport(left, top, right-left, bottom-top);
     gl.disable(GL_DEPTH_TEST); //no zbuffering by default
 
-/+    textures.update; //upload pending textures.  +/
+    textures.update; //upload pending textures.
   }
 
   override void onPaint()
@@ -2190,14 +2190,14 @@ public:
   override void onEndPaint(){
     if(chkClear(view._mustZoomAll)) view.zoomAll;
 
-/+    if(!dr.drawCnt){
-      if(!firstPaint) tryInitialZoomAll; //if dr has a painting
+    if(!dr.drawCnt){
+      if(!firstPaint) onInitialZoomAll; //if dr has a painting
       dr.glDraw(view   );
     }
     if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
 
     lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
-    lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);  +/
+    lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);
 
     firstPaint = true;
   }
@@ -2213,7 +2213,7 @@ public:
     super.onEndPaint;
   }
 
-  /+void drawFpsTimeLine(Drawing dr){
+  void drawFPS(Drawing dr){
     with(dr){
       //FPS graph
       translate(vec2(0, 64+4));
@@ -2227,13 +2227,13 @@ public:
         const origin = vec2(clientWidth-2, 2);
 
         auto rect(double t0, double t1){
-          Bounds2f b;
+          bounds2 b;
           float base = prevGroup[$-1].t1;
           float len = group[$-1].t1 - base;
-          b.bMin.x = origin.x + (t0-base-len)*scale.x;
-          b.bMax.x = origin.x + (t1-base-len)*scale.x;
-          b.bMin.y = origin.y + scale.y*(idx-1);
-          b.bMax.y = b.bMin.y + scale.y*.9;
+          b.low.x  = origin.x + (t0-base-len)*scale.x;
+          b.high.x = origin.x + (t1-base-len)*scale.x;
+          b.low.y  = origin.y + scale.y*(idx-1);
+          b.high.y = b.low.y + scale.y*.9;
           return b;
         }
 
@@ -2247,7 +2247,7 @@ public:
           if(pass==0){
             fillRect(r);
           }else{
-            color = lerp(color, clWhite, 0.5);
+            color = mix(color, clWhite, 0.5f);
             line(r.topLeft, r.bottomLeft);
           }
         }
@@ -2264,6 +2264,6 @@ public:
       pop;
 
     }
-  } +/
+  }
 
 }

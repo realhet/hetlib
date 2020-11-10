@@ -2,7 +2,7 @@ module het.draw2d;
 
 import het.opengl, het.fonts, het.megatexturing;
 
-public import het.geometry;
+public import het.geometry, het.color;
 public import het.megatexturing : textures;
 
 
@@ -85,7 +85,7 @@ struct RectAlign{align(1): import std.bitmanip;
     this.keepAspect = keepAspect;
   }
 
-  Bounds2f apply(in Bounds2f rCanvas, in Bounds2f rImage){
+  bounds2 apply(in bounds2 rCanvas, in bounds2 rImage){
 
     void alignOne(ref float dst1, ref float dst2,ref float src1, ref float src2, bool shrink, bool enlarge, int align_){
       if(shrink && enlarge) return;
@@ -105,7 +105,7 @@ struct RectAlign{align(1): import std.bitmanip;
       }
     }
 
-    Bounds2f rdst = rCanvas, rdst2 = rdst, rsrc = rImage;
+    bounds2 rdst = rCanvas, rdst2 = rdst, rsrc = rImage;
     alignOne(rdst2.left, rdst2.right, rsrc.left, rsrc.right, canShrink, canEnlarge, cast(int)hAlign);
     alignOne(rdst2.top, rdst2.bottom, rsrc.top, rsrc.bottom, canShrink, canEnlarge, cast(int)vAlign);
     if(keepAspect){
@@ -197,10 +197,7 @@ class Drawing {
     if(logDrawing) LOG(shortName, "queued subDrawing", cast(void*) src, src.totalDrawObj);
     subDrawings ~= src;
 
-    if(!src.boundsEmpty){
-      bounds_.expandTo(src.bounds_, boundsEmpty);
-      boundsEmpty = false;
-    }
+    bounds_ |= src.bounds_;
   }
 
   void copyFrom(Drawing src){
@@ -333,15 +330,15 @@ class Drawing {
     vec2 aA, aB, aC;     //24
     uint aColor;        //4
 
-    //drawGlyph obly
+    //drawGlyph only
     vec2 aD;             //8
     uint aColor2;       //4
 
     vec2 aClipMin, aClipMax; //16  clipping rect. Terribly unoptimal
 
-    void expandBounds(ref Bounds2f b, ref bool isFirst) const {   //opt: ez az isFirst megneheziti a dolgokat. Kene valami jobb jelzes a bounds uressegre, pl. NAN bounds.
+    void expandBounds(ref bounds2 b) const{
       auto t = aType.iround;
-      void x(in vec2 v){ b.expandTo(v, isFirst); } //jobb modszer kene a bounds szamitasra...
+      void x(in vec2 v){ b |= v; }
 
       if(t==1) x(aA); //Point
       else if(t==68){ x(aA); x(aB); x(aC); } //Tri
@@ -370,10 +367,10 @@ class Drawing {
       act.reserve(bufferMax);
       buffers ~= act;
     }
-    o.aClipMin = clipBounds.bMin;
-    o.aClipMax = clipBounds.bMax;
+    o.aClipMin = clipBounds.low;
+    o.aClipMax = clipBounds.high;
     buffers[$-1] ~= o;
-    o.expandBounds(bounds_, boundsEmpty);
+    o.expandBounds(bounds_);
   }
 
   private auto exportDrawingObjs(){
@@ -383,20 +380,20 @@ class Drawing {
 //  private int dirty = -1; //must set to -1 data[] is changed. bit0 = VBO, bit1 = bounds
   private void markDirty() { /*dirty = -1;*/ }
 
-  private Bounds2f bounds_;
-  Bounds2f getBounds()const { return bounds_; }
-  private bool boundsEmpty = true;
+  private bounds2 bounds_;
+  bounds2 getBounds()const { return bounds_; }
 
   vec2 inputTransform(in vec2 p) { return (p+actState.drawOrigin)*actState.drawScale; }
-  Bounds2f inputTransform(in Bounds2f b) { return Bounds2f(inputTransform(b.bMin), inputTransform(b.bMax)); }
+  bounds2 inputTransform(in bounds2 b) { return bounds2(inputTransform(b.low), inputTransform(b.high)); }
 
   vec2 inverseInputTransform(in vec2 v) { return v/actState.drawScale-actState.drawOrigin; } //todo: slow divide
-  Bounds2f inverseInputTransform(in Bounds2f b) { return Bounds2f(inverseInputTransform(b.bMin), inverseInputTransform(b.bMax)); }
+  bounds2 inverseInputTransform(in bounds2 b) { return bounds2(inverseInputTransform(b.low), inverseInputTransform(b.high)); }
 
-  Bounds2f clipBounds;
-  private Bounds2f[] clipBoundsStack;
+  private enum clipBounds_init = bounds2(-1e30, -1e30, 1e30, 1e30);
+  bounds2 clipBounds = clipBounds_init;
+  private bounds2[] clipBoundsStack;
 
-  void pushClipBounds(Bounds2f bnd){ //bnd is in local coords
+  void pushClipBounds(bounds2 bnd){ //bnd is in local coords
     clipBoundsStack ~= clipBounds;
     clipBounds = inputTransform(bnd);
   }
@@ -412,11 +409,10 @@ class Drawing {
     if(logDrawing) LOG(shortName, "clearing", stats);
     destroyVboList;
     destroy(buffers);
-    bounds_ = Bounds2f.init;
-    boundsEmpty = true;
+    bounds_ = bounds2.init;
     markDirty;
 
-    clipBounds = Bounds2f(-1e30, -1e30, 1e30, 1e30);
+    clipBounds = clipBounds_init;
     clipBoundsStack = [];
 
     actState = DrawState.init;
@@ -424,7 +420,6 @@ class Drawing {
     stack.clear;
 
     subDrawings = [];
-    //this = Drawing.init; //todo: clear alone is not ok
   }
 
   void clear(RGB background){
@@ -445,7 +440,7 @@ class Drawing {
     }*/ //todo: point2 is not working with appender. should use vec2[]
 
     //Create a new Point1
-    append(DrawingObj(1, inputTransform(p), vec2.Null, vec2(s, 0), c));
+    append(DrawingObj(1, inputTransform(p), vec2(0), vec2(s, 0), c));
   }
 
   void point(float x, float y) { point(vec2(x, y)); }
@@ -470,9 +465,9 @@ class Drawing {
 
 // Lines ///////////////////////////////////////////////////////////////////////
 
-  private vec2 lineCursor = vec2.Null;
+  private vec2 lineCursor;
 
-  void lineTo(const vec2 p_) { //todo: const struct->in struct
+  void lineTo(in vec2 p_) { //todo: const struct->in struct
     vec2 p = inputTransform(p_);
     markDirty;
     auto c = realDrawColor, w = lineWidth;
@@ -481,19 +476,19 @@ class Drawing {
   }
   void lineTo(in vec2 p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
 
-  void lineTo(in ivec2 p)                                 { lineTo(p.toF); }
-  void lineTo(in ivec2 p, bool isMove)                    { lineTo(p.toF, isMove); }
+  void lineTo(in ivec2 p)                                 { lineTo(p); }
+  void lineTo(in ivec2 p, bool isMove)                    { lineTo(p, isMove); }
 
   void moveTo(in vec2 p)                                 { lineCursor = inputTransform(p); }
-  void moveTo(in ivec2 p)                                 { moveTo(p.toF); }
+  void moveTo(in ivec2 p)                                 { moveTo(p); }
 
   void lineRel(in vec2 p)                                { lineTo(lineCursor+inputTransform(p)); }
   void moveRel(in vec2 p)                                { moveTo(lineCursor+inputTransform(p)); }
   void line(in vec2 p0, in vec2 p1)                       { lineCursor = inputTransform(p0); lineTo(p1); }
 
-  void line(in ivec2 p0, in ivec2 p1)                       { line(p0.toF, p1.toF); } //todo: az integerre mukodjon mar a floatos a geometryben!
-  void line(in Seg2f s)                                 { line(s.p[0], s.p[1]); }
-  void line(in Seg2f[] a)                               { foreach(const s; a) line(s); }
+  void line(in ivec2 p0, in ivec2 p1)                       { line(p0, p1); }
+  void line(in seg2 s)                                 { line(s.p[0], s.p[1]); }
+  void line(in seg2[] a)                               { foreach(const s; a) line(s); }
 
   void lineTo(float x, float y)                         { lineTo(vec2(x, y)); }
   void lineTo(float x, float y, bool isMove)            { lineTo(vec2(x, y), isMove); }
@@ -576,24 +571,24 @@ class Drawing {
   alias vline = vLine, hline = hLine, moveto = moveTo, lineto = lineTo;
 
   void drawRect(float x0, float y0, float x1, float y1) { hLine(x0, y0, x1); hLine(x0, y1, x1); vLine(x0, y0, y1); vLine(x1, y0, y1); }
-  void drawRect(const vec2 a, const vec2 b)               { drawRect(a.x, a.y, b.x, b.y); }
-  void drawRect(const Bounds2f b)                       { drawRect(b.bMin, b.bMax); }
-  void drawRect(const Bounds2i b)                       { drawRect(b.toF); }
+  void drawRect(in vec2 a, in vec2 b)               { drawRect(a.x, a.y, b.x, b.y); }
+  void drawRect(in bounds2 b)                       { drawRect(b.low, b.high); }
+  void drawRect(in ibounds2 b)                       { drawRect(bounds2(b)); }
 
   void drawX(float x0, float y0, float x1, float y1)    { line(x0, y0, x1, y1); line(x0, y1, x1, y0); }
-  void drawX(const vec2 a, const vec2 b)                  { drawX(a.x, a.y, b.x, b.y); }
-  void drawX(const Bounds2f b)                          { drawX(b.bMin, b.bMax); }
-  void drawX(const Bounds2i b)                          { drawX(b.toF); }
+  void drawX(in vec2 a, in vec2 b)                  { drawX(a.x, a.y, b.x, b.y); }
+  void drawX(in bounds2 b)                          { drawX(b.low, b.high); }
+  void drawX(in ibounds2 b)                          { drawX(bounds2(b)); }
 
   void fillRect(float x0, float y0, float x1, float y1) {
     auto c = realDrawColor;
     append(DrawingObj(67, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c));
   }
-  void fillRect(const vec2 a, const vec2 b)               { fillRect(a.x, a.y, b.x, b.y); }
-  void fillRect(const Bounds2f b)                       { fillRect(b.bMin, b.bMax); }
-  void fillRect(const Bounds2i b)                       { fillRect(b.toF); } //todo: Bounds2i automatikusan atalakulhasson Bounds2f-re
+  void fillRect(in vec2 a, in vec2 b)               { fillRect(a.x, a.y, b.x, b.y); }
+  void fillRect(in bounds2 b)                       { fillRect(b.low, b.high); }
+  void fillRect(in ibounds2 b)                      { fillRect(bounds2(b)); } //todo: ibounds2 automatikusan atalakulhasson bounds2-re
 
-  void drawGlyph(int idx, in Bounds2f b, in RGB8 bkColor = clBlack){
+  void drawGlyph(int idx, in bounds2 b, in RGB8 bkColor = clBlack){
     auto c = realDrawColor;
     auto c2 = bkColor.to!RGBA8;
 
@@ -605,12 +600,12 @@ class Drawing {
 
     auto info = textures.accessInfo(idx); //todo: csunya, kell egy texture wrapper erre
 
-    auto b2 = al.apply(b, Bounds2f(0, 0, info.width, info.height));
+    auto b2 = al.apply(b, bounds2(0, 0, info.width, info.height));
 
-    append(DrawingObj(256+idx, inputTransform(b2.bMin), inputTransform(b2.bMax), tx0, c, tx1, c2.raw));
+    append(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw));
   }
 
-  void drawGlyph(in File fileName, in Bounds2f b, in RGB8 bkColor = clBlack){
+  void drawGlyph(in File fileName, in bounds2 b, in RGB8 bkColor = clBlack){
     drawGlyph(textures[fileName], b, bkColor);
   }
 
@@ -620,14 +615,14 @@ class Drawing {
 
   void drawGlyph(int idx, in vec2 p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
     auto info = textures.accessInfo(idx);
-    drawGlyph(idx, Bounds2f(p.x, p.y, p.x+info.width, p.y+info.height), bkColor);
+    drawGlyph(idx, bounds2(p.x, p.y, p.x+info.width, p.y+info.height), bkColor);
   }
 
   void drawGlyph(int idx, float x=0, float y=0, in RGB8 bkColor = clBlack){
     drawGlyph(idx, vec2(x, y), bkColor);
   }
 
-  void drawFontGlyph(int idx, in Bounds2f b, in RGB8 bkColor = clBlack, in int fontFlags = 0){   //bit0:bold
+  void drawFontGlyph(int idx, in bounds2 b, in RGB8 bkColor = clBlack, in int fontFlags = 0){   //bit0:bold
     auto c = realDrawColor;
     auto c2 = bkColor.to!RGBA8;
 
@@ -639,18 +634,18 @@ class Drawing {
 
 //    auto info = textures.accessInfo(idx); //todo: csunya, kell egy texture wrapper erre
 
-//    auto b2 = al.apply(b, Bounds2f(0, 0, info.width, info.height));
+//    auto b2 = al.apply(b, bounds2(0, 0, info.width, info.height));
 
-    append(DrawingObj(256+idx, inputTransform(b.bMin), inputTransform(b.bMax), tx0, c, tx1, c2.raw));
+    append(DrawingObj(256+idx, inputTransform(b.low), inputTransform(b.high), tx0, c, tx1, c2.raw));
   }
 
   void fillTriangle(float x0, float y0, float x1, float y1, float x2, float y2){
     auto c = realDrawColor;
     append(DrawingObj(68, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), inputTransform(vec2(x2,y2)), c));
   }
-  void fillTriangle(const vec2 a, const vec2 b, const vec2 c){ fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y); }
+  void fillTriangle(in vec2 a, in vec2 b, in vec2 c){ fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y); }
 
-  void fillConvexPoly(const vec2[] p){
+  void fillConvexPoly(in vec2[] p){
     foreach(i; 2..p.length) fillTriangle(p[0], p[i], p[i-1]);
   }
 
@@ -659,16 +654,16 @@ class Drawing {
          y1 = (y0+y2)*0.5f;
     moveTo(x0, y1); lineTo(x1, y0); lineTo(x2, y1); lineTo(x1, y2); lineTo(x0, y1);
   }
-  void drawRombus(const vec2 a, const vec2 b)               { drawRombus(a.x, a.y, b.x, b.y); }
-  void drawRombus(const Bounds2f b)                       { drawRombus(b.bMin, b.bMax); }
+  void drawRombus(in vec2 a, in vec2 b)               { drawRombus(a.x, a.y, b.x, b.y); }
+  void drawRombus(in bounds2 b)                       { drawRombus(b.low, b.high); }
 
   void fillRombus(float x0, float y0, float x2, float y2){
     auto x1 = (x0+x2)*0.5f,
          y1 = (y0+y2)*0.5f;
     fillConvexPoly([vec2(x0,y1), vec2(x1, y0), vec2(x2, y1), vec2(x1, y2)]);
   }
-  void fillRombus(const vec2 a, const vec2 b)               { fillRombus(a.x, a.y, b.x, b.y); }
-  void fillRombus(const Bounds2f b)                       { fillRombus(b.bMin, b.bMax); }
+  void fillRombus(in vec2 a, in vec2 b)               { fillRombus(a.x, a.y, b.x, b.y); }
+  void fillRombus(in bounds2 b)                       { fillRombus(b.low, b.high); }
 
 // gridLines ////////////////////////////////////////////////////
 
@@ -684,8 +679,8 @@ class Drawing {
     lineStipple = stipple;
 
     auto vis = view.visibleArea;
-    vis.bMin = vFloor(vis.bMin/dist-vec2(1,1)).toF*dist;
-    vis.bMax = vCeil (vis.bMax/dist+vec2(1,1)).toF*dist;
+    vis.low  = (vis.low /dist-vec2(1,1)).floor*dist;
+    vis.high = (vis.high/dist+vec2(1,1)).ceil *dist;
     auto cnt = vis.size/dist,
          siz = view.clientSize/cnt;
 
@@ -695,9 +690,9 @@ class Drawing {
         alpha = remap_clamp(siz[c], 4, 16, 0, 0.20);
         if(!alpha) continue;
 
-        for(float a = vis.bMin[c]; a<=vis.bMax[c]; a+=dist) {
-          if(c==0) vLine(a, vis.bMin.y, vis.bMax.y);
-              else hLine(vis.bMin.x, a, vis.bMax.x);
+        for(float a = vis.low[c]; a<=vis.high[c]; a+=dist) {
+          if(c==0) vLine(a, vis.low.y, vis.high.y);
+              else hLine(vis.low.x, a, vis.high.x);
         }
       }
     }
@@ -731,11 +726,11 @@ class Drawing {
       lineTo(x+sin(a)*ra, y+cos(a)*rb, !i);
     }
   }
-  void ellipse(const vec2 p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
-  void ellipse(const vec2 p, const vec2 r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r.x, r.y, arc0, arc1); }
+  void ellipse(in vec2 p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
+  void ellipse(in vec2 p, in vec2 r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r.x, r.y, arc0, arc1); }
 
   void circle(float x, float y, float r, float arc0=0, float arc1=2*PI) { ellipse(x, y, r, r, arc0, arc1); }
-  void circle(const vec2 p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
+  void circle(in vec2 p, float r, float arc0=0, float arc1=2*PI) { ellipse(p.x, p.y, r, r, arc0, arc1); }
 
 // Text ////////////////////////////////////////////////////////////////////////
 
@@ -762,8 +757,8 @@ class Drawing {
   void textOut(float x, float y, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
     textOut(vec2(x, y), text, width, align_, vertFlip);
   }
-  void textOut(const ivec2 p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
-    textOut(p.toF, text, width, align_, vertFlip);
+  void textOut(in ivec2 p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
+    textOut(vec2(p), text, width, align_, vertFlip);
   }
 
   void textOut(vec2 p, string[] lines, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false){
@@ -802,20 +797,14 @@ class Drawing {
   }
 
   void draw(Bitmap bmp, float x0=0, float y0=0, bool clearTypeEffect=false){
-    if(bmp.empty) return;
+    if(bmp is null || bmp.empty) return;
 
-    void doit(RGB8 delegate(int x, int y) fv){
-      foreach(y; 0..bmp.height) foreach(x; 0..bmp.width){
-        color = fv(x, y);
-        if(clearTypeEffect) fillRectClearType(x0+x, y0+y, x0+x+1, y0+y+1);
-                       else fillRect         (x0+x, y0+y, x0+x+1, y0+y+1);
-      }
+    auto img = bmp.get!RGB;
+    foreach(x, y, c; img){
+      color = c;
+      if(clearTypeEffect) fillRectClearType(x0+x, y0+y, x0+x+1, y0+y+1);
+                     else fillRect         (x0+x, y0+y, x0+x+1, y0+y+1);
     }
-
-    if(bmp.channels==4) doit((x, y) => bmp.rgba[x, y].rgb8); else
-    if(bmp.channels==3) doit((x, y) => bmp.rgb [x, y].rgb8); else
-    if(bmp.channels==2) doit((x, y) => bmp.la  [x, y].rgb8); else
-    if(bmp.channels==1) doit((x, y) => bmp.l   [x, y].rgb8);
   }
 
   void drawClearType(Bitmap bmp, float x0=0, float y0=0){
@@ -824,10 +813,10 @@ class Drawing {
 
   void drawAlpha(Bitmap bmp, float x0=0, float y0=0){
     //todo: bmp.to    auto tmp = bmp.to!LA8;
-
-    auto tmp = bmp.dup;
+    enforce("not impl");
+    /*auto tmp = bmp.dup;
     if(tmp.channels==4) tmp.rgba.data.each!((ref c){ c.r = c.a; c.g = c.a; c.b = c.a; });
-    draw(tmp, x0, y0);
+    draw(tmp, x0, y0);*/
   }
 
 
@@ -1435,9 +1424,9 @@ class Drawing {
 
 // Draw the objects on GPU  /////////////////////////////
 
-  void glDraw(ref View2D view, const vec2 translate = vec2.Null) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
+  void glDraw(ref View2D view, in vec2 translate = vec2(0)) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
 
-  void glDraw(const vec2 center, float scale, const vec2 translate=vec2.Null) {
+  void glDraw(in vec2 center, float scale, in vec2 translate=vec2(0)) {
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));
     enforce(clipBoundsStack.empty, "Drawing.glDraw() clipBounds stack is not empty.  It has %d items.".format(clipBoundsStack.length));
 
@@ -1462,7 +1451,7 @@ class Drawing {
 
       shader.uniform("uScale", uScale);
       shader.uniform("uShift", uShift+translate);
-      shader.uniform("uViewPortSize", vpSize.toF);
+      shader.uniform("uViewPortSize", vec2(vpSize));
 
       //map all megaTextures
       foreach(i, t; textures.getGLTextures){

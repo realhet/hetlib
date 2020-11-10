@@ -4,13 +4,10 @@
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
 //@release
 
-///@compile -L/SUBSYSTEM:console -L/ENTRY:WinMainCRTStartup
-///@link /SUBSYSTEM:console /ENTRY:WinMainCRTStartup
-
-import het.;
+import het;
 
 class MyWin: GLWindow{
-  mixin autoCreate;  //automatically creates an instance of this form ath startup
+  mixin autoCreate;  //automatically creates an instance of this form at startup
 
   override void onCreate(){
     writeln("Console test");
