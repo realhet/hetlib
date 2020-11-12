@@ -431,11 +431,20 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
   }
 
   //append ',' and newline(dense only) if needed
-  if(dense){
-    if(st.length && !st[$-1].among('{', '[')) st ~= ",";
-  }else{
-    if(st.length && st[$-1]!='\n') st ~= ",\n";
-    st ~= indent;
+  {
+    //get the last symbol before any whitespace
+    char lastSymbol;
+    auto s = st.stripRight;
+    if(s.length) lastSymbol = s[$-1];
+    //todo: this is unoptimal, but at least safe. It is possible to put this inside the [] and {} loop.
+
+    const needComma = !lastSymbol.among('{', '[', ',', '\xff'); //ff is empty stream, no comma needed
+    if(dense){
+      if(needComma) st ~= ",";
+    }else{
+      if(needComma) st ~= ",\n";
+      st ~= indent;
+    }
   }
 
   //append the associative name if there is one
@@ -449,8 +458,8 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
   }else static if(isSomeString!T        ){ st ~= quoted(data);
   }else static if(isSomeChar!T          ){ st ~= quoted([data]);
   }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
-  }else static if(isVector!T            ){ streamAppend_json(st, data.components, dense || false, hex, "", indent);
-  }else static if(isMatrix!T            ){ streamAppend_json(st, data.columns   , dense || false, hex, "", indent);
+  }else static if(isVector!T            ){ print("before V:", st); streamAppend_json(st, data.components, dense || true, hex, "", indent); print("after V:", st);
+  }else static if(isMatrix!T            ){ print("before M:", st); streamAppend_json(st, data.columns   , dense || true, hex, "", indent); print("before M:", st);
   }else static if(isAggregateType!T     ){ // Struct, Class
     //handle null for class
     static if(is(T == class)){
@@ -491,8 +500,7 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
 
 // tests /////////////////////////////////////////////////
 
-void test_JsonClassInheritance(){
-
+private void unittest_JsonClassInheritance(){
   static class A{ int id; }
   static class B:A{ string bStr; }
   static class C:A{ string cStr;  }
@@ -508,15 +516,20 @@ void test_JsonClassInheritance(){
   arr ~= null;
 
   auto json1 = arr.toJson;
-  json1.print;
-
   arr.clear;
-
   arr.fromJson(json1);
   auto json2 = arr.toJson;
-  json2.print;
 
-  enforce(json1 == json2, "fromJson inherited classes fail.");
+  //json1.print; json2.print;
+
+  assert(json1 == json2, "fromJson inherited classes fail.");
+}
+
+private void unittest_toJson(){
+  //check formatting of 2d arrays
+  assert([[1,2],[3,4]].toJson(true) == "[[1,2],[3,4]]");
+  assert([[1,2],[3,4]].toJson(false) == "[\n  [\n    1,\n    2\n  ],\n  [\n    3,\n    4\n  ]\n]");
+  assert(mat2(1,2,3,4).toJson(false) == [[1,2],[3,4]].toJson(true));
 }
 
 //! clearFields /////////////////////////////////////////
@@ -662,3 +675,22 @@ Property[] findProperties(Property[] props, string nameFilter, string rootPath="
 string[] getChangedPropertyValues(Property[] props, string rootPath=""){
   return getPropertyValues!"chkClear(a.uiChanged)"(props, rootPath);
 }
+
+
+
+void unittest_main(){
+  //todo: more tests!
+  unittest_JsonClassInheritance;
+  unittest_toJson;
+
+  // check the precision of jsonized vectors
+  foreach(T; AliasSeq!(float, double, real)){
+    auto v = vec3(1,2,3)*T(PI);
+    auto s = v.toJson;
+    Vector!(T, 3) v2; v2.fromJson(s);
+    //print(v, s, v2);
+    assert(v2 == v);
+  }
+}
+
+unittest{ unittest_main; }

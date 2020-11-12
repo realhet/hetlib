@@ -1025,7 +1025,7 @@ auto makeConversionTestImage(int size=32){
   return img;
 }
 
-void testImageBilinearAndSerialize(){  //todo: make a unittest out of this
+void testImageBilinearAndSerialize(){  //todo: make a unittest out of these
   //makeConversionTestImage(32).serialize("webp quality=20").saveTo(File(`c:\dl\imageConvTest.webp`));
 
 /*
@@ -1042,6 +1042,23 @@ void testImageBilinearAndSerialize(){  //todo: make a unittest out of this
 
     data.saveTo(File(`c:\dl\a`~(Type.sizeof*8).text~`.`~ext));
   }}*/
+
+//some bitmap tests
+  /*
+  auto name = "brg";
+  enforce(name in colorMaps);
+  auto width = 128;
+  auto raw = colorMaps[name].toArray(width);
+  auto img = image2D(width, 1, raw);
+  img.serialize("webp").saveTo(File(`c:\dl\brg.webp`));
+
+  File(`c:\dl\a32.tga`)
+    .deserialize!Bitmap
+    .serialize("png")
+    .saveTo(`c:\dl\a.png`);
+
+  newBitmap(`font:\Times New Roman\64?Hello World`~"\U0001F4A9").serialize("webp").saveTo(`c:\dl\text.webp`); */
+
 }
 
 

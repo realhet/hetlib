@@ -45,8 +45,8 @@ private enum approxEqualDefaultDiff = 1e-3f;
 //todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 
 /// myTo: scalar conversion used in smart-constructors
-alias myto(T) = stdto!T;
-//auto myto(T)(in T a){ return cast(T) a; }
+private alias myto(T) = stdto!T;
+//private auto myto(T)(in T a){ return cast(T) a; }
 
 /// converts numbers to text, includes all the digits stored in the original type.
 string text_precise(T)(in T a){
@@ -1789,7 +1789,7 @@ struct Bounds(VT){
     return low.approxEqual(other.low) && high.approxEqual(other.high);
   }
 
-  bool contain(string cfg = "[]", T)(in T other) const{ //closed closed
+  bool contains(string cfg = "[]", T)(in T other) const{ //closed closed
     static assert(cfg.length==2 && "[(".canFind(cfg[0]) && "])".canFind(cfg[1]), "invalid open/close config. // [] closed, () open");
 
     static if(cfg[0]=='[') alias f1 = greaterThanEqual; else alias f1 = greaterThan;
@@ -2446,8 +2446,8 @@ private void unittest_Image(){  // image2D tests ///////////////////////////////
     subImg[10, 10] = subImg[0..4, 0..5]; // also copy rectangle. Size is taken form source image
 
     // display the image (it's upside down)
-    import het.utils : xxh;
-    assert(subImg.asArray.xxh == 478208559);
+    import std.digest.crc;
+    assert(subImg.asArray.hexDigest!CRC32 == "BB6C00F4");
   }
 
 }

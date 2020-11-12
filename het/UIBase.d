@@ -1,10 +1,9 @@
 module het.uibase;
 
-import het.utils, het.geometry, het.draw2d, het.image, het.win,
-  std.bitmanip: bitfields;
+import het.utils, het.geometry, het.draw2d, het.bitmap, het.win, het.opengl;
 
-//import core.vararg; //todo: ez nem kell majd.
-//import std.traits;
+import std.traits;
+import std.bitmanip: bitfields;
 
 // enums ///////////////////////////////////////
 
@@ -20,13 +19,13 @@ enum
   NormalFontHeight = 18;  //fucking keep it on 18!!!!
 
 const
-  InternalTabScale = 0.11,   //around 0.15
-  LeadingTabScale  = 0.31;  //for programming
+  InternalTabScale = 0.11f,   //around 0.15
+  LeadingTabScale  = 0.31f;  //for programming
 
 enum
   EmptyCellWidth  = 0,
   EmptyCellHeight = 0,
-  EmptyCellSize   = V2f(EmptyCellWidth, EmptyCellHeight);
+  EmptyCellSize   = vec2(EmptyCellWidth, EmptyCellHeight);
 
 private enum
   AlignEpsilon = .001f; //avoids float errors that come from float sums of subCell widths/heights
@@ -34,22 +33,19 @@ private enum
 
 // Global shit //////////////////////////////
 
-/*deprecated*/ __gshared V2f currentMouse; //current mouse position in world
+/*deprecated*/ __gshared vec2 g_currentMouse; //current mouse position in world
 
-/*deprecated*/ float actFontHeight(){
-  import het.ui;
-  return im.style.fontHeight;
+__gshared RGB function() g_actFontColorFunct;
+
+auto actFontColor(){
+  return enforce(g_actFontColorFunct , "initialize g_actFontColor!")();
 }
 
-/*deprecated*/ RGB actFontColor(){
-  import het.ui;
-  return im.style.fontColor;
+__gshared float function() g_actFontHeightFunct;
+
+auto actFontHeight(){
+  return enforce(g_actFontHeightFunct , "initialize g_actFontHeight!")();
 }
-
-//todo: deprecation is handled extremely unraliable. Sometimes the fucking compiller passes, sometimes not.
-
-//__gshared float actFontHeight = 18;
-//__gshared RGB actFontColor = clBlack;
 
 //allows relative sizes to current fontHeight
 // 15  : 15 pixels
@@ -63,22 +59,22 @@ float toWidthHeight(string s, float baseHeight){
   }
 }
 
-private V2f calcGlyphSize_clearType(in TextStyle ts, int stIdx){
+private vec2 calcGlyphSize_clearType(in TextStyle ts, int stIdx){
   auto info = textures.accessInfo(stIdx);
 
   float aspect = float(info.width)/(info.height*3/*clearType x3*/); //opt: rcp_fast
-  auto size =  V2f(ts.fontHeight*aspect, ts.fontHeight);
+  auto size =  vec2(ts.fontHeight*aspect, ts.fontHeight);
 
   if(ts.bold) size.x += size.y*(BoldOffset*2);
 
   return size;
 }
 
-private V2f calcGlyphSize_image(/*in TextStyle ts,*/ int stIdx){
+private vec2 calcGlyphSize_image(/*in TextStyle ts,*/ int stIdx){
   auto info = textures.accessInfo(stIdx);
 
 //  float aspect = float(info.width)/(info.height); //opt: rcp_fast
-  auto size =  V2f(info.width, info.height);
+  auto size =  vec2(info.width, info.height);
 
   //image frame goes here
 
@@ -132,7 +128,7 @@ struct HitInfo{ //Btn returns it
   uint id;
   bool hover, captured, clicked, pressed, released;
   float hover_smooth, captured_smooth;
-  Bounds2f hitBounds;
+  bounds2 hitBounds;
 
   alias clicked this;
 }
@@ -141,8 +137,8 @@ struct HitTestManager{
 
   struct HitTestRec{
     uint hash;            //in the next frame this must be the isSame
-    Bounds2f hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
-    V2f localPos;
+    bounds2 hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
+    vec2 localPos;
   }
 
   //act frame
@@ -156,14 +152,14 @@ struct HitTestManager{
     auto act = actMap.map!"a.hash".filter!"a";  //todo: refactor this
 
     foreach(h; act)
-      smoothHover[h] = lerp(smoothHover.get(h, 0.0f), 1, upSpeed);
+      smoothHover[h] = mix(smoothHover.get(h, 0.0f), 1, upSpeed);
 
     uint[] toRemove;
     foreach(h; smoothHover.keys){
       if(!act.canFind(h)){
         if(h in smoothHover){
-          smoothHover[h] = lerp(smoothHover[h], 0, downSpeed);
-          if(smoothHover[h]<0.02) toRemove ~= h; //todo: test if it is allowed to remove from az assoc array while iterating on it's keys
+          smoothHover[h] = mix(smoothHover[h], 0, downSpeed);
+          if(smoothHover[h]<0.02f) toRemove ~= h; //todo: test if it is allowed to remove from az assoc array while iterating on it's keys
         }
       }
     }
@@ -173,13 +169,13 @@ struct HitTestManager{
 
 // -------- SliderInfo - a base to store historical data for every control //////////////////////////////
 /*  struct SliderInfo{
-    Bounds2f localRect; //mouse is from hittest.local
+    bounds2 localRect; //mouse is from hittest.local
     bool expired;
   }
 
   SliderInfo[uint] sliderInfo;
 
-  void addSliderInfo(uint id, in Bounds2f localRect){
+  void addSliderInfo(uint id, in bounds2 localRect){
     sliderInfo[id] = SliderInfo(localRect);
   }
 
@@ -201,7 +197,7 @@ struct HitTestManager{
 
     clickedHash = pressedHash = releasedHash = 0; //normally it's 0 all the time, except that one frame it's clicked.
 
-    with(mainWindow){ //todo: get the mouse state from elsewhere!!!!!!!!!!!!!
+    with(cast(GLWindow)mainWindow){ //todo: get the mouse state from elsewhere!!!!!!!!!!!!!
       if(topHash && mouse.LMB && mouse.justPressed){
         capturedHash = topHash;
         pressedHash = topHash;
@@ -229,7 +225,7 @@ struct HitTestManager{
     cellHashMap[cast(void*)cell] = hash;     //todo: error on duplicated ID
   }
 
-  void addHitRect(Cell cell, Bounds2f hitBounds, V2f localPos){//it is called automatically from each cell
+  void addHitRect(Cell cell, bounds2 hitBounds, vec2 localPos){//it is called automatically from each cell
     if(auto hash = cellHashMap.get(cast(void*)cell, 0)){
       enforce(!hitStack.any!(a => a.hash==hash), "hash already defined for cell: "~cell.text);
       hitStack ~= HitTestRec(hash, hitBounds, localPos);
@@ -245,7 +241,7 @@ struct HitTestManager{
 
   auto checkHitBounds(uint hash){
     auto idx = lastHitStack.map!"a.hash".countUntil(hash);
-    return idx<0 ? Bounds2f()
+    return idx<0 ? bounds2()
                  : lastHitStack[idx].hitBounds;
   }
 
@@ -291,7 +287,7 @@ struct HitTestManager{
       }
 
       dr.lineWidth = 1;
-      dr.lineStipple = lsNormal;
+      dr.lineStyle = LineStyle.normal;
     }
   }
 
@@ -340,7 +336,7 @@ __gshared HitTestManager hitTestManager;
 [ ] font.shadow (color, size)
 [ ] font.outline (color, size)
 
-[ ]   import core.cpuid; ez lehetne a teszt
+[ ]   core.cpuid; ez lehetne a teszt
 
 190605
 [x] variadric control creation parameters
@@ -395,8 +391,6 @@ Tests:
 */
 
 // Template Parameter Processing /////////////////////////////////
-
-import std.traits;
 
 private{
   bool is2(A, B)() { return is(immutable(A)==immutable(B)); }
@@ -522,7 +516,7 @@ struct TextStyle{
   void modify(string[string] map){
     map.rehash;
     if(auto p="font"       in map) font          = (*p);
-    if(auto p="fontHeight" in map) fontHeight    = (*p).toWidthHeight(actFontHeight).iRound.to!ubyte;
+    if(auto p="fontHeight" in map) fontHeight    = (*p).toWidthHeight(actFontHeight).iround.to!ubyte;
     if(auto p="bold"       in map) bold          = (*p).toInt!=0;
     if(auto p="italic"     in map) italic        = (*p).toInt!=0;
     if(auto p="underline"  in map) underline     = (*p).toInt!=0;
@@ -594,7 +588,7 @@ void initTextStyles(){
   }
 
   //relativeFontHeight ()
-  ubyte rfh(float r){ return (NormalFontHeight*(r/18.0)).iRound.to!ubyte; }
+  ubyte rfh(float r){ return (NormalFontHeight*(r/18.0)).iround.to!ubyte; }
 
 
   a("normal"      , tsNormal  , TextStyle("Segoe UI", rfh(18), false, false, false, false, clBlack, clWhite));
@@ -675,18 +669,18 @@ void setParam(T)(string[string] p, string name, void delegate(T) dg){
   }
 }
 
-void spreadH(Cell[] cells, in V2f origin = V2f.Null){
+void spreadH(Cell[] cells, in vec2 origin = vec2(0)){
   float cx = origin.x;
   foreach(c; cells){
-    c.outerPos = V2f(cx, origin.y);
+    c.outerPos = vec2(cx, origin.y);
     cx += c.outerWidth;
   }
 }
 
-void spreadV(Cell[] cells, in V2f origin = V2f.Null){
+void spreadV(Cell[] cells, in vec2 origin = vec2(0)){
   float cy = origin.y;
   foreach(c; cells){
-    c.outerPos = V2f(origin.x, cy);
+    c.outerPos = vec2(origin.x, cy);
     cy += c.outerHeight;
   }
 }
@@ -697,7 +691,7 @@ float maxOuterHeight(Cell[] cells, float def = EmptyCellHeight) { return cells.e
 float maxOuterRight (Cell[] cells, float def = EmptyCellWidth ) { return cells.empty ? def : cells.map!"a.outerRight" .maxElement; }
 float maxOuterBottom(Cell[] cells, float def = EmptyCellWidth ) { return cells.empty ? def : cells.map!"a.outerBottom" .maxElement; }
 
-V2f maxOuterSize(Cell[] cells, V2f def = EmptyCellSize) { return V2f(maxOuterRight(cells, def.x), maxOuterBottom(cells, def.y)); }
+vec2 maxOuterSize(Cell[] cells, vec2 def = EmptyCellSize) { return vec2(maxOuterRight(cells, def.x), maxOuterBottom(cells, def.y)); }
 
 float totalOuterWidth (Cell[] cells, float def = EmptyCellWidth ) { return cells.empty ? def : cells.map!"a.outerWidth" .sum; }
 float totalOuterHeight(Cell[] cells, float def = EmptyCellHeight) { return cells.empty ? def : cells.map!"a.outerHeight".sum;}
@@ -819,21 +813,21 @@ struct Border{
   }
 
 
-  Bounds2f adjustBounds(in Bounds2f bb){
-    Bounds2f res = bb;
-    if(extendBottomRight)with(res.bMax){ x += width; y += width; }
+  bounds2 adjustBounds(in bounds2 bb){
+    bounds2 res = bb;
+    if(extendBottomRight)with(res.high){ x += width; y += width; }
     return res;
   }
 }
 
-int toLineStipple(BorderStyle bs){
+auto toLineStyle(BorderStyle bs){
   with(BorderStyle) switch(bs){
-    case dot:         return lsDot;
-    case dash:        return lsDash;
-    case dashDot:     return lsDashDot;
-    case dash2:       return lsDash2;
-    case dashDot2:    return lsDashDot2;
-    default: return lsNormal;
+    case dot:         return LineStyle.dot;
+    case dash:        return LineStyle.dash;
+    case dashDot:     return LineStyle.dashDot;
+    case dash2:       return LineStyle.dash2;
+    case dashDot2:    return LineStyle.dashDot2;
+    default: return LineStyle.normal;
   }
 }
 
@@ -865,7 +859,7 @@ class Cell{ // Cell ////////////////////////////////////
     //egy atomic lenne a legjobb
   }
 
-  V2f outerPos, innerSize;
+  vec2 outerPos, innerSize;
 
   ref _FlexValue flex() { static _FlexValue nullFlex; return nullFlex   ; } //todo: this is bad, but fast. maybe do it with a setter and const ref.
   ref Margin  margin () { static Margin  nullMargin ; return nullMargin ; }
@@ -873,24 +867,24 @@ class Cell{ // Cell ////////////////////////////////////
   ref Padding padding() { static Padding nullPadding; return nullPadding; }
 
   float extraMargin()      { return (VisualizeContainers && cast(Container)this)? 3:0; }
-  V2f topLeftGapSize()     { return V2f(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   ); }
-  V2f bottomRightGapSize() { return V2f(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom); }
-  V2f gapSize() { return topLeftGapSize + bottomRightGapSize; }
+  vec2 topLeftGapSize()     { return vec2(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   ); }
+  vec2 bottomRightGapSize() { return vec2(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom); }
+  vec2 gapSize() { return topLeftGapSize + bottomRightGapSize; }
 
   @property{
     //todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
-    V2f innerPos () { return outerPos+topLeftGapSize; } void innerPos(in V2f p){ outerPos = p+topLeftGapSize; }
-    V2f outerSize() { return innerSize+gapSize; } void outerSize(in V2f s){ innerSize = s-gapSize; }
-    auto innerBounds() { return Bounds2f(innerPos, innerPos+innerSize); }
-    void innerBounds(in Bounds2f b) { innerPos = b.bMin; innerSize = b.size; }
-    auto outerBounds() { return Bounds2f(outerPos, outerPos+outerSize); }
-    void outerBounds(in Bounds2f b) { outerPos = b.bMin; outerSize = b.size; }
+    vec2 innerPos () { return outerPos+topLeftGapSize; } void innerPos(in vec2 p){ outerPos = p+topLeftGapSize; }
+    vec2 outerSize() { return innerSize+gapSize; } void outerSize(in vec2 s){ innerSize = s-gapSize; }
+    auto innerBounds() { return bounds2(innerPos, innerPos+innerSize); }
+    void innerBounds(in bounds2 b) { innerPos = b.low; innerSize = b.size; }
+    auto outerBounds() { return bounds2(outerPos, outerPos+outerSize); }
+    void outerBounds(in bounds2 b) { outerPos = b.low; outerSize = b.size; }
 
     auto outerBottomRight() { return outerPos+outerSize; }
 
-    auto borderBounds(float location=0.5)(){
+    auto borderBounds(float location=0.5f)(){
       auto hb = border.width*location;
-      return Bounds2f(outerPos+V2f(margin.left+extraMargin+hb, margin.top+extraMargin+hb), outerBottomRight-V2f(margin.right+extraMargin+hb, margin.bottom+extraMargin+hb));
+      return bounds2(outerPos+vec2(margin.left+extraMargin+hb, margin.top+extraMargin+hb), outerBottomRight-vec2(margin.right+extraMargin+hb, margin.bottom+extraMargin+hb));
     }
     auto borderBounds_inner() { return borderBounds!1; }
     auto borderBounds_outer() { return borderBounds!0; }
@@ -905,14 +899,14 @@ class Cell{ // Cell ////////////////////////////////////
     auto outerHeight() { return innerSize.y+gapSize.y; } void outerHeight(float v) { innerSize.y = v-gapSize.y; }
     auto outerRight () { return outerX+outerWidth; }
     auto outerBottom() { return outerY+outerHeight; }
-    auto innerCenter() { return innerPos + innerSize*.5; }
+    auto innerCenter() { return innerPos + innerSize*.5f; }
 
     alias size = innerSize;
     alias width = innerWidth;
     alias height = innerHeight;
   }
 
-  Bounds2f getHitBounds() { return borderBounds_outer; } //Used by hittest. Can override.
+  bounds2 getHitBounds() { return borderBounds_outer; } //Used by hittest. Can override.
 
   private void notImpl(string s){ raise(s~" in "~typeof(this).stringof); }
 
@@ -953,9 +947,9 @@ class Cell{ // Cell ////////////////////////////////////
   void delete_(int at, int cnt) { insert([], at, cnt); }
   Cell[] cut(int at, int cnt)   { Cell[] res; insert([], at, cnt, &res); }*/
 
-  bool internal_hitTest(in V2f mouse, V2f ofs=V2f.Null){ //todo: only check when the hitTest flag is true
-    auto bnd = getHitBounds.translated(ofs);
-    if(bnd.checkInsideRect(mouse)){
+  bool internal_hitTest(in vec2 mouse, in vec2 ofs=vec2(0)){ //todo: only check when the hitTest flag is true
+    auto bnd = getHitBounds + ofs;
+    if(bnd.contains!"[)"(mouse)){
       hitTestManager.addHitRect(this, bnd, mouse-outerPos);
       return true;
     }else{
@@ -967,7 +961,7 @@ class Cell{ // Cell ////////////////////////////////////
     if(!border.width || border.style == BorderStyle.none) return;
 
     auto bw = border.width, bb = borderBounds;
-    dr.lineStipple = border.style.toLineStipple;
+    dr.lineStyle = border.style.toLineStyle;
     dr.color = border.color;
     dr.lineWidth = bw * (border.style==BorderStyle.double_ ? 0.33f : 1);
 
@@ -984,8 +978,8 @@ class Cell{ // Cell ////////////////////////////////////
       }
     }
 
-    if(border.style==BorderStyle.double_){ doit(-0.333); doit(0.333); }
-                                     else{ doit;                      }
+    if(border.style==BorderStyle.double_){ doit(-0.333f); doit(0.333f); }
+                                     else{ doit;                        }
   }
 }
 
@@ -1028,21 +1022,21 @@ class Shape : Cell{ // Shape /////////////////////////////////////
 /*  this(T)(ShapeType shapeType, RGB color, T state, float fontHeight){
     this.type = shapeType;
     this.color = color;
-    innerSize = V2f(fontHeight*.5, fontHeight);
+    innerSize = vec2(fontHeight*.5, fontHeight);
   }*/
 
   override void draw(Drawing dr){
     final switch(type){
       case ShapeType.led:{
-        auto r = min(innerWidth, innerHeight)*0.92;
+        auto r = min(innerWidth, innerHeight)*0.92f;
 
 
         auto p = innerCenter;
 
         dr.pointSize = r;       dr.color = RGB(.3, .3, .3);  dr.point(p);
-        dr.pointSize = r*.8;    dr.color = color;   dr.point(p);
-        dr.pointSize = r*0.4;   dr.alpha = 0.4; dr.color = clWhite; dr.point(p-V2f(1,1)*(r*0.15));
-        dr.pointSize = r*0.2;   dr.alpha = 0.4; dr.color = clWhite; dr.point(p-V2f(1,1)*(r*0.18));
+        dr.pointSize = r*.8f;   dr.color = color;   dr.point(p);
+        dr.pointSize = r*0.4f;  dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f));
+        dr.pointSize = r*0.2f;  dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f));
         dr.alpha = 1;
 
       break;}
@@ -1091,13 +1085,13 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 
     if(VisualizeGlyphs){
       dr.color = clGray;
-      dr.lineStipple = lsNormal;
-      dr.lineWidth = 0.16*2;
+      dr.lineStyle = LineStyle.normal;
+      dr.lineWidth = 0.16f*2;
       dr.drawRect(innerBounds);
 
       if(isTab){
         dr.arrowStyle = asVector;
-        dr.lineWidth = innerHeight*0.04;
+        dr.lineWidth = innerHeight*0.04f;
         dr.line(innerBounds.leftCenter, innerBounds.rightCenter);
         dr.arrowStyle = asNone;
       }else if(isWhite){
@@ -1162,7 +1156,7 @@ struct TextPos{
   private{
     Type type;
     int fIdx, fLine, fColumn; //todo: union
-    V2f fPoint;
+    vec2 fPoint;
     float fHeight=0;
 
     void enforceType(string file = __FILE__, int line = __LINE__)(Type t) const{
@@ -1172,7 +1166,7 @@ struct TextPos{
 
   this(int idx                   ){ type = Type.idx ;  fIdx   = idx  ;                     }
   this(int line, int column      ){ type = Type.lc  ;  fLine  = line ;  fColumn = column; }
-  this(in V2f point, float height){ type = Type.xy  ;  fPoint = point;  fHeight = height;  }
+  this(in vec2 point, float height){ type = Type.xy  ;  fPoint = point;  fHeight = height;  }
 
   bool valid() const{ return type != Type.none; }
   bool isIdx() const{ return type == Type.idx ; }
@@ -1204,7 +1198,7 @@ struct TextRange{
 
 struct EditCmd{ // EditCmd ////////////////////////////////////////
   private enum _intParamDefault = int.min+1,
-               _pointParamDefault = V2f(-1e30, -1e30);
+               _pointParamDefault = vec2(-1e30, -1e30);
 
   enum Cmd {
     //caret commands              //parameters
@@ -1220,19 +1214,19 @@ struct EditCmd{ // EditCmd ////////////////////////////////////////
 
   Cmd cmd;
   int _intParam = _intParamDefault;
-  V2f _pointParam = _pointParamDefault;
+  vec2 _pointParam = _pointParamDefault;
 
   //parameter access
   string strParam;
   int intParam(int def=0) const{ return _intParam==_intParamDefault ? def : _intParam; }
-  V2f pointParam(in V2f def=V2f.Null) const{ return _pointParam==_pointParamDefault ? def : _pointParam; }
+  vec2 pointParam(in vec2 def=vec2(0)) const{ return _pointParam==_pointParamDefault ? def : _pointParam; }
 
   this(T...)(Cmd cmd, T args){
     this.cmd = cmd;
     static foreach(a; args){
       static if(isSomeString!(typeof(a))) strParam = a;
       static if(isIntegral  !(typeof(a))) _intParam = a;
-      static if(is(const typeof(a) == ConstOf!V2f)) _pointParam = a;
+      static if(is(const typeof(a) == ConstOf!vec2)) _pointParam = a;
     }
   }
 
@@ -1290,18 +1284,18 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     return clampIdx(baseIdx + clampedColumn);
   }
 
-  private int lc2idx(in V2i colLine){ with(colLine) return lc2idx(y, x); }
+  private int lc2idx(in ivec2 colLine){ with(colLine) return lc2idx(y, x); }
 
-  private V2i xy2lc(in V2f point){
-    if(wrappedLines.empty) return V2i.Null;
+  private ivec2 xy2lc(in vec2 point){
+    if(wrappedLines.empty) return ivec2(0);
 
     float yMin = wrappedLines[0].top,
           yMax = wrappedLines[$-1].bottom,
           y = point.y;
 
     static if(1){ //above or below: snap to first/last line or start/end of the whole text.
-      if(y<yMin) return V2i.Null;
-      if(y>yMax) return V2i(wrappedLineCount-1, wrappedLines[wrappedLineCount-1].cellCount);
+      if(y<yMin) return ivec2(0);
+      if(y>yMax) return ivec2(wrappedLineCount-1, wrappedLines[wrappedLineCount-1].cellCount);
     }else{ //other version: just clamp it to the nearest
       y = tp.point.y.clamp(yMin, yMax);
     }
@@ -1337,23 +1331,23 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
 
 //print(column, line);
-    return V2i(column, line);
+    return ivec2(column, line);
   }
 
-  private int xy2idx(in V2f point){ return lc2idx(xy2lc(point)); }
+  private int xy2idx(in vec2 point){ return lc2idx(xy2lc(point)); }
 
-  private V2i idx2lc(int idx){
-    if(idx<=0 || cellCount==0) return V2i(0, 0);
+  private ivec2 idx2lc(int idx){
+    if(idx<=0 || cellCount==0) return ivec2(0, 0);
 
     int col = idx;
     if(idx < cellCount) foreach(int line; 0..wrappedLineCount){
       const count = wrappedLines[line].cellCount;
       if(col < count)
-        return V2i(col, line);
+        return ivec2(col, line);
       col -= count;
     }
 
-    return V2i(wrappedLines[$-1].cellCount, wrappedLineCount); //The cell after the last.
+    return ivec2(wrappedLines[$-1].cellCount, wrappedLineCount); //The cell after the last.
   }
 
   TextPos toIdx(in TextPos tp){
@@ -1379,7 +1373,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
   TextPos toXY(in TextPos tp){
     if(!tp.valid) return tp;
 
-    if(!cellCount) return TextPos(V2f(0, 0), defaultFontHeight);
+    if(!cellCount) return TextPos(vec2(0, 0), defaultFontHeight);
     if(tp.isXY   ) return tp;
 
     TextPos lc;
@@ -1395,7 +1389,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     }
 
     auto cell = wrappedLines[line].cells[col];  //todo: refactor
-    auto pos = V2f(cell.outerPos.x + (isRight ? cell.outerWidth : 0), wrappedLines[line].top);
+    auto pos = vec2(cell.outerPos.x + (isRight ? cell.outerWidth : 0), wrappedLines[line].top);
     return TextPos(pos, wrappedLines[line].height);
   }
 
@@ -1431,7 +1425,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
       if(!delta) return;
       auto c = toXY(caret);
 
-      caret = toIdx(TextPos(V2f(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); //todo: it only works for the same fontHeight and  monospaced stuff
+      caret = toIdx(TextPos(vec2(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); //todo: it only works for the same fontHeight and  monospaced stuff
       caretRestrict;
     }
 
@@ -1638,7 +1632,7 @@ class Container : Cell { // Container ////////////////////////////////////
     foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure(); //recursive in the front
   }
 
-  override bool internal_hitTest(in V2f mouse, V2f ofs=V2f.Null){
+  override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     if(super.internal_hitTest(mouse, ofs)){
       ofs += innerPos;
       foreach(sc; subCells) sc.internal_hitTest(mouse, ofs); //recursive
@@ -1650,7 +1644,7 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-  static Bounds2f _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
+  static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 
   override void draw(Drawing dr){
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
@@ -1666,14 +1660,14 @@ class Container : Cell { // Container ////////////////////////////////////
     if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
 
     dr.translate(innerPos);
-    if(flags.clipChildren) dr.pushClipBounds(Bounds2f(0, 0, innerWidth, innerHeight));
+    if(flags.clipChildren) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
 
     foreach(sc; subCells){
       sc.draw(dr); //recursive
     }
 
     if(flags._hasOverlayDrawing){
-      import het.ui;
+      import het.ui;              !!!!!!!!!
       if(auto drOverlay = this in het.ui.im.overlayDrawings)
         dr.copyFrom(*drOverlay);
     }
@@ -1697,16 +1691,16 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   //aligns the container on the screen
-  void applyPanelPosition(in Bounds2f bnd){ with(PanelPosition){
+  void applyPanelPosition(in bounds2 bnd){ with(PanelPosition){
     const pp = flags.panelPosition;
     if(pp == none) return;
 
-    V2i p; divMod(cast(int)pp-1, 3, p.y, p.x);
+    ivec2 p; divMod(cast(int)pp-1, 3, p.y, p.x);
     if(p.x.inRange(0, 2) && p.y.inRange(0, 2)){
       auto t = p.toF*.5,
-           u = V2f(1, 1)-t;
+           u = vec2(1, 1)-t;
 
-      outerPos = bnd.topLeft*u + bnd.bottomRight*t //todo: bug: fucking V2f.lerp is broken again
+      outerPos = bnd.topLeft*u + bnd.bottomRight*t //todo: bug: fucking vec2.lerp is broken again
                - outerSize*t;
     }
   }}
@@ -2106,14 +2100,14 @@ class Row : Container { // Row ////////////////////////////////////
 
     //align/spread horizontally
     size_t iStart = 0;
-    auto cursor = V2f.Null;
+    auto cursor = vec2(0);
     float maxLineHeight = 0;
     WrappedLine[] wrappedLines;
 
     void lineEnd(size_t iEnd){
       wrappedLines ~= WrappedLine(subCells[iStart..iEnd], cursor.y, maxLineHeight);
 
-      cursor = V2f(0, cursor.y+maxLineHeight);
+      cursor = vec2(0, cursor.y+maxLineHeight);
       maxLineHeight = 0;
       iStart = iEnd;
     }

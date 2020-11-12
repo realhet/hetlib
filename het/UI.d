@@ -12,7 +12,7 @@ public import het.uibase;
 enum SliderOrientation{ horz, vert, round, auto_ }
 enum HoverState { normal, hover, pressed, disabled }
 
-void calcSliderOrientation(ref SliderOrientation orientation, in Bounds2f r){
+void calcSliderOrientation(ref SliderOrientation orientation, in bounds2 r){
   if(orientation == SliderOrientation.auto_){
     float aspect = safeDiv(r.width/r.height, 1);
     enum THRESHOLD = 1.5f;
@@ -31,12 +31,12 @@ class Slider : Cell { // Slider //////////////////////////////////
     uint mod_id, mod_actid;
     SliderOrientation mod_ori;
     V2f mod_p0, mod_p1;
-    Bounds2f mod_knob;
+    bounds2 mod_knob;
     V2f mod_ofs, mod_mouseBase;
     float mod_nPosBase;
     int mod_dir; //0:unknown, 1:h, 2:v
 
-    void modSet(uint id, in SliderOrientation ori, V2f p0, V2f p1, in Bounds2f bKnob){
+    void modSet(uint id, in SliderOrientation ori, V2f p0, V2f p1, in bounds2 bKnob){
       mod_id = id;
       mod_ori = ori;
       mod_p0 = p0;
@@ -57,7 +57,7 @@ class Slider : Cell { // Slider //////////////////////////////////
   float nPos, nCenter=0;  //center is the start of the marking on the line
   int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
 
-  Bounds2f hitBounds;
+  bounds2 hitBounds;
 
   this(uint id, ref float nPos_, in im.range range_, ref bool userModified, TextStyle ts=tsNormal){
     this.id = id;
@@ -174,7 +174,7 @@ class Slider : Cell { // Slider //////////////////////////////////
       nPos_ = nPos;
   }
 
-  override Bounds2f getHitBounds(){
+  override bounds2 getHitBounds(){
     return innerBounds;
   }
 
@@ -199,15 +199,15 @@ class Slider : Cell { // Slider //////////////////////////////////
 
       drawLine(p0, p1, clLine);
 
-      if(rulerSides&1) drawStraightRuler(dr, Bounds2f(p0-ro, p1-ro*0.4f), rulerDiv0, rulerDiv1, true );
-      if(rulerSides&2) drawStraightRuler(dr, Bounds2f(p0+ro*0.4f, p1+ro), rulerDiv0, rulerDiv1, false);
+      if(rulerSides&1) drawStraightRuler(dr, bounds2(p0-ro, p1-ro*0.4f), rulerDiv0, rulerDiv1, true );
+      if(rulerSides&2) drawStraightRuler(dr, bounds2(p0+ro*0.4f, p1+ro), rulerDiv0, rulerDiv1, false);
 
       if(!nPos.isNaN){
         auto p = vLerp(p0, p1, nPos);
         if(!nCenter.isNaN) drawLine(vLerp(p0, p1, nCenter), p, clThumb);
         drawThumb(p, t);
 
-        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(Bounds2f(p, p).inflated(lwThumb*0.5, lwThumb*1.5)));
+        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*0.5, lwThumb*1.5)));
       }
 
     }else if(orientation==SliderOrientation.vert){
@@ -218,14 +218,14 @@ class Slider : Cell { // Slider //////////////////////////////////
 
       drawLine(p0, p1, clLine);
 
-      if(rulerSides&1) drawStraightRuler(dr, Bounds2f(p1-ro, p0-ro*0.4f), rulerDiv0, rulerDiv1, true );
-      if(rulerSides&2) drawStraightRuler(dr, Bounds2f(p1+ro*0.4f, p0+ro), rulerDiv0, rulerDiv1, false);
+      if(rulerSides&1) drawStraightRuler(dr, bounds2(p1-ro, p0-ro*0.4f), rulerDiv0, rulerDiv1, true );
+      if(rulerSides&2) drawStraightRuler(dr, bounds2(p1+ro*0.4f, p0+ro), rulerDiv0, rulerDiv1, false);
 
       if(!nPos.isNaN){
         auto p = vLerp(p0, p1, nPos);
         if(!nCenter.isNaN) drawLine(vLerp(p0, p1, nCenter), p, clThumb);
         drawThumb(p, t);
-        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(Bounds2f(p, p).inflated(lwThumb*1.5, lwThumb*0.5)));
+        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*1.5, lwThumb*0.5)));
       }
     }else if(orientation==SliderOrientation.round){
       //center square
@@ -266,7 +266,7 @@ class Slider : Cell { // Slider //////////////////////////////////
   }
 
   // Draw Rulers
-  protected void drawStraightRuler(Drawing dr, in Bounds2f r, int cnt, int cnt2=-1, bool topleft=true){
+  protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true){
     cnt--;
     if(cnt<=0) return;
     if(cnt2<0) cnt2 = cnt;
@@ -909,7 +909,7 @@ struct WinContext{ //WinContext /////////////////////////////
 
 
 struct SizingFrame{
-  Bounds2f bounds;
+  bounds2 bounds;
   V2f cornerSize;
   V2f cornerSize2; //inner with gap added
 
@@ -940,7 +940,7 @@ struct SizingFrame{
 }
 
 
-auto calcSizingFrame(in Bounds2f fullBounds, in WinContext ctx){
+auto calcSizingFrame(in bounds2 fullBounds, in WinContext ctx){
 
   auto calcFrameBounds() { // calculates bounds moved inward
     if(!ctx.inwardFrame) return fullBounds;
@@ -969,11 +969,11 @@ auto calcSizingFrame(in Bounds2f fullBounds, in WinContext ctx){
 class ImWin{ // ImWin //////////////////////////////////
   static WinContext ctx; //must update from outside
 
-  Bounds2f bounds;
+  bounds2 bounds;
   string caption;
   bool focused;
 
-  this(string caption_, Bounds2f bounds_){
+  this(string caption_, bounds2 bounds_){
     caption = caption_;
     bounds = bounds_;
     adjustBounds;
@@ -1162,6 +1162,9 @@ struct im{ static:
   void _beginFrame(in V2f mousePos){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
 
+    static auto getActFontHeight(){ return textStyle.fontHeight; }  g_actFontHeightFunct = &getActFontHeight;
+    static auto getActFontColor (){ return textStyle.fontColor;  }  g_actFontColorFunct  = &getActFontColor ;
+
     //update building/measuring/drawing state
     inFrame = true;
     canDraw = false;
@@ -1181,7 +1184,7 @@ struct im{ static:
     deltaTime = dt.update;
   }
 
-  void _endFrame(in Bounds2f screenBounds){ //called from end of update
+  void _endFrame(in bounds2 screenBounds){ //called from end of update
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
     enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 
@@ -1350,7 +1353,7 @@ static cnt=0;
       this.state = &state;
     }
 
-    void apply(in Bounds2f screenBounds){ //must be called first, before update, so the positions are calculated well
+    void apply(in bounds2 screenBounds){ //must be called first, before update, so the positions are calculated well
       if(state) with(*state){
         float totalHeight = parent ? parent.innerHeight : screenBounds.height;
         float docHeight = container.outerHeight;  //todo: COPY
@@ -1361,7 +1364,7 @@ static cnt=0;
       }
     }
 
-    void update(in Bounds2f screenBounds){
+    void update(in bounds2 screenBounds){
       if(state) with(*state){
         float totalHeight = parent ? parent.innerHeight : screenBounds.height;
         float docHeight = container.outerHeight; //todo: PASTE
@@ -1409,11 +1412,11 @@ static cnt=0;
     return vScroll(cache[id_]);
   }
 
-  private void applyScrollers(in Bounds2f screenBounds){
+  private void applyScrollers(in bounds2 screenBounds){
     foreach(sc; scrollers) sc.apply(screenBounds);
   }
 
-  private void updateScrollers(in Bounds2f screenBounds){
+  private void updateScrollers(in bounds2 screenBounds){
     foreach(sc; scrollers) sc.update(screenBounds);
   }
 
@@ -1429,7 +1432,7 @@ static cnt=0;
 
   private struct HintRec{
     .Container owner;
-    Bounds2f bounds;
+    bounds2 bounds;
     string markup, markupDetails; //todo: support delegates too
   }
   private HintRec[] hints;
@@ -1439,7 +1442,7 @@ static cnt=0;
 
   /// This can be used to inject a hint into the parameters of a Control
   auto hint(string markup, string markupDetails=""){ //todo: delegate too
-    return HintRec(null, Bounds2f.Null, markup, markupDetails); //todo: lazyness
+    return HintRec(null, bounds2.Null, markup, markupDetails); //todo: lazyness
   }
 
   void addHint(HintRec hr){ hints ~= hr; }
@@ -1457,7 +1460,7 @@ static cnt=0;
     }
   };
 
-  private void generateHints(in Bounds2f screenBounds){ //called on the end of the frame
+  private void generateHints(in bounds2 screenBounds){ //called on the end of the frame
     static float mouseStopped_secs = 0;
     static float noHint_secs = 0;
 

@@ -1030,8 +1030,8 @@ public:
     moving = !delta.world.isnull;
   }
 
-  bool inWorld () const { return worldRect .contain!"[)"(act.world ); }
-  bool inScreen() const { return screenRect.contain!"[)"(act.screen); }
+  bool inWorld () const { return worldRect .contains!"[)"(act.world ); }
+  bool inScreen() const { return screenRect.contains!"[)"(act.screen); }
 }
 
 /////////////////////////////////////////////////////////////////////////////

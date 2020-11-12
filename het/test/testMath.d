@@ -139,50 +139,29 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
 
-  import het.math, het.utils, het.debugclient, het.geometry, het.color, het.bitmap, het.win, het.view, het.opengl, het.binpacker, het.megatexturing,
+  import het.stream;
+  het.stream.unittest_main;
+
+  import het.uibase;
+
+
+/*  import het.math, het.utils, het.debugclient, het.geometry, het.color, het.bitmap, het.win, het.view, het.opengl, het.binpacker, het.megatexturing,
     het.fonts, het.draw2d, het.dialogs, het.keywords, het.tokenizer;
 
-  import het.libvlc, het.fileops, het.http, het.parser, het.stream;
+  import het.libvlc, het.fileops, het.http, het.parser, het.stream;*/
 
-  // check the precision of vectors
-  foreach(T; AliasSeq!(float, double, real)){
-    auto v = vec3(1,2,3)*T(PI);
-    auto s = v.toJson;
-    Vector!(T, 3) v2; v2.fromJson(s);
-    print(v, s, v2);
-    assert(v2 == v);
-  }
-
-  [[1,2],[3,4],[5,6]].toJson(true).print;
-  auto sm = mat3x2(1,2,3,4,5,6).toJson; //bug here!!!
-  mat3x2 m2;
-  m2.fromJson(sm);
-  print(sm, m2);
-
-
-readln;
-application.exit;
-
-  auto name = "brg";
-  enforce(name in colorMaps);
-  auto width = 128;
-  auto raw = colorMaps[name].toArray(width);
-  auto img = image2D(width, 1, raw);
-  img.serialize("webp").saveTo(File(`c:\dl\brg.webp`));
-
-  File(`c:\dl\a32.tga`)
-    .deserialize!Bitmap
-    .serialize("png")
-    .saveTo(`c:\dl\a.png`);
-
-  newBitmap(`font:\Times New Roman\64?Hello World`~"\U0001F4A9").serialize("webp").saveTo(`c:\dl\text.webp`);
-
-  writeln("done");
-  readln;
-  //application.exit;
+//readln; application.exit;
 
 }//); }
 
+
+void main(){
+  application.runConsole({
+    maintest;
+  });
+}
+
+/*
 import het.win;
 
 class MyWin: Window{
@@ -208,3 +187,4 @@ class MyWin: Window{
   }
 
 }
+*/

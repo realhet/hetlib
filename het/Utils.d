@@ -961,7 +961,7 @@ auto logCodec(bool encode, T, float digits, int max)(float x){
   enum mul = (0.30101f*max)/digits,
        add = max/mul;
   static if(encode){
-    return cast(T)(iRound((log2(x)+add)*mul).clamp(0, max));
+    return cast(T)(iround((log2(x)+add)*mul).clamp(0, max));
   }else{
     return 2.0f^^(x*(1/mul)-add);
   }
