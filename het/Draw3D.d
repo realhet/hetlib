@@ -13,7 +13,7 @@ enum DUMP_3DS_IMPORT = false;
 
 
 struct VertexRec{
-  V3f aPosition;
+  vec3 aPosition;
 }
 
 // utils /////////////////////////////////////////////////
@@ -26,18 +26,18 @@ auto project(in mat4 m, in vec3 v){
 
 mat4 lookAt(const vec3 eye, const vec3 target, const vec3 up){
   auto forward = target - eye;
-  if(!forward.length_squared) return mat4.identity;
-  forward.normalize;
+  if(!sqrLength(forward)) return mat4.identity;
+  forward = normalize(forward);
 
-  auto side = cross(forward, up).normalized;
+  auto side = cross(forward, up).normalize;
   auto upVector = cross(side, forward);
 
-  return mat4(vec4(side, 0), vec4(upVector, 0), vec4(-forward, 0), vec4(eye, 1)).transposed.inverse;
+  return mat4(vec4(side, 0), vec4(upVector, 0), vec4(-forward, 0), vec4(eye, 1)).transpose.inverse;
 }
 
 void repairRotation(ref mat4 m, bool doNormalize){
-  vec3 col(int n){ return vec3(  m.matrix[0][n]      , m.matrix[1][n]      , m.matrix[2][n]     ); }
-  void setCol(int n, in vec3 v){ m.matrix[0][n] = v.x; m.matrix[1][n] = v.y; m.matrix[2][n] = v.z; }
+  vec3 col(int n){ return vec3(  m[0][n]      , m[1][n]      , m[2][n]     ); }
+  void setCol(int n, in vec3 v){ m[0][n] = v.x; m[1][n] = v.y; m[2][n] = v.z; }
 
   float[3] len;
   foreach(int i, ref a; len) { a = col(i).length; if(!a) a=1; }
@@ -91,8 +91,8 @@ struct Cursor3D{
   vec3 device; //-1..1 range
   vec3 world;
 
-  void setup(in V2i pos, in Bounds2i bounds){
-    inScreen = bounds.checkInside(pos);
+  void setup(in ivec2 pos, in ibounds2 bounds){
+    inScreen = bounds.contains!"[)"(pos);
     with(pos-bounds.topLeft) screen = ivec2(x, y);
     invy = bounds.height-1-screen.y;
 
@@ -130,7 +130,7 @@ private:
 
   static auto axisVector(int n){
     auto e = vec3(0,0,0);
-    e.vector[n.cyclicMod(3)] = 1;
+    e[mod(n, 3)] = 1;
     return e;
   }
 
@@ -144,20 +144,20 @@ private:
   }
 
   static auto mat2idx(in mat4 m){
-    auto axis        (int n) { return [m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]]; }
+    auto axis        (int n) { return [m[0][n], m[1][n], m[2][n]]; }
     auto axisIndex   (int n) { return cast(int) axis(n).map!(a => a<0 ? -a : a).maxIndex; }  //note: abs suxx, it is declared in gl3n and makes utils. abs obsolete
     auto axisNegative(int n) { return axis(n)[axisIndex(n)]<0 ? 1 : 0; }
     return idxEncode(&axisIndex, &axisNegative);
   }
 
   static auto str2idx(string s){
-    auto axisIndex   (int n) { return (cast(int)(s.get(n).lc-'x')).cyclicMod(3); }
+    auto axisIndex   (int n) { return (cast(int)(s.get(n).lc-'x')).mod(3); }
     auto axisNegative(int n) { auto ch = s.get(n); return ch == ch.lc ? 0 : 1; }
     return idxEncode(&axisIndex, &axisNegative);
   }
 
   static void idxDecode(int val, void delegate(int n, int idx, int neg) setAxis){
-    int ax0 = (val>>4).cyclicMod(3);
+    int ax0 = (val>>4).mod(3);
     setAxis(0, ax0, val.getBit(0));
 
     int[] ax = iota(3).filter!(i => i!=ax0).array;
@@ -185,7 +185,7 @@ public:
   @RANGE(0, 24) ubyte idx;
 
   this(string s)                        { asString = s; }
-  this(int i)                           { idx = cast(ubyte) i.cyclicMod(48); }
+  this(int i)                           { idx = cast(ubyte) i.mod(48); }
 
   auto opCmp(in CubeOrientation other)  { return idx - other.idx; }
 
@@ -202,7 +202,7 @@ public:
   }
 
   void spin(int axis, int cnt){
-    matrix = matrix * mat4.rotation(PI/2*cnt.cyclicMod(4), axisVector(axis));
+    matrix = matrix * mat4.rotation(PIf/2*cnt.cyclicMod(4), axisVector(axis));
   }
 
   void mirror(int axis){
@@ -537,7 +537,7 @@ class Camera{ //! Camera //////////////////////////////////////
 
 
 
-/+void Camera::lookFrom(const V3f& _target, const V3f& dir, const QVector<Bounds3f>& aabbs, int width, int height, float step, float scale)
+/+void Camera::lookFrom(const vec3& _target, const vec3& dir, const QVector<bounds3>& aabbs, int width, int height, float step, float scale)
 {
   float dist=step;
   const float maxDist=5000;
@@ -551,7 +551,7 @@ class Camera{ //! Camera //////////////////////////////////////
   M44f mVP(glst.mView*glst.mProjection);
   Frustum fr(mVP);
 
-  V3f d = -dir.normalized();
+  vec3 d = -dir.normalized();
 
   FOR(i, aabbs){
     while(fr.isAABB_outside(aabbs.at(i).translated(d*dist))){
@@ -568,9 +568,9 @@ done:
 }
 
 
-void Camera::lookFrom(const V3f& _target, const V3f& dir, const Bounds3f& aabb, int width, int height, float step, float scale)
+void Camera::lookFrom(const vec3& _target, const vec3& dir, const bounds3& aabb, int width, int height, float step, float scale)
 {
-  lookFrom(_target, dir, QVector<Bounds3f>()<<aabb, width, height, step, scale);
+  lookFrom(_target, dir, QVector<bounds3>()<<aabb, width, height, step, scale);
 } +/
 
 
@@ -669,7 +669,7 @@ vec3[] loadStl(File f){ return f.readStr.loadStl;}
 
 class LineDrawing {
   struct LineVertex {
-    V3f aPosition;  //*** the fieldnames must match the name of the shader attributes!
+    vec3 aPosition;  //*** the fieldnames must match the name of the shader attributes!
     uint aColor;
   }
 
@@ -683,27 +683,27 @@ class LineDrawing {
     return vbo_;
   }
 
-  void addLine(in V3f p0, in V3f p1, in RGB cl0, in RGB cl1){ vertices ~= [ LineVertex(p0, cl0), LineVertex(p1, cl1) ]; vboValid = false; }
-  void addLine(in V3f p0, in V3f p1, in RGB cl){ addLine(p0, p1, cl, cl); }
+  void addLine(in vec3 p0, in vec3 p1, in RGB cl0, in RGB cl1){ vertices ~= [ LineVertex(p0, cl0), LineVertex(p1, cl1) ]; vboValid = false; }
+  void addLine(in vec3 p0, in vec3 p1, in RGB cl){ addLine(p0, p1, cl, cl); }
 
   void addAxes(mat4 m, float scale = 1){
-    V3f v(int n)(){ return V3f(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); }
+    vec3 v(int n)(){ return vec3(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); }
     addLine(v!3, v!3+v!0*scale, clAxisX);
     addLine(v!3, v!3+v!1*scale, clAxisY);
     addLine(v!3, v!3+v!2*scale, clAxisZ);
   }
 
-  void addCross(V3f center, float size, RGB col){
-    addLine(center-V3f(size, 0, 0), center+V3f(size, 0, 0), col);
-    addLine(center-V3f(0, size, 0), center+V3f(0, size, 0), col);
-    addLine(center-V3f(0, 0, size), center+V3f(0, 0, size), col);
+  void addCross(vec3 center, float size, RGB col){
+    addLine(center-vec3(size, 0, 0), center+vec3(size, 0, 0), col);
+    addLine(center-vec3(0, size, 0), center+vec3(0, size, 0), col);
+    addLine(center-vec3(0, 0, size), center+vec3(0, 0, size), col);
   }
 
-  void addBB(in Bounds3f bb, mat4 m, RGB cl = clWhite){
+  void addBB(in bounds3 bb, mat4 m, RGB cl = clWhite){
     void a(string s)(){
-      auto q0 = m * vec4(s[0]=='0' ? bb.bMin.x : bb.bMax.x, s[1]=='0' ? bb.bMin.y : bb.bMax.y, s[2]=='0' ? bb.bMin.z : bb.bMax.z, 1); //todo: vec3 V3f interop suxxx
+      auto q0 = m * vec4(s[0]=='0' ? bb.bMin.x : bb.bMax.x, s[1]=='0' ? bb.bMin.y : bb.bMax.y, s[2]=='0' ? bb.bMin.z : bb.bMax.z, 1); //todo: vec3 vec3 interop suxxx
       auto q1 = m * vec4(s[3]=='0' ? bb.bMin.x : bb.bMax.x, s[4]=='0' ? bb.bMin.y : bb.bMax.y, s[5]=='0' ? bb.bMin.z : bb.bMax.z, 1);
-      addLine(V3f(q0.x, q0.y, q0.z), V3f(q1.x, q1.y, q1.z), cl);
+      addLine(vec3(q0.x, q0.y, q0.z), vec3(q1.x, q1.y, q1.z), cl);
     }
     a!"000100"; a!"000010"; a!"000001";
     a!"010110"; a!"100110"; a!"100101";
@@ -726,7 +726,7 @@ mixin template FIELD_protected(T, string name){
 class Draw3D{ //!Draw3D ////////////////////////////////////////
   Camera cam;
 
-  Bounds2i viewport;
+  ibounds2 viewport;
   Cursor3D cursor;
 
   //Model matrices, transformations
@@ -770,9 +770,9 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   float pickedZ;
   MeshNode pickedNode;
 
-  V2i screenMousePos;
+  ivec2 screenMousePos;
 
-  void beginFrame(V2i screenMousePos){
+  void beginFrame(ivec2 screenMousePos){
     enforce(!inFrame, "already in beginFrame()");
 
     this.screenMousePos = screenMousePos;
@@ -813,7 +813,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   }
 
   /// gets a cursor at a specific moment. Slow because of depth read.
-  auto getCursor(V2i screenMousePos){
+  auto getCursor(ivec2 screenMousePos){
     Cursor3D res;
     viewport = gl.getViewport; //todo: proper viewport handling, not just the full window
     res.setup(screenMousePos, viewport);
@@ -840,7 +840,7 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
   void rotate(float f, in vec3 a){ /*pushMatrix;*/ mModel.rotate(f, a); }
 
   struct VRecord {
-    V3f aPosition;
+    vec3 aPosition;
   };
 
   void draw(VBO vbo, RGBA color = clWhite){
@@ -1046,8 +1046,8 @@ class Draw3D{ //!Draw3D ////////////////////////////////////////
     }
 
     if(options.showCameraPivot){ auto ld = new LineDrawing;
-      auto c = V3f(cam.pivot.x, cam.pivot.y, cam.pivot.z),
-           d = V3f(cam.pivotPlaneCenter.x, cam.pivotPlaneCenter.y, cam.pivotPlaneCenter.z),
+      auto c = vec3(cam.pivot.x, cam.pivot.y, cam.pivot.z),
+           d = vec3(cam.pivotPlaneCenter.x, cam.pivotPlaneCenter.y, cam.pivotPlaneCenter.z),
            a = options.axisLength/3;
 
       auto c1 = clFuchsia, c2 = clWhite;
@@ -1470,11 +1470,11 @@ class MeshObject{   //! MeshObject ///////////////////////////////
   }
 
   private bool boundsValid;
-  private Bounds3f cachedBounds;
+  private bounds3 cachedBounds;
 
-  Bounds3f bounds(){
+  bounds3 bounds(){
     if(chkSet(boundsValid))
-      cachedBounds = Bounds3f(vertices.map!(v=>V3f(v.x, v.y, v.z)).array);
+      cachedBounds = bounds3(vertices.map!(v=>vec3(v.x, v.y, v.z)).array);
     return cachedBounds;
   }
 
@@ -1492,7 +1492,7 @@ protected:
   void f(int a, int b, int c)           { Index[4] r = [(base+a).to!Index, (base+b).to!Index, (base+c).to!Index, 0]; faces ~= r; }
   void q(int a, int b, int c, int d)    { f(a, b, c);  f(c, b, d); }
 
-  void addBox(Bounds3f bnd) { setBase;
+  void addBox(bounds3 bnd) { setBase;
     bnd.sortBounds;
     with(bnd) foreach(x; [bMin.x, bMax.x])
               foreach(y; [bMin.y, bMax.y])
@@ -1520,7 +1520,7 @@ protected:
     }
   }
 
-  void addPoly(in V2f[][] outlines, float y0=0, float y1=1){
+  void addPoly(in vec2[][] outlines, float y0=0, float y1=1){
     addPoly(tesselate(outlines), y0, y1);
   }
 
@@ -1528,11 +1528,11 @@ protected:
     TessResult tess;
     with(tess){
       auto a = 2*PI/sides;
-      vertices = iota(sides).map!(i => V2f(0, 1).vRot(i*a)*radius).array ~ V2f.Null;
+      vertices = iota(sides).map!(i => vec2(0, 1).vRot(i*a)*radius).array ~ vec2.Null;
 
       foreach(i; 0..sides){
         int j=i+1; if(j==sides) j=0;
-        vertices ~= V2f(0, 1).vRot(i*a)*radius;
+        vertices ~= vec2(0, 1).vRot(i*a)*radius;
         lines ~= [i, j];
         triangles ~= [i, j, sides];
       }
@@ -2128,25 +2128,25 @@ class Model{ //! Model /////////////////////////
 static:
   int boxIdx;
 
-  auto newBox(in Bounds3f bnd){
+  auto newBox(in bounds3 bnd){
     auto o = new MeshObject(`custom:\\box_`~(boxIdx++).text);
     o.addBox(bnd);
     return new Model(o);
   }
-  auto newBox(in vec3 size){ with(size*.5) return newBox(Bounds3f(-x, -y, -z, x, y, z)); }
+  auto newBox(in vec3 size){ with(size*.5) return newBox(bounds3(-x, -y, -z, x, y, z)); }
   auto newBox(float sx, float sy, float sz){ return newBox(vec3(sx, sy, sz)); }
   auto newBox(float size){ return newBox(vec3(size)); }
 
   int polyIdx;
 
-  auto newPoly(in V2f[][] outlines, float y0, float y1){
+  auto newPoly(in vec2[][] outlines, float y0, float y1){
     auto o = new MeshObject(`custom:\\poly_`~(polyIdx++).text);
     o.addPoly(outlines, y0, y1);
     return new Model(o);
   }
-  auto newPoly(in V2f[]   outline , float y0, float y1) { return newPoly([outline], y0, y1); }
-  auto newPoly(in V2f[][] outlines, float height=1)     { return newPoly(outlines, 0, height); }
-  auto newPoly(in V2f[]   outline , float height=1)     { return newPoly(outline, 0, height); }
+  auto newPoly(in vec2[]   outline , float y0, float y1) { return newPoly([outline], y0, y1); }
+  auto newPoly(in vec2[][] outlines, float height=1)     { return newPoly(outlines, 0, height); }
+  auto newPoly(in vec2[]   outline , float height=1)     { return newPoly(outline, 0, height); }
 
   int NGonIdx;
 

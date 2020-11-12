@@ -1,6 +1,6 @@
 module het.ui;
 
-import het.utils, het.draw2d, het.inputs, std.traits, het.stream, std.meta;
+import het.utils, het.draw2d, het.inputs, std.traits, het.stream, het.opengl, std.meta;
 
 public import het.uibase;
 
@@ -30,13 +30,13 @@ class Slider : Cell { // Slider //////////////////////////////////
   __gshared static{ //information about the current slider being modified
     uint mod_id, mod_actid;
     SliderOrientation mod_ori;
-    V2f mod_p0, mod_p1;
+    vec2 mod_p0, mod_p1;
     bounds2 mod_knob;
-    V2f mod_ofs, mod_mouseBase;
+    vec2 mod_ofs, mod_mouseBase;
     float mod_nPosBase;
     int mod_dir; //0:unknown, 1:h, 2:v
 
-    void modSet(uint id, in SliderOrientation ori, V2f p0, V2f p1, in bounds2 bKnob){
+    void modSet(uint id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob){
       mod_id = id;
       mod_ori = ori;
       mod_p0 = p0;
@@ -80,13 +80,13 @@ class Slider : Cell { // Slider //////////////////////////////////
 
     bkColor = ts.bkColor;
 
-    clThumb = lerp(lerp(clSliderThumb, clSliderThumbHover, hit.hover_smooth), clSliderThumbPressed, hit.captured_smooth);
-    clLine =  lerp(lerp(clSliderLine , clSliderLineHover , hit.hover_smooth), clSliderLinePressed , hit.captured_smooth);
-    clRuler = lerp(bkColor, ts.fontColor, 0); //disable ruler for now
+    clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hit.hover_smooth), clSliderThumbPressed, hit.captured_smooth);
+    clLine =  mix(mix(clSliderLine , clSliderLineHover , hit.hover_smooth), clSliderLinePressed , hit.captured_smooth);
+    clRuler = mix(bkColor, ts.fontColor, 0); //disable ruler for now
 
-    innerSize = V2f(ts.fontHeight*6, ts.fontHeight); //default size
+    innerSize = vec2(ts.fontHeight*6, ts.fontHeight); //default size
 
-    float thumbSize = ts.fontHeight*0.8;
+    float thumbSize = ts.fontHeight*0.8f;
     rulerOfs = thumbSize*0.5f;
     lwThumb = thumbSize*(1.0f/3);
     lwLine  = thumbSize*(2.0f/NormalFontHeight);
@@ -101,20 +101,20 @@ class Slider : Cell { // Slider //////////////////////////////////
       mod_actid = id;
 
       //decide wether the knob has to jump to the mouse position or not
-      const doJump = mod_id==id && isLinear && !mod_knob.checkInside(currentMouse);
-      if(doJump) mod_ofs = V2f.Null;
-            else mod_ofs = mod_knob.center-currentMouse;
+      const doJump = mod_id==id && isLinear && !mod_knob.contains!"[)"(g_currentMouse);
+      if(doJump) mod_ofs = vec2(0);
+            else mod_ofs = mod_knob.center-g_currentMouse;
 
       if(doJump){
         if(mod_ori==SliderOrientation.horz){
-          nPos = remap_clamp(currentMouse.x, mod_p0.x, mod_p1.x, 0, 1);
-          if(currentMouse.x<mod_p0.x) mod_ofs.x = mod_p0.x-currentMouse.x;
-          if(currentMouse.x>mod_p1.x) mod_ofs.x = mod_p1.x-currentMouse.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
+          nPos = remap_clamp(g_currentMouse.x, mod_p0.x, mod_p1.x, 0, 1);
+          if(g_currentMouse.x<mod_p0.x) mod_ofs.x = mod_p0.x-g_currentMouse.x;
+          if(g_currentMouse.x>mod_p1.x) mod_ofs.x = mod_p1.x-g_currentMouse.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
         }else if(mod_ori==SliderOrientation.vert){
-          nPos = remap_clamp(currentMouse.y, mod_p0.y, mod_p1.y, 0, 1);
+          nPos = remap_clamp(g_currentMouse.y, mod_p0.y, mod_p1.y, 0, 1);
           //note: p1 and p0 are intentionally swapped!!!
-          if(currentMouse.y<mod_p1.y) mod_ofs.y = mod_p1.y-currentMouse.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
-          if(currentMouse.y>mod_p0.y) mod_ofs.y = mod_p0.y-currentMouse.y - (range_.isEndless ? 1 : 0);
+          if(g_currentMouse.y<mod_p1.y) mod_ofs.y = mod_p1.y-g_currentMouse.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+          if(g_currentMouse.y>mod_p0.y) mod_ofs.y = mod_p0.y-g_currentMouse.y - (range_.isEndless ? 1 : 0);
         }
       }
 
@@ -135,19 +135,19 @@ class Slider : Cell { // Slider //////////////////////////////////
       if(isLinear) slowMouse(precise!=1, precise);
 
       if(mod_ori==SliderOrientation.horz){
-        auto p = currentMouse.x+mod_ofs.x;
+        auto p = g_currentMouse.x+mod_ofs.x;
         if(range_.isCircular || range_.isEndless) mouseMoveRelX(wrapInRange(p, mod_p0.x, mod_p1.x, wrapCnt)); //circular wrap around
         nPos = remap(p, mod_p0.x, mod_p1.x, 0, 1);
         if(range_.isClamped) nPos = nPos.clamp(0, 1);
       }else if(mod_ori==SliderOrientation.vert){
-        auto p = currentMouse.y+mod_ofs.y;
+        auto p = g_currentMouse.y+mod_ofs.y;
         if(range_.isCircular || range_.isEndless) mouseMoveRelY(wrapInRange(p, mod_p0.y, mod_p1.y, wrapCnt)); //circular wrap around
         nPos = remap(p, mod_p0.y, mod_p1.y, 0, 1);
         if(range_.isClamped) nPos = nPos.clamp(0, 1);
       }else{
         auto diff = rawMousePos-mod_mouseBase;
         auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2;
-        if(mod_dir==0 && diff.len_prec>=3) mod_dir = act_dir;
+        if(mod_dir==0 && length(diff)>=3) mod_dir = act_dir;
         auto delta = (mod_dir ? mod_dir : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
         mod_nPosBase += delta*(precise*(1.0f/180));
         mod_nPosBase = mod_nPosBase.clamp(0, 1);
@@ -179,21 +179,21 @@ class Slider : Cell { // Slider //////////////////////////////////
   }
 
   override void draw(Drawing dr){
-    const mod_update = !hitBounds.isNull && !inputs.LMB.value;
+    const mod_update = !hitBounds.empty && !inputs.LMB.value;
 
     dr.color = bkColor; dr.fillRect(borderBounds_inner);
     drawBorder(dr);
 
-    dr.alpha = 1; dr.lineStipple = lsNormal; dr.arrowStyle = asNone;
-    void drawThumb(V2f a, V2f t){ dr.lineWidth = lwThumb; dr.color = clThumb; dr.line(a-t.vRot90, a+t.vRot90); }
-    void drawLine(V2f a, V2f b, RGB cl){ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); }
+    dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = asNone;
+    void drawThumb(vec2 a, vec2 t){ dr.lineWidth = lwThumb; dr.color = clThumb; dr.line(a-t.rotate90, a+t.rotate90); }
+    void drawLine(vec2 a, vec2 b, RGB cl){ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); }
 
     auto b = innerBounds;
     orientation.calcSliderOrientation(b);
 
     if(orientation==SliderOrientation.horz){
-      auto t = V2f(lwThumb, 0),
-           ro = V2f(0, rulerOfs),
+      auto t = vec2(lwThumb, 0),
+           ro = vec2(0, rulerOfs),
            p0 = b.leftCenter  + t,
            p1 = b.rightCenter - t;
 
@@ -202,17 +202,17 @@ class Slider : Cell { // Slider //////////////////////////////////
       if(rulerSides&1) drawStraightRuler(dr, bounds2(p0-ro, p1-ro*0.4f), rulerDiv0, rulerDiv1, true );
       if(rulerSides&2) drawStraightRuler(dr, bounds2(p0+ro*0.4f, p1+ro), rulerDiv0, rulerDiv1, false);
 
-      if(!nPos.isNaN){
-        auto p = vLerp(p0, p1, nPos);
-        if(!nCenter.isNaN) drawLine(vLerp(p0, p1, nCenter), p, clThumb);
+      if(!isnan(nPos)){
+        auto p = mix(p0, p1, nPos);
+        if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
         drawThumb(p, t);
 
-        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*0.5, lwThumb*1.5)));
+        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*0.5f, lwThumb*1.5f)));
       }
 
     }else if(orientation==SliderOrientation.vert){
-      auto t = V2f(0, -lwThumb),
-           ro = V2f(rulerOfs, 0),
+      auto t = vec2(0, -lwThumb),
+           ro = vec2(rulerOfs, 0),
            p0 = b.bottomCenter + t,
            p1 = b.topCenter    - t;
 
@@ -221,11 +221,11 @@ class Slider : Cell { // Slider //////////////////////////////////
       if(rulerSides&1) drawStraightRuler(dr, bounds2(p1-ro, p0-ro*0.4f), rulerDiv0, rulerDiv1, true );
       if(rulerSides&2) drawStraightRuler(dr, bounds2(p1+ro*0.4f, p0+ro), rulerDiv0, rulerDiv1, false);
 
-      if(!nPos.isNaN){
-        auto p = vLerp(p0, p1, nPos);
-        if(!nCenter.isNaN) drawLine(vLerp(p0, p1, nCenter), p, clThumb);
+      if(!isnan(nPos)){
+        auto p = mix(p0, p1, nPos);
+        if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
         drawThumb(p, t);
-        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*1.5, lwThumb*0.5)));
+        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*1.5f, lwThumb*0.5f)));
       }
     }else if(orientation==SliderOrientation.round){
       //center square
@@ -246,12 +246,12 @@ class Slider : Cell { // Slider //////////////////////////////////
       dr.color = clLine;
       dr.circle(c, r, a0, a1);
 
-      if(!nPos.isNaN){
+      if(!isnan(nPos)){
         float n = 1-nPos;
         n = endless ? n.fract : n.clamp(0, 1);  //todo: ezt megcsinalni a range-val
-        float a = lerp(a0, a1, n);
-        if(!endless && !nCenter.isNaN){
-          float ac = lerp(a0, a1, (1-nCenter).clamp(0, 1));
+        float a = mix(a0, a1, n);
+        if(!endless && !isnan(nCenter)){
+          float ac = mix(a0, a1, (1-nCenter).clamp(0, 1));
           dr.color = clThumb;
           if(ac>=a) dr.circle(c, r, a, ac);
                else dr.circle(c, r, ac, a);
@@ -259,7 +259,7 @@ class Slider : Cell { // Slider //////////////////////////////////
 
         dr.lineWidth = lwThumb;
         dr.color = clThumb;
-        auto v = V2f(sin(a), cos(a));
+        auto v = vec2(sin(a), cos(a));
         dr.line(c, c+v*r);
       }
     }
@@ -296,7 +296,7 @@ class Slider : Cell { // Slider //////////////////////////////////
     }
   }
 
-  protected void drawRoundRuler(Drawing dr, in V2f center, float radius, int cnt, int cnt2=-1, bool endless=false){
+  protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false){
     cnt--;
     if(cnt<=0) return;
     if(cnt2<0) cnt2 = cnt;
@@ -398,7 +398,7 @@ class Link : Row{ //Link ///////////////////////////////
     }else if(hit.captured){
       ts.fontColor = clLinkPressed;
     }else{
-      ts.fontColor = lerp(ts.fontColor, clLinkHover, hit.hover_smooth);
+      ts.fontColor = mix(ts.fontColor, clLinkHover, hit.hover_smooth);
       ts.underline = hit.hover;
     }
 
@@ -904,28 +904,28 @@ struct WinContext{ //WinContext /////////////////////////////
   Drawing dr;
   float pixelSize;
   int pass;
-  V2f mouse;
+  vec2 mouse;
 }
 
 
 struct SizingFrame{
   bounds2 bounds;
-  V2f cornerSize;
-  V2f cornerSize2; //inner with gap added
+  vec2 cornerSize;
+  vec2 cornerSize2; //inner with gap added
 
-  Seg2f[] edge(int idx){ with(bounds){  // top, right, bottom, left
+  seg2[] edge(int idx){ with(bounds){  // top, right, bottom, left
     alias c = cornerSize2;
     switch(idx&3){
-      case  0: return [Seg2f(x0+c.x, y0, x1-c.x, y0)];
-      case  2: return [Seg2f(x0+c.x, y1, x1-c.x, y1)];
-      case  1: return [Seg2f(x1, y0+c.y, x1, y1-c.y)];
-      default: return [Seg2f(x0, y0+c.y, x0, y1-c.y)];
+      case  0: return [seg2(x0+c.x, y0, x1-c.x, y0)];
+      case  2: return [seg2(x0+c.x, y1, x1-c.x, y1)];
+      case  1: return [seg2(x1, y0+c.y, x1, y1-c.y)];
+      default: return [seg2(x0, y0+c.y, x0, y1-c.y)];
     }
   }}
 
-  Seg2f[] corner(int idx){ with(bounds){  // topRight, bottomRight, bottomLeft, topLeft
+  seg2[] corner(int idx){ with(bounds){  // topRight, bottomRight, bottomLeft, topLeft
     alias c = cornerSize;
-    auto a(float x, float y, float dx, float dy){ return [ Seg2f(x, y, x+dx*c.x, y), Seg2f(x, y, x, y+dy*c.y) ]; }
+    auto a(float x, float y, float dx, float dy){ return [ seg2(x, y, x+dx*c.x, y), seg2(x, y, x, y+dy*c.y) ]; }
     switch(idx&3){
       case  0: return a(x1, y0, -1,  1);
       case  1: return a(x1, y1, -1, -1);
@@ -934,7 +934,7 @@ struct SizingFrame{
     }
   }}
 
-  Seg2f[][] cornersAndEdges(){
+  seg2[][] cornersAndEdges(){
     return iota(8).map!(i => i&1 ? corner(i>>1) : edge(i>>1)).array;
   }
 }
@@ -958,9 +958,9 @@ auto calcSizingFrame(in bounds2 fullBounds, in WinContext ctx){
 
   auto maxCornerSize = f.bounds.size * 0.66f;
   auto maxCornerLen = ctx.cornerLength * ctx.pixelSize;
-  f.cornerSize = vMin(V2f(maxCornerLen, maxCornerLen), maxCornerSize);
+  f.cornerSize = min(vec2(maxCornerLen, maxCornerLen), maxCornerSize);
   auto gapLen = ctx.cornerThickness * ctx.pixelSize * 1.0f;
-  f.cornerSize2 = vMin(f.cornerSize + V2f(gapLen, gapLen), maxCornerSize);
+  f.cornerSize2 = min(f.cornerSize + vec2(gapLen, gapLen), maxCornerSize);
 
   return f;
 }
@@ -979,20 +979,20 @@ class ImWin{ // ImWin //////////////////////////////////
     adjustBounds;
   }
 
-  V2f sizeMin = V2f(32, 32);
-  V2f sizeMax;               // ignored if less than sizeMin
+  vec2 sizeMin = vec2(32, 32);
+  vec2 sizeMax;               // ignored if less than sizeMin
   float sizeStep = 0;        // ignored if <=0
   float aspect = 0;          // if nonzero
 
-  V2f placementBase;
+  vec2 placementBase;
   float placementStep = 0;
 
-  void draw(Drawing dr, in V2f size){
+  void draw(Drawing dr, in vec2 size){
     dr.color = clGray;
-//    dr.fillRect(V2f(0, 0), size);
+//    dr.fillRect(vec2(0, 0), size);
 
     auto tex = textures[File(`c:\dl\oida6.png`)];
-    dr.drawGlyph(tex, Rect2f(V2f(0, 0), size));
+    dr.drawGlyph(tex, bounds2(vec2(0, 0), size));
 
     dr.scale(ctx.pixelSize); scope(exit) dr.pop;
 
@@ -1003,7 +1003,7 @@ class ImWin{ // ImWin //////////////////////////////////
       auto rIcon = new Row(" "~icon~" ");
 
       auto clHeaderBackground = clWinBackground;
-      auto clHeaderText       = lerp(clWinText, clHeaderBackground, focused ? 0 : 0.35);
+      auto clHeaderText       = mix(clWinText, clHeaderBackground, focused ? 0 : 0.35f);
 
       auto toolBtn(string s, RGB textColor=clHeaderText, RGB bkColor=clHeaderBackground){
         return new Row(tag(`style fontColor="%s" bkColor="%s"`.format(textColor, bkColor))~" "~s~" ");
@@ -1048,28 +1048,28 @@ class ImWin{ // ImWin //////////////////////////////////
       return round(max-min/step)*step+min;
     }
 
-    bounds.sortBounds;
+    bounds = bounds.sorted;
     return;
     float w = bounds.width, h = bounds.height;
 
     if(aspect>0){
       //tries to make the diagonal az close az can
-      auto dBounds = V2f(w, h).len_prec,
-           dAspect = V2f(aspect, 1).len_prec;
+      auto dBounds = length(vec2(w, h)),
+           dAspect = length(vec2(aspect, 1));
       auto dRate =  dBounds/dAspect;
 
       w = aspect*dRate;
       h = dRate;
     }
 
-    auto newPos  = V2f(adjustPlacement(bounds.bMin.x, placementBase.x, placementStep),
-                       adjustPlacement(bounds.bMin.y, placementBase.y, placementStep)),
-         newSize = V2f(adjustSize(w, sizeMin.x, sizeMax.x, sizeStep),
+    auto newPos  = vec2(adjustPlacement(bounds.low.x, placementBase.x, placementStep),
+                       adjustPlacement(bounds.low.y, placementBase.y, placementStep)),
+         newSize = vec2(adjustSize(w, sizeMin.x, sizeMax.x, sizeStep),
                        adjustSize(h, sizeMin.y, sizeMax.y, sizeStep));
 
     //anchor is topLeft
-    bounds.bMin = newPos;
-    bounds.bMax = newPos + newSize;
+    bounds.low = newPos;
+    bounds.high = newPos + newSize;
   }
 
   void drawFrame(bool focused, ref ImWin hovered){ with(ctx){
@@ -1084,8 +1084,8 @@ class ImWin{ // ImWin //////////////////////////////////
       dr.drawRect(bounds);
     }
 
-    auto clHalf = lerp(clNormal, clAccent, .5),
-         inside = bounds.checkInside(mouse);
+    auto clHalf = mix(clNormal, clAccent, .5f),
+         inside = bounds.contains!"[)"(mouse);
 
     if(pass==0){
       if(inside) hovered = this;
@@ -1099,7 +1099,7 @@ class ImWin{ // ImWin //////////////////////////////////
         auto elements = sizingFrame.cornersAndEdges;
 
         dr.lineWidth = -cornerThickness;
-        dr.color = lerp(clNormal, clAccent, 0.99f);
+        dr.color = mix(clNormal, clAccent, 0.99f);
         foreach(e; elements){
           //dr.line(e);
         }
@@ -1119,12 +1119,12 @@ class ImWin{ // ImWin //////////////////////////////////
 
 }
 
-auto testWin(Drawing dr, V2f mouse, float pixelSize){ // testWin() ///////////////////////////////////////
+auto testWin(Drawing dr, vec2 mouse, float pixelSize){ // testWin() ///////////////////////////////////////
 
   static wins = [
-    new ImWin("win1", Rect2f(0  ,   0, 640, 480)),
-    new ImWin("win2", Rect2f(640,   0, 640, 480)),
-    new ImWin("win3", Rect2f(0  , 480, 600, 300)),
+    new ImWin("win1", bounds2(0  ,   0, 640, 480)),
+    new ImWin("win2", bounds2(640,   0, 640, 480)),
+    new ImWin("win3", bounds2(0  , 480, 600, 300)),
   ];
 
   ImWin hovered;
@@ -1159,18 +1159,20 @@ struct im{ static:
   uint comboId;    //when the focus of this is lost, comboState goes false
 
   //todo: package visibility is not working as it should -> remains public
-  void _beginFrame(in V2f mousePos){ //called from mainform.update
+  void _beginFrame(in vec2 mousePos){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
 
-    static auto getActFontHeight(){ return textStyle.fontHeight; }  g_actFontHeightFunct = &getActFontHeight;
-    static auto getActFontColor (){ return textStyle.fontColor;  }  g_actFontColorFunct  = &getActFontColor ;
+    //inject stuff into het.uibase. So no import het.ui is needed there.
+    static auto getActFontHeight(){ return float(textStyle.fontHeight); }  het.uibase.g_actFontHeightFunct = &getActFontHeight;
+    static auto getActFontColor (){ return textStyle.fontColor;         }  het.uibase.g_actFontColorFunct  = &getActFontColor ;
+    het.uibase.g_getOverlayDrawingFunct = &getOverlayDrawing;
 
     //update building/measuring/drawing state
     inFrame = true;
     canDraw = false;
 
     im.reset;
-    currentMouse = mousePos;
+    g_currentMouse = mousePos;
     hitTestManager.initFrame;
 
     //clear last frame's object references
@@ -1206,7 +1208,7 @@ struct im{ static:
     mouseOverUI = false;
     bool mouseOverPopup;
     foreach_reverse(a; rc){
-      if(a.internal_hitTest(currentMouse)){
+      if(a.internal_hitTest(g_currentMouse)){
         mouseOverUI = true;
 
         if(popupState.cell==a)
@@ -1371,11 +1373,11 @@ static cnt=0;
 
         if(container.flags.hovered){ //todo: overlapping Panels not handled properly (all of them are scrolling, not just the topmost)
           import het.win;
-          scrollY += mainWindow.mouse.delta.wheel*120; //todo: Window/mouse should it should come from outside
+          scrollY += (cast(GLWindow)mainWindow).mouse.delta.wheel*120; //todo: Window/mouse should it should come from outside
         }
 
         scrollY = scrollY.clamp(min(0, totalHeight-docHeight), 0);
-        scrollY_smooth = lerp(scrollY_smooth, scrollY, 0.25);
+        scrollY_smooth = mix(scrollY_smooth, scrollY, 0.25f);
         scrollY_smooth = scrollY_smooth.clamp(min(0, totalHeight-docHeight), 0);
       }
     }
@@ -1521,7 +1523,7 @@ static cnt=0;
 
       //align the hint
       hintContainer.outerPos = lastHint.bounds.bottomCenter //Bounds.bottomCenter
-                             + V2f(-hintContainer.outerWidth*.5, 5);
+                             + vec2(-hintContainer.outerWidth*.5, 5);
 
       //clamp horizontaly
       hintContainer.outerPos.x = clamp(hintContainer.outerPos.x, 0, max(0, screenBounds.width-hintContainer.outerWidth));
@@ -1637,12 +1639,16 @@ static cnt=0;
     overlayDrawings[actContainer] = dr;
   }
 
+  Drawing getOverlayDrawing(.Container cntr){
+    if(auto drOverlay = cntr in overlayDrawings) return *drOverlay;
+                                            else return null;
+  }
 
   //easy access
 
   @property{
     float fh(){ return textStyle.fontHeight; }
-    void fh(float v){ textStyle.fontHeight = cast(ubyte)(v.iRound); }
+    void fh(float v){ textStyle.fontHeight = cast(ubyte)(v.iround); }
   }
 
   auto subCells(){ return actContainer.subCells; }
@@ -1676,7 +1682,7 @@ static cnt=0;
 
   enum RangeType{ linear, log, circular, endless }
   struct range{                                    //endless can go out of range, circular always using modulo.
-    float min, max, step=1; RangeType type;
+    float min, max, step=1; RangeType type;  //todo: this is an 1D bounds
 
     //todo: handle invalid intervals
     bool isLinear  () const { return type==RangeType.linear  ; }
@@ -1703,11 +1709,11 @@ static cnt=0;
 
     T clamp(T)(T f){
       if(isIntegral!T){
-        if(!min.isNaN && f<min.iCeil ) f = min.iCeil ; else
-        if(!max.isNaN && f>max.iFloor) f = max.iFloor;
+        if(!isnan(min) && f<min.iceil ) f = min.iceil ; else
+        if(!isnan(max) && f>max.ifloor) f = max.ifloor;
       }else{
-        if(!min.isNaN && f<min) f = min; else
-        if(!max.isNaN && f>max) f = max;
+        if(!isnan(min) && f<min) f = min; else
+        if(!isnan(max) && f>max) f = max;
       }
       return f;
     }
@@ -1814,7 +1820,7 @@ static cnt=0;
 
       if(cell && parent){
         auto bnd = het.uibase.Container._savedComboBounds;
-        cell.outerPos = V2f(bnd.left+2, bnd.bottom-2);
+        cell.outerPos = vec2(bnd.left+2, bnd.bottom-2);
       }
     }
   }
@@ -1845,7 +1851,7 @@ static cnt=0;
       margin = Margin(0.5*fh, 0.5*fh, 0.5*fh, 0.5*fh);
 
       style = tsCode;
-      const bkColors = [0.06, 0.09].map!(t => lerp(textStyle.bkColor, textStyle.fontColor, t)).array;
+      const bkColors = [0.06f, 0.09f].map!(t => mix(textStyle.bkColor, textStyle.fontColor, t)).array;
       border = "1 single gray";
 
       foreach(idx, line; src.split('\n')){
@@ -1871,7 +1877,7 @@ static cnt=0;
   string strikeout(string s){ return tag("style strikeout=1")~s~tag("style strikeout=0"); }
 
   string progressSpinner(int style=1){
-    int t(int n){ return ((QPS*n*1.5).iFloor)%n; }
+    int t(int n){ return ((QPS*n*1.5).ifloor)%n; }
     auto ch(int i){ return [cast(dchar)i].to!string; }
 
     switch(style){
@@ -1884,7 +1890,7 @@ static cnt=0;
 
   void ProgressSpinner(int progressStyle = 0){
     Row({
-      style.fontColor = lerp(style.bkColor, style.fontColor, .66);
+      style.fontColor = mix(style.bkColor, style.fontColor, .66f);
       Text(" "~progressSpinner(progressStyle)~" ");
     });
   }
@@ -1985,7 +1991,7 @@ static cnt=0;
 
   //Spacer //////////////////////////
   void Spacer(float size=float.init){
-    if(size.isNaN) size = fh*.5f;
+    if(isnan(size)) size = fh*.5f;
     const vertical = cast(.Row)actContainer !is null;
 
 /*    auto r = new .Row("", textStyle);
@@ -2051,7 +2057,7 @@ static cnt=0;
   void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover){
     style = tsBtn;
 
-    auto bColor = lerp(style.bkColor, clWinBtnHoverBorder, hover);
+    auto bColor = mix(style.bkColor, clWinBtnHoverBorder, hover);
 
     applyBtnBorder(bColor);
 
@@ -2064,18 +2070,18 @@ static cnt=0;
     }
 
     if(isWhite){
-      if(captured) style.bkColor = lerp(clWinBackground, clWinBtnPressed, .5);
+      if(captured) style.bkColor = mix(clWinBackground, clWinBtnPressed, .5f);
               else style.bkColor = clWinBackground; //todo: ez felulirja a
     }
 
     if(theme == "tool"){ //every appearance is lighter on a toolBtn
-      style.bkColor   = lerp(style.bkColor, tsNormal.bkColor, .5);
+      style.bkColor   = mix(style.bkColor, tsNormal.bkColor, .5f);
       if(captured && enabled) border.width = 0; //this if() makes the edge squareish
     }
 
     if(selected){
-      style.bkColor = lerp(style.bkColor, clAccent, .5);
-      border.color  = lerp(border.color , clAccent, .5);
+      style.bkColor = mix(style.bkColor, clAccent, .5f);
+      border.color  = mix(border.color , clAccent, .5f);
     }
 
     bkColor = style.bkColor; //todo: update the backgroundColor of the container. Should be automatic, but how?...
@@ -2085,13 +2091,13 @@ static cnt=0;
     style   = tsNormal;
 
     auto bColor = focused  ? clBlack :
-                  !enabled ? lerp(clWinBtn       , style.bkColor, 0.5)
-                           : lerp(clWinBtn, clWinBtnHoverBorder, hover);
+                  !enabled ? mix(clWinBtn       , style.bkColor, 0.5f)
+                           : mix(clWinBtn, clWinBtnHoverBorder, hover);
 
     applyBtnBorder(bColor);
 
     if(!enabled){
-      style.fontColor = lerp(style.fontColor, style.bkColor, 0.5);
+      style.fontColor = mix(style.fontColor, style.bkColor, 0.5f);
     }
 
     bkColor = style.bkColor;
@@ -2124,7 +2130,7 @@ static cnt=0;
       auto row = cast(.Row)actContainer;
 
       hit = hitTest(id_);
-      auto localMouse = currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
+      auto localMouse = g_currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 
       mixin(hintHandler);
 
@@ -2341,21 +2347,21 @@ static cnt=0;
       style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
 
       margin = "0";
-      auto bcolor = lerp(style.fontColor, style.bkColor, .5);
-      border       = Border(1, BorderStyle.normal, lerp(bcolor, style.fontColor, hit.hover_smooth));
+      auto bcolor = mix(style.fontColor, style.bkColor, .5f);
+      border       = Border(1, BorderStyle.normal, mix(bcolor, style.fontColor, hit.hover_smooth));
       border.inset = true;
       border.extendBottomRight = true;
       padding = Padding(0, 2, 0, 2);
 
-      style.bkColor = lerp(style.bkColor, clGray, hit.hover_smooth*.16);
+      style.bkColor = mix(style.bkColor, clGray, hit.hover_smooth*.16f);
 
       if(!enabled){
-        style.fontColor = lerp(style.fontColor, clGray, 0.5); //todo: rather use an 50% overlay for disabled?
+        style.fontColor = mix(style.fontColor, clGray, 0.5f); //todo: rather use an 50% overlay for disabled?
       }
 
       if(_selected){
-        style.bkColor = lerp(style.bkColor, clAccent, .5);
-        border.color  = lerp(border.color , clAccent, .5);
+        style.bkColor = mix(style.bkColor, clAccent, .5f);
+        border.color  = mix(border.color , clAccent, .5f);
       }
 
       bkColor = style.bkColor; //todo: update the backgroundColor of the container. Should be automatic, but how?...
@@ -2415,12 +2421,12 @@ static cnt=0;
 
     auto shp = new .Shape;
     //set defaults
-    shp.innerSize = V2f(0.7, 1)*style.fontHeight;
+    shp.innerSize = vec2(0.7, 1)*style.fontHeight;
     shp.color = clRainbowRed;
 
     static foreach(a; args){{ alias t = Unqual!(typeof(a));
       static if(is(t==RGB)) shp.color = a;
-      static if(is(t==V2f)) shp.innerSize = a;
+      static if(is(t==vec2)) shp.innerSize = a;
     }}
 
     shp.color = lerp(clBlack, shp.color, state.remap(0, 1, 0.2, 1));
@@ -2446,7 +2452,7 @@ static cnt=0;
       if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down)) isSelected = true; //mosue down left or right
 
       padding = "2 2";
-      bkColor = lerp(bkColor, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33));
+      bkColor = mix(bkColor, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f));
       style.bkColor = bkColor;
 
       static if(__traits(compiles, s())) s();
@@ -2673,7 +2679,7 @@ static cnt=0;
 
     bool userModified;
     auto oldFh = style.fontHeight;
-    if(theme != "tool") style.fontHeight = (fh*1.4).to!ubyte;
+    if(theme != "tool") style.fontHeight = (fh*1.4f).to!ubyte;
 
     auto sl = new .Slider(id_, normValue, _range, userModified, style);
 
@@ -2699,7 +2705,7 @@ static cnt=0;
     HitInfo hit;
     Column({
       border.width = 1; //todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
-      border.color = lerp(style.bkColor, style.fontColor, state ? .1 : 0);
+      border.color = mix(style.bkColor, style.fontColor, state ? .1f : 0);
 
       Row({
         hit = ToolBtn(symbol("Caret"~(state ? "Down" : "Right")~"Solid8"));
@@ -2753,7 +2759,7 @@ static cnt=0;
 
     if(!title.empty){
       Text(doc.getChapterTextStyle, title);
-      Spacer(1.5*fh);
+      Spacer(1.5f*fh);
     }
     if(contents) contents();
   }

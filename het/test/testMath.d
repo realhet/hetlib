@@ -142,7 +142,16 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
   import het.stream;
   het.stream.unittest_main;
 
-  import het.uibase;
+  import het.uibase; //rememberEditedWrappedLines()  drawTextEditorOverlay()
+  import het.ui;
+
+  import common.gcode;
+  import common.gcodeshader;
+
+  //https://solarianprogrammer.com/2013/05/22/opengl-101-matrices-projection-view-model/#:~:text=The%20matrix%20M%2C%20that%20contains,a%20single%20matrix%20for%20efficiency.
+
+  print(123);
+  readln;
 
 
 /*  import het.math, het.utils, het.debugclient, het.geometry, het.color, het.bitmap, het.win, het.view, het.opengl, het.binpacker, het.megatexturing,

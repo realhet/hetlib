@@ -35,6 +35,8 @@ private enum
 
 /*deprecated*/ __gshared vec2 g_currentMouse; //current mouse position in world
 
+//todo: these ugly things are only here to separate uiBase for ui.
+
 __gshared RGB function() g_actFontColorFunct;
 
 auto actFontColor(){
@@ -46,6 +48,27 @@ __gshared float function() g_actFontHeightFunct;
 auto actFontHeight(){
   return enforce(g_actFontHeightFunct , "initialize g_actFontHeight!")();
 }
+
+__gshared Drawing function(Container) g_getOverlayDrawingFunct;
+
+auto getOverlayDrawing(Container cntr){
+  return enforce(g_getOverlayDrawingFunct, "g_getOverlayDrawingFunct")(cntr);
+}
+
+void rememberEditedWrappedLines(Row row, WrappedLine[] wrappedLines){
+/*  import het.ui: im;
+  if(im.textEditorState.row is row)
+    im.textEditorState.wrappedLines = wrappedLines;*/
+}
+
+void drawTextEditorOverlay(Drawing dr, Row row){
+/*  import het.ui: im;  if(im.textEditorState.row is row){
+    dr.translate(row.innerPos);
+    im.textEditorState.drawOverlay(dr, clWhite-row.bkColor);
+    dr.pop;
+  }*/
+}
+
 
 //allows relative sizes to current fontHeight
 // 15  : 15 pixels
@@ -307,7 +330,7 @@ __gshared HitTestManager hitTestManager;
 [x] string.toRGB
 [x] toSize: 5.5x = 5.5*fontHeight
 [ ] round border. (shader?)
-[x] border: should be a struct: lineStipple, width, color
+[x] border: should be a struct: lineStyle, width, color
 [x] margin, padding: stored in Container
 [x] border stored in container
 [x] border groove ridge outset inset
@@ -947,7 +970,7 @@ class Cell{ // Cell ////////////////////////////////////
   void delete_(int at, int cnt) { insert([], at, cnt); }
   Cell[] cut(int at, int cnt)   { Cell[] res; insert([], at, cnt, &res); }*/
 
-  bool internal_hitTest(in vec2 mouse, in vec2 ofs=vec2(0)){ //todo: only check when the hitTest flag is true
+  bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){ //todo: only check when the hitTest flag is true
     auto bnd = getHitBounds + ofs;
     if(bnd.contains!"[)"(mouse)){
       hitTestManager.addHitRect(this, bnd, mouse-outerPos);
@@ -1666,11 +1689,8 @@ class Container : Cell { // Container ////////////////////////////////////
       sc.draw(dr); //recursive
     }
 
-    if(flags._hasOverlayDrawing){
-      import het.ui;              !!!!!!!!!
-      if(auto drOverlay = this in het.ui.im.overlayDrawings)
-        dr.copyFrom(*drOverlay);
-    }
+    if(flags._hasOverlayDrawing)
+      dr.copyFrom(getOverlayDrawing(this));
 
     if(flags.clipChildren) dr.popClipBounds;
     dr.pop;
@@ -1683,7 +1703,7 @@ class Container : Cell { // Container ////////////////////////////////////
       else dr.color = clGray;
 
       dr.lineWidth = 1;
-      dr.lineStipple = lsNormal;
+      dr.lineStyle = LineStyle.normal;
       dr.drawRect(outerBounds.inflated(-1.5));
     }
 
@@ -1697,7 +1717,7 @@ class Container : Cell { // Container ////////////////////////////////////
 
     ivec2 p; divMod(cast(int)pp-1, 3, p.y, p.x);
     if(p.x.inRange(0, 2) && p.y.inRange(0, 2)){
-      auto t = p.toF*.5,
+      auto t = p*.5f,
            u = vec2(1, 1)-t;
 
       outerPos = bnd.topLeft*u + bnd.bottomRight*t //todo: bug: fucking vec2.lerp is broken again
@@ -1745,17 +1765,20 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
       }else if(cmd=="flex"  ){
         container.append(new Row(tag("prop flex=1"), ts));
       }else if(cmd=="link"   ){
-        import het.ui: Link;
-        container.append(new Link(params["1"], 0, false, null));
-/*      }else if(cmd=="btn" || cmd=="button"   ){
-        auto btn = new Clickable(params["1"], 0, false, null);
+        /*import het.ui: Link;
+        container.append(new Link(params["1"], 0, false, null));*/
+        raise("not impl");
+      }else if(cmd=="btn" || cmd=="button"   ){
+        /*auto btn = new Clickable(params["1"], 0, false, null);
         btn.setProps(params);
         append(btn);*/
+        raise("not impl");
       }else if(cmd=="key" || cmd=="keyCombo"  ){
-        import het.ui: KeyComboOld;
+        /*import het.ui: KeyComboOld;
         auto kc = new KeyComboOld(params["1"]);
         kc.setProps(params);
-        container.append(kc);
+        container.append(kc);*/
+        raise("not impl");
       }else if(cmd=="style"){ //textStyle
         ts.modify(params);
       }else if(cmd=="prop" || cmd=="props"){ //container's properties
@@ -2213,18 +2236,14 @@ class Row : Container { // Row ////////////////////////////////////
     }
 
     //remember the contents of the edited row
-    import het.ui: im;  if(im.textEditorState.row is this) im.textEditorState.wrappedLines = wrappedLines;
+    rememberEditedWrappedLines(this, wrappedLines);
   }
 
   override void draw(Drawing dr){
     super.draw(dr); //draw frame, bkgnd and subCells
 
     //draw the carets and selection of the editor
-    import het.ui: im;  if(im.textEditorState.row is this){
-      dr.translate(innerPos);
-      im.textEditorState.drawOverlay(dr, bkColor.inverse);
-      dr.pop;
-    }
+    drawTextEditorOverlay(dr, this);
   }
 
 }

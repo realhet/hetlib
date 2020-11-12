@@ -458,8 +458,8 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
   }else static if(isSomeString!T        ){ st ~= quoted(data);
   }else static if(isSomeChar!T          ){ st ~= quoted([data]);
   }else static if(is(T == bool)         ){ st ~= data ? "true" : "false";
-  }else static if(isVector!T            ){ print("before V:", st); streamAppend_json(st, data.components, dense || true, hex, "", indent); print("after V:", st);
-  }else static if(isMatrix!T            ){ print("before M:", st); streamAppend_json(st, data.columns   , dense || true, hex, "", indent); print("before M:", st);
+  }else static if(isVector!T            ){ streamAppend_json(st, data.components, dense || true, hex, "", indent);
+  }else static if(isMatrix!T            ){ streamAppend_json(st, data.columns   , dense || true, hex, "", indent);
   }else static if(isAggregateType!T     ){ // Struct, Class
     //handle null for class
     static if(is(T == class)){

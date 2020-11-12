@@ -676,7 +676,7 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
 
   // create special matrices
 
-  static if(N==2 && M==2){
+  static if(N==M && N==2 && isFloatingPoint!CT){
 
     static auto rotation(CommonType!(CT, float) rad){
       auto c = cos(rad), s = sin(rad);
@@ -686,6 +686,246 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
     static auto rotation90 ()   { return MatrixType(0, -1, 1, 0); }
     static auto rotation270()   { return MatrixType(0, 1, 0, -1); }
   }
+
+  // this is based on the gl3n package
+  static if(N==M && N>=3){
+    static if(isFloatingPoint!CT){
+
+      static Matrix rotation(A)(in Vector!(A, N) axis_, CT alpha){
+        CT cosa = cos(alpha),  sina = sin(alpha);
+        auto axis = normalize(Vectortype(axis_));
+        auto temp = (1 - cosa)*axis;
+
+        return cast(Matrix) Matrix!(CT, 3, 3)(
+          temp.x * axis.x + cosa           ,   temp.x * axis.y + sina * axis.z  ,  temp.x * axis.z - sina * axis.y  ,
+          temp.y * axis.x - sina * axis.z  ,   temp.y * axis.y + cosa           ,  temp.y * axis.z + sina * axis.x  ,
+          temp.z * axis.x + sina * axis.y  ,   temp.z * axis.y - sina * axis.x  ,  temp.z * axis.z + cosa           );
+      }
+
+      static Matrix rotationx(CT alpha){
+        CT cosa = cos(alpha), sina = sin(alpha);
+
+        auto m = Matrix(1);
+        m[1][1] = cosa;  m[1][2] = -sina;
+        m[2][1] = sina;  m[2][2] =  cosa;
+        return m;
+      }
+
+      static Matrix rotationy(CT alpha) {
+        CT cosa = cos(alpha), sina = sin(alpha);
+
+        auto m = Matrix(1);
+        m[0][0] =  cosa;  m[0][2] = sina;
+        m[2][0] = -sina;  m[2][2] = cosa;
+        return m;
+      }
+
+      static Matrix rotationz(CT alpha){
+        CT cosa = cos(alpha), sina = sin(alpha);
+
+        auto m = Matrix(1);
+        m[0][0] = cosa;  m[0][1] = -sina;
+        m[1][0] = sina;  m[1][1] =  cosa;
+        return m;
+      }
+
+      auto rotate(in Vector!(A, N) axis, CT alpha){ this = rotation(axis, alpha)*this;  return this; }
+      auto rotatex(CT alpha){ this = rotationx(alpha)*this;  return this; }
+      auto rotatey(CT alpha){ this = rotationy(alpha)*this;  return this; }
+      auto rotatez(CT alpha){ this = rotationz(alpha)*this;  return this; }
+    }// isFloatingPoint
+
+/*        unittest {
+            assert(mat4.xrotation(0).matrix == [[1.0f, 0.0f, 0.0f, 0.0f],
+                                                [0.0f, 1.0f, -0.0f, 0.0f],
+                                                [0.0f, 0.0f, 1.0f, 0.0f],
+                                                [0.0f, 0.0f, 0.0f, 1.0f]]);
+            assert(mat4.yrotation(0).matrix == [[1.0f, 0.0f, 0.0f, 0.0f],
+                                                [0.0f, 1.0f, 0.0f, 0.0f],
+                                                [0.0f, 0.0f, 1.0f, 0.0f],
+                                                [0.0f, 0.0f, 0.0f, 1.0f]]);
+            assert(mat4.zrotation(0).matrix == [[1.0f, -0.0f, 0.0f, 0.0f],
+                                                [0.0f, 1.0f, 0.0f, 0.0f],
+                                                [0.0f, 0.0f, 1.0f, 0.0f],
+                                                [0.0f, 0.0f, 0.0f, 1.0f]]);
+            mat4 xro = mat4.identity;
+            xro.rotatex(0);
+            assert(mat4.xrotation(0).matrix == xro.matrix);
+            assert(xro.matrix == mat4.identity.rotatex(0).matrix);
+            assert(xro.matrix == mat4.rotation(0, vec3(1.0f, 0.0f, 0.0f)).matrix);
+            mat4 yro = mat4.identity;
+            yro.rotatey(0);
+            assert(mat4.yrotation(0).matrix == yro.matrix);
+            assert(yro.matrix == mat4.identity.rotatey(0).matrix);
+            assert(yro.matrix == mat4.rotation(0, vec3(0.0f, 1.0f, 0.0f)).matrix);
+            mat4 zro = mat4.identity;
+            xro.rotatez(0);
+            assert(mat4.zrotation(0).matrix == zro.matrix);
+            assert(zro.matrix == mat4.identity.rotatez(0).matrix);
+            assert(zro.matrix == mat4.rotation(0, vec3(0.0f, 0.0f, 1.0f)).matrix);
+        }               */
+
+
+    /// Sets the translation of the matrix (nxn matrices, n >= 3).
+    void set_translation(mt[] values...) // intended to be a property
+        in { assert(values.length >= (rows-1)); }
+        body {
+            foreach(r; TupleRange!(0, rows-1)) {
+                matrix[r][rows-1] = values[r];
+            }
+        }
+
+    /// Copyies the translation from mat to the current matrix (nxn matrices, n >= 3).
+    void set_translation(Matrix mat) {
+        foreach(r; TupleRange!(0, rows-1)) {
+            matrix[r][rows-1] = mat.matrix[r][rows-1];
+        }
+    }
+
+    /// Returns an identity matrix with the current translation applied (nxn matrices, n >= 3)..
+    Matrix get_translation() const {
+        Matrix ret = Matrix.identity;
+
+        foreach(r; TupleRange!(0, rows-1)) {
+            ret.matrix[r][rows-1] = matrix[r][rows-1];
+        }
+
+        return ret;
+    }
+
+    unittest {
+        mat3 m3 = mat3(0.0f, 1.0f, 2.0f,
+                       3.0f, 4.0f, 5.0f,
+                       6.0f, 7.0f, 1.0f);
+        assert(m3.get_translation().matrix == [[1.0f, 0.0f, 2.0f], [0.0f, 1.0f, 5.0f], [0.0f, 0.0f, 1.0f]]);
+        m3.set_translation(mat3.identity);
+        assert(mat3.identity.matrix == m3.get_translation().matrix);
+        m3.set_translation([2.0f, 5.0f]);
+        assert(m3.get_translation().matrix == [[1.0f, 0.0f, 2.0f], [0.0f, 1.0f, 5.0f], [0.0f, 0.0f, 1.0f]]);
+        assert(mat3.identity.matrix == mat3.identity.get_translation().matrix);
+
+        mat4 m4 = mat4(0.0f, 1.0f, 2.0f, 3.0f,
+                       4.0f, 5.0f, 6.0f, 7.0f,
+                       8.0f, 9.0f, 10.0f, 11.0f,
+                       12.0f, 13.0f, 14.0f, 1.0f);
+        assert(m4.get_translation().matrix == [[1.0f, 0.0f, 0.0f, 3.0f],
+                                   [0.0f, 1.0f, 0.0f, 7.0f],
+                                   [0.0f, 0.0f, 1.0f, 11.0f],
+                                   [0.0f, 0.0f, 0.0f, 1.0f]]);
+        m4.set_translation(mat4.identity);
+        assert(mat4.identity.matrix == m4.get_translation().matrix);
+        m4.set_translation([3.0f, 7.0f, 11.0f]);
+        assert(m4.get_translation().matrix == [[1.0f, 0.0f, 0.0f, 3.0f],
+                                   [0.0f, 1.0f, 0.0f, 7.0f],
+                                   [0.0f, 0.0f, 1.0f, 11.0f],
+                                   [0.0f, 0.0f, 0.0f, 1.0f]]);
+        assert(mat4.identity.matrix == mat4.identity.get_translation().matrix);
+    }
+
+    /// Sets the scale of the matrix (nxn matrices, n >= 3).
+    void set_scale(mt[] values...)
+        in { assert(values.length >= (rows-1)); }
+        body {
+            foreach(r; TupleRange!(0, rows-1)) {
+                matrix[r][r] = values[r];
+            }
+        }
+
+    /// Copyies the scale from mat to the current matrix (nxn matrices, n >= 3).
+    void set_scale(Matrix mat) {
+        foreach(r; TupleRange!(0, rows-1)) {
+            matrix[r][r] = mat.matrix[r][r];
+        }
+    }
+
+    /// Returns an identity matrix with the current scale applied (nxn matrices, n >= 3).
+    Matrix get_scale() {
+        Matrix ret = Matrix.identity;
+
+        foreach(r; TupleRange!(0, rows-1)) {
+            ret.matrix[r][r] = matrix[r][r];
+        }
+
+        return ret;
+    }
+
+    unittest {
+        mat3 m3 = mat3(0.0f, 1.0f, 2.0f,
+                       3.0f, 4.0f, 5.0f,
+                       6.0f, 7.0f, 1.0f);
+        assert(m3.get_scale().matrix == [[0.0f, 0.0f, 0.0f], [0.0f, 4.0f, 0.0f], [0.0f, 0.0f, 1.0f]]);
+        m3.set_scale(mat3.identity);
+        assert(mat3.identity.matrix == m3.get_scale().matrix);
+        m3.set_scale([0.0f, 4.0f]);
+        assert(m3.get_scale().matrix == [[0.0f, 0.0f, 0.0f], [0.0f, 4.0f, 0.0f], [0.0f, 0.0f, 1.0f]]);
+        assert(mat3.identity.matrix == mat3.identity.get_scale().matrix);
+
+        mat4 m4 = mat4(0.0f, 1.0f, 2.0f, 3.0f,
+                       4.0f, 5.0f, 6.0f, 7.0f,
+                       8.0f, 9.0f, 10.0f, 11.0f,
+                       12.0f, 13.0f, 14.0f, 1.0f);
+        assert(m4.get_scale().matrix == [[0.0f, 0.0f, 0.0f, 0.0f],
+                                   [0.0f, 5.0f, 0.0f, 0.0f],
+                                   [0.0f, 0.0f, 10.0f, 0.0f],
+                                   [0.0f, 0.0f, 0.0f, 1.0f]]);
+        m4.set_scale(mat4.identity);
+        assert(mat4.identity.matrix == m4.get_scale().matrix);
+        m4.set_scale([0.0f, 5.0f, 10.0f]);
+        assert(m4.get_scale().matrix == [[0.0f, 0.0f, 0.0f, 0.0f],
+                                   [0.0f, 5.0f, 0.0f, 0.0f],
+                                   [0.0f, 0.0f, 10.0f, 0.0f],
+                                   [0.0f, 0.0f, 0.0f, 1.0f]]);
+        assert(mat4.identity.matrix == mat4.identity.get_scale().matrix);
+    }
+
+    /// Copies rot into the upper left corner, the translation (nxn matrices, n >= 3).
+    void set_rotation(Matrix!(mt, 3, 3) rot) {
+        foreach(r; TupleRange!(0, 3)) {
+            foreach(c; TupleRange!(0, 3)) {
+                matrix[r][c] = rot[r][c];
+            }
+        }
+    }
+
+    /// Returns an identity matrix with the current rotation applied (nxn matrices, n >= 3).
+    Matrix!(mt, 3, 3) get_rotation() {
+        Matrix!(mt, 3, 3) ret = Matrix!(mt, 3, 3).identity;
+
+        foreach(r; TupleRange!(0, 3)) {
+            foreach(c; TupleRange!(0, 3)) {
+                ret.matrix[r][c] = matrix[r][c];
+            }
+        }
+
+        return ret;
+    }
+
+    unittest {
+        mat3 m3 = mat3(0.0f, 1.0f, 2.0f,
+                       3.0f, 4.0f, 5.0f,
+                       6.0f, 7.0f, 1.0f);
+        assert(m3.get_rotation().matrix == [[0.0f, 1.0f, 2.0f], [3.0f, 4.0f, 5.0f], [6.0f, 7.0f, 1.0f]]);
+        m3.set_rotation(mat3.identity);
+        assert(mat3.identity.matrix == m3.get_rotation().matrix);
+        m3.set_rotation(mat3(0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 1.0f));
+        assert(m3.get_rotation().matrix == [[0.0f, 1.0f, 2.0f], [3.0f, 4.0f, 5.0f], [6.0f, 7.0f, 1.0f]]);
+        assert(mat3.identity.matrix == mat3.identity.get_rotation().matrix);
+
+        mat4 m4 = mat4(0.0f, 1.0f, 2.0f, 3.0f,
+                       4.0f, 5.0f, 6.0f, 7.0f,
+                       8.0f, 9.0f, 10.0f, 11.0f,
+                       12.0f, 13.0f, 14.0f, 1.0f);
+        assert(m4.get_rotation().matrix == [[0.0f, 1.0f, 2.0f], [4.0f, 5.0f, 6.0f], [8.0f, 9.0f, 10.0f]]);
+        m4.set_rotation(mat3.identity);
+        assert(mat3.identity.matrix == m4.get_rotation().matrix);
+        m4.set_rotation(mat3(0.0f, 1.0f, 2.0f, 4.0f, 5.0f, 6.0f, 8.0f, 9.0f, 10.0f));
+        assert(m4.get_rotation().matrix == [[0.0f, 1.0f, 2.0f], [4.0f, 5.0f, 6.0f], [8.0f, 9.0f, 10.0f]]);
+        assert(mat3.identity.matrix == mat4.identity.get_rotation().matrix);
+    }
+
+  }
+
+
 }
 
 private alias matrixElementTypes = AliasSeq!(float, double);
@@ -1023,22 +1263,24 @@ auto cmp(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) && (isNumeric!B ||
 //  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
 }
 
-auto mix(A, B, T)(in A a, in B b, in T t){
+auto mix(A, B, T)(in A a, in B b, in T t){ // result type is the common of A and B, not influenced by T
   static if(is(Unqual!T==bool)) return mix(a, b, int(t));
   alias CT = CommonScalarType!(A, B); //type of result NOT depends on t
   return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t);
 }
 
-auto avg(A...)(in A a){
+auto avg(A...)(in A a){ //return type is casted to common source type
   static assert(A.length>0);
   static if(isInputRange!(A[0]) && !isVector!(A[0]) && !isMatrix!(A[0])){ //an array
     assert(A.length == 1);
-    return a[0][].sum * (1.0f / a[0].length);
+    alias RT = Unqual!(ElementType!(A[0]));
+    return cast(RT) (a[0][].sum * (1.0f / a[0].length));
   }else{  // arguments
-    alias T = Unqual!(typeof(CommonVectorType!A(0) * 1.0f));
+    alias RT = Unqual!(CommonVectorType!A);
+    alias T = typeof(RT(0) * 1.0f);
     T res = a[0];
     static foreach(i; 1..a.length) res += a[i];
-    return res * (1.0f / A.length);
+    return cast(RT) (res * (1.0f / A.length));
   }
 }
 
@@ -1280,6 +1522,14 @@ private void unittest_CommonFunctions(){
 
   assert(is(typeof(mix(ubyte.init, ubyte.init, 0.0)) == ubyte)); // result type depends only on the first 2 parameters
 
+  {//test if avg() and mix() keeps the right types
+    static immutable RGB clRed = 0xFF, clBlue = 0xFF0000;
+    auto x = RGB(127, 0, 127);
+    { auto a = mix(clRed, clBlue, .5);  assert(a==x && is(typeof(a)==RGB)); }
+    { auto a = avg(clRed, clBlue);      assert(a==x && is(typeof(a)==RGB)); }
+    { auto a = avg([clRed, clBlue]);    assert(a==x && is(typeof(a)==RGB)); }
+  }
+
   assert(step(vec3(1, 2, 3), 2) == vec3(1, 1, 0));
   assert(is(typeof(step(1,2 ))==int));
   assert(is(typeof(step(vec2(1), 2.))==dvec2));
@@ -1334,9 +1584,8 @@ private void unittest_CommonFunctions(){
 
 // need a new sum because the original is summing with double, not float. The vector module is mainly float.
 auto sum(R)(R r){
-  import std.range : ElementType;
-  alias T = ElementType!R;
-  typeof(T(0)*2) sum = 0;  //the initial value is Type*2
+  alias T = Unqual!(ElementType!R);
+  typeof(T(0)+T(0)) sum = 0;  //the initial value is Type*2
   foreach(a; r) sum += a;
   return sum;
 }
@@ -1684,14 +1933,14 @@ struct Bounds(VT){
   }
 
   static if(VectorLength==2){
-    auto width () const    { return high.x-low.x; }         auto halfWidth()  const{ return width *0.5f; }
-    auto height() const    { return high.y-low.y; }         auto halfHeight() const{ return height*0.5f; }
+    auto width () const    { return high.x-low.x; }         auto halfWidth()  const{ return cast(ComponentType) width *0.5f; }
+    auto height() const    { return high.y-low.y; }         auto halfHeight() const{ return cast(ComponentType) height*0.5f; }
 
     auto center() const    { return avg(low, high); }
     auto area  () const    { return size.x*size.y; }
 
-    auto smallDiameter() const { return min(width, height); }   auto smallRadius() const { return smallDiameter*0.5f; }
-    auto largeDiameter() const { return max(width, height); }   auto largeRadius() const { return largeDiameter*0.5f; }
+    auto smallDiameter() const { return min(width, height); }   auto smallRadius() const { return cast(ComponentType) smallDiameter*0.5f; }
+    auto largeDiameter() const { return max(width, height); }   auto largeRadius() const { return cast(ComponentType) largeDiameter*0.5f; }
 
     auto left  () const { return low .x; }  ref left  () { return low .x; }  alias x0 = left;
     auto right () const { return high.x; }  ref right () { return high.x; }  alias y0 = top;

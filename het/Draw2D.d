@@ -200,7 +200,7 @@ class Drawing {
     bounds_ |= src.bounds_;
   }
 
-  void copyFrom(Drawing src){
+  void copyFrom(Drawing src){ /// Appends the contents of another drawing into itself. Used in UI to draw overlays on top of cells.
     if(src is null) return;
 
     foreach(obj; src.exportDrawingObjs){
