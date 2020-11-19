@@ -2015,7 +2015,7 @@ public:
   MouseState mouse;
   private View2D viewGUI_;
 
-  ref viewGUI() {
+  auto viewGUI() {
     viewGUI_.scale = 1;
     viewGUI_.origin = clientSizeHalf;
     viewGUI_.skipAnimation;
@@ -2101,10 +2101,9 @@ protected:
     createRenderingContext;
 
     //init drawing, view, mouse
-    dr = new Drawing;
-    drGUI  = new Drawing;
-    view.owner = this;  view.centerCorrection = true;
-    viewGUI_.owner = this;
+    dr    = new Drawing;  view     = new View2D;  view    .owner = this;  view.centerCorrection = true;
+    drGUI = new Drawing;  viewGUI_ = new View2D;  viewGUI_.owner = this;
+
     mouse = new MouseState;
   }
 
@@ -2159,6 +2158,15 @@ protected:
     view.updateAnimation(deltaTime, true/*invalidate*/);
   }
 
+  override void onUpdateUIBeginFrame(){
+    import het.ui:im;
+    im._beginFrame(vec2(mouse.act.screen));
+  }
+
+  override void onUpdateUIEndFrame(){
+    import het.ui:im;
+    im._endFrame(bounds2(clientBounds));
+  }
 
 public:
   HGLRC rc() { return frc; }

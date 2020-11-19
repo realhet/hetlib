@@ -2,7 +2,7 @@ module het.view;
 
 import het.win, het.inputs;
 
-struct View2D {
+class View2D {
 public:
   private Window owner_;
   @property auto owner(){

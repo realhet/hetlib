@@ -256,6 +256,8 @@ int main(string[] args)
     if(application.initFunct) application.initFunct();
 
     while(1){
+      //note: GetMessage waits, if there is nothing;
+      //note: PeekMessage returns even if there is nothing.
       while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)){
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -263,8 +265,14 @@ int main(string[] args)
         if(Window.mainWindowDestroyed) goto done;
       }
 
-      foreach(w; Window.windowList.values){
-        w.internalUpdate; //todo: az autoUpdate-t megjavitani. Ez itt az onIdle megfeleloje. Update: az autoUpdate az egy deprecated cucc, csak a Win.upUpdate defaultbol volt meghivva.
+      const isMainWindowHidden = mainWindow && mainWindow.isHidden;
+      if(isMainWindowHidden){
+        sleep(1);
+
+        //if this next line is uncommented, it will do 67 UPS instead of 38 UPS. The WM_TIMER is kinda bad.
+        //foreach(w; Window.windowList.values) w.internalUpdate;
+      }else{
+        foreach(w; Window.windowList.values) w.internalUpdate; //This is forced 100%cpu update.
       }
     }
 
@@ -584,6 +592,8 @@ public:
   //window management
   void show()                   { ShowWindow(hwnd, SW_SHOW); }
   void hide()                   { ShowWindow(hwnd, SW_HIDE); }
+  bool isHidden()               { WINDOWPLACEMENT wp; wp.length = wp.sizeof; enforce(GetWindowPlacement(hwnd, &wp)); return ~wp.showCmd & 1; }
+  bool isVisible()              { return !isHidden; }
   void maximizeWin()            { ShowWindow(hwnd, SW_MAXIMIZE); }
   void minimizeWin()            { ShowWindow(hwnd, SW_MINIMIZE); }
   void setFocus()               { SetFocus(hwnd); } //it's only keyboard focus
@@ -681,7 +691,7 @@ public:
 
   ActionManager actions; //every form has this
 
-  float targetUpdateRate=75; //must be slightly higher than target display freq.
+  float targetUpdateRate=70; //must be slightly higher than target display freq.
                              //Or much higher if it is a physical simulation.
                              //todo: ezt is meg kell csinalni jobban.
 
@@ -694,6 +704,9 @@ public:
 
   protected void onMouseUpdate(){ } //forwarded to GLWindow. Must be called right after view.update
   protected void onUpdateViewAnimation() { } //forwarded to GLWindow
+
+  protected void onUpdateUIBeginFrame() { } //GLWindow implements these too
+  protected void onUpdateUIEndFrame() { }
 
   private void updateWithActionManager() {
     //this calls the update on every window. But right now it is only for one window.
@@ -716,9 +729,9 @@ public:
     //update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
     onUpdateViewAnimation;
 
-    //prepare and finalize the IMGUI for every frame
-    //import het.ui: im;  im._beginFrame(mouse.act.screen.toF);  scope(exit) im._endFrame(clientBounds.toF);
-    //note: this is turned off to be able to do early tests. Later it must be enabled
+    //UI integration: prepare and finalize the IMGUI for every frame
+    onUpdateUIBeginFrame;
+    scope(exit) onUpdateUIEndFrame;
 
     //call the user overridden update method for the window
     try{

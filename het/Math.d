@@ -676,7 +676,7 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
 
   // create special matrices
 
-  static if(N==M && N==2 && isFloatingPoint!CT){
+  static if(N==M && N==2 && isFloatingPoint!CT){ //only for mat2
 
     static auto rotation(CommonType!(CT, float) rad){
       auto c = cos(rad), s = sin(rad);
@@ -688,54 +688,56 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
   }
 
   // this is based on the gl3n package
-  static if(N==M && N>=3){
-    static if(isFloatingPoint!CT){
+  static if(N==M && N>=3 && isFloatingPoint!CT){ // only for mat3 and mat4
 
-      static Matrix rotation(A)(in Vector!(A, N) axis_, CT alpha){
-        CT cosa = cos(alpha),  sina = sin(alpha);
-        auto axis = normalize(Vectortype(axis_));
-        auto temp = (1 - cosa)*axis;
+    static Matrix rotation(A)(in Vector!(A, N) axis_, CT alpha){
+      CT cosa = cos(alpha),  sina = sin(alpha);
+      auto axis = normalize(Vectortype(axis_));
+      auto temp = (1 - cosa)*axis;
 
-        return cast(Matrix) Matrix!(CT, 3, 3)(
-          temp.x * axis.x + cosa           ,   temp.x * axis.y + sina * axis.z  ,  temp.x * axis.z - sina * axis.y  ,
-          temp.y * axis.x - sina * axis.z  ,   temp.y * axis.y + cosa           ,  temp.y * axis.z + sina * axis.x  ,
-          temp.z * axis.x + sina * axis.y  ,   temp.z * axis.y - sina * axis.x  ,  temp.z * axis.z + cosa           );
-      }
+      return cast(Matrix) Matrix!(CT, 3, 3)(
+        temp.x * axis.x + cosa           ,   temp.x * axis.y + sina * axis.z  ,  temp.x * axis.z - sina * axis.y  ,
+        temp.y * axis.x - sina * axis.z  ,   temp.y * axis.y + cosa           ,  temp.y * axis.z + sina * axis.x  ,
+        temp.z * axis.x + sina * axis.y  ,   temp.z * axis.y - sina * axis.x  ,  temp.z * axis.z + cosa           );
+    }
 
-      static Matrix rotationx(CT alpha){
-        CT cosa = cos(alpha), sina = sin(alpha);
+    static Matrix rotationx(CT alpha){
+      CT cosa = cos(alpha), sina = sin(alpha);
 
-        auto m = Matrix(1);
-        m[1][1] = cosa;  m[1][2] = -sina;
-        m[2][1] = sina;  m[2][2] =  cosa;
-        return m;
-      }
+      auto m = Matrix(1);
+      m[1][1] = cosa;  m[1][2] = -sina;
+      m[2][1] = sina;  m[2][2] =  cosa;
+      return m;
+    }
 
-      static Matrix rotationy(CT alpha) {
-        CT cosa = cos(alpha), sina = sin(alpha);
+    static Matrix rotationy(CT alpha) {
+      CT cosa = cos(alpha), sina = sin(alpha);
 
-        auto m = Matrix(1);
-        m[0][0] =  cosa;  m[0][2] = sina;
-        m[2][0] = -sina;  m[2][2] = cosa;
-        return m;
-      }
+      auto m = Matrix(1);
+      m[0][0] =  cosa;  m[0][2] = sina;
+      m[2][0] = -sina;  m[2][2] = cosa;
+      return m;
+    }
 
-      static Matrix rotationz(CT alpha){
-        CT cosa = cos(alpha), sina = sin(alpha);
+    static Matrix rotationz(CT alpha){
+      CT cosa = cos(alpha), sina = sin(alpha);
 
-        auto m = Matrix(1);
-        m[0][0] = cosa;  m[0][1] = -sina;
-        m[1][0] = sina;  m[1][1] =  cosa;
-        return m;
-      }
+      auto m = Matrix(1);
+      m[0][0] = cosa;  m[0][1] = -sina;
+      m[1][0] = sina;  m[1][1] =  cosa;
+      return m;
+    }
 
-      auto rotate(in Vector!(A, N) axis, CT alpha){ this = rotation(axis, alpha)*this;  return this; }
-      auto rotatex(CT alpha){ this = rotationx(alpha)*this;  return this; }
-      auto rotatey(CT alpha){ this = rotationy(alpha)*this;  return this; }
-      auto rotatez(CT alpha){ this = rotationz(alpha)*this;  return this; }
-    }// isFloatingPoint
+    auto rotate(A)(in Vector!(A, N) axis, CT alpha){ this = rotation(axis, alpha)*this;  return this; }
+    auto rotatex(CT alpha){ this = rotationx(alpha)*this;  return this; }
+    auto rotatey(CT alpha){ this = rotationy(alpha)*this;  return this; }
+    auto rotatez(CT alpha){ this = rotationz(alpha)*this;  return this; }
 
-/*        unittest {
+  }
+
+/+
+
+        unittest {
             assert(mat4.xrotation(0).matrix == [[1.0f, 0.0f, 0.0f, 0.0f],
                                                 [0.0f, 1.0f, -0.0f, 0.0f],
                                                 [0.0f, 0.0f, 1.0f, 0.0f],
@@ -763,11 +765,11 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
             assert(mat4.zrotation(0).matrix == zro.matrix);
             assert(zro.matrix == mat4.identity.rotatez(0).matrix);
             assert(zro.matrix == mat4.rotation(0, vec3(0.0f, 0.0f, 1.0f)).matrix);
-        }               */
+        }
 
 
     /// Sets the translation of the matrix (nxn matrices, n >= 3).
-    void set_translation(mt[] values...) // intended to be a property
+    void set_translation(CT[] values...) // intended to be a property
         in { assert(values.length >= (rows-1)); }
         body {
             foreach(r; TupleRange!(0, rows-1)) {
@@ -923,7 +925,7 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
         assert(mat3.identity.matrix == mat4.identity.get_rotation().matrix);
     }
 
-  }
+  }   +/
 
 
 }

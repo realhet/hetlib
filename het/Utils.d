@@ -109,6 +109,7 @@ import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, ST
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
+enum logFileOps = true;
 
 // Obj.Destroy is not clearing shit
 void free(T)(ref T o)if(is(T==class)){
@@ -2684,7 +2685,7 @@ void inspectSymbol(alias T)(string before="", int level=0) {
 static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////
   import std.traits : SharedOf;
   enum isShared = is(SharedOf!T == T);
-  enum log = true;
+  enum log = false;
 
   static if(isShared){
     static T instance;
@@ -4077,7 +4078,7 @@ public:
       enforce(!mustExists, format(`Can't read file: "%s"`, fullName)); //todo: egysegesiteni a file hibauzeneteket
     }
 
-    LOG(fullName);
+    if(logFileOps) LOG(fullName);
     return data;
   }
 
@@ -4112,6 +4113,7 @@ public:
       scope(exit) f.close;
       if(offset) f.seek(offset);
       f.rawWrite(data);
+      if(logFileOps) LOG(fullName);
     }catch(Throwable){
       enforce(false, format(`Can't write file: "%s"`, fullName));
     }
@@ -4383,12 +4385,8 @@ private{
     return year%4==0 && (year%100!=0 || year%400==0);
   }
 
-  double encodeTime(int hour, int min, int sec, double ms)
-  {
-    return ms   * (1.0/(24*60*60*1000))+
-           sec  * (1.0/(24*60*60     ))+
-           min  * (1.0/(24*60        ))+
-           hour * (1.0/(24           ));
+  double encodeTime(int hour, int min, int sec, double ms){
+    return (((ms/1000+sec)/60+min)/60+hour)/24;
   }
 
   double encodeDate(int year, int month, int day) //returns NaN if invalid
@@ -4455,7 +4453,7 @@ private{
   {
     SYSTEMTIME result;
     if(isnan(dateTime))return result;
-    int M, I = ifloor(fract(dateTime)*msecsInDay);
+    int M, I = iround(fract(dateTime)*msecsInDay);
     with(result){
       divMod(I, 1000, I, M); wMilliseconds = cast(ushort)M;
       divMod(I,   60, I, M); wSecond       = cast(ushort)M;
@@ -4536,11 +4534,14 @@ struct Time{
     return Time(st);
   }
   this(string str){
-    int h,m,s; string msstr;
-    enforce(2<=str.formattedRead!"%d:%d:%d.%s"(h, m, s, msstr), "Invalid time format. hh:mm[:ss[.zzz]]");
-    double ms;
-    if(!msstr.empty) ms = msstr.to!int*10.0^^(3-msstr.length);
-    this(h, m, s, ms);
+    int h,m; double s=0;
+    try{
+      const len = str.split(':').length;
+           if(len==3) str.formattedRead!"%s:%s:%s"(h, m, s);
+      else if(len==2) str.formattedRead!"%s:%s"   (h, m   );
+      else raise("");
+    }catch(Throwable){ raise(`Invalid time format: "` ~ str ~ `"`); }
+    this(h, m, s.ifloor, s.fract*1000);
   }
 
   @property int hour()const { auto st = decodeTime(raw); return st.wHour        ; }
@@ -4554,16 +4555,7 @@ struct Time{
   @property void ms  (ushort x) { auto st = decodeTime(raw); st.wMilliseconds = x; this = Time(st); }
 
   string toString()const {
-    auto st = decodeTime(raw);
-    with(st){
-      auto s = format("%.2d:%.2d", wHour, wMinute);
-      if(wSecond || wMilliseconds){
-        s ~= format(":%.2d", wSecond);
-        if(wMilliseconds)
-          s ~= format(".%.3d", wMilliseconds);
-      }
-      return s;
-    }
+    with(decodeTime(raw)) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds);
   }
 
   int opCmp(const Time t) const { return dblCmp(raw, t.raw); }

@@ -328,7 +328,7 @@ class FrmMain: GLWindow{
       foreach(i; 0..4) areas ~= new DoubleDozenArea(i); //UK only
     }
 
-    void glDraw(ref View2D view){
+    void glDraw(View2D view){
       if(drawing is null){
         drawing = new Drawing;
         with(drawing){
@@ -445,7 +445,7 @@ class FrmMain: GLWindow{
         earn(kv.key, kv.value);
     }
 
-    void glDraw(ref View2D view){
+    void glDraw(View2D view){
       foreach(c; coins) c.glDraw(view);
     }
 

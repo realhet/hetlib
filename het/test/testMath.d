@@ -2,10 +2,10 @@
 //@import c:\d\libs
 //@ldc
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-///@release
-//@debug
+//@release
+///@debug
 
-//@compile --cov
+///@compile --cov
 
 import het.utils;
 
@@ -136,6 +136,64 @@ static if(1){ // 3D Julia ////////////////////////////////////////////////
 }
 
 
+void gdiDrawFractal(Window win){
+  import core.sys.windows.windows;
+
+  auto rect = win.clientRect;
+  FillRect(win.hdc, &rect, cast(HBRUSH) (COLOR_WINDOW+2));
+
+  iResolution = vec2(320, 240);
+  foreach(p; iResolution.itrunc.iota2){
+    vec2 fragCoord = p;
+    vec4 fragColor;
+    mainImage(fragColor, fragCoord);
+    SetPixel(win.hdc, p.x, p.y, fragColor.floatToRgb.lll.raw);
+  }
+}
+
+
+class ScannerSimulation{ // ScannerSimulation
+  bounds2 targetBounds = bounds2(-16, -16, 16, 16);
+  vec2 targetCenter(){ return targetBounds.center; }
+
+  vec2 projectorPos = vec2(-61, 0 );    vec2 projectorDir(){ return normalize(targetCenter-projectorPos); }
+  vec2 cameraPos    = vec2(-40, 20);    vec2 cameraDir   (){ return normalize(targetCenter-cameraPos   ); }
+
+  enum resolution = 100;
+  enum rayLength = 60.0f;
+
+  int actRay;
+
+  // simulate the highly distorted camera and the projector optics.
+  auto cameraRay(int n){ return seg2(cameraPos, cameraPos + cameraDir.rotate(mix(-30.0f, 32.0f, float(n)/resolution).radians - cos(n*0.05f)*0.08f)*70); }
+  auto projectorRay(int n){ return seg2(projectorPos, projectorPos + projectorDir.rotate(n.remap(0, resolution, -21.0f, 20.0f).radians + sin(n*0.08f)*0.05f)*100); }
+
+
+  void draw(Drawing dr, View2D view){ with(dr){
+    actRay = (actRay+1)%resolution;
+    actRay = QPS.iround % resolution;
+
+    { static bool a; if(!chkSet(a)) mmGrid(view); }
+
+    auto rayColor(int i){ return RGB(RGB(30,30,30) * (i==actRay ? 2 : 1)); }
+
+    foreach(i; 0..resolution) dr.line2(rayColor(i), cameraRay(i)   );
+    foreach(i; 0..resolution) dr.line2(rayColor(i), projectorRay(i));
+
+
+    color = clGray;
+    drawRect(targetBounds);
+    drawX(targetBounds);
+    circle(targetCenter, 32/2);
+
+    dr.line2(ArrowStyle.vector, clLime  , cameraPos    , cameraPos    + 10*cameraDir   );
+    dr.line2(ArrowStyle.vector, clYellow, projectorPos , projectorPos + 10*projectorDir);
+
+  }}
+
+}
+
+
 void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main ////////////////////////////////////////////
   het.math.unittest_main;
 
@@ -145,13 +203,13 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
   import het.uibase; //rememberEditedWrappedLines()  drawTextEditorOverlay()
   import het.ui;
 
-  import common.gcode;
-  import common.gcodeshader;
+//  import common.gcode;
+//  import common.gcodeshader;
 
   //https://solarianprogrammer.com/2013/05/22/opengl-101-matrices-projection-view-model/#:~:text=The%20matrix%20M%2C%20that%20contains,a%20single%20matrix%20for%20efficiency.
 
   print(123);
-  readln;
+//  readln;
 
 
 /*  import het.math, het.utils, het.debugclient, het.geometry, het.color, het.bitmap, het.win, het.view, het.opengl, het.binpacker, het.megatexturing,
@@ -164,11 +222,11 @@ void maintest(){ //import het.utils; het.utils.application.runConsole({ //! Main
 }//); }
 
 
-void main(){
+/*void main(){
   application.runConsole({
     maintest;
   });
-}
+}*/
 
 /*
 import het.win;
@@ -181,19 +239,51 @@ class MyWin: Window{
   }
 
   override void onPaint(){
-    import core.sys.windows.windows;
-
-    auto rect = clientRect;
-    FillRect(hdc, &rect, cast(HBRUSH) (COLOR_WINDOW+2));
-
-    iResolution = vec2(320, 240);
-    foreach(p; iResolution.itrunc.iota2){
-      vec2 fragCoord = p;
-      vec4 fragColor;
-      mainImage(fragColor, fragCoord);
-      SetPixel(hdc, p.x, p.y, fragColor.floatToRgb.lll.raw);
-    }
+    gdiDrawFractal;
   }
 
 }
 */
+
+
+
+
+
+import het, het.ui;
+
+class MyWin: GLWindow{
+  mixin autoCreate;  //automatically creates an instance of this form at startup
+public:
+
+  ScannerSimulation sim;
+
+  override void onCreate(){
+
+    // so dome unittests
+    //het.math.unittest_main;
+    //import het.stream; het.stream.unittest_main;
+
+  }
+  override void onUpdate(){
+    view.navigate(1,1);
+
+    with(im) Panel({
+      padding = "4";
+      Text(clRed, "Hello World!");
+
+      uiCellDocumentation;
+    });
+
+    invalidate;
+  }
+
+  override void onPaint(){
+    dr.clear(clBlack);
+    if(!sim) sim = new ScannerSimulation;
+    sim.draw(dr, view);
+
+    im.draw(dr);
+  }
+}
+
+

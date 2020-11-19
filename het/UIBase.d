@@ -56,17 +56,17 @@ auto getOverlayDrawing(Container cntr){
 }
 
 void rememberEditedWrappedLines(Row row, WrappedLine[] wrappedLines){
-/*  import het.ui: im;
+  import het.ui: im;
   if(im.textEditorState.row is row)
-    im.textEditorState.wrappedLines = wrappedLines;*/
+    im.textEditorState.wrappedLines = wrappedLines;
 }
 
 void drawTextEditorOverlay(Drawing dr, Row row){
-/*  import het.ui: im;  if(im.textEditorState.row is row){
+  import het.ui: im;  if(im.textEditorState.row is row){
     dr.translate(row.innerPos);
     im.textEditorState.drawOverlay(dr, clWhite-row.bkColor);
     dr.pop;
-  }*/
+  }
 }
 
 
@@ -1110,13 +1110,11 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
       dr.color = clGray;
       dr.lineStyle = LineStyle.normal;
       dr.lineWidth = 0.16f*2;
-      dr.drawRect(innerBounds);
+      dr.line2(innerBounds);
 
       if(isTab){
-        dr.arrowStyle = asVector;
         dr.lineWidth = innerHeight*0.04f;
-        dr.line(innerBounds.leftCenter, innerBounds.rightCenter);
-        dr.arrowStyle = asNone;
+        dr.line2(ArrowStyle.vector, innerBounds.leftCenter, innerBounds.rightCenter);
       }else if(isWhite){
         dr.drawX(innerBounds);
       }

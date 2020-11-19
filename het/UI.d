@@ -1,6 +1,8 @@
 module het.ui;
 
-import het.utils, het.draw2d, het.inputs, std.traits, het.stream, het.opengl, std.meta;
+import het.utils, het.draw2d, het.inputs, het.stream, het.opengl;
+
+import std.traits, std.meta;
 
 public import het.uibase;
 
@@ -184,7 +186,7 @@ class Slider : Cell { // Slider //////////////////////////////////
     dr.color = bkColor; dr.fillRect(borderBounds_inner);
     drawBorder(dr);
 
-    dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = asNone;
+    dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none;
     void drawThumb(vec2 a, vec2 t){ dr.lineWidth = lwThumb; dr.color = clThumb; dr.line(a-t.rotate90, a+t.rotate90); }
     void drawLine(vec2 a, vec2 b, RGB cl){ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); }
 
@@ -1146,7 +1148,6 @@ auto testWin(Drawing dr, vec2 mouse, float pixelSize){ // testWin() ////////////
 
 
 struct im{ static:
-  import std.traits;
 
   //Frame handling
   bool mouseOverUI, wantMouse, wantKeys;

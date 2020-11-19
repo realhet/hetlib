@@ -213,8 +213,19 @@ Image!(T, 2) extract_bilinear(T)(Image!(T, 2) iSrc, float x0, float y0, int w, i
   return res;
 }
 
-Image!(T, 2) extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  auto res = image2D(w, h, T.init);
+auto sample_nearest(T)(Image!(T, 2) iSrc, ivec2 p){
+  if(p.x<0 || p.y<0 || p.x>=iSrc.width || p.y>=iSrc.height) return T.init;
+  return iSrc[p];
+}
+
+auto sample_nearest(T)(Image!(T, 2) iSrc, vec2 p){
+  return iSrc.sample_nearest(p.ifloor);
+}
+
+auto extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
+  return image2D(w, h, (ivec2 p) => iSrc.sample_nearest(p*vec2(xs, ys))); //opt: it's slow, but universal
+
+/*  auto res = image2D(w, h, T.init);
   auto x00 = x0;
 
   foreach(int y; 0..h){
@@ -233,7 +244,7 @@ Image!(T, 2) extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, in
     y0 += ys;
   }
 
-  return res;
+  return res;*/
 }
 
 //This is a special one: it only processes the first 2 ubytes of an uint
@@ -1574,13 +1585,9 @@ version(D2D_FONT_RENDERER){ private:
 
       }
 
-      if(isSegoeAssets){ //align the assets font with letters
+      if(isSegoeAssets){ //align the assets font vertically with letters
         int ysh = iround(res.height*0.16f); //scroll down that many pixels
-        raise("Segoe font shift not implemented yet");
-        //res = res.extract_nearest(0, -ysh, res.width, res.height);
-        //res.data[0..res.width*ysh] = 0;
-
-        //!!!!!!!!!!!!!!!!!!! todo: align the Segoe assets font with letters /////////////////////////////////////////
+        res.set(res.access!ubyte.extract_nearest(0, -ysh, res.width, res.height));
       }
 
       return res;

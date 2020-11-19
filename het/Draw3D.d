@@ -202,7 +202,7 @@ public:
   }
 
   void spin(int axis, int cnt){
-    matrix = matrix * mat4.rotation(PIf/2*cnt.cyclicMod(4), axisVector(axis));
+    matrix = matrix * mat4.rotation(PIf/2*cnt.mod(4), axisVector(axis));
   }
 
   void mirror(int axis){

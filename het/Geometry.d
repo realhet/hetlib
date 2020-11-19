@@ -662,6 +662,7 @@ V2f xy(in V3f v){ return V2f(v.x, v.y); } //swizzles
 
 struct seg2 { //todo: make a Segment template struct
   vec2[2] p;
+  alias p this;
 
   this(in vec2 a, in vec2 b) { p = [a, b]; }
   this(float x0, float y0, float x1, float y1) { this(vec2(x0, y0), vec2(x1, y1)); }

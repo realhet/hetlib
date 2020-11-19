@@ -5,6 +5,7 @@ import het.opengl, het.fonts, het.megatexturing;
 public import het.geometry, het.color;
 public import het.megatexturing : textures;
 
+import std.bitmanip;
 
 __gshared bool logDrawing = 0;
 
@@ -53,7 +54,7 @@ Text:  x0,  y0,  sf, c4,  c4,  c4,      c4 ,  69,     c4,  c4,  c4   //sf = size
 //Todo: Appendert kell hasznalni!
 
 //Standard LineStyles
-enum LineStyle {
+enum LineStyle:ubyte {
   normal        =  0,
   dot           =  2,
   dash          = 19,
@@ -140,21 +141,22 @@ struct RectAlign{align(1): import std.bitmanip;
 
 }
 
-struct ArrowStyle {
-  int headArrow, tailArrow; //1:arrow, 2:bar
-  int centerNormal; //1:left, 2:right, 3:both
-
-  int encode()const { return headArrow<<0 | tailArrow<<2 | centerNormal<<4; }
+//Standard arrows
+private int encodeArrowStyle(int headArrow, int tailArrow, int centerNormal){
+  return headArrow<<0 | tailArrow<<2 | centerNormal<<4;
 }
 
-//Standard arrows
-enum asNoArrow       = ArrowStyle(0,0,0),
-     asNone          = asNoArrow,
-     asArrow         = ArrowStyle(1,0,0),
-     asDoubleArrow   = ArrowStyle(1,1,0),
-     asNormalLeft    = ArrowStyle(0,0,1),
-     asNormalRight   = ArrowStyle(0,0,2),
-     asVector        = ArrowStyle(1,2,0);
+enum ArrowStyle:ubyte {
+  none                  = 0,
+  arrow                 = encodeArrowStyle(1,0,0),
+  doubleArrow           = encodeArrowStyle(1,1,0),
+  normalLeft            = encodeArrowStyle(0,0,1),
+  normalRight           = encodeArrowStyle(0,0,2),
+  arrowNormalLeft       = encodeArrowStyle(1,0,1),
+  arrowNormalRight      = encodeArrowStyle(1,0,2),
+  vector                = encodeArrowStyle(1,2,0),
+  segment               = encodeArrowStyle(2,2,0)
+}
 
 class Drawing {
 
@@ -220,21 +222,25 @@ class Drawing {
 ////////////////////////////////////////////////////////////////////////////////
 
   struct DrawState {
-    RGB drawColor = clWhite,
-        fillColor = clBlack;
-    uint alpha = 0xFF000000;
+    // saveable area
+    RGB drawColor = clWhite;    //    RGB fillColor = clBlack;
+    ubyte alpha = 0xFF;
+    LineStyle lineStyle;
+    ArrowStyle arrowStyle;
+    ubyte fontFlags;
+
+    ubyte _dummy1;
+    // end of saveable area
     float  pointSize = -1,
            lineWidth = -1;
-    LineStyle lineStyle;
-    auto arrowSize = vec2(8, 2.5);
-    ArrowStyle arrowStyle = asNoArrow;
+//    auto arrowSize = vec2(8, 2.5);   //this is fixed in the shader
 
     float fontHeight = 18;
     float fontWeight = 1.0;
-    bool fontMonoSpace,
-         fontItalic,
-         fontUnderline, //todo:implementalni!
-         fontStrikeOut; //todo:implementalni!
+
+    static foreach(i, s; ["MonoSpace", "Italic", "Underline", "StrikeOut"]){
+      mixin("@property bool font*() const { return (fontFlags>>#)&1; }  @property void font*(bool b){ fontFlags = cast(ubyte) (fontFlags & ~(1<<#) | (cast(int)b << #)); }".replace('*', s).replace('#', i.text));
+    }
 
     private enum fontWeightBold = 1.4f;
     @property bool fontBold()           { return fontWeight> (fontWeightBold+1)*.5f; }
@@ -242,6 +248,18 @@ class Drawing {
 
     auto drawScale = vec2(1, 1);
     auto drawOrigin = vec2(0, 0);
+
+
+    /// used in advanced drawing functions such as line2()
+    long quickSave(){
+      static assert(drawColor.offsetof + 8 == _dummy1.offsetof + _dummy1.sizeof);
+      return *(cast(long*) &this);
+    }
+
+    /// ditto
+    void quickRestore(long data){
+      *(cast(long*) &this) = data;
+    }
   }
 
   private DrawState actState;
@@ -251,31 +269,34 @@ class Drawing {
   private vec2[2][] stack; //matrix stack
 
 
-  @property float alpha()       { return (actState.alpha>>24)*(1.0f/255); }
-  @property void alpha(float a) { actState.alpha = cast(uint)clamp(iround(a*255), 0, 255)<<24; } //todo: clamp bugos?
+  @property float alpha()       { return actState.alpha*(1.0f/255); }
+  @property void alpha(float a) { actState.alpha = cast(ubyte) iround(a.clamp(0, 1)*255); }
 
   @property RGB color()        { return actState.drawColor; }
   @property void color(RGB c)  { actState.drawColor = c; }
 
-  @property RGB fillColor()            { return actState.fillColor; }
-  @property void fillColor(RGB c)      { actState.fillColor = c; }
+//  @property RGB fillColor()            { return actState.fillColor; }
+//  @property void fillColor(RGB c)      { actState.fillColor = c; }
 
   ref float pointSize()         { return actState.pointSize; }
   ref float lineWidth()         { return actState.lineWidth; }
-  ref int lineStyle()           { return actState.lineStyle; }
+  ref lineStyle()           { return actState.lineStyle; }
 
-  ref arrowSize()  { return actState.arrowSize;  }
   ref arrowStyle() { return actState.arrowStyle; }
 
   ref scaleFactor() { return actState.drawScale; }
   ref origin()      { return actState.drawOrigin; }
 
   ref fontHeight      () { return actState.fontHeight           ; }
-  ref fontMonoSpace   () { return actState.fontMonoSpace        ; }
   ref fontWeight      () { return actState.fontWeight           ; }
-  ref fontItalic      () { return actState.fontItalic           ; }
-  ref fontUnderline   () { return actState.fontUnderline        ; }
-  ref fontStrikeOut   () { return actState.fontStrikeOut        ; }
+  @property bool fontMonoSpace   () const { return actState.fontMonoSpace        ; }
+  @property bool fontItalic      () const { return actState.fontItalic           ; }
+  @property bool fontUnderline   () const { return actState.fontUnderline        ; }
+  @property bool fontStrikeOut   () const { return actState.fontStrikeOut        ; }
+  @property      fontMonoSpace   (bool b) { return actState.fontMonoSpace = b    ; }
+  @property      fontItalic      (bool b) { return actState.fontItalic    = b    ; }
+  @property      fontUnderline   (bool b) { return actState.fontUnderline = b    ; }
+  @property      fontStrikeOut   (bool b) { return actState.fontStrikeOut = b    ; }
 
   @property bool fontBold(){ return actState.fontBold; }
   @property fontBold(bool b){ actState.fontBold = b; }
@@ -291,8 +312,8 @@ class Drawing {
   alias popState = restoreState;
 
   //access combined colors
-  private uint realDrawColor()  { return actState.drawColor.raw | actState.alpha; }
-  private uint realFillColor()  { return actState.fillColor.raw | actState.alpha; }
+  private uint realDrawColor()  { return actState.drawColor.raw | actState.alpha<<24; }
+//  private uint realFillColor()  { return actState.fillColor.raw | actState.alpha<<24; }
 
   void push() {
     enforce(stack.length<1024, "Drawing.glDraw() matrix stack is too big.  It has %d items.".format(stack.length));
@@ -471,7 +492,7 @@ class Drawing {
     vec2 p = inputTransform(p_);
     markDirty;
     auto c = realDrawColor, w = lineWidth;
-    append(DrawingObj(3+actState.arrowStyle.encode, lineCursor, p, vec2(w, lineStyle), c));
+    append(DrawingObj(3+actState.arrowStyle, lineCursor, p, vec2(w, lineStyle), c));
     lineCursor = p;
   }
   void lineTo(in vec2 p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
@@ -505,7 +526,7 @@ class Drawing {
   void vLine(in vec2 p0, float y1)                       { line(p0.x, p0.y, p0.x, y1); }
   void vLine(float x, float y0, float y1)               { line(x, y0, x, y1); }
 
-  void line2(T...)(in args T){
+/*  void line2(T...)(in args T){
     foreach(a; args){
       alias A = unqual!(typeof(a));
       static if(is(A == vec2)) lineTo(a);
@@ -517,6 +538,31 @@ class Drawing {
       static if(isIntegral!A || isFloatingPoint!A) lineWidth = a;
       //todo: static if(is(A == LineStyle)) lineStyle = a;
     }
+  }*/
+
+  void line2(A...)(in A args){
+
+    // backup current drawState (only a subset of it)
+    auto backup = actState.quickSave;  scope(exit) actState.quickRestore(backup);
+    // todo: only do this when tere are colors, or styles in the args
+
+    bool first = true;
+    float coord; //it remembers the first coordinate
+
+    static foreach(a; args){{
+      alias T = Unqual!(typeof(a));
+            static if(is(T == RGB       )){ color = a;
+      }else static if(is(T == RGBA      )){ alpha = a.a/255.0f;
+      }else static if(is(T == LineStyle )){ lineStyle = a;
+      }else static if(is(T == ArrowStyle)){ arrowStyle = a;
+      }else static if(is(T == vec2      )){ lineTo(a, first); first = false;
+      }else static if(is(T == ivec2     )){ lineTo(a, first); first = false;
+      }else static if(is(T == seg2      )){ lineTo(a[0], first); first = false; lineTo(a[1]);
+      }else static if(is(T == bounds2   )){ lineTo(a.topLeft, first); lineTo(a.topRight); lineTo(a.bottomRight), lineTo(a.bottomLeft), lineTo(a.topLeft);
+      }else static if(is(T == ibounds2  )){ lineTo(a.topLeft, first); lineTo(a.topRight); lineTo(a.bottomRight), lineTo(a.bottomLeft), lineTo(a.topLeft);
+      }else static if(isNumeric!T        ){ if(isnan(coord)) coord = a; else { lineTo(coord, a, first); first = false; coord = float.init; }
+      }else static assert("invalid type: "~T.stringof);
+    }}
   }
 
   protected static auto genRgbGraph(string fv)(){
@@ -667,7 +713,7 @@ class Drawing {
 
 // gridLines ////////////////////////////////////////////////////
 
-  void gridLines(ref View2D view, float dist, RGB color=clGray, float width=-1, LineStyle style = LineStyle.normal, string hv = "hv")
+  void gridLines(View2D view, float dist, RGB color=clGray, float width=-1, LineStyle style = LineStyle.normal, string hv = "hv")
   {
     //todo: this is not working with translate()
     auto horz = hv.canFind('h'), vert = hv.canFind('v');
@@ -701,14 +747,14 @@ class Drawing {
     alpha = 1; //todo: nem tul jo
   }
 
-  void mmGrid(ref View2D view) {
+  void mmGrid(View2D view) {
     auto a = 0.55f;
     gridLines(view, 1,  clGray,  0.05*a);
     gridLines(view, 5,  clGray,  0.10*a);
     gridLines(view, 10, clWhite, 0.15*a);
   }
 
-  void inchGrid(ref View2D view) {
+  void inchGrid(View2D view) {
     gridLines(view, 25.4/16, clGray , 0.05);
     gridLines(view, 25.4/ 4, clGray , 0.10);
     gridLines(view, 25.4   , clWhite, 0.15);
@@ -823,7 +869,7 @@ class Drawing {
 
 // Complex stuff: debug scene //////////////////////////////////////////////////
 
-  void debugDrawings(ref View2D view){
+  void debugDrawings(View2D view){
     mmGrid(view);
 
     foreach(i; 1..9){
@@ -1424,7 +1470,7 @@ class Drawing {
 
 // Draw the objects on GPU  /////////////////////////////
 
-  void glDraw(ref View2D view, in vec2 translate = vec2(0)) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
+  void glDraw(View2D view, in vec2 translate = vec2(0)) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
 
   void glDraw(in vec2 center, float scale, in vec2 translate=vec2(0)) {
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));
