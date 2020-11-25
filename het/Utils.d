@@ -2668,9 +2668,13 @@ void inspectSymbol(alias T)(string before="", int level=0) {
           writeln(before, fullyQualifiedName!member, " is a module");
         else static if(s.startsWith("package "))
           writeln(before, fullyQualifiedName!member, " is a package");
-        else static if(is(typeof(member.init)))
-          writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof);
-        else{
+        else static if(is(typeof(member.init))){
+          static if(member.stringof.endsWith(')')){
+            writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof);
+          }else{
+            writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof);
+          }
+        }else{
           string fn = memberName;
           static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member;
           writeln(before, fn, " is template ", s);

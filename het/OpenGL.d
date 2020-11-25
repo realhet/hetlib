@@ -2156,16 +2156,23 @@ protected:
 
   override void onUpdateViewAnimation(){
     view.updateAnimation(deltaTime, true/*invalidate*/);
+
+    // set extra info about mouse and bounds for view and viewGUI
+    vec2 mp = mouse.act.screen;
+    bounds2 bnd = clientBounds;
+
+    with(view   ){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); }
+    with(viewGUI){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); }
   }
 
   override void onUpdateUIBeginFrame(){
     import het.ui:im;
-    im._beginFrame(vec2(mouse.act.screen));
+    im._beginFrame([im.TargetSurface(view), im.TargetSurface(viewGUI)]);
   }
 
   override void onUpdateUIEndFrame(){
     import het.ui:im;
-    im._endFrame(bounds2(clientBounds));
+    im._endFrame; //(bounds2(clientBounds))
   }
 
 public:

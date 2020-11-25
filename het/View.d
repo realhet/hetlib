@@ -22,6 +22,19 @@ private:
 public:
   vec2 origin;
 
+  // extra information from external source
+  vec2 mousePos;
+  bounds2 clipBounds;
+
+  this(){}
+
+  this(in vec2 origin, float scale){
+    this.origin = origin;
+    this.scale = scale;
+  }
+
+  override string toString() const { return format!"View2D(%s, %s)"(origin, scale); }
+
   @property{ float logScale() const { return m_logScale; }  void  logScale(float s){ m_logScale = s; m_scale = pow(2, logScale); m_invScale = 1/scale; }  }
   @property{ float scale   () const { return m_scale;    }  void  scale   (float s){ logScale = log2(s); }                                                }
   @property{ float invScale() const { return m_invScale; }  void  invScale(float s){ logScale = log2(1/s); }                                              }
@@ -67,10 +80,8 @@ public:
   }
 
   //todo: make this transformation cached and fast!
-  vec2 trans(in vec2 world, bool animated=true)     { return ((world-getOrigin(animated))*getScale(animated)+clientSizeHalf); }  //opt: fucking slow, need to be cached
-  vec2 invTrans(in vec2 client, bool animated=true) { return (client-clientSizeHalf)/getScale(animated) + getOrigin(animated); }
-
-  vec2 mouseAct()                { return owner.screenToClient(inputs.mouseAct); }
+  T trans(T)(in T world, bool animated=true)     { return ((world-getOrigin(animated))*getScale(animated)+clientSizeHalf); }  //opt: fucking slow, need to be cached
+  T invTrans(T)(in T client, bool animated=true) { return (client-clientSizeHalf)/getScale(animated) + getOrigin(animated); }
 
   //Scroll/Zoom User controls
   bool scrollSlower;       //also affects zoom
@@ -109,14 +120,14 @@ public:
     skipAnimation;
   }
 
-  void zoomAround(in vec2 point, float amount) {  //todo: the zoom and the translation amount is not proportional. Fast zooming to the side looks bad. Zoom in center is ok.
+  void zoomAround(in vec2 screenPoint, float amount) {  //todo: the zoom and the translation amount is not proportional. Fast zooming to the side looks bad. Zoom in center is ok.
     if(!amount) return;
-    auto sh = point-clientSizeHalf;
+    auto sh = screenPoint-clientSizeHalf;
     origin += sh*invScale;
     zoom(amount);
     origin -= sh*invScale;
   }
-  void zoomAroundMouse(float amount) { zoomAround(mouseAct, amount); }
+  void zoomAroundMouse(float amount) { zoomAround(trans(mousePos), amount); }
 
 
   // navigate 2D view with the keyboard and the mouse

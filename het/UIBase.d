@@ -19,8 +19,8 @@ enum
   NormalFontHeight = 18;  //fucking keep it on 18!!!!
 
 const
-  InternalTabScale = 0.11f,   //around 0.15
-  LeadingTabScale  = 0.31f;  //for programming
+  InternalTabScale = 0.12f/2,  //around 0.15 for programming
+  LeadingTabScale  = 0.12f*3;  //these are relative to the original length which is 8 spaces or something like that
 
 enum
   EmptyCellWidth  = 0,
@@ -32,8 +32,6 @@ private enum
 
 
 // Global shit //////////////////////////////
-
-/*deprecated*/ __gshared vec2 g_currentMouse; //current mouse position in world
 
 //todo: these ugly things are only here to separate uiBase for ui.
 
@@ -62,7 +60,8 @@ void rememberEditedWrappedLines(Row row, WrappedLine[] wrappedLines){
 }
 
 void drawTextEditorOverlay(Drawing dr, Row row){
-  import het.ui: im;  if(im.textEditorState.row is row){
+  import het.ui: im;
+  if(im.textEditorState.row is row){
     dr.translate(row.innerPos);
     im.textEditorState.drawOverlay(dr, clWhite-row.bkColor);
     dr.pop;
@@ -151,7 +150,7 @@ struct HitInfo{ //Btn returns it
   uint id;
   bool hover, captured, clicked, pressed, released;
   float hover_smooth, captured_smooth;
-  bounds2 hitBounds;
+  bounds2 hitBounds; // this is in ui coordinates. Problematic with zoomable and GUI views.
 
   alias clicked this;
 }
@@ -889,18 +888,18 @@ class Cell{ // Cell ////////////////////////////////////
   ref Border  border () { static Border  nullBorder ; return nullBorder ; }
   ref Padding padding() { static Padding nullPadding; return nullPadding; }
 
-  float extraMargin()      { return (VisualizeContainers && cast(Container)this)? 3:0; }
-  vec2 topLeftGapSize()     { return vec2(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   ); }
-  vec2 bottomRightGapSize() { return vec2(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom); }
-  vec2 gapSize() { return topLeftGapSize + bottomRightGapSize; }
+  float extraMargin()       const { return (VisualizeContainers && cast(Container)this)? 3:0; }
+  vec2 topLeftGapSize()     const { with(cast()this) return vec2(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   ); }
+  vec2 bottomRightGapSize() const { with(cast()this) return vec2(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom); }
+  vec2 gapSize()            const { return topLeftGapSize + bottomRightGapSize; }
 
   @property{
     //todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
-    vec2 innerPos () { return outerPos+topLeftGapSize; } void innerPos(in vec2 p){ outerPos = p+topLeftGapSize; }
-    vec2 outerSize() { return innerSize+gapSize; } void outerSize(in vec2 s){ innerSize = s-gapSize; }
-    auto innerBounds() { return bounds2(innerPos, innerPos+innerSize); }
+    vec2 innerPos () const { return outerPos+topLeftGapSize; } void innerPos(in vec2 p){ outerPos = p+topLeftGapSize; }
+    vec2 outerSize() const { return innerSize+gapSize; } void outerSize(in vec2 s){ innerSize = s-gapSize; }
+    auto innerBounds() const { return bounds2(innerPos, innerPos+innerSize); }
     void innerBounds(in bounds2 b) { innerPos = b.low; innerSize = b.size; }
-    auto outerBounds() { return bounds2(outerPos, outerPos+outerSize); }
+    auto outerBounds() const { return bounds2(outerPos, outerPos+outerSize); }
     void outerBounds(in bounds2 b) { outerPos = b.low; outerSize = b.size; }
 
     auto outerBottomRight() { return outerPos+outerSize; }
@@ -912,17 +911,17 @@ class Cell{ // Cell ////////////////////////////////////
     auto borderBounds_inner() { return borderBounds!1; }
     auto borderBounds_outer() { return borderBounds!0; }
 
-    auto outerX     () { return outerPos.x; } void outerX(float v) { outerPos.x = v; }
-    auto outerY     () { return outerPos.y; } void outerY(float v) { outerPos.y = v; }
-    auto innerX     () { return outerPos.x+topLeftGapSize.x; } void x(float v) { outerPos.x = v-topLeftGapSize.x; }
-    auto innerY     () { return outerPos.y+topLeftGapSize.y; } void y(float v) { outerPos.y = v-topLeftGapSize.y; }
-    auto innerWidth () { return innerSize.x; } void innerWidth (float v) { innerSize.x = v; }
-    auto innerHeight() { return innerSize.y; } void innerHeight(float v) { innerSize.y = v; }
-    auto outerWidth () { return innerSize.x+gapSize.x; } void outerWidth (float v) { innerSize.x = v-gapSize.x; }
-    auto outerHeight() { return innerSize.y+gapSize.y; } void outerHeight(float v) { innerSize.y = v-gapSize.y; }
-    auto outerRight () { return outerX+outerWidth; }
-    auto outerBottom() { return outerY+outerHeight; }
-    auto innerCenter() { return innerPos + innerSize*.5f; }
+    auto outerX     () const { return outerPos.x; } void outerX(float v) { outerPos.x = v; }
+    auto outerY     () const { return outerPos.y; } void outerY(float v) { outerPos.y = v; }
+    auto innerX     () const { return outerPos.x+topLeftGapSize.x; } void x(float v) { outerPos.x = v-topLeftGapSize.x; }
+    auto innerY     () const { return outerPos.y+topLeftGapSize.y; } void y(float v) { outerPos.y = v-topLeftGapSize.y; }
+    auto innerWidth () const { return innerSize.x; } void innerWidth (float v) { innerSize.x = v; }
+    auto innerHeight() const { return innerSize.y; } void innerHeight(float v) { innerSize.y = v; }
+    auto outerWidth () const { return innerSize.x+gapSize.x; } void outerWidth (float v) { innerSize.x = v-gapSize.x; }
+    auto outerHeight() const { return innerSize.y+gapSize.y; } void outerHeight(float v) { innerSize.y = v-gapSize.y; }
+    auto outerRight () const { return outerX+outerWidth; }
+    auto outerBottom() const { return outerY+outerHeight; }
+    auto innerCenter() const { return innerPos + innerSize*.5f; }
 
     alias size = innerSize;
     alias width = innerWidth;
@@ -1089,9 +1088,16 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
       if(isReturn || isNewLine) ch = ' ';
     }
 
-    string glyphSpec = `font:\`~ts.font~`\72\x3\?`~[ch].toUTF8;
+    // ch -> subTexIdx lookup. Cached with a map.   10 FPS -> 13..14 FPS
+    static int[dchar] subTextIdxMap;
+    if(auto p = ch in subTextIdxMap){
+      stIdx = *p;
+    }else{
+      string glyphSpec = `font:\`~ts.font~`\72\x3\?`~[ch].toUTF8;
+      stIdx = textures[File(glyphSpec)];
+      subTextIdxMap[ch] = stIdx;
+    }
 
-    stIdx = textures[File(glyphSpec)];
     fontFlags = ts.fontFlags;
     fontColor = ts.fontColor;
     bkColor = ts.bkColor;
@@ -1127,22 +1133,24 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b0_0_0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
+  ulong _data = 0b1_0_1_0_0_0_0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
-    bool          , "canWrap"         , 1,
-    HAlign        , "hAlign"          , 2,  //alignment for all subCells
-    VAlign        , "vAlign"          , 2,
-    YAlign        , "yAlign"          , 2,
-    bool          , "dontHideSpaces"  , 1,  //useful for active edit mode
-    bool          , "canSelect"       , 1,
-    bool          , "focused"         , 1,  //maintained by system, not by user
-    bool          , "hovered"         , 1,  //maintained by system, not by user
-    PanelPosition , "panelPosition"   , 4,  //only for desktop
-    bool          , "clipChildren"    , 1,
-    bool          , "_saveComboBounds", 1,  //marks the container to save the absolute bounds to align the popup window to.
+    bool          , "canWrap"           , 1,
+    HAlign        , "hAlign"            , 2,  //alignment for all subCells
+    VAlign        , "vAlign"            , 2,
+    YAlign        , "yAlign"            , 2,
+    bool          , "dontHideSpaces"    , 1,  //useful for active edit mode
+    bool          , "canSelect"         , 1,
+    bool          , "focused"           , 1,  //maintained by system, not by user
+    bool          , "hovered"           , 1,  //maintained by system, not by user
+    PanelPosition , "panelPosition"     , 4,  //only for desktop
+    bool          , "clipChildren"      , 1,
+    bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
     bool          , "_hasOverlayDrawing", 1,
-
-    int           , ""                , 14,
+    bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
+    bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
+    uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
+    int           , ""                  , 11,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -2017,8 +2025,8 @@ private{ //wrappedLine[] functionality
 
 // Elastic Tabs //////////////////////////////////////////
 void processElasticTabs(Cell[] rows, int level=0){
-  bool tabCntGood(Cell c){ return c.tabCnt>level; }
-//"processElasticTabs".print;
+  bool tabCntGood(Cell row){ return row.tabCnt > level; }
+
   while(1){
     //search the islands
     while(rows.length && !tabCntGood(rows[0])) rows = rows[1..$];
@@ -2048,7 +2056,64 @@ void processElasticTabs(Cell[] rows, int level=0){
     }
     processElasticTabs(range, level+1); //recursive
 
-    //writeln(range.map!(a => a.tabCnt));
+    rows = rows[n..$];//advance
+  }
+}
+
+//todo: this WrappedLine tab processing is terribly unoptimal
+private bool isTab(in Cell c){
+  if(const g = cast(Glyph)c) return g.isTab;
+                        else return false;
+}
+
+private int tabCnt(in WrappedLine wl){
+  return cast(int) wl.cells.count!(c => c.isTab);
+}
+
+private int tabIdx(in WrappedLine wl, int i){
+  int j;
+  foreach(idx, const cell; wl.cells){
+    if(cell.isTab){
+      if(j==i) return cast(int) idx;
+      j++;
+    }
+  }
+  return -1;
+}
+
+float tabPos(WrappedLine wl, int i) { with(wl.cells[wl.tabIdx(i)]) return outerRight; }
+
+void processElasticTabs(WrappedLine[] rows, int level=0){
+  bool tabCntGood(in WrappedLine wl){ return wl.tabCnt > level; }       //!!!!!!!!!!!!!!!!
+
+  while(1){
+    //search the islands
+    while(rows.length && !tabCntGood(rows[0])) rows = rows[1..$];
+    int n; while(n<rows.length && tabCntGood(rows[n])) n++;
+    if(!n) break;
+    auto range = rows[0..n];
+
+    auto rightMostTabPos = range.map!(r => r.tabPos(level)).maxElement;
+
+    foreach(row; range){
+      auto tIdx = row.tabIdx(level),
+           tab = cast(Glyph)(row.cells[tIdx]),
+           delta = rightMostTabPos-(tab.outerRight);
+
+      if(delta){
+        tab.innerSize.x += delta;
+
+        //todo: itt ha tordeles van, akkor ez szar.
+        foreach(g; row.cells[tIdx+1..$]) g.outerPos.x += delta;
+//        row.innerSize.x += delta;
+      }
+
+      if(VisualizeTabColors){
+        tab.bkColor = avg(clWhite, clRainbow[level%$]); //debug coloring
+      }
+
+    }
+    processElasticTabs(range, level+1); //recursive
 
     rows = rows[n..$];//advance
   }
@@ -2168,6 +2233,30 @@ class Row : Container { // Row ////////////////////////////////////
     return wrappedLines;
   }
 
+  /// this works on the Row as if it were a one-liner. This is not the WrappedLines version.
+  private void adjustTabSizes_singleLine(){
+    foreach(idx, tIdx; tabIdx){
+      const isLeading = idx==tIdx; //it's not good for multiline!!!
+      subCells[tIdx].innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);
+    }
+  }
+
+  //this handles multiple lines. Must count newline chars too, so the tabIdx[] array is useless here.
+  private void adjustTabSizes_multiLine(){  //todo: refactor this
+    int tabCnt, colCnt;
+    foreach(c; subCells){
+      if(auto g = cast(Glyph)c){
+        if(g.isNewLine || g.isReturn){ tabCnt = colCnt = 0; continue; }
+        else if(g.isTab){
+          const isLeading = tabCnt == colCnt;
+          c.innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);  //copy+paste
+          tabCnt++;
+        }
+      }
+      colCnt++;
+    }
+  }
+
   override void measure(){
     const autoWidth  = innerSize.x==0,
           autoHeight = innerSize.y==0,
@@ -2177,14 +2266,14 @@ class Row : Container { // Row ////////////////////////////////////
     //scope(exit) print("  rm end", subCells.length, innerSize, "flex:", flex, flags.canWrap, doWrap);
 
     //adjust length of leading and internal tabs
-    foreach(idx, tIdx; tabIdx){
-      const isLeading = idx==tIdx; //it's not good for multiline!!!
-      subCells[tIdx].innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);
-    }
+    if(flags.rowElasticTabs) adjustTabSizes_multiLine;
+                        else adjustTabSizes_singleLine;
 
     solveFlexAndMeasureAll(autoWidth);
 
     auto wrappedLines = makeWrappedLines(doWrap);
+
+    if(flags.rowElasticTabs) processElasticTabs(wrappedLines);
 
     //hide spaces on the sides by wetting width to 0. This needs for size calculation.
     //todo: don't do this for the line being edited!!!
@@ -2280,7 +2369,7 @@ class Column : Container { // Column ////////////////////////////////////
       if(auto co = cast(Container)sc) co.measure; //width changed, need a new measure
     }
 
-    processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.
+    if(flags.columnElasticTabs) processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.
 
     //process vertically flexible items
     if(!autoHeight){

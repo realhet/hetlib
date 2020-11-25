@@ -265,13 +265,14 @@ public:
 
   }
   override void onUpdate(){
+    caption = FPS.text;
     view.navigate(1,1);
 
     with(im) Panel({
       padding = "4";
       Text(clRed, "Hello World!");
 
-      uiCellDocumentation;
+      foreach(i; 0..1) uiCellDocumentation;
     });
 
     invalidate;

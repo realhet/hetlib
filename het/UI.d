@@ -6,6 +6,9 @@ import std.traits, std.meta;
 
 public import het.uibase;
 
+
+//todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
+
 //todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
 
 // utility stuff ////////////////////////////////
@@ -61,7 +64,7 @@ class Slider : Cell { // Slider //////////////////////////////////
 
   bounds2 hitBounds;
 
-  this(uint id, ref float nPos_, in im.range range_, ref bool userModified, TextStyle ts=tsNormal){
+  this(uint id, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts=tsNormal){
     this.id = id;
 
     auto hit = im.hitTest(this, id);
@@ -103,20 +106,20 @@ class Slider : Cell { // Slider //////////////////////////////////
       mod_actid = id;
 
       //decide wether the knob has to jump to the mouse position or not
-      const doJump = mod_id==id && isLinear && !mod_knob.contains!"[)"(g_currentMouse);
+      const doJump = mod_id==id && isLinear && !mod_knob.contains!"[)"(mousePos);
       if(doJump) mod_ofs = vec2(0);
-            else mod_ofs = mod_knob.center-g_currentMouse;
+            else mod_ofs = mod_knob.center-mousePos;
 
       if(doJump){
         if(mod_ori==SliderOrientation.horz){
-          nPos = remap_clamp(g_currentMouse.x, mod_p0.x, mod_p1.x, 0, 1);
-          if(g_currentMouse.x<mod_p0.x) mod_ofs.x = mod_p0.x-g_currentMouse.x;
-          if(g_currentMouse.x>mod_p1.x) mod_ofs.x = mod_p1.x-g_currentMouse.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
+          nPos = remap_clamp(mousePos.x, mod_p0.x, mod_p1.x, 0, 1);
+          if(mousePos.x<mod_p0.x) mod_ofs.x = mod_p0.x-mousePos.x;
+          if(mousePos.x>mod_p1.x) mod_ofs.x = mod_p1.x-mousePos.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
         }else if(mod_ori==SliderOrientation.vert){
-          nPos = remap_clamp(g_currentMouse.y, mod_p0.y, mod_p1.y, 0, 1);
+          nPos = remap_clamp(mousePos.y, mod_p0.y, mod_p1.y, 0, 1);
           //note: p1 and p0 are intentionally swapped!!!
-          if(g_currentMouse.y<mod_p1.y) mod_ofs.y = mod_p1.y-g_currentMouse.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
-          if(g_currentMouse.y>mod_p0.y) mod_ofs.y = mod_p0.y-g_currentMouse.y - (range_.isEndless ? 1 : 0);
+          if(mousePos.y<mod_p1.y) mod_ofs.y = mod_p1.y-mousePos.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+          if(mousePos.y>mod_p0.y) mod_ofs.y = mod_p0.y-mousePos.y - (range_.isEndless ? 1 : 0);
         }
       }
 
@@ -137,12 +140,12 @@ class Slider : Cell { // Slider //////////////////////////////////
       if(isLinear) slowMouse(precise!=1, precise);
 
       if(mod_ori==SliderOrientation.horz){
-        auto p = g_currentMouse.x+mod_ofs.x;
+        auto p = mousePos.x+mod_ofs.x;
         if(range_.isCircular || range_.isEndless) mouseMoveRelX(wrapInRange(p, mod_p0.x, mod_p1.x, wrapCnt)); //circular wrap around
         nPos = remap(p, mod_p0.x, mod_p1.x, 0, 1);
         if(range_.isClamped) nPos = nPos.clamp(0, 1);
       }else if(mod_ori==SliderOrientation.vert){
-        auto p = g_currentMouse.y+mod_ofs.y;
+        auto p = mousePos.y+mod_ofs.y;
         if(range_.isCircular || range_.isEndless) mouseMoveRelY(wrapInRange(p, mod_p0.y, mod_p1.y, wrapCnt)); //circular wrap around
         nPos = remap(p, mod_p0.y, mod_p1.y, 0, 1);
         if(range_.isClamped) nPos = nPos.clamp(0, 1);
@@ -461,407 +464,6 @@ class WinRow : Row{ //WinRow ///////////////////////////////
   }
 }
 
-/+
-ContainerBuilder builder(Container cntr){
-  return ContainerBuilder(cntr);
-}
-
-struct ContainerBuilder{ //ContainerBuilder //////////////////////////////
-
-//type containers
-  struct id       { uint val; }
-  struct enabled  { bool val = true; }
-  struct disabled { bool val; }
-  struct selected { bool val; }
-
-  struct color    { RGB val; }
-  struct bkColor  { RGB val; }
-  struct fontColor{ RGB val; }
-
-  struct onClick  { void delegate() val; }
-  struct onPress  { void delegate() val; }
-  struct onRelease{ void delegate() val; }
-  struct onHold   { void delegate() val; }
-  struct onChange { void delegate() val; }
-
-  struct onRightClick{ void delegate() val; }
-  struct manual   { bool val; } //emulate button press
-
-//builder state
-
-  Container container;
-  private uint indentCnt; //todo: ez qrvara nem ide, mert mi van, ha tobb builder van
-
-  this(Container container_){
-    container = container_;
-    enforce(container !is null);
-  }
-
-  ~this(){
-  }
-
-  string prop (string s){ return tag(`prop ` ~s);}
-  string style(string s){ return tag(`style `~s);}
-
-  void indent(int delta=1){ indentCnt += delta; }
-  void unindent(int delta=1){ indent(-delta); }
-
-  /*deprecated*/ void row(T...)(T args){
-    TextStyle ts = tsNormal;
-
-    Row actRow;
-
-    void ensureActRow(){
-      if(actRow is null){
-        actRow = new Row("", ts);
-        actRow.bkColor = ts.bkColor;
-        container.append(actRow);
-      }
-    }
-
-    void closeActRow(){
-      if((actRow !is null) && actRow.subCells is null){
-        actRow.innerHeight = ts.fontHeight;
-      }
-      actRow = null;
-    }
-
-    void appendText(string s){
-      ensureActRow;
-      if(actRow.subCells.empty && indentCnt>0)
-        s = "\t".replicate(indentCnt) ~ s;
-      actRow.appendMarkupLine(s, ts);
-    }
-
-    void appendLines(string a){
-      auto lines = a.split('\n').map!(a => a.withoutEnding('\r')).array;
-      foreach(int i, s; lines){
-        appendText(s);
-        const isLast = i+1==lines.length;
-        if(!isLast) closeActRow;
-      }
-    }
-
-    static foreach(a; args){
-      static if(is(typeof(a)==string)){
-        appendLines(a);
-      }else static if(is(typeof(a) : Cell)){
-        if(a !is null){
-          ensureActRow;
-          actRow.append(cast(Cell)a);
-        }
-      }else static if(is(immutable typeof(a)==immutable TextStyle)){ //todo: is2 or std.traits.isSame
-        ts = a;
-      }else static if(is(immutable typeof(a)==immutable RGB8)){
-        ts.fontColor = a;
-      }else static if(is(immutable typeof(a)==immutable Cell[])){ //todo: ne csak cellre menjen
-        foreach(int idx, cell; a){
-          ensureActRow;
-          if(cell !is null){
-            if(idx>0) appendText("  "); //todo: ez nem lesz jo igy, mert Row[]-ra mashogy megy.
-            actRow.append(cast(Cell)cell);
-          }
-        }
-      }else static if(is(immutable typeof(a)==immutable Row[])){ //todo: ne csak cellre meg row-ra menjen
-        foreach(int idx, cell; a){
-          ensureActRow;
-          if(cell !is null){
-            actRow.append(cast(Cell)cell);
-          }
-        }
-      }else static if(isIterable!(typeof(a))){ //todo: ezt rendberakni, hogy a felso kettot ki lehessen szedni
-        foreach(v; a){
-          auto cell = cast(Cell)v;
-          if(cell !is null)
-            actRow.append(cell);
-        }
-      }else static if(__traits(compiles, a.text)){
-        appendText(a.text);
-      }else{
-        static assert(false, "Unsupported type: "~typeof(a).stringof);
-      }
-    }
-
-    closeActRow;
-
-  }
-
-  //special rows
-  void title   (string s) { container.parse(tag("title"   )~s); } //todo: it's not good, because it is not inside row(...)
-  void chapter (string s) { container.parse(tag("chapter" )~s); }
-  void chapter1(string s) { container.parse(tag("chapter1")~s); }
-  void chapter2(string s) { container.parse(tag("chapter2")~s); }
-  void comment (string s) { container.parse(tag("comment" )~s); }
-
-  string bold(string s) { return tag("bold")~s~tag(""); }
-
-  void img(string s) { row(tag(`img "`~s~`"`)); }
-
-  void vSpace(int height=8, RGB color = clWhite){
-    TextStyle ts = tsNormal;
-    ts.fontHeight = height.to!ubyte;
-    ts.bkColor = color;
-    row(ts, " ");
-  }
-
-  void _winRowinternal(string markup, TextStyle ts = tsNormal){
-    auto wr = new WinRow(markup, ts); //does extra padding
-    container.append(wr);
-  }
-
-  void winHeader(string caption, string title, RGB bkColor = clWhite){
-    if(!caption.empty){
-      TextStyle ts = tsSmaller; ts.bkColor = bkColor;
-      _winRowinternal("User Account Control", ts);
-    }
-    if(!title.empty){
-      TextStyle ts = tsLarger; ts.bkColor = bkColor;
-      _winRowinternal(`Do you want to allow this app to make changes to your device?`, ts);
-      vSpace(4, bkColor);
-    }
-  }
-
-  void winRowLarge(string text){ vSpace(4); _winRowinternal(text, tsLarger ); vSpace(4); }
-  void winRowSmall(string text){ _winRowinternal(text, tsSmaller); }
-  void winRow     (string text){ _winRowinternal(text           ); }
-
-  void winLink(string text, uint hash, bool enabled, void delegate() onClick){
-/*    auto wr = new WinRow("");
-    auto l = new Link(text, hash, enabled, onClick);
-    wr.append(l);
-    container.append(wr);*/
-  }
-
-  void winBtnRow(T : Cell)(T[] cells, TextStyle ts = tsNormal){
-    vSpace(4);
-    auto wr = new WinRow("", ts);
-
-    foreach(i, c; cells){
-      wr.append(c);
-      const last = i+1==cells.length;
-      if(!last) wr.append(new Row(tag("prop width=8"), ts)); //todo: make it with join()
-    }
-
-    container.append(wr);
-
-    vSpace(4);
-  }
-
-  protected  uint resolveId(uint id1, lazy uint id2){ return id1 ? id1 : id2;  }
-
-  //gets params from cmdLine, enabled, id, hit
-  protected mixin template Helper(){
-    auto params = cmdLine.commandLineToMap,
-         en = args.paramByType!(enabled, true) && !args.paramByType!disabled,
-         sel = args.paramByType!(selected),
-         id = resolveId(args.paramByType!(ContainerBuilder.id, true), file.xxh(line)),
-         hit = hitTestManager.check(id),
-
-         onRightClick_ = args.paramByType!onRightClick,
-         manualHold = args.paramByType!(manual, false); //todo: ezt megcsinalni szepen
-
-    void handleRightClick(){
-      if(en && onRightClick_ !is null && hit.hover && inputs.RMB.pressed){
-        onRightClick_();
-      }
-    }
-
-    void btnEvents(){
-      if(en){
-        if(hit.clicked) args.paramCall!(onClick, true);
-        if(hit.captured || manualHold) args.paramCall!onHold;
-        if(hit.pressed)  args.paramCall!onPress;
-        if(hit.released) args.paramCall!onRelease;
-        if(hit.pressed || hit.released) args.paramCall!onChange;
-      }
-    }
-
-    RGB hoverColor(RGB baseColor, RGB bkColor) {
-      return !en ? clWinBtnDisabledText
-                 : lerp(baseColor, bkColor, hit.captured ? 0.5 : hit.hover_smooth*0.3);
-    }
-  };
-
-  protected mixin template GetChkBoxColors(){
-    auto baseFontColor = args.paramByType!(fontColor, false, fontColor(clWinText));
-    auto baseMarkColor = args.paramByType!(color, true, color(clAccent));
-    auto baseBkColor = args.paramByType!(bkColor, false, bkColor(clWinBackground));
-    auto markColor = hoverColor(state ? baseMarkColor : baseFontColor, baseBkColor);
-    auto textColor = hoverColor(baseFontColor                        , baseBkColor);
-
-    Clickable newChkBox(string mark){
-      auto ts = tsNormal; ts.fontColor = markColor;
-
-      auto capt = params.get("0", "");
-
-      return new Clickable(id, mark~
-                         tag(`style fontColor="`~textColor.text~`"`)~
-                         (capt=="" ? "" : " ")~capt, ts, params);
-    }
-  }
-
-  FlexRow flex(string markup=""){ return new FlexRow(markup); }
-
-  Clickable btn(string file=__FILE__, int line=__LINE__, T...)(string cmdLine, T args){ mixin Helper; handleRightClick();
-    btnEvents;
-
-    auto ts = tsBtn,
-         brd = Border(2, BorderStyle.normal, lerp(ts.bkColor, clWinBtnHoverBorder, hit.hover_smooth));
-    if(!en){
-      ts.fontColor = clWinBtnDisabledText;
-      brd.color = ts.bkColor;
-    }else if(hit.captured){
-      brd.style = BorderStyle.none;
-      ts.bkColor = clWinBtnPressed;
-    }
-
-    if(sel){
-      ts.bkColor = lerp(ts.bkColor, clAccent, .5);
-      brd.color  = lerp(brd.color , clAccent, .5);
-    }
-
-    auto b = new Clickable(id, tag("flex")~params.get("0", "")~tag("flex"), ts, params);
-    b.margin = Margin(2, 2, 2, 2); //todo: adjacent margin's should collapse into each other
-    b.border = brd;
-    b.padding = Padding(2, 2, 2, 2);
-
-    return b;
-  }
-
-  Clickable chkBox(string file=__FILE__, int line=__LINE__, T...)(string cmdLine, T args){ mixin Helper; handleRightClick();
-    btnEvents;
-
-    //update checkbox state
-    auto state = false;
-    args.paramGetter(state);
-    if(en && hit.clicked){
-      state.toggle;
-      args.paramSetter(state);
-    }
-
-    mixin GetChkBoxColors;
-    return newChkBox(tag(`symbol Checkbox`~(state?"CompositeReversed":"")));
-  }
-
-  Clickable radioBtn(string file=__FILE__, uint line=__LINE__, T...)(string cmdLine, T args){ mixin Helper; handleRightClick();
-    btnEvents;
-
-    //update checkbox state
-    auto state = false;
-    args.paramGetter(state);
-    if(en && hit.clicked){
-      state = true;
-      args.paramSetter(state);
-    }
-
-    mixin GetChkBoxColors;
-    return newChkBox(tag(`symbol RadioBtn`~(state?"On":"Off")));
-  }
-
-  void menuItem(string ico, string caption, string key){
-
-    const
-      hash = caption.xxh,
-      hover = hitTestManager.checkHover(hash), //check if the last frame had a hit
-      smoothHover = hitTestManager.checkHover_smooth(hash);
-
-    auto ts = tsNormal; ts.bkColor = clMenuBk;
-
-    ts.bkColor = lerp(ts.bkColor, clMenuHover, smoothHover);
-
-    auto r = new Row(tag("prop padding.vert=2 padding.horz=12"), ts);
-    hitTestManager.addHash(r, hash); //register this hash for this cell. This rtegistration is for the next frame only
-
-    r.border.width = 1;
-    r.border.color = clRed;
-
-    auto icon = new Row((ico.length ? tag(`symbol "`~ico~`"`) : ""), ts); icon.outerWidth = 28;
-    auto capt = new Row(caption, ts); capt.flex_ = 1;
-
-    r.append([icon, capt]);
-
-    if(key=="*SUBMENU*"){
-      r.append(new Row(tag("symbol ChevronRight"), ts));
-    }else{
-      if(key.length) r.append(new KeyComboOld(key));
-    }
-
-
-
-    container.append(r);
-  }
-
-  void subMenu(string ico, string s){ menuItem(ico, s, "*SUBMENU*"); }
-
-  void menuLine(){
-    auto rOuter = new Row(tag("prop padding.vert=4 padding.horz=14"));
-    rOuter.bkColor = clMenuBk;
-
-    auto rLine = new Row(tag("prop height=0.5 bkColor=0x808080 flex=1"));
-    rOuter.append(rLine);
-
-    container.append(rOuter);
-  }
-
-
-/*  void hSlider(string capt, ref float value, ContainerBuilder.range range, string outputFormat, float outputWidth=50){
-    float a = range.normalize(value);
-
-    auto sl = new Slider(capt.xxh, a);
-
-    row(capt.empty ? "" : capt~"\t", sl, outputFormat.empty ? null : new Row(tag("prop width="~outputWidth.text)~tag("flex")~outputFormat.format(value)));
-  }*/
-
-  Slider hSlider(string file=__FILE__, int line=__LINE__, T...)(string cmdLine, T args){ mixin Helper; handleRightClick(); //todo: so many things are the same for vSlider
-    btnEvents;
-
-/*    auto ts = tsBtn,
-         brd = Border(2, BorderStyle.normal, lerp(ts.bkColor, clWinBtnHoverBorder, hit.hover_smooth));
-    if(!en){
-      ts.fontColor = clWinBtnDisabledText;
-      brd.color = ts.bkColor;
-    }else if(hit.captured){
-      brd.style = BorderStyle.none;
-      ts.bkColor = clWinBtnPressed;
-    }*/
-
-    auto range = args.paramByType!range;
-
-    alias ValueType = paramGetterType!T;
-    //todo: check for suitable types here
-
-    ValueType value;
-    args.paramGetter(value);
-    static assert(isIntegral!ValueType || isFloatingPoint!ValueType, "Slider needs integer or floating point input. Got: "~ValueType.stringof);
-
-    float normValue = range.normalize(value);
-
-    int wrapCnt;
-    if(range.isEndless){
-      wrapCnt = normValue.floor.iRound;  //todo: refactor endless wrapCnt stuff
-      normValue = normValue-normValue.floor;
-    }
-
-    bool userModified;
-    auto sl = new Slider(id, normValue, range, userModified);
-    sl.setProps(params);
-
-    if(userModified){
-
-      if(range.isEndless) normValue += wrapCnt-sl.wrapCnt;
-
-      float f = range.denormalize(normValue);
-      static if(isIntegral!ValueType) f = round(f);
-      value = f.to!ValueType;
-
-      args.paramSetter(value);
-    }
-
-    return sl;
-  }
-
-
-} +/
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1153,6 +755,19 @@ struct im{ static:
   bool mouseOverUI, wantMouse, wantKeys;
   private bool inFrame, canDraw; //synchronization for internal methods
 
+  // target surface is a view and a drawing
+  struct TargetSurface{ View2D view; }
+  private TargetSurface[2] targetSurfaces;  //surface0: zoomable view, surface1: GUI view
+
+  private View2D actView;
+
+  private void selectTargetSurface(int n){
+    enforce(n.among(0, 1));
+    with(targetSurfaces[n]){
+      actView = view;
+    }
+  }
+
   float deltaTime=0;
 
   bool comboState; //automatically cleared on focus.change
@@ -1160,8 +775,11 @@ struct im{ static:
   uint comboId;    //when the focus of this is lost, comboState goes false
 
   //todo: package visibility is not working as it should -> remains public
-  void _beginFrame(in vec2 mousePos){ //called from mainform.update
+  void _beginFrame(TargetSurface[2] targetSurfaces){ //called from mainform.update
     enforce(!inFrame, "im.beginFrame() already called.");
+
+    this.targetSurfaces = targetSurfaces;
+    selectTargetSurface(1); //default is the GUI surface
 
     //inject stuff into het.uibase. So no import het.ui is needed there.
     static auto getActFontHeight(){ return float(textStyle.fontHeight); }  het.uibase.g_actFontHeightFunct = &getActFontHeight;
@@ -1173,7 +791,6 @@ struct im{ static:
     canDraw = false;
 
     im.reset;
-    g_currentMouse = mousePos;
     hitTestManager.initFrame;
 
     //clear last frame's object references
@@ -1187,17 +804,23 @@ struct im{ static:
     deltaTime = dt.update;
   }
 
-  void _endFrame(in bounds2 screenBounds){ //called from end of update
+  void _endFrame(){ //called from end of update
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
     enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
+
+    selectTargetSurface(1); // GUI surface by default
 
     auto rc = rootContainers(true);
 
     //measure
     foreach(a; rc) a.measure;
 
-    //align
-    foreach(a; rc){ a.applyPanelPosition(screenBounds); }
+    const screenBounds = targetSurfaces[1].view.clipBounds;
+
+    //align on screen
+    foreach(a; rc)
+      if(a.flags.targetSurface == 1) //only for GUI panels
+        a.applyPanelPosition(screenBounds);
 
     applyScrollers(screenBounds);
 
@@ -1209,7 +832,8 @@ struct im{ static:
     mouseOverUI = false;
     bool mouseOverPopup;
     foreach_reverse(a; rc){
-      if(a.internal_hitTest(g_currentMouse)){
+      const uiMousePos = targetSurfaces[a.flags.targetSurface].view.mousePos;
+      if(a.internal_hitTest(uiMousePos)){
         mouseOverUI = true;
 
         if(popupState.cell==a)
@@ -1218,8 +842,6 @@ struct im{ static:
         break; //got a hit, so escape now
       }
     }
-
-    if(mouseOverPopup) PING1;
 
     //clicking away from popup closes the popup
     if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
@@ -1244,17 +866,29 @@ struct im{ static:
     inFrame = false;
   }
 
-  void draw(Drawing dr){
+  void draw(){
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
-    foreach(r; root) r.draw(dr); //draw in zOrder
+    auto dr = [new Drawing, new Drawing];
 
-    hitTestManager.draw(dr);
+    foreach(a; rootContainers(true)){
+      a.draw(dr[a.flags.targetSurface]); //draw in zOrder
+    }
+
+    foreach(i; 0..2){
+      dr[i].glDraw(targetSurfaces[i].view);
+      dr[i].clear;
+    }
+
+    //hitTestManager.draw(dr[1]); //fuck!
 
     //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
+    //todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
   }
 
   void Panel(T...)(T args){ //todo: multiple Panels, but not call them frames...
+    enforce(actContainer is null, "Panel() must be on root level");
+
     import het.win;
 auto t0=QPS;
     //im.beginFrame(mainWindow.mouse.act.screen.toF);  called from winMain update
@@ -2131,7 +1765,7 @@ static cnt=0;
       auto row = cast(.Row)actContainer;
 
       hit = hitTest(id_);
-      auto localMouse = g_currentMouse - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
+      auto localMouse = actView.mousePos - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 
       mixin(hintHandler);
 
@@ -2682,7 +2316,7 @@ static cnt=0;
     auto oldFh = style.fontHeight;
     if(theme != "tool") style.fontHeight = (fh*1.4f).to!ubyte;
 
-    auto sl = new .Slider(id_, normValue, _range, userModified, style);
+    auto sl = new .Slider(id_, normValue, _range, userModified, actView.mousePos, style);
 
     style.fontHeight = oldFh;
 

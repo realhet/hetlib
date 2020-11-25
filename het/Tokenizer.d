@@ -251,7 +251,7 @@ ref Token getAny(ref Token[] tokens, size_t idx){
                            : tokens.getNullToken;
 }
 
-/// Safely access a token, skip comments
+/// Safely access a token, skip comments.
 ref Token getNonComment(ref Token[] tokens, size_t idx){ //no comment version
   foreach(ref t; tokens){
     if(t.isComment) continue;
@@ -301,6 +301,13 @@ Token[][] splitTokens(string delim)(Token[] tokens, int level){
   return tokens.split!((in t) => t.level == level && t.isOperator(op));
 }
 
+/// Extracts the source code of a token range. Adds a newline if the last comment is a // comment
+string tokensToStr(in Token[] tokens, string code){
+  if(tokens.empty) return "";
+  auto s = code.text[tokens[0].pos .. tokens[$-1].endPos]; //not safe
+  if(tokens[$-1].isSlashSlasComment) s ~= "\n"; //Add a newline if the last comment needs it
+  return s;
+}
 
 class Tokenizer{ // Tokenizer ///////////////////////////////
 public:

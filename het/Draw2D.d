@@ -196,6 +196,8 @@ class Drawing {
   void subDraw(Drawing src){ //todo: revisit this subdrawing thing
     if(!src.isClone) CRIT("src must be a clone (at least for now.)");
 
+    //note: potential problem, the subDrawing has no location. It is useless for dynamic changes.
+
     if(logDrawing) LOG(shortName, "queued subDrawing", cast(void*) src, src.totalDrawObj);
     subDrawings ~= src;
 
