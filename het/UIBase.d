@@ -5,7 +5,7 @@ import het.utils, het.geometry, het.draw2d, het.bitmap, het.win, het.opengl;
 import std.traits;
 import std.bitmanip: bitfields;
 
-// enums ///////////////////////////////////////
+// enums/constants ///////////////////////////////////////
 
 //adjust the size of the original Tab character
 enum
@@ -15,14 +15,19 @@ enum
   VisualizeHitStack        = 0;
 
 //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
-enum
+immutable DefaultFontName = //this is the cached font
+  "Segoe UI"
+//  "Consolas"
+;
+
+immutable
   NormalFontHeight = 18;  //fucking keep it on 18!!!!
 
-const
+enum
   InternalTabScale = 0.12f/2,  //around 0.15 for programming
   LeadingTabScale  = 0.12f*3;  //these are relative to the original length which is 8 spaces or something like that
 
-enum
+immutable
   EmptyCellWidth  = 0,
   EmptyCellHeight = 0,
   EmptyCellSize   = vec2(EmptyCellWidth, EmptyCellHeight);
@@ -535,6 +540,8 @@ struct TextStyle{
 
   int fontFlags() const{ return boolMask(bold, italic, underline, strikeout); }
 
+  bool isDefaultFont() const{ return font == DefaultFontName; } //todo: slow. 'font' Should be a property.
+
   void modify(string[string] map){
     map.rehash;
     if(auto p="font"       in map) font          = (*p);
@@ -613,7 +620,7 @@ void initTextStyles(){
   ubyte rfh(float r){ return (NormalFontHeight*(r/18.0)).iround.to!ubyte; }
 
 
-  a("normal"      , tsNormal  , TextStyle("Segoe UI", rfh(18), false, false, false, false, clBlack, clWhite));
+  a("normal"      , tsNormal  , TextStyle(DefaultFontName, rfh(18), false, false, false, false, clBlack, clWhite));
   a(  "larger"    , tsLarger  , tsNormal, { tsLarger.fontHeight = rfh(22); });
   a(  "smaller"   , tsSmaller , tsNormal, { tsSmaller.fontHeight = rfh(14); });
   a(  "half"      , tsHalf    , tsNormal, { tsHalf.fontHeight = rfh(9); });
@@ -1089,13 +1096,21 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
     }
 
     // ch -> subTexIdx lookup. Cached with a map.   10 FPS -> 13..14 FPS
-    static int[dchar] subTextIdxMap;
-    if(auto p = ch in subTextIdxMap){
-      stIdx = *p;
-    }else{
+    void lookupSubTexIdx(){
       string glyphSpec = `font:\`~ts.font~`\72\x3\?`~[ch].toUTF8;
       stIdx = textures[File(glyphSpec)];
-      subTextIdxMap[ch] = stIdx;
+    }
+
+    if(ts.isDefaultFont){ // cached version for the default font
+      static int[dchar] subTextIdxMap;
+      if(auto p = ch in subTextIdxMap){
+        stIdx = *p;
+      }else{
+        lookupSubTexIdx;
+        subTextIdxMap[ch] = stIdx;
+      }
+    }else{ //uncached for non-default fonts
+      lookupSubTexIdx;
     }
 
     fontFlags = ts.fontFlags;

@@ -228,12 +228,28 @@ struct Token{ // Token //////////////////////////////
     return isKeyword(allAttributes);
   }
 
+  bool isHierarchyOpen() const{ //todo:slow
+    return kind==TokenKind.operator && ["{","[","(","q{"].canFind(source);
+  }
+
+  bool isHierarchyClose() const{ //todo:slow
+    return kind==TokenKind.operator && ["}","]",")"].canFind(source);
+  }
+
+  //return the level. If the token is { ( [ q{, it decreases the result by 1. Doesn't care about: } ] )
+  int baseLevel() const {
+    return level - (isHierarchyOpen ? 1 : 0);
+  }
+
   //shorthand
   //bool opEquals(string s) const { return source==s; } //note this conflicted with the linker when importing het.parser.
 
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
 }
 
+int baseLevel(in Token[] tokens){
+  return tokens.length ? tokens[0].baseLevel : 0;
+}
 
 // token array helper functs ///////////////////////////////////////////////////////////////////////////
 
@@ -302,7 +318,7 @@ Token[][] splitTokens(string delim)(Token[] tokens, int level){
 }
 
 /// Extracts the source code of a token range. Adds a newline if the last comment is a // comment
-string tokensToStr(in Token[] tokens, string code){
+string tokensToStr(in Token[] tokens, SourceCode code){
   if(tokens.empty) return "";
   auto s = code.text[tokens[0].pos .. tokens[$-1].endPos]; //not safe
   if(tokens[$-1].isSlashSlasComment) s ~= "\n"; //Add a newline if the last comment needs it
@@ -1124,11 +1140,9 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     }
 
     //nesting level calculation
-    if(t.kind==operator){
-      if(["{","[","(","q{"].canFind(t.source)){
-        nesting ~= t.source;
-        nestingOpeningIdx ~= cast(int)idx; //todo: normalis nevet talalni ennek, vagy bele egy structba
-      }
+    if(t.isHierarchyOpen){
+      nesting ~= t.source;
+      nestingOpeningIdx ~= cast(int)idx; //todo: normalis nevet talalni ennek, vagy bele egy structba
     }
 
     t.level = cast(int)nesting.length;
@@ -1168,30 +1182,28 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     }
 
     //process nesting.closing errors
-    if(t.kind==operator){
-      if(["}","]",")"].canFind(t.source)){
-        string opening, closing;
-        if(!nesting.empty) opening = nesting[$-1];
+    if(t.isHierarchyClose){
+      string opening, closing;
+      if(!nesting.empty) opening = nesting[$-1];
 
-             if(opening=="{" ) closing = "}";
-        else if(opening=="q{") closing = "}";
-        else if(opening=="[" ) closing = "]";
-        else if(opening=="(" ) closing = ")";
+           if(opening=="{" ) closing = "}";
+      else if(opening=="q{") closing = "}";
+      else if(opening=="[" ) closing = "]";
+      else if(opening=="(" ) closing = ")";
 
-        if(t.source==closing){
-          if(opening=="q{"){
-            cl = skString;
-            overrideSyntaxHighLight(tokens[nestingOpeningIdx[$-1]+1..idx]);
-          }
-
-          //advance
-          nesting = nesting[0..$-1];
-          nestingOpeningIdx = nestingOpeningIdx[0..$-1];
-        }else{
-          //nesting error
-          cl = skError;
-          if(!nestingOpeningIdx.empty) fill(tokens[nestingOpeningIdx[$-1]], skError);
+      if(t.source==closing){
+        if(opening=="q{"){
+          cl = skString;
+          overrideSyntaxHighLight(tokens[nestingOpeningIdx[$-1]+1..idx]);
         }
+
+        //advance
+        nesting = nesting[0..$-1];
+        nestingOpeningIdx = nestingOpeningIdx[0..$-1];
+      }else{
+        //nesting error
+        cl = skError;
+        if(!nestingOpeningIdx.empty) fill(tokens[nestingOpeningIdx[$-1]], skError);
       }
     }
 
