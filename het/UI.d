@@ -320,7 +320,7 @@ class Slider : Cell { // Slider //////////////////////////////////
 
 class Document : Column { // Document /////////////////////////////////
   this(){
-    super(tsNormal);
+    bkColor = tsNormal.bkColor;
   }
 
   string title;
@@ -601,7 +601,7 @@ class ImWin{ // ImWin //////////////////////////////////
     dr.scale(ctx.pixelSize); scope(exit) dr.pop;
 
     PERF("capt", {
-      auto doc = scoped!Column(tsNormal);
+      auto doc = scoped!Column;
       doc.innerWidth = size.x/dr.scaleFactor.x;
       auto icon = "\U0001F4F9";
       auto rIcon = new Row(" "~icon~" ");
@@ -811,6 +811,7 @@ struct im{ static:
     selectTargetSurface(1); // GUI surface by default
 
     auto rc = rootContainers(true);
+    rc = rc.sort!((a, b) => a.flags.targetSurface < b.flags.targetSurface, SwapStrategy.stable).array;
 
     //measure
     foreach(a; rc) a.measure;
@@ -1378,7 +1379,8 @@ static cnt=0;
 
 
   void Column(string file=__FILE__, int line=__LINE__, T...)(T args){  // Column //////////////////////////////
-    auto column = new .Column(style);
+    auto column = new .Column;
+    column.bkColor = style.bkColor;
     append(column); push(column, file.xxh(line)); scope(exit) pop;
 
     static foreach(a; args){{ alias t = typeof(a);

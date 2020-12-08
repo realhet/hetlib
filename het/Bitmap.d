@@ -1588,6 +1588,8 @@ version(D2D_FONT_RENDERER){ private:
       if(isSegoeAssets){ //align the assets font vertically with letters
         int ysh = iround(res.height*0.16f); //scroll down that many pixels
         res.set(res.access!ubyte.extract_nearest(0, -ysh, res.width, res.height));
+
+        //todo: a combolox lefele meno haromszogletu bizbaszaval ez szar.
       }
 
       return res;

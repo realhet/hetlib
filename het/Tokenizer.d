@@ -195,8 +195,9 @@ struct Token{ // Token //////////////////////////////
   }
 
   bool isOperator(int op)       const { return id==op && kind==TokenKind.operator; }
+  bool isKeyword ()             const { return           kind==TokenKind.keyword ; }
   bool isKeyword (int kw)       const { return id==kw && kind==TokenKind.keyword ; }
-  bool isIdentifier()           const { return kind==TokenKind.identifier; }
+  bool isIdentifier()           const { return           kind==TokenKind.identifier; }
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
   bool isComment()              const { return kind==TokenKind.comment; }
   bool isSlashSlasComment()     const { return isComment && source.startsWith("//"); }
@@ -251,7 +252,31 @@ int baseLevel(in Token[] tokens){
   return tokens.length ? tokens[0].baseLevel : 0;
 }
 
-// token array helper functs ///////////////////////////////////////////////////////////////////////////
+// helper functs ///////////////////////////////////////////////////////////////////////////
+
+string transformLeadingSpacesToTabs(string original, int spacesPerTab=2)
+in(original != "", "This is here to test a multiline header with a contract.")
+//out{ assert(1, "ouch"); }
+/*do*/ {
+
+  string process(string s){
+    s = stripRight(s);
+    int cnt;
+    string spaces = " ".replicate(spacesPerTab);
+    while(s.startsWith(spaces)){
+      s = s[spaces.length..$];
+      cnt++;
+    }
+    s = "\t".replicate(cnt) ~ s;
+    return s;
+  }
+
+  return original.splitter('\n').map!(s => process(s)).join('\n'); //todo: this is bad for strings
+}
+
+string stripAllLines(string original){
+  return original.splitter('\n').map!strip.join('\n');
+}
 
 /// Returns a null token positioned on to the end of the token array
 ref Token getNullToken(ref Token[] tokens){
@@ -324,6 +349,55 @@ string tokensToStr(in Token[] tokens, SourceCode code){
   if(tokens[$-1].isSlashSlasComment) s ~= "\n"; //Add a newline if the last comment needs it
   return s;
 }
+
+auto splitDeclarations(Token[] tokens){
+  Token[][] res;
+
+  const level = tokens.baseLevel;
+
+  while(tokens.length){
+
+    //collect the comments first
+    if(tokens[0].isComment){
+      res ~= [tokens.front];
+      tokens.popFront;
+      continue;
+    }
+
+    //search for the end of the declaration
+    auto findDeclarationEnd(){
+      bool isAssignExpr;
+      foreach(i, ref t; tokens){
+        if(t.level == level){
+          if(t.isOperator(opsemiColon)) return i;  // ';' is always an end marker
+          else if(t.isOperator(opassign)) isAssignExpr = true;  // detect '=' assign expression. Possible struct initializer.
+        }else if(t.level == level+1){
+          if(t.isOperator(opcurlyBracketClose))
+            if(!isAssignExpr) return i; // '}' means end if unless it's an assign expression.
+        }
+      }
+      //raise("Unable to find end of declaration."); it's not an error in enum
+      return tokens.length-1;
+    }
+
+    auto lastIdx = findDeclarationEnd;
+    res ~= tokens[0..lastIdx+1];
+    tokens = tokens[lastIdx+1..$];
+
+    //todo: 'else' and ':' is handled later.
+  }
+
+  return res;
+}
+
+auto splitHeaderAndBlock(Token[] tokens){
+  const level = tokens.baseLevel;
+  auto st = tokens.countUntil!(t => t.level==level+1 && t.source=="{");
+  enforce(st>=0, "No {} block found");
+  struct Res{ Token[] header, block; }
+  return Res(tokens[0..st], tokens[st+1..$-1]);
+}
+
 
 class Tokenizer{ // Tokenizer ///////////////////////////////
 public:

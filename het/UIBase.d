@@ -1,8 +1,8 @@
 module het.uibase;
 
-import het.utils, het.geometry, het.draw2d, het.bitmap, het.win, het.opengl;
+import het.utils, het.geometry, het.draw2d, het.bitmap, het.win, het.opengl,
+  het.keywords/*apply syntax*/;
 
-import std.traits;
 import std.bitmanip: bitfields;
 
 // enums/constants ///////////////////////////////////////
@@ -874,7 +874,7 @@ struct _FlexValue{ float val=0; alias val this; } //ganyolas
 
 class Cell{ // Cell ////////////////////////////////////
 
-  static shared int[string] objCnt;  //todo: ha ez nem shared, akkor beszarik a hatterben betolto jpeg. Miert?
+/+  static shared int[string] objCnt;  //todo: ha ez nem shared, akkor beszarik a hatterben betolto jpeg. Miert?
   this(){
 //    auto n = this.classinfo.name;
 //    if(n !in objCnt) objCnt[n]=0;
@@ -886,7 +886,7 @@ class Cell{ // Cell ////////////////////////////////////
 //    objCnt[n]--;
     //ennek qrvara sharednek kell lennie, mert a gc akarmelyik threadbol mehet.
     //egy atomic lenne a legjobb
-  }
+  } +/
 
   vec2 outerPos, innerSize;
 
@@ -961,9 +961,9 @@ class Cell{ // Cell ////////////////////////////////////
   void draw(Drawing dr) { }
 
   //append Glyphs
-  void appendg(File  fn, in TextStyle ts){ append(new Img(fn, ts)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
-  void appendg(dchar ch, in TextStyle ts){ append(new Glyph(ch, ts)); }
-  void appendg(string s, in TextStyle ts){ foreach(ch; s.byDchar) appendg(ch, ts); }
+  void appendImg (File  fn, in TextStyle ts){ append(new Img(fn, ts.bkColor)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
+  void appendChar(dchar ch, in TextStyle ts){ append(new Glyph(ch, ts)); }
+  void appendStr (string s, in TextStyle ts){ foreach(ch; s.byDchar) appendChar(ch, ts); }
 
   //elastic tabs
   int[] tabIdx() { return []; }
@@ -1016,9 +1016,13 @@ class Cell{ // Cell ////////////////////////////////////
 class Img : Container { // Img ////////////////////////////////////
   int stIdx;
 
-  this(File fn, in TextStyle ts=tsNormal){
-    super(ts);
+  this(File fn){
     stIdx = textures[fn];
+  }
+
+  this(File fn, RGB bkColor){
+    this.bkColor = bkColor;
+    this(fn);
   }
 
   override void draw(Drawing dr){
@@ -1605,9 +1609,6 @@ struct Selection{ //selection of cells in a container.
 
 
 class Container : Cell { // Container ////////////////////////////////////
-  this(in TextStyle ts){
-    bkColor = ts.bkColor;
-  }
 
   private{
     Cell[] subCells_;
@@ -1745,8 +1746,35 @@ class Container : Cell { // Container ////////////////////////////////////
                - outerSize*t;
     }
   }}
-}
 
+// these can mixed in
+
+  mixin template CachedMeasuring(){
+    bool measured;
+
+    override void measure(){
+      if(measured.chkSet) super.measure;
+    }
+  }
+
+  mixin template CachedDrawing(){
+    Drawing cachedDrawing;
+
+    override void draw(Drawing dr){
+      if(dr.isClone){
+        super.draw(dr); //prevent recursion
+        print("recursion prevented");
+      }else{
+        if(!cachedDrawing){
+          cachedDrawing = dr.clone;
+          super.draw(cachedDrawing);
+        }
+        dr.subDraw(cachedDrawing);
+      }
+    }
+  };
+
+}
 
 // markup parser /////////////////////////////////////////
 
@@ -1765,17 +1793,17 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
         a.setProps(params);
         container.append(a);
       }else if(cmd=="img"){
-        auto img = new Img(File(params["1"]), ts);
+        auto img = new Img(File(params["1"]), ts.bkColor);
         img.setProps(params);
         container.append(img);
       }else if(cmd=="char"   ){
-        container.appendg(dchar(params["1"].toInt), ts);
+        container.appendChar(dchar(params["1"].toInt), ts);
       }else if(cmd=="symbol"    ){
         auto name = params["1"];
         auto ch = segoeSymbolByName(name);
         auto oldFont = ts.font;
         ts.font = "Segoe MDL2 Assets";
-        container.appendg(ch, ts);
+        container.appendChar(ch, ts);
         ts.font = oldFont;
       }else if(cmd=="space"  ){
         auto r = new Row("", ts);
@@ -1810,7 +1838,7 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
         throw new Exception(`Unknown command: "%s"`.format(cmd));
       }
     }catch(Throwable t){
-      container.appendg("["~t.msg~": "~cmdLine~"]", tsError);
+      container.appendStr("["~t.msg~": "~cmdLine~"]", tsError);
     }
   }
 }
@@ -1824,12 +1852,12 @@ int countMarkupLineCells(string markup){
   }
 }
 
-void appendMarkupLine(TC:Container)(TC cntr, string s, ref TextStyle ts){
+void appendMarkupLine(Container cntr, string s, ref TextStyle ts){
   int[] dummy;
-  appendMarkupLine!(false, TC)(cntr, s, ts, dummy);
+  appendMarkupLine!(false)(cntr, s, ts, dummy);
 }
 
-void appendMarkupLine(bool returnSubCellStrOfs=true, TC:Container)(TC cntr, string s, ref TextStyle ts, ref int[] subCellStrOfs){
+void appendMarkupLine(bool returnSubCellStrOfs=true)(Container cntr, string s, ref TextStyle ts, ref int[] subCellStrOfs){
   enum CommandStartMarker = '\u00B6',
        CommandEndMarker   = '\u00A7';
 
@@ -1863,7 +1891,7 @@ void appendMarkupLine(bool returnSubCellStrOfs=true, TC:Container)(TC cntr, stri
       if(inCommand){ //collect command
         commandLine ~= ch;
       }else{ //process text
-        cntr.appendg(ch, ts);
+        cntr.appendChar(ch, ts);
 
         static if(returnSubCellStrOfs) while(subCellStrOfs.length <= cntr.subCells.length) subCellStrOfs ~= currentOfs; //PASTE!!!
       }
@@ -1894,9 +1922,27 @@ in(text.length == syntax.length)
 
     if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
 
-    cntr.appendg(ch, ts);
+    cntr.appendChar(ch, ts);
   }
 }
+
+/// Lookup a syntax style and apply it to a TextStyle reference
+void applySyntax(ref TextStyle ts, uint syntax, SyntaxPreset preset)
+in(syntax<syntaxTable.length)
+{
+  auto fmt = &syntaxTable[syntax].formats[preset];
+  ts.fontColor = fmt.fontColor;
+  ts.bkColor   = fmt.bkColor;
+  ts.bold      = fmt.fontFlags.getBit(0);
+  ts.italic    = fmt.fontFlags.getBit(1);
+  ts.underline = fmt.fontFlags.getBit(2);
+}
+
+/// Shorthand with global default preset
+void applySyntax(ref TextStyle ts, uint syntax){
+  applySyntax(ts, syntax, defaultSyntaxPreset);
+}
+
 
 
 private struct WrappedLine{ // WrappedLine /////////////////////////////////////////////////////////
@@ -2142,23 +2188,22 @@ class Row : Container { // Row ////////////////////////////////////
 
   override int[] tabIdx() { return tabIdxInternal; }
 
-  this(in TextStyle ts){
-    super(ts);
+  this(){
   }
 
   this(string markup, TextStyle ts = tsNormal){
-    super(ts);
-    this.appendMarkupLine(markup, ts);
+    bkColor = ts.bkColor;
+    appendMarkupLine(this, markup, ts);
   }
 
   this(T:Cell)(T[] cells,in TextStyle ts){
-    super(ts);
+    bkColor = ts.bkColor;
     append(cast(Cell[])cells);
   }
 
-  override void appendg(dchar ch, in TextStyle ts){
+  override void appendChar(dchar ch, in TextStyle ts){
     if(ch==9) tabIdxInternal ~= cast(int)subCells.length; //Elastic Tabs
-    super.appendg(ch, ts);
+    super.appendChar(ch, ts);
   }
 
   private void solveFlexAndMeasureAll(bool autoWidth){
@@ -2351,10 +2396,6 @@ class Row : Container { // Row ////////////////////////////////////
 }
 
 class Column : Container { // Column ////////////////////////////////////
-
-  this(in TextStyle ts){
-    super(ts);
-  }
 
 /*  override void parse(string s, TextStyle ts = tsNormal){   //todo: I guess it's deprecated
     beep;
