@@ -255,6 +255,11 @@ if(N.inRange(2, 4))
     }
   }
 
+  auto opCast(T)() const{
+    static if(is(T==bool)) return !isnull(this);
+                      else return T(this);
+  }
+
   bool opEquals(T)(in T other) const {
     static if(isVector!T){ // vector==vector
       static assert(T.length == length);
@@ -1310,7 +1315,7 @@ auto isfin(A)(in A a){ return a.generateVector!(bool, a => std.math.isFinite  (a
 
 auto isnull(A)(in A a){
   static if(isBounds!A) return !a.valid;
-  else static if(isVector!A){ return a == A(0); }
+  else static if(isVector!A){ return a == A.init; }
   else static if(isMatrix!A){ return a == A(0); }
   else static assert("invalid argument type");
 }
@@ -1961,13 +1966,8 @@ struct Bounds(VT){
   }
 
 
-  auto sorted(){
-    typeof(this) res;
-    if(valid){
-      res.low  = min(low, high);
-      res.high = max(low, high);
-    }
-    return res;
+  auto sorted(){ //it ignores validity! Don't use on invalid bounds!
+    return typeof(this)(min(low, high), max(low, high));
   }
 
   string toString() const {
@@ -1977,6 +1977,11 @@ struct Bounds(VT){
 
   bool valid() const{
     return all(lessThanEqual(low, high)); // a zero size bounds is valid because it contains the first point of expansion
+  }
+
+  auto opCast(T)() const{
+    static if(is(T==bool)) return valid;
+                      else return T(this);
   }
 
   // multidimensional size
@@ -2046,7 +2051,7 @@ struct Bounds(VT){
     static if(cfg[0]=='[') alias f1 = greaterThanEqual; else alias f1 = greaterThan;
     static if(cfg[1]==']') alias f2 = lessThanEqual   ; else alias f2 = lessThan   ;
 
-    static if(isBounds!T) return contain!cfg(other.low) && contain!cfg(other.high);
+    static if(isBounds!T) return contains!cfg(other.low) && contains!cfg(other.high);
                      else return all(f1(other, low) & f2(other, high));
   }
 

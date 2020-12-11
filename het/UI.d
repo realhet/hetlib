@@ -830,12 +830,14 @@ struct im{ static:
     //from here, all positions are valid
 
     //hittest in zOrder (currently in reverse creation order)
-    mouseOverUI = false;
+    bool[2] mouseOverUI;
     bool mouseOverPopup;
     foreach_reverse(a; rc){
-      const uiMousePos = targetSurfaces[a.flags.targetSurface].view.mousePos;
+      const surf = a.flags.targetSurface; //1: gui, 0:view
+
+      const uiMousePos = targetSurfaces[surf].view.mousePos;
       if(a.internal_hitTest(uiMousePos)){
-        mouseOverUI = true;
+        mouseOverUI[surf] = true;
 
         if(popupState.cell==a)
           mouseOverPopup = true;
@@ -849,7 +851,7 @@ struct im{ static:
       comboState = false;
 
     //the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
-    wantMouse = mouseOverUI;
+    wantMouse = mouseOverUI[1];
 
     updateScrollers(screenBounds);
     resetScrollers; //needed no more
@@ -1326,6 +1328,7 @@ static cnt=0;
     bool isCircular() const { return type==RangeType.circular; }
     bool isEndless () const { return type==RangeType.endless ; }
     bool isClamped () const { return isLinear || isLog || isCircular; }
+    bool isOrdered () const { return min <= max; }
 
     float normalize(float x){
       auto n = isLog ? x.log2.remap(min.log2, max.log2, 0, 1)  //todo: handle log(0)
@@ -2140,7 +2143,7 @@ static cnt=0;
     return ListBoxResult(hit, changed);
   }
 
-  auto ListBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+  auto ListBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, A[] items, Args args){
     auto idx = cast(int) items.countUntil(value); //opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
     auto res = ListBox!(file, line)(idx, items, args);
     if(res) value = items[idx];
@@ -2299,6 +2302,11 @@ static cnt=0;
   {
     mixin(id.M ~ enable.M ~ selected.M ~ range.M);
 
+    //flipped range interval. Needed for vertical scrollbar
+    const flipped = !_range.isOrdered;
+    if(flipped) swap(_range.min, _range.max);
+
+
 //    float customWidth_;
     string props;
     static foreach(a; args){{ alias t = Unqual!(typeof(a));
@@ -2306,7 +2314,7 @@ static cnt=0;
       static if(isSomeString!t) props = a; //todo: ennek is
     }}
 
-    float normValue = _range.normalize(value);
+    float normValue = _range.normalize(flipped ? _range.max-value : value); // FLIP
 
     int wrapCnt;
     if(_range.isEndless){
@@ -2332,6 +2340,7 @@ static cnt=0;
       float f = _range.denormalize(normValue);
       static if(isIntegral!V) f = round(f);
       value = f.to!V;
+      if(flipped) value = _range.max.to!V-value; // UNFLIP
     }
 
     //todo: what to return on from slider

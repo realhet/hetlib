@@ -2233,6 +2233,8 @@ public:
       //FPS graph
       translate(vec2(0, 64+4));
 
+      fontHeight = 7;
+
       lineWidth = 1;
       lineStyle = LineStyle.normal;
       auto groups = timeLine.getGroups;

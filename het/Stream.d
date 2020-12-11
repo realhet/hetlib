@@ -93,6 +93,8 @@ string[] fromJson/*_ignore*/(Type)(ref Type data, string st, string moduleName="
 //auto fromJson_raise(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){        fromJson!(Type)(data, st, moduleName, ErrorHandling.raise, srcFile, srcFunct, srcLine); }
 //auto fromJson_track(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__){ return fromJson!(Type)(data, st, moduleName, ErrorHandling.track, srcFile, srcFunct, srcLine); }
 
+//todo: this should be a nonDestructive overwrite for not just classes but for assocArrays too.
+//todo: New name: addJson or includeJson
 auto fromJsonProps(Type)(Type data, string st, string moduleName="unnamed_json", ErrorHandling errorHandling=ErrorHandling.ignore, string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__)
 if(is(Type == class))
 {
@@ -391,6 +393,25 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
         if(data.length != cnt) throw new Exception("Static array size mismatch: %s < %s".format(cnt, data.length));
       }
 
+    }else static if(isAssociativeArray!T){
+
+      //handle null
+      if(actToken.isKeyword(kwnull)){
+        data = T.init;
+        return; //nothing else to expect after null
+      }
+
+      auto elementMap = extractElements;
+
+      alias VT = Unqual!(ValueType!T),
+            KT = Unqual!(KeyType!T);
+
+      foreach(k, v; elementMap){
+        VT tmp;
+        streamDecode_json(state, v, tmp);
+        data[k.to!KT] = tmp;
+      }
+
     }else{
       static assert(0, "Unhandled type: "~T.stringof);
     }
@@ -438,7 +459,7 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
     if(s.length) lastSymbol = s[$-1];
     //todo: this is unoptimal, but at least safe. It is possible to put this inside the [] and {} loop.
 
-    const needComma = !lastSymbol.among('{', '[', ',', '\xff'); //ff is empty stream, no comma needed
+    const needComma = !lastSymbol.among('{', '[', ',', ':', '\xff'); //ff is empty stream, no comma needed
     if(dense){
       if(needComma) st ~= ",";
     }else{
@@ -492,6 +513,16 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
       streamAppend_json(st, val, dense, actHex, "", nextIndent);
 
     st ~= dense ? "]" : "\n"~indent~"]";        //closing bracket ]
+  }else static if(isAssociativeArray!T){ // Associative array
+    if(data.empty){ st ~= "null"; return; }
+
+    st ~= dense ? "{" : "{\n";                  //opening bracket {
+    const nextIndent = dense ? "" : indent~"  ";
+
+    foreach(k, ref v; data)
+      streamAppend_json(st, v, dense, hex, k.text, nextIndent);
+
+    st ~= dense ? "}" : "\n"~indent~"}";        //closing bracket }
   }else{
     static assert(0, "Unhandled type: "~T.stringof);
   }
