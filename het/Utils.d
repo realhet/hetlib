@@ -77,6 +77,7 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 // std imports
 public import std.string, std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta, core.stdc.string; //het.math also imports std.algorithm, std.functional
 public import std.utf;
+public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum;
 public import std.uri: urlEncode = encode, urlDecode = decode;
 public import std.process : environment;
 public import std.zlib : compress, uncompress;
@@ -2134,17 +2135,17 @@ ubyte[] hexToBin(string s){
 
 string hexToStr(in string s){ return cast(string)hexToBin(s); }
 
-bool isDigit(dchar ch) @safe {
-  return inRange(ch, '0', '9');
-}
-
 bool isHexDigit(dchar ch) @safe {
   return isDigit(ch)
       || inRange(ch, 'a', 'f')
       || inRange(ch, 'A', 'F');
 }
 
-bool isLetter(dchar ch) @safe {
+bool isDigit(dchar ch) @safe { // also there is std.uni.inNumber
+  return inRange(ch, '0', '9');
+}
+
+bool isLetter(dchar ch) @safe { // also there is std.uni.isAlpha
   return inRange(ch, 'a', 'z')
       || inRange(ch, 'A', 'Z');
 }
@@ -2166,7 +2167,7 @@ bool isIdentifier(const string s) @safe
   return w.length==s.length;
 }
 
-string wordAt(const string s, const ptrdiff_t pos) @safe
+string wordAt(const string s, const ptrdiff_t pos) @safe //todo: this is ascii!!!! fails if isWordChar contains uni.isAlpha or uni.isNumber!!!!
 {
   if(!isWordChar(s.get(pos))) return "";
 
@@ -2199,6 +2200,18 @@ T toInt(T=int)(string s){ //todo: toLong
     if(s[1].among('b', 'B')) return s[2..$].to!T( 2);
   }
   return s.to!T;
+}
+
+string replaceWords(alias fun = isWordChar)(string str, string from, string to){
+  auto res = appender!string();
+  auto src = str.byCodePoint;
+  foreach(isWord, len; str.map!fun.group){
+    auto act = src.take(len).text;
+    src.popFrontExactly(len);
+    //writefln!"%-15s %-5s %3s"(act, isWord, len);
+    res.put(isWord && act==from ? to : act);
+  }
+  return(res[]);
 }
 
 //todo: isWild variadic return parameters list, like formattedtext

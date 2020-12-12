@@ -535,7 +535,7 @@ public:
   }
 
   bool skipWhiteSpaceAndComments() //returns true if eof
-  {
+  { //todo: __EOF__ handling
     while(1){
       switch(ch){
         default:{

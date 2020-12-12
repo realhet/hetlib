@@ -1730,7 +1730,7 @@ static cnt=0;
   void applyEditStyle(bool enabled, bool focused, float hover){
     style   = tsNormal;
 
-    auto bColor = focused  ? clBlack :
+    auto bColor = focused  ? clAccent :
                   !enabled ? mix(clWinBtn       , style.bkColor, 0.5f)
                            : mix(clWinBtn, clWinBtnHoverBorder, hover);
 
@@ -2030,7 +2030,7 @@ static cnt=0;
       //mixin GetChkBoxColors;
       RGB hoverColor(RGB baseColor, RGB bkColor) {
         return !enabled ? clWinBtnDisabledText
-                        : lerp(baseColor, bkColor, hit.captured ? 0.5 : hit.hover_smooth*0.3);
+                        : mix(baseColor, bkColor, hit.captured ? 0.5f : hit.hover_smooth*0.3f);
       }
 
       auto markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor);
