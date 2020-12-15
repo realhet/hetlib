@@ -47,9 +47,13 @@ Tri  : X0   Y0   X1, Y1, X2     Y2      col,  68
 Glyph: x0,  y0,  x1, y1,  tx0, ty0      col,  256     tx1, ty1, col2
                           tx0:fontFlags
 
-Text:  x0,  y0,  sf, c4,  c4,  c4,      c4 ,  69,     c4,  c4,  c4   //sf = size+flags
+Bez2 : Ax   Ay   Bx  By   Cx    Cy      Col   69      Width - -
+
+
+////////////Text:  x0,  y0,  sf, c4,  c4,  c4,      c4 ,  69,     c4,  c4,  c4   //sf = size+flags
 
 */
+
 
 //Todo: Appendert kell hasznalni!
 
@@ -349,22 +353,22 @@ class Drawing {
 ////////////////////////////////////////////////////////////////////////////////
 
   struct DrawingObj {
-    float aType;        //4
-    vec2 aA, aB, aC;     //24
-    uint aColor;        //4
+    float aType;                //4
+    vec2 aA, aB, aC;            //24
+    uint aColor;                //4
 
     //drawGlyph only
-    vec2 aD;             //8
-    uint aColor2;       //4
+    vec2 aD;                    //8
+    uint aColor2;               //4
 
-    vec2 aClipMin, aClipMax; //16  clipping rect. Terribly unoptimal
+    vec2 aClipMin, aClipMax;    //16  clipping rect. Terribly unoptimal
 
     void expandBounds(ref bounds2 b) const{
       auto t = aType.iround;
       void x(in vec2 v){ b |= v; }
 
       if(t==1) x(aA); //Point
-      else if(t==68){ x(aA); x(aB); x(aC); } //Tri
+      else if(t.among(68, 69)){ x(aA); x(aB); x(aC); } //Tri, Bez2
       else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) { x(aA); x(aB); } //Point2, Line, rect, glyph
       else raise("aType %s not impl".format(aType));
     }
@@ -375,7 +379,7 @@ class Drawing {
       void x(ref vec2 v){ v = tr(v); }
 
       if(t==1) x(aA); //Point
-      else if(t==68){ x(aA); x(aB); x(aC); } //Tri
+      else if(t.among(68, 69)){ x(aA); x(aB); x(aC); } //Tri
       else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) { x(aA); x(aB); } //Point2, Line, rect, glyph
     }
   };
@@ -405,6 +409,8 @@ class Drawing {
 
   private bounds2 bounds_;
   bounds2 getBounds()const { return bounds_; }
+
+  vec2 inputTransformRel(in vec2 p) { return p*actState.drawScale; } //for relative movements
 
   vec2 inputTransform(in vec2 p) { return (p+actState.drawOrigin)*actState.drawScale; }
   bounds2 inputTransform(in bounds2 b) { return bounds2(inputTransform(b.low), inputTransform(b.high)); }
@@ -488,26 +494,26 @@ class Drawing {
 
 // Lines ///////////////////////////////////////////////////////////////////////
 
-  private vec2 lineCursor;
+  private vec2 lineCursor; // untransformed for fastness, but can't survive a transformation
 
   void lineTo(in vec2 p_) { //todo: const struct->in struct
     vec2 p = inputTransform(p_);
     markDirty;
     auto c = realDrawColor, w = lineWidth;
-    append(DrawingObj(3+actState.arrowStyle, lineCursor, p, vec2(w, lineStyle), c));
-    lineCursor = p;
+    append(DrawingObj(3+actState.arrowStyle, inputTransform(lineCursor), p, vec2(w, lineStyle), c));
+    lineCursor = p_;
   }
   void lineTo(in vec2 p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
 
   void lineTo(in ivec2 p)                                 { lineTo(p); }
   void lineTo(in ivec2 p, bool isMove)                    { lineTo(p, isMove); }
 
-  void moveTo(in vec2 p)                                 { lineCursor = inputTransform(p); }
+  void moveTo(in vec2 p)                                 { lineCursor = p; }
   void moveTo(in ivec2 p)                                 { moveTo(p); }
 
-  void lineRel(in vec2 p)                                { lineTo(lineCursor+inputTransform(p)); }
-  void moveRel(in vec2 p)                                { moveTo(lineCursor+inputTransform(p)); }
-  void line(in vec2 p0, in vec2 p1)                       { lineCursor = inputTransform(p0); lineTo(p1); }
+  void lineRel(in vec2 p)                                { lineTo(lineCursor+p); }  //kinda slow, but can change transformations between relative movements
+  void moveRel(in vec2 p)                                { moveTo(lineCursor+p); }
+  void line(in vec2 p0, in vec2 p1)                       { lineCursor = p0; lineTo(p1); }
 
   void line(in ivec2 p0, in ivec2 p1)                       { line(p0, p1); }
   void line(in seg2 s)                                 { line(s.p[0], s.p[1]); }
@@ -565,6 +571,12 @@ class Drawing {
       }else static if(isNumeric!T        ){ if(isnan(coord)) coord = a; else { lineTo(coord, a, first); first = false; coord = float.init; }
       }else static assert("invalid type: "~T.stringof);
     }}
+  }
+
+  void bezier2(in vec2 A, in vec2 B, in vec2 C) {
+    markDirty;
+    auto c = realDrawColor, w = lineWidth;
+    append(DrawingObj(69, inputTransform(A), inputTransform(B), inputTransform(C), c,vec2(w, lineStyle)));
   }
 
   protected static auto genRgbGraph(string fv)(){
@@ -886,7 +898,7 @@ class Drawing {
 
     import std.traits;
     lineWidth = 1;
-    moveTo(0, 50);
+    moveTo(0, 50.5f);
     foreach (ls; EnumMembers!LineStyle){
       lineStyle = ls;
       lineRel(200, 0);  moveRel(-200, 10);
@@ -1014,6 +1026,25 @@ class Drawing {
       return info;
     }
 
+    SubTexInfo fetchSubTexInfo(int subTexIdx){
+      int infoTexWidth = int(textureSize(smpInfo, 0).x);
+      ivec2 infoTexCoord = ivec2((subTexIdx<<1)%infoTexWidth, (subTexIdx<<1)/infoTexWidth);
+
+      vec4[2] subTexInfoRaw;
+      subTexInfoRaw[0] = texelFetch(smpInfo, infoTexCoord, 0);
+      infoTexCoord.x += 1;
+      subTexInfoRaw[1] = texelFetch(smpInfo, infoTexCoord, 0);
+
+      return decodeSubTexInfo(subTexInfoRaw);
+    }
+
+    void emitSubTexInfo(SubTexInfo info){
+      stIdx    = info.megaTexIdx;
+      stConfig = info.config    ;
+      stPos    = info.pos       ;
+      stSize   = info.size      ;
+    }
+
     //common math stuff
     float clamp(float a, float mi, float ma) { return min(max(a, mi), ma); }
     vec2 rot90(vec2 p) { return vec2(-p.y, p.x); }
@@ -1032,7 +1063,7 @@ class Drawing {
     vec2 finalTrans(vec2 p) { return p/(uViewPortSize)*vec2(2,-2); }
 
     //calculates halfCircle subdivision count
-    float calcSegCnt(float radius, float maxVerts) { return clamp(round(radius/3.0+2.0), 2.0, maxVerts/2.0-2.0); }
+    float calcSegCnt(float radius, int maxVerts) { return clamp(round(radius/3.0+2.0), 2.0, maxVerts/2.0-2.0); }
 
     //calculates halfSize vector from a float. Uses screenPixel based size when the input is negative.
     vec2 calcRadius(float size) {
@@ -1114,7 +1145,7 @@ class Drawing {
       EndPrimitive();
     }
 
-    void emitLine(vec2 u0, vec2 u1, float lineWidth, float stipple, float maxVerts, float arrowStyle){
+    void emitLine(vec2 u0, vec2 u1, float lineWidth, float stipple, int maxVerts, float arrowStyle){
       float halfWidth = calcHalfSize(lineWidth);
       vec2 p0 = trans(u0),  p1 = trans(u1);
 
@@ -1171,61 +1202,66 @@ class Drawing {
 
     }
 
+    vec2 evalBezier2(vec2 A, vec2 B, vec2 C, float t){
+      return mix(mix(A, B, t), mix(B, C, t), t);
+    }
+
+    void emitBezier2(vec2 A, vec2 B, vec2 C,float lineWidth, int maxVerts){
+
+      float halfWidth = calcHalfSize(lineWidth);
+      float tStep = 1.0/(maxVerts/2-1);
+      float t = 0.0;
+      vec2 lastPos = A - (evalBezier2(A, B, C, tStep) - A); //mirror the first step backwards
+
+      for(int i = 0; i<maxVerts/2; i++, t += tStep){
+        vec2 pos = evalBezier2(A, B, C, t);
+        vec2 dir = normalize(pos-lastPos);
+        lastPos = pos;
+
+        vec2 hSide = rot90(dir)*halfWidth;
+
+        emit(pos-hSide); emit(pos+hSide);
+      }
+
+      EndPrimitive();
+    }
+
     void main(){
       fColor = Color[0];
       fStipple = vec2(0, 0);
       boldTexelOffset = 0;
       fontFlags = 0;
       fClipMin = trans(ClipMin[0]) + uViewPortSize*0.5;
-      fClipMax = trans(ClipMax[0]) + uViewPortSize*0.5; //todo:trans
+      fClipMax = trans(ClipMax[0]) + uViewPortSize*0.5;
 
-      int t = int(Type[0]);
-      if(t==1){ //Point
+      int type = int(Type[0]);
+      if(type==1){ //Point
         emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices);
-      }else if(t==2){ //Point2
+      }else if(type==2){ //Point2
         emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices/2);
         emitEllipse(trans(B[0]), calcRadius(C[0].y), MaxCurveVertices/2);
-      }else if(t>=3 && t<=3+63){
-        emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, MaxCurveVertices, float(t-3));
-      }else if(t==67){ //filled rect
+      }else if(type>=3 && type<=3+63){ //Line
+        emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, MaxCurveVertices, type-3);
+      }else if(type==67){ //Filled rect
         emitRect(trans(A[0]), trans(B[0]));
-      }else if(t==68){ //triangle
+      }else if(type==68){ //Triangle
         emitTriangle(trans(A[0]), trans(B[0]), trans(C[0]));
-      }else if(t>=256 && t<256+0x10000){ //glyph rect geom shader////////////////////////////////
-        t -= 256;
-
+      }else if(type==69){ //Bezier 2nd order
+        emitBezier2(trans(A[0]), trans(B[0]), trans(C[0]), D[0].x/*lineWidth*/, MaxCurveVertices);
+      }else if(type>=256 && type<256+0x10000){ //glyph rect geom shader////////////////////////////////
         fontFlags = int(floor(C[0].x));
-
-        bool isBold = (fontFlags & 1)!=0;
 
         fColor2 = Color2[0];
 
-        int subTexIdx = t;
+        SubTexInfo info = fetchSubTexInfo(type-256);
+        emitSubTexInfo(info);
 
-        int infoTexWidth = int(textureSize(smpInfo, 0).x);
-        ivec2 infoTexCoord = ivec2((subTexIdx<<1)%infoTexWidth, (subTexIdx<<1)/infoTexWidth);
-
-        vec4[2] subTexInfoRaw;
-        subTexInfoRaw[0] = texelFetch(smpInfo, infoTexCoord, 0);
-        infoTexCoord.x += 1;
-        subTexInfoRaw[1] = texelFetch(smpInfo, infoTexCoord, 0);
-
-        SubTexInfo info = decodeSubTexInfo(subTexInfoRaw);
-
-        stIdx    = info.megaTexIdx;
-        stConfig = info.config    ;
-        stPos    = info.pos       ;
-        stSize   = info.size      ;
-
-        //texture coordinates (non-normalized)
-        vec2 t0 = info.pos;
-        vec2 t1 = info.pos+info.size;
-
-        //adjust to the textel centers
-        t0 += vec2(.5, .5);
-        t1 -= vec2(.5, .5);
+        //texture coordinates (non-normalized)  //adjust to the textel centers
+        vec2 t0 = info.pos                        + vec2(.5);
+        vec2 t1 = info.pos+info.size              - vec2(.5);
 
         //enlarge for boldness
+        bool isBold = (fontFlags & 1)!=0;
         if(isBold){
           float o = info.size.y*BoldOffset;
           boldTexelOffset = o;
@@ -1403,6 +1439,7 @@ class Drawing {
 
           float phase = fract(fStipple.y/(pow(2,scale+2.6)))*6;
 
+          //this is crazy and not having the docs for it.
           mask /= 2;  if(fract(mask)>0){ if(phase<1 || phase>=2 && phase<3) a = 1;  mask -= 0.5; }
           mask /= 2;  if(fract(mask)>0){ if(phase>=1 && phase<2) a = 1; mask -= 0.5; }
           mask /= 2;  if(fract(mask)>0){ if(phase>=3 && phase<4) a = 1; mask -= 0.5; }

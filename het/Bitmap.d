@@ -213,7 +213,7 @@ Image!(T, 2) extract_bilinear(T)(Image!(T, 2) iSrc, float x0, float y0, int w, i
   return res;
 }
 
-auto sample_nearest(T)(Image!(T, 2) iSrc, ivec2 p){
+auto sample_nearest(T)(Image!(T, 2) iSrc, ivec2 p){  //todo: unsafe/safe versions, safe with boundary mode and color -> openCV
   if(p.x<0 || p.y<0 || p.x>=iSrc.width || p.y>=iSrc.height) return T.init;
   return iSrc[p];
 }
@@ -223,7 +223,7 @@ auto sample_nearest(T)(Image!(T, 2) iSrc, vec2 p){
 }
 
 auto extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
-  return image2D(w, h, (ivec2 p) => iSrc.sample_nearest(p*vec2(xs, ys))); //opt: it's slow, but universal
+  return image2D(w, h, (ivec2 p) => iSrc.sample_nearest(p*vec2(xs, ys)+vec2(x0, y0))); //opt: it's slow, but universal
 
 /*  auto res = image2D(w, h, T.init);
   auto x00 = x0;
@@ -1558,7 +1558,7 @@ version(D2D_FONT_RENDERER){ private:
         dcrt.BeginDraw;
           dcrt.Clear(inverse ? white : black);
           brush.SetColor(inverse ? black : white);
-          dcrt.DrawTextLayout(D2D1_POINT_2F(0, isSegoeAssets ? 0 : props.height*(-1.0f/18)), textLayout, brush, D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT);
+          dcrt.DrawTextLayout(D2D1_POINT_2F(0, isSegoeAssets ? 0 : props.height*((-1.425f)/18)), textLayout, brush, D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT);
         dcrt.EndDraw.hrChk("EndDraw");
 
         return gBmp.toBitmap;
@@ -1586,10 +1586,11 @@ version(D2D_FONT_RENDERER){ private:
       }
 
       if(isSegoeAssets){ //align the assets font vertically with letters
-        int ysh = iround(res.height*0.16f); //scroll down that many pixels
-        res.set(res.access!ubyte.extract_nearest(0, -ysh, res.width, res.height));
+        int ysh = iround(res.height*0.125f); //scroll down that many pixels
 
-        //todo: a combolox lefele meno haromszogletu bizbaszaval ez szar. A checkBox-nal is szar!
+        auto img = res.access!ubyte;
+        img = img.extract_nearest(0, -ysh, res.width, res.height);
+        res.set(img);
       }
 
       return res;

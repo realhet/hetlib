@@ -1084,8 +1084,11 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
   bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
   RGB fontColor, bkColor;
 
+  dchar ch;
 
   this(dchar ch, in TextStyle ts){
+    this.ch = ch;
+
     //tab is the isSame as a space
     isTab = ch==9;
     isWhite = isTab || ch==32;

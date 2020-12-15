@@ -1412,7 +1412,7 @@ static cnt=0;
     }}
   }
 
-  void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Composite //////////////////////////////
+  void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Container //////////////////////////////
     auto cntr = new .Container(style);
     append(cntr); push(cntr, file.xxh(line)); scope(exit) pop;
 
@@ -1686,7 +1686,7 @@ static cnt=0;
     margin  = Margin(2, 2, 2, 2);
     border  = Border(2, BorderStyle.normal, bColor);
     padding = Padding(2, 2, 2, 2);
-    if(theme=="tool"){
+    if(theme == "tool"){
       border.width    = 1;
       border.inset = true;
       margin .top = margin .bottom = 0;

@@ -2203,15 +2203,24 @@ T toInt(T=int)(string s){ //todo: toLong
 }
 
 string replaceWords(alias fun = isWordChar)(string str, string from, string to){
-  auto res = appender!string();
-  auto src = str.byCodePoint;
-  foreach(isWord, len; str.map!fun.group){
-    auto act = src.take(len).text;
-    src.popFrontExactly(len);
-    //writefln!"%-15s %-5s %3s"(act, isWord, len);
-    res.put(isWord && act==from ? to : act);
+  auto src = (&str).refRange;
+
+  auto fetchAndReplace(bool isWord, uint len){
+    auto act = src.takeExactly(len).text;
+    return isWord && act==from ? to : act;
   }
-  return(res[]);
+
+  static if(0){  //todo: compare the speed of this functional approach
+    return str.map!fun
+              .group
+              .map!(p => fetchAndReplace(p[]));
+              .join;
+  }else{
+    string res;
+    foreach(isWord, len; str.map!fun.group)
+      res ~= fetchAndReplace(isWord, len);
+    return(res);
+  }
 }
 
 //todo: isWild variadic return parameters list, like formattedtext
