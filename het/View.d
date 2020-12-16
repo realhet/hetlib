@@ -22,7 +22,7 @@ private:
 public:
   vec2 origin;
 
-  // extra information from external source
+  // extra information from external source in screen space
   vec2 mousePos;
   bounds2 clipBounds;
 

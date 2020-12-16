@@ -153,11 +153,13 @@ struct ImStorage(T){
 
 struct HitInfo{ //Btn returns it
   uint id;
+  bool enabled = true;
   bool hover, captured, clicked, pressed, released;
   float hover_smooth, captured_smooth;
   bounds2 hitBounds; // this is in ui coordinates. Problematic with zoomable and GUI views.
 
-  alias clicked this;
+  @property bool clickedAndEnabled() const{ return clicked & enabled; }
+  alias clickedAndEnabled this;
 }
 
 struct HitTestManager{
@@ -1130,7 +1132,7 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
   }
 
   override void draw(Drawing dr){
-    drawBorder(dr); //todo: csak a containernek kell border elvileg
+    drawBorder(dr); //todo: csak a containernek kell border elvileg, ez hatha gyorsit.
     dr.color = fontColor;
     dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags);
 

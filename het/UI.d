@@ -67,7 +67,7 @@ class Slider : Cell { // Slider //////////////////////////////////
   this(uint id, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts=tsNormal){
     this.id = id;
 
-    auto hit = im.hitTest(this, id);
+    auto hit = im.hitTest(this, id, true); //todo: enabled support
 
     hitBounds = hit.hitBounds;
 
@@ -391,7 +391,7 @@ class Link : Row{ //Link ///////////////////////////////
 
   this(string cmdLine, uint hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
 
-    auto hit = im.hitTest(this, hash);
+    auto hit = im.hitTest(this, hash, enabled);
 
     if(enabled && onClick !is null && hit.clicked){
       onClick();
@@ -941,6 +941,7 @@ static cnt=0;
     }
   }
 
+  /// internal use only
   bool focusUpdate(.Container container, uint id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
     if(focusedState.id==id){
       if(!canFocus || exitFocusNow){ //not enabled anymore: exit focus
@@ -970,7 +971,7 @@ static cnt=0;
   }
 
   bool isFocused(uint id)               { return focusedState.id                 && focusedState.id == id; }
-  bool isFocused(.Container container)  { return focusedState.container !is null && focusedState.container == container; }
+  bool isFocused(.Container container)  { return focusedState.container !is null && focusedState.container is container; }
 
 //  void focusExit(uint id)               { if(isFocused(id)) focusedState.reset; }
 //  void focusExit(Container container)   { if(isFocused(container)) focusedState.reset; }
@@ -1365,15 +1366,16 @@ static cnt=0;
   auto endlessRange (float min, float max, float step=1){ return range(min, max, step, RangeType.endless ); }
 
 
-  static auto hitTest(Cell cell, uint id){
+  static auto hitTest(Cell cell, uint id, bool enabled){
     assert(cell !is null);
     auto res = hitTestManager.check(id);
+    res.enabled = enabled;
     hitTestManager.addHash(actContainer, id);
     return res;
   }
 
-  auto hitTest(uint id){
-    return hitTest(actContainer, id);
+  auto hitTest(uint id, bool enabled){
+    return hitTest(actContainer, id, enabled);
   }
 
 
@@ -1769,14 +1771,17 @@ static cnt=0;
       flags.clipChildren = true;
       auto row = cast(.Row)actContainer;
 
-      hit = hitTest(id_);
+      hit = hitTest(id_, enabled);
       auto localMouse = actView.mousePos - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 
       mixin(hintHandler);
 
+      bool manualFocus;
+      static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
+
       const focused = focusUpdate(actContainer, id_,
         enabled,
-        hit.pressed, //enter
+        hit.pressed || manualFocus, //enter
         inputs["Esc"].pressed,  //exit
         /* onEnter */ {
           value2editor;
@@ -1943,7 +1948,7 @@ static cnt=0;
     HitInfo hit;
 
     Row({
-      hit = hitTest(id_);
+      hit = hitTest(id_, enabled);
 
       mixin(hintHandler);
 
@@ -1965,6 +1970,9 @@ static cnt=0;
       static foreach(a; args) static if(__traits(compiles, a())) a();
     });
 
+    //KeyCombo in click mode.
+    static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) hit.clicked = true;
+
     return hit;
   }
 
@@ -1982,7 +1990,7 @@ static cnt=0;
 
     HitInfo hit;
     Row({
-      hit = hitTest(id_);
+      hit = hitTest(id_, enabled);
 
       style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
 
@@ -2022,7 +2030,7 @@ static cnt=0;
     Row({
       flags.canWrap = false;
 
-      hit = hitTest(id_);
+      hit = hitTest(id_, enabled);
 
       //update checkbox state
       if(enabled && hit.clicked) state.toggle;
@@ -2087,7 +2095,7 @@ static cnt=0;
   auto ListBoxItem(C)(ref bool isSelected, C s, uint itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
     HitInfo hit;
     Row({
-      hit = hitTest(itemId);
+      hit = hitTest(itemId, enabled);
 
       if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down)) isSelected = true; //mosue down left or right
 
@@ -2119,7 +2127,7 @@ static cnt=0;
     HitInfo hit;
     bool changed;
     Column({
-      hit = hitTest(id_);
+      hit = hitTest(id_, enabled);
       border = "1 normal gray";
 
       foreach(i, s; items){
@@ -2167,7 +2175,7 @@ static cnt=0;
     HitInfo hit;
 
     Row({
-      hit = hitTest(id_);
+      hit = hitTest(id_, enabled_);
 
       mixin(hintHandler);
 
