@@ -110,7 +110,7 @@ import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, ST
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
-enum logFileOps = false;
+__gshared logFileOps = false;
 
 // Obj.Destroy is not clearing shit
 void free(T)(ref T o)if(is(T==class)){

@@ -1413,6 +1413,7 @@ auto iota2(E)(in E e){ return iota2(0, e); }
 float calcAnimationT(float dt, float speed, float maxDt = 0.1f){
   return dt<maxDt ? 1-pow(speed, dt*30)
                   : 1;
+  //todo: Upgrade to https://val-sagrario.github.io/Dynamics%20of%20First%20Order%20Systems%20for%20game%20devs%20-%20Jan%202020.pdf
 }
 
 /***********************************

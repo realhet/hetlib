@@ -2010,7 +2010,7 @@ TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZer
 class GLWindow: Window{
 public:
 
-  Drawing dr, drGUI;
+  //Drawing dr, drGUI;
   View2D view;
   MouseState mouse;
   private View2D viewGUI_;
@@ -2101,8 +2101,8 @@ protected:
     createRenderingContext;
 
     //init drawing, view, mouse
-    dr    = new Drawing;  view     = new View2D;  view    .owner = this;  view.centerCorrection = true;
-    drGUI = new Drawing;  viewGUI_ = new View2D;  viewGUI_.owner = this;
+    /*dr    = new Drawing;*/  view     = new View2D;  view    .owner = this;  view.centerCorrection = true;
+    /*drGUI = new Drawing;*/  viewGUI_ = new View2D;  viewGUI_.owner = this;
 
     mouse = new MouseState;
   }
@@ -2127,10 +2127,10 @@ protected:
       return;
     }
 
-    if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
+/*    if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
       view.workArea = dr.getBounds;
       view.zoomAll_immediate;
-    }
+    }*/
   }
 
   override void onMouseUpdate(){
@@ -2185,7 +2185,7 @@ public:
     super.onBeginPaint;
     onWglMakeCurrent(true);
 
-    dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not.
+    //dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not.
 
     with(clientRect) gl.viewport(left, top, right-left, bottom-top);
     gl.disable(GL_DEPTH_TEST); //no zbuffering by default
@@ -2205,14 +2205,14 @@ public:
   override void onEndPaint(){
     if(chkClear(view._mustZoomAll)) view.zoomAll;
 
-    if(!dr.drawCnt){
+    /*if(!dr.drawCnt){
       if(!firstPaint) onInitialZoomAll; //if dr has a painting
       dr.glDraw(view   );
     }
     if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
 
     lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
-    lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);
+    lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);*/
 
     firstPaint = true;
   }

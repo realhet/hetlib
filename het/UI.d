@@ -869,6 +869,8 @@ struct im{ static:
     inFrame = false;
   }
 
+  bounds2[2] surfaceBounds;
+
   void draw(){
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
@@ -879,6 +881,7 @@ struct im{ static:
     }
 
     foreach(i; 0..2){
+      surfaceBounds[i] = dr[i].getBounds;
       dr[i].glDraw(targetSurfaces[i].view);
       dr[i].clear;
     }

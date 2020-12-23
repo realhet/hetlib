@@ -408,7 +408,9 @@ class Drawing {
   private void markDirty() { /*dirty = -1;*/ }
 
   private bounds2 bounds_;
-  bounds2 getBounds()const { return bounds_; }
+  bounds2 getBounds()const {
+    return bounds_;
+  }
 
   vec2 inputTransformRel(in vec2 p) { return p*actState.drawScale; } //for relative movements
 
@@ -1207,7 +1209,6 @@ class Drawing {
     }
 
     void emitBezier2(vec2 A, vec2 B, vec2 C,float lineWidth, int maxVerts){
-
       float halfWidth = calcHalfSize(lineWidth);
       float tStep = 1.0/(maxVerts/2-1);
       float t = 0.0;
