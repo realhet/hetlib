@@ -70,7 +70,7 @@ enum LineStyle:ubyte {
 //these are also used in ui.d
 enum HAlign { left, center, right, justify }  //when the container width is fixed
 enum VAlign { top, center, bottom, justify }  //when the container height is fixed
-enum YAlign { top, center, bottom, baseline } //this aligns the y position of each cell in a line. baseline is 0.7ish
+enum YAlign { top, center, bottom, baseline, stretch } //this aligns the y position of each cell in a line. baseline is 0.7ish
 
 
 

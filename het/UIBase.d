@@ -1157,12 +1157,12 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b1_0_1_0_0_0_0000_0_0_0_0_01_00_00_1; //todo: ui editor for this
+  ulong _data = 0b1_0_1_0_0_0_0000_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"           , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
     VAlign        , "vAlign"            , 2,
-    YAlign        , "yAlign"            , 2,
+    YAlign        , "yAlign"            , 3,
     bool          , "dontHideSpaces"    , 1,  //useful for active edit mode
     bool          , "canSelect"         , 1,
     bool          , "focused"           , 1,  //maintained by system, not by user
@@ -1174,7 +1174,7 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
     bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
     uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
-    int           , ""                  , 11,
+    int           , ""                  , 10,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1768,7 +1768,7 @@ class Container : Cell { // Container ////////////////////////////////////
     override void draw(Drawing dr){
       if(dr.isClone){
         super.draw(dr); //prevent recursion
-        print("recursion prevented");
+        print("Drawing recursion prevented");
       }else{
         if(!cachedDrawing){
           cachedDrawing = dr.clone;
@@ -1982,6 +1982,10 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
 
   void alignY(float t){ //only callable once, as it is relative
     if(t) foreach(c; cells) c.outerPos.y += (height-c.outerHeight)*t;
+  }
+
+  void stretchY(){
+    foreach(c; cells) c.outerHeight = height;
   }
 
   void alignX(float fullWidth, float t){
@@ -2384,6 +2388,7 @@ class Row : Container { // Row ////////////////////////////////////
         case YAlign.center      : wl.alignY(0.5); break;
         case YAlign.bottom      : wl.alignY(1.0); break;
         case YAlign.baseline    : wl.alignY(0.8); break;
+        case YAlign.stretch     : wl.stretchY; break;
       }
     }
 
