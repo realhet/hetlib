@@ -1446,7 +1446,7 @@ version(D2D_FONT_RENDERER){ private:
   private:
     BitmapFontProps props;
     alias props this;
-    bool isSegoeAssets;
+    bool isSegoeAssets, isLucidaConsole;
 
     ID2D1Factory d2dFactory;
     IDWriteFactory dwFactory;
@@ -1479,6 +1479,7 @@ version(D2D_FONT_RENDERER){ private:
       if(!chkClear(mustRebuild)) return;
 
       isSegoeAssets = fontName=="Segoe MDL2 Assets";
+      isLucidaConsole = fontName=="Lucida Console";
 
       //Create font
       SafeRelease(textFormat);
@@ -1558,7 +1559,12 @@ version(D2D_FONT_RENDERER){ private:
         dcrt.BeginDraw;
           dcrt.Clear(inverse ? white : black);
           brush.SetColor(inverse ? black : white);
-          dcrt.DrawTextLayout(D2D1_POINT_2F(0, isSegoeAssets ? 0 : props.height*((-1.425f)/18)), textLayout, brush, D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT);
+
+          float y = 0;
+          if(isLucidaConsole) y = props.height*0.16f; else
+          if(!isSegoeAssets) y = props.height*((-1.425f)/18);
+
+          dcrt.DrawTextLayout(D2D1_POINT_2F(0, y), textLayout, brush, D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT);
         dcrt.EndDraw.hrChk("EndDraw");
 
         return gBmp.toBitmap;

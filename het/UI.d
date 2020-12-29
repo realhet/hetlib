@@ -1368,7 +1368,6 @@ static cnt=0;
   auto circularRange(float min, float max, float step=1){ return range(min, max, step, RangeType.circular); }
   auto endlessRange (float min, float max, float step=1){ return range(min, max, step, RangeType.endless ); }
 
-
   static auto hitTest(Cell cell, uint id, bool enabled){
     assert(cell !is null);
     auto res = hitTestManager.check(id);

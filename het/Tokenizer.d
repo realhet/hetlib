@@ -242,6 +242,15 @@ struct Token{ // Token //////////////////////////////
     return level - (isHierarchyOpen ? 1 : 0);
   }
 
+  string comment(){
+    assert(kind == TokenKind.comment);
+    auto s = source;
+    if(s.startsWith("//")) s = s[2..$];
+    else if(s.startsWith("/*") ||  s.startsWith("/+")) s = s[2..$-2];
+    else assert(0, "invalid comment source format");
+    return s;
+  }
+
   //shorthand
   //bool opEquals(string s) const { return source==s; } //note this conflicted with the linker when importing het.parser.
 
@@ -667,7 +676,7 @@ public:
       case 'r': { fetch; return "\x0D"; }
       case 't': { fetch; return "\x09"; }
       case 'v': { fetch; return "\x0B"; }
-      case 'x': { fetch;
+      case 'x': { fetch; // hexString is deprecated.  -> std.conv.hexString!
         int x = expectHexDigit(ch); fetch;
         x = (x<<4) + expectHexDigit(ch); fetch;
         return to!string(cast(char)x);
@@ -725,6 +734,7 @@ public:
     finalizeToken;
     lastToken.data = s;
 
+    //this check should be optional, so it can process javascript as well
     if(onlyOneChar && cnt!=2) error("Character constant must contain exactly one character.");
   }
 

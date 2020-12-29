@@ -17,7 +17,8 @@ enum
 //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 immutable DefaultFontName = //this is the cached font
   "Segoe UI"
-//  "Consolas"
+//  "Lucida Console"
+//  "Consolas" <- too curvy
 ;
 
 immutable
@@ -631,7 +632,7 @@ void initTextStyles(){
   a(  "bold"      , tsBold    , tsNormal, { tsBold.bold = true; });
   a(    "bold2"   , tsBold2   , tsBold  , { tsBold2.fontColor = clChapter; });
   a(  "quote"     , tsQuote   , tsNormal, { tsQuote.italic = true; });
-  a(  "code"      , tsCode    , tsNormal, { tsCode.font = "Consolas"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //todo: should be half bold?
+  a(  "code"      , tsCode    , tsNormal, { tsCode.font = "Lucida Console"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //todo: should be half bold?
   a(  "link"      , tsLink    , tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; });
   a(  "title"     , tsTitle   , tsNormal, { tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); });
   a(    "chapter" , tsChapter , tsTitle , { tsChapter.fontHeight = rfh(40); });
@@ -900,12 +901,12 @@ class Cell{ // Cell ////////////////////////////////////
   float extraMargin()       const { return (VisualizeContainers && cast(Container)this)? 3:0; }
   vec2 topLeftGapSize()     const { with(cast()this) return vec2(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   ); }
   vec2 bottomRightGapSize() const { with(cast()this) return vec2(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom); }
-  vec2 gapSize()            const { return topLeftGapSize + bottomRightGapSize; }
+  vec2 totalGapSize()       const { return topLeftGapSize + bottomRightGapSize; }
 
   @property{
     //todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
     vec2 innerPos () const { return outerPos+topLeftGapSize; } void innerPos(in vec2 p){ outerPos = p+topLeftGapSize; }
-    vec2 outerSize() const { return innerSize+gapSize; } void outerSize(in vec2 s){ innerSize = s-gapSize; }
+    vec2 outerSize() const { return innerSize+totalGapSize; } void outerSize(in vec2 s){ innerSize = s-totalGapSize; }
     auto innerBounds() const { return bounds2(innerPos, innerPos+innerSize); }
     void innerBounds(in bounds2 b) { innerPos = b.low; innerSize = b.size; }
     auto outerBounds() const { return bounds2(outerPos, outerPos+outerSize); }
@@ -926,8 +927,8 @@ class Cell{ // Cell ////////////////////////////////////
     auto innerY     () const { return outerPos.y+topLeftGapSize.y; } void y(float v) { outerPos.y = v-topLeftGapSize.y; }
     auto innerWidth () const { return innerSize.x; } void innerWidth (float v) { innerSize.x = v; }
     auto innerHeight() const { return innerSize.y; } void innerHeight(float v) { innerSize.y = v; }
-    auto outerWidth () const { return innerSize.x+gapSize.x; } void outerWidth (float v) { innerSize.x = v-gapSize.x; }
-    auto outerHeight() const { return innerSize.y+gapSize.y; } void outerHeight(float v) { innerSize.y = v-gapSize.y; }
+    auto outerWidth () const { return innerSize.x+totalGapSize.x; } void outerWidth (float v) { innerSize.x = v-totalGapSize.x; }
+    auto outerHeight() const { return innerSize.y+totalGapSize.y; } void outerHeight(float v) { innerSize.y = v-totalGapSize.y; }
     auto outerRight () const { return outerX+outerWidth; }
     auto outerBottom() const { return outerY+outerHeight; }
     auto innerCenter() const { return innerPos + innerSize*.5f; }
@@ -986,6 +987,16 @@ class Cell{ // Cell ////////////////////////////////////
     }else{
       return false;
     }
+  }
+
+  ///this hitTest is only works after measure.
+  Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init){
+    Tuple!(Cell, vec2)[] res;
+
+    if((outerBounds+ofs).contains!"[)"(p))
+      res ~= tuple(this, ofs);
+
+    return res;
   }
 
   final void drawBorder(Drawing dr){
@@ -1693,6 +1704,25 @@ class Container : Cell { // Container ////////////////////////////////////
       return false;
     }
   }
+
+  ///this hitTest is only works after measure.
+  override Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init){
+    auto res = super.contains(p, ofs);
+
+    if(res.length){
+      ofs += innerPos;
+      foreach(sc; subCells){
+        auto act = sc.contains(p, ofs);
+        if(act.length){
+          res ~= act;
+          break;
+        }
+      }
+    }
+
+    return res;
+  }
+
 
   static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 

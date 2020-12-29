@@ -5142,6 +5142,8 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   enforce(crc32("Hello")==0xf7d18982);
   enforce(crc32("Nobody inspects the spammish repetition") == 0xAD4270ED);
 
+  { RNG rng; rng.seed = 0; enforce(iota(30).map!(i => rng.random(100).text).join(' ') == "0 3 86 20 27 67 31 16 37 42 8 47 7 84 5 29 91 36 77 32 69 84 71 30 16 32 46 24 82 27"); }
+
   enforce(maskLowBits(0)==0);
   enforce(maskLowBits(1)==1);
   enforce(maskLowBits(2)==3);
