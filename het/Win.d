@@ -266,14 +266,20 @@ int main(string[] args)
       }
 
       const isMainWindowHidden = mainWindow && mainWindow.isHidden;
+      bool canSleep;
       if(isMainWindowHidden){
-        sleep(1);
-
-        //if this next line is uncommented, it will do 67 UPS instead of 38 UPS. The WM_TIMER is kinda bad.
-        //foreach(w; Window.windowList.values) w.internalUpdate;
+        canSleep = true;
+        foreach(w; Window.windowList.values) w.internalUpdate; //WM_TIMER just sucks....
       }else{
-        foreach(w; Window.windowList.values) w.internalUpdate; //This is forced 100%cpu update.
+        canSleep = true;
+        foreach(w; Window.windowList.values){
+          w.internalUpdate; //This is forced 100%cpu update.
+          if(!w.canSleep) canSleep = false;
+        }
       }
+
+      if(canSleep) sleep(1); //sleep 1 does nothing
+
     }
 
     done:
@@ -387,7 +393,9 @@ private:
   HDC fhdc;
   string fName;
   string paintErrorStr;
-  bool isMain, pendingInvalidate;
+  bool isMain, //this is the main windows
+       pendingInvalidate, //invalidate() was called. Timer checks it and clears it.
+       canSleep; //In the last update, there was no invalidate() calls, so it can sleep in the main loop.
   enum WM_MyStartup = WM_USER+0;
 
   string getClassName(){
@@ -574,6 +582,8 @@ public:
 
       case WM_MyStartup : if(isMain) SetTimer(hwnd, 999, 10, null); return 0; //this is a good time to launch the timer. Called by a delayed PostMessage
       case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; return 0;
+      case WM_SIZE      : if(!dontUpdate) internalUpdate; InvalidateRect(hwnd, null, 0); return 0;
+
 
       case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
       case WM_CHAR      : inputChars ~= cast(wchar)wParam; return 0; //WM_UNICHAR nem hivodik magatol...
@@ -624,7 +634,7 @@ public:
   auto screenToClient(T)(in T p)   { return p-screenPos; }
   auto clientToScreen(T)(in T p)   { return p+screenPos; }
 
-  void invalidate()     { if(chkSet(pendingInvalidate)) { auto r = clientRect; InvalidateRect(hwnd, &r, 0); } }
+  void invalidate()     { if(chkSet(pendingInvalidate)) { /*auto r = clientRect;*/ InvalidateRect(hwnd, null, 0); } }
 
   private string lastCaption = "\0";
   @property string caption() {
@@ -781,6 +791,7 @@ public:
 
     inputs.update; //TODO: it's single windowed only this way. The update system should be centralized.
     try{
+      bool anyInvalidate;
       foreach(i; 0..updateCnt){
         totalTime = timeLast + deltaTime*i;
 
@@ -792,6 +803,7 @@ public:
           w.UPS = UPS;
 
           w.updateWithActionManager;//update Others
+          anyInvalidate |= w.pendingInvalidate;
         }
 
         if(i==0) inputs.clearDeltas; //only the first update is used for input processing... Later maybe interpolation can kick in...
@@ -803,6 +815,9 @@ public:
           UPS = UPSCnt;  UPSCnt = 0;
         }
       }
+
+      if(updateCnt>0) canSleep = !anyInvalidate; //if there was an actual update cycle, update the canSleep state. It can only sleep when tere was no invalidate() calls
+
     }finally{
       timeLast = timeAct;
     }

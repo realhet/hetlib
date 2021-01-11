@@ -311,10 +311,8 @@ struct HitTestManager{
       dr.lineWidth = (QPS*3).fract;
       dr.color = clFuchsia;
 
-      foreach(hr; hitStack){
+      foreach(hr; hitStack)
         dr.drawRect(hr.hitBounds);
-//        print(hr);
-      }
 
       dr.lineWidth = 1;
       dr.lineStyle = LineStyle.normal;
@@ -903,7 +901,24 @@ class Cell{ // Cell ////////////////////////////////////
   vec2 bottomRightGapSize() const { with(cast()this) return vec2(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom); }
   vec2 totalGapSize()       const { return topLeftGapSize + bottomRightGapSize; }
 
-  @property{
+  @property{ //accessing the raw values as an lvalue
+    //version 1: property setters+getters. No += support.
+    /*
+    auto outerX     () const { return outerPos.x; } void outerX(float v) { outerPos.x = v; }
+    auto outerY     () const { return outerPos.y; } void outerY(float v) { outerPos.y = v; }
+    auto innerWidth () const { return innerSize.x; } void innerWidth (float v) { innerSize.x = v; }
+    auto innerHeight() const { return innerSize.y; } void innerHeight(float v) { innerSize.y = v; }
+    */
+
+    //version 2: "auto ref const" and "auto ref" lvalues. Better but the code is redundant.
+    auto ref const outerX     () { return outerPos .x; }    auto ref outerX     () { return outerPos .x; }
+    auto ref const outerY     () { return outerPos .y; }    auto ref outerY     () { return outerPos .y; }
+    auto ref const innerWidth () { return innerSize.x; }    auto ref innerWidth () { return innerSize.x; }
+    auto ref const innerHeight() { return innerSize.y; }    auto ref innerHeight() { return innerSize.y; }
+  }
+
+  @property{ //calculated prioperties. No += operators are allowed.
+
     //todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
     vec2 innerPos () const { return outerPos+topLeftGapSize; } void innerPos(in vec2 p){ outerPos = p+topLeftGapSize; }
     vec2 outerSize() const { return innerSize+totalGapSize; } void outerSize(in vec2 s){ innerSize = s-totalGapSize; }
@@ -921,12 +936,8 @@ class Cell{ // Cell ////////////////////////////////////
     auto borderBounds_inner() { return borderBounds!1; }
     auto borderBounds_outer() { return borderBounds!0; }
 
-    auto outerX     () const { return outerPos.x; } void outerX(float v) { outerPos.x = v; }
-    auto outerY     () const { return outerPos.y; } void outerY(float v) { outerPos.y = v; }
     auto innerX     () const { return outerPos.x+topLeftGapSize.x; } void x(float v) { outerPos.x = v-topLeftGapSize.x; }
     auto innerY     () const { return outerPos.y+topLeftGapSize.y; } void y(float v) { outerPos.y = v-topLeftGapSize.y; }
-    auto innerWidth () const { return innerSize.x; } void innerWidth (float v) { innerSize.x = v; }
-    auto innerHeight() const { return innerSize.y; } void innerHeight(float v) { innerSize.y = v; }
     auto outerWidth () const { return innerSize.x+totalGapSize.x; } void outerWidth (float v) { innerSize.x = v-totalGapSize.x; }
     auto outerHeight() const { return innerSize.y+totalGapSize.y; } void outerHeight(float v) { innerSize.y = v-totalGapSize.y; }
     auto outerRight () const { return outerX+outerWidth; }
@@ -1045,6 +1056,7 @@ class Img : Container { // Img ////////////////////////////////////
   }
 
   override void measure(){
+    //note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
     const autoWidth  = innerWidth ==0,
           autoHeight = innerHeight==0,
           siz = calcGlyphSize_image(stIdx);
@@ -1161,6 +1173,8 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
       }
     }
   }
+
+  override string toString() { return format!"Glyph(%s, %s, %s)"(ch.text.quoted, stIdx, outerBounds); }
 }
 
 enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
@@ -1168,7 +1182,7 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b1_0_1_0_0_0_0000_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b01_0_1_0_0_0_0000_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"           , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -1185,7 +1199,8 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
     bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
     uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
-    int           , ""                  , 10,
+    bool          , "_debug"            , 1, // the container can be marked, for debugging
+    int           , ""                  , 9,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1393,8 +1408,6 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
     column = wl.selectNearestGap(x);
 
-
-//print(column, line);
     return ivec2(column, line);
   }
 
@@ -1798,7 +1811,7 @@ class Container : Cell { // Container ////////////////////////////////////
     override void draw(Drawing dr){
       if(dr.isClone){
         super.draw(dr); //prevent recursion
-        print("Drawing recursion prevented");
+        //print("Drawing recursion prevented");
       }else{
         if(!cachedDrawing){
           cachedDrawing = dr.clone;
@@ -2246,16 +2259,12 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   private void solveFlexAndMeasureAll(bool autoWidth){
-    //print("solveFlex ", subCells.count, autoWidth);
-
     float flexSum = 0;
     bool doFlex;
     if(!autoWidth){
       flexSum = subCells.calcFlexSum;
       doFlex = flexSum>0;
     }
-
-    //print("flexSum", flexSum, doFlex);
 
     if(doFlex){
       //calc remaining space from nonflex cells
@@ -2281,8 +2290,6 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   private auto makeWrappedLines(bool doWrap){
-    //print(subCells.length, "iw", innerWidth, "dw", doWrap);
-
     //align/spread horizontally
     size_t iStart = 0;
     auto cursor = vec2(0);
@@ -2298,12 +2305,16 @@ class Row : Container { // Row ////////////////////////////////////
     }
 
     const limit = innerWidth + AlignEpsilon;
-    bool isNewLine;
-    for(size_t i=0; i<subCells.length; i++){ auto subCell = subCells[i];
-      //It is illegal to use \n here. Make a new Row instead!
+    for(size_t i=0; i<subCells.length; i++){
+
+      auto act(){ return subCells[i]; }
+      auto actWidth(){ return act.outerWidth; }
+      auto actIsNewLine(){ if(auto g = cast(Glyph)act) return g.isNewLine; else return false; }
 
       //wrap
-      if(doWrap && cursor.x>0 && cursor.x+subCell.outerWidth > limit){
+      if(actIsNewLine){
+        lineEnd(i);
+      }else if(doWrap && cursor.x>0 && cursor.x+actWidth > limit){
 
         if(1){ //WordWrap: go back to a space
           bool failed;
@@ -2312,20 +2323,16 @@ class Row : Container { // Row ////////////////////////////////////
             if(j==iStart || subCells[j].outerPos.y != cursor.y){ failed = true; break; }
           }
           if(!failed){
-            i = j; subCell = subCells[i];
+            i = j;
           }
         }
 
         lineEnd(i);
-      }else if(isNewLine){
-        lineEnd(i);
       }
 
-      subCell.outerPos = cursor;
-      cursor.x += subCell.outerWidth;
-      maxLineHeight.maximize(subCell.outerHeight);
-
-      if(auto g = cast(Glyph)subCell) isNewLine = g.isNewLine; else isNewLine = false;
+      act.outerPos = cursor; //because of this, newline and wrapped space goes to the next line. This allocates a new wrapped_row for them.
+      cursor.x += actWidth;
+      maxLineHeight.maximize(act.outerHeight);
     }
     if(subCells.length) lineEnd(subCells.length);
 
@@ -2357,12 +2364,11 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   override void measure(){
+    //print(typeid(this).name, ".measure", width, height); scope(exit) print(typeid(this).name, ".measure", width, height, "END");
+
     const autoWidth  = innerSize.x==0,
           autoHeight = innerSize.y==0,
           doWrap = flags.canWrap && !autoWidth;
-
-    //print("  rm begin", subCells.length, innerSize, "flex:", flex, "canWrap:", flags.canWrap, "autoWidth:", autoWidth, "doWrap,", doWrap);
-    //scope(exit) print("  rm end", subCells.length, innerSize, "flex:", flex, flags.canWrap, doWrap);
 
     //adjust length of leading and internal tabs
     if(flags.rowElasticTabs) adjustTabSizes_multiLine;
@@ -2448,21 +2454,29 @@ class Column : Container { // Column ////////////////////////////////////
   }*/
 
   override void measure(){
+    //print(typeid(this).name, ".measure", width); scope(exit) print(typeid(this).name, ".measure", width, "END");
+
     bool autoWidth  = innerSize.x==0;
     bool autoHeight = innerSize.y==0;
 
-    //fixed width or autoWidth
+    //measure the subCells and stretch them to a maximum width
     if(autoWidth){
       //measure maxWidth
       measureSubCells;
       innerWidth = subCells.map!"a.outerWidth".maxElement(0);
-    }
 
-    //set uniform widths for all cells of the column
-    //todo: this is too much, and should be optional. What's with containers with explicit width?!
-    foreach(sc; subCells){
-      sc.outerWidth = innerWidth; //set the width of every subcell in this column
-      if(auto co = cast(Container)sc) co.measure; //width changed, need a new measure
+      //at this point all the subCells are measured
+      //now set the width of every subcell in this column if it differs, and remeasure only when necessary
+      foreach(sc; subCells) if(sc.outerWidth != innerWidth){
+        sc.outerWidth = innerWidth;
+        if(auto co = cast(Container)sc) co.measure;
+      }
+      //note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. But that's not an usual case: ListBox: all textCells are fixedWidth, Document: all paragraphs are autoWidth.
+    }else{
+      foreach(sc; subCells){ //first set the width of every subcell in this column, and measure all (for the first time).
+        sc.outerWidth = innerWidth;
+        if(auto co = cast(Container)sc) co.measure;
+      }
     }
 
     if(flags.columnElasticTabs) processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.

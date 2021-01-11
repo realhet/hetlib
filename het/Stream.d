@@ -588,7 +588,7 @@ if(is(Type==class) || __traits(isRef, data)) //only let classes not to be refere
 
 class Property{
   @STORED{
-    string name, caption, hint;
+    string name, caption, hint, unit;
     bool isReadOnly;
   }
 
@@ -623,6 +623,8 @@ class FloatProperty : Property {
 
   override string asText(){ return act.text; }
 }
+
+//todo: BoolProperty
 
 class PropertySet : Property {
   shared static this(){ registerStoredClass!(typeof(this)); }

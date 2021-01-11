@@ -2154,15 +2154,18 @@ protected:
     mouse.worldRect = bounds2(view.invTrans(vec2(mouse.screenRect.topLeft)), view.invTrans(vec2(mouse.screenRect.bottomRight)));
   }
 
-  override void onUpdateViewAnimation(){
-    view.updateAnimation(deltaTime, true/*invalidate*/);
-
+  void updateViewClipBoundsAndMousePos(){
     // set extra info about mouse and bounds for view and viewGUI
     vec2 mp = mouse.act.screen;
     bounds2 bnd = clientBounds;
 
     with(view   ){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); }
     with(viewGUI){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); }
+  }
+
+  override void onUpdateViewAnimation(){
+    view.updateAnimation(deltaTime, true/*invalidate*/);
+    updateViewClipBoundsAndMousePos;
   }
 
   override void onUpdateUIBeginFrame(){
@@ -2191,7 +2194,13 @@ public:
     gl.disable(GL_DEPTH_TEST); //no zbuffering by default
 
     textures.update; //upload pending textures.
-  }
+
+    {//todo: this is a fix: if the clientSize changes between update() and draw() this will update it. Must rethink the update() draw() thing completely.
+      updateViewClipBoundsAndMousePos;
+      import het.ui:im;
+      im.setTargetSurfaceViews(view, viewGUI);
+    }
+ }
 
   override void onPaint()
   {

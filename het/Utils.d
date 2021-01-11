@@ -878,8 +878,8 @@ void sort(T)(ref T a, ref T b, ref T c){
   sort(b, c);
 }
 
-int alignUp  (int p, int align_) { return (p+align_-1)/align_*align_; }
-int alignDown(int p, int align_) { return p/align_*align_; }
+auto alignUp  (T)(T p, int align_) { return (p+(align_-1))/align_*align_; }
+auto alignDown(T)(T p, int align_) { return p/align_*align_; }
 
 bool chkSet  (ref bool b) { if( b) return false; else { b = true ; return true; } }
 bool chkClear(ref bool b) { if(!b) return false; else { b = false; return true; } }
@@ -3172,10 +3172,25 @@ public:
 
 // a simple one from Delphi
 
-struct RNG {
-  uint seed = 0x41974702;
+struct SeedStream(uint a, uint c){
+  uint seed; // modulo = 2^32 only
+  enum empty = false;
+  uint front() const{ return seed; }
+  void popFront() { seed = seed * a + c; }
+}
 
-  void randomize(uint seed) { seed = seed; }
+// https://en.wikipedia.org/wiki/Linear_congruential_generator
+alias
+  SeedStream_numericalRecipes = SeedStream!(   1664525, 1013904223),
+  SeedStream_pascal           = SeedStream!( 0x8088405,          1),
+  SeedStream_borlandC         = SeedStream!(  22695477,          1);
+
+struct RNG {
+  auto seedStream = SeedStream_pascal(0x41974702);
+
+  ref uint seed() { return seedStream.seed; }
+
+  void randomize(uint seed) { this.seed = seed; }
 
   void randomize(){
     long c;
@@ -3183,8 +3198,23 @@ struct RNG {
     seed = cast(uint)c*0x784921;
   }
 
+  uint randomUint(){
+    seedStream.popFront;
+    return seed;
+  }
+
+  int randomInt(){
+    seedStream.popFront;
+    return int(seed);
+  }
+
+  float randomFloat(){
+    seedStream.popFront;
+    return seed*0x1.0p-32;
+  }
+
   uint random(uint n){
-    seed = nextRandom(seed);
+    seedStream.popFront;
     return (ulong(seed)*n)>>32;
   }
 
@@ -3192,43 +3222,18 @@ struct RNG {
     return int(random(uint(n)));
   }
 
-  //uint opCall(uint n){ return random(n); }
-
-  static uint nextRandom(uint i){ //get the next 32bit random in the sequence
-    return int(i)*int(0x8088405)+1;  //yes, they are ints, not uints...
-  }
-
-  uint randomU(){
-    seed = nextRandom(seed);
-    return seed;
-  }
-
-  int randomI(){
-    seed = nextRandom(seed);
-    return cast(int)seed;
-  }
-
-  float randomF(){
-    seed = nextRandom(seed);
-    return seed*0x1.0p-32;
-  }
-
   ulong random(ulong n){
     if(n<=0xFFFF_FFFF) return random(cast(uint)n);
 
-    seed = nextRandom(seed);
-    auto a = seed;
-    seed = nextRandom(seed);
-
-    return (ulong(a)<<32 | seed)%n; //terribly slow
+    return (ulong(randomUint)<<32 | randomUint)%n; //terribly slow
   }
 
   auto randomGaussPair()
   {
     float x1, x2, w;
     do{
-      x1 = randomF;
-      x2 = randomF;
+      x1 = randomFloat;
+      x2 = randomFloat;
       w = x1*x1 + x2*x2;
     }while(w>1);
     w = sqrt((-2*log(w))/w);
@@ -3240,7 +3245,7 @@ struct RNG {
 
   void randomFill(uint[] values){
     foreach(ref uint v; values)
-      v = seed = nextRandom(seed);
+      v = randomUint;
   }
 
   void randomFill(uint[] values, uint customSeed){
@@ -3256,13 +3261,14 @@ struct RNG {
 RNG defaultRng;
 
 ref uint randSeed()                             { return defaultRng.seed; }
-void randomize(uint seed)                       { defaultRng.seed = seed; }
+void randomize(uint seed)                       { defaultRng.randomize(seed); }
 void randomize()                                { defaultRng.randomize; }
-uint random(uint n)                             { return defaultRng.random(n); }
-uint randomU()                                  { return defaultRng.randomU; }
-uint randomI()                                  { return defaultRng.randomI; }
-float randomF()                                 { return defaultRng.randomF; }
+uint  random(uint  n)                           { return defaultRng.random(n); }
+int   random(int   n)                           { return defaultRng.random(n); }
 ulong random(ulong n)                           { return defaultRng.random(n); }
+uint randomUint()                               { return defaultRng.randomUint; }
+uint randomInt()                                { return defaultRng.randomInt; }
+float randomFloat()                             { return defaultRng.randomFloat; }
 auto randomGaussPair()                          { return defaultRng.randomGaussPair; }
 auto randomGauss()                              { return defaultRng.randomGauss; }
 void randomFill(uint[] values)                  { defaultRng.randomFill(values); }
@@ -4545,6 +4551,9 @@ struct Date{
 
   int opCmp(const Date d)      const { return dblCmp(raw, d.raw); }
   int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
+
+  //todo: make more operator overloads for date/time/dateTime
+  int opBinary(string op)(Date b) if(op=="-") { return raw - b.raw; }
 }
 
 struct Time{
@@ -5157,6 +5166,8 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   enforce(countHighZeroBits(0xFFFF0000)==0);
 
   UpdateInterval()._testRepeater;
+
+  enforce([8,9,10,11,12,13].map!(a => alignUp(a, 4)).equal([8,12,12,12,12,16]));
 
   //startup
   CoInitialize(null);

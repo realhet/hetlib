@@ -29,7 +29,7 @@ void calcSliderOrientation(ref SliderOrientation orientation, in bounds2 r){
 }
 
 
-class Slider : Cell { // Slider //////////////////////////////////
+class Slider : Container { // Slider //////////////////////////////////
   //todo: shift precise mode: must use float knob position to improve the precision
 
   __gshared static{ //information about the current slider being modified
@@ -64,30 +64,56 @@ class Slider : Cell { // Slider //////////////////////////////////
 
   bounds2 hitBounds;
 
-  this(uint id, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts=tsNormal){
+  bool focused;
+
+  this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit){
     this.id = id;
 
-    auto hit = im.hitTest(this, id, true); //todo: enabled support
+    hit = im.hitTest(this, id, enabled);
 
     hitBounds = hit.hitBounds;
 
-    //todo: enabled for slider
-/*    bool en = true;
-    if(!en){
-    }else if(hit.captured){
-//      ts.fontColor = clLinkPressed;
-    }else{
-//      ts.fontColor = lerp(ts.fontColor, clLinkHover, hit.hover_smooth);
-//      ts.underline = hit.hover;
-    }*/
+    focused = im.focusUpdate(this, id,
+      enabled,
+      hit.pressed/* || manualFocus*/, //when to enter
+      inputs["Esc"].pressed,  //when to exit
+      /* onEnter */ { },
+      /* onFocus */ { },
+      /* onExit  */ { }
+    );
+    //res.focused = focused;
+
+    if(focused){
+      void set(float n){
+        nPos_ = n.clamp(0, 1);
+        userModified = true;
+      }
+
+      void delta(float scale){
+        auto nStep(){ return range_.step / (range_.max-range_.min); }
+        set(nPos_ + nStep *scale);
+      }
+
+      const pageSize = 8;
+      if(inputs.Left.repeated  || inputs.Down.repeated) delta(-1);
+      if(inputs.Right.repeated || inputs.Up.repeated  ) delta( 1);
+      if(inputs.PgDn.repeated)                          delta(-pageSize);
+      if(inputs.PgUp.repeated)                          delta( pageSize);
+      if(inputs.Home.down)                              set(0);
+      if(inputs.End .down)                              set(1);
+    }
 
     nPos = nPos_;
 
     bkColor = ts.bkColor;
 
-    clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hit.hover_smooth), clSliderThumbPressed, hit.captured_smooth);
-    clLine =  mix(mix(clSliderLine , clSliderLineHover , hit.hover_smooth), clSliderLinePressed , hit.captured_smooth);
+    const hoverOrFocus = max(hit.hover_smooth*.5f, focused ? 1.0f : 0);
+
+    clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth);
+    clLine =  mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth);
     clRuler = mix(bkColor, ts.fontColor, 0); //disable ruler for now
+
+    if(!enabled) clLine = clThumb = clGray; //todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
 
     innerSize = vec2(ts.fontHeight*6, ts.fontHeight); //default size
 
@@ -101,7 +127,7 @@ class Slider : Cell { // Slider //////////////////////////////////
     const isLinear = mod_ori.among(SliderOrientation.horz, SliderOrientation.vert);
     const isRound = mod_ori==SliderOrientation.round;
     const precise = inputs.Shift.active ? 0.125f : 1;
-    if(hit.pressed){  //todo: enabled handling
+    if(hit.pressed && enabled){  //todo: enabled handling
       userModified = true;
       mod_actid = id;
 
@@ -134,8 +160,6 @@ class Slider : Cell { // Slider //////////////////////////////////
     //continuous update if active
     if(id==mod_actid){
       userModified = true;
-
-      clThumb = clRed;
 
       if(isLinear) slowMouse(precise!=1, precise);
 
@@ -268,6 +292,7 @@ class Slider : Cell { // Slider //////////////////////////////////
         dr.line(c, c+v*r);
       }
     }
+
   }
 
   // Draw Rulers
@@ -759,6 +784,11 @@ struct im{ static:
   struct TargetSurface{ View2D view; }
   private TargetSurface[2] targetSurfaces;  //surface0: zoomable view, surface1: GUI view
 
+  void setTargetSurfaceViews(View2D view, View2D viewGUI){
+    targetSurfaces[0].view = view;
+    targetSurfaces[1].view = viewGUI;
+  }
+
   private View2D actView;
 
   private void selectTargetSurface(int n){
@@ -886,7 +916,12 @@ struct im{ static:
       dr[i].clear;
     }
 
-    //hitTestManager.draw(dr[1]); //fuck!
+    if(VisualizeHitStack){
+      auto d = new Drawing;
+      hitTestManager.draw(d);
+      d.glDraw(targetSurfaces[1].view); //todo: problem with hitStack: it is assumed to be on GUI view
+      d.free;
+    }
 
     //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
     //todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
@@ -1248,7 +1283,11 @@ static cnt=0;
 
   void dump(){
     void doit(Cell cell, int indent=0){
-      print("  ".replicate(indent), cell.classinfo.name.split('.')[$-1], " ", cell.outerPos, cell.innerSize, cell.flex, cast(.Container)cell ? (cast(.Container)cell).flags.text : "");
+      print("  ".replicate(indent), cell.classinfo.name.split('.')[$-1], " ",
+        cell.outerPos, cell.innerSize, cell.flex,
+//        cast(.Container)cell ? (cast(.Container)cell).flags.text : "",
+        cast(.Glyph)cell ? (cast(.Glyph)cell).ch.text.quoted : ""
+      );
       foreach(subCell; cell.subCells)
         doit(subCell, indent+1);
     }
@@ -1327,6 +1366,8 @@ static cnt=0;
     float min, max, step=1; RangeType type;  //todo: this is an 1D bounds
 
     //todo: handle invalid intervals
+    bool isComplete() const { return !isnan(min) && !isnan(max); }
+
     bool isLinear  () const { return type==RangeType.linear  ; }
     bool isLog     () const { return type==RangeType.log     ; }
     bool isCircular() const { return type==RangeType.circular; }
@@ -1334,7 +1375,7 @@ static cnt=0;
     bool isClamped () const { return isLinear || isLog || isCircular; }
     bool isOrdered () const { return min <= max; }
 
-    float normalize(float x){
+    float normalize(float x) const{
       auto n = isLog ? x.log2.remap(min.log2, max.log2, 0, 1)  //todo: handle log(0)
                      : x     .remap(min     , max     , 0, 1);
       if(isCircular) if(n<0 || n>1) n = n-n.floor;
@@ -1342,7 +1383,7 @@ static cnt=0;
       return n;
     }
 
-    float denormalize(float n){
+    float denormalize(float n) const{
       if(isCircular) if(n<0 || n>1) n = n-n.floor;
       if(isClamped ) n = n.clamp(0, 1);
 
@@ -1350,13 +1391,23 @@ static cnt=0;
                          :       n.remap(0, 1, min     , max     )); //clamp is needed because of rounding errors
     }
 
-    T clamp(T)(T f){
-      if(isIntegral!T){
-        if(!isnan(min) && f<min.iceil ) f = min.iceil ; else
-        if(!isnan(max) && f>max.ifloor) f = max.ifloor;
-      }else{
-        if(!isnan(min) && f<min) f = min; else
-        if(!isnan(max) && f>max) f = max;
+    Unqual!T clamp(T)(T f) const{
+      if(isComplete){
+        static if(isIntegral!T){
+          if(isOrdered) f = f.clamp(min.ceil.to!T, max.floor.to!T);
+                   else f = f.clamp(max.ceil.to!T, min.floor.to!T);
+        }else{
+          if(isOrdered) f = f.clamp(min.to!T, max.to!T);
+                   else f = f.clamp(max.to!T, min.to!T);
+        }
+      }else{ //incomplete range: eiter min or max is nan
+        static if(isIntegral!T){
+          if(!isnan(min) && f<min.iceil ) f = min.iceil ; else
+          if(!isnan(max) && f>max.ifloor) f = max.ifloor;
+        }else{
+          if(!isnan(min) && f<min) f = min; else
+          if(!isnan(max) && f>max) f = max;
+        }
       }
       return f;
     }
@@ -1368,11 +1419,11 @@ static cnt=0;
   auto circularRange(float min, float max, float step=1){ return range(min, max, step, RangeType.circular); }
   auto endlessRange (float min, float max, float step=1){ return range(min, max, step, RangeType.endless ); }
 
-  static auto hitTest(Cell cell, uint id, bool enabled){
-    assert(cell !is null);
+  static auto hitTest(.Container container, uint id, bool enabled){
+    assert(container !is null);
     auto res = hitTestManager.check(id);
     res.enabled = enabled;
-    hitTestManager.addHash(actContainer, id);
+    hitTestManager.addHash(container, id);
     return res;
   }
 
@@ -1698,6 +1749,22 @@ static cnt=0;
     }
   }
 
+  void applyLinkStyle(bool enabled, bool focused, bool captured, float hover){
+    style = tsNormal;
+
+    float highlight = 0;
+    if(!enabled){
+      style.fontColor = clWinBtnDisabledText;
+    }else{
+      highlight = max(hover*0.66f, captured);
+      style.fontColor = mix(clWinText, clAccent, highlight);
+    }
+
+    style.underline = highlight > 0.5f;
+
+    //todo: handle focused
+  }
+
   void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover){
     style = tsBtn;
 
@@ -1729,6 +1796,8 @@ static cnt=0;
     }
 
     bkColor = style.bkColor; //todo: update the backgroundColor of the container. Should be automatic, but how?...
+
+    //todo: handle focused
   }
 
   void applyEditStyle(bool enabled, bool focused, float hover){
@@ -1754,17 +1823,32 @@ static cnt=0;
   }
 
   auto Edit(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
+    enum IsNum = std.traits.isNumeric!T0;
+
     mixin(id.M ~ enable.M);
+    static if(IsNum) mixin(range.M);
 
     EditResult res;
 
     void value2editor(){ textEditorState.str = value.text; }
+
+    bool wasConvertError; //editor2value messaging back with this
+
     void editor2value(){
       try{
         auto newValue = textEditorState.str.to!T0;  //todo: range clamp
+
+        static if(IsNum){
+          auto clamped = _range.clamp(newValue);
+          wasConvertError = clamped != newValue;
+          newValue = clamped;
+        }
+
         res.changed = newValue != value;
         value = newValue;
-      }catch{}
+      }catch(Exception){
+        wasConvertError = true;
+      }
     }
 
     Row({
@@ -1856,6 +1940,7 @@ static cnt=0;
 
       //put the text out
       if(focused){
+        if(wasConvertError) textStyle.fontColor = clRed;
         row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs);
       }else{
         row.appendMarkupLine(value.text         , textStyle);
@@ -1906,7 +1991,7 @@ static cnt=0;
 
     auto hit = Btn!(file, line)(capt, args, id(sign)); //2 id's can pass because of the static foreach
     bool chg;
-    if(hit){
+    if(hit.captured && inputs.LMB.repeated){
       auto oldValue = value,
            step = abs(_range.step),
            newValue = _range.clamp(value+step*sign);
@@ -1925,8 +2010,9 @@ static cnt=0;
   }
 
   auto IncDecBtn(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
-    return DecBtn!(file, line)(value, args)
-        || IncBtn!(file, line)(value, args);
+    auto r1 = DecBtn!(file, line)(value, args),
+         r2 = IncBtn!(file, line)(value, args);
+    return r1 || r2;
   }
 
   auto IncDec(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
@@ -1955,7 +2041,7 @@ static cnt=0;
       mixin(hintHandler);
 
       bool focused = focusUpdate(actContainer, id_,
-        enabled, hit.pressed, false,  //enabled, enter, exit
+        enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
         /* onEnter */ { },
         /* onFocus */ { },
         /* onExit  */ { }
@@ -1965,6 +2051,47 @@ static cnt=0;
       flags.hAlign = HAlign.center;
 
       applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth);
+
+      static if(isSomeString!T0) Text(text); //centered text
+                            else text(); //delegate
+
+      static foreach(a; args) static if(__traits(compiles, a())) a();
+    });
+
+    //KeyCombo in click mode.
+    static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) hit.clicked = true;
+
+    return hit;
+  }
+
+  auto Link(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // Link //////////////////////////////
+  if(isSomeString!T0 || __traits(compiles, text()) )
+  {
+    mixin(id.M ~ enable.M);
+
+    HitInfo hit;
+
+    Row({
+      hit = hitTest(id_, enabled);
+
+      mixin(hintHandler);
+
+      bool focused = focusUpdate(actContainer, id_,
+        enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
+        /* onEnter */ { },
+        /* onFocus */ { },
+        /* onExit  */ { }
+      );
+
+      // handle the space key when focused
+      if(focused){
+        with(inputs.Space){
+          if(down   ) hit.captured = true;
+          if(pressed) hit.clicked  = true;
+        }
+      }
+
+      applyLinkStyle(enabled, focused, hit.captured, hit.hover_smooth);
 
       static if(isSomeString!T0) Text(text); //centered text
                             else text(); //delegate
@@ -2316,12 +2443,12 @@ static cnt=0;
     const flipped = !_range.isOrdered;
     if(flipped) swap(_range.min, _range.max);
 
-
-//    float customWidth_;
-    string props;
+    //string props;
     static foreach(a; args){{ alias t = Unqual!(typeof(a));
-      static if(isFloatingPoint!t || isIntegral!t) customWidth = a; //todo: ennek delegatenek kene lennie
-      static if(isSomeString!t) props = a; //todo: ennek is
+      static if(isSomeString!t){
+        //props = a; //todo: ennek is
+        static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!");
+      }
     }}
 
     float normValue = _range.normalize(flipped ? _range.max-value : value); // FLIP
@@ -2332,18 +2459,21 @@ static cnt=0;
       normValue = normValue-normValue.floor;
     }
 
-    bool userModified;
     auto oldFh = style.fontHeight;
-    if(theme != "tool") style.fontHeight = (fh*1.4f).to!ubyte;
+    if(theme != "tool") style.fontHeight = (fh*1.4f).to!ubyte; //note: scrollbar gets the thumbsize from fontHeight
 
-    auto sl = new .Slider(id_, normValue, _range, userModified, actView.mousePos, style);
+    bool userModified;
+    HitInfo hit;
+    auto sl = new .Slider(id_, enabled, normValue, _range, userModified, actView.mousePos, style, hit);
 
     style.fontHeight = oldFh;
 
-    sl.setProps(props);
-    append(sl);
+    append(sl); push(sl, id_); scope(exit) pop;
 
-    if(userModified){
+    mixin(hintHandler);
+    static foreach(a; args) static if(__traits(compiles, a())) a();
+
+    if(userModified && enabled){
 
       if(_range.isEndless) normValue += wrapCnt-sl.wrapCnt;
 
@@ -2552,7 +2682,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), "width=180"); //todo: rightclick
+        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), { width = 180; }); //todo: rightclick
       //todo: Bigger slider height when (theme!="tool")
     });
   }else static if(isIntegral!T          ){
@@ -2563,7 +2693,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), "width=180"); //todo: rightclick
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = 180; }); //todo: rightclick
     });
   }else static if(is(T == bool)         ){
     Row({
