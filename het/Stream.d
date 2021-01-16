@@ -624,7 +624,13 @@ class FloatProperty : Property {
   override string asText(){ return act.text; }
 }
 
-//todo: BoolProperty
+class BoolProperty : Property {
+  shared static this(){ registerStoredClass!(typeof(this)); }
+
+  @STORED bool act, def;
+
+  override string asText(){ return act.text; }
+}
 
 class PropertySet : Property {
   shared static this(){ registerStoredClass!(typeof(this)); }

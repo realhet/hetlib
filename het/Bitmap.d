@@ -24,6 +24,10 @@ Bitmap errorBitmap(){
   return new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF)));
 }
 
+Bitmap newBitmap(in ubyte[] data, bool mustSucceed=true){
+  return data.deserialize!Bitmap(mustSucceed);
+}
+
 Bitmap newBitmap(in File file, bool mustSucceed=true){ //todo: what if cant load the bitmap? raise, null or replacement image?
   return newBitmap(file.fullName, mustSucceed);
 }
@@ -618,8 +622,8 @@ bool isPeak(T)(Image!T img, int o){ with(img){
 
 
 /// Calculates sum of vertical and horicontal derivates of the green channel. 0..255
-float measureContrast(T)(Image!T img, Bounds2i b){ with(img){
-  with(bounds.clamp(b)){
+float measureContrast(T)(Image!(T, 2) img, ibounds2 b){ with(img){
+  /*with(bounds.clamp(b)){
     if(isNull) return 0;
 
     long total = long(max(0, b.width-1)) * max(0, b.height-1) * 2;
@@ -638,7 +642,9 @@ float measureContrast(T)(Image!T img, Bounds2i b){ with(img){
     }
 
     return float(diffSum) / total;
-  }
+  }*/
+  print("TODO: measureContrast!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+  return 0.543223;
 }}
 
 
@@ -768,6 +774,7 @@ public:
   @property width   () const{ return width_   ; }
   @property height  () const{ return height_  ; }
   @property size    () const{ return ivec2(width, height); }
+  @property bounds  () const{ return ibounds2(ivec2(0), size); }
   @property channels() const{ return channels_; }
   @property type    () const{ return type_    ; }
 

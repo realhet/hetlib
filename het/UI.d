@@ -2206,7 +2206,7 @@ static cnt=0;
       static if(is(t==vec2)) shp.innerSize = a;
     }}
 
-    shp.color = lerp(clBlack, shp.color, state.remap(0, 1, 0.2, 1));
+    shp.color = mix(clBlack, shp.color, state.remap(0, 1, 0.2f, 1));
 
     actContainer.append(cast(.Cell)shp);
 
@@ -2741,6 +2741,8 @@ void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne 
     doit(p.act);
   }else if(auto p = cast(StringProperty)prop){
     fp.choices = p.choices;
+    doit(p.act);
+  }else if(auto p = cast(BoolProperty)prop){
     doit(p.act);
   }else if(auto p = cast(PropertySet)prop){
     stdStructFrame(fp.getCaption, {
