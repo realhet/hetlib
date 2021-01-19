@@ -593,6 +593,7 @@ class Property{
   }
 
   bool uiChanged; //stdUi sets this to true
+  //todo: would be better to save the last value, than update this (and sometimes forget to update)
 
   string asText() { return ""; }
 }

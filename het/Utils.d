@@ -1250,6 +1250,15 @@ T popFirst(T)(ref T[] arr, T default_){ if(arr.empty) return default_; return po
 T popLast (T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popLast (arr); }
 
 
+//converts an array to uint[], badding the end with a specified byte. ByteOrder is machine specific.
+uint[] toUints(in void[] data, ubyte filler=0){
+  import std.traits;
+  enum unitSize = ElementType!(typeof(return)).sizeof;
+  const uint dataLength = data.length.to!uint,
+             extLength  = dataLength.alignUp(unitSize);
+  return cast(uint[])((cast(ubyte[])data) ~ [ubyte(0)].replicate(extLength - dataLength));
+}
+
 /* Ezek LDC-vel nem mennek!!!!
 void appendUninitializedReserved(T)(ref T[] arr, size_t N = 1) {
   auto length_p = cast(size_t*)(&arr);

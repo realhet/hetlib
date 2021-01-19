@@ -1234,6 +1234,12 @@ static cnt=0;
   string theme; //for now it's a str, later it will be much more complex
   //valid valus: "", "tool"
 
+  auto lastCell(T:Cell=Cell)(){
+    Cell cell;
+    if(actContainer && actContainer.subCells.length) cell = actContainer.subCells[$-1];
+    return cast(T)cell;
+  }
+
   private struct StackEntry{ .Container container; uint baseId; bool enabled; TextStyle textStyle; string theme; }
   private StackEntry[] stack;
 
@@ -1522,7 +1528,8 @@ static cnt=0;
   PopupState popupState;
 
   private void Popup(Cell parent, void delegate() contents){ // Popup for combobox only ////////////////////////////////////
-    enforce(popupState.cell is null, "im.Popup() already called.");
+    //todo: this check is not working because of the IM gui. When ComboBox1 is pulled down and the user clicks on ComboBox2
+    //commented out intentionally: enforce(popupState.cell is null, "im.Popup() already called.");
 
     auto oldLen = actContainer.subCells.length;
     contents();
@@ -1685,20 +1692,22 @@ static cnt=0;
   }
 
   //Spacer //////////////////////////
-  void Spacer(float size=float.init){
+  void Spacer(T...)(T args){
+    float size;
+    static if(args.length && isNumeric!(T[0])) size = args[0];
+
     if(isnan(size)) size = fh*.5f;
     const vertical = cast(.Row)actContainer !is null;
 
-/*    auto r = new .Row("", textStyle);
-    auto a = size/2;
-    r.margin = vertical ? Margin(0, a, 0, a)
-                        : Margin(a, 0, a, 0);
-    append(r);*/
-
     Row({
-      auto a = size/2;
-      margin = vertical ? Margin(0, a, 0, a)
-                        : Margin(a, 0, a, 0);
+      //flags.yAlign = YAlign.stretch;
+      padding = vertical ? Padding(0, size, 0, 0)
+                         : Padding(size, 0, 0, 0);
+
+      //todo: the Spacer has 0 area. It should be expanded to the max.
+      /*bkColor = clRed;
+      foreach(a; args) static if(is(Unqual!(typeof(a))==RGB)) bkColor = a;
+      foreach(a; args) static if(__traits(compiles, a())) a();*/
     });
   }
 
@@ -1964,23 +1973,29 @@ static cnt=0;
   }
 
   auto Static(string file=__FILE__, int line=__LINE__, T0, T...)(in T0 value, T args){ // Static /////////////////////////////////
-    mixin(id.M ~ enable.M);
+    static if(is(T0 : Property)){
+      auto p = cast(Property)value;
+      Static!(file, line)(p.asText, hint(p.hint),args);
+    }else{
+      Row({
+        mixin(id.M);
+        auto hit = hitTest(id_, enabled);
+        mixin(hintHandler);
+        applyEditStyle(true, false, 0); //todo: Enabled in static???
 
-    Row({
-      applyEditStyle(enabled, false, 0);
+        static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
+                                      else flags.hAlign = HAlign.left;
 
-      static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
-                                    else flags.hAlign = HAlign.left;
+        static if(__traits(compiles, value())) value();
+                                          else Text(value.text);
 
-      static if(__traits(compiles, value())) value();
-                                        else Text(value.text);
+        static foreach(a; args) static if(__traits(compiles, a())) a();
 
-      foreach(a; args) if(__traits(compiles, a())) a();
-
-      //set minimal height for the control if empty
-      if(actContainer.subCells.empty && innerHeight==0)
-          innerHeight = fh;
-    });
+        //set minimal height for the control if empty
+        if(actContainer.subCells.empty && innerHeight==0)
+            innerHeight = fh;
+      });
+    }
   }
 
   auto IncBtn(string file=__FILE__, int line=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0){ //IncBtn /////////////////////////////////
@@ -2010,9 +2025,16 @@ static cnt=0;
   }
 
   auto IncDecBtn(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
-    auto r1 = DecBtn!(file, line)(value, args),
-         r2 = IncBtn!(file, line)(value, args);
-    return r1 || r2;
+    bool res;
+    Row({
+      flags.btnRowLines = true;
+      auto r1 = DecBtn!(file, line)(value, args);
+      lastCell.margin.right = 0;
+      auto r2 = IncBtn!(file, line)(value, args);
+      lastCell.margin.left = 0;
+      res = r1 || r2;
+    });
+    return res;
   }
 
   auto IncDec(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
@@ -2037,7 +2059,6 @@ static cnt=0;
 
     Row({
       hit = hitTest(id_, enabled);
-
       mixin(hintHandler);
 
       bool focused = focusUpdate(actContainer, id_,
@@ -2062,6 +2083,41 @@ static cnt=0;
     static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) hit.clicked = true;
 
     return hit;
+  }
+
+  // BtnRow //////////////////////////////////
+  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, string[] captions, T args){
+    mixin(id.M ~ enable.M);
+
+    auto last = idx;
+
+    Row({
+      flags.btnRowLines = true;
+      foreach(i0, capt; captions){
+        const i = cast(int)i0, first = i==0, last = i==cast(int)captions.length-1;
+        if(Btn(capt, id(i), selected(idx==i))) idx = i;
+
+        auto b = lastCell;
+        if(!first) b.margin.left = 0;
+        if(!last ) b.margin.right= 0;
+      }
+    });
+
+    return last != idx;
+  }
+
+  auto BtnRow(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, A[] items, Args args){
+    auto idx = cast(int) items.countUntil(value); //todo: it's a copy from ListBox. Refactor needed
+    auto res = BtnRow!(file, line)(idx, items, args);
+    if(res) value = items[idx];
+    return res;
+  }
+
+  auto BtnRow(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum)){
+    auto s = e.text;
+    auto res = BtnRow!(file, line)(s, getEnumMembers!E, args);
+    if(res) ignoreExceptions({ e = s.to!E; });
+    return res;
   }
 
   auto Link(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // Link //////////////////////////////
@@ -2160,6 +2216,7 @@ static cnt=0;
       flags.canWrap = false;
 
       hit = hitTest(id_, enabled);
+      mixin(hintHandler);
 
       //update checkbox state
       if(enabled && hit.clicked) state.toggle;
@@ -2183,6 +2240,15 @@ static cnt=0;
     });
 
     return hit;
+  }
+
+  auto ChkBox(string file=__FILE__, int line=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args){
+    auto bp = cast(BoolProperty)prop;
+    enforce(bp !is null);
+    auto last = bp.act;
+    auto res = ChkBox!(file, line)(bp.act, caption.empty ? prop.caption : caption, hint(prop.hint), args);
+    bp.uiChanged |= last != bp.act;
+    return res;
   }
 
   auto Led(string file=__FILE__, int line=__LINE__, T, Ta...)(T param, Ta args){

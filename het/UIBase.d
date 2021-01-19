@@ -1182,7 +1182,7 @@ enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs v
 enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
 
 union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b01_0_1_0_0_0_0000_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b001_0_1_0_0_0_0000_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"           , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -1200,7 +1200,8 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
     uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
     bool          , "_debug"            , 1, // the container can be marked, for debugging
-    int           , ""                  , 9,
+    bool          , "btnRowLines"       , 1, // draw thin, dark lines between the buttons of a btnRow
+    int           , ""                  , 8,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1761,6 +1762,13 @@ class Container : Cell { // Container ////////////////////////////////////
 
     if(flags._hasOverlayDrawing)
       dr.copyFrom(getOverlayDrawing(this));
+
+    if(flags.btnRowLines && subCells.length>1){
+      dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.5f;
+      foreach(sc; subCells[1..$])
+        dr.vLine(sc.outerX, sc.outerY+sc.margin.top+.5f, sc.outerY+sc.outerHeight-sc.margin.bottom-.5f);
+      dr.alpha = 1;
+    }
 
     if(flags.clipChildren) dr.popClipBounds;
     dr.pop;
