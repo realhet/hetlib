@@ -2086,20 +2086,30 @@ static cnt=0;
   }
 
   // BtnRow //////////////////////////////////
+  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(void delegate() fun, T args){
+    mixin(id.M);
+    Row({
+      flags.btnRowLines = true;
+
+      fun();
+
+      foreach(i, c; subCells){
+        const first = i==0, last = i+1==subCells.length;
+        if(!first) c.margin.left = 0;
+        if(!last ) c.margin.right= 0;
+      }
+    });
+  }
+
   auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, string[] captions, T args){
     mixin(id.M ~ enable.M);
 
     auto last = idx;
 
-    Row({
-      flags.btnRowLines = true;
+    BtnRow!(file, line)({
       foreach(i0, capt; captions){
-        const i = cast(int)i0, first = i==0, last = i==cast(int)captions.length-1;
+        const i = cast(int)i0;
         if(Btn(capt, id(i), selected(idx==i))) idx = i;
-
-        auto b = lastCell;
-        if(!first) b.margin.left = 0;
-        if(!last ) b.margin.right= 0;
       }
     });
 

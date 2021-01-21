@@ -1764,9 +1764,9 @@ class Container : Cell { // Container ////////////////////////////////////
       dr.copyFrom(getOverlayDrawing(this));
 
     if(flags.btnRowLines && subCells.length>1){
-      dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.5f;
+      dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.25f;
       foreach(sc; subCells[1..$])
-        dr.vLine(sc.outerX, sc.outerY+sc.margin.top+.5f, sc.outerY+sc.outerHeight-sc.margin.bottom-.5f);
+        dr.vLine(sc.outerX, sc.outerY+sc.margin.top+.25f, sc.outerY+sc.outerHeight-sc.margin.bottom-.25f);
       dr.alpha = 1;
     }
 
