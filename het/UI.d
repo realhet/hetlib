@@ -1982,6 +1982,7 @@ static cnt=0;
         auto hit = hitTest(id_, enabled);
         mixin(hintHandler);
         applyEditStyle(true, false, 0); //todo: Enabled in static???
+        style = tsNormal;
 
         static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
                                       else flags.hAlign = HAlign.left;
@@ -2432,7 +2433,7 @@ static cnt=0;
   }
 
 
-  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // ComboBox ////////////////////////////////
+  auto ComboBox_idx(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // ComboBox ////////////////////////////////
     mixin(id.M); //todo: enabled
 
     //find translator function . This translates data to gui.
@@ -2494,12 +2495,19 @@ static cnt=0;
     return res;
   }
 
-  //todo: redundancy: these are the same for ListBox
-  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+  auto ComboBox_ref(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
     auto idx = cast(int) items.countUntil(value);
-    auto res = ComboBox!(file, line)(idx, items, args);
+    auto res = ComboBox_idx!(file, line)(idx, items, args);
     if(res) value = items[idx];
     return res;
+  }
+
+  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){
+    return ComboBox_idx!(file, line, A, Args)(idx, items, args);
+  }
+
+  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+    return ComboBox_ref!(file, line, A, Args)(value, items, args);
   }
 
   auto ComboBox(string file=__FILE__, int line=__LINE__, E, T...)(ref E e, T args) if(is(E==enum)){
@@ -2561,6 +2569,72 @@ static cnt=0;
 
     //todo: what to return on from slider
     return userModified;
+  }
+
+  // AdvancedSlider //////////////////////////////
+  void AdvancedSlider_impl(T)(T prop, void delegate() fun=null) if(is(T==FloatProperty) || is(T==IntProperty)){
+    //slider, min/max/act value display, default, edit/inc/dec
+
+    const postFix = (" "~prop.unit).stripRight;
+    const caption = prop.name.camelToCaption;
+
+    const variant = 0;
+
+    auto range = im.range(prop.min, prop.max, prop.step);
+    auto hint = im.hint(prop.hint);
+
+    const last = prop.act;
+
+    if(variant == 0){
+      Column({
+        width = 300;
+        Row({
+          Text(/*bold*/(caption));
+          //Spacer;
+          Row({
+            flex = 1;
+            actContainer.flags.hAlign = HAlign.right;
+            Text(" ");
+          });
+          Flex;
+
+          if(fun !is null){
+            fun();
+            Spacer;
+          }
+          Edit(prop.act, range, hint, { width = fh*3; });
+          Text(postFix~" ");
+          if(prop.step>0){
+            IncDecBtn(prop.act, range); //todo: hint is annoying here
+          }
+        });
+        Slider(prop.act, range, hint, { flex = 1; });
+        Row({
+          if(Link(prop.min.text ~ postFix)) prop.act = prop.min;
+          Row({
+            flex = 1;
+            flags.hAlign = HAlign.center; //todo: not precise center!!!
+            if(Link("default: " ~ prop.def.text ~ postFix)) prop.act = prop.def;
+          });
+          if(Link(prop.max.text ~ postFix)) prop.act = prop.max;
+        });
+      });
+    }
+
+    prop.uiChanged |= last != prop.act;
+  }
+
+  void AdvancedSlider(Property prop, void delegate() fun=null){
+    //this just casts the Property and calls the appropriate implementation
+         if(auto p = cast(IntProperty  )prop) AdvancedSlider_impl(p, fun);
+    else if(auto p = cast(FloatProperty)prop) AdvancedSlider_impl(p, fun);
+    else raise("Invalid type");
+  }
+
+  void AdvancedSliderChkBox(Property p, Property pBool, string capt=""){
+    AdvancedSlider(p, {
+      ChkBox(pBool, capt);
+    });
   }
 
   auto Node(ref bool state, void delegate() title, void delegate() contents){ // Node ////////////////////////////

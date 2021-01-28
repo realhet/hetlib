@@ -2326,6 +2326,12 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     else static assert(0, "not impl");
   }
 
+  auto bounds() const {
+    Bounds!(Unqual!(typeof(size))) b;
+    b.high = size;
+    return b;
+  }
+
   // these returning single arrays / maps of arrays
   auto row(int y)    const { return impl[stride*y .. stride*y + width]; }
   auto row(int y)          { return impl[stride*y .. stride*y + width]; }

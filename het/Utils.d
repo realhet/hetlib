@@ -2575,6 +2575,25 @@ string camelToCaption(string s){
   return res.join(' ');
 }
 
+void mergeUrlParams(ref string s1, string s2){
+  string path1, params1; split2(s1, "?", path1, params1);
+  string path2, params2; split2(s2, "?", path2, params2);
+
+  enforce(path1.empty || path1==path2);
+
+  string[string] m;
+
+  foreach(s; chain(params1.split('&'), params2.split('&'))){
+    string name, value; split2(s, "=", name, value);
+    m[name] = value;
+  }
+
+  string[] res;
+  foreach(k, v; m)
+    res ~= k~'='~v;
+
+  s1 = path2~'?'~res.join('&');
+}
 
 // structs to text /////////////////////////////////////
 

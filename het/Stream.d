@@ -639,6 +639,25 @@ class PropertySet : Property {
   @STORED Property[] properties;
 
   override string asText(){ return ""; }
+
+  //copy paste from propArray --------------------------------------------------
+  bool empty(){ return properties.empty; }
+
+  auto access(T=void, bool mustExists=true)(string name){
+    static if(is(T==void)) alias PT = Property;
+    else static if(is(T : Property)) alias PT = T;
+    else mixin("alias PT = ", T.stringof.capitalize ~ "Property;");
+
+    auto p = cast(PT)findProperty(properties, name);
+    static if(mustExists) enforce(p !is null, format!`%s not found: "%s"`(PT.stringof, name));
+    return p;
+  }
+
+  auto get(T=void)(string name){ return access!(T, false)(name); }
+
+  bool exists(string name){ return get(name) !is null; }
+  //end of copy paste ----------------------------------------------------------
+
 }
 
 void expandPropertySets(char sep='.')(ref Property[] props){ //creates propertySets from properties named like "set.name"

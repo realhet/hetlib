@@ -584,18 +584,18 @@ class Drawing {
   protected static auto genRgbGraph(string fv)(){
     return q{
       auto oldColor = color;
+      color = clWhite; @(x0, y0, data.map!"a.l".array, xScale, yScale);
       color = clRed  ; @(x0, y0, data.map!"a.r".array, xScale, yScale);
       color = clLime ; @(x0, y0, data.map!"a.g".array, xScale, yScale);
       color = clBlue ; @(x0, y0, data.map!"a.b".array, xScale, yScale);
-      color = clWhite; @(x0, y0, data.map!"a.l".array, xScale, yScale);
-      static if(is(T==RGBA8)||is(T==RGBAf)){ color = clFuchsia; @(x0, y0, data.map!"a.a".array, xScale, yScale); }
+      static if(is(T==RGBA8)){ color = clFuchsia; @(x0, y0, data.map!"a.a".array, xScale, yScale); }
       color = oldColor;
     }.replace("@", fv);
   }
 
   void vGraph(T)(float x0, float y0, in T[] data, float xScale=1, float yScale=1){
     if(data.empty) return;
-    static if(is(T==RGB8)||is(T==RGBf)||is(T==RGBA8)||is(T==RGBAf)){
+    static if(is(T==RGB8)||is(T==RGBA8)){
       mixin(genRgbGraph!"vGraph");
     }else static if(is(T==vec2) || is(T==ivec2)){
       foreach(i, const v; data) lineTo(x0+v.y*xScale, y0+v.x*yScale, !i);
@@ -610,7 +610,7 @@ class Drawing {
 
   void hGraph(T)(float x0, float y0, in T[] data, float xScale=1, float yScale=1){
     if(data.empty) return;
-    static if(is(T==RGB8)||is(T==RGBf)||is(T==RGBA8)||is(T==RGBAf)){
+    static if(is(T==RGB8)||is(T==RGBA8)){
       mixin(genRgbGraph!"hGraph");
     }else static if(is(T==vec2) || is(T==ivec2)){
       foreach(i, const v; data) lineTo(x0+v.x*xScale, y0+v.y*yScale, !i);
