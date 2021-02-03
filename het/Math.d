@@ -1900,7 +1900,7 @@ template CommonBoundsType(A...){
 }
 
 struct Bounds(VT){
-  VT low = 0, high = -1; // A bounds is invalid when high<low. And empty when high==low. The extend operator '|' handles these cases accordingly.
+  VT low = 0, high = -1; // A bounds is invalid when high<low. And empty when high<=low. The extend operator '|' handles these cases accordingly.
 
   alias BoundsType = typeof(this);
   alias ComponentType = ScalarType!VT;

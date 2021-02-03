@@ -82,7 +82,7 @@ public import std.uri: urlEncode = encode, urlDecode = decode;
 public import std.process : environment;
 public import std.zlib : compress, uncompress;
 public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write;
-public import std.bitmanip : swapEndian;
+public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
 
 import std.encoding : transcode, Windows1252String;
 import std.exception : stdEnforce = enforce;

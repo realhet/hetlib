@@ -5,6 +5,15 @@ import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 //todo: auto ref parameters.
 //todo: srcFunct seems obsolete.
 
+//21.02.03
+//todo: propertySet getters with typed defaults
+//todo: propertySet getters with reference output
+//todo: propertySet export to json with act values (or defaults)
+//todo: propertySet import from json with act values (or defaults)
+//todo: string.fromJson(`"hello"`),   int.fromJson("124");  ...
+//todo: "hello".toJson(),   1234.toJson("fieldName");  ...  //must work on const!
+//todo: import a struct from a propertySet
+
 private __gshared string[string] classFullNameMap;
 
 private alias LoaderFunc = void function(ref JsonDecoderState state, int idx, void*);
