@@ -1637,7 +1637,6 @@ struct Selection{ //selection of cells in a container.
   }*/
 }+/
 
-
 class Container : Cell { // Container ////////////////////////////////////
 
   private{
@@ -1829,6 +1828,91 @@ class Container : Cell { // Container ////////////////////////////////////
       }
     }
   };
+
+
+  struct SearchResult{
+    Container container;
+    vec2 absInnerPos;
+    Cell[] cells;
+
+    auto cellBounds(){ return cells.map!(c => c.outerBounds + absInnerPos); }
+    auto bounds(){ return cellBounds.fold!"a|b"; }
+
+    void drawHighlighted(Drawing dr, RGB clHighlight){
+      foreach(cell; cells)if(auto glyph = cast(Glyph)cell) with(glyph){
+        dr.color = bkColor;
+        dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags);
+      }
+    }
+  }
+
+  /// Search for a text recursively in the Cell structure
+  auto search(string searchText, vec2 origin = vec2.init){
+
+    struct SearchContext{
+      dstring searchText;
+      vec2 absInnerPos;
+      Cell[] cellPath;
+
+      SearchResult[] results;
+      int maxResults = 9999;
+
+      bool canStop() const { return results.length >= maxResults; }
+    }
+
+    static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "exit from recursion"
+      //recursive entry/leave
+      context.cellPath ~= thisC;
+      context.absInnerPos += thisC.innerPos;
+
+      scope(exit){
+        context.absInnerPos -= thisC.innerPos;
+        context.cellPath.popBack;
+      }
+
+    //print("enter");
+
+      Cell[] cells = thisC.subCells;
+      size_t baseIdx;
+      foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group){
+        auto act = cells[baseIdx..baseIdx+len];
+
+        if(!isGlyph){
+          foreach(c; act.map!(c => cast(Container)c).filter!"a"){
+            if(cntrSearchImpl(c, context)) return true; //end recursive call
+          }
+        }else{
+          auto chars = act.map!(c => (cast(Glyph)c).ch);
+
+    //print("searching in", chars.text);
+
+          size_t searchBaseIdx = 0;
+          while(1){
+            auto idx = chars.indexOf(context.searchText, No.caseSensitive);
+            if(idx<0) break;
+
+            context.results ~= SearchResult(thisC, context.absInnerPos, cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]);
+            if(context.canStop) return true;
+
+            const skip = idx + context.searchText.length;
+            chars.popFrontExactly(skip);
+            searchBaseIdx += skip;
+          }
+        }
+
+    //readln;
+    //print("advance", len);
+        baseIdx += len;
+      }
+
+      return false;
+    }
+
+    auto context = SearchContext(searchText.to!dstring, origin);
+    if(!searchText.empty)
+      cntrSearchImpl(this, context);
+    return context.results;
+  }
 
 }
 
@@ -2514,3 +2598,113 @@ class Column : Container { // Column ////////////////////////////////////
   }
 }
 
+
+class SelectionManager(T : Cell){ // SelectionManager ///////////////////////////////////////////////
+
+  //T must have some bool properties:
+  static assert(__traits(compiles, { T a;
+    a.isSelected  = true;
+    a.oldSelected = true;
+  }), "Field requirements not met.");
+
+  bounds2 getBounds(T item){ return item.outerBounds; }
+
+  T hoveredItem;
+
+  enum MouseOp { idle, move, rectSelect }
+  MouseOp mouseOp;
+
+  vec2 mouseLast;
+
+  enum SelectOp { none, add, sub, toggle, clearAdd }
+  SelectOp selectOp;
+
+  vec2 dragSource;
+  bounds2 dragBounds;
+
+  bounds2 selectionBounds(){
+    if(mouseOp == MouseOp.rectSelect) return dragBounds;
+                                 else return bounds2.init;
+  }
+
+  void update(bool mouseEnabled, View2D view, T[] items){
+
+    void selectNone()           { foreach(a; items) a.isSelected = false; }
+    void selectOnly(T item)     { selectNone; if(item) item.isSelected = true; }
+    void selectHoveredOnly()    { selectOnly(hoveredItem); }
+    void saveOldSelected()      { foreach(a; items) a.oldSelected = a.isSelected; }
+
+    // acquire mouse positions
+    auto mouseAct = view.mousePos;
+    auto mouseDelta = mouseAct-mouseLast;
+    scope(exit) mouseLast = mouseAct;
+
+    const LMB          = inputs.LMB.down,
+          LMB_pressed  = inputs.LMB.pressed,
+          LMB_released = inputs.LMB.released,
+          Shift        = inputs.Shift.down,
+          Ctrl         = inputs.Ctrl.down;
+
+    const modNone       = !Shift && !Ctrl,
+          modShift      =  Shift && !Ctrl,
+          modCtrl       = !Shift &&  Ctrl,
+          modShiftCtrl  =  Shift &&  Ctrl;
+
+    const inputChanged = mouseDelta || inputs.LMB.changed || inputs.Shift.changed || inputs.Ctrl.changed;
+
+    // update current selection mode
+    if(modNone      ) selectOp = SelectOp.clearAdd;
+    if(modShift     ) selectOp = SelectOp.add;
+    if(modCtrl      ) selectOp = SelectOp.sub;
+    if(modShiftCtrl ) selectOp = SelectOp.toggle;
+
+    // update dragBounds
+    if(LMB_pressed) dragSource = mouseAct;
+    if(LMB        ) dragBounds = bounds2(dragSource, mouseAct).sorted;
+
+    //update hovered item
+    hoveredItem = null;
+    if(mouseEnabled) foreach(item; items) if(getBounds(item).contains!"[)"(mouseAct)) hoveredItem = item;
+
+    if(LMB_pressed && mouseEnabled){ // Left Mouse pressed //
+      if(hoveredItem){
+        if(modNone){ if(!hoveredItem.isSelected) selectHoveredOnly;  mouseOp = MouseOp.move; }
+        if(modShift || modCtrl || modShiftCtrl) hoveredItem.isSelected.toggle;
+      }else{
+        mouseOp = MouseOp.rectSelect;
+        saveOldSelected;
+      }
+    }
+
+    {// update ongoing things //
+      if(mouseOp == MouseOp.rectSelect && inputChanged){
+        foreach(a; items) if(dragBounds.contains!"[]"(getBounds(a))){
+          final switch(selectOp){
+            case SelectOp.add, SelectOp.clearAdd : a.isSelected = true ; break;
+            case SelectOp.sub                    : a.isSelected = false; break;
+            case SelectOp.toggle                 : a.isSelected = !a.oldSelected; break;
+            case SelectOp.none                   : break;
+          }
+        }else{
+          a.isSelected = (selectOp == SelectOp.clearAdd) ? false : a.oldSelected;
+        }
+      }
+    }
+
+    if(mouseOp == MouseOp.move && mouseDelta){
+      foreach(a; items) if(a.isSelected){
+        a.outerPos += mouseDelta;
+        a.cachedDrawing.free;
+      }
+    }
+
+
+    if(LMB_released){ // left mouse released //
+
+      //...
+
+      mouseOp = MouseOp.idle;
+    }
+  }
+
+}

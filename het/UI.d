@@ -911,7 +911,7 @@ struct im{ static:
     }
 
     foreach(i; 0..2){
-      surfaceBounds[i] = dr[i].getBounds;
+      surfaceBounds[i] = dr[i].bounds;
       dr[i].glDraw(targetSurfaces[i].view);
       dr[i].clear;
     }
@@ -2371,6 +2371,23 @@ static cnt=0;
     return res;
   }
 
+  //todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. It's a lot of copy paste and yet it's far from full accessible functionality.
+  static void ScrollListBox(T, U, string file=__FILE__ , int line=__LINE__)(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
+  if(isInputRange!U && is(ElementType!U == T)) {
+    auto scrollMax = max(0, items.walkLength.to!int-pageSize);
+    topIndex = topIndex.clamp(0, scrollMax);
+    auto view = items.drop(topIndex).take(pageSize).array;
+    Row!(file, line)({
+      ListBox(focusedItem, view, cellFun);
+      if(1 || scrollMax){
+        Spacer;
+        Slider(topIndex, range(scrollMax, 0), { width = 1*fh; });
+        flags.yAlign = YAlign.stretch;
+      }
+    });
+  }
+
+
 /+  auto Btn(string file=__FILE__, int line=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
@@ -3121,3 +3138,4 @@ void uiContainerAlignTest(){ with(im){
           }
         };
 +/
+

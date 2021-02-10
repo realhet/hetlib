@@ -408,9 +408,7 @@ class Drawing {
   private void markDirty() { /*dirty = -1;*/ }
 
   private bounds2 bounds_;
-  bounds2 getBounds()const {
-    return bounds_;
-  }
+  @property bounds2 bounds()const { return bounds_; }
 
   vec2 inputTransformRel(in vec2 p) { return p*actState.drawScale; } //for relative movements
 
