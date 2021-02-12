@@ -816,7 +816,7 @@ public:
   // Errors returned in exceptions
   void build(File mainFileName_, BuildSettings bs = BuildSettings.init) // Build //////////////////////
   {
-    {
+    {// compile
       times = times.init;
       mixin(perf("all"));
 
@@ -957,11 +957,59 @@ public:
     }
   }
 
+  void findDependencies(File mainFileName_, BuildSettings bs){ // findDependencies //////////////////////////////////////
+    sLog = "";
+    initData(mainFileName_);
+    isWindowedApp = false;
+
+    //copy buildsettings   //todo:lame
+    verbose = bs.verbose;
+    compileOnly = bs.compileOnly;
+    generateMap = bs.generateMap;
+    DPaths.importPaths = bs.importPaths;
+    compileArgs = bs.compileArgs;
+    linkArgs = bs.linkArgs;
+    collectTodos = bs.collectTodos;
+    useLDC = bs.useLDC;
+    singleStepCompilation = bs.singleStepCompilation;
+
+    //Rebuild all?
+    if(bs.rebuild){
+      reset_cache;
+    }
+
+    //reqursively collect modules
+    processSourceFile(mainFileName);
+
+    //check if target exists
+    enforce(isExe||isDll, "Must specify project target (//@EXE or //@DLL).");
+
+    //calculate dependency hashed of obj files to lookup in the objCache
+    modules.resolveModuleImportDependencies;
+
+    int totalLines = modules.map!"a.sourceLines".sum,
+        totalBytes = modules.map!"a.sourceBytes".sum;
+    logln(bold("SOURCE STATS:        "), format("Modules: %s   Lines: %s   Bytes: %s", modules.count, totalLines, totalBytes));
+
+    logln(bold("\nDEPENDENCIES:"));
+    foreach(i, const m; modules){
+      auto list = m.deps.filter!(fn => fn!=m.fileName).map!(a => smallName(a)).join(", ");
+      logln(bold(smallName(m.fileName))~" : "~list);
+    }
+
+    logln(bold("\nIMPORTS:"));
+    foreach(const m; modules){
+      auto list = m.imports.filter!(fn => fn!=m.fileName).map!(a => smallName(a)).join(", ");
+      logln(bold(smallName(m.fileName))~" : "~list);
+    }
+  }
+
+
   // This can be used by commandline or by a dll export.
   //    Input: args (args[0] is ignored)
   //    Outputs: statnard ans error outputs.
   //    result: 0 = no error
-  int commandInterface(string[] args, ref string sOutput, ref string sError) nothrow
+  int commandInterface(string[] args, ref string sOutput, ref string sError) nothrow // command interface /////////////////////////////
   {
     try{
       sLog = sError = sOutput = "";

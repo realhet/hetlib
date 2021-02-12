@@ -2,7 +2,10 @@
 //@import c:\D\libs
 //@ldc
 //@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-//@release
+
+///@release
+//@debug
+
 ///@run $ c:\D\HDMD\dsyntax_dll.d -cv
 ///@run @pause
 
@@ -15,10 +18,20 @@ import het.utils, buildsys;
 int main(string[] args){
   int code;
   application.runConsole(args,{
-    string sOut, sErr;
+
+    todo
+
     BuildSystem bs;
-    code = bs.commandInterface(args, sOut, sErr);
-    if(code) writeln("\33\14", sErr, "\33\7");
+    BuildSettings settings;
+    settings.verbose = true;
+    bs.findDependencies(File(`c:\D\projects\Karc\karc.d`), settings);
+
+    if(0){
+      string sOut, sErr;
+      code = bs.commandInterface(args, sOut, sErr);
+      if(code) writeln("\33\14", sErr, "\33\7");
+    }
+
   });
   return code;
 }
