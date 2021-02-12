@@ -1,5 +1,8 @@
 module het.utils;
 
+__gshared logFileOps = false;
+
+
 pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 
 //todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
@@ -109,8 +112,6 @@ import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, ST
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS;
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
-
-__gshared logFileOps = false;
 
 // Obj.Destroy is not clearing shit
 void free(T)(ref T o)if(is(T==class)){
@@ -4195,6 +4196,13 @@ public:
 void saveTo(T)(const T[] data, const File file)if( is(T == char))                               { file. writeStr(cast(string)data); }
 void saveTo(T)(const T[] data, const File file)if(!is(T == char))                               { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)                              { file .write([data]); }
+
+void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
+  if(FOnlyIfChanged == Yes.onlyIfChanged){
+    if(file.size == data.length && file.readStr == data) return;
+  }
+  file.writeStr(data);
+}
 
 void saveTo(T)(const T[] data, const string fileName)                                           { data.saveTo(File(fileName)); }
 void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)                        { [data].saveTo(File(fileName)); }

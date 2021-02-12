@@ -375,9 +375,8 @@ private:
   }
 
   static void destroyAllWindows(){
-    while(windowList.length){
+    while(windowList.length)
       windowList.values[$-1].destroy;
-    }
   }
 
   //update control
@@ -494,7 +493,7 @@ public:
     PostMessage(hwnd, WM_MyStartup, 0, 0);
   }
 
-  void destroy() //todo: multiWindow: szolni kene a tobbinek, hogy destroyozzon, vagy nemtom...
+  private void destroy_impl() //todo: multiWindow: szolni kene a tobbinek, hogy destroyozzon, vagy nemtom...
   {
     enforce(hwnd, format(`Window "%s" already destroyed.`, name));
 
@@ -523,6 +522,7 @@ public:
 
 
   ~this(){
+    destroy_impl;
 //todo: multiwindownal a destructort osszerakni, mert most az le van xarva...
 //    auto className = getClassName;
 //    DestroyWindow(hwnd);
@@ -578,7 +578,7 @@ public:
         return 0;
       }
 
-      case WM_DESTROY   : destroy; if(isMain) PostQuitMessage(0); return 0;
+      case WM_DESTROY   : this.destroy; if(isMain) PostQuitMessage(0); return 0;
 
       case WM_MyStartup : if(isMain) SetTimer(hwnd, 999, 10, null); return 0; //this is a good time to launch the timer. Called by a delayed PostMessage
       case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; return 0;
@@ -763,7 +763,7 @@ public:
     }
 
     //handle debug.kill
-    if(dbg.forceExit_check){ dbg.forceExit_clear; destroy; } //todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
+    if(dbg.forceExit_check){ dbg.forceExit_clear; this.destroy; } //todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
 
     const double timeTarget = 1.0f/targetUpdateRate;
 
