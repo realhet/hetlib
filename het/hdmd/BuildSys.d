@@ -242,8 +242,9 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 class ModuleInfo{
-  File fileName;
+  File fileName; //todo: rename it to just 'file'
   string fileHash;
+  string moduleFullName;
   File[] imports;
   File[] deps; //dependencies
   string objHash; //calculated by hashing the dependencies and the compiler flags
@@ -255,6 +256,9 @@ class ModuleInfo{
     fileHash = content.hash;
     sourceLines = content.parser.sourceLines;
     sourceBytes = content.source.length.to!int;
+
+    moduleFullName = content.parser.getModuleFullName;
+    if(moduleFullName.empty) moduleFullName = fileName.nameWithoutExt;
   }
 }
 
@@ -957,7 +961,7 @@ public:
     }
   }
 
-  void findDependencies(File mainFileName_, BuildSettings bs){ // findDependencies //////////////////////////////////////
+  auto findDependencies(File mainFileName_, BuildSettings bs){ // findDependencies //////////////////////////////////////
     sLog = "";
     initData(mainFileName_);
     isWindowedApp = false;
@@ -1002,6 +1006,8 @@ public:
       auto list = m.imports.filter!(fn => fn!=m.fileName).map!(a => smallName(a)).join(", ");
       logln(bold(smallName(m.fileName))~" : "~list);
     }
+
+    return modules;
   }
 
 

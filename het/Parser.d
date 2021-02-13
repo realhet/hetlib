@@ -258,6 +258,14 @@ private: /////////////////////////////////////////////////////////////////////
     return res;
   }
 
+  auto findFirstKeywordIndex(int kw, bool insideTokenStringsToo = false){
+    foreach(i, ref t; tokens){
+      if(t.isTokenString && !insideTokenStringsToo) continue;
+      if(t.isKeyword(kw)) return i.to!int;
+    }
+    return -1;
+  }
+
   //parse all module imports in the file   //todo: errol syntax highlight
   auto collectBuildMacrosAndTodos(out string[] macros, out string[] todos) //updates Token.isBuildCommant
   {
@@ -344,6 +352,22 @@ private: /////////////////////////////////////////////////////////////////////
   }
 
   //end of parser stuff/////////////////////////////
+
+  //find the module keyword and get the full module name.
+  public auto getModuleFullName()
+  {
+     string res;
+     auto idx = findFirstKeywordIndex(kwmodule);
+     if(idx>=0){
+       idx++;
+       while(idx<tokens.length && tokens[idx].isComment) idx++;
+       while(idx<tokens.length && (tokens[idx].isIdentifier || tokens[idx].isOperator(opdot))){
+         res ~= tokens[idx].source;
+         idx++;
+       }
+     }
+     return res;
+  }
 
   //parse all module imports in the file
   auto collectImports()
