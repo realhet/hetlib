@@ -7,12 +7,24 @@ import het.utils, het.tokenizer, het.keywords, std.regex;
 //global thing to share compiler specific paths stuff
 struct DPaths{   //todo: Path-osra atirni
 static __gshared:
-  string installPath = `c:\D\dmd2\`; //todo: it's not good for LDC2
+/*  string installPath = `c:\D\dmd2\`; //todo: it's not good for LDC2
   string stdPath()      { return installPath~`src\phobos\`; };
   string etcPath()      { return installPath~`src\phobos\`; };
   string corePath()     { return installPath~`src\druntime\src\`; };
-  string libPath()      { return installPath~`windows\lib\`; } //todo: 64bit DPaths.libPath
+  string libPath()      { return installPath~`windows\lib\`; } //todo: 64bit DPaths.libPath*/
+
+  //LDC 64bit paths
+  string installPath = `c:\D\ldc2\`;
+  string importPath()   { return installPath~`import\`; }
+  string stdPath()      { return importPath~`std\`; }
+  string etcPath()      { return importPath~`etc\`; }
+  string corePath()     { return importPath~`core\`; }
+  string ldcPath()      { return importPath~`ldc\`; }
+  string libPath()      { return installPath~`lib64\`; }
+
+  string[] systemPaths(){ return [stdPath, corePath, etcPath, ldcPath]; }
   string[] importPaths;
+  string[] allPaths(){ return importPaths ~ systemPaths; }
 
   void init(){
     importPaths.clear;
@@ -33,6 +45,10 @@ static __gshared:
   string getImportPathList(){
     includeDelimiters;
     return importPaths.join(";");
+  }
+
+  bool isSystemFile(File f){
+    return f.fullName.isWild(importPath~"*");
   }
 }
 

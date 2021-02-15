@@ -19,6 +19,7 @@ int main(string[] args){
   int code;
   application.runConsole(args,{
     string sOut, sErr;
+    BuildSystem bs;
     code = bs.commandInterface(args, sOut, sErr);
     if(code) writeln("\33\14", sErr, "\33\7");
   });

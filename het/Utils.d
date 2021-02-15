@@ -1243,6 +1243,7 @@ void set(T)(ref T[] arr, size_t idx, T val, T def = T.init){
 
 void clear(T)(ref T[] arr)        { arr.length = 0; }
 bool addIfCan(T)(ref T[] arr, in T item) { if(!arr.canFind(item)){ arr ~= item; return true; }else return false; }
+bool addIfCan(T)(ref T[] arr, in T[] items) { bool res; foreach(const item; items) if(arr.addIfCan(item)) res = true; return res; }
 
 T popFirst(T)(ref T[] arr){ auto res = arr[0  ]; arr = arr[1..$  ]; return res; }
 T popLast (T)(ref T[] arr){ auto res = arr[$-1]; arr = arr[0..$-1]; return res; }
@@ -2598,21 +2599,17 @@ void mergeUrlParams(ref string s1, string s2){
 
 // structs to text /////////////////////////////////////
 
-string toString2(T)(const T o)
+string toString2(T)(in T obj)
 if(isAggregateType!T)
 {
   string[] parts;
   alias types = FieldTypeTuple!T;
   foreach(idx, name; FieldNameTuple!T){
-    string value;
-    mixin("value = o."~name~".text;");
-
-    if(isSomeString!(types[idx])) value = `"`~value.replace(`"`, `\"`)~`"`;
-
-    parts ~= "%s:%s".format(name, value);
+    string value = mixin("obj."~name~".text;");
+    if(isSomeString!(types[idx])) value = value.quoted;
+    parts ~= format!"%s : %s"(name, value);
   }
-
-  return "%s(%s)".format(T.stringof, parts.join(", "));
+  return format!"%s(%s)"(T.stringof, parts.join(", "));
 }
 
 // Meta helpers ///////////////////////////

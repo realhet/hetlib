@@ -15,10 +15,10 @@ import het.utils, het.parser, std.file, std.digest.sha, std.regex, std.path, std
 //////////////////////////////////////////////////////////////////////////////
 
 immutable
-  versionStr = "1.01",
+  versionStr = "1.02",
   helpStr =  //todo: ehhez edditort csinalni
   "\33\16HDMD\33\7 "~versionStr~" - An automatic build tool for the \33\17DMD\33\7 and \33\17LDC\33\7 compilers.
-by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2020
+by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021
 
 \33\17Usage:\33\7    hdmd.exe <mainSourceFile.d> [options]
 
@@ -99,8 +99,18 @@ struct EditorFile{ align(1):  //Editor sends it's modified files using this stru
 }
 
 struct BuildSettings{
-  bool verbose, compileOnly, generateMap, leaveObjs, rebuild, runInShell, killExe, collectTodos, useLDC, singleStepCompilation;
+  bool verbose, compileOnly, generateMap, leaveObjs, rebuild, killExe, collectTodos, useLDC, singleStepCompilation;
+  bool isWindowedApp;
   string[] importPaths, compileArgs, linkArgs;
+
+  /// This is needed because the main source header can override the string arrays
+  auto dup(){
+    auto res = this;
+    res.importPaths = importPaths.dup;
+    res.compileArgs = compileArgs.dup;
+    res.linkArgs    = linkArgs   .dup;
+    return res;
+  }
 }
 
 private struct MSVCEnv{ static{ // MSVCEnv ///////////////////////////////
@@ -157,7 +167,7 @@ private:
 
   //then look into the filesystem
   struct Content{
-    File fileName;
+    File file;
     string source;
     DateTime dateTime;
     string hash;
@@ -172,7 +182,7 @@ private:
     }
 
     void process(){
-      parser.tokenize(fileName.fullName, source); //todo: fileName-t tovabb vinni
+      parser.tokenize(file.fullName, source); //todo: fileName-t tovabb vinni
     }
   }
   Content[File] cache;
@@ -180,7 +190,7 @@ private:
 public:
   void reset() { cache.clear; }
 
-  void dump() { foreach(ref ch; cache) writeln(ch.fileName); } //todo: editor: ha typo-t ejtek, es egy nekifutasra irtam be a szot, akkor magatol korrigaljon!
+  void dump() { foreach(ref ch; cache) writeln(ch.file); } //todo: editor: ha typo-t ejtek, es egy nekifutasra irtam be a szot, akkor magatol korrigaljon!
 
   void setEditorFiles(int count, EditorFile* data){
     editorFiles.clear;
@@ -191,15 +201,15 @@ public:
     editorFiles.rehash;
   }
 
-  Content* access(File fileName){
+  Content* access(File file){
     //id  cache editor what_to_do_with_cache
     //0   0     0      load from file
     //1   0     1      load from editor
     //2   1     0      load from file if fileDate>cacheDate
     //3   1     1      load from editor if editorDate>cacheDate
 
-    auto ef = fileName in editorFiles;
-    auto ch = fileName in cache;
+    auto ef = file in editorFiles;
+    auto ch = file in cache;
 
     void refresh(){
       ch.unProcess;
@@ -207,19 +217,19 @@ public:
         ch.dateTime = ef.dateTime;
         ch.source = to!string(ef.source[0..ef.length]);
       }else{ //refresh from file
-        ch.dateTime = fileName.modified;
-        ch.source = fileName.readStr(false); //not mustexists because some files are nonexistent due to conditional imports
+        ch.dateTime = file.modified;
+        ch.source = file.readStr(false); //not mustexists because some files are nonexistent due to conditional imports
       }
       ch.hash = calcHash(ch.source);
     }
 
     if(!ch){ //not in cache
-      cache[fileName] = Content(fileName);
-      ch = fileName in cache; //opt: unoptimal
+      cache[file] = Content(file);
+      ch = file in cache; //opt: unoptimal
       refresh;
     }else{ //already in cache
       auto dt = ef ? ef.dateTime
-                   : fileName.modified;
+                   : file.modified;
       if(ch.dateTime<dt) refresh;
     }
 
@@ -242,7 +252,7 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 
 class ModuleInfo{
-  File fileName; //todo: rename it to just 'file'
+  File file; //todo: rename it to just 'file'
   string fileHash;
   string moduleFullName;
   File[] imports;
@@ -252,13 +262,13 @@ class ModuleInfo{
   int sourceLines, sourceBytes; //stats
 
   this(BuildCache.Content* content){
-    fileName = content.fileName;
+    file = content.file;
     fileHash = content.hash;
     sourceLines = content.parser.sourceLines;
     sourceBytes = content.source.length.to!int;
 
     moduleFullName = content.parser.getModuleFullName;
-    if(moduleFullName.empty) moduleFullName = fileName.nameWithoutExt;
+    if(moduleFullName.empty) moduleFullName = file.nameWithoutExt;
   }
 }
 
@@ -278,14 +288,14 @@ void resolveModuleImportDependencies(ref ModuleInfo[] modules)
   //extend module imports to dependency lists
   foreach(ref m; modules){
     m.deps = m.imports.dup;           //it's depending on it's imports...
-    m.deps.addIfCan(m.fileName);      //...and itself. (In D a module can import itself too)
+    m.deps.addIfCan(m.file);      //...and itself. (In D a module can import itself too)
   }
 
   bool any;
   do{
     any = false;
     foreach(ref m1; modules) foreach(ref m2; modules){
-      if(m1.deps.canFind(m2.fileName)){ //when m1 deps m2
+      if(m1.deps.canFind(m2.file)){ //when m1 deps m2
         foreach(fn; m2.deps){
           any |= m1.deps.addIfCan(fn); //add m2's deps to m1's import list if can. Don't add self
         }
@@ -300,9 +310,9 @@ void resolveModuleImportDependencies(ref ModuleInfo[] modules)
 void calculateObjHashes(ref ModuleInfo[] modules, string salt)
 {
   foreach(ref m; modules){
-    string s = salt~"|"~m.fileName.fullName;
+    string s = salt~"|"~m.file.fullName;
     foreach(dep; m.deps){
-      s ~= modules.filter!(m => m.fileName==dep).map!"a.fileName.fullName~a.fileHash".reduce!"a~b"; //opt: ez 2x olyan gyors lehetne filter nelkul
+      s ~= modules.filter!(m => m.file==dep).map!"a.file.fullName~a.fileHash".reduce!"a~b"; //opt: ez 2x olyan gyors lehetne filter nelkul
     }
     m.objHash = calcHash(s);
     //contains hash of all the required filenames and fileContents plus a salt (compiler options)
@@ -316,17 +326,30 @@ void calculateObjHashes(ref ModuleInfo[] modules, string salt)
 
 struct BuildSystem{
 private: //current build
-  BuildCache cache;
-  ubyte[][string] objCache, exeCache, mapCache, resCache;
+  //input data
+  File mainFile;
+  BuildSettings settings;
 
   //flags
-  bool verbose, compileOnly, generateMap, isWindowedApp, collectTodos, useLDC, singleStepCompilation;
+  //bool verbose, compileOnly, generateMap, isWindowedApp, collectTodos, useLDC, singleStepCompilation;
+
+  //derived data
+  bool isExe, isDll, hasCoreModule;
+  File targetFile, mapFile, defFile, resFile;
+  File[string] resFiles;
+  string[] runLines, defLines;
+  ModuleInfo[] modules;
+  string[] todos;
+
+  //cached data
+  BuildCache cache;
+  ubyte[][string] objCache, exeCache, mapCache, resCache;
 
   //logging
   string sLog;
   void log(T...)(T args)
   {
-    if(verbose) { write(args); console.flush; }
+    if(settings.verbose) { write(args); console.flush; }
     foreach(const s; args)
       sLog ~= to!string(s);
   }
@@ -356,50 +379,35 @@ private: //current build
   }
   static perf(string f){ return "auto _perfMeasurerStruct = Perf(times."~f~");"; }
 
-  //internal data.
-  File mainFileName;
-  Path mainPath;
-  bool isExe, isDll, hasCoreModule;
-  File targetFileName;
-  string[] compileArgs, linkArgs, runLines, defLines, importPaths;
-  File[string] resFiles;
-  ModuleInfo[] modules;
-  string[] todos;
-  File mapFileName, defFileName, resFileName;
-
   void prepareMapResDef(){
     //mapFile
-    File mf = targetFileName.otherExt(".map");
+    File mf = targetFile.otherExt(".map");
     mf.remove;
-    if(generateMap){
-      mapFileName = mf;
+    if(settings.generateMap){
+      mapFile = mf;
     }
 
     //defFile
-    File df = targetFileName.otherExt(".def"); //todo:redundant
+    File df = targetFile.otherExt(".def"); //todo:redundant
     df.remove;
     if(!defLines.empty){
-      defFileName = df;
+      defFile = df;
       string defContent = defLines.join("\r\n");
-      defFileName.write(defContent);
+      defFile.write(defContent);
       foreach(idx, line; defLines) logln(idx ? " ".replicate(5):bold("DEF: "), line);
     }
 
     //resFile
-    if(resFiles.length>0) resFileName = targetFileName.otherExt(".res"); //todo:redundant
+    if(resFiles.length>0) resFile = targetFile.otherExt(".res"); //todo:redundant
   }
 
-  void initData(File mainFileName_){ //clears the above
-    mainFileName = mainFileName_;
-    mainPath = mainFileName.path;
+  void initData(File mainFile_){ //clears the above
+    mainFile = mainFile_;
     isExe = isDll = hasCoreModule = false;
-    targetFileName = File("");
-    compileArgs .clear;
-    linkArgs    .clear;
+    targetFile = File("");
     runLines    .clear;
     defLines    .clear;
     resFiles    .clear;
-    importPaths .clear;
     modules     .clear;
     todos       .clear;
   }
@@ -416,16 +424,16 @@ private: //current build
   string smallName(File fn){ //strips down extension, removes filePath
     fn.ext = "";
 
-    if(!removePath(fn, mainPath) && !removePath(fn, DPaths.stdPath) && !removePath(fn, DPaths.etcPath) && !removePath(fn, DPaths.corePath)){
-      foreach(p; DPaths.importPaths) if(removePath(fn, p)) break;
-    }
+    if(!removePath(fn, mainFile.path))
+      foreach(p; DPaths.allPaths)
+        if(removePath(fn, p)) break;
 
     return fn.fullName.replace(`\`, `.`);
   }
 
   void processBuildMacro(string buildMacro){
-    void addCompileArgs(const string[] args){ foreach(p; args) if(!compileArgs.canFind(p)) compileArgs ~= p; } //todo:addIfCan-t megcsinalni, hogy tudjon arrayt is
-    void addLinkArgs   (const string[] args){ foreach(p; args) if(!linkArgs   .canFind(p)) linkArgs    ~= p; }
+    void addCompileArgs(const string[] args){ foreach(p; args) settings.compileArgs.addIfCan(p); }
+    void addLinkArgs   (const string[] args){ foreach(p; args) settings.linkArgs   .addIfCan(p); }
 
     const args = splitCommandLine(buildMacro),
           cmd = lc(args[0]),
@@ -448,11 +456,11 @@ private: //current build
         isDll = cmd=="dll";
 
         auto ext = "."~cmd;
-        targetFileName = param1.empty ? mainFileName.otherExt(ext)
-                                      : File(mainPath, param1~ext); //todo: pathosra
+        targetFile = param1.empty ? mainFile.otherExt(ext)
+                                  : File(mainFile.path, param1~ext); //todo: pathosra
 
         if(isDll){ //add implicit macros for DLL
-          compileArgs ~= "-shared";
+          settings.compileArgs ~= "-shared";
           defLines ~= "LIBRARY";
           defLines ~= "EXETYPE NT";
           defLines ~= "SUBSYSTEM WINDOWS";
@@ -465,7 +473,7 @@ private: //current build
         string id = args.length>2 ? args[2] : "";
         auto src = File(param1);
 
-        if(!src.isAbsolute) src.path = mainPath; //all resources are relative to the project, unless they as absolute.
+        if(!src.isAbsolute) src.path = mainFile.path; //all resources are relative to the project, unless they as absolute.
 
         bool any;
         if(src.exists){ //one file
@@ -491,27 +499,27 @@ private: //current build
         break;
       }
       case "def"    :{ defLines ~= buildMacro[3..$].strip;                                      break; }
-      case "win"    :{ isWindowedApp = true;                                                    break; }
-      case "compile":{ addCompileArgs(args[1..$]);                                              break; }
+      case "win"    :{ settings.isWindowedApp = true;                                           break; }
+      case "compile":{ settings.compileArgs.addIfCan(args[1..$]);                               break; }
       case "link"   :{ addLinkArgs(args[1..$]);                                                 break; }
-      case "run"    :{ runLines ~= buildMacro[3..$].strip.replace("$", targetFileName.fullName);break; }
+      case "run"    :{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);    break; }
       case "import" :{ DPaths.addImportPathList(buildMacro[6..$]);                              break; }
       case "release":{ addCompileArgs(["-release", "-O", "-inline", "-boundscheck=off"]);       break; }
-      case "ldc"    :{ useLDC = true;                                                           break; }
-      case "single" :{ singleStepCompilation = true;                                            break; }
+      case "ldc"    :{ settings.useLDC = true;                                                  break; }
+      case "single" :{ settings.singleStepCompilation = true;                                   break; }
       default: enforce(false, "Unknown BuildMacro command: "~cmd);
     }
   }
 
   //process source files recursively
-  void processSourceFile(File fileName){
-    if(modules.canFind!(a => a.fileName==fileName)) return;
+  void processSourceFile(File file){
+    if(modules.canFind!(a => a.file==file)) return;
 
-    enforce(fileName.exists, format(`File not found: "%s"`, fileName));
+    enforce(file.exists, format(`File not found: "%s"`, file));
 
     //add this module
     double dateTime;
-    auto act = cache.access(fileName);
+    auto act = cache.access(file);
     modules ~= new ModuleInfo(act);
     auto mAct = &modules[$-1];
 
@@ -524,8 +532,7 @@ private: //current build
     //decide if it has to link with windows libs
     if(!hasCoreModule){
       foreach(const imp; act.parser.importDecls) if(imp.isCoreModule){
-        addIfCan(linkArgs, "kernel32.lib"); //not needed to add these, they're implicit
-        addIfCan(linkArgs, "user32.lib");
+        addIfCan(settings.linkArgs, ["kernel32.lib", "user32.lib"]); //todo: not needed to add these, they're implicit -> try it out!
         hasCoreModule = true;
         break;
       }
@@ -533,7 +540,7 @@ private: //current build
 
     //collect imports NEW
     act.parser.importDecls.filter!q{a.isUserModule}
-                          .each!(a => mAct.imports.addIfCan(File(a.resolveFileName(mainPath.fullPath, fileName.fullName, true))) );
+                          .each!(a => mAct.imports.addIfCan(File(a.resolveFileName(mainFile.path.fullPath, file.fullName, true))) );
 
     //reqursive walk on imports
     foreach(imp; mAct.imports) processSourceFile(imp);
@@ -568,20 +575,20 @@ private: //current build
   }
 
   ModuleInfo* findModule(File fn){
-    foreach(ref m; modules) if(m.fileName==fn) return &m;
+    foreach(ref m; modules) if(m.file==fn) return &m;
     return null;
   }
 
-  auto objFileNameOf(File srcFileName)
+  auto objFileOf(File srcFile)
   {
     //for incremental builds: main file is OBJ, all others are LIBs
-    //auto ext = srcFileName==mainFileName ? ".obj" : ".lib";
+    //auto ext = srcFile==mainFile ? ".obj" : ".lib";
     auto ext = ".obj";
-    return srcFileName.otherExt(ext);
+    return srcFile.otherExt(ext);
   }
 
-  bool is64bit(){ return compileArgs.canFind("-m64"); }
-  bool isOptimized(){ return compileArgs.canFind("-O"); }
+  bool is64bit(){ return settings.compileArgs.canFind("-m64"); }
+  bool isOptimized(){ return settings.compileArgs.canFind("-O"); }
 
   void compile(File[] srcFiles, string[] compileArgs, bool multi) // Compile ////////////////////////
   {
@@ -589,15 +596,15 @@ private: //current build
     if(srcFiles.empty) return;
 
     //make DMD commandline args
-    auto args = [useLDC ? "ldmd2" : "dmd", "-vcolumns"];
+    auto args = [settings.useLDC ? "ldmd2" : "dmd", "-vcolumns"];
 
     if(multi){
       args ~= ["-c", "-op", "-allinst"];
     }else{
-      if(generateMap && !useLDC/+LDC doesn't supports+/) args ~= "-map";
+      if(settings.generateMap && !settings.useLDC/+LDC doesn't supports+/) args ~= "-map";
     }
 
-    if(useLDC && !is64bit){ args.addIfCan("-m32"); }
+    if(settings.useLDC && !is64bit){ args.addIfCan("-m32"); }
 
     if(!DPaths.importPaths.empty) args ~= "-I"~DPaths.getImportPathList; //TODO: space in path == bug?
     args ~= compileArgs;
@@ -612,17 +619,17 @@ private: //current build
       }
     }else{//single
       auto c = args;
-      c ~= `-of=`~targetFileName.fullName;
+      c ~= `-of=`~targetFile.fullName;
       foreach(fn; srcFiles) c ~= fn.fullName;
-      if(defFileName.fullName!="") c ~= defFileName.fullName;
-      if(resFileName.fullName!="") c ~= resFileName.fullName;
+      if(defFile.fullName!="") c ~= defFile.fullName;
+      if(resFile.fullName!="") c ~= resFile.fullName;
 
-      string[] libFileNames;
-      foreach(fn; linkArgs) switch(lc(File(fn).ext)){ //todo: ezt osszevonni a linkerrel
-        case ".lib": libFileNames ~= fn; break;
+      string[] libFiles;
+      foreach(fn; settings.linkArgs) switch(lc(File(fn).ext)){ //todo: ezt osszevonni a linkerrel
+        case ".lib": libFiles ~= fn; break;
         default: break;
       }
-      if(is64bit && !useLDC) c ~= libFileNames;
+      if(is64bit && !settings.useLDC) c ~= libFiles;
 
       cmdLines ~= c;
     }
@@ -638,7 +645,7 @@ private: //current build
     foreach(i, ref o; sOutputs) sOutput ~= processDMDErrors(o, srcFiles[i].path.fullPath);
     sOutput = mergeDMDErrors(sOutput);
     //add todos
-    if(collectTodos)
+    if(settings.collectTodos)
       sOutput ~= todos.map!(s => s~"\r\n").join;
 
     //check results
@@ -651,7 +658,7 @@ private: //current build
     if(multi){
       File[] objStored;
       foreach(fn; srcFiles){
-        auto objFn = objFileNameOf(fn);
+        auto objFn = objFileOf(fn);
         objCache[findModule(fn).objHash] = objFn.read;
         objStored ~= objFn;
       }
@@ -665,7 +672,7 @@ private: //current build
     File[] objWritten;
     foreach(fn; filesInCache){ //provide files already in cache
       auto data = objCache[findModule(fn).objHash];
-      auto objFn = objFileNameOf(fn);
+      auto objFn = objFileOf(fn);
       if(!equal(data, fn.read(false))){ //only write if needed
         objFn.write(data);
         objWritten ~= fn;
@@ -675,43 +682,43 @@ private: //current build
       logln(bold("WRITING CACHE -> OBJ: "), objWritten.map!(a=>smallName(a)).join(", "));
   }
 
-  void resCompile(File resFileName, string resHash) //todo: ez igy csunya, ahogy at van passzolva
+  void resCompile(File resFile, string resHash) //todo: ez igy csunya, ahogy at van passzolva
   {
     mixin(perf("res"));
-    resFileName.remove;
+    resFile.remove;
     if(resFiles.length>0){
       auto resInCache = (resHash in resCache) !is null;
       if(resInCache){ //found in cache
         auto data = resCache[resHash];
-        if(!equal(resFileName.read, data)){
-          logln(bold("WRITING CACHE -> RES: "), resFileName);
-          resFileName.write(data);
+        if(!equal(resFile.read, data)){
+          logln(bold("WRITING CACHE -> RES: "), resFile);
+          resFile.write(data);
         }
       }else{ //recompiling
-        auto rcFileName = resFileName.otherExt(".rc");
+        auto rcFile = resFile.otherExt(".rc");
 
         string toCString(File s) { return `"`~s.fullName.replace(`\`, `\\`).replace(`"`, `\"`)~`"`; }
 
         //create rc content
         auto rcContent = resFiles.byKeyValue
           .map!(kv => format("Z%s 999 %s", toHexString(cast(ubyte[])kv.key), toCString(kv.value))).join("\r\n");
-        rcFileName.write(rcContent);
+        rcFile.write(rcContent);
 
         //call RC.exe
-        auto rcCmd = ["rc", rcFileName.fullName];
+        auto rcCmd = ["rc", rcFile.fullName];
         logln(bold("CALLING RC: "), joinCommandLine(rcCmd));
         auto rc = execute(rcCmd, null, Config.suppressConsole);
 
         //cleanup
-        rcFileName.remove;
+        rcFile.remove;
 
         enforce(enforce(rc.status==0, rc.output));
 
-        logln(bold("STORING RES -> CACHE: "), resFileName);
-        resCache[resHash] = resFileName.read;
+        logln(bold("STORING RES -> CACHE: "), resFile);
+        resCache[resHash] = resFile.read;
       }
     }else{
-      resFileName.remove; //no resfile needed
+      resFile.remove; //no resfile needed
     }
   }
 
@@ -720,51 +727,51 @@ private: //current build
     mixin(perf("link"));
     if(modules.empty) return;
 
-    const useOptLink = !useLDC && !is64bit,
+    const useOptLink = !settings.useLDC && !is64bit,
           useMSLink = !useOptLink;
 
-    string[] objFileNames = modules.map!(m => objFileNameOf(m.fileName).fullName).array,
-             libFileNames,           //user32, kernel32 nem kell, megtalalja magatol
+    string[] objFiles = modules.map!(m => objFileOf(m.file).fullName).array,
+             libFiles,           //user32, kernel32 nem kell, megtalalja magatol
              linkOpts; //todo: kideriteni, hogy ez miert kell a windowsos cuccokhoz
 
     if(useOptLink) linkOpts ~= "/noi";
 
-    if(generateMap) addIfCan(linkOpts, useMSLink ? "/MAP" : "/DETAILEDMAP");
+    if(settings.generateMap) addIfCan(linkOpts, useMSLink ? "/MAP" : "/DETAILEDMAP");
 
     foreach(fn; linkArgs) switch(lc(File(fn).ext)){ //sort out different link commandline parts
-      case ".obj": objFileNames ~= fn; break;
-      case ".lib": libFileNames ~= fn; break;
-      case ".map": mapFileName = File(fn); break;
+      case ".obj": objFiles ~= fn; break;
+      case ".lib": libFiles ~= fn; break;
+      case ".map": mapFile = File(fn); break;
       default: linkOpts ~= fn; //treat as an option
     }
 
     if(useOptLink){//////////////////////////////////////////////////////////////////////////
       string[] tol(string s) { return s.empty ? [] : [s]; }
-      auto cmd = ["link"] ~ objFileNames                  ~","
-                          ~ targetFileName.fullName       ~","
-                          ~ tol(mapFileName.fullName)     ~","
-                          ~ libFileNames                  ~","
-                          ~ tol(defFileName.fullName)     ~","
-                          ~ tol(resFileName.fullName);
+      auto cmd = ["link"] ~ objFiles                  ~","
+                          ~ targetFile.fullName       ~","
+                          ~ tol(mapFile.fullName)     ~","
+                          ~ libFiles                  ~","
+                          ~ tol(defFile.fullName)     ~","
+                          ~ tol(resFile.fullName);
       while(cmd[$-1]==",") cmd = cmd[0..$-1]; //cut back last commas
       cmd ~= linkOpts.join("") ~";";  //add options and a semicolon
 
       logln(bold("LINKING: "), joinCommandLine(cmd));
       auto link = execute(cmd, [`LIB`:DPaths.libPath], Config.suppressConsole);
 
-      defFileName.remove; //cleanup
+      defFile.remove; //cleanup
       enforce(link.status==0, link.output);  if(!link.output.empty) logln(link.output);
     }else if(useMSLink){//////////////////////////////////////////////////////////////////////////
       auto cmd = ["link",
-                  `/LIBPATH:`~(useLDC?(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`):(is64bit?`c:\D\dmd2\windows\lib64`:`c:\D\dmd2\windows\lib`)),
-                  `/OUT:`~targetFileName.fullName,
+                  `/LIBPATH:`~(settings.useLDC?(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`):(is64bit?`c:\D\dmd2\windows\lib64`:`c:\D\dmd2\windows\lib`)), //todo: the place for these is in DPath
+                  `/OUT:`~targetFile.fullName,
                   `/MACHINE:`~(is64bit ? "X64" : "X86")]
                   ~linkOpts
-                  ~libFileNames
+                  ~libFiles
                   ~`legacy_stdio_definitions.lib`
-                  ~objFileNames;
+                  ~objFiles;
 
-      if(useLDC){
+      if(settings.useLDC){
         cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
         /+note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
           https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
@@ -776,7 +783,7 @@ private: //current build
       logln(bold("LINKING: "), line);
       auto link = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
 
-      defFileName.remove; //cleanup
+      defFile.remove; //cleanup
       enforce(link.status==0, link.output);  if(!link.output.empty) logln(link.output);
     }
   }
@@ -792,15 +799,15 @@ public:
     resCache.clear;
   };
 
-  bool killDeleteExe(File fileName){
+  bool killDeleteExe(File file){
     const killTimeOut   = 1.0,//sec
           deleteTimeOut = 1.0;//sec
 
     bool doDelete(){
       auto t0 = QPS;
       while(QPS-t0<deleteTimeOut){
-        fileName.remove(false);
-        if(!fileName.exists) return true;//success
+        file.remove(false);
+        if(!file.exists) return true;//success
         sleep(50);
       }
       return false;
@@ -818,75 +825,63 @@ public:
   }
 
   // Errors returned in exceptions
-  void build(File mainFileName_, BuildSettings bs = BuildSettings.init) // Build //////////////////////
+  void build(File mainFile_, BuildSettings settings_ = BuildSettings.init) // Build //////////////////////
   {
     {// compile
       times = times.init;
       mixin(perf("all"));
 
       sLog = "";
-      initData(mainFileName_);
-      isWindowedApp = false;
-
-      //copy buildsettings   //todo:lame
-      verbose = bs.verbose;
-      compileOnly = bs.compileOnly;
-      generateMap = bs.generateMap;
-      DPaths.importPaths = bs.importPaths;
-      compileArgs = bs.compileArgs;
-      linkArgs = bs.linkArgs;
-      collectTodos = bs.collectTodos;
-      useLDC = bs.useLDC;
-      singleStepCompilation = bs.singleStepCompilation;
+      initData(mainFile_);
+      settings = settings_.dup;
 
       //Rebuild all?
-      if(bs.rebuild){
+      if(settings.rebuild)
         reset_cache;
-      }
 
       //reqursively collect modules
-      processSourceFile(mainFileName);
+      processSourceFile(mainFile);
 
       //check if target exists
       enforce(isExe||isDll, "Must specify project target (//@EXE or //@DLL).");
 
       //calculate dependency hashed of obj files to lookup in the objCache
       modules.resolveModuleImportDependencies;
-      modules.calculateObjHashes(joinCommandLine(compileArgs)~" useLDC:"~text(useLDC));
+      modules.calculateObjHashes(joinCommandLine(settings.compileArgs)~" useLDC:"~text(settings.useLDC));
 
       //ensure that no std or core files are going to be recompiled
       foreach(const m; modules)
-        enforce(!m.fileName.fullName.startsWith(DPaths.stdPath) && !m.fileName.fullName.startsWith(DPaths.etcPath) && !m.fileName.fullName.startsWith(DPaths.corePath),
+        enforce(!m.file.fullName.startsWith(DPaths.stdPath) && !m.file.fullName.startsWith(DPaths.etcPath) && !m.file.fullName.startsWith(DPaths.corePath),
           `It is forbidden to recompile an std/etc/core module.`);
 
       //select files for compilation
       File[] filesToCompile, filesInCache;
-      foreach(ref m; modules) ((m.objHash !in objCache) ? filesToCompile : filesInCache) ~= m.fileName;
+      foreach(ref m; modules) ((m.objHash !in objCache) ? filesToCompile : filesInCache) ~= m.file;
 
       //print out information
       {
         int totalLines = modules.map!"a.sourceLines".sum,
             totalBytes = modules.map!"a.sourceBytes".sum;
 
-        logln(bold("BUILDING PROJECT:    "), mainFileName);
-        logln(bold("TARGET FILE:         "), targetFileName);
-        logln(bold("OPTIONS:             "), useLDC?"LDC":"DMD", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", singleStepCompilation?"SINGLE":"INCR");
+        logln(bold("BUILDING PROJECT:    "), mainFile);
+        logln(bold("TARGET FILE:         "), targetFile);
+        logln(bold("OPTIONS:             "), settings.useLDC?"LDC":"DMD", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR");
         logln(bold("SOURCE STATS:        "), format("Lines: %s   Bytes: %s", totalLines, totalBytes));
 
         foreach(i, const m; modules){
-          auto list = m.deps.filter!(fn => fn!=m.fileName).map!(a => smallName(a)).join(", ");
-          bool comp = filesToCompile.canFind(m.fileName);
-          logln((comp ? " \33\16*\33\7 " : "  "), bold(smallName(m.fileName))~" : "~list);
+          auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
+          bool comp = filesToCompile.canFind(m.file);
+          logln((comp ? " \33\16*\33\7 " : "  "), bold(smallName(m.file))~" : "~list);
         }
       }
 
 
       //delete target file and bat file.
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
-      targetFileName.remove(false);
-      if(targetFileName.exists){
-        if(bs.killExe){
-          enforce(killDeleteExe(targetFileName), "Failed to close target process.");
+      targetFile.remove(false);
+      if(targetFile.exists){
+        if(settings.killExe){
+          enforce(killDeleteExe(targetFile), "Failed to close target process.");
         }else{
           enforce(false, "Unable to delete target file.");
         }
@@ -898,40 +893,40 @@ public:
 
       /////////////////////////////////////////////////////////////////////////////////////
       // compile and link
-      auto exeHash = calcHash(joinCommandLine(linkArgs ~ targetFileName.fullName ~ modules[0].objHash ~ resHash)); //depends on main obj and on linker params.  //todo: include resource hash
+      auto exeHash = calcHash(joinCommandLine(settings.linkArgs ~ targetFile.fullName ~ modules[0].objHash ~ resHash)); //depends on main obj and on linker params.  //todo: include resource hash
       bool exeInCache = (exeHash in exeCache) !is null;
       if(exeInCache){ //exe file is already found in cache
         auto data = exeCache[exeHash];
-        logln(bold("WRITING CACHE -> EXE: "), targetFileName);
-        targetFileName.write(data); //overwrite if needed
+        logln(bold("WRITING CACHE -> EXE: "), targetFile);
+        targetFile.write(data); //overwrite if needed
         if(exeHash in mapCache)
-          mapFileName.write(mapCache[exeHash]);
+          mapFile.write(mapCache[exeHash]);
       }else{
         prepareMapResDef;
-        resCompile(resFileName, resHash);
+        resCompile(resFile, resHash);
 
-        if(singleStepCompilation){
-          compile(filesToCompile, compileArgs, false);
+        if(settings.singleStepCompilation){
+          compile(filesToCompile, settings.compileArgs, false);
         }else{
-          compile(filesToCompile, compileArgs, true);
+          compile(filesToCompile, settings.compileArgs, true);
           overwriteObjsFromCache(filesInCache);
-          link(linkArgs);
+          link(settings.linkArgs);
         }
 
-        logln(bold("STORING EXE -> CACHE: "), targetFileName);
-        exeCache[exeHash] = targetFileName.read;
-        if(mapFileName.exists)
-          mapCache[exeHash] = mapFileName.read;
+        logln(bold("STORING EXE -> CACHE: "), targetFile);
+        exeCache[exeHash] = targetFile.read;
+        if(mapFile.exists)
+          mapCache[exeHash] = mapFile.read;
       }
 
       /////////////////////////////////////////////////////////////////////////////////////
       // cleanup
-      if(!bs.leaveObjs){ //including res file
-        resFileName.remove;
+      if(!settings.leaveObjs){ //including res file
+        resFile.remove;
         foreach(fn; filesToCompile~filesInCache) fn.otherExt(".obj").remove;
       }
 
-      if(!generateMap) mapFileName.remove; //linker makes it for dlls even not wanted
+      if(!settings.generateMap) mapFile.remove; //linker makes it for dlls even not wanted
 
     }//end of compile
 
@@ -941,49 +936,37 @@ public:
 
     /////////////////////////////////////////////////////////////////////////////////////
     // run
-    if(!compileOnly){
-      const batFileName = File(targetFileName.path, "$run.bat");
-      batFileName.remove;
+    if(!settings.compileOnly){
+      const batFile = File(targetFile.path, "$run.bat");
+      batFile.remove;
 
       auto runCmd = runLines.join("\r\n");
 
       //make the default runCmd for exe
       if(runCmd.empty && isExe){
-        runCmd = targetFileName.fullName;
-        if(!isWindowedApp) runCmd ~= "\r\n@pause";
+        runCmd = targetFile.fullName;
+        if(!settings.isWindowedApp) runCmd ~= "\r\n@pause";
       }
 
       if(!runCmd.empty){
-        batFileName.write(runCmd);
+        batFile.write(runCmd);
         foreach(idx, line; runCmd.split('\n')) logln(idx ? " ".replicate(9):bold("RUNNING: "), line);
-        spawnProcess(batFileName.fullName);  //todo: editor kesobb letorolhetne ezt a bat-ot magatol.
+        spawnProcess(batFile.fullName);  //todo: editor kesobb letorolhetne ezt a bat-ot magatol.
       }
     }
   }
 
-  auto findDependencies(File mainFileName_, BuildSettings bs){ // findDependencies //////////////////////////////////////
+  auto findDependencies(File mainFile_, BuildSettings settings_=BuildSettings.init){ // findDependencies //////////////////////////////////////
     sLog = "";
-    initData(mainFileName_);
-    isWindowedApp = false;
-
-    //copy buildsettings   //todo:lame
-    verbose = bs.verbose;
-    compileOnly = bs.compileOnly;
-    generateMap = bs.generateMap;
-    DPaths.importPaths = bs.importPaths;
-    compileArgs = bs.compileArgs;
-    linkArgs = bs.linkArgs;
-    collectTodos = bs.collectTodos;
-    useLDC = bs.useLDC;
-    singleStepCompilation = bs.singleStepCompilation;
+    initData(mainFile_);
+    settings = settings_.dup;
 
     //Rebuild all?
-    if(bs.rebuild){
+    if(settings.rebuild)
       reset_cache;
-    }
 
     //reqursively collect modules
-    processSourceFile(mainFileName);
+    processSourceFile(mainFile);
 
     //check if target exists
     enforce(isExe||isDll, "Must specify project target (//@EXE or //@DLL).");
@@ -997,14 +980,14 @@ public:
 
     logln(bold("\nDEPENDENCIES:"));
     foreach(i, const m; modules){
-      auto list = m.deps.filter!(fn => fn!=m.fileName).map!(a => smallName(a)).join(", ");
-      logln(bold(smallName(m.fileName))~" : "~list);
+      auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
+      logln(bold(smallName(m.file))~" : "~list);
     }
 
     logln(bold("\nIMPORTS:"));
     foreach(const m; modules){
-      auto list = m.imports.filter!(fn => fn!=m.fileName).map!(a => smallName(a)).join(", ");
-      logln(bold(smallName(m.fileName))~" : "~list);
+      auto list = m.imports.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
+      logln(bold(smallName(m.file))~" : "~list);
     }
 
     return modules;
@@ -1020,8 +1003,11 @@ public:
     try{
       sLog = sError = sOutput = "";
 
-      File mainFileName;
+      File mainFile;
       bool help = false;
+
+
+todo: utils.parseOptions(T)(string[] args, ref T options){
 
       BuildSettings settings;
       import std.getopt;
@@ -1030,7 +1016,6 @@ public:
         "v|verbose"     , `Verbose output. Otherwise it will only display the errors.`  , &settings.verbose      ,
         "m|map"         , `Generate map file.`                                          , &settings.generateMap  ,
         "c|compileOnly" , `Compile and link only, do not run.`                          , &settings.compileOnly  ,
-//this is the default        "s|shell"       , `Run in a new shell.`                                         , &settings.runInShell   ,
         "e|leaveObj"    , `Leave behind .obj and .res files after compilation.`         , &settings.leaveObjs    ,
         "r|rebuild"     , `Rebuilds everything. Clears all caches.`                     , &settings.rebuild      ,
         "I|include"     , `Add include path to search for .d files.`                    , &settings.importPaths  ,
@@ -1046,12 +1031,12 @@ public:
       if(opts.helpWanted || args.length<=1) {
         string s = opts.options.map!(o => format(`  %-19s %s`,
           [o.optShort, o.optLong].join(" "), o.help)).join("\r\n");
-        verbose = true;
+        this.settings.verbose = true;
         logln(helpStr.replace(`$$$OPTS$$$`, s));
       }else{
-        mainFileName = File(absolutePath(args[1]));
-        enforce(mainFileName.exists, "Error: File not found: "~mainFileName.fullName);
-        build(mainFileName, settings);
+        mainFile = File(absolutePath(args[1]));
+        enforce(mainFile.exists, "Error: File not found: "~mainFile.fullName);
+        build(mainFile, settings);
       }
 
       sOutput = sLog;
