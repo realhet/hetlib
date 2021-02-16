@@ -99,9 +99,19 @@ struct EditorFile{ align(1):  //Editor sends it's modified files using this stru
 }
 
 struct BuildSettings{
-  bool verbose, compileOnly, generateMap, leaveObjs, rebuild, killExe, collectTodos, useLDC, singleStepCompilation;
-  bool isWindowedApp;
-  string[] importPaths, compileArgs, linkArgs;
+  @("v|verbose     = Verbose output. Otherwise it will only display the errors.") bool verbose                  ;
+  @("m|map         = Generate map file.",                                       ) bool generateMap              ;
+  @("c|compileOnly = Compile and link only, do not run."                        ) bool compileOnly              ;
+  @("e|leaveObj    = Leave behind .obj and .res files after compilation."       ) bool leaveObjs                ;
+  @("r|rebuild     = Rebuilds everything. Clears all caches."                   ) bool rebuild                  ;
+  @("I|include     = Add include path to search for .d files."                  ) string[] importPaths          ;
+  @("o|compileOpt  = Pass extra compiler option."                               ) string[] compileArgs          ;
+  @("L|linkOpt     = Pass extra linker option."                                 ) string[] linkArgs             ;
+  @("k|kill        = Kill currently running executable before compile."         ) bool killExe                  ;
+  @("t|todo        = Collect //Todo: and //Opt: comments."                      ) bool collectTodos             ;
+  @("n|single      = Single step compilation"                                   ) bool singleStepCompilation    ;
+  @("d|ldc         = Use LDC2 compiler instead of DMD"                          ) bool useLDC                   ;
+  @("w|windowedApp = Setup DEF file for windows application"                    ) bool isWindowedApp            ;
 
   /// This is needed because the main source header can override the string arrays
   auto dup(){
@@ -1003,45 +1013,20 @@ public:
     try{
       sLog = sError = sOutput = "";
 
-      File mainFile;
-      bool help = false;
-
-
-todo: utils.parseOptions(T)(string[] args, ref T options){
-
       BuildSettings settings;
-      import std.getopt;
-      auto opts = getopt(args,
-        std.getopt.config.bundling,
-        "v|verbose"     , `Verbose output. Otherwise it will only display the errors.`  , &settings.verbose      ,
-        "m|map"         , `Generate map file.`                                          , &settings.generateMap  ,
-        "c|compileOnly" , `Compile and link only, do not run.`                          , &settings.compileOnly  ,
-        "e|leaveObj"    , `Leave behind .obj and .res files after compilation.`         , &settings.leaveObjs    ,
-        "r|rebuild"     , `Rebuilds everything. Clears all caches.`                     , &settings.rebuild      ,
-        "I|include"     , `Add include path to search for .d files.`                    , &settings.importPaths  ,
-        "o|compileOpt"  , `Pass extra compiler option.`                                 , &settings.compileArgs  ,
-        "L|linkOpt"     , `Pass extra linker option.`                                   , &settings.linkArgs     ,
-        "k|kill"        , `Kill currently running executable before compile.`           , &settings.killExe      ,
-        "t|todo"        , `Collect //Todo: and //Opt: comments.`                        , &settings.collectTodos ,
-
-        "n|single"      , `Single step compilation`                                     , &settings.singleStepCompilation,
-        "d|ldc"         , `Use LDC2 compiler instead of DMD`                            , &settings.useLDC       ,
-      );
+      auto opts = parseOptions(args, settings, No.handleHelp);
 
       if(opts.helpWanted || args.length<=1) {
-        string s = opts.options.map!(o => format(`  %-19s %s`,
-          [o.optShort, o.optLong].join(" "), o.help)).join("\r\n");
         this.settings.verbose = true;
-        logln(helpStr.replace(`$$$OPTS$$$`, s));
+        logln(helpStr.replace(`$$$OPTS$$$`, opts.helpText));
       }else{
-        mainFile = File(absolutePath(args[1]));
+        auto mainFile = File(absolutePath(args[1]));
         enforce(mainFile.exists, "Error: File not found: "~mainFile.fullName);
         build(mainFile, settings);
       }
 
       sOutput = sLog;
       return 0;
-
     }catch(Throwable t){
       sError = t.msg;
 //      try{ sError = format("[hdmd/%s(%s)]: %s", t.file, t.line, t.msg); }catch{}

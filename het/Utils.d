@@ -89,6 +89,7 @@ public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
 
 import std.encoding : transcode, Windows1252String;
 import std.exception : stdEnforce = enforce;
+import std.getopt;
 
 // hetlib imports
 public import het.debugclient;
@@ -369,7 +370,11 @@ void throwLastError(string file = __FILE__, int line = __LINE__, string fn = __F
 
 // Cmdline params ///////////////////////////////////////////
 
-void parseOptions(T)(string[] args, ref T options){
+string helpText(in GetoptResult opts){
+  return opts.options.map!(o => format(`  %-20s %s`, [o.optShort, o.optLong].join(" "), o.help)).join("\n");
+}
+
+auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp){
   /* exampls struct: struct Options {
     @(`Exits right after a solution.`)                                                    EarlyExit = false;
     @(`t|BenchmarkTime = Minimum duration of the benchmark. Default: $DEFAULT$ sec`)      BenchmarkMinTime = 12;
@@ -379,13 +384,14 @@ void parseOptions(T)(string[] args, ref T options){
 
   string[] getoptLines = getStructInfo(options).getoptLines("options");
 
-  mixin("import std.getopt; auto opts = getopt(args, std.getopt.config.bundling,\r\n"~getStructInfo!T.getoptLines("options").join(",")~");");
+  mixin("auto opts = getopt(args, std.getopt.config.bundling,\r\n"~getStructInfo!T.getoptLines("options").join(",")~");");
 
-  if(opts.helpWanted) {
-    string s = opts.options.map!(o => format(`  %-23s %s`, [o.optShort, o.optLong].join(" "), o.help)).join("\r\n");
-    writeln(s);
+  if(opts.helpWanted && handleHelp){
+    writeln(opts.helpText);
     application.exit;
   }
+
+  return opts;
 }
 
 // Exception handling ///////////////////////////////////////
