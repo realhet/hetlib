@@ -2199,7 +2199,7 @@ private void enforceImageSize2D(A...)(in ivec2 size, A args){
   static foreach(a; args){{
     alias T = Unqual!(typeof(a));
     static if(isImage2D!T){ //an actual 2D image
-      enforce(a.size == size, "Image size mismatch");
+      enforce(a.size == size, format!"Image size mismatch: (this)%s != (other)%s"(size, a.size) );
     } //other types are clipped or used as uniform
   }}
 }
@@ -2528,7 +2528,7 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
   // operations on the whole image
   auto opUnary(string op)(){ return mixin(op, "this[]"); }
 
-  auto opBinary(string op, bool reverse=false, A)(A a){ //todo: refactor this in the same way as generateVector()
+  auto opBinary(string op, bool reverse=false, A)(in A a){ //todo: refactor this in the same way as generateVector()
     static if(isImage2D!A){
       alias T = Unqual!(typeof(mixin("this[0,0]", op, "a[0,0]")));
       if(a.size == size){ // elementwise operations
@@ -2536,7 +2536,10 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
           return reverse ? mixin("a   [p.x, p.y]", op, "this[p.x, p.y]")
                          : mixin("this[p.x, p.y]", op, "a   [p.x, p.y]"); //opt: too much index calculations
         });
-      }else enforce(0, "incompatible image size");
+      }else{
+        enforce(0, "incompatible image size");
+        assert(0);
+      }
     }else{ //single element
       alias T = Unqual!(typeof(mixin("this[0,0]", op, "a")));
       return image2D(size, (ivec2 p){
@@ -2546,7 +2549,7 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     }
   }
 
-  auto opBinaryRight(string op, A)(A a){ return opBinary!(op, true)(a); }
+  auto opBinaryRight(string op, A)(in A a){ return opBinary!(op, true)(a); }
 
   bool opEquals(A)(in A a) const{
     static assert(isImage2D!A);

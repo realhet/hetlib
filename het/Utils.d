@@ -4682,14 +4682,17 @@ struct DateTime{
   @property void sec  (ushort x) { auto st = decodeDateTime(raw); st.wSecond       = x; this = DateTime(st); }
   @property void ms   (ushort x) { auto st = decodeDateTime(raw); st.wMilliseconds = x; this = DateTime(st); }
 
+  @property bool isNull() const{ return isnan(raw) || raw==0; }
+
   string toString()const {
-    if(isnan(raw)) return "[NULL DateTime]";
+    if(isNull) return "[NULL DateTime]";
     Date d; d.raw = ifloor(raw);
     Time t; t.raw = fract(raw);
     return d.toString ~ ' ' ~ t.toString;
   }
 
   string timeStamp()const {
+    if(isNull) return "null";
     return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
   }
 

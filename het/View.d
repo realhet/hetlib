@@ -43,12 +43,7 @@ public:
   auto origin_anim()  const { return m_origin_anim; }
   auto scale_anim()   const { return pow(2, m_logScale_anim); }
 
-  private bounds2 workArea_;
-  @property{
-    auto workArea() const { return workArea_; }
-    void workArea(const bounds2  b) { workArea_ = b; }
-    void workArea(const ibounds2 b) { workArea_ = bounds2(b); }
-  }
+  bounds2 workArea;
 
   auto subScreenArea = bounds2(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
 
