@@ -2618,6 +2618,12 @@ if(isAggregateType!T)
   return format!"%s(%s)"(T.stringof, parts.join(", "));
 }
 
+void clearFields(T)(T obj)
+if(isAggregateType!T)
+{
+  foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f));
+}
+
 // Meta helpers ///////////////////////////
 
 auto getSymbolNamesByUDA(T, string uda)(){
@@ -3899,12 +3905,13 @@ public:
 
   this(string path_){ fullPath = path_; }
   this(Path base, string path_){
+    //todo: use buildPath()
     fullPath = base.fullPath;
     if(fullPath!="") fullPath = includeTrailingPathDelimiter(fullPath);
     fullPath ~= path_;
   }
 
-  string toString() const { return "Path["~fullPath~"]"; }
+  string toString() const { return "Path("~fullPath.quoted~")"; }
   bool isNull() const{ return fullPath==""; }
   bool opCast() const{ return !isNull(); }
 
@@ -4068,7 +4075,7 @@ public:
 
   string fullName;
 
-  string toString()const{ return "File["~fullName~"]"; }
+  string toString()const{ return "File("~fullName.quoted~")"; }
   bool isNull()    const{ return fullName==""; }
   bool opCast()    const{ return !isNull(); }
 
@@ -4217,6 +4224,7 @@ void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDyn
 
 File appFileName() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
 Path appPath() { static __gshared Path s; if(s.isNull) s = appFileName.path; return s; }
+Path currentPath() { return Path(std.file.getcwd); }
 
 
 // Stream IO /////////////////////////////////////////////////////////////////

@@ -10,6 +10,206 @@ module buildsys;
 
 import het.utils, het.parser, std.file, std.digest.sha, std.regex, std.path, std.process;
 
+
+class Executor{
+  import std.process, std.file : chdir;
+
+  //input data
+  string[] cmd;
+  string[string] env;
+  Path workPath, tempPath;
+
+  //temporal data
+  File logFile;
+  StdFile stdLogFile;
+  Pid pid;
+
+  //output data
+  string output;
+  int result;
+
+  enum State { idle, running, finished }
+  @property{
+    auto state() const{
+      if(pid !is null) return State.running;
+      if(cmd is null) return State.idle;
+      return State.finished;
+    }
+    auto isIdle    () const{ return state==State.idle    ; }
+    auto isRunning () const{ return state==State.running ; }
+    auto isFinished() const{ return state==State.finished; }
+  }
+
+  void start(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
+    if(isRunning) ERR("already running");
+    this.cmd = cmd;
+    this.env = env;
+    this.workPath = workPath;
+    this.tempPath = tempPath;
+    start;
+  }
+
+  void start(){
+    if(isRunning) ERR("already running");
+
+    try{
+      // create logFile default logFile path is tempPath
+      Path actualTempPath = tempPath ? tempPath : appPath;
+      logFile = File(actualTempPath, this.identityStr ~ ".log");
+      logFile.path.make;
+      stdLogFile = StdFile(logFile.fullName, "w");
+
+      // optionally switch to a work directory
+      Path lastPath;
+      if(workPath){ lastPath = currentPath; chdir(workPath.fullPath); }
+      scope(exit) if(workPath) chdir(lastPath.fullPath); // restore it on exit of this funct
+
+      // launch the process
+      pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, Config.retainStdout | Config.retainStderr | Config.suppressConsole);
+    }catch(Exception e){
+      ignoreExceptions({ stdLogFile.close;         });
+      ignoreExceptions({ logFile.remove;           });
+      result = -1;
+      output = "Error: " ~ e.simplifiedMsg;
+    }
+  }
+
+  void update(){
+    // checks if the running process ended.
+    if(pid !is null){
+      auto w = tryWait(pid);
+      if(w.terminated){
+        result = w.status;
+        ignoreExceptions({ stdLogFile.close;         });
+        ignoreExceptions({ output = logFile.readStr; });
+        ignoreExceptions({ logFile.remove;           });
+        pid = null;
+      }
+    }
+  }
+
+  void kill(){
+    if(isRunning){
+      std.process.kill(pid);
+      result = -1;
+      output = "Error: Process has been killed.";
+      pid = null;
+    }
+  }
+
+  void reset(){
+    kill;
+    this.clearFields;
+  }
+
+}
+
+/// returns true it it still need to work more
+bool update(Executor[] executors, void delegate(int) onProgress = null){
+  foreach(i, e; executors){
+    if(!e.isFinished){
+      e.update;
+      if(e.isFinished && onProgress !is null) onProgress(i.to!int);
+    }
+  }
+  return !executors.all!(e => e.isFinished);
+}
+
+void executorTest(){
+  auto e = new Executor;
+
+  print("testing...");
+  e.start(["cmd", "/c", "echo", "hello world", "%ENVTEST%", "%CD%"], //commandline
+          ["ENVTEST" : "EnvTestValue"], //env override
+          Path(`z:\TEMP`), //workPath
+          Path(`z:\TEMP`)); //tempPath for the logFile
+  print(currentPath);
+  while([e].update){ print(e.state, e.result, e.output); sleep(3); }
+  print(e.state, e.result, e.output);
+
+  print("end of test");
+}
+
+int spawnProcessMulti2(const string[][] cmdLines, const string[string] env, out string[] sOutput, void delegate(int i) onProgress = null){
+  //it was developed for running multiple compiler instances.
+
+  Executor[] executors;
+  foreach(cmdLine; cmdLines){
+    auto e = new Executor;
+    e.start(cmdLine, env);
+  }
+
+  while(executors.update(onProgress)) sleep(3);
+
+  itt tartok!!!!!!!!!!!!!!!
+
+  ////////////////////////////////////////////////
+  import std.process;
+
+  //create log files
+  StdFile[] logFiles;
+  foreach(i; 0..cmdLines.length){
+    auto fn = File(tempPath, "spawnProcessMulti.$log"~to!string(i));
+    logFiles ~= StdFile(fn.fullName, "w");
+  }
+
+  //create pool of commands
+  Pid[] pool;
+  foreach(i, cmd; cmdLines){
+    pool ~= spawnProcess(cmd, stdin, logFiles[i], logFiles[i], env,
+                         Config.retainStdout | Config.retainStderr | Config.suppressConsole);
+  }
+
+  //execute
+  bool[] running;  //todo:bugzik az stdOut fileDelete itt, emiatt nem megy az, hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
+  running.length = pool.length;
+  running[] = true;
+
+  int res = 0;
+  do{
+    sleep(10);
+    foreach(i; 0..pool.length){
+      if(running[i]){
+        auto w = tryWait(pool[i]);
+        if(w.terminated){
+          running[i] = false;
+          if(w.status != 0){
+            res = w.status;
+            running[] = false;
+          }
+          if(onProgress !is null) onProgress(cast(int)i);
+        }
+      }
+    }
+  }while(running.any);
+
+  /*foreach(i, p; pool){
+    int r = wait(p);
+    if(r) res = r;
+    if(onProgress !is null) onProgress(i);
+  }*/
+
+  //make sure every process is closed (when one of them yielded an error)
+  foreach(p; pool) { try{ kill(p);}catch(Exception e){} }
+
+  //read/clear logfiles
+  foreach(i, ref f; logFiles){
+    File fn = File(f.name);
+    f.close;
+    sOutput ~= fn.readStr;
+
+    //fucking lame because tryWait doesn't wait the file to be closed;
+    foreach(k; 0..100){
+      if(fn.exists){ try{ fn.remove; }catch(Exception e){ sleep(10); } }
+      if(!fn.exists) break;
+    }
+  }
+  logFiles.clear;
+
+  return res;
+}
+
+
 //////////////////////////////////////////////////////////////////////////////
 //  Builder help text                                                       //
 //////////////////////////////////////////////////////////////////////////////
@@ -18,7 +218,7 @@ immutable
   versionStr = "1.02",
   helpStr =  //todo: ehhez edditort csinalni
   "\33\16HDMD\33\7 "~versionStr~" - An automatic build tool for the \33\17DMD\33\7 and \33\17LDC\33\7 compilers.
-by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021
+by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
 \33\17Usage:\33\7    hdmd.exe <mainSourceFile.d> [options]
 
@@ -599,36 +799,36 @@ private: //current build
 
   bool is64bit(){ return settings.compileArgs.canFind("-m64"); }
   bool isOptimized(){ return settings.compileArgs.canFind("-O"); }
+  bool isIncremental(){ return !settings.singleStepCompilation; }
 
-  void compile(File[] srcFiles, string[] compileArgs, bool multi) // Compile ////////////////////////
-  {
-    mixin(perf("compile"));
-    if(srcFiles.empty) return;
-
-    //make DMD commandline args
+  string[] makeCommonCompileArgs(){
+    //make commandline args
     auto args = [settings.useLDC ? "ldmd2" : "dmd", "-vcolumns"];
 
-    if(multi){
+    if(isIncremental){
       args ~= ["-c", "-op", "-allinst"];
     }else{
-      if(settings.generateMap && !settings.useLDC/+LDC doesn't supports+/) args ~= "-map";
+      if(settings.generateMap && !settings.useLDC/+LDC doesn't supports+/) args ~= "-map"; //todo: DMD is deprecated
     }
 
     if(settings.useLDC && !is64bit){ args.addIfCan("-m32"); }
 
     if(!DPaths.importPaths.empty) args ~= "-I"~DPaths.getImportPathList; //TODO: space in path == bug?
-    args ~= compileArgs;
+    args ~= settings.compileArgs;
 
-    //make commandLines
+    return args;
+  }
+
+  string[][] makeCompileCmdLines(File[] srcFiles, string[] commonCompilerArgs){ //todo: refact multi
     string[][] cmdLines;
-    if(multi){
+    if(isIncremental){
       foreach(fn; srcFiles){
-        auto c = args ~ fn.fullName;
+        auto c = commonCompilerArgs ~ fn.fullName;
         //ez nem tudom, mi. if(sameText(fn.ext, `.lib`)) c ~= "-lib";
         cmdLines ~= c;
       }
     }else{//single
-      auto c = args;
+      auto c = commonCompilerArgs;
       c ~= `-of=`~targetFile.fullName;
       foreach(fn; srcFiles) c ~= fn.fullName;
       if(defFile.fullName!="") c ~= defFile.fullName;
@@ -643,11 +843,22 @@ private: //current build
 
       cmdLines ~= c;
     }
+    return cmdLines;
+  }
+
+  void compile(File[] srcFiles) // Compile ////////////////////////
+  {
+    if(srcFiles.empty) return;
+
+    mixin(perf("compile"));
+
+    auto args = makeCommonCompileArgs();
+    auto cmdLines = makeCompileCmdLines(srcFiles, args);
 
 //////////////////////////////////////////////////////////////////////////////////////
 
     string[] sOutputs;
-    int res = spawnProcessMulti(cmdLines, null, sOutputs, (i){ logln(bold("COMPILING: ")~joinCommandLine(cmdLines[i])); });
+    int res = spawnProcessMulti2(cmdLines, null, sOutputs, (i){ logln(bold("COMPILED: ")~joinCommandLine(cmdLines[i])); });
     logln;
 
     //postprocess the combined error log
@@ -665,7 +876,7 @@ private: //current build
 //////////////////////////////////////////////////////////////////////////////////////
 
     //store freshly compiled obj files for later use
-    if(multi){
+    if(isIncremental){
       File[] objStored;
       foreach(fn; srcFiles){
         auto objFn = objFileOf(fn);
@@ -885,7 +1096,6 @@ public:
         }
       }
 
-
       //delete target file and bat file.
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
       targetFile.remove(false);
@@ -915,13 +1125,9 @@ public:
         prepareMapResDef;
         resCompile(resFile, resHash);
 
-        if(settings.singleStepCompilation){
-          compile(filesToCompile, settings.compileArgs, false);
-        }else{
-          compile(filesToCompile, settings.compileArgs, true);
-          overwriteObjsFromCache(filesInCache);
-          link(settings.linkArgs);
-        }
+        compile(filesToCompile);
+        overwriteObjsFromCache(filesInCache);
+        link(settings.linkArgs);
 
         logln(bold("STORING EXE -> CACHE: "), targetFile);
         exeCache[exeHash] = targetFile.read;
