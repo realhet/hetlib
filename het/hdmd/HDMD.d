@@ -13,8 +13,6 @@
 //todo: editor: legyen egy fugg vonal a 80. meg a 132. karakter utan.
 //todo: "//@import c:\d" should be automatic
 
-
-
 import het.utils, buildsys;
 
 int main(string[] args){
@@ -22,8 +20,6 @@ int main(string[] args){
   application.runConsole(args,{
     string sOut, sErr;
     BuildSystem bs;
-
-    //todo: chdir to mainModule's path
 
     re:
     code = bs.commandInterface(args, sOut, sErr);

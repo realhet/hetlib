@@ -85,13 +85,14 @@ class Executor{
       scope(exit) if(workPath) chdir(lastPath.fullPath); // restore it on exit of this funct
 
       // launch the process
-      pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, Config.retainStdout | Config.retainStderr | Config.suppressConsole);
+      pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole);
+      //note: Config.retainStdout makes it impossible to remove the file after.
     }catch(Exception e){
-      ignoreExceptions({ stdLogFile.close;         });
-      ignoreExceptions({ logFile.remove;           });
       result = -1;
       output = "Error: " ~ e.simplifiedMsg;
       ended = true;
+      ignoreExceptions({ stdLogFile.close;         });
+      ignoreExceptions({ logFile.forcedRemove;     });
     }
   }
 
@@ -103,9 +104,8 @@ class Executor{
         result = w.status;
         pid = null;
         ended = true;
-        ignoreExceptions({ stdLogFile.close;         });
         ignoreExceptions({ output = logFile.readStr; });
-        ignoreExceptions({ logFile.remove;           });
+        ignoreExceptions({ logFile.forcedRemove;     });
       }
     }
   }
@@ -117,13 +117,14 @@ class Executor{
       output = "Error: Process has been killed.";
       pid = null;
       ended = true;
+      ignoreExceptions({ logFile.forcedRemove;     });
     }
   }
 
 }
 
 /// returns true it it still need to work more
-bool update(Executor[] executors, void delegate(int, int, string) onProgress = null){
+bool update(Executor[] executors, void delegate(int idx, int result, string output) onProgress = null){
   foreach(i, e; executors){
     if(!e.isFinished){
       e.update;
@@ -244,8 +245,8 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, out string
 //////////////////////////////////////////////////////////////////////////////
 
 immutable
-  versionStr = "1.02",
-  helpStr =  //todo: ehhez edditort csinalni
+  versionStr = "1.03",
+  mainHelpStr =  //todo: ehhez edditort csinalni az ide-ben
   "\33\16HDMD\33\7 "~versionStr~" - An automatic build tool for the \33\17DMD\33\7 and \33\17LDC\33\7 compilers.
 by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
@@ -253,8 +254,9 @@ by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
 \33\17Options:\33\7
 $$$OPTS$$$
-
-\33\17Build macros:\33\7
+",
+  macroHelpStr =
+"\33\17Build macros:\33\7
   These special comments are embedded in the source files to control various
   options in HDMD. No other external/redundant files needed, every information
   needed for a build is stored inside your precious sources files.
@@ -341,6 +343,7 @@ struct BuildSettings{
   @("n|single      = Single step compilation"                                   ) bool singleStepCompilation    ;
   @("d|ldc         = Use LDC2 compiler instead of DMD"                          ) bool useLDC                   ;
   @("w|windowedApp = Setup DEF file for windows application"                    ) bool isWindowedApp            ;
+  @("a|macroHelp   = Show info about the build macros"                          ) bool macroHelp                ;
 
   /// This is needed because the main source header can override the string arrays
   auto dup(){
@@ -641,7 +644,9 @@ private: //current build
   }
 
   void initData(File mainFile_){ //clears the above
-    mainFile = mainFile_;
+    mainFile = mainFile_.normalized;
+    enforce(mainFile.exists, "Can't open main project file: "~mainFile.fullName);
+
     isExe = isDll = hasCoreModule = false;
     targetFile = File("");
     runLines    .clear;
@@ -830,6 +835,20 @@ private: //current build
   bool isOptimized(){ return settings.compileArgs.canFind("-O"); }
   bool isIncremental(){ return !settings.singleStepCompilation; }
 
+  /// converts the compiler args from ldmd2 to ldc2
+  string[] toLdc2(string[] a){
+    if(a.get(0) != "ldmd2") return a;
+//    print("!!!!!!!!!!! toLdc2()");
+    a[0] = "ldc2";
+    foreach(ref s; a){
+      if(s=="-inline") s = "--enable-inlining=true";  //todo: this is the default in -O2
+      if(s.startsWith("-") && !s.startsWith("--")
+         && !s.isWild("-?") && !s.isWild("-?=*")) s = "-"~s;
+    }
+//    a.each!print;
+    return a;
+  }
+
   string[] makeCommonCompileArgs(){
     //make commandline args
     auto args = [settings.useLDC ? "ldmd2" : "dmd", "-vcolumns"];
@@ -842,7 +861,9 @@ private: //current build
 
     if(settings.useLDC && !is64bit){ args.addIfCan("-m32"); }
 
-    if(!DPaths.importPaths.empty) args ~= "-I"~DPaths.getImportPathList; //TODO: space in path == bug?
+    args ~= format!`-I=%s`(mainFile.path.fullPath); //add the main source path. As cwd could be anything else.
+
+    if(!DPaths.importPaths.empty) args ~= "-I="~DPaths.getImportPathList; //TODO: space in path == bug?
     args ~= settings.compileArgs;
 
     return args;
@@ -883,6 +904,8 @@ private: //current build
 
     auto args = makeCommonCompileArgs();
     auto cmdLines = makeCompileCmdLines(srcFiles, args);
+
+    foreach(ref l; cmdLines) l = toLdc2(l); //use ldc2 instead of ldmd2
 
 //////////////////////////////////////////////////////////////////////////////////////
 
@@ -1084,7 +1107,7 @@ public:
   }
 
   // Errors returned in exceptions
-  void build(File mainFile_, BuildSettings settings_ = BuildSettings.init) // Build //////////////////////
+  void build(File mainFile_, BuildSettings originalSettings) // Build //////////////////////
   {
     {// compile
       times = times.init;
@@ -1092,7 +1115,7 @@ public:
 
       sLog = "";
       initData(mainFile_);
-      settings = settings_.dup;
+      settings = originalSettings;
 
       //Rebuild all?
       if(settings.rebuild)
@@ -1210,10 +1233,10 @@ public:
     }
   }
 
-  auto findDependencies(File mainFile_, BuildSettings settings_=BuildSettings.init){ // findDependencies //////////////////////////////////////
+  auto findDependencies(File mainFile_, BuildSettings originalSettings){ // findDependencies //////////////////////////////////////
     sLog = "";
     initData(mainFile_);
-    settings = settings_.dup;
+    settings = originalSettings;
 
     //Rebuild all?
     if(settings.rebuild)
@@ -1257,16 +1280,21 @@ public:
     try{
       sLog = sError = sOutput = "";
 
-      BuildSettings settings;
+      settings = BuildSettings.init;
       auto opts = parseOptions(args, settings, No.handleHelp);
 
+//args.each!print; import het.stream;print(settings.toJson);
+
       if(opts.helpWanted || args.length<=1) {
-        this.settings.verbose = true;
-        logln(helpStr.replace(`$$$OPTS$$$`, opts.helpText));
+        settings.verbose = true;
+        logln(mainHelpStr.replace(`$$$OPTS$$$`, opts.helpText));
+      }else if(settings.macroHelp){
+        settings.verbose = true;
+        logln(macroHelpStr);
       }else{
-        auto mainFile = File(absolutePath(args[1]));
+        auto mainFile = File(args[1]);
         enforce(mainFile.exists, "Error: File not found: "~mainFile.fullName);
-        build(mainFile, settings);
+        build(mainFile, settings); //this overwrites the settings.
       }
 
       sOutput = sLog;

@@ -109,8 +109,8 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx;
 
-import std.windows.registry, core.sys.windows.winreg, core.thread, std.file,
-  std.path, std.json, std.digest.digest, std.parallelism, core.runtime;
+import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
+  std.json, std.digest.digest, std.parallelism, core.runtime;
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
@@ -383,8 +383,7 @@ auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp)
   }*/
 
   string[] getoptLines = getStructInfo(options).getoptLines("options");
-
-  mixin("auto opts = getopt(args, std.getopt.config.bundling,\r\n"~getStructInfo!T.getoptLines("options").join(",")~");");
+  auto opts = mixin("getopt(args, std.getopt.config.bundling,\r\n"~getStructInfo!T.getoptLines("options").join(",")~")");
 
   if(opts.helpWanted && handleHelp){
     writeln(opts.helpText);
@@ -3911,12 +3910,8 @@ public:
   string fullPath;
 
   this(string path_){ fullPath = path_; }
-  this(Path base, string path_){
-    //todo: use buildPath()
-    fullPath = base.fullPath;
-    if(fullPath!="") fullPath = includeTrailingPathDelimiter(fullPath);
-    fullPath ~= path_;
-  }
+  this(string path_, string name_) { fullPath = combinePath(path_, name_); }
+  this(Path path_, string name_) { fullPath = combinePath(path_.fullPath, name_); }
 
   string toString() const { return "Path("~fullPath.quoted~")"; }
   bool isNull() const{ return fullPath==""; }
@@ -3927,7 +3922,11 @@ public:
   @property string dir() const { return excludeTrailingPathDelimiter(fullPath); }
   @property void dir(string dir_) { fullPath = includeTrailingPathDelimiter(dir_); }
 
-  auto isAbsolute()const{ return isAbsolutePath (fullPath); }
+  auto isAbsolute()const{ return isAbsolutePath(fullPath); }
+
+  Path normalized()             const { return Path(buildNormalizedPath(absolutePath(fullPath))); }
+  Path normalized(string base)  const { return Path(buildNormalizedPath(absolutePath(fullPath, base))); }
+  Path normalized(in Path base) const { return normalized(base.fullPath); }
 
   Path parent() const { string s = dir; while(s!="" && s[$-1]!='\\') s.length--; return Path(s); }
 
@@ -4007,7 +4006,13 @@ Path programFilesPath() {
 ///  File                                                                    ///
 ////////////////////////////////////////////////////////////////////////////////
 
-private bool isAbsolutePath(const string fn) { return fn.startsWith(`\\`) || fn.indexOf(`:\`)==1; }
+private bool isAbsolutePath(string fn) { return std.path.isAbsolute(fn); }
+
+private string combinePath(string a, string b){
+  if(!a) return b;
+  if(!b) return a;
+  return std.path.buildPath(a, b);
+}
 
 struct File{
 private static{/////////////////////////////////////////////////////////////////
@@ -4059,12 +4064,6 @@ private static{/////////////////////////////////////////////////////////////////
     return res;
   }
 
-  string combinePath(string a, string b){
-    if(!a) return b;
-    if(!b) return a;
-    return includeTrailingPathDelimiter(a)~b;
-  }
-
   string extractFilePath(string fn) {
     auto s = dirName(fn);
     if(s==".") return "";
@@ -4079,6 +4078,7 @@ public:
   this(string fullName_) { fullName = fullName_; }
   this(string path_, string name_) { fullName = combinePath(path_, name_); }
   this(Path path_, string name_) { fullName = combinePath(path_.fullPath, name_); }
+  this(Path path_, File file_) { fullName = combinePath(path_.fullPath, file_.fullName); }
 
   string fullName;
 
@@ -4089,6 +4089,10 @@ public:
   auto exists()    const{ return fileExists     (fullName); }
   auto size()      const{ return fileSize       (fullName); }
   auto isAbsolute()const{ return isAbsolutePath (fullName); }
+
+  File normalized()             const{ return File(buildNormalizedPath(absolutePath(fullName))); }
+  File normalized(string base)  const{ return File(buildNormalizedPath(absolutePath(fullName, base))); }
+  File normalized(in Path base) const{ return normalized(base.fullPath); }
 
   auto times()     const{ return fileTimes      (fullName); }
   auto modified()  const{ return times.modified; }
@@ -4132,6 +4136,15 @@ public:
       }
     }
     return !exists;
+  }
+
+  /// Useful to remove files that are generated from std output. Those aren't closed immediatelly.
+  void forcedRemove() const{
+    foreach(k; 0..100){
+      if(exists){ try{ remove; }catch(Exception e){ sleep(10); } }
+      if(!exists) return;
+    }
+    ERR("Failed to forcedRemove file ", this);
   }
 
   ubyte[] read(bool mustExists = true, ulong offset = 0, size_t len = size_t.max)const{ //todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
