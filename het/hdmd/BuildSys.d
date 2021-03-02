@@ -27,12 +27,22 @@ class Executor{
   //output data
   string output;
   int result;
+  bool ended;
+
+  this(){
+  }
+
+  this(bool startNow, in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
+    this();
+    (startNow ? &start : &setup)(cmd, env, workPath, tempPath);
+  }
+
 
   enum State { idle, running, finished }
   @property{
     auto state() const{
       if(pid !is null) return State.running;
-      if(cmd is null) return State.idle;
+      if(!ended) return State.idle;
       return State.finished;
     }
     auto isIdle    () const{ return state==State.idle    ; }
@@ -40,12 +50,22 @@ class Executor{
     auto isFinished() const{ return state==State.finished; }
   }
 
-  void start(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
+  void reset(){
+    kill;
+    this.clearFields;
+  }
+
+  void setup(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
     if(isRunning) ERR("already running");
-    this.cmd = cmd;
-    this.env = env;
+    reset;
+    this.cmd = cmd.dup;
+    this.env = cast(string[string])env;
     this.workPath = workPath;
     this.tempPath = tempPath;
+  }
+
+  void start(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
+    setup(cmd, env, workPath, tempPath);
     start;
   }
 
@@ -71,6 +91,7 @@ class Executor{
       ignoreExceptions({ logFile.remove;           });
       result = -1;
       output = "Error: " ~ e.simplifiedMsg;
+      ended = true;
     }
   }
 
@@ -80,10 +101,11 @@ class Executor{
       auto w = tryWait(pid);
       if(w.terminated){
         result = w.status;
+        pid = null;
+        ended = true;
         ignoreExceptions({ stdLogFile.close;         });
         ignoreExceptions({ output = logFile.readStr; });
         ignoreExceptions({ logFile.remove;           });
-        pid = null;
       }
     }
   }
@@ -94,22 +116,18 @@ class Executor{
       result = -1;
       output = "Error: Process has been killed.";
       pid = null;
+      ended = true;
     }
-  }
-
-  void reset(){
-    kill;
-    this.clearFields;
   }
 
 }
 
 /// returns true it it still need to work more
-bool update(Executor[] executors, void delegate(int) onProgress = null){
+bool update(Executor[] executors, void delegate(int, int, string) onProgress = null){
   foreach(i, e; executors){
     if(!e.isFinished){
       e.update;
-      if(e.isFinished && onProgress !is null) onProgress(i.to!int);
+      if(e.isFinished && (onProgress !is null)) onProgress(i.to!int, e.result, e.output);
     }
   }
   return !executors.all!(e => e.isFinished);
@@ -130,21 +148,32 @@ void executorTest(){
   print("end of test");
 }
 
-int spawnProcessMulti2(const string[][] cmdLines, const string[string] env, out string[] sOutput, void delegate(int i) onProgress = null){
+int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, out string[] sOutput, void delegate(int idx, int result, string output) onProgress = null){
   //it was developed for running multiple compiler instances.
 
-  Executor[] executors;
-  foreach(cmdLine; cmdLines){
-    auto e = new Executor;
-    e.start(cmdLine, env);
+  Executor[] executors = cmdLines.map!(s => new Executor(false, s, env)).array;
+
+  void startOne(){ foreach(e; executors) if(e.isIdle){ e.start; break; } }
+
+  while(executors.update(onProgress)){
+    const runningCnt = executors.count!(e => e.isRunning);
+    if(runningCnt==0 || (runningCnt<GetNumberOfCores-1 && GetCPULoadPercent<90 && GetMemAvailMB>512)){
+      startOne; sleep(30);
+    }
+
+    sleep(10);
   }
 
-  while(executors.update(onProgress)) sleep(3);
-
-  itt tartok!!!!!!!!!!!!!!!
+  sOutput = [];
+  auto res = 0;
+  foreach(e; executors){
+    if(e.result) res = e.result;
+    sOutput ~= e.output;
+  }
+  return res;
 
   ////////////////////////////////////////////////
-  import std.process;
+/+  import std.process;
 
   //create log files
   StdFile[] logFiles;
@@ -206,7 +235,7 @@ int spawnProcessMulti2(const string[][] cmdLines, const string[string] env, out 
   }
   logFiles.clear;
 
-  return res;
+  return res; +/
 }
 
 
@@ -858,7 +887,16 @@ private: //current build
 //////////////////////////////////////////////////////////////////////////////////////
 
     string[] sOutputs;
-    int res = spawnProcessMulti2(cmdLines, null, sOutputs, (i){ logln(bold("COMPILED: ")~joinCommandLine(cmdLines[i])); });
+    int res = spawnProcessMulti2(cmdLines, null, sOutputs, (idx, result, output){
+      logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
+
+      // storing obj into objCache
+      if(isIncremental && result==0){
+        auto srcFn = srcFiles[idx];
+        auto objFn = objFileOf(srcFn);
+        objCache[findModule(srcFn).objHash] = objFn.read(true);
+      }
+    });
     logln;
 
     //postprocess the combined error log
@@ -876,7 +914,7 @@ private: //current build
 //////////////////////////////////////////////////////////////////////////////////////
 
     //store freshly compiled obj files for later use
-    if(isIncremental){
+    /*if(isIncremental){
       File[] objStored;
       foreach(fn; srcFiles){
         auto objFn = objFileOf(fn);
@@ -885,7 +923,7 @@ private: //current build
       }
       if(!objStored.empty)
         logln(bold("STORING OBJ -> CACHE: "), objStored.map!(a=>smallName(a)).join(", "));
-    }
+    }*/
   }
 
   void overwriteObjsFromCache(File[] filesInCache)

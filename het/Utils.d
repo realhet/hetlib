@@ -97,20 +97,20 @@ public import het.math;
 public import het.color;
 
 // Windows imports
-public import core.sys.windows.windows : SetPriorityClass, HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
+public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
+  HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
   BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
-  GetCurrentProcess,
-  GUID;
-
-import std.windows.registry, core.sys.windows.winreg, core.thread, std.file,
-  std.path, std.json, std.digest.digest, std.parallelism, core.runtime;
-
-import core.sys.windows.windows : HRESULT, HWND, SYSTEMTIME, FILETIME, MB_OK, STD_OUTPUT_HANDLE, HMODULE,
-  GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow, SetFocus, SetForegroundWindow, GetForegroundWindow,
+  HRESULT, HWND, GUID, SYSTEMTIME, FILETIME, MB_OK, STD_OUTPUT_HANDLE, HMODULE,
+  GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow,
+  SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
   GetStdHandle, GetTempPathW, GetFileTime,
   FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
-  SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS;
+  SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
+  GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx;
+
+import std.windows.registry, core.sys.windows.winreg, core.thread, std.file,
+  std.path, std.json, std.digest.digest, std.parallelism, core.runtime;
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
@@ -1965,6 +1965,13 @@ string capitalize(alias fv = toUpper)(string s){
     if(u != s[0]) s = u~s[1..$];
   }
   return s;
+}
+
+void listAppend(ref string s, string what, string separ){
+  auto w = what.strip;
+  if(w.empty) return;
+  if(!s.strip.empty) s ~= separ;
+  s ~= w;
 }
 
 string truncate(string ellipsis="...")(string s, size_t maxLen){ //todo: string.truncate-t megcsinalni unicodeosra rendesen.
@@ -4926,8 +4933,50 @@ extern(C){
   bool SetProcessAffinityMask(HANDLE process, DWORD_PTR mask);
 }
 
-//public import core.cpuid: GetNumberOfCores = coresPerCPU;
 public import std.parallelism: GetNumberOfCores = totalCPUs;
+
+private auto GetCPULoadPercent_internal(){
+  // get tick counters
+  ulong idle, kernel, user;
+  auto ft(ref ulong a){ return cast(FILETIME*)(&a); }
+  if(!GetSystemTimes(ft(idle), ft(kernel), ft(user))) return float.nan;
+
+  // calculate  1 - (delta(Idle) / delta(kernel+user))
+  __gshared static ulong prevTotal, prevIdle;
+  auto total = kernel+user;
+  auto res = 1 - float(idle-prevIdle) / (total-prevTotal); //can divide by zero when called too frequently
+  prevTotal = total;
+  prevIdle  = idle ;
+
+  return res*100;
+}
+
+auto GetCPULoadPercent(){
+  __gshared static double lastTime = 0;
+  __gshared static float lastPercent = 0;
+
+  const interval = 0.33f; //seconds
+
+  auto actTime = QPS;
+  if(actTime-lastTime > interval){
+    lastTime = actTime;
+    auto a = GetCPULoadPercent_internal;
+    if(!isnan(a)) lastPercent = a;
+  }
+
+  return lastPercent;
+}
+
+
+auto GetMemUsagePercent(){
+  MEMORYSTATUSEX ms; ms.dwLength = ms.sizeof; GlobalMemoryStatusEx(&ms);
+  with(ms) return ((1-(float(ullAvailPhys)/ullTotalPhys))*100).percent;
+}
+
+auto GetMemAvailMB(){
+  MEMORYSTATUSEX ms; ms.dwLength = ms.sizeof; GlobalMemoryStatusEx(&ms);
+  return ms.ullAvailPhys>>20;
+}
 
 
 ///////////////////////////////////////////////////////////////////////////
