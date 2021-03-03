@@ -252,6 +252,8 @@ by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
 \33\17Usage:\33\7  hldc.exe <mainSourceFile.d> [options]
 
+\33\17Background mode:\33\7  hldc.exe background [options]
+
 \33\17Requirements:\33\7
  * Visual Studio 2017 Community (for mslink.exe and the static libs)
  * Visual D (this installs LDC2 and sets up the environment for VS)
