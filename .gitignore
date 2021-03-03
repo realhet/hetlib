@@ -9,6 +9,6 @@
 #included directories
 !het/
 !het/test/
-!het/hdmd/
+!het/hldc/
 !imageformats/
 !webp/
