@@ -247,10 +247,10 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, out string
 immutable
   versionStr = "1.03",
   mainHelpStr =  //todo: ehhez edditort csinalni az ide-ben
-  "\33\16HDMD\33\7 "~versionStr~" - An automatic build tool for the \33\17DMD\33\7 and \33\17LDC\33\7 compilers.
+  "\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC2\33\7 compiler.
 by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
-\33\17Usage:\33\7    hdmd.exe <mainSourceFile.d> [options]
+\33\17Usage:\33\7    hldc.exe <mainSourceFile.d> [options]
 
 \33\17Options:\33\7
 $$$OPTS$$$
@@ -258,7 +258,7 @@ $$$OPTS$$$
   macroHelpStr =
 "\33\17Build macros:\33\7
   These special comments are embedded in the source files to control various
-  options in HDMD. No other external/redundant files needed, every information
+  options in HLDC. No other external/redundant files needed, every information
   needed for a build is stored inside your precious sources files.
   Double quotes are supported for parameters containing spaces.
 
@@ -288,12 +288,12 @@ $$$OPTS$$$
   Puts the optional prefix before the induvidual fileNames.
 
 \33\17//@WIN\33\7
-  Specifies that is a windowed application. The default run.bat will not
+  Specifies that this is a Windows application. The default run.bat will not
   include the 'pause' command at the end.
 
 \33\17//@COMPILE [param1 [param2 [paramN...]]]\33\7
 \33\17//@LINK [param1 [param2 [paramN...]]]\33\7
-  Passes parameters to the DMD compiler and to the OPTLINK linker.
+  Passes parameters to the LDC compiler and to the MSLINK linker.
 
 \33\17//@RUN <command>\33\7
   After successful compile/link it puts these commands into a .bat file
@@ -310,10 +310,7 @@ Experimental:
   Adds -release -O -inline -boundscheck=off params to the COMPILE options
 
 \33\17//@SINGLE\33\7
-  Single pass compilation without caching
-
-\33\17//@LDC\33\7
-  Use LDMD2 compiler instead of DMD.
+  Single pass compilation without caching. At the moment it's quite broken.
 ";
 
 //////////////////////////////////////////////////////////////////////////////
@@ -341,7 +338,6 @@ struct BuildSettings{
   @("k|kill        = Kill currently running executable before compile."         ) bool killExe                  ;
   @("t|todo        = Collect //Todo: and //Opt: comments."                      ) bool collectTodos             ;
   @("n|single      = Single step compilation"                                   ) bool singleStepCompilation    ;
-  @("d|ldc         = Use LDC2 compiler instead of DMD"                          ) bool useLDC                   ;
   @("w|windowedApp = Setup DEF file for windows application"                    ) bool isWindowedApp            ;
   @("a|macroHelp   = Show info about the build macros"                          ) bool macroHelp                ;
 
@@ -749,8 +745,9 @@ private: //current build
       case "run"    :{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);    break; }
       case "import" :{ DPaths.addImportPathList(buildMacro[6..$]);                              break; }
       case "release":{ addCompileArgs(["-release", "-O", "-inline", "-boundscheck=off"]);       break; }
-      case "ldc"    :{ settings.useLDC = true;                                                  break; }
       case "single" :{ settings.singleStepCompilation = true;                                   break; }
+
+      case "ldc"    :{ logln("Deprecated build macro: //@LDC");                                 break; }
       default: enforce(false, "Unknown BuildMacro command: "~cmd);
     }
   }
@@ -831,39 +828,32 @@ private: //current build
     return srcFile.otherExt(ext);
   }
 
-  bool is64bit(){ return settings.compileArgs.canFind("-m64"); }
+  bool is64bit(){ return !settings.compileArgs.canFind("-m32"); }
   bool isOptimized(){ return settings.compileArgs.canFind("-O"); }
   bool isIncremental(){ return !settings.singleStepCompilation; }
 
   /// converts the compiler args from ldmd2 to ldc2
-  string[] toLdc2(string[] a){
-    if(a.get(0) != "ldmd2") return a;
-//    print("!!!!!!!!!!! toLdc2()");
-    a[0] = "ldc2";
-    foreach(ref s; a){
-      if(s=="-inline") s = "--enable-inlining=true";  //todo: this is the default in -O2
-      if(s.startsWith("-") && !s.startsWith("--")
-         && !s.isWild("-?") && !s.isWild("-?=*")) s = "-"~s;
+  void makeLdc2CompatibleArgs(ref string[] args){
+    foreach(ref a; args){
+      if(a=="-inline") a = "-enable-inlining=true";  //note: this is the default in -O2
     }
-//    a.each!print;
-    return a;
   }
 
   string[] makeCommonCompileArgs(){
     //make commandline args
-    auto args = [settings.useLDC ? "ldmd2" : "dmd", "-vcolumns"];
+    auto args = ["ldc2", "-vcolumns"];
 
-    if(isIncremental){
-      args ~= ["-c", "-op", "-allinst"];
-    }else{
-      if(settings.generateMap && !settings.useLDC/+LDC doesn't supports+/) args ~= "-map"; //todo: DMD is deprecated
-    }
+    if(isIncremental) args ~= ["-c", "-op", "-allinst"];
 
-    if(settings.useLDC && !is64bit){ args.addIfCan("-m32"); }
+    // default bitness is 64
+    if(!settings.compileArgs.canFind("-m32") && !settings.compileArgs.canFind("-m64")) args ~= "-m64";
+
+    //defaul mcpu if not present
+    if(!settings.compileArgs.map!(a => a.startsWith("-mcpu=")).any) args ~= ["-mcpu=athlon64-sse3", "-mattr=+ssse3"];
 
     args ~= format!`-I=%s`(mainFile.path.fullPath); //add the main source path. As cwd could be anything else.
+    if(!DPaths.importPaths.empty) args ~= `-I=`~DPaths.getImportPathList; //TODO: space in path == bug?
 
-    if(!DPaths.importPaths.empty) args ~= "-I="~DPaths.getImportPathList; //TODO: space in path == bug?
     args ~= settings.compileArgs;
 
     return args;
@@ -889,7 +879,6 @@ private: //current build
         case ".lib": libFiles ~= fn; break;
         default: break;
       }
-      if(is64bit && !settings.useLDC) c ~= libFiles;
 
       cmdLines ~= c;
     }
@@ -905,7 +894,7 @@ private: //current build
     auto args = makeCommonCompileArgs();
     auto cmdLines = makeCompileCmdLines(srcFiles, args);
 
-    foreach(ref l; cmdLines) l = toLdc2(l); //use ldc2 instead of ldmd2
+    foreach(ref line; cmdLines) makeLdc2CompatibleArgs(line);
 
 //////////////////////////////////////////////////////////////////////////////////////
 
@@ -1009,8 +998,8 @@ private: //current build
     mixin(perf("link"));
     if(modules.empty) return;
 
-    const useOptLink = !settings.useLDC && !is64bit,
-          useMSLink = !useOptLink;
+    const useOptLink = false,
+          useMSLink = true;
 
     string[] objFiles = modules.map!(m => objFileOf(m.file).fullName).array,
              libFiles,           //user32, kernel32 nem kell, megtalalja magatol
@@ -1045,7 +1034,7 @@ private: //current build
       enforce(link.status==0, link.output);  if(!link.output.empty) logln(link.output);
     }else if(useMSLink){//////////////////////////////////////////////////////////////////////////
       auto cmd = ["link",
-                  `/LIBPATH:`~(settings.useLDC?(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`):(is64bit?`c:\D\dmd2\windows\lib64`:`c:\D\dmd2\windows\lib`)), //todo: the place for these is in DPath
+                  `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //todo: the place for these is in DPath
                   `/OUT:`~targetFile.fullName,
                   `/MACHINE:`~(is64bit ? "X64" : "X86")]
                   ~linkOpts
@@ -1053,7 +1042,7 @@ private: //current build
                   ~`legacy_stdio_definitions.lib`
                   ~objFiles;
 
-      if(settings.useLDC){
+      { // add libs for LDC
         cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
         /+note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
           https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
@@ -1129,7 +1118,7 @@ public:
 
       //calculate dependency hashed of obj files to lookup in the objCache
       modules.resolveModuleImportDependencies;
-      modules.calculateObjHashes(joinCommandLine(settings.compileArgs)~" useLDC:"~text(settings.useLDC));
+      modules.calculateObjHashes(joinCommandLine(settings.compileArgs)~" useLDC:"~text(true)); //Note: compuler specific hash generation. Now it is only uses LDC2
 
       //ensure that no std or core files are going to be recompiled
       foreach(const m; modules)
@@ -1147,7 +1136,7 @@ public:
 
         logln(bold("BUILDING PROJECT:    "), mainFile);
         logln(bold("TARGET FILE:         "), targetFile);
-        logln(bold("OPTIONS:             "), settings.useLDC?"LDC":"DMD", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR");
+        logln(bold("OPTIONS:             "), "LDC", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR");
         logln(bold("SOURCE STATS:        "), format("Lines: %s   Bytes: %s", totalLines, totalBytes));
 
         foreach(i, const m; modules){
