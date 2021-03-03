@@ -17,7 +17,7 @@ class Executor{
   //input data
   string[] cmd;
   string[string] env;
-  Path workPath, tempPath;
+  Path workPath, logPath;
 
   //temporal data
   File logFile;
@@ -32,9 +32,9 @@ class Executor{
   this(){
   }
 
-  this(bool startNow, in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
+  this(bool startNow, in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path logPath = Path.init){
     this();
-    (startNow ? &start : &setup)(cmd, env, workPath, tempPath);
+    (startNow ? &start : &setup)(cmd, env, workPath, logPath);
   }
 
 
@@ -55,17 +55,17 @@ class Executor{
     this.clearFields;
   }
 
-  void setup(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
+  void setup(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path logPath = Path.init){
     if(isRunning) ERR("already running");
     reset;
     this.cmd = cmd.dup;
     this.env = cast(string[string])env;
     this.workPath = workPath;
-    this.tempPath = tempPath;
+    this.logPath = logPath;
   }
 
-  void start(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path tempPath = Path.init){
-    setup(cmd, env, workPath, tempPath);
+  void start(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path logPath = Path.init){
+    setup(cmd, env, workPath, logPath);
     start;
   }
 
@@ -74,8 +74,8 @@ class Executor{
 
     try{
       // create logFile default logFile path is tempPath
-      Path actualTempPath = tempPath ? tempPath : appPath;
-      logFile = File(actualTempPath, this.identityStr ~ ".log");
+      Path actualLogPath = logPath ? logPath : het.utils.tempPath;
+      logFile = File(actualLogPath, this.identityStr ~ ".log");
       logFile.path.make;
       stdLogFile = StdFile(logFile.fullName, "w");
 
@@ -141,7 +141,7 @@ void executorTest(){
   e.start(["cmd", "/c", "echo", "hello world", "%ENVTEST%", "%CD%"], //commandline
           ["ENVTEST" : "EnvTestValue"], //env override
           Path(`z:\TEMP`), //workPath
-          Path(`z:\TEMP`)); //tempPath for the logFile
+          Path(`z:\TEMP`)); //logPath for the logFile
   print(currentPath);
   while([e].update){ print(e.state, e.result, e.output); sleep(3); }
   print(e.state, e.result, e.output);
@@ -149,10 +149,10 @@ void executorTest(){
   print("end of test");
 }
 
-int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, out string[] sOutput, void delegate(int idx, int result, string output) onProgress = null){
+int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, void delegate(int idx, int result, string output) onProgress){
   //it was developed for running multiple compiler instances.
 
-  Executor[] executors = cmdLines.map!(s => new Executor(false, s, env)).array;
+  Executor[] executors = cmdLines.map!(s => new Executor(false, s, env, workPath, logPath)).array;
 
   void startOne(){ foreach(e; executors) if(e.isIdle){ e.start; break; } }
 
@@ -250,7 +250,19 @@ immutable
   "\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC2\33\7 compiler.
 by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
-\33\17Usage:\33\7    hldc.exe <mainSourceFile.d> [options]
+\33\17Usage:\33\7  hldc.exe <mainSourceFile.d> [options]
+
+\33\17Requirements:\33\7
+ * Visual Studio 2017 Community (for mslink.exe and the static libs)
+ * Visual D (this installs LDC2 and sets up the environment for VS)
+ * LDC location must be: c:\\d\\ldc2\\bin\\ldc2.exe (to access precompiled libs from there)
+ * Implicit path of static libraries: c:\\d\\ldc2\\lib64\\ (put any .lib files here)
+ * Implicit path of library includes: c:\\d\\libs\\ (you can put here your packages)
+ * Best practice: 64bit target, incremental build
+
+\33\17Known bugs:\33\7
+ * Don't use Tuples in format(). They're conflicting with the -allinst parameter which is
+   required for incremental builds.
 
 \33\17Options:\33\7
 $$$OPTS$$$
@@ -288,8 +300,8 @@ $$$OPTS$$$
   Puts the optional prefix before the induvidual fileNames.
 
 \33\17//@WIN\33\7
-  Specifies that this is a Windows application. The default run.bat will not
-  include the 'pause' command at the end.
+  Specifies that this is a Windows application. A DEF file for Windows will be created.
+  The default run.bat will not include the 'pause' command at the end.
 
 \33\17//@COMPILE [param1 [param2 [paramN...]]]\33\7
 \33\17//@LINK [param1 [param2 [paramN...]]]\33\7
@@ -326,7 +338,7 @@ struct EditorFile{ align(1):  //Editor sends it's modified files using this stru
   DateTime dateTime;
 }
 
-struct BuildSettings{
+struct BuildSettings{ //todo: mi a faszert irja ki allandoan az 1 betus roviditest mindenhez???
   @("v|verbose     = Verbose output. Otherwise it will only display the errors.") bool verbose                  ;
   @("m|map         = Generate map file.",                                       ) bool generateMap              ;
   @("c|compileOnly = Compile and link only, do not run."                        ) bool compileOnly              ;
@@ -338,7 +350,7 @@ struct BuildSettings{
   @("k|kill        = Kill currently running executable before compile."         ) bool killExe                  ;
   @("t|todo        = Collect //Todo: and //Opt: comments."                      ) bool collectTodos             ;
   @("n|single      = Single step compilation"                                   ) bool singleStepCompilation    ;
-  @("w|windowedApp = Setup DEF file for windows application"                    ) bool isWindowedApp            ;
+  @("w|workPath    = Specify path for temp files. Default = Project's path."    ) string workPath               ;
   @("a|macroHelp   = Show info about the build macros"                          ) bool macroHelp                ;
 
   /// This is needed because the main source header can override the string arrays
@@ -566,13 +578,14 @@ struct BuildSystem{
 private: //current build
   //input data
   File mainFile;
+  Path workPath; //mainly for the .obj files. This is optional.
   BuildSettings settings;
 
   //flags
   //bool verbose, compileOnly, generateMap, isWindowedApp, collectTodos, useLDC, singleStepCompilation;
 
   //derived data
-  bool isExe, isDll, hasCoreModule;
+  bool isExe, isDll, hasCoreModule, isWindowedApp;
   File targetFile, mapFile, defFile, resFile;
   File[string] resFiles;
   string[] runLines, defLines;
@@ -643,8 +656,13 @@ private: //current build
     mainFile = mainFile_.normalized;
     enforce(mainFile.exists, "Can't open main project file: "~mainFile.fullName);
 
-    isExe = isDll = hasCoreModule = false;
+    DPaths.init;
+    DPaths.addImportPath(mainFile.path.fullPath);
+    DPaths.addImportPath(`c:\d\libs\`);
+
+    isExe = isDll = hasCoreModule = isWindowedApp = false;
     targetFile = File("");
+    workPath = Path("");
     runLines    .clear;
     defLines    .clear;
     resFiles    .clear;
@@ -739,14 +757,13 @@ private: //current build
         break;
       }
       case "def"    :{ defLines ~= buildMacro[3..$].strip;                                      break; }
-      case "win"    :{ settings.isWindowedApp = true;                                           break; }
+      case "win"    :{ isWindowedApp = true;                                                    break; }
       case "compile":{ settings.compileArgs.addIfCan(args[1..$]);                               break; }
       case "link"   :{ addLinkArgs(args[1..$]);                                                 break; }
       case "run"    :{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);    break; }
       case "import" :{ DPaths.addImportPathList(buildMacro[6..$]);                              break; }
       case "release":{ addCompileArgs(["-release", "-O", "-inline", "-boundscheck=off"]);       break; }
       case "single" :{ settings.singleStepCompilation = true;                                   break; }
-
       case "ldc"    :{ logln("Deprecated build macro: //@LDC");                                 break; }
       default: enforce(false, "Unknown BuildMacro command: "~cmd);
     }
@@ -815,17 +832,30 @@ private: //current build
     return list.join;
   }
 
-  ModuleInfo* findModule(File fn){
+  ModuleInfo* findModule(in File fn){
     foreach(ref m; modules) if(m.file==fn) return &m;
     return null;
+  }
+
+  auto moduleFullNameOf(in File fn){
+    auto mi = findModule(fn);
+    return mi ? mi.moduleFullName : "";
   }
 
   auto objFileOf(File srcFile)
   {
     //for incremental builds: main file is OBJ, all others are LIBs
     //auto ext = srcFile==mainFile ? ".obj" : ".lib";
-    auto ext = ".obj";
-    return srcFile.otherExt(ext);
+    //note: no lib support at the moment.
+
+    //this is the simplest strategy
+    if(workPath.isNull){
+      return srcFile.otherExt("obj"); //right next to the source file
+    }else{
+      auto s = moduleFullNameOf(srcFile);
+      enforce(s != "", "moduleFullNameOf() fail: "~srcFile.text);
+      return File(workPath, s~".obj");
+    }
   }
 
   bool is64bit(){ return !settings.compileArgs.canFind("-m32"); }
@@ -843,7 +873,7 @@ private: //current build
     //make commandline args
     auto args = ["ldc2", "-vcolumns"];
 
-    if(isIncremental) args ~= ["-c", "-op", "-allinst"];
+    if(isIncremental) args ~= ["-c", "-allinst"];  // no more "-op", because every output filename is specified explicitly with "-of="
 
     // default bitness is 64
     if(!settings.compileArgs.canFind("-m32") && !settings.compileArgs.canFind("-m64")) args ~= "-m64";
@@ -851,8 +881,7 @@ private: //current build
     //defaul mcpu if not present
     if(!settings.compileArgs.map!(a => a.startsWith("-mcpu=")).any) args ~= ["-mcpu=athlon64-sse3", "-mattr=+ssse3"];
 
-    args ~= format!`-I=%s`(mainFile.path.fullPath); //add the main source path. As cwd could be anything else.
-    if(!DPaths.importPaths.empty) args ~= `-I=`~DPaths.getImportPathList; //TODO: space in path == bug?
+    args ~= format!`-I=%s`(DPaths.getImportPathList);
 
     args ~= settings.compileArgs;
 
@@ -863,7 +892,7 @@ private: //current build
     string[][] cmdLines;
     if(isIncremental){
       foreach(fn; srcFiles){
-        auto c = commonCompilerArgs ~ fn.fullName;
+        auto c = commonCompilerArgs ~ ["-of="~objFileOf(fn).fullName, fn.fullName];
         //ez nem tudom, mi. if(sameText(fn.ext, `.lib`)) c ~= "-lib";
         cmdLines ~= c;
       }
@@ -899,7 +928,7 @@ private: //current build
 //////////////////////////////////////////////////////////////////////////////////////
 
     string[] sOutputs;
-    int res = spawnProcessMulti2(cmdLines, null, sOutputs, (idx, result, output){
+    int res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
       logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
 
       // storing obj into objCache
@@ -922,20 +951,6 @@ private: //current build
     //check results
     enforce(res==0, sOutput);
     if(!sOutput.empty) logln(sOutput);
-
-//////////////////////////////////////////////////////////////////////////////////////
-
-    //store freshly compiled obj files for later use
-    /*if(isIncremental){
-      File[] objStored;
-      foreach(fn; srcFiles){
-        auto objFn = objFileOf(fn);
-        objCache[findModule(fn).objHash] = objFn.read;
-        objStored ~= objFn;
-      }
-      if(!objStored.empty)
-        logln(bold("STORING OBJ -> CACHE: "), objStored.map!(a=>smallName(a)).join(", "));
-    }*/
   }
 
   void overwriteObjsFromCache(File[] filesInCache)
@@ -944,10 +959,8 @@ private: //current build
     foreach(fn; filesInCache){ //provide files already in cache
       auto data = objCache[findModule(fn).objHash];
       auto objFn = objFileOf(fn);
-      if(!equal(data, fn.read(false))){ //only write if needed
-        objFn.write(data);
+      if(objFn.writeIfNeeded(data))
         objWritten ~= fn;
-      }
     }
     if(!objWritten.empty)
       logln(bold("WRITING CACHE -> OBJ: "), objWritten.map!(a=>smallName(a)).join(", "));
@@ -998,16 +1011,11 @@ private: //current build
     mixin(perf("link"));
     if(modules.empty) return;
 
-    const useOptLink = false,
-          useMSLink = true;
-
     string[] objFiles = modules.map!(m => objFileOf(m.file).fullName).array,
              libFiles,           //user32, kernel32 nem kell, megtalalja magatol
              linkOpts; //todo: kideriteni, hogy ez miert kell a windowsos cuccokhoz
 
-    if(useOptLink) linkOpts ~= "/noi";
-
-    if(settings.generateMap) addIfCan(linkOpts, useMSLink ? "/MAP" : "/DETAILEDMAP");
+    if(settings.generateMap) addIfCan(linkOpts, "/MAP");
 
     foreach(fn; linkArgs) switch(lc(File(fn).ext)){ //sort out different link commandline parts
       case ".obj": objFiles ~= fn; break;
@@ -1016,47 +1024,34 @@ private: //current build
       default: linkOpts ~= fn; //treat as an option
     }
 
-    if(useOptLink){//////////////////////////////////////////////////////////////////////////
-      string[] tol(string s) { return s.empty ? [] : [s]; }
-      auto cmd = ["link"] ~ objFiles                  ~","
-                          ~ targetFile.fullName       ~","
-                          ~ tol(mapFile.fullName)     ~","
-                          ~ libFiles                  ~","
-                          ~ tol(defFile.fullName)     ~","
-                          ~ tol(resFile.fullName);
-      while(cmd[$-1]==",") cmd = cmd[0..$-1]; //cut back last commas
-      cmd ~= linkOpts.join("") ~";";  //add options and a semicolon
+    auto cmd = ["link",
+                `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //todo: the place for these is in DPath
+                `/OUT:`~targetFile.fullName,
+                `/MACHINE:`~(is64bit ? "X64" : "X86")]
+                ~linkOpts
+                ~libFiles
+                ~`legacy_stdio_definitions.lib`
+                ~objFiles;
 
-      logln(bold("LINKING: "), joinCommandLine(cmd));
-      auto link = execute(cmd, [`LIB`:DPaths.libPath], Config.suppressConsole);
+    // add libs for LDC
+    cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
+    /+note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
+      https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
+        libcmt.lib: static CRT link library for a release build (/MT)
+        msvcrt.lib: import library for the release DLL version of the CRT (/MD) +/
 
-      defFile.remove; //cleanup
-      enforce(link.status==0, link.output);  if(!link.output.empty) logln(link.output);
-    }else if(useMSLink){//////////////////////////////////////////////////////////////////////////
-      auto cmd = ["link",
-                  `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //todo: the place for these is in DPath
-                  `/OUT:`~targetFile.fullName,
-                  `/MACHINE:`~(is64bit ? "X64" : "X86")]
-                  ~linkOpts
-                  ~libFiles
-                  ~`legacy_stdio_definitions.lib`
-                  ~objFiles;
+    auto line = joinCommandLine(cmd);
+    logln(bold("LINKING: "), line);
+    auto link = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
 
-      { // add libs for LDC
-        cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
-        /+note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
-          https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
-            libcmt.lib: static CRT link library for a release build (/MT)
-            msvcrt.lib: import library for the release DLL version of the CRT (/MD) +/
-      }
-
-      auto line = joinCommandLine(cmd);
-      logln(bold("LINKING: "), line);
-      auto link = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
-
-      defFile.remove; //cleanup
-      enforce(link.status==0, link.output);  if(!link.output.empty) logln(link.output);
+    //cleanup
+    defFile.remove;
+    if(targetFile.extIs("exe")){
+      targetFile.otherExt("exp").remove;
+      targetFile.otherExt("lib").remove;
     }
+
+    enforce(link.status==0, link.output);  if(!link.output.empty) logln(link.output);
   }
 
 
@@ -1098,7 +1093,7 @@ public:
   // Errors returned in exceptions
   void build(File mainFile_, BuildSettings originalSettings) // Build //////////////////////
   {
-    {// compile
+    {// build /////////////////////////////////////////////////
       times = times.init;
       mixin(perf("all"));
 
@@ -1109,6 +1104,11 @@ public:
       //Rebuild all?
       if(settings.rebuild)
         reset_cache;
+
+      //workPath
+      workPath = Path(settings.workPath);
+      if(!workPath.isNull)
+        enforce(workPath.exists, "Workpath doesn't exists: "~workPath.text);
 
       //reqursively collect modules
       processSourceFile(mainFile);
@@ -1122,8 +1122,7 @@ public:
 
       //ensure that no std or core files are going to be recompiled
       foreach(const m; modules)
-        enforce(!m.file.fullName.startsWith(DPaths.stdPath) && !m.file.fullName.startsWith(DPaths.etcPath) && !m.file.fullName.startsWith(DPaths.corePath),
-          `It is forbidden to recompile an std/etc/core module.`);
+        enforce(!DPaths.isStdFile(m.file), `It is forbidden to recompile an std/etc/core module. `~m.file.text);
 
       //select files for compilation
       File[] filesToCompile, filesInCache;
@@ -1139,10 +1138,17 @@ public:
         logln(bold("OPTIONS:             "), "LDC", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR");
         logln(bold("SOURCE STATS:        "), format("Lines: %s   Bytes: %s", totalLines, totalBytes));
 
-        foreach(i, const m; modules){
-          auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
-          bool comp = filesToCompile.canFind(m.file);
-          logln((comp ? " \33\16*\33\7 " : "  "), bold(smallName(m.file))~" : "~list);
+        if(0){ //verbose display of the module graph
+          foreach(i, const m; modules){
+            auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
+            bool comp = filesToCompile.canFind(m.file);
+            logln((comp ? " \33\16*\33\7 " : "  "), bold(smallName(m.file))~" : "~list);
+          }
+        }
+
+        if(1){
+          if(filesToCompile.length) logln(bold("MODULES TO COMPILE:  "), filesToCompile.map!(f => smallName(f)).join(", "));
+          if(filesInCache  .length) logln(bold("MODULES FROM CACHE:  "), filesInCache  .map!(f => smallName(f)).join(", "));
         }
       }
 
@@ -1150,7 +1156,7 @@ public:
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
       targetFile.remove(false);
       if(targetFile.exists){
-        if(settings.killExe){
+       if(settings.killExe){
           enforce(killDeleteExe(targetFile), "Failed to close target process.");
         }else{
           enforce(false, "Unable to delete target file.");
@@ -1160,6 +1166,17 @@ public:
       /////////////////////////////////////////////////////////////////////////////////////
       // calculate resource hash
       string resHash = calcHash(resFiles.byKeyValue.map!(kv => format("(%s|%s|%.8f)", kv.key, kv.value, kv.value.modified)).join);
+
+
+      /////////////////////////////////////////////////////////////////////////////////////
+      // Cleanum: define what to do at cleanup. Do it even if an Exception occurs.
+      scope(exit){
+        if(!settings.leaveObjs){ //including res file
+          resFile.remove;
+          foreach(fn; chain(filesToCompile, filesInCache)) objFileOf(fn).remove;
+        }
+        if(!settings.generateMap) mapFile.remove; //linker makes it for dlls even not wanted
+      }
 
       /////////////////////////////////////////////////////////////////////////////////////
       // compile and link
@@ -1185,15 +1202,6 @@ public:
           mapCache[exeHash] = mapFile.read;
       }
 
-      /////////////////////////////////////////////////////////////////////////////////////
-      // cleanup
-      if(!settings.leaveObjs){ //including res file
-        resFile.remove;
-        foreach(fn; filesToCompile~filesInCache) fn.otherExt(".obj").remove;
-      }
-
-      if(!settings.generateMap) mapFile.remove; //linker makes it for dlls even not wanted
-
     }//end of compile
 
     /////////////////////////////////////////////////////////////////////////////////////
@@ -1211,7 +1219,7 @@ public:
       //make the default runCmd for exe
       if(runCmd.empty && isExe){
         runCmd = targetFile.fullName;
-        if(!settings.isWindowedApp) runCmd ~= "\r\n@pause";
+        if(!isWindowedApp) runCmd ~= "\r\n@pause";
       }
 
       if(!runCmd.empty){

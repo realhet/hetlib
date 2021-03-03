@@ -15,11 +15,11 @@ static __gshared:
 
   //LDC 64bit paths
   string installPath = `c:\D\ldc2\`;
-  string importPath()   { return installPath~`import\`; }
-  string stdPath()      { return importPath~`std\`; }
-  string etcPath()      { return importPath~`etc\`; }
-  string corePath()     { return importPath~`core\`; }
-  string ldcPath()      { return importPath~`ldc\`; }
+  string stdImportPath()   { return installPath~`import\`; }
+  string stdPath()      { return stdImportPath~`std\`; }
+  string etcPath()      { return stdImportPath~`etc\`; }
+  string corePath()     { return stdImportPath~`core\`; }
+  string ldcPath()      { return stdImportPath~`ldc\`; }
   string libPath()      { return installPath~`lib64\`; }
 
   string[] systemPaths(){ return [stdPath, corePath, etcPath, ldcPath]; }
@@ -34,11 +34,16 @@ static __gshared:
     foreach(ref p; importPaths) p = includeTrailingPathDelimiter(p);
   }
 
+  void addImportPath(string path){
+    path = path.strip;
+    if(path.empty) return;
+    foreach(p; importPaths) if(samePath(path, p)) return;
+    importPaths ~= path.includeTrailingPathDelimiter;
+  }
+
   void addImportPathList(string paths){
     foreach(path; paths.split(';')){
-      path = path.strip;
-      if(!path.empty && !importPaths.canFind(path))
-        importPaths ~= includeTrailingPathDelimiter(path);
+      addImportPath(path);
     }
   }
 
@@ -47,8 +52,8 @@ static __gshared:
     return importPaths.join(";");
   }
 
-  bool isSystemFile(File f){
-    return f.fullName.isWild(importPath~"*");
+  bool isStdFile(in File f){
+    return f.fullName.isWild(stdImportPath~"*");
   }
 }
 

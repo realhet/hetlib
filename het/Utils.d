@@ -2412,8 +2412,11 @@ auto commandLineToMap(string line){
   return map;
 }
 
-string quoted(string s){
-  return format!"%(%s%)"([s]);
+string quoted(string s, char q = '"'){
+  if(q=='"') return format!"%(%s%)"([s]);
+  else if(q=='`') return q ~ s.replace(q, ' ') ~ q;
+  else ERR("Unsupported quote char: "~q);
+  assert(0);
 }
 
 /*string quoteForDos(){
@@ -3896,6 +3899,11 @@ char pathDelimiter() {
 string includeTrailingPathDelimiter(string fn) { if(!fn.endsWith(pathDelimiter)) fn ~= pathDelimiter; return fn; }
 string excludeTrailingPathDelimiter(string fn) { if(fn.endsWith(pathDelimiter)) fn = fn[0..$-1]; return fn; }
 
+bool samePath(string a, string b){
+  return sameText(a.excludeTrailingPathDelimiter,
+                  b.excludeTrailingPathDelimiter);
+}
+
 struct Path{
   private static{
 
@@ -3909,18 +3917,18 @@ struct Path{
 public:
   string fullPath;
 
-  this(string path_){ fullPath = path_; }
-  this(string path_, string name_) { fullPath = combinePath(path_, name_); }
-  this(Path path_, string name_) { fullPath = combinePath(path_.fullPath, name_); }
+  this(string path_){ dir = path_; }
+  this(string path_, string name_) { this(combinePath(path_, name_)); }
+  this(Path path_, string name_) { this(combinePath(path_.fullPath, name_)); }
 
-  string toString() const { return "Path("~fullPath.quoted~")"; }
+  string toString() const { return "Path("~fullPath.quoted('`')~")"; }
   bool isNull() const{ return fullPath==""; }
   bool opCast() const{ return !isNull(); }
 
   bool exists() const { return dirExists(dir); }
 
   @property string dir() const { return excludeTrailingPathDelimiter(fullPath); }
-  @property void dir(string dir_) { fullPath = includeTrailingPathDelimiter(dir_); }
+  @property void dir(string dir_) { fullPath = dir_=="" ? "" : includeTrailingPathDelimiter(dir_); }
 
   auto isAbsolute()const{ return isAbsolutePath(fullPath); }
 
@@ -4082,7 +4090,7 @@ public:
 
   string fullName;
 
-  string toString()const{ return "File("~fullName.quoted~")"; }
+  string toString()const{ return "File("~fullName.quoted('`')~")"; }
   bool isNull()    const{ return fullName==""; }
   bool opCast()    const{ return !isNull(); }
 
@@ -4210,12 +4218,24 @@ public:
     }
   }
 
+  bool sameContents(const void[] data){
+    return size==data.length && equal(cast(const ubyte[])data, read(false));
+  }
+
+  bool writeIfNeeded(const void[] data){
+    const needToWrite = !sameContents(data);
+    if(needToWrite) write(data);
+    //if(!needToWrite) print("SKIPPING WRITING IDENTICAL FILE");
+    return needToWrite;
+  }
+
   void append(const void[] data)const{ write(data, size); } //todo: compression, automatic uncompression
 
   void writeStr(const string data, ulong offset = 0)const { write(data, offset); }
   void appendStr(const string data) { append(data); }
 
   int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
+  bool opEquals(const File b) const{ return sameText(fullName, b.fullName); }
 
   size_t toHash() const{
     return fullName.xxh;
