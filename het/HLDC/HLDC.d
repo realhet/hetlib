@@ -1,19 +1,14 @@
 //@exe
-//@import c:\D\libs
-//@ldc
-//@compile -m64 -mcpu=athlon64-sse3 -mattr=+ssse3
-
 //@release
-///@debug
-
-///@run $ c:\D\HDMD\dsyntax_dll.d -cv
-///@run @pause
 
 //todo: linker error: undeclared identifier. Ertelmesen probalja megkeresni es ajanlja fel. Azazhogy nem! Inkabb legyen jo az import felderites!
 //todo: editor: legyen egy fugg vonal a 80. meg a 132. karakter utan.
 //todo: "//@import c:\d" should be automatic
+//todo: "Must specify project target (//@EXE or //@DLL)." -> module(line,col): error:
 
 import het.utils, buildsys;
+
+string bold(string s) { return "\33\13"~s~"\33\7"; }
 
 int main(string[] args){
   int code;
@@ -21,17 +16,21 @@ int main(string[] args){
     string sOut, sErr;
     BuildSystem bs;
 
-    const backgroundMode = args.get(1)=="background";
+    const isDaemon = args.get(1)=="daemon";
 
-    if(backgroundMode){
-      auto cmdFile = File(tempPath, "hldc_cmd.txt");
-      auto outFile = File(tempPath, "hldc_out.txt");
-      auto errFile = File(tempPath, "hldc_err.txt");
+    if(isDaemon){
+
+      bs.disableKillProgram = true;
+      bs.isDaemon           = true;
+
+      auto commPath = getWorkPath(args, tempPath),
+           cmdFile = File(commPath, "hldc_cmd.txt"),
+           outFile = File(commPath, "hldc_out.txt"),
+           errFile = File(commPath, "hldc_err.txt");
 
       while(1){
         print;
-        print("> Background mode active.");
-        print("> Expecting commandline in", cmdFile, "...");
+        print(bold("> Daemon mode active."), "Expecting commandline in", cmdFile, "...");
 
         while(!cmdFile.exists){ sleep(10); } sleep(10);
         string[] cmdArgs = cmdFile.readStr.splitCommandLine;
@@ -40,19 +39,23 @@ int main(string[] args){
         newArgs[1] = cmdArgs.get(1);
         foreach(i; 2..cmdArgs.length) newArgs ~= cmdArgs[i];
 
-        print("> Executing:", joinCommandLine(newArgs));
+        print(bold("> Executing command:"), joinCommandLine(newArgs));
+        print("> Build process be terminated by writing \"stop\" into the command file"); //todo: stop build process
         print;
 
         code = bs.commandInterface(newArgs, sOut, sErr);
         if(code) writeln("\33\14", sErr, "\33\7");
 
         print;
-        print("> Writing output:", outFile);
+        bs.cacheInfo;
+
+        print;
+        print(bold("> Writing output:"), outFile);
         outFile.writeStr(sOut);
-        print("> Writing error:", errFile);
+        print(bold("> Writing error:"), errFile);
         errFile.writeStr(sErr);
 
-        print("> Deleting cmd file:", cmdFile);
+        print(bold("> Deleting cmd file:"), cmdFile);
         cmdFile.forcedRemove;
       }
 

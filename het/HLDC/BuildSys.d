@@ -8,6 +8,17 @@ module buildsys;
 //TODO: invalid //@ direktivaknal error
 //TODO: a dll kilepeskor takaritsa el az obj fileokat
 
+/*
+[ ] irja ki, hogy mi van a cache-ban.
+[x] run program utan eltunik a console
+[ ] a visszaadott output text nem tartalmazhat szineket, vagy tartalmazhat, de akkor meg a delphiben kell azokat a kodokat kiszedni. (1B)
+[ ] kill build lehetosege.
+
+// ezek nem mennek kulonallo buildsystembol, csak az ide-bol!!!
+[-] kill program accessviolazik
+[-] kill program szinten meghiva a DIDE debug service-t, azt majd tiltani kell. Ugyanis kesobb allandoan mukodni fog ez az exe es emiatt nem csatlakozhat ra a dide-re! Ezen agyalni kell!
+*/
+
 import het.utils, het.parser, std.file, std.digest.sha, std.regex, std.path, std.process;
 
 
@@ -79,13 +90,8 @@ class Executor{
       logFile.path.make;
       stdLogFile = StdFile(logFile.fullName, "w");
 
-      // optionally switch to a work directory
-      Path lastPath;
-      if(workPath){ lastPath = currentPath; chdir(workPath.fullPath); }
-      scope(exit) if(workPath) chdir(lastPath.fullPath); // restore it on exit of this funct
-
       // launch the process
-      pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole);
+      pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole, workPath.fullPath);
       //note: Config.retainStdout makes it impossible to remove the file after.
     }catch(Exception e){
       result = -1;
@@ -252,7 +258,7 @@ by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 
 \33\17Usage:\33\7  hldc.exe <mainSourceFile.d> [options]
 
-\33\17Background mode:\33\7  hldc.exe background [options]
+\33\17Daemon mode:\33\7  hldc.exe daemon [default options]
 
 \33\17Requirements:\33\7
  * Visual Studio 2017 Community (for mslink.exe and the static libs)
@@ -261,6 +267,7 @@ by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
  * Implicit path of static libraries: c:\\d\\ldc2\\lib64\\ (put any .lib files here)
  * Implicit path of library includes: c:\\d\\libs\\ (you can put here your packages)
  * Best practice: 64bit target, incremental build
+ * Main module must start with this build-macro: //@EXE
 
 \33\17Known bugs:\33\7
  * Don't use Tuples in format(). They're conflicting with the -allinst parameter which is
@@ -270,7 +277,7 @@ by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
 $$$OPTS$$$
 ",
   macroHelpStr =
-"\33\17Build macros:\33\7
+"\33\17Build-macros:\33\7
   These special comments are embedded in the source files to control various
   options in HLDC. No other external/redundant files needed, every information
   needed for a build is stored inside your precious sources files.
@@ -351,9 +358,9 @@ struct BuildSettings{ //todo: mi a faszert irja ki allandoan az 1 betus rovidite
   @("L|linkOpt     = Pass extra linker option."                                 ) string[] linkArgs             ;
   @("k|kill        = Kill currently running executable before compile."         ) bool killExe                  ;
   @("t|todo        = Collect //Todo: and //Opt: comments."                      ) bool collectTodos             ;
-  @("n|single      = Single step compilation"                                   ) bool singleStepCompilation    ;
+  @("n|single      = Single step compilation."                                  ) bool singleStepCompilation    ;
   @("w|workPath    = Specify path for temp files. Default = Project's path."    ) string workPath               ;
-  @("a|macroHelp   = Show info about the build macros"                          ) bool macroHelp                ;
+  @("a|macroHelp   = Show info about the build-macros."                         ) bool macroHelp                ;
 
   /// This is needed because the main source header can override the string arrays
   auto dup(){
@@ -363,6 +370,19 @@ struct BuildSettings{ //todo: mi a faszert irja ki allandoan az 1 betus rovidite
     res.linkArgs    = linkArgs   .dup;
     return res;
   }
+
+  Path getWorkPath(lazy Path defaultPath){
+    auto p = Path(workPath);
+    if(!p) p = defaultPath;
+    enforce(!p || p.exists, "WorkPath doesn't exist " ~ p.text);
+    return p;
+  }
+}
+
+Path getWorkPath(string[] args, lazy Path defaultPath)
+{
+  BuildSettings s; parseOptions(args, s, No.handleHelp);
+  return s.getWorkPath(defaultPath);
 }
 
 private struct MSVCEnv{ static{ // MSVCEnv ///////////////////////////////
@@ -597,6 +617,9 @@ private: //current build
   //cached data
   BuildCache cache;
   ubyte[][string] objCache, exeCache, mapCache, resCache;
+
+  //flags for special operation (daemon mode)
+  public bool disableKillProgram, isDaemon;
 
   //logging
   string sLog;
@@ -851,7 +874,7 @@ private: //current build
     //note: no lib support at the moment.
 
     //this is the simplest strategy
-    if(workPath.isNull){
+    if(!workPath){
       return srcFile.otherExt("obj"); //right next to the source file
     }else{
       auto s = moduleFullNameOf(srcFile);
@@ -1067,6 +1090,7 @@ public:
     resCache.clear;
   };
 
+  // this is only usable from the IDE, not from a standalone build tool
   bool killDeleteExe(File file){
     const killTimeOut   = 1.0,//sec
           deleteTimeOut = 1.0;//sec
@@ -1108,9 +1132,7 @@ public:
         reset_cache;
 
       //workPath
-      workPath = Path(settings.workPath);
-      if(!workPath.isNull)
-        enforce(workPath.exists, "Workpath doesn't exists: "~workPath.text);
+      workPath = settings.getWorkPath(Path("")); // "" means obj files are placed next to their sources.
 
       //reqursively collect modules
       processSourceFile(mainFile);
@@ -1158,7 +1180,7 @@ public:
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
       targetFile.remove(false);
       if(targetFile.exists){
-       if(settings.killExe){
+       if(settings.killExe && !disableKillProgram){
           enforce(killDeleteExe(targetFile), "Failed to close target process.");
         }else{
           enforce(false, "Unable to delete target file.");
@@ -1213,6 +1235,19 @@ public:
     /////////////////////////////////////////////////////////////////////////////////////
     // run
     if(!settings.compileOnly){
+      //This is closing the console in the new window, not good, needs a bat file anyways...
+      /*if(runLines.empty && isExe){
+        runLines ~= targetFile.fullName;
+        if(!isWindowedApp) runLines ~= "@pause";
+      }
+
+      if(!runLines.empty){
+        auto cmd = ["cmd", "/c", runLines.join("&")];
+        logln(bold("RUNNING: ") ~ cmd.text);
+        spawnProcess(cmd);
+      }*/
+
+      //old version
       const batFile = File(targetFile.path, "$run.bat");
       batFile.remove;
 
@@ -1221,13 +1256,13 @@ public:
       //make the default runCmd for exe
       if(runCmd.empty && isExe){
         runCmd = targetFile.fullName;
-        if(!isWindowedApp) runCmd ~= "\r\n@pause";
+        //if(!isWindowedApp) runCmd ~= "\r\n@pause";
       }
 
       if(!runCmd.empty){
         batFile.write(runCmd);
         foreach(idx, line; runCmd.split('\n')) logln(idx ? " ".replicate(9):bold("RUNNING: "), line);
-        spawnProcess(batFile.fullName);  //todo: editor kesobb letorolhetne ezt a bat-ot magatol.
+        spawnProcess(["cmd", "/c", "start", batFile.fullName], null, Config.detached);
       }
     }
   }
@@ -1238,6 +1273,7 @@ public:
     settings = originalSettings;
 
     //Rebuild all?
+
     if(settings.rebuild)
       reset_cache;
 
@@ -1304,5 +1340,12 @@ public:
       sOutput = sLog;
       return -1;
     }
+  }
+
+  void cacheInfo(){
+/*    logln(bold("CACHE STATS:"));
+    foreach(m; modules){
+      logln(m.moduleFullName.leftJustify(20));
+    }*/
   }
 }
