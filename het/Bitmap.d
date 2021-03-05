@@ -6,11 +6,14 @@ import std.uni: isAlphaNum;
 import core.sys.windows.windows : HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, DIB_RGB_COLORS,
   HRESULT, WCHAR, BOOL, RECT, IID;
 
-//jpg, png, tga
-import imageformats;
+//png, tga, jpg(read_jpeg_info only)
+import imageformats; //todo: a jpeg ebbol mar nem kell.
 
 //webp
 import webp.encode, webp.decode;
+
+//jpeg
+import turbojpeg.turbojpeg;
 
 //turn Direct2D linkage on/off
 version = D2D_FONT_RENDERER;
@@ -639,6 +642,9 @@ struct BitmapInfo{
 
   int numPixels() const{ return size[].product; }
 
+  const ref auto width(){ return size.x; }
+  const ref auto height(){ return size.y; }
+
 private static{
 
   bool isWebp(in ubyte[] s){ return s.length>16 && s[0..4].equal("RIFF") && s[8..15].equal("WEBPVP8") && s[15].among(' ', 'L', 'X'); }
@@ -694,7 +700,7 @@ private:
         size = ivec2(features.width, features.height);
         chn = features.has_alpha ? 4 : 3;
       }
-    }else if(supportedBitmapExts.canFind(format)){ //use imageFormats package
+    }else if(supportedBitmapExts.canFind(format)){ //use imageFormats package. It should be good for libjpeg-turbo as well.
       try{
         read_image_info_from_mem(stream, size.x, size.y, chn);
       }catch(Throwable){}
@@ -751,13 +757,27 @@ public:
   @property channels() const{ return channels_; }
   @property type    () const{ return type_    ; }
 
+  void setRaw(void[] data, int width, int height, int channels, string type){
+    // check consistency
+    auto chSize = type.predSwitch("ubyte", 1, "float", 4, "int", 4, "ushort", 2, 0);
+    enforce(chSize>0                     , type.format!`Invalid bitmap component type: "%s"`);
+    enforce(channels.inRange(1, 4)       , channels.format!`Invalid number of bitmap channels: "%s"`);
+    enforce(width>=0                     , width.format!`Invalid bitmap width: "%s"`);
+    enforce(height>=0                    , height.format!`Invalid bitmap height: "%s"`);
+    enforce(width*height*channels*chSize == data.length,
+      format!"Inconsistent bitmap size: %s{w} * %s{h} * %s{ch} * %s != %s{bytes}"(
+                                        width, height, channels, chSize, data.length));
+    counter++;
+    data_ = data;
+    width_ = width;
+    height_ = height;
+    channels_ = channels;
+    type_ = type;
+  }
+
   void set(E)(Image!(E, 2) im){
     counter++;
-    width_      = im.width ;
-    height_     = im.height;
-    channels_   = VectorLength!E;
-    type_       = (ScalarType!E).stringof;
-    data_       = im.asArray;
+    setRaw(im.asArray, im.width, im.height, VectorLength!E, (ScalarType!E).stringof);
   }
 
   auto castedImage(E)(){
@@ -837,7 +857,7 @@ private ubyte[] serializeImage(T)(Image!(T, 2) img, string format=""){ // compil
     case "png":  return write_png_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,2,3,4]).asArray); //all chn supported
     case "tga":  return write_tga_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,4,3,4]).asArray); //all except 2 chn supported
     case "webp": return write_webp_to_mem(img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([3,4,3,4]).asArray, getQuality); //only 3 and 4 chn
-    case "jpg": case "jpeg": raise("encoding to jpg not supported"); return []; //todo: implement jpeg writer with https://code.dlang.org/packages/turbojpeg-d
+    case "jpg": case "jpeg": raise("encoding to jpg not supported"); return []; //todo: implement turbojpeg encoder
     default: raise("invalid image serialization format: "~format); return [];
   }
 }
@@ -956,6 +976,21 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
         case 4: { auto data = uninitializedArray!(RGBA[])(info.numPixels); WebPDecodeRGBAInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*4, info.size.x*4); bmp.set(image2D(info.size, data)); } break;
         //todo: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
         default: raise("webp 1-2chn not impl");
+      }
+    }else if(info.format=="jpg"){
+      switch(info.chn){
+        case 1, 3: {
+          //PERF("tjd"); foreach(i; 0..10) actBitmap = data.deserialize!Bitmap(true); print(PERF.report); //turbojpeg/classic release/debug performance: 43, 47, 335, 1941
+          auto pixelFormat = info.chn.predSwitch(3, TJPF_RGB, 1, TJPF_GRAY),
+               pitch = tjPixelSize[pixelFormat]*info.width,
+               data = uninitializedArray!(ubyte[])(info.height*pitch);
+
+          tjChk(tjDecoder, tjDecompress2(tjDecoder, stream.ptr, stream.length.to!int, data.ptr, info.width, pitch, info.height, pixelFormat, 0), "tjDecompress2");
+
+          bmp.setRaw(data, info.width, info.height, info.chn, "ubyte");
+        } break;
+        //todo: Tobb jpeg-bol osszekombinalni a 2-4 channelt.
+        default: raise("jpg 2-4chn not impl");
       }
     }else{ //imageFormats package
       auto img = read_image_from_mem(stream);

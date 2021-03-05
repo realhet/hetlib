@@ -114,7 +114,21 @@ import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
-// Obj.Destroy is not clearing shit
+// MSVC compatibility /////////////////////////
+
+// __iob_func - needed for turbojpeg
+// https://stackoverflow.com/questions/30412951/unresolved-external-symbol-imp-fprintf-and-imp-iob-func-sdl2
+extern (C){
+  import core.stdc.stdio : FILE;
+  shared FILE[3] __iob_func;
+}
+
+private void init__iob_func(){
+  import core.stdc.stdio : stdin, stdout, stderr;
+  __iob_func = [*stdin, *stdout, *stderr];
+}
+
+// Obj.Destroy is not clearing the reference
 void free(T)(ref T o)if(is(T==class)){
   if(o !is null){
     o.destroy;
@@ -5318,6 +5332,7 @@ private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol h
 
 static this(){ //for all threads <- bullshit!!! It's not shared!!!
   randomize;
+  init__iob_func;
 }
 
 

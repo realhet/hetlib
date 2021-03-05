@@ -1,9 +1,5 @@
 module het.binpacker;
 
-import het.utils, het.geometry;
-
-import het.draw2d; //for testing only
-
 /* 2D MaxRects Bin Packer
 
 Copyright (c) 2017 Shen Yiming
@@ -25,6 +21,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.*/
+
+import het.utils, het.geometry;
+import het.draw2d; //for testing only
 
 alias RectangleData = int; //todo: a rectangle bele mehetne a binPacker classba es lehetne generic tipusu a data
 
