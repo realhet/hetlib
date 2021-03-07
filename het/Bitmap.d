@@ -785,7 +785,7 @@ public:
   }
 
   auto access(E)(){
-    enforce(VectorLength!E == channels, "channel mismatch");
+    enforce(VectorLength!E == channels, format!"channel mismatch (reqd, present): (%s, %s)"(VectorLength!E, channels));
     enforce((ScalarType!E).stringof == type, "type mismatch");
     return castedImage!E;
   }
@@ -807,7 +807,7 @@ public:
 
 // Bitmap/Image serializer //////////////////////////////////////////
 
-immutable serializeImage_supportedFormats = ["webp", "png", "bmp", "tga"];
+immutable serializeImage_supportedFormats = ["webp", "png", "bmp", "tga", "jpg"];
 
 __gshared serializeImage_defaultFormat = "png"; // png is the best because it knows 1..4 components and it's moderately compressed.
 
@@ -839,6 +839,24 @@ private static ubyte[] write_webp_to_mem(int width, int height, ubyte[] data, in
   return res;
 }
 
+private static ubyte[] write_jpg_to_mem(int width, int height, ubyte[] data, int quality){
+  const channels = data.length.to!int/(width*height),
+        pitch = width*channels;
+  enforce(data.length = pitch*height, "invalid image data");
+  const pixelFormat = channels.predSwitch(1, TJPF_GRAY, 3, TJPF_RGB); //todo: alpha
+  const subsamp = TJSAMP_420; //todo: subsamp-ot kihozni
+
+  ubyte* jpegBuf;
+  uint jpegSize;
+  tjChk(tjEncoder, tjCompress2(tjEncoder, data.ptr, width, pitch,
+        height, pixelFormat, &jpegBuf, &jpegSize, subsamp, quality, 0), "tjCompress2");
+
+  scope(exit) tjFree(jpegBuf);
+  auto res = uninitializedArray!(ubyte[])(jpegSize);
+  res[] = jpegBuf[0..jpegSize];
+  return res;
+}
+
 private ubyte[] serializeImage(T)(Image!(T, 2) img, string format=""){ // compile time version
   import imageformats;
 
@@ -857,7 +875,7 @@ private ubyte[] serializeImage(T)(Image!(T, 2) img, string format=""){ // compil
     case "png":  return write_png_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,2,3,4]).asArray); //all chn supported
     case "tga":  return write_tga_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,4,3,4]).asArray); //all except 2 chn supported
     case "webp": return write_webp_to_mem(img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([3,4,3,4]).asArray, getQuality); //only 3 and 4 chn
-    case "jpg": case "jpeg": raise("encoding to jpg not supported"); return []; //todo: implement turbojpeg encoder
+    case "jpg":  return write_jpg_to_mem (img.width, img.height, cast(ubyte[]) img.convertImage_ubyte_chnRemap!([1,1,3,3]).asArray, getQuality); //losts alpha
     default: raise("invalid image serialization format: "~format); return [];
   }
 }

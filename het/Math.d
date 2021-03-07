@@ -1281,7 +1281,7 @@ auto avg(A...)(in A a){ //return type is casted to common source type
   static if(isInputRange!(A[0]) && !isVector!(A[0]) && !isMatrix!(A[0])){ //an array
     assert(A.length == 1);
     alias RT = Unqual!(ElementType!(A[0]));
-    return cast(RT) (a[0][].sum * (1.0f / a[0].length));
+    return cast(RT) (a[0][].sum * (1.0f / a[0].length)); //todo: it's not for ranges, just arrays because []!!! MSE() can't use it.
   }else{  // arguments
     alias RT = Unqual!(CommonVectorType!A);
     alias T = typeof(RT(0) * 1.0f);
@@ -2349,6 +2349,11 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
                   else return rows.array.join;
   }
 
+  @property auto asArray() const{ //todo: ezt nem lehet egyszerubben? const vagy nem const. Peldaul "const auto"
+    if(size.x==stride) return impl;
+                  else return rows.array.join;
+  }
+
   @property void asArray(A)(A a){
     this[0, 0] = image2D(size, a); //creates a same size image from 'a' and copies it into itself.
   }
@@ -2577,7 +2582,6 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
   int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
 }
 
-
 private void unittest_Image(){  // image2D tests /////////////////////////////////
   static immutable RGB clRed = 0x0000FF, clGreen = 0x008000,  clBlue = 0xFF0000, clWhite = 0xFFFFFF; //have some colors to test immutable vectors
 
@@ -2719,6 +2723,33 @@ private void unittest_Image(){  // image2D tests ///////////////////////////////
 }
 
 
+// MSE, PNSR //////////////////////////
+
+///Squared Error
+auto SE(A, B)(in A a, in B b){ return (a-b)^^2; }
+
+auto MSE(T)(in T[] a, in T[] b){
+  static if(isVector!T){ // vector components can be flattened to an array
+    alias CT = T.ComponentType;
+    return MSE(cast(CT[])a, cast(CT[])b);
+  }else static if(isNumeric!T){
+    import std.range;
+    return zip(StoppingPolicy.requireSameLength, a, b).map!(a => SE(a[])).sum*(1.0f/float(a.length));
+  }else static assert(0, "Invalid type for MSE()");
+}
+
+auto MSE(E)(in Image!(E, 2) a, in Image!(E, 2) b){ return MSE(a.asArray, b.asArray); }
+
+auto PSNR(T)(in T a, in T b, int max){ return 10*log10(max^^2/MSE(a, b)); }
+
+void unittest_Other(){
+  auto a = [1, 2, 3, 4], b = [3, 2, 1, -1], mse = 8.25f;
+  assert(MSE(a, b)==mse);
+  assert(MSE(image2D(2,2,a), image2D(2,2,b))==mse);
+  assert(PSNR(image2D(2,2,a), image2D(2,2,b), 255).approxEqual(38.9663));
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 ///  Tests                                                                   ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -2740,6 +2771,7 @@ void unittest_main(){
   unittest_Bounds;
   unittest_ImageElementType;
   unittest_Image;
+  unittest_Other();
 }
 
 unittest{ unittest_main; }
