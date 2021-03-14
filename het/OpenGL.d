@@ -1707,6 +1707,7 @@ public:
 
   int mipmapLevels() const{ return mipmapEnabled ? 1 : 1; } //todo: mipmaps
 
+  void resize(in ivec2 size, bool preserve=true){ resize(size.x, size.y, preserve); }
   void resize(int xs, int ys, bool preserve=true){
     if(xs==width && ys==height) return;
 
@@ -2193,7 +2194,7 @@ public:
     with(clientRect) gl.viewport(left, top, right-left, bottom-top);
     gl.disable(GL_DEPTH_TEST); //no zbuffering by default
 
-    textures.update; //upload pending textures.
+//    textures.update; //upload pending textures.
 
     {//todo: this is a fix: if the clientSize changes between update() and draw() this will update it. Must rethink the update() draw() thing completely.
       updateViewClipBoundsAndMousePos;
@@ -2230,6 +2231,8 @@ public:
     //must not call super!
     gl.swapInterval(VSynch);
     SwapBuffers(hdc);
+
+    textures.update; //upload pending textures.
 
     updateGLHandles;
 

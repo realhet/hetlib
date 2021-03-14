@@ -2056,6 +2056,33 @@ struct Bounds(VT){
                      else return all(f1(other, low) & f2(other, high));
   }
 
+  static if(VectorLength==1 && is(ComponentType==int)){
+    int opApply(int delegate(int i) dg){
+      int result = 0;
+      foreach(i; low..high){
+        result = dg(i);
+        if (result) break;
+      }
+      return result;
+    }
+  }
+
+  static if(VectorLength==2 && is(ComponentType==int)){
+
+    private int myOpApply(string payload, DG)(DG dg){
+      int result = 0;
+      outer: foreach(y; low.y..high.y){
+        foreach(x; low.x..high.x){
+          result = mixin(payload);
+          if (result) break outer;
+        }
+      }
+      return result;
+    }
+
+    int opApply(int delegate(int x, int y) dg){ return myOpApply!"dg(x, y)"(dg); }
+    int opApply(int delegate(ivec2 p) dg){ return myOpApply!"dg(ivec2(x, y))"(dg); }
+  }
 }
 
 static foreach(T; AliasSeq!(float, double, int))
@@ -2108,6 +2135,11 @@ private void unittest_Bounds(){
     assert((ibounds2(19, 4, 25, 10) & ibounds2(18, 0, 24, 6)) == ibounds2(19, 4, 24, 6));
     assert((ibounds2(-1, 4, 5, 10) & ibounds2(0, -1, 6, 5)) == ibounds2(0, 4, 5, 5));
     assert(!(ibounds2(16, 13, 22, 19) & ibounds2(18, 5, 24, 11)).valid);
+  }
+  {// opApply tests
+    int[] a; foreach(x, y; ibounds2(ivec2(1, 5), ivec2(3, 8))) a ~= [x, y]; assert(a.equal([1, 5, 2, 5, 1, 6, 2, 6, 1, 7, 2, 7]));
+    int[] b; foreach(p   ; ibounds2(1, 5, 3, 8))       with(p) b ~= [x, y]; assert(b.equal(a));
+    int[] c; foreach(i   ; ibounds (2, 6)) c ~= i; assert(c.equal([2, 3, 4, 5]));
   }
 }
 
@@ -2561,25 +2593,28 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     return (size == a.size) && size.iota2.map!(p => this[p.x, p.y] == a[p.x, p.y]).all;
   }
 
-  private int myOpApply(string payload, DG)(DG dg){
-    int result = 0, lineOfs = 0;
-    outer: foreach(y; 0..height){
-      foreach(x; 0..width){
-        result = mixin(payload);
-        if (result) break outer;
+  static if(N==2){
+    private int myOpApply(string payload, DG)(DG dg){
+      int result = 0, lineOfs = 0;
+      outer: foreach(y; 0..height){
+        foreach(x; 0..width){
+          result = mixin(payload);
+          if (result) break outer;
+        }
+        lineOfs += stride;
       }
-      lineOfs += stride;
+      return result;
     }
-    return result;
+
+    //int opApply(int delegate(int x, int y       ) dg)  { return myOpApply!"dg(x, y)"(dg); }  it maches 2 declarations
+    //int opApply(int delegate(ivec2 pos          ) dg)  { return myOpApply!"dg(ivec2(x, y)"(dg); }
+
+    //only able to support 1, 2 or 3 param versions.
+    int opApply(int delegate(ref E              ) dg)  { return myOpApply!"dg(impl[lineOfs+x])"(dg); }
+    int opApply(int delegate(ivec2 pos   , ref E) dg)  { return myOpApply!"dg(ivec2(x, y), impl[lineOfs+x])"(dg); }
+    int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
   }
 
-//  int opApply(int delegate(int x, int y       ) dg)  { return myOpApply!"dg(x, y)"(dg); }  it maches 2 declarations
-//  int opApply(int delegate(ivec2 pos          ) dg)  { return myOpApply!"dg(ivec2(x, y)"(dg); }
-
-  //only able to support 1, 2 or 3 param versions.
-  int opApply(int delegate(ref E              ) dg)  { return myOpApply!"dg(impl[lineOfs+x])"(dg); }
-  int opApply(int delegate(ivec2 pos   , ref E) dg)  { return myOpApply!"dg(ivec2(x, y), impl[lineOfs+x])"(dg); }
-  int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
 }
 
 private void unittest_Image(){  // image2D tests /////////////////////////////////

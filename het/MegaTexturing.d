@@ -51,6 +51,7 @@ enum SubTexChannelConfig{
   RGBA, unknown3, unknown4, RGBA_ClearType,
 }
 
+// packed data struct that
 private struct SubTexInfo{ align(1): import std.bitmanip;
   mixin(bitfields!(
     uint, "cellX",    14,      uint, "texIdx_lo", 2,
@@ -77,9 +78,10 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
   bool isNull() const{ return this==typeof(this).init; }
   ivec2 pos   () const{ return ivec2(cellX, cellY)<<SubTexCellBits; }
 
-  int width() const{ return width1+1; }
-  int height() const{ return height1+1; }
-  ivec2 size  () const{ return ivec2(width, height); }
+  int width()   const{ return width1+1; }
+  int height()  const{ return height1+1; }
+  auto size()   const{ return ivec2(width, height); }
+  auto bounds() const{ return ibounds2(pos, pos+size); }
 
   int texIdx() const{ return texIdx_lo | texIdx_hi<<2; }
 
@@ -87,24 +89,25 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
   int  channelBase  () const{ return texChn_lo; }
   int  channelCnt   () const{ return texChn_hi+1; }
 
-  auto toString() const{ return isNull ? "SubTexInfo(null)" : "SubTexInfo((%d, %d), (%d, %d), #%d, %s, %s)".format(pos.x, pos.y, size.x, size.y, texIdx, channelConfig, (cast(ubyte*)(&this))[0..8].to!string ); }
+  auto toString() const{ return isNull ? "SubTexInfo(null)" : "SubTexInfo(pos:(%-4d, %-4d), size:(%-4d, %-4d), mega:%d, chn:%4s)".format(pos.x, pos.y, size.x, size.y, texIdx, channelConfig); }
 }
 
 class MegaTexture{ // MegaTexture class /////////////////////////////
 private:
   int texIdx, channels;
-public  MaxRectsBin bin;
   GLTexture glTexture;
 
-  int texWidth () const{ return bin.width <<SubTexCellBits; }
-  int texHeight() const{ return bin.height<<SubTexCellBits; }
-
   void resizeGLTexture(){
-    if(glTexture.width!=texWidth || glTexture.height!=texHeight){
+    if(glTexture.size!=texSize){
       glTexture.fastBind;
-      glTexture.resize(texWidth, texHeight);
+      glTexture.resize(texSize);
     }
   }
+
+public:
+  MaxRectsBin bin;
+  auto texSize() const{ return ivec2(bin.width, bin.height) << SubTexCellBits; }
+
 public:
   this(int texIdx, int channels){
     enforce(texIdx.inRange(0, MegaTexMaxCnt-1), "texIdx out of range");
@@ -117,7 +120,7 @@ public:
           maxSize = min(MegaTexMaxSize, gl.maxTextureSize)>>SubTexCellBits;
     bin = new MaxRectsBin(minSize, minSize, maxSize, maxSize);
 
-    glTexture = new GLTexture("MegaTexture[%d]".format(texIdx), texWidth, texHeight, GLTextureType.RGBA8, false/*no mipmap*/); //todo: MegaTexture.mipmap
+    glTexture = new GLTexture("MegaTexture[%d]".format(texIdx), texSize.x, texSize.y, GLTextureType.RGBA8, false/*no mipmap*/); //todo: MegaTexture.mipmap
     glTexture.bind;
   }
 
@@ -153,12 +156,12 @@ public:
     bin.dump;
   }
 
-  void drawMaxRects(Drawing dr){
+  void debugDraw(Drawing dr){
     dr.scale(SubTexCellSize); scope(exit) dr.pop;
 
     foreach(r; bin.freeRects){
       dr.color = clGray;
-      dr.drawRect(r.bounds.inflated(-0.125));
+      dr.drawRect(r.bounds.inflated(-0.25f));
     }
 
     foreach(j, r; bin.rects){
@@ -181,6 +184,9 @@ private:
 
 public  GLTexture glTexture;
 
+  int[int] lastAccessed; //last globalUpdateTick when accessed/updated
+
+
 public  SubTexInfo[] infoArray;
   int[] freeIndices;
 
@@ -202,6 +208,10 @@ public  SubTexInfo[] infoArray;
   void checkValidIdx(int idx) const{ //todo: refactor to isValidIdx
     enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx));
     //ez nem kell, mert a delayed loader null-t allokal eloszor. enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
+  }
+
+  void accessedNow(int idx){
+    lastAccessed[idx] = globalUpdateTick;
   }
 
 public:
@@ -245,6 +255,8 @@ public:
       if(capacity<infoArray.length) grow;
     }
 
+    accessedNow(actIdx);
+
     upload(actIdx);
 
     return actIdx;
@@ -264,13 +276,14 @@ public:
   //gets a subTexInfo by idx
   SubTexInfo access(int idx){
     checkValidIdx(idx);
+    accessedNow(idx);
     return infoArray[idx];
   }
 
   void modify(int idx, in SubTexInfo info){
     checkValidIdx(idx);
+    accessedNow(idx);
     infoArray[idx] = info;
-
     upload(idx);
   }
 
@@ -318,7 +331,12 @@ private:
   MegaTexture[] megaTextures;
 
   int[File] byFileName;
-  bool mustRehash;
+/*  int idxByFileName(in File fileName, bool mustExists=true){
+    if(auto a = fileName in _byFileName) return *a;
+    if(mustExists) ERR("Can't find texture ", file)
+  }*/
+
+  bool mustRehash; //todo: this is useless i think
 
   private bool[int] pendingIndices; //files being loaded by a worker thread
   private bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
@@ -422,11 +440,12 @@ public:
   bool update(){
     bool inv;
 
-    if(mustRehash) byFileName.rehash;
+    //todo: is this rehash useful at all?
+    //if(mustRehash) byFileName.rehash;
 
     auto t0 = QPS;
 
-    enum UploadTextureMaxTime = 0.1; //10 fps
+    enum UploadTextureMaxTime = 1/60.0f;
     do{
 
       Bitmap bmp;
@@ -452,6 +471,7 @@ public:
         }
       }else{
         uploadSubTex(idx, bmp);
+        gl.flush;
       }
 
       inv = true;
@@ -477,10 +497,12 @@ public:
 
     //delayed = false;
 
+    //todo: nonexisting file and/or exception is not handling well here.
+
     if(!(fileName in byFileName)){
 
       if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false; //todo: delayed restriction. should refactor this nicely
-
+//delayed = false;
       if(delayed){
         auto idx = allocSubTexInfo;
 
@@ -492,6 +514,9 @@ public:
 //          enforce(SetProcessAffinityMask(GetCurrentProcess, 0xFE), getLastErrorStr);
 //          sleep(random(1000));
           //SetPriorityClass(GetCurrentProcess, BELOW_NORMAL_PRIORITY_CLASS);
+
+          //import core.sys.windows.windows;
+          //SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
 
 //"fuck".writeln;
 
@@ -518,12 +543,12 @@ public:
 
           synchronized(textures){
             textures.bmpQueue ~= bmp;
-            mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
+            //mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
           }
 
         }
 
-        if(0){
+        if(1){
           import std.concurrency;
           spawn(&loader, idx, fileName);
         }else{
@@ -622,5 +647,77 @@ if(log) "Created subtex %s:".writefln(fileName);
   ivec2 textureSize(File file){
     return textureSize(access(file));
   }
+
+  /// A SubTexInfo +
+  struct SubTexInfo2{
+    int idx, lastAccessed;
+    File file;
+    SubTexInfo info;
+
+    auto toString(){
+      return format!"%-4s: %s age:%-5d %s"(idx, info, lastAccessed, file.fullName);
+    }
+  }
+
+  auto collectSubTexInfo2(){
+    SubTexInfo2[] res;
+
+    //make an inverse map
+    File[int] fileByIdx; foreach(k, v; byFileName) fileByIdx[v]=k; //todo: make it functional
+    //int[File] fileByIdx = assocArray(byFileName.keys, byFileName.values);
+
+    foreach(i, info; infoTexture.infoArray){
+      const idx          = i.to!int,
+            lastAccessed = infoTexture.lastAccessed[idx],
+            file         = fileByIdx.require(idx);
+      res ~= SubTexInfo2(idx, lastAccessed, file, info);
+    }
+
+    return res;
+  }
+
+  void debugDraw(Drawing dr){ //debugDraw /////////////////////////////
+    //print("Megatexture debug draw----------------------------");
+
+    auto subTexInfos = collectSubTexInfo2;
+
+    int ofs;
+    foreach(megaIdx, mt; megaTextures){
+      dr.translate(0, ofs); scope(exit){ dr.pop; ofs += mt.texSize.y + 16; }
+
+      foreach(i, const si; subTexInfos) if(si.info.texIdx==megaIdx){
+        const subTexIdx = i.to!int;
+        dr.drawGlyph(subTexIdx, bounds2(si.info.bounds), clGray);
+      }
+
+      mt.debugDraw(dr);
+
+      dr.lineWidth = -1;
+      dr.color = clBlue;
+      dr.drawRect(bounds2(vec2(0), mt.texSize));
+
+      //mt.drawRects(dr);
+
+    }
+
+  }
+
+/*    dr.scale(SubTexCellSize); scope(exit) dr.pop;
+
+    foreach(r; bin.freeRects){
+      dr.color = clGray;
+      dr.drawRect(r.bounds.inflated(-0.25f));
+    }
+
+    foreach(j, r; bin.rects){
+      dr.color = clVga[(cast(int)j % ($-1))+1];
+      dr.alpha = 0.5;
+      dr.fillRect(r.bounds);
+      dr.drawRect(r.bounds);
+    }
+
+    dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);*/
+
+
 }
 

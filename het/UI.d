@@ -2007,7 +2007,7 @@ static cnt=0;
 
     auto hit = Btn!(file, line)(capt, args, id(sign)); //2 id's can pass because of the static foreach
     bool chg;
-    if(hit.captured && inputs.LMB.repeated){
+    if(hit.repeated){
       auto oldValue = value,
            step = abs(_range.step),
            newValue = _range.clamp(value+step*sign);

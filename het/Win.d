@@ -9,6 +9,8 @@ pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 
 public import het.utils, het.geometry, het.inputs;
 
+__gshared int globalUpdateTick; //counts in every update cycle
+
 // het.draw2d
 
 import core.runtime,
@@ -723,6 +725,9 @@ public:
 
     //timing
     auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS);
+
+    //ticking
+    globalUpdateTick++;
 
     //flush the keyboard input queue (WM_CHAR event)
     scope(exit) inputChars = "";

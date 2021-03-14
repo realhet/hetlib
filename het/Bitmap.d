@@ -2,6 +2,7 @@ module het.bitmap; //This is the new replacement of het.image.d
 
 import het.utils;
 
+
 import std.uni: isAlphaNum;
 import core.sys.windows.windows : HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, DIB_RGB_COLORS,
   HRESULT, WCHAR, BOOL, RECT, IID;
@@ -56,6 +57,55 @@ Bitmap colorMapBitmapLoader(string name){
 }
 
 Bitmap newBitmap(string fn, bool mustSucceed=true){
+  //todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
+  //      when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
+
+  //handle thumbnails
+  //todo: cache decoded full size image
+  //todo: turboJpeg small size extract
+  {
+    immutable thumbStr = "?thumb";
+    // ?thumb32w    specifies maximum width
+    // ?thumb32h    specifies maximum height
+    // ?thumb32wh   specifies maximum width and maximum height
+    // ?thumb32     ditto
+    //todo: ?thumb=32w is not possible because processMarkupCommandLine() uses the = pro parameters and it can't passed into this filename.
+
+    string thumbDef;
+    if(fn.split2(thumbStr, fn, thumbDef, false/+must not strip!+/)){
+      //get the original bitmap
+      auto orig = newBitmap(fn, mustSucceed);
+      if(orig is null) return orig; //silently failed
+
+      //get width/height posfixes
+      bool maxWidthSpecified, maxHeightSpecified;
+      while(1){
+        if(thumbDef.endsWith("w")){ maxWidthSpecified  = true; thumbDef.popBack; continue; }
+        if(thumbDef.endsWith("h")){ maxHeightSpecified = true; thumbDef.popBack; continue; }
+        break;
+      }
+      const maxAllSpecified = maxWidthSpecified == maxHeightSpecified;
+      if(maxAllSpecified)
+        maxWidthSpecified = maxHeightSpecified = true;
+
+      auto value = thumbDef.to!int;
+      enforce(value>=1);
+
+      float minScale = 1;
+      if(maxWidthSpecified ) minScale.minimize(float(value) / orig.size.x);
+      if(maxHeightSpecified) minScale.minimize(float(value) / orig.size.y);
+
+      if(minScale < 1){
+        ivec2 newSize = round(orig.size*minScale);
+        print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
+        orig.resize_nearest(newSize);
+        return orig;
+      }
+
+      return orig; //todo: same size as the original... stored 2x in the texture. Not effective.
+    }
+  }
+
   // split prefix:\line
   auto prefix = fn.until!(not!isAlphaNum).text;
   auto line = fn;
@@ -232,26 +282,37 @@ auto sample_nearest(T)(Image!(T, 2) iSrc, vec2 p){
 auto extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
   return image2D(w, h, (ivec2 p) => iSrc.sample_nearest(p*vec2(xs, ys)+vec2(x0, y0))); //opt: it's slow, but universal
 
-/*  auto res = image2D(w, h, T.init);
-  auto x00 = x0;
-
-  foreach(int y; 0..h){
-    auto yt = y0.ifloor,
-         yf = y0-yt;
-
-    x0 = x00; //advance row
-    foreach(int x; 0..w){
-      auto xt = x0.ifloor,
-           xf = x0-xt;
-
-      res[x, y] = iSrc[iSrc.ofs_safe(xt, yt)];
-
-      x0 += xs;
-    }
-    y0 += ys;
+  /*Image!(T, 2) resize_halve(T)(Image!(T, 2) iSrc, ivec2 newSize){
   }
 
-  return res;*/
+  Image!(T, 2) resize_bilinear(T)(Image!(T, 2) iSrc, ivec2 newSize){
+  }*/
+
+  /*  auto res = image2D(w, h, T.init);
+    auto x00 = x0;
+
+    foreach(int y; 0..h){
+      auto yt = y0.ifloor,
+           yf = y0-yt;
+
+      x0 = x00; //advance row
+      foreach(int x; 0..w){
+        auto xt = x0.ifloor,
+             xf = x0-xt;
+
+        res[x, y] = iSrc[iSrc.ofs_safe(xt, yt)];
+
+        x0 += xs;
+      }
+      y0 += ys;
+    }
+
+    return res;*/
+}
+
+Image!(T, 2) resize_nearest(T)(Image!(T, 2) iSrc, ivec2 newSize){
+  //todo: What about pixel center 0.5?  It is now shifting the image.
+  return extract_nearest(iSrc, 0, 0, newSize.x, newSize.y, float(newSize.x)/iSrc.size.x, float(newSize.y)/iSrc.size.y);
 }
 
 //This is a special one: it only processes the first 2 ubytes of an uint
@@ -795,12 +856,25 @@ public:
       alias CT = ScalarType   !T,
             len = VectorLength!T;
       if(CT.stringof == type && len==channels)
-        return mixin("access!(", T.stringof, ").image2D!(a => a.convertPixel!(", E.stringof, "))");
+        return access!T.image2D!(a => a.convertPixel!E);
+        //return mixin("access!(", T.stringof, ").image2D!(a => a.convertPixel!(", E.stringof, "))");
     }}
 
-    raise("invalid bitmap format"); assert(0);
+    raise("unsupported bitmap format"); assert(0);
   }
 
+  void resize_nearest(ivec2 newSize){
+    static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
+      alias CT = ScalarType   !T,
+            len = VectorLength!T;
+      if(CT.stringof == type && len==channels){
+        set(access!T.resize_nearest(newSize));
+        return;
+      }
+    }}
+
+    raise("unsupported bitmap format"); assert(0);
+  }
 
   override string toString() const { return format("Bitmap(%d, %d, %d, \"%s\")", width, height, channels, type); }
 }

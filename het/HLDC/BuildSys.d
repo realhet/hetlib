@@ -130,13 +130,21 @@ class Executor{
 }
 
 /// returns true it it still need to work more
-bool update(Executor[] executors, void delegate(int idx, int result, string output) onProgress = null){
+bool update(Executor[] executors, bool delegate(int idx, int result, string output) onProgress = null){
+  bool doBreak;
   foreach(i, e; executors){
     if(!e.isFinished){
       e.update;
-      if(e.isFinished && (onProgress !is null)) onProgress(i.to!int, e.result, e.output);
+      if(e.isFinished && (onProgress !is null)){
+        const doContinue = onProgress(i.to!int, e.result, e.output);
+        if(!doContinue) doBreak = true;
+      }
     }
+    if(doBreak) break;
   }
+
+  if(doBreak) executors.each!(e => e.kill);
+
   return !executors.all!(e => e.isFinished);
 }
 
@@ -155,7 +163,7 @@ void executorTest(){
   print("end of test");
 }
 
-int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, void delegate(int idx, int result, string output) onProgress){
+int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress){
   //it was developed for running multiple compiler instances.
 
   Executor[] executors = cmdLines.map!(s => new Executor(false, s, env, workPath, logPath)).array;
@@ -962,6 +970,8 @@ private: //current build
         auto objFn = objFileOf(srcFn);
         objCache[findModule(srcFn).objHash] = objFn.read(true);
       }
+
+      return result == 0; //break if any error
     });
     logln;
 
@@ -1151,6 +1161,9 @@ public:
       //select files for compilation
       File[] filesToCompile, filesInCache;
       foreach(ref m; modules) ((m.objHash !in objCache) ? filesToCompile : filesInCache) ~= m.file;
+
+      //order by age
+      filesToCompile = filesToCompile.sort!((a, b) => a.modified > b.modified).array;
 
       //print out information
       {

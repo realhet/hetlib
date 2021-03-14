@@ -111,8 +111,6 @@ private vec2 calcGlyphSize_image(/*in TextStyle ts,*/ int stIdx){
 
 // NEW! ------------------------> ImStorage /////////////////////////////
 
-__gshared int globalUpdateTick;
-
 struct ImStorage(T){
   struct StorageEntry{
     T value;
@@ -161,6 +159,8 @@ struct HitInfo{ //Btn returns it
 
   @property bool clickedAndEnabled() const{ return clicked & enabled; }
   alias clickedAndEnabled this;
+
+  bool repeated() const{ return captured && inputs.LMB.repeated; }
 }
 
 struct HitTestManager{
@@ -1927,7 +1927,6 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
     try{
       auto params = cmdLine.commandLineToMap;
       auto cmd = params.get("0", "");
-
       if(cmd=="row"   ){
         auto a = new Row(params["1"], tsNormal);
         a.setProps(params);
