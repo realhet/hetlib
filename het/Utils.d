@@ -3234,10 +3234,30 @@ public:
 // a simple one from Delphi
 
 struct SeedStream(uint a, uint c){
+  enum multiplier = a, increment = c;
+  enum empty = false; //infinite range
   uint seed; // modulo = 2^32 only
-  enum empty = false;
   uint front() const{ return seed; }
-  void popFront() { seed = seed * a + c; }
+  void popFront() { seed = seed * multiplier + increment; }
+
+  static void test(int seed){
+    print("Testing SeedStream: mul:", multiplier, format!"(0x%x)"(multiplier), "  inc:", increment, format!"(0x%x)"(increment));
+    BitArray ba;
+    ba.length = 1L << 32;
+    write("seed = ", seed, "  ");
+    ba[] = false;
+    auto ss = typeof(this)(seed);
+    auto act(){ return ss.front; }
+    long cnt = 0;
+    while(!ba[act]){
+      ba[act] = true;
+      ss.popFront;
+      cnt++;
+    }
+    long firstZero = -1; foreach(idx, b; ba) if(!b){ firstZero = idx; break; }
+    print("cycle length =", cnt.format!"0x%x", "  first false at:", firstZero);
+  }
+
 }
 
 // https://en.wikipedia.org/wiki/Linear_congruential_generator

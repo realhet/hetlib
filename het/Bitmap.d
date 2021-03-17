@@ -60,16 +60,18 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
   //todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
   //      when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
 
-  //handle thumbnails
-  //todo: cache decoded full size image
-  //todo: turboJpeg small size extract
-  {
+
+  { //handle thumbnails
     immutable thumbStr = "?thumb";
     // ?thumb32w    specifies maximum width
     // ?thumb32h    specifies maximum height
     // ?thumb32wh   specifies maximum width and maximum height
     // ?thumb32     ditto
+    //todo: ?thumb32x24  different maxwidth and maxheight
+    //todo: keep aspect or not
     //todo: ?thumb=32w is not possible because processMarkupCommandLine() uses the = pro parameters and it can't passed into this filename.
+    //todo: cache decoded full size image
+    //todo: turboJpeg small size extract
 
     string thumbDef;
     if(fn.split2(thumbStr, fn, thumbDef, false/+must not strip!+/)){
@@ -97,8 +99,8 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
 
       if(minScale < 1){
         ivec2 newSize = round(orig.size*minScale);
-        print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
-        orig.resize_nearest(newSize);
+        //print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
+        orig.resize_nearest(newSize); //todo: mipmapped bilinear/trilinear
         return orig;
       }
 
@@ -312,7 +314,7 @@ auto extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, flo
 
 Image!(T, 2) resize_nearest(T)(Image!(T, 2) iSrc, ivec2 newSize){
   //todo: What about pixel center 0.5?  It is now shifting the image.
-  return extract_nearest(iSrc, 0, 0, newSize.x, newSize.y, float(newSize.x)/iSrc.size.x, float(newSize.y)/iSrc.size.y);
+  return extract_nearest(iSrc, 0, 0, newSize.x, newSize.y, iSrc.size.x/float(newSize.x), iSrc.size.y/float(newSize.y));
 }
 
 //This is a special one: it only processes the first 2 ubytes of an uint
@@ -810,6 +812,7 @@ public:
   //in general: use newBitmap() to create a bitmap
 
   bool empty(){ return data_.length==0 || width<=0 || height<=0 || channels<=0; }
+  auto sizeInBytes() const{ return data_.length; }
 
   @property width   () const{ return width_   ; }
   @property height  () const{ return height_  ; }

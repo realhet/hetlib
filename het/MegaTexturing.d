@@ -9,7 +9,16 @@ import het.draw2d;
 
 alias textures = Singleton!TextureManager;
 
-__gshared DEBUG_clearRemovedSubtexArea = false; // marks the free'd parts with fuchsia
+__gshared
+  DEBUG_clearRemovedSubtexArea  = false, // marks the free'd parts with fuchsia
+  global_disableSubtextureAging = false; // Suspend updating texture access statistics. Good for debugging the megaTextures.
+
+bool canUnloadTexture(File f, int age){
+  if(age<3) return false;
+  if(["custom", "font"].map!(a => f.fullName.startsWith(a)).any) return false;
+  return true;
+}
+
 
 // MegaTexturing constants ///////////////////////////////
 
@@ -27,10 +36,10 @@ enum
 
 enum
   //starting size for textures
-  MegaTexMinSizeBits = 10,
+  MegaTexMinSizeBits = 13,
   MegaTexMinSize = 1<<MegaTexMinSizeBits,
 
-  MegaTexMaxSizeBits = SubTexSizeBits, //it can be the same... why not
+  MegaTexMaxSizeBits = 13,//SubTexSizeBits, //it can be the same... why not
   MegaTexMaxSize = 1<<MegaTexMaxSizeBits,
 
   SubTexPosBits = MegaTexMaxSizeBits-SubTexCellBits,
@@ -116,7 +125,7 @@ public:
     this.texIdx = texIdx;
     this.channels = channels;
 
-    const minSize = 64>>SubTexCellBits,
+    const minSize = min(MegaTexMinSize, gl.maxTextureSize)>>SubTexCellBits,
           maxSize = min(MegaTexMaxSize, gl.maxTextureSize)>>SubTexCellBits;
     bin = new MaxRectsBin(minSize, minSize, maxSize, maxSize);
 
@@ -159,17 +168,26 @@ public:
   void debugDraw(Drawing dr){
     dr.scale(SubTexCellSize); scope(exit) dr.pop;
 
+    dr.lineWidth = -1;
+
+    dr.lineStyle = LineStyle.normal;
     foreach(r; bin.freeRects){
-      dr.color = clGray;
+      dr.color = clWhite;
       dr.drawRect(r.bounds.inflated(-0.25f));
     }
 
+    dr.lineStyle = LineStyle.dash;
     foreach(j, r; bin.rects){
-      dr.color = clVga[(cast(int)j % ($-1))+1];
-      dr.alpha = 0.5;
+      dr.color = clBlack; //clVga[(cast(int)j % ($-1))+1];
+      dr.alpha = 0.25;
       dr.fillRect(r.bounds);
-      dr.drawRect(r.bounds);
+      dr.alpha = 1;
+
+      dr.color = clWhite;
+      dr.drawRect(r.bounds.inflated(-0.25f));
     }
+
+    dr.lineStyle = LineStyle.normal;
 
     dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);
   }
@@ -211,7 +229,8 @@ public  SubTexInfo[] infoArray;
   }
 
   void accessedNow(int idx){
-    lastAccessed[idx] = globalUpdateTick;
+    if(!global_disableSubtextureAging)
+      lastAccessed[idx] = global_UpdateTick;
   }
 
 public:
@@ -446,6 +465,8 @@ public:
     auto t0 = QPS;
 
     enum UploadTextureMaxTime = 1/60.0f;
+    size_t uploadedSize;
+    enum TextureFlushLimit = 8 << 20;
     do{
 
       Bitmap bmp;
@@ -471,7 +492,13 @@ public:
         }
       }else{
         uploadSubTex(idx, bmp);
-        gl.flush;
+
+        //flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
+        uploadedSize += bmp.sizeInBytes;
+        if(uploadedSize >= TextureFlushLimit){
+          uploadedSize -= TextureFlushLimit;
+          gl.flush;
+        }
       }
 
       inv = true;
@@ -550,6 +577,7 @@ public:
 
         if(1){
           import std.concurrency;
+          //LOG("LOADING bmp", fileName);
           spawn(&loader, idx, fileName);
         }else{
           import std.parallelism;
@@ -654,12 +682,17 @@ if(log) "Created subtex %s:".writefln(fileName);
     File file;
     SubTexInfo info;
 
-    auto toString(){
+    bool canUnload() const{ return canUnloadTexture(file, global_UpdateTick - lastAccessed); }
+
+    auto toString() const{
       return format!"%-4s: %s age:%-5d %s"(idx, info, lastAccessed, file.fullName);
     }
   }
 
   auto collectSubTexInfo2(){
+    //todo: this should be the main list.
+    //although it's fast: For 2GB textures, it's only 0.2ms to collect. (Standard test images)
+
     SubTexInfo2[] res;
 
     //make an inverse map
@@ -679,25 +712,36 @@ if(log) "Created subtex %s:".writefln(fileName);
   void debugDraw(Drawing dr){ //debugDraw /////////////////////////////
     //print("Megatexture debug draw----------------------------");
 
+    //megatexture debugging will not affect texture last-accessed statistics
+    global_disableSubtextureAging = true;
+    scope(exit) global_disableSubtextureAging = false;
+
+    //collect all subtextures
+    auto t0 = QPS;
     auto subTexInfos = collectSubTexInfo2;
+    LOG(QPS-t0);
 
     int ofs;
     foreach(megaIdx, mt; megaTextures){
       dr.translate(0, ofs); scope(exit){ dr.pop; ofs += mt.texSize.y + 16; }
 
+      //draw background
+      dr.color = clFuchsia;
+      dr.fillRect(bounds2(vec2(0), mt.texSize));
+
+      //draw subtextures
       foreach(i, const si; subTexInfos) if(si.info.texIdx==megaIdx){
         const subTexIdx = i.to!int;
-        dr.drawGlyph(subTexIdx, bounds2(si.info.bounds), clGray);
+        dr.color = clWhite;
+        dr.drawGlyph(subTexIdx, bounds2(si.info.bounds), clGray); //todo: drawRect support for ibounds2
+        if(!si.canUnload){
+          dr.lineWidth=-3; dr.color = clRed;
+          dr.drawX(bounds2(si.info.bounds));
+        }
       }
 
+      //draw free and used rects and frame
       mt.debugDraw(dr);
-
-      dr.lineWidth = -1;
-      dr.color = clBlue;
-      dr.drawRect(bounds2(vec2(0), mt.texSize));
-
-      //mt.drawRects(dr);
-
     }
 
   }

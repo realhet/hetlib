@@ -1591,17 +1591,19 @@ public:
 
   //todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
 
-  void upload(const(void)[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+  void upload(in void[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     if(!prepareInputRect(x, y, xs, ys)) return;
 
     //check required buffer size
-    int bytes = (stride ? stride : xs)*ys*texelSize;
+    const bytes = (stride ? stride : xs)*ys*texelSize;
     enforce(data.length>=bytes, "Insufficient input data x=%s, y=%s, sx=%s, sy=%s, stride=%s, reqBytes=%s data.length=%s".format(x, y, xs, ys, stride, bytes, data.length));
 
     //do the actual upload
     checkBinding;
     gl.pixelStore(GL_UNPACK_ROW_LENGTH, stride);
     gl.texSubImage2D(GL_TEXTURE_2D, 0, x, y, xs, ys, GL_FORMAT(type), GL_DATATYPE(type), data);
+
+    global_TPSCnt += size_t(xs*texelSize)*ys;
 
     mipmapBuilt = false; //todo: rebuild mipmap
   }
