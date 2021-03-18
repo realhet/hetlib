@@ -9,12 +9,20 @@ import het.draw2d;
 
 alias textures = Singleton!TextureManager;
 
+__gshared int[dchar] DefaultFont_subTexIdxMap; //Used by UI, must be cleared after every megatexture GC
+
 __gshared
-  DEBUG_clearRemovedSubtexArea  = false, // marks the free'd parts with fuchsia
-  global_disableSubtextureAging = false; // Suspend updating texture access statistics. Good for debugging the megaTextures.
+  DEBUG_clearRemovedSubtexArea          = false, // marks the free'd parts with fuchsia
+  global_disableSubtextureAging         = false, // Suspend updating texture access statistics. Good for debugging the megaTextures, it can be disabled temporarily.
+  EnableMultiThreadedTextureLoading     = true,
+
+  synchLog = false,  //LOG the start and end of synch blocks
+
+  MegaTexMinSize = 1<< 9,      //can set by the application before any textures being used
+  MegaTexMaxSize = 1<<13;      //todo: ensure the safety of this with a setter.
 
 bool canUnloadTexture(File f, int age){
-  if(age<3) return false;
+  if(age<=3) return false;
   if(["custom", "font"].map!(a => f.fullName.startsWith(a)).any) return false;
   return true;
 }
@@ -29,26 +37,27 @@ enum
   SubTexCellMask = SubTexCellSize-1,
 
   //Maximum size of textures. Hardware dependent. Max 16K
-  SubTexSizeBits = 14,               //16K at max.
+  SubTexSizeBits = 14,   //MAX 14bits / 16K
   SubTexMaxSize = 1<<SubTexSizeBits,
   SubTexSizeMask = SubTexMaxSize-1;
 
 
 enum
   //starting size for textures
-  MegaTexMinSizeBits = 13,
-  MegaTexMinSize = 1<<MegaTexMinSizeBits,
+//  MegaTexMinSizeBits = 13,                       //todo: !!!!!!!! must be set when app starts
+//  MegaTexMinSize = 1<<MegaTexMinSizeBits,
 
-  MegaTexMaxSizeBits = 13,//SubTexSizeBits, //it can be the same... why not
-  MegaTexMaxSize = 1<<MegaTexMaxSizeBits,
-
-  SubTexPosBits = MegaTexMaxSizeBits-SubTexCellBits,
-
-  MegaTexIdxBits = 4,                 //samplerArray[8]
-  MegaTexMaxCnt = 1<<MegaTexIdxBits,
+//  MegaTexMaxSizeBits = 13,                       //todo: !!!!!!!! must be set when app starts
+//  MegaTexMaxSize = 1<<MegaTexMaxSizeBits,
 
   SubTexIdxBits = 16,
   SubTexIdxCnt = 1<<SubTexIdxBits;
+
+  // not used SubTexPosBits = MegaTexMaxSizeBits-SubTexCellBits,
+
+//  MegaTexIdxBits = 4,                 //in the shader, it is max 8. -> samplerArray[8]
+  enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits,         //todo: !!!!!!!! must be set when app starts
+
 
 
 // SubTexInfo struct ////////////////////////
@@ -101,6 +110,12 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
   auto toString() const{ return isNull ? "SubTexInfo(null)" : "SubTexInfo(pos:(%-4d, %-4d), size:(%-4d, %-4d), mega:%d, chn:%4s)".format(pos.x, pos.y, size.x, size.y, texIdx, channelConfig); }
 }
 
+auto longToSubTexInfo(long val){
+  SubTexInfo si;
+  si = *(cast(SubTexInfo*)&val);
+  return si;
+}
+
 class MegaTexture{ // MegaTexture class /////////////////////////////
 private:
   int texIdx, channels;
@@ -138,6 +153,10 @@ public:
     bin.free;
   }
 
+  void reinitialize(){
+    bin.reinitialize;
+  }
+
   override string toString(){ return "MegaTexture(%s)".format(glTexture); }
 
   bool add(in ivec2 size, int channels, int data/*subTexIdx*/, out SubTexInfo info){
@@ -159,6 +178,7 @@ public:
 
   void remove(in int data){
     bin.remove(data).enforce("nothing to remove");
+    //if(!bin.remove(data)) WARN("bin: nothing to remove ", data);
   }
 
   void dump() const{
@@ -247,16 +267,17 @@ public:
   }
 
   //peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
-  int peekNextIdx() const{
+  //note: this technique is too dangerous. Must add the info, but not upload.
+  /*int peekNextIdx() const{
     if(!freeIndices.empty){//reuse a free slot
       return freeIndices[$-1];
     }else{ //add an extra slot
       return cast(int)infoArray.length;
     }
-  }
+  }*/
 
   //allocates a new subTexture slot
-  int add(in SubTexInfo info){
+  int add(in SubTexInfo info, Flag!"uploadNow" uploadNow= Yes.uploadNow){
     //ez nem kell, mert a delayed loader pont null-t allokal eloszor: enforce(!info.isNull, "cannot allocate SubTexInfo.null");
 
     int actIdx;
@@ -276,7 +297,7 @@ public:
 
     accessedNow(actIdx);
 
-    upload(actIdx);
+    if(uploadNow) upload(actIdx);
 
     return actIdx;
   }
@@ -365,6 +386,10 @@ private:
     enforce(size.x<=gl.maxTextureSize && size.y<=gl.maxTextureSize, "Texture too big on current opengl implementation (%s)".format(size));
   }
 
+  void chkMtIdx(int mtIdx){
+    enforce(mtIdx.inRange(megaTextures), "mtIdx out of range (%s !in [0..%s])".format(mtIdx, megaTextures.length));
+  }
+
   bool isCompatible(const Bitmap bmp, const MegaTexture mt){
     return true;
     //mt.channels==bmp.channels;
@@ -372,7 +397,7 @@ private:
 
   void addNewMegaTexture(int channels){
     if(megaTextures.length>=MegaTexMaxCnt){
-      raise("Out of megatextures"); //todo: make a texture garbage collect cycle here
+      raise("Out of megatextures");
     }
     megaTextures ~= new MegaTexture(megaTextures.length.to!int, channels);
   }
@@ -381,26 +406,90 @@ private:
     return infoTexture.add(info);
   }
 
+  private int garbageCycle; //just an ever increasing index
+
+  bool isPending(int idx){
+    return idx in pendingIndices && pendingIndices[idx];
+  }
+
+  bool isInvalidatingAgain(int idx){
+    return idx in invalidateAgain && invalidateAgain[idx];
+  }
+
+  bool isUntouchable(int idx){ return isPending(idx) || isInvalidatingAgain(idx); }
+
+  void garbageCollect(){ // garbageCollect() /////////////////////////////////////////
+    int mtIdx = garbageCycle % cast(int)megaTextures.length;
+    chkMtIdx(mtIdx);
+
+    garbageCycle++; //set the index for the next garbageCollect
+
+    //LOG("GCycle", garbageCycle);
+
+    auto allInfos = collectSubTexInfo2.filter!(i => i.info.texIdx==mtIdx).array; //on the current megatexture
+    //auto infosToUnload = allInfos.filter!(i =>  i.canUnload).array;
+    //auto infosToSave   = allInfos.filter!(i => !i.canUnload).array;
+
+    // no need to wait pending because they are not allocated yet in the bins and update() only called from main thread, also it can start a GC
+    /+while(allInfos.map!(i => isPending(i.idx)).any){
+      LOG("Waiting for pending textures...");
+      sleep(10);
+    }+/
+
+    //LOG("MegaTexture.GC   mtIdx:", mtIdx, "  removing:", infosToUnload.length, "  keeping:", infosToSave.length, "   total:", collectSubTexInfo2.count);
+
+    //note: Tere is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
+    //raise("notImpl " ~ info.text);
+
+    foreach(info; allInfos){
+      invalidate(info.file);
+    }
+
+    megaTextures[mtIdx].reinitialize;
+
+    //todo: Ugly lag and one frame of garbage when the DefaultFont_subTexIdxMap is cleared.
+    // Not nice. But seems safe. It takes a lot of time, to draw the fonts again and it is impossible to read them back from the reinitialized texture.
+    // solution -> dedicated megatexture to the defaultfont
+    DefaultFont_subTexIdxMap.clear; // UI uses this cache, and now it is invalid because of the GC
+  }
+
   SubTexInfo allocSpace(int subTexIdx, in Bitmap bmp){
     enforceSize(bmp.size);
 
     SubTexInfo info;
-    bool check(MegaTexture mt){
+    bool tryAdd(MegaTexture mt){
       return isCompatible(bmp, mt) && mt.add(bmp.size, bmp.channels, subTexIdx, info);
     }
 
-    foreach(mt; megaTextures) if(check(mt)) return info;
+    // the order could be improved
+    foreach(mt; megaTextures) if(tryAdd(mt)) return info;
 
-    //add a new one
-    addNewMegaTexture(4);
-    enforce(check(megaTextures[$-1]));
-    return info;
+    //at this point failed to add to the current set of megatextures.
+
+    if(megaTextures.length>=MegaTexMaxCnt){
+      if(0){
+        raise("Out of megatextures"); //todo: make a texture garbage collect cycle here
+      }else{
+        foreach(i; 0..MegaTexMaxCnt){
+          garbageCollect;
+          foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
+        }
+      }
+    }else{
+
+      if(megaTextures.length) MegaTexMinSize = MegaTexMaxSize; //All textures use the max size expect the first. (small apps ned only 512*512)
+      addNewMegaTexture(4);
+      foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
+    }
+
+    enforce("Unable to allocate subTexture. "~bmp.size.text);
+    assert(0);
   }
 
   void uploadData(SubTexInfo info, Bitmap bmp, bool dontUploadData=false){
     auto mtIdx = info.texIdx;
 
-    enforce(mtIdx>=0 && mtIdx<megaTextures.length, "mtIdx out of range (%s)".format(mtIdx));
+    chkMtIdx(mtIdx);
     auto mt = megaTextures[mtIdx];
 
     if(!dontUploadData){
@@ -414,6 +503,16 @@ private:
     }
   }
 
+  /*ubyte[] downloadData(SubTexInfo info){
+    auto mtIdx = info.texIdx;
+
+    chkMtIdx(mtIdx);
+    auto mt = megaTextures[mtIdx];
+
+    mt.glTexture.fastBind;
+    mt.glTexture.download(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
+  }*/
+
   void uploadSubTex(int idx, Bitmap bmp, bool dontUploadData=false){ //it has an existing id
     auto info = allocSpace(idx, bmp);
     infoTexture.modify(idx, info);
@@ -423,9 +522,17 @@ private:
   int createSubTex(Bitmap bmp){ //creates a new one, returns the idx
     if(bmp.empty) return 0; //special null texture
 
-    auto idx = infoTexture.peekNextIdx;
+    /+ old and bogus version
+    auto idx = infoTexture.peekNextIdx;     //returns 8
+    auto info = allocSpace(idx, bmp);       //GC deletes info[0..4], and allocspace if susseeded, stores the subtexIdx in info.
+    infoTexture.add(info);                  //and this allocates on 3 (last freed) not 8.  BUG!!!!!!!!!!!
+    +/
+
+    // new version allowing GC to manipulate subTexInfos.
+    auto idx = infoTexture.add(longToSubTexInfo(-1)/+just a marking, that it's not null+/, No.uploadNow);
     auto info = allocSpace(idx, bmp);
-    infoTexture.add(info);
+    infoTexture.modify(idx, info);
+
     uploadData(info, bmp);
     return idx;
   }
@@ -436,8 +543,7 @@ private:
 
     //get megaTex idx
     auto mtIdx = info.texIdx;
-
-    enforce(mtIdx>=0 && mtIdx<megaTextures.length, "mtIdx out of range (%s)".format(mtIdx));
+    chkMtIdx(mtIdx);
 
     //clear the area with clFuchsia for debug
     if(DEBUG_clearRemovedSubtexArea) with(megaTextures[mtIdx].glTexture){
@@ -470,7 +576,11 @@ public:
     do{
 
       Bitmap bmp;
-      synchronized(textures) bmp = bmpQueue.popFirst(null);
+      synchronized(textures){
+        if(synchLog) LOG("bmpQueue.popFirst(null) before");
+        bmp = bmpQueue.popFirst(null);
+        if(synchLog) LOG("bmpQueue.popFirst(null) after");
+      }
 
       if(!bmp) break;
 
@@ -486,7 +596,7 @@ public:
 
         invalidateAgain.remove(idx);
         foreach(f, i; byFileName) if(i == idx){ //opt: slow linear search
-          //WARN("Reinvalidating", f, idx);
+          WARN("Reinvalidating", f, idx);
           invalidate(f);
           break;
         }
@@ -511,18 +621,21 @@ public:
   void invalidate(in File fileName){
     if(auto idx = (fileName in byFileName)){
       if(*idx in pendingIndices){
-        //WARN("Texture loader is pending", fileName, *idx);
+        WARN("Texture loader is pending", fileName, *idx);
         invalidateAgain[*idx] = true;
         return;
       }
-      byFileName.remove(fileName);
+      enforce(byFileName.remove(fileName), "Unable to remove "~fileName.fullName);
       removeSubTex(*idx);
+      //LOG("invalidated ", fileName, "  idx:", *idx);
+    }else{
+      //LOG("no need to invalidate, doesn't exists", fileName);
     }
   }
 
   int access(in File fileName, bool delayed = true){ //todo: bugos a delayed leader
 
-    //delayed = false;
+    delayed &= EnableMultiThreadedTextureLoading;
 
     //todo: nonexisting file and/or exception is not handling well here.
 
@@ -531,7 +644,10 @@ public:
       if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false; //todo: delayed restriction. should refactor this nicely
 //delayed = false;
       if(delayed){
-        auto idx = allocSubTexInfo;
+
+        //ez egy bug miatt, ami a 0. megatextura garbageCollectje utan fordul elo
+        //nem jo, ha a 0-as megaTex-re van egy betoltes alatt levo textura 'rakva'
+        auto idx = allocSubTexInfo(longToSubTexInfo(-1)); //az allocSubTexInfo ez kizarolag innen van hivva
 
         pendingIndices[idx] = true;
         byFileName[fileName] = idx;
@@ -569,16 +685,20 @@ public:
 //          "E%s ".writef(idx);
 
           synchronized(textures){
+            if(synchLog) LOG("textures.bmpQueue ~= bmp; before");
             textures.bmpQueue ~= bmp;
+            if(synchLog) LOG("textures.bmpQueue ~= bmp; after");
             //mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
           }
 
         }
 
         if(1){
+          //todo: upgrade this to be able to prioritize loading order in realtime.
           import std.concurrency;
+
           //LOG("LOADING bmp", fileName);
-          spawn(&loader, idx, fileName);
+          spawn(&loader, idx, fileName);   //crashes after 5 min
         }else{
           import std.parallelism;
           auto t = task!loader(idx, fileName);
@@ -617,6 +737,10 @@ public:
     }
 
     return byFileName[fileName];
+  }
+
+  bool isCustomExists(string name){
+    return (File("custom://"~name) in byFileName) !is null;
   }
 
   int custom(string name, Bitmap bmp=null){ //if bitmap != null then refresh
@@ -689,20 +813,28 @@ if(log) "Created subtex %s:".writefln(fileName);
     }
   }
 
+  void infoDump(){
+    print("--------------- MegaTexture dump ----------------");
+    foreach(i, info; infoTexture.infoArray)
+      print(format!"%-3d : %-20s "(i, info));
+    foreach(f; byFileName.keys.sort){
+      print(format!"%-3d : %-20s "(byFileName[f], f.nameWithoutExt));
+    }
+  }
+
   auto collectSubTexInfo2(){
     //todo: this should be the main list.
     //although it's fast: For 2GB textures, it's only 0.2ms to collect. (Standard test images)
 
+    //LOG("attempting to get subtexInfo2");
+    //infoDump;
+
     SubTexInfo2[] res;
 
-    //make an inverse map
-    File[int] fileByIdx; foreach(k, v; byFileName) fileByIdx[v]=k; //todo: make it functional
-    //int[File] fileByIdx = assocArray(byFileName.keys, byFileName.values);
-
-    foreach(i, info; infoTexture.infoArray){
-      const idx          = i.to!int,
-            lastAccessed = infoTexture.lastAccessed[idx],
-            file         = fileByIdx.require(idx);
+    foreach(file, idx; byFileName){
+      //LOG("retrieving ", file, "  idx:", idx);
+      const info = infoTexture.infoArray[idx],
+            lastAccessed = infoTexture.lastAccessed[idx];
       res ~= SubTexInfo2(idx, lastAccessed, file, info);
     }
 
@@ -717,9 +849,7 @@ if(log) "Created subtex %s:".writefln(fileName);
     scope(exit) global_disableSubtextureAging = false;
 
     //collect all subtextures
-    auto t0 = QPS;
     auto subTexInfos = collectSubTexInfo2;
-    LOG(QPS-t0);
 
     int ofs;
     foreach(megaIdx, mt; megaTextures){
@@ -730,12 +860,11 @@ if(log) "Created subtex %s:".writefln(fileName);
       dr.fillRect(bounds2(vec2(0), mt.texSize));
 
       //draw subtextures
-      foreach(i, const si; subTexInfos) if(si.info.texIdx==megaIdx){
-        const subTexIdx = i.to!int;
+      foreach(const si; subTexInfos) if(si.info.texIdx==megaIdx){
         dr.color = clWhite;
-        dr.drawGlyph(subTexIdx, bounds2(si.info.bounds), clGray); //todo: drawRect support for ibounds2
+        dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); //todo: drawRect support for ibounds2
         if(!si.canUnload){
-          dr.lineWidth=-3; dr.color = clRed;
+          dr.lineWidth=-3; dr.color = clYellow;
           dr.drawX(bounds2(si.info.bounds));
         }
       }
@@ -745,23 +874,6 @@ if(log) "Created subtex %s:".writefln(fileName);
     }
 
   }
-
-/*    dr.scale(SubTexCellSize); scope(exit) dr.pop;
-
-    foreach(r; bin.freeRects){
-      dr.color = clGray;
-      dr.drawRect(r.bounds.inflated(-0.25f));
-    }
-
-    foreach(j, r; bin.rects){
-      dr.color = clVga[(cast(int)j % ($-1))+1];
-      dr.alpha = 0.5;
-      dr.fillRect(r.bounds);
-      dr.drawRect(r.bounds);
-    }
-
-    dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);*/
-
 
 }
 

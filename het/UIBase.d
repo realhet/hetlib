@@ -1,7 +1,8 @@
 module het.uibase;
 
 import het.utils, het.geometry, het.draw2d, het.bitmap, het.win, het.opengl,
-  het.keywords/*apply syntax*/;
+  het.keywords/*apply syntax*/,
+  het.megatexturing : DefaultFont_subTexIdxMap;
 
 import std.bitmanip: bitfields;
 
@@ -1134,12 +1135,11 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
     }
 
     if(ts.isDefaultFont){ // cached version for the default font
-      static int[dchar] subTextIdxMap;
-      if(auto p = ch in subTextIdxMap){
+      if(auto p = ch in DefaultFont_subTexIdxMap){
         stIdx = *p;
       }else{
         lookupSubTexIdx;
-        subTextIdxMap[ch] = stIdx;
+        DefaultFont_subTexIdxMap[ch] = stIdx;
       }
     }else{ //uncached for non-default fonts
       lookupSubTexIdx;

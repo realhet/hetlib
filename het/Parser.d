@@ -3,6 +3,7 @@ module het.parser;
 import het.utils, het.tokenizer, het.keywords, std.regex;
 
 //todo: editor: mouse back/fwd navigalas, mint delphiben
+//todo: 8K, 8M, 8G should be valid numbers! Preprocessing job...
 
 //global thing to share compiler specific paths stuff
 struct DPaths{   //todo: Path-osra atirni

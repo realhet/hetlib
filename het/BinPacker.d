@@ -82,12 +82,16 @@ class MaxRectsBin{
         this.options = options;
         this.padding = padding;
 
-        enum initialSize = 64;
-
         this.width  = this.options.smart ? initialWidth  : maxWidth ;
         this.height = this.options.smart ? initialHeight : maxHeight;
         this.freeRects ~= new Rectangle(0, 0, this.maxWidth + this.padding, this.maxHeight + this.padding);
         this.stage = new Rectangle(0, 0, this.width, this.height);
+    }
+
+    void reinitialize(){
+      this.rects = [];
+      this.freeRects = [new Rectangle(0, 0, this.maxWidth + this.padding, this.maxHeight + this.padding)];
+      this.stage = new Rectangle(0, 0, this.width, this.height);
     }
 
     Rectangle add(int width, int height, RectangleData data = RectangleData.init){

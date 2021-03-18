@@ -804,7 +804,7 @@ class Drawing {
     saveState; scope(exit) restoreState; //opt:slow
 
     auto scale = fontHeight*(1.0f/40);         //todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
-    lineWidth = 3*scale*fontWeight;
+    lineWidth = 3*scale*fontWeight*scaleFactor.x;
     lineStyle = LineStyle.normal;
 
     //align
