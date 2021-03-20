@@ -4,7 +4,7 @@ import het.utils;
 
 //todo: libCUrl dll-t statikusan linkelni! Jelenleg az ldc2\bin-ben levo van hasznalva
 
-enum _log = false; //todo: ezt a logolast kozpontositani
+//enum _log = true; //todo: ezt a logolast kozpontositani
 
 auto curlGet(string url){
   import std.net.curl;
@@ -163,13 +163,14 @@ public:
   }
 
 private:
-  auto inbox = new shared RequestQueue;
-  auto outbox = new shared ResponseQueue;
-  shared int terminated = 0; // 1= terminate, 2 = ack
+  //note: here if I use new RequestQueue, then it will be the same shared instance between all HttpQueue classes. Here I need a separate instance. Terminated and state_ is ok, but newExpression means a global constructor here!!
+  shared RequestQueue inbox;
+  shared ResponseQueue outbox;
 
+  shared int terminated = 0; // 1= terminate, 2 = ack
   shared State state_;
 
-  static void httpWorker(const string name, shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared State* state_){
+  static void httpWorker(string name, shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared State* state_){
     enum log = false;
 
     auto st = cast(State*) state_;
@@ -210,6 +211,9 @@ private:
 
 public:
   this(string name = ""){
+    inbox = new shared RequestQueue;
+    outbox = new shared ResponseQueue;
+
     import std.concurrency : spawn;
     spawn(&httpWorker, name, inbox, outbox, &terminated, &state_);
   }

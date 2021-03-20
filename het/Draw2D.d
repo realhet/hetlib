@@ -244,7 +244,7 @@ class Drawing {
     float fontHeight = 18;
     float fontWeight = 1.0;
 
-    static foreach(i, s; ["MonoSpace", "Italic", "Underline", "StrikeOut"]){
+    static foreach(i, s; ["MonoSpace", "Italic", "Underline", "StrikeOut", "Image"]){
       mixin("@property bool font*() const { return (fontFlags>>#)&1; }  @property void font*(bool b){ fontFlags = cast(ubyte) (fontFlags & ~(1<<#) | (cast(int)b << #)); }".replace('*', s).replace('#', i.text));
     }
 
@@ -648,6 +648,66 @@ class Drawing {
   void fillRect(in bounds2 b)                       { fillRect(b.low, b.high); }
   void fillRect(in ibounds2 b)                      { fillRect(bounds2(b)); } //todo: ibounds2 automatikusan atalakulhasson bounds2-re
 
+  void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args){
+    RGBA8 bkColor = clBlack;
+    auto rectAlign = RectAlign(HAlign.center, VAlign.center, true, false, true); //shrink, enlarge, aspect
+    auto nearest = No.nearest;
+
+    static foreach(i, A_; T){ alias A = Unqual!A_; auto a(){ return args[i]; }
+           static if(is(A==RGB8           )) bkColor = a.to!RGBA8;
+      else static if(is(A==RGBA8          )) bkColor = a;
+      else static if(is(A==Flag!"nearest" )) nearest = a;
+      else static if(is(A==RectAlign      )) rectAlign = a;
+      else static assert("Unhandled parameter ", typeof(a));
+    }
+
+    auto c = realDrawColor;
+    auto c2 = bkColor;
+
+    auto tx0 = vec2(16/*fontflag=image*/ | (nearest ? 0 : 1), 0),
+         tx1 = vec2(1, 1);
+
+    auto info = textures.accessInfo(idx); //todo: csunya, kell egy texture wrapper erre
+
+    auto b2 = rectAlign.apply(bnd, bounds2(0, 0, info.width, info.height));
+
+    append(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw));
+  }
+
+  void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args){
+    auto info = textures.accessInfo(idx); //autosize version
+    drawGlyph_impl(idx, bounds2(topLeft, topLeft+info.size), args);
+  }
+
+  void drawGlyph(Img, T...)(in Img img, in T args){
+    //Img can be int or File or string
+    //todo: Bitmap, Image2D
+    int idx = -1;
+         static if(isSomeString!Img       ) idx = textures[img];
+    else static if(is(Unqual!Img == File) ) idx = textures[img];
+    else static if(is(Unqual!Img == int)  ) idx = img;
+    else static assert("Unsupported Img param: ", Img);
+
+    //position can be x,y  vec2,   ivec2      the size is automatic
+    //bounds can be bounds2, ibounds2   2x vec2,
+         static if(T.length>=1 && isBounds!(T[0]))                                  drawGlyph_impl(idx, bounds2(args[0   ]), args[1..$]);
+    else static if(T.length>=1 && isVector!(T[0]))
+      static if(T.length>=2 && isVector!(T[1]))                                     drawGlyph_impl(idx, bounds2(args[0..2]), args[2..$]);
+                                                                               else drawGlyph_impl(idx, vec2   (args[0   ]), args[1..$]);
+    else static if(T.length>=2 && isArithmetic!(T[0]) && isArithmetic!(T[1]))
+      static if(T.length>=4 && isArithmetic!(T[2]) && isArithmetic!(T[3]))          drawGlyph_impl(idx, bounds2(args[0..4]), args[4..$]);
+                                                                               else drawGlyph_impl(idx, vec2   (args[0..2]), args[2..$]);
+    else static assert("Unsupported Bounds param: ", Img);
+  }
+
+  /+//old shit
+
+  /*  void drawGlyph(int idx       , in bounds2 b, in RGB8 bkColor = clBlack){
+  void drawGlyph(in File fileName, in bounds2 b, in RGB8 bkColor = clBlack){
+  void drawGlyph(in File fileName, in vec2 p, in RGB8 bkColor = clBlack){
+  void drawGlyph(int idx         , in vec2 p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
+  void drawGlyph(int idx         , float x=0, float y=0, in RGB8 bkColor = clBlack){ */
+
   void drawGlyph(int idx, in bounds2 b, in RGB8 bkColor = clBlack){
     auto c = realDrawColor;
     auto c2 = bkColor.to!RGBA8;
@@ -680,7 +740,7 @@ class Drawing {
 
   void drawGlyph(int idx, float x=0, float y=0, in RGB8 bkColor = clBlack){
     drawGlyph(idx, vec2(x, y), bkColor);
-  }
+  } +/
 
   void drawFontGlyph(int idx, in bounds2 b, in RGB8 bkColor = clBlack, in int fontFlags = 0){   //bit0:bold
     auto c = realDrawColor;
@@ -688,6 +748,8 @@ class Drawing {
 
     auto tx0 = vec2(fontFlags, 0),
          tx1 = vec2(0, 0);
+
+    //todo: must combine this with drawGlyph
 
     //align proportiolally
 //    auto al = RectAlign(HAlign.center, VAlign.center, true, true, false); //shrink, enlarge, aspect
@@ -1468,7 +1530,8 @@ class Drawing {
         //samplingLevel : 0 = nearest, 1 = linear, 2 = rooks6, 3 = cleartype
         int samplingLevel = 0;
         if(isImage){
-          samplingLevel = 1;
+          samplingLevel = fontFlags & 1; // nearest or linear
+          //todo: nearest when close and linear when far
         }else{
           float L = length(texelPerPixel);
           samplingLevel = L>32 ? 2: //minify
@@ -1487,6 +1550,10 @@ class Drawing {
           else if(stConfig==12) finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
           else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
 
+          //experimental grid
+          if(1) if(texelPerPixel.x < 0.1){
+            if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
+          }
         }else if(samplingLevel==2){//rooks6
           vec4 texel = megaSample_rooks6(tc);
           if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);

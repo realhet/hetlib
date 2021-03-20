@@ -633,7 +633,8 @@ public:
     }
   }
 
-  int access(in File fileName, bool delayed = true){ //todo: bugos a delayed leader
+  int access(in File fileName, Flag!"delayed" fDelayed = Yes.delayed){ //todo: bugos a delayed leader
+    bool delayed = fDelayed;
 
     delayed &= EnableMultiThreadedTextureLoading;
 
