@@ -4053,6 +4053,10 @@ private bool isAbsolutePath(string fn) { return std.path.isAbsolute(fn); }
 private string combinePath(string a, string b){
   if(!a) return b;
   if(!b) return a;
+
+  //note: in buildPath() "c:\a" + "\xyz" equals "c:\syz". This is bad.
+  b = b.withoutStarting(`\`);
+
   return std.path.buildPath(a, b);
 }
 
@@ -4734,14 +4738,19 @@ struct DateTime{
       auto parts = str.split(' '); //dateTime
       this(Date(parts[0]), Time(parts[1]));
     }else{
-      if(str.isWild("??????-??????-???")){ //timestamp
-        this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int,
-             str[7..9].to!int, str[9..11].to!int, str[11..13].to!int, str[14..17].to!int);
+      //todo: check for digits here, not any chars!
+      if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
+        this(       str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
+      }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
+        this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int);
       }else{
         this(Date(str), Time(0, 0)); //Date only
       }
     }
   }
+
+  this(double val){ raw = val; }
+  void opAssign(T)(T val) if(isNumeric!T) { raw = val; }
 
   static DateTime current(){
     SYSTEMTIME st;  GetLocalTime(&st);
@@ -4775,7 +4784,8 @@ struct DateTime{
 
   string timeStamp()const {
     if(isNull) return "null";
-    return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
+    //4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
+    return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
   }
 
   int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
