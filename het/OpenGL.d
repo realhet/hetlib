@@ -1221,7 +1221,7 @@ private:
       gl.compileShader(shader.handle);
       if(!gl.getShaderCompiled(shader.handle)){
         auto err = gl.getShaderInfoLog(shader.handle);
-        File(appPath, "shader.error").writeStr(source~"\n=============================================\n"~err);
+        File(appPath, "shader.error").write(source~"\n=============================================\n"~err);
         error("Compile error:\n"~err);
       }
       return shader;

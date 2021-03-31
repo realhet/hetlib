@@ -104,7 +104,7 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow,
   SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
-  GetStdHandle, GetTempPathW, GetFileTime,
+  GetStdHandle, GetTempPathW, GetFileTime, SetFileTime,
   FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx;
@@ -4243,14 +4243,23 @@ public:
     return readText32(mustExists, defaultEncoding, offset, len).splitLines;
   }
 
-  void write(const void[] data, ulong offset = 0)const{ //todo: compression, automatic uncompression
+  void write(const void[] data, ulong offset = 0, Flag!"preserveTimes" preserveTimes = No.preserveTimes)const{ //todo: compression, automatic uncompression
     try{
       path.make;
       auto f = StdFile(fullName, offset ? "r+b" : "wb");
       scope(exit) f.close;
+
+      FILETIME cre, acc, wri;
+      bool getTimeSuccess;
+      if(preserveTimes) getTimeSuccess = GetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0;
+
       if(offset) f.seek(offset);
       f.rawWrite(data);
       if(logFileOps) LOG(fullName);
+
+      if(preserveTimes && getTimeSuccess)
+        enforce(SetFileTime(f.windowsHandle, null, &acc, &cre)!=0, "Error writing file times.");
+
     }catch(Throwable){
       enforce(false, format(`Can't write file: "%s"`, fullName));
     }
@@ -4269,9 +4278,6 @@ public:
 
   void append(const void[] data)const{ write(data, size); } //todo: compression, automatic uncompression
 
-  void writeStr(const string data, ulong offset = 0)const { write(data, offset); }
-  void appendStr(const string data) { append(data); }
-
   int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
   bool opEquals(const File b) const{ return sameText(fullName, b.fullName); }
 
@@ -4289,7 +4295,7 @@ void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = 
   if(FOnlyIfChanged == Yes.onlyIfChanged){
     if(file.size == data.length && file.readStr == data) return;
   }
-  file.writeStr(data);
+  file.write(data);
 }
 
 void saveTo(T)(const T[] data, const string fileName)                                           { data.saveTo(File(fileName)); }
