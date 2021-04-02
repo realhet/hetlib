@@ -784,13 +784,14 @@ struct im{ static:
   struct TargetSurface{ View2D view; }
   private TargetSurface[2] targetSurfaces;  //surface0: zoomable view, surface1: GUI view
 
-  void setTargetSurfaceViews(View2D view, View2D viewGUI){
-    targetSurfaces[0].view = view;
+  void setTargetSurfaceViews(View2D viewWorld, View2D viewGUI){
+    targetSurfaces[0].view = viewWorld;
     targetSurfaces[1].view = viewGUI;
   }
 
-  private View2D actView;
+  private View2D actView; //this is only used for getting mouse position from actview
 
+  //todo: this should be the only opportunity to switch between GUI and World. Better that a containerflag that is initialized too late.
   private void selectTargetSurface(int n){
     enforce(n.among(0, 1));
     with(targetSurfaces[n]){
@@ -803,6 +804,9 @@ struct im{ static:
   bool comboState; //automatically cleared on focus.change
   bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
   uint comboId;    //when the focus of this is lost, comboState goes false
+
+  //GUI area that tracks PanelPosition changes
+  bounds2 clientArea;
 
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(TargetSurface[2] targetSurfaces){ //called from mainform.update
@@ -830,6 +834,9 @@ struct im{ static:
     popupState.reset;
     comboOpening = false;
 
+    //this is needed for PanelPosition
+    clientArea = targetSurfaces[1].view.clipBounds;
+
     static DeltaTimer dt;
     deltaTime = dt.update;
   }
@@ -844,14 +851,9 @@ struct im{ static:
     rc = rc.sort!((a, b) => a.flags.targetSurface < b.flags.targetSurface, SwapStrategy.stable).array;
 
     //measure
-    foreach(a; rc) a.measure;
+    foreach(a; rc) if(!a.flags._measured) a.measure; //some panels are already have been measured
 
     const screenBounds = targetSurfaces[1].view.clipBounds;
-
-    //align on screen
-    foreach(a; rc)
-      if(a.flags.targetSurface == 1) //only for GUI panels
-        a.applyPanelPosition(screenBounds);
 
     applyScrollers(screenBounds);
 
@@ -927,38 +929,74 @@ struct im{ static:
     //todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
   }
 
-  void Panel(T...)(T args){ //todo: multiple Panels, but not call them frames...
+  //PanelPosition ///////////////////////////////////////////
+  //aligns the container on the screen
+
+  enum PanelPosition{ none, topLeft, topCenter, topRight, leftCenter, center, rightCenter, bottomLeft, bottomCenter, bottomRight,
+                                     topClient,           leftClient, client, rightClient,             bottomClient               }
+
+  private bool isAlignPosition (PanelPosition pp){ with(PanelPosition) return pp.inRange(topLeft  , bottomRight ); } //it will only position the container
+  private bool isClientPosition(PanelPosition pp){ with(PanelPosition) return pp.inRange(topClient, bottomClient); } //it will change the client rect too
+
+  private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area){ with(PanelPosition){
+    //flags.targetSurface is unknown at this point, check it later in 'finalize'
+    if     (pp.among(client, topClient, bottomClient)) cntr.outerWidth  = area.width ;
+    else if(pp.among(client, leftClient, rightClient)) cntr.outerHeight = area.height;
+  }}
+
+  private void finalizePanelPosition(.Container cntr, PanelPosition pp, ref bounds2 area){ with(PanelPosition){
+    if(pp == none) return;
+
+    enforce(cntr.flags.targetSurface == 1, "Unable to set PanelPosition on world_surface.");
+
+    cntr.measure; //must know all the sizes from now on
+
+    if(isAlignPosition(pp)){
+      ivec2 p; divMod(cast(int)pp-1, 3, p.y, p.x);
+      if(p.x.inRange(0, 2) && p.y.inRange(0, 2)){
+        auto t = p*.5f,
+             u = vec2(1)-t;
+
+        cntr.outerPos = area.topLeft*u + area.bottomRight*t //todo: bug: fucking vec2.lerp is broken again
+                      - cntr.outerSize*t;
+      }
+    }else if(isClientPosition(pp)){
+      //todo: put checking for running out of area and scrolling here.
+      switch(pp){
+        case topClient   : cntr.outerPos = area.topLeft    ; area.top     += cntr.outerHeight; break;
+        case bottomClient: area.bottom  -= cntr.outerHeight; cntr.outerPos = area.bottomLeft ; break;
+        case leftClient  : cntr.outerPos = area.topLeft    ; area.left    += cntr.outerWidth ; break;
+        case rightClient : area.right   -= cntr.outerWidth ; cntr.outerPos = area.topRight   ; break;
+        case client      : cntr.outerPos = area.topLeft    ; area = bounds2.init; break;
+        default: ERR("invalid PanelPosition");
+      }
+    }
+  }}
+
+  void Panel(T...)(in T args){ //todo: multiple Panels, but not call them frames...
     enforce(actContainer is null, "Panel() must be on root level");
 
-    import het.win;
-auto t0=QPS;
-    //im.beginFrame(mainWindow.mouse.act.screen.toF);  called from winMain update
-auto t1=QPS;
+    //todo: this should work for all containers, not just high level ones
+    PanelPosition pp;
+    static foreach(idx, a; args) static if(is(Unqual!(T[idx]) == PanelPosition)) pp = a;
+
+    .Container cntr;
+
     Document({
+      cntr = actContainer;
+
+      //preparations
+      initializePanelPosition(cntr, pp, clientArea); //todo: outerSize should be stored, not innerSize, because the padding/border/margin settings after this can fuck up the alignment.
+
+      //default panel frame
       padding = "4";
       border = "1 normal silver";
 
-      static foreach(a; args){{
-        alias t = Unqual!(typeof(a));
-        static if(is(t == PanelPosition)) flags.panelPosition = a; //PanelPosition
-        static if(__traits(compiles, a())) if(a) a(); //delegate/function
-      }}
-
+      //call the delegates
+      static foreach(a; args) static if(__traits(compiles, a())) if(a) a(); //delegate/function
     });
-auto t2=QPS;
-    //im.endFrame;  //called from winMain update
-auto t3=QPS;
 
-static cnt=0;
-    if(((cnt++)&31)==0){
-    //todo: ezeket a performance adatokat egy uira kirakni.
-//      writefln("begin: %5.3f  build:  %5.3f  end: %5.3f", t1-t0, t2-t1, t3-t2);
-//      writeln(mainWindow.lastFrameStats);
-//      import het.opengl;
-//      glHandleStats.print;
-//      hitTestManager.stats.print;
-//      Cell.objCnt.print;
-    }
+    finalizePanelPosition(cntr, pp, clientArea);
   }
 
   // Focus handling /////////////////////////////////
@@ -1227,7 +1265,7 @@ static cnt=0;
   //todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
 
   //todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
-  .Container actContainer; //top of the containerStack for faster access
+  .Container actContainer, lastContainer; //top of the containerStack for faster access
   bool enabled;
   uint baseId;
   TextStyle textStyle;   alias style = textStyle; //todo: style.opDispatch("fontHeight=0.5x")
@@ -1281,6 +1319,9 @@ static cnt=0;
     theme     = stack.back.theme;
 
     stack.popBack;
+
+    //save actContainer here.
+    lastContainer = actContainer;
 
     //actContainer is the top of the stack or null
     actContainer = stack.empty ? null : stack.back.container;
@@ -1474,7 +1515,7 @@ static cnt=0;
   }
 
   void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Container //////////////////////////////
-    auto cntr = new .Container(style);
+    auto cntr = new .Container;
     append(cntr); push(cntr, file.xxh(line)); scope(exit) pop;
 
     static foreach(a; args){{ alias t = typeof(a);

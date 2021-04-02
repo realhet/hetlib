@@ -1056,7 +1056,7 @@ class Img : Container { // Img ////////////////////////////////////
     dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
   }
 
-  override void measure(){
+  override void measure_impl(){
     //note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
     const autoWidth  = innerWidth ==0,
           autoHeight = innerHeight==0,
@@ -1179,10 +1179,8 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 
 enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
 
-enum PanelPosition{ none, topLeft, top, topRight, left, center, right, bottomLeft, bottom, bottomRight }
-
 union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b001_0_1_0_0_0_0000_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"           , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -1192,7 +1190,6 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "canSelect"         , 1,
     bool          , "focused"           , 1,  //maintained by system, not by user
     bool          , "hovered"           , 1,  //maintained by system, not by user
-    PanelPosition , "panelPosition"     , 4,  //only for desktop
     bool          , "clipChildren"      , 1,
     bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
     bool          , "_hasOverlayDrawing", 1,
@@ -1201,7 +1198,8 @@ union ContainerFlags{ //todo: do this nicer with a table
     uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
     bool          , "_debug"            , 1, // the container can be marked, for debugging
     bool          , "btnRowLines"       , 1, // draw thin, dark lines between the buttons of a btnRow
-    int           , ""                  , 8,
+    bool          , "_measured"         , 1, // used to tell if a top level container was measured already
+    int           , ""                  , 11,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1692,7 +1690,12 @@ class Container : Cell { // Container ////////////////////////////////////
     void append(Cell[] a){ subCells_ ~= a; }
   }
 
-  void measure(){
+  final void measure(){
+    measure_impl;
+    flags._measured = true;
+  }
+
+  protected void measure_impl(){
     bool autoWidth  = innerSize.x==0;
     bool autoHeight = innerSize.y==0;
 
@@ -1703,7 +1706,7 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   protected void measureSubCells(){
-    foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure(); //recursive in the front
+    foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure; //recursive in the front
   }
 
   override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
@@ -1787,28 +1790,14 @@ class Container : Cell { // Container ////////////////////////////////////
 
   }
 
-  //aligns the container on the screen
-  void applyPanelPosition(in bounds2 bnd){ with(PanelPosition){
-    const pp = flags.panelPosition;
-    if(pp == none) return;
-
-    ivec2 p; divMod(cast(int)pp-1, 3, p.y, p.x);
-    if(p.x.inRange(0, 2) && p.y.inRange(0, 2)){
-      auto t = p*.5f,
-           u = vec2(1, 1)-t;
-
-      outerPos = bnd.topLeft*u + bnd.bottomRight*t //todo: bug: fucking vec2.lerp is broken again
-               - outerSize*t;
-    }
-  }}
-
 // these can mixed in
 
   mixin template CachedMeasuring(){
     bool measured;
 
-    override void measure(){
-      if(measured.chkSet) super.measure;
+    override void measure_impl(){
+      WARN("Ezt felulvizsgalni, mert van mar flags._measured is!!!");
+      if(measured.chkSet) super.measure_impl;
     }
   }
 
@@ -2454,7 +2443,7 @@ class Row : Container { // Row ////////////////////////////////////
     }
   }
 
-  override void measure(){
+  override void measure_impl(){
     //print(typeid(this).name, ".measure", width, height); scope(exit) print(typeid(this).name, ".measure", width, height, "END");
 
     const autoWidth  = innerSize.x==0,
@@ -2544,7 +2533,7 @@ class Column : Container { // Column ////////////////////////////////////
     }
   }*/
 
-  override void measure(){
+  override void measure_impl(){
     //print(typeid(this).name, ".measure", width); scope(exit) print(typeid(this).name, ".measure", width, "END");
 
     bool autoWidth  = innerSize.x==0;
@@ -2593,7 +2582,12 @@ class Column : Container { // Column ////////////////////////////////////
 
     subCells.spreadV;
 
-    innerSize = subCells.maxOuterSize;
+    const contentSize = autoWidth || autoHeight ? subCells.maxOuterSize : vec2(0);
+    bool hScrollNeeded, vScrollNeeded;
+    if(autoWidth ) innerSize.x = contentSize.x; else hScrollNeeded = innerSize.x<contentSize.x;
+    if(autoHeight) innerSize.y = contentSize.y; else vScrollNeeded = innerSize.y<contentSize.y;
+
+    if(vScrollNeeded || hScrollNeeded){ print(this.identityStr, "scroll needed"); }
   }
 }
 

@@ -55,6 +55,8 @@ void WARN(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION
 void ERR (string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(40, file, line, funct)(args); }
 void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(50, file, line, funct)(args); }
 
+void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ ERR!(file, line, funct)("Not implemented."); }
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 void PING(int index = 0) { dbg.ping(index); }
