@@ -82,7 +82,7 @@ public import std.string, std.array, std.conv, std.typecons, std.range, std.form
 public import std.utf;
 public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum;
 public import std.uri: urlEncode = encode, urlDecode = decode;
-public import std.process : environment;
+public import std.process : environment, thisThreadID;
 public import std.zlib : compress, uncompress;
 public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write;
 public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
@@ -3233,15 +3233,17 @@ public:
 
 // a simple one from Delphi
 
-struct SeedStream(uint a, uint c){
-  enum multiplier = a, increment = c;
-  enum empty = false; //infinite range
+struct SeedStream{
+  // https://en.wikipedia.org/wiki/Linear_congruential_generator
+  uint a, c;
   uint seed; // modulo = 2^32 only
-  uint front() const{ return seed; }
-  void popFront() { seed = seed * multiplier + increment; }
 
-  static void test(int seed){
-    print("Testing SeedStream: mul:", multiplier, format!"(0x%x)"(multiplier), "  inc:", increment, format!"(0x%x)"(increment));
+  enum empty = false; //infinite range
+  uint front() const{ return seed; }
+  void popFront() { seed = seed * a + c; }
+
+  void test(int seed){
+    print("Testing SeedStream: a:", a, format!"(0x%x)"(a), "  c:", c, format!"(0x%x)"(c));
     BitArray ba;
     ba.length = 1L << 32;
     write("seed = ", seed, "  ");
@@ -3257,14 +3259,11 @@ struct SeedStream(uint a, uint c){
     long firstZero = -1; foreach(idx, b; ba) if(!b){ firstZero = idx; break; }
     print("cycle length =", cnt.format!"0x%x", "  first false at:", firstZero);
   }
-
 }
 
-// https://en.wikipedia.org/wiki/Linear_congruential_generator
-alias
-  SeedStream_numericalRecipes = SeedStream!(   1664525, 1013904223),
-  SeedStream_pascal           = SeedStream!( 0x8088405,          1),
-  SeedStream_borlandC         = SeedStream!(  22695477,          1);
+SeedStream SeedStream_numericalRecipes(uint seed){ return SeedStream(   1664525, 1013904223, seed); }
+SeedStream SeedStream_pascal          (uint seed){ return SeedStream( 0x8088405,          1, seed); }
+SeedStream SeedStream_borlandC        (uint seed){ return SeedStream(  22695477,          1, seed); }
 
 struct RNG {
   auto seedStream = SeedStream_pascal(0x41974702);
@@ -3276,6 +3275,7 @@ struct RNG {
   void randomize(){
     long c;
     QueryPerformanceCounter(&c);
+    c ^= thisThreadID;
     seed = cast(uint)c*0x784921;
   }
 
@@ -3339,7 +3339,7 @@ struct RNG {
   // not good: disables default constructor. int opCall(int max){ return random(max); }
 }
 
-RNG defaultRng;
+RNG defaultRng; //Every thread get's its own, because of different QPC
 
 ref uint randSeed()                             { return defaultRng.seed; }
 void randomize(uint seed)                       { defaultRng.randomize(seed); }
@@ -3356,11 +3356,12 @@ void randomFill(uint[] values)                  { defaultRng.randomFill(values);
 void randomFill(uint[] values, uint customSeed) { defaultRng.randomFill(values, customSeed); }
 
 
+/+ Wonder what's this crap?!!
 int getUniqueSeed(T)(in T ptr){ //gets a 32bit seed from a ptr and the current time
   long cnt;  QueryPerformanceCounter(&cnt);
   auto arr = (cast(const void[])[ptr]) ~ (cast(const void[])[cnt]);
   return arr.xxh_internal;
-}
+}+/
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Hashing                                                                 ///
@@ -4310,8 +4311,147 @@ File appFileName() { static __gshared File s; if(s.isNull) s = File(thisExePath)
 Path appPath() { static __gshared Path s; if(s.isNull) s = appFileName.path; return s; }
 Path currentPath() { return Path(std.file.getcwd); }
 
+// FileEntry, listFiles, findFiles //////////////////////////////////
 
-// Stream IO /////////////////////////////////////////////////////////////////
+import core.sys.windows.windows : WIN32_FIND_DATAW, HANDLE, INVALID_HANDLE_VALUE, FindFirstFileW, FileTimeToSystemTime, FindNextFileW, FindClose,
+  FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_ARCHIVE, FILE_ATTRIBUTE_SYSTEM, FILE_ATTRIBUTE_HIDDEN;
+
+struct FileEntry{
+  Path path;
+  string name;
+
+  FILETIME ftCreationTime, ftLastWriteTime, ftLastAccessTime;
+  long size;
+  uint dwFileAttributes;
+
+  @property{
+    string ext() const{ return File(name).ext; }
+    bool isDirectory() const{ return (dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)!=0; }
+    bool isReadOnly () const{ return (dwFileAttributes & FILE_ATTRIBUTE_READONLY )!=0; }
+    bool isArchive  () const{ return (dwFileAttributes & FILE_ATTRIBUTE_ARCHIVE  )!=0; }
+    bool isSystem   () const{ return (dwFileAttributes & FILE_ATTRIBUTE_SYSTEM   )!=0; }
+    bool isHidden   () const{ return (dwFileAttributes & FILE_ATTRIBUTE_HIDDEN   )!=0; }
+  }
+
+  this(in WIN32_FIND_DATAW data, in Path path){
+    this.path                   = path;
+    this.name                   = data.cFileName.toStr;
+    this.ftCreationTime         = data.ftCreationTime;
+    this.ftLastWriteTime        = data.ftLastWriteTime;
+    this.ftLastAccessTime       = data.ftLastAccessTime;
+    this.size                   = data.nFileSizeLow | (long(data.nFileSizeHigh)<<32);
+    this.dwFileAttributes       = data.dwFileAttributes;
+
+  }
+
+  string toString() const{ return format!"%-80s %s%s%s%s%s %12d"(File(path, name).fullName, isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".", size); }
+}
+
+///similar directory listing like the one in totalcommander
+FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = No.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
+  FileEntry[] files, paths, parent;
+
+  if(mask=="*") mask = "";
+
+  WIN32_FIND_DATAW data;
+  HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data);
+  if(hFind != INVALID_HANDLE_VALUE){
+    do{
+      auto entry = FileEntry(data, path);
+      if(entry.isDirectory){
+        if(entry.name == ".") continue;
+        if(entry.name == ".."){ parent ~= entry; continue; }
+        paths ~= entry;
+      }else{
+        if(mask=="" || entry.name.isWild(mask)) files ~= entry;
+      }
+    }while(FindNextFileW(hFind, &data));
+    FindClose(hFind);
+  }
+
+  auto pathIdx = new int[paths.length];
+  paths.makeIndex!((a, b) => icmp(a.name, b.name)<0)(pathIdx);
+
+
+  auto fileIdx = new int[files.length];
+
+  auto ascending = 1;
+  if(order.startsWith("-")){ order = order[1..$]; ascending = -1; }
+  order = order.withoutStarting("+");
+
+  static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
+  static auto cmpSize(long a, long b){ return a==b?0:a<b?1:-1; }
+  static auto cmpTime(FILETIME a, FILETIME b){ return cmpSize(*cast(long*)&a, *cast(long*)&b); }
+
+  switch(order.lc){
+    case "name": files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx); break;
+    case "ext": files.makeIndex!((a, b) => ascending*cmpChain(icmp(File(a.name).ext, File(b.name).ext), icmp(a.name, b.name))<0)(fileIdx); break;
+    case "size": files.makeIndex!((a, b) => ascending*cmpSize(a.size,b.size)<0)(fileIdx); break;
+    case "date": files.makeIndex!((a, b) => ascending*(*cast(long*)&a.ftLastWriteTime-*cast(long*)&b.ftLastWriteTime)>0)(fileIdx); break;
+    default: raise("Invalid sort order: " ~ order.quoted);
+  }
+
+  return chain(parent, pathIdx.map!(i => paths[i]), fileIdx.map!(i => files[i])).array;
+}
+
+///this is a recursive search
+FileEntry[] findFiles(Path path, string mask="", string order="name", int level=0){ //this is similar to
+  FileEntry[] files, paths;
+
+  if(mask=="*") mask = "";
+
+  WIN32_FIND_DATAW data;
+  HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data);
+  if(hFind != INVALID_HANDLE_VALUE){
+    do{
+      auto entry = FileEntry(data, path);
+      if(entry.isDirectory){
+        if(entry.name.among(".", "..")) continue;
+        paths ~= entry;
+      }else{
+        if(mask=="" || entry.name.isWild(mask)) files ~= entry;
+      }
+    }while(FindNextFileW(hFind, &data));
+    FindClose(hFind);
+  }
+
+  //recursion
+  files ~= paths.map!(p => findFiles(Path(p.path, p.name), mask, order, level+1)).join;
+
+  //only sort on root level
+  if(level==0){
+    PERF("makeIndex");
+    auto fileIdx = new int[files.length];
+
+    auto ascending = 1;
+    if(order.startsWith("-")){ order = order[1..$]; ascending = -1; }
+    order = order.withoutStarting("+");
+
+    static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
+    static auto cmpSize(long a, long b){ return a==b?0:a<b?1:-1; }
+    static auto cmpTime(FILETIME a, FILETIME b){ return cmpSize(*cast(long*)&a, *cast(long*)&b); }
+
+    switch(order.lc){
+      case "name": files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx); break;
+      case "ext": files.makeIndex!((a, b) => ascending*cmpChain(icmp(File(a.name).ext, File(b.name).ext), cmpChain(icmp(a.path.fullPath, b.path.fullPath), icmp(a.name, b.name)))<0)(fileIdx); break;
+      case "size": files.makeIndex!((a, b) => ascending*cmpSize(a.size,b.size)<0)(fileIdx); break;
+      case "date": files.makeIndex!((a, b) => ascending*(*cast(long*)&a.ftLastWriteTime-*cast(long*)&b.ftLastWriteTime)>0)(fileIdx); break;
+      default: raise("Invalid sort order: " ~ order.quoted);
+    }
+    PERF("buildArray");
+
+    files = fileIdx.map!(i => files[i]).array;
+
+    print(PERF.report);
+
+    return files;
+  }else{
+    return files;
+  }
+
+}
+
+// Stream IO -> het.stream /////////////////////////////////////////////////////////////////
 T stRead(T)(ref ubyte[] st)
 {
   auto siz = T.sizeof;
@@ -5319,7 +5459,7 @@ template uuid(T, string g) {
 /// Global initialize/finalize ///
 //////////////////////////////////
 
-// for main thread only ////////////////////////////
+// for main thread only, called from application class ////////////////////////////
 
 private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
                                  //todo: a unittest alatt nem indul ez el.
@@ -5364,16 +5504,14 @@ private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol h
   CoUninitialize;
 }
 
-// for all threads only ////////////////////////////
+// static this for each thread ////////////////////////////
 
 static this(){ //for all threads <- bullshit!!! It's not shared!!!
-  randomize;
+  randomize; //randomices for every thread using QPC and thisThreadID
   init__iob_func;
 }
 
-
-
-//for all threads
+// static this for process ////////////////////////////
 
 shared float QPS0;
 
