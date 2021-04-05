@@ -129,7 +129,7 @@ private:
 public:
   this(){
     tryOpen;
-    sendLog("START:"~appFileName.toString);
+    sendLog("START:"~appFile.toString);
   }
 
   void ping(int index = 0){

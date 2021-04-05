@@ -107,7 +107,8 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   GetStdHandle, GetTempPathW, GetFileTime, SetFileTime,
   FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
-  GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx;
+  GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
+  HICON;
 
 import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
   std.json, std.digest.digest, std.parallelism, core.runtime;
@@ -553,7 +554,7 @@ class ExeMapFile{
   this(File fn = File("$ThisExeFile$")){
 
     if(fn.fullName == "$ThisExeFile$")
-      fn = appFileName.otherExt("map");
+      fn = appFile.otherExt("map");
 
     foreach(line; fn.readLines(false)){
       auto p = line.split.array;
@@ -624,7 +625,7 @@ auto getModuleInfoByAddr(void* addr){
         base = mi.lpBaseOfDll;
         size = mi.SizeOfImage;
 
-        if(fileName==appFileName)
+        if(fileName==appFile)
           res.location = exeMapFile.locate(addr-base);
 
         if(location.empty)
@@ -4307,8 +4308,8 @@ void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T
 void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDynamicArray!T)        { data = (cast(T[])fileName.read(mustExists))[0]; }
 
 
-File appFileName() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
-Path appPath() { static __gshared Path s; if(s.isNull) s = appFileName.path; return s; }
+File appFile() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
+Path appPath() { static __gshared Path s; if(s.isNull) s = appFile.path; return s; }
 Path currentPath() { return Path(std.file.getcwd); }
 
 // FileEntry, listFiles, findFiles //////////////////////////////////
@@ -4609,13 +4610,13 @@ alias SharedMemClient(SharedDataType, string sharedFileName) = SharedMem!(Shared
 struct ini{
 private:
   static const useRegistry = true;
-  static File iniFileName()   { auto fn = appFileName; fn.ext = ".ini"; return fn; }
+  static File iniFile()   { auto fn = appFile; fn.ext = ".ini"; return fn; }
 
   static string[string] map;
 
   static Key baseKey()          { return Registry.currentUser.getKey("Software"); }
   static string companyName()   { return "realhet"; }
-  static string configName()    { return "Config:"~appFileName.fullName; }
+  static string configName()    { return "Config:"~appFile.fullName; }
 
   static string loadRegStr()    {
     string s;
@@ -4624,7 +4625,7 @@ private:
         s = baseKey.getKey(companyName).getValue(configName).value_SZ;
       }catch(Throwable){}
     }else{
-      s = iniFileName.readStr(false);
+      s = iniFile.readStr(false);
     }
     return s;
   }
@@ -4648,8 +4649,8 @@ private:
       }
     }else{
       auto s = mapToStr(map);
-      if(empty) iniFileName.remove;
-           else iniFileName.write(s);
+      if(empty) iniFile.remove;
+           else iniFile.write(s);
     }
   }
 public:

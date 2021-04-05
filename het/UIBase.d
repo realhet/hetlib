@@ -890,7 +890,7 @@ class Cell{ // Cell ////////////////////////////////////
     //egy atomic lenne a legjobb
   } +/
 
-  vec2 outerPos, innerSize;
+  vec2 outerPos, outerSize;
 
   ref _FlexValue flex() { static _FlexValue nullFlex; return nullFlex   ; } //todo: this is bad, but fast. maybe do it with a setter and const ref.
   ref Margin  margin () { static Margin  nullMargin ; return nullMargin ; }
@@ -912,39 +912,38 @@ class Cell{ // Cell ////////////////////////////////////
     */
 
     //version 2: "auto ref const" and "auto ref" lvalues. Better but the code is redundant.
-    auto ref const outerX     () { return outerPos .x; }    auto ref outerX     () { return outerPos .x; }
-    auto ref const outerY     () { return outerPos .y; }    auto ref outerY     () { return outerPos .y; }
-    auto ref const innerWidth () { return innerSize.x; }    auto ref innerWidth () { return innerSize.x; }
-    auto ref const innerHeight() { return innerSize.y; }    auto ref innerHeight() { return innerSize.y; }
+    auto ref outerX     () const { return outerPos .x; }    auto ref outerX     () { return outerPos .x; }
+    auto ref outerY     () const { return outerPos .y; }    auto ref outerY     () { return outerPos .y; }
+    auto ref outerWidth () const { return outerSize.x; }    auto ref outerWidth () { return outerSize.x; }
+    auto ref outerHeight() const { return outerSize.y; }    auto ref outerHeight() { return outerSize.y; }
   }
 
   @property{ //calculated prioperties. No += operators are allowed.
 
     //todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
-    vec2 innerPos () const { return outerPos+topLeftGapSize; } void innerPos(in vec2 p){ outerPos = p+topLeftGapSize; }
-    vec2 outerSize() const { return innerSize+totalGapSize; } void outerSize(in vec2 s){ innerSize = s-totalGapSize; }
-    auto innerBounds() const { return bounds2(innerPos, innerPos+innerSize); }
-    void innerBounds(in bounds2 b) { innerPos = b.low; innerSize = b.size; }
-    auto outerBounds() const { return bounds2(outerPos, outerPos+outerSize); }
-    void outerBounds(in bounds2 b) { outerPos = b.low; outerSize = b.size; }
+    const(vec2) innerPos () const { return outerPos+topLeftGapSize; }                  void innerPos (in vec2 p){ outerPos  = p-topLeftGapSize; }
+    const(vec2) innerSize() const { return outerSize-totalGapSize;  }                  void innerSize(in vec2 s){ outerSize = s+totalGapSize; }
+    auto innerBounds() const { return bounds2(innerPos, innerPos+innerSize); }  void innerBounds(in bounds2 b) { innerPos = b.low; innerSize = b.size; }
+    auto outerBounds() const { return bounds2(outerPos, outerPos+outerSize); }  void outerBounds(in bounds2 b) { outerPos = b.low; outerSize = b.size; }
 
     auto outerBottomRight() { return outerPos+outerSize; }
 
     auto borderBounds(float location=0.5f)(){
-      auto hb = border.width*location;
+      const hb = border.width*location;
       return bounds2(outerPos+vec2(margin.left+extraMargin+hb, margin.top+extraMargin+hb), outerBottomRight-vec2(margin.right+extraMargin+hb, margin.bottom+extraMargin+hb));
     }
     auto borderBounds_inner() { return borderBounds!1; }
     auto borderBounds_outer() { return borderBounds!0; }
 
-    auto innerX     () const { return outerPos.x+topLeftGapSize.x; } void x(float v) { outerPos.x = v-topLeftGapSize.x; }
-    auto innerY     () const { return outerPos.y+topLeftGapSize.y; } void y(float v) { outerPos.y = v-topLeftGapSize.y; }
-    auto outerWidth () const { return innerSize.x+totalGapSize.x; } void outerWidth (float v) { innerSize.x = v-totalGapSize.x; }
-    auto outerHeight() const { return innerSize.y+totalGapSize.y; } void outerHeight(float v) { innerSize.y = v-totalGapSize.y; }
-    auto outerRight () const { return outerX+outerWidth; }
+    auto innerX() const { return innerPos.x; }          void innerX(float v) { outerPos.x = v-topLeftGapSize.x; }
+    auto innerY() const { return innerPos.y; }          void innerY(float v) { outerPos.y = v-topLeftGapSize.y; }
+    auto innerWidth () const { return innerSize.x; }    void innerWidth (float v) { outerSize.x = v+totalGapSize.x; }
+    auto innerHeight() const { return innerSize.y; }    void innerHeight(float v) { outerSize.y = v+totalGapSize.y; }
+    auto outerRight () const { return outerX+outerWidth ; }
     auto outerBottom() const { return outerY+outerHeight; }
     auto innerCenter() const { return innerPos + innerSize*.5f; }
 
+    //note when working with controls, it is like specify border and then the width, not including the border. So width is mostly means innerWidth
     alias size = innerSize;
     alias width = innerWidth;
     alias height = innerHeight;
@@ -1058,16 +1057,16 @@ class Img : Container { // Img ////////////////////////////////////
 
   override void measure_impl(){
     //note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
-    const autoWidth  = innerWidth ==0,
-          autoHeight = innerHeight==0,
+    const autoWidth  = outerWidth ==0,
+          autoHeight = outerHeight==0,
           siz = calcGlyphSize_image(stIdx);
 
     if(autoHeight && autoWidth){
       innerSize = siz;
     }else if(autoHeight){
-      innerSize.y = innerSize.x/max(siz.x, 1)*siz.y;
+      innerHeight = innerWidth/max(siz.x, 1)*siz.y;
     }else if(autoWidth){
-      innerSize.x = innerSize.y/max(siz.y, 1)*siz.x;
+      innerWidth = innerHeight/max(siz.y, 1)*siz.x;
     }
   }
 }
@@ -1696,8 +1695,8 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   protected void measure_impl(){
-    bool autoWidth  = innerSize.x==0;
-    bool autoHeight = innerSize.y==0;
+    bool autoWidth  = outerSize.x==0;
+    bool autoHeight = outerSize.y==0;
 
     measureSubCells;
 
@@ -1756,7 +1755,8 @@ class Container : Cell { // Container ////////////////////////////////////
     if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
 
     dr.translate(innerPos);
-    if(flags.clipChildren) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
+    const useClipBounds = flags.clipChildren;
+    if(useClipBounds) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
 
     foreach(sc; subCells){
       sc.draw(dr); //recursive
@@ -1772,7 +1772,7 @@ class Container : Cell { // Container ////////////////////////////////////
       dr.alpha = 1;
     }
 
-    if(flags.clipChildren) dr.popClipBounds;
+    if(useClipBounds) dr.popClipBounds;
     dr.pop;
 
     drawBorder(dr); //border is the last
@@ -2235,11 +2235,11 @@ void processElasticTabs(Cell[] rows, int level=0){
            delta = rightMostTabPos-(tab.outerRight);
 
       if(delta){
-        tab.innerSize.x += delta;
+        tab.innerWidth = tab.innerWidth + delta;
 
         //todo: itt ha tordeles van, akkor ez szar.
         foreach(g; row.subCells[tIdx+1..$]) g.outerPos.x += delta;
-//        row.innerSize.x += delta;
+//        row.innerWidth += delta;
       }
 
       if(VisualizeTabColors){
@@ -2294,11 +2294,11 @@ void processElasticTabs(WrappedLine[] rows, int level=0){
            delta = rightMostTabPos-(tab.outerRight);
 
       if(delta){
-        tab.innerSize.x += delta;
+        tab.innerWidth = tab.innerWidth + delta;
 
         //todo: itt ha tordeles van, akkor ez szar.
         foreach(g; row.cells[tIdx+1..$]) g.outerPos.x += delta;
-//        row.innerSize.x += delta;
+//        row.innerWidth += delta;
       }
 
       if(VisualizeTabColors){
@@ -2423,7 +2423,7 @@ class Row : Container { // Row ////////////////////////////////////
   private void adjustTabSizes_singleLine(){
     foreach(idx, tIdx; tabIdx){
       const isLeading = idx==tIdx; //it's not good for multiline!!!
-      subCells[tIdx].innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);
+      with(subCells[tIdx]) innerWidth = innerWidth * (isLeading ? LeadingTabScale : InternalTabScale);
     }
   }
 
@@ -2435,7 +2435,7 @@ class Row : Container { // Row ////////////////////////////////////
         if(g.isNewLine || g.isReturn){ tabCnt = colCnt = 0; continue; }
         else if(g.isTab){
           const isLeading = tabCnt == colCnt;
-          c.innerSize.x *= (isLeading ? LeadingTabScale : InternalTabScale);  //copy+paste
+          c.innerWidth = c.innerWidth * (isLeading ? LeadingTabScale : InternalTabScale);  //copy+paste
           tabCnt++;
         }
       }
@@ -2444,10 +2444,10 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   override void measure_impl(){
-    //print(typeid(this).name, ".measure", width, height); scope(exit) print(typeid(this).name, ".measure", width, height, "END");
+    //scope(exit) LOG(width, height, "END");
 
-    const autoWidth  = innerSize.x==0,
-          autoHeight = innerSize.y==0,
+    const autoWidth  = outerSize.x==0,
+          autoHeight = outerSize.y==0,
           doWrap = flags.canWrap && !autoWidth;
 
     //adjust length of leading and internal tabs
@@ -2457,6 +2457,7 @@ class Row : Container { // Row ////////////////////////////////////
     solveFlexAndMeasureAll(autoWidth);
 
     auto wrappedLines = makeWrappedLines(doWrap);
+    //LOG("wl", wrappedLines, autoWidth, wrappedLines.calcWidth);
 
     if(flags.rowElasticTabs) processElasticTabs(wrappedLines);
 
@@ -2465,32 +2466,32 @@ class Row : Container { // Row ////////////////////////////////////
     if(doWrap && !flags.dontHideSpaces) wrappedLines.hideSpaces(flags.hAlign);
 
     //horizontal alignment, sizing
-    if(autoWidth ) innerSize.x = wrappedLines.calcWidth; //set actual size if automatic
+    if(autoWidth ) innerWidth = wrappedLines.calcWidth; //set actual size if automatic
 
     //horizontal text align on every line
     //todo: clip or stretch
     if(!autoWidth || wrappedLines.length>1) foreach(ref wl; wrappedLines){
       final switch(flags.hAlign){
         case HAlign.left    : break;
-        case HAlign.center  : wl.alignX(innerSize.x, 0.5); break;
-        case HAlign.right   : wl.alignX(innerSize.x, 1  ); break;
-        case HAlign.justify : wl.justifyX(innerSize.x); break;
+        case HAlign.center  : wl.alignX(innerWidth, 0.5); break;
+        case HAlign.right   : wl.alignX(innerWidth, 1  ); break;
+        case HAlign.justify : wl.justifyX(innerWidth); break;
       }
     }
 
     //vertical alignment, sizing
     if(autoHeight){
-      innerSize.y = wrappedLines.calcHeight;
+      innerHeight = wrappedLines.calcHeight;
       //height is calculated, no remaining space, so no align is needed
     }else{
       //height is fixed
-      auto remaining = innerSize.y - wrappedLines.calcHeight;
+      auto remaining = innerHeight - wrappedLines.calcHeight;
       if(remaining > AlignEpsilon){
         final switch(flags.vAlign){
           case VAlign.top         : break;
-          case VAlign.center      : wrappedLines.alignY(innerSize.y, 0.5); break;
-          case VAlign.bottom      : wrappedLines.alignY(innerSize.y, 1.0); break;
-          case VAlign.justify     : wrappedLines.justifyY(innerSize.y); break;
+          case VAlign.center      : wrappedLines.alignY(innerHeight, 0.5); break;
+          case VAlign.bottom      : wrappedLines.alignY(innerHeight, 1.0); break;
+          case VAlign.justify     : wrappedLines.justifyY(innerHeight); break;
         }
       }else if(remaining < AlignEpsilon){
         //todo: clipping/scrolling
@@ -2536,8 +2537,8 @@ class Column : Container { // Column ////////////////////////////////////
   override void measure_impl(){
     //print(typeid(this).name, ".measure", width); scope(exit) print(typeid(this).name, ".measure", width, "END");
 
-    bool autoWidth  = innerSize.x==0;
-    bool autoHeight = innerSize.y==0;
+    bool autoWidth  = outerSize.x==0;
+    bool autoHeight = outerSize.y==0;
 
     //measure the subCells and stretch them to a maximum width
     if(autoWidth){
@@ -2582,12 +2583,17 @@ class Column : Container { // Column ////////////////////////////////////
 
     subCells.spreadV;
 
-    const contentSize = autoWidth || autoHeight ? subCells.maxOuterSize : vec2(0);
+    const contentSize = subCells.maxOuterSize;
     bool hScrollNeeded, vScrollNeeded;
-    if(autoWidth ) innerSize.x = contentSize.x; else hScrollNeeded = innerSize.x<contentSize.x;
-    if(autoHeight) innerSize.y = contentSize.y; else vScrollNeeded = innerSize.y<contentSize.y;
+    if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
+    if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
 
-    if(vScrollNeeded || hScrollNeeded){ print(this.identityStr, "scroll needed"); }
+    if(vScrollNeeded || hScrollNeeded){
+      flags.clipChildren = true;
+
+      if((QPS*30).fract<.5) bkColor = clRed;
+      print(this.identityStr, "scroll needed");
+    }
   }
 }
 
