@@ -13,7 +13,8 @@ enum
   VisualizeContainers      = 0,
   VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
-  VisualizeHitStack        = 0;
+  VisualizeHitStack        = 0,
+  VisualizeSliders         = 1;
 
 //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 immutable DefaultFontName = //this is the cached font

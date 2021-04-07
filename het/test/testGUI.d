@@ -3,12 +3,17 @@
 
 import het, het.ui;
 
+enum Category{ Draw2D, Sliders }
+
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
 
   bounds2 lastWorkArea;
   bool showFPS;
 
+  Category category = Category.Sliders;
+
   override void onCreate(){ // create /////////////////////////////////
+    caption = "GUI Test";
   }
 
   override void onDestroy(){ // destroy //////////////////////////////
@@ -25,15 +30,68 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     if(view.workArea.width>8 && view.workArea.height>8 && chkSet(lastWorkArea, view.workArea))
       view.zoomAll;
 
-    with(im) Panel(PanelPosition.top, {
-      Text("Top panel");
+    with(im) Panel(PanelPosition.topClient, {
+      Row({
+        Text(tsChapter, "GUI Test");
+        Spacer;
+        BtnRow(category);
+      });
     });
 
-    with(im) Panel(PanelPosition.left, {
-      vScroll;
+    with(im) Panel(PanelPosition.client, {
 
-      Text("Left panel");
+      if(category==Category.Sliders){
+        immutable sizes = [8, 16, 32, 64, 128];
+
+        static float value = 50;
+
+        static int sliderFontHeight, defaultSliderFontHeight;
+        if(!sliderFontHeight) sliderFontHeight = defaultSliderFontHeight = style.fontHeight;
+        Row({
+          Text("FontHeight"); Spacer; Slider(sliderFontHeight, range(1, 72));
+          Spacer; if(Btn(format!"Default(%s)"(defaultSliderFontHeight))) sliderFontHeight = defaultSliderFontHeight;
+        });
+
+        void TestSlider(int size, SliderOrientation orientation){
+          flags.yAlign = YAlign.top;
+          Row({
+            border = "1 normal silver"; margin = "1";
+            style.fontHeight = sliderFontHeight.to!ubyte;
+            Slider(value, range(0, 100), orientation, {
+              final switch(orientation){
+                case SliderOrientation.horz : width = size;             height = sliderFontHeight; break;
+                case SliderOrientation.vert : width = sliderFontHeight; height = size;             break;
+                case SliderOrientation.round: width = size;             height = size;             break;
+                case SliderOrientation.auto_: auto i = sizes.countUntil(size);  width = fh*(i+1); height = fh*(sizes.length-i);  break;
+              }
+            });
+          });
+          if(orientation==SliderOrientation.horz) Text('\n');
+        }
+
+        //fh = 30;
+
+        Row({ padding = "5";
+          flags.yAlign = YAlign.top;
+          Text(bold("Normal sliders\n"));
+          foreach(orientation; EnumMembers!SliderOrientation) Column({
+            Row("orientation : ", orientation.text);
+            Row({ foreach(size; sizes) TestSlider(size, orientation); });
+          });
+        });
+        Row({ padding = "5";
+          flags.yAlign = YAlign.top;
+          Text(bold("Scrollbars\n"));
+          foreach(orientation; EnumMembers!SliderOrientation) Column({
+            Row("orientation : ", orientation.text);
+            Row({ foreach(size; sizes) TestSlider(size, orientation); });
+          });
+        });
+
+      }
+
     });
+
 
 /*    with(im) Panel(PanelPosition.topLeft, {
       width = PanelWidth;

@@ -375,7 +375,7 @@ if(N.inRange(2, 4))
     }else static if(op=="*" && isMatrix!T && T.height==length){ // vector * matrix
       return other.transpose * this;
     }else static if(op=="in" && isBounds!T && T.VectorLength == length){
-      return other.contain(this);
+      return other.contains(this);
     }else{
       static assert(false, "invalid operation");
     }

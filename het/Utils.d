@@ -4311,6 +4311,7 @@ void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDyn
 File appFile() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
 Path appPath() { static __gshared Path s; if(s.isNull) s = appFile.path; return s; }
 Path currentPath() { return Path(std.file.getcwd); }
+alias workPath = currentPath;
 
 // FileEntry, listFiles, findFiles //////////////////////////////////
 

@@ -6,6 +6,18 @@ import std.traits, std.meta;
 
 public import het.uibase;
 
+auto getStaticParamDef(T, A...)(in T def, in A args){
+  Unqual!T res = def;
+  foreach(a; args) static if(__traits(compiles, res = a)) return a;
+  return res;
+}
+
+auto getStaticParam(T, A...)(in A args){
+  Unqual!T res;
+  foreach(a; args) static if(__traits(compiles, res = a)) return a;
+  static assert("Can't find required param: "~T.stringof);
+}
+
 
 //todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
 
@@ -13,335 +25,8 @@ public import het.uibase;
 
 // utility stuff ////////////////////////////////
 
+//nincs hasznalva ez elvileg: enum HoverState { normal, hover, pressed, disabled }
 
-enum SliderOrientation{ horz, vert, round, auto_ }
-enum HoverState { normal, hover, pressed, disabled }
-
-void calcSliderOrientation(ref SliderOrientation orientation, in bounds2 r){
-  if(orientation == SliderOrientation.auto_){
-    float aspect = safeDiv(r.width/r.height, 1);
-    enum THRESHOLD = 1.5f;
-
-    orientation = aspect>=THRESHOLD     ? SliderOrientation.horz:
-                  aspect<=(1/THRESHOLD) ? SliderOrientation.vert:
-                                          SliderOrientation.round;
-  }
-}
-
-
-class Slider : Container { // Slider //////////////////////////////////
-  //todo: shift precise mode: must use float knob position to improve the precision
-
-  __gshared static{ //information about the current slider being modified
-    uint mod_id, mod_actid;
-    SliderOrientation mod_ori;
-    vec2 mod_p0, mod_p1;
-    bounds2 mod_knob;
-    vec2 mod_ofs, mod_mouseBase;
-    float mod_nPosBase;
-    int mod_dir; //0:unknown, 1:h, 2:v
-
-    void modSet(uint id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob){
-      mod_id = id;
-      mod_ori = ori;
-      mod_p0 = p0;
-      mod_p1 = p1;
-      mod_knob = bKnob;
-    }
-  }
-
-  uint id;
-  SliderOrientation orientation = SliderOrientation.auto_;
-  RGB bkColor;
-  RGB   clLine, clThumb, clRuler;
-  float lwLine, lwThumb, lwRuler, rulerOfs;
-
-  int rulerDiv0 = 9, rulerDiv1 = 4;
-  ubyte rulerSides=3;
-
-  float nPos, nCenter=0;  //center is the start of the marking on the line
-  int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
-
-  bounds2 hitBounds;
-
-  bool focused;
-
-  this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit){
-    this.id = id;
-
-    hit = im.hitTest(this, id, enabled);
-
-    hitBounds = hit.hitBounds;
-
-    focused = im.focusUpdate(this, id,
-      enabled,
-      hit.pressed/* || manualFocus*/, //when to enter
-      inputs["Esc"].pressed,  //when to exit
-      /* onEnter */ { },
-      /* onFocus */ { },
-      /* onExit  */ { }
-    );
-    //res.focused = focused;
-
-    if(focused){
-      void set(float n){
-        nPos_ = n.clamp(0, 1);
-        userModified = true;
-      }
-
-      void delta(float scale){
-        auto nStep(){ return range_.step / (range_.max-range_.min); }
-        set(nPos_ + nStep *scale);
-      }
-
-      const pageSize = 8;
-      if(inputs.Left.repeated  || inputs.Down.repeated) delta(-1);
-      if(inputs.Right.repeated || inputs.Up.repeated  ) delta( 1);
-      if(inputs.PgDn.repeated)                          delta(-pageSize);
-      if(inputs.PgUp.repeated)                          delta( pageSize);
-      if(inputs.Home.down)                              set(0);
-      if(inputs.End .down)                              set(1);
-    }
-
-    nPos = nPos_;
-
-    bkColor = ts.bkColor;
-
-    const hoverOrFocus = max(hit.hover_smooth*.5f, focused ? 1.0f : 0);
-
-    clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth);
-    clLine =  mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth);
-    clRuler = mix(bkColor, ts.fontColor, 0); //disable ruler for now
-
-    if(!enabled) clLine = clThumb = clGray; //todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
-
-    innerSize = vec2(ts.fontHeight*6, ts.fontHeight); //default size
-
-    float thumbSize = ts.fontHeight*0.8f;
-    rulerOfs = thumbSize*0.5f;
-    lwThumb = thumbSize*(1.0f/3);
-    lwLine  = thumbSize*(2.0f/NormalFontHeight);
-    lwRuler = lwLine*0.5f;
-
-    //hit.pressed
-    const isLinear = mod_ori.among(SliderOrientation.horz, SliderOrientation.vert);
-    const isRound = mod_ori==SliderOrientation.round;
-    const precise = inputs.Shift.active ? 0.125f : 1;
-    if(hit.pressed && enabled){  //todo: enabled handling
-      userModified = true;
-      mod_actid = id;
-
-      //decide wether the knob has to jump to the mouse position or not
-      const doJump = mod_id==id && isLinear && !mod_knob.contains!"[)"(mousePos);
-      if(doJump) mod_ofs = vec2(0);
-            else mod_ofs = mod_knob.center-mousePos;
-
-      if(doJump){
-        if(mod_ori==SliderOrientation.horz){
-          nPos = remap_clamp(mousePos.x, mod_p0.x, mod_p1.x, 0, 1);
-          if(mousePos.x<mod_p0.x) mod_ofs.x = mod_p0.x-mousePos.x;
-          if(mousePos.x>mod_p1.x) mod_ofs.x = mod_p1.x-mousePos.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
-        }else if(mod_ori==SliderOrientation.vert){
-          nPos = remap_clamp(mousePos.y, mod_p0.y, mod_p1.y, 0, 1);
-          //note: p1 and p0 are intentionally swapped!!!
-          if(mousePos.y<mod_p1.y) mod_ofs.y = mod_p1.y-mousePos.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
-          if(mousePos.y>mod_p0.y) mod_ofs.y = mod_p0.y-mousePos.y - (range_.isEndless ? 1 : 0);
-        }
-      }
-
-      if(isRound){
-        mouseLock;
-        mod_mouseBase = rawMousePos;
-        mod_nPosBase = nPos;
-        mod_dir = 0;
-      }
-    }
-
-    //continuous update if active
-    if(id==mod_actid){
-      userModified = true;
-
-      if(isLinear) slowMouse(precise!=1, precise);
-
-      if(mod_ori==SliderOrientation.horz){
-        auto p = mousePos.x+mod_ofs.x;
-        if(range_.isCircular || range_.isEndless) mouseMoveRelX(wrapInRange(p, mod_p0.x, mod_p1.x, wrapCnt)); //circular wrap around
-        nPos = remap(p, mod_p0.x, mod_p1.x, 0, 1);
-        if(range_.isClamped) nPos = nPos.clamp(0, 1);
-      }else if(mod_ori==SliderOrientation.vert){
-        auto p = mousePos.y+mod_ofs.y;
-        if(range_.isCircular || range_.isEndless) mouseMoveRelY(wrapInRange(p, mod_p0.y, mod_p1.y, wrapCnt)); //circular wrap around
-        nPos = remap(p, mod_p0.y, mod_p1.y, 0, 1);
-        if(range_.isClamped) nPos = nPos.clamp(0, 1);
-      }else{
-        auto diff = rawMousePos-mod_mouseBase;
-        auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2;
-        if(mod_dir==0 && length(diff)>=3) mod_dir = act_dir;
-        auto delta = (mod_dir ? mod_dir : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
-        mod_nPosBase += delta*(precise*(1.0f/180));
-        mod_nPosBase = mod_nPosBase.clamp(0, 1);
-        nPos = mod_nPosBase;
-          //todo: endless????
-          //todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
-          //todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
-      }
-    }
-
-    //hit.released
-    if(hit.released){
-      mod_actid = 0;
-
-      //todo: this isn't safe! what if the control disappears!!!
-      if(isLinear){
-        slowMouse(false);
-      }else{
-        mouseUnlock;
-      }
-    }
-
-    if(userModified)
-      nPos_ = nPos;
-  }
-
-  override bounds2 getHitBounds(){
-    return innerBounds;
-  }
-
-  override void draw(Drawing dr){
-    const mod_update = !hitBounds.empty && !inputs.LMB.value;
-
-    dr.color = bkColor; dr.fillRect(borderBounds_inner);
-    drawBorder(dr);
-
-    dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none;
-    void drawThumb(vec2 a, vec2 t){ dr.lineWidth = lwThumb; dr.color = clThumb; dr.line(a-t.rotate90, a+t.rotate90); }
-    void drawLine(vec2 a, vec2 b, RGB cl){ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); }
-
-    auto b = innerBounds;
-    orientation.calcSliderOrientation(b);
-
-    if(orientation==SliderOrientation.horz){
-      auto t = vec2(lwThumb, 0),
-           ro = vec2(0, rulerOfs),
-           p0 = b.leftCenter  + t,
-           p1 = b.rightCenter - t;
-
-      drawLine(p0, p1, clLine);
-
-      if(rulerSides&1) drawStraightRuler(dr, bounds2(p0-ro, p1-ro*0.4f), rulerDiv0, rulerDiv1, true );
-      if(rulerSides&2) drawStraightRuler(dr, bounds2(p0+ro*0.4f, p1+ro), rulerDiv0, rulerDiv1, false);
-
-      if(!isnan(nPos)){
-        auto p = mix(p0, p1, nPos);
-        if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
-        drawThumb(p, t);
-
-        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*0.5f, lwThumb*1.5f)));
-      }
-
-    }else if(orientation==SliderOrientation.vert){
-      auto t = vec2(0, -lwThumb),
-           ro = vec2(rulerOfs, 0),
-           p0 = b.bottomCenter + t,
-           p1 = b.topCenter    - t;
-
-      drawLine(p0, p1, clLine);
-
-      if(rulerSides&1) drawStraightRuler(dr, bounds2(p1-ro, p0-ro*0.4f), rulerDiv0, rulerDiv1, true );
-      if(rulerSides&2) drawStraightRuler(dr, bounds2(p1+ro*0.4f, p0+ro), rulerDiv0, rulerDiv1, false);
-
-      if(!isnan(nPos)){
-        auto p = mix(p0, p1, nPos);
-        if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
-        drawThumb(p, t);
-        if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*1.5f, lwThumb*0.5f)));
-      }
-    }else if(orientation==SliderOrientation.round){
-      //center square
-      bool endless = false;
-
-      b = b.fittingSquare;
-      if(mod_update) modSet(id, orientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b));
-
-      auto c = b.center, r = b.width*0.4f;
-
-      if(rulerSides) drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless);
-      r *= 0.8f;
-
-      float a0 = (endless ? 0 : 0.25f)*PIf;
-      float a1 = (endless ? 2 : 1.75f)*PIf;
-
-      dr.lineWidth = lwLine;
-      dr.color = clLine;
-      dr.circle(c, r, a0, a1);
-
-      if(!isnan(nPos)){
-        float n = 1-nPos;
-        n = endless ? n.fract : n.clamp(0, 1);  //todo: ezt megcsinalni a range-val
-        float a = mix(a0, a1, n);
-        if(!endless && !isnan(nCenter)){
-          float ac = mix(a0, a1, (1-nCenter).clamp(0, 1));
-          dr.color = clThumb;
-          if(ac>=a) dr.circle(c, r, a, ac);
-               else dr.circle(c, r, ac, a);
-        }
-
-        dr.lineWidth = lwThumb;
-        dr.color = clThumb;
-        auto v = vec2(sin(a), cos(a));
-        dr.line(c, c+v*r);
-      }
-    }
-
-  }
-
-  // Draw Rulers
-  protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true){
-    cnt--;
-    if(cnt<=0) return;
-    if(cnt2<0) cnt2 = cnt;
-    dr.color = clRuler; dr.lineWidth = lwRuler;
-    if(r.height < r.width){
-      float c = r.center.y,
-            b = r.top,
-            t = r.bottom,
-            j = r.left,
-            ja = r.width/cnt;
-      if(!topleft) swap(b, t);
-      foreach(i; 0..cnt+1){
-        dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c);
-        j += ja;
-      }
-    }else{
-      float c = r.center.x,
-            b = r.left,
-            t = r.right,
-            j = r.top,
-            ja = r.height/cnt;
-      if(!topleft) swap(b, t);
-      foreach(i; 0..cnt+1){
-        dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c);
-        j += ja;
-      }
-    }
-  }
-
-  protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false){
-    cnt--;
-    if(cnt<=0) return;
-    if(cnt2<0) cnt2 = cnt;
-  //  radius *= (1/1.25f);
-    dr.color = clRuler; dr.lineWidth = lwRuler;
-    foreach(i; 0..cnt+1){
-      float a = endless ? 2*PIf*i/cnt
-                        : -0.25f*PIf + 1.5f*PIf*i/cnt;
-      float co = -cos(a), si = -sin(a);
-      dr.moveTo(center.x+co*radius, center.y+si*radius);
-      float radius2 = radius*( !endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f);
-      dr.lineTo(center.x+co*radius2, center.y+si*radius2);
-    }
-  }
-}
 
 class Document : Column { // Document /////////////////////////////////
   this(){
@@ -835,7 +520,7 @@ struct im{ static:
     comboOpening = false;
 
     //this is needed for PanelPosition
-    clientArea = targetSurfaces[1].view.clipBounds;
+    clientArea = targetSurfaces[1].view.clipBounds; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 
     static DeltaTimer dt;
     deltaTime = dt.update;
@@ -2575,11 +2260,356 @@ struct im{ static:
     return res;
   }
 
-  // Slider ///////////////////////////
+  // ------------------------------->>>>>>>>>>    Slider ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  enum SliderOrientation{ horz, vert, round, auto_ }
+
+  pure auto getActualSliderOrientation(in SliderOrientation orientation, in bounds2 r){
+    if(orientation != SliderOrientation.auto_) return orientation;
+
+    immutable THRESHOLD = 1.5f;
+    float aspect = safeDiv(r.width/r.height, 1);
+    return aspect>=THRESHOLD     ? SliderOrientation.horz:
+           aspect<=(1/THRESHOLD) ? SliderOrientation.vert:
+                                   SliderOrientation.round;
+  }
+
+  private struct SliderState{ //information about the current slider being modified
+    uint mod_id, mod_actid;
+    SliderOrientation mod_ori;
+    vec2 mod_p0, mod_p1;
+    bounds2 mod_knob;
+    vec2 mod_ofs, mod_mouseBase;
+    float mod_nPosBase;
+    int mod_dir; //0:unknown, 1:h, 2:v
+
+    void modSet(uint id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob){
+      mod_id = id;
+      mod_ori = ori;
+      mod_p0 = p0;
+      mod_p1 = p1;
+      mod_knob = bKnob;
+    }
+
+    bool isLinear() const { return mod_ori.among(SliderOrientation.horz, SliderOrientation.vert) != 0; }
+    bool isRound () const { return mod_ori==SliderOrientation.round; }
+
+    void jumpToPoint(ref float nPos, in vec2 mousePos, bool isEndless){
+      sliderState.mod_ofs = vec2(0);
+      if(sliderState.mod_ori==SliderOrientation.horz){
+        nPos = remap_clamp(mousePos.x, mod_p0.x, mod_p1.x, 0, 1);
+        if(mousePos.x<mod_p0.x) mod_ofs.x = mod_p0.x-mousePos.x;
+        if(mousePos.x>mod_p1.x) mod_ofs.x = mod_p1.x-mousePos.x - (isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
+      }else if(sliderState.mod_ori==SliderOrientation.vert){
+        nPos = remap_clamp(mousePos.y, sliderState.mod_p0.y, sliderState.mod_p1.y, 0, 1);
+        //note: p1 and p0 are intentionally swapped!!!
+        if(mousePos.y<sliderState.mod_p1.y) sliderState.mod_ofs.y = sliderState.mod_p1.y-mousePos.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+        if(mousePos.y>sliderState.mod_p0.y) sliderState.mod_ofs.y = sliderState.mod_p0.y-mousePos.y - (isEndless ? 1 : 0);
+      }else{
+        NOTIMPL;
+      }
+    }
+
+
+  }
+
+  SliderState sliderState;
+
+  private class SliderClass : .Container {
+    //note: must be a Container because hitTest works on Containers only.
+
+    //todo: shift precise mode: must use float knob position to improve the precision
+
+    uint id;
+    SliderOrientation orientation = SliderOrientation.auto_;
+    RGB bkColor;
+    RGB   clLine, clThumb, clRuler;
+    float lwLine, lwThumb, lwRuler, rulerOfs;
+
+    int rulerDiv0 = 9, rulerDiv1 = 4;
+    ubyte rulerSides=3;
+
+    float nPos, nCenter=0;  //center is the start of the marking on the line
+    int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
+
+    bounds2 hitBounds;
+
+    bool focused;
+
+    this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit, SliderOrientation orientation, float fhScale){
+      this.id = id;
+      this.orientation = orientation;
+
+      hit = im.hitTest(this, id, enabled);
+
+      hitBounds = hit.hitBounds;
+
+      focused = im.focusUpdate(this, id,
+        enabled,
+        hit.pressed/* || manualFocus*/, //when to enter
+        inputs["Esc"].pressed,  //when to exit
+        /* onEnter */ { },
+        /* onFocus */ { },
+        /* onExit  */ { }
+      );
+      //res.focused = focused;
+
+      if(focused){
+        void set(float n){
+          nPos_ = n.clamp(0, 1);
+          userModified = true;
+        }
+
+        void delta(float scale){
+          auto nStep(){ return range_.step / (range_.max-range_.min); }
+          set(nPos_ + nStep *scale);
+        }
+
+        const pageSize = 8;
+        if(inputs.Left.repeated  || inputs.Down.repeated) delta(-1);
+        if(inputs.Right.repeated || inputs.Up.repeated  ) delta( 1);
+        if(inputs.PgDn.repeated)                          delta(-pageSize);
+        if(inputs.PgUp.repeated)                          delta( pageSize);
+        if(inputs.Home.down)                              set(0);
+        if(inputs.End .down)                              set(1);
+      }
+
+      nPos = nPos_;
+
+      bkColor = ts.bkColor;
+
+      const hoverOrFocus = max(hit.hover_smooth*.5f, focused ? 1.0f : 0);
+
+      clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth);
+      clLine =  mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth);
+      clRuler = mix(bkColor, ts.fontColor, 0); //disable ruler for now
+
+      if(!enabled) clLine = clThumb = clGray; //todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
+
+      const fh = ts.fontHeight*fhScale;
+      innerSize = vec2(fh*6, fh); //default size
+
+      float thumbSize = fh*0.8f;
+      rulerOfs = thumbSize*0.5f;
+      lwThumb = thumbSize*(1.0f/3);
+      lwLine  = thumbSize*(2.0f/NormalFontHeight);
+      lwRuler = lwLine*0.5f;
+
+      //hit.pressed
+
+      if(hit.pressed && enabled){  //todo: enabled handling
+        userModified = true;
+        sliderState.mod_actid = id;
+
+        //remember the knob-mouse offset at the time of press
+        sliderState.mod_ofs = sliderState.mod_knob.center-mousePos; //no jump, just remember the knob-mouse offset
+
+        //decide wether the knob has to jump to the mouse position or not
+        const doJump = sliderState.mod_id==id && sliderState.isLinear && !sliderState.mod_knob.contains!"[)"(mousePos);
+        if(doJump) sliderState.jumpToPoint(nPos, mousePos, range_.isEndless);
+
+        //round knob: lock the mouse and start measuring delta movement
+        if(sliderState.isRound){ //todo: "round" knob never jumps
+          mouseLock;  //todo: possible bug when the slider disappears, amd the mouse stays locked forever
+          sliderState.mod_mouseBase = rawMousePos;
+          sliderState.mod_nPosBase = nPos;
+          sliderState.mod_dir = 0;
+        }
+      }
+
+      //continuous update if active
+      if(id==sliderState.mod_actid){
+        userModified = true;
+
+        const precise = inputs.Shift.active ? 0.125f : 1; //note: this is a scaling factor...
+
+        if(sliderState.isLinear) slowMouse(precise!=1, precise);
+
+        if(sliderState.mod_ori==SliderOrientation.horz){
+          auto p = mousePos.x+sliderState.mod_ofs.x;
+          if(range_.isCircular || range_.isEndless) mouseMoveRelX(wrapInRange(p, sliderState.mod_p0.x, sliderState.mod_p1.x, wrapCnt)); //circular wrap around
+          nPos = remap(p, sliderState.mod_p0.x, sliderState.mod_p1.x, 0, 1);
+          if(range_.isClamped) nPos = nPos.clamp(0, 1);
+        }else if(sliderState.mod_ori==SliderOrientation.vert){
+          auto p = mousePos.y+sliderState.mod_ofs.y;
+          if(range_.isCircular || range_.isEndless) mouseMoveRelY(wrapInRange(p, sliderState.mod_p0.y, sliderState.mod_p1.y, wrapCnt)); //circular wrap around
+          nPos = remap(p, sliderState.mod_p0.y, sliderState.mod_p1.y, 0, 1);
+          if(range_.isClamped) nPos = nPos.clamp(0, 1);
+        }else{
+          auto diff = rawMousePos-sliderState.mod_mouseBase;
+          auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2;
+          if(sliderState.mod_dir==0 && length(diff)>=3) sliderState.mod_dir = act_dir;
+          auto delta = (sliderState.mod_dir ? sliderState.mod_dir : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
+          sliderState.mod_nPosBase += delta*(precise*(1.0f/180));
+          sliderState.mod_nPosBase = sliderState.mod_nPosBase.clamp(0, 1);
+          nPos = sliderState.mod_nPosBase;
+            //todo: endless????
+            //todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
+            //todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
+        }
+      }
+
+      //hit.released
+      if(hit.released){
+        sliderState.mod_actid = 0;
+
+        //todo: this isn't safe! what if the control disappears!!!
+        if(sliderState.isLinear){
+          slowMouse(false);
+        }else{
+          mouseUnlock;
+        }
+      }
+
+      if(userModified)
+        nPos_ = nPos;
+    }
+
+    override bounds2 getHitBounds(){
+      return innerBounds;
+    }
+
+    override void draw(Drawing dr){
+      const mod_update = !hitBounds.empty && !inputs.LMB.value;
+
+      dr.color = bkColor; dr.fillRect(borderBounds_inner);
+      drawBorder(dr);
+
+      dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none;
+      void drawThumb(vec2 a, vec2 t){ dr.lineWidth = lwThumb; dr.color = clThumb; dr.line(a-t.rotate90, a+t.rotate90); }
+      void drawLine(vec2 a, vec2 b, RGB cl){ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); }
+
+      auto b = innerBounds;
+      const actOrientation = getActualSliderOrientation(orientation, b);
+
+      if(actOrientation==SliderOrientation.horz){
+        auto t = vec2(lwThumb, 0),
+             ro = vec2(0, rulerOfs),
+             p0 = b.leftCenter  + t,
+             p1 = b.rightCenter - t;
+
+        drawLine(p0, p1, clLine);
+
+        if(rulerSides&1) drawStraightRuler(dr, bounds2(p0-ro, p1-ro*0.4f), rulerDiv0, rulerDiv1, true );
+        if(rulerSides&2) drawStraightRuler(dr, bounds2(p0+ro*0.4f, p1+ro), rulerDiv0, rulerDiv1, false);
+
+        if(!isnan(nPos)){
+          auto p = mix(p0, p1, nPos);
+          if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
+          drawThumb(p, t);
+
+          if(mod_update) sliderState.modSet(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*0.5f, lwThumb*1.5f)));
+        }
+
+      }else if(actOrientation==SliderOrientation.vert){
+        auto t = vec2(0, -lwThumb),
+             ro = vec2(rulerOfs, 0),
+             p0 = b.bottomCenter + t,
+             p1 = b.topCenter    - t;
+
+        drawLine(p0, p1, clLine);
+
+        if(rulerSides&1) drawStraightRuler(dr, bounds2(p1-ro, p0-ro*0.4f), rulerDiv0, rulerDiv1, true );
+        if(rulerSides&2) drawStraightRuler(dr, bounds2(p1+ro*0.4f, p0+ro), rulerDiv0, rulerDiv1, false);
+
+        if(!isnan(nPos)){
+          auto p = mix(p0, p1, nPos);
+          if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
+          drawThumb(p, t);
+          if(mod_update) sliderState.modSet(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*1.5f, lwThumb*0.5f)));
+        }
+      }else if(actOrientation==SliderOrientation.round){
+        //center square
+        bool endless = false;
+
+        b = b.fittingSquare;
+        if(mod_update) sliderState.modSet(id, actOrientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b));
+
+        auto c = b.center, r = b.width*0.4f;
+
+        if(rulerSides) drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless);
+        r *= 0.8f;
+
+        float a0 = (endless ? 0 : 0.25f)*PIf;
+        float a1 = (endless ? 2 : 1.75f)*PIf;
+
+        dr.lineWidth = lwLine;
+        dr.color = clLine;
+        dr.circle(c, r, a0, a1);
+
+        if(!isnan(nPos)){
+          float n = 1-nPos;
+          n = endless ? n.fract : n.clamp(0, 1);  //todo: ezt megcsinalni a range-val
+          float a = mix(a0, a1, n);
+          if(!endless && !isnan(nCenter)){
+            float ac = mix(a0, a1, (1-nCenter).clamp(0, 1));
+            dr.color = clThumb;
+            if(ac>=a) dr.circle(c, r, a, ac);
+                 else dr.circle(c, r, ac, a);
+          }
+
+          dr.lineWidth = lwThumb;
+          dr.color = clThumb;
+          auto v = vec2(sin(a), cos(a));
+          dr.line(c, c+v*r);
+        }
+      }
+
+    }
+
+    // Draw Rulers
+    protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true){
+      cnt--;
+      if(cnt<=0) return;
+      if(cnt2<0) cnt2 = cnt;
+      dr.color = clRuler; dr.lineWidth = lwRuler;
+      if(r.height < r.width){
+        float c = r.center.y,
+              b = r.top,
+              t = r.bottom,
+              j = r.left,
+              ja = r.width/cnt;
+        if(!topleft) swap(b, t);
+        foreach(i; 0..cnt+1){
+          dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c);
+          j += ja;
+        }
+      }else{
+        float c = r.center.x,
+              b = r.left,
+              t = r.right,
+              j = r.top,
+              ja = r.height/cnt;
+        if(!topleft) swap(b, t);
+        foreach(i; 0..cnt+1){
+          dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c);
+          j += ja;
+        }
+      }
+    }
+
+    protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false){
+      cnt--;
+      if(cnt<=0) return;
+      if(cnt2<0) cnt2 = cnt;
+    //  radius *= (1/1.25f);
+      dr.color = clRuler; dr.lineWidth = lwRuler;
+      foreach(i; 0..cnt+1){
+        float a = endless ? 2*PIf*i/cnt
+                          : -0.25f*PIf + 1.5f*PIf*i/cnt;
+        float co = -cos(a), si = -sin(a);
+        dr.moveTo(center.x+co*radius, center.y+si*radius);
+        float radius2 = radius*( !endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f);
+        dr.lineTo(center.x+co*radius2, center.y+si*radius2);
+      }
+    }
+  }
+
+
   auto Slider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
   if(isFloatingPoint!V || isIntegral!V)
   {
-    mixin(id.M ~ enable.M ~ selected.M ~ range.M);
+    mixin(id.M ~ enable.M ~ selected.M ~ range.M);  //todo: selected???
 
     //flipped range interval. Needed for vertical scrollbar
     const flipped = !_range.isOrdered;
@@ -2601,14 +2631,9 @@ struct im{ static:
       normValue = normValue-normValue.floor;
     }
 
-    auto oldFh = style.fontHeight;
-    if(theme != "tool") style.fontHeight = (fh*1.4f).to!ubyte; //note: scrollbar gets the thumbsize from fontHeight
-
     bool userModified;
     HitInfo hit;
-    auto sl = new .Slider(id_, enabled, normValue, _range, userModified, actView.mousePos, style, hit);
-
-    style.fontHeight = oldFh;
+    auto sl = new SliderClass(id_, enabled, normValue, _range, userModified, actView.mousePos, style, hit, getStaticParamDef(SliderOrientation.auto_, args), theme=="tool" ? 1 : 1.4f);
 
     append(sl); push(sl, id_); scope(exit) pop;
 
@@ -3180,3 +3205,390 @@ void uiContainerAlignTest(){ with(im){
         };
 +/
 
+enum oldSliderSource = q{ //! OldSliderSource ////////////////////////////////////////////////////
+
+  enum SliderOrientation{ horz, vert, round, auto_ }
+  enum HoverState { normal, hover, pressed, disabled }
+
+  void calcSliderOrientation(ref SliderOrientation orientation, in bounds2 r){
+    if(orientation == SliderOrientation.auto_){
+      float aspect = safeDiv(r.width/r.height, 1);
+      enum THRESHOLD = 1.5f;
+
+      orientation = aspect>=THRESHOLD     ? SliderOrientation.horz:
+                    aspect<=(1/THRESHOLD) ? SliderOrientation.vert:
+                                            SliderOrientation.round;
+    }
+  }
+
+
+  class Slider : Container { // Slider //////////////////////////////////
+    //todo: shift precise mode: must use float knob position to improve the precision
+
+    __gshared static{ //information about the current slider being modified
+      uint mod_id, mod_actid;
+      SliderOrientation mod_ori;
+      vec2 mod_p0, mod_p1;
+      bounds2 mod_knob;
+      vec2 mod_ofs, mod_mouseBase;
+      float mod_nPosBase;
+      int mod_dir; //0:unknown, 1:h, 2:v
+
+      void modSet(uint id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob){
+        mod_id = id;
+        mod_ori = ori;
+        mod_p0 = p0;
+        mod_p1 = p1;
+        mod_knob = bKnob;
+      }
+    }
+
+    uint id;
+    SliderOrientation orientation = SliderOrientation.auto_;
+    RGB bkColor;
+    RGB   clLine, clThumb, clRuler;
+    float lwLine, lwThumb, lwRuler, rulerOfs;
+
+    int rulerDiv0 = 9, rulerDiv1 = 4;
+    ubyte rulerSides=3;
+
+    float nPos, nCenter=0;  //center is the start of the marking on the line
+    int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
+
+    bounds2 hitBounds;
+
+    bool focused;
+
+    this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit){
+      this.id = id;
+
+      hit = im.hitTest(this, id, enabled);
+
+      hitBounds = hit.hitBounds;
+
+      focused = im.focusUpdate(this, id,
+        enabled,
+        hit.pressed/* || manualFocus*/, //when to enter
+        inputs["Esc"].pressed,  //when to exit
+        /* onEnter */ { },
+        /* onFocus */ { },
+        /* onExit  */ { }
+      );
+      //res.focused = focused;
+
+      if(focused){
+        void set(float n){
+          nPos_ = n.clamp(0, 1);
+          userModified = true;
+        }
+
+        void delta(float scale){
+          auto nStep(){ return range_.step / (range_.max-range_.min); }
+          set(nPos_ + nStep *scale);
+        }
+
+        const pageSize = 8;
+        if(inputs.Left.repeated  || inputs.Down.repeated) delta(-1);
+        if(inputs.Right.repeated || inputs.Up.repeated  ) delta( 1);
+        if(inputs.PgDn.repeated)                          delta(-pageSize);
+        if(inputs.PgUp.repeated)                          delta( pageSize);
+        if(inputs.Home.down)                              set(0);
+        if(inputs.End .down)                              set(1);
+      }
+
+      nPos = nPos_;
+
+      bkColor = ts.bkColor;
+
+      const hoverOrFocus = max(hit.hover_smooth*.5f, focused ? 1.0f : 0);
+
+      clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth);
+      clLine =  mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth);
+      clRuler = mix(bkColor, ts.fontColor, 0); //disable ruler for now
+
+      if(!enabled) clLine = clThumb = clGray; //todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
+
+      innerSize = vec2(ts.fontHeight*6, ts.fontHeight); //default size
+
+      float thumbSize = ts.fontHeight*0.8f;
+      rulerOfs = thumbSize*0.5f;
+      lwThumb = thumbSize*(1.0f/3);
+      lwLine  = thumbSize*(2.0f/NormalFontHeight);
+      lwRuler = lwLine*0.5f;
+
+      //hit.pressed
+      const isLinear = mod_ori.among(SliderOrientation.horz, SliderOrientation.vert);
+      const isRound = mod_ori==SliderOrientation.round;
+      const precise = inputs.Shift.active ? 0.125f : 1;
+      if(hit.pressed && enabled){  //todo: enabled handling
+        userModified = true;
+        mod_actid = id;
+
+        //decide wether the knob has to jump to the mouse position or not
+        const doJump = mod_id==id && isLinear && !mod_knob.contains!"[)"(mousePos);
+        if(doJump) mod_ofs = vec2(0);
+              else mod_ofs = mod_knob.center-mousePos;
+
+        if(doJump){
+          if(mod_ori==SliderOrientation.horz){
+            nPos = remap_clamp(mousePos.x, mod_p0.x, mod_p1.x, 0, 1);
+            if(mousePos.x<mod_p0.x) mod_ofs.x = mod_p0.x-mousePos.x;
+            if(mousePos.x>mod_p1.x) mod_ofs.x = mod_p1.x-mousePos.x - (range_.isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
+          }else if(mod_ori==SliderOrientation.vert){
+            nPos = remap_clamp(mousePos.y, mod_p0.y, mod_p1.y, 0, 1);
+            //note: p1 and p0 are intentionally swapped!!!
+            if(mousePos.y<mod_p1.y) mod_ofs.y = mod_p1.y-mousePos.y; //todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+            if(mousePos.y>mod_p0.y) mod_ofs.y = mod_p0.y-mousePos.y - (range_.isEndless ? 1 : 0);
+          }
+        }
+
+        if(isRound){
+          mouseLock;
+          mod_mouseBase = rawMousePos;
+          mod_nPosBase = nPos;
+          mod_dir = 0;
+        }
+      }
+
+      //continuous update if active
+      if(id==mod_actid){
+        userModified = true;
+
+        if(isLinear) slowMouse(precise!=1, precise);
+
+        if(mod_ori==SliderOrientation.horz){
+          auto p = mousePos.x+mod_ofs.x;
+          if(range_.isCircular || range_.isEndless) mouseMoveRelX(wrapInRange(p, mod_p0.x, mod_p1.x, wrapCnt)); //circular wrap around
+          nPos = remap(p, mod_p0.x, mod_p1.x, 0, 1);
+          if(range_.isClamped) nPos = nPos.clamp(0, 1);
+        }else if(mod_ori==SliderOrientation.vert){
+          auto p = mousePos.y+mod_ofs.y;
+          if(range_.isCircular || range_.isEndless) mouseMoveRelY(wrapInRange(p, mod_p0.y, mod_p1.y, wrapCnt)); //circular wrap around
+          nPos = remap(p, mod_p0.y, mod_p1.y, 0, 1);
+          if(range_.isClamped) nPos = nPos.clamp(0, 1);
+        }else{
+          auto diff = rawMousePos-mod_mouseBase;
+          auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2;
+          if(mod_dir==0 && length(diff)>=3) mod_dir = act_dir;
+          auto delta = (mod_dir ? mod_dir : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
+          mod_nPosBase += delta*(precise*(1.0f/180));
+          mod_nPosBase = mod_nPosBase.clamp(0, 1);
+          nPos = mod_nPosBase;
+            //todo: endless????
+            //todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
+            //todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
+        }
+      }
+
+      //hit.released
+      if(hit.released){
+        mod_actid = 0;
+
+        //todo: this isn't safe! what if the control disappears!!!
+        if(isLinear){
+          slowMouse(false);
+        }else{
+          mouseUnlock;
+        }
+      }
+
+      if(userModified)
+        nPos_ = nPos;
+    }
+
+    override bounds2 getHitBounds(){
+      return innerBounds;
+    }
+
+    override void draw(Drawing dr){
+      const mod_update = !hitBounds.empty && !inputs.LMB.value;
+
+      dr.color = bkColor; dr.fillRect(borderBounds_inner);
+      drawBorder(dr);
+
+      dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none;
+      void drawThumb(vec2 a, vec2 t){ dr.lineWidth = lwThumb; dr.color = clThumb; dr.line(a-t.rotate90, a+t.rotate90); }
+      void drawLine(vec2 a, vec2 b, RGB cl){ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); }
+
+      auto b = innerBounds;
+      orientation.calcSliderOrientation(b);
+
+      if(orientation==SliderOrientation.horz){
+        auto t = vec2(lwThumb, 0),
+             ro = vec2(0, rulerOfs),
+             p0 = b.leftCenter  + t,
+             p1 = b.rightCenter - t;
+
+        drawLine(p0, p1, clLine);
+
+        if(rulerSides&1) drawStraightRuler(dr, bounds2(p0-ro, p1-ro*0.4f), rulerDiv0, rulerDiv1, true );
+        if(rulerSides&2) drawStraightRuler(dr, bounds2(p0+ro*0.4f, p1+ro), rulerDiv0, rulerDiv1, false);
+
+        if(!isnan(nPos)){
+          auto p = mix(p0, p1, nPos);
+          if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
+          drawThumb(p, t);
+
+          if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*0.5f, lwThumb*1.5f)));
+        }
+
+      }else if(orientation==SliderOrientation.vert){
+        auto t = vec2(0, -lwThumb),
+             ro = vec2(rulerOfs, 0),
+             p0 = b.bottomCenter + t,
+             p1 = b.topCenter    - t;
+
+        drawLine(p0, p1, clLine);
+
+        if(rulerSides&1) drawStraightRuler(dr, bounds2(p1-ro, p0-ro*0.4f), rulerDiv0, rulerDiv1, true );
+        if(rulerSides&2) drawStraightRuler(dr, bounds2(p1+ro*0.4f, p0+ro), rulerDiv0, rulerDiv1, false);
+
+        if(!isnan(nPos)){
+          auto p = mix(p0, p1, nPos);
+          if(!isnan(nCenter)) drawLine(mix(p0, p1, nCenter), p, clThumb);
+          drawThumb(p, t);
+          if(mod_update) modSet(id, orientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(bounds2(p, p).inflated(lwThumb*1.5f, lwThumb*0.5f)));
+        }
+      }else if(orientation==SliderOrientation.round){
+        //center square
+        bool endless = false;
+
+        b = b.fittingSquare;
+        if(mod_update) modSet(id, orientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b));
+
+        auto c = b.center, r = b.width*0.4f;
+
+        if(rulerSides) drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless);
+        r *= 0.8f;
+
+        float a0 = (endless ? 0 : 0.25f)*PIf;
+        float a1 = (endless ? 2 : 1.75f)*PIf;
+
+        dr.lineWidth = lwLine;
+        dr.color = clLine;
+        dr.circle(c, r, a0, a1);
+
+        if(!isnan(nPos)){
+          float n = 1-nPos;
+          n = endless ? n.fract : n.clamp(0, 1);  //todo: ezt megcsinalni a range-val
+          float a = mix(a0, a1, n);
+          if(!endless && !isnan(nCenter)){
+            float ac = mix(a0, a1, (1-nCenter).clamp(0, 1));
+            dr.color = clThumb;
+            if(ac>=a) dr.circle(c, r, a, ac);
+                 else dr.circle(c, r, ac, a);
+          }
+
+          dr.lineWidth = lwThumb;
+          dr.color = clThumb;
+          auto v = vec2(sin(a), cos(a));
+          dr.line(c, c+v*r);
+        }
+      }
+
+    }
+
+    // Draw Rulers
+    protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true){
+      cnt--;
+      if(cnt<=0) return;
+      if(cnt2<0) cnt2 = cnt;
+      dr.color = clRuler; dr.lineWidth = lwRuler;
+      if(r.height < r.width){
+        float c = r.center.y,
+              b = r.top,
+              t = r.bottom,
+              j = r.left,
+              ja = r.width/cnt;
+        if(!topleft) swap(b, t);
+        foreach(i; 0..cnt+1){
+          dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c);
+          j += ja;
+        }
+      }else{
+        float c = r.center.x,
+              b = r.left,
+              t = r.right,
+              j = r.top,
+              ja = r.height/cnt;
+        if(!topleft) swap(b, t);
+        foreach(i; 0..cnt+1){
+          dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c);
+          j += ja;
+        }
+      }
+    }
+
+    protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false){
+      cnt--;
+      if(cnt<=0) return;
+      if(cnt2<0) cnt2 = cnt;
+    //  radius *= (1/1.25f);
+      dr.color = clRuler; dr.lineWidth = lwRuler;
+      foreach(i; 0..cnt+1){
+        float a = endless ? 2*PIf*i/cnt
+                          : -0.25f*PIf + 1.5f*PIf*i/cnt;
+        float co = -cos(a), si = -sin(a);
+        dr.moveTo(center.x+co*radius, center.y+si*radius);
+        float radius2 = radius*( !endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f);
+        dr.lineTo(center.x+co*radius2, center.y+si*radius2);
+      }
+    }
+  }
+
+  // Slider ///////////////////////////
+  auto Slider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
+  if(isFloatingPoint!V || isIntegral!V)
+  {
+    mixin(id.M ~ enable.M ~ selected.M ~ range.M);
+
+    //flipped range interval. Needed for vertical scrollbar
+    const flipped = !_range.isOrdered;
+    if(flipped) swap(_range.min, _range.max);
+
+    //string props;
+    static foreach(a; args){{ alias t = Unqual!(typeof(a));
+      static if(isSomeString!t){
+        //props = a; //todo: ennek is
+        static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!");
+      }
+    }}
+
+    float normValue = _range.normalize(flipped ? _range.max-value : value); // FLIP
+
+    int wrapCnt;
+    if(_range.isEndless){
+      wrapCnt = normValue.floor.iround;  //todo: refactor endless wrapCnt stuff
+      normValue = normValue-normValue.floor;
+    }
+
+    auto oldFh = style.fontHeight;
+    if(theme != "tool") style.fontHeight = (fh*1.4f).to!ubyte; //note: scrollbar gets the thumbsize from fontHeight
+
+    bool userModified;
+    HitInfo hit;
+    auto sl = new .Slider(id_, enabled, normValue, _range, userModified, actView.mousePos, style, hit, getStaticParamDef(SliderOrientation.auto_, args));
+
+    style.fontHeight = oldFh;
+
+    append(sl); push(sl, id_); scope(exit) pop;
+
+    mixin(hintHandler);
+    static foreach(a; args) static if(__traits(compiles, a())) a();
+
+    if(userModified && enabled){
+
+      if(_range.isEndless) normValue += wrapCnt-sl.wrapCnt;
+
+      float f = _range.denormalize(normValue);
+      static if(isIntegral!V) f = round(f);
+      value = f.to!V;
+      if(flipped) value = _range.max.to!V-value; // UNFLIP
+    }
+
+    //todo: what to return on from slider
+    return userModified;
+  }
+
+
+};

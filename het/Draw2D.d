@@ -424,7 +424,7 @@ class Drawing {
 
   void pushClipBounds(bounds2 bnd){ //bnd is in local coords
     clipBoundsStack ~= clipBounds;
-    clipBounds = inputTransform(bnd);
+    clipBounds = inputTransform(bnd) & clipBounds;
   }
 
   void popClipBounds(){
