@@ -560,7 +560,7 @@ class Drawing {
     static foreach(a; args){{
       alias T = Unqual!(typeof(a));
             static if(is(T == RGB       )){ color = a;
-      }else static if(is(T == RGBA      )){ alpha = a.a/255.0f;
+      }else static if(is(T == RGBA      )){ color = a.rgb; alpha = a.a/255.0f;
       }else static if(is(T == LineStyle )){ lineStyle = a;
       }else static if(is(T == ArrowStyle)){ arrowStyle = a;
       }else static if(is(T == vec2      )){ lineTo(a, first); first = false;
