@@ -2525,15 +2525,10 @@ class Row : Container { // Row ////////////////////////////////////
 
 class Column : Container { // Column ////////////////////////////////////
 
-/*  override void parse(string s, TextStyle ts = tsNormal){   //todo: I guess it's deprecated
-    beep;
-    if(s.startsWithTag("li")){ //lame
-      import het.ui;
-      append(newListItem(s, ts));
-    }else{
-      append(new Row(s, ts));
-    }
-  }*/
+  /// this is overriden by ScrollColumn
+  void setupScroll(bool hScrollNeeded, bool vScrollNeeded, bool autoWidth, bool autoHeight, in vec2 contentSize){
+    flags.clipChildren = true; // the default is just to clip children
+  }
 
   override void measure_impl(){
     //print(typeid(this).name, ".measure", width); scope(exit) print(typeid(this).name, ".measure", width, "END");
@@ -2589,12 +2584,8 @@ class Column : Container { // Column ////////////////////////////////////
     if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
     if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
 
-    if(vScrollNeeded || hScrollNeeded){
-      flags.clipChildren = true;
-
-      if((QPS*30).fract<.5) bkColor = clRed;
-      print(this.identityStr, "scroll needed");
-    }
+    if(vScrollNeeded || hScrollNeeded)
+      setupScroll(hScrollNeeded, vScrollNeeded, autoWidth, autoHeight, contentSize);
   }
 }
 

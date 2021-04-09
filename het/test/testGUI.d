@@ -204,10 +204,10 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
       style.fontHeight = sliderFontHeight.to!ubyte;
       Slider(value, range(0, 100), orientation, sliderStyle, {
         final switch(orientation){
-          case SliderOrientation.horz : width = size;             height = sliderFontHeight; break;
-          case SliderOrientation.vert : width = sliderFontHeight; height = size;             break;
-          case SliderOrientation.round: width = size;             height = size;             break;
-          case SliderOrientation.auto_: auto i = sizes.countUntil(size);  width = fh*(i+1); height = fh*(sizes.length-i);  break;
+          case SliderOrientation.horz : outerWidth = size;             outerHeight = sliderFontHeight; break;
+          case SliderOrientation.vert : outerWidth = sliderFontHeight; outerHeight = size;             break;
+          case SliderOrientation.round: outerWidth = size;             outerHeight = size;             break;
+          case SliderOrientation.auto_: auto i = sizes.countUntil(size);  outerWidth = fh*(i+1); outerHeight = fh*(sizes.length-i);  break;
         }
       });
     });
