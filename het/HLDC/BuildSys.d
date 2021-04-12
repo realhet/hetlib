@@ -968,7 +968,7 @@ private: //current build
       if(isIncremental && result==0){
         auto srcFn = srcFiles[idx];
         auto objFn = objFileOf(srcFn);
-        objCache[findModule(srcFn).objHash] = objFn.read(true);
+        objCache[findModule(srcFn).objHash] = objFn.forcedRead;
       }
 
       return result == 0; //break if any error
@@ -1323,7 +1323,7 @@ public:
   //    Input: args (args[0] is ignored)
   //    Outputs: statnard ans error outputs.
   //    result: 0 = no error
-  int commandInterface(string[] args, ref string sOutput, ref string sError) nothrow // command interface /////////////////////////////
+  int commandInterface(string[] args, ref string sOutput, ref string sError) // command interface /////////////////////////////
   {
     try{
       sLog = sError = sOutput = "";
@@ -1347,9 +1347,9 @@ public:
 
       sOutput = sLog;
       return 0;
-    }catch(Throwable t){
-      sError = t.msg;
-//      try{ sError = format("[hdmd/%s(%s)]: %s", t.file, t.line, t.msg); }catch{}
+    }catch(Exception e){
+      //sError = format("Exception in %s(%s): %s", e.file, e.line, e.msg);
+      sError = e.msg;
       sOutput = sLog;
       return -1;
     }

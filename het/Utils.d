@@ -4188,11 +4188,22 @@ public:
 
   /// Useful to remove files that are generated from std output. Those aren't closed immediatelly.
   void forcedRemove() const{
-    foreach(k; 0..100){
+    foreach(k; 0..500){
       if(exists){ try{ remove; }catch(Exception e){ sleep(10); } }
       if(!exists) return;
     }
     ERR("Failed to forcedRemove file ", this);
+  }
+
+  ubyte[] forcedRead() const{
+    foreach(k; 0..500){
+      try{
+        auto res = read(true);
+        return res;
+      }catch(Exception e){ sleep(10); }
+    }
+    ERR("Failed to forcedRead file ", this);
+    assert(0);
   }
 
   ubyte[] read(bool mustExists = true, ulong offset = 0, size_t len = size_t.max)const{ //todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
@@ -4276,6 +4287,11 @@ public:
     if(needToWrite) write(data);
     //if(!needToWrite) print("SKIPPING WRITING IDENTICAL FILE");
     return needToWrite;
+  }
+
+  void writeText(string s){
+    immutable bom = "\uFEFF";
+    write(s.startsWith(bom) ? s : bom~s);
   }
 
   void append(const void[] data)const{ write(data, size); } //todo: compression, automatic uncompression

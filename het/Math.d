@@ -412,6 +412,9 @@ alias RG8   = Vector!(ubyte, 2),  RG   = RG8;
 alias RGB8  = Vector!(ubyte, 3),  RGB  = RGB8;
 alias RGBA8 = Vector!(ubyte, 4),  RGBA = RGBA8;
 
+auto BGR (T...)(in T args){ return RGB (args).bgr ; }
+auto BGRA(T...)(in T args){ return RGBA(args).bgra; }
+
 enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float));
 
 private void unittest_Vectors(){

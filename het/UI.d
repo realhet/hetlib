@@ -6,6 +6,58 @@ import std.traits, std.meta;
 
 public import het.uibase;
 
+struct clipBoard{ static:
+  import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT, EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
+
+  bool hasFormat(uint fmt){
+    bool res;
+    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+      res = IsClipboardFormatAvailable(fmt)!=0;
+    }
+    return res;
+  }
+
+  bool hasText(){ return hasFormat(CF_TEXT); }
+
+  string getText(){
+    string res;
+    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+      auto hData = GetClipboardData(CF_TEXT);
+      if(hData){
+        auto pData = cast(char*)GlobalLock(hData);
+        scope(exit) GlobalUnlock(hData);
+        res = pData.toStr;
+      }
+    }
+    return res;
+  }
+
+  bool setText(string text, bool mustSucceed){
+    bool success;
+    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+      EmptyClipboard;
+      HGLOBAL hClipboardData;
+      auto hData = GlobalAlloc(0, text.length+1);
+      auto pData = cast(char*)GlobalLock(hData);
+      pData[0..text.length] = text[];
+      pData[text.length] = 0;
+      GlobalUnlock(hClipboardData);
+      success = SetClipboardData(CF_TEXT, hData) !is null;
+    }
+    if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
+    return success;
+  }
+
+  @property{
+    string text(){ return getText; }
+    void text(string s){ setText(s, true); }
+  }
+}
+
+
+
+
+
 auto getStaticParamDef(T, A...)(in T def, in A args){
   Unqual!T res = def;
   foreach(a; args) static if(__traits(compiles, res = a)) return a;
@@ -18,26 +70,11 @@ auto getStaticParam(T, A...)(in A args){
   static assert("Can't find required param: "~T.stringof);
 }
 
-
 //todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
 
 //todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
 
 // utility stuff ////////////////////////////////
-
-//nincs hasznalva ez elvileg: enum HoverState { normal, hover, pressed, disabled }
-
-class ScrollColumn : Column{
-
-  vec2 scrollOffsed;
-
-  override void setupScroll(bool hScrollNeeded, bool vScrollNeeded, bool autoWidth, bool autoHeight, in vec2 contentSize){
-    flags.clipChildren = true; // the default is just to clip children
-
-
-
-  }
-}
 
 class Document : Column { // Document /////////////////////////////////
   this(){
@@ -750,17 +787,17 @@ struct im{ static:
 //  void focusExit()                      { focusedState.reset; }
 
 
-// ScrollState, scroller ////////////////////////////////////////////////
-  struct ScrollState{ //currently it's for y only
+// OldScrollState, scroller ////////////////////////////////////////////////
+  deprecated struct OldScrollState{ //currently it's for y only
     float scrollY = 0;
     float scrollY_smooth = 0;
   }
 
-  class Scroller{   //todo: kinetic scrolling
+  deprecated class OldScroller{   //todo: kinetic scrolling
     .Container container, parent;
-    ScrollState* state;
+    OldScrollState* state;
 
-    this(.Container container, .Container parent, ref ScrollState state){
+    this(.Container container, .Container parent, ref OldScrollState state){
       this.container = container;
       this.parent = parent;
       this.state = &state;
@@ -795,9 +832,9 @@ struct im{ static:
 
   }
 
-  Scroller[] scrollers;
+  OldScroller[] scrollers;
 
-  auto vScroll(ref ScrollState state){
+  auto vScroll(ref OldScrollState state){
     enforce(stack.length>=2);
     //todo: get the bounds from the previous container on the stack
     //todo: handle PanelPosition center/bottom
@@ -811,7 +848,7 @@ struct im{ static:
     auto idx = scrollers.map!(s => s.container).countUntil(actContainer);
     enforce(idx<0, "Scroller already defined");
 
-    scrollers ~= new Scroller(actContainer, stack[$-2].container, state);
+    scrollers ~= new OldScroller(actContainer, stack[$-2].container, state);
 
     return scrollers[$-1];
   }
@@ -1664,6 +1701,10 @@ struct im{ static:
             if(KeyCombo("End"      ).typed) cmdQueue ~= EditCmd(cEnd              );
             if(KeyCombo("Up"       ).typed) cmdQueue ~= EditCmd(cUp               );
             if(KeyCombo("Down"     ).typed) cmdQueue ~= EditCmd(cDown             );
+
+            if(KeyCombo("Ctrl+V Shift+Ins").typed){
+              cmdQueue ~= EditCmd(cInsert, clipBoard.text);
+            }
           }
           //todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.
 
@@ -1839,7 +1880,7 @@ struct im{ static:
     });
   }
 
-  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, string[] captions, T args){
+  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, in string[] captions, T args){
     mixin(id.M ~ enable.M);
 
     auto last = idx;

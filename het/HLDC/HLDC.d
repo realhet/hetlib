@@ -51,9 +51,9 @@ int main(string[] args){
 
         print;
         print(bold("> Writing output:"), outFile);
-        outFile.writeStr(sOut);
+        outFile.write(sOut);
         print(bold("> Writing error:"), errFile);
-        errFile.writeStr(sErr);
+        errFile.write(sErr);
 
         print(bold("> Deleting cmd file:"), cmdFile);
         cmdFile.forcedRemove;

@@ -326,26 +326,31 @@ class Drawing {
     stack ~= [origin, scaleFactor];
   }
 
-  void pop() {
-    enforce(!stack.empty, "Drawing.pop() stack is empty");
-    auto a = stack.popLast;
-    origin = a[0];
-    scaleFactor = a[1];
+  auto pop(int count=1) {
+    foreach(i; 0..count){
+      enforce(!stack.empty, "Drawing.pop() stack is empty");
+      auto a = stack.popLast;
+      origin = a[0];
+      scaleFactor = a[1];
+    }
+    return this; //fluid interface
   }
 
-  void translate(float dx, float dy){
+  auto translate(float dx, float dy){
     push;                //seems like origin is in scale units, not in screen units.
     origin.x = origin.x + dx;//*scaleFactor.x;
     origin.y = origin.y + dy;//*scaleFactor.y;
+    return this; //fluid interface
   }
-  void translate(in vec2 d){ translate(d.x, d.y); }
-  void translate(in ivec2 d){ translate(d.x, d.y); }
+  auto translate(in vec2 d){ return translate(d.x, d.y); }
+  auto translate(in ivec2 d){ return translate(d.x, d.y); }
 
-  void scale(float s){ //todo: ezt meg kell csinalni matrixosra.
+  auto scale(float s){ //todo: ezt meg kell csinalni matrixosra.
     push;
     origin *= scaleFactor;
     scaleFactor *= s;
     origin /= scaleFactor;
+    return this; //fluid interface
   }
 
 ////////////////////////////////////////////////////////////////////////////////

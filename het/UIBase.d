@@ -1178,9 +1178,10 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 }
 
 enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
+enum ScrollState { off, on, autoOff, autoOn, auto_ = autoOff}
 
 union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b00_00_0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "canWrap"           , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -1199,7 +1200,9 @@ union ContainerFlags{ //todo: do this nicer with a table
     bool          , "_debug"            , 1, // the container can be marked, for debugging
     bool          , "btnRowLines"       , 1, // draw thin, dark lines between the buttons of a btnRow
     bool          , "_measured"         , 1, // used to tell if a top level container was measured already
-    int           , ""                  , 11,
+    ScrollState   , "hScrollState"      , 2,
+    ScrollState   , "vScrollState"      , 2,
+    int           , ""                  , 7,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -1701,8 +1704,40 @@ class Container : Cell { // Container ////////////////////////////////////
 
     measureSubCells;
 
-    if(autoWidth ) innerWidth  = subCells.map!(c => c.outerRight ).maxElement(0);
-    if(autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);
+    updateScroll(autoWidth, autoHeight);
+    // old version in Container
+    /+if(autoWidth ) innerWidth  = subCells.map!(c => c.outerRight ).maxElement(0);
+    if(autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);+/
+
+    //the version in Columns
+    /+if(0){
+      const contentSize = subCells.maxOuterSize;
+      bool hScrollNeeded, vScrollNeeded;
+      if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
+      if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
+
+      /// this is overriden by ScrollColumn
+      virtual void setupScroll(bool hScrollNeeded, bool vScrollNeeded, bool autoWidth, bool autoHeight, in vec2 contentSize){
+        flags.clipChildren = true; // the default is just to clip children
+      }
+
+      if(vScrollNeeded || hScrollNeeded)
+        setupScroll(hScrollNeeded, vScrollNeeded, autoWidth, autoHeight, contentSize);
+    }+/
+
+  }
+
+  //must be called from the end of measyure_impl.
+  protected void updateScroll(bool autoWidth, bool autoHeight){
+    auto contentSize = vec2(subCells.map!(c => c.outerRight ).maxElement(0),
+                            subCells.map!(c => c.outerBottom).maxElement(0));
+
+    bool hScrollNeeded, vScrollNeeded;
+    if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
+    if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
+
+    if(vScrollNeeded || hScrollNeeded){
+    }
   }
 
   protected void measureSubCells(){
@@ -2512,6 +2547,8 @@ class Row : Container { // Row ////////////////////////////////////
 
     //remember the contents of the edited row
     rememberEditedWrappedLines(this, wrappedLines);
+
+    updateScroll(autoWidth, autoHeight);
   }
 
   override void draw(Drawing dr){
@@ -2524,11 +2561,6 @@ class Row : Container { // Row ////////////////////////////////////
 }
 
 class Column : Container { // Column ////////////////////////////////////
-
-  /// this is overriden by ScrollColumn
-  void setupScroll(bool hScrollNeeded, bool vScrollNeeded, bool autoWidth, bool autoHeight, in vec2 contentSize){
-    flags.clipChildren = true; // the default is just to clip children
-  }
 
   override void measure_impl(){
     //print(typeid(this).name, ".measure", width); scope(exit) print(typeid(this).name, ".measure", width, "END");
@@ -2579,13 +2611,7 @@ class Column : Container { // Column ////////////////////////////////////
 
     subCells.spreadV;
 
-    const contentSize = subCells.maxOuterSize;
-    bool hScrollNeeded, vScrollNeeded;
-    if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
-    if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
-
-    if(vScrollNeeded || hScrollNeeded)
-      setupScroll(hScrollNeeded, vScrollNeeded, autoWidth, autoHeight, contentSize);
+    updateScroll(autoWidth, autoHeight);
   }
 }
 
