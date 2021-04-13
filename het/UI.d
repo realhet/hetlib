@@ -55,21 +55,6 @@ struct clipBoard{ static:
 }
 
 
-
-
-
-auto getStaticParamDef(T, A...)(in T def, in A args){
-  Unqual!T res = def;
-  foreach(a; args) static if(__traits(compiles, res = a)) return a;
-  return res;
-}
-
-auto getStaticParam(T, A...)(in A args){
-  Unqual!T res;
-  foreach(a; args) static if(__traits(compiles, res = a)) return a;
-  static assert("Can't find required param: "~T.stringof);
-}
-
 //todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
 
 //todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
@@ -165,7 +150,7 @@ class Link : Row{ //Link ///////////////////////////////
       ts.underline = hit.hover;
     }
 
-    flags.canWrap = false;
+    flags.wordWrap = false;
 
     auto params = cmdLine.commandLineToMap;
     super(params["0"], ts);
@@ -178,7 +163,7 @@ class Link : Row{ //Link ///////////////////////////////
   this(uint id, string markup, TextStyle ts, string[string] params){
     hitTestManager.addHash(this, id);
 
-    flags.canWrap = false;
+    flags.wordWrap = false;
 
     super(markup, ts);
     setProps(params);
@@ -196,7 +181,7 @@ class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
     padding_ = Padding(2, 2, 0, 0);
     border_.width = 1;
     border_.color = clGray;
-    flags.canWrap = false;
+    flags.wordWrap = false;
 
     super(markup, ts);
   }
@@ -1216,7 +1201,7 @@ struct im{ static:
   void Symbol(string def){ Text(symbol(def)); }
 
 
-  void Column(string file=__FILE__, int line=__LINE__, T...)(T args){  // Column //////////////////////////////
+  void Column(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Column //////////////////////////////
     auto column = new .Column;
     column.bkColor = style.bkColor;
     append(column); push(column, file.xxh(line)); scope(exit) pop;
@@ -1230,20 +1215,21 @@ struct im{ static:
     }}
   }
 
-  void Row(string file=__FILE__, int line=__LINE__, T...)(T args){  // Row //////////////////////////////
+  void Row(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Row //////////////////////////////
     auto row = new .Row("", textStyle);
     append(row); push(row, file.xxh(line)); scope(exit) pop;
 
-    static foreach(a; args){{ alias t = typeof(a);
-      static if(isFunctionPointer!a){
-        a();
-      }else static if(isDelegate!a){
-        a();
-      }else static if(isSomeString!t){
-        Text(a);
-      }else{
-        static assert(false, "Unsupported type: "~t.stringof);
-      }
+    static foreach(a; args){{ alias t = Unqual!(typeof(a));
+
+           static if(isFunctionPointer!a) a();
+      else static if(isDelegate!a       ) a();
+      else static if(isSomeString!t     ) Text(a);
+      else static if(is(t == YAlign)    ) flags.yAlign = a;
+      else static if(is(t == HAlign)    ) flags.hAlign = a;
+      else static if(is(t == VAlign)    ) flags.vAlign = a;
+      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static assert(false, "Unsupported type: "~t.stringof);
+
     }}
   }
 
@@ -1466,57 +1452,33 @@ struct im{ static:
   }
 
   //Spacer //////////////////////////
-  void Spacer(T...)(T args){
-    float size;
-    static if(args.length && isNumeric!(T[0])) size = args[0];
-
-    if(isnan(size)) size = fh*.5f;
-    const vertical = cast(.Row)actContainer !is null;
-
-    Row({
-      //flags.yAlign = YAlign.stretch;
-      padding = vertical ? Padding(0, size, 0, 0)
-                         : Padding(size, 0, 0, 0);
-
-      //todo: the Spacer has 0 area. It should be expanded to the max.
-      /*bkColor = clRed;
-      foreach(a; args) static if(is(Unqual!(typeof(a))==RGB)) bkColor = a;
-      foreach(a; args) static if(__traits(compiles, a())) a();*/
+  private void SpacerRow(Args...)(float size, in Args args){
+    const vert = cast(.Row)actContainer !is null;
+    Row(args, {
+      if(vert){ innerWidth  = size; flags.yAlign = YAlign.stretch; }
+          else{ innerHeight = size; /+ width is auto by default. A Column will stretch it properly. +/ }
     });
   }
 
-
-  /+private void _EditHandleInput(T0)(ref T0 value, ref string str, ref bool chg){ //handles e
-    import het.win;
-    if(mainWindow.inputChars.empty) return;
-
-    with(EditCmd) foreach(ch; mainWindow.inputChars.unTag.byDchar){
-      writeln(ch.to!int);
-      if(ch>=32){
-        textEditState.cmdQueue ~= EditCmd(cInsert, ch);
-      }
-
-/+      switch(ch){
-        case 8:{ //backSpace
-/*          try{
-            str = str[0..$-str.strideBack];
-          }catch{
-            beep;
-          }*/
-          textEditState.cmdQueue ~= EditCmd(cDeleteBack);
-        break;}
-        case 13, 27: break;
-        default: str ~= ch;+/
-      }
+  void Spacer(Args...)(in Args args){
+    float size;
+    static if(args.length && isNumeric!(Args[0])){
+      size = args[0];
+      enum argStart = 1;
+    }else{
+      enum argStart = 0;
     }
+    if(isnan(size)) size = fh*.5f;
 
-    try{
-      auto newValue = str.to!T0; //write back value
-      //todo: validate/clamp
-      chg = value != newValue;
-      if(chg) value = newValue;
-    }catch(Throwable){}
-  }+/
+    SpacerRow(size, args[argStart..$]);
+  }
+
+  void HR(){
+    SpacerRow(fh*InvNormalFontHeight, {
+      margin = "0.33333x 0";
+      bkColor = mix(style.bkColor, style.fontColor, 0.25f);
+    });
+  }
 
   // apply Btn and Edit style////////////////////////////////////
 
@@ -1847,7 +1809,7 @@ struct im{ static:
         /* onExit  */ { }
       );
 
-      //flags.canWrap = false;
+      //flags.wordWrap = false;
       flags.hAlign = HAlign.center;
 
       applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth);
@@ -1902,6 +1864,7 @@ struct im{ static:
     return res;
   }
 
+  //todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
   auto BtnRow(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum)){
     string s = e.text;
     auto res = BtnRow!(file, line)(s, getEnumMembers!E, args);
@@ -2002,7 +1965,7 @@ struct im{ static:
 
     HitInfo hit;
     Row({
-      flags.canWrap = false;
+      flags.wordWrap = false;
 
       hit = hitTest(id_, enabled);
       mixin(hintHandler);
@@ -2187,7 +2150,7 @@ struct im{ static:
         /* onExit  */ { }
       );
 
-      //flags.canWrap = false;
+      //flags.wordWrap = false;
       flags.hAlign = HAlign.center;
 
       applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth);

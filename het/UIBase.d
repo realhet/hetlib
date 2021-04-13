@@ -14,7 +14,7 @@ enum
   VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
-  VisualizeSliders         = 1;
+  VisualizeSliders         = 0;
 
 //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 immutable DefaultFontName = //this is the cached font
@@ -24,7 +24,8 @@ immutable DefaultFontName = //this is the cached font
 ;
 
 immutable
-  NormalFontHeight = 18;  //fucking keep it on 18!!!!
+  NormalFontHeight = 18,  //fucking keep it on 18!!!!
+  InvNormalFontHeight = 1.0f/NormalFontHeight;
 
 enum
   InternalTabScale = 0.12f/2,  //around 0.15 for programming
@@ -1037,72 +1038,6 @@ class Cell{ // Cell ////////////////////////////////////
   }
 }
 
-
-class Img : Container { // Img ////////////////////////////////////
-  int stIdx;
-
-  this(File fn){
-    stIdx = textures[fn];
-  }
-
-  this(File fn, RGB bkColor){
-    this.bkColor = bkColor;
-    this(fn);
-  }
-
-  override void draw(Drawing dr){
-    drawBorder(dr);
-
-    dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
-  }
-
-  override void measure_impl(){
-    //note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
-    const autoWidth  = outerWidth ==0,
-          autoHeight = outerHeight==0,
-          siz = calcGlyphSize_image(stIdx);
-
-    if(autoHeight && autoWidth){
-      innerSize = siz;
-    }else if(autoHeight){
-      innerHeight = innerWidth/max(siz.x, 1)*siz.y;
-    }else if(autoWidth){
-      innerWidth = innerHeight/max(siz.y, 1)*siz.x;
-    }
-  }
-}
-
-enum ShapeType{ led }
-
-class Shape : Cell{ // Shape /////////////////////////////////////
-  ShapeType type;
-  RGB color;
-
-/*  this(T)(ShapeType shapeType, RGB color, T state, float fontHeight){
-    this.type = shapeType;
-    this.color = color;
-    innerSize = vec2(fontHeight*.5, fontHeight);
-  }*/
-
-  override void draw(Drawing dr){
-    final switch(type){
-      case ShapeType.led:{
-        auto r = min(innerWidth, innerHeight)*0.92f;
-
-
-        auto p = innerCenter;
-
-        dr.pointSize = r;       dr.color = RGB(.3, .3, .3);  dr.point(p);
-        dr.pointSize = r*.8f;   dr.color = color;   dr.point(p);
-        dr.pointSize = r*0.4f;  dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f));
-        dr.pointSize = r*0.2f;  dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f));
-        dr.alpha = 1;
-
-      break;}
-    }
-  }
-}
-
 class Glyph : Cell { // Glyph ////////////////////////////////////
   int stIdx;
 
@@ -1177,37 +1112,37 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
   override string toString() { return format!"Glyph(%s, %s, %s)"(ch.text.quoted, stIdx, outerBounds); }
 }
 
-enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
-enum ScrollState { off, on, autoOff, autoOn, auto_ = autoOff}
 
-union ContainerFlags{ //todo: do this nicer with a table
-  ulong _data = 0b00_00_0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
-  mixin(bitfields!(
-    bool          , "canWrap"           , 1,
-    HAlign        , "hAlign"            , 2,  //alignment for all subCells
-    VAlign        , "vAlign"            , 2,
-    YAlign        , "yAlign"            , 3,
-    bool          , "dontHideSpaces"    , 1,  //useful for active edit mode
-    bool          , "canSelect"         , 1,
-    bool          , "focused"           , 1,  //maintained by system, not by user
-    bool          , "hovered"           , 1,  //maintained by system, not by user
-    bool          , "clipChildren"      , 1,
-    bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
-    bool          , "_hasOverlayDrawing", 1,
-    bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
-    bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
-    uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
-    bool          , "_debug"            , 1, // the container can be marked, for debugging
-    bool          , "btnRowLines"       , 1, // draw thin, dark lines between the buttons of a btnRow
-    bool          , "_measured"         , 1, // used to tell if a top level container was measured already
-    ScrollState   , "hScrollState"      , 2,
-    ScrollState   , "vScrollState"      , 2,
-    int           , ""                  , 7,
-  ));
+enum ShapeType{ led }
 
-  //todo: setProps, mint a margin-nal
+class Shape : Cell{ // Shape /////////////////////////////////////
+  ShapeType type;
+  RGB color;
+
+/*  this(T)(ShapeType shapeType, RGB color, T state, float fontHeight){
+    this.type = shapeType;
+    this.color = color;
+    innerSize = vec2(fontHeight*.5, fontHeight);
+  }*/
+
+  override void draw(Drawing dr){
+    final switch(type){
+      case ShapeType.led:{
+        auto r = min(innerWidth, innerHeight)*0.92f;
+
+
+        auto p = innerCenter;
+
+        dr.pointSize = r;       dr.color = RGB(.3, .3, .3);  dr.point(p);
+        dr.pointSize = r*.8f;   dr.color = color;   dr.point(p);
+        dr.pointSize = r*0.4f;  dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f));
+        dr.pointSize = r*0.2f;  dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f));
+        dr.alpha = 1;
+
+      break;}
+    }
+  }
 }
-
 
 // TextPos ///////////////////////////////////////////////////
 
@@ -1617,330 +1552,6 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 }
 
 
-/*int opCmp(in TextPoint a, in TextPoint b){   //b-a
-  auto l = b.line-a.line;
-  return l ? l : b.col-a.col;
-}*/
-
-// Selection struct //
-/+
-struct Selection{ //selection of cells in a container.
-  TextPoint[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
-
-  void clear(){ sel = []; }
-
-/*todo:  bool isSelected(in TextPoint i){ //is a cell selected?
-    return sel.map!(s => s[0]<=i && i<s[1]).any;
-  }
-
-  bool isCaret(in TextPoint i){ //is there a caret on the left?
-    return sel.map!(s => s[0]==i && s[0]==s[1]).any;
-  }*/
-}+/
-
-class Container : Cell { // Container ////////////////////////////////////
-
-  private{
-    Cell[] subCells_;
-    public{ //todo: ezt a publicot leszedni es megoldani szepen
-      _FlexValue flex_;
-      Margin margin_  ;
-      Padding padding_;
-      Border  border_ ;
-    }
-  }
-
-  Cell removeLast() {
-    enforce(subCells_.length);
-    auto res = subCells_[$-1];
-    subCells_ = subCells_[0..$-1];
-    return res;
-  }
-
-  final override{
-    ref _FlexValue flex() { return flex_   ; }
-    ref Margin  margin () { return margin_ ; } //todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
-    ref Padding padding() { return padding_; }
-    ref Border  border () { return border_ ; }
-  }
-
-  RGB bkColor=clWhite; //todo: background struct
-  ContainerFlags flags;
-
-  override void setProps(string[string] p){
-    super.setProps(p);
-
-    margin_ .setProps(p, "margin" );
-    padding_.setProps(p, "padding");
-    border_ .setProps(p, "border" );
-
-    p.setParam("flex"   , (float f){ flex_   = f; });
-    p.setParam("bkColor", (RGB   c){ bkColor = c; });
-
-    //todo: flags.setProps param
-  }
-
-  void parse(string s, TextStyle ts = tsNormal){
-    enforce("notimpl");
-  }
-
-  override{
-    void clearSubCells(){ subCells_ = []; }
-    @property Cell[] subCells() { return subCells_; }
-    @property void subCells(Cell[] cells) { subCells_ = cells; }
-
-    void append(Cell   c){ if(c !is null) subCells_ ~= c; }
-    void append(Cell[] a){ subCells_ ~= a; }
-  }
-
-  final void measure(){
-    measure_impl;
-    flags._measured = true;
-  }
-
-  protected void measure_impl(){
-    bool autoWidth  = outerSize.x==0;
-    bool autoHeight = outerSize.y==0;
-
-    measureSubCells;
-
-    updateScroll(autoWidth, autoHeight);
-    // old version in Container
-    /+if(autoWidth ) innerWidth  = subCells.map!(c => c.outerRight ).maxElement(0);
-    if(autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);+/
-
-    //the version in Columns
-    /+if(0){
-      const contentSize = subCells.maxOuterSize;
-      bool hScrollNeeded, vScrollNeeded;
-      if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
-      if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
-
-      /// this is overriden by ScrollColumn
-      virtual void setupScroll(bool hScrollNeeded, bool vScrollNeeded, bool autoWidth, bool autoHeight, in vec2 contentSize){
-        flags.clipChildren = true; // the default is just to clip children
-      }
-
-      if(vScrollNeeded || hScrollNeeded)
-        setupScroll(hScrollNeeded, vScrollNeeded, autoWidth, autoHeight, contentSize);
-    }+/
-
-  }
-
-  //must be called from the end of measyure_impl.
-  protected void updateScroll(bool autoWidth, bool autoHeight){
-    auto contentSize = vec2(subCells.map!(c => c.outerRight ).maxElement(0),
-                            subCells.map!(c => c.outerBottom).maxElement(0));
-
-    bool hScrollNeeded, vScrollNeeded;
-    if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
-    if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
-
-    if(vScrollNeeded || hScrollNeeded){
-    }
-  }
-
-  protected void measureSubCells(){
-    foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure; //recursive in the front
-  }
-
-  override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
-    if(super.internal_hitTest(mouse, ofs)){
-      ofs += innerPos;
-      foreach(sc; subCells) sc.internal_hitTest(mouse, ofs); //recursive
-      flags.hovered = true;
-      return true;
-    }else{
-      flags.hovered = false;
-      return false;
-    }
-  }
-
-  ///this hitTest is only works after measure.
-  override Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init){
-    auto res = super.contains(p, ofs);
-
-    if(res.length){
-      ofs += innerPos;
-      foreach(sc; subCells){
-        auto act = sc.contains(p, ofs);
-        if(act.length){
-          res ~= act;
-          break;
-        }
-      }
-    }
-
-    return res;
-  }
-
-
-  static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
-
-  override void draw(Drawing dr){
-    //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
-    //if(chkSet(measured)) measure;
-
-    //autofill background
-    dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
-    //dr.alpha = 0.1;
-
-    dr.fillRect(border.adjustBounds(borderBounds_inner));
-    //dr.alpha = 1;
-
-    if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
-
-    dr.translate(innerPos);
-    const useClipBounds = flags.clipChildren;
-    if(useClipBounds) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
-
-    foreach(sc; subCells){
-      sc.draw(dr); //recursive
-    }
-
-    if(flags._hasOverlayDrawing)
-      dr.copyFrom(getOverlayDrawing(this));
-
-    if(flags.btnRowLines && subCells.length>1){
-      dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.25f;
-      foreach(sc; subCells[1..$])
-        dr.vLine(sc.outerX, sc.outerY+sc.margin.top+.25f, sc.outerY+sc.outerHeight-sc.margin.bottom-.25f);
-      dr.alpha = 1;
-    }
-
-    if(useClipBounds) dr.popClipBounds;
-    dr.pop;
-
-    drawBorder(dr); //border is the last
-
-    if(VisualizeContainers){
-      if(cast(Column)this){ dr.color = clRed; }
-      else if(cast(Row)this){ dr.color = clBlue; }
-      else dr.color = clGray;
-
-      dr.lineWidth = 1;
-      dr.lineStyle = LineStyle.normal;
-      dr.drawRect(outerBounds.inflated(-1.5));
-    }
-
-
-  }
-
-// these can mixed in
-
-  mixin template CachedMeasuring(){
-    bool measured;
-
-    override void measure_impl(){
-      WARN("Ezt felulvizsgalni, mert van mar flags._measured is!!!");
-      if(measured.chkSet) super.measure_impl;
-    }
-  }
-
-  mixin template CachedDrawing(){
-    Drawing cachedDrawing;
-
-    override void draw(Drawing dr){
-      if(dr.isClone){
-        super.draw(dr); //prevent recursion
-        //print("Drawing recursion prevented");
-      }else{
-        if(!cachedDrawing){
-          cachedDrawing = dr.clone;
-          super.draw(cachedDrawing);
-        }
-        dr.subDraw(cachedDrawing);
-      }
-    }
-  };
-
-
-  struct SearchResult{
-    Container container;
-    vec2 absInnerPos;
-    Cell[] cells;
-
-    auto cellBounds(){ return cells.map!(c => c.outerBounds + absInnerPos); }
-    auto bounds(){ return cellBounds.fold!"a|b"; }
-
-    void drawHighlighted(Drawing dr, RGB clHighlight){
-      foreach(cell; cells)if(auto glyph = cast(Glyph)cell) with(glyph){
-        dr.color = bkColor;
-        dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags);
-      }
-    }
-  }
-
-  /// Search for a text recursively in the Cell structure
-  auto search(string searchText, vec2 origin = vec2.init){
-
-    struct SearchContext{
-      dstring searchText;
-      vec2 absInnerPos;
-      Cell[] cellPath;
-
-      SearchResult[] results;
-      int maxResults = 9999;
-
-      bool canStop() const { return results.length >= maxResults; }
-    }
-
-    static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "exit from recursion"
-      //recursive entry/leave
-      context.cellPath ~= thisC;
-      context.absInnerPos += thisC.innerPos;
-
-      scope(exit){
-        context.absInnerPos -= thisC.innerPos;
-        context.cellPath.popBack;
-      }
-
-    //print("enter");
-
-      Cell[] cells = thisC.subCells;
-      size_t baseIdx;
-      foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group){
-        auto act = cells[baseIdx..baseIdx+len];
-
-        if(!isGlyph){
-          foreach(c; act.map!(c => cast(Container)c).filter!"a"){
-            if(cntrSearchImpl(c, context)) return true; //end recursive call
-          }
-        }else{
-          auto chars = act.map!(c => (cast(Glyph)c).ch);
-
-    //print("searching in", chars.text);
-
-          size_t searchBaseIdx = 0;
-          while(1){
-            auto idx = chars.indexOf(context.searchText, No.caseSensitive);
-            if(idx<0) break;
-
-            context.results ~= SearchResult(thisC, context.absInnerPos, cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]);
-            if(context.canStop) return true;
-
-            const skip = idx + context.searchText.length;
-            chars.popFrontExactly(skip);
-            searchBaseIdx += skip;
-          }
-        }
-
-    //readln;
-    //print("advance", len);
-        baseIdx += len;
-      }
-
-      return false;
-    }
-
-    auto context = SearchContext(searchText.to!dstring, origin);
-    if(!searchText.empty)
-      cntrSearchImpl(this, context);
-    return context.results;
-  }
-
-}
-
 // markup parser /////////////////////////////////////////
 
 void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle ts){
@@ -2349,6 +1960,386 @@ void processElasticTabs(WrappedLine[] rows, int level=0){
 }
 
 
+
+/*int opCmp(in TextPoint a, in TextPoint b){   //b-a
+  auto l = b.line-a.line;
+  return l ? l : b.col-a.col;
+}*/
+
+// Selection struct //
+/+
+struct Selection{ //selection of cells in a container.
+  TextPoint[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
+
+  void clear(){ sel = []; }
+
+/*todo:  bool isSelected(in TextPoint i){ //is a cell selected?
+    return sel.map!(s => s[0]<=i && i<s[1]).any;
+  }
+
+  bool isCaret(in TextPoint i){ //is there a caret on the left?
+    return sel.map!(s => s[0]==i && s[0]==s[1]).any;
+  }*/
+}+/
+
+enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
+enum ScrollState { off, on, autoOff, autoOn, auto_ = autoOff}
+
+union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
+  //todo: do this nicer with a table
+  ulong _data = 0b00_00_0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  mixin(bitfields!(
+    bool          , "wordWrap"          , 1,
+    HAlign        , "hAlign"            , 2,  //alignment for all subCells
+    VAlign        , "vAlign"            , 2,
+    YAlign        , "yAlign"            , 3,
+    bool          , "dontHideSpaces"    , 1,  //useful for active edit mode
+    bool          , "canSelect"         , 1,
+    bool          , "focused"           , 1,  //maintained by system, not by user
+    bool          , "hovered"           , 1,  //maintained by system, not by user
+    bool          , "clipChildren"      , 1,
+    bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
+    bool          , "_hasOverlayDrawing", 1,
+    bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
+    bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
+    uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
+    bool          , "_debug"            , 1, // the container can be marked, for debugging
+    bool          , "btnRowLines"       , 1, // draw thin, dark lines between the buttons of a btnRow
+    bool          , "_measured"         , 1, // used to tell if a top level container was measured already
+    ScrollState   , "hScrollState"      , 2,
+    ScrollState   , "vScrollState"      , 2,
+    bool          , "autoWidth"         , 1, // kinda readonly: It's set by Container in measure to outerSize!=0
+    bool          , "autoHeight"        , 1, // later everything else can read it.
+    int           , ""                  , 5,
+  ));
+
+  //todo: setProps, mint a margin-nal
+}
+
+// Effective horizontal and vertical flow configuration of subCells
+enum FlowConfig { autoSize, wrap, noScroll, scroll, autoScroll }
+
+auto getHFlowConfig(in bool autoWidth, in bool wordWrap, in ScrollState hScroll) pure{
+  return autoWidth ? FlowConfig.autoSize :
+         wordWrap  ? FlowConfig.wrap :
+         hScroll==ScrollState.off ? FlowConfig.noScroll :
+         hScroll==ScrollState.on  ? FlowConfig.scroll : FlowConfig.autoScroll;
+}
+
+auto getVFlowConfig(in bool autoHeight, in ScrollState vScroll) pure{
+  return autoHeight ? FlowConfig.autoSize :
+         vScroll==ScrollState.off ? FlowConfig.noScroll :
+         vScroll==ScrollState.on  ? FlowConfig.scroll : FlowConfig.autoScroll;
+}
+
+class Container : Cell { // Container ////////////////////////////////////
+
+  private{
+    Cell[] subCells_;
+    public{ //todo: ezt a publicot leszedni es megoldani szepen
+      _FlexValue flex_;
+      Margin margin_  ;
+      Padding padding_;
+      Border  border_ ;
+    }
+  }
+
+  Cell removeLast() {
+    enforce(subCells_.length);
+    auto res = subCells_[$-1];
+    subCells_ = subCells_[0..$-1];
+    return res;
+  }
+
+  final override{
+    ref _FlexValue flex() { return flex_   ; }
+    ref Margin  margin () { return margin_ ; } //todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
+    ref Padding padding() { return padding_; }
+    ref Border  border () { return border_ ; }
+  }
+
+  RGB bkColor=clWhite; //todo: background struct
+  ContainerFlags flags;
+
+  override void setProps(string[string] p){
+    super.setProps(p);
+
+    margin_ .setProps(p, "margin" );
+    padding_.setProps(p, "padding");
+    border_ .setProps(p, "border" );
+
+    p.setParam("flex"   , (float f){ flex_   = f; });
+    p.setParam("bkColor", (RGB   c){ bkColor = c; });
+
+    //todo: flags.setProps param
+  }
+
+  void parse(string s, TextStyle ts = tsNormal){
+    enforce("notimpl");
+  }
+
+  override{
+    void clearSubCells(){ subCells_ = []; }
+    @property Cell[] subCells() { return subCells_; }
+    @property void subCells(Cell[] cells) { subCells_ = cells; }
+
+    void append(Cell   c){ if(c !is null) subCells_ ~= c; }
+    void append(Cell[] a){ subCells_ ~= a; }
+  }
+
+  protected auto getHFlowConfig(){ return .getHFlowConfig(flags.autoWidth , flags.wordWrap, flags.hScrollState); }
+  protected auto getVFlowConfig(){ return .getVFlowConfig(flags.autoHeight,                 flags.vScrollState); }
+
+  /// this must overrided by every descendant. Its task is to measure and then place all the subcells.
+  void rearrange(){
+    measureSubCells;
+    if(flags.autoWidth ) innerWidth  = subCells.map!(c => c.outerRight ).maxElement(0);
+    if(flags.autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);
+  }
+
+  final void measure(){
+    if(!flags._measured){
+      flags.autoWidth  = outerSize.x==0;
+      flags.autoHeight = outerSize.y==0;
+    }
+
+    rearrange;
+
+    updateScrollState(flags.autoWidth, flags.autoHeight);
+
+    flags._measured = true;
+  }
+
+  //must be called from the end of measyure_impl.
+  protected void updateScrollState(bool autoWidth, bool autoHeight){
+    auto contentSize = vec2(subCells.map!(c => c.outerRight ).maxElement(0),
+                            subCells.map!(c => c.outerBottom).maxElement(0));
+
+    bool hScrollNeeded, vScrollNeeded;
+    if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
+    if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
+
+    //update automatic scrollState and make needScroll values consequent with them.
+    with(ScrollState){
+      static foreach(ch; "hv") mixin(q{
+        if     (flags.*ScrollState==autoOff &&  *ScrollNeeded) flags.*ScrollState = autoOn;
+        else if(flags.*ScrollState==autoOn  && !*ScrollNeeded) flags.*ScrollState = autoOff;
+        *ScrollNeeded = flags.*ScrollState.among(autoOn, on)>0;
+      }.replace('*', ch));
+
+    }
+
+    /*if(flags.wordWrap && vScrollNeeded){
+      //ez problema, ujra kell tordelni.
+    } */
+
+
+    if(vScrollNeeded || hScrollNeeded){
+    }
+  }
+
+  protected void measureSubCells(){
+    foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure; //recursive in the front
+  }
+
+  override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
+    if(super.internal_hitTest(mouse, ofs)){
+      ofs += innerPos;
+      foreach(sc; subCells) sc.internal_hitTest(mouse, ofs); //recursive
+      flags.hovered = true;
+      return true;
+    }else{
+      flags.hovered = false;
+      return false;
+    }
+  }
+
+  ///this hitTest is only works after measure.
+  override Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init){
+    auto res = super.contains(p, ofs);
+
+    if(res.length){
+      ofs += innerPos;
+      foreach(sc; subCells){
+        auto act = sc.contains(p, ofs);
+        if(act.length){
+          res ~= act;
+          break;
+        }
+      }
+    }
+
+    return res;
+  }
+
+
+  static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
+
+  override void draw(Drawing dr){
+    //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
+    //if(chkSet(measured)) measure;
+
+    //autofill background
+    dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
+    //dr.alpha = 0.1;
+
+    dr.fillRect(border.adjustBounds(borderBounds_inner));
+    //dr.alpha = 1;
+
+    if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
+
+    dr.translate(innerPos);
+    const useClipBounds = flags.clipChildren;
+    if(useClipBounds) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
+
+    foreach(sc; subCells){
+      sc.draw(dr); //recursive
+    }
+
+    if(flags._hasOverlayDrawing)
+      dr.copyFrom(getOverlayDrawing(this));
+
+    if(flags.btnRowLines && subCells.length>1){
+      dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.25f;
+      foreach(sc; subCells[1..$])
+        dr.vLine(sc.outerX, sc.outerY+sc.margin.top+.25f, sc.outerY+sc.outerHeight-sc.margin.bottom-.25f);
+      dr.alpha = 1;
+    }
+
+    if(useClipBounds) dr.popClipBounds;
+    dr.pop;
+
+    drawBorder(dr); //border is the last
+
+    if(VisualizeContainers){
+      if(cast(Column)this){ dr.color = clRed; }
+      else if(cast(Row)this){ dr.color = clBlue; }
+      else dr.color = clGray;
+
+      dr.lineWidth = 1;
+      dr.lineStyle = LineStyle.normal;
+      dr.drawRect(outerBounds.inflated(-1.5));
+    }
+
+
+  }
+
+// these can mixed in
+
+  mixin template CachedMeasuring(){
+    bool measured;
+
+    override void measure_impl(){
+      WARN("Ezt felulvizsgalni, mert van mar flags._measured is!!!");
+      if(measured.chkSet) super.measure_impl;
+    }
+  }
+
+  mixin template CachedDrawing(){
+    Drawing cachedDrawing;
+
+    override void draw(Drawing dr){
+      if(dr.isClone){
+        super.draw(dr); //prevent recursion
+        //print("Drawing recursion prevented");
+      }else{
+        if(!cachedDrawing){
+          cachedDrawing = dr.clone;
+          super.draw(cachedDrawing);
+        }
+        dr.subDraw(cachedDrawing);
+      }
+    }
+  };
+
+
+  struct SearchResult{
+    Container container;
+    vec2 absInnerPos;
+    Cell[] cells;
+
+    auto cellBounds(){ return cells.map!(c => c.outerBounds + absInnerPos); }
+    auto bounds(){ return cellBounds.fold!"a|b"; }
+
+    void drawHighlighted(Drawing dr, RGB clHighlight){
+      foreach(cell; cells)if(auto glyph = cast(Glyph)cell) with(glyph){
+        dr.color = bkColor;
+        dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags);
+      }
+    }
+  }
+
+  /// Search for a text recursively in the Cell structure
+  auto search(string searchText, vec2 origin = vec2.init){
+
+    struct SearchContext{
+      dstring searchText;
+      vec2 absInnerPos;
+      Cell[] cellPath;
+
+      SearchResult[] results;
+      int maxResults = 9999;
+
+      bool canStop() const { return results.length >= maxResults; }
+    }
+
+    static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "exit from recursion"
+      //recursive entry/leave
+      context.cellPath ~= thisC;
+      context.absInnerPos += thisC.innerPos;
+
+      scope(exit){
+        context.absInnerPos -= thisC.innerPos;
+        context.cellPath.popBack;
+      }
+
+    //print("enter");
+
+      Cell[] cells = thisC.subCells;
+      size_t baseIdx;
+      foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group){
+        auto act = cells[baseIdx..baseIdx+len];
+
+        if(!isGlyph){
+          foreach(c; act.map!(c => cast(Container)c).filter!"a"){
+            if(cntrSearchImpl(c, context)) return true; //end recursive call
+          }
+        }else{
+          auto chars = act.map!(c => (cast(Glyph)c).ch);
+
+    //print("searching in", chars.text);
+
+          size_t searchBaseIdx = 0;
+          while(1){
+            auto idx = chars.indexOf(context.searchText, No.caseSensitive);
+            if(idx<0) break;
+
+            context.results ~= SearchResult(thisC, context.absInnerPos, cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]);
+            if(context.canStop) return true;
+
+            const skip = idx + context.searchText.length;
+            chars.popFrontExactly(skip);
+            searchBaseIdx += skip;
+          }
+        }
+
+    //readln;
+    //print("advance", len);
+        baseIdx += len;
+      }
+
+      return false;
+    }
+
+    auto context = SearchContext(searchText.to!dstring, origin);
+    if(!searchText.empty)
+      cntrSearchImpl(this, context);
+    return context.results;
+  }
+
+}
+
+
 class Row : Container { // Row ////////////////////////////////////
 
   //for Elastic tabs
@@ -2374,10 +2365,10 @@ class Row : Container { // Row ////////////////////////////////////
     super.appendChar(ch, ts);
   }
 
-  private void solveFlexAndMeasureAll(bool autoWidth){
+  private void solveFlexAndMeasureAll(){
     float flexSum = 0;
     bool doFlex;
-    if(!autoWidth){
+    if(!flags.autoWidth){
       flexSum = subCells.calcFlexSum;
       doFlex = flexSum>0;
     }
@@ -2395,7 +2386,7 @@ class Row : Container { // Row ////////////////////////////////////
         remaining /= flexSum;
         foreach(sc; subCells) if(sc.flex){
           sc.outerWidth = sc.flex*remaining;
-          if(auto co = cast(Container)sc) co.measure; //measure flex
+          if(auto co = cast(Container)sc){ co.flags.autoWidth = false; co.measure; } //measure flex
         }
       }
     }else{ //no flex
@@ -2479,18 +2470,14 @@ class Row : Container { // Row ////////////////////////////////////
     }
   }
 
-  override void measure_impl(){
-    //scope(exit) LOG(width, height, "END");
-
-    const autoWidth  = outerSize.x==0,
-          autoHeight = outerSize.y==0,
-          doWrap = flags.canWrap && !autoWidth;
+  override void rearrange(){
+    const doWrap = flags.wordWrap && !flags.autoWidth;
 
     //adjust length of leading and internal tabs
     if(flags.rowElasticTabs) adjustTabSizes_multiLine;
                         else adjustTabSizes_singleLine;
 
-    solveFlexAndMeasureAll(autoWidth);
+    solveFlexAndMeasureAll();
 
     auto wrappedLines = makeWrappedLines(doWrap);
     //LOG("wl", wrappedLines, autoWidth, wrappedLines.calcWidth);
@@ -2502,11 +2489,11 @@ class Row : Container { // Row ////////////////////////////////////
     if(doWrap && !flags.dontHideSpaces) wrappedLines.hideSpaces(flags.hAlign);
 
     //horizontal alignment, sizing
-    if(autoWidth ) innerWidth = wrappedLines.calcWidth; //set actual size if automatic
+    if(flags.autoWidth ) innerWidth = wrappedLines.calcWidth; //set actual size if automatic
 
     //horizontal text align on every line
     //todo: clip or stretch
-    if(!autoWidth || wrappedLines.length>1) foreach(ref wl; wrappedLines){
+    if(!flags.autoWidth || wrappedLines.length>1) foreach(ref wl; wrappedLines){
       final switch(flags.hAlign){
         case HAlign.left    : break;
         case HAlign.center  : wl.alignX(innerWidth, 0.5); break;
@@ -2516,7 +2503,7 @@ class Row : Container { // Row ////////////////////////////////////
     }
 
     //vertical alignment, sizing
-    if(autoHeight){
+    if(flags.autoHeight){
       innerHeight = wrappedLines.calcHeight;
       //height is calculated, no remaining space, so no align is needed
     }else{
@@ -2547,8 +2534,6 @@ class Row : Container { // Row ////////////////////////////////////
 
     //remember the contents of the edited row
     rememberEditedWrappedLines(this, wrappedLines);
-
-    updateScroll(autoWidth, autoHeight);
   }
 
   override void draw(Drawing dr){
@@ -2562,23 +2547,19 @@ class Row : Container { // Row ////////////////////////////////////
 
 class Column : Container { // Column ////////////////////////////////////
 
-  override void measure_impl(){
-    //print(typeid(this).name, ".measure", width); scope(exit) print(typeid(this).name, ".measure", width, "END");
-
-    bool autoWidth  = outerSize.x==0;
-    bool autoHeight = outerSize.y==0;
-
+  override void rearrange(){
     //measure the subCells and stretch them to a maximum width
-    if(autoWidth){
+    if(flags.autoWidth){
       //measure maxWidth
       measureSubCells;
       innerWidth = subCells.map!"a.outerWidth".maxElement(0);
 
       //at this point all the subCells are measured
       //now set the width of every subcell in this column if it differs, and remeasure only when necessary
-      foreach(sc; subCells) if(sc.outerWidth != innerWidth){
+      float iw = innerWidth;
+      foreach(sc; subCells) if(cast(Container)sc && (cast(Container)sc).flags.autoWidth && sc.outerWidth != innerWidth){
         sc.outerWidth = innerWidth;
-        if(auto co = cast(Container)sc) co.measure;
+        if(auto co = cast(Container)sc){ co.flags.autoWidth = false; co.measure; }
       }
       //note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. But that's not an usual case: ListBox: all textCells are fixedWidth, Document: all paragraphs are autoWidth.
     }else{
@@ -2591,7 +2572,7 @@ class Column : Container { // Column ////////////////////////////////////
     if(flags.columnElasticTabs) processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.
 
     //process vertically flexible items
-    if(!autoHeight){
+    if(!flags.autoHeight){
       auto flexSum = subCells.calcFlexSum;
 
       if(flexSum > 0){
@@ -2603,18 +2584,49 @@ class Column : Container { // Column ////////////////////////////////////
           remaining /= flexSum;
           foreach(sc; subCells) if(sc.flex){
             sc.outerHeight = sc.flex*remaining;
-            if(auto co = cast(Container)sc) co.measure; //height changed, measure again
+            if(auto co = cast(Container)sc){ co.flags.autoHeight = false; co.measure; } //height changed, measure again
           }
         }
       }
     }
 
     subCells.spreadV;
-
-    updateScroll(autoWidth, autoHeight);
   }
 }
 
+
+class Img : Container { // Img ////////////////////////////////////
+  int stIdx;
+
+  this(File fn){
+    stIdx = textures[fn];
+  }
+
+  this(File fn, RGB bkColor){
+    this.bkColor = bkColor;
+    this(fn);
+  }
+
+  override void rearrange(){
+    //note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
+    //todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
+    const siz = calcGlyphSize_image(stIdx);
+
+    if(flags.autoHeight && flags.autoWidth){
+      innerSize = siz;
+    }else if(flags.autoHeight){
+      innerHeight = innerWidth/max(siz.x, 1)*siz.y;
+    }else if(flags.autoWidth){
+      innerWidth = innerHeight/max(siz.y, 1)*siz.x;
+    }
+  }
+
+  override void draw(Drawing dr){
+    drawBorder(dr);
+
+    dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
+  }
+}
 
 class SelectionManager(T : Cell){ // SelectionManager ///////////////////////////////////////////////
 

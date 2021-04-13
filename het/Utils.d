@@ -2671,6 +2671,8 @@ auto getSymbolNamesByUDA(T, string uda)(){
   return res;
 }*/
 
+enum SameType(A, B) = is(Unqual!A == Unqual!B);
+
 template getUDA(alias a, U){
   enum u = q{ getUDAs!(a, U)[$-1] };
     static if(hasUDA!(a, U) && !is(mixin(u)))
@@ -2680,7 +2682,7 @@ template getUDA(alias a, U){
 }
 
 ///helper templates to get all the inherited class fields, works for structs as well
-template AllClasses(T){
+template AllClasses(T){         //todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
        static if(is(T == Object)) alias AllClasses = AliasSeq!();
   else static if(is(T == class )) alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
   else                            alias AllClasses = T;
@@ -2709,6 +2711,21 @@ string[] getEnumMembers(T)(){
   static if(is(T == enum)) return [__traits(allMembers, T)];
   else return [];
 }
+
+
+auto getStaticParamDef(T, Args...)(in T def, in Args args){
+  Unqual!T res = def;
+  static foreach(a; args) static if(__traits(compiles, res = a)) return a;
+  return res;
+}
+
+auto getStaticParam(T, Args...)(in Args args){
+  Unqual!T res;
+  static foreach(a; args) static if(__traits(compiles, res = a)) return a;
+  static assert("Can't find required param: "~T.stringof);
+}
+
+enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0;
 
 
 alias toAlias(alias T) = T;

@@ -530,27 +530,53 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
   TestSliders(SliderStyle.slider, [EnumMembers!SliderOrientation]);
   TestSliders(SliderStyle.scrollBar, [SliderOrientation.horz, SliderOrientation.vert]);
 
-  Row({
+  Row(YAlign.top, {
+    flags.yAlign = YAlign.top;
     immutable scrollStates = ["off", "on", "auto"];
-    static hs = 1, vs = 1, wrap=false;
-    Row({
-      Text("flags.hScrollState"); BtnRow(hs, scrollStates); Spacer;
-      Text("flags.vScrollState"); BtnRow(vs, scrollStates); Spacer;
-      ChkBox(wrap, "flag.canWrap");
+    static hs=1, vs=1, ww=false, aw=false, ah=false;
+    Column({
+      Row({ Text("hFlowConfig \t");
+        auto f = getHFlowConfig(aw, ww, cast(ScrollState)hs);
+        if(BtnRow(f)) switch(f){
+          case FlowConfig.autoSize   : aw = true;                               break;
+          case FlowConfig.wrap       : aw = false; ww = true;                   break;
+          case FlowConfig.noScroll   : aw = ww = false; hs = ScrollState.off;   break;
+          case FlowConfig.scroll     : aw = ww = false; hs = ScrollState.on;    break;
+          case FlowConfig.autoScroll : aw = ww = false; hs = ScrollState.auto_; break;
+          default:
+        }
+      });
+      Row({ Text("vFlowConfig \t");
+        auto f = getVFlowConfig(ah, cast(ScrollState)vs).text;
+        if(BtnRow(f, [FlowConfig.autoSize, FlowConfig.noScroll, FlowConfig.scroll, FlowConfig.autoScroll].map!text.array)) switch(f.to!FlowConfig){
+          case FlowConfig.autoSize   : ah = true;                          break;
+          case FlowConfig.noScroll   : ah = false; vs = ScrollState.off;   break;
+          case FlowConfig.scroll     : ah = false; vs = ScrollState.on;    break;
+          case FlowConfig.autoScroll : ah = false; vs = ScrollState.auto_; break;
+          default:
+        }
+      });
+      HR;
+      ChkBox(aw, "autoWidth");
+      ChkBox(ww, "wordWrap");
+      Row({ Text("hScrollState \t"); BtnRow(hs, scrollStates); });
+      HR;
+      ChkBox(ah, "autoHeight");
+      Row({ Text("vScrollState \t"); BtnRow(vs, scrollStates); });
     });
-    Text("\n");
-    foreach(i; 0..3) Row({
+    foreach(str; ["a", "abcdefg", "a\nb\nc", "abscefg\nABCDEF\n12345"]) Row({
       border = "1 normal silver";
       margin = "2";
-      width = 144; height = 144;
+      if(!aw) width  = 128;
+      if(!ah) height = 128;
       with(flags){
         clipChildren = true;
         hScrollState = cast(ScrollState)hs;
         vScrollState = cast(ScrollState)vs;
-        canWrap = wrap;
+        wordWrap = ww;
       }
       fh = 72;
-      Text(["abscefg\nABCDEF\n12345", "a\nb\nc", "abcdefg"][i]);
+      Text(str);
     });
   });
 
