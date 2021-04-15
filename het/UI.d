@@ -1007,8 +1007,8 @@ struct im{ static:
     theme = "";
 
     root = [];
-    stack = [];
-    push!(.Container)(null, 0); //null meaning -> root[] is the container
+    stack = [StackEntry(null, 0, enabled, textStyle, theme)];
+    actContainer = null;
 
     overlayDrawings.clear;
 
@@ -1021,10 +1021,15 @@ struct im{ static:
   }
 
   private void push(T : .Container)(T c, uint newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
-    stack ~= StackEntry(c, [newId].xxh(baseId), enabled, textStyle, theme);
+    newId = [newId].xxh(baseId);
+    c.id = newId;
+    stack ~= StackEntry(c, newId, enabled, textStyle, theme);
 
     //actContainer is the top of the stack or null
     actContainer = c;
+  }
+
+  private void pushNull(){
   }
 
   private void pop(){
@@ -2389,7 +2394,7 @@ struct im{ static:
       mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed);
     }
 
-    static bool handleKeyboard(ref float nPos, in range range_, float pageSize){
+    bool handleKeyboard(ref float nPos, in range range_, float pageSize){
       bool userModified;
 
       void set(float n){
@@ -2402,8 +2407,11 @@ struct im{ static:
         set(nPos + nStep *scale);
       }
 
-      if(inputs.Left.repeated  || inputs.Down.repeated) delta(-1);     //todo: ha ismert az irany, akkor csak azok a gombok menjenek!
-      if(inputs.Right.repeated || inputs.Up.repeated  ) delta( 1);
+      const horz = drawn_orientation != SliderOrientation.vert, // round knobs are working for both
+            vert = drawn_orientation != SliderOrientation.horz;
+
+      if(horz && inputs.Left.repeated  || vert && inputs.Down.repeated) delta(-1);
+      if(horz && inputs.Right.repeated || vert && inputs.Up.repeated  ) delta( 1);
       if(inputs.PgDn.repeated)                          delta(-pageSize);
       if(inputs.PgUp.repeated)                          delta( pageSize);
       if(inputs.Home.down)                              set(0);
@@ -2463,7 +2471,6 @@ struct im{ static:
 
     //todo: shift precise mode: must use float knob position to improve the precision
 
-    uint id;
     SliderOrientation orientation;
     SliderStyle sliderStyle;
     RGB bkColor, clLine, clThumb, clRuler;
@@ -2516,7 +2523,7 @@ struct im{ static:
           clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth);
           clLine =  mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth);
           clRuler = mix(bkColor, ts.fontColor, 0.5); //disable ruler for now
-          rulerSides = 3;
+          rulerSides = 3 *0;
         break;
         case SliderStyle.scrollBar:
           clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
@@ -2637,6 +2644,7 @@ struct im{ static:
         }
       }
 
+      drawDebug(dr);
     }
 
     // Draw Rulers
@@ -2729,7 +2737,7 @@ struct im{ static:
       float f = _range.denormalize(normValue);
       static if(isIntegral!V) f = round(f);
       value = f.to!V;
-      if(flipped) value = _range.max.to!V-value; // UNFLIP
+      if(flipped) value = (_range.max-value).to!V; // UNFLIP
     }
 
     //todo: what to return on from slider

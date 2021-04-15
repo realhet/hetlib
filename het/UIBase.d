@@ -10,7 +10,8 @@ import std.bitmanip: bitfields;
 
 //adjust the size of the original Tab character
 enum
-  VisualizeContainers      = 0,
+  VisualizeContainers      = 1,
+  VisualizeContainerIds    = 1,
   VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
@@ -1882,11 +1883,19 @@ void processElasticTabs(Cell[] rows, int level=0){
            delta = rightMostTabPos-(tab.outerRight);
 
       if(delta){
-        tab.innerWidth = tab.innerWidth + delta;
+        tab.innerWidth = tab.innerWidth + delta; //todo: after this, the flex width are fucked up.
 
         //todo: itt ha tordeles van, akkor ez szar.
-        foreach(g; row.subCells[tIdx+1..$]) g.outerPos.x += delta;
-//        row.innerWidth += delta;
+        float flexRatioSum = 0;
+        foreach(g; row.subCells[tIdx+1..$]){
+          g.outerPos.x += delta; //shift the cells
+          if(g.flex) flexRatioSum += g.flex;
+        }
+
+        if(flexRatioSum>0){
+          //WARN("flex and tab processing not implemented yet");
+          //todo: flex and tab processing
+        }
       }
 
       if(VisualizeTabColors){
@@ -1983,11 +1992,14 @@ struct Selection{ //selection of cells in a container.
 }+/
 
 enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
+
 enum ScrollState { off, on, autoOff, autoOn, auto_ = autoOff}
+
+bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, ScrollState.autoOn)>0; }
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b00_00_0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b00_00_00_0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2010,7 +2022,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     ScrollState   , "vScrollState"      , 2,
     bool          , "autoWidth"         , 1, // kinda readonly: It's set by Container in measure to outerSize!=0
     bool          , "autoHeight"        , 1, // later everything else can read it.
-    int           , ""                  , 5,
+    bool          , "hasHScrollBar"     , 1, // system manages this, not the user.
+    bool          , "hasVScrollBar"     , 1,
+    int           , ""                  , 3,
   ));
 
   //todo: setProps, mint a margin-nal
@@ -2026,13 +2040,22 @@ auto getHFlowConfig(in bool autoWidth, in bool wordWrap, in ScrollState hScroll)
          hScroll==ScrollState.on  ? FlowConfig.scroll : FlowConfig.autoScroll;
 }
 
+bool getEffectiveHScroll(in bool autoWidth, in bool wordWrap, in ScrollState hScroll) pure{
+  return !autoWidth && !wordWrap && hScroll.getEffectiveScroll;
+}
+
 auto getVFlowConfig(in bool autoHeight, in ScrollState vScroll) pure{
   return autoHeight ? FlowConfig.autoSize :
          vScroll==ScrollState.off ? FlowConfig.noScroll :
          vScroll==ScrollState.on  ? FlowConfig.scroll : FlowConfig.autoScroll;
 }
 
+bool getEffectiveVScroll(in bool autoHeight, in ScrollState vScroll) pure{
+  return !autoHeight && vScroll.getEffectiveScroll;
+}
+
 class Container : Cell { // Container ////////////////////////////////////
+  uint id; // Scrolling needs it. Also useful for debugging.
 
   private{
     Cell[] subCells_;
@@ -2087,14 +2110,27 @@ class Container : Cell { // Container ////////////////////////////////////
     void append(Cell[] a){ subCells_ ~= a; }
   }
 
-  protected auto getHFlowConfig(){ return .getHFlowConfig(flags.autoWidth , flags.wordWrap, flags.hScrollState); }
-  protected auto getVFlowConfig(){ return .getVFlowConfig(flags.autoHeight,                 flags.vScrollState); }
+  protected{
+    auto getHFlowConfig()      const { return .getHFlowConfig     (flags.autoWidth , flags.wordWrap, flags.hScrollState); }
+    auto getEffectiveHScroll() const { return .getEffectiveHScroll(flags.autoWidth , flags.wordWrap, flags.hScrollState); }
+    auto getVFlowConfig()      const { return .getVFlowConfig     (flags.autoHeight,                 flags.vScrollState); }
+    auto getEffectiveVScroll() const { return .getEffectiveVScroll(flags.autoHeight,                 flags.vScrollState); }
+  }
+
+  float calcContentWidth (){ return subCells.map!(c => c.outerRight ).maxElement(0); }
+  float calcContentHeight(){ return subCells.map!(c => c.outerBottom).maxElement(0); }
+  vec2  calcContentSize  (){ return vec2(calcContentWidth, calcContentHeight); }
+
+  protected void updateAutoSize(){
+    if(flags.autoWidth ) innerWidth  = calcContentWidth;
+    if(flags.autoHeight) innerHeight = calcContentWidth;
+  }
 
   /// this must overrided by every descendant. Its task is to measure and then place all the subcells.
+  /// must update innerSize is autoWidth or autoHeight is specified.
   void rearrange(){
     measureSubCells;
-    if(flags.autoWidth ) innerWidth  = subCells.map!(c => c.outerRight ).maxElement(0);
-    if(flags.autoHeight) innerHeight = subCells.map!(c => c.outerBottom).maxElement(0);
+    updateAutoSize;
   }
 
   final void measure(){
@@ -2103,39 +2139,76 @@ class Container : Cell { // Container ////////////////////////////////////
       flags.autoHeight = outerSize.y==0;
     }
 
-    rearrange;
+    const hFlow = getHFlowConfig, vFlow = getVFlowConfig, maxFlow = max(hFlow, vFlow);
 
-    updateScrollState(flags.autoWidth, flags.autoHeight);
+    flags.hasHScrollBar = false;
+    flags.hasVScrollBar = false;
+
+    if(maxFlow<=FlowConfig.noScroll){ //very simple case with no scrolling, only autoSizing and wordWrapping
+      rearrange;
+    }else{ //scr9ollbars are a possibility from here
+
+      const scrollThickness = 15,
+            e = 1; //minimum area that must remain after the scrollbar.
+
+      bool alloc(char o)(){
+        auto size = innerSize;
+        static if(o=='H') if(size.x>=e && (size.y>=scrollThickness+e || vFlow==FlowConfig.autoSize) && !flags.hasHScrollBar){
+          flags.hasHScrollBar = true;
+          if(vFlow!=FlowConfig.autoSize) outerSize.y -= scrollThickness;
+          return true;
+        }
+        static if(o=='V') if(size.y>=e && (size.y>=scrollThickness+e || hFlow==FlowConfig.autoSize) && !flags.hasVScrollBar){
+          flags.hasVScrollBar = true;
+          if(hFlow!=FlowConfig.autoSize) outerSize.x -= scrollThickness;
+          return true;
+        }
+        return false;
+      }
+
+      if(maxFlow<=FlowConfig.scroll){ // there can be scrollbars, but no autoScrollbars
+        if(hFlow==FlowConfig.scroll) alloc!'H';
+        if(vFlow==FlowConfig.scroll) alloc!'V';
+        rearrange;
+      }else{ // at least one axis is autoScroll, this is the most complicated case.
+        if(hFlow==FlowConfig.autoScroll && vFlow==FlowConfig.autoScroll){ // 2 auto scrollbars
+
+          rearrange;
+          const cs = calcContentSize;
+          if(cs.y>innerHeight){
+            if(cs.x>innerWidth){ //H&V overflow
+              alloc!'H'; alloc!'V';
+            }else{ //V overflow
+              if(alloc!'V' && cs.x > innerWidth) alloc!'H'; //possivle H overflow because of VScrollBar
+            }
+          }else{
+            if(cs.x>innerWidth){ //H overflow
+              if(alloc!'H' && cs.y > innerHeight) alloc!'V'; //possivle V overflow because of HScrollBar
+            }
+          }
+
+        }else if(hFlow==FlowConfig.autoScroll){ //only auto hscroll
+          if(vFlow==FlowConfig.scroll) alloc!'V'; //alloc fixed if needed
+          rearrange;
+          if(calcContentWidth > innerWidth) alloc!'H';
+        }else{ //only auto vscroll
+          if(hFlow==FlowConfig.scroll) alloc!'H'; //alloc fixed if needed
+          rearrange;
+          if(calcContentHeight > innerHeight){
+            if(alloc!'V' && hFlow==FlowConfig.wrap){
+              rearrange;
+              //if(!flags.hasHScrollBar && calcContentWidth > innerWidth) alloc!'H';
+            }
+          }
+        }
+      }
+
+      //restore size after rearrange. (Autosize wont subtract the scrollbarthickness, so it will be added here as an extra.)
+      if(flags.hasHScrollBar) outerSize.y += scrollThickness;
+      if(flags.hasVScrollBar) outerSize.x += scrollThickness;
+    }
 
     flags._measured = true;
-  }
-
-  //must be called from the end of measyure_impl.
-  protected void updateScrollState(bool autoWidth, bool autoHeight){
-    auto contentSize = vec2(subCells.map!(c => c.outerRight ).maxElement(0),
-                            subCells.map!(c => c.outerBottom).maxElement(0));
-
-    bool hScrollNeeded, vScrollNeeded;
-    if(autoWidth ) innerWidth  = contentSize.x; else hScrollNeeded = innerWidth  < contentSize.x ;
-    if(autoHeight) innerHeight = contentSize.y; else vScrollNeeded = innerHeight < contentSize.y;
-
-    //update automatic scrollState and make needScroll values consequent with them.
-    with(ScrollState){
-      static foreach(ch; "hv") mixin(q{
-        if     (flags.*ScrollState==autoOff &&  *ScrollNeeded) flags.*ScrollState = autoOn;
-        else if(flags.*ScrollState==autoOn  && !*ScrollNeeded) flags.*ScrollState = autoOff;
-        *ScrollNeeded = flags.*ScrollState.among(autoOn, on)>0;
-      }.replace('*', ch));
-
-    }
-
-    /*if(flags.wordWrap && vScrollNeeded){
-      //ez problema, ujra kell tordelni.
-    } */
-
-
-    if(vScrollNeeded || hScrollNeeded){
-    }
   }
 
   protected void measureSubCells(){
@@ -2206,23 +2279,49 @@ class Container : Cell { // Container ////////////////////////////////////
       dr.alpha = 1;
     }
 
+    {
+      const hs = flags.hasHScrollBar, vs = flags.hasVScrollBar;
+      if(hs || vs){
+        dr.lineWidth = -15; dr.alpha = .5f;
+        dr.color = clFuchsia;
+        auto b = bounds2(vec2(0), innerSize).inflated(-8);
+        if(hs && vs){ //both
+          dr.line2(b.bottomLeft, b.bottomRight, b.topRight);
+        }else if(hs){ //horz only
+          dr.line2(b.bottomLeft, b.bottomRight);
+        }else{ //vert only
+          dr.line2(b.topRight, b.bottomRight);
+        }
+        dr.alpha = 1;
+      }
+    }
+
     if(useClipBounds) dr.popClipBounds;
     dr.pop;
 
     drawBorder(dr); //border is the last
 
+    drawDebug(dr);
+  }
+
+  void drawDebug(Drawing dr){
     if(VisualizeContainers){
       if(cast(Column)this){ dr.color = clRed; }
       else if(cast(Row)this){ dr.color = clBlue; }
-      else dr.color = clGray;
+      else dr.color = clLime;
 
       dr.lineWidth = 1;
       dr.lineStyle = LineStyle.normal;
       dr.drawRect(outerBounds.inflated(-1.5));
     }
 
-
+    if(VisualizeContainerIds){
+      dr.fontHeight = 14;
+      dr.color = clFuchsia;
+      dr.textOut(outerPos+vec2(3), format!"%-8X"(id));
+    }
   }
+
 
 // these can mixed in
 
@@ -2552,7 +2651,7 @@ class Column : Container { // Column ////////////////////////////////////
     if(flags.autoWidth){
       //measure maxWidth
       measureSubCells;
-      innerWidth = subCells.map!"a.outerWidth".maxElement(0);
+      innerWidth = calcContentWidth;
 
       //at this point all the subCells are measured
       //now set the width of every subcell in this column if it differs, and remeasure only when necessary
@@ -2591,6 +2690,8 @@ class Column : Container { // Column ////////////////////////////////////
     }
 
     subCells.spreadV;
+
+    if(flags.autoHeight) innerHeight = calcContentHeight;
   }
 }
 
