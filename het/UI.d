@@ -543,7 +543,7 @@ struct im{ static:
     canDraw = false;
 
     im.reset;
-    hitTestManager.initFrame;
+    //this goes into endFrame, so the latest hit data will be accessible more early. hitTestManager.initFrame;
 
     //clear last frame's object references
     focusedState.container = null;
@@ -573,7 +573,10 @@ struct im{ static:
 
     const screenBounds = targetSurfaces[1].view.clipBounds;
 
-    applyScrollers(screenBounds);
+    //todo: remove this: applyScrollers(screenBounds);
+
+    hScrollInfo.createBars(true);
+    vScrollInfo.createBars(true);
 
     popupState.doAlign;
 
@@ -595,6 +598,9 @@ struct im{ static:
         break; //got a hit, so escape now
       }
     }
+
+    //all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
+    hitTestManager.nextFrame;
 
     //clicking away from popup closes the popup
     if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
@@ -1205,6 +1211,107 @@ struct im{ static:
   string symbol(string def){ return tag(`symbol `~def); }
   void Symbol(string def){ Text(symbol(def)); }
 
+  struct ScrollInfo{ // ------------------------------- ScrollInfo //////////////////////////////
+    char orientation;
+
+    struct ScrollInfoRec{
+      uint id;
+      .Container container; //contains id
+      uint lastAccess; //to purge the old ones
+
+      //current parameters for the scrollbar
+      float contentSize=0, pageSize=0; //only valid if container has the has[H/V]ScrollBar flag.
+
+      //persistent data
+      float offset=0;
+      im.SliderClass slider;
+    }
+
+    protected ScrollInfoRec[uint] infos;
+
+    auto getScrollBar(uint id){
+      if(auto p = id in infos) return (*p).slider; else return null;
+    }
+
+    //1. called from measure() when it decided the scrollbars needed
+    auto update(.Container container, float contentSize, float pageSize)
+    in(container)
+    in(container.id)
+    {
+      infos.findAdd(container.id, (ref ScrollInfoRec info){
+        info.container   = container;
+        info.id          = container.id;
+        info.contentSize = contentSize;
+        info.pageSize    = pageSize;
+        info.lastAccess  = global_UpdateTick;
+      });
+    }
+
+    //optional
+    /*void purge(){  createBars has it.
+      uint[] toRemove;
+      foreach(k, const v; infos) if(v.lastAccess < global_updateTick) toRemove ~= k;
+      foreach(k; toRemove) infos.remove(k);
+      //opt: assocArray.rehash test
+    }*/
+
+    //todo: IDE: nicer error display, and autoSolve: "undefined identifier `global_updateTick`, did you mean variable `global_UpdateTick`?"
+
+    //2. called after measure when the final local positions are known. It creates the bars if needed and registers them with hitTestManager
+    void createBars(bool doPurge){
+      assert(orientation.among('H', 'V'));
+
+      uint[] toRemove;
+      foreach(id, ref info; infos){
+        if(info.lastAccess<global_UpdateTick){
+          if(doPurge) toRemove ~= id;
+          continue;
+        }
+        const exists = (orientation=='H' && info.container.flags.hasHScrollBar)
+                    || (orientation=='V' && info.container.flags.hasVScrollBar);
+        if(!exists) continue;
+
+        bool enabled = true;
+        float normValue = 0.5f;
+
+        bool userModified;
+        HitInfo hit;
+        auto actView = targetSurfaces[1].view; //todo: scrollbars only work on GUI surface
+        auto sl = new SliderClass(info.container.id^(0x84389040+orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos, tsNormal, hit,
+          orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1);
+
+        info.slider = sl;
+
+        //set the position of the slider.
+        //todo: Because it's after hitTest, interaction will be delayed for 1 frame. But it should not.
+        const scrollThickness = 15; //todo: this is duplicated!!!
+        if(orientation=='H'){
+          sl.outerPos = vec2(0, info.container.innerHeight-scrollThickness);
+          sl.outerSize = vec2(info.container.innerWidth, scrollThickness);
+        }else{
+          sl.outerPos = vec2(info.container.innerWidth-scrollThickness, 0);
+          sl.outerSize = vec2(scrollThickness, info.container.innerHeight);
+        }
+
+        //todo: the hitInfo is for the last frame. It should be processed a bit later
+        if(userModified && enabled){
+          //process normValue
+        }
+      }
+
+      //purge old ones
+      foreach(id; toRemove) infos.remove(id);
+    }
+
+
+    void dump(){
+      print("-".replicate(40), orientation.to!string.lc~"ScrollInfo dump");
+      infos.values.each!print;
+    }
+  }
+
+  auto hScrollInfo = ScrollInfo('H');
+  auto vScrollInfo = ScrollInfo('V');
 
   void Column(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Column //////////////////////////////
     auto column = new .Column;
@@ -2466,7 +2573,7 @@ struct im{ static:
 
   SliderState sliderState;
 
-  private class SliderClass : .Container {
+  class SliderClass : .Container {
     //note: must be a Container because hitTest works on Containers only.
 
     //todo: shift precise mode: must use float knob position to improve the precision
@@ -2543,7 +2650,7 @@ struct im{ static:
     }
 
     override bounds2 getHitBounds(){
-      return innerBounds;
+      return outerBounds;
     }
 
     private void drawThumb(Drawing dr, vec2 a, vec2 t){

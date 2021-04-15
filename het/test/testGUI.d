@@ -602,7 +602,7 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
 
   bounds2 lastWorkArea;
-  bool showFPS;
+  bool showFPS=true;
 
   Category category = Category.Sliders;
 

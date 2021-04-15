@@ -9,7 +9,7 @@ pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 
 public import het.utils, het.geometry, het.inputs;
 
-__gshared int global_UpdateTick; //counts in every update cycle
+__gshared uint global_UpdateTick; //counts in every update cycle
 __gshared size_t global_TPSCnt; //texture upload bytes
 __gshared int TPS; //texture upload/sec MB
 

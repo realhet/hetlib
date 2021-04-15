@@ -6,12 +6,14 @@ import het.utils, het.geometry, het.draw2d, het.bitmap, het.win, het.opengl,
 
 import std.bitmanip: bitfields;
 
+import het.ui : im; //todo: bad crosslink for scrollInfo
+
 // enums/constants ///////////////////////////////////////
 
 //adjust the size of the original Tab character
 enum
-  VisualizeContainers      = 1,
-  VisualizeContainerIds    = 1,
+  VisualizeContainers      = 0,
+  VisualizeContainerIds    = 0,
   VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
@@ -244,7 +246,7 @@ struct HitTestManager{
     }
   }
 
-  void initFrame(){
+  void nextFrame(){
     cellHashMap.clear;
     lastHitStack = hitStack.dup;
     hitStack.clear;
@@ -1969,28 +1971,6 @@ void processElasticTabs(WrappedLine[] rows, int level=0){
 }
 
 
-
-/*int opCmp(in TextPoint a, in TextPoint b){   //b-a
-  auto l = b.line-a.line;
-  return l ? l : b.col-a.col;
-}*/
-
-// Selection struct //
-/+
-struct Selection{ //selection of cells in a container.
-  TextPoint[2][] sel; //s[0]==s[1] -> it's a caret.  s[0]>s[1]: nothing,  s[0]<s[1]: selection
-
-  void clear(){ sel = []; }
-
-/*todo:  bool isSelected(in TextPoint i){ //is a cell selected?
-    return sel.map!(s => s[0]<=i && i<s[1]).any;
-  }
-
-  bool isCaret(in TextPoint i){ //is there a caret on the left?
-    return sel.map!(s => s[0]==i && s[0]==s[1]).any;
-  }*/
-}+/
-
 enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
 
 enum ScrollState { off, on, autoOff, autoOn, auto_ = autoOff}
@@ -2056,6 +2036,9 @@ bool getEffectiveVScroll(in bool autoHeight, in ScrollState vScroll) pure{
 
 class Container : Cell { // Container ////////////////////////////////////
   uint id; // Scrolling needs it. Also useful for debugging.
+
+  auto getHScrollBar(){ return flags.hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; }
+  auto getVScrollBar(){ return flags.hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; }
 
   private{
     Cell[] subCells_;
@@ -2139,6 +2122,7 @@ class Container : Cell { // Container ////////////////////////////////////
       flags.autoHeight = outerSize.y==0;
     }
 
+    // detect scrollbars
     const hFlow = getHFlowConfig, vFlow = getVFlowConfig, maxFlow = max(hFlow, vFlow);
 
     flags.hasHScrollBar = false;
@@ -2148,17 +2132,20 @@ class Container : Cell { // Container ////////////////////////////////////
       rearrange;
     }else{ //scr9ollbars are a possibility from here
 
+      //opt: cache calcContentSize. It is called too much
+      //opt: rearrange should optionally return contentSize
+
       const scrollThickness = 15,
             e = 1; //minimum area that must remain after the scrollbar.
 
       bool alloc(char o)(){
-        auto size = innerSize;
+        const size = innerSize;
         static if(o=='H') if(size.x>=e && (size.y>=scrollThickness+e || vFlow==FlowConfig.autoSize) && !flags.hasHScrollBar){
           flags.hasHScrollBar = true;
           if(vFlow!=FlowConfig.autoSize) outerSize.y -= scrollThickness;
           return true;
         }
-        static if(o=='V') if(size.y>=e && (size.y>=scrollThickness+e || hFlow==FlowConfig.autoSize) && !flags.hasVScrollBar){
+        static if(o=='V') if(size.y>=e && (size.x>=scrollThickness+e || hFlow==FlowConfig.autoSize) && !flags.hasVScrollBar){
           flags.hasVScrollBar = true;
           if(hFlow!=FlowConfig.autoSize) outerSize.x -= scrollThickness;
           return true;
@@ -2193,7 +2180,7 @@ class Container : Cell { // Container ////////////////////////////////////
           if(calcContentWidth > innerWidth) alloc!'H';
         }else{ //only auto vscroll
           if(hFlow==FlowConfig.scroll) alloc!'H'; //alloc fixed if needed
-          rearrange;
+          rearrange;    //opt: this rearrange can exit early when the wordWrap and contentheight becomes too much.
           if(calcContentHeight > innerHeight){
             if(alloc!'V' && hFlow==FlowConfig.wrap){
               rearrange;
@@ -2204,8 +2191,14 @@ class Container : Cell { // Container ////////////////////////////////////
       }
 
       //restore size after rearrange. (Autosize wont subtract the scrollbarthickness, so it will be added here as an extra.)
-      if(flags.hasHScrollBar) outerSize.y += scrollThickness;
-      if(flags.hasVScrollBar) outerSize.x += scrollThickness;
+      if(flags.hasHScrollBar){
+        outerSize.y += scrollThickness;
+        im.hScrollInfo.update(this, calcContentWidth, innerWidth);
+      }
+      if(flags.hasVScrollBar){
+        outerSize.x += scrollThickness;
+        im.vScrollInfo.update(this, calcContentHeight, innerHeight);
+      }
     }
 
     flags._measured = true;
@@ -2217,9 +2210,14 @@ class Container : Cell { // Container ////////////////////////////////////
 
   override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     if(super.internal_hitTest(mouse, ofs)){
-      ofs += innerPos;
-      foreach(sc; subCells) sc.internal_hitTest(mouse, ofs); //recursive
       flags.hovered = true;
+
+      ofs += innerPos;
+
+      if(auto vb = getVScrollBar) if(vb.internal_hitTest(mouse, ofs)) return true;
+      if(auto hb = getHScrollBar) if(hb.internal_hitTest(mouse, ofs)) return true;
+
+      foreach_reverse(sc; subCells) if(sc.internal_hitTest(mouse, ofs)) return true; //recursive
       return true;
     }else{
       flags.hovered = false;
@@ -2282,17 +2280,17 @@ class Container : Cell { // Container ////////////////////////////////////
     {
       const hs = flags.hasHScrollBar, vs = flags.hasVScrollBar;
       if(hs || vs){
-        dr.lineWidth = -15; dr.alpha = .5f;
-        dr.color = clFuchsia;
-        auto b = bounds2(vec2(0), innerSize).inflated(-8);
-        if(hs && vs){ //both
-          dr.line2(b.bottomLeft, b.bottomRight, b.topRight);
-        }else if(hs){ //horz only
-          dr.line2(b.bottomLeft, b.bottomRight);
-        }else{ //vert only
-          dr.line2(b.topRight, b.bottomRight);
+        if(auto hBar = getHScrollBar) hBar.draw(dr);  //todo: getHScrollBar?.draw(gl);
+        if(auto vBar = getVScrollBar) vBar.draw(dr);
+
+        if(0){ //simple visualization
+          dr.lineWidth = -15; dr.alpha = .5f;
+          dr.color = clFuchsia;
+          auto b = bounds2(vec2(0), innerSize).inflated(-8);
+          if(hs) dr.line2(b.bottomLeft, b.bottomRight);
+          if(vs) dr.line2(b.topRight, b.bottomRight);
+          dr.alpha = 1;
         }
-        dr.alpha = 1;
       }
     }
 

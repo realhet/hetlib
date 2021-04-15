@@ -1271,6 +1271,19 @@ T popLast (T)(ref T[] arr){ auto res = arr[$-1]; arr = arr[0..$-1]; return res; 
 T popFirst(T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popFirst(arr); }
 T popLast (T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popLast (arr); }
 
+/// My version of associativeArray.update: Makes sur the thing is exists and lets it to modify. Returns true if already found.
+bool findAdd(K, V)(ref V[K] aa, in K key, void delegate(ref V) update){
+  auto p = key in aa;
+  if(p){
+    update(*p);
+    return true;
+  }else{
+    V value;
+    update(value);
+    aa[key] = value;
+    return false;
+  }
+}
 
 //converts an array to uint[], badding the end with a specified byte. ByteOrder is machine specific.
 uint[] toUints(in void[] data, ubyte filler=0){

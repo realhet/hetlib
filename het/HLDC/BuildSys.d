@@ -259,7 +259,7 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workP
 //////////////////////////////////////////////////////////////////////////////
 
 immutable
-  versionStr = "1.03",
+  versionStr = "1.04",
   mainHelpStr =  //todo: ehhez edditort csinalni az ide-ben
   "\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC2\33\7 compiler.
 by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
@@ -958,22 +958,39 @@ private: //current build
 
     foreach(ref line; cmdLines) makeLdc2CompatibleArgs(line);
 
+    logln;logln(bold("COMPILE COMMANDS:"));
+    foreach(line; cmdLines) logln(joinCommandLine(line));
+    logln;
+
 //////////////////////////////////////////////////////////////////////////////////////
 
     string[] sOutputs;
-    int res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
-      logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
+    int res;
 
-      // storing obj into objCache
-      if(isIncremental && result==0){
-        auto srcFn = srcFiles[idx];
-        auto objFn = objFileOf(srcFn);
-        objCache[findModule(srcFn).objHash] = objFn.forcedRead;
-      }
+    try{
+      log(bold("Compiling: "));
+      res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
 
-      return result == 0; //break if any error
-    });
-    logln;
+        //logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
+        log(" \33#*\33\7 ".replace("#", result ? "\14" : "\12").replace("*", srcFiles[idx].name));
+
+        // storing obj into objCache
+        if(isIncremental && result==0){
+          auto srcFn = srcFiles[idx];
+          auto objFn = objFileOf(srcFn);
+          objCache[findModule(srcFn).objHash] = objFn.forcedRead;
+        }
+
+        return result == 0; //break if any error
+      });
+      logln;
+      logln;
+    }catch(Exception e){
+      logln;
+      logln("exception at spawnProcessMulti2()");
+      logln(e);
+      throw e;
+    }
 
     //postprocess the combined error log
     string sOutput;
