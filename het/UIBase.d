@@ -28,7 +28,10 @@ immutable DefaultFontName = //this is the cached font
 
 immutable
   NormalFontHeight = 18,  //fucking keep it on 18!!!!
-  InvNormalFontHeight = 1.0f/NormalFontHeight;
+  InvNormalFontHeight = 1.0f/NormalFontHeight,
+
+  MinScrollThumbSize = 4, //pixels
+  DefaultScrollThickness = 15; //pixels
 
 enum
   InternalTabScale = 0.12f/2,  //around 0.15 for programming
@@ -583,7 +586,7 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 const
       clChapter                 = RGB(221,   3,  48),
       clAccent                  = RGB(0  , 120, 215),
-      clMenuBk                  = RGB(240, 240, 241),
+      clMenuBk                  = RGB(235, 235, 236),
       clMenuHover               = RGB(222, 222, 222),
       clLink                    = RGB(0  , 120, 215),
 
@@ -613,7 +616,12 @@ const
       clSliderThumbHover        = RGB(23, 23, 23),
       clSliderThumbPressed      = clWinBtn,
       clSliderHintBorder        = clMenuBk,
-      clSliderHintBk            = clWinBtn;
+      clSliderHintBk            = clWinBtn,
+
+      clScrollBk                = clMenuBk,
+      clScrollThumb             = clWinBtn,
+      clScrollThumbPressed      = clWinBtnPressed;
+
 
 void initTextStyles(){
 
@@ -2039,6 +2047,9 @@ class Container : Cell { // Container ////////////////////////////////////
 
   auto getHScrollBar(){ return flags.hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; }
   auto getVScrollBar(){ return flags.hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; }
+  auto getHScrollOffset(){ return flags.hasHScrollBar ? im.hScrollInfo.getScrollOffset(id) : 0; }
+  auto getVScrollOffset(){ return flags.hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; }
+  auto getScrollOffset(){ return vec2(getHScrollOffset, getVScrollOffset); }
 
   private{
     Cell[] subCells_;
@@ -2135,7 +2146,7 @@ class Container : Cell { // Container ////////////////////////////////////
       //opt: cache calcContentSize. It is called too much
       //opt: rearrange should optionally return contentSize
 
-      const scrollThickness = 15,
+      const scrollThickness = DefaultScrollThickness,
             e = 1; //minimum area that must remain after the scrollbar.
 
       bool alloc(char o)(){
@@ -2208,14 +2219,28 @@ class Container : Cell { // Container ////////////////////////////////////
     foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure; //recursive in the front
   }
 
+  protected auto getScrollResizeBounds(in Cell hb, in Cell vb) const {
+    return bounds2(vb.outerPos.x, hb.outerPos.y, innerWidth, innerHeight);
+  }
+
   override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     if(super.internal_hitTest(mouse, ofs)){
       flags.hovered = true;
 
       ofs += innerPos;
 
-      if(auto vb = getVScrollBar) if(vb.internal_hitTest(mouse, ofs)) return true;
-      if(auto hb = getHScrollBar) if(hb.internal_hitTest(mouse, ofs)) return true;
+      auto hb = getHScrollBar, vb = getVScrollBar;
+      if(vb) if(vb.internal_hitTest(mouse, ofs)) return true;
+      if(hb) if(hb.internal_hitTest(mouse, ofs)) return true;
+      if(vb&&hb){
+        const bnd = getScrollResizeBounds(hb, vb);
+        if(bnd.contains!"[)"(mouse-ofs)){
+          //todo: resizeButton area between 2 scrollBars. It is now just ignored.
+          return true;
+        }
+      }
+
+      ofs -= getScrollOffset;
 
       foreach_reverse(sc; subCells) if(sc.internal_hitTest(mouse, ofs)) return true; //recursive
       return true;
@@ -2230,7 +2255,7 @@ class Container : Cell { // Container ////////////////////////////////////
     auto res = super.contains(p, ofs);
 
     if(res.length){
-      ofs += innerPos;
+      ofs += innerPos - getScrollOffset;
       foreach(sc; subCells){
         auto act = sc.contains(p, ofs);
         if(act.length){
@@ -2259,9 +2284,14 @@ class Container : Cell { // Container ////////////////////////////////////
 
     if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
 
+    const scrollOffset = getScrollOffset,
+          hasScrollOffset = !isnull(scrollOffset);
+
     dr.translate(innerPos);
     const useClipBounds = flags.clipChildren;
     if(useClipBounds) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
+
+    if(hasScrollOffset) dr.translate(-scrollOffset);
 
     foreach(sc; subCells){
       sc.draw(dr); //recursive
@@ -2277,19 +2307,18 @@ class Container : Cell { // Container ////////////////////////////////////
       dr.alpha = 1;
     }
 
-    {
-      const hs = flags.hasHScrollBar, vs = flags.hasVScrollBar;
-      if(hs || vs){
-        if(auto hBar = getHScrollBar) hBar.draw(dr);  //todo: getHScrollBar?.draw(gl);
-        if(auto vBar = getVScrollBar) vBar.draw(dr);
+    if(hasScrollOffset) dr.pop;
 
-        if(0){ //simple visualization
-          dr.lineWidth = -15; dr.alpha = .5f;
-          dr.color = clFuchsia;
-          auto b = bounds2(vec2(0), innerSize).inflated(-8);
-          if(hs) dr.line2(b.bottomLeft, b.bottomRight);
-          if(vs) dr.line2(b.topRight, b.bottomRight);
-          dr.alpha = 1;
+    {
+      auto hb = getHScrollBar, vb = getVScrollBar;
+      if(hb || vb){
+        if(hb) hb.draw(dr);  //todo: getHScrollBar?.draw(gl);
+        if(vb) vb.draw(dr);
+
+        if(hb&&vb){
+          const bnd = getScrollResizeBounds(hb, vb);
+          dr.color = clScrollBk;
+          dr.fillRect(bnd);
         }
       }
     }

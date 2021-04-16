@@ -118,7 +118,11 @@ class Executor{
 
   void kill(){
     if(isRunning){
-      std.process.kill(pid);
+      try{
+        std.process.kill(pid);
+      }catch(Exception e){
+        WARN(extendExceptionMsg(e.text)); //sometimes it gives "Access is denied.", maybe because it's already dead, so just ignore.
+      }
       result = -1;
       output = "Error: Process has been killed.";
       pid = null;
@@ -967,30 +971,23 @@ private: //current build
     string[] sOutputs;
     int res;
 
-    try{
-      log(bold("Compiling: "));
-      res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
+    log(bold("Compiling: "));
+    res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
 
-        //logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
-        log(" \33#*\33\7 ".replace("#", result ? "\14" : "\12").replace("*", srcFiles[idx].name));
+      //logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
+      log(" \33#*\33\7 ".replace("#", result ? "\14" : "\12").replace("*", srcFiles[idx].name));
 
-        // storing obj into objCache
-        if(isIncremental && result==0){
-          auto srcFn = srcFiles[idx];
-          auto objFn = objFileOf(srcFn);
-          objCache[findModule(srcFn).objHash] = objFn.forcedRead;
-        }
+      // storing obj into objCache
+      if(isIncremental && result==0){
+        auto srcFn = srcFiles[idx];
+        auto objFn = objFileOf(srcFn);
+        objCache[findModule(srcFn).objHash] = objFn.forcedRead;
+      }
 
-        return result == 0; //break if any error
-      });
-      logln;
-      logln;
-    }catch(Exception e){
-      logln;
-      logln("exception at spawnProcessMulti2()");
-      logln(e);
-      throw e;
-    }
+      return result == 0; //break if any error
+    });
+    logln;
+    logln;
 
     //postprocess the combined error log
     string sOutput;

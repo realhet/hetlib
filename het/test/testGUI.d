@@ -518,6 +518,8 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
 
   void TestSliders(SliderStyle sliderStyle, SliderOrientation[] orientations){
     Row({ padding = "5";
+      flags.wordWrap = false;
+      flags.hScrollState = ScrollState.on;
       flags.yAlign = YAlign.top;
       Text(bold(sliderStyle.text), "\n");
       foreach(orientation; orientations) Column({
@@ -592,6 +594,7 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
         }
         fh = fonth;
         Text(str);
+        if(Btn("\U0001F327")) beep;
       });
     });
   });
@@ -602,7 +605,7 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
 class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////////
 
   bounds2 lastWorkArea;
-  bool showFPS=true;
+  bool showFPS=0;
 
   Category category = Category.Sliders;
 
@@ -633,6 +636,11 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     });
 
     with(im) Panel(PanelPosition.client, {
+      flags.vScrollState = ScrollState.on;
+      flags.hScrollState = ScrollState.on;
+      flags.wordWrap = false;
+      flags.clipChildren = true;
+
       UI_Category(category);
     });
 

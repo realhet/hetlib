@@ -663,7 +663,7 @@ struct im{ static:
   private bool isClientPosition(PanelPosition pp){ with(PanelPosition) return pp.inRange(topClient, bottomClient); } //it will change the client rect too
 
   private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area){ with(PanelPosition){
-    //flags.targetSurface is unknown at this point, check it later in 'finalize'
+    //flags.targetSurface is unknown at this point, will check it later in 'finalize'
     if     (pp.among(client, topClient, bottomClient)) cntr.outerWidth  = area.width ;
     else if(pp.among(client, leftClient, rightClient)) cntr.outerHeight = area.height;
   }}
@@ -691,7 +691,7 @@ struct im{ static:
         case bottomClient: area.bottom  -= cntr.outerHeight; cntr.outerPos = area.bottomLeft ; break;
         case leftClient  : cntr.outerPos = area.topLeft    ; area.left    += cntr.outerWidth ; break;
         case rightClient : area.right   -= cntr.outerWidth ; cntr.outerPos = area.topRight   ; break;
-        case client      : cntr.outerPos = area.topLeft    ; area = bounds2.init; break;
+        case client      : cntr.outerPos = area.topLeft    ; cntr.outerSize = area.size; area = bounds2.init; break;
         default: ERR("invalid PanelPosition");
       }
     }
@@ -1233,6 +1233,10 @@ struct im{ static:
       if(auto p = id in infos) return (*p).slider; else return null;
     }
 
+    auto getScrollOffset(uint id){ //opt: Should combine get offset and getScrollBar
+      if(auto p = id in infos) return (*p).offset; else return 0;
+    }
+
     //1. called from measure() when it decided the scrollbars needed
     auto update(.Container container, float contentSize, float pageSize)
     in(container)
@@ -1271,31 +1275,45 @@ struct im{ static:
                     || (orientation=='V' && info.container.flags.hasVScrollBar);
         if(!exists) continue;
 
-        bool enabled = true;
-        float normValue = 0.5f;
+        bool enabled;
+        float normValue;
+        float normThumbSize;
+        float activeRange = info.contentSize - info.pageSize;
+
+        const flip = orientation=='V';
+        void doFlip(){ if(flip) normValue = 1-normValue; }
+
+        if(activeRange > 0.001f){
+          enabled = true;
+          normValue = info.offset/activeRange;
+          normThumbSize = info.pageSize/info.contentSize;
+
+          doFlip;
+        }
 
         bool userModified;
         HitInfo hit;
-        auto actView = targetSurfaces[1].view; //todo: scrollbars only work on GUI surface
-        auto sl = new SliderClass(info.container.id^(0x84389040+orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos, tsNormal, hit,
-          orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1);
+        auto actView = targetSurfaces[1].view; //todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, just like the upcoming enabled flag.
+        auto sl = new SliderClass(info.container.id^(0x84389f40+orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos, tsNormal, hit,
+          orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1, normThumbSize);
 
         info.slider = sl;
 
         //set the position of the slider.
         //todo: Because it's after hitTest, interaction will be delayed for 1 frame. But it should not.
-        const scrollThickness = 15; //todo: this is duplicated!!!
-        if(orientation=='H'){
-          sl.outerPos = vec2(0, info.container.innerHeight-scrollThickness);
-          sl.outerSize = vec2(info.container.innerWidth, scrollThickness);
+        const scrollThickness = DefaultScrollThickness; //todo: this is duplicated!!!
+        with(info.container) if(orientation=='H'){
+          sl.outerPos = vec2(0, innerHeight-scrollThickness);
+          sl.outerSize = vec2(innerWidth-(flags.hasVScrollBar ? scrollThickness : 0), scrollThickness);
         }else{
-          sl.outerPos = vec2(info.container.innerWidth-scrollThickness, 0);
-          sl.outerSize = vec2(scrollThickness, info.container.innerHeight);
+          sl.outerPos = vec2(innerWidth-scrollThickness, 0);
+          sl.outerSize = vec2(scrollThickness, innerHeight-(flags.hasHScrollBar ? scrollThickness : 0));
         }
 
         //todo: the hitInfo is for the last frame. It should be processed a bit later
         if(userModified && enabled){
-          //process normValue
+          doFlip;
+          info.offset = normValue*activeRange;
         }
       }
 
@@ -2502,6 +2520,8 @@ struct im{ static:
     }
 
     bool handleKeyboard(ref float nPos, in range range_, float pageSize){
+      if(nPos.isnan) return false;
+
       bool userModified;
 
       void set(float n){
@@ -2528,6 +2548,8 @@ struct im{ static:
     }
 
     bool handleMouse(uint id, in HitInfo hit, ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt){
+      if(nPos.isnan) return false;
+
       bool userModified;
 
       if(hit.pressed && enabled){  //todo: enabled handling
@@ -2581,13 +2603,23 @@ struct im{ static:
     SliderOrientation orientation;
     SliderStyle sliderStyle;
     RGB bkColor, clLine, clThumb, clRuler;
-
     float baseSize; //this is calculated from current fontHeight and theme.
+    float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
     //these are the derived sizes
     float rulerOfs (){ return baseSize*0.5f; }
-    float lwThumb  (){ return baseSize*(1.0f/3); }
     float lwLine   (){ return baseSize*(2.0f/NormalFontHeight); }
     float lwRuler  (){ return lwLine*0.5f; }
+
+    /// this is the half thickness of the thumb in the active direction
+    float calcLwThumb  (SliderOrientation ori){
+      if(sliderStyle == SliderStyle.scrollBar && !isnan(normThumbSize)){
+        const minSizePixels = min(innerWidth, MinScrollThumbSize);
+        return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f;
+      }else{
+        return baseSize*(1.0f/3);
+      }
+    }
+
 
     int rulerDiv0 = 9, rulerDiv1 = 4;
     ubyte rulerSides=3;
@@ -2599,18 +2631,19 @@ struct im{ static:
 
     bool focused;
 
-    this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale){
+    this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init){
       this.id = id;
       this.orientation = orientation;
       this.sliderStyle = sliderStyle;
-      this.nPos = nPos_;
+      this.nPos = enabled ? nPos_ : float.init;
+      this.normThumbSize = normThumbSize;
 
       if(sliderStyle==SliderStyle.scrollBar) padding = "2";
 
       hit = im.hitTest(this, id, enabled);
       hitBounds = hit.hitBounds;
 
-      if(sliderStyle==SliderStyle.slider) focused = im.focusUpdate(this, id,
+      if(1 || sliderStyle==SliderStyle.slider) focused = im.focusUpdate(this, id,
         enabled,
         hit.pressed/* || manualFocus*/, //when to enter
         inputs["Esc"].pressed,  //when to exit
@@ -2623,7 +2656,7 @@ struct im{ static:
       if(focused) userModified |= sliderState.handleKeyboard(nPos, range_, 8);
 
       bkColor = ts.bkColor;
-      const hoverOrFocus = max(hit.hover_smooth*.5f, focused ? 1.0f : 0);
+      const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0;
 
       final switch(sliderStyle){
         case SliderStyle.slider:
@@ -2633,7 +2666,10 @@ struct im{ static:
           rulerSides = 3 *0;
         break;
         case SliderStyle.scrollBar:
-          clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
+          clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus);
+          bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f));
+
+          //clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
           rulerSides = 0;
         break;
       }
@@ -2653,7 +2689,7 @@ struct im{ static:
       return outerBounds;
     }
 
-    private void drawThumb(Drawing dr, vec2 a, vec2 t){
+    private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb){
       final switch(sliderStyle){
       case SliderStyle.slider:
         dr.lineWidth = lwThumb; dr.color = clThumb;
@@ -2681,7 +2717,8 @@ struct im{ static:
       dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none;
 
       auto b = innerBounds;
-      const actOrientation = getActualSliderOrientation(orientation, b, sliderStyle);
+      const actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
+            lwThumb = calcLwThumb(actOrientation);
 
       if(isLinear(actOrientation)){
         const horz = actOrientation == SliderOrientation.horz,
@@ -2704,12 +2741,17 @@ struct im{ static:
           auto p = mix(p0, p1, nPos);
           if(!isnan(nCenter) && sliderStyle==SliderStyle.slider) drawLine(dr, mix(p0, p1, nCenter), p, clThumb);
 
-          drawThumb(dr, p, thumbOfs);
+          drawThumb(dr, p, thumbOfs, lwThumb);
 
           if(mod_update){
-            auto thumbHalfSize = lwThumb * vec2(0.5f, 1.5f);
-            if(!horz) swap(thumbHalfSize.x, thumbHalfSize.y);
-            auto thumbRect = bounds2(p, p).inflated(thumbHalfSize);
+            vec2 thumbHalfSize;
+            if(sliderStyle==SliderStyle.slider){
+              thumbHalfSize = lwThumb * vec2(0.5f, 1.5f);
+              if(!horz) swap(thumbHalfSize.x, thumbHalfSize.y);
+            }else{
+              thumbHalfSize = horz ? vec2(lwThumb, outerHeight*.5f) : vec2(outerWidth*.5f, lwThumb);
+            }
+            const thumbRect = bounds2(p, p).inflated(thumbHalfSize);
             sliderState.afterDraw(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(thumbRect));
           }
         }
