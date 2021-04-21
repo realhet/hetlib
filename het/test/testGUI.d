@@ -519,7 +519,6 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
   void TestSliders(SliderStyle sliderStyle, SliderOrientation[] orientations){
     Row({ padding = "5";
       flags.wordWrap = false;
-      flags.hScrollState = ScrollState.on;
       flags.yAlign = YAlign.top;
       Text(bold(sliderStyle.text), "\n");
       foreach(orientation; orientations) Column({
@@ -532,15 +531,18 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
   TestSliders(SliderStyle.slider, [EnumMembers!SliderOrientation]);
   TestSliders(SliderStyle.scrollBar, [SliderOrientation.horz, SliderOrientation.vert]);
 
-
   Column({
     immutable scrollStates = ["off", "on", "auto"];
-    static hs=0, vs=0, ww=false, aw=false, ah=false;
+    immutable containerTypes = ["Row", "Column", "Container"];
+    static hs=1, vs=1, ww=false, aw=false, ah=false;
     immutable defaultFonth = 72;
     static ubyte fonth = defaultFonth;
     static cellSize = ivec2(128);
+    static containerType = "Column";
     Row(bold("AutoSize, WordWrap, ScrollBar tests"));
     Row({
+      Text("Container ", BtnRow(containerType, containerTypes));
+      Spacer;
       Text("fontHeight ");
       Slider(fonth, range(1, 255));
       if(Btn("Default("~defaultFonth.text~")")) fonth = defaultFonth; //todo: flex and \t not go well: the adjustment of \t is AFTER the flex, not before.
@@ -581,21 +583,40 @@ void UI_Sliders(){ with(im){ // Sliders ////////////////////////////////////////
         ChkBox(ah, "autoHeight");
         Row({ Text("vScrollState \t"); BtnRow(vs, scrollStates); });
       });
-      foreach(idx, str; ["a", "abcdefg", "a\nb\nc", "abscefg\nABCDEF\n12345"]) Row({
-        border = "1 normal silver";
-        margin = "2";
-        if(!aw) width  = cellSize.x;
-        if(!ah) height = cellSize.y;
-        with(flags){
-          clipChildren = true;
-          hScrollState = cast(ScrollState)hs;
-          vScrollState = cast(ScrollState)vs;
-          wordWrap = ww;
-        }
-        fh = fonth;
-        Text(str);
-        if(Btn("\U0001F327")) beep;
-      });
+
+      void TestContainers(alias Cntr)(){
+        foreach(idx, str; ["a", "abcdefg", "a\nb\nc", "abscefg\nABCDEF\n12345"]) Cntr({
+          border = "1 normal silver";
+          margin = "2";
+          if(!aw) width  = cellSize.x;
+          if(!ah) height = cellSize.y;
+          with(flags){
+            clipChildren = true;
+            hScrollState = cast(ScrollState)hs;
+            vScrollState = cast(ScrollState)vs;
+            wordWrap = ww;
+          }
+          fh = fonth;
+          Text(str);
+          if(Btn("\U0001F327")) beep;
+
+          static if(Cntr.stringof=="Container()") foreach(i, ref c; actContainer.subCells){
+            const ph = i*0.2+float((QPS*0.3).fract)*2*PIf;
+            c.outerPos = vec2((sin(ph)+1)*50, (cos(ph)+1)*50);
+            auto g = cast(Glyph)c;
+            if(g) g.bkColor = hsvToRgb((i*0.1f).fract, 1, 1).floatToRgb;
+          }
+
+        });
+
+      }
+
+      if(containerType=="Row") TestContainers!Row;
+      if(containerType=="Column") TestContainers!Column;
+      if(containerType=="Container") TestContainers!Container;
+
+      //foreach(Cntr; AliasSeq!(Row, Column, Container)) static if(is()){
+
     });
   });
 
@@ -636,9 +657,6 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
     });
 
     with(im) Panel(PanelPosition.client, {
-      flags.vScrollState = ScrollState.on;
-      flags.hScrollState = ScrollState.on;
-      flags.wordWrap = false;
       flags.clipChildren = true;
 
       UI_Category(category);

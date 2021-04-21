@@ -982,8 +982,10 @@ class Cell{ // Cell ////////////////////////////////////
   @property Cell[] subCells() { return []; }
   @property void subCells(Cell[] cells) { notImpl("setSubCells"); }
 
-  void append(Cell   c){ notImpl("append()"); }
-  void append(Cell[] a){ notImpl("append()"); }
+  final auto subContainers(){ return subCells.map!(c => cast(Container)c).filter!"a"; }
+
+  void append     (Cell   c){ ERR("Can't append() in a Cell"); }
+  void appendMulti(Cell[] a){ ERR("Can't appendMulti() in a Cell"); } //todo: subCell things should be put in Container!
 
   void draw(Drawing dr) { }
 
@@ -1047,6 +1049,17 @@ class Cell{ // Cell ////////////////////////////////////
     if(border.style==BorderStyle.double_){ doit(-0.333f); doit(0.333f); }
                                      else{ doit;                        }
   }
+
+  void dump(int indent=0){
+    print("  ".replicate(indent), this.classinfo.name.split('.')[$-1], " ",
+      outerPos, innerSize, flex,
+//      cast(.Container)this ? (cast(.Container)this).flags.text : "",
+      cast(.Glyph)this ? (cast(.Glyph)this).ch.text.quoted : ""
+    );
+    foreach(c; subCells)
+      c.dump(indent+1);
+  }
+
 }
 
 class Glyph : Cell { // Glyph ////////////////////////////////////
@@ -1871,6 +1884,40 @@ private{ //wrappedLine[] functionality
 
   void hideSpaces(WrappedLine[] lines, HAlign hAlign){ foreach(l; lines) l.hideSpaces(hAlign); }
 
+  ///vertical cell align in each line.  Only works right after the warpedLines was created
+  void applyYAlign(WrappedLine[] lines, YAlign yAlign){
+    if(yAlign == YAlign.top) return;
+    if(yAlign != YAlign.top) foreach(ref wl; lines) final switch(yAlign){
+      case YAlign.center      : wl.alignY(0.5); break;
+      case YAlign.bottom      : wl.alignY(1.0); break;
+      case YAlign.baseline    : wl.alignY(0.8); break;
+      case YAlign.stretch     : wl.stretchY; break;
+      case YAlign.top         : break;
+    }
+  }
+
+  ///horizontal align.  Only works right after the warpedLines was created
+  void applyHAlign(WrappedLine[] wrappedLines, HAlign hAlign, float targetWidth){
+    if(hAlign == HAlign.left) return;
+    foreach(ref wl; wrappedLines) final switch(hAlign){
+      case HAlign.center  : wl.alignX(targetWidth, 0.5); break;
+      case HAlign.right   : wl.alignX(targetWidth, 1  ); break;
+      case HAlign.justify : wl.justifyX(targetWidth); break;
+      case HAlign.left    : break;
+    }
+  }
+
+  ///vertical align.  Only works right after the warpedLines was created
+  void applyVAlign(WrappedLine[] wrappedLines, VAlign vAlign, float targetHeight){
+    final switch(vAlign){
+      case VAlign.center      : wrappedLines.alignY(targetHeight, 0.5); break;
+      case VAlign.bottom      : wrappedLines.alignY(targetHeight, 1.0); break;
+      case VAlign.justify     : wrappedLines.justifyY(targetHeight); break;
+      case VAlign.top         : break;
+    }
+  }
+
+
 }
 
 
@@ -2100,8 +2147,8 @@ class Container : Cell { // Container ////////////////////////////////////
     @property Cell[] subCells() { return subCells_; }
     @property void subCells(Cell[] cells) { subCells_ = cells; }
 
-    void append(Cell   c){ if(c !is null) subCells_ ~= c; }
-    void append(Cell[] a){ subCells_ ~= a; }
+    void append     (Cell   c){ subCells_ ~= c; }
+    void appendMulti(Cell[] a){ subCells_ ~= a; }
   }
 
   protected{
@@ -2115,16 +2162,12 @@ class Container : Cell { // Container ////////////////////////////////////
   float calcContentHeight(){ return subCells.map!(c => c.outerBottom).maxElement(0); }
   vec2  calcContentSize  (){ return vec2(calcContentWidth, calcContentHeight); }
 
-  protected void updateAutoSize(){
-    if(flags.autoWidth ) innerWidth  = calcContentWidth;
-    if(flags.autoHeight) innerHeight = calcContentWidth;
-  }
-
   /// this must overrided by every descendant. Its task is to measure and then place all the subcells.
-  /// must update innerSize is autoWidth or autoHeight is specified.
+  /// must update innerSize if autoWidth or autoHeight is specified.
   void rearrange(){
     measureSubCells;
-    updateAutoSize;
+    if(flags.autoWidth ) innerWidth  = calcContentWidth ;
+    if(flags.autoHeight) innerHeight = calcContentHeight;
   }
 
   final void measure(){
@@ -2170,21 +2213,22 @@ class Container : Cell { // Container ////////////////////////////////////
         rearrange;
       }else{ // at least one axis is autoScroll, this is the most complicated case.
         if(hFlow==FlowConfig.autoScroll && vFlow==FlowConfig.autoScroll){ // 2 auto scrollbars
-
           rearrange;
           const cs = calcContentSize;
           if(cs.y>innerHeight){
             if(cs.x>innerWidth){ //H&V overflow
               alloc!'H'; alloc!'V';
             }else{ //V overflow
-              if(alloc!'V' && cs.x > innerWidth) alloc!'H'; //possivle H overflow because of VScrollBar
+              if(alloc!'V' && cs.x > innerWidth){ //possivle H overflow because of VScrollBar
+                if(cast(Column)this) rearrange; //Column will make the items thinner
+                                else alloc!'H'; //Other things will need a scrollbar
+              }
             }
           }else{
             if(cs.x>innerWidth){ //H overflow
               if(alloc!'H' && cs.y > innerHeight) alloc!'V'; //possivle V overflow because of HScrollBar
             }
           }
-
         }else if(hFlow==FlowConfig.autoScroll){ //only auto hscroll
           if(vFlow==FlowConfig.scroll) alloc!'V'; //alloc fixed if needed
           rearrange;
@@ -2193,23 +2237,22 @@ class Container : Cell { // Container ////////////////////////////////////
           if(hFlow==FlowConfig.scroll) alloc!'H'; //alloc fixed if needed
           rearrange;    //opt: this rearrange can exit early when the wordWrap and contentheight becomes too much.
           if(calcContentHeight > innerHeight){
-            if(alloc!'V' && hFlow==FlowConfig.wrap){
-              rearrange;
-              //if(!flags.hasHScrollBar && calcContentWidth > innerWidth) alloc!'H';
+            if(alloc!'V' && (hFlow==FlowConfig.wrap || cast(Column)this/*column also changes the width!*/)){
+              rearrange; //second rearrange
+              //I think this is overkill, not needed: if(!flags.hasHScrollBar && calcContentWidth > innerWidth) alloc!'H';
             }
           }
         }
       }
 
+      //setup the scrollbars
+      if(flags.hasHScrollBar) im.hScrollInfo.update(this, calcContentWidth, innerWidth);
+      if(flags.hasVScrollBar) im.vScrollInfo.update(this, calcContentHeight, innerHeight);
+
       //restore size after rearrange. (Autosize wont subtract the scrollbarthickness, so it will be added here as an extra.)
-      if(flags.hasHScrollBar){
-        outerSize.y += scrollThickness;
-        im.hScrollInfo.update(this, calcContentWidth, innerWidth);
-      }
-      if(flags.hasVScrollBar){
-        outerSize.x += scrollThickness;
-        im.vScrollInfo.update(this, calcContentHeight, innerHeight);
-      }
+      if(flags.hasHScrollBar) outerSize.y += scrollThickness;
+      if(flags.hasVScrollBar) outerSize.x += scrollThickness;
+
     }
 
     flags._measured = true;
@@ -2483,7 +2526,7 @@ class Row : Container { // Row ////////////////////////////////////
 
   this(T:Cell)(T[] cells,in TextStyle ts){
     bkColor = ts.bkColor;
-    append(cast(Cell[])cells);
+    appendMulti(cast(Cell[])cells);
   }
 
   override void appendChar(dchar ch, in TextStyle ts){
@@ -2597,14 +2640,13 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   override void rearrange(){
-    const doWrap = flags.wordWrap && !flags.autoWidth;
-
     //adjust length of leading and internal tabs
     if(flags.rowElasticTabs) adjustTabSizes_multiLine;
                         else adjustTabSizes_singleLine;
 
     solveFlexAndMeasureAll();
 
+    const doWrap = flags.wordWrap && !flags.autoWidth;
     auto wrappedLines = makeWrappedLines(doWrap);
     //LOG("wl", wrappedLines, autoWidth, wrappedLines.calcWidth);
 
@@ -2615,18 +2657,11 @@ class Row : Container { // Row ////////////////////////////////////
     if(doWrap && !flags.dontHideSpaces) wrappedLines.hideSpaces(flags.hAlign);
 
     //horizontal alignment, sizing
-    if(flags.autoWidth ) innerWidth = wrappedLines.calcWidth; //set actual size if automatic
+    if(flags.autoWidth) innerWidth = wrappedLines.calcWidth; //set actual size if automatic
 
     //horizontal text align on every line
-    //todo: clip or stretch
-    if(!flags.autoWidth || wrappedLines.length>1) foreach(ref wl; wrappedLines){
-      final switch(flags.hAlign){
-        case HAlign.left    : break;
-        case HAlign.center  : wl.alignX(innerWidth, 0.5); break;
-        case HAlign.right   : wl.alignX(innerWidth, 1  ); break;
-        case HAlign.justify : wl.justifyX(innerWidth); break;
-      }
-    }
+    if(!flags.autoWidth || wrappedLines.length>1) wrappedLines.applyHAlign(flags.hAlign, innerWidth);
+                                      //note: >1 because autoWidth and 1 line is already aligned
 
     //vertical alignment, sizing
     if(flags.autoHeight){
@@ -2635,28 +2670,10 @@ class Row : Container { // Row ////////////////////////////////////
     }else{
       //height is fixed
       auto remaining = innerHeight - wrappedLines.calcHeight;
-      if(remaining > AlignEpsilon){
-        final switch(flags.vAlign){
-          case VAlign.top         : break;
-          case VAlign.center      : wrappedLines.alignY(innerHeight, 0.5); break;
-          case VAlign.bottom      : wrappedLines.alignY(innerHeight, 1.0); break;
-          case VAlign.justify     : wrappedLines.justifyY(innerHeight); break;
-        }
-      }else if(remaining < AlignEpsilon){
-        //todo: clipping/scrolling
-      }
+      if(remaining > AlignEpsilon) wrappedLines.applyVAlign(flags.vAlign, innerHeight);
     }
 
-    //vertical cell align in each line
-    if(flags.yAlign != YAlign.top)foreach(ref wl; wrappedLines){
-      final switch(flags.yAlign){
-        case YAlign.top         : break;
-        case YAlign.center      : wl.alignY(0.5); break;
-        case YAlign.bottom      : wl.alignY(1.0); break;
-        case YAlign.baseline    : wl.alignY(0.8); break;
-        case YAlign.stretch     : wl.stretchY; break;
-      }
-    }
+    wrappedLines.applyYAlign(flags.yAlign);
 
     //remember the contents of the edited row
     rememberEditedWrappedLines(this, wrappedLines);
@@ -2674,25 +2691,35 @@ class Row : Container { // Row ////////////////////////////////////
 class Column : Container { // Column ////////////////////////////////////
 
   override void rearrange(){
+
+    void setSubCellWidths(float targetWidth){
+      foreach(c; subContainers){
+        c.outerWidth = targetWidth;
+        c.flags.autoWidth = false;
+        c.measure;
+      }
+    }
+
+    void setSubCellWidths_afterMeasure(float targetWidth){
+      foreach(c; subContainers) if(c.outerWidth!=targetWidth){
+        c.outerWidth = targetWidth;
+        c.flags.autoWidth = false;
+        c.measure; //opt: maybe not a full remeasure is necessary, just a realign as the subcells inside that are already ordered.
+      }
+    }
+
     //measure the subCells and stretch them to a maximum width
     if(flags.autoWidth){
       //measure maxWidth
       measureSubCells;
       innerWidth = calcContentWidth;
-
       //at this point all the subCells are measured
       //now set the width of every subcell in this column if it differs, and remeasure only when necessary
-      float iw = innerWidth;
-      foreach(sc; subCells) if(cast(Container)sc && (cast(Container)sc).flags.autoWidth && sc.outerWidth != innerWidth){
-        sc.outerWidth = innerWidth;
-        if(auto co = cast(Container)sc){ co.flags.autoWidth = false; co.measure; }
-      }
+      setSubCellWidths_afterMeasure(innerWidth);
       //note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. But that's not an usual case: ListBox: all textCells are fixedWidth, Document: all paragraphs are autoWidth.
     }else{
-      foreach(sc; subCells){ //first set the width of every subcell in this column, and measure all (for the first time).
-        sc.outerWidth = innerWidth;
-        if(auto co = cast(Container)sc) co.measure;
-      }
+      //first set the width of every subcell in this column, and measure all (for the first time).
+      setSubCellWidths(innerWidth);
     }
 
     if(flags.columnElasticTabs) processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.

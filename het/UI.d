@@ -364,11 +364,11 @@ class ImWin{ // ImWin //////////////////////////////////
       auto rPause    = toolBtn(tag("symbol Pause"));
 
       auto rLeft = new Row("");
-      rLeft.append([rIcon, rCaption, rPlay, rPause]);
+      rLeft.appendMulti([rIcon, rCaption, rPlay, rPause]);
       rLeft.measure;
 
       auto rRight = new Row("");
-      rRight.append([rMaximize, rClose]);
+      rRight.appendMulti([rMaximize, rClose]);
       rRight.measure;
 
 
@@ -1058,18 +1058,8 @@ struct im{ static:
   }
 
   void dump(){
-    void doit(Cell cell, int indent=0){
-      print("  ".replicate(indent), cell.classinfo.name.split('.')[$-1], " ",
-        cell.outerPos, cell.innerSize, cell.flex,
-//        cast(.Container)cell ? (cast(.Container)cell).flags.text : "",
-        cast(.Glyph)cell ? (cast(.Glyph)cell).ch.text.quoted : ""
-      );
-      foreach(subCell; cell.subCells)
-        doit(subCell, indent+1);
-    }
-
     writeln("---- IM dump --------------------------------");
-    foreach(cell; root) doit(cell);
+    foreach(cell; root) cell.dump;
     writeln("---- End of IM dump -------------------------");
   }
 
@@ -1284,11 +1274,17 @@ struct im{ static:
         void doFlip(){ if(flip) normValue = 1-normValue; }
 
         if(activeRange > 0.001f){
+          //restrict range
+          info.offset.minimize(activeRange);
+          info.offset.maximize(0);
+
           enabled = true;
           normValue = info.offset/activeRange;
           normThumbSize = info.pageSize/info.contentSize;
 
           doFlip;
+        }else{
+          info.offset = 0; //no active range, so just reset it to 0
         }
 
         bool userModified;
@@ -1332,6 +1328,8 @@ struct im{ static:
   auto vScrollInfo = ScrollInfo('V');
 
   void Column(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Column //////////////////////////////
+    mixin(id.M ~ enable.M);
+
     auto column = new .Column;
     column.bkColor = style.bkColor;
     append(column); push(column, file.xxh(line)); scope(exit) pop;
@@ -1346,6 +1344,8 @@ struct im{ static:
   }
 
   void Row(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Row //////////////////////////////
+    mixin(id.M ~ enable.M);
+
     auto row = new .Row("", textStyle);
     append(row); push(row, file.xxh(line)); scope(exit) pop;
 
@@ -1364,6 +1364,8 @@ struct im{ static:
   }
 
   void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Container //////////////////////////////
+    mixin(id.M ~ enable.M);
+
     auto cntr = new .Container;
     append(cntr); push(cntr, file.xxh(line)); scope(exit) pop;
 
@@ -1957,7 +1959,7 @@ struct im{ static:
   }
 
   // BtnRow //////////////////////////////////
-  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(void delegate() fun, T args){
+  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(void delegate() fun, in T args){
     mixin(id.M);
     Row({
       flags.btnRowLines = true;
@@ -1972,7 +1974,7 @@ struct im{ static:
     });
   }
 
-  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, in string[] captions, T args){
+  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, in string[] captions, in T args){
     mixin(id.M ~ enable.M);
 
     auto last = idx;
@@ -1987,7 +1989,7 @@ struct im{ static:
     return last != idx;
   }
 
-  auto BtnRow(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, A[] items, Args args){
+  auto BtnRow(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, in Args args){
     auto idx = cast(int) items.countUntil(value); //todo: it's a copy from ListBox. Refactor needed
     auto res = BtnRow!(file, line)(idx, items, args);
     if(res) value = items[idx];
@@ -1995,7 +1997,7 @@ struct im{ static:
   }
 
   //todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
-  auto BtnRow(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum)){
+  auto BtnRow(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum)){
     string s = e.text;
     auto res = BtnRow!(file, line)(s, getEnumMembers!E, args);
     if(res) ignoreExceptions({ e = s.to!E; });

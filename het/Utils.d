@@ -4927,7 +4927,7 @@ struct DateTime{
   this(const Date date, const Time time){
     raw = date.raw+time.raw;
   }
-  this(string str){
+  this(string str){  //todo: this sucks: no error handling at all
     if(str.canFind(' ')){
       auto parts = str.split(' '); //dateTime
       this(Date(parts[0]), Time(parts[1]));
@@ -4936,7 +4936,7 @@ struct DateTime{
       if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
         this(       str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
       }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
-        this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int);
+        this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
       }else{
         this(Date(str), Time(0, 0)); //Date only
       }

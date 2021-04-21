@@ -687,6 +687,7 @@ private: //current build
 
     //resFile
     if(resFiles.length>0) resFile = targetFile.otherExt(".res"); //todo:redundant
+                     else resFile = File("");
   }
 
   void initData(File mainFile_){ //clears the above
@@ -1039,8 +1040,10 @@ private: //current build
 
         //call RC.exe
         auto rcCmd = ["rc", rcFile.fullName];
-        logln(bold("CALLING RC: "), joinCommandLine(rcCmd));
-        auto rc = execute(rcCmd, null, Config.suppressConsole);
+        auto line = joinCommandLine(rcCmd);
+        logln(bold("CALLING RC: "), line);
+        auto rc = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
+        //todo: resource compiler totally bugs on 64bit. Workaround: use resource hacker manually
 
         //cleanup
         rcFile.remove;
@@ -1081,6 +1084,8 @@ private: //current build
                 ~libFiles
                 ~`legacy_stdio_definitions.lib`
                 ~objFiles;
+
+    if(resFile) cmd ~= resFile.fullName;
 
     // add libs for LDC
     cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
@@ -1216,7 +1221,7 @@ public:
 
       /////////////////////////////////////////////////////////////////////////////////////
       // calculate resource hash
-      string resHash = calcHash(resFiles.byKeyValue.map!(kv => format("(%s|%s|%.8f)", kv.key, kv.value, kv.value.modified)).join);
+      string resHash = calcHash(resFiles.byKeyValue.map!(kv => format!"(%s|%s|%s)"(kv.key, kv.value, kv.value.modified)).join);
 
 
       /////////////////////////////////////////////////////////////////////////////////////

@@ -126,8 +126,10 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
     }else{
       enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!");
     }
-  }else if(prefix=="screen"){
-    raise("screen(shot) is not implemented");
+  }else if(prefix=="desktop"){
+    return getDesktopSnapshot;
+  }else if(prefix=="monitor"){
+    return getPrimaryMonitorSnapshot; //todo: monitor indexing
   }else if(prefix=="debug"){ //debug images
     uint color = (line.to!int)>>1;
     color = color | (255-color)<<8;
@@ -1183,19 +1185,49 @@ void testImageBilinearAndSerialize(){  //todo: make a unittest out of these
 }
 
 
+import core.sys.windows.windows : GetDeviceCaps, GetSystemMetrics, ReleaseDC, BitBlt, HORZRES, VERTRES, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SRCCOPY;
+
+auto getPrimaryMonitorSize(){ //note: it's just the primary monitor area
+  HDC hScreenDC = GetDC(null);//CreateDC("DISPLAY", NULL, NULL, NULL);
+  scope(exit) ReleaseDC(null, hScreenDC);  //This is needed and returns 1, so it is working.
+  return ivec2(GetDeviceCaps(hScreenDC, HORZRES), GetDeviceCaps(hScreenDC, VERTRES));
+}
+
+auto getPrimaryMonitorBounds(){
+  return ibounds2(ivec2(0), getPrimaryMonitorSize);
+}
+
+auto getDesktopSize(){
+  return ivec2(GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN));
+}
+
+auto getDesktopBounds(){
+  auto pos = ivec2(GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN));
+  return ibounds2(pos, pos+getDesktopSize);
+}
+
+auto getSnapshot(in ibounds2 bnd){
+  auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.free;
+  auto dc = GetDC(null); scope(exit) ReleaseDC(null, dc);
+  BitBlt(gBmp.hdcMem, 0, 0, bnd.width, bnd.height, dc, bnd.left, bnd.top, SRCCOPY);
+  return new Bitmap(gBmp.toImage);
+}
+
+auto getDesktopSnapshot(){ return getSnapshot(getDesktopBounds); }
+auto getPrimaryMonitorSnapshot(){ return getSnapshot(getPrimaryMonitorBounds); }
+
 // GdiBitmap class ////////////////////////////////////
 
 class GdiBitmap{ //holds a windows gdi bitmap and makes it accessible as a normal RGBA Image or Bitmap object
   ivec2 size;
   HBITMAP hBitmap;
-  static HDC hdcMem; //needs only one of this
+  static HDC hdcMem, hdcScreen; //needs only one of these
   BITMAPINFO bmi;
 
   this(in ivec2 size){
 
     this.size = size;
 
-    static HDC hdcScreen;
     if(!hdcScreen) hdcScreen = GetDC(null);
     if(!hdcMem) hdcMem  = CreateCompatibleDC(hdcScreen);
 
@@ -1219,7 +1251,7 @@ class GdiBitmap{ //holds a windows gdi bitmap and makes it accessible as a norma
 
   ~this(){
     DeleteObject(hBitmap);
-    //and the hdcMem is static
+    //hdcScreen and hdcMem are static
   }
 
   auto toImage(){
