@@ -2726,21 +2726,6 @@ string[] getEnumMembers(T)(){
 }
 
 
-auto getStaticParamDef(T, Args...)(in T def, in Args args){
-  Unqual!T res = def;
-  static foreach(a; args) static if(__traits(compiles, res = a)) return a;
-  return res;
-}
-
-auto getStaticParam(T, Args...)(in Args args){
-  Unqual!T res;
-  static foreach(a; args) static if(__traits(compiles, res = a)) return a;
-  static assert("Can't find required param: "~T.stringof);
-}
-
-enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0;
-
-
 alias toAlias(alias T) = T;
 
 void inspectSymbol(alias T)(string before="", int level=0) {
@@ -2797,6 +2782,42 @@ void inspectSymbol(alias T)(string before="", int level=0) {
   }else{
     print("!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", T.stringof ~ "." ~ memberName);
   }
+}
+
+// StaticParam ////////////////////
+
+auto getStaticParamDef(T, Args...)(in T def, in Args args){
+  Unqual!T res = def;
+  static foreach(a; args) static if(__traits(compiles, res = a)) return a;
+  return res;
+}
+
+auto getStaticParam(T, Args...)(in Args args){
+  Unqual!T res;
+  static foreach(a; args) static if(__traits(compiles, res = a)) return a;
+  static assert("Can't find required param: "~T.stringof);
+}
+
+enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0;
+
+
+// GenericArg /////////////////////////////////////
+
+struct GenericArg(string N="", T){ alias type = T; enum name = N;
+  T value;
+}
+
+enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T);
+
+/// pass a generic arg to a function
+auto genericArg(string N="", T)(in T p){
+  return const GenericArg!(N, T)(p);
+}
+
+/// cast anything to GenericArg
+auto asGenericArg(A)(in A a){
+    static if(isGenericArg!A) return a;
+                         else return genericArg(a);
 }
 
 
@@ -4236,7 +4257,7 @@ public:
     assert(0);
   }
 
-  ubyte[] read(bool mustExists = true, ulong offset = 0, size_t len = size_t.max)const{ //todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
+  ubyte[] read(bool mustExists = true, ulong offset = 0, size_t len = size_t.max, string srcFile=__FILE__, int srcLine=__LINE__)const{ //todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
     ubyte[] data;
 
     if(!mustExists && !exists) return data;
@@ -4255,7 +4276,7 @@ public:
       }
 
     }catch(Throwable){
-      enforce(!mustExists, format(`Can't read file: "%s"`, fullName)); //todo: egysegesiteni a file hibauzeneteket
+      enforce(!mustExists, format!`Can't read file: "%s"`(fullName), srcFile, srcLine); //todo: egysegesiteni a file hibauzeneteket
     }
 
     if(logFileOps) LOG(fullName);

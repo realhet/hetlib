@@ -2061,9 +2061,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "hasVScrollBar"     , 1,
     int           , ""                  , 3,
   ));
-
-  //todo: setProps, mint a margin-nal
 }
+
+static assert(ContainerFlags.sizeof==8);
 
 // Effective horizontal and vertical flow configuration of subCells
 enum FlowConfig { autoSize, wrap, noScroll, scroll, autoScroll }
@@ -2441,7 +2441,7 @@ class Container : Cell { // Container ////////////////////////////////////
   /// Search for a text recursively in the Cell structure
   auto search(string searchText, vec2 origin = vec2.init){
 
-    struct SearchContext{
+    static struct SearchContext{
       dstring searchText;
       vec2 absInnerPos;
       Cell[] cellPath;

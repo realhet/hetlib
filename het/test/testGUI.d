@@ -62,7 +62,6 @@ void UI_TestDrawing(){
 
 }
 
-
 void UI_Inputs(){
   static InputsTester it;
   if(!it) it = new typeof(it);

@@ -80,7 +80,7 @@ private bool validRvalueSwizzle(string def){
 }
 
 
-enum isVector(T) = is(T.VectorType);
+enum isVector(T) = is(T.VectorType); //todo: This should be is(T==Vector!(T, N), T, int N) and Vectortype should be a template around this isExpression.
 
 private bool anyVector(T...)(){
   static foreach(t; T)

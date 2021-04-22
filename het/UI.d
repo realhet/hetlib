@@ -2,6 +2,8 @@ module het.ui;
 
 import het.utils, het.draw2d, het.inputs, het.stream, het.opengl;
 
+//todo: Unqual is not needed to check a type. Try to push this idea through a whole testApp.
+
 import std.traits, std.meta;
 
 public import het.uibase;
