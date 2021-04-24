@@ -86,6 +86,8 @@ public import std.process : environment, thisThreadID;
 public import std.zlib : compress, uncompress;
 public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write;
 public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
+public import std.typecons: Typedef;
+public import std.path: baseName;
 
 import std.encoding : transcode, Windows1252String;
 import std.exception : stdEnforce = enforce;
@@ -3294,13 +3296,13 @@ struct SeedStream{
   uint front() const{ return seed; }
   void popFront() { seed = seed * a + c; }
 
-  void test(int seed){
+  void test(){
     print("Testing SeedStream: a:", a, format!"(0x%x)"(a), "  c:", c, format!"(0x%x)"(c));
     BitArray ba;
     ba.length = 1L << 32;
     write("seed = ", seed, "  ");
     ba[] = false;
-    auto ss = typeof(this)(seed);
+    auto ss = this;
     auto act(){ return ss.front; }
     long cnt = 0;
     while(!ba[act]){
@@ -3990,6 +3992,8 @@ bool samePath(string a, string b){
   return sameText(a.excludeTrailingPathDelimiter,
                   b.excludeTrailingPathDelimiter);
 }
+
+bool samePath(in Path a, in Path b){ return samePath(a.fullPath, b.fullPath); }
 
 struct Path{
   private static{

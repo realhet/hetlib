@@ -1304,13 +1304,18 @@ auto step(A, B)(in A edge, in B x){
   return generateVector!(CT, (edge, x) => x<edge ? 0 : 1 )(edge, x);
 }
 
-auto smoothstep(A, B, C)(in A edge0, in B edge1, in C x){
+auto smoothstep(string fun="t * t * (3 - 2 * t)", A, B, C)(in A edge0, in B edge1, in C x){
   alias CT = CommonScalarType!(A, B, C, float); //result is at least float. In the range: 0..1
   return generateVector!(CT, (edge0, edge1, x){
-    auto t = clamp(((x - edge0)*1.0f) / (edge1 - edge0), 0, 1); //difision is forced to float with that *1.0f
-    return t * t * (3 - 2 * t);
+    auto t = clamp(((x - edge0)*1.0f) / (edge1 - edge0), 0, 1); //division is forced to float with that *1.0f
+    return mixin(fun);
   })(edge0, edge1, x);
 }
+
+auto smootherstep(A, B, C)(in A edge0, in B edge1, in C x){
+  return smoothstep!("t * t * t * (t * (t * 6 - 15) + 10)")(edge0, edge1, x);
+}
+
 
 auto isnan(A)(in A a){ return a.generateVector!(bool, a => std.math.isNaN     (a) ); }
 auto isinf(A)(in A a){ return a.generateVector!(bool, a => std.math.isInfinity(a) ); }

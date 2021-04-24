@@ -250,7 +250,7 @@ public  SubTexInfo[] infoArray;
 
   void accessedNow(int idx){
     if(!global_disableSubtextureAging)
-      lastAccessed[idx] = global_UpdateTick;
+      lastAccessed[idx] = global_tick;
   }
 
 public:
@@ -807,7 +807,7 @@ if(log) "Created subtex %s:".writefln(fileName);
     File file;
     SubTexInfo info;
 
-    bool canUnload() const{ return canUnloadTexture(file, global_UpdateTick - lastAccessed); }
+    bool canUnload() const{ return canUnloadTexture(file, global_tick - lastAccessed); }
 
     auto toString() const{
       return format!"%-4s: %s age:%-5d %s"(idx, info, lastAccessed, file.fullName);

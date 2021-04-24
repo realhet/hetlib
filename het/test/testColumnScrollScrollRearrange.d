@@ -1,9 +1,173 @@
 //@exe
-//@release
+///@release
 
 import het, het.ui;
 
-class CustomTexture{
+// Id system ////////////////////////////////////////////////////////////
+
+//version = stringId;
+version = longId;
+
+     version(stringId) alias IdType = string;
+else version(longId  ) alias IdType = ulong ;
+else                   alias IdType = uint  ;
+
+struct Id{
+  IdType value;
+}
+
+static if(is(IdType==uint) || is(IdType==ulong)){
+
+  //note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
+  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__   )(        ){ return Id(cast(IdType)hashOf(srcLine, hashOf(srcModule)));  }
+  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__, T)(in T idx){ return Id(cast(IdType)hashOf(idx, makeId!(srcModule, srcLine).value)); }
+  auto makeId(in Id i1, in Id i2)                                               { return Id(cast(IdType)hashOf(i2.value, i1.value));      }
+
+}else static if(is(IdType==string)){
+
+  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__   )(        ){ return Id(srcModule ~ '(' ~ srcLine.text ~ ')'); }
+  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__, T)(in T idx){ return Id(makeId!(srcModule, srcLine).value ~ '[' ~ idx.text ~ ']'); }
+  auto makeId(in Id i1, in Id i2)                                               { return Id(i1.value ~ '.' ~ i2.value); }
+
+}else static assert(0, "Invalid IdType");
+
+
+void testId(){
+  string[] strings = File(`c:\d\libs\het\utils.d`).readLines;
+
+  immutable str = "Hello";
+  import core.internal.hash;
+  enum test = bytesHash(str.ptr, str.length, 0);
+  print(test);
+
+  foreach(batch; 0..5){
+    auto t0 = QPS;
+    foreach(const s; strings) s.xxh(0);
+    auto t1 = QPS;
+    foreach(const s; strings) hashOf(s);
+    auto t2 = QPS;
+
+    print("xxh: ", t1-t0, "hashOf: ", t2-t1);
+  }
+
+  print("IdType =", IdType.stringof);
+
+  {
+    enum i1 = makeId; enum i2 = makeId;
+    enum i3 = makeId;
+    enforce(i1==i2);
+    print("CTFE makeId()", i1, i2, i3);
+  }
+  print("MakeId(idx)", makeId, makeId(0), makeId(1), makeId(2));
+
+  print(__FILE__, __FILE_FULL_PATH__, __MODULE__, __FUNCTION__, __PRETTY_FUNCTION__);
+
+
+  auto r = 9.5f,
+       center = ivec2(30),
+       im = image2D(center*2, (ivec2 p) => RGB((smoothstep(r+.5f, r-.5f, distance(p, center))*255).iround*0x10101) );
+
+  im.serialize.saveTo(`c:\d\aa_smoothStep.png`);
+}
+
+
+//  void combine(uint nextId){ return value = value*22695477+1; }
+//  void combine(in ImId nextId){ combine(nextId.value); }
+
+// ImStorage ///////////////////////////////////////////////
+
+interface ImStorageInfo{
+  void purge(uint maxAge);
+
+  string name();
+  string infoSummary();
+  string[] infoDetails();
+}
+
+struct ImStorageManager{ static:
+  ImStorageInfo[string] storages;
+
+  void registerStorage(ImStorageInfo info){
+    storages[info.name] = info;
+  }
+
+  void purge(uint maxAge){
+    storages.values.each!(s => s.purge(maxAge));
+  }
+
+  string stats(string details=""){
+    string res;
+    foreach(name; storages.keys.sort){
+      const maskOk = name.isWild(details);
+      if(maskOk || details=="") res ~= storages[name].infoSummary ~ '\n';
+      if(maskOk               ) res ~= storages[name].infoDetails.join('\n') ~ '\n';
+    }
+    return res;
+  }
+
+  string detailedStats(){ return stats("*"); }
+}
+
+struct ImStorage(T){ static:
+  alias ID = uint;
+
+  struct Item{
+    T data;
+    ID id;
+    uint tick;
+  }
+
+  Item[uint] items; //by Id
+
+  void purge(uint maxAge){ //age = 0 purge all
+    uint limit = global_tick-maxAge;
+    auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array;
+    toRemove.each!(k => items.remove(k));
+  }
+
+  class InfoClass : ImStorageInfo {
+    string name(){ return ImStorage!T.stringof; }
+    string infoSummary(){
+      return format!("%s(count: %s, minAge = %s, maxAge = %s")(name, items.length,
+          global_tick - items.values.map!(a => a.tick).minElement(uint.max),
+          global_tick - items.values.map!(a => a.tick).maxElement(uint.min)
+      );
+    }
+    string[] infoDetails(){
+      return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%-9d | %s"(global_tick-a.value.tick, a.key, a.value.data)).array.sort.array;
+    }
+    void purge(uint maxAge){
+      ImStorage!T.purge(maxAge);
+    }
+  }
+
+  auto ref access(in ID id){
+    auto p = id in items;
+    if(!p){
+      items[id] = Item.init;
+      p = id in items;
+      p.id = id;
+    }
+    p.tick = global_tick;
+    return p.data;
+  }
+
+  void set(in ID id, in T data){ access(id) = data; }
+
+  bool exists(in ID id){ return (id in items) !is null; }
+
+  uint age(in ID id){
+    if(auto p = id in items){
+      return global_tick-p.tick;
+    }else return typeof(return).max;
+  }
+
+  static this(){
+    ImStorageManager.registerStorage(new InfoClass);
+  }
+}
+
+class CustomTexture{ // CustomTexture ///////////////////////////////
   string name(){ return this.identityStr; }
   protected{
     Bitmap bmp;
@@ -21,21 +185,73 @@ class CustomTexture{
   }
 }
 
+class PathEditor{ // PathEditor ////////////////////////////////
+  Path editedPath;
 
-class FrmTestInputs: GLWindow { mixin autoCreate;
+/*  @property Path path() const{ return actPath; }
+  @property void path(in Path p) { actPath = editedPath = p; }
+
+  this(){ path = currentPath.normalized; }
+  this(in Path p){ path = p.normalized; }*/
+
+  bool UI(Args...)(ref Path actPath, in Args args){ with(im){
+    bool mustRefresh;
+    Edit(editedPath.fullPath, args, {
+      if(flags.focused){
+        auto normalizedPath = editedPath.normalized;
+        const isPathOk = normalizedPath.exists;
+
+        void colorize(RGB cl){
+          style.bkColor = bkColor = mix(bkColor, cl, 0.25f);
+          border.color = cl;
+        }
+
+        if(!isPathOk) colorize(clRed);
+        else if(!samePath(normalizedPath, actPath)) colorize(clGreen);
+
+        if(inputs.Esc.pressed){ editedPath = actPath; }
+        if(inputs.Enter.pressed && isPathOk){
+          actPath = normalizedPath;
+          focusedState.reset;
+          mustRefresh = true;
+        }
+      }else{
+        editedPath = actPath;
+        if(!actPath.exists) style.fontColor = clRed;
+      }
+    });
+    return mustRefresh;
+  }}
+}
+
+
+class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm ///////////////////////////////////
 
   CustomTexture customTexture;
   int threshold = 32;
 
+  PathEditor pathEditor;
+  Path actPath;
+
   override void onCreate(){
+    auto id = makeId;
+    print(id);
+
+    testId;
+
+    readln;
+
     customTexture = new CustomTexture;
+
+    pathEditor = new PathEditor;
+    actPath = Path(`c:\d\projects\karc\samples`);
 
     refresh;
   }
 
   void refresh(){
     static Bitmap bOrig;
-    if(!bOrig) bOrig = newBitmap(`c:\dl\login_hestore.png`);
+    if(!bOrig) bOrig = newBitmap(`c:\dl\s-l1600 (19).jpg`);
 
     auto iSrc = bOrig.get!ubyte;
     auto iDst = image2D(bOrig.size, bOrig.get!RGB.asArray);
@@ -61,8 +277,73 @@ class FrmTestInputs: GLWindow { mixin autoCreate;
     view.navigate(!im.wantKeys, !im.wantMouse);
     invalidate;
 
+    bool mustRefresh;
+    static Path browserPath;
+    static FileEntry[] browserFiles;
+
+    ImStorageManager.purge(10);
+
+    struct MyInt{ int value; }
+    auto a = ImStorage!MyInt.access(123).value++;
+    if(inputs.Shift.down) ImStorage!int.access(1234) += 10;
+
+    print(ImStorageManager.detailedStats);
+
     with(im){
-      Panel(PanelPosition.topLeft, {
+      Panel(PanelPosition.topClient, {
+        fh = fh*3;
+        Text("Header");
+      });
+      Panel(PanelPosition.rightClient, {
+        padding = "2";
+        Column({
+          margin = "2";
+          Row({
+            if(pathEditor.UI(actPath, { flex = 1; })) mustRefresh = true;
+            if(Btn("Refresh")) mustRefresh = true;
+          });
+        });
+        Container({
+          margin = "2";
+          border = "1 normal gray";
+          width = 300;
+          flex = 1;
+          bkColor = clSilver;
+
+          if(chkSet(browserPath, actPath)) mustRefresh = true;
+
+          if(mustRefresh){
+            browserFiles = listFiles(browserPath, "*.jpg", "name");
+          }
+
+          static int idx = -1;
+          ListBox(idx, browserFiles, (in FileEntry e){
+            if(e.isDirectory){ style.bold = true; Text("["~e.name~"]"); }
+                        else { Text(File(e.name).nameWithoutExt); }
+          });
+
+/*            foreach(i, const e; browserFiles){
+              Row({
+                //actContainer.outerPos = vec2(0, i*NormalFontHeight);
+                if(e.isDirectory){ style.bold = true; Text("["~e.name~"]"); }
+                            else { Text(File(e.name).nameWithoutExt); }
+              });
+            }*/
+
+
+          flags.clipChildren = true;
+          flags.vScrollState = ScrollState.auto_;
+          flags.wordWrap = false;
+          flags.hScrollState = ScrollState.auto_;
+        });
+        Column({
+          margin = "2";
+          Row("Details:");
+          Row("Blabla:");
+          Row("Blabla:");
+        });
+
+
 
 /*        Row({
           border = "1 normal black";
@@ -81,11 +362,11 @@ class FrmTestInputs: GLWindow { mixin autoCreate;
         style.bkColor = clAqua;
         fh = 255; Text("\U0001F0CF");*/
 
-        Row({
+        /* Row({
           Text("threshold");
           if(Slider(threshold, logRange(1, 255), { width = 512; })) refresh;
           Text(threshold.text);
-        });
+        });*/
 
       });
     }

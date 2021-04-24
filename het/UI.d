@@ -1102,6 +1102,7 @@ struct im{ static:
 
   auto subCells(){ return actContainer.subCells; }
   auto subCells(T : .Cell)(){ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); }
+  auto subContainers(){ return actContainer.subContainers; }
 
   //container delegates
   //void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
@@ -1239,7 +1240,7 @@ struct im{ static:
         info.id          = container.id;
         info.contentSize = contentSize;
         info.pageSize    = pageSize;
-        info.lastAccess  = global_UpdateTick;
+        info.lastAccess  = global_tick;
       });
     }
 
@@ -1259,7 +1260,7 @@ struct im{ static:
 
       uint[] toRemove;
       foreach(id, ref info; infos){
-        if(info.lastAccess<global_UpdateTick){
+        if(info.lastAccess<global_tick){
           if(doPurge) toRemove ~= id;
           continue;
         }
@@ -1329,7 +1330,7 @@ struct im{ static:
   auto hScrollInfo = ScrollInfo('H');
   auto vScrollInfo = ScrollInfo('V');
 
-  void Column(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Column //////////////////////////////
+  void Column(string file=__FILE__, int line=__LINE__, Args...)(in Args args){  // Column //////////////////////////////
     mixin(id.M ~ enable.M);
 
     auto column = new .Column;

@@ -118,8 +118,11 @@ private vec2 calcGlyphSize_image(/*in TextStyle ts,*/ int stIdx){
   return size;
 }
 
+
+
 // NEW! ------------------------> ImStorage /////////////////////////////
 
+/+
 struct ImStorage(T){
   struct StorageEntry{
     T value;
@@ -154,7 +157,7 @@ struct ImStorage(T){
 
   }*/
 }
-
++/
 
 
 // HitTest ///////////////////////////////
