@@ -1780,7 +1780,7 @@ struct im{ static:
             switch(ch){
               //case 8:  cmdQueue ~= EditCmd(cDeleteBack);  break; //todo: bug: ha caret.idx=0, akkor benazik.
               default:
-                if(ch>=32){
+                if(ch>=32 || ch==9){
                   cmdQueue ~= EditCmd(cInsert, [ch].to!string);
                 }else{
                   unprocessed ~= ch;

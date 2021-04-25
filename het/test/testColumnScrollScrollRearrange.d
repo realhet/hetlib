@@ -228,7 +228,7 @@ class PathEditor{ // PathEditor ////////////////////////////////
 class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm ///////////////////////////////////
 
   CustomTexture customTexture;
-  int threshold = 32;
+  int threshold = 2;
 
   PathEditor pathEditor;
   Path actPath;
@@ -251,7 +251,11 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
 
   void refresh(){
     static Bitmap bOrig;
-    if(!bOrig) bOrig = newBitmap(`c:\dl\s-l1600 (19).jpg`);
+    if(!bOrig) bOrig = newBitmap(`\dl\ebaytest2.png`);
+    //`c:\D\projects\Karc\Samples\old\200221-213031-481.jpg`);
+
+    //`c:\dl\s-l1600 (54).jpg`;
+    //`c:\dl\books-notebook-notepad-pencil.jpg`);//c:\dl\s-l1600 (19).jpg`);
 
     auto iSrc = bOrig.get!ubyte;
     auto iDst = image2D(bOrig.size, bOrig.get!RGB.asArray);
@@ -262,12 +266,19 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
     foreach(y; 0..iSrc.height-2) foreach(x; 0..iSrc.width-2){
       auto subImg = iSrc[x..x+2, y..y+2],
            hDiff = min(absDiff(subImg[0,0],subImg[1,0]), absDiff(subImg[0,1],subImg[1,1])),
-           vDiff = min(absDiff(subImg[0,0],subImg[0,1]), absDiff(subImg[1,0],subImg[1,1]));
-      img[x, y+iSrc.height] = cast(ubyte)(
-         min(hDiff, vDiff)>=threshold ? 255 : 0
-      );
+           vDiff = min(absDiff(subImg[0,0],subImg[0,1]), absDiff(subImg[1,0],subImg[1,1])),
+           xDiff = min(absDiff(subImg[0,0],subImg[1,0]), absDiff(subImg[0,0],subImg[0,1]), absDiff(subImg[0,0],subImg[1,1]), absDiff(subImg[1,0],subImg[0,1])),
+           xDiffAvg = max(absDiff(subImg[0,0],subImg[1,0]), absDiff(subImg[0,0],subImg[0,1]), absDiff(subImg[0,0],subImg[1,1]), absDiff(subImg[1,0],subImg[0,1]));
 
-      if(img[x, y+iSrc.height]) iDst[x, y] = clFuchsia;
+      void set(RGB col){ iDst[x, y] = col; }
+      switch(xDiff/*+xDiffAvg/4*/){
+        case 1: set(clLime);                  break;
+        case 2: set(clYellow);                break;
+        case 3: set(clOrange);                break;
+        case 4: set(clRed);                   break;
+        case 5:..case 255: set(clFuchsia);    break;
+        default: set(clBlack);
+      }
     }
 
     customTexture.update(new Bitmap(iDst));

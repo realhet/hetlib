@@ -15,7 +15,7 @@ enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
   VisualizeGlyphs          = 0,
-  VisualizeTabColors       = 0,
+  VisualizeTabColors       = 1,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
 
@@ -35,7 +35,7 @@ immutable
 
 enum
   InternalTabScale = 0.12f/2,  //around 0.15 for programming
-  LeadingTabScale  = 0.12f*3;  //these are relative to the original length which is 8 spaces or something like that
+  LeadingTabScale  = 0.12f*3 *1.5f;  //these are relative to the original length which is 8 spaces or something like that
 
 immutable
   EmptyCellWidth  = 0,
