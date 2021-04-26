@@ -5,34 +5,56 @@ import het, het.ui;
 
 // Id system ////////////////////////////////////////////////////////////
 
-//version = stringId;
-version = longId;
+version = stringId;
+//version = longId;
 
-     version(stringId) alias IdType = string;
-else version(longId  ) alias IdType = ulong ;
-else                   alias IdType = uint  ;
 
-struct Id{
-  IdType value;
+struct SrcId{
+       version(stringId) alias T = string;
+  else version(longId  ) alias T = ulong ;
+  else                   alias T = uint  ;
+
+  T value;
+
+
 }
 
-static if(is(IdType==uint) || is(IdType==ulong)){
+string processGenericArgs(string code){
+  return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}";
+}
+
+static if(is(SrcId.T==uint) || is(SrcId.T==ulong)){
+
+  auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value));      }
 
   //note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
-  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__   )(        ){ return Id(cast(IdType)hashOf(srcLine, hashOf(srcModule)));  }
-  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__, T)(in T idx){ return Id(cast(IdType)hashOf(idx, makeId!(srcModule, srcLine).value)); }
-  auto makeId(in Id i1, in Id i2)                                               { return Id(cast(IdType)hashOf(i2.value, i1.value));      }
+  auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
+    auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule)));
+    mixin(processGenericArgs(q{
+      static if(N=="id") id = SrcId(cast(SrcId.T)hashOf(a, id.value));
+    }));
+    return id;
+  }
 
-}else static if(is(IdType==string)){
+}else static if(is(SrcId.T==string)){
 
-  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__   )(        ){ return Id(srcModule ~ '(' ~ srcLine.text ~ ')'); }
-  auto makeId(string srcModule=__MODULE__, size_t srcLine=__LINE__, T)(in T idx){ return Id(makeId!(srcModule, srcLine).value ~ '[' ~ idx.text ~ ']'); }
-  auto makeId(in Id i1, in Id i2)                                               { return Id(i1.value ~ '.' ~ i2.value); }
+  auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
 
-}else static assert(0, "Invalid IdType");
+  auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
+    auto id = SrcId(srcModule ~ `.d(` ~ srcLine.text ~ ')'); // .d is included to make sourceModule detection easier
+    mixin(processGenericArgs(q{
+      static if(N=="id") id = SrcId(id.value ~ '[' ~ a.text ~ ']');
+    }));
+    return id;
+  }
+
+}else static assert(0, "Invalid SrcId.T");
 
 
-void testId(){
+
+
+void test_SrcId(){
+
   string[] strings = File(`c:\d\libs\het\utils.d`).readLines;
 
   immutable str = "Hello";
@@ -50,24 +72,19 @@ void testId(){
     print("xxh: ", t1-t0, "hashOf: ", t2-t1);
   }
 
-  print("IdType =", IdType.stringof);
+  print("IdType =", SrcId.T.stringof);
 
-  {
-    enum i1 = makeId; enum i2 = makeId;
-    enum i3 = makeId;
-    enforce(i1==i2);
-    print("CTFE makeId()", i1, i2, i3);
+  { //simple id test: id's on same lines are equal, except with extra params
+
+    auto f1(string srcModule = __MODULE__, size_t srcLine = __LINE__, Args...)(in Args args){
+      auto id = srcId!(srcModule, srcLine)(args);
+      return id.value;
+    }
+
+    enum i1 = srcId; enum i2 = srcId;
+    enum i3 = srcId; auto i4 = srcId(genericArg!"id"("Hello"), genericArg!"id"(123));
+    enforce(i1==i2 && i2!=i3 && i3!=i4);
   }
-  print("MakeId(idx)", makeId, makeId(0), makeId(1), makeId(2));
-
-  print(__FILE__, __FILE_FULL_PATH__, __MODULE__, __FUNCTION__, __PRETTY_FUNCTION__);
-
-
-  auto r = 9.5f,
-       center = ivec2(30),
-       im = image2D(center*2, (ivec2 p) => RGB((smoothstep(r+.5f, r-.5f, distance(p, center))*255).iround*0x10101) );
-
-  im.serialize.saveTo(`c:\d\aa_smoothStep.png`);
 }
 
 
@@ -234,10 +251,10 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
   Path actPath;
 
   override void onCreate(){
-    auto id = makeId;
+    auto id = srcId;
     print(id);
 
-    testId;
+    test_SrcId;
 
     readln;
 

@@ -2807,6 +2807,7 @@ enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Ar
 
 struct GenericArg(string N="", T){ alias type = T; enum name = N;
   T value;
+  alias value this;
 }
 
 enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T);
@@ -2821,6 +2822,12 @@ auto asGenericArg(A)(in A a){
     static if(isGenericArg!A) return a;
                          else return genericArg(a);
 }
+
+auto asGenericArgValue(A)(in A a){
+    static if(isGenericArg!A) return a.value;
+                         else return a;
+}
+
 
 
 static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////
