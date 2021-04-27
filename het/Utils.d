@@ -2829,6 +2829,80 @@ auto asGenericArgValue(A)(in A a){
 }
 
 
+string processGenericArgs(string code){
+  return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}";
+}
+
+// SrcId ////////////////////////////////////////////////////////////
+
+enum srcLocationStr(string srcModule, size_t srcLine) = srcModule ~ `.d(` ~ srcLine.text ~ ')';
+
+struct SrcId{
+  /// select Id datatype. Default=string if debug, long if release
+       version(stringId) alias T = string;
+  else version(longId  ) alias T = ulong ;
+  else version(intId   ) alias T = uint  ;
+  else{
+    alias T = ulong;
+    //todo: it could be string in debug mode. Needs a new ide to handle that.
+  }
+
+  T value;
+
+/*  auto opCast(T : bool)() const{ return value != T.init; }
+  bool opEquals(in SrcId b) const{ return value == b.value; }
+  size_t toHash() const{ return .toHash(value); }*/
+
+  alias value this;
+}
+
+static if(is(SrcId.T==uint) || is(SrcId.T==ulong)){
+
+  //auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value)); }
+
+  void combine(T)(ref SrcId i1, in T i2){ i1.value = cast(SrcId.T)hashOf(i2, i1.value); }
+
+  //note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
+  auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
+    auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule)));
+    mixin(processGenericArgs(q{
+      static if(N=="id") id.combine(a);
+    }));
+    return id;
+  }
+
+}else static if(is(SrcId.T==string)){
+
+  //auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
+
+  void combine(T)(ref SrcId i1, in T i2){ i1.value ~= '[' ~ i2.text ~ ']'; }
+
+  auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
+    auto id = SrcId(srcLocationStr!(srcModule, srcLine)); // .d is included to make sourceModule detection easier
+    mixin(processGenericArgs(q{
+      static if(N=="id") id.combine(a);
+    }));
+    return id;
+  }
+
+}else static assert(0, "Invalid SrcId.T");
+
+void test_SrcId(){
+  { //simple id test: id's on same lines are equal, except with extra params
+
+    auto f1(string srcModule = __MODULE__, size_t srcLine = __LINE__, Args...)(in Args args){
+      auto id = srcId!(srcModule, srcLine)(args);
+      return id.value;
+    }
+
+    //newlines in source do matter here!!!!
+    /+1+/ enum i1 = srcId; enum i2 = srcId;
+    /+2+/ enum i3 = srcId; auto i4 = srcId(genericArg!"id"("Hello"), genericArg!"id"(123)), i5 = srcId(genericArg!"id"("Hello"));
+    /+3+/ auto i6 = i5; i6.combine("Test");
+    /+4+/ auto i7 = i6; i7.combine(0);
+    enforce(i1==i2 && i2!=i3 && i3!=i4 && i4!=i5 && i5!=i6 && i6!=i7);
+  }
+}
 
 static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////
   import std.traits : SharedOf;
@@ -3616,8 +3690,26 @@ void benchmark_xxh(){
 
     len = iceil(len*1.5);
   }
-}
 
+/+
+  string[] strings = File(`c:\d\libs\het\utils.d`).readLines;
+
+  immutable str = "Hello";
+  import core.internal.hash;
+  enum test = bytesHash(str.ptr, str.length, 0);
+  print(test);
+
+  foreach(batch; 0..5){
+    auto t0 = QPS;
+    foreach(const s; strings) s.xxh(0);
+    auto t1 = QPS;
+    foreach(const s; strings) hashOf(s);
+    auto t2 = QPS;
+
+    print("xxh: ", t1-t0, "hashOf: ", t2-t1);
+  }
++/
+}
 
 // crc32 //////////////////////////////////////////////////////////////////
 
@@ -5576,6 +5668,8 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   ini.loadIni;
 
   console.setUTF8;
+
+  test_SrcId;
 }
 
 private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.

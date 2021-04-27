@@ -1,95 +1,9 @@
 //@exe
-///@release
+//@release
+
+//@compile --d-version intId
 
 import het, het.ui;
-
-// Id system ////////////////////////////////////////////////////////////
-
-version = stringId;
-//version = longId;
-
-
-struct SrcId{
-       version(stringId) alias T = string;
-  else version(longId  ) alias T = ulong ;
-  else                   alias T = uint  ;
-
-  T value;
-
-
-}
-
-string processGenericArgs(string code){
-  return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}";
-}
-
-static if(is(SrcId.T==uint) || is(SrcId.T==ulong)){
-
-  auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value));      }
-
-  //note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
-  auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
-    auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule)));
-    mixin(processGenericArgs(q{
-      static if(N=="id") id = SrcId(cast(SrcId.T)hashOf(a, id.value));
-    }));
-    return id;
-  }
-
-}else static if(is(SrcId.T==string)){
-
-  auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
-
-  auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
-    auto id = SrcId(srcModule ~ `.d(` ~ srcLine.text ~ ')'); // .d is included to make sourceModule detection easier
-    mixin(processGenericArgs(q{
-      static if(N=="id") id = SrcId(id.value ~ '[' ~ a.text ~ ']');
-    }));
-    return id;
-  }
-
-}else static assert(0, "Invalid SrcId.T");
-
-
-
-
-void test_SrcId(){
-
-  string[] strings = File(`c:\d\libs\het\utils.d`).readLines;
-
-  immutable str = "Hello";
-  import core.internal.hash;
-  enum test = bytesHash(str.ptr, str.length, 0);
-  print(test);
-
-  foreach(batch; 0..5){
-    auto t0 = QPS;
-    foreach(const s; strings) s.xxh(0);
-    auto t1 = QPS;
-    foreach(const s; strings) hashOf(s);
-    auto t2 = QPS;
-
-    print("xxh: ", t1-t0, "hashOf: ", t2-t1);
-  }
-
-  print("IdType =", SrcId.T.stringof);
-
-  { //simple id test: id's on same lines are equal, except with extra params
-
-    auto f1(string srcModule = __MODULE__, size_t srcLine = __LINE__, Args...)(in Args args){
-      auto id = srcId!(srcModule, srcLine)(args);
-      return id.value;
-    }
-
-    enum i1 = srcId; enum i2 = srcId;
-    enum i3 = srcId; auto i4 = srcId(genericArg!"id"("Hello"), genericArg!"id"(123));
-    enforce(i1==i2 && i2!=i3 && i3!=i4);
-  }
-}
-
-
-//  void combine(uint nextId){ return value = value*22695477+1; }
-//  void combine(in ImId nextId){ combine(nextId.value); }
 
 // ImStorage ///////////////////////////////////////////////
 
@@ -252,9 +166,9 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
 
   override void onCreate(){
     auto id = srcId;
-    print(id);
-
-    test_SrcId;
+    auto id2 = id;
+    id2.combine(123);
+    print(id, id2);
 
     readln;
 

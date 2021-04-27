@@ -1366,6 +1366,27 @@ struct im{ static:
     }}
   }
 
+  void Control(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){  // Row //////////////////////////////
+    mixin(enable.M);
+
+    auto row = new .Row("", textStyle);
+    append(row); push(row, srcModuleile.xxh(line)); scope(exit) pop;
+
+    static foreach(a; args){{ alias t = Unqual!(typeof(a));
+
+           static if(isFunctionPointer!a) a();
+      else static if(isDelegate!a       ) a();
+      else static if(isSomeString!t     ) Text(a);
+      else static if(is(t == YAlign)    ) flags.yAlign = a;
+      else static if(is(t == HAlign)    ) flags.hAlign = a;
+      else static if(is(t == VAlign)    ) flags.vAlign = a;
+      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static assert(false, "Unsupported type: "~t.stringof);
+
+    }}
+  }
+
+
   void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Container //////////////////////////////
     mixin(id.M ~ enable.M);
 
