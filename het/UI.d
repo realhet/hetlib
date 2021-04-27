@@ -134,9 +134,9 @@ class FlexRow : Row{ //FlexRow///////////////////////////////
 
 class Link : Row{ //Link ///////////////////////////////
 
-  this(string cmdLine, uint hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
-
-    auto hit = im.hitTest(this, hash, enabled);
+  this(string cmdLine, in SrcId hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
+    this.id = hash;
+    auto hit = im.hitTest(this, enabled);
 
     if(enabled && onClick !is null && hit.clicked){
       onClick();
@@ -160,17 +160,6 @@ class Link : Row{ //Link ///////////////////////////////
   }
 }
 
-/*class Clickable : Row{ //Clickable / ChkBox / RadioBtn ///////////////////////////////
-
-  this(uint id, string markup, TextStyle ts, string[string] params){
-    hitTestManager.addHash(this, id);
-
-    flags.wordWrap = false;
-
-    super(markup, ts);
-    setProps(params);
-  }
-} */
 
 class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
 
@@ -495,6 +484,7 @@ auto testWin(Drawing dr, vec2 mouse, float pixelSize){ // testWin() ////////////
 
 
 struct im{ static:
+  alias Id = het.utils.SrcId;
 
   //Frame handling
   bool mouseOverUI, wantMouse, wantKeys;
@@ -523,7 +513,7 @@ struct im{ static:
 
   bool comboState; //automatically cleared on focus.change
   bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
-  uint comboId;    //when the focus of this is lost, comboState goes false
+  Id comboId;    //when the focus of this is lost, comboState goes false
 
   //GUI area that tracks PanelPosition changes
   bounds2 clientArea;
@@ -610,9 +600,6 @@ struct im{ static:
 
     //the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
     wantMouse = mouseOverUI[1];
-
-    updateScrollers(screenBounds);
-    resetScrollers; //needed no more
 
     if(textEditorState.active){ //an edit control is active.
       //todo: mainWindow.isForeground check
@@ -727,7 +714,7 @@ struct im{ static:
 
   // Focus handling /////////////////////////////////
   struct FocusedState{
-    uint id;              //globally store the current hash
+    Id id;              //globally store the current hash
     .Container container;  //this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
 
     void reset(){ this = typeof(this).init; }
@@ -736,15 +723,15 @@ struct im{ static:
 
   TextEditorState textEditorState; //maintained by edit control
 
-  void onFocusLost(uint oldId){
+  void onFocusLost(in Id oldId){
     if(comboId && oldId==comboId){
       comboState = false;
-      comboId = 0;
+      comboId = Id.init;
     }
   }
 
   /// internal use only
-  bool focusUpdate(.Container container, uint id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
+  bool focusUpdate(.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit){
     if(focusedState.id==id){
       if(!canFocus || exitFocusNow){ //not enabled anymore: exit focus
         if(onExit) onExit();
@@ -772,100 +759,12 @@ struct im{ static:
     return res;
   }
 
-  bool isFocused(uint id)               { return focusedState.id                 && focusedState.id == id; }
+  bool isFocused(in Id id)              { return focusedState.id!=Id.init        && focusedState.id == id; }
   bool isFocused(.Container container)  { return focusedState.container !is null && focusedState.container is container; }
 
-//  void focusExit(uint id)               { if(isFocused(id)) focusedState.reset; }
+//  void focusExit(in Id id)              { if(isFocused(id)) focusedState.reset; }
 //  void focusExit(Container container)   { if(isFocused(container)) focusedState.reset; }
 //  void focusExit()                      { focusedState.reset; }
-
-
-// OldScrollState, scroller ////////////////////////////////////////////////
-  deprecated struct OldScrollState{ //currently it's for y only
-    float scrollY = 0;
-    float scrollY_smooth = 0;
-  }
-
-  deprecated class OldScroller{   //todo: kinetic scrolling
-    .Container container, parent;
-    OldScrollState* state;
-
-    this(.Container container, .Container parent, ref OldScrollState state){
-      this.container = container;
-      this.parent = parent;
-      this.state = &state;
-    }
-
-    void apply(in bounds2 screenBounds){ //must be called first, before update, so the positions are calculated well
-      if(state) with(*state){
-        float totalHeight = parent ? parent.innerHeight : screenBounds.height;
-        float docHeight = container.outerHeight;  //todo: COPY
-
-        if(totalHeight<docHeight){
-          container.outerPos.y = scrollY_smooth;
-        } //otherwise assume it's aligned properly. Only change the position when it doesn't fit in.
-      }
-    }
-
-    void update(in bounds2 screenBounds){
-      if(state) with(*state){
-        float totalHeight = parent ? parent.innerHeight : screenBounds.height;
-        float docHeight = container.outerHeight; //todo: PASTE
-
-        if(container.flags.hovered){ //todo: overlapping Panels not handled properly (all of them are scrolling, not just the topmost)
-          import het.win;
-          scrollY += (cast(GLWindow)mainWindow).mouse.delta.wheel*120; //todo: Window/mouse should it should come from outside
-        }
-
-        scrollY = scrollY.clamp(min(0, totalHeight-docHeight), 0);
-        scrollY_smooth = mix(scrollY_smooth, scrollY, 0.25f);
-        scrollY_smooth = scrollY_smooth.clamp(min(0, totalHeight-docHeight), 0);
-      }
-    }
-
-  }
-
-  OldScroller[] scrollers;
-
-  auto vScroll(ref OldScrollState state){
-    enforce(stack.length>=2);
-    //todo: get the bounds from the previous container on the stack
-    //todo: handle PanelPosition center/bottom
-    //todo: hscroll
-
-    //scroller workflow:
-    //1. build: make the scrolling list -> scroll(myScrollState)
-    //2. measure
-    //3. scrollers.update
-
-    auto idx = scrollers.map!(s => s.container).countUntil(actContainer);
-    enforce(idx<0, "Scroller already defined");
-
-    scrollers ~= new OldScroller(actContainer, stack[$-2].container, state);
-
-    return scrollers[$-1];
-  }
-
-  auto vScroll(string file=__FILE__ , int line=__LINE__, T...)(T args){ //todo: this is only good for unique panels
-    mixin(id.M);
-    __gshared static ScrollState[uint] cache;
-
-    if(id_ !in cache) cache[id_] = ScrollState();
-
-    return vScroll(cache[id_]);
-  }
-
-  private void applyScrollers(in bounds2 screenBounds){
-    foreach(sc; scrollers) sc.apply(screenBounds);
-  }
-
-  private void updateScrollers(in bounds2 screenBounds){
-    foreach(sc; scrollers) sc.update(screenBounds);
-  }
-
-  private void resetScrollers(){
-    scrollers = [];
-  }
 
   // hints /////////////////////////////////////////////////////////////////
 
@@ -993,7 +892,7 @@ struct im{ static:
   //todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
   .Container actContainer, lastContainer; //top of the containerStack for faster access
   bool enabled;
-  uint baseId;
+  Id baseId;
   TextStyle textStyle;   alias style = textStyle; //todo: style.opDispatch("fontHeight=0.5x")
   string theme; //for now it's a str, later it will be much more complex
   //valid valus: "", "tool"
@@ -1004,18 +903,18 @@ struct im{ static:
     return cast(T)cell;
   }
 
-  private struct StackEntry{ .Container container; uint baseId; bool enabled; TextStyle textStyle; string theme; }
+  private struct StackEntry{ .Container container; Id baseId; bool enabled; TextStyle textStyle; string theme; }
   private StackEntry[] stack;
 
   void reset(){
     //statck reset
-    baseId = 0;
+    baseId = Id.init;
     enabled = true;
     textStyle = tsNormal;
     theme = "";
 
     root = [];
-    stack = [StackEntry(null, 0, enabled, textStyle, theme)];
+    stack = [StackEntry(null, Id.init, enabled, textStyle, theme)];
     actContainer = null;
 
     overlayDrawings.clear;
@@ -1028,16 +927,13 @@ struct im{ static:
     //lastQPS = QPS;
   }
 
-  private void push(T : .Container)(T c, uint newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
-    newId = [newId].xxh(baseId);
+  private void push(T : .Container)(T c, in Id newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
     c.id = newId;
+    baseId = newId;
     stack ~= StackEntry(c, newId, enabled, textStyle, theme);
 
     //actContainer is the top of the stack or null
     actContainer = c;
-  }
-
-  private void pushNull(){
   }
 
   private void pop(){
@@ -1126,7 +1022,9 @@ struct im{ static:
   );
 
   //Parameter structs ///////////////////////////////////
-  struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+  //deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+  private immutable prepareId = q{ auto id_ = combine(baseId, srcId!(srcModule, srcLine)(args)); };
+
   struct enable  { bool val;  private enum M = q{ auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;   static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled   = enabled && a.val; }; }
   struct selected{ bool val;  private enum M = q{ auto _selected = false;                                        static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected = a.val;            }; }
 
@@ -1188,16 +1086,16 @@ struct im{ static:
   auto circularRange(float min, float max, float step=1){ return range(min, max, step, RangeType.circular); }
   auto endlessRange (float min, float max, float step=1){ return range(min, max, step, RangeType.endless ); }
 
-  static auto hitTest(.Container container, uint id, bool enabled){
+  static auto hitTest(.Container container, bool enabled){
     assert(container !is null);
-    auto res = hitTestManager.check(id);
+    auto res = hitTestManager.check(container.id);
     res.enabled = enabled;
-    hitTestManager.addHash(container, id);
+    hitTestManager.addHash(container, container.id);
     return res;
   }
 
-  auto hitTest(uint id, bool enabled){
-    return hitTest(actContainer, id, enabled);
+  auto hitTest(bool enabled){
+    return hitTest(actContainer, enabled);
   }
 
 
@@ -1208,7 +1106,7 @@ struct im{ static:
     char orientation;
 
     struct ScrollInfoRec{
-      uint id;
+      Id id;
       .Container container; //contains id
       uint lastAccess; //to purge the old ones
 
@@ -1220,20 +1118,20 @@ struct im{ static:
       im.SliderClass slider;
     }
 
-    protected ScrollInfoRec[uint] infos;
+    protected ScrollInfoRec[Id] infos;
 
-    auto getScrollBar(uint id){
+    auto getScrollBar(in Id id){
       if(auto p = id in infos) return (*p).slider; else return null;
     }
 
-    auto getScrollOffset(uint id){ //opt: Should combine get offset and getScrollBar
+    auto getScrollOffset(in Id id){ //opt: Should combine get offset and getScrollBar
       if(auto p = id in infos) return (*p).offset; else return 0;
     }
 
     //1. called from measure() when it decided the scrollbars needed
     auto update(.Container container, float contentSize, float pageSize)
     in(container)
-    in(container.id)
+    in(container.id!=Id.init)
     {
       infos.findAdd(container.id, (ref ScrollInfoRec info){
         info.container   = container;
@@ -1246,7 +1144,7 @@ struct im{ static:
 
     //optional
     /*void purge(){  createBars has it.
-      uint[] toRemove;
+      Id[] toRemove;
       foreach(k, const v; infos) if(v.lastAccess < global_updateTick) toRemove ~= k;
       foreach(k; toRemove) infos.remove(k);
       //opt: assocArray.rehash test
@@ -1258,7 +1156,7 @@ struct im{ static:
     void createBars(bool doPurge){
       assert(orientation.among('H', 'V'));
 
-      uint[] toRemove;
+      Id[] toRemove;
       foreach(id, ref info; infos){
         if(info.lastAccess<global_tick){
           if(doPurge) toRemove ~= id;
@@ -1293,7 +1191,7 @@ struct im{ static:
         bool userModified;
         HitInfo hit;
         auto actView = targetSurfaces[1].view; //todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, just like the upcoming enabled flag.
-        auto sl = new SliderClass(info.container.id^(0x84389f40+orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos, tsNormal, hit,
+        auto sl = new SliderClass(combine(info.container.id, orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos, tsNormal, hit,
           orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1, normThumbSize);
 
         info.slider = sl;
@@ -1330,12 +1228,12 @@ struct im{ static:
   auto hScrollInfo = ScrollInfo('H');
   auto vScrollInfo = ScrollInfo('V');
 
-  void Column(string file=__FILE__, int line=__LINE__, Args...)(in Args args){  // Column //////////////////////////////
-    mixin(id.M ~ enable.M);
+  void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){  // Column //////////////////////////////
+    mixin(prepareId, enable.M);
 
     auto column = new .Column;
     column.bkColor = style.bkColor;
-    append(column); push(column, file.xxh(line)); scope(exit) pop;
+    append(column); push(column, id_); scope(exit) pop;
 
     static foreach(a; args){{ alias t = typeof(a);
       static if(isFunctionPointer!a){
@@ -1346,11 +1244,11 @@ struct im{ static:
     }}
   }
 
-  void Row(string file=__FILE__, int line=__LINE__, T...)(in T args){  // Row //////////////////////////////
-    mixin(id.M ~ enable.M);
+  void Row(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){  // Row //////////////////////////////
+    mixin(prepareId, enable.M);
 
     auto row = new .Row("", textStyle);
-    append(row); push(row, file.xxh(line)); scope(exit) pop;
+    append(row); push(row, id_); scope(exit) pop;
 
     static foreach(a; args){{ alias t = Unqual!(typeof(a));
 
@@ -1366,32 +1264,11 @@ struct im{ static:
     }}
   }
 
-  void Control(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){  // Row //////////////////////////////
-    mixin(enable.M);
-
-    auto row = new .Row("", textStyle);
-    append(row); push(row, srcModuleile.xxh(line)); scope(exit) pop;
-
-    static foreach(a; args){{ alias t = Unqual!(typeof(a));
-
-           static if(isFunctionPointer!a) a();
-      else static if(isDelegate!a       ) a();
-      else static if(isSomeString!t     ) Text(a);
-      else static if(is(t == YAlign)    ) flags.yAlign = a;
-      else static if(is(t == HAlign)    ) flags.hAlign = a;
-      else static if(is(t == VAlign)    ) flags.vAlign = a;
-      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
-      else static assert(false, "Unsupported type: "~t.stringof);
-
-    }}
-  }
-
-
-  void Container(string file=__FILE__, int line=__LINE__, T...)(T args){  // Container //////////////////////////////
-    mixin(id.M ~ enable.M);
+  void Container(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(T args){  // Container //////////////////////////////
+    mixin(prepareId, enable.M);
 
     auto cntr = new .Container;
-    append(cntr); push(cntr, file.xxh(line)); scope(exit) pop;
+    append(cntr); push(cntr, id_); scope(exit) pop;
 
     static foreach(a; args){{ alias t = typeof(a);
       static if(isFunctionPointer!a){
@@ -1519,7 +1396,7 @@ struct im{ static:
 //  string flex(float value){ return flex(value.text); } //kinda lame to do it with texts
 
   //Text /////////////////////////////////
-  void Text(/*string file=__FILE__, int line=__LINE__,*/ T...)(T args){ //todo: not multiline yet
+  void Text(/*string srcModule=__MODULE__, size_t srcLine=__LINE__,*/ T...)(T args){ //todo: not multiline yet
 
     //multiline behaviour:
     //  parent is Row: if multiline -> make a column around it
@@ -1586,7 +1463,7 @@ struct im{ static:
      else Row({ Text(text); });*/
   }
 
-  void Comment(/*string file=__FILE__, int line=__LINE__, */T...)(T args){
+  void Comment(/*string srcModule=__MODULE__, size_t srcLine=__LINE__, */T...)(T args){
     // It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...
     Text/*!(file, line)*/(tsComment, args);
   }
@@ -1723,10 +1600,10 @@ struct im{ static:
     alias changed this;
   }
 
-  auto Edit(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
+  auto Edit(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
     enum IsNum = std.traits.isNumeric!T0;
 
-    mixin(id.M ~ enable.M);
+    mixin(prepareId, enable.M);
     static if(IsNum) mixin(range.M);
 
     EditResult res;
@@ -1753,12 +1630,15 @@ struct im{ static:
     }
 
     Row({
+      actContainer.id = id_;
+      baseId = id_;
+
       auto ref hit(){ return res.hit; }
 
       flags.clipChildren = true;
       auto row = cast(.Row)actContainer;
 
-      hit = hitTest(id_, enabled);
+      hit = hitTest(enabled);
       auto localMouse = actView.mousePos - hit.hitBounds.topLeft - row.topLeftGapSize; //todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 
       mixin(hintHandler);
@@ -1868,14 +1748,17 @@ struct im{ static:
     return res; //a hit testet vissza kene adni im.valtozoban
   }
 
-  auto Static(string file=__FILE__, int line=__LINE__, T0, T...)(in T0 value, T args){ // Static /////////////////////////////////
+  auto Static(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(in T0 value, T args){ // Static /////////////////////////////////
     static if(is(T0 : Property)){
       auto p = cast(Property)value;
-      Static!(file, line)(p.asText, hint(p.hint),args);
+      Static!(srcModule, srcLine)(p.asText, hint(p.hint),args);
     }else{
       Row({
-        mixin(id.M);
-        auto hit = hitTest(id_, enabled);
+        mixin(prepareId);
+        actContainer.id = id_;
+        baseId = id_;
+        auto hit = hitTest(enabled);
+
         mixin(hintHandler);
         applyEditStyle(true, false, 0); //todo: Enabled in static???
         style = tsNormal;
@@ -1895,13 +1778,13 @@ struct im{ static:
     }
   }
 
-  auto IncBtn(string file=__FILE__, int line=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0){ //IncBtn /////////////////////////////////
-    mixin(id.M ~ enable.M ~ range.M);
+  auto IncBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0){ //IncBtn /////////////////////////////////
+    mixin(enable.M, range.M);
 
     auto capt = symbol(`Calculator` ~ (sign>0 ? `Addition` : `Subtract`));
     enum isInt = isIntegral!T0;
 
-    auto hit = Btn!(file, line)(capt, args, id(sign)); //2 id's can pass because of the static foreach
+    auto hit = Btn!(srcModule, srcLine)(capt, args, genericArg!"id"(sign)); //2 id's can pass because of the static foreach
     bool chg;
     if(hit.repeated){
       auto oldValue = value,
@@ -1917,45 +1800,47 @@ struct im{ static:
     return chg;
   }
 
-  auto DecBtn(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
-    return IncBtn!(file, line, -1)(value, args);
+  auto DecBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){
+    return IncBtn!(srcModule, srcLine, -1)(value, args);
   }
 
-  auto IncDecBtn(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
+  auto IncDecBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){
     bool res;
     Row({
       flags.btnRowLines = true;
-      auto r1 = DecBtn!(file, line)(value, args);
+      auto r1 = DecBtn!(srcModule, srcLine)(value, args);
       lastCell.margin.right = 0;
-      auto r2 = IncBtn!(file, line)(value, args);
+      auto r2 = IncBtn!(srcModule, srcLine)(value, args);
       lastCell.margin.left = 0;
       res = r1 || r2;
     });
     return res;
   }
 
-  auto IncDec(string file=__FILE__, int line=__LINE__, T0, T...)(ref T0 value, T args){
+  auto IncDec(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){
     auto oldValue = value;
     Edit!(file, line)(value, { width = 2*fh; }, args); //todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
     IncDecBtn(value, args);
     return oldValue != value;
   }
 
-  auto WhiteBtn(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args){
-    return Btn!(file, line, true, T0, T)(text, args);
+  auto WhiteBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args){
+    return Btn!(srcModule, srcLine, true, T0, T)(text, args);
   }
 
-  auto Btn(string file=__FILE__, int line=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
+  auto Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
-    mixin(id.M ~ enable.M ~ selected.M);
+    mixin(prepareId, enable.M, selected.M);
 
     const isToolBtn = theme=="tool";
 
     HitInfo hit;
 
     Row({
-      hit = hitTest(id_, enabled);
+      actContainer.id = id_;
+      baseId = id_;
+      hit = hitTest(enabled);
       mixin(hintHandler);
 
       bool focused = focusUpdate(actContainer, id_,
@@ -1983,9 +1868,8 @@ struct im{ static:
   }
 
   // BtnRow //////////////////////////////////
-  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(void delegate() fun, in T args){
-    mixin(id.M);
-    Row({
+  auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(void delegate() fun, in T args){
+    Row!(srcModule, srcLine)({
       flags.btnRowLines = true;
 
       fun();
@@ -1995,48 +1879,50 @@ struct im{ static:
         if(!first) c.margin.left = 0;
         if(!last ) c.margin.right= 0;
       }
-    });
+    }, args);
   }
 
-  auto BtnRow(string file=__FILE__, int line=__LINE__, T...)(ref int idx, in string[] captions, in T args){
-    mixin(id.M ~ enable.M);
+  auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref int idx, in string[] captions, in T args){
+    mixin(enable.M);
 
     auto last = idx;
 
-    BtnRow!(file, line)({
+    BtnRow!(srcModule, srcLine)({
       foreach(i0, capt; captions){
         const i = cast(int)i0;
-        if(Btn(capt, id(i), selected(idx==i))) idx = i;
+        if(Btn(capt, genericArg!"id"(i), selected(idx==i))) idx = i;
       }
-    });
+    }, args);
 
     return last != idx;
   }
 
-  auto BtnRow(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, in Args args){
+  auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, in Args args){
     auto idx = cast(int) items.countUntil(value); //todo: it's a copy from ListBox. Refactor needed
-    auto res = BtnRow!(file, line)(idx, items, args);
+    auto res = BtnRow!(srcModule, srcLine)(idx, items, args);
     if(res) value = items[idx];
     return res;
   }
 
   //todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
-  auto BtnRow(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum)){
+  auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum)){
     string s = e.text;
-    auto res = BtnRow!(file, line)(s, getEnumMembers!E, args);
+    auto res = BtnRow!(srcModule, srcLine)(s, getEnumMembers!E, args);
     if(res) ignoreExceptions({ e = s.to!E; });
     return res;
   }
 
-  auto Link(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // Link //////////////////////////////
+  auto Link(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)  // Link //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
-    mixin(id.M ~ enable.M);
+    mixin(prepareId, enable.M);
 
     HitInfo hit;
 
     Row({
-      hit = hitTest(id_, enabled);
+      actContainer.id = id_;
+      baseId = id_;
+      hit = hitTest(enabled);
 
       mixin(hintHandler);
 
@@ -2069,21 +1955,23 @@ struct im{ static:
     return hit;
   }
 
-  auto ToolBtn(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args){ //shorthand for tool theme
+  auto ToolBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args){ //shorthand for tool theme
     auto old = theme; theme = "tool"; scope(exit) theme = old;
-    return Btn!(file, line)(text, args);
+    return Btn!(srcModule, srcLine)(text, args);
   }
 
-  auto OldListItem(string file=__FILE__, int line=__LINE__, T0, T...)(T0 text, T args)  // OldListItem //////////////////////////////
+  auto OldListItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)  // OldListItem //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
-    mixin(id.M ~ enable.M ~ selected.M);
+    mixin(prepareId, enable.M, selected.M);
 
     //todo: This is only the base of a listitem. Later it must communicate with a container
 
     HitInfo hit;
     Row({
-      hit = hitTest(id_, enabled);
+      actContainer.id = id_;
+      baseId = id_;
+      hit = hitTest(enabled);
 
       style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
 
@@ -2116,14 +2004,16 @@ struct im{ static:
 
 
   //ChkBox //////////////////////////////
-  auto ChkBox(string file=__FILE__, int line=__LINE__, string chkBoxStyle="chk", T...)(ref bool state, string caption, T args){
-    mixin(id.M ~ enable.M ~ selected.M);
+  auto ChkBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, string chkBoxStyle="chk", T...)(ref bool state, string caption, T args){
+    mixin(prepareId, enable.M, selected.M);
 
     HitInfo hit;
     Row({
       flags.wordWrap = false;
 
-      hit = hitTest(id_, enabled);
+      actContainer.id = id_;
+      baseId = id_;
+      hit = hitTest(enabled);
       mixin(hintHandler);
 
       //update checkbox state
@@ -2150,17 +2040,17 @@ struct im{ static:
     return hit;
   }
 
-  auto ChkBox(string file=__FILE__, int line=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args){
+  auto ChkBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args){
     auto bp = cast(BoolProperty)prop;
     enforce(bp !is null);
     auto last = bp.act;
-    auto res = ChkBox!(file, line)(bp.act, caption.empty ? prop.caption : caption, hint(prop.hint), args);
+    auto res = ChkBox!(srcModule, srcLine)(bp.act, caption.empty ? prop.caption : caption, hint(prop.hint), args);
     bp.uiChanged |= last != bp.act;
     return res;
   }
 
-  auto Led(string file=__FILE__, int line=__LINE__, T, Ta...)(T param, Ta args){
-    mixin(id.M);
+  auto Led(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Ta...)(T param, Ta args){
+    mixin(prepareId);
     auto hit = hitTestManager.check(id_);
 
     float state = 0;
@@ -2193,12 +2083,13 @@ struct im{ static:
   }
 
   // RadioBtn //////////////////////////
-  auto RadioBtn(string file=__FILE__, uint line=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
+  auto RadioBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
 
-  auto ListBoxItem(C)(ref bool isSelected, C s, uint itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
+  auto ListBoxItem(C)(ref bool isSelected, C s, in Id itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
     HitInfo hit;
     Row({
-      hit = hitTest(itemId, enabled);
+      actContainer.id = itemId; //todo: ubgly af
+      hit = hitTest(enabled);
 
       if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down)) isSelected = true; //mosue down left or right
 
@@ -2220,8 +2111,8 @@ struct im{ static:
     alias changed this;
   }
 
-  auto ListBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // LixtBox ///////////////////////////////
-    mixin(id.M); //todo: enabled, tool theme
+  auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // LixtBox ///////////////////////////////
+    mixin(prepareId); //todo: enabled, tool theme
 
     //find translator function . This translates data to gui.
     enum isTranslator(T) = __traits(compiles, T.init(A.init)); //is(T==void delegate(in A)) || is(T==void delegate(A)) || is(T==void function(in A)) || is(T==void function(A));
@@ -2230,11 +2121,13 @@ struct im{ static:
     HitInfo hit;
     bool changed;
     Column({
-      hit = hitTest(id_, enabled);
+      actContainer.id = id_;
+      baseId = id_;
+      hit = hitTest(enabled);
       border = "1 normal gray";
 
       foreach(i, s; items){
-        auto itemId = id_ + cast(int) i + 1;
+        auto itemId = combine(id_, i);
         auto selected = idx==i, oldSelected = selected;
 
         static if(translated){
@@ -2254,22 +2147,22 @@ struct im{ static:
     return ListBoxResult(hit, changed);
   }
 
-  auto ListBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, A[] items, Args args){
+  auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, A[] items, Args args){
     auto idx = cast(int) items.countUntil(value); //opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
-    auto res = ListBox!(file, line)(idx, items, args);
+    auto res = ListBox!(srcModule, srcLine)(idx, items, args);
     if(res) value = items[idx];
     return res;
   }
 
-  auto ListBox(string file=__FILE__, int line=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum)){
+  auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum)){
     auto s = e.text;
-    auto res = ListBox!(file, line)(s, getEnumMembers!E, args);
+    auto res = ListBox!(srcModule, srcLine)(s, getEnumMembers!E, args);
     if(res) ignoreExceptions({ e = s.to!E; });
     return res;
   }
 
   //todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. It's a lot of copy paste and yet it's far from full accessible functionality.
-  static void ScrollListBox(T, U, string file=__FILE__ , int line=__LINE__)(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
+  static void ScrollListBox(T, U, string srcModule=__MODULE__ , size_t srcLine=__LINE__)(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
   if(isInputRange!U && is(ElementType!U == T)) {
     auto scrollMax = max(0, items.walkLength.to!int-pageSize);
     topIndex = topIndex.clamp(0, scrollMax);
@@ -2285,7 +2178,7 @@ struct im{ static:
   }
 
 
-/+  auto Btn(string file=__FILE__, int line=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
+/+  auto Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
   if(isSomeString!T0 || __traits(compiles, text()) )
   {
     mixin(id.M ~ enable.M ~ selected.M);
@@ -2321,7 +2214,7 @@ struct im{ static:
   }         +/
 
 
-  auto PopupBtn(string file=__FILE__, int line=__LINE__, T0, Args...)(T0 text, Args args) // PopupBtn ////////////////////////////////
+  auto PopupBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, Args...)(T0 text, Args args) // PopupBtn ////////////////////////////////
   if((isSomeString!T0 || __traits(compiles, text())) && Args.length>=1 && __traits(compiles, args[$-1]()) )
   {
     Cell btn;
@@ -2347,15 +2240,15 @@ struct im{ static:
   }
 
 
-  auto ComboBox_idx(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // ComboBox ////////////////////////////////
-    mixin(id.M); //todo: enabled
+  auto ComboBox_idx(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // ComboBox ////////////////////////////////
+    //todo: enabled
 
     //find translator function . This translates data to gui.
     enum isTranslator(T) = __traits(compiles, T.init(A.init));
     enum translated = anySatisfy!(isTranslator, Args);
 
     Cell btn;
-    auto hit = WhiteBtn({
+    auto hit = WhiteBtn!(srcModule, srcLine)({
       btn = actContainer;
       flags.hAlign = HAlign.left;
 
@@ -2395,9 +2288,9 @@ struct im{ static:
 
         static if(translated){
           static foreach(f; args) static if(isTranslator!(typeof(f)))
-            res = ListBox(idx, items, id(id_+1), &inheritComboWidth, f); //todo: this translator appending is a big mess
+            res = ListBox!(srcModule, srcLine)(idx, items, genericArg!"id"(1), &inheritComboWidth, f); //todo: this translator appending is a big mess
         }else{
-          res = ListBox(idx, items, id(id_+1), &inheritComboWidth);
+          res = ListBox!(srcModule, srcLine)(idx, items, genericArg!"id"(1), &inheritComboWidth);
         }
 
         if(res.hit.hover && inputs.LMB.released){
@@ -2409,24 +2302,24 @@ struct im{ static:
     return res;
   }
 
-  auto ComboBox_ref(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+  auto ComboBox_ref(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
     auto idx = cast(int) items.countUntil(value);
-    auto res = ComboBox_idx!(file, line)(idx, items, args);
+    auto res = ComboBox_idx!(srcModule, srcLine)(idx, items, args);
     if(res) value = items[idx];
     return res;
   }
 
-  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){
-    return ComboBox_idx!(file, line, A, Args)(idx, items, args);
+  auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){
+    return ComboBox_idx!(srcModule, srcLine, A, Args)(idx, items, args);
   }
 
-  auto ComboBox(string file=__FILE__, int line=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
-    return ComboBox_ref!(file, line, A, Args)(value, items, args);
+  auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, Args args){
+    return ComboBox_ref!(srcModule, srcLine, A, Args)(value, items, args);
   }
 
-  auto ComboBox(string file=__FILE__, int line=__LINE__, E, T...)(ref E e, T args) if(is(E==enum)){
+  auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, T...)(ref E e, T args) if(is(E==enum)){
     auto s = e.text;
-    auto res = ComboBox!(file, line)(s, getEnumMembers!E, args);
+    auto res = ComboBox!(srcModule, srcLine)(s, getEnumMembers!E, args);
     if(res) ignoreExceptions({ e = s.to!E; });
     return res;
   }
@@ -2462,12 +2355,12 @@ struct im{ static:
   private struct SliderState{ //information about the current slider being modified
 
     // information generated and maintained in update
-    uint pressed_id;
+    Id pressed_id;
     vec2 pressed_thumbMouseOfs, pressed_rawMousePos;
     float pressed_nPos; //normalized pos
     int lockedDirection; //0:unknown, 1:h, 2:v
 
-    void onPress(uint id, ref float nPos, in vec2 mousePos){
+    void onPress(in Id id, ref float nPos, in vec2 mousePos){
       //mouse was pressed, initialize values
       pressed_id = id;
       pressed_rawMousePos = rawMousePos;
@@ -2481,12 +2374,12 @@ struct im{ static:
     }
 
     // information saved in draw(). All vectors are transformed into view space.
-    uint drawn_id;
+    Id drawn_id;
     SliderOrientation drawn_orientation;
     vec2 drawn_p0, drawn_p1;
     bounds2 drawn_thumbRect;
 
-    void afterDraw(uint id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob){
+    void afterDraw(in Id id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob){
       drawn_id = id;
       drawn_orientation = ori;
       drawn_p0 = p0;
@@ -2573,7 +2466,7 @@ struct im{ static:
       return userModified;
     }
 
-    bool handleMouse(uint id, in HitInfo hit, ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt){
+    bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt){
       if(nPos.isnan) return false;
 
       bool userModified;
@@ -2604,7 +2497,7 @@ struct im{ static:
 
       //hit.released
       if(hit.released){
-        pressed_id = 0;
+        pressed_id = Id.init;
 
         //todo: this isn't safe! what if the control disappears!!!
         if(isLinear(drawn_orientation)){
@@ -2657,7 +2550,7 @@ struct im{ static:
 
     bool focused;
 
-    this(uint id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init){
+    this(in Id id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init){
       this.id = id;
       this.orientation = orientation;
       this.sliderStyle = sliderStyle;
@@ -2666,7 +2559,7 @@ struct im{ static:
 
       if(sliderStyle==SliderStyle.scrollBar) padding = "2";
 
-      hit = im.hitTest(this, id, enabled);
+      hit = im.hitTest(this, enabled);
       hitBounds = hit.hitBounds;
 
       if(1 || sliderStyle==SliderStyle.slider) focused = im.focusUpdate(this, id,
@@ -2871,10 +2764,10 @@ struct im{ static:
   }
 
 
-  auto Slider(string file=__FILE__, uint line=__LINE__, V, T...)(ref V value, T args)
+  auto Slider(string srcModule=__MODULE__, size_t srcLine=__LINE__, V, T...)(ref V value, T args)
   if(isFloatingPoint!V || isIntegral!V)
   {
-    mixin(id.M ~ enable.M ~ selected.M ~ range.M);  //todo: selected???
+    mixin(prepareId, enable.M, selected.M, range.M);  //todo: selected???
 
     //flipped range interval. Needed for vertical scrollbar
     const flipped = !_range.isOrdered;
@@ -3039,7 +2932,7 @@ struct im{ static:
     auto doc = new .Document;
     doc.title = title;
     doc.lastChapterLevel = 0;
-    append(doc); push(doc, 0); scope(exit) pop;
+    append(doc); push(doc, srcId()); scope(exit) pop;
 
     if(!title.empty){
       Text(doc.getChapterTextStyle, title);
@@ -3169,34 +3062,34 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
       if(thisFieldProps.choices.length){
         ComboBox(data, thisFieldProps.choices, hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
       }else{
-        Edit(data, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
+        Edit(data, genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
       }
     });
   }else static if(isFloatingPoint!T     ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = format("%g", data);
-      Edit(s, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
+      Edit(s, genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), { width = 180; }); //todo: rightclick
+        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), genericArg!"id"(thisFieldProps.hash+1), { width = 180; }); //todo: rightclick
       //todo: Bigger slider height when (theme!="tool")
     });
   }else static if(isIntegral!T          ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = data.text;
-      Edit(s, id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
+      Edit(s, genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), id(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = 180; }); //todo: rightclick
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), genericArg!"id"(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = 180; }); //todo: rightclick
     });
   }else static if(is(T == bool)         ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      ChkBox(data, "", id(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly));
+      ChkBox(data, "", genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly));
       Text("\t");
     });
   }else static if(isAggregateType!T     ){ // Struct, Class

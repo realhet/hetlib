@@ -13,7 +13,7 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 //adjust the size of the original Tab character
 enum
   VisualizeContainers      = 0,
-  VisualizeContainerIds    = 0,
+  VisualizeContainerIds    = 1,
   VisualizeGlyphs          = 0,
   VisualizeTabColors       = 1,
   VisualizeHitStack        = 0,
@@ -163,7 +163,7 @@ struct ImStorage(T){
 // HitTest ///////////////////////////////
 
 struct HitInfo{ //Btn returns it
-  uint id;
+  SrcId id;
   bool enabled = true;
   bool hover, captured, clicked, pressed, released;
   float hover_smooth, captured_smooth;
@@ -178,16 +178,16 @@ struct HitInfo{ //Btn returns it
 struct HitTestManager{
 
   struct HitTestRec{
-    uint hash;            //in the next frame this must be the isSame
+    SrcId hash;            //in the next frame this must be the isSame
     bounds2 hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
     vec2 localPos;
   }
 
   //act frame
   HitTestRec[] hitStack, lastHitStack;
-  uint[void*] cellHashMap;
+  SrcId[void*] cellHashMap;
 
-  float[uint] smoothHover;
+  float[SrcId] smoothHover;
   private void updateSmoothHover(ref HitTestRec[] actMap){
     enum upSpeed = 0.5f, downSpeed = 0.25f;
 
@@ -196,7 +196,7 @@ struct HitTestManager{
     foreach(h; act)
       smoothHover[h] = mix(smoothHover.get(h, 0.0f), 1, upSpeed);
 
-    uint[] toRemove;
+    SrcId[] toRemove;
     foreach(h; smoothHover.keys){
       if(!act.canFind(h)){
         if(h in smoothHover){
@@ -209,45 +209,24 @@ struct HitTestManager{
     foreach(h; toRemove) smoothHover.remove(h);
   }
 
-// -------- SliderInfo - a base to store historical data for every control //////////////////////////////
-/*  struct SliderInfo{
-    bounds2 localRect; //mouse is from hittest.local
-    bool expired;
-  }
-
-  SliderInfo[uint] sliderInfo;
-
-  void addSliderInfo(uint id, in bounds2 localRect){
-    sliderInfo[id] = SliderInfo(localRect);
-  }
-
-  void updateSliderInfo(){
-    uint[] toRemove;
-    foreach(id; sliderInfo.keys) with(sliderInfo[id]){
-      if(expired) toRemove ~= id;
-      expired = true; //must be preserved through 2 frames
-    }
-    toRemove.each!(a => sliderInfo.remove(a));
-  }*/
-
-  uint capturedHash, clickedHash, pressedHash, releasedHash;
+  SrcId capturedHash, clickedHash, pressedHash, releasedHash;
   private void updateMouseCapture(ref HitTestRec[] hits){
-    const topHash = hits.length ? hits[$-1].hash : 0;
+    const topHash = hits.length ? hits[$-1].hash : SrcId.init;
 
     //if LMB was just pressed, then it will be the captured control
     //if LMB released, and the captured hash is also hovered, the it is clicked.
 
-    clickedHash = pressedHash = releasedHash = 0; //normally it's 0 all the time, except that one frame it's clicked.
+    clickedHash = pressedHash = releasedHash = SrcId.init; //normally it's 0 all the time, except that one frame it's clicked.
 
     with(cast(GLWindow)mainWindow){ //todo: get the mouse state from elsewhere!!!!!!!!!!!!!
-      if(topHash && mouse.LMB && mouse.justPressed){
+      if(topHash!=SrcId.init && mouse.LMB && mouse.justPressed){
         capturedHash = topHash;
         pressedHash = topHash;
       }
       if(mouse.justReleased){
-        if(capturedHash && topHash==capturedHash) clickedHash = capturedHash;
-        if(capturedHash) releasedHash = capturedHash;
-        capturedHash = 0;
+        if(capturedHash!=SrcId.init && topHash==capturedHash) clickedHash = capturedHash;
+        if(capturedHash!=SrcId.init) releasedHash = capturedHash;
+        capturedHash = SrcId.init;
       }
     }
   }
@@ -263,48 +242,48 @@ struct HitTestManager{
   }
 
   //Used to identify the cell when it later calls addHitRect()
-  void addHash(Cell cell, uint hash){
+  void addHash(Cell cell, in SrcId hash){
     cellHashMap[cast(void*)cell] = hash;     //todo: error on duplicated ID
   }
 
   void addHitRect(Cell cell, bounds2 hitBounds, vec2 localPos){//it is called automatically from each cell
-    if(auto hash = cellHashMap.get(cast(void*)cell, 0)){
+    if(auto hash = cellHashMap.get(cast(void*)cell, SrcId.init)){
       enforce(!hitStack.any!(a => a.hash==hash), "hash already defined for cell: "~cell.text);
       hitStack ~= HitTestRec(hash, hitBounds, localPos);
     }
   }
 
   //todo: elrejteni ezeket az individual check-eket a check()en belulre.
-  bool checkHover(uint hash){
+  bool checkHover(in SrcId hash){
     auto idx = lastHitStack.map!"a.hash".countUntil(hash);
     return idx<0 ? false
                  : true;
   }
 
-  auto checkHitBounds(uint hash){
+  auto checkHitBounds(in SrcId hash){
     auto idx = lastHitStack.map!"a.hash".countUntil(hash);
     return idx<0 ? bounds2()
                  : lastHitStack[idx].hitBounds;
   }
 
-  float checkHover_smooth(uint hash){
+  float checkHover_smooth(in SrcId hash){
     if(capturedHash) return 0;
     return smoothHover.get(hash, 0);
   }
 
-  bool checkCaptured(uint h){
+  bool checkCaptured(in SrcId h){
     return capturedHash==h && checkHover(h);
   }
 
-  float checkCaptured_smooth(uint h){
+  float checkCaptured_smooth(in SrcId h){
     return capturedHash==h ? checkHover_smooth(h) : 0;
   }
 
-  bool checkClicked(uint h){ return clickedHash==h; }
-  bool checkPressed(uint h){ return pressedHash==h; }
-  bool checkReleased(uint h){ return releasedHash==h; }
+  bool checkClicked(in SrcId h){ return clickedHash==h; }
+  bool checkPressed(in SrcId h){ return pressedHash==h; }
+  bool checkReleased(in SrcId h){ return releasedHash==h; }
 
-  auto check(uint id){
+  auto check(in SrcId id){
     HitInfo h;
     h.id = id;
     h.hover = checkHover(id);
@@ -2093,7 +2072,7 @@ bool getEffectiveVScroll(in bool autoHeight, in ScrollState vScroll) pure{
 }
 
 class Container : Cell { // Container ////////////////////////////////////
-  uint id; // Scrolling needs it. Also useful for debugging.
+  SrcId id; // Scrolling needs it. Also useful for debugging.
 
   auto getHScrollBar(){ return flags.hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; }
   auto getVScrollBar(){ return flags.hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; }
@@ -2391,7 +2370,7 @@ class Container : Cell { // Container ////////////////////////////////////
     if(VisualizeContainerIds){
       dr.fontHeight = 14;
       dr.color = clFuchsia;
-      dr.textOut(outerPos+vec2(3), format!"%-8X"(id));
+      dr.textOut(outerPos+vec2(3), id.text);
     }
   }
 
