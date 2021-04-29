@@ -13,9 +13,9 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 //adjust the size of the original Tab character
 enum
   VisualizeContainers      = 0,
-  VisualizeContainerIds    = 1,
+  VisualizeContainerIds    = 0,
   VisualizeGlyphs          = 0,
-  VisualizeTabColors       = 1,
+  VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
 
@@ -176,7 +176,7 @@ struct HitInfo{ //Btn returns it
 }
 
 struct HitTestManager{
-
+//todo: rename hash to id
   struct HitTestRec{
     SrcId hash;            //in the next frame this must be the isSame
     bounds2 hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
@@ -302,8 +302,9 @@ struct HitTestManager{
       dr.lineWidth = (QPS*3).fract;
       dr.color = clFuchsia;
 
-      foreach(hr; hitStack)
+      foreach(hr; hitStack){
         dr.drawRect(hr.hitBounds);
+      }
 
       dr.lineWidth = 1;
       dr.lineStyle = LineStyle.normal;

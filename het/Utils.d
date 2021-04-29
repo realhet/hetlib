@@ -2875,12 +2875,12 @@ static if(is(SrcId.T==uint) || is(SrcId.T==ulong)){
 
   //auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
 
-  auto combine(T)(in SrcId i1, in T i2){ return SrcId(i1.value ~ '[' ~ i2.text ~ ']'); }
+  auto combine(T)(in SrcId i1, in T i2){ return SrcId(i1.value ~ '.' ~ i2.text); }
 
   auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
     auto id = SrcId(srcLocationStr!(srcModule, srcLine)); // .d is included to make sourceModule detection easier
     mixin(processGenericArgs(q{
-      static if(N=="id") id = id.combine(a);
+      static if(N=="id") id ~= '[' ~ a.text ~ ']';
     }));
     return id;
   }
@@ -4492,6 +4492,8 @@ struct FileEntry{
   Path path;
   string name;
 
+  string fullName() const{ return path.fullPath~name; }
+
   FILETIME ftCreationTime, ftLastWriteTime, ftLastAccessTime;
   long size;
   uint dwFileAttributes;
@@ -4622,6 +4624,56 @@ FileEntry[] findFiles(Path path, string mask="", string order="name", int level=
   }
 
 }
+
+
+struct clipBoard{ static: //clipBoard //////////////////////////
+  import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT, EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
+
+  bool hasFormat(uint fmt){
+    bool res;
+    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+      res = IsClipboardFormatAvailable(fmt)!=0;
+    }
+    return res;
+  }
+
+  bool hasText(){ return hasFormat(CF_TEXT); }
+
+  string getText(){
+    string res;
+    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+      auto hData = GetClipboardData(CF_TEXT);
+      if(hData){
+        auto pData = cast(char*)GlobalLock(hData);
+        scope(exit) GlobalUnlock(hData);
+        res = pData.toStr;
+      }
+    }
+    return res;
+  }
+
+  bool setText(string text, bool mustSucceed){
+    bool success;
+    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+      EmptyClipboard;
+      HGLOBAL hClipboardData;
+      auto hData = GlobalAlloc(0, text.length+1);
+      auto pData = cast(char*)GlobalLock(hData);
+      pData[0..text.length] = text[];
+      pData[text.length] = 0;
+      GlobalUnlock(hClipboardData);
+      success = SetClipboardData(CF_TEXT, hData) !is null;
+    }
+    if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
+    return success;
+  }
+
+  @property{
+    string text(){ return getText; }
+    void text(string s){ setText(s, true); }
+  }
+}
+
 
 // Stream IO -> het.stream /////////////////////////////////////////////////////////////////
 T stRead(T)(ref ubyte[] st)

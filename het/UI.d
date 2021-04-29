@@ -8,53 +8,6 @@ import std.traits, std.meta;
 
 public import het.uibase;
 
-struct clipBoard{ static:
-  import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT, EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
-
-  bool hasFormat(uint fmt){
-    bool res;
-    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
-      res = IsClipboardFormatAvailable(fmt)!=0;
-    }
-    return res;
-  }
-
-  bool hasText(){ return hasFormat(CF_TEXT); }
-
-  string getText(){
-    string res;
-    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
-      auto hData = GetClipboardData(CF_TEXT);
-      if(hData){
-        auto pData = cast(char*)GlobalLock(hData);
-        scope(exit) GlobalUnlock(hData);
-        res = pData.toStr;
-      }
-    }
-    return res;
-  }
-
-  bool setText(string text, bool mustSucceed){
-    bool success;
-    if(OpenClipboard(null)){ scope(exit) CloseClipboard;
-      EmptyClipboard;
-      HGLOBAL hClipboardData;
-      auto hData = GlobalAlloc(0, text.length+1);
-      auto pData = cast(char*)GlobalLock(hData);
-      pData[0..text.length] = text[];
-      pData[text.length] = 0;
-      GlobalUnlock(hClipboardData);
-      success = SetClipboardData(CF_TEXT, hData) !is null;
-    }
-    if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
-    return success;
-  }
-
-  @property{
-    string text(){ return getText; }
-    void text(string s){ setText(s, true); }
-  }
-}
 
 
 //todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
@@ -109,372 +62,6 @@ class Document : Column { // Document /////////////////////////////////
     super.parse(s, ts);
   }
 
-}
-
-// ListItem ////////////////////////////////
-
-Row newListItem(string s, TextStyle ts = tsNormal){
-  auto left  = new Row("\u2022", ts);
-  left.outerWidth = ts.fontHeight*2;
-  left.subCells = new FlexRow("", ts) ~ left.subCells ~ new FlexRow("", ts);
-
-  auto right = new Row(s, ts); right.flex_=1;
-  auto act   = new Row([left, right], ts);
-
-  act.bkColor = ts.bkColor;
-  return act;
-}
-
-class FlexRow : Row{ //FlexRow///////////////////////////////
-  this(string markup, TextStyle ts=tsNormal){
-    super(markup, ts);
-    flex_ = 1;
-  }
-}
-
-class Link : Row{ //Link ///////////////////////////////
-
-  this(string cmdLine, in SrcId hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
-    this.id = hash;
-    auto hit = im.hitTest(this, enabled);
-
-    if(enabled && onClick !is null && hit.clicked){
-      onClick();
-    }
-
-    if(!enabled){
-      ts.fontColor = clLinkDisabled;
-      ts.underline = false;
-    }else if(hit.captured){
-      ts.fontColor = clLinkPressed;
-    }else{
-      ts.fontColor = mix(ts.fontColor, clLinkHover, hit.hover_smooth);
-      ts.underline = hit.hover;
-    }
-
-    flags.wordWrap = false;
-
-    auto params = cmdLine.commandLineToMap;
-    super(params["0"], ts);
-    setProps(params);
-  }
-}
-
-
-class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
-
-  this(string markup, TextStyle ts = tsKey){
-    auto allKeys = inputs.entries.values.filter!(e => e.isButton && e.value).array.sort!((a,b)=>a.pressedTime<b.pressedTime, SwapStrategy.stable).map!"a.name".array;
-
-    if(allKeys.canFind(markup)) ts.bkColor = clLime;
-
-    margin_ = Margin(1, 1, 0.75, 0.75);
-    padding_ = Padding(2, 2, 0, 0);
-    border_.width = 1;
-    border_.color = clGray;
-    flags.wordWrap = false;
-
-    super(markup, ts);
-  }
-
-}
-
-
-class WinRow : Row{ //WinRow ///////////////////////////////
-
-  this(string markup, TextStyle ts = tsNormal){
-    padding_ = Padding(4, 16, 4, 16);
-
-    super(markup, ts);
-  }
-
-  this(Cell[] cells, TextStyle ts = tsNormal){
-    padding_ = Padding(4, 16, 4, 16);
-
-    super(cells, ts);
-  }
-
-  override{
-  }
-}
-
-
-
-//////////////////////////////////////////////////////////////////////////////
-/// ImWin  (experimental)                                                  ///
-//////////////////////////////////////////////////////////////////////////////
-
-
-/*  enum FrameItem {
-    edgeTop,
-    cornerTopRight,
-    edgeRight,
-    cornerBottomRight,
-    edgeBottom,
-    cornerBottomLeft,
-    edgeLeft,
-    cornedTopLeft,
-
-    //optional
-    caption,
-    close,
-    maximize,
-    minimize,
-
-    scrollH,
-    scrollV
-  }*/
-
-
-struct WinContext{ //WinContext /////////////////////////////
-  //appearance
-  float frameThickness       = 1.5,  //these values are independent from zoom level, based on dr.pixelSize
-        cornerThickness      =   6,
-        cornerHighlightRange =  16,
-        cornerLength         =  20;
-  bool inwardFrame = true;   // moves the frame a slightly inward in order to keep the same distance from other frames at every zoom levels.
-
-  private import ub = het.uibase; //het.uibase,clAccent egyszeruen nem megy.
-  RGB clNormal = ub.clWinBackground,
-      clAccent = ub.clAccent;//ub.clAccent;
-
-  //runtime updated stuff
-  Drawing dr;
-  float pixelSize;
-  int pass;
-  vec2 mouse;
-}
-
-
-struct SizingFrame{
-  bounds2 bounds;
-  vec2 cornerSize;
-  vec2 cornerSize2; //inner with gap added
-
-  seg2[] edge(int idx){ with(bounds){  // top, right, bottom, left
-    alias c = cornerSize2;
-    switch(idx&3){
-      case  0: return [seg2(x0+c.x, y0, x1-c.x, y0)];
-      case  2: return [seg2(x0+c.x, y1, x1-c.x, y1)];
-      case  1: return [seg2(x1, y0+c.y, x1, y1-c.y)];
-      default: return [seg2(x0, y0+c.y, x0, y1-c.y)];
-    }
-  }}
-
-  seg2[] corner(int idx){ with(bounds){  // topRight, bottomRight, bottomLeft, topLeft
-    alias c = cornerSize;
-    auto a(float x, float y, float dx, float dy){ return [ seg2(x, y, x+dx*c.x, y), seg2(x, y, x, y+dy*c.y) ]; }
-    switch(idx&3){
-      case  0: return a(x1, y0, -1,  1);
-      case  1: return a(x1, y1, -1, -1);
-      case  2: return a(x0, y1,  1, -1);
-      default: return a(x0, y0,  1,  1);
-    }
-  }}
-
-  seg2[][] cornersAndEdges(){
-    return iota(8).map!(i => i&1 ? corner(i>>1) : edge(i>>1)).array;
-  }
-}
-
-
-auto calcSizingFrame(in bounds2 fullBounds, in WinContext ctx){
-
-  auto calcFrameBounds() { // calculates bounds moved inward
-    if(!ctx.inwardFrame) return fullBounds;
-    auto a = ctx.pixelSize*ctx.frameThickness,
-         aw = min(fullBounds.width *0.25f, a),
-         ah = min(fullBounds.height*0.25f, a);
-
-    return fullBounds.inflated(-aw, -ah);
-  }
-
-  SizingFrame f;
-  f.bounds = calcFrameBounds;
-  auto w = f.bounds.width ;
-  auto h = f.bounds.height;
-
-  auto maxCornerSize = f.bounds.size * 0.66f;
-  auto maxCornerLen = ctx.cornerLength * ctx.pixelSize;
-  f.cornerSize = min(vec2(maxCornerLen, maxCornerLen), maxCornerSize);
-  auto gapLen = ctx.cornerThickness * ctx.pixelSize * 1.0f;
-  f.cornerSize2 = min(f.cornerSize + vec2(gapLen, gapLen), maxCornerSize);
-
-  return f;
-}
-
-
-class ImWin{ // ImWin //////////////////////////////////
-  static WinContext ctx; //must update from outside
-
-  bounds2 bounds;
-  string caption;
-  bool focused;
-
-  this(string caption_, bounds2 bounds_){
-    caption = caption_;
-    bounds = bounds_;
-    adjustBounds;
-  }
-
-  vec2 sizeMin = vec2(32, 32);
-  vec2 sizeMax;               // ignored if less than sizeMin
-  float sizeStep = 0;        // ignored if <=0
-  float aspect = 0;          // if nonzero
-
-  vec2 placementBase;
-  float placementStep = 0;
-
-  void draw(Drawing dr, in vec2 size){
-    dr.color = clGray;
-//    dr.fillRect(vec2(0, 0), size);
-
-    auto tex = textures[File(`c:\dl\oida6.png`)];
-    dr.drawGlyph(tex, bounds2(vec2(0, 0), size));
-
-    dr.scale(ctx.pixelSize); scope(exit) dr.pop;
-
-    PERF("capt", {
-      auto doc = scoped!Column;
-      doc.innerWidth = size.x/dr.scaleFactor.x;
-      auto icon = "\U0001F4F9";
-      auto rIcon = new Row(" "~icon~" ");
-
-      auto clHeaderBackground = clWinBackground;
-      auto clHeaderText       = mix(clWinText, clHeaderBackground, focused ? 0 : 0.35f);
-
-      auto toolBtn(string s, RGB textColor=clHeaderText, RGB bkColor=clHeaderBackground){
-        return new Row(tag(`style fontColor="%s" bkColor="%s"`.format(textColor, bkColor))~" "~s~" ");
-      }
-
-      auto rCaption  = toolBtn(caption);
-      auto rMaximize = toolBtn(tag("symbol ChromeMaximize"));
-      auto rClose    = toolBtn(tag("symbol ChromeClose"), clWhite, clWinRed);
-
-      auto rPlay     = toolBtn(tag("symbol PlaySolid"), clAccent);
-      auto rPause    = toolBtn(tag("symbol Pause"));
-
-      auto rLeft = new Row("");
-      rLeft.appendMulti([rIcon, rCaption, rPlay, rPause]);
-      rLeft.measure;
-
-      auto rRight = new Row("");
-      rRight.appendMulti([rMaximize, rClose]);
-      rRight.measure;
-
-
-      rLeft.draw(dr);
-      dr.translate(size.x/dr.scaleFactor.x - rRight.outerWidth, 0);
-      rRight.draw(dr);
-      dr.pop;
-    });
-    //perf.report.writeln;
-  }
-
-  void adjustBounds(){
-
-    static float adjustPlacement(float a, float base, float step){
-      return round((a-base)/step)*step+base;
-    }
-
-    static float adjustSize(float a, float min, float max, float step){
-      if(a<min) return min; //min is the dominant constrait
-      a = adjustPlacement(a, min, step);
-      if(max<=min) return a;
-      //optional max check
-      if(a<=max) return a;
-      return round(max-min/step)*step+min;
-    }
-
-    bounds = bounds.sorted;
-    return;
-    float w = bounds.width, h = bounds.height;
-
-    if(aspect>0){
-      //tries to make the diagonal az close az can
-      auto dBounds = length(vec2(w, h)),
-           dAspect = length(vec2(aspect, 1));
-      auto dRate =  dBounds/dAspect;
-
-      w = aspect*dRate;
-      h = dRate;
-    }
-
-    auto newPos  = vec2(adjustPlacement(bounds.low.x, placementBase.x, placementStep),
-                       adjustPlacement(bounds.low.y, placementBase.y, placementStep)),
-         newSize = vec2(adjustSize(w, sizeMin.x, sizeMax.x, sizeStep),
-                       adjustSize(h, sizeMin.y, sizeMax.y, sizeStep));
-
-    //anchor is topLeft
-    bounds.low = newPos;
-    bounds.high = newPos + newSize;
-  }
-
-  void drawFrame(bool focused, ref ImWin hovered){ with(ctx){
-
-    auto sizingFrame = calcSizingFrame(bounds, ctx);
-    auto bounds = sizingFrame.bounds;
-    this.focused = focused;
-
-    void drawFrameRect(in RGB c){
-      dr.color = c;
-      dr.lineWidth = -frameThickness;
-      dr.drawRect(bounds);
-    }
-
-    auto clHalf = mix(clNormal, clAccent, .5f),
-         inside = bounds.contains!"[)"(mouse);
-
-    if(pass==0){
-      if(inside) hovered = this;
-
-      //draw contents
-      dr.translate(bounds.topLeft);
-      draw(dr, bounds.size);
-      dr.pop;
-
-      if(focused){
-        auto elements = sizingFrame.cornersAndEdges;
-
-        dr.lineWidth = -cornerThickness;
-        dr.color = mix(clNormal, clAccent, 0.99f);
-        foreach(e; elements){
-          //dr.line(e);
-        }
-
-        drawFrameRect(clAccent);
-      }else{//not focused
-        drawFrameRect(clNormal);
-      }
-
-    }else if(pass==1){
-
-      if(this is hovered && !focused){ //hovered frame always visible
-        drawFrameRect(clHalf);
-      }
-    }
-  }}
-
-}
-
-auto testWin(Drawing dr, vec2 mouse, float pixelSize){ // testWin() ///////////////////////////////////////
-
-  static wins = [
-    new ImWin("win1", bounds2(0  ,   0, 640, 480)),
-    new ImWin("win2", bounds2(640,   0, 640, 480)),
-    new ImWin("win3", bounds2(0  , 480, 600, 300)),
-  ];
-
-  ImWin hovered;
-
-  ImWin.ctx.dr = dr;
-  ImWin.ctx.mouse = mouse;
-  ImWin.ctx.pixelSize = pixelSize;
-
-  foreach(pass; 0..2) foreach_reverse(idx, win; wins){
-    ImWin.ctx.pass = pass;
-    win.drawFrame(idx==0, hovered);
-  }
 }
 
 
@@ -591,6 +178,11 @@ struct im{ static:
       }
     }
 
+    if(VisualizeHitStack){
+      drVisualizeHitStack = new Drawing;
+      hitTestManager.draw(drVisualizeHitStack);
+    }
+
     //all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
     hitTestManager.nextFrame;
 
@@ -616,6 +208,8 @@ struct im{ static:
 
   bounds2[2] surfaceBounds;
 
+  Drawing drVisualizeHitStack;
+
   void draw(){
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
@@ -631,12 +225,10 @@ struct im{ static:
       dr[i].clear;
     }
 
-    if(VisualizeHitStack){
-      auto d = new Drawing;
-      hitTestManager.draw(d);
-      d.glDraw(targetSurfaces[1].view); //todo: problem with hitStack: it is assumed to be on GUI view
-      d.free;
+    if(VisualizeHitStack && drVisualizeHitStack){
+      drVisualizeHitStack.glDraw(targetSurfaces[1].view); //todo: problem with hitStack: it is assumed to be on GUI view
     }
+    drVisualizeHitStack.free;
 
     //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
     //todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
@@ -686,7 +278,7 @@ struct im{ static:
     }
   }}
 
-  void Panel(T...)(in T args){ //todo: multiple Panels, but not call them frames...
+  void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ //todo: multiple Panels, but not call them frames...
     enforce(actContainer is null, "Panel() must be on root level");
 
     //todo: this should work for all containers, not just high level ones
@@ -695,7 +287,7 @@ struct im{ static:
 
     .Container cntr;
 
-    Document({
+    Document!(srcModule, srcLine)({
       cntr = actContainer;
 
       //preparations
@@ -892,10 +484,11 @@ struct im{ static:
   //todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
   .Container actContainer, lastContainer; //top of the containerStack for faster access
   bool enabled;
-  Id baseId;
   TextStyle textStyle;   alias style = textStyle; //todo: style.opDispatch("fontHeight=0.5x")
   string theme; //for now it's a str, later it will be much more complex
   //valid valus: "", "tool"
+
+  Id actId() { return actContainer ? actContainer.id : Id.init; }
 
   auto lastCell(T:Cell=Cell)(){
     Cell cell;
@@ -903,18 +496,17 @@ struct im{ static:
     return cast(T)cell;
   }
 
-  private struct StackEntry{ .Container container; Id baseId; bool enabled; TextStyle textStyle; string theme; }
+  private struct StackEntry{ .Container container; bool enabled; TextStyle textStyle; string theme; }
   private StackEntry[] stack;
 
   void reset(){
     //statck reset
-    baseId = Id.init;
     enabled = true;
     textStyle = tsNormal;
     theme = "";
 
     root = [];
-    stack = [StackEntry(null, Id.init, enabled, textStyle, theme)];
+    stack = [StackEntry(null, enabled, textStyle, theme)];
     actContainer = null;
 
     overlayDrawings.clear;
@@ -929,8 +521,7 @@ struct im{ static:
 
   private void push(T : .Container)(T c, in Id newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
     c.id = newId;
-    baseId = newId;
-    stack ~= StackEntry(c, newId, enabled, textStyle, theme);
+    stack ~= StackEntry(c, enabled, textStyle, theme);
 
     //actContainer is the top of the stack or null
     actContainer = c;
@@ -940,7 +531,6 @@ struct im{ static:
     enforce(stack.length>1); //stack[0] is always null and it is never popped.
 
     //restore the last textStyle & theme. Changes inside a subHierarchy doesn't count.
-    baseId    = stack.back.baseId;
     enabled   = stack.back.enabled;
     textStyle = stack.back.textStyle;
     theme     = stack.back.theme;
@@ -1023,7 +613,7 @@ struct im{ static:
 
   //Parameter structs ///////////////////////////////////
   //deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-  private immutable prepareId = q{ auto id_ = combine(baseId, srcId!(srcModule, srcLine)(args)); };
+  private immutable prepareId = q{ auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); };
 
   struct enable  { bool val;  private enum M = q{ auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;   static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled   = enabled && a.val; }; }
   struct selected{ bool val;  private enum M = q{ auto _selected = false;                                        static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected = a.val;            }; }
@@ -1232,15 +822,13 @@ struct im{ static:
     mixin(prepareId, enable.M);
 
     auto column = new .Column;
-    column.bkColor = style.bkColor;
     append(column); push(column, id_); scope(exit) pop;
 
+    column.bkColor = style.bkColor;
     static foreach(a; args){{ alias t = typeof(a);
-      static if(isFunctionPointer!a){
-        a();
-      }else static if(isDelegate!a){
-        a();
-      }else static assert(false, "Unsupported type: "~typeof(a).stringof);
+      static if(__traits(compiles, a())) a();
+      else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
+      else static assert(false, "Unsupported type: "~typeof(a).stringof);
     }}
   }
 
@@ -1259,6 +847,7 @@ struct im{ static:
       else static if(is(t == HAlign)    ) flags.hAlign = a;
       else static if(is(t == VAlign)    ) flags.vAlign = a;
       else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
       else static assert(false, "Unsupported type: "~t.stringof);
 
     }}
@@ -1631,7 +1220,6 @@ struct im{ static:
 
     Row({
       actContainer.id = id_;
-      baseId = id_;
 
       auto ref hit(){ return res.hit; }
 
@@ -1756,7 +1344,6 @@ struct im{ static:
       Row({
         mixin(prepareId);
         actContainer.id = id_;
-        baseId = id_;
         auto hit = hitTest(enabled);
 
         mixin(hintHandler);
@@ -1839,7 +1426,6 @@ struct im{ static:
 
     Row({
       actContainer.id = id_;
-      baseId = id_;
       hit = hitTest(enabled);
       mixin(hintHandler);
 
@@ -1921,7 +1507,6 @@ struct im{ static:
 
     Row({
       actContainer.id = id_;
-      baseId = id_;
       hit = hitTest(enabled);
 
       mixin(hintHandler);
@@ -1970,7 +1555,6 @@ struct im{ static:
     HitInfo hit;
     Row({
       actContainer.id = id_;
-      baseId = id_;
       hit = hitTest(enabled);
 
       style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
@@ -2012,7 +1596,6 @@ struct im{ static:
       flags.wordWrap = false;
 
       actContainer.id = id_;
-      baseId = id_;
       hit = hitTest(enabled);
       mixin(hintHandler);
 
@@ -2085,10 +1668,9 @@ struct im{ static:
   // RadioBtn //////////////////////////
   auto RadioBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
 
-  auto ListBoxItem(C)(ref bool isSelected, C s, in Id itemId){ with(im){ //todo: ezt osszahozni a ListItem-el
+  auto ListBoxItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, Args...)(ref bool isSelected, C s, in Args args){ with(im){ //todo: ezt osszahozni a ListItem-el
     HitInfo hit;
-    Row({
-      actContainer.id = itemId; //todo: ubgly af
+    Row!(srcModule, srcLine)({
       hit = hitTest(enabled);
 
       if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down)) isSelected = true; //mosue down left or right
@@ -2099,7 +1681,7 @@ struct im{ static:
 
       static if(__traits(compiles, s())) s();
                                     else Text(s.text);
-    });
+    }, args);
 
     return hit;
   }}
@@ -2111,7 +1693,7 @@ struct im{ static:
     alias changed this;
   }
 
-  auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args){ // LixtBox ///////////////////////////////
+  auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, in Args args){ // LixtBox ///////////////////////////////
     mixin(prepareId); //todo: enabled, tool theme
 
     //find translator function . This translates data to gui.
@@ -2121,8 +1703,7 @@ struct im{ static:
     HitInfo hit;
     bool changed;
     Column({
-      actContainer.id = id_;
-      baseId = id_;
+      actContainer.id = id_; //todo: lame way of passing that fucking genericArg!"id"
       hit = hitTest(enabled);
       border = "1 normal gray";
 
@@ -2132,9 +1713,9 @@ struct im{ static:
 
         static if(translated){
           static foreach(f; args) static if(isTranslator!(typeof(f)))
-            auto hit = ListBoxItem(selected, { f(s); }, itemId);
+            auto hit = ListBoxItem(selected, { f(s); }, genericArg!"id"(i));
         }else{
-          auto hit = ListBoxItem(selected, s, itemId);
+          auto hit = ListBoxItem(selected, s, genericArg!"id"(i));
         }
         if(!oldSelected && selected){
           idx = cast(int) i;
@@ -2143,7 +1724,7 @@ struct im{ static:
       }
 
       static foreach(a; args) static if(__traits(compiles, a())) a();
-    });
+    }/*, args*/); //todo: passing that fucking genericArg!"id"
     return ListBoxResult(hit, changed);
   }
 
@@ -2878,9 +2459,9 @@ struct im{ static:
     });
   }
 
-  auto Node(ref bool state, void delegate() title, void delegate() contents){ // Node ////////////////////////////
+  auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__)(ref bool state, void delegate() title, void delegate() contents){ // Node ////////////////////////////
     HitInfo hit;
-    Column({
+    Column!(srcModule, srcLine)({
       border.width = 1; //todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
       border.color = mix(style.bkColor, style.fontColor, state ? .1f : 0);
 
@@ -2902,8 +2483,8 @@ struct im{ static:
     return hit;
   }
 
-  auto Node(ref bool state, string title, void delegate() contents){
-    return Node(state, { Text(title); }, contents);
+  auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__)(ref bool state, string title, void delegate() contents){
+    return Node!(srcModule, srcLine)(state, { Text(title); }, contents);
   }
 
   /// A node header that usually connects to a server, can have an error message and a state of refreshing. It can has a refresh button too
@@ -2926,13 +2507,11 @@ struct im{ static:
 
 
   // Document ////////////////////////
-  void Document(void delegate() contents = null){ Document("", contents); }
-
-  void Document(string title, void delegate() contents = null){
+  void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(string title, void delegate() contents = null){
     auto doc = new .Document;
     doc.title = title;
     doc.lastChapterLevel = 0;
-    append(doc); push(doc, srcId()); scope(exit) pop;
+    append(doc); push(doc, srcId!(srcModule, srcLine)); scope(exit) pop;
 
     if(!title.empty){
       Text(doc.getChapterTextStyle, title);
@@ -2940,6 +2519,8 @@ struct im{ static:
     }
     if(contents) contents();
   }
+
+  void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() contents = null){ Document!(srcModule, srcLine)("", contents); }
 
   // Chapter /////////////////////////
   void Chapter(string title, void delegate() contents = null){
@@ -3142,6 +2723,10 @@ void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne 
   }
 }
 
+////////////////////////////////////////////////////////
+///  Dead code                                       ///
+////////////////////////////////////////////////////////
+
 
 // PropertySet tests ///////////////////////////////
 
@@ -3189,5 +2774,375 @@ void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne 
             ]
           }
         };
++/
+
+// ListItem ////////////////////////////////
+/+
+Row newListItem(string s, TextStyle ts = tsNormal){
+  auto left  = new Row("\u2022", ts);
+  left.outerWidth = ts.fontHeight*2;
+  left.subCells = new FlexRow("", ts) ~ left.subCells ~ new FlexRow("", ts);
+
+  auto right = new Row(s, ts); right.flex_=1;
+  auto act   = new Row([left, right], ts);
+
+  act.bkColor = ts.bkColor;
+  return act;
+}
+
+class FlexRow : Row{ //FlexRow///////////////////////////////
+  this(string markup, TextStyle ts=tsNormal){
+    super(markup, ts);
+    flex_ = 1;
+  }
+}
+
+class Link : Row{ //Link ///////////////////////////////
+
+  this(string cmdLine, in SrcId hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
+    this.id = hash;
+    auto hit = im.hitTest(this, enabled);
+
+    if(enabled && onClick !is null && hit.clicked){
+      onClick();
+    }
+
+    if(!enabled){
+      ts.fontColor = clLinkDisabled;
+      ts.underline = false;
+    }else if(hit.captured){
+      ts.fontColor = clLinkPressed;
+    }else{
+      ts.fontColor = mix(ts.fontColor, clLinkHover, hit.hover_smooth);
+      ts.underline = hit.hover;
+    }
+
+    flags.wordWrap = false;
+
+    auto params = cmdLine.commandLineToMap;
+    super(params["0"], ts);
+    setProps(params);
+  }
+}
+
+
+class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
+
+  this(string markup, TextStyle ts = tsKey){
+    auto allKeys = inputs.entries.values.filter!(e => e.isButton && e.value).array.sort!((a,b)=>a.pressedTime<b.pressedTime, SwapStrategy.stable).map!"a.name".array;
+
+    if(allKeys.canFind(markup)) ts.bkColor = clLime;
+
+    margin_ = Margin(1, 1, 0.75, 0.75);
+    padding_ = Padding(2, 2, 0, 0);
+    border_.width = 1;
+    border_.color = clGray;
+    flags.wordWrap = false;
+
+    super(markup, ts);
+  }
+
+}
+
+
+class WinRow : Row{ //WinRow ///////////////////////////////
+
+  this(string markup, TextStyle ts = tsNormal){
+    padding_ = Padding(4, 16, 4, 16);
+
+    super(markup, ts);
+  }
+
+  this(Cell[] cells, TextStyle ts = tsNormal){
+    padding_ = Padding(4, 16, 4, 16);
+
+    super(cells, ts);
+  }
+
+  override{
+  }
+}
+
++/
+
+/+
+
+
+//////////////////////////////////////////////////////////////////////////////
+/// ImWin  (experimental)                                                  ///
+//////////////////////////////////////////////////////////////////////////////
+
+
+/*  enum FrameItem {
+    edgeTop,
+    cornerTopRight,
+    edgeRight,
+    cornerBottomRight,
+    edgeBottom,
+    cornerBottomLeft,
+    edgeLeft,
+    cornedTopLeft,
+
+    //optional
+    caption,
+    close,
+    maximize,
+    minimize,
+
+    scrollH,
+    scrollV
+  }*/
+
+
+struct WinContext{ //WinContext /////////////////////////////
+  //appearance
+  float frameThickness       = 1.5,  //these values are independent from zoom level, based on dr.pixelSize
+        cornerThickness      =   6,
+        cornerHighlightRange =  16,
+        cornerLength         =  20;
+  bool inwardFrame = true;   // moves the frame a slightly inward in order to keep the same distance from other frames at every zoom levels.
+
+  private import ub = het.uibase; //het.uibase,clAccent egyszeruen nem megy.
+  RGB clNormal = ub.clWinBackground,
+      clAccent = ub.clAccent;//ub.clAccent;
+
+  //runtime updated stuff
+  Drawing dr;
+  float pixelSize;
+  int pass;
+  vec2 mouse;
+}
+
+
+struct SizingFrame{
+  bounds2 bounds;
+  vec2 cornerSize;
+  vec2 cornerSize2; //inner with gap added
+
+  seg2[] edge(int idx){ with(bounds){  // top, right, bottom, left
+    alias c = cornerSize2;
+    switch(idx&3){
+      case  0: return [seg2(x0+c.x, y0, x1-c.x, y0)];
+      case  2: return [seg2(x0+c.x, y1, x1-c.x, y1)];
+      case  1: return [seg2(x1, y0+c.y, x1, y1-c.y)];
+      default: return [seg2(x0, y0+c.y, x0, y1-c.y)];
+    }
+  }}
+
+  seg2[] corner(int idx){ with(bounds){  // topRight, bottomRight, bottomLeft, topLeft
+    alias c = cornerSize;
+    auto a(float x, float y, float dx, float dy){ return [ seg2(x, y, x+dx*c.x, y), seg2(x, y, x, y+dy*c.y) ]; }
+    switch(idx&3){
+      case  0: return a(x1, y0, -1,  1);
+      case  1: return a(x1, y1, -1, -1);
+      case  2: return a(x0, y1,  1, -1);
+      default: return a(x0, y0,  1,  1);
+    }
+  }}
+
+  seg2[][] cornersAndEdges(){
+    return iota(8).map!(i => i&1 ? corner(i>>1) : edge(i>>1)).array;
+  }
+}
+
+
+auto calcSizingFrame(in bounds2 fullBounds, in WinContext ctx){
+
+  auto calcFrameBounds() { // calculates bounds moved inward
+    if(!ctx.inwardFrame) return fullBounds;
+    auto a = ctx.pixelSize*ctx.frameThickness,
+         aw = min(fullBounds.width *0.25f, a),
+         ah = min(fullBounds.height*0.25f, a);
+
+    return fullBounds.inflated(-aw, -ah);
+  }
+
+  SizingFrame f;
+  f.bounds = calcFrameBounds;
+  auto w = f.bounds.width ;
+  auto h = f.bounds.height;
+
+  auto maxCornerSize = f.bounds.size * 0.66f;
+  auto maxCornerLen = ctx.cornerLength * ctx.pixelSize;
+  f.cornerSize = min(vec2(maxCornerLen, maxCornerLen), maxCornerSize);
+  auto gapLen = ctx.cornerThickness * ctx.pixelSize * 1.0f;
+  f.cornerSize2 = min(f.cornerSize + vec2(gapLen, gapLen), maxCornerSize);
+
+  return f;
+}
+
+class ImWin{ // ImWin //////////////////////////////////
+  static WinContext ctx; //must update from outside
+
+  bounds2 bounds;
+  string caption;
+  bool focused;
+
+  this(string caption_, bounds2 bounds_){
+    caption = caption_;
+    bounds = bounds_;
+    adjustBounds;
+  }
+
+  vec2 sizeMin = vec2(32, 32);
+  vec2 sizeMax;               // ignored if less than sizeMin
+  float sizeStep = 0;        // ignored if <=0
+  float aspect = 0;          // if nonzero
+
+  vec2 placementBase;
+  float placementStep = 0;
+
+  void draw(Drawing dr, in vec2 size){
+    dr.color = clGray;
+//    dr.fillRect(vec2(0, 0), size);
+
+    auto tex = textures[File(`c:\dl\oida6.png`)];
+    dr.drawGlyph(tex, bounds2(vec2(0, 0), size));
+
+    dr.scale(ctx.pixelSize); scope(exit) dr.pop;
+
+    PERF("capt", {
+      auto doc = scoped!Column;
+      doc.innerWidth = size.x/dr.scaleFactor.x;
+      auto icon = "\U0001F4F9";
+      auto rIcon = new Row(" "~icon~" ");
+
+      auto clHeaderBackground = clWinBackground;
+      auto clHeaderText       = mix(clWinText, clHeaderBackground, focused ? 0 : 0.35f);
+
+      auto toolBtn(string s, RGB textColor=clHeaderText, RGB bkColor=clHeaderBackground){
+        return new Row(tag(`style fontColor="%s" bkColor="%s"`.format(textColor, bkColor))~" "~s~" ");
+      }
+
+      auto rCaption  = toolBtn(caption);
+      auto rMaximize = toolBtn(tag("symbol ChromeMaximize"));
+      auto rClose    = toolBtn(tag("symbol ChromeClose"), clWhite, clWinRed);
+
+      auto rPlay     = toolBtn(tag("symbol PlaySolid"), clAccent);
+      auto rPause    = toolBtn(tag("symbol Pause"));
+
+      auto rLeft = new Row("");
+      rLeft.appendMulti([rIcon, rCaption, rPlay, rPause]);
+      rLeft.measure;
+
+      auto rRight = new Row("");
+      rRight.appendMulti([rMaximize, rClose]);
+      rRight.measure;
+
+
+      rLeft.draw(dr);
+      dr.translate(size.x/dr.scaleFactor.x - rRight.outerWidth, 0);
+      rRight.draw(dr);
+      dr.pop;
+    });
+    //perf.report.writeln;
+  }
+
+  void adjustBounds(){
+
+    static float adjustPlacement(float a, float base, float step){
+      return round((a-base)/step)*step+base;
+    }
+
+    static float adjustSize(float a, float min, float max, float step){
+      if(a<min) return min; //min is the dominant constrait
+      a = adjustPlacement(a, min, step);
+      if(max<=min) return a;
+      //optional max check
+      if(a<=max) return a;
+      return round(max-min/step)*step+min;
+    }
+
+    bounds = bounds.sorted;
+    return;
+    float w = bounds.width, h = bounds.height;
+
+    if(aspect>0){
+      //tries to make the diagonal az close az can
+      auto dBounds = length(vec2(w, h)),
+           dAspect = length(vec2(aspect, 1));
+      auto dRate =  dBounds/dAspect;
+
+      w = aspect*dRate;
+      h = dRate;
+    }
+
+    auto newPos  = vec2(adjustPlacement(bounds.low.x, placementBase.x, placementStep),
+                       adjustPlacement(bounds.low.y, placementBase.y, placementStep)),
+         newSize = vec2(adjustSize(w, sizeMin.x, sizeMax.x, sizeStep),
+                       adjustSize(h, sizeMin.y, sizeMax.y, sizeStep));
+
+    //anchor is topLeft
+    bounds.low = newPos;
+    bounds.high = newPos + newSize;
+  }
+
+  void drawFrame(bool focused, ref ImWin hovered){ with(ctx){
+
+    auto sizingFrame = calcSizingFrame(bounds, ctx);
+    auto bounds = sizingFrame.bounds;
+    this.focused = focused;
+
+    void drawFrameRect(in RGB c){
+      dr.color = c;
+      dr.lineWidth = -frameThickness;
+      dr.drawRect(bounds);
+    }
+
+    auto clHalf = mix(clNormal, clAccent, .5f),
+         inside = bounds.contains!"[)"(mouse);
+
+    if(pass==0){
+      if(inside) hovered = this;
+
+      //draw contents
+      dr.translate(bounds.topLeft);
+      draw(dr, bounds.size);
+      dr.pop;
+
+      if(focused){
+        auto elements = sizingFrame.cornersAndEdges;
+
+        dr.lineWidth = -cornerThickness;
+        dr.color = mix(clNormal, clAccent, 0.99f);
+        foreach(e; elements){
+          //dr.line(e);
+        }
+
+        drawFrameRect(clAccent);
+      }else{//not focused
+        drawFrameRect(clNormal);
+      }
+
+    }else if(pass==1){
+
+      if(this is hovered && !focused){ //hovered frame always visible
+        drawFrameRect(clHalf);
+      }
+    }
+  }}
+
+}
+
+auto testWin(Drawing dr, vec2 mouse, float pixelSize){ // testWin() ///////////////////////////////////////
+
+  static wins = [
+    new ImWin("win1", bounds2(0  ,   0, 640, 480)),
+    new ImWin("win2", bounds2(640,   0, 640, 480)),
+    new ImWin("win3", bounds2(0  , 480, 600, 300)),
+  ];
+
+  ImWin hovered;
+
+  ImWin.ctx.dr = dr;
+  ImWin.ctx.mouse = mouse;
+  ImWin.ctx.pixelSize = pixelSize;
+
+  foreach(pass; 0..2) foreach_reverse(idx, win; wins){
+    ImWin.ctx.pass = pass;
+    win.drawFrame(idx==0, hovered);
+  }
+}
+
 +/
 

@@ -1,7 +1,7 @@
 //@exe
-//@release
+///@release
 
-//@compile --d-version intId
+//@compile --d-version stringId
 
 import het, het.ui;
 
@@ -40,15 +40,15 @@ struct ImStorageManager{ static:
 }
 
 struct ImStorage(T){ static:
-  alias ID = uint;
+  alias Id = im.Id;
 
   struct Item{
     T data;
-    ID id;
+    Id id;
     uint tick;
   }
 
-  Item[uint] items; //by Id
+  Item[Id] items; //by Id
 
   void purge(uint maxAge){ //age = 0 purge all
     uint limit = global_tick-maxAge;
@@ -65,14 +65,14 @@ struct ImStorage(T){ static:
       );
     }
     string[] infoDetails(){
-      return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%-9d | %s"(global_tick-a.value.tick, a.key, a.value.data)).array.sort.array;
+      return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%18s | %s"(global_tick-a.value.tick, a.key, a.value.data)).array.sort.array;
     }
     void purge(uint maxAge){
       ImStorage!T.purge(maxAge);
     }
   }
 
-  auto ref access(in ID id){
+  auto ref access(in Id id){
     auto p = id in items;
     if(!p){
       items[id] = Item.init;
@@ -83,11 +83,11 @@ struct ImStorage(T){ static:
     return p.data;
   }
 
-  void set(in ID id, in T data){ access(id) = data; }
+  void set(in Id id, in T data){ access(id) = data; }
 
-  bool exists(in ID id){ return (id in items) !is null; }
+  bool exists(in Id id){ return (id in items) !is null; }
 
-  uint age(in ID id){
+  uint age(in Id id){
     if(auto p = id in items){
       return global_tick-p.tick;
     }else return typeof(return).max;
@@ -165,13 +165,6 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
   Path actPath;
 
   override void onCreate(){
-    auto id = srcId;
-    auto id2 = id;
-    id2.combine(123);
-    print(id, id2);
-
-    readln;
-
     customTexture = new CustomTexture;
 
     pathEditor = new PathEditor;
@@ -182,10 +175,9 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
 
   void refresh(){
     static Bitmap bOrig;
-    if(!bOrig) bOrig = newBitmap(`\dl\ebaytest2.png`);
+    if(!bOrig) bOrig = newBitmap(`\dl\login_ebay.png`);
     //`c:\D\projects\Karc\Samples\old\200221-213031-481.jpg`);
 
-    //`c:\dl\s-l1600 (54).jpg`;
     //`c:\dl\books-notebook-notepad-pencil.jpg`);//c:\dl\s-l1600 (19).jpg`);
 
     auto iSrc = bOrig.get!ubyte;
@@ -219,22 +211,63 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
     view.navigate(!im.wantKeys, !im.wantMouse);
     invalidate;
 
+    /*ImStorageManager.purge(10);
+
+    struct MyInt{ int value; }
+    auto a = ImStorage!MyInt.access(srcId(genericArg!"id"("fuck"))).value++;
+    if(inputs.Shift.down) ImStorage!int.access(srcId(genericArg!"id"("shit"))) += 10;
+
+    print(ImStorageManager.detailedStats);*/
+
     bool mustRefresh;
     static Path browserPath;
     static FileEntry[] browserFiles;
 
-    ImStorageManager.purge(10);
-
-    struct MyInt{ int value; }
-    auto a = ImStorage!MyInt.access(123).value++;
-    if(inputs.Shift.down) ImStorage!int.access(1234) += 10;
-
-    print(ImStorageManager.detailedStats);
+    auto LedBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__)(in bool ledState, RGB ledColor, string caption){ with(im){
+      return Btn!(srcModule, srcLine)({ if(ledColor!=clBlack){ flags.hAlign = HAlign.left; Led(ledState, ledColor); Text(" "); } Text(caption); width = 3.5*fh; });
+    }}
 
     with(im){
+
       Panel(PanelPosition.topClient, {
-        fh = fh*3;
-        Text("Header");
+        foreach(sensorIdx; 0..2) Row(sensorIdx.genericArg!"id", {
+          style.bkColor = bkColor = sensorIdx==1 ? clAccent : clWhite;
+          fh = fh*3.4;
+          Text(sensorIdx==0 ? clBlack : clWhite, "S"~(+sensorIdx+1).text);
+          Column({
+            style.bkColor = bkColor = sensorIdx==1 ? clAccent : clWhite;
+            Row({
+              //theme = "tool";
+              static trig = false; if(LedBtn(trig, clYellow, "Trigger").pressed) trig.toggle;
+              static insp = false; if(LedBtn(insp, clYellow, "Inspect").pressed) insp.toggle;
+              static save = false; if(LedBtn(save, clYellow, "Collect").pressed) save.toggle;
+            });
+            Row({
+              bool b;
+              LedBtn(b, clRed, "Source");
+              LedBtn(b, clRed, "Image" );
+              LedBtn(b, clRed, "Detect");
+            });
+          });
+          Row({
+            style.bkColor = bkColor = sensorIdx==1 ? clAccent : clWhite;
+            Btn({ padding = "8"; fh = 36; Text("\u25fb"); });
+            static continuous = false; if(Btn({ Led(continuous, clLime); padding = "8"; fh = 36; Text("\u25b6"); }).pressed) continuous.toggle;
+          });
+
+          Row({
+            margin = "0 2";
+            innerWidth = 96;
+            innerHeight = 56;
+            bkColor = clGray;
+          });
+          Row({
+            margin = "0 2";
+            innerWidth = 96*4;
+            innerHeight = 56;
+            bkColor = clGray;
+          });
+        });
       });
       Panel(PanelPosition.rightClient, {
         padding = "2";
@@ -260,8 +293,19 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
 
           static int idx = -1;
           ListBox(idx, browserFiles, (in FileEntry e){
-            if(e.isDirectory){ style.bold = true; Text("["~e.name~"]"); }
-                        else { Text(File(e.name).nameWithoutExt); }
+            //This should be virtual:
+            // - itemSize is known.
+            // - after measure visible area in pixels must be saved.
+            // - in next update () only the visible ones should be called.
+            // - cache the items????  Not now, no time...
+            if(e.isDirectory){
+              flags.vAlign = VAlign.center; height = 36; style.bold = true; Text("["~e.name~"]");
+            }else{
+              Row({ width = 72; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
+              Row({ width = 72; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
+              Text(File(e.name).nameWithoutExt);
+            }
+
           });
 
 /*            foreach(i, const e; browserFiles){
