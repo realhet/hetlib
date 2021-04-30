@@ -8,8 +8,6 @@ import std.traits, std.meta;
 
 public import het.uibase;
 
-
-
 //todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
 
 //todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
@@ -136,6 +134,8 @@ struct im{ static:
 
     static DeltaTimer dt;
     deltaTime = dt.update;
+
+    ImStorageManager.purge(200);
   }
 
   void _endFrame(){ //called from end of update
@@ -728,7 +728,7 @@ struct im{ static:
         info.id          = container.id;
         info.contentSize = contentSize;
         info.pageSize    = pageSize;
-        info.lastAccess  = global_tick;
+        info.lastAccess  = application.tick;
       });
     }
 
@@ -748,7 +748,7 @@ struct im{ static:
 
       Id[] toRemove;
       foreach(id, ref info; infos){
-        if(info.lastAccess<global_tick){
+        if(info.lastAccess<application.tick){
           if(doPurge) toRemove ~= id;
           continue;
         }
@@ -825,10 +825,19 @@ struct im{ static:
     append(column); push(column, id_); scope(exit) pop;
 
     column.bkColor = style.bkColor;
+
     static foreach(a; args){{ alias t = typeof(a);
-      static if(__traits(compiles, a())) a();
+
+           static if(isFunctionPointer!a) a();
+      else static if(isDelegate!a       ) a();
+      else static if(isSomeString!t     ) Text(a);
+      else static if(is(t == YAlign)    ) flags.yAlign = a;
+      else static if(is(t == HAlign)    ) flags.hAlign = a;
+      else static if(is(t == VAlign)    ) flags.vAlign = a;
+      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
       else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
-      else static assert(false, "Unsupported type: "~typeof(a).stringof);
+      else static assert(false, "Unsupported type: "~t.stringof);
+
     }}
   }
 
@@ -859,17 +868,20 @@ struct im{ static:
     auto cntr = new .Container;
     append(cntr); push(cntr, id_); scope(exit) pop;
 
-    static foreach(a; args){{ alias t = typeof(a);
-      static if(isFunctionPointer!a){
-        a();
-      }else static if(isDelegate!a){
-        a();
-      }else static if(isSomeString!t){
-        Text(a);
-      }else{
-        static assert(false, "Unsupported type: "~t.stringof);
-      }
+    static foreach(a; args){{ alias t = Unqual!(typeof(a));
+
+           static if(isFunctionPointer!a) a();
+      else static if(isDelegate!a       ) a();
+      else static if(isSomeString!t     ) Text(a);
+      else static if(is(t == YAlign)    ) flags.yAlign = a;
+      else static if(is(t == HAlign)    ) flags.hAlign = a;
+      else static if(is(t == VAlign)    ) flags.vAlign = a;
+      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
+      else static assert(false, "Unsupported type: "~t.stringof);
+
     }}
+
   }
 
   // popup state
@@ -1190,6 +1202,8 @@ struct im{ static:
   }
 
   auto Edit(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
+    static if(is(T0==Path)) return EditPath!(srcModule, srcLine)(value, args);
+
     enum IsNum = std.traits.isNumeric!T0;
 
     mixin(prepareId, enable.M);
@@ -1335,6 +1349,62 @@ struct im{ static:
 
     return res; //a hit testet vissza kene adni im.valtozoban
   }
+
+  auto EditPath(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref Path actPath, in Args args){ // EditPath ///////////////////////////////////////
+    static struct Res{
+      bool mustRefresh; alias mustRefresh this;
+      bool valid, editing, changed;
+    }
+    Res res;
+
+    Row!(srcModule, srcLine)(args, {
+      auto editedPath = &ImStorage!Path.access(actContainer.id);
+
+      auto normalize = (in Path p) => p.normalized;
+      auto validate = (in Path p) => p.exists;
+
+      Edit(editedPath.fullPath, {
+        flex = 1;
+        if(flags.focused){
+          res.editing = true;
+
+          auto normalizedValue = normalize(*editedPath);
+          res.valid = validate(normalizedValue);
+          res.changed = actPath != *editedPath;
+
+          void colorize(RGB cl){
+            style.bkColor = bkColor = mix(bkColor, cl, 0.25f);
+            border.color = cl;
+          }
+
+          if(!res.valid) colorize(clRed); else if(res.changed) colorize(clGreen);
+
+          if(inputs.Esc.pressed){ *editedPath = actPath; }
+          if(inputs.Enter.pressed && res.valid){
+            actPath = normalizedValue;
+            focusedState.reset;
+            res.mustRefresh = true;
+          }
+        }else{
+          *editedPath = actPath;
+          res.valid =  validate(actPath);
+          if(!res.valid) style.fontColor = clRed;
+        }
+      });
+
+      if(res.editing){
+        if(res.changed){
+          if(Btn(symbol("Accept"), enable(res.valid))){ actPath = *editedPath; res.editing = false; res.valid = validate(actPath); res.mustRefresh = true; focusedState.reset; }
+          if(Btn(symbol("Cancel"))){ *editedPath = actPath; res.editing = false; res.valid = validate(actPath); focusedState.reset; }
+        }
+      }else{
+        if(res.valid && Btn(symbol("Refresh"))){ res.mustRefresh = true; }
+      }
+    });
+
+    return res;
+  }
+
 
   auto Static(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(in T0 value, T args){ // Static /////////////////////////////////
     static if(is(T0 : Property)){
@@ -1708,7 +1778,6 @@ struct im{ static:
       border = "1 normal gray";
 
       foreach(i, s; items){
-        auto itemId = combine(id_, i);
         auto selected = idx==i, oldSelected = selected;
 
         static if(translated){

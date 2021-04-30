@@ -119,47 +119,6 @@ private vec2 calcGlyphSize_image(/*in TextStyle ts,*/ int stIdx){
 }
 
 
-
-// NEW! ------------------------> ImStorage /////////////////////////////
-
-/+
-struct ImStorage(T){
-  struct StorageEntry{
-    T value;
-    int age; //in update ticks
-    float smoothTime=0; //last time accessed smoothly
-
-  }
-
-  private static StorageEntry[string] map;
-
-  static T get(string name){
-    auto a = name in map;
-    if(a){
-      return a.value;
-    }else{
-      return T.init;
-    }
-  }
-
-  static void set(string name, in T newValue){
-    auto a = name in map;
-    if(a){
-      a.value = newValue;
-      a.age = globalUpdateTick;
-    }else{
-      map[name] = StorageEntry(newValue, globalUpdateTick);
-    }
-  }
-
-/*  static auto smoothGet(float rate)(string name){
-
-
-  }*/
-}
-+/
-
-
 // HitTest ///////////////////////////////
 
 struct HitInfo{ //Btn returns it
@@ -2042,7 +2001,8 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "autoHeight"        , 1, // later everything else can read it.
     bool          , "hasHScrollBar"     , 1, // system manages this, not the user.
     bool          , "hasVScrollBar"     , 1,
-    int           , ""                  , 3,
+    bool          , "saveVisibleBounds" , 1, // draw() will save the visible innerBounds under the name id.appendIdx("visibleBounds");
+    int           , ""                  , 2,
   ));
 }
 
@@ -2312,6 +2272,12 @@ class Container : Cell { // Container ////////////////////////////////////
 
     const scrollOffset = getScrollOffset,
           hasScrollOffset = !isnull(scrollOffset);
+
+    if(flags.saveVisibleBounds){
+      flags.saveVisibleBounds = true;
+      imstVisibleBounds(id) = bounds2(scrollOffset, scrollOffset+innerSize);
+      //print("draw", id, imstVisibleBounds(id));
+    }
 
     dr.translate(innerPos);
     const useClipBounds = flags.clipChildren;

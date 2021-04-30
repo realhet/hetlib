@@ -1,102 +1,10 @@
 //@exe
-///@release
+//@release
 
-//@compile --d-version stringId
+//@compile --d-version intId
 
 import het, het.ui;
 
-// ImStorage ///////////////////////////////////////////////
-
-interface ImStorageInfo{
-  void purge(uint maxAge);
-
-  string name();
-  string infoSummary();
-  string[] infoDetails();
-}
-
-struct ImStorageManager{ static:
-  ImStorageInfo[string] storages;
-
-  void registerStorage(ImStorageInfo info){
-    storages[info.name] = info;
-  }
-
-  void purge(uint maxAge){
-    storages.values.each!(s => s.purge(maxAge));
-  }
-
-  string stats(string details=""){
-    string res;
-    foreach(name; storages.keys.sort){
-      const maskOk = name.isWild(details);
-      if(maskOk || details=="") res ~= storages[name].infoSummary ~ '\n';
-      if(maskOk               ) res ~= storages[name].infoDetails.join('\n') ~ '\n';
-    }
-    return res;
-  }
-
-  string detailedStats(){ return stats("*"); }
-}
-
-struct ImStorage(T){ static:
-  alias Id = im.Id;
-
-  struct Item{
-    T data;
-    Id id;
-    uint tick;
-  }
-
-  Item[Id] items; //by Id
-
-  void purge(uint maxAge){ //age = 0 purge all
-    uint limit = global_tick-maxAge;
-    auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array;
-    toRemove.each!(k => items.remove(k));
-  }
-
-  class InfoClass : ImStorageInfo {
-    string name(){ return ImStorage!T.stringof; }
-    string infoSummary(){
-      return format!("%s(count: %s, minAge = %s, maxAge = %s")(name, items.length,
-          global_tick - items.values.map!(a => a.tick).minElement(uint.max),
-          global_tick - items.values.map!(a => a.tick).maxElement(uint.min)
-      );
-    }
-    string[] infoDetails(){
-      return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%18s | %s"(global_tick-a.value.tick, a.key, a.value.data)).array.sort.array;
-    }
-    void purge(uint maxAge){
-      ImStorage!T.purge(maxAge);
-    }
-  }
-
-  auto ref access(in Id id){
-    auto p = id in items;
-    if(!p){
-      items[id] = Item.init;
-      p = id in items;
-      p.id = id;
-    }
-    p.tick = global_tick;
-    return p.data;
-  }
-
-  void set(in Id id, in T data){ access(id) = data; }
-
-  bool exists(in Id id){ return (id in items) !is null; }
-
-  uint age(in Id id){
-    if(auto p = id in items){
-      return global_tick-p.tick;
-    }else return typeof(return).max;
-  }
-
-  static this(){
-    ImStorageManager.registerStorage(new InfoClass);
-  }
-}
 
 class CustomTexture{ // CustomTexture ///////////////////////////////
   string name(){ return this.identityStr; }
@@ -116,43 +24,115 @@ class CustomTexture{ // CustomTexture ///////////////////////////////
   }
 }
 
-class PathEditor{ // PathEditor ////////////////////////////////
-  Path editedPath;
 
-/*  @property Path path() const{ return actPath; }
-  @property void path(in Path p) { actPath = editedPath = p; }
+class KarcFileBrowser{ // KarcFileBrowser ////////////////////////////////////////
+  Path path;
 
-  this(){ path = currentPath.normalized; }
-  this(in Path p){ path = p.normalized; }*/
+  bool mustRefresh;
+  Path updatedPath;
+  FileEntry[] files;
 
-  bool UI(Args...)(ref Path actPath, in Args args){ with(im){
-    bool mustRefresh;
-    Edit(editedPath.fullPath, args, {
-      if(flags.focused){
-        auto normalizedPath = editedPath.normalized;
-        const isPathOk = normalizedPath.exists;
+  int selectedIdx = -1;
 
-        void colorize(RGB cl){
-          style.bkColor = bkColor = mix(bkColor, cl, 0.25f);
-          border.color = cl;
+  void update(){
+    if(mustRefresh || path != updatedPath){
+      updatedPath = path;
+      mustRefresh = false;
+
+      files = listFiles(updatedPath, "*.jpg", "name");
+    }
+  }
+
+  void UI_path(){
+    update;
+    if(im.EditPath(path, this.genericId)) mustRefresh = true;
+  }
+
+  void UI_browser(){
+    update;
+    with(im) Container(this.genericId, {
+      margin = "2";
+      border = "1 normal gray";
+      innerWidth = 300;
+      flex = 1;
+      bkColor = clSilver;
+
+      void UI(in FileEntry e){
+        //border.width = 1;
+        //border.color = clAccent;
+        //style.bkColor = bkColor = mix(clAccent, clWhite, 1);
+
+        if(e.isDirectory){
+          flags.vAlign = VAlign.center; height = 36; style.bold = true; Text("["~e.name~"]");
+        }else{
+          Row({ width = 72; height = 36; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
+          Row({ width = 72; height = 36; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
+          Text(File(e.name).nameWithoutExt);
         }
-
-        if(!isPathOk) colorize(clRed);
-        else if(!samePath(normalizedPath, actPath)) colorize(clGreen);
-
-        if(inputs.Esc.pressed){ editedPath = actPath; }
-        if(inputs.Enter.pressed && isPathOk){
-          actPath = normalizedPath;
-          focusedState.reset;
-          mustRefresh = true;
-        }
-      }else{
-        editedPath = actPath;
-        if(!actPath.exists) style.fontColor = clRed;
       }
+
+      //Container({
+
+      static float maxWidth = 0; print(maxWidth);
+      const rowHeight = 40;
+      const totalHeight = rowHeight*files.length;
+
+      //size placeholder
+      Container({ outerSize = vec2(0); actContainer.outerPos = vec2(maxWidth, totalHeight); });
+
+      flags.saveVisibleBounds = true;
+
+      auto visibleBounds = imstVisibleBounds(actId);
+//        print("ftch", actId, visibleBounds);
+
+      if(visibleBounds.height>0 && files.length){
+        int st = clamp((visibleBounds.top   /rowHeight).ifloor,  0, files.length.to!int-1);
+        int en = clamp((visibleBounds.bottom/rowHeight).iceil , st, files.length.to!int-1);
+
+//          print(st, en, visibleBounds);
+
+        foreach(idx;  st..en+1){
+          auto selected(){ return idx==selectedIdx; }
+
+          Row(genericId(idx), {
+            padding = "2";
+            flags.wordWrap = false;
+
+            auto hit = hitTest(true/*enabled*/);
+
+            if(!selected && hit.hover && (inputs.LMB.pressed || inputs.RMB.pressed)) selectedIdx = idx; //mosue down left or right
+
+            style.bkColor = bkColor = mix(bkColor, clAccent, max(selected ? .5f:0, hit.hover_smooth*.25f));
+
+            UI(files[idx]);
+          });
+
+          lastContainer.measure;
+          lastContainer.outerPos.y = idx*rowHeight;
+
+          maxWidth.maximize(lastContainer.outerWidth);
+          lastContainer.flags.autoWidth = false;
+          lastContainer.outerWidth = maxWidth; //todo: it's a useless crap shit fuck ass #$!@%^#$!
+        }
+      }
+
+
+      flags.clipChildren = true;
+      flags.vScrollState = ScrollState.auto_;
+      flags.wordWrap = false;
+      flags.hScrollState = ScrollState.auto_;
     });
-    return mustRefresh;
-  }}
+  }
+
+  void UI_detail(){
+    update;
+    with(im) Column(this.genericId, {
+      margin = "2";
+      Row("Details:");
+      Row("Blabla:");
+      Row("Blabla:");
+    });
+  }
 }
 
 
@@ -161,16 +141,17 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
   CustomTexture customTexture;
   int threshold = 2;
 
-  PathEditor pathEditor;
-  Path actPath;
+  KarcFileBrowser browser;
 
   override void onCreate(){
     customTexture = new CustomTexture;
 
-    pathEditor = new PathEditor;
-    actPath = Path(`c:\d\projects\karc\samples`);
+    browser = new KarcFileBrowser;
+    browser.path = Path(`c:\d\projects\karc\samples\Dir1`);
 
     refresh;
+
+    //print("fuck! ha nincs console es valamelyik thread-en a jpeg decoder WARNingot dob, akkor vegtelen looppal kifagy.");
   }
 
   void refresh(){
@@ -210,18 +191,6 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
   override void onUpdate(){
     view.navigate(!im.wantKeys, !im.wantMouse);
     invalidate;
-
-    /*ImStorageManager.purge(10);
-
-    struct MyInt{ int value; }
-    auto a = ImStorage!MyInt.access(srcId(genericArg!"id"("fuck"))).value++;
-    if(inputs.Shift.down) ImStorage!int.access(srcId(genericArg!"id"("shit"))) += 10;
-
-    print(ImStorageManager.detailedStats);*/
-
-    bool mustRefresh;
-    static Path browserPath;
-    static FileEntry[] browserFiles;
 
     auto LedBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__)(in bool ledState, RGB ledColor, string caption){ with(im){
       return Btn!(srcModule, srcLine)({ if(ledColor!=clBlack){ flags.hAlign = HAlign.left; Led(ledState, ledColor); Text(" "); } Text(caption); width = 3.5*fh; });
@@ -271,63 +240,10 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
       });
       Panel(PanelPosition.rightClient, {
         padding = "2";
-        Column({
-          margin = "2";
-          Row({
-            if(pathEditor.UI(actPath, { flex = 1; })) mustRefresh = true;
-            if(Btn("Refresh")) mustRefresh = true;
-          });
-        });
-        Container({
-          margin = "2";
-          border = "1 normal gray";
-          width = 300;
-          flex = 1;
-          bkColor = clSilver;
+        browser.UI_path;
+        browser.UI_browser;
+        browser.UI_detail;
 
-          if(chkSet(browserPath, actPath)) mustRefresh = true;
-
-          if(mustRefresh){
-            browserFiles = listFiles(browserPath, "*.jpg", "name");
-          }
-
-          static int idx = -1;
-          ListBox(idx, browserFiles, (in FileEntry e){
-            //This should be virtual:
-            // - itemSize is known.
-            // - after measure visible area in pixels must be saved.
-            // - in next update () only the visible ones should be called.
-            // - cache the items????  Not now, no time...
-            if(e.isDirectory){
-              flags.vAlign = VAlign.center; height = 36; style.bold = true; Text("["~e.name~"]");
-            }else{
-              Row({ width = 72; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
-              Row({ width = 72; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
-              Text(File(e.name).nameWithoutExt);
-            }
-
-          });
-
-/*            foreach(i, const e; browserFiles){
-              Row({
-                //actContainer.outerPos = vec2(0, i*NormalFontHeight);
-                if(e.isDirectory){ style.bold = true; Text("["~e.name~"]"); }
-                            else { Text(File(e.name).nameWithoutExt); }
-              });
-            }*/
-
-
-          flags.clipChildren = true;
-          flags.vScrollState = ScrollState.auto_;
-          flags.wordWrap = false;
-          flags.hScrollState = ScrollState.auto_;
-        });
-        Column({
-          margin = "2";
-          Row("Details:");
-          Row("Blabla:");
-          Row("Blabla:");
-        });
 
 
 

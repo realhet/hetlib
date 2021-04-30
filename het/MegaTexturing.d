@@ -250,7 +250,7 @@ public  SubTexInfo[] infoArray;
 
   void accessedNow(int idx){
     if(!global_disableSubtextureAging)
-      lastAccessed[idx] = global_tick;
+      lastAccessed[idx] = application.tick;
   }
 
 public:
@@ -596,7 +596,7 @@ public:
 
         invalidateAgain.remove(idx);
         foreach(f, i; byFileName) if(i == idx){ //opt: slow linear search
-          WARN("Reinvalidating", f, idx);
+          //WARN("Reinvalidating", f, idx);
           invalidate(f);
           break;
         }
@@ -621,7 +621,7 @@ public:
   void invalidate(in File fileName){
     if(auto idx = (fileName in byFileName)){
       if(*idx in pendingIndices){
-        WARN("Texture loader is pending", fileName, *idx);
+        //WARN("Texture loader is pending", fileName, *idx);
         invalidateAgain[*idx] = true;
         return;
       }
@@ -674,9 +674,9 @@ public:
           try{
             bmp = newBitmap(fileName); // <- this takes time. This should be delayed
           }catch(Throwable){
-            //bmp = new Bitmap(new Image!RGBA([RGBA(0xFFFF00FF)], 1, 1));
-            //bmp = newBitmap(`font:\Segoe MDL2 Assets\16?`~"\uE783");
-            WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
+            //todo: Nem jo!!! Nem thread safe !!!  WARN("Bitmap decode error. Using errorBitmap", fileName);
+            //Ez nem thread safe!!!! multithreaded modban vegtelen loopba tud kerulni.
+            //todo: ezt megoldani a placeholder bitmappal rendesen
             bmp = errorBitmap;
           }
 
@@ -807,7 +807,7 @@ if(log) "Created subtex %s:".writefln(fileName);
     File file;
     SubTexInfo info;
 
-    bool canUnload() const{ return canUnloadTexture(file, global_tick - lastAccessed); }
+    bool canUnload() const{ return canUnloadTexture(file, application.tick - lastAccessed); }
 
     auto toString() const{
       return format!"%-4s: %s age:%-5d %s"(idx, info, lastAccessed, file.fullName);

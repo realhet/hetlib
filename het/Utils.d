@@ -164,6 +164,8 @@ __gshared static private:
   KillerThread killerThread;
 
 __gshared static public:///////////////////////////////////////////////////////////////////
+  uint tick;
+
   void function() initFunct;
 
   auto argc()            { return arg_.length; }
@@ -2830,7 +2832,18 @@ auto asGenericArgValue(A)(in A a){
 
 
 string processGenericArgs(string code){
+  //generates a static foreach. "code" is a static if chain evaluating N (name) and T (type). Inputs: args:
   return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}";
+}
+
+string appendGenericIds(string idVariable){
+  return processGenericArgs(`static if(N=="id") `~idVariable~`.appendIdx(a.value);`);
+}
+
+
+auto genericId(T)(in T a){
+  static if(is(T==class)) return genericArg!"id"(a.identityStr);
+                     else return genericArg!"id"(a);
 }
 
 // SrcId ////////////////////////////////////////////////////////////
@@ -2861,13 +2874,12 @@ static if(is(SrcId.T==uint) || is(SrcId.T==ulong)){
   //auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value)); }
 
   auto combine(T)(in SrcId i1, in T i2){ return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); }
+  void appendIdx(T)(ref SrcId id, in T idx){ id = combine(id, idx); }
 
   //note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
   auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
     auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); //note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
-    mixin(processGenericArgs(q{
-      static if(N=="id") id = id.combine(a);
-    }));
+    mixin(appendGenericIds("id"));
     return id;
   }
 
@@ -2876,12 +2888,11 @@ static if(is(SrcId.T==uint) || is(SrcId.T==ulong)){
   //auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
 
   auto combine(T)(in SrcId i1, in T i2){ return SrcId(i1.value ~ '.' ~ i2.text); }
+  void appendIdx(T)(ref SrcId id, in T idx){ id ~= '[' ~ idx.text ~ ']'; }   //for clarity string uses the [idx] form, instead of a.b;
 
   auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){
     auto id = SrcId(srcLocationStr!(srcModule, srcLine)); // .d is included to make sourceModule detection easier
-    mixin(processGenericArgs(q{
-      static if(N=="id") id ~= '[' ~ a.text ~ ']';
-    }));
+    mixin(appendGenericIds("id"));
     return id;
   }
 
@@ -2902,6 +2913,110 @@ void test_SrcId(){
     /+4+/ auto i7 = i6.combine(0);
     enforce(i1==i2 && i2!=i3 && i3!=i4 && i4!=i5 && i5!=i6 && i6!=i7);
   }
+}
+
+
+// ImStorage ///////////////////////////////////////////////
+
+// Usage:  ImStorage!float.set(srcId!("module", 123)(genericArg!"id"(456)), newValue)  //this is the most complicated one
+
+    /+ImStorageManager.purge(10);
+
+    struct MyInt{ int value; }
+    auto a = ImStorage!MyInt.access(srcId(genericArg!"id"("fuck"))).value++;
+    if(inputs.Shift.down) ImStorage!int.access(srcId(genericArg!"id"("shit"))) += 10;
+
+    print(ImStorageManager.detailedStats);+/
+
+
+interface ImStorageInfo{
+  void purge(uint maxAge);
+
+  string name();
+  string infoSummary();
+  string[] infoDetails();
+}
+
+struct ImStorageManager{ static:
+  __gshared ImStorageInfo[string] storages;
+
+  void registerStorage(ImStorageInfo info){
+    storages[info.name] = info;
+  }
+
+  void purge(uint maxAge){
+    storages.values.each!(s => s.purge(maxAge));
+  }
+
+  string stats(string details=""){
+    string res;
+    foreach(name; storages.keys.sort){
+      const maskOk = name.isWild(details);
+      if(maskOk || details=="") res ~= storages[name].infoSummary ~ '\n';
+      if(maskOk               ) res ~= storages[name].infoDetails.join('\n') ~ '\n';
+    }
+    return res;
+  }
+
+  string detailedStats(){ return stats("*"); }
+}
+
+struct ImStorage(T){ static:
+  alias Id = SrcId;
+
+  struct Item{
+    T data;
+    Id id;
+    uint tick;
+  }
+
+  Item[Id] items; //by Id
+
+  void purge(uint maxAge){ //age = 0 purge all
+    uint limit = application.tick-maxAge;
+    auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array;
+    toRemove.each!(k => items.remove(k));
+  }
+
+  class InfoClass : ImStorageInfo {
+    string name(){ return ImStorage!T.stringof; }
+    string infoSummary(){
+      return format!("%s(count: %s, minAge = %s, maxAge = %s")(name, items.length,
+          application.tick - items.values.map!(a => a.tick).minElement(uint.max),
+          application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
+      );
+    }
+    string[] infoDetails(){
+      return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%18s | %s"(application.tick-a.value.tick, a.key, a.value.data)).array.sort.array;
+    }
+    void purge(uint maxAge){
+      ImStorage!T.purge(maxAge);
+    }
+  }
+
+  auto ref access(in Id id){
+    auto p = id in items;
+    if(!p){
+      items[id] = Item.init;
+      p = id in items;
+      p.id = id;
+    }
+    p.tick = application.tick;
+    return p.data;
+  }
+
+  void set(in Id id, in T data){ access(id) = data; }
+
+  bool exists(in Id id){ return (id in items) !is null; }
+
+  uint age(in Id id){
+    if(auto p = id in items){
+      return application.tick-p.tick;
+    }else return typeof(return).max;
+  }
+
+  //todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
+  //shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
 }
 
 static T Singleton(T)() if(is(T == class)){ // Singleton ////////////////////////
@@ -2931,6 +3046,10 @@ static T Singleton(T)() if(is(T == class)){ // Singleton ///////////////////////
 
   return instance;
 }
+
+
+///note: This has been moved here to avoid circular module initialization in uiBase
+ref auto imstVisibleBounds(in SrcId id){ return ImStorage!bounds2.access(id.combine("visibleBounds")); };
 
 
 // hexDump ///////////////////////////
@@ -4179,6 +4298,10 @@ public:
 
   Path opBinary(string op:"~")(string p2){
     return Path(this, p2);
+  }
+
+  bool opEquals(in Path other) const{
+    return samePath(this.normalized, other.normalized);
   }
 }
 
