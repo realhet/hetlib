@@ -878,3 +878,22 @@ if(log) "Created subtex %s:".writefln(fileName);
 
 }
 
+
+class CustomTexture{ // CustomTexture ///////////////////////////////
+  string name(){ return this.identityStr; }
+  protected{
+    Bitmap bmp;
+    bool mustUpload;
+  }
+
+  void clear(){ bmp.free; mustUpload = false; }
+  void update(){ mustUpload = true; }
+  void update(Bitmap bmp){ this.bmp = bmp; mustUpload = true; }
+
+  int texIdx(){
+    if(bmp is null) return -1; //nothing to draw
+    if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
+    Bitmap b = chkClear(mustUpload) ? bmp : null;
+    return textures.custom(name, b);
+  }
+}

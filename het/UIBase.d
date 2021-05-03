@@ -899,6 +899,7 @@ class Cell{ // Cell ////////////////////////////////////
     auto innerCenter() const { return innerPos + innerSize*.5f; }
 
     //note when working with controls, it is like specify border and then the width, not including the border. So width is mostly means innerWidth
+    alias pos = outerPos;
     alias size = innerSize;
     alias width = innerWidth;
     alias height = innerHeight;

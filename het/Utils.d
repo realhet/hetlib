@@ -5217,13 +5217,18 @@ struct Time{
 struct DateTime{
   /+private+/ double raw;
 
-  this(const SYSTEMTIME st){
+  this(in FILETIME ft){
+    SYSTEMTIME st;
+    FileTimeToSystemTime(&ft, &st);
+    this(st);
+  }
+  this(in SYSTEMTIME st){
     with(st) raw = encodeDate(wYear, wMonth, wDay) + encodeTime(wHour, wMinute, wSecond, wMilliseconds);
   }
   this(int year, int month, int day, int hour=0, int minute=0, int second=0, int milliseconds=0){
     raw = encodeDate(year, month, day) + encodeTime(hour, minute, second, milliseconds);
   }
-  this(const Date date, const Time time){
+  this(in Date date, in Time time){
     raw = date.raw+time.raw;
   }
   this(string str){  //todo: this sucks: no error handling at all

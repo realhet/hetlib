@@ -1,127 +1,206 @@
 //@exe
-//@release
 
-//@compile --d-version intId
+//@release
+///@debug
+///@compile --d-debug
+
+//@compile --d-version longId
 
 import het, het.ui;
 
+struct KarcFileEntry{ // KarcFileEntry //////////////////////////////////////////////
+  enum thumbWidth = 72,
+       thumbHeight = 36,
+       totalPadding = 4;
 
-class CustomTexture{ // CustomTexture ///////////////////////////////
-  string name(){ return this.identityStr; }
-  protected{
-    Bitmap bmp;
-    bool mustUpload;
-  }
+  Path path;
+  DateTime dateTime;
+  string single, karc0, karc1; //valid combinations: single, s0, s1, s0+s1
 
-  void update(){ mustUpload = true; }
-  void update(Bitmap bmp){ this.bmp = bmp; mustUpload = true; }
+  bool isDirectory() const{ return single.endsWith('\\'); }
+  bool isSingle   () const{ return single.length>0; }
+  bool isKarc0    () const{ return karc0.length>0; }
+  bool isKarc1    () const{ return karc1.length>0; }
+  int  karcCnt    () const{ return isKarc0.to!int + isKarc1.to!int; }
+  bool isKarc     () const{ return karcCnt>0; }
 
-  int texIdx(){
-    if(bmp is null) return -1; //nothing to draw
-    if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
-    Bitmap b = chkClear(mustUpload) ? bmp : null;
-    return textures.custom(name, b);
-  }
+  void UI(int sensorIdx){ with(im){
+
+    void Thumb(string fn, bool selected, int widthScale){
+      Row({
+        padding = (totalPadding/2).text;
+        innerSize = vec2(thumbWidth*widthScale, thumbHeight);
+        if(!selected) bkColor = clWinBackground;
+        if(fn=="") return;
+        flags.hAlign = HAlign.center;
+        if(File(fn).extIs(["jpg"])){
+          Text(tag(format!`img "%s?thumb64" height=%s`(path.fullPath~fn, thumbHeight)));
+        }else{
+          flags.vAlign = VAlign.center;
+          Text(isDirectory ? "DIR" : File(fn).ext.uc ~ "\nfile");
+        }
+      });
+    }
+
+    //padding = "2";
+    flags.wordWrap = false;
+    flags.vAlign = VAlign.center;
+    flags.yAlign = YAlign.center;
+    innerHeight = thumbHeight + totalPadding;
+
+    if(isKarc){
+      if(karcCnt==2){
+        Thumb(karc0, sensorIdx==0, 1);
+        Thumb(karc1, sensorIdx==1, 1);
+        Spacer;
+        Text(File(karc0).nameWithoutExt[0..$-1], "0,1");
+      }else{
+        Thumb(karc0, isKarc0, 1);
+        Thumb(karc1, isKarc1, 1);
+        Spacer;
+        Text(File(isKarc0 ? karc0 : karc1).nameWithoutExt);
+      }
+    }else if(isSingle){
+      Thumb(single, true, 2);
+      Spacer;
+      if(isDirectory){
+        style.bold = true; Text(single);
+      }else{
+        Text(File(single).nameWithoutExt);
+      }
+
+    }
+  }}
+
+
 }
-
 
 class KarcFileBrowser{ // KarcFileBrowser ////////////////////////////////////////
   Path path;
 
   bool mustRefresh;
   Path updatedPath;
-  FileEntry[] files;
+  KarcFileEntry[] items;
 
   int selectedIdx = -1;
+  int sensorIdx = 0;
+
+  float maxWidth = 0; //this must cleared when items changed
 
   void update(){
     if(mustRefresh || path != updatedPath){
       updatedPath = path;
       mustRefresh = false;
+      maxWidth = 0;
 
-      files = listFiles(updatedPath, "*.jpg", "name");
+      auto files = listFiles(updatedPath, "*.jpg", "name", Yes.onlyFiles);
+      items.clear;
+
+      while(!files.empty) with(files.front){
+        if(name.isWild("*_S0.*")){
+          items ~= KarcFileEntry(path, DateTime(ftLastWriteTime), "", name);
+          files.popFront;
+          if(files.length) with(files.front) if(name.isWild(items[$-1].karc0.replace("_S0.", "_S1."))){
+            items[$-1].karc1 = name;
+            files.popFront;
+          }
+        }else if(name.isWild("*_S1.*")){
+          items ~= KarcFileEntry(path, DateTime(ftLastWriteTime), "", "", name);
+          files.popFront;
+        }else{
+          if(!isDirectory) items ~= KarcFileEntry(path, DateTime(ftLastWriteTime), name ~ (isDirectory ? `\` : ``));
+          files.popFront;
+        }
+      }
+
+      items = items.sort!((in a,in b) => a.dateTime > b.dateTime).array;
     }
   }
 
-  void UI_path(){
+  auto UI_path(){
+    bool clicked;
+
     update;
-    if(im.EditPath(path, this.genericId)) mustRefresh = true;
+    if(im.EditPath(path, this.genericId)) mustRefresh = clicked = true;
+
+    return clicked;
   }
 
-  void UI_browser(){
+  auto UI_browser(){
+    bool clicked;
+
     update;
     with(im) Container(this.genericId, {
       margin = "2";
       border = "1 normal gray";
-      innerWidth = 300;
-      flex = 1;
-      bkColor = clSilver;
+      innerWidth = 400;
+      flex = 1; //It is vertical flex
+      //innerHeight = 500;
+      bkColor = clWinBackground;
 
-      void UI(in FileEntry e){
-        //border.width = 1;
-        //border.color = clAccent;
-        //style.bkColor = bkColor = mix(clAccent, clWhite, 1);
+      const rowHeight = KarcFileEntry.thumbHeight + KarcFileEntry.totalPadding;
 
-        if(e.isDirectory){
-          flags.vAlign = VAlign.center; height = 36; style.bold = true; Text("["~e.name~"]");
-        }else{
-          Row({ width = 72; height = 36; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
-          Row({ width = 72; height = 36; flags.hAlign = HAlign.center; Text(tag(`img "%s?thumb64" height=36`.format(e.fullName)));});
-          Text(File(e.name).nameWithoutExt);
-        }
-      }
-
-      //Container({
-
-      static float maxWidth = 0; print(maxWidth);
-      const rowHeight = 40;
-      const totalHeight = rowHeight*files.length;
+      const totalHeight = rowHeight*items.length;
 
       //size placeholder
-      Container({ outerSize = vec2(0); actContainer.outerPos = vec2(maxWidth, totalHeight); });
+      Container({ outerSize = vec2(0); outerPos = vec2(maxWidth, totalHeight); });
+
+      with(flags){
+        clipChildren = true;
+        vScrollState = ScrollState.auto_;
+        wordWrap = false;
+        hScrollState = ScrollState.auto_;
+      }
 
       flags.saveVisibleBounds = true;
-
       auto visibleBounds = imstVisibleBounds(actId);
-//        print("ftch", actId, visibleBounds);
 
-      if(visibleBounds.height>0 && files.length){
-        int st = clamp((visibleBounds.top   /rowHeight).ifloor,  0, files.length.to!int-1);
-        int en = clamp((visibleBounds.bottom/rowHeight).iceil , st, files.length.to!int-1);
-
-//          print(st, en, visibleBounds);
+      if(visibleBounds.height>0 && items.length){
+        int st = clamp((visibleBounds.top   /rowHeight).ifloor,  0, items.length.to!int-1);
+        int en = clamp((visibleBounds.bottom/rowHeight).iceil , st, items.length.to!int-1);
 
         foreach(idx;  st..en+1){
           auto selected(){ return idx==selectedIdx; }
 
           Row(genericId(idx), {
-            padding = "2";
-            flags.wordWrap = false;
-
             auto hit = hitTest(true/*enabled*/);
-
-            if(!selected && hit.hover && (inputs.LMB.pressed || inputs.RMB.pressed)) selectedIdx = idx; //mosue down left or right
-
+            if(/*!selected && */hit.hover && (inputs.LMB.pressed || inputs.RMB.pressed)){
+              selectedIdx = idx; //mosue down left or right
+              clicked = true;
+              with(items[selectedIdx]) if(isKarc){
+                if(karcCnt==2){
+                  //todo: this mouse getting thing is fucking lame. actMousePos should be accessible at all times, and flags.targetSurface should be inherited.
+                  const clientMouseX = im.actView.mousePos.x - hit.hitBounds.left - actContainer.topLeftGapSize.x,
+                        thumbOuterWidth = KarcFileEntry.thumbWidth + KarcFileEntry.totalPadding,
+                        thumbIdx = (clientMouseX / thumbOuterWidth).ifloor;
+                  if(thumbIdx.inRange(0, 1)){
+                    sensorIdx = thumbIdx;
+                  }
+                }else{
+                  sensorIdx = isKarc0 ? 0 : 1;
+                }
+              }
+            }
             style.bkColor = bkColor = mix(bkColor, clAccent, max(selected ? .5f:0, hit.hover_smooth*.25f));
 
-            UI(files[idx]);
+            items[idx].UI(sensorIdx);
           });
 
-          lastContainer.measure;
-          lastContainer.outerPos.y = idx*rowHeight;
+          with(lastContainer){
+            measure;
+            outerPos.y = idx*rowHeight;
 
-          maxWidth.maximize(lastContainer.outerWidth);
-          lastContainer.flags.autoWidth = false;
-          lastContainer.outerWidth = maxWidth; //todo: it's a useless crap shit fuck ass #$!@%^#$!
+            maxWidth.maximize(outerWidth);
+
+            //todo: autoWidth wont reset automatically when setting outterWidth
+            flags.autoWidth = false;
+            outerWidth = maxWidth;
+          }
         }
       }
-
-
-      flags.clipChildren = true;
-      flags.vScrollState = ScrollState.auto_;
-      flags.wordWrap = false;
-      flags.hScrollState = ScrollState.auto_;
     });
+
+    return clicked;
   }
 
   void UI_detail(){
@@ -147,7 +226,7 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
     customTexture = new CustomTexture;
 
     browser = new KarcFileBrowser;
-    browser.path = Path(`c:\d\projects\karc\samples\Dir1`);
+    browser.path = Path(`c:\d\projects\karc\samples`);
 
     refresh;
 
@@ -241,8 +320,8 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
       Panel(PanelPosition.rightClient, {
         padding = "2";
         browser.UI_path;
-        browser.UI_browser;
-        browser.UI_detail;
+        if(browser.UI_browser){ if(0) beep; }
+        //browser.UI_detail;
 
 
 
@@ -282,7 +361,7 @@ class FrmTestInputs: GLWindow { mixin autoCreate;  // Frm //////////////////////
       //draw something
       dr.textOut(0, 0, "Hello");
 
-      if(customTexture.texIdx>=0) dr.drawGlyph(customTexture.texIdx, vec2(0), Yes.nearest);
+      dr.drawGlyph(customTexture, vec2(0), Yes.nearest);
 
       view.workArea = dr.bounds;
       //view.zoomAll;

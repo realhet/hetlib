@@ -3,7 +3,7 @@ module het.draw2d;
 import het.opengl, het.megatexturing;
 
 public import het.geometry, het.color;
-public import het.megatexturing : textures;
+public import het.megatexturing : textures, CustomTexture;
 
 import std.bitmanip;
 
@@ -654,6 +654,8 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   void fillRect(in ibounds2 b)                      { fillRect(bounds2(b)); } //todo: ibounds2 automatikusan atalakulhasson bounds2-re
 
   void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args){
+    if(idx<0) return;
+
     RGBA8 bkColor = clBlack;
     auto rectAlign = RectAlign(HAlign.center, VAlign.center, true, false, true); //shrink, enlarge, aspect
     auto nearest = No.nearest;
@@ -680,17 +682,19 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   }
 
   void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args){
+    if(idx<0) return;
     auto info = textures.accessInfo(idx); //autosize version
     drawGlyph_impl(idx, bounds2(topLeft, topLeft+info.size), args);
   }
 
-  void drawGlyph(Img, T...)(in Img img, in T args){
-    //Img can be int or File or string
+  void drawGlyph(Img, T...)(/+ Not const because CustomTexture.texIdx is mutable +/Img img, in T args){
+    //Img can be int or File or string or CustomTexture
     //todo: Bitmap, Image2D
     int idx = -1;
          static if(isSomeString!Img       ) idx = textures[img];
-    else static if(is(Unqual!Img == File) ) idx = textures[img];
-    else static if(is(Unqual!Img == int)  ) idx = img;
+    else static if(is(Img == File        )) idx = textures[img];
+    else static if(is(Img == int         )) idx = img;
+    else static if(is(Img : CustomTexture)){ if(img) idx = img.texIdx; }
     else static assert("Unsupported Img param: ", Img);
 
     //position can be x,y  vec2,   ivec2      the size is automatic
@@ -699,9 +703,9 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     else static if(T.length>=1 && isVector!(T[0]))
       static if(T.length>=2 && isVector!(T[1]))                                     drawGlyph_impl(idx, bounds2(args[0..2]), args[2..$]);
                                                                                else drawGlyph_impl(idx, vec2   (args[0   ]), args[1..$]);
-    else static if(T.length>=2 && isArithmetic!(T[0]) && isArithmetic!(T[1]))
-      static if(T.length>=4 && isArithmetic!(T[2]) && isArithmetic!(T[3]))          drawGlyph_impl(idx, bounds2(args[0..4]), args[4..$]);
-                                                                               else drawGlyph_impl(idx, vec2   (args[0..2]), args[2..$]);
+    else static if(T.length>=2 && __traits(isArithmetic, T[0]) && __traits(isArithmetic, T[1]))
+      static if(T.length>=4 && __traits(isArithmetic, T[2]) && __traits(isArithmetic, T[3])) drawGlyph_impl(idx, bounds2(args[0..4]), args[4..$]);
+                                                                                        else drawGlyph_impl(idx, vec2   (args[0..2]), args[2..$]);
     else static assert("Unsupported Bounds param: ", Img);
   }
 

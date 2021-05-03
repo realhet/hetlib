@@ -84,7 +84,7 @@ struct im{ static:
     targetSurfaces[1].view = viewGUI;
   }
 
-  private View2D actView; //this is only used for getting mouse position from actview
+  /*private*/ View2D actView; //this is only used for getting mouse position from actview
 
   //todo: this should be the only opportunity to switch between GUI and World. Better that a containerflag that is initialized too late.
   private void selectTargetSurface(int n){
@@ -607,7 +607,7 @@ struct im{ static:
   }
 
   mixin(
-    ["innerWidth", "outerWidth", "innerHeight", "outerHeight", "innerSize", "outerSize", "width", "height"].map!ContainerProp.join ~
+    ["innerWidth", "outerWidth", "innerHeight", "outerHeight", "innerSize", "outerSize", "innerPos", "outerPos", "pos", "width", "height"].map!ContainerProp.join ~
     ["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
   );
 
@@ -1782,9 +1782,9 @@ struct im{ static:
 
         static if(translated){
           static foreach(f; args) static if(isTranslator!(typeof(f)))
-            auto hit = ListBoxItem(selected, { f(s); }, genericArg!"id"(i));
+            auto hit = ListBoxItem(selected, { f(s); }, genericId(i));
         }else{
-          auto hit = ListBoxItem(selected, s, genericArg!"id"(i));
+          auto hit = ListBoxItem(selected, s, genericId(i));
         }
         if(!oldSelected && selected){
           idx = cast(int) i;
