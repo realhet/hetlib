@@ -2100,8 +2100,20 @@ static foreach(T; AliasSeq!(float, double, int))
 
 // functions with bounds ////////////////////////////////
 
-auto manhattanDistance(B, V)(in B bnd, in V v) if(isBounds!B && isVector!V){
+auto bounds2_center(A, B, C, D)(A xcenter, B ycenter, C xsize, D ysize){
+  const xsizeh = xsize * .5f, ysizeh = ysize * .5f;
+  return bounds2(xcenter-xsizeh, ycenter-ysizeh,
+                 xcenter+xsizeh, ycenter+ysizeh);
+}
 
+auto bounds2_center(A, B)(in A center, in B size){
+  return bounds2_center(center.x, center.y, size.x, size.y);
+}
+
+
+
+auto manhattanDistance(B, V)(in B bnd, in V v) if(isBounds!B && isVector!V){
+  ERR("TODO");
 }
 
 private void unittest_Bounds(){

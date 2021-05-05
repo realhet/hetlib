@@ -858,6 +858,7 @@ if(log) "Created subtex %s:".writefln(fileName);
 
       //draw background
       dr.color = clFuchsia;
+      dr.alpha = 1;
       dr.fillRect(bounds2(vec2(0), mt.texSize));
 
       //draw subtextures

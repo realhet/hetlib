@@ -681,9 +681,9 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     append(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw));
   }
 
-  void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args){
+  void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args){ //autosize version
     if(idx<0) return;
-    auto info = textures.accessInfo(idx); //autosize version
+    auto info = textures.accessInfo(idx); //opt: double call to accessInfo
     drawGlyph_impl(idx, bounds2(topLeft, topLeft+info.size), args);
   }
 
@@ -693,7 +693,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     int idx = -1;
          static if(isSomeString!Img       ) idx = textures[img];
     else static if(is(Img == File        )) idx = textures[img];
-    else static if(is(Img == int         )) idx = img;
+    else static if(isIntegral!Img         ) idx = img;
     else static if(is(Img : CustomTexture)){ if(img) idx = img.texIdx; }
     else static assert("Unsupported Img param: ", Img);
 
