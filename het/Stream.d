@@ -745,6 +745,52 @@ string[] getChangedPropertyValues(Property[] props, string rootPath=""){
 }
 
 
+struct PropArray{ // PropArray ////////////////////////////////////////////
+  string queryName; //name of the
+  Property[] props;
+  string pendingQuery; //url of changed settings
+
+  bool pending(){ return !pendingQuery.empty; }
+  void clear(){ props.clear; pendingQuery = ""; }
+
+  bool empty(){ return props.empty; }
+
+  auto access(T=void, bool mustExists=true)(string name){
+    static if(is(T==void)) alias PT = Property;
+    else static if(is(T : Property)) alias PT = T;
+    else mixin("alias PT = ", T.stringof.capitalize ~ "Property;");
+
+    auto p = cast(PT)findProperty(props, name);
+    static if(mustExists) enforce(p !is null, format!`%s not found: "%s"`(PT.stringof, name));
+    return p;
+  }
+
+  auto get(T=void)(string name){ return access!(T, false)(name); }
+
+  auto get(T=void)(string name, string def){
+    auto p = get(name);
+    if(p is null) return def;
+    return p.asText;
+  }
+
+  bool exists(string name){ return get(name) !is null; }
+
+  void update(){
+    auto s = props.getChangedPropertyValues;
+    if(s.length){
+      auto q = queryName~"?"~s.join("&");
+      mergeUrlParams(pendingQuery, q);
+    }
+  }
+
+  string fetchPendingQuery(){
+    auto res = pendingQuery;
+    pendingQuery = "";
+    return res;
+  }
+}
+
+
 
 void unittest_main(){
   //todo: more tests!

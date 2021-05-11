@@ -209,6 +209,37 @@ private:
     *terminated = 2; //ack
   }
 
+  struct StatusLedState{ // StatusLedState /////////////////////////////////
+    BinarySignalSmootherNew!4 smComm;
+    int lastCommCnt;
+    enum maxTimeOut = 5; //must be high, because CURL is blocking. Even if it's called from different threads.
+    //todo: replace CURL
+    bool commState;
+    bool errorState;
+
+    uint tick;
+
+    void update(State state){
+      if(chkSet(tick, application.tick)){
+        commState = smComm.process(lastCommCnt.chkSet(state.commCnt));
+        errorState = state.error || (QPS-state.alive) > maxTimeOut;
+      }
+    }
+
+    enum Style { greenRedBlack, greenRedYellow }
+    Style style;
+
+    auto ledState(){
+      final switch(style){
+        case Style.greenRedBlack : return tuple(!commState, errorState ? clRed : clLime);
+        case Style.greenRedYellow: return tuple(true      , commState ? clYellow : errorState ? clRed : clLime);
+      }
+    }
+  }
+
+  StatusLedState statusLedState;
+  uint statusLedTick;
+
 public:
   this(string name = ""){
     inbox = new shared RequestQueue;
@@ -244,6 +275,12 @@ public:
   State state(){
     return state_;
   }
+
+  auto ledState(){
+    statusLedState.update(state);
+    return statusLedState.ledState;
+  }
+
 }
 
 class GlobalHttpQueue : HttpQueue{ this(){ super("globalHttpQueue"); } }

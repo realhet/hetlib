@@ -1874,7 +1874,7 @@ public:
   }
 
   private void initLoad(File fileName){
-    enforce(!loading_,            format(`%s.load() already loading`    , typeof(this).stringof));
+    enforce(!loading_,       format(`%s.load() already loading`    , typeof(this).stringof));
     enforce(fileName.exists, format(`%s.load() file not found "%s"`, typeof(this).stringof, fileName));
     fileName_ = fileName;
     loading_ = true;
@@ -3617,6 +3617,25 @@ int getUniqueSeed(T)(in T ptr){ //gets a 32bit seed from a ptr and the current t
   return arr.xxh_internal;
 }+/
 
+/// Helps to track a value whick can be updated. Remembers the last falue too. Has boolean and autoinc notification options.
+struct ChangingValue(T){ // ChangingValue /////////////////////////////////
+  T actValue, lastValue;
+  uint changedCount;
+  bool changed;
+
+  @property T value() const { return actValue; }
+  @property void value(in T newValue){
+    lastValue = actValue;
+    actValue = newValue;
+    changed = actValue != lastValue;
+    if(changed)
+      changedCount++;
+  }
+
+  alias value this;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 ///  Hashing                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -4195,7 +4214,112 @@ void benchmark_norx(){
 
 
 ////////////////////////////////////////////////////////////////////////////////
-///  Path                                                                ///
+///  Virtual files                                                           ///
+////////////////////////////////////////////////////////////////////////////////
+
+bool isVirtualFileName(string fileName){ return fileName.startsWith(`virtual:\`); }
+bool isVirtual(in File file){ return file.fullName.isVirtualFileName; }
+
+enum VirtualFileCommand { getInfo, remove, read, write }
+
+private auto virtualFileQuery_raise(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max){
+  auto res = virtualFileQuery(cmd, fileName, dataIn, offset, size);
+  if(!res) raise(res.error);
+  return res;
+}
+
+private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max){ synchronized {
+  struct Res{
+    string error;
+    bool success(){ return error==""; }
+    alias success this;
+
+    //query results
+    bool exists;
+    ulong size;
+    File.FileTimes fileTimes;
+    ubyte[] dataOut;
+  }
+
+  struct Rec{
+    string fileName;
+    File.FileTimes fileTimes;
+    ubyte[] data;
+  }
+
+  __gshared static Rec[string] files;
+
+  enum log = true;
+  Res res;
+  final switch(cmd){
+
+    case VirtualFileCommand.getInfo:{
+      auto p = fileName in files;
+      res.exists = p !is null;
+      if(res.exists){
+        res.size = p.data.length;
+        res.fileTimes = p.fileTimes;
+      }
+    } break;
+
+    case VirtualFileCommand.remove:{
+      auto p = fileName in files;
+      res.exists = p !is null;
+      if(res.exists) files.remove(fileName);
+                else res.error = "Can't remove Virtual File: "~fileName.quoted;
+    } break;
+
+    case VirtualFileCommand.read:{
+      auto p = fileName in files;
+      if(p is null){ res.error = "Virtual File not found: "~fileName.quoted; return res; }
+
+      if(offset<p.data.length){
+        auto actSize = min(size-offset, p.data.length);
+        if(actSize>0)
+          res.dataOut = p.data[offset..offset+actSize];
+      }
+      p.fileTimes.accessed = now;
+
+      if(log) LOG("Accessed", fileName.quoted);
+    } break;
+
+    case VirtualFileCommand.write:{
+      if(!fileName.isVirtualFileName){ res.error = "Invalid virtual fileName: "~fileName.quoted; return res; }
+
+      auto ubyteDataIn(){ return cast(const ubyte[])dataIn; }
+
+      auto p = fileName in files;
+      if(p is null){
+        auto dt = now;
+        files[fileName] = Rec(fileName, File.FileTimes(dt, dt, DateTime.init), []);
+        if(log) LOG("Created", fileName.quoted);
+        p = fileName in files;
+        assert(p);
+      }
+
+      if(offset==0){
+        p.data = ubyteDataIn.dup; //note: rather always duplicate than only when offset>0
+      }else{
+        auto end = offset + dataIn.length;
+        if(end<offset){ res.error = "Offset overflow: "~fileName.quoted; return res; }
+
+        p.data.length = max(p.data.length, end);
+        p.data[offset..end] = ubyteDataIn[];
+      }
+      p.fileTimes.modified = now;
+      if(log) LOG("Updated", fileName.quoted);
+
+    } break;
+
+  }
+
+  return res; //no error
+}}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+///  Path                                                                    ///
 ////////////////////////////////////////////////////////////////////////////////
 
 char pathDelimiter() {
@@ -4344,6 +4468,7 @@ private static{/////////////////////////////////////////////////////////////////
   bool fileExists(string fn)
   {
     if(fn.empty) return false;
+    if(fn.isVirtualFileName) return virtualFileQuery(VirtualFileCommand.getInfo, fn).exists;
     try{
       auto f = StdFile(fn, "rb");
       return true;
@@ -4354,6 +4479,7 @@ private static{/////////////////////////////////////////////////////////////////
 
   ulong fileSize(string fn)
   {
+    if(fn.isVirtualFileName) return virtualFileQuery(VirtualFileCommand.getInfo, fn).size;
     try{
       auto f = StdFile(fn, "rb");
       return f.size;
@@ -4369,6 +4495,9 @@ private static{/////////////////////////////////////////////////////////////////
   FileTimes fileTimes(string fn)
   {
     FileTimes res;
+    if(fn=="") return res;
+
+    if(fn.isVirtualFileName) return virtualFileQuery(VirtualFileCommand.getInfo, fn).fileTimes;
 
     StdFile f;
     try{
@@ -4419,7 +4548,7 @@ public:
   File normalized(string base)  const{ return File(buildNormalizedPath(absolutePath(fullName, base))); }
   File normalized(in Path base) const{ return normalized(base.fullPath); }
 
-  auto times()     const{ return fileTimes      (fullName); }
+  auto times()     const{ return fileTimes(fullName); }
   auto modified()  const{ return times.modified; }
   auto accessed()  const{ return times.accessed; }
   auto created()   const{ return times.created ; }
@@ -4455,7 +4584,8 @@ public:
   bool remove(bool mustSucceed = true) const{
     if(exists){
       try{
-        std.file.remove(fullName);
+        if(this.isVirtual) virtualFileQuery(VirtualFileCommand.remove, fullName);
+                      else std.file.remove(fullName);
       }catch(Throwable){
         enforce(!mustSucceed, format(`Can't delete file: "%s"`, fullName));
       }
@@ -4486,21 +4616,29 @@ public:
   ubyte[] read(bool mustExists = true, ulong offset = 0, size_t len = size_t.max, string srcFile=__FILE__, int srcLine=__LINE__)const{ //todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
     ubyte[] data;
 
+    if(!exists){
+      if(mustExists) raise(format!`Can't read file: "%s"`(fullName), srcFile, srcLine);
+      return data;
+    }
+
     if(!mustExists && !exists) return data;
     try{
-      auto f = StdFile(fullName, "rb");
-      scope(exit) f.close;
+      if(this.isVirtual){
+        data = virtualFileQuery_raise(VirtualFileCommand.read, fullName, data, offset, len).dataOut;
+      }else{
+        auto f = StdFile(fullName, "rb");
+        scope(exit) f.close;
 
-      if(offset) f.seek(offset);
-      ulong avail = f.size-offset;
-      ulong actualSiz = len;
+        if(offset) f.seek(offset);
+        ulong avail = f.size-offset;
+        ulong actualSiz = len;
 
-      minimize(actualSiz, avail);
-      if(actualSiz>0){
-        data.length = cast(size_t)actualSiz;
-        data = f.rawRead(data);
+        minimize(actualSiz, avail);
+        if(actualSiz>0){
+          data.length = cast(size_t)actualSiz;
+          data = f.rawRead(data);
+        }
       }
-
     }catch(Throwable){
       enforce(!mustExists, format!`Can't read file: "%s"`(fullName), srcFile, srcLine); //todo: egysegesiteni a file hibauzeneteket
     }
@@ -4535,21 +4673,25 @@ public:
 
   void write(const void[] data, ulong offset = 0, Flag!"preserveTimes" preserveTimes = No.preserveTimes)const{ //todo: compression, automatic uncompression
     try{
-      path.make;
-      auto f = StdFile(fullName, offset ? "r+b" : "wb");
-      scope(exit) f.close;
+      if(this.isVirtual){
+        enforce(!preserveTimes, "preserveTimes not supported with virtual files.");
+        auto v = virtualFileQuery_raise(VirtualFileCommand.write, fullName, cast(ubyte[])data, offset);
+      }else{
+        path.make;
+        auto f = StdFile(fullName, offset ? "r+b" : "wb");
+        scope(exit) f.close;
 
-      FILETIME cre, acc, wri;
-      bool getTimeSuccess;
-      if(preserveTimes) getTimeSuccess = GetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0;
+        FILETIME cre, acc, wri;
+        bool getTimeSuccess;
+        if(preserveTimes) getTimeSuccess = GetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0;
 
-      if(offset) f.seek(offset);
-      f.rawWrite(data);
-      if(logFileOps) LOG(fullName);
+        if(offset) f.seek(offset);
+        f.rawWrite(data);
+        if(logFileOps) LOG(fullName);
 
-      if(preserveTimes && getTimeSuccess)
-        enforce(SetFileTime(f.windowsHandle, null, &acc, &cre)!=0, "Error writing file times.");
-
+        if(preserveTimes && getTimeSuccess)
+          enforce(SetFileTime(f.windowsHandle, null, &acc, &cre)!=0, "Error writing file times.");
+      }
     }catch(Throwable){
       enforce(false, format(`Can't write file: "%s"`, fullName));
     }
@@ -4795,6 +4937,36 @@ struct clipBoard{ static: //clipBoard //////////////////////////
     string text(){ return getText; }
     void text(string s){ setText(s, true); }
   }
+}
+
+
+// zip files ////////////////////////////////
+
+/// extrazt a zip stream appended to the end.
+ubyte[] trailingZip(ubyte[] buf){
+  ubyte[] res;
+
+  //find central directory signature from the back
+  struct PKCentralDirectoryRecord{ align(1):
+    uint signature;
+    ushort diskNumber, diskCD, diskEntries, totalEntries;
+    uint cdSize, cdOfs;
+    ushort commentLen;
+  }
+
+  if(buf.length < PKCentralDirectoryRecord.sizeof) return res;
+
+  auto cdr = cast(PKCentralDirectoryRecord*)&buf[$-PKCentralDirectoryRecord.sizeof];
+  auto zipSize = cdr.cdOfs+cdr.cdSize+PKCentralDirectoryRecord.sizeof;
+  auto cdrGood = cdr.signature == 0x06054b50 && cdr.diskNumber==0 && cdr.diskCD==0   //signature  &&  one dist only
+              && cdr.diskEntries==cdr.totalEntries && cdr.commentLen==0              //entries are ok  &&  no comment
+              && buf.length >= zipSize; //buf size is sufficient
+  if(!cdrGood) return res;
+
+  buf = buf[buf.length-zipSize..$];
+  if(buf[0]==0x50 && buf[1]==0x4b) res = buf; //must be something with PK
+
+  return res;
 }
 
 
@@ -5237,7 +5409,11 @@ struct DateTime{
       this(Date(parts[0]), Time(parts[1]));
     }else{
       //todo: check for digits here, not any chars!
-      if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
+      if(str.isWild("????-??-??T??????.???")){ //windows timestamp
+        this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4));
+      }else if(str.isWild("????-??-??T??????")){ //windows timestamp
+        this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int);
+      }else if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
         this(       str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
       }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
         this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
@@ -5274,7 +5450,7 @@ struct DateTime{
   @property bool isNull() const{ return isnan(raw) || raw==0; }
 
   string toString()const {
-    if(isNull) return "[NULL DateTime]";
+    if(isNull) return "NULL DateTime";
     Date d; d.raw = ifloor(raw);
     Time t; t.raw = fract(raw);
     return d.toString ~ ' ' ~ t.toString;
@@ -5283,7 +5459,10 @@ struct DateTime{
   string timeStamp()const {
     if(isNull) return "null";
     //4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
-    return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
+    //return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
+
+    // windows timestamp format (inserts it after duplicate files)
+    return format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", year, month, day, hour, min, sec, ms);
   }
 
   int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
@@ -5354,6 +5533,8 @@ public:
     return res;
   }
 };
+
+auto blink(float freq=3/*hz*/, float duty=.5f){ return (QPS*freq).fract < duty; }
 
 synchronized class Perf {
   private{

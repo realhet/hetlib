@@ -1064,6 +1064,8 @@ struct im{ static:
      else Row({ Text(text); });*/
   }
 
+  void Tab(){ Text(" \t"); }
+
   void Comment(/*string srcModule=__MODULE__, size_t srcLine=__LINE__, */T...)(T args){
     // It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...
     Text/*!(file, line)*/(tsComment, args);
@@ -1112,6 +1114,15 @@ struct im{ static:
       margin = "0.33333x 0";
       bkColor = mix(style.bkColor, style.fontColor, 0.25f);
     });
+  }
+
+  void HLine(){ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); }
+
+  void GroupFrame(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() fun){
+    Row!(srcModule, srcLine)({Column({
+      border = "normal silver"; padding = "0"; margin = "2 0";
+      fun();
+    });});
   }
 
   // apply Btn and Edit style////////////////////////////////////
@@ -1735,10 +1746,25 @@ struct im{ static:
     });*/
   }
 
+  auto LedBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)(void delegate() ledFun, T caption, in Args args){
+    return Btn!(srcModule, srcLine)({
+      flags.hAlign = HAlign.left;
+      ledFun();
+      if(actContainer.subCells.length) Spacer(fh*0.25f);
+      width = 3.5*fh;
+      static if(isSomeString!T) Text(caption);
+                           else caption();
+    }, args);
+  }
+
+  auto LedBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)(bool ledState, RGB ledColor, T caption, in Args args){
+    return LedBtn!(srcModule, srcLine)({ if(ledColor!=clBlack){ flags.hAlign = HAlign.left; Led(ledState, ledColor); } }, caption, args);
+  }
+
   // RadioBtn //////////////////////////
   auto RadioBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref bool state, string caption, T args){ return ChkBox!(file, line, "radio")(state, caption, args); }
 
-  auto ListBoxItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, Args...)(ref bool isSelected, C s, in Args args){ with(im){ //todo: ezt osszahozni a ListItem-el
+  auto ListBoxItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, Args...)(ref bool isSelected, C s, in Args args){
     HitInfo hit;
     Row!(srcModule, srcLine)({
       hit = hitTest(enabled);
@@ -1754,7 +1780,7 @@ struct im{ static:
     }, args);
 
     return hit;
-  }}
+  }
 
 
   struct ListBoxResult{
