@@ -897,4 +897,6 @@ class CustomTexture{ // CustomTexture ///////////////////////////////
     Bitmap b = chkClear(mustUpload) ? bmp : null;
     return textures.custom(name, b);
   }
+
+  ivec2 size()const { return bmp ? bmp.size : ivec2(0); }
 }

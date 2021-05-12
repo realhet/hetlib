@@ -124,6 +124,15 @@ public:
   }
   void zoomAroundMouse(float amount) { zoomAround(trans(mousePos), amount); }
 
+  ///Automatically call zoomAll() when workArea changes
+  private bounds2 lastWorkArea; //detection change for autoZoom()
+  bool autoZoom(){
+    if(workArea.area>0 && chkSet(lastWorkArea, workArea)){
+      zoomAll;
+      return true;
+    }
+    return false;
+  }
 
   // navigate 2D view with the keyboard and the mouse
   // it optionally calls invalidate

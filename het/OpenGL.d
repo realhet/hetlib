@@ -2011,13 +2011,13 @@ TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZer
 /// GLWindow class //////////////////////////////////////////////////////////////////////////
 
 class GLWindow: Window{
-public:
-
-  //Drawing dr, drGUI;
   View2D view;
   MouseState mouse;
-  private View2D viewGUI_;
 
+  //diagnostic stuff
+  bool showFPS, showMegaTextures;
+
+  private View2D viewGUI_;
   auto viewGUI() {
     viewGUI_.scale = 1;
     viewGUI_.origin = clientSizeHalf;
@@ -2200,7 +2200,7 @@ public:
 
     {//todo: this is a fix: if the clientSize changes between update() and draw() this will update it. Must rethink the update() draw() thing completely.
       updateViewClipBoundsAndMousePos;
-      import het.ui:im;
+      import het.ui: im;
       im.setTargetSurfaceViews(view, viewGUI);
     }
  }
@@ -2215,6 +2215,15 @@ public:
   private bool firstPaint;
 
   override void onEndPaint(){
+    if(showMegaTextures) drawMegaTextures;
+
+    import het.ui: im;
+    im.draw!"system call only";
+
+    //todo: here should be an on OverlayPaint wich is paints on top of the UI
+
+    if(showFPS) drawFPS();
+
     if(chkClear(view._mustZoomAll)) view.zoomAll;
 
     /*if(!dr.drawCnt){
@@ -2296,5 +2305,21 @@ public:
 
     }
   }
+
+  void drawFPS(){
+    auto drGUI = scoped!Drawing;
+    drawFPS(drGUI);
+    drGUI.glDraw(viewGUI);
+  }
+
+  void drawMegaTextures(){
+    auto dr = scoped!Drawing;
+    import het.megatexturing: textures;
+    dr.translate(0, view.workArea.bottom+100);
+    textures.debugDraw(dr);
+    dr.pop;
+    dr.glDraw(view);
+  }
+
 
 }

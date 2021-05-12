@@ -1977,7 +1977,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b00_00_00_0_001_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b0_0_0_0_0_0_00_00_0_1_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2003,7 +2003,8 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "hasHScrollBar"     , 1, // system manages this, not the user.
     bool          , "hasVScrollBar"     , 1,
     bool          , "saveVisibleBounds" , 1, // draw() will save the visible innerBounds under the name id.appendIdx("visibleBounds");
-    int           , ""                  , 2,
+    bool          , "_measureOnlyOnce"  , 1,
+    int           , ""                  , 1,
   ));
 }
 
@@ -2115,6 +2116,8 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   final void measure(){
+    if(flags._measureOnlyOnce && flags._measured) return;
+
     if(!flags._measured){
       flags.autoWidth  = outerSize.x==0;
       flags.autoHeight = outerSize.y==0;
@@ -2344,15 +2347,6 @@ class Container : Cell { // Container ////////////////////////////////////
 
 
 // these can mixed in
-
-  mixin template CachedMeasuring(){
-    bool measured;
-
-    override void measure_impl(){
-      WARN("Ezt felulvizsgalni, mert van mar flags._measured is!!!");
-      if(measured.chkSet) super.measure_impl;
-    }
-  }
 
   mixin template CachedDrawing(){
     Drawing cachedDrawing;

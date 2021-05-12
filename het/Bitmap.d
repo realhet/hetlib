@@ -134,6 +134,32 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
     uint color = (line.to!int)>>1;
     color = color | (255-color)<<8;
     return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color)));
+
+
+  }else if(prefix=="icon"){
+    /+
+    auto getAssociatedIcon(string fn){
+      HICON hIcon;
+      if(0){
+        import core.sys.windows.shellapi : ExtractAssociatedIconA;
+        ushort dummy;
+        hIcon = ExtractAssociatedIconA(mainWindow.hwnd, fn.toPChar, &dummy);  //note: this deprecated crap freezes on non-existing files.
+      }else{
+        //https://stackoverflow.com/questions/524137/get-icons-for-common-file-types
+        import core.sys.windows.shellapi;
+        SHFILEINFOA fi;
+        uint file_attribute=0; //todo: specify file attributes too that was accessed in FileEntry -> SHGFI_USEFILEATTRIBUTES
+        //todo: fi.szTypeName -> SHGFI_TYPENAME
+        if(SHGetFileInfoA(fn.toPChar, file_attribute, &fi, typeof(fi).sizeof.to!uint, SHGFI_ICON | SHGFI_SMALLICON))
+          hIcon = fi.hIcon; //must free it with DestroyIcon
+      }
+
+      return hIcon;
+    }
+    +/
+
+    //todo: icon loader
+    NOTIMPL;
   }else{
     auto loader = prefix in customBitmapLoaders;
     if(loader)

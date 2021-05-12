@@ -210,7 +210,8 @@ struct im{ static:
 
   Drawing drVisualizeHitStack;
 
-  void draw(){
+  void draw(string restrict="")(){
+    static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
     auto dr = [new Drawing, new Drawing];
@@ -232,6 +233,8 @@ struct im{ static:
 
     //not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
     //todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
+
+    //todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
   }
 
   //PanelPosition ///////////////////////////////////////////
@@ -1843,7 +1846,7 @@ struct im{ static:
     auto scrollMax = max(0, items.walkLength.to!int-pageSize);
     topIndex = topIndex.clamp(0, scrollMax);
     auto view = items.drop(topIndex).take(pageSize).array;
-    Row!(file, line)({
+    Row!(srcModule, srcLine)({
       ListBox(focusedItem, view, cellFun);
       if(1 || scrollMax){
         Spacer;

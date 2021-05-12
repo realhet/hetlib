@@ -1996,7 +1996,7 @@ struct Bounds(VT){
   // multidimensional size
   auto size() const{ return max(high-low, 0); }
 
-  bool empty() const{ return size.lessThanEqual(0).any; }
+  bool empty() const{ return size.lessThanEqual(0).any; } //not empty means, that it has an >0 area
 
   auto opBinary(string op, T)(in T other) const
   {
