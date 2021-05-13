@@ -43,7 +43,7 @@ public:
   auto origin_anim()  const { return m_origin_anim; }
   auto scale_anim()   const { return pow(2, m_logScale_anim); }
 
-  bounds2 workArea;
+  bounds2 workArea, workArea_accum; //next workarea is the currently built one being drawn
 
   auto subScreenArea = bounds2(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
 

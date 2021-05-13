@@ -1,9 +1,11 @@
 module het.draw3d;
 
+//20210513: broken: Must reapply math.d changes!!!!!!!!!!!!!!!!!
+
 //http://faydoc.tripod.com/formats/3ds.htm
 //http://read.pudn.com/downloads70/sourcecode/windows/opengl/253342/INC/3DSFTK.H__.htm
 
-import het.utils, het.opengl;
+import het.utils, het.opengl, het.stream;
 
 enum DUMP_3DS_IMPORT = false;
 
@@ -202,11 +204,11 @@ public:
   }
 
   void spin(int axis, int cnt){
-    matrix = matrix * mat4.rotation(PIf/2*cnt.mod(4), axisVector(axis));
+    matrix = matrix * mat4.rotation(vec4(axisVector(axis), 1), PIf/2*cnt.mod(4));
   }
 
   void mirror(int axis){
-    int i = axis.cyclicMod(3);
+    int i = axis.mod(3);
     auto s = asString.to!(char[]);
     s[i] = cast(char) (s[i].lc == s[i] ? s[i].uc : s[i].lc);
     asString = s.to!string;
@@ -219,7 +221,7 @@ public:
 
   void spinRandom(RNG* rng = null){
     if(!rng) rng = &defaultRng;
-    spinRandom(rng.randomU);
+    spinRandom(rng.randomUint);
   }
 
   static void selfTest(){
@@ -298,8 +300,8 @@ class Camera{ //! Camera //////////////////////////////////////
 
   void dump(){ this.toJson.writeln; }
 
-  private vec3 axis(int n) const { vec3 v; foreach(i; 0..3) v.vector[i] = eye.matrix[i][n]; return v; } //todo: the matric row/column majority is not good here
-  private void setAxis(int n, vec3 v) { foreach(i; 0..3) eye.matrix[i][n] = v.vector[i]; }
+  private vec3 axis(int n) const { vec3 v; foreach(i; 0..3) v[i] = eye[n][i]; return v; } //todo: the matric row/column majority is not good here   update: I swapped it!!!!
+  private void setAxis(int n, vec3 v) { foreach(i; 0..3) eye[n][i] = v[i]; }
 
   vec3 right() const { return axis(0); }
   vec3 up() const { return axis(1); }
@@ -335,7 +337,7 @@ class Camera{ //! Camera //////////////////////////////////////
     verticalFov = het.utils.clamp(verticalFov, 30, 140);
     float newTop = pivotPlaneDistance*tanFovY;
 
-    eye = eye * mat4.translation(0, 0, newTop-oldTop);
+    eye = eye * mat4.translation(vec3(0, 0, newTop-oldTop));
     synch;
   }
 
@@ -452,7 +454,7 @@ class Camera{ //! Camera //////////////////////////////////////
 
 
   void lookFrom(const vec3 target, const vec3 dir, float dist){
-    auto d = -dir.normalized,
+    auto d = -normalize(dir),
          u = vec3(0, 1, 0),
          l = cross(u, d);
          u = cross(d, l);
@@ -687,7 +689,7 @@ class LineDrawing {
   void addLine(in vec3 p0, in vec3 p1, in RGB cl){ addLine(p0, p1, cl, cl); }
 
   void addAxes(mat4 m, float scale = 1){
-    vec3 v(int n)(){ return vec3(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); }
+    vec3 v(int n)(){ return vec3(m.matrix[0][n], m.matrix[1][n], m.matrix[2][n]); } //!!!!!!!!!!! fel van cserelve a column meg a row!!!!!!!!
     addLine(v!3, v!3+v!0*scale, clAxisX);
     addLine(v!3, v!3+v!1*scale, clAxisY);
     addLine(v!3, v!3+v!2*scale, clAxisZ);

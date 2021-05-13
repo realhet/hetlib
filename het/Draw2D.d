@@ -1584,7 +1584,11 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
 // Draw the objects on GPU  /////////////////////////////
 
-  void glDraw(View2D view, in vec2 translate = vec2(0)) { glDraw(view.getOrigin(true), view.getScale(true), translate); }
+  void glDraw(View2D view, in vec2 translate = vec2(0)) {
+    glDraw(view.getOrigin(true), view.getScale(true), translate);
+
+    view.workArea_accum |= this.bounds;
+  }
 
   void glDraw(in vec2 center, float scale, in vec2 translate=vec2(0)) {
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));

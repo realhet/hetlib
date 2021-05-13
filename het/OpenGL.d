@@ -2162,8 +2162,8 @@ protected:
     vec2 mp = mouse.act.screen;
     bounds2 bnd = clientBounds;
 
-    with(view   ){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); }
-    with(viewGUI){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); }
+    with(view   ){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); workArea_accum = bounds2.init; }
+    with(viewGUI){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); workArea_accum = bounds2.init; }
   }
 
   override void onUpdateViewAnimation(){
@@ -2219,6 +2219,8 @@ public:
 
     import het.ui: im;
     im.draw!"system call only";
+
+    if(!view.workArea_accum.empty) view.workArea = view.workArea_accum;
 
     //todo: here should be an on OverlayPaint wich is paints on top of the UI
 

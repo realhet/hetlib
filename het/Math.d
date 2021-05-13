@@ -80,7 +80,7 @@ private bool validRvalueSwizzle(string def){
 }
 
 
-enum isVector(T) = is(T.VectorType); //todo: This should be is(T==Vector!(T, N), T, int N) and Vectortype should be a template around this isExpression.
+enum isVector(T) = is(T==Vector!(CT, N), CT, int N);
 
 private bool anyVector(T...)(){
   static foreach(t; T)
@@ -543,17 +543,18 @@ private void unittest_Vectors(){
 ///  Matrix                                                                  ///
 ////////////////////////////////////////////////////////////////////////////////
 
-enum isMatrix(T) = is(T.MatrixType);
+enum isMatrix(T) = is(T==Matrix!(CT, N, M), CT, int N, int M);
 
 struct Matrix(CT, int N, int M)
 if(N.inRange(2, 4) && M.inRange(2, 4)){
   alias MatrixType = typeof(this);
   alias ComponentType = CT;
+  alias VectorType = Vector!(CT, M);
   enum MatrixTypeName = ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "mat" ~ (N==M ? N.text : N.text ~ 'x' ~ M.text)
                                                           : MatrixType.stringof;
 
   //mat N x M: A matrix with N columns and M rows. OpenGL uses column-major matrices, which is standard for mathematics users.
-  Vector!(CT, M)[N] columns;
+  VectorType[N] columns;
   enum width = N, height = M;
   enum length = N;
 
@@ -700,7 +701,7 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
 
     static Matrix rotation(A)(in Vector!(A, N) axis_, CT alpha){
       CT cosa = cos(alpha),  sina = sin(alpha);
-      auto axis = normalize(Vectortype(axis_));
+      auto axis = normalize(VectorType(axis_));
       auto temp = (1 - cosa)*axis;
 
       return cast(Matrix) Matrix!(CT, 3, 3)(
