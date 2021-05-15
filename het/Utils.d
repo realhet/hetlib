@@ -107,7 +107,7 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
   GetStdHandle, GetTempPathW, GetFileTime, SetFileTime,
-  FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
+  FileTimeToLocalFileTime, FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
   HICON;
@@ -4463,6 +4463,11 @@ private string combinePath(string a, string b){
   return std.path.buildPath(a, b);
 }
 
+bool FileTimeToLocalSystemTime(in FILETIME* ft, SYSTEMTIME* st){
+  FILETIME ftl;
+  return FileTimeToLocalFileTime(ft, &ftl) && FileTimeToSystemTime(&ftl, st);
+}
+
 struct File{
 private static{/////////////////////////////////////////////////////////////////
   bool fileExists(string fn)
@@ -4510,9 +4515,9 @@ private static{/////////////////////////////////////////////////////////////////
     if(GetFileTime(f.windowsHandle, &cre, &acc, &wri)){
       SYSTEMTIME st;
 
-      FileTimeToSystemTime(&cre, &st); res.created  = DateTime(st);
-      FileTimeToSystemTime(&acc, &st); res.accessed = DateTime(st);
-      FileTimeToSystemTime(&wri, &st); res.modified = DateTime(st);
+      FileTimeToLocalSystemTime(&cre, &st); res.created  = DateTime(st);
+      FileTimeToLocalSystemTime(&acc, &st); res.accessed = DateTime(st);
+      FileTimeToLocalSystemTime(&wri, &st); res.modified = DateTime(st);
     }
 
     return res;
@@ -4784,6 +4789,10 @@ struct FileEntry{
   }
 
   string toString() const{ return format!"%-80s %s%s%s%s%s %12d"(File(path, name).fullName, isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".", size); }
+
+  auto created () const { return DateTime(ftCreationTime  ); }
+  auto accessed() const { return DateTime(ftLastAccessTime); }
+  auto modified() const { return DateTime(ftLastWriteTime ); }
 }
 
 ///similar directory listing like the one in totalcommander
@@ -5391,7 +5400,7 @@ struct DateTime{
 
   this(in FILETIME ft){
     SYSTEMTIME st;
-    FileTimeToSystemTime(&ft, &st);
+    FileTimeToLocalSystemTime(&ft, &st);
     this(st);
   }
   this(in SYSTEMTIME st){

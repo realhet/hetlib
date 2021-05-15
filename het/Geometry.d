@@ -694,15 +694,15 @@ auto toSegs(in bounds2 bnd, bool clockwise=true) { return bnd.toPoints(clockwise
 
 
 //todo: these should be done with CTCG
-bounds2 inflated(in bounds2 b, in vec2 v){  return bounds2(b.low-v, b.high+v); } //todo: support this for all bounds
+bounds2 inflated(in bounds2 b, in vec2 v){  return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //todo: support this for all bounds
 bounds2 inflated(in bounds2 b, in float x, in float y){  return b.inflated(vec2(x, y)); }
 bounds2 inflated(in bounds2 b, float f){  return b.inflated(f, f); } //todo: support this for all bounds
 
-bounds2 inflated(in ibounds2 b, in vec2 v){  return bounds2(b.low-v, b.high+v); } //todo: support this for all bounds
+bounds2 inflated(in ibounds2 b, in vec2 v){  return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //todo: support this for all bounds
 bounds2 inflated(in ibounds2 b, in float x, in float y){  return b.inflated(vec2(x, y)); }
 bounds2 inflated(in ibounds2 b, float f){  return b.inflated(f, f); } //todo: support this for all bounds
 
-ibounds2 inflated(in ibounds2 b, in ivec2 v){ return ibounds2(b.low-v, b.high+v); } //todo: support this for all bounds
+ibounds2 inflated(in ibounds2 b, in ivec2 v){ return b.valid ? ibounds2(b.low-v, b.high+v) : ibounds2.init; } //todo: support this for all bounds
 ibounds2 inflated(in ibounds2 b, int x, int y){ return b.inflated(ivec2(x, y)); } //todo: support this for all bounds
 ibounds2 inflated(in ibounds2 b, int a){ return b.inflated(a, a); } //todo: support this for all bounds
 

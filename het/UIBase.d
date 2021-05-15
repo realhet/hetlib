@@ -2755,6 +2755,11 @@ class SelectionManager(T : Cell){ // SelectionManager //////////////////////////
                                  else return bounds2.init;
   }
 
+  // notification functions: the manager must know when an item is deleted
+  void notifyRemove(T   cell ){ if(hoveredItem && hoveredItem is cell) hoveredItem = null; }
+  void notifyRemove(T[] cells){ if(hoveredItem) cells.each!(c => notifyRemove(c)); }
+  void notifyRemoveAll(){ hoveredItem = null; }
+
   void update(bool mouseEnabled, View2D view, T[] items){
 
     void selectNone()           { foreach(a; items) a.isSelected = false; }

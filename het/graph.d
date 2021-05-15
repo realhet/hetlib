@@ -38,8 +38,7 @@ class GraphNode(Graph, Label) : Row { // GraphNode /////////////////////////////
 
   Graph parent;
 
-  this(Graph parent){
-    this.parent = parent;
+  this(){
     flags._measureOnlyOnce = true;
   }
 
@@ -61,8 +60,9 @@ class GraphNode(Graph, Label) : Row { // GraphNode /////////////////////////////
     foreach(t; targets) return t; return null;
   }
 
-  string name() const {
+  string name() const { //default implementation
     foreach(t; (cast()this).targets) return t.name;
+    ERR("Unable to get default name. Should override GraphNode.name().");
     return "";
   }
 
@@ -78,22 +78,87 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
   SelectionManager!Node selection;
 
   bool invertEdgeDirection;
+  float groupMargin = 30;
 
   auto nodes        (){ return cast(Node[])subCells; } //note: all subcells' type must be Node
   auto selectedNodes(){ return nodes.filter!(a => a.isSelected); }
   auto hoveredNode  (){ return selection.hoveredItem; }
 
-  private Node[string] _nodeByName;
-  auto nodeByName(string name){ auto a = name in _nodeByName; return a ? *a : null; }
-  void addNode(string name, Node node){
-    enforce(cast(Node)node !is null, "addNode() must be a valid "~Node.stringof);
-    enforce((name in _nodeByName)is null, "Node named "~name.quoted~" already exists");
-    _nodeByName[name] = node;
+  private Node[string] nodeByName;
+
+  auto findNode(string name){ auto a = name in nodeByName; return a ? *a : null; }
+
+  Node addNode(string name, Node node){
+    enforce(cast(Node)node !is null     , "addNode() param must be an instance of "~Node.stringof       );
+    enforce(name.length                 , "Name must be non-empty."                                     );
+    enforce(findNode(name) is null      , "Node named "~name.quoted~" already exists"                   );
+    enforce(!node.parent                , "Node already has a parent."                                  );
+
+    const bnd = allBounds;
+    const nextPos = bnd.valid ? bnd.bottomLeft + vec2(0, 32) : vec2(0);
+    node.outerPos = nextPos;
+
+    nodeByName[name] = node;
+    append(node); //this is Container.append()
+    return node;
   }
 
-  float groupBoundMargin = 30;
-  auto nodeGroups(){ return nodes.dup.sort!((a, b) => a.groupName < b.groupName).groupBy; } //note .dup is important because .sort works in place.
-  auto groupBounds(){ return nodeGroups.map!(grp => grp.map!(a => a.outerBounds).fold!"a|b".inflated(groupBoundMargin)); }
+  Node findAddNode(string name, lazy Node node){
+    if(auto n = findNode(name)) return n;
+    return addNode(name, node/+lazy!!!+/);
+  }
+
+  bool removeNode(Node node){
+    const oldLen = subCells.length;
+    subCells = subCells.filter!(c => c !is node).array; //todo: use remove()
+    if(subCells.length < oldLen){
+      nodeByName.remove(node.name);
+      selection.notifyRemove(node);
+      return true;
+    }else
+      return false;
+  }
+
+  bool removeNode(string name){
+    if(auto node = findNode(name)){
+      removeNode(node);
+      return true;
+    }else
+      return false;
+  }
+
+  auto removeNodes(R)(R nodes) if(isInputRange!R && is(ElementType!R == Node)){
+    return nodes.count!(n => removeNode(n)).to!int;
+  }
+
+  auto removeNodes(string nameFilter){
+    return nodes.filter!(n => n.name.isWild(nameFilter));
+  }
+
+  Node toggleNode(string name, lazy Node node){
+    if(removeNode(name)) return null;
+                    else return addNode(name, node/+lazy!!!+/);
+  }
+
+  void removeAll(){
+    subCells = [];
+    nodeByName.clear;
+    selection.notifyRemoveAll;
+  }
+
+  auto nodeGroups(){ return nodes.dup.sort!((a, b) => a.groupName < b.groupName).groupBy; } //note .dup is important because .sort works in-place.
+
+  auto groupBounds(){
+    return nodeGroups.filter!(g => g.front.groupName!="")          //exclude unnamed groups
+                     .map!(grp => grp.map!(a => a.outerBounds)
+                                     .fold!"a|b");
+  }
+
+  auto allBounds(){
+    return nodes.map!(n => n.outerBounds)
+                .fold!"a|b"(bounds2.init);
+  }
+
 
   Container.SearchResult[] searchResults;
   bool searchBoxVisible;
@@ -104,9 +169,6 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
     float viewScale = 1; //used for automatic screenspace linewidth
     vec2[2] searchBezierStart; //first 2 point of search bezier lines. Starting from the GUI matchCount display.
   }
-
-  protected bounds2 _workArea; //calculated in draw
-  auto workArea(){ return _workArea; }
 
   this(){
     bkColor = clBlack;
@@ -120,7 +182,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
     if(_links.empty)
       foreach(d; nodes)
         foreach(from; d.labels)
-          if(from.isReference) if(auto to = nodeByName(from.name))
+          if(from.isReference) if(auto to = findNode(from.name))
             _links ~= Link(from, to);
     return _links;
   }
@@ -164,7 +226,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
   protected void drawGroupBounds(Drawing dr, RGB clGroupFrame){ with(dr){
     color = clGroupFrame;
     lineWidth = -1;
-    foreach(bnd; groupBounds) drawRect(bnd);
+    foreach(bnd; groupBounds) drawRect(bnd.inflated(groupMargin));
   }}
 
   protected void drawLinks(Drawing dr){ with(dr){
@@ -217,8 +279,6 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
     auto dr2 = dr.clone;
     drawOverlay(dr2); //draw uncached stuff on top
     dr.subDraw(dr2);
-
-    _workArea = dr.bounds;
   }
 
   void UI_SearchBox(View2D view){ // UI SearchBox ////////////////////////////////
