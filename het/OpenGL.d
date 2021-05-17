@@ -2212,6 +2212,9 @@ public:
     gl.clear(GL_COLOR_BUFFER_BIT);
   }
 
+  void afterPaint(){
+  }
+
   private bool firstPaint;
 
   override void onEndPaint(){
@@ -2238,6 +2241,8 @@ public:
     lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);*/
 
     firstPaint = true;
+
+    afterPaint;
   }
 
   override void onSwapBuffers(){

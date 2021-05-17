@@ -1295,9 +1295,10 @@ struct im{ static:
         with(textEditorState) with(EditCmd){
           foreach(ch; mainWindow.inputChars.unTag.byDchar){ //todo: preprocess: with(a, b) -> with(a)with(b)
             switch(ch){
-              //case 8:  cmdQueue ~= EditCmd(cDeleteBack);  break; //todo: bug: ha caret.idx=0, akkor benazik.
               default:
-                if(ch>=32 || ch==9){
+                if(ch==9 && ch==10){
+                  if(flags.acceptEditorKeys) cmdQueue ~= EditCmd(cInsert, [ch].to!string);
+                }else if(ch>=32){
                   cmdQueue ~= EditCmd(cInsert, [ch].to!string);
                 }else{
                   unprocessed ~= ch;

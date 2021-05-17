@@ -14,8 +14,8 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
-  VisualizeGlyphs          = 0,
-  VisualizeTabColors       = 0,
+  VisualizeGlyphs          = 1,
+  VisualizeTabColors       = 1,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
 
@@ -135,124 +135,96 @@ struct HitInfo{ //Btn returns it
 }
 
 struct HitTestManager{
-//todo: rename hash to id
+
   struct HitTestRec{
-    SrcId hash;            //in the next frame this must be the isSame
+    SrcId id;            //in the next frame this must be the isSame
     bounds2 hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
     vec2 localPos;
   }
 
   //act frame
   HitTestRec[] hitStack, lastHitStack;
-  SrcId[void*] cellHashMap;
+  SrcId[void*] idOfCell;
 
   float[SrcId] smoothHover;
-  private void updateSmoothHover(ref HitTestRec[] actMap){
+  private void updateSmoothHover(ref HitTestRec[] actHitStack){
     enum upSpeed = 0.5f, downSpeed = 0.25f;
 
-    auto act = actMap.map!"a.hash".filter!"a";  //todo: refactor this
+    //raise hover values
+    auto hoveredIds = actHitStack.map!"a.id".filter!"a".array.sort;
+    foreach(id; hoveredIds)
+      smoothHover[id] = mix(smoothHover.get(id, 0), 1, upSpeed);
 
-    foreach(h; act)
-      smoothHover[h] = mix(smoothHover.get(h, 0.0f), 1, upSpeed);
-
+    //lower (and remove) hover values
     SrcId[] toRemove;
-    foreach(h; smoothHover.keys){
-      if(!act.canFind(h)){
-        if(h in smoothHover){
-          smoothHover[h] = mix(smoothHover[h], 0, downSpeed);
-          if(smoothHover[h]<0.02f) toRemove ~= h; //todo: test if it is allowed to remove from az assoc array while iterating on it's keys
-        }
+    foreach(id, ref value; smoothHover){
+      if(!hoveredIds.canFind(id)){
+        value = mix(value, 0, downSpeed);
+        if(value<0.02f) toRemove ~= id;
       }
     }
 
     foreach(h; toRemove) smoothHover.remove(h);
   }
 
-  SrcId capturedHash, clickedHash, pressedHash, releasedHash;
+  SrcId capturedId, clickedId, pressedId, releasedId;
   private void updateMouseCapture(ref HitTestRec[] hits){
-    const topHash = hits.length ? hits[$-1].hash : SrcId.init;
+    const topId = hits.get(hits.length-1).id;
 
     //if LMB was just pressed, then it will be the captured control
-    //if LMB released, and the captured hash is also hovered, the it is clicked.
+    //if LMB released, and the captured id is also hovered, the it is clicked.
 
-    clickedHash = pressedHash = releasedHash = SrcId.init; //normally it's 0 all the time, except that one frame it's clicked.
+    clickedId = pressedId = releasedId = SrcId.init; //normally it's 0 all the time, except that one frame it's clicked.
 
     with(cast(GLWindow)mainWindow){ //todo: get the mouse state from elsewhere!!!!!!!!!!!!!
-      if(topHash!=SrcId.init && mouse.LMB && mouse.justPressed){
-        capturedHash = topHash;
-        pressedHash = topHash;
+      if(topId && mouse.LMB && mouse.justPressed){
+        pressedId = capturedId = topId;
       }
       if(mouse.justReleased){
-        if(capturedHash!=SrcId.init && topHash==capturedHash) clickedHash = capturedHash;
-        if(capturedHash!=SrcId.init) releasedHash = capturedHash;
-        capturedHash = SrcId.init;
+        if(capturedId){
+          releasedId = capturedId;
+          if(topId==capturedId) clickedId = capturedId;
+        }
+        capturedId = SrcId.init;
       }
     }
   }
 
   void nextFrame(){
-    cellHashMap.clear;
-    lastHitStack = hitStack.dup;
-    hitStack.clear;
+    idOfCell.clear;
+    lastHitStack = hitStack;
+    hitStack = [];
 
     updateSmoothHover(lastHitStack);
     updateMouseCapture(lastHitStack);
-//    updateSliderInfo;
   }
 
   //Used to identify the cell when it later calls addHitRect()
-  void addHash(Cell cell, in SrcId hash){
-    cellHashMap[cast(void*)cell] = hash;     //todo: error on duplicated ID
+  void addHash(Cell cell, in SrcId id){
+    auto c = cast(void*)cell;
+    assert((c in idOfCell) is null, "Duplicated hitTest cell.");
+    idOfCell[c] = id;
   }
 
-  void addHitRect(Cell cell, bounds2 hitBounds, vec2 localPos){//it is called automatically from each cell
-    if(auto hash = cellHashMap.get(cast(void*)cell, SrcId.init)){
-      enforce(!hitStack.any!(a => a.hash==hash), "hash already defined for cell: "~cell.text);
-      hitStack ~= HitTestRec(hash, hitBounds, localPos);
+  void addHitRect(Cell cell, in bounds2 hitBounds, in vec2 localPos){//must be called from each cell that needs mouse hit test
+    if(auto id = idOfCell.get(cast(void*)cell, SrcId.init)){
+      assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~cell.text);
+      hitStack ~= HitTestRec(id, hitBounds, localPos);
     }
   }
-
-  //todo: elrejteni ezeket az individual check-eket a check()en belulre.
-  bool checkHover(in SrcId hash){
-    auto idx = lastHitStack.map!"a.hash".countUntil(hash);
-    return idx<0 ? false
-                 : true;
-  }
-
-  auto checkHitBounds(in SrcId hash){
-    auto idx = lastHitStack.map!"a.hash".countUntil(hash);
-    return idx<0 ? bounds2()
-                 : lastHitStack[idx].hitBounds;
-  }
-
-  float checkHover_smooth(in SrcId hash){
-    if(capturedHash) return 0;
-    return smoothHover.get(hash, 0);
-  }
-
-  bool checkCaptured(in SrcId h){
-    return capturedHash==h && checkHover(h);
-  }
-
-  float checkCaptured_smooth(in SrcId h){
-    return capturedHash==h ? checkHover_smooth(h) : 0;
-  }
-
-  bool checkClicked(in SrcId h){ return clickedHash==h; }
-  bool checkPressed(in SrcId h){ return pressedHash==h; }
-  bool checkReleased(in SrcId h){ return releasedHash==h; }
 
   auto check(in SrcId id){
     HitInfo h;
     h.id = id;
-    h.hover = checkHover(id);
-    h.hover_smooth = checkHover_smooth(id);
-    h.captured = checkCaptured(id);
-    h.captured_smooth = checkCaptured_smooth(id);
-    h.clicked = checkClicked(id);
-    h.pressed = checkPressed(id);
-    h.released = checkReleased(id);
-    h.hitBounds = checkHitBounds(id);
+    if(id==SrcId.init) return h;
+    h.hover             = lastHitStack.map!"a.id".canFind(id);
+    h.captured          = capturedId==id && h.hover;
+    h.hover_smooth      = smoothHover.get(id, 0);
+    h.captured_smooth   = max(h.hover_smooth, h.captured);
+    h.pressed           = pressedId ==id;
+    h.released          = releasedId==id;
+    h.clicked           = clickedId ==id;
+    h.hitBounds         = lastHitStack.get(lastHitStack.map!"a.id".countUntil(id)).hitBounds;
     return h;
   }
 
@@ -261,9 +233,7 @@ struct HitTestManager{
       dr.lineWidth = (QPS*3).fract;
       dr.color = clFuchsia;
 
-      foreach(hr; hitStack){
-        dr.drawRect(hr.hitBounds);
-      }
+      hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b));
 
       dr.lineWidth = 1;
       dr.lineStyle = LineStyle.normal;
@@ -271,7 +241,7 @@ struct HitTestManager{
   }
 
   auto stats(){
-    return format("HitTest lengths: hitStack:%s, lastHitStack::%s, cellHashMap:%s, smoothHover::%s", hitStack.length, lastHitStack.length, cellHashMap.length, smoothHover.length);
+    return format("HitTest lengths: hitStack:%s, lastHitStack::%s, idOfCell:%s, smoothHover::%s", hitStack.length, lastHitStack.length, idOfCell.length, smoothHover.length);
   }
 
 }
@@ -1977,7 +1947,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b0_0_0_0_0_0_00_00_0_1_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b____0_0_0_0_0_0_00_00_0_1_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2004,7 +1974,8 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "hasVScrollBar"     , 1,
     bool          , "saveVisibleBounds" , 1, // draw() will save the visible innerBounds under the name id.appendIdx("visibleBounds");
     bool          , "_measureOnlyOnce"  , 1,
-    int           , ""                  , 1,
+    bool          , "acceptEditorKeys"  , 1, // accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.
+    // ------------------------ 32bits ---------------------------------------
   ));
 }
 

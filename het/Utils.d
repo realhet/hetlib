@@ -2862,8 +2862,9 @@ struct SrcId{
 
   T value;
 
-/*  auto opCast(T : bool)() const{ return value != T.init; }
-  bool opEquals(in SrcId b) const{ return value == b.value; }
+  bool opCast(B : bool)() const{ return value != T.init; }
+
+/*  bool opEquals(in SrcId b) const{ return value == b.value; }
   size_t toHash() const{ return .toHash(value); }*/
 
   alias value this;
