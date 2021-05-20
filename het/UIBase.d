@@ -14,8 +14,8 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
-  VisualizeGlyphs          = 1,
-  VisualizeTabColors       = 1,
+  VisualizeGlyphs          = 0,
+  VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
 
@@ -139,12 +139,11 @@ struct HitTestManager{
   struct HitTestRec{
     SrcId id;            //in the next frame this must be the isSame
     bounds2 hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
-    vec2 localPos;
+    vec2 localPos;       //relative to outerPos
   }
 
   //act frame
   HitTestRec[] hitStack, lastHitStack;
-  SrcId[void*] idOfCell;
 
   float[SrcId] smoothHover;
   private void updateSmoothHover(ref HitTestRec[] actHitStack){
@@ -191,7 +190,6 @@ struct HitTestManager{
   }
 
   void nextFrame(){
-    idOfCell.clear;
     lastHitStack = hitStack;
     hitStack = [];
 
@@ -199,18 +197,11 @@ struct HitTestManager{
     updateMouseCapture(lastHitStack);
   }
 
-  //Used to identify the cell when it later calls addHitRect()
-  void addHash(Cell cell, in SrcId id){
-    auto c = cast(void*)cell;
-    assert((c in idOfCell) is null, "Duplicated hitTest cell.");
-    idOfCell[c] = id;
-  }
+  void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos){//must be called from each cell that needs mouse hit test
+    assert(id, "Null Id is illegal");
+    assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text);
+    hitStack ~= HitTestRec(id, hitBounds, localPos);
 
-  void addHitRect(Cell cell, in bounds2 hitBounds, in vec2 localPos){//must be called from each cell that needs mouse hit test
-    if(auto id = idOfCell.get(cast(void*)cell, SrcId.init)){
-      assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~cell.text);
-      hitStack ~= HitTestRec(id, hitBounds, localPos);
-    }
   }
 
   auto check(in SrcId id){
@@ -241,7 +232,7 @@ struct HitTestManager{
   }
 
   auto stats(){
-    return format("HitTest lengths: hitStack:%s, lastHitStack::%s, idOfCell:%s, smoothHover::%s", hitStack.length, lastHitStack.length, idOfCell.length, smoothHover.length);
+    return format("HitTest lengths: hitStack:%s, lastHitStack::%s, smoothHover::%s", hitStack.length, lastHitStack.length, smoothHover.length);
   }
 
 }
@@ -912,16 +903,11 @@ class Cell{ // Cell ////////////////////////////////////
   int tabCnt() { return cast(int)tabIdx.length; } //todo: int -> size_t
   float tabPos(int i) { with(subCells[tabIdx[i]]) return outerRight; }
 
-/* advanced insert delete. Not needed for IMGUI
-  void insert(Cell[] ins, int at=int.max, int del=0, Cell[]* cutCells=null) { notImpl("modifySubCells() not implemented"); }
-  void append(Cell[] c)         { insert(c); }
-  void delete_(int at, int cnt) { insert([], at, cnt); }
-  Cell[] cut(int at, int cnt)   { Cell[] res; insert([], at, cnt, &res); }*/
-
   bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){ //todo: only check when the hitTest flag is true
-    auto bnd = getHitBounds + ofs;
-    if(bnd.contains!"[)"(mouse)){
-      hitTestManager.addHitRect(this, bnd, mouse-outerPos);
+    auto hitBnd = getHitBounds + ofs;
+    if(hitBnd.contains!"[)"(mouse)){
+      if(auto container = cast(Container)this)
+        hitTestManager.addHitRect(container.id, hitBnd, mouse-outerPos);
       return true;
     }else{
       return false;
@@ -2211,7 +2197,7 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-  ///this hitTest is only works after measure.
+  ///this hitTest only works after measure.
   override Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init){
     auto res = super.contains(p, ofs);
 
@@ -2665,11 +2651,13 @@ class Column : Container { // Column ////////////////////////////////////
 }
 
 
+//todo: Ezt le kell valtani egy container.backgroundImage-al.
 class Img : Container { // Img ////////////////////////////////////
   int stIdx;
 
   this(File fn){
     stIdx = textures[fn];
+    id = srcId(genericId("Img"));
   }
 
   this(File fn, RGB bkColor){

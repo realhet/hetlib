@@ -1,5 +1,6 @@
 module buildsys;
 
+//todo: RUN: set working directory to the main.d
 //todo: editor: goto line
 //TODO: a todokat, meg optkat meg warningokat, ne jelolje mar pirossal az editorban a filenevek tabjainal.
 //TODO: editor find in project files.

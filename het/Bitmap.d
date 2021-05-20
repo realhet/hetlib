@@ -19,6 +19,14 @@ import turbojpeg.turbojpeg;
 //turn Direct2D linkage on/off
 version = D2D_FONT_RENDERER;
 
+alias bitmaps = Singleton!BitmapCache;
+
+class BitmapCache{
+  Bitmap access(File file){
+    return null;
+  }
+}
+
 // newBitmap ////////////////////////////
 
 //todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
@@ -1303,7 +1311,7 @@ struct BitmapFontProps{
 auto decodeFontDeclaration(string s, out string text){
   BitmapFontProps res;
 
-  enforce(isFontDeclaration(s), `Not a font declaration. "%s" `.format(s));
+  enforce(s.isFontDeclaration, `Not a font declaration. "%s" `.format(s));
   //example: `font:\Times New Roman\64\x3\ct?text`
   //                ^ fontName
   // optional size, x3: width*=3, x2, ct=clearType

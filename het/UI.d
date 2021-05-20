@@ -2,6 +2,15 @@ module het.ui;
 
 import het.utils, het.draw2d, het.inputs, het.stream, het.opengl;
 
+void testGenericArgDetection(){ with(im){
+  im.Row(25, title : "hello", { });
+  im.Row!("module")(id : 25, { });
+  im.Row/*comment*/(25,/*comment*/ title/*comment*/ :/*comment*/ "hello", { });
+  im.Row!("module")(/*comment*/id/*comment*/ /*comment*/:/*comment*/ 25, { });
+}
+
+
+
 //todo: Unqual is not needed to check a type. Try to push this idea through a whole testApp.
 
 import std.traits, std.meta;
@@ -683,7 +692,6 @@ struct im{ static:
     assert(container !is null);
     auto res = hitTestManager.check(container.id);
     res.enabled = enabled;
-    hitTestManager.addHash(container, container.id);
     return res;
   }
 
@@ -829,7 +837,7 @@ struct im{ static:
 
     column.bkColor = style.bkColor;
 
-    static foreach(a; args){{ alias t = typeof(a);
+    static foreach(a; args){{ alias t = typeof(cast()a);
 
            static if(isFunctionPointer!a) a();
       else static if(isDelegate!a       ) a();

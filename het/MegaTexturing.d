@@ -23,7 +23,7 @@ __gshared
 
 bool canUnloadTexture(File f, int age){
   if(age<=3) return false;
-  if(["custom", "font"].map!(a => f.fullName.startsWith(a)).any) return false;
+  if(f.drive.among("custom", "font")) return false;
   return true;
 }
 
@@ -371,10 +371,6 @@ private:
   MegaTexture[] megaTextures;
 
   int[File] byFileName;
-/*  int idxByFileName(in File fileName, bool mustExists=true){
-    if(auto a = fileName in _byFileName) return *a;
-    if(mustExists) ERR("Can't find texture ", file)
-  }*/
 
   bool mustRehash; //todo: this is useless i think
 
@@ -741,30 +737,30 @@ public:
   }
 
   bool isCustomExists(string name){
-    return (File("custom://"~name) in byFileName) !is null;
+    return (File(`custom:\`~name) in byFileName) !is null;
   }
 
   int custom(string name, Bitmap bmp=null){ //if bitmap != null then refresh
 enum log = false;
 if(log) "testures.custom(%s, %s)".writefln(name, bmp);
 
-    auto fileName = File("custom://"~name);
+    auto fileName = File(`custom:\`~name);
 
-    if(auto a = (fileName in byFileName)){
-      if(bmp){ //update existing
+    if(auto a = (fileName in byFileName)){ //already exists?
+      if(bmp){ //reupdate existing
         removeSubTex(*a);
         auto idx = createSubTex(bmp);
         byFileName[fileName] = idx;
         mustRehash = true;
 if(log) "Updated subtex %s:".writefln(fileName);
         return idx;
-      }else{
+      }else{ //no change, just return the existing handle
 if(log) "Found subtex %s:".writefln(fileName);
         return *a;
       }
-    }else{
+    }else{ //this is a new entry
       if(bmp is null){
-        bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));  //just create a purple placeholder
+        bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));  //if no bmp, just create a purple placeholder
       }
       auto idx = createSubTex(bmp);
       byFileName[fileName] = idx;
@@ -881,10 +877,14 @@ if(log) "Created subtex %s:".writefln(fileName);
 
 
 class CustomTexture{ // CustomTexture ///////////////////////////////
-  string name(){ return this.identityStr; }
+  const string name;
   protected{
     Bitmap bmp;
     bool mustUpload;
+  }
+
+  this(string name=""){
+    this.name = name.strip.length ? name : this.identityStr;
   }
 
   void clear(){ bmp.free; mustUpload = false; }
@@ -899,4 +899,7 @@ class CustomTexture{ // CustomTexture ///////////////////////////////
   }
 
   ivec2 size()const { return bmp ? bmp.size : ivec2(0); }
+
+  auto getFile(){ return File(`custom:\`~name); }
+  auto getBmp(){ return bmp; }
 }

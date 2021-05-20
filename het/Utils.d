@@ -107,7 +107,7 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
   GetStdHandle, GetTempPathW, GetFileTime, SetFileTime,
-  FileTimeToLocalFileTime, FileTimeToSystemTime, GetLocalTime, Sleep, GetComputerNameW, GetProcAddress,
+  FileTimeToLocalFileTime, FileTimeToSystemTime, GetLocalTime, GetSystemTimeAsFileTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
   HICON;
@@ -2022,7 +2022,9 @@ string truncate(string ellipsis="...")(string s, size_t maxLen){ //todo: string.
 string decapitalize()(string s){ return s.capitalize!toLower; }
 
 bool sameString(string a, string b) { return a==b; }
-bool sameText(string a, string b) { return uc(a)==uc(b); }
+bool sameText(string a, string b) { return uc(a)==uc(b); } //todo: unoptimal
+
+auto amongText(Values...)(string value, Values values){ return value.among!sameText(values); }
 
 /// Show the differences in 2 strings
 string strDiff(char diffChar='^', char sameChar='_')(string a, string b){
@@ -4338,6 +4340,7 @@ bool samePath(string a, string b){
 
 bool samePath(in Path a, in Path b){ return samePath(a.fullPath, b.fullPath); }
 
+
 struct Path{
   private static{
 
@@ -4369,6 +4372,21 @@ public:
   Path normalized()             const { return Path(buildNormalizedPath(absolutePath(fullPath))); }
   Path normalized(string base)  const { return Path(buildNormalizedPath(absolutePath(fullPath, base))); }
   Path normalized(in Path base) const { return normalized(base.fullPath); }
+
+  string drive()const {
+    foreach(i, ch; fullPath){
+      if(ch.isAlphaNum) continue;
+      if(ch==':') return fullPath[0..i+1];
+      return "";
+    }
+    return "";
+  }
+
+  size_t driveIs(in string[] drives...)const {
+    string e0 = drive.lc.withoutEnding(':');
+    foreach(i, s; drives) if(s.lc.withoutEnding(':')==e0) return i+1;
+    return 0;
+  }
 
   Path parent() const { string s = dir; while(s!="" && s[$-1]!='\\') s.length--; return Path(s); }
 
@@ -4559,13 +4577,15 @@ public:
   auto accessed()  const{ return times.accessed; }
   auto created()   const{ return times.created ; }
 
-
   @property string dir()const           { return extractFileDir(fullName); }
   @property void dir(string newDir)     { fullName = combinePath(newDir, extractFileName(fullName)); }
 
   @property Path path()const          { return Path(extractFilePath(fullName)); }
   @property void path(Path newPath)   { fullName = combinePath(newPath.fullPath, extractFileName(fullName)); }
   @property void path(string newPath) { fullName = combinePath(newPath         , extractFileName(fullName)); }
+
+  string drive() const { return Path(fullName).drive; }
+  size_t driveIs(in string[] drives...) const { return Path(fullName).driveIs(drives); }
 
   @property string name()const          { return extractFileName(fullName); }
   @property void name(string newName)   { fullName = combinePath(extractFilePath(fullName), newName); }
@@ -4577,14 +4597,14 @@ public:
 
   File otherExt(const string ext_) const { File a = this; a.ext = ext_; return a;  }
 
-  bool extIs(in string[] exts...)const {
+  size_t extIs(in string[] exts...)const { //todo: ez full ganyolas...
     string e0 = lc(ext);
-    foreach(s; exts){
+    foreach(i, s; exts){
       string e = s;
       if(e!="" && e[0]!='.') e = '.'~e;
-      if(lc(e)==e0) return true;
+      if(lc(e)==e0) return i+1;
     }
-    return false;
+    return 0;
   }
 
   bool remove(bool mustSucceed = true) const{
@@ -4730,7 +4750,7 @@ public:
 }
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))                               { file. writeStr(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))                               { file. write(cast(string)data); }
 void saveTo(T)(const T[] data, const File file)if(!is(T == char))                               { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)                              { file .write([data]); }
 
@@ -4764,6 +4784,7 @@ struct FileEntry{
   string name;
 
   string fullName() const{ return path.fullPath~name; }
+  File file()const { return File(fullName); }
 
   FILETIME ftCreationTime, ftLastWriteTime, ftLastAccessTime;
   long size;
@@ -4797,7 +4818,7 @@ struct FileEntry{
 }
 
 ///similar directory listing like the one in totalcommander
-FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = No.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
+FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
   FileEntry[] files, paths, parent;
 
   if(mask=="*") mask = "";
@@ -4809,14 +4830,17 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
       auto entry = FileEntry(data, path);
       if(entry.isDirectory){
         if(entry.name == ".") continue;
-        if(entry.name == ".."){ parent ~= entry; continue; }
-        paths ~= entry;
+        if(entry.name == ".."){ if(!onlyFiles) parent ~= entry; continue; }
+        if(!onlyFiles || recursive) paths ~= entry;
       }else{
         if(mask=="" || entry.name.isWild(mask)) files ~= entry;
       }
     }while(FindNextFileW(hFind, &data));
     FindClose(hFind);
   }
+
+  //todo: implement recursive
+  //todo: onlyFiles && recursive, watch out for ".."!!!
 
   auto pathIdx = new int[paths.length];
   paths.makeIndex!((a, b) => icmp(a.name, b.name)<0)(pathIdx);
@@ -4840,7 +4864,8 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
     default: raise("Invalid sort order: " ~ order.quoted);
   }
 
-  return chain(parent, pathIdx.map!(i => paths[i]), fileIdx.map!(i => files[i])).array;
+  if(onlyFiles) return                                            fileIdx.map!(i => files[i]) .array;
+                return chain(parent, pathIdx.map!(i => paths[i]), fileIdx.map!(i => files[i])).array;
 }
 
 ///this is a recursive search
@@ -5331,8 +5356,9 @@ struct Date{
     this(year2k(y), m, d);
   }
   static Date current() {
-    SYSTEMTIME st;  GetLocalTime(&st);
-    return Date(st);
+    Date d;
+    d.raw = DateTime.current.raw.ifloor;
+    return d;
   }
 
   @property int year ()const { auto st = decodeDate(raw); return st.wYear ; }
@@ -5396,16 +5422,30 @@ struct Time{
   int opCmp(const Time t) const { return dblCmp(raw, t.raw); }
 }
 
+
 struct DateTime{
+  private static __gshared {
+    extern(Windows) nothrow @nogc void function(FILETIME*) myGetSystemTimePreciseAsFileTime = &GetSystemTimeAsFileTime;
+
+    void loadFunctions(){
+      getProcAddress(loadLibrary("kernel32.dll"), "GetSystemTimePreciseAsFileTime", myGetSystemTimePreciseAsFileTime, false);
+    }
+  }
+
   /+private+/ double raw;
 
-  this(in FILETIME ft){
+  this(FILETIME ft){   //filetime is UTC
     SYSTEMTIME st;
+
+    //extract fractional time below 1
+    int time_100ns = ft.dwLowDateTime % 10_000;
+    ft.dwLowDateTime -= time_100ns; //not sure of the rounding mode in windows, so truncate manually
+
     FileTimeToLocalSystemTime(&ft, &st);
-    this(st);
+    this(st, time_100ns*(1.0/(24*60*60 * 10_000_000.0)));
   }
-  this(in SYSTEMTIME st){
-    with(st) raw = encodeDate(wYear, wMonth, wDay) + encodeTime(wHour, wMinute, wSecond, wMilliseconds);
+  this(in SYSTEMTIME st, double extra_days=0){
+    with(st) raw = encodeDate(wYear, wMonth, wDay) + encodeTime(wHour, wMinute, wSecond, wMilliseconds) + extra_days;
   }
   this(int year, int month, int day, int hour=0, int minute=0, int second=0, int milliseconds=0){
     raw = encodeDate(year, month, day) + encodeTime(hour, minute, second, milliseconds);
@@ -5437,8 +5477,8 @@ struct DateTime{
   void opAssign(T)(T val) if(isNumeric!T) { raw = val; }
 
   static DateTime current(){
-    SYSTEMTIME st;  GetLocalTime(&st);
-    return DateTime(st);
+    FILETIME ft; myGetSystemTimePreciseAsFileTime(&ft);
+    return DateTime(ft); //todo: DateTime should be FILETIME based
   }
 
   @property int year ()const { auto st = decodeDate(raw); return st.wYear        ; }
@@ -5477,6 +5517,50 @@ struct DateTime{
 
   int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
   int opCmp(const Date     d ) const { return dblCmp(raw, d .raw); }
+
+  static void test(){ //todo: refactor these and do unit testing
+    {
+      double[] arr;
+      arr.length = 20;
+      foreach(ref t; arr) t = QPS; //100ns precision. QPS in a loop is 2-3 times the same on my machine.
+      foreach(i, t; arr.slide(2).array) writefln("%5d %20.15f %20.15f", i, t[0], t[1]-t[0]);
+    }
+
+    {
+      double[] arr;
+      arr.length = 20;
+      foreach(ref t; arr) t = now.raw*(24*60*60); //100ns precision. QPS in a loop is 2-3 times the same on my machine.
+      foreach(i, t; arr.slide(2).array) writefln("%5d %20.15f %20.15f", i, t[0], t[1]-t[0]);
+    }
+
+    DateTime dt = now;
+    print(dt);
+    dt.raw = 0;
+    print(dt);
+    dt.raw = 1;
+    print(dt);
+
+    dt = now;
+    double d = now.raw*(24*60*60);
+    writefln("%20.15f", d);
+    writefln("%20.15f", nextAfter(d, double.max));
+    writefln("%20.15f double: smallest precision in seconds", nextAfter(d, double.max)-d);
+
+    dt.raw = -73000*1.5; print(dt);
+
+    {
+      enum N = 1000;
+      auto t0 = QPS;
+      foreach(i; 0..N) QPS;
+      print("QPS() runtime ns", (QPS-t0)/N*1e9);
+    }
+    {
+      enum N = 1000;
+      auto t0 = QPS;
+      foreach(i; 0..N) now;
+      print("now() runtime ns", (QPS-t0)/N*1e9);
+    }
+  }
 }
 
 Time     time () { return Time    .current; } //0 = midnight  1 = 24hours
@@ -6010,6 +6094,9 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   //functional tests
 
   installExceptionFilter;
+
+  DateTime.loadFunctions;
+  enforce(Date(2000, 1, 1) - Date(1601, 1, 1) == 145731);
 
   enforce(xxh("hello")==0xfb0077f9);
   enforce(xxh("Nobody inspects the spammish repetition", 123456) == 0xc2845cee);

@@ -178,8 +178,6 @@ struct Token{ // Token //////////////////////////////
   int level; //hiehrarchy level in [] () {} q{}
   string source;
 
-  @property int endPos() const{ return pos+length; }
-
   TokenKind kind;
   bool isTokenString; //it is inside the outermost tokenstring. Calculated in Parser.tokenize.BracketHierarchy, not in tokenizer.
   bool isBuildMacro; // //@ comments right after a newline or at the beginning of the file. Calculated in parser.collectBuildMacros
@@ -188,13 +186,23 @@ struct Token{ // Token //////////////////////////////
     return "%-20s: %s %s".format(kind, level, source);//~" "~(!data ? "" : data.text);
   }*/
 
+  static void dumpStruct(){
+    foreach(name; FieldNameTuple!Token){
+      print(format!"%-16s %4d %4d"(name, mixin(name, ".offsetof"), mixin(name, ".sizeof")));
+    }
+  }
+
+
+  @property int endPos() const{ return pos+length; }
+
   void toString(scope void delegate(const(char)[]) sink, FormatSpec!char fmt){
          if(fmt.spec == 'u') put(sink, format!"%-20s: %s %s"(kind, level, source));
     else if(fmt.spec == 't') put(sink, format!"%s\t%s\t%s"(kind, level, source));
     else put(sink, source ~ "("~level.text~")");
   }
 
-  bool isOperator(int op)       const { return id==op && kind==TokenKind.operator; }
+  bool isOperator(int op)           const { return id==op && kind==TokenKind.operator; }
+  int isOperator(int op1, int op2) const { return kind==TokenKind.operator ? cast(int)id.among(op1, op2) : 0; }
   bool isKeyword ()             const { return           kind==TokenKind.keyword ; }
   bool isKeyword (int kw)       const { return id==kw && kind==TokenKind.keyword ; }
   bool isIdentifier()           const { return           kind==TokenKind.identifier; }
