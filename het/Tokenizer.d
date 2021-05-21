@@ -159,11 +159,11 @@ class SourceCode{ // SourceCode ///////////////////////////////
 
     if(error == ""){
       auto bigc = new char[0x10000];
-      syntaxHighLight(file.fullName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
+      error = syntaxHighLight(file.fullName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
       bigComments = decodeBigComments(bigc);
-    }else{
-      WARN(error);
     }
+
+    if(error != "") WARN(error);
 
     checkConsistency;
   }
@@ -180,13 +180,15 @@ struct Token{ // Token //////////////////////////////
 
   TokenKind kind;
   bool isTokenString; //it is inside the outermost tokenstring. Calculated in Parser.tokenize.BracketHierarchy, not in tokenizer.
+                      //update: 210520: implemented in syntaxHighlighter too.
+
   bool isBuildMacro; // //@ comments right after a newline or at the beginning of the file. Calculated in parser.collectBuildMacros
 
   /*string toString() const{
     return "%-20s: %s %s".format(kind, level, source);//~" "~(!data ? "" : data.text);
   }*/
 
-  static void dumpStruct(){
+  static void dumpStruct(){ //todo: make it accessible from utils
     foreach(name; FieldNameTuple!Token){
       print(format!"%-16s %4d %4d"(name, mixin(name, ".offsetof"), mixin(name, ".sizeof")));
     }
@@ -263,6 +265,42 @@ struct Token{ // Token //////////////////////////////
   //bool opEquals(string s) const { return source==s; } //note this conflicted with the linker when importing het.parser.
 
   void raiseError(string msg, string fileName=""){ throw new Exception(format(`%s(%d:%d): Error at "%s": %s`, fileName, line+1, posInLine+1, source, msg)); }
+
+  // intelligent checkers
+
+  bool among_one(string op)() const{
+         static if(op=="(") return isOperator(oproundBracketOpen);
+    else static if(op==")") return isOperator(oproundBracketClose);
+    else static if(op=="[") return isOperator(opsquareBracketOpen);
+    else static if(op=="]") return isOperator(opsquareBracketClose);
+    else static if(op=="{") return isOperator(opcurlyBracketOpen);
+    else static if(op=="}") return isOperator(opcurlyBracketClose);
+    else static if(op==",") return isOperator(opcomma);
+    else static if(op==":") return isOperator(opcolon);
+    else static if(op=="!") return isOperator(opnot);
+    else static if(op=="is") return isOperator(opis);
+    else static if(op=="alias") return isKeyword(kwalias);
+    else static if(op=="enum") return isKeyword(kwenum);
+    else static if(op=="struct") return isKeyword(kwstruct);
+    else static if(op=="union") return isKeyword(kwunion);
+    else static if(op=="class") return isKeyword(kwclass);
+    else static if(op=="interface") return isKeyword(kwinterface);
+    else static if(op=="template") return isKeyword(kwtemplate);
+    else static assert(0, "Unknown operator string: "~op);
+  }
+
+  int among_idx(string ops)() const{
+    static foreach(idx, op; ops.split(" ")) if(among_one!op) return int(idx);
+    return -1;
+  }
+
+  bool among(string ops)() const{
+    static if(ops.split(" ").length>1) return among_idx!ops >= 0;
+                                  else return among_one!ops;
+  }
+
+  bool among(string ops)(int level) const{ return this.level==level && among!ops; }
+
 }
 
 int baseLevel(in Token[] tokens){
@@ -1149,8 +1187,10 @@ auto tokenize2(string src, string fileName="", bool raiseError=true){ //it does 
 
 
 
-void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen) // SyntaxHighlight ////////////////////////////
+string syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen) // SyntaxHighlight ////////////////////////////
 {
+  string errors;
+
   //todo: a delphis } bracket pa'rkereso is bugos: a stringekben levo {-en is megall.
   //todo: ezt az enumot kivinni es ubye tipusuva tenni, osszevonni
   enum { skWhiteSpace, skSelected, skFoundAct, skFoundAlso, skNavLink, skNumber, skString, skKeyword, skSymbol, skComment,
@@ -1201,6 +1241,7 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
   bool nextIdIsAttrib;
   string[] nesting;
   int[] nestingOpeningIdx;
+  int tokenStringLevel;
 
   string[int] bigCommentsMap;
   int lastBigCommentHeaderLine = -1;
@@ -1235,9 +1276,12 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     if(t.isHierarchyOpen){
       nesting ~= t.source;
       nestingOpeningIdx ~= cast(int)idx; //todo: normalis nevet talalni ennek, vagy bele egy structba
+
+      if(nesting.back=="q{") tokenStringLevel++;
     }
 
     t.level = cast(int)nesting.length;
+    t.isTokenString = tokenStringLevel>0;
 
     if(chkClear(nextIdIsAttrib) && t.kind==identifier){
       cl = skAttribute;
@@ -1290,12 +1334,14 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
         }
 
         //advance
+        if(nesting.back=="q{") tokenStringLevel--;
         nesting = nesting[0..$-1];
         nestingOpeningIdx = nestingOpeningIdx[0..$-1];
       }else{
         //nesting error
         cl = skError;
         if(!nestingOpeningIdx.empty) fill(tokens[nestingOpeningIdx[$-1]], skError);
+        errors ~= format!"%s(%s,%s) Error: Bad nesting bracket.\n"(fileName, t.line+1, t.posInLine+1);
       }
     }
 
@@ -1303,11 +1349,18 @@ void syntaxHighLight(string fileName, Token[] tokens, size_t srcLen, ubyte* res,
     fill(t, cl);
   }
 
+  foreach_reverse(i; nestingOpeningIdx){
+    fill(tokens[i], skError);
+    errors ~= format!"%s(%s,%s) Error: Missing closing bracket.\n"(fileName, tokens[i].line+1, tokens[i].posInLine+1);
+  }
+
   bigCommentsMap.rehash; //todo: revisit strings
   auto sBigComments = bigCommentsMap.byKeyValue.map!(a => format(`%s:%s`, a.key, a.value)).join("\r\n");
   sBigComments.length = min(sBigComments.length, bigCommentsLen);
   bigComments[0..sBigComments.length] = sBigComments[];
   bigComments[sBigComments.length] = '\0';
+
+  return errors.strip;
 }
 
 //GPU text editor format

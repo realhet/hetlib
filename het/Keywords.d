@@ -43,7 +43,7 @@ private enum _keywordStrs = [ //last items of categories must be untouched!!!
   //floats
     "float","double","real",    "ifloat","idouble","ireal",     "cfloat","cdouble","creal",
   //others
-    "bool",                         "char","wchar","dchar",     "string","wstring","dstring",        "void",
+    "bool",                         "char","wchar","dchar",  /* "string","wstring","dstring", these are aliases. */       "void",
 
 //user definied types
   "alias","enum","interface","struct","class","union","delegate","function",

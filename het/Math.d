@@ -2459,7 +2459,7 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     return [start, end];
   }
 
-  auto opSlice(){ return this; }
+  auto opSlice() const { return this; }
 
   // Support `$` in slicing notation, e.g., arr[1..$, 0..$-1].
   @property {

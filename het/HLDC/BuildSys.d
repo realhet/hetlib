@@ -1,5 +1,6 @@
 module buildsys;
 
+//todo: syntaxHighlight() returns errors! Build system it must handle those!
 //todo: RUN: set working directory to the main.d
 //todo: editor: goto line
 //TODO: a todokat, meg optkat meg warningokat, ne jelolje mar pirossal az editorban a filenevek tabjainal.
@@ -453,7 +454,7 @@ private:
   //then look into the filesystem
   struct Content{
     File file;
-    string source;
+    string source_original;
     DateTime dateTime;
     string hash;
 
@@ -467,7 +468,9 @@ private:
     }
 
     void process(){
-      parser.tokenize(file.fullName, source); //todo: fileName-t tovabb vinni
+      parser.tokenize(file.fullName, source_original); //it is needed to extract imported modules and such
+      if(parser.wasError)
+        WARN(parser.errorStr);
     }
   }
   Content[File] cache;
@@ -500,12 +503,12 @@ public:
       ch.unProcess;
       if(ef){ //refresh from editor
         ch.dateTime = ef.dateTime;
-        ch.source = to!string(ef.source[0..ef.length]);
+        ch.source_original = to!string(ef.source[0..ef.length]);
       }else{ //refresh from file
         ch.dateTime = file.modified;
-        ch.source = file.readStr(false); //not mustexists because some files are nonexistent due to conditional imports
+        ch.source_original = file.readStr(false); //not mustexists because some files are nonexistent due to conditional imports
       }
-      ch.hash = calcHash(ch.source);
+      ch.hash = calcHash(ch.source_original);
     }
 
     if(!ch){ //not in cache
@@ -550,7 +553,7 @@ class ModuleInfo{
     file = content.file;
     fileHash = content.hash;
     sourceLines = content.parser.sourceLines;
-    sourceBytes = content.source.length.to!int;
+    sourceBytes = content.source_original.length.to!int;
 
     moduleFullName = content.parser.getModuleFullName;
     if(moduleFullName.empty) moduleFullName = file.nameWithoutExt;

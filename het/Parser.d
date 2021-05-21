@@ -62,6 +62,7 @@ static __gshared:
 //  Bracket Hierarchy Processor                                             //
 //////////////////////////////////////////////////////////////////////////////
 
+/// This is a nicer looking version than syntaxHighLight, but it lacks a lot of functionality.
 struct BracketHierarchyProcessor{
 public:
   string fileName; //for error report
@@ -221,8 +222,8 @@ class Parser{
 
   string errorStr;
   bool wasError() const                    { return errorStr!=""; }
-  private void error(string err)           { if(!wasError) errorStr = err; }
-  private void error(Token* t, string err) { error(format("%s(%d:%d): %s", fileName, t.line, t.posInLine, err)); }
+  private void error(string err)           { if(err) errorStr = join2(errorStr, "\n", err); }
+  private void error(Token* t, string err) { if(err) error(format("%s(%d:%d): %s", fileName, t.line, t.posInLine, err)); }
 
   //stats
   int sourceLines()     { return tokens.empty ? 0 : tokens[$-1].line+1; }
@@ -232,8 +233,12 @@ class Parser{
   void tokenize(string fileName, string source){
     this.fileName = fileName;
     this.source = source;
-    this.buildMacros.clear;
-    this.todos.clear;
+
+    buildMacros = [];
+    importDecls = [];
+    todos = [];
+    tokens = [];
+    errorStr = "";
 
     //Tokenizing
     auto tokenizer = scoped!Tokenizer;
@@ -360,8 +365,9 @@ private: /////////////////////////////////////////////////////////////////////
   void expectOp(int op){ if(sym.isOperator(op)) nextSym; else error(format(`"%s" expected.`, opStr(op))); }
 
   auto expectIdentifier() {
-    if(sym.kind!=TokenKind.identifier) error("Identifier expected.");
-    string s = sym.source;  nextSym;
+    if(!sym.isIdentifier) error("Identifier expected. "~format(`%s(%d,%d): %s`, fileName, sym.line+1, sym.posInLine+1, sym.source));
+    auto s = sym.source;
+    nextSym;
     return s;
   }
 
