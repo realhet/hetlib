@@ -32,9 +32,7 @@ class BitmapCache{
 //todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
 auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
 
-Bitmap errorBitmap(){
-  return new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF)));
-}
+Bitmap errorBitmap(){ return new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF))); }
 
 Bitmap newBitmap(in ubyte[] data, bool mustSucceed=true){
   return data.deserialize!Bitmap(mustSucceed);
@@ -51,7 +49,6 @@ in(prefix.length>=2, "invalid prefix string")
 {
   prefix = prefix.lc;
   enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
-
   customBitmapLoaders[prefix] = loader;
 }
 
@@ -833,8 +830,11 @@ private:
   int width_, height_, channels_=4;
   string type_ = "ubyte";
 public:
-  int tag;     // can be an external id
-  int counter; // can notify of cnahges
+  deprecated int tag;     // can be an external id
+  deprecated int counter; // can notify of cnahges
+
+  File file;
+  DateTime modified;
 
   // todo: constraints
   // todo: fileName
@@ -867,17 +867,21 @@ public:
     enforce(width*height*channels*chSize == data.length,
       format!"Inconsistent bitmap size: %s{w} * %s{h} * %s{ch} * %s != %s{bytes}"(
                                         width, height, channels, chSize, data.length));
-    counter++;
     data_ = data;
     width_ = width;
     height_ = height;
     channels_ = channels;
     type_ = type;
+
+    counter++;
+    modified = now;
   }
 
   void set(E)(Image!(E, 2) im){
-    counter++;
     setRaw(im.asArray, im.width, im.height, VectorLength!E, (ScalarType!E).stringof);
+
+    counter++;
+    modified = now;
   }
 
   auto castedImage(E)(){
@@ -915,7 +919,7 @@ public:
     raise("unsupported bitmap format"); assert(0);
   }
 
-  override string toString() const { return format("Bitmap(%d, %d, %d, \"%s\")", width, height, channels, type); }
+  override string toString() const { return format("Bitmap(%s, %d, %d, %d, %s, %s)", file, width, height, channels, type.quoted, modified.timeStamp); }
 }
 
 // Bitmap/Image serializer //////////////////////////////////////////

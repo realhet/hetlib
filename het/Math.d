@@ -2170,7 +2170,7 @@ private void unittest_Bounds(){
 ////////////////////////////////////////////////////////////////////////////////
 
 
-enum isImage(A) = is(A.ImageType);
+enum isImage(A) = is(A.ImageType); //not nice
 
 template ImageDimension(A){
   static if(isImage!A) enum ImageDimension = A.Dimension;
@@ -2279,6 +2279,9 @@ private auto image2DfromRanges(R, D...)(in ivec2 size, R range, D def){
 
 auto image2D(alias fun="", A...)(A args){  // image2D constructor //////////////////////////////////
   static assert(A.length>0, "invalid args");
+
+  //todo: nem lehet kombinalni az img.retro-t az img.rgb swizzlinggel.   img2 = img.rows.retro.image2D.image2D!"a.b1g";   <-  2x image2D needed
+  //todo: img2 = image2D(img.size, (x, y) => img[x, img.height-1-y].lll);  az (x, y) forma sem megy csak az (ivec2 p)
 
   static if(A.length>=2 && is(Unqual!(A[0])==int) && is(Unqual!(A[1])==int)){ // Starts with 2 ints: width, height
     return image2D!fun(ivec2(args[0], args[1]), args[2..$]);
@@ -2775,7 +2778,6 @@ private void unittest_Image(){  // image2D tests ///////////////////////////////
     import std.digest.crc;
     assert(subImg.asArray.hexDigest!CRC32 == "BB6C00F4");
   }
-
 }
 
 

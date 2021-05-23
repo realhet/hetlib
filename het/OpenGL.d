@@ -1384,7 +1384,7 @@ auto loadShader(File file){
     return new Shader("unnamed/cached", text);
   }
 
-  return loadCachedFile!shaderFromText(file);
+  return loadCachedTextFile!shaderFromText(file);
 }
 
 

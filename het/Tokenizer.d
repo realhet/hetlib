@@ -209,6 +209,7 @@ struct Token{ // Token //////////////////////////////
   bool isKeyword (int kw)       const { return id==kw && kind==TokenKind.keyword ; }
   bool isIdentifier()           const { return           kind==TokenKind.identifier; }
   bool isIdentifier(string s)   const { return isIdentifier && source==s; }
+  bool isIdentifier(string s, int level)   const { return isIdentifier && this.level==level && source==s; }
   bool isComment()              const { return kind==TokenKind.comment; }
   bool isSlashSlasComment()     const { return isComment && source.startsWith("//"); }
   bool isDoxigenComment()       const { return isComment && ["///", "/**", "/++"].map!(a => source.startsWith(a)).any; }

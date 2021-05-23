@@ -335,7 +335,7 @@ static public:
         dg();
         exceptionHandlerActive_ = false;
       }catch(Throwable e){
-        showException(e.toString);
+        showException(e);
         exceptionHandlerActive_ = false;
         return -1;
       }
@@ -413,6 +413,8 @@ auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp)
 }
 
 // Exception handling ///////////////////////////////////////
+
+enum ErrorHandling { ignore, raise, track }
 
 T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
 {
@@ -494,6 +496,20 @@ string extendExceptionMsg(string lines){
   return lines.split("\n").map!processLine.filter!(not!empty).join("\n");
 }
 
+string extendedMsg(Throwable t){ return extendExceptionMsg(t.toString); }
+
+//cuts off traqce info
+string simplifyExceptionMsg(string msg){
+  string[] s;
+  foreach(line; msg.split("\n").map!strip){ //todo: use countUntil here!
+    if(line == "") break;
+    s ~= line;
+  }
+  return s.join("\n");
+}
+
+string simpleMsg(Throwable t){ return simplifyExceptionMsg(t.msg); }
+
 void showException(string s) nothrow
 {
   try{
@@ -516,20 +532,9 @@ void showException(string s) nothrow
 void showException(Throwable o) nothrow
 {
   string s;
-  try{ s = o.toString(); }catch(Throwable o){}
+  try{ s = o.toString(); }catch(Throwable o){ s = "Unable to get exception.toString"; }
   showException(s);
 }
-
-//cuts off traqce info
-string simplifiedMsg(Throwable t){
-  string[] s;
-  foreach(line; t.msg.split("\n").map!strip){ //todo: use countUntil here!
-    if(line == "") break;
-    s ~= line;
-  }
-  return s.join("\n");
-}
-
 
 void forceAssertions(string file=__FILE__, int line=__LINE__)(){ //todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
   enforce(ignoreExceptions({ assert(false); }), "Enable DEBUG compiler output! %s(%s)".format(file, line));
@@ -5063,7 +5068,7 @@ void stWrite(T)(ref ubyte[] st, const T[] data)
 
 // loadCachedFile /////////////////////////////////////////////////////
 
-auto loadCachedFile(alias fun)(File file)
+auto loadCachedTextFile(alias fun)(File file)
 if(__traits(isStaticFunction, fun))
 {
   alias T = ReturnType!fun;
@@ -5090,7 +5095,7 @@ if(__traits(isStaticFunction, fun))
     //1. load
     string text;
     try{
-      text = file.readStr;
+      text = file.readText;
     }catch{
       throw new Exception("Unable to load cached file: "~file.fullName);
     } //it will try again later
@@ -5100,7 +5105,7 @@ if(__traits(isStaticFunction, fun))
     try{
       obj = fun(text);
     }catch(Throwable t){
-      error = simplifiedMsg(t);
+      error = t.simpleMsg;
     }
 
     loaded[file] = Rec(file, actModified, obj, error); //todo: fileRead and getDate should be system-wide-atomic

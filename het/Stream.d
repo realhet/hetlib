@@ -4,6 +4,7 @@ import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 
 //todo: auto ref parameters.
 //todo: srcFunct seems obsolete.
+//todo: srcFunct seems obsolete.
 
 //21.02.03
 //todo: propertySet getters with typed defaults
@@ -28,8 +29,6 @@ void registerStoredClass(T)(){
   classLoaderFunc[fullyQualifiedName!T] = cast(LoaderFunc) (&streamDecode_json!T);
   classSaverFunc [fullyQualifiedName!T] = cast(SaverFunc ) (&streamAppend_json!T);
 }
-
-enum ErrorHandling { ignore, raise, track }
 
 private auto quoteIfNeeded(string s){ return s.canFind(" ") ? quoted(s) : s; } //todo: this is lame, must make it better in utils/filename routines
 
