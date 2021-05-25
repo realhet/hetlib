@@ -5605,14 +5605,16 @@ struct DateTime{
 
   /// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
   void actualize(){
-    if(isnan(raw)){
-      raw = current.raw;
+    auto c = current.raw;
+    if(isNull || c>raw){
+      raw = c;
     }else{
-      auto a = current.raw;
-      if(a>raw) raw = a;
-          else raw = raw.nextUp;
+      raw = raw.nextUp;
     }
   }
+
+  double toSeconds()    const{ return raw.isnan ? 0 : raw*(24*60*60); }
+  ulong toNanoSeconds() const{ return raw.isnan ? 0 : cast(ulong)(raw*(24*60*60*1e9)); }
 }
 
 Time     time () { return Time    .current; } //0 = midnight  1 = 24hours

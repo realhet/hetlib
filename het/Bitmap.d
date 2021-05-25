@@ -23,9 +23,9 @@ version = D2D_FONT_RENDERER;
 auto newBitmap2(File file, ErrorHandling errorHandling){ //newBitmap2() ////////////////////////////
   Bitmap res;
   final switch(errorHandling){
-    case ErrorHandling.raise :{ try{ res = newBitmap(file, true); }catch(Exception e){ throw e;                              } } break;
-    case ErrorHandling.track :{ try{ res = newBitmap(file, true); }catch(Exception e){ WARN(e.simpleMsg); res = errorBitmap; } } break;
-    case ErrorHandling.ignore:{ try{ res = newBitmap(file, true); }catch(Exception e){                    res = errorBitmap; } } break;
+    case ErrorHandling.raise :{ try{ res = newBitmap_internal(file, true); }catch(Exception e){ throw e;                              } } break;
+    case ErrorHandling.track :{ try{ res = newBitmap_internal(file, true); }catch(Exception e){ WARN(e.simpleMsg); res = errorBitmap; } } break;
+    case ErrorHandling.ignore:{ try{ res = newBitmap_internal(file, true); }catch(Exception e){                    res = errorBitmap; } } break;
   }
   res.file = file;
   res.modified = file.modified;
@@ -53,7 +53,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
         if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
 
         if(delayed){
-          res = new Bitmap(image2D(1, 1, clGray));
+          res = pendingBitmap;
           res.file = file;
           cache[file] = res;
 
@@ -84,7 +84,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
       loading.remove(file);
 
       if(auto p = file in cache){
-        (*p).free; //drop the old bitmap
+        //FUCKING NOT!!!! (*p).free; //drop the old bitmap
         res = (*p) = bmpIn; //swap in the new bitmap
         res.loading = false; //just to make sure
         //if(log) LOG("Just loaded:", res);
@@ -129,13 +129,14 @@ __gshared struct bitmaps{ static :
 auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
 
 Bitmap errorBitmap(){ return new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF))); }
+Bitmap pendingBitmap(){ return new Bitmap(image2D(1, 1, RGBA(0xFFC0C0C0))); }
 
-Bitmap newBitmap(in ubyte[] data, bool mustSucceed=true){
+Bitmap newBitmap_internal(in ubyte[] data, bool mustSucceed=true){
   return data.deserialize!Bitmap(mustSucceed);
 }
 
-Bitmap newBitmap(in File file, bool mustSucceed=true){ //todo: what if cant load the bitmap? raise, null or replacement image?
-  return newBitmap(file.fullName, mustSucceed);
+Bitmap newBitmap_internal(in File file, bool mustSucceed=true){ //todo: what if cant load the bitmap? raise, null or replacement image?
+  return newBitmap_internal(file.fullName, mustSucceed);
 }
 
 private __gshared Bitmap function(string)[string] customBitmapLoaders;
@@ -157,7 +158,7 @@ Bitmap colorMapBitmapLoader(string name){
   return bmp;
 }
 
-Bitmap newBitmap(string fn, bool mustSucceed=true){
+Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
   //todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
   //      when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
 
@@ -177,7 +178,7 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
     string thumbDef;
     if(fn.split2(thumbStr, fn, thumbDef, false/+must not strip!+/)){
       //get the original bitmap
-      auto orig = newBitmap(fn, mustSucceed);
+      auto orig = newBitmap_internal(fn, mustSucceed);
       if(orig is null) return orig; //silently failed
 
       //get width/height posfixes

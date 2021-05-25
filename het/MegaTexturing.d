@@ -450,6 +450,7 @@ private:
   }
 
   SubTexInfo allocSpace(int subTexIdx, in Bitmap bmp){
+    enforce(bmp);
     enforceSize(bmp.size);
 
     SubTexInfo info;
@@ -630,7 +631,7 @@ public:
     }
   }
 
-  int access(in File fileName, Flag!"delayed" fDelayed = Yes.delayed){ //todo: bugos a delayed leader
+  int access_old(in File fileName, Flag!"delayed" fDelayed = Yes.delayed){ //todo: bugos a delayed leader
     bool delayed = fDelayed;
 
     delayed &= EnableMultiThreadedTextureLoading;
@@ -669,7 +670,7 @@ public:
 //          sleep(100);
           Bitmap bmp;
           try{
-            bmp = newBitmap(fileName); // <- this takes time. This should be delayed
+            bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
           }catch(Throwable){
             //todo: Nem jo!!! Nem thread safe !!!  WARN("Bitmap decode error. Using errorBitmap", fileName);
             //Ez nem thread safe!!!! multithreaded modban vegtelen loopba tud kerulni.
@@ -718,7 +719,7 @@ public:
       }else{ //immediate loader
         Bitmap bmp;
         try{
-          bmp = newBitmap(fileName); // <- this takes time. This should be delayed
+          bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
         }catch(Throwable){
           WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
           bmp = errorBitmap;
@@ -795,7 +796,7 @@ if(log) "Created subtex %s:".writefln(fileName);
   }
 
   ivec2 textureSize(File file){
-    return textureSize(access(file));
+    return textureSize(access2(file));
   }
 
   /// A SubTexInfo +
@@ -875,21 +876,36 @@ if(log) "Created subtex %s:".writefln(fileName);
   }
 
 
-  DateTime[File] bitmapModifiedMap;
+  ulong[File] bitmapModified;
 
-  int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){
-    bool delayed = fDelayed & EnableMultiThreadedTextureLoading;
+  /// NOT threadsafe!!!
+  int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){  // access2 //////////////////////////
+    enum log = 0;
 
-    //delayed = false;
-    auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.track);
+    bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
+    auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);
+    auto modified = bmp.modified.toNanoSeconds;
+
+    if((bmp is null)) print("FUCK1"); else if((bmp.empty)) print("FUCK2");
+
+    if(log) LOG(bmp);
     if(auto existing = file in byFileName){
-      if(bmp.modified == bitmapModifiedMap.get(file, DateTime.init)) return *existing; //existing texture and matching modified datetime
+
+      //todo: ennel az egyenlosegjelnel 2 bug van:
+      // 1: ha ==, akkor a thumbnailnak 0 a datetime-je
+      // 2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a nearest sampling bugja tapasztalhato a folyamatosan athelyezett thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
+      if(modified == bitmapModified.get(file, 0)){
+        if(log) LOG("\33\12existing\33\7");
+        return *existing; //existing texture and matching modified datetime
+      }
+      if(log) LOG("\33\14removing\33\7");
       removeSubTex(*existing); //It's changed, must remove
     }
     //upload new texture
+    if(log) LOG("\33\16creating\33\7", modified);
     auto idx = createSubTex(bmp);
     byFileName[file] = idx;
-    bitmapModifiedMap[file] = bmp.modified;  //todo: no remove
+    bitmapModified[file] = modified;
     mustRehash = true;
     return idx;
   }
