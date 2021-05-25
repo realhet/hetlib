@@ -1222,6 +1222,40 @@ struct UpdateInterval{
 ///  Arrays                                                                  ///
 ////////////////////////////////////////////////////////////////////////////////
 
+void fetchFront(T)(ref T[] arr, T def = T.init){
+  if(arr.length){
+    auto res = arr[0];
+    arr = arr[1..$];
+    return res;
+  }else{
+    return def;
+  }
+}
+
+auto fetchFront(T)(ref T[] arr, sizediff_t count){
+  auto i = min(arr.length, count),
+       res = arr[0..i];
+  arr = arr[i, $];
+  return res;
+}
+
+auto fetchBack(T)(ref T[] arr, T def = T.init){
+  if(arr.length){
+    auto res = arr[$-1];
+    arr = arr[0..$-1];
+    return res;
+  }else{
+    return def;
+  }
+}
+
+auto fetchBack(T)(ref T[] arr, sizediff_t count){
+  auto i = max(arr.length-count, 0),
+       res = arr[i..$];
+  arr = arr[0..i];
+  return res;
+}
+
 
 //make initialized static 1d, 2d, 3d arrays
 auto makeArray(T, size_t N, T val)()
@@ -4359,9 +4393,10 @@ struct Path{
 public:
   string fullPath;
 
-  this(string path_){ dir = path_; }
-  this(string path_, string name_) { this(combinePath(path_, name_)); }
-  this(Path path_, string name_) { this(combinePath(path_.fullPath, name_)); }
+  this(string path_)                    { dir = path_; }
+  this(string path_, string name_)      { this(combinePath(path_, name_)); }
+  this(Path path_, string name_)        { this(combinePath(path_.fullPath, name_)); }
+  this(Path path_)                      { this(path_.fullPath); }
 
   string toString() const { return "Path("~fullPath.quoted('`')~")"; }
   bool isNull() const{ return fullPath==""; }
@@ -4558,10 +4593,11 @@ private static{/////////////////////////////////////////////////////////////////
   string changeFileExt(const string fn, const string ext) { return setExtension(fn, ext); }
 }
 public:
-  this(string fullName_) { fullName = fullName_; }
-  this(string path_, string name_) { fullName = combinePath(path_, name_); }
-  this(Path path_, string name_) { fullName = combinePath(path_.fullPath, name_); }
-  this(Path path_, File file_) { fullName = combinePath(path_.fullPath, file_.fullName); }
+  this(string fullName_)                { fullName = fullName_; }
+  this(string path_, string name_)      { this(combinePath(path_, name_)); }
+  this(Path path_, string name_)        { this(combinePath(path_.fullPath, name_)); }
+  this(Path path_, File file_)          { this(combinePath(path_.fullPath, file_.fullName)); }
+  this(File file)                       { this(file.fullName); }
 
   string fullName;
 
@@ -5564,6 +5600,17 @@ struct DateTime{
       auto t0 = QPS;
       foreach(i; 0..N) now;
       print("now() runtime ns", (QPS-t0)/N*1e9);
+    }
+  }
+
+  /// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
+  void actualize(){
+    if(isnan(raw)){
+      raw = current.raw;
+    }else{
+      auto a = current.raw;
+      if(a>raw) raw = a;
+          else raw = raw.nextUp;
     }
   }
 }

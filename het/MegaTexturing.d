@@ -370,7 +370,7 @@ private:
   InfoTexture infoTexture;
   MegaTexture[] megaTextures;
 
-  int[File] byFileName;
+  int[File] byFileName; //texIdx of File
 
   bool mustRehash; //todo: this is useless i think
 
@@ -516,7 +516,8 @@ private:
   }
 
   int createSubTex(Bitmap bmp){ //creates a new one, returns the idx
-    if(bmp.empty) return 0; //special null texture
+    //NO! Null texture is not allowed here!!!   if(bmp.empty) return 0; //special NULL texture
+    //this is checked by allocSpace. enforce(bmp && !bmp.empty);
 
     /+ old and bogus version
     auto idx = infoTexture.peekNextIdx;     //returns 8
@@ -771,7 +772,7 @@ if(log) "Created subtex %s:".writefln(fileName);
   }
 
   int opIndex(File fileName){
-    return access(fileName);
+    return access2(fileName);
   }
 
   SubTexInfo accessInfo(int idx){ //todo ez egy texture class-ba kell, hogy benne legyen
@@ -873,6 +874,25 @@ if(log) "Created subtex %s:".writefln(fileName);
 
   }
 
+
+  DateTime[File] bitmapModifiedMap;
+
+  int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){
+    bool delayed = fDelayed & EnableMultiThreadedTextureLoading;
+
+    //delayed = false;
+    auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.track);
+    if(auto existing = file in byFileName){
+      if(bmp.modified == bitmapModifiedMap.get(file, DateTime.init)) return *existing; //existing texture and matching modified datetime
+      removeSubTex(*existing); //It's changed, must remove
+    }
+    //upload new texture
+    auto idx = createSubTex(bmp);
+    byFileName[file] = idx;
+    bitmapModifiedMap[file] = bmp.modified;  //todo: no remove
+    mustRehash = true;
+    return idx;
+  }
 }
 
 

@@ -19,13 +19,109 @@ import turbojpeg.turbojpeg;
 //turn Direct2D linkage on/off
 version = D2D_FONT_RENDERER;
 
-alias bitmaps = Singleton!BitmapCache;
 
-class BitmapCache{
-  Bitmap access(File file){
-    return null;
+auto newBitmap2(File file, ErrorHandling errorHandling){ //newBitmap2() ////////////////////////////
+  Bitmap res;
+  final switch(errorHandling){
+    case ErrorHandling.raise :{ try{ res = newBitmap(file, true); }catch(Exception e){ throw e;                              } } break;
+    case ErrorHandling.track :{ try{ res = newBitmap(file, true); }catch(Exception e){ WARN(e.simpleMsg); res = errorBitmap; } } break;
+    case ErrorHandling.ignore:{ try{ res = newBitmap(file, true); }catch(Exception e){                    res = errorBitmap; } } break;
   }
+  res.file = file;
+  res.modified = file.modified;
+  return res;
 }
+
+// BitmapManager - bitmaps() ////////////////////////////////////////////////
+
+enum BitmapQueryCommand{ access, access_delayed, finishWork, remove, stats, details }
+
+Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
+  enum log = false;
+
+  Bitmap res;
+
+  __gshared static Bitmap[File] cache, loading;
+
+  final switch(cmd){
+
+    case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed:{
+      if(auto p = file in cache){ //already in cache
+        res = *p;
+      }else{ //new thing, must be loaded
+        bool delayed = cmd==BitmapQueryCommand.access_delayed;
+        if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
+
+        if(delayed){
+          res = new Bitmap(image2D(1, 1, clGray));
+          res.file = file;
+          cache[file] = res;
+
+          res.loading = true;
+          loading[file] = res;
+
+          static void loadOne(Bitmap bmp){
+            auto file = bmp.file; //it receives the unloaded Bitmap and monitors the .removed field too.
+            if(bmp.removed){
+              if(log) LOG("Bitmap has been removed before delayed loader started. Canceling bitmap decode operation.", bmp);
+              return;
+            }
+            auto b = newBitmap2(file, ErrorHandling.track);
+            bitmapQuery(BitmapQueryCommand.finishWork, file, ErrorHandling.raise, b);
+          }
+
+          import std.parallelism;
+          taskPool.put(task!loadOne(res));
+        }else{
+          res = newBitmap2(file, errorHandling);
+          res.loading = false;
+          cache[file] = res;
+        }
+      }
+    }break;
+
+    case BitmapQueryCommand.finishWork:{
+      loading.remove(file);
+
+      if(auto p = file in cache){
+        (*p).free; //drop the old bitmap
+        res = (*p) = bmpIn; //swap in the new bitmap
+        res.loading = false; //just to make sure
+        //if(log) LOG("Just loaded:", res);
+      }else{
+        if(log) LOG("Bitmap was removed after delayed loading has started. ", bmpIn);
+      }
+    }break;
+
+    case BitmapQueryCommand.remove:{
+      if(auto p = file in cache) (*p).removed = true;
+      loading.remove(file);
+      cache.remove(file);
+    }break;
+
+    case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
+      print("---- bitmapQuery stats: (total loading) ---- ", cache.length, loading.length);
+      if(cmd==BitmapQueryCommand.details) cache.keys.sort.each!(k => print("  ", cache[k]));
+    }break;
+  }
+
+  return res;
+}}
+
+__gshared struct bitmaps{ static :
+  auto opCall(T)(T file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track){
+    return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling);
+  }
+  auto opCall(T)(T file, ErrorHandling errorHandling=ErrorHandling.track, Flag!"delayed" delayed=No.delayed){ return opCall(file, delayed, errorHandling); }
+
+  auto opIndex(T)(T file){ return opCall(file, No.delayed, ErrorHandling.raise); }
+
+  void remove(T)(T file){ bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
+
+  void stats(){ bitmapQuery(BitmapQueryCommand.stats, File(), ErrorHandling.ignore); }
+  void details(){ bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); }
+}
+
 
 // newBitmap ////////////////////////////
 
@@ -131,6 +227,8 @@ Bitmap newBitmap(string fn, bool mustSucceed=true){
     }else{
       enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!");
     }
+  }else if(prefix=="virtual"){
+    return File(fn).deserialize!Bitmap(mustSucceed);
   }else if(prefix=="desktop"){
     return getDesktopSnapshot;
   }else if(prefix=="monitor"){
@@ -835,6 +933,9 @@ public:
 
   File file;
   DateTime modified;
+  bool loading, removed; //todo: these are managed by bitmaps(). Should be protected and readonly.
+
+  void changed(){ modified.actualize; }
 
   // todo: constraints
   // todo: fileName
@@ -874,14 +975,12 @@ public:
     type_ = type;
 
     counter++;
-    modified = now;
   }
 
   void set(E)(Image!(E, 2) im){
     setRaw(im.asArray, im.width, im.height, VectorLength!E, (ScalarType!E).stringof);
 
     counter++;
-    modified = now;
   }
 
   auto castedImage(E)(){
