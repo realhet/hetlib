@@ -161,7 +161,6 @@ public:
     bool comm, error, idle;
     double alive; //for timeout checking
   }
-
 private:
   //note: here if I use new RequestQueue, then it will be the same shared instance between all HttpQueue classes. Here I need a separate instance. Terminated and state_ is ok, but newExpression means a global constructor here!!
   shared RequestQueue inbox;
@@ -171,7 +170,7 @@ private:
   shared State state_;
 
   static void httpWorker(string name, shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared State* state_){
-    enum log = false;
+    enum log = 0;
 
     auto st = cast(State*) state_;
     while(*terminated == 0){

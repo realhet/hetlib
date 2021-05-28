@@ -381,10 +381,10 @@ string getLastErrorStr()
 }
 
 alias raiseLastError = throwLastError;
-void throwLastError(string file = __FILE__, int line = __LINE__, string fn = __FUNCTION__)
+void throwLastError(string file = __FILE__, int line = __LINE__)
 {
   auto error = getLastErrorStr;
-  enforce(error=="", "LastError: "~error, file, line, fn);
+  enforce(error=="", "LastError: "~error, file, line);
 }
 
 // Cmdline params ///////////////////////////////////////////
@@ -416,9 +416,11 @@ auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp)
 
 enum ErrorHandling { ignore, raise, track }
 
-T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__)  //__PRETTY_FUNCTION__ <- is too verbose
-{
-  if(!value) stdEnforce(0, str, file, line);
+T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__){
+  if(!value){
+    auto s = str; if(s.empty) s = " ";  //node: enforce without message:     -> object.Exception@C:\D\Projects\Karc\karc2.d(79)          <- DIDE can't interpret this.
+    stdEnforce(0, s, file, line);
+  }
   return value;
 }
 
@@ -441,11 +443,11 @@ template CustomEnforce(string prefix){
   }
 }
 
-void raise(string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__){
-  enforce(0, str, file, line, fn);
+void raise(string str="", string file = __FILE__, int line = __LINE__){
+  enforce(0, str, file, line);
 }
 
-void hrChk(HRESULT res, lazy string str = "", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__){
+void hrChk(HRESULT res, lazy string str = "", string file = __FILE__, int line = __LINE__){
   if(res==0) return;
 
   string h; switch(res){
@@ -462,7 +464,7 @@ void hrChk(HRESULT res, lazy string str = "", string file = __FILE__, int line =
     default: h = "%X".format(res);
   }
 
-  enforce(false, "HRESULT=%s %s".format(h, str), file, line, fn);
+  enforce(false, "HRESULT=%s %s".format(h, str), file, line);
 }
 
 void beep(int MBType = MB_OK){
@@ -2237,7 +2239,7 @@ bool isHexDigit(dchar ch) @safe {
       || inRange(ch, 'A', 'F');
 }
 
-bool isDigit(dchar ch) @safe { // also there is std.uni.inNumber
+bool isDigit(dchar ch) @safe { // also there is std.uni.isNumber
   return inRange(ch, '0', '9');
 }
 
@@ -4291,7 +4293,7 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
 
   __gshared static Rec[string] files;
 
-  enum log = true;
+  enum log = 0;
   Res res;
   final switch(cmd){
 
@@ -5494,7 +5496,7 @@ struct DateTime{
   this(in Date date, in Time time){
     raw = date.raw+time.raw;
   }
-  this(string str){  //todo: this sucks: no error handling at all
+  this(string str){
     if(str.canFind(' ')){
       auto parts = str.split(' '); //dateTime
       this(Date(parts[0]), Time(parts[1]));
@@ -5510,6 +5512,7 @@ struct DateTime{
         this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
       }else{
         this(Date(str), Time(0, 0)); //Date only
+        //note: this will drop the error if any
       }
     }
   }

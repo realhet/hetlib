@@ -84,8 +84,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
       loading.remove(file);
 
       if(auto p = file in cache){
-        //FUCKING NOT!!!! (*p).free; //drop the old bitmap
-        res = (*p) = bmpIn; //swap in the new bitmap
+        res = (*p) = bmpIn; //swap in the new bitmap and let the GC free up the previous one. The GC will no if there is no references left.
         res.loading = false; //just to make sure
         //if(log) LOG("Just loaded:", res);
       }else{

@@ -1529,8 +1529,8 @@ private:
     mipmapEnabled = me;
   }
 
-  void enforce(bool c, lazy string msg, string file=__FILE__, int line=__LINE__, string fv = __FUNCTION__){ //todo: enforce with template params
-    .enforce(c, "GLTexture["~name~"] "~msg, file, line, fv);
+  void enforce(bool c, lazy string msg, string file=__FILE__, int line=__LINE__){ //todo: enforce with template params
+    .enforce(c, "GLTexture["~name~"] "~msg, file, line);
   }
 
 public:
@@ -1555,9 +1555,9 @@ public:
     setup(true, type_, width_, height_, mipmapEnabled_);
   }
 
-  private void checkBinding(string file = __FILE__, int line = __LINE__, string fn = __FUNCTION__){
-    enforce(handle.handle!=0, "GLTexture not exists.", file, line, fn);
-    enforce(gl.getInteger(GL_TEXTURE_BINDING_2D)==handle.handle, "GLTexture not bound.", file, line, fn);
+  private void checkBinding(string file = __FILE__, int line = __LINE__){
+    enforce(handle.handle!=0, "GLTexture not exists.", file, line);
+    enforce(gl.getInteger(GL_TEXTURE_BINDING_2D)==handle.handle, "GLTexture not bound.", file, line);
   }
 
   int texelSize()const{ return GL_TEXELSIZE(type); }
