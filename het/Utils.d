@@ -1224,7 +1224,7 @@ struct UpdateInterval{
 ///  Arrays                                                                  ///
 ////////////////////////////////////////////////////////////////////////////////
 
-void fetchFront(T)(ref T[] arr, T def = T.init){
+auto fetchFront(T)(ref T[] arr, T def = T.init){
   if(arr.length){
     auto res = arr[0];
     arr = arr[1..$];
@@ -1282,26 +1282,42 @@ auto makeArray3(T, size_t N, size_t M, size_t O, T val)()
 }
 
 
-// safely get a copy of and array element
-T get(T)(T[] arr, size_t idx, T def = T.init){
-  return idx<arr.length ? arr[idx]
-                        : def;
+//safe assoc array lookup
+
+//todo: DIDE fails when opening object.d. It should know that's a system module.
+
+inout(V) get(K, V)(inout(V[K]) aa, K key){
+  return object.get(aa, key, V.init); /+this is object.get()+/
 }
 
+//safe array access
+
+inout(V) get(V, I)(inout(V[]) arr, I idx, lazy V def = V.init) if(isIntegral!I){
+  static if(isSigned!I) return idx<arr.length && idx>=0 ? arr[idx] : def;
+                   else return idx<arr.length           ? arr[idx] : def;
+}
+
+
+/+todo: unittest    auto aa = ["cica": 5, "kutya": 10];
+    writeln( aa.get("cica") );
+    writeln( aa.get("haha") );
+    writeln( aa.get("hehe",  99) );+/
+
+
 // safely get an element ptr
-T* getp(T)(T[] arr, size_t idx, T* def = null){
-  return idx<arr.length ? &arr[idx]
-                        : def;
+auto getPtr(V, I)(inout(V[]) arr, I idx, lazy V* def = null) if(isIntegral!I){
+  static if(isSigned!I) return idx<arr.length && idx>=0 ? &arr[idx] : def;
+                   else return idx<arr.length           ? &arr[idx] : def;
 }
 
 // safely access and element, putting default values in front of it when needed
-ref T access(T)(ref T[] arr, size_t idx, T def = T.init){
+ref V access(V)(ref V[] arr, size_t idx, lazy V def = V.init) if(isIntegral!I){
   while(idx>=arr.length) arr ~= def; //optional extend
   return arr[idx];
 }
 
-// safely set an array element
-void set(T)(ref T[] arr, size_t idx, T val, T def = T.init){
+// safely set an array element, extending with extra elements if idx is too high
+void set(V)(ref V[] arr, size_t idx, V val, lazy V def = T.init){
   arr.access(idx, def) = val;
 }
 
@@ -1310,11 +1326,13 @@ void clear(T)(ref T[] arr)        { arr.length = 0; }
 bool addIfCan(T)(ref T[] arr, in T item) { if(!arr.canFind(item)){ arr ~= item; return true; }else return false; }
 bool addIfCan(T)(ref T[] arr, in T[] items) { bool res; foreach(const item; items) if(arr.addIfCan(item)) res = true; return res; }
 
-T popFirst(T)(ref T[] arr){ auto res = arr[0  ]; arr = arr[1..$  ]; return res; }
-T popLast (T)(ref T[] arr){ auto res = arr[$-1]; arr = arr[0..$-1]; return res; }
+deprecated("fetchFirst, not popFirst!"){
+  T popFirst(T)(ref T[] arr){ auto res = arr[0  ]; arr = arr[1..$  ]; return res; }
+  T popLast (T)(ref T[] arr){ auto res = arr[$-1]; arr = arr[0..$-1]; return res; }
 
-T popFirst(T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popFirst(arr); }
-T popLast (T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popLast (arr); }
+  T popFirst(T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popFirst(arr); }
+  T popLast (T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popLast (arr); }
+}
 
 /// My version of associativeArray.update: Makes sur the thing is exists and lets it to modify. Returns true if already found.
 bool findAdd(K, V)(ref V[K] aa, in K key, void delegate(ref V) update){
@@ -6015,6 +6033,9 @@ struct UDA{}
   struct STORED{}
   struct HEX{}
   struct BASE64{}
+
+  // het.ui
+  struct UI{}    // similar to @Composable.  It alters the UI's state
 
   //het.opengl
   struct UNIFORM{ string name=""; } //marks a variable as gl.Shader attribute

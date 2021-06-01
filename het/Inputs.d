@@ -292,12 +292,54 @@ public:
   }
 
   InputEntry opIndex(string name){
+    if(name=="") return nullEntry;
     auto e = name in entries;
+    if(e is null) e = translateKey(name) in entries; //try to translate
     return e ? *e : nullEntry;
   }
 
   InputEntry opDispatch(string name)(){
     return opIndex(name);
+  }
+
+  /// Tries to interpret a key's name. Searching the closest in inputs.entries.
+  string translateKey(string key){
+    //empty string is empty
+    if(key=="") return "";
+    //can find in inputs
+    if(key in entries) return key;
+
+    //try to find it in a dynamic dictionary
+    static string[string] dict;
+    if(auto p = key in dict) return *p;
+
+    //compress words to letters
+    auto words = key.split(' ');
+    foreach(ref word; words){
+      if(word.among!sameText("Left", "Right", "Middle", "Mid", "Mouse", "Click", "Button", "Btn", "Wheel")) word = word[0..1].uc;
+      else if(word.sameText("Control")) word = "Ctrl";
+    }
+
+    //join words and try to translate
+    string trans = words.join;
+    static string[string] wdict;
+    if(wdict is null) wdict = ["LMC": "LMB",  "MMC": "MMB",  "RMC": "RMB",  "M3": "MMB",  "M4": "MB4",  "M5": "MB5",  "MWDown": "MWDn"];
+    if(auto p = trans in wdict) trans = *p;
+
+    //fint the translated result in inputs.entries
+    string found;
+    if(trans in entries){ //case sens
+      found = trans;
+    }else{ //case insens
+      auto keys = entries.keys;
+      auto i = keys.map!lc.countUntil(trans.lc);
+      if(i>=0) found = keys[i];
+    }
+    if(found=="") ERR(format!"Can't find transformed key in inputs.entries: %s -> %s"(key.quoted, trans.quoted));
+
+    //save the transformed name
+    dict[key] = found;
+    return found;
   }
 
   //query functions for key combo access
@@ -361,8 +403,10 @@ private:
   ubyte[256] keys;
   InputEntry[256] emap;
 
-  InputEntry eWin; //there is no Win = LWin | RWin key on the map, so emulate it.
-  InputEntry eCapsLockState, eNumLockState, eScrLockState; //toggled states
+  InputEntry
+    eWin,  //there is no Win = LWin | RWin key on the map, so emulate it.
+    eCapsLockState, eNumLockState, eScrLockState, //toggled states
+    eMWUp, eMWDn; //Mouse Wheel up/down as buttons reacting to movement
 
   void add(int vk, string name){
     if(emap[vk]) throw new Exception("KeyboardInputHandler.add("~name~") Duplicated vk: "~text(vk));
@@ -380,11 +424,13 @@ public:
     special(eCapsLockState, "CapsLockState", true);
     special(eNumLockState , "NumLockState" , true);
     special(eScrLockState , "ScrLockState" , true);
+    special(eMWUp         , "MWUp");
+    special(eMWDn         , "MWDn");
 
     //Top row
     add(VK_ESCAPE, "Esc");
     foreach(i; 0..24) add(VK_F1+i, "F"~text(i+1));
-    add(VK_SNAPSHOT, "PrnScr");
+    add(VK_SNAPSHOT, "PrtScn");
     add(VK_SCROLL, "ScrLock");
     add(VK_PAUSE, "Pause");
 
@@ -426,7 +472,7 @@ public:
 
     //Mouse
     add(VK_LBUTTON , "LMB"); add(VK_RBUTTON , "RMB");  add(VK_MBUTTON, "MMB");
-    add(VK_XBUTTON1, "XB1"); add(VK_XBUTTON2, "XB2"); //back, fwd on mouse
+    add(VK_XBUTTON1, "MB4"/+"XB1"+/); add(VK_XBUTTON2, "MB5"/+"XB2"+/); //back, fwd buttons on mouse
 
     //Multimedia
     add(7                       , "XBox");
@@ -505,9 +551,12 @@ public:
 
     //manual things
     eWin.value = max(emap[VK_LWIN].value, emap[VK_RWIN].value); //Win = LWin || RWin
+
     eCapsLockState.value = keys[VK_CAPITAL]&1;
     eNumLockState .value = keys[VK_NUMLOCK]&1;
     eScrLockState .value = keys[VK_SCROLL ]&1;
+
+    //eMWUp and eMWDn is updated from the mouse handler
 
 //    foreach(int i; 0..256) if(keys[i]&0x80) write(" ", i); writeln;
   }
@@ -521,7 +570,7 @@ public:
 
 class MouseInputHandler: InputHandlerBase {
 private:
-  InputEntry mx, my, mw, mxr, myr;
+  InputEntry mx, my, mw, mxr, myr, mwUp, mwDn;
   static float wheelDeltaAccum = 0;
 public:
   this(){
@@ -555,9 +604,13 @@ public:
       }
     }
     mw.value += wheelDeltaAccum;  wheelDeltaAccum = 0;
+
+    //mouseWheel up/down as buttons
+    if(mwUp is null){ mwUp = inputs["MWUp"]; mwDn = inputs["MWDn"]; }
+    mwUp.value = mw.delta>0 ? 1 : 0;
+    mwDn.value = mw.delta<0 ? 1 : 0;
   }
 }
-
 
 // DirectInput mouse & gamepad ///////////////////////////////////////////////////
 

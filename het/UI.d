@@ -367,7 +367,7 @@ struct im{ static:
               HintDetails_sec   = 2.5,
               HintRelease_sec   = 1  ;
 
-  private struct HintRec{
+  struct HintRec{
     .Container owner;
     bounds2 bounds;
     string markup, markupDetails; //todo: support delegates too
@@ -616,7 +616,7 @@ struct im{ static:
 
   //Parameter structs ///////////////////////////////////
   //deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-  private immutable prepareId = q{ auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); };
+  immutable prepareId = q{ auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); };
 
   struct enable  { bool val;  private enum M = q{ auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;   static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled   = enabled && a.val; }; }
   struct selected{ bool val;  private enum M = q{ auto _selected = false;                                        static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected = a.val;            }; }

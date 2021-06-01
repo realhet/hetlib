@@ -140,6 +140,7 @@ struct HitTestManager{
     SrcId id;            //in the next frame this must be the isSame
     bounds2 hitBounds;   //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
     vec2 localPos;       //relative to outerPos
+    bool clickable;
   }
 
   //act frame
@@ -168,7 +169,8 @@ struct HitTestManager{
 
   SrcId capturedId, clickedId, pressedId, releasedId;
   private void updateMouseCapture(ref HitTestRec[] hits){
-    const topId = hits.get(hits.length-1).id;
+    //const topClickableId = hits.get(hits.length-1).id;
+    const topId = hits.retro.filter!(h => h.clickable).take(1).array.get(0).id;
 
     //if LMB was just pressed, then it will be the captured control
     //if LMB released, and the captured id is also hovered, the it is clicked.
@@ -197,10 +199,10 @@ struct HitTestManager{
     updateMouseCapture(lastHitStack);
   }
 
-  void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos){//must be called from each cell that needs mouse hit test
+  void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos, in bool clickable){//must be called from each cell that needs mouse hit test
     assert(id, "Null Id is illegal");
     assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text);
-    hitStack ~= HitTestRec(id, hitBounds, localPos);
+    hitStack ~= HitTestRec(id, hitBounds, localPos, clickable);
 
   }
 
@@ -907,7 +909,7 @@ class Cell{ // Cell ////////////////////////////////////
     auto hitBnd = getHitBounds + ofs;
     if(hitBnd.contains!"[)"(mouse)){
       if(auto container = cast(Container)this)
-        hitTestManager.addHitRect(container.id, hitBnd, mouse-outerPos);
+        hitTestManager.addHitRect(container.id, hitBnd, mouse-outerPos, container.flags.clickable);
       return true;
     }else{
       return false;
@@ -1933,12 +1935,13 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b____0_0_0_0_0_0_00_00_0_1_0_1_0_0_0_0_0_0_0_001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b____________1____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
     VAlign        , "vAlign"            , 2,
     YAlign        , "yAlign"            , 3,
+
     bool          , "dontHideSpaces"    , 1,  //useful for active edit mode
     bool          , "canSelect"         , 1,
     bool          , "focused"           , 1,  //maintained by system, not by user
@@ -1947,21 +1950,26 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
     bool          , "_hasOverlayDrawing", 1,
     bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
+
     bool          , "rowElasticTabs"    , 1, //Row will do elastic tabs inside its own WrappedLines.
     uint          , "targetSurface"     , 1, // 0: zoomable view, 1: GUI screen
     bool          , "_debug"            , 1, // the container can be marked, for debugging
     bool          , "btnRowLines"       , 1, // draw thin, dark lines between the buttons of a btnRow
-    bool          , "_measured"         , 1, // used to tell if a top level container was measured already
-    ScrollState   , "hScrollState"      , 2,
-    ScrollState   , "vScrollState"      , 2,
     bool          , "autoWidth"         , 1, // kinda readonly: It's set by Container in measure to outerSize!=0
     bool          , "autoHeight"        , 1, // later everything else can read it.
     bool          , "hasHScrollBar"     , 1, // system manages this, not the user.
     bool          , "hasVScrollBar"     , 1,
+
+    bool          , "_measured"         , 1, // used to tell if a top level container was measured already
     bool          , "saveVisibleBounds" , 1, // draw() will save the visible innerBounds under the name id.appendIdx("visibleBounds");
     bool          , "_measureOnlyOnce"  , 1,
     bool          , "acceptEditorKeys"  , 1, // accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.
+    ScrollState   , "hScrollState"      , 2,
+    ScrollState   , "vScrollState"      , 2,
     // ------------------------ 32bits ---------------------------------------
+    bool          , "clickable"         , 1, // hittest will not check this as clicked. It checks the parent instead.
+
+    int           , "_dummy"            ,31,
   ));
 }
 

@@ -36,7 +36,18 @@ auto newBitmap2(File file, ErrorHandling errorHandling){ //newBitmap2() ////////
 
 enum BitmapQueryCommand{ access, access_delayed, finishWork, remove, stats, details }
 
-Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
+Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){
+  const hasBitmapTransformation = file.fullName.canFind(`?thumb`);
+
+  if(cmd.among(BitmapQueryCommand.access, BitmapQueryCommand.access_delayed) && hasBitmapTransformation){
+    LOG("Bitmap has transformation:", file, cmd);
+    //return null;
+  }
+
+  return bitmapQuery_inner(cmd, file, errorHandling, bmpIn);
+}
+
+Bitmap bitmapQuery_inner(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
   enum log = false;
 
   Bitmap res;
@@ -57,7 +68,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
           res.file = file;
           cache[file] = res;
 
-          res.loading = true;
+          res.loading = true; //just to make sure
           loading[file] = res;
 
           static void loadOne(Bitmap bmp){
@@ -127,8 +138,18 @@ __gshared struct bitmaps{ static :
 //todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
 auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
 
-Bitmap errorBitmap(){ return new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF))); }
-Bitmap pendingBitmap(){ return new Bitmap(image2D(1, 1, RGBA(0xFFC0C0C0))); }
+Bitmap errorBitmap(string cause=""){
+  auto bmp = new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF)));
+  bmp.modified = now;
+  bmp.error = "Error" ~ (cause.length ? ": "~cause : "");
+  return bmp;
+}
+
+Bitmap pendingBitmap(){
+  auto bmp = new Bitmap(image2D(1, 1, RGBA(0xFFC0C0C0)));
+  bmp.modified = now;
+  return bmp;
+}
 
 Bitmap newBitmap_internal(in ubyte[] data, bool mustSucceed=true){
   return data.deserialize!Bitmap(mustSucceed);
@@ -237,8 +258,6 @@ Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
     uint color = (line.to!int)>>1;
     color = color | (255-color)<<8;
     return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color)));
-
-
   }else if(prefix=="icon"){
     /+
     auto getAssociatedIcon(string fn){
@@ -935,6 +954,8 @@ public:
   DateTime modified;
   bool loading, removed; //todo: these are managed by bitmaps(). Should be protected and readonly.
 
+  string error;
+
   void changed(){ modified.actualize; }
 
   // todo: constraints
@@ -1193,7 +1214,9 @@ class Bitmap {
 // Bitmap deserialize ///////////////////////////////////
 
 Bitmap deserialize(T : Bitmap)(in File file, bool mustSucceed=false){
-  return deserialize!T(file.read(mustSucceed), mustSucceed);
+  auto b = deserialize!T(file.read(mustSucceed), mustSucceed);
+  if(b) b.modified = file.modified;
+  return b;
 }
 
 Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
@@ -1203,6 +1226,7 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
     enforce(info.valid, "Invalid bitmap format");
 
     bmp = new Bitmap;
+    bmp.modified = now;
     if(info.format=="webp"){
 
       switch(info.chn){
@@ -1347,7 +1371,10 @@ auto getSnapshot(in ibounds2 bnd){
   auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.free;
   auto dc = GetDC(null); scope(exit) ReleaseDC(null, dc);
   BitBlt(gBmp.hdcMem, 0, 0, bnd.width, bnd.height, dc, bnd.left, bnd.top, SRCCOPY);
-  return new Bitmap(gBmp.toImage);
+
+  auto bmp = new Bitmap(gBmp.toImage);
+  bmp.modified = now;
+  return bmp;
 }
 
 auto getDesktopSnapshot(){ return getSnapshot(getDesktopBounds); }
