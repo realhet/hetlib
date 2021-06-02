@@ -20,169 +20,86 @@ import turbojpeg.turbojpeg;
 version = D2D_FONT_RENDERER;
 
 
-auto newBitmap2(File file, ErrorHandling errorHandling){ //newBitmap2() ////////////////////////////
-  Bitmap res;
-  final switch(errorHandling){
-    case ErrorHandling.raise :{ try{ res = newBitmap_internal(file, true); }catch(Exception e){ throw e;                              } } break;
-    case ErrorHandling.track :{ try{ res = newBitmap_internal(file, true); }catch(Exception e){ WARN(e.simpleMsg); res = errorBitmap; } } break;
-    case ErrorHandling.ignore:{ try{ res = newBitmap_internal(file, true); }catch(Exception e){                    res = errorBitmap; } } break;
+struct BitmapTransformation{ // BitmapTransformation (thumb) ////////////////////////////////////
+  enum thumbKeyword = "?thumb";
+  // ?thumb32w    specifies maximum width
+  // ?thumb32h    specifies maximum height
+  // ?thumb32wh   specifies maximum width and maximum height
+  // ?thumb32     ditto
+  //todo: ?thumb32x24  different maxwidth and maxheight
+  //todo: keep aspect or not
+  //todo: ?thumb=32w is not possible because processMarkupCommandLine() uses the = pro parameters and it can't passed into this filename.
+  //todo: cache decoded full size image
+  //todo: turboJpeg small size extract
+
+  File originalFile, transformedFile;
+  int thumbMaxSize;
+  bool maxWidthSpecified, maxHeightSpecified;
+
+  bool isThumb() const{ return thumbMaxSize>0; }
+
+  this(File file){
+
+    transformedFile = file;
+    auto s = file.fullName;
+
+    //try to decode thumbnail params
+    string thumbDef, orig;
+    if(file.fullName.split2(thumbKeyword, orig, thumbDef, false/+must not strip!+/)){
+      originalFile = File(orig);
+
+      //get width/height posfixes
+      while(1){
+        if(thumbDef.endsWith("w")){ maxWidthSpecified  = true; thumbDef.popBack; continue; }
+        if(thumbDef.endsWith("h")){ maxHeightSpecified = true; thumbDef.popBack; continue; }
+        break;
+      }
+      const maxAllSpecified = maxWidthSpecified == maxHeightSpecified;
+      if(maxAllSpecified)
+        maxWidthSpecified = maxHeightSpecified = true;
+
+      ignoreExceptions({ thumbMaxSize = thumbDef.to!int; });
+    }
   }
-  res.file = file;
-  res.modified = file.modified;
-  return res;
+
+  alias needTransform this;
+  bool needTransform(){
+    return isThumb;
+  }
+
+  Bitmap transform(Bitmap orig){
+    if(!orig || !orig.valid) return newErrorBitmap("Invalid source for BitmapTransform.");
+
+    auto doIt(){
+      if(isThumb){
+        float minScale = 1;
+        if(maxWidthSpecified ) minScale.minimize(float(thumbMaxSize) / orig.size.x);
+        if(maxHeightSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.y);
+
+        if(minScale < 1){
+          ivec2 newSize = round(orig.size*minScale);
+          //print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
+          return orig.resize_nearest(newSize); //todo: mipmapped bilinear/trilinear
+        }
+      }
+
+      return orig.dup;
+    }
+
+    // set filename and copy the modified time
+    auto res = doIt;
+    res.file = transformedFile;
+    res.modified = orig.modified;
+    return res;
+  }
+
 }
 
 // BitmapManager - bitmaps() ////////////////////////////////////////////////
 
-enum BitmapQueryCommand{ access, access_delayed, finishWork, remove, stats, details }
+enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformation, remove, stats, details }
 
-Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){
-  const hasBitmapTransformation = file.fullName.canFind(`?thumb`);
-
-  if(cmd.among(BitmapQueryCommand.access, BitmapQueryCommand.access_delayed) && hasBitmapTransformation){
-    LOG("Bitmap has transformation:", file, cmd);
-    //return null;
-  }
-
-  return bitmapQuery_inner(cmd, file, errorHandling, bmpIn);
-}
-
-Bitmap bitmapQuery_inner(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
-  enum log = false;
-
-  Bitmap res;
-
-  __gshared static Bitmap[File] cache, loading;
-
-  final switch(cmd){
-
-    case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed:{
-      if(auto p = file in cache){ //already in cache
-        res = *p;
-      }else{ //new thing, must be loaded
-        bool delayed = cmd==BitmapQueryCommand.access_delayed;
-        if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
-
-        if(delayed){
-          res = pendingBitmap;
-          res.file = file;
-          cache[file] = res;
-
-          res.loading = true; //just to make sure
-          loading[file] = res;
-
-          static void loadOne(Bitmap bmp){
-            auto file = bmp.file; //it receives the unloaded Bitmap and monitors the .removed field too.
-            if(bmp.removed){
-              if(log) LOG("Bitmap has been removed before delayed loader started. Canceling bitmap decode operation.", bmp);
-              return;
-            }
-            auto b = newBitmap2(file, ErrorHandling.track);
-            bitmapQuery(BitmapQueryCommand.finishWork, file, ErrorHandling.raise, b);
-          }
-
-          import std.parallelism;
-          taskPool.put(task!loadOne(res));
-        }else{
-          res = newBitmap2(file, errorHandling);
-          res.loading = false;
-          cache[file] = res;
-        }
-      }
-    }break;
-
-    case BitmapQueryCommand.finishWork:{
-      loading.remove(file);
-
-      if(auto p = file in cache){
-        res = (*p) = bmpIn; //swap in the new bitmap and let the GC free up the previous one. The GC will no if there is no references left.
-        res.loading = false; //just to make sure
-        //if(log) LOG("Just loaded:", res);
-      }else{
-        if(log) LOG("Bitmap was removed after delayed loading has started. ", bmpIn);
-      }
-    }break;
-
-    case BitmapQueryCommand.remove:{
-      if(auto p = file in cache) (*p).removed = true;
-      loading.remove(file);
-      cache.remove(file);
-    }break;
-
-    case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
-      print("---- bitmapQuery stats: (total loading) ---- ", cache.length, loading.length);
-      if(cmd==BitmapQueryCommand.details) cache.keys.sort.each!(k => print("  ", cache[k]));
-    }break;
-  }
-
-  return res;
-}}
-
-__gshared struct bitmaps{ static :
-  auto opCall(T)(T file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track){
-    return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling);
-  }
-  auto opCall(T)(T file, ErrorHandling errorHandling=ErrorHandling.track, Flag!"delayed" delayed=No.delayed){ return opCall(file, delayed, errorHandling); }
-
-  auto opIndex(T)(T file){ return opCall(file, No.delayed, ErrorHandling.raise); }
-
-  void remove(T)(T file){ bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
-
-  void stats(){ bitmapQuery(BitmapQueryCommand.stats, File(), ErrorHandling.ignore); }
-  void details(){ bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); }
-}
-
-
-// newBitmap ////////////////////////////
-
-//todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
-auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
-
-Bitmap errorBitmap(string cause=""){
-  auto bmp = new Bitmap(image2D(1, 1, RGBA(0xFFFF00FF)));
-  bmp.modified = now;
-  bmp.error = "Error" ~ (cause.length ? ": "~cause : "");
-  return bmp;
-}
-
-Bitmap pendingBitmap(){
-  auto bmp = new Bitmap(image2D(1, 1, RGBA(0xFFC0C0C0)));
-  bmp.modified = now;
-  return bmp;
-}
-
-Bitmap newBitmap_internal(in ubyte[] data, bool mustSucceed=true){
-  return data.deserialize!Bitmap(mustSucceed);
-}
-
-Bitmap newBitmap_internal(in File file, bool mustSucceed=true){ //todo: what if cant load the bitmap? raise, null or replacement image?
-  return newBitmap_internal(file.fullName, mustSucceed);
-}
-
-private __gshared Bitmap function(string)[string] customBitmapLoaders;
-
-void registerCustomBitmapLoader(string prefix, Bitmap function(string) loader)
-in(prefix.length>=2, "invalid prefix string")
-{
-  prefix = prefix.lc;
-  enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
-  customBitmapLoaders[prefix] = loader;
-}
-
-Bitmap colorMapBitmapLoader(string name){
-  enforce(name in colorMaps);
-  auto width = 128,
-       raw = colorMaps[name].toArray!RGBA(width),
-       img = image2D(width, 1, raw),
-       bmp = new Bitmap(img);
-  return bmp;
-}
-
-Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
-  //todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
-  //      when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
-
-
+/+
   { //handle thumbnails
     immutable thumbStr = "?thumb";
     // ?thumb32w    specifies maximum width
@@ -229,6 +146,278 @@ Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
       return orig; //todo: same size as the original... stored 2x in the texture. Not effective.
     }
   }
++/
+
+
+Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
+  import std.parallelism;
+  enum log = false;
+
+  Bitmap res;
+
+  __gshared static Bitmap[File] cache, loading;
+  __gshared static BitmapTransformation[File] transformationQueue;
+
+  /// Allocate new file in cache , mark it as "loading"
+  static auto startLoading(File file){
+    auto b = newLoadingBitmap;
+    b.file = file;
+    cache[file] = b;
+    loading[file] = b;
+    return b;
+  }
+
+  /// Allocate new file in cache and launch the loader thread
+  static auto startDelayedLoad(File file){
+    auto bmp = startLoading(file);
+
+    static void worker_load(Bitmap bmp/+"loading" bitmap that is holding filename to load+/){
+      auto file = bmp.file; //it receives the original unloaded Bitmap and monitors the .removed field too.
+      if(bmp.removed){ if(log) LOG("Bitmap has been removed before delayed loader. Canceling operation.", bmp); return; }
+      auto newBmp = newBitmap(file, ErrorHandling.track);
+      bitmapQuery(BitmapQueryCommand.finishWork, file, ErrorHandling.track, newBmp);
+    }
+
+    taskPool.put(task!worker_load(bmp));
+    return bmp; //returns a "loading" placeholder bitmap
+  }
+
+  /// Allocate new transformed file in cache and launch the transformer thread
+  static auto startDelayedTransformation(Bitmap originalBmp, Bitmap transformedBmp, BitmapTransformation tr){
+
+    static void worker_transform(Bitmap originalBmp, Bitmap transformedBmp, BitmapTransformation tr){
+      if(transformedBmp.removed){ if(log) LOG("Bitmap has been removed before delayed transformation. Canceling operation.", transformedBmp); return; }
+      ignoreExceptions({
+        auto newBmp = tr.transform(originalBmp);
+        //LOG(originalBmp, transformedBmp, newBmp, tr);
+        bitmapQuery(BitmapQueryCommand.finishTransformation, tr.transformedFile, ErrorHandling.track, newBmp);
+      });
+    }
+
+    taskPool.put(task!worker_transform(originalBmp, transformedBmp, tr));
+  }
+
+  final switch(cmd){
+
+    case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed:{
+
+      if(bmpIn){ //just put the image into the cache
+
+        res = bmpIn;
+        cache[file] = res;
+
+      }else{ //try to load the file from the fileSystem
+
+        if(auto p = file in cache){ //already in cache
+          res = *p;
+        }else{ //new thing, must be loaded
+          bool delayed = cmd==BitmapQueryCommand.access_delayed;
+          if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
+
+          auto tr = file.BitmapTransformation;
+
+          if(delayed){ // delayed load
+
+            if(tr){
+              res = startLoading(tr.transformedFile);
+              if(auto originalBmp = tr.originalFile in cache){
+                startDelayedTransformation(*originalBmp, res, tr);
+              }else{
+                transformationQueue[tr.originalFile] = tr;
+                startDelayedLoad(tr.originalFile);
+              }
+            }else{
+              res = startDelayedLoad(file);
+            }
+          }else{ //immediate load
+            if(tr){
+              //get the original file
+              //note: it doesn't look at delayed caches: loaded[] and transformQueue[]. Those will complete later if there are any.
+              Bitmap orig;
+              if(auto o = tr.originalFile in cache){
+                orig = *o;
+              }else{
+                orig = newBitmap(tr.originalFile, errorHandling);
+                cache[tr.originalFile] = orig;
+              }
+
+              //and transform it
+              assert(orig !is null);
+              res = tr.transform(orig);
+              res.file = file; //set the correct name
+            }else{
+              res = newBitmap(file, errorHandling);
+            }
+            cache[file] = res;
+          }
+        }
+      }//endif bmpIn
+    }break;
+
+    case BitmapQueryCommand.finishWork, BitmapQueryCommand.finishTransformation:{
+      loading.remove(file);
+
+      if(auto p = file in cache){
+        *p = bmpIn; //swap in the new bitmap and let the GC free up the previous one. The GC will know if there is no references left.
+
+        //optionally start a transformation
+        if(cmd==BitmapQueryCommand.finishWork) if(auto tr = file in transformationQueue){
+          startDelayedTransformation(bmpIn, cache[(*tr).transformedFile], *tr);
+          transformationQueue.remove(file);
+        }
+      }else{
+        if(log) LOG("Bitmap was removed after delayed ", cmd.text.withoutStarting("finish").lc, " has started. ", bmpIn);
+      }
+    }break;
+
+    case BitmapQueryCommand.remove:{
+      if(auto p = file in cache) (*p).removed = true;
+      loading.remove(file);
+      transformationQueue.remove(file);
+      cache.remove(file);
+    }break;
+
+    case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
+      print("---- bitmapQuery stats: (cache, loading, transformationQueue) ---- ", cache.length, loading.length, transformationQueue.length);
+      if(cmd==BitmapQueryCommand.details) cache.keys.sort.each!(k => print("  ", cache[k]));
+    }break;
+  }
+
+  return res;
+}}
+
+__gshared struct bitmaps{ static : // bitmaps() ///////////////////////////////////////////
+  auto opCall(T)(T file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track){
+    return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling);
+  }
+  auto opCall(T)(T file, ErrorHandling errorHandling, Flag!"delayed" delayed=No.delayed){ return opCall(file, delayed, errorHandling); }
+
+  auto opIndex(T)(T file)       { return opCall(file, No.delayed, ErrorHandling.raise); }
+
+  auto opIndexAssign(T)(T file, Bitmap bmp) { enforce(bmp && bmp.valid); return opCall(file, No.delayed, ErrorHandling.raise, bmp); }
+
+  auto opIndexAssign(T, I)(T file, I img) if(isImage2D!I){ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); }
+
+  void remove (T)(T file)       { bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
+
+  void stats()                  { bitmapQuery(BitmapQueryCommand.stats, File(), ErrorHandling.ignore); }
+  void details()                { bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); }
+}
+
+void testBitmaps(){
+  print("\nStarting bitmap() tests.----------------------------------------");
+
+  void doIt(string title, Bitmap delegate() fun){
+    writeln("bitmap() test: \33\16"~title~"\33\7");
+    const t0 = QPS;
+    Bitmap b = fun();
+    if(b.loading){
+      print("  first access    :", b);
+      while(b.loading){
+        sleep(10);
+        b = fun();
+      }
+      print("  loaded          :", b);
+    }else{
+      print("  immediate access:", b);
+    }
+    print("  time              :\33\12", (QPS-t0)*1e3, "ms\33\7");
+  }
+
+  auto file  = File(`c:\dl\BaiLing0.jpg`);
+  auto thumb = File(file.fullName~"?thumb64");
+  enforce(file.exists);
+
+  doIt("immediate"                    , ()=>bitmaps(file, No.delayed));  bitmaps.remove(file);
+  doIt("immediate again, after remove", ()=>bitmaps(file, No.delayed));  bitmaps.remove(file);
+  doIt("delayed first (cache miss)"   , ()=>bitmaps(file, Yes.delayed));
+  doIt("delayed again (cache hit)"    , ()=>bitmaps(file, Yes.delayed));  bitmaps.remove(file);
+  doIt("delayed again (removed  )"    , ()=>bitmaps(file, Yes.delayed));  bitmaps.remove(file);
+
+  print("Thumb immediate tests:");
+  bitmaps.remove(file); bitmaps.remove(thumb);
+  doIt("immediate originalFile (miss)", ()=>bitmaps(file , No.delayed));
+  doIt("immediate thumb"              , ()=>bitmaps(thumb, No.delayed));   //bitmaps(thumb).saveTo(`c:\dl\thumb.bmp`);   { auto b = new Bitmap; b.loadFrom(`c:\dl\thumb.bmp`); b.print; }
+  bitmaps.remove(file); bitmaps.remove(thumb);
+  doIt("immediate thumb"              , ()=>bitmaps(thumb, No.delayed));
+  doIt("immediate originalFile (hit)" , ()=>bitmaps(file , No.delayed));
+
+  print("Thumb delayed tests:");
+  bitmaps.remove(file); bitmaps.remove(thumb);
+  doIt("delayed originalFile (miss)", ()=>bitmaps(file , Yes.delayed));
+  doIt("delayed thumb"              , ()=>bitmaps(thumb, Yes.delayed));
+  bitmaps.remove(file); bitmaps.remove(thumb);
+  doIt("delayed thumb"              , ()=>bitmaps(thumb, Yes.delayed));
+  doIt("delayed originalFile (hit)" , ()=>bitmaps(file , Yes.delayed));
+
+  print("\nBitmap cache statistics");
+  bitmaps.details;
+  print("All bitmap() tests done.----------------------------------------\n");
+  readln;
+}
+
+
+// CustomBitmapLoader ///////////////////////////////////////////////////
+
+private __gshared Bitmap function(string)[string] customBitmapLoaders;
+
+void registerCustomBitmapLoader(string prefix, Bitmap function(string) loader) //todo: make it threadsafe
+in(prefix.length>=2, "invalid prefix string")
+{
+  prefix = prefix.lc;
+  enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
+  customBitmapLoaders[prefix] = loader;
+}
+
+Bitmap colorMapBitmapLoader(string name){
+  enforce(name in colorMaps);
+  auto width = 128,
+       raw = colorMaps[name].toArray!RGBA(width),
+       img = image2D(width, 1, raw),
+       bmp = new Bitmap(img);
+  return bmp;
+}
+
+// newBitmap ////////////////////////////
+
+//Load a bitmap immediately with optional error handling. No caching, no thumbnail/transformations.
+auto newBitmap(File file, ErrorHandling errorHandling){ //newBitmap() ////////////////////////////
+  Bitmap res;
+  final switch(errorHandling){
+    case ErrorHandling.raise :{ try{ res = newBitmap_internal(file, true); }catch(Exception e){ throw e;                                              } } break;
+    case ErrorHandling.track :{ try{ res = newBitmap_internal(file, true); }catch(Exception e){ WARN(e.simpleMsg); res = newErrorBitmap(e.simpleMsg); } } break;
+    case ErrorHandling.ignore:{ try{ res = newBitmap_internal(file, true); }catch(Exception e){                    res = newErrorBitmap(e.simpleMsg); } } break;
+  }
+  res.file = file;
+  res.modified = file.modified;
+  return res;
+}
+
+//todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
+auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
+
+private Bitmap newSpecialBitmap(string error=""){
+  const loading = error=="loading";
+  auto bmp = new Bitmap(image2D(1, 1, loading ? RGBA(0xFFC0C0C0) : RGBA(0xFFFF00FF)));
+  bmp.changed;
+  if(loading){
+    bmp.loading = true;
+  }else{
+    if(error) bmp.error = error;
+  }
+  return bmp;
+}
+
+Bitmap newErrorBitmap(string cause){ return newSpecialBitmap(cause); }
+private Bitmap newLoadingBitmap()          { return newSpecialBitmap("loading"); }
+
+private Bitmap newBitmap_internal(in ubyte[] data, bool mustSucceed=true){ return data.deserialize!Bitmap(mustSucceed); }
+
+private Bitmap newBitmap_internal(in File file, bool mustSucceed=true){ return newBitmap_internal(file.fullName, mustSucceed); }
+
+Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
+  //todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
+  //      when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
 
   // split prefix:\line
   auto prefix = fn.until!(not!isAlphaNum).text;
@@ -953,8 +1142,25 @@ public:
   File file;
   DateTime modified;
   bool loading, removed; //todo: these are managed by bitmaps(). Should be protected and readonly.
-
   string error;
+
+  auto dup(){
+    static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
+      alias CT = ScalarType   !T,
+            len = VectorLength!T;
+      if(CT.stringof == type && len==channels){
+        auto b = new Bitmap(access!T);
+        b.file = file;
+        b.modified = modified;
+        b.error = error;
+        return b;
+      }
+    }}
+    raise("unsupported bitmap format"); assert(0);
+  }
+
+  bool valid(){ return !loading && error=="" && !empty; }
+
 
   void changed(){ modified.actualize; }
 
@@ -1026,7 +1232,7 @@ public:
     raise("unsupported bitmap format"); assert(0);
   }
 
-  void resize_nearest(ivec2 newSize){
+  void resizeInPlace_nearest(ivec2 newSize){
     static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
       alias CT = ScalarType   !T,
             len = VectorLength!T;
@@ -1039,7 +1245,43 @@ public:
     raise("unsupported bitmap format"); assert(0);
   }
 
-  override string toString() const { return format("Bitmap(%s, %d, %d, %d, %s, %s)", file, width, height, channels, type.quoted, modified.timeStamp); }
+  auto resize_nearest(ivec2 newSize){
+    static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{ //todo: redundant
+      alias CT = ScalarType   !T,
+            len = VectorLength!T;
+      if(CT.stringof == type && len==channels){
+        auto b = new Bitmap(access!T.resize_nearest(newSize));
+        b.file = file; //todo: redundant
+        b.modified = modified;
+        b.error = error;
+        return b;
+      }
+    }}
+    raise("unsupported bitmap format"); assert(0);
+  }
+
+  override string toString() const {
+    return format("Bitmap(%s, %d, %d, %d, %s, %s, %s, %s)",
+                          file, width, height, channels, type.quoted, modified.timeStamp,
+                          "["~ [loading?"loading":"", removed?"removed":""].join(", " ) ~"]", error ? "error: "~error : ""); }
+
+  void copyFrom(Bitmap b){
+    enforce(b && b.valid);
+    setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_);
+    error = b.error;
+    changed;
+  }
+
+  void saveTo(F)(in F file){
+    auto f = File(file);
+    this.serialize(f.ext.withoutStarting('.')).saveTo(f);
+  }
+
+  void loadFrom(F)(in F file){
+    auto f = File(file);
+    auto b = f.read.deserialize!Bitmap;
+    copyFrom(b);
+  }
 }
 
 // Bitmap/Image serializer //////////////////////////////////////////

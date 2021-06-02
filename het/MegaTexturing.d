@@ -671,11 +671,11 @@ public:
           Bitmap bmp;
           try{
             bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
-          }catch(Throwable){
+          }catch(Exception e){
             //todo: Nem jo!!! Nem thread safe !!!  WARN("Bitmap decode error. Using errorBitmap", fileName);
             //Ez nem thread safe!!!! multithreaded modban vegtelen loopba tud kerulni.
             //todo: ezt megoldani a placeholder bitmappal rendesen
-            bmp = errorBitmap;
+            bmp = newErrorBitmap(e.simpleMsg);
           }
 
           //bmp.channels = 4; //todo: not just 4 chn bitmap support
@@ -720,9 +720,9 @@ public:
         Bitmap bmp;
         try{
           bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
-        }catch(Throwable){
+        }catch(Exception e){
           WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
-          bmp = errorBitmap;
+          bmp = newErrorBitmap(e.simpleMsg);
         }
 
         //auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed

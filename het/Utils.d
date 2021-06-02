@@ -4829,7 +4829,6 @@ void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T
 void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))          { data = cast(T[])fileName.read(mustExists); }
 void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDynamicArray!T)        { data = (cast(T[])fileName.read(mustExists))[0]; }
 
-
 File appFile() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
 Path appPath() { static __gshared Path s; if(s.isNull) s = appFile.path; return s; }
 Path currentPath() { return Path(std.file.getcwd); }
