@@ -97,7 +97,7 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
 
 // BitmapManager - bitmaps() ////////////////////////////////////////////////
 
-enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformation, remove, stats, details }
+enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, update }
 
 /+
   { //handle thumbnails
@@ -148,8 +148,11 @@ enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformatio
   }
 +/
 
-
 Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
+
+  //disable delayed
+  //if(cmd==BitmapQueryCommand.access_delayed) cmd = BitmapQueryCommand.access;
+
   import std.parallelism;
   enum log = false;
 
@@ -172,10 +175,12 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
     auto bmp = startLoading(file);
 
     static void worker_load(Bitmap bmp/+"loading" bitmap that is holding filename to load+/){
+      const errorHandling = ErrorHandling.ignore; //track;
+
       auto file = bmp.file; //it receives the original unloaded Bitmap and monitors the .removed field too.
-      if(bmp.removed){ if(log) LOG("Bitmap has been removed before delayed loader. Canceling operation.", bmp); return; }
-      auto newBmp = newBitmap(file, ErrorHandling.track);
-      bitmapQuery(BitmapQueryCommand.finishWork, file, ErrorHandling.track, newBmp);
+      if(bmp.removed){ if(log) LOG("Bitmap has been removed before delayed loader. Cancelling operation.", bmp); return; }
+      auto newBmp = newBitmap(file, errorHandling);
+      bitmapQuery(BitmapQueryCommand.finishWork, file, errorHandling, newBmp);
     }
 
     taskPool.put(task!worker_load(bmp));
@@ -197,6 +202,70 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
     taskPool.put(task!worker_transform(originalBmp, transformedBmp, tr));
   }
 
+  // Loads and transforms a file, and updates the caches. Works in delayed and immediate mode.
+  //   requiredOriginalTime : optional check for the transformation's original file modified time
+  Bitmap loadAndTransform(File file, DateTime requiredOriginalTime = DateTime.init){
+    Bitmap res;
+
+    bool delayed = cmd==BitmapQueryCommand.access_delayed;
+    if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
+
+    auto tr = file.BitmapTransformation;
+
+    bool checkRequiredModifiedTime(Bitmap bmp){
+      if(requiredOriginalTime.isNull) return true;
+      return requiredOriginalTime == bmp.modified;
+    }
+
+    if(delayed){ // delayed load
+      if(tr){
+        res = startLoading(tr.transformedFile);
+        if(auto originalBmp = tr.originalFile in cache){
+          if(checkRequiredModifiedTime(*originalBmp)){ //original bmp is up to date
+            startDelayedTransformation(*originalBmp, res, tr);
+          }else{ //original is an old version
+            auto lastBmp = *originalBmp; //preserve it in the cache, so it can be displayed while loading the new
+
+            transformationQueue[tr.originalFile] = tr;
+            startDelayedLoad(tr.originalFile);
+
+            cache[tr.originalFile] = lastBmp;
+            lastBmp.loading = true;
+          }
+        }else{
+          transformationQueue[tr.originalFile] = tr;
+          startDelayedLoad(tr.originalFile);
+        }
+      }else{
+        res = startDelayedLoad(file);
+      }
+    }else{ //immediate load
+      if(tr){
+        //get the original file
+        //note: it doesn't look at delayed caches: loaded[] and transformQueue[]. Those will complete later if there are any.
+        Bitmap orig;
+        auto originalBmp = tr.originalFile in cache;
+        if(originalBmp && checkRequiredModifiedTime(*originalBmp)){
+          orig = *originalBmp;
+        }else{
+          orig = newBitmap(tr.originalFile, errorHandling);
+          cache[tr.originalFile] = orig;
+        }
+
+        //and transform it
+        assert(orig !is null);
+        res = tr.transform(orig);
+        res.file = file; //set the correct name
+      }else{
+        res = newBitmap(file, errorHandling);
+      }
+      cache[file] = res;
+    }
+
+    return res;
+  }
+
+
   final switch(cmd){
 
     case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed:{
@@ -210,46 +279,25 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
 
         if(auto p = file in cache){ //already in cache
           res = *p;
-        }else{ //new thing, must be loaded
-          bool delayed = cmd==BitmapQueryCommand.access_delayed;
-          if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
 
-          auto tr = file.BitmapTransformation;
-
-          if(delayed){ // delayed load
-
-            if(tr){
-              res = startLoading(tr.transformedFile);
-              if(auto originalBmp = tr.originalFile in cache){
-                startDelayedTransformation(*originalBmp, res, tr);
-              }else{
-                transformationQueue[tr.originalFile] = tr;
-                startDelayedLoad(tr.originalFile);
+          //check for a refreshed version
+          if(!res.loading){ // current bitmap is NOT loading
+            if(auto t = file.getLatestModifiedTime){ // the modified time is accessible
+              if(t != res.modified){ // it has a new version, must load...
+                if(cmd == BitmapQueryCommand.access_delayed){
+                  loadAndTransform(file, t);
+                  //put back the original file into the cache and mark that it is loading
+                  cache[file] = res;
+                  res.loading = true;
+                }else{
+                  res = loadAndTransform(file, t);
+                }
               }
-            }else{
-              res = startDelayedLoad(file);
             }
-          }else{ //immediate load
-            if(tr){
-              //get the original file
-              //note: it doesn't look at delayed caches: loaded[] and transformQueue[]. Those will complete later if there are any.
-              Bitmap orig;
-              if(auto o = tr.originalFile in cache){
-                orig = *o;
-              }else{
-                orig = newBitmap(tr.originalFile, errorHandling);
-                cache[tr.originalFile] = orig;
-              }
-
-              //and transform it
-              assert(orig !is null);
-              res = tr.transform(orig);
-              res.file = file; //set the correct name
-            }else{
-              res = newBitmap(file, errorHandling);
-            }
-            cache[file] = res;
           }
+
+        }else{ //new thing, must be loaded
+          res = loadAndTransform(file);
         }
       }//endif bmpIn
     }break;
@@ -280,6 +328,11 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
     case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
       print("---- bitmapQuery stats: (cache, loading, transformationQueue) ---- ", cache.length, loading.length, transformationQueue.length);
       if(cmd==BitmapQueryCommand.details) cache.keys.sort.each!(k => print("  ", cache[k]));
+    }break;
+
+    case BitmapQueryCommand.update:{
+      //cache.
+
     }break;
   }
 
@@ -414,6 +467,18 @@ private Bitmap newLoadingBitmap()          { return newSpecialBitmap("loading");
 private Bitmap newBitmap_internal(in ubyte[] data, bool mustSucceed=true){ return data.deserialize!Bitmap(mustSucceed); }
 
 private Bitmap newBitmap_internal(in File file, bool mustSucceed=true){ return newBitmap_internal(file.fullName, mustSucceed); }
+
+/// Gets the modified time of any given filename. Including real/virtual files, fonts, transformed images, thumbnails
+/// returns null if unknown
+auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.virtualOnly/*todo: preproc*/){
+  if(file){
+    auto drive = file.drive;
+    if(!virtualOnly || drive!="virtual"){
+      return file.withoutQuery.modified;
+    }
+  }
+  return DateTime.init;
+}
 
 Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
   //todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.

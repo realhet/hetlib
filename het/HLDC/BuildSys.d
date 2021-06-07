@@ -97,7 +97,7 @@ class Executor{
       //note: Config.retainStdout makes it impossible to remove the file after.
     }catch(Exception e){
       result = -1;
-      output = "Error: " ~ e.simplifiedMsg;
+      output = "Error: " ~ e.simpleMsg;
       ended = true;
       ignoreExceptions({ stdLogFile.close;         });
       ignoreExceptions({ logFile.forcedRemove;     });
@@ -193,70 +193,6 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workP
   }
   return res;
 
-  ////////////////////////////////////////////////
-/+  import std.process;
-
-  //create log files
-  StdFile[] logFiles;
-  foreach(i; 0..cmdLines.length){
-    auto fn = File(tempPath, "spawnProcessMulti.$log"~to!string(i));
-    logFiles ~= StdFile(fn.fullName, "w");
-  }
-
-  //create pool of commands
-  Pid[] pool;
-  foreach(i, cmd; cmdLines){
-    pool ~= spawnProcess(cmd, stdin, logFiles[i], logFiles[i], env,
-                         Config.retainStdout | Config.retainStderr | Config.suppressConsole);
-  }
-
-  //execute
-  bool[] running;  //todo:bugzik az stdOut fileDelete itt, emiatt nem megy az, hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
-  running.length = pool.length;
-  running[] = true;
-
-  int res = 0;
-  do{
-    sleep(10);
-    foreach(i; 0..pool.length){
-      if(running[i]){
-        auto w = tryWait(pool[i]);
-        if(w.terminated){
-          running[i] = false;
-          if(w.status != 0){
-            res = w.status;
-            running[] = false;
-          }
-          if(onProgress !is null) onProgress(cast(int)i);
-        }
-      }
-    }
-  }while(running.any);
-
-  /*foreach(i, p; pool){
-    int r = wait(p);
-    if(r) res = r;
-    if(onProgress !is null) onProgress(i);
-  }*/
-
-  //make sure every process is closed (when one of them yielded an error)
-  foreach(p; pool) { try{ kill(p);}catch(Exception e){} }
-
-  //read/clear logfiles
-  foreach(i, ref f; logFiles){
-    File fn = File(f.name);
-    f.close;
-    sOutput ~= fn.readStr;
-
-    //fucking lame because tryWait doesn't wait the file to be closed;
-    foreach(k; 0..100){
-      if(fn.exists){ try{ fn.remove; }catch(Exception e){ sleep(10); } }
-      if(!fn.exists) break;
-    }
-  }
-  logFiles.clear;
-
-  return res; +/
 }
 
 
@@ -265,7 +201,7 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workP
 //////////////////////////////////////////////////////////////////////////////
 
 immutable
-  versionStr = "1.04",
+  versionStr = "1.05",
   mainHelpStr =  //todo: ehhez edditort csinalni az ide-ben
   "\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC2\33\7 compiler.
 by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
@@ -1298,7 +1234,7 @@ public:
       if(!runCmd.empty){
         batFile.write(runCmd);
         foreach(idx, line; runCmd.split('\n')) logln(idx ? " ".replicate(9):bold("RUNNING: "), line);
-        spawnProcess(["cmd", "/c", "start", batFile.fullName], null, Config.detached);
+        spawnProcess(["cmd", "/c", "start", batFile.fullName], null, Config.detached, targetFile.path.fullPath);
       }
     }
   }

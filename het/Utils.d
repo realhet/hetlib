@@ -1292,7 +1292,8 @@ inout(V) get(K, V)(inout(V[K]) aa, K key){
 
 //safe array access
 
-inout(V) get(V, I)(inout(V[]) arr, I idx, lazy V def = V.init) if(isIntegral!I){
+//note: inout(V) doesn't work with class[]: it says can't convert const(Class) to inout(Class)
+/*inout*/V get(V, I)(/*inout*/V[] arr, I idx, lazy V def = V.init) if(isIntegral!I){
   static if(isSigned!I) return idx<arr.length && idx>=0 ? arr[idx] : def;
                    else return idx<arr.length           ? arr[idx] : def;
 }
@@ -4808,6 +4809,15 @@ public:
   size_t toHash() const{
     return fullName.xxh;
   }
+
+  File withoutQuery() const{
+    auto i = fullName.indexOf('?');
+    return File(i>=0 ? fullName[0..i] : fullName);
+  }
+
+  //todo: query to map string[string]. It's something like the commandline args and also like the wildcard result struct
+
+  File opBinary(string op)(string s) const if(op == "~"){ return File(fullName~s); }
 }
 
 //helpers for saving and loading
@@ -5558,7 +5568,8 @@ struct DateTime{
   @property void sec  (ushort x) { auto st = decodeDateTime(raw); st.wSecond       = x; this = DateTime(st); }
   @property void ms   (ushort x) { auto st = decodeDateTime(raw); st.wMilliseconds = x; this = DateTime(st); }
 
-  @property bool isNull() const{ return isnan(raw) || raw==0; }
+  bool isNull() const{ return isnan(raw) || raw==0; }
+  bool opCast() const{ return !isNull(); }
 
   string toString()const {
     if(isNull) return "NULL DateTime";

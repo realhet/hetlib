@@ -1268,7 +1268,7 @@ struct im{ static:
         /* onEnter */ {
           value2editor;
 
-          //must ovverride the previous value from another edit
+          //must override the previous value from another edit
           //todo: this must be rewritten with imStorage bounds.
           textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
 
