@@ -160,6 +160,8 @@ public:
     int commCnt, errorCnt;
     bool comm, error, idle;
     double alive; //for timeout checking
+
+    auto goodCnt() const{ return commCnt-errorCnt; }
   }
 private:
   //note: here if I use new RequestQueue, then it will be the same shared instance between all HttpQueue classes. Here I need a separate instance. Terminated and state_ is ok, but newExpression means a global constructor here!!
@@ -237,15 +239,17 @@ private:
   }
 
   StatusLedState statusLedState;
-  uint statusLedTick;
+
+  const string name;
 
 public:
   this(string name = ""){
+    this.name = name=="" ? this.identityStr : name;
     inbox = new shared RequestQueue;
     outbox = new shared ResponseQueue;
 
     import std.concurrency : spawn;
-    spawn(&httpWorker, name, inbox, outbox, &terminated, &state_);
+    spawn(&httpWorker, this.name, inbox, outbox, &terminated, &state_);
   }
 
   ~this(){ //must be called manually, or the class must be allocated with scoped!

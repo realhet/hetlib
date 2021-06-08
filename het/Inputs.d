@@ -166,10 +166,12 @@ enum InputEntryType{ //Operation      Examples
 }
 
 class InputEntry{
+  bool opCast(T:bool)() const { return active; }
+
   const InputHandlerBase owner;
   const string name;
   const InputEntryType type;
-  float value=0, lastValue=0;
+  float value=0, lastValue=0, pressedTime=0;
 
   string category() const { return owner.category; }
 
@@ -193,14 +195,20 @@ class InputEntry{
   bool pressed() const { return active && !lastActive; }
   bool released()const { return !active && lastActive; }
 
+  float activeDuration() const{
+    if(active) return inputs.now-pressedTime;
+          else return 0;
+  }
+
+  bool longPress() const{ return activeDuration >= longPressDuration; }
+
   bool down() const { return  active; }
   bool up() const { return !active; }
 
-  float pressedTime = 0;
-
   // repeat support, for typing emulation
-  static double repeatDelay1 = 0.5;
-  static double repeatDelay2 = 0.125; //updated from outside
+  static longPressDuration = 0.5;
+  static repeatDelay1 = 0.5;
+  static repeatDelay2 = 0.125; //updated from outside
 
   private{
     bool repeated_;
@@ -277,6 +285,15 @@ public:
 
   void update() {
     now = QPS_local;
+
+    //ensure that inputentry is untouched
+    with(nullEntry){
+      if(value || lastValue || pressedTime){
+        WARN("nullEntry was disturbed.");
+        value=0; lastValue=0; pressedTime=0;
+      }
+    }
+
     clearDeltas;
     foreach(h; handlers) h.update;
 
@@ -291,14 +308,25 @@ public:
     foreach(e; entries) e.lastValue = e.value;
   }
 
-  InputEntry opIndex(string name){
-    if(name=="") return nullEntry;
-    auto e = name in entries;
-    if(e is null) e = translateKey(name) in entries; //try to translate
-    return e ? *e : nullEntry;
+  auto opIndex(string name){ //todo: this should be const. And there should be access(name) which has read/write access.
+
+    struct InpitEntryWrapper{ //note: this wrapper is needed for opCast!(bool) to work properly. For classes, D doesn't call opCast, it checks the pointer.
+      alias entry this;
+      InputEntry entry;
+      bool opCast(T:bool)() { return entry ? entry.active : false; }
+    }
+
+    auto doit(){
+      if(name=="") return nullEntry;
+      auto e = name in entries;
+      if(e is null) e = translateKey(name) in entries; //try to translate
+      return e ? *e : nullEntry;
+    }
+
+    return InpitEntryWrapper(doit);
   }
 
-  InputEntry opDispatch(string name)(){
+  auto opDispatch(string name)(){
     return opIndex(name);
   }
 

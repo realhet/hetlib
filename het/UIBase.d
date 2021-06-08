@@ -2319,7 +2319,7 @@ class Container : Cell { // Container ////////////////////////////////////
     override void draw(Drawing dr){
       if(dr.isClone){
         super.draw(dr); //prevent recursion
-        //print("Drawing recursion prevented");
+        print("Drawing recursion prevented");
       }else{
         if(!cachedDrawing){
           cachedDrawing = dr.clone;

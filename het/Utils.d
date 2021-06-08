@@ -4453,12 +4453,11 @@ public:
 
   bool make(bool mustSucceed=true)const{
     if(exists) return true;
-    try{
-      mkdirRecurse(dir);
-    }catch(Throwable){
-      enforce(!mustSucceed, format(`Can't make directory : "%s"`, dir)); //todo: common file errors
-    }
-    return exists;
+    ignoreExceptions({ mkdirRecurse(dir); });
+
+    const res = exists;
+    if(mustSucceed && !res) raise(format!`Unable to make directory : %s`(dir.quoted));
+    return res;
   }
 
   bool remove(alias rmdirfunc=rmdir)(bool mustSucceed=true)const{
