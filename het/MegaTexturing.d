@@ -909,7 +909,7 @@ if(log) "Created subtex %s:".writefln(fileName);
 }
 
 
-class CustomTexture{ // CustomTexture ///////////////////////////////
+deprecated(`Use bitmaps("name", bitmap)")`) class CustomTexture{ // CustomTexture ///////////////////////////////
   const string name;
   protected{
     Bitmap bmp;

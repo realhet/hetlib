@@ -1455,7 +1455,7 @@ struct im{ static:
     auto capt = symbol(`Calculator` ~ (sign>0 ? `Addition` : `Subtract`));
     enum isInt = isIntegral!T0;
 
-    auto hit = Btn!(srcModule, srcLine)(capt, args, genericArg!"id"(sign)); //2 id's can pass because of the static foreach
+    auto hit = Btn!(srcModule, srcLine)(capt, args, genericId(sign)); //2 id's can pass because of the static foreach
     bool chg;
     if(hit.repeated){
       auto oldValue = value,
@@ -1560,7 +1560,7 @@ struct im{ static:
     BtnRow!(srcModule, srcLine)({
       foreach(i0, capt; captions){
         const i = cast(int)i0;
-        if(Btn(capt, genericArg!"id"(i), selected(idx==i))) idx = i;
+        if(Btn(capt, genericId(i), selected(idx==i))) idx = i;
       }
     }, args);
 
@@ -1711,7 +1711,7 @@ struct im{ static:
     auto bp = cast(BoolProperty)prop;
     enforce(bp !is null);
     auto last = bp.act;
-    auto res = ChkBox!(srcModule, srcLine)(bp.act, caption.empty ? prop.caption : caption, hint(prop.hint), args);
+    auto res = ChkBox!(srcModule, srcLine)(bp.act, caption.empty ? prop.caption : caption, genericId(prop.name), hint(prop.hint), args);
     bp.uiChanged |= last != bp.act;
     return res;
   }
@@ -1802,7 +1802,7 @@ struct im{ static:
     HitInfo hit;
     bool changed;
     Column({
-      actContainer.id = id_; //todo: lame way of passing that fucking genericArg!"id"
+      actContainer.id = id_; //todo: lame way of passing that fucking genericId
       hit = hitTest(enabled);
       border = "1 normal gray";
 
@@ -1822,7 +1822,7 @@ struct im{ static:
       }
 
       static foreach(a; args) static if(__traits(compiles, a())) a();
-    }/*, args*/); //todo: passing that fucking genericArg!"id"
+    }/*, args*/); //todo: passing that fucking genericId
     return ListBoxResult(hit, changed);
   }
 
@@ -1944,7 +1944,7 @@ struct im{ static:
       }
 
       Flex;
-      Row({ Text(" ", symbol("ChevronDown"), " "); });
+      Row({ flags.clickable = false; Text(" ", symbol("ChevronDown"), " "); });
     }, args);
 
     if(isFocused(hit.id)) (cast(het.uibase.Container)btn).flags._saveComboBounds = true; //notifies glDraw to place the popup
@@ -1967,9 +1967,9 @@ struct im{ static:
 
         static if(translated){
           static foreach(f; args) static if(isTranslator!(typeof(f)))
-            res = ListBox!(srcModule, srcLine)(idx, items, genericArg!"id"(1), &inheritComboWidth, f); //todo: this translator appending is a big mess
+            res = ListBox!(srcModule, srcLine)(idx, items, genericId(1), &inheritComboWidth, f); //todo: this translator appending is a big mess
         }else{
-          res = ListBox!(srcModule, srcLine)(idx, items, genericArg!"id"(1), &inheritComboWidth);
+          res = ListBox!(srcModule, srcLine)(idx, items, genericId(1), &inheritComboWidth);
         }
 
         if(res.hit.hover && inputs.LMB.released){
@@ -2506,7 +2506,7 @@ struct im{ static:
     const last = prop.act;
 
     if(variant == 0){
-      Column({
+      Column(genericId(prop.name), {
         width = 300;
         Row({
           Text(/*bold*/(caption));
@@ -2739,36 +2739,36 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
     Row({
       Text(thisFieldProps.getCaption, "\t");
       if(thisFieldProps.choices.length){
-        ComboBox(data, thisFieldProps.choices, hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
+        ComboBox(data, thisFieldProps.choices, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
       }else{
-        Edit(data, genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
+        Edit(data, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; });
       }
     });
   }else static if(isFloatingPoint!T     ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = format("%g", data);
-      Edit(s, genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
+      Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), genericArg!"id"(thisFieldProps.hash+1), { width = 180; }); //todo: rightclick
+        Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), { width = 180; }); //todo: rightclick
       //todo: Bigger slider height when (theme!="tool")
     });
   }else static if(isIntegral!T          ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = data.text;
-      Edit(s, genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
+      Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
-        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), genericArg!"id"(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = 180; }); //todo: rightclick
+        Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = 180; }); //todo: rightclick
     });
   }else static if(is(T == bool)         ){
     Row({
       Text(thisFieldProps.getCaption, "\t");
-      ChkBox(data, "", genericArg!"id"(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly));
+      ChkBox(data, "", genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly));
       Text("\t");
     });
   }else static if(isAggregateType!T     ){ // Struct, Class

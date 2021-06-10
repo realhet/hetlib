@@ -981,12 +981,9 @@ class FrmMain: GLWindow { mixin autoCreate; // !FrmMain ////////////////////////
   }
 
   override void onPaint(){ // paint //////////////////////////////////////
+    gl.clearColor(RGB(0x2d2d2d)); gl.clear(GL_COLOR_BUFFER_BIT);
+
     //auto t0 = QPS;
-
-    dr.clear(clBlack);
-    drGUI.clear;
-
-    im.draw(dr);
 
     //drGUI.glDraw(viewGUI);
     //drGUI.clear;

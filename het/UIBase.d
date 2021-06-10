@@ -1967,7 +1967,7 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     ScrollState   , "hScrollState"      , 2,
     ScrollState   , "vScrollState"      , 2,
     // ------------------------ 32bits ---------------------------------------
-    bool          , "clickable"         , 1, // hittest will not check this as clicked. It checks the parent instead.
+    bool          , "clickable"         , 1, // If false, hittest will not check this as clicked. It checks the parent instead.
 
     int           , "_dummy"            ,31,
   ));

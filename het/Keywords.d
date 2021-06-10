@@ -462,6 +462,8 @@ immutable SyntaxStyleRow[] syntaxTable = [
 mixin(format!"enum SyntaxKind   {%s}"(syntaxTable.map!"a.kindName".join(',')));
 mixin(format!"enum SyntaxPreset {%s}"(syntaxPresetNames.join(',')));
 
+static foreach(m; EnumMembers!SyntaxKind) mixin("alias sk* = SyntaxKind.*;".replace('*', m.text));
+
 __gshared defaultSyntaxPreset = SyntaxPreset.Dark;
 
 //todo: slow, needs a color theme struct
