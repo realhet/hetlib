@@ -6,6 +6,8 @@ import het.utils, het.draw2d, het.inputs, het.stream, het.opengl;
 
 import std.traits, std.meta;
 
+import het.keywords : SyntaxKind;
+
 public import het.uibase;
 
 //todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
@@ -566,6 +568,11 @@ struct im{ static:
                          else root ~= c;
   }
 
+  .Container removeLastContainer(){ //needed for temporary composable building
+    return actContainer ? actContainer.removeLastContainer
+                        : cast(.Container)root.fetchBack;
+  }
+
   // overlay drawing //////////////////////////
   Drawing[.Container] overlayDrawings;
 
@@ -828,7 +835,7 @@ struct im{ static:
 
     column.bkColor = style.bkColor;
 
-    static foreach(a; args){{ alias t = typeof(cast()a);
+    static foreach(a; args){{ alias t = typeof(cast()a);  //todd: refactor copypaste
 
            static if(isFunctionPointer!a) a();
       else static if(isDelegate!a       ) a();
@@ -837,6 +844,7 @@ struct im{ static:
       else static if(is(t == HAlign)    ) flags.hAlign = a;
       else static if(is(t == VAlign)    ) flags.vAlign = a;
       else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static if(is(t == SyntaxKind)){ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
       else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
       else static assert(false, "Unsupported type: "~t.stringof);
 
@@ -858,6 +866,7 @@ struct im{ static:
       else static if(is(t == HAlign)    ) flags.hAlign = a;
       else static if(is(t == VAlign)    ) flags.vAlign = a;
       else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static if(is(t == SyntaxKind)){ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
       else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
       else static assert(false, "Unsupported type: "~t.stringof);
 
@@ -879,6 +888,7 @@ struct im{ static:
       else static if(is(t == HAlign)    ) flags.hAlign = a;
       else static if(is(t == VAlign)    ) flags.vAlign = a;
       else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static if(is(t == SyntaxKind)){ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
       else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
       else static assert(false, "Unsupported type: "~t.stringof);
 
@@ -942,7 +952,7 @@ struct im{ static:
   }
 
 
-  void Code(string src){ // Code /////////////////////////////
+  deprecated void Code_old(string src){ // Code /////////////////////////////
     //todo: syntax highlight
     //Spacer(0.5*fh);
     Column({
@@ -1024,6 +1034,8 @@ struct im{ static:
         textStyle = a;
       }else static if(is(t == RGB)){
         textStyle.fontColor = a;
+      }else static if(is(t == SyntaxKind)){
+        textStyle.applySyntax(a);
       }else /*static if(isSomeString!t)*/{   //general case, handles as string
 
         /* mar nem ez tordel, hanem a Row.

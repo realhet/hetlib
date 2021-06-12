@@ -718,6 +718,7 @@ struct Border{
   bool inset;  //border has a size inside gap and margin
   float ofs = 0; //border is offsetted by ofs*width
   bool extendBottomRight; //for grid cells
+  bool borderFirst; //for code editor: it is possible to make round borders with it.
 
   float gapWidth() const{ return inset ? 0 : width; } //effective borderWidth
 
@@ -1627,20 +1628,21 @@ in(text.length == syntax.length)
 }
 
 /// Lookup a syntax style and apply it to a TextStyle reference
-void applySyntax(ref TextStyle ts, uint syntax, SyntaxPreset preset)
+void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint syntax, SyntaxPreset preset)
 in(syntax<syntaxTable.length)
 {
   auto fmt = &syntaxTable[syntax].formats[preset];
   ts.fontColor = fmt.fontColor;
-  ts.bkColor   = fmt.bkColor;
+  if(bkColor) ts.bkColor   = fmt.bkColor;
   ts.bold      = fmt.fontFlags.getBit(0);
   ts.italic    = fmt.fontFlags.getBit(1);
   ts.underline = fmt.fontFlags.getBit(2);
 }
 
+
 /// Shorthand with global default preset
-void applySyntax(ref TextStyle ts, uint syntax){
-  applySyntax(ts, syntax, defaultSyntaxPreset);
+void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint syntax){
+  applySyntax!bkColor(ts, syntax, defaultSyntaxPreset);
 }
 
 
@@ -2018,12 +2020,8 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-  Cell removeLast() {
-    enforce(subCells_.length);
-    auto res = subCells_[$-1];
-    subCells_ = subCells_[0..$-1];
-    return res;
-  }
+  auto removeLast(T = Cell)() { return cast(T)subCells_.fetchBack; }
+  auto removeLastContainer() { return removeLast!Container; }
 
   final override{
     ref _FlexValue flex() { return flex_   ; }
@@ -2230,11 +2228,13 @@ class Container : Cell { // Container ////////////////////////////////////
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
     //if(chkSet(measured)) measure;
 
+    if(border.borderFirst) drawBorder(dr); //for code editor
+
     //autofill background
     dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
     //dr.alpha = 0.1;
 
-    dr.fillRect(border.adjustBounds(borderBounds_inner));
+    dr.fillRect(border.borderFirst ? innerBounds/*for code editor's round border*/ : border.adjustBounds(borderBounds_inner));
     //dr.alpha = 1;
 
     if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
@@ -2287,7 +2287,7 @@ class Container : Cell { // Container ////////////////////////////////////
     if(useClipBounds) dr.popClipBounds;
     dr.pop;
 
-    drawBorder(dr); //border is the last
+    if(!border.borderFirst) drawBorder(dr); //border is the last by default
 
     drawDebug(dr);
   }

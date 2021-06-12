@@ -175,6 +175,7 @@ struct Token{ // Token //////////////////////////////
   int id; //emuns: operator, keyword
   int pos, length; //todo: length OR source is redundant
   int line, posInLine;
+  int preWhite, postWhite; //before and after this token
   int level; //hiehrarchy level in [] () {} q{}
   string source;
 
@@ -278,7 +279,9 @@ struct Token{ // Token //////////////////////////////
     else static if(op=="}") return isOperator(opcurlyBracketClose);
     else static if(op==",") return isOperator(opcomma);
     else static if(op==":") return isOperator(opcolon);
+    else static if(op==";") return isOperator(opsemiColon);
     else static if(op=="!") return isOperator(opnot);
+    else static if(op=="@") return isOperator(opatSign);
     else static if(op=="is") return isOperator(opis);
     else static if(op=="alias") return isKeyword(kwalias);
     else static if(op=="enum") return isKeyword(kwenum);
@@ -287,6 +290,7 @@ struct Token{ // Token //////////////////////////////
     else static if(op=="class") return isKeyword(kwclass);
     else static if(op=="interface") return isKeyword(kwinterface);
     else static if(op=="template") return isKeyword(kwtemplate);
+    else static if(op=="module") return isKeyword(kwmodule);
     else static assert(0, "Unknown operator string: "~op);
   }
 
@@ -307,6 +311,108 @@ struct Token{ // Token //////////////////////////////
 int baseLevel(in Token[] tokens){
   return tokens.length ? tokens[0].baseLevel : 0;
 }
+
+// TokenRange //////////////////////////////////////////////////////////////////////////////
+
+struct TokenRange{
+  Token[] allTokens; //the full range
+  int st, en; // start, end(excluding), index
+
+  void clamp(){
+    st.maximize(0);
+    en.minimize(allTokens.length.to!int);
+  }
+
+  /// Access the original range. It is faster, but can't see out of itself.
+  Token[] tokens(){
+    clamp;
+    return allTokens[st..en];
+  }
+
+  this(Token[] tokens){
+    allTokens = tokens;
+    st=0;
+    en = tokens.length.to!int;
+    clamp;
+  }
+
+  this(Token[] tokens, int start, int end){
+    allTokens = tokens;
+    st = start;
+    en = end;
+    clamp;
+  }
+
+  ref Token opIndex(int idx){
+    int i = st+idx;
+    if(!(i.inRange(allTokens))) ERR("out of bounds");
+    return allTokens[i];
+  }
+
+  int opDollar(size_t dim : 0)() const{
+    return length;
+  }
+
+  int[2] opSlice(size_t dim : 0)(int start, int end){ return [start, end]; }
+
+  auto opSlice(){ return this; }
+
+  auto opIndex(int[2] r){
+    r[] += st;
+    r[0].maximize(0);
+    r[1].minimize(allTokens.length.to!int); //automatic clamp
+    return TokenRange(allTokens, r[0], r[1]);
+  }
+
+  @property int  length() const{ return max(en-st, 0); }
+  @property void length(int newLength){ en = min(st + max(newLength, 0), allTokens.length.to!int); }//it clamps automatically
+
+  bool empty() const{ return st>=en; }
+  ref Token front(){ return allTokens[st  ]; }  void popFront(){ st++; }
+  ref Token back (){ return allTokens[en-1]; }  void popBack (){ en--; }
+  //ref Token front_safe(){ enforce( st   .inRange(allTokens), "TokenRange.front out of bounds"); return front; }
+  //ref Token back_safe (){ enforce((en-1).inRange(allTokens), "TokenRange.back out of bounds" ); return back ; }
+  auto save() { return this; }
+
+  bool extendFront(){
+    int i = prevNonComment(allTokens, st);
+    if(i.inRange(allTokens)){ st = i; return true; }
+    return false;
+  }
+
+  bool extendBack(){
+    int i = nextNonComment(allTokens, en-1);
+    if(i.inRange(allTokens)){ en = i+1; return true;}
+    return false;
+  }
+}
+
+/// Seeks the front of the range until the condition is reached
+/// If fails, it preserves the original range
+bool seekStart(alias fun)(ref TokenRange range){
+  auto idx = range.tokens.countUntil!fun; //note: For optimal speed, the Token[] must be exposed whenever it is possible.
+  if(idx>=0){ range.st += idx; return true ; }
+        else{                  return false; }
+}
+
+/// Seek from the start of the range and set the end of the range to include the token satisfying the condition.
+/// If fails, it preserves the original range
+bool seekEnd(alias fun)(ref TokenRange range){
+  auto idx = range.tokens.countUntil!fun;
+  if(idx>=0){ range.en = range.st + idx.to!int + 1; return true ; }
+        else{                                       return false; }
+}
+
+int nextNonComment(in Token[] tokens, int i){
+  if((i+1).inRange(tokens))do{ i++; }while(i<tokens.length && tokens[i].isComment);
+  return i;
+}
+
+int prevNonComment(in Token[] tokens, int i){
+  if((i-1).inRange(tokens))do{ i--; }while(i>=0 && tokens[i].isComment);
+  return i;
+}
+
 
 // helper functs ///////////////////////////////////////////////////////////////////////////
 
@@ -343,7 +449,7 @@ ref Token getNullToken(ref Token[] tokens){
 }
 
 /// Safely access a token in an array
-ref Token getAny(ref Token[] tokens, size_t idx){
+ref Token getAny(ref Token[] tokens, size_t idx){ //todo: bad naming!
   return idx<tokens.length ? tokens[idx]
                            : tokens.getNullToken;
 }
@@ -426,6 +532,7 @@ auto splitDeclarations(Token[] tokens){
       foreach(i, ref t; tokens){
         if(t.level == level){
           if(t.isOperator(opsemiColon)) return i;  // ';' is always an end marker
+          else if(t.isOperator(opcolon)) return i;  // ':' is an end marker in declarations
           else if(t.isOperator(opassign)) isAssignExpr = true;  // detect '=' assign expression. Possible struct initializer.
         }else if(t.level == level+1){
           if(t.isOperator(opcurlyBracketClose))
@@ -452,6 +559,44 @@ auto splitHeaderAndBlock(Token[] tokens){
   enforce(st>=0, "No {} block found");
   struct Res{ Token[] header, block; }
   return Res(tokens[0..st], tokens[st+1..$-1]);
+}
+
+auto stripLeadingAttributesAndComments(ref Token[] tokens){
+  auto attrs = getLeadingAttributesAndComments(tokens);
+  tokens = tokens[attrs.length..$];
+}
+
+auto getLeadingAttributesAndComments(Token[] tokens){
+  auto orig = tokens;
+
+  ref Token t(){ assert(tokens.length); return tokens[0]; }
+  void advance(){ assert(tokens.length); tokens = tokens[1..$]; }
+  void skipComments(){ while(t.isComment) advance; }
+  void skipBlock(){ auto level = t.level; while(!t.among!")"(level)) advance; advance; }
+
+  while(tokens.length){
+    if(t.isComment){              //comments
+      advance;
+    }else if(t.among!"@"){
+      advance; skipComments;
+      if(t.isIdentifier){         //@UDA
+        advance; skipComments;
+        if(t.among!"(") skipBlock;//@UDA(params)
+      }else if(t.among!"("){         //@(params)
+        skipBlock;
+      }else{
+        WARN("Garbage after @");  //todo: it is some garbage, what to do with the error
+        break;
+      }
+    }else if(t.isAttribute){      //attr
+      advance; skipComments;
+      if(t.among!"(") skipBlock;  //attr(params)
+    }else{
+      break; //reached the end normally
+    }
+  }
+
+  return orig[0..$-tokens.length];
 }
 
 
@@ -636,6 +781,14 @@ public:
     tk.pos = pos;
     tk.line = line;
     tk.posInLine = posInLine;
+
+    if(res.empty){
+      tk.preWhite = pos;
+    }else{
+      tk.preWhite = pos-res[$-1].endPos;
+      res[$-1].postWhite = tk.preWhite;
+    }
+
     res ~= tk;
   }
 
@@ -1106,7 +1259,11 @@ public:
       errorStr = o.toString;
     }
 
+    //set the last postWhite counter
+    if(res.length) res[$-1].postWhite = pos - res[$-1].endPos;
+
     tokens = res;
+
     return errorStr;
   }
 
