@@ -2023,6 +2023,22 @@ class Container : Cell { // Container ////////////////////////////////////
   auto removeLast(T = Cell)() { return cast(T)subCells_.fetchBack; }
   auto removeLastContainer() { return removeLast!Container; }
 
+  bool removeLastChar(dchar ch){
+    if(subCells_.length) if(auto c = cast(Glyph)subCells_[$-1]) if(c.ch==ch){
+      subCells_ = subCells_[0..$-1];
+      return true;
+    }
+    return false;
+  }
+
+  bool removeLastNewLine(){
+    if(removeLastChar('\n')){
+      removeLastChar('\r');
+      return true;
+    }
+    return false;
+  }
+
   final override{
     ref _FlexValue flex() { return flex_   ; }
     ref Margin  margin () { return margin_ ; } //todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
@@ -2221,6 +2237,7 @@ class Container : Cell { // Container ////////////////////////////////////
     return res;
   }
 
+  void onDraw(Drawing dr){ } //can override to draw some custom things.
 
   static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 
@@ -2260,6 +2277,8 @@ class Container : Cell { // Container ////////////////////////////////////
 
     if(flags._hasOverlayDrawing)
       dr.copyFrom(getOverlayDrawing(this));
+
+    onDraw(dr);
 
     if(flags.btnRowLines && subCells.length>1){
       dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.25f;

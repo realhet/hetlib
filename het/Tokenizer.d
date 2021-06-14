@@ -254,9 +254,9 @@ struct Token{ // Token //////////////////////////////
     return level - (isHierarchyOpen ? 1 : 0);
   }
 
-  string comment(){
+  string comment() const{
     assert(kind == TokenKind.comment);
-    auto s = source;
+    string s = source;
     if(s.startsWith("//")) s = s[2..$];
     else if(s.startsWith("/*") ||  s.startsWith("/+")) s = s[2..$-2];
     else assert(0, "invalid comment source format");
@@ -282,6 +282,7 @@ struct Token{ // Token //////////////////////////////
     else static if(op==";") return isOperator(opsemiColon);
     else static if(op=="!") return isOperator(opnot);
     else static if(op=="@") return isOperator(opatSign);
+    else static if(op=="=") return isOperator(opassign);
     else static if(op=="is") return isOperator(opis);
     else static if(op=="alias") return isKeyword(kwalias);
     else static if(op=="enum") return isKeyword(kwenum);
@@ -291,6 +292,9 @@ struct Token{ // Token //////////////////////////////
     else static if(op=="interface") return isKeyword(kwinterface);
     else static if(op=="template") return isKeyword(kwtemplate);
     else static if(op=="module") return isKeyword(kwmodule);
+    else static if(op=="mixin") return isKeyword(kwmixin);
+    else static if(op=="import") return isKeyword(kwimport);
+    else static if(op=="unittest") return isKeyword(kwunittest);
     else static assert(0, "Unknown operator string: "~op);
   }
 
@@ -512,7 +516,7 @@ string tokensToStr(in Token[] tokens, SourceCode code){
   return s;
 }
 
-auto splitDeclarations(Token[] tokens){
+auto splitDeclarations(Token[] tokens, bool isStatements=false){
   Token[][] res;
 
   const level = tokens.baseLevel;
@@ -528,15 +532,20 @@ auto splitDeclarations(Token[] tokens){
 
     //search for the end of the declaration
     auto findDeclarationEnd(){
-      bool isAssignExpr;
+      bool ignoreColon = isStatements, isAssignExpr;
       foreach(i, ref t; tokens){
-        if(t.level == level){
-          if(t.isOperator(opsemiColon)) return i;  // ';' is always an end marker
-          else if(t.isOperator(opcolon)) return i;  // ':' is an end marker in declarations
-          else if(t.isOperator(opassign)) isAssignExpr = true;  // detect '=' assign expression. Possible struct initializer.
-        }else if(t.level == level+1){
-          if(t.isOperator(opcurlyBracketClose))
-            if(!isAssignExpr) return i; // '}' means end if unless it's an assign expression.
+        if(t.level == level){ //base level
+
+          //update state flags first
+          if(!isAssignExpr && t.among!"=") isAssignExpr = true;
+          if(!ignoreColon  && t.among!"= import enum class interface") ignoreColon = true;
+
+          if(t.among!";") return i;  // ';' is always an end marker
+
+          if(!ignoreColon && t.among!":") return i; // ':' is NOT always an end marker (->import, class,  =)
+
+        }else if(t.level == level+1){ //bracket level
+          if(!isAssignExpr && t.among!"}") return i; // '}' means end if unless it's an assign expression.
         }
       }
       //raise("Unable to find end of declaration."); it's not an error in enum
@@ -554,11 +563,12 @@ auto splitDeclarations(Token[] tokens){
 }
 
 auto splitHeaderAndBlock(Token[] tokens){
+  enforce(tokens.length && tokens[$-1].among!"}", "Invalid input for splitHeaderAndBlock()");
   const level = tokens.baseLevel;
   auto st = tokens.countUntil!(t => t.level==level+1 && t.source=="{");
-  enforce(st>=0, "No {} block found");
-  struct Res{ Token[] header, block; }
-  return Res(tokens[0..st], tokens[st+1..$-1]);
+  enforce(st>=0, "No {} block found: "~tokens.map!"a.source".join(' '));
+  struct Res{ Token[] header, block; bool isSingleLine; }
+  return Res(tokens[0..st], tokens[st+1..$-1], tokens[st].line==tokens[$-1].line);
 }
 
 auto stripLeadingAttributesAndComments(ref Token[] tokens){

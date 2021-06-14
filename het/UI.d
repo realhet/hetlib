@@ -873,10 +873,10 @@ struct im{ static:
     }}
   }
 
-  void Container(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(T args){  // Container //////////////////////////////
+  void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(T args){  // Container //////////////////////////////
     mixin(prepareId, enable.M);
 
-    auto cntr = new .Container;
+    auto cntr = new CType;
     append(cntr); push(cntr, id_); scope(exit) pop;
 
     static foreach(a; args){{ alias t = Unqual!(typeof(a));
