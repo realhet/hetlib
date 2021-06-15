@@ -587,7 +587,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   protected static auto genRgbGraph(string fv)(){
     return q{
       auto oldColor = color;
-      color = clWhite; @(x0, y0, data.map!"a.l".array, xScale, yScale);
+      //note: this is not sure if black or white, or ignored. color = clWhite; @(x0, y0, data.map!"a.l".array, xScale, yScale);
       color = clRed  ; @(x0, y0, data.map!"a.r".array, xScale, yScale);
       color = clLime ; @(x0, y0, data.map!"a.g".array, xScale, yScale);
       color = clBlue ; @(x0, y0, data.map!"a.b".array, xScale, yScale);
