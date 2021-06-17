@@ -40,12 +40,32 @@ public:
   @property{ float invScale() const { return m_invScale; }  void  invScale(float s){ logScale = log2(1/s); }                                              }
   //animated stuff
   float animSpeed = 0.3; //0=off, 0.3=normal, 0.9=slow
-  auto origin_anim()  const { return m_origin_anim; }
-  auto scale_anim()   const { return pow(2, m_logScale_anim); }
+  auto origin_anim()   const { return m_origin_anim; }
+  auto scale_anim()    const { return pow(2, m_logScale_anim); }
+  auto invScale_anim() const { return 1.0f/scale_anim; }
 
   bounds2 workArea, workArea_accum; //next workarea is the currently built one being drawn
 
   auto subScreenArea = bounds2(0, 0, 1, 1); // if there is some things on the screen that is in front of the view, it can be used to set the screen to a smaller portion of the viewPort
+
+  auto subScreenOrigin(){
+    vec2 res = origin;
+    if(subScreenArea.valid){
+      auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
+      res += subScreenShift * invScale;
+    }
+    return res;
+  }
+
+  auto subScreenOrigin_anim(){
+    vec2 res = origin_anim;
+    if(subScreenArea.valid){
+      auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
+      res += subScreenShift * invScale_anim;
+    }
+    return res;
+  }
+
 
   vec2 clientSize()                { return vec2(owner.clientSize); }
   vec2 clientSizeHalf()            { return clientSize*0.5f; } //floor because otherwise it would make aliasing in the center of the view

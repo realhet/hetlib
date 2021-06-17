@@ -38,6 +38,8 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
 
   bool isThumb() const{ return thumbMaxSize>0; }
 
+  bool isHistogram, isGrayHistogram; //todo: this is lame. This should be solved by registered plugins.
+
   this(File file){
 
     transformedFile = file;
@@ -59,12 +61,18 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
         maxWidthSpecified = maxHeightSpecified = true;
 
       ignoreExceptions({ thumbMaxSize = thumbDef.to!int; });
+    }else if(file.fullName.canFind("?histogram")){
+      originalFile = File(orig[0..orig.countUntil('?')]);
+      isHistogram = true;
+    }else if(file.fullName.canFind("?grayHistogram")){
+      originalFile = File(orig[0..orig.countUntil('?')]);
+      isGrayHistogram = true;
     }
   }
 
   alias needTransform this;
   bool needTransform(){
-    return isThumb;
+    return isThumb|| isHistogram || isGrayHistogram;
   }
 
   Bitmap transform(Bitmap orig){
@@ -81,6 +89,20 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
           //print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
           return orig.resize_nearest(newSize); //todo: mipmapped bilinear/trilinear
         }
+      }else if(isHistogram){
+        auto img = orig.get!RGB;
+        int[3][256] histogram;
+        foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++;
+        int histogramMax = histogram[].map!(h => h[].max).array.max;
+        float sc = 255.0f/histogramMax;
+        return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc))));
+      }else if(isGrayHistogram){
+        auto img = orig.get!ubyte;
+        int[256] histogram;
+        foreach(p; img.asArray) histogram[p]++;
+        int histogramMax = histogram[].max;
+        float sc = 255.0f/histogramMax;
+        return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
       }
 
       return orig.dup;
