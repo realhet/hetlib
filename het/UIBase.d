@@ -1937,7 +1937,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b____________1____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b___________01____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -1970,8 +1970,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     ScrollState   , "vScrollState"      , 2,
     // ------------------------ 32bits ---------------------------------------
     bool          , "clickable"         , 1, // If false, hittest will not check this as clicked. It checks the parent instead.
+    bool          , "noBackground"      , 1,
 
-    int           , "_dummy"            ,31,
+    int           , "_dummy"            ,30,
   ));
 }
 
@@ -2248,11 +2249,10 @@ class Container : Cell { // Container ////////////////////////////////////
     if(border.borderFirst) drawBorder(dr); //for code editor
 
     //autofill background
-    dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
-    //dr.alpha = 0.1;
-
-    dr.fillRect(border.borderFirst ? innerBounds/*for code editor's round border*/ : border.adjustBounds(borderBounds_inner));
-    //dr.alpha = 1;
+    if(!flags.noBackground){
+      dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
+      dr.fillRect(border.borderFirst ? innerBounds/*for code editor's round border*/ : border.adjustBounds(borderBounds_inner));
+    }
 
     if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
 

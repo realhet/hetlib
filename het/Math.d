@@ -2098,6 +2098,7 @@ static foreach(T; AliasSeq!(float, double, int))
   static foreach(N; [1, 2, 3])
     static if(N==1) mixin(format!q{alias %sbounds = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
                else mixin(format!q{alias %sbounds%s = %s;}(ComponentTypePrefix!T, N, Bounds!(Vector!(T, N)).stringof));
+//todo: bounds helyett bounds1 jobb lenne, mert a bounds az sokszor masra is hasznalva van: pl. bmp.bounds
 
 // functions with bounds ////////////////////////////////
 

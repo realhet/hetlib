@@ -218,12 +218,17 @@ struct im{ static:
 
     auto dr = [new Drawing, new Drawing];
 
+
+
+    foreach(i; 0..2) surfaceBounds[i] = bounds2.init;
     foreach(a; rootContainers(true)){
-      a.draw(dr[a.flags.targetSurface]); //draw in zOrder
+      const s = a.flags.targetSurface;
+      surfaceBounds[s] |= a.outerBounds;
+      a.draw(dr[s]); //draw in zOrder
     }
 
     foreach(i; 0..2){
-      surfaceBounds[i] = dr[i].bounds;
+      //it's not good because of invisible scrollable elements. -> surfaceBounds[i] |= dr[i].bounds;
       dr[i].glDraw(targetSurfaces[i].view);
       dr[i].clear;
     }
