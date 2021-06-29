@@ -1331,7 +1331,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         vec2 t1 = info.pos+info.size              - vec2(.5);
 
         //enlarge for boldness
-        bool isBold = (fontFlags & 1)!=0;
+        bool isBold = (fontFlags & 16)==0 && (fontFlags & 1)!=0;
         if(isBold){
           float o = info.size.y*BoldOffset;
           boldTexelOffset = o;
@@ -1418,8 +1418,10 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       }
 
       //underline, strikeout
-      if(((fontFlags&4)!=0) && hline(tc.y, 0.875, 0.075)
-       ||((fontFlags&8)!=0) && hline(tc.y, 0.48, 0.075)) center = vec4(0,0,0,1);
+      if((fontFlags&16)==0){
+        if(((fontFlags&4)!=0) && hline(tc.y, 0.875, 0.075)
+         ||((fontFlags&8)!=0) && hline(tc.y, 0.48, 0.075)) center = vec4(0,0,0,1);
+      }
 
       return center;
     }
@@ -1559,10 +1561,44 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
           else if(stConfig==12) finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
           else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
 
-          //experimental grid
-          if(1) if(texelPerPixel.x < 0.1){
-            if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
+          if(samplingLevel!=0){ //nearest-re van kotve... todo...
+            // experimental shader
+            #define DX(x, y, n) (megaSample_nearest(tc+vec2(x, y))*n)
+/*            vec4 gradX =
+                               DX(-1, -2, -1) + DX( 1, -2,  1) +
+              DX(-2, -1, -1) + DX(-1, -1, -2) + DX( 1, -1,  2) + DX( 2, -1,  1) +
+              DX(-2,  0, -2) + DX(-1,  0, -3) + DX( 1,  0,  3) + DX( 2,  0,  2) +
+              DX(-2,  1, -1) + DX(-1,  1, -2) + DX( 1,  1,  2) + DX( 2,  1,  1) +
+                               DX(-1,  2, -1) + DX( 1,  2,  1)
+            ;
+
+            #define DY(x, y, n) (megaSample_nearest(tc+vec2(y, x))*n)
+            vec4 gradY =
+                               DY(-1, -2, -1) + DY( 1, -2,  1) +
+              DY(-2, -1, -1) + DY(-1, -1, -2) + DY( 1, -1,  2) + DY( 2, -1,  1) +
+              DY(-2,  0, -2) + DY(-1,  0, -3) + DY( 1,  0,  3) + DY( 2,  0,  2) +
+              DY(-2,  1, -1) + DY(-1,  1, -2) + DY( 1,  1,  2) + DY( 2,  1,  1) +
+                               DY(-1,  2, -1) + DY( 1,  2,  1)
+            ;
+
+            vec4 gradXY = sqrt(gradX*gradX + gradY*gradY);
+
+            finalColor = vec4(gradXY.rgb, 1);*/
+
+            vec4 valleyX = vec4(0);
+            for(int y=-19; y<19; y++){
+              valleyX += DX(-7, y, 1) + DX(-6, y, 1) + DX(-5, y, 1) + DX(-1, y, -2)+DX(0, y, -2)+DX(1, y, -2) + DX(5, y, 1) + DX(6, y, 1) + DX(7, y, 1);
+            }
+
+            finalColor = pow(valleyX/5, vec4(1));
+
+            finalColor.a = 1;
           }
+
+          //experimental grid
+          /*if(fontFlags&2) if(texelPerPixel.x < 0.1){
+            if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
+          }*/
         }else if(samplingLevel==2){//rooks6
           vec4 texel = megaSample_rooks6(tc);
           if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);

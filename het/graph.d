@@ -71,6 +71,8 @@ class GraphNode(Graph, Label) : Row { // GraphNode /////////////////////////////
 }
 
 class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // ContainerGraph ///////////////////////////////////////////
+  bool showSelection = true;
+
   static assert(__traits(compiles, {
     Node n; string s = n.groupName; //this could be optional.
   }), "Field requirements not met.");
@@ -267,7 +269,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
 
   protected void drawOverlay(Drawing dr){ with(dr){
     drawLinks(dr);
-    drawSelectedItems(dr, clAccent, 0.25, clWhite, 0.2);
+    if(showSelection) drawSelectedItems(dr, clAccent, 0.25, clWhite, 0.2);
     drawSelectionRect(dr, clWhite);
     drawGroupBounds(dr, clSilver);
     drawSearchResults(dr, clYellow);
