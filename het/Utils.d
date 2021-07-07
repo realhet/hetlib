@@ -2375,6 +2375,10 @@ struct WildResult{ static:
 
 alias wild = WildResult;
 
+bool isWildMask(char chAny = '*', char chOne = '?')(string s){
+  return s.any!(a => a.among(chAny, chOne));
+}
+
 bool isWild(bool ignoreCase = true, char chAny = '*', char chOne = '?')(string input, string wildStr){
   //bool cmp(char a, char b){ return ignoreCase ? a.toLower==b.toLower : a==b; }
   const cs = ignoreCase ? No.caseSensitive : Yes.caseSensitive;   //kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.

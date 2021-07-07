@@ -1225,10 +1225,10 @@ private:
         error("Compile error:\n"~err);
       }
       return shader;
-    }catch(Throwable o){
+    }catch(Exception e){
       shader.release;
       shader = null;
-      error(o.toString);
+      error(e.simpleMsg);
     }
     return null;
   }

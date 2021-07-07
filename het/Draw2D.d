@@ -163,10 +163,7 @@ enum ArrowStyle:ubyte {
 }
 
 class Drawing {  // Drawing /////////////////////////////////////////////////////////
-
   auto shortName() const { return "Drawing("~(cast(void*)this).text~")"; }
-
-  private static Shader shader;
 
   private VBO[] vboList;
   private void destroyVboList(){
@@ -986,13 +983,12 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 //  Shader code                                                               //
 ////////////////////////////////////////////////////////////////////////////////
 
-
   //todo: megaTexMaxCount-ot meg a tobbi konstanst kivulrol szedni
   //todo: arrowless curves could use max vertices
   //todo: arrows -> triangles instead of trapezoids
   //todo: arrows: no curcature needed
   //todo: compress geom shader output size
-  immutable shaderCode = q{
+  static immutable shaderCode = q{
     #version 150
 
     #define MegaTexMaxCnt       }~MegaTexMaxCnt         .text~q{
@@ -1618,6 +1614,51 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   };
 
 
+  // these can be used from the customShaders
+  static{ // Shader management /////////////////////////////
+    auto globalShaderFloats = [0.0f].replicate(8);
+    auto globalShaderBools = [false].replicate(8);
+
+    private string[8] customShaders;
+    private bool customShadersChanged;
+
+    string getCustomShader(size_t idx){ return customShaders.get(idx); }
+
+    void setCustomShader(size_t idx, string src){
+      enforce(idx<customShaders.length);
+      customShadersChanged |= customShaders[idx] != src;
+      customShaders[idx] = src;
+    }
+
+    Shader getShader(){
+      auto recompile(Flag!"ignoreCustomShaders" useDefaultShaders){
+        const t0 = QPS;
+        return new Shader("Draw2D", shaderCode);
+        LOG("Shader compiles in", QPS-t0, "sec");
+      }
+
+      static Shader sh, shDefault;
+      if(!sh || customShadersChanged){
+        customShadersChanged = false;
+        try{
+          sh = recompile(No.ignoreCustomShaders);
+        }catch(Exception e){
+          if(!shDefault) try{
+            shDefault = sh = recompile(Yes.ignoreCustomShaders);
+          }catch(Exception e2){
+            throw new Exception("FATAL ERROR: can't compile default shader for Draw2D");
+          }
+          ERR("Error compiling Draw2D shader\n" ~ e.simpleMsg);
+          sh = shDefault;
+        }
+      }
+
+      return sh;
+    }
+  }
+
+
+
 // Draw the objects on GPU  /////////////////////////////
 
   void glDraw(View2D view, in vec2 translate = vec2(0)) {
@@ -1641,9 +1682,8 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     }
     buffers.clear;
 
+    auto shader = getShader;
     foreach(vbo; vboList){
-      if(!shader) shader = new Shader("DrawingShader", shaderCode);
-
       auto vpSize = gl.getViewport.size;  //todo: ezek a vbo hivas elott mehetnek kifele
 
       auto uScale = vec2(scale, scale),
@@ -1660,7 +1700,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         shader.uniform(name, cast(int)i, false);
       }
 
-      shader.attrib(vbo);
+      shader.attrib(vbo); //this bings the VBO and the Shader too
 
       //todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
       gl.enable(GL_CULL_FACE);
