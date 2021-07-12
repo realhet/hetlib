@@ -657,18 +657,21 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     auto rectAlign = RectAlign(HAlign.center, VAlign.center, true, false, true); //shrink, enlarge, aspect
     auto nearest = No.nearest;
 
+    int shaderIdx = -1;
+
     static foreach(i, A_; T){ alias A = Unqual!A_; auto a(){ return args[i]; }
            static if(is(A==RGB8           )) bkColor = a.to!RGBA8;
       else static if(is(A==RGBA8          )) bkColor = a;
       else static if(is(A==Flag!"nearest" )) nearest = a;
       else static if(is(A==RectAlign      )) rectAlign = a;
+      else static if(is(A==GenericArg!(N, T), string N, T)) shaderIdx = a.value;
       else static assert("Unhandled parameter ", typeof(a));
     }
 
     auto c = realDrawColor;
     auto c2 = bkColor;
 
-    auto tx0 = vec2(16/*fontflag=image*/ | (nearest ? 0 : 1), 0),
+    auto tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
          tx1 = vec2(1, 1);
 
     auto info = textures.accessInfo(idx); //todo: csunya, kell egy texture wrapper erre
@@ -1489,6 +1492,71 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
           || gl_FragCoord.y>ma.y || gl_FragCoord.y<mi.y;
     }
 
+
+    // global variables for default and custom shader
+    vec4 bkColor, fontColor;
+    vec2 tc;
+
+    bool isImage, isFont, isItalic, isCustomShader;
+    int customShaderIdx;
+
+    vec4 defaultShader(){
+      vec4 finalColor, texel;
+      //italic
+      if(isFont && isItalic){
+        float dy = tc.y-(stPos.y+stSize.y*0.5);
+        tc.x += dy*0.5;
+      }
+
+      //samplingLevel : 0 = nearest, 1 = linear, 2 = rooks6, 3 = cleartype
+      int samplingLevel = 0;
+      if(isImage){
+        samplingLevel = fontFlags & 1; // nearest or linear
+        //todo: nearest when close and linear when far
+      }else{
+        float L = length(texelPerPixel);
+        samplingLevel = L>32 ? 2: //minify
+                        L< 1 ? 1: //magnify
+                               3; //medium
+      }
+
+      if(samplingLevel==-1){ //debug
+        finalColor = vec4(1,0,1,1);
+      }else if(samplingLevel==0 || samplingLevel==1){//nearest, linear
+
+        if(samplingLevel==0) texel = megaSample_nearest(tc);
+                        else texel = megaSample_linear(tc-vec2(0.5, 0.5));
+
+        if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
+        else if(stConfig==12) finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
+        else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
+
+        //experimental grid
+        /*if(fontFlags&2) if(texelPerPixel.x < 0.1){
+          if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
+        }*/
+      }else if(samplingLevel==2){//rooks6
+        vec4 texel = megaSample_rooks6(tc);
+        if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
+        if(stConfig==12)      finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
+        else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
+      }else{ //clearType
+        vec3 smp; float[3] alpha;
+        megaSample_clearType(tc, smp, alpha);
+
+        if(stConfig==12)      finalColor = clearTypeMix(bkColor, vec4(smp, fontColor.a), alpha);
+        else if(stConfig==0)  finalColor = clearTypeMix(bkColor, fontColor             , alpha);
+      }
+
+      return finalColor;
+    }
+
+    //@CUSTOMSHADER
+
+    vec4 customShader(){
+      return vec4(1, 0.5, 1, 1);
+    }
+
     void main(){
       if(chkClip(fClipMin, fClipMax)) discard;
 
@@ -1519,96 +1587,25 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         FragColor = color;
 
       }else{ //!----------------> glyph fragment shader /////////////////////////////
-        vec4 bkColor = fColor2;
-        vec4 fontColor = fColor;
-        vec4 finalColor, texel;
 
-        vec2 tc = fTexCoord;
+        // initialize global variables
+        bkColor = fColor2;
+        fontColor = fColor;
 
-        //italic
-        if((fontFlags&2)!=0){
-          float dy = tc.y-(stPos.y+stSize.y*0.5);
-          tc.x += dy*0.5;
+        tc = fTexCoord;
+
+        isImage = (fontFlags&16)!=0;
+        isFont = !isImage;
+        isItalic = (fontFlags&2)!=0;
+        isCustomShader = (fontFlags&32)!=0;
+        customShaderIdx = (fontFlags/64)&7;
+
+        if(!isCustomShader){ //default shader form images and text
+          FragColor = defaultShader();
+        }else{ //customShader
+          FragColor = customShader();
         }
 
-        bool isImage = (fontFlags&16)!=0;
-        bool isFont = !isImage;
-
-        //samplingLevel : 0 = nearest, 1 = linear, 2 = rooks6, 3 = cleartype
-        int samplingLevel = 0;
-        if(isImage){
-          samplingLevel = fontFlags & 1; // nearest or linear
-          //todo: nearest when close and linear when far
-        }else{
-          float L = length(texelPerPixel);
-          samplingLevel = L>32 ? 2: //minify
-                          L< 1 ? 1: //magnify
-                                 3; //medium
-        }
-
-        if(samplingLevel==-1){ //debug
-          finalColor = vec4(1,0,1,1);
-        }else if(samplingLevel==0 || samplingLevel==1){//nearest, linear
-
-          if(samplingLevel==0) texel = megaSample_nearest(tc);
-                          else texel = megaSample_linear(tc-vec2(0.5, 0.5));
-
-          if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
-          else if(stConfig==12) finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
-          else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
-
-          if(samplingLevel!=0){ //nearest-re van kotve... todo...
-            // experimental shader
-            #define DX(x, y, n) (megaSample_nearest(tc+vec2(x, y))*n)
-/*            vec4 gradX =
-                               DX(-1, -2, -1) + DX( 1, -2,  1) +
-              DX(-2, -1, -1) + DX(-1, -1, -2) + DX( 1, -1,  2) + DX( 2, -1,  1) +
-              DX(-2,  0, -2) + DX(-1,  0, -3) + DX( 1,  0,  3) + DX( 2,  0,  2) +
-              DX(-2,  1, -1) + DX(-1,  1, -2) + DX( 1,  1,  2) + DX( 2,  1,  1) +
-                               DX(-1,  2, -1) + DX( 1,  2,  1)
-            ;
-
-            #define DY(x, y, n) (megaSample_nearest(tc+vec2(y, x))*n)
-            vec4 gradY =
-                               DY(-1, -2, -1) + DY( 1, -2,  1) +
-              DY(-2, -1, -1) + DY(-1, -1, -2) + DY( 1, -1,  2) + DY( 2, -1,  1) +
-              DY(-2,  0, -2) + DY(-1,  0, -3) + DY( 1,  0,  3) + DY( 2,  0,  2) +
-              DY(-2,  1, -1) + DY(-1,  1, -2) + DY( 1,  1,  2) + DY( 2,  1,  1) +
-                               DY(-1,  2, -1) + DY( 1,  2,  1)
-            ;
-
-            vec4 gradXY = sqrt(gradX*gradX + gradY*gradY);
-
-            finalColor = vec4(gradXY.rgb, 1);*/
-
-            vec4 valleyX = vec4(0);
-            for(int y=-19; y<19; y++){
-              valleyX += DX(-7, y, 1) + DX(-6, y, 1) + DX(-5, y, 1) + DX(-1, y, -2)+DX(0, y, -2)+DX(1, y, -2) + DX(5, y, 1) + DX(6, y, 1) + DX(7, y, 1);
-            }
-
-            finalColor = pow(valleyX/5, vec4(1));
-
-            finalColor.a = 1;
-          }
-
-          //experimental grid
-          /*if(fontFlags&2) if(texelPerPixel.x < 0.1){
-            if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
-          }*/
-        }else if(samplingLevel==2){//rooks6
-          vec4 texel = megaSample_rooks6(tc);
-          if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
-          if(stConfig==12)      finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
-          else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
-        }else{ //clearType
-          vec3 smp; float[3] alpha;
-          megaSample_clearType(tc, smp, alpha);
-
-          if(stConfig==12)      finalColor = clearTypeMix(bkColor, vec4(smp, fontColor.a), alpha);
-          else if(stConfig==0)  finalColor = clearTypeMix(bkColor, fontColor             , alpha);
-        }
-
-        FragColor = finalColor;
       }
     }
   };
@@ -1616,8 +1613,12 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
   // these can be used from the customShaders
   static{ // Shader management /////////////////////////////
-    auto globalShaderFloats = [0.0f].replicate(8);
-    auto globalShaderBools = [false].replicate(8);
+    struct GlobalShaderParams{
+      auto floats = [0.0f].replicate(8);
+      auto bools = [false].replicate(8);
+    }
+
+    GlobalShaderParams globalShaderParams;
 
     private string[8] customShaders;
     private bool customShadersChanged;
@@ -1646,6 +1647,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
           if(!shDefault) try{
             shDefault = sh = recompile(Yes.ignoreCustomShaders);
           }catch(Exception e2){
+            ERR(e2.simpleMsg);
             throw new Exception("FATAL ERROR: can't compile default shader for Draw2D");
           }
           ERR("Error compiling Draw2D shader\n" ~ e.simpleMsg);

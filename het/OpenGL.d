@@ -1215,6 +1215,7 @@ private:
 
   auto loadShader(char typeChr, int type, string source)
   {
+    const t0 = QPS;
     auto shader = new GLShaderHandle(resName~"."~typeChr, source.length, type);
     try{
       gl.shaderSource(shader.handle, source);
@@ -1224,6 +1225,7 @@ private:
         File(appPath, "shader.error").write(source~"\n=============================================\n"~err);
         error("Compile error:\n"~err);
       }
+      LOG(format!`Shader "%s" compile time %.3f sec`(resName~"."~typeChr, QPS-t0));
       return shader;
     }catch(Exception e){
       shader.release;
@@ -1233,7 +1235,8 @@ private:
     return null;
   }
 
-  void compile(){
+  void build(){
+    const t0 = QPS;
                               vertexShader   = loadShader('v', GL_VERTEX_SHADER  , vertexShaderSrc  );
     if(geometryShaderSrc!="") geometryShader = loadShader('g', GL_GEOMETRY_SHADER, geometryShaderSrc);
                               fragmentShader = loadShader('f', GL_FRAGMENT_SHADER, fragmentShaderSrc);
@@ -1248,6 +1251,8 @@ private:
 
     if(!gl.getProgramLinked(programObject.handle))
       error("Link error\r\n"~gl.getProgramInfoLog(programObject.handle));
+
+    LOG(format!`Shader "%s" total build time: %.3f sec`(resName, QPS-t0));
   }
 
   void collectAttribs(){
@@ -1273,7 +1278,7 @@ public:
     geometryShaderSrc = gs;
     fragmentShaderSrc = fs;
 
-    compile;
+    build;
     collectAttribs;
   }
 

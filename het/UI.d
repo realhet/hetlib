@@ -2838,6 +2838,30 @@ void stdUI(Property prop, string parentFullName=""){ //todo: ennek inkabb benne 
   }
 }
 
+
+//! Misc UIs //////////////////////////////////
+
+void UI_globalShaderParams(){ with(im){
+  Row("global Shader Parameters");
+  Row({
+    padding = "4";
+    Column({
+      foreach(idx, ref b; Drawing.globalShaderParams.bools)
+        ChkBox(b, idx.format!"bool%d", genericId(idx));
+    });
+    Spacer;
+    Column({
+      foreach(idx, ref f; Drawing.globalShaderParams.floats) Row({
+        theme = "tool";
+        Text(idx.format!"float%d\t");
+        Slider(f, range(0, 1), { width = 12*fh; }, genericId(idx));
+      });
+    });
+  });
+}}
+
+
+
 ////////////////////////////////////////////////////////
 ///  Dead code                                       ///
 ////////////////////////////////////////////////////////
