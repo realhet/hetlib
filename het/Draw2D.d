@@ -1373,6 +1373,10 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     uniform sampler2D smpMega[MegaTexMaxCnt];
 
+    // customShader global input variables
+    uniform float GF0, GF1, GF2, GF3, GF4, GF5, GF6, GF7;
+    uniform bool  GB0, GB1, GB2, GB3, GB4, GB5, GB6, GB7;
+
     vec4 megaSample_nearest_internal(vec2 tc){
 //      if(stIdx!=0) return vec4(1, 0, 1, 1); //return fuschia for multitexturing
 
@@ -1551,11 +1555,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       return finalColor;
     }
 
-    //@CUSTOMSHADER
-
-    vec4 customShader(){
-      return vec4(1, 0.5, 1, 1);
-    }
+    vec4 customShader(){ return vec4(((int(tc.x)^int(tc.y))&255)/255.0 * vec3(1, 0, 1), 1); } //note: this single line marks the place of the custom shader
 
     void main(){
       if(chkClip(fClipMin, fClipMax)) discard;
@@ -1620,37 +1620,49 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     GlobalShaderParams globalShaderParams;
 
-    private string[8] customShaders;
-    private bool customShadersChanged;
+    private string customShader_;
+    private bool customShaderChanged;
 
-    string getCustomShader(size_t idx){ return customShaders.get(idx); }
-
-    void setCustomShader(size_t idx, string src){
-      enforce(idx<customShaders.length);
-      customShadersChanged |= customShaders[idx] != src;
-      customShaders[idx] = src;
+    @property void customShader(string s){
+      if(chkSet(customShader_, s)){
+        customShaderChanged = true;
+      }
     }
+    @property string customShader(){ return customShader_; }
 
     Shader getShader(){
-      auto recompile(Flag!"ignoreCustomShaders" useDefaultShaders){
+      auto recompile(Flag!"ignoreCustomShader" ignoreCustomShader){
         const t0 = QPS;
-        return new Shader("Draw2D", shaderCode);
-        LOG("Shader compiles in", QPS-t0, "sec");
+
+        string code = shaderCode;
+        if(!ignoreCustomShader && customShader_!=""){
+          auto p = code.split("vec4 customShader(){");
+          enforce(p.length==2);
+          auto i = p[1].map!(ch => ch.among('\r', '\n')).countUntil(true);
+          enforce(i>0);
+          p[1] = p[1][i+1..$];
+
+          code = p[0] ~ customShader ~ "\n" ~ p[1];
+        }
+
+        return new Shader("Draw2D", code);
+        LOG("Shader compiled in", QPS-t0, "sec");
       }
 
       static Shader sh, shDefault;
-      if(!sh || customShadersChanged){
-        customShadersChanged = false;
+      if(!sh || customShaderChanged){
+        customShaderChanged = false;
         try{
-          sh = recompile(No.ignoreCustomShaders);
+          sh = recompile(No.ignoreCustomShader);
         }catch(Exception e){
           if(!shDefault) try{
-            shDefault = sh = recompile(Yes.ignoreCustomShaders);
+            shDefault = sh = recompile(Yes.ignoreCustomShader);
           }catch(Exception e2){
             ERR(e2.simpleMsg);
             throw new Exception("FATAL ERROR: can't compile default shader for Draw2D");
           }
           ERR("Error compiling Draw2D shader\n" ~ e.simpleMsg);
+          beep;
           sh = shDefault;
         }
       }
@@ -1685,6 +1697,11 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     buffers.clear;
 
     auto shader = getShader;
+
+    // update shader uniform values
+    foreach(idx, b; globalShaderParams.bools ) shader.uniform("GB"~idx.text, b, false);
+    foreach(idx, f; globalShaderParams.floats) shader.uniform("GF"~idx.text, f, false);
+
     foreach(vbo; vboList){
       auto vpSize = gl.getViewport.size;  //todo: ezek a vbo hivas elott mehetnek kifele
 

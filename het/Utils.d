@@ -1238,7 +1238,7 @@ auto fetchFront(T)(ref T[] arr, T def = T.init){
 auto fetchFront(T)(ref T[] arr, sizediff_t count){
   auto i = min(arr.length, count),
        res = arr[0..i];
-  arr = arr[i, $];
+  arr = arr[i..$];
   return res;
 }
 
@@ -2474,8 +2474,8 @@ auto splitQuotedStr(string line, char delim, char quote){
 auto splitCommandLine(string line){
   //split, convert, strip, filter empties
   return line.splitQuotedStr(' ', '"')
+             .filter!"a.length"
              .map!(a => a.strip.to!string.withoutQuotes('"'))
-             .filter!(a => !a.empty)
              .array;
 }
 

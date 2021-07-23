@@ -1036,6 +1036,7 @@ public://///////////////////////////////////////////////////////
   void uniform(int loc, in vec3 v){ glUniform3fv(loc, 1, v.array.ptr); glChk; }
 
   void uniform(int loc, int v      ){ glUniform1iv(loc, 1, &v  ); glChk; }
+  void uniform(int loc, bool b     ){ uniform(loc, b ? 1 : 0);}
   void uniform(int loc, in ivec2 v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, v.array.ptr); glChk(file, line); }
 
   void uniform(int loc, in float[4][4] v){ glUniformMatrix4fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
