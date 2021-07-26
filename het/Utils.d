@@ -89,6 +89,7 @@ public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrit
 public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
 public import std.typecons: Typedef;
 public import std.path: baseName;
+public import std.exception : collectException, ifThrown;
 
 import std.encoding : transcode, Windows1252String;
 import std.exception : stdEnforce = enforce;
@@ -220,6 +221,13 @@ __gshared static public:////////////////////////////////////////////////////////
   @property HWND handle() { return mainWindowHandle; }
 }
 
+// Ega color codes
+struct EgaColor{
+  static foreach(idx, s; "black blue green cyan red magenta brown white gray ltBlue ltGreen ltCyan ltRed ltMagenta yellow ltWhite".split(' '))
+    mixin(format!`static auto %s(string s){ return "\33\%s"~s~"\33\7"; }`(s, idx.to!string(8)));
+
+  //Usage: Print(EgaColor.red("Red text"));
+}
 
 // Console //////////////////////////////////////////////////////////////////////
 
@@ -5533,10 +5541,16 @@ struct DateTime{
       this(Date(parts[0]), Time(parts[1]));
     }else{
       //todo: check for digits here, not any chars!
-      if(str.isWild("????-??-??T??????.???")){ //windows timestamp
+      if      (str.isWild("????-??-??T??????.???")){ //windows timestamp.zzz
         this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4));
       }else if(str.isWild("????-??-??T??????")){ //windows timestamp
         this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int);
+      }else if(str.isWild("????-??-??T????")){ //windows timestamp, no seconds
+        this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int);
+      }else if(str.isWild("????-??-??T")){ //windows timestamp, no time
+        this(wild.ints(0), wild.ints(1), wild.ints(2));
+      }else if(str.isWild("????-??-??")){ //windows timestamp, no time, no T
+        this(wild.ints(0), wild.ints(1), wild.ints(2));
       }else if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
         this(       str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
       }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
@@ -5582,14 +5596,30 @@ struct DateTime{
     return d.toString ~ ' ' ~ t.toString;
   }
 
-  string timeStamp()const {
+  string timestamp(in Flag!"shortened" shortened = No.shortened)const {
     if(isNull) return "null";
     //4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
     //return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
 
     // windows timestamp format (inserts it after duplicate files)
-    return format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", year, month, day, hour, min, sec, ms);
+    auto s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", year, month, day, hour, min, sec, ms);
+
+    if(shortened){ //todo: not so fast
+      if(s.endsWith(".000")){
+        s = s[0..$-4];
+        if(s.endsWith(":00")){
+          s = s[0..$-3];
+          if(s.endsWith("00:00")){
+            s = s[0..$-5];
+          }
+        }
+      }
+    }
+
+    return s;
   }
+
+  string timestamp_compact()const { return timestamp(Yes.shortened); }
 
   int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
   int opCmp(const Date     d ) const { return dblCmp(raw, d .raw); }

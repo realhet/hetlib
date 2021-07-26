@@ -1349,7 +1349,7 @@ public:
 
   override string toString() const {
     return format("Bitmap(%s, %d, %d, %d, %s, %s, %s, %s)",
-                          file, width, height, channels, type.quoted, modified.timeStamp,
+                          file, width, height, channels, type.quoted, modified.timestamp,
                           "["~ [loading?"loading":"", removed?"removed":""].join(", " ) ~"]", error ? "error: "~error : ""); }
 
   void copyFrom(Bitmap b){
