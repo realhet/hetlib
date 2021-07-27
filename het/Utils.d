@@ -5607,10 +5607,10 @@ struct DateTime{
     if(shortened){ //todo: not so fast
       if(s.endsWith(".000")){
         s = s[0..$-4];
-        if(s.endsWith(":00")){
-          s = s[0..$-3];
-          if(s.endsWith("00:00")){
-            s = s[0..$-5];
+        if(s.endsWith("00")){
+          s = s[0..$-2];
+          if(s.endsWith("0000")){
+            s = s[0..$-4];
           }
         }
       }
