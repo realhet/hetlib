@@ -1630,6 +1630,8 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     }
     @property string customShader(){ return customShader_; }
 
+    void delegate(Shader) onCustomShaderSetup; // entry point to setup custom variables for the customShader
+
     Shader getShader(){
       auto recompile(Flag!"ignoreCustomShader" ignoreCustomShader){
         const t0 = QPS;
@@ -1698,34 +1700,36 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     auto shader = getShader;
 
+    auto vpSize = gl.getViewport.size;  //todo: ezek a vbo hivas elott mehetnek kifele
+
+    auto uScale = vec2(scale, scale),
+         uShift = -center;
+
+    shader.uniform("uScale", uScale);
+    shader.uniform("uShift", uShift+translate);
+    shader.uniform("uViewPortSize", vec2(vpSize));
+
+    //map all megaTextures
+    foreach(i, t; textures.getGLTextures){
+      t.bind(cast(int)i, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
+      auto name = i==0 ? "smpInfo" : "smpMega[%d]".format(i-1);
+      shader.uniform(name, cast(int)i, false);
+    }
+
     // update shader uniform values
     foreach(idx, b; globalShaderParams.bools ) shader.uniform("GB"~idx.text, b, false);
     foreach(idx, f; globalShaderParams.floats) shader.uniform("GF"~idx.text, f, false);
 
+    if(onCustomShaderSetup) onCustomShaderSetup(shader);
+
+    //todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
+    gl.enable(GL_CULL_FACE);
+    gl.enable(GL_BLEND);        gl.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    gl.enable(GL_ALPHA_TEST);   gl.alphaFunc(GL_GREATER, 0);
+    gl.disable(GL_DEPTH_TEST);
+
     foreach(vbo; vboList){
-      auto vpSize = gl.getViewport.size;  //todo: ezek a vbo hivas elott mehetnek kifele
-
-      auto uScale = vec2(scale, scale),
-           uShift = -center;
-
-      shader.uniform("uScale", uScale);
-      shader.uniform("uShift", uShift+translate);
-      shader.uniform("uViewPortSize", vec2(vpSize));
-
-      //map all megaTextures
-      foreach(i, t; textures.getGLTextures){
-        t.bind(cast(int)i, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear);
-        auto name = i==0 ? "smpInfo" : "smpMega[%d]".format(i-1);
-        shader.uniform(name, cast(int)i, false);
-      }
-
       shader.attrib(vbo); //this bings the VBO and the Shader too
-
-      //todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
-      gl.enable(GL_CULL_FACE);
-      gl.enable(GL_BLEND);        gl.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-      gl.enable(GL_ALPHA_TEST);   gl.alphaFunc(GL_GREATER, 0);
-      gl.disable(GL_DEPTH_TEST);
 
       //gl.polygonMode(GL_FRONT_AND_BACK, GL_LINE);
       vbo.draw(GL_POINTS);

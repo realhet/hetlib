@@ -51,8 +51,8 @@ class AMDB{
 
     long opCmp(in Id b) const{ return long(id)-long(b.id); }
 
-    string serializeText() const{ return id.to!string(36); }
-    void deserializeText(string s){ id = s.to!uint(36); }
+    string serializeText() const{ return id.to!string(10); }
+    void deserializeText(string s){ id = s.to!uint(10); }
   }
 
   protected uint lastIdIndex;
