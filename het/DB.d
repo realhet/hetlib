@@ -447,7 +447,7 @@ class AMDB{
   // process //////////////////////////////
 
   //splits multiline text into sentences
-  string[][] textToSentences(string input){
+  static string[][] textToSentences(string input){
 
     static string[][] lineToSentences(string line){
       //strip at "..."
@@ -571,8 +571,36 @@ class AMDB{
     foreach(s; textToSentences(input)) processDataSentence(s, tid, id);
   }
 
+  void filter(string input){
+
+  }
+
   // manage database ////////////////////////////////////////////
 
-  void create(){
-  }
+}
+
+//! Unittest //////////////////////////////////////
+
+void unittest_splitSentences(){
+  uint h;
+  void a(string s){ auto r = AMDB.textToSentences(s).text; h = r.xxh(h); print(s); }
+
+  a("One part");
+  a("Part one  Part two");
+  a("Part 1  Part 2     Part 3");
+  a("Part 1  Part 2  Part 3  Part 4");
+
+  a("One part...2nd sentence.");
+  a("Part one  Part two...2nd");
+  a("Part 1  Part 2     Part 3  ...  2nd");
+
+  a("Part one  Part two\n...2nd");
+
+  a("Part one  Part two\nNew     sentence  ...next");
+
+  enforce(h==955615075, "AMDB.textToSentences test FAIL");
+}
+
+void unittest_main(){
+  unittest_splitSentences;
 }
