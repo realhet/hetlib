@@ -7,7 +7,7 @@ __gshared{
 }
 
 enum UseOldTexImage2D = false; //otherwise use TexStorage2D instead!
-
+enum LOG_shaderLoadingTimes = false;
 /+glResManager plan:
 Detailed list:
   Shader  : name, handleV, handleG, handleF, flags:VGF, size
@@ -1226,7 +1226,7 @@ private:
         File(appPath, "shader.error").write(source~"\n=============================================\n"~err);
         error("Compile error:\n"~err);
       }
-      LOG(format!`Shader "%s" compile time %.3f sec`(resName~"."~typeChr, QPS-t0));
+      if(LOG_shaderLoadingTimes) LOG(format!`Shader "%s" compile time %.3f sec`(resName~"."~typeChr, QPS-t0));
       return shader;
     }catch(Exception e){
       shader.release;
@@ -1253,7 +1253,7 @@ private:
     if(!gl.getProgramLinked(programObject.handle))
       error("Link error\r\n"~gl.getProgramInfoLog(programObject.handle));
 
-    LOG(format!`Shader "%s" total build time: %.3f sec`(resName, QPS-t0));
+    if(LOG_shaderLoadingTimes) LOG(format!`Shader "%s" total build time: %.3f sec`(resName, QPS-t0));
   }
 
   void collectAttribs(){

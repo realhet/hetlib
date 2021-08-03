@@ -799,6 +799,10 @@ if(log) "Created subtex %s:".writefln(fileName);
     return textureSize(access2(file));
   }
 
+  void uploadInplace(int idx, Bitmap bmp){
+    uploadData(accessInfo(idx), bmp);
+  }
+
   /// A SubTexInfo +
   struct SubTexInfo2{
     int idx, lastAccessed;

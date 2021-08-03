@@ -474,7 +474,7 @@ auto isFontDeclaration(string s){ return s.startsWith(`font:\`); }
 private Bitmap newSpecialBitmap(string error=""){
   const loading = error=="loading";
   auto bmp = new Bitmap(image2D(1, 1, loading ? RGBA(0xFFC0C0C0) : RGBA(0xFFFF00FF)));
-  bmp.changed;
+  bmp.markChanged;
   if(loading){
     bmp.loading = true;
   }else{
@@ -1220,16 +1220,17 @@ public:
 class Bitmap{ // Bitmap class /////////////////////////////////////////////
 private:
   void[] data_;
-  int width_, height_, channels_=4;
   string type_ = "ubyte";
+  int width_, height_, channels_=4;
 public:
   deprecated int tag;     // can be an external id
   deprecated int counter; // can notify of cnahges
 
   File file;
   DateTime modified;
-  bool loading, removed; //todo: these are managed by bitmaps(). Should be protected and readonly.
   string error;
+  bool loading, removed; //todo: these are managed by bitmaps(). Should be protected and readonly.
+  bool processed; //user flag. Can do postprocessing after the image is loaded
 
   auto dup(){
     static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
@@ -1247,9 +1248,9 @@ public:
   }
 
   bool valid(){ return !loading && error=="" && !empty; }
+  bool canProcess(){ return valid && !processed; }
 
-
-  void changed(){ modified.actualize; }
+  void markChanged(){ modified.actualize; }
 
   // todo: constraints
   // todo: fileName
@@ -1356,7 +1357,7 @@ public:
     enforce(b && b.valid);
     setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_);
     error = b.error;
-    changed;
+    markChanged;
   }
 
   void saveTo(F)(in F file){
