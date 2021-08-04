@@ -116,6 +116,7 @@ class AMDB{
     return def;
   }
 
+  size_t itemCount() const { return itemById.length; }
   // Link //////////////////////////////////////
 
   struct Link{
@@ -196,6 +197,7 @@ class AMDB{
     return exists(entity, "is a", eTypeId); //todo: "has supertype" handling
   }
 
+  size_t linkCount() const { return linkById.length; }
 
   // Central notification handling ////////////////////////////
 
@@ -561,18 +563,25 @@ class AMDB{
 
 
   // multiline bulk processing
+  private Id lastSchemaId;
+
   void schema(string input){
-    Id id; //hold the last id to resolve "..."
-    foreach(s; textToSentences(input)) processSchemaSentence(s, id);
+    lastDataTypeId = lastDataId = Id.init; //reset the state of other input categories
+
+    foreach(s; textToSentences(input)) processSchemaSentence(s, lastSchemaId);
   }
+
+  private Id lastDataId, lastDataTypeId;
 
   void data(string input){
-    Id tid, id; //hold the last id and tid(AType) to resolve "..."
-    foreach(s; textToSentences(input)) processDataSentence(s, tid, id);
+    lastSchemaId = Id.init; //reset the state of other input categories
+
+    foreach(s; textToSentences(input)) processDataSentence(s, lastDataTypeId, lastDataId);
   }
 
-  void filter(string input){
-
+  void query(string input){
+    auto sentences = textToSentences(input);
+    print(sentences);
   }
 
   // manage database ////////////////////////////////////////////
@@ -583,7 +592,10 @@ class AMDB{
 
 void unittest_splitSentences(){
   uint h;
-  void a(string s){ auto r = AMDB.textToSentences(s).text; h = r.xxh(h); print(s); }
+  void a(string s){
+    auto r = AMDB.textToSentences(s).text; h = r.xxh(h);
+    //print(s);
+  }
 
   a("One part");
   a("Part one  Part two");
