@@ -3576,7 +3576,7 @@ struct SeedStream{
     print("Testing SeedStream: a:", a, format!"(0x%x)"(a), "  c:", c, format!"(0x%x)"(c));
     BitArray ba;
     ba.length = 1L << 32;
-    write("seed = ", seed, "  ");
+    print("seed = ", seed);
     ba[] = false;
     auto ss = this;
     auto act(){ return ss.front; }
@@ -3585,7 +3585,9 @@ struct SeedStream{
       ba[act] = true;
       ss.popFront;
       cnt++;
+      if((cnt & 0xFFFFFF)==0) write("\b\b\b", cnt>>24);
     }
+    print;
     long firstZero = -1; foreach(idx, b; ba) if(!b){ firstZero = idx; break; }
     print("cycle length =", cnt.format!"0x%x", "  first false at:", firstZero);
   }

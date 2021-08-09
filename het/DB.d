@@ -579,9 +579,63 @@ class AMDB{
     foreach(s; textToSentences(input)) processDataSentence(s, lastDataTypeId, lastDataId);
   }
 
-  void query(string input){
+  Id[] query(string input){
     auto sentences = textToSentences(input);
     print(sentences);
+
+    Id[] res;
+
+    bool chkStr(string s, string mask){
+      return s.isWild(mask);
+    }
+
+    bool chkId(in Id id, string mask){
+      string s;
+      if(!id) s = "null";
+      else if(isItem(id)) s = itemStr(id);
+      else if(isLink(id)) s = "...";
+      else NOTIMPL;
+      return chkStr(s, mask);
+    }
+
+    if(sentences.length==1){
+      auto p = sentences[0];
+      if(p.length==1){
+        foreach(id, const item; itemById){
+          if(chkStr(item, p[0])) res ~= id;
+        }
+      }else if(p.length==2){
+        foreach(id, const link; linkById){
+          if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id;
+        }
+      }else if(p.length==3){
+        foreach(id, const link; linkById){
+          if(chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
+        }
+      }else NOTIMPL;
+    }else if(sentences.length==2){
+      //todo: recursive
+
+      //todo: this should be the first parameter of a specialized query: it refines a list by sourceId match
+      auto baseIds = query(sentences[0].join("  ")); //todo: don't join them again or use escaping!
+      auto p = sentences[1];
+      assert(p[0]=="...");
+      if(p.length==2){
+        foreach(baseId; baseIds){
+          foreach(id, const link; linkById){
+            if(link.sourceId==baseId && !link.targetId && chkId(link.verbId, p[1])) res ~= id;
+          }
+        }
+      }else if(p.length==3){
+        foreach(baseId; baseIds){
+          foreach(id, const link; linkById){
+            if(link.sourceId==baseId && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
+          }
+        }
+      }else NOTIMPL;
+    }else NOTIMPL;
+
+    return res;
   }
 
   // manage database ////////////////////////////////////////////

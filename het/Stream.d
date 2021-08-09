@@ -792,11 +792,42 @@ struct PropArray{ // PropArray ////////////////////////////////////////////
 
 //! Archiver //////////////////////////////////////////////////////
 
+/// returns 1.0 if all bytes are the same
+//  common values: 0.5 for d source files, 0.25 for .exe, 0.05 for jpg, zip, below 0.01 for png
+float dataRedundance(in void[] data){
+  int[8] bins;
+
+  foreach(b; cast(ubyte[])data)
+    foreach(i; 0..8)
+      bins[i] += (b>>i)&1;
+
+  auto invLen = 1.0f / data.length.to!int;
+
+  return sqrt(bins[].map!(b => sqr(b*invLen-0.5f)).sum * 0.5f);
+}
+
+// finds a datablock that possibly contains data. It helps in reconstucting archived blocks.
+sizediff_t findNonRedundantBlock(File f, size_t blockSize, float threshold, Flag!"exponentialSearch" exponentialSearch){
+  auto fsize = f.size, fofs = blockSize; //skip first block
+
+  bool eof(){ return fofs+blockSize>fsize; }
+  bool check(){ return !eof && f.read(true, fofs, blockSize).dataRedundance<threshold; }
+
+  while(!eof){
+    if(check) return fofs;
+    fofs = exponentialSearch ? fofs*2 : fofs+blockSize;
+  }
+  return -1;
+}
+
+
+
 /// This encapsulates custom data objects in a stream. Any type of bytestream will do, no packaging is needed.
 /// The data can be identified and easily skipped from both directions. Contains crc.
 
 class Archiver{
   private SeedStream seedStream;
+  void testSeedStream(){ seedStream.test; }
 
   this(){
     seedStream = SeedStream_pascal(56432);
