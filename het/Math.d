@@ -2640,6 +2640,18 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     int opApply(int delegate(int x, int y, ref E) dg)  { return myOpApply!"dg(x, y, impl[lineOfs+x])"(dg); }
   }
 
+  static if(N==2){
+
+    void saveTo(F)(in F file){ //todo: make it const
+      //note: saveTo() must be a member function in order to work
+      //todo: this is fucking nasty! Should not import hetlib into here!!! Should use a global funct instead which is initialized by het.bitmaps.
+      import het.bitmap : serialize;
+      import het.utils : File, saveTo, withoutStarting;
+      auto f = File(file);
+      saveTo(this.serialize(f.ext.withoutStarting('.')), f);
+    }
+  }
+
 }
 
 private void unittest_Image(){  // image2D tests /////////////////////////////////
