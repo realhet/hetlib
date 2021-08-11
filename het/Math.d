@@ -2645,8 +2645,9 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     void saveTo(F)(in F file){ //todo: make it const
       //note: saveTo() must be a member function in order to work
       //todo: this is fucking nasty! Should not import hetlib into here!!! Should use a global funct instead which is initialized by het.bitmaps.
-      import het.bitmap : serialize;
-      import het.utils : File, saveTo, withoutStarting;
+      //todo: must do this with a global function!!! The problem is that need to pass the type and elementcount to it.
+      mixin("import het.bitmap : serialize;");
+      mixin("import het.utils : File, saveTo, withoutStarting;");
       auto f = File(file);
       saveTo(this.serialize(f.ext.withoutStarting('.')), f);
     }

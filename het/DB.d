@@ -14,19 +14,25 @@ class AMDBException : Exception {
 
 class AMDB{
 
+  this(){
+    //do critical unittests
+    __gshared static bool tested;
+    if(tested.chkSet) unittest_splitSentences;
+  }
+
   bool autoCreateETypes   = true;
   bool autoCreateVerbs    = true;
   bool autoCreateEntities = false;
 
   void error(string s) const{ throw new AMDBException(s); }
 
-  static string autoEscape(string s){
+  static string autoQuoted(string s){
     //todo: slow
     if(s.canFind!(ch => ch<32 || ch.among('"', '\'', '`')) || s.canFind("  ") || s.canFind("..."))return s.quoted;
     else return s;
   }
 
-  static string autoUnescape(string s){
+  static string autoUnquoted(string s){
     if(s.startsWith('"')){
       import het.tokenizer; //todo: agyuval verebre...
       Token[] t;
@@ -243,11 +249,13 @@ class AMDB{
   }
 
   string serializeText(in Id id){
+
+
     if(auto link = id in linkById){
       with(*link) return id.serializeText ~" "~ sourceId.serializeText ~" "~ verbId.serializeText ~(targetId ? " "~targetId.serializeText : "");
     }else if(auto item = id in itemById){
-      auto s = *item;
-      if(s.startsWith('"') || s.canFind!(a => a.among('\n', '\r'))) s = escape(s); //string is closed with newLine.  Only need to escape when it contains newLine or starts with the escape quote.
+      auto s = autoQuoted(*item);
+      //string is closed with newLine.  Only need to escape when it contains newLine or starts with the escape quote. But to make sure, escape it if it contains any special chars
       return id.serializeText~"="~s;
     }else error("Invalid Id to serialize:"~id.text);
     assert(0);
@@ -266,7 +274,7 @@ class AMDB{
       Id id; id.deserializeText(line[0..p0]);
       line = line[p0+1..$];
       if(isItem){
-        loadItem(id, autoUnescape(line));
+        loadItem(id, autoUnquoted(line));
       }else{
         Link link;
         auto p = line.split(' ');
@@ -448,10 +456,51 @@ class AMDB{
 
   // process //////////////////////////////
 
-  //splits multiline text into sentences
+  /// Finds and collects "" quoted string literals and replaces them with a given string
+  protected static string[] replaceQuotedStrings(ref string s, string replacement){
+    string[] res;
+    string processed, act = s;
+    while(1){
+      immutable quote = '"';
+      auto idx = act.indexOf(quote);
+      if(idx<0) break;
+
+      processed ~= act[0..idx];
+      act = act[idx..$];
+
+      //find ending quote
+      string qstr = act[0..1]; act = act[1..$];
+      do{
+        idx = act.indexOf(quote);
+        if(idx<0) throw new Exception("Unterminated string literal.");
+        qstr ~= act[0..idx+1];
+        act = act[idx+1..$];
+      }while(qstr.endsWith(`\"`));
+
+      import het.tokenizer;
+      Token[] tokens;
+      auto error = tokenize("string literal tokenizer", qstr, tokens);
+      if(error!="") throw new Exception("Error decoding string literal: "~error);
+      enforce(tokens.length==1 && tokens[0].isString, "Error decoding string literal: String literal expected.");
+
+      res ~= tokens[0].data.to!string;
+
+      processed ~= replacement; //mark the position
+    }
+    processed ~= act;
+    s = processed;
+    return res;
+  }
+
   static string[][] textToSentences(string input){
 
-    static string[][] lineToSentences(string line){
+    auto quotedStrings = replaceQuotedStrings(input, `  "  `);
+    string fetchQStr(){
+      enforce(quotedStrings.length, "Quoted string literals: Array is empty.");
+      return quotedStrings.fetchFront;
+    }
+
+    string[][] lineToSentences(string line){
       //strip at "..."
       auto p = line.strip.split("...").map!strip.array;
 
@@ -460,14 +509,15 @@ class AMDB{
       if(p.length && p[0]=="") p = p[1..$]; //is it allowed to start a new line with "...".
 
       //split the sentences to words. Separator is double space.
-      static string[] splitSentence(string s){
-        return s.strip.split("  ").map!strip.filter!"a.length".array; //todo: empty string encoded as ""
+      string[] splitSentence(string s){
+        return s.strip.split("  ").map!strip.filter!"a.length".map!(a => a==`"` ? fetchQStr : a).array; //todo: empty string encoded as ""
       }
       return p.map!(a => splitSentence(a)).array;
     }
 
     return input.splitLines.map!(line => lineToSentences(line)).join;
   }
+
 
   void processSchemaSentence(string[] p, ref Id id){
     enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
@@ -648,7 +698,7 @@ void unittest_splitSentences(){
   uint h;
   void a(string s){
     auto r = AMDB.textToSentences(s).text; h = r.xxh(h);
-    //print(s);
+    //print(s, "|", r);
   }
 
   a("One part");
@@ -664,7 +714,10 @@ void unittest_splitSentences(){
 
   a("Part one  Part two\nNew     sentence  ...next");
 
-  enforce(h==955615075, "AMDB.textToSentences test FAIL");
+  a(`a"c"d"e  e"..."f  f\""""g`);   //c style "" string literals are decoded as a word.
+
+  //print(h);
+  enforce(h==1522071754, "AMDB.textToSentences test FAIL");
 }
 
 void unittest_main(){
