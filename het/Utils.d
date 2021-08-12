@@ -5754,25 +5754,28 @@ auto blink(float freq=3/*hz*/, float duty=.5f){ return (QPS*freq).fract < duty; 
 synchronized class Perf {
   private{
     float[string] table;
+    double[string] firstAppearance;
     string actName;
     float T0;
   }
 
   void reset(){
     table = null;
+    firstAppearance = null;
     actName = "";
   }
 
   void addTime(string name, float time){
-    if(name !in table) table[name] = 0;
+    if(name !in table){
+      table[name] = 0;
+      firstAppearance[name] = QPS;
+    }
     table[name] = table[name]+time;
   }
 
   string report(){
     if(actName!="") end;
-    //pragma(msg, typeof(table));
-    auto r = (cast(float[string])table).byKeyValue.map!(kv => "%-30s:%9.3f ms\n".format(kv.key, kv.value*1e3)).join;
-           //^^^^^^^^^^^^^^^^^^^^ ez egy uj ldc 2020-as buzisag miatt kell, nem megy sharedre....
+    auto r = (cast()firstAppearance).keys.sort!((a, b) => firstAppearance[a] < firstAppearance[b]).map!(k => format!"%-30s:%9.3f ms\n"(k, table[k]*1e3)).join;
     reset;
     return r;
   }
