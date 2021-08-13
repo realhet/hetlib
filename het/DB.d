@@ -12,13 +12,84 @@ class AMDBException : Exception {
   this(string s){ super(s); }
 }
 
+interface DBFileInterface{
+  File file();
+  string[] readLines(); //reads the whole file
+  void appendLines(string[] lines); //appends some lines
+}
+
+class TextDBFile : DBFileInterface{
+  private File file_;
+
+  this(File file){
+    this.file_ = file;
+  }
+
+  File file(){ return file_; }
+
+  string[] readLines(){ return file_.readLines; }
+
+  void appendLines(string[] lines){ file_.append("\n"~lines.join("\n")~"\n"); }
+}
+
 class AMDB{
+  private DBFileInterface dbFileInterface;
+
+  File file(){ return dbFileInterface ? dbFileInterface.file : File(""); }
 
   this(){
     //do critical unittests
     __gshared static bool tested;
     if(tested.chkSet) unittest_splitSentences;
   }
+
+  this(DBFileInterface dbFileInterface){
+    this();
+
+    this.dbFileInterface = dbFileInterface;
+
+    //load
+    try{
+      if(dbFileInterface) foreach(line; dbFileInterface.readLines){
+        line = line.strip;
+        if(line=="") continue;
+        const idx = line.map!(ch => ch==' ' || ch=='=').countUntil(true);
+        enforce(idx>0, "Invalid text db line format: "~line.quoted);
+
+        //get Id
+        const id = Id(line[0..idx].to!uint);
+        enforce(id, "Invalid null id");
+        enforce(!(id in itemById), id.text~" already exists as an item. "~line.quoted);
+        enforce(!(id in linkById), id.text~" already exists as a link. "~line.quoted);
+
+        const lineType = line[idx];
+        line = line[idx+1..$];
+
+        switch(lineType){
+          case '=':{ //Item
+            _internalCreateItem(id, autoUnquoted(line));
+          }break;
+          case ' ':{
+            auto p = line.split(' ').map!(a => Id(a.to!uint)).array;
+            enforce(p.length.among(2, 3), "Invalid link id count. "~line.quoted);
+            if(p.length==2) p ~= Id.init;
+            foreach(a; p) enforce(!a || a in itemById || a in linkById, "Invalid link id: "~a.text~" "~line.quoted);
+            _internalCreateLink(id, Link(p[0], p[1], p[2]));
+
+          }break;
+          default: raise("Unknown lineType. "~line.quoted);
+        }
+
+        lastIdIndex.maximize(id.id);
+
+      }
+    }catch(Exception e){
+      raise("AMDB load error: "~e.simpleMsg);
+    }
+  }
+
+  this(File file){ this(new TextDBFile(file)); }
+  this(string fileName){ this(File(fileName)); }
 
   bool autoCreateETypes   = true;
   bool autoCreateVerbs    = true;
@@ -72,6 +143,27 @@ class AMDB{
     lastIdIndex.maximize(id.id);
   }
 
+  // Commit buffer ////////////////////
+
+  private string[] commitBuffer;
+
+  bool inTransaction(){ return commitBuffer.length>0; }
+
+  void commit(){
+    if(!inTransaction) return;
+
+    if(dbFileInterface){
+      dbFileInterface.appendLines(commitBuffer);
+    }
+
+    commitBuffer = null;
+  }
+
+  void cancel(){
+    if(!inTransaction) return;
+
+    NOTIMPL;
+  }
 
   // Item /////////////////////////////
 
@@ -209,14 +301,13 @@ class AMDB{
 
   //called after create but not when loading
   void onItemCreated(in Id id){
-    print(serializeText(id));
+    commitBuffer ~= serializeText(id);
   }
 
   //called after create but not when loading
   void onLinkCreated(in Id id){
-    print(serializeText(id));
+    commitBuffer ~= serializeText(id);
   }
-
 
   // serialization ////////////////////////////////////////////
 
@@ -688,7 +779,59 @@ class AMDB{
     return res;
   }
 
-  // manage database ////////////////////////////////////////////
+  // text mode interface ////////////////////////////////////////////
+
+  private char textCommandMode = 'q';
+
+  int execTextCommand(string input){
+    input = input.strip;
+    try{
+      switch(input){
+        case "data": case "d": case "schema": case "s": case "query": case "q": textCommandMode = input[0]; break;
+        case "commit": commit; break;
+        case "cancel": cancel; break;
+
+        case "info":
+        break;
+
+        case "exit": case "x":{
+          enforce(!inTransaction, "Pending transaction. Use \"commit\" or \"cancel\" before exiting.");
+          return false;
+        }
+        default:
+          switch(textCommandMode){
+            case 's': schema(input); break;
+            case 'd': data(input); break;
+            case 'q': query(input).sort.each!(i => print(prettyStr(i))); break;
+            default: raise("invalid mode: "~textCommandMode);
+          }
+      }
+    }catch(Exception e){
+      print(EgaColor.ltRed("ERROR:"), e.simpleMsg);
+    }
+
+    writeln;
+    return true;
+  }
+
+  string inputTextCommand(){
+    //prompt
+    write(EgaColor.white(">"), format!" I:%d + L:%d = %d %s"(itemCount, linkCount, itemCount+linkCount, commitBuffer.length ? EgaColor.red("*"~commitBuffer.length.text~" ") : ""));
+
+    switch(textCommandMode){
+      case 's': write(EgaColor.ltMagenta("schema ")); break;
+      case 'd': write(EgaColor.ltBlue   ("data ")); break;
+      case 'q': write(EgaColor.ltGreen  ("query ")); break;
+      default: raise("invalid mode");
+    }
+    write(EgaColor.white("> "));
+
+    return readln;
+  }
+
+  void textCommandLoop(){
+    while(execTextCommand(inputTextCommand)){}
+  }
 
 }
 
