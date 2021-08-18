@@ -33,11 +33,23 @@ class TextDBFile : DBFileInterface{
 }
 
 class AMDB{
+  enum versionStr = "1.00";
+
+  private uint lastIdIndex;
+  Items items;
+  Links links;
+
   private DBFileInterface dbFileInterface;
 
-  File file(){ return dbFileInterface ? dbFileInterface.file : File(""); }
+  bool autoCreateETypes   = true ,
+       autoCreateVerbs    = true ,
+       autoCreateEntities = false;
+
+  //----------------------------------------------------------------------------------
 
   this(){
+    items.db = links.db =this;
+
     //do critical unittests
     __gshared static bool tested;
     if(tested.chkSet) unittest_splitSentences;
@@ -48,58 +60,26 @@ class AMDB{
 
     this.dbFileInterface = dbFileInterface;
 
-    //load
-    try{
-      if(dbFileInterface) foreach(line; dbFileInterface.readLines){
-        line = line.strip;
-        if(line=="") continue;
-        const idx = line.map!(ch => ch==' ' || ch=='=').countUntil(true);
-        enforce(idx>0, "Invalid text db line format: "~line.quoted);
-
-        //get Id
-        const id = Id(line[0..idx].to!uint);
-        enforce(id, "Invalid null id");
-        enforce(!(id in itemById), id.text~" already exists as an item. "~line.quoted);
-        enforce(!(id in linkById), id.text~" already exists as a link. "~line.quoted);
-
-        const lineType = line[idx];
-        line = line[idx+1..$];
-
-        switch(lineType){
-          case '=':{ //Item
-            _internalCreateItem(id, autoUnquoted(line));
-          }break;
-          case ' ':{
-            auto p = line.split(' ').map!(a => Id(a.to!uint)).array;
-            enforce(p.length.among(2, 3), "Invalid link id count. "~line.quoted);
-            if(p.length==2) p ~= Id.init;
-            foreach(a; p) enforce(!a || a in itemById || a in linkById, "Invalid link id: "~a.text~" "~line.quoted);
-            _internalCreateLink(id, Link(p[0], p[1], p[2]));
-
-          }break;
-          default: raise("Unknown lineType. "~line.quoted);
-        }
-
-        lastIdIndex.maximize(id.id);
-
-      }
-    }catch(Exception e){
-      raise("AMDB load error: "~e.simpleMsg);
-    }
+    load;
   }
 
   this(File file){ this(new TextDBFile(file)); }
   this(string fileName){ this(File(fileName)); }
 
-  bool autoCreateETypes   = true;
-  bool autoCreateVerbs    = true;
-  bool autoCreateEntities = false;
+  //clear all the internal data. Does not change the dbFile.
+  private void clear(){
+    lastIdIndex = 0;
+    links.clear;
+    items.clear;
+  }
+
+  File file(){ return dbFileInterface ? dbFileInterface.file : File(""); }
 
   void error(string s) const{ throw new AMDBException(s); }
 
   static string autoQuoted(string s){
     //todo: slow
-    if(s.canFind!(ch => ch<32 || ch.among('"', '\'', '`')) || s.canFind("  ") || s.canFind("..."))return s.quoted;
+    if(s.canFind!(ch => ch<32 || ch.among('"', '\'', '`', '\\')) || s.canFind("  ") || s.canFind("..."))return s.quoted;
     else return s;
   }
 
@@ -118,8 +98,8 @@ class AMDB{
   struct Id{
     uint id;
 
-    @property bool isNull() const { return id==0; }
-    T opCast(T: bool)() const { return this.id != 0; }
+    bool valid() const { return id!=0; }
+    bool opCast(B: bool)() const { return valid; }
 
     size_t toHash() const @safe pure nothrow{ return id; }
     bool opEquals(ref const Id b) const @safe pure nothrow{ return id==b.id; }
@@ -132,90 +112,101 @@ class AMDB{
     void deserializeText(string s){ id = s.to!uint(10); }
   }
 
-  protected uint lastIdIndex;
+  private Id _internal_generateNextId(){ return Id(++lastIdIndex); }
 
-  Id nextId(){
-    return Id(++lastIdIndex);
-  }
+  /// When an item is loaded
+  private void _internal_maximizeNextId(in Id id){ lastIdIndex.maximize(id.id); }
 
-  // When an item is imported
-  void updateNextId(in Id id){
-    lastIdIndex.maximize(id.id);
-  }
+  // Items /////////////////////////////
 
-  // Commit buffer ////////////////////
+  struct Items{
+    private AMDB db;
+    private string[Id] byId;
+    private Id[string] byItem;
 
-  private string[] commitBuffer;
+    // data access -------------------------------------------
 
-  bool inTransaction(){ return commitBuffer.length>0; }
+    auto ids(){ return byId.keys; }
+    auto strings(){ return byItem.keys; }
 
-  void commit(){
-    if(!inTransaction) return;
+    auto count() const{ return byId.length; }
 
-    if(dbFileInterface){
-      dbFileInterface.appendLines(commitBuffer);
+    string get(in Id id                 ) const{ if(auto a = id in byId) return *a; else return "" ; }
+    string get(in Id id, lazy string def) const{ if(auto a = id in byId) return *a; else return def; }
+
+    string require(in Id id                 ) const{ if(auto a = id in byId) return *a; else{ db.error(format!"Required id %s not found."   (id     )); assert(0); } }
+    string require(in Id id, lazy string msg) const{ if(auto a = id in byId) return *a; else{ db.error(format!"Required id %s not found. %s"(id, msg)); assert(0); } }
+
+    Id get(string str             ) const{ if(auto a = str in byItem) return *a; else return Id.init; }
+    Id get(string str, lazy Id def) const{ if(auto a = str in byItem) return *a; else return def    ; }
+
+    Id require(string str                 ) const{ if(auto a = str in byItem) return *a; else{ db.error(format!"Required item %s not found."   (str.quoted     )); assert(0); } }
+    Id require(string str, lazy string msg) const{ if(auto a = str in byItem) return *a; else{ db.error(format!"Required item %s not found. %s"(str.quoted, msg)); assert(0); } }
+
+    auto opBinaryRight(string op)(in Id id) if(op=="in"){
+
+      struct ItemResult{
+        string str;
+        bool valid;
+        alias str this;
+        bool opCast(B : bool)() const{ return valid; }
+      }
+
+      if(auto a = id in byId) return ItemResult(*a, true); else return ItemResult.init;
     }
 
-    commitBuffer = null;
+    Id opBinaryRight(string op)(string str) if(op=="in"){ return get(str); }
+
+    string opIndex(in Id id) const{ return require(id); }
+    Id opIndex(string str) const{ return require(str); }
+
+    // data manipulation -------------------------------------------------------
+
+    private void clear(){ byId = null; byItem = null; }
+
+    private Id create(string name, void delegate(Id) onCreate = null){
+      auto id = get(name);
+      if(id) return id;
+
+      id = db._internal_generateNextId;
+      db._internal_createItem(id, name);
+      db.onItemCreated(id);
+      if(onCreate !is null) onCreate(id);
+      return id;
+    }
+
+    private void load(in Id id, string data){
+      if(!id) db.error("Invalid null id");
+      if(id in db.links) db.error(format!"Load error: Item id already exists as a link. id=%s old=%s new=%s"(id, db.toStr(id), data));
+      if(auto existing = id in this){
+        if(existing==data) return; //already loaded, id is the same
+        db.error(format!"Load error: Id already exists with different item data. id=%s old=%s new=%s"(id, db.toStr(id), data));
+      }
+      //id is free, check duplicated data
+      if(get(data)) format!"Load error: Item already exists with different id. new=%s"(data);
+
+      //good to go, create it
+      db._internal_createItem(id, data);
+      db._internal_maximizeNextId(id);
+    }
   }
-
-  void cancel(){
-    if(!inTransaction) return;
-
-    NOTIMPL;
-  }
-
-  // Item /////////////////////////////
-
-  private string[Id] itemById;
-  private Id[string] idByItem;
-
-  private enum Access{ get, require, create }
-
-  // returns Id.null if not found
-  Id itemId_get(string name)                                    { if(auto id = name in idByItem) return *id; else return Id.init; }
-
-  // return defaault id if not found
-  Id itemId_get(string name, lazy Id def)                       { if(auto id = name in idByItem) return *id; else return def; }
-
-  // throws an exception if not found
-  Id itemId_require(string name, lazy string errorMsg="")       { if(auto id = name in idByItem) return *id;
-                                                                                            else{ error(format!"Required item %s not found. %s"(name, errorMsg)); assert(0); } }
 
   //inserts into the lists, called by itemId_create and importItem
-  protected void _internalCreateItem(in Id id, string name){
-    idByItem[name] = id;
-    itemById[id] = name;
+  private void _internal_createItem(in Id id, string name){
+    items.byItem[name] = id;
+    items.byId[id] = name;
   }
 
-  // auto-create if not found
-  Id itemId_create(string name, void delegate(Id) onCreate = null){
-    if(auto res = itemId_get(name)) return res;
-
-    auto id = nextId;
-    _internalCreateItem(id, name);
-    onItemCreated(id);
-    if(onCreate !is null) onCreate(id);
-    return id;
+  private bool _internal_tryRemoveItem(in Id id){
+    if(auto item = id in items){
+      items.byId.remove(id);
+      items.byItem.remove(item);
+      return true;
+    }
+    return false;
   }
 
-
-  bool isItem(in Id id   ) const{ return (id in itemById)!is null; }
-  bool isItem(string name) const{ return (name in idByItem)!is null; }
-
-  string itemStr(in Id id) const{
-    if(auto a = id in itemById) return *a;
-    error("Item doesn't exists: "~id.text);
-    assert(0);
-  }
-
-  string itemStr(in Id id, lazy string def) const{
-    if(auto a = id in itemById) return *a;
-    return def;
-  }
-
-  size_t itemCount() const { return itemById.length; }
-  // Link //////////////////////////////////////
+  // Links //////////////////////////////////////
 
   struct Link{
     Id sourceId, verbId, targetId;
@@ -229,15 +220,87 @@ class AMDB{
           && verbId  ==b.verbId
           && targetId==b.targetId;
     }
+
+    bool valid() const { return sourceId.valid && verbId.valid; }
+    bool opCast(B : bool)() const{ return valid; }
   }
 
-  Link[Id] linkById;
-  Id[Link] idByLink;
+  struct Links{
+    private AMDB db;
+    private Link[Id] byId;
+    private Id[Link] byLink;
+
+    // data access -------------------------------------------
+
+    auto ids(){ return byId.keys; }
+    auto links(){ return byLink.keys; }
+
+    auto count() const{ return byId.length; }
+
+    Link get(in Id id               ) const{ if(auto a = id in byId) return *a; else return Link.init; }
+    Link get(in Id id, lazy Link def) const{ if(auto a = id in byId) return *a; else return def      ; }
+
+    Link require(in Id id                 ) const{ if(auto a = id in byId) return *a; else{ db.error(format!"Required link %s not found."   (id     )); assert(0); } }
+    Link require(in Id id, lazy string msg) const{ if(auto a = id in byId) return *a; else{ db.error(format!"Required link %s not found. %s"(id, msg)); assert(0); } }
+
+    Id get(in Link link               ) const{ if(auto a = link in byLink) return *a; else return Id.init; }
+    Id get(in Link link, lazy Id defId) const{ if(auto a = link in byLink) return *a; else return defId  ; }
+
+    Id get(in Id sourceId, in Id verbId                ) const{ return get(Link(sourceId, verbId          )); }
+    Id get(in Id sourceId, in Id verbId, in Id targetId) const{ return get(Link(sourceId, verbId, targetId)); }
+
+    Id require(in Link link                 ) const{ if(auto a = link in byLink) return *a; else{ db.error(format!"Required link %s not found."   (link     )); assert(0); } }
+    Id require(in Link link, lazy string msg) const{ if(auto a = link in byLink) return *a; else{ db.error(format!"Required link %s not found. %s"(link, msg)); assert(0); } }
+
+    Id require(in Id sourceId, in Id verbId                ) const{ return require(Link(sourceId, verbId          )); }
+    Id require(in Id sourceId, in Id verbId, in Id targetId) const{ return require(Link(sourceId, verbId, targetId)); }
+
+    auto opBinaryRight(string op)(in Id id) if(op=="in"){ return get(id); }
+    Id opBinaryRight(string op)(in Link link) if(op=="in"){ return get(link); }
+
+    Link opIndex(in Id id) const{ return require(id); }
+    Id opIndex(in Link link) const{ return require(link); }
+
+    // data manipulation -------------------------------------------------------
+
+    private void clear(){ byId = null; byLink = null; }
+
+    private Id create(in Id sourceId, in Id verbId, in Id targetId=Id.init){
+      auto link = Link(sourceId, verbId, targetId);
+      auto id = get(link);
+      if(id) return id; //access if can
+
+      id = db._internal_generateNextId;
+      db._internal_createLink(id, link);
+      db.onLinkCreated(id);
+
+      return id;
+    }
+
+    private void load(in Id id, in Link data){
+      if(!id) db.error("Invalid null id");
+      if(id in db.items) db.error(format!"Load error: Link id already exists as an item. id=%s old=%s new=%s"(id, db.toStr(id), data));
+      if(auto link = id in this){
+        if(link==data) return; //already loaded, id is the same
+        db.error(format!"Load error: Id already exists with different link data. id=%s old=%s new=%s"(id, db.toStr(id), data));
+      }
+      //id is free, check duplicated data
+      if(get(data)) format!"Load error: Link already exists with different id. new=%s"(data);
+
+      //good to go, create it
+      db._internal_createLink(id, data);
+      db._internal_maximizeNextId(id);
+    }
+
+
+  }
+
+  // toStr //////////////////////////////////////////////////////////////////
 
   string toStr(in Id id, int recursion=0){
     if(!id) return "Null";
-    if(auto item = id in itemById) return format!"Item(%s, %s)"(id, (*item).quoted);
-    if(auto link = id in linkById) with(*link){
+    if(auto item = id in items) return format!"Item(%s, %s)"(id, (item).quoted);
+    if(auto link = id in links) with(link){
       if(recursion-->0){
         return format!"Link(%s, %s, %s, %s)"(id, toStr(sourceId, recursion), toStr(verbId, recursion), toStr(targetId, recursion));
       }else{
@@ -247,105 +310,173 @@ class AMDB{
     return format!"Unknown(%s)"(id);
   }
 
-  string prettyStr(in Id id, bool recursion=false){
-    if(!id) return "Null";
-    if(auto item = id in itemById){
-      string s = *item;
-      if(isSystemVerb(s)) return EgaColor.ltWhite(s);
-      if(isSystemType(s)) return EgaColor.ltGreen(s);
-      if(isVerb(id))      return EgaColor.yellow(s);
-      if(isEType(id))     return EgaColor.ltMagenta(s);
-      if(isEntity(id))    return EgaColor.ltBlue(s);
-      return s;
+  string colorizeItem(in Id id){
+    return colorizeItem(items.get(id, id.text));
+  }
+
+  string colorizeItem(string s){
+    if(isSystemVerb(s)) return EgaColor.ltWhite(s);
+    if(isSystemType(s)) return EgaColor.ltGreen(s);
+
+    if(auto id = s in items){
+      if(isVerb(id)) return EgaColor.yellow(s);
+      if(isEType(id)) return EgaColor.ltMagenta(s);
+      if(isEntity(id)) return EgaColor.ltBlue(s);
     }
-    if(auto link = id in linkById) with(*link){
-      if(recursion){
+    return s;
+  }
+
+  ///this is an old version... Should use the new one below...
+  string prettyStr(in Id id, bool recursion=true){
+    if(!id) return "Null";
+    if(auto item = id in items){
+      string s = colorizeItem(autoQuoted(item));
+
+      if(!recursion){
+        return s;
+      }else{
+        return format!"%s : %s"(id, s);
+      }
+    }
+    if(auto link = id in links) with(link){
+      if(!recursion){
         return format!"...%s"(id);
       }else{
-        return format!"%s : %s  %s  %s"(id, prettyStr(sourceId, true), prettyStr(verbId, true), prettyStr(targetId, true));
+        return format!"%s : %s  %s  %s"(id, prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false));
       }
     }
     return format!"Unknown(%s)"(id);
   }
 
-  protected void _internalCreateLink(in Id id, in Link link){
-    linkById[id] = link;
-    idByLink[link] = id;
+  string prettyStr(in IdSequence seq){
+
+    string prettyStr(in Id id, bool recursion=true){
+      if(!id) return "Null";
+      if(auto item = id in items){
+        return colorizeItem(autoQuoted(item));
+      }
+      if(auto link = id in links) with(link){
+        if(!recursion){
+          return "...";
+        }else{
+          return format!"%s  %s  %s"(prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false));
+        }
+      }
+      return format!"Unknown(%s)"(id);
+    }
+
+    return seq.ids.map!(i => prettyStr(i, true)).join("  ");
   }
 
-  Id linkId(in Id sourceId, in Id verbId, in Id targetId=Id.init, bool createNew=true){
-    auto link = Link(sourceId, verbId, targetId);
-    if(auto id = link in idByLink){
-      //print(format!"Link accessed: %s"(linkToStr(*id, link)));
-      return *id;
-    }
-    if(createNew){
-      auto id = nextId;
-      _internalCreateLink(id, link);
-      onLinkCreated(id);
-      return id;
-    }else{
-      return Id.init;
-    }
+  private void _internal_createLink(in Id id, in Link link){
+    links.byId[id] = link;
+    links.byLink[link] = id;
   }
-
-  bool isLink(in Id id) const{ return (id in linkById)!is null; }
 
   bool isInstanceOf(string entity, in Id eTypeId){
     return exists(entity, "is a", eTypeId); //todo: "has supertype" handling
   }
 
-  size_t linkCount() const { return linkById.length; }
+  // Delete, modify (no commit handling)///////////////////////////////////////////////////
+
+  bool hasReferences(in Id id){
+    if(!id) return false;
+    //opt: slow linear search
+    foreach(const link; links.links) if(link.sourceId==id || link.verbId==id || link.targetId==id) return true;
+    return false;
+  }
+
+  bool _internal_tryRemoveLink(in Id id){
+    if(auto link = id in links){
+      links.byId.remove(id);
+      links.byLink.remove(link);
+      return true;
+    }
+    return false;
+  }
+
+  void deleteThing(in Id id){
+    if(!id) return; //no need to delete null
+    enforce(!hasReferences(id), "Can't delete, because it has rteferences:  "~prettyStr(id));
+    if(_internal_tryRemoveItem(id) || _internal_tryRemoveLink(id)) return;
+    raise("Can't delete thing. Id not found: "~id.text);
+  }
+
+  void _internal_replaceLink(in Id linkId, in Link oldLink, in Link newLink){
+    links.byLink.remove(oldLink);
+    links.byId[linkId] = newLink;
+    links.byLink[newLink] = linkId;
+  }
+
+  void changeTargetTo(in Id linkId, in Id newTargetId){
+    const oldLink = enforce(linkId in links, "CTT: Link not found: "~linkId.text);
+
+    if(oldLink.targetId==newTargetId) return; //nothing changed
+    const newLink = Link(oldLink.sourceId, oldLink.verbId, newTargetId);
+
+    //check is the modified link already exists.
+    const existingLinkId = newLink in links;
+    if(existingLinkId) raise("CTT: modified link already exists: "~prettyStr(existingLinkId));
+
+    //update the internal state
+    _internal_replaceLink(linkId, oldLink, newLink);
+  }
 
   // Central notification handling ////////////////////////////
 
   //called after create but not when loading
   void onItemCreated(in Id id){
     commitBuffer ~= serializeText(id);
+    cancelBuffer ~= '~'~id.serializeText;
   }
 
   //called after create but not when loading
   void onLinkCreated(in Id id){
     commitBuffer ~= serializeText(id);
+    cancelBuffer ~= '~'~id.serializeText;
+  }
+
+  // Commit buffer ////////////////////
+
+  private string[] commitBuffer, cancelBuffer;
+
+  bool inTransaction(){ return commitBuffer.length>0; }
+
+  void commit(){
+    if(!inTransaction) return;
+
+    if(dbFileInterface)
+      dbFileInterface.appendLines(commitBuffer); //todo: transaction header/footer
+
+    commitBuffer = null;
+    cancelBuffer = null;
+  }
+
+  void cancel(){
+    if(!inTransaction) return;
+    enforce(cancelBuffer.length == commitBuffer.length, "Cancel/commit buffer inconsistency: " ~ cancelBuffer.length.text ~ "!=" ~ commitBuffer.length.text);
+
+    while(cancelBuffer.length){
+      auto s = cancelBuffer[$-1];
+      try{
+        if(s.startsWith('~')){
+          Id id;  id.deserializeText(s[1..$]);
+          deleteThing(id);
+        }else NOTIMPL;
+      }finally{
+        cancelBuffer = cancelBuffer[0..$-1];
+        commitBuffer = commitBuffer[0..$-1];
+      }
+    }
   }
 
   // serialization ////////////////////////////////////////////
 
-  protected void loadItem(in Id id, string data){
-    if(isLink(id)) error(format!"Load error: Item id already exists as a link. id=%s old=%s new=%s"(id, toStr(id), data));
-    if(auto item = id in itemById){
-      if(*item==data) return; //already loaded, id is the same
-      error(format!"Load error: Id already exists with different item data. id=%s old=%s new=%s"(id, toStr(id), data));
-    }
-    //id is free, check duplicated data
-    if(data in idByItem) format!"Load error: Item already exists with different id. new=%s"(data);
-
-    //good to go, create it
-    _internalCreateItem(id, data);
-    updateNextId(id);
-  }
-
-  protected void loadLink(in Id id, in Link data){
-    if(isItem(id)) error(format!"Load error: Link id already exists as an item. id=%s old=%s new=%s"(id, toStr(id), data));
-    if(auto link = id in linkById){
-      if(*link==data) return; //already loaded, id is the same
-      error(format!"Load error: Id already exists with different link data. id=%s old=%s new=%s"(id, toStr(id), data));
-    }
-    //id is free, check duplicated data
-    if(data in idByLink) format!"Load error: Link already exists with different id. new=%s"(data);
-
-    //good to go, create it
-    _internalCreateLink(id, data);
-    updateNextId(id);
-  }
-
   string serializeText(in Id id){
-
-
-    if(auto link = id in linkById){
-      with(*link) return id.serializeText ~" "~ sourceId.serializeText ~" "~ verbId.serializeText ~(targetId ? " "~targetId.serializeText : "");
-    }else if(auto item = id in itemById){
-      auto s = autoQuoted(*item);
+    if(auto link = id in links){
+      with(link) return id.serializeText ~" "~ sourceId.serializeText ~" "~ verbId.serializeText ~(targetId ? " "~targetId.serializeText : "");
+    }else if(auto item = id in items){
+      auto s = autoQuoted(item);
       //string is closed with newLine.  Only need to escape when it contains newLine or starts with the escape quote. But to make sure, escape it if it contains any special chars
       return id.serializeText~"="~s;
     }else error("Invalid Id to serialize:"~id.text);
@@ -354,28 +485,38 @@ class AMDB{
 
   string serializeText(R)(in R r){ return r.map!(i => serializeText(i)~"\n").join; }
 
-  void deserializeText(string input){
-    if(input.strip=="") return;
+  void deserializeLine(string line){
+    line = line.strip;
+    if(line=="") return;
+    const idx = line.map!(ch => ch==' ' || ch=='=').countUntil(true);
+    enforce(idx>0, "Invalid text db line format: "~line.quoted);
 
-    //todo: 2passes: 1. prepare, 2. if no error: import... Option to ignore errors
-    foreach(line; input.splitLines){
-      auto p0 = line.map!(a => a.among(' ', '=')).countUntil(true);
-      if(p0<=0) WARN("Invalid AMDB text format: "~line.quoted);
-      const isItem = line[p0]=='=';
-      Id id; id.deserializeText(line[0..p0]);
-      line = line[p0+1..$];
-      if(isItem){
-        loadItem(id, autoUnquoted(line));
-      }else{
-        Link link;
-        auto p = line.split(' ');
-        enforce(p.length.among(2, 3), "Invalid link serialization format");
-        link.sourceId                   .deserializeText(p[0]);
-        link.verbId                     .deserializeText(p[1]);
-        if(p.length==3) link.targetId   .deserializeText(p[2]);
+    //get Id
+    const id = Id(line[0..idx].to!uint);
+    const lineType = line[idx];
+    line = line[idx+1..$];
 
-        loadLink(id, link);
-      }
+    switch(lineType){
+      case '=':{ //Item
+        items.load(id, autoUnquoted(line));
+      }break;
+      case ' ':{
+        auto p = line.split(' ').map!(a => Id(a.to!uint)).array;
+        enforce(p.length.among(2, 3), "Invalid link id count. "~line.quoted);
+        if(p.length==2) p ~= Id.init;
+        foreach(a; p) enforce(!a || a in items || a in links, "Invalid link id: "~a.text~" "~line.quoted);
+        links.load(id, Link(p[0], p[1], p[2]));
+      }break;
+      default: raise("Unknown lineType. "~line.quoted);
+    }
+  }
+
+  private void load(){
+    try{
+      clear;
+      if(dbFileInterface) foreach(line; dbFileInterface.readLines) deserializeLine(line);
+    }catch(Exception e){
+      raise("AMDB load error: "~e.simpleMsg);
     }
   }
 
@@ -415,14 +556,14 @@ class AMDB{
   bool isSystemVerb(string name){ return (name in systemVerbMap)!is null; }
 
   Id sysId(string name){
-    if(auto id = itemId_get(name)) return id;
-    if(isSystemVerb(name) || isSystemType(name)) return itemId_create(name);
+    if(auto id = name in items) return id;
+    if(isSystemVerb(name) || isSystemType(name)) return items.create(name);
 
     error("Invalid sysId name. Must be a systemVerb or a systemType. "~name.quoted);
     assert(0);
   }
 
-  protected void verifyETypeName(string s){
+  private void verifyETypeName(string s){
     enforce(s.length, "Invalid entity name. Empty string. "~s.quoted);
     auto ch = s.decodeFront;
     enforce(ch.isLetter && ch==ch.toUpper, "Invalid entity name. Must start with a capital letter. "~s.quoted);
@@ -430,7 +571,7 @@ class AMDB{
     enforce(!isSystemVerb(s), "Invalid entity name. Can't be a system verb. "~s.quoted);
   }
 
-  protected void verifyVerbName(string s){
+  private void verifyVerbName(string s){
     enforce(s.length, "Invalid verb name. Empty string. "~s.quoted);
     auto olds = s; //todo: it's ugly
     auto ch = s.decodeFront;
@@ -440,20 +581,20 @@ class AMDB{
   }
 
   bool exists(S, V, T)(in S s, in V v, in T t){
-    static if(is(S==Id)) auto si = s; else auto si = itemId_get(s);
-    static if(is(V==Id)) auto vi = v; else auto vi = itemId_get(v);
-    static if(is(T==Id)) auto ti = t; else auto ti = itemId_get(t);
-    return (Link(si, vi, ti) in idByLink) !is null;
+    static if(is(S==Id)) auto si = s; else auto si = s in items;
+    static if(is(V==Id)) auto vi = v; else auto vi = v in items;
+    static if(is(T==Id)) auto ti = t; else auto ti = t in items;
+    return (Link(si, vi, ti) in links).valid; //this is fast
   }
 
-  bool exists(S, V)(in S s, in V v){ return exists(s, v); }
+  bool exists(S, V)(in S s, in V v){ return exists(s, v, Id.init); }
 
   auto filter(S, V, T)(in S source, in V verb, in T target){
     bool test(in Link link){
 
       bool testOne(T)(in Id id, in T criteria){
         static if(isSomeString!T){
-          if(!itemById.get(id).isWild(criteria)) return false;
+          if(!items.get(id).isWild(criteria)) return false;
         }else static if(is(Unqual!T == Id)){
           if(source && id != criteria) return false;
         }else static assert(0, "Invalid params");
@@ -466,33 +607,31 @@ class AMDB{
       return true;
     }
 
-    return linkById.byKeyValue.filter!(a => test(a.value)).map!"a.key";
+    return links.byId.byKeyValue.filter!(a => test(a.value)).map!"a.key";
   }
 
   bool isAType(T)(in T a){ return exists(a, "is a", "AType"); }
   bool isEType(T)(in T a){ return exists(a, "is a", "EType"); }
   bool isVerb (T)(in T a){ return exists(a, "is a", "Verb" ); }
 
-  bool isEntity(in Id id){ return filter(id, "is a", "*").any!(a => isEType(linkById[a].targetId)); }
+  bool isEntity(in Id id){ return filter(id, "is a", "*").any!(a => isEType(links[a].targetId)); }
 
-  auto items(){ return itemById.keys; }
-  auto links(){ return linkById.keys; }
-  auto things(){ return chain(items, links); }
-  auto verbs() { return filter("*", "is a", "Verb" ).map!(a => linkById[a].sourceId); }
-  auto eTypes(){ return filter("*", "is a", "EType").map!(a => linkById[a].sourceId); }
-  auto aTypes(){ return filter("*", "is a", "AType").map!(a => linkById[a].sourceId); }
+  auto things(){ return chain(items.ids, links.ids); }
+  auto verbs() { return filter("*", "is a", "Verb" ).map!(a => links[a].sourceId); }
+  auto eTypes(){ return filter("*", "is a", "EType").map!(a => links[a].sourceId); }
+  auto aTypes(){ return filter("*", "is a", "AType").map!(a => links[a].sourceId); }
 
   // create things /////////////////////////////
 
-  protected Id createEType(string s){
+  private Id createEType(string s){
     verifyETypeName(s);
-    return itemId_create(s, (id){ linkId(id, sysId("is a"), sysId("EType")); }); //implicit "* is a EType"
+    return items.create(s, (id){ links.create(id, sysId("is a"), sysId("EType")); }); //implicit "* is a EType"
   }
 
-  protected Id resolveType(string s){
+  private Id resolveType(string s){
     if(isSystemType(s)) return sysId(s);
 
-    if(auto id = itemId_get(s)) if(exists(id, "is a", "EType")) return id;
+    if(auto id = s in items) if(exists(id, "is a", "EType")) return id;
 
     if(autoCreateETypes){
       return createEType(s);
@@ -502,15 +641,15 @@ class AMDB{
     }
   }
 
-  protected Id createVerb(string s){
+  private Id createVerb(string s){
     verifyVerbName(s);
-    return itemId_create(s, (id){ linkId(id, sysId("is a"), sysId("Verb"));} ); //implicit "* is a Verb"
+    return items.create(s, (id){ links.create(id, sysId("is a"), sysId("Verb"));} ); //implicit "* is a Verb"
   }
 
-  protected Id resolveVerb(string s){
+  private Id resolveVerb(string s){
     if(isSystemVerb(s)) return sysId(s); //system verbs are not asserted
 
-    if(auto id = itemId_get(s)) if(exists(id, "is a", "Verb")) return id;
+    if(auto id = s in items) if(exists(id, "is a", "Verb")) return id;
 
     if(autoCreateVerbs){
       return createVerb(s);
@@ -520,21 +659,21 @@ class AMDB{
     }
   }
 
-  protected Id createVerbAssertion(string name){
+  private Id createVerbAssertion(string name){
     enforce(name!="...", "Verb Assertion source can't be a \"...\" association.");
     enforce(!isSystemType(name), "Verb Assertion source can't be a SystemType: "~name.quoted);
     enforce(!isSystemVerb(name), "Verb Assertion source can't be a SystemVerb: "~name.quoted);
     return createVerb(name);
   }
 
-  protected Id createETypeAssertion(string name){
+  private Id createETypeAssertion(string name){
     enforce(name!="...", "EType Assertion source can't be a \"...\" association.");
     enforce(!isSystemType(name), "EType Assertion source can't be a SystemType: "~name.quoted);
     enforce(!isSystemVerb(name), "EType Assertion source can't be a SystemVerb: "~name.quoted);
     return createEType(name);
   }
 
-  protected Id createEntityAssertion(string name, string type){
+  private Id createEntityAssertion(string name, string type){
     enforce(name!="...", "Entity assertion source can't be a \"...\" association.");
 
     enforce(!isSystemType(name), "Entity assertion source can't be a SystemType: "~name.quoted);
@@ -542,13 +681,13 @@ class AMDB{
     enforce(!exists(name, "is a", "EType"), "Entity assertion source can't be an EType: "~name.quoted);
     enforce(exists(type, "is a", "EType"), "Entity assertion target must be an EType: "~type.quoted);
 
-    return linkId(itemId_create(name), sysId("is a"), itemId_require(type));
+    return links.create(items.create(name), sysId("is a"), items[type]);
   }
 
   // process //////////////////////////////
 
   /// Finds and collects "" quoted string literals and replaces them with a given string
-  protected static string[] replaceQuotedStrings(ref string s, string replacement){
+  private static string[] replaceQuotedStrings(ref string s, string replacement){
     string[] res;
     string processed, act = s;
     while(1){
@@ -612,7 +751,7 @@ class AMDB{
 
   void processSchemaSentence(string[] p, ref Id id){
     enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
-    enforce(!id.isNull || p[0]!="...", "Last Id is null at sentence:"~p.text);
+    enforce(id || p[0]!="...", "Last Id is null at sentence:"~p.text);
 
     p[1] = inputTranslateVerb(p[1]);
 
@@ -630,17 +769,16 @@ class AMDB{
       }
     }else{
       //association type
-      id = linkId(p[0]=="..." ? id : resolveType(p[0]),
-                 resolveVerb(p[1]),
-                 p.length>2 ? resolveType(p[2]) : Id.init);
+      id = links.create(p[0]=="..." ? id : resolveType(p[0]),
+                        resolveVerb(p[1]),
+                        p.length>2 ? resolveType(p[2]) : Id.init);
 
-      linkId(id, sysId("is a"), sysId("AType"));
+      links.create(id, sysId("is a"), sysId("AType"));
     }
   }
 
   bool typeCheck(in Id typeId, string data){
-    if(isItem(typeId)){
-      const typeName = itemStr(typeId);
+    if(const typeName = typeId in items){
       if(isEType(typeId)){
         return isInstanceOf(data, typeId); //todo: supertypes
       }else if(isSystemType(typeName)){ //todo: slow
@@ -657,13 +795,13 @@ class AMDB{
     return false;
   }
 
-  protected Id[] findATypesForSentence(string[] p, in Id lastTypeId){
+  private Id[] findATypesForSentence(string[] p, in Id lastTypeId){
 
     enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
     enforce(isVerb(p[1]), "Unknown verb: "~p.text);
-    Id verbId = itemId_require(p[1]);
+    Id verbId = items[p[1]];
     Id[] res;
-    foreach(aid, link; linkById) if(link.verbId==verbId) if(isAType(aid)){
+    foreach(aid, link; links.byId) if(link.verbId==verbId) if(isAType(aid)){
 
       const sourceIsOk = p[0]=="..." && link.sourceId==lastTypeId || !isAType(link.sourceId) && typeCheck(link.sourceId, p[0]);
       if(!sourceIsOk) continue;
@@ -678,7 +816,7 @@ class AMDB{
 
   void processDataSentence(string[] p, ref Id tid, ref Id id){
     enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
-    enforce(!id.isNull || p[0]!="...", "Last Id is null at sentence:"~p.text);  //same until this point!!!!
+    enforce(id || p[0]!="...", "Last Id is null at sentence:"~p.text);  //same until this point!!!!
 
     p[1] = inputTranslateVerb(p[1]);
 
@@ -695,9 +833,9 @@ class AMDB{
       if(aTypes.empty) error("Unable to find AType for: "~p.text);
       if(aTypes.length>1) error("Ambiguous ATypes found for for: "~p.text~" ["~aTypes.map!(a => prettyStr(a)).join(", ")~"]");
 
-      id = linkId(p[0]=="..." ? id : itemId_create(p[0]),
-                  itemId_require(p[1]),
-                  p.length>2 ? itemId_create(p[2]) : Id.init);
+      id = links.create(p[0]=="..." ? id : items.create(p[0]),
+                        items[p[1]],
+                        p.length>2 ? items.create(p[2]) : Id.init);
       tid = aTypes[0];
     }
   }
@@ -720,63 +858,125 @@ class AMDB{
     foreach(s; textToSentences(input)) processDataSentence(s, lastDataTypeId, lastDataId);
   }
 
-  Id[] query(string input){
-    auto sentences = textToSentences(input);
-    print(sentences);
+  /// own version of wildcard check specialized to AMDB
+  private bool chkStr(string s, string mask){
+    return s.isWild(mask);
+  }
 
+  private bool chkId(in Id id, string mask){
+    string s;
+    if(!id) s = "null";
+    else if(auto a = id in items) s = a;
+    else if(id in links) s = "...";
+    else NOTIMPL;
+    return chkStr(s, mask);
+  }
+
+
+  Id[] query(string[] p){ //works on a single sentence
+    Id[] res;
+    if(p.length==1){
+      foreach(id, const item; items.byId){
+        if(chkStr(item, p[0])) res ~= id;
+      }
+    }else if(p.length==2){
+      foreach(id, const link; links.byId){
+        if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id;
+      }
+    }else if(p.length==3){
+      foreach(id, const link; links.byId){
+        if(chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
+      }
+    }else NOTIMPL;
+    return res;
+  }
+
+  /// Extends srcIds with referencing child links. Sentence must start with "..."
+  Id[] query(Id[] sourceIds, string[] p){
+    Id[] res;
+    enforce(p.length.among(2, 3), `Invalid sentence for srcId based query. Invalid sentence length. `~p.text);
+    enforce(p.get(0)=="...", `Invalid sentence for srcId based query. Source must be "...". `~p.text);
+    if(p.length==2){
+      foreach(sourceId; sourceIds){
+        foreach(id, const link; links.byId){
+          if(link.sourceId==sourceId && !link.targetId && chkId(link.verbId, p[1])) res ~= id;
+        }
+      }
+    }else if(p.length==3){
+      foreach(sourceId; sourceIds){
+        foreach(id, const link; links.byId){
+          if(link.sourceId==sourceId && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
+        }
+      }
+    }
+    return res;
+  }
+
+  /// Extends srcIds with referencing child links. generalized recursive version, works with more than one sentence
+  Id[] query(Id[] sourceIds, string[][] sentences){
+    while(sentences.length) sourceIds = query(sourceIds, sentences.fetchFront);
+    return sourceIds;
+  }
+
+  Id[] query(string[][] sentences){ //works on sentences
     Id[] res;
 
-    bool chkStr(string s, string mask){
-      return s.isWild(mask);
-    }
+    if(sentences.length==0) return null; //empty query
+    if(sentences.length==1) return query(sentences[0]); //one sentence
+    return query(query(sentences[0]), sentences[1..$]); //many sentences in a chain
+  }
 
-    bool chkId(in Id id, string mask){
-      string s;
-      if(!id) s = "null";
-      else if(isItem(id)) s = itemStr(id);
-      else if(isLink(id)) s = "...";
-      else NOTIMPL;
-      return chkStr(s, mask);
-    }
+  Id[] query(string input){
+    return query(textToSentences(input));
+  }
 
-    if(sentences.length==1){
-      auto p = sentences[0];
-      if(p.length==1){
-        foreach(id, const item; itemById){
-          if(chkStr(item, p[0])) res ~= id;
-        }
-      }else if(p.length==2){
-        foreach(id, const link; linkById){
-          if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id;
-        }
-      }else if(p.length==3){
-        foreach(id, const link; linkById){
-          if(chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
-        }
-      }else NOTIMPL;
-    }else if(sentences.length==2){
-      //todo: recursive
+  static struct IdSequence{
+    Id[] ids;
+    alias ids this;
+  }
 
-      //todo: this should be the first parameter of a specialized query: it refines a list by sourceId match
-      auto baseIds = query(sentences[0].join("  ")); //todo: don't join them again or use escaping!
-      auto p = sentences[1];
-      assert(p[0]=="...");
-      if(p.length==2){
-        foreach(baseId; baseIds){
-          foreach(id, const link; linkById){
-            if(link.sourceId==baseId && !link.targetId && chkId(link.verbId, p[1])) res ~= id;
+  // extendLeft //////////////////////////////////////////////////////////
+
+  private enum defaultExtendLeftRecursion = int.max;
+
+  IdSequence extendLeft(IdSequence seq, int recursion=defaultExtendLeftRecursion){
+    foreach(i; 0..recursion){
+      if(seq.length)
+        if(auto link = seq[0] in links.byId)
+          if(link.sourceId in links){
+            seq = IdSequence(link.sourceId ~ seq.ids);
+            continue;
           }
-        }
-      }else if(p.length==3){
-        foreach(baseId; baseIds){
-          foreach(id, const link; linkById){
-            if(link.sourceId==baseId && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
-          }
-        }
-      }else NOTIMPL;
-    }else NOTIMPL;
+      break;
+    }
+    return seq;
+  }
 
-    return res;
+  IdSequence extendLeft(Id id, int recursion=defaultExtendLeftRecursion){ return extendLeft(IdSequence([id]), recursion); }
+
+  IdSequence[] extendLeft(IdSequence[] seqs, int recursion=defaultExtendLeftRecursion){ return seqs.map!(s => extendLeft(s, recursion)).array; }
+
+  IdSequence[] extendLeft(Id[] ids, int recursion=defaultExtendLeftRecursion){ return ids.map!(i => extendLeft(i, recursion)).array; }
+
+  // extendRight //////////////////////////////////////////////////////////
+
+  Id[] linksBySourceId(in Id sourceId){
+    Id[] res;
+    foreach(id, const link; links.byId)
+      if(link.sourceId==sourceId) res ~= id;
+    return res.sort.array;
+  }
+
+  Id[] linksBySourceId_recursive(in Id sourceId){
+    return linksBySourceId(sourceId).map!(i => i ~ linksBySourceId_recursive(i)).join;
+  }
+
+  IdSequence extendRight(IdSequence seq){
+    return seq.length ? IdSequence(seq.ids ~ linksBySourceId_recursive(seq[$-1])) : seq;
+  }
+
+  IdSequence[] extendRight(IdSequence[] seq){
+    return seq.map!(s => extendRight(s)).array;
   }
 
   // text mode interface ////////////////////////////////////////////
@@ -786,23 +986,56 @@ class AMDB{
   int execTextCommand(string input){
     input = input.strip;
     try{
-      switch(input){
+      switch(input.lc){
         case "data": case "d": case "schema": case "s": case "query": case "q": textCommandMode = input[0]; break;
-        case "commit": commit; break;
+        case "commit": case "ok": commit; break;
         case "cancel": cancel; break;
 
         case "info":
+          print("Engine     : AMDB", versionStr);
+          print("  Built    :", DateTime(__TIMESTAMP__).timestamp);
+          writeln;
+          print("File       :", file.fullName);
+          print("  Size     :", format!"%.1f"(file.size/1024.0), "KB");
+          print("  Created  :", file.created.timestamp);
+          print("  Modified :", file.modified.timestamp);
+          print("  Accessed :", file.accessed.timestamp);
+          print("  Now      :", now.timestamp);
+          writeln;
+          const itemBytes = items.ids.map!(i => serializeText(i).length+1).sum; writefln!"Items: %8d %8.1f KB"(items.count, itemBytes/1024.0);
+          const linkBytes = links.ids.map!(i => serializeText(i).length+1).sum; writefln!"Links: %8d %8.1f KB"(links.count, linkBytes/1024.0);
+          writefln!"Total: %8d %8.1f KB"(items.count+links.count, (itemBytes+linkBytes)/1024.0);
+          writeln;
+          writeln("Commit buffer entries: ", commitBuffer.length ? EgaColor.red(commitBuffer.length.text) : "0");
         break;
 
-        case "exit": case "x":{
-          enforce(!inTransaction, "Pending transaction. Use \"commit\" or \"cancel\" before exiting.");
-          return false;
-        }
+        case "etypes": eTypes.each!(i => print(prettyStr(i))); break;
+        case "verbs": verbs.each!(i => print(prettyStr(i))); break;
+
+        case "commitbuffer", "commitbuf": commitBuffer.each!print; break;
+        case "cancelbuffer", "cancelbuf": cancelBuffer.each!print; break;
+
+        case "exit": case "x": enforce(!inTransaction, "Pending transaction. Use \"commit\" or \"cancel\" before exiting."); return false;
+
         default:
           switch(textCommandMode){
             case 's': schema(input); break;
             case 'd': data(input); break;
-            case 'q': query(input).sort.each!(i => print(prettyStr(i))); break;
+            case 'q':{
+              try{
+                const i = input.to!int;
+                print(prettyStr(extendLeft(Id(i))));
+              }catch(Exception){
+                const eRight = input.endsWith  ("...");  if(eRight) input = input.withoutEnding  ("...");
+                const eLeft  = input.startsWith("...");  if(eLeft ) input = input.withoutStarting("...");
+                foreach(id; query(input).sort){
+                  auto seq = IdSequence([id]);
+                  if(eRight) seq = extendRight(seq);
+                  if(eLeft) seq = extendLeft(seq);
+                  print(prettyStr(seq));
+                }
+              }
+            }break;
             default: raise("invalid mode: "~textCommandMode);
           }
       }
@@ -816,7 +1049,7 @@ class AMDB{
 
   string inputTextCommand(){
     //prompt
-    write(EgaColor.white(">"), format!" I:%d + L:%d = %d %s"(itemCount, linkCount, itemCount+linkCount, commitBuffer.length ? EgaColor.red("*"~commitBuffer.length.text~" ") : ""));
+    write(EgaColor.white(">"), format!" I:%d + L:%d = %d %s"(items.count, links.count, items.count+links.count, commitBuffer.length ? EgaColor.red("*"~commitBuffer.length.text~" ") : ""));
 
     switch(textCommandMode){
       case 's': write(EgaColor.ltMagenta("schema ")); break;

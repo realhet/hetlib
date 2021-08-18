@@ -363,6 +363,8 @@ void write(T...)(auto ref T args)
 void writeln (T...)(auto ref T args){ write(args, '\n'); }
 void writef  (T...)(string fmt, auto ref T args){ write(format(fmt, args)); }
 void writefln(T...)(string fmt, auto ref T args){ write(format(fmt, args), '\n'); }
+void writef  (string fmt, T...)(auto ref T args){ write(format!fmt(args)); }
+void writefln(string fmt, T...)(auto ref T args){ write(format!fmt(args), '\n'); }
 
 void print(T...)(auto ref T args){ //like in python
   string[] s;
@@ -5540,7 +5542,15 @@ struct DateTime{
   this(string str){
     if(str.canFind(' ')){
       auto parts = str.split(' '); //dateTime
-      this(Date(parts[0]), Time(parts[1]));
+
+      if(parts.length==2){
+        this(Date(parts[0]), Time(parts[1]));
+      }else if(parts.length==5){ //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
+        this(Date(parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int), Time(parts[3]));
+      }else{
+        throw new Exception("Invalid datetime format: "~str);
+        this(0,0,0); //fuck off, compiler!!!
+      }
     }else{
       //todo: check for digits here, not any chars!
       if      (str.isWild("????-??-??T??????.???")){ //windows timestamp.zzz
