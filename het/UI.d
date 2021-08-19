@@ -832,28 +832,34 @@ struct im{ static:
   auto hScrollInfo = ScrollInfo('H');
   auto vScrollInfo = ScrollInfo('V');
 
-  void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){  // Column //////////////////////////////
-    mixin(prepareId, enable.M);
-
-    auto column = new .Column;
-    append(column); push(column, id_); scope(exit) pop;
-
-    column.bkColor = style.bkColor;
-
-    static foreach(a; args){{ alias t = typeof(cast()a);  //todd: refactor copypaste
-
+  private void processContainerArgs(Args...)(in Args args){
+    static foreach(a; args){{ alias t = typeof(cast()a);
            static if(isFunctionPointer!a) a();
       else static if(isDelegate!a       ) a();
       else static if(isSomeString!t     ) Text(a);
       else static if(is(t == YAlign)    ) flags.yAlign = a;
       else static if(is(t == HAlign)    ) flags.hAlign = a;
       else static if(is(t == VAlign)    ) flags.vAlign = a;
-      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
+      else static if(is(t == TextStyle) ) textStyle = a;
+      else static if(is(t == RGB)       ) style.bkColor = bkColor = a;
+      else static if(is(t == Padding)   ) padding = a;
+      else static if(is(t == Border)    ) border = a;
+      else static if(is(t == Margin)    ) margin = a;
       else static if(is(t == SyntaxKind)){ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
       else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
       else static assert(false, "Unsupported type: "~t.stringof);
-
     }}
+  }
+
+  void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){  // Column //////////////////////////////
+    mixin(prepareId, enable.M);
+
+    auto column = new .Column;
+    append(column); push(column, id_); scope(exit) pop;
+
+    column.bkColor = style.bkColor; //todo: miafaszom ez?
+
+    processContainerArgs(args);
   }
 
   void Row(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){  // Row //////////////////////////////
@@ -862,20 +868,7 @@ struct im{ static:
     auto row = new .Row("", textStyle);
     append(row); push(row, id_); scope(exit) pop;
 
-    static foreach(a; args){{ alias t = Unqual!(typeof(a));
-
-           static if(isFunctionPointer!a) a();
-      else static if(isDelegate!a       ) a();
-      else static if(isSomeString!t     ) Text(a);
-      else static if(is(t == YAlign)    ) flags.yAlign = a;
-      else static if(is(t == HAlign)    ) flags.hAlign = a;
-      else static if(is(t == VAlign)    ) flags.vAlign = a;
-      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
-      else static if(is(t == SyntaxKind)){ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
-      else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
-      else static assert(false, "Unsupported type: "~t.stringof);
-
-    }}
+    processContainerArgs(args);
   }
 
   void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(T args){  // Container //////////////////////////////
@@ -884,21 +877,7 @@ struct im{ static:
     auto cntr = new CType;
     append(cntr); push(cntr, id_); scope(exit) pop;
 
-    static foreach(a; args){{ alias t = Unqual!(typeof(a));
-
-           static if(isFunctionPointer!a) a();
-      else static if(isDelegate!a       ) a();
-      else static if(isSomeString!t     ) Text(a);
-      else static if(is(t == YAlign)    ) flags.yAlign = a;
-      else static if(is(t == HAlign)    ) flags.hAlign = a;
-      else static if(is(t == VAlign)    ) flags.vAlign = a;
-      else static if(is(t == RGB)       ){ bkColor = a; style.bkColor = a; }
-      else static if(is(t == SyntaxKind)){ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
-      else static if(is(t == GenericArg!(N, T), string N, T) && N=="id"){ }
-      else static assert(false, "Unsupported type: "~t.stringof);
-
-    }}
-
+    processContainerArgs(args);
   }
 
   // popup state

@@ -531,7 +531,7 @@ class AMDB{
 
   // systemTypes //////////////////////////////////////////
 
-  immutable allSystemTypes = ["Verb", "EType", "AType", "String", "Int", "Float", "DateTime"];
+  immutable allSystemTypes = ["Verb", "EType", "AType", "String", "Int", "Float", "DateTime", "Date", "Time"];
 
   auto systemTypeMap(){
     static int[string] m;
@@ -786,6 +786,8 @@ class AMDB{
           case "String": return true;
           case "Int": return data.to!int.collectException is null;
           case "DateTime": return data.DateTime.collectException is null;
+          case "Date": return data.Date.collectException is null;
+          case "Time": return data.Time.collectException is null;
           default:
         }
       }
@@ -814,6 +816,22 @@ class AMDB{
     return res;
   }
 
+  private bool walkToSourceAType(ref Id id){
+    if(auto link = id in links) if(isAType(link.sourceId)){
+        id = link.sourceId;
+        return true;
+      }
+    return false;
+  }
+
+  private bool walkToSourceLink(ref Id id){
+    if(auto link = id in links) if(link.sourceId in links){
+        id = link.sourceId;
+        return true;
+      }
+    return false;
+  }
+
   void processDataSentence(string[] p, ref Id tid, ref Id id){
     enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
     enforce(id || p[0]!="...", "Last Id is null at sentence:"~p.text);  //same until this point!!!!
@@ -827,12 +845,23 @@ class AMDB{
       }else{
         enforce(0, "Unhandled system verb in data: "~p.text);
       }
-    }else{
-      //association
-      auto aTypes = findATypesForSentence(p, tid);
+    }else{ //association
+      //find a valid atype for this sentence. Try to step back to sourceId if that is an atype.
+      Id[] aTypes;
+      auto tempTid = tid, tempId = id;
+      do{
+        aTypes = findATypesForSentence(p, tempTid);
+      }while(aTypes.empty && p[0]=="..." && walkToSourceAType(tempTid) && walkToSourceLink(tempId));
+
+      //check if exactly one type found
       if(aTypes.empty) error("Unable to find AType for: "~p.text);
       if(aTypes.length>1) error("Ambiguous ATypes found for for: "~p.text~" ["~aTypes.map!(a => prettyStr(a)).join(", ")~"]");
 
+      //ok to go. Actualize current id and tid after a possible step-back
+      id = tempId;
+      tid = tempTid;
+
+      //create the link
       id = links.create(p[0]=="..." ? id : items.create(p[0]),
                         items[p[1]],
                         p.length>2 ? items.create(p[2]) : Id.init);

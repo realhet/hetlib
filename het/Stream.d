@@ -772,6 +772,17 @@ struct PropArray{ // PropArray ////////////////////////////////////////////
     return p.asText;
   }
 
+  //todo: getDef is a bad name. Should be combined with normal get()
+  auto getDef(string name, string def){
+    if(auto p = get(name)) return p.asText;
+    return def;
+  }
+
+  auto getDef(string name, int def){
+    if(auto p = get(name)) try{ return p.asText.to!int; }catch(Exception){}
+    return def;
+  }
+
   bool exists(string name){ return get(name) !is null; }
 
   void update(){
