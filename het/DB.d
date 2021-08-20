@@ -162,16 +162,31 @@ class AMDB{
 
     // data manipulation -------------------------------------------------------
 
+    //inserts into the lists, called by itemId_create and importItem
+    private void _internal_createItem(in Id id, string name){
+      byItem[name] = id;
+      byId[id] = name;
+    }
+
+    private bool _internal_tryRemoveItem(in Id id){
+      if(auto item = id in this){
+        byId.remove(id);
+        byItem.remove(item);
+        return true;
+      }
+      return false;
+    }
+
     private void clear(){ byId = null; byItem = null; }
 
-    private Id create(string name, void delegate(Id) onCreate = null){
+    private Id create(string name, void delegate(Id) afterCreate = null){
       auto id = get(name);
       if(id) return id;
 
       id = db._internal_generateNextId;
-      db._internal_createItem(id, name);
+      _internal_createItem(id, name);
       db.onItemCreated(id);
-      if(onCreate !is null) onCreate(id);
+      if(afterCreate) afterCreate(id);
       return id;
     }
 
@@ -186,24 +201,9 @@ class AMDB{
       if(get(data)) format!"Load error: Item already exists with different id. new=%s"(data);
 
       //good to go, create it
-      db._internal_createItem(id, data);
       db._internal_maximizeNextId(id);
+      _internal_createItem(id, data);
     }
-  }
-
-  //inserts into the lists, called by itemId_create and importItem
-  private void _internal_createItem(in Id id, string name){
-    items.byItem[name] = id;
-    items.byId[id] = name;
-  }
-
-  private bool _internal_tryRemoveItem(in Id id){
-    if(auto item = id in items){
-      items.byId.remove(id);
-      items.byItem.remove(item);
-      return true;
-    }
-    return false;
   }
 
   // Links //////////////////////////////////////
@@ -263,6 +263,20 @@ class AMDB{
 
     // data manipulation -------------------------------------------------------
 
+    private void _internal_createLink(in Id id, in Link link){
+      byId[id] = link;
+      byLink[link] = id;
+    }
+
+    bool _internal_tryRemoveLink(in Id id){
+      if(auto link = id in this){
+        byId.remove(id);
+        byLink.remove(link);
+        return true;
+      }
+      return false;
+    }
+
     private void clear(){ byId = null; byLink = null; }
 
     private Id create(in Id sourceId, in Id verbId, in Id targetId=Id.init){
@@ -271,7 +285,7 @@ class AMDB{
       if(id) return id; //access if can
 
       id = db._internal_generateNextId;
-      db._internal_createLink(id, link);
+      _internal_createLink(id, link);
       db.onLinkCreated(id);
 
       return id;
@@ -288,8 +302,8 @@ class AMDB{
       if(get(data)) format!"Load error: Link already exists with different id. new=%s"(data);
 
       //good to go, create it
-      db._internal_createLink(id, data);
       db._internal_maximizeNextId(id);
+      _internal_createLink(id, data);
     }
 
 
@@ -327,50 +341,33 @@ class AMDB{
   }
 
   ///this is an old version... Should use the new one below...
-  string prettyStr(in Id id, bool recursion=true){
+  /*string prettyStr(in Id id, bool recursion=true){
     if(!id) return "Null";
     if(auto item = id in items){
       string s = colorizeItem(autoQuoted(item));
-
-      if(!recursion){
-        return s;
-      }else{
-        return format!"%s : %s"(id, s);
-      }
+      return recursion ? format!"%s : %s"(id, s) : s;
     }
     if(auto link = id in links) with(link){
-      if(!recursion){
-        return format!"...%s"(id);
-      }else{
-        return format!"%s : %s  %s  %s"(id, prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false));
-      }
+      return recursion ? format!"%s : %s  %s  %s"(id, prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false))
+                       : format!"...%s"(id);
+    }
+    return format!"Unknown(%s)"(id);
+  }*/
+
+  string prettyStr(in Id id, bool recursion=true){
+    if(!id) return "Null";
+    if(auto item = id in items){
+      return colorizeItem(autoQuoted(item));
+    }
+    if(auto link = id in links) with(link){
+      return recursion ? format!"%s  %s  %s"(prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false))
+                       : "...";
     }
     return format!"Unknown(%s)"(id);
   }
 
   string prettyStr(in IdSequence seq){
-
-    string prettyStr(in Id id, bool recursion=true){
-      if(!id) return "Null";
-      if(auto item = id in items){
-        return colorizeItem(autoQuoted(item));
-      }
-      if(auto link = id in links) with(link){
-        if(!recursion){
-          return "...";
-        }else{
-          return format!"%s  %s  %s"(prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false));
-        }
-      }
-      return format!"Unknown(%s)"(id);
-    }
-
     return seq.ids.map!(i => prettyStr(i, true)).join("  ");
-  }
-
-  private void _internal_createLink(in Id id, in Link link){
-    links.byId[id] = link;
-    links.byLink[link] = id;
   }
 
   bool isInstanceOf(string entity, in Id eTypeId){
@@ -379,26 +376,43 @@ class AMDB{
 
   // Delete, modify (no commit handling)///////////////////////////////////////////////////
 
-  bool hasReferences(in Id id){
-    if(!id) return false;
-    //opt: slow linear search
-    foreach(const link; links.links) if(link.sourceId==id || link.verbId==id || link.targetId==id) return true;
-    return false;
+  auto referrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id){
+    return links.byId.byKeyValue.filter!(a => chkSource && a.value.sourceId==id
+                                           || chkVerb   && a.value.verbId  ==id
+                                           || chkTarget && a.value.targetId==id).map!retExpr;
   }
 
-  bool _internal_tryRemoveLink(in Id id){
-    if(auto link = id in links){
-      links.byId.remove(id);
-      links.byLink.remove(link);
-      return true;
-    }
-    return false;
+  auto sourceReferrers(in Id id){ return referrers!(Yes.source, No .verb, No .target)(id); }
+  auto verbReferrers  (in Id id){ return referrers!(No .source, Yes.verb, No .target)(id); }
+  auto targetReferrers(in Id id){ return referrers!(No .source, No .verb, Yes.target)(id); }
+
+  bool hasReferrers(in Id id){
+    if(!id) return false;
+    return !referrers(id).empty;
   }
+
+  auto allReferrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id){
+    bool[Id] found;
+
+    void doit(in Id id){
+      foreach(r; referrers!(chkSource, chkVerb, chkTarget, retExpr)(id)) if(r !in found){
+        found[r]=true;
+        doit(r);
+      }
+    }
+    doit(id);
+
+    return found.keys.sort.array;
+  }
+
+  auto allSourceReferrers(in Id id){ return referrers!(Yes.source, No .verb, No .target)(id); }
+  auto allTargetReferrers(in Id id){ return referrers!(No .source, No .verb, Yes.target)(id); }
+
 
   void deleteThing(in Id id){
     if(!id) return; //no need to delete null
-    enforce(!hasReferences(id), "Can't delete, because it has rteferences:  "~prettyStr(id));
-    if(_internal_tryRemoveItem(id) || _internal_tryRemoveLink(id)) return;
+    enforce(!hasReferrers(id), "Can't delete, because it has rteferences:  "~prettyStr(id));
+    if(items._internal_tryRemoveItem(id) || links._internal_tryRemoveLink(id)) return;
     raise("Can't delete thing. Id not found: "~id.text);
   }
 
@@ -616,10 +630,19 @@ class AMDB{
 
   bool isEntity(in Id id){ return filter(id, "is a", "*").any!(a => isEType(links[a].targetId)); }
 
-  auto things(){ return chain(items.ids, links.ids); }
-  auto verbs() { return filter("*", "is a", "Verb" ).map!(a => links[a].sourceId); }
-  auto eTypes(){ return filter("*", "is a", "EType").map!(a => links[a].sourceId); }
-  auto aTypes(){ return filter("*", "is a", "AType").map!(a => links[a].sourceId); }
+  auto things()  { return chain(items.ids, links.ids); }
+  auto verbs()   { return filter("*", "is a", "Verb" ).map!(a => links[a].sourceId); }
+  auto eTypes()  { return filter("*", "is a", "EType").map!(a => links[a].sourceId); }
+  auto aTypes()  { return filter("*", "is a", "AType").map!(a => links[a].sourceId); }
+
+  auto entities()           { return eTypes                             .map!(e => filter("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
+  auto entities(string mask){ return eTypes.filter!(e => chkId(e, mask)).map!(e => filter("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
+
+
+  bool isSchema(in Id id){
+    if(auto link = id in links) if(items.get(link.verbId)=="is a" || isAType(id)) return true;
+    return false;
+  }
 
   // create things /////////////////////////////
 
@@ -901,16 +924,15 @@ class AMDB{
     return chkStr(s, mask);
   }
 
-
   Id[] query(string[] p){ //works on a single sentence
     Id[] res;
     if(p.length==1){
-      foreach(id, const item; items.byId){
-        if(chkStr(item, p[0])) res ~= id;
+      foreach(id, const link; links.byId){
+        if(chkId(link.sourceId, p[0]) || chkId(link.verbId, p[0]) || chkId(link.targetId, p[0])) res ~= id; // x  ->  x can be at any place
       }
     }else if(p.length==2){
       foreach(id, const link; links.byId){
-        if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id;
+        if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id; // target must be null
       }
     }else if(p.length==3){
       foreach(id, const link; links.byId){
@@ -928,7 +950,8 @@ class AMDB{
     if(p.length==2){
       foreach(sourceId; sourceIds){
         foreach(id, const link; links.byId){
-          if(link.sourceId==sourceId && !link.targetId && chkId(link.verbId, p[1])) res ~= id;
+          /* if(link.sourceId==sourceId && !link.targetId && chkId(link.verbId, p[1])) res ~= id; */
+          if(link.sourceId==sourceId && (chkId(link.verbId, p[1]) || chkId(link.targetId, p[1]))) res ~= id;  // ...x  ->  x can be at any place
         }
       }
     }else if(p.length==3){
@@ -1010,14 +1033,40 @@ class AMDB{
 
   // text mode interface ////////////////////////////////////////////
 
-  private char textCommandMode = 'q';
+  void printFilteredSortedItems(R)(R r, string mask=""){
+    r.filter!(i => mask=="" || chkId(i, mask)).array.sort!((a,b)=>icmp(items.get(a, ""), items.get(b, ""))<0).each!(i => print(prettyStr(i)));
+  }
+
+  //private char textCommandMode = 'q';
 
   int execTextCommand(string input){
     input = input.strip;
     try{
-      switch(input.lc){
-        case "data": case "d": case "schema": case "s": case "query": case "q": textCommandMode = input[0]; break;
-        case "commit": case "ok": commit; break;
+      string cmd = input.wordAt(0);
+      input = input[cmd.length..$].strip;
+
+      switch(cmd.lc){
+        case "id": print(prettyStr(extendLeft(Id(input.to!uint)))); break;
+
+        case "s", "schema": schema(input); break;
+        case "d", "data": data(input); break;
+        case "q", "query":{
+          const eRight = input.endsWith  ("...");  if(eRight) input = input.withoutEnding  ("...");
+          const eLeft  = input.startsWith("...");  if(eLeft ) input = input.withoutStarting("...");
+          foreach(id; query(input).sort){
+            auto seq = IdSequence([id]);
+            if(eRight) seq = extendRight(seq);
+            if(eLeft) seq = extendLeft(seq);
+            print(prettyStr(seq));
+          }
+        }break;
+
+        case "items"   : printFilteredSortedItems(items.ids, input); break;
+        case "etypes"  : printFilteredSortedItems(eTypes   , input); break;
+        case "verbs"   : printFilteredSortedItems(verbs    , input); break;
+        case "entities": printFilteredSortedItems(entities(input=="" ? "*" : input)); break;
+
+        case "commit": commit; break;
         case "cancel": cancel; break;
 
         case "info":
@@ -1038,35 +1087,12 @@ class AMDB{
           writeln("Commit buffer entries: ", commitBuffer.length ? EgaColor.red(commitBuffer.length.text) : "0");
         break;
 
-        case "etypes": eTypes.each!(i => print(prettyStr(i))); break;
-        case "verbs": verbs.each!(i => print(prettyStr(i))); break;
-
         case "commitbuffer", "commitbuf": commitBuffer.each!print; break;
         case "cancelbuffer", "cancelbuf": cancelBuffer.each!print; break;
 
         case "exit": case "x": enforce(!inTransaction, "Pending transaction. Use \"commit\" or \"cancel\" before exiting."); return false;
 
-        default:
-          switch(textCommandMode){
-            case 's': schema(input); break;
-            case 'd': data(input); break;
-            case 'q':{
-              try{
-                const i = input.to!int;
-                print(prettyStr(extendLeft(Id(i))));
-              }catch(Exception){
-                const eRight = input.endsWith  ("...");  if(eRight) input = input.withoutEnding  ("...");
-                const eLeft  = input.startsWith("...");  if(eLeft ) input = input.withoutStarting("...");
-                foreach(id; query(input).sort){
-                  auto seq = IdSequence([id]);
-                  if(eRight) seq = extendRight(seq);
-                  if(eLeft) seq = extendLeft(seq);
-                  print(prettyStr(seq));
-                }
-              }
-            }break;
-            default: raise("invalid mode: "~textCommandMode);
-          }
+        default: error("Unknown command: "~cmd.quoted);
       }
     }catch(Exception e){
       print(EgaColor.ltRed("ERROR:"), e.simpleMsg);
@@ -1080,12 +1106,12 @@ class AMDB{
     //prompt
     write(EgaColor.white(">"), format!" I:%d + L:%d = %d %s"(items.count, links.count, items.count+links.count, commitBuffer.length ? EgaColor.red("*"~commitBuffer.length.text~" ") : ""));
 
-    switch(textCommandMode){
+/*    switch(textCommandMode){
       case 's': write(EgaColor.ltMagenta("schema ")); break;
       case 'd': write(EgaColor.ltBlue   ("data ")); break;
       case 'q': write(EgaColor.ltGreen  ("query ")); break;
       default: raise("invalid mode");
-    }
+    }*/
     write(EgaColor.white("> "));
 
     return readln;
