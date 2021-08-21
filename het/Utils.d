@@ -243,10 +243,18 @@ static private:
     return handle;
   }
 
-  void textAttr(int attr){
-    flush;
-    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), cast(ushort)attr);
-  }
+  auto outputHandle(){ return GetStdHandle(STD_OUTPUT_HANDLE); }
+
+  private int _textAttr = 7;
+  private void setTextAttr()          { flush; SetConsoleTextAttribute(outputHandle, cast(ushort)_textAttr); }
+  @property int  color  ()            { return      _textAttr.getBits(0, 4); }
+  @property void color  (int c)       { _textAttr = _textAttr.setBits(0, 4, c); setTextAttr(); }
+  @property int  bkColor()            { return      _textAttr.getBits(4, 4); }
+  @property void bkColor(int c)       { _textAttr = _textAttr.setBits(4, 4, c); setTextAttr(); }
+  @property bool reversevideo()       { return      _textAttr.getBits(14, 1)!=0; }
+  @property void reversevideo(bool b) { _textAttr = _textAttr.setBits(14, 1, b); setTextAttr(); }
+  @property bool underscore()         { return      _textAttr.getBits(15, 1)!=0; }
+  @property void underscore(bool b)   { _textAttr = _textAttr.setBits(15, 1, b); setTextAttr(); }
 
   void indentAdjust(int param){
     switch(param){
@@ -291,15 +299,17 @@ static private:
     }
 
     while(!s.empty){
-      auto i = s.countUntil!"a>='\33' && a<='\34'";
+      auto i = s.countUntil!(a => a.inRange('\33', '\36'));
       if(i<0) { wr(s); break; } //no escapes at all
       if(i>0) { wr(s[0..i]); s = s[i..$]; } //write test before the escape
       //here comes a code
       if(s.length>1){
         auto param = cast(int)s[1];
         switch(s[0]){
-          case '\33': textAttr(param); break;
-          case '\34': indentAdjust(param); break;
+          case '\33': color = param; break;
+          case '\34': bkColor = param; break;
+          case '\35': reversevideo = (param&1)!=0; underscore = (param&2)!=0; break;
+          case '\36': indentAdjust(param);break;
           default:
         }
         s = s[2..$];
@@ -2720,6 +2730,22 @@ void mergeUrlParams(ref string s1, string s2){
 
   s1 = path2~'?'~res.join('&');
 }
+
+// strips off regex-like /flags off the input string.
+string fetchRegexFlags(ref string s){
+  string res;
+  foreach_reverse(idx, ch; s){
+    if(ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch.inRange('0', '9') || ch=='_') continue;
+    if(ch=='/'){
+      res = s[idx+1..$];
+      s = s[0..idx].stripRight;
+      return res;
+    }
+    break;
+  }
+  return res;
+}
+
 
 // structs to text /////////////////////////////////////
 

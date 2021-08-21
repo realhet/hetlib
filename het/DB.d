@@ -392,36 +392,28 @@ class AMDB{
     return s;
   }
 
-  ///this is an old version... Should use the new one below...
-  /*string prettyStr(in Id id, bool recursion=true){
-    if(!id) return "Null";
-    if(auto item = id in items){
-      string s = colorizeItem(autoQuoted(item));
-      return recursion ? format!"%s : %s"(id, s) : s;
-    }
-    if(auto link = id in links) with(link){
-      return recursion ? format!"%s : %s  %s  %s"(id, prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false))
-                       : format!"...%s"(id);
-    }
-    return format!"Unknown(%s)"(id);
-  }*/
-
   string prettyStr(in Id id, bool recursion=true){
     if(!id) return "Null";
     if(auto item = id in items){
       return colorizeItem(autoQuoted(item));
     }
     if(auto link = id in links) with(link){
-      return recursion ? format!"%s  %s  %s"(prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false))
-                       : "...";
+      auto s = recursion ? format!"%s  %s  %s"(prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false))
+                         : "...";
+      if(s.startsWith("...  ")) s = "..."~s[5..$]; //noo need spaces right after ...
+      return s;
     }
     return format!"Unknown(%s)"(id);
   }
 
   string prettyStr(in IdSequence seq){
-    return seq.ids.map!(i => prettyStr(i, true)).join("  ");
+    return iota(seq.length.to!int).map!((i){
+      auto id = seq.ids[i];
+      auto s = prettyStr(id, true);
+      if(i==seq.centerIdx) s = "\34\10" ~ s ~ "\34\0";
+      return s;
+    }).join("  ");
   }
-
 
   // serialization ////////////////////////////////////////////
 
@@ -648,10 +640,21 @@ class AMDB{
   auto entities()           { return eTypes                             .map!(e => filter("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
   auto entities(string mask){ return eTypes.filter!(e => chkId(e, mask)).map!(e => filter("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
 
-  bool isSchema(in Id id){
-    if(auto link = id in links) if(items.get(link.verbId)=="is a" && !isEType(link.targetId) || isAType(id)) return true;
-    return false;
+  char thingCategory(in Id id){
+    if(!id) return 0;
+    if(auto link = id in links){
+      if(isAType(id)) return 's';
+      if(items.get(link.verbId)=="is a"){
+        if(isEType(link.targetId)) return 'e';
+        return 's';
+      }else return 'd';
+    }else return 'i';
   }
+
+  bool isSchema                 (in Id id){ return thingCategory(id)=='s'; }
+  bool isEntityAssociation      (in Id id){ return thingCategory(id)=='e'; }
+  bool isData                   (in Id id){ return thingCategory(id)=='d'; }
+  bool isItem                   (in Id id){ return thingCategory(id)=='i'; }
 
   // create system things /////////////////////////////
 
@@ -718,45 +721,9 @@ class AMDB{
 
   // input text, sentence processing //////////////////////////////
 
-  /// Finds and collects "" quoted string literals and replaces them with a given string
-  private static string[] replaceQuotedStrings(ref string s, string replacement){
-    string[] res;
-    string processed, act = s;
-    while(1){
-      immutable quote = '"';
-      auto idx = act.indexOf(quote);
-      if(idx<0) break;
-
-      processed ~= act[0..idx];
-      act = act[idx..$];
-
-      //find ending quote
-      string qstr = act[0..1]; act = act[1..$];
-      do{
-        idx = act.indexOf(quote);
-        if(idx<0) throw new Exception("Unterminated string literal.");
-        qstr ~= act[0..idx+1];
-        act = act[idx+1..$];
-      }while(qstr.endsWith(`\"`));
-
-      import het.tokenizer;
-      Token[] tokens;
-      auto error = tokenize("string literal tokenizer", qstr, tokens);
-      if(error!="") throw new Exception("Error decoding string literal: "~error);
-      enforce(tokens.length==1 && tokens[0].isString, "Error decoding string literal: String literal expected.");
-
-      res ~= tokens[0].data.to!string;
-
-      processed ~= replacement; //mark the position
-    }
-    processed ~= act;
-    s = processed;
-    return res;
-  }
-
   static string[][] textToSentences(string input){
-
-    auto quotedStrings = replaceQuotedStrings(input, `  "  `);
+    import het.tokenizer : collectAndReplaceQuotedStrings;
+    auto quotedStrings = collectAndReplaceQuotedStrings(input, `  "  `);
     string fetchQStr(){
       enforce(quotedStrings.length, "Quoted string literals: Array is empty.");
       return quotedStrings.fetchFront;
@@ -778,6 +745,11 @@ class AMDB{
     }
 
     return input.splitLines.map!(line => lineToSentences(line)).join;
+  }
+
+  static string[][] toSentences(T)(T s){
+    static if(isSomeString!T) return textToSentences(s);
+                         else return s;
   }
 
   // schema, data entry ///////////////////////////////////////////////////////
@@ -923,6 +895,63 @@ class AMDB{
 
   // query ////////////////////////////////////////////////////////
 
+  struct QueryInputSources{
+    bool items, schema, entities, data;
+
+    @property bool any () const{ return items || schema || entities || data; }
+    @property bool all () const{ return items && schema && entities && data; }
+    @property bool none() const{ return !any; }
+
+    @property bool anyLinks() const{ return schema || entities || data; }
+    @property bool anyItems() const{ return items; }
+
+    void setFlags(string flags){
+      this = typeof(this).init;
+      if(flags.canFind('i')) items    = true;
+      if(flags.canFind('s')) schema   = true;
+      if(flags.canFind('e')) entities = true;
+      if(flags.canFind('d')) data     = true;
+      if(flags.canFind('a')) items = schema = entities = data = true;
+
+      //none means only the 'data'
+      if(none) data = true;
+    }
+
+    bool check(char thingCategory) const{
+      if(all) return true;
+      if(none) return false;
+      switch(thingCategory){
+        case 'i': return items;
+        case 's': return schema;
+        case 'e': return entities;
+        case 'd': return data;
+        default: return false;
+      }
+    }
+  }
+
+  struct QueryOptions{
+    QueryInputSources sources;  alias sources this;
+    bool extendLeft, extendRight;
+
+    void processFlags(string flags){
+    }
+  }
+
+  private auto fetchQueryOptions(ref string input){
+    auto flags = input.fetchRegexFlags;
+    QueryOptions res;
+
+    res.sources.setFlags(flags);
+
+    // extend left and right
+    res.extendRight = input.endsWith  ("...");  if(res.extendRight) input = input.withoutEnding  ("...");
+    res.extendLeft  = input.startsWith("...");  if(res.extendLeft ) input = input.withoutStarting("...");
+
+    return res;
+  }
+
+
   /// own version of wildcard check specialized to AMDB
   private bool chkStr(string s, string mask){
     return s.isWild(mask);
@@ -939,33 +968,26 @@ class AMDB{
 
   enum QuerySource{ all, data, schema, items }
 
-  Id[] query(string[] p, in QuerySource qs){ //works on a single sentence
+  Id[] query(string[] p, in QueryInputSources qs){ //works on a single sentence
 
-    bool checkQuerySourceLinks(in Id id){
-      switch(qs){
-        case QuerySource.all: return true;
-        case QuerySource.schema: return isSchema(id);
-        case QuerySource.data: return !isSchema(id);
-        default: return false;
-      }
-    }
+    bool checkQuerySourceLinks(in Id id){ return qs.check(thingCategory(id)); }
 
     Id[] res;
     if(p.length==1){
-      if(qs!=QuerySource.items) foreach(id, const link; links.byId){
+      if(qs.anyLinks) foreach(id, const link; links.byId){
         if(!checkQuerySourceLinks(id)) continue;
         if(chkId(link.sourceId, p[0]) || chkId(link.verbId, p[0]) || chkId(link.targetId, p[0])) res ~= id; // x  ->  x can be at any place
       }
-      if(qs==QuerySource.items) foreach(id; items.ids){
+      if(qs.anyItems) foreach(id; items.ids){
         if(chkId(id, p[0])) res ~= id; // also can be an item too
       }
     }else if(p.length==2){
-      if(qs!=QuerySource.items) foreach(id, const link; links.byId){
+      if(qs.anyLinks) foreach(id, const link; links.byId){
         if(!checkQuerySourceLinks(id)) continue;
         if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id; // target must be null
       }
     }else if(p.length==3){
-      if(qs!=QuerySource.items) foreach(id, const link; links.byId){
+      if(qs.anyLinks) foreach(id, const link; links.byId){
         if(!checkQuerySourceLinks(id)) continue;
         if(chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
       }
@@ -1001,21 +1023,37 @@ class AMDB{
     return sourceIds;
   }
 
-  Id[] query(string[][] sentences, in QuerySource qs){ //works on sentences
+  Id[] query(T)(T sentences, in QueryInputSources qs){ //works on sentences
     Id[] res;
-
-    if(sentences.length==0) return null; //empty query
-    if(sentences.length==1) return query(sentences[0], qs); //one sentence
-    return query(query(sentences[0], qs), sentences[1..$]); //many sentences in a chain
+    auto s = toSentences(sentences);
+    if(s.length==0) return null; //empty query
+    if(s.length==1) return query(s[0], qs); //one sentence
+    return query(query(s[0], qs), s[1..$]); //many sentences in a chain
   }
 
-  Id[] query(string input, in QuerySource qs){
-    return query(textToSentences(input), qs);
+  IdSequence extend(in Id id, in QueryOptions queryOptions){
+    auto seq = IdSequence([id]);
+    if(queryOptions.extendRight) seq = extendRight(seq);
+    if(queryOptions.extendLeft ) seq = extendLeft (seq);
+    return seq;
   }
 
-  static struct IdSequence{
+  IdSequence[] query(T)(T sentences, in QueryOptions queryOptions){ //this version does left/right extensions too
+    return query(sentences, queryOptions.sources).sort.map!(i => extend(i, queryOptions)).array;
+  }
+
+  static struct IdSequence{ // IdSequence ///////////////////////////////////////
     Id[] ids;
     alias ids this;
+
+    int leftExtension, rightExtension;
+
+    @property int centerIdx() const{ return ids.length.to!int-1-rightExtension; }
+
+    void appendLeft (Id   ext){ ids = ext ~ ids      ; leftExtension  ++; }
+    void appendRight(Id   ext){ ids =       ids ~ ext; rightExtension ++; }
+    void appendLeft (Id[] ext){ ids = ext ~ ids      ; leftExtension  += ext.length.to!int; }
+    void appendRight(Id[] ext){ ids =       ids ~ ext; rightExtension += ext.length.to!int; }
   }
 
   // extend Left/Right //////////////////////////////////////////////////////////
@@ -1027,7 +1065,7 @@ class AMDB{
       if(seq.length)
         if(auto link = seq[0] in links.byId)
           if(link.sourceId in links){
-            seq = IdSequence(link.sourceId ~ seq.ids);
+            seq.appendLeft(link.sourceId);
             continue;
           }
       break;
@@ -1035,44 +1073,16 @@ class AMDB{
     return seq;
   }
 
-  IdSequence extendLeft(Id id, int recursion=defaultExtendLeftRecursion){ return extendLeft(IdSequence([id]), recursion); }
-
-  IdSequence[] extendLeft(IdSequence[] seqs, int recursion=defaultExtendLeftRecursion){ return seqs.map!(s => extendLeft(s, recursion)).array; }
-
-  IdSequence[] extendLeft(Id[] ids, int recursion=defaultExtendLeftRecursion){ return ids.map!(i => extendLeft(i, recursion)).array; }
-
-  Id[] linksBySourceId(in Id sourceId){
-    Id[] res;
-    foreach(id, const link; links.byId)
-      if(link.sourceId==sourceId) res ~= id;
-    return res.sort.array;
-  }
-
-  Id[] linksBySourceId_recursive(in Id sourceId){
-    return linksBySourceId(sourceId).map!(i => i ~ linksBySourceId_recursive(i)).join;
-  }
-
   IdSequence extendRight(IdSequence seq){
-    return seq.length ? IdSequence(seq.ids ~ linksBySourceId_recursive(seq[$-1])) : seq;
-  }
-
-  IdSequence[] extendRight(IdSequence[] seq){
-    return seq.map!(s => extendRight(s)).array;
+    Id[] sourceExtension(in Id sourceId){ return sourceReferrers(sourceId).map!(i => i ~ sourceExtension(i)).join; }
+    if(seq.length && seq[$-1]in links) seq.appendRight(sourceExtension(seq[$-1]));
+    return seq;
   }
 
   // text mode interface ////////////////////////////////////////////
 
   void printFilteredSortedItems(R)(R r, string mask=""){
     r.filter!(i => mask=="" || chkId(i, mask)).array.sort!((a,b)=>icmp(items.get(a, ""), items.get(b, ""))<0).each!(i => print(prettyStr(i)));
-  }
-
-  private auto fetchQuerySource(ref string s){
-    //todo: make it properly
-    if(s.endsWith("/s")){ s = s[0..$-2]; return QuerySource.schema; }
-    if(s.endsWith("/d")){ s = s[0..$-2]; return QuerySource.data  ; }
-    if(s.endsWith("/i")){ s = s[0..$-2]; return QuerySource.items ; }
-    if(s.endsWith("/a")){ s = s[0..$-2]; return QuerySource.all   ; }
-    return QuerySource.data; //data is the default
   }
 
   void tryDelete(Id[] ids){
@@ -1104,24 +1114,13 @@ class AMDB{
       input = input[cmd.length..$].strip;
 
       switch(cmd.lc){
-        case "id": print(prettyStr(extendLeft(Id(input.to!uint)))); break;
+        case "id": print(prettyStr(extendLeft(IdSequence([Id(input.to!uint)])))); break;
 
         case "s", "schema": schema(input); break;
         case "d", "data": data(input); break;
         case "q", "query":{
-          const querySource = fetchQuerySource(input);
-          const eRight = input.endsWith  ("...");  if(eRight) input = input.withoutEnding  ("...");
-          const eLeft  = input.startsWith("...");  if(eLeft ) input = input.withoutStarting("...");
-
-          Id[] res = query(input, querySource).sort.array;
-          foreach(id; res){
-            auto seq = IdSequence([id]);
-            if(eRight) seq = extendRight(seq);
-            if(eLeft) seq = extendLeft(seq);
-            print(prettyStr(seq));
-          }
-
-          tryDelete(res);
+          const options = fetchQueryOptions(input);
+          query(input, options).each!(i => print(prettyStr(i)));
         }break;
 
         case "items"   : printFilteredSortedItems(items.ids, input); break;

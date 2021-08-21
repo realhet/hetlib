@@ -1665,6 +1665,44 @@ void discoverJsonHierarchy(ref Token[] tokens, string fileName="json_text"){
   enforce(level==0, "Fatal error: JsonHierarchy level!=0");
 }
 
+// collectAndReplaceQuotedStrings() /////////////////////////////////////////
+
+/// Finds and collects "" quoted string literals and replaces them with a given string
+string[] collectAndReplaceQuotedStrings(ref string s, string replacement){
+  string[] res;
+  string processed, act = s;
+  while(1){
+    immutable quote = '"';
+    auto idx = act.indexOf(quote);
+    if(idx<0) break;
+
+    processed ~= act[0..idx];
+    act = act[idx..$];
+
+    //find ending quote
+    string qstr = act[0..1]; act = act[1..$];
+    do{
+      idx = act.indexOf(quote);
+      if(idx<0) throw new Exception("Unterminated string literal.");
+      qstr ~= act[0..idx+1];
+      act = act[idx+1..$];
+    }while(qstr.endsWith(`\"`));
+
+    import het.tokenizer;
+    Token[] tokens;
+    auto error = tokenize("string literal tokenizer", qstr, tokens);
+    if(error!="") throw new Exception("Error decoding string literal: "~error);
+    enforce(tokens.length==1 && tokens[0].isString, "Error decoding string literal: String literal expected.");
+
+    res ~= tokens[0].data.to!string;
+
+    processed ~= replacement; //mark the position
+  }
+  processed ~= act;
+  s = processed;
+  return res;
+}
+
 // Big test //////////////////////////////////////////////
 
 void testTokenizer(){
