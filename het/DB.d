@@ -376,43 +376,128 @@ class AMDB{
     return format!"Unknown(%s)"(id);
   }
 
-  string colorizeItem(in Id id){
-    return colorizeItem(items.get(id, id.text));
-  }
+  string prettyStr(Flag!"color" color = Yes.color)(in Id id){
+    if(!id){
+      auto s = "null";
+      static if(color) s = EgaColor.ltWhite(s);
+      return s;
+    }else if(auto item = id in items){
+      auto s = autoQuoted(item);
+      static if(color){
+        if     (isSystemVerb(s)) s = EgaColor.ltWhite(s);
+        else if(isSystemType(s)) s = EgaColor.ltGreen(s);
+        else if(isVerb  (id)   ) s = EgaColor.yellow(s);
+        else if(isEType (id)   ) s = EgaColor.ltMagenta(s);
+        else if(isEntity(id)   ) s = EgaColor.ltBlue(s);
+      }
+      return s;
+    }else if(auto link = id in links){
 
-  string colorizeItem(string s){
-    if(isSystemVerb(s)) return EgaColor.ltWhite(s);
-    if(isSystemType(s)) return EgaColor.ltGreen(s);
+      string a(in Id id){ return id in links ? "..." : prettyStr!(color)(id); }
 
-    if(auto id = s in items){
-      if(isVerb(id)) return EgaColor.yellow(s);
-      if(isEType(id)) return EgaColor.ltMagenta(s);
-      if(isEntity(id)) return EgaColor.ltBlue(s);
-    }
-    return s;
-  }
+      auto sSource = a(link.sourceId),
+           sVerb   = a(link.verbId),
+           sTarget = link.targetId ? a(link.targetId) : "";
 
-  string prettyStr(in Id id, bool recursion=true){
-    if(!id) return "Null";
-    if(auto item = id in items){
-      return colorizeItem(autoQuoted(item));
-    }
-    if(auto link = id in links) with(link){
-      auto s = recursion ? format!"%s  %s  %s"(prettyStr(sourceId, false), prettyStr(verbId, false), prettyStr(targetId, false))
-                         : "...";
-      if(s.startsWith("...  ")) s = "..."~s[5..$]; //noo need spaces right after ...
+      return sSource ~ (sSource=="..." ? "" : "  ") ~ sVerb ~ (sTarget=="" ? "" : "  ") ~ sTarget;
+    }else{
+      auto s = format!"Unknown(%s)"(id);
+      static if(color) s = EgaColor.ltRed(s);
       return s;
     }
-    return format!"Unknown(%s)"(id);
   }
 
-  string prettyStr(in IdSequence seq){
+  struct ColumnInfo{
+    bool anySourceIsNoLink;
+    int maxSourceWidth, maxVerbWidth, maxTargetWidth;
+
+    // extra info, calculated later
+    bool isBackLink;
+    int offset, size;
+  }
+
+  private void accumulateColumnInfo(ref ColumnInfo ci, in Id id){
+    if(auto link = id in links){
+
+      string a(in Id id){ return id in links ? "..." : prettyStr!(No.color)(id); }
+
+      auto sSource = a(link.sourceId),
+           sVerb   = a(link.verbId),
+           sTarget = link.targetId ? a(link.targetId) : "";
+
+      ci.anySourceIsNoLink |= sSource!="...";
+      ci.maxSourceWidth.maximize(cast(int)(sSource.walkLength));
+      ci.maxVerbWidth  .maximize(cast(int)(sVerb  .walkLength));
+      ci.maxTargetWidth.maximize(cast(int)(sTarget.walkLength));
+    }else{
+      auto s = prettyStr!(No.color)(id);
+      ci.anySourceIsNoLink |= s!="...";
+      ci.maxSourceWidth.maximize(cast(int)(s.walkLength));
+    }
+  }
+
+  private void calcExtraColumnInfo(ColumnInfo[] columns){
+    foreach(idx, ref c; columns) with(c){
+      isBackLink = !anySourceIsNoLink && c.maxSourceWidth==3;
+      size = maxSourceWidth + (maxVerbWidth ? (isBackLink ? 0 : 2) + maxVerbWidth : 0) + (maxTargetWidth ? 2+maxTargetWidth: 0);
+      offset = idx>0 ? columns[idx-1].offset+columns[idx-1].size+2 : 0;
+    }
+  }
+
+
+  string prettyStr(Flag!"color" color = Yes.color)(in IdSequence seq){
     return iota(seq.length.to!int).map!((i){
       auto id = seq.ids[i];
-      auto s = prettyStr(id, true);
-      if(i==seq.centerIdx) s = "\34\10" ~ s ~ "\34\0";
+      auto s = prettyStr!(color)(id);
+      static if(color) if(i==seq.centerIdx) s = "\34\10" ~ s ~ "\34\0";
       return s;
     }).join("  ");
+  }
+
+  void printTable(in IdSequence[] seqs){
+    const sentenceColumnIndices = seqs.map!(seq => seq.coulmnIndices(this)).array;
+
+    // collect width of columns
+    ColumnInfo[] columns;
+    columns.length = sentenceColumnIndices.map!(a => a.maxElement(-1)).maxElement(-1)+1;
+    foreach(sequenceIdx, const columnIndices; sentenceColumnIndices){
+      const ids = seqs[sequenceIdx].ids;
+      foreach(sentenceIdx, columnIdx; columnIndices){
+        const id = ids[sentenceIdx];
+        accumulateColumnInfo(columns[columnIdx], id);
+      }
+    }
+
+    calcExtraColumnInfo(columns);
+
+    // draw the cells from left to right, top to bottom.
+    foreach(sequenceIdx, const columnIndices; sentenceColumnIndices){
+      const ids = seqs[sequenceIdx].ids;
+      int lastColumnIdx = -1;
+      foreach(sentenceIdx, columnIdx; columnIndices){
+        const id = ids[sentenceIdx];
+        with(columns[columnIdx]){
+          const newLine = columnIdx != lastColumnIdx+1;
+          lastColumnIdx = columnIdx;
+          if(newLine){
+            write("\n", " ".replicate(offset));
+          }else{
+            if(sentenceIdx>0) write("  ");
+          }
+          //write(prettyStr(id, maxSourceWidth, maxVerbWidth, maxTargetWidth));
+          //todo: highlight
+          //todo: justify for 1 width
+          //todo: justify for 3 width
+          //todo: justify for integers
+          //todo: justify for datetimes
+          write(prettyStr(id).leftJustify(columns[columnIdx].size), "NEM JO!!! SZINES TEXTET NEM TUD JUSTIFIKALNI!!!");
+
+          write(size);
+        }
+      }
+      writeln;
+    }
+
   }
 
   // serialization ////////////////////////////////////////////
@@ -1054,11 +1139,31 @@ class AMDB{
     void appendRight(Id   ext){ ids =       ids ~ ext; rightExtension ++; }
     void appendLeft (Id[] ext){ ids = ext ~ ids      ; leftExtension  += ext.length.to!int; }
     void appendRight(Id[] ext){ ids =       ids ~ ext; rightExtension += ext.length.to!int; }
+
+    int[] coulmnIndices(AMDB db) const{
+      int[] indices;
+      Id[] stack;
+      foreach(id; ids){
+
+        //measure how much to step back for the parent
+        sizediff_t backSteps = -1;
+        auto link = id in db.links;
+        if(!stack.empty && link)
+          backSteps = stack.retro.countUntil!(s => s == link.sourceId);
+
+        if     (backSteps==0) stack ~= id;
+        else if(backSteps> 0) stack = stack[0..$-backSteps]~id;
+        else                  stack = [id]; //no connection -> restart the stack
+
+        indices ~= (cast(int)stack.length)-1;
+      }
+      return indices;
+    }
   }
 
   // extend Left/Right //////////////////////////////////////////////////////////
 
-  private enum defaultExtendLeftRecursion = int.max;
+  private enum defaultExtendLeftRecursion = 100;
 
   IdSequence extendLeft(IdSequence seq, int recursion=defaultExtendLeftRecursion){
     foreach(i; 0..recursion){
@@ -1120,7 +1225,8 @@ class AMDB{
         case "d", "data": data(input); break;
         case "q", "query":{
           const options = fetchQueryOptions(input);
-          query(input, options).each!(i => print(prettyStr(i)));
+          //query(input, options).each!(i => print(prettyStr(i)));
+          printTable(query(input, options));
         }break;
 
         case "items"   : printFilteredSortedItems(items.ids, input); break;
