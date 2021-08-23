@@ -361,6 +361,25 @@ static public:
     }
     return 0;
   }
+
+  int consoleStrLength(string s){
+    int len;
+    bool expectParam;
+    foreach(ch; s){
+      if(chkClear(expectParam)) continue;
+      if(ch.inRange('\33', '\36')){ expectParam = true; continue; }
+      len++;
+    }
+    return len;
+  }
+
+  string leftJustify(string s, int size){
+    return s ~ " ".replicate(max(size-consoleStrLength(s), 0));
+  }
+
+  string rightJustify(string s, int size){
+    return " ".replicate(max(size-consoleStrLength(s), 0)) ~ s;
+  }
 }
 
 void write(T...)(auto ref T args)

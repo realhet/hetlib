@@ -407,6 +407,41 @@ class AMDB{
     }
   }
 
+  string prettyStr(Flag!"color" color = Yes.color)(in Id id, const ColumnInfo ci){
+    if(!id){
+      auto s = "null";
+      static if(color) s = EgaColor.ltWhite(s);
+      return console.leftJustify(s, ci.size);
+    }else if(auto item = id in items){
+      auto s = autoQuoted(item);
+      static if(color){
+        if     (isSystemVerb(s)) s = EgaColor.ltWhite(s);
+        else if(isSystemType(s)) s = EgaColor.ltGreen(s);
+        else if(isVerb  (id)   ) s = EgaColor.yellow(s);
+        else if(isEType (id)   ) s = EgaColor.ltMagenta(s);
+        else if(isEntity(id)   ) s = EgaColor.ltBlue(s);
+      }
+      return console.leftJustify(s, ci.size);
+    }else if(auto link = id in links){
+
+      string a(in Id id){ return id in links ? "..." : prettyStr!(color)(id); }
+
+      auto sSource = a(link.sourceId),
+           sVerb   = a(link.verbId),
+           sTarget = link.targetId ? a(link.targetId) : "";
+
+      sSource = console.leftJustify(sSource, ci.maxSourceWidth);
+      sVerb   = console.leftJustify(sVerb  , ci.maxVerbWidth  );
+      sTarget = console.leftJustify(sTarget, ci.maxTargetWidth);
+
+      return sSource ~ (ci.isBackLink?"":"  ") ~ sVerb ~ (ci.maxTargetWidth?"  ":"") ~ sTarget;
+    }else{
+      auto s = format!"Unknown(%s)"(id);
+      static if(color) s = EgaColor.ltRed(s);
+      return console.leftJustify(s, ci.size);
+    }
+  }
+
   struct ColumnInfo{
     bool anySourceIsNoLink;
     int maxSourceWidth, maxVerbWidth, maxTargetWidth;
@@ -414,29 +449,29 @@ class AMDB{
     // extra info, calculated later
     bool isBackLink;
     int offset, size;
-  }
 
-  private void accumulateColumnInfo(ref ColumnInfo ci, in Id id){
-    if(auto link = id in links){
+    private void accumulate(AMDB db, in Id id){
+      if(auto link = id in db.links){
 
-      string a(in Id id){ return id in links ? "..." : prettyStr!(No.color)(id); }
+        string a(in Id id){ return id in db.links ? "..." : db.prettyStr!(No.color)(id); }
 
-      auto sSource = a(link.sourceId),
-           sVerb   = a(link.verbId),
-           sTarget = link.targetId ? a(link.targetId) : "";
+        auto sSource = a(link.sourceId),
+             sVerb   = a(link.verbId),
+             sTarget = link.targetId ? a(link.targetId) : "";
 
-      ci.anySourceIsNoLink |= sSource!="...";
-      ci.maxSourceWidth.maximize(cast(int)(sSource.walkLength));
-      ci.maxVerbWidth  .maximize(cast(int)(sVerb  .walkLength));
-      ci.maxTargetWidth.maximize(cast(int)(sTarget.walkLength));
-    }else{
-      auto s = prettyStr!(No.color)(id);
-      ci.anySourceIsNoLink |= s!="...";
-      ci.maxSourceWidth.maximize(cast(int)(s.walkLength));
+        anySourceIsNoLink |= sSource!="...";
+        maxSourceWidth.maximize(cast(int)(sSource.walkLength));
+        maxVerbWidth  .maximize(cast(int)(sVerb  .walkLength));
+        maxTargetWidth.maximize(cast(int)(sTarget.walkLength));
+      }else{
+        auto s = db.prettyStr!(No.color)(id);
+        anySourceIsNoLink |= s!="...";
+        maxSourceWidth.maximize(cast(int)(s.walkLength));
+      }
     }
   }
 
-  private void calcExtraColumnInfo(ColumnInfo[] columns){
+  private void calcColumnInfoExtra(ColumnInfo[] columns){
     foreach(idx, ref c; columns) with(c){
       isBackLink = !anySourceIsNoLink && c.maxSourceWidth==3;
       size = maxSourceWidth + (maxVerbWidth ? (isBackLink ? 0 : 2) + maxVerbWidth : 0) + (maxTargetWidth ? 2+maxTargetWidth: 0);
@@ -444,8 +479,8 @@ class AMDB{
     }
   }
 
-
   string prettyStr(Flag!"color" color = Yes.color)(in IdSequence seq){
+    //todo: Use sentenceColumnIndices!
     return iota(seq.length.to!int).map!((i){
       auto id = seq.ids[i];
       auto s = prettyStr!(color)(id);
@@ -464,11 +499,11 @@ class AMDB{
       const ids = seqs[sequenceIdx].ids;
       foreach(sentenceIdx, columnIdx; columnIndices){
         const id = ids[sentenceIdx];
-        accumulateColumnInfo(columns[columnIdx], id);
+        columns[columnIdx].accumulate(this, id);
       }
     }
 
-    calcExtraColumnInfo(columns);
+    calcColumnInfoExtra(columns);
 
     // draw the cells from left to right, top to bottom.
     foreach(sequenceIdx, const columnIndices; sentenceColumnIndices){
@@ -476,24 +511,21 @@ class AMDB{
       int lastColumnIdx = -1;
       foreach(sentenceIdx, columnIdx; columnIndices){
         const id = ids[sentenceIdx];
-        with(columns[columnIdx]){
-          const newLine = columnIdx != lastColumnIdx+1;
-          lastColumnIdx = columnIdx;
-          if(newLine){
-            write("\n", " ".replicate(offset));
-          }else{
-            if(sentenceIdx>0) write("  ");
-          }
-          //write(prettyStr(id, maxSourceWidth, maxVerbWidth, maxTargetWidth));
-          //todo: highlight
-          //todo: justify for 1 width
-          //todo: justify for 3 width
-          //todo: justify for integers
-          //todo: justify for datetimes
-          write(prettyStr(id).leftJustify(columns[columnIdx].size), "NEM JO!!! SZINES TEXTET NEM TUD JUSTIFIKALNI!!!");
-
-          write(size);
+        auto ci(){ return columns[columnIdx]; }
+        const newLine = columnIdx != lastColumnIdx+1;
+        lastColumnIdx = columnIdx;
+        if(newLine){
+          write("\n", " ".replicate(ci.offset));
+        }else{
+          if(sentenceIdx>0) write("  ");
         }
+        //write(prettyStr(id, maxSourceWidth, maxVerbWidth, maxTargetWidth));
+        //todo: highlight
+        //todo: justify for 1 width
+        //todo: justify for 3 width
+        //todo: justify for integers
+        //todo: justify for datetimes
+        write(prettyStr(id, ci));
       }
       writeln;
     }
@@ -1179,7 +1211,7 @@ class AMDB{
   }
 
   IdSequence extendRight(IdSequence seq){
-    Id[] sourceExtension(in Id sourceId){ return sourceReferrers(sourceId).map!(i => i ~ sourceExtension(i)).join; }
+    Id[] sourceExtension(in Id sourceId){ return sourceReferrers(sourceId).map!(i => i ~ sourceExtension(i)).join.sort.array; }
     if(seq.length && seq[$-1]in links) seq.appendRight(sourceExtension(seq[$-1]));
     return seq;
   }

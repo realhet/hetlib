@@ -742,6 +742,9 @@ public:
     return (File(`custom:\`~name) in byFileName) !is null;
   }
 
+  bool exists(File f){ return (f in byFileName) !is null; }
+  bool exists(string f){ return (File(f) in byFileName) !is null; }
+
   int custom(string name, Bitmap bmp=null){ //if bitmap != null then refresh
 enum log = false;
 if(log) "testures.custom(%s, %s)".writefln(name, bmp);
