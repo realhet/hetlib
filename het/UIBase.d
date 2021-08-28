@@ -131,7 +131,10 @@ struct HitInfo{ //Btn returns it
   @property bool clickedAndEnabled() const{ return clicked & enabled; }
   alias clickedAndEnabled this;
 
-  bool repeated() const{ return captured && inputs.LMB.repeated; }
+  bool repeated() const{
+    return pressed || captured && inputs.LMB.repeated;
+    //todo: architectural bug: captured is delayed by 1 frame according to repeated
+  }
 }
 
 struct HitTestManager{
@@ -211,12 +214,12 @@ struct HitTestManager{
     h.id = id;
     if(id==SrcId.init) return h;
     h.hover             = lastHitStack.map!"a.id".canFind(id);
-    h.captured          = capturedId==id && h.hover;
-    h.hover_smooth      = smoothHover.get(id, 0);
-    h.captured_smooth   = max(h.hover_smooth, h.captured);
     h.pressed           = pressedId ==id;
     h.released          = releasedId==id;
     h.clicked           = clickedId ==id;
+    h.captured          = h.pressed || capturedId==id && h.hover; //todo: architectural bug: captured is delayed by 1 frame according to repeated
+    h.hover_smooth      = smoothHover.get(id, 0);
+    h.captured_smooth   = max(h.hover_smooth, h.captured);
     h.hitBounds         = lastHitStack.get(lastHitStack.map!"a.id".countUntil(id)).hitBounds;
     return h;
   }

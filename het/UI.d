@@ -1486,7 +1486,7 @@ struct im{ static:
 
   auto IncDec(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){
     auto oldValue = value;
-    Edit!(file, line)(value, { width = 2*fh; }, args); //todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
+    Edit!(srcModule, srcLine)(value, { width = 2*fh; }, args); //todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
     IncDecBtn(value, args);
     return oldValue != value;
   }

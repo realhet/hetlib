@@ -481,7 +481,7 @@ class AMDB{
 
   string prettyStr(Flag!"color" color = Yes.color)(in IdSequence seq){
     //todo: Use sentenceColumnIndices!
-    return iota(seq.length.to!int).map!((i){
+    return iota(seq.ids.length.to!int).map!((i){
       auto id = seq.ids[i];
       auto s = prettyStr!(color)(id);
       static if(color) if(i==seq.centerIdx) s = "\34\10" ~ s ~ "\34\0";
@@ -508,10 +508,11 @@ class AMDB{
     // draw the cells from left to right, top to bottom.
     foreach(sequenceIdx, const columnIndices; sentenceColumnIndices){
       const ids = seqs[sequenceIdx].ids;
+
       int lastColumnIdx = -1;
       foreach(sentenceIdx, columnIdx; columnIndices){
         const id = ids[sentenceIdx];
-        auto ci(){ return columns[columnIdx]; }
+        const ci(){ return columns[columnIdx]; }
         const newLine = columnIdx != lastColumnIdx+1;
         lastColumnIdx = columnIdx;
         if(newLine){
@@ -519,13 +520,12 @@ class AMDB{
         }else{
           if(sentenceIdx>0) write("  ");
         }
-        //write(prettyStr(id, maxSourceWidth, maxVerbWidth, maxTargetWidth));
-        //todo: highlight
-        //todo: justify for 1 width
-        //todo: justify for 3 width
         //todo: justify for integers
         //todo: justify for datetimes
-        write(prettyStr(id, ci));
+        auto s = id ? prettyStr(id, ci) : " ".replicate(ci.size);
+        /*auto highlighted = seqs[sequenceIdx].centerIdx==sentenceIdx;
+        if(highlighted) write("\34\10", s, "\34\0"); else */
+        write(s);
       }
       writeln;
     }
@@ -1050,9 +1050,6 @@ class AMDB{
   struct QueryOptions{
     QueryInputSources sources;  alias sources this;
     bool extendLeft, extendRight;
-
-    void processFlags(string flags){
-    }
   }
 
   private auto fetchQueryOptions(ref string input){
@@ -1161,8 +1158,6 @@ class AMDB{
 
   static struct IdSequence{ // IdSequence ///////////////////////////////////////
     Id[] ids;
-    alias ids this;
-
     int leftExtension, rightExtension;
 
     @property int centerIdx() const{ return ids.length.to!int-1-rightExtension; }
@@ -1176,17 +1171,19 @@ class AMDB{
       int[] indices;
       Id[] stack;
       foreach(id; ids){
+        if(!id){
+          stack ~= id; //nothing to do with null
+        }else{
+          //measure how much to step back for the parent
+          sizediff_t backSteps = -1;
+          auto link = id in db.links;
+          if(!stack.empty && link)
+            backSteps = stack.retro.countUntil!(s => !s || s == link.sourceId);
 
-        //measure how much to step back for the parent
-        sizediff_t backSteps = -1;
-        auto link = id in db.links;
-        if(!stack.empty && link)
-          backSteps = stack.retro.countUntil!(s => s == link.sourceId);
-
-        if     (backSteps==0) stack ~= id;
-        else if(backSteps> 0) stack = stack[0..$-backSteps]~id;
-        else                  stack = [id]; //no connection -> restart the stack
-
+          if     (backSteps==0) stack ~= id;
+          else if(backSteps> 0) stack = stack[0..$-backSteps]~id;
+          else                  stack = [id]; //no connection -> restart the stack
+        }
         indices ~= (cast(int)stack.length)-1;
       }
       return indices;
@@ -1199,8 +1196,8 @@ class AMDB{
 
   IdSequence extendLeft(IdSequence seq, int recursion=defaultExtendLeftRecursion){
     foreach(i; 0..recursion){
-      if(seq.length)
-        if(auto link = seq[0] in links.byId)
+      if(seq.ids.length)
+        if(auto link = seq.ids[0] in links.byId)
           if(link.sourceId in links){
             seq.appendLeft(link.sourceId);
             continue;
@@ -1212,8 +1209,21 @@ class AMDB{
 
   IdSequence extendRight(IdSequence seq){
     Id[] sourceExtension(in Id sourceId){ return sourceReferrers(sourceId).map!(i => i ~ sourceExtension(i)).join.sort.array; }
-    if(seq.length && seq[$-1]in links) seq.appendRight(sourceExtension(seq[$-1]));
+    if(seq.ids.length && seq.ids[$-1]in links) seq.appendRight(sourceExtension(seq.ids[$-1]));
     return seq;
+  }
+
+  IdSequence[] padLeft(IdSequence[] seqs){
+    if(seqs.empty) return seqs;
+    int maxLeftExtension = seqs.map!(s => s.leftExtension).maxElement;
+    foreach(ref s; seqs){
+      int a = max(maxLeftExtension-s.leftExtension, 0);
+      if(a>0){
+        s.ids = [Id.init].replicate(a) ~ s.ids;
+        s.leftExtension += a;
+      }
+    }
+    return seqs;
   }
 
   // text mode interface ////////////////////////////////////////////
@@ -1257,8 +1267,8 @@ class AMDB{
         case "d", "data": data(input); break;
         case "q", "query":{
           const options = fetchQueryOptions(input);
-          //query(input, options).each!(i => print(prettyStr(i)));
-          printTable(query(input, options));
+          auto res = padLeft(query(input, options));
+          printTable(res);
         }break;
 
         case "items"   : printFilteredSortedItems(items.ids, input); break;

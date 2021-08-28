@@ -83,6 +83,10 @@ char toGrayscaleAscii(float luma){
   return charMap[luma.quantize!(charMap.length)];
 }
 
+auto textColorFor(RGB c){
+  return c.l>=128 ? clBlack : clWhite;
+}
+
 
 
 // RGB formats ////////////////////////////////////////////////
