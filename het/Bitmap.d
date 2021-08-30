@@ -2477,3 +2477,4 @@ dchar segoeSymbolByName(string name){
 shared static this(){
   registerCustomBitmapLoader("colormap", &colorMapBitmapLoader);
 }
+
