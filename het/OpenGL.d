@@ -1431,6 +1431,8 @@ public:
 
     //if(logVBO) LOG("bufferData", "count:", count, "stride:", stride, "fields:", "["~elementFields.map!"a.name".join(", ")~"]");
     gl.bufferData(GL_ARRAY_BUFFER, count*stride, data, accessType);
+
+    global_VPSCnt += resSize;
   }
 
   this(T)(const(T)[] data, string attrName="", int accessType = GL_STATIC_DRAW){
@@ -1512,8 +1514,10 @@ int GL_TEXELSIZE(GLTextureType type){ return GL_COMPONENTSIZE(type)*GL_COMPONENT
 class GLTexture:GlResource {
 public:
   override string resName() const    { return name; }
-  override size_t resSize() const    { return width*height*GL_TEXELSIZE(type); }
+  override size_t resSize() const    { return size_t(width*GL_TEXELSIZE(type))*height; }
   override string resInfo() const    { return format("size:%sx%s format:%s isCustom:%s mipEnabled:%s mipBuilt:%s", width, height, type, isCustom, mipmapEnabled, mipmapBuilt); }
+
+  size_t sizeBytes() const { return resSize; }
 private:
   GLTextureHandle handle;
   bool mipmapBuilt, mipmapEnabled;
@@ -1609,7 +1613,7 @@ public:
     gl.pixelStore(GL_UNPACK_ROW_LENGTH, stride);
     gl.texSubImage2D(GL_TEXTURE_2D, 0, x, y, xs, ys, GL_FORMAT(type), GL_DATATYPE(type), data);
 
-    global_TPSCnt += size_t(xs*texelSize)*ys;
+    global_TPSCnt += resSize;
 
     mipmapBuilt = false; //todo: rebuild mipmap
   }

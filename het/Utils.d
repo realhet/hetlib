@@ -2766,6 +2766,21 @@ string fetchRegexFlags(ref string s){
 }
 
 
+string shortSizeText(T)(in T n){
+  //todo: optimize this
+  //todo: 4096 -> 4k
+  //toso: 4.0k -> 4k
+  string s = n.text;                      if(s.length<=4) return s;
+  s = format!"%.1f"(double(n)/(1 <<10));  if(s.length<=3) return s~'k';
+  s = format!"%.0f"(double(n)/(1 <<10));  if(s.length<=3) return s~'k';
+  s = format!"%.1f"(double(n)/(1 <<20));  if(s.length<=3) return s~'M';
+  s = format!"%.0f"(double(n)/(1 <<20));  if(s.length<=3) return s~'M';
+  s = format!"%.1f"(double(n)/(1 <<30));  if(s.length<=3) return s~'G';
+  s = format!"%.0f"(double(n)/(1 <<30));  if(s.length<=3) return s~'G';
+  s = format!"%.1f"(double(n)/(1L<<40));  if(s.length<=3) return s~'T';
+  s = format!"%.0f"(double(n)/(1L<<40));                  return s~'T';
+}
+
 // structs to text /////////////////////////////////////
 
 string toString2(T)(in T obj)
@@ -4345,13 +4360,20 @@ void benchmark_norx(){
 bool isVirtualFileName(string fileName){ return fileName.startsWith(`virtual:\`); }
 bool isVirtual(in File file){ return file.fullName.isVirtualFileName; }
 
-enum VirtualFileCommand { getInfo, remove, read, write }
+enum VirtualFileCommand { getInfo, remove, read, write, stats }
 
 private auto virtualFileQuery_raise(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max){
   auto res = virtualFileQuery(cmd, fileName, dataIn, offset, size);
   if(!res) raise(res.error);
   return res;
 }
+
+struct VirtualFileCacheStats{
+  size_t count;
+  size_t sizeBytes;
+}
+
+private VirtualFileCacheStats _virtualFileCacheStats; //used as a result
 
 private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max){ synchronized {
   struct Res{
@@ -4385,6 +4407,11 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
         res.size = p.data.length;
         res.fileTimes = p.fileTimes;
       }
+    } break;
+
+    case VirtualFileCommand.stats:{
+      _virtualFileCacheStats.count = files.length;
+      _virtualFileCacheStats.sizeBytes = files.byValue.map!(f => f.data.length).sum;
     } break;
 
     case VirtualFileCommand.remove:{
@@ -4441,7 +4468,10 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
   return res; //no error
 }}
 
-
+auto virtualFileCacheStats(){
+  virtualFileQuery(VirtualFileCommand.stats, "");
+  return _virtualFileCacheStats;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Path                                                                    ///

@@ -36,6 +36,8 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
   int thumbMaxSize;
   bool maxWidthSpecified, maxHeightSpecified;
 
+  size_t sizeBytes; //used by bitmapQuery/detailed stats
+
   bool isThumb() const{ return thumbMaxSize>0; }
 
   bool isHistogram, isGrayHistogram; //todo: this is lame. This should be solved by registered plugins.
@@ -77,6 +79,8 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
 
   Bitmap transform(Bitmap orig){
     if(!orig || !orig.valid) return newErrorBitmap("Invalid source for BitmapTransform.");
+
+    sizeBytes = orig.sizeBytes; //used by bitmapQuery/detailed stats
 
     auto doIt(){
       if(isThumb){
@@ -169,6 +173,23 @@ enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformatio
     }
   }
 +/
+
+struct BitmapCacheStats{
+  size_t count;
+  size_t sizeBytes;
+  Bitmap[] bitmaps; //pnly when detailed stats requested
+
+  string toString(){
+    auto res = format!"BitmapCacheStats: count: %6d  size: %4s"(count         , sizeBytes.shortSizeText);
+
+    if(bitmaps.length)
+      res ~= "\n" ~ bitmaps.sort!((a, b) => a.file < b.file).map!text.join("\n");
+
+    return res;
+  }
+}
+
+private BitmapCacheStats _bitmapCacheStats; //this is a result
 
 Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null){ synchronized{
 
@@ -348,8 +369,10 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
     }break;
 
     case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
-      print("---- bitmapQuery stats: (cache, loading, transformationQueue) ---- ", cache.length, loading.length, transformationQueue.length);
-      if(cmd==BitmapQueryCommand.details) cache.keys.sort.each!(k => print("  ", cache[k]));
+      _bitmapCacheStats.count = cache.length;
+      _bitmapCacheStats.sizeBytes = cache.byValue.map!(b => b.sizeBytes).sum;
+
+      _bitmapCacheStats.bitmaps = cmd==BitmapQueryCommand.details ? _bitmapCacheStats.bitmaps = cache.values.dup : null;
     }break;
 
     case BitmapQueryCommand.update:{
@@ -375,8 +398,8 @@ __gshared struct bitmaps{ static : // bitmaps() ////////////////////////////////
 
   void remove (T)(T file)       { bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
 
-  void stats()                  { bitmapQuery(BitmapQueryCommand.stats, File(), ErrorHandling.ignore); }
-  void details()                { bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); }
+  BitmapCacheStats stats()   { bitmapQuery(BitmapQueryCommand.stats  , File(), ErrorHandling.ignore); return _bitmapCacheStats; }
+  BitmapCacheStats details() { bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); return _bitmapCacheStats; }
 }
 
 void testBitmaps(){
@@ -1264,7 +1287,7 @@ public:
   //in general: use newBitmap() to create a bitmap
 
   bool empty(){ return data_.length==0 || width<=0 || height<=0 || channels<=0; }
-  auto sizeInBytes() const{ return data_.length; }
+  size_t sizeBytes() const{ return data_.length; }
 
   @property width   () const{ return width_   ; }
   @property height  () const{ return height_  ; }

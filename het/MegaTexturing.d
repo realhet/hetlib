@@ -101,6 +101,8 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
   auto size()   const{ return ivec2(width, height); }
   auto bounds() const{ return ibounds2(pos, pos+size); }
 
+  size_t sizeBytes() const{ return width*height*4/+...instead of channelCnt, to show actual memory usage+/;  }
+
   int texIdx() const{ return texIdx_lo | texIdx_hi<<2; }
 
   auto channelConfig() const{ return cast(SubTexChannelConfig)(texChn_lo | texChn_hi<<2); }
@@ -212,6 +214,7 @@ public:
     dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);
   }
 
+  size_t sizeBytes() const{ return glTexture ? glTexture.sizeBytes : 0; }
 }
 
 
@@ -340,6 +343,8 @@ public:
 
     foreach(i, a; infoArray) writefln("(%s, %s)", i, a);  //this works
   }
+
+  size_t sizeBytes() const{ return glTexture ? glTexture.sizeBytes : 0; }
 }
 
 //todo: make the texture class
@@ -602,7 +607,7 @@ public:
         uploadSubTex(idx, bmp);
 
         //flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
-        uploadedSize += bmp.sizeInBytes;
+        uploadedSize += bmp.sizeBytes;
         if(uploadedSize >= TextureFlushLimit){
           uploadedSize -= TextureFlushLimit;
           gl.flush;
@@ -826,6 +831,19 @@ if(log) "Created subtex %s:".writefln(fileName);
     foreach(f; byFileName.keys.sort){
       print(format!"%-3d : %-20s "(byFileName[f], f.nameWithoutExt));
     }
+  }
+
+  int length() const{ return byFileName.length.to!int; }
+  size_t usedSizeBytes() const{ return infoTexture.infoArray.map!(a => size_t(a.sizeBytes)).sum; }
+  size_t poolSizeBytes() const{ return megaTextures.map!(mt => mt.sizeBytes).sum + infoTexture.sizeBytes; }
+
+  auto megaTextureSizes() const{ return megaTextures.map!(m => m.texSize).array; }
+
+  string megaTextureConfig() const{
+    return megaTextureSizes.map!(
+      s => s.x.shortSizeText
+          ~ (s.x == s.y ? "" : "x"~s.y.shortSizeText)
+    ).join(", ");
   }
 
   auto collectSubTexInfo2(){

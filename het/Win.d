@@ -10,8 +10,8 @@ pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 public import het.utils, het.geometry, het.inputs;
 
 // moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
-__gshared size_t global_TPSCnt; //texture upload bytes
-__gshared uint TPS; //texture upload/sec MB
+__gshared size_t global_TPSCnt, TPS; //texture upload bytes /sec
+__gshared size_t global_VPSCnt, VPS; //VBO upload bytes /sec
 
 // het.draw2d
 
@@ -821,9 +821,8 @@ public:
           FPS = FPSCnt;  FPSCnt = 0;
           UPS = UPSCnt;  UPSCnt = 0;
           if(isMain) {
-            enum unit = 1<<20; //1 MB
-            TPS = cast(int)(global_TPSCnt/unit); //texture upload/sec
-            global_TPSCnt -= TPS*unit;
+            TPS = global_TPSCnt;  global_TPSCnt = 0; //texture upload/sec
+            VPS = global_VPSCnt;  global_VPSCnt = 0; //VBO upload/sec
           }
         }
       }

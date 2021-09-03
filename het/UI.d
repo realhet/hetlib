@@ -2518,7 +2518,7 @@ struct im{ static:
             fun();
             Spacer;
           }
-          Edit(prop.act, range, hint, { width = fh*3; });
+          Edit(prop.act, range, hint, { width = fh*3.5; });
           Text(postFix~" ");
           if(prop.step>0){
             IncDecBtn(prop.act, range); //todo: hint is annoying here
