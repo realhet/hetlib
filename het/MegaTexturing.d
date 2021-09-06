@@ -379,8 +379,8 @@ private:
 
   bool mustRehash; //todo: this is useless i think
 
-  private bool[int] pendingIndices; //files being loaded by a worker thread
-  private bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
+  bool[int] pendingIndices; //files being loaded by a worker thread
+  bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
 
   void enforceSize(const ivec2 size){
     enforce(size.x<=SubTexMaxSize     && size.y<=SubTexMaxSize    , "Texture too big (%s)"                                 .format(size));

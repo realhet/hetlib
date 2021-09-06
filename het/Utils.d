@@ -3796,7 +3796,7 @@ string identityStr(T)(in T a){ // identityStr /////////////////////////
 //Source: https://github.com/repeatedly/xxhash-d/blob/master/src/xxhash.d
 //        https://code.google.com/p/xxhash/
 // Copyright: Masahiro Nakagawa 2014-.
-// above 8MB it is unofficially parallel
+// above 0.5MB it is unofficially parallel
 @trusted
 uint xxh(bool enableParallel=true)(in void[] source, uint seed = 0){
   if(source.length <= 1<<19){    //Dont change it from 1<<19, otherwise the hash is broken   (was 8<<20)
@@ -3820,6 +3820,13 @@ uint xxh(bool enableParallel=true)(in void[] source, uint seed = 0){
 
     return hlist.xxh_internal(seed);
   }
+}
+
+ulong xxh64(bool enableParallel=true)(in void[] source, ulong seed = 0){
+  size_t mid = source.length/2;
+  uint lo = source[0..mid].xxh!enableParallel(cast(uint)(seed    )+2654435761U);
+  uint hi = source[mid..$].xxh!enableParallel(cast(uint)(seed>>32)+2246822519U+lo);
+  return (lo | ulong(hi)<<32) + hi*2654435761U;
 }
 
 private @trusted pure nothrow
@@ -6310,10 +6317,13 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   DateTime.loadFunctions;
   enforce(Date(2000, 1, 1) - Date(1601, 1, 1) == 145731);
 
-  enforce(xxh("hello")==0xfb0077f9);
-  enforce(xxh("Nobody inspects the spammish repetition", 123456) == 0xc2845cee);
+  const s1 = "hello", s2 = "Nobody inspects the spammish repetition";
+  enforce(xxh(s1)==0xfb0077f9);
+  enforce(xxh(s2, 123456) == 0xc2845cee);
+  enforce(xxh64(s1)==0xFEC93A747CA698A2);                        //xxh64(s1).to!string(16).print;
+  enforce(xxh64(s2, 1234567890123456) == 0xA93F4E6F5E6F12E9);    //xxh64(s2, 1234567890123456).to!string(16).print;
   enforce(crc32("Hello")==0xf7d18982);
-  enforce(crc32("Nobody inspects the spammish repetition") == 0xAD4270ED);
+  enforce(crc32(s2) == 0xAD4270ED);
 
   { RNG rng; rng.seed = 0; enforce(iota(30).map!(i => rng.random(100).text).join(' ') == "0 3 86 20 27 67 31 16 37 42 8 47 7 84 5 29 91 36 77 32 69 84 71 30 16 32 46 24 82 27"); }
 

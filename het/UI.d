@@ -138,6 +138,8 @@ struct im{ static:
     deltaTime = dt.update;
 
     ImStorageManager.purge(200);
+
+    { static uint t; if(t.chkSet(QPS.ifloor)) bitmaps.garbageCollect; }
   }
 
   void _endFrame(){ //called from end of update

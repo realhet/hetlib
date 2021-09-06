@@ -2,6 +2,7 @@ module het.bitmap; //This is the new replacement of het.image.d
 
 import het.utils;
 
+__gshared size_t BitmapCacheMaxSizeBytes = 768<<20;
 
 import std.uni: isAlphaNum;
 import core.sys.windows.windows : HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, DIB_RGB_COLORS,
@@ -123,7 +124,7 @@ struct BitmapTransformation{ // BitmapTransformation (thumb) ///////////////////
 
 // BitmapManager - bitmaps() ////////////////////////////////////////////////
 
-enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, update }
+enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect }
 
 /+
   { //handle thumbnails
@@ -375,11 +376,35 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
       _bitmapCacheStats.bitmaps = cmd==BitmapQueryCommand.details ? _bitmapCacheStats.bitmaps = cache.values.dup : null;
     }break;
 
-    case BitmapQueryCommand.update:{
-      //cache.
+    case BitmapQueryCommand.garbageCollect:{
+      //auto T0 = QPS;
+      const t = application.tick;
+      auto  list = cache.byValue.filter!(b => !b.resident && !b.loading && !b.removed && t-b.accessed_tick>=3).array;
+      const sizeBytes = list.map!(b => b.sizeBytes).sum;
 
+      if(sizeBytes > BitmapCacheMaxSizeBytes){ //LOG("Bitmap cache GC");
+
+        //ascending by access time
+        list = list.sort!((a, b)=>a.accessed_tick<b.accessed_tick).array;
+
+        const targetSize = sizeBytes - sizeBytes/8;
+        size_t remaining = sizeBytes;
+        foreach(b; list){
+          //print("removing", b);
+
+          remaining -= b.sizeBytes;
+          cache.remove(b.file);
+          b.removed = true;
+
+          if(remaining<=targetSize) break;
+        }
+
+        //LOG(QPS-T0);
+      }
     }break;
   }
+
+  if(res) res.accessed_tick = application.tick;
 
   return res;
 }}
@@ -400,6 +425,8 @@ __gshared struct bitmaps{ static : // bitmaps() ////////////////////////////////
 
   BitmapCacheStats stats()   { bitmapQuery(BitmapQueryCommand.stats  , File(), ErrorHandling.ignore); return _bitmapCacheStats; }
   BitmapCacheStats details() { bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); return _bitmapCacheStats; }
+
+  void garbageCollect(){ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); }
 }
 
 void testBitmaps(){
@@ -1254,6 +1281,9 @@ public:
   string error;
   bool loading, removed; //todo: these are managed by bitmaps(). Should be protected and readonly.
   bool processed; //user flag. Can do postprocessing after the image is loaded
+  bool resident; //if true, garbageCollector will nor free this
+
+  uint accessed_tick; //garbageCollect using it
 
   auto dup(){
     static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
