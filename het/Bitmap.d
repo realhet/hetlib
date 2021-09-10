@@ -177,11 +177,11 @@ enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformatio
 
 struct BitmapCacheStats{
   size_t count;
-  size_t sizeBytes;
+  size_t allSizeBytes, residentSizeBytes;
   Bitmap[] bitmaps; //pnly when detailed stats requested
 
   string toString(){
-    auto res = format!"BitmapCacheStats: count: %6d  size: %4s"(count         , sizeBytes.shortSizeText);
+    auto res = format!"BitmapCacheStats: count: %6d  residentSize: %4s allSize: %4s"(count, residentSizeBytes.shortSizeText, allSizeBytes.shortSizeText);
 
     if(bitmaps.length)
       res ~= "\n" ~ bitmaps.sort!((a, b) => a.file < b.file).map!text.join("\n");
@@ -371,7 +371,8 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
 
     case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
       _bitmapCacheStats.count = cache.length;
-      _bitmapCacheStats.sizeBytes = cache.byValue.map!(b => b.sizeBytes).sum;
+      _bitmapCacheStats.allSizeBytes      = cache.byValue.map!(b => b.sizeBytes).sum;
+      _bitmapCacheStats.residentSizeBytes = cache.byValue.filter!(b => b.resident).map!(b => b.sizeBytes).sum;
 
       _bitmapCacheStats.bitmaps = cmd==BitmapQueryCommand.details ? _bitmapCacheStats.bitmaps = cache.values.dup : null;
     }break;
@@ -382,13 +383,14 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
       auto  list = cache.byValue.filter!(b => !b.resident && !b.loading && !b.removed && t-b.accessed_tick>=3).array;
       const sizeBytes = list.map!(b => b.sizeBytes).sum;
 
-      if(sizeBytes > BitmapCacheMaxSizeBytes){ //LOG("Bitmap cache GC");
+      if(sizeBytes > BitmapCacheMaxSizeBytes){
 
         //ascending by access time
         list = list.sort!((a, b)=>a.accessed_tick<b.accessed_tick).array;
 
-        const targetSize = sizeBytes - sizeBytes/8;
+        const targetSize = BitmapCacheMaxSizeBytes;
         size_t remaining = sizeBytes;
+        //LOG("Bitmap cache GC", remaining.shortSizeText, targetSize.shortSizeText);
         foreach(b; list){
           //print("removing", b);
 
@@ -570,7 +572,9 @@ Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
     return File(fn).deserialize!Bitmap(mustSucceed);
   }else if(prefix=="font"){
     version(D2D_FONT_RENDERER){
-      return bitmapFontRenderer.renderDecl(fn); //todo: error handling, mustExists
+      auto res = bitmapFontRenderer.renderDecl(fn); //todo: error handling, mustExists
+      if(res.valid) res.resident = true; //dont garbagecollect fonts because they are slow to generate
+      return res;
     }else{
       enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!");
     }

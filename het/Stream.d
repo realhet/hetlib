@@ -872,7 +872,7 @@ class Archiver{
   private void applyHeaderCompression(string op)(string headerCompression, bool compressAllData, uint[] uLeadIn, uint[] uHeader, uint[] uData, uint[] uLeadOut){
     if(headerCompression=="") return;
 
-    seedStream.seed = headerCompression.xxh;
+    seedStream.seed = headerCompression.xxh32;
     auto ss = refRange(&seedStream);
     void apply(uint[] a){ mixin(q{ a[] #= ss.take(a.length).array[]; }.replace("#", op)); }
 
@@ -890,7 +890,7 @@ class Archiver{
 
     void[] cdata;
     if(dataCompression!=""){
-      auto compr = norx!(64, 4, 1).encrypt(dataCompression, [headerCompression.xxh], data);
+      auto compr = norx!(64, 4, 1).encrypt(dataCompression, [headerCompression.xxh32], data);
       cdata = compr.data ~ compr.tag[0..4];
     }else{
       cdata = data.dup; //because it will work inplace
@@ -906,7 +906,7 @@ class Archiver{
     applyHeaderCompression!"+"(headerCompression, dataCompression.empty, uLeadIn, uHeader, uData, uLeadOut);
 
     auto res = uLeadIn ~ uHeader ~ uData ~ uLeadOut;
-    res ~= res.xxh; //add final error checking
+    res ~= cast(uint)res.xxh3; //add final error checking
 
     return cast(ubyte[])res;
   }

@@ -139,7 +139,10 @@ struct im{ static:
 
     ImStorageManager.purge(200);
 
-    { static uint t; if(t.chkSet(QPS.ifloor)) bitmaps.garbageCollect; }
+    { static uint tbmp; if(tbmp.chkSet((QPS.ifloor  )/2)) bitmaps     .garbageCollect; }
+    { static uint tvf ; if(tvf .chkSet((QPS.ifloor+1)/2)) virtualFiles.garbageCollect; }
+
+    resourceMonitor.update;
   }
 
   void _endFrame(){ //called from end of update
@@ -2660,7 +2663,7 @@ struct FieldProps{
     return s;
   }
 
-  auto hash() const{ return fullName.xxh; }
+  size_t hash() const{ return fullName.xxh3; }
 
   //todo: compile time flexible struct builder. Eg.: FieldProps().caption("Capt").unit("mm").logRange(0.1, 1000)
   /+
@@ -2842,6 +2845,260 @@ void UI_globalShaderParams(){ with(im){
 }}
 
 
+///////////////////////////////////////////////////////////////////////////
+/// ResourceMonitor                                                     ///
+///////////////////////////////////////////////////////////////////////////
+
+struct ResourceMonitor{
+  struct Item{
+    bool isAccumulator=true;
+
+    enum M = 4;
+    enum string[M] timeStepNames  = [   "1 sec",     "10 sec",     "2 min",    "24 min"];
+    enum int[M]    counterMax     = [1,         10,            12,         12          ];
+    enum N = 300;
+    enum string[M] timeRangeNames = [   "5 min",    "50 min",     "10 hour",   "5 day" ];
+    float[M] act;
+    float[N][M] history;
+    int[M] counter;
+
+    float val() const{ return history[0][$-1]; }
+
+    void update(){ //must call in every seconds
+      if(isnan(history[0][0])){
+        //initialize fucking nans
+        foreach(ref a; act) a = 0;
+        foreach(ref b; history) foreach(ref a; b) a = 0;
+      }
+
+      foreach(i; 0..M){
+        //print(i, counter[i], counterMax[i]);
+        counter[i] ++;
+        if(counter[i] >= counterMax[i]){
+          counter[i] = 0;
+
+          //latch it out fast
+          float a = act[i];
+          if(isAccumulator){
+            act[i] = 0;
+            a /= counterMax[i];//average
+          }
+
+          //shift
+          history[i][0..$-1] = history[i][1..$];
+          history[i][$-1] = a;
+
+          //carry
+          if(i+1<M){
+            if(isAccumulator) act[i+1] += a;
+                         else act[i+1] = a;
+          }
+        }else{
+          break;
+        }
+      }
+    }
+
+  }
+
+  Item
+    textureCount, texturePoolSize, textureUsedSize,
+
+    bitmapCount, allBitmapSize, residentBitmapSize,
+
+    virtualFileCount, allVirtualFileSize, residentVirtualFileSize,
+
+    UPS, FPS, TPS, VPS;
+
+  void updateInternal(void delegate() onCollectData){
+    immutable unit = 24*60*60;
+    __gshared static long lastUnit;
+    long actUnit = cast(long)(floor(now.raw*unit));
+    long deltaUnit = actUnit-lastUnit;
+    lastUnit = actUnit;
+
+    if(deltaUnit>100) deltaUnit = 1; //ignore to big lag
+
+    if(deltaUnit>0) onCollectData();
+
+    foreach(i; 0..deltaUnit){
+      //print(actUnit);
+      static foreach(idx, name; FieldNameTuple!(typeof(this))){{
+        alias T = Fields!(typeof(this))[idx];
+        static if(is(T==Item)) mixin(name).update;
+      }}
+    }
+  }
+}
+
+__gshared ResourceMonitor resourceMonitor;
+
+
+void update(ref ResourceMonitor rm){ with(rm){
+  updateInternal({
+    //collect and actualize data
+    textureCount.act[0] = textures.length;
+    texturePoolSize.act[0] = textures.poolSizeBytes;
+    textureUsedSize.act[0] = textures.usedSizeBytes;
+
+    const bs = bitmaps.stats;
+    bitmapCount          .act[0] = bs.count;
+    residentBitmapSize   .act[0] = bs.residentSizeBytes;
+    allBitmapSize        .act[0] = bs.allSizeBytes;
+
+    const vs = virtualFiles.stats;
+    virtualFileCount.act[0] = vs.count;
+    residentVirtualFileSize .act[0] = vs.residentSizeBytes;
+    allVirtualFileSize      .act[0] = vs.allSizeBytes;
+
+    UPS.act[0] = mainWindow.UPS;
+    FPS.act[0] = mainWindow.FPS;
+
+    TPS.act[0] = het.win.TPS;
+    VPS.act[0] = het.win.VPS;
+  });
+}}
+
+
+@UI void ui(ref ResourceMonitor m, int graphWidth){ with(im) with(m){
+
+  const
+    clTexturePool = RGB(255, 180, 40),
+    clTextureUsed = RGB(180, 255, 40),
+
+    clBitmap         = clAqua,
+    clResidentBitmap = mix(clGray, clBitmap, .25),
+
+    clVirtualFile         = RGB(100, 150, 255),
+    clResidentVirtualFile = mix(clGray, clVirtualFile, .25),
+
+    clUPS         = RGB(180, 40, 255),
+    clFPS         = RGB(255, 40, 180),
+
+    clTPS         = RGB(40,  80, 255),
+    clVPS         = RGB(40, 255,  80);
+
+  static int timeIdx = 0;
+  int gridXStepSize = Item.N/(timeIdx==2 ? 10 : 5);
+
+
+  void Legend(string title, float size=float.nan, RGB color = RGB(1, 2, 3), string suffix=""){
+    if(color != RGB(1, 2, 3)) Text(color, symbol("CheckboxFill"), tsNormal.fontColor, " ");
+    Text(title);
+    if(!isnan(size)) Row(HAlign.right, shortSizeText(size)~suffix, { width = fh*(2.25 + suffix.length*0.3); });
+  }
+
+  struct Data{ float[] values; RGB color; }
+
+  void Graph(string name, Data[] data, int gridXStepSize = 0, int gridYDivisions=4){
+    Btn({
+      bkColor = RGB(40, 40, 40);
+      padding = "3";
+      margin = "2 0";
+      innerWidth = graphWidth;
+      innerHeight = fh*3.5;
+
+      /*auto hit = hitTest(actContainer, true);
+      const w = hit.hitBounds.width-actContainer.totalGapSize.x;
+      const h = innerHeight;*/
+
+      const w = innerWidth;
+      const h = innerHeight;
+
+      auto dr = new Drawing;
+      with(dr){
+        const
+          dataWidth = data.map!(d => d.values.length).maxElement(1),
+          dataHeight = data.map!(d => d.values.maxElement(1)).maxElement(1),
+          sx =  (w+1) / dataWidth,
+          sy = -(h) / dataHeight;
+
+        dr.color = RGB(70, 70, 70);
+        dr.lineWidth = 1;
+        if(gridXStepSize) iota(0, dataWidth+1, gridXStepSize).each!(i => vLine(round(sx*i)-.5f, 0, h));
+        if(gridYDivisions) iota(gridYDivisions+1).each!(i => hLine(0, (h*i/gridYDivisions).round-.5f, w));
+
+        dr.lineWidth = 2;
+        foreach(d; data){
+          color = d.color;  hGraph(0, h, d.values, sx, sy);
+        }
+      }
+      addOverlayDrawing(dr);
+    }, genericId(name));
+  }
+
+  void VirtualFileGraph(){
+    Row({
+      Text(format!"Virtual files (%s)"(virtualFileCount.val));                      Flex;
+      Legend("Resident", residentVirtualFileSize.val, clResidentVirtualFile, "B");  Spacer;
+      Legend("All"     , allVirtualFileSize.val     , clVirtualFile        , "B");
+    });
+    Graph("VirtualFiles", [Data(residentVirtualFileSize.history[timeIdx][], clResidentVirtualFile),
+                           Data(allVirtualFileSize     .history[timeIdx][], clVirtualFile        )], gridXStepSize);
+  }
+
+  void BitmapCacheGraph(){
+    Row({
+      Text(format!"Bitmap cache (%s)"(bitmapCount.val));                  Flex;
+      Legend("Resident", residentBitmapSize.val, clResidentBitmap, "B");  Spacer;
+      Legend("All"     , allBitmapSize.val     , clBitmap        , "B");
+    });
+    Graph("BitmapCache", [Data(residentBitmapSize.history[timeIdx][], clResidentBitmap),
+                          Data(allBitmapSize     .history[timeIdx][], clBitmap        )], gridXStepSize);
+  }
+
+  void TextureCacheGraph(){
+    Row({
+      Text(format!"Texture cache (%s)"(textureCount.val));  Flex;
+      Legend("Used", textureUsedSize.val, clTextureUsed, "B");   Text("   ");
+      Legend("Pool", texturePoolSize.val, clTexturePool, "B");
+    });
+    //Text("Config: "~textures.megaTextureConfig);
+    Graph("TextureCache", [Data(texturePoolSize.history[timeIdx][], clTexturePool),
+                           Data(textureUsedSize.history[timeIdx][], clTextureUsed)], gridXStepSize);
+  }
+
+  void FPSGraph(){
+    Row({
+      Text("Refresh rate");           Flex;
+      Legend("UPS", UPS.val, clUPS, "Hz");  Text("   ");
+      Legend("FPS", FPS.val, clFPS, "Hz");
+    });
+    Graph("FPS", [Data(UPS.history[timeIdx][], clUPS),
+                  Data(FPS.history[timeIdx][], clFPS)], gridXStepSize);
+  }
+
+  void TPSGraph(){
+    Row({
+      Text("GPU data upload");                   Flex;
+      Legend("TEX", TPS.val, clTPS, "B/s");  Text("   ");
+      Legend("VBO", VPS.val, clVPS, "B/s");
+    });
+    Graph("TPS", [Data(TPS.history[timeIdx][], clTPS),
+                  Data(VPS.history[timeIdx][], clVPS)], gridXStepSize);
+  }
+
+  void SelectTimeIdx(ref int t){
+    Row(HAlign.right, {
+      Text("Time step");                ComboBox(timeIdx, ResourceMonitor.Item.timeStepNames , { width = fh*4; });
+      Text("   Visible interval");      ComboBox(timeIdx, ResourceMonitor.Item.timeRangeNames, { width = fh*4; });
+    });
+  }
+
+  Column({
+    padding = "4";
+    border = "1 normal silver";
+    theme = "tool";
+    Text(bold("Resource Monitor"));    Spacer;
+    VirtualFileGraph;                   Spacer;
+    BitmapCacheGraph;                   Spacer;
+    TextureCacheGraph;                  Spacer;
+    TPSGraph;                           Spacer;
+    FPSGraph;                           Spacer;
+    SelectTimeIdx(timeIdx);
+  });
+
+}}
 
 ////////////////////////////////////////////////////////
 ///  Dead code                                       ///

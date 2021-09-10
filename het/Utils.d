@@ -1234,7 +1234,7 @@ struct UpdateInterval{
 
         int n = UpdateInterval(tLast, tAct).repeater(tBase, tFirstDelta, tDelta);
 
-        h = xxh([n], h);
+        h = xxh32([n], h);
 
         /*if(n){ dr.color = clVGA[n];  dr.fillRect(r); }
         dr.color = clWhite;  dr.fontHeight = 0.1;  dr.textOut(r.x, r.y, n.text);*/
@@ -1263,6 +1263,12 @@ struct UpdateInterval{
 ////////////////////////////////////////////////////////////////////////////////
 ///  Arrays                                                                  ///
 ////////////////////////////////////////////////////////////////////////////////
+
+size_t sizeBytes(T)(in T a){
+  static if(isDynamicArray!T) return a.length * ElementType!T.sizeof;
+  else return T.sizeof;
+}
+
 
 auto fetchFront(T)(ref T[] arr, T def = T.init){
   if(arr.length){
@@ -3790,47 +3796,15 @@ string identityStr(T)(in T a){ // identityStr /////////////////////////
   else static assert(0, "identityStr() unhandled type: "~T.stringof);
 }
 
-// xxh //////////////////////////////////////////////////////
+//! xxh32 //////////////////////////////////////////////////////
 // a fast hashing function
 
 //Source: https://github.com/repeatedly/xxhash-d/blob/master/src/xxhash.d
 //        https://code.google.com/p/xxhash/
 // Copyright: Masahiro Nakagawa 2014-.
-// above 0.5MB it is unofficially parallel
-@trusted
-uint xxh(bool enableParallel=true)(in void[] source, uint seed = 0){
-  if(source.length <= 1<<19){    //Dont change it from 1<<19, otherwise the hash is broken   (was 8<<20)
-    return xxh_internal(source, seed);
-  }else{
-    enum chunkSh   = 16,  //Dont change it from 16, otherwise the hash is broken   (was 20)
-         chunkSize = 1<<chunkSh;
 
-    auto hlist = new uint[(source.length+chunkSize-1)>>chunkSh];
-
-    auto ch(size_t i){ return source[i<<chunkSh .. min((i+1)<<chunkSh, $)]; }//todo: megcsinalni ezt funkcionalisra
-
-    static if(enableParallel){
-      import std.parallelism;
-      foreach(i, ref h; parallel(hlist))
-        h = ch(i).xxh_internal;
-    }else{
-      foreach(i, ref h; hlist)
-        h = ch(i).xxh_internal;
-    }
-
-    return hlist.xxh_internal(seed);
-  }
-}
-
-ulong xxh64(bool enableParallel=true)(in void[] source, ulong seed = 0){
-  size_t mid = source.length/2;
-  uint lo = source[0..mid].xxh!enableParallel(cast(uint)(seed    )+2654435761U);
-  uint hi = source[mid..$].xxh!enableParallel(cast(uint)(seed>>32)+2246822519U+lo);
-  return (lo | ulong(hi)<<32) + hi*2654435761U;
-}
-
-private @trusted pure nothrow
-uint xxh_internal(in void[] source, uint seed = 0)   //todo: it must run at compile time too
+@trusted pure nothrow
+uint xxh32(in void[] source, uint seed = 0)   //todo: it must run at compile time too
 {
     enum Prime32_1 = 2654435761U,
          Prime32_2 = 2246822519U,
@@ -3958,17 +3932,17 @@ uint xxh_internal(in void[] source, uint seed = 0)   //todo: it must run at comp
     return result;
 } //todo: xxh unittest
 
-uint xxhuc(in void[] source, uint seed = 0)
+uint xxh32uc(in void[] source, uint seed = 0)
 {
-  return xxh(uc(cast(string)source));
+  return xxh32(uc(cast(string)source));
 }
 
-void benchmark_xxh(){
+void benchmark_xxh32(){
   size_t len = 1;
   while(len<2_000_000_000){
     auto data = new ubyte[len];
     auto t0 = QPS;
-    xxh(data);
+    xxh32(data);
     auto t1 = QPS;
 
     writefln("len = %10d   time = %6.3f   MB/s = %9.3f", len, t1-t0, len/(t1-t0)/1024/1024);
@@ -3996,7 +3970,290 @@ void benchmark_xxh(){
 +/
 }
 
-// crc32 //////////////////////////////////////////////////////////////////
+//! xxh3 ///////////////////////////////////////////////////////////////////
+
+private struct XXH3{ static private:
+  enum STRIPE_LEN             =  64,
+       SECRET_CONSUME_RATE    =   8,  /* nb of secret bytes consumed at each accumulation */
+       ACC_NB                 = STRIPE_LEN / ulong.sizeof,
+       SECRET_MERGEACCS_START =  11,
+       SECRET_LASTACC_START   =   7,  /* not aligned on 8, last secret is different from acc & scrambler */
+       MIDSIZE_STARTOFFSET    =   3,
+       MIDSIZE_LASTOFFSET     =  17,
+       SECRET_SIZE_MIN        = 136,
+       SECRET_DEFAULT_SIZE    = 192,
+
+       PRIME32_1 = 0x9E3779B1U,  PRIME64_1 = 0x9E3779B185EBCA87UL,
+       PRIME32_2 = 0x85EBCA77U,  PRIME64_2 = 0xC2B2AE3D27D4EB4FUL,
+       PRIME32_3 = 0xC2B2AE3DU,  PRIME64_3 = 0x165667B19E3779F9UL,
+       PRIME32_4 = 0x27D4EB2FU,  PRIME64_4 = 0x85EBCA77C2B2AE63UL,
+       PRIME32_5 = 0x165667B1U,  PRIME64_5 = 0x27D4EB2F165667C5UL;
+
+  immutable ulong[ACC_NB] INIT_ACC = [PRIME32_3, PRIME64_1, PRIME64_2, PRIME64_3, PRIME64_4, PRIME32_2, PRIME64_5, PRIME32_1];
+
+  immutable ubyte[SECRET_DEFAULT_SIZE] kSecret = [
+    0xb8, 0xfe, 0x6c, 0x39, 0x23, 0xa4, 0x4b, 0xbe, 0x7c, 0x01, 0x81, 0x2c, 0xf7, 0x21, 0xad, 0x1c,
+    0xde, 0xd4, 0x6d, 0xe9, 0x83, 0x90, 0x97, 0xdb, 0x72, 0x40, 0xa4, 0xa4, 0xb7, 0xb3, 0x67, 0x1f,
+    0xcb, 0x79, 0xe6, 0x4e, 0xcc, 0xc0, 0xe5, 0x78, 0x82, 0x5a, 0xd0, 0x7d, 0xcc, 0xff, 0x72, 0x21,
+    0xb8, 0x08, 0x46, 0x74, 0xf7, 0x43, 0x24, 0x8e, 0xe0, 0x35, 0x90, 0xe6, 0x81, 0x3a, 0x26, 0x4c,
+    0x3c, 0x28, 0x52, 0xbb, 0x91, 0xc3, 0x00, 0xcb, 0x88, 0xd0, 0x65, 0x8b, 0x1b, 0x53, 0x2e, 0xa3,
+    0x71, 0x64, 0x48, 0x97, 0xa2, 0x0d, 0xf9, 0x4e, 0x38, 0x19, 0xef, 0x46, 0xa9, 0xde, 0xac, 0xd8,
+    0xa8, 0xfa, 0x76, 0x3f, 0xe3, 0x9c, 0x34, 0x3f, 0xf9, 0xdc, 0xbb, 0xc7, 0xc7, 0x0b, 0x4f, 0x1d,
+    0x8a, 0x51, 0xe0, 0x4b, 0xcd, 0xb4, 0x59, 0x31, 0xc8, 0x9f, 0x7e, 0xc9, 0xd9, 0x78, 0x73, 0x64,
+    0xea, 0xc5, 0xac, 0x83, 0x34, 0xd3, 0xeb, 0xc3, 0xc5, 0x81, 0xa0, 0xff, 0xfa, 0x13, 0x63, 0xeb,
+    0x17, 0x0d, 0xdd, 0x51, 0xb7, 0xf0, 0xda, 0x49, 0xd3, 0x16, 0x55, 0x26, 0x29, 0xd4, 0x68, 0x9e,
+    0x2b, 0x16, 0xbe, 0x58, 0x7d, 0x47, 0xa1, 0xfc, 0x8f, 0xf8, 0xb8, 0xd1, 0x7a, 0xd0, 0x31, 0xce,
+    0x45, 0xcb, 0x3a, 0x8f, 0x95, 0x16, 0x04, 0x28, 0xaf, 0xd7, 0xfb, 0xca, 0xbb, 0x4b, 0x40, 0x7e,
+  ];
+
+  ulong readLE64(in void* memPtr) { return *cast(const ulong*)memPtr; }
+  uint readLE32(in void* memPtr) { return *cast(const uint*)memPtr; }
+  void writeLE64(void* memPtr, ulong val) { *cast(ulong*)memPtr = val; }
+
+  ulong mult32to64(T, U)(T x, U y){ return (cast(ulong)cast(uint)(x) * cast(ulong)cast(uint)(y)); }
+
+  ulong[2] mult64to128(ulong lhs, ulong rhs){
+    /* First calculate all of the cross products. */
+    const lo_lo = mult32to64(lhs & 0xFFFFFFFF, rhs & 0xFFFFFFFF),
+          hi_lo = mult32to64(lhs >> 32       , rhs & 0xFFFFFFFF),
+          lo_hi = mult32to64(lhs & 0xFFFFFFFF, rhs >> 32       ),
+          hi_hi = mult32to64(lhs >> 32       , rhs >> 32       ),
+
+    /* Now add the products together. These will never overflow. */
+          cross = (lo_lo >> 32) + (hi_lo & 0xFFFFFFFF) + lo_hi,
+          upper = (hi_lo >> 32) + (cross >> 32       ) + hi_hi,
+          lower = (cross << 32) | (lo_lo & 0xFFFFFFFF);
+
+    return [lower, upper];
+  }
+
+  import std.bitmanip : swapEndian;
+  uint swap32(uint x){ return x.swapEndian; }
+  ulong swap64(ulong x){ return x.swapEndian; }
+
+  uint rotl32(uint x, uint r){ return ((x << r) | (x >> (32 - r))); }
+  ulong rotl64(ulong x, uint r){ return ((x << r) | (x >> (64 - r))); }
+
+  ulong mul128_fold64(ulong lhs, ulong rhs){
+    auto a = mult64to128(lhs, rhs);
+    return a[0] ^ a[1];
+  }
+
+  ulong xorshift64(ulong v64, uint shift){
+    return v64 ^ (v64 >> shift);
+  }
+
+  ulong avalanche(ulong h64){
+    h64 = xorshift64(h64, 37);
+    h64 *= 0x165667919E3779F9UL;
+    h64 = xorshift64(h64, 32);
+    return h64;
+  }
+
+  ulong avalanche64(ulong h64){
+    h64 ^= h64 >> 33;
+    h64 *= PRIME64_2;
+    h64 ^= h64 >> 29;
+    h64 *= PRIME64_3;
+    h64 ^= h64 >> 32;
+    return h64;
+  }
+
+  ulong rrmxmx(ulong h64, ulong len){
+    /* this mix is inspired by Pelle Evensen's rrmxmx */
+    h64 ^= rotl64(h64, 49) ^ rotl64(h64, 24);
+    h64 *= 0x9FB21C651E98DF25UL;
+    h64 ^= (h64 >> 35) + len;
+    h64 *= 0x9FB21C651E98DF25UL;
+    return xorshift64(h64, 28);
+  }
+
+  ulong mix16B(in ubyte* input, in ubyte* secret, ulong seed64) {
+    const input_lo = readLE64(input    ),
+          input_hi = readLE64(input + 8);
+    return mul128_fold64(
+      input_lo ^ (readLE64(secret    ) + seed64),
+      input_hi ^ (readLE64(secret + 8) - seed64)
+    );
+  }
+
+  ulong mix2Accs(const ulong* acc, in ubyte* secret){
+    return mul128_fold64( acc[0] ^ readLE64(secret    ),
+                          acc[1] ^ readLE64(secret + 8) );
+  }
+
+  ulong mergeAccs(in ulong* acc, in ubyte* secret, ulong start){
+    return avalanche(start + iota(4).map!(i => mix2Accs(acc + 2 * i, secret + 16 * i)).sum);
+  }
+
+  void accumulate_512_scalar(ulong* acc/+ presumed aligned +/, in ubyte* input, in ubyte* secret){
+    foreach(i; 0..ACC_NB){
+      auto data_val = readLE64(input + 8 * i), //todo: const
+           data_key = data_val ^ readLE64(secret + i * 8);
+      acc[i ^ 1] += data_val; /* swap adjacent lanes */
+      acc[i    ] += mult32to64(data_key & 0xFFFFFFFF, data_key >> 32);
+    }
+  }
+
+  void accumulate(ulong* acc,in ubyte* input,in ubyte* secret, size_t nbStripes){
+    foreach(n; 0..nbStripes){
+      const inp = input + n * STRIPE_LEN;
+      //opt: PREFETCH(in + PREFETCH_DIST);
+      accumulate_512_scalar(acc, inp, secret + n * SECRET_CONSUME_RATE);
+    }
+  }
+
+  void scrambleAcc_scalar(ulong* acc/+ presumed aligned +/, in ubyte* secret){
+    foreach(i; 0..ACC_NB)
+      acc[i] = (xorshift64(acc[i], 47) ^ readLE64(secret + 8 * i)) * PRIME32_1;
+  }
+
+  void hashLong_internal_loop(ulong* acc, in ubyte* input, size_t len, in ubyte* secret, size_t secretSize){
+    const nbStripesPerBlock = (secretSize - STRIPE_LEN) / SECRET_CONSUME_RATE,
+          block_len = STRIPE_LEN * nbStripesPerBlock,
+          nb_blocks = (len - 1) / block_len;
+
+    foreach(n; 0..nb_blocks){
+      accumulate(acc, input + n * block_len, secret, nbStripesPerBlock);
+      scrambleAcc_scalar(acc, secret + secretSize - STRIPE_LEN);
+    }
+
+    /* last partial block */
+    const nbStripes = ((len - 1) - (block_len * nb_blocks)) / STRIPE_LEN;
+    accumulate(acc, input + nb_blocks * block_len, secret, nbStripes);
+
+    /* last stripe */
+    const p = input + len - STRIPE_LEN;
+    accumulate_512_scalar(acc, p, secret + secretSize - STRIPE_LEN - SECRET_LASTACC_START);
+  }
+
+  void initCustomSecret_scalar(void* customSecret, ulong seed64){
+    const kSecretPtr = kSecret.ptr;
+
+    const nbRounds = SECRET_DEFAULT_SIZE / 16;
+    foreach(i; 0..nbRounds){
+      auto lo = readLE64(kSecretPtr + 16 * i    ) + seed64,
+           hi = readLE64(kSecretPtr + 16 * i + 8) - seed64;
+      writeLE64(customSecret + 16 * i    , lo);
+      writeLE64(customSecret + 16 * i + 8, hi);
+    }
+  }
+
+  ulong generate64_internal(in ubyte* input, size_t len, ulong seed, in ubyte* secret, size_t secretLen){
+
+    ulong len_0to16(){
+
+      ulong len_1to3(){
+        const c1       = input[0],
+              c2       = input[len >> 1],
+              c3       = input[len - 1],
+              combined = (c1 << 16) | (c2  << 24) | (c3 <<  0) | (len <<  8),
+              bitflip  = (readLE32(secret) ^ readLE32(secret + 4)) + seed,
+              keyed    = combined ^ bitflip;
+        return avalanche64(keyed);
+      }
+
+      ulong len_4to8(){
+        seed ^= cast(ulong)swap32(cast(uint)seed) << 32;
+        const input1  = readLE32(input),
+              input2  = readLE32(input + len - 4),
+              bitflip = (readLE64(secret + 8) ^ readLE64(secret + 16)) - seed,
+              input64 = input2 + ((cast(ulong)input1) << 32),
+              keyed   = input64 ^ bitflip;
+        return rrmxmx(keyed, len);
+      }
+
+      ulong len_9to16(){
+        const bitflip1 = (readLE64(secret + 24) ^ readLE64(secret + 32)) + seed,
+              bitflip2 = (readLE64(secret + 40) ^ readLE64(secret + 48)) - seed,
+              input_lo = readLE64(input) ^ bitflip1,
+              input_hi = readLE64(input + len - 8) ^ bitflip2,
+              acc      = len + swap64(input_lo) + input_hi + mul128_fold64(input_lo, input_hi);
+        return avalanche(acc);
+      }
+
+      if (len >  8) return len_9to16;
+      if (len >= 4) return len_4to8;
+      if (len     ) return len_1to3;
+      return avalanche64(seed ^ (readLE64(secret + 56) ^ readLE64(secret + 64)));
+    }
+
+    ulong len_17to128(){
+      ulong acc = len * PRIME64_1;
+      if (len > 32) {
+        if (len > 64) {
+          if (len > 96) {
+            acc += mix16B(input + 48      , secret +  96, seed);
+            acc += mix16B(input + len - 64, secret + 112, seed);
+          }
+          acc += mix16B(input + 32      , secret + 64, seed);
+          acc += mix16B(input + len - 48, secret + 80, seed);
+        }
+        acc += mix16B(input + 16      , secret + 32, seed);
+        acc += mix16B(input + len - 32, secret + 48, seed);
+      }
+      acc += mix16B(input +        0, secret +  0, seed);
+      acc += mix16B(input + len - 16, secret + 16, seed);
+
+      return avalanche(acc);
+    }
+
+    ulong len_129to240(){
+      ulong acc = len * PRIME64_1;
+
+      foreach(i; 0..8)
+        acc += mix16B(input + (16 * i), secret + (16 * i), seed);
+      acc = avalanche(acc);
+
+      const nbRounds = len / 16;
+      foreach(i; 8..nbRounds)
+        acc += mix16B(input + (16 * i), secret + (16 * (i - 8)) + MIDSIZE_STARTOFFSET, seed);
+
+      /* last bytes */
+      acc += mix16B(input + len - 16, secret + SECRET_SIZE_MIN - MIDSIZE_LASTOFFSET, seed);
+      return avalanche(acc);
+    }
+
+    ulong hashLong_withSeed() {
+      ubyte[SECRET_DEFAULT_SIZE] secret;
+      initCustomSecret_scalar(secret.ptr, seed);
+      ulong[ACC_NB] acc = INIT_ACC;
+
+      hashLong_internal_loop(acc.ptr, input, len, secret.ptr, secret.length);
+      return mergeAccs(acc.ptr, secret.ptr + SECRET_MERGEACCS_START, len * PRIME64_1);
+    }
+
+    if(len <= 16) return len_0to16;
+    if(len <= 128) return len_17to128;
+    if(len <= 240) return len_129to240;
+    return hashLong_withSeed;
+  }
+
+  ulong generate64(in void* input, size_t len, ulong seed=0){
+    return generate64_internal(cast(const ubyte*)input, len, seed, kSecret.ptr, kSecret.sizeof);
+  }
+
+  void selftest(){
+    const lengths = [ 0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 64, 65, 95, 96, 97, 127, 128, 129, 239, 240, 241, 255, 256, 257, 511, 512, 513 ];
+    const results = [ 0x2d06800538d394c2, 0x0fe498556034255e, 0xe72a1171b2f83a1a, 0x4366019a3823dccf, 0x4b48e4f5d655d132, 0xd8fae3d7a0c3754b, 0x0f5f4187bb0b7b70, 0x9c84d18587e10b2c,
+                      0x00d94b281bba523e, 0x127c8cf284a2ac8d, 0x7d553d9cba2010cb, 0xc6c419714f465d1b, 0x974813de6f540eb4, 0xf9e1b4199e9b6ccb, 0x35691ab299857461, 0x40fcd44dc3049173,
+                      0x62cd23a00db02a2c, 0x969b2300ea907020, 0x8382b2fb55a25b3e, 0x9e0f9ae9891b607c, 0x86cf3e266cdbe658, 0xf529e83950d89de1, 0xf2e216f8f8e10db5, 0xfba432f419d27644,
+                      0x3339807d2a21fd56, 0xc4bdbce6762c4ac7, 0x795d6a504c1cfecc, 0xa6bfe3904a35af5c, 0xeb5c4226460ec2c9, 0xcb803070815f2ab2, 0x21b7914a0ab293ec, 0xa56955aa7e5d2e12, 0x40273dbf31e227c9 ];
+    foreach(i, len; lengths){
+      const str = iota(len).map!(j => cast(char)(j*i % 51 + ' ')).to!string,
+            seed = i%5,
+            hash = .xxh3(str, seed);
+      enforce(hash==results[i], "FATAL ERROR: XXH3_64 failed at len:"~len.text);
+    }
+  }
+}
+
+ulong xxh3(in void[] data, ulong seed=0){
+  return XXH3.generate64(data.ptr, data.length, seed);
+}
+
+
+//! crc32 //////////////////////////////////////////////////////////////////
 
 @trusted pure nothrow
 uint crc32(in void[] source, uint seed = 0xffffffff)
@@ -4138,7 +4395,7 @@ private static:
     const(void)[] arr = K; //work on this slice
 
     if(arr.length > byteCnt){ //longer than needed: set the last dword to the hast of the remaining part.
-      uint hash = arr[byteCnt-4..$].xxh; //todo: ellenorizni ezt es az xxh-t is. Lehet, hogy le kene cserelni norx-ra.
+      uint hash = arr[byteCnt-4..$].xxh32; //todo: ellenorizni ezt es az xxh-t is. Lehet, hogy le kene cserelni norx-ra.
       arr = arr[0..byteCnt-4] ~ cast(void[])[hash];
     }
 
@@ -4349,7 +4606,7 @@ void benchmark_norx(){
   print("decoding");
   auto dec = norx!(64, 4, 1).decrypt("1234", "nonce", enc);
   auto t2 = QPS;
-  print(plainText.xxh);
+  print(plainText.xxh32);
   auto t3 = QPS;
   print(plainText.crc32);
   auto t4 = QPS;
@@ -4364,10 +4621,12 @@ void benchmark_norx(){
 ///  Virtual files                                                           ///
 ////////////////////////////////////////////////////////////////////////////////
 
+__gshared size_t VirtualFileCacheMaxSizeBytes = 64<<20;
+
 bool isVirtualFileName(string fileName){ return fileName.startsWith(`virtual:\`); }
 bool isVirtual(in File file){ return file.fullName.isVirtualFileName; }
 
-enum VirtualFileCommand { getInfo, remove, read, write, stats }
+enum VirtualFileCommand { getInfo, remove, read, write, stats, garbageCollect }
 
 private auto virtualFileQuery_raise(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max){
   auto res = virtualFileQuery(cmd, fileName, dataIn, offset, size);
@@ -4377,7 +4636,7 @@ private auto virtualFileQuery_raise(in VirtualFileCommand cmd, string fileName, 
 
 struct VirtualFileCacheStats{
   size_t count;
-  size_t sizeBytes;
+  size_t allSizeBytes, residentSizeBytes;
 }
 
 private VirtualFileCacheStats _virtualFileCacheStats; //used as a result
@@ -4393,12 +4652,15 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
     ulong size;
     File.FileTimes fileTimes;
     ubyte[] dataOut;
+    bool resident;
   }
 
   struct Rec{
     string fileName;
     File.FileTimes fileTimes;
     ubyte[] data;
+    bool resident; //garbageCollect will not free this file
+                   //todo: make a way to set 'resident' bit
   }
 
   __gshared static Rec[string] files;
@@ -4413,12 +4675,15 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
       if(res.exists){
         res.size = p.data.length;
         res.fileTimes = p.fileTimes;
+        res.resident = p.resident;
       }
     } break;
 
     case VirtualFileCommand.stats:{
       _virtualFileCacheStats.count = files.length;
-      _virtualFileCacheStats.sizeBytes = files.byValue.map!(f => f.data.length).sum;
+      _virtualFileCacheStats.allSizeBytes      = files.byValue                         .map!(f => f.data.length).sum;
+      _virtualFileCacheStats.residentSizeBytes = files.byValue.filter!(f => f.resident).map!(f => f.data.length).sum;
+
     } break;
 
     case VirtualFileCommand.remove:{
@@ -4454,6 +4719,7 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
         if(log) LOG("Created", fileName.quoted);
         p = fileName in files;
         assert(p);
+        (*p).fileTimes.created = now;
       }
 
       if(offset==0){
@@ -4470,14 +4736,47 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
 
     } break;
 
+    case VirtualFileCommand.garbageCollect:{
+      //auto T0 = QPS;
+      const sizeBytes = files.byValue.filter!(f => !f.resident).map!(f => f.data.length).sum; //sum of non-resident size
+
+      if(sizeBytes > VirtualFileCacheMaxSizeBytes){ //LOG("Bitmap cache GC");
+        const t = now;
+
+        //ascending by access time
+        auto list = files.values.sort!((a, b) => a.fileTimes.latest < b.fileTimes.latest);
+
+        const targetSize = VirtualFileCacheMaxSizeBytes;
+        size_t remaining = sizeBytes;
+        string[] toRemove;
+        foreach(f; list){
+          toRemove ~= f.fileName;
+          remaining -= f.data.length;
+          if(remaining<=targetSize) break;
+        }
+
+        toRemove.each!(f => files.remove(f));
+
+        //LOG(QPS-T0);
+      }
+    }break;
+
   }
 
   return res; //no error
 }}
 
-auto virtualFileCacheStats(){
-  virtualFileQuery(VirtualFileCommand.stats, "");
-  return _virtualFileCacheStats;
+// globally accessible virtual file stuff
+struct virtualFiles{ __gshared static:
+
+  auto stats(){
+    virtualFileQuery(VirtualFileCommand.stats, "");
+    return _virtualFileCacheStats;
+  }
+
+  void garbageCollect(){
+    virtualFileQuery(VirtualFileCommand.garbageCollect, "");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -4673,6 +4972,11 @@ private static{/////////////////////////////////////////////////////////////////
 
   struct FileTimes{
     DateTime created, modified, accessed;
+    DateTime latest() const{
+      return DateTime(max(created  ? created.raw  : 0,
+                          modified ? modified.raw : 0,
+                          accessed ? accessed.raw : 0));
+    }
   }
 
   FileTimes fileTimes(string fn)
@@ -4904,9 +5208,7 @@ public:
   int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
   bool opEquals(const File b) const{ return sameText(fullName, b.fullName); }
 
-  size_t toHash() const{
-    return fullName.xxh;
-  }
+  size_t toHash() const{ return fullName.hashOf; }
 
   File withoutQuery() const{
     auto i = fullName.indexOf('?');
@@ -6318,12 +6620,12 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   enforce(Date(2000, 1, 1) - Date(1601, 1, 1) == 145731);
 
   const s1 = "hello", s2 = "Nobody inspects the spammish repetition";
-  enforce(xxh(s1)==0xfb0077f9);
-  enforce(xxh(s2, 123456) == 0xc2845cee);
-  enforce(xxh64(s1)==0xFEC93A747CA698A2);                        //xxh64(s1).to!string(16).print;
-  enforce(xxh64(s2, 1234567890123456) == 0xA93F4E6F5E6F12E9);    //xxh64(s2, 1234567890123456).to!string(16).print;
+  enforce(xxh32(s1)==0xfb0077f9);
+  enforce(xxh32(s2, 123456) == 0xc2845cee);
   enforce(crc32("Hello")==0xf7d18982);
   enforce(crc32(s2) == 0xAD4270ED);
+
+  XXH3.selftest;
 
   { RNG rng; rng.seed = 0; enforce(iota(30).map!(i => rng.random(100).text).join(' ') == "0 3 86 20 27 67 31 16 37 42 8 47 7 84 5 29 91 36 77 32 69 84 71 30 16 32 46 24 82 27"); }
 

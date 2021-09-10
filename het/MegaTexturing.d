@@ -1,6 +1,6 @@
 module het.megatexturing;
 
-import het.opengl, het.binpacker;
+import het.opengl, het.algorithm;
 
 // imports for debug
 import het.draw2d;
