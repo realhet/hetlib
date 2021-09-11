@@ -3972,7 +3972,7 @@ void benchmark_xxh32(){
 
 //! xxh3 ///////////////////////////////////////////////////////////////////
 
-private struct XXH3{ static private:
+struct XXH3{ static:
   enum STRIPE_LEN             =  64,
        SECRET_CONSUME_RATE    =   8,  /* nb of secret bytes consumed at each accumulation */
        ACC_NB                 = STRIPE_LEN / ulong.sizeof,
@@ -4086,7 +4086,8 @@ private struct XXH3{ static private:
     return avalanche(start + iota(4).map!(i => mix2Accs(acc + 2 * i, secret + 16 * i)).sum);
   }
 
-  void accumulate_512_scalar(ulong* acc/+ presumed aligned +/, in ubyte* input, in ubyte* secret){
+  void accumulate512_scalar(ulong* acc/+ presumed aligned +/, in ubyte* input, in ubyte* secret){
+    //note: a XXH3.readLE64 nem inlineolodik, csak akkor, ha az XXH3-on belulrol van meghivva!!!
     foreach(i; 0..ACC_NB){
       auto data_val = readLE64(input + 8 * i), //todo: const
            data_key = data_val ^ readLE64(secret + i * 8);
@@ -4095,11 +4096,55 @@ private struct XXH3{ static private:
     }
   }
 
+  void accumulate512_sse(ulong* acc/+ presumed aligned +/, in ubyte* input, in ubyte* secret){
+    enum ver = "opt";
+
+    auto inp = cast(const ulong*) input, sec = cast(const ulong*) secret;
+
+    static if(ver=="normal"){ //1250ms
+      foreach(i; 0..8){
+        const v = inp[i],  k = sec[i] ^ v;
+        acc[i  ] += (k & 0xFFFFFFFF) * (k >> 32);
+        acc[i^1] += v;
+      }
+    }
+
+    static if(ver=="unroll2"){ //1150ms
+      for(int i; i<8; i+=2){ //a bit faster, because only 1 write into acc
+        const v0 = inp[i  ]     ,  v1 = inp[i+1]     ,
+              k0 = sec[i  ] ^ v0,  k1 = sec[i+1] ^ v1;
+        const a0 = k0 & 0xFFFFFFFF,  a1 = k1 & 0xFFFFFFFF,
+              b0 = k0 >> 32       ,  b1 = k1 >> 32       ;
+        acc[i  ] += a0*b0 + v1;
+        acc[i+1] += a1*b1 + v0;
+      }
+    }
+
+    static if(ver=="opt") asm{ //860ms
+      //R8 acc, RDX input, RCX secret
+      //free: RAX, RCX, RDX, R8, R9, R10, R11, XMM0-XMM5
+      prefetcht0 [R8 + 0x200];
+      mov R11, 0;  L0:;
+        movdqu  XMM0, [RDX + R11];                    //v0, v1
+        movdqu  XMM1, [RCX + R11]; pxor XMM1, XMM0;   //k0, k1,  also a0, a1
+        movdqa  XMM2, XMM1; psrlq XMM2, 32;           //b0, b1
+        pmuludq XMM1, XMM2;
+        shufps  XMM0, XMM0, 0b01_00_11_10;            //v1, v0 swapped
+        movdqu  XMM3, [R8 + R11];
+        paddq   XMM0, XMM1;
+        paddq   XMM0, XMM3;
+        movdqu  [R8 + R11], XMM0;
+      add R11, 0x10;  cmp R11, 0x40;  jnz L0;
+    }
+  }
+
+  auto accumulate512 = &accumulate512_sse;
+
   void accumulate(ulong* acc,in ubyte* input,in ubyte* secret, size_t nbStripes){
     foreach(n; 0..nbStripes){
       const inp = input + n * STRIPE_LEN;
       //opt: PREFETCH(in + PREFETCH_DIST);
-      accumulate_512_scalar(acc, inp, secret + n * SECRET_CONSUME_RATE);
+      accumulate512(acc, inp, secret + n * SECRET_CONSUME_RATE);
     }
   }
 
@@ -4124,7 +4169,7 @@ private struct XXH3{ static private:
 
     /* last stripe */
     const p = input + len - STRIPE_LEN;
-    accumulate_512_scalar(acc, p, secret + secretSize - STRIPE_LEN - SECRET_LASTACC_START);
+    accumulate512(acc, p, secret + secretSize - STRIPE_LEN - SECRET_LASTACC_START);
   }
 
   void initCustomSecret_scalar(void* customSecret, ulong seed64){
@@ -4223,7 +4268,7 @@ private struct XXH3{ static private:
       return mergeAccs(acc.ptr, secret.ptr + SECRET_MERGEACCS_START, len * PRIME64_1);
     }
 
-    if(len <= 16) return len_0to16;
+    if(len <=  16) return len_0to16;
     if(len <= 128) return len_17to128;
     if(len <= 240) return len_129to240;
     return hashLong_withSeed;
