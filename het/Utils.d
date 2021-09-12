@@ -1270,7 +1270,7 @@ size_t sizeBytes(T)(in T a){
 }
 
 
-auto fetchFront(T)(ref T[] arr, T def = T.init){
+auto fetchFront(T)(ref T[] arr, lazy T def = T.init){
   if(arr.length){
     auto res = arr[0];
     arr = arr[1..$];
@@ -1286,6 +1286,14 @@ auto fetchFront(T)(ref T[] arr, sizediff_t count){
   arr = arr[i..$];
   return res;
 }
+
+auto fetchFront(R, E=ElementType!R)(ref R r, lazy E def = E.init) if(isInputRange!R){
+  if(r.empty) return def;
+  auto res = r.front;
+  r.popFront;
+  return res;
+}
+
 
 auto fetchBack(T)(ref T[] arr, T def = T.init){
   if(arr.length){
@@ -1303,6 +1311,14 @@ auto fetchBack(T)(ref T[] arr, sizediff_t count){
   arr = arr[0..i];
   return res;
 }
+
+auto fetchBack(R, E=ElementType!R)(ref R r, lazy E def = E.init) if(isInputRange!R){
+  if(r.empty) return def;
+  auto res = r.back;
+  r.popBack;
+  return res;
+}
+
 
 
 //make initialized static 1d, 2d, 3d arrays
@@ -3644,6 +3660,13 @@ struct SeedStream{
     print("Testing SeedStream: a:", a, format!"(0x%x)"(a), "  c:", c, format!"(0x%x)"(c));
     BitArray ba;
     ba.length = 1L << 32;
+
+    {
+      auto s = this; s.seed=0;
+      print("First few values:", s.take(10).map!"a.to!string(10)".join(", "));
+      print("             hex:", s.take(10).map!"a.to!string(16)".join(", "));
+    }
+
     print("seed = ", seed);
     ba[] = false;
     auto ss = this;
@@ -4293,10 +4316,15 @@ struct XXH3{ static:
   }
 }
 
-ulong xxh3(in void[] data, ulong seed=0){
+ulong xxh3_64(in void[] data, ulong seed=0){
   return XXH3.generate64(data.ptr, data.length, seed);
 }
 
+alias xxh3 = xxh3_64;
+
+uint xxh3_32(in void[] data, ulong seed=0){
+  return cast(uint)xxh3(data, seed);
+}
 
 //! crc32 //////////////////////////////////////////////////////////////////
 
@@ -5206,21 +5234,22 @@ public:
     return readText32(mustExists, defaultEncoding, offset, len).splitLines;
   }
 
-  void write(const void[] data, ulong offset = 0, Flag!"preserveTimes" preserveTimes = No.preserveTimes)const{ //todo: compression, automatic uncompression
+  private void write_internal(const void[] data, bool rewriteAll, ulong offset, Flag!"preserveTimes" preserveTimes)const{
     try{
       if(this.isVirtual){
         enforce(!preserveTimes, "preserveTimes not supported with virtual files.");
         auto v = virtualFileQuery_raise(VirtualFileCommand.write, fullName, cast(ubyte[])data, offset);
       }else{
         path.make;
-        auto f = StdFile(fullName, offset ? "r+b" : "wb");
+
+        auto f = StdFile(fullName, rewriteAll ? "wb" : "r+b");
         scope(exit) f.close;
 
         FILETIME cre, acc, wri;
         bool getTimeSuccess;
         if(preserveTimes) getTimeSuccess = GetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0;
 
-        if(offset) f.seek(offset);
+        if(!rewriteAll && offset) f.seek(offset);
         f.rawWrite(data);
         if(logFileOps) LOG(fullName);
 
@@ -5230,6 +5259,14 @@ public:
     }catch(Throwable){
       enforce(false, format(`Can't write file: "%s"`, fullName));
     }
+  }
+
+  void write(const void[] data, Flag!"preserveTimes" preserveTimes=No.preserveTimes)const{
+    write_internal(data, true, 0, preserveTimes);
+  }
+
+  void write(const void[] data, ulong offset, Flag!"preserveTimes" preserveTimes=No.preserveTimes)const{
+    write_internal(data, false, offset, preserveTimes);
   }
 
   bool sameContents(const void[] data){
