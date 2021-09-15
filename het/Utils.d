@@ -1270,55 +1270,53 @@ size_t sizeBytes(T)(in T a){
 }
 
 
-auto fetchFront(T)(ref T[] arr, lazy T def = T.init){
-  if(arr.length){
-    auto res = arr[0];
-    arr = arr[1..$];
+auto fetchFront(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
+  static if(isInputRange!T){
+    if(arr.empty) return def;
+    auto res = arr.front;
+    arr.popFront;
     return res;
-  }else{
-    return def;
-  }
+  }else static if(isDynamicArray!T){
+    if(arr.length){
+      auto res = arr[0];
+      arr = arr[1..$];
+      return res;
+    }else{
+      return def;
+    }
+  }else static assert("unhandled type");
 }
 
-auto fetchFront(T)(ref T[] arr, sizediff_t count){
+auto fetchFrontN(T)(ref T[] arr, sizediff_t count){
   auto i = min(arr.length, count),
        res = arr[0..i];
   arr = arr[i..$];
   return res;
 }
 
-auto fetchFront(R, E=ElementType!R)(ref R r, lazy E def = E.init) if(isInputRange!R){
-  if(r.empty) return def;
-  auto res = r.front;
-  r.popFront;
-  return res;
-}
-
-
-auto fetchBack(T)(ref T[] arr, T def = T.init){
-  if(arr.length){
-    auto res = arr[$-1];
-    arr = arr[0..$-1];
+auto fetchBack(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
+  static if(isInputRange!T){
+    if(arr.empty) return def;
+    auto res = arr.back;
+    arr.popBack;
     return res;
-  }else{
-    return def;
-  }
+  }else static if(isDynamicArray!T){
+    if(arr.length){
+      auto res = arr[$-1];
+      arr = arr[0..$-1];
+      return res;
+    }else{
+      return def;
+    }
+  }else static assert("unhandled type");
 }
 
-auto fetchBack(T)(ref T[] arr, sizediff_t count){
+auto fetchBackN(T)(ref T[] arr, sizediff_t count){
   auto i = max(arr.length-count, 0),
        res = arr[i..$];
   arr = arr[0..i];
   return res;
 }
-
-auto fetchBack(R, E=ElementType!R)(ref R r, lazy E def = E.init) if(isInputRange!R){
-  if(r.empty) return def;
-  auto res = r.back;
-  r.popBack;
-  return res;
-}
-
 
 
 //make initialized static 1d, 2d, 3d arrays

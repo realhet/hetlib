@@ -2024,7 +2024,7 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-  auto removeLast(T = Cell)() { return cast(T)subCells_.fetchBack; }
+  auto removeLast(T = Cell)() { return cast(T)(subCells_.fetchBack); }
   auto removeLastContainer() { return removeLast!Container; }
 
   bool removeLastChar(dchar ch){
