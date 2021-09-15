@@ -950,8 +950,8 @@ void sort(T)(ref T a, ref T b, ref T c){
   sort(b, c);
 }
 
-auto alignUp  (T)(T p, int align_) { return (p+(align_-1))/align_*align_; }
-auto alignDown(T)(T p, int align_) { return p/align_*align_; }
+auto alignUp  (T, U)(T p, U align_) { return (p+(align_-1))/align_*align_; }
+auto alignDown(T, U)(T p, U align_) { return p/align_*align_; }
 
 bool chkSet  (ref bool b) { if( b) return false; else { b = true ; return true; } }
 bool chkClear(ref bool b) { if(!b) return false; else { b = false; return true; } }
@@ -1415,8 +1415,8 @@ bool findAdd(K, V)(ref V[K] aa, in K key, void delegate(ref V) update){
 uint[] toUints(in void[] data, ubyte filler=0){
   import std.traits;
   enum unitSize = ElementType!(typeof(return)).sizeof;
-  const uint dataLength = data.length.to!uint,
-             extLength  = dataLength.alignUp(unitSize);
+  const dataLength = data.length,
+        extLength  = dataLength.alignUp(unitSize);
   return cast(uint[])((cast(ubyte[])data) ~ [ubyte(0)].replicate(extLength - dataLength));
 }
 
@@ -4699,7 +4699,7 @@ __gshared size_t VirtualFileCacheMaxSizeBytes = 64<<20;
 bool isVirtualFileName(string fileName){ return fileName.startsWith(`virtual:\`); }
 bool isVirtual(in File file){ return file.fullName.isVirtualFileName; }
 
-enum VirtualFileCommand { getInfo, remove, read, write, stats, garbageCollect }
+enum VirtualFileCommand { getInfo, remove, read, write, writeAndTruncate, stats, garbageCollect }
 
 private auto virtualFileQuery_raise(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max){
   auto res = virtualFileQuery(cmd, fileName, dataIn, offset, size);
@@ -4771,7 +4771,7 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
       if(p is null){ res.error = "Virtual File not found: "~fileName.quoted; return res; }
 
       if(offset<p.data.length){
-        auto actSize = min(size-offset, p.data.length);
+        const actSize = min(size, p.data.length-offset);
         if(actSize>0)
           res.dataOut = p.data[offset..offset+actSize];
       }
@@ -4780,10 +4780,8 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
       if(log) LOG("Accessed", fileName.quoted);
     } break;
 
-    case VirtualFileCommand.write:{
+    case VirtualFileCommand.write, VirtualFileCommand.writeAndTruncate:{
       if(!fileName.isVirtualFileName){ res.error = "Invalid virtual fileName: "~fileName.quoted; return res; }
-
-      auto ubyteDataIn(){ return cast(const ubyte[])dataIn; }
 
       auto p = fileName in files;
       if(p is null){
@@ -4795,15 +4793,15 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
         (*p).fileTimes.created = now;
       }
 
-      if(offset==0){
-        p.data = ubyteDataIn.dup; //note: rather always duplicate than only when offset>0
-      }else{
-        auto end = offset + dataIn.length;
-        if(end<offset){ res.error = "Offset overflow: "~fileName.quoted; return res; }
+      auto end = offset + dataIn.length;
+      if(end<offset){ res.error = "Offset overflow: "~fileName.quoted; return res; }
 
-        p.data.length = max(p.data.length, end);
-        p.data[offset..end] = ubyteDataIn[];
-      }
+      p.data.length = max(p.data.length, end); //enlarge
+      p.data[offset..end] = cast(const ubyte[])dataIn[]; //copy
+
+      if(cmd == VirtualFileCommand.writeAndTruncate)
+        p.data.length = end; //truncate
+
       p.fileTimes.modified = now;
       if(log) LOG("Updated", fileName.quoted);
 
@@ -4838,6 +4836,16 @@ private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const 
 
   return res; //no error
 }}
+
+void unittest_virtualFileReadWrite(){
+  auto f = File(`virtual:\test_virtualFileReadWrite.dat`);
+  f.write("012345678"); assert(cast(string)f.read(true)=="012345678");
+  f.write("CDEF", 12);  assert(cast(string)f.read(true, 12, 4)=="CDEF");
+  f.write("89AB", 8);   assert(cast(string)f.read(true, 6)=="6789ABCDEF");
+  f.write("XY");        assert(cast(string)f.read(true)=="XY");
+  f.remove;
+}
+
 
 // globally accessible virtual file stuff
 struct virtualFiles{ __gshared static:
@@ -5238,7 +5246,7 @@ public:
     try{
       if(this.isVirtual){
         enforce(!preserveTimes, "preserveTimes not supported with virtual files.");
-        auto v = virtualFileQuery_raise(VirtualFileCommand.write, fullName, cast(ubyte[])data, offset);
+        auto v = virtualFileQuery_raise(rewriteAll ? VirtualFileCommand.writeAndTruncate : VirtualFileCommand.write, fullName, cast(ubyte[])data, rewriteAll ? 0 : offset);
       }else{
         path.make;
 
@@ -5249,7 +5257,7 @@ public:
         bool getTimeSuccess;
         if(preserveTimes) getTimeSuccess = GetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0;
 
-        if(!rewriteAll && offset) f.seek(offset);
+        if(!rewriteAll) f.seek(offset);
         f.rawWrite(data);
         if(logFileOps) LOG(fullName);
 

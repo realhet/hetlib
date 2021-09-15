@@ -1338,7 +1338,7 @@ class AMDB{
 void unittest_splitSentences(){
   uint h;
   void a(string s){
-    auto r = AMDB.textToSentences(s).text; h = r.xxh(h);
+    auto r = AMDB.textToSentences(s).text; h = r.xxh32(h);
     //print(s, "|", r);
   }
 
