@@ -360,6 +360,8 @@ class AMDB{
   }
   Transaction transaction;
 
+  void commit(){ transaction.commit; }
+  void cancel(){ transaction.cancel; }
 
   // toStr, prettyStr //////////////////////////////////////////////////////////////////
 
@@ -658,7 +660,7 @@ class AMDB{
 
   // systemTypes //////////////////////////////////////////
 
-  immutable allSystemTypes = ["Verb", "EType", "AType", "String", "Int", "Float", "DateTime", "Date", "Time"];
+  immutable allSystemTypes = ["Verb", "EType", "AType", "String", "Int", "Long", "UInt", "ULong", "Float", "Double", "DateTime", "Date", "Time"];
 
   auto systemTypeMap(){
     static int[string] m;
@@ -725,7 +727,7 @@ class AMDB{
 
       bool testOne(T)(in Id id, in T criteria){
         static if(isSomeString!T){
-          if(!items.get(id).isWild(criteria)) return false;
+          if(!items.get(id).isWild(criteria)) return false; //todo: ez hasonlit a chkId-re, ossze kene vonni!
         }else static if(is(Unqual!T == Id)){
           if(source && id != criteria) return false;
         }else static assert(0, "Invalid params");
@@ -879,6 +881,9 @@ class AMDB{
         switch(typeName){
           case "String": return true;
           case "Int": return data.to!int.collectException is null;
+          case "Long": return data.to!long.collectException is null;
+          case "UInt": return data.to!uint.collectException is null;
+          case "ULong": return data.to!ulong.collectException is null;
           case "DateTime": return data.DateTime.collectException is null;
           case "Date": return data.Date.collectException is null;
           case "Time": return data.Time.collectException is null;
@@ -1071,12 +1076,24 @@ class AMDB{
     return s.isWild(mask);
   }
 
-  private bool chkId(in Id id, string mask){
+  private bool chkId(in Id id, string mask){ //todo: ez mehetne a filter-be is, mert hasonlo
     string s;
     if(!id) s = "null";
     else if(auto a = id in items) s = a;
     else if(id in links) s = "...";
     else NOTIMPL;
+
+    // mask : eType
+    if(mask.canFind(':')){
+      auto p = mask.split(':').map!strip;
+      enforce(p.length==2, "Invalid typed mask format");
+
+      const itemMask  = p[0]=="" ? "*" : p[0];
+      const eTypeMask = p[1]=="" ? "*" : p[1];
+
+      return chkStr(s, itemMask) && !filter(id, "is a", eTypeMask).empty;
+    }
+
     return chkStr(s, mask);
   }
 
@@ -1213,6 +1230,7 @@ class AMDB{
     return seq;
   }
 
+  // pads with empty sentences from the left to equalize the lengths of the left-extensions
   IdSequence[] padLeft(IdSequence[] seqs){
     if(seqs.empty) return seqs;
     int maxLeftExtension = seqs.map!(s => s.leftExtension).maxElement;
@@ -1252,6 +1270,10 @@ class AMDB{
     if(ids.length) WARN("Unable to delete all"); //todo: wipe
   }
 
+  auto query(string input){
+    const options = fetchQueryOptions(input);
+    return query(input, options);
+  }
 
   int execTextCommand(string input){
     input = input.strip;
@@ -1266,8 +1288,8 @@ class AMDB{
         case "s", "schema": schema(input); break;
         case "d", "data": data(input); break;
         case "q", "query":{
-          const options = fetchQueryOptions(input);
-          auto res = padLeft(query(input, options));
+          //const options = fetchQueryOptions(input);
+          auto res = padLeft(query(input/*, options*/));
           printTable(res);
         }break;
 
