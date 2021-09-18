@@ -83,7 +83,7 @@ public import std.string, std.array, std.conv, std.typecons, std.range, std.form
 public import std.utf;
 public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum;
 public import std.uri: urlEncode = encode, urlDecode = decode;
-public import std.process : environment, thisThreadID;
+public import std.process : environment, thisThreadID, execute;
 public import std.zlib : compress, uncompress;
 public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write;
 public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
@@ -2438,6 +2438,20 @@ bool isWildMask(char chAny = '*', char chOne = '?')(string s){
   return s.any!(a => a.among(chAny, chOne));
 }
 
+bool isWild(bool ignoreCase = true, char chAny = '*', char chOne = '?')(string input, string[] wildStrs){
+  foreach(w; wildStrs){
+    if(isWild!(ignoreCase, chAny, chOne)(input, w)) return true;
+  }
+  return false;
+}
+
+bool isWildMulti(bool ignoreCase = true, char chAny = '*', char chOne = '?', char chSepar = ';')(string input, string wildStrs){
+  foreach(w; wildStrs.splitter(chSepar)){
+    if(isWild!(ignoreCase, chAny, chOne)(input, w)) return true;
+  }
+  return false;
+}
+
 bool isWild(bool ignoreCase = true, char chAny = '*', char chOne = '?')(string input, string wildStr){
   //bool cmp(char a, char b){ return ignoreCase ? a.toLower==b.toLower : a==b; }
   const cs = ignoreCase ? No.caseSensitive : Yes.caseSensitive;   //kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.
@@ -2638,10 +2652,10 @@ bool split2(string s, string delim, out string a, out string b, bool doStrip = t
   return i>=0;
 }
 
-string[] split2(string s, string delim, bool doStrip = true){
+auto split2(string s, string delim, bool doStrip = true){
   string s1, s2;
   split2(s, delim, s1, s2, doStrip);
-  return [s1, s2];
+  return tuple(s1, s2);
 }
 
 string join2(string a, string delim, string b){
@@ -4905,6 +4919,11 @@ public:
   @property string dir() const { return excludeTrailingPathDelimiter(fullPath); }
   @property void dir(string dir_) { fullPath = dir_=="" ? "" : includeTrailingPathDelimiter(dir_); }
 
+  auto times()     const{ return File.fileTimes(dir); }
+  auto modified()  const{ return times.modified; }
+  auto accessed()  const{ return times.accessed; }
+  auto created()   const{ return times.created ; }
+
   auto isAbsolute()const{ return isAbsolutePath(fullPath); }
 
   Path normalized()             const { return Path(buildNormalizedPath(absolutePath(fullPath))); }
@@ -5068,7 +5087,7 @@ private static{/////////////////////////////////////////////////////////////////
     StdFile f;
     try{
       f = StdFile(fn, "rb");
-    }catch(Throwable){
+    }catch(Exception e){
       return res;
     }
 
@@ -5123,6 +5142,7 @@ public:
   @property string dir()const           { return extractFileDir(fullName); }
   @property void dir(string newDir)     { fullName = combinePath(newDir, extractFileName(fullName)); }
 
+  @property string fullPath()const    { return extractFilePath(fullName); }
   @property Path path()const          { return Path(extractFilePath(fullName)); }
   @property void path(Path newPath)   { fullName = combinePath(newPath.fullPath, extractFileName(fullName)); }
   @property void path(string newPath) { fullName = combinePath(newPath         , extractFileName(fullName)); }
@@ -5260,7 +5280,7 @@ public:
         if(logFileOps) LOG(fullName);
 
         if(preserveTimes && getTimeSuccess)
-          enforce(SetFileTime(f.windowsHandle, null, &acc, &cre)!=0, "Error writing file times.");
+          enforce(SetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0, "Error writing file times.");
       }
     }catch(Throwable){
       enforce(false, format(`Can't write file: "%s"`, fullName));
@@ -5298,9 +5318,36 @@ public:
 
   size_t toHash() const{ return fullName.hashOf; }
 
-  File withoutQuery() const{
+  File withoutQueryString() const{
     auto i = fullName.indexOf('?');
     return File(i>=0 ? fullName[0..i] : fullName);
+  }
+
+  @property string queryString() const{ //todo: test querystrings with bitmap/font renderer
+    auto i = fullName.indexOf('?');
+    return i>=0 ? fullName[i+1..$] : "";
+  }
+
+  @property void queryString(string s){
+    s = s.strip.withoutStarting('?');
+    auto fn = withoutQueryString.fullName;
+    if(s!="") fn ~= '?' ~ s;
+    fullName = fn;
+  }
+
+  auto queryItems(){
+    return queryString.splitter('&').map!(s => s.split2("=", false));
+  }
+
+  @property string query(T=string)(string name, lazy T def=T.init){ //note: it is slow, but requre no additional memory (map structure)
+    foreach(a; queryItems) if(sameText(a[0], name)) return a[1].to!T;
+    return def;
+  }
+
+  @property void query(T=string)(string name, in T val){
+    string[] arr;
+    foreach(a; queryItems) arr ~= a[0]~"="~  (sameText(a[0], name) ? val.to!string : a[1]);
+    queryString = arr.join('&');
   }
 
   //todo: query to map string[string]. It's something like the commandline args and also like the wildcard result struct

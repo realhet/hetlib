@@ -1,5 +1,7 @@
 module het.bitmap; //This is the new replacement of het.image.d
 
+pragma(lib, "gdi32.lib");
+
 import het.utils;
 
 __gshared size_t BitmapCacheMaxSizeBytes = 768<<20;
@@ -548,7 +550,7 @@ auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.vi
   if(file){
     auto drive = file.drive;
     if(!virtualOnly || drive!="virtual"){
-      return file.withoutQuery.modified;
+      return file.withoutQueryString.modified;
     }
   }
   return DateTime.init;
@@ -1169,7 +1171,7 @@ bool isPeak(T)(Image!T img, int o){ with(img){
 
 // BitmapInfo ///////////////////////////////////
 
-immutable supportedBitmapExts = ["webp", "png", "jpg", "jpeg", "bmp", "tga"];
+immutable supportedBitmapExts = ["webp", "png", "jpg", "jpeg", "bmp", "tga", "gif"];
 immutable supportedBitmapFilter = supportedBitmapExts.map!(a=>"*."~a).join(';');
 
 File[] bitmapFiles(in Path p){
@@ -1194,6 +1196,7 @@ private static{
   bool isJpg (in ubyte[] s){ return s.startsWith([0xff, 0xd8, 0xff]); }
   bool isPng (in ubyte[] s){ return s.startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); }
   bool isBmp (in ubyte[] s){ return s.length>18 && s[0..2].equal("BM") && (cast(uint[])s[14..18])[0].among(12, 40, 52, 56, 108, 124); }
+  bool isGif (in ubyte[] s){ return s.length>=6+7 && s[0..4].equal("GIF8") && s[4].among('7', '9') && s[5]=='a'; }
 
   bool isTga (in ubyte[] s){ //tga detection is really loose, so it's on the last place...
     if(s.length>18){
@@ -1213,6 +1216,7 @@ private static{
       if(isBmp (s)) return "bmp";
       if(isWebp(s)) return "webp";
       if(isTga (s)) return "tga";
+      if(isGif (s)) return "gif";
     }
 
     //unable to detect from stream, try fileExt
@@ -1243,10 +1247,17 @@ private:
         size = ivec2(features.width, features.height);
         chn = features.has_alpha ? 4 : 3;
       }
+    }else if(format=="gif"){
+      try{
+        enforce(stream.length>=8);
+        const us = cast(ushort[])stream[0..8];
+        size = ivec2(us[3], us[4]);
+        chn = 4;
+      }catch(Exception){}
     }else if(supportedBitmapExts.canFind(format)){ //use imageFormats package. It should be good for libjpeg-turbo as well.
       try{
         read_image_info_from_mem(stream, size.x, size.y, chn);
-      }catch(Throwable){}
+      }catch(Exception){}
     }
   }
 
@@ -1409,6 +1420,11 @@ public:
     return format("Bitmap(%s, %d, %d, %d, %s, %s, %s, %s)",
                           file, width, height, channels, type.quoted, modified.timestamp,
                           "["~ [loading?"loading":"", removed?"removed":""].join(", " ) ~"]", error ? "error: "~error : ""); }
+
+  string details(){
+    return format!"%-50s   res: %-11s   MP: %5.1f   chn: %s   compr.size: %4sB   uncompr.size: %4sB   ratio:%4.1f%%   bpp:%6.2f"(
+                          file.fullName, width.text~"x"~height.text, double(width)*height/1_000_000, channels, file.size.shortSizeText, sizeBytes.shortSizeText, double(file.size)*100/sizeBytes, double(file.size)/width/height*8);
+  }
 
   void copyFrom(Bitmap b){
     enforce(b && b.valid);
@@ -1614,30 +1630,17 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
 
     bmp = new Bitmap;
     bmp.modified = now;
-    if(info.format=="webp"){
 
+    void doWebp(){
       switch(info.chn){
         case 3: { auto data = uninitializedArray!(RGB [])(info.numPixels); WebPDecodeRGBInto (stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*3, info.size.x*3); bmp.set(image2D(info.size, data)); } break;
         case 4: { auto data = uninitializedArray!(RGBA[])(info.numPixels); WebPDecodeRGBAInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*4, info.size.x*4); bmp.set(image2D(info.size, data)); } break;
         //todo: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
         default: raise("webp 1-2chn not impl");
       }
-    }else if(info.format=="jpg"){
-      switch(info.chn){
-        case 1, 3: {
-          //PERF("tjd"); foreach(i; 0..10) actBitmap = data.deserialize!Bitmap(true); print(PERF.report); //turbojpeg/classic release/debug performance: 43, 47, 335, 1941
-          auto pixelFormat = info.chn.predSwitch(3, TJPF_RGB, 1, TJPF_GRAY),
-               pitch = tjPixelSize[pixelFormat]*info.width,
-               data = uninitializedArray!(ubyte[])(info.height*pitch);
+    }
 
-          tjChk(tjDecoder, tjDecompress2(tjDecoder, stream.ptr, stream.length.to!int, data.ptr, info.width, pitch, info.height, pixelFormat, 0), "tjDecompress2");
-
-          bmp.setRaw(data, info.width, info.height, info.chn, "ubyte");
-        } break;
-        //todo: Tobb jpeg-bol osszekombinalni a 2-4 channelt.
-        default: raise("jpg 2-4chn not impl");
-      }
-    }else{ //imageFormats package
+    void doImageFormats(){ //imageFormats package
       auto img = read_image_from_mem(stream);
       exit: switch(info.chn){
         static foreach(i, T; AliasSeq!(ubyte, RG, RGB, RGBA)){
@@ -1646,6 +1649,43 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
         default: raise("imgformat: fatal error: channels out of range");
       }
     }
+
+    void doTurboJpeg(){
+      switch(info.chn){
+        case 1, 3: {
+          //PERF("tjd"); foreach(i; 0..10) actBitmap = data.deserialize!Bitmap(true); print(PERF.report); //turbojpeg/classic release/debug performance: 43, 47, 335, 1941
+          auto pixelFormat = info.chn.predSwitch(3, TJPF_RGB, 1, TJPF_GRAY),
+               pitch = tjPixelSize[pixelFormat]*info.width,
+               data = uninitializedArray!(ubyte[])(info.height*pitch);
+
+          try{
+            tjChk(tjDecoder, tjDecompress2(tjDecoder, stream.ptr, stream.length.to!int, data.ptr, info.width, pitch, info.height, pixelFormat, 0), "tjDecompress2");
+
+            bmp.setRaw(data, info.width, info.height, info.chn, "ubyte");
+          }catch(Exception e){
+            WARN("TurboJpeg decode failed: "~e.simpleMsg~"\nTrying with ImageFormats.");
+            try{
+              doImageFormats;
+            }catch(Exception e){
+              WARN("  ImageFormats failed as well: "~e.simpleMsg);
+              throw e;
+            }
+          }
+
+        } break;
+        //todo: Tobb jpeg-bol osszekombinalni a 2-4 channelt.
+        default: raise("jpg 2-4chn not impl");
+      }
+    }
+
+    void doGif(){
+      raise("GIF decoder NOTIMPL");
+    }
+
+    if(info.format=="webp") doWebp;
+    else if(info.format=="jpg") doTurboJpeg;
+    else if(info.format=="gif") doGif;
+    else doImageFormats;
 
     return bmp;
 
