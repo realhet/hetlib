@@ -1556,6 +1556,21 @@ auto auto mean(R, E) (R r, E seed) if(isInputRange!R && !isInfinite!R && is(type
 }*/
 
 
+/// returns 1.0 if all bytes are the same
+//  common values: 0.5 for d source files, 0.25 for .exe, 0.05 for jpg, zip, below 0.01 for png
+float calcRedundance(in void[] data){
+  int[8] bins;
+
+  foreach(b; cast(ubyte[])data)
+    foreach(i; 0..8)
+      bins[i] += (b>>i)&1;
+
+  auto invLen = 1.0f / data.length.to!int;
+
+  return sqrt(bins[].map!(b => sqr(b*invLen-0.5f)).sum * 0.5f);
+}
+
+
 //Signal smoothing /////////////////////////////
 
 struct BinarySignalSmoother{
@@ -5415,7 +5430,7 @@ struct FileEntry{
 
   }
 
-  string toString() const{ return format!"%-80s %s%s%s%s%s %12d"(File(path, name).fullName, isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".", size); }
+  string toString() const{ return format!"%-80s %s%s%s%s%s %12d cre:%s mod:%s"(File(path, name).fullName, isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".", size, DateTime(ftCreationTime), DateTime(ftLastWriteTime)); }
 
   auto created () const { return DateTime(ftCreationTime  ); }
   auto accessed() const { return DateTime(ftLastAccessTime); }
@@ -5424,9 +5439,9 @@ struct FileEntry{
 
 ///similar directory listing like the one in totalcommander
 FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
-  FileEntry[] files, paths, parent;
+  enforce(!(!onlyFiles && recursive), "Invalid params");
 
-  if(mask=="*") mask = "";
+  FileEntry[] files, paths, parent;
 
   WIN32_FIND_DATAW data;
   HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data);
@@ -5438,7 +5453,7 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
         if(entry.name == ".."){ if(!onlyFiles) parent ~= entry; continue; }
         if(!onlyFiles || recursive) paths ~= entry;
       }else{
-        if(mask=="" || entry.name.isWild(mask)) files ~= entry;
+        if(mask=="" || entry.name.isWildMulti(mask)) files ~= entry;
       }
     }while(FindNextFileW(hFind, &data));
     FindClose(hFind);
@@ -5447,9 +5462,22 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
   //todo: implement recursive
   //todo: onlyFiles && recursive, watch out for ".."!!!
 
+  if(recursive){
+    foreach(p; paths.map!(a => Path(path, a.name))){
+      LOG("listFiles recursion:", p);
+      files ~= listFiles(p, mask, "", Yes.onlyFiles, Yes.recursive);
+    }
+
+    paths.clear;
+  }
+
+  if(order==""){ //fast exit when no ordering needed
+    if(onlyFiles) return                      files;
+                  return chain(parent, paths, files).array;
+  }
+
   auto pathIdx = new int[paths.length];
   paths.makeIndex!((a, b) => icmp(a.name, b.name)<0)(pathIdx);
-
 
   auto fileIdx = new int[files.length];
 
@@ -5464,8 +5492,8 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
   switch(order.lc){
     case "name": files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx); break;
     case "ext": files.makeIndex!((a, b) => ascending*cmpChain(icmp(File(a.name).ext, File(b.name).ext), icmp(a.name, b.name))<0)(fileIdx); break;
-    case "size": files.makeIndex!((a, b) => ascending*cmpSize(a.size,b.size)<0)(fileIdx); break;
-    case "date": files.makeIndex!((a, b) => ascending*(*cast(long*)&a.ftLastWriteTime-*cast(long*)&b.ftLastWriteTime)>0)(fileIdx); break;
+    case "size": files.makeIndex!((a, b) => cmpChain(ascending*cmpSize(a.size,b.size), icmp(a.name, b.name))<0)(fileIdx); break;
+    case "date": files.makeIndex!((a, b) => cmpChain(ascending*cmpTime(a.ftLastWriteTime, b.ftLastWriteTime), icmp(b.name, a.name))>0)(fileIdx); break;
     default: raise("Invalid sort order: " ~ order.quoted);
   }
 
@@ -5530,6 +5558,82 @@ FileEntry[] findFiles(Path path, string mask="", string order="name", int level=
 
 }
 
+struct DirResult{
+
+  static struct DirFile{
+    File file;
+    ulong size;
+    DateTime modified;
+
+    string toString() const{ return format!"%s %12d %s"(modified, size, file.fullName); }
+  }
+  DirFile[] files;
+
+  static struct DirPath{
+    Path path;
+    DateTime modified;
+    string toString() const{ return format!"%s %12s %s"(modified, "", path.fullPath); }
+  }
+  DirPath[] paths;
+
+  static struct DirExt{
+    string ext;
+    ulong count, size;
+    string toString() const{ return format!"%-10s %7d %3sB"(ext, count, size.shortSizeText); }
+  }
+  DirExt[] exts;
+
+  string toString() const{
+    return files.map!text.join('\n')~'\n'~
+           paths.map!text.join('\n')~'\n'~
+           exts .map!text.join('\n')~'\n';
+  }
+}
+
+/// List files using dir DOS command
+/// note: this is bad: it's fast, but no second and millisecond precision, only hour:minute.
+/// use listFiles with recursion
+auto dirPerS(in Path path, string pattern = "*"){ // dirPerS//////////////////////////
+  DirResult res;
+  with(res){
+
+    Path actPath;
+    foreach(line; execute([`cmd`, `/c`, `dir`, path.fullPath, `/s`, `/-c`]).output.splitLines){
+                    //2011-01-03  01:05             93407 10-5.jpg
+      if(line.isWild("????-??-??  ??:??     ????????????? *")){
+        auto f = File(actPath, wild[6]),
+             s = wild[5].strip.to!ulong,
+             d = DateTime(wild.ints(0), wild.ints(1), wild.ints(2), wild.ints(3), wild.ints(4), 0);
+        if(f.name.isWildMulti(pattern)) files ~= DirFile(f, s, d);
+      }
+      else          //2018-02-03  08:28    <DIR>          1
+    /+if(line.isWild("????-??-??  ??:??    <DIR>          *")) { }
+      else          // Directory of f:\oldc\Prg1                   +/
+      if(line.isWild(" Directory of *")) actPath = Path(wild[0]);
+    }
+
+    files = files.sort!((a, b) => a.modified < b.modified).array;
+
+    DateTime[string] pathTimes;
+    files.each!((f){ if(f.file.fullPath !in pathTimes) pathTimes[f.file.fullPath] = f.modified; });
+
+    foreach(k, v; pathTimes) paths ~= DirPath(Path(k), v);
+    paths = paths.sort!((a, b) => a.modified<b.modified).array;
+
+    ulong[string] extCnt, extSize;
+    files.each!((f){
+      extCnt[f.file.ext.lc]++;
+      extSize[f.file.ext.lc]+=f.size;
+    });
+
+    foreach(k; extCnt.keys)
+      exts ~= DirExt(k, extCnt[k], extSize[k]);
+
+    exts = exts.sort!((a, b) => a.size > b.size).array;
+
+  }
+  return res;
+}
 
 struct clipBoard{ static: //clipBoard //////////////////////////
   import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT, EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
@@ -5608,7 +5712,6 @@ ubyte[] trailingZip(ubyte[] buf){
 
   return res;
 }
-
 
 // Stream IO -> het.stream /////////////////////////////////////////////////////////////////
 T stRead(T)(ref ubyte[] st)
@@ -6211,6 +6314,8 @@ struct DateTime{
 
   double toSeconds()    const{ return raw.isnan ? 0 : raw*(24*60*60); }
   ulong toNanoSeconds() const{ return raw.isnan ? 0 : cast(ulong)(raw*(24*60*60*1e9)); }
+
+  Time time() const{ Time t; t.raw = raw.fract; return t; }
 }
 
 Time     time () { return Time    .current; } //0 = midnight  1 = 24hours

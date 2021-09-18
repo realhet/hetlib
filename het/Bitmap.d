@@ -1689,8 +1689,8 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
 
     return bmp;
 
-  }catch(Throwable t){
-    if(mustSucceed) throw t;
+  }catch(Exception e){
+    if(mustSucceed) throw e;
   }
 
   return null;

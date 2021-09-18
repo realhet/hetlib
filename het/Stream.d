@@ -251,16 +251,43 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     //switch all possible types
     /*-*/ static if(isFloatingPoint!T     ){
       getSign;
-      data = cast(Type)((actToken.data).get!real);
+      data = cast(Type)(actToken.data.get!double);
       if(isNegative) data = -data;
     }else static if(is(T == enum)         ){
       data = actToken.data.get!string.to!Type;
     }else static if(isIntegral!T          ){
       getSign;
-      static if(is(T == ulong)) auto L = actToken.data.get!ulong;
-                           else auto L = actToken.data.get!long;
-      if(isNegative) L = -L;
-      data = L.to!Type;
+
+      try             { data = actToken.data.get!long .to!Type; }
+      catch(Exception){ data = actToken.data.get!ulong.to!Type; }
+
+      if(isNegative) data = -data;
+
+      //slow workaround: data = ((isNegative ? "-" : "")~actToken.source).to!Type;
+
+      // previous version had a bug.
+      /+try{
+
+        //static if(is(T == ulong)) auto L = actToken.data.get!ulong;
+                             else auto L = actToken.data.get!long;
+        //if(isNegative) L = -L;
+        //data = L.to!Type;*/
+
+        //this also has a bug.
+        UL = actToken.data.get!ulong; //variant fails at long - ulong shit.
+      }catch(Exception e){
+        LOG("DECODING LONG END", actToken, actToken.data, Type.stringof, isNegative, e.simpleMsg);
+        throw e;
+      }+/
+
+      //todo: fix this variant long/ulong bug
+      /+void variantError(){
+        import std.variant;
+        Variant v;
+        v = "36290379465".to!long;
+        v.get!long.print; //good
+        v.get!ulong.print; //bad: Variant: attempting to use incompatible types long and ulong
+      }+/
     }else static if(isSomeString!T        ){
       data = actToken.data.get!string.to!Type;
     }else static if(isSomeChar!T          ){
@@ -804,6 +831,31 @@ struct PropArray{ // PropArray ////////////////////////////////////////////
 //! Archiver //////////////////////////////////////////////////////
 
 
+
+// cache data to files /////////////////////////////////
+
+T cache(T)(lazy T data, File file, bool refresh=false){
+  T res;
+  if(refresh) file.remove;
+
+  if(file.exists){
+    try{
+      string s = file.read.uncompress.to!string;
+      res.fromJson(s, "", ErrorHandling.raise);
+      LOG("Cache loaded:", file);
+      //res.toJson.saveTo(file.otherExt(".txt"));
+      return res;
+    }catch(Exception e){
+      WARN("Cache error:", file, e.extendedMsg/+e.simpleMsg+/);
+      file.remove;
+    }
+  }
+
+  res = data;
+  res.toJson.compress.saveTo(file);
+  LOG("Cache recalculated:", file);
+  return res;
+}
 
 // Unittest //////////////////////////////////////////////////////
 

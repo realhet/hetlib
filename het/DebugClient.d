@@ -41,7 +41,7 @@ void DBG (int level = 10, string file = __FILE__, int line = __LINE__, string fu
 
   enum location = makeSrcLocation(file, funct, line);
   //format colorful message
-  string s = format!"%s\33\7: T%0.4f: C%x: %s:  "(LOGLevelString!level, QPS-QPS0, GetCurrentProcessorNumber, location);
+  string s = format!"%s\33\10: T%0.4f: C%x: %s:  \33\7"(LOGLevelString!level, QPS-QPS0, GetCurrentProcessorNumber, location);
   static foreach(idx, a; args){ if(idx) s ~= " "; s ~= a.text; }
   s ~= "\33\7";
 

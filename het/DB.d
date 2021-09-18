@@ -1,11 +1,657 @@
 module het.db;
 
-import het.utils;
+import het.utils, het.stream;
+
+/////////////////////////////////////////////////////////////////////
+/// Archiver                                                      ///
+/////////////////////////////////////////////////////////////////////
+
+/// This encapsulates custom data objects in a stream. Any type of bytestream will do, no packaging is needed.
+/// The data can be identified and easily skipped from both directions. Contains crc.
+
+class Archiver{
+
+  enum DefaultMasterRecordMaxSize = 0x200; //DON'T CHANGE!
+  enum InitialFilePoolSize = 0x100;
+
+  enum LeadInSize = 5*4;
+  enum LeadOutSize = 5*4;
+  enum MaxLeadSize = max(LeadInSize, LeadOutSize);
+  enum PlainFrameSize = LeadInSize + LeadOutSize;
+
+  static struct JumpRecord{
+    enum Marking = "\x1EJMP";
+    enum SizeBytes = PlainFrameSize +JumpRecord.Marking.length.alignUp(4) +JumpRecord.sizeof.alignUp(4);
+    ulong from, to, over;
+  }
+  static assert(JumpRecord.sizeof==24);
+
+  static struct MasterRecord{ // MasterRecord ///////////////////////////////////
+    enum Marking = "\x1EMR";
+
+    //all offsets and sizes in bytes
+    @STORED{
+      string volume, originalFileName;
+      ulong masterRecordBegin,
+            masterRecordEnd,
+            filePoolBegin,
+            filePoolEnd,
+            blobPoolBegin,
+            totalFileCount,
+            totalFileSize,
+            totalBlobCount,
+            totalBlobSize;
+      DateTime created, modified;
+
+      //todo: archiveEnd: after this ofs, growth is not possible  0=endless
+    }
+
+    void checkConsistency(){
+      auto a = [masterRecordBegin, masterRecordEnd, filePoolBegin, filePoolEnd, blobPoolBegin];
+      enforce(a.map!q{(a&3)==0}.all, "FATAL MRCC Fail: unaligned");
+      enforce(a.equal(a.sort)      , "FATAL MRCC Fail: unordered");
+    }
+
+    private bool valid; //this is set by outside conditions
+    T opCast(T:bool)() const{ return valid; }
+
+    ulong actualMasterRecordMaxSize() const{
+      enforce(masterRecordEnd>=masterRecordBegin, "Invalid MR size");
+      return masterRecordEnd-masterRecordBegin;
+    }
+
+    void initializeNew(File file, string volume, ulong baseOffset, ulong filePoolInitialSize){
+      this = MasterRecord.init;
+      this.volume = volume;
+      originalFileName  = file.fullName;
+      masterRecordBegin = baseOffset;
+      masterRecordEnd   = masterRecordBegin +  DefaultMasterRecordMaxSize;
+      filePoolBegin     = masterRecordEnd;
+      filePoolEnd       = filePoolBegin     +  filePoolInitialSize + JumpRecord.SizeBytes;
+      blobPoolBegin     = filePoolEnd;
+      created = modified = now;
+    }
+
+  }
+
+  // finds a datablock that possibly contains data. It helps in reconstucting archived blocks.
+  static sizediff_t findNonRedundantBlock(File f, size_t blockSize, size_t startOffset, float threshold, Flag!"exponentialSearch" exponentialSearch){
+    auto fsize = f.size, fofs = startOffset; //skip first block
+
+    bool eof(){ return fofs+blockSize>fsize; }
+    bool check(){ return !eof && f.read(true, fofs, blockSize).calcRedundance<threshold; }
+
+    while(!eof){
+      if(check) return fofs;
+      fofs = exponentialSearch ? fofs*2 : fofs+blockSize;
+    }
+    return -1;
+  }
+
+
+  // Archiver main /////////////////////////////////////////////////////////////////////
+
+  private SeedStream seedStream;
+
+  this(){
+    seedStream = SeedStream_pascal(56432);
+
+    __gshared static bool selfTestDone;
+    if(chkSet(selfTestDone)) selfTest;
+  }
+
+  void initSeedStream(uint a, uint c){ seedStream = SeedStream(a, c); }
+  void testSeedStream(){ seedStream.test; }
+
+  private MasterRecord masterRecord;
+  /*private*/ File file;
+  private string compr;
+
+  void close(){
+    file = File.init;
+    masterRecord = masterRecord.init;
+    compr = "";
+  }
+
+  bool valid() const{ return masterRecord.valid && file.exists; }
+  T opCast(T:bool)() const{ return valid; }
+
+  private void write_internal(in void[] rec, ulong ofs){
+    masterRecord.checkConsistency;
+    file.write(rec, ofs, masterRecord.masterRecordBegin>0 ? Yes.preserveTimes : No.preserveTimes); //note: don't change datetime when this archive is attached to the end of another file.
+  }
+
+  private void padRight(ref uint[] data, ulong maxSizeBytes){
+    enforce((maxSizeBytes&3)==0, "align4 error");
+    while(data.sizeBytes < maxSizeBytes) data ~= seedStream.fetchFront;
+  }
+
+  private ulong actualFrameSize(ulong headerSizeBytes, ulong dataSizeBytes) const{
+    return PlainFrameSize + (compr!="" ? 4 : 0) + headerSizeBytes.alignUp(4) + dataSizeBytes.alignUp(4);
+  }
+
+  private void writeMasterRecord(){
+    auto rec = createRecord(MasterRecord.Marking, masterRecord.toJson.compress, now.timestamp, compr);
+    padRight(rec, masterRecord.actualMasterRecordMaxSize);
+
+    enforce(rec.sizeBytes <= masterRecord.actualMasterRecordMaxSize, "Archive MR overflow. %d <= %d".format(rec.sizeBytes, masterRecord.actualMasterRecordMaxSize));
+    write_internal(rec, masterRecord.masterRecordBegin);
+  }
+
+  private void readMasterRecord(in ulong ofs){
+    masterRecord = MasterRecord.init;
+    const data = cast(uint[])file.read(true, ofs, DefaultMasterRecordMaxSize),
+          res = decodeRecord(data, compr);
+    enforce(res.error=="", "Error decoding MR: "~res.error);
+    masterRecord.fromJson(res.data.uncompress.to!string);
+    enforce(masterRecord.masterRecordBegin==ofs, "MR offset mismatch. %d != %d".format(masterRecord.masterRecordBegin, ofs));
+
+    masterRecord.checkConsistency;
+
+    masterRecord.valid = true;
+  }
+
+  private auto writeRecord(string fn, in void[] data){ with(masterRecord){
+    const rec = createRecord(fn, data.compress, now.timestamp, compr),
+          recSize = rec.sizeBytes,
+          requiredSize = recSize + JumpRecord.SizeBytes; //todo: calculate jumpRecSize properly
+
+    enforce((recSize & 3 | requiredSize & 3) == 0, "FATAL: Alignment error"); //must be dword aligned
+
+    bool fitsInFilePool() const{ return masterRecord.filePoolBegin + requiredSize <= masterRecord.filePoolEnd; }
+
+    if(!fitsInFilePool){
+      //must extend filePool (1.5x exponential growth)
+      void extendFilePoolEnd(){ filePoolEnd += max((totalFileSize/2)&~3UL, requiredSize); }
+
+      if(filePoolEnd==blobPoolBegin){
+        //there are no blobs at the end, it can extend as far as it's needed
+        extendFilePoolEnd;
+        blobPoolBegin = filePoolEnd;
+      }else{
+        //there are blobs in the way, must make a jump.
+        auto jumpRec = createRecord(JumpRecord.Marking, [JumpRecord(filePoolBegin, blobPoolBegin, filePoolEnd)], now.timestamp, "");
+
+        //todo: calculate jumpRecSize properly
+        enforce(JumpRecord.SizeBytes == jumpRec.sizeBytes, "FATAL: jumpRecordSize mismatch  expected:%d  actual:%d".format(JumpRecord.SizeBytes, jumpRec.sizeBytes));
+
+        padRight(jumpRec, filePoolEnd-filePoolBegin);
+        enforce(jumpRec.sizeBytes == filePoolEnd-filePoolBegin, "FATAL: jumpRecord padding fail");
+
+        write_internal(jumpRec, filePoolBegin);
+        filePoolBegin += jumpRec.sizeBytes;
+
+        //allocate new filePool after the blobs
+        filePoolBegin = blobPoolBegin;
+        filePoolEnd = filePoolBegin;
+        extendFilePoolEnd;
+        blobPoolBegin = filePoolEnd;
+      }
+    }
+    enforce(fitsInFilePool, "Fatal error: doesn't fitsInFilePool");
+
+    //write the file and adjust the pool
+    auto res = Bounds!ulong(filePoolBegin, filePoolBegin+recSize);
+    write_internal(rec, filePoolBegin);
+
+    filePoolBegin += recSize;
+    totalFileSize += recSize;
+    totalFileCount ++;
+
+    writeMasterRecord; //always write it for safety
+
+    return res;
+  }}
+
+  private auto writeBlobRecord(string fn, in void[] data){ with(masterRecord){
+    const rec = createRecord(fn, data, now.timestamp, compr),
+          recSize = rec.sizeBytes;
+
+    auto res = Bounds!ulong(blobPoolBegin, blobPoolBegin+recSize);
+    write_internal(rec, blobPoolBegin);
+
+    //write the file and adjust the pool
+    blobPoolBegin += recSize;
+    totalBlobSize += recSize;
+    totalBlobCount ++;
+
+    writeMasterRecord; //always write it for safety
+
+    return res;
+  }}
+
+  private auto findMasterRecordOfs(){
+    auto ofs = findNonRedundantBlock(file, DefaultMasterRecordMaxSize, 0, 0.125, Yes.exponentialSearch); //don't change this!!!
+    if(ofs<0) raise("Unable to locate suitable MR offset.");
+    return ofs;
+  }
+
+  void create(T)(T file_, string volume, string compr="", ulong baseOfs=0){
+    enforce(!valid, "Archive already opened.");
+
+    close;
+    try{
+      file = File(file_);
+      this.compr = compr;
+
+      if(file.exists){
+        beep;
+        const code = [now].xxh3.to!string(36).take(3).to!string;
+        writef("Archive.create: %s starting from offset:%s will be overwritten. Are you sure? (type %s if yes) ", file, baseOfs, code);
+        if(readln.strip.uc==code){
+          writeln(" Overwrite enabled. ");
+        }else{
+          raise("Archive.create: user approval error.");
+        }
+      }else{
+        file.write([0]);
+      }
+
+      masterRecord.initializeNew(file, volume, baseOfs, InitialFilePoolSize);
+      writeMasterRecord;
+
+      masterRecord.valid = true; //from now it's valid and opened
+    }catch(Exception e){
+      close;
+      throw e;
+    }
+  }
+
+  void open(T)(T file_, string compr="", ulong baseOfs=0){
+    enforce(!valid, "Archive already opened.");
+
+    close;
+    try{
+      file = File(file_);
+      this.compr = compr;
+      enforce(file.exists, "Archive file not found: "~file.text);
+
+      readMasterRecord(baseOfs); //if it succeeds, it will set valid to true
+    }catch(Exception e){
+      close;
+      throw e;
+    }
+  }
+
+  auto addRecord(string name, in void[] data){
+    enforce(valid, "No archive is opened.");
+    return writeRecord(name, data);
+  }
+
+  auto addBlob(string name, in void[] data){
+    enforce(valid, "No archive is opened.");
+    return writeBlobRecord(name, data);
+  }
+
+  auto addBlob(File f){
+    return addBlob(f.fullName, f.read(true));
+  }
+
+  // record reading //////////////////////////////////////////////////////////////////////////////
+
+  struct ReadRecordResult{
+    string name;
+    ubyte[] data;
+  }
+
+  auto readRecords(string pattern){
+    enforce(valid, "No archive is opened.");
+    ReadRecordResult[] res;
+
+    ulong ofs = masterRecord.masterRecordEnd;
+    while(1){
+      auto r = decodeRecordFromFile(ofs); //opt: this reads even those records that don't needed...
+      LOG("Record found:", r.header);
+
+      if(r.error.length){
+        //todo: more consistency checking needed
+        LOG("End of records: ", r.error);
+        break;
+      }
+
+      if(r.header==JumpRecord.Marking){
+        enforce(r.data.length == JumpRecord.sizeof);
+        auto jr = (cast(JumpRecord[])r.data)[0];
+        LOG("Got jump record", jr);
+        ofs = jr.to;
+        continue;
+      }
+
+      if(r.header.isWildMulti(pattern)) res ~= ReadRecordResult(r.header, cast(ubyte[])(r.data.uncompress));
+      ofs += r.recordSizeBytes; //todo: endless loop protection
+    }
+
+    return res;
+  }
+
+  // record handling //////////////////////////////////////////////////////////////////////////////
+  private {
+
+    uint[] createRecord(string header, in void[] data, string headerCompression, string dataCompression){
+
+      void applyHeaderCompression(string op)(string headerCompression/+empty for debug only+/, bool compressAllData, uint[] uLeadIn, uint[] uHeader, uint[] uData, uint[] uLeadOut){
+        if(headerCompression=="") return;
+
+        seedStream.seed = headerCompression.xxh3_32;
+        auto ss = refRange(&seedStream);
+        void apply(uint[] a){ mixin(q{ a[] #= ss.take(a.length).array[]; }.replace("#", op)); }
+
+        apply(uLeadIn);
+        apply(uHeader);
+        if(compressAllData){
+          apply(uData);
+        }else{
+          if(uData.length) apply(uData[$-1..$]); // there is normal compression, just do possible padded zeros in last byte
+        }
+        apply(uLeadOut);
+      }
+
+      void[] cdata;
+      if(dataCompression!=""){
+        auto compr = norx!(64, 4, 1).encrypt(dataCompression, [headerCompression.xxh3_32], data);
+        cdata = compr.data ~ compr.tag[0..4];
+      }else{
+        cdata = data.dup; //because it will work inplace
+      }
+
+      uint[] uLeadIn  = [0u, 1, 2, header.length.to!uint, cdata.length.to!uint];
+      uint[] uHeader  = header.dup.toUints;
+      uint[] uData    = cdata.toUints;
+      uint[] uLeadOut = [0u, 1, -1, (uLeadIn.length + uHeader.length + uData.length /+size of the leadin and data except the end marker+/).to!uint];
+
+      //print(uLeadIn); print(uHeader); print(uData); print(uLeadOut);
+
+      applyHeaderCompression!"+"(headerCompression, dataCompression.empty, uLeadIn, uHeader, uData, uLeadOut);
+
+      auto res = uLeadIn ~ uHeader ~ uData ~ uLeadOut;
+      res ~= res.xxh3_32; //add final error checking
+
+      return res;
+    }
+
+    auto decodeRecord(in uint[] data_, string dataCompression){
+      auto data = data_.dup; //because it will work on it
+
+      struct Record{
+        string error;
+        string warning;
+
+        string header;
+        ubyte[] data;
+        ulong recordSizeBytes;
+      }
+      Record res;
+
+      try{
+        uint[] tryFetch(uint n){
+          uint len = min(n, data.length);
+          auto res = data[0..len];
+          data = data[len..$];
+          return res;
+        }
+
+        uint[] fetchExactly(uint n){
+          auto arr = tryFetch(n);
+          enforce(arr.length == n, "Not enough input data");
+          res.recordSizeBytes += n*4;
+          return arr;
+        }
+
+        uint[] uLeadIn = fetchExactly(5);
+        const seed = uLeadIn[0];
+
+        seedStream.seed = uLeadIn[0];
+        auto ss = refRange(&seedStream);
+        void apply(uint[] a){ a[] -= ss.take(a.length).array[]; }
+
+        apply(uLeadIn);
+        enforce(uLeadIn[0..3].equal([0u, 1, 2]), "Invalid LeadIn sequence");
+
+        const uint headerBytes = uLeadIn[3];
+        uint[] uHeader = fetchExactly((headerBytes+3)/4);
+        apply(uHeader);
+        res.header = ((cast(char[])uHeader)[0..headerBytes]).to!string;
+
+        const uint dataBytes = uLeadIn[4];
+        uint[] uData = fetchExactly((dataBytes+3)/4);
+        if(dataCompression=="") apply(uData);
+                           else if(uData.length) apply(uData[$-1..$]);
+
+        ubyte[] cData = (cast(ubyte[])uData)[0..dataBytes];
+        if(dataCompression!=""){
+          enforce(cData.length>=4, "Not enough cData "~cData.length.text);
+          const expectedTag = cData[$-4..$];
+          cData = cData[0..$-4];
+
+          auto decompr = norx!(64, 4, 1).decrypt(dataCompression, [seed], cData);
+          enforce(expectedTag.equal(decompr.tag[0..4]), "Tag check fail");
+          res.data = decompr.data;
+        }else{
+          res.data = cData;
+        }
+
+        //verify leadOut
+        try{
+          uint[] uLeadOut = fetchExactly(4);
+          apply(uLeadOut);
+          //print("LEADOUT", uLeadOut);
+
+          enforce(uLeadOut[0..3].equal([0u, 1, -1]), "bad leadOut sequence: "~uLeadOut[0..3].text);
+
+          uint len = (uLeadIn.length + uHeader.length + uData.length).to!uint;
+          enforce(uLeadOut[3]==len, format!"uSize mismatch: %d != %s"(uLeadOut[3], len));
+
+          uint storedSheckSum = fetchExactly(1)[0];
+          uint calcedSheckSum = data_[0..len+4/*leadOut*/].xxh3_32;
+          enforce(storedSheckSum == calcedSheckSum, "crc error");
+        }catch(Exception e){
+          res.error = "LeadOut error: "~e.simpleMsg; return res;
+        }
+      }catch(Exception e){
+        res.error = e.msg; return res;
+      }
+
+      return res;
+    }
+
+    auto peekRecord(in uint[] data){
+      struct Res{
+        bool isLeadIn, isLeadOut, needMoreData;
+        ulong headerLength, dataLength, seekBack, fullSize;
+        bool valid(){ return !needMoreData && (isLeadIn || isLeadOut); }
+      }
+
+      Res res;
+      if(data.length>=3){
+        seedStream.seed = data[0];
+        seedStream.popFront;
+        if(data[1] == seedStream.front+1){
+          seedStream.popFront;
+          auto a = data[2]-seedStream.front;
+          if(a==2){
+            seedStream.popFront;
+            res.isLeadIn = true;
+            if(data.length>=5){
+              res.headerLength = data[3]-seedStream.front; seedStream.popFront;
+              res.dataLength   = data[4]-seedStream.front;
+              res.fullSize     = actualFrameSize(res.headerLength, res.dataLength);
+            }else{
+              res.needMoreData = true;
+            }
+          }else if(a==-1){
+            seedStream.popFront;
+            res.isLeadOut = true;
+            if(data.length>=4){
+              res.seekBack = data[3]-seedStream.front;
+            }else{
+              res.needMoreData = true;
+            }
+          }
+        }
+      }else{
+        res.needMoreData = true;
+      }
+
+      return res;
+    }
+
+    auto decodeRecordFromFile(ulong ofs){
+      re:
+      auto data = cast(uint[])file.read(false, ofs, ofs+MaxLeadSize);
+      auto peek = peekRecord(data);
+
+      bool once;
+      if(!once && peek.valid && peek.isLeadOut){
+        once = true;
+        ofs = ofs-peek.seekBack; //todo: test it properly
+        goto re;
+      }
+
+      if(peek.valid && peek.isLeadIn)
+        data = cast(uint[])file.read(true, ofs, ofs+peek.fullSize);
+
+      return decodeRecord(data, compr);
+    }
+
+  } // end of record handling
+
+  // tests /////////////////////////////////////////////////////////////////
+
+  void selfTest(){
+    RNG rng;
+    //const t0=QPS;
+    foreach(headerLen; [0, 1, 3, 4, 5, 7, 8, 9]){
+      foreach(dataLen; [0, 1, 3, 4, 5, 7, 8, 9]){
+        string header = iota(headerLen).map!(i => cast(char)(rng.random(96)+32)).to!string;
+        ubyte[] data = iota(dataLen).map!(i => cast(ubyte)(rng.random(256))).array;
+        foreach(dataCompr; ["", "deflate"]){
+          auto record = cast(uint[])createRecord(header, data, "hdrc", dataCompr);
+          auto res = decodeRecord(record, dataCompr);
+          //print(res);
+          immutable hde = "Header compression error: ";
+          enforce(res.error=="", hde~res.error);
+          enforce(res.header==header, hde~"header mismatch");
+          enforce(res.data==data, hde~"data mismatch");
+        }
+      }
+    }
+    //writeln(QPS-t0);
+  }
+
+  static void longTest(){
+    import het.db;
+
+    LOG("Doing tests");
+
+    RNG rng; rng.seed = 123456;
+    with(rng){
+      ubyte[] randomFile(){
+        bool large = random(2)==1;
+        ubyte randomByte(){ return cast(ubyte)(large ? random(256) : random(64)+32); }
+        return iota((large ? 65536 : 512)+random(1024)).map!(i => randomByte).array;
+      }
+      static bool isSmall(in void[] a){ return a.sizeBytes<8192; }
+
+      const allFiles = iota(100).map!(i => randomFile).array,
+            smallFiles = allFiles.filter!isSmall.array,
+            largeFiles = allFiles.filter!(not!isSmall).array;
+
+      foreach(c; ["", "test"]){
+        auto f = File(`c:\arctest.bin`);
+        f.remove;
+
+        auto arc = new Archiver;
+        arc.create(f, "testvolume");
+
+        auto db = new AMDB(new ArchiverDBFile(arc, "main.db"));
+
+        db.schema("Blob  is a  EType");
+
+        //db.schema("Bitmap  is a  Blob"); //todo: subtypes
+
+        db.schema("File type  is a  EType");
+          db.data("JPG        is a  File type");
+          db.data("BMP        is a  File type");
+          db.data("PNG        is a  File type");
+          db.data("WEBP       is a  File type");
+
+        db.schema("Blob  archive location       Long");
+        db.schema("Blob  file type              File type");
+        db.schema("Blob  original file name     String");
+        db.schema("Blob  size in bytes          Long");
+        db.schema("Blob  has thumbnail          Blob");
+        db.commit;
+
+        Bounds!ulong[] locations;
+        foreach(data; allFiles){
+          if(isSmall(data)){
+            locations ~= arc.addRecord(data.xxh3.text, data);
+          }else{
+            locations ~= arc.addBlob(data.xxh3.text, data);
+            auto loc = locations[$-1];
+
+            string id = data.xxh3.to!string(36).padLeft('0', 13).to!string;
+            auto bname = format!"BLOB_%s"(id);
+            db.data(format!"%s  is a  Blob"(bname));
+            db.data(format!"%s  file type  JPG"(bname));
+            db.data(format!"%s  archive location  %d"(bname, loc.low));
+            db.data(format!"%s  size in bytes  %d"(bname, data.sizeBytes));
+            if(0) db.data(format!"%s  original file name  %s"(bname, ""));
+            //db.data(format!"%s  has thumbnail  %s");
+          }
+        }
+
+        foreach(i, loc; locations){
+          //auto res = arc.decodeRecord(cast(uint[])f.read(true, loc.low, loc.high-loc.low), c);
+          auto res = arc.decodeRecordFromFile(loc.low);
+          enforce(res.error == "", "Error: "~res.error);
+
+          //must not forget to uncompress small files
+          if(isSmall(res.data)) res.data = cast(ubyte[])res.data.uncompress; //it's outdated!!!!!!
+
+          //hash checks
+          const h = allFiles[i].xxh3;
+          enforce(h.text == res.header, "ERR1");
+          enforce(h == res.data.xxh3, "ERR2");
+        }
+
+        arc.masterRecord.toJson.print;
+
+        db.printTable(db.padLeft(db.query(":Blob")));
+
+      }
+      LOG("Great success. Nice!");
+    }
+  }
+
+}
 
 
 /////////////////////////////////////////////////////////////////////
 /// AMDB                                                          ///
 /////////////////////////////////////////////////////////////////////
+
+
+// ArchiverDBFile /////////////////////////////////////////////////////
+class ArchiverDBFile : DBFileInterface{ //this is an AMDB inside an Archive
+  string name;
+  Archiver arc;
+
+  this(Archiver arc, string name){
+    this.arc = arc;
+    this.name = name;
+  }
+
+  File file(){ return File(arc.file.fullName~`\`~name); } //just an information, not a usable file (yet)
+
+  string[] readLines(){
+    return arc.readRecords(name).map!(r => (cast(string)r.data).splitLines).join;
+  }
+
+  void appendLines(string[] lines){
+    arc.addRecord(name, '\n'~lines.join('\n')~'\n');
+  }
+}
 
 
 class AMDBException : Exception {
