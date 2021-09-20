@@ -20,14 +20,18 @@ class Archiver{
   enum PlainFrameSize = LeadInSize + LeadOutSize;
 
   static struct JumpRecord{
-    enum Marking = "\x1EJMP";
-    enum SizeBytes = PlainFrameSize +JumpRecord.Marking.length.alignUp(4) +JumpRecord.sizeof.alignUp(4);
+    enum Marking = "$JMP";
     ulong from, to, over;
   }
   static assert(JumpRecord.sizeof==24);
 
+  size_t calcJumpRecordSizeBytes()const{
+    return PlainFrameSize +JumpRecord.Marking.length.alignUp(4) +JumpRecord.sizeof.alignUp(4)
+           +(compr=="" ? 0 : 4);
+  }
+
   static struct MasterRecord{ // MasterRecord ///////////////////////////////////
-    enum Marking = "\x1EMR";
+    enum Marking = "$MR";
 
     //all offsets and sizes in bytes
     @STORED{
@@ -67,7 +71,7 @@ class Archiver{
       masterRecordBegin = baseOffset;
       masterRecordEnd   = masterRecordBegin +  DefaultMasterRecordMaxSize;
       filePoolBegin     = masterRecordEnd;
-      filePoolEnd       = filePoolBegin     +  filePoolInitialSize + JumpRecord.SizeBytes;
+      filePoolEnd       = filePoolBegin     +  filePoolInitialSize;
       blobPoolBegin     = filePoolEnd;
       created = modified = now;
     }
@@ -154,7 +158,7 @@ class Archiver{
   private auto writeRecord(string fn, in void[] data){ with(masterRecord){
     const rec = createRecord(fn, data.compress, now.timestamp, compr),
           recSize = rec.sizeBytes,
-          requiredSize = recSize + JumpRecord.SizeBytes; //todo: calculate jumpRecSize properly
+          requiredSize = recSize + calcJumpRecordSizeBytes;
 
     enforce((recSize & 3 | requiredSize & 3) == 0, "FATAL: Alignment error"); //must be dword aligned
 
@@ -170,10 +174,10 @@ class Archiver{
         blobPoolBegin = filePoolEnd;
       }else{
         //there are blobs in the way, must make a jump.
-        auto jumpRec = createRecord(JumpRecord.Marking, [JumpRecord(filePoolBegin, blobPoolBegin, filePoolEnd)], now.timestamp, "");
+        auto jumpRec = createRecord(JumpRecord.Marking, [JumpRecord(filePoolBegin, blobPoolBegin, filePoolEnd)], now.timestamp, compr);
 
         //todo: calculate jumpRecSize properly
-        enforce(JumpRecord.SizeBytes == jumpRec.sizeBytes, "FATAL: jumpRecordSize mismatch  expected:%d  actual:%d".format(JumpRecord.SizeBytes, jumpRec.sizeBytes));
+        enforce(calcJumpRecordSizeBytes == jumpRec.sizeBytes, "FATAL: jumpRecordSize mismatch  expected:%d  actual:%d".format(calcJumpRecordSizeBytes, jumpRec.sizeBytes));
 
         padRight(jumpRec, filePoolEnd-filePoolBegin);
         enforce(jumpRec.sizeBytes == filePoolEnd-filePoolBegin, "FATAL: jumpRecord padding fail");
@@ -247,7 +251,7 @@ class Archiver{
         file.write([0]);
       }
 
-      masterRecord.initializeNew(file, volume, baseOfs, InitialFilePoolSize);
+      masterRecord.initializeNew(file, volume, baseOfs, InitialFilePoolSize+calcJumpRecordSizeBytes);
       writeMasterRecord;
 
       masterRecord.valid = true; //from now it's valid and opened
@@ -299,7 +303,7 @@ class Archiver{
     ReadRecordResult[] res;
 
     ulong ofs = masterRecord.masterRecordEnd;
-    while(1){
+    foreach(idx; 0..masterRecord.totalFileCount){
       auto r = decodeRecordFromFile(ofs); //opt: this reads even those records that don't needed...
       LOG("Record found:", r.header);
 

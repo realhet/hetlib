@@ -1650,6 +1650,21 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
       }
     }
 
+    void doWebpConversion(){
+      const s = [QPS].xxh32.to!string(36).text;
+      const tempFileSrc = File(tempPath, `$` ~ s ~ ".src" ); scope(exit) tempFileSrc.remove;
+      const tempFileDst = File(tempPath, `$` ~ s ~ ".webp"); scope(exit) tempFileDst.remove;
+
+      tempFileSrc.write(stream);
+      auto res = execute(["cwebp", "-preset", "photo", "-q", "85", tempFileSrc.fullName, "-o", tempFileDst.fullName]);
+      if(res.status==0){
+        LOG("\n"~res.output);
+        bmp = deserialize!Bitmap(tempFileDst);
+      }else{
+        raise("Webp conversion failed:"~ res.output);
+      }
+    }
+
     void doTurboJpeg(){
       switch(info.chn){
         case 1, 3: {
@@ -1657,17 +1672,15 @@ Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false){
           auto pixelFormat = info.chn.predSwitch(3, TJPF_RGB, 1, TJPF_GRAY),
                pitch = tjPixelSize[pixelFormat]*info.width,
                data = uninitializedArray!(ubyte[])(info.height*pitch);
-
           try{
             tjChk(tjDecoder, tjDecompress2(tjDecoder, stream.ptr, stream.length.to!int, data.ptr, info.width, pitch, info.height, pixelFormat, 0), "tjDecompress2");
-
             bmp.setRaw(data, info.width, info.height, info.chn, "ubyte");
           }catch(Exception e){
-            WARN("TurboJpeg decode failed: "~e.simpleMsg~"\nTrying with ImageFormats.");
+            WARN("TurboJpeg decode failed: "~e.simpleMsg);
             try{
-              doImageFormats;
+              //doImageFormats;
+              doWebpConversion;
             }catch(Exception e){
-              WARN("  ImageFormats failed as well: "~e.simpleMsg);
               throw e;
             }
           }
