@@ -5234,10 +5234,10 @@ public:
         scope(exit) f.close;
 
         if(offset) f.seek(offset);
-        ulong avail = f.size-offset;
-        ulong actualSiz = len;
+        ulong siz = f.size;
+        ulong avail = offset<siz ? siz-offset : 0;
+        ulong actualSiz = min(len, avail);
 
-        minimize(actualSiz, avail);
         if(actualSiz>0){
           data.length = cast(size_t)actualSiz;
           data = f.rawRead(data);

@@ -12,7 +12,7 @@ import het.utils, het.stream;
 class Archiver{
 
   enum DefaultMasterRecordMaxSize = 0x200; //DON'T CHANGE!
-  enum InitialFilePoolSize = 0x100;
+  enum InitialrecordPoolSize = 0x100;
 
   enum LeadInSize = 5*4;
   enum LeadOutSize = 5*4;
@@ -38,11 +38,11 @@ class Archiver{
       string volume, originalFileName;
       ulong masterRecordBegin,
             masterRecordEnd,
-            filePoolBegin,
-            filePoolEnd,
+            recordPoolBegin,
+            recordPoolEnd,
             blobPoolBegin,
-            totalFileCount,
-            totalFileSize,
+            totalRecordCount,
+            totalRecordSize,
             totalJumpCount,
             totalJumpSize,
             totalBlobCount,
@@ -53,7 +53,7 @@ class Archiver{
     }
 
     void checkConsistency(){
-      auto a = [masterRecordBegin, masterRecordEnd, filePoolBegin, filePoolEnd, blobPoolBegin];
+      auto a = [masterRecordBegin, masterRecordEnd, recordPoolBegin, recordPoolEnd, blobPoolBegin];
       enforce(a.map!q{(a&3)==0}.all, "FATAL MRCC Fail: unaligned");
       enforce(a.equal(a.sort)      , "FATAL MRCC Fail: unordered");
     }
@@ -66,18 +66,43 @@ class Archiver{
       return masterRecordEnd-masterRecordBegin;
     }
 
-    void initializeNew(File file, string volume, ulong baseOffset, ulong filePoolInitialSize){
+    void initializeNew(File file, string volume, ulong baseOffset, ulong recordPoolInitialSize){
       this = MasterRecord.init;
       this.volume = volume;
       originalFileName  = file.fullName;
       masterRecordBegin = baseOffset;
       masterRecordEnd   = masterRecordBegin +  DefaultMasterRecordMaxSize;
-      filePoolBegin     = masterRecordEnd;
-      filePoolEnd       = filePoolBegin     +  filePoolInitialSize;
-      blobPoolBegin     = filePoolEnd;
+      recordPoolBegin     = masterRecordEnd;
+      recordPoolEnd       = recordPoolBegin     +  recordPoolInitialSize;
+      blobPoolBegin     = recordPoolEnd;
       created = modified = now;
     }
 
+    string stats(in File file){
+      string s = "Archive stats: ";
+      if(!valid) return s~"INVALID\n";
+      s ~= file.fullName ~ "\n";
+      if(icmp(originalFileName, file.fullName)) s ~= "  Original file: "~originalFileName~"\n";
+
+      s ~= "  Created : "~created.text ~"\n";
+      s ~= "  Modified: "~modified.text~"\n";
+
+      void BE(string name, ulong begin, ulong end){
+        s ~= format!"  %s begin: %10d  end: %10d  size: %10dB\n"(name, begin, end, end-begin); }
+
+                 BE("Master record", masterRecordBegin, masterRecordEnd);
+                 BE("Record pool  ", recordPoolBegin,     recordPoolEnd);
+      const siz = file.size;
+      s ~= format!"  Blob pool     begin: %10d  capacity: %4sB\n"(blobPoolBegin, siz>blobPoolBegin ? (file.size-blobPoolBegin).shortSizeText : "- ");
+
+      void CTA(string name, ulong count, ulong size){
+        s ~= format!"  %s count: %7d  total size: %4sB  avg size: %4sB\n"(name, count, size.shortSizeText, count ? (size/count).shortSizeText : "- "); }
+
+      CTA("Record", totalRecordCount, totalRecordSize);
+      CTA("Jump  ", totalJumpCount  , totalJumpSize);
+      CTA("Blob  ", totalBlobCount  , totalBlobSize);
+      return s;
+    }
   }
 
   // finds a datablock that possibly contains data. It helps in reconstucting archived blocks.
@@ -120,7 +145,10 @@ class Archiver{
   }
 
   bool valid() const{ return masterRecord.valid && file.exists; }
-  T opCast(T:bool)() const{ return valid; }
+
+  string stats(){
+    return masterRecord.stats(file);
+  }
 
   private void write_internal(in void[] rec, ulong ofs){
     masterRecord.checkConsistency;
@@ -137,6 +165,8 @@ class Archiver{
   }
 
   private void writeMasterRecord(){
+    masterRecord.modified = now;
+
     auto rec = createRecord(MasterRecord.Marking, masterRecord.toJson.compress, now.timestamp, compr);
     padRight(rec, masterRecord.actualMasterRecordMaxSize);
 
@@ -164,48 +194,48 @@ class Archiver{
 
     enforce((recSize & 3 | requiredSize & 3) == 0, "FATAL: Alignment error"); //must be dword aligned
 
-    bool fitsInFilePool() const{ return masterRecord.filePoolBegin + requiredSize <= masterRecord.filePoolEnd; }
+    bool fitsInrecordPool() const{ return masterRecord.recordPoolBegin + requiredSize <= masterRecord.recordPoolEnd; }
 
-    if(!fitsInFilePool){
-      //must extend filePool (1.5x exponential growth)
-      void extendFilePoolEnd(){ filePoolEnd += max((totalFileSize/2)&~3UL, requiredSize); }
+    if(!fitsInrecordPool){
+      //must extend recordPool (1.5x exponential growth)
+      void extendrecordPoolEnd(){ recordPoolEnd += max((totalRecordSize/2)&~3UL, requiredSize); }
 
-      if(filePoolEnd==blobPoolBegin){
+      if(recordPoolEnd==blobPoolBegin){
         //there are no blobs at the end, it can extend as far as it's needed
-        extendFilePoolEnd;
-        blobPoolBegin = filePoolEnd;
+        extendrecordPoolEnd;
+        blobPoolBegin = recordPoolEnd;
       }else{
         //there are blobs in the way, must make a jump.
-        auto jumpRec = createRecord(JumpRecord.Marking, [JumpRecord(filePoolBegin, blobPoolBegin, filePoolEnd)], now.timestamp, compr);
+        auto jumpRec = createRecord(JumpRecord.Marking, [JumpRecord(recordPoolBegin, blobPoolBegin, recordPoolEnd)], now.timestamp, compr);
 
         //todo: calculate jumpRecSize properly
         enforce(calcJumpRecordSizeBytes == jumpRec.sizeBytes, "FATAL: jumpRecordSize mismatch  expected:%d  actual:%d".format(calcJumpRecordSizeBytes, jumpRec.sizeBytes));
 
-        padRight(jumpRec, filePoolEnd-filePoolBegin);
-        enforce(jumpRec.sizeBytes == filePoolEnd-filePoolBegin, "FATAL: jumpRecord padding fail");
+        padRight(jumpRec, recordPoolEnd-recordPoolBegin);
+        enforce(jumpRec.sizeBytes == recordPoolEnd-recordPoolBegin, "FATAL: jumpRecord padding fail");
 
-        write_internal(jumpRec, filePoolBegin);
-        filePoolBegin += jumpRec.sizeBytes;
+        write_internal(jumpRec, recordPoolBegin);
+        recordPoolBegin += jumpRec.sizeBytes;
 
         totalJumpCount ++;
         totalJumpSize += jumpRec.sizeBytes;
 
-        //allocate new filePool after the blobs
-        filePoolBegin = blobPoolBegin;
-        filePoolEnd = filePoolBegin;
-        extendFilePoolEnd;
-        blobPoolBegin = filePoolEnd;
+        //allocate new recordPool after the blobs
+        recordPoolBegin = blobPoolBegin;
+        recordPoolEnd = recordPoolBegin;
+        extendrecordPoolEnd;
+        blobPoolBegin = recordPoolEnd;
       }
     }
-    enforce(fitsInFilePool, "Fatal error: doesn't fitsInFilePool");
+    enforce(fitsInrecordPool, "Fatal error: doesn't fitsInrecordPool");
 
     //write the file and adjust the pool
-    auto res = Bounds!ulong(filePoolBegin, filePoolBegin+recSize);
-    write_internal(rec, filePoolBegin);
+    auto res = Bounds!ulong(recordPoolBegin, recordPoolBegin+recSize);
+    write_internal(rec, recordPoolBegin);
 
-    filePoolBegin += recSize;
-    totalFileSize += recSize;
-    totalFileCount ++;
+    recordPoolBegin += recSize;
+    totalRecordSize += recSize;
+    totalRecordCount ++;
 
     writeMasterRecord; //always write it for safety
 
@@ -256,7 +286,7 @@ class Archiver{
         file.write([0]);
       }
 
-      masterRecord.initializeNew(file, volume, baseOfs, InitialFilePoolSize+calcJumpRecordSizeBytes);
+      masterRecord.initializeNew(file, volume, baseOfs, InitialrecordPoolSize+calcJumpRecordSizeBytes);
       writeMasterRecord;
 
       masterRecord.valid = true; //from now it's valid and opened
@@ -298,7 +328,7 @@ class Archiver{
 
   // record reading //////////////////////////////////////////////////////////////////////////////
 
-  struct ReadRecordResult{
+  static struct ReadRecordResult{
     string name;
     ubyte[] data;
   }
@@ -308,26 +338,29 @@ class Archiver{
     ReadRecordResult[] res;
 
     ulong ofs = masterRecord.masterRecordEnd;
-    foreach(idx; 0..masterRecord.totalFileCount){
+    foreach(idx; 0..masterRecord.totalRecordCount){
       re:
+
+      //const T0 = QPS;
       auto r = decodeRecordFromFile(ofs); //opt: this reads even those records that don't needed...
-      LOG("Record found:", r.header);
+      //LOG("Record found:", r.header, "elapsed sec:", QPS-T0);
 
       if(r.error.length){
         //todo: more consistency checking needed
-        LOG("End of records: ", r.error);
+        //LOG("unexpected end of records: ", r.error);
         break;
       }
 
       if(r.header==JumpRecord.Marking){
         enforce(r.data.length == JumpRecord.sizeof);
         auto jr = (cast(JumpRecord[])r.data)[0];
-        LOG("Got jump record", jr);
         ofs = jr.to;
-        goto re; //don't count in totalFile
+        goto re; //don't count in totalRecord
       }
 
-      if(r.header.isWildMulti(pattern)) res ~= ReadRecordResult(r.header, cast(ubyte[])(r.data.uncompress));
+      if(r.header.isWildMulti(pattern))
+        res ~= ReadRecordResult(r.header, cast(ubyte[])(r.data.uncompress));
+
       ofs += r.recordSizeBytes; //todo: endless loop protection
     }
 
@@ -382,7 +415,7 @@ class Archiver{
     auto decodeRecord(in uint[] data_, string dataCompression){
       auto data = data_.dup; //because it will work on it
 
-      struct Record{
+      static struct Record{
         string error;
         string warning;
 
@@ -505,9 +538,9 @@ class Archiver{
       return res;
     }
 
-    auto decodeRecordFromFile(ulong ofs){
+    public auto decodeRecordFromFile(ulong ofs){
       re:
-      auto data = cast(uint[])file.read(false, ofs, ofs+MaxLeadSize);
+      auto data = cast(uint[])file.read(false, ofs, MaxLeadSize);
       auto peek = peekRecord(data);
 
       bool once;
@@ -517,8 +550,9 @@ class Archiver{
         goto re;
       }
 
-      if(peek.valid && peek.isLeadIn)
-        data = cast(uint[])file.read(true, ofs, ofs+peek.fullSize);
+      if(peek.valid && peek.isLeadIn){
+        data = cast(uint[])file.read(true, ofs, peek.fullSize);
+      }
 
       return decodeRecord(data, compr);
     }
