@@ -43,6 +43,8 @@ class Archiver{
             blobPoolBegin,
             totalFileCount,
             totalFileSize,
+            totalJumpCount,
+            totalJumpSize,
             totalBlobCount,
             totalBlobSize;
       DateTime created, modified;
@@ -107,8 +109,8 @@ class Archiver{
   void initSeedStream(uint a, uint c){ seedStream = SeedStream(a, c); }
   void testSeedStream(){ seedStream.test; }
 
-  private MasterRecord masterRecord;
-  /*private*/ File file;
+  private MasterRecord masterRecord;    auto getMasterRecord() const{ return masterRecord; }
+  File file;                            auto getFile()         const{ return file; }
   private string compr;
 
   void close(){
@@ -184,6 +186,9 @@ class Archiver{
 
         write_internal(jumpRec, filePoolBegin);
         filePoolBegin += jumpRec.sizeBytes;
+
+        totalJumpCount ++;
+        totalJumpSize += jumpRec.sizeBytes;
 
         //allocate new filePool after the blobs
         filePoolBegin = blobPoolBegin;
@@ -304,6 +309,7 @@ class Archiver{
 
     ulong ofs = masterRecord.masterRecordEnd;
     foreach(idx; 0..masterRecord.totalFileCount){
+      re:
       auto r = decodeRecordFromFile(ofs); //opt: this reads even those records that don't needed...
       LOG("Record found:", r.header);
 
@@ -318,7 +324,7 @@ class Archiver{
         auto jr = (cast(JumpRecord[])r.data)[0];
         LOG("Got jump record", jr);
         ofs = jr.to;
-        continue;
+        goto re; //don't count in totalFile
       }
 
       if(r.header.isWildMulti(pattern)) res ~= ReadRecordResult(r.header, cast(ubyte[])(r.data.uncompress));
@@ -650,10 +656,12 @@ class ArchiverDBFile : DBFileInterface{ //this is an AMDB inside an Archive
 
   string[] readLines(){
     return arc.readRecords(name).map!(r => (cast(string)r.data).splitLines).join;
+    //log this
   }
 
   void appendLines(string[] lines){
     arc.addRecord(name, '\n'~lines.join('\n')~'\n');
+    //log this too
   }
 }
 
