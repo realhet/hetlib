@@ -78,12 +78,13 @@ class Archiver{
       created = modified = now;
     }
 
-    string stats(in File file){
+    string stats(in File file, string serial){
       string s = "Archive stats: ";
       if(!valid) return s~"INVALID\n";
       s ~= file.fullName ~ "\n";
       if(icmp(originalFileName, file.fullName)) s ~= "  Original file: "~originalFileName~"\n";
 
+      s ~= "  Volume  : "~volume.quoted~"   Serial: "~serial.quoted~"\n";
       s ~= "  Created : "~created.text ~"\n";
       s ~= "  Modified: "~modified.text~"\n";
 
@@ -106,7 +107,7 @@ class Archiver{
   }
 
   // finds a datablock that possibly contains data. It helps in reconstucting archived blocks.
-  static sizediff_t findNonRedundantBlock(File f, size_t blockSize, size_t startOffset, float threshold, Flag!"exponentialSearch" exponentialSearch){
+/*  static sizediff_t findNonRedundantBlock(File f, size_t blockSize, size_t startOffset, float threshold, Flag!"exponentialSearch" exponentialSearch){
     auto fsize = f.size, fofs = startOffset; //skip first block
 
     bool eof(){ return fofs+blockSize>fsize; }
@@ -117,7 +118,7 @@ class Archiver{
       fofs = exponentialSearch ? fofs*2 : fofs+blockSize;
     }
     return -1;
-  }
+  }*/
 
 
   // Archiver main /////////////////////////////////////////////////////////////////////
@@ -147,7 +148,7 @@ class Archiver{
   bool valid() const{ return masterRecord.valid && file.exists; }
 
   string stats(){
-    return masterRecord.stats(file);
+    return masterRecord.stats(file, seedStream.a.to!string(16)~'-'~seedStream.c.to!string(16));
   }
 
   private void write_internal(in void[] rec, ulong ofs){
@@ -254,16 +255,18 @@ class Archiver{
     totalBlobSize += recSize;
     totalBlobCount ++;
 
-    writeMasterRecord; //always write it for safety
+    //Note: Dont write master record here! Only write master record after a normal record.
+    //      That is the end of that transaction! Blob writing is just the middle of a transaction.
+    //NO!!!! writeMasterRecord; //NO -> always write it for safety
 
     return res;
   }}
 
-  private auto findMasterRecordOfs(){
+  /+private auto findMasterRecordOfs(){
     auto ofs = findNonRedundantBlock(file, DefaultMasterRecordMaxSize, 0, 0.125, Yes.exponentialSearch); //don't change this!!!
     if(ofs<0) raise("Unable to locate suitable MR offset.");
     return ofs;
-  }
+  }+/
 
   void create(T)(T file_, string volume, string compr="", ulong baseOfs=0){
     enforce(!valid, "Archive already opened.");
@@ -283,7 +286,7 @@ class Archiver{
           raise("Archive.create: user approval error.");
         }
       }else{
-        file.write([0]);
+        file.write(""); //this initializes an 'empty' file
       }
 
       masterRecord.initializeNew(file, volume, baseOfs, InitialrecordPoolSize+calcJumpRecordSizeBytes);
@@ -317,6 +320,7 @@ class Archiver{
     return writeRecord(name, data);
   }
 
+  ///note: addBlob must be followed by an addRecord which will write out the master record automatically.
   auto addBlob(string name, in void[] data){
     enforce(valid, "No archive is opened.");
     return writeBlobRecord(name, data);
@@ -646,7 +650,6 @@ class Archiver{
         }
 
         foreach(i, loc; locations){
-          //auto res = arc.decodeRecord(cast(uint[])f.read(true, loc.low, loc.high-loc.low), c);
           auto res = arc.decodeRecordFromFile(loc.low);
           enforce(res.error == "", "Error: "~res.error);
 
@@ -749,9 +752,7 @@ class AMDB{
 
   this(DBFileInterface dbFileInterface){
     this();
-
     this.dbFileInterface = dbFileInterface;
-
     load;
   }
 
