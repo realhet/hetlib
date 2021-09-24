@@ -175,9 +175,11 @@ class Archiver{
     write_internal(rec, masterRecord.masterRecordBegin);
   }
 
+  private uint[] read_internal(bool mustSucceed, ulong ofs, ulong sizeBytes){ return cast(uint[])file.read(mustSucceed, ofs, sizeBytes); }
+
   private void readMasterRecord(in ulong ofs){
     masterRecord = MasterRecord.init;
-    const data = cast(uint[])file.read(true, ofs, DefaultMasterRecordMaxSize),
+    const data = read_internal(true, ofs, DefaultMasterRecordMaxSize),
           res = decodeRecord(data, compr);
     enforce(res.error=="", "Error decoding MR: "~res.error);
     masterRecord.fromJson(res.data.uncompress.to!string);
@@ -544,7 +546,7 @@ class Archiver{
 
     public auto decodeRecordFromFile(ulong ofs){
       re:
-      auto data = cast(uint[])file.read(false, ofs, MaxLeadSize);
+      auto data = read_internal(false, ofs, MaxLeadSize);
       auto peek = peekRecord(data);
 
       bool once;
@@ -555,7 +557,7 @@ class Archiver{
       }
 
       if(peek.valid && peek.isLeadIn){
-        data = cast(uint[])file.read(true, ofs, peek.fullSize);
+        data = read_internal(true, ofs, peek.fullSize);
       }
 
       return decodeRecord(data, compr);
@@ -827,6 +829,7 @@ class AMDB{
     string get(in Id id                 ) const{ if(auto a = id in byId) return *a; else return "" ; }
     string get(in Id id, lazy string def) const{ if(auto a = id in byId) return *a; else return def; }
 
+    //todo: require() has an incompatible meaning compared to assocArray.require
     string require(in Id id                 ) const{ if(auto a = id in byId) return *a; else{ db.error(format!"Required id %s not found."   (id     )); assert(0); } }
     string require(in Id id, lazy string msg) const{ if(auto a = id in byId) return *a; else{ db.error(format!"Required id %s not found. %s"(id, msg)); assert(0); } }
 
@@ -918,10 +921,14 @@ class AMDB{
     bool opCast(B : bool)() const{ return valid; }
   }
 
+  struct VerbTarget{ Id verbId, targetId; }
+
   struct Links{
     private AMDB db;
     private Link[Id] byId;
     private Id[Link] byLink;
+
+    bool[Id][VerbTarget] sourcesByVerbTarget;
 
     // data access -------------------------------------------
 
@@ -959,12 +966,17 @@ class AMDB{
     private void _internal_createLink(in Id id, in Link link){
       byId[id] = link;
       byLink[link] = id;
+
+      sourcesByVerbTarget[VerbTarget(link.verbId, link.targetId)][link.sourceId] = true;
     }
 
     bool _internal_tryRemoveLink(in Id id){
       if(auto link = id in this){
         byId.remove(id);
         byLink.remove(link);
+
+        sourcesByVerbTarget[VerbTarget(link.verbId, link.targetId)].remove(link.sourceId);
+
         return true;
       }
       return false;
@@ -1281,6 +1293,7 @@ class AMDB{
   // find referrers ///////////////////////////////////////////////////
 
   auto referrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id){
+    //opt:linear
     return links.byId.byKeyValue.filter!(a => chkSource && a.value.sourceId==id
                                            || chkVerb   && a.value.verbId  ==id
                                            || chkTarget && a.value.targetId==id).map!retExpr;
@@ -1406,6 +1419,7 @@ class AMDB{
 
   // filter, exists ///////////////////////////////////////////////////////
 
+  /// this is kinda fast
   bool exists(S, V, T)(in S s, in V v, in T t){
     static if(is(S==Id)) auto si = s; else auto si = s in items;
     static if(is(V==Id)) auto vi = v; else auto vi = v in items;
@@ -1415,7 +1429,10 @@ class AMDB{
 
   bool exists(S, V)(in S s, in V v){ return exists(s, v, Id.init); }
 
-  auto filter(S, V, T)(in S source, in V verb, in T target){
+  /// this is fucking slow but only needed for queryes
+  auto filter2(S, V, T)(in S source, in V verb, in T target){ //opt:linear
+    //print("Filter is fucking slow!");
+
     bool test(in Link link){
 
       bool testOne(T)(in Id id, in T criteria){
@@ -1440,17 +1457,27 @@ class AMDB{
   bool isEType(T)(in T a){ return exists(a, "is a", "EType"); }
   bool isVerb (T)(in T a){ return exists(a, "is a", "Verb" ); }
 
-  bool isEntity(in Id id){ return filter(id, "is a", "*").any!(a => isEType(links[a].targetId)); }
+  bool isEntity(in Id id){ return filter2(id, "is a", "*").any!(a => isEType(links[a].targetId)); }
 
   bool isInstanceOf(T, U)(in T entity, in U eType){ return exists(entity, "is a", eType); } //todo: subtype handling
 
   auto things()  { return chain(items.ids, links.ids); }
-  auto verbs()   { return filter("*", "is a", "Verb" ).map!(a => links[a].sourceId); }
-  auto eTypes()  { return filter("*", "is a", "EType").map!(a => links[a].sourceId); }
-  auto aTypes()  { return filter("*", "is a", "AType").map!(a => links[a].sourceId); }
 
-  auto entities()           { return eTypes                             .map!(e => filter("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
-  auto entities(string mask){ return eTypes.filter!(e => chkId(e, mask)).map!(e => filter("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
+  Id[] idArrayOfIsASomething(T)(in T t){
+    VerbTarget vt;
+    static if(is(T==Id)) vt.targetId = t; else vt.targetId = t in items;
+    vt.verbId = "is a" in items; //otp: keyword cache
+
+    if(auto a = vt in links.sourcesByVerbTarget) return a.keys;
+                                            else return [];
+  }
+
+  Id[] verbs()   { return idArrayOfIsASomething("Verb");  }
+  Id[] eTypes()  { return idArrayOfIsASomething("EType"); }
+  Id[] aTypes()  { return idArrayOfIsASomething("AType"); } //previously it was: return filter("*", "is a", "AType").map!(a => links[a].sourceId);
+
+  auto entities()           { return eTypes                             .map!(e => filter2("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
+  auto entities(string mask){ return eTypes.filter!(e => chkId(e, mask)).map!(e => filter2("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
 
   char thingCategory(in Id id){
     if(!id) return 0;
@@ -1590,20 +1617,26 @@ class AMDB{
   }
 
   private Id[] findATypesForSentence(string[] p, in Id lastTypeId){
+    //const T0 = QPS; scope(exit) print("FAFS", p, QPS-T0);
 
     enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
     enforce(isVerb(p[1]), "Unknown verb: "~p.text);
     Id verbId = items[p[1]];
     Id[] res;
-    foreach(aid, link; links.byId) if(link.verbId==verbId) if(isAType(aid)){
 
-      const sourceIsOk = p[0]=="..." && link.sourceId==lastTypeId || !isAType(link.sourceId) && typeCheck(link.sourceId, p[0]);
-      if(!sourceIsOk) continue;
+    //old slow linear version: foreach(aid, link; links.byId) if(link.verbId==verbId) if(isAType(aid)){
 
-      const targetIsOk = p.length==2 && !link.targetId || p.length==3 && !isAType(link.targetId) && typeCheck(link.targetId, p[2]);
-      if(!targetIsOk) continue;
+    foreach(aid; aTypes){
+      const link = links[aid];
+      if(link.verbId==verbId){ //opt: there should be a map for aTypes by verb
+        const sourceIsOk = p[0]=="..." && link.sourceId==lastTypeId || !isAType(link.sourceId) && typeCheck(link.sourceId, p[0]);
+        if(!sourceIsOk) continue;
 
-      res ~= aid;
+        const targetIsOk = p.length==2 && !link.targetId || p.length==3 && !isAType(link.targetId) && typeCheck(link.targetId, p[2]);
+        if(!targetIsOk) continue;
+
+        res ~= aid;
+      }
     }
     return res;
   }
@@ -1667,6 +1700,7 @@ class AMDB{
         enforce(0, "Unhandled system verb in data: "~p.text);
       }
     }else{ //association
+
       //find a valid atype for this sentence. Try to step back to sourceId if that is an atype.
       Id[] aTypes;
       auto tempTid = tid, tempId = id;
@@ -1769,7 +1803,7 @@ class AMDB{
     return s.isWild(mask);
   }
 
-  private bool chkId(in Id id, string mask){ //todo: ez mehetne a filter-be is, mert hasonlo
+  private bool matchId(in Id id, string mask){ //todo: ez mehetne a filter-be is, mert hasonlo
     string s;
     if(!id) s = "null";
     else if(auto a = id in items) s = a;
@@ -1784,7 +1818,7 @@ class AMDB{
       const itemMask  = p[0]=="" ? "*" : p[0];
       const eTypeMask = p[1]=="" ? "*" : p[1];
 
-      return chkStr(s, itemMask) && !filter(id, "is a", eTypeMask).empty;
+      return chkStr(s, itemMask) && !filter2(id, "is a", eTypeMask).empty;
     }
 
     return chkStr(s, mask);
@@ -1798,20 +1832,20 @@ class AMDB{
 
     Id[] res;
     if(p.length==1){
-      if(qs.anyLinks) foreach(id, const link; links.byId){
+      if(qs.anyLinks) foreach(id, const link; links.byId){ //opt:linear
         if(!checkQuerySourceLinks(id)) continue;
         if(chkId(link.sourceId, p[0]) || chkId(link.verbId, p[0]) || chkId(link.targetId, p[0])) res ~= id; // x  ->  x can be at any place
       }
-      if(qs.anyItems) foreach(id; items.ids){
+      if(qs.anyItems) foreach(id; items.ids){              //opt:linear
         if(chkId(id, p[0])) res ~= id; // also can be an item too
       }
     }else if(p.length==2){
-      if(qs.anyLinks) foreach(id, const link; links.byId){
+      if(qs.anyLinks) foreach(id, const link; links.byId){ //opt:linear
         if(!checkQuerySourceLinks(id)) continue;
         if(!link.targetId && chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1])) res ~= id; // target must be null
       }
     }else if(p.length==3){
-      if(qs.anyLinks) foreach(id, const link; links.byId){
+      if(qs.anyLinks) foreach(id, const link; links.byId){ //opt:linear
         if(!checkQuerySourceLinks(id)) continue;
         if(chkId(link.sourceId, p[0]) && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
       }
@@ -1826,14 +1860,14 @@ class AMDB{
     enforce(p.get(0)=="...", `Invalid sentence for srcId based query. Source must be "...". `~p.text);
     if(p.length==2){
       foreach(sourceId; sourceIds){
-        foreach(id, const link; links.byId){
+        foreach(id, const link; links.byId){ //opt:linear
           /* if(link.sourceId==sourceId && !link.targetId && chkId(link.verbId, p[1])) res ~= id; */
           if(link.sourceId==sourceId && (chkId(link.verbId, p[1]) || chkId(link.targetId, p[1]))) res ~= id;  // ...x  ->  x can be at any place
         }
       }
     }else if(p.length==3){
       foreach(sourceId; sourceIds){
-        foreach(id, const link; links.byId){
+        foreach(id, const link; links.byId){ //opt:linear
           if(link.sourceId==sourceId && chkId(link.verbId, p[1]) && chkId(link.targetId, p[2])) res ~= id;
         }
       }
@@ -1907,7 +1941,7 @@ class AMDB{
   IdSequence extendLeft(IdSequence seq, int recursion=defaultExtendLeftRecursion){
     foreach(i; 0..recursion){
       if(seq.ids.length)
-        if(auto link = seq.ids[0] in links.byId)
+        if(auto link = seq.ids[0] in links.byId) //opt:linear
           if(link.sourceId in links){
             seq.appendLeft(link.sourceId);
             continue;
