@@ -1803,7 +1803,7 @@ class AMDB{
     return s.isWild(mask);
   }
 
-  private bool matchId(in Id id, string mask){ //todo: ez mehetne a filter-be is, mert hasonlo
+  private bool chkId(in Id id, string mask){ //todo: ez mehetne a filter-be is, mert hasonlo
     string s;
     if(!id) s = "null";
     else if(auto a = id in items) s = a;
