@@ -613,7 +613,7 @@ class Archiver{
         auto arc = new Archiver;
         arc.create(f, "testvolume");
 
-        auto db = new AMDB(new ArchiverDBFile(arc, "main.db"));
+        auto db = new AMDBCore(new ArchiverDBFile(arc, "main.db"));
 
         db.schema("Blob  is a  EType");
 
@@ -729,7 +729,7 @@ class TextDBFile : DBFileInterface{
   void appendLines(string[] lines){ file_.append("\n"~lines.join("\n")~"\n"); }
 }
 
-class AMDB{
+class AMDBCore{
   enum versionStr = "1.00";
 
   private uint lastIdIndex;
@@ -815,7 +815,7 @@ class AMDB{
   // Items /////////////////////////////
 
   struct Items{
-    private AMDB db;
+    private AMDBCore db;
     private string[Id] byId;
     private Id[string] byItem;
 
@@ -922,18 +922,22 @@ class AMDB{
   }
 
   struct VerbTarget{ Id verbId, targetId; }
+  struct SourceVerb{ Id sourceId, verbId; }
 
   struct Links{
-    private AMDB db;
+    private AMDBCore db;
     private Link[Id] byId;
     private Id[Link] byLink;
 
     bool[Id][VerbTarget] sourcesByVerbTarget;
+    bool[Id][SourceVerb] targetsBySourceVerb;
 
     // data access -------------------------------------------
 
     auto ids(){ return byId.keys; }
     auto links(){ return byLink.keys; }
+
+    auto byLink_(){ return byLink.byKey; }
 
     auto count() const{ return byId.length; }
 
@@ -968,6 +972,7 @@ class AMDB{
       byLink[link] = id;
 
       sourcesByVerbTarget[VerbTarget(link.verbId, link.targetId)][link.sourceId] = true;
+      targetsBySourceVerb[SourceVerb(link.sourceId, link.verbId)][link.targetId] = true;
     }
 
     bool _internal_tryRemoveLink(in Id id){
@@ -976,6 +981,7 @@ class AMDB{
         byLink.remove(link);
 
         sourcesByVerbTarget[VerbTarget(link.verbId, link.targetId)].remove(link.sourceId);
+        targetsBySourceVerb[SourceVerb(link.sourceId, link.verbId)].remove(link.targetId);
 
         return true;
       }
@@ -1017,7 +1023,7 @@ class AMDB{
   // Transaction ////////////////////
 
   struct Transaction{
-    private AMDB db;
+    private AMDBCore db;
     private string[] commitBuffer, cancelBuffer;
 
     @property bool active() const { return commitBuffer.length>0; }
@@ -1065,6 +1071,7 @@ class AMDB{
   }
   Transaction transaction;
 
+  @property bool canCommit() const { return transaction.active; }
   void commit(){ transaction.commit; }
   void cancel(){ transaction.cancel; }
 
@@ -1157,7 +1164,7 @@ class AMDB{
     bool isBackLink;
     int offset, size;
 
-    private void accumulate(AMDB db, in Id id){
+    private void accumulate(AMDBCore db, in Id id){
       if(auto link = id in db.links){
 
         string a(in Id id){ return id in db.links ? "..." : db.prettyStr!(No.color)(id); }
@@ -1911,7 +1918,7 @@ class AMDB{
     void appendLeft (Id[] ext){ ids = ext ~ ids      ; leftExtension  += ext.length.to!int; }
     void appendRight(Id[] ext){ ids =       ids ~ ext; rightExtension += ext.length.to!int; }
 
-    int[] coulmnIndices(AMDB db) const{
+    int[] coulmnIndices(AMDBCore db) const{
       int[] indices;
       Id[] stack;
       foreach(id; ids){
@@ -2087,7 +2094,7 @@ class AMDB{
 void unittest_splitSentences(){
   uint h;
   void a(string s){
-    auto r = AMDB.textToSentences(s).text; h = r.xxh32(h);
+    auto r = AMDBCore.textToSentences(s).text; h = r.xxh32(h);
     //print(s, "|", r);
   }
 
