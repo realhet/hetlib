@@ -94,6 +94,7 @@ string commonKeyModifier(string key){ //eg: LShift -> Shift
 }
 
 struct KeyComboEntry{ //a single keycombo like F1, LShift+RShift, Ctrl+Alt, Ctrl+Num+, Ctrl+K+U
+                      //todo: Ctrl+KU is sequential!
   string[] keys;
 
   this(string s){

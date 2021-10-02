@@ -354,7 +354,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 //  Draw primitives                                                           //
 ////////////////////////////////////////////////////////////////////////////////
 
-  struct DrawingObj {
+  struct DrawingObj { align(1):
     float aType;                //4
     vec2 aA, aB, aC;            //24
     uint aColor;                //4
@@ -362,8 +362,21 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     //drawGlyph only
     vec2 aD;                    //8
     uint aColor2;               //4
+    uint dummy;                 //4
 
-    vec2 aClipMin, aClipMax;    //16  clipping rect. Terribly unoptimal
+    vec2 aClipMin, aClipMax;    //16  clipping rect.
+
+                                //total: 60 bytes: Terribly unoptimal
+
+    //atype: 4
+    //acolor, acolor2: 8
+    //aclip 16
+
+    //aPos: 8
+    //aHeight: 4
+
+    //total: 4+8+16+8+4 = 40
+    //marad: 20
 
     void expandBounds(ref bounds2 b) const{
       auto t = aType.iround;
@@ -385,6 +398,8 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) { x(aA); x(aB); } //Point2, Line, rect, glyph
     }
   };
+  static assert(DrawingObj.sizeof==64);
+
   private const bufferMax = (2<<20)/DrawingObj.sizeof;
   private DrawingObj[][] buffers;
 
