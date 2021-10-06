@@ -435,6 +435,9 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   vec2 inverseInputTransform(in vec2 v) { return v/actState.drawScale-actState.drawOrigin; } //todo: slow divide
   bounds2 inverseInputTransform(in bounds2 b) { return bounds2(inverseInputTransform(b.low), inverseInputTransform(b.high)); }
 
+  float zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
+  float invZoomFactor = 1; //comes from outside view
+
   private enum clipBounds_init = bounds2(-1e30, -1e30, 1e30, 1e30);
   bounds2 clipBounds = clipBounds_init;
   private bounds2[] clipBoundsStack;

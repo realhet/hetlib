@@ -2288,7 +2288,7 @@ version(D2D_FONT_RENDERER){ private:
       DWRITE_TEXT_METRICS metrics;
       textLayout.GetMetrics(metrics).hrChk("GetMetrics");
 
-      auto bmpSize(){ return ivec2((metrics.width*props.xScale).iround, props.height); }
+      auto bmpSize(){ return ivec2((metrics.width*props.xScale).iround, props.height).max(ivec2(1)); }
 
       if(isSpace){
         return new Bitmap(image2D(bmpSize, ubyte(0)));

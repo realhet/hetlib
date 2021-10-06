@@ -1276,8 +1276,13 @@ auto cmp(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) && (isNumeric!B ||
 
 auto mix(A, B, T)(in A a, in B b, in T t){ // result type is the common of A and B, not influenced by T
   static if(is(Unqual!T==bool)) return mix(a, b, int(t));
-  alias CT = CommonScalarType!(A, B); //type of result NOT depends on t
-  return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t);
+  else static if(isBounds!A && isBounds!B) return bounds2(mix(a.low, b.low, t), mix(a.high, b.high, t));
+  else static if(isBounds!A && isVector!B) return bounds2(mix(a.low, b    , t), mix(a.high, b     , t));
+  else static if(isVector!A && isBounds!B) return bounds2(mix(a    , b.low, t), mix(a     , b.high, t));
+  else{
+    alias CT = CommonScalarType!(A, B); //type of result NOT depends on t
+    return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t);
+  }
 }
 
 auto avg(A...)(in A a){ //return type is casted to common source type
@@ -2063,6 +2068,16 @@ struct Bounds(VT){
 
     static if(isBounds!T) return contains!cfg(other.low) && contains!cfg(other.high);
                      else return all(f1(other, low) & f2(other, high));
+  }
+
+  bool overlaps(T)(in T other){ //intersection.area > 0
+    static if(VectorLength==1){
+      if(other.low >= high || other.high <= low) return false;
+    }else static if(VectorLength==2){
+      if(other.low.x >= high.x || other.high.x <= low.x) return false;
+      if(other.low.y >= high.y || other.high.y <= low.y) return false;
+    }else static assert(0, "NOTIMPL");
+    return true;
   }
 
   static if(VectorLength==1 && is(ComponentType==int)){

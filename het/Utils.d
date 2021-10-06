@@ -3242,7 +3242,7 @@ ref auto imstVisibleBounds(in SrcId id){ return ImStorage!bounds2.access(id.comb
 // hexDump ///////////////////////////
 //import std.algorithm, std.stdio, std.file, std.range;
 
-void hexDump(in void[] data){
+/+void hexDump(in void[] data){
   auto d = cast(const ubyte[])data;
   int idx;
   foreach(chunk; d.chunks(16)){
@@ -3251,6 +3251,26 @@ void hexDump(in void[] data){
       chunk.map!(c => // Replace non-printable
         c < 0x20 || c > 0x7E ? '.' : char(c)));
   }
+}+/
+
+void hexDump(T=ubyte)(in void[] data, int width=16){
+    enum digits = T.sizeof*2;
+
+  string hexLine(in T[] buf){
+      return buf.take(width)
+                  .map!(a => a.format!("%0"~digits.text~"X"))
+                  .padRight(" ".replicate(digits), width)
+                  .join(' ');
+    }
+
+  string binaryLine(in void[] buf){
+        return (cast(ubyte[])buf).take(width*T.sizeof)
+                  .map!`a>=32 && a<=127 ? char(a) : '.'`
+                  .array;
+    }
+
+    foreach(i, a; (cast(T[])data).chunks(width).map!array.enumerate)
+        writefln!"%04X : %s : %s"(i*width, hexLine(a), binaryLine(a));
 }
 
 // UNICODE /////////////////////////////////////////////

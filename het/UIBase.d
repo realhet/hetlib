@@ -1951,7 +1951,7 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "canSelect"         , 1,
     bool          , "focused"           , 1,  //maintained by system, not by user
     bool          , "hovered"           , 1,  //maintained by system, not by user
-    bool          , "clipChildren"      , 1,
+    bool          , "clipSubCells"      , 1,
     bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
     bool          , "_hasOverlayDrawing", 1,
     bool          , "columnElasticTabs" , 1, //Column will do ElasticTabs its own Rows.
@@ -1975,7 +1975,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "clickable"         , 1, // If false, hittest will not check this as clicked. It checks the parent instead.
     bool          , "noBackground"      , 1,
 
-    int           , "_dummy"            ,30,
+    bool          , "cullSubCells"      , 1, // clipSubCells must be enabled too
+
+    int           , "_dummy"            ,29,
   ));
 }
 
@@ -2243,6 +2245,16 @@ class Container : Cell { // Container ////////////////////////////////////
 
   void onDraw(Drawing dr){ } //can override to draw some custom things.
 
+  protected void drawSubCells_cull(Drawing dr){
+    //this uses linear search. It can be optimized in subClasses.
+    if(auto b = dr.clipBounds){
+      b = dr.inverseInputTransform(b);
+      foreach(c; subCells)
+        if(b.overlaps(/+dr.inputTransform+/(c.outerBounds))) c.draw(dr);
+    }
+  }
+
+
   static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 
   override void draw(Drawing dr){
@@ -2269,13 +2281,16 @@ class Container : Cell { // Container ////////////////////////////////////
     }
 
     dr.translate(innerPos);
-    const useClipBounds = flags.clipChildren;
+    const useClipBounds = flags.clipSubCells;
     if(useClipBounds) dr.pushClipBounds(bounds2(0, 0, innerWidth, innerHeight));
 
     if(hasScrollOffset) dr.translate(-scrollOffset);
 
-    foreach(sc; subCells){
-      sc.draw(dr); //recursive
+    //recursively draw subCells
+    if(flags.cullSubCells){
+      drawSubCells_cull(dr); //it can be optimized
+    }else{
+      subCells.each!(c => c.draw(dr));
     }
 
     if(flags._hasOverlayDrawing)
@@ -2611,6 +2626,11 @@ class Row : Container { // Row ////////////////////////////////////
   }
 
   override void draw(Drawing dr){
+    if(/*flags.targetSurface==0*/1){
+      //dr.clipBounds.print;
+      //dump;
+    }
+
     super.draw(dr); //draw frame, bkgnd and subCells
 
     //draw the carets and selection of the editor

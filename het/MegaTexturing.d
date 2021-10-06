@@ -83,7 +83,7 @@ private struct SubTexInfo{ align(1): import std.bitmanip;
          && (pos.y & SubTexCellMask)==0, "unaligned pos");
 
     enforce(pos.x>=0 && size.x>0 && pos.x+size.x<=SubTexMaxSize
-         && pos.y>=0 && size.y>0 && pos.y+size.y<=SubTexMaxSize, "pos, size: Out of range");
+         && pos.y>=0 && size.y>0 && pos.y+size.y<=SubTexMaxSize, "pos, size: Out of range. pos:%s size:%s pos+size:%s SubTexMaxSize:%s".format(pos, size, pos+size, SubTexMaxSize));
     enforce(texIdx.inRange(0, MegaTexMaxCnt-1), "texIdx: Out of range");
 
     cellX = pos.x>>SubTexCellBits;  texIdx_lo = texIdx.getBits(0, 2);

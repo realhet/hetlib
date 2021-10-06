@@ -2231,7 +2231,7 @@ public:
     if(showMegaTextures) drawMegaTextures;
 
     import het.ui: im;
-    im.draw!"system call only";
+    im._drawFrame!"system call only";
 
     if(!view.workArea_accum.empty) view.workArea = view.workArea_accum;
 

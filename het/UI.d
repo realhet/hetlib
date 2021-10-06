@@ -107,6 +107,8 @@ struct im{ static:
 
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(TargetSurface[2] targetSurfaces){ //called from mainform.update
+    //const T0 = QPS; scope(exit) print("im.beginFrame", QPS-T0);
+
     enforce(!inFrame, "im.beginFrame() already called.");
 
     this.targetSurfaces = targetSurfaces;
@@ -146,6 +148,8 @@ struct im{ static:
   }
 
   void _endFrame(){ //called from end of update
+    //const T0 = QPS; scope(exit) print("im.endFrame", QPS-T0);
+
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
     enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 
@@ -217,12 +221,20 @@ struct im{ static:
 
   Drawing drVisualizeHitStack;
 
-  void draw(string restrict="")(){
+  void _drawFrame(string restrict="")(){
+    //const T0 = QPS; scope(exit) print("im.draw", QPS-T0);
+
     static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
     auto dr = [new Drawing, new Drawing];
 
+    //init clipbounds
+    foreach(i, ref d; dr){        ref view(){ return targetSurfaces[i].view; }
+      d.zoomFactor    = view.scale   ;
+      d.invZoomFactor = view.invScale;
+      d.pushClipBounds(view.clipBounds.inflated(-view.clipBounds.size*0));
+    }
 
 
     foreach(i; 0..2) surfaceBounds[i] = bounds2.init;
@@ -232,10 +244,11 @@ struct im{ static:
       a.draw(dr[s]); //draw in zOrder
     }
 
-    foreach(i; 0..2){
+    foreach(i, d; dr){
       //it's not good because of invisible scrollable elements. -> surfaceBounds[i] |= dr[i].bounds;
-      dr[i].glDraw(targetSurfaces[i].view);
-      dr[i].clear;
+      d.popClipBounds;
+      d.glDraw(targetSurfaces[i].view);
+      d.clear;
     }
 
     if(VisualizeHitStack && drVisualizeHitStack){
@@ -1251,7 +1264,7 @@ struct im{ static:
 
       auto ref hit(){ return res.hit; }
 
-      flags.clipChildren = true;
+      flags.clipSubCells = true;
       auto row = cast(.Row)actContainer;
 
       hit = hitTest(enabled);
