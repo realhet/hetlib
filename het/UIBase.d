@@ -2254,7 +2254,6 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-
   static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 
   override void draw(Drawing dr){
@@ -2698,6 +2697,24 @@ class Column : Container { // Column ////////////////////////////////////
 
     if(flags.autoHeight) innerHeight = calcContentHeight;
   }
+
+  override void drawSubCells_cull(Drawing dr){
+    //this uses linear search. It can be optimized in subClasses.
+    if(auto b = dr.clipBounds){
+      b = dr.inverseInputTransform(b);
+
+      const ub = subCells.map!(c => c.outerPos.y + c.outerSize.y).assumeSorted.upperBound(b.top).length;
+      if(ub>0){
+        auto scUpper = subCells[$-ub..$];
+        const lb = scUpper.map!(c => c.outerPos.y).assumeSorted.lowerBound(b.bottom).length;
+        if(lb>0){
+          foreach(c; scUpper[0..lb])
+            if(b.overlaps((c.outerBounds))) c.draw(dr);
+        }
+      }
+    }
+  }
+
 }
 
 

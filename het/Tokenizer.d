@@ -82,6 +82,18 @@ class SourceCode{ // SourceCode ///////////////////////////////
     bigComments.clear;
   }
 
+  void foreachLine(void delegate(int idx, string line, ubyte[] syntax) callBack){
+    auto syn = syntax;
+    int idx;
+    foreach(line; text.splitter('\n')){
+      auto synLine = syn[0..line.length];
+      syn = syn[line.length+1..$]; //advance
+
+      if(line.endsWith('\r')){ line.popBack; synLine.popBack; }
+      callBack(idx++, line, synLine);
+    }
+  }
+
   int lineCount(){
     if(tokens.empty) return text.count('\n').to!int+1;
     return tokens[$-1].line + text[tokens[$-1].pos..$].count('\n').to!int + 1;
