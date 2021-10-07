@@ -1126,7 +1126,7 @@ struct im{ static:
   }
 
   void HR(){
-    SpacerRow(fh*InvNormalFontHeight, {
+    SpacerRow(fh*InvDefaultFontHeight, {
       margin = "0.33333x 0";
       bkColor = mix(style.bkColor, style.fontColor, 0.25f);
     });
@@ -2219,7 +2219,7 @@ struct im{ static:
     float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
     //these are the derived sizes
     float rulerOfs (){ return baseSize*0.5f; }
-    float lwLine   (){ return baseSize*(2.0f/NormalFontHeight); }
+    float lwLine   (){ return baseSize*(2.0f*InvDefaultFontHeight); }
     float lwRuler  (){ return lwLine*0.5f; }
 
     /// this is the half thickness of the thumb in the active direction

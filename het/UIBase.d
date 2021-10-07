@@ -14,7 +14,7 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
-  VisualizeGlyphs          = 0,
+  VisualizeGlyphs          = 1,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
@@ -27,8 +27,8 @@ immutable DefaultFontName = //this is the cached font
 ;
 
 immutable
-  NormalFontHeight = 18,  //fucking keep it on 18!!!!
-  InvNormalFontHeight = 1.0f/NormalFontHeight,
+  DefaultFontHeight = 18,  //fucking keep it on 18!!!!
+  InvDefaultFontHeight = 1.0f/DefaultFontHeight,
 
   MinScrollThumbSize = 4, //pixels
   DefaultScrollThickness = 15; //pixels
@@ -451,8 +451,8 @@ shared static this(){ //static init///////////////////////////////
 
 // TextStyle ////////////////////////////////////
 struct TextStyle{
-  string font;
-  ubyte fontHeight=NormalFontHeight;
+  string font = DefaultFontName;
+  ubyte fontHeight = DefaultFontHeight;
   bool bold, italic, underline, strikeout;
   RGB fontColor=clBlack, bkColor=clWhite;
 
@@ -493,10 +493,10 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
       clChapter                 = RGB(221,   3,  48),
-      clAccent                  = RGB(0  , 120, 215),
+      clAccent                  = RGB(  0, 120, 215),
       clMenuBk                  = RGB(235, 235, 236),
       clMenuHover               = RGB(222, 222, 222),
-      clLink                    = RGB(0  , 120, 215),
+      clLink                    = RGB(  0, 120, 215),
 
       clLinkHover               = RGB(102, 102, 102),
       clLinkPressed             = RGB(153, 153, 153),
@@ -540,7 +540,7 @@ void initTextStyles(){
   }
 
   //relativeFontHeight ()
-  ubyte rfh(float r){ return (NormalFontHeight*(r/18.0)).iround.to!ubyte; }
+  ubyte rfh(float r){ return (DefaultFontHeight*(r/18.0f)).iround.to!ubyte; }
 
 
   a("normal"      , tsNormal  , TextStyle(DefaultFontName, rfh(18), false, false, false, false, clBlack, clWhite));
@@ -1207,7 +1207,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     row = null;
     wrappedLines = null;
     cellStrOfs = null;
-    defaultFontHeight = NormalFontHeight;
+    defaultFontHeight = DefaultFontHeight;
   }
 
   bool active()                 const { return row !is null; }
@@ -2043,6 +2043,10 @@ class Container : Cell { // Container ////////////////////////////////////
       return true;
     }
     return false;
+  }
+
+  void removeSubCells(){
+    //_subCells = [];
   }
 
   final override{
