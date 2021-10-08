@@ -15,7 +15,7 @@ enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
   VisualizeGlyphs          = 1,
-  VisualizeTabColors       = 0,
+  VisualizeTabColors       = 1,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
 
@@ -27,10 +27,10 @@ immutable DefaultFontName = //this is the cached font
 ;
 
 immutable
-  DefaultFontHeight = 18,  //fucking keep it on 18!!!!
+  DefaultFontHeight    = 18,  //fucking keep it on 18!!!!
   InvDefaultFontHeight = 1.0f/DefaultFontHeight,
 
-  MinScrollThumbSize = 4, //pixels
+  MinScrollThumbSize     = 4, //pixels
   DefaultScrollThickness = 15; //pixels
 
 enum
@@ -100,7 +100,7 @@ private vec2 calcGlyphSize_clearType(in TextStyle ts, int stIdx){
   auto info = textures.accessInfo(stIdx);
 
   float aspect = float(info.width)/(info.height*3/*clearType x3*/); //opt: rcp_fast
-  auto size =  vec2(ts.fontHeight*aspect, ts.fontHeight);
+  auto  size   = vec2(ts.fontHeight*aspect, ts.fontHeight);
 
   if(ts.bold) size.x += size.y*(BoldOffset*2);
 
@@ -456,7 +456,7 @@ struct TextStyle{
   bool bold, italic, underline, strikeout;
   RGB fontColor=clBlack, bkColor=clWhite;
 
-  int fontFlags() const{ return boolMask(bold, italic, underline, strikeout); }
+  ubyte fontFlags() const{ return cast(ubyte)boolMask(bold, italic, underline, strikeout); }
 
   bool isDefaultFont() const{ return font == DefaultFontName; } //todo: slow. 'font' Should be a property.
 
@@ -904,6 +904,12 @@ class Cell{ // Cell ////////////////////////////////////
   void appendChar(dchar ch, in TextStyle ts){ append(new Glyph(ch, ts)); }
   void appendStr (string s, in TextStyle ts){ foreach(ch; s.byDchar) appendChar(ch, ts); }
 
+  void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax){
+    auto g = new Glyph(ch, ts);
+    g.syntax = syntax;
+    append(g);
+  }
+
   //elastic tabs
   int[] tabIdx() { return []; }
   int tabCnt() { return cast(int)tabIdx.length; } //todo: int -> size_t
@@ -969,12 +975,12 @@ class Cell{ // Cell ////////////////////////////////////
 
 class Glyph : Cell { // Glyph ////////////////////////////////////
   int stIdx;
-
-  int fontFlags; //todo: compress information
-  bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
+  dchar ch;
   RGB fontColor, bkColor;
 
-  dchar ch;
+  ubyte fontFlags; //todo: compress information
+  ubyte syntax;
+  bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
 
   this(dchar ch, in TextStyle ts){
     this.ch = ch;
@@ -1626,7 +1632,7 @@ in(text.length == syntax.length)
 
     if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
 
-    cntr.appendChar(ch, ts);
+    cntr.appendSyntaxChar(ch, ts, actSyntax);
   }
 }
 
@@ -2461,7 +2467,7 @@ class Container : Cell { // Container ////////////////////////////////////
 class Row : Container { // Row ////////////////////////////////////
 
   //for Elastic tabs
-  private int[] tabIdxInternal;
+  /+private+/ int[] tabIdxInternal;
 
   override int[] tabIdx() { return tabIdxInternal; }
 
