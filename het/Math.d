@@ -1633,9 +1633,9 @@ auto cross(A, B)(in A a, in B b) {
     return cross(a.xy0, b.xy0);
   }else static if(len==3){
     alias V = Vector!(CommonScalarType!(A, B), 3);
-    return V(a.y*b.z - b.y*a.z,
-             a.z*b.x - b.z*a.x,
-             a.x*b.y - b.x*a.y);
+    return V(  a.y*b.z - b.y*a.z,
+               a.z*b.x - b.z*a.x,
+               a.x*b.y - b.x*a.y);
   }else static assert(0, "Cross product needs at least on 2D or 3D vector argument.");
 }
 

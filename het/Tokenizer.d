@@ -86,8 +86,8 @@ class SourceCode{ // SourceCode ///////////////////////////////
     auto syn = syntax;
     int idx;
     foreach(line; text.splitter('\n')){
-      auto synLine = syn[0..line.length];
-      syn = syn[line.length+1..$]; //advance
+      auto synLine = syn.fetchFrontN(line.length+1/+newLine+/);
+      if(synLine.length > line.length) synLine.popBack;
 
       if(line.endsWith('\r')){ line.popBack; synLine.popBack; }
       callBack(idx++, line, synLine);

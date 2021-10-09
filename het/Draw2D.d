@@ -1035,7 +1035,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
       //all
       ClipMin = aClipMin;
-      ClipMax = aClipMax;
+      ClipMax = aClipMax; //todo: culling in geometry shader
     } //just shovels the data through
 
     @geometry:////////////////////////////////////////////////////////////////////////

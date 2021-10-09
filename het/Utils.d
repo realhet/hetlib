@@ -44,6 +44,11 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 //todo: editor.exception: mutassa az std\stdio.d(404,1): Exception: blabla jellegu hibakat!
 
 //todo: editor: tablazatos kod rendberakasa
+
+//test tabs   12353124fewq 1342314   54321rt
+//test tabs   34561243     gre12tg43 4321
+//                                   splitted by 3 tabs needed
+
 /*Poti("PolyOpt SmallSegLen"     , polyOpt_SmallSegLen        , 1        , 500     , 10 ),
   Poti("PolyOpt Epsilon"           , polyOpt_Epsilon            , 0        , 500     ,  1 ),
   Poti("PolyOpt parallelThreshold"  , polyOpt_ParallelThreshold    , 0.0        , 1.0     ,  0.01 ),
@@ -5458,6 +5463,8 @@ struct FileEntry{
 }
 
 ///similar directory listing like the one in totalcommander
+static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
+
 FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
   enforce(!(!onlyFiles && recursive), "Invalid params");
 
@@ -5505,7 +5512,6 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
   if(order.startsWith("-")){ order = order[1..$]; ascending = -1; }
   order = order.withoutStarting("+");
 
-  static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
   static auto cmpSize(long a, long b){ return a==b?0:a<b?1:-1; }
   static auto cmpTime(FILETIME a, FILETIME b){ return cmpSize(*cast(long*)&a, *cast(long*)&b); }
 

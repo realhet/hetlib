@@ -14,7 +14,7 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
-  VisualizeGlyphs          = 1,
+  VisualizeGlyphs          = 0,
   VisualizeTabColors       = 1,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
@@ -31,11 +31,10 @@ immutable
   InvDefaultFontHeight = 1.0f/DefaultFontHeight,
 
   MinScrollThumbSize     = 4, //pixels
-  DefaultScrollThickness = 15; //pixels
+  DefaultScrollThickness = 15, //pixels
 
-enum
-  InternalTabScale = 0.12f/2,  //around 0.15 for programming
-  LeadingTabScale  = 0.12f*3 *1.5f;  //these are relative to the original length which is 8 spaces or something like that
+  LeadingTabWidth  = 24.00f,  LeadingTabAspect  = LeadingTabWidth  / DefaultFontHeight,
+  InternalTabWidth =  7.25f,  InternalTabAspect = InternalTabWidth / DefaultFontHeight;
 
 immutable
   EmptyCellWidth  = 0,
@@ -652,6 +651,7 @@ float calcFlexSum(Cell[] cells) { return cells.map!"a.flex".sum; }
 
 bool isWhite(const Cell c){ auto g = cast(const Glyph)c; return g && g.isWhite; }
 
+void adjustTabSize(Cell c, bool isLeading){ c.outerWidth = c.outerHeight * (isLeading ? LeadingTabAspect : InternalTabAspect); }
 
 
 
@@ -2051,8 +2051,8 @@ class Container : Cell { // Container ////////////////////////////////////
     return false;
   }
 
-  void removeSubCells(){
-    //_subCells = [];
+  void internal_setSubCells(Cell[] c){
+    subCells_ = c;
   }
 
   final override{
@@ -2471,6 +2471,10 @@ class Row : Container { // Row ////////////////////////////////////
 
   override int[] tabIdx() { return tabIdxInternal; }
 
+  void refreshTabIdx(){
+    tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array;
+  }
+
   this(){
   }
 
@@ -2574,7 +2578,7 @@ class Row : Container { // Row ////////////////////////////////////
   private void adjustTabSizes_singleLine(){
     foreach(idx, tIdx; tabIdx){
       const isLeading = idx==tIdx; //it's not good for multiline!!!
-      with(subCells[tIdx]) innerWidth = innerWidth * (isLeading ? LeadingTabScale : InternalTabScale);
+      adjustTabSize(subCells[tIdx], isLeading);
     }
   }
 
@@ -2586,7 +2590,7 @@ class Row : Container { // Row ////////////////////////////////////
         if(g.isNewLine || g.isReturn){ tabCnt = colCnt = 0; continue; }
         else if(g.isTab){
           const isLeading = tabCnt == colCnt;
-          c.innerWidth = c.innerWidth * (isLeading ? LeadingTabScale : InternalTabScale);  //copy+paste
+          adjustTabSize(c, isLeading);
           tabCnt++;
         }
       }
