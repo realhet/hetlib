@@ -1023,6 +1023,8 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       return res;
     }
 
+    #define sqr(a)  ((a)*(a))
+
     @vertex://////////////////////////////////////////////////////////////////////////
     in  float aType; in  vec2 aA, aB, aC, aD; in  vec4 aColor, aColor2; in  vec2 aClipMin, aClipMax;
     out float Type; out vec2  A,  B,  C,  D; out vec4  Color,  Color2 ; out vec2 ClipMin , ClipMax ;
@@ -1514,16 +1516,28 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
           || gl_FragCoord.y>ma.y || gl_FragCoord.y<mi.y;
     }
 
+    vec4 applyBorder(vec4 color, vec2 tc, float borderWidth){
+      if(borderWidth<=0) return color;
+
+      ivec2 itc = ivec2(floor(tc));
+      float borderDist = min( min(abs(tc.x-(stPos.x-boldTexelOffset*2.6)) , abs(tc.x-(stPos.x+stSize.x+boldTexelOffset*2.6))) ,
+                              min(abs(tc.y-stPos.y)                        , abs(tc.y-(stPos.y+stSize.y))) );
+
+      return mix(color, vec4(0.5, 0.5, 0.5, 1), (1-smoothstep(-borderWidth, borderWidth, borderDist))*0.5);
+    }
 
     // global variables for default and custom shader
     vec4 bkColor, fontColor;
-    vec2 tc;
+    vec2 tc, originalTc;
 
     bool isImage, isFont, isItalic, isCustomShader;
     int customShaderIdx;
 
     vec4 defaultShader(){
       vec4 finalColor, texel;
+
+      originalTc = tc;
+
       //italic
       if(isFont && isItalic){
         float dy = tc.y-(stPos.y+stSize.y*0.5);
@@ -1569,6 +1583,10 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         if(stConfig==12)      finalColor = clearTypeMix(bkColor, vec4(smp, fontColor.a), alpha);
         else if(stConfig==0)  finalColor = clearTypeMix(bkColor, fontColor             , alpha);
       }
+
+      // border
+      if(isFont)
+        finalColor = applyBorder(finalColor, originalTc, 4);
 
       return finalColor;
     }

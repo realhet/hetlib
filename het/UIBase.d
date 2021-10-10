@@ -15,7 +15,7 @@ enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
   VisualizeGlyphs          = 0,
-  VisualizeTabColors       = 1,
+  VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
 
@@ -33,8 +33,8 @@ immutable
   MinScrollThumbSize     = 4, //pixels
   DefaultScrollThickness = 15, //pixels
 
-  LeadingTabWidth  = 24.00f,  LeadingTabAspect  = LeadingTabWidth  / DefaultFontHeight,
-  InternalTabWidth =  7.25f,  InternalTabAspect = InternalTabWidth / DefaultFontHeight;
+  LeadingTabWidth  =  7.25f*4,  LeadingTabAspect  = LeadingTabWidth  / DefaultFontHeight,
+  InternalTabWidth =  3.25f  ,  InternalTabAspect = InternalTabWidth / DefaultFontHeight;
 
 immutable
   EmptyCellWidth  = 0,
@@ -915,7 +915,7 @@ class Cell{ // Cell ////////////////////////////////////
   int tabCnt() { return cast(int)tabIdx.length; } //todo: int -> size_t
   float tabPos(int i) { with(subCells[tabIdx[i]]) return outerRight; }
 
-  bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){ //todo: only check when the hitTest flag is true
+  bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     auto hitBnd = getHitBounds + ofs;
     if(hitBnd.contains!"[)"(mouse)){
       if(auto container = cast(Container)this)
@@ -1619,7 +1619,7 @@ Params:
         applySyntax =   delegate to apply a syntax index to the TextStyle
         ts =            reference to the TextStyle used while appending all the characters
  */
-void appendCode(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts)
+void appendCode(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
 in(text.length == syntax.length)
 {
   size_t numCodeUnits, currentOfs;
@@ -1632,7 +1632,12 @@ in(text.length == syntax.length)
 
     if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
 
-    cntr.appendSyntaxChar(ch, ts, actSyntax);
+    if(ch=='\t' && nonStringTabToSpaces>=0 && actSyntax!=6/+string+/){
+      foreach(i; 0..nonStringTabToSpaces)
+        cntr.appendSyntaxChar(' ', ts, actSyntax);
+    }else{
+      cntr.appendSyntaxChar(ch, ts, actSyntax);
+    }
   }
 }
 
@@ -1938,7 +1943,7 @@ void processElasticTabs(WrappedLine[] rows, int level=0){
 }
 
 
-enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
+//enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
 
 enum ScrollState { off, on, autoOff, autoOn, auto_ = autoOff}
 
@@ -1956,7 +1961,7 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "dontHideSpaces"    , 1,  //useful for active edit mode
     bool          , "canSelect"         , 1,
     bool          , "focused"           , 1,  //maintained by system, not by user
-    bool          , "hovered"           , 1,  //maintained by system, not by user
+    bool          , "hovered_deprecated", 1,  //maintained by system, not by user
     bool          , "clipSubCells"      , 1,
     bool          , "_saveComboBounds"  , 1,  //marks the container to save the absolute bounds to align the popup window to.
     bool          , "_hasOverlayDrawing", 1,
@@ -2208,9 +2213,31 @@ class Container : Cell { // Container ////////////////////////////////////
     return bounds2(vb.outerPos.x, hb.outerPos.y, innerWidth, innerHeight);
   }
 
+  Cell[] sortedSubCellsAroundAxis(int axis)(vec2 p){ //note: only tests for the given direction. It's a speedup for internal_hitTest.
+    auto sc = subCells;
+    if(sc.length){
+      // 2 binary searches      //note: does not work with vertical newLine!!!
+      const lowerCnt = sc.map!(c => c.outerPos[axis] + c.outerSize[axis]).assumeSorted.lowerBound(p[axis]).length; //drop cells on top
+      sc = sc[lowerCnt..$];
+      if(sc.length){
+        const higherCnt = sc.map!(c => c.outerPos[axis]).assumeSorted.upperBound(p[axis]).length; //drop cells on bottom
+        sc = sc[0..$-higherCnt];
+      }
+    }
+    return sc;
+  }
+
+  Cell[] sortedSubCellsAroundX(vec2 p){ return sortedSubCellsAroundAxis!0(p); }
+  Cell[] sortedSubCellsAroundY(vec2 p){ return sortedSubCellsAroundAxis!1(p); }
+
+  Cell[] internal_hitTest_filteredSubCells(vec2 p){ //note: for column, it only needs to filter the y direction because this is just an optimization.
+    //slow linear filter
+    return subCells.filter!(c => c.outerBounds.contains!"[)"(p)).array; //otp: what if I unroll it to 4 comparations?
+  }
+
   override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     if(super.internal_hitTest(mouse, ofs)){
-      flags.hovered = true;
+      //flags.hovered = true; //note: can't update 'hovered' flag here because hitTest does NOT evaluate the WHOLE tree.
 
       ofs += innerPos;
 
@@ -2227,10 +2254,10 @@ class Container : Cell { // Container ////////////////////////////////////
 
       ofs -= getScrollOffset;
 
-      foreach_reverse(sc; subCells) if(sc.internal_hitTest(mouse, ofs)) return true; //recursive
+      foreach_reverse(sc; internal_hitTest_filteredSubCells(mouse-ofs)) if(sc.internal_hitTest(mouse, ofs)) return true; //recursive
       return true;
     }else{
-      flags.hovered = false;
+      //flags.hovered = false;
       return false;
     }
   }
@@ -2650,6 +2677,15 @@ class Row : Container { // Row ////////////////////////////////////
     drawTextEditorOverlay(dr, this);
   }
 
+
+  override Cell[] internal_hitTest_filteredSubCells(vec2 p){
+    if(flags.wordWrap){
+      return super.internal_hitTest_filteredSubCells(p); //todo: wrapped filter support
+    }else{
+      return sortedSubCellsAroundX(p);
+    }
+  }
+
 }
 
 class Column : Container { // Column ////////////////////////////////////
@@ -2727,6 +2763,11 @@ class Column : Container { // Column ////////////////////////////////////
         }
       }
     }
+  }
+
+  override Cell[] internal_hitTest_filteredSubCells(vec2 p){
+    return sortedSubCellsAroundY(p);
+    //note: no wrapping in  columns (yet)
   }
 
 }
@@ -2853,10 +2894,10 @@ class SelectionManager(T : Cell){ // SelectionManager //////////////////////////
       if(mouseOp == MouseOp.rectSelect && inputChanged){
         foreach(a; items) if(dragBounds.contains!"[]"(getBounds(a))){
           final switch(selectOp){
-            case SelectOp.add, SelectOp.clearAdd : a.isSelected = true ; break;
-            case SelectOp.sub                    : a.isSelected = false; break;
+            case SelectOp.add, SelectOp.clearAdd : a.isSelected = true ;          break;
+            case SelectOp.sub                    : a.isSelected = false;          break;
             case SelectOp.toggle                 : a.isSelected = !a.oldSelected; break;
-            case SelectOp.none                   : break;
+            case SelectOp.none                   :                                break;
           }
         }else{
           a.isSelected = (selectOp == SelectOp.clearAdd) ? false : a.oldSelected;

@@ -26,16 +26,16 @@ public import std.functional; //extends: lessThan, greaterThan, not
 
 // import locally used things.     //must not import het.utils to keep it simle and standalone
 import std.format : format;
-import std.conv : text, stdto = to;
-import std.uni : toLower;
+import std.conv   : text, stdto = to;
+import std.uni    : toLower;
 import std.string : strip;
-import std.array : replicate, split, replace, join, array;
-import std.range : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro;
+import std.array  : replicate, split, replace, join, array;
+import std.range  : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro;
 import std.traits : Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType, ReturnType;
-import std.meta : AliasSeq;
+import std.meta   : AliasSeq;
 
 import std.exception : enforce;
-import std.stdio : write, writeln;
+import std.stdio     : write, writeln;
 
 
 // utility stuff ////////////////////////////////////////////////////
@@ -53,7 +53,7 @@ string text_precise(T)(in T a){
   static if(isFloatingPoint!T){
     //note: Dlang .dig property reports less digits than actually needed to cover all mantissa bits.
     static if(is(Unqual!T == float )) return a.format!"%.8g";
-                                 else return a.format!"%.17g";
+    else                              return a.format!"%.17g";
   }else static if(isIntegral!T){
     return a.text;
   }else static assert(0, "invalid type");
@@ -61,12 +61,12 @@ string text_precise(T)(in T a){
 
 private enum swizzleRegs = ["xyzw", "rgba", "stpq"];
 
-private enum ComponentTypePrefix(CT) = is(CT==float ) ? "" :  //rgb and rgba handled specially
-                                       is(CT==double) ? "d" :
-                                       is(CT==bool  ) ? "b" :
-                                       is(CT==int   ) ? "i" :
-                                       is(CT==uint  ) ? "u" :
-                                       "UNDEF";
+private enum ComponentTypePrefix(CT) =  is(CT==float  ) ? ""  :  //rgb and rgba handled specially
+                                        is(CT==double ) ? "d" :
+                                        is(CT==bool   ) ? "b" :
+                                        is(CT==int    ) ? "i" :
+                                        is(CT==uint   ) ? "u" :
+                                        "UNDEF";
 
 private bool validRvalueSwizzle(string def){
   if(def.startsWith('_')) return validRvalueSwizzle(def[1..$]); //_ is allowed at the start because of the constants 0 and 1
@@ -168,11 +168,11 @@ if(N.inRange(2, 4))
 {
   alias VectorType = typeof(this);
   alias ComponentType = CT;
-  enum VectorTypeName = is(VectorType==Vector!(ubyte, 2)) ? "RG" :
-                        is(VectorType==Vector!(ubyte, 3)) ? "RGB" :
-                        is(VectorType==Vector!(ubyte, 4)) ? "RGBA" :
-                        ComponentTypePrefix!CT != "UNDEF" ? ComponentTypePrefix!CT ~ "vec" ~ N.stringof
-                                                          : VectorType.stringof;
+  enum VectorTypeName =  is(VectorType==Vector!(ubyte, 2))  ? "RG"   :
+                         is(VectorType==Vector!(ubyte, 3))  ? "RGB"  :
+                         is(VectorType==Vector!(ubyte, 4))  ? "RGBA" :
+                         ComponentTypePrefix!CT != "UNDEF"  ? ComponentTypePrefix!CT ~ "vec" ~ N.stringof
+                                                            : VectorType.stringof;
 
   static if(isFloatingPoint!CT){
     CT[N] components = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
@@ -747,18 +747,18 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
 /+
 
         unittest {
-            assert(mat4.xrotation(0).matrix == [[1.0f, 0.0f, 0.0f, 0.0f],
-                                                [0.0f, 1.0f, -0.0f, 0.0f],
-                                                [0.0f, 0.0f, 1.0f, 0.0f],
-                                                [0.0f, 0.0f, 0.0f, 1.0f]]);
-            assert(mat4.yrotation(0).matrix == [[1.0f, 0.0f, 0.0f, 0.0f],
-                                                [0.0f, 1.0f, 0.0f, 0.0f],
-                                                [0.0f, 0.0f, 1.0f, 0.0f],
-                                                [0.0f, 0.0f, 0.0f, 1.0f]]);
-            assert(mat4.zrotation(0).matrix == [[1.0f, -0.0f, 0.0f, 0.0f],
-                                                [0.0f, 1.0f, 0.0f, 0.0f],
-                                                [0.0f, 0.0f, 1.0f, 0.0f],
-                                                [0.0f, 0.0f, 0.0f, 1.0f]]);
+            assert(mat4.xrotation(0).matrix == [ [1.0f, 0.0f, 0.0f, 0.0f],
+                                                 [0.0f, 1.0f, 0.0f, 0.0f],
+                                                 [0.0f, 0.0f, 1.0f, 0.0f],
+                                                 [0.0f, 0.0f, 0.0f, 1.0f] ]);
+            assert(mat4.yrotation(0).matrix == [ [1.0f, 0.0f, 0.0f, 0.0f],
+                                                 [0.0f, 1.0f, 0.0f, 0.0f],
+                                                 [0.0f, 0.0f, 1.0f, 0.0f],
+                                                 [0.0f, 0.0f, 0.0f, 1.0f] ]);
+            assert(mat4.zrotation(0).matrix == [ [1.0f, 0.0f, 0.0f, 0.0f],
+                                                 [0.0f, 1.0f, 0.0f, 0.0f],
+                                                 [0.0f, 0.0f, 1.0f, 0.0f],
+                                                 [0.0f, 0.0f, 0.0f, 1.0f] ]);
             mat4 xro = mat4.identity;
             xro.rotatex(0);
             assert(mat4.xrotation(0).matrix == xro.matrix);
@@ -819,10 +819,10 @@ if(N.inRange(2, 4) && M.inRange(2, 4)){
                        4.0f, 5.0f, 6.0f, 7.0f,
                        8.0f, 9.0f, 10.0f, 11.0f,
                        12.0f, 13.0f, 14.0f, 1.0f);
-        assert(m4.get_translation().matrix == [[1.0f, 0.0f, 0.0f, 3.0f],
-                                   [0.0f, 1.0f, 0.0f, 7.0f],
-                                   [0.0f, 0.0f, 1.0f, 11.0f],
-                                   [0.0f, 0.0f, 0.0f, 1.0f]]);
+        assert(m4.get_translation().matrix == [ [1.0f, 0.0f, 0.0f,  3.0f],
+                                                [0.0f, 1.0f, 0.0f,  7.0f],
+                                                [0.0f, 0.0f, 1.0f, 11.0f],
+                                                [0.0f, 0.0f, 0.0f,  1.0f]]);
         m4.set_translation(mat4.identity);
         assert(mat4.identity.matrix == m4.get_translation().matrix);
         m4.set_translation([3.0f, 7.0f, 11.0f]);
@@ -1633,9 +1633,9 @@ auto cross(A, B)(in A a, in B b) {
     return cross(a.xy0, b.xy0);
   }else static if(len==3){
     alias V = Vector!(CommonScalarType!(A, B), 3);
-    return V(  a.y*b.z - b.y*a.z,
-               a.z*b.x - b.z*a.x,
-               a.x*b.y - b.x*a.y);
+    return V( a.y*b.z - b.y*a.z,
+              a.z*b.x - b.z*a.x,
+              a.x*b.y - b.x*a.y);
   }else static assert(0, "Cross product needs at least on 2D or 3D vector argument.");
 }
 

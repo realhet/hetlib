@@ -27,12 +27,12 @@ const CompilerVersion = 100;
 
 enum TokenKind {unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat};
 
-@trusted string tokenize(string fileName, string text, out Token[] tokens) //returns error of any
+@trusted string tokenize(string fileName, string text, out Token[] tokens, WhiteSpaceStats* whiteSpaceStats=null) //returns error of any
 {
-  auto t = scoped!Tokenizer;  return t.tokenize(fileName, text, tokens);
+  auto t = scoped!Tokenizer;  return t.tokenize(fileName, text, tokens, whiteSpaceStats);
 }
 
-Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen)
+deprecated("use SourceCode class") Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen)
 {
   Token[] tokens;
   tokenize("", src, tokens);    //todo: nem jo, nincs error visszaadas
@@ -67,6 +67,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
   ubyte[] syntax;
   ushort[] hierarchy;
   string[int] bigComments;
+  WhiteSpaceStats whiteSpaceStats;
 
   void checkConsistency(){
 //    enforce(text.length == lines.map!"a.length".sum + (max(lines.length.to!int-1, 0)), "text <> lines");
@@ -80,6 +81,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
     syntax.clear;
     hierarchy.clear;
     bigComments.clear;
+    whiteSpaceStats = WhiteSpaceStats.init;
   }
 
   void foreachLine(void delegate(int idx, string line, ubyte[] syntax) callBack){
@@ -167,7 +169,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
 
     hierarchy.length = syntax.length = text.length;
 
-    error = tokenize(file.fullName, text, tokens);
+    error = tokenize(file.fullName, text, tokens, &whiteSpaceStats);
 
     if(error == ""){
       auto bigc = new char[0x10000];
@@ -621,6 +623,32 @@ auto getLeadingAttributesAndComments(Token[] tokens){
   return orig[0..$-tokens.length];
 }
 
+struct WhiteSpaceStats{
+  int tabCnt;
+  int spaceCnt0, spaceCnt1, spaceCnt2, spaceCnt4, spaceCnt8, spaceCntOther;
+
+  private int lastSpaceCnt;
+
+  void addSpaceCnt(int spaceCnt){
+    const actDelta = abs(spaceCnt-lastSpaceCnt);
+    lastSpaceCnt = spaceCnt;
+    switch(actDelta){
+      case 0  : spaceCnt0++; break;
+      case 1  : spaceCnt1++; break;
+      case 2  : spaceCnt2++; break;
+      case 4  : spaceCnt4++; break;
+      case 8  : spaceCnt8++; break;
+      default : spaceCntOther++; break;
+    }
+  }
+
+  int detectIndentSize(int defaultSpaceCnt=4){
+    const idx = [tabCnt, spaceCnt1, spaceCnt2, spaceCnt4, spaceCnt8].maxIndex;
+    if(idx==0) return defaultSpaceCnt;
+    else       return 1 << (idx-1).to!int;
+  }
+}
+
 
 class Tokenizer{ // Tokenizer ///////////////////////////////
 public:
@@ -630,6 +658,8 @@ public:
   dchar ch; //actual character
   int skipCh; //size oh ch (1..4)
   Token[] res;   //should rename to tokens
+
+  WhiteSpaceStats whiteSpaceStats;
 
   void error(string s){ throw new Exception(format("%s(%d:%d): Tokenizer error: %s", fileName, line, posInLine, s)); }
 
@@ -757,6 +787,12 @@ public:
     }
   }
 
+  void skipSpacesAfterNewLine(){
+    int spaceCnt=0;
+    while(ch==' '){ fetch; spaceCnt++; };
+    whiteSpaceStats.addSpaceCnt(spaceCnt);
+  }
+
   bool skipWhiteSpaceAndComments() //returns true if eof
   { //todo: __EOF__ handling
     while(1){
@@ -767,28 +803,22 @@ public:
         case '\x00': case '\x1A':{ //EOF
           return true;
         }
-        case ' ': case '\x09': case '\x0B': case '\x0C':{ //whitespace
+        case '\x09':{ //tab
           fetch;
+          whiteSpaceStats.tabCnt++;
           break;
         }
-        case '\r':{ //NewLine1
-          fetch;
-          if(ch=='\n') fetch;
-          incLine;
-          break;
-        }
-        case '\n':{ //NewLine2
-          fetch;
-          if(ch=='\r') fetch;
-          incLine;
-          break;
-        }
+        case ' ', '\x0B', '\x0C': fetch; break; //whitespace
+
+        case '\r': /+NewLine1+/ fetch;  if(ch=='\n') fetch;  incLine;  skipSpacesAfterNewLine;  break;
+        case '\n': /+NewLine2+/ fetch;  if(ch=='\r') fetch;  incLine;  skipSpacesAfterNewLine;  break;
+
         case '/':{ //comment
           switch(peek){
             default: return false;
-            case '/': newToken(TokenKind.comment); skipLineComment  ; finalizeToken; break;
-            case '*': newToken(TokenKind.comment); skipBlockComment ; finalizeToken; break;
-            case '+': newToken(TokenKind.comment); skipNestedComment; finalizeToken; break;
+            case '/': newToken(TokenKind.comment);  skipLineComment;   finalizeToken; break;
+            case '*': newToken(TokenKind.comment);  skipBlockComment;  finalizeToken; break;
+            case '+': newToken(TokenKind.comment);  skipNestedComment; finalizeToken; break;
           }
           break;
         }
@@ -1218,7 +1248,7 @@ public:
 
 public:
   //returns the error or ""
-  string tokenize(in string fileName, in string text, out Token[] tokens){
+  string tokenize(in string fileName, in string text, out Token[] tokens, WhiteSpaceStats* whiteSpaceStats = null){
     auto enc = encodingOf(text);
     enforce(enc==TextEncoding.UTF8, "Tokenizer only works on UTF8 input. ("~enc.text~" detected)");
 
@@ -1285,6 +1315,8 @@ public:
     if(res.length) res[$-1].postWhite = pos - res[$-1].endPos;
 
     tokens = res;
+
+    if(whiteSpaceStats) *whiteSpaceStats = this.whiteSpaceStats;
 
     return errorStr;
   }
