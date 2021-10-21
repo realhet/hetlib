@@ -87,6 +87,7 @@ auto textColorFor(RGB c){
   return c.l>=128 ? clBlack : clWhite;
 }
 
+auto blackOrWhiteFor(RGB c){ return textColorFor(c); }
 
 
 // RGB formats ////////////////////////////////////////////////

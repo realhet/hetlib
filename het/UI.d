@@ -1038,6 +1038,8 @@ struct im{ static:
         textStyle.fontColor = a;
       }else static if(is(t == SyntaxKind)){
         textStyle.applySyntax(a);
+      }else static if(__traits(compiles, a())){
+        a();
       }else /*static if(isSomeString!t)*/{   //general case, handles as string
 
         /* mar nem ez tordel, hanem a Row.
@@ -1320,15 +1322,15 @@ struct im{ static:
           }
 
           with(het.inputs){
-            if(KeyCombo("LMB"      ).hold ) cmdQueue ~= EditCmd(cMouse, localMouse);
-            if(KeyCombo("Backspace").typed) cmdQueue ~= EditCmd(cDeleteBack       );
-            if(KeyCombo("Del"      ).typed) cmdQueue ~= EditCmd(cDelete           );
-            if(KeyCombo("Left"     ).typed) cmdQueue ~= EditCmd(cLeft             );
-            if(KeyCombo("Right"    ).typed) cmdQueue ~= EditCmd(cRight            );
-            if(KeyCombo("Home"     ).typed) cmdQueue ~= EditCmd(cHome             ); //todo: When the edit is focused, don't let the view to zoom home. Problem: Editor has a priority here, but the view is checked first.
-            if(KeyCombo("End"      ).typed) cmdQueue ~= EditCmd(cEnd              );
-            if(KeyCombo("Up"       ).typed) cmdQueue ~= EditCmd(cUp               );
-            if(KeyCombo("Down"     ).typed) cmdQueue ~= EditCmd(cDown             );
+            if(KeyCombo("LMB"       ).hold ) cmdQueue ~= EditCmd(cMouse, localMouse );
+            if(KeyCombo("Backspace" ).typed) cmdQueue ~= EditCmd(cDeleteBack        );
+            if(KeyCombo("Del"       ).typed) cmdQueue ~= EditCmd(cDelete            );
+            if(KeyCombo("Left"      ).typed) cmdQueue ~= EditCmd(cLeft              );
+            if(KeyCombo("Right"     ).typed) cmdQueue ~= EditCmd(cRight             );
+            if(KeyCombo("Home"      ).typed) cmdQueue ~= EditCmd(cHome              ); //todo: When the edit is focused, don't let the view to zoom home. Problem: Editor has a priority here, but the view is checked first.
+            if(KeyCombo("End"       ).typed) cmdQueue ~= EditCmd(cEnd               );
+            if(KeyCombo("Up"        ).typed) cmdQueue ~= EditCmd(cUp                );
+            if(KeyCombo("Down"      ).typed) cmdQueue ~= EditCmd(cDown              );
 
             if(KeyCombo("Ctrl+V Shift+Ins").typed){
               cmdQueue ~= EditCmd(cInsert, clipBoard.text);

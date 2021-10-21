@@ -1585,8 +1585,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       }
 
       // border
-      if(isFont)
-        finalColor = applyBorder(finalColor, originalTc, 4);
+      //if(isFont) finalColor = applyBorder(finalColor, originalTc, 4);
 
       return finalColor;
     }
