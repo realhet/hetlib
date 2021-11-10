@@ -6075,7 +6075,7 @@ private{
 }
 
 struct Date{
-  private int raw;
+  /+private+/ int raw;
   this(int year, int month, int day){
     double a = encodeDate(year, month, day);
     if(isnan(a)) raw = 0;
@@ -6114,6 +6114,8 @@ struct Date{
 
   //todo: make more operator overloads for date/time/dateTime
   int opBinary(string op)(Date b) if(op=="-") { return raw - b.raw; }
+
+  int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
 }
 
 struct Time{
@@ -6342,6 +6344,8 @@ struct DateTime{
   ulong toNanoSeconds() const{ return raw.isnan ? 0 : cast(ulong)(raw*(24*60*60*1e9)); }
 
   Time time() const{ Time t; t.raw = raw.fract; return t; }
+
+  int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
 }
 
 Time     time () { return Time    .current; } //0 = midnight  1 = 24hours

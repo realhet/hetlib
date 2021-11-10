@@ -1719,6 +1719,9 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   }
 
   void glDraw(in vec2 center, float scale, in vec2 translate=vec2(0)) {
+
+    //static if(1){ const T0 = QPS; scope(exit) print("DR", (QPS-T0)*1000); }
+
     enforce(stack.empty, "Drawing.glDraw() matrix stack is not empty.  It has %d items.".format(stack.length));
     enforce(clipBoundsStack.empty, "Drawing.glDraw() clipBounds stack is not empty.  It has %d items.".format(clipBoundsStack.length));
 

@@ -105,9 +105,15 @@ struct im{ static:
   //GUI area that tracks PanelPosition changes
   bounds2 clientArea;
 
+  enum doTiming = false;
+
+  static if(doTiming){
+    double tBeginFrame, tEndFrame, tDraw;
+  }
+
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(TargetSurface[2] targetSurfaces){ //called from mainform.update
-    //const T0 = QPS; scope(exit) print("im.beginFrame", QPS-T0);
+    static if(doTiming){ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
 
     enforce(!inFrame, "im.beginFrame() already called.");
 
@@ -148,7 +154,7 @@ struct im{ static:
   }
 
   void _endFrame(){ //called from end of update
-    //const T0 = QPS; scope(exit) print("im.endFrame", QPS-T0);
+    static if(doTiming){ const T0 = QPS; scope(exit) tEndFrame = QPS-T0; }
 
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
     enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
@@ -222,7 +228,7 @@ struct im{ static:
   Drawing drVisualizeHitStack;
 
   void _drawFrame(string restrict="")(){
-    //const T0 = QPS; scope(exit) print("im.draw", QPS-T0);
+    static if(doTiming){ const T0 = QPS; scope(exit){ tDraw = QPS-T0; print(format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"(tBeginFrame*1000, tEndFrame*1000, tDraw*1000));} }
 
     static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
@@ -2923,7 +2929,9 @@ struct ResourceMonitor{
 
     virtualFileCount, allVirtualFileSize, residentVirtualFileSize,
 
-    UPS, FPS, TPS, VPS;
+    UPS, FPS, TPS, VPS,
+
+    gcUsed, gcFree, gcAll;
 
   void updateInternal(void delegate() onCollectData){
     immutable unit = 24*60*60;
@@ -2971,11 +2979,18 @@ void update(ref ResourceMonitor rm){ with(rm){
 
     TPS.act[0] = het.win.TPS;
     VPS.act[0] = het.win.VPS;
+
+    import core.memory : GC;
+    with(GC.stats){
+      gcUsed.act[0] = usedSize;
+      gcFree.act[0] = freeSize;
+      gcAll.act[0] = usedSize+freeSize;
+    }
   });
 }}
 
 
-@UI void ui(ref ResourceMonitor m, int graphWidth){ with(im) with(m){
+@UI void ui(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 
   const
     clTexturePool = RGB(255, 180, 40),
@@ -2991,7 +3006,10 @@ void update(ref ResourceMonitor rm){ with(rm){
     clFPS         = RGB(255, 40, 180),
 
     clTPS         = RGB(40,  80, 255),
-    clVPS         = RGB(40, 255,  80);
+    clVPS         = RGB(40, 255,  80),
+
+    clGcUsed      = RGB(120, 180, 40),
+    clGcAll       = RGB(40, 220, 120);
 
   static int timeIdx = 0;
   int gridXStepSize = Item.N/(timeIdx==2 ? 10 : 5);
@@ -3093,6 +3111,16 @@ void update(ref ResourceMonitor rm){ with(rm){
                   Data(VPS.history[timeIdx][], clVPS)], gridXStepSize);
   }
 
+  void GCGraph(){
+    Row({
+      Text("GC memory");                   Flex;
+      Legend("Used", gcUsed.val, clGcUsed, "B");  Text("   ");
+      Legend("All" , gcAll.val,  clGcAll , "B");
+    });
+    Graph("GC", [Data(gcUsed.history[timeIdx][], clGcUsed),
+                 Data(gcAll .history[timeIdx][], clGcAll)], gridXStepSize);
+  }
+
   void SelectTimeIdx(ref int t){
     Row(HAlign.right, {
       Text("Time step");                ComboBox(timeIdx, ResourceMonitor.Item.timeStepNames , { width = fh*4; });
@@ -3110,6 +3138,7 @@ void update(ref ResourceMonitor rm){ with(rm){
     TextureCacheGraph;                  Spacer;
     TPSGraph;                           Spacer;
     FPSGraph;                           Spacer;
+    GCGraph;                            Spacer;
     SelectTimeIdx(timeIdx);
   });
 

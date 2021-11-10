@@ -585,8 +585,8 @@ public:
       case WM_DESTROY   : this.destroy; if(isMain) PostQuitMessage(0); return 0;
 
       case WM_MyStartup : if(isMain) SetTimer(hwnd, 999, 10, null); return 0; //this is a good time to launch the timer. Called by a delayed PostMessage
-      case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; return 0;
-      case WM_SIZE      : if(!dontUpdate) internalUpdate; InvalidateRect(hwnd, null, 0); return 0;
+      case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; if(chkClear(pendingInvalidate)) RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); return 0;
+      case WM_SIZE      : if(!dontUpdate) internalUpdate; RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); return 0;
 
 
       case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
@@ -638,7 +638,13 @@ public:
   auto screenToClient(T)(in T p)   { return p-screenPos; }
   auto clientToScreen(T)(in T p)   { return p+screenPos; }
 
-  void invalidate()     { if(chkSet(pendingInvalidate)) { /*auto r = clientRect;*/ InvalidateRect(hwnd, null, 0); } }
+  void invalidate(){
+    if(chkSet(pendingInvalidate)) {
+      /*auto r = clientRect;*/
+      //InvalidateRect(hwnd, null, 0);
+      //RedrawWindow(hwnd, null, null, RDW_INVALIDATE); //https://stackoverflow.com/questions/2325894/difference-between-invalidaterect-and-redrawwindow
+    }
+  }
 
   private string lastCaption = "\0";
   @property string caption() {
@@ -723,6 +729,8 @@ public:
   protected void onUpdateUIEndFrame() { }
 
   private void updateWithActionManager() {
+//const A = QPS;
+//scope(exit) print((QPS-A)*1000);
     //this calls the update on every window. But right now it is only for one window.
 
     //timing
@@ -735,10 +743,10 @@ public:
     scope(exit) inputChars = "";
 
     //make openGL accessible
-    onWglMakeCurrent(true);   scope(exit){ onWglMakeCurrent(false); }
+    onWglMakeCurrent(true);
 
     //prepare/finalize the old, immediate mode keyboard 'actions' interface (inputs.d)
-    actions.beginUpdate;      scope(exit){ if(actions.changed) invalidate;  actions.endUpdate; }
+    actions.beginUpdate;
 
     //update the local mouse struct
     onMouseUpdate;
@@ -748,7 +756,7 @@ public:
 
     //UI integration: prepare and finalize the IMGUI for every frame
     onUpdateUIBeginFrame;
-    scope(exit) onUpdateUIEndFrame;
+
 
     //call the user overridden update method for the window
     try{
@@ -756,9 +764,17 @@ public:
     }catch(Throwable t){
       showException(t);
     }
+
+    onUpdateUIEndFrame;
+
+    { if(actions.changed) invalidate;  actions.endUpdate; }
+
+    onWglMakeCurrent(false);
   }
 
   private final void internalUpdate() {
+    //static if(1){ const T0 = QPS; scope(exit) print("IU", (QPS-T0)*1000); }
+
     enforce(isMain, "Window.internalUpdate() called from non main window.");
 
     //lock
