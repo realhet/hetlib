@@ -95,6 +95,8 @@ public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
 public import std.typecons: Typedef;
 public import std.path: baseName;
 public import std.exception : collectException, ifThrown;
+public import core.time;
+
 
 import std.encoding : transcode, Windows1252String;
 import std.exception : stdEnforce = enforce;
@@ -2784,9 +2786,73 @@ string camelToCaption(string s){
   return res.join(' ');
 }
 
-void mergeUrlParams(ref string s1, string s2){
+
+struct OrderedAA(K,V) {
+  V[K] _impl;
+  K[] keyOrder;
+
+  void opIndexAssign(V value, K key) {
+    if(key !in _impl) keyOrder ~= key;
+    _impl[key] = value;
+  }
+
+  V opIndex(K key) {
+    return _impl[key];
+  }
+
+  int opApply(int delegate(K,V) dg) {
+    foreach (key; keyOrder)
+      if(dg(key, _impl[key])) return 1;
+    return 0;
+  }
+
+  auto byKeyValue(){
+    return keyOrder.map!(k => tuple!("key", "value")(k, _impl[k]));
+  }
+}
+
+struct UrlParams{
+  string path;
+  OrderedAA!(string, string) params;
+}
+
+UrlParams decodeUrlParams(string url){
+  string path, params; split2(url, "?", path, params);
+
+  auto res = UrlParams(path);
+
+  foreach(s; params.split('&')){
+    string name, value; split2(s, "=", name, value);
+    res.params[urlDecode(name)] = urlDecode(value);
+  }
+
+  return res;
+}
+
+string encodeUrlParams(UrlParams up){
+  string p = up.params.byKeyValue.map!(a => urlEncode(a.key) ~ '=' ~ urlEncode(a.value)).join('&');
+  return up.path ~ (p.length ? '?' ~ p : "");
+}
+
+string overrideUrlParams(string url, string overrides){
+  if(!overrides.canFind('?')) overrides = '?' ~ overrides;
+  auto base = url.decodeUrlParams, ovr = overrides.decodeUrlParams;
+
+  foreach(k, v; ovr.params)
+    base.params[k] = v;
+
+  return encodeUrlParams(base);
+}
+
+string overrideUrlPath(string url, string path){
+  auto a = url.decodeUrlParams;
+  a.path = path;
+  return a.encodeUrlParams;
+}
+
+void mergeUrlParams(ref string s1, string s2){ //used by het.stream.proparray only. Kinda deprecated
   string path1, params1; split2(s1, "?", path1, params1);
-  string path2, params2; split2(s2, "?", path2, params2);
+  string path2, params2; split2(s2, "?", path2, params2); //s2 overrides the path!!!!
 
   enforce(path1.empty || path1==path2);
 
@@ -4450,10 +4516,12 @@ uint hashCombine(uint c1, uint c2)
 
 //! norx /////////////////////////////////////
 
-struct norx(int w/*wordSize*/, int l/*loopCnt*/, int p/*parallelCnt*/)
-if(w.among(32, 64) && l.inRange(1, 63) && p==1)
-{
+alias norx6441 = norx!(64, 4, 1);
+
+struct norx(int w/*wordSize*/, int l/*loopCnt*/, int p/*parallelCnt*/){
 private static:
+  static assert(w.among(32, 64) && l.inRange(1, 63) && p==1);
+
                   //word type         ror offsets
   static if(w==32){ alias T = uint ;  enum sh = [8, 11, 16, 31];  }
   static if(w==64){ alias T = ulong;  enum sh = [8, 19, 40, 63];  }
@@ -6346,6 +6414,13 @@ struct DateTime{
   Time time() const{ Time t; t.raw = raw.fract; return t; }
 
   int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
+
+  DateTime opBinary(string op)(in Duration d) const{
+    DateTime res = this;
+    double r = d.total!"hnsecs" * (1.0/(24*60*60*1e7));
+    mixin("res.raw"~op~"=r;");
+    return res;
+  }
 }
 
 Time     time () { return Time    .current; } //0 = midnight  1 = 24hours
