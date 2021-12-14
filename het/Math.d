@@ -1252,6 +1252,11 @@ bool inRange(V, L, H)(in V value, in L lower, in H higher){
                                         else return all(greaterThanEqual(value, lower)) && all(lessThanEqual(value, higher));
 }
 
+auto enforceRange(V, L, H)(in V value, in L lower, in H higher, string name=""){
+  enforce(inRange(value, lower, higher), format!"Out of range: %s (%s !in [%s, %s])"(name, value, lower, higher));
+  return value;
+}
+
 /// bounds can be unsorted
 bool inRange_sorted(V, L, H)(in V value, in L r1, in H r2){ return inRange(value, min(r1, r2), max(r1, r2)); }
 
