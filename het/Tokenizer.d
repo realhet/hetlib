@@ -152,6 +152,8 @@ class SourceCode{ // SourceCode ///////////////////////////////
   auto getLineSyntax   (int i){ return getLine(i).syntax   ; }
   auto getLineHierarchy(int i){ return getLine(i).hierarchy; }
 
+  this(string text){ this(text, File("")); }
+  this(File file){ this(file.readText(true), file); }
   this(string text, File file){
     //lineOfs = chain([-1], lines.map!"cast(int)a.length".cumulativeFold!"a+b+1").array;
 
@@ -160,9 +162,6 @@ class SourceCode{ // SourceCode ///////////////////////////////
 
     process;
   }
-
-  this(string text){ this(text, File("")); }
-  this(File file){ this(file.readText, file); }
 
   void process(){
     clearResult;
