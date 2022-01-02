@@ -931,7 +931,25 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     textOut(p, lines.splitLines, width, align_, vertFlip);
   }
 
+  void autoSizeText(vec2 p, string s, float aspect=1.0f){
+    auto fh = fontHeight;
+    const baseSize = vec2(textWidth(s), fh);
 
+    const target = fh*aspect;
+    vec2 size = baseSize;
+    while(size.x > target){
+      enum step = .75f;
+      fh *= step;
+      size *= step;
+    }
+
+    const oldFh = fontHeight;
+    fontHeight = fh;
+
+    textOut(p-size/2, s);
+
+    fontHeight = oldFh;
+  }
 
 
 // Draw Bitmap ////////////////////////////////////

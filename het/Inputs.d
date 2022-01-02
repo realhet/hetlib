@@ -61,6 +61,66 @@ void _notifyMouseWheel(float delta) //Must be called from outside, from a Window
   MouseInputHandler.wheelDeltaAccum += delta;
 }
 
+char shiftedKey(char key){
+  switch(key){
+    case 'a':..case'z': return cast(char)(key - 'a' + 'A');
+    case '0':..case'9': return ")!@#$%^&*("[key-'0'];
+    case '`' : return '~';
+    case '-' : return '_';
+    case '=' : return '+';
+    case '[' : return '{';
+    case ']' : return '}';
+    case ';' : return ':';
+    case '\'': return '"';
+    case '\\': return '|';
+    case ',' : return '<';
+    case '.' : return '>';
+    case '/' : return '?';
+    default:   return key;
+  }
+}
+
+char unshiftedKey(char key){
+  switch(key){
+    case 'A':..case'Z': return cast(char)(key - 'A' + 'a');
+
+    case ')': return '0';
+    case '!': return '1';
+    case '@': return '2';
+    case '#': return '3';
+    case '$': return '4';
+    case '%': return '5';
+    case '^': return '6';
+    case '&': return '7';
+    case '*': return '8';
+    case '(': return '9';
+
+    case '~': return '`' ;
+    case '_': return '-' ;
+    case '+': return '=' ;
+    case '{': return '[' ;
+    case '}': return ']' ;
+    case ':': return ';' ;
+    case '"': return '\'';
+    case '|': return '\\';
+    case '<': return ',' ;
+    case '>': return '.' ;
+    case '?': return '/' ;
+    default:   return key;
+  }
+}
+
+string shiftedKey(string s){
+  if(s.length==1) return shiftedKey(s[0]).to!string;
+  return s;
+}
+
+string unshiftedKey(string s){
+  if(s.length==1) return unshiftedKey(s[0]).to!string;
+  return s;
+}
+
+
 /////////////////////////////////////////////////////////////////////////////
 ///  KeyCombo                                                             ///
 /////////////////////////////////////////////////////////////////////////////
@@ -218,7 +278,12 @@ class InputEntry{
 
   bool repeated()const { return repeated_; }
 
+  //private bool retriggered_;
+  //bool retriggered()const { return retriggered_; }
+
   void _updateRepeated(double now){
+    //retriggered_ = value && repeated_; //one frame delay
+
     repeated_ = false;
     if(value){
       if(pressed){
@@ -256,13 +321,15 @@ public:
   InputHandlerBase[string] handlers;
   InputEntry[string] entries;
 
+  KeyboardInputHandler keyboardInputHandler;
+
   this(){
     //add the nullEntry
     nullEntry = new InputEntry(null, InputEntryType.digitalState, "null");
     entries [nullEntry.name] = nullEntry;
 
     //register common handlers
-    registerInputHandler(new KeyboardInputHandler);
+    registerInputHandler(keyboardInputHandler = new KeyboardInputHandler);
     registerInputHandler(new MouseInputHandler);
     registerInputHandler(new PotiInputHandler);
     registerInputHandler(new XInputInputHandler);
@@ -420,6 +487,14 @@ public: //standard stuff
   };
   alias modifiers = keyModifierMask;
 
+  void pressKey(string key, bool press=true){
+    auto kh = keyboardInputHandler;
+    auto vk = enforce(kh.vkOfKey(key), "Inputs.keyPress: Invalid key "~key.quoted);
+    auto sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte;
+    keybd_event(vk, sc, press ? 0 : KEYEVENTF_KEYUP, 0);
+  }
+
+  void releaseKey(string key){ pressKey(key, false); }
 }
 
 
@@ -431,6 +506,17 @@ class KeyboardInputHandler: InputHandlerBase {
 private:
   ubyte[256] keys;
   InputEntry[256] emap;
+
+  //maps to and from virtual keycodes
+  ubyte[string] _nameToVk;
+  string[ubyte] _vkToName;
+
+  void initMaps(){
+    foreach(idx, e; emap)if(e){
+      _nameToVk[e.name] = idx.to!ubyte;
+      _vkToName[idx.to!ubyte] = e.name;
+    }
+  }
 
   InputEntry
     eWin,  //there is no Win = LWin | RWin key on the map, so emulate it.
@@ -561,6 +647,8 @@ public:
     add(VK_NONAME, "VK_NONAME");
     add(VK_PA1, "VK_PA1");
     add(VK_OEM_CLEAR, "VK_OEM_CLEAR");*/
+
+    initMaps;
   }
 
   override void update(){
@@ -590,6 +678,8 @@ public:
 //    foreach(int i; 0..256) if(keys[i]&0x80) write(" ", i); writeln;
   }
 
+  ubyte vkOfKey(string key){ return _nameToVk.get(key, ubyte(0)); }
+  string keyOfVk(ubyte vk){ return _vkToName.get(vk, ""); }
 }
 
 
@@ -1193,6 +1283,11 @@ private:
   InputEntry[16] buttons;
   InputEntry[7] axes;
 
+  InputEntry[15] abxyCombos;
+  int actAbxyState, lastAbxyState, //current and last state of ABXY buttons
+      processedAbxyState, abxyPhase; //latched state after the delay
+  enum abxyDelay = 12; //todo: It is 60 FPS based, not time based
+
   void addButton(int idx, string name){
     enforce(!buttons[idx], "XInputHandler.addButton("~name~") Duplicated idx: "~text(idx));
     auto e = new InputEntry(this, InputEntryType.digitalButton, name);
@@ -1217,6 +1312,14 @@ public:
     addButton(3, "xiRight");  addButton( 6, "xiLS");   addButton( 7, "xiRS");    addButton(15, "xiY");
 
     addAnalog(0, "xiLX"); addAnalog(1, "xiLY");            addAnalog(2, "xiRX"); addAnalog(3, "xiRY");
+
+    //simultaneously pressed combos of ABXY buttons
+    foreach(i; 1..16){
+      const name = "xic" ~ iota(4).map!(a => (1<<a) & i ? "ABXY"[a..a+1] : "").join;
+      auto e = new InputEntry(this, InputEntryType.digitalButton, name);
+      abxyCombos[i-1] = e;
+      entries ~= e;
+    }
   }
 
   override void update(){
@@ -1230,12 +1333,41 @@ public:
     axes[4].value = st.bLeftTrigger*(1.0f/256);
     axes[5].value = st.bRightTrigger*(1.0f/256);
     axes[6].value = axes[5].value-axes[4].value;
+
+    abxyUpdate;
+  }
+
+  private void abxyUpdate(){
+    //update abxy combos
+    lastAbxyState = actAbxyState;
+    actAbxyState = iota(4).map!(a => buttons[12+a].down ? (1<<a) : 0).sum;
+
+    if(!actAbxyState){
+      processedAbxyState = processedAbxyState==0 ? lastAbxyState : 0;
+                         // ^^ this ensures that the smallest clicks are recognised too.
+      abxyPhase = 0;
+    }else{
+      const changed = lastAbxyState!=actAbxyState;
+
+      if(changed || abxyPhase)
+        abxyPhase++;
+
+      if(abxyPhase >= abxyDelay){
+        processedAbxyState = actAbxyState;
+        abxyPhase = 0;
+      }
+    }
+
+    foreach(i; 1..16) abxyCombos[i-1].value =  i==processedAbxyState ? 1 : 0;
+
+    //print(format("%2x %3d %2x", actAbxyState, abxyPhase, processedAbxyState));
+    //writef!"%X"(processedAbxyState);
   }
 
 }
 
 /////////////////////////////////////////////////////////////////////////////
-///  Actions                                                              ///
+///  Actions (deprecated)                                                 ///
 /////////////////////////////////////////////////////////////////////////////
 
 struct Action{  //todo: this is kinda deprecated: the new thing is MenuItem/KeyCombo.
@@ -1487,3 +1619,65 @@ public:
 
 }
 
+
+//! Keyboard/Mouse hooks //////////////////////////////////////////////////////
+
+@("kbd/mouse access") public {
+  //todo: which is faster?   import core.sys.windows.windows;  or
+  import core.sys.windows.windef, core.sys.windows.winuser, core.sys.windows.winbase;
+
+  extern(Windows) LRESULT LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) nothrow
+  {
+    bool log = 1;
+    try{
+      if(wParam==WM_KEYDOWN){
+        auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam;
+        if(log) writeln("down", pKeyBoard.vkCode);
+      }else if(wParam==WM_KEYUP){
+        auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam;
+        if(log) writeln("up", pKeyBoard.vkCode);
+      }else{
+        if(log) writeln("wparam", wParam);
+      }
+
+
+    }catch(Exception){}
+
+    return CallNextHookEx(null, nCode, wParam, lParam);
+  }
+
+  auto installGlobalKeyboardHook(){
+    auto a = SetWindowsHookEx(WH_KEYBOARD_LL, &LowLevelKeyboardProc, GetModuleHandle(null), 0);
+    if(!a) writeln("fail:k0");
+    return a;
+  }
+
+  extern(Windows) LRESULT LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) nothrow
+  {
+    try{
+      bool log = false;
+      const hs = cast(MSLLHOOKSTRUCT*)lParam;
+      if(hs){
+        switch(wParam){
+          case WM_LBUTTONDOWN: break;
+          case WM_LBUTTONUP: break;
+          case WM_MOUSEMOVE: break;
+          case WM_MOUSEWHEEL: break;
+          case WM_RBUTTONDOWN: break;
+          case WM_RBUTTONUP: break;
+          default: break;
+        }
+        if(log) print("mouse:", nCode, wParam, *hs);
+      }
+    }catch(Exception){}
+
+    return CallNextHookEx(null, nCode, wParam, lParam);
+  }
+
+  auto installGlobalMouseHook(){
+    auto a = SetWindowsHookEx(WH_MOUSE_LL, &LowLevelMouseProc, GetModuleHandle(null), 0);
+    if(!a) writeln("fail:k0");
+    return a;
+  }
+
+}
