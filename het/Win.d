@@ -32,6 +32,55 @@ public import core.sys.windows.winuser:
   WS_EX_NOPARENTNOTIFY, WS_EX_OVERLAPPEDWINDOW, WS_EX_PALETTEWINDOW, WS_EX_RIGHT, WS_EX_RIGHTSCROLLBAR, WS_EX_RTLREADING, WS_EX_STATICEDGE,
   WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_EX_WINDOWEDGE;
 
+// window info ////////////////////////////////////////////////////////////
+
+string getWindowText(HWND handle){
+  char[256] buf;
+  auto n = GetWindowTextA(handle, buf.ptr, buf.length);
+  return buf[0..n].dup;
+}
+
+string getClassName(HWND handle){
+  char[256] buf;
+  auto n = GetClassNameA(handle, buf.ptr, buf.length);
+  return buf[0..n].dup;
+}
+
+uint getWindowThreadProcessId(HWND handle){
+  uint pid;
+  GetWindowThreadProcessId(handle, &pid);
+  return pid;
+}
+
+struct WindowInfo{
+  HWND handle;
+  string text, className;
+  uint pid;
+  File file;
+}
+
+auto getWindowInfo(HWND handle){
+  //const t0 = QPS;
+
+  WindowInfo res;
+  res.handle = handle;
+  res.text = getWindowText(handle);
+  res.className = getClassName(handle);
+  res.pid = getWindowThreadProcessId(handle);
+
+  if(res.pid) if(auto hProc = OpenProcess(0x1000/+PROCESS_QUERY_LIMITED_INFORMATION+/, false, res.pid)){
+    char[256] buf;
+    import core.sys.windows.psapi;
+    GetModuleFileNameExA(hProc, null, buf.ptr, buf.length);
+    res.file.fullName = buf.toStr;
+  }
+
+  //print(QPS-t0); // .1 ms
+
+  return res;
+}
+
+
 // windows message decoding //////////////////////////////////////////////
 
 string winMsgToString(uint msg){
