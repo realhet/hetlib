@@ -35,15 +35,15 @@ public import core.sys.windows.winuser:
 // window info ////////////////////////////////////////////////////////////
 
 string getWindowText(HWND handle){
-  char[256] buf;
-  auto n = GetWindowTextA(handle, buf.ptr, buf.length);
-  return buf[0..n].dup;
+  wchar[256] buf;
+  auto n = GetWindowTextW(handle, buf.ptr, buf.length);
+  return buf[0..n].toStr;
 }
 
 string getClassName(HWND handle){
-  char[256] buf;
-  auto n = GetClassNameA(handle, buf.ptr, buf.length);
-  return buf[0..n].dup;
+  wchar[256] buf;
+  auto n = GetClassNameW(handle, buf.ptr, buf.length);
+  return buf[0..n].toStr;
 }
 
 uint getWindowThreadProcessId(HWND handle){
@@ -69,9 +69,9 @@ auto getWindowInfo(HWND handle){
   res.pid = getWindowThreadProcessId(handle);
 
   if(res.pid) if(auto hProc = OpenProcess(0x1000/+PROCESS_QUERY_LIMITED_INFORMATION+/, false, res.pid)){
-    char[256] buf;
+    wchar[256] buf;
     import core.sys.windows.psapi;
-    GetModuleFileNameExA(hProc, null, buf.ptr, buf.length);
+    auto n = GetModuleFileNameExW(hProc, null, buf.ptr, buf.length);
     res.file.fullName = buf.toStr;
   }
 

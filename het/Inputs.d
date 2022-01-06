@@ -487,11 +487,17 @@ public: //standard stuff
   };
   alias modifiers = keyModifierMask;
 
+  void pressKey(ubyte vk, bool press=true){
+    //const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
+    const ek = vk.among(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_INSERT, VK_DELETE) ? KEYEVENTF_EXTENDEDKEY : 0;
+    keybd_event(vk, 0, (press ? 0 : KEYEVENTF_KEYUP) | ek, 0);
+  }
+
+  void releaseKey(ubyte vk){ pressKey(vk, false); }
+
   void pressKey(string key, bool press=true){
-    auto kh = keyboardInputHandler;
-    auto vk = enforce(kh.vkOfKey(key), "Inputs.keyPress: Invalid key "~key.quoted);
-    auto sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte;
-    keybd_event(vk, sc, press ? 0 : KEYEVENTF_KEYUP, 0);
+    auto vk = enforce(keyboardInputHandler.vkOfKey(key), "Inputs.keyPress: Invalid key "~key.quoted);
+    pressKey(vk, press);
   }
 
   void releaseKey(string key){ pressKey(key, false); }
@@ -1285,8 +1291,9 @@ private:
 
   InputEntry[15] abxyCombos;
   int actAbxyState, lastAbxyState, //current and last state of ABXY buttons
-      processedAbxyState, abxyPhase; //latched state after the delay
-  enum abxyDelay = 12; //todo: It is 60 FPS based, not time based
+      processedAbxyState, abxyPhase, //latched state after the delay
+      summedAbxyState; //for small clicks
+  enum abxyDelay = 10; //todo: It is 60 FPS based, not time based
 
   void addButton(int idx, string name){
     enforce(!buttons[idx], "XInputHandler.addButton("~name~") Duplicated idx: "~text(idx));
@@ -1341,10 +1348,12 @@ public:
     //update abxy combos
     lastAbxyState = actAbxyState;
     actAbxyState = iota(4).map!(a => buttons[12+a].down ? (1<<a) : 0).sum;
+    summedAbxyState |= actAbxyState;
 
     if(!actAbxyState){
-      processedAbxyState = processedAbxyState==0 ? lastAbxyState : 0;
+      processedAbxyState = processedAbxyState==0 ? summedAbxyState : 0;
                          // ^^ this ensures that the smallest clicks are recognised too.
+      summedAbxyState = 0;
       abxyPhase = 0;
     }else{
       const changed = lastAbxyState!=actAbxyState;
