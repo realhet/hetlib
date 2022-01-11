@@ -120,6 +120,75 @@ string unshiftedKey(string s){
   return s;
 }
 
+struct ClickDetector{
+
+  enum doubleTicks    = 15,
+       longPressTicks = 30;
+
+  bool pressing, pressed, released;
+  bool clicked, doubleClicked, tripleClicked, nClicked;
+  bool longPressed, longPressing, longClicked;
+  int clickCount;
+
+  uint tPressed, tPressedPrev;
+
+  void update(bool state){
+    //clear all the transitional bits
+    pressed = released = clicked = doubleClicked = tripleClicked = nClicked = longPressed = longClicked = false;
+
+    pressed  =  state && !pressing;
+    released = !state &&  pressing;
+    pressing = state;
+
+    if(pressed){
+      tPressedPrev = tPressed;
+      tPressed = application.tick;
+      if(tPressed-tPressedPrev < doubleTicks){
+        switch(++clickCount){
+          case 1:doubleClicked = true; break;
+          case 2:tripleClicked = true; break;
+          default: nClicked = true;
+        }
+      }else{
+        clickCount = 0;
+      }
+    }else if(released){
+      if(longPressing.chkClear){
+        longClicked = clicked = true;
+      }else{
+        clicked = true;
+      }
+    }
+
+    const pressDuration = pressing ? application.tick-tPressed : 0;
+    enum enableDoubleLongPress = true;
+    if(pressDuration>longPressTicks && (enableDoubleLongPress || clickCount==0)){
+      if(longPressing.chkSet){
+        longPressed = true;
+        clickCount = 0;
+      }
+    }
+  }
+
+
+  string toString() const{
+    return format!"%s%s %s%s %s"(
+      pressing ? "P":"_",
+      pressed ? "+" : clicked?"-": " ",
+      longPressing ? "P":"_",
+      longPressed ? "+" : longClicked?"-": " ",
+      doubleClicked ? "2" : tripleClicked ? "3" : nClicked ? "N" : " "
+    );
+
+/*    bool pressing, pressed, released;
+    bool clicked, fistClicked, doubleClicked, tripleClicked, quadClicked, manyClicked;
+    bool longPressed, longPressing, longClicked;
+    int clickCount;
+
+    uint tPressed, tPressedPrev;*/
+
+  }
+}
 
 /////////////////////////////////////////////////////////////////////////////
 ///  KeyCombo                                                             ///
@@ -307,7 +376,7 @@ class InputHandlerBase{
   this() { }
 }
 
-class InputManager{
+class InputManager{ //! InputManager /////////////////////////////////
 private:
   bool initialized = false;
 
@@ -496,11 +565,14 @@ public: //standard stuff
   void releaseKey(ubyte vk){ pressKey(vk, false); }
 
   void pressKey(string key, bool press=true){
-    auto vk = enforce(keyboardInputHandler.vkOfKey(key), "Inputs.keyPress: Invalid key "~key.quoted);
+    auto vk = enforce(strToVk(key), "Inputs.keyPress: Invalid key "~key.quoted);
     pressKey(vk, press);
   }
 
   void releaseKey(string key){ pressKey(key, false); }
+
+  ubyte strToVk(string key){ return keyboardInputHandler.strToVk(key); }
+  string vkToStr(ubyte vk){ return keyboardInputHandler.vkToStr(vk); }
 }
 
 
@@ -596,7 +668,7 @@ public:
     add(VK_XBUTTON1, "MB4"/+"XB1"+/); add(VK_XBUTTON2, "MB5"/+"XB2"+/); //back, fwd buttons on mouse
 
     //Multimedia
-    add(7                       , "XBox");
+    add(7                       , "XBox"); //what is this?
     add(VK_LAUNCH_MAIL          , "Mail");
     add(VK_LAUNCH_MEDIA_SELECT  , "Media");
     add(VK_LAUNCH_APP1          , "App1");
@@ -684,8 +756,8 @@ public:
 //    foreach(int i; 0..256) if(keys[i]&0x80) write(" ", i); writeln;
   }
 
-  ubyte vkOfKey(string key){ return _nameToVk.get(key, ubyte(0)); }
-  string keyOfVk(ubyte vk){ return _vkToName.get(vk, ""); }
+  ubyte strToVk(string key){ return _nameToVk.get(key, ubyte(0)); }
+  string vkToStr(ubyte vk){ return _vkToName.get(vk, ""); }
 }
 
 
@@ -1288,6 +1360,7 @@ class XInputInputHandler: InputHandlerBase {
 private:
   InputEntry[16] buttons;
   InputEntry[7] axes;
+  InputEntry guideButton;
 
   InputEntry[15] abxyCombos;
   int actAbxyState, lastAbxyState, //current and last state of ABXY buttons
@@ -1311,6 +1384,8 @@ public:
   this(){
     category = "xinput";
 
+    guideButton = new InputEntry(this, InputEntryType.digitalButton, "xiGuide"); entries ~= guideButton;
+
     addAnalog(4, "xiLT", true);                addAnalog(6, "xiT");              addAnalog( 5, "xiRT", true);
     addButton(8, "xiLB");                                                        addButton( 9, "xiRB");
     addButton(0, "xiUp");     addButton( 5, "xiBack"); addButton( 4, "xiStart"); addButton(12, "xiA");
@@ -1331,6 +1406,44 @@ public:
 
   override void update(){
     auto st = XInput.getState;
+
+    //this hack gets the guide button state.
+    bool guideButtonState;
+    static if(1){
+      //todo: guide button poller: https://forums.tigsource.com/index.php?topic=26792.0
+        //LoadLibrary("C:/Windows/System32/xinput1_3.dll");
+        //Get the address of ordinal 100.
+      struct SecretStruct{
+        uint eventCount;
+        ushort buttons;
+  //        unsigned short up:1, down:1, left:1, right:1, start:1, back:1, l3:1, r3:1,
+  //                           lButton:1, rButton:1, guideButton:1, unknown:1, aButton:1,
+  //                           bButton:1, xButton:1, yButton:1; // button state bitfield
+        ubyte lTrigger;  //Left Trigger
+        ubyte rTrigger;  //Right Trigger
+        short lJoyY;  //Left Joystick Y
+        short lJoyx;  //Left Joystick X
+        short rJoyY;  //Right Joystick Y
+        short rJoyX;  //Right Joystick X
+      }
+
+      static bool guideHackTried;
+      static extern(C) int function(int, ref SecretStruct) guideHackFunct;
+      if(guideHackTried.chkSet){
+        auto lib = loadLibrary("xinput1_3.dll", false);
+        if(lib) getProcAddress(lib, 100, guideHackFunct, false);
+      }
+
+      if(guideHackFunct !is null){
+        SecretStruct sc;
+        if(guideHackFunct(0, sc)==0) //only 10us
+          guideButtonState = (sc.buttons & 0x400)!=0;
+      }
+    }
+
+    //todo: get all the states from xinput1_3, not just the guide button
+
+    guideButton.value = guideButtonState ? 1 : 0;
 
     foreach(int idx, e; buttons) if(e) e.value = (st.wButtons>>idx)&1;
     axes[0].value = st.sThumbLX*(1.0f/32768);

@@ -1353,7 +1353,7 @@ auto makeArray3(T, size_t N, size_t M, size_t O, T val)()
 
 //todo: DIDE fails when opening object.d. It should know that's a system module.
 
-inout(V) get(K, V)(inout(V[K]) aa, K key){
+/*inout(*/V/*)*/ get(K, V)(/*inout(*/V[K]/*)*/ aa, K key){
   return object.get(aa, key, V.init); /+this is object.get()+/
 }
 
@@ -6854,10 +6854,16 @@ auto loadLibrary(File fn, bool mustLoad = true){
   return loadLibrary(fn.fullName, mustLoad);
 }
 
-void getProcAddress(T)(HMODULE hModule, const string name, ref T func, bool mustSucceed = true)
+void getProcAddress(T)(HMODULE hModule, string name, ref T func, bool mustSucceed = true)
 {
   func = cast(T)GetProcAddress(hModule, toStringz(name));
   if(mustSucceed) enforce(func, "getProcAddress() fail: "~name);
+}
+
+void getProcAddress(T)(HMODULE hModule, size_t idx, ref T func, bool mustSucceed = true)
+{
+  func = cast(T)GetProcAddress(hModule, cast(char*)idx);
+  if(mustSucceed) enforce(func, "getProcAddress() fail: idx("~idx.text~")");
 }
 
 string genLoadLibraryFuncts(T, alias hMod = "hModule", alias prefix=T.stringof ~ "_")(){
