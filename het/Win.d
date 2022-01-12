@@ -670,7 +670,7 @@ public:
   @property auto clientSize() { return clientBounds.size; }
   @property void clientSize(in ivec2 newSize){
     auto r = RECT(0, 0, newSize.x, newSize.y);
-    AdjustWindowRect(&r, WS_OVERLAPPEDWINDOW, false); //todo: popup window
+    AdjustWindowRect(&r, getWindowStyle, false);
 
     auto adjustedSize = ivec2(r.right-r.left, r.bottom-r.top);
     SetWindowPos(hwnd, null, 0, 0, adjustedSize.x, adjustedSize.y, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW);

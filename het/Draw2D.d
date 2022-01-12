@@ -1909,7 +1909,7 @@ static:
 
   float textWidth (float scale, bool monoSpace, string text) {
     if(monoSpace) return text.length*fontMonoWidth                              *scale;
-             else return text.map!(ch => charMap[cast(int)ch].gfx.width).sum    *scale;
+             else return text.map!(ch => charMap[(cast(int)ch).clamp(0,255)].gfx.width).sum    *scale;
   }
 
   float textHeight(float scale, string text) { return fontHeight*scale; }

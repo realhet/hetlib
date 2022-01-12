@@ -122,7 +122,7 @@ string unshiftedKey(string s){
 
 struct ClickDetector{
 
-  enum doubleTicks    = 15,
+  enum doubleTicks    = 15,   //todo: use winuser.GetDoubleClickTime()
        longPressTicks = 30;
 
   bool pressing, pressed, released;
@@ -143,7 +143,7 @@ struct ClickDetector{
     if(pressed){
       tPressedPrev = tPressed;
       tPressed = application.tick;
-      if(tPressed-tPressedPrev < doubleTicks){
+      if(tPressed-tPressedPrev <= doubleTicks){
         switch(++clickCount){
           case 1:doubleClicked = true; break;
           case 2:tripleClicked = true; break;
@@ -156,7 +156,7 @@ struct ClickDetector{
       if(longPressing.chkClear){
         longClicked = clicked = true;
       }else{
-        clicked = true;
+        if(clickCount==0) clicked = true;
       }
     }
 
@@ -168,6 +168,8 @@ struct ClickDetector{
         clickCount = 0;
       }
     }
+
+    if(application.tick-tPressed > doubleTicks) clickCount = 0;
   }
 
 
@@ -573,6 +575,33 @@ public: //standard stuff
 
   ubyte strToVk(string key){ return keyboardInputHandler.strToVk(key); }
   string vkToStr(ubyte vk){ return keyboardInputHandler.vkToStr(vk); }
+
+  string vkToUni(ubyte vk, Flag!"shift" shift, Flag!"altGr" altGr){
+    if(!vk) return "";
+    static ubyte[256] keymap = ubyte(0).repeat(256).array;
+
+    keymap[VK_SHIFT  ] = shift ? 0xFF : 0;
+    keymap[VK_CONTROL] = altGr ? 0xff : 0;
+    keymap[VK_MENU   ] = altGr ? 0xff : 0;
+
+    wchar[32] buf;
+    const res = ToUnicode(vk, 0, keymap.ptr, buf.ptr, buf.length, 0);
+    if(res!=1) return "";//"\uFFFD";
+    return buf.toStr;
+  }
+
+  string vkToUni(ubyte vk, int flags){ return vkToUni(vk, flags&1 ? Yes.shift : No.shift, flags&2 ? Yes.altGr : No.altGr); }
+  string strToUni(string key, int flags){ return vkToUni(strToVk(key), flags); }
+  string strToUni(string key, Flag!"shift" shift, Flag!"altGr" altGr){ return vkToUni(strToVk(key), shift, altGr); }
+
+  //this version uses the current keystate
+  string vkToUni(ubyte vk){
+    wchar[32] buf;
+    const res = ToUnicode(vk, 0, keyboardInputHandler.keys.ptr, buf.ptr, buf.length, 0);
+    if(res!=1) return "";//"\uFFFD";
+    return buf.toStr;
+  }
+  string strToUni(string key){ return vkToUni(strToVk(key)); }
 }
 
 
