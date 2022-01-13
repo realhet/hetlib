@@ -32,6 +32,12 @@ public import core.sys.windows.winuser:
   WS_EX_NOPARENTNOTIFY, WS_EX_OVERLAPPEDWINDOW, WS_EX_PALETTEWINDOW, WS_EX_RIGHT, WS_EX_RIGHTSCROLLBAR, WS_EX_RTLREADING, WS_EX_STATICEDGE,
   WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_EX_WINDOWEDGE;
 
+
+//use het.bitmap.getDesktopBounds instead!
+//auto desktopRect()   { RECT r; GetClientRect(GetDesktopWindow, &r); return r; }
+//auto desktopBounds() { with(desktopRect) return ibounds2(left, top, right, bottom); }
+
+
 // window info ////////////////////////////////////////////////////////////
 
 string getWindowText(HWND handle){
@@ -663,6 +669,21 @@ public:
   void setForegroundWindow()    { show; SetForegroundWindow(hwnd); }
   bool isForeground()           { return GetForegroundWindow == hwnd; }
 
+  RECT windowRect()   { RECT r; GetWindowRect(hwnd, &r); return r; }
+  @property auto windowBounds() { with(windowRect) return ibounds2(left, top, right, bottom); }
+  @property void windowBounds(in ibounds2 b) {
+    SetWindowPos(hwnd, null, b.left, b.top, b.width, b.height, SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW);
+  }
+
+  @property auto windowSize() { return windowBounds.size; }
+  @property void windowSize(in ivec2 newSize){
+    SetWindowPos(hwnd, null, 0, 0, newSize.x, newSize.y, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW);
+  }
+
+  @property auto windowPos() { return windowBounds.topLeft; }
+  @property void windowPos(in ivec2 p) {
+    SetWindowPos(hwnd, null, p.x, p.y, 0, 0, SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW);
+  }
 
   RECT clientRect()   { RECT r; GetClientRect(hwnd, &r); return r; }
   auto clientBounds() { with(clientRect) return ibounds2(left, top, right, bottom); }

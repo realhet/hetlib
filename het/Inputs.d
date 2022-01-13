@@ -610,8 +610,8 @@ public: //standard stuff
 /////////////////////////////////////////////////////////////////////////////
 
 class KeyboardInputHandler: InputHandlerBase {
-private:
   ubyte[256] keys;
+private:
   InputEntry[256] emap;
 
   //maps to and from virtual keycodes
