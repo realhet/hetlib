@@ -759,10 +759,19 @@ public:
   }
 
   override void update(){
-    GetKeyboardState(&keys[0]);
+    //this sucks when not in focus, or the mouse is not moving over it -> GetKeyboardState(&keys[0]);
+
+    const t0 = QPS;
+    foreach(vk; 0..256) if(emap[vk]){
+      const s = GetAsyncKeyState(vk);
+      keys[vk] = cast(ubyte)(s>>8);
+    }
+
+    static ubyte shrink(int a){ return a&1 | (a>>8) & 0x80; }
+
+    foreach(vk; [VK_CAPITAL, VK_SCROLL, VK_NUMLOCK]) keys[vk] = shrink(GetKeyState(vk));
 
     int[] ks;
-
     foreach(vk; 0..256){
       int down = keys[vk]&0x80 ? 1 : 0;
       if(emap[vk]){
@@ -783,6 +792,8 @@ public:
     //eMWUp and eMWDn is updated from the mouse handler
 
 //    foreach(int i; 0..256) if(keys[i]&0x80) write(" ", i); writeln;
+
+    //print(QPS-t0);
   }
 
   ubyte strToVk(string key){ return _nameToVk.get(key, ubyte(0)); }
