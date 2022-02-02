@@ -6483,13 +6483,28 @@ public:
     bool res = total>=secs;
     if(res){
       total -= secs;
-      if(!enableOverflow){
+      if(!enableOverflow){ //todo: batch overflow when the callbact receives how many times it needs to update
         if(total>=secs) total = 0;
       }
     }
     return res;
   }
 };
+
+bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float periodLength_sec, size_t hash=0){
+  enum staticHash = hashOf(moduleName, moduleLine);
+  hash ^= staticHash;
+
+  static DeltaTimer[size_t] timers;
+
+  auto a = hash in timers;
+  if(!a){
+    timers[hash] = DeltaTimer.init;
+    a = hash in timers;
+  }
+
+  return a.update_periodic(periodLength_sec, false); //todo: result should be an int counting how many updates missed since last time
+}
 
 auto blink(float freq=3/*hz*/, float duty=.5f){ return (QPS*freq).fract < duty; }
 
