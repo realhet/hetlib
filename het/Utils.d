@@ -2307,7 +2307,7 @@ string binToHex(in void[] input){
 string toHex(in void[] input){ return(binToHex(input)); }
 
 ubyte[] hexToBin(string s){
-  if(s.startsWith("0x") || s.startsWith("0X")) s = s[2..$];
+  if(s.startsWith_ci("0x")) s = s[2..$];
 
   ubyte[] r;
   r.reserve(s.length/2);
@@ -2376,7 +2376,7 @@ string wordAt(const string s, const ptrdiff_t pos) @safe //todo: this is ascii!!
   return s[st..en];
 }
 
-ptrdiff_t indexOfWord(const string s, const string sub, size_t startIdx, in std.string.CaseSensitive cs = Yes.caseSensitive) @safe
+ptrdiff_t wordPos(const string s, const string sub, size_t startIdx, in std.string.CaseSensitive cs = Yes.caseSensitive) @safe
 {
   ptrdiff_t res;
   while(1){
@@ -2388,9 +2388,9 @@ ptrdiff_t indexOfWord(const string s, const string sub, size_t startIdx, in std.
   return res;
 }
 
-ptrdiff_t indexOfWord(const string s, const string sub, in std.string.CaseSensitive cs = Yes.caseSensitive) @safe
+ptrdiff_t wordPos(const string s, const string sub, in std.string.CaseSensitive cs = Yes.caseSensitive) @safe
 {
-  return indexOfWord(s, sub, 0, cs);
+  return wordPos(s, sub, 0, cs);
 }
 
 T toInt(T=int)(string s){ //todo: toLong
@@ -2719,7 +2719,7 @@ dstring[] splitLines(dstring s){
 }
 
 bool startsWith_ci(string s, string w) pure{
-  if(w.length>s.length) return false;
+  if(w.length>s.length) return false; //todo: refactor functionally
   foreach(i, ch; w){
     if(uc(s[i]) != uc(ch)) return false;
   }

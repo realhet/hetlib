@@ -1190,9 +1190,9 @@ private:
     const mg = "@geometry:";
     const mf = "@fragment:";
 
-    auto pv = indexOfWord(ush, mv, 0          );  if(pv<0) error(`Can't split unified shader: "`~mv~`" marker not found.`);
-    auto pg = indexOfWord(ush, mg, pv         );  //can be empty
-    auto pf = indexOfWord(ush, mf, max(pv, pg));  if(pf<0) error(`Can't split unified shader: "`~mf~`" marker not found.`);
+    auto pv = wordPos(ush, mv, 0          );  if(pv<0) error(`Can't split unified shader: "`~mv~`" marker not found.`);
+    auto pg = wordPos(ush, mg, pv         );  //can be empty
+    auto pf = wordPos(ush, mf, max(pv, pg));  if(pf<0) error(`Can't split unified shader: "`~mf~`" marker not found.`);
 
     if(pv>pf) error(`Vertex shader must be the first.`);
     if(pg>=0 && !(pv<pg && pg<pf)) error(`Geometry shader must be in the middle.`);
