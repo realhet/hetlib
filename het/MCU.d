@@ -392,27 +392,28 @@ auto allConnectors(){ return chain(allDSubConnectors, allM12Connectors); }
 }}
 
 
-
 /// This class contains common things around an Arduino Nano controller project.
 class ArduinoNanoProject{ // ArduinoNanoProject /////////////////////////////////////////////////////
 
   struct Wire{ // Wire ////////////////////////////////////////////////////////
     string identifier;
-    int pin_A;
-    string color, description;
-    int pin_B;
 
-    auto decodeIdentifier() const{
+    int pin_A; //this comes out from the box
+    string color, description;
+    int pin_B; //this is on the end of the cable
+
+    protected auto decodeIdentifier() const{
       if(identifier=="") return tuple("", "");
-      identifier.isWild("*:*").enforce("Wire.identifier must be in format: pinName:variableName "~identifier.quoted); //todo: refactor these into the struct
-      enforce(wild[1].startsWith("IN_") || wild[1].startsWith("OUT_"), "Wire.variableName must starts with IN_ or OUT_ "~identifier.quoted);
-      return tuple(wild[0], wild[1]);
+      const p = identifier.split(':');
+      enforce(p.length==2, `Wire.identifier must be in format: pin:label.`);
+      enforce(p[1].startsWith("IN_") || p[1].startsWith("OUT_"), `Wire.label must start with "IN_" or "OUT_".`);
+      return tuple(p[0], p[1]);
     }
 
-    @property string pinName()      const{ return decodeIdentifier[0]; }
-    @property string variableName() const{ return decodeIdentifier[1]; }
-    @property bool isInput () const{ return identifier!="" &&  variableName.startsWith("IN_"); }
-    @property bool isOutput() const{ return identifier!="" && !variableName.startsWith("IN_"); }
+    @property string pin   () const{ return decodeIdentifier[0]; } //this is the MCU pin
+    @property string label () const{ return decodeIdentifier[1]; }
+    @property bool isInput () const{ return identifier!="" && label.startsWith("IN_" ); }
+    @property bool isOutput() const{ return identifier!="" && label.startsWith("OUT_"); }
 
 
     void ui(float panelWidth) const{
@@ -433,7 +434,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
           Row({
             flex = 1;
             if(identifier!=""){
-              Text(bold(variableName), "  ");
+              Text(bold(label), "  ");
             }
             if(description.isWild("*WARNING:*")){
               Text(wild[0]);
@@ -447,7 +448,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
             }
           });
           if(identifier!="") Row({
-            Btn({ Text(pinName~" ");  Led(random(2)==0, isInput ? clLime : clRed); }, genericId(pinName));
+            Btn({ Text(pin~" ");  Led(random(2)==0, isInput ? clLime : clRed); }, genericId(pin));
           });
         });
       });
@@ -495,6 +496,11 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
   }
 
 
+  static Wire[] AllWires   (bool IN=true, bool OUT=true)(Cable[] cables){ return cables.map!"a.wires".join.filter!(a => IN && a.isInput || OUT && a.isOutput).array.withoutDuplicates!"a.identifier"; }
+  static Wire[] InputWires (Cable[] cables){ return AllWires!(true, false)(cables); }
+  static Wire[] OutputWires(Cable[] cables){ return AllWires!(false, true)(cables); }
+
+  static string[] AllWireLabels(Cable[] cables){ return AllWires(cables).map!"a.label".array; }
 
   Cable[] cables; //all the cables connected to the MCU
 
@@ -506,16 +512,9 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
   static bool arduinoPinLessThan(string a, string b){ //sort index for arduino pin names
 
     string process(string s){
-      if(s.length>=2){
-        dchar ch = s[0].toUpper;
-        if(ch=='A') ch = 'Z';
-
-        ubyte idx;
-        ignoreExceptions({ idx = s[1..$].to!ubyte; });
-
-        if(idx) return format!"%c%02d"(ch, idx);
-      }
-      return "unknown:"~s;
+      s = s.uc.replace("A", "Z");
+      if(s.length==2) s = s[0]~"0"~s[1];
+      return s;
     }
 
     return lessThan(process(a), process(b));

@@ -1425,6 +1425,37 @@ uint[] toUints(in void[] data, ubyte filler=0){
   return cast(uint[])((cast(ubyte[])data) ~ [ubyte(0)].replicate(extLength - dataLength));
 }
 
+
+T[] withoutDuplicates(alias pred = "a", T)(in T[] arr){
+/*  auto getKey(in T item){ return unaryFun!pred(item); }
+
+  bool[ReturnType!getKey] m;
+  T[] res;
+  auto app = appender(&res);
+  foreach(item; arr){
+    const key = getKey(item);
+    if(key !in m){
+      m[key] = true;
+      app ~= item;
+    }
+  }
+  return app[];*/
+
+  auto getKey(in T item){ return unaryFun!pred(item); }
+
+  bool[ReturnType!getKey] m;
+  T[] res;
+  foreach(item; arr){
+    const key = getKey(item);
+    if(key !in m){
+      m[key] = true;
+      res ~= item;
+    }
+  }
+  return res;
+}
+
+
 /* Ezek LDC-vel nem mennek!!!!
 void appendUninitializedReserved(T)(ref T[] arr, size_t N = 1) {
   auto length_p = cast(size_t*)(&arr);
@@ -2196,7 +2227,7 @@ private S _withoutStarting(bool start, bool remove, S, T)(in S s, in T end){
   }else return s;
 }
 
-S withoutStarting(S, T)(in S s, in T end){ return _withoutStarting!(1, 1)(s, end); }
+S withoutStarting(S, T)(in S s, in T end){ return _withoutStarting!(1, 1)(s, end); } //todo: inconvenience with includeTrailingPathDelimiter
 S withoutEnding  (S, T)(in S s, in T end){ return _withoutStarting!(0, 1)(s, end); }
 S withStarting   (S, T)(in S s, in T end){ return _withoutStarting!(1, 0)(s, end); }
 S withEnding     (S, T)(in S s, in T end){ return _withoutStarting!(0, 0)(s, end); }
@@ -2211,6 +2242,7 @@ a
 a/b
 a/
 a*/
+
 
 string getFirstDir(char sep='\\')(string s){
   auto i = s.indexOf(sep);
@@ -6563,6 +6595,7 @@ synchronized class Perf {
 shared PERF = new shared Perf;
 
 //TODO: strToDateTime, creators
+
 
 struct Sequencer(T){ //Sequencer /////////////////////////////
   T[float] events;
