@@ -136,40 +136,6 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     else static assert(0, `Unhandled op "%s"`.format(b));
   }
 
-  /* old shit
-  string peekClassName(){
-    enum log = true;
-    if(log) print("peekClassName------------");
-
-    enforce(isOp!'{'); //must be at the start of a class
-    const level = state.tokens[idx].level+1;
-
-    string res;
-
-    bool peekAt(int i, string cn){
-      if(log) print("looking for:", cn, "level:", level, "in:", state.tokens[i..$].take(3));
-
-      if(i+2 < state.tokens.length
-      && state.tokens[i+0].level==level
-      && state.tokens[i+1].isOperator(opcolon)
-      && state.tokens[i+0].kind == TokenKind.literalString
-      && state.tokens[i+2].kind == TokenKind.literalString
-      && state.tokens[i+0].data == cn){
-        res = state.tokens[i+2].data.to!string;
-        if(log) print("found class declaration:", res);
-        return true;
-      }
-      return false;
-    }
-
-    if(peekAt(idx+1, "class")) return res;
-
-    if(peekAt(idx+1, "kind")) return res;
-    if(peekAt(idx+3, "kind")) return res;
-
-    return "";
-  }*/
-
   string peekClassName(int[string] elementMap){
     string res;
 
@@ -249,7 +215,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
   try{ //the outermost exception handler calls state.onError
 
     //switch all possible types
-    /*-*/ static if(isFloatingPoint!T     ){
+    static if(isFloatingPoint!T     ){
       getSign;
       data = cast(Type)(actToken.data.get!double);
       if(isNegative) data = -data;
@@ -305,7 +271,6 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
     }else static if(isMatrix!T){
       streamDecode_json(state, idx, data.columns); //just forward it to its internal array
     }else static if(isAggregateType!T     ){ // Struct, Class
-
       //handle null
       if(actToken.isKeyword(kwnull)){
         static if(is(T == class)){ //null class found
@@ -367,7 +332,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
       }}
 
       //recursive call for each field
-      static foreach(fieldName; FieldNamesWithUDA!(T, STORED, true)){{
+      static foreach(fieldName; FieldAndFunctionNamesWithUDA!(T, STORED, true)){{
 
         //dirty fix for LDCXJSON reading. (not writing)
              static if(fieldName=="char_"   ) enum fn = "char"   ;
@@ -376,7 +341,14 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
         else                                  enum fn = fieldName;
 
         if(auto p = fn in elementMap){
-          streamDecode_json(state, *p, __traits(getMember, data, fieldName));
+          alias member = __traits(getMember, data, fieldName);
+          static if(isFunction!member){ //handle properties
+            typeof(member) tmp;
+            streamDecode_json(state, *p, tmp);
+            mixin("data.", fieldName, "=tmp;");
+          }else{
+            streamDecode_json(state, *p, __traits(getMember, data, fieldName));
+          }
         }
       }}
 
@@ -531,7 +503,7 @@ void streamAppend_json(Type)(ref string st, /*!!!!!*/in Type data, bool dense=fa
     }
 
     //recursive call for each field
-    static foreach (fieldName; FieldNamesWithUDA!(T, STORED, true)){{
+    static foreach (fieldName; FieldAndFunctionNamesWithUDA!(T, STORED, true)){{
       enum hasHex = hasUDA!(__traits(getMember, T, fieldName), HEX);
       streamAppend_json(st, __traits(getMember, data, fieldName), dense, hex || hasHex, fieldName, nextIndent);
     }}
@@ -857,12 +829,59 @@ T cache(T)(lazy T data, File file, bool refresh=false){
   return res;
 }
 
+void unittest_property_inherited(){
+
+  static class C1{
+    int a;
+    @STORED int i;
+    @STORED @property{
+      auto p() const{ return a+100; } void p(int v) { a = v-100; }
+      auto q() const{ return a+100; } void q(int v) { a = v-100; }
+    }
+    @STORED int j;
+  }
+
+  static class C2:C1{
+    @STORED{
+      int b, c;
+      @property{
+        auto s() const{ return a+100; } void s(int v) { a = v-100; }
+        auto t() const{ return a+100; } void t(int v) { a = v-100; }
+        auto u() const{ return a+100; } void u(int v) { a = v-100; }
+      }
+    }
+  }
+
+  auto c1 = new C1, c2 = new C2;
+
+  print(FieldNamesWithUDA!(C1, STORED, true).stringof);
+  print(FieldNamesWithUDA!(C2, STORED, true).stringof);
+  print(FieldNamesWithUDA!(DateTime, STORED, true).stringof);
+  print(FieldAndFunctionNamesWithUDA!(C1, STORED, true).stringof);
+  print(FieldAndFunctionNamesWithUDA!(C2, STORED, true).stringof);
+  print(FieldAndFunctionNamesWithUDA!(DateTime, STORED, true).stringof);
+
+  print(c1.toJson);
+  print(c2.toJson);
+  c2.u = 555;
+  string saved = c2.toJson;
+  print(c2.toJson);
+
+  registerStoredClass!C2;
+
+  C1 d = new C2; (cast(C2)d).u = 1000;
+  C1 tmp;
+  tmp.fromJson(d.toJson);
+  tmp.toJson.print;
+}
+
 // Unittest //////////////////////////////////////////////////////
 
 void unittest_main(){
   //todo: more tests!
   unittest_JsonClassInheritance;
   unittest_toJson;
+  unittest_property_inherited;
 
   // check the precision of jsonized vectors
   foreach(T; AliasSeq!(float, double, real)){
@@ -873,5 +892,7 @@ void unittest_main(){
     assert(v2 == v);
   }
 }
+
+
 
 unittest{ unittest_main; }

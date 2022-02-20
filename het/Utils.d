@@ -1360,9 +1360,15 @@ auto makeArray3(T, size_t N, size_t M, size_t O, T val)()
 //safe array access
 
 //note: inout(V) doesn't work with class[]: it says can't convert const(Class) to inout(Class)
-/*inout*/V get(V, I)(/*inout*/V[] arr, I idx, lazy V def = V.init) if(isIntegral!I){
-  static if(isSigned!I) return idx<arr.length && idx>=0 ? arr[idx] : def;
-                   else return idx<arr.length           ? arr[idx] : def;
+/*inout*/V get(V, I)(/*inout*/V[] arr, I idx) if(isIntegral!I){
+  static if(isSigned!I) return idx<arr.length && idx>=0 ? arr[idx] : V.init;
+                   else return idx<arr.length           ? arr[idx] : V.init;
+}
+
+//Default can be a different type. In that case, result will be voncerted
+/*inout*/D get(V, I, D)(/*inout*/V[] arr, I idx, lazy D def) if(isIntegral!I){
+  static if(isSigned!I) return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def;
+                   else return idx<arr.length           ? arr[idx].to!D.ifThrown(def) : def;
 }
 
 
@@ -2979,9 +2985,10 @@ auto getSymbolNamesByUDA(T, string uda)(){
 
 enum SameType(A, B) = is(Unqual!A == Unqual!B);
 
+/// returns only the last UDA if more than one exists.
 template getUDA(alias a, U){
   enum u = q{ getUDAs!(a, U)[$-1] };
-    static if(hasUDA!(a, U) && !is(mixin(u)))
+    static if(hasUDA!(a, U) && !is(mixin(u)))   //note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
       enum getUDA = mixin(u);
     else
       enum getUDA = U.init;
@@ -2994,24 +3001,40 @@ template AllClasses(T){         //todo: a kisbetu meg nagybetu legyen konzekvens
   else                            alias AllClasses = T;
 }
 
-alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T);
+/// returns the member names of only this child class only, not the ancestor classes.
+/// Analogous to FieldNameTuple template
+template ThisClassMemberNameTuple(T){
+  static if(is(T == class ) && !is(T == Object))
+    enum ThisClassMemberNameTuple = __traits(allMembers, T)[0..__traits(allMembers, T).length-__traits(allMembers, BaseClassesTuple!T[0]).length];
+  else
+    enum ThisClassMemberNameTuple = AliasSeq!();
+}
 
-alias AllFields(T) = staticMap!(tupleof, AllClasses!T);
+alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); //good order, but no member properties
+alias AllMemberNames(T) = __traits(allMembers, T); //wrong backward inheritance order.
 
+/// used by het.stream. This is the old version, without properties. Fields are in correct order.
 template FieldNamesWithUDA(T, U, bool allIfNone){
   enum fields = AllFieldNames!T;
   enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U);
 
-  static if(allIfNone){
-    static if(anySatisfy!(hasThisUDA, fields))
-      enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
-    else
-      enum FieldNamesWithUDA = fields;
-  }else{
+  static if(allIfNone && !anySatisfy!(hasThisUDA, fields))
+    enum FieldNamesWithUDA = fields;
+  else
     enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
-  }
 }
 
+/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
+template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone){
+  enum bool isUda        (string name) = hasUDA!(__traits(getMember, T, name), U);
+  enum bool isUdaFunction(string name) = isUda!name && isFunction!(__traits(getMember, T, name));
+  enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T));
+
+  static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
+    enum FieldAndFunctionNamesWithUDA = AllFieldNames!T;
+  else
+    enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T);
+}
 
 string[] getEnumMembers(T)(){
   static if(is(T == enum)) return [__traits(allMembers, T)];
@@ -3019,7 +3042,7 @@ string[] getEnumMembers(T)(){
 }
 
 
-alias toAlias(alias T) = T;
+alias toAlias(alias T) = T; //todo: Alias!T alreadyb exists
 
 void inspectSymbol(alias T)(string before="", int level=0) {
   enum maxInspectLevel = 10;

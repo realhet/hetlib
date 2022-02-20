@@ -234,7 +234,7 @@ class ComPortInfo{ //ComPortInfo ///////////////////////////////////////////////
       return format!"%s %s%s%s"(baud, bits, ParityLetters.get(cast(int) parity), StopBitStrings.get(cast(int) stopBits));
     }
 
-    void config(string s){
+    void config(string s){  //todo: refactor com port config
       baud = defaultBaud;
       bits = defaultBits;
       parity = Parity.none;
