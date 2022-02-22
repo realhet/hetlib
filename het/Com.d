@@ -18,7 +18,13 @@ class ComPort{ // ComPort /////////////////////////////////////////
   bool enabled;
 
   ubyte[] inBuf, outBuf;
-  protected string lineBuf; //messages
+
+  bool binary; //select message protocol
+
+  protected string lineBuf; //messages buffer
+  protected ubyte[] binaryBuf; //used in binary mode
+
+  uint maxLineBufSize = 4096;
 
   string prefix; //messages: Application dependent prefix. both for incoming and outgoing messages.
 
@@ -56,6 +62,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
       inBuf = [];
       outBuf = [];
       lineBuf = "";
+      binaryBuf = [];
     }
 
     void comOpen(){
@@ -159,41 +166,89 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   static int computeCheckSum(string s){ return (cast(ubyte[])s).sum &0xFF; }
 
-  void send(string msg){
-    write(cast(ubyte[])(format!"%s%s~%x\n"(prefix, msg, computeCheckSum(msg))));
+  void send(in void[] msg){
+    if(binary){
+      write(cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n"));
+    }else{
+      const str = cast(string)msg;
+      write(cast(ubyte[])(format!"%s%s~%x\n"(prefix, str, computeCheckSum(str))));
+    }
     messagesOut ++;
   }
 
-  void update_messages(void delegate(string) fun){
+  void update_messages(void delegate(in void[]) fun){
     update;
 
     if(inBuf.length){
-      ignoreExceptions({ lineBuf ~= (cast(char[])inBuf).text; });
-      inBuf = [];
+      if(binary){
+        binaryBuf ~= inBuf;
+        inBuf = [];
 
-      while(1){
-        const idx = lineBuf.indexOf('\n'); //todo: variable declaration in while condition. Needs latest LDC.
-        if(idx<0)break; //todo: if no \n received after a timeout, that's an error too.
-        const actLine = lineBuf[0..idx];
-        lineBuf = lineBuf[idx+1..$];
+        while(1){
+          const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n'));
+          if(idx<0) break;
 
-        //check msg checkSum
-        const cIdx = actLine.retro.indexOf('~');
-        if(actLine.startsWith(prefix) && cIdx>0){
-          const
-            msg = actLine[prefix.length..$-cIdx-1],
-            crc = actLine[$-cIdx..$],
-            crc2 = computeCheckSum(msg).format!"%x";
+          auto actLine = binaryBuf[0..idx];
+          binaryBuf = binaryBuf[idx+prefix.length+1..$];
+
+          if(actLine.length<4){
+            dataErrorCnt++;
+            error("Binary message too small. Can't check crc32.");
+          }
+          const crc = (cast(uint[])actLine[$-4..$])[0];
+          actLine = actLine[0..$-4];
+          const crc2 = actLine.crc32;
 
           if(crc==crc2){
-            fun(msg);
+            messagesIn++;
+            fun(actLine);
           }else{
-            error("Crc error: "~msg.quoted);
+            error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
             dataErrorCnt++;
           }
-        }else{
+        }
+
+        if(binaryBuf.length>maxLineBufSize){ //todo: refactor: maxMessageBytes
+          binaryBuf = [];
           dataErrorCnt++;
-          error("Invalid package format: "~lineBuf.quoted);
+          error("Receiving garbage instead of valid packages: "~prefix.quoted);
+        }
+
+      }else{
+        ignoreExceptions({ lineBuf ~= (cast(char[])inBuf).text; });
+        inBuf = [];
+
+        while(1){
+          const idx = lineBuf.indexOf('\n'); //todo: variable declaration in while condition. Needs latest LDC.
+          if(idx<0)break; //todo: if no \n received after a timeout, that's an error too.
+          const actLine = lineBuf[0..idx];
+          lineBuf = lineBuf[idx+1..$];
+
+          //check msg checkSum
+          const cIdx = actLine.retro.indexOf('~');
+          if(actLine.startsWith(prefix) && cIdx>0){
+            const
+              msg = actLine[prefix.length..$-cIdx-1],
+              crc = actLine[$-cIdx..$],
+              crc2 = computeCheckSum(msg).format!"%x";
+
+            if(crc==crc2){
+              messagesIn++;
+              fun(msg);
+            }else{
+              error("Crc error: "~msg.quoted);
+              dataErrorCnt++;
+            }
+          }else{
+            dataErrorCnt++;
+            error("Invalid package format: "~lineBuf.quoted);
+          }
+        }
+
+        if(lineBuf.length>=maxLineBufSize){
+          lineBuf = [];
+          dataErrorCnt++;
+          error("Receiving garbage instead of valid packages: "~prefix.quoted);
         }
       }
     }
