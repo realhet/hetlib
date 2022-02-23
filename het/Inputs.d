@@ -567,11 +567,25 @@ public: //standard stuff
   void releaseKey(ubyte vk){ pressKey(vk, false); }
 
   void pressKey(string key, bool press=true){
+    if(key=="") return; //empty is  valid
     auto vk = enforce(strToVk(key), "Inputs.keyPress: Invalid key "~key.quoted);
     pressKey(vk, press);
   }
 
   void releaseKey(string key){ pressKey(key, false); }
+
+  void typeKey(string key){
+    //todo: accent handling
+    //todo: shift symbol handling
+    const needShift = key.length==1 && (key[0].isLetter && ((key[0].toUpper==key[0]) != inputs["CapsLockState"].active));
+
+    if(needShift) pressKey("LShift");
+    pressKey(key);
+    releaseKey(key);
+    if(needShift) releaseKey("LShift");
+  }
+
+  void typeText(string s){ foreach(ch; s) typeKey(ch.to!string); }
 
   ubyte strToVk(string key){ return keyboardInputHandler.strToVk(key); }
   string vkToStr(ubyte vk){ return keyboardInputHandler.vkToStr(vk); }

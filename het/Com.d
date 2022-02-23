@@ -194,17 +194,18 @@ class ComPort{ // ComPort /////////////////////////////////////////
           if(actLine.length<4){
             dataErrorCnt++;
             error("Binary message too small. Can't check crc32.");
-          }
-          const crc = (cast(uint[])actLine[$-4..$])[0];
-          actLine = actLine[0..$-4];
-          const crc2 = actLine.crc32;
-
-          if(crc==crc2){
-            messagesIn++;
-            fun(actLine);
           }else{
-            error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
-            dataErrorCnt++;
+            const crc = (cast(uint[])actLine[$-4..$])[0];
+            actLine = actLine[0..$-4];
+            const crc2 = actLine.crc32;
+
+            if(crc==crc2){
+              messagesIn++;
+              fun(actLine);
+            }else{
+              error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
+              dataErrorCnt++;
+            }
           }
         }
 
