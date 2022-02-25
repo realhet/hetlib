@@ -180,7 +180,7 @@ struct HitTestManager{
     clickedId = pressedId = releasedId = SrcId.init; //normally it's 0 all the time, except that one frame it's clicked.
 
     with(cast(GLWindow)mainWindow){ //todo: get the mouse state from elsewhere!!!!!!!!!!!!!
-      if(topId && mouse.LMB && mouse.justPressed){
+      if(topId && mouse.LMB && mouse.justPressed && isForeground){ //note: isForeground will not work with a toolwindow
         pressedId = capturedId = topId;
       }
       if(mouse.justReleased){

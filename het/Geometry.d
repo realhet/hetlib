@@ -1033,7 +1033,7 @@ struct QuadraticFitResult{    //todo: combine Quadratic and linear fitter
   float y(float x){ return a*x^^2 + b*x + c; }
 }
 
-private float det(float a, float b, float c, float d){ return a*d-c*b; }
+private float det(float a, float b, float c, float d){ return a*d-c*b; } //todo: combine this with math.det
 private float det(float a, float b, float c, float d, float e, float f, float g, float h, float i){
   return +a*det(e, f, h, i)
          -d*det(b, c, h, i)

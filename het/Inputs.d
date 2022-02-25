@@ -44,16 +44,16 @@ __gshared int[] virtualKeysDown;
 
 // Utils /////////////////////////////////////////////////////////////////////
 
-void getKeyboardDelays(ref double d1, ref double d2){
+void getKeyboardDelays(ref float d1, ref float d2){
   //Gets windows keyboard delays in seconds
   //note: The query takes 6microsecs only, so it can go into the update loop
   int val;
 
   SystemParametersInfoW(SPI_GETKEYBOARDDELAY, 0, &val, 0);
-  d1 = remap(val, 0, 3, 0.250, 1); //0: 250ms .. 3: 1sec
+  d1 = remap(val, 0, 3, 0.250f, 1); //0: 250ms .. 3: 1sec
 
   SystemParametersInfoW(SPI_GETKEYBOARDSPEED, 0, &val, 0);
-  d2 = 1.0/remap(val, 0, 31, 2.5, 30); //0: 2.5hz .. 31: 30Hz
+  d2 = 1.0f/remap(val, 0, 31, 2.5f, 37.5f); //0: 2.5hz .. 31: 40Hz
 }
 
 void _notifyMouseWheel(float delta) //Must be called from outside, from a Window loop in Window.d
@@ -332,15 +332,11 @@ class InputEntry{
           else return 0;
   }
 
-  bool longPress() const{ return activeDuration >= longPressDuration; }
+  bool longPress() const{ return activeDuration >= inputs.longPressDuration; }
 
   bool down() const { return  active; }
   bool up() const { return !active; }
 
-  // repeat support, for typing emulation
-  static longPressDuration = 0.5;
-  static repeatDelay1 = 0.5;
-  static repeatDelay2 = 0.125; //updated from outside
 
   private{
     bool repeated_;
@@ -349,24 +345,8 @@ class InputEntry{
 
   bool repeated()const { return repeated_; }
 
-  //private bool retriggered_;
-  //bool retriggered()const { return retriggered_; }
-
   void _updateRepeated(double now){
-    //retriggered_ = value && repeated_; //one frame delay
-
-    repeated_ = false;
-    if(value){
-      if(pressed){
-        repeated_ = true;
-        repeatNextTime = now+repeatDelay1;
-      }else{
-        if(now>=repeatNextTime){
-          repeated_ = true;
-          repeatNextTime = now+repeatDelay2;
-        }
-      }
-    }
+    repeated_ = inputs.repeatLogic(active, pressed, repeatNextTime);
   }
 
 }
@@ -388,6 +368,7 @@ private:
   void error(string s) { throw new Exception("InputManager: "~s); }
 
   double now; //local fast time in seconds
+  //todo: replace this with DateTime and prioper seconds handling.
 public:
   InputHandlerBase[string] handlers;
   InputEntry[string] entries;
@@ -436,7 +417,7 @@ public:
     clearDeltas;
     foreach(h; handlers) h.update;
 
-    getKeyboardDelays(InputEntry.repeatDelay1, InputEntry.repeatDelay2); //todo: this is only needed once a sec, dunno how slow it is.
+    getKeyboardDelays(InputManager.repeatDelay1, InputManager.repeatDelay2); //todo: this is only needed once a sec, dunno how slow it is.
     foreach(e; entries){
       if(e.pressed) e.pressedTime = now;
       e._updateRepeated(now);
@@ -558,17 +539,40 @@ public: //standard stuff
   };
   alias modifiers = keyModifierMask;
 
+  // keyboard emulation ///////////////////////////////////
+
+  bool validKey(string key){ return strToVk(key)!=0; }
+
+  static bool isMouseBtn   (int vk){ return vk.among(VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2)>0; } //todo: these are slow...
+  static bool isExtendedKey(int vk){ return vk.among(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_INSERT, VK_DELETE)>0; }
+
+  bool isMouseBtn(string key){ return isMouseBtn(strToVk(key)); } //todo: these are slow...
+
   void pressKey(ubyte vk, bool press=true){
-    //const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
-    const ek = vk.among(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_INSERT, VK_DELETE) ? KEYEVENTF_EXTENDEDKEY : 0;
-    keybd_event(vk, 0, (press ? 0 : KEYEVENTF_KEYUP) | ek, 0);
+    if(!vk) return;
+    if(isMouseBtn(vk)){
+      void a(int d, int u, int x=0){ mouse_event(press ? d : u , 0, 0, x, 0); }
+      switch(vk){
+        case VK_LBUTTON  : a(MOUSEEVENTF_LEFTDOWN  , MOUSEEVENTF_LEFTUP  ); break;
+        case VK_RBUTTON  : a(MOUSEEVENTF_RIGHTDOWN , MOUSEEVENTF_RIGHTUP ); break;
+        case VK_MBUTTON  : a(MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP); break;
+        case VK_XBUTTON1 : a(MOUSEEVENTF_XDOWN     , MOUSEEVENTF_XUP     , XBUTTON1); break;
+        case VK_XBUTTON2 : a(MOUSEEVENTF_XDOWN     , MOUSEEVENTF_XUP     , XBUTTON2); break;
+        default: enforce(0, `Unknown mouse button %s`.format(vk));
+      }
+    }else{
+      //const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
+      keybd_event(vk, 0, (press ? 0 : KEYEVENTF_KEYUP) | (isExtendedKey(vk) ? KEYEVENTF_EXTENDEDKEY : 0), 0);
+    }
   }
 
   void releaseKey(ubyte vk){ pressKey(vk, false); }
 
   void pressKey(string key, bool press=true){
-    if(key=="") return; //empty is  valid
-    auto vk = enforce(strToVk(key), "Inputs.keyPress: Invalid key "~key.quoted);
+    //if(key=="") return; //empty is  valid
+    //auto vk = enforce(strToVk(key), "Inputs.keyPress: Invalid key "~key.quoted);
+    const vk = strToVk(key);
+    if(!vk) return;
     pressKey(vk, press);
   }
 
@@ -577,7 +581,7 @@ public: //standard stuff
   void typeKey(string key){
     //todo: accent handling
     //todo: shift symbol handling
-    const needShift = key.length==1 && (key[0].isLetter && ((key[0].toUpper==key[0]) != inputs["CapsLockState"].active));
+    const needShift = key.length==1 && (key[0].isLetter && ((key[0].toUpper==key[0]) != inputs["CapsLockState"].active)) && !inputs["Shift"].down;
 
     if(needShift) pressKey("LShift");
     pressKey(key);
@@ -586,6 +590,8 @@ public: //standard stuff
   }
 
   void typeText(string s){ foreach(ch; s) typeKey(ch.to!string); }
+
+  // keycode conversion //////////////////////////////////////
 
   ubyte strToVk(string key){ return keyboardInputHandler.strToVk(key); }
   string vkToStr(ubyte vk){ return keyboardInputHandler.vkToStr(vk); }
@@ -616,6 +622,33 @@ public: //standard stuff
     return buf.toStr;
   }
   string strToUni(string key){ return vkToUni(strToVk(key)); }
+
+  // repeat logic /////////////////////////////////////
+  static{
+    float longPressDuration = 0.5;
+    float repeatDelay1 = 0.5;
+    float repeatDelay2 = 0.125; //updated from outside
+  }
+
+  bool repeatLogic(in bool active, in bool pressed, ref double repeatNextTime, in float delay1, in float delay2){
+    if(active){ //todo: at kene terni tick-re...
+      //note: 'now' is saved in every update cycle. That's why this fucnt is not static.
+      if(pressed){
+        repeatNextTime = now+repeatDelay1;
+        return true;
+      }
+      if(now>=repeatNextTime){
+        repeatNextTime = now+repeatDelay2;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool repeatLogic(in bool active, in bool pressed, ref double repeatNextTime){
+    return repeatLogic(active, pressed, repeatNextTime, repeatDelay1, repeatDelay2);
+  }
+
 }
 
 
@@ -708,10 +741,10 @@ public:
 
     //Mouse
     add(VK_LBUTTON , "LMB"); add(VK_RBUTTON , "RMB");  add(VK_MBUTTON, "MMB");
-    add(VK_XBUTTON1, "MB4"/+"XB1"+/); add(VK_XBUTTON2, "MB5"/+"XB2"+/); //back, fwd buttons on mouse
+    add(VK_XBUTTON1, "MB4"); add(VK_XBUTTON2, "MB5"); //back, fwd buttons on mouse
 
     //Multimedia
-    add(7                       , "XBox"); //what is this?
+    add(7                       , "XBox"); //Ubdocumented xbox guide bitton
     add(VK_LAUNCH_MAIL          , "Mail");
     add(VK_LAUNCH_MEDIA_SELECT  , "Media");
     add(VK_LAUNCH_APP1          , "App1");
