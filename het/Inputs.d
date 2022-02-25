@@ -44,7 +44,7 @@ __gshared int[] virtualKeysDown;
 
 // Utils /////////////////////////////////////////////////////////////////////
 
-void getKeyboardDelays(ref float d1, ref float d2){
+void spiGetKeyboardDelays(ref float d1, ref float d2){
   //Gets windows keyboard delays in seconds
   //note: The query takes 6microsecs only, so it can go into the update loop
   int val;
@@ -54,6 +54,18 @@ void getKeyboardDelays(ref float d1, ref float d2){
 
   SystemParametersInfoW(SPI_GETKEYBOARDSPEED, 0, &val, 0);
   d2 = 1.0f/remap(val, 0, 31, 2.5f, 37.5f); //0: 2.5hz .. 31: 40Hz
+}
+
+int[3] spiGetMouse(){
+  int[3] val;
+  SystemParametersInfoW(SPI_GETMOUSE, 0, &val, 0);
+  return val;
+}
+
+int spiGetMouseSpeed(){
+  int val;
+  SystemParametersInfoW(SPI_GETMOUSESPEED, 0, &val, 0);
+  return val;
 }
 
 void _notifyMouseWheel(float delta) //Must be called from outside, from a Window loop in Window.d
@@ -359,6 +371,15 @@ class InputHandlerBase{
 }
 
 class InputManager{ //! InputManager /////////////////////////////////
+  static{
+    float longPressDuration = 0.5;
+
+    float repeatDelay1 = 0.5;   //updated in every frame
+    float repeatDelay2 = 0.125; //updated in every frame
+
+    int mouseSpeed = 10; //updated in every frame
+    int[3] mouseThresholds = [6, 10, 1]; //updated in every frame
+  }
 private:
   bool initialized = false;
 
@@ -417,7 +438,11 @@ public:
     clearDeltas;
     foreach(h; handlers) h.update;
 
-    getKeyboardDelays(InputManager.repeatDelay1, InputManager.repeatDelay2); //todo: this is only needed once a sec, dunno how slow it is.
+    spiGetKeyboardDelays(repeatDelay1, repeatDelay2); //todo: this is only needed once a sec, dunno how slow it is.
+    mouseSpeed = spiGetMouseSpeed;
+    mouseThresholds = spiGetMouse;
+
+
     foreach(e; entries){
       if(e.pressed) e.pressedTime = now;
       e._updateRepeated(now);
@@ -544,7 +569,8 @@ public: //standard stuff
   bool validKey(string key){ return strToVk(key)!=0; }
 
   static bool isMouseBtn   (int vk){ return vk.among(VK_LBUTTON, VK_RBUTTON, VK_MBUTTON, VK_XBUTTON1, VK_XBUTTON2)>0; } //todo: these are slow...
-  static bool isExtendedKey(int vk){ return vk.among(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_INSERT, VK_DELETE)>0; }
+  static bool isExtendedKey(int vk){ return vk.among(VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_HOME, VK_END, VK_PRIOR, VK_NEXT, VK_INSERT, VK_DELETE)>0;
+   }
 
   bool isMouseBtn(string key){ return isMouseBtn(strToVk(key)); } //todo: these are slow...
 
@@ -561,8 +587,25 @@ public: //standard stuff
         default: enforce(0, `Unknown mouse button %s`.format(vk));
       }
     }else{
-      //const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
-      keybd_event(vk, 0, (press ? 0 : KEYEVENTF_KEYUP) | (isExtendedKey(vk) ? KEYEVENTF_EXTENDEDKEY : 0), 0);
+      //Note: keybd_event, SendInput: multimedia keys that launch apps aren't working. Sound volume, and play controls are working.
+
+      const flags = (press ? 0 : KEYEVENTF_KEYUP) | (isExtendedKey(vk) ? KEYEVENTF_EXTENDEDKEY : 0);
+
+      enum method = 0;
+
+      static if(method==0){
+        //const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
+        keybd_event(vk, 0, flags, 0);
+      }else static if(method==1){
+        INPUT input;
+        input.type = INPUT_KEYBOARD;
+        with(input.ki){
+          wVk = vk;
+          //wScan = MapVirtualKey(vk, 0).to!ushort; //<--- not needed
+          dwFlags = flags;
+        }
+        SendInput(1, &input, INPUT.sizeof);
+      }else static assert(0, "invalid keyboard emulation method index");
     }
   }
 
@@ -624,11 +667,6 @@ public: //standard stuff
   string strToUni(string key){ return vkToUni(strToVk(key)); }
 
   // repeat logic /////////////////////////////////////
-  static{
-    float longPressDuration = 0.5;
-    float repeatDelay1 = 0.5;
-    float repeatDelay2 = 0.125; //updated from outside
-  }
 
   bool repeatLogic(in bool active, in bool pressed, ref double repeatNextTime, in float delay1, in float delay2){
     if(active){ //todo: at kene terni tick-re...
@@ -648,6 +686,85 @@ public: //standard stuff
   bool repeatLogic(in bool active, in bool pressed, ref double repeatNextTime){
     return repeatLogic(active, pressed, repeatNextTime, repeatDelay1, repeatDelay2);
   }
+
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+///  Input Emulator                                                       ///
+/////////////////////////////////////////////////////////////////////////////
+
+class InputEmulator{
+  // redirects keyboard and mouse inputs to windows
+  protected{
+    string[] activeKeys, lastActiveKeys, pressedKeys, releasedKeys;
+    string repeatedKey, lastRepeatedKey;
+    double repeatState;
+    bool repeatedKeyPressed;
+  }
+
+  void updateKeyState(string[] activeKeys_){
+    lastActiveKeys = activeKeys;
+    activeKeys = activeKeys_.sort.uniq.array;
+
+    //detect pressed and released keys. Using only the state of activeKeys and lastActiveKeys.
+    pressedKeys  = activeKeys.filter!(k => !lastActiveKeys.canFind(k)).array;
+    releasedKeys = lastActiveKeys.filter!(k => !activeKeys.canFind(k)).array;
+
+    foreach(k; releasedKeys) inputs.releaseKey(k);
+    foreach(k; pressedKeys) inputs.pressKey(k);
+
+    if(!releasedKeys.empty) repeatedKey = "";
+    pressedKeys.filter!(k => !inputs.isMouseBtn(k)).each!(k => repeatedKey = k); //all keys can be repeated except mouse buttons
+    repeatedKeyPressed = inputs.repeatLogic(repeatedKey!="", lastRepeatedKey != repeatedKey, repeatState);
+    if(repeatedKeyPressed && !pressedKeys.canFind(repeatedKey))
+      inputs.pressKey(repeatedKey);
+
+    //update history
+    lastRepeatedKey = repeatedKey;
+    lastActiveKeys = activeKeys;
+  }
+
+  protected vec2 lastMMoveFraction;
+
+  void mouseMove1(float nx, float ny){
+    lastMMoveFraction += vec2(nx, ny);
+    ivec2 r = iround(lastMMoveFraction);
+    if(r) mouse_event(MOUSEEVENTF_MOVE, r.x, r.y, 0, 0);
+    lastMMoveFraction -= r;
+  }
+
+
+  void mouseMove(float nx, float ny, float fastOrSlow){
+    float f(float x){
+      return x<0 ? -f(-x)
+                 : max(0, x*1.125-0.1); //deadzone
+    }
+
+    auto len = vec2(nx, ny).length;
+    auto speed = len>0.95 ? 5 : 2;  //turbo speed at the very ends
+
+    if(fastOrSlow!=0){
+      float a = fastOrSlow.sqr.remap(0, 1, 1, 4);
+      if(fastOrSlow<0) a = 1/a;
+      speed *= a;
+    }
+
+    mouseMove1(f(nx)*speed, f(ny)*-speed);
+  }
+
+  void mouseWheel(float speed/+ -1..1 range +/, float fastOrSlow){
+    if(speed.abs>0.05f/+deadZone+/){
+      speed = signedsqr(speed) * 15; //base wheel speed
+      if(fastOrSlow!=0){
+        float f = fastOrSlow.sqr.remap(0, 1, 1, 5);
+        if(fastOrSlow<0) f = 1/f;
+        speed *= f;
+      }
+      if(const i = speed.iround) mouse_event(MOUSEEVENTF_WHEEL, 0, 0, i, 0);
+    }
+  }
+
 
 }
 

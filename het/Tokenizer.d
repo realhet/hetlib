@@ -24,6 +24,7 @@ const CompilerVersion = 100;
 //todo: nem kell a token.data-t azonnal kiszamolni. Csak lazy modon.
 //todo: TokenKind. camelCase
 
+//todo: "/+ newline //+ is bad.
 
 enum TokenKind {unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat};
 
