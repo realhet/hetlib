@@ -16,6 +16,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
   int baud = 9600;
   string config = "8N1";
   bool enabled;
+  bool showErrors;
 
   ubyte[] inBuf, outBuf;
 
@@ -53,7 +54,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
     void error(string s){
       errorCnt++;
       lastError = s;
-      ERR(s);
+      if(showErrors) ERR(s);
     }
 
     void comClose(){

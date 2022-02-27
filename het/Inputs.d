@@ -696,12 +696,10 @@ public: //standard stuff
 
 class InputEmulator{
   // redirects keyboard and mouse inputs to windows
-  protected{
-    string[] activeKeys, lastActiveKeys, pressedKeys, releasedKeys;
-    string repeatedKey, lastRepeatedKey;
-    double repeatState;
-    bool repeatedKeyPressed;
-  }
+  string[] activeKeys, lastActiveKeys, pressedKeys, releasedKeys;
+  string repeatedKey, lastRepeatedKey;
+  double repeatState;
+  bool repeatedKeyPressed;
 
   void updateKeyState(string[] activeKeys_){
     lastActiveKeys = activeKeys;
