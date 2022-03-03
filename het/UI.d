@@ -1143,7 +1143,7 @@ struct im{ static:
   void HLine(){ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); }
 
   void GroupFrame(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() fun){
-    Row!(srcModule, srcLine)({Column({
+    Row!(srcModule, srcLine)({Column({ //todo: why there is a row too, not just a column???
       border = "normal silver"; padding = "0"; margin = "2 0";
       fun();
     });});

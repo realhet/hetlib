@@ -2794,7 +2794,7 @@ auto splitSections(string sectionNameMarker="*")(ubyte[] data, string sectionDel
 }
 
 /// Because the one in std is bugging
-string outdent(string s){
+string outdent(string s){   //todo: this is lame
   return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n');
 }
 

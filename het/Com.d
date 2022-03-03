@@ -14,9 +14,11 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   string port;
   int baud = 9600;
-  string config = "8N1";
+  string params = "8N1";
   bool enabled;
   bool showErrors;
+
+  @property string config() const{ return format!"%s %d %s"(port, baud, params); }
 
   ubyte[] inBuf, outBuf;
 
@@ -31,7 +33,9 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   //stats
   size_t messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt;
+
   string lastError;
+  DateTime lastErrorTime, lastIncomingDataTime, lastIncomingMessageTime;
 
   void resetStats(){
     foreach(a; AliasSeq!(messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt)) a=0;
@@ -49,15 +53,18 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   protected{
     HANDLE hCom;
+    string openedConfig;
     double tLastFailedOpen=0;
 
     void error(string s){
       errorCnt++;
       lastError = s;
+      lastErrorTime = now;
       if(showErrors) ERR(s);
     }
 
     void comClose(){
+      openedConfig = "";
       CloseHandle(hCom);
       hCom = null;
       inBuf = [];
@@ -70,7 +77,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
       comClose;
 
       try{
-        enforce(config.sameText("8N1"), "Only 8N1 supported");
+        enforce(params.sameText("8N1"), "Only 8N1 supported");
 
         auto s = port;
         if(s.uc.startsWith("COM") && s.length>4) s = `\\.\`~s;
@@ -102,6 +109,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
         if(!SetCommTimeouts(hCom, &ct)) raise("SetComTimeouts", getLastErrorStr);
 
         lastError = "";
+        openedConfig = config;
       }catch(Exception e){
         error(e.simpleMsg);
         tLastFailedOpen = QPS;
@@ -128,9 +136,8 @@ class ComPort{ // ComPort /////////////////////////////////////////
   }
 
   void update(){
-
-    //disabled. Just shut it down
-    if(!enabled && hCom){
+    //disabled or config changed. Just shut it down
+    if(hCom && (!enabled || openedConfig!=config)){
       comClose;
       lastError = "";
     }
@@ -142,7 +149,6 @@ class ComPort{ // ComPort /////////////////////////////////////////
     }
 
     if(enabled && hCom){
-
       //write if there is something in outBuf
       if(outBuf.length){ write(outBuf); outBuf=[]; }
 
@@ -154,6 +160,8 @@ class ComPort{ // ComPort /////////////////////////////////////////
           bytesIn += bytesRead;
 
           inBuf ~= buf[0..bytesRead]; //appender???
+
+          lastIncomingDataTime = now;
         }
       }else{
         error("ReadFile: "~getLastErrorStr); //ERROR after 4 hours: The handle is invalid. (it is ok, because it was set to 0))
@@ -202,6 +210,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
             if(crc==crc2){
               messagesIn++;
+              lastIncomingMessageTime = now;
               fun(actLine);
             }else{
               error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
@@ -236,6 +245,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
             if(crc==crc2){
               messagesIn++;
+              lastIncomingMessageTime = now;
               fun(msg);
             }else{
               error("Crc error: "~msg.quoted);
@@ -273,6 +283,8 @@ class ComPortInfo{ //ComPortInfo ///////////////////////////////////////////////
   mixin ReadonlyField!(bool     , "exists");
   mixin ReadonlyField!(string   , "description");
   mixin ReadonlyField!(string   , "deviceId");
+
+  @property string name() const{ return "COM"~id.text; }
 
   enum defaultBaud = 9600, defaultBits = 8;
 
@@ -369,6 +381,8 @@ class ComPorts{ // ComPorts ////////////////////////////////////////////////////
   ComPortInfo[] ports;
 
   auto opIndex(int idx){ return ports.get(idx-1); }
+
+  auto existingPorts() { return ports.filter!("a.exists"); }
 
   //cache some registry keys
   //private __gshared static Key regKeyPortConfig_read, regKeyPortConfig_write;
@@ -513,3 +527,54 @@ class ComPorts{ // ComPorts ////////////////////////////////////////////////////
 }
 
 alias comPorts = Singleton!ComPorts;
+
+
+void ui(ComPort com, string title = ""){ import het.ui; with(im){
+
+  Row(bold(title=="" ? "Serial Communication" : title), "  ", {
+    ChkBox(com.enabled, "Enabled");
+
+    Text("  ");
+
+    Row({ Led(com.opened, clLime); Text("Open"); });
+
+    Text("  ");
+
+    Row({
+      if(!com.enabled) Led(false, clGray);
+      else if(com.lastErrorTime.toSeconds > com.lastIncomingMessageTime.toSeconds) Led(true, clRed); //toSeconds needed for nan->0
+      else Led(now.toSeconds - com.lastIncomingMessageTime.toSeconds < 1.0f/20, clLime);
+      Text("Comm");
+    });
+  });
+
+  Row({
+    Text("Port\t");
+    Edit(com.port, { width = fh*3; });
+
+    static bool choosePort;
+    if(!choosePort){
+      if(Btn("...")) choosePort = true;
+    }else{
+      Text(" Select ");
+      foreach(port; comPorts.existingPorts){
+        if(Btn(port.name, selected(sameText(port.name, com.port)), hint([port.description, port.deviceId].join(' ')), genericId(port.id))){
+          com.port = port.name;
+          choosePort = false;
+        }
+      }
+      if(Btn("\u25C0", hint("Cancel Serial Port selection."))) choosePort = false;
+    }
+  });
+
+  Row("Stats\t", {
+    Static(com.toString.split(" ")[2..$].join(" "));
+  });
+
+  Row("Error\t", {
+    Static(com.lastError=="" ? " " : com.lastError);
+    if(com.lastError!="") Comment((now.toSeconds-com.lastErrorTime.toSeconds).format!"%.0f secs ago");
+  });
+
+  //todo: statistics
+}}
