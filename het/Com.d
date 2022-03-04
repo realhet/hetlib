@@ -266,6 +266,60 @@ class ComPort{ // ComPort /////////////////////////////////////////
     }
   }
 
+
+  void UI(string title = "", void delegate() fun = null){ import het.ui; with(im){ //UI //////////////////////////////////////
+
+    Row(bold(title=="" ? "Serial Communication" : title), "  ", {
+      ChkBox(this.enabled, "Enabled");  //todo: enabled conflicts with im.enable
+
+      Text("  ");
+
+      Row({ Led(opened, clLime); Text("Open"); });
+
+      Text("  ");
+
+      Row({
+        if(!this.enabled) Led(false, clGray);
+        else if(lastErrorTime.toSeconds > lastIncomingMessageTime.toSeconds) Led(true, clRed); //note: toSeconds needed for nan->0
+        else Led(now.toSeconds - lastIncomingMessageTime.toSeconds < 1.0f/20, clLime);
+        Text("Comm");
+      });
+
+      Text("  ");
+
+      if(fun) fun();
+    });
+
+    Row({
+      Text("Port\t");
+      Edit(port, { width = fh*3; });
+
+      static bool choosePort;
+      if(!choosePort){
+        if(Btn("...")) choosePort = true;
+      }else{
+        Text(" Select ");
+        foreach(p; comPorts.existingPorts){
+          if(Btn(p.name, selected(sameText(p.name, port)), hint([p.description, p.deviceId].join(' ')), genericId(p.id))){
+            port = p.name;
+            choosePort = false;
+          }
+        }
+        if(Btn("\u25C0", hint("Cancel Serial Port selection."))) choosePort = false;
+      }
+    });
+
+    Row("Stats\t", {
+      Static(toString.split(" ")[2..$].join(" "));
+    });
+
+    Row("Error\t", {
+      Static(lastError=="" ? " " : lastError, { /*flex = 1;*/ });
+      if(lastError!="") Comment((now.toSeconds-lastErrorTime.toSeconds).format!"%.0f secs ago");
+    });
+
+    //todo: statistics
+  }}
 }
 
 
@@ -529,52 +583,3 @@ class ComPorts{ // ComPorts ////////////////////////////////////////////////////
 alias comPorts = Singleton!ComPorts;
 
 
-void ui(ComPort com, string title = ""){ import het.ui; with(im){
-
-  Row(bold(title=="" ? "Serial Communication" : title), "  ", {
-    ChkBox(com.enabled, "Enabled");
-
-    Text("  ");
-
-    Row({ Led(com.opened, clLime); Text("Open"); });
-
-    Text("  ");
-
-    Row({
-      if(!com.enabled) Led(false, clGray);
-      else if(com.lastErrorTime.toSeconds > com.lastIncomingMessageTime.toSeconds) Led(true, clRed); //toSeconds needed for nan->0
-      else Led(now.toSeconds - com.lastIncomingMessageTime.toSeconds < 1.0f/20, clLime);
-      Text("Comm");
-    });
-  });
-
-  Row({
-    Text("Port\t");
-    Edit(com.port, { width = fh*3; });
-
-    static bool choosePort;
-    if(!choosePort){
-      if(Btn("...")) choosePort = true;
-    }else{
-      Text(" Select ");
-      foreach(port; comPorts.existingPorts){
-        if(Btn(port.name, selected(sameText(port.name, com.port)), hint([port.description, port.deviceId].join(' ')), genericId(port.id))){
-          com.port = port.name;
-          choosePort = false;
-        }
-      }
-      if(Btn("\u25C0", hint("Cancel Serial Port selection."))) choosePort = false;
-    }
-  });
-
-  Row("Stats\t", {
-    Static(com.toString.split(" ")[2..$].join(" "));
-  });
-
-  Row("Error\t", {
-    Static(com.lastError=="" ? " " : com.lastError);
-    if(com.lastError!="") Comment((now.toSeconds-com.lastErrorTime.toSeconds).format!"%.0f secs ago");
-  });
-
-  //todo: statistics
-}}

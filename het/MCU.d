@@ -402,6 +402,8 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
     string color, description;
     int pin_B; //this is on the end of the cable
 
+    char state = '?'; //elements: ? 1 0
+
     protected auto decodeIdentifier() const{
       if(identifier=="") return tuple("", "");
       const p = identifier.split(':');
@@ -416,7 +418,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
     @property bool isOutput() const{ return identifier!="" && label.startsWith("OUT_"); }
 
 
-    void ui(float panelWidth) const{
+    void UI(float panelWidth) const{
       with(im) Row(YAlign.top, {
         style.bkColor = bkColor = clWhite;
         margin = "0";
@@ -448,7 +450,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
             }
           });
           if(identifier!="") Row({
-            Btn({ Text(pin~" ");  Led(random(2)==0, isInput ? clLime : clRed); }, genericId(pin));
+            Btn({ Text(pin~" ");  Led(state != '0', state.among('0', '1') ? isInput ? clLime : clYellow : clGray); }, genericId(pin));
           });
         });
       });
@@ -469,7 +471,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
       }
     }
 
-    void ui(float panelWidth=340) { with(im){
+    void UI(float panelWidth=340) { with(im){
       CableFrame({
         flags.yAlign = YAlign.baseline;
         ColorRow(color);
@@ -478,7 +480,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
         fh = 18;
         foreach(const wire; wires){
           Text("\n    ");
-          wire.ui(panelWidth);
+          wire.UI(panelWidth);
         }
         Text("\n");
         Row({
@@ -503,6 +505,16 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
   static string[] AllWireLabels(Cable[] cables){ return AllWires(cables).map!"a.label".array; }
 
   Cable[] cables; //all the cables connected to the MCU
+
+  void updateWireStates(bool[string] map){
+    foreach(ref c; cables)
+      foreach(ref w; c.wires)
+        if(auto a = w.label in map)
+          w.state = *a ? '1' : '0';
+        else
+          w.state = '?';
+  }
+
 
   abstract string generateProgram();
 
@@ -561,7 +573,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
 
   }//static @UI
 
-  void UI(){ with(im){
+  void UI_Cables(){ with(im){
     CableFrame({
       if(Btn("Generate program")){
         auto s = generateProgram;
@@ -572,7 +584,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
 
     //cables.each!"a.ui";
     Row({
-      Column({ cables.each!"a.ui"; });
+      Column({ cables.each!"a.UI"; });
       //Column({ cables[3..$].each!"a.ui"; });
     });
 

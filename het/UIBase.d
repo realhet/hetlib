@@ -127,6 +127,8 @@ struct HitInfo{ //Btn returns it
   float hover_smooth, captured_smooth;
   bounds2 hitBounds; // this is in ui coordinates. Problematic with zoomable and GUI views.
 
+  @property bool down() const{ return captured && enabled; }
+
   @property bool clickedAndEnabled() const{ return clicked & enabled; }
   alias clickedAndEnabled this;
 
