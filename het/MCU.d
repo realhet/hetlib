@@ -102,7 +102,7 @@ struct ConnectorInfo{// ConnectorInfo ///////////////////////////////////////
     vec2 tr(vec2 p){
       p -= uSize*.5f;
 
-      if(backSide!=isMale) p.x = -p.x;
+      if(backSide==isMale) p.x = -p.x;
       if(rot90) p = vec2(-p.y, p.x);
       if(rot180) p = vec2(-p.x, -p.y);
 
