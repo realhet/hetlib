@@ -577,7 +577,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
     CableFrame({
       if(Btn("Generate program")){
         auto s = generateProgram;
-        clipBoard.text = s;
+        clipboard.text = s;
         s.print;
       }
     });

@@ -5784,7 +5784,7 @@ auto dirPerS(in Path path, string pattern = "*"){ // dirPerS////////////////////
   return res;
 }
 
-struct clipBoard{ static: //clipBoard //////////////////////////
+struct clipboard{ static: //clipboard //////////////////////////
   import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT, EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
 
   bool hasFormat(uint fmt){

@@ -1339,7 +1339,7 @@ struct im{ static:
             if(KeyCombo("Down"      ).typed) cmdQueue ~= EditCmd(cDown              );
 
             if(KeyCombo("Ctrl+V Shift+Ins").typed){
-              cmdQueue ~= EditCmd(cInsert, clipBoard.text);
+              cmdQueue ~= EditCmd(cInsert, clipboard.text);
             }
           }
           //todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.

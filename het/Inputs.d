@@ -44,6 +44,9 @@ __gshared int[] virtualKeysDown;
 
 // Utils /////////////////////////////////////////////////////////////////////
 
+// VK_ letter and number constants
+static foreach(a; chain(iota('A', 'Z'+1), iota('0', '9'+1))) mixin(a.to!char.format!"enum VK_%1$s=%1$d;");
+
 void spiGetKeyboardDelays(ref float d1, ref float d2){
   //Gets windows keyboard delays in seconds
   //note: The query takes 6microsecs only, so it can go into the update loop
@@ -591,7 +594,7 @@ public: //standard stuff
 
       const flags = (press ? 0 : KEYEVENTF_KEYUP) | (isExtendedKey(vk) ? KEYEVENTF_EXTENDEDKEY : 0);
 
-      enum method = 0;
+      enum method = 1;
 
       static if(method==0){
         //const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
@@ -620,6 +623,23 @@ public: //standard stuff
   }
 
   void releaseKey(string key){ pressKey(key, false); }
+
+  void clickKey(string key){
+    pressKey(key);
+    releaseKey(key);
+  }
+
+  void pressCombo(string combo){
+    with(KeyComboEntry(combo)){
+      //todo: release already pressed modifiers
+      //todo: delays between presses
+      if(keys.length){
+        foreach(mod; keys[0..$-1]) pressKey(mod);
+        clickKey(keys.back);
+        foreach_reverse(mod; keys[0..$-1]) releaseKey(mod);
+      }
+    }
+  }
 
   void typeKey(string key){
     //todo: accent handling

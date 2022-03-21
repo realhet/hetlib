@@ -60,7 +60,7 @@ uint getWindowThreadProcessId(HWND handle){
 
 struct WindowInfo{
   HWND handle;
-  string text, className;
+  string title, className;
   uint pid;
   File file;
 }
@@ -70,7 +70,7 @@ auto getWindowInfo(HWND handle){
 
   WindowInfo res;
   res.handle = handle;
-  res.text = getWindowText(handle);
+  res.title = getWindowText(handle);
   res.className = getClassName(handle);
   res.pid = getWindowThreadProcessId(handle);
 
