@@ -293,20 +293,23 @@ static private:
   }
   __gshared Recorder recorder;
 
+  private bool triggerFocusMainWindow;
+
   void myWrite(string s){
+    if(s.empty) return;
 
     void wr(string s) {
       if(indent>0){
         auto si = "\n" ~ "    ".replicate(indent.min(20));
-        s = s.replace("\n", si);
+        s = s.safeUTF8.replace("\n", si);   //opt: safeUTF8 is fucking slow!!!!
       }
 
-      stdWrite(s);
+      stdWrite(s); //this is safe for UTF8 errors.
       if(recorder.recording) synchronized recorder.recordedStr ~= s;
     }
 
     while(!s.empty){
-      auto i = s.countUntil!(a => a.inRange('\33', '\36'));
+      auto i = (cast(ubyte[])s).countUntil!(a => a.inRange('\33', '\36'));  //works on ubyte[], so it can't raise UTF8 errors
       if(i<0) { wr(s); break; } //no escapes at all
       if(i>0) { wr(s[0..i]); s = s[i..$]; } //write test before the escape
       //here comes a code
@@ -325,10 +328,14 @@ static private:
       }
     }
     flush; //it is needed
+
+    if(chkSet(triggerFocusMainWindow) && afterFirstPrintFlushed) afterFirstPrintFlushed();
   }
 
 static public:
   __gshared int indent = 0;
+
+  void delegate() afterFirstPrintFlushed; //MainWindow can regain it's focus
 
   void flush(){ stdout.flush; }
 
@@ -2283,6 +2290,19 @@ auto toPWChar(S)(S s) nothrow { //converts to Windows' widestring
   const(wchar)* r;
   try { r = toUTF16z(s); }catch{}
   return r;
+}
+
+/// replaces UTF errors with the error character. So the string will be safe for furster processing.
+string safeUTF8(string s){
+  //opt: fucking slow!!!
+  string res;
+  while(s.length){
+    size_t i;
+    dchar ch = s.decode!(Yes.useReplacementDchar)(i);
+    res ~= ch;
+    s = s[i..$];
+  }
+  return res;
 }
 
 //builds c zterminated string

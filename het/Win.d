@@ -317,7 +317,12 @@ int main(string[] args)
     while(1){
       //note: GetMessage waits, if there is nothing;
       //note: PeekMessage returns even if there is nothing.
+
+      PING(2);
+
       while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)){
+        PING(3);
+
         TranslateMessage(&msg);
         DispatchMessage(&msg);
 
@@ -337,8 +342,10 @@ int main(string[] args)
         }
       }
 
-      if(canSleep) sleep(1); //sleep 1 does nothing
-
+      if(canSleep){
+        PING(4);
+        sleep(1); //sleep 1 does nothing
+      }
     }
 
     done:
@@ -509,6 +516,10 @@ public:
 
   TimeLine timeLine;
 
+  void setForegroundWindowIfVisible(){
+    if(isVisible) SetForegroundWindow(hwnd);
+  }
+
   this(){
     //acquire window name
     fName = _upcomingWindowName;
@@ -521,7 +532,11 @@ public:
     fhwnd = createWin(name, name, getWindowStyle, getWindowStyleEx);
     windowList[hwnd] = this; //after this, the window can accept wm_messages
 
-    if(isMain){ mainWindow = this; mainWindowHandle = hwnd; }
+    if(isMain){
+      mainWindow = this; mainWindowHandle = hwnd;
+
+      console.afterFirstPrintFlushed = &setForegroundWindowIfVisible;
+    }
 
     dbg.setExeHwnd(hwnd);
 
@@ -594,14 +609,42 @@ public:
 
 //  static bool wasUpdateAfterPaint;
 
-  enum dontUpdate = false, dontPaint = false; //replace "enum" with "auto", and it can be modified...
-
   LRESULT onWmUser(UINT message, WPARAM wParam, LPARAM lParam){
     return 0;
   }
 
+  protected bool inRedraw;
+  protected int updatesSinceLastDraw;
+
+  protected void internalRedraw(){
+    if(inRedraw){ WARN("Already in internalRedraw()"); return; }
+    if(inUpdate){ WARN("Already in internalUpdate()"); return; }
+    inRedraw = true; scope(exit){ inRedraw = false; updatesSinceLastDraw = 0; }
+
+    auto t0 = QPS;
+    onBeginPaint;
+    timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0);  t0 = QPS;
+    internalPaint;
+    timeLine.addEvent(TimeLine.Event.Type.paint      , t0);  t0 = QPS;
+    onEndPaint;
+    timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0);  t0 = QPS;
+    onSwapBuffers;
+    timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0);  //t0 = QPS;
+    timeLine.restrictSize(60);
+  }
+
+  protected void forceRedraw(){
+    RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW);
+  }
+
   protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam){
     if(0) LOG(message.winMsgToString, wParam, lParam);
+
+    //todo: rendesen megcsinalni a game loopot.
+    // https://www.google.com/search?q=win32+game+loop&rlz=1C1CHBF_enHU813HU813&oq=win32+game+loop&aqs=chrome..69i57.3265j0j4&sourceid=chrome&ie=UTF-8
+    // https://gist.github.com/lynxluna/4242170
+    // https://gamedev.stackexchange.com/questions/59857/game-loop-on-windows
+    // https://docs.microsoft.com/en-us/cpp/mfc/idle-loop-processing?view=msvc-170
 
     switch (message){
 
@@ -618,20 +661,8 @@ public:
           //todo: window resize eseten nincs update, csak paint. Emiatt az UI szarul frissul.
           //if(!wasUpdateAfterPaint) internalUpdate;  // <--- Ez meg mouse input bugokat okoz.
 
-          if(!dontPaint){
-            auto t0 = QPS;
-            onBeginPaint;
-            timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0);  t0 = QPS;
-            internalPaint;
-            timeLine.addEvent(TimeLine.Event.Type.paint      , t0);  t0 = QPS;
-            onEndPaint;
-            timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0);  t0 = QPS;
-            onSwapBuffers;
-            timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0);  //t0 = QPS;
-            timeLine.restrictSize(60);
-          }
-
-          //wasUpdateAfterPaint = false;
+          if(updatesSinceLastDraw==0) internalUpdate; //fix: move window with mouse, no update called. 220324
+          internalRedraw;
         }
 
         return 0;
@@ -640,8 +671,8 @@ public:
       case WM_DESTROY   : this.destroy; if(isMain) PostQuitMessage(0); return 0;
 
       case WM_MyStartup : if(isMain) SetTimer(hwnd, 999, 10, null); return 0; //this is a good time to launch the timer. Called by a delayed PostMessage
-      case WM_TIMER     : if(wParam==999) if(!dontUpdate) internalUpdate; if(chkClear(pendingInvalidate)) RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); return 0;
-      case WM_SIZE      : if(!dontUpdate) internalUpdate; RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); return 0;
+      case WM_TIMER     : if(wParam==999){ internalUpdate; if(chkClear(pendingInvalidate)) forceRedraw; } return 0;
+      case WM_SIZE      : internalUpdate; forceRedraw; return 0;
 
 
       case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
@@ -842,8 +873,14 @@ public:
     onWglMakeCurrent(false);
   }
 
+  private bool inUpdate;
+
   private final void internalUpdate() {
     //static if(1){ const T0 = QPS; scope(exit) print("IU", (QPS-T0)*1000); }
+
+    if(inUpdate){ WARN("Already in internalUpdate()"); return; }
+    inUpdate = true;
+    scope(exit) inUpdate = false;
 
     enforce(isMain, "Window.internalUpdate() called from non main window.");
 
@@ -853,6 +890,8 @@ public:
     scope(exit){
       enableUpdate;
       //wasUpdateAfterPaint = true;
+
+      //forceRedraw; //Bug: ha ez itt van, akkor az ablakot lehetetlen bezarni
     }
 
     //handle debug.kill

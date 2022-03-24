@@ -113,6 +113,8 @@ struct im{ static:
 
   //todo: package visibility is not working as it should -> remains public
   void _beginFrame(TargetSurface[2] targetSurfaces){ //called from mainform.update
+PING(5);
+
     static if(doTiming){ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
 
     enforce(!inFrame, "im.beginFrame() already called.");
@@ -154,6 +156,8 @@ struct im{ static:
   }
 
   void _endFrame(){ //called from end of update
+PING(6);
+
     static if(doTiming){ const T0 = QPS; scope(exit) tEndFrame = QPS-T0; }
 
     enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
@@ -228,6 +232,8 @@ struct im{ static:
   Drawing drVisualizeHitStack;
 
   void _drawFrame(string restrict="")(){
+
+PING(7);
     static if(doTiming){ const T0 = QPS; scope(exit){ tDraw = QPS-T0; print(format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"(tBeginFrame*1000, tEndFrame*1000, tDraw*1000));} }
 
     static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");

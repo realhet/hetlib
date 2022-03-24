@@ -12,13 +12,13 @@ class ComPort{ // ComPort /////////////////////////////////////////
   enum InputBufferSize = 4096;
 
 
-  string port;
-  int baud = 9600;
-  string params = "8N1";
+  @STORED string port = "";
+  @STORED int baud = 9600;
+  @STORED string params = "8N1";
   bool enabled;
   bool showErrors;
 
-  @property string config() const{ return format!"%s %d %s"(port, baud, params); }
+  @property string config() const{ return [port, baud.text, params].join(' '); }
 
   ubyte[] inBuf, outBuf;
 
@@ -80,6 +80,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
         enforce(params.sameText("8N1"), "Only 8N1 supported");
 
         auto s = port;
+        if(s.map!isDigit.all) s = "COM" ~ s;
         if(s.uc.startsWith("COM") && s.length>4) s = `\\.\`~s;
 
         auto h = CreateFile(s.toPWChar, GENERIC_READ | GENERIC_WRITE, 0, null, OPEN_EXISTING, 0, null);
