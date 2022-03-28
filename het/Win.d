@@ -318,10 +318,10 @@ int main(string[] args)
       //note: GetMessage waits, if there is nothing;
       //note: PeekMessage returns even if there is nothing.
 
-      PING(2);
+      //PING(2);
 
       while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)){
-        PING(3);
+        //PING(3);
 
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -343,7 +343,7 @@ int main(string[] args)
       }
 
       if(canSleep){
-        PING(4);
+        //PING(4);
         sleep(1); //sleep 1 does nothing
       }
     }
