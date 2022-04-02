@@ -1574,6 +1574,8 @@ struct im{ static:
 
       foreach(i, c; subCells){
         const first = i==0, last = i+1==subCells.length;
+
+        //stick them together with 0 margin
         if(!first) c.margin.left = 0;
         if(!last ) c.margin.right= 0;
       }
