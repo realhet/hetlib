@@ -2,7 +2,6 @@ module het.utils;
 
 __gshared logFileOps = false;
 
-
 pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 
 //toto:  //bug: tag must be a thing
@@ -84,7 +83,8 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 // Imports /////////////////////////////
 
 // std imports
-public import std.string, std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta, core.stdc.string; //het.math also imports std.algorithm, std.functional
+public import std.array, std.string, std.conv, std.typecons, std.range, std.format, std.traits, std.meta; //het.math also imports std.algorithm, std.functional
+public import core.stdc.string : memcpy;
 public import std.utf;
 public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum;
 public import std.uri: urlEncode = encode, urlDecode = decode;
@@ -125,6 +125,14 @@ import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std
   std.json, std.digest.digest, std.parallelism, core.runtime;
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
+
+
+// LDC 1.28 bugfix:
+
+import std.digest : toHexString;  //unknown id: toHexString   -> std.digest.digest is deprecated
+public import std.array : join;  //het.utils:  blabla.join conflicts with blabla.join   
+//het.ui: LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
+
 
 // MSVC compatibility /////////////////////////
 

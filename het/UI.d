@@ -1333,7 +1333,7 @@ struct im{ static:
             }  //jajj de korulmenyes ez a switch case fos....
           }
 
-          with(het.inputs){
+          {
             if(KeyCombo("LMB"       ).hold ) cmdQueue ~= EditCmd(cMouse, localMouse );
             if(KeyCombo("Backspace" ).typed) cmdQueue ~= EditCmd(cDeleteBack        );
             if(KeyCombo("Del"       ).typed) cmdQueue ~= EditCmd(cDelete            );
@@ -1345,7 +1345,7 @@ struct im{ static:
             if(KeyCombo("Down"      ).typed) cmdQueue ~= EditCmd(cDown              );
 
             if(KeyCombo("Ctrl+V Shift+Ins").typed){
-              cmdQueue ~= EditCmd(cInsert, clipboard.text);
+              cmdQueue ~= EditCmd(cInsert, clipboard.text); //LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
             }
           }
           //todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.
