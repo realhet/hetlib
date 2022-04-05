@@ -130,7 +130,7 @@ public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 // LDC 1.28 bugfix:
 
 import std.digest : toHexString;  //unknown id: toHexString   -> std.digest.digest is deprecated
-public import std.array : join;  //het.utils:  blabla.join conflicts with blabla.join   
+public import std.array : join;  //het.utils:  blabla.join conflicts with blabla.join
 //het.ui: LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
 
 

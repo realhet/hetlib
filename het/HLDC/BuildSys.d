@@ -21,8 +21,11 @@ module buildsys;
 [-] kill program szinten meghiva a DIDE debug service-t, azt majd tiltani kell. Ugyanis kesobb allandoan mukodni fog ez az exe es emiatt nem csatlakozhat ra a dide-re! Ezen agyalni kell!
 */
 
-import het.utils, het.parser, std.file, std.digest.sha, std.regex, std.path, std.process;
+import het.utils, het.parser, std.file, std.regex, std.path, std.process;
 
+
+enum LDCVER = 128; //the targeted LDC version by this builder
+                   //valid versions: 120, 128
 
 class Executor{
   import std.process, std.file : chdir;
@@ -201,27 +204,29 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workP
 //////////////////////////////////////////////////////////////////////////////
 
 immutable
-  versionStr = "1.05",
+  versionStr = "1.06",
   mainHelpStr =  //todo: ehhez edditort csinalni az ide-ben
-  "\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC2\33\7 compiler.
-by \33\xC0re\33\xF0al\33\xA0het\33\7 2016-2021  Build: "~__TIMESTAMP__~"
+  "\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC "~{ auto s = LDCVER.text; return s[0]~"."~s[1..$]; }()~"\33\7  compiler.
+by \33\0\34\x0Cre\34\x0Fal\34\x0Ahet\34\0\33\7 2016-2022  Build: "~__TIMESTAMP__~"
 
 \33\17Usage:\33\7  hldc.exe <mainSourceFile.d> [options]
 
 \33\17Daemon mode:\33\7  hldc.exe daemon [default options]
 
 \33\17Requirements:\33\7
- * Visual Studio 2017 Community (for mslink.exe and the static libs)
+ * Visual Studio 2017 Community Edition (for the VC runtime, not anymore for the ms linker)
  * Visual D (this installs LDC2 and sets up the environment for VS)
  * LDC location must be: c:\\d\\ldc2\\bin\\ldc2.exe (to access precompiled libs from there)
  * Implicit path of static libraries: c:\\d\\ldc2\\lib64\\ (put any .lib files here)
- * Implicit path of library includes: c:\\d\\libs\\ (you can put here your packages)
- * Best practice: 64bit target, incremental build
+ * Implicit path of library includes: c:\\d\\libs\\ (you can put here your package folders)
+ * Only supports Windows 64bit target, incremental build
  * Main module must start with this build-macro: //@EXE
 
 \33\17Known bugs:\33\7
- * Don't use Tuples in format(). They're conflicting with the -allinst parameter which is
+ * Fixed in LDC 1.28: Don't use Tuples in format(). They're conflicting with the -allinst parameter which is
    required for incremental builds.
+ * Resource building is broken.
+ * Dll/Lib output is also broken.
 
 \33\17Options:\33\7
 $$$OPTS$$$
@@ -335,6 +340,7 @@ Path getWorkPath(string[] args, lazy Path defaultPath)
   return s.getWorkPath(defaultPath);
 }
 
+
 private struct MSVCEnv{ static{ // MSVCEnv ///////////////////////////////
   private{
     string[string] amd64, x86;
@@ -354,7 +360,13 @@ private struct MSVCEnv{ static{ // MSVCEnv ///////////////////////////////
     }
 
     string[string] acquire(ref string[string] e, string arch){
-      if(e.empty) get(e, `msvcenv `~arch~` && set`);
+      if(e.empty){
+        static if(LDCVER>=128){
+          get(e, `set`); //msvcenv.bat is deprecated.
+        }else{
+          get(e, `msvcenv `~arch~` && set`);
+        }
+      }
       return e;
     }
   }
@@ -371,11 +383,12 @@ private struct MSVCEnv{ static{ // MSVCEnv ///////////////////////////////
 
 private string calcHash(string data, string data2 = "") //todo: XXH-ra atirni ezt
 {
-  auto sha = new SHA1Digest;
+  return [(data~data2).xxh3_64].binToHex;
+/*  auto sha = new SHA1Digest;
   sha.reset;
   sha.put(cast(ubyte[])data);
   sha.put(cast(ubyte[])data2);
-  return toHexString(sha.finish);
+  return toHexString(sha.finish);*/
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -975,7 +988,7 @@ private: //current build
 
         //create rc content
         auto rcContent = resFiles.byKeyValue
-          .map!(kv => format("Z%s 999 %s", toHexString(cast(ubyte[])kv.key), toCString(kv.value))).join("\r\n");
+          .map!(kv => format("Z%s 999 %s", kv.key.binToHex, toCString(kv.value))).join("\r\n");
         rcFile.write(rcContent);
 
         //call RC.exe
@@ -1016,23 +1029,36 @@ private: //current build
       default: linkOpts ~= fn; //treat as an option
     }
 
-    auto cmd = ["link",
-                `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //todo: the place for these is in DPath
-                `/OUT:`~targetFile.fullName,
-                `/MACHINE:`~(is64bit ? "X64" : "X86")]
-                ~linkOpts
-                ~libFiles
-                ~`legacy_stdio_definitions.lib`
-                ~objFiles;
+    //todo: /ENTRY, /SUBSYSTEM=CONSOLE/WINDOWS  -> VisualD has help.
+
+    string[] cmd;
+    static if(LDCVER>=128){
+      cmd = ["ldc2", `-of=`~targetFile.fullName,
+                     `--link-internally`,  //default = ms link
+                     `--mscrtlib=libcmt`]  //default = libcmt
+                   ~linkOpts.map!"`-L=`~a".array
+                   ~objFiles;
+    }else{
+      cmd = ["link",  `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //todo: the place for these is in DPath
+                      `/OUT:`~targetFile.fullName,
+                      `/MACHINE:`~(is64bit ? "X64" : "X86")]
+                  ~linkOpts
+                  ~libFiles
+                  ~`legacy_stdio_definitions.lib`
+                  ~objFiles
+                  ~["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
+    }
 
     if(resFile) cmd ~= resFile.fullName;
 
     // add libs for LDC
-    cmd ~= ["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
     /+note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
       https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
         libcmt.lib: static CRT link library for a release build (/MT)
-        msvcrt.lib: import library for the release DLL version of the CRT (/MD) +/
+        msvcrt.lib: import library for the release DLL version of the CRT (/MD)
+      LDC 1.28: no need to add manually.  --mscrtlib=...
+    +/
+
 
     auto line = joinCommandLine(cmd);
     logln(bold("LINKING: "), line);
