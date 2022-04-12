@@ -45,27 +45,41 @@ private enum
   AlignEpsilon = .001f; //avoids float errors that come from float sums of subCell widths/heights
 
 
-// Global shit //////////////////////////////
+// Global dependency injection shit //////////////////////////////
 
 //todo: these ugly things are only here to separate uiBase for ui.
 
 __gshared RGB function() g_actFontColorFunct;
 
-auto actFontColor(){
-  return enforce(g_actFontColorFunct , "initialize g_actFontColor!")();
+auto g_actFontColor(){
+  assert(g_actFontColorFunct);
+  return  g_actFontColorFunct();
 }
 
 __gshared float function() g_actFontHeightFunct;
 
-auto actFontHeight(){
-  return enforce(g_actFontHeightFunct , "initialize g_actFontHeight!")();
+auto g_actFontHeight(){
+  assert(g_actFontHeightFunct);
+  return g_actFontHeightFunct();
 }
+
 
 __gshared Drawing function(Container) g_getOverlayDrawingFunct;
 
-auto getOverlayDrawing(Container cntr){
-  return enforce(g_getOverlayDrawingFunct, "g_getOverlayDrawingFunct")(cntr);
+auto g_getOverlayDrawing(Container cntr){
+  assert(g_getOverlayDrawingFunct);
+  return g_getOverlayDrawingFunct(cntr);
 }
+
+
+//todo: Eliminate this dependency injection: addDrawCallback() should be maintained by het.uibase and not het.ui!!
+__gshared void function(Drawing, Container) function(Container) g_getDrawCallbackFunct;
+
+auto g_getDrawCallback(Container cntr){
+  assert(g_getDrawCallbackFunct);
+  return g_getDrawCallbackFunct(cntr);
+}
+
 
 void rememberEditedWrappedLines(Row row, WrappedLine[] wrappedLines){
   import het.ui: im;
@@ -464,7 +478,7 @@ struct TextStyle{
   void modify(string[string] map){
     map.rehash;
     if(auto p="font"       in map) font          = (*p);
-    if(auto p="fontHeight" in map) fontHeight    = (*p).toWidthHeight(actFontHeight).iround.to!ubyte;
+    if(auto p="fontHeight" in map) fontHeight    = (*p).toWidthHeight(g_actFontHeight).iround.to!ubyte;
     if(auto p="bold"       in map) bold          = (*p).toInt!=0;
     if(auto p="italic"     in map) italic        = (*p).toInt!=0;
     if(auto p="underline"  in map) underline     = (*p).toInt!=0;
@@ -671,7 +685,7 @@ struct Padding{  //Padding, Margin /////////////////////////////////////////////
     void vert(float a) { top = bottom = a; }
   }
 
-  private static float toF(string s){ return s.toWidthHeight(actFontHeight); }
+  private static float toF(string s){ return s.toWidthHeight(g_actFontHeight); }
 
   void opAssign(in string s){ setProps(s); }
 
@@ -751,7 +765,7 @@ struct Border{
     if(!hasWidth && style!=BorderStyle.none) width = 1; //default width
     p = p[1..$];
     if(p.empty){
-      color = actFontColor; //default color
+      color = g_actFontColor; //default color
       return;
     }
 
@@ -762,7 +776,7 @@ struct Border{
   void setProps(string[string] p, string prefix){
     p.setParam(prefix, (string s){ setProps(s); });
 
-    p.setParam(prefix~".width", (string a){ width = a.toWidthHeight(actFontHeight); });
+    p.setParam(prefix~".width", (string a){ width = a.toWidthHeight(g_actFontHeight); });
     p.setParam(prefix~".color", (RGB    a){ color = a; });
     p.setParam(prefix~".style", (string a){ style = a.toBorderStyle; });
   }
@@ -880,12 +894,12 @@ class Cell{ // Cell ////////////////////////////////////
 
   //params
   void setProps(string[string] p){
-    p.setParam("width" , (string s){ width  = s.toWidthHeight(actFontHeight); });
-    p.setParam("height", (string s){ height = s.toWidthHeight(actFontHeight); });
-    p.setParam("innerWidth" , (string s){ innerWidth  = s.toWidthHeight(actFontHeight); });
-    p.setParam("innerHeight", (string s){ innerHeight = s.toWidthHeight(actFontHeight); });
-    p.setParam("outerWidth" , (string s){ outerWidth  = s.toWidthHeight(actFontHeight); });
-    p.setParam("outerHeight", (string s){ outerHeight = s.toWidthHeight(actFontHeight); });
+    p.setParam("width" , (string s){ width  = s.toWidthHeight(g_actFontHeight); });
+    p.setParam("height", (string s){ height = s.toWidthHeight(g_actFontHeight); });
+    p.setParam("innerWidth" , (string s){ innerWidth  = s.toWidthHeight(g_actFontHeight); });
+    p.setParam("innerHeight", (string s){ innerHeight = s.toWidthHeight(g_actFontHeight); });
+    p.setParam("outerWidth" , (string s){ outerWidth  = s.toWidthHeight(g_actFontHeight); });
+    p.setParam("outerHeight", (string s){ outerHeight = s.toWidthHeight(g_actFontHeight); });
   }
   final void setProps(string cmdLine){ setProps(cmdLine.commandLineToMap); }
 
@@ -1520,7 +1534,7 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
       }else if(cmd=="space"  ){
         auto r = new Row("", ts);
         r.innerHeight = ts.fontHeight;
-        r.outerWidth = params["1"].toWidthHeight(actFontHeight);
+        r.outerWidth = params["1"].toWidthHeight(g_actFontHeight);
         r.setProps(params);
         container.append(r);
       }else if(cmd=="flex"  ){
@@ -1953,7 +1967,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b___________01____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b______00001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -1987,10 +2001,11 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     // ------------------------ 32bits ---------------------------------------
     bool          , "clickable"         , 1, // If false, hittest will not check this as clicked. It checks the parent instead.
     bool          , "noBackground"      , 1,
-
     bool          , "cullSubCells"      , 1, // clipSubCells must be enabled too
+    bool          , "_hasDrawCallback"  , 1,
+    bool          , "selected"          , 1, //maintained by system, not by user (in applyBtnStyle)
 
-    int           , "_dummy"            ,29,
+    int           , "_dummy"            ,27,
   ));
 }
 
@@ -2332,7 +2347,10 @@ class Container : Cell { // Container ////////////////////////////////////
     }
 
     if(flags._hasOverlayDrawing)
-      dr.copyFrom(getOverlayDrawing(this));
+      dr.copyFrom(g_getOverlayDrawing(this));
+
+    if(flags._hasDrawCallback)
+      g_getDrawCallback(this)(dr, this);
 
     onDraw(dr);
 

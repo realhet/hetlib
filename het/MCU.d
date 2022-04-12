@@ -229,8 +229,11 @@ struct ConnectorInfo{// ConnectorInfo ///////////////////////////////////////
         if(numPins>=4) P(R, 1.75, "2");
         if(numPins>=5) P(0, 0   , "5");
       }else if(numPins==8){
-        enum R = 3.25f, e = .2f, N = 8;
-        iota(N).each!(i => P(R, i.remap(0, N-1, e, 2-e), [1, 8, 7, 6, 5, 4, 3, 2][i].text));
+        {
+          enum R = 3.25f, e = .2f, N = 7;
+          iota(N).each!(i => P(R, i.remap(0, N-1, e, 2-e), [2, 3, 4, 5, 6, 7, 1][i].text));
+        }
+        P(0, 0   , "8");
       }else if(numPins==12){
         {
           enum R = 3.5f, e = .18f, N = 9;
@@ -318,7 +321,7 @@ auto allConnectors(){ return chain(allDSubConnectors, allM12Connectors); }
         bk = actContainer.bkColor;
 
   struct IMData{
-    bool opened, genderOverride, backSide;
+    bool opened=true, genderOverride, backSide;
     int rotation;
   }
 
@@ -518,7 +521,6 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
 
   abstract string generateProgram();
 
-
   // helper functs /////////////////////////////////////////////////////
 
   static bool arduinoPinLessThan(string a, string b){ //sort index for arduino pin names
@@ -573,30 +575,27 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
 
   }//static @UI
 
-  void UI_Cables(){ with(im){
-    CableFrame({
-      if(Btn("Generate program")){
-        auto s = generateProgram;
-        clipboard.text = s;
-        s.print;
-      }
-    });
+  void BtnGenerateProgram(){
+    with(im)if(Btn("Generate program")){
+      auto s = generateProgram;
+      clipboard.text = s;
+      s.print;
+    }
+  }
 
-    //cables.each!"a.ui";
-    Row({
-      Column({ cables.each!"a.UI"; });
-      //Column({ cables[3..$].each!"a.ui"; });
-    });
+  @STORED int cablesTabsIdx;
 
-    /+foreach(conn; allConnectors){
-      Row({
-        flags.yAlign = YAlign.center;
-        Text(conn, "\t");
-        //const ci = connectorInfo(conn);
-        ConnectorBtn(conn, genericId(conn)); //opt: this graphics is fucking slow. 30FPS
-      });
-    }+/
+  void TabsCables(){ with(im){
+    Tabs!(
+      "a.name",     //title, generated from the item
+      (a){ a.UI; }  //content generated form the item
+    )
+    (cables, // items
+      cablesTabsIdx, //index to remember selected item
+      genericArg!"includeAll"(true) //extra options: includeAll -> Shows an "All" option at the end of the items.
+    );
   }}
+
 }
 
 

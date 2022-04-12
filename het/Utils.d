@@ -5642,7 +5642,7 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
 
   if(recursive){
     foreach(p; paths.map!(a => Path(path, a.name))){
-      LOG("listFiles recursion:", p);
+      //LOG("listFiles recursion:", p);
       files ~= listFiles(p, mask, "", Yes.onlyFiles, Yes.recursive);
     }
 
@@ -6146,7 +6146,7 @@ private{
     }
   }
 
-  SYSTEMTIME decodeDate(double dateTime)
+  public SYSTEMTIME decodeDate(double dateTime)
   {
     enum D1 = 365,
          D4 = D1 * 4 + 1,
@@ -6314,13 +6314,14 @@ struct Time{
 
 
 struct DateTime{
-  private static __gshared {
+  static __gshared {
     extern(Windows) nothrow @nogc void function(FILETIME*) myGetSystemTimePreciseAsFileTime = &GetSystemTimeAsFileTime;
 
-    void loadFunctions(){
+    private void loadFunctions(){
       getProcAddress(loadLibrary("kernel32.dll"), "GetSystemTimePreciseAsFileTime", myGetSystemTimePreciseAsFileTime, false);
     }
   }
+
 
   /+private+/ double raw;
 

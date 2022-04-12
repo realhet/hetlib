@@ -33,7 +33,9 @@ public:
     this.scale = scale;
   }
 
-  override string toString() const { return format!"View2D(%s, %s)"(origin, scale); }
+  override string toString() const {
+    return format!"View2D(%s, %s)"(origin, scale);
+  }
 
   @property{ float logScale() const { return m_logScale; }  void  logScale(float s){ m_logScale = s; m_scale = pow(2, logScale); m_invScale = 1/scale; }  }
   @property{ float scale   () const { return m_scale;    }  void  scale   (float s){ logScale = log2(s); }                                                }

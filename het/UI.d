@@ -3,6 +3,7 @@ module het.ui;
 import het.utils, het.draw2d, het.inputs, het.stream, het.opengl;
 
 //todo: Unqual is not needed to check a type. Try to push this idea through a whole testApp.
+//todo: animated caret, Neovide style: https://youtu.be/Vd5AACp6GG0?t=421
 
 import std.traits, std.meta;
 
@@ -126,6 +127,7 @@ struct im{ static:
     static auto getActFontHeight(){ return float(textStyle.fontHeight); }  het.uibase.g_actFontHeightFunct = &getActFontHeight;
     static auto getActFontColor (){ return textStyle.fontColor;         }  het.uibase.g_actFontColorFunct  = &getActFontColor ;
     het.uibase.g_getOverlayDrawingFunct = &getOverlayDrawing;
+    het.uibase.g_getDrawCallbackFunct = &getDrawCallback;
 
     //update building/measuring/drawing state
     inFrame = true;
@@ -609,19 +611,37 @@ struct im{ static:
   }
 
   // overlay drawing //////////////////////////
-  Drawing[.Container] overlayDrawings;
+  private Drawing[.Container] overlayDrawings;
 
   void addOverlayDrawing(Drawing dr){
     enforce(actContainer !is null);
-    enforce(!actContainer.flags._hasOverlayDrawing, "Container already has an overlay drawing.");
+    enforce(!actContainer.flags._hasOverlayDrawing, "Container already has an OverlayDrawing.");
 
     actContainer.flags._hasOverlayDrawing = true;
     overlayDrawings[actContainer] = dr;
   }
 
-  Drawing getOverlayDrawing(.Container cntr){
+  private Drawing getOverlayDrawing(.Container cntr){
     if(auto drOverlay = cntr in overlayDrawings) return *drOverlay;
                                             else return null;
+  }
+
+  // DrawCallback ////////////////////////
+  alias DrawCallback = void function(Drawing, .Container);
+
+  private DrawCallback[.Container] drawCallbacks;
+
+  void addDrawCallback(DrawCallback fun){
+    enforce(actContainer !is null);
+    enforce(!actContainer.flags._hasDrawCallback, "Container already has a DrawCallback.");
+
+    actContainer.flags._hasDrawCallback = true;
+    drawCallbacks[actContainer] = fun;
+  }
+
+  private auto getDrawCallback(.Container cntr){
+    if(auto cb = cntr in drawCallbacks) return *cb;
+                                   else return null;
   }
 
   //easy access
@@ -1148,11 +1168,28 @@ struct im{ static:
 
   void HLine(){ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); }
 
-  void GroupFrame(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() fun){
-    Row!(srcModule, srcLine)({Column({ //todo: why there is a row too, not just a column???
-      border = "normal silver"; padding = "0"; margin = "2 0";
+  void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(void delegate() fun, A args){ //Grp /////////////////////////////
+    Cntr({
+      border = "2 normal silver"; padding = "0 4"; margin = "2 4";
       fun();
-    });});
+    }, args);
+  }
+
+  void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)(T title, void delegate() fun, A args){
+    Container({
+      Row({ padding.left+=fh/4; padding.right+=fh/4; }, title);
+      lastContainer.outerPos.x = fh/2;
+      lastContainer.measure;
+      const hh = lastContainer.outerHeight;
+
+      Grp!(Cntr, srcModule, srcLine)({
+        margin.top += (hh*(3/8.0f)).iround;
+        padding.top = max(padding.top, hh-margin.top-border.width);
+        fun();
+      }, args);
+    });
+
+    swap(lastContainer.subCells[0], lastContainer.subCells[1]); //nasty trick to measure the caption first
   }
 
   // apply Btn and Edit style////////////////////////////////////
@@ -1191,6 +1228,8 @@ struct im{ static:
     auto bColor = mix(style.bkColor, clWinBtnHoverBorder, hover);
 
     applyBtnBorder(bColor);
+
+    flags.selected = selected; //todo: nem itt van a helye. minden containernek kezelnie kell a selected generic parametert, a focused mar kozpontositva van. Az enabledet is meg kell igy csinalni.
 
     if(!enabled){
       style.fontColor = clWinBtnDisabledText;
@@ -1610,6 +1649,113 @@ struct im{ static:
     auto res = BtnRow!(srcModule, srcLine)(s, getEnumMembers!E, args);
     if(res) ignoreExceptions({ e = s.to!E; });
     return res;
+  }
+
+
+  bool TabsHeader(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, I, A...)(T[] items, ref I idx, A args) // TabsHeader /////////////////////////////
+  if(isIntegral!I)
+  {
+    static customDraw(Drawing dr, .Container cntr){
+      bool materialStyle = true; //todo: theme selection.  tool, white, material... these are conflicting now.
+
+      auto btns = cast(.Container[])(cntr.subCells);
+      if(btns.empty) return;
+
+      if(!materialStyle){
+        dr.lineWidth = 2;
+        bool first = true;
+        vec2 bOfs;
+        foreach(btn; btns){
+          const bnd = btn.borderBounds;
+          const sel = btn.flags.selected;
+
+          if(first) bOfs = bnd.bottomLeft;
+
+          dr.color = clWinBtn;
+          dr.lineTo(bnd.bottomLeft, first); first = false;
+          if(sel){
+            dr.lineTo(bnd.topLeft);
+            dr.lineTo(bnd.topRight);
+          }
+          dr.lineTo(bnd.bottomRight);
+        }
+
+        dr.lineTo(cntr.innerWidth-bOfs.x, bOfs.y); //extend right
+      }else{
+        dr.lineWidth = 4;
+        dr.color = clWinBtn;
+        const bOfs = btns[0].borderBounds.bottomLeft;
+        dr.hLine(bOfs.x, bOfs.y, cntr.innerWidth-bOfs.x);
+
+        dr.color = clAccent;
+        btns.filter!(b => b.flags.selected).each!((b){
+          with(b.borderBounds) dr.hLine(left, bottom, right);
+        });
+      }
+    }
+
+    bool clicked;
+    Row!(srcModule, srcLine)({
+      foreach(i; 0..items.length){
+        if(WhiteBtn(items[i], genericId(i), /*selected(i==idx)*/ {
+          //if(border.color==clWinBtn) border.color = bkColor; //todo: this is a nasty workaround. Need a completely white Btn (link) for this.
+          bkColor = clWinBackground;
+          border.color = clWinBackground;
+          flags.selected = i==idx;  //todo: Ez kurvaga'ny! Ez adja at a selectiont a draw callbacknak
+
+          padding = "4";
+        })){ idx = i.to!I; clicked = true; }
+      }
+
+      addDrawCallback(&customDraw);
+
+
+    }, args);
+
+    return clicked;
+  }
+
+  void TabsPage(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(A args){ //TabsPage ////////////////////////////////
+    Column!(srcModule, srcLine)({
+      bool materialStyle = true;
+      if(materialStyle){
+        margin = "2 4";
+      }else{
+        margin  = Margin(0, 2, 2, 2);
+        border  = Border(2, BorderStyle.normal, clWinBtn);
+        padding = Padding(2, 2, 2, 2);
+      }
+    }, args);
+  }
+
+  void Tabs(alias mapTitle = "a.title", alias mapUI = "a.UI", R, I, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(R r, ref I idx, A args){ //Tabs/////////////////////////////
+    mixin(prepareId);
+
+    bool includeAll = false;
+    static foreach(a; args){{
+      static if(is(typeof(a) == GenericArg!(N, T), string N, T) && N=="includeAll"){ includeAll = a; }
+    }}
+
+    auto titles = r.map!mapTitle.array;
+    alias TT = typeof(titles[0]);
+    const len = titles.length;
+
+    if(includeAll){
+      static if(isSomeString!TT) titles ~= "All";
+      else static if(isFunction!TT) titles ~= (TT){ Text("All"); }; //inferred type
+      else static if(isDelegate!TT) titles ~= (TT){ Text("All"); }; //inferred type
+      else static assert("Unhandled type: ", TT);
+    }
+
+    TabsHeader!(srcModule, srcLine)(titles, idx);
+    TabsPage!(srcModule, srcLine)({
+      if(idx>=0 && idx<len){
+        auto r2 = r.drop(idx);
+        if(!r2.empty) r2.front.unaryFun!mapUI();
+      }else{
+        if(includeAll && idx==len) foreach(a; r) a.unaryFun!mapUI;
+      }
+    });
   }
 
   auto Link(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)  // Link //////////////////////////////

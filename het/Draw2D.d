@@ -514,7 +514,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
 // Lines ///////////////////////////////////////////////////////////////////////
 
-  private vec2 lineCursor; // untransformed for fastness, but can't survive a transformation
+  vec2 lineCursor; // untransformed for fastness, but can't survive a transformation
 
   void lineTo(in vec2 p_) { //todo: const struct->in struct
     vec2 p = inputTransform(p_);
