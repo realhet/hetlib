@@ -91,7 +91,8 @@ public import std.uri: urlEncode = encode, urlDecode = decode;
 public import std.process : environment, thisThreadID, execute;
 public import std.zlib : compress, uncompress;
 public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write;
-public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
+//public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
+public import std.bitmanip;
 public import std.typecons: Typedef;
 public import std.path: baseName;
 public import std.exception : collectException, ifThrown;
@@ -625,9 +626,10 @@ class ExeMapFile{
   Rec[] list;
 
   this(File fn = File("$ThisExeFile$")){
-
     if(fn.fullName == "$ThisExeFile$")
       fn = appFile.otherExt("map");
+
+print("MAPFILE", fn);
 
     foreach(line; fn.readLines(false)){
       auto p = line.split.array;
@@ -5924,10 +5926,12 @@ uint stReadSize(ref ubyte[] st){ //read compressed 32bit
 
 void stWrite(T)(ref ubyte[] st, const T data)
 {
-  auto siz = T.sizeof;
+  /*auto siz = T.sizeof;
   ubyte* dst = st.ptr+st.length;
   st.length += siz;
-  memcpy(dst, &data, siz);
+  memcpy(dst, &data, siz);*/
+
+  st ~= (cast(ubyte*)&data)[0..T.sizeof];
 }
 
 void stWriteSize(ref ubyte[] st, const uint s){ //compressed 32bit
@@ -5941,6 +5945,13 @@ void stWrite(T)(ref ubyte[] st, const T[] data)
   stWrite(st, len);
   foreach(const a; data) stWrite(st, data);
 }
+
+
+void byteArrayAppend(T)(ref ubyte[] st, const T data){
+  st ~= (cast(ubyte*)&data)[0..T.sizeof];
+}
+
+auto toBytes(T)(ref T data){ return (cast(ubyte*)&data)[0..T.sizeof]; }
 
 
 //todo: DIDE GotoError must show 5 lines up and down around the error.
