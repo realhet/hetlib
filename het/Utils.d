@@ -629,7 +629,7 @@ class ExeMapFile{
     if(fn.fullName == "$ThisExeFile$")
       fn = appFile.otherExt("map");
 
-print("MAPFILE", fn);
+    WARN("MAPFILE processing is broken", fn);
 
     foreach(line; fn.readLines(false)){
       auto p = line.split.array;

@@ -121,7 +121,7 @@ string winMsgToString(uint msg){
 struct TimeLine{
 
   struct Event{
-    enum Type {update, beginPaint, paint, endPaint, swapBuffers};
+    enum Type           {update, beginPaint, paint, endPaint, swapBuffers};
     Type type;
     double t0, t1;
 

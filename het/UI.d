@@ -552,13 +552,7 @@ struct im{ static:
     actContainer = null;
 
     overlayDrawings.clear;
-
-
-    //time calculation
-    //todo: jobb neveket kell kitalalni erre
-    //QPS = .QPS;
-    //dt = lastQPS.isNaN ? 1.0f/60 : QPS-lastQPS;
-    //lastQPS = QPS;
+    drawCallbacks.clear;
   }
 
   private void push(T : .Container)(T c, in Id newId){ //todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.

@@ -1687,7 +1687,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     Shader getShader(){
       auto recompile(Flag!"ignoreCustomShader" ignoreCustomShader){
-        const t0 = QPS;
+        //const t0 = QPS;
 
         string code = shaderCode;
         if(!ignoreCustomShader && customShader_!=""){
@@ -1701,11 +1701,12 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         }
 
         return new Shader("Draw2D", code);
-        LOG("Shader compiled in", QPS-t0, "sec");
+        //LOG("Shader compiled in", QPS-t0, "sec");
       }
 
       static Shader sh, shDefault;
       if(!sh || customShaderChanged){
+
         customShaderChanged = false;
         try{
           sh = recompile(No.ignoreCustomShader);
