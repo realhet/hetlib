@@ -233,6 +233,9 @@ struct im{ static:
 
   Drawing drVisualizeHitStack;
 
+  private enum reuseDr = true;
+  private Drawing[2] staticDr;
+
   void _drawFrame(string restrict="")(){
 
 //PING(7);
@@ -241,7 +244,12 @@ struct im{ static:
     static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");
     enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 
-    auto dr = [new Drawing, new Drawing];
+    static if(reuseDr){
+      if(!staticDr[0]) staticDr = [new Drawing("im0"), new Drawing("im1")];
+      auto dr = staticDr;
+    }else{
+      auto dr = [new Drawing, new Drawing];
+    }
 
     //init clipbounds
     foreach(i, ref d; dr){        ref view(){ return targetSurfaces[i].view; }
@@ -249,7 +257,6 @@ struct im{ static:
       d.invZoomFactor = view.invScale;
       d.pushClipBounds(view.clipBounds.inflated(-view.clipBounds.size*0));
     }
-
 
     foreach(i; 0..2) surfaceBounds[i] = bounds2.init;
     foreach(a; rootContainers(true)){

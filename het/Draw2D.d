@@ -54,8 +54,75 @@ Bez2 : Ax   Ay   Bx  By   Cx    Cy      Col   69      Width - -
 
 */
 
+// DrawingBuffers //////////////////////////////////////////////////////////////////
 
 //Todo: Appendert kell hasznalni!
+
+// select buffer appenders method here:
+alias DrawingBuffers = DrawingBuffersAppender2;
+
+
+struct DrawingBuffersOld(T){
+  private const bufferMax = (2<<20)/T.sizeof;
+  private T[][] buffers;    //todo: immutable
+
+  void initialize()     {}
+  size_t objCount()     const{ return buffers.map!"a.length".sum; }
+  bool empty()          const{ return buffers.empty; }
+  void clear()          { buffers.clear; }
+  auto allObjs()        { return buffers.join; }
+  auto toVBOs()         { return buffers.map!(b => new VBO(b)).array; }
+
+  void put(ref T obj){
+    if(buffers.empty || buffers[$-1].length>=bufferMax){
+      T[] act;
+      act.reserve(bufferMax);
+      buffers ~= act;
+    }
+    buffers[$-1] ~= obj;
+  }
+}
+
+struct DrawingBuffersSimple(T){
+  private const bufferMax = (2<<20)/T.sizeof;
+  private T[] buffer;
+
+  void initialize()     { buffer.reserve(bufferMax); }
+  size_t objCount()     const{ return buffer.length; }
+  bool empty()          const{ return buffer.empty; }
+  void clear()          { buffer.clear; }
+  auto allObjs()        { return buffer; }
+  auto toVBOs()         { return [new VBO(buffer)]; }
+  void put(ref T obj)   { buffer ~= obj; }
+}
+
+struct DrawingBuffersAppender1(T){
+  private T[] buffer;
+  RefAppender!(T[]) app;
+
+  void initialize()     { app = appender(&buffer); }
+  size_t objCount()     const{ return app[].length; }
+  bool empty()          const{ return app[].empty; }
+  void clear()          { app.clear; }
+  auto allObjs()        { return app[]; }
+  auto toVBOs()         { return [new VBO(app[])]; }
+  void put(ref T obj)   { app.put(obj); }
+}
+
+struct DrawingBuffersAppender2(T){
+  private const bufferMax = (2<<20)/T.sizeof;
+  Appender!(T[]) app;   //Note: const(T)[] is not good because that can't be cleared.
+
+  void initialize()     { /*app.reserve(bufferMax);*/ } //Note: No need to initialize an empty Appender. It's already initialized.
+  size_t objCount()     const{ return app[].length; }
+  bool empty()          const{ return app[].empty; }
+  void clear()          { app.clear; } //todo: This keeps the buffer capacity in memory. For 24/7 operation, in every minute is should be shrinked to the half if possible.
+  auto allObjs()        { return app[]; }
+  auto toVBOs()         { return [new VBO(app[])]; }
+  void put(in T obj)    { app.put(obj); }
+}
+
+
 
 //Standard LineStyles
 enum LineStyle:ubyte {
@@ -176,8 +243,16 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
        totalDrawObj; //total DrawingObjects on GPU
   const bool isClone;
 
+  string name;
+
   this(){
     isClone = false;
+    buffers.initialize;
+  }
+
+  this(string name){
+    this.name = name;
+    this();
   }
 
   this(Drawing src){ //make a clone
@@ -208,9 +283,9 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   void copyFrom(Drawing src){ /// Appends the contents of another drawing into itself. Used in UI to draw overlays on top of cells.
     if(src is null) return;
 
-    foreach(obj; src.exportDrawingObjs){
-      obj.applyTransform(&inputTransform);
-      append(obj); //todo: this is a terrible slow copy
+    foreach(o; src.exportDrawingObjs){
+      o.applyTransform(&inputTransform);
+      myAppend(o); //todo: this is a terrible slow copy
     }
   }
 
@@ -218,7 +293,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     //destroyVboList; //not needed: gc will release it anyways
   }
 
-  string stats(){ return format!"(total:%d pending:%d vbo:[%s])"(totalDrawObj, buffers.map!"a.length".sum, vboList.map!(a => a.handle).array.text); }
+  string stats(){ return format!"(total:%d pending:%d vbo:[%s])"(totalDrawObj, buffers.objCount, vboList.map!(a => a.handle).array.text); }
 
 ////////////////////////////////////////////////////////////////////////////////
 //  State variables                                                           //
@@ -400,25 +475,19 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   };
   static assert(DrawingObj.sizeof==64);
 
-  private const bufferMax = (2<<20)/DrawingObj.sizeof;
-  private DrawingObj[][] buffers;
+  DrawingBuffers!DrawingObj buffers;
 
-  const bool empty() { return buffers.empty && vboList.empty; }
+  bool empty() const { return buffers.empty && vboList.empty; }
 
-  private void append(DrawingObj o){
-    if(buffers.empty || buffers[$-1].length>=bufferMax){
-      DrawingObj[] act;
-      act.reserve(bufferMax);
-      buffers ~= act;
-    }
+  private void myAppend(DrawingObj o){
     o.aClipMin = clipBounds.low;
     o.aClipMax = clipBounds.high;
-    buffers[$-1] ~= o;
     o.expandBounds(bounds_);
+    buffers.put(o);
   }
 
   private auto exportDrawingObjs(){
-    return buffers.join;
+    return buffers.allObjs;
   }
 
 //  private int dirty = -1; //must set to -1 data[] is changed. bit0 = VBO, bit1 = bounds
@@ -457,7 +526,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   void clear(){
     if(logDrawing) LOG(shortName, "clearing", stats);
     destroyVboList;
-    destroy(buffers);
+    buffers.clear;
     bounds_ = bounds2.init;
     markDirty;
 
@@ -489,7 +558,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     }*/ //todo: point2 is not working with appender. should use vec2[]
 
     //Create a new Point1
-    append(DrawingObj(1, inputTransform(p), vec2(0), vec2(s, 0), c));
+    myAppend(DrawingObj(1, inputTransform(p), vec2(0), vec2(s, 0), c));
   }
 
   void point(float x, float y) { point(vec2(x, y)); }
@@ -507,7 +576,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     }
     //from now process 2 points at a time
     while(idx<p.length) {
-      append(DrawingObj(2, inputTransform(p[idx]), inputTransform(p[idx+1]), vec2(s, s), c));
+      myAppend(DrawingObj(2, inputTransform(p[idx]), inputTransform(p[idx+1]), vec2(s, s), c));
       idx += 2;
     }
   }
@@ -520,7 +589,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     vec2 p = inputTransform(p_);
     markDirty;
     auto c = realDrawColor, w = lineWidth;
-    append(DrawingObj(3+actState.arrowStyle, inputTransform(lineCursor), p, vec2(w, lineStyle), c));
+    myAppend(DrawingObj(3+actState.arrowStyle, inputTransform(lineCursor), p, vec2(w, lineStyle), c));
     lineCursor = p_;
   }
   void lineTo(in vec2 p, bool isMove)                    { if(isMove) moveTo(p); else lineTo(p); }
@@ -596,7 +665,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
   void bezier2(in vec2 A, in vec2 B, in vec2 C) {
     markDirty;
     auto c = realDrawColor, w = lineWidth;
-    append(DrawingObj(69, inputTransform(A), inputTransform(B), inputTransform(C), c,vec2(w, lineStyle)));
+    myAppend(DrawingObj(69, inputTransform(A), inputTransform(B), inputTransform(C), c,vec2(w, lineStyle)));
   }
 
   protected static auto genRgbGraph(string fv)(){
@@ -662,7 +731,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
   void fillRect(float x0, float y0, float x1, float y1) {
     auto c = realDrawColor;
-    append(DrawingObj(67, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c));
+    myAppend(DrawingObj(67, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c));
   }
   void fillRect(in vec2 a, in vec2 b)               { fillRect(a.x, a.y, b.x, b.y); }
   void fillRect(in bounds2 b)                       { fillRect(b.low, b.high); }
@@ -696,7 +765,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     auto b2 = rectAlign.apply(bnd, bounds2(0, 0, info.width, info.height));
 
-    append(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw));
+    myAppend(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw));
   }
 
   void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args){ //autosize version
@@ -785,12 +854,12 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
 //    auto b2 = al.apply(b, bounds2(0, 0, info.width, info.height));
 
-    append(DrawingObj(256+idx, inputTransform(b.low), inputTransform(b.high), tx0, c, tx1, c2.raw));
+    myAppend(DrawingObj(256+idx, inputTransform(b.low), inputTransform(b.high), tx0, c, tx1, c2.raw));
   }
 
   void fillTriangle(float x0, float y0, float x1, float y1, float x2, float y2){
     auto c = realDrawColor;
-    append(DrawingObj(68, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), inputTransform(vec2(x2,y2)), c));
+    myAppend(DrawingObj(68, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), inputTransform(vec2(x2,y2)), c));
   }
   void fillTriangle(in vec2 a, in vec2 b, in vec2 c){ fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y); }
 
@@ -1748,12 +1817,19 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     drawCnt++;
 
-    //transfer buffers into vboes
-    foreach(ref data; buffers){
+    vboList ~= buffers.toVBOs;
+    buffers.clear;
+
+    //LOG(identityStr(this), name, drawCnt, vboList.length);
+
+/*    //transfer buffers into vboes
+    //LOG("B", buffers.length);
+    foreach(data; buffers){
+      //LOG("DL", data.length);
       totalDrawObj += data.length;
       vboList ~= new VBO(data);
     }
-    buffers.clear;
+    buffers.clear;*/
 
     auto shader = getShader;
 
