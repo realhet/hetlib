@@ -7,43 +7,87 @@ import std.windows.registry,
        core.sys.windows.winnt,
        core.sys.windows.basetsd : HANDLE;
 
-
-class ComPort{ // ComPort /////////////////////////////////////////
-  enum InputBufferSize = 4096;
-
-
+struct ComPortSettings{ // ComPortSettings ////////////////////////////////////////////////
   @STORED string port = "";
   @STORED int baud = 9600;
   @STORED string params = "8N1";
   bool enabled;
-  bool showErrors;
+}
 
-  @property string config() const{ return [port, baud.text, params].join(' '); }
+HANDLE open(in ComPortSettings settings){
+  enforce(settings.params.sameText("8N1"), "Only 8N1 supported"); //todo: interpret params
+
+  string s = settings.port;
+  if(s.map!isDigit.all) s = "COM" ~ s;
+  if(s.uc.startsWith("COM") && s.length>4) s = `\\.\`~s;
+
+  auto h = CreateFile(s.toPWChar, GENERIC_READ | GENERIC_WRITE, 0, null, OPEN_EXISTING, 0, null);
+  if(h == INVALID_HANDLE_VALUE)
+    raise("Can't open serial port "~s.quoted~" "~getLastErrorStr);
+
+  try{
+    DCB dcb;
+    if(!GetCommState(h, &dcb)) raise("GetComState", getLastErrorStr);
+    with(dcb){
+      BaudRate = settings.baud;
+      Parity = 0; //One
+      StopBits = 0; //None
+      ByteSize = 8;
+      _bf = 0;
+    }
+    if(!SetCommState(h, &dcb)) raise("SetComState", getLastErrorStr);
+
+    COMMTIMEOUTS ct;
+    with(ct){
+      ReadIntervalTimeout = 0xFFFFFFFF;
+      ReadTotalTimeoutMultiplier = 0;
+      ReadTotalTimeoutConstant = 0;
+      WriteTotalTimeoutMultiplier = 1;
+      WriteTotalTimeoutConstant = 500;
+    }
+    if(!SetCommTimeouts(h, &ct)) raise("SetComTimeouts", getLastErrorStr);
+  }catch(Exception e){
+    CloseHandle(h);
+    throw e;
+  }
+
+  return h;
+}
+
+struct ComPortStats{ //ComPortStats /////////////////////////////////////////////////////////
+  size_t messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt;
+
+  string lastError;
+  DateTime lastErrorTime, lastIncomingDataTime, lastIncomingMessageTime;
+
+  void reset(){
+    this = typeof(this).init;
+  }
+}
+
+enum ComPortProtocol { raw, textPackets, binaryPackets }
+
+class ComPort{ // ComPort /////////////////////////////////////////
+  @STORED ComPortSettings settings;
+
+  ComPortProtocol protocol;
+  string prefix; //messages: Application dependent prefix. both for incoming and outgoing messages.
+  bool showErrors;
 
   ubyte[] inBuf, outBuf;
 
-  bool binary; //select message protocol
+  //@property string config() const{ return [port, baud.text, params].join(' '); }
 
   protected string lineBuf; //messages buffer
   protected ubyte[] binaryBuf; //used in binary mode
 
   uint maxLineBufSize = 4096;
 
-  string prefix; //messages: Application dependent prefix. both for incoming and outgoing messages.
-
   //stats
-  size_t messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt;
-
-  string lastError;
-  DateTime lastErrorTime, lastIncomingDataTime, lastIncomingMessageTime;
-
-  void resetStats(){
-    foreach(a; AliasSeq!(messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt)) a=0;
-    lastError="";
-  }
+  ComPortStats stats;
 
   override string toString() const{
-    return format!`port: %s  baud: %s  %s  errors: %s, %s  out: %s, %sB  in: %s, %sB`(
+    with(stats) with(settings) return format!`port: %s  baud: %s  %s  errors: %s, %s  out: %s, %sB  in: %s, %sB`(
       port, baud, enabled ? active ? "Active" : "Enabled" : "Disabled",
       errorCnt, dataErrorCnt,
       messagesOut, shortSizeText(bytesOut),
@@ -53,18 +97,25 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   protected{
     HANDLE hCom;
-    string openedConfig;
+    size_t openedConfig; //change detection
     double tLastFailedOpen=0;
 
     void error(string s){
-      errorCnt++;
-      lastError = s;
-      lastErrorTime = now;
-      if(showErrors) ERR(s);
+      if(s==""){
+        stats.lastError = "";
+        stats.lastErrorTime = DateTime.init;
+      }else{
+        stats.errorCnt++;
+        stats.lastError = s;
+        stats.lastErrorTime = now;
+        if(showErrors) ERR(s);
+      }
     }
 
+    void clearError(){ error(""); }
+
     void comClose(){
-      openedConfig = "";
+      openedConfig = 0;
       CloseHandle(hCom);
       hCom = null;
       inBuf = [];
@@ -77,40 +128,11 @@ class ComPort{ // ComPort /////////////////////////////////////////
       comClose;
 
       try{
-        enforce(params.sameText("8N1"), "Only 8N1 supported");
+        hCom = settings.open;
 
-        auto s = port;
-        if(s.map!isDigit.all) s = "COM" ~ s;
-        if(s.uc.startsWith("COM") && s.length>4) s = `\\.\`~s;
+        clearError;
 
-        auto h = CreateFile(s.toPWChar, GENERIC_READ | GENERIC_WRITE, 0, null, OPEN_EXISTING, 0, null);
-        if(h == INVALID_HANDLE_VALUE)
-          raise("Can't open serial port "~s.quoted~" "~getLastErrorStr);
-
-        hCom = h;
-        DCB dcb;
-        if(!GetCommState(hCom, &dcb)) raise("GetComState", getLastErrorStr);
-        with(dcb){
-          BaudRate = baud;
-          Parity = 0; //One
-          StopBits = 0; //None
-          ByteSize = 8;
-          _bf = 0;
-        }
-        if(!SetCommState(hCom, &dcb)) raise("SetComState", getLastErrorStr);
-
-        COMMTIMEOUTS ct;
-        with(ct){
-          ReadIntervalTimeout = 0xFFFFFFFF;
-          ReadTotalTimeoutMultiplier = 0;
-          ReadTotalTimeoutConstant = 0;
-          WriteTotalTimeoutMultiplier = 1;
-          WriteTotalTimeoutConstant = 500;
-        }
-        if(!SetCommTimeouts(hCom, &ct)) raise("SetComTimeouts", getLastErrorStr);
-
-        lastError = "";
-        openedConfig = config;
+        openedConfig = settings.hashOf;
       }catch(Exception e){
         error(e.simpleMsg);
         tLastFailedOpen = QPS;
@@ -119,15 +141,17 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   }
 
+  @property inout ref enabled() { return settings.enabled; }
+
   bool opened() const { return hCom !is null; }
   bool active() const { return enabled && opened; }
 
-  bool write(in ubyte[] msg){ //low level write. Skips outBuf.
+  bool write_internal(in ubyte[] msg){ //low level write. Skips outBuf.
     if(!active) return false;
 
     uint bytesWritten;
     if(WriteFile(hCom, msg.ptr, msg.length.to!uint, &bytesWritten, null)){
-      bytesOut += msg.length;
+      stats.bytesOut += msg.length;
       return true;
     }else{
       error("WriteFile error: "~getLastErrorStr);
@@ -136,11 +160,11 @@ class ComPort{ // ComPort /////////////////////////////////////////
     }
   }
 
-  void update(){
+  void update_internal(){
     //disabled or config changed. Just shut it down
-    if(hCom && (!enabled || openedConfig!=config)){
+    if(hCom && (!enabled || openedConfig!=settings.hashOf)){
       comClose;
-      lastError = "";
+      clearError;
     }
 
     //enabled, but not opened yet
@@ -150,23 +174,28 @@ class ComPort{ // ComPort /////////////////////////////////////////
     }
 
     if(enabled && hCom){
-      //write if there is something in outBuf
-      if(outBuf.length){ write(outBuf); outBuf=[]; }
-
       //read if can
-      ubyte[InputBufferSize] buf;
+      ubyte[4096] buf;
       uint bytesRead;
-      if(ReadFile(hCom, buf.ptr, buf.length.to!uint, &bytesRead, null)){
+      again: if(ReadFile(hCom, buf.ptr, buf.length.to!uint, &bytesRead, null)){
         if(bytesRead>0){
-          bytesIn += bytesRead;
+          stats.bytesIn += bytesRead;
 
-          inBuf ~= buf[0..bytesRead]; //appender???
+          inBuf ~= buf[0..bytesRead]; //todo: appender???
 
-          lastIncomingDataTime = now;
+          stats.lastIncomingDataTime = now;
+          goto again;
         }
       }else{
         error("ReadFile: "~getLastErrorStr); //ERROR after 4 hours: The handle is invalid. (it is ok, because it was set to 0))
         comClose; //close it as it will be unable to recover anyways
+      }
+
+      //write if there is something in outBuf
+      if(outBuf.length){
+        auto tmp = outBuf;
+        outBuf = [];
+        write_internal(tmp);
       }
     }
 
@@ -177,94 +206,112 @@ class ComPort{ // ComPort /////////////////////////////////////////
   static int computeCheckSum(string s){ return (cast(ubyte[])s).sum &0xFF; }
 
   void send(in void[] msg){
-    if(binary){
-      write(cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n"));
-    }else{
-      const str = cast(string)msg;
-      write(cast(ubyte[])(format!"%s%s~%x\n"(prefix, str, computeCheckSum(str))));
+    final switch(protocol){
+      case ComPortProtocol.raw:
+        outBuf ~= cast(ubyte[])msg;
+      break;
+      case ComPortProtocol.textPackets:
+        const str = cast(string)msg;
+        outBuf ~= cast(ubyte[])(format!"%s%s~%x\n"(prefix, str, computeCheckSum(str)));
+        stats.messagesOut ++;
+      break;
+      case ComPortProtocol.binaryPackets:
+        outBuf ~= cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n");
+        stats.messagesOut ++;
+      break;
     }
-    messagesOut ++;
   }
 
-  void update_messages(void delegate(in void[]) fun){
-    update;
+  void receive(T)(void delegate(in T) fun){
+    update_internal;
 
-    if(inBuf.length){
-      if(binary){
-        binaryBuf ~= inBuf;
-        inBuf = [];
+    if(inBuf.empty) return;
 
-        while(1){
-          const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n'));
-          if(idx<0) break;
+    void processRaw(){
+      auto tmp = inBuf;
+      inBuf = [];
+      fun(tmp.to!T);
+    }
 
-          auto actLine = binaryBuf[0..idx];
-          binaryBuf = binaryBuf[idx+prefix.length+1..$];
+    void processBinaryPackets(){
+      binaryBuf ~= inBuf;
+      inBuf = [];
+      while(1){
+        const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n'));
+        if(idx<0) break;
 
-          if(actLine.length<4){
-            dataErrorCnt++;
-            error("Binary message too small. Can't check crc32.");
+        auto actLine = binaryBuf[0..idx];
+        binaryBuf = binaryBuf[idx+prefix.length+1..$];
+        if(actLine.length<4){
+          stats.dataErrorCnt++;
+          error("Binary message too small. Can't check crc32.");
+        }else{
+          const crc = (cast(uint[])actLine[$-4..$])[0];
+          actLine = actLine[0..$-4];
+          const crc2 = actLine.crc32;
+
+          if(crc==crc2){
+            stats.messagesIn++;
+            stats.lastIncomingMessageTime = now;
+            fun(actLine.to!T);
           }else{
-            const crc = (cast(uint[])actLine[$-4..$])[0];
-            actLine = actLine[0..$-4];
-            const crc2 = actLine.crc32;
-
-            if(crc==crc2){
-              messagesIn++;
-              lastIncomingMessageTime = now;
-              fun(actLine);
-            }else{
-              error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
-              dataErrorCnt++;
-            }
+            error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
+            stats.dataErrorCnt++;
           }
-        }
-
-        if(binaryBuf.length>maxLineBufSize){ //todo: refactor: maxMessageBytes
-          binaryBuf = [];
-          dataErrorCnt++;
-          error("Receiving garbage instead of valid packages: "~prefix.quoted);
-        }
-
-      }else{
-        ignoreExceptions({ lineBuf ~= (cast(char[])inBuf).text; });
-        inBuf = [];
-
-        while(1){
-          const idx = lineBuf.indexOf('\n'); //todo: variable declaration in while condition. Needs latest LDC.
-          if(idx<0)break; //todo: if no \n received after a timeout, that's an error too.
-          const actLine = lineBuf[0..idx];
-          lineBuf = lineBuf[idx+1..$];
-
-          //check msg checkSum
-          const cIdx = actLine.retro.indexOf('~');
-          if(actLine.startsWith(prefix) && cIdx>0){
-            const
-              msg = actLine[prefix.length..$-cIdx-1],
-              crc = actLine[$-cIdx..$],
-              crc2 = computeCheckSum(msg).format!"%x";
-
-            if(crc==crc2){
-              messagesIn++;
-              lastIncomingMessageTime = now;
-              fun(msg);
-            }else{
-              error("Crc error: "~msg.quoted);
-              dataErrorCnt++;
-            }
-          }else{
-            dataErrorCnt++;
-            error("Invalid package format: "~lineBuf.quoted);
-          }
-        }
-
-        if(lineBuf.length>=maxLineBufSize){
-          lineBuf = [];
-          dataErrorCnt++;
-          error("Receiving garbage instead of valid packages: "~prefix.quoted);
         }
       }
+
+      if(binaryBuf.length>maxLineBufSize){ //todo: refactor: maxMessageBytes
+        binaryBuf = [];
+        stats.dataErrorCnt++;
+        error("Receiving garbage instead of valid packages: "~prefix.quoted);
+      }
     }
+
+    void processTextPackets(){
+      lineBuf = (cast(char[])inBuf).text.ifThrown("");
+      inBuf = [];
+
+      while(1){
+        const idx = lineBuf.indexOf('\n'); //todo: variable declaration in while condition. Needs latest LDC.
+        if(idx<0)break; //todo: if no \n received after a timeout, that's an error too.
+        const actLine = lineBuf[0..idx];
+        lineBuf = lineBuf[idx+1..$];
+
+        //check msg checkSum
+        const cIdx = actLine.retro.indexOf('~');
+        if(actLine.startsWith(prefix) && cIdx>0){
+          const
+            msg = actLine[prefix.length..$-cIdx-1],
+            crc = actLine[$-cIdx..$],
+            crc2 = computeCheckSum(msg).format!"%x";
+
+          if(crc==crc2){
+            stats.messagesIn++;
+            stats.lastIncomingMessageTime = now;
+            fun(cast(T)msg);
+          }else{
+            error("Crc error: "~msg.quoted);
+            stats.dataErrorCnt++;
+          }
+        }else{
+          stats.dataErrorCnt++;
+          error("Invalid package format: "~lineBuf.quoted);
+        }
+      }
+
+      if(lineBuf.length>=maxLineBufSize){
+        lineBuf = [];
+        stats.dataErrorCnt++;
+        error("Receiving garbage instead of valid packages: "~prefix.quoted);
+      }
+    }
+
+    final switch(protocol){
+      case ComPortProtocol.raw          : processRaw            ; break;
+      case ComPortProtocol.binaryPackets: processBinaryPackets  ; break;
+      case ComPortProtocol.textPackets  : processTextPackets    ; break;
+    } //end switch
   }
 
 
@@ -281,8 +328,8 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
       Row({
         if(!this.enabled) Led(false, clGray);
-        else if(lastErrorTime.toSeconds > lastIncomingMessageTime.toSeconds) Led(true, clRed); //note: toSeconds needed for nan->0
-        else Led(now.toSeconds - lastIncomingMessageTime.toSeconds < 1.0f/20, clLime);
+        else if(stats.lastErrorTime.toSeconds > stats.lastIncomingMessageTime.toSeconds) Led(true, clRed); //note: toSeconds needed for nan->0
+        else Led(now.toSeconds - stats.lastIncomingMessageTime.toSeconds < 1.0f/20, clLime);
         Text("Comm");
       });
 
@@ -293,7 +340,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
     Row({
       Text("Port\t");
-      Edit(port, { width = fh*3; });
+      Edit(settings.port, { width = fh*3; });
 
       static bool choosePort;
       if(!choosePort){
@@ -301,8 +348,8 @@ class ComPort{ // ComPort /////////////////////////////////////////
       }else{
         Text(" Select ");
         foreach(p; comPorts.existingPorts){
-          if(Btn(p.name, selected(sameText(p.name, port)), hint([p.description, p.deviceId].join(' ')), genericId(p.id))){
-            port = p.name;
+          if(Btn(p.name, selected(sameText(p.name, settings.port)), hint([p.description, p.deviceId].join(' ')), genericId(p.id))){
+            settings.port = p.name;
             choosePort = false;
           }
         }
@@ -315,8 +362,8 @@ class ComPort{ // ComPort /////////////////////////////////////////
     });
 
     Row("Error\t", {
-      Static(lastError=="" ? " " : lastError, { /*flex = 1;*/ });
-      if(lastError!="") Comment((now.toSeconds-lastErrorTime.toSeconds).format!"%.0f secs ago");
+      Static(stats.lastError=="" ? " " : stats.lastError, { /*flex = 1;*/ });
+      if(stats.lastError!="") Comment((now.toSeconds-stats.lastErrorTime.toSeconds).format!"%.0f secs ago");
     });
 
     //todo: statistics

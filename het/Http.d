@@ -172,6 +172,8 @@ private:
   shared State state_;
 
   static void httpWorker(string name, shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared State* state_){
+    Thread.getThis.isDaemon = true;
+
     enum log = 0;
 
     auto st = cast(State*) state_;

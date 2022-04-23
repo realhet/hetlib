@@ -110,10 +110,9 @@ struct DrawingBuffersAppender1(T){
 }
 
 struct DrawingBuffersAppender2(T){
-  private const bufferMax = (2<<20)/T.sizeof;
   Appender!(T[]) app;   //Note: const(T)[] is not good because that can't be cleared.
 
-  void initialize()     { /*app.reserve(bufferMax);*/ } //Note: No need to initialize an empty Appender. It's already initialized.
+  void initialize()     { } //Note: No need to initialize an empty Appender. It's already initialized.
   size_t objCount()     const{ return app[].length; }
   bool empty()          const{ return app[].empty; }
   void clear()          { app.clear; } //todo: This keeps the buffer capacity in memory. For 24/7 operation, in every minute is should be shrinked to the half if possible.
