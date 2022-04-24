@@ -57,6 +57,7 @@ HANDLE open(in ComPortSettings settings){
 struct ComPortStats{ //ComPortStats /////////////////////////////////////////////////////////
   size_t messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt;
 
+  bool opened;
   string lastError;
   DateTime lastErrorTime, lastIncomingDataTime, lastIncomingMessageTime;
 
@@ -67,16 +68,141 @@ struct ComPortStats{ //ComPortStats ////////////////////////////////////////////
 
 enum ComPortProtocol { raw, textPackets, binaryPackets }
 
+struct MsgComPortError{ string error; }
+struct MsgComPortClosed{ }
+struct MsgComPortOpened{ }
+struct MsgComPortDestroy{ }
+
+private void comPortWorker(shared ComPort owner_){
+  auto owner = cast()owner_; //nasty hack
+
+  import core.thread, std.concurrency;
+  Thread.getThis.isDaemon = true;
+
+  //local things
+  ComPortSettings settings;
+  size_t openedConfig; //change detection hash
+  HANDLE hCom;
+  double tLastFailedOpen=0;
+  string lastError;
+
+  bool enabled(){ return settings.enabled; }
+  bool active(){ return enabled && hCom; }
+
+  void error(string s){
+    synchronized(owner){
+      owner.workerHasError = true;
+      owner.workerError = s;
+    }
+  }
+
+  void errorClear(){ error(""); }
+
+  void comClose(){
+    openedConfig = 0;
+    if(hCom){
+      CloseHandle(hCom);
+      hCom = null;
+      errorClear;
+    }
+    owner.stats.opened = false;
+  }
+
+  void comOpen(){
+    if(hCom) comClose;
+
+    try{
+      hCom = settings.open;
+
+      openedConfig = settings.hashOf;
+      owner.stats.opened = true;
+      errorClear;
+    }catch(Exception e){
+      error(e.simpleMsg);
+      tLastFailedOpen = QPS;
+    }
+  }
+
+  while(1){
+    //disabled or config changed. Just shut it down
+    if(hCom && (!enabled || openedConfig!=settings.hashOf)){
+      comClose;
+    }
+
+    //enabled, but not opened yet
+    if(enabled && !hCom){
+      if(QPS-tLastFailedOpen > .5f) //don't try to reopen at max FPS
+        comOpen;
+    }
+
+    ubyte[] inBuf, outBuf;
+
+    if(enabled && hCom){
+      //read if can
+      ubyte[4096] buf;
+      uint bytesRead;
+      again: if(ReadFile(hCom, buf.ptr, buf.length, &bytesRead, null)){
+        if(bytesRead>0){
+          inBuf ~= buf[0..bytesRead]; //todo: appender???
+          goto again;
+        }
+
+      }else{
+        error("ReadFile: "~getLastErrorStr); //ERROR after 4 hours: The handle is invalid. (it is ok, because it was set to 0))
+        comClose; //close it as it will be unable to recover anyways
+      }
+    }
+
+    //communicate with master
+    synchronized(owner){
+
+      if(owner.terminated){
+        owner.terminated = 2; //ack
+        CloseHandle(hCom);
+        break;
+      }
+
+      //latch outgoing data
+      settings = owner.settings;
+      outBuf = owner.outBuf;
+      owner.outBuf = [];
+
+      //latch incoming data
+      if(inBuf.length){
+        owner.inBuf ~= inBuf;
+        owner.stats.lastIncomingDataTime = now;
+        owner.stats.bytesIn += inBuf.length;
+      }
+    }
+
+    if(enabled && hCom && outBuf.length){
+      //write if there is something in outBuf
+
+      uint bytesWritten;
+      if(WriteFile(hCom, outBuf.ptr, cast(uint)outBuf.length, &bytesWritten, null)){
+        //todo: verify bytesWritten
+        synchronized(owner){ owner.stats.bytesOut += bytesWritten; }
+      }else{
+        error("WriteFile error: "~getLastErrorStr);
+        comClose; //close it as it will be unable to recover anyways
+      }
+    }
+
+    sleep(10);
+  }//endless loop
+}
+
+
 class ComPort{ // ComPort /////////////////////////////////////////
+  import std.concurrency;
+
   @STORED ComPortSettings settings;
 
   ComPortProtocol protocol;
-  string prefix; //messages: Application dependent prefix. both for incoming and outgoing messages.
+  string prefix; //messages: Packet protocols, Application dependent prefix. both for incoming and outgoing messages.
   bool showErrors;
 
-  ubyte[] inBuf, outBuf;
-
-  //@property string config() const{ return [port, baud.text, params].join(' '); }
+  protected ubyte[] inBuf, outBuf; //must synchronize
 
   protected string lineBuf; //messages buffer
   protected ubyte[] binaryBuf; //used in binary mode
@@ -85,6 +211,22 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   //stats
   ComPortStats stats;
+
+  protected Tid workerTid;
+  protected int terminated;
+
+  protected bool workerHasError; //latched string
+  protected string workerError;
+
+  this(){
+    workerTid = spawn(&comPortWorker, cast(shared)this);
+  }
+
+  ~this(){
+    terminated = 1;
+    while(terminated != 2)
+      sleep(1);
+  }
 
   override string toString() const{
     with(stats) with(settings) return format!`port: %s  baud: %s  %s  errors: %s, %s  out: %s, %sB  in: %s, %sB`(
@@ -95,111 +237,22 @@ class ComPort{ // ComPort /////////////////////////////////////////
     );
   }
 
-  protected{
-    HANDLE hCom;
-    size_t openedConfig; //change detection
-    double tLastFailedOpen=0;
-
-    void error(string s){
-      if(s==""){
-        stats.lastError = "";
-        stats.lastErrorTime = DateTime.init;
-      }else{
-        stats.errorCnt++;
-        stats.lastError = s;
-        stats.lastErrorTime = now;
-        if(showErrors) ERR(s);
-      }
+  private void error(string s){
+    if(s==""){
+      stats.lastError = "";
+      stats.lastErrorTime = DateTime.init;
+    }else{
+      stats.errorCnt++;
+      stats.lastError = s;
+      stats.lastErrorTime = now;
+      if(showErrors) ERR(s);
     }
-
-    void clearError(){ error(""); }
-
-    void comClose(){
-      openedConfig = 0;
-      CloseHandle(hCom);
-      hCom = null;
-      inBuf = [];
-      outBuf = [];
-      lineBuf = "";
-      binaryBuf = [];
-    }
-
-    void comOpen(){
-      comClose;
-
-      try{
-        hCom = settings.open;
-
-        clearError;
-
-        openedConfig = settings.hashOf;
-      }catch(Exception e){
-        error(e.simpleMsg);
-        tLastFailedOpen = QPS;
-      }
-    }
-
   }
 
   @property inout ref enabled() { return settings.enabled; }
 
-  bool opened() const { return hCom !is null; }
+  bool opened() const { return stats.opened; }
   bool active() const { return enabled && opened; }
-
-  bool write_internal(in ubyte[] msg){ //low level write. Skips outBuf.
-    if(!active) return false;
-
-    uint bytesWritten;
-    if(WriteFile(hCom, msg.ptr, msg.length.to!uint, &bytesWritten, null)){
-      stats.bytesOut += msg.length;
-      return true;
-    }else{
-      error("WriteFile error: "~getLastErrorStr);
-      comClose; //close it as it will be unable to recover anyways
-      return false;
-    }
-  }
-
-  void update_internal(){
-    //disabled or config changed. Just shut it down
-    if(hCom && (!enabled || openedConfig!=settings.hashOf)){
-      comClose;
-      clearError;
-    }
-
-    //enabled, but not opened yet
-    if(enabled && !hCom){
-      if(QPS-tLastFailedOpen > .5f) //don't try to reopen at max FPS
-        comOpen;
-    }
-
-    if(enabled && hCom){
-      //read if can
-      ubyte[4096] buf;
-      uint bytesRead;
-      again: if(ReadFile(hCom, buf.ptr, buf.length.to!uint, &bytesRead, null)){
-        if(bytesRead>0){
-          stats.bytesIn += bytesRead;
-
-          inBuf ~= buf[0..bytesRead]; //todo: appender???
-
-          stats.lastIncomingDataTime = now;
-          goto again;
-        }
-      }else{
-        error("ReadFile: "~getLastErrorStr); //ERROR after 4 hours: The handle is invalid. (it is ok, because it was set to 0))
-        comClose; //close it as it will be unable to recover anyways
-      }
-
-      //write if there is something in outBuf
-      if(outBuf.length){
-        auto tmp = outBuf;
-        outBuf = [];
-        write_internal(tmp);
-      }
-    }
-
-  }
 
   // ComPort - simple message protocol /////////////////////////
 
@@ -222,20 +275,44 @@ class ComPort{ // ComPort /////////////////////////////////////////
     }
   }
 
-  void receive(T)(void delegate(in T) fun){
-    update_internal;
+  private size_t lastSettingsHash;
 
-    if(inBuf.empty) return;
+  void receive(T)(void delegate(in T) fun){
+    //latch inconing data
+    ubyte[] raw;
+    synchronized(this){
+      raw = inBuf;
+      inBuf = [];
+
+      if(chkClear(workerHasError))
+        error(workerError);
+    }
+
+    if(raw.empty) return;
+
+    void returnPacket(U)(U data){
+      stats.messagesIn++;
+      stats.lastIncomingMessageTime = now;
+
+      try{
+        static assert(is(T==string) || !isSomeString!T, "Only string (of char) or other nonstring types supported.");
+
+        static if(is(T==string) && !is(U==string))
+          fun((cast(string)data).safeUTF8); //make sure that the string is valid
+        else
+          fun(cast(T)data);
+
+      }catch(Exception e){
+        ERR("Unhandled Exception in receive().", e.simpleMsg);
+      }
+    }
 
     void processRaw(){
-      auto tmp = inBuf;
-      inBuf = [];
-      fun(tmp.to!T);
+      returnPacket(raw);
     }
 
     void processBinaryPackets(){
-      binaryBuf ~= inBuf;
-      inBuf = [];
+      binaryBuf ~= raw;
       while(1){
         const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n'));
         if(idx<0) break;
@@ -251,9 +328,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
           const crc2 = actLine.crc32;
 
           if(crc==crc2){
-            stats.messagesIn++;
-            stats.lastIncomingMessageTime = now;
-            fun(actLine.to!T);
+            returnPacket(actLine);
           }else{
             error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
             stats.dataErrorCnt++;
@@ -269,8 +344,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
     }
 
     void processTextPackets(){
-      lineBuf = (cast(char[])inBuf).text.ifThrown("");
-      inBuf = [];
+      lineBuf = (cast(string)raw).safeUTF8;
 
       while(1){
         const idx = lineBuf.indexOf('\n'); //todo: variable declaration in while condition. Needs latest LDC.
@@ -287,9 +361,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
             crc2 = computeCheckSum(msg).format!"%x";
 
           if(crc==crc2){
-            stats.messagesIn++;
-            stats.lastIncomingMessageTime = now;
-            fun(cast(T)msg);
+            returnPacket(msg);
           }else{
             error("Crc error: "~msg.quoted);
             stats.dataErrorCnt++;

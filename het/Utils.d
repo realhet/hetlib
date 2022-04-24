@@ -2302,17 +2302,18 @@ auto toPWChar(S)(S s) nothrow { //converts to Windows' widestring
   return r;
 }
 
-/// replaces UTF errors with the error character. So the string will be safe for furster processing.
+/// replaces UTF errors with the error character. So the string will be safe for further processing.
 string safeUTF8(string s){
-  //opt: fucking slow!!!
-  string res;
-  while(s.length){
-    size_t i;
-    dchar ch = s.decode!(Yes.useReplacementDchar)(i);
-    res ~= ch;
-    s = s[i..$];
+  try{
+    std.utf.validate(s);
+    return s;
+  }catch(Exception){
+    auto res = appender!string;
+    size_t i, len = s.length;
+    while(i<len)
+      res ~= s.decode!(Yes.useReplacementDchar)(i);
+    return res[];
   }
-  return res;
 }
 
 //builds c zterminated string
