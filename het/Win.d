@@ -616,9 +616,12 @@ public:
   protected bool inRedraw;
   protected int updatesSinceLastDraw;
 
+  private enum showWarnings = false;
+
   protected void internalRedraw(){
-    if(inRedraw){ WARN("Already in internalRedraw()"); return; }
-    if(inUpdate){ WARN("Already in internalUpdate()"); return; }
+    if(inRedraw){ if(showWarnings) WARN("Already in internalRedraw()"); return; }
+    if(inUpdate){ if(showWarnings) WARN("Already in internalUpdate()"); return; }
+
     inRedraw = true; scope(exit){ inRedraw = false; updatesSinceLastDraw = 0; }
 
     auto t0 = QPS;
@@ -878,7 +881,7 @@ public:
   private final void internalUpdate() {
     //static if(1){ const T0 = QPS; scope(exit) print("IU", (QPS-T0)*1000); }
 
-    if(inUpdate){ WARN("Already in internalUpdate()"); return; }
+    if(inUpdate){ if(showWarnings) WARN("Already in internalUpdate()"); return; }
     inUpdate = true;
     scope(exit) inUpdate = false;
 

@@ -277,7 +277,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
   private size_t lastSettingsHash;
 
-  void receive(T)(void delegate(in T) fun){
+  void receive(T)(void delegate(T) fun){
     //latch inconing data
     ubyte[] raw;
     synchronized(this){
