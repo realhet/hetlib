@@ -629,29 +629,28 @@ class ExeMapFile{
     if(fn.fullName == "$ThisExeFile$")
       fn = appFile.otherExt("map");
 
-    WARN("MAPFILE processing is broken", fn);
-
+    bool active=false;
     foreach(line; fn.readLines(false)){
+      if(!active) active = line.isWild("*Address*Publics by Value*Rva+Base*Lib:Object");
       auto p = line.split.array;
       switch(p.length){
         case 5:{
-          if(p[0]=="Preferred") baseAddr = p[4].to!ulong(16);
-        } break;
-        case 6:{
-          if(p[0].isWild("0001:*")){
-            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
+          if(p[0]=="Preferred"){
+            baseAddr = p[4].to!ulong(16);
           }
         } break;
-        /*case 4:{ //this is DATA, not CODE
-          if(p[0].isWild("0002:*") && !p[2].startsWith(".")){
-            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[$-1]);
+        case 4:{
+          if(active && p[0].isWild("0001:*")){ //LDC1.28+
+            list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[3]);
           }
-        } break;*/
+        } break;
         default:
       }
     }
 
     list = list.sort!"a.addr < b.addr".array; //not sure if already sorted
+
+    if(list.empty) ERR("EXEMAPFILE is fucked up.");
   }
 
   string locate(ulong relAddr){
@@ -688,8 +687,10 @@ auto getModuleInfoByAddr(void* addr){
 
   Res res; with(res){
     import core.sys.windows.windows;
+
     if(GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                          GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, cast(wchar*)addr, &handle)){
+
       wchar[256] tmp;
       if(GetModuleFileNameW(handle, tmp.ptr, 256))
         fileName = File(tmp.toStr);

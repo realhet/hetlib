@@ -1,5 +1,9 @@
 module buildsys;
 
+//20220428
+//[ ] hldc bug: use a fresh hldc daemon or Shift+F9 -> karc2 rebuild -> it wont kill other compilers after the first error in karc2.d
+//[ ] access viola, map file interpreter is broken
+
 //todo: syntaxHighlight() returns errors! Build system it must handle those!
 //todo: RUN: set working directory to the main.d
 //todo: editor: goto line
