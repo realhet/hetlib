@@ -1601,13 +1601,15 @@ public:
 
   //todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
 
-  void upload(in void[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+  void upload(in void[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0, bool bug=false){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     if(!prepareInputRect(x, y, xs, ys)) return;
 
     //check required buffer size
     const bytes = (stride ? stride : xs)*ys*texelSize;
     enforce(data.length>=bytes, "Insufficient input data x=%s, y=%s, sx=%s, sy=%s, stride=%s, reqBytes=%s data.length=%s".format(x, y, xs, ys, stride, bytes, data.length));
-
+if(bug) LOG(stride, x, y, xs, ys, GL_FORMAT(type), GL_DATATYPE(type), cast(RGBA[])(data[0..8]));
+//8bit jpg blackness: 752 5784 72 752 480 6408 5121 [RGBA(46, 46, 46, 255), RGBA(48, 48, 48, 255)]
+//24bit jpg good: 1280 6448 112 1280 148 6408 5121 [RGBA(46, 13, 32, 255), RGBA(47, 19, 34, 255)]
     //do the actual upload
     checkBinding;
     gl.pixelStore(GL_UNPACK_ROW_LENGTH, stride);
@@ -1630,7 +1632,7 @@ public:
   }
 
   //upload a subrect from an image2D
-  void upload(T)(Image!(T, 2) img, int x=0, int y=0, int sx=int.min, int sy=int.min){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+  void upload(T)(Image!(T, 2) img, int x=0, int y=0, int sx=int.min, int sy=int.min, bool bug=false){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
     if(!isCompatibleType!T){ // incompatible format?
       upload(new Bitmap(img), x, y, sx, sy); // Bitmap will automatically convert
     }else{ // compatible
@@ -1638,14 +1640,16 @@ public:
       if(sx==int.min) sx = min(width -x, img.width );
       if(sy==int.min) sy = min(height-y, img.height);
 
-      upload(img.impl, x, y, sx, sy, img.stride);
+      upload(img.impl, x, y, sx, sy, img.stride, bug);
     }
   }
 
   void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min){
+    bool bug = bmp.file.fullName.isWild("*preview.jpg");
+
     switch(type){
       case GLTextureType.L8   : upload(bmp.get!ubyte, x, y, sx,sy); break;
-      case GLTextureType.RGBA8: upload(bmp.get!RGBA , x, y, sx,sy); break;
+      case GLTextureType.RGBA8: upload(bmp.get!RGBA , x, y, sx,sy, bug); break;
       default: raise("unhandled texture type: "~type.text);
     }
   }

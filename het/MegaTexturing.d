@@ -906,13 +906,14 @@ if(log) "Created subtex %s:".writefln(fileName);
   /// NOT threadsafe by design!!!
   int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){  // access2 //////////////////////////
     enum log = 0;
-
+fDelayed = No.delayed;
     bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
     auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);
     auto modified = bmp.modified.toNanoSeconds;
 
     if(log) LOG(bmp);
     if(auto existing = file in byFileName){
+
       //todo: ennel az egyenlosegjelnel 2 bug van:
       // 1: ha ==, akkor a thumbnailnak 0 a datetime-je
       // 2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a nearest sampling bugja tapasztalhato a folyamatosan athelyezett thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
@@ -925,6 +926,7 @@ if(log) "Created subtex %s:".writefln(fileName);
     }
     //upload new texture
     if(log) LOG("\33\16creating\33\7", modified);
+
     auto idx = createSubTex(bmp);
     byFileName[file] = idx;
     bitmapModified[file] = modified;
