@@ -126,8 +126,8 @@ class Executor{
   }
 
   void kill(){
-    if(isRunning){
-      try{
+    if(!isFinished){
+      if(pid) try{
         std.process.kill(pid);
       }catch(Exception e){
         WARN(extendExceptionMsg(e.text)); //sometimes it gives "Access is denied.", maybe because it's already dead, so just ignore.
@@ -156,7 +156,9 @@ bool update(Executor[] executors, bool delegate(int idx, int result, string outp
     if(doBreak) break;
   }
 
-  if(doBreak) executors.each!(e => e.kill);
+  if(doBreak){
+    executors.each!(e => e.kill);
+  }
 
   return !executors.all!(e => e.isFinished);
 }
@@ -1156,13 +1158,14 @@ public:
 
       //print out information
       {
-        int totalLines = modules.map!"a.sourceLines".sum,
+        int totalModules = modules.length.to!int,
+            totalLines = modules.map!"a.sourceLines".sum,
             totalBytes = modules.map!"a.sourceBytes".sum;
 
         logln(bold("BUILDING PROJECT:    "), mainFile);
         logln(bold("TARGET FILE:         "), targetFile);
         logln(bold("OPTIONS:             "), "LDC", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR");
-        logln(bold("SOURCE STATS:        "), format("Lines: %s   Bytes: %s", totalLines, totalBytes));
+        logln(bold("SOURCE STATS:        "), format("Modules: %s   Lines: %s   Bytes: %s", totalModules, totalLines, totalBytes));
 
         if(0){ //verbose display of the module graph
           foreach(i, const m; modules){
@@ -1269,7 +1272,7 @@ public:
     }
   }
 
-  auto findDependencies(File mainFile_, BuildSettings originalSettings){ // findDependencies //////////////////////////////////////
+/+  auto findDependencies(File mainFile_, BuildSettings originalSettings){ // findDependencies //////////////////////////////////////
     sLog = "";
     initData(mainFile_);
     settings = originalSettings;
@@ -1305,7 +1308,7 @@ public:
     }
 
     return modules;
-  }
+  }+/ //dead code: 220429
 
 
   // This can be used by commandline or by a dll export.
