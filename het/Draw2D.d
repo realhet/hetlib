@@ -745,14 +745,14 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     int shaderIdx = -1;
 
-    static foreach(i, A_; T){ alias A = Unqual!A_; auto a(){ return args[i]; }
+    static foreach(i, A_; T){{ alias A = Unqual!A_; auto a(){ return args[i]; }
            static if(is(A==RGB8           )) bkColor = a.to!RGBA8;
       else static if(is(A==RGBA8          )) bkColor = a;
       else static if(is(A==Flag!"nearest" )) nearest = a;
       else static if(is(A==RectAlign      )) rectAlign = a;
       else static if(is(A==GenericArg!(N, T), string N, T)) shaderIdx = a.value;
       else static assert("Unhandled parameter ", typeof(a));
-    }
+    }}
 
     auto c = realDrawColor;
     auto c2 = bkColor;
@@ -1651,12 +1651,17 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
         if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
         else if(stConfig==12) finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
-        else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
+        else if(stConfig==0)  finalColor = vec4(texel.rrr, 1); //old version, not good. 8bit pictures must be black and white only! finalColor = mix(bkColor, fontColor                   , texel.a);
 
         //experimental grid
         /*if(fontFlags&2) if(texelPerPixel.x < 0.1){
           if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
         }*/
+
+        /*if(stConfig==0) finalColor = vec4(.5, 0, 0, 1);
+        else if(stConfig==8) finalColor = vec4(0, 1, 0, 1);
+        else if(stConfig==12) finalColor = vec4(0, 0, 1, 1);
+        else finalColor = vec4(.5, .5, .5, 1);*/
       }else if(samplingLevel==2){//rooks6
         vec4 texel = megaSample_rooks6(tc);
         if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);

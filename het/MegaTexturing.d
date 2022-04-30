@@ -903,10 +903,10 @@ if(log) "Created subtex %s:".writefln(fileName);
 
   ulong[File] bitmapModified;
 
-  /// NOT threadsafe by design!!!
+  /// NOT threadsafe by design!!! Gfx is mainthread only anyways.
   int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){  // access2 //////////////////////////
     enum log = 0;
-fDelayed = No.delayed;
+
     bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
     auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);
     auto modified = bmp.modified.toNanoSeconds;

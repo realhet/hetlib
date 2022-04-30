@@ -1607,9 +1607,6 @@ public:
     //check required buffer size
     const bytes = (stride ? stride : xs)*ys*texelSize;
     enforce(data.length>=bytes, "Insufficient input data x=%s, y=%s, sx=%s, sy=%s, stride=%s, reqBytes=%s data.length=%s".format(x, y, xs, ys, stride, bytes, data.length));
-if(bug) LOG(stride, x, y, xs, ys, GL_FORMAT(type), GL_DATATYPE(type), cast(RGBA[])(data[0..8]));
-//8bit jpg blackness: 752 5784 72 752 480 6408 5121 [RGBA(46, 46, 46, 255), RGBA(48, 48, 48, 255)]
-//24bit jpg good: 1280 6448 112 1280 148 6408 5121 [RGBA(46, 13, 32, 255), RGBA(47, 19, 34, 255)]
     //do the actual upload
     checkBinding;
     gl.pixelStore(GL_UNPACK_ROW_LENGTH, stride);
