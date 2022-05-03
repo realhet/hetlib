@@ -123,7 +123,7 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   HICON;
 
 import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
-  std.json, std.digest.digest, std.parallelism, core.runtime;
+  std.json, std.parallelism, core.runtime;
 
 public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
 
@@ -174,25 +174,15 @@ __gshared struct application{
 __gshared static private:
   bool initialized, finalized;
 
-  string[] arg_;
-  void initArgs(){
-    arg_ = splitCommandLine(toStr(GetCommandLine));
-  }
-
   KillerThread killerThread;
 
 __gshared static public:///////////////////////////////////////////////////////////////////
   uint tick;
 
+  import core.runtime : Runtime;
+  alias args = Runtime.args;
+
   void function() initFunct;
-
-  auto argc()            { return arg_.length; }
-  string arg(size_t idx){
-    if(arg_.empty) initArgs;
-    if(idx<argc)return arg_[idx]; else return "";
-  }
-  alias args = arg;
-
 
   void exit(int code=0){ //immediate exit
     try{ finalize; }catch(Throwable){}
@@ -219,15 +209,8 @@ __gshared static public:////////////////////////////////////////////////////////
   }
 
   int runConsole(void delegate() dg){
-    return runConsole(null, dg);
-
-    //todo: replace exception handler (no info on it yet)
-    //todo: replace main() with -> void main(string[] args){ application.runConsole(args, { });}
-  }
-
-  int runConsole(string[] args, void delegate() dg){
+    enforce(!initialized, "Application.run(): Already running.");
     initialize;
-    arg_ = args;
     auto ret = console.handleException(dg);
     finalize;
     //here we wait all threads. In windowed mode we don't
@@ -248,6 +231,13 @@ struct EgaColor{
 // Console //////////////////////////////////////////////////////////////////////
 
 struct console{  //todo: ha ezt a writeln-t hivja a gc.collect-bol egy destructor, akkor crash.
+
+  //execute program in hetlib console({ program }); (colorful console, debug and exception handling)
+  //args in application.args
+  static void opCall(void delegate() dg){
+    application.runConsole(dg);
+  }
+
 static private:
   __gshared bool visible_;
   __gshared bool exceptionHandlerActive_;
@@ -654,6 +644,8 @@ class ExeMapFile{
   }
 
   string locate(ulong relAddr){
+    //todo: Try core.runtime.defaultTraceHandler
+
     foreach(idx; 1..list.length)
       if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
         return list[idx-1].name;
@@ -2293,13 +2285,13 @@ void removeLastEmpty(ref string[] lines){
 
 auto toPChar(S)(S s) nothrow { //converts to Windows' string
   const(char)* r;
-  try { r = toUTFz!(char*)(s); }catch{}
+  try { r = toUTFz!(char*)(s); }catch(Throwable){}
   return r;
 }
 
 auto toPWChar(S)(S s) nothrow { //converts to Windows' widestring
   const(wchar)* r;
-  try { r = toUTF16z(s); }catch{}
+  try { r = toUTF16z(s); }catch(Throwable){}
   return r;
 }
 
@@ -2322,7 +2314,7 @@ void strMake(string src, char* dst, size_t dstLen)
 in{
   assert(dst !is null);
   assert(dstLen>=1);
-}body{
+}do{
   size_t sLen = min(dstLen-1, src.length);
   memcpy(dst, src.ptr, sLen);           //todo: this is so naive. Must revisit...
   dst[sLen] = 0; //zero terminated
@@ -5989,7 +5981,7 @@ if(__traits(isStaticFunction, fun))
     string text;
     try{
       text = file.readText;
-    }catch{
+    }catch(Exception){
       throw new Exception("Unable to load cached file: "~file.fullName);
     } //it will try again later
 

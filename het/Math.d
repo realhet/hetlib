@@ -2479,7 +2479,7 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
   // Support for `x..y` notation in slicing operator for the given dimension.
   int[2] opSlice(size_t dim)(int start, int end) if (dim >= 0 && dim < 2)
   in { assert(start >= 0 && end <= this.opDollar!dim); }
-  body {
+  do {
     return [start, end];
   }
 
