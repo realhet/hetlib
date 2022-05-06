@@ -386,6 +386,14 @@ class ComPort{ // ComPort /////////////////////////////////////////
     } //end switch
   }
 
+  bool thereWasAnError() const{ return stats.lastErrorTime.toSeconds > stats.lastIncomingMessageTime.toSeconds; }
+
+  bool thereWasAMessage(float since_sec=9999, float blink_sec=0) const{
+    if(thereWasAnError) return false;
+    const t = stats.lastIncomingMessageTime.toSeconds,
+          t0 = now.toSeconds;
+    return t.inRange(t0-since_sec, t0-blink_sec);
+  }
 
   void UI(string title = "", void delegate() fun = null){ import het.ui; with(im){ //UI //////////////////////////////////////
 
@@ -400,8 +408,8 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
       Row({
         if(!this.enabled) Led(false, clGray);
-        else if(stats.lastErrorTime.toSeconds > stats.lastIncomingMessageTime.toSeconds) Led(true, clRed); //note: toSeconds needed for nan->0
-        else Led(now.toSeconds - stats.lastIncomingMessageTime.toSeconds < 1.0f/20, clLime);
+        else if(thereWasAnError) Led(true, clRed); //note: toSeconds needed for nan->0
+        else Led(thereWasAMessage(9999, 1.0f/20), clLime);
         Text("Comm");
       });
 

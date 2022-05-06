@@ -927,6 +927,13 @@ struct percent{
 //todo: 'in' operator piros, de annak ciankeiknek kene lennie, mint az out-nak. Azazhogy helyzettol figg annak a szine
 
 
+auto calcLinearCoefficients(T1, T2, T3, T4 )(T1 x1, T2 y1, T3 x2, T4 y2){
+  auto m = safeDiv(y2 - y1, x2 - x1),
+       c = y1 - x1*m;
+  return tuple(m, c); //todo: use this in remap
+}
+
+
 //todo: remap goes to math
 T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 {
@@ -6499,6 +6506,9 @@ struct DateTime{
       raw = raw.nextUp;
     }
   }
+
+  DateTime add_day(double delta_days) const { DateTime res; res.raw = raw + delta_days; return res; }
+  DateTime add_sec(double delta_sec) const { return add_day(delta_sec*(1.0/(24*60*60))); }
 
   double toSeconds()    const{ return raw.isnan ? 0 : raw*(24*60*60); }
   ulong toNanoSeconds() const{ return raw.isnan ? 0 : cast(ulong)(raw*(24*60*60*1e9)); }

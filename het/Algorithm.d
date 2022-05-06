@@ -484,4 +484,66 @@ public:
 }
 
 
+//!PositionExtrapolator ////////////////////////////////////
+struct PositionExtrapolator{
+private:
+  struct HistoryRec{
+    DateTime t;
+    double position;
+  }
+  HistoryRec[] history;
+
+public:
+
+  double historyDuration_sec = 1;
+
+  void reset(){
+    history = [];
+  }
+
+  void update(){
+    const tz = now.add_sec(-historyDuration_sec);
+    history = history.remove!(a => a.t<tz);
+  }
+
+  void appendPosition(double pos, DateTime t = now){
+    history ~= HistoryRec(t, pos);
+  }
+
+  double position(DateTime t = now) const{
+    //no data
+    if(history.empty) return typeof(return).nan;
+
+    //constant
+    if(history.length==1) return history[0].position;
+
+    //interpolate
+    if(t.inRange(history[0].t, history[$-1].t)){
+      foreach(a; history.slide(2))
+        if(t.inRange(a[0].t, a[1].t))
+          return remap(t.raw, a[0].t.raw, a[1].t.raw, a[0].position, a[1].position);
+    }
+
+    //extrapolate
+    return remap(t.raw, history[0].t.raw, history[$-1].t.raw, history[0].position, history[$-1].position);
+  }
+
+  double speed() const{
+    if(history.length<2) return 0;
+    return safeDiv(history[$-1].position - history[0].position, (history[$-1].t.raw - history[0].t.raw)*24*60*60);
+  }
+
+  void selfTest(){
+    PositionExtrapolator pe;
+    [100, 125, 150, 0, 0, 300, 300, 300, 300, 300, 300, 500, 505].chain([0].replicate(20)).each!((a){
+      sleep(100);
+      if(a) pe.appendPosition(a);
+      pe.update;
+      pe.position.print;
+
+      if(a==505)
+        iota(-1.5, 1.5, 0.03333).map!(i => pe.position(now.add_sec(i))).print;
+    });
+  }
+}
 
