@@ -2178,7 +2178,7 @@ protected:
   }
 
   override void onUpdateViewAnimation(){
-    view.updateAnimation(deltaTime, true/*invalidate*/);
+    view.updateAnimation(deltaTime.value(second), true/*invalidate*/);
     updateViewClipBoundsAndMousePos;
   }
 
@@ -2286,8 +2286,8 @@ public:
 
         auto rect(double t0, double t1){
           bounds2 b;
-          float base = prevGroup[$-1].t1;
-          float len = group[$-1].t1 - base;
+          float base = prevGroup[$-1].t1.value(second);
+          float len = group[$-1].t1.value(second) - base;
           b.low.x  = origin.x + (t0-base-len)*scale.x;
           b.high.x = origin.x + (t1-base-len)*scale.x;
           b.low.y  = origin.y + scale.y*(idx-1);
@@ -2295,13 +2295,13 @@ public:
           return b;
         }
 
-        auto rAll = rect(prevGroup[$-1].t1, group[$-1].t1);
+        auto rAll = rect(prevGroup[$-1].t1.value(second), group[$-1].t1.value(second));
         color = clBlack;
         fillRect(rAll);
 
         foreach(pass; 0..2) foreach(g; group){
           color = g.color;
-          auto r = rect(g.t0, g.t1);
+          auto r = rect(g.t0.value(second), g.t1.value(second));
           if(pass==0){
             fillRect(r);
           }else{
@@ -2311,7 +2311,7 @@ public:
         }
 
         void mark(float f){
-          auto r = rect(group[$-1].t1-(1/f), group[$-1].t1);
+          auto r = rect(group[$-1].t1.value(second)-(1/f), group[$-1].t1.value(second));
           color = clWhite;
           line(r.topLeft, r.bottomLeft);
         }

@@ -163,8 +163,8 @@ public:
     auto oldScale = scale;
 
     with(owner.actions){
-      const scrollSpeed = owner.deltaTime*800,
-            zoomSpeed   = owner.deltaTime*6,
+      const scrollSpeed = owner.deltaTime.value(second)*800,
+            zoomSpeed   = owner.deltaTime.value(second)*6,
             wheelSpeed  = 0.375f;
 
       group("View controls");          ////todo: ctrl+s es s (mint move osszeakad!)
@@ -189,7 +189,7 @@ public:
     return res;
   }
 
-  bool updateAnimation(float deltaTime, bool callInvalidate){
+  bool updateAnimation(float deltaTime, bool callInvalidate){  //todo: use quantities.time
     float at = calcAnimationT(deltaTime, animSpeed);
     if(chkSet(animStarted)) at = 1;
 

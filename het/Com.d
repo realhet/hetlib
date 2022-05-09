@@ -83,7 +83,7 @@ private void comPortWorker(shared ComPort owner_){
   ComPortSettings settings;
   size_t openedConfig; //change detection hash
   HANDLE hCom;
-  double tLastFailedOpen=0;
+  Time tLastFailedOpen=0*second;
   string lastError;
 
   bool enabled(){ return settings.enabled; }
@@ -131,7 +131,7 @@ private void comPortWorker(shared ComPort owner_){
 
     //enabled, but not opened yet
     if(enabled && !hCom){
-      if(QPS-tLastFailedOpen > .5f) //don't try to reopen at max FPS
+      if(QPS-tLastFailedOpen > .5*second) //don't try to reopen at max FPS
         comOpen;
     }
 
@@ -386,13 +386,13 @@ class ComPort{ // ComPort /////////////////////////////////////////
     } //end switch
   }
 
-  bool thereWasAnError() const{ return stats.lastErrorTime.toSeconds > stats.lastIncomingMessageTime.toSeconds; }
+  bool thereWasAnError() const{ return stats.lastErrorTime.toNanoSeconds > stats.lastIncomingMessageTime.toNanoSeconds; }
 
-  bool thereWasAMessage(float since_sec=9999, float blink_sec=0) const{
+  bool thereWasAMessage(in Time since=9999*second, in Time blink=0*second) const{
     if(thereWasAnError) return false;
-    const t = stats.lastIncomingMessageTime.toSeconds,
-          t0 = now.toSeconds;
-    return t.inRange(t0-since_sec, t0-blink_sec);
+    const t = stats.lastIncomingMessageTime,
+          t0 = now;
+    return t && t>=t0-since && t<t0-blink;;
   }
 
   void UI(string title = "", void delegate() fun = null){ import het.ui; with(im){ //UI //////////////////////////////////////
@@ -409,7 +409,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
       Row({
         if(!this.enabled) Led(false, clGray);
         else if(thereWasAnError) Led(true, clRed); //note: toSeconds needed for nan->0
-        else Led(thereWasAMessage(9999, 1.0f/20), clLime);
+        else Led(thereWasAMessage(1*hour, (1.0f/20)*second), clLime);
         Text("Comm");
       });
 
@@ -443,7 +443,6 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
     Row("Error\t", {
       Static(stats.lastError=="" ? " " : stats.lastError, { /*flex = 1;*/ });
-      if(stats.lastError!="") Comment((now.toSeconds-stats.lastErrorTime.toSeconds).format!"%.0f secs ago");
     });
 
     //todo: statistics

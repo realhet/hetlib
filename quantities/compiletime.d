@@ -123,6 +123,10 @@ See_Also:
 +/
 struct Quantity(N, alias dims)
 {
+
+//het 22.05.09:
+    bool opCast() const{ return _value!=0; }
+
     static assert(isNumeric!N);
     static assert(is(typeof(dims) : Dimensions));
     static assert(Quantity.sizeof == N.sizeof);
@@ -214,7 +218,7 @@ public:
     doesn't have the same dimensions as Q. If Q is a Quantity, inconsistent
     dimensions produce a compilation error.
     +/
-    N value(Q)(auto ref const Q target) const 
+    N value(Q)(auto ref const Q target) const
             if (isQuantity!Q)
     {
         mixin ensureSameDim!(Q.dimensions);
@@ -222,7 +226,7 @@ public:
     }
 
     /// ditto
-    N value(Q)(auto ref const Q target) const 
+    N value(Q)(auto ref const Q target) const
             if (isQVariant!Q)
     {
         import std.exception;
@@ -240,7 +244,7 @@ public:
     /++
     Tests wheter this quantity has the same dimensions as another one.
     +/
-    bool isConsistentWith(Q)(auto ref const Q qty) const 
+    bool isConsistentWith(Q)(auto ref const Q qty) const
             if (isQVariantOrQuantity!Q)
     {
         return dimensions == qty.dimensions;
@@ -262,7 +266,7 @@ public:
     +/
     static if (isDimensionless)
     {
-        T opCast(T)() const 
+        T opCast(T)() const
                 if (isNumeric!T)
         {
             return _value;
@@ -303,7 +307,7 @@ public:
 
     // Unary + and -
     /// ditto
-    Quantity opUnary(string op)() const 
+    Quantity opUnary(string op)() const
             if (op == "+" || op == "-")
     {
         return Quantity.make(mixin(op ~ "_value"));
@@ -320,7 +324,7 @@ public:
 
     // Add (or substract) two quantities if they share the same dimensions
     /// ditto
-    Quantity opBinary(string op, Q)(auto ref const Q qty) const 
+    Quantity opBinary(string op, Q)(auto ref const Q qty) const
             if (isQuantity!Q && (op == "+" || op == "-"))
     {
         ensureSameDim!(Q.dimensions);
@@ -329,7 +333,7 @@ public:
 
     // Add (or substract) a dimensionless quantity and a number
     /// ditto
-    Quantity opBinary(string op, T)(T scalar) const 
+    Quantity opBinary(string op, T)(T scalar) const
             if (isNumeric!T && (op == "+" || op == "-"))
     {
         ensureEmpty!dimensions;
@@ -337,7 +341,7 @@ public:
     }
 
     /// ditto
-    Quantity opBinaryRight(string op, T)(T scalar) const 
+    Quantity opBinaryRight(string op, T)(T scalar) const
             if (isNumeric!T && (op == "+" || op == "-"))
     {
         ensureEmpty!dimensions;
@@ -346,21 +350,21 @@ public:
 
     // Multiply or divide a quantity by a number
     /// ditto
-    Quantity opBinary(string op, T)(T scalar) const 
+    Quantity opBinary(string op, T)(T scalar) const
             if (isNumeric!T && (op == "*" || op == "/" || op == "%"))
     {
         return Quantity.make(mixin("_value" ~ op ~ "scalar"));
     }
 
     /// ditto
-    Quantity opBinaryRight(string op, T)(T scalar) const 
+    Quantity opBinaryRight(string op, T)(T scalar) const
             if (isNumeric!T && op == "*")
     {
         return Quantity.make(mixin("scalar" ~ op ~ "_value"));
     }
 
     /// ditto
-    auto opBinaryRight(string op, T)(T scalar) const 
+    auto opBinaryRight(string op, T)(T scalar) const
             if (isNumeric!T && (op == "/" || op == "%"))
     {
         alias RQ = Quantity!(N, dimensions.inverted());
@@ -369,7 +373,7 @@ public:
 
     // Multiply or divide two quantities
     /// ditto
-    auto opBinary(string op, Q)(auto ref const Q qty) const 
+    auto opBinary(string op, Q)(auto ref const Q qty) const
             if (isQuantity!Q && (op == "*" || op == "/"))
     {
         alias RQ = Quantity!(N, mixin("dimensions" ~ op ~ "Q.dimensions"));
@@ -377,7 +381,7 @@ public:
     }
 
     /// ditto
-    Quantity opBinary(string op, Q)(auto ref const Q qty) const 
+    Quantity opBinary(string op, Q)(auto ref const Q qty) const
             if (isQuantity!Q && (op == "%"))
     {
         ensureSameDim!(Q.dimensions);
@@ -429,7 +433,7 @@ public:
 
     // Exact equality between quantities
     /// ditto
-    bool opEquals(Q)(auto ref const Q qty) const 
+    bool opEquals(Q)(auto ref const Q qty) const
             if (isQuantity!Q)
     {
         ensureSameDim!(Q.dimensions);
@@ -438,7 +442,7 @@ public:
 
     // Exact equality between a dimensionless quantity and a number
     /// ditto
-    bool opEquals(T)(T scalar) const 
+    bool opEquals(T)(T scalar) const
             if (isNumeric!T)
     {
         ensureEmpty!dimensions;
@@ -447,7 +451,7 @@ public:
 
     // Comparison between two quantities
     /// ditto
-    int opCmp(Q)(auto ref const Q qty) const 
+    int opCmp(Q)(auto ref const Q qty) const
             if (isQuantity!Q)
     {
         ensureSameDim!(Q.dimensions);
@@ -460,7 +464,7 @@ public:
 
     // Comparison between a dimensionless quantity and a number
     /// ditto
-    int opCmp(T)(T scalar) const 
+    int opCmp(T)(T scalar) const
             if (isNumeric!T)
     {
         ensureEmpty!dimensions;

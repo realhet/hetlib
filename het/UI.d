@@ -151,8 +151,8 @@ struct im{ static:
 
     ImStorageManager.purge(200);
 
-    { static uint tbmp; if(tbmp.chkSet((QPS.ifloor  )/2)) bitmaps     .garbageCollect; }
-    { static uint tvf ; if(tvf .chkSet((QPS.ifloor+1)/2)) virtualFiles.garbageCollect; }
+    { static uint tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2)) bitmaps     .garbageCollect; }
+    { static uint tvf ; if(tvf .chkSet((QPS.value(second).ifloor+1)/2)) virtualFiles.garbageCollect; }
 
     resourceMonitor.update;
   }
@@ -1020,7 +1020,7 @@ struct im{ static:
   string strikeout(string s){ return tag("style strikeout=1")~s~tag("style strikeout=0"); }
 
   string progressSpinner(int style=1){
-    int t(int n){ return ((QPS*n*1.5).ifloor)%n; }
+    int t(int n){ return ((QPS.value(second)*n*1.5).ifloor)%n; }
     auto ch(int i){ return [cast(dchar)i].to!string; }
 
     switch(style){
@@ -1385,7 +1385,7 @@ struct im{ static:
             if(KeyCombo("Down"      ).typed) cmdQueue ~= EditCmd(cDown              );
 
             if(KeyCombo("Ctrl+V Shift+Ins").typed){
-              cmdQueue ~= EditCmd(cInsert, clipboard.text); //LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
+              cmdQueue ~= EditCmd(cInsert, clipboard.asText); //LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
             }
           }
           //todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.

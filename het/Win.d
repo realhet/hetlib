@@ -123,7 +123,7 @@ struct TimeLine{
   struct Event{
     enum Type           {update, beginPaint, paint, endPaint, swapBuffers};
     Type type;
-    double t0, t1;
+    Time t0, t1;
 
     auto color(){
       enum typeColors = [clBlue, clLime, clYellow, clRed, clGray];
@@ -137,7 +137,7 @@ struct TimeLine{
     return !group.empty && group[$-1].type == Event.Type.max;
   }
 
-  void addEvent(Event.Type type, double t0, double t1=QPS){
+  void addEvent(Event.Type type, Time t0, Time t1=QPS){
     auto ev = Event(type, t0, t1);
 
     const  newGroup = groups.empty || isComplete(groups[$-1]);
@@ -819,11 +819,11 @@ public:
                              //Or much higher if it is a physical simulation.
                              //todo: ezt is meg kell csinalni jobban.
 
-  private double time0=0, timeAct=0, timeLast=0; //internal vars for timing
+  private Time time0=0*second, timeAct=0*second, timeLast=0*second; //internal vars for timing
   private int FPSCnt, UPSCnt; //internal counters for statistics
   private long PSSec; //second tetection
 
-  double totalTime=0, deltaTime=0, lagTime=0; //
+  Time totalTime=0*second, deltaTime=0*second, lagTime=0*second; //
   int FPS, UPS, lagCnt; //FramesPerSec, UpdatePerSec
 
   protected void onMouseUpdate(){ } //forwarded to GLWindow. Must be called right after view.update
@@ -900,27 +900,27 @@ public:
     //handle debug.kill
     if(dbg.forceExit_check){ dbg.forceExit_clear; this.destroy; } //todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
 
-    const double timeTarget = 1.0f/targetUpdateRate;
+    const timeTarget = (1.0f/targetUpdateRate)*second;
 
     //refresh processorId
     mainThreadProcessorNumber = GetCurrentProcessorNumber;
 
     //initialize timing system
     if(!time0){
-      time0 = timeLast = QPS-timeTarget-0.001f;
+      time0 = timeLast = QPS-timeTarget-0.001*second;
     }
 
     timeAct = QPS;
     deltaTime = timeAct-timeLast;
     if(deltaTime<timeTarget) return; //too small elapsed time
 
-    if(deltaTime>0.5/*sec*/){ //LAG handling
+    if(deltaTime>0.5*second){ //LAG handling
       lagCnt++;
       lagTime += deltaTime;
       deltaTime = timeTarget;
     }
 
-    int updateCnt = iround(deltaTime/timeTarget).clamp(0, 1);
+    int updateCnt = iround(deltaTime.value(second)/timeTarget.value(second)).clamp(0, 1);
 
     deltaTime /= updateCnt;
 
@@ -945,7 +945,7 @@ public:
         UPSCnt++;
 
         //update FPS, UPS
-        if(chkSet(PSSec, ltrunc(totalTime))){
+        if(chkSet(PSSec, ltrunc(totalTime.value(second)))){
           FPS = FPSCnt;  FPSCnt = 0;
           UPS = UPSCnt;  UPSCnt = 0;
           if(isMain) {

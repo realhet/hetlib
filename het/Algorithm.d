@@ -495,14 +495,14 @@ private:
 
 public:
 
-  double historyDuration_sec = 1;
+  Time historyDuration = 1*second;
 
   void reset(){
     history = [];
   }
 
   void update(){
-    const tz = now.add_sec(-historyDuration_sec);
+    const tz = now - historyDuration;
     history = history.remove!(a => a.t<tz);
   }
 
@@ -542,7 +542,7 @@ public:
       pe.position.print;
 
       if(a==505)
-        iota(-1.5, 1.5, 0.03333).map!(i => pe.position(now.add_sec(i))).print;
+        iota(-1.5, 1.5, 0.03333).map!(i => pe.position(now + i*second)).print;
     });
   }
 }

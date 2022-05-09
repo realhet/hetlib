@@ -96,7 +96,8 @@ public import std.bitmanip;
 public import std.typecons: Typedef;
 public import std.path: baseName;
 public import std.exception : collectException, ifThrown;
-public import core.time;
+
+public import quantities.si;
 
 
 import std.encoding : transcode, Windows1252String;
@@ -836,15 +837,15 @@ public:
   bool over, finished;
   this(){
     super({
-      double t0 = 0;
-      const timeOut = 0.66; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
+      auto t0 = 0.0*second;
+      const timeOut = 0.66*second; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
       while(!over){
-        if(t0==0){
+        if(t0==0*second){
           if(dbg.forceExit_check) t0 = QPS; //start timer
         }else{
           auto elapsed = QPS-t0;
           if(!dbg.forceExit_check){
-            t0 = 0; //reset timer. exiting out normally.
+            t0 = 0*second; //reset timer. exiting out normally.
           }else{
             if(elapsed>timeOut){
               dbg.forceExit_clear; //timeout reached, exit drastically
@@ -2778,6 +2779,8 @@ auto tabTextToCells(string text, immutable(char)[2] delims = "\t\n"){
 auto csvToCells(string text){
   return tabTextToCells(text, ";\n");
 }
+
+//todo: import splitLines from std.string
 
 string[] splitLines(string s){
   return s.split('\n').map!(a => a.withoutEnding('\r')).array;
@@ -5858,8 +5861,8 @@ struct clipboard{ static: //clipboard //////////////////////////
   }
 
   @property{
-    string text(){ return getText; }
-    void text(string s){ setText(s, true); }
+    string asText(){ return getText; }
+    void asText(string s){ setText(s, true); }
   }
 }
 
@@ -6119,7 +6122,7 @@ public:
 }
 
 /////////////////////////////////////////////////////////////////////////////////
-/// Date/Time                                                                 ///
+/// Date/TimeOfDay                                                                 ///
 /////////////////////////////////////////////////////////////////////////////////
 
 void sleep(int ms)
@@ -6284,17 +6287,17 @@ struct Date{
   int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
 }
 
-struct Time{
+struct TimeOfDay{
   private double raw;
   this(int hour, int min, int sec=0, double ms=0){
     raw = encodeTime(hour, min, sec, ms);
   }
   this(const SYSTEMTIME st){
-    with(st) this = Time(wHour, wMinute, wSecond, wMilliseconds);
+    with(st) this = TimeOfDay(wHour, wMinute, wSecond, wMilliseconds);
   }
-  static Time current(){
+  static TimeOfDay current(){
     SYSTEMTIME st;  GetLocalTime(&st);
-    return Time(st);
+    return TimeOfDay(st);
   }
   this(string str){
     int h,m; double s=0;
@@ -6312,16 +6315,16 @@ struct Time{
   @property int sec ()const { auto st = decodeTime(raw); return st.wSecond      ; }
   @property int ms  ()const { auto st = decodeTime(raw); return st.wMilliseconds; }
 
-  @property void hour(ushort x) { auto st = decodeTime(raw); st.wHour         = x; this = Time(st); }
-  @property void min (ushort x) { auto st = decodeTime(raw); st.wMinute       = x; this = Time(st); }
-  @property void sec (ushort x) { auto st = decodeTime(raw); st.wSecond       = x; this = Time(st); }
-  @property void ms  (ushort x) { auto st = decodeTime(raw); st.wMilliseconds = x; this = Time(st); }
+  @property void hour(ushort x) { auto st = decodeTime(raw); st.wHour         = x; this = TimeOfDay(st); }
+  @property void min (ushort x) { auto st = decodeTime(raw); st.wMinute       = x; this = TimeOfDay(st); }
+  @property void sec (ushort x) { auto st = decodeTime(raw); st.wSecond       = x; this = TimeOfDay(st); }
+  @property void ms  (ushort x) { auto st = decodeTime(raw); st.wMilliseconds = x; this = TimeOfDay(st); }
 
   string toString()const {
     with(decodeTime(raw)) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds);
   }
 
-  int opCmp(const Time t) const { return dblCmp(raw, t.raw); }
+  int opCmp(const TimeOfDay t) const { return dblCmp(raw, t.raw); }
 }
 
 
@@ -6347,23 +6350,24 @@ struct DateTime{
     FileTimeToLocalSystemTime(&ft, &st);
     this(st, time_100ns*(1.0/(24*60*60 * 10_000_000.0)));
   }
+
   this(in SYSTEMTIME st, double extra_days=0){
-    with(st) raw = encodeDate(wYear, wMonth, wDay) + encodeTime(wHour, wMinute, wSecond, wMilliseconds) + extra_days;
+    with(st) raw = encodeDate(wYear, wMonth, wDay) + (encodeTime(wHour, wMinute, wSecond, wMilliseconds) + extra_days);
   }
   this(int year, int month, int day, int hour=0, int minute=0, int second=0, int milliseconds=0){
     raw = encodeDate(year, month, day) + encodeTime(hour, minute, second, milliseconds);
   }
-  this(in Date date, in Time time){
-    raw = date.raw+time.raw;
+  this(in Date date, in TimeOfDay timeOfDay){
+    raw = date.raw+timeOfDay.raw;
   }
   this(string str){
     if(str.canFind(' ')){
       auto parts = str.split(' '); //dateTime
 
       if(parts.length==2){
-        this(Date(parts[0]), Time(parts[1]));
+        this(Date(parts[0]), TimeOfDay(parts[1]));
       }else if(parts.length==5){ //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
-        this(Date(parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int), Time(parts[3]));
+        this(Date(parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int), TimeOfDay(parts[3]));
       }else{
         throw new Exception("Invalid datetime format: "~str);
         this(0,0,0); //fuck off, compiler!!!
@@ -6385,7 +6389,7 @@ struct DateTime{
       }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
         this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
       }else{
-        this(Date(str), Time(0, 0)); //Date only
+        this(Date(str), TimeOfDay(0, 0)); //Date only
         //note: this will drop the error if any
       }
     }
@@ -6421,7 +6425,7 @@ struct DateTime{
   string toString()const {
     if(isNull) return "NULL DateTime";
     Date d; d.raw = ifloor(raw);
-    Time t; t.raw = fract(raw);
+    TimeOfDay t; t.raw = fract(raw);
     return d.toString ~ ' ' ~ t.toString;
   }
 
@@ -6455,7 +6459,7 @@ struct DateTime{
 
   static void test(){ //todo: refactor these and do unit testing
     {
-      double[] arr;
+      Time[] arr;
       arr.length = 20;
       foreach(ref t; arr) t = QPS; //100ns precision. QPS in a loop is 2-3 times the same on my machine.
       foreach(i, t; arr.slide(2).array) writefln("%5d %20.15f %20.15f", i, t[0], t[1]-t[0]);
@@ -6507,53 +6511,70 @@ struct DateTime{
     }
   }
 
-  DateTime add_day(double delta_days) const { DateTime res; res.raw = raw + delta_days; return res; }
-  DateTime add_sec(double delta_sec) const { return add_day(delta_sec*(1.0/(24*60*60))); }
-
-  double toSeconds()    const{ return raw.isnan ? 0 : raw*(24*60*60); }
-  ulong toNanoSeconds() const{ return raw.isnan ? 0 : cast(ulong)(raw*(24*60*60*1e9)); }
-
-  Time time() const{ Time t; t.raw = raw.fract; return t; }
+  TimeOfDay timeOfDay() const{ TimeOfDay t; t.raw = raw.fract; return t; }
 
   int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
 
-  DateTime opBinary(string op)(in Duration d) const{
-    DateTime res = this;
-    double r = d.total!"hnsecs" * (1.0/(24*60*60*1e7));
-    mixin("res.raw"~op~"=r;");
-    return res;
+  //this is the hash for bitmap objects
+  ulong toNanoSeconds() const{ return raw.isnan ? 0 : cast(ulong)(raw*(24*60*60*1e9)); }
+
+  ///calculate the difference between DateTimes
+  Time opBinary(string op : "-")(in DateTime b) const{
+    return (raw-b.raw)*quantities.si.day;
+  }
+
+  ///adjust DateTime by si.Time
+  DateTime opBinary(string op)(in Time b) const if(op.among("+", "-")) {
+    return DateTime(mixin("raw", op, "b.value(quantities.si.day)"));
+  }
+
+  ///adjust this DateTime by si.Time
+  DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-")){
+    mixin("raw", op,"= b.value(quantities.si.day);");
+    return this;
   }
 }
 
-Time     time () { return Time    .current; } //0 = midnight  1 = 24hours
-Date     today() { return Date    .current; } //same system as in Delphi
-DateTime now  () { return DateTime.current; }
+TimeOfDay timeOfDay () { return TimeOfDay.current; } //0 = midnight  1 = 24hours
+Date      today     () { return Date     .current; } //same system as in Delphi
+DateTime  now       () { return DateTime .current; }
 
-
-double QPS() //it's in seconds and synchronized with now() only at the start
+Time QPS() //it's in seconds and synchronized with now() only at the start
 {
   long cntr;
   QueryPerformanceCounter(&cntr);
   static __gshared double timeBase;
   static __gshared long   cntrBase;
   static __gshared double invFreq;
-  if(!cntrBase){
-    timeBase = time.raw*secsInDay;
-    cntrBase = cntr;
-
+  static __gshared double shift;
+  if(!cntrBase){ //todo: thus should be synchronized with std.singleton
     //query the freq only once
     long freq;
     QueryPerformanceFrequency(&freq);
     invFreq = 1.0/cast(double)freq;
+
+    timeBase = timeOfDay.raw*secsInDay;
+    cntrBase = cntr;
+
+    shift = timeBase - cntrBase*invFreq;
   }
-  return cast(double)(cntr-cntrBase)*invFreq + timeBase; //cntr has to be 'normalized' before multiplication to preserve precision
+  return (cntr*invFreq + shift)*second;
 }
 
-float QPS_local(){ //todo: mi a faszom kurvaannya ez is... 0-tol indulo QPS bazzz
-  __gshared static double firstQPS = 0;
-  if(!firstQPS) firstQPS = QPS;
-  return QPS-firstQPS;
-}
+//deprecated. Use QPS-QPS0
+/*Time QPS_local(){ //note: mi a faszom kurvaannya ez is... 0-tol indulo QPS bazzz
+  __gshared static Time firstQPS = 0*second;
+  const Q = QPS;
+  if(firstQPS==0*second) firstQPS = Q; //todo: thus should be synchronized with std.singleton
+  return Q-firstQPS;
+}*/
+auto QPS_local(){ return QPS-QPS0; }
+
+
+private __gshared  Time _TLast;
+
+auto T0(){ _TLast = QPS; return QPS; }
+auto DT()(){ const Q = QPS, res = Q-_TLast; _TLast = Q; return res; }
 
 struct DeltaTimer {
   double tLast = 0;
@@ -6564,11 +6585,11 @@ public:
   void reset() //resets the total elapsed time
   {
     total = 0;
-    tLast = QPS;
+    tLast = QPS.value(second);
   }
 
   float update() {  //returns time since last update
-    double tAct = QPS;
+    double tAct = QPS.value(second);
     if(tLast==0) tLast = tAct;
     delta = tAct-tLast;
     total += delta;
@@ -6605,14 +6626,15 @@ bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float pe
   return a.update_periodic(periodLength_sec, false); //todo: result should be an int counting how many updates missed since last time
 }
 
-auto blink(float freq=3/*hz*/, float duty=.5f){ return (QPS*freq).fract < duty; }
+auto blink(float freq=3/*hz*/, float duty=.5f){ return (QPS.value(second)*freq).fract < duty; }
 
-synchronized class Perf {
+synchronized class Perf { //all is shared, this is not good.
+  //todo: revisit this crap
   private{
-    float[string] table;
+    double[string] table;
     double[string] firstAppearance;
     string actName;
-    float T0;
+    double T0;
   }
 
   void reset(){
@@ -6621,10 +6643,10 @@ synchronized class Perf {
     actName = "";
   }
 
-  void addTime(string name, float time){
+  void addTime(string name, in double time){
     if(name !in table){
       table[name] = 0;
-      firstAppearance[name] = QPS;
+      firstAppearance[name] = QPS.value(second);
     }
     table[name] = table[name]+time;
   }
@@ -6637,7 +6659,7 @@ synchronized class Perf {
   }
 
   void opCall(string name, void delegate() dg = null){
-    float T = QPS;
+    auto T = QPS.value(second);
     if(actName!=""){ //flush
       addTime(actName, T-T0);
       actName = "";
@@ -6788,7 +6810,7 @@ auto GetCPULoadPercent(){
 
   const interval = 0.33f; //seconds
 
-  auto actTime = QPS;
+  auto actTime = QPS.value(second);
   if(actTime-lastTime > interval){
     lastTime = actTime;
     auto a = GetCPULoadPercent_internal;
@@ -7138,7 +7160,7 @@ static this(){ //for all threads <- bullshit!!! It's not shared!!!
 
 // static this for process ////////////////////////////
 
-shared float QPS0;
+shared Time QPS0;
 
 shared static this(){
   QPS0 = QPS;

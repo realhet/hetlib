@@ -443,7 +443,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
             }
             if(description.isWild("*WARNING:*")){
               Text(wild[0]);
-              const blink = QPS.fract<.5;
+              const blink = QPS.value(second).fract<.5;
               style.bkColor = blink ? clRed : clWhite;
               style.fontColor = !blink ? clRed : clWhite;
               Text("\u26A0 ", bold(wild[1]));
@@ -578,7 +578,7 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
   void BtnGenerateProgram(){
     with(im)if(Btn("Generate program")){
       auto s = generateProgram;
-      clipboard.text = s;
+      clipboard.asText = s;
       s.print;
     }
   }

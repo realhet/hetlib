@@ -867,7 +867,7 @@ public:
           case kw__EOF__              :{ seekToEOF; removeLastToken; break; }
           case kw__TIMESTAMP__        :{ kind = TokenKind.literalString; data = now.text; break; }
           case kw__DATE__             :{ kind = TokenKind.literalString; data = today.text; break; }
-          case kw__TIME__             :{ kind = TokenKind.literalString; data = time.text; break; }
+          case kw__TIME__             :{ kind = TokenKind.literalString; data = timeOfDay.text; break; }
           case kw__VENDOR__           :{ kind = TokenKind.literalString; data = "realhet"; break; }
           case kw__VERSION__          :{ kind = TokenKind.literalInt   ; data = CompilerVersion;break; }
           case kw__FILE__             :{ import std.path; kind = TokenKind.literalString; data = baseName(fileName); break; }
@@ -1750,7 +1750,7 @@ string[] collectAndReplaceQuotedStrings(ref string s, string replacement){
 // Big test //////////////////////////////////////////////
 
 void testTokenizer(){
-  double tTokenize = 0, tFull = 0;
+  Time tTokenize = 0*second, tFull = 0*second;
   int size;
 
   string test(File f){
@@ -1758,7 +1758,7 @@ void testTokenizer(){
     auto s = f.readText;
     size += s.length;
 
-    double t0 = QPS;
+    auto t0 = QPS;
     tokenize(f.fullName, s, tokens);
     tTokenize += QPS-t0;
 
@@ -1775,8 +1775,8 @@ void testTokenizer(){
   auto s = path.files(`*.d`).map!(f => test(f)).join;
 
   File(path, `result.txt`).write(s);
-  print("tokenizer time:", tTokenize, "size:", size, "MB/s:", size/1024.0/1024.0/tTokenize);
-  print("full time:", tFull    , "size:", size, "MB/s:", size/1024.0/1024.0/tFull    );
+  print("tokenizer time:", tTokenize.value(second), "size:", size, "MB/s:", size/1024.0/1024.0/tTokenize.value(second));
+  print("full time:", tFull.value(second)    , "size:", size, "MB/s:", size/1024.0/1024.0/tFull.value(second)    );
   enforce(File(path, `reference.txt`).readText == s, "Tokenizer correctness test failed.");
   print("\33\12Tokenizer works correctly\33\7");
 

@@ -380,7 +380,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
     }break;
 
     case BitmapQueryCommand.garbageCollect:{
-      //auto T0 = QPS;
+      //T0;
       const t = application.tick;
       auto  list = cache.byValue.filter!(b => !b.resident && !b.loading && !b.removed && t-b.accessed_tick>=3).array;
       const sizeBytes = list.map!(b => b.sizeBytes).sum;
@@ -403,7 +403,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
           if(remaining<=targetSize) break;
         }
 
-        //LOG(QPS-T0);
+        //LOG(DT);
       }
     }break;
   }

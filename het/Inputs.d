@@ -47,16 +47,16 @@ __gshared int[] virtualKeysDown;
 // VK_ letter and number constants
 static foreach(a; chain(iota('A', 'Z'+1), iota('0', '9'+1))) mixin(a.to!char.format!"enum VK_%1$s=%1$d;");
 
-void spiGetKeyboardDelays(ref float d1, ref float d2){
+void spiGetKeyboardDelays(ref Time d1, ref Time d2){
   //Gets windows keyboard delays in seconds
   //note: The query takes 6microsecs only, so it can go into the update loop
   int val;
 
   SystemParametersInfoW(SPI_GETKEYBOARDDELAY, 0, &val, 0);
-  d1 = remap(val, 0, 3, 0.250f, 1); //0: 250ms .. 3: 1sec
+  d1 = remap(val, 0, 3, 0.250f, 1)*second; //0: 250ms .. 3: 1sec
 
   SystemParametersInfoW(SPI_GETKEYBOARDSPEED, 0, &val, 0);
-  d2 = 1.0f/remap(val, 0, 31, 2.5f, 37.5f); //0: 2.5hz .. 31: 40Hz
+  d2 = (1.0f/remap(val, 0, 31, 2.5f, 37.5f))*second; //0: 2.5hz .. 31: 40Hz
 }
 
 int[3] spiGetMouse(){
@@ -318,7 +318,9 @@ class InputEntry{
   const InputHandlerBase owner;
   const string name;
   const InputEntryType type;
-  float value=0, lastValue=0, pressedTime=0;
+  float value=0,
+        lastValue=0;
+  Time pressedTime=0*second;
 
   string category() const { return owner.category; }
 
@@ -342,9 +344,9 @@ class InputEntry{
   bool pressed() const { return active && !lastActive; }
   bool released()const { return !active && lastActive; }
 
-  float activeDuration() const{
+  Time activeDuration() const{
     if(active) return inputs.now-pressedTime;
-          else return 0;
+          else return 0*second;
   }
 
   bool longPress() const{ return activeDuration >= inputs.longPressDuration; }
@@ -355,12 +357,12 @@ class InputEntry{
 
   private{
     bool repeated_;
-    double repeatNextTime = 0;
+    Time repeatNextTime = 0*second;
   }
 
   bool repeated()const { return repeated_; }
 
-  void _updateRepeated(double now){
+  void _updateRepeated(Time now){
     repeated_ = inputs.repeatLogic(active, pressed, repeatNextTime);
   }
 
@@ -375,10 +377,10 @@ class InputHandlerBase{
 
 class InputManager{ //! InputManager /////////////////////////////////
   static{
-    float longPressDuration = 0.5;
+    auto longPressDuration = 0.5*second;
 
-    float repeatDelay1 = 0.5;   //updated in every frame
-    float repeatDelay2 = 0.125; //updated in every frame
+    auto repeatDelay1 = 0.5*second;   //updated in every frame
+    auto repeatDelay2 = 0.125*second; //updated in every frame
 
     int mouseSpeed = 10; //updated in every frame
     int[3] mouseThresholds = [6, 10, 1]; //updated in every frame
@@ -391,7 +393,7 @@ private:
   void rehashAll() { entries.rehash; handlers.rehash; }
   void error(string s) { throw new Exception("InputManager: "~s); }
 
-  double now; //local fast time in seconds
+  Time now; //local fast time in seconds
   //todo: replace this with DateTime and prioper seconds handling.
 public:
   InputHandlerBase[string] handlers;
@@ -432,9 +434,9 @@ public:
 
     //ensure that inputentry is untouched
     with(nullEntry){
-      if(value || lastValue || pressedTime){
+      if(value || lastValue || pressedTime!=0*second){
         WARN("nullEntry was disturbed.");
-        value=0; lastValue=0; pressedTime=0;
+        value=0; lastValue=0; pressedTime=0*second;
       }
     }
 
@@ -688,7 +690,7 @@ public: //standard stuff
 
   // repeat logic /////////////////////////////////////
 
-  bool repeatLogic(in bool active, in bool pressed, ref double repeatNextTime, in float delay1, in float delay2){
+  bool repeatLogic(in bool active, in bool pressed, ref Time repeatNextTime, in Time delay1, in Time delay2){
     if(active){ //todo: at kene terni tick-re...
       //note: 'now' is saved in every update cycle. That's why this fucnt is not static.
       if(pressed){
@@ -703,7 +705,7 @@ public: //standard stuff
     return false;
   }
 
-  bool repeatLogic(in bool active, in bool pressed, ref double repeatNextTime){
+  bool repeatLogic(in bool active, in bool pressed, ref Time repeatNextTime){
     return repeatLogic(active, pressed, repeatNextTime, repeatDelay1, repeatDelay2);
   }
 
@@ -718,7 +720,7 @@ class InputEmulator{
   // redirects keyboard and mouse inputs to windows
   string[] activeKeys, lastActiveKeys, pressedKeys, releasedKeys;
   string repeatedKey, lastRepeatedKey;
-  double repeatState;
+  Time repeatState;
   bool repeatedKeyPressed;
 
   void updateKeyState(string[] activeKeys_){

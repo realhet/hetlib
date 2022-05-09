@@ -573,7 +573,7 @@ public:
 
     auto t0 = QPS;
 
-    enum UploadTextureMaxTime = 1/60.0f;
+    enum UploadTextureMaxTime = 1.0*second/60;
     size_t uploadedSize;
     enum TextureFlushLimit = 8 << 20;
     do{

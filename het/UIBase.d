@@ -241,7 +241,7 @@ struct HitTestManager{
 
   void draw(Drawing dr){
     if(VisualizeHitStack){
-      dr.lineWidth = (QPS*3).fract;
+      dr.lineWidth = (QPS.value(second)*3).fract;
       dr.color = clFuchsia;
 
       hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b));
@@ -589,7 +589,7 @@ void initTextStyles(){
 
 bool updateTextStyles(){
   //flashing error
-  bool act = (QPS/60*132).fract<0.66;
+  bool act = (QPS.value(second)/60*132).fract<0.66;
   tsError.fontColor = act ? clYellow : clRed;
   tsError.bkColor   = act ? clRed : clYellow;
   return chkSet(tsError.underline, act);
@@ -1495,7 +1495,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     auto c = toXY(caret);
     if(c.valid){
       dr.color = color;
-      dr.lineWidth = sqr(1-(QPS*1.5).fract)*2.5;//sin((QPS*1.5).fract*PI*2).remap(-1, 1, 0.1, 2);
+      dr.lineWidth = sqr(1-(QPS.value(second)*1.5).fract)*2.5;//sin((QPS*1.5).fract*PI*2).remap(-1, 1, 0.1, 2);
 
       dr.vLine(c.point.x, c.point.y, c.point.y+c.height);
     }
