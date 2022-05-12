@@ -866,8 +866,8 @@ public:
           default                     :{ error("Unhandled keyword specialtoken: "~source); break; }
           case kw__EOF__              :{ seekToEOF; removeLastToken; break; }
           case kw__TIMESTAMP__        :{ kind = TokenKind.literalString; data = now.text; break; }
-          case kw__DATE__             :{ kind = TokenKind.literalString; data = today.text; break; }
-          case kw__TIME__             :{ kind = TokenKind.literalString; data = timeOfDay.text; break; }
+          case kw__DATE__             :{ kind = TokenKind.literalString; data = now.dateText; break; }
+          case kw__TIME__             :{ kind = TokenKind.literalString; data = now.timeText; break; }
           case kw__VENDOR__           :{ kind = TokenKind.literalString; data = "realhet"; break; }
           case kw__VERSION__          :{ kind = TokenKind.literalInt   ; data = CompilerVersion;break; }
           case kw__FILE__             :{ import std.path; kind = TokenKind.literalString; data = baseName(fileName); break; }

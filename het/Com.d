@@ -386,7 +386,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
     } //end switch
   }
 
-  bool thereWasAnError() const{ return stats.lastErrorTime.toNanoSeconds > stats.lastIncomingMessageTime.toNanoSeconds; }
+  bool thereWasAnError() const{ return stats.lastErrorTime > stats.lastIncomingMessageTime; }
 
   bool thereWasAMessage(in Time since=9999*second, in Time blink=0*second) const{
     if(thereWasAnError) return false;

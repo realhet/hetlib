@@ -521,16 +521,16 @@ public:
     if(t.inRange(history[0].t, history[$-1].t)){
       foreach(a; history.slide(2))
         if(t.inRange(a[0].t, a[1].t))
-          return remap(t.raw, a[0].t.raw, a[1].t.raw, a[0].position, a[1].position);
+          return remap(0, (a[0].t-t).value(second), (a[1].t-t).value(second), a[0].position, a[1].position);
     }
 
     //extrapolate
-    return remap(t.raw, history[0].t.raw, history[$-1].t.raw, history[0].position, history[$-1].position);
+    return remap(0, (history[0].t-t).value(second), (history[$-1].t-t).value(second), history[0].position, history[$-1].position);
   }
 
   double speed() const{
     if(history.length<2) return 0;
-    return safeDiv(history[$-1].position - history[0].position, (history[$-1].t.raw - history[0].t.raw)*24*60*60);
+    return safeDiv(history[$-1].position - history[0].position, (history[$-1].t - history[0].t).value(second));
   }
 
   void selfTest(){

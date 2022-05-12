@@ -3088,7 +3088,11 @@ struct ResourceMonitor{
 
     gcUsed, gcFree, gcAll;
 
+  private DeltaTimer DT;
+
   void updateInternal(void delegate() onCollectData){
+
+    /+
     immutable unit = 24*60*60;
     __gshared static long lastUnit;
     long actUnit = cast(long)(floor(now.raw*unit));
@@ -3100,12 +3104,29 @@ struct ResourceMonitor{
     if(deltaUnit>0) onCollectData();
 
     foreach(i; 0..deltaUnit){
-      //print(actUnit);
+
+      static foreach(idx, name; FieldNameTuple!(typeof(this))){{
+        alias T = Fields!(typeof(this))[idx];
+        static if(is(T==Item)) mixin(name).update;
+      }}
+    } +/
+
+    __gshared static DateTime next;
+
+    bool collected = false;
+    while(now>=next || !next){
+      next = now + 1*second;
+      if(next + 100*second < now) next = now; //ignore to big lag
+
+      if(chkSet(collected))
+        onCollectData(); //collect only once, but update on every second
+
       static foreach(idx, name; FieldNameTuple!(typeof(this))){{
         alias T = Fields!(typeof(this))[idx];
         static if(is(T==Item)) mixin(name).update;
       }}
     }
+
   }
 }
 

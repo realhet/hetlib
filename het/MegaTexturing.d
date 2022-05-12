@@ -909,7 +909,7 @@ if(log) "Created subtex %s:".writefln(fileName);
 
     bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
     auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);
-    auto modified = bmp.modified.toNanoSeconds;
+    auto modified = bmp.modified.toId_deprecated; //todo: deprecate toId and use the DateTime itself
 
     if(log) LOG(bmp);
     if(auto existing = file in byFileName){

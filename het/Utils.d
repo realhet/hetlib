@@ -96,6 +96,7 @@ public import std.bitmanip;
 public import std.typecons: Typedef;
 public import std.path: baseName;
 public import std.exception : collectException, ifThrown;
+public import std.system : endian, os;
 
 public import quantities.si;
 
@@ -118,7 +119,7 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
   GetStdHandle, GetTempPathW, GetFileTime, SetFileTime,
-  FileTimeToLocalFileTime, FileTimeToSystemTime, GetLocalTime, GetSystemTimeAsFileTime, Sleep, GetComputerNameW, GetProcAddress,
+  FileTimeToLocalFileTime, LocalFileTimeToFileTime, FileTimeToSystemTime, SystemTimeToFileTime, GetLocalTime, GetSystemTimeAsFileTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
   HICON;
@@ -5268,9 +5269,7 @@ private static{/////////////////////////////////////////////////////////////////
   struct FileTimes{
     DateTime created, modified, accessed;
     DateTime latest() const{
-      return DateTime(max(created  ? created.raw  : 0,
-                          modified ? modified.raw : 0,
-                          accessed ? accessed.raw : 0));
+      return max(created, modified, accessed);
     }
   }
 
@@ -5290,11 +5289,9 @@ private static{/////////////////////////////////////////////////////////////////
 
     FILETIME cre, acc, wri;
     if(GetFileTime(f.windowsHandle, &cre, &acc, &wri)){
-      SYSTEMTIME st;
-
-      FileTimeToLocalSystemTime(&cre, &st); res.created  = DateTime(st);
-      FileTimeToLocalSystemTime(&acc, &st); res.accessed = DateTime(st);
-      FileTimeToLocalSystemTime(&wri, &st); res.modified = DateTime(st);
+      res.created  = DateTime(cre);
+      res.accessed = DateTime(acc);
+      res.modified = DateTime(wri);
     }
 
     return res;
@@ -5612,11 +5609,13 @@ struct FileEntry{
 
   }
 
-  string toString() const{ return format!"%-80s %s%s%s%s%s %12d cre:%s mod:%s"(File(path, name).fullName, isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".", size, DateTime(ftCreationTime), DateTime(ftLastWriteTime)); }
+  string toString() const{ return format!"%-80s %s%s%s%s%s %12d cre:%s mod:%s"(File(path, name).fullName,
+    isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".",
+    size, DateTime(UTC, ftCreationTime), DateTime(UTC, ftLastWriteTime)); }
 
-  auto created () const { return DateTime(ftCreationTime  ); }
-  auto accessed() const { return DateTime(ftLastAccessTime); }
-  auto modified() const { return DateTime(ftLastWriteTime ); }
+  auto created () const { return DateTime(UTC, ftCreationTime  ); }
+  auto accessed() const { return DateTime(UTC, ftLastAccessTime); }
+  auto modified() const { return DateTime(UTC, ftLastWriteTime ); }
 }
 
 ///similar directory listing like the one in totalcommander
@@ -6125,10 +6124,9 @@ public:
 /// Date/TimeOfDay                                                                 ///
 /////////////////////////////////////////////////////////////////////////////////
 
-void sleep(int ms)
-{
-  Sleep(ms);
-}
+void sleep(int ms){ Sleep(ms); }
+
+void sleep(in Time t){ sleep(t.value(milli(second)).to!int); }
 
 immutable string[12] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -6242,8 +6240,8 @@ private{
     return y;
   }
 }
-
-struct Date{
+/+
+struct Date{ //220511: deprecated
   /+private+/ int raw;
   this(int year, int month, int day){
     double a = encodeDate(year, month, day);
@@ -6287,7 +6285,7 @@ struct Date{
   int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
 }
 
-struct TimeOfDay{
+struct TimeOfDay{ //220511: deprecated
   private double raw;
   this(int hour, int min, int sec=0, double ms=0){
     raw = encodeTime(hour, min, sec, ms);
@@ -6326,6 +6324,9 @@ struct TimeOfDay{
 
   int opCmp(const TimeOfDay t) const { return dblCmp(raw, t.raw); }
 }
++/
+
+const oldshit = q{
 
 
 struct DateTime{
@@ -6357,42 +6358,21 @@ struct DateTime{
   this(int year, int month, int day, int hour=0, int minute=0, int second=0, int milliseconds=0){
     raw = encodeDate(year, month, day) + encodeTime(hour, minute, second, milliseconds);
   }
-  this(in Date date, in TimeOfDay timeOfDay){
-    raw = date.raw+timeOfDay.raw;
-  }
-  this(string str){
-    if(str.canFind(' ')){
-      auto parts = str.split(' '); //dateTime
 
-      if(parts.length==2){
-        this(Date(parts[0]), TimeOfDay(parts[1]));
-      }else if(parts.length==5){ //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
-        this(Date(parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int), TimeOfDay(parts[3]));
-      }else{
-        throw new Exception("Invalid datetime format: "~str);
-        this(0,0,0); //fuck off, compiler!!!
-      }
-    }else{
-      //todo: check for digits here, not any chars!
-      if      (str.isWild("????-??-??T??????.???")){ //windows timestamp.zzz
-        this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4));
-      }else if(str.isWild("????-??-??T??????")){ //windows timestamp
-        this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int);
-      }else if(str.isWild("????-??-??T????")){ //windows timestamp, no seconds
-        this(wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int);
-      }else if(str.isWild("????-??-??T")){ //windows timestamp, no time
-        this(wild.ints(0), wild.ints(1), wild.ints(2));
-      }else if(str.isWild("????-??-??")){ //windows timestamp, no time, no T
-        this(wild.ints(0), wild.ints(1), wild.ints(2));
-      }else if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
-        this(       str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
-      }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
-        this(year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
-      }else{
-        this(Date(str), TimeOfDay(0, 0)); //Date only
-        //note: this will drop the error if any
-      }
-    }
+  this(int year, int month, int day, Time add){
+    raw = encodeDate(year, month, day) + add.value(quantities.si.day);
+  }
+
+/+  this(in Date date, in TimeOfDay timeOfDay){
+    raw = date.raw+timeOfDay.raw;
+  }+/
+
+  this(in DateTime dt){
+    raw = dt.raw;
+  }
+
+  this(string str){
+    raw = parseDateTime(str).raw;
   }
 
   this(double val){ raw = val; }
@@ -6421,12 +6401,22 @@ struct DateTime{
 
   bool isNull() const{ return isnan(raw) || raw==0; }
   bool opCast() const{ return !isNull(); }
+  int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
+  //int opCmp(const Date     d ) const { return dblCmp(raw, d .raw); }
+
+  string dateText() const{ //todo: format
+    if(isNull) return "NULL Date";
+    with(decodeDate(raw)) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay);
+  }
+
+  string timeText() const{ //todo format
+    if(isNull) return "NULL Time";
+    with(decodeTime(raw)) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds);
+  }
 
   string toString()const {
     if(isNull) return "NULL DateTime";
-    Date d; d.raw = ifloor(raw);
-    TimeOfDay t; t.raw = fract(raw);
-    return d.toString ~ ' ' ~ t.toString;
+    with(decodeDateTime(raw)) return format("%.4d.%.2d.%.2d %.2d:%.2d:%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
   }
 
   string timestamp(in Flag!"shortened" shortened = No.shortened)const {
@@ -6453,9 +6443,6 @@ struct DateTime{
   }
 
   string timestamp_compact()const { return timestamp(Yes.shortened); }
-
-  int opCmp(const DateTime dt) const { return dblCmp(raw, dt.raw); }
-  int opCmp(const Date     d ) const { return dblCmp(raw, d .raw); }
 
   static void test(){ //todo: refactor these and do unit testing
     {
@@ -6511,7 +6498,7 @@ struct DateTime{
     }
   }
 
-  TimeOfDay timeOfDay() const{ TimeOfDay t; t.raw = raw.fract; return t; }
+  //TimeOfDay timeOfDay() const{ TimeOfDay t; t.raw = raw.fract; return t; }
 
   int dayOfWeek(){ return decodeDate(raw).wDayOfWeek; }
 
@@ -6533,11 +6520,445 @@ struct DateTime{
     mixin("raw", op,"= b.value(quantities.si.day);");
     return this;
   }
+
+  Time time() const{ return raw.fract * quantities.si.day; }
 }
 
-TimeOfDay timeOfDay () { return TimeOfDay.current; } //0 = midnight  1 = 24hours
-Date      today     () { return Date     .current; } //same system as in Delphi
+//TimeOfDay timeOfDay () { return TimeOfDay.current; } //0 = midnight  1 = 24hours
+//Date      today     () { return Date     .current; } //same system as in Delphi
 DateTime  now       () { return DateTime .current; }
+
+DateTime parseDate(in TimeZone tz, string str){
+  int y,m,d;
+  enforce(3==str.formattedRead!"%d.%d.%d"(y, m, d), "Invalid date format. -> [yy]yy.mm.dd");
+  return DateTime(tz, year2k(y), m, d);
+}
+
+Time parseTime(string str){
+  int h,m; double s=0;
+  try{
+    const len = str.split(':').length;
+         if(len==3) str.formattedRead!"%s:%s:%s"(h, m, s);
+    else if(len==2) str.formattedRead!"%s:%s"   (h, m   );
+    else raise("");
+  }catch(Throwable){ raise(`Invalid time format: "` ~ str ~ `"`); }
+  return h*hour + m*minute + s*second;
+}
+
+DateTime parseDateTime(in TimeZone tz, string str){
+  if(str.canFind(' ')){
+    auto parts = str.split(' '); //dateTime
+
+    if(parts.length==2){
+      return parseDate(tz, parts[0]) + parseTime(parts[1]);
+    }else if(parts.length==5){ //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
+      return DateTime(tz, parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int) + parseTime(parts[3]);
+    }
+  }else{
+    //todo: check for digits here, not any chars!
+    if      (str.isWild("????-??-??T??????.???")){ //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4));
+    }else if(str.isWild("????-??-??T??????")){ //windows timestamp
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int);
+    }else if(str.isWild("????-??-??T????")){ //windows timestamp, no seconds
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int);
+    }else if(str.isWild("????-??-??T")){ //windows timestamp, no time
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2));
+    }else if(str.isWild("????-??-??")){ //windows timestamp, no time, no T
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2));
+    }else if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
+      return DateTime(tz,        str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
+    }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
+      return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
+    }else{
+      return parseDate(tz, str); //Date only
+    }
+  }
+
+  throw new Exception("Invalid datetime format: "~str);
+}
+
+};
+
+
+struct TimeZone {
+  byte shift;
+}
+
+enum UTC = TimeZone(0);
+enum Local = TimeZone(127);
+
+auto RawDateTime(ulong t){ DateTime a; a.raw = t; return a; }
+
+struct DateTime{
+  ///a 64-bit value representing the number of 100/64 nanosecond(!!!not 100ns!!!) intervals since January 1, 1601 (UTC).
+  private ulong raw;      //0 = null
+
+  void set(in TimeZone tz, in SYSTEMTIME a){
+    switch(tz.shift){
+      case 0: utcSystemTime = a; break;
+      case 127: localSystemTime = a; break;
+      default: throw new Exception("Invalid "~tz.text);
+    }
+  }
+
+  void set(in TimeZone tz, in FILETIME a){
+    switch(tz.shift){
+      case 0: utcFileTime = a; break;
+      case 127: localFileTime = a; break;
+      default: throw new Exception("Invalid "~tz.text);
+    }
+  }
+
+  void set(in TimeZone tz, in string s){ this = parseDateTime(tz, s); }
+
+  this(T)(                in T a){ this(Local, a); }
+  this(T)(in TimeZone tz, in T a){ set(tz, a); }
+
+  this(                in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0){ this(Local, y, m, d, h, mi, s, ms); }
+  this(in TimeZone tz, in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0){
+    //todo: adjust carry overflow
+    this(tz, SYSTEMTIME(year2k(y).to!ushort, m.to!ushort, 0, d.to!ushort, h.to!ushort, mi.to!ushort, s.to!ushort, ms.to!ushort));
+  }
+
+  this(                in int y, in int m, in int d) { this(Local, y, m, d); }
+  this(in TimeZone tz, in int y, in int m, in int d) { this(tz   , y, m, d, 0); }
+
+  this(                in int y, in int m, in int d, in Time t){ this(Local, y, m, d, t); }
+  this(in TimeZone tz, in int y, in int m, in int d, in Time t){ this(tz   , y, m, d); this += t; }
+
+  bool isNull() const{ return raw==0; }
+  bool opCast() const{ return !isNull(); }
+  long opCmp(const DateTime b) const { return raw - b.raw; }
+
+  enum RawShift = 6;
+  enum RawUnit : ulong {         // 37ns is the fastest measurable interval. Using Windown 10 QPC
+    _100ns      =  1<<RawShift , // 100ns = Unit of FILETIME.  6 extra bits of precision below 100ns. Useful time based unique id generation.
+    us          =   10 * _100ns,
+    ms          = 1000 * us    ,
+    sec         = 1000 * ms    , // 1 sec = Unit of quantities.SI
+    min         =   60 * sec   ,
+    hour        =   60 * min   ,
+    day         =   24 * hour  ,
+    week        =    7 * day   ,
+    month       = cast(ulong)(365.2425 * day/12), //Gregorian average
+    year        =   12 * month ,
+    _913year    =  913 * year  , //max years before overflow.  1601 + 913 = 2516
+  }
+  static assert(RawUnit._913year == 0xffe5c294_8e7f0000); //lock the above calculations
+
+  private enum UnixShift_sec = 11644473600;
+  private enum UnixShift_unit = UnixShift_sec*RawUnit.sec;
+
+  static private{ //Conversions between windows local/utc/filetime/systemtime/raw. Also throw exceptions.
+
+    double rawToSeconds(in ulong  a){ return a*(1.0/RawUnit.sec); }
+    ulong  secondsToRaw(in double a){ return (a*RawUnit.sec).to!ulong; }
+
+    auto fileTimeToRaw(in FILETIME ft){
+      if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow.");
+      return ((cast(ulong)ft.dwLowDateTime )<<(RawShift   ))|
+             ((cast(ulong)ft.dwHighDateTime)<<(RawShift+32));
+    }
+
+    auto rawToFileTime(in ulong raw){
+      return FILETIME(cast(uint)(raw>>>(RawShift   )),
+                      cast(uint)(raw>>>(RawShift+32)));
+    }
+
+    import core.sys.windows.windows : FileTimeToSystemTime, SystemTimeToFileTime, SystemTimeToTzSpecificLocalTime, TzSpecificLocalTimeToSystemTime;
+
+    // unify 2 parameter form by adding a default null parameter in front
+    int MySystemTimeToTzSpecificLocalTime(in SYSTEMTIME* a, SYSTEMTIME* b){ return SystemTimeToTzSpecificLocalTime(null, cast(SYSTEMTIME*)a, b); }
+    int MyTzSpecificLocalTimeToSystemTime(in SYSTEMTIME* a, SYSTEMTIME* b){ return TzSpecificLocalTimeToSystemTime(null, cast(SYSTEMTIME*)a, b); }
+
+    template tmpl(SRC, alias fun, DST){
+      auto tmpl()(in SRC src){
+        DST dst = void;
+        if(!fun(&src, &dst)) throw new ConvException(__traits(identifier, fun)~"() error.  src: "~src.text);
+        return dst;
+      }
+    }
+
+    alias systemTimeToLocalTzSystemTime = tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
+    alias localTzSystemTimeToSystemTime = tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
+    alias fileTimeToSystemTime          = tmpl!(FILETIME  , FileTimeToSystemTime             , SYSTEMTIME);
+    alias systemTimeToFileTime          = tmpl!(SYSTEMTIME, SystemTimeToFileTime             , FILETIME  );
+  }
+
+  private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
+
+    T _get(bool isLocal, T)() const{
+      const ft = rawToFileTime(raw);
+      static if(isLocal){
+        const st = systemTimeToLocalTzSystemTime(fileTimeToSystemTime(ft));
+        static if(is(T==FILETIME  )) return systemTimeToFileTime(st);
+        static if(is(T==SYSTEMTIME)) return st;
+      }else{
+        static if(is(T==FILETIME  )) return ft;
+        static if(is(T==SYSTEMTIME)) return fileTimeToSystemTime(ft);
+      }
+    }
+
+    void _set(bool isLocal, T)(in T src){
+      static if(isLocal){
+        static if(is(T==FILETIME  )) const st = fileTimeToSystemTime(src);
+        static if(is(T==SYSTEMTIME)) const st = src;
+        _set!false(localTzSystemTimeToSystemTime(st)); //recursion
+      }else{
+        static if(is(T==FILETIME  )) const ft = src;
+        static if(is(T==SYSTEMTIME)) const ft = systemTimeToFileTime(src);
+        raw = fileTimeToRaw(ft);
+      }
+    }
+  }
+
+  @property{
+    auto utcFileTime    () const{ return _get!(false, FILETIME  )(); }  void utcFileTime    (in FILETIME   a) { _set!false(a); }
+    auto utcSystemTime  () const{ return _get!(false, SYSTEMTIME)(); }  void utcSystemTime  (in SYSTEMTIME a) { _set!false(a); }
+    auto localFileTime  () const{ return _get!(true , FILETIME  )(); }  void localFileTime  (in FILETIME   a) { _set!true (a); }
+    auto localSystemTime() const{ return _get!(true , SYSTEMTIME)(); }  void localSystemTime(in SYSTEMTIME a) { _set!true (a); }
+
+    double unixTime(){ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; }
+    void unixTime(in double a){ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; }
+
+    DateTime utcDayStart() const{ if(isNull) return this; return RawDateTime(raw - raw%RawUnit.day); }
+    DateTime utcDayEnd  () const{ if(isNull) return this; return RawDateTime(utcDayStart.raw + RawUnit.day); }
+
+    DateTime localDayStart() const{
+      if(isNull) return this;
+      auto st = localSystemTime;
+      st.wHour = 0;
+      st.wMinute = 0;
+      st.wSecond = 0;
+      st.wMilliseconds = 0;
+      return DateTime(st);
+    }
+
+    DateTime localDayEnd  () const{
+      if(isNull) return this;
+      assert(0, "NOTIMPL");
+      return localDayStart + day; //Bad DST!!!!
+    }
+
+    Time utcTime  () const{ return this-utcDayStart; }
+    Time localTime() const{ return this-localDayStart; }
+
+    Time time() const{ return localTime; }
+    DateTime dayStart() const{ return localDayStart; }
+  }
+
+  ///calculate the difference between DateTimes
+  Time opBinary(string op : "-")(in DateTime b) const{
+    return long(raw-b.raw)*(1.0/RawUnit.sec)*quantities.si.second;
+  }
+
+  ///adjust DateTime by si.Time
+  DateTime opBinary(string op)(in Time b) const if(op.among("+", "-")) {
+    DateTime res = this;
+    mixin("res.raw", op, "=(b.value(quantities.si.second)*RawUnit.sec).to!ulong;");
+    return res;
+  }
+
+  ///adjust this DateTime by si.Time
+  DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-")){
+    mixin("raw", op,"= (b.value(quantities.si.second)*RawUnit.sec).to!ulong;");
+    return this;
+  }
+
+  private long timeZoneOffset_raw() const{ //todo: rename to utcOffset (read aboit it on web first!)
+    if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL");
+    DateTime dt = void; dt.utcFileTime = localFileTime;
+    return dt.raw-this.raw;
+  }
+
+  Time timeZoneOffset() const{
+    if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL");
+    DateTime dt = void; dt.utcFileTime = localFileTime;
+    return dt-this;
+  }
+
+  @property{ //dayOfWeek stuff
+    //note: 0=sun, 6=sat
+    int  localDayOfWeek(){ return localSystemTime.wDayOfWeek; }     int  utcDayOfWeek(){ return utcSystemTime.wDayOfWeek; }
+    bool localIsWeekend(){ return localDayOfWeek.among(0, 6)!=0; }  bool utcIsWeekend(){ return utcDayOfWeek.among(0, 6)!=0; }
+    bool localIsWeekday(){ return !localIsWeekend; }                bool utcIsWeekday(){ return !utcIsWeekend; }
+  }
+
+  /// This is the hash for bitmap objects
+  ulong toId_deprecated() const{ return raw; }
+
+  /// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
+  void actualize(){
+    auto c = now.raw;
+    if(isNull || c>raw) raw = c;
+                   else raw++; //now it's the exact same as the previous one. Just increment.
+  }
+
+  string dateText(alias fun = localSystemTime)() const{ //todo: format
+    if(isNull) return "NULL Date";
+    with(fun) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay);
+  }
+
+  string timeText(alias fun = localSystemTime)() const{ //todo format
+    if(isNull) return "NULL Time";
+    with(fun) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds);
+  }
+
+  string toString(alias fun = localSystemTime)()const {
+    if(isNull) return "NULL DateTime";
+    with(fun) return format("%.4d.%.2d.%.2d %.2d:%.2d:%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
+  }
+
+  string timestamp(alias fun = localSystemTime)(in Flag!"shortened" shortened = No.shortened)const {
+    if(isNull) return "null";
+    //4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
+    //return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
+
+    // windows timestamp format (inserts it after duplicate files)
+    string s;
+    with(fun) s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
+
+    if(shortened){ //todo: not so fast
+      if(s.endsWith(".000")){
+        s = s[0..$-4];
+        if(s.endsWith("00")){
+          s = s[0..$-2];
+          if(s.endsWith("0000")){
+            s = s[0..$-4];
+          }
+        }
+      }
+    }
+
+    return s;
+  }
+
+  string timestamp_compact(alias fun = localSystemTime)()const { return timestamp!fun(Yes.shortened); }
+
+  //todo: utcXXX not good! should ude TimeZone as first param
+  string utcDateText() const{ return dateText!utcSystemTime; }
+  string utcTimeText() const{ return timeText!utcSystemTime; }
+  string utcToString() const{ return toString!utcSystemTime; }
+  string utcTimestamp(in Flag!"shortened" shortened = No.shortened)const { return timestamp!utcSystemTime(shortened); }
+  string utcTtimestamp_compact()const { return utcTimestamp(Yes.shortened); }
+
+  static{ //self diagnostics
+
+    void selftest(){
+      enforce(DateTime(2000, 1, 2) - DateTime(1601, 1, 2) == 145731 * day);
+    }
+
+    void benchmark(){
+      print("DateTime RawUnits");
+      foreach(a; EnumMembers!(DateTime.RawUnit))
+        format!"%-10s %29d %16x"(a, a, a).replace(' ', '_').print;
+
+      print;
+      print("now() call frequency: ");
+      20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; });
+
+      void bench(string code, size_t N=1000)(){
+        write(code, "   //");
+        const t0 = now;
+        mixin(code);
+        ((now-t0)/N).siFormat!"%8.0f ns".print;
+      }
+
+      print;
+      bench!q{ foreach(i; 0..N) now;               };
+      bench!q{ N.iota.each!((i){ now; });          };
+      bench!q{ foreach(i; 0..N) now-now;           };
+      bench!q{ foreach(i; 0..N) .today;            };
+      bench!q{ foreach(i; 0..N) .time;             };
+
+      void dstTest(){
+        void doit(bool summer){
+          const m = summer ? 7 : 1;
+          print;
+          print((m?"Winter":"Summer")~" DST test:");
+          print("  UTC   -> UTC   ", DateTime(UTC  , 21, m,30,12).toString!(DateTime.utcSystemTime));
+          print("  UTC   -> Local ", DateTime(UTC  , 21, m,30,12));
+          print("  Local -> UTC   ", DateTime(       21, m,30,12).toString!(DateTime.utcSystemTime));
+          print("  Local -> Local ", DateTime(       21, m,30,12));
+        }
+        doit(0); doit(1);
+
+        print;
+        print("Test local-utc for 12 31*24hour steps.");
+        foreach(u; [UTC, Local])
+          iota(12).map!(i => DateTime(u, 21, 1, 30, 12) + i*31*day).enumerate.map!(a =>  //A month is not a real month!!!! it's 32*24 hours!!!!
+            format!"%2s %2s %2s"(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour)).each!print;
+      }
+      dstTest;
+
+    }
+
+  }
+}
+
+private extern(Windows) nothrow @nogc void GetSystemTimePreciseAsFileTime(FILETIME*);
+
+DateTime now(){
+  DateTime dt = void; FILETIME ft = void;
+  GetSystemTimePreciseAsFileTime(&ft);
+  dt.utcFileTime = ft;
+  return dt;
+}
+
+DateTime today(){ return now.localDayStart; }
+Time     time (){ return now.localTime    ; }
+
+DateTime parseDate(in TimeZone tz, string str){
+  int y,m,d;
+  enforce(3==str.formattedRead!"%d.%d.%d"(y, m, d), "Invalid date format. -> [yy]yy.mm.dd");
+  return DateTime(tz, year2k(y), m, d);
+}
+
+Time parseTime(string str){
+  int h,m; double s=0;
+  try{
+    const len = str.split(':').length;
+         if(len==3) str.formattedRead!"%s:%s:%s"(h, m, s);
+    else if(len==2) str.formattedRead!"%s:%s"   (h, m   );
+    else raise("");
+  }catch(Throwable){ raise(`Invalid time format: "` ~ str ~ `"`); }
+  return h*hour + m*minute + s*second;
+}
+
+DateTime parseDateTime(in TimeZone tz, string str){
+  if(str.canFind(' ')){
+    auto parts = str.split(' '); //dateTime
+
+    if(parts.length==2){
+      return parseDate(tz, parts[0]) + parseTime(parts[1]);
+    }else if(parts.length==5){ //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
+      return DateTime(tz, parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int) + parseTime(parts[3]);
+    }
+  }else{
+    //todo: check for digits here, not any chars!
+    if      (str.isWild("????-??-??T??????.???")){ //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4));
+    }else if(str.isWild("????-??-??T??????")){ //windows timestamp
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int);
+    }else if(str.isWild("????-??-??T????")){ //windows timestamp, no seconds
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int);
+    }else if(str.isWild("????-??-??T")){ //windows timestamp, no time
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2));
+    }else if(str.isWild("????-??-??")){ //windows timestamp, no time, no T
+      return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2));
+    }else if(str.isWild("????????-??????-???")){ //timestamp 4 digit year
+      return DateTime(tz,        str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
+    }else if(str.isWild("??????-??????-???")){ //timestamp 2 digit year
+      return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
+    }else{
+      return parseDate(tz, str); //Date only
+    }
+  }
+
+  throw new Exception("Invalid datetime format: "~str);
+}
+
 
 Time QPS() //it's in seconds and synchronized with now() only at the start
 {
@@ -6553,7 +6974,7 @@ Time QPS() //it's in seconds and synchronized with now() only at the start
     QueryPerformanceFrequency(&freq);
     invFreq = 1.0/cast(double)freq;
 
-    timeBase = timeOfDay.raw*secsInDay;
+    timeBase = now.time.value(second);
     cntrBase = cntr;
 
     shift = timeBase - cntrBase*invFreq;
@@ -7107,8 +7528,7 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
 
   installExceptionFilter;
 
-  DateTime.loadFunctions;
-  enforce(Date(2000, 1, 1) - Date(1601, 1, 1) == 145731);
+  DateTime.selftest;
 
   const s1 = "hello", s2 = "Nobody inspects the spammish repetition";
   enforce(xxh32(s1)==0xfb0077f9);
