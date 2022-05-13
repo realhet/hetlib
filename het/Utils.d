@@ -172,8 +172,8 @@ void SafeRelease(T:IUnknown)(ref T i){
 
 __gshared HWND mainWindowHandle; //het.win fills it
 
-__gshared struct application{
-__gshared static private:
+struct application{
+__gshared static private:  //__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
   bool initialized, finalized;
 
   KillerThread killerThread;
@@ -184,14 +184,14 @@ __gshared static public:////////////////////////////////////////////////////////
   import core.runtime : Runtime;
   alias args = Runtime.args;
 
-  void function() initFunct;
+  void function() _windowInitFunct; //todo: should be moved to win.d //Win.d call it from it's own main.
 
   void exit(int code=0){ //immediate exit
-    try{ finalize; }catch(Throwable){}
+    try{ _finalize; }catch(Throwable){}
     ExitProcess(code);
   }
 
-  void initialize(){
+  void _initialize(){  //win.main() or runConsole() calls this.
     if(chkSet(initialized)){
       SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS);
 
@@ -201,7 +201,7 @@ __gshared static public:////////////////////////////////////////////////////////
     }
   }
 
-  void finalize(){
+  void _finalize(){ //win.main() or runConsole() calls this.
     if(!initialized) return;
     if(chkSet(finalized)){
       console.handleException({ globalFinalize; });
@@ -212,9 +212,9 @@ __gshared static public:////////////////////////////////////////////////////////
 
   int runConsole(void delegate() dg){
     enforce(!initialized, "Application.run(): Already running.");
-    initialize;
+    _initialize;
     auto ret = console.handleException(dg);
-    finalize;
+    _finalize;
     //here we wait all threads. In windowed mode we don't
     return ret;
   }
@@ -244,7 +244,7 @@ static private:
   __gshared bool visible_;
   __gshared bool exceptionHandlerActive_;
   HWND hwnd(){
-    __gshared static void* handle;
+    __gshared void* handle;
     if(handle is null){
       handle = GetConsoleWindow;
     }
@@ -6130,6 +6130,7 @@ void sleep(in Time t){ sleep(t.value(milli(second)).to!int); }
 
 immutable string[12] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+ //todo: delete old crap from datetime
 
 private{
   enum dateReference = 693594;
@@ -6326,6 +6327,7 @@ struct TimeOfDay{ //220511: deprecated
 }
 +/
 
+/+
 const oldshit = q{
 
 
@@ -6579,7 +6581,7 @@ DateTime parseDateTime(in TimeZone tz, string str){
 }
 
 };
-
++/
 
 struct TimeZone {
   byte shift;
@@ -6721,6 +6723,16 @@ struct DateTime{
 
     double unixTime(){ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; }
     void unixTime(in double a){ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; }
+
+    private enum RawDelphiShift = 109205*RawUnit.day;
+    double localDelphiTime() const{
+      return isNull ? 0
+                    : double(fileTimeToRaw(localFileTime)-RawDelphiShift)/RawUnit.day;
+    }
+    void localDelphiTime(double d){
+      if(d.isnan || d==0) raw = 0;
+                     else localFileTime = rawToFileTime((d*RawUnit.day).to!ulong + RawDelphiShift);
+    }
 
     DateTime utcDayStart() const{ if(isNull) return this; return RawDateTime(raw - raw%RawUnit.day); }
     DateTime utcDayEnd  () const{ if(isNull) return this; return RawDateTime(utcDayStart.raw + RawUnit.day); }
@@ -6960,7 +6972,42 @@ DateTime parseDateTime(in TimeZone tz, string str){
 }
 
 
-Time QPS() //it's in seconds and synchronized with now() only at the start
+public import std.range : iota;
+
+auto iota(in DateTime begin, in DateTime end, in Time step){
+  //https://forum.dlang.org/post/ivskeghrhbuhpiytesas@forum.dlang.org -> Ali's solution
+
+  static struct Result{
+    DateTime current, end;
+    Time step;
+
+    @property bool empty(){ return current >= end; }
+    @property auto front(){ return current; }
+    void popFront(){ assert(!empty); current += step; }
+  }
+
+  return Result(begin, end, step);
+}
+
+auto by(in DateTime begin, in Time step){
+
+  static struct Result{
+    DateTime current;
+    Time step;
+
+    enum empty = false;
+    @property auto front(){ return current; }
+    void popFront(){ current += step; }
+  }
+
+  return Result(begin, step);
+}
+
+auto by(in DateTime begin, in Frequency f){
+  return begin.by(1/f);
+}
+
+/+ deprecated Time QPS() //it's in seconds and synchronized with start of the current day only at the start
 {
   long cntr;
   QueryPerformanceCounter(&cntr);
@@ -6980,7 +7027,7 @@ Time QPS() //it's in seconds and synchronized with now() only at the start
     shift = timeBase - cntrBase*invFreq;
   }
   return (cntr*invFreq + shift)*second;
-}
+}      +/
 
 //deprecated. Use QPS-QPS0
 /*Time QPS_local(){ //note: mi a faszom kurvaannya ez is... 0-tol indulo QPS bazzz
@@ -6989,8 +7036,10 @@ Time QPS() //it's in seconds and synchronized with now() only at the start
   if(firstQPS==0*second) firstQPS = Q; //todo: thus should be synchronized with std.singleton
   return Q-firstQPS;
 }*/
-auto QPS_local(){ return QPS-QPS0; }
+//auto QPS_local(){ return QPS-QPS0; }
 
+Time QPS      (){ return now - appStartedDay; }
+Time QPS_local(){ return now - appStarted   ; }
 
 private __gshared  Time _TLast;
 
@@ -7580,8 +7629,9 @@ static this(){ //for all threads <- bullshit!!! It's not shared!!!
 
 // static this for process ////////////////////////////
 
-shared Time QPS0;
+__gshared const DateTime appStarted, appStartedDay; //todo: how to make it readonly?
 
 shared static this(){
-  QPS0 = QPS;
+  cast()appStarted = now;
+  cast()appStartedDay = appStarted.localDayStart;
 }

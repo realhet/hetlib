@@ -306,13 +306,13 @@ int main(string[] args)
 {
   MSG  msg;
   Runtime.initialize;
-  application.initialize;
+  application._initialize;
 
   try{
     SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS);
     initWglChoosePixelFormat(); //hack
 
-    if(application.initFunct) application.initFunct();
+    if(application._windowInitFunct) application._windowInitFunct();
 
     while(1){
       //note: GetMessage waits, if there is nothing;
@@ -355,10 +355,10 @@ int main(string[] args)
     showException(o);
   }
 
-  application.finalize;
+  application._finalize;
   Runtime.terminate;
 
-application.exit; //let it exit even if there are threads stuck in
+//nonono! Mark the unused threads as daemon threads!!!! application.exit; //let it exit even if there are threads stuck in
 
   return cast(int)msg.wParam;
 }
@@ -490,7 +490,7 @@ public:
 
   template autoCreate(){ //include this into any window ant it will be the mainWindow
     static this(){
-      application.initFunct = {
+      application._windowInitFunct = {
         createWindow!(typeof(this));
       };
     }

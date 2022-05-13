@@ -202,7 +202,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
     foreach(sr; searchResults)
       sr.drawHighlighted(dr, clSearchHighLight);
 
-    lineWidth = -2 * sqr(sin(QPS.fract*PIf*2));
+    lineWidth = -2 * sqr(sin(QPS.value(second).fract*PIf*2));
     alpha = 0.66;
     color = clSearchHighLight;
     foreach(sr; searchResults)

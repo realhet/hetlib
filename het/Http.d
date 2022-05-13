@@ -146,7 +146,7 @@ struct DigitalSignal_smoothed{
     return lastDisplayed;
   }
 
-  bool get(){ return get(QPS); }
+  bool get(){ return get(QPS.value(second)); } //todo: datetime
 }
 
 
@@ -179,23 +179,23 @@ private:
 
     auto st = cast(State*) state_;
     while(*terminated == 0){
-      st.alive = QPS;
+      st.alive = QPS.value(second); //todo: now
       auto r = inbox.pop;
       if(r.valid){
         st.idle = false;
 
         if(log) LOG("httpWorker fetching: ", r.query);
-        double t0 = 0; if(log) t0 = QPS;
+        double t0 = 0; if(log) t0 = QPS.value(second);  //todo: now
 
         st.comm = true;
         st.commCnt++;
 
         try{
           r.response = curlGet(r.query);
-          if(log) LOG("Done fetching: ", r.query, QPS-t0);
+          if(log) LOG("Done fetching: ", r.query, QPS.value(second)-t0);
           st.error = false;
         }catch(Exception e){
-          if(log) WARN("ERROR fetching: ", r.query, QPS-t0, e.msg);
+          if(log) WARN("ERROR fetching: ", r.query, QPS.value(second)-t0, e.msg);
           r.error = e.msg;
           st.error = true;
           st.errorCnt++;
@@ -226,7 +226,7 @@ private:
     void update(State state){
       if(chkSet(tick, application.tick)){
         commState = smComm.process(lastCommCnt.chkSet(state.commCnt));
-        errorState = state.error || (QPS-state.alive) > maxTimeOut;
+        errorState = state.error || (QPS.value(second)-state.alive) > maxTimeOut; //todo: now
       }
     }
 

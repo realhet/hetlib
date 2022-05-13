@@ -560,7 +560,14 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     myAppend(DrawingObj(1, inputTransform(p), vec2(0), vec2(s, 0), c));
   }
 
-  void point(float x, float y) { point(vec2(x, y)); }
+  void point(in RGB c, in vec2 p){ //todo: refactor this
+    const oldc = color; scope(exit) color = oldc;
+    color = c;
+    point(p);
+  }
+
+  void point(in float x, in float y) { point(vec2(x, y)); }
+  void point(in RGB c, in float x, in float y) { point(c, vec2(x, y)); }
 
   void point(in ivec2 p) { point(p.x, p.y); }
 

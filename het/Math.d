@@ -37,6 +37,12 @@ import std.meta   : AliasSeq;
 import std.exception : enforce;
 import std.stdio     : write, writeln;
 
+// quantities support
+
+/*import quantities.compiletime;
+
+enum isFloatingPointOrQuantity(T) = isFloatingPoint!T || isQuantity!T;
+enum isNumericOrQuantity(T) = isNumeric!T || isQuantity!T;*/
 
 // utility stuff ////////////////////////////////////////////////////
 
