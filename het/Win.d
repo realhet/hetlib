@@ -358,7 +358,8 @@ int main(string[] args)
   application._finalize;
   Runtime.terminate;
 
-//nonono! Mark the unused threads as daemon threads!!!! application.exit; //let it exit even if there are threads stuck in
+  //Todo: Mark the unused threads as daemon threads (in karc2.d, utils.d, bitmap.d) and remove this application.exit!!!!
+  application.exit; //let it exit even if there are threads stuck in
 
   return cast(int)msg.wParam;
 }
@@ -533,7 +534,9 @@ public:
     windowList[hwnd] = this; //after this, the window can accept wm_messages
 
     if(isMain){
-      mainWindow = this; mainWindowHandle = hwnd;
+      mainWindow = this;
+      _mainWindowHandle = hwnd;
+      _mainWindowIsForeground = ()=>mainWindow.isForeground;
 
       console.afterFirstPrintFlushed = &setForegroundWindowIfVisible;
     }
@@ -589,7 +592,8 @@ public:
 
     if(isMain){
       mainWindow = null;
-      mainWindowHandle = null;
+      _mainWindowHandle = null;
+      _mainWindowIsForeground = ()=>false;
       mainWindowDestroyed = true;
     }
   }

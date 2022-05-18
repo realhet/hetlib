@@ -87,6 +87,9 @@ struct im{ static:
     targetSurfaces[1].view = viewGUI;
   }
 
+  auto getView(){ return targetSurfaces[0].view; }
+  auto getViewGUI(){ return targetSurfaces[1].view; }
+
   /*private*/ View2D actView; //this is only used for getting mouse position from actview
 
   //todo: this should be the only opportunity to switch between GUI and World. Better that a containerflag that is initialized too late.
@@ -1720,7 +1723,7 @@ struct im{ static:
     Column!(srcModule, srcLine)({
       bool materialStyle = true;
       if(materialStyle){
-        margin = "2 4";
+        margin = "4 0";
       }else{
         margin  = Margin(0, 2, 2, 2);
         border  = Border(2, BorderStyle.normal, clWinBtn);
@@ -1729,7 +1732,7 @@ struct im{ static:
     }, args);
   }
 
-  void Tabs(alias mapTitle = "a.title", alias mapUI = "a.UI", R, I, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(R r, ref I idx, A args){ //Tabs/////////////////////////////
+  void Tabs(alias mapTitle = "a.title", alias mapUI = "a.UI()", R, I, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(R r, ref I idx, A args){ //Tabs/////////////////////////////
     mixin(prepareId);
 
     bool includeAll = false;

@@ -170,7 +170,8 @@ void SafeRelease(T:IUnknown)(ref T i){
 ///  Application                                                             ///
 ////////////////////////////////////////////////////////////////////////////////
 
-__gshared HWND mainWindowHandle; //het.win fills it
+__gshared HWND _mainWindowHandle; //het.win fills it
+__gshared bool delegate() _mainWindowIsForeground = ()=>false;
 
 struct application{
 __gshared static private:  //__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
@@ -219,7 +220,9 @@ __gshared static public:////////////////////////////////////////////////////////
     return ret;
   }
 
-  @property HWND handle() { return mainWindowHandle; }
+  @property HWND handle() { return _mainWindowHandle; }
+
+  bool isForeground(){ return _mainWindowIsForeground(); }
 }
 
 // Ega color codes
@@ -1152,6 +1155,19 @@ float easeInOutQuad(float t, float b, float c, float d) {
   if ((t/=d/2) < 1) return c/2*t*t + b;
   return -c/2 * ((--t)*(t-2) - 1) + b;
 }
+
+//?. optional chaining operator
+
+auto ifNotNull(alias fun, T)(T p){
+  if(p !is null) return unaryFun!fun(p);
+  else           return typeof(return).init;
+}
+
+auto ifNotNull(alias fun, T, U)(T p, lazy U def){
+  if(p !is null) return unaryFun!fun(p);
+  else           return def;
+}
+
 
 // Interval ////////////////////////////////////////
 // Interval: Keeps an integer or float range. It can clamp values using that range,
