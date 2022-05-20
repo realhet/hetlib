@@ -3075,9 +3075,11 @@ template FieldNamesWithUDA(T, U, bool allIfNone){
     enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
 }
 
+//todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
+
 /// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
 template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone){
-  enum bool isUda        (string name) = hasUDA!(__traits(getMember, T, name), U);
+  enum bool isUda        (string name) = is(U==void) || hasUDA!(__traits(getMember, T, name), U);
   enum bool isUdaFunction(string name) = isUda!name && isFunction!(__traits(getMember, T, name));
   enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T));
 
@@ -3086,6 +3088,8 @@ template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone){
   else
     enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T);
 }
+
+enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false);
 
 string[] getEnumMembers(T)(){
   static if(is(T == enum)) return [__traits(allMembers, T)];
@@ -7459,6 +7463,7 @@ struct UDA{}
   struct HINT{ string text; }
   struct UNIT{ string text; }
   struct RANGE{ float low, high; bool valid()const{ return !low.isnan && !high.isnan; } }
+  struct STEP{ float s = 1; }
   struct INDENT{ }
   struct HIDDEN{ }
 }

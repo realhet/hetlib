@@ -349,7 +349,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
           }else{
             streamDecode_json(state, *p, __traits(getMember, data, fieldName));
           }
-        }
+        }//todo: error handling
       }}
 
     }else static if(isArray!T){ // Array
@@ -603,6 +603,7 @@ class Property{
   //todo: would be better to save the last value, than update this (and sometimes forget to update)
 
   string asText() { return ""; }
+  string asDecl() { return format!"Property %s;"(name); }
 }
 
 class StringProperty : Property {
@@ -614,6 +615,16 @@ class StringProperty : Property {
   }
 
   override string asText(){ return act; }
+
+  override string asDecl(){
+    auto s = "@STORED string "~name;
+    if(def!=string.init) s ~= " = "~def.quoted;
+    s ~= ";";
+    if(choices.length) s ~= format!" enum %s_choices = %s;"(name, choices);
+    s ~= "\n";
+    return s;
+  }
+
 }
 
 class IntProperty : Property {
@@ -622,6 +633,15 @@ class IntProperty : Property {
   @STORED int act, def, min, max, step=0;
 
   override string asText(){ return act.text; }
+
+  override string asDecl() {
+    auto s = "@STORED int "~name;
+    if(def) s ~= " = "~def.text;
+    s ~= ";\n";
+    if(min || max) s = format!"@RANGE(%s, %s) %s"(min, max, s);
+    if(step) s = format!"@STEP(%s) %s"(step, s);
+    return s;
+  }
 }
 
 class FloatProperty : Property {
@@ -630,6 +650,15 @@ class FloatProperty : Property {
   @STORED float act=0, def=0, min=0, max=0, step=0;
 
   override string asText(){ return act.text; }
+
+  override string asDecl() {
+    auto s = "@STORED float "~name;
+    s ~= " = "~def.text;
+    s ~= ";\n";
+    if(min || max) s = format!"@RANGE(%g, %g) %s"(min, max, s);
+    if(step) s = format!"@STEP(%g) %s"(step, s);
+    return s;
+  }
 }
 
 class BoolProperty : Property {
@@ -638,6 +667,13 @@ class BoolProperty : Property {
   @STORED bool act, def;
 
   override string asText(){ return act.text; }
+
+  override string asDecl() {
+    auto s = "@STORED bool "~name;
+    if(def) s ~= " = "~def.text;
+    s ~= ";\n";
+    return s;
+  }
 }
 
 class PropertySet : Property {
@@ -646,6 +682,14 @@ class PropertySet : Property {
   @STORED Property[] properties;
 
   override string asText(){ return ""; }
+
+  override string asDecl() {
+    auto s = "struct _T"~name~" {\n"~
+      properties.map!(a => "  "~a.asDecl).join~
+      "}\n"~
+      "@STORED _T"~name~" "~name~";\n";
+    return s;
+  }
 
   //copy paste from propArray --------------------------------------------------
   bool empty(){ return properties.empty; }
@@ -665,6 +709,15 @@ class PropertySet : Property {
   bool exists(string name){ return get(name) !is null; }
   //end of copy paste ----------------------------------------------------------
 
+  void toStruct(T, bool reverse=false)(ref T data){
+    static foreach(fieldName; FieldAndFunctionNames!T){{
+      auto p = access!(mixin("typeof(T."~fieldName~")"), true)(fieldName);
+      static if(!reverse) mixin("data."~fieldName~" = p.act;");
+                     else mixin("p.act = data."~fieldName~";");
+    }}
+  }
+
+  void fromStruct(T)(ref T data){ toStruct!(T, true)(data); }
 }
 
 void expandPropertySets(char sep='.')(ref Property[] props){ //creates propertySets from properties named like "set.name"
@@ -765,7 +818,7 @@ struct PropArray{ // PropArray ////////////////////////////////////////////
 
   auto get(T=void)(string name){ return access!(T, false)(name); }
 
-  auto get(T=void)(string name, string def){
+  auto get(string name, string def){
     auto p = get(name);
     if(p is null) return def;
     return p.asText;
@@ -785,6 +838,8 @@ struct PropArray{ // PropArray ////////////////////////////////////////////
   bool exists(string name){ return get(name) !is null; }
 
   void update(){
+    if(queryName=="") ERR("Unspecified queryname");
+
     auto s = props.getChangedPropertyValues;
     if(s.length){
       auto q = queryName~"?"~s.join("&");
