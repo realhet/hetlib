@@ -1858,6 +1858,7 @@ struct im{ static:
     HitInfo hit;
     Row({
       flags.wordWrap = false;
+      margin.left = margin.right = 2;
 
       actContainer.id = id_;
       hit = hitTest(enabled);
@@ -2928,7 +2929,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = format("%g", data);
-      Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
+      Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4.5; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict
@@ -2939,7 +2940,7 @@ void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
     Row({
       Text(thisFieldProps.getCaption, "\t");
       auto s = data.text;
-      Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4; });
+      Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4.5; });
       try{ data = s.to!T; }catch(Throwable){}
       Text(thisFieldProps.unit, "\t");
       if(thisFieldProps.range.valid) //todo: im.range() conflict

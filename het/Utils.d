@@ -5309,12 +5309,30 @@ private static{/////////////////////////////////////////////////////////////////
 
     FILETIME cre, acc, wri;
     if(GetFileTime(f.windowsHandle, &cre, &acc, &wri)){
-      res.created  = DateTime(cre);
-      res.accessed = DateTime(acc);
-      res.modified = DateTime(wri);
+      res.created  = DateTime(UTC, cre);
+      res.accessed = DateTime(UTC, acc);
+      res.modified = DateTime(UTC, wri);
     }
 
     return res;
+  }
+
+  void setFileTimes_modified(string fn, DateTime modified)
+  {
+    if(fn=="") return;
+
+    if(fn.isVirtualFileName) throw new Exception("Can't set time of virtual files");
+
+    StdFile f;
+    try{
+      f = StdFile(fn, "a+b");
+    }catch(Exception e){
+      throw new Exception("Can't open file "~fn.quoted);
+    }
+
+    FILETIME wri = modified.utcFileTime;
+    if(!SetFileTime(f.windowsHandle, null, null, &wri))
+      throw new Exception("Error setting filetime "~fn.quoted);
   }
 
   string extractFilePath(string fn) {
@@ -5349,9 +5367,11 @@ public:
   File normalized(in Path base) const{ return normalized(base.fullPath); }
 
   auto times()     const{ return fileTimes(fullName); }
-  auto modified()  const{ return times.modified; }
+  @property auto modified()  const{ return times.modified; }
   auto accessed()  const{ return times.accessed; }
   auto created()   const{ return times.created ; }
+
+  @property void modified(in DateTime m){ setFileTimes_modified(fullName, m); }
 
   @property string dir()const           { return extractFileDir(fullName); }
   @property void dir(string newDir)     { fullName = combinePath(newDir, extractFileName(fullName)); }
@@ -5642,6 +5662,8 @@ struct FileEntry{
 static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
 
 FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
+  path = path.normalized;
+
   enforce(!(!onlyFiles && recursive), "Invalid params");
 
   FileEntry[] files, paths, parent;
@@ -5705,6 +5727,8 @@ FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"only
 
 ///this is a recursive search
 FileEntry[] findFiles(Path path, string mask="", string order="name", int level=0){ //this is similar to
+  path = path.normalized;
+
   FileEntry[] files, paths;
 
   if(mask=="*") mask = "";
@@ -6741,7 +6765,7 @@ struct DateTime{
     auto localFileTime  () const{ return _get!(true , FILETIME  )(); }  void localFileTime  (in FILETIME   a) { _set!true (a); }
     auto localSystemTime() const{ return _get!(true , SYSTEMTIME)(); }  void localSystemTime(in SYSTEMTIME a) { _set!true (a); }
 
-    double unixTime(){ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; }
+    double unixTime() const{ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; }
     void unixTime(in double a){ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; }
 
     private enum RawDelphiShift = 109205*RawUnit.day;
@@ -6872,6 +6896,7 @@ struct DateTime{
   string utcDateText() const{ return dateText!utcSystemTime; }
   string utcTimeText() const{ return timeText!utcSystemTime; }
   string utcToString() const{ return toString!utcSystemTime; }
+  string utcText() const{ return utcToString; }
   string utcTimestamp(in Flag!"shortened" shortened = No.shortened)const { return timestamp!utcSystemTime(shortened); }
   string utcTtimestamp_compact()const { return utcTimestamp(Yes.shortened); }
 

@@ -2027,10 +2027,11 @@ class GLWindow: Window{
 
   //diagnostic stuff
   bool showFPS, showMegaTextures;
+  float guiScale = 1;
 
   private View2D viewGUI_;
   auto viewGUI() {
-    viewGUI_.scale = 1;
+    viewGUI_.scale = guiScale;
     viewGUI_.origin = clientSizeHalf;
     viewGUI_.skipAnimation;
     return viewGUI_;
