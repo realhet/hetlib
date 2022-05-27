@@ -6812,13 +6812,13 @@ struct DateTime{
   ///adjust DateTime by si.Time
   DateTime opBinary(string op)(in Time b) const if(op.among("+", "-")) {
     DateTime res = this;
-    mixin("res.raw", op, "=(b.value(quantities.si.second)*RawUnit.sec).to!ulong;");
+    mixin("res.raw", op, "=(b.value(quantities.si.second)*RawUnit.sec).to!long;");
     return res;
   }
 
   ///adjust this DateTime by si.Time
   DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-")){
-    mixin("raw", op,"= (b.value(quantities.si.second)*RawUnit.sec).to!ulong;");
+    mixin("raw", op,"= (b.value(quantities.si.second)*RawUnit.sec).to!long;");
     return this;
   }
 
