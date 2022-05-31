@@ -778,12 +778,18 @@ void installExceptionFilter(){
       write("Press enter to exit..."); readln;
     }*/
 
-    showException(msg);
+    static if(1){ //1 = disable exception handling
+      showException(msg);
 
-    return
-      EXCEPTION_EXECUTE_HANDLER;    //exits because D runtime has no registered handler
-      //EXCEPTION_CONTINUE_SEARCH;    //exits, unhandled by this filter.
-      //EXCEPTION_CONTINUE_EXECUTION; //continues, but it becomes an endless as it retriggers an exception on the same error
+      return
+        EXCEPTION_EXECUTE_HANDLER;    //exits because D runtime has no registered handler
+        //EXCEPTION_CONTINUE_SEARCH;    //exits, unhandled by this filter.
+        //EXCEPTION_CONTINUE_EXECUTION; //continues, but it becomes an endless as it retriggers an exception on the same error
+    }else{
+      //showException(msg);
+      //WARN(msg);
+      return EXCEPTION_CONTINUE_EXECUTION;
+    }
   }
 
   auto res = SetUnhandledExceptionFilter(&filter);
@@ -1326,7 +1332,7 @@ auto fetchFront(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
     }else{
       return def;
     }
-  }else static assert("unhandled type");
+  }else static assert(0, "unhandled type");
 }
 
 auto fetchFrontN(T)(ref T[] arr, sizediff_t count){
@@ -1350,7 +1356,7 @@ auto fetchBack(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
     }else{
       return def;
     }
-  }else static assert("unhandled type");
+  }else static assert(0, "unhandled type");
 }
 
 auto fetchBackN(T)(ref T[] arr, sizediff_t count){
@@ -3166,7 +3172,7 @@ auto getStaticParamDef(T, Args...)(in T def, in Args args){
 auto getStaticParam(T, Args...)(in Args args){
   Unqual!T res;
   static foreach(a; args) static if(__traits(compiles, res = a)) return a;
-  static assert("Can't find required param: "~T.stringof);
+  static assert(0, "Can't find required param: "~T.stringof);
 }
 
 enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0;

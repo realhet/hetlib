@@ -664,7 +664,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       }else static if(is(T == bounds2   )){ lineTo(a.topLeft, first); lineTo(a.topRight); lineTo(a.bottomRight), lineTo(a.bottomLeft), lineTo(a.topLeft);
       }else static if(is(T == ibounds2  )){ lineTo(a.topLeft, first); lineTo(a.topRight); lineTo(a.bottomRight), lineTo(a.bottomLeft), lineTo(a.topLeft);
       }else static if(isNumeric!T        ){ if(isnan(coord)) coord = a; else { lineTo(coord, a, first); first = false; coord = float.init; }
-      }else static assert("invalid type: "~T.stringof);
+      }else static assert(0, "invalid type: "~T.stringof);
     }}
   }
 
@@ -758,7 +758,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
       else static if(is(A==Flag!"nearest" )) nearest = a;
       else static if(is(A==RectAlign      )) rectAlign = a;
       else static if(is(A==GenericArg!(N, T), string N, T)) shaderIdx = a.value;
-      else static assert("Unhandled parameter ", typeof(a));
+      else static assert(0, "Unhandled parameter "~typeof(a).stringof);
     }}
 
     auto c = realDrawColor;
@@ -788,7 +788,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     else static if(is(Img == File        )) idx = textures[img];
     else static if(isIntegral!Img         ) idx = img;
     else static if(is(Img : CustomTexture)){ if(img) idx = img.texIdx; }
-    else static assert("Unsupported Img param: ", Img);
+    else static assert(0, "Unsupported Img param: "~Img.stringof);
 
     //position can be x,y  vec2,   ivec2      the size is automatic
     //bounds can be bounds2, ibounds2   2x vec2,
@@ -799,7 +799,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     else static if(T.length>=2 && __traits(isArithmetic, T[0]) && __traits(isArithmetic, T[1]))
       static if(T.length>=4 && __traits(isArithmetic, T[2]) && __traits(isArithmetic, T[3])) drawGlyph_impl(idx, bounds2(args[0..4]), args[4..$]);
                                                                                         else drawGlyph_impl(idx, vec2   (args[0..2]), args[2..$]);
-    else static assert("Unsupported Bounds param: ", Img);
+    else static assert(0, "Unsupported Bounds param: "~Img.stringof);
   }
 
   /+//old shit

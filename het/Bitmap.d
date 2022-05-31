@@ -414,18 +414,18 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
 }}
 
 __gshared struct bitmaps{ static : // bitmaps() ///////////////////////////////////////////
-  auto opCall(T)(T file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track){
-    return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling);
+  auto opCall(F)(F file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null){
+    return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling, bmp);
   }
-  auto opCall(T)(T file, ErrorHandling errorHandling, Flag!"delayed" delayed=No.delayed){ return opCall(file, delayed, errorHandling); }
+  auto opCall(F)(F file, ErrorHandling errorHandling, Flag!"delayed" delayed=No.delayed, Bitmap bmp=null){ return opCall(file, delayed, errorHandling, bmp); }
 
-  auto opIndex(T)(T file)       { return opCall(file, No.delayed, ErrorHandling.raise); }
+  auto opIndex(F)(F file) { return opCall(file, No.delayed, ErrorHandling.raise); }
 
-  auto opIndexAssign(T)(T file, Bitmap bmp) { enforce(bmp && bmp.valid); return opCall(file, No.delayed, ErrorHandling.raise, bmp); }
+  auto opIndexAssign(F)(Bitmap bmp, F file) { /*enforce(bmp && bmp.valid);*/ return opCall(file, No.delayed, ErrorHandling.raise, bmp); }
 
-  auto opIndexAssign(T, I)(T file, I img) if(isImage2D!I){ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); }
+  auto opIndexAssign(F, I)(I img, F file) if(isImage2D!I){ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); }
 
-  void remove (T)(T file)       { bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
+  void remove (F)(F file)       { bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
 
   BitmapCacheStats stats()   { bitmapQuery(BitmapQueryCommand.stats  , File(), ErrorHandling.ignore); return _bitmapCacheStats; }
   BitmapCacheStats details() { bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); return _bitmapCacheStats; }

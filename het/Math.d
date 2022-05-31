@@ -234,7 +234,7 @@ if(N.inRange(2, 4))
     static if(is(ComponentType==ubyte) && args.length==1 && (is(A[0]==int) || is(A[0]==uint) || isSomeString!(A[0]))){
       //special case for RG, RGB and RGBA: decodes it from one value
       static if(isSomeString!(A[0])){
-        static assert("not impl");
+        static assert(0, "not impl");
       }else static if(is(A[0]==int) || is(A[0]==uint)){
         // raw data copy
         //todo: kulonvalasztani a compile time es a runtime konvertalast. Ha egyaltalan lehet.
@@ -275,7 +275,7 @@ if(N.inRange(2, 4))
         return components.equal(other.components);
     }else static if(__traits(compiles, components[0]==other)){ // vector==scalar
       return components[0]==other;
-    }else static assert("Incompatible types: "~typeof(this).stringof~" and "~T.stringof);
+    }else static assert(0, "Incompatible types: "~typeof(this).stringof~" and "~T.stringof);
   }
 
   // raw data access for ubyte vectors.
@@ -1342,7 +1342,7 @@ auto isnull(A)(in A a){
   static if(isBounds!A) return !a.valid;
   else static if(isVector!A){ return a == A.init; }
   else static if(isMatrix!A){ return a == A(0); }
-  else static assert("invalid argument type");
+  else static assert(0, "invalid argument type");
 }
 
 auto isPowerOf2(A)(in A a){ return a.generateVector!(bool, a => std.math.isPowerOf2(a) ); }

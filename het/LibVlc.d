@@ -4,9 +4,9 @@ import het.utils, het.bitmap, het.geometry, core.sync.rwmutex;
 
 private:
 
-void log(string s){
-//  writeln("VLC: "~s);
-}
+enum disable_LOG = true;
+
+static if(disable_LOG){ void LOG(A...)(in A args){} }
 
 alias libvlc_video_format_cb  = extern(C) uint function(ref void* opaque, char* chroma, ref uint width, ref uint height, uint *pitches, uint *lines);
 alias libvlc_video_cleanup_cb = extern(C) void function(void* opaque);
@@ -64,7 +64,7 @@ struct libvlc{
 public:
 
 //global entry point for the lib
-alias vcl = Singleton!VlcInstance;
+alias vlc = Singleton!VlcInstance;
 
 class VlcInstance{
 private:
@@ -102,8 +102,8 @@ public:
 
   VlcPlayer[] players;
 
-  VlcPlayer newPlayer(const string uri, const ivec2 size=0){
-    auto p = new VlcPlayer(this, uri, size);
+  VlcPlayer newPlayer(const string uri, const ivec2 sizeOverride=0){
+    auto p = new VlcPlayer(this, uri, sizeOverride);
     players ~= p;
     return p;
   }
@@ -119,7 +119,7 @@ private:
   enum maxWidth = 4096, //todo: memory footprint: pool is allovating 4K for all the time. pool must be locked properly with the dimensons.
        maxHeight = maxWidth*2/3;
 
-  ivec2 size;
+  ivec2 sizeOverride;
 
 private: //resource
   ReadWriteMutex mutex;
@@ -157,6 +157,7 @@ public:
     synchronized(mutex.reader){
       dst.set(Image!(ubyte, 2)(ivec2(w, h), pool[o..$], p).dup);
       dst.counter = counter;
+      dst.modified.actualize;
     }
 
     return true;
@@ -173,15 +174,18 @@ private:
     uint my_video_format_cb(ref void* opaque, char* chroma, ref uint width, ref uint height, uint *pitches, uint *lines){
       auto pl = cast(VlcPlayer)opaque;
 
-//      writefln("pre my_video_format_cb(%s, %d, %d, %s, %s)", chroma.to!string, width, height, pitches[0..3].text, lines[0..3].text);
+      LOG(format!"pre my_video_format_cb(%s, %d, %d, %s, %s)"(chroma.to!string, width, height, pitches[0..3].text, lines[0..3].text));
 
-      width = pl.size.x; height = pl.size.y;
+      //sizeOverride
+      if(pl.sizeOverride){ //todo: use command line instead!!!!
+        width = pl.sizeOverride.x; height = pl.sizeOverride.y;
+      }
 
       chroma[0..4] = "I420";
       lines[0] = height;  lines[1] = lines[2] = height/2;
       pitches[0..3] = width;
 
-//      writefln("my_video_format_cb(%s, %d, %d, %s, %s)", chroma.to!string, width, height, pitches[0..3].text, lines[0..3].text);
+      LOG(format!"my_video_format_cb(%s, %d, %d, %s, %s)"(chroma.to!string, width, height, pitches[0..3].text, lines[0..3].text));
 
       pl.width = width;   //redundant
       pl.height = height;
@@ -190,42 +194,41 @@ private:
     }
 
     void my_video_cleanup_cb(void* opaque){
-    //  writeln("my_video_cleanup_cb()");
+      LOG;
       auto pl = cast(VlcPlayer)opaque;
       pl.videoCleanup;
     }
 
     void my_video_lock_cb(void* opaque, void** planes){
       auto pl = cast(VlcPlayer)opaque;
-      //write(".");
       planes[0..3] = pl.planes;
-//      writeln("my_video_lock_cb ", pl.uri, " ", pl.width, " ", pl.height, " ", planes[0..3], " ", planes[1]-planes[0], " ", planes[2]-planes[1]);
+      LOG(pl.uri, " ", pl.width, " ", pl.height, " ", planes[0..3], " ", planes[1]-planes[0], " ", planes[2]-planes[1]);
       pl.mutex.writer.lock;
     }
 
     void my_video_unlock_cb(void* opaque, void* picture, void** planes){
       auto pl = cast(VlcPlayer)opaque;
-      //writeln("my_video_unlock_cb ", pl.uri);
+      LOG(pl.uri);
       pl.mutex.writer.unlock;
     }
 
     void my_video_display_cb(void* opaque, void* picture){
       auto pl = cast(VlcPlayer)opaque;
-      //writeln("my_video_display_cb ", pl.uri);
+      LOG(pl.uri);
       pl.counter_ ++;
     }
   }
 
 public:
-  this(VlcInstance owner, string uri, ivec2 size){
+  this(VlcInstance owner, string uri, ivec2 sizeOverride){
     this.owner = owner;
-    this.size = size;
+    this.sizeOverride = sizeOverride;
 
     //todo: ez lehet kisebb helyu is, a size meg lehet rugalmasabb is
     pool.length = maxWidth*maxWidth; //maxWidth is texture width and height. Maxheight is the maximum video height that can be stored using I420 format on a maxHeight^^2 texture surface.
     mutex = new ReadWriteMutex(ReadWriteMutex.Policy.PREFER_WRITERS);
 
-    if(!uri.empty) open(uri);
+    if(!uri.empty) open(uri); //todo: measure time of this. Maybe move to worker thread.
   }
 
   override string toString(){
@@ -243,7 +246,7 @@ public:
     string fn = options[0];
     options = options[1..$];
 
-    //writeln("opening: ", fn);
+    LOG("opening: ", fn);
 
     if(File(fn).exists){
       error_open = "Media files not supported yet"; return false;
@@ -256,8 +259,8 @@ public:
       //string s = "dshow-vdev=Microsoft\u00AE LifeCam Cinema(TM)".toUTF8;
       foreach(opt; options){
         libvlc.media_add_option(m, toPChar(opt));
-        writeln("  opt: ", opt);
-        writefln("  opth: %(%.2X %)", cast(ubyte[])opt);
+        LOG("  opt: ", opt);
+        LOG("  opth: %(%.2X %)", cast(ubyte[])opt);
       }
 
       mp = libvlc.media_player_new_from_media(m);

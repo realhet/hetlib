@@ -1748,7 +1748,7 @@ struct im{ static:
       static if(isSomeString!TT) titles ~= "All";
       else static if(isFunction!TT) titles ~= (TT){ Text("All"); }; //inferred type
       else static if(isDelegate!TT) titles ~= (TT){ Text("All"); }; //inferred type
-      else static assert("Unhandled type: ", TT);
+      else static assert(0, "Unhandled type: "~TT.stringof);
     }
 
     TabsHeader!(srcModule, srcLine)(titles, idx);
