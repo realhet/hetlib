@@ -385,6 +385,8 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
       auto  list = cache.byValue.filter!(b => !b.resident && !b.loading && !b.removed && t-b.accessed_tick>=3).array;
       const sizeBytes = list.map!(b => b.sizeBytes).sum;
 
+      LOG(sizeBytes, cache.byValue.map!(a => a.sizeBytes).sum);
+
       if(sizeBytes > BitmapCacheMaxSizeBytes){
 
         //ascending by access time
