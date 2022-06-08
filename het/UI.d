@@ -1174,7 +1174,7 @@ struct im{ static:
 
   void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(void delegate() fun, A args){ //Grp /////////////////////////////
     Cntr({
-      border = "2 normal silver"; padding = "0 4"; margin = "2 4";
+      border = "2 normal silver"; padding = "2 4"; margin = "2 4";
       fun();
     }, args);
   }
@@ -1227,7 +1227,9 @@ struct im{ static:
   }
 
   void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover){
+    const oldFh = style.fontHeight;
     style = tsBtn;
+    style.fontHeight = oldFh;
 
     auto bColor = mix(style.bkColor, clWinBtnHoverBorder, hover);
 
@@ -1504,6 +1506,8 @@ struct im{ static:
         mixin(hintHandler);
         applyEditStyle(true, false, 0); //todo: Enabled in static???
         style = tsNormal;
+
+        border.color = mix(border.color, style.bkColor, .5f);
 
         static if(std.traits.isNumeric!T0) flags.hAlign = HAlign.right;
                                       else flags.hAlign = HAlign.left;
@@ -2738,7 +2742,7 @@ struct im{ static:
     });
   }
 
-  auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__)(ref bool state, void delegate() title, void delegate() contents){ // Node ////////////////////////////
+  auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args){ // Node ////////////////////////////
     HitInfo hit;
     Column!(srcModule, srcLine)({
       border.width = 1; //todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
@@ -2758,12 +2762,12 @@ struct im{ static:
         });
       });
 
-    });
+    }, args);
     return hit;
   }
 
-  auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__)(ref bool state, string title, void delegate() contents){
-    return Node!(srcModule, srcLine)(state, { Text(title); }, contents);
+  auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, string title, void delegate() contents, Args args){
+    return Node!(srcModule, srcLine)(state, { Text(title); }, contents, args);
   }
 
   /// A node header that usually connects to a server, can have an error message and a state of refreshing. It can has a refresh button too
@@ -3084,13 +3088,13 @@ struct ResourceMonitor{
   Item
     textureCount, texturePoolSize, textureUsedSize,
 
-    bitmapCount, allBitmapSize, residentBitmapSize,
+    bitmapCount, allBitmapSize, nonUnloadableBitmapSize, residentBitmapSize,
 
     virtualFileCount, allVirtualFileSize, residentVirtualFileSize,
 
     UPS, FPS, TPS, VPS,
 
-    gcUsed, gcFree, gcAll;
+    gcUsed, gcFree, gcAll, gcRate;
 
   private DeltaTimer DT;
 
@@ -3145,9 +3149,10 @@ void update(ref ResourceMonitor rm){ with(rm){
     textureUsedSize.act[0] = textures.usedSizeBytes;
 
     const bs = bitmaps.stats;
-    bitmapCount          .act[0] = bs.count;
-    residentBitmapSize   .act[0] = bs.residentSizeBytes;
-    allBitmapSize        .act[0] = bs.allSizeBytes;
+    bitmapCount            .act[0] = bs.count;
+    residentBitmapSize     .act[0] = bs.residentSizeBytes;
+    nonUnloadableBitmapSize.act[0] = bs.nonUnloadableSizeBytes;
+    allBitmapSize          .act[0] = bs.allSizeBytes;
 
     const vs = virtualFiles.stats;
     virtualFileCount.act[0] = vs.count;
@@ -3165,6 +3170,12 @@ void update(ref ResourceMonitor rm){ with(rm){
       gcUsed.act[0] = usedSize;
       gcFree.act[0] = freeSize;
       gcAll.act[0] = usedSize+freeSize;
+
+      const long act = allocatedInCurrentThread;
+      __gshared long last;
+
+      gcRate.act[0] = act-last;
+      last = act;
     }
   });
 }}
@@ -3172,11 +3183,12 @@ void update(ref ResourceMonitor rm){ with(rm){
 
 @UI void ui(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 
-  const
+  immutable
     clTexturePool = RGB(255, 180, 40),
     clTextureUsed = RGB(180, 255, 40),
 
     clBitmap         = clAqua,
+    clHotBitmap      = mix(clGray, clBitmap, .5),
     clResidentBitmap = mix(clGray, clBitmap, .25),
 
     clVirtualFile         = RGB(100, 150, 255),
@@ -3189,7 +3201,8 @@ void update(ref ResourceMonitor rm){ with(rm){
     clVPS         = RGB(40, 255,  80),
 
     clGcUsed      = RGB(120, 180, 40),
-    clGcAll       = RGB(40, 220, 120);
+    clGcAll       = RGB(40, 220, 120),
+    clGcRate      = RGB(80, 160,  90);
 
   static int timeIdx = 0;
   int gridXStepSize = Item.N/(timeIdx==2 ? 10 : 5);
@@ -3242,7 +3255,7 @@ void update(ref ResourceMonitor rm){ with(rm){
 
   void VirtualFileGraph(){
     Row({
-      Text(format!"Virtual files (%s)"(virtualFileCount.val));                      Flex;
+      Text(format!"Virtual files[] (%s)"(virtualFileCount.val));                      Flex;
       Legend("Resident", residentVirtualFileSize.val, clResidentVirtualFile, "B");  Spacer;
       Legend("All"     , allVirtualFileSize.val     , clVirtualFile        , "B");
     });
@@ -3252,17 +3265,19 @@ void update(ref ResourceMonitor rm){ with(rm){
 
   void BitmapCacheGraph(){
     Row({
-      Text(format!"Bitmap cache (%s)"(bitmapCount.val));                  Flex;
-      Legend("Resident", residentBitmapSize.val, clResidentBitmap, "B");  Spacer;
-      Legend("All"     , allBitmapSize.val     , clBitmap        , "B");
+      Text(format!"Bitmaps (%s)"(bitmapCount.val));                        Flex;
+      Legend("Res" , residentBitmapSize.val      , clResidentBitmap , "B");  Spacer;
+      Legend("Hot" , nonUnloadableBitmapSize.val , clHotBitmap      , "B");  Spacer;
+      Legend("All" , allBitmapSize.val           , clBitmap         , "B");
     });
-    Graph("BitmapCache", [Data(residentBitmapSize.history[timeIdx][], clResidentBitmap),
-                          Data(allBitmapSize     .history[timeIdx][], clBitmap        )], gridXStepSize);
+    Graph("BitmapCache", [Data(residentBitmapSize     .history[timeIdx][], clResidentBitmap),
+                          Data(nonUnloadableBitmapSize.history[timeIdx][], clHotBitmap     ),
+                          Data(allBitmapSize          .history[timeIdx][], clBitmap        )], gridXStepSize);
   }
 
   void TextureCacheGraph(){
     Row({
-      Text(format!"Texture cache (%s)"(textureCount.val));  Flex;
+      Text(format!"Textures (%s)"(textureCount.val));  Flex;
       Legend("Used", textureUsedSize.val, clTextureUsed, "B");   Text("   ");
       Legend("Pool", texturePoolSize.val, clTexturePool, "B");
     });
@@ -3301,6 +3316,14 @@ void update(ref ResourceMonitor rm){ with(rm){
                  Data(gcAll .history[timeIdx][], clGcAll)], gridXStepSize);
   }
 
+  void GCRateGraph(){
+    Row({
+      Text("GC memory (main thread)"); Flex;
+      Legend("allocation rate", gcRate.val, clGcRate, "B/s");
+    });
+    Graph("GCRate", [Data(gcRate.history[timeIdx][], clGcRate)], gridXStepSize);
+  }
+
   void SelectTimeIdx(ref int t){
     Row(HAlign.right, {
       Text("Time step");                ComboBox(timeIdx, ResourceMonitor.Item.timeStepNames , { width = fh*4; });
@@ -3319,6 +3342,7 @@ void update(ref ResourceMonitor rm){ with(rm){
     TPSGraph;                           Spacer;
     FPSGraph;                           Spacer;
     GCGraph;                            Spacer;
+    GCRateGraph;                        Spacer;
     SelectTimeIdx(timeIdx);
   });
 

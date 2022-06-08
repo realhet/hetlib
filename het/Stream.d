@@ -277,6 +277,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
           data = null; return; //todo: what happens with old instance???!!!
         }else{
           data = T.init; //if it's a struct, reset it
+          //todo: Need an own struct initializer because assignment doesn't work: "cannot modify strict instance 'data' of type ... because it contains 'const' or 'immutable' members.
         }
         return; //nothing else to expect after null
       }

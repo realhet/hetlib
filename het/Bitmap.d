@@ -179,7 +179,7 @@ enum BitmapQueryCommand{ access, access_delayed, finishWork, finishTransformatio
 
 struct BitmapCacheStats{
   size_t count;
-  size_t allSizeBytes, residentSizeBytes;
+  size_t allSizeBytes, nonUnloadableSizeBytes, residentSizeBytes;
   Bitmap[] bitmaps; //pnly when detailed stats requested
 
   string toString(){
@@ -373,19 +373,41 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
 
     case BitmapQueryCommand.stats, BitmapQueryCommand.details:{
       _bitmapCacheStats.count = cache.length;
-      _bitmapCacheStats.allSizeBytes      = cache.byValue.map!(b => b.sizeBytes).sum;
-      _bitmapCacheStats.residentSizeBytes = cache.byValue.filter!(b => b.resident).map!(b => b.sizeBytes).sum;
+      _bitmapCacheStats.allSizeBytes           = cache.byValue                       .map!"a.sizeBytes".sum;
+      _bitmapCacheStats.nonUnloadableSizeBytes = cache.byValue.filter!"!a.unloadable".map!"a.sizeBytes".sum;
+      _bitmapCacheStats.residentSizeBytes      = cache.byValue.filter!"a.resident"   .map!"a.sizeBytes".sum;
 
       _bitmapCacheStats.bitmaps = cmd==BitmapQueryCommand.details ? _bitmapCacheStats.bitmaps = cache.values.dup : null;
     }break;
 
     case BitmapQueryCommand.garbageCollect:{
       //T0;
-      const t = application.tick;
-      auto  list = cache.byValue.filter!(b => !b.resident && !b.loading && !b.removed && t-b.accessed_tick>=3).array;
+      auto  list = cache.byValue.filter!"a.unloadable".array;
       const sizeBytes = list.map!(b => b.sizeBytes).sum;
 
-      LOG(sizeBytes, cache.byValue.map!(a => a.sizeBytes).sum);
+
+      static if(0){
+        LOG("BITMAP GC StATISTICS");
+        void printStats(alias f)(){
+          auto filtered = cache.byValue.filter!f;
+          print(format!"%-20s %5d %5sB"(f.stringof, filtered.walkLength, filtered.map!"a.sizeBytes".sum.shortSizeText));
+        }
+        foreach(f; AliasSeq!("a.resident", "!a.resident", "a.loading" , "a.removed", "true")) printStats!f;
+
+        //dump some statistics
+        print("b[].accessed: ",
+          cache.byValue
+            .filter!(b => !b.resident && !b.loading && !b.removed && b.width>400)
+            .array
+            .sort!((a,b) => icmp(a.file.fullName, b.file.fullName)<0)
+            .map!(b => format!"%s %6siB %s"(
+              b.unloadable ? "PROT" : "----",
+              b.sizeBytes.shortSizeText,
+              b.file.name
+            ))
+            .join('\n')
+        );
+      }
 
       if(sizeBytes > BitmapCacheMaxSizeBytes){
 
@@ -1284,7 +1306,7 @@ public:
 }
 
 
-class Bitmap{ // Bitmap class /////////////////////////////////////////////
+class Bitmap{ // !Bitmap class /////////////////////////////////////////////
 private:
   void[] data_;
   string type_ = "ubyte";
@@ -1301,6 +1323,14 @@ public:
   bool resident; //if true, garbageCollector will nor free this
 
   uint accessed_tick; //garbageCollect using it
+
+  @property bool unloadable() const{
+    enum recentlyUsedTicks = 3;
+    return !resident
+        && !loading
+        && !removed
+        && accessed_tick+recentlyUsedTicks <= application.tick;
+  }
 
   auto dup(){
     static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{

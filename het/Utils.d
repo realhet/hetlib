@@ -180,7 +180,7 @@ __gshared static private:  //__gshared is for variables, static is for functions
   KillerThread killerThread;
 
 __gshared static public:///////////////////////////////////////////////////////////////////
-  uint tick;
+  uint tick; //enough for 2 years @ 60Hz
 
   import core.runtime : Runtime;
   alias args = Runtime.args;
@@ -1653,6 +1653,15 @@ float calcRedundance(in void[] data){
   auto invLen = 1.0f / data.length.to!int;
 
   return sqrt(bins[].map!(b => sqr(b*invLen-0.5f)).sum * 0.5f);
+}
+
+
+auto stdDev(R)(R a){
+  auto n = a.length,
+       avg = a.sum/n,
+       var = reduce!((a, b) => a + pow(b - avg, 2) / n)(0.0f, a),
+       sd = sqrt(var);
+  return sd;
 }
 
 
