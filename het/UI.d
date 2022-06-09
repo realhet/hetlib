@@ -1118,7 +1118,9 @@ struct im{ static:
      else Row({ Text(text); });*/
   }
 
-  void Tab(){ Text(" \t"); }
+  void Tab(){ Text("\t"); }
+
+  void NL(){ Text("\n"); }
 
   void Comment(/*string srcModule=__MODULE__, size_t srcLine=__LINE__, */T...)(T args){
     // It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...

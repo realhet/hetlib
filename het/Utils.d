@@ -2193,6 +2193,9 @@ alias BigStream = /*shared*/ BigStream_;
 ///  Strings                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+bool isUpper(A)(in A a){ return a==a.toUpper; }
+bool isLower(A)(in A a){ return a==a.toLower; }
+
 bool isAsciiLower(char c) pure{ return c.inRange('a', 'z'); }
 bool isAsciiUpper(char c) pure{ return c.inRange('A', 'Z'); }
 
@@ -7156,7 +7159,8 @@ bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float pe
   return a.update_periodic(periodLength_sec, false); //todo: result should be an int counting how many updates missed since last time
 }
 
-auto blink(float freq=3/*hz*/, float duty=.5f){ return (QPS.value(second)*freq).fract < duty; }
+auto blinkf(float freq=3){ return (QPS.value(second)*freq).fract; }
+auto blink(float freq=3/*hz*/, float duty=.5f){ return blinkf(freq) < duty; }
 
 synchronized class Perf { //all is shared, this is not good.
   //todo: revisit this crap
