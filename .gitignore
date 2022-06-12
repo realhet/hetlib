@@ -15,3 +15,5 @@
 !turbojpeg/
 !quantities/
 !internal/
+!dvulkan/
+!examples/
