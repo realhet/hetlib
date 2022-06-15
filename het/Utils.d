@@ -916,6 +916,21 @@ float wrapInRange(ref float p, float pMin, float pMax, ref int wrapCnt){ //speci
   return p-pOld;
 }
 
+///Calculates circular rotation delta where the circle is divided to N segments.
+///Example: cyclicDelta(270, 5, 360) == 95
+auto cyclicDelta(A, B, N)(A a, B b, N n)
+if(isIntegral!A && isIntegral!B && isIntegral!N)
+in(n>=3)
+in(a.inRange(0, n))
+in(b.inRange(0, n))
+do{
+  const m = (n-1)/2;
+  if(a==b) return 0;
+  auto d = b-a;
+  d = d>m ? d-n : d<-m ? d+n : d;
+  return d;
+} //todo: unittest on a 0..N+1 square. N e 3, 4, 5
+
 
 T rcpf_fast(T)(const T x)if(__traits(isFloating, T)){
   return 1.0f/x; //todo: Ezt megcsinalni SSE-vel

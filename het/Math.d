@@ -2391,6 +2391,9 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
     mixin("ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
           .replace("@", name).replace("#", i.text) );
 
+  static if(N>=2) auto area() const { return width*height; }
+  static if(N>=3) auto volume() const { return area*depth; }
+
   this(in ivec2 size, E[] initialData = [], int stride=0) { //from array. stride is optional
     if(stride<=0) stride = size.x;
              else enforce(stride>=size.x);
