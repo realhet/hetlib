@@ -354,6 +354,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
         //check msg checkSum
         const cIdx = actLine.retro.indexOf('~');
+
         if(actLine.startsWith(prefix) && cIdx>0){
           const
             msg = actLine[prefix.length..$-cIdx-1],
@@ -368,7 +369,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
           }
         }else{
           stats.dataErrorCnt++;
-          error("Invalid package format: "~lineBuf.quoted);
+          error("Invalid package format: "~actLine.quoted);
         }
       }
 
@@ -443,6 +444,7 @@ class ComPort{ // ComPort /////////////////////////////////////////
 
     Row("Error\t", {
       Static(stats.lastError=="" ? " " : stats.lastError, { /*flex = 1;*/ });
+      if(Btn("Clear")) stats.lastError = "";
     });
 
     //todo: statistics

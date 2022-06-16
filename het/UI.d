@@ -760,6 +760,9 @@ struct im{ static:
   string symbol(string def){ return tag(`symbol `~def); }
   void Symbol(string def){ Text(symbol(def)); }
 
+  void Img(string def){ Text(tag(`img `~def)); }
+  void Img(File f){ Text(tag(`img `~f.fullName)); }  //todo: quoted filename not works
+
   struct ScrollInfo{ // ------------------------------- ScrollInfo //////////////////////////////
     char orientation;
 
@@ -2824,6 +2827,44 @@ struct im{ static:
 
     if(contents) contents();
   }
+
+  // CrashTestMarker /////////////////////////
+  void CrashTestMarker(double angle, RGB c1 = clYellow){
+    const
+      c2 = style.fontColor,
+      f = fh,
+      oldBkColor = bkColor; //todo: it has to be inherited
+
+    Container({
+      flags.clickable = false;
+      width = f;
+      height = f;
+      bkColor = oldBkColor;
+      //todo: make mouse clicks fall throug this to the parent container
+
+      auto dr = new Drawing;
+
+      auto p = vec2(f*.5), r = f*.45;
+
+      dr.color = c2;
+      dr.pointSize = r*2;  dr.point(p);
+
+      r -= f/12;
+
+      void pie(double angle){
+        enum N=8;
+        dr.color = c1;
+        iota(N+1).map!(i => p + vec2(r, 0).rotate(i*(PI/2/N)+angle))
+                 .slide(2)
+                 .each!((a){ dr.fillTriangle(p, a[1], a[0]); });
+      }
+
+      pie(angle); pie(angle+PI);
+
+      addOverlayDrawing(dr);
+    });
+  }
+
 
 }
 

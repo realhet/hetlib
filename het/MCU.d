@@ -576,10 +576,10 @@ class ArduinoNanoProject{ // ArduinoNanoProject ////////////////////////////////
   }//static @UI
 
   void BtnGenerateProgram(){
-    with(im)if(Btn("Generate program")){
+    with(im)if(Btn("GenPrg")){
       auto s = generateProgram;
       clipboard.asText = s;
-      s.print;
+      beep;
     }
   }
 
