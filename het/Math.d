@@ -1214,7 +1214,7 @@ static foreach(T; AliasSeq!(int, long))
 auto fract(A)(in A a) { static assert(isFloatingPoint!(ScalarType!A)); return a-floor(a); }
 
 auto mod(A, B)(in A x, in B y) {
-  // this is the cyclic modulo.  (% is the symmetric)
+  // this is the cyclic modulo for floats.  (% is the symmetric)
   alias CT = CommonScalarType!(A, B);
   static if(isFloatingPoint!CT) return x - y * floor(x*(1.0f/y));
                            else return cast(CT) (x - y*(x/y));
@@ -1224,6 +1224,12 @@ auto modf(A, B)(in A a, out B b) {
   const floora = floor(a);
   b = cast(Unqual!B) floora;
   return a-floora;
+}
+
+auto modw(A, B)(in A a, in B b){ //cyclic (wrapped) modulo for ints
+  return generateVector!(CommonScalarType!(A, B),
+    (a, b) => a>=0 ? a%b : b-1+(a+1)%b
+  )(a, b);
 }
 
 private auto minMax(bool isMin, T, U)(in T a, in U b){
