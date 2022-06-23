@@ -498,7 +498,8 @@ class ModuleInfo{
   File file; //todo: rename it to just 'file'
   string fileHash;
   string moduleFullName;
-  File[] imports;
+  File[] importedFiles;
+  string[] importedModuleNames; //todo: it's fucking lame
   File[] deps; //dependencies
   string objHash; //calculated by hashing the dependencies and the compiler flags
 
@@ -530,7 +531,7 @@ void resolveModuleImportDependencies(ref ModuleInfo[] modules)
 
   //extend module imports to dependency lists
   foreach(ref m; modules){
-    m.deps = m.imports.dup;           //it's depending on it's imports...
+    m.deps = m.importedFiles.dup; //it's depending on it's imports...
     m.deps.addIfCan(m.file);      //...and itself. (In D a module can import itself too)
   }
 
@@ -620,9 +621,9 @@ private: //current build
 
   struct Perf{
     float *t;
-    double T0;
-    this(ref float f){ T0 = QPS; t = &f; }
-    ~this(){ *t += QPS-T0; }
+    DateTime T0;
+    this(ref float f){ T0 = now; t = &f; }
+    ~this(){ *t += (now-T0).value(second); }
   }
   static perf(string f){ return "auto _perfMeasurerStruct = Perf(times."~f~");"; }
 
@@ -794,11 +795,16 @@ private: //current build
     }
 
     //collect imports NEW
-    act.parser.importDecls.filter!q{a.isUserModule}
-                          .each!(a => mAct.imports.addIfCan(File(a.resolveFileName(mainFile.path.fullPath, file.fullName, true))) );
+    foreach(const imp; act.parser.importDecls) if(imp.isUserModule){
+      const f = File(imp.resolveFileName(mainFile.path.fullPath, file.fullName, true));
+      if(!mAct.importedFiles.canFind(f)){
+        mAct.importedFiles ~= f;
+        mAct.importedModuleNames ~= imp.name.fullName;
+      }
+    }
 
     //reqursive walk on imports
-    foreach(imp; mAct.imports) processSourceFile(imp);
+    foreach(imp; mAct.importedFiles) processSourceFile(imp);
   }
 
   static string processDMDErrors(string sErr, string path){ //processes each errorlog individually, making absolute filepaths
@@ -1093,12 +1099,12 @@ public:
 
   // this is only usable from the IDE, not from a standalone build tool
   bool killDeleteExe(File file){
-    const killTimeOut   = 1.0,//sec
-          deleteTimeOut = 1.0;//sec
+    const killTimeOut   = 1.0*second,//sec
+          deleteTimeOut = 1.0*second;//sec
 
     bool doDelete(){
-      auto t0 = QPS;
-      while(QPS-t0<deleteTimeOut){
+      auto t0 = now;
+      while((now-t0)<deleteTimeOut){
         file.remove(false);
         if(!file.exists) return true;//success
         sleep(50);
@@ -1107,9 +1113,9 @@ public:
     }
 
     if(!dbg.forceExit_set) return false; //fail: no DIDE present
-    auto t0 = QPS;
+    auto t0 = now;
     const timeOut = 1.0;//sec
-    while(QPS-t0<killTimeOut){
+    while(now-t0<killTimeOut){
       if(!dbg.forceExit_check) return doDelete; //success, delete it
       sleep(50);
     }
@@ -1272,43 +1278,24 @@ public:
     }
   }
 
-/+  auto findDependencies(File mainFile_, BuildSettings originalSettings){ // findDependencies //////////////////////////////////////
+
+  auto findDependencies(File mainFile_, BuildSettings originalSettings){ // findDependencies //////////////////////////////////////
     sLog = "";
     initData(mainFile_);
     settings = originalSettings;
 
     //Rebuild all?
-
     if(settings.rebuild)
       reset_cache;
+
+    //workPath
+    workPath = settings.getWorkPath(Path("")); // "" means obj files are placed next to their sources.
 
     //reqursively collect modules
     processSourceFile(mainFile);
 
-    //check if target exists
-    enforce(isExe||isDll, "Must specify project target (//@EXE or //@DLL).");
-
-    //calculate dependency hashed of obj files to lookup in the objCache
-    modules.resolveModuleImportDependencies;
-
-    int totalLines = modules.map!"a.sourceLines".sum,
-        totalBytes = modules.map!"a.sourceBytes".sum;
-    logln(bold("SOURCE STATS:        "), format("Modules: %s   Lines: %s   Bytes: %s", modules.count, totalLines, totalBytes));
-
-    logln(bold("\nDEPENDENCIES:"));
-    foreach(i, const m; modules){
-      auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
-      logln(bold(smallName(m.file))~" : "~list);
-    }
-
-    logln(bold("\nIMPORTS:"));
-    foreach(const m; modules){
-      auto list = m.imports.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
-      logln(bold(smallName(m.file))~" : "~list);
-    }
-
     return modules;
-  }+/ //dead code: 220429
+  }
 
 
   // This can be used by commandline or by a dll export.

@@ -468,23 +468,24 @@ shared static this(){ //static init///////////////////////////////
 struct TextStyle{
   string font = DefaultFontName;
   ubyte fontHeight = DefaultFontHeight;
-  bool bold, italic, underline, strikeout;
+  bool bold, italic, underline, strikeout, transparent;
   RGB fontColor=clBlack, bkColor=clWhite;
 
-  ubyte fontFlags() const{ return cast(ubyte)boolMask(bold, italic, underline, strikeout); }
+  ubyte fontFlags() const{ return cast(ubyte)boolMask(bold, italic, underline, strikeout, 0, transparent); }
 
   bool isDefaultFont() const{ return font == DefaultFontName; } //todo: slow. 'font' Should be a property.
 
   void modify(string[string] map){
     map.rehash;
-    if(auto p="font"       in map) font          = (*p);
-    if(auto p="fontHeight" in map) fontHeight    = (*p).toWidthHeight(g_actFontHeight).iround.to!ubyte;
-    if(auto p="bold"       in map) bold          = (*p).toInt!=0;
-    if(auto p="italic"     in map) italic        = (*p).toInt!=0;
-    if(auto p="underline"  in map) underline     = (*p).toInt!=0;
-    if(auto p="strikeout"  in map) strikeout     = (*p).toInt!=0;
-    if(auto p="fontColor"  in map) fontColor     = (*p).toRGB;
-    if(auto p="bkColor"    in map) bkColor       = (*p).toRGB;
+    if(auto p="font"        in map) font          = (*p);
+    if(auto p="fontHeight"  in map) fontHeight    = (*p).toWidthHeight(g_actFontHeight).iround.to!ubyte;
+    if(auto p="bold"        in map) bold          = (*p).toInt!=0;
+    if(auto p="italic"      in map) italic        = (*p).toInt!=0;
+    if(auto p="underline"   in map) underline     = (*p).toInt!=0;
+    if(auto p="strikeout"   in map) strikeout     = (*p).toInt!=0;
+    if(auto p="transparent" in map) transparent   = (*p).toInt!=0;
+    if(auto p="fontColor"   in map) fontColor     = (*p).toRGB;
+    if(auto p="bkColor"     in map) bkColor       = (*p).toRGB;
   }
   void modify(string cmdLine){
     modify(commandLineToMap(cmdLine));
@@ -558,7 +559,7 @@ void initTextStyles(){
   ubyte rfh(float r){ return (DefaultFontHeight*(r/18.0f)).iround.to!ubyte; }
 
 
-  a("normal"      , tsNormal  , TextStyle(DefaultFontName, rfh(18), false, false, false, false, clBlack, clWhite));
+  a("normal"      , tsNormal  , TextStyle(DefaultFontName, rfh(18), false, false, false, false, false, clBlack, clWhite));
   a(  "larger"    , tsLarger  , tsNormal, { tsLarger.fontHeight = rfh(22); });
   a(  "smaller"   , tsSmaller , tsNormal, { tsSmaller.fontHeight = rfh(14); });
   a(  "half"      , tsHalf    , tsNormal, { tsHalf.fontHeight = rfh(9); });
@@ -1967,7 +1968,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b______00001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b______000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2004,8 +2005,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "cullSubCells"      , 1, // clipSubCells must be enabled too
     bool          , "_hasDrawCallback"  , 1,
     bool          , "selected"          , 1, //maintained by system, not by user (in applyBtnStyle)
+    bool          , "hidden"            , 1, //only affects draw() calls.
 
-    int           , "_dummy"            ,27,
+    int           , "_dummy"            ,26,
   ));
 }
 
@@ -2311,6 +2313,7 @@ class Container : Cell { // Container ////////////////////////////////////
   static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 
   override void draw(Drawing dr){
+    if(flags.hidden) return;
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
     //if(chkSet(measured)) measure;
 
@@ -2822,6 +2825,8 @@ class Img : Container { // Img ////////////////////////////////////
   }
 
   override void draw(Drawing dr){
+    if(flags.hidden) return;
+
     drawBorder(dr);
 
     dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);

@@ -186,7 +186,7 @@ struct ImportDecl{
   bool isStdModule () const { return nameStartsWith("std"); }
   bool isEtcModule () const { return nameStartsWith("etc"); }
   bool isCoreModule() const { return nameStartsWith("core"); }
-  bool isUserModule() const { return !isStdModule && !isCoreModule; }
+  bool isUserModule() const { return !isStdModule && !isCoreModule && !isEtcModule; }
 
   string resolveFileName(string mainPath, string baseFileName, bool mustExists) const //returns "" if not found. Must handle outside.
   { //todo: use FileName, FilePath
@@ -445,6 +445,7 @@ private: /////////////////////////////////////////////////////////////////////
       }
 
     }
+
     return res;
   }
 

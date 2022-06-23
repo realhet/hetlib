@@ -2232,7 +2232,7 @@ public:
   override void onEndPaint(){
     if(showMegaTextures) drawMegaTextures;
 
-    import het.ui: im;
+    import het.ui: im; //this is a nasty entry point to imgui
     im._drawFrame!"system call only";
 
     if(!view.workArea_accum.empty) view.workArea = view.workArea_accum;

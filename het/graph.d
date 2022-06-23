@@ -232,6 +232,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
   }}
 
   protected void drawLinks(Drawing dr){ with(dr){
+/+
     alpha = 0.66;
     foreach(link; links){
       const h1 = link.from.parent.isHovered, h2 = link.to.isHovered;
@@ -264,7 +265,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
       bezier2(P2, P3, P4);
 
     }
-    alpha = 1;
+    alpha = 1; +/
   }}
 
   protected void drawOverlay(Drawing dr){ with(dr){

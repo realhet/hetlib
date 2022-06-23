@@ -127,7 +127,8 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
 import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
   std.json, std.parallelism, core.runtime;
 
-public import core.sys.windows.com : IUnknown, CoInitialize, CoUninitialize;
+public import core.sys.windows.com : IUnknown;
+import core.sys.windows.com : CoInitializeEx, CoUninitialize;
 
 
 // LDC 1.28 bugfix:
@@ -7508,6 +7509,7 @@ struct UDA{}
 @UDA{
   // het.stream
   struct STORED{}
+  struct VERB{ string keyCombo; }
   struct HEX{}
   struct BASE64{}
 
@@ -7686,7 +7688,10 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
   enforce([8,9,10,11,12,13].map!(a => alignUp(a, 4)).equal([8,12,12,12,12,16]));
 
   //startup
-  CoInitialize(null);
+
+  CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
+  //before 220623 it was: CoInitialize(null);
+
   ini.loadIni;
 
   console.setUTF8;

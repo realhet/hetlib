@@ -141,28 +141,31 @@ private:
 
     OPENFILENAMEW ofn;
     ofn.hwndOwner = owner;
-    ofn.Flags = OFN_FILEMUSTEXIST | OFN_OVERWRITEPROMPT | OFN_EXPLORER ;
-    if(isMulti) ofn.Flags |= OFN_ALLOWMULTISELECT ;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_EXPLORER | OFN_NOREADONLYRETURN | OFN_EXTENSIONDIFFERENT;
+    if(isMulti) ofn.Flags |= OFN_ALLOWMULTISELECT;
+    if(isOpen) ofn.Flags |= OFN_FILEMUSTEXIST;
+
+    //note: change file type won't refresh folder bug -> https://stackoverflow.com/questions/922204/getopenfilename-does-not-refresh-when-changing-filter
 
     //filename
-    wchar[0x4000] fileStr;
+    wchar[0x1000] fileStr;
     fileStr[] = 0;
     fileStr[0..fileName.length] = fileName.to!wstring[];
     ofn.lpstrFile = fileStr.ptr;
     ofn.nMaxFile = fileStr.length;
 
     //initialDir
-    ofn.lpstrInitialDir = initialDir.to!wstring.ptr; //todo:!!!!!!!!!!!!!! zero terminate strings!!!
+    ofn.lpstrInitialDir = initialDir.toPWChar;
 
     //filter
     filter = processExtFilter(filter, true);
-    ofn.lpstrFilter = filter.to!wstring.ptr;    //todo:!!!!!!!!!!!!!! zero terminate strings!!!
-    uint filterHash = xxh(filter);
+    ofn.lpstrFilter = filter.toPWChar;
+    uint filterHash = xxh32(filter);
     string filterIniEntry = format("FileFilterIndex%8x", filterHash);
     ofn.nFilterIndex = ini.read(filterIniEntry, "1").to!int;
 
     //default ext
-    ofn.lpstrDefExt = defaultExt.to!wstring.ptr;
+    ofn.lpstrDefExt = defaultExt.toPWChar;
 
     //title
     string title;
@@ -215,16 +218,30 @@ private:
     return fileName;
   }
 
-  auto toList(string s){
+  File[] toList(string s){
+
+    const list = s.split('\0');
+    return list.length.predSwitch(0, File[].init,
+                                  1, [File(list[0])],
+                                     list[1..$].map!(a => File(list[0], a)).array);
+
+    /* Example of why old school programming is bad.
+
+    File[] res;
+    if(s.empty) return res;
+
     //converts zero separated list from the form [basePath,name1,name2...] to [file1,file2...]
     auto list = s.split('\0');
-    File[] res;
-    res.reserve(list.length-1);
+    if(list.length==1){
+      res = [File(list[0])];
+    }else{
+      res.reserve(list.length-1);
+      if(list.length<2) return res;
+      foreach(i; 1..list.length)
+        res ~= File(list[0], list[i]);
+    }
 
-    if(list.length<2) return res;
-    foreach(i; 1..list.length)
-      res ~= File(list[0], list[i]);
-    return res;
+    return res;*/
   }
 
 }

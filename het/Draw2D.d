@@ -314,8 +314,8 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
     float fontHeight = 18;
     float fontWeight = 1.0;
-
-    static foreach(i, s; ["MonoSpace", "Italic", "Underline", "StrikeOut", "Image"]){
+                        //  1            2        4            8            16                                                            32
+    static foreach(i, s; ["MonoSpace", "Italic", "Underline", "StrikeOut", "Image", /+from here: customshader if image, or for font-> +/ "Transparent"]){
       mixin("@property bool font*() const { return (fontFlags>>#)&1; }  @property void font*(bool b){ fontFlags = cast(ubyte) (fontFlags & ~(1<<#) | (cast(int)b << #)); }".replace('*', s).replace('#', i.text));
     }
 
@@ -1623,8 +1623,11 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     vec4 bkColor, fontColor;
     vec2 tc, originalTc;
 
-    bool isImage, isFont, isItalic, isCustomShader;
-    int customShaderIdx;
+    bool isImage, isFont, isItalic;
+
+    /*image only*/ bool isCustomShader;  int customShaderIdx;
+    /*font  only*/ bool isTransparent;
+
 
     vec4 defaultShader(){
       vec4 finalColor, texel;
@@ -1646,7 +1649,7 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         float L = length(texelPerPixel);
         samplingLevel = L>32 ? 2: //minify
                         L< 1 ? 1: //magnify
-                               3; //medium
+                               (isTransparent ? 2 : 3/*cleartype*/); //medium zoom
       }
 
       if(samplingLevel==-1){ //debug
@@ -1657,8 +1660,11 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
                         else texel = megaSample_linear(tc-vec2(0.5, 0.5));
 
         if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
-        else if(stConfig==12) finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
-        else if(stConfig==0)  finalColor = vec4(texel.rrr, 1); //old version, not good. 8bit pictures must be black and white only! finalColor = mix(bkColor, fontColor                   , texel.a);
+        else if(stConfig==12) finalColor = isTransparent ? vec4(texel.rgb, texel.a) : mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
+        else if(stConfig==0){
+          if(isImage) finalColor = vec4(texel.rrr, 1); //pictures must be black and white only!
+          else        finalColor = isTransparent ? vec4(fontColor.rgb, texel.a) : mix(bkColor, fontColor, texel.a); //fonts interpolate the 2 colors
+        }
 
         //experimental grid
         /*if(fontFlags&2) if(texelPerPixel.x < 0.1){
@@ -1671,15 +1677,15 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         else finalColor = vec4(.5, .5, .5, 1);*/
       }else if(samplingLevel==2){//rooks6
         vec4 texel = megaSample_rooks6(tc);
-        if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);
-        if(stConfig==12)      finalColor = mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
-        else if(stConfig==0)  finalColor = mix(bkColor, fontColor                   , texel.a);
+        if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);  //wtf is this????
+        if(stConfig==12)      finalColor = isTransparent ? vec4(texel.rgb, texel.a) : mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
+        else if(stConfig==0)  finalColor = isTransparent ? vec4(fontColor.rgb, texel.a) : mix(bkColor, fontColor, texel.a); //FONT
       }else{ //clearType
         vec3 smp; float[3] alpha;
         megaSample_clearType(tc, smp, alpha);
 
         if(stConfig==12)      finalColor = clearTypeMix(bkColor, vec4(smp, fontColor.a), alpha);
-        else if(stConfig==0)  finalColor = clearTypeMix(bkColor, fontColor             , alpha);
+        else if(stConfig==0)  finalColor = clearTypeMix(bkColor, fontColor             , alpha); //FONT
       }
 
       // border
@@ -1730,8 +1736,18 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
         isImage = (fontFlags&16)!=0;
         isFont = !isImage;
         isItalic = (fontFlags&2)!=0;
-        isCustomShader = (fontFlags&32)!=0;
-        customShaderIdx = (fontFlags/64)&7;
+
+        //decode image or font specific flags
+        isCustomShader = false;
+        customShaderIdx = 0;
+        isTransparent = false;
+
+        if(isFont){
+          isTransparent = (fontFlags&32)!=0;
+        }else{
+          isCustomShader = (fontFlags&32)!=0;
+          customShaderIdx = (fontFlags/64)&7;
+        }
 
         if(!isCustomShader){ //default shader form images and text
           FragColor = defaultShader();
@@ -1827,7 +1843,6 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
     if(logDrawing) LOG(shortName, "drawing", stats, "center:", center, "scale:", scale, "translate:", translate);
 
     drawCnt++;
-
     vboList ~= buffers.toVBOs;
     buffers.clear;
 

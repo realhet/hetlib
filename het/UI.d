@@ -120,7 +120,6 @@ struct im{ static:
 //PING(5);
 
     static if(doTiming){ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
-
     enforce(!inFrame, "im.beginFrame() already called.");
 
     this.targetSurfaces = targetSurfaces;
@@ -236,7 +235,7 @@ struct im{ static:
 
   Drawing drVisualizeHitStack;
 
-  private enum reuseDr = true;
+  private enum bool reuseDr = 0;
   private Drawing[2] staticDr;
 
   void _drawFrame(string restrict="")(){

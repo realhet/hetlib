@@ -684,6 +684,7 @@ public:
 
       case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
       case WM_CHAR      : inputChars ~= cast(wchar)wParam; return 0; //WM_UNICHAR nem hivodik magatol...
+      case WM_SYSKEYDOWN: return 0;  //just ignore these. It let's me handle Alt and F10 properly.
 
       default:
         if(message.inRange(WM_USER, 0x7FFF)) return onWmUser(message-WM_USER, wParam, lParam);
