@@ -505,6 +505,9 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
 
   float zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
   float invZoomFactor = 1; //comes from outside view
+  //todo: rename invScale and invZoomFactor to pixelSize, scale and zoomFactor to scaleFactor.
+
+  //todo: zoomFactor naming is incompatible with view.scale
 
   private enum clipBounds_init = bounds2(-1e30, -1e30, 1e30, 1e30);
   bounds2 clipBounds = clipBounds_init;

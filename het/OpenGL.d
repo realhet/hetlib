@@ -2167,6 +2167,9 @@ protected:
 
     mouse.screenRect = clientBounds;
     mouse.worldRect = bounds2(view.invTrans(vec2(mouse.screenRect.topLeft)), view.invTrans(vec2(mouse.screenRect.bottomRight)));
+
+    //todo: bad names: worldRect is "screenBounds in world coords"
+    //todo: bad names: screenRect is "screenBounds in client coords"
   }
 
   void updateViewClipBoundsAndMousePos(){
@@ -2174,8 +2177,8 @@ protected:
     vec2 mp = mouse.act.screen;
     bounds2 bnd = clientBounds;
 
-    with(view   ){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); workArea_accum = bounds2.init; }
-    with(viewGUI){ mousePos = invTrans(mp); clipBounds = invTrans(bnd); workArea_accum = bounds2.init; }
+    with(view   ){ mousePos = invTrans(mp); screenBounds = invTrans(bnd); workArea_accum = bounds2.init; }
+    with(viewGUI){ mousePos = invTrans(mp); screenBounds = invTrans(bnd); workArea_accum = bounds2.init; }
   }
 
   override void onUpdateViewAnimation(){

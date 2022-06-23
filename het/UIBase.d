@@ -1968,7 +1968,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b______000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b_____0000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2006,8 +2006,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "_hasDrawCallback"  , 1,
     bool          , "selected"          , 1, //maintained by system, not by user (in applyBtnStyle)
     bool          , "hidden"            , 1, //only affects draw() calls.
+    bool          , "dontSearch"        , 1, //no search() inside this container
 
-    int           , "_dummy"            ,26,
+    int           , "_dummy"            ,25,
   ));
 }
 
@@ -2457,7 +2458,9 @@ class Container : Cell { // Container ////////////////////////////////////
       bool canStop() const { return results.length >= maxResults; }
     }
 
-    static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "exit from recursion"
+    static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
+      if(thisC.flags.dontSearch) return false;
+
       //recursive entry/leave
       context.cellPath ~= thisC;
       context.absInnerPos += thisC.innerPos;

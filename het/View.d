@@ -24,7 +24,7 @@ public:
 
   // extra information from external source in screen space
   vec2 mousePos;
-  bounds2 clipBounds;
+  bounds2 screenBounds;
 
   this(){}
 
@@ -62,10 +62,15 @@ public:
   auto subScreenOrigin_anim(){
     vec2 res = origin_anim;
     if(subScreenArea.valid){
-      auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
+      auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels    //todo: refactor this redundant crap
       res += subScreenShift * invScale_anim;
     }
     return res;
+  }
+
+  auto subScreenBounds() const{ //note: subsceen is the mostly visible area on the view's surface. The portion of the screen that remains visible aster the overlayed GUI.
+    return bounds2(mix(screenBounds.topLeft, screenBounds.bottomRight, subScreenArea.topLeft    ),
+                   mix(screenBounds.topLeft, screenBounds.bottomRight, subScreenArea.bottomRight));
   }
 
 

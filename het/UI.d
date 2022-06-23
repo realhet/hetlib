@@ -146,7 +146,7 @@ struct im{ static:
     comboOpening = false;
 
     //this is needed for PanelPosition
-    clientArea = targetSurfaces[1].view.clipBounds; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
+    clientArea = targetSurfaces[1].view.screenBounds; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 
     static DeltaTimer dt;
     deltaTime = dt.update;
@@ -175,7 +175,7 @@ struct im{ static:
     //measure
     foreach(a; rc) if(!a.flags._measured) a.measure; //some panels are already have been measured
 
-    const screenBounds = targetSurfaces[1].view.clipBounds;
+    const screenBounds = targetSurfaces[1].view.screenBounds;
 
     //todo: remove this: applyScrollers(screenBounds);
 
@@ -257,7 +257,7 @@ struct im{ static:
     foreach(i, ref d; dr){        ref view(){ return targetSurfaces[i].view; }
       d.zoomFactor    = view.scale   ;
       d.invZoomFactor = view.invScale;
-      d.pushClipBounds(view.clipBounds.inflated(-view.clipBounds.size*0));
+      d.pushClipBounds(view.screenBounds.inflated(-view.screenBounds.size*0));
     }
 
     foreach(i; 0..2) surfaceBounds[i] = bounds2.init;
@@ -525,7 +525,7 @@ struct im{ static:
     auto res = root.map!(c => cast(.Container)c)
                    .filter!"a"
                    .array;
-    if(forceAll) enforce(root.length == res.length, "FATAL ERROR: All of root[] must be a descendant of Container.");
+    if(forceAll) enforce(root.length == res.length, "FATAL ERROR: All of root[] must be non null and a descendant of Container.");
     return res;
   }
 

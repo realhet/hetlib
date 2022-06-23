@@ -1,6 +1,7 @@
 module het.math;
 
 //todo: vec2 lvalue-be lehessen assignolni ivec2 rvalue-t!
+//todo: ldc fast math http://johanengelen.github.io/ldc/2016/10/11/Math-performance-LDC.html
 
 // This module replaces and extends the interface of std.math.
 // Anything usefull in std.math should wrapped here to support vector/scalar operations.
@@ -2087,7 +2088,7 @@ struct Bounds(VT){
                      else return all(f1(other, low) & f2(other, high));
   }
 
-  bool overlaps(T)(in T other){ //intersection.area > 0
+  bool overlaps(T)(in T other) const{ //intersection.area > 0
     static if(VectorLength==1){
       if(other.low >= high || other.high <= low) return false;
     }else static if(VectorLength==2){
