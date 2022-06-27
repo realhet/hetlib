@@ -221,7 +221,6 @@ struct HitTestManager{
     assert(id, "Null Id is illegal");
     assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text);
     hitStack ~= HitTestRec(id, hitBounds, localPos, clickable);
-
   }
 
   auto check(in SrcId id){
@@ -812,6 +811,12 @@ alias isCell = isClass!(Cell);*/
 
 struct _FlexValue{ float val=0; alias val this; } //ganyolas
 
+///This struct is returned by locate()
+struct CellLocation{
+  Cell cell;
+  vec2 localPos;             //innerPos is the origin, not outerPos. It's on the containers client area.
+  bounds2 globalOuterBounds; //absolute outerBounds
+}
 
 class Cell{ // Cell ////////////////////////////////////
 
@@ -935,8 +940,12 @@ class Cell{ // Cell ////////////////////////////////////
   bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     auto hitBnd = getHitBounds + ofs;
     if(hitBnd.contains!"[)"(mouse)){
-      if(auto container = cast(Container)this)
-        hitTestManager.addHitRect(container.id, hitBnd, mouse-outerPos, container.flags.clickable);
+      if(auto container = cast(Container)this){
+        if(container.flags.noHitTest) return false; //note: false means -> keep continue the search
+        hitTestManager.addHitRect(container.id, hitBnd, mouse-(innerPos+ofs), container.flags.clickable);
+      }else{
+        //it's just a regular cell. Can't add to hitTest because it has no ID.
+      }
       return true;
     }else{
       return false;
@@ -951,6 +960,13 @@ class Cell{ // Cell ////////////////////////////////////
       res ~= tuple(this, ofs);
 
     return res;
+  }
+
+  //this is the third version: it returns
+  CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2.init){
+    auto bnd = outerBounds + ofs;//note: locate() searches in outerBounds, not just the borderBounds.
+    if(bnd.contains!"[)"(mouse))return [CellLocation(this, mouse-(innerPos+ofs), bnd)];
+                                return [];
   }
 
   final void drawBorder(Drawing dr){
@@ -1968,7 +1984,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b_____0000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b____00000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2007,8 +2023,10 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "selected"          , 1, //maintained by system, not by user (in applyBtnStyle)
     bool          , "hidden"            , 1, //only affects draw() calls.
     bool          , "dontSearch"        , 1, //no search() inside this container
+    bool          , "noHitTest"         , 1, //don't even bother to add this container and it's subcontainers to the hit list.
+    bool          , "dontLocate"        , 1, //disables the locate() method for this container and its subcontainers
 
-    int           , "_dummy"            ,25,
+    int           , "_dummy"            ,23,
   ));
 }
 
@@ -2047,7 +2065,7 @@ class Container : Cell { // Container ////////////////////////////////////
   auto getVScrollOffset(){ return flags.hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; }
   auto getScrollOffset(){ return vec2(getHScrollOffset, getVScrollOffset); }
 
-  private{
+  protected{
     Cell[] subCells_;
     public{ //todo: ezt a publicot leszedni es megoldani szepen
       _FlexValue flex_;
@@ -2280,6 +2298,19 @@ class Container : Cell { // Container ////////////////////////////////////
       //flags.hovered = false;
       return false;
     }
+  }
+
+  ///This version of hit_test is for static stuff. It ignores scrollbars but has a fast optimizes search in rows and columns
+  override CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2(0)){
+    if(flags.dontLocate) return [];
+    auto res = super.locate(mouse, ofs);
+    if(res.length){
+      ofs += innerPos;
+      res ~= internal_hitTest_filteredSubCells(mouse-ofs).map!(a => a.locate(mouse, ofs)).join;
+      //this is the optimized search function specific to custom containers.
+      //The order is forward. Visits every container, not just the first it finds. Overlays containers should be filtered out later.
+    }
+    return res;
   }
 
   ///this hitTest only works after measure.

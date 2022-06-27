@@ -329,7 +329,7 @@ struct im{ static:
     }
   }}
 
-  void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ //todo: multiple Panels, but not call them frames...
+  void Panel(alias string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ //todo: multiple Panels, but not call them frames...
     enforce(actContainer is null, "Panel() must be on root level");
 
     //todo: this should work for all containers, not just high level ones
@@ -338,7 +338,7 @@ struct im{ static:
 
     .Container cntr;
 
-    Document!(srcModule, srcLine)({
+    Document!(srcModule, srcLine)({ //todo: why document? It should be a template parameter!
       cntr = actContainer;
 
       //preparations
