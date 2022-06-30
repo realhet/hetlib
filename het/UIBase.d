@@ -1984,7 +1984,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b____00000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b___000000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2025,8 +2025,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "dontSearch"        , 1, //no search() inside this container
     bool          , "noHitTest"         , 1, //don't even bother to add this container and it's subcontainers to the hit list.
     bool          , "dontLocate"        , 1, //disables the locate() method for this container and its subcontainers
+    bool          , "oldSelected"       , 1, //SelectionManager2 needs this.
 
-    int           , "_dummy"            ,23,
+    int           , "_dummy"            ,22,
   ));
 }
 
@@ -2981,3 +2982,6 @@ class SelectionManager(T : Cell){ // SelectionManager //////////////////////////
   }
 
 }
+
+
+

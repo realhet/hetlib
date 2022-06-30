@@ -198,7 +198,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
 
   // drawing routines ////////////////////////////////////////////
 
-  protected void drawSearchResults(Drawing dr, RGB clSearchHighLight){ with(dr){
+  protected void drawSearchResults(Drawing dr, RGB clSearchHighLight){ with(dr){ //this is copied to dide2
     foreach(sr; searchResults)
       sr.drawHighlighted(dr, clSearchHighLight);
 
@@ -311,7 +311,7 @@ class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container { // Cont
 
         if(Btn(symbol("Zoom"), isFocused(editContainer) ? kcFindZoom : KeyCombo(""), enable(matchCnt>0), hint("Zoom screen on search results."))){
           const maxScale = max(view.scale, 1);
-          view.zoomBounds(searchResults.map!(r => r.bounds).fold!"a|b", 12);
+          view.zoom(searchResults.map!(r => r.bounds).fold!"a|b", 12);
           view.scale = min(view.scale, maxScale);
         }
 

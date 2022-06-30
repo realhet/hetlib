@@ -23,7 +23,7 @@ public:
   vec2 origin;
 
   // extra information from external source in screen space
-  vec2 mousePos;
+  vec2 mousePos, mouseLast;
   bounds2 screenBounds;
 
   this(){}
@@ -115,7 +115,7 @@ public:
 
   void zoom(float amount)       { scale = pow(2, log2(scale)+amount*scrollRate); }
 
-  void zoomBounds(in bounds2 bb, float overZoomPercent = 3){
+  void zoom(in bounds2 bb, float overZoomPercent = 3){
     if(!bb.valid || !subScreenArea.valid) return;
     //corrigate according to subScreenArea
     auto realClientSize = clientSize * subScreenArea.size; //in pixels
@@ -135,7 +135,7 @@ public:
 
   void zoomAll_later(){ _mustZoomAll = true; }
 
-  void zoomAll(){ zoomBounds(workArea); }
+  void zoomAll(){ zoom(workArea); }
 
   void zoomAll_immediate(){
     zoomAll;
