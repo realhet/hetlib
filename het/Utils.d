@@ -3396,18 +3396,19 @@ struct ImStorage(T){ static:
     }
   }
 
-  auto ref access(in Id id){
+  auto ref access(in Id id, lazy T default_ = T.init){
     auto p = id in items;
     if(!p){
       items[id] = Item.init;
       p = id in items;
+      p.data = default_;
       p.id = id;
     }
     p.tick = application.tick;
     return p.data;
   }
 
-  void set(in Id id, in T data){ access(id) = data; }
+  void set(in Id id, T data){ access(id) = data; }
 
   bool exists(in Id id){ return (id in items) !is null; }
 
@@ -5128,10 +5129,11 @@ struct virtualFiles{ __gshared static:
 ///  Path                                                                    ///
 ////////////////////////////////////////////////////////////////////////////////
 
-char pathDelimiter() {
+//char pathDelimiter() {
   //static __gshared c = dirSeparator[0]; return c;  <- After all I'm Windows only...
-  return '\\';
-}
+//  return '\\';
+//}
+immutable pathDelimiter = '\\';
 
 string includeTrailingPathDelimiter(string fn) { if(!fn.endsWith(pathDelimiter)) fn ~= pathDelimiter; return fn; }
 string excludeTrailingPathDelimiter(string fn) { if(fn.endsWith(pathDelimiter)) fn = fn[0..$-1]; return fn; }
@@ -5167,6 +5169,12 @@ public:
   bool opCast() const{ return !isNull(); }
 
   bool exists() const { return dirExists(dir); }
+
+  string name() const{
+    auto a = fullPath.withoutEnding(pathDelimiter),
+         i = a.retro.countUntil(pathDelimiter);
+    return i<0 ? a : a[$-i..$];
+  }
 
   @property string dir() const { return excludeTrailingPathDelimiter(fullPath); }
   @property void dir(string dir_) { fullPath = dir_=="" ? "" : includeTrailingPathDelimiter(dir_); }

@@ -1057,6 +1057,7 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
     if(!VisualizeGlyphs) if(isReturn || isNewLine) innerWidth = 0;
   }
 
+
   override void draw(Drawing dr){
     drawBorder(dr); //todo: csak a containernek kell border elvileg, ez hatha gyorsit.
     dr.color = fontColor;
@@ -2834,10 +2835,11 @@ class Column : Container { // Column ////////////////////////////////////
 //todo: Ezt le kell valtani egy container.backgroundImage-al.
 class Img : Container { // Img ////////////////////////////////////
   int stIdx;
+  bool transparent;
 
   this(File fn){
     stIdx = textures[fn];
-    id = srcId(genericId("Img"));
+    id = srcId(genericId("Img")); //todo: this is bad
   }
 
   this(File fn, RGB bkColor){
@@ -2864,7 +2866,8 @@ class Img : Container { // Img ////////////////////////////////////
 
     drawBorder(dr);
 
-    dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
+    if(transparent) dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/);
+               else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
   }
 }
 

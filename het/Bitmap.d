@@ -254,7 +254,7 @@ Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandlin
     Bitmap res;
 
     bool delayed = cmd==BitmapQueryCommand.access_delayed;
-    if(file.driveIs(`font`)) delayed = false; //todo: delayed restriction. should refactor this nicely
+    if(file.driveIs(`font`) || file.driveIs(`icon`)) delayed = false; //todo: delayed restriction. should refactor this nicely
 
     auto tr = file.BitmapTransformation;
 
@@ -597,6 +597,7 @@ Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
   if(prefix==""){ //threat it as a simple filename
     return File(fn).deserialize!Bitmap(mustSucceed);
   }else if(prefix=="font"){
+    //todo: font and icon should be put in a list that ensures the following: bitmap.resident, no delayed load
     version(D2D_FONT_RENDERER){
       auto res = bitmapFontRenderer.renderDecl(fn); //todo: error handling, mustExists
       if(res.valid) res.resident = true; //dont garbagecollect fonts because they are slow to generate
@@ -615,29 +616,19 @@ Bitmap newBitmap_internal(string fn, bool mustSucceed=true){
     color = color | (255-color)<<8;
     return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color)));
   }else if(prefix=="icon"){
-    /+
-    auto getAssociatedIcon(string fn){
-      HICON hIcon;
-      if(0){
-        import core.sys.windows.shellapi : ExtractAssociatedIconA;
-        ushort dummy;
-        hIcon = ExtractAssociatedIconA(mainWindow.hwnd, fn.toPChar, &dummy);  //note: this deprecated crap freezes on non-existing files.
-      }else{
-        //https://stackoverflow.com/questions/524137/get-icons-for-common-file-types
-        import core.sys.windows.shellapi;
-        SHFILEINFOA fi;
-        uint file_attribute=0; //todo: specify file attributes too that was accessed in FileEntry -> SHGFI_USEFILEATTRIBUTES
-        //todo: fi.szTypeName -> SHGFI_TYPENAME
-        if(SHGetFileInfoA(fn.toPChar, file_attribute, &fi, typeof(fi).sizeof.to!uint, SHGFI_ICON | SHGFI_SMALLICON))
-          hIcon = fi.hIcon; //must free it with DestroyIcon
-      }
+    //folder: icon:\folder\    //"folder" is a literal!!!
+    //drive: icon:\d:\
+    //file: icon:\.bat
 
-      return hIcon;
-    }
-    +/
+    //todo: LoadIcon from dll/exe
 
-    //todo: icon loader
-    NOTIMPL;
+    //options: ?small ?16 ?large ?32
+
+    auto res = getAssociatedIconBitmap(line);
+    if(mustSucceed & !res) raise("Unable to get associated icon for `"~fn~"`");
+
+    if(res.valid) res.resident = true;
+    return res;
   }else{
     auto loader = prefix in customBitmapLoaders;
     if(loader)
@@ -1820,6 +1811,8 @@ void testImageBilinearAndSerialize(){  //todo: make a unittest out of these
 
 import core.sys.windows.windows : GetDeviceCaps, GetSystemMetrics, ReleaseDC, BitBlt, HORZRES, VERTRES, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SRCCOPY;
 
+// Screenshot //////////////////////////
+
 auto getPrimaryMonitorSize(){ //note: it's just the primary monitor area
   HDC hScreenDC = GetDC(null);//CreateDC("DISPLAY", NULL, NULL, NULL);
   scope(exit) ReleaseDC(null, hScreenDC);  //This is needed and returns 1, so it is working.
@@ -1851,6 +1844,94 @@ auto getSnapshot(in ibounds2 bnd){
 
 auto getDesktopSnapshot(){ return getSnapshot(getDesktopBounds); }
 auto getPrimaryMonitorSnapshot(){ return getSnapshot(getPrimaryMonitorBounds); }
+
+// Icon /////////////////////////////////////
+
+private HICON getAssociatedIcon(string fn){
+  import core.sys.windows.shellapi, core.sys.windows.winnt;
+  HICON hIcon;
+
+  bool opt(string o){
+    const res = fn.endsWith('?'~o);
+    if(res) fn = fn[0..$-o.length-1];
+    return res;
+  }
+
+  bool isSmall;
+  if(opt("small")) isSmall = true;
+  if(opt("16"   )) isSmall = true;
+  if(opt("large")) isSmall = false;
+  if(opt("32"   )) isSmall = false;
+
+  if(fn.canFind('?')){
+    raise("Unknown option: `"~fn~"`");
+    return null;
+  }
+
+  if(!(fn == `folder\`
+    || fn.length==3 && fn.endsWith(`:\`)
+    || fn.length>=2 && fn.startsWith("."))) raise(format!q"<getAssociatedIcon: icon name must be a `c:\` (c is optional) or `folder\` (folder is "folder") or  `.ext` (ext is optional). Instead of `%s`");>"(fn));
+
+  /*ushort dummy;
+  hIcon = ExtractAssociatedIconA(mainWindow.hwnd, fn.toPChar, &dummy);  //note: this deprecated crap freezes on non-existing files.*/
+
+  //https://stackoverflow.com/questions/524137/get-icons-for-common-file-types
+  SHFILEINFOW fi;
+  uint file_attribute = FILE_ATTRIBUTE_NORMAL; //todo: specify file attributes too that was accessed in FileEntry -> SHGFI_USEFILEATTRIBUTES
+  if(fn.endsWith(pathDelimiter))
+    file_attribute = FILE_ATTRIBUTE_DIRECTORY;
+
+  //note: SHGFI_USEFILEATTRIBUTES means: do not access the disk, just the filename
+
+  if(SHGetFileInfoW(fn.toPWChar, file_attribute, &fi, typeof(fi).sizeof.to!uint, SHGFI_ICON | (isSmall ? SHGFI_SMALLICON : SHGFI_LARGEICON) | SHGFI_USEFILEATTRIBUTES))
+    hIcon = fi.hIcon; //must free it with DestroyIcon
+
+  //note: this is not the same icon as in TotalCmd
+  //todo: large 48*48 icon with proper alpha channel.
+  //note: fi.szTypeName -> when SHGFI_TYPENAME used, it returns the typename
+  return hIcon;
+}
+
+private Bitmap getAssociatedIconBitmap(string fn){
+  auto hIcon = getAssociatedIcon(fn);
+  if(!hIcon) return null;
+
+  import core.sys.windows.winuser, core.sys.windows.wingdi;
+
+  scope(exit) DestroyIcon(hIcon);
+
+  ICONINFO ii;
+  if(GetIconInfo(hIcon, &ii)){
+    scope(exit){
+      if(ii.hbmColor) DeleteObject(ii.hbmColor);
+      if(ii.hbmMask) DeleteObject(ii.hbmMask);
+    }
+    if(ii.hbmColor){ //Icon has colour plane
+      BITMAPINFOHEADER bi;
+      if(GetObject(ii.hbmColor, typeof(bi).sizeof.to!int, &bi)){
+        //print("hbmColor", bi.biWidth, bi.biHeight);
+
+        auto gBmp = scoped!GdiBitmap(bi.biWidth, bi.biHeight);
+
+        DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_MASK );  auto imMask  = gBmp.toImage;
+        DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_IMAGE);  auto imColor = gBmp.toImage;
+
+        //swap blue-red, gray if transparent.
+        auto imAlpha = image2D!((i, m) => m.g ? RGBA(127, 127, 127, 0) : RGBA(i.b, i.g, i.r, 255))(imColor, imMask);
+
+        auto bmp = new Bitmap(imAlpha);
+        assert(!fn.startsWith(`icon:\`));
+        bmp.file = File(`icon:\`~fn);
+        bmp.modified = now;
+        return bmp;
+      }
+    }
+  }
+
+  return null;
+}
+
+
 
 // GdiBitmap class ////////////////////////////////////
 
