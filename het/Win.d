@@ -301,7 +301,20 @@ private void initWglChoosePixelFormat() //gets it with a dummy window, so the fi
 
 //extern(Windows) int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int iCmdShow)
 
+
+/*
+//this is not complete... It keeps staying inside this loop... Maybe because the opengl redraw is slow...
+void application_processMessages(){
+  MSG  msg;
+  while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)){
+    TranslateMessage(&msg);
+    DispatchMessage(&msg);
+  }
+}*/
+
+
 //this main() is recognized by druntime.
+
 int main(string[] args)
 {
   MSG  msg;

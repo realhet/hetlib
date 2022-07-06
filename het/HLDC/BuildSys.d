@@ -917,6 +917,8 @@ private: //current build
     return cmdLines;
   }
 
+  public void delegate(File f, int result, string output) onCompileProgress;
+
   void compile(File[] srcFiles) // Compile ////////////////////////
   {
     if(srcFiles.empty) return;
@@ -945,10 +947,12 @@ private: //current build
 
       // storing obj into objCache
       if(isIncremental && result==0){
-        auto srcFn = srcFiles[idx];
-        auto objFn = objFileOf(srcFn);
-        objCache[findModule(srcFn).objHash] = objFn.forcedRead;
+        auto srcFile = srcFiles[idx];
+        auto objFile = objFileOf(srcFile);
+        objCache[findModule(srcFile).objHash] = objFile.forcedRead;
       }
+
+      if(onCompileProgress) onCompileProgress(srcFiles[idx], result, output);
 
       return result == 0; //break if any error
     });
