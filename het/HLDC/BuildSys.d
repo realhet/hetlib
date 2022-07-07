@@ -142,7 +142,7 @@ class Executor{
 
 }
 
-/// returns true it it still need to work more
+/// returns true if it must work more
 bool update(Executor[] executors, bool delegate(int idx, int result, string output) onProgress = null){
   bool doBreak;
   foreach(i, e; executors){
@@ -178,18 +178,23 @@ void executorTest(){
   print("end of test");
 }
 
-int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress){
+int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress/*returns enable flag*/, bool delegate() onIdle/*return cancel flag*/){
   //it was developed for running multiple compiler instances.
 
   Executor[] executors = cmdLines.map!(s => new Executor(false, s, env, workPath, logPath)).array;
 
   void startOne(){ foreach(e; executors) if(e.isIdle){ e.start; break; } }
 
+  bool cancelled;
   while(executors.update(onProgress)){
     const runningCnt = executors.count!(e => e.isRunning);
     if(runningCnt==0 || (runningCnt<GetNumberOfCores-1 && GetCPULoadPercent<90 && GetMemAvailMB>512)){
-      startOne; sleep(30);
+      if(!cancelled) startOne;
+      sleep(30);
     }
+
+    if(onIdle) cancelled |= onIdle();
+    if(cancelled && runningCnt==0) break;
 
     sleep(10);
   }
@@ -324,11 +329,15 @@ struct BuildSettings{ //todo: mi a faszert irja ki allandoan az 1 betus rovidite
   @("a|macroHelp   = Show info about the build-macros."                         ) bool macroHelp                ;
 
   /// This is needed because the main source header can override the string arrays
-  auto dup(){
-    auto res = this;
-    res.importPaths = importPaths.dup;
-    res.compileArgs = compileArgs.dup;
-    res.linkArgs    = linkArgs   .dup;
+  auto dup() const{
+    BuildSettings res;
+    static foreach(fn; AllFieldNames!BuildSettings){
+      static if(is(typeof(mixin(fn))==const(string[]))){
+        mixin("res.*=*.dup;".replace("*", fn)); //deep copy
+      }else{
+        mixin("res.*=*;".replace("*", fn));
+      }
+    }
     return res;
   }
 
@@ -594,7 +603,7 @@ private: //current build
   public bool disableKillProgram, isDaemon;
 
   //logging
-  string sLog;
+  public string sLog;
   void log(T...)(T args)
   {
     if(settings.verbose) { write(args); console.flush; }
@@ -917,8 +926,6 @@ private: //current build
     return cmdLines;
   }
 
-  public void delegate(File f, int result, string output) onCompileProgress;
-
   void compile(File[] srcFiles) // Compile ////////////////////////
   {
     if(srcFiles.empty) return;
@@ -940,6 +947,7 @@ private: //current build
     int res;
 
     log(bold("Compiling: "));
+    bool cancelled;
     res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
 
       //logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
@@ -955,7 +963,13 @@ private: //current build
       if(onCompileProgress) onCompileProgress(srcFiles[idx], result, output);
 
       return result == 0; //break if any error
+    }, {
+      cancelled |= onIdle ? onIdle() : false;
+      return cancelled;
     });
+
+    enforce(!cancelled, "Compillation cancelled.");
+
     logln;
     logln;
 
@@ -1128,7 +1142,7 @@ public:
   }
 
   // Errors returned in exceptions
-  void build(File mainFile_, BuildSettings originalSettings) // Build //////////////////////
+  void build(in File mainFile_, in BuildSettings originalSettings) // Build //////////////////////
   {
     {// build /////////////////////////////////////////////////
       times = times.init;
@@ -1136,7 +1150,7 @@ public:
 
       sLog = "";
       initData(mainFile_);
-      settings = originalSettings;
+      settings = originalSettings.dup;
 
       //Rebuild all?
       if(settings.rebuild)
@@ -1190,6 +1204,9 @@ public:
           if(filesInCache  .length) logln(bold("MODULES FROM CACHE:  "), filesInCache  .map!(f => smallName(f)).join(", "));
         }
       }
+
+      //notify the ide, that a compilation has started. So it can mark the modules visually.
+      if(onCompileStart) onCompileStart(mainFile, filesToCompile, filesInCache);
 
       //delete target file and bat file.
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
@@ -1344,4 +1361,12 @@ public:
       logln(m.moduleFullName.leftJustify(20));
     }*/
   }
+
+  // events ///////////////////////////////////////////////////////////////////////////
+
+  void delegate(File f, int result, string output) onCompileProgress;
+  void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache) onCompileStart;
+  bool delegate() onIdle; //returns true if IDE wants to cancel.
+
+
 }
