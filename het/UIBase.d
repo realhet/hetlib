@@ -2466,10 +2466,10 @@ class Container : Cell { // Container ////////////////////////////////////
     vec2 absInnerPos;
     Cell[] cells;
 
-    auto cellBounds(){ return cells.map!(c => c.outerBounds + absInnerPos); }
-    auto bounds(){ return cellBounds.fold!"a|b"; }
+    auto cellBounds() const{ return cells.map!(c => c.outerBounds + absInnerPos); }
+    auto bounds() const{ return cellBounds.fold!"a|b"; }
 
-    void drawHighlighted(Drawing dr, RGB clHighlight){
+    void drawHighlighted(Drawing dr, RGB clHighlight) const{
       foreach(cell; cells)if(auto glyph = cast(Glyph)cell) with(glyph){
         dr.color = bkColor;
         dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags);
@@ -2478,6 +2478,76 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   /// Search for a text recursively in the Cell structure
+/+  auto search(string searchText, vec2 origin = vec2.init){
+
+    static struct SearchContext{
+      dstring searchText;
+      vec2 absInnerPos;
+      Cell[] cellPath;
+
+      SearchResult[] results;
+      int maxResults = 9999;
+
+      bool canStop() const { return results.length >= maxResults; }
+    }
+
+    static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
+      if(thisC.flags.dontSearch) return false;
+
+      //recursive entry/leave
+      context.cellPath ~= thisC;
+      context.absInnerPos += thisC.innerPos;
+
+      scope(exit){
+        context.absInnerPos -= thisC.innerPos;
+        context.cellPath.popBack;
+      }
+
+    //print("enter");
+
+      Cell[] cells = thisC.subCells;
+      size_t baseIdx;
+      foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group){
+        auto act = cells[baseIdx..baseIdx+len];
+
+        if(!isGlyph){
+          foreach(c; act.map!(c => cast(Container)c).filter!"a"){
+            if(cntrSearchImpl(c, context)) return true; //end recursive call
+          }
+        }else{
+          auto chars = act.map!(c => (cast(Glyph)c).ch);
+
+    //print("searching in", chars.text);
+
+          size_t searchBaseIdx = 0;
+          while(1){
+            auto idx = chars.indexOf(context.searchText, No.caseSensitive); //this is the actual search
+            if(idx<0) break;
+
+            context.results ~= SearchResult(thisC, context.absInnerPos, cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]);
+            if(context.canStop) return true;
+
+            const skip = idx + context.searchText.length;
+            chars.popFrontExactly(skip);
+            searchBaseIdx += skip;
+          }
+        }
+
+    //readln;
+    //print("advance", len);
+        baseIdx += len;
+      }
+
+      return false;
+    }
+
+    auto context = SearchContext(searchText.to!dstring, origin);
+    if(!searchText.empty)
+      cntrSearchImpl(this, context);
+    return context.results;
+  } +/
+
+  /// do a recursive visit. Search result and continuation is supplied by alias functions
   auto search(string searchText, vec2 origin = vec2.init){
 
     static struct SearchContext{

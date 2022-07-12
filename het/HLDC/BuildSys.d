@@ -598,6 +598,7 @@ private: //current build
   //cached data
   BuildCache cache;
   ubyte[][string] objCache, exeCache, mapCache, resCache;
+  string[string] outputCache;
 
   //flags for special operation (daemon mode)
   public bool disableKillProgram, isDaemon;
@@ -926,7 +927,7 @@ private: //current build
     return cmdLines;
   }
 
-  void compile(File[] srcFiles) // Compile ////////////////////////
+  void compile(File[] srcFiles, File[] cachedFiles) // Compile ////////////////////////
   {
     if(srcFiles.empty) return;
 
@@ -947,6 +948,19 @@ private: //current build
     int res;
 
     log(bold("Compiling: "));
+
+
+    string sOutput; //combined error log
+
+    foreach(srcFile; cachedFiles){
+      const objHash = findModule(srcFile).objHash,
+            output = outputCache[objHash];
+
+      if(onCompileProgress) onCompileProgress(srcFile, 0/+success+/, outputCache[objHash]);
+
+      sOutput ~= processDMDErrors(output, srcFile.path.fullPath);
+    }
+
     bool cancelled;
     res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
 
@@ -955,14 +969,23 @@ private: //current build
 
       // storing obj into objCache
       if(isIncremental && result==0){
-        auto srcFile = srcFiles[idx];
-        auto objFile = objFileOf(srcFile);
-        objCache[findModule(srcFile).objHash] = objFile.forcedRead;
+        const srcFile = srcFiles[idx],
+              objFile = objFileOf(srcFile),
+              objHash = findModule(srcFile).objHash;
+        objCache[objHash] = objFile.forcedRead;
+        outputCache[objHash] = output;
       }
 
       if(onCompileProgress) onCompileProgress(srcFiles[idx], result, output);
 
-      return result == 0; //break if any error
+      static if(0){
+        //hard stop: kill
+        return result == 0; //break(kill) if any error
+      }else{
+        //soft stop: cancel and keep all results.
+        if(result) cancelled = true;
+        return true; //continue
+      }
     }, {
       cancelled |= onIdle ? onIdle() : false;
       return cancelled;
@@ -970,11 +993,12 @@ private: //current build
 
     enforce(!cancelled, "Compillation cancelled.");
 
+    //todo: refactor cancel/kill functionality.. onIdle should be able to kill too.
+
     logln;
     logln;
 
-    //postprocess the combined error log
-    string sOutput;
+    //process combined error log
     foreach(i, ref o; sOutputs) sOutput ~= processDMDErrors(o, srcFiles[i].path.fullPath);
     sOutput = mergeDMDErrors(sOutput);
     //add todos
@@ -1110,6 +1134,7 @@ public:
   {
     cache.reset;
     objCache.clear;
+    outputCache.clear;
     exeCache.clear;
     mapCache.clear;
     resCache.clear;
@@ -1206,7 +1231,7 @@ public:
       }
 
       //notify the ide, that a compilation has started. So it can mark the modules visually.
-      if(onCompileStart) onCompileStart(mainFile, filesToCompile, filesInCache);
+      if(onCompileStart) onCompileStart(mainFile, filesToCompile, filesInCache, todos);
 
       //delete target file and bat file.
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
@@ -1248,7 +1273,7 @@ public:
         prepareMapResDef;
         resCompile(resFile, resHash);
 
-        compile(filesToCompile);
+        compile(filesToCompile, filesInCache);
         overwriteObjsFromCache(filesInCache);
         link(settings.linkArgs);
 
@@ -1365,7 +1390,7 @@ public:
   // events ///////////////////////////////////////////////////////////////////////////
 
   void delegate(File f, int result, string output) onCompileProgress;
-  void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache) onCompileStart;
+  void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos) onCompileStart;
   bool delegate() onIdle; //returns true if IDE wants to cancel.
 
 

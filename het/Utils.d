@@ -2221,7 +2221,7 @@ char asciiLower(char c) pure{ return cast(char)(cast(int)c + (c.isAsciiLower ? 0
 string asciiUpper(string s) { char[] res = s.dup; foreach(ref char ch; res) ch = ch.asciiUpper; return cast(string)res; }
 string asciiLower(string s) { char[] res = s.dup; foreach(ref char ch; res) ch = ch.asciiLower; return cast(string)res; }
 
-auto uc(char s) pure{ return s.toUpper; }
+auto uc(char s) pure{ return s.toUpper; }  //todo: combine these 3 together
 auto lc(char s) pure{ return s.toLower; }
 
 auto uc(wchar s) pure{ return s.toUpper; }
@@ -2238,7 +2238,7 @@ string escape(T)(T s){
   return format!"%(%s%)"([s]);
 }
 
-string capitalize(alias fv = toUpper)(string s){
+string capitalize(alias fv = toUpper)(string s){  //todo: terrible looking solution, with NO unicode handling.
   if(!s.empty){
     char u = fv([s[0]])[0];
     if(u != s[0]) s = u~s[1..$];
@@ -5260,7 +5260,8 @@ public:
   }
 
   bool opEquals(in Path other) const{
-    return samePath(this.normalized, other.normalized);
+    //note: Don't use normalized() because that depends on the underlying filesystem. Must avoid this dependency.
+    return samePath(this.fullPath, other.fullPath);
   }
 }
 
@@ -5589,10 +5590,16 @@ public:
 
   void append(const void[] data)const{ write(data, size); } //todo: compression, automatic uncompression
 
-  int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
-  bool opEquals(const File b) const{ return sameText(fullName, b.fullName); }
+  int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; } //todo: case insens cmp. Discover the cmp funct in std library. lessThan is simple. cmp is unknown by me.
 
-  size_t toHash() const{ return fullName.hashOf; }
+  bool opEquals(const File b) const{
+    return sameText(fullName, b.fullName);
+
+    //note: Don't use normalized() because that depends on the underlying filesystem. Must avoid this dependency.
+    //return this.normalized == b.normalized;
+  }
+
+  size_t toHash() const{ return fullName.lc.hashOf; } //note:no normalized!!! That's dependent of the current system.
 
   File withoutQueryString() const{
     auto i = fullName.indexOf('?');
