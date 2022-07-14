@@ -122,7 +122,8 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   FileTimeToLocalFileTime, LocalFileTimeToFileTime, FileTimeToSystemTime, SystemTimeToFileTime, GetLocalTime, GetSystemTimeAsFileTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
-  HICON;
+  HICON,
+  GetLongPathNameA, GetShortPathNameA;
 
 import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
   std.json, std.parallelism, core.runtime;
@@ -2270,7 +2271,8 @@ string truncate(string ellipsis="...")(string s, size_t maxLen){ //todo: string.
 string decapitalize()(string s){ return s.capitalize!toLower; }
 
 bool sameString(string a, string b) { return a==b; }
-bool sameText(string a, string b) { return uc(a)==uc(b); } //todo: unoptimal
+bool sameText(string a, string b) { return icmp(a, b)==0; }
+bool sameFile(File a, File b) { return sameText(a.normalized.fullName, b.normalized.fullName); }
 
 auto amongText(Values...)(string value, Values values){ return value.among!sameText(values); }
 
@@ -2383,7 +2385,8 @@ void strMake(string src, char[] dst){
   strMake(src, dst.ptr, dst.length);
 }
 
-string dataToStr(const(void)* src, size_t len){ //todo: this is ultra-lame:  (cast(char[])src)[0..len].to!string
+string dataToStr(const(void)* src, size_t len){ //todo: this is ultra-lame:  (cast(char[])src)[0..len].to!string    https://stackoverflow.com/questions/32220621/converting-a-temporary-character-array-to-a-string-in-d    .idup
+  //this would be the good solution.  Now Testing with file.originalCasing()  return (cast(const(char)*) src)[0..len].idup;
   char[] s;
   s.length = len;
   memcpy(s.ptr, src, len);
@@ -5259,10 +5262,11 @@ public:
     return Path(this, p2);
   }
 
-  bool opEquals(in Path other) const{
-    //note: Don't use normalized() because that depends on the underlying filesystem. Must avoid this dependency.
-    return samePath(this.fullPath, other.fullPath);
-  }
+  /+note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
+  int opCmp(const Path b)       const{ return fullPath>b.fullPath ? 1 : fullPath<b.fullPath ? -1 : 0; }
+  bool opEquals(const Path b)   const{ return fullPath==b.fullPath; }
+  size_t toHash()               const{ return fullPath.hashOf; }
+
 }
 
 Path tempPath() {
@@ -5590,16 +5594,15 @@ public:
 
   void append(const void[] data)const{ write(data, size); } //todo: compression, automatic uncompression
 
-  int opCmp(const File b) const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; } //todo: case insens cmp. Discover the cmp funct in std library. lessThan is simple. cmp is unknown by me.
 
-  bool opEquals(const File b) const{
-    return sameText(fullName, b.fullName);
+  /+note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.
+          `font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
+          Also avoid normalization because it is depends on the contents of the HDD.+/
 
-    //note: Don't use normalized() because that depends on the underlying filesystem. Must avoid this dependency.
-    //return this.normalized == b.normalized;
-  }
+  int opCmp(const File b)       const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
+  bool opEquals(const File b)   const{ return fullName==b.fullName; }
+  size_t toHash()               const{ return fullName.hashOf; }
 
-  size_t toHash() const{ return fullName.lc.hashOf; } //note:no normalized!!! That's dependent of the current system.
 
   File withoutQueryString() const{
     auto i = fullName.indexOf('?');
@@ -5637,6 +5640,22 @@ public:
 
   File opBinary(string op)(string s) const if(op == "~"){ return File(fullName~s); }
 }
+
+File actualFile(in File f){
+  char[MAX_PATH] buf;
+  auto len = GetShortPathNameA(f.normalized.fullName.toPChar, buf.ptr, MAX_PATH);
+  if(len && len<MAX_PATH){
+    auto fs = File(buf[0..len].idup);
+    len = GetLongPathNameA(fs.fullName.toPChar, buf.ptr, MAX_PATH);
+    if(len && len<MAX_PATH){
+      import std.ascii : toLower;
+      buf[0] = toLower(buf[0]);
+      return File(buf[0..len].idup);
+    }
+  }
+  return f;
+}
+
 
 //helpers for saving and loading
 void saveTo(T)(const T[] data, const File file)if( is(T == char))                               { file. write(cast(string)data); }

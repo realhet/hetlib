@@ -661,7 +661,7 @@ private: //current build
   }
 
   void initData(File mainFile_){ //clears the above
-    mainFile = mainFile_.normalized;
+    mainFile = mainFile_.actualFile;
     enforce(mainFile.exists, "Can't open main project file: "~mainFile.fullName);
 
     DPaths.init;
@@ -806,7 +806,7 @@ private: //current build
 
     //collect imports NEW
     foreach(const imp; act.parser.importDecls) if(imp.isUserModule){
-      const f = File(imp.resolveFileName(mainFile.path.fullPath, file.fullName, true));
+      const f = File(imp.resolveFile(mainFile.path, file.fullName, true));
       if(!mAct.importedFiles.canFind(f)){
         mAct.importedFiles ~= f;
         mAct.importedModuleNames ~= imp.name.fullName;
@@ -902,17 +902,19 @@ private: //current build
   }
 
   string[][] makeCompileCmdLines(File[] srcFiles, string[] commonCompilerArgs){ //todo: refact multi
+    //note: filenames are normalCase, but LDC2 must get lowercase filenames.
+
     string[][] cmdLines;
     if(isIncremental){
       foreach(fn; srcFiles){
-        auto c = commonCompilerArgs ~ ["-of="~objFileOf(fn).fullName, fn.fullName];
+        auto c = commonCompilerArgs ~ ["-of="~objFileOf(fn).fullName.lc, fn.fullName.lc];
         //ez nem tudom, mi. if(sameText(fn.ext, `.lib`)) c ~= "-lib";
         cmdLines ~= c;
       }
     }else{//single
       auto c = commonCompilerArgs;
       c ~= `-of=`~targetFile.fullName;
-      foreach(fn; srcFiles) c ~= fn.fullName;
+      foreach(fn; srcFiles) c ~= fn.fullName.lc; //lowercase because LDC2 drops all kinds of errors.
       if(defFile.fullName!="") c ~= defFile.fullName;
       if(resFile.fullName!="") c ~= resFile.fullName;
 

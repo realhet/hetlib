@@ -188,23 +188,23 @@ struct ImportDecl{
   bool isCoreModule() const { return nameStartsWith("core"); }
   bool isUserModule() const { return !isStdModule && !isCoreModule && !isEtcModule; }
 
-  string resolveFileName(string mainPath, string baseFileName, bool mustExists) const //returns "" if not found. Must handle outside.
+  File resolveFile(Path mainPath, string baseFileName, bool mustExists) const //returns "" if not found. Must handle outside.
   { //todo: use FileName, FilePath
     const fn = name.fileName;
     string[] paths = isStdModule  ? [ DPaths.stdPath ] :
                      isEtcModule  ? [ DPaths.etcPath ] :
                      isCoreModule ? [ DPaths.corePath ]
-                                  : [ mainPath ] ~ DPaths.importPaths;
+                                  : [ mainPath.fullPath ] ~ DPaths.importPaths;
     string s;
     foreach(p; paths){
       s = includeTrailingPathDelimiter(p)~fn;
-      if(File(s).exists) return s; //it's a module
+      if(File(s).exists) return File(s).actualFile; //it's a module
       s = File(s).otherExt("").fullName ~ `\package.d`;
-      if(File(s).exists) return s; //it's a module
+      if(File(s).exists) return File(s).actualFile; //it's a module
     }
 
     if(mustExists) throw new Exception("Module not found: "~fn~"  referenced from: "~baseFileName);
-    return "";
+    return File.init;
   }
 }
 
@@ -298,6 +298,7 @@ private: /////////////////////////////////////////////////////////////////////
   {
     auto rxTodo = ctRegex!(`\/\/todo:(.*)`, `gi`);
     auto rxOpt  = ctRegex!(`\/\/opt:(.*)`, `gi`);
+    auto rxBug  = ctRegex!(`\/\/bug:(.*)`, `gi`);
 
     foreach(ref cmt; tokens){
       if(cmt.isComment){
@@ -324,6 +325,11 @@ private: /////////////////////////////////////////////////////////////////////
             m = cmt.source.matchFirst(rxOpt);
             if(!m.empty){
               t = "Opt";  s = m[1];
+            }else{
+              m = cmt.source.matchFirst(rxBug);
+              if(!m.empty){
+                t = "Bug";  s = m[1];
+              }
             }
           }
 
