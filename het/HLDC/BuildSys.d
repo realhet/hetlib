@@ -178,25 +178,31 @@ void executorTest(){
   print("end of test");
 }
 
-int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress/*returns enable flag*/, bool delegate() onIdle/*return cancel flag*/){
+int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress/*returns enable flag*/, bool delegate(int inFlight, int justStartedIdx) onIdle/*return cancel flag*/){
   //it was developed for running multiple compiler instances.
 
   Executor[] executors = cmdLines.map!(s => new Executor(false, s, env, workPath, logPath)).array;
 
-  void startOne(){ foreach(e; executors) if(e.isIdle){ e.start; break; } }
-
+  DateTime lastLaunchTime;
   bool cancelled;
   while(executors.update(onProgress)){
-    const runningCnt = executors.count!(e => e.isRunning);
-    if(runningCnt==0 || (runningCnt<GetNumberOfCores-1 && GetCPULoadPercent<90 && GetMemAvailMB>512)){
-      if(!cancelled) startOne;
-      sleep(30);
+    const runningCnt = executors.count!(e => e.isRunning).to!int;
+
+    int justStartedIdx = -1;
+    if(!cancelled) if(runningCnt==0 || ((now-lastLaunchTime).value(second)>0.05f && runningCnt<GetNumberOfCores-1 && GetCPULoadPercent<90 && GetMemAvailMB>512)){ //todo: make these settings configurable
+      //find something to launch
+      foreach(i, e; executors) if(e.isIdle){
+        e.start;
+        lastLaunchTime = now;
+        justStartedIdx = i.to!int;
+        break;
+      }
     }
 
-    if(onIdle) cancelled |= onIdle();
+    if(onIdle) cancelled |= onIdle(runningCnt, justStartedIdx);
     if(cancelled && runningCnt==0) break;
 
-    sleep(10);
+    sleep(10); //todo: config
   }
 
   sOutput = [];
@@ -988,8 +994,8 @@ private: //current build
         if(result) cancelled = true;
         return true; //continue
       }
-    }, {
-      cancelled |= onIdle ? onIdle() : false;
+    }, (int inFlight, int justStartedIdx){
+      cancelled |= onIdle ? onIdle(inFlight, justStartedIdx) : false;
       return cancelled;
     });
 
@@ -1233,7 +1239,7 @@ public:
       }
 
       //notify the ide, that a compilation has started. So it can mark the modules visually.
-      if(onCompileStart) onCompileStart(mainFile, filesToCompile, filesInCache, todos);
+      if(onBuildStarted) onBuildStarted(mainFile, filesToCompile, filesInCache, todos);
 
       //delete target file and bat file.
       //It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
@@ -1391,9 +1397,9 @@ public:
 
   // events ///////////////////////////////////////////////////////////////////////////
 
+  void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos) onBuildStarted;
   void delegate(File f, int result, string output) onCompileProgress;
-  void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos) onCompileStart;
-  bool delegate() onIdle; //returns true if IDE wants to cancel.
+  bool delegate(int inFlight, int justStartedIdx) onIdle; //returns true if IDE wants to cancel.
 
 
 }

@@ -1454,7 +1454,25 @@ void set(V)(ref V[] arr, size_t idx, V val, lazy V def = T.init){
 }
 
 
-void clear(T)(ref T[] arr)        { arr.length = 0; }
+//original dlang functionality: .clear removes all keys and values from associative array.
+
+void clear(T)(ref T[] a)                { a.length = 0; }
+void clear(T)(ref T a)if(is(T==struct)) { a = T.init; }
+
+//references cleared only if not null
+void clear(T)(T  a)if(is(T==class )){ if(a) a.clear; }
+void clear(T)(T* a)if(is(T==struct)){ if(a) (*a).clear; }
+
+//note: clear for classes is not OK, because it can't clear protected fields. Solution: mixin ClassMixin_clear
+//void clear(T)(T cla)if(is(T==class)){ with(cla) foreach(f; FieldNameTuple!(T)) mixin("$ = $.init;".replace("$", f)); }
+mixin template ClassMixin_clear(){
+  void clear(){
+    foreach(f; FieldNameTuple!(typeof(this)))
+      mixin("$ = $.init;".replace("$", f));
+  }
+}
+
+
 bool addIfCan(T)(ref T[] arr, in T item) { if(!arr.canFind(item)){ arr ~= item; return true; }else return false; }
 bool addIfCan(T)(ref T[] arr, in T[] items) { bool res; foreach(const item; items) if(arr.addIfCan(item)) res = true; return res; }
 
