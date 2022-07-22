@@ -3030,19 +3030,19 @@ string fetchRegexFlags(ref string s){
 }
 
 
-string shortSizeText(T)(in T n){
+string shortSizeText(string spacing="", T)(in T n){
   //todo: optimize this
   //todo: 4096 -> 4k
   //toso: 4.0k -> 4k
-  string s = n.text;                      if(s.length<=4) return s;
-  s = format!"%.1f"(double(n)/(1 <<10));  if(s.length<=3) return s~'k';
-  s = format!"%.0f"(double(n)/(1 <<10));  if(s.length<=3) return s~'k';
-  s = format!"%.1f"(double(n)/(1 <<20));  if(s.length<=3) return s~'M';
-  s = format!"%.0f"(double(n)/(1 <<20));  if(s.length<=3) return s~'M';
-  s = format!"%.1f"(double(n)/(1 <<30));  if(s.length<=3) return s~'G';
-  s = format!"%.0f"(double(n)/(1 <<30));  if(s.length<=3) return s~'G';
-  s = format!"%.1f"(double(n)/(1L<<40));  if(s.length<=3) return s~'T';
-  s = format!"%.0f"(double(n)/(1L<<40));                  return s~'T';
+  string s = n.text;                      if(s.length<=4) return s~spacing;
+  s = format!"%.1f"(double(n)/(1 <<10));  if(s.length<=3) return s~spacing~'k';
+  s = format!"%.0f"(double(n)/(1 <<10));  if(s.length<=3) return s~spacing~'k';
+  s = format!"%.1f"(double(n)/(1 <<20));  if(s.length<=3) return s~spacing~'M';
+  s = format!"%.0f"(double(n)/(1 <<20));  if(s.length<=3) return s~spacing~'M';
+  s = format!"%.1f"(double(n)/(1 <<30));  if(s.length<=3) return s~spacing~'G';
+  s = format!"%.0f"(double(n)/(1 <<30));  if(s.length<=3) return s~spacing~'G';
+  s = format!"%.1f"(double(n)/(1L<<40));  if(s.length<=3) return s~spacing~'T';
+  s = format!"%.0f"(double(n)/(1L<<40));                  return s~spacing~'T';
 }
 
 // structs to text /////////////////////////////////////

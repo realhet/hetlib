@@ -60,7 +60,7 @@ struct SourceLine{ //SourceLine ///////////////////////////////
 
 class SourceCode{ // SourceCode ///////////////////////////////
   File file;
-  string text;
+  string text;  //todo: text is a bad name!!!
 
   //results after process:
   Token[] tokens;

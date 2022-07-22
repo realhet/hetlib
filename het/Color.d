@@ -492,6 +492,9 @@ immutable RGB
   clSkyBlue         = 0xF0CAA6,
   clMoneyGreen      = 0xC0DCC0,
 
+  clGold            = 0x00D7FF,
+  clBronze          = 0x327FCD,
+
 //standard vga palette
   clVgaBlack        = 0x000000,
   clVgaDarkGray     = 0x555555,
