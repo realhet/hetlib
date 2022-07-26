@@ -1932,4 +1932,17 @@ class BuildResult{ // BuildResult //////////////////////////////////////////////
     return res;
   }
 
+  //find sub-messages recursively
+  auto subMessagesOf(in CodeLocation loc){
+    BuildMessage[] subMessages;  //todo: this is an array of struct. It's unoptimal
+    void doit(in CodeLocation parentLocation){
+      auto sm = messages.byValue.filter!(m => m.parentLocation==parentLocation).array;
+      subMessages ~= sm;
+      sm.each!(m => doit(m.location));
+    }
+    doit(loc);
+    return subMessages;
+  }
+
+
 }
