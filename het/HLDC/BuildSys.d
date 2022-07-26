@@ -31,7 +31,175 @@ import het.utils, het.parser, std.file, std.regex, std.path, std.process;
 enum LDCVER = 128; //the targeted LDC version by this builder
                    //valid versions: 120, 128
 
-class Executor{
+// predecode LDC Ouptup ///////////////////////////////////////////////////////////////////////
+
+auto predecodeLdcOutput(string input){
+  //LDC2 must be called with --vcolumns --verrors-context    And all filenames must be ABSOLUTE!
+  //first detect long messages:
+  //   file.d*(*,*):*  //message geader
+  //   ... optional multiline contents
+  //   context code line
+  //         ^ context position indicator
+
+  static bool isMessageLine(string line){ return line.isWild(`?:\*.d*(*): *`)==true; }
+  static bool isContextPositionLine(string line){ return line.endsWith('^') && line[0..$-1].map!"a==' '".all; }
+
+  static struct PredecodedLdcOutput{
+    string[][] messages;
+    string[] pragmas;
+
+    void dump(){
+
+      void box(string capt, string[] m){
+        print("\u250C\u2500"~capt~"\u2500".replicate(30));
+        m.each!(a => print("\u2502"~a));
+        print("\u2514"~"\u2500".replicate(5));
+      }
+
+      box("PRAGMAS", pragmas);
+      messages.each!(m => box("MESSAGE", m));
+    }
+  }
+
+  PredecodedLdcOutput res;
+
+  auto lines = input.splitLines;
+
+  int lastMessageIdx = -1;
+  string[] stack; //contains possible pragma messages
+
+  void fetchLastMessage(int markerIdx = -1){
+    if(lastMessageIdx>=0){
+
+      if(markerIdx<0) res.pragmas ~= stack;
+
+      auto r = lines[lastMessageIdx..(markerIdx>=0 ? markerIdx : lastMessageIdx)+1];
+      res.messages ~= r[0..$-(markerIdx>=0?2:0)];
+      lastMessageIdx = -1;
+
+    }else{
+      res.pragmas ~= stack;
+    }
+
+    stack = [];
+  }
+
+  foreach(i; 0..lines.length.to!int){
+    if(isMessageLine(lines[i])){
+      fetchLastMessage;
+      lastMessageIdx = i;
+    }else if(isContextPositionLine(lines[i]) &&
+             i>0 && lines[i-1].length>=lines[i].length && //previous line is sameSize or longer?
+             lastMessageIdx>=0 && i-lastMessageIdx>=2 && //is there 3 lines from the last message?
+             lines[i].countUntil('^')== (lines[lastMessageIdx].isWild("*(*,*)*") ? wild.ints(2, -1)-1 : -1) //spaces before marker and column in message are correct?
+             ){
+        fetchLastMessage(i);
+    }else stack ~= lines[i];
+  }
+  fetchLastMessage;
+
+  return res;
+}
+
+void test_predecodeLdcOutput(){
+
+  immutable testProgram = q{
+    deprecated("cause") void depr1(){
+      print("a");
+    }
+
+    void depr2(){
+      depr1; depr1;
+      depr1;
+    }
+
+    void depr3(){
+      depr2;
+      depr1;
+    }
+
+    void main(){
+      pragma(msg, "this is just a pragma");
+      iota(5).map!"b+5".print;
+      mixin(`"iota(5).map!"b+5".print;"`);
+      pragma(msg, "this is just a pragma\nwith multiple lines");
+      iota(5).countUntil!((a, b)=>c>d)(5);
+      pragma(msg, "also a pragma");
+      depr3;
+      pragma(msg, "fake markes here");
+      pragma(msg, "       ^");
+      pragma(msg, "end of file");
+    }
+  };
+
+// C:\D>ldc2 --vcolumns --verrors-context -Ic:\d\libs testMixinError.d
+
+immutable inputText = q"{the first pragma
+c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+    body
+    ^
+c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+    body
+    ^
+c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+  depr1; depr1;
+  ^
+c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
+  depr1; depr1;
+         ^
+c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+  depr1;
+  ^
+c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+  depr1;
+  ^
+this is just a pragma
+c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
+c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
+        return fun(_input.front);
+                  ^
+c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
+        return MapResult!(_fun, Range)(r);
+               ^
+c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
+  iota(5).map!"b+5".print;
+         ^
+c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
+this is just a pragma
+with multiple lines
+c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
+  iota(5).countUntil!((a, b)=>c>d)(5);
+                                  ^
+c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
+  with `pred = __lambda1,
+       R = Result,
+       Rs = (int)`
+  must satisfy the following constraint:
+`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
+ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
+          ^
+c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
+  with `pred = __lambda1,
+       R = Result,
+       N = int`
+  must satisfy the following constraint:
+`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
+ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
+          ^
+c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
+ptrdiff_t countUntil(alias pred, R)(R haystack)
+          ^
+also a pragma
+fake markes here
+       ^
+end of file
+}";
+
+  inputText.predecodeLdcOutput.dump;
+}
+
+
+class Executor{ //Executor ///////////////////////////////////////
   import std.process, std.file : chdir;
 
   //input data
@@ -40,8 +208,8 @@ class Executor{
   Path workPath, logPath;
 
   //temporal data
-  File logFile;
-  StdFile stdLogFile;
+  File       logFile/+,    errFile+/;
+  StdFile stdLogFile/+, stdErrFile+/;
   Pid pid;
 
   //output data
@@ -99,6 +267,9 @@ class Executor{
       logFile.path.make;
       stdLogFile = StdFile(logFile.fullName, "w");
 
+      //errFile = logFile.otherExt("err");
+      //stdErrFile = StdFile(errFile.fullName, "w");
+
       // launch the process
       pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole, workPath.fullPath);
       //note: Config.retainStdout makes it impossible to remove the file after.
@@ -106,8 +277,8 @@ class Executor{
       result = -1;
       output = "Error: " ~ e.simpleMsg;
       ended = true;
-      ignoreExceptions({ stdLogFile.close;         });
-      ignoreExceptions({ logFile.forcedRemove;     });
+      ignoreExceptions({ stdLogFile.close;         });  ignoreExceptions({ logFile.forcedRemove;     });
+      //ignoreExceptions({ stdErrFile.close;         });  ignoreExceptions({ errFile.forcedRemove;     });
     }
   }
 
@@ -120,7 +291,16 @@ class Executor{
         pid = null;
         ended = true;
         ignoreExceptions({ output = logFile.readStr; });
-        ignoreExceptions({ logFile.forcedRemove;     });
+
+        //string error; ignoreExceptions({ error = errFile.readStr; });
+        //LOG(mainFile, "CMD", cmd);
+        //LOG(mainFile, "OUTPUT", output);
+        //LOG(mainFile, "ERROR", error);
+        //todo: this is only specific for compilers!!!
+        //output = output.splitLines.enumerate.map!(a => format!"%s(%d, 1): Message: %s\n"(mainFile.fullName, a.index+1, a.value)).join ~ error;
+
+        ignoreExceptions({ logFile.forcedRemove; });
+        //ignoreExceptions({ errFile.forcedRemove; });
       }
     }
   }
@@ -136,7 +316,8 @@ class Executor{
       output = "Error: Process has been killed.";
       pid = null;
       ended = true;
-      ignoreExceptions({ logFile.forcedRemove;     });
+      ignoreExceptions({ logFile.forcedRemove; });
+      //ignoreExceptions({ errFile.forcedRemove; });
     }
   }
 
@@ -178,10 +359,10 @@ void executorTest(){
   print("end of test");
 }
 
-int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress/*returns enable flag*/, bool delegate(int inFlight, int justStartedIdx) onIdle/*return cancel flag*/){
+int spawnProcessMulti2(File[] mainFiles, in string[][] cmdLines, in string[string] env, Path workPath, Path logPath, out string[] sOutput, bool delegate(int idx, int result, string output) onProgress/*returns enable flag*/, bool delegate(int inFlight, int justStartedIdx) onIdle/*return cancel flag*/){
   //it was developed for running multiple compiler instances.
 
-  Executor[] executors = cmdLines.map!(s => new Executor(false, s, env, workPath, logPath)).array;
+  Executor[] executors = cmdLines.map!(a => new Executor(false, a, env, workPath, logPath)).array;
 
   DateTime lastLaunchTime;
   bool cancelled;
@@ -208,7 +389,8 @@ int spawnProcessMulti2(in string[][] cmdLines, in string[string] env, Path workP
   sOutput = [];
   auto res = 0;
   foreach(e; executors){
-    if(e.result) res = e.result;
+    if(e.result) res = e.result; //aggregate error codes
+    //combine output and error lof
     sOutput ~= e.output;
   }
   return res;
@@ -890,7 +1072,7 @@ private: //current build
 
   string[] makeCommonCompileArgs(){
     //make commandline args
-    auto args = ["ldc2", "-vcolumns"];
+    auto args = ["ldc2", "-vcolumns", "-verrors-context"];
 
     if(isIncremental) args ~= ["-c", "-allinst"];  // no more "-op", because every output filename is specified explicitly with "-of="
 
@@ -970,7 +1152,7 @@ private: //current build
     }
 
     bool cancelled;
-    res = spawnProcessMulti2(cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
+    res = spawnProcessMulti2(srcFiles, cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, (idx, result, output){
 
       //logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
       log(" \33#*\33\7 ".replace("#", result ? "\14" : "\12").replace("*", srcFiles[idx].name));
@@ -1401,5 +1583,353 @@ public:
   void delegate(File f, int result, string output) onCompileProgress;
   bool delegate(int inFlight, int justStartedIdx) onIdle; //returns true if IDE wants to cancel.
 
+
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+//  MultiThreaded background builder                                        //
+//////////////////////////////////////////////////////////////////////////////
+
+import core.thread, std.concurrency;
+
+
+// messages sent to buildSystemWorker
+
+enum MsgBuildCommand{ cancel, shutDown }
+
+struct MsgBuildRequest{
+  File mainFile;
+  BuildSettings settings;
+}
+
+
+// messages received from buildSystemWorker
+
+struct MsgBuildStarted{
+  File mainFile;
+  immutable File[] filesToCompile, filesInCache;
+  immutable string[] todos;
+}
+
+struct MsgCompileStarted{
+  int fileIdx=-1;    //indexes MsgBuildStarted.filesToCompile
+}
+
+struct MsgCompileProgress{
+  File file;
+  int result;
+  string output;
+}
+
+struct MsgBuildFinished{
+  File mainFile;
+  string error;
+  string output;
+}
+
+
+
+struct BuildSystemWorkerState{ //BuildSystemWorkerState /////////////////////////////////
+  //worker state that don't need synching.
+  bool building, cancelling;
+  int totalModules, compiledModules, inFlight;
+}
+
+__gshared const BuildSystemWorkerState buildSystemWorkerState;
+
+void buildSystemWorker(){ // worker //////////////////////////
+  BuildSystem buildSystem;
+  auto state = &cast()buildSystemWorkerState;
+  bool isDone = false;
+
+  //register events
+
+  void onBuildStarted(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos){ //todo: rename to buildStart
+    with(state){
+      totalModules = (filesToCompile.length + filesInCache.length).to!int;
+      compiledModules = inFlight = 0;
+    }
+
+    //LOG(mainFile, filesToCompile, filesInCache);
+    ownerTid.send(MsgBuildStarted(mainFile, filesToCompile.idup, filesInCache.idup, todos.idup));
+  }
+  buildSystem.onBuildStarted = &onBuildStarted;
+
+  void onCompileProgress(File file, int result, string output){
+    state.compiledModules++;
+    //LOG(file, result);
+    ownerTid.send(MsgCompileProgress(file, result, output));
+  }
+  buildSystem.onCompileProgress = &onCompileProgress;
+
+  bool onIdle(int inFlight, int justStartedIdx){
+    state.inFlight = inFlight;
+
+    if(justStartedIdx>=0)
+      ownerTid.send(MsgCompileStarted(justStartedIdx));
+
+    //receive commands from mainThread
+    bool cancelRequest = false;
+    receiveTimeout(0.msecs,
+      (MsgBuildCommand cmd){
+        if     (cmd==MsgBuildCommand.shutDown){ cancelRequest = true; isDone = true; state.cancelling = true; }
+        else if(cmd==MsgBuildCommand.cancel  ){ cancelRequest = true;                state.cancelling = true; }
+      },
+      (immutable MsgBuildRequest req){
+        WARN("Build request ignored: already building...");
+      }
+    );
+
+    return cancelRequest;
+  }
+  buildSystem.onIdle = &onIdle;
+
+  // main worker loop
+  while(!isDone) {
+    receive(
+      (MsgBuildCommand cmd){
+        if(cmd==MsgBuildCommand.shutDown) isDone = true;
+      },
+      (immutable MsgBuildRequest req){
+        string error;
+        try{
+          state.building = true;
+          //todo: onIdle
+          buildSystem.build(req.mainFile, req.settings);
+        }catch(Exception e){
+          error = e.simpleMsg;
+        }
+        ownerTid.send(MsgBuildFinished(req.mainFile, error, buildSystem.sLog));
+      }
+    );
+
+    state.clear; //must be the last thing in loop to clear this.
+  }
+
+}
+
+struct CodeLocation{ //CodeLocation ////////////////////////
+  File file;
+  int line, column;
+
+  bool opCast(T:bool)() const{ return cast(bool)file; }
+
+  int opCmp(in CodeLocation b) const{ return icmp(file.fullName, b.file.fullName).cmpChain(cmp(line, b.line)).cmpChain(cmp(column, b.column)); }
+
+  string toString() const{ return format!"%s(%d,%d)"(file.fullName, line, column); }
+}
+
+enum BuildMessageType{ find, error, bug, warning, deprecation, todo, opt } //todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");
+
+auto buildMessageTypeColors = [clWhite, clRed, clOrange, clYellow, clAqua, clWowBlue, clWowPurple];
+auto color(in BuildMessageType t){ return buildMessageTypeColors[t]; }
+
+auto buildMessageTypeCaptions = [/+im.symbol("Zoom")+/"Find", "Err", "Bug", "Warn", "Depr", "Todo", "Opt"];
+auto caption(in BuildMessageType t){ return buildMessageTypeCaptions[t]; }
+
+
+struct BuildMessage{ //BuildMessage ///////////////////////////////
+  CodeLocation location;
+  BuildMessageType type;
+  string message;
+  CodeLocation parentLocation;  //multiline message lines are linked together using parentLocation
+
+  string toString() const{
+    return parentLocation ? format!"%s: %s:        %s"(location, type.text.capitalize, message)
+                          : format!"%s: %s: %s"       (location, type.text.capitalize, message);
+  }
+}
+
+enum ModuleBuildState { notInProject, queued, compiling, aborted, hasErrors, hasWarnings, hasDeprecations, flawless }
+
+auto moduleBuildStateColors = [clBlack, clWhite, clWhite, clGray, clRed, RGB(128, 255, 0), RGB(64, 255, 0), clLime];
+auto color(in ModuleBuildState s){ return moduleBuildStateColors[s]; }
+
+class BuildResult{ // BuildResult //////////////////////////////////////////////
+  File mainFile;
+  File[] filesToCompile, filesInCache;
+  int[File] results; //command line console exit codes
+  string[][File] outputs, remainings; //raw output lines, remaining output lines after processing
+  BuildMessage[CodeLocation] messages; //all the things referencing a code location
+
+  private{ CodeLocation _lastAddedLocation;
+           BuildMessageType _lastAddedType; }
+
+  File[] allFiles;
+  bool[File] filesInFlight;
+  bool[File] filesInProject;
+
+  string[string] correctFileCase;
+
+  DateTime lastUpdateTime;
+
+  mixin ClassMixin_clear;
+
+  auto getBuildStateOfFile(File f) const{ with(ModuleBuildState){
+    if(f !in filesInProject) return notInProject;
+    if(auto r = f in results){
+      if(*r) return hasErrors;
+      return hasWarnings; //todo: detect hasDeprecations, flawless
+    }
+    return f in filesInFlight ? compiling : queued;
+  }}
+
+
+  string repairFileCase(string fn){
+    return correctFileCase.require(fn, (){
+      if(auto idx = allFiles.map!"a.fullName".countUntil!"icmp(a,b)==0"(fn)+1){
+        return allFiles[idx-1].fullName;
+      }else{
+        return File(fn).actualFile.fullName;
+      }
+    }());
+
+
+  }
+
+  private bool _processLine(string line){
+    try{
+      if(line.isWild(`?:\?*.d*(?*,?*):?*`)){
+        string fn = repairFileCase(wild[0]~`:\`~wild[1]~`.d`);
+        string mixinPostfix = wild[2];
+
+        //LOG(fn~mixinPostfix);
+        auto location = CodeLocation(File(fn~mixinPostfix), wild[3].to!int, wild[4].to!int),
+             content = wild[5];
+
+        void add(BuildMessage bm){
+          messages[bm.location] = bm;
+          _lastAddedLocation = bm.location;
+          _lastAddedType = bm.type;
+        }
+
+        if(content.startsWith("  ")){ //supplemental message
+          enforce(_lastAddedLocation);
+          add(BuildMessage(location, _lastAddedType, content.strip, _lastAddedLocation));
+          return true;
+        }else if(content.isWild(" ?*:?*")){ //original message
+          const type = wild[0].decapitalize.to!(BuildMessageType); //can throw
+          add(BuildMessage(location, type, wild[1].strip));
+          return true;
+        }
+      }
+    }catch(Exception e){ }
+    return false;
+  }
+
+
+  void receiveBuildMessages(){
+    while(receiveTimeout(0.msecs,
+      (in MsgBuildStarted msg){
+        clear;
+        mainFile       = msg.mainFile;
+        filesToCompile = msg.filesToCompile.dup;
+        filesInCache   = msg.filesInCache.dup;
+
+        allFiles = (filesToCompile~filesInCache);
+        allFiles.each!((f){ filesInProject[f] = true; });
+
+        msg.todos.each!(t => _processLine(t));
+      },
+      (in MsgCompileStarted msg){
+        auto f = filesToCompile.get(msg.fileIdx);
+        assert(f);
+        filesInFlight[f] = true;
+      },
+      (in MsgCompileProgress msg){
+
+        auto f = msg.file;
+        filesInFlight.remove(f);
+        results[f] = msg.result;
+
+        /+lines = msg.output.splitLines;
+        string[] remaining; //this is the output messages
+        foreach(line; lines){
+          if(_processLine(line)) continue;
+          remaining ~= line;
+        }
+
+        if(remaining.length && remaining[$-1]=="") remaining = remaining[0..$-1]; //todo: something puts an extra newline on it...*/
+
+        outputs[f] = lines;
+        remainings[f] = remaining;
+        +/
+
+        auto o = predecodeLdcOutput(msg.output);
+        foreach(m; o.messages) _processLine(m.join('\n'));
+
+        outputs[f] = msg.output.splitLines; //todo: not used anymore. Everything is in messages[]
+        remainings[f] = o.pragmas;  //todo: rename remainings to pragmas
+      },
+
+      (in MsgBuildFinished msg){
+        filesInFlight.clear;
+
+        //todo: clear currently compiling modules.
+        //decide the global success of the build procedure
+        //todo: there are errors whose source are not specified or not loaded, those must be displayed too. Also the compiler output.
+
+        dump.print;
+      }
+
+    )){
+      lastUpdateTime = now;
+    }
+
+  }
+
+
+  string dumpMessage(in BuildMessage bm, string indent=""){
+    string res = indent ~ bm.text ~"\n";
+
+    foreach(const v; messages.values)
+      if(v.parentLocation == bm.location)
+        res ~= dumpMessage(v, indent~"  ");
+
+    return res;
+  }
+
+  string dumpMessage(in CodeLocation location, string indent=""){
+    if(!location) return "";
+    if(const bm = location in messages)
+      return dumpMessage(*bm, indent);
+    return "";
+  }
+
+
+  string dump(){
+    string res;
+
+    res ~= ("\n");
+    res ~= ("///////////////////////////////////\n");
+    res ~= ("///  Output                     ///\n");
+    res ~= ("///////////////////////////////////\n");
+    static if(0){ auto f = mainFile;
+      if(f in remainings && remainings[f].length){
+        remainings[f].each!(a => res ~= a~"\n");
+      }
+    }else{
+      foreach(f; remainings.keys.sort){
+        if(f in remainings && remainings[f].length){
+          res ~= f.fullName~": Output:\n";
+          remainings[f].each!(a => res ~= a~"\n");
+        }
+      }
+    }
+    res ~= "\n";
+
+    res ~= ("///////////////////////////////////\n");
+    res ~= ("///  Messages                   ///\n");
+    res ~= ("///////////////////////////////////\n");
+    foreach(loc; messages.keys.sort){
+      const bm = messages[loc];
+      if(!bm.parentLocation)
+        res ~= dumpMessage(bm, "  ");
+    }
+    res ~= "\n";
+
+    return res;
+  }
 
 }

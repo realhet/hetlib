@@ -1173,8 +1173,9 @@ public:
       if(ch=='f' || ch=='F') { fetch; size = 4; }
       else if(ch=='L')       {  fetch; size = 10; }
 
-      bool isImag;
-      if(ch=='i')            { fetch; isImag = true; }
+      enum isImag = false; //imaginary numbers are no longer supported.
+      //if(ch=='i')            { fetch; isImag = true; }
+      //note: LDC2 -verrors-context: Imaginary numbers can generate deprecation message without a source code location, then the compiler crashes when attempting to generate a verrors-context for that.
 
       //put it together
       real rbase = base;
@@ -1185,9 +1186,9 @@ public:
       //place it into the correct type
       Variant v;
       if(isImag){
-        if(size== 4) v = 1.0i * cast(float)num; else
+        /+if(size== 4) v = 1.0i * cast(float)num; else
         if(size== 8) v = 1.0i * cast(double)num; else
-                     v = 1.0i * cast(real)num;
+                     v = 1.0i * cast(real)num;+/
       }else{
         if(size== 4) v = cast(float) num; else
         if(size== 8) v = cast(double) num; else
