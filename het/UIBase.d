@@ -909,33 +909,7 @@ class Cell{ // Cell ////////////////////////////////////
   }
   final void setProps(string cmdLine){ setProps(cmdLine.commandLineToMap); }
 
-  //subCells
-  void clearSubCells() { }
-  @property Cell[] subCells() { return []; }
-  @property void subCells(Cell[] cells) { notImpl("setSubCells"); }
-
-  final auto subContainers(){ return subCells.map!(c => cast(Container)c).filter!"a"; }
-
-  void append     (Cell   c){ ERR("Can't append() in a Cell"); }
-  void appendMulti(Cell[] a){ ERR("Can't appendMulti() in a Cell"); } //todo: subCell things should be put in Container!
-
   void draw(Drawing dr) { }
-
-  //append Glyphs
-  void appendImg (File  fn, in TextStyle ts){ append(new Img(fn, ts.bkColor)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
-  void appendChar(dchar ch, in TextStyle ts){ append(new Glyph(ch, ts)); }
-  void appendStr (string s, in TextStyle ts){ foreach(ch; s.byDchar) appendChar(ch, ts); }
-
-  void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax){
-    auto g = new Glyph(ch, ts);
-    g.syntax = syntax;
-    append(g);
-  }
-
-  //elastic tabs
-  int[] tabIdx() { return []; }
-  int tabCnt() { return cast(int)tabIdx.length; } //todo: int -> size_t
-  float tabPos(int i) { with(subCells[tabIdx[i]]) return outerRight; }
 
   bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0)){
     auto hitBnd = getHitBounds + ofs;
@@ -1000,7 +974,7 @@ class Cell{ // Cell ////////////////////////////////////
 //      cast(.Container)this ? (cast(.Container)this).flags.text : "",
       cast(.Glyph)this ? (cast(.Glyph)this).ch.text.quoted : ""
     );
-    foreach(c; subCells)
+    if(auto cntr = cast(Container)this) foreach(c; cntr.subCells)
       c.dump(indent+1);
   }
 
@@ -1535,11 +1509,11 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
       if(cmd=="row"   ){
         auto a = new Row(params["1"], tsNormal);
         a.setProps(params);
-        container.append(a);
+        container.appendCell(a);
       }else if(cmd=="img"){
         auto img = new Img(File(params["1"]), ts.bkColor);
         img.setProps(params);
-        container.append(img);
+        container.appendCell(img);
       }else if(cmd=="char"   ){
         container.appendChar(dchar(params["1"].toInt), ts);
       }else if(cmd=="symbol"    ){
@@ -1554,9 +1528,9 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
         r.innerHeight = ts.fontHeight;
         r.outerWidth = params["1"].toWidthHeight(g_actFontHeight);
         r.setProps(params);
-        container.append(r);
+        container.appendCell(r);
       }else if(cmd=="flex"  ){
-        container.append(new Row(tag("prop flex=1"), ts));
+        container.appendCell(new Row(tag("prop flex=1"), ts));
       }else if(cmd=="link"   ){
         /*import het.ui: Link;
         container.append(new Link(params["1"], 0, false, null));*/
@@ -1873,6 +1847,34 @@ private{ //wrappedLine[] functionality
 
 
 // Elastic Tabs //////////////////////////////////////////
+
+//elastic tabs
+int[] tabIdx(Cell c) {
+  if(auto r = cast(Row)c) return r.tabIdx;
+                     else return [];
+}
+
+int tabCnt(Cell c) {
+  return cast(int)c.tabIdx.length; //todo: int -> size_t
+}
+
+float tabPos(Cell c, int i) {
+  if(auto r = cast(Row)c) return r.subCells[r.tabIdxInternal[i]].outerRight;
+                     else return 0;
+}
+
+Glyph[] subGlyphs(Cell c){
+  if(auto r = cast(Container)c) return cast(Glyph[])r.subCells;
+                           else return [];
+}
+
+
+Glyph subGlyph(Cell c, int i){
+  if(auto r = cast(Container)c) return cast(Glyph)r.subCells.get(i);
+                           else return null;
+}
+
+
 void processElasticTabs(Cell[] rows, int level=0){
   bool tabCntGood(Cell row){ return row.tabCnt > level; }
 
@@ -1887,7 +1889,7 @@ void processElasticTabs(Cell[] rows, int level=0){
 
     foreach(row; range){
       auto tIdx = row.tabIdx[level],
-           tab = cast(Glyph)(row.subCells[tIdx]),
+           tab = row.subGlyph(tIdx),
            delta = rightMostTabPos-(tab.outerRight);
 
       if(delta){
@@ -1895,7 +1897,7 @@ void processElasticTabs(Cell[] rows, int level=0){
 
         //todo: itt ha tordeles van, akkor ez szar.
         float flexRatioSum = 0;
-        foreach(g; row.subCells[tIdx+1..$]){
+        foreach(g; (cast(Container)row).subCells[tIdx+1..$]){
           g.outerPos.x += delta; //shift the cells
           if(g.flex) flexRatioSum += g.flex;
         }
@@ -2068,7 +2070,6 @@ class Container : Cell { // Container ////////////////////////////////////
   auto getScrollOffset(){ return vec2(getHScrollOffset, getVScrollOffset); }
 
   protected{
-    Cell[] subCells_;
     public{ //todo: ezt a publicot leszedni es megoldani szepen
       _FlexValue flex_;
       Margin margin_  ;
@@ -2077,12 +2078,44 @@ class Container : Cell { // Container ////////////////////////////////////
     }
   }
 
-  auto removeLast(T = Cell)() { return cast(T)(subCells_.fetchBack); }
+/*  override{
+    void clearSubCells(){ subCells_ = []; }
+    @property Cell[] subCells() { return subCells_; }
+    @property void subCells(Cell[] cells) { subCells_ = cells; }
+  }*/
+
+  //subCells
+  Cell[] subCells;
+  void clearSubCells() { subCells = []; }
+  final auto subContainers(){ return subCells.map!(c => cast(Container)c).filter!"a"; }
+
+  void appendCell (Cell   c){ subCells ~= c; }
+
+
+  final void append(Cell c){ appendCell(c); }
+  final void append(Cell[] r){ r.each!(c => appendCell(c)); }
+
+  final void append(void delegate() fun){
+    import het.ui : im;
+    append(im.build(fun));
+  }
+
+  void appendImg (File  fn, in TextStyle ts){ appendCell(new Img(fn, ts.bkColor)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
+  void appendChar(dchar ch, in TextStyle ts){ appendCell(new Glyph(ch, ts)); }
+  void appendStr (string s, in TextStyle ts){ foreach(ch; s.byDchar) appendChar(ch, ts); } //todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
+
+  void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax){
+    auto g = new Glyph(ch, ts);
+    g.syntax = syntax;
+    appendCell(g);
+  }
+
+  auto removeLast(T = Cell)() { return cast(T)(subCells.fetchBack); }
   auto removeLastContainer() { return removeLast!Container; }
 
   bool removeLastChar(dchar ch){
-    if(subCells_.length) if(auto c = cast(Glyph)subCells_[$-1]) if(c.ch==ch){
-      subCells_ = subCells_[0..$-1];
+    if(subCells.length) if(auto c = cast(Glyph)subCells[$-1]) if(c.ch==ch){
+      subCells = subCells[0..$-1];
       return true;
     }
     return false;
@@ -2096,8 +2129,8 @@ class Container : Cell { // Container ////////////////////////////////////
     return false;
   }
 
-  void internal_setSubCells(Cell[] c){
-    subCells_ = c;
+  void internal_setSubCells(Cell[] c){ //todo: remove this
+    subCells = c;
   }
 
   final override{
@@ -2125,15 +2158,6 @@ class Container : Cell { // Container ////////////////////////////////////
 
   void parse(string s, TextStyle ts = tsNormal){
     enforce("notimpl");
-  }
-
-  override{
-    void clearSubCells(){ subCells_ = []; }
-    @property Cell[] subCells() { return subCells_; }
-    @property void subCells(Cell[] cells) { subCells_ = cells; }
-
-    void append     (Cell   c){ subCells_ ~= c; }
-    void appendMulti(Cell[] a){ subCells_ ~= a; }
   }
 
   protected{
@@ -2625,8 +2649,6 @@ class Row : Container { // Row ////////////////////////////////////
   //for Elastic tabs
   /+private+/ int[] tabIdxInternal;
 
-  override int[] tabIdx() { return tabIdxInternal; }
-
   void refreshTabIdx(){
     tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array;
   }
@@ -2644,10 +2666,15 @@ class Row : Container { // Row ////////////////////////////////////
     appendMulti(cast(Cell[])cells);
   }
 
-  override void appendChar(dchar ch, in TextStyle ts){
+  override void appendCell(Cell c){
+    if(isTab(c)) tabIdxInternal ~= cast(int)subCells.length;
+    super.appendCell(c);
+  }
+
+  /*override void appendChar(dchar ch, in TextStyle ts){
     if(ch==9) tabIdxInternal ~= cast(int)subCells.length; //Elastic Tabs
     super.appendChar(ch, ts);
-  }
+  }*/
 
   private void solveFlexAndMeasureAll(){
     float flexSum = 0;
@@ -2732,7 +2759,7 @@ class Row : Container { // Row ////////////////////////////////////
 
   /// this works on the Row as if it were a one-liner. This is not the WrappedLines version.
   private void adjustTabSizes_singleLine(){
-    foreach(idx, tIdx; tabIdx){
+    foreach(idx, tIdx; tabIdxInternal){
       const isLeading = idx==tIdx; //it's not good for multiline!!!
       adjustTabSize(subCells[tIdx], isLeading);
     }

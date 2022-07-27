@@ -58,7 +58,7 @@ class Document : Column { // Document /////////////////////////////////
     else if(s.startsWithTag("chapter3")){ ts = tsChapter3; actChapterLevel = 4; addChapter(s, 2); }
 
     //extra space, todo:margins
-    if(chkSet(lastChapterLevel, actChapterLevel)) append(new Row(tag("prop height=1x"), tsNormal));
+    if(chkSet(lastChapterLevel, actChapterLevel)) appendCell(new Row(tag("prop height=1x"), tsNormal));
 
     super.parse(s, ts);
   }
@@ -550,6 +550,22 @@ struct im{ static:
   private struct StackEntry{ .Container container; bool enabled; TextStyle textStyle; string theme; }
   private StackEntry[] stack;
 
+  //Note: build* functions are only callable from update()
+
+  // Build an array of cells using a temporary container
+  Cell[] build(string srcModule=__MODULE__, size_t srcLine=__LINE__,A...)(in A args){
+    Container!(.Container, srcModule, srcLine)(args);
+    return removeLastContainer.subCells;
+  }
+
+  auto buildContainer(T : .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args){
+    Container!(T, srcModule, srcLine)(args);
+    return cast(T)removeLastContainer;
+  }
+
+  auto buildRow   (string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args){ return buildContainer!(.Row   , srcModule, srcLine)(args); }
+  auto buildColumn(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args){ return buildContainer!(.Column, srcModule, srcLine)(args); }
+
   void reset(){
     //statck reset
     enabled = true;
@@ -603,8 +619,8 @@ struct im{ static:
     return null;
   }
 
-  private void append(T : Cell)(T c){
-    if(actContainer !is null) actContainer.append(c);
+  private void append(Cell c){
+    if(actContainer !is null) actContainer.appendCell(c);
                          else root ~= c;
   }
 
@@ -907,34 +923,19 @@ struct im{ static:
     }}
   }
 
-  void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args){  // Column //////////////////////////////
-    mixin(prepareId, enable.M);
-
-    auto column = new .Column;
-    append(column); push(column, id_); scope(exit) pop;
-
-    column.bkColor = style.bkColor; //todo: miafaszom ez?
-
-    processContainerArgs(args);
-  }
-
-  void Row(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){  // Row //////////////////////////////
-    mixin(prepareId, enable.M);
-
-    auto row = new .Row("", textStyle);
-    append(row); push(row, id_); scope(exit) pop;
-
-    processContainerArgs(args);
-  }
-
-  void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(T args){  // Container //////////////////////////////
+  void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){  // Container //////////////////////////////
     mixin(prepareId, enable.M);
 
     auto cntr = new CType;
     append(cntr); push(cntr, id_); scope(exit) pop;
 
+    cntr.bkColor = style.bkColor; //note: inheriting bkcolor in a weird way, from the fontStyle
+
     processContainerArgs(args);
   }
+
+  void Row   (string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ Container!(.Row   , srcModule, srcLine)(args); }
+  void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ Container!(.Column, srcModule, srcLine)(args); }
 
   // popup state
   struct PopupState{

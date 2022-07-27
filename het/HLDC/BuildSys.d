@@ -65,6 +65,8 @@ auto predecodeLdcOutput(string input){
 
   auto lines = input.splitLines;
 
+  if(lines.length && lines[$-1]=="") lines = lines[0..$-1]; //last line is always empty. Just remove it.
+
   int lastMessageIdx = -1;
   string[] stack; //contains possible pragma messages
 
@@ -1944,5 +1946,38 @@ class BuildResult{ // BuildResult //////////////////////////////////////////////
     return subMessages;
   }
 
-
 }
+
+
+/// Error collection ///////////////////////////////////
+/+
+
+c:\d\libs\het\tokenizer.d(792,41): Deprecation: use `{ }` for an empty statement, not `;`
+c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+
+C:\D\projects\DIDE\dide2.d(383,22): Error: constructor `dide2.Label.this(int height, bool bold, Vector!(float, 2) pos, string str, bool alignRight, float parentWidth = 0.0F)` is not callable using argument types `(int, bool, string, bool, const(float))`
+C:\D\projects\DIDE\dide2.d(383,22):        cannot pass argument `src.bigComments[k]` of type `string` to parameter `Vector!(float, 2) pos`
+
+C:\D\projects\DIDE\dide2.d(338,28): Error: undefined identifier `r`
+
+C:\D\projects\DIDE\dide2.d(324,7): Error: no property `height` for type `het.uibase.TextStyle`
+  //todo: no property for type: missleading when the property name is correct but it's private or protected.
+
+C:\D\projects\DIDE\dide2.d(383,59): Error: found `src` when expecting `)`
+C:\D\projects\DIDE\dide2.d(383,104): Error: found `)` when expecting `;` following statement
+C:\D\projects\DIDE\dide2.d(383,104): Error: found `)` instead of statement
+
+C:\D\projects\DIDE\dide2.d(331,20): Error: cannot implicitly convert expression `isRegion` of type `const(uint)` to `bool`
+
+C:\D\testGetAssociatedIcon.d(29,15): Error: undefined identifier `DestroyIcon`
+
+C:\D\projects\DIDE\dide2.d(51,2): Error: `@identifier` or `@(ArgumentList)` expected, not `@{`
+
+C:\D\projects\DIDE\dide2.d(103,24): Error: found `cmd` when expecting `)`
+
+C:\D\projects\DIDE\dide2.d(103,28): Error: found `{` when expecting `;` following statement
+
+C:\D\projects\DIDE\dide2.d(104,5): Error: found `)` instead of statement
+
+C:\D\projects\DIDE\dide2.d(107,1): Error: unrecognized declaration
++/
