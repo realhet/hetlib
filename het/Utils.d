@@ -5745,7 +5745,9 @@ struct FileEntry{
 }
 
 ///similar directory listing like the one in totalcommander
-static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
+auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
+
+auto myCmp(T)(in T a, in T b){ return a==b ? 0 : a<b ? 1 : -1; }
 
 FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
   path = path.normalized;

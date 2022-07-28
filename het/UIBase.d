@@ -14,7 +14,7 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
-  VisualizeGlyphs          = 0,
+  VisualizeGlyphs          = 1,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
@@ -1850,7 +1850,7 @@ private{ //wrappedLine[] functionality
 
 //elastic tabs
 int[] tabIdx(Cell c) {
-  if(auto r = cast(Row)c) return r.tabIdx;
+  if(auto r = cast(Row)c) return r.tabIdxInternal;
                      else return [];
 }
 
