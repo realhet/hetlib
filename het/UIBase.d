@@ -14,7 +14,7 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
-  VisualizeGlyphs          = 1,
+  VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0;
