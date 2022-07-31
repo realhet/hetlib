@@ -926,7 +926,14 @@ struct im{ static:
   void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){  // Container //////////////////////////////
     mixin(prepareId, enable.M);
 
-    auto cntr = new CType;
+    static if(__traits(compiles, new CType)){
+      auto cntr = new CType;
+    }else{
+      alias FirstCtorParam = ParameterTypeTuple!(__traits(getOverloads, CType, "__ctor")[0])[0];
+      static assert(is(FirstCtorParam : .Container), "If there is no () constructor, the first parameter must be a Container. actContainer will be sent to it as the parent.");
+      auto cntr = new CType(cast(FirstCtorParam)actContainer); //try to give parent for the new control
+    }
+
     append(cntr); push(cntr, id_); scope(exit) pop;
 
     cntr.bkColor = style.bkColor; //note: inheriting bkcolor in a weird way, from the fontStyle

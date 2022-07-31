@@ -494,6 +494,7 @@ immutable RGB
 
   clGold            = 0x00D7FF,
   clBronze          = 0x327FCD,
+  clPink            = 0xCBC0FF,
 
 //standard vga palette
   clVgaBlack        = 0x000000,

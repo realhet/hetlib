@@ -1724,7 +1724,7 @@ struct CodeLocation{ //CodeLocation ////////////////////////
 
 enum BuildMessageType{ find, error, bug, warning, deprecation, todo, opt } //todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");
 
-auto buildMessageTypeColors = [clWhite, clRed, clOrange, clYellow, clAqua, clWowBlue, clWowPurple];
+auto buildMessageTypeColors = [clPink/*clWhite*/, clRed, RGB(0x0040FF)/*clOrange*/, clYellow, clAqua, clWowBlue, clWowPurple];
 auto color(in BuildMessageType t){ return buildMessageTypeColors[t]; }
 
 auto buildMessageTypeCaptions = [/+im.symbol("Zoom")+/"Find", "Err", "Bug", "Warn", "Depr", "Todo", "Opt"];

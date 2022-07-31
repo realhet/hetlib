@@ -476,13 +476,15 @@ auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp)
 
 enum ErrorHandling { ignore, raise, track }
 
-T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__){
+/+T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__){
   if(!value){
     auto s = str; if(s.empty) s = " ";  //node: enforce without message:     -> object.Exception@C:\D\Projects\Karc\karc2.d(79)          <- DIDE can't interpret this.
     stdEnforce(0, s, file, line);
   }
   return value;
-}
+} +/
+
+alias enforce = stdEnforce;
 
 ///this version compares 2 values and shows the difference too
 void enforceDiff(T)(in T expected, in T actual, lazy string caption="", string file = __FILE__, int line = __LINE__){
