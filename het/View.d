@@ -24,7 +24,7 @@ public:
 
   // extra information from external source in screen space
   vec2 mousePos, mouseLast;
-  bounds2 screenBounds;
+  bounds2 screenBounds_anim, screenBounds_dest; //todo: maybe anim/destination should be 2 identical viewTransform struct. Not a boolean parameter in EVERY member...
 
   this(){}
 
@@ -68,9 +68,14 @@ public:
     return res;
   }
 
-  auto subScreenBounds() const{ //note: subsceen is the mostly visible area on the view's surface. The portion of the screen that remains visible aster the overlayed GUI.
-    return bounds2(mix(screenBounds.topLeft, screenBounds.bottomRight, subScreenArea.topLeft    ),
-                   mix(screenBounds.topLeft, screenBounds.bottomRight, subScreenArea.bottomRight));
+  auto subScreenBounds_anim() const{ //note: subsceen is the mostly visible area on the view's surface. The portion of the screen that remains visible aster the overlayed GUI.
+    return bounds2(mix(screenBounds_anim.topLeft, screenBounds_anim.bottomRight, subScreenArea.topLeft    ),
+                   mix(screenBounds_anim.topLeft, screenBounds_anim.bottomRight, subScreenArea.bottomRight));
+  }
+
+  auto subScreenBounds_dest() const{ //note: subsceen is the mostly visible area on the view's surface. The portion of the screen that remains visible aster the overlayed GUI.
+    return bounds2(mix(screenBounds_dest.topLeft, screenBounds_dest.bottomRight, subScreenArea.topLeft    ),
+                   mix(screenBounds_dest.topLeft, screenBounds_dest.bottomRight, subScreenArea.bottomRight));
   }
 
 
@@ -115,7 +120,9 @@ public:
 
   void zoom(float amount)       { scale = pow(2, log2(scale)+amount*scrollRate); }
 
-  void zoom(in bounds2 bb, float overZoomPercent = 3){
+  enum DefaultOverZoomPercent = 5;
+
+  void zoom(in bounds2 bb, float overZoomPercent = DefaultOverZoomPercent){
     if(!bb.valid || !subScreenArea.valid) return;
     //corrigate according to subScreenArea
     auto realClientSize = clientSize * subScreenArea.size; //in pixels
@@ -129,6 +136,35 @@ public:
 
     //corrigate according to subScreenArea: shift
     origin -= subScreenShift * invScale;
+  }
+
+  void scrollZoom(in bounds2 target, float overZoomPercent = DefaultOverZoomPercent){
+    if(!target.valid || !subScreenArea.valid) return;
+
+    //world space screen bounds offseted inside
+    auto sb = subScreenBounds_dest;
+    if(overZoomPercent){
+      auto border = min(abs(sb.width), abs(sb.height))*(0.01f*overZoomPercent);
+      sb = sb.inflated(-border);
+    }
+
+    //scale up the screen if the target donesn't fit inside
+    float requiredScale = max(max(1, target.height/sb.height), max(1, target.width/sb.width));
+    if(requiredScale>1){
+      const c = sb.center;
+      sb = (sb-c)*requiredScale+c;
+    }
+
+    //calculate offset needed to shift target into screen
+    float calcOfs(float s0, float s1, float t0, float t1){
+      return s0>t0 ? s0-t0 : s1<t1 ? s1-t1 : 0;
+    }
+    auto ofs = vec2(calcOfs(sb.left, sb.right , target.left, target.right ),
+                    calcOfs(sb.top , sb.bottom, target.top , target.bottom));
+
+    //execute changes
+    if(requiredScale>1) scale = scale/requiredScale;
+    if(ofs) origin -= ofs;
   }
 
   bool _mustZoomAll; //schedule zoom all on the next draw
@@ -175,18 +211,18 @@ public:
       group("View controls");          ////todo: ctrl+s es s (mint move osszeakad!)
 
       const enm = mouseEnabled;   //todo: actions are deprecated. This view.navigate function should be replaced with az IMGUI enable flag and a hidden window.
-      onActive  ("Scroll"              , "MMB RMB"     , enm, { scroll(inputs.mouseDelta); }         );
-      onDelta   ("Zoom"                , "MW"          , enm, (x){ zoomAroundMouse(x*wheelSpeed); }  );
+      onActive  ("Scroll"              , "MMB RMB"     , enm , { scroll(inputs.mouseDelta); }         );
+      onDelta   ("Zoom"                , "MW"          , enm , (x){ zoomAroundMouse(x*wheelSpeed); }  );
 
       const enk = keyboardEnabled;
-      onActive  ("Scroll left"         , "A"           , enk, { scrollH( scrollSpeed); }             );
-      onActive  ("Scroll right"        , "D"           , enk, { scrollH(-scrollSpeed); }             );
-      onActive  ("Scroll up"           , "W"           , enk, { scrollV( scrollSpeed); }             );
-      onActive  ("Scroll down"         , "S"           , enk, { scrollV(-scrollSpeed); }             );
-      onActive  ("Zoom in"             , "PgUp"        , enk, { zoom( zoomSpeed); }                  );
-      onActive  ("Zoom out"            , "PgDn"        , enk, { zoom(-zoomSpeed); }                  );
-      onModifier("Scroll/Zoom slower"  , "Shift"       , enk, scrollSlower                           );
-      onPressed ("Zoom all"            , "Home"        , enk, { zoomAll; }                           );
+      onActive  ("Scroll left"         , "A"           , enk , { scrollH( scrollSpeed); }             );
+      onActive  ("Scroll right"        , "D"           , enk , { scrollH(-scrollSpeed); }             );
+      onActive  ("Scroll up"           , "W"           , enk , { scrollV( scrollSpeed); }             );
+      onActive  ("Scroll down"         , "S"           , enk , { scrollV(-scrollSpeed); }             );
+      onActive  ("Zoom in"             , "PgUp"        , enk , { zoom( zoomSpeed); }                  );
+      onActive  ("Zoom out"            , "PgDn"        , enk , { zoom(-zoomSpeed); }                  );
+      onModifier("Scroll/Zoom slower"  , "Shift"       , enk || enm, scrollSlower                           );
+      onPressed ("Zoom all"            , "Home"        , enk , { zoomAll; }                           );
     }
 
     bool res = origin!=oldOrigin || scale!=oldScale;
@@ -231,6 +267,42 @@ public:
         origin.y        = a[2];
       }
     }catch(Throwable){}
+  }
+
+  //Smart scrolling/zooming /////////////////////////////////////////////////////////
+
+  struct ScrollTarget{
+    bounds2 rect;
+    DateTime when;
+  }
+
+  ScrollTarget[] scrollTargets;
+  bool mustScroll; //a new scroll target has been added, so on next update it needs to scroll there
+
+  void smartScrollTo(bounds2 rect){
+    if(!rect) return;
+
+    auto t = application.tickTime,
+         idx = scrollTargets.map!"a.rect".countUntil(rect);
+
+    if(idx>=0){
+      scrollTargets[idx].when = t; //just update the time
+    }else{
+      scrollTargets ~= ScrollTarget(rect, t);
+      mustScroll = true;
+    }
+  }
+
+  void updateSmartScroll(){
+    if(mustScroll.chkClear){
+      auto bnd = scrollTargets.map!"a.rect".fold!"a |= b"(bounds2.init);
+      if(bnd)
+        scrollZoom(bnd);
+    }
+
+    //filter out too old rocts
+    const t = now-1*second;
+    scrollTargets = scrollTargets.filter!(a => a.when>t).array;
   }
 
 }

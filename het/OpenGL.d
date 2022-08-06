@@ -2177,8 +2177,8 @@ protected:
     vec2 mp = mouse.act.screen;
     bounds2 bnd = clientBounds;
 
-    with(view   ){ mouseLast = mousePos; mousePos = invTrans(mp); screenBounds = invTrans(bnd); workArea_accum = bounds2.init; }
-    with(viewGUI){ mouseLast = mousePos; mousePos = invTrans(mp); screenBounds = invTrans(bnd); workArea_accum = bounds2.init; }
+    with(view   ){ mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
+    with(viewGUI){ mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
   }
 
   override void onUpdateViewAnimation(){

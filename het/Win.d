@@ -860,6 +860,7 @@ public:
 
     //ticking
     application.tick++;
+    application.tickTime = now;
 
     //flush the keyboard input queue (WM_CHAR event)
     scope(exit) inputChars = "";

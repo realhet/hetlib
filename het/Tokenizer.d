@@ -1,5 +1,8 @@
 module het.tokenizer;
-import het.utils, het.keywords, std.variant;
+
+public import het.utils, het.keywords;
+
+import std.variant;
                                           //todo: size_t-re atallni
 //TEST: testTokenizer()
 
@@ -25,6 +28,8 @@ const CompilerVersion = 100;
 //todo: TokenKind. camelCase
 
 //todo: "/+ newline //+ is bad.
+
+//todo: detect 3 spaces exotic indent.
 
 enum TokenKind {unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat};
 

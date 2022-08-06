@@ -183,6 +183,7 @@ __gshared static private:  //__gshared is for variables, static is for functions
 
 __gshared static public:///////////////////////////////////////////////////////////////////
   uint tick; //enough for 2 years @ 60Hz
+  DateTime tickTime;
 
   import core.runtime : Runtime;
   alias args = Runtime.args;
@@ -7562,15 +7563,21 @@ void listModuiles(){
 
 struct UDA{}
 
+enum VerbFlag { hold=1 }
+
 @UDA{
   // het.stream
   struct STORED{}
-  struct VERB{ string keyCombo; }
+
+  struct VERB{ string keyCombo; int flags; }
+  auto HOLD( string keyCombo){ return VERB(keyCombo, VerbFlag.hold); }
+
   struct HEX{}
   struct BASE64{}
 
   // het.ui
-  struct UI{}    // similar to @Composable.  It alters the UI's state
+  //struct UI{}    // similar to @Composable.  It alters the UI's state
+  //note: UI is ised for the default UI function. Conflicts with this UDA
 
   //het.opengl
   struct UNIFORM{ string name=""; } //marks a variable as gl.Shader attribute
@@ -7712,6 +7719,8 @@ private void globalInitialize(){ //note: ezek a runConsole-bol vagy a winmainbol
                                  //todo: a unittest alatt nem indul ez el.
   //todo: functional tests: nem ide kene
   //functional tests
+
+  application.tickTime = now;
 
   installExceptionFilter;
 

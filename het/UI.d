@@ -146,7 +146,7 @@ struct im{ static:
     comboOpening = false;
 
     //this is needed for PanelPosition
-    clientArea = targetSurfaces[1].view.screenBounds; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
+    clientArea = targetSurfaces[1].view.screenBounds_anim; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 
     static DeltaTimer dt;
     deltaTime = dt.update;
@@ -175,7 +175,7 @@ struct im{ static:
     //measure
     foreach(a; rc) if(!a.flags._measured) a.measure; //some panels are already have been measured
 
-    const screenBounds = targetSurfaces[1].view.screenBounds;
+    const screenBounds = targetSurfaces[1].view.screenBounds_anim;
 
     //todo: remove this: applyScrollers(screenBounds);
 
@@ -257,7 +257,7 @@ struct im{ static:
     foreach(i, ref d; dr){        ref view(){ return targetSurfaces[i].view; }
       d.zoomFactor    = view.scale   ;
       d.invZoomFactor = view.invScale;
-      d.pushClipBounds(view.screenBounds.inflated(-view.screenBounds.size*0));
+      d.pushClipBounds(view.screenBounds_anim.inflated(-view.screenBounds_anim.size*0));
     }
 
     foreach(i; 0..2) surfaceBounds[i] = bounds2.init;
@@ -3231,7 +3231,7 @@ void update(ref ResourceMonitor rm){ with(rm){
 }}
 
 
-@UI void ui(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
+void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 
   immutable
     clTexturePool = RGB(255, 180, 40),

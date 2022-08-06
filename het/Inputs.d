@@ -302,8 +302,11 @@ void callVerbs(T)(T a){
      enum verb = getUDA!(Member, VERB); //note: het.utils.getUDA will not fail with @VERB too, which is a type, not a VERB value.
      static if(verb.keyCombo!=""){
        //LOG("A", __traits(identifier, Member));
-       if(KeyCombo(verb.keyCombo).pressed)
-         __traits(getMember, a, __traits(identifier, Member))();
+       auto kc = KeyCombo(verb.keyCombo);
+
+       bool b = (verb.flags & VerbFlag.hold) ? kc.down : kc.typed;
+
+       if(b) __traits(getMember, a, __traits(identifier, Member))();
      }
   }}
 
