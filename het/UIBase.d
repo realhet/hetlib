@@ -2089,8 +2089,14 @@ class Container : Cell { // Container ////////////////////////////////////
   void clearSubCells() { subCells = []; }
   final auto subContainers(){ return subCells.map!(c => cast(Container)c).filter!"a"; }
 
-  void appendCell (Cell   c){ subCells ~= c; }
+  void appendCell (Cell c){ subCells ~= c; }
 
+  int cellCount(){ return cast(int)subCells.length; }
+
+  int subCellIndex(in Cell c) const{
+    //note: overflows at 2G items, I don't care because that would be 128GB memory usage.
+    return cast(int)subCells.countUntil(c);
+  }
 
   final void append(Cell c){ appendCell(c); }
   final void append(Cell[] r){ r.each!(c => appendCell(c)); }

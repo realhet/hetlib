@@ -22,9 +22,11 @@ private:
 public:
   vec2 origin;
 
-  // extra information from external source in screen space
+  // extra information from external source in screen space. All is in world coords
   vec2 mousePos, mouseLast;
   bounds2 screenBounds_anim, screenBounds_dest; //todo: maybe anim/destination should be 2 identical viewTransform struct. Not a boolean parameter in EVERY member...
+
+  @property bool isMouseInside() const{ return mousePos in subScreenBounds_anim; }
 
   this(){}
 

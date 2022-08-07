@@ -1426,7 +1426,7 @@ auto makeArray3(T, size_t N, size_t M, size_t O, T val)()
                    else return idx<arr.length           ? arr[idx] : V.init;
 }
 
-//Default can be a different type. In that case, result will be voncerted
+//Default can be a different type. In that case, result will be converted
 /*inout*/D get(V, I, D)(/*inout*/V[] arr, I idx, lazy D def) if(isIntegral!I){
   static if(isSigned!I) return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def;
                    else return idx<arr.length           ? arr[idx].to!D.ifThrown(def) : def;
