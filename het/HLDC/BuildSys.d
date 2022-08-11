@@ -1872,7 +1872,7 @@ class BuildResult{ // BuildResult //////////////////////////////////////////////
         //decide the global success of the build procedure
         //todo: there are errors whose source are not specified or not loaded, those must be displayed too. Also the compiler output.
 
-        dump.print;
+        //dump.print;
       }
 
     )){

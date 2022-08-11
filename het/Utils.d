@@ -993,18 +993,6 @@ bool isDescending(T0, T1)(in T0 a, in T1 b){ return a > b; }
 bool isAscending (T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b ? chain : a < b; }
 bool isDescending(T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b ? chain : a > b; }
 
-public import std.algorithm: sort, swap;
-
-void sort(T)(ref T a, ref T b){
-  if(a>b) swap(a,b);
-}
-
-void sort(T)(ref T a, ref T b, ref T c){
-  sort(a, b);
-  sort(a, c);
-  sort(b, c);
-}
-
 auto alignUp  (T, U)(T p, U align_) { return (p+(align_-1))/align_*align_; }
 auto alignDown(T, U)(T p, U align_) { return p/align_*align_; }
 
@@ -1370,7 +1358,7 @@ auto fetchBack(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
     return res;
   }else static if(isDynamicArray!T){
     if(arr.length){
-      auto res = arr[$-1];
+      auto res = arr.back;
       arr = arr[0..$-1];
       return res;
     }else{
@@ -1481,7 +1469,7 @@ bool addIfCan(T)(ref T[] arr, in T[] items) { bool res; foreach(const item; item
 
 deprecated("fetchFirst, not popFirst!"){
   T popFirst(T)(ref T[] arr){ auto res = arr[0  ]; arr = arr[1..$  ]; return res; }
-  T popLast (T)(ref T[] arr){ auto res = arr[$-1]; arr = arr[0..$-1]; return res; }
+  T popLast (T)(ref T[] arr){ auto res = arr.back; arr = arr[0..$-1]; return res; }
 
   T popFirst(T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popFirst(arr); }
   T popLast (T)(ref T[] arr, T default_){ if(arr.empty) return default_; return popLast (arr); }
@@ -1790,8 +1778,8 @@ struct SparseArray(K, V, V Def=V.init){ //todo: bitarray-ra megcsinalni a bool-t
   }
 
   void set(in K key, in V value){
-    if(keys.length && key>keys[$-1]){ //fast path: append or update the last value
-      if(values[$-1] != value) append_unsafe(key, value);
+    if(keys.length && key>keys.back){ //fast path: append or update the last value
+      if(values.back != value) append_unsafe(key, value);
       return;
     }
 
@@ -2040,11 +2028,11 @@ public:
       return;
     }
 
-    if(blocks.empty || blocks[$-1].data.length>=blockSize){
+    if(blocks.empty || blocks.back.data.length>=blockSize){
       appendBlock(data);
     }else{
-      blocks[$-1].data ~= data;
-      blocks[$-1].idxEn += len;
+      blocks.back.data ~= data;
+      blocks.back.idxEn += len;
       length_ += len;
     }
   }
@@ -2109,12 +2097,12 @@ public:
         if(toRead>0){
           auto data = f.rawRead(new T[cast(size_t)toRead]);
 
-          if(bt.doSeekForward && data[$-1]!=bt.seekForwardUntil){
+          if(bt.doSeekForward && data.back!=bt.seekForwardUntil){
             T[] extra;
             char[1] buff;
             while(!f.eof){
               extra ~= f.rawRead(buff);
-              if(extra[$-1]==bt.seekForwardUntil) break;
+              if(extra.back==bt.seekForwardUntil) break;
             }
             data ~= extra;
           }
@@ -2355,7 +2343,7 @@ string withoutFirstDir(char sep='\\')(string s){
 
 
 string[] withoutLastEmpty(string[] lines){
-  if(!lines.empty && lines[$-1].strip.empty) return lines[0..$-1];
+  if(!lines.empty && lines.back.strip.empty) return lines[0..$-1];
   return lines;
 }
 
@@ -2837,7 +2825,7 @@ string capitalizeFirstLetter(string s){
 }
 
 string stripRightReturn(string a){
-  if(a.length && a[$-1]=='\r') return a[0..$-1];
+  if(a.length && a.back=='\r') return a[0..$-1];
   return a;
 }
 
@@ -3452,7 +3440,7 @@ static T Singleton(T)() if(is(T == class)){ // Singleton ///////////////////////
   enum log = false;
 
   static if(isShared){
-    static T instance;
+    static T instance; //todo: initOnce does this locking too.
     static bool initialized;
     if(!initialized){
       synchronized{
@@ -4747,7 +4735,7 @@ private static:
     if(arr.length >= len) return arr;
     ubyte[] e; e.length = len-arr.length;
     e[0  ] |= 0x01;
-    e[$-1] |= 0x80;
+    e.back |= 0x80;
     return arr ~ e;
   }
 
@@ -5229,7 +5217,7 @@ public:
     return 0;
   }
 
-  Path parent() const { string s = dir; while(s!="" && s[$-1]!='\\') s.length--; return Path(s); }
+  Path parent() const { string s = dir; while(s!="" && s.back!='\\') s.length--; return Path(s); }
 
   bool make(bool mustSucceed=true)const{
     if(exists) return true;
@@ -5748,7 +5736,9 @@ struct FileEntry{
 }
 
 ///similar directory listing like the one in totalcommander
-auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
+auto cmpChain(int c1, lazy int c2)                           { return c1 ? c1 : c2; }
+auto cmpChain(int c1, lazy int c2, lazy int c3)              { return c1 ? c1 : c2 ? c2 : c3; }
+auto cmpChain(int c1, lazy int c2, lazy int c3, lazy int c4) { return c1 ? c1 : c2 ? c2 : c3 ? c3 : c4; }
 
 auto myCmp(T)(in T a, in T b){ return a==b ? 0 : a<b ? 1 : -1; }
 

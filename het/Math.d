@@ -21,7 +21,7 @@ public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI);
 public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly;
 
 // publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
-public import std.algorithm; //extends: cmp, any, all, equal, min, max
+public import std.algorithm; //extends : cmp, any, all, equal, min, max;
 
 public import std.functional; //extends: lessThan, greaterThan, not
 
@@ -1286,11 +1286,29 @@ auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
 
 //note: cmp is extending/hijacking std.algorihtm.cmp's functionality with vector/scalar mode.
 public import std.algorithm: cmp;
+//public import std.math: cmp;  <- maybe this should be included as well
 auto cmp(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)) { //no predicate, optional vector/scalar mode
-//  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){ // scalar vector combo? This function will serve it.
     return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b); // std.math.cmp(a, b) can only work on the excat same type.
-//  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
+} //todo: string compare nem megy a dide.d-ben. Narrow it down and ask on forum.
+//     print(het.math.cmp("a", "b"), cmp(1, 2), cmp(0.1, 0.2));  <- ha itt nincs "het.math", akkor hulye hibat dob: function conflicts with itself.
+
+/+auto cmp(A, B)(A a, B b) { //no predicate, optional vector/scalar mode
+  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){ // scalar vector combo? This function will serve it.
+    return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b); // std.math.cmp(a, b) can only work on the excat same type.
+  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
+}+/
+
+public import std.algorithm: sort;
+void sort(T)(ref T a, ref T b){
+  if(a>b) swap(a,b);
 }
+
+void sort(T)(ref T a, ref T b, ref T c){
+  sort(a, b);
+  sort(a, c);
+  sort(b, c);
+}
+
 
 auto mix(A, B, T)(in A a, in B b, in T t){ // result type is the common of A and B, not influenced by T
   static if(is(Unqual!T==bool)) return mix(a, b, int(t));

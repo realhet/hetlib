@@ -883,9 +883,17 @@ class Cell{ // Cell ////////////////////////////////////
     auto innerY() const { return innerPos.y; }          void innerY(float v) { outerPos.y = v-topLeftGapSize.y; }
     auto innerWidth () const { return innerSize.x; }    void innerWidth (float v) { outerSize.x = v+totalGapSize.x; }
     auto innerHeight() const { return innerSize.y; }    void innerHeight(float v) { outerSize.y = v+totalGapSize.y; }
+
+    auto outerLeft  () const { return outerX; }
     auto outerRight () const { return outerX+outerWidth ; }
+    auto outerTop   () const { return outerY; }
     auto outerBottom() const { return outerY+outerHeight; }
     auto innerCenter() const { return innerPos + innerSize*.5f; }
+
+    auto outerTopLeft    () const { return outerPos; }
+    auto outerTopRight   () const { return outerPos + vec2(outerWidth, 0); }
+    auto outerBottomRight() const { return outerPos + outerSize; }
+    auto outerBottomLeft () const { return outerPos + vec2(0, outerHeight); }
 
     //note when working with controls, it is like specify border and then the width, not including the border. So width is mostly means innerWidth
     alias pos = outerPos;
@@ -969,7 +977,7 @@ class Cell{ // Cell ////////////////////////////////////
   }
 
   void dump(int indent=0){
-    print("  ".replicate(indent), this.classinfo.name.split('.')[$-1], " ",
+    print("  ".replicate(indent), this.classinfo.name.split('.').back, " ",
       outerPos, innerSize, flex,
 //      cast(.Container)this ? (cast(.Container)this).flags.text : "",
       cast(.Glyph)this ? (cast(.Glyph)this).ch.text.quoted : ""
@@ -1249,7 +1257,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
     if(wrappedLines.empty) return ivec2(0);
 
     float yMin = wrappedLines[0].top,
-          yMax = wrappedLines[$-1].bottom,
+          yMax = wrappedLines.back.bottom,
           y = point.y;
 
     static if(1){ //above or below: snap to first/last line or start/end of the whole text.
@@ -1304,7 +1312,7 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
       col -= count;
     }
 
-    return ivec2(wrappedLines[$-1].cellCount, wrappedLineCount); //The cell after the last.
+    return ivec2(wrappedLines.back.cellCount, wrappedLineCount); //The cell after the last.
   }
 
   TextPos toIdx(in TextPos tp){
@@ -1676,7 +1684,7 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
   //const{ //todo: outerRight is not const
     auto top(){ return y0; }
     auto bottom(){ return top+height; }
-    auto right(){ return cells.length ? cells[$-1].outerRight : 0; }
+    auto right(){ return cells.length ? cells.back.outerRight : 0; }
     auto left(){ return cells.length ? cells[0].outerPos.x : 0; }
     auto calcWidth(){ assert(left==0); return right; } //todo: assume left is 0
   //}
@@ -1732,7 +1740,7 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
   }
 
   void hideRightSpace(){
-    if(cells.length && isWhite(cells[$-1]))
+    if(cells.length && isWhite(cells.back))
       cells[0].outerWidth = 0;
   }
 
@@ -1766,7 +1774,7 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
   auto selectCellsInRange(float x0, float x1){ //cell only need to touch the range
     int lo = 0, hi = 0;
     sort(x0, x1);
-    if(cells.empty || x1<cells[0].outerPos.x || x0>cells[$-1].outerRight) return tuple(lo, hi); //no intersection
+    if(cells.empty || x1<cells[0].outerPos.x || x0>cells.back.outerRight) return tuple(lo, hi); //no intersection
 
     foreach(i, c; cells) if(x0 <= c.outerRight){ lo = cast(int)i; break; }
     foreach_reverse(i, c; cells) if(x1 >= c.outerPos.x){ hi = cast(int)i+1; break; }
@@ -1779,7 +1787,7 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
 private{ //wrappedLine[] functionality
 
   float calcHeight(WrappedLine[] lines){
-    return lines.length ? lines[$-1].bottom - lines[0].y0 //todo: ezt nem menet kozben, hanem egy eloszamitaskent kene meghivni
+    return lines.length ? lines.back.bottom - lines[0].y0 //todo: ezt nem menet kozben, hanem egy eloszamitaskent kene meghivni
                         : 0;
   }
 
@@ -2120,7 +2128,7 @@ class Container : Cell { // Container ////////////////////////////////////
   auto removeLastContainer() { return removeLast!Container; }
 
   bool removeLastChar(dchar ch){
-    if(subCells.length) if(auto c = cast(Glyph)subCells[$-1]) if(c.ch==ch){
+    if(subCells.length) if(auto c = cast(Glyph)subCells.back) if(c.ch==ch){
       subCells = subCells[0..$-1];
       return true;
     }
