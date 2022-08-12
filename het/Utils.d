@@ -5,8 +5,6 @@ __gshared logFileOps = false;
 pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 
 //todo: ref const for opCmp and opEquals
-//bug: rewrite DateTime.opCmp using normal cmp()
-//bug: verify myCmp
 
 //toto:  //bug: tag must be a thing
 //todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
@@ -87,7 +85,7 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 // Imports /////////////////////////////
 
 // std imports
-public import std.array, std.string, std.conv, std.typecons, std.range, std.format, std.traits, std.meta; //het.math also imports std.algorithm, std.functional
+public import std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta; //het.math also imports std.string, std.uni, std.algorithm, std.functional
 public import core.stdc.string : memcpy;
 public import std.utf;
 public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum;
@@ -5276,9 +5274,9 @@ public:
   }
 
   /+note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
-  int opCmp(const Path b)       const{ return fullPath>b.fullPath ? 1 : fullPath<b.fullPath ? -1 : 0; }
-  bool opEquals(const Path b)   const{ return fullPath==b.fullPath; }
-  size_t toHash()               const{ return fullPath.hashOf; }
+  int opCmp(in Path b)       const{ return cmp(fullPath, b.fullPath); }
+  bool opEquals(in Path b)   const{ return fullPath==b.fullPath; }
+  size_t toHash()            const{ return fullPath.hashOf; }
 
 }
 
@@ -5612,8 +5610,8 @@ public:
           `font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
           Also avoid normalization because it is depends on the contents of the HDD.+/
 
-  int opCmp(const File b)       const{ return fullName>b.fullName ? 1 : fullName<b.fullName ? -1 : 0; }
-  bool opEquals(const File b)   const{ return fullName==b.fullName; }
+  int opCmp(in File b)       const{ return cmp(fullName, b.fullName); }
+  bool opEquals(in File b)   const{ return fullName==b.fullName; }
   size_t toHash()               const{ return fullName.hashOf; }
 
 
@@ -5740,11 +5738,6 @@ struct FileEntry{
 }
 
 ///similar directory listing like the one in totalcommander
-auto cmpChain(int c1, lazy int c2)                           { return c1 ? c1 : c2; }
-auto cmpChain(int c1, lazy int c2, lazy int c3)              { return c1 ? c1 : c2 ? c2 : c3; }
-auto cmpChain(int c1, lazy int c2, lazy int c3, lazy int c4) { return c1 ? c1 : c2 ? c2 : c3 ? c3 : c4; }
-
-auto myCmp(T)(in T a, in T b){ return a==b ? 0 : a<b ? 1 : -1; }
 
 FileEntry[] listFiles(Path path, string mask="", string order="name", Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive){ //this is similar to
   path = path.normalized;
@@ -6760,7 +6753,9 @@ struct DateTime{
 
   bool isNull() const{ return raw==0; }
   bool opCast() const{ return !isNull(); }
-  long opCmp(const DateTime b) const { return raw - b.raw; }
+  int  opCmp   (in DateTime b) const{ return cmp(raw, b.raw); }
+  bool opEquals(in DateTime b) const{ return raw==b.raw; }
+
 
   enum RawShift = 6;
   enum RawUnit : ulong {         // 37ns is the fastest measurable interval. Using Windown 10 QPC

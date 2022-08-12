@@ -702,7 +702,6 @@ class DistinctColorMap: ColorMap{
   this(string name, string category, int[3][] pal, bool isLinear=false){
     this.name = name;
     this.category = category;
-    import std.array : array; import std.algorithm : map; //todo:utils
     this.pal = pal.map!(c => RGB(c[0], c[1], c[2])).array;
     this.isLinear = isLinear;
   }

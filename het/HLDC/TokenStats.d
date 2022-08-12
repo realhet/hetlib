@@ -6,8 +6,6 @@
 
 import hetlib.utils, std.file, tokenizer;
 
-import std.algorithm, std.typecons;
-
 Tuple!(string, int)[] aa_sort(int[string] aa){
    typeof(return) r=[];
    foreach(k,v;aa) r~=tuple(k,v);

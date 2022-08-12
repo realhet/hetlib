@@ -8,7 +8,7 @@ Source: $(LINK https://github.com/biozic/quantities)
 +/
 module quantities.internal.dimensions;
 
-import std.algorithm;
+import std.algorithm : countUntil, remove, isSorted;
 import std.array;
 import std.conv;
 import std.exception;
@@ -78,21 +78,21 @@ public:
         return result;
     }
 
-    void opOpAssign(string op)(Rational other) @safe pure nothrow 
+    void opOpAssign(string op)(Rational other) @safe pure nothrow
             if (op == "+" || op == "-" || op == "*" || op == "/")
     {
         mixin("this = this" ~ op ~ "other;");
         assert(isNormalized);
     }
 
-    void opOpAssign(string op)(int value) @safe pure nothrow 
+    void opOpAssign(string op)(int value) @safe pure nothrow
             if (op == "+" || op == "-" || op == "*" || op == "/")
     {
         mixin("this = this" ~ op ~ "value;");
         assert(isNormalized);
     }
 
-    Rational opUnary(string op)() @safe pure nothrow const 
+    Rational opUnary(string op)() @safe pure nothrow const
             if (op == "+" || op == "-")
     out (result)
     {
@@ -103,7 +103,7 @@ public:
         return Rational(mixin(op ~ "num"), den);
     }
 
-    Rational opBinary(string op)(Rational other) @safe pure nothrow const 
+    Rational opBinary(string op)(Rational other) @safe pure nothrow const
             if (op == "+" || op == "-")
     {
         auto ret = Rational(mixin("num * other.den" ~ op ~ "other.num * den"), den * other.den);
@@ -111,7 +111,7 @@ public:
         return ret;
     }
 
-    Rational opBinary(string op)(Rational other) @safe pure nothrow const 
+    Rational opBinary(string op)(Rational other) @safe pure nothrow const
             if (op == "*")
     {
         auto ret = Rational(num * other.num, den * other.den);
@@ -119,7 +119,7 @@ public:
         return ret;
     }
 
-    Rational opBinary(string op)(Rational other) @safe pure nothrow const 
+    Rational opBinary(string op)(Rational other) @safe pure nothrow const
             if (op == "/")
     {
         auto ret = Rational(num * other.den, den * other.num);
@@ -127,7 +127,7 @@ public:
         return ret;
     }
 
-    Rational opBinary(string op)(int value) @safe pure nothrow const 
+    Rational opBinary(string op)(int value) @safe pure nothrow const
             if (op == "+" || op == "-" || op == "*" || op == "/")
     out
     {
@@ -163,7 +163,7 @@ public:
         return opCmp(Rational(value));
     }
 
-    T opCast(T)() @safe pure nothrow const 
+    T opCast(T)() @safe pure nothrow const
             if (isNumeric!T)
     {
         return num / cast(T) den;
@@ -366,18 +366,18 @@ public:
         return Dimensions(_dims.inverted);
     }
 
-    Dimensions opUnary(string op)() @safe pure nothrow const 
+    Dimensions opUnary(string op)() @safe pure nothrow const
             if (op == "~")
     {
         return Dimensions(_dims.inverted);
     }
-    Dimensions opBinary(string op)(const Dimensions other) @safe pure const 
+    Dimensions opBinary(string op)(const Dimensions other) @safe pure const
             if (op == "*")
     {
         return Dimensions(_dims.insertSorted(other._dims));
     }
 
-    Dimensions opBinary(string op)(const Dimensions other) @safe pure const 
+    Dimensions opBinary(string op)(const Dimensions other) @safe pure const
             if (op == "/")
     {
         return Dimensions(_dims.insertSorted(other._dims.inverted));

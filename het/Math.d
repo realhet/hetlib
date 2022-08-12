@@ -21,15 +21,13 @@ public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI);
 public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly;
 
 // publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
+public import std.string, std.uni;    //std.string publicly imports std.algorithm, so it MUST be publicly imported from here.
 public import std.algorithm; //extends : cmp, any, all, equal, min, max;
-
 public import std.functional; //extends: lessThan, greaterThan, not
 
-// import locally used things.     //must not import het.utils to keep it simle and standalone
+// import locally used things.     //must not import het.utils to keep het.math simle and standalone
 import std.format : format;
 import std.conv   : text, stdto = to;
-import std.uni    : toLower;
-import std.string : strip;
 import std.array  : replicate, split, replace, join, array;
 import std.range  : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro;
 import std.traits : Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType, ReturnType;
@@ -1284,19 +1282,28 @@ auto clamp(T1, T2, T3)(in T1 val, in T2 lower, in T3 upper){
                                else return std.algorithm.clamp(val, lower, upper);
 }
 
-//note: cmp is extending/hijacking std.algorihtm.cmp's functionality with vector/scalar mode.
-public import std.algorithm: cmp;
-//public import std.math: cmp;  <- maybe this should be included as well
-auto cmp(A, B)(in A a, in B b) if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)) { //no predicate, optional vector/scalar mode
-    return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b); // std.math.cmp(a, b) can only work on the excat same type.
-} //todo: string compare nem megy a dide.d-ben. Narrow it down and ask on forum.
-//     print(het.math.cmp("a", "b"), cmp(1, 2), cmp(0.1, 0.2));  <- ha itt nincs "het.math", akkor hulye hibat dob: function conflicts with itself.
 
-/+auto cmp(A, B)(A a, B b) { //no predicate, optional vector/scalar mode
-  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){ // scalar vector combo? This function will serve it.
-    return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b); // std.math.cmp(a, b) can only work on the excat same type.
-  }else return std.algorithm.cmp(a, b); //this works on input ranges. Only if het.math cannot serve it.
-}+/
+public import std.algorithm : cmp;
+public import std.math      : cmp;
+
+auto cmp(A, B)(in A a, in B b)
+if(!(isInputRange!A && isInputRange!B)          //exclude std.algorithm.cmp
+&& !(isFloatingPoint!A && isFloatingPoint!B))   //exclude std.math.cmp
+{ // a<b -> -1
+  // a>b -> +1    -> sgn(a-b)
+  // a==0 -> 0
+  static if((isNumeric!A || isVector!A) && (isNumeric!B || isVector!B)){
+    return generateVector!(int, (a, b) => a==b ? 0 : a<b ? -1 : 1)(a, b);
+  }else{
+    return a==b ? 0 : a<b ? -1 : 1; //last resort
+  }
+}
+
+
+auto cmpChain(int c1, lazy int c2)                           { return c1 ? c1 : c2; }
+auto cmpChain(int c1, lazy int c2, lazy int c3)              { return c1 ? c1 : c2 ? c2 : c3; }
+auto cmpChain(int c1, lazy int c2, lazy int c3, lazy int c4) { return c1 ? c1 : c2 ? c2 : c3 ? c3 : c4; }
+
 
 public import std.algorithm: sort;
 void sort(T)(ref T a, ref T b){
