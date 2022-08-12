@@ -122,7 +122,7 @@ public:
 
   void zoom(float amount)       { scale = pow(2, log2(scale)+amount*scrollRate); }
 
-  enum DefaultOverZoomPercent = 5;
+  enum DefaultOverZoomPercent = 8;
 
   void zoom(in bounds2 bb, float overZoomPercent = DefaultOverZoomPercent){
     if(!bb.valid || !subScreenArea.valid) return;

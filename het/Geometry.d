@@ -826,6 +826,19 @@ float segmentPointDistance_prec(const vec2 v, const vec2 w, const vec2 p){
   }
 */
 
+
+/// 2D point position restriction inside bounds
+vec2 restrictPos_normal(T1, T2)(in Vector!(T1, 2) p, in Bounds!(Vector!(T2, 2)) bnd){
+  return p.clamp(bnd.low, bnd.high);
+}
+
+vec2 restrictPos_editor(T1, T2)(in Vector!(T1, 2) p, in Bounds!(Vector!(T2, 2)) bnd){
+  return p.y<bnd.top ? bnd.topLeft :
+         p.y>bnd.bottom ? bnd.bottomRight :
+         vec2(p.x.clamp(bnd.left, bnd.right), p.y);
+}
+
+
 ///  Cohen Sutherland line-rect Clipping ///////////////////////////////////////////////////////////////
 ///  Ported to Delphi from wikipedia C code by Omar Reis - 2012                          ///
 ///  Ported back to C by realhet 2013, lol                                               ///
