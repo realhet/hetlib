@@ -135,7 +135,7 @@ string unshiftedKey(string s){
   return s;
 }
 
-struct ClickDetector{
+struct ClickDetector{ //ClickDetector ///////////////////////////////
 
   enum doubleTicks    = 15,   //todo: use winuser.GetDoubleClickTime()
        longPressTicks = 30;

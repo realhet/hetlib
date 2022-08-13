@@ -27,7 +27,7 @@ immutable DefaultFontName = //this is the cached font
 ;
 
 immutable
-  DefaultFontHeight    = 18,  //fucking keep it on 18!!!!
+  DefaultFontHeight    = 18,
   InvDefaultFontHeight = 1.0f/DefaultFontHeight,
 
   MinScrollThumbSize     = 4, //pixels
@@ -35,6 +35,8 @@ immutable
 
   LeadingTabWidth  =  7.25f*4,  LeadingTabAspect  = LeadingTabWidth  / DefaultFontHeight,
   InternalTabWidth =  3.25f  ,  InternalTabAspect = InternalTabWidth / DefaultFontHeight;
+
+static assert(DefaultFontHeight==18, "//fucking keep it on 18!!!!");
 
 immutable
   EmptyCellWidth  = 0,
