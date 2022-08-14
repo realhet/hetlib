@@ -858,10 +858,6 @@ public:
     //timing
     auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS);
 
-    //ticking
-    application.tick++;
-    application.tickTime = now;
-
     //flush the keyboard input queue (WM_CHAR event)
     scope(exit) inputChars = "";
 
@@ -929,6 +925,7 @@ public:
       time0 = timeLast = QPS-timeTarget-0.001*second;
     }
 
+    const tickNow = now; //this is for application.tickTime. Taken at the same time as timeAct.
     timeAct = QPS;
     deltaTime = timeAct-timeLast;
     if(deltaTime<timeTarget) return; //too small elapsed time
@@ -939,15 +936,22 @@ public:
       deltaTime = timeTarget;
     }
 
-    int updateCnt = iround(deltaTime.value(second)/timeTarget.value(second)).clamp(0, 1);
+    //int updateCnt = iround(deltaTime.value(second)/timeTarget.value(second)).clamp(0, 1);
+    int updateCnt = 1; //220814: It is better to be stable. This game loop is already way too complicated. This performs best for DIDE2
 
     deltaTime /= updateCnt;
 
-    inputs.update; //TODO: it's single windowed only this way. The update system should be centralized.
     try{
       bool anyInvalidate;
       foreach(i; 0..updateCnt){
         totalTime = timeLast + deltaTime*i;
+
+        //ticking. The same timing information as what the windows are receiving
+        application.tick++;
+        application.tickTime  = tickNow - deltaTime*(updateCnt-i);
+        application.deltaTime = deltaTime;
+
+        inputs.update; //note: it's main window only
 
         updateWithActionManager; //update Main
         foreach(w; windowList) if(!w.isMain){ //call othyer forms.updates

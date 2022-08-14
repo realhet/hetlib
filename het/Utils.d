@@ -185,7 +185,8 @@ __gshared static private:  //__gshared is for variables, static is for functions
 
 __gshared static public:///////////////////////////////////////////////////////////////////
   uint tick; //enough for 2 years @ 60Hz
-  DateTime tickTime;
+  DateTime tickTime;  //it is always behind one frame time compared to now(). But it is only accessed once per frame. If there is LAG, it is interpolated.
+  Time deltaTime;
 
   import core.runtime : Runtime;
   alias args = Runtime.args;

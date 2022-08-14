@@ -1459,7 +1459,7 @@ auto iota2(E)(in E e){ return iota2(0, e); }
  * Its aim is to provide similar animation smoothess at different FPS.
  * Params:
  *      dt =    Delta time in seconds
- *      speed = speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.
+ *      speed = speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.  //todo: this is not working
  *      maxDt = Maximum allowed deltaTime. Above this, the smhooth animation is disabled, restulting a value of 1.0.
  * Returns:
  *      Interpolation constant used in follow() functions.

@@ -137,17 +137,25 @@ string unshiftedKey(string s){
 
 struct ClickDetector{ //ClickDetector ///////////////////////////////
 
-  enum doubleTicks    = 15,   //todo: use winuser.GetDoubleClickTime()
-       longPressTicks = 30;
+  enum doubleDuration = .25f * second,   //todo: use winuser.GetDoubleClickTime()
+       longDuration   = .5f  * second;
 
   bool pressing, pressed, released;
   bool clicked, doubleClicked, tripleClicked, nClicked;
   bool longPressed, longPressing, longClicked;
   int clickCount;
 
-  uint tPressed, tPressedPrev;
+  DateTime tPressed, tPressedPrev;
 
-  void update(bool state){
+  void update(bool state, DateTime t=DateTime.init){
+
+    //getting time.
+    if(!t){                     //1st priority is the given time parameter
+      t = application.tickTime; //2nd priority if there is a running gui app
+      if(!t)
+        t = now;                //last priority is system time
+    }
+
     //clear all the transitional bits
     pressed = released = clicked = doubleClicked = tripleClicked = nClicked = longPressed = longClicked = false;
 
@@ -157,8 +165,8 @@ struct ClickDetector{ //ClickDetector ///////////////////////////////
 
     if(pressed){
       tPressedPrev = tPressed;
-      tPressed = application.tick;
-      if(tPressed-tPressedPrev <= doubleTicks){
+      tPressed = t;
+      if(tPressed-tPressedPrev <= doubleDuration){
         switch(++clickCount){
           case 1:doubleClicked = true; break;
           case 2:tripleClicked = true; break;
@@ -175,16 +183,16 @@ struct ClickDetector{ //ClickDetector ///////////////////////////////
       }
     }
 
-    const pressDuration = pressing ? application.tick-tPressed : 0;
+    const pressDuration = pressing ? t-tPressed : 0*second;
     enum enableDoubleLongPress = true;
-    if(pressDuration>longPressTicks && (enableDoubleLongPress || clickCount==0)){
+    if(pressDuration>longDuration && (enableDoubleLongPress || clickCount==0)){
       if(longPressing.chkSet){
         longPressed = true;
         clickCount = 0;
       }
     }
 
-    if(application.tick-tPressed > doubleTicks) clickCount = 0;
+    if(t-tPressed > doubleDuration) clickCount = 0;
   }
 
 

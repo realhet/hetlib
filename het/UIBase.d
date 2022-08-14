@@ -17,7 +17,9 @@ enum
   VisualizeGlyphs          = 0,
   VisualizeTabColors       = 0,
   VisualizeHitStack        = 0,
-  VisualizeSliders         = 0;
+  VisualizeSliders         = 0,
+
+  addHitRectAsserts        = 0; //Verifies that Cell.Id is non null and unique
 
 //todo: bug: NormalFontHeight = 18*4  -> RemoteUVC.d crashes.
 immutable DefaultFontName = //this is the cached font
@@ -220,8 +222,10 @@ struct HitTestManager{
   }
 
   void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos, in bool clickable){//must be called from each cell that needs mouse hit test
-    assert(id, "Null Id is illegal");
-    assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text);
+    static if(addHitRectAsserts){
+      assert(id, "Null Id is illegal");
+      assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text);
+    }
     hitStack ~= HitTestRec(id, hitBounds, localPos, clickable);
   }
 
