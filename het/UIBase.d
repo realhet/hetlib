@@ -840,6 +840,10 @@ class Cell{ // Cell ////////////////////////////////////
     //egy atomic lenne a legjobb
   } +/
 
+  ///Optionally the container can have a parent.
+  Container getParent(){ return null; }
+  void setParent(Container p){}
+
   vec2 outerPos, outerSize;
 
   ref _FlexValue flex() { static _FlexValue nullFlex; return nullFlex   ; } //todo: this is bad, but fast. maybe do it with a setter and const ref.
@@ -2001,7 +2005,7 @@ bool getEffectiveScroll(ScrollState s) pure { return s.among(ScrollState.on, Scr
 
 union ContainerFlags{ // ------------------------------ ContainerFlags /////////////////////////////////
   //todo: do this nicer with a table
-  ulong _data = 0b___000000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+  ulong _data = 0b_000_00000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
   mixin(bitfields!(
     bool          , "wordWrap"          , 1,
     HAlign        , "hAlign"            , 2,  //alignment for all subCells
@@ -2041,10 +2045,12 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "hidden"            , 1, //only affects draw() calls.
     bool          , "dontSearch"        , 1, //no search() inside this container
     bool          , "noHitTest"         , 1, //don't even bother to add this container and it's subcontainers to the hit list.
+
     bool          , "dontLocate"        , 1, //disables the locate() method for this container and its subcontainers
     bool          , "oldSelected"       , 1, //SelectionManager2 needs this.
+    bool          , "needRefresh"       , 1, //Dide2: CodeRow sets it when it changes. Pulls the request up to the parent.
 
-    int           , "_dummy"            ,22,
+    int           , "_dummy"            ,21,
   ));
 }
 
@@ -2110,6 +2116,10 @@ class Container : Cell { // Container ////////////////////////////////////
   int subCellIndex(in Cell c) const{
     //note: overflows at 2G items, I don't care because that would be 128GB memory usage.
     return cast(int)subCells.countUntil(c);
+  }
+
+  void adoptSubCells(){
+    subCells.each!(c => c.setParent(this));
   }
 
   final void append(Cell c){ appendCell(c); }
@@ -2199,9 +2209,27 @@ class Container : Cell { // Container ////////////////////////////////////
     if(flags.autoHeight) innerHeight = calcContentHeight;
   }
 
+  /// Mark the container, so it will be re-measured on the next measure() call.
+  /// Normal behaviour is ALWAYS measure. (It is the normal behaviour for immediate mode UI)
+  void needMeasure(){
+    if(flags._measured){
+      //preserve autoWidth and autoHeight for the next measure
+      //todo: this is not completely sane...
+      if(flags.autoWidth ) outerSize.x = 0;
+      if(flags.autoHeight) outerSize.y = 0;
+    }
+
+    flags._measureOnlyOnce = true;
+    flags._measured = false;
+
+    if(auto c = getParent) c.needMeasure;
+  }
+
+  /// this must be called from outside. It calls rearrange and measures subContainers if needed.
   final void measure(){
     if(flags._measureOnlyOnce && flags._measured) return;
 
+    //autodetect autoWidth and autoHeight. If the user didn't changed it, then it's auto.
     if(!flags._measured){
       flags.autoWidth  = outerSize.x==0;
       flags.autoHeight = outerSize.y==0;
@@ -2290,7 +2318,7 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
   protected void measureSubCells(){
-    foreach(sc; subCells) if(auto co = cast(Container)sc) co.measure; //recursive in the front
+    subContainers.each!"a.measure"; //recursive in the front
   }
 
   protected auto getScrollResizeBounds(in Cell hb, in Cell vb) const {
@@ -2721,9 +2749,7 @@ class Row : Container { // Row ////////////////////////////////////
         }
       }
     }else{ //no flex
-      foreach(sc; subCells){
-        if(auto co = cast(Container)sc) co.measure; //measure all
-      }
+      measureSubCells;
     }
   }
 
