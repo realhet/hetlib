@@ -15,7 +15,7 @@ enum
   VisualizeContainers      = 0,
   VisualizeContainerIds    = 0,
   VisualizeGlyphs          = 0,
-  VisualizeTabColors       = 0,
+  VisualizeTabColors       = 0, //todo: spaces at row ends
   VisualizeHitStack        = 0,
   VisualizeSliders         = 0,
 
@@ -1866,6 +1866,28 @@ private{ //wrappedLine[] functionality
 
 // Elastic Tabs //////////////////////////////////////////
 
+/+ Elastic Tabstops License
+https://nickgravgaard.com/elastic-tabstops/
+https://github.com/nickgravgaard/AlwaysAlignedVS/blob/master/LICENSE.md
+
+Copyright 2010-2017 Nick Gravgaard
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+associated documentation files (the "Software"), to deal in the Software without restriction,
+including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial
+portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++/
+
 //elastic tabs
 int[] tabIdx(Cell c) {
   if(auto r = cast(Row)c) return r.tabIdxInternal;
@@ -1891,7 +1913,6 @@ Glyph subGlyph(Cell c, int i){
   if(auto r = cast(Container)c) return cast(Glyph)r.subCells.get(i);
                            else return null;
 }
-
 
 void processElasticTabs(Cell[] rows, int level=0){
   bool tabCntGood(Cell row){ return row.tabCnt > level; }
@@ -1927,7 +1948,7 @@ void processElasticTabs(Cell[] rows, int level=0){
       }
 
       if(VisualizeTabColors){
-        tab.bkColor = avg(clWhite, clRainbow[level%$]); //debug coloring
+        tab.bkColor = mix(clGray, clRainbow[level%$], .25f); //debug coloring
       }
 
     }
@@ -2048,9 +2069,13 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
 
     bool          , "dontLocate"        , 1, //disables the locate() method for this container and its subcontainers
     bool          , "oldSelected"       , 1, //SelectionManager2 needs this.
-    bool          , "needRefresh"       , 1, //Dide2: CodeRow sets it when it changes. Pulls the request up to the parent.
 
-    int           , "_dummy"            ,21,
+    bool          , "changedCreated"    , 1, //changed by creationg a new row
+    bool          , "changedModified"   , 1, //changed by modifying existing row
+    bool          , "changedRemovedNext", 1, //next row removed
+    bool          , "changedRemovedPrev", 1, //prev row removed
+
+    int           , "_dummy"            ,18,
   ));
 }
 
@@ -2211,7 +2236,10 @@ class Container : Cell { // Container ////////////////////////////////////
 
   /// Mark the container, so it will be re-measured on the next measure() call.
   /// Normal behaviour is ALWAYS measure. (It is the normal behaviour for immediate mode UI)
-  void needMeasure(){
+  /// returns: If it was effective. So it could do more things recursively.
+  bool needMeasure(){
+    flags._measureOnlyOnce = true;
+
     if(flags._measured){
       //preserve autoWidth and autoHeight for the next measure
       //todo: this is not completely sane...
@@ -2219,10 +2247,12 @@ class Container : Cell { // Container ////////////////////////////////////
       if(flags.autoHeight) outerSize.y = 0;
     }
 
-    flags._measureOnlyOnce = true;
+    const effective = flags._measured;
     flags._measured = false;
 
     if(auto c = getParent) c.needMeasure;
+
+    return effective;
   }
 
   /// this must be called from outside. It calls rearrange and measures subContainers if needed.
@@ -2539,7 +2569,7 @@ class Container : Cell { // Container ////////////////////////////////////
     Cell[] cells;
 
     auto cellBounds() const{ return cells.map!(c => c.outerBounds + absInnerPos); }
-    auto bounds() const{ return cellBounds.fold!"a|b"; }
+    auto bounds() const{ return cellBounds.fold!"a|b"(bounds2.init); }
 
     void drawHighlighted(Drawing dr, RGB clHighlight) const{
       foreach(cell; cells)if(auto glyph = cast(Glyph)cell) with(glyph){
@@ -2689,6 +2719,18 @@ class Container : Cell { // Container ////////////////////////////////////
     return context.results;
   }
 
+
+  protected void parentPropagateChanged(){
+    if(auto p = getParent) if(!p.flags.changedModified){
+      p.flags.changedModified = true;
+      p.parentPropagateChanged;
+    }
+  }
+
+  void setChangedModified()    { flags.changedModified    = true;  parentPropagateChanged; }
+  void setChangedCreated()     { flags.changedCreated     = true;  parentPropagateChanged; }
+  void setChangedRemovedNext() { flags.changedRemovedNext = true;  parentPropagateChanged; }
+  void setChangedRemovedPrev() { flags.changedRemovedPrev = true;  parentPropagateChanged; }
 }
 
 
@@ -2700,6 +2742,14 @@ class Row : Container { // Row ////////////////////////////////////
   void refreshTabIdx(){
     tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array;
   }
+
+  /// Must be called manually when needed for debugging
+  bool verifyTabIdx(){
+    auto prev = tabIdxInternal.dup;
+    refreshTabIdx;
+    return equal(tabIdxInternal, prev);
+  }
+
 
   this(){
   }
@@ -2832,7 +2882,7 @@ class Row : Container { // Row ////////////////////////////////////
     if(flags.rowElasticTabs) adjustTabSizes_multiLine;
                         else adjustTabSizes_singleLine;
 
-    solveFlexAndMeasureAll();
+    solveFlexAndMeasureAll();  //opt: a containerFlag to disable the slow flexSum calculation
 
     const doWrap = flags.wordWrap && !flags.autoWidth;
     auto wrappedLines = makeWrappedLines(doWrap);

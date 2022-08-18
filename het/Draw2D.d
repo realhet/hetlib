@@ -1669,15 +1669,15 @@ class Drawing {  // Drawing ////////////////////////////////////////////////////
           else        finalColor = isTransparent ? vec4(fontColor.rgb, texel.a) : mix(bkColor, fontColor, texel.a); //fonts interpolate the 2 colors
         }
 
-        //experimental grid
-        /*if(fontFlags&2) if(texelPerPixel.x < 0.1){
-          if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
-        }*/
-
         /*if(stConfig==0) finalColor = vec4(.5, 0, 0, 1);
         else if(stConfig==8) finalColor = vec4(0, 1, 0, 1);
         else if(stConfig==12) finalColor = vec4(0, 0, 1, 1);
         else finalColor = vec4(.5, .5, .5, 1);*/
+
+        //experimental grid
+        /*it's broken if(fontFlags&2) if(texelPerPixel.x < 0.1){
+          if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
+        }*/
       }else if(samplingLevel==2){//rooks6
         vec4 texel = megaSample_rooks6(tc);
         if(stConfig==8 )      finalColor = vec4(texel.rgb, fontColor.a);  //wtf is this????
