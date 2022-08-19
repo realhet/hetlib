@@ -1685,7 +1685,17 @@ void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint sy
   applySyntax!bkColor(ts, syntax, defaultSyntaxPreset);
 }
 
+auto tsSyntax(uint syntax, SyntaxPreset preset){
+  auto ts = tsNormal;
+  applySyntax(ts, syntax, preset);
+  return ts;
+}
 
+auto tsSyntax(uint syntax){
+  auto ts = tsNormal;
+  applySyntax(ts, syntax, defaultSyntaxPreset);
+  return ts;
+}
 
 private struct WrappedLine{ // WrappedLine /////////////////////////////////////////////////////////
   Cell[] cells;
@@ -2243,12 +2253,16 @@ class Container : Cell { // Container ////////////////////////////////////
     if(flags._measured){
       //preserve autoWidth and autoHeight for the next measure
       //todo: this is not completely sane...
-      if(flags.autoWidth ) outerSize.x = 0;
-      if(flags.autoHeight) outerSize.y = 0;
+      //if(flags.autoWidth ) outerSize.x = 0;
+      //if(flags.autoHeight) outerSize.y = 0;
     }
 
     const effective = flags._measured;
-    flags._measured = false;
+    if(effective){
+      flags._measured = false;
+      //outerSize.x = 0;   //todo: this is how to make it autosize. it's lame.
+      //outerSize.y = 0;
+    }
 
     if(auto c = getParent) c.needMeasure;
 
