@@ -1343,12 +1343,18 @@ struct im{ static:
 
       mixin(hintHandler);
 
-      bool manualFocus;
-      static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
+      bool focusEnter;
+      mixin(processGenericArgs(q{ static if(N=="focusEnter") focusEnter = a; }));
+
+      //const focusEnter = getGenericArg!(args, bool, "focusEnter");
+
+      //note: This would be the implementation with a struct: static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
+      // The downside is that the struct litters the namespace with simple names.
+      //220820: this is too specific. Use the ManualFocus parameter instead. static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
 
       const focused = focusUpdate(actContainer, id_,
         enabled,
-        hit.pressed || manualFocus, //enter
+        hit.pressed || focusEnter, //enter
         inputs["Esc"].pressed,  //exit
         /* onEnter */ {
           value2editor;

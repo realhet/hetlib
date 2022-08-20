@@ -999,7 +999,7 @@ bool isDescending(T0, T1)(in T0 a, in T1 b, lazy bool chain=true){ return a == b
 auto alignUp  (T, U)(T p, U align_) { return (p+(align_-1))/align_*align_; }
 auto alignDown(T, U)(T p, U align_) { return p/align_*align_; }
 
-bool chkSet  (ref bool b) { if( b) return false; else { b = true ; return true; } }
+bool chkSet  (ref bool b) { if( b) return false; else { b = true ; return true; } } //todo: make it work with properties, bitfields
 bool chkClear(ref bool b) { if(!b) return false; else { b = false; return true; } }
 
 bool chkSet(T)(ref T a, in T b) { if(a==b) return false; else { a = b; return true; } }

@@ -2080,12 +2080,10 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "dontLocate"        , 1, //disables the locate() method for this container and its subcontainers
     bool          , "oldSelected"       , 1, //SelectionManager2 needs this.
 
-    bool          , "changedCreated"    , 1, //changed by creationg a new row
-    bool          , "changedModified"   , 1, //changed by modifying existing row
-    bool          , "changedRemovedNext", 1, //next row removed
-    bool          , "changedRemovedPrev", 1, //prev row removed
+    bool          , "changedCreated"    , 1, //CodeRow: changed by creationg a new cell
+    bool          , "changedRemoved"    , 1, //CodeRow: changed by removing existing cells
 
-    int           , "_dummy"            ,18,
+    int           , "_dummy"            ,20,
   ));
 }
 
@@ -2734,17 +2732,63 @@ class Container : Cell { // Container ////////////////////////////////////
   }
 
 
-  protected void parentPropagateChanged(){
-    if(auto p = getParent) if(!p.flags.changedModified){
-      p.flags.changedModified = true;
-      p.parentPropagateChanged;
+  private enum genSetChanged = q{
+    if(!flags.changed#){
+      flags.changed# = true;
+      if(auto p = getParent) if(p)
+        p.setChanged#;
     }
+  };
+
+  // changed tracking for file change detection //////////////////////////////////
+
+  /// Sets flags.changed* if needed. Also sets it for the parents recursively.
+  void setChangedCreated(){ mixin(genSetChanged.replace("#", "Created")); }
+  void setChangedRemoved(){ mixin(genSetChanged.replace("#", "Removed")); } //Ditto
+
+  private enum genClearChanged = q{
+    if(flags.changed#){
+      flags.changed# = false;
+      subContainers.each!"a.clearChanged#";
+    }
+  };
+
+  /// Clears flags.changed* if needed. Also clears it for all the children recursively.
+  void clearChangedCreated(){ mixin(genClearChanged.replace("#", "Created")); }
+  void clearChangedRemoved(){ mixin(genClearChanged.replace("#", "Created")); }
+
+  @property int changedMask() const{
+    return (flags.changedCreated?1:0) | (flags.changedRemoved?2:0);
   }
 
-  void setChangedModified()    { flags.changedModified    = true;  parentPropagateChanged; }
-  void setChangedCreated()     { flags.changedCreated     = true;  parentPropagateChanged; }
-  void setChangedRemovedNext() { flags.changedRemovedNext = true;  parentPropagateChanged; }
-  void setChangedRemovedPrev() { flags.changedRemovedPrev = true;  parentPropagateChanged; }
+  @property bool changed() const{
+    return flags.changedCreated || flags.changedRemoved;
+  }
+
+  void clearChanged(){
+    clearChangedCreated;
+    clearChangedRemoved;
+  }
+
+  // changed tracking for syntax highlight /////////////////////////////
+
+  ///Override these to implement changedTime tracking.
+  /+int getThisChangedTime(){ return 0; }
+  void setThisChangedTime(int i){ } ///Ditto
+
+  @property int changedTime(){
+      return getThisChangedTime;
+  }
+
+  @property void changedTime(int i){
+      //no optimization: Because there can be non channgedTime aware classes in the parent chain.
+      if(i>getThisChangedTime){  //only proceed when previous changedTime time is lower than current.
+        setThisChangedTime(i);
+        if(auto p = getParent())
+            p.changedTime = i;
+      }
+  }+/
+
 }
 
 
