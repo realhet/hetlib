@@ -40,6 +40,18 @@ immutable
 
 static assert(DefaultFontHeight==18, "//fucking keep it on 18!!!!");
 
+
+Glyph newLineGlyph(){ // newLineGlyph /////////////////////////////////////////////
+  import std.concurrency;
+  __gshared Glyph g;
+  return initOnce!g((){ auto a = new Glyph("\u240A\u2936\u23CE"d[1], tsNormal); a.innerSize = DefaultFontNewLineSize; return a; }());
+}
+
+///Used for minimum length in a CodeRow if it's empty. Also the virtual newline chars at the end.
+enum DefaultFontNewLineWidth = DefaultFontHeight*6/18;
+enum DefaultFontNewLineSize = vec2(DefaultFontNewLineWidth, DefaultFontHeight); ///Ditto
+
+
 immutable
   EmptyCellWidth  = 0,
   EmptyCellHeight = 0,
@@ -2996,6 +3008,11 @@ class Row : Container { // Row ////////////////////////////////////
     }
   }
 
+  //fast content size calculations (after measure)
+  //todo: these content calculations should be universal along all Containers.
+  float contentInnerWidth () const { return subCells.length ? subCells.back.outerRight : DefaultFontNewLineWidth; }
+  float contentInnerHeight() const { return subCells.map!"a.outerHeight".maxElement(DefaultFontHeight); }
+  vec2 contentInnerSize() const { return vec2(contentInnerWidth, contentInnerHeight); }
 }
 
 class Column : Container { // Column ////////////////////////////////////

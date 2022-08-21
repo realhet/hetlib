@@ -201,14 +201,14 @@ void registerWindowClass(string className, wchar* icon = IDI_APPLICATION)
     lpszMenuName  = null;
     lpszClassName = toPWChar(className);
   }
-  RegisterClass(&wndclass);
+  RegisterClassW(&wndclass);
 }
 
 void unregisterWindowClass(string className)
 {
   if(!_registeredClasses.canFind(className)) return;
   _registeredClasses = _registeredClasses.remove(_registeredClasses.countUntil(className));
-  UnregisterClass(toPWChar(className), GetModuleHandleW(NULL));
+  UnregisterClassW(toPWChar(className), GetModuleHandleW(NULL));
 }
 
 
@@ -223,14 +223,14 @@ HWND helperWindow() // Source: GLFW3
 
   string className = "Helper window class";
   registerWindowClass(className);
-  window = CreateWindowEx(WS_EX_OVERLAPPEDWINDOW,
-                          toPWChar(className),
-                          "Helper window",
-                          WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
-                          0, 0, 1, 1,
-                          HWND_MESSAGE, NULL,
-                          GetModuleHandleW(NULL),
-                          NULL);
+  window = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,
+                           toPWChar(className),
+                           "Helper window",
+                           WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                           0, 0, 1, 1,
+                           HWND_MESSAGE, NULL,
+                           GetModuleHandleW(NULL),
+                           NULL);
 
   // HACK: The first call to ShowWindow is ignored if the parent process
   //       passed along a STARTUPINFO, so clear that flag with a no-op call
@@ -437,18 +437,18 @@ private:
     }*/
 
     registerWindowClass(className);
-    HWND hwnd = CreateWindowEx(exStyle,              // styleEx: WS_EX_ACCEPTFILES, WS_EX_NOACTIVATE, WS_EX_OVERLAPPEDWINDOW, WS_EX_PALETTEWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-                               className.toPWChar,   // window class name
-                               caption.toPWChar,     // window caption
-                               style,                // window style, WS_ICONIC, WS_HSCROLL, WS_MAXIMIZE, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SIZEBOX
-                               CW_USEDEFAULT,        // initial x position
-                               CW_USEDEFAULT,        // initial y position
-                               CW_USEDEFAULT,        // initial x size
-                               CW_USEDEFAULT,        // initial y size
-                               NULL,                 // parent window handle
-                               NULL,                 // window menu handle
-                               GetModuleHandle(NULL),// program instance handle
-                               NULL);                // creation parameters
+    HWND hwnd = CreateWindowExW(exStyle,              // styleEx: WS_EX_ACCEPTFILES, WS_EX_NOACTIVATE, WS_EX_OVERLAPPEDWINDOW, WS_EX_PALETTEWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+                                className.toPWChar,   // window class name
+                                caption.toPWChar,     // window caption
+                                style,                // window style, WS_ICONIC, WS_HSCROLL, WS_MAXIMIZE, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_SIZEBOX
+                                CW_USEDEFAULT,        // initial x position
+                                CW_USEDEFAULT,        // initial y position
+                                CW_USEDEFAULT,        // initial x size
+                                CW_USEDEFAULT,        // initial y size
+                                NULL,                 // parent window handle
+                                NULL,                 // window menu handle
+                                GetModuleHandle(NULL),// program instance handle
+                                NULL);                // creation parameters
 
     if(!hwnd) error("CreateWindow() failed "~text(GetLastError));
     return hwnd;
@@ -617,7 +617,7 @@ public:
 //todo: multiwindownal a destructort osszerakni, mert most az le van xarva...
 //    auto className = getClassName;
 //    DestroyWindow(hwnd);
-//    UnregisterClass(className.toPWChar, GetModuleHandle(NULL));
+//    UnregisterClassW(className.toPWChar, GetModuleHandle(NULL));
   }
 
   //virtuals
@@ -631,6 +631,7 @@ public:
   }
 
   protected bool inRedraw;
+  protected bool _isSizingMoving;
   protected int updatesSinceLastDraw;
 
   private enum showWarnings = false;
@@ -656,6 +657,8 @@ public:
   protected void forceRedraw(){
     RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW);
   }
+
+  protected wchar lastSurrogateHi;
 
   protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam){
     if(0) LOG(message.winMsgToString, wParam, lParam);
@@ -694,10 +697,35 @@ public:
       case WM_TIMER     : if(wParam==999){ internalUpdate; if(chkClear(pendingInvalidate)) forceRedraw; } return 0;
       case WM_SIZE      : internalUpdate; forceRedraw; return 0;
 
-
       case WM_MOUSEWHEEL: _notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
-      case WM_CHAR      : inputChars ~= cast(wchar)wParam; return 0; //WM_UNICHAR nem hivodik magatol...
+
+      case WM_CHAR:{
+        try{
+          const ch = cast(wchar)wParam;
+          if(ch.isSurrogateHi){
+            lastSurrogateHi = ch;
+          }else if(ch.isSurrogateLo){
+            if(lastSurrogateHi != wchar.init){
+              inputChars ~= ([lastSurrogateHi, ch]).text;
+              lastSurrogateHi = wchar.init;
+            }
+          }else{
+            inputChars ~= ch;
+          }
+        }catch(Exception e){
+          WARN(e.simpleMsg);
+        }
+
+        return 0;
+      }
+
+      //Disable beeps when Alt+keypress and F10
       case WM_SYSKEYDOWN: return 0;  //just ignore these. It let's me handle Alt and F10 properly.
+      case WM_SYSCHAR: if(wParam==' ') break; else return 0; //Only enable Alt+Space
+      case WM_MENUCHAR: return MNC_CLOSE; //It disables beeps when Alt+keypress
+
+      case WM_ENTERSIZEMOVE: _isSizingMoving = true; return 0;
+      case WM_EXITSIZEMOVE: _isSizingMoving = false; return 0;
 
       default:
         if(message.inRange(WM_USER, 0x7FFF)) return onWmUser(message-WM_USER, wParam, lParam);
@@ -720,6 +748,9 @@ public:
   void setFocus()               { SetFocus(hwnd); } //it's only keyboard focus
   void setForegroundWindow()    { show; SetForegroundWindow(hwnd); }
   bool isForeground()           { return GetForegroundWindow == hwnd; }
+  bool isSizingMoving()         { return _isSizingMoving; }
+
+  bool canProcessUserInput()    { return isForeground && !isSizingMoving; }
 
   RECT windowRect()   { RECT r; GetWindowRect(hwnd, &r); return r; }
   @property auto windowBounds() { with(windowRect) return ibounds2(left, top, right, bottom); }
