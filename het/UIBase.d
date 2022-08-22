@@ -856,34 +856,31 @@ class Cell{ // Cell ////////////////////////////////////
   inout(Container) getParent() inout { return null; }
   void setParent(Container p){}
 
-  auto thisAndAllParents(Base : Cell = Cell, bool thisToo = true)(){
+  auto thisAndAllParents(Base : Cell = Cell, bool thisToo = true, bool isConst=is(typeof(this)==const))() inout{
+
     struct ParentRange{
       private Cell act;
-      private void skip(){ static if(is(Base==Cell)){} else while(!empty && (cast(Base)act is null)) popFront; }
-      this(Cell a){ act = a; skip; }
+
+      private void skip(){
+        static if(is(Base==Cell)) {}
+        else while(!empty && (cast(Base)act is null)) popFront;
+      }
+
+      this(const Cell a){ act = cast()a; skip; }
 
       @property bool empty() const{ return act is null; }
-      auto front() { return cast(Base)act; }
       void popFront(){ act = act.getParent;  }
+
+      auto front() {
+        static if(isConst) return cast(const Base)act;
+                      else return cast(      Base)act;
+      }
     }
+
     return ParentRange(thisToo ? this : getParent);
   }
 
-  auto thisAndAllParents(Base : Cell = Cell, bool thisToo = true)() const{
-    struct ConstParentRange{
-      private Cell act;
-      private void skip(){ static if(is(Base==Cell)){} else while(!empty && (cast(Base)act is null)) popFront; }
-      this(Cell a){ act = a; skip; }
-
-      @property bool empty() const{ return act is null; }
-      const front() { return cast(Base)act; }
-      void popFront(){ act = act.getParent;  }
-    }
-    return ConstParentRange(cast()(thisToo ? this : getParent));
-  }
-
-  auto allParents(Base : Cell = Container)()      { return thisAndAllParents!(Base, false); }
-  auto allParents(Base : Cell = Container)() const{ return thisAndAllParents!(Base, false); }
+  auto allParents(Base : Cell = Container)() inout{ return thisAndAllParents!(Base, false); }
 
   vec2 outerPos, outerSize;
 
