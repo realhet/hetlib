@@ -869,7 +869,7 @@ class Cell{ // Cell ////////////////////////////////////
       this(const Cell a){ act = cast()a; skip; }
 
       @property bool empty() const{ return act is null; }
-      void popFront(){ act = act.getParent;  }
+      void popFront(){ act = act.getParent; skip; }
 
       auto front() {
         static if(isConst) return cast(const Base)act;
