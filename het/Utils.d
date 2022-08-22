@@ -1328,6 +1328,9 @@ size_t sizeBytes(T)(in T a){
   else return T.sizeof;
 }
 
+@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class)) {
+  return r.empty ? null : r.front;
+}
 
 auto fetchFront(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
   static if(isInputRange!T){

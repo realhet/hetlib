@@ -1055,6 +1055,8 @@ public:
         s ~= ch;  fetch;
       }
     }else{ //single char ending
+      //todo: Nesting is not handled properly (not handlet at all):   These should give an error: q"(foo(xxx)"  q"/foo/xxx/"    But this should compile: q"((foo")"xxx)"
+
       dchar ending;
       switch(ch){
         case '[': ending = ']'; break;
@@ -1066,7 +1068,6 @@ public:
                               else error(`Invalid char "%s" used as delimiter in a DelimitedString`.format(ch));
       }
       fetch;
-
       while(1){
         if(isEOF(ch)) error("Unexpected EOF in a DelimitedString.");
         if(ch==ending && peek=='"') { fetch; break; }

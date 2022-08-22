@@ -853,15 +853,44 @@ class Cell{ // Cell ////////////////////////////////////
   } +/
 
   ///Optionally the container can have a parent.
-  Container getParent(){ return null; }
+  inout(Container) getParent() inout { return null; }
   void setParent(Container p){}
+
+  auto thisAndAllParents(Base : Cell = Cell, bool thisToo = true)(){
+    struct ParentRange{
+      private Cell act;
+      private void skip(){ static if(is(Base==Cell)){} else while(!empty && (cast(Base)act is null)) popFront; }
+      this(Cell a){ act = a; skip; }
+
+      @property bool empty() const{ return act is null; }
+      auto front() { return cast(Base)act; }
+      void popFront(){ act = act.getParent;  }
+    }
+    return ParentRange(thisToo ? this : getParent);
+  }
+
+  auto thisAndAllParents(Base : Cell = Cell, bool thisToo = true)() const{
+    struct ConstParentRange{
+      private Cell act;
+      private void skip(){ static if(is(Base==Cell)){} else while(!empty && (cast(Base)act is null)) popFront; }
+      this(Cell a){ act = a; skip; }
+
+      @property bool empty() const{ return act is null; }
+      const front() { return cast(Base)act; }
+      void popFront(){ act = act.getParent;  }
+    }
+    return ConstParentRange(cast()(thisToo ? this : getParent));
+  }
+
+  auto allParents(Base : Cell = Container)()      { return thisAndAllParents!(Base, false); }
+  auto allParents(Base : Cell = Container)() const{ return thisAndAllParents!(Base, false); }
 
   vec2 outerPos, outerSize;
 
   ref _FlexValue flex() { static _FlexValue nullFlex; return nullFlex   ; } //todo: this is bad, but fast. maybe do it with a setter and const ref.
   ref Margin  margin () { static Margin  nullMargin ; return nullMargin ; }
   ref Border  border () { static Border  nullBorder ; return nullBorder ; }
-  ref Padding padding() { static Padding nullPadding; return nullPadding; }
+  ref Padding padding() { static Padding nullPadding; return nullPadding; }  //todo: inout ref
 
   float extraMargin()       const { return (VisualizeContainers && cast(Container)this)? 3:0; }
   vec2 topLeftGapSize()     const { with(cast()this) return vec2(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   ); }
@@ -2092,10 +2121,11 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "dontLocate"        , 1, //disables the locate() method for this container and its subcontainers
     bool          , "oldSelected"       , 1, //SelectionManager2 needs this.
 
-    bool          , "changedCreated"    , 1, //CodeRow: changed by creationg a new cell
-    bool          , "changedRemoved"    , 1, //CodeRow: changed by removing existing cells
+    bool          , "changedCreated"    , 1, //Dide2.CodeRow: changed by creationg a new cell
+    bool          , "changedRemoved"    , 1, //Dide2.CodeRow: changed by removing existing cells
+    bool          , "readOnly"          , 1, //Dide2 uses this. Only inherits from dide2.
 
-    int           , "_dummy"            ,20,
+    int           , "_dummy"            ,19,
   ));
 }
 
