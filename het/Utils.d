@@ -1328,8 +1328,12 @@ size_t sizeBytes(T)(in T a){
   else return T.sizeof;
 }
 
-@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class)) {
+@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class)) { //todo: constness
   return r.empty ? null : r.front;
+}
+
+@property auto backOrNull(R)(R r)if(isBidirectionalRange!R && is(ElementType!R==class)) {
+  return r.empty ? null : r.back;
 }
 
 auto fetchFront(T)(ref T arr, lazy ElementType!T def = ElementType!T.init){
