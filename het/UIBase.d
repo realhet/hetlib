@@ -3040,6 +3040,20 @@ class Row : Container { // Row ////////////////////////////////////
   float contentInnerWidth () const { return subCells.length ? subCells.back.outerRight : DefaultFontNewLineWidth; }
   float contentInnerHeight() const { return subCells.map!"a.outerHeight".maxElement(DefaultFontHeight); }
   vec2 contentInnerSize() const { return vec2(contentInnerWidth, contentInnerHeight); }
+
+  Cell subCellAtX(float x, Flag!"snapToNearest" snapToNearest = No.snapToNearest){
+    assert(!flags.wordWrap); //todo: no multiline either
+
+    if(subCells.empty) return null;
+
+    if(x<subCells.front.outerLeft) return snapToNearest ? subCells.front : null;
+
+    foreach(sc; subCells)
+      if(x<sc.outerRight) return sc;
+
+    return snapToNearest ? subCells.back : null;
+  }
+
 }
 
 class Column : Container { // Column ////////////////////////////////////
