@@ -4,6 +4,8 @@ pragma(lib, "gdi32.lib");
 
 import het.utils;
 
+enum smallSpace = "\u2008";
+
 __gshared size_t BitmapCacheMaxSizeBytes = 768<<20;
 
 import std.uni: isAlphaNum;
@@ -2386,7 +2388,10 @@ version(D2D_FONT_RENDERER){ private:
       if(mustRebuild) rebuild;
 
       //a single space character needs special care
-      const isSpace = text==" ";
+      const spaceIdx = text.among(" ", /*"\u2000", "\u2001", "\u2004",*/ smallSpace);    //todo: measure the width of spaces. For example put 2 well known chars around it.
+      const spaceScale =  [1,      1 , /*2       , 4       , 0.666f  ,*/ 0.4f    ][spaceIdx];
+               //                1/4em 1/2em     1em       1/6em     1/4em      thin
+      const isSpace = spaceIdx>0;
       if(isSpace) text = "j";  // a letter used to emulate the width of a space.
       //todo: get space width from DirectWrite
 
@@ -2401,7 +2406,7 @@ version(D2D_FONT_RENDERER){ private:
       DWRITE_TEXT_METRICS metrics;
       textLayout.GetMetrics(metrics).hrChk("GetMetrics");
 
-      auto bmpSize(){ return ivec2((metrics.width*props.xScale).iround, props.height).max(ivec2(1)); }
+      auto bmpSize(){ return ivec2((metrics.width*props.xScale*spaceScale).iround, props.height).max(ivec2(1)); }
 
       if(isSpace){
         return new Bitmap(image2D(bmpSize, ubyte(0)));

@@ -1461,7 +1461,7 @@ void clear(T)(ref T[] a)                { a.length = 0; }
 void clear(T)(ref T a)if(is(T==struct)) { a = T.init; }
 
 //references cleared only if not null
-void clear(T)(T  a)if(is(T==class )){ if(a) a.clear; }
+//For classes it's a BAD idea!!! It clears the reference only. Assign null instead!  void clear(T)(T  a)if(is(T==class )){ if(a) a.clear; }
 void clear(T)(T* a)if(is(T==struct)){ if(a) (*a).clear; }
 
 //note: clear for classes is not OK, because it can't clear protected fields. Solution: mixin ClassMixin_clear

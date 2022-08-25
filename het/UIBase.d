@@ -48,8 +48,8 @@ Glyph newLineGlyph(){ // newLineGlyph //////////////////////////////////////////
 }
 
 ///Used for minimum length in a CodeRow if it's empty. Also the virtual newline chars at the end.
-enum DefaultFontNewLineWidth = DefaultFontHeight*6/18;
-enum DefaultFontNewLineSize = vec2(DefaultFontNewLineWidth, DefaultFontHeight); ///Ditto
+enum DefaultFontNewLineSize = vec2(DefaultFontHeight*6/18, DefaultFontHeight); ///Ditto
+enum DefaultFontEmptyEditorSize = vec2(1, DefaultFontHeight);
 
 
 immutable
@@ -834,6 +834,20 @@ struct CellLocation{
   Cell cell;
   vec2 localPos;             //innerPos is the origin, not outerPos. It's on the containers client area.
   bounds2 globalOuterBounds; //absolute outerBounds
+
+  vec2 calcSnapOffsetFromPadding(float epsilon = 1){
+
+    static float doit(float coord, float innerSize, float pad0, float pad1, float epsilon){
+      if(coord.inRange(-pad0, 0)) return -coord + epsilon;
+      coord -= innerSize;
+      if(coord.inRange(0, pad1)) return -coord - epsilon;
+      return 0;
+    }
+
+    with(cell) return vec2(doit(localPos.x, innerSize.x, padding.left, padding.right , epsilon),
+                           doit(localPos.y, innerSize.y, padding.top , padding.bottom, epsilon));
+  }
+
 }
 
 class Cell{ // Cell ////////////////////////////////////
@@ -1705,6 +1719,53 @@ in(text.length == syntax.length)
   }
 }
 
+bool updateSyntax(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
+in(text.length == syntax.length)
+{
+  const cntrSubCellsLength = cntr.subCells.length;
+  size_t dstIdx = 0;
+  bool wasError, wasUpdate;
+  void pushSyntaxChar(dchar ch, ref TextStyle ts, ubyte actSyntax){
+    if(dstIdx<cntrSubCellsLength){
+      if(auto g = cast(Glyph)cntr.subCells[dstIdx]){
+        if(g.ch==ch){
+          if(g.syntax.chkSet(actSyntax)){
+            g.bkColor   = ts.bkColor;
+            g.fontColor = ts.fontColor;
+            g.fontFlags = ts.fontFlags;
+            wasUpdate = true; //todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
+          }
+        }else{
+          wasError = true;
+        }
+      }else{
+        //it's not a glyph... Do nothing.
+      }
+    }
+    dstIdx++;
+  }
+
+  size_t numCodeUnits, currentOfs;
+  ubyte lastSyntax = 255;
+
+  while(text.length){            //todo: combine and refactor this with appendCode
+    auto actSyntax = syntax[currentOfs];
+    auto ch = text.decodeFront!(Yes.useReplacementDchar)(numCodeUnits);
+    currentOfs += numCodeUnits;
+
+    if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
+
+    if(ch=='\t' && nonStringTabToSpaces>=0 && actSyntax!=6/+string+/){
+      foreach(i; 0..nonStringTabToSpaces)
+        pushSyntaxChar(' ', ts, actSyntax);
+    }else{
+      pushSyntaxChar(ch, ts, actSyntax);
+    }
+  }
+
+  return !wasError && cntrSubCellsLength == dstIdx;
+}
+
 /// Lookup a syntax style and apply it to a TextStyle reference
 void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint syntax, SyntaxPreset preset)
 in(syntax<syntaxTable.length)
@@ -2504,12 +2565,20 @@ class Container : Cell { // Container ////////////////////////////////////
     //todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
     //if(chkSet(measured)) measure;
 
-    if(border.borderFirst) drawBorder(dr); //for code editor
+    if(border.borderFirst){
+      border.color = bkColor;
+      drawBorder(dr); //for code editor
+    }
 
     //autofill background
     if(!flags.noBackground){
       dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
-      dr.fillRect(border.borderFirst ? innerBounds/*for code editor's round border*/ : border.adjustBounds(borderBounds_inner));
+
+      if(border.borderFirst){
+        dr.fillRect(innerBounds);
+      }else{
+         dr.fillRect(border.adjustBounds(borderBounds_inner));
+      }
     }
 
     if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
@@ -3037,7 +3106,7 @@ class Row : Container { // Row ////////////////////////////////////
 
   //fast content size calculations (after measure)
   //todo: these content calculations should be universal along all Containers.
-  float contentInnerWidth () const { return subCells.length ? subCells.back.outerRight : DefaultFontNewLineWidth; }
+  float contentInnerWidth () const { return subCells.length ? subCells.back.outerRight : DefaultFontEmptyEditorSize.x; }
   float contentInnerHeight() const { return subCells.map!"a.outerHeight".maxElement(DefaultFontHeight); }
   vec2 contentInnerSize() const { return vec2(contentInnerWidth, contentInnerHeight); }
 
