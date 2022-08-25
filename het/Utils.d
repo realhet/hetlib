@@ -1473,6 +1473,7 @@ mixin template ClassMixin_clear(){
   }
 }
 
+auto nonNulls(R)(R r){ return r.filter!"a"; }
 
 bool addIfCan(T)(ref T[] arr, in T item) { if(!arr.canFind(item)){ arr ~= item; return true; }else return false; }
 bool addIfCan(T)(ref T[] arr, in T[] items) { bool res; foreach(const item; items) if(arr.addIfCan(item)) res = true; return res; }

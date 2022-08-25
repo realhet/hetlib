@@ -1697,7 +1697,8 @@ Params:
         applySyntax =   delegate to apply a syntax index to the TextStyle
         ts =            reference to the TextStyle used while appending all the characters
  */
-void appendCode(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
+
+void appendCode(Container cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
 in(text.length == syntax.length)
 {
   size_t numCodeUnits, currentOfs;
@@ -1765,6 +1766,71 @@ in(text.length == syntax.length)
 
   return !wasError && cntrSubCellsLength == dstIdx;
 }
+
+//toro: Refactor the whole Row/Glyph/Syntax mystery
+
+/*enum updateCodeSyntax = appendCode!(Yes.updateSyntax);
+
+void appendCode(Flag!updateInplace = No.updateSyntax)(Container cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
+in(text.length == syntax.length)
+{
+  int resultCode; //0==ok
+
+  static if(updateInplace){
+    const cntrSubCellsLength = cntr.subCells.length;
+    size_t dstIdx = 0;
+    bool wasError, wasUpdate;
+
+    void doit(dchar ch, ref TextStyle ts, ubyte actSyntax){
+      if(dstIdx<cntrSubCellsLength){
+        if(auto g = cast(Glyph)cntr.subCells[dstIdx]){
+          if(g.ch==ch){
+            if(g.syntax.chkSet(actSyntax)){
+              g.bkColor   = ts.bkColor  ;
+              g.fontColor = ts.fontColor;
+              g.fontFlags = ts.fontFlags;
+              wasUpdate = true; //todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
+            }
+          }else{
+            wasError = true;
+          }
+        }else{
+          //it's not a glyph. Do nothing.
+        }
+      }
+      dstIdx++;
+    }
+
+    scope(exit) resultCode = !wasError && cntrSubCellsLength == dstIdx;
+  }else{ //appendCode
+
+    void doit(dchar ch, ubyte actSyntax){
+      cntr.appendSyntaxChar(ch, ts, actSyntax);
+    }
+
+  }
+
+  size_t numCodeUnits, currentOfs;
+  ubyte lastSyntax = 255;
+
+  while(text.length){
+    auto actSyntax = syntax[currentOfs];
+    auto ch = text.decodeFront!(Yes.useReplacementDchar)(numCodeUnits);
+    currentOfs += numCodeUnits;
+
+    if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
+
+    if(ch=='\t' && nonStringTabToSpaces>=0 && actSyntax!=6/+string+/){
+      foreach(i; 0..nonStringTabToSpaces)
+        doit(' ', ts);
+    }else{
+      doit(ch, ts);
+    }
+  }
+
+  return resultCode;
+}*/
+
 
 /// Lookup a syntax style and apply it to a TextStyle reference
 void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint syntax, SyntaxPreset preset)
