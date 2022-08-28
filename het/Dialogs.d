@@ -141,9 +141,10 @@ private:
 
     OPENFILENAMEW ofn;
     ofn.hwndOwner = owner;
-    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_EXPLORER | OFN_NOREADONLYRETURN | OFN_EXTENSIONDIFFERENT;
-    if(isMulti) ofn.Flags |= OFN_ALLOWMULTISELECT;
-    if(isOpen) ofn.Flags |= OFN_FILEMUSTEXIST;
+    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
+    if(isMulti ) ofn.Flags |= OFN_ALLOWMULTISELECT;
+    if(isOpen  ) ofn.Flags |= OFN_FILEMUSTEXIST;
+    if(!isOpen ) ofn.Flags |= OFN_NOREADONLYRETURN;
 
     //note: change file type won't refresh folder bug -> https://stackoverflow.com/questions/922204/getopenfilename-does-not-refresh-when-changing-filter
 

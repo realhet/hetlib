@@ -2247,9 +2247,8 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
 
     bool          , "changedCreated"    , 1, //Dide2.CodeRow: changed by creationg a new cell
     bool          , "changedRemoved"    , 1, //Dide2.CodeRow: changed by removing existing cells
-    bool          , "readOnly"          , 1, //Dide2 uses this. Only inherits from dide2.
 
-    int           , "_dummy"            ,19,
+    int           , "_dummy"            ,20,
   ));
 }
 

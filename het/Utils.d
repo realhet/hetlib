@@ -120,7 +120,7 @@ public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
   GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow,
   SetFocus, SetForegroundWindow, GetForegroundWindow,
   SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
-  GetStdHandle, GetTempPathW, GetFileTime, SetFileTime,
+  GetStdHandle, GetTempPathW, GetFileTime, SetFileTime, GetFileAttributesW,
   FileTimeToLocalFileTime, LocalFileTimeToFileTime, FileTimeToSystemTime, SystemTimeToFileTime, GetLocalTime, GetSystemTimeAsFileTime, Sleep, GetComputerNameW, GetProcAddress,
   SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
   GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
@@ -2752,7 +2752,7 @@ auto commandLineToMap(string line){
 
 string quoted(string s, char q = '"'){
   if(q=='"') return format!"%(%s%)"([s]);
-  else if(q=='`') return q ~ s.replace(q, ' ') ~ q;
+  else if(q=='`') return s.canFind(q) ? quoted(s, '"') : q ~ s ~ q; //note: it's safe: uses " when ` is impossible
   else ERR("Unsupported quote char: "~q);
   assert(0);
 }
@@ -5353,6 +5353,14 @@ private static{/////////////////////////////////////////////////////////////////
     }
   }
 
+  bool fileReadOnly(string fn)
+  {
+    if(fn.isVirtualFileName) return false; //todo: virtual files / readOnly
+    auto a = GetFileAttributesW(toPWChar(fn));
+    if(a==INVALID_FILE_ATTRIBUTES) return false;
+    return a & FILE_ATTRIBUTE_READONLY;
+  }
+
   struct FileTimes{
     DateTime created, modified, accessed;
     DateTime latest() const{
@@ -5432,6 +5440,8 @@ public:
   File normalized()             const{ return File(buildNormalizedPath(absolutePath(fullName))); }
   File normalized(string base)  const{ return File(buildNormalizedPath(absolutePath(fullName, base))); }
   File normalized(in Path base) const{ return normalized(base.fullPath); }
+
+  bool isReadOnly() const{ return fileReadOnly(fullName); }
 
   auto times()     const{ return fileTimes(fullName); }
   @property auto modified()  const{ return times.modified; }
@@ -6764,7 +6774,7 @@ struct DateTime{
   bool opCast() const{ return !isNull(); }
   int  opCmp   (in DateTime b) const{ return cmp(raw, b.raw); }
   bool opEquals(in DateTime b) const{ return raw==b.raw; }
-
+  size_t toHash() const{ return raw; }
 
   enum RawShift = 6;
   enum RawUnit : ulong {         // 37ns is the fastest measurable interval. Using Windown 10 QPC
