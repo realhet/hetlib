@@ -33,9 +33,9 @@ const CompilerVersion = 100;
 
 enum TokenKind {unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat};
 
-@trusted string tokenize(string fileName, string text, out Token[] tokens, WhiteSpaceStats* whiteSpaceStats=null) //returns error of any
+@trusted string tokenize(string fileName, string sourceText, out Token[] tokens, WhiteSpaceStats* whiteSpaceStats=null) //returns error of any
 {
-  auto t = scoped!Tokenizer;  return t.tokenize(fileName, text, tokens, whiteSpaceStats);
+  auto t = scoped!Tokenizer;  return t.tokenize(fileName, sourceText, tokens, whiteSpaceStats);
 }
 
 deprecated("use SourceCode class") Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen)
@@ -58,14 +58,14 @@ auto decodeBigComments(char[] raw){
 }
 
 struct SourceLine{ //SourceLine ///////////////////////////////
-  string text;
+  string sourceText;
   ubyte[] syntax;
   ushort[] hierarchy;
 }
 
 class SourceCode{ // SourceCode ///////////////////////////////
   File file;
-  string text;  //todo: text is a bad name!!!
+  string sourceText;
 
   //results after process:
   Token[] tokens;
@@ -93,7 +93,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
   void foreachLine(void delegate(int idx, string line, ubyte[] syntax) callBack){
     auto syn = syntax;
     int idx;
-    foreach(line; text.splitter('\n')){
+    foreach(line; sourceText.splitter('\n')){
       auto synLine = syn.fetchFrontN(line.length+1/+newLine+/);
       if(synLine.length > line.length) synLine.popBack;
 
@@ -103,8 +103,8 @@ class SourceCode{ // SourceCode ///////////////////////////////
   }
 
   int lineCount(){
-    if(tokens.empty) return text.count('\n').to!int+1;
-    return tokens[$-1].line + text[tokens[$-1].pos..$].count('\n').to!int + 1;
+    if(tokens.empty) return sourceText.count('\n').to!int+1;
+    return tokens[$-1].line + sourceText[tokens[$-1].pos..$].count('\n').to!int + 1;
   }
 
   auto seekLine(int lineDst){
@@ -118,11 +118,11 @@ class SourceCode{ // SourceCode ///////////////////////////////
       }
     }
 
-    if(line==lineDst) while(pos>0 && text[pos-1]!='\n') pos--;
+    if(line==lineDst) while(pos>0 && sourceText[pos-1]!='\n') pos--;
 
     while(line<lineDst){
-      auto i = text[pos..$].indexOf('\n');
-      if(i<0) return text.length.to!int;
+      auto i = sourceText[pos..$].indexOf('\n');
+      if(i<0) return sourceText.length.to!int;
 
       pos += i+1;
       line++;
@@ -134,9 +134,9 @@ class SourceCode{ // SourceCode ///////////////////////////////
   int[2] getLineRange(int i){
     if(i<0 || i>=lineCount) return (int[2]).init;
     int pos = seekLine(i);
-    auto j = text[pos..$].indexOf('\n');
+    auto j = sourceText[pos..$].indexOf('\n');
     int pos2;
-    if(j<0) pos2 = text.length.to!int;
+    if(j<0) pos2 = sourceText.length.to!int;
        else pos2 = pos + j.to!int;
     return [pos, pos2];
   }
@@ -146,24 +146,24 @@ class SourceCode{ // SourceCode ///////////////////////////////
 
     auto r = getLineRange(i);
     if(r[0] < r[1]){
-      res.text      = text     [r[0]..r[1]];
-      res.syntax    = syntax   [r[0]..r[1]];
-      res.hierarchy = hierarchy[r[0]..r[1]];
+      res.sourceText = sourceText[r[0]..r[1]];
+      res.syntax     = syntax    [r[0]..r[1]];
+      res.hierarchy  = hierarchy [r[0]..r[1]];
     }
 
     return res;
   }
 
-  auto getLineText     (int i){ return getLine(i).text     ; }
-  auto getLineSyntax   (int i){ return getLine(i).syntax   ; }
-  auto getLineHierarchy(int i){ return getLine(i).hierarchy; }
+  auto getLineText     (int i){ return getLine(i).sourceText ; }
+  auto getLineSyntax   (int i){ return getLine(i).syntax     ; }
+  auto getLineHierarchy(int i){ return getLine(i).hierarchy  ; }
 
-  this(string text){ this(text, File("")); }
+  this(string sourceText){ this(sourceText, File("")); }
   this(File file){ this(file.readText(true), file); }
-  this(string text, File file){
+  this(string sourceText, File file){
     //lineOfs = chain([-1], lines.map!"cast(int)a.length".cumulativeFold!"a+b+1").array;
 
-    this.text = text;
+    this.sourceText = sourceText;
     this.file = file;
 
     process;
@@ -172,13 +172,13 @@ class SourceCode{ // SourceCode ///////////////////////////////
   void process(){
     clearResult;
 
-    hierarchy.length = syntax.length = text.length;
+    hierarchy.length = syntax.length = sourceText.length;
 
-    error = tokenize(file.fullName, text, tokens, &whiteSpaceStats);
+    error = tokenize(file.fullName, sourceText, tokens, &whiteSpaceStats);
 
     if(error == ""){
       auto bigc = new char[0x10000];
-      error = syntaxHighLight(file.fullName, tokens, text.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
+      error = syntaxHighLight(file.fullName, tokens, sourceText.length, syntax.ptr, hierarchy.ptr, bigc.ptr, bigc.length.to!int);
       bigComments = decodeBigComments(bigc);
     }
 
