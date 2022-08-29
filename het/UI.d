@@ -3267,7 +3267,7 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
   void Legend(string title, float size=float.nan, RGB color = RGB(1, 2, 3), string suffix=""){
     if(color != RGB(1, 2, 3)) Text(color, symbol("CheckboxFill"), tsNormal.fontColor, " ");
     Text(title);
-    if(!isnan(size)) Row(HAlign.right, shortSizeText(size)~suffix, { width = fh*(2.25 + suffix.length*0.3); });
+    if(!isnan(size)) Row(HAlign.right, shortSizeText!1024(size)~suffix, { width = fh*(2.25 + suffix.length*0.3); });
   }
 
   struct Data{ float[] values; RGB color; }

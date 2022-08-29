@@ -841,8 +841,8 @@ if(log) "Created subtex %s:".writefln(fileName);
 
   string megaTextureConfig() const{
     return megaTextureSizes.map!(
-      s => s.x.shortSizeText
-          ~ (s.x == s.y ? "" : "x"~s.y.shortSizeText)
+      s => s.x.shortSizeText!1024
+          ~ (s.x == s.y ? "" : "x"~s.y.shortSizeText!1024)
     ).join(", ");
   }
 

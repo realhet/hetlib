@@ -2307,7 +2307,7 @@ class Container : Cell { // Container ////////////////////////////////////
   void clearSubCells() { subCells = []; }
   final auto subContainers(){ return subCells.map!(c => cast(Container)c).filter!"a"; }
 
-  void appendCell (Cell c){ subCells ~= c; }
+  void appendCell (Cell c){ if(c) subCells ~= c; }
 
   int cellCount(){ return cast(int)subCells.length; }
 

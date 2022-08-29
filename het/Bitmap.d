@@ -185,7 +185,7 @@ struct BitmapCacheStats{
   Bitmap[] bitmaps; //pnly when detailed stats requested
 
   string toString(){
-    auto res = format!"BitmapCacheStats: count: %6d  residentSize: %4s allSize: %4s"(count, residentSizeBytes.shortSizeText, allSizeBytes.shortSizeText);
+    auto res = format!"BitmapCacheStats: count: %6d  residentSize: %4s allSize: %4s"(count, residentSizeBytes.shortSizeText!1024, allSizeBytes.shortSizeText!1024);
 
     if(bitmaps.length)
       res ~= "\n" ~ bitmaps.sort!((a, b) => a.file < b.file).map!text.join("\n");
@@ -1448,7 +1448,7 @@ public:
 
   string details(){
     return format!"%-50s   res: %-11s   MP: %5.1f   chn: %s   compr.size: %4sB   uncompr.size: %4sB   ratio:%4.1f%%   bpp:%6.2f"(
-                          file.fullName, width.text~"x"~height.text, double(width)*height/1_000_000, channels, file.size.shortSizeText, sizeBytes.shortSizeText, double(file.size)*100/sizeBytes, double(file.size)/width/height*8);
+                          file.fullName, width.text~"x"~height.text, double(width)*height/1_000_000, channels, file.size.shortSizeText!1024, sizeBytes.shortSizeText!1024, double(file.size)*100/sizeBytes, double(file.size)/width/height*8);
   }
 
   void copyFrom(Bitmap b){

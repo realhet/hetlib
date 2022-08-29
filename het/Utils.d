@@ -3032,19 +3032,24 @@ string fetchRegexFlags(ref string s){
 }
 
 
-string shortSizeText(string spacing="", T)(in T n){
+string shortSizeText(int base, string spacing="", T)(in T n){
   //todo: optimize this
   //todo: 4096 -> 4k
   //toso: 4.0k -> 4k
+
+  static if(base==1024) enum divFactor(int n) = (1.0/1024)^^n;
+  else static if(base==1000) enum divFactor(int n) = (0.0001)^^n;
+  else static assert(0, "invalid base");
+
   string s = n.text;                      if(s.length<=4) return s~spacing;
-  s = format!"%.1f"(double(n)/(1 <<10));  if(s.length<=3) return s~spacing~'k';
-  s = format!"%.0f"(double(n)/(1 <<10));  if(s.length<=3) return s~spacing~'k';
-  s = format!"%.1f"(double(n)/(1 <<20));  if(s.length<=3) return s~spacing~'M';
-  s = format!"%.0f"(double(n)/(1 <<20));  if(s.length<=3) return s~spacing~'M';
-  s = format!"%.1f"(double(n)/(1 <<30));  if(s.length<=3) return s~spacing~'G';
-  s = format!"%.0f"(double(n)/(1 <<30));  if(s.length<=3) return s~spacing~'G';
-  s = format!"%.1f"(double(n)/(1L<<40));  if(s.length<=3) return s~spacing~'T';
-  s = format!"%.0f"(double(n)/(1L<<40));                  return s~spacing~'T';
+  s = format!"%.1f"(n*divFactor!1);  if(s.length<=3) return s~spacing~'k';
+  s = format!"%.0f"(n*divFactor!1);  if(s.length<=3) return s~spacing~'k';
+  s = format!"%.1f"(n*divFactor!2);  if(s.length<=3) return s~spacing~'M';
+  s = format!"%.0f"(n*divFactor!2);  if(s.length<=3) return s~spacing~'M';
+  s = format!"%.1f"(n*divFactor!3);  if(s.length<=3) return s~spacing~'G';
+  s = format!"%.0f"(n*divFactor!3);  if(s.length<=3) return s~spacing~'G';
+  s = format!"%.1f"(n*divFactor!4);  if(s.length<=3) return s~spacing~'T';
+  s = format!"%.0f"(n*divFactor!4);                  return s~spacing~'T';
 }
 
 // structs to text /////////////////////////////////////
@@ -5902,7 +5907,7 @@ struct DirResult{
   static struct DirExt{
     string ext;
     ulong count, size;
-    string toString() const{ return format!"%-10s %7d %3sB"(ext, count, size.shortSizeText); }
+    string toString() const{ return format!"%-10s %7d %3sB"(ext, count, size.shortSizeText!1024); }
   }
   DirExt[] exts;
 
