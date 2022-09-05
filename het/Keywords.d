@@ -39,11 +39,32 @@ private enum _keywordStrs = [ //last items of categories must be untouched!!!
 
 //basic types
   //ints
-    "byte","ubyte",             "short","ushort",               "int","uint",       "long","ulong",         "cent","ucent",
+    "byte","ubyte",             "short","ushort",               "int","uint",       "long","ulong",         //these are deprecated: "cent","ucent",
   //floats
-    "float","double","real",    "ifloat","idouble","ireal",     "cfloat","cdouble","creal",
+    "float","double","real",    //these are deprecated: "ifloat","idouble","ireal",     "cfloat","cdouble","creal",
   //others
-    "bool",                         "char","wchar","dchar",  /* "string","wstring","dstring", these are aliases. */       "void",
+    "bool",                         "char","wchar","dchar",
+  /+popular aliases: +/
+    "string","wstring","dstring",
+
+    "File", "Path", "DateTime", "Time",
+
+    "Vector",
+    "vec2", "dvec2", "ivec2", "uvec2", "bvec2", "RG",
+    "vec3", "dvec3", "ivec3", "uvec3", "bvec3", "RGB",
+    "vec4", "dvec4", "ivec4", "uvec4", "bvec4", "RGBA",
+
+    "Matrix",
+     "mat2" , "mat3" , "mat4" , "mat2x3",  "mat2x4",  "mat3x2",  "mat3x4",  "mat4x2",  "mat4x3",
+    "dmat2", "dmat3", "dmat4", "dmat2x3", "dmat2x4", "dmat3x2", "dmat3x4", "dmat4x2", "dmat4x3",
+
+    "Bounds",
+    "bounds" , "dbounds" , "ibounds" ,
+    "bounds2", "dbounds2", "ibounds2",
+    "bounds3", "dbounds3", "ibounds3",
+
+  //the last basic type is void:
+    "void",
 
 //user definied types
   "alias","enum","interface","struct","class","union","delegate","function",

@@ -90,7 +90,9 @@ class SourceCode{ // SourceCode ///////////////////////////////
     whiteSpaceStats = WhiteSpaceStats.init;
   }
 
-  void foreachLine(void delegate(int idx, string line, ubyte[] syntax) callBack){
+  void foreachLine(T)(T delegate(int idx, string line, ubyte[] syntax) callBack)
+  if(is(T==void) || is(T==bool))
+  {
     auto syn = syntax;
     int idx;
     foreach(line; sourceText.splitter('\n')){
@@ -98,7 +100,12 @@ class SourceCode{ // SourceCode ///////////////////////////////
       if(synLine.length > line.length) synLine.popBack;
 
       if(line.endsWith('\r')){ line.popBack; synLine.popBack; }
-      callBack(idx++, line, synLine);
+
+      static if(is(T==void)){
+        callBack(idx++, line, synLine);
+      }else{
+        if(!callBack(idx++, line, synLine)) break;
+      }
     }
   }
 

@@ -125,6 +125,16 @@ float toWidthHeight(string s, float baseHeight){
   }
 }
 
+///It is needed for syntax highlighter when it changes font.bold
+private float adjustBoldWidth(Glyph g, int prevFontFlags){   //todo: also check monospaceness
+  enum boldMask = 1;
+  if((prevFontFlags&boldMask) == (g.fontFlags&boldMask)) return 0;
+  auto delta = g.innerHeight * (BoldOffset*2);
+  if(prevFontFlags&boldMask) delta = -delta;
+  g.outerSize.x += delta;
+  return delta;
+}
+
 private vec2 calcGlyphSize_clearType(in TextStyle ts, int stIdx){
   auto info = textures.accessInfo(stIdx);
 
@@ -488,7 +498,7 @@ struct TextStyle{
   bool bold, italic, underline, strikeout, transparent;
   RGB fontColor=clBlack, bkColor=clWhite;
 
-  ubyte fontFlags() const{ return cast(ubyte)boolMask(bold, italic, underline, strikeout, 0, transparent); }
+  ubyte fontFlags() const{ return cast(ubyte)boolMask(bold, italic, underline, strikeout, 0/+isImage+/, transparent); } //todo: implement monospaced font style for string literals, but firts I must refactor fontFlags.
 
   bool isDefaultFont() const{ return font == DefaultFontName; } //todo: slow. 'font' Should be a property.
 
@@ -1100,7 +1110,6 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 
     if(!VisualizeGlyphs) if(isReturn || isNewLine) innerWidth = 0;
   }
-
 
   override void draw(Drawing dr){
     drawBorder(dr); //todo: csak a containernek kell border elvileg, ez hatha gyorsit.
@@ -1726,17 +1735,26 @@ in(text.length == syntax.length)
   const cntrSubCellsLength = cntr.subCells.length;
   size_t dstIdx = 0;
   bool wasError, wasUpdate;
+  float boldShift = 0;
   void pushSyntaxChar(dchar ch, ref TextStyle ts, ubyte actSyntax){
     if(dstIdx<cntrSubCellsLength){
       if(auto g = cast(Glyph)cntr.subCells[dstIdx]){
         if(g.ch==ch){
-          if(g.syntax.chkSet(actSyntax)){
+
+          if(boldShift) g.outerPos.x += boldShift; //always shift remaining glyphs
+
+          if(g.syntax.chkSet(actSyntax)){ //only set syntax if changed
             g.bkColor   = ts.bkColor;
             g.fontColor = ts.fontColor;
+
+            const prevFontFlags = g.fontFlags;
             g.fontFlags = ts.fontFlags;
+            if(auto delta = g.adjustBoldWidth(prevFontFlags))
+              boldShift += delta;
+
             wasUpdate = true; //todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
           }
-        }else{
+        }else{//not the same char as it was expected. Only the syntax highlight can change, not the text.
           wasError = true;
         }
       }else{
@@ -1762,6 +1780,8 @@ in(text.length == syntax.length)
     }else{
       pushSyntaxChar(ch, ts, actSyntax);
     }
+
+    if(wasError) break;
   }
 
   return !wasError && cntrSubCellsLength == dstIdx;
