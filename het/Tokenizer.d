@@ -988,7 +988,7 @@ public:
     int cnt;
     while(1){
       cnt++;
-      if(isEOF(ch)) error("Unexpected EOF in a WysiwygString.");
+      if(isEOF(ch)) error("Unexpected EOF in a string WysiwygString.");
       if(ch==ending) { fetch; break; }
       if(isNewLine(ch)) { s ~= '\n'; skipNewLineOnce; continue; }
       if(handleEscapes && ch=='\\'){ s ~= parseEscapeChar; continue; }
@@ -1005,7 +1005,7 @@ public:
   void parseDoubleQuotedString(){ parseWysiwygString(true); }
   void parseLiteralChar(){ parseWysiwygString(true, true); }
 
-  void parseHexString(){
+  /+deprecated void parseHexString(){
     newToken(TokenKind.literalString);
     fetch; fetch;
     bool phase;  string s;  int act;
@@ -1030,7 +1030,7 @@ public:
     parseStringPosFix;
     finalizeToken;
     lastToken.data = s;
-  }
+  }+/
 
   void parseDelimitedString(){
     newToken(TokenKind.literalString);
@@ -1282,7 +1282,7 @@ public:
             if(nc=='"'){
               if(ch=='r'){ parseWysiwygString; break; }
               if(ch=='q'){ parseDelimitedString; break; }
-              if(ch=='x'){ parseHexString; break; }
+              //deprecated if(ch=='x'){ parseHexString; break; }  //todo: x"" hexString can be an addon in the IDE.
             }else if(nc=='{'){
               if(ch=='q'){ tryParseOperator; break; }
             }

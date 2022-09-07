@@ -45,8 +45,8 @@ public:
   //animated stuff
   float animSpeed = 0.3; //0=off, 0.3=normal, 0.9=slow
   auto origin_anim()   const { return m_origin_anim; }
-  auto scale_anim()    const { return pow(2, m_logScale_anim); }
-  auto invScale_anim() const { return 1.0f/scale_anim; }
+  auto scale_anim()    const { return pow(2, m_logScale_anim); }  //zoomFactor
+  auto invScale_anim() const { return 1.0f/scale_anim; }          //pixelSize
 
   bounds2 workArea, workArea_accum; //next workarea is the currently built one being drawn
 
@@ -309,3 +309,42 @@ public:
 
 }
 
+/// Clamps worldCoord points into a view's visible subSurface
+struct RectClamper{ //RectClamper /////////////////////////////////////////////
+  const{
+    bounds2 outerBnd, innerBnd;
+    vec2 center, innerHalfSize;
+  }
+
+  this(View2D view, float borderSizePixels){
+    auto ob = view.subScreenBounds_anim;
+    this(ob, ob.inflated(-view.invScale_anim*borderSizePixels));
+  }
+
+  this(in bounds2 outerBnd, in bounds2 innerBnd){
+    this.outerBnd = outerBnd;
+    this.innerBnd = innerBnd;
+    center = outerBnd.center;
+    innerHalfSize = innerBnd.size/2;
+  }
+
+  private vec2 clamp_noCenter(vec2 p) const{
+    p -= center;
+    if(p.x > innerHalfSize.x) p *= innerHalfSize.x/p.x; /*else*/ if(p.x < -innerHalfSize.x) p *= -innerHalfSize.x/p.x;
+    if(p.y > innerHalfSize.y) p *= innerHalfSize.y/p.y; /*else*/ if(p.y < -innerHalfSize.y) p *= -innerHalfSize.y/p.y;
+    return p;
+  }
+
+  vec2 clamp(vec2 p) const{
+    return clamp_noCenter(p) + center;
+  }
+
+  vec2[2] clampArrow(in vec2 p, float scale0=.99f, float scale1=1) const{
+    auto cc = clamp_noCenter(p);
+    return [cc*scale0+center, cc*scale1+center];
+  }
+
+  bool overlaps(in bounds2 b) const{
+    return outerBnd.overlaps(b);
+  }
+}
