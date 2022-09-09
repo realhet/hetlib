@@ -2948,7 +2948,7 @@ class Container : Cell { // Container ////////////////////////////////////
 
   /// Clears flags.changed* if needed. Also clears it for all the children recursively.
   void clearChangedCreated(){ mixin(genClearChanged.replace("#", "Created")); }
-  void clearChangedRemoved(){ mixin(genClearChanged.replace("#", "Created")); }
+  void clearChangedRemoved(){ mixin(genClearChanged.replace("#", "Removed")); }
 
   @property int changedMask() const{
     return (flags.changedCreated?1:0) | (flags.changedRemoved?2:0);
