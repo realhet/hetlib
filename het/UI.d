@@ -944,6 +944,19 @@ struct im{ static:
   void Row   (string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ Container!(.Row   , srcModule, srcLine)(args); }
   void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args){ Container!(.Column, srcModule, srcLine)(args); }
 
+  /// It is used to put cached cells or subcells into the imgui.
+  void CellRef(Cell cell){
+    if(cell) Container({
+      actContainer.append(cell);
+    });
+  }
+
+  void CellRef(Cell[] cells){
+    if(cells.length) Container({
+      actContainer.append(cells);
+    });
+  }
+
   // popup state
   struct PopupState{
     Cell cell; // the popup itself
@@ -2807,6 +2820,35 @@ struct im{ static:
   }
 
 
+  private void FileIcon_internal(int iconHeight)(string ext){ with(im){  //todo: this could go inside het.ui.im
+    if(ext.empty) return;
+
+    static Cell[][string] cache;  //todo: when megatexture is reallocated, the texture id's of icons become invalid.
+
+    Cell[] cells;
+
+    cache.update(ext, {
+        Container({
+          Text(tag(format!`img "icon:\%s" height=%f`(ext, iconHeight)));  //note: this is fucking slow, but works
+        });
+        auto cntr = removeLastContainer;
+        cells = cntr.subCells;  //note: this retirns the last char or a whole error string produced by text markup processor.
+        return cells;
+      },
+      (ref Cell[] c){
+        cells = c;
+      }
+    );
+
+    CellRef(cells);
+  }}
+
+  void FileIcon_small (string ext){ FileIcon_internal!(DefaultFontHeight*1-2)(ext); }
+  void FileIcon_normal(string ext){ FileIcon_internal!(DefaultFontHeight*2-2)(ext); }
+  void FileIcon_large (string ext){ FileIcon_internal!(DefaultFontHeight*4-2)(ext); }
+  alias FileIcon = FileIcon_normal;
+
+
   // Document ////////////////////////
   void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(string title, void delegate() contents = null){
     auto doc = new .Document;
@@ -3192,50 +3234,49 @@ struct ResourceMonitor{
     }
 
   }
+
+  void update(){
+    updateInternal({
+      //collect and actualize data
+      textureCount.act[0] = textures.length;
+      texturePoolSize.act[0] = textures.poolSizeBytes;
+      textureUsedSize.act[0] = textures.usedSizeBytes;
+
+      const bs = bitmaps.stats;
+      bitmapCount            .act[0] = bs.count;
+      residentBitmapSize     .act[0] = bs.residentSizeBytes;
+      nonUnloadableBitmapSize.act[0] = bs.nonUnloadableSizeBytes;
+      allBitmapSize          .act[0] = bs.allSizeBytes;
+
+      const vs = virtualFiles.stats;
+      virtualFileCount.act[0] = vs.count;
+      residentVirtualFileSize .act[0] = vs.residentSizeBytes;
+      allVirtualFileSize      .act[0] = vs.allSizeBytes;
+
+      UPS.act[0] = mainWindow.UPS;
+      FPS.act[0] = mainWindow.FPS;
+
+      TPS.act[0] = het.win.TPS;
+      VPS.act[0] = het.win.VPS;
+
+      import core.memory : GC;
+      with(GC.stats){
+        gcUsed.act[0] = usedSize;
+        gcFree.act[0] = freeSize;
+        gcAll.act[0] = usedSize+freeSize;
+
+        const long act = allocatedInCurrentThread;
+        __gshared long last;
+
+        gcRate.act[0] = act-last;
+        last = act;
+      }
+    });
+  }
+
 }
 
 __gshared ResourceMonitor resourceMonitor;
-
-
-void update(ref ResourceMonitor rm){ with(rm){
-  updateInternal({
-    //collect and actualize data
-    textureCount.act[0] = textures.length;
-    texturePoolSize.act[0] = textures.poolSizeBytes;
-    textureUsedSize.act[0] = textures.usedSizeBytes;
-
-    const bs = bitmaps.stats;
-    bitmapCount            .act[0] = bs.count;
-    residentBitmapSize     .act[0] = bs.residentSizeBytes;
-    nonUnloadableBitmapSize.act[0] = bs.nonUnloadableSizeBytes;
-    allBitmapSize          .act[0] = bs.allSizeBytes;
-
-    const vs = virtualFiles.stats;
-    virtualFileCount.act[0] = vs.count;
-    residentVirtualFileSize .act[0] = vs.residentSizeBytes;
-    allVirtualFileSize      .act[0] = vs.allSizeBytes;
-
-    UPS.act[0] = mainWindow.UPS;
-    FPS.act[0] = mainWindow.FPS;
-
-    TPS.act[0] = het.win.TPS;
-    VPS.act[0] = het.win.VPS;
-
-    import core.memory : GC;
-    with(GC.stats){
-      gcUsed.act[0] = usedSize;
-      gcFree.act[0] = freeSize;
-      gcAll.act[0] = usedSize+freeSize;
-
-      const long act = allocatedInCurrentThread;
-      __gshared long last;
-
-      gcRate.act[0] = act-last;
-      last = act;
-    }
-  });
-}}
-
 
 void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 
