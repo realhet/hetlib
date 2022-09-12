@@ -405,6 +405,14 @@ struct im{ static:
   bool isFocused(in Id id)              { return focusedState.id!=Id.init        && focusedState.id == id; }
   bool isFocused(.Container container)  { return focusedState.container !is null && focusedState.container is container; }
 
+  void focusNothing(){
+    if(focusedState.id){
+      onFocusLost(focusedState.id);
+
+      focusedState.reset;
+    }
+  }
+
 //  void focusExit(in Id id)              { if(isFocused(id)) focusedState.reset; }
 //  void focusExit(Container container)   { if(isFocused(container)) focusedState.reset; }
 //  void focusExit()                      { focusedState.reset; }

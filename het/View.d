@@ -145,7 +145,7 @@ public:
 
     //world space screen bounds offseted inside
     auto sb = subScreenBounds_dest;
-    if(overZoomPercent){
+    if(overZoomPercent>0){
       auto border = min(abs(sb.width), abs(sb.height))*(0.01f*overZoomPercent);
       sb = sb.inflated(-border);
     }
@@ -153,7 +153,7 @@ public:
     //scale up the screen if the target donesn't fit inside
     float requiredScale = max(max(1, target.height/sb.height), max(1, target.width/sb.width));
     if(requiredScale>1){
-      const c = sb.center;
+      const c = origin;
       sb = (sb-c)*requiredScale+c;
     }
 
@@ -298,8 +298,9 @@ public:
   void updateSmartScroll(){
     if(mustScroll.chkClear){
       auto bnd = scrollTargets.map!"a.rect".fold!"a |= b"(bounds2.init);
-      if(bnd)
+      if(bnd){
         scrollZoom(bnd);
+      }
     }
 
     //filter out too old rocts
