@@ -8,6 +8,8 @@ import std.bitmanip: bitfields;
 
 import het.ui : im; //todo: bad crosslink for scrollInfo
 
+//todo: rename "hovered" -> "hot"
+
 // enums/constants ///////////////////////////////////////
 
 //adjust the size of the original Tab character

@@ -158,6 +158,20 @@ struct TimeLine{
 }
 
 
+// MouseCursor /////////////////////////////////////////////////////////////////////
+
+enum MouseCursor{ ARROW, IBEAM, WAIT, CROSS, UPARROW, /+SIZE, ICON,+/ SIZENWSE, SIZENESW, SIZEWE, SIZENS, SIZEALL, NO, HAND, APPSTARTING, HELP}
+
+private void SetCursor(MouseCursor c){
+  immutable _cursorIds = mixin("[", [EnumMembers!MouseCursor].map!`"IDC_"~a.text`.join(','), "]");
+  __gshared HCURSOR[MouseCursor.max] _loadedCursors;
+
+  auto ref h(){ return _loadedCursors[c]; }
+  if(!h){ h = LoadCursorW(null, _cursorIds[c]); }
+  core.sys.windows.winuser.SetCursor(h);
+}
+
+
 //TODO: ezek a specialis commentek szekciokra oszthatnak a filet es az editorban lehetne maszkalni a szekciok kozott
 //todo: Ha a console ablak bezarodik, az ablakozorendszer destruktora akkor is hivodjon meg!
 
@@ -727,6 +741,8 @@ public:
       case WM_ENTERSIZEMOVE: _isSizingMoving = true; return 0;
       case WM_EXITSIZEMOVE: _isSizingMoving = false; return 0;
 
+      case WM_SETCURSOR: internalUpdateMouseCursor(Yes.forced); return 1;
+
       default:
         if(message.inRange(WM_USER, 0x7FFF)) return onWmUser(message-WM_USER, wParam, lParam);
     }
@@ -922,6 +938,13 @@ public:
     onWglMakeCurrent(false);
   }
 
+  MouseCursor mouseCursor;
+  private MouseCursor lastMouseCursor;
+  private void internalUpdateMouseCursor(Flag!"forced" forced = No.forced){
+    if(lastMouseCursor.chkSet(mouseCursor) || forced)
+      SetCursor(mouseCursor);
+  }
+
   private bool inUpdate;
 
   private final void internalUpdate() {
@@ -1011,6 +1034,7 @@ public:
 
       if(updateCnt>0) canSleep = !anyInvalidate; //if there was an actual update cycle, update the canSleep state. It can only sleep when tere was no invalidate() calls
 
+      internalUpdateMouseCursor;
     }finally{
       timeLast = timeAct;
     }
