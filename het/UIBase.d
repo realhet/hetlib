@@ -2270,7 +2270,9 @@ union ContainerFlags{ // ------------------------------ ContainerFlags /////////
     bool          , "changedCreated"    , 1, //Dide2.CodeRow: changed by creationg a new cell
     bool          , "changedRemoved"    , 1, //Dide2.CodeRow: changed by removing existing cells
 
-    int           , "_dummy"            ,20,
+    bool          , "dontStretchSubCells", 1, //Column: don't stretch the items to the innerWidth of the column.
+
+    int           , "_dummy"            ,19,
   ));
 }
 
@@ -2420,6 +2422,17 @@ class Container : Cell { // Container ////////////////////////////////////
   float calcContentWidth (){ return subCells.map!(c => c.outerRight ).maxElement(0); }
   float calcContentHeight(){ return subCells.map!(c => c.outerBottom).maxElement(0); }
   vec2  calcContentSize  (){ return vec2(calcContentWidth, calcContentHeight); }
+
+  final void setSubContainerWidths(bool setAll=true)(float targetWidth){
+    foreach(c; subContainers)
+      if(setAll ? true : c.outerWidth!=targetWidth){
+        c.outerWidth = targetWidth;
+        c.flags.autoWidth = false;
+        c.measure;
+      }
+  }
+
+  final void setSubContainerWidths_differentOnly(float targetWidth){ setSubContainerWidths!false(targetWidth); }
 
   /// this must overrided by every descendant. Its task is to measure and then place all the subcells.
   /// must update innerSize if autoWidth or autoHeight is specified.
@@ -3216,34 +3229,21 @@ class Column : Container { // Column ////////////////////////////////////
 
   override void rearrange(){
 
-    void setSubCellWidths(float targetWidth){
-      foreach(c; subContainers){
-        c.outerWidth = targetWidth;
-        c.flags.autoWidth = false;
-        c.measure;
-      }
-    }
-
-    void setSubCellWidths_afterMeasure(float targetWidth){
-      foreach(c; subContainers) if(c.outerWidth!=targetWidth){
-        c.outerWidth = targetWidth;
-        c.flags.autoWidth = false;
-        c.measure; //opt: maybe not a full remeasure is necessary, just a realign as the subcells inside that are already ordered.
-      }
-    }
-
     //measure the subCells and stretch them to a maximum width
-    if(flags.autoWidth){
+    if(flags.dontStretchSubCells){
+      measureSubCells;
+      innerWidth = calcContentWidth;
+    }else if(flags.autoWidth){
       //measure maxWidth
       measureSubCells;
       innerWidth = calcContentWidth;
       //at this point all the subCells are measured
       //now set the width of every subcell in this column if it differs, and remeasure only when necessary
-      setSubCellWidths_afterMeasure(innerWidth);
+      setSubContainerWidths_differentOnly(innerWidth);
       //note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. But that's not an usual case: ListBox: all textCells are fixedWidth, Document: all paragraphs are autoWidth.
     }else{
       //first set the width of every subcell in this column, and measure all (for the first time).
-      setSubCellWidths(innerWidth);
+      setSubContainerWidths(innerWidth);
     }
 
     if(flags.columnElasticTabs) processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.

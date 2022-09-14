@@ -1711,6 +1711,11 @@ void buildSystemWorker(){ // worker //////////////////////////
 
 }
 
+File withoutDMixin(File f){
+  if(f.fullName.isWild("*.d-mixin-*")){ return File(wild[0]~".d"); }
+  return f;
+}
+
 struct CodeLocation{ //CodeLocation ////////////////////////
   File file;
   int line, column;
@@ -1719,7 +1724,9 @@ struct CodeLocation{ //CodeLocation ////////////////////////
 
   int opCmp(in CodeLocation b) const{ return icmp(file.fullName, b.file.fullName).cmpChain(cmp(line, b.line)).cmpChain(cmp(column, b.column)); }
 
-  string toString() const{ return format!"%s(%d,%d)"(file.fullName, line, column); }
+  string toString() const{
+    return file.fullName ~ (column ? format!"(%d,%d)"(line, column) : line ? format!"(%d)"(line) : "");
+  }
 }
 
 enum BuildMessageType{ find, error, bug, warning, deprecation, todo, opt } //todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");

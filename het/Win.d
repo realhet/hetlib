@@ -741,7 +741,7 @@ public:
       case WM_ENTERSIZEMOVE: _isSizingMoving = true; return 0;
       case WM_EXITSIZEMOVE: _isSizingMoving = false; return 0;
 
-      case WM_SETCURSOR: internalUpdateMouseCursor(Yes.forced); return 1;
+      case WM_SETCURSOR: if(!isMouseInside) DefWindowProc(hwnd, message, wParam, lParam); internalUpdateMouseCursor(Yes.forced); return 1;
 
       default:
         if(message.inRange(WM_USER, 0x7FFF)) return onWmUser(message-WM_USER, wParam, lParam);
@@ -765,6 +765,11 @@ public:
   void setForegroundWindow()    { show; SetForegroundWindow(hwnd); }
   bool isForeground()           { return GetForegroundWindow == hwnd; }
   bool isSizingMoving()         { return _isSizingMoving; }
+
+  bool isMouseInside()          {
+    if(isSizingMoving || isHidden) return false;
+    return clientBounds.contains!"[)"(inputs.mouseAct);
+  }
 
   bool canProcessUserInput()    { return isForeground && !isSizingMoving; }
 
@@ -941,6 +946,7 @@ public:
   MouseCursor mouseCursor;
   private MouseCursor lastMouseCursor;
   private void internalUpdateMouseCursor(Flag!"forced" forced = No.forced){
+    if(!isMouseInside) return;
     if(lastMouseCursor.chkSet(mouseCursor) || forced)
       SetCursor(mouseCursor);
   }

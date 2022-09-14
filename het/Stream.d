@@ -14,6 +14,7 @@ import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 //todo: string.fromJson(`"hello"`),   int.fromJson("124");  ...
 //todo: "hello".toJson(),   1234.toJson("fieldName");  ...  //must work on const!
 //todo: import a struct from a propertySet
+//todo: HitInfo.toJson is fucked up.
 
 private __gshared string[string] classFullNameMap;
 
