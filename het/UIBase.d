@@ -2787,6 +2787,7 @@ class Container : Cell { // Container ////////////////////////////////////
     Container container;
     vec2 absInnerPos;
     Cell[] cells;
+    string reference; //user can use it to identify the search result
 
     auto cellBounds() const{ return cells.map!(c => c.outerBounds + absInnerPos); }
     auto bounds() const{ return cellBounds.fold!"a|b"(bounds2.init); }

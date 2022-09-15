@@ -235,6 +235,8 @@ struct im{ static:
 
   Drawing drVisualizeHitStack;
 
+  int actTargetSurface; //0:world, 1:GUI
+
   private enum bool reuseDr = 0;
   private Drawing[2] staticDr;
 
@@ -264,6 +266,7 @@ struct im{ static:
     foreach(a; rootContainers(true)){
       const s = a.flags.targetSurface;
       surfaceBounds[s] |= a.outerBounds;
+      actTargetSurface = s;
       a.draw(dr[s]); //draw in zOrder
     }
 
