@@ -92,9 +92,9 @@ enum KeywordCat { Unknown, Attribute, Value, BasicType, UserDefiniedType, Keywor
 
 KeywordCat kwCatOf(int k)
 {with(KeywordCat){
-	if(k<=kwUnknown	  ) return Unknown	  ;
-	if(k<=kwpackage	  ) return Attribute	  ;
-	if(k<=kwsuper	  ) return Value	  ;
+	if(k<=kwUnknown		) return Unknown	  ;
+	if(k<=kwpackage		) return Attribute	  ;
+	if(k<=kwsuper	  )	return Value	  ;
 	if(k<=kwvoid	  ) return BasicType	  ;
 	if(k<=kwfunction	  ) return UserDefiniedType	  ;
 	if(k<=kwversion	  ) return Keyword	  ;
@@ -109,8 +109,8 @@ bool kwIsAttribute	  (int k) { return kwCatOf(k)==KeywordCat.Attribute	   ; }
 bool kwIsValue	  (int k) { return kwCatOf(k)==KeywordCat.Value	   ; }
 bool kwIsBasicType	  (int k) { return kwCatOf(k)==KeywordCat.BasicType	   ; }
 bool kwIsUserDefiniedType	  (int k) { return kwCatOf(k)==KeywordCat.UserDefiniedType	   ; }
-bool kwIsKeyword	  (int k) { return kwCatOf(k)==KeywordCat.Keyword	   ; }
-bool kwIsSpecialFunct	  (int k) { return kwCatOf(k)==KeywordCat.SpecialFunct	   ; }
+bool kwIsKeyword	  (int	k) { return kwCatOf(k)==KeywordCat.Keyword	   ; }
+bool kwIsSpecialFunct		(int k) { return kwCatOf(k)==KeywordCat.SpecialFunct	   ; }
 bool kwIsSpecialKeyword	  (int k) { return kwCatOf(k)==KeywordCat.SpecialKeyword	   ; }
 bool kwIsOperator	  (int k) { return kwCatOf(k)==KeywordCat.Operator	   ; }
 
@@ -161,46 +161,46 @@ string kwStr(int kw) { return tdKeywords.keyOf(kw); }
 // ?
 // in is new delete
 
-private enum	_operatorStrs = [   //TODO: make it a Map, after it has a working static initializer.
-	"."	,"dot",	          ".."	      ,"dotDot",	              "..."	     ,"dotDotDot",
-	"?"	,"question",	          ","	      ,"comma",	              ";"	     ,"semiColon",
-	":"	,"colon",	          "$"	      ,"dollar",	              "@"	     ,"atSign",
-	"="	,"assign",	          "=>"	      ,"lambda",	              "#"	     ,"hashMark",
-	"\\"	,"backSlash",	          //backslash only supported for for quoted texts
-
-	"("	      ,"roundBracketOpen",	  ")"	       ,"roundBracketClose",
-	"["	      ,"squareBracketOpen",	  "]"	       ,"squareBracketClose",
-	"{"	      ,"curlyBracketOpen",	  "}"	       ,"curlyBracketClose",
-	"q{"	      ,"tokenString",
-
-	"!"	       ,"not",
-	"&"	       ,"and",	         "&="	      ,"AndAssign",	           "&&"	      ,"andAnd",
-	"|"	       ,"or",	         "|="	      ,"OrAssign",	           "||"	      ,"orOr",
-	"^"	       ,"xor",	         "^="	      ,"XorAssign",
-	"~"	       ,"complement",	         "~="	      ,"ComplementAssign",
-
-	"-"	      ,"sub",	              "-="	     ,"SubAssign",	           "--"	      ,"subSub",
-	"+"	      ,"add",	              "+="	     ,"AddAssign",	           "++"	      ,"addAdd",
-	"*"	      ,"mul",	              "*="	     ,"MulAssign",
-	"/"	      ,"div",	              "/="	     ,"DivAssign",
-	"%"	      ,"mod",	              "%="	     ,"ModAssign",
-	"^^"	      ,"power",	              "^^="	     ,"PowerAssign",
-
-	"<<"	     ,"shl",	                "<<="	    ,"ShlAssign",
-	">>"	     ,"sar",	                ">>="	    ,"SarAssign",
-	">>>"	     ,"shr",	                ">>>="	    ,"ShrAssign",
-
-	"<"	      ,"less",	            "<="	      ,"LessEqual",
-	">"	      ,"greater",	            ">="	      ,"GreaterEqual",
-	"=="	      ,"equal",
-	"!="	      ,"notEqual",
+private enum _operatorStrs = [ //TODO: make it a Map, after it has a working static initializer.
+	"."	, "dot"	, ".."	, "dotDot"	,	"..."	, "dotDotDot"	,
+	"?"	, "question"	, ","	, "comma"	, ";"	, "semiColon"	,
+	":"	, "colon"	, "$"	, "dollar"	, "@"	, "atSign"	,
+	"="	, "assign"	, "=>"	, "lambda"	, "#"	, "hashMark"	,
+	"\\"	, "backSlash"	,				//backslash only allower for for quoted texts
+							
+	"("	, "roundBracketOpen"	, ")"	, "roundBracketClose"	,		
+	"["	, "squareBracketOpen"	, "]"	, "squareBracketClose"	,		
+	"{"	, "curlyBracketOpen"	, "}"	, "curlyBracketClose"	,		
+	"q{"	, "tokenString"	,				
+							
+	"!"	, "not"	,				
+	"&"	, "and"	, "&="	, "AndAssign"	, "&&"	, "andAnd"	,
+	"|"	, "or"	, "|="	, "OrAssign"	, "||"	, "orOr"	,
+	"^"	, "xor"	, "^="	, "XorAssign"	,		
+	"~"	, "complement"	, "~="	, "ComplementAssign"	,		
+							
+	"-"	, "sub"	, "-="	, "SubAssign"	, "--"	, "subSub"	,
+	"+"	, "add"	, "+="	, "AddAssign"	, "++"	, "addAdd"	,
+	"*"	, "mul"	, "*="	, "MulAssign"	,
+	"/"	, "div"	, "/="	, "DivAssign"	,
+	"%"	, "mod"	, "%="	, "ModAssign"	,
+	"^^"	, "power"	, "^^="	, "PowerAssign"	,
+					
+	"<<"	 ,"shl"	 , "<<="	 ,"ShlAssign"	,
+	">>"	 ,"sar"	 , ">>="	 ,"SarAssign"	,
+	">>>"	 ,"shr"	 , ">>>="	 ,"ShrAssign"	,
+					
+	"<"	 ,"less"	 , "<="	 ,"LessEqual"	,
+	">"	 ,"greater"	 , ">="	 ,"GreaterEqual"	,
+	"=="	 ,"equal"	 ,
+	"!="	 ,"notEqual"	 ,
 
 /*  "<>"       ,"lessGreater",         "<>="      ,"LessGreaterEqual",
-	"!<"	     ,"notLess",	     "!<="	    ,"notLessEqual",
-	"!>"	     ,"notGreater",	     "!>="	    ,"notGreaterEqual",
+	"!<"			   ,"notLess",	     "!<="	    ,"notLessEqual",
+	"!>"			   ,"notGreater",	     "!>="	    ,"notGreaterEqual",
 	"!<>"	     ,"notLessGreater",	     "!<>="	    ,"notLessGreaterEqual", these unordered compares are deprecated*/
 
-	"in"       ,"in",                  "is"       ,"is",           "new"      ,"new",          "delete"   ,"delete"
+	"in"	 ,"in"	, "is"	, "is"	, "new"	, "new"	, "delete"	, "delete"
 ];
 
 string[] _operatorEnums() { string[] r;

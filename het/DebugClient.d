@@ -227,6 +227,8 @@ public:
 
 // DebugLogServer ////////////////////////////////////////////////
 
+//todo: Set a unique name to the dbgserver's Shared Memory, and pass it to the launched program.
+
 alias dbgsrv = Singleton!DebugLogServer;
 
 class DebugLogServer{
