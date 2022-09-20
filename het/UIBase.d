@@ -14,8 +14,8 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 
 //adjust the size of the original Tab character
 enum
-	VisualizeContainers	   = 0,
-	VisualizeContainerIds	   = 0,
+	VisualizeContainers	   =	0,
+	VisualizeContainerIds		= 0,
 	VisualizeGlyphs	   = 0,
 	VisualizeTabColors	   = 0, //todo: spaces at row ends
 	VisualizeHitStack	   = 0,
@@ -183,8 +183,8 @@ struct HitInfo{ //Btn returns it
 struct HitTestManager{
 
 	struct HitTestRec{
-		SrcId id;	  //in the next frame this must be the isSame
-		bounds2 hitBounds;	  //absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
+		SrcId id;	  //in the	next frame this must be the isSame
+		bounds2 hitBounds;		//absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
 		vec2 localPos;	  //relative to outerPos
 		bool clickable;
 	}
@@ -257,9 +257,9 @@ struct HitTestManager{
 		HitInfo h;
 		h.id = id;
 		if(id==SrcId.init) return h;
-		h.hover	  = lastHitStack.map!"a.id".canFind(id);
-		h.pressed	  = pressedId ==id;
-		h.released	  = releasedId==id;
+		h.hover	  =	lastHitStack.map!"a.id".canFind(id);
+		h.pressed		=	pressedId ==id;
+		h.released		= releasedId==id;
 		h.clicked	  = clickedId ==id;
 		h.captured	  = h.pressed || capturedId==id && h.hover; //todo: architectural bug: captured is delayed by 1 frame according to repeated
 		h.hover_smooth	  = smoothHover.get(id, 0);
@@ -510,8 +510,8 @@ struct TextStyle{
 		if(auto p="fontHeight"	in map) fontHeight	  = (*p).toWidthHeight(g_actFontHeight).iround.to!ubyte;
 		if(auto p="bold"	in map) bold	  = (*p).toInt!=0;
 		if(auto p="italic"	in map) italic	  = (*p).toInt!=0;
-		if(auto p="underline"	in map) underline	  = (*p).toInt!=0;
-		if(auto p="strikeout"	in map) strikeout	  = (*p).toInt!=0;
+		if(auto p="underline"	in map) underline		 = (*p).toInt!=0;
+		if(auto p="strikeout"	in map) strikeout		 = (*p).toInt!=0;
 		if(auto p="transparent"	in map) transparent	  = (*p).toInt!=0;
 		if(auto p="fontColor"	in map) fontColor	  = (*p).toRGB;
 		if(auto p="bkColor"	in map) bkColor	  = (*p).toRGB;
@@ -538,37 +538,37 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent	              = RGB(  0, 120, 215),
-			clMenuBk	              = RGB(235, 235, 236),
+			clAccent			            = RGB(  0, 120, 215),
+			clMenuBk			            = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
-			clLinkHover	           = RGB(102, 102, 102),
-			clLinkPressed	           = RGB(153, 153, 153),
-			clLinkDisabled	           = RGB(122, 122, 122), // clWinBtnHoverBorder
+			clLinkHover	           =	RGB(102, 102, 102),
+			clLinkPressed		= RGB(153,	153, 153),
+			clLinkDisabled		= RGB(122, 122, 122), // clWinBtnHoverBorder
 
 			clWinRed                  = RGB(232,17,35),
 
 			clWinText	     = clBlack,
 			clWinBackground	     = clWhite,
 			clWinFocusBorder	     = clBlack,
-			clWinBtn	     = RGB(204, 204, 204),
-			clWinBtnHoverBorder	     = RGB(122, 122, 122),
+			clWinBtn	     = RGB(204,	204, 204),
+			clWinBtnHoverBorder		= RGB(122, 122, 122),
 			clWinBtnPressed	     = clWinBtnHoverBorder,
 			clWinBtnDisabledText	     = clWinBtnHoverBorder,
 
-			clHintText	        = clWinText,
-			clHintBk	        = RGB(236, 233, 216),
-			clHintDetailsText	        = clWinText,
-			clHintDetailsBk	        = clWhite,
+			clHintText		= clWinText,
+			clHintBk	        =	RGB(236, 233, 216),
+			clHintDetailsText			= clWinText,
+			clHintDetailsBk	        =	clWhite,
 
 			clSliderLine	     = clLinkPressed,
-			clSliderLineHover	     = clLinkHover,
-			clSliderLinePressed	     = clLinkPressed,
+			clSliderLineHover		=	clLinkHover,
+			clSliderLinePressed		=	clLinkPressed,
 			clSliderThumb	     = clAccent,
-			clSliderThumbHover	     = RGB(23, 23, 23),
-			clSliderThumbPressed	     = clWinBtn,
-			clSliderHintBorder	     = clMenuBk,
+			clSliderThumbHover		=	RGB(23, 23, 23),
+			clSliderThumbPressed		=	clWinBtn,
+			clSliderHintBorder		=	clMenuBk,
 			clSliderHintBk	     = clWinBtn,
 
 			clScrollBk	     = clMenuBk,
@@ -593,19 +593,19 @@ void initTextStyles(){
 	a(	 "smaller"	, tsSmaller	, tsNormal, { tsSmaller.fontHeight = rfh(14); });
 	a(	 "half"	, tsHalf	, tsNormal, { tsHalf.fontHeight = rfh(9); });
 	a(	 "comment"	, tsComment	, tsNormal, { tsComment.fontHeight = rfh(12); });
-	a(	 "error"	, tsError	, tsNormal, { tsError.bold = tsError.underline = true; tsError.bkColor = clRed; tsError.fontColor = clYellow; });
-	a(	 "bold"	, tsBold	, tsNormal, { tsBold.bold = true; });
-	a(    "bold2"	, tsBold2	, tsBold  , { tsBold2.fontColor = clChapter; });
-	a(	 "quote"	, tsQuote	, tsNormal, { tsQuote.italic = true; });
-	a(	 "code"	, tsCode	, tsNormal, { tsCode.font = "Lucida Console"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //todo: should be half bold?
-	a(	 "link"	, tsLink	, tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; });
-	a(	 "title"	, tsTitle	, tsNormal, { tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); });
-	a(	   "chapter"	, tsChapter	, tsTitle , { tsChapter.fontHeight = rfh(40); });
-	a(	   "chapter2", tsChapter2, tsTitle , { tsChapter2.fontHeight = rfh(32); });
-	a(	   "chapter3", tsChapter3, tsTitle , { tsChapter3.fontHeight = rfh(27); });
+	a(	 "error"	, tsError	, tsNormal,	{ tsError.bold = tsError.underline = true; tsError.bkColor = clRed; tsError.fontColor = clYellow; });
+	a(	 "bold"	, tsBold	, tsNormal, {	tsBold.bold = true; });
+	a(    "bold2"	, tsBold2	, tsBold	, { tsBold2.fontColor = clChapter; });
+	a(	 "quote"	, tsQuote	, tsNormal,	{ tsQuote.italic = true; });
+	a(	 "code"	, tsCode	, tsNormal, {	tsCode.font = "Lucida Console"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //todo: should be half bold?
+	a(	 "link"	, tsLink	, tsNormal, {	tsLink.underline = true; tsLink.fontColor = clLink; });
+	a(	 "title"	, tsTitle	, tsNormal,	{ tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); });
+	a(			 "chapter"	, tsChapter	, tsTitle , { tsChapter.fontHeight = rfh(40); });
+	a(			 "chapter2", tsChapter2, tsTitle , { tsChapter2.fontHeight = rfh(32); });
+	a(			 "chapter3", tsChapter3, tsTitle , { tsChapter3.fontHeight = rfh(27); });
 
-	a(	 "btn"	      , tsBtn	    , tsNormal, { tsBtn.bkColor =  clWinBtn; });
-	a(	 "key"	      , tsKey	    , tsSmaller, { tsKey.bkColor =  RGB(236, 235, 230); tsKey.bold = true; });
+	a(	 "btn"			    , tsBtn			  , tsNormal, { tsBtn.bkColor =  clWinBtn; });
+	a(	 "key"			    , tsKey			  , tsSmaller, { tsKey.bkColor =  RGB(236, 235, 230); tsKey.bold = true; });
 
 	textStyles["" ] = &tsNormal;
 	textStyles["n" ] = &tsNormal;
@@ -866,14 +866,14 @@ class Cell{ // Cell ////////////////////////////////////
 
 /+  static shared int[string] objCnt;  //todo: ha ez nem shared, akkor beszarik a hatterben betolto jpeg. Miert?
 	this(){
-//	   auto n = this.classinfo.name;
-//	   if(n !in objCnt) objCnt[n]=0;
-//	   objCnt[n]++;
+//			 auto n = this.classinfo.name;
+//			 if(n !in objCnt) objCnt[n]=0;
+//			 objCnt[n]++;
 	}
 
 	~this(){
-//	   auto n = this.classinfo.name;
-//	   objCnt[n]--;
+//			 auto n = this.classinfo.name;
+//			 objCnt[n]--;
 		//ennek qrvara sharednek kell lennie, mert a gc akarmelyik threadbol mehet.
 		//egy atomic lenne a legjobb
 	} +/
@@ -930,10 +930,10 @@ class Cell{ // Cell ////////////////////////////////////
 		*/
 
 		//version 2: "auto ref const" and "auto ref" lvalues. Better but the code is redundant.
-		auto ref outerX	() const { return outerPos .x; }	   auto ref outerX	() { return outerPos .x; }
-		auto ref outerY	() const { return outerPos .y; }	   auto ref outerY	() { return outerPos .y; }
-		auto ref outerWidth	() const { return outerSize.x; }	   auto ref outerWidth	() { return outerSize.x; }
-		auto ref outerHeight() const { return outerSize.y; }	   auto ref outerHeight() { return outerSize.y; }
+		auto ref outerX	() const { return outerPos .x; }			 auto ref outerX	() { return outerPos .x; }
+		auto ref outerY	() const { return outerPos .y; }			 auto ref outerY	() { return outerPos .y; }
+		auto ref outerWidth	() const { return outerSize.x; }			 auto ref outerWidth	() { return outerSize.x; }
+		auto ref outerHeight() const { return outerSize.y; }			 auto ref outerHeight() { return outerSize.y; }
 	}
 
 	@property{ //calculated prioperties. No += operators are allowed.
@@ -953,10 +953,10 @@ class Cell{ // Cell ////////////////////////////////////
 		auto borderBounds_inner() { return borderBounds!1; }
 		auto borderBounds_outer() { return borderBounds!0; }
 
-		auto innerX() const { return innerPos.x; }	   void innerX(float v) { outerPos.x = v-topLeftGapSize.x; }
-		auto innerY() const { return innerPos.y; }	   void innerY(float v) { outerPos.y = v-topLeftGapSize.y; }
-		auto innerWidth () const { return innerSize.x; }	   void innerWidth (float v) { outerSize.x = v+totalGapSize.x; }
-		auto innerHeight() const { return innerSize.y; }	   void innerHeight(float v) { outerSize.y = v+totalGapSize.y; }
+		auto innerX() const { return innerPos.x; }			 void innerX(float v) { outerPos.x = v-topLeftGapSize.x; }
+		auto innerY() const { return innerPos.y; }			 void innerY(float v) { outerPos.y = v-topLeftGapSize.y; }
+		auto innerWidth () const { return innerSize.x; }			 void innerWidth (float v) { outerSize.x = v+totalGapSize.x; }
+		auto innerHeight() const { return innerSize.y; }			 void innerHeight(float v) { outerSize.y = v+totalGapSize.y; }
 
 		auto outerLeft	() const { return outerX; }
 		auto outerRight	() const { return outerX+outerWidth ; }
@@ -1178,8 +1178,8 @@ Problemas dolgok:
 - 3 fele pozicio meghatarozas szovegen belul:
 
 	TextPosition{
-		TextIndex	  : int
-		TextLineCol	  : { int line, int col; }
+		TextIndex	  :	int
+		TextLineCol		: { int line, int col; }
 		TextXY	  : { float x, float y0, float y1; }  //y0 and y1 covers the whole wrappedLine.height
 	}
 
@@ -1281,9 +1281,9 @@ struct EditCmd{ // EditCmd ////////////////////////////////////////
 
 /// All the information needed for a text editor
 struct TextEditorState{ // TextEditorState /////////////////////////////////////
-	string str;	     //the string being edited                       Edit() fills it
-	float defaultFontHeight;	     //used when there's no text to display 0 -> uibase.NortmalFontHeight
-	int[] cellStrOfs;	     //mapping petween glyphs and string ranges      Edit() fills it
+	string str;	     //the string	being edited	Edit() fills it
+	float defaultFontHeight;		//used when there's no text to display	0	-> uibase.NortmalFontHeight
+	int[] cellStrOfs;	     //mapping petween glyphs and string ranges	Edit() fills it
 
 	Row row;	  //editor container. Must be a row.	             Edit() fills it
 	WrappedLine[] wrappedLines;	  //formatted glyphs	             Measure fills it when edit is same as wrappedLines
@@ -1435,8 +1435,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
 		void checkConsistency(){
 			enum e0 = "textEditorState consistency check fail: ";
-			enforce(row !is null	     , e0~"row is null"   );
-			enforce(cellStrOfs.length == cellCount+1	     , e0~"invalid cellStrOfs"  );
+			enforce(row !is null		, e0~"row is null"   );
+			enforce(cellStrOfs.length	== cellCount+1	     , e0~"invalid cellStrOfs"  );
 			enforce(wrappedLines.map!(l => l.cellCount).sum == cellCount	     , e0~"invalid wrappedLines");
 		}
 
@@ -1528,16 +1528,16 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
 		with(eCmd) final switch(cmd){
 			case Cmd.nop: break;
-			case Cmd.cInsert	     : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
-			case Cmd.cDelete	     : deleteAtCaret(false); break;
+			case Cmd.cInsert			   : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
+			case Cmd.cDelete			   : deleteAtCaret(false); break;
 			case Cmd.cDeleteBack	     : deleteAtCaret(true ); break;
 			case Cmd.cLeft	     : caretMoveRel(-intParam(1)); break;
 			case Cmd.cRight	     : caretMoveRel( intParam(1)); break;
-			case Cmd.cUp	     : caretMoveVert(-intParam(1)); break;
-			case Cmd.cDown	     : caretMoveVert( intParam(1)); break;
-			case Cmd.cHome	     : caretMoveAbs(        0); break;
-			case Cmd.cEnd	     : caretMoveAbs(cellCount); break;
-			case Cmd.cMouse	     : caret = toIdx(TextPos(pointParam, 0)); break;
+			case Cmd.cUp		:	caretMoveVert(-intParam(1)); break;
+			case Cmd.cDown		:	caretMoveVert( intParam(1)); break;
+			case Cmd.cHome		:	caretMoveAbs(        0); break;
+			case Cmd.cEnd			:	caretMoveAbs(cellCount); break;
+			case Cmd.cMouse		:	caret = toIdx(TextPos(pointParam, 0)); break;
 			//todo: cMouse pontatlan.
 			//todo: minden cursor valtozaskor a caret legyen teljesen fekete
 		}
@@ -1702,10 +1702,10 @@ void appendMarkupLine(bool returnSubCellStrOfs=true)(Container cntr, string s, r
 /**
 Append syntax highlighted source code to a container (normally a Row).
 Params:
-				cntr =	  the container being updated
-				text =	  the input text
-				syntax =	  byte array of syntax indices
-				applySyntax =	  delegate to apply a syntax index to the TextStyle
+				cntr =		 the container being updated
+				text =		 the input text
+				syntax =	  byte	array of syntax indices
+				applySyntax =		delegate to apply a syntax index to the TextStyle
 				ts =	  reference to the TextStyle used while appending all the characters
  */
 
@@ -1731,12 +1731,12 @@ in(text.length == syntax.length)
 	}
 }
 
-bool updateSyntax(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
+bool updateSyntax(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, out bool wasWidthChange, int nonStringTabToSpaces=-1)
 in(text.length == syntax.length)
 {
 	const cntrSubCellsLength = cntr.subCells.length;
 	size_t dstIdx = 0;
-	bool wasError, wasUpdate;
+	bool wasError, wasUpdate, wasBoldShift;
 	float boldShift = 0;
 	void pushSyntaxChar(dchar ch, ref TextStyle ts, ubyte actSyntax){
 		if(dstIdx<cntrSubCellsLength){
@@ -1751,8 +1751,10 @@ in(text.length == syntax.length)
 
 						const prevFontFlags = g.fontFlags;
 						g.fontFlags = ts.fontFlags;
-						if(auto delta = g.adjustBoldWidth(prevFontFlags))
+						if(auto delta = g.adjustBoldWidth(prevFontFlags)){
 							boldShift += delta;
+							wasBoldShift = true;
+						}
 
 						wasUpdate = true; //todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
 					}
@@ -1786,6 +1788,8 @@ in(text.length == syntax.length)
 		if(wasError) break;
 	}
 
+
+	wasWidthChange = wasBoldShift;  //bug: this only works with elastic tabs when the whole line grows, not when shrinks.
 	return !wasError && cntrSubCellsLength == dstIdx;
 }
 
@@ -3374,8 +3378,8 @@ class SelectionManager(T : Cell){ // SelectionManager //////////////////////////
 
 		void selectNone()	   { foreach(a; items) a.isSelected = false; }
 		void selectOnly(T item)	   { selectNone; if(item) item.isSelected = true; }
-		void selectHoveredOnly()	   { selectOnly(hoveredItem); }
-		void saveOldSelected()	   { foreach(a; items) a.oldSelected = a.isSelected; }
+		void selectHoveredOnly()		{ selectOnly(hoveredItem); }
+		void saveOldSelected()	   {	foreach(a; items) a.oldSelected = a.isSelected; }
 
 		// acquire mouse positions
 		auto mouseAct = view.mousePos;
