@@ -28,8 +28,8 @@ Shift+K
 Shift+K+U    //All must pressed
 Shift+Ctrl+U
 
-Ctrl+K&U		   //sequential shortcuts: lastKeyCombo, lastKeyCombo2
-Ctrl+U&K		   //2nd modifier: if not present then can be nothing, or the same as the first modifier.
+Ctrl+K&U			  //sequential shortcuts: lastKeyCombo, lastKeyCombo2
+Ctrl+U&K			  //2nd modifier: if not present then can be nothing, or the same as the first modifier.
 
 +/
 
@@ -348,8 +348,8 @@ alias inputs = Singleton!InputManager;
 
 enum InputEntryType{ //Operation      Examples
 	digitalState,	 //=0 Off, !=0 On.	       a switch
-	analogState,	 //[0..1]		Volume potmeter, Light level, Piano key state
-	digitalButton,	 //=0 Off, !=0	On.	       normally released. Keyboard, MouseButton
+	analogState,	 //[0..1]		Volume potmeter,	Light level, Piano key state
+	digitalButton,	 //=0 Off, !=0	On.		normally released. Keyboard, MouseButton
 	analogButton,	 //[0..1]	       normally released. Left/Right trigger, piano note
 	absolute,	 //any value	       Mouse ScreenPos, position of a playback time slider
 	delta,	 //any value	       Mouse Wheel, Jog wheel
@@ -630,8 +630,8 @@ public: //standard stuff
 				case VK_LBUTTON	: a(MOUSEEVENTF_LEFTDOWN	, MOUSEEVENTF_LEFTUP	); break;
 				case VK_RBUTTON	: a(MOUSEEVENTF_RIGHTDOWN	, MOUSEEVENTF_RIGHTUP	); break;
 				case VK_MBUTTON	: a(MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP); break;
-				case VK_XBUTTON1	: a(MOUSEEVENTF_XDOWN		   , MOUSEEVENTF_XUP		   , XBUTTON1); break;
-				case VK_XBUTTON2	: a(MOUSEEVENTF_XDOWN		   , MOUSEEVENTF_XUP		   , XBUTTON2); break;
+				case VK_XBUTTON1	: a(MOUSEEVENTF_XDOWN			  , MOUSEEVENTF_XUP			  , XBUTTON1); break;
+				case VK_XBUTTON2	: a(MOUSEEVENTF_XDOWN			  , MOUSEEVENTF_XUP			  , XBUTTON2); break;
 				default: enforce(0, `Unknown mouse button %s`.format(vk));
 			}
 		}else{
@@ -804,8 +804,8 @@ class InputEmulator{
 								 : max(0, x*1.125-0.1); //deadzone
 		}
 
-		auto len = vec2(nx, ny).length;
-		auto speed = len>0.95 ? 5 : 2;  //turbo speed at the very ends
+		float len = vec2(nx, ny).length;
+		float speed = len>0.95 ? 5 : 2;  //turbo speed at the very ends
 
 		if(fastOrSlow!=0){
 			float a = fastOrSlow.sqr.remap(0, 1, 1, 4);
@@ -933,14 +933,14 @@ public:
 		add(VK_VOLUME_DOWN		, "Vol-");
 		add(VK_VOLUME_UP	    ,	"Vol+");
 		add(VK_VOLUME_MUTE		, "Mute");
-		add(VK_MEDIA_NEXT_TRACK		   , "Next");
-		add(VK_MEDIA_PREV_TRACK		   , "Prev");
+		add(VK_MEDIA_NEXT_TRACK			  , "Next");
+		add(VK_MEDIA_PREV_TRACK			  , "Prev");
 		add(VK_MEDIA_STOP	    , "Stop");
 		add(VK_MEDIA_PLAY_PAUSE	    , "Play");
 
 		add(VK_BROWSER_BACK	   , "Back");
-		add(VK_BROWSER_FORWARD		  , "Forward");
-		add(VK_BROWSER_REFRESH		  , "Refresh");
+		add(VK_BROWSER_FORWARD			 , "Forward");
+		add(VK_BROWSER_REFRESH			 , "Refresh");
 		add(VK_BROWSER_STOP	   ,	"BrStop");
 		add(VK_BROWSER_SEARCH		, "Search");
 		add(VK_BROWSER_FAVORITES	   , "Favorites");
@@ -1219,38 +1219,38 @@ private{
 		{&IID_Pov		 , 40, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
 		{&IID_Pov		 , 44, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
 		// Buttons
-		{null		     , 48+ 0, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 1, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 2, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 3, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 4, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 5, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 6, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 7, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 8, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+ 9, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+10, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+11, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+12, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+13, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+14, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+15, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+16, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+17, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+18, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+19, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+20, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+21, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+22, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+23, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+24, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+25, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+26, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+27, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+28, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+29, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+30, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
-		{null		     , 48+31, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 0, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 1, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 2, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 3, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 4, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 5, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 6, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 7, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 8, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+ 9, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+10, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+11, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+12, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+13, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+14, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+15, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+16, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+17, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+18, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+19, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+20, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+21, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+22, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+23, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+24, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+25, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+26, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+27, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+28, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+29, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+30, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		{null			    , 48+31, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
 	];
 
 	struct DIJoystickState{ align(1):
@@ -1684,8 +1684,8 @@ public:
 				uint eventCount;
 				ushort	buttons;
 	//	unsigned short up:1, down:1, left:1, right:1, start:1, back:1, l3:1, r3:1,
-	//		                         lButton:1, rButton:1, guideButton:1, unknown:1, aButton:1,
-	//		                         bButton:1, xButton:1, yButton:1; // button state bitfield
+	//			                        lButton:1, rButton:1, guideButton:1, unknown:1, aButton:1,
+	//			                        bButton:1, xButton:1, yButton:1; // button state bitfield
 				ubyte lTrigger;	 //Left Trigger
 				ubyte rTrigger;	 //Right Trigger
 				short lJoyY;	 //Left Joystick Y

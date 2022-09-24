@@ -232,9 +232,9 @@ __gshared static public:////////////////////////////////////////////////////////
 }
 
 // Ega color codes
-struct EgaColor{
+struct EgaColor(bool enabled = true){
 	static foreach(idx, s; "black blue green cyan red magenta brown white gray ltBlue ltGreen ltCyan ltRed ltMagenta yellow ltWhite".split(' '))
-		mixin(format!`static auto %s(string s){ return "\33\%s"~s~"\33\7"; }`(s, idx.to!string(8)));
+		mixin(format!`static auto %s(string s){ return enabled ? "\33\%s"~s~"\33\7" : s; }`(s, idx.to!string(8)));
 
 	//Usage: Print(EgaColor.red("Red text"));
 }
@@ -3535,9 +3535,9 @@ bool isUnicodeColorChar(dchar ch){
 		int[] UnicodeEmojiBlocks = [
 			0x00A,           //Latin1 supplement
 
-			0x203, 0x204,		  //2000-206F General Punctuation
-			0x212, 0x213,		  //2100-214F Letterlike Symbols
-			0x219, 0x21A,		  //2190-21FF Arrows
+			0x203, 0x204,			 //2000-206F General Punctuation
+			0x212, 0x213,			 //2100-214F Letterlike Symbols
+			0x219, 0x21A,			 //2190-21FF Arrows
 
 			0x231, 0x232,    //2300-23FF Miscellaneous Technical
 			0x23C,
@@ -3754,8 +3754,8 @@ auto byLineBlock(string str, size_t maxBlockSize=DefaultLineBlockSize){  //todo:
 	enforce(b.join('|').xxh == h, "string.byLineBlocks fail2");
 }*/
 
-enum TextEncoding	{ ANSI, UTF8	,            UTF32BE,            UTF32LE,    UTF16BE, UTF16LE   } //UTF32 must be checked BEFORE UTF16
-private const encodingHeaders =	[""	  ,	"\xEF\xBB\xBF", "\x00\x00\xFE\xFF", "\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"];
+enum TextEncoding	{ ANSI, UTF8	,            UTF32BE,            UTF32LE,	UTF16BE, UTF16LE   } //UTF32 must be checked BEFORE UTF16
+private const encodingHeaders =	[""	  ,	"\xEF\xBB\xBF", "\x00\x00\xFE\xFF",	"\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"];
 private const encodingCharSize=	[1	  , 1             ,                  4,                  4,          2,          2];
 
 TextEncoding encodingOf(const string s, TextEncoding def = TextEncoding.UTF8, string* withoutEnc=null){
@@ -4326,8 +4326,8 @@ struct XXH3{ static:
 		/* First calculate all of the cross products. */
 		const lo_lo = mult32to64(lhs & 0xFFFFFFFF, rhs & 0xFFFFFFFF),
 					hi_lo = mult32to64(lhs >> 32       , rhs & 0xFFFFFFFF),
-					lo_hi = mult32to64(lhs & 0xFFFFFFFF, rhs >> 32		     ),
-					hi_hi = mult32to64(lhs >> 32       , rhs >> 32		     ),
+					lo_hi = mult32to64(lhs & 0xFFFFFFFF, rhs >> 32			    ),
+					hi_hi = mult32to64(lhs >> 32       , rhs >> 32			    ),
 
 		/* Now add the products together. These will never overflow. */
 					cross = (lo_lo >> 32) + (hi_lo & 0xFFFFFFFF) + lo_hi,
@@ -5184,8 +5184,8 @@ public:
 	string fullPath;
 
 	this(string path_)	     { dir = path_; }
-	this(string path_, string name_)		{ this(combinePath(path_, name_)); }
-	this(Path path_, string name_)	     {	this(combinePath(path_.fullPath, name_)); }
+	this(string path_, string name_)		{	this(combinePath(path_, name_)); }
+	this(Path path_, string name_)		{	this(combinePath(path_.fullPath, name_)); }
 	this(Path path_)	     { this(path_.fullPath); }
 
 	string toString() const { return "Path("~fullPath.quoted('`')~")"; }
@@ -5431,8 +5431,8 @@ public:
 	string fullName;
 
 	string toString()const{ return "File("~fullName.quoted('`')~")"; }
-	bool isNull()		  const{ return fullName==""; }
-	bool opCast()		  const{ return !isNull(); }
+	bool isNull()			 const{ return fullName==""; }
+	bool opCast()			 const{ return !isNull(); }
 
 	auto exists()	   const{ return fileExists	(fullName); }
 	auto size()	   const{ return fileSize	(fullName); }
@@ -5689,8 +5689,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))		                            { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))		                            { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))			                           { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))			                           { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
@@ -5703,8 +5703,8 @@ void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = 
 void saveTo(T)(const T[] data, const string fileName)	                       { data.saveTo(File(fileName)); }
 void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)	                       { [data].saveTo(File(fileName)); }
 
-void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))		      {	data = fileName.readStr(mustExists); }
-void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))		      {	data = cast(T[])fileName.read(mustExists); }
+void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))			     {	data = fileName.readStr(mustExists); }
+void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))			     {	data = cast(T[])fileName.read(mustExists); }
 void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDynamicArray!T)		{ data = (cast(T[])fileName.read(mustExists))[0]; }
 
 File appFile() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
@@ -5738,8 +5738,8 @@ struct FileEntry{
 	}
 
 	this(in WIN32_FIND_DATAW data, in Path path){
-		this.path		     = path;
-		this.name		     = data.cFileName.toStr;
+		this.path			    = path;
+		this.name			    = data.cFileName.toStr;
 		this.ftCreationTime	      = data.ftCreationTime;
 		this.ftLastWriteTime	      = data.ftLastWriteTime;
 		this.ftLastAccessTime	      = data.ftLastAccessTime;
@@ -6369,8 +6369,8 @@ private{
 		auto d = decodeDate(dateTime),
 				 t = decodeTime(dateTime);
 		d.wMilliseconds	= t.wMilliseconds;
-		d.wSecond	= t.wSecond		    ;
-		d.wMinute	= t.wMinute		    ;
+		d.wSecond	= t.wSecond			   ;
+		d.wMinute	= t.wMinute			   ;
 		d.wHour	= t.wHour	     ;
 		return d;
 	}
@@ -6451,9 +6451,9 @@ struct TimeOfDay{ //220511: deprecated
 		this(h, m, s.ifloor, s.fract*1000);
 	}
 
-	@property int hour()const { auto st = decodeTime(raw); return st.wHour	     ;	}
-	@property int min	()const { auto st = decodeTime(raw); return st.wMinute		; }
-	@property int sec	()const { auto st = decodeTime(raw); return st.wSecond		; }
+	@property int hour()const { auto st = decodeTime(raw); return st.wHour		;	}
+	@property int min	()const { auto st = decodeTime(raw); return st.wMinute		;	}
+	@property int sec	()const { auto st = decodeTime(raw); return st.wSecond		;	}
 	@property int ms	()const { auto st = decodeTime(raw); return st.wMilliseconds; }
 
 	@property void hour(ushort x) { auto st = decodeTime(raw); st.wHour	= x; this = TimeOfDay(st); }
@@ -6529,10 +6529,10 @@ struct DateTime{
 
 	@property int year ()const { auto st = decodeDate(raw); return st.wYear	     ; }
 	@property int month()const { auto st = decodeDate(raw); return st.wMonth	     ; }
-	@property int day	()const { auto st = decodeDate(raw); return st.wDay	     ;	}
-	@property int hour	()const { auto st = decodeTime(raw); return st.wHour		; }
-	@property int min	()const { auto st = decodeTime(raw); return st.wMinute		    ; }
-	@property int sec	()const { auto st = decodeTime(raw); return st.wSecond		    ; }
+	@property int day	()const { auto st = decodeDate(raw); return st.wDay		;	}
+	@property int hour	()const { auto st = decodeTime(raw); return st.wHour		;	}
+	@property int min	()const { auto st = decodeTime(raw); return st.wMinute			   ; }
+	@property int sec	()const { auto st = decodeTime(raw); return st.wSecond			   ; }
 	@property int ms	()const { auto st = decodeTime(raw); return st.wMilliseconds; }
 
 	@property void year (ushort x) { auto st = decodeDateTime(raw); st.wYear	= x; this = DateTime(st); }
@@ -6828,8 +6828,8 @@ struct DateTime{
 
 		alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 		alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
-		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime		           , SYSTEMTIME);
-		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime		           , FILETIME  );
+		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime			          , SYSTEMTIME);
+		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime			          , FILETIME  );
 	}
 
 	private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
