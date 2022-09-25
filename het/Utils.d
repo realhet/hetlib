@@ -6,7 +6,6 @@ pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, n
 
 //todo: ref const for opCmp and opEquals
 
-//toto:  //bug: tag must be a thing
 //todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
 		 //https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
 
@@ -232,7 +231,8 @@ __gshared static public:////////////////////////////////////////////////////////
 }
 
 // Ega color codes
-struct EgaColor(bool enabled = true){
+struct EgaColor/*(bool enabled = true)*/{
+	enum enabled = true;
 	static foreach(idx, s; "black blue green cyan red magenta brown white gray ltBlue ltGreen ltCyan ltRed ltMagenta yellow ltWhite".split(' '))
 		mixin(format!`static auto %s(string s){ return enabled ? "\33\%s"~s~"\33\7" : s; }`(s, idx.to!string(8)));
 
@@ -4106,6 +4106,54 @@ string identityStr(T)(in T a){ // identityStr /////////////////////////
 	else			static assert(0, "identityStr() unhandled type: "~T.stringof);
 }
 
+// some really symple hashes.
+
+uint uintHash(uint h0, string haFun)(string s){
+	uint h = h0;
+	foreach(a; s.byChar.map!"cast(uint)a") h = mixin(haFun);
+	return h;
+}
+
+uint djb2Hash(bool opt)(string s){
+	//http://www.cse.yorku.ca/~oz/hash.html
+	return s.uintHash!(5381, opt ? "(h << 5) + h + a" : "h*33u + a");
+}
+
+uint sdbmHash(bool opt)(string s){
+	//http://www.cse.yorku.ca/~oz/hash.html
+	return s.uintHash!(0, opt ? "(h << 6) + (h << 16) - h + a" : "h* 65599u + a");
+}
+
+/// It's fast
+uint tokenHash()(string s){
+	switch(s.length){
+		case 0: return 0;
+		case 1: return *(cast(ubyte*)s.ptr)+7123u;
+		case 2: return *(cast(ushort*)s.ptr)+2541281u;
+		default: return s.sdbmHash!1;
+	}
+}
+
+void testSmallHashes(){ //todo: unittest
+	auto data = [`(`, `{`, `[`, "/*", "/+", "//", `'`, `"`, "`", "r\"", "q\"", "q{", `#line `, `#!`, `)`, `}`, `]`, "\0", "\x1A", "__EOF__"].replicate(10);
+	
+	data.take(20).each!(s => print(s.djb2Hash!0, s.djb2Hash!1, s.sdbmHash!0, s.sdbmHash!1, s.xxh32, s.hashOf));
+	
+	
+	uint h;
+	void f0(){ h += data.map!(djb2Hash!0).sum; }
+	void f1(){ h += data.map!(djb2Hash!1).sum; }
+	void f2(){ h += data.map!(sdbmHash!0).sum; }
+	void f3(){ h += data.map!(sdbmHash!1).sum; }
+	void f4(){ h += data.map!(xxh32).sum; }
+	void f5(){ h += data.map!(hashOf).sum; }
+	void f6(){ h += data.map!(tokenHash).sum; }
+
+	import std.datetime.stopwatch;
+	benchmark!(f0, f1, f2, f3, f4, f5, f6)(1000).each!print;
+}
+
+
 //! xxh32 //////////////////////////////////////////////////////
 // a fast hashing function
 
@@ -4326,8 +4374,8 @@ struct XXH3{ static:
 		/* First calculate all of the cross products. */
 		const lo_lo = mult32to64(lhs & 0xFFFFFFFF, rhs & 0xFFFFFFFF),
 					hi_lo = mult32to64(lhs >> 32       , rhs & 0xFFFFFFFF),
-					lo_hi = mult32to64(lhs & 0xFFFFFFFF, rhs >> 32			    ),
-					hi_hi = mult32to64(lhs >> 32       , rhs >> 32			    ),
+					lo_hi = mult32to64(lhs & 0xFFFFFFFF, rhs >> 32						 ),
+					hi_hi = mult32to64(lhs >> 32       , rhs >> 32						 ),
 
 		/* Now add the products together. These will never overflow. */
 					cross = (lo_lo >> 32) + (hi_lo & 0xFFFFFFFF) + lo_hi,
@@ -5689,8 +5737,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))			                           { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))			                           { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))						                        { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))						                        { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
@@ -5703,8 +5751,8 @@ void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = 
 void saveTo(T)(const T[] data, const string fileName)	                       { data.saveTo(File(fileName)); }
 void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)	                       { [data].saveTo(File(fileName)); }
 
-void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))			     {	data = fileName.readStr(mustExists); }
-void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))			     {	data = cast(T[])fileName.read(mustExists); }
+void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))						  {	data = fileName.readStr(mustExists); }
+void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))						  {	data = cast(T[])fileName.read(mustExists); }
 void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDynamicArray!T)		{ data = (cast(T[])fileName.read(mustExists))[0]; }
 
 File appFile() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
@@ -5738,8 +5786,8 @@ struct FileEntry{
 	}
 
 	this(in WIN32_FIND_DATAW data, in Path path){
-		this.path			    = path;
-		this.name			    = data.cFileName.toStr;
+		this.path						 = path;
+		this.name						 = data.cFileName.toStr;
 		this.ftCreationTime	      = data.ftCreationTime;
 		this.ftLastWriteTime	      = data.ftLastWriteTime;
 		this.ftLastAccessTime	      = data.ftLastAccessTime;
@@ -6369,8 +6417,8 @@ private{
 		auto d = decodeDate(dateTime),
 				 t = decodeTime(dateTime);
 		d.wMilliseconds	= t.wMilliseconds;
-		d.wSecond	= t.wSecond			   ;
-		d.wMinute	= t.wMinute			   ;
+		d.wSecond	= t.wSecond					 ;
+		d.wMinute	= t.wMinute					 ;
 		d.wHour	= t.wHour	     ;
 		return d;
 	}
@@ -6531,8 +6579,8 @@ struct DateTime{
 	@property int month()const { auto st = decodeDate(raw); return st.wMonth	     ; }
 	@property int day	()const { auto st = decodeDate(raw); return st.wDay		;	}
 	@property int hour	()const { auto st = decodeTime(raw); return st.wHour		;	}
-	@property int min	()const { auto st = decodeTime(raw); return st.wMinute			   ; }
-	@property int sec	()const { auto st = decodeTime(raw); return st.wSecond			   ; }
+	@property int min	()const { auto st = decodeTime(raw); return st.wMinute					 ; }
+	@property int sec	()const { auto st = decodeTime(raw); return st.wSecond					 ; }
 	@property int ms	()const { auto st = decodeTime(raw); return st.wMilliseconds; }
 
 	@property void year (ushort x) { auto st = decodeDateTime(raw); st.wYear	= x; this = DateTime(st); }
@@ -6828,8 +6876,8 @@ struct DateTime{
 
 		alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 		alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
-		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime			          , SYSTEMTIME);
-		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime			          , FILETIME  );
+		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime						       , SYSTEMTIME);
+		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime						       , FILETIME  );
 	}
 
 	private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
