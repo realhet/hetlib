@@ -512,8 +512,8 @@ struct BuildSettings{ //todo: mi a faszert irja ki allandoan az 1 betus rovidite
 	@("c|compileOnly = Compile and link only, do not run."	   ) bool	compileOnly	   ;
 	@("e|leaveObj    = Leave behind .obj and .res files after compilation."	   ) bool leaveObjs	   ;
 	@("r|rebuild     = Rebuilds everything. Clears all caches."	   ) bool rebuild	   ;
-	@("I|include     = Add include path to search for .d files."	   ) string[] importPaths	   ;
-	@("o|compileOpt  = Pass extra compiler option."		) string[] compileArgs	   ;
+	@("I|include     = Add include path to search for .d files."	   ) string[]	importPaths	   ;
+	@("o|compileOpt  = Pass extra compiler option."		) string[] compileArgs		;
 	@("L|linkOpt     = Pass extra linker option."	   )	string[] linkArgs	   ;
 	@("k|kill        = Kill currently running executable before compile."	   ) bool killExe	   ;
 	@("t|todo        = Collect //Todo: and //Opt: comments."	   ) bool collectTodos	   ;
@@ -864,9 +864,9 @@ private: //current build
 		isExe = isDll = hasCoreModule = isWindowedApp = false;
 		targetFile = File("");
 		workPath = Path("");
-		runLines		  .clear;
-		defLines		  .clear;
-		resFiles		  .clear;
+		runLines			 .clear;
+		defLines			 .clear;
+		resFiles			 .clear;
 		modules	   .clear;
 		todos	   .clear;
 	}
@@ -957,8 +957,8 @@ private: //current build
 
 				break;
 			}
-			case "def"		  :{ defLines ~= buildMacro[3..$].strip;	   break; }
-			case "win"		  :{ isWindowedApp = true;	   break; }
+			case "def"			 :{ defLines ~= buildMacro[3..$].strip;	   break; }
+			case "win"			 :{ isWindowedApp = true;	   break; }
 			case "compile":{ settings.compileArgs.addIfCan(args[1..$]);	   break; }
 			case "link"	:{ addLinkArgs(args[1..$]);	   break; }
 			case "run"	:{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);	   break; }
@@ -1540,9 +1540,9 @@ public:
 
 
 	// This can be used by commandline or by a dll export.
-	//		  Input: args (args[0] is ignored)
-	//		  Outputs: statnard ans error outputs.
-	//		  result: 0 = no error
+	//			 Input: args (args[0] is ignored)
+	//			 Outputs: statnard ans error outputs.
+	//			 result: 0 = no error
 	int commandInterface(string[] args, ref string sOutput, ref string sError) // command interface /////////////////////////////
 	{
 		try{

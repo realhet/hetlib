@@ -12,954 +12,953 @@ alias textures = Singleton!TextureManager;
 __gshared int[dchar] DefaultFont_subTexIdxMap; //Used by UI, must be cleared after every megatexture GC
 
 __gshared
-  DEBUG_clearRemovedSubtexArea          = false, // marks the free'd parts with fuchsia
-  global_disableSubtextureAging         = false, // Suspend updating texture access statistics. Good for debugging the megaTextures, it can be disabled temporarily.
-  EnableMultiThreadedTextureLoading     = true,
+	DEBUG_clearRemovedSubtexArea	    = false, // marks the free'd parts with fuchsia
+	global_disableSubtextureAging	    = false, // Suspend updating texture access statistics. Good for debugging the megaTextures, it can be disabled temporarily.
+	EnableMultiThreadedTextureLoading	    = true,
 
-  synchLog = false,  //LOG the start and end of synch blocks
+	synchLog = false,  //LOG the start and end of synch blocks
 
-  MegaTexMinSize = 1<< 9,      //can set by the application before any textures being used
-  MegaTexMaxSize = 1<<13;      //todo: ensure the safety of this with a setter.
+	MegaTexMinSize = 1<< 9,	     //can set by the application before any textures being used
+	MegaTexMaxSize = 1<<13;	     //todo: ensure the safety of this with a setter.
 
 bool canUnloadTexture(File f, int age){
-  if(age<=3) return false;
-  if(f.drive.among("custom", "font")) return false;
-  return true;
+	if(age<=3) return false;
+	if(f.drive.among("custom", "font")) return false;
+	return true;
 }
 
 
 // MegaTexturing constants ///////////////////////////////
 
 enum
-  //the alignment of a subTexture. Also the number of mipmaps.
-  SubTexCellBits = 3,
-  SubTexCellSize = 1<<SubTexCellBits,
-  SubTexCellMask = SubTexCellSize-1,
+	//the alignment of a subTexture. Also the number of mipmaps.
+	SubTexCellBits = 3,
+	SubTexCellSize = 1<<SubTexCellBits,
+	SubTexCellMask = SubTexCellSize-1,
 
-  //Maximum size of textures. Hardware dependent. Max 16K
-  SubTexSizeBits = 14,   //MAX 14bits / 16K
-  SubTexMaxSize = 1<<SubTexSizeBits,
-  SubTexSizeMask = SubTexMaxSize-1;
+	//Maximum size of textures. Hardware dependent. Max 16K
+	SubTexSizeBits = 14,   //MAX 14bits / 16K
+	SubTexMaxSize = 1<<SubTexSizeBits,
+	SubTexSizeMask = SubTexMaxSize-1;
 
 
 enum
-  //starting size for textures
-//  MegaTexMinSizeBits = 13,                       //todo: !!!!!!!! must be set when app starts
-//  MegaTexMinSize = 1<<MegaTexMinSizeBits,
+	//starting size for textures
+//	 MegaTexMinSizeBits = 13,                       //todo: !!!!!!!! must be set when app starts
+//	 MegaTexMinSize = 1<<MegaTexMinSizeBits,
 
-//  MegaTexMaxSizeBits = 13,                       //todo: !!!!!!!! must be set when app starts
-//  MegaTexMaxSize = 1<<MegaTexMaxSizeBits,
+//	 MegaTexMaxSizeBits = 13,                       //todo: !!!!!!!! must be set when app starts
+//	 MegaTexMaxSize = 1<<MegaTexMaxSizeBits,
 
-  SubTexIdxBits = 16,
-  SubTexIdxCnt = 1<<SubTexIdxBits;
+	SubTexIdxBits = 16,
+	SubTexIdxCnt = 1<<SubTexIdxBits;
 
-  // not used SubTexPosBits = MegaTexMaxSizeBits-SubTexCellBits,
+	// not used SubTexPosBits = MegaTexMaxSizeBits-SubTexCellBits,
 
 //  MegaTexIdxBits = 4,                 //in the shader, it is max 8. -> samplerArray[8]
-  enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits,         //todo: !!!!!!!! must be set when app starts
+	enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits,         //todo: !!!!!!!! must be set when app starts
 
 
 
 // SubTexInfo struct ////////////////////////
 
 enum SubTexChannelConfig{
-  R   , G       , B       , A             ,
-  RG  , GB      , BA      , unknown0      ,
-  RGB , GBA     , unknown1, unknown2      ,
-  RGBA, unknown3, unknown4, RGBA_ClearType,
+	R	, G	    , B	     , A	     ,
+	RG	, GB	    , BA	     , unknown0	     ,
+	RGB	, GBA	    , unknown1, unknown2	     ,
+	RGBA, unknown3, unknown4, RGBA_ClearType,
 }
 
 // packed data struct that
 private struct SubTexInfo{ align(1): import std.bitmanip;
-  mixin(bitfields!(
-    uint, "cellX",    14,      uint, "texIdx_lo", 2,
-    uint, "cellY",    14,      uint, "texIdx_hi", 2, //texIdxHi = 3-x, to be likely visible
-    uint, "width1",   14,      uint, "texChn_lo", 2,
-    uint, "height1",  14,      uint, "texChn_hi", 2));
+	mixin(bitfields!(
+		uint, "cellX",	 14,	     uint, "texIdx_lo", 2,
+		uint, "cellY",	 14,	     uint, "texIdx_hi", 2, //texIdxHi = 3-x, to be likely visible
+		uint, "width1",	 14,	     uint, "texChn_lo", 2,
+		uint, "height1",	 14,	     uint, "texChn_hi", 2));
 
-  this(in ivec2 pos, in ivec2 size, int texIdx, in SubTexChannelConfig texChn)   //pos and size is in pixels
-  {
-    enforce((pos.x & SubTexCellMask)==0
-         && (pos.y & SubTexCellMask)==0, "unaligned pos");
+	this(in ivec2 pos, in ivec2 size, int texIdx, in SubTexChannelConfig texChn)   //pos and size is in pixels
+	{
+		enforce((pos.x & SubTexCellMask)==0
+				 && (pos.y & SubTexCellMask)==0, "unaligned pos");
 
-    enforce(pos.x>=0 && size.x>0 && pos.x+size.x<=SubTexMaxSize
-         && pos.y>=0 && size.y>0 && pos.y+size.y<=SubTexMaxSize, "pos, size: Out of range. pos:%s size:%s pos+size:%s SubTexMaxSize:%s".format(pos, size, pos+size, SubTexMaxSize));
-    enforce(texIdx.inRange(0, MegaTexMaxCnt-1), "texIdx: Out of range");
+		enforce(pos.x>=0 && size.x>0 && pos.x+size.x<=SubTexMaxSize
+				 && pos.y>=0 && size.y>0 && pos.y+size.y<=SubTexMaxSize, "pos, size: Out of range. pos:%s size:%s pos+size:%s SubTexMaxSize:%s".format(pos, size, pos+size, SubTexMaxSize));
+		enforce(texIdx.inRange(0, MegaTexMaxCnt-1), "texIdx: Out of range");
 
-    cellX = pos.x>>SubTexCellBits;  texIdx_lo = texIdx.getBits(0, 2);
-    cellY = pos.y>>SubTexCellBits;  texIdx_hi = texIdx.getBits(2, 2);
-    auto tc = cast(int)texChn;
-    width1  = size.x-1;             texChn_lo = tc.getBits(0, 2);
-    height1 = size.y-1;             texChn_hi = tc.getBits(2, 2);
-  }
+		cellX =	pos.x>>SubTexCellBits;	 texIdx_lo = texIdx.getBits(0, 2);
+		cellY =	pos.y>>SubTexCellBits;	 texIdx_hi = texIdx.getBits(2, 2);
+		auto tc	= cast(int)texChn;
+		width1	= size.x-1;	            texChn_lo = tc.getBits(0, 2);
+		height1	= size.y-1;	            texChn_hi = tc.getBits(2, 2);
+	}
 
-  bool isNull() const{ return this==typeof(this).init; }
-  ivec2 pos   () const{ return ivec2(cellX, cellY)<<SubTexCellBits; }
+	bool isNull() const{ return this==typeof(this).init; }
+	ivec2 pos   () const{ return ivec2(cellX, cellY)<<SubTexCellBits; }
 
-  int width()   const{ return width1+1; }
-  int height()  const{ return height1+1; }
-  auto size()   const{ return ivec2(width, height); }
-  auto bounds() const{ return ibounds2(pos, pos+size); }
+	int width()	const{ return width1+1; }
+	int height()	const{ return height1+1; }
+	auto size()	const{ return ivec2(width, height); }
+	auto bounds()	const{ return ibounds2(pos, pos+size); }
 
-  size_t sizeBytes() const{ return width*height*4/+...instead of channelCnt, to show actual memory usage+/;  }
+	size_t sizeBytes() const{ return width*height*4/+...instead of channelCnt, to show actual memory usage+/;  }
 
-  int texIdx() const{ return texIdx_lo | texIdx_hi<<2; }
+	int texIdx() const{ return texIdx_lo | texIdx_hi<<2; }
 
-  auto channelConfig() const{ return cast(SubTexChannelConfig)(texChn_lo | texChn_hi<<2); }
-  int  channelBase  () const{ return texChn_lo; }
-  int  channelCnt   () const{ return texChn_hi+1; }
+	auto	channelConfig() const{ return cast(SubTexChannelConfig)(texChn_lo | texChn_hi<<2); }
+	int	channelBase	 () const{ return texChn_lo; }
+	int	channelCnt	 () const{ return texChn_hi+1; }
 
-  auto toString() const{ return isNull ? "SubTexInfo(null)" : "SubTexInfo(pos:(%-4d, %-4d), size:(%-4d, %-4d), mega:%d, chn:%4s)".format(pos.x, pos.y, size.x, size.y, texIdx, channelConfig); }
+	auto toString() const{ return isNull ? "SubTexInfo(null)" : "SubTexInfo(pos:(%-4d, %-4d), size:(%-4d, %-4d), mega:%d, chn:%4s)".format(pos.x, pos.y, size.x, size.y, texIdx, channelConfig); }
 }
 
 auto longToSubTexInfo(long val){
-  SubTexInfo si;
-  si = *(cast(SubTexInfo*)&val);
-  return si;
+	SubTexInfo si;
+	si = *(cast(SubTexInfo*)&val);
+	return si;
 }
 
 class MegaTexture{ // MegaTexture class /////////////////////////////
 private:
-  int texIdx, channels;
-  GLTexture glTexture;
+	int texIdx, channels;
+	GLTexture glTexture;
 
-  void resizeGLTexture(){
-    if(glTexture.size!=texSize){
-      glTexture.fastBind;
-      glTexture.resize(texSize);
-    }
-  }
-
-public:
-  MaxRectsBin bin;
-  auto texSize() const{ return ivec2(bin.width, bin.height) << SubTexCellBits; }
+	void resizeGLTexture(){
+		if(glTexture.size!=texSize){
+			glTexture.fastBind;
+			glTexture.resize(texSize);
+		}
+	}
 
 public:
-  this(int texIdx, int channels){
-    enforce(texIdx.inRange(0, MegaTexMaxCnt-1), "texIdx out of range");
-    enforce(channels==4, "Only 4chn Megatextures supported");
+	MaxRectsBin bin;
+	auto texSize() const{ return ivec2(bin.width, bin.height) << SubTexCellBits; }
 
-    this.texIdx = texIdx;
-    this.channels = channels;
+public:
+	this(int texIdx, int channels){
+		enforce(texIdx.inRange(0, MegaTexMaxCnt-1), "texIdx out of range");
+		enforce(channels==4, "Only 4chn Megatextures supported");
 
-    const minSize = min(MegaTexMinSize, gl.maxTextureSize)>>SubTexCellBits,
-          maxSize = min(MegaTexMaxSize, gl.maxTextureSize)>>SubTexCellBits;
-    bin = new MaxRectsBin(minSize, minSize, maxSize, maxSize);
+		this.texIdx = texIdx;
+		this.channels = channels;
 
-    glTexture = new GLTexture("MegaTexture[%d]".format(texIdx), texSize.x, texSize.y, GLTextureType.RGBA8, false/*no mipmap*/); //todo: MegaTexture.mipmap
-    glTexture.bind;
-  }
+		const minSize = min(MegaTexMinSize, gl.maxTextureSize)>>SubTexCellBits,
+					maxSize = min(MegaTexMaxSize, gl.maxTextureSize)>>SubTexCellBits;
+		bin = new MaxRectsBin(minSize, minSize, maxSize, maxSize);
 
-  ~this(){
-    glTexture.free;
-    bin.free;
-  }
+		glTexture = new GLTexture("MegaTexture[%d]".format(texIdx), texSize.x, texSize.y, GLTextureType.RGBA8, false/*no mipmap*/); //todo: MegaTexture.mipmap
+		glTexture.bind;
+	}
 
-  void reinitialize(){
-    bin.reinitialize;
-  }
+	~this(){
+		glTexture.free;
+		bin.free;
+	}
 
-  override string toString(){ return "MegaTexture(%s)".format(glTexture); }
+	void reinitialize(){
+		bin.reinitialize;
+	}
 
-  bool add(in ivec2 size, int channels, int data/*subTexIdx*/, out SubTexInfo info){
-    auto cellSize = (size+SubTexCellMask)>>SubTexCellBits,
-         rect = bin.add(cellSize.x, cellSize.y, data);
+	override string toString(){ return "MegaTexture(%s)".format(glTexture); }
 
-    if(rect is null){
-      //todo: MegaTexture.repack()
-      return false; //unable to allocate because out of space.
-    }
+	bool add(in ivec2 size, int channels, int data/*subTexIdx*/, out SubTexInfo info){
+		auto cellSize = (size+SubTexCellMask)>>SubTexCellBits,
+				 rect = bin.add(cellSize.x, cellSize.y, data);
 
-    resizeGLTexture;//apply the possible binSize change
+		if(rect is null){
+			//todo: MegaTexture.repack()
+			return false; //unable to allocate because out of space.
+		}
 
-    auto pos = ivec2(rect.x, rect.y)<<SubTexCellBits;
-    info = SubTexInfo(pos, size, texIdx, cast(SubTexChannelConfig)((channels-1)*4)); //todo: MegaTexture.channels = 1, 2, 3, not just 4
+		resizeGLTexture;//apply the possible binSize change
 
-    return true;
-  }
+		auto pos = ivec2(rect.x, rect.y)<<SubTexCellBits;
+		info = SubTexInfo(pos, size, texIdx, cast(SubTexChannelConfig)((channels-1)*4)); //todo: MegaTexture.channels = 1, 2, 3, not just 4
 
-  void remove(in int data){
-    bin.remove(data).enforce("nothing to remove");
-    //if(!bin.remove(data)) WARN("bin: nothing to remove ", data);
-  }
+		return true;
+	}
 
-  void dump() const{
-    bin.dump;
-  }
+	void remove(in int data){
+		bin.remove(data).enforce("nothing to remove");
+		//if(!bin.remove(data)) WARN("bin: nothing to remove ", data);
+	}
 
-  void debugDraw(Drawing dr){
-    dr.scale(SubTexCellSize); scope(exit) dr.pop;
+	void dump() const{
+		bin.dump;
+	}
 
-    dr.lineWidth = -1;
+	void debugDraw(Drawing dr){
+		dr.scale(SubTexCellSize); scope(exit) dr.pop;
 
-    dr.lineStyle = LineStyle.normal;
-    foreach(r; bin.freeRects){
-      dr.color = clWhite;
-      dr.drawRect(r.bounds.inflated(-0.25f));
-    }
+		dr.lineWidth = -1;
 
-    dr.lineStyle = LineStyle.dash;
-    foreach(j, r; bin.rects){
-      dr.color = clBlack; //clVga[(cast(int)j % ($-1))+1];
-      dr.alpha = 0.25;
-      dr.fillRect(r.bounds);
-      dr.alpha = 1;
+		dr.lineStyle = LineStyle.normal;
+		foreach(r; bin.freeRects){
+			dr.color = clWhite;
+			dr.drawRect(r.bounds.inflated(-0.25f));
+		}
 
-      dr.color = clWhite;
-      dr.drawRect(r.bounds.inflated(-0.25f));
-    }
+		dr.lineStyle = LineStyle.dash;
+		foreach(j, r; bin.rects){
+			dr.color = clBlack; //clVga[(cast(int)j % ($-1))+1];
+			dr.alpha = 0.25;
+			dr.fillRect(r.bounds);
+			dr.alpha = 1;
 
-    dr.lineStyle = LineStyle.normal;
+			dr.color = clWhite;
+			dr.drawRect(r.bounds.inflated(-0.25f));
+		}
 
-    dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);
-  }
+		dr.lineStyle = LineStyle.normal;
 
-  size_t sizeBytes() const{ return glTexture ? glTexture.sizeBytes : 0; }
+		dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);
+	}
+
+	size_t sizeBytes() const{ return glTexture ? glTexture.sizeBytes : 0; }
 }
 
 
 class InfoTexture{ // InfoTexture class ////////////////////////////////
 private:
-  enum TexelsPerInfo = 2; //for rgba & 8byte subTexInfo
-  enum TexWidth = 512, InfoPerLine = TexWidth/TexelsPerInfo;
+	enum TexelsPerInfo = 2; //for rgba & 8byte subTexInfo
+	enum TexWidth = 512, InfoPerLine = TexWidth/TexelsPerInfo;
 
 public  GLTexture glTexture;
 
-  int[int] lastAccessed; //last globalUpdateTick when accessed/updated
+	int[int] lastAccessed; //last globalUpdateTick when accessed/updated
 
 
-public  SubTexInfo[] infoArray;
-  int[] freeIndices;
+public	SubTexInfo[] infoArray;
+	int[]	freeIndices;
 
-  int capacity() const{ return InfoPerLine * glTexture.height; }
-  int length() const{ return cast(int)infoArray.length; }
+	int capacity() const{ return InfoPerLine * glTexture.height; }
+	int length() const{ return cast(int)infoArray.length; }
 
-  void upload(int idx){ //opt: ezt megcsinalni kotegelt feldolgozasura
-    glTexture.fastBind;
-    glTexture.upload(infoArray[idx..idx+1], idx % InfoPerLine * TexelsPerInfo, idx / InfoPerLine, 2, 1);
-  }
+	void upload(int idx){ //opt: ezt megcsinalni kotegelt feldolgozasura
+		glTexture.fastBind;
+		glTexture.upload(infoArray[idx..idx+1], idx % InfoPerLine * TexelsPerInfo, idx / InfoPerLine, 2, 1);
+	}
 
-  void grow(){
-    glTexture.fastBind;
-    glTexture.resize(TexWidth, glTexture.height*2); //exponential grow
-  }
+	void grow(){
+		glTexture.fastBind;
+		glTexture.resize(TexWidth, glTexture.height*2); //exponential grow
+	}
 
-  bool isValidIdx(int idx) const{ return idx.inRange(infoArray); }
+	bool isValidIdx(int idx) const{ return idx.inRange(infoArray); }
 
-  void checkValidIdx(int idx) const{ //todo: refactor to isValidIdx
-    enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx));
-    //ez nem kell, mert a delayed loader null-t allokal eloszor. enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
-  }
+	void checkValidIdx(int idx) const{ //todo: refactor to isValidIdx
+		enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx));
+		//ez nem kell, mert a delayed loader null-t allokal eloszor. enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
+	}
 
-  void accessedNow(int idx){
-    if(!global_disableSubtextureAging)
-      lastAccessed[idx] = application.tick;
-  }
+	void accessedNow(int idx){
+		if(!global_disableSubtextureAging)
+			lastAccessed[idx] = application.tick;
+	}
 
 public:
 
-  this(){
-    enforce(SubTexInfo.sizeof==8, "Only implemented for 8 byte SubTextInfo");
+	this(){
+		enforce(SubTexInfo.sizeof==8, "Only implemented for 8 byte SubTextInfo");
 
-    glTexture = new GLTexture("InfoTexture", TexWidth, 1/*height*/, GLTextureType.RGBA8, false/*no mipmap*/);
-    glTexture.bind;
-  }
+		glTexture = new GLTexture("InfoTexture", TexWidth, 1/*height*/, GLTextureType.RGBA8, false/*no mipmap*/);
+		glTexture.bind;
+	}
 
-  ~this(){
-    glTexture.free;
-  }
+	~this(){
+		glTexture.free;
+	}
 
-  //peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
-  //note: this technique is too dangerous. Must add the info, but not upload.
-  /*int peekNextIdx() const{
-    if(!freeIndices.empty){//reuse a free slot
-      return freeIndices[$-1];
-    }else{ //add an extra slot
-      return cast(int)infoArray.length;
-    }
-  }*/
+	//peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
+	//note: this technique is too dangerous. Must add the info, but not upload.
+	/*int peekNextIdx() const{
+		if(!freeIndices.empty){//reuse a free slot
+			return freeIndices[$-1];
+		}else{ //add an extra slot
+			return cast(int)infoArray.length;
+		}
+	}*/
 
-  //allocates a new subTexture slot
-  int add(in SubTexInfo info, Flag!"uploadNow" uploadNow= Yes.uploadNow){
-    //ez nem kell, mert a delayed loader pont null-t allokal eloszor: enforce(!info.isNull, "cannot allocate SubTexInfo.null");
+	//allocates a new subTexture slot
+	int add(in SubTexInfo info, Flag!"uploadNow" uploadNow= Yes.uploadNow){
+		//ez nem kell, mert a delayed loader pont null-t allokal eloszor: enforce(!info.isNull, "cannot allocate SubTexInfo.null");
 
-    int actIdx;
+		int actIdx;
 
-    //this must be analogous with peekNextIdx
-    if(!freeIndices.empty){//reuse a free slot
-      actIdx = freeIndices.popLast;
-      infoArray[actIdx] = info;
-    }else{ //add an extra slot
-      infoArray ~= info;
-      actIdx = cast(int)infoArray.length-1;
+		//this must be analogous with peekNextIdx
+		if(!freeIndices.empty){//reuse a free slot
+			actIdx = freeIndices.popLast;
+			infoArray[actIdx] = info;
+		}else{ //add an extra slot
+			infoArray ~= info;
+			actIdx = cast(int)infoArray.length-1;
 
-      enforce(actIdx<SubTexIdxCnt, "FATAL: SubTexIdxCnt limit reached");
+			enforce(actIdx<SubTexIdxCnt, "FATAL: SubTexIdxCnt limit reached");
 
-      if(capacity<infoArray.length) grow;
-    }
+			if(capacity<infoArray.length) grow;
+		}
 
-    accessedNow(actIdx);
+		accessedNow(actIdx);
 
-    if(uploadNow) upload(actIdx);
+		if(uploadNow) upload(actIdx);
 
-    return actIdx;
-  }
+		return actIdx;
+	}
 
-  //removes a subTex by idx
-  void remove(int idx){
-    checkValidIdx(idx);
+	//removes a subTex by idx
+	void remove(int idx){
+		checkValidIdx(idx);
 
-    infoArray[idx] = SubTexInfo.init;
-    freeIndices ~= idx;
+		infoArray[idx] = SubTexInfo.init;
+		freeIndices ~= idx;
 
-    upload(idx); //upload the null for safety
-    //todo: feltetelesen fordithatova tenni ezeket a felszabaditas utani zero filleket
-  }
+		upload(idx); //upload the null for safety
+		//todo: feltetelesen fordithatova tenni ezeket a felszabaditas utani zero filleket
+	}
 
-  //gets a subTexInfo by idx
-  SubTexInfo access(int idx){
-    checkValidIdx(idx);
-    accessedNow(idx);
-    return infoArray[idx];
-  }
+	//gets a subTexInfo by idx
+	SubTexInfo access(int idx){
+		checkValidIdx(idx);
+		accessedNow(idx);
+		return infoArray[idx];
+	}
 
-  void modify(int idx, in SubTexInfo info){
-    checkValidIdx(idx);
-    accessedNow(idx);
-    infoArray[idx] = info;
-    upload(idx);
-  }
+	void modify(int idx, in SubTexInfo info){
+		checkValidIdx(idx);
+		accessedNow(idx);
+		infoArray[idx] = info;
+		upload(idx);
+	}
 
 
-  void dump() const{
-    //infoArray.enumerate.each!writeln;
-    //!!! LDC 1.20.0 win64 linker bug when using enumerate here!!!!!
+	void dump() const{
+		//infoArray.enumerate.each!writeln;
+		//!!! LDC 1.20.0 win64 linker bug when using enumerate here!!!!!
 
-    //foreach(i, a; infoArray) writeln(tuple(i, a));
-    //!!! linker error as well
+		//foreach(i, a; infoArray) writeln(tuple(i, a));
+		//!!! linker error as well
 
-    //foreach(i, a; infoArray) writeln(tuple(i, i+1));
-    //!!! this is bad as well, the problem is not related to own structs, just to tuples
+		//foreach(i, a; infoArray) writeln(tuple(i, i+1));
+		//!!! this is bad as well, the problem is not related to own structs, just to tuples
 
-    foreach(i, a; infoArray) writefln("(%s, %s)", i, a);  //this works
-  }
+		foreach(i, a; infoArray) writefln("(%s, %s)", i, a);  //this works
+	}
 
-  size_t sizeBytes() const{ return glTexture ? glTexture.sizeBytes : 0; }
+	size_t sizeBytes() const{ return glTexture ? glTexture.sizeBytes : 0; }
 }
 
 //todo: make the texture class
 class Texture{ // Texture class /////////////////////////////////
 //this holds all the info to access a subTexture
 private:
-  TextureManager owner;
-  int idx;
-  File file;
+	TextureManager owner;
+	int idx;
+	File file;
 
-  private this(TextureManager owner, int idx){ //this is unnamed and empty
-    this.owner = owner;
-    this.idx = idx;
-  }
+	private this(TextureManager owner, int idx){ //this is unnamed and empty
+		this.owner = owner;
+		this.idx = idx;
+	}
 
 public:
-  this(TextureManager owner, int idx, File file, bool delayed = false){
-    this(owner, idx);
-    this.file = file;
-  }
+	this(TextureManager owner, int idx, File file, bool delayed = false){
+		this(owner, idx);
+		this.file = file;
+	}
 
-  override string toString() const{ return "Texture(#%d, %s)".format(idx, file); }
+	override string toString() const{ return "Texture(#%d, %s)".format(idx, file); }
 }
 
 
 class TextureManager{ // TextureManager class /////////////////////////////////
 private:
-  InfoTexture infoTexture;
-  MegaTexture[] megaTextures;
+	InfoTexture infoTexture;
+	MegaTexture[] megaTextures;
 
-  int[File] byFileName; //texIdx of File
+	int[File] byFileName; //texIdx of File
 
-  bool mustRehash; //todo: this is useless i think
+	bool mustRehash; //todo: this is useless i think
 
-  bool[int] pendingIndices; //files being loaded by a worker thread
-  bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
+	bool[int] pendingIndices; //files being loaded by a worker thread
+	bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
 
-  void enforceSize(const ivec2 size){
-    enforce(size.x<=SubTexMaxSize     && size.y<=SubTexMaxSize    , "Texture too big (%s)"                                 .format(size));
-    enforce(size.x<=gl.maxTextureSize && size.y<=gl.maxTextureSize, "Texture too big on current opengl implementation (%s)".format(size));
-  }
+	void enforceSize(const ivec2 size){
+		enforce(size.x<=SubTexMaxSize	&& size.y<=SubTexMaxSize    , "Texture too big (%s)"                                 .format(size));
+		enforce(size.x<=gl.maxTextureSize	&& size.y<=gl.maxTextureSize, "Texture too big on current opengl implementation (%s)".format(size));
+	}
 
-  void chkMtIdx(int mtIdx){
-    enforce(mtIdx.inRange(megaTextures), "mtIdx out of range (%s !in [0..%s])".format(mtIdx, megaTextures.length));
-  }
+	void chkMtIdx(int mtIdx){
+		enforce(mtIdx.inRange(megaTextures), "mtIdx out of range (%s !in [0..%s])".format(mtIdx, megaTextures.length));
+	}
 
-  bool isCompatible(const Bitmap bmp, const MegaTexture mt){
-    return true;
-    //mt.channels==bmp.channels;
-  }
+	bool isCompatible(const Bitmap bmp, const MegaTexture mt){
+		return true;
+		//mt.channels==bmp.channels;
+	}
 
-  void addNewMegaTexture(int channels){
-    if(megaTextures.length>=MegaTexMaxCnt){
-      raise("Out of megatextures");
-    }
-    megaTextures ~= new MegaTexture(megaTextures.length.to!int, channels);
-  }
+	void addNewMegaTexture(int channels){
+		if(megaTextures.length>=MegaTexMaxCnt){
+			raise("Out of megatextures");
+		}
+		megaTextures ~= new MegaTexture(megaTextures.length.to!int, channels);
+	}
 
-  int allocSubTexInfo(in SubTexInfo info = SubTexInfo.init){ //info should point to a 'loading progress image'
-    return infoTexture.add(info);
-  }
+	int allocSubTexInfo(in SubTexInfo info = SubTexInfo.init){ //info should point to a 'loading progress image'
+		return infoTexture.add(info);
+	}
 
-  private int garbageCycle; //just an ever increasing index
+	private int garbageCycle; //just an ever increasing index
 
-  bool isPending(int idx){
-    return idx in pendingIndices && pendingIndices[idx];
-  }
+	bool isPending(int idx){
+		return idx in pendingIndices && pendingIndices[idx];
+	}
 
-  bool isInvalidatingAgain(int idx){
-    return idx in invalidateAgain && invalidateAgain[idx];
-  }
+	bool isInvalidatingAgain(int idx){
+		return idx in invalidateAgain && invalidateAgain[idx];
+	}
 
-  bool isUntouchable(int idx){ return isPending(idx) || isInvalidatingAgain(idx); }
+	bool isUntouchable(int idx){ return isPending(idx) || isInvalidatingAgain(idx); }
 
-  void garbageCollect(){ // garbageCollect() /////////////////////////////////////////
-    int mtIdx = garbageCycle % cast(int)megaTextures.length;
-    chkMtIdx(mtIdx);
+	void garbageCollect(){ // garbageCollect() /////////////////////////////////////////
+		int mtIdx = garbageCycle % cast(int)megaTextures.length;
+		chkMtIdx(mtIdx);
 
-    garbageCycle++; //set the index for the next garbageCollect
+		garbageCycle++; //set the index for the next garbageCollect
 
-    //LOG("GCycle", garbageCycle);
+		//LOG("GCycle", garbageCycle);
 
-    auto allInfos = collectSubTexInfo2.filter!(i => i.info.texIdx==mtIdx).array; //on the current megatexture
-    //auto infosToUnload = allInfos.filter!(i =>  i.canUnload).array;
-    //auto infosToSave   = allInfos.filter!(i => !i.canUnload).array;
+		auto allInfos = collectSubTexInfo2.filter!(i => i.info.texIdx==mtIdx).array; //on the current megatexture
+		//auto infosToUnload	= allInfos.filter!(i =>  i.canUnload).array;
+		//auto infosToSave	= allInfos.filter!(i => !i.canUnload).array;
 
-    // no need to wait pending because they are not allocated yet in the bins and update() only called from main thread, also it can start a GC
-    /+while(allInfos.map!(i => isPending(i.idx)).any){
-      LOG("Waiting for pending textures...");
-      sleep(10);
-    }+/
+		// no need to wait pending because they are not allocated yet in the bins and update() only called from main thread, also it can start a GC
+		/+while(allInfos.map!(i => isPending(i.idx)).any){
+			LOG("Waiting for pending textures...");
+			sleep(10);
+		}+/
 
-    //LOG("MegaTexture.GC   mtIdx:", mtIdx, "  removing:", infosToUnload.length, "  keeping:", infosToSave.length, "   total:", collectSubTexInfo2.count);
+		//LOG("MegaTexture.GC   mtIdx:", mtIdx, "  removing:", infosToUnload.length, "  keeping:", infosToSave.length, "   total:", collectSubTexInfo2.count);
 
-    //note: Tere is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
-    //raise("notImpl " ~ info.text);
+		//note: Tere is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
+		//raise("notImpl " ~ info.text);
 
-    foreach(info; allInfos){
-      invalidate(info.file);
-    }
+		foreach(info; allInfos){
+			invalidate(info.file);
+		}
 
-    megaTextures[mtIdx].reinitialize;
+		megaTextures[mtIdx].reinitialize;
 
-    //todo: Ugly lag and one frame of garbage when the DefaultFont_subTexIdxMap is cleared.
-    // Not nice. But seems safe. It takes a lot of time, to draw the fonts again and it is impossible to read them back from the reinitialized texture.
-    // solution -> dedicated megatexture to the defaultfont
-    DefaultFont_subTexIdxMap.clear; // UI uses this cache, and now it is invalid because of the GC
-  }
+		//todo: Ugly lag and one frame of garbage when the DefaultFont_subTexIdxMap is cleared.
+		// Not nice. But seems safe. It takes a lot of time, to draw the fonts again and it is impossible to read them back from the reinitialized texture.
+		// solution -> dedicated megatexture to the defaultfont
+		DefaultFont_subTexIdxMap.clear; // UI uses this cache, and now it is invalid because of the GC
+	}
 
-  SubTexInfo allocSpace(int subTexIdx, in Bitmap bmp){
-    enforce(bmp);
-    enforceSize(bmp.size);
+	SubTexInfo allocSpace(int subTexIdx, in Bitmap bmp){
+		enforce(bmp);
+		enforceSize(bmp.size);
 
-    SubTexInfo info;
-    bool tryAdd(MegaTexture mt){
-      return isCompatible(bmp, mt) && mt.add(bmp.size, bmp.channels, subTexIdx, info);
-    }
+		SubTexInfo info;
+		bool tryAdd(MegaTexture mt){
+			return isCompatible(bmp, mt) && mt.add(bmp.size, bmp.channels, subTexIdx, info);
+		}
 
-    // the order could be improved
-    foreach(mt; megaTextures) if(tryAdd(mt)) return info;
+		// the order could be improved
+		foreach(mt; megaTextures) if(tryAdd(mt)) return info;
 
-    //at this point failed to add to the current set of megatextures.
+		//at this point failed to add to the current set of megatextures.
 
-    if(megaTextures.length>=MegaTexMaxCnt){
-      if(0){
-        raise("Out of megatextures"); //todo: make a texture garbage collect cycle here
-      }else{
-        foreach(i; 0..MegaTexMaxCnt){
-          garbageCollect;
-          foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
-        }
-      }
-    }else{
+		if(megaTextures.length>=MegaTexMaxCnt){
+			if(0){
+				raise("Out of megatextures"); //todo: make a texture garbage collect cycle here
+			}else{
+				foreach(i; 0..MegaTexMaxCnt){
+					garbageCollect;
+					foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
+				}
+			}
+		}else{
 
-      if(megaTextures.length) MegaTexMinSize = MegaTexMaxSize; //All textures use the max size expect the first. (small apps ned only 512*512)
-      addNewMegaTexture(4);
-      foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
-    }
+			if(megaTextures.length) MegaTexMinSize = MegaTexMaxSize; //All textures use the max size expect the first. (small apps ned only 512*512)
+			addNewMegaTexture(4);
+			foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
+		}
 
-    enforce("Unable to allocate subTexture. "~bmp.size.text);
-    assert(0);
-  }
+		enforce("Unable to allocate subTexture. "~bmp.size.text);
+		assert(0);
+	}
 
-  void uploadData(SubTexInfo info, Bitmap bmp, bool dontUploadData=false){
-    auto mtIdx = info.texIdx;
+	void uploadData(SubTexInfo info, Bitmap bmp, bool dontUploadData=false){
+		auto mtIdx = info.texIdx;
 
-    chkMtIdx(mtIdx);
-    auto mt = megaTextures[mtIdx];
+		chkMtIdx(mtIdx);
+		auto mt = megaTextures[mtIdx];
 
-    if(!dontUploadData){
-      mt.glTexture.fastBind;
+		if(!dontUploadData){
+			mt.glTexture.fastBind;
 
-      //todo: this is wasting ram and not work with custom non 4ch bitmaps
-      //note: temporary solution: there is a nondestructive converter inside
-      //bmp.channels = 4;
+			//todo: this is wasting ram and not work with custom non 4ch bitmaps
+			//note: temporary solution: there is a nondestructive converter inside
+			//bmp.channels = 4;
+			mt.glTexture.upload(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
+		}
+	}
 
-      mt.glTexture.upload(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
-    }
-  }
+	/*ubyte[] downloadData(SubTexInfo info){
+		auto mtIdx = info.texIdx;
 
-  /*ubyte[] downloadData(SubTexInfo info){
-    auto mtIdx = info.texIdx;
+		chkMtIdx(mtIdx);
+		auto mt = megaTextures[mtIdx];
 
-    chkMtIdx(mtIdx);
-    auto mt = megaTextures[mtIdx];
+		mt.glTexture.fastBind;
+		mt.glTexture.download(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
+	}*/
 
-    mt.glTexture.fastBind;
-    mt.glTexture.download(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
-  }*/
+	void uploadSubTex(int idx, Bitmap bmp, bool dontUploadData=false){ //it has an existing id
+		auto info = allocSpace(idx, bmp);
+		infoTexture.modify(idx, info);
+		uploadData(info, bmp, dontUploadData);
+	}
 
-  void uploadSubTex(int idx, Bitmap bmp, bool dontUploadData=false){ //it has an existing id
-    auto info = allocSpace(idx, bmp);
-    infoTexture.modify(idx, info);
-    uploadData(info, bmp, dontUploadData);
-  }
+	int createSubTex(Bitmap bmp){	//creates a new one, returns the idx
+		//NO! Null texture is not allowed here!!! if(bmp.empty) return 0; //special NULL texture
+		//this is checked by allocSpace. enforce(bmp && !bmp.empty);
 
-  int createSubTex(Bitmap bmp){ //creates a new one, returns the idx
-    //NO! Null texture is not allowed here!!!   if(bmp.empty) return 0; //special NULL texture
-    //this is checked by allocSpace. enforce(bmp && !bmp.empty);
+		/+ old and bogus version
+		auto idx = infoTexture.peekNextIdx;	    //returns 8
+		auto info = allocSpace(idx, bmp);	    //GC deletes info[0..4], and allocspace if susseeded, stores the subtexIdx in info.
+		infoTexture.add(info);	    //and this allocates on 3 (last freed) not 8.  BUG!!!!!!!!!!!
+		+/
 
-    /+ old and bogus version
-    auto idx = infoTexture.peekNextIdx;     //returns 8
-    auto info = allocSpace(idx, bmp);       //GC deletes info[0..4], and allocspace if susseeded, stores the subtexIdx in info.
-    infoTexture.add(info);                  //and this allocates on 3 (last freed) not 8.  BUG!!!!!!!!!!!
-    +/
+		// new version allowing GC to manipulate subTexInfos.
+		auto idx = infoTexture.add(longToSubTexInfo(-1)/+just a marking, that it's not null+/, No.uploadNow);
+		auto info = allocSpace(idx, bmp);
+		infoTexture.modify(idx, info);
 
-    // new version allowing GC to manipulate subTexInfos.
-    auto idx = infoTexture.add(longToSubTexInfo(-1)/+just a marking, that it's not null+/, No.uploadNow);
-    auto info = allocSpace(idx, bmp);
-    infoTexture.modify(idx, info);
+		uploadData(info, bmp);
+		return idx;
+	}
 
-    uploadData(info, bmp);
-    return idx;
-  }
+	void removeSubTex(int idx){
+		//get SubTexInfo
+		auto info = infoTexture.access(idx);
 
-  void removeSubTex(int idx){
-    //get SubTexInfo
-    auto info = infoTexture.access(idx);
+		//get megaTex idx
+		auto mtIdx = info.texIdx;
+		chkMtIdx(mtIdx);
 
-    //get megaTex idx
-    auto mtIdx = info.texIdx;
-    chkMtIdx(mtIdx);
+		//clear the area with clFuchsia for debug
+		if(DEBUG_clearRemovedSubtexArea) with(megaTextures[mtIdx].glTexture){
+			fastBind;
+			fill(RGBA(0xFFFF00FF), info.pos.x, info.pos.y, info.size.x, info.size.y);
+		}
 
-    //clear the area with clFuchsia for debug
-    if(DEBUG_clearRemovedSubtexArea) with(megaTextures[mtIdx].glTexture){
-      fastBind;
-      fill(RGBA(0xFFFF00FF), info.pos.x, info.pos.y, info.size.x, info.size.y);
-    }
+		megaTextures[mtIdx].remove(idx);
+		infoTexture.remove(idx);
+	}
 
-    megaTextures[mtIdx].remove(idx);
-    infoTexture.remove(idx);
-  }
-
-  Bitmap[] bmpQueue;
+	Bitmap[] bmpQueue;
 
 public:
-  this(){
-    infoTexture = new InfoTexture;
-  }
+	this(){
+		infoTexture = new InfoTexture;
+	}
 
-  bool update(){
-    bool inv;
+	bool update(){
+		bool inv;
 
-    //todo: is this rehash useful at all?
-    //if(mustRehash) byFileName.rehash;
+		//todo: is this rehash useful at all?
+		//if(mustRehash) byFileName.rehash;
 
-    auto t0 = QPS;
+		auto t0 = QPS;
 
-    enum UploadTextureMaxTime = 1.0*second/60;
-    size_t uploadedSize;
-    enum TextureFlushLimit = 8 << 20;
-    do{
+		enum UploadTextureMaxTime = 1.0*second/60;
+		size_t uploadedSize;
+		enum TextureFlushLimit = 8 << 20;
+		do{
 
-      Bitmap bmp;
-      synchronized(textures){
-        if(synchLog) LOG("bmpQueue.popFirst(null) before");
-        bmp = bmpQueue.popFirst(null);
-        if(synchLog) LOG("bmpQueue.popFirst(null) after");
-      }
+			Bitmap bmp;
+			synchronized(textures){
+				if(synchLog) LOG("bmpQueue.popFirst(null) before");
+				bmp = bmpQueue.popFirst(null);
+				if(synchLog) LOG("bmpQueue.popFirst(null) after");
+			}
 
-      if(!bmp) break;
+			if(!bmp) break;
 
-      auto idx = bmp.tag;
+			auto idx = bmp.tag;
 
-      pendingIndices.remove(idx); //not pending anymore so it can be reinvalidated
+			pendingIndices.remove(idx); //not pending anymore so it can be reinvalidated
 
-      if(idx in invalidateAgain){
-        //WARN("Delayed loaded bmp is in invalidateAgain.", idx);
+			if(idx in invalidateAgain){
+				//WARN("Delayed loaded bmp is in invalidateAgain.", idx);
 
-        uploadSubTex(idx, bmp, true); //this is here to finalize the allocation of the texture before the invalidation
-        //opt: disable the upload of this texture data
+				uploadSubTex(idx, bmp, true); //this is here to finalize the allocation of the texture before the invalidation
+				//opt: disable the upload of this texture data
 
-        invalidateAgain.remove(idx);
-        foreach(f, i; byFileName) if(i == idx){ //opt: slow linear search
-          //WARN("Reinvalidating", f, idx);
-          invalidate(f);
-          break;
-        }
-      }else{
-        uploadSubTex(idx, bmp);
+				invalidateAgain.remove(idx);
+				foreach(f, i; byFileName) if(i == idx){ //opt: slow linear search
+					//WARN("Reinvalidating", f, idx);
+					invalidate(f);
+					break;
+				}
+			}else{
+				uploadSubTex(idx, bmp);
 
-        //flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
-        uploadedSize += bmp.sizeBytes;
-        if(uploadedSize >= TextureFlushLimit){
-          uploadedSize -= TextureFlushLimit;
-          gl.flush;
-        }
-      }
+				//flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
+				uploadedSize += bmp.sizeBytes;
+				if(uploadedSize >= TextureFlushLimit){
+					uploadedSize -= TextureFlushLimit;
+					gl.flush;
+				}
+			}
 
-      inv = true;
+			inv = true;
 
-    }while(QPS-t0<UploadTextureMaxTime/*sec*/);
+		}while(QPS-t0<UploadTextureMaxTime/*sec*/);
 
-    return inv;
-  }
+		return inv;
+	}
 
-  void invalidate(in File fileName){
-    if(auto idx = (fileName in byFileName)){
-      if(*idx in pendingIndices){
-        //WARN("Texture loader is pending", fileName, *idx);
-        invalidateAgain[*idx] = true;
-        return;
-      }
-      enforce(byFileName.remove(fileName), "Unable to remove "~fileName.fullName);
-      removeSubTex(*idx);
-      //LOG("invalidated ", fileName, "  idx:", *idx);
-    }else{
-      //LOG("no need to invalidate, doesn't exists", fileName);
-    }
-  }
+	void invalidate(in File fileName){
+		if(auto idx = (fileName in byFileName)){
+			if(*idx in pendingIndices){
+				//WARN("Texture loader is pending", fileName, *idx);
+				invalidateAgain[*idx] = true;
+				return;
+			}
+			enforce(byFileName.remove(fileName), "Unable to remove "~fileName.fullName);
+			removeSubTex(*idx);
+			//LOG("invalidated ", fileName, "  idx:", *idx);
+		}else{
+			//LOG("no need to invalidate, doesn't exists", fileName);
+		}
+	}
 
-  int access_old(in File fileName, Flag!"delayed" fDelayed = Yes.delayed){ //todo: bugos a delayed leader
-    bool delayed = fDelayed;
+	int access_old(in File fileName, Flag!"delayed" fDelayed = Yes.delayed){ //todo: bugos a delayed leader
+		bool delayed = fDelayed;
 
-    delayed &= EnableMultiThreadedTextureLoading;
+		delayed &= EnableMultiThreadedTextureLoading;
 
-    //todo: nonexisting file and/or exception is not handling well here.
+		//todo: nonexisting file and/or exception is not handling well here.
 
-    if(!(fileName in byFileName)){
+		if(!(fileName in byFileName)){
 
-      if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false; //todo: delayed restriction. should refactor this nicely
+			if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false; //todo: delayed restriction. should refactor this nicely
 //delayed = false;
-      if(delayed){
+			if(delayed){
 
-        //ez egy bug miatt, ami a 0. megatextura garbageCollectje utan fordul elo
-        //nem jo, ha a 0-as megaTex-re van egy betoltes alatt levo textura 'rakva'
-        auto idx = allocSubTexInfo(longToSubTexInfo(-1)); //az allocSubTexInfo ez kizarolag innen van hivva
+				//ez egy bug miatt, ami a 0. megatextura garbageCollectje utan fordul elo
+				//nem jo, ha a 0-as megaTex-re van egy betoltes alatt levo textura 'rakva'
+				auto idx = allocSubTexInfo(longToSubTexInfo(-1)); //az allocSubTexInfo ez kizarolag innen van hivva
 
-        pendingIndices[idx] = true;
-        byFileName[fileName] = idx;
-        mustRehash = true;
+				pendingIndices[idx] = true;
+				byFileName[fileName] = idx;
+				mustRehash = true;
 
-        static void loader(int idx, File fileName){
-//          enforce(SetProcessAffinityMask(GetCurrentProcess, 0xFE), getLastErrorStr);
-//          sleep(random(1000));
-          //SetPriorityClass(GetCurrentProcess, BELOW_NORMAL_PRIORITY_CLASS);
+				static void loader(int idx, File fileName){
+//	         enforce(SetProcessAffinityMask(GetCurrentProcess, 0xFE), getLastErrorStr);
+//	         sleep(random(1000));
+					//SetPriorityClass(GetCurrentProcess, BELOW_NORMAL_PRIORITY_CLASS);
 
-          //import core.sys.windows.windows;
-          //SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
+					//import core.sys.windows.windows;
+					//SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
 
 //"fuck".writeln;
 
-//          "Loader.start %.2d %s".writefln(idx, GetCurrentProcessorNumber);
-//          "B%s ".writef(idx);
+//	         "Loader.start %.2d %s".writefln(idx, GetCurrentProcessorNumber);
+//	         "B%s ".writef(idx);
 
-          /*if(GetCurrentProcessorNumber==mainThreadProcessorNumber) */
+					/*if(GetCurrentProcessorNumber==mainThreadProcessorNumber) */
 
 //          sleep(100);
-          Bitmap bmp;
-          try{
-            bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
-          }catch(Exception e){
-            //todo: Nem jo!!! Nem thread safe !!!  WARN("Bitmap decode error. Using errorBitmap", fileName);
-            //Ez nem thread safe!!!! multithreaded modban vegtelen loopba tud kerulni.
-            //todo: ezt megoldani a placeholder bitmappal rendesen
-            bmp = newErrorBitmap(e.simpleMsg);
-          }
+					Bitmap bmp;
+					try{
+						bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
+					}catch(Exception e){
+						//todo: Nem jo!!! Nem thread safe !!!	WARN("Bitmap decode error. Using errorBitmap", fileName);
+						//Ez nem thread safe!!!! multithreaded	modban vegtelen loopba tud kerulni.
+						//todo: ezt megoldani a placeholder bitmappal rendesen
+						bmp = newErrorBitmap(e.simpleMsg);
+					}
 
-          //bmp.channels = 4; //todo: not just 4 chn bitmap support
-          bmp.tag = idx; //tag = SubTexIdx
+					//bmp.channels = 4; //todo: not just 4 chn bitmap support
+					bmp.tag = idx; //tag = SubTexIdx
 
 //          "E%s ".writef(idx);
 
-          synchronized(textures){
-            if(synchLog) LOG("textures.bmpQueue ~= bmp; before");
-            textures.bmpQueue ~= bmp;
-            if(synchLog) LOG("textures.bmpQueue ~= bmp; after");
-            //mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
-          }
+					synchronized(textures){
+						if(synchLog) LOG("textures.bmpQueue ~= bmp; before");
+						textures.bmpQueue ~= bmp;
+						if(synchLog) LOG("textures.bmpQueue ~= bmp; after");
+						//mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
+					}
 
-        }
+				}
 
-        if(1){
-          //todo: upgrade this to be able to prioritize loading order in realtime.
-          import std.concurrency;
+				if(1){
+					//todo: upgrade this to be able to prioritize loading order in realtime.
+					import std.concurrency;
 
-          //LOG("LOADING bmp", fileName);
-          spawn(&loader, idx, fileName);   //crashes after 5 min
-        }else{
-          import std.parallelism;
-          auto t = task!loader(idx, fileName);
-          taskPool.put(t);
-//          t.yieldForce;
-//          loader(idx, fileName);
+					//LOG("LOADING bmp", fileName);
+					spawn(&loader, idx, fileName);   //crashes after 5 min
+				}else{
+					import std.parallelism;
+					auto t = task!loader(idx, fileName);
+					taskPool.put(t);
+//	         t.yieldForce;
+//	         loader(idx, fileName);
 
 /*          Bitmap[int] queue;
-          synchronized(textures){
-            queue = bmpQueue.dup;
-            bmpQueue.clear;
-          }
+					synchronized(textures){
+						queue = bmpQueue.dup;
+						bmpQueue.clear;
+					}
 
-          foreach(kv; queue.byKeyValue)
-            uploadSubTex(kv.key, kv.value);*/
+					foreach(kv; queue.byKeyValue)
+						uploadSubTex(kv.key, kv.value);*/
 
-        }
+				}
 
-      }else{ //immediate loader
-        Bitmap bmp;
-        try{
-          bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
-        }catch(Exception e){
-          WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
-          bmp = newErrorBitmap(e.simpleMsg);
-        }
+			}else{ //immediate loader
+				Bitmap bmp;
+				try{
+					bmp = newBitmap_internal(fileName); // <- this takes time. This should be delayed
+				}catch(Exception e){
+					WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
+					bmp = newErrorBitmap(e.simpleMsg);
+				}
 
-        //auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed
-        //bmp.channels = 4; //todo: not just 4 chn bitmap support
+				//auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed
+				//bmp.channels = 4; //todo: not just 4 chn bitmap support
 
-        auto idx = createSubTex(bmp); //it uploads immediatelly
+				auto idx = createSubTex(bmp); //it uploads immediatelly
 
-        byFileName[fileName] = idx;
-        mustRehash = true;
-      }
-    }
+				byFileName[fileName] = idx;
+				mustRehash = true;
+			}
+		}
 
-    return byFileName[fileName];
-  }
+		return byFileName[fileName];
+	}
 
-  bool isCustomExists(string name){
-    return (File(`custom:\`~name) in byFileName) !is null;
-  }
+	bool isCustomExists(string name){
+		return (File(`custom:\`~name) in byFileName) !is null;
+	}
 
-  bool exists(File f){ return (f in byFileName) !is null; }
-  bool exists(string f){ return (File(f) in byFileName) !is null; }
+	bool exists(File f){ return (f in byFileName) !is null; }
+	bool exists(string f){ return (File(f) in byFileName) !is null; }
 
-  int custom(string name, Bitmap bmp=null){ //if bitmap != null then refresh
+	int custom(string name, Bitmap bmp=null){ //if bitmap != null then refresh
 enum log = false;
 if(log) "testures.custom(%s, %s)".writefln(name, bmp);
 
-    auto fileName = File(`custom:\`~name);
+		auto fileName = File(`custom:\`~name);
 
-    if(auto a = (fileName in byFileName)){ //already exists?
-      if(bmp){ //reupdate existing
-        removeSubTex(*a);
-        auto idx = createSubTex(bmp);
-        byFileName[fileName] = idx;
-        mustRehash = true;
+		if(auto a = (fileName in byFileName)){ //already exists?
+			if(bmp){ //reupdate existing
+				removeSubTex(*a);
+				auto idx = createSubTex(bmp);
+				byFileName[fileName] = idx;
+				mustRehash = true;
 if(log) "Updated subtex %s:".writefln(fileName);
-        return idx;
-      }else{ //no change, just return the existing handle
+				return idx;
+			}else{ //no change, just return the existing handle
 if(log) "Found subtex %s:".writefln(fileName);
-        return *a;
-      }
-    }else{ //this is a new entry
-      if(bmp is null){
-        bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));  //if no bmp, just create a purple placeholder
-      }
-      auto idx = createSubTex(bmp);
-      byFileName[fileName] = idx;
-      mustRehash = true;
+				return *a;
+			}
+		}else{ //this is a new entry
+			if(bmp is null){
+				bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));  //if no bmp, just create a purple placeholder
+			}
+			auto idx = createSubTex(bmp);
+			byFileName[fileName] = idx;
+			mustRehash = true;
 if(log) "Created subtex %s:".writefln(fileName);
-      return idx;
-    }
-  }
+			return idx;
+		}
+	}
 
-  int opIndex(File fileName){
-    return access2(fileName);
-  }
+	int opIndex(File fileName){
+		return access2(fileName);
+	}
 
-  SubTexInfo accessInfo(int idx){ //todo ez egy texture class-ba kell, hogy benne legyen
-    return infoTexture.access(idx);
-  }
+	SubTexInfo accessInfo(int idx){ //todo ez egy texture class-ba kell, hogy benne legyen
+		return infoTexture.access(idx);
+	}
 
-  SubTexInfo opIndex(int idx){
-    return infoTexture.access(idx);
-  }
+	SubTexInfo opIndex(int idx){
+		return infoTexture.access(idx);
+	}
 
-  void dump() const{
-    infoTexture.dump;
-  }
+	void dump() const{
+		infoTexture.dump;
+	}
 
-  GLTexture[] getGLTextures(){ return infoTexture.glTexture ~ megaTextures.map!(a => a.glTexture).array; }
+	GLTexture[] getGLTextures(){ return infoTexture.glTexture ~ megaTextures.map!(a => a.glTexture).array; }
 
-  ivec2 textureSize(int idx){
-    return infoTexture.isValidIdx(idx) ? accessInfo(idx).size
-                                       : ivec2(0);
-  }
+	ivec2 textureSize(int idx){
+		return infoTexture.isValidIdx(idx) ? accessInfo(idx).size
+																			 : ivec2(0);
+	}
 
-  ivec2 textureSize(File file){
-    return textureSize(access2(file));
-  }
+	ivec2 textureSize(File file){
+		return textureSize(access2(file));
+	}
 
-  void uploadInplace(int idx, Bitmap bmp){
-    uploadData(accessInfo(idx), bmp);
-  }
+	void uploadInplace(int idx, Bitmap bmp){
+		uploadData(accessInfo(idx), bmp);
+	}
 
-  /// A SubTexInfo +
-  struct SubTexInfo2{
-    int idx, lastAccessed;
-    File file;
-    SubTexInfo info;
+	/// A SubTexInfo +
+	struct SubTexInfo2{
+		int idx, lastAccessed;
+		File file;
+		SubTexInfo info;
 
-    bool canUnload() const{ return canUnloadTexture(file, application.tick - lastAccessed); }
+		bool canUnload() const{ return canUnloadTexture(file, application.tick - lastAccessed); }
 
-    auto toString() const{
-      return format!"%-4s: %s age:%-5d %s"(idx, info, lastAccessed, file.fullName);
-    }
-  }
+		auto toString() const{
+			return format!"%-4s: %s age:%-5d %s"(idx, info, lastAccessed, file.fullName);
+		}
+	}
 
-  void infoDump(){
-    print("--------------- MegaTexture dump ----------------");
-    foreach(i, info; infoTexture.infoArray)
-      print(format!"%-3d : %-20s "(i, info));
-    foreach(f; byFileName.keys.sort){
-      print(format!"%-3d : %-20s "(byFileName[f], f.nameWithoutExt));
-    }
-  }
+	void infoDump(){
+		print("--------------- MegaTexture dump ----------------");
+		foreach(i, info; infoTexture.infoArray)
+			print(format!"%-3d : %-20s "(i, info));
+		foreach(f; byFileName.keys.sort){
+			print(format!"%-3d : %-20s "(byFileName[f], f.nameWithoutExt));
+		}
+	}
 
-  int length() const{ return byFileName.length.to!int; }
-  size_t usedSizeBytes() const{ return infoTexture.infoArray.map!(a => size_t(a.sizeBytes)).sum; }
-  size_t poolSizeBytes() const{ return megaTextures.map!(mt => mt.sizeBytes).sum + infoTexture.sizeBytes; }
+	int length() const{ return byFileName.length.to!int; }
+	size_t usedSizeBytes() const{ return infoTexture.infoArray.map!(a => size_t(a.sizeBytes)).sum; }
+	size_t poolSizeBytes() const{ return megaTextures.map!(mt => mt.sizeBytes).sum + infoTexture.sizeBytes; }
 
-  auto megaTextureSizes() const{ return megaTextures.map!(m => m.texSize).array; }
+	auto megaTextureSizes() const{ return megaTextures.map!(m => m.texSize).array; }
 
-  string megaTextureConfig() const{
-    return megaTextureSizes.map!(
-      s => s.x.shortSizeText!1024
-          ~ (s.x == s.y ? "" : "x"~s.y.shortSizeText!1024)
-    ).join(", ");
-  }
+	string megaTextureConfig() const{
+		return megaTextureSizes.map!(
+			s => s.x.shortSizeText!1024
+					~ (s.x == s.y ? "" : "x"~s.y.shortSizeText!1024)
+		).join(", ");
+	}
 
-  auto collectSubTexInfo2(){
-    //todo: this should be the main list.
-    //although it's fast: For 2GB textures, it's only 0.2ms to collect. (Standard test images)
+	auto collectSubTexInfo2(){
+		//todo: this should be the main list.
+		//although it's fast: For 2GB textures, it's only 0.2ms to collect. (Standard test images)
 
-    //LOG("attempting to get subtexInfo2");
-    //infoDump;
+		//LOG("attempting to get subtexInfo2");
+		//infoDump;
 
-    SubTexInfo2[] res;
+		SubTexInfo2[] res;
 
-    foreach(file, idx; byFileName){
-      //LOG("retrieving ", file, "  idx:", idx);
-      const info = infoTexture.infoArray[idx],
-            lastAccessed = infoTexture.lastAccessed[idx];
-      res ~= SubTexInfo2(idx, lastAccessed, file, info);
-    }
+		foreach(file, idx; byFileName){
+			//LOG("retrieving ", file, "  idx:", idx);
+			const info = infoTexture.infoArray[idx],
+						lastAccessed = infoTexture.lastAccessed[idx];
+			res ~= SubTexInfo2(idx, lastAccessed, file, info);
+		}
 
-    return res;
-  }
+		return res;
+	}
 
-  void debugDraw(Drawing dr){ //debugDraw /////////////////////////////
-    //print("Megatexture debug draw----------------------------");
+	void debugDraw(Drawing dr){ //debugDraw /////////////////////////////
+		//print("Megatexture debug draw----------------------------");
 
-    //megatexture debugging will not affect texture last-accessed statistics
-    global_disableSubtextureAging = true;
-    scope(exit) global_disableSubtextureAging = false;
+		//megatexture debugging will not affect texture last-accessed statistics
+		global_disableSubtextureAging = true;
+		scope(exit) global_disableSubtextureAging = false;
 
-    //collect all subtextures
-    auto subTexInfos = collectSubTexInfo2;
+		//collect all subtextures
+		auto subTexInfos = collectSubTexInfo2;
 
-    int ofs;
-    foreach(megaIdx, mt; megaTextures){
-      dr.translate(0, ofs); scope(exit){ dr.pop; ofs += mt.texSize.y + 16; }
+		int ofs;
+		foreach(megaIdx, mt; megaTextures){
+			dr.translate(0, ofs); scope(exit){ dr.pop; ofs += mt.texSize.y + 16; }
 
-      //draw background
-      dr.color = clFuchsia;
-      dr.alpha = 1;
-      dr.fillRect(bounds2(vec2(0), mt.texSize));
+			//draw background
+			dr.color = clFuchsia;
+			dr.alpha = 1;
+			dr.fillRect(bounds2(vec2(0), mt.texSize));
 
-      //draw subtextures
-      foreach(const si; subTexInfos) if(si.info.texIdx==megaIdx){
-        dr.color = clWhite;
-        dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); //todo: drawRect support for ibounds2
-        if(!si.canUnload){
-          dr.lineWidth=-3; dr.color = clYellow;
-          dr.drawX(bounds2(si.info.bounds));
-        }
-      }
+			//draw subtextures
+			foreach(const si; subTexInfos) if(si.info.texIdx==megaIdx){
+				dr.color = clWhite;
+				dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); //todo: drawRect support for ibounds2
+				if(!si.canUnload){
+					dr.lineWidth=-3; dr.color = clYellow;
+					dr.drawX(bounds2(si.info.bounds));
+				}
+			}
 
-      //draw free and used rects and frame
-      mt.debugDraw(dr);
-    }
+			//draw free and used rects and frame
+			mt.debugDraw(dr);
+		}
 
-  }
+	}
 
 
-  ulong[File] bitmapModified;
+	ulong[File] bitmapModified;
 
-  /// NOT threadsafe by design!!! Gfx is mainthread only anyways.
-  int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){  // access2 //////////////////////////
-    enum log = 0;
+	/// NOT threadsafe by design!!! Gfx is mainthread only anyways.
+	int access2(File file, Flag!"delayed" fDelayed = Yes.delayed){  // access2 //////////////////////////
+		enum log = 0;
 
-    bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
-    auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);
-    auto modified = bmp.modified.toId_deprecated; //todo: deprecate toId and use the DateTime itself
+		bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
+		auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  //opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
+		auto modified = bmp.modified.toId_deprecated; //todo: deprecate toId and use the DateTime itself
 
-    if(log) LOG(bmp);
-    if(auto existing = file in byFileName){
+		if(log) LOG(bmp);
+		if(auto existing = file in byFileName){
 
-      //todo: ennel az egyenlosegjelnel 2 bug van:
-      // 1: ha ==, akkor a thumbnailnak 0 a datetime-je
-      // 2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a nearest sampling bugja tapasztalhato a folyamatosan athelyezett thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
-      if(modified == bitmapModified.get(file, 0)){
-        if(log) LOG("\33\12existing\33\7");
-        return *existing; //existing texture and matching modified datetime
-      }
-      if(log) LOG("\33\14removing\33\7");
-      removeSubTex(*existing); //It's changed, must remove
-    }
-    //upload new texture
-    if(log) LOG("\33\16creating\33\7", modified);
+			//todo: ennel az egyenlosegjelnel 2 bug van:
+			// 1: ha ==, akkor a thumbnailnak 0 a datetime-je
+			// 2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a nearest sampling bugja tapasztalhato a folyamatosan athelyezett thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
+			if(modified == bitmapModified.get(file, 0)){
+				if(log) LOG("\33\12existing\33\7");
+				return *existing; //existing texture and matching modified datetime
+			}
+			if(log) LOG("\33\14removing\33\7");
+			removeSubTex(*existing); //It's changed, must remove
+		}
+		//upload new texture
+		if(log) LOG("\33\16creating\33\7", modified);
 
-    auto idx = createSubTex(bmp);
-    byFileName[file] = idx;
-    bitmapModified[file] = modified;
-    mustRehash = true;
-    return idx;
-  }
+		auto idx = createSubTex(bmp);
+		byFileName[file] = idx;
+		bitmapModified[file] = modified;
+		mustRehash = true;
+		return idx;
+	}
 }
 
 
 deprecated(`Use bitmaps("name", bitmap)")`) class CustomTexture{ // CustomTexture ///////////////////////////////
-  const string name;
-  protected{
-    Bitmap bmp;
-    bool mustUpload;
-  }
+	const string name;
+	protected{
+		Bitmap bmp;
+		bool mustUpload;
+	}
 
-  this(string name=""){
-    this.name = name.strip.length ? name : this.identityStr;
-  }
+	this(string name=""){
+		this.name = name.strip.length ? name : this.identityStr;
+	}
 
-  void clear(){ bmp.free; mustUpload = false; }
-  void update(){ mustUpload = true; }
-  void update(Bitmap bmp){ this.bmp = bmp; mustUpload = true; }
+	void clear(){ bmp.free; mustUpload = false; }
+	void update(){ mustUpload = true; }
+	void update(Bitmap bmp){ this.bmp = bmp; mustUpload = true; }
 
-  int texIdx(){
-    if(bmp is null) return -1; //nothing to draw
-    if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
-    Bitmap b = chkClear(mustUpload) ? bmp : null;
-    return textures.custom(name, b);
-  }
+	int texIdx(){
+		if(bmp is null) return -1; //nothing to draw
+		if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
+		Bitmap b = chkClear(mustUpload) ? bmp : null;
+		return textures.custom(name, b);
+	}
 
-  ivec2 size()const { return bmp ? bmp.size : ivec2(0); }
+	ivec2 size()const { return bmp ? bmp.size : ivec2(0); }
 
-  auto getFile(){ return File(`custom:\`~name); }
-  auto getBmp(){ return bmp; }
+	auto getFile(){ return File(`custom:\`~name); }
+	auto getBmp(){ return bmp; }
 }

@@ -5737,8 +5737,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))						                        { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))						                        { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))								                      { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))								                      { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
@@ -5751,8 +5751,8 @@ void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = 
 void saveTo(T)(const T[] data, const string fileName)	                       { data.saveTo(File(fileName)); }
 void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)	                       { [data].saveTo(File(fileName)); }
 
-void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))						  {	data = fileName.readStr(mustExists); }
-void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))						  {	data = cast(T[])fileName.read(mustExists); }
+void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))							 {	data = fileName.readStr(mustExists); }
+void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))							 {	data = cast(T[])fileName.read(mustExists); }
 void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDynamicArray!T)		{ data = (cast(T[])fileName.read(mustExists))[0]; }
 
 File appFile() { static __gshared File s; if(s.isNull) s = File(thisExePath); return s; }
@@ -6876,8 +6876,8 @@ struct DateTime{
 
 		alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 		alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
-		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime						       , SYSTEMTIME);
-		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime						       , FILETIME  );
+		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime								     , SYSTEMTIME);
+		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime								     , FILETIME  );
 	}
 
 	private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
@@ -6950,6 +6950,12 @@ struct DateTime{
 			else	res += day - 	diff_ms*milli(second);
 			
 			return res;
+			
+			/+todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
+				.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
+				.uniq
+				.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); +/
+
 		}
 
 		Time utcTime  () const{ return this-utcDayStart; }
@@ -7281,7 +7287,7 @@ public:
 	}
 };
 
-bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float periodLength_sec, size_t hash=0){
+bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float periodLength_sec, size_t hash=0){ //todo: use quantities.Time
 	enum staticHash = hashOf(moduleName, moduleLine);
 	hash ^= staticHash;
 

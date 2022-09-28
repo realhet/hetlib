@@ -1461,9 +1461,9 @@ auto iota2(E)(in E e){ return iota2(0, e); }
  * Calculates an interpolating constant 't' from a deltaTime.
  * Its aim is to provide similar animation smoothess at different FPS.
  * Params:
- *			   dt =	Delta time in seconds
- *			   speed =	speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.  //todo: this is not working
- *			   maxDt =	Maximum allowed deltaTime. Above this, the smhooth animation is disabled, restulting a value of 1.0.
+ *				  dt =	Delta time in seconds
+ *				  speed =	speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.  //todo: this is not working
+ *				  maxDt =	Maximum allowed deltaTime. Above this, the smhooth animation is disabled, restulting a value of 1.0.
  * Returns:
  *      Interpolation constant used in follow() functions.
  * See_Also:
@@ -1479,9 +1479,9 @@ float calcAnimationT(float dt, float speed, float maxDt = 0.1f){
 /***********************************
  * Interpolate smooth animation between act and target positions.
  * Params:
- *			   act =	 Actual position.
- *			   target =	 Target position, act will go towards that.
- *			   t =	 Interpolation constant. 1.0 means immediate transition to target.
+ *				  act =	 Actual position.
+ *				  target =	 Target position, act will go towards that.
+ *				  t =	 Interpolation constant. 1.0 means immediate transition to target.
  *		 Use calcAnimationT() to calculate it from deltaTime.
  *      snapDistance =	 Below this distance, act will immediatelly snap to target.
  *
@@ -2243,6 +2243,8 @@ enum isImage1D(A) = ImageDimension!A == 1;
 enum isImage2D(A) = ImageDimension!A == 2;
 enum isImage3D(A) = ImageDimension!A == 3;
 
+alias Image2D(T) = Image!(T, 2);
+
 // tells the elementType of an 1D range.  Returns void if can't.
 template ElementType1D(R){
 	static if(!isVector!R) alias ElementType1D = ElementType!R;
@@ -2332,12 +2334,14 @@ private auto image2DfromRanges(R, D...)(in ivec2 size, R range, D def){
 	static if(Dim.among(1, 2)){
 		alias T = InnerElementType!R;
 		Unqual!T filler = getDefaultArg!T(def); //Unqual needed for padRight
-		static if(Dim == 2) auto arr = join( range.take(size.y).map!(a => a.padRight(filler, size.x).array) );
-									 else auto arr = range.array;
-		arr = arr.padRight(filler, size[].product).array;
+		static 	if(Dim == 2) 	auto arr = join( range.take(size.y).map!(a => a.padRight(filler, size.x).array) );
+			else	auto arr = range.array;
+		arr = arr.padRight(filler, size[].product).array; //opt: this is fucking unoptimal!
 		return Image!(T, 2)(size, arr);
 	}else static assert(0, "invalid args");
 }
+
+enum isIntOrUint(T) = is(Unqual!T==int) || is(Unqual!T==uint);
 
 auto image2D(alias fun="", A...)(A args){  // image2D constructor //////////////////////////////////
 	static assert(A.length>0, "invalid args");
@@ -2345,7 +2349,7 @@ auto image2D(alias fun="", A...)(A args){  // image2D constructor //////////////
 	//todo: nem lehet kombinalni az img.retro-t az img.rgb swizzlinggel.   img2 = img.rows.retro.image2D.image2D!"a.b1g";   <-  2x image2D needed
 	//todo: img2 = image2D(img.size, (x, y) => img[x, img.height-1-y].lll);  az (x, y) forma sem megy csak az (ivec2 p)
 
-	static if(A.length>=2 && is(Unqual!(A[0])==int) && is(Unqual!(A[1])==int)){ // Starts with 2 ints: width, height
+	static if(A.length>=2 && isIntOrUint!(A[0]) && isIntOrUint!(A[1])){ // Starts with 2 ints: width, height
 		return image2D!fun(ivec2(args[0], args[1]), args[2..$]);
 
 	}else static if(is(Unqual!(A[0])==ivec2)){ // Starts with known ivec2 size
@@ -2467,12 +2471,12 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
 
 	@property auto asArray(){
 		if(size.x==stride) 	return impl;
-		else	return rows.array.join;
+		else	return rows.join;
 	}
 
 	@property auto asArray() const{ //todo: ezt nem lehet egyszerubben? const vagy nem const. Peldaul "const auto"
 		if(size.x==stride) 	return impl;
-		else	return rows.array.join;
+		else	return rows.join;
 	}
 
 	@property void asArray(A)(A a){
@@ -2482,9 +2486,9 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
 	auto dup(string op="")() const { //optional predfix op
 		static if(op==""){
 			//return Image!(E, N)(size, height.iota.map!(i => impl[i*stride..i*stride+width].dup).join); //todo:2D only
-			return Image!(E, N)(size, rows.map!(r => r.dup).join); //todo:2D only
-			//todo: optimize for stride==width case
-			//todo: check if dup.join copies 2x or not.
+			if(stride==width) 	return Image!(E, N)(size, impl.dup);
+			else	return Image!(E, N)(size, rows.map!(r => r.dup).join); //todo:2D only
+				//todo: check this r.dup.join in disassembler
 		}else{
 			auto tmp = this.dup;
 			foreach(ref a; tmp.impl) a = cast(E) (mixin(op, "a")); //transform all the elements manually
@@ -2636,15 +2640,15 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
 	void opIndexAssign(A)(in A a, int[2] r1, int[2] r2){ assignRectangular!""(a, r1, r2); }
 	void opIndexAssign(A)(in A a                      ){ this[0..$, 0..$] = a; }
 
-	void opIndexAssign(string op, A)(in A a, int     i, int			  j){ mixin("this[i, j]", op, "= a;"); }
-	void opIndexAssign(string op, A)(in A a, int[2] r1, int			  j){ assignHorizontal	!op(a, r1,  j); }
+	void opIndexAssign(string op, A)(in A a, int     i, int				 j){ mixin("this[i, j]", op, "= a;"); }
+	void opIndexAssign(string op, A)(in A a, int[2] r1, int				 j){ assignHorizontal	!op(a, r1,  j); }
 	void opIndexAssign(string op, A)(in A a, int     i, int[2] r2){ assignVertical	!op(a,  i, r2); }
 	void opIndexAssign(string op, A)(in A a, int[2] r1, int[2] r2){ assignRectangular!op(a, r1, r2); }
 	void opIndexAssign(string op, A)(in A a                      ){ mixin("this[0..$, 0..$]", op, "= a;"); }
 
 	// Index/Slice unary ops. All non-const, I don't wanna suck with constness
-	auto opIndexUnary(string op)(int     i, int			  j) { return mixin(op, "this[i, j]"); }
-	auto opIndexUnary(string op)(int[2] r1, int			  j) { return this[r1[0]..r1[1], j           ].dup!op; }
+	auto opIndexUnary(string op)(int     i, int				 j) { return mixin(op, "this[i, j]"); }
+	auto opIndexUnary(string op)(int[2] r1, int				 j) { return this[r1[0]..r1[1], j           ].dup!op; }
 	auto opIndexUnary(string op)(int     i, int[2] r2) { return this[i           , r2[0]..r2[1]].dup!op; }
 	auto opIndexUnary(string op)(int[2] r1, int[2] r2) { return this[r1[0]..r1[1], r2[0]..r2[1]].dup!op; }
 	auto opIndexUnary(string op)(                    ) { return mixin(op, "this[0..$, 0..$]"); }

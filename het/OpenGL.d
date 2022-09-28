@@ -37,8 +37,8 @@ enum{//ErrorCode////////////////////////
 	GL_INVALID_VALUE	           = 0x0501,
 	GL_INVALID_OPERATION	           = 0x0502,
 	GL_STACK_OVERFLOW	           = 0x0503,
-	GL_STACK_UNDERFLOW	           = 0x0504,
-	GL_OUT_OF_MEMORY	           = 0x0505,
+	GL_STACK_UNDERFLOW		= 0x0504,
+	GL_OUT_OF_MEMORY	           =	0x0505,
 }
 
 enum{//Primitives////////////////////////
@@ -50,8 +50,8 @@ enum{//Primitives////////////////////////
 	GL_TRIANGLE_STRIP	    =	 5,
 	GL_TRIANGLE_FAN	    =	 6,
 	GL_QUADS	    =	 7,
-	GL_QUAD_STRIP	    =	 8,
-	GL_POLYGON	    =	 9,
+	GL_QUAD_STRIP		=	 8,
+	GL_POLYGON	    =		9,
 	GL_LINES_ADJACENCY	    = 10,
 	GL_LINE_STRIP_ADJACENCY	    = 11,
 	GL_TRIANGLES_ADJACENCY	    = 12,
@@ -65,9 +65,9 @@ enum{ //Booleans////////////////////////
 
 enum{//AccumOp////////////////////////
 	GL_ACCUM	                      = 0x0100,
-	GL_LOAD	                      = 0x0101,
-	GL_RETURN	                      = 0x0102,
-	GL_MULT	                      = 0x0103,
+	GL_LOAD	                      =	0x0101,
+	GL_RETURN		= 0x0102,
+	GL_MULT	                      =	0x0103,
 	GL_ADD	                      = 0x0104,
 }
 
@@ -77,46 +77,46 @@ enum{//AlphaFunction////////////////////////
 	GL_EQUAL	                    = 0x0202,
 	GL_LEQUAL	                    = 0x0203,
 	GL_GREATER	                    = 0x0204,
-	GL_NOTEQUAL	                    = 0x0205,
-	GL_GEQUAL	                    = 0x0206,
-	GL_ALWAYS	                    = 0x0207,
+	GL_NOTEQUAL		= 0x0205,
+	GL_GEQUAL			                  =	0x0206,
+	GL_ALWAYS			                  =	0x0207,
 }
 
 enum{//GetString////////////////////////
-	GL_VENDOR	                  = 0x1F00,
-	GL_RENDERER	                  = 0x1F01,
+	GL_VENDOR	                  =	0x1F00,
+	GL_RENDERER		= 0x1F01,
 	GL_VERSION	                  = 0x1F02,
 	GL_EXTENSIONS	                  = 0x1F03,
 }
 
 enum{// AttribMask////////////////////////
-	GL_CURRENT_BIT	         = 0x00000001,
-	GL_POINT_BIT	         = 0x00000002,
+	GL_CURRENT_BIT		= 0x00000001,
+	GL_POINT_BIT	         =	0x00000002,
 	GL_LINE_BIT	         = 0x00000004,
 	GL_POLYGON_BIT	         = 0x00000008,
 	GL_POLYGON_STIPPLE_BIT	         = 0x00000010,
-	GL_PIXEL_MODE_BIT	         = 0x00000020,
-	GL_LIGHTING_BIT	         = 0x00000040,
+	GL_PIXEL_MODE_BIT		= 0x00000020,
+	GL_LIGHTING_BIT	         =	0x00000040,
 	GL_FOG_BIT	         = 0x00000080,
-	GL_DEPTH_BUFFER_BIT	         = 0x00000100,
-	GL_ACCUM_BUFFER_BIT	         = 0x00000200,
-	GL_STENCIL_BUFFER_BIT	         = 0x00000400,
-	GL_VIEWPORT_BIT	         = 0x00000800,
+	GL_DEPTH_BUFFER_BIT			       =	0x00000100,
+	GL_ACCUM_BUFFER_BIT			       =	0x00000200,
+	GL_STENCIL_BUFFER_BIT		=	0x00000400,
+	GL_VIEWPORT_BIT		= 0x00000800,
 	GL_TRANSFORM_BIT	         = 0x00001000,
 	GL_ENABLE_BIT	         = 0x00002000,
 	GL_COLOR_BUFFER_BIT	         = 0x00004000,
-	GL_HINT_BIT	         = 0x00008000,
-	GL_EVAL_BIT	         = 0x00010000,
-	GL_LIST_BIT	         = 0x00020000,
-	GL_TEXTURE_BIT	         = 0x00040000,
-	GL_SCISSOR_BIT	         = 0x00080000,
+	GL_HINT_BIT			       = 0x00008000,
+	GL_EVAL_BIT			       = 0x00010000,
+	GL_LIST_BIT			       = 0x00020000,
+	GL_TEXTURE_BIT			       = 0x00040000,
+	GL_SCISSOR_BIT			       = 0x00080000,
 	GL_ALL_ATTRIB_BITS	         = 0x000fffff,
 }
 
 enum{//BlendingFactor////////////////////////
 	GL_ZERO	    = 0	    ,
-	GL_ONE	    = 1	    ,
-	GL_SRC_COLOR	    = 0x0300,
+	GL_ONE	    = 1		,
+	GL_SRC_COLOR	    =	0x0300,
 	GL_ONE_MINUS_SRC_COLOR	    = 0x0301,
 	GL_SRC_ALPHA	    = 0x0302,
 	GL_ONE_MINUS_SRC_ALPHA	    = 0x0303,
@@ -138,10 +138,10 @@ enum{//DataType////////////////////////
 	GL_UNSIGNED_SHORT	              = 0x1403,
 	GL_INT	              = 0x1404,
 	GL_UNSIGNED_INT	              = 0x1405,
-	GL_FLOAT	              = 0x1406,
-	GL_2_BYTES	              = 0x1407,
-	GL_3_BYTES	              = 0x1408,
-	GL_4_BYTES	              = 0x1409,
+	GL_FLOAT	              =	0x1406,
+	GL_2_BYTES		= 0x1407,
+	GL_3_BYTES		= 0x1408,
+	GL_4_BYTES		= 0x1409,
 	GL_DOUBLE	              = 0x140A,
 }
 
@@ -157,14 +157,14 @@ enum{//Face sides////////////////////////
 }
 
 enum{//PixelFormat////////////////////////
-	GL_COLOR_INDEX	             = 0x1900,
-	GL_STENCIL_INDEX	             = 0x1901,
-	GL_DEPTH_COMPONENT	             = 0x1902,
-	GL_RED	             = 0x1903,
-	GL_GREEN	             = 0x1904,
+	GL_COLOR_INDEX	             =	0x1900,
+	GL_STENCIL_INDEX		=	0x1901,
+	GL_DEPTH_COMPONENT			= 0x1902,
+	GL_RED	             =	0x1903,
+	GL_GREEN		= 0x1904,
 	GL_BLUE	             = 0x1905,
-	GL_ALPHA	             = 0x1906,
-	GL_RGB	             = 0x1907,
+	GL_ALPHA		= 0x1906,
+	GL_RGB	             =	0x1907,
 	GL_RGBA	             = 0x1908,
 	GL_LUMINANCE	             = 0x1909,
 	GL_LUMINANCE_ALPHA	             = 0x190A,
@@ -172,17 +172,17 @@ enum{//PixelFormat////////////////////////
 
 enum{//PolygonMode////////////////////////
 	GL_POINT	                       = 0x1B00,
-	GL_LINE	                       = 0x1B01,
-	GL_FILL	                       = 0x1B02,
+	GL_LINE			                     = 0x1B01,
+	GL_FILL			                     = 0x1B02,
 }
 
 enum{//GetTarget////////////////////////
-	GL_CURRENT_COLOR	      = 0x0B00,
-	GL_CURRENT_INDEX	      = 0x0B01,
+	GL_CURRENT_COLOR			    = 0x0B00,
+	GL_CURRENT_INDEX			    = 0x0B01,
 	GL_CURRENT_NORMAL	      = 0x0B02,
-	GL_CURRENT_TEXTURE_COORDS	      = 0x0B03,
-	GL_CURRENT_RASTER_COLOR	      = 0x0B04,
-	GL_CURRENT_RASTER_INDEX	      = 0x0B05,
+	GL_CURRENT_TEXTURE_COORDS		= 0x0B03,
+	GL_CURRENT_RASTER_COLOR			    =	0x0B04,
+	GL_CURRENT_RASTER_INDEX			    =	0x0B05,
 	GL_CURRENT_RASTER_TEXTURE_COORDS= 0x0B06,
 	GL_CURRENT_RASTER_POSITION      = 0x0B07,
 	GL_CURRENT_RASTER_POSITION_VALID= 0x0B08,
@@ -319,24 +319,24 @@ enum{//GetTarget////////////////////////
 	GL_MAX_VIEWPORT_DIMS	 = 0x0D3A,
 	GL_MAX_CLIENT_ATTRIB_STACK_DEPTH= 0x0D3B,
 	GL_SUBPIXEL_BITS	    = 0x0D50,
-	GL_INDEX_BITS	    = 0x0D51,
-	GL_RED_BITS	    = 0x0D52,
-	GL_GREEN_BITS	    = 0x0D53,
-	GL_BLUE_BITS	    = 0x0D54,
-	GL_ALPHA_BITS	    = 0x0D55,
-	GL_DEPTH_BITS	    = 0x0D56,
-	GL_STENCIL_BITS	    = 0x0D57,
-	GL_ACCUM_RED_BITS	    = 0x0D58,
-	GL_ACCUM_GREEN_BITS	    = 0x0D59,
+	GL_INDEX_BITS		= 0x0D51,
+	GL_RED_BITS	    =	0x0D52,
+	GL_GREEN_BITS		=	0x0D53,
+	GL_BLUE_BITS		= 0x0D54,
+	GL_ALPHA_BITS			  =	0x0D55,
+	GL_DEPTH_BITS			  =	0x0D56,
+	GL_STENCIL_BITS		=	0x0D57,
+	GL_ACCUM_RED_BITS			=	0x0D58,
+	GL_ACCUM_GREEN_BITS			= 0x0D59,
 	GL_ACCUM_BLUE_BITS	    = 0x0D5A,
-	GL_ACCUM_ALPHA_BITS	    = 0x0D5B,
-	GL_NAME_STACK_DEPTH	    = 0x0D70,
+	GL_ACCUM_ALPHA_BITS			  = 0x0D5B,
+	GL_NAME_STACK_DEPTH			  = 0x0D70,
 	GL_AUTO_NORMAL	    = 0x0D80,
-	GL_TEXTURE_1D	    = 0x0DE0,
-	GL_TEXTURE_2D	    = 0x0DE1,
+	GL_TEXTURE_1D			  = 0x0DE0,
+	GL_TEXTURE_2D			  = 0x0DE1,
 	GL_FEEDBACK_BUFFER_POINTER	    = 0x0DF0,
-	GL_FEEDBACK_BUFFER_SIZE	    = 0x0DF1,
-	GL_FEEDBACK_BUFFER_TYPE	    = 0x0DF2,
+	GL_FEEDBACK_BUFFER_SIZE			  = 0x0DF1,
+	GL_FEEDBACK_BUFFER_TYPE			  = 0x0DF2,
 	GL_SELECTION_BUFFER_POINTER	    = 0x0DF3,
 	GL_SELECTION_BUFFER_SIZE	    = 0x0DF4,
 	GL_TEXTURE_WIDTH	    = 0x1000,
@@ -347,8 +347,8 @@ enum{//GetTarget////////////////////////
 }
 
 enum{//getShaderiv////////////////////////
-	GL_SHADER_TYPE	        = 35663,
-	GL_DELETE_STATUS	        = 35712,
+	GL_SHADER_TYPE	        =	35663,
+	GL_DELETE_STATUS		= 35712,
 	GL_COMPILE_STATUS	        = 35713,
 	GL_INFO_LOG_LENGTH	        = 35716,
 	GL_SHADER_SOURCE_LENGTH	        = 35720,
@@ -360,35 +360,35 @@ enum{//getProgramiv////////////////////////
 
 enum{//ARB_vertex_buffer_object////////////////////////
 	GL_ARRAY_BUFFER	      = 0x8892,
-	GL_ELEMENT_ARRAY_BUFFER	      = 0x8893,
-	GL_ARRAY_BUFFER_BINDING	      = 0x8894,
+	GL_ELEMENT_ARRAY_BUFFER			    = 0x8893,
+	GL_ARRAY_BUFFER_BINDING			    = 0x8894,
 	GL_ELEMENT_ARRAY_BUFFER_BINDING	      = 0x8895,
-	GL_VERTEX_ARRAY_BUFFER_BINDING	      = 0x8896,
-	GL_NORMAL_ARRAY_BUFFER_BINDING	      = 0x8897,
-	GL_COLOR_ARRAY_BUFFER_BINDING	      = 0x8898,
-	GL_INDEX_ARRAY_BUFFER_BINDING	      = 0x8899,
+	GL_VERTEX_ARRAY_BUFFER_BINDING			    = 0x8896,
+	GL_NORMAL_ARRAY_BUFFER_BINDING			    = 0x8897,
+	GL_COLOR_ARRAY_BUFFER_BINDING			    = 0x8898,
+	GL_INDEX_ARRAY_BUFFER_BINDING			    = 0x8899,
 	GL_TEXTURE_COORD_ARRAY_BUFFER_BINDING	      = 0x889A,
 	GL_EDGE_FLAG_ARRAY_BUFFER_BINDING	      = 0x889B,
 	GL_SECONDARY_COLOR_ARRAY_BUFFER_BINDING	      = 0x889C,
 	GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING	      = 0x889D,
 	GL_WEIGHT_ARRAY_BUFFER_BINDING	      = 0x889E,
 	GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING	      = 0x889F,
-	GL_STREAM_DRAW	      = 0x88E0,
-	GL_STREAM_READ	      = 0x88E1,
-	GL_STREAM_COPY	      = 0x88E2,
-	GL_STATIC_DRAW	      = 0x88E4,
-	GL_STATIC_READ	      = 0x88E5,
-	GL_STATIC_COPY	      = 0x88E6,
-	GL_DYNAMIC_DRAW	      = 0x88E8,
-	GL_DYNAMIC_READ	      = 0x88E9,
-	GL_DYNAMIC_COPY	      = 0x88EA,
+	GL_STREAM_DRAW			    = 0x88E0,
+	GL_STREAM_READ			    = 0x88E1,
+	GL_STREAM_COPY			    = 0x88E2,
+	GL_STATIC_DRAW			    = 0x88E4,
+	GL_STATIC_READ			    = 0x88E5,
+	GL_STATIC_COPY			    = 0x88E6,
+	GL_DYNAMIC_DRAW			    = 0x88E8,
+	GL_DYNAMIC_READ			    = 0x88E9,
+	GL_DYNAMIC_COPY			    = 0x88EA,
 	GL_READ_ONLY	      = 0x88B8,
-	GL_WRITE_ONLY	      = 0x88B9,
-	GL_READ_WRITE	      = 0x88BA,
+	GL_WRITE_ONLY			    = 0x88B9,
+	GL_READ_WRITE			    = 0x88BA,
 	GL_BUFFER_SIZE	      = 0x8764,
 	GL_BUFFER_USAGE	      = 0x8765,
-	GL_BUFFER_ACCESS	      = 0x88BB,
-	GL_BUFFER_MAPPED	      = 0x88BC,
+	GL_BUFFER_ACCESS			    = 0x88BB,
+	GL_BUFFER_MAPPED			    = 0x88BC,
 	GL_BUFFER_MAP_POINTER	      = 0x88BD,
 }
 
@@ -399,26 +399,26 @@ enum{//ARB_shader_objects////////////////////////
 	GL_OBJECT_DELETE_STATUS	          = 0x8B80,
 	GL_OBJECT_COMPILE_STATUS	          = 0x8B81,
 	GL_OBJECT_LINK_STATUS	          = 0x8B82,
-	GL_OBJECT_VALIDATE_STATUS	          = 0x8B83,
-	GL_OBJECT_INFO_LOG_LENGTH	          = 0x8B84,
+	GL_OBJECT_VALIDATE_STATUS			        = 0x8B83,
+	GL_OBJECT_INFO_LOG_LENGTH			        = 0x8B84,
 	GL_OBJECT_ATTACHED_OBJECTS	          = 0x8B85,
 	GL_OBJECT_ACTIVE_UNIFORMS	          = 0x8B86,
 	GL_OBJECT_ACTIVE_UNIFORM_MAX_LENGTH	          = 0x8B87,
 	GL_OBJECT_SHADER_SOURCE_LENGTH	          = 0x8B88,
 	GL_SHADER_OBJECT	          = 0x8B48,
-	GL_FLOAT_VEC2	          = 0x8B50,
-	GL_FLOAT_VEC3	          = 0x8B51,
-	GL_FLOAT_VEC4	          = 0x8B52,
-	GL_INT_VEC2	          = 0x8B53,
-	GL_INT_VEC3	          = 0x8B54,
-	GL_INT_VEC4	          = 0x8B55,
+	GL_FLOAT_VEC2		= 0x8B50,
+	GL_FLOAT_VEC3		= 0x8B51,
+	GL_FLOAT_VEC4		= 0x8B52,
+	GL_INT_VEC2			        =	0x8B53,
+	GL_INT_VEC3			        =	0x8B54,
+	GL_INT_VEC4			        =	0x8B55,
 	GL_BOOL	          = 0x8B56,
-	GL_BOOL_VEC2	          = 0x8B57,
-	GL_BOOL_VEC3	          = 0x8B58,
-	GL_BOOL_VEC4	          = 0x8B59,
-	GL_FLOAT_MAT2	          = 0x8B5A,
-	GL_FLOAT_MAT3	          = 0x8B5B,
-	GL_FLOAT_MAT4	          = 0x8B5C,
+	GL_BOOL_VEC2			        = 0x8B57,
+	GL_BOOL_VEC3			        = 0x8B58,
+	GL_BOOL_VEC4			        = 0x8B59,
+	GL_FLOAT_MAT2			        = 0x8B5A,
+	GL_FLOAT_MAT3			        = 0x8B5B,
+	GL_FLOAT_MAT4			        = 0x8B5C,
 	GL_ACTIVE_ATTRIBUTES	          = 35721,
 }
 
@@ -426,8 +426,8 @@ enum{//ARB_vertex_shader////////////////////////
 	GL_VERTEX_SHADER	        = 0x8B31,
 	GL_MAX_VERTEX_UNIFORM_COMPONENTS	        = 0x8B4A,
 	GL_MAX_VARYING_FLOATS	        = 0x8B4B,
-	GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS	        = 0x8B4C,
-	GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS	        = 0x8B4D,
+	GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS	        =	0x8B4C,
+	GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS		= 0x8B4D,
 	GL_OBJECT_ACTIVE_ATTRIBUTES	        = 0x8B89,
 	GL_OBJECT_ACTIVE_ATTRIBUTE_MAX_LENGTH	        = 0x8B8A,
 	GL_MAX_VERTEX_OUTPUT_COMPONENTS	        = 0x9122,
@@ -435,15 +435,15 @@ enum{//ARB_vertex_shader////////////////////////
 
 enum{//ARB_fragment_shader////////////////////////
 	GL_FRAGMENT_SHADER	           = 0x8B30,
-	GL_MAX_FRAGMENT_UNIFORM_COMPONENTS	           = 0x8B49,
-	GL_MAX_FRAGMENT_INPUT_COMPONENTS	           = 0x9125,
+	GL_MAX_FRAGMENT_UNIFORM_COMPONENTS		= 0x8B49,
+	GL_MAX_FRAGMENT_INPUT_COMPONENTS	           =	0x9125,
 }
 
 enum{//ARB_geometry_shader////////////////////////
 	GL_GEOMETRY_SHADER	      = 36313,
 	GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS	      = 0x8C29,
-	GL_GEOMETRY_VERTICES_OUT	      = 0x8916,
-	GL_GEOMETRY_INPUT_TYPE	      = 0x8917,
+	GL_GEOMETRY_VERTICES_OUT		= 0x8916,
+	GL_GEOMETRY_INPUT_TYPE	      =	0x8917,
 	GL_GEOMETRY_OUTPUT_TYPE	      = 0x8918,
 	GL_MAX_GEOMETRY_UNIFORM_COMPONENTS	      = 0x8DDF,
 	GL_MAX_GEOMETRY_OUTPUT_VERTICES	      = 0x8DE0,
@@ -456,45 +456,45 @@ enum{//other////////////////////////
 	GL_MULTISAMPLE                                = 0x809D,
 
 	WGL_NUMBER_PIXEL_FORMATS_ARB	              = 0x2000,
-	WGL_DRAW_TO_WINDOW_ARB	              = 0x2001,
-	WGL_DRAW_TO_BITMAP_ARB	              = 0x2002,
-	WGL_ACCELERATION_ARB	              = 0x2003,
-	WGL_NEED_PALETTE_ARB	              = 0x2004,
+	WGL_DRAW_TO_WINDOW_ARB		= 0x2001,
+	WGL_DRAW_TO_BITMAP_ARB		= 0x2002,
+	WGL_ACCELERATION_ARB			            =	0x2003,
+	WGL_NEED_PALETTE_ARB			            =	0x2004,
 	WGL_NEED_SYSTEM_PALETTE_ARB	              = 0x2005,
 	WGL_SWAP_LAYER_BUFFERS_ARB	              = 0x2006,
 	WGL_SWAP_METHOD_ARB	              = 0x2007,
 	WGL_NUMBER_OVERLAYS_ARB	              = 0x2008,
 	WGL_NUMBER_UNDERLAYS_ARB	              = 0x2009,
 	WGL_TRANSPARENT_ARB	              = 0x200A,
-	WGL_TRANSPARENT_RED_VALUE_ARB	              = 0x2037,
-	WGL_TRANSPARENT_GREEN_VALUE_ARB	              = 0x2038,
+	WGL_TRANSPARENT_RED_VALUE_ARB	              =	0x2037,
+	WGL_TRANSPARENT_GREEN_VALUE_ARB		= 0x2038,
 	WGL_TRANSPARENT_BLUE_VALUE_ARB	              = 0x2039,
-	WGL_TRANSPARENT_ALPHA_VALUE_ARB	              = 0x203A,
-	WGL_TRANSPARENT_INDEX_VALUE_ARB	              = 0x203B,
-	WGL_SHARE_DEPTH_ARB	              = 0x200C,
-	WGL_SHARE_STENCIL_ARB	              = 0x200D,
-	WGL_SHARE_ACCUM_ARB	              = 0x200E,
-	WGL_SUPPORT_GDI_ARB	              = 0x200F,
+	WGL_TRANSPARENT_ALPHA_VALUE_ARB			            = 0x203A,
+	WGL_TRANSPARENT_INDEX_VALUE_ARB			            = 0x203B,
+	WGL_SHARE_DEPTH_ARB	              =	0x200C,
+	WGL_SHARE_STENCIL_ARB		= 0x200D,
+	WGL_SHARE_ACCUM_ARB			            =	0x200E,
+	WGL_SUPPORT_GDI_ARB			            =	0x200F,
 	WGL_SUPPORT_OPENGL_ARB	              = 0x2010,
 	WGL_DOUBLE_BUFFER_ARB	              = 0x2011,
 	WGL_STEREO_ARB	              = 0x2012,
-	WGL_PIXEL_TYPE_ARB	              = 0x2013,
-	WGL_COLOR_BITS_ARB	              = 0x2014,
-	WGL_RED_BITS_ARB	              = 0x2015,
+	WGL_PIXEL_TYPE_ARB		= 0x2013,
+	WGL_COLOR_BITS_ARB		= 0x2014,
+	WGL_RED_BITS_ARB	              =	0x2015,
 	WGL_RED_SHIFT_ARB	              = 0x2016,
 	WGL_GREEN_BITS_ARB	              = 0x2017,
-	WGL_GREEN_SHIFT_ARB	              = 0x2018,
-	WGL_BLUE_BITS_ARB	              = 0x2019,
-	WGL_BLUE_SHIFT_ARB	              = 0x201A,
-	WGL_ALPHA_BITS_ARB	              = 0x201B,
+	WGL_GREEN_SHIFT_ARB		= 0x2018,
+	WGL_BLUE_BITS_ARB	              =	0x2019,
+	WGL_BLUE_SHIFT_ARB			            = 0x201A,
+	WGL_ALPHA_BITS_ARB			            = 0x201B,
 	WGL_ALPHA_SHIFT_ARB	              = 0x201C,
 	WGL_ACCUM_BITS_ARB	              = 0x201D,
-	WGL_ACCUM_RED_BITS_ARB	              = 0x201E,
-	WGL_ACCUM_GREEN_BITS_ARB	              = 0x201F,
+	WGL_ACCUM_RED_BITS_ARB	              =	0x201E,
+	WGL_ACCUM_GREEN_BITS_ARB		= 0x201F,
 	WGL_ACCUM_BLUE_BITS_ARB	              = 0x2020,
 	WGL_ACCUM_ALPHA_BITS_ARB	              = 0x2021,
-	WGL_DEPTH_BITS_ARB	              = 0x2022,
-	WGL_STENCIL_BITS_ARB	              = 0x2023,
+	WGL_DEPTH_BITS_ARB	              =	0x2022,
+	WGL_STENCIL_BITS_ARB		= 0x2023,
 	WGL_AUX_BUFFERS_ARB	              = 0x2024,
 
 	WGL_NO_ACCELERATION_ARB	                 = 0x2025,
@@ -515,10 +515,10 @@ enum{//other////////////////////////
 // TEXTURING
 
 enum{//texture_object////////////////////////
-	GL_TEXTURE_PRIORITY	                        = 0x8066,
-	GL_TEXTURE_RESIDENT	                        = 0x8067,
-	GL_TEXTURE_BINDING_1D	                        = 0x8068,
-	GL_TEXTURE_BINDING_2D	                        = 0x8069,
+	GL_TEXTURE_PRIORITY			                      =	0x8066,
+	GL_TEXTURE_RESIDENT			                      =	0x8067,
+	GL_TEXTURE_BINDING_1D		= 0x8068,
+	GL_TEXTURE_BINDING_2D		= 0x8069,
 
 	GL_CLAMP_TO_EDGE                              = 0x812F,
 
@@ -526,47 +526,47 @@ enum{//texture_object////////////////////////
 }
 
 enum{// texture format////////////////////////
-	GL_ALPHA4	                    = 0x803B,
-	GL_ALPHA8	                    = 0x803C,
-	GL_ALPHA12	                    = 0x803D,
-	GL_ALPHA16	                    = 0x803E,
-	GL_LUMINANCE4	                    = 0x803F,
-	GL_LUMINANCE8	                    = 0x8040,
-	GL_LUMINANCE12	                    = 0x8041,
-	GL_LUMINANCE16	                    = 0x8042,
-	GL_LUMINANCE4_ALPHA4	                    = 0x8043,
-	GL_LUMINANCE6_ALPHA2	                    = 0x8044,
-	GL_LUMINANCE8_ALPHA8	                    = 0x8045,
+	GL_ALPHA4			                  = 0x803B,
+	GL_ALPHA8			                  = 0x803C,
+	GL_ALPHA12			                  = 0x803D,
+	GL_ALPHA16			                  = 0x803E,
+	GL_LUMINANCE4			                  = 0x803F,
+	GL_LUMINANCE8			                  = 0x8040,
+	GL_LUMINANCE12			                  = 0x8041,
+	GL_LUMINANCE16			                  = 0x8042,
+	GL_LUMINANCE4_ALPHA4			                  = 0x8043,
+	GL_LUMINANCE6_ALPHA2			                  = 0x8044,
+	GL_LUMINANCE8_ALPHA8			                  = 0x8045,
 	GL_LUMINANCE12_ALPHA4	                    = 0x8046,
-	GL_LUMINANCE12_ALPHA12	                    = 0x8047,
-	GL_LUMINANCE16_ALPHA16	                    = 0x8048,
+	GL_LUMINANCE12_ALPHA12			                  = 0x8047,
+	GL_LUMINANCE16_ALPHA16			                  = 0x8048,
 	GL_INTENSITY	                    = 0x8049,
-	GL_INTENSITY4	                    = 0x804A,
-	GL_INTENSITY8	                    = 0x804B,
-	GL_INTENSITY12	                    = 0x804C,
-	GL_INTENSITY16	                    = 0x804D,
+	GL_INTENSITY4			                  = 0x804A,
+	GL_INTENSITY8			                  = 0x804B,
+	GL_INTENSITY12			                  = 0x804C,
+	GL_INTENSITY16			                  = 0x804D,
 	GL_R3_G3_B2	                    = 0x2A10,
-	GL_RGB4	                    = 0x804F,
-	GL_RGB5	                    = 0x8050,
-	GL_RGB8	                    = 0x8051,
-	GL_RGB10	                    = 0x8052,
-	GL_RGB12	                    = 0x8053,
-	GL_RGB16	                    = 0x8054,
-	GL_RGBA2	                    = 0x8055,
-	GL_RGBA4	                    = 0x8056,
-	GL_RGB5_A1	                    = 0x8057,
-	GL_RGBA8	                    = 0x8058,
-	GL_RGB10_A2	                    = 0x8059,
-	GL_RGBA12	                    = 0x805A,
-	GL_RGBA16	                    = 0x805B,
-	GL_TEXTURE_RED_SIZE	                    = 0x805C,
-	GL_TEXTURE_GREEN_SIZE	                    = 0x805D,
+	GL_RGB4			                  = 0x804F,
+	GL_RGB5			                  = 0x8050,
+	GL_RGB8			                  = 0x8051,
+	GL_RGB10			                  =	0x8052,
+	GL_RGB12			                  =	0x8053,
+	GL_RGB16			                  =	0x8054,
+	GL_RGBA2			                  =	0x8055,
+	GL_RGBA4			                  =	0x8056,
+	GL_RGB5_A1		= 0x8057,
+	GL_RGBA8	                    =	0x8058,
+	GL_RGB10_A2			= 0x8059,
+	GL_RGBA12			                  =	0x805A,
+	GL_RGBA16			                  =	0x805B,
+	GL_TEXTURE_RED_SIZE	                    =	0x805C,
+	GL_TEXTURE_GREEN_SIZE		= 0x805D,
 	GL_TEXTURE_BLUE_SIZE	                    = 0x805E,
 	GL_TEXTURE_ALPHA_SIZE	                    = 0x805F,
-	GL_TEXTURE_LUMINANCE_SIZE	                    = 0x8060,
-	GL_TEXTURE_INTENSITY_SIZE	                    = 0x8061,
-	GL_PROXY_TEXTURE_1D	                    = 0x8063,
-	GL_PROXY_TEXTURE_2D	                    = 0x8064,
+	GL_TEXTURE_LUMINANCE_SIZE			                  = 0x8060,
+	GL_TEXTURE_INTENSITY_SIZE			                  = 0x8061,
+	GL_PROXY_TEXTURE_1D			                  = 0x8063,
+	GL_PROXY_TEXTURE_2D			                  = 0x8064,
 }
 
 enum{
@@ -578,13 +578,13 @@ enum{
 	GL_NEAREST	       = 0x2600,
 	GL_LINEAR	       = 0x2601,
 	GL_NEAREST_MIPMAP_NEAREST	       = 0x2700,
-	GL_LINEAR_MIPMAP_NEAREST	       = 0x2701,
-	GL_NEAREST_MIPMAP_LINEAR	       = 0x2702,
-	GL_LINEAR_MIPMAP_LINEAR	       = 0x2703,
-	GL_TEXTURE_MAG_FILTER	       = 0x2800,
-	GL_TEXTURE_MIN_FILTER	       = 0x2801,
-	GL_TEXTURE_WRAP_S	       = 0x2802,
-	GL_TEXTURE_WRAP_T	       = 0x2803,
+	GL_LINEAR_MIPMAP_NEAREST			     = 0x2701,
+	GL_NEAREST_MIPMAP_LINEAR			     = 0x2702,
+	GL_LINEAR_MIPMAP_LINEAR			= 0x2703,
+	GL_TEXTURE_MAG_FILTER			     =	0x2800,
+	GL_TEXTURE_MIN_FILTER			     =	0x2801,
+	GL_TEXTURE_WRAP_S			     = 0x2802,
+	GL_TEXTURE_WRAP_T			     = 0x2803,
 	GL_CLAMP	       = 0x2900,
 	GL_REPEAT	       = 0x2901,
 }
@@ -600,8 +600,8 @@ enum{// TessCallback ////////////////////////
 	GLU_TESS_BEGIN	          = 100100,
 	GLU_BEGIN	          = 100100,
 	GLU_TESS_VERTEX	          = 100101,
-	GLU_VERTEX	          = 100101,
-	GLU_TESS_END	          = 100102,
+	GLU_VERTEX	          =	100101,
+	GLU_TESS_END		= 100102,
 	GLU_END	          = 100102,
 	GLU_TESS_ERROR	          = 100103,
 	GLU_TESS_EDGE_FLAG	          = 100104,
@@ -609,17 +609,17 @@ enum{// TessCallback ////////////////////////
 	GLU_TESS_COMBINE	          = 100105,
 	GLU_TESS_BEGIN_DATA	          = 100106,
 	GLU_TESS_VERTEX_DATA	          = 100107,
-	GLU_TESS_END_DATA	          = 100108,
-	GLU_TESS_ERROR_DATA	          = 100109,
-	GLU_TESS_EDGE_FLAG_DATA	          = 100110,
-	GLU_TESS_COMBINE_DATA	          = 100111,
+	GLU_TESS_END_DATA	          =	100108,
+	GLU_TESS_ERROR_DATA		= 100109,
+	GLU_TESS_EDGE_FLAG_DATA			= 100110,
+	GLU_TESS_COMBINE_DATA	          =	100111,
 }
 
 enum TessContour:int {// TessContour////////////////////////
 	GLU_CW	                     = 100120,
 	GLU_CCW	                     = 100121,
-	GLU_INTERIOR	                     = 100122,
-	GLU_EXTERIOR	                     = 100123,
+	GLU_INTERIOR			                   = 100122,
+	GLU_EXTERIOR			                   = 100123,
 	GLU_UNKNOWN	                     = 100124,
 }
 
@@ -630,21 +630,21 @@ enum{// TessProperty////////////////////////
 }
 
 enum{// TessError ////////////////////////
-	GLU_TESS_MISSING_BEGIN_POLYGON	   = 100151,
-	GLU_TESS_MISSING_BEGIN_CONTOUR	   = 100152,
-	GLU_TESS_MISSING_END_POLYGON	   = 100153,
-	GLU_TESS_MISSING_END_CONTOUR	   = 100154,
+	GLU_TESS_MISSING_BEGIN_POLYGON		= 100151,
+	GLU_TESS_MISSING_BEGIN_CONTOUR		= 100152,
+	GLU_TESS_MISSING_END_POLYGON			 =	100153,
+	GLU_TESS_MISSING_END_CONTOUR			 =	100154,
 	GLU_TESS_COORD_TOO_LARGE	   = 100155,
 	GLU_TESS_NEED_COMBINE_CALLBACK	   = 100156,
-	GLU_TESS_ERROR7	   = 100157,
-	GLU_TESS_ERROR8	   = 100158,
+	GLU_TESS_ERROR7			 = 100157,
+	GLU_TESS_ERROR8			 = 100158,
 }
 
 enum TessWinding:int {// TessWinding ////////////////////////
 	odd	     = 100130,
 	nonZero	     = 100131,
-	positive	     = 100132,
-	negative	     = 100133,
+	positive			   = 100132,
+	negative			   = 100133,
 	abs_geq_two	     = 100134,
 }
 
@@ -663,8 +663,8 @@ private: //original opengl api calls, private helpers
 		void function(int name, int* v)	                               glGetIntegerv;
 		void function(int pname, float *value)	                               glGetFloatv;
 
-		void function(int what)	                                              glEnable, glDisable;
-		bool function(int what)	                                              glIsEnabled;
+		void function(int what)			                                            glEnable, glDisable;
+		bool function(int what)			                                            glIsEnabled;
 
 		void function(float r, float g, float b, float a)	                    glClearColor;
 		void function(float d)	                    glClearDepth;
@@ -672,8 +672,8 @@ private: //original opengl api calls, private helpers
 
 		void function(int x, int y, int w, int h, int format, int type, int len, void* data) glReadnPixels;
 
-		void function(int what)	                                    glFrontFace;
-		void function(int what)	                                    glCullFace;
+		void function(int what)			                                  glFrontFace;
+		void function(int what)			                                  glCullFace;
 		void function(int face, int what)	                                    glPolygonMode;
 		void function(float width)	                                    glLineWidth;
 		void function(int what)	                                    glDepthFunc;
@@ -702,8 +702,8 @@ private: //original opengl api calls, private helpers
 		void function(int prg, int idx, int bufSize, int* length, int* size, int *type, char* name) glGetActiveAttrib;
 
 		void function(int index, int size, int type, bool normalized,	int stride, void* ptr) glVertexAttribPointer;
-		void function(int index, int size, int type,	int stride, void* ptr) glVertexAttribIPointer;
-		void function(int index)	                        glEnableVertexAttribArray, glDisableVertexAttribArray;
+		void function(int index, int size, int type,	int	stride, void* ptr) glVertexAttribIPointer;
+		void function(int index)		glEnableVertexAttribArray, glDisableVertexAttribArray;
 		void function(int mode, int first, int count)	                        glDrawArrays;
 
 		void function(int n, int* ids)	   glGenBuffers, glDeleteBuffers;
@@ -712,8 +712,8 @@ private: //original opengl api calls, private helpers
 		void function(int target, int offset, int size, const(void)* data)	   glBufferSubData;
 
 		int function(int prg, const(char)* name)	   glGetUniformLocation;
-		void function(int loc, int cnt, const(float)* val)	   glUniform1fv , glUniform2fv , glUniform3fv , glUniform4fv ;
-		void function(int loc, int cnt, const(int  )* val)	   glUniform1iv , glUniform2iv , glUniform3iv , glUniform4iv ;
+		void function(int loc, int cnt, const(float)* val)			 glUniform1fv , glUniform2fv , glUniform3fv , glUniform4fv ;
+		void function(int loc, int cnt, const(int  )* val)			 glUniform1iv , glUniform2iv , glUniform3iv , glUniform4iv ;
 		void function(int loc, int cnt, bool transpose, const(float)* val)	   glUniformMatrix4fv, glUniformMatrix3fv;
 
 //not supported on dell    void function(int loc, int cnt, const(uint )* val)                    glUniform1uiv, glUniform2uiv, glUniform3uiv, glUniform4uiv;
@@ -721,8 +721,8 @@ private: //original opengl api calls, private helpers
 		void function(int slot)	                            glActiveTexture;
 		void function(int cnt, const(int) *texId)	                            glDeleteTextures;
 
-		void function(int slot, int* handle)	                                 glGenTextures;
-		void function(int slot, int texture)	                                 glBindTexture;
+		void function(int slot, int* handle)			                               glGenTextures;
+		void function(int slot, int texture)			                               glBindTexture;
 		void function(int what, int value)	                                 glPixelStorei;
 		void function(int target, int level, int format, int type, void* pixels)	 glGetTexImage;
 		void function(int target, int level, int internalFmt, int width, int height, int border, int format, int type, const(void)* data)	 glTexImage2D;
@@ -736,8 +736,8 @@ private: //original opengl api calls, private helpers
 	// GLU functs /////////////////////////////
 
 		void* function()	    gluNewTess;
-		void function(void* tess)	    gluDeleteTess, gluTessBeginContour, gluTessEndContour, gluTessEndPolygon;
-		void function(void* tess, int what, void* fn)	    gluTessCallback;
+		void function(void* tess)		gluDeleteTess, gluTessBeginContour, gluTessEndContour, gluTessEndPolygon;
+		void function(void* tess, int	what, void* fn)	    gluTessCallback;
 		void function(void* tess, double x, double y, double z)	    gluTessNormal;
 		void function(void* tess, int prop, double value)	    gluTessProperty;
 		void function(void* tess, void* data)	    gluTessBeginPolygon;
@@ -792,14 +792,14 @@ private: //original opengl api calls, private helpers
 			case GL_STACK_UNDERFLOW	: return "STACK_UNDERFLOW";
 			case GL_OUT_OF_MEMORY	: return "OUT_OF_MEMORY";
 
-			case GLU_TESS_MISSING_BEGIN_POLYGON	  : return "TESS_MISSING_BEGIN_POLYGON";
-			case GLU_TESS_MISSING_BEGIN_CONTOUR	  : return "TESS_MISSING_BEGIN_CONTOUR";
-			case GLU_TESS_MISSING_END_POLYGON	  : return "TESS_MISSING_END_POLYGON";
-			case GLU_TESS_MISSING_END_CONTOUR	  : return "TESS_MISSING_END_CONTOUR";
+			case GLU_TESS_MISSING_BEGIN_POLYGON		: return "TESS_MISSING_BEGIN_POLYGON";
+			case GLU_TESS_MISSING_BEGIN_CONTOUR		: return "TESS_MISSING_BEGIN_CONTOUR";
+			case GLU_TESS_MISSING_END_POLYGON		 :	return "TESS_MISSING_END_POLYGON";
+			case GLU_TESS_MISSING_END_CONTOUR		 :	return "TESS_MISSING_END_CONTOUR";
 			case GLU_TESS_COORD_TOO_LARGE	  : return "TESS_COORD_TOO_LARGE";
 			case GLU_TESS_NEED_COMBINE_CALLBACK	  : return "TESS_NEED_COMBINE_CALLBACK";
-			case GLU_TESS_ERROR7	  : return "TESS_ERROR7";
-			case GLU_TESS_ERROR8	  : return "TESS_ERROR8";
+			case GLU_TESS_ERROR7		 : return "TESS_ERROR7";
+			case GLU_TESS_ERROR8		 : return "TESS_ERROR8";
 
 			default: return "UNKNOWN("~text(err)~")";
 		}
@@ -874,8 +874,8 @@ public://///////////////////////////////////////////////////////
 	}
 
 	void clearColor(float r, float g, float b, float a)	  { glClearColor(r, g, b, a); }
-	void clearColor(T)(in T color)	  { with(color.convertPixel!vec4) clearColor(r, g, b, a); }
-	void clearDepth(float depth)	  { glClearDepth(depth); }
+	void clearColor(T)(in T color)		{ with(color.convertPixel!vec4) clearColor(r, g, b, a); }
+	void clearDepth(float depth)	  {	glClearDepth(depth); }
 	void clear(int mask)	  { glClear(mask); glChk; }
 
 	void readPixels(int x, int y, int w, int h, int format, int type, void[] data) { glReadnPixels(x, y, w, h, format, type, data.length.to!int, data.ptr); glChk; }
@@ -1076,14 +1076,14 @@ public://///////////////////////////////////////////////////////
 	//resource managed things
 
 	int genTexture()	          { int res; glGenTextures(1, &res);	glChk; return res; }
-	int genBuffer()	          { int res; glGenBuffers (1, &res);	glChk; return res; }
-	int createShader(int type)	          { auto res = glCreateShader(type);	glChk; return res; }
-	int createProgram()	          { auto res = glCreateProgram();	glChk; return res; }
+	int genBuffer()	          { int res;	glGenBuffers (1, &res);	glChk; return res; }
+	int createShader(int type)		{	auto res = glCreateShader(type);	glChk; return res; }
+	int createProgram()		{ auto	res = glCreateProgram();	glChk; return res; }
 
-	void deleteTexture(int handle)	      { if(!handle) return; glDeleteTextures(1, &handle); glChk; }
-	void deleteBuffer (int handle)	      { if(!handle) return; glDeleteBuffers	(1, &handle); glChk; }
-	void deleteShader (int shader)	      { if(!shader) return; glDeleteShader	(shader	   ); glChk; }
-	void deleteProgram(int prg   )	      { if(!prg   ) return; glDeleteProgram	(prg	   ); glChk; }
+	void deleteTexture(int handle)			    { if(!handle) return; glDeleteTextures(1, &handle); glChk; }
+	void deleteBuffer (int handle)			    { if(!handle) return; glDeleteBuffers	(1, &handle); glChk; }
+	void deleteShader (int shader)			    { if(!shader) return; glDeleteShader	(shader	   ); glChk; }
+	void deleteProgram(int prg   )			    { if(!prg   ) return; glDeleteProgram	(prg	   ); glChk; }
 }
 
 //GLHandle, GlResource ////////////////////////////////////////
@@ -1125,8 +1125,8 @@ class GLHandle(string resName, string gen, string del){
 	}
 }
 
-alias GLBufferHandle	= GLHandle!("Buffer" , "gl.genBuffer"	     , "gl.deleteBuffer" );
-alias GLTextureHandle	= GLHandle!("Texture", "gl.genTexture"	     , "gl.deleteTexture");
+alias GLBufferHandle	= GLHandle!("Buffer" , "gl.genBuffer"		,	"gl.deleteBuffer" );
+alias GLTextureHandle	= GLHandle!("Texture", "gl.genTexture"		,	"gl.deleteTexture");
 alias GLProgramHandle	= GLHandle!("Program", "gl.createProgram"	     , "gl.deleteProgram");
 alias GLShaderHandle	= GLHandle!("Shader" , "gl.createShader(param)", "gl.deleteShader" );
 
@@ -1170,9 +1170,9 @@ public:
 		return res;
 	}
 
-	override string resName() const	   { return name; }
-	override size_t resSize() const	   { return [vertexShaderSrc, geometryShaderSrc, fragmentShaderSrc].map!(x=>x.length).sum; }
-	override string resInfo() const	   { return "["~shaderTypes~"] "~attribs.keys.to!string; }
+	override string resName() const			 { return name; }
+	override size_t resSize() const			 { return [vertexShaderSrc, geometryShaderSrc, fragmentShaderSrc].map!(x=>x.length).sum; }
+	override string resInfo() const			 { return "["~shaderTypes~"] "~attribs.keys.to!string; }
 private:
 	mixin CustomEnforce!"GLShader error"; //todo: customEnforce
 
@@ -1348,13 +1348,13 @@ public:
 		if(dst.count!=1) error("attrib("~name~") array attribs not supported yet.");
 
 		//todo: working with typenames is compiler-implementation dependent.
-				 if(srcType.among("Vector!(float, 2)", "float[2]"	  ) && (dst.type==GL_FLOAT_VEC2	 )) attrib (vbo, dst.loc, GL_FLOAT	       , 2, false,	offset);
-		else if(srcType.among("Vector!(float, 3)", "float[3]"	  ) && (dst.type==GL_FLOAT_VEC3	 )) attrib (vbo, dst.loc, GL_FLOAT	       , 3, false,	offset);
-		else if(srcType.among("Vector!(float, 4)", "float[4]"	  ) && (dst.type==GL_FLOAT_VEC4	 )) attrib (vbo, dst.loc, GL_FLOAT	       , 4, false,	offset);
+				 if(srcType.among("Vector!(float, 2)", "float[2]"	  )	&& (dst.type==GL_FLOAT_VEC2	 )) attrib (vbo, dst.loc, GL_FLOAT		,	2, false,	offset);
+		else if(srcType.among("Vector!(float, 3)", "float[3]"		) && (dst.type==GL_FLOAT_VEC3	 )) attrib (vbo, dst.loc, GL_FLOAT		, 3,	false,	offset);
+		else if(srcType.among("Vector!(float, 4)", "float[4]"		) && (dst.type==GL_FLOAT_VEC4	 )) attrib (vbo, dst.loc, GL_FLOAT		, 4,	false,	offset);
 		else if(srcType.among("int", "uint", "Vector!(ubyte, 3)") && (dst.type==GL_FLOAT_VEC3	 )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 3, true ,	offset);
 		else if(srcType.among("int", "uint", "Vector!(ubyte, 4)") && (dst.type==GL_FLOAT_VEC4	 )) attrib (vbo, dst.loc, GL_UNSIGNED_BYTE, 4, true ,	offset);
-		else if(srcType.among("float"	                          ) && (dst.type==GL_FLOAT	 )) attrib (vbo, dst.loc, GL_FLOAT	, 1, false,	offset);
-		else if(srcType.among("int"	                          ) && (dst.type==GL_INT	 )) attribI(vbo, dst.loc, GL_INT	, 1,	offset);
+		else if(srcType.among("float"		) && (dst.type==GL_FLOAT	 )) attrib (vbo, dst.loc, GL_FLOAT	, 1, false,	offset);
+		else if(srcType.among("int"	                          )	&& (dst.type==GL_INT	 )) attribI(vbo, dst.loc, GL_INT	, 1,	offset);
 		else if(srcType.among("uint"	                          ) && (dst.type==GL_UNSIGNED_INT)) attribI(vbo, dst.loc, GL_UNSIGNED_INT	, 1,	offset);
 		else error("attrib("~name~") unable to convert "~srcType~"->"~text(dst.type));
 
@@ -1398,9 +1398,9 @@ auto loadShader(File file){
 
 class VBO:GlResource {
 public:
-	override string resName() const	   { return elementFields.map!(a=>a.name).array.text; }
-	override size_t resSize() const	   { return count*stride; }
-	override string resInfo() const	   { return format("count:%s stride:%s elements:%s", count, stride, elementFields.map!(a=>a.name).array); }
+	override string resName() const			 { return elementFields.map!(a=>a.name).array.text; }
+	override size_t resSize() const			 { return count*stride; }
+	override string resInfo() const			 { return format("count:%s stride:%s elements:%s", count, stride, elementFields.map!(a=>a.name).array); }
 private:
 	alias Handle = GLBufferHandle;
 
@@ -1513,9 +1513,9 @@ int GL_TEXELSIZE(GLTextureType type){ return GL_COMPONENTSIZE(type)*GL_COMPONENT
 
 class GLTexture:GlResource {
 public:
-	override string resName() const	   { return name; }
-	override size_t resSize() const	   { return size_t(width*GL_TEXELSIZE(type))*height; }
-	override string resInfo() const	   { return format("size:%sx%s format:%s isCustom:%s mipEnabled:%s mipBuilt:%s", width, height, type, isCustom, mipmapEnabled, mipmapBuilt); }
+	override string resName() const			 { return name; }
+	override size_t resSize() const			 { return size_t(width*GL_TEXELSIZE(type))*height; }
+	override string resInfo() const			 { return format("size:%sx%s format:%s isCustom:%s mipEnabled:%s mipBuilt:%s", width, height, type, isCustom, mipmapEnabled, mipmapBuilt); }
 
 	size_t sizeBytes() const { return resSize; }
 private:
@@ -1642,11 +1642,14 @@ public:
 	}
 
 	void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min){
-		bool bug = bmp.file.fullName.isWild("*preview.jpg");
-
+		//opt: bmp.GetForUpload should need a performance monitoring
 		switch(type){
-			case GLTextureType.L8   : upload(bmp.get!ubyte, x, y, sx,sy); break;
-			case GLTextureType.RGBA8: upload(bmp.get!RGBA , x, y, sx,sy, bug); break;
+			case GLTextureType.L8   : upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
+			case GLTextureType.RGBA8: 
+				//T0;
+				upload(bmp.getForUpload!RGBA , x, y, sx,sy); 
+				//LOG(DT);
+			break;
 			default: raise("unhandled texture type: "~type.text);
 		}
 	}
@@ -1768,10 +1771,10 @@ public:
 			void[] dataToUpload;
 
 /*	     if(!isCustom){ //because of megaTexturing this is deprecated
-	     auto bmp = newBitmap(name);
-	     bmp.channels = 4; //todo: not just rgba8
-	     setup(isCustom, GLTextureType.RGBA8, bmp.width, bmp.height, mipmapEnabled);
-	     dataToUpload = bmp.data;
+			   auto bmp = newBitmap(name);
+			   bmp.channels = 4; //todo: not just rgba8
+			   setup(isCustom, GLTextureType.RGBA8, bmp.width, bmp.height, mipmapEnabled);
+			   dataToUpload = bmp.data;
 			}*/
 
 			static if(UseOldTexImage2D){
@@ -1810,8 +1813,8 @@ public:
 		}
 
 		//clamping
-		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S	   , clamped ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T	   , clamped ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S			 , clamped ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T			 , clamped ? GL_CLAMP_TO_EDGE : GL_REPEAT);
 
 		gl.enable(GL_TEXTURE_2D);
 	}
@@ -2116,8 +2119,8 @@ protected:
 		createRenderingContext;
 
 		//init drawing, view, mouse
-		/*dr	= new Drawing;*/	 view	= new View2D;	 view    .owner = this;  view.centerCorrection = true;
-		/*drGUI	= new Drawing;*/	 viewGUI_	= new View2D;	 viewGUI_.owner = this;
+		/*dr	= new Drawing;*/	 view	= new View2D;	 view    .owner = this;	view.centerCorrection = true;
+		/*drGUI	= new Drawing;*/	 viewGUI_	= new View2D;	 viewGUI_.owner =	this;
 
 		mouse = new MouseState;
 	}
@@ -2143,8 +2146,8 @@ protected:
 		}
 
 /*	   if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
-	   view.workArea = dr.getBounds;
-	   view.zoomAll_immediate;
+			 view.workArea = dr.getBounds;
+			 view.zoomAll_immediate;
 		}*/
 	}
 
