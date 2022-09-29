@@ -291,8 +291,8 @@ struct im{ static:
 	//PanelPosition ///////////////////////////////////////////
 	//aligns the container on the screen
 
-	enum PanelPosition{ none, topLeft, topCenter, topRight,	leftCenter, center, rightCenter, bottomLeft,	bottomCenter, bottomRight,
-																		 topClient,	leftClient, client, rightClient,	bottomClient               }
+	enum PanelPosition{ none, topLeft, topCenter, topRight,	leftCenter, center, rightCenter,	bottomLeft,	bottomCenter, bottomRight,
+																		 topClient,	leftClient, client, rightClient,	bottomClient	}
 
 	private bool isAlignPosition (PanelPosition pp){ with(PanelPosition) return pp.inRange(topLeft  , bottomRight ); } //it will only position the container
 	private bool isClientPosition(PanelPosition pp){ with(PanelPosition) return pp.inRange(topClient, bottomClient); } //it will change the client rect too
@@ -323,9 +323,9 @@ struct im{ static:
 			//todo: put checking for running out of area and scrolling here.
 			switch(pp){
 				case topClient   : cntr.outerPos = area.topLeft    ; area.top     += cntr.outerHeight; break;
-				case bottomClient: area.bottom  -= cntr.outerHeight; cntr.outerPos = area.bottomLeft	; break;
-				case leftClient	: cntr.outerPos = area.topLeft	; area.left    += cntr.outerWidth	; break;
-				case rightClient	: area.right   -= cntr.outerWidth	; cntr.outerPos = area.topRight	; break;
+				case bottomClient: area.bottom	-= cntr.outerHeight; cntr.outerPos = area.bottomLeft	; break;
+				case leftClient	: cntr.outerPos	= area.topLeft	; area.left    += cntr.outerWidth	; break;
+				case rightClient	: area.right	-= cntr.outerWidth	; cntr.outerPos = area.topRight	; break;
 				case client	: cntr.outerPos = area.topLeft	; cntr.outerSize = area.size; area = bounds2.init; break;
 				default: ERR("invalid PanelPosition");
 			}
@@ -2364,10 +2364,10 @@ struct im{ static:
 
 			if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated) delta(-1);
 			if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated  ) delta( 1);
-			if(inputs.PgDn.repeated)	                         delta(-pageSize);
-			if(inputs.PgUp.repeated)	                         delta( pageSize);
-			if(inputs.Home.down)	                         set(0);
-			if(inputs.End .down)	                         set(1);
+			if(inputs.PgDn.repeated)		                        delta(-pageSize);
+			if(inputs.PgUp.repeated)		                        delta( pageSize);
+			if(inputs.Home.down)		                        set(0);
+			if(inputs.End .down)		                        set(1);
 
 			return userModified;
 		}
@@ -2436,8 +2436,8 @@ struct im{ static:
 		float lwRuler	(){ return lwLine*0.5f; }
 
 		/// this is the half thickness of the thumb in the active direction
-		float calcLwThumb  (SliderOrientation ori){
-			if(sliderStyle == SliderStyle.scrollBar && !isnan(normThumbSize)){
+		float calcLwThumb	(SliderOrientation ori){
+			if(sliderStyle ==	SliderStyle.scrollBar && !isnan(normThumbSize)){
 				const minSizePixels = min(innerWidth, MinScrollThumbSize);
 				return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f;
 			}else{
@@ -3302,11 +3302,11 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 		clVirtualFile	= RGB(100, 150, 255),
 		clResidentVirtualFile	= mix(clGray, clVirtualFile, .25),
 
-		clUPS	        = RGB(180, 40, 255),
-		clFPS	        = RGB(255, 40, 180),
+		clUPS		       = RGB(180, 40, 255),
+		clFPS		       = RGB(255, 40, 180),
 
-		clTPS	        = RGB(40,  80, 255),
-		clVPS	        = RGB(40, 255,  80),
+		clTPS		       = RGB(40,  80, 255),
+		clVPS		       = RGB(40, 255,  80),
 
 		clGcUsed	     = RGB(120, 180, 40),
 		clGcAll	     = RGB(40, 220, 120),
@@ -3443,18 +3443,41 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 		padding = "4";
 		border = "1 normal silver";
 		theme = "tool";
-		Text(bold("Resource Monitor"));    Spacer;
-		VirtualFileGraph;	                 Spacer;
-		BitmapCacheGraph;	                 Spacer;
+		Text(bold("Resource Monitor"));	   Spacer;
+		VirtualFileGraph;		   Spacer;
+		BitmapCacheGraph;		   Spacer;
 		TextureCacheGraph;	                 Spacer;
-		TPSGraph;	                 Spacer;
-		FPSGraph;	                 Spacer;
+		TPSGraph;		                Spacer;
+		FPSGraph;		                Spacer;
 		GCGraph;	                 Spacer;
 		GCRateGraph;	                 Spacer;
 		SelectTimeIdx(timeIdx);
 	});
 
 }}
+
+void UI_SystemDiagnostics(){ with(im){
+	Row("Build\t", { Static(__TIMESTAMP__, { width = fh*16; }); });
+	auto n = now, ldt = n.localDelphiTime;
+	Row("UTC time:\t"  , { Static(n.utcText                                                       , { width = fh*16; }); });
+	Row("Delphi time\t", { Static(ldt.format!"%.6f"~"   hours only: "~(ldt.fract*24).format!"%.6f", { width = fh*16; }); });
+	Row("Unix time\t"  , { Static(n.unixTime.format!"%.6f"                                        , { width = fh*16; }); });
+	static bool showResMonitor;
+	Row(YAlign.top, "Diagnostics\t", { Column({
+		if(auto w = cast(GLWindow)mainWindow) ChkBox(w.showFPS       , "Show FPS Graph"       );
+		ChkBox(showResMonitor, "Show Resource Monitor");
+	}); });
+	if(showResMonitor){
+		resourceMonitor.UI(344);
+		Row("GC manual control ", {
+			import core.memory;
+			foreach(b; AliasSeq!(GC.collect, GC.minimize, GC.enable, GC.disable))
+				if(Btn(b.stringof, genericId(b.stringof))) b();
+			Text("\n", GC.stats.toJson);
+		});
+	}
+}}
+
 
 ////////////////////////////////////////////////////////
 ///  Dead code                                       ///
@@ -3629,8 +3652,8 @@ class WinRow : Row{ //WinRow ///////////////////////////////
 
 struct WinContext{ //WinContext /////////////////////////////
 	//appearance
-	float frameThickness	= 1.5,  //these values are independent from zoom level, based on dr.pixelSize
-				cornerThickness	=   6,
+	float frameThickness	=	1.5,  //these values are independent from zoom level, based on dr.pixelSize
+				cornerThickness	=	6,
 				cornerHighlightRange	=	16,
 				cornerLength	=	20;
 	bool inwardFrame = true;	//	moves the frame a slightly inward in order to keep the same distance from other frames at every zoom levels.
@@ -3860,8 +3883,8 @@ class ImWin{ // ImWin //////////////////////////////////
 auto testWin(Drawing dr, vec2 mouse, float pixelSize){ // testWin() ///////////////////////////////////////
 
 	static wins = [
-		new ImWin("win1", bounds2(0  ,	  0, 640, 480)),
-		new ImWin("win2", bounds2(640,	  0, 640, 480)),
+		new ImWin("win1", bounds2(0  ,		 0, 640, 480)),
+		new ImWin("win2", bounds2(640,		 0, 640, 480)),
 		new ImWin("win3", bounds2(0  , 480, 600, 300)),
 	];
 

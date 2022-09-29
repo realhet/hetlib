@@ -17,8 +17,8 @@ auto convertPixelComponentType(CT, A)(auto ref A a){
 /// converts between different number of color components
 auto convertPixelChannels(int DstLen, A)(auto ref A a){
 	alias SrcLen	= VectorLength!A,
-				T	= ScalarType  !A,
-				VT	= Vector!(T, DstLen);
+				T	= ScalarType	!A,
+				VT	= Vector!(T,	DstLen);
 	//		Src: L              LA        RGB       RGBA	Dst:
 	immutable table	= [["a          ", "a.r   ", "a.l   ", "a.l  "],	//	L
 										 ["VT(a,*)    ", "a     ", "a.l1  ", "a.la "],	//	LA
@@ -35,8 +35,8 @@ auto convertPixelChannels(int DstLen, A)(auto ref A a){
 }
 
 // converts a color to another color type (different channels and type)
-auto convertPixel(B, A)(auto ref A a){
-	alias DstType	= ScalarType  !B,
+auto convertPixel(B, A)(auto	ref A a){
+	alias DstType	= ScalarType	!B,
 				DstLen	= VectorLength!B;
 
 	return a.convertPixelComponentType!DstType     // 2 step conversion: type and channels
@@ -73,8 +73,8 @@ auto hsvToRgb(float H, float S, float V){ //0..1 range
 
 auto toGrayscale(T, N)(in Vector!(T, N) x)
 {
-			 static if(N==3)	return x.lll;
-	else static if(N==4)	return x.llla;
+		static if(N==3)	return x.lll;
+	else 	static if(N==4)	return x.llla;
 	else	return x;
 }
 
@@ -274,8 +274,8 @@ union RGBAf{ align(1): @jsonize float[4] comp;  mixin ColorFMembers;
 	@property{ float a() const { return comp[3]; } void a(float alpha){ comp[3] = alpha; }}
 }
 
-bool isColor8(T)(){ return is(T==	  L8)||is(T==LA8)||is(T==RGB8)||is(T==RGBA8); }
-bool isColorF(T)(){ return is(T==	  Lf)||is(T==LAf)||is(T==RGBf)||is(T==RGBAf); }
+bool isColor8(T)(){ return is(T==		 L8)||is(T==LA8)||is(T==RGB8)||is(T==RGBA8); }
+bool isColorF(T)(){ return is(T==		 Lf)||is(T==LAf)||is(T==RGBf)||is(T==RGBAf); }
 bool isColor(T)(){ return isColor8!T || isColorF!T; }
 
 auto lerp(T, U)(in T a, in T b, U t)if(isColor8!T && isIntegral!U){
@@ -325,8 +325,8 @@ private auto colorFunct2(T, alias fv)(in T a, in T b)if(isColorF!T){
 }
 
 
-auto min	   (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "min")(a, b); }
-auto max	   (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "max")(a, b); }
+auto min		  (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "min")(a, b); }
+auto max		  (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "max")(a, b); }
 auto absDiff(T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "absDiff")(a, b); }
 
 int sad(T)(in T a, in T b)if(isColor8!T){
@@ -469,32 +469,32 @@ enforce(false, "HSVToRGB_rainbow() ez total fos");
 // color constants ////////////////////////////////////////////////////////////////////////////////////
 
 immutable RGB
-//classic delphi palette
-	clBlack	        = 0x000000,
+//classic delphi	palette
+	clBlack		= 0x000000,
 	clMaroon	        = 0x000080,
-	clGreen	        = 0x008000,
-	clOlive	        = 0x008080,
-	clNavy	        = 0x800000,
-	clPurple	        = 0x800080,
-	clTeal	        = 0x808000,
-	clGray	        = 0x808080,
-	clSilver	        = 0xC0C0C0,
+	clGreen		       = 0x008000,
+	clOlive		       = 0x008080,
+	clNavy	        =	0x800000,
+	clPurple		= 0x800080,
+	clTeal		       =	0x808000,
+	clGray		       =	0x808080,
+	clSilver		= 0xC0C0C0,
 	clRed	        = 0x0000FF,
-	clLime	        = 0x00FF00,
-	clYellow	        = 0x00FFFF,
-	clBlue	        = 0xFF0000,
+	clLime	        =	0x00FF00,
+	clYellow		= 0x00FFFF,
+	clBlue	        =	0xFF0000,
 	clFuchsia	        = 0xFF00FF,
-	clAqua	        = 0xFFFF00,
-	clLtGray	        = 0xC0C0C0,
-	clDkGray	        = 0x808080,
+	clAqua	        =	0xFFFF00,
+	clLtGray		= 0xC0C0C0,
+	clDkGray		= 0x808080,
 	clWhite	        = 0xFFFFFF,
 
 	clSkyBlue	     = 0xF0CAA6,
 	clMoneyGreen	     = 0xC0DCC0,
 
-	clGold	         = 0x00D7FF,
-	clBronze	         = 0x327FCD,
-	clPink	         = 0xCBC0FF,
+	clGold	         =	0x00D7FF,
+	clBronze		= 0x327FCD,
+	clPink	         =	0xCBC0FF,
 
 //standard vga palette
 	clVgaBlack	 = 0x000000,
@@ -515,29 +515,29 @@ immutable RGB
 	clVgaWhite	 = 0xFFFFFF,
 
 //C64 palette
-	clC64Black	      = 0x000000,
-	clC64White	      = 0xFFFFFF,
-	clC64Red	      = 0x354374,
-	clC64Cyan	      = 0xBAAC7C,
-	clC64Purple	      = 0x90487B,
+	clC64Black		= 0x000000,
+	clC64White		= 0xFFFFFF,
+	clC64Red	      =	0x354374,
+	clC64Cyan	      =	0xBAAC7C,
+	clC64Purple		= 0x90487B,
 	clC64Green	      = 0x4F9764,
-	clC64Blue	      = 0x853240,
-	clC64Yellow	      = 0x7ACDBF,
-	clC64Orange	      = 0x2F5B7B,
+	clC64Blue	      =	0x853240,
+	clC64Yellow		= 0x7ACDBF,
+	clC64Orange		= 0x2F5B7B,
 	clC64Brown	      = 0x00454f,
 	clC64Pink	      = 0x6572a3,
 	clC64DGrey	      = 0x505050,
-	clC64Grey	      = 0x787878,
-	clC64LGreen	      = 0x8ed7a4,
-	clC64LBlue	      = 0xbd6a78,
-	clC64LGrey	      = 0x9f9f9f,
+	clC64Grey	      =	0x787878,
+	clC64LGreen		= 0x8ed7a4,
+	clC64LBlue		     = 0xbd6a78,
+	clC64LGrey		     = 0x9f9f9f,
 
 //WOW palette
 	clWowGrey	      = 0x9d9d9d,
-	clWowWhite	      = 0xffffff,
-	clWowGreen	      = 0x00ff1e,
-	clWowBlue	      = 0xdd7000,
-	clWowPurple	      = 0xee35a3,
+	clWowWhite		     = 0xffffff,
+	clWowGreen		     = 0x00ff1e,
+	clWowBlue	      =	0xdd7000,
+	clWowPurple		= 0xee35a3,
 	clWowRed	      = 0x0080ff,
 	clWowRed2	      = 0x80cce5,
 
@@ -547,19 +547,19 @@ immutable RGB
 	clVimGreen	      = 0x4ACAB9,
 	clVimTeal	      = 0xB1C070,
 	clVimRed	      = 0x534ED5,
-	clVimPurple	      = 0xD897C3,
-	clVimYellow	      = 0x47C5E7,
+	clVimPurple		     = 0xD897C3,
+	clVimYellow		     = 0x47C5E7,
 	clVimWhite	      = 0xFFFFFF,
-	clVimGray	      = 0x9FA19E,
-	clVimOrange	      = 0x458CE7,
+	clVimGray	      =	0x9FA19E,
+	clVimOrange		= 0x458CE7,
 
 //Rainbow       https://github.com/FastLED/FastLED/wiki/Pixel-reference
-/*  clRainbowRed	= 0x0000FF,
-	clRainbowOrange	  =	0x0055AA,
-	clRainbowYellow	  =	0x00AAAA,
+/*  clRainbowRed	=	0x0000FF,
+	clRainbowOrange		=	0x0055AA,
+	clRainbowYellow		=	0x00AAAA,
 	clRainbowGreen	  =	0x00FF00,
-	clRainbowAqua	  =	0x55AA00,
-	clRainbowBlue	  =	0xFF0000,
+	clRainbowAqua		 =	0x55AA00,
+	clRainbowBlue		 =	0xFF0000,
 	clRainbowPurple	  =	0xAA0055,
 	clRainbowPing	  =	0x5500AA,*/
 
@@ -574,26 +574,26 @@ immutable RGB
 	clRainbowPink	= 0x8800FF,
 
 //solarized colors -> https://ethanschoonover.com/solarized/
-	clSolBase03	     = 0x362b00,
-	clSolBase02	     = 0x423607,
-	clSolBase01	     = 0x756e58,
-	clSolBase00	     = 0x837b65,
-	clSolBase0	     = 0x969483,
-	clSolBase1	     = 0xa1a193,
-	clSolBase2	     = 0xd5e8ee,
-	clSolBase3	     = 0xe3f6fd,
-	clSolYellow	     = 0x0089b5,
-	clSolOrange	     = 0x164bcb,
+	clSolBase03		    = 0x362b00,
+	clSolBase02		    = 0x423607,
+	clSolBase01		    = 0x756e58,
+	clSolBase00		    = 0x837b65,
+	clSolBase0		    = 0x969483,
+	clSolBase1		    = 0xa1a193,
+	clSolBase2		    = 0xd5e8ee,
+	clSolBase3		    = 0xe3f6fd,
+	clSolYellow		    = 0x0089b5,
+	clSolOrange		    = 0x164bcb,
 	clSolRed	     = 0x2f32dc,
 	clSolMagenta	     = 0x8236d3,
-	clSolViolet	     = 0xc4716c,
-	clSolBlue	     = 0xd28b26,
-	clSolCyan	     = 0x98a12a,
+	clSolViolet		= 0xc4716c,
+	clSolBlue		    =	0xd28b26,
+	clSolCyan		    =	0x98a12a,
 	clSolGreen	     = 0x009985,
 
-	clAxisX	          = RGB(213, 40, 40),
-	clAxisY	          = RGB(40, 166, 40),
-	clAxisZ	          = RGB(40, 40, 215),
+	clAxisX		         = RGB(213, 40, 40),
+	clAxisY		         = RGB(40, 166, 40),
+	clAxisZ		         = RGB(40, 40, 215),
 
 	clOrange          = clRainbowOrange;
 

@@ -1344,7 +1344,7 @@ public:
 		raise("unsupported bitmap format"); assert(0);
 	}
 
-	bool valid(){ return !empty && !loading && error==""; }
+	bool valid(){ return !empty && !loading && error==""; } //todo: this is not the best because first must check for (this !is null) from the outside
 	bool canProcess(){ return valid && !processed; }
 
 	void markChanged(){ modified.actualize; }
@@ -1594,8 +1594,8 @@ private ubyte[] serializeImage(Bitmap bmp, string format=""){ // runtime version
 
 //combined compress function
 ubyte[] serialize(A)(A a, string format=""){
-			 static if(is(A==Bitmap)	 ) return a.serializeImage(format);		      // Bitmap
-	else static if(isImage2D!A	 ) return a.serializeImage(format);		      // 2D Image
+			 static if(is(A==Bitmap)	 ) return a.serializeImage(format);			     // Bitmap
+	else static if(isImage2D!A	 ) return a.serializeImage(format);			     // 2D Image
 	else static assert(0, "invalid arg");
 }
 
@@ -2353,8 +2353,8 @@ version(D2D_FONT_RENDERER){ private:
 		bool mustRebuild = true;
 
 		const
-			white		   = D2D1_COLOR_F(1, 1, 1),
-			black		   = D2D1_COLOR_F(0, 0, 0),
+			white			  = D2D1_COLOR_F(1, 1, 1),
+			black			  = D2D1_COLOR_F(0, 0, 0),
 			heightScale = 0.75f;
 
 		void initialize(){

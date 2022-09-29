@@ -719,6 +719,14 @@ auto getModuleInfoByAddr(void* addr){
 	return res;
 }
 
+private __gshared int gDisableOSExceptionsCouinter;
+
+void convertOSExceptionsToNormalExceptions(void delegate() fun){
+	gDisableOSExceptionsCouinter++;
+	scope(exit) gDisableOSExceptionsCouinter--;
+	if(fun) fun();
+}
+
 void installExceptionFilter(){
 
 	__gshared static installed = false;
@@ -727,6 +735,14 @@ void installExceptionFilter(){
 	import core.sys.windows.windows;
 
 	static extern(Windows) LONG filter(EXCEPTION_POINTERS* p){
+		
+		if(gDisableOSExceptionsCouinter){
+			throw new Exception("OS Exception Ignored: "~(*p).ExceptionRecord.text);
+			//todo: Decode the message properly.
+			//todo: lehet hogy kellene egyb sajat OSExceptiont csinalnom es nem tovabbengedni a Winapi Exception Filteren
+			//return EXCEPTION_CONTINUE_EXECUTION;
+		}
+		
 		string msg;
 		with(p.ExceptionRecord){
 
@@ -5737,8 +5753,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))								                      { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))								                      { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))									                     { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))									                     { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
@@ -6876,8 +6892,8 @@ struct DateTime{
 
 		alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 		alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
-		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime								     , SYSTEMTIME);
-		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime								     , FILETIME  );
+		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime									    , SYSTEMTIME);
+		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime									    , FILETIME  );
 	}
 
 	private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
