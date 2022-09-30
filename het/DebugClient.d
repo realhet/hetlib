@@ -57,6 +57,23 @@ void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION
 
 void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ ERR!(file, line, funct)("Not implemented."); }
 
+T HIST(size_t N, size_t M=0x10000, string name="", T)(T value){
+	static assert(M.isPowerOf2);
+	//todo: this should be a measurement tool in DIDE
+	static size_t[N] bucketCnt;
+	static size_t totalCnt;
+	
+	bucketCnt[value.clamp(0, N-1)] ++;
+	totalCnt++;
+	if(totalCnt%M == 0){ 
+		writeln("HIST.totalCnt=", totalCnt);
+		bucketCnt[].each!writeln;
+		writeln;
+	}
+	return value;
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////////
 
 void PING(int index = 0) { dbg.ping(index); }

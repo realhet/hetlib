@@ -305,6 +305,8 @@ if(N.inRange(2, 4))
 	static auto basis(int n){ VectorType v;  v[n] = ComponentType(1);  return v; }
 
 	// swizzling ///////////////////////
+	
+	//todo: syntax highlight the swizzles. Colorize + monospace. Red, Green, Blue, Gray(Luma), White(1), Black(0)
 
 	static foreach(regs; swizzleRegs)
 		static foreach(len; 1..N+1)
@@ -1461,9 +1463,9 @@ auto iota2(E)(in E e){ return iota2(0, e); }
  * Calculates an interpolating constant 't' from a deltaTime.
  * Its aim is to provide similar animation smoothess at different FPS.
  * Params:
- *				  dt =	Delta time in seconds
- *				  speed =	speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.  //todo: this is not working
- *				  maxDt =	Maximum allowed deltaTime. Above this, the smhooth animation is disabled, restulting a value of 1.0.
+ *					 dt =	Delta time in seconds
+ *					 speed =	speed constant. 0.0 = never, 0.1 slow, 0.9 fast, 1.0 immediate.  //todo: this is not working
+ *					 maxDt =	Maximum allowed deltaTime. Above this, the smhooth animation is disabled, restulting a value of 1.0.
  * Returns:
  *      Interpolation constant used in follow() functions.
  * See_Also:
@@ -1479,9 +1481,9 @@ float calcAnimationT(float dt, float speed, float maxDt = 0.1f){
 /***********************************
  * Interpolate smooth animation between act and target positions.
  * Params:
- *				  act =	 Actual position.
- *				  target =	 Target position, act will go towards that.
- *				  t =	 Interpolation constant. 1.0 means immediate transition to target.
+ *					 act =	 Actual position.
+ *					 target =	 Target position, act will go towards that.
+ *					 t =	 Interpolation constant. 1.0 means immediate transition to target.
  *		 Use calcAnimationT() to calculate it from deltaTime.
  *      snapDistance =	 Below this distance, act will immediatelly snap to target.
  *

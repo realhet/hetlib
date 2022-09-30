@@ -45,7 +45,8 @@ private enum _keywordStrs = [ //last items of categories must be untouched!!!
 	//others
 		"bool",                         "char","wchar","dchar",
 	/+popular aliases: +/
-		"string","wstring","dstring",
+		"string", "wstring", "dstring",
+		"size_t", "sizediff_t", "ptrdiff_t", "noreturn",
 
 		"File", "Path", "DateTime", "Time",
 
@@ -196,8 +197,8 @@ private enum _operatorStrs = [ //TODO: make it a Map, after it has a working sta
 	"!="	 ,"notEqual"	 ,
 
 /*  "<>"       ,"lessGreater",         "<>="      ,"LessGreaterEqual",
-	"!<"			   ,"notLess",	     "!<="	    ,"notLessEqual",
-	"!>"			   ,"notGreater",	     "!>="	    ,"notGreaterEqual",
+	"!<"					 ,"notLess",	     "!<="	    ,"notLessEqual",
+	"!>"					 ,"notGreater",	     "!>="	    ,"notGreaterEqual",
 	"!<>"	     ,"notLessGreater",	     "!<>="	    ,"notLessGreaterEqual", these unordered compares are deprecated*/
 
 	"in"	 ,"in"	, "is"	, "is"	, "new"	, "new"	, "delete"	, "delete"
