@@ -1017,6 +1017,8 @@ bool chkClear	(ref bool b) { if(!b	) return false; else { b = false	; return tru
 
 bool chkSet	(T)(ref T a, in T b) { if(a==b) return false; else { a = b; return true; } }
 
+auto returnThenSet(T, U)(ref T a, in U b) { auto res = a; a = b; return res; }
+
 void divMod(T)(in T a, in T b, out T div, out T mod){
 	div = a/b;
 	mod = a%b;
@@ -5753,8 +5755,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))									                     { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))									                     { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))										                    { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))										                    { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
@@ -6892,8 +6894,8 @@ struct DateTime{
 
 		alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 		alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
-		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime									    , SYSTEMTIME);
-		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime									    , FILETIME  );
+		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime										   , SYSTEMTIME);
+		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime										   , FILETIME  );
 	}
 
 	private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
