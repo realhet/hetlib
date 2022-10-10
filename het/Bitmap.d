@@ -1429,7 +1429,7 @@ public:
 			}
 		}
 		
-		WARN("Unoptimized bitmap getForUpload");
+		//WARN("Unoptimized bitmap getForUpload");  //opt: optimize this warn.
 		return get!E;
 	}
 	
@@ -1594,8 +1594,8 @@ private ubyte[] serializeImage(Bitmap bmp, string format=""){ // runtime version
 
 //combined compress function
 ubyte[] serialize(A)(A a, string format=""){
-			 static if(is(A==Bitmap)	 ) return a.serializeImage(format);			     // Bitmap
-	else static if(isImage2D!A	 ) return a.serializeImage(format);			     // 2D Image
+			 static if(is(A==Bitmap)	 ) return a.serializeImage(format);				    // Bitmap
+	else static if(isImage2D!A	 ) return a.serializeImage(format);				    // 2D Image
 	else static assert(0, "invalid arg");
 }
 
@@ -2353,8 +2353,8 @@ version(D2D_FONT_RENDERER){ private:
 		bool mustRebuild = true;
 
 		const
-			white			  = D2D1_COLOR_F(1, 1, 1),
-			black			  = D2D1_COLOR_F(0, 0, 0),
+			white				 = D2D1_COLOR_F(1, 1, 1),
+			black				 = D2D1_COLOR_F(0, 0, 0),
 			heightScale = 0.75f;
 
 		void initialize(){

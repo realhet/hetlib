@@ -456,7 +456,7 @@ struct SyntaxStyleRow{
 //todo: from the program this is NOT extendable
 immutable syntaxPresetNames =	             ["Default"             , "Classic"                         , "C64"                   , "Dark"                     ];
 immutable SyntaxStyleRow[] syntaxTable =[	
-	{"Whitespace"	, [{clBlack	,clWhite	,0}, {clVgaYellow	,clVgaLowBlue	,0}, {clC64LBlue	,clC64Blue	,0}, {0xc7c5c5	,0x2d2d2d ,0}]},
+	{"Whitespace"	, [{clBlack	,clWhite	,0}, {clVgaYellow	,clVgaLowBlue	,0}, {clC64LBlue	,clC64Blue	,0}, {0xc7c5c5	,0x2f2f2f ,0}]},
 	{"Selected"	, [{clWhite	,10841427	,0}, {clVgaLowBlue	,clVgaLightGray	,0}, {clC64Blue	,clC64LBlue	,0}, {clBlack	,0xc7c5c5 ,0}]},
 	{"FoundAct"	, [{0xFCFDCD	,clBlack	,0}, {clVgaLightGray	,clVgaBlack	,0}, {clC64LGrey	,clC64Black	,0}, {clBlack	,0xffffff ,0}]},
 	{"FoundAlso"	, [{clBlack	,0x78AAFF	,0}, {clVgaLightGray	,clVgaBrown	,0}, {clC64LGrey	,clC64DGrey	,0}, {clBlack	,0xa7a5a5 ,0}]},
@@ -473,14 +473,14 @@ immutable SyntaxStyleRow[] syntaxTable =[
 	{"Identifier4"	, [{clPurple	,clWhite	,0}, {clVgaHighMagenta	,clVgaLowBlue	,0}, {clC64Purple	,clC64Blue	,0}, {0xf040e0	,0x2d2d2d ,0}]},
 	{"Identifier5"	, [{0x0040b0	,clWhite	,0}, {clVgaBrown	,clVgaLowBlue	,0}, {clC64Orange	,clC64Blue	,0}, {0x0060f0	,0x2d2d2d ,0}]},
 	{"Identifier6"	, [{0xb04000	,clWhite	,0}, {clVgaHighBlue	,clVgaLowBlue	,0}, {clC64LBlue	,clC64Blue	,0}, {0xf06000	,0x2d2d2d ,0}]},
-	{"Label"	, [{clBlack	,0xDDFFEE	,4}, {clBlack	,clVgaHighCyan	,0}, {clBlack	,clC64Cyan	,0}, {clBlack	,0x2d2d2d ,4}]},
+	{"Label"	, [{clBlack	,0xDDFFEE	,4}, {clBlack	,clVgaHighCyan	,0}, {clBlack	,clC64Cyan	,0}, {0xFFA43B	,0x2d2d2d ,2}]},
 	{"Attribute"	, [{clPurple	,clWhite	,1}, {clVgaHighMagenta	,clVgaLowBlue	,1}, {clC64Purple	,clC64Blue	,1}, {0xAAB42B	,0x2d2d2d ,1}]},
 	{"BasicType"	, [{clTeal	,clWhite	,1}, {clVgaHighCyan	,clVgaLowBlue	,1}, {clC64Cyan	,clC64Blue	,1}, {clWhite	,0x2d2d2d ,1}]},
 	{"Error"	, [{clRed	,clWhite	,4}, {clVgaHighRed	,clVgaLowBlue	,4}, {clC64Red	,clC64Blue	,0}, {0x00FFEF	,0x2d2dFF ,0}]},
 	{"Binary1"	, [{clWhite	,clBlue	,0}, {clVgaLowBlue	,clVgaYellow	,0}, {clC64Blue	,clC64Yellow	,0}, {0x2d2d2d	,0x20bCFA ,0}]},
 ];
 
-mixin(format!"enum SyntaxKind   {%s}"(syntaxTable.map!"a.kindName".join(',')));
+mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(',')));
 mixin(format!"enum SyntaxPreset {%s}"(syntaxPresetNames.join(',')));
 
 static foreach(m; EnumMembers!SyntaxKind) mixin("alias sk* = SyntaxKind.*;".replace('*', m.text));

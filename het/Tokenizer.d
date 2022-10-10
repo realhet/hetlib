@@ -33,9 +33,9 @@ const CompilerVersion = 100;
 
 enum TokenKind {unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat};
 
-@trusted string tokenize(string fileName, string sourceText, out Token[] tokens, WhiteSpaceStats* whiteSpaceStats=null) //returns error of any
+@trusted string tokenize(string fileName, string sourceText, out Token[] tokens, WhitespaceStats* whitespaceStats=null) //returns error of any
 {
-	auto t = scoped!Tokenizer;  return t.tokenize(fileName, sourceText, tokens, whiteSpaceStats);
+	auto t = scoped!Tokenizer;  return t.tokenize(fileName, sourceText, tokens, whitespaceStats);
 }
 
 deprecated("use SourceCode class") Token[] syntaxHighLight(string fileName, string src, ubyte* res, ushort* hierarchy, char* bigComments, int bigCommentsLen)
@@ -75,7 +75,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
 	ubyte[] syntax;
 	ushort[] hierarchy;
 	string[int] bigComments;
-	WhiteSpaceStats whiteSpaceStats;
+	WhitespaceStats whitespaceStats;
 
 	void	checkConsistency(){
 //		enforce(text.length == lines.map!"a.length".sum + (max(lines.length.to!int-1, 0)), "text <> lines");
@@ -89,7 +89,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
 		syntax.clear;
 		hierarchy.clear;
 		bigComments.clear;
-		whiteSpaceStats = WhiteSpaceStats.init;
+		whitespaceStats = WhitespaceStats.init;
 	}
 
 	void foreachLine(T)(T delegate(int idx, string line, ubyte[] syntax) callBack)
@@ -183,7 +183,7 @@ class SourceCode{ // SourceCode ///////////////////////////////
 
 		hierarchy.length = syntax.length = sourceText.length;
 
-		error = tokenize(file.fullName, sourceText, tokens, &whiteSpaceStats);
+		error = tokenize(file.fullName, sourceText, tokens, &whitespaceStats);
 
 		if(error == ""){
 			auto bigc = new char[0x10000];
@@ -637,7 +637,7 @@ auto getLeadingAttributesAndComments(Token[] tokens){
 	return orig[0..$-tokens.length];
 }
 
-struct WhiteSpaceStats{
+struct WhitespaceStats{
 	int tabCnt;
 	int spaceCnt0, spaceCnt1, spaceCnt2, spaceCnt4, spaceCnt8, spaceCntOther;
 
@@ -673,7 +673,7 @@ public:
 	int skipCh; //size oh ch (1..4)
 	Token[] res;   //should rename to tokens
 
-	WhiteSpaceStats whiteSpaceStats;
+	WhitespaceStats whitespaceStats;
 
 	void error(string s){ throw new Exception(format("%s(%d:%d): Tokenizer error: %s", fileName, line, posInLine, s)); }
 
@@ -804,7 +804,7 @@ public:
 	void skipSpacesAfterNewLine(){
 		int spaceCnt=0;
 		while(ch==' '){ fetch; spaceCnt++; };
-		whiteSpaceStats.addSpaceCnt(spaceCnt);
+		whitespaceStats.addSpaceCnt(spaceCnt);
 	}
 
 	bool skipWhiteSpaceAndComments() //returns true if eof
@@ -819,7 +819,7 @@ public:
 				}
 				case '\x09':{ //tab
 					fetch;
-					whiteSpaceStats.tabCnt++;
+					whitespaceStats.tabCnt++;
 					break;
 				}
 				case ' ', '\x0B', '\x0C': fetch; break; //whitespace
@@ -1222,8 +1222,8 @@ public:
 
 			Variant v;
 			if(!isLong && !isUnsigned){ //no postfixes
-				if(num<=			       0x7FFF_FFFF            ) v = cast(int)num; else
-				if(num<=			       0xFFFF_FFFF && base!=10) v = cast(uint)num; else //hex/bin can be unsigned too to use the smallest size as possible
+				if(num<=				      0x7FFF_FFFF            ) v = cast(int)num; else
+				if(num<=				      0xFFFF_FFFF && base!=10) v = cast(uint)num; else //hex/bin can be unsigned too to use the smallest size as possible
 				if(num<=0x7FFF_FFFF_FFFF_FFFF            ) v = cast(long)num;
 																							else v = num;
 			}else if(isLong && isUnsigned){ //UL
@@ -1264,7 +1264,7 @@ public:
 
 public:
 	//returns the error or ""
-	string tokenize(in string fileName, in string text, out Token[] tokens, WhiteSpaceStats* whiteSpaceStats = null){
+	string tokenize(in string fileName, in string text, out Token[] tokens, WhitespaceStats* whitespaceStats = null){
 		auto enc = encodingOf(text);
 		enforce(enc==TextEncoding.UTF8, "Tokenizer only works on UTF8 input. ("~enc.text~" detected)");
 
@@ -1332,7 +1332,7 @@ public:
 
 		tokens = res;
 
-		if(whiteSpaceStats) *whiteSpaceStats = this.whiteSpaceStats;
+		if(whitespaceStats) *whitespaceStats = this.whitespaceStats;
 
 		return errorStr;
 	}
