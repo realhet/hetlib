@@ -128,7 +128,8 @@ float toWidthHeight(string s, float baseHeight){
 }
 
 ///It is needed for syntax highlighter when it changes font.bold
-private float adjustBoldWidth(Glyph g, int prevFontFlags){   //todo: also check monospaceness
+///Also used by CodeColumnBuilder
+float adjustBoldWidth(Glyph g, int prevFontFlags){   //todo: also check monospaceness
 	enum boldMask = 1;
 	if((prevFontFlags&boldMask) == (g.fontFlags&boldMask)) return 0;
 	auto delta = g.innerHeight * (BoldOffset*2);
@@ -538,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent			            = RGB(  0, 120, 215),
-			clMenuBk			            = RGB(235, 235, 236),
+			clAccent				           = RGB(  0, 120, 215),
+			clMenuBk				           = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -604,8 +605,8 @@ void initTextStyles(){
 	a(			 "chapter2", tsChapter2, tsTitle , { tsChapter2.fontHeight = rfh(32); });
 	a(			 "chapter3", tsChapter3, tsTitle , { tsChapter3.fontHeight = rfh(27); });
 
-	a(	 "btn"			    , tsBtn			  , tsNormal, { tsBtn.bkColor =  clWinBtn; });
-	a(	 "key"			    , tsKey			  , tsSmaller, { tsKey.bkColor =  RGB(236, 235, 230); tsKey.bold = true; });
+	a(	 "btn"				   , tsBtn				 , tsNormal, { tsBtn.bkColor =  clWinBtn; });
+	a(	 "key"				   , tsKey				 , tsSmaller, { tsKey.bkColor =  RGB(236, 235, 230); tsKey.bold = true; });
 
 	textStyles["" ] = &tsNormal;
 	textStyles["n" ] = &tsNormal;
@@ -1528,8 +1529,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
 		with(eCmd) final switch(cmd){
 			case Cmd.nop: break;
-			case Cmd.cInsert			   : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
-			case Cmd.cDelete			   : deleteAtCaret(false); break;
+			case Cmd.cInsert				  : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
+			case Cmd.cDelete				  : deleteAtCaret(false); break;
 			case Cmd.cDeleteBack	     : deleteAtCaret(true ); break;
 			case Cmd.cLeft	     : caretMoveRel(-intParam(1)); break;
 			case Cmd.cRight	     : caretMoveRel( intParam(1)); break;

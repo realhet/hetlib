@@ -172,6 +172,7 @@ struct ScanResult{
 	@property bool isError() const{ with(ScanOp) return !!op.among(error_underflow, error_stopped1, error_stopped2); }
 }
 
+enum isScannerRange(R) = isInputRange!R && is(ElementType!R==ScanResult);
 
 mixin template StructureScanner(){
 	
@@ -365,6 +366,8 @@ struct StructureScanner_DLang{ static:
 	enum State : ubyte { // State graph
 		/+special system tokens+/ ignore, pop, error, eof, @Trans("", eof) unstructured, 
 		
+		//todo: Find out how to automatize these copypastes. No mixins are allowed in macros. But one UDA can emit more behaviours, not just one.
+		
 		@Pop("}")	@Error("] )")
 		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
 		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
@@ -424,7 +427,7 @@ struct StructureScanner_DLang{ static:
 		/+todo: handled specially +/	 	 @EOF	 qStringMain	,
 	}
 	
-	enum initialState = State.structuredBlock; //todo: @Initial UDA would be better.
+	enum initialState = State.structuredBlock;
 }
 
 
