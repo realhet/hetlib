@@ -491,10 +491,16 @@ __gshared defaultSyntaxPreset = SyntaxPreset.Dark;
 auto syntaxFontColor(string syntax){ return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].fontColor; }
 auto syntaxBkColor  (string syntax){ return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].bkColor  ; }
 
-//todo: slow, needs a color theme struct
+auto syntaxFontColor(SyntaxKind syntax){ return syntaxTable[syntax].formats[defaultSyntaxPreset].fontColor; }
+auto syntaxBkColor  (SyntaxKind syntax){ return syntaxTable[syntax].formats[defaultSyntaxPreset].bkColor  ; }
+
+//opt: slow, needs a color theme struct, and needs an enum for the syntaxkind.
+//todo: this is a good example for table view in DIDE2
+
 deprecated auto clEmptyLine(){ return mix(syntaxBkColor("Whitespace"), syntaxBkColor("Whitespace").l>0x80 ? clWhite : clBlack, 0.0625f); }
 
 auto clCodeBackground	(){ return syntaxBkColor("Whitespace"); }
+auto clCodeFont	(){ return syntaxFontColor("Identifier1"); }
 auto clCodeBorder	(){ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); }
 auto clGroupBackground(){ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .1f); }
 auto clGroupBorder    (){ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); }

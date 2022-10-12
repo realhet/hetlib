@@ -310,7 +310,7 @@ version(none) struct StructureScanner_DLang{ static:
 	enum NewLineTokens	= "\r\n \r \n \u2028 \u2029";
 	enum EOFTokens	= "\0 \x1A";
 	enum EOF	= Trans(EOFTokens	, State.unstructured);
-	enum StructuredEOF	= Trans(EOFTokens ~ " __EOF__"	, State.unstructured);
+	enum StructuredEOF	= Trans(EOFTokens /*~ " __EOF__"*/	, State.unstructured);  //todo: __EOF__ is only valid when it is a complete keyword.
 	
 	string extendCWD(string s){ return s.split(" ").map!(a => [a~"c", a~"w", a~"d", a]).join.join(" "); }
 	auto PopCWD	(string s	){ return Pop(extendCWD(s)); }
@@ -358,7 +358,7 @@ struct StructureScanner_DLang{ static:
 	enum NewLineTokens	= "\r\n \r \n \u2028 \u2029";
 	enum EOFTokens	= "\0 \x1A";
 	enum EOF	= Trans(EOFTokens	, State.unstructured);
-	enum StructuredEOF	= Trans(EOFTokens ~ " __EOF__"	, State.unstructured);
+	enum StructuredEOF	= Trans(EOFTokens /+~ " __EOF__"+/	, State.unstructured); //todo: __EOF__ is only valid when it is a complete keyword.
 	
 	string extendCWD(string s){ return s.split(" ").map!(a => [a~"c", a~"w", a~"d", a]).join.join(" "); }
 	auto PopCWD	(string s	){ return Pop(extendCWD(s)); }
