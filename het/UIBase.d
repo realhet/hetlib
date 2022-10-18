@@ -539,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent				           = RGB(  0, 120, 215),
-			clMenuBk				           = RGB(235, 235, 236),
+			clAccent						         = RGB(  0, 120, 215),
+			clMenuBk						         = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -605,8 +605,8 @@ void initTextStyles(){
 	a(			 "chapter2", tsChapter2, tsTitle , { tsChapter2.fontHeight = rfh(32); });
 	a(			 "chapter3", tsChapter3, tsTitle , { tsChapter3.fontHeight = rfh(27); });
 
-	a(	 "btn"				   , tsBtn				 , tsNormal, { tsBtn.bkColor =  clWinBtn; });
-	a(	 "key"				   , tsKey				 , tsSmaller, { tsKey.bkColor =  RGB(236, 235, 230); tsKey.bold = true; });
+	a(	 "btn"						 , tsBtn				 , tsNormal, { tsBtn.bkColor =  clWinBtn; });
+	a(	 "key"						 , tsKey				 , tsSmaller, { tsKey.bkColor =  RGB(236, 235, 230); tsKey.bold = true; });
 
 	textStyles["" ] = &tsNormal;
 	textStyles["n" ] = &tsNormal;
@@ -747,6 +747,23 @@ struct Padding{  //Padding, Margin /////////////////////////////////////////////
 		p.setParam(prefix~".top"	, (string s){ top	= toF(s); });
 		p.setParam(prefix~".bottom", (string s){ bottom	= toF(s); });
 	}
+	
+	void set(float a){
+		top = right = bottom = left = a;
+	}
+	
+	void set(float a, float b){
+		top 	= bottom 	= a;
+		left	= right	= b;
+	}
+
+	void set(float a, float b, float c, float d){
+		top	= a; 
+		right	= b;
+		bottom 	= c;
+		left	= d;
+	}
+
 }
 
 alias Margin = Padding;
@@ -1529,8 +1546,8 @@ struct TextEditorState{ // TextEditorState /////////////////////////////////////
 
 		with(eCmd) final switch(cmd){
 			case Cmd.nop: break;
-			case Cmd.cInsert				  : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
-			case Cmd.cDelete				  : deleteAtCaret(false); break;
+			case Cmd.cInsert					 : caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
+			case Cmd.cDelete					 : deleteAtCaret(false); break;
 			case Cmd.cDeleteBack	     : deleteAtCaret(true ); break;
 			case Cmd.cLeft	     : caretMoveRel(-intParam(1)); break;
 			case Cmd.cRight	     : caretMoveRel( intParam(1)); break;

@@ -2243,6 +2243,9 @@ alias BigStream = /*shared*/ BigStream_;
 ///  Strings                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////
 
+bool isDLangWhitespace	(C)(in C ch){ return !!ch.among(' ', '\t', '\x0b', '\x0c'); }
+bool isDLangNewLine	(S)(in S str){ return !!str.among("\r\n", "\n", "\r", "\u2028", "\u2029"); }
+
 bool isUpper(A)(in A a){ return a==a.toUpper; }
 bool isLower(A)(in A a){ return a==a.toLower; }
 
@@ -5755,8 +5758,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))										                    { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))										                    { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))											                   { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))											                   { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
@@ -6894,8 +6897,8 @@ struct DateTime{
 
 		alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 		alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
-		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime										   , SYSTEMTIME);
-		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime										   , FILETIME  );
+		alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime											  , SYSTEMTIME);
+		alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime											  , FILETIME  );
 	}
 
 	private{ ///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME

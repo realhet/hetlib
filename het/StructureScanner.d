@@ -164,6 +164,7 @@ enum ScanOp{
 	error_underflow, 	//stack was empty when a pop or trans occured
 	error_stopped1,
 	error_stopped2,
+	error_unclosed,
 }
 
 struct ScanResult{
@@ -292,6 +293,18 @@ mixin template StructureScanner(){
 			}
 		}//end while
 		
+		//Handle valid EOF after a // slashComment for example.
+		if(src.empty && stack.length>=2) sw: switch(stack.back){
+			static foreach(s; EnumMembers!State) 
+				static if(collectStateTransitions!s.any!(t => t.token=="\0" && t.isPop)){
+					case s: stack.popBack; yield(ScanResult(ScanOp.pop, "\0")); break sw;
+				}
+			default:
+		}
+		
+		if(stack.length>1/+!stack.equal([initialState])+/) //todo: this is not a complete error check
+			yield(ScanResult(ScanOp.error_unclosed, "Unclosed structure: "~stack.text));
+		
 	}//end func
 	
 	auto scanner(string src){
@@ -303,133 +316,76 @@ mixin template StructureScanner(){
 // DLangScanner ///////////////////////////////////////////////
 
 alias DLangScanner = StructureScanner_DLang.scanner;
-
-version(none) struct StructureScanner_DLang{ static:
-	mixin StructureScanner;
+struct StructureScanner_DLang{ static: 
 
 	enum NewLineTokens	= "\r\n \r \n \u2028 \u2029";
 	enum EOFTokens	= "\0 \x1A";
-	enum EOF	= Trans(EOFTokens	, State.unstructured);
-	enum StructuredEOF	= Trans(EOFTokens /*~ " __EOF__"*/	, State.unstructured);  //todo: __EOF__ is only valid when it is a complete keyword.
 	
 	string extendCWD(string s){ return s.split(" ").map!(a => [a~"c", a~"w", a~"d", a]).join.join(" "); }
 	auto PopCWD	(string s	){ return Pop(extendCWD(s)); }
 	
-	enum State : ubyte { // State graph
-		/+special system tokens+/ ignore, pop, eof, @Trans("", eof) unstructured, 
-		
-		@Push("{ ( [ q{"	, structured	) @Pop("] ) }")
+	enum structuredAttrs = q{
+		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
 		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
 		@Push("'"	, cChar	) @Push(`"`	, cString	) @Push("`"	, dString	) @Push(`r"`	, rString	)
 		@Push(`q"/`	, qStringSlash	) @Push(`q"{`	, qStringCurly	) @Push(`q"(`	, qStringRound	) 
 		@Push(`q"[`	, qStringSquare	) @Push(`q"<`	, qStringAngle	) @Push(`q"`	, qStringBegin	)
 		@StructuredEOF
-		structured,
-		
-		@Pop(NewLineTokens)	 @Pop(EOFTokens)	 	slashComment	,
-			 @Pop("*/")	 @EOF	cComment	,
-		@Push("/+", dComment)	 @Pop("+/")	 @EOF	dComment 	,
-						
-		@Ignore(`\\ \'`)	 @PopCWD(`'`)	 @EOF	 cChar	,
-		@Ignore(`\\ \"`)	 @PopCWD(`"`)	 @EOF	 cString	,
-			 @PopCWD(`"`)	 @EOF	 rString	,
-			 @PopCWD("`")	 @EOF	 dString	,
-			 @PopCWD(`/"`)	 @EOF	 qStringSlash	,
-		@Push("{", qStringCurlyInner)	 @PopCWD(`}"`)	 @EOF	 qStringCurly	,
-		@Push("(", qStringRoundInner)	 @PopCWD(`)"`)	 @EOF	 qStringRound	,
-		@Push("[", qStringSquareInner)	 @PopCWD(`]"`)	 @EOF	 qStringSquare	,
-		@Push("<", qStringAngleInner)	 @PopCWD(`>"`)	 @EOF	 qStringAngle	,
-						
-		@Push("{", qStringCurlyInner)	 @Pop(`}`)	 @EOF	 qStringCurlyInner	,
-		@Push("(", qStringRoundInner)	 @Pop(`)`)	 @EOF	 qStringRoundInner	,
-		@Push("[", qStringSquareInner)	 @Pop(`]`)	 @EOF	 qStringSquareInner	,
-		@Push("<", qStringAngleInner)	 @Pop(`>`)	 @EOF	 qStringAngleInner	,
-						
-		@Trans(NewLineTokens, qStringMain)	 	 @EOF	 qStringBegin	,
-		/+todo: handled specially +/	 	 @EOF	 qStringMain	,
-	}
+	};
 	
-	enum initialState = State.structured;
-} 
-
-struct StructureScanner_DLang{ static:
-	mixin StructureScanner;
-
-	enum NewLineTokens	= "\r\n \r \n \u2028 \u2029";
-	enum EOFTokens	= "\0 \x1A";
-	enum EOF	= Trans(EOFTokens	, State.unstructured);
-	enum StructuredEOF	= Trans(EOFTokens /+~ " __EOF__"+/	, State.unstructured); //todo: __EOF__ is only valid when it is a complete keyword.
-	
-	string extendCWD(string s){ return s.split(" ").map!(a => [a~"c", a~"w", a~"d", a]).join.join(" "); }
-	auto PopCWD	(string s	){ return Pop(extendCWD(s)); }
-	
-	enum State : ubyte { // State graph
+	mixin(q{ enum State : ubyte { // State graph
 		/+special system tokens+/ ignore, pop, error, eof, @Trans("", eof) unstructured, 
 		
-		//todo: Find out how to automatize these copypastes. No mixins are allowed in macros. But one UDA can emit more behaviours, not just one.
-		
-		@Pop("}")	@Error("] )")
-		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
-		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
-		@Push("'"	, cChar	) @Push(`"`	, cString	) @Push("`"	, dString	) @Push(`r"`	, rString	)
-		@Push(`q"/`	, qStringSlash	) @Push(`q"{`	, qStringCurly	) @Push(`q"(`	, qStringRound	) 
-		@Push(`q"[`	, qStringSquare	) @Push(`q"<`	, qStringAngle	) @Push(`q"`	, qStringBegin	)
-		@StructuredEOF
-		structuredBlock,
-
-		@Pop(")")	@Error("] }")
-		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
-		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
-		@Push("'"	, cChar	) @Push(`"`	, cString	) @Push("`"	, dString	) @Push(`r"`	, rString	)
-		@Push(`q"/`	, qStringSlash	) @Push(`q"{`	, qStringCurly	) @Push(`q"(`	, qStringRound	) 
-		@Push(`q"[`	, qStringSquare	) @Push(`q"<`	, qStringAngle	) @Push(`q"`	, qStringBegin	)
-		@StructuredEOF
-		structuredList,
-
-		@Pop("]")	@Error(") }")
-		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
-		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
-		@Push("'"	, cChar	) @Push(`"`	, cString	) @Push("`"	, dString	) @Push(`r"`	, rString	)
-		@Push(`q"/`	, qStringSlash	) @Push(`q"{`	, qStringCurly	) @Push(`q"(`	, qStringRound	) 
-		@Push(`q"[`	, qStringSquare	) @Push(`q"<`	, qStringAngle	) @Push(`q"`	, qStringBegin	)
-		@StructuredEOF
-		structuredIndex,
-
-		@Pop("}")	@Error("] )")
-		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
-		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
-		@Push("'"	, cChar	) @Push(`"`	, cString	) @Push("`"	, dString	) @Push(`r"`	, rString	)
-		@Push(`q"/`	, qStringSlash	) @Push(`q"{`	, qStringCurly	) @Push(`q"(`	, qStringRound	) 
-		@Push(`q"[`	, qStringSquare	) @Push(`q"<`	, qStringAngle	) @Push(`q"`	, qStringBegin	)
-		@StructuredEOF
-		structuredString,
-
-		@Pop(NewLineTokens)	 @Pop(EOFTokens)	 	slashComment	,
-			 @Pop("*/")	 @EOF	cComment	,
-		@Push("/+", dComment)	 @Pop("+/")	 @EOF	dComment 	,
+		@Pop("}") @Error("] )")	$$$		structuredBlock	,
+		@Pop(")") @Error("] }")	$$$		structuredList	,
+		@Pop("]") @Error(") }")	$$$		structuredIndex	,
+		@Pop("}") @Error("] )")	$$$		structuredString	,
 						
-		@Ignore(`\\ \'`)	 @PopCWD(`'`)	 @EOF	 cChar	,
-		@Ignore(`\\ \"`)	 @PopCWD(`"`)	 @EOF	 cString	,
-			 @PopCWD(`"`)	 @EOF	 rString	,
-			 @PopCWD("`")	 @EOF	 dString	,
-			 @PopCWD(`/"`)	 @EOF	 qStringSlash	,
-		@Push("{", qStringCurlyInner)	 @PopCWD(`}"`)	 @EOF	 qStringCurly	,
-		@Push("(", qStringRoundInner)	 @PopCWD(`)"`)	 @EOF	 qStringRound	,
-		@Push("[", qStringSquareInner)	 @PopCWD(`]"`)	 @EOF	 qStringSquare	,
-		@Push("<", qStringAngleInner)	 @PopCWD(`>"`)	 @EOF	 qStringAngle	,
+		@Pop(NewLineTokens)	@Pop(EOFTokens) 		slashComment	,
+			@Pop("*/")	@EOF 	cComment	,
+		@Push("/+", dComment)	@Pop("+/")	@EOF	dComment 	,
 						
-		@Push("{", qStringCurlyInner)	 @Pop(`}`)	 @EOF	 qStringCurlyInner	,
-		@Push("(", qStringRoundInner)	 @Pop(`)`)	 @EOF	 qStringRoundInner	,
-		@Push("[", qStringSquareInner)	 @Pop(`]`)	 @EOF	 qStringSquareInner	,
-		@Push("<", qStringAngleInner)	 @Pop(`>`)	 @EOF	 qStringAngleInner	,
+		@Ignore(`\\ \'`)	@PopCWD(`'`)	@EOF	cChar	,
+		@Ignore(`\\ \"`)	@PopCWD(`"`)	@EOF	cString	,
+			@PopCWD(`"`)	@EOF	rString	,
+			@PopCWD("`")	@EOF	dString	,
+			@PopCWD(`/"`)	@EOF	qStringSlash	,
+		@Push("{", qStringCurlyInner)	@PopCWD(`}"`)	@EOF	qStringCurly	,
+		@Push("(", qStringRoundInner)	@PopCWD(`)"`)	@EOF	qStringRound	,
+		@Push("[", qStringSquareInner)	@PopCWD(`]"`)	@EOF	qStringSquare	,
+		@Push("<", qStringAngleInner)	@PopCWD(`>"`)	@EOF	qStringAngle	,
 						
-		@Trans(NewLineTokens, qStringMain)	 	 @EOF	 qStringBegin	,
-		/+todo: handled specially +/	 	 @EOF	 qStringMain	,
-	}
+		@Push("{", qStringCurlyInner)	@Pop(`}`)	@EOF	qStringCurlyInner	,
+		@Push("(", qStringRoundInner)	@Pop(`)`)	@EOF	qStringRoundInner	,
+		@Push("[", qStringSquareInner)	@Pop(`]`)	@EOF	qStringSquareInner	,
+		@Push("<", qStringAngleInner)	@Pop(`>`)	@EOF	qStringAngleInner	,
+						
+		@Trans(NewLineTokens, qStringMain) 		@EOF	qStringBegin	,
+		/+todo: quoted identifier str+/		@EOF	qStringMain	,
+	}}.replace("$$$", structuredAttrs));
 	
 	enum initialState = State.structuredBlock;
+	
+	mixin StructureScanner;
+	enum EOF	= Trans(EOFTokens	, State.unstructured);
+	enum StructuredEOF	= Trans(EOFTokens /+~ " __EOF__"+/	, State.unstructured); //todo: __EOF__ is only valid when it is a complete keyword.
 }
 
+alias DDocScanner = StructureScanner_DDoc.scanner;
+struct StructureScanner_DDoc{ static: mixin StructureScanner;
+
+	enum NewLineTokens = "\r\n \r \n \u2028 \u2029";
+	
+	enum State : ubyte { // State graph
+		/+special system tokens+/ ignore, pop, error,
+		
+		@Push("$(", element) 	@Push("`", inline) @Trans(NewLineTokens~" \0", line) 	line	,
+		@Push("$(", element) @Pop(")") 	@Push("`", inline)	element	,
+			@Pop("`") @Pop(NewLineTokens~" \0")	inline	,
+	}
+	
+	enum initialState = State.line;
+}
 
 // testing ///////////////////////////////////
 
