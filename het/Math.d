@@ -2550,7 +2550,6 @@ struct Image(E, int N)  // Image struct //////////////////////////////////
 	private void clampx(ref int[2] x){ x[0].clampx; x[1].clampx; }
 	private void clampy(ref int[2] y){ y[0].clampy; y[1].clampy; }*/
 
-
 	private void assignHorizontal(string op, A)(A a, int[2] r1, int j) { // todo: optimizalasi kiserlet: tesztelni az optimizalt eredmenyt, ha ezt kivaltom az assignRectangular-al.
 		static if(isImage2D!A){
 			return assignHorizontal!op(a.rows.join, r1, j);

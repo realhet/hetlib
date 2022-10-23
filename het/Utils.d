@@ -3771,6 +3771,11 @@ static T Singleton(T)() if(is(T == class)){ // Singleton ///////////////////////
 	return instance;
 }
 
+// Base64 //////////////////////////////////
+
+import std.base64;
+alias toBase64 = Base64.encode;
+alias fromBase64 = Base64.decode;
 
 ///note: This has been moved here to avoid circular module initialization in uiBase
 ref auto imstVisibleBounds(in SrcId id){ return ImStorage!bounds2.access(id.combine("visibleBounds")); };
@@ -6034,8 +6039,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))													                 { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))													                 { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))														                { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))														                { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
