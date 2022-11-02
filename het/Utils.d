@@ -4394,6 +4394,63 @@ struct ChangingValue(T){ // ChangingValue /////////////////////////////////
 }
 
 
+// Time series compression /////////////////////////////////////////
+
+// https://www.timescale.com/blog/time-series-compression-algorithms-explained/
+
+struct DeltaCompressor(T){
+	T threshold = T(0);
+	enum initial = T.init;
+	T last = initial;
+	
+	void reset(){ this = typeof(this).init; }
+	
+	T compress(T act){ 
+		T res;
+		if(threshold==0){
+			res = act-last;
+			last = act;
+		}else{
+			if(abs(act-last)>threshold){
+				res = act>last ? act-last-threshold : act-last+threshold;
+				last = act;
+			}else{
+				res = 0;
+			}
+		}
+		return res;
+	}
+
+	T uncompress(T input){ 
+		if(threshold==0){
+			last += input;
+		}else{
+			if(input>0){
+				last += input + threshold;
+			}else if(input<0){
+				last += input - threshold;
+			}
+		}
+		return last;
+	}
+}
+
+struct CompressorChain(C1, C2){
+	C1 c1;  //first compression
+	C2 c2;  //second compression
+	
+	void reset(){ this = typeof(this).init; }
+	
+	alias CT = ReturnType!(C2.compress);
+	alias UT = ReturnType!(C1.uncompress);
+	
+	auto compress	(UT act){ return c2.compress(c1.compress(act)); }
+	auto uncompress	(CT act){ return c1.uncompress(c2.uncompress(act)); }
+}
+
+alias DeltaDeltaCompressor(T) = CompressorChain!(DeltaCompressor!T, DeltaCompressor!T);
+
+
 ////////////////////////////////////////////////////////////////////////////////
 ///  Hashing                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -6039,8 +6096,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))														                { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))														                { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))															               { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))															               { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.

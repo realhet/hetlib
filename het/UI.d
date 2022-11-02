@@ -322,8 +322,8 @@ struct im{ static:
 		}else if(isClientPosition(pp)){
 			//todo: put checking for running out of area and scrolling here.
 			switch(pp){
-				case topClient   : cntr.outerPos = area.topLeft    ; area.top     += cntr.outerHeight; break;
-				case bottomClient: area.bottom	-= cntr.outerHeight; cntr.outerPos = area.bottomLeft	; break;
+				case topClient   : cntr.outerPos = area.topLeft    ; area.top	+= cntr.outerHeight; break;
+				case bottomClient: area.bottom	-= cntr.outerHeight; cntr.outerPos	= area.bottomLeft	; break;
 				case leftClient	: cntr.outerPos	= area.topLeft	; area.left    += cntr.outerWidth	; break;
 				case rightClient	: area.right	-= cntr.outerWidth	; cntr.outerPos = area.topRight	; break;
 				case client	: cntr.outerPos = area.topLeft	; cntr.outerSize = area.size; area = bounds2.init; break;
@@ -688,7 +688,7 @@ struct im{ static:
 	//container delegates
 	//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
 
-	auto ContainerProp(string name) {
+	auto ContainerProp(string name) { //todo: assignment operation sucks with this: width = height = fh
 		return q{
 			@property auto #() { return actContainer.#; }
 			@property void #(typeof(actContainer.#) val){ actContainer.# = val; }
@@ -1324,7 +1324,8 @@ struct im{ static:
 	}
 
 	auto Edit(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args){ // Edit /////////////////////////////////
-		static if(is(T0==Path)) return EditPath!(srcModule, srcLine)(value, args);
+		static if(is(T0==Path)) return EditPath!(srcModule, srcLine)(value, args); //todo: not good! There will be 2 returns!!!
+		static if(is(T0==File)) return EditFile!(srcModule, srcLine)(value, args); //todo: not good! There will be 2 returns!!!
 
 		enum IsNum = std.traits.isNumeric!T0;
 
@@ -1528,6 +1529,63 @@ struct im{ static:
 				}
 			}else{
 				if(res.valid && Btn(symbol("Refresh"))){ res.mustRefresh = true; }
+			}
+		});
+
+		return res;
+	}
+
+	auto EditFile(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref File actFile, in Args args){ // EditFile ///////////////////////////////////////
+		//todo: CopyPasta
+		static struct Res{ 
+			bool mustRefresh; alias mustRefresh this;
+			bool valid, editing, changed;
+		}
+		Res res;
+
+		Row!(srcModule, srcLine)(args, {
+			auto editedFile = &ImStorage!File.access(actContainer.id);
+
+			auto normalize = (in File p) => p.normalized;
+			auto validate = (in File p) => p.exists;
+
+			Edit(editedFile.fullName, {
+				flex = 1;
+				if(flags.focused){
+					res.editing = true;
+
+					auto normalizedValue = normalize(*editedFile);
+					res.valid = validate(normalizedValue);
+					res.changed = actFile != *editedFile;
+
+					void colorize(RGB cl){
+						style.bkColor = bkColor = mix(bkColor, cl, 0.25f);
+						border.color = cl;
+					}
+
+					if(!res.valid) colorize(clRed); else if(res.changed) colorize(clGreen);
+
+					if(inputs.Esc.pressed){ *editedFile = actFile; }
+					if(inputs.Enter.pressed && res.valid){
+						actFile = normalizedValue;
+						focusedState.reset;
+						res.mustRefresh = true;
+					}
+				}else{
+					*editedFile = actFile;
+					res.valid =  validate(actFile);
+					if(!res.valid) style.fontColor = clRed;
+				}
+			});
+
+			if(res.editing){
+				if(res.changed){
+					if(Btn(symbol("Accept"), enable(res.valid))){ actFile = *editedFile; res.editing = false; res.valid = validate(actFile); res.mustRefresh = true; focusedState.reset; }
+					if(Btn(symbol("Cancel"))){ *editedFile = actFile; res.editing = false; res.valid = validate(actFile); focusedState.reset; }
+				}
+			}else{
+				//todo: optional refresh button. Disabled for file
+				//if(res.valid && Btn(symbol("Refresh"))){ res.mustRefresh = true; }
 			}
 		});
 
@@ -2364,10 +2422,10 @@ struct im{ static:
 
 			if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated) delta(-1);
 			if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated  ) delta( 1);
-			if(inputs.PgDn.repeated)		                        delta(-pageSize);
-			if(inputs.PgUp.repeated)		                        delta( pageSize);
-			if(inputs.Home.down)		                        set(0);
-			if(inputs.End .down)		                        set(1);
+			if(inputs.PgDn.repeated)			                       delta(-pageSize);
+			if(inputs.PgUp.repeated)			                       delta( pageSize);
+			if(inputs.Home.down)			                       set(0);
+			if(inputs.End .down)			                       set(1);
 
 			return userModified;
 		}
@@ -2589,7 +2647,7 @@ struct im{ static:
 				if(mod_update) sliderState.afterDraw(id, actOrientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b));
 
 				auto c = b.center, r = b.width*0.4f;
-
+				
 				if(rulerSides) drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless);
 				r *= 0.8f;
 
@@ -3302,11 +3360,11 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 		clVirtualFile	= RGB(100, 150, 255),
 		clResidentVirtualFile	= mix(clGray, clVirtualFile, .25),
 
-		clUPS		       = RGB(180, 40, 255),
-		clFPS		       = RGB(255, 40, 180),
+		clUPS			      = RGB(180, 40, 255),
+		clFPS			      = RGB(255, 40, 180),
 
-		clTPS		       = RGB(40,  80, 255),
-		clVPS		       = RGB(40, 255,  80),
+		clTPS			      = RGB(40,  80, 255),
+		clVPS			      = RGB(40, 255,  80),
 
 		clGcUsed	     = RGB(120, 180, 40),
 		clGcAll	     = RGB(40, 220, 120),
@@ -3444,11 +3502,11 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 		border = "1 normal silver";
 		theme = "tool";
 		Text(bold("Resource Monitor"));	   Spacer;
-		VirtualFileGraph;		   Spacer;
-		BitmapCacheGraph;		   Spacer;
+		VirtualFileGraph;			  Spacer;
+		BitmapCacheGraph;			  Spacer;
 		TextureCacheGraph;	                 Spacer;
-		TPSGraph;		                Spacer;
-		FPSGraph;		                Spacer;
+		TPSGraph;			               Spacer;
+		FPSGraph;			               Spacer;
 		GCGraph;	                 Spacer;
 		GCRateGraph;	                 Spacer;
 		SelectTimeIdx(timeIdx);
