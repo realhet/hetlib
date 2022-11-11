@@ -539,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent						         = RGB(  0, 120, 215),
-			clMenuBk						         = RGB(235, 235, 236),
+			clAccent							        = RGB(  0, 120, 215),
+			clMenuBk							        = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -1915,7 +1915,10 @@ private struct WrappedLine{ // WrappedLine /////////////////////////////////////
 		auto bottom(){ return top+height; }
 		auto right(){ return cells.length ? cells.back.outerRight : 0; }
 		auto left(){ return cells.length ? cells[0].outerPos.x : 0; }
-		auto calcWidth(){ assert(left==0); return right; } //todo: assume left is 0
+		auto calcWidth(){ 
+			assert(left==0, "Trying to rearrange subCells of a Row that were already realigned."); 
+			return right; 
+		} //todo: assume left is 0
 	//}
 
 	int cellCount() const{ return cast(int)cells.length; }
@@ -3168,15 +3171,16 @@ class Row : Container { // Row ////////////////////////////////////
 
 	override void rearrange(){
 		//adjust length of leading and internal tabs
-		if(flags.rowElasticTabs) adjustTabSizes_multiLine;
-												else adjustTabSizes_singleLine;
+		if(flags.rowElasticTabs) 	adjustTabSizes_multiLine;
+		else 	adjustTabSizes_singleLine;
 
 		solveFlexAndMeasureAll();  //opt: a containerFlag to disable the slow flexSum calculation
 
 		const doWrap = flags.wordWrap && !flags.autoWidth;
+		
 		auto wrappedLines = makeWrappedLines(doWrap);
 		//LOG("wl", wrappedLines, autoWidth, wrappedLines.calcWidth);
-
+		
 		if(flags.rowElasticTabs) processElasticTabs(wrappedLines);
 
 		//hide spaces on the sides by wetting width to 0. This needs for size calculation.
