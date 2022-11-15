@@ -1848,12 +1848,14 @@ struct im{ static:
 		alias TT = typeof(titles[0]);
 		const len = titles.length;
 
-		if(includeAll){
+		/*if(includeAll){
 			static if(isSomeString!TT) titles ~= "All";
-			else static if(isFunction!TT) titles ~= (TT){ Text("All"); }; //inferred type
-			else static if(isDelegate!TT) titles ~= (TT){ Text("All"); }; //inferred type
+			else static if(isFunction!TT) titles ~= TT({ Text("All"); }, {} ); //inferred type
+			else static if(isDelegate!TT) titles ~= TT({ Text("All"); }, {} ); //inferred type
 			else static assert(0, "Unhandled type: "~TT.stringof);
-		}
+		}*/
+		//todo: includeAll is broken when title is a callable 
+		
 
 		TabsHeader!(srcModule, srcLine)(titles, idx);
 		TabsPage!(srcModule, srcLine)({
@@ -2422,10 +2424,10 @@ struct im{ static:
 
 			if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated) delta(-1);
 			if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated  ) delta( 1);
-			if(inputs.PgDn.repeated)			                       delta(-pageSize);
-			if(inputs.PgUp.repeated)			                       delta( pageSize);
-			if(inputs.Home.down)			                       set(0);
-			if(inputs.End .down)			                       set(1);
+			if(inputs.PgDn.repeated)				                      delta(-pageSize);
+			if(inputs.PgUp.repeated)				                      delta( pageSize);
+			if(inputs.Home.down)				                      set(0);
+			if(inputs.End .down)				                      set(1);
 
 			return userModified;
 		}
@@ -3360,11 +3362,11 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 		clVirtualFile	= RGB(100, 150, 255),
 		clResidentVirtualFile	= mix(clGray, clVirtualFile, .25),
 
-		clUPS			      = RGB(180, 40, 255),
-		clFPS			      = RGB(255, 40, 180),
+		clUPS				     = RGB(180, 40, 255),
+		clFPS				     = RGB(255, 40, 180),
 
-		clTPS			      = RGB(40,  80, 255),
-		clVPS			      = RGB(40, 255,  80),
+		clTPS				     = RGB(40,  80, 255),
+		clVPS				     = RGB(40, 255,  80),
 
 		clGcUsed	     = RGB(120, 180, 40),
 		clGcAll	     = RGB(40, 220, 120),
@@ -3502,11 +3504,11 @@ void UI(ref ResourceMonitor m, float graphWidth){ with(im) with(m){
 		border = "1 normal silver";
 		theme = "tool";
 		Text(bold("Resource Monitor"));	   Spacer;
-		VirtualFileGraph;			  Spacer;
-		BitmapCacheGraph;			  Spacer;
+		VirtualFileGraph;				 Spacer;
+		BitmapCacheGraph;				 Spacer;
 		TextureCacheGraph;	                 Spacer;
-		TPSGraph;			               Spacer;
-		FPSGraph;			               Spacer;
+		TPSGraph;				              Spacer;
+		FPSGraph;				              Spacer;
 		GCGraph;	                 Spacer;
 		GCRateGraph;	                 Spacer;
 		SelectTimeIdx(timeIdx);

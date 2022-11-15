@@ -2,6 +2,8 @@ module het.bitmap; //This is the new replacement of het.image.d
 
 pragma(lib, "gdi32.lib");
 
+//todo: icons have a black background since windows update installed near 22.11.15
+
 import het.utils;
 
 enum smallSpace = "\u2008";
@@ -1594,8 +1596,8 @@ private ubyte[] serializeImage(Bitmap bmp, string format=""){ // runtime version
 
 //combined compress function
 ubyte[] serialize(A)(A a, string format=""){
-			 static if(is(A==Bitmap)	 ) return a.serializeImage(format);				    // Bitmap
-	else static if(isImage2D!A	 ) return a.serializeImage(format);				    // 2D Image
+			 static if(is(A==Bitmap)	 ) return a.serializeImage(format);					   // Bitmap
+	else static if(isImage2D!A	 ) return a.serializeImage(format);					   // 2D Image
 	else static assert(0, "invalid arg");
 }
 

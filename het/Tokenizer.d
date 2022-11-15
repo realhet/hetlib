@@ -896,7 +896,7 @@ public:
 			}else if(kwIsOperator(id)){
 				switch(id){
 					default: { error("Unhandled keyword operator: "~source); break; }
-					case kwin: case kwis: case kwnew: case kwdelete:{
+					case kwin: case kwis: case kwnew: /*case kwdelete  deprecated:*/{
 						kind = TokenKind.operator;
 						id = opParse(source);
 						if(!id) error("Cannot lookup keyword operator.");
@@ -1222,8 +1222,8 @@ public:
 
 			Variant v;
 			if(!isLong && !isUnsigned){ //no postfixes
-				if(num<=				      0x7FFF_FFFF            ) v = cast(int)num; else
-				if(num<=				      0xFFFF_FFFF && base!=10) v = cast(uint)num; else //hex/bin can be unsigned too to use the smallest size as possible
+				if(num<=					     0x7FFF_FFFF            ) v = cast(int)num; else
+				if(num<=					     0xFFFF_FFFF && base!=10) v = cast(uint)num; else //hex/bin can be unsigned too to use the smallest size as possible
 				if(num<=0x7FFF_FFFF_FFFF_FFFF            ) v = cast(long)num;
 																							else v = num;
 			}else if(isLong && isUnsigned){ //UL

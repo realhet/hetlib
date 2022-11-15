@@ -83,7 +83,7 @@ private enum _keywordStrs = [ //last items of categories must be untouched!!!
 	"__FILE__","__FILE_FULL_PATH__","__MODULE__","__LINE__","__FUNCTION__","__PRETTY_FUNCTION__",
 
 //operators
-	"in","is","new","delete",
+	"in","is","new", /*"delete",*/
 ];
 
 //enum declaration
@@ -101,7 +101,7 @@ KeywordCat kwCatOf(int k)
 	if(k<=kwversion	  ) return Keyword	  ;
 	if(k<=kw__vector	  ) return SpecialFunct	  ;
 	if(k<=kw__PRETTY_FUNCTION__	  ) return SpecialKeyword	  ;
-	if(k<=kwdelete	  ) return Operator	  ;
+	if(k<=kwnew	  ) return Operator	  ;
 	return Unknown;
 }}
 

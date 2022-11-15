@@ -2561,6 +2561,12 @@ T toInt(T=int)(string s){ //todo: toLong
 	return s.to!T;
 }
 
+bool isDLangIdentifierStart	(T)(T ch)if(isSomeChar!T){ return ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch=='_' || isUniAlpha(ch); }
+bool isDLangNumberStart	(T)(T ch)if(isSomeChar!T){ return ch.inRange('0', '9'); }
+bool isDLangIdentifierCont	(T)(T ch)if(isSomeChar!T){ return isDLangIdentifierStart(ch) || isDLangNumberStart(ch); }
+bool isDLangNumberCont	(T)(T ch)if(isSomeChar!T){ return isDLangIdentifierCont(ch); }
+
+
 string replaceWords(alias fun = isWordChar)(string str, string from, string to){
 	auto src = (&str).refRange;
 
@@ -4436,8 +4442,8 @@ struct DeltaCompressor(T){
 }
 
 struct CompressorChain(C1, C2){
-	C1 c1;  //first compression
-	C2 c2;  //second compression
+	C1 c1;	 //first compression
+	C2 c2;	 //second compression
 	
 	void reset(){ this = typeof(this).init; }
 	
@@ -6096,8 +6102,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))															               { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))															               { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))																              { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))																              { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
