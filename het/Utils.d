@@ -3516,6 +3516,25 @@ void inspectSymbol(alias T)(string before="", int level=0) {
 	}
 }
 
+auto arraySwitch(alias sourceRange, alias targetRangeOrFunction, T = ElementType!(typeof(sourceRange)))(in T input){
+	static if(isInputRange!(typeof(targetRangeOrFunction))) 	alias targetRange = targetRangeOrFunction;
+	else	alias targetRange = sourceRange.map!targetRangeOrFunction;
+	
+	switch(input){
+		static foreach(a; zip(StoppingPolicy.requireSameLength, sourceRange, targetRange))
+			case a[0]: return a[1];
+		default: 
+			throw new Exception(__FUNCTION__~": Invalid input value: "~input);
+	}
+}
+
+auto functionSwitch(alias fun, E)(E e){
+	final switch(e)
+		static foreach(a; EnumMembers!E)
+			case a: return a.unaryFun!fun;
+}
+
+
 // StaticParam ////////////////////
 
 auto getStaticParamDef(T, Args...)(in T def, in Args args){
@@ -6102,8 +6121,8 @@ File actualFile(in File f){
 
 
 //helpers for saving and loading
-void saveTo(T)(const T[] data, const File file)if( is(T == char))																              { file. write(cast(string)data); }
-void saveTo(T)(const T[] data, const File file)if(!is(T == char))																              { file. write(data); }
+void saveTo(T)(const T[] data, const File file)if( is(T == char))																			           { file. write(cast(string)data); }
+void saveTo(T)(const T[] data, const File file)if(!is(T == char))																			           { file. write(data); }
 void saveTo(T)(const T data, const File file)if(!isDynamicArray!T)	                             { file .write([data]); }
 
 void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged){ //todo: combine all saveTo functions into one funct.
