@@ -539,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent							        = RGB(  0, 120, 215),
-			clMenuBk							        = RGB(235, 235, 236),
+			clAccent									      = RGB(  0, 120, 215),
+			clMenuBk									      = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -763,7 +763,15 @@ struct Padding{  //Padding, Margin /////////////////////////////////////////////
 		bottom 	= c;
 		left	= d;
 	}
-
+	
+	void apply(T)(ref T r, float scale = 1){
+		r.left 	+= scale*left;
+		r.top 	+= scale*top;
+		r.right 	-= scale*right; 
+		r.bottom 	-= scale*bottom; 
+	}
+	
+	void unapply(T)(ref T r){ apply(r, -1); }
 }
 
 alias Margin = Padding;
@@ -866,16 +874,17 @@ struct CellLocation{
 	bounds2 globalOuterBounds;	//absolute outerBounds
 
 	vec2 calcSnapOffsetFromPadding(float epsilon = 1){
-
+		
 		static float doit(float coord, float innerSize, float pad0, float pad1, float epsilon){
+			epsilon = max(innerSize*.5f, epsilon);
 			if(coord.inRange(-pad0, 0)) return -coord + epsilon;
 			coord -= innerSize;
 			if(coord.inRange(0, pad1)) return -coord - epsilon;
 			return 0;
 		}
 
-		with(cell) return vec2(doit(localPos.x, innerSize.x, padding.left, padding.right , epsilon),
-													 doit(localPos.y, innerSize.y, padding.top , padding.bottom, epsilon));
+		with(cell) return vec2(	doit(localPos.x, innerSize.x, padding.left, padding.right, epsilon),
+			doit(localPos.y, innerSize.y, padding.top, padding.bottom, epsilon));
 	}
 
 }
@@ -2708,8 +2717,8 @@ class Container : Cell { // Container ////////////////////////////////////
 
 		if(flags._saveComboBounds) _savedComboBounds = dr.inputTransform(outerBounds);
 
-		const scrollOffset = getScrollOffset,
-					hasScrollOffset = !isnull(scrollOffset);
+		const 	scrollOffset = getScrollOffset,
+			hasScrollOffset = !isnull(scrollOffset);
 
 		if(flags.saveVisibleBounds){
 			flags.saveVisibleBounds = true;
