@@ -539,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent									      = RGB(  0, 120, 215),
-			clMenuBk									      = RGB(235, 235, 236),
+			clAccent											    = RGB(  0, 120, 215),
+			clMenuBk											    = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -1089,48 +1089,97 @@ class Cell{ // Cell ////////////////////////////////////
 
 }
 
+
+// helper function to access a texture of a font character
+int fontTexture(Args...)(in dchar ch, in Args args)
+if(Args.length==0 || Args.length==1 && (is(Args[0] == TextStyle) || is(Args[0] == string)))
+{
+	int stIdx; //the result texture index
+	
+	static if(Args.length==0){
+		enum fontName = DefaultFontName;
+		enum isDefault = true;
+	}else static if(is(Args[0] == TextStyle)){
+		auto 	fontName 	= args[0].font,
+			isDefault	= args[0].isDefaultFont;
+	}else{
+		auto 	fontName 	= args[0],
+			isDefault	= args[0] == DefaultFontName;
+	}
+	
+	// ch -> subTexIdx lookup. Cached with a map.   10 FPS -> 13..14 FPS
+	void lookupSubTexIdx(){
+		string glyphSpec = `font:\`~fontName~`\72\x3\?`~[ch].toUTF8;
+		stIdx = textures[File(glyphSpec)];
+	}
+	
+	if(isDefault){ // cached version for the default font
+		if(auto p = ch in DefaultFont_subTexIdxMap){
+			stIdx = *p;
+		}else{
+			lookupSubTexIdx;
+			DefaultFont_subTexIdxMap[ch] = stIdx;
+		}
+	}else{ //uncached for non-default fonts
+		lookupSubTexIdx;
+	}
+	
+	return stIdx;
+}
+
+
+void drawText(R)(Drawing dr, vec2 pos, R str, in TextStyle ts)
+if(isInputRange(R) && isSomeChar!(ElementType!R))
+{
+	foreach(dchar ch; str){
+		auto stIdx = ch.fontTexture(ts);
+		auto size = calcGlyphSize_clearType(ts, stIdx);
+		dr.color = ts.fontColor;
+		dr.drawFontGlyph(stIdx, bounds2(pos, pos+size), ts.bkColor, ts.fontFlags);
+		pos.x += size.x;
+	}
+}
+
+vec2 textExtent(R)(R str, in TextStyle ts)
+if(isInputRange(R) && isSomeChar!(ElementType!R))
+{
+	vec2 res;
+	foreach(dchar ch; str){
+		auto stIdx = ch.fontTexture(ts);
+		auto size = calcGlyphSize_clearType(ts, stIdx);
+		res.x += size.x;
+		res.y.maximize(size.y);
+	}
+}
+
+
 class Glyph : Cell { // Glyph ////////////////////////////////////
 	int stIdx;
 	dchar ch;
 	RGB fontColor, bkColor;
-
+	
 	ubyte fontFlags; //todo: compress information
 	ubyte syntax;
 	bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
-
+	
 	this(dchar ch, in TextStyle ts){
 		this.ch = ch;
-
+		
 		//tab is the isSame as a space
 		isTab = ch==9;
 		isWhite = isTab || ch==32;
 		isNewLine = ch==10;
 		isReturn = ch==13;         //todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. ossz 16byte all rendelkezeser ugyis.
-
+		
 		if(VisualizeGlyphs){
 			if(isReturn) ch = 0x240D;else
 			if(isNewLine) ch = 0x240A; //0x23CE;
 		}else{
 			if(isReturn || isNewLine) ch = ' ';
 		}
-
-		// ch -> subTexIdx lookup. Cached with a map.   10 FPS -> 13..14 FPS
-		void lookupSubTexIdx(){
-			string glyphSpec = `font:\`~ts.font~`\72\x3\?`~[ch].toUTF8;
-			stIdx = textures[File(glyphSpec)];
-		}
-
-		if(ts.isDefaultFont){ // cached version for the default font
-			if(auto p = ch in DefaultFont_subTexIdxMap){
-				stIdx = *p;
-			}else{
-				lookupSubTexIdx;
-				DefaultFont_subTexIdxMap[ch] = stIdx;
-			}
-		}else{ //uncached for non-default fonts
-			lookupSubTexIdx;
-		}
-
+		
+		stIdx = ch.fontTexture(ts);
+		
 		fontFlags = ts.fontFlags;
 		fontColor = ts.fontColor;
 		bkColor = ts.bkColor;
