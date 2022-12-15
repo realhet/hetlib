@@ -312,7 +312,7 @@ class Executor{ //Executor ///////////////////////////////////////
 			if(pid) try{
 				std.process.kill(pid);
 			}catch(Exception e){
-				WARN(extendExceptionMsg(e.text)); //sometimes it gives "Access is denied.", maybe because it's already dead, so just ignore.
+				WARN(e.extendedMsg); //sometimes it gives "Access is denied.", maybe because it's already dead, so just ignore.
 			}
 			result = -1;
 			output = "Error: Process has been killed.";

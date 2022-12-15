@@ -325,8 +325,8 @@ private auto colorFunct2(T, alias fv)(in T a, in T b)if(isColorF!T){
 }
 
 
-auto min		  (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "min")(a, b); }
-auto max		  (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "max")(a, b); }
+auto min			 (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "min")(a, b); }
+auto max			 (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "max")(a, b); }
 auto absDiff(T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "absDiff")(a, b); }
 
 int sad(T)(in T a, in T b)if(isColor8!T){
@@ -472,12 +472,12 @@ immutable RGB
 //classic delphi	palette
 	clBlack		= 0x000000,
 	clMaroon	        = 0x000080,
-	clGreen		       = 0x008000,
-	clOlive		       = 0x008080,
+	clGreen			      = 0x008000,
+	clOlive			      = 0x008080,
 	clNavy	        =	0x800000,
 	clPurple		= 0x800080,
-	clTeal		       =	0x808000,
-	clGray		       =	0x808080,
+	clTeal			      =	0x808000,
+	clGray			      =	0x808080,
 	clSilver		= 0xC0C0C0,
 	clRed	        = 0x0000FF,
 	clLime	        =	0x00FF00,
@@ -529,16 +529,16 @@ immutable RGB
 	clC64DGrey	      = 0x505050,
 	clC64Grey	      =	0x787878,
 	clC64LGreen		= 0x8ed7a4,
-	clC64LBlue		     = 0xbd6a78,
-	clC64LGrey		     = 0x9f9f9f,
+	clC64LBlue			    = 0xbd6a78,
+	clC64LGrey			    = 0x9f9f9f,
 
 //WOW palette
 	clWowGrey	      = 0x9d9d9d,
-	clWowWhite		     = 0xffffff,
-	clWowGreen		     = 0x00ff1e,
+	clWowWhite			    = 0xffffff,
+	clWowGreen			    = 0x00ff1e,
 	clWowBlue	      =	0xdd7000,
-	clWowPurple		= 0xee35a3,
-	clWowRed	      = 0x0080ff,
+	clWowPurple		=	0xee35a3,
+	clWowRed		= 0x0080ff,
 	clWowRed2	      = 0x80cce5,
 
 //VIM
@@ -547,8 +547,8 @@ immutable RGB
 	clVimGreen	      = 0x4ACAB9,
 	clVimTeal	      = 0xB1C070,
 	clVimRed	      = 0x534ED5,
-	clVimPurple		     = 0xD897C3,
-	clVimYellow		     = 0x47C5E7,
+	clVimPurple			    = 0xD897C3,
+	clVimYellow			    = 0x47C5E7,
 	clVimWhite	      = 0xFFFFFF,
 	clVimGray	      =	0x9FA19E,
 	clVimOrange		= 0x458CE7,
@@ -574,26 +574,26 @@ immutable RGB
 	clRainbowPink	= 0x8800FF,
 
 //solarized colors -> https://ethanschoonover.com/solarized/
-	clSolBase03		    = 0x362b00,
-	clSolBase02		    = 0x423607,
-	clSolBase01		    = 0x756e58,
-	clSolBase00		    = 0x837b65,
-	clSolBase0		    = 0x969483,
-	clSolBase1		    = 0xa1a193,
-	clSolBase2		    = 0xd5e8ee,
-	clSolBase3		    = 0xe3f6fd,
-	clSolYellow		    = 0x0089b5,
-	clSolOrange		    = 0x164bcb,
+	clSolBase03			   = 0x362b00,
+	clSolBase02			   = 0x423607,
+	clSolBase01			   = 0x756e58,
+	clSolBase00			   = 0x837b65,
+	clSolBase0			   = 0x969483,
+	clSolBase1			   = 0xa1a193,
+	clSolBase2			   = 0xd5e8ee,
+	clSolBase3			   = 0xe3f6fd,
+	clSolYellow			   = 0x0089b5,
+	clSolOrange			   = 0x164bcb,
 	clSolRed	     = 0x2f32dc,
 	clSolMagenta	     = 0x8236d3,
-	clSolViolet		= 0xc4716c,
-	clSolBlue		    =	0xd28b26,
-	clSolCyan		    =	0x98a12a,
+	clSolViolet		=	0xc4716c,
+	clSolBlue			=	0xd28b26,
+	clSolCyan			=	0x98a12a,
 	clSolGreen	     = 0x009985,
 
-	clAxisX		         = RGB(213, 40, 40),
-	clAxisY		         = RGB(40, 166, 40),
-	clAxisZ		         = RGB(40, 40, 215),
+	clAxisX			        = RGB(213, 40, 40),
+	clAxisY			        = RGB(40, 166, 40),
+	clAxisZ			        = RGB(40, 40, 215),
 
 	clOrange          = clRainbowOrange;
 
@@ -897,3 +897,11 @@ class StandardColorMaps : ColorMaps {
 
 alias colorMaps = Singleton!StandardColorMaps;
 
+// Ega color codes
+struct EgaColor/*(bool enabled = true)*/{
+	enum enabled = true;
+	static foreach(idx, s; "black blue green cyan red magenta brown white gray ltBlue ltGreen ltCyan ltRed ltMagenta yellow ltWhite".split(' '))
+		mixin(format!`static auto %s(string s){ return enabled ? "\33\%s"~s~"\33\7" : s; }`(s, idx.to!string(8)));
+
+	//Usage: Print(EgaColor.red("Red text"));
+}
