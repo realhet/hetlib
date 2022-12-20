@@ -333,8 +333,8 @@ struct StructureScanner_DLang{ static:
 		@StructuredEOF
 	};
 	
-	//note: D tokenstring only nests {}, ignores [] and ().  DMD source actively uses this behavior.  ->  @Pop("}") 	@Push("{", tokenString)		tokenString
-	//note2: I chose full D nesting support for tokenStrings, so they can be displayed in structured mode as well.
+	//note: D tokenstring only nests {}, ignores [] and ().  DMD source actively uses this behavior.  ->	@Pop("}") 	@Push("{", tokenString)		tokenString
+	//note2: I chose full D nesting support for tokenStrings, so they can be displayed in structured mode	as well.
 	
 	mixin(q{ enum State : ubyte { // State graph
 		/+special system tokens+/ ignore, pop, error, eof, @Trans("", eof) unstructured, 
@@ -346,7 +346,7 @@ struct StructureScanner_DLang{ static:
 						
 		@Pop(NewLineTokens)	@Pop(EOFTokens) 		slashComment	,
 			@Pop("*/")	@EOF 	cComment	,
-		@Push("/+", dComment)	@Pop("+/")	@EOF	dComment 	,
+		@Push("/+", dComment)	@Pop("+/")	@EOF	dComment 	, //bug: This is broken: /+ //NewLine +/
 						
 		@Ignore(`\\ \'`)	@PopCWD(`'`)	@EOF	cChar	,
 		@Ignore(`\\ \"`)	@PopCWD(`"`)	@EOF	cString	,
