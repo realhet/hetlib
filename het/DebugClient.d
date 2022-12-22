@@ -55,7 +55,19 @@ void WARN(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION
 void ERR (string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(40, file, line, funct)(args); }
 void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ DBG!(50, file, line, funct)(args); }
 
-void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args){ ERR!(file, line, funct)("Not implemented."); }
+void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args)
+{
+	synchronized{
+		
+		//show this error only once
+		const h = file.hashOf(line);
+		__gshared bool[size_t] map;
+		if(h in map) return;
+		
+		map[h] = true;
+		ERR!(file, line, funct)("NOT IMPLEMENTED");
+	}
+}
 
 T HIST(size_t N, size_t M=0x10000, string name="", T)(T value){
 	static assert(M.isPowerOf2);

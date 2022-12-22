@@ -1021,8 +1021,8 @@ version(/+$DIDE_REGION+/all)
 					return m;
 				}
 				
-				auto rotate(A)(in Vector!(A, N) axis, CT alpha)
-				{ this = rotation(axis, alpha)*this;  return this; }
+				auto rotate(A)(in Vector!(A, N) axis,	CT alpha)
+				{ this = rotation(axis, alpha)*this;	return this; }
 				auto rotatex(CT alpha)
 				{ this = rotationx(alpha)*this;	 return this; }
 				auto rotatey(CT alpha)
@@ -1692,7 +1692,7 @@ version(/+$DIDE_REGION+/all)
 		
 			static if(VectorLength==1 && is(ComponentType==int))
 			{
-				int opApply(int delegate(int i) dg)
+				int opApply(int delegate(int i) dg) const
 				{
 					int result = 0;
 					foreach(i; low..high){
@@ -1705,7 +1705,7 @@ version(/+$DIDE_REGION+/all)
 		
 			static if(VectorLength==2 && is(ComponentType==int))
 			{
-				private int myOpApply(string payload, DG)(DG dg)
+				private int myOpApply(string payload, DG)(DG dg) const
 				{
 					int result = 0;
 					outer: foreach(y; low.y..high.y)
@@ -1719,9 +1719,9 @@ version(/+$DIDE_REGION+/all)
 					return result;
 				}
 		
-				int opApply(int delegate(int x, int y) dg)
+				int opApply(int delegate(int x, int y) dg) const
 				{ return myOpApply!"dg(x, y)"(dg); }
-				int opApply(int delegate(ivec2 p) dg)
+				int opApply(int delegate(ivec2 p) dg) const
 				{ return myOpApply!"dg(ivec2(x, y))"(dg); }
 			}
 		}
@@ -2344,11 +2344,11 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 	
-		void opIndexAssign(A)(in A a, int[2] r1, int j)
-		{ assignHorizontal!""(a, r1,  j); }
-		void opIndexAssign(A)(in A a, int i, int[2] r2)
-		{ assignVertical	!""(a,  i, r2); }
-		void opIndexAssign(A)(in A a, int[2] r1, int[2] r2)
+		void opIndexAssign(A)(in	A a,	int[2] r1, int j)
+		{ assignHorizontal!""(a,	r1,	j); }
+		void opIndexAssign(A)(in	A a,	int i, int[2] r2)
+		{ assignVertical	!""(a,	i, r2); }
+		void opIndexAssign(A)(in	A a, int[2] r1, int[2] r2)
 		{ assignRectangular!""(a, r1, r2); }
 		void opIndexAssign(A)(in A a)
 		{ this[0..$, 0..$] = a; }
@@ -2367,8 +2367,8 @@ version(/+$DIDE_REGION+/all)
 		// Index/Slice unary ops. All non-const, I don't wanna suck with constness
 		auto opIndexUnary(string op)(int i, int j)
 		{ return mixin(op, "this[i, j]"); }
-		auto opIndexUnary(string op)(int[2] r1, int j)
-		{ return this[r1[0]..r1[1], j           ].dup!op; }
+		auto opIndexUnary(string op)(int[2] r1,	int j)
+		{ return this[r1[0]..r1[1], j	].dup!op; }
 		auto opIndexUnary(string op)(int i, int[2] r2)
 		{ return this[i           , r2[0]..r2[1]].dup!op; }
 		auto opIndexUnary(string op)(int[2] r1, int[2] r2)
@@ -2455,12 +2455,12 @@ version(/+$DIDE_REGION+/all)
 		static if(N==2)
 		{
 			void saveTo(F)(in F file)
-			{//todo: make it const
-				//note: saveTo() must be a member function in order to work
-				//todo: this is fucking nasty! Should not import hetlib into here!!!
-				//      Should use a global funct instead which is initialized by het.bitmaps.
-				//todo: must do this with a global function!!! 
-				//      The problem is that need to pass the type and elementcount to it.
+			{//todo:	make it const
+				//note:	saveTo() must be a member function in order to work
+				//todo:	this is fucking nasty! Should not import hetlib into here!!!
+				//	Should use a global funct instead which is initialized by het.bitmaps.
+				//todo:	must do this with a global function!!! 
+				//	The problem is that need to pass the type and elementcount to it.
 				mixin("import het.bitmap : serialize;");
 				mixin("import het.utils : File, saveTo, withoutStarting;");
 				auto f = File(file);
@@ -2492,10 +2492,10 @@ version(/+$DIDE_REGION+/all)
 			assert(__traits(compiles, image2D(2, 2, [clRed, clGreen, clBlue].dup, clWhite)));
 		}
 		
-		auto img = image2D(4, 3, [
-			0,  1,  2,  3,
-			4,  5,  6,  7,
-			8,  9, 10, 11
+		auto	img	= image2D(4, 3, [
+			0,	1,	2,	 3,
+			4,	5,	6,	 7,
+			8,	9, 10, 11
 		]);
 		
 		assert(img.width == 4 && img.height == 3);
