@@ -539,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent											    = RGB(  0, 120, 215),
-			clMenuBk											    = RGB(235, 235, 236),
+			clAccent												   = RGB(  0, 120, 215),
+			clMenuBk												   = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -876,7 +876,7 @@ struct CellLocation{
 	vec2 calcSnapOffsetFromPadding(float epsilon = 1){
 		
 		static float doit(float coord, float innerSize, float pad0, float pad1, float epsilon){
-			epsilon = max(innerSize*.5f, epsilon);
+			epsilon = min(innerSize*.5f, epsilon);
 			if(coord.inRange(-pad0, 0)) return -coord + epsilon;
 			coord -= innerSize;
 			if(coord.inRange(0, pad1)) return -coord - epsilon;
@@ -1049,7 +1049,7 @@ class Cell{ // Cell ////////////////////////////////////
 	CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2.init){
 		auto bnd = outerBounds + ofs;//note: locate() searches in outerBounds, not just the borderBounds.
 		if(bnd.contains!"[)"(mouse))return [CellLocation(this, mouse-(innerPos+ofs), bnd)];
-																return [];
+		return [];
 	}
 
 	final void drawBorder(Drawing dr){
@@ -3088,6 +3088,7 @@ class Row : Container { // Row ////////////////////////////////////
 
 	//for Elastic tabs
 	/+private+/ int[] tabIdxInternal;
+	int rearrangedLineCount;
 
 	void refreshTabIdx(){
 		tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array;
@@ -3212,7 +3213,7 @@ class Row : Container { // Row ////////////////////////////////////
 	}
 
 	//this handles multiple lines. Must count	newline chars too, so the tabIdx[] array is useless here.
-	private void adjustTabSizes_multiLine(){	//todo: refactor this
+	private void adjustTabSizes_multiLine(){//todo: refactor this
 		int tabCnt, colCnt;
 		foreach(c; subCells){
 			if(auto g = cast(Glyph)c){
@@ -3266,6 +3267,8 @@ class Row : Container { // Row ////////////////////////////////////
 
 		//remember the contents of the edited row
 		rememberEditedWrappedLines(this, wrappedLines);
+		
+		rearrangedLineCount = wrappedLines.length.to!int;
 	}
 
 	override void draw(Drawing dr){
@@ -3282,10 +3285,10 @@ class Row : Container { // Row ////////////////////////////////////
 
 
 	override Cell[] internal_hitTest_filteredSubCells(vec2 p){
-		if(flags.wordWrap){
+		if(rearrangedLineCount!=1){
 			return super.internal_hitTest_filteredSubCells(p); //todo: wrapped filter support
 		}else{
-			return sortedSubCellsAroundX(p);
+			return sortedSubCellsAroundX(p); //bug: it wont work for multiline
 		}
 	}
 
