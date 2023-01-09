@@ -170,7 +170,7 @@ enum ScanOp{
 struct ScanResult{
 	ScanOp op;
 	string src;
-	@property bool isError() const{ with(ScanOp) return !!op.among(error_underflow, error_stopped1, error_stopped2); }
+	@property bool isError() const{ return op >= ScanOp.error; }
 }
 
 enum isScannerRange(R) = isInputRange!R && is(ElementType!R==ScanResult);

@@ -4956,6 +4956,10 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return isDLangIdentifierStart(ch) || isDLangNumberStart(ch); }
 		bool isDLangNumberCont	(T)(T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierCont(ch); }
+		bool isDLangSymbol(T)(T ch)if(isSomeChar!T)
+		{ 
+			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //todo: optimize this to a lookup
+		}
 		
 	}version(/+$DIDE_REGION+/all){
 		string replaceWords(alias fun = isWordChar)(string str, string from, string to)
