@@ -476,7 +476,7 @@ immutable SyntaxStyleRow[] syntaxTable =[
 	{"Label"	, [{clBlack	,0xDDFFEE	,4}, {clBlack	,clVgaHighCyan	,0}, {clBlack	,clC64Cyan	,0}, {0xFFA43B	,0x2d2d2d ,2}]},
 	{"Attribute"	, [{clPurple	,clWhite	,1}, {clVgaHighMagenta	,clVgaLowBlue	,1}, {clC64Purple	,clC64Blue	,1}, {0xAAB42B	,0x2d2d2d ,1}]},
 	{"BasicType"	, [{clTeal	,clWhite	,1}, {clVgaHighCyan	,clVgaLowBlue	,1}, {clC64Cyan	,clC64Blue	,1}, {clWhite	,0x2d2d2d ,1}]},
-	{"Error"	, [{clRed	,clWhite	,4}, {clVgaHighRed	,clVgaLowBlue	,4}, {clC64Red	,clC64Blue	,0}, {0x00FFEF	,0x2d2dFF ,0}]},
+	{"Error"	, [{clRed	,clWhite	,4}, {clVgaHighRed	,clVgaLowBlue	,4}, {clC64Red	,clC64Blue	,0}, {clYellow	,clRed     ,0}]},
 	{"Binary1"	, [{clWhite	,clBlue	,0}, {clVgaLowBlue	,clVgaYellow	,0}, {clC64Blue	,clC64Yellow	,0}, {0x2d2d2d	,0x20bCFA ,0}]},
 ];
 

@@ -2270,6 +2270,22 @@ version(/+$DIDE_REGION Numeric+/all)
 			return -c/2 * ((--t)*(t-2) - 1) + b;
 		}
 		
+		//https://github.com/jesusgollonet/ofpennereasing/blob/master/PennerEasing/Quad.cpp
+		
+		//http://vitiy.info/easing-functions-for-your-animations/
+		float easeOutElastic(float t, float b, float c, float d)
+		{
+			// t: time elapsed from start of animation
+			// b: start value
+			// c: value change
+			// d: duration of animation
+			if (t==0) return b;  if ((t/=d)==1) return b+c;  
+			float p=d*.3f;
+			float a=c;
+			float s=p/4;
+			return (a*pow(2,-10*t) * sin( (t*d-s)*(2*PIf)/p ) + c + b);
+		}
+		
 		unittest
 		{
 			string s;
