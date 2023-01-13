@@ -14,12 +14,13 @@ import het.ui : im; //todo: bad crosslink for scrollInfo
 
 //adjust the size of the original Tab character
 enum
-	VisualizeContainers	   =	0,
-	VisualizeContainerIds		= 0,
-	VisualizeGlyphs	   = 0,
-	VisualizeTabColors	   = 0, //todo: spaces at row ends
-	VisualizeHitStack	   = 0,
-	VisualizeSliders	   = 0,
+	VisualizeContainers	= 0,
+	VisualizeContainerIds	= 0,
+	VisualizeGlyphs	= 0,
+	VisualizeTabColors	= 0, //todo: spaces at row ends
+	VisualizeHitStack	= 0,
+	VisualizeSliders	= 0,
+	VisualizeCodeLineNumbers 	= 1,
 
 	addHitRectAsserts        = 0; //Verifies that Cell.Id is non null and unique
 
@@ -1163,7 +1164,7 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 	bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
 	
 	ubyte syntax; //needed for DIDE
-	int line, column; //1based. needed for DIDE.
+	int line; //1based. needed for DIDE.
 	
 	this(dchar ch, in TextStyle ts){
 		this.ch = ch;
@@ -1201,6 +1202,12 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 		drawBorder(dr); //todo: csak a containernek kell border elvileg, ez hatha gyorsit.
 		dr.color = fontColor;
 		dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags);
+		
+		if(VisualizeCodeLineNumbers){
+			dr.color = clWhite;
+			dr.fontHeight = 1.25;
+			dr.textOut(outerPos, format!"%s"(line));
+		}
 		
 		if(VisualizeGlyphs){
 			dr.color = clGray;
@@ -2448,14 +2455,28 @@ class Container : Cell { // Container ////////////////////////////////////
 	void appendStr (string s, in TextStyle ts){ foreach(ch; s.byDchar) appendChar(ch, ts); } //todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
 	
 	void appendCodeChar(dchar	ch, in TextStyle ts, SyntaxKind sk){ appendCell(new Glyph(ch, ts, sk)); }
-	void appendCodeStr (string s, in TextStyle ts, SyntaxKind sk){ foreach(ch; s.byDchar) appendCodeChar(ch, ts, sk); }
+	void appendCodeStr(string s, in TextStyle ts, SyntaxKind sk){ foreach(ch; s.byDchar) appendCodeChar(ch, ts, sk); }
+	
+	void appendCodeStr(string s, SyntaxKind sk)
+	{
+		static TextStyle style;
+		style.applySyntax(sk);
+		appendCodeStr(s, style, sk);  //todo: syntax and style are redundant: syntax defines the style (more or less)
+	}
 
-	void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax){
+	void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax){ //todo: redundant: there is appendCodeChar too
 		auto g = new Glyph(ch, ts);
 		g.syntax = syntax;
 		appendCell(g);
 	}
-
+	
+	void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, ubyte syntax, int line){ //todo: this is used from CodeCOlumnBuildet.
+		auto g = new Glyph(ch, ts);
+		g.syntax = syntax;
+		g.line = line;
+		appendCell(g);
+	}
+	
 	auto removeLast(T = Cell)() { return cast(T)(subCells.fetchBack); }
 	auto removeLastContainer() { return removeLast!Container; }
 
