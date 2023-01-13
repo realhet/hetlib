@@ -539,8 +539,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props){
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
 			clChapter	              = RGB(221,   3,  48),
-			clAccent												   = RGB(  0, 120, 215),
-			clMenuBk												   = RGB(235, 235, 236),
+			clAccent														 = RGB(  0, 120, 215),
+			clMenuBk														 = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(  0, 120, 215),
 
@@ -1156,11 +1156,14 @@ if(isInputRange(R) && isSomeChar!(ElementType!R))
 class Glyph : Cell { // Glyph ////////////////////////////////////
 	int stIdx;
 	dchar ch;
-	RGB fontColor, bkColor;
 	
+	RGB fontColor, bkColor;
 	ubyte fontFlags; //todo: compress information
-	ubyte syntax;
+	
 	bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
+	
+	ubyte syntax; //needed for DIDE
+	int line, column; //1based. needed for DIDE.
 	
 	this(dchar ch, in TextStyle ts){
 		this.ch = ch;
@@ -1188,12 +1191,17 @@ class Glyph : Cell { // Glyph ////////////////////////////////////
 
 		if(!VisualizeGlyphs) if(isReturn || isNewLine) innerWidth = 0;
 	}
+	
+	this(dchar ch, in TextStyle ts, SyntaxKind sk){
+		this(ch, ts);
+		syntax = cast(ubyte) sk;
+	}
 
 	override void draw(Drawing dr){
 		drawBorder(dr); //todo: csak a containernek kell border elvileg, ez hatha gyorsit.
 		dr.color = fontColor;
 		dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags);
-
+		
 		if(VisualizeGlyphs){
 			dr.color = clGray;
 			dr.lineStyle = LineStyle.normal;
@@ -2438,6 +2446,9 @@ class Container : Cell { // Container ////////////////////////////////////
 	void appendImg (File	fn, in TextStyle ts){ appendCell(new Img(fn, ts.bkColor)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
 	void appendChar(dchar	ch, in TextStyle ts){ appendCell(new Glyph(ch, ts)); }
 	void appendStr (string s, in TextStyle ts){ foreach(ch; s.byDchar) appendChar(ch, ts); } //todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
+	
+	void appendCodeChar(dchar	ch, in TextStyle ts, SyntaxKind sk){ appendCell(new Glyph(ch, ts, sk)); }
+	void appendCodeStr (string s, in TextStyle ts, SyntaxKind sk){ foreach(ch; s.byDchar) appendCodeChar(ch, ts, sk); }
 
 	void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax){
 		auto g = new Glyph(ch, ts);
