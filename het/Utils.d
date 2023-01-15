@@ -4533,11 +4533,6 @@ version(/+$DIDE_REGION Containers+/all)
 	version(/+$DIDE_REGION+/all){
 	// Strings //////////////////////////////////
 		
-		bool isDLangWhitespace	(C)(in C ch)
-		{return !!ch.among(' ', '\t', '\x0b', '\x0c');}
-		bool isDLangNewLine	(S)(in S str)
-		{ return !!str.among("\r\n", "\n", "\r", "\u2028", "\u2029"); }
-		
 		bool isUpper(A)(in A a)
 		{return a==a.toUpper;}
 		bool isLower(A)(in A a)
@@ -4964,14 +4959,24 @@ version(/+$DIDE_REGION Containers+/all)
 			return s.to!T;
 		}
 		
+		bool isDLangWhitespace	(C)(in C ch)
+		{return !!ch.among(' ', '\t', '\x0b', '\x0c');}
+		
+		bool isDLangNewLine(T)(T ch)if(isSomeChar!T)
+		{ return !!ch.among('\n', '\r', '\u2028', '\u2029'); }
+		bool isDLangNewLine	(S)(in S str)if(isSomeString!S)
+		{ return !!str.among("\r\n", "\n", "\r", "\u2028", "\u2029"); }
+		
 		bool isDLangIdentifierStart	(T)(T ch)if(isSomeChar!T)
 		{ return ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch=='_' || isUniAlpha(ch); }
-		bool isDLangNumberStart	(T)(T ch)if(isSomeChar!T)
-		{ return ch.inRange('0', '9'); }
 		bool isDLangIdentifierCont	(T)(T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierStart(ch) || isDLangNumberStart(ch); }
+		
+		bool isDLangNumberStart	(T)(T ch)if(isSomeChar!T)
+		{ return ch.inRange('0', '9'); }
 		bool isDLangNumberCont	(T)(T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierCont(ch); }
+		
 		bool isDLangSymbol(T)(T ch)if(isSomeChar!T)
 		{ 
 			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //todo: optimize this to a lookup

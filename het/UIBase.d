@@ -20,7 +20,7 @@ enum
 	VisualizeTabColors	= 0, //todo: spaces at row ends
 	VisualizeHitStack	= 0,
 	VisualizeSliders	= 0,
-	VisualizeCodeLineNumbers 	= 1,
+	VisualizeCodeLineNumbers 	= 0,
 
 	addHitRectAsserts        = 0; //Verifies that Cell.Id is non null and unique
 
