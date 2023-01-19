@@ -170,7 +170,7 @@ enum ScanOp{
 struct ScanResult{
 	ScanOp op;
 	string src;
-	@property bool isError() const{ return op >= ScanOp.error; }
+	@property bool valid() const{ return op < ScanOp.error; }
 }
 
 enum isScannerRange(R) = isInputRange!R && is(ElementType!R==ScanResult);
@@ -314,6 +314,9 @@ mixin template StructureScanner(){
 }
 
 // DLangScanner ///////////////////////////////////////////////
+
+bool isValidDLang(string s)
+{ return DLangScanner(s).all!"a.valid"; }
 
 alias DLangScanner = StructureScanner_DLang.scanner;
 struct StructureScanner_DLang{ static: 
