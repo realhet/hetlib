@@ -1,4 +1,4 @@
-module het.color;
+module het.color;/+DIDE+/
 
 import het.utils;
 
@@ -6,60 +6,69 @@ auto floatToRgb(T, int N)(in Vector!(T, N) x)	 if(is(T == float)) { return Vecto
 auto rgbToFloat(T, int N)(in Vector!(T, N) x)	 if(is(T == ubyte)) { return x * (1.0f/255);	 }
 
 /// changes/converts the ComponentType of a color  support float and ubyte, ignores others.
-auto convertPixelComponentType(CT, A)(auto ref A a){
+auto convertPixelComponentType(CT, A)(auto ref A a) {
 	alias ST = ScalarType!A;
-
-			 static if(is(ST == ubyte) && is(CT == float))	return a.generateVector!(CT, a => a * (1.0f/255));
-	else static if(is(ST == float) && is(CT == ubyte))	return a.generateVector!(CT, a => a * 255	      );
-	else	return a.generateVector!(CT, a => a	      );
+	
+			 static if(is(ST == ubyte) && is(CT == float)) return a.generateVector!(CT, a => a * (1.0f/255));
+	else static if(is(ST == float) && is(CT == ubyte)) return a.generateVector!(CT, a => a * 255	      );
+	else return a.generateVector!(CT, a => a	      );
 }
 
 /// converts between different number of color components
-auto convertPixelChannels(int DstLen, A)(auto ref A a){
+auto convertPixelChannels(int DstLen, A)(auto ref A a) {
 	alias SrcLen	= VectorLength!A,
 				T	= ScalarType	!A,
 				VT	= Vector!(T,	DstLen);
-	//		Src: L              LA        RGB       RGBA	Dst:
-	immutable table	= [["a          ", "a.r   ", "a.l   ", "a.l  "],	//	L
-										 ["VT(a,*)    ", "a     ", "a.l1  ", "a.la "],	//	LA
-										 ["VT(a,a,a)  ", "a.rrr ", "a     ", "a.rgb"],	//	RGB
-										 ["VT(a,a,a,*)", "a.rrrg", "a.rgb1", "a    "]];	//	RGBA
-
-	enum one = is(T==ubyte) ? "255" : "1"; // * : ubyte alpha, and float alpha is different!!!
-
-	static foreach(i; 1..5) static if(DstLen == i)
-		static foreach(j; 1..5) static if(SrcLen == j)
-			return mixin(table[i-1][j-1].replace("*", one));
-
+	//Src: L              LA        RGB       RGBA	Dst:
+	immutable table	= [
+		["a          ", "a.r   ", "a.l   ", "a.l  "],	//L
+												 ["VT(a,*)    ", "a     ", "a.l1  ", "a.la "],	//LA
+												 ["VT(a,a,a)  ", "a.rrr ", "a     ", "a.rgb"],	//RGB
+												 ["VT(a,a,a,*)", "a.rrrg", "a.rgb1", "a    "]
+	];	//RGBA
+	
+	enum one = is(T==ubyte) ? "255" : "1"; //* : ubyte alpha, and float alpha is different!!!
+	
+	static foreach(i; 1..5)
+	static if(DstLen == i)
+	static foreach(j; 1..5)
+	static if(SrcLen == j)
+	return mixin(table[i-1][j-1].replace("*", one));
+		
+	
+	
 	static assert(VectorLength!(typeof(return)) == DstLen, "DstLen mismatch");
 }
 
-// converts a color to another color type (different channels and type)
-auto convertPixel(B, A)(auto	ref A a){
+//converts a color to another color type (different channels and type)
+auto convertPixel(B, A)(auto	ref A a) {
 	alias DstType	= ScalarType	!B,
 				DstLen	= VectorLength!B;
-
-	return a.convertPixelComponentType!DstType     // 2 step conversion: type and channels
+	
+	return a.convertPixelComponentType!DstType     //2 step conversion: type and channels
 					.convertPixelChannels!DstLen;
 }
 
-auto hsvToRgb(A)(in A val) if(isColor!A){
-	static if(A.length==4){
-		return A(val.rgb.hsvToRgb, val.a); // preserve alpha
-	}else{
+auto hsvToRgb(A)(in A val) if(isColor!A) {
+	static if(A.length==4) {
+		return A(val.rgb.hsvToRgb, val.a); //preserve alpha
+	}else {
 		static if(is(A.ComponentType == float)) return hsvToRgb(val.x, val.y, val.z);
-																			 else return val.rgbToFloat.hsvToRgb.floatToRgb;
+		else return val.rgbToFloat.hsvToRgb.floatToRgb;
 	}
 }
 
-auto hsvToRgb(float H, float S, float V){ //0..1 range
+auto hsvToRgb(float H, float S, float V) {
+	 //0..1 range
 	int sel;
 	auto mod = modf(H * 6, sel),
-			 a = vec4(V,
-								V * (1 - S),
-								V * (1 - S * mod),
-								V * (1 - S * (1 - mod)));
-	switch(sel){
+			 a = vec4(
+		V,
+										V * (1 - S),
+										V * (1 - S * mod),
+										V * (1 - S * (1 - mod))
+	);
+	switch(sel) {
 		case	 0: return a.xwy;
 		case	 1: return a.zxy;
 		case	 2: return a.yxw;
@@ -73,303 +82,302 @@ auto hsvToRgb(float H, float S, float V){ //0..1 range
 
 auto toGrayscale(T, N)(in Vector!(T, N) x)
 {
-		static if(N==3)	return x.lll;
-	else 	static if(N==4)	return x.llla;
-	else	return x;
+		static if(N==3) return x.lll;
+	else static if(N==4) return x.llla;
+	else return x;
 }
 
-char toGrayscaleAscii(float luma){
+char toGrayscaleAscii(float luma) {
 	immutable charMap = " .:-=+*#%@";
 	return charMap[luma.quantize!(charMap.length)];
 }
 
-auto textColorFor(RGB c){
-	return c.l>=128 ? clBlack : clWhite;
-}
+auto textColorFor(RGB c) { return c.l>=128 ? clBlack : clWhite; }
 
-auto blackOrWhiteFor(RGB c){ return textColorFor(c); }
+auto blackOrWhiteFor(RGB c) { return textColorFor(c); }
 
 
-// RGB formats ////////////////////////////////////////////////
+//RGB formats ////////////////////////////////////////////////
 
-/+alias RGB = RGB8, RGBA = RGBA8;
-
-RGB	BGR (uint a){ auto c = RGB (a); c.rbSwap; return c; }
-RGBA	BGRA(uint a){ auto c = RGBA(a); c.rbSwap; return c; }
-
-auto inverse(in RGB	a){ return RGB (a.r^255, a.g^255, a.b^255     ); }
-auto inverse(in RGBA	a){ return RGBA(a.r^255, a.g^255, a.b^255, a.a); }
-
-private ubyte f2b(float f){ return cast(ubyte)((f.clamp(0, 1)*255.0f).iround); }
-private float b2f(int b){ return b*(1/255.0f); }
-private ubyte _rgb_to_l_fast(in ubyte[3] rgb)       { return cast(ubyte)((rgb[0]+(rgb[1]<<1)+rgb[2])>>2); }
-private float _rgbf_to_l(in float[3] comp)      { return comp[0]*0.299f + comp[1]*0.586f + comp[2]*0.114f; }
-
-private mixin template ColorMembers(){
-	@jsonize this(in typeof(comp) array){ comp = array; }
-
-	auto l8	() const { return L8	 ([l	     ]); }
-	auto la8	() const { return LA8	 ([l, a	     ]); }
-	auto rgb8	() const { static if(is(typeof(this)==RGB8 )) return this; else return RGB8 ([r, g, b   ]); }
-	auto bgr8	() const { return RGB8 ([b, g, r   ]); }
-	auto rgba8() const { static if(is(typeof(this)==RGBA8)) return this; else return RGBA8([r, g, b, a]); }
-	auto bgra8() const { return RGBA8([b, g, r, a]); }
-
-	auto lf	() const { return Lf	 ([l	     ]); }
-	auto laf	() const { return LAf	 ([l, a	     ]); }
-	auto rgbf	() const { static if(is(typeof(this)==RGBf )) return this; else return RGBf ([r, g, b   ]); }
-	auto bgrf	() const { return RGBf ([b, g, r   ]); }
-	auto rgbaf() const { static if(is(typeof(this)==RGBAf)) return this; else return RGBAf([r, g, b, a]); }
-	auto bgraf() const { return RGBAf([b, g, r, a]); }
-
-	void rbSwap(){ auto t=r; r=b; b=t; }
-
-	T to(T)() const if(is(T==L8	)){ return l8	; }
-	T to(T)() const if(is(T==LA8	)){ return la8	; }
-	T to(T)() const if(is(T==RGB8	)){ return rgb8	; }
-	T to(T)() const if(is(T==RGBA8)){ return rgba8; }
-	T to(T)() const if(is(T==Lf	)){ return lf	; }
-	T to(T)() const if(is(T==LAf	)){ return laf	; }
-	T to(T)() const if(is(T==RGBf	)){ return rgbf	; }
-	T to(T)() const if(is(T==RGBAf)){ return rgbaf; }
-}
-
-private mixin template Color8Members(){
-	mixin ColorMembers;
-}
-
-private mixin template ColorFMembers(){
-	mixin ColorMembers;
-}
-
-/*struct L8{ align(1): @jsonize ubyte[1] comp; mixin Color8Members;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in float[comp.length] a){ this(a[0]); }
-	this(in float[] a){ enforce(a.length==comp.length); this(a[0]); }
-
-	this(int data) { comp[0] = cast(ubyte)data; }
-	this(float luminance) { comp[0] = f2b(luminance); }
-
-	//access
-	@property{ ubyte l() const { return comp[0]; } void l(ubyte luminance){ comp[0] = luminance; }}
-	alias r = l, g = l, b = l;
-	@property{ ubyte a() const { return 0xFF; } void a(ubyte alpha) { } }
-
-	@property{ ubyte raw() const { return comp[0]; } void raw(uint x) { this = L8(x); } }
-}
-
-struct LA8{ align(1): @jsonize ubyte[2] comp; mixin Color8Members;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in float[comp.length] a){ this(a[0], a[1]); }
-	this(in float[] a){ enforce(a.length==comp.length); this(a[0], a[1]); }
-
-	this(int data) { comp[0] = cast(ubyte)data; comp[1] = cast(ubyte)(data>>8); }
-	this(int luminance, int alpha) { comp[0] = cast(ubyte)luminance; comp[1] = cast(ubyte)alpha; }
-	this(float luminance, float alpha) { comp[0] = luminance.f2b; comp[1] = alpha.f2b; }
-
-	//access
-	@property{ ubyte l() const { return comp[0]; } void l(ubyte luminance){ comp[0] = luminance; }}
-	alias r = l, g = l, b = l;
-	@property{ ubyte a() const { return comp[1]; } void a(ubyte alpha){ comp[1] = alpha; }}
-
-	@property{ ushort raw() const { return (cast(ushort[])comp)[0]; } void raw(uint x) { this = LA8(x); } }
-}
-
-struct RGB8{ align(1): @jsonize ubyte[3] comp; mixin Color8Members;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in float[comp.length] a){ this(a[0], a[1], a[2]); }
-	this(in float[] a){ enforce(a.length==comp.length); this(a[0], a[1], a [2]); }
-
-	this(int data) { comp[0] = cast(ubyte)data; comp[1] = cast(ubyte)(data>>8); comp[2] = cast(ubyte)(data>>16); }
-	this(int red, int green, int blue) { comp[0] = cast(ubyte)red; comp[1] = cast(ubyte)green; comp[2] = cast(ubyte)blue; }
-	this(float red, float green, float blue) { comp[0] = red.f2b; comp[1] = green.f2b; comp[2] = blue.f2b; }
-
-	//access
-	@property{ ubyte r() const { return comp[0]; } void r(ubyte red  ){ comp[0] = red  ; }}
-	@property{ ubyte g() const { return comp[1]; } void g(ubyte green){ comp[1] = green; }}
-	@property{ ubyte b() const { return comp[2]; } void b(ubyte blue ){ comp[2] = blue ; }}
-	@property{ ubyte l() const { return _rgb_to_l_fast(comp[0..3]); } void l(ubyte luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
-	@property{ ubyte a() const { return 0xFF; } void a(ubyte alpha) { } }
-
-	@property{ uint raw() const { return comp[0] | (comp[1]<<8) | (comp[2]<<16); } void raw(uint x) { this = RGB8(x); } }
-
-	alias rgba8 this; //implicit conversion to rgba8. And that will be converted to uint
-}
-
-struct RGBA8{ align(1): @jsonize ubyte[4] comp; mixin Color8Members;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in float[comp.length] a){ this(a[0], a[1], a[2], a[3]); }
-	this(in float[] a){ enforce(a.length==comp.length); this(a[0], a[1], a [2], a[3]); }
-
-	this(uint data) { comp[0] = cast(ubyte)data; comp[1] = cast(ubyte)(data>>8); comp[2] = cast(ubyte)(data>>16); comp[3] = cast(ubyte)(data>>24); }
-	this(int red, int green, int blue, int alpha=255) { comp[0] = cast(ubyte)red; comp[1] = cast(ubyte)green; comp[2] = cast(ubyte)blue; comp[3] = cast(ubyte)alpha; }
-	this(float red, float green, float blue, float alpha=1.0f) { comp[0] = red.f2b; comp[1] = green.f2b; comp[2] = blue.f2b; comp[3] = alpha.f2b; }
-
-	this(RGB8 rgb, int alpha=255 ){ comp[0..3] = rgb.comp[0..3]; comp[3] = cast(ubyte)alpha; }
-	this(RGB8 rgb, float alpha=1.0f){ comp[0..3] = rgb.comp[0..3]; comp[3] = alpha.f2b; }
-
-	@property{ ubyte r() const { return comp[0]; } void r(ubyte red  ){ comp[0] = red  ; }}
-	@property{ ubyte g() const { return comp[1]; } void g(ubyte green){ comp[1] = green; }}
-	@property{ ubyte b() const { return comp[2]; } void b(ubyte blue ){ comp[2] = blue ; }}
-	@property{ ubyte a() const { return comp[3]; } void a(ubyte alpha){ comp[3] = alpha; }}
-	@property{ ubyte l() const { return _rgb_to_l_fast(comp[0..3]); } void l(ubyte luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
-
-	@property{ uint raw() const { return comp[0] | (comp[1]<<8) | (comp[2]<<16) | (comp[3]<<24); } void raw(uint x) { this = RGBA8(x); } }
-
-	alias raw this; //implicit conversion
-}
-
-union Lf{ align(1): @jsonize float[1] comp; mixin ColorFMembers;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in ubyte[comp.length] a){ this(a[0].b2f); }
-	this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f); }
-
-	this(float luminance) { comp[0] = luminance; }
-
-	//access
-	@property{ float l() const { return comp[0]; } void l(float luminance){ comp[0] = luminance; }}
-	alias r = l, g = l, b = l;
-	@property{ float a() const { return 1.0f; } void a(float alpha) { } }
-}
-
-union LAf{ align(1): @jsonize float[2] comp; mixin ColorFMembers;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in ubyte[comp.length] a){ this(a[0].b2f, a[1].b2f); }
-	this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f, a[1].b2f); }
-
-	this(float luminance, float alpha) { comp[0] = luminance; comp[1] = alpha; }
-
-	//access
-	@property{ float l() const { return comp[0]; } void l(float luminance){ comp[0] = luminance; }}
-	alias r = l, g = l, b = l;
-	@property{ float a() const { return comp[1]; } void a(float alpha){ comp[1] = alpha; }}
-}
-
-struct RGBf{ align(1): @jsonize float[3] comp; mixin ColorFMembers;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in ubyte[comp.length] a){ this(a[0].b2f, a[1].b2f, a[2].b2f); }
-	this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f, a[1].b2f, a[2].b2f); }
-
-	this(float red, float green, float blue) { comp[0] = red; comp[1] = green; comp[2] = blue; }
-
-	//access
-	@property{ float r() const { return comp[0]; } void r(float red  ){ comp[0] = red  ; }}
-	@property{ float g() const { return comp[1]; } void g(float green){ comp[1] = green; }}
-	@property{ float b() const { return comp[2]; } void b(float blue ){ comp[2] = blue ; }}
-	@property{ float l() const { return _rgbf_to_l(comp); } void l(float luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
-	@property{ float a() const { return 1.0f; } void a(float alpha) { } }
-}
-
-union RGBAf{ align(1): @jsonize float[4] comp;  mixin ColorFMembers;
-	@jsonize this(in typeof(comp) array){ comp = array; }
-	this(in ubyte[comp.length] a){ this(a[0].b2f, a[1].b2f, a[2].b2f, a[3].b2f); }
-	this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f, a[1].b2f, a[2].b2f, a[3].b2f); }
-
-	this(float red, float green, float blue, float alpha=1.0f) { comp[0] = red; comp[1] = green; comp[2] = blue; comp[3] = alpha; }
-
-	@property{ float r() const { return comp[0]; } void r(float red  ){ comp[0] = red  ; }}
-	@property{ float g() const { return comp[1]; } void g(float green){ comp[1] = green; }}
-	@property{ float b() const { return comp[2]; } void b(float blue ){ comp[2] = blue ; }}
-	@property{ float l() const { return _rgbf_to_l(comp[0..3]); } void l(float luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
-	@property{ float a() const { return comp[3]; } void a(float alpha){ comp[3] = alpha; }}
-}
-
-bool isColor8(T)(){ return is(T==		 L8)||is(T==LA8)||is(T==RGB8)||is(T==RGBA8); }
-bool isColorF(T)(){ return is(T==		 Lf)||is(T==LAf)||is(T==RGBf)||is(T==RGBAf); }
-bool isColor(T)(){ return isColor8!T || isColorF!T; }
-
-auto lerp(T, U)(in T a, in T b, U t)if(isColor8!T && isIntegral!U){
-	T res; int it = (255-t);
-	foreach(i; 0..a.comp.length)
-		res.comp[i] = cast(ubyte)((a.comp[i]*it + b.comp[i]*t)>>8);
-	return res;
-}
-
-auto lerp(T, U)(in T a, in T b, U	tf)if(isColor8!T && isFloatingPoint!U){
-	T res; int t = iround(tf*255),	it = (255-t);
-	foreach(i; 0..a.comp.length)
-		res.comp[i] = cast(ubyte)((a.comp[i]*it + b.comp[i]*t)>>8);
-	return res;
-}
-
-auto darken (T, U)(in T a, U f)if(isColor8!T){ return lerp(a, clBlack, f); }
-auto lighten(T, U)(in T a, U f)if(isColor8!T){ return lerp(a, clWhite, f); }
-
-auto avg(T)(in T a, in T b)if(isColor8!T){
-	T res;
-	foreach(i; 0..a.comp.length)
-		res.comp[i] = cast(ubyte)((a.comp[i]+b.comp[i]+1)>>1);
-	return res;
-}
-
-auto avg(T)(in T a, in T b)if(isColorF!T){
-	T res;
-	foreach(i; 0..a.comp.length)
-		res.comp[i] = (a.comp[i]+b.comp[i])*0.5f;
-	return res;
-}
-
-
-private auto colorFunct2(T, alias fv)(in T a, in T b)if(isColor8!T){
-	T res;
-	foreach(i; 0..a.comp.length)
-		res.comp[i] = cast(ubyte)fv(a.comp[i], b.comp[i]);
-	return res;
-}
-
-private auto colorFunct2(T, alias fv)(in T a, in T b)if(isColorF!T){
-	T res;
-	foreach(i; 0..a.comp.length)
-		res.comp[i] = fv(a.comp[i], b.comp[i]);
-	return res;
-}
-
-
-auto min			 (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "min")(a, b); }
-auto max			 (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "max")(a, b); }
-auto absDiff(T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "absDiff")(a, b); }
-
-int sad(T)(in T a, in T b)if(isColor8!T){
-	int res = 0;
-	foreach(i; 0..a.comp.length)
-		res += abs(a.comp[i]-b.comp[i]);
-	return res;
-}
-
-float sad(T)(in T a, in T b)if(isColorF!T){
-	float res = 0;
-	foreach(i; 0..a.comp.length)
-		res += abs(a.comp[i]-b.comp[i]);
-	return res;
-} */
-
-
-/*RGB HSVToRGB(float H, float S, float V){ return RGB(HSVToRGBf(H, S, V)); }
-
-RGBf HSVToRGBf(float H, float S, float V) //0..1 range
-{
-	if(!S) return RGBf(V,V,V);
-	if(!V) return RGBf(0,0,0);
-
-	auto Hval = H * 6,
-			 sel = ifloor(Hval),
-			 mod = Hval - sel,
-			 v1 = V * (1 - S),
-			 v2 = V * (1 - S * mod),
-			 v3 = V * (1 - S * (1 - mod));
-
-	switch(sel){
-		case 0: return RGBf(V , v3, v1);
-		case 1: return RGBf(v2, V , v1);
-		case 2: return RGBf(v1, V , v3);
-		case 3: return RGBf(v1, v2, V );
-		case 4: return RGBf(v3, v1, V );
-		case 5: return RGBf(V , v1, v2);
-		case 6: return RGBf(V , v3, v1);
-		default: return RGBf(1, 0, 1); //impossible
+/+
+	alias RGB = RGB8, RGBA = RGBA8;
+	
+	RGB	BGR (uint a){ auto c = RGB (a); c.rbSwap; return c; }
+	RGBA	BGRA(uint a){ auto c = RGBA(a); c.rbSwap; return c; }
+	
+	auto inverse(in RGB	a){ return RGB (a.r^255, a.g^255, a.b^255     ); }
+	auto inverse(in RGBA	a){ return RGBA(a.r^255, a.g^255, a.b^255, a.a); }
+	
+	private ubyte f2b(float f){ return cast(ubyte)((f.clamp(0, 1)*255.0f).iround); }
+	private float b2f(int b){ return b*(1/255.0f); }
+	private ubyte _rgb_to_l_fast(in ubyte[3] rgb)       { return cast(ubyte)((rgb[0]+(rgb[1]<<1)+rgb[2])>>2); }
+	private float _rgbf_to_l(in float[3] comp)      { return comp[0]*0.299f + comp[1]*0.586f + comp[2]*0.114f; }
+	
+	private mixin template ColorMembers(){
+		@jsonize this(in typeof(comp) array){ comp = array; }
+	
+		auto l8	() const { return L8	 ([l	     ]); }
+		auto la8	() const { return LA8	 ([l, a	     ]); }
+		auto rgb8	() const { static if(is(typeof(this)==RGB8 )) return this; else return RGB8 ([r, g, b   ]); }
+		auto bgr8	() const { return RGB8 ([b, g, r   ]); }
+		auto rgba8() const { static if(is(typeof(this)==RGBA8)) return this; else return RGBA8([r, g, b, a]); }
+		auto bgra8() const { return RGBA8([b, g, r, a]); }
+	
+		auto lf	() const { return Lf	 ([l	     ]); }
+		auto laf	() const { return LAf	 ([l, a	     ]); }
+		auto rgbf	() const { static if(is(typeof(this)==RGBf )) return this; else return RGBf ([r, g, b   ]); }
+		auto bgrf	() const { return RGBf ([b, g, r   ]); }
+		auto rgbaf() const { static if(is(typeof(this)==RGBAf)) return this; else return RGBAf([r, g, b, a]); }
+		auto bgraf() const { return RGBAf([b, g, r, a]); }
+	
+		void rbSwap(){ auto t=r; r=b; b=t; }
+	
+		T to(T)() const if(is(T==L8	)){ return l8	; }
+		T to(T)() const if(is(T==LA8	)){ return la8	; }
+		T to(T)() const if(is(T==RGB8	)){ return rgb8	; }
+		T to(T)() const if(is(T==RGBA8)){ return rgba8; }
+		T to(T)() const if(is(T==Lf	)){ return lf	; }
+		T to(T)() const if(is(T==LAf	)){ return laf	; }
+		T to(T)() const if(is(T==RGBf	)){ return rgbf	; }
+		T to(T)() const if(is(T==RGBAf)){ return rgbaf; }
 	}
-} */
-
+	
+	private mixin template Color8Members(){
+		mixin ColorMembers;
+	}
+	
+	private mixin template ColorFMembers(){
+		mixin ColorMembers;
+	}
+	
+	/*struct L8{ align(1): @jsonize ubyte[1] comp; mixin Color8Members;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in float[comp.length] a){ this(a[0]); }
+		this(in float[] a){ enforce(a.length==comp.length); this(a[0]); }
+	
+		this(int data) { comp[0] = cast(ubyte)data; }
+		this(float luminance) { comp[0] = f2b(luminance); }
+	
+		//access
+		@property{ ubyte l() const { return comp[0]; } void l(ubyte luminance){ comp[0] = luminance; }}
+		alias r = l, g = l, b = l;
+		@property{ ubyte a() const { return 0xFF; } void a(ubyte alpha) { } }
+	
+		@property{ ubyte raw() const { return comp[0]; } void raw(uint x) { this = L8(x); } }
+	}
+	
+	struct LA8{ align(1): @jsonize ubyte[2] comp; mixin Color8Members;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in float[comp.length] a){ this(a[0], a[1]); }
+		this(in float[] a){ enforce(a.length==comp.length); this(a[0], a[1]); }
+	
+		this(int data) { comp[0] = cast(ubyte)data; comp[1] = cast(ubyte)(data>>8); }
+		this(int luminance, int alpha) { comp[0] = cast(ubyte)luminance; comp[1] = cast(ubyte)alpha; }
+		this(float luminance, float alpha) { comp[0] = luminance.f2b; comp[1] = alpha.f2b; }
+	
+		//access
+		@property{ ubyte l() const { return comp[0]; } void l(ubyte luminance){ comp[0] = luminance; }}
+		alias r = l, g = l, b = l;
+		@property{ ubyte a() const { return comp[1]; } void a(ubyte alpha){ comp[1] = alpha; }}
+	
+		@property{ ushort raw() const { return (cast(ushort[])comp)[0]; } void raw(uint x) { this = LA8(x); } }
+	}
+	
+	struct RGB8{ align(1): @jsonize ubyte[3] comp; mixin Color8Members;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in float[comp.length] a){ this(a[0], a[1], a[2]); }
+		this(in float[] a){ enforce(a.length==comp.length); this(a[0], a[1], a [2]); }
+	
+		this(int data) { comp[0] = cast(ubyte)data; comp[1] = cast(ubyte)(data>>8); comp[2] = cast(ubyte)(data>>16); }
+		this(int red, int green, int blue) { comp[0] = cast(ubyte)red; comp[1] = cast(ubyte)green; comp[2] = cast(ubyte)blue; }
+		this(float red, float green, float blue) { comp[0] = red.f2b; comp[1] = green.f2b; comp[2] = blue.f2b; }
+	
+		//access
+		@property{ ubyte r() const { return comp[0]; } void r(ubyte red  ){ comp[0] = red  ; }}
+		@property{ ubyte g() const { return comp[1]; } void g(ubyte green){ comp[1] = green; }}
+		@property{ ubyte b() const { return comp[2]; } void b(ubyte blue ){ comp[2] = blue ; }}
+		@property{ ubyte l() const { return _rgb_to_l_fast(comp[0..3]); } void l(ubyte luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
+		@property{ ubyte a() const { return 0xFF; } void a(ubyte alpha) { } }
+	
+		@property{ uint raw() const { return comp[0] | (comp[1]<<8) | (comp[2]<<16); } void raw(uint x) { this = RGB8(x); } }
+	
+		alias rgba8 this; //implicit conversion to rgba8. And that will be converted to uint
+	}
+	
+	struct RGBA8{ align(1): @jsonize ubyte[4] comp; mixin Color8Members;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in float[comp.length] a){ this(a[0], a[1], a[2], a[3]); }
+		this(in float[] a){ enforce(a.length==comp.length); this(a[0], a[1], a [2], a[3]); }
+	
+		this(uint data) { comp[0] = cast(ubyte)data; comp[1] = cast(ubyte)(data>>8); comp[2] = cast(ubyte)(data>>16); comp[3] = cast(ubyte)(data>>24); }
+		this(int red, int green, int blue, int alpha=255) { comp[0] = cast(ubyte)red; comp[1] = cast(ubyte)green; comp[2] = cast(ubyte)blue; comp[3] = cast(ubyte)alpha; }
+		this(float red, float green, float blue, float alpha=1.0f) { comp[0] = red.f2b; comp[1] = green.f2b; comp[2] = blue.f2b; comp[3] = alpha.f2b; }
+	
+		this(RGB8 rgb, int alpha=255 ){ comp[0..3] = rgb.comp[0..3]; comp[3] = cast(ubyte)alpha; }
+		this(RGB8 rgb, float alpha=1.0f){ comp[0..3] = rgb.comp[0..3]; comp[3] = alpha.f2b; }
+	
+		@property{ ubyte r() const { return comp[0]; } void r(ubyte red  ){ comp[0] = red  ; }}
+		@property{ ubyte g() const { return comp[1]; } void g(ubyte green){ comp[1] = green; }}
+		@property{ ubyte b() const { return comp[2]; } void b(ubyte blue ){ comp[2] = blue ; }}
+		@property{ ubyte a() const { return comp[3]; } void a(ubyte alpha){ comp[3] = alpha; }}
+		@property{ ubyte l() const { return _rgb_to_l_fast(comp[0..3]); } void l(ubyte luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
+	
+		@property{ uint raw() const { return comp[0] | (comp[1]<<8) | (comp[2]<<16) | (comp[3]<<24); } void raw(uint x) { this = RGBA8(x); } }
+	
+		alias raw this; //implicit conversion
+	}
+	
+	union Lf{ align(1): @jsonize float[1] comp; mixin ColorFMembers;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in ubyte[comp.length] a){ this(a[0].b2f); }
+		this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f); }
+	
+		this(float luminance) { comp[0] = luminance; }
+	
+		//access
+		@property{ float l() const { return comp[0]; } void l(float luminance){ comp[0] = luminance; }}
+		alias r = l, g = l, b = l;
+		@property{ float a() const { return 1.0f; } void a(float alpha) { } }
+	}
+	
+	union LAf{ align(1): @jsonize float[2] comp; mixin ColorFMembers;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in ubyte[comp.length] a){ this(a[0].b2f, a[1].b2f); }
+		this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f, a[1].b2f); }
+	
+		this(float luminance, float alpha) { comp[0] = luminance; comp[1] = alpha; }
+	
+		//access
+		@property{ float l() const { return comp[0]; } void l(float luminance){ comp[0] = luminance; }}
+		alias r = l, g = l, b = l;
+		@property{ float a() const { return comp[1]; } void a(float alpha){ comp[1] = alpha; }}
+	}
+	
+	struct RGBf{ align(1): @jsonize float[3] comp; mixin ColorFMembers;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in ubyte[comp.length] a){ this(a[0].b2f, a[1].b2f, a[2].b2f); }
+		this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f, a[1].b2f, a[2].b2f); }
+	
+		this(float red, float green, float blue) { comp[0] = red; comp[1] = green; comp[2] = blue; }
+	
+		//access
+		@property{ float r() const { return comp[0]; } void r(float red  ){ comp[0] = red  ; }}
+		@property{ float g() const { return comp[1]; } void g(float green){ comp[1] = green; }}
+		@property{ float b() const { return comp[2]; } void b(float blue ){ comp[2] = blue ; }}
+		@property{ float l() const { return _rgbf_to_l(comp); } void l(float luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
+		@property{ float a() const { return 1.0f; } void a(float alpha) { } }
+	}
+	
+	union RGBAf{ align(1): @jsonize float[4] comp;  mixin ColorFMembers;
+		@jsonize this(in typeof(comp) array){ comp = array; }
+		this(in ubyte[comp.length] a){ this(a[0].b2f, a[1].b2f, a[2].b2f, a[3].b2f); }
+		this(in ubyte[] a){ enforce(a.length==comp.length); this(a[0].b2f, a[1].b2f, a[2].b2f, a[3].b2f); }
+	
+		this(float red, float green, float blue, float alpha=1.0f) { comp[0] = red; comp[1] = green; comp[2] = blue; comp[3] = alpha; }
+	
+		@property{ float r() const { return comp[0]; } void r(float red  ){ comp[0] = red  ; }}
+		@property{ float g() const { return comp[1]; } void g(float green){ comp[1] = green; }}
+		@property{ float b() const { return comp[2]; } void b(float blue ){ comp[2] = blue ; }}
+		@property{ float l() const { return _rgbf_to_l(comp[0..3]); } void l(float luminance) { comp[0] = comp[1] =comp[2] = luminance; } }
+		@property{ float a() const { return comp[3]; } void a(float alpha){ comp[3] = alpha; }}
+	}
+	
+	bool isColor8(T)(){ return is(T==		 L8)||is(T==LA8)||is(T==RGB8)||is(T==RGBA8); }
+	bool isColorF(T)(){ return is(T==		 Lf)||is(T==LAf)||is(T==RGBf)||is(T==RGBAf); }
+	bool isColor(T)(){ return isColor8!T || isColorF!T; }
+	
+	auto lerp(T, U)(in T a, in T b, U t)if(isColor8!T && isIntegral!U){
+		T res; int it = (255-t);
+		foreach(i; 0..a.comp.length)
+			res.comp[i] = cast(ubyte)((a.comp[i]*it + b.comp[i]*t)>>8);
+		return res;
+	}
+	
+	auto lerp(T, U)(in T a, in T b, U	tf)if(isColor8!T && isFloatingPoint!U){
+		T res; int t = iround(tf*255),	it = (255-t);
+		foreach(i; 0..a.comp.length)
+			res.comp[i] = cast(ubyte)((a.comp[i]*it + b.comp[i]*t)>>8);
+		return res;
+	}
+	
+	auto darken (T, U)(in T a, U f)if(isColor8!T){ return lerp(a, clBlack, f); }
+	auto lighten(T, U)(in T a, U f)if(isColor8!T){ return lerp(a, clWhite, f); }
+	
+	auto avg(T)(in T a, in T b)if(isColor8!T){
+		T res;
+		foreach(i; 0..a.comp.length)
+			res.comp[i] = cast(ubyte)((a.comp[i]+b.comp[i]+1)>>1);
+		return res;
+	}
+	
+	auto avg(T)(in T a, in T b)if(isColorF!T){
+		T res;
+		foreach(i; 0..a.comp.length)
+			res.comp[i] = (a.comp[i]+b.comp[i])*0.5f;
+		return res;
+	}
+	
+	
+	private auto colorFunct2(T, alias fv)(in T a, in T b)if(isColor8!T){
+		T res;
+		foreach(i; 0..a.comp.length)
+			res.comp[i] = cast(ubyte)fv(a.comp[i], b.comp[i]);
+		return res;
+	}
+	
+	private auto colorFunct2(T, alias fv)(in T a, in T b)if(isColorF!T){
+		T res;
+		foreach(i; 0..a.comp.length)
+			res.comp[i] = fv(a.comp[i], b.comp[i]);
+		return res;
+	}
+	
+	
+	auto min			 (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "min")(a, b); }
+	auto max			 (T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "max")(a, b); }
+	auto absDiff(T)(in T a, in T b)if(isColor8!T || isColorF!T){ return colorFunct2(T, "absDiff")(a, b); }
+	
+	int sad(T)(in T a, in T b)if(isColor8!T){
+		int res = 0;
+		foreach(i; 0..a.comp.length)
+			res += abs(a.comp[i]-b.comp[i]);
+		return res;
+	}
+	
+	float sad(T)(in T a, in T b)if(isColorF!T){
+		float res = 0;
+		foreach(i; 0..a.comp.length)
+			res += abs(a.comp[i]-b.comp[i]);
+		return res;
+	} */
+	
+	
+	/*RGB HSVToRGB(float H, float S, float V){ return RGB(HSVToRGBf(H, S, V)); }
+	
+	RGBf HSVToRGBf(float H, float S, float V) //0..1 range
+	{
+		if(!S) return RGBf(V,V,V);
+		if(!V) return RGBf(0,0,0);
+	
+		auto Hval = H * 6,
+				 sel = ifloor(Hval),
+				 mod = Hval - sel,
+				 v1 = V * (1 - S),
+				 v2 = V * (1 - S * mod),
+				 v3 = V * (1 - S * (1 - mod));
+	
+		switch(sel){
+			case 0: return RGBf(V , v3, v1);
+			case 1: return RGBf(v2, V , v1);
+			case 2: return RGBf(v1, V , v3);
+			case 3: return RGBf(v1, v2, V );
+			case 4: return RGBf(v3, v1, V );
+			case 5: return RGBf(V , v1, v2);
+			case 6: return RGBf(V , v3, v1);
+			default: return RGBf(1, 0, 1); //impossible
+		}
+	} */
+	
 +/
 
 //const test = lerp(RGB8(1,2,3), RGB8(0x808080), 128);
@@ -379,105 +387,105 @@ RGBf HSVToRGBf(float H, float S, float V) //0..1 range
 //auto lerp(T)(in T a, in T b, int t)if(is(T==RGBA8)){ T res; int it = (255-i); foreach(i; 0..a.comp.length) res.comp[i] = (a.comp[i]*t + b.comp[i]*it)>>8; return res; }
 
 /*
-//this was commented out long ago
-
-struct RGB{
-	align(1):
-	ubyte r, g, b;
-	ubyte a() const { return 0xff; }
-
-	this(uint x){
-		r = cast(ubyte)(x	);
-		g = cast(ubyte)(x>>8	);
-		b = cast(ubyte)(x>>16);
+	//this was commented out long ago
+	
+	struct RGB{
+		align(1):
+		ubyte r, g, b;
+		ubyte a() const { return 0xff; }
+	
+		this(uint x){
+			r = cast(ubyte)(x	);
+			g = cast(ubyte)(x>>8	);
+			b = cast(ubyte)(x>>16);
+		}
+	
+		this(int x){
+			this(cast(uint)x);
+		}
+	
+		this(ubyte	r_, ubyte g_, ubyte b_){
+			r = r_;	g = g_;  b = b_;
+		}
+	
+		this(float r_, float g_, float b_){
+			r = cast(ubyte)iRound(clamp(r_, 0, 1)*255);
+			g = cast(ubyte)iRound(clamp(g_, 0, 1)*255);
+			b = cast(ubyte)iRound(clamp(b_, 0, 1)*255);
+		}
+	
+		float[3] toF()const {
+			enum d = 1.0f/255;
+			return [r*d, g*d, b*d];
+		}
+	
+		@property uint raw()const { return r | (g<<8) | (b<<16); }
+	
+		RGB fadeTo(const RGB dst, float t)const { return rgbLerp(this, dst, clamp(t, 0, 1)); }
+		RGB darker (float t)const { return fadeTo(clBlack, t); }
+		RGB lighter(float t)const { return fadeTo(clWhite, t); }
+		RGB brighter(float t)const { return lighter(t); }
+	
+		//swizzle
+		RGB bgr()const { return RGB(b, g, r); }
 	}
-
-	this(int x){
-		this(cast(uint)x);
+	
+	
+	RGB rgbLerp(const RGB a, const RGB b, float t){
+		RGB res;
+		res.r = cast(ubyte)iLerp(a.r, b.r, t);
+		res.g = cast(ubyte)iLerp(a.g, b.g, t);
+		res.b = cast(ubyte)iLerp(a.b, b.b, t);
+		return res;
 	}
-
-	this(ubyte	r_, ubyte g_, ubyte b_){
-		r = r_;	g = g_;  b = b_;
+	
+	RGB rgbAvg(const RGB a, const RGB b, float t){ return rgbLerp(a, b, .5); }
+	
+	int rgbSad(const RGB a, const RGB b){
+		int res;
+		res += abs((a.r)-(b.r));
+		res += abs((a.g)-(b.g));
+		res += abs((a.b)-(b.b));
+		return res;
 	}
-
-	this(float r_, float g_, float b_){
-		r = cast(ubyte)iRound(clamp(r_, 0, 1)*255);
-		g = cast(ubyte)iRound(clamp(g_, 0, 1)*255);
-		b = cast(ubyte)iRound(clamp(b_, 0, 1)*255);
+	
+	RGB rgbMax(const RGB a, const RGB b){ return RGB(max(a.r, b.r), max(a.g, b.g), max(a.b, b.b)); }
+	RGB rgbMin(const RGB a, const RGB b){ return RGB(min(a.r, b.r), min(a.g, b.g), min(a.b, b.b)); }
+	
+	RGB rainbow_HUE(float H){
+		auto h2 = (H-iFloor(H))*8,
+				 i0 = iTrunc(h2),
+				 i1 = (i0+1)&7,
+				 fr = fract(h2);
+		RGB clr = rgbLerp(clRainbow[i0], clRainbow[i1], iRemapClamp(fr, 1, 0, 0, 255)); //interpolate rainbow palette
+		return clr;
 	}
-
-	float[3] toF()const {
-		enum d = 1.0f/255;
-		return [r*d, g*d, b*d];
+	
+	RGB HSVToRGB_rainbow(float H, float S, float V){
+		auto h2 = (H-iFloor(H))*8,
+				 i0 = iTrunc(h2),
+				 i1 = (i0+1)&7,
+				 fr = fract(h2);
+		RGB clr = rgbLerp(clRainbow[i0], clRainbow[i1], iRemapClamp(fr, 1, 0, 0, 255)); //interpolate rainbow palette
+		clr = rgbLerp(RGB(0xFFFFFF), clr, iRemapClamp(S, 1, 0, 0, 255)); //saturate
+		clr = rgbLerp(RGB(0x000000), clr, iRemapClamp(V, 1, 0, 0, 255)); //darken
+	enforce(false, "HSVToRGB_rainbow() ez total fos");
+		return clr;
 	}
-
-	@property uint raw()const { return r | (g<<8) | (b<<16); }
-
-	RGB fadeTo(const RGB dst, float t)const { return rgbLerp(this, dst, clamp(t, 0, 1)); }
-	RGB darker (float t)const { return fadeTo(clBlack, t); }
-	RGB lighter(float t)const { return fadeTo(clWhite, t); }
-	RGB brighter(float t)const { return lighter(t); }
-
-	//swizzle
-	RGB bgr()const { return RGB(b, g, r); }
-}
-
-
-RGB rgbLerp(const RGB a, const RGB b, float t){
-	RGB res;
-	res.r = cast(ubyte)iLerp(a.r, b.r, t);
-	res.g = cast(ubyte)iLerp(a.g, b.g, t);
-	res.b = cast(ubyte)iLerp(a.b, b.b, t);
-	return res;
-}
-
-RGB rgbAvg(const RGB a, const RGB b, float t){ return rgbLerp(a, b, .5); }
-
-int rgbSad(const RGB a, const RGB b){
-	int res;
-	res += abs((a.r)-(b.r));
-	res += abs((a.g)-(b.g));
-	res += abs((a.b)-(b.b));
-	return res;
-}
-
-RGB rgbMax(const RGB a, const RGB b){ return RGB(max(a.r, b.r), max(a.g, b.g), max(a.b, b.b)); }
-RGB rgbMin(const RGB a, const RGB b){ return RGB(min(a.r, b.r), min(a.g, b.g), min(a.b, b.b)); }
-
-RGB rainbow_HUE(float H){
-	auto h2 = (H-iFloor(H))*8,
-			 i0 = iTrunc(h2),
-			 i1 = (i0+1)&7,
-			 fr = fract(h2);
-	RGB clr = rgbLerp(clRainbow[i0], clRainbow[i1], iRemapClamp(fr, 1, 0, 0, 255)); //interpolate rainbow palette
-	return clr;
-}
-
-RGB HSVToRGB_rainbow(float H, float S, float V){
-	auto h2 = (H-iFloor(H))*8,
-			 i0 = iTrunc(h2),
-			 i1 = (i0+1)&7,
-			 fr = fract(h2);
-	RGB clr = rgbLerp(clRainbow[i0], clRainbow[i1], iRemapClamp(fr, 1, 0, 0, 255)); //interpolate rainbow palette
-	clr = rgbLerp(RGB(0xFFFFFF), clr, iRemapClamp(S, 1, 0, 0, 255)); //saturate
-	clr = rgbLerp(RGB(0x000000), clr, iRemapClamp(V, 1, 0, 0, 255)); //darken
-enforce(false, "HSVToRGB_rainbow() ez total fos");
-	return clr;
-}
 */
 
-// color constants ////////////////////////////////////////////////////////////////////////////////////
+//color constants ////////////////////////////////////////////////////////////////////////////////////
 
 immutable RGB
 //classic delphi	palette
 	clBlack		= 0x000000,
 	clMaroon	        = 0x000080,
-	clGreen			      = 0x008000,
-	clOlive			      = 0x008080,
+	clGreen					    = 0x008000,
+	clOlive					    = 0x008080,
 	clNavy	        =	0x800000,
 	clPurple		= 0x800080,
-	clTeal			      =	0x808000,
-	clGray			      =	0x808080,
+	clTeal					    =	0x808000,
+	clGray					    =	0x808080,
 	clSilver		= 0xC0C0C0,
 	clRed	        = 0x0000FF,
 	clLime	        =	0x00FF00,
@@ -529,13 +537,13 @@ immutable RGB
 	clC64DGrey	      = 0x505050,
 	clC64Grey	      =	0x787878,
 	clC64LGreen		= 0x8ed7a4,
-	clC64LBlue			    = 0xbd6a78,
-	clC64LGrey			    = 0x9f9f9f,
+	clC64LBlue					  = 0xbd6a78,
+	clC64LGrey					  = 0x9f9f9f,
 
 //WOW palette
 	clWowGrey	      = 0x9d9d9d,
-	clWowWhite			    = 0xffffff,
-	clWowGreen			    = 0x00ff1e,
+	clWowWhite					  = 0xffffff,
+	clWowGreen					  = 0x00ff1e,
 	clWowBlue	      =	0xdd7000,
 	clWowPurple		=	0xee35a3,
 	clWowRed		= 0x0080ff,
@@ -547,21 +555,23 @@ immutable RGB
 	clVimGreen	      = 0x4ACAB9,
 	clVimTeal	      = 0xB1C070,
 	clVimRed	      = 0x534ED5,
-	clVimPurple			    = 0xD897C3,
-	clVimYellow			    = 0x47C5E7,
+	clVimPurple					  = 0xD897C3,
+	clVimYellow					  = 0x47C5E7,
 	clVimWhite	      = 0xFFFFFF,
 	clVimGray	      =	0x9FA19E,
 	clVimOrange		= 0x458CE7,
 
 //Rainbow       https://github.com/FastLED/FastLED/wiki/Pixel-reference
-/*  clRainbowRed	=	0x0000FF,
-	clRainbowOrange		=	0x0055AA,
-	clRainbowYellow		=	0x00AAAA,
-	clRainbowGreen	  =	0x00FF00,
-	clRainbowAqua		 =	0x55AA00,
-	clRainbowBlue		 =	0xFF0000,
-	clRainbowPurple	  =	0xAA0055,
-	clRainbowPing	  =	0x5500AA,*/
+/*
+	  clRainbowRed	=	0x0000FF,
+		clRainbowOrange		=	0x0055AA,
+		clRainbowYellow		=	0x00AAAA,
+		clRainbowGreen	  =	0x00FF00,
+		clRainbowAqua		 =	0x55AA00,
+		clRainbowBlue		 =	0xFF0000,
+		clRainbowPurple	  =	0xAA0055,
+		clRainbowPing	  =	0x5500AA,
+*/
 
 //Rainbow. Distinct	colors for the human eye. This is a better version.
 	clRainbowRed	= 0x0000FF,
@@ -574,16 +584,16 @@ immutable RGB
 	clRainbowPink	= 0x8800FF,
 
 //solarized colors -> https://ethanschoonover.com/solarized/
-	clSolBase03			   = 0x362b00,
-	clSolBase02			   = 0x423607,
-	clSolBase01			   = 0x756e58,
-	clSolBase00			   = 0x837b65,
-	clSolBase0			   = 0x969483,
-	clSolBase1			   = 0xa1a193,
-	clSolBase2			   = 0xd5e8ee,
-	clSolBase3			   = 0xe3f6fd,
-	clSolYellow			   = 0x0089b5,
-	clSolOrange			   = 0x164bcb,
+	clSolBase03					 = 0x362b00,
+	clSolBase02					 = 0x423607,
+	clSolBase01					 = 0x756e58,
+	clSolBase00					 = 0x837b65,
+	clSolBase0					 = 0x969483,
+	clSolBase1					 = 0xa1a193,
+	clSolBase2					 = 0xd5e8ee,
+	clSolBase3					 = 0xe3f6fd,
+	clSolYellow					 = 0x0089b5,
+	clSolOrange					 = 0x164bcb,
 	clSolRed	     = 0x2f32dc,
 	clSolMagenta	     = 0x8236d3,
 	clSolViolet		=	0xc4716c,
@@ -591,9 +601,9 @@ immutable RGB
 	clSolCyan			=	0x98a12a,
 	clSolGreen	     = 0x009985,
 
-	clAxisX			        = RGB(213, 40, 40),
-	clAxisY			        = RGB(40, 166, 40),
-	clAxisZ			        = RGB(40, 40, 215),
+	clAxisX					      = RGB(213, 40, 40),
+	clAxisY					      = RGB(40, 166, 40),
+	clAxisZ					      = RGB(40, 40, 215),
 
 	clOrange          = clRainbowOrange;
 
@@ -609,22 +619,23 @@ immutable RGB8[]
 	clAll	= clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol;
 
 
-private RGB colorByName(string name, bool mustExists=false){
-
+private RGB colorByName(string name, bool mustExists=false) {
+	
 	__gshared static RGB[string] map;
-
-	if(map is null){ //todo: user driendly editing of all the colors
+	
+	if(map is null) {
+		 //todo: user driendly editing of all the colors
 		import std.traits;
 		static foreach(member; __traits(allMembers, mixin(__MODULE__)))
-			static if(is(Unqual!(typeof(mixin(member)))==RGB))
-				map[member.withoutStarting("cl").decapitalize] = mixin(member);  //todo: utils
-
+		static if(is(Unqual!(typeof(mixin(member)))==RGB))
+		map[member.withoutStarting("cl").decapitalize] = mixin(member);  //todo: utils
+		
 		map.rehash;
 	}
-
+	
 	//todo: decapitalize, enforce
 	auto a = name.decapitalize in map;
-	if(a is null){
+	if(a is null) {
 		enforce(!mustExists, `Unknown color name "%s"`.format(name));
 		return clFuchsia;
 	}
@@ -633,22 +644,22 @@ private RGB colorByName(string name, bool mustExists=false){
 
 //toRGB //////////////////////////////////
 
-RGB toRGB(string s, bool mustExists=false){
+RGB toRGB(string s, bool mustExists=false) {
 	s = s.strip;
 	enforce(!s.empty, `Empty RGB literal.`);
-
+	
 	//decimal or hex number
 	if(s[0].inRange('0', '9')) return RGB(s.toInt);
-
+	
 	//rgb(0,0,255)
 	if(s.isWild("*?(*?,*?,*?)"))
-		if(wild[0].toUpper.among("RGB", "RGB8"))
-			return RGB(wild.ints(1), wild.ints(2), wild.ints(3));
-
+	if(wild[0].toUpper.among("RGB", "RGB8"))
+	return RGB(wild.ints(1), wild.ints(2), wild.ints(3));
+	
 	return colorByName(s, mustExists);
 }
 
-unittest{
+unittest {
 	assert(toRGB("blue")==RGB(0, 0, 255));
 	assert(toRGB("Red").rgbToFloat==vec3(1, 0, 0));
 }
@@ -666,96 +677,97 @@ unittest{
 
 //todo: there should be a bezier interpolated colormap too. RegressionColorMap is so bad for HSV and JET for example.
 
-class ColorMap{
+class ColorMap {
 	string name, category;
 	int index;
-
+	
 	abstract RGB eval(float x);
-
-	T[] toArray(T=RGB)(int len){
+	
+	T[] toArray(T=RGB)(int len) {
 		float invLen = 1.0f/max(len-1, 1);
 		return iota(len).map!(i => eval(i*invLen).convertPixel!T).array;
 	}
 }
 
 
-class RegressionColorMap: ColorMap{
+class RegressionColorMap: ColorMap {
 	double[][3] polys;
-
-	this(string name, string category, double[][3] polys){
+	
+	this(string name, string category, double[][3] polys) {
 		this.name = name;
 		this.category = category;
 		this.polys = polys;
 	}
-
-	override RGB eval(float x){
+	
+	override RGB eval(float x) {
 		x = x.clamp(0, 1);
 		return vec3(evalPoly(x, polys[0]), evalPoly(x, polys[1]), evalPoly(x, polys[2])).floatToRgb;
 	}
 }
 
 
-class DistinctColorMap: ColorMap{
+class DistinctColorMap: ColorMap {
 	RGB[] pal;
 	bool isLinear;
-
-	this(string name, string category, int[3][] pal, bool isLinear=false){
+	
+	this(string name, string category, int[3][] pal, bool isLinear=false) {
 		this.name = name;
 		this.category = category;
 		this.pal = pal.map!(c => RGB(c[0], c[1], c[2])).array;
 		this.isLinear = isLinear;
 	}
-
-	override RGB eval(float x){
+	
+	override RGB eval(float x) {
 		if(x<=0) return pal[0];
 		if(x>=0.9999) return pal[$-1];
-
-		if(isLinear){
+		
+		if(isLinear) {
 			x *= pal.length-1;
 			const i = x.ifloor, fr = x.fract; //todo: modf
 			return mix(pal[i], pal[i+1], fr);
-		}else{ // nearest
+		}else {
+			 //nearest
 			x *= pal.length;
 			return pal[x.ifloor];
 		}
 	}
 }
 
-class ColorMapCategory{
+class ColorMapCategory {
 	string name;
 	ColorMaps colorMaps;
 	alias colorMaps this;
-
-	this(string name){
+	
+	this(string name) {
 		this.name = name;
 		colorMaps = new ColorMaps;
 	}
 }
 
-class ColorMapCategories{
+class ColorMapCategories {
 	ColorMapCategory[string] byName;
 	ColorMapCategory[] byIndex;
-
-	private void add(ColorMap m){
-		if(!(m.category in byName)){
+	
+	private void add(ColorMap m) {
+		if(!(m.category in byName)) {
 			auto cat = new ColorMapCategory(m.category);
 			byName[m.category] = cat;
 			byIndex ~= cat;
 		}
 		byName[m.category].colorMaps.add(m);
 	}
-
+	
 	@property auto length() const { return byIndex.length; }
-	auto opIndex(size_t idx){ return byIndex[idx]; }
-	auto opIndex(string name){ return byName[name]; }
-
-	auto opDispatch(string name)(){ return byName[name]; }
-
+	auto opIndex(size_t idx) { return byIndex[idx]; }
+	auto opIndex(string name) { return byName[name]; }
+	
+	auto opDispatch(string name)() { return byName[name]; }
+	
 	//todo: Range
-
-	int opApply(int delegate(ColorMapCategory) dg){
+	
+	int opApply(int delegate(ColorMapCategory) dg) {
 		int result = 0;
-		foreach(c; byIndex){
+		foreach(c; byIndex) {
 			result = dg(c);
 			if(result) break;
 		}
@@ -763,34 +775,32 @@ class ColorMapCategories{
 	}
 }
 
-class ColorMaps{
+class ColorMaps {
 	ColorMap[string] byName;
 	ColorMap[] byIndex;
-
+	
 	ColorMapCategories categories;
-
-	private void add(ColorMap m){
+	
+	private void add(ColorMap m) {
 		import std.conv; //utils
 		m.index = byIndex.length.to!int;
 		byIndex ~= m;
 		byName[m.name] = m;
 	}
-
-	this(){
-		categories = new ColorMapCategories;
-	}
-
+	
+	this() { categories = new ColorMapCategories; }
+	
 	@property auto length() const { return byIndex.length; }
-	auto opIndex(size_t idx){ return byIndex[idx]; }
-	auto opIndex(string name){ return byName[name]; }
-
-	auto opDispatch(string name)(){ return byName[name]; }
-
+	auto opIndex(size_t idx) { return byIndex[idx]; }
+	auto opIndex(string name) { return byName[name]; }
+	
+	auto opDispatch(string name)() { return byName[name]; }
+	
 	bool opBinaryRight(string op)(string lhs) const if(op=="in") { return (lhs in byName) !is null; }
-
-	int opApply(int delegate(ColorMap) dg){
+	
+	int opApply(int delegate(ColorMap) dg) {
 		int result = 0;
-		foreach(c; byIndex){
+		foreach(c; byIndex) {
 			result = dg(c);
 			if(result) break;
 		}
@@ -799,15 +809,17 @@ class ColorMaps{
 }
 
 class StandardColorMaps : ColorMaps {
-
-	this(){
-		initColorMaps((ColorMap m){
-			add(m);
-			categories.add(m);
-		});
+	
+	this() {
+		initColorMaps(
+			(ColorMap m){
+				add(m);
+				categories.add(m);
+			}
+		);
 	}
-
-	private static void initColorMaps(void delegate(ColorMap) add){
+	
+	private static void initColorMaps(void delegate(ColorMap) add) {
 		//Exported from python
 		add(new RegressionColorMap("viridis", "Uniform", [[0.2753652,-0.05184015,1.717864,-13.64572,24.0259,-11.33279],[0.01529448,1.245687,-0.1677699,-0.1776745],[0.331099,1.350983,0.6340607,-21.84333,62.08875,-70.69913,28.27274]]));
 		add(new RegressionColorMap("plasma", "Uniform", [[0.07050842,1.846171,-0.5688886,-0.3956234],[0.02749319,0.1857873,-7.011921,40.69019,-79.73788,68.91157,-22.09464],[0.5189733,1.480299,-4.612459,3.238719,-0.488916]]));
@@ -892,16 +904,16 @@ class StandardColorMaps : ColorMaps {
 		add(new RegressionColorMap("nipy_spectral", "Miscellaneous", [[-0.001206257,53.31128,-4299.214,163237.6,-3316665,4.133337e+07,-3.454638e+08,2.046836e+09,-8.901047e+09,2.903197e+10,-7.191536e+10,1.360109e+11,-1.961268e+11,2.137749e+11,-1.729889e+11,1.006479e+11,-3.977534e+10,9.554834e+09,-1.052669e+09],[-9.864143e-05,-13.25711,1333.054,-52527.71,1102747,-1.408904e+07,1.183304e+08,-6.873801e+08,2.859697e+09,-8.719151e+09,1.974626e+10,-3.337548e+10,4.193378e+10,-3.860321e+10,2.528916e+10,-1.116758e+10,2.986101e+09,-3.693357e+08,1853919],[-0.0006056399,5.900594,159.1363,4982.974,-301372.2,5445169,-5.407943e+07,3.463394e+08,-1.540796e+09,4.964353e+09,-1.187217e+10,2.135994e+10,-2.904603e+10,2.973474e+10,-2.259205e+10,1.237664e+10,-4.630595e+09,1.061123e+09,-1.125584e+08]]));
 		add(new RegressionColorMap("gist_ncar", "Miscellaneous", [[-0.0003636799,16.80427,-1564.536,57053.79,-1119805,1.359276e+07,-1.105008e+08,6.333613e+08,-2.650792e+09,8.297157e+09,-1.972478e+10,3.590456e+10,-5.009425e+10,5.320661e+10,-4.230506e+10,2.440159e+10,-9.646657e+09,2.338251e+09,-2.620135e+08],[0.001020357,-73.79832,6854.985,-216902.5,3557532,-3.561335e+07,2.374844e+08,-1.10875e+09,3.724163e+09,-9.093487e+09,1.602623e+10,-1.966945e+10,1.497659e+10,-3.485777e+09,-6.402194e+09,8.532396e+09,-5.089658e+09,1.599026e+09,-2.143133e+08],[0.5014435,100.752,-9618.786,320063,-5681982,6.387999e+07,-4.958721e+08,2.793526e+09,-1.177335e+10,3.779987e+10,-9.333461e+10,1.777016e+11,-2.59914e+11,2.889721e+11,-2.394783e+11,1.430871e+11,-5.817503e+10,1.439236e+10,-1.633829e+09]]));
 	}
-
+	
 }
 
 alias colorMaps = Singleton!StandardColorMaps;
 
-// Ega color codes
-struct EgaColor/*(bool enabled = true)*/{
+//Ega color codes
+struct EgaColor/*(bool enabled = true)*/ {
 	enum enabled = true;
 	static foreach(idx, s; "black blue green cyan red magenta brown white gray ltBlue ltGreen ltCyan ltRed ltMagenta yellow ltWhite".split(' '))
-		mixin(format!`static auto %s(string s){ return enabled ? "\33\%s"~s~"\33\7" : s; }`(s, idx.to!string(8)));
-
+	mixin(format!`static auto %s(string s){ return enabled ? "\33\%s"~s~"\33\7" : s; }`(s, idx.to!string(8)));
+	
 	//Usage: Print(EgaColor.red("Red text"));
 }

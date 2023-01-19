@@ -1,20 +1,19 @@
-module het.opengl;
+module het.opengl;/+DIDE+/
 
 pragma(lib, "opengl32.lib");
 
-__gshared{
-	bool logVBO = 0;
-}
+__gshared { bool logVBO = 0; }
 
 enum UseOldTexImage2D = false; //otherwise use TexStorage2D instead!
 enum LOG_shaderLoadingTimes = false;
-/+glResManager plan:
-Detailed list:
-	Shader	 : name, handleV, handleG, handleF, flags:VGF, size
-	VBO	 : name, handle, recordType, length, size
-	GLTexture : name, handle, isCustom, type, width, height, mip, size
-
-Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  total:size
+/+
+	glResManager plan:
+	Detailed list:
+		Shader	 : name, handleV, handleG, handleF, flags:VGF, size
+		VBO	 : name, handle, recordType, length, size
+		GLTexture : name, handle, isCustom, type, width, height, mip, size
+	
+	Summarized list: Shader: count/size,  VBO: count/size, GLTexture: count/size,  total:size
 +/
 
 //todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
@@ -31,7 +30,8 @@ alias gl = Singleton!GLFuncts;
 
 //! GL enums///////////////////////////////////////////////////////////
 
-enum{//ErrorCode////////////////////////
+enum  {
+	//ErrorCode////////////////////////
 	GL_NO_ERROR	           = 0     ,
 	GL_INVALID_ENUM	           = 0x0500,
 	GL_INVALID_VALUE	           = 0x0501,
@@ -41,7 +41,8 @@ enum{//ErrorCode////////////////////////
 	GL_OUT_OF_MEMORY	           =	0x0505,
 }
 
-enum{//Primitives////////////////////////
+enum  {
+	//Primitives////////////////////////
 	GL_POINTS	    =	 0,
 	GL_LINES	    =	 1,
 	GL_LINE_LOOP	    =	 2,
@@ -58,12 +59,14 @@ enum{//Primitives////////////////////////
 	GL_TRIANGLE_STRIP_ADJACENCY	    = 13,
 }
 
-enum{ //Booleans////////////////////////
+enum  {
+	 //Booleans////////////////////////
 	GL_FALSE	                       = 0,
 	GL_TRUE	                       = 1,
 }
 
-enum{//AccumOp////////////////////////
+enum  {
+	//AccumOp////////////////////////
 	GL_ACCUM	                      = 0x0100,
 	GL_LOAD	                      =	0x0101,
 	GL_RETURN		= 0x0102,
@@ -71,25 +74,28 @@ enum{//AccumOp////////////////////////
 	GL_ADD	                      = 0x0104,
 }
 
-enum{//AlphaFunction////////////////////////
+enum  {
+	//AlphaFunction////////////////////////
 	GL_NEVER	                    = 0x0200,
 	GL_LESS	                    = 0x0201,
 	GL_EQUAL	                    = 0x0202,
 	GL_LEQUAL	                    = 0x0203,
 	GL_GREATER	                    = 0x0204,
 	GL_NOTEQUAL		= 0x0205,
-	GL_GEQUAL					                =	0x0206,
-	GL_ALWAYS					                =	0x0207,
+	GL_GEQUAL							              =	0x0206,
+	GL_ALWAYS							              =	0x0207,
 }
 
-enum{//GetString////////////////////////
+enum  {
+	//GetString////////////////////////
 	GL_VENDOR	                  =	0x1F00,
 	GL_RENDERER		= 0x1F01,
 	GL_VERSION	                  = 0x1F02,
 	GL_EXTENSIONS	                  = 0x1F03,
 }
 
-enum{// AttribMask////////////////////////
+enum  {
+	//AttribMask////////////////////////
 	GL_CURRENT_BIT		= 0x00000001,
 	GL_POINT_BIT	         =	0x00000002,
 	GL_LINE_BIT	         = 0x00000004,
@@ -98,22 +104,23 @@ enum{// AttribMask////////////////////////
 	GL_PIXEL_MODE_BIT		= 0x00000020,
 	GL_LIGHTING_BIT	         =	0x00000040,
 	GL_FOG_BIT	         = 0x00000080,
-	GL_DEPTH_BUFFER_BIT					     =	0x00000100,
-	GL_ACCUM_BUFFER_BIT					     =	0x00000200,
+	GL_DEPTH_BUFFER_BIT							   =	0x00000100,
+	GL_ACCUM_BUFFER_BIT							   =	0x00000200,
 	GL_STENCIL_BUFFER_BIT		=	0x00000400,
 	GL_VIEWPORT_BIT		= 0x00000800,
 	GL_TRANSFORM_BIT	         = 0x00001000,
 	GL_ENABLE_BIT	         = 0x00002000,
 	GL_COLOR_BUFFER_BIT	         = 0x00004000,
-	GL_HINT_BIT					     = 0x00008000,
-	GL_EVAL_BIT					     = 0x00010000,
-	GL_LIST_BIT					     = 0x00020000,
-	GL_TEXTURE_BIT					     = 0x00040000,
-	GL_SCISSOR_BIT					     = 0x00080000,
+	GL_HINT_BIT							   = 0x00008000,
+	GL_EVAL_BIT							   = 0x00010000,
+	GL_LIST_BIT							   = 0x00020000,
+	GL_TEXTURE_BIT							   = 0x00040000,
+	GL_SCISSOR_BIT							   = 0x00080000,
 	GL_ALL_ATTRIB_BITS	         = 0x000fffff,
 }
 
-enum{//BlendingFactor////////////////////////
+enum  {
+	//BlendingFactor////////////////////////
 	GL_ZERO	    = 0	    ,
 	GL_ONE	    = 1		,
 	GL_SRC_COLOR	    =	0x0300,
@@ -131,7 +138,8 @@ enum{//BlendingFactor////////////////////////
 	GL_ONE_MINUS_CONSTANT_ALPHA	    = 0x8004,
 }
 
-enum{//DataType////////////////////////
+enum  {
+	//DataType////////////////////////
 	GL_BYTE	              = 0x1400,
 	GL_UNSIGNED_BYTE	              = 0x1401,
 	GL_SHORT	              = 0x1402,
@@ -145,18 +153,21 @@ enum{//DataType////////////////////////
 	GL_DOUBLE	              = 0x140A,
 }
 
-enum{//FrontFaceDirection////////////////////////
+enum  {
+	//FrontFaceDirection////////////////////////
 	GL_CW	                         = 0x0900,
 	GL_CCW	                         = 0x0901,
 }
 
-enum{//Face sides////////////////////////
+enum  {
+	//Face sides////////////////////////
 	GL_FRONT	              = 1028,
 	GL_BACK	              = 1029,
 	GL_FRONT_AND_BACK	              = 1032,
 }
 
-enum{//PixelFormat////////////////////////
+enum  {
+	//PixelFormat////////////////////////
 	GL_COLOR_INDEX	             =	0x1900,
 	GL_STENCIL_INDEX		=	0x1901,
 	GL_DEPTH_COMPONENT			= 0x1902,
@@ -170,19 +181,21 @@ enum{//PixelFormat////////////////////////
 	GL_LUMINANCE_ALPHA	             = 0x190A,
 }
 
-enum{//PolygonMode////////////////////////
+enum  {
+	//PolygonMode////////////////////////
 	GL_POINT	                       = 0x1B00,
-	GL_LINE					                   = 0x1B01,
-	GL_FILL					                   = 0x1B02,
+	GL_LINE							                 = 0x1B01,
+	GL_FILL							                 = 0x1B02,
 }
 
-enum{//GetTarget////////////////////////
-	GL_CURRENT_COLOR					  = 0x0B00,
-	GL_CURRENT_INDEX					  = 0x0B01,
+enum  {
+	//GetTarget////////////////////////
+	GL_CURRENT_COLOR						 = 0x0B00,
+	GL_CURRENT_INDEX						 = 0x0B01,
 	GL_CURRENT_NORMAL	      = 0x0B02,
 	GL_CURRENT_TEXTURE_COORDS		= 0x0B03,
-	GL_CURRENT_RASTER_COLOR					  =	0x0B04,
-	GL_CURRENT_RASTER_INDEX					  =	0x0B05,
+	GL_CURRENT_RASTER_COLOR						 =	0x0B04,
+	GL_CURRENT_RASTER_INDEX						 =	0x0B05,
 	GL_CURRENT_RASTER_TEXTURE_COORDS= 0x0B06,
 	GL_CURRENT_RASTER_POSITION      = 0x0B07,
 	GL_CURRENT_RASTER_POSITION_VALID= 0x0B08,
@@ -346,7 +359,8 @@ enum{//GetTarget////////////////////////
 	GL_TEXTURE_BORDER	    = 0x1005,
 }
 
-enum{//getShaderiv////////////////////////
+enum  {
+	//getShaderiv////////////////////////
 	GL_SHADER_TYPE	        =	35663,
 	GL_DELETE_STATUS		= 35712,
 	GL_COMPILE_STATUS	        = 35713,
@@ -354,53 +368,56 @@ enum{//getShaderiv////////////////////////
 	GL_SHADER_SOURCE_LENGTH	        = 35720,
 }
 
-enum{//getProgramiv////////////////////////
+enum  {
+	//getProgramiv////////////////////////
 	GL_LINK_STATUS                  = 35714,
 }
 
-enum{//ARB_vertex_buffer_object////////////////////////
+enum  {
+	//ARB_vertex_buffer_object////////////////////////
 	GL_ARRAY_BUFFER	      = 0x8892,
-	GL_ELEMENT_ARRAY_BUFFER					  = 0x8893,
-	GL_ARRAY_BUFFER_BINDING					  = 0x8894,
+	GL_ELEMENT_ARRAY_BUFFER						 = 0x8893,
+	GL_ARRAY_BUFFER_BINDING						 = 0x8894,
 	GL_ELEMENT_ARRAY_BUFFER_BINDING	      = 0x8895,
-	GL_VERTEX_ARRAY_BUFFER_BINDING					  = 0x8896,
-	GL_NORMAL_ARRAY_BUFFER_BINDING					  = 0x8897,
-	GL_COLOR_ARRAY_BUFFER_BINDING					  = 0x8898,
-	GL_INDEX_ARRAY_BUFFER_BINDING					  = 0x8899,
+	GL_VERTEX_ARRAY_BUFFER_BINDING						 = 0x8896,
+	GL_NORMAL_ARRAY_BUFFER_BINDING						 = 0x8897,
+	GL_COLOR_ARRAY_BUFFER_BINDING						 = 0x8898,
+	GL_INDEX_ARRAY_BUFFER_BINDING						 = 0x8899,
 	GL_TEXTURE_COORD_ARRAY_BUFFER_BINDING	      = 0x889A,
 	GL_EDGE_FLAG_ARRAY_BUFFER_BINDING	      = 0x889B,
 	GL_SECONDARY_COLOR_ARRAY_BUFFER_BINDING	      = 0x889C,
 	GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING	      = 0x889D,
 	GL_WEIGHT_ARRAY_BUFFER_BINDING	      = 0x889E,
 	GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING	      = 0x889F,
-	GL_STREAM_DRAW					  = 0x88E0,
-	GL_STREAM_READ					  = 0x88E1,
-	GL_STREAM_COPY					  = 0x88E2,
-	GL_STATIC_DRAW					  = 0x88E4,
-	GL_STATIC_READ					  = 0x88E5,
-	GL_STATIC_COPY					  = 0x88E6,
-	GL_DYNAMIC_DRAW					  = 0x88E8,
-	GL_DYNAMIC_READ					  = 0x88E9,
-	GL_DYNAMIC_COPY					  = 0x88EA,
+	GL_STREAM_DRAW						 = 0x88E0,
+	GL_STREAM_READ						 = 0x88E1,
+	GL_STREAM_COPY						 = 0x88E2,
+	GL_STATIC_DRAW						 = 0x88E4,
+	GL_STATIC_READ						 = 0x88E5,
+	GL_STATIC_COPY						 = 0x88E6,
+	GL_DYNAMIC_DRAW						 = 0x88E8,
+	GL_DYNAMIC_READ						 = 0x88E9,
+	GL_DYNAMIC_COPY						 = 0x88EA,
 	GL_READ_ONLY	      = 0x88B8,
-	GL_WRITE_ONLY					  = 0x88B9,
-	GL_READ_WRITE					  = 0x88BA,
+	GL_WRITE_ONLY						 = 0x88B9,
+	GL_READ_WRITE						 = 0x88BA,
 	GL_BUFFER_SIZE	      = 0x8764,
 	GL_BUFFER_USAGE	      = 0x8765,
-	GL_BUFFER_ACCESS					  = 0x88BB,
-	GL_BUFFER_MAPPED					  = 0x88BC,
+	GL_BUFFER_ACCESS						 = 0x88BB,
+	GL_BUFFER_MAPPED						 = 0x88BC,
 	GL_BUFFER_MAP_POINTER	      = 0x88BD,
 }
 
-enum{//ARB_shader_objects////////////////////////
+enum  {
+	//ARB_shader_objects////////////////////////
 	GL_PROGRAM_OBJECT	          = 0x8B40,
 	GL_OBJECT_TYPE	          = 0x8B4E,
 	GL_OBJECT_SUBTYPE	          = 0x8B4F,
 	GL_OBJECT_DELETE_STATUS	          = 0x8B80,
 	GL_OBJECT_COMPILE_STATUS	          = 0x8B81,
 	GL_OBJECT_LINK_STATUS	          = 0x8B82,
-	GL_OBJECT_VALIDATE_STATUS					      = 0x8B83,
-	GL_OBJECT_INFO_LOG_LENGTH					      = 0x8B84,
+	GL_OBJECT_VALIDATE_STATUS							    = 0x8B83,
+	GL_OBJECT_INFO_LOG_LENGTH							    = 0x8B84,
 	GL_OBJECT_ATTACHED_OBJECTS	          = 0x8B85,
 	GL_OBJECT_ACTIVE_UNIFORMS	          = 0x8B86,
 	GL_OBJECT_ACTIVE_UNIFORM_MAX_LENGTH	          = 0x8B87,
@@ -409,20 +426,21 @@ enum{//ARB_shader_objects////////////////////////
 	GL_FLOAT_VEC2		= 0x8B50,
 	GL_FLOAT_VEC3		= 0x8B51,
 	GL_FLOAT_VEC4		= 0x8B52,
-	GL_INT_VEC2					      =	0x8B53,
-	GL_INT_VEC3					      =	0x8B54,
-	GL_INT_VEC4					      =	0x8B55,
+	GL_INT_VEC2							    =	0x8B53,
+	GL_INT_VEC3							    =	0x8B54,
+	GL_INT_VEC4							    =	0x8B55,
 	GL_BOOL	          = 0x8B56,
-	GL_BOOL_VEC2					      = 0x8B57,
-	GL_BOOL_VEC3					      = 0x8B58,
-	GL_BOOL_VEC4					      = 0x8B59,
-	GL_FLOAT_MAT2					      = 0x8B5A,
-	GL_FLOAT_MAT3					      = 0x8B5B,
-	GL_FLOAT_MAT4					      = 0x8B5C,
+	GL_BOOL_VEC2							    = 0x8B57,
+	GL_BOOL_VEC3							    = 0x8B58,
+	GL_BOOL_VEC4							    = 0x8B59,
+	GL_FLOAT_MAT2							    = 0x8B5A,
+	GL_FLOAT_MAT3							    = 0x8B5B,
+	GL_FLOAT_MAT4							    = 0x8B5C,
 	GL_ACTIVE_ATTRIBUTES	          = 35721,
 }
 
-enum{//ARB_vertex_shader////////////////////////
+enum  {
+	//ARB_vertex_shader////////////////////////
 	GL_VERTEX_SHADER	        = 0x8B31,
 	GL_MAX_VERTEX_UNIFORM_COMPONENTS	        = 0x8B4A,
 	GL_MAX_VARYING_FLOATS	        = 0x8B4B,
@@ -433,13 +451,15 @@ enum{//ARB_vertex_shader////////////////////////
 	GL_MAX_VERTEX_OUTPUT_COMPONENTS	        = 0x9122,
 }
 
-enum{//ARB_fragment_shader////////////////////////
+enum  {
+	//ARB_fragment_shader////////////////////////
 	GL_FRAGMENT_SHADER	           = 0x8B30,
 	GL_MAX_FRAGMENT_UNIFORM_COMPONENTS		= 0x8B49,
 	GL_MAX_FRAGMENT_INPUT_COMPONENTS	           =	0x9125,
 }
 
-enum{//ARB_geometry_shader////////////////////////
+enum  {
+	//ARB_geometry_shader////////////////////////
 	GL_GEOMETRY_SHADER	      = 36313,
 	GL_MAX_GEOMETRY_TEXTURE_IMAGE_UNITS	      = 0x8C29,
 	GL_GEOMETRY_VERTICES_OUT		= 0x8916,
@@ -452,14 +472,15 @@ enum{//ARB_geometry_shader////////////////////////
 	GL_MAX_GEOMETRY_OUTPUT_COMPONENTS	      = 0x9124,
 }
 
-enum{//other////////////////////////
+enum  {
+	//other////////////////////////
 	GL_MULTISAMPLE                                = 0x809D,
-
+	
 	WGL_NUMBER_PIXEL_FORMATS_ARB	              = 0x2000,
 	WGL_DRAW_TO_WINDOW_ARB		= 0x2001,
 	WGL_DRAW_TO_BITMAP_ARB		= 0x2002,
-	WGL_ACCELERATION_ARB					          =	0x2003,
-	WGL_NEED_PALETTE_ARB					          =	0x2004,
+	WGL_ACCELERATION_ARB							        =	0x2003,
+	WGL_NEED_PALETTE_ARB							        =	0x2004,
 	WGL_NEED_SYSTEM_PALETTE_ARB	              = 0x2005,
 	WGL_SWAP_LAYER_BUFFERS_ARB	              = 0x2006,
 	WGL_SWAP_METHOD_ARB	              = 0x2007,
@@ -469,12 +490,12 @@ enum{//other////////////////////////
 	WGL_TRANSPARENT_RED_VALUE_ARB	              =	0x2037,
 	WGL_TRANSPARENT_GREEN_VALUE_ARB		= 0x2038,
 	WGL_TRANSPARENT_BLUE_VALUE_ARB	              = 0x2039,
-	WGL_TRANSPARENT_ALPHA_VALUE_ARB					          = 0x203A,
-	WGL_TRANSPARENT_INDEX_VALUE_ARB					          = 0x203B,
+	WGL_TRANSPARENT_ALPHA_VALUE_ARB							        = 0x203A,
+	WGL_TRANSPARENT_INDEX_VALUE_ARB							        = 0x203B,
 	WGL_SHARE_DEPTH_ARB	              =	0x200C,
 	WGL_SHARE_STENCIL_ARB		= 0x200D,
-	WGL_SHARE_ACCUM_ARB					          =	0x200E,
-	WGL_SUPPORT_GDI_ARB					          =	0x200F,
+	WGL_SHARE_ACCUM_ARB							        =	0x200E,
+	WGL_SUPPORT_GDI_ARB							        =	0x200F,
 	WGL_SUPPORT_OPENGL_ARB	              = 0x2010,
 	WGL_DOUBLE_BUFFER_ARB	              = 0x2011,
 	WGL_STEREO_ARB	              = 0x2012,
@@ -485,8 +506,8 @@ enum{//other////////////////////////
 	WGL_GREEN_BITS_ARB	              = 0x2017,
 	WGL_GREEN_SHIFT_ARB		= 0x2018,
 	WGL_BLUE_BITS_ARB	              =	0x2019,
-	WGL_BLUE_SHIFT_ARB					          = 0x201A,
-	WGL_ALPHA_BITS_ARB					          = 0x201B,
+	WGL_BLUE_SHIFT_ARB							        = 0x201A,
+	WGL_ALPHA_BITS_ARB							        = 0x201B,
 	WGL_ALPHA_SHIFT_ARB	              = 0x201C,
 	WGL_ACCUM_BITS_ARB	              = 0x201D,
 	WGL_ACCUM_RED_BITS_ARB	              =	0x201E,
@@ -496,107 +517,108 @@ enum{//other////////////////////////
 	WGL_DEPTH_BITS_ARB	              =	0x2022,
 	WGL_STENCIL_BITS_ARB		= 0x2023,
 	WGL_AUX_BUFFERS_ARB	              = 0x2024,
-
+	
 	WGL_NO_ACCELERATION_ARB	                 = 0x2025,
 	WGL_GENERIC_ACCELERATION_ARB	                 = 0x2026,
 	WGL_FULL_ACCELERATION_ARB	                 = 0x2027,
-
+	
 	WGL_SWAP_EXCHANGE_ARB	                       = 0x2028,
 	WGL_SWAP_COPY_ARB	                       = 0x2029,
 	WGL_SWAP_UNDEFINED_ARB	                       = 0x202A,
-
+	
 	WGL_TYPE_RGBA_ARB	                      = 0x202B,
 	WGL_TYPE_COLORINDEX_ARB	                      = 0x202C,
-
+	
 	WGL_SAMPLE_BUFFERS_ARB	                       = 0x2041,
 	WGL_SAMPLES_ARB	                       = 0x2042,
 }
 
-// TEXTURING
+//TEXTURING
 
-enum{//texture_object////////////////////////
-	GL_TEXTURE_PRIORITY					                    =	0x8066,
-	GL_TEXTURE_RESIDENT					                    =	0x8067,
+enum  {
+	//texture_object////////////////////////
+	GL_TEXTURE_PRIORITY							                  =	0x8066,
+	GL_TEXTURE_RESIDENT							                  =	0x8067,
 	GL_TEXTURE_BINDING_1D		= 0x8068,
 	GL_TEXTURE_BINDING_2D		= 0x8069,
-
+	
 	GL_CLAMP_TO_EDGE                              = 0x812F,
-
+	
 	GL_MAX_TEXTURE_IMAGE_UNITS                    = 0x8872,
 }
 
-enum{// texture format////////////////////////
-	GL_ALPHA4					                = 0x803B,
-	GL_ALPHA8					                = 0x803C,
-	GL_ALPHA12					                = 0x803D,
-	GL_ALPHA16					                = 0x803E,
-	GL_LUMINANCE4					                = 0x803F,
-	GL_LUMINANCE8					                = 0x8040,
-	GL_LUMINANCE12					                = 0x8041,
-	GL_LUMINANCE16					                = 0x8042,
-	GL_LUMINANCE4_ALPHA4					                = 0x8043,
-	GL_LUMINANCE6_ALPHA2					                = 0x8044,
-	GL_LUMINANCE8_ALPHA8					                = 0x8045,
+enum  {
+	//texture format////////////////////////
+	GL_ALPHA4							              = 0x803B,
+	GL_ALPHA8							              = 0x803C,
+	GL_ALPHA12							              = 0x803D,
+	GL_ALPHA16							              = 0x803E,
+	GL_LUMINANCE4							              = 0x803F,
+	GL_LUMINANCE8							              = 0x8040,
+	GL_LUMINANCE12							              = 0x8041,
+	GL_LUMINANCE16							              = 0x8042,
+	GL_LUMINANCE4_ALPHA4							              = 0x8043,
+	GL_LUMINANCE6_ALPHA2							              = 0x8044,
+	GL_LUMINANCE8_ALPHA8							              = 0x8045,
 	GL_LUMINANCE12_ALPHA4	                    = 0x8046,
-	GL_LUMINANCE12_ALPHA12					                = 0x8047,
-	GL_LUMINANCE16_ALPHA16					                = 0x8048,
+	GL_LUMINANCE12_ALPHA12							              = 0x8047,
+	GL_LUMINANCE16_ALPHA16							              = 0x8048,
 	GL_INTENSITY	                    = 0x8049,
-	GL_INTENSITY4					                = 0x804A,
-	GL_INTENSITY8					                = 0x804B,
-	GL_INTENSITY12					                = 0x804C,
-	GL_INTENSITY16					                = 0x804D,
+	GL_INTENSITY4							              = 0x804A,
+	GL_INTENSITY8							              = 0x804B,
+	GL_INTENSITY12							              = 0x804C,
+	GL_INTENSITY16							              = 0x804D,
 	GL_R3_G3_B2	                    = 0x2A10,
-	GL_RGB4					                = 0x804F,
-	GL_RGB5					                = 0x8050,
-	GL_RGB8					                = 0x8051,
-	GL_RGB10					                =	0x8052,
-	GL_RGB12					                =	0x8053,
-	GL_RGB16					                =	0x8054,
-	GL_RGBA2					                =	0x8055,
-	GL_RGBA4					                =	0x8056,
+	GL_RGB4							              = 0x804F,
+	GL_RGB5							              = 0x8050,
+	GL_RGB8							              = 0x8051,
+	GL_RGB10							              =	0x8052,
+	GL_RGB12							              =	0x8053,
+	GL_RGB16							              =	0x8054,
+	GL_RGBA2							              =	0x8055,
+	GL_RGBA4							              =	0x8056,
 	GL_RGB5_A1		= 0x8057,
 	GL_RGBA8	                    =	0x8058,
 	GL_RGB10_A2			= 0x8059,
-	GL_RGBA12					                =	0x805A,
-	GL_RGBA16					                =	0x805B,
+	GL_RGBA12							              =	0x805A,
+	GL_RGBA16							              =	0x805B,
 	GL_TEXTURE_RED_SIZE	                    =	0x805C,
 	GL_TEXTURE_GREEN_SIZE		= 0x805D,
 	GL_TEXTURE_BLUE_SIZE	                    = 0x805E,
 	GL_TEXTURE_ALPHA_SIZE	                    = 0x805F,
-	GL_TEXTURE_LUMINANCE_SIZE					                = 0x8060,
-	GL_TEXTURE_INTENSITY_SIZE					                = 0x8061,
-	GL_PROXY_TEXTURE_1D					                = 0x8063,
-	GL_PROXY_TEXTURE_2D					                = 0x8064,
+	GL_TEXTURE_LUMINANCE_SIZE							              = 0x8060,
+	GL_TEXTURE_INTENSITY_SIZE							              = 0x8061,
+	GL_PROXY_TEXTURE_1D							              = 0x8063,
+	GL_PROXY_TEXTURE_2D							              = 0x8064,
 }
 
-enum{
-	GL_TEXTURE0                                   = 0x84C0,
-}
-auto GL_TEXTURE(const int n){ return GL_TEXTURE0+n; }
+enum  { GL_TEXTURE0                                   = 0x84C0, }
+auto GL_TEXTURE(const int n) { return GL_TEXTURE0+n; }
 
-enum{
+enum  {
 	GL_NEAREST	       = 0x2600,
 	GL_LINEAR	       = 0x2601,
 	GL_NEAREST_MIPMAP_NEAREST	       = 0x2700,
-	GL_LINEAR_MIPMAP_NEAREST					   = 0x2701,
-	GL_NEAREST_MIPMAP_LINEAR					   = 0x2702,
+	GL_LINEAR_MIPMAP_NEAREST							 = 0x2701,
+	GL_NEAREST_MIPMAP_LINEAR							 = 0x2702,
 	GL_LINEAR_MIPMAP_LINEAR			= 0x2703,
-	GL_TEXTURE_MAG_FILTER					   =	0x2800,
-	GL_TEXTURE_MIN_FILTER					   =	0x2801,
-	GL_TEXTURE_WRAP_S					   = 0x2802,
-	GL_TEXTURE_WRAP_T					   = 0x2803,
+	GL_TEXTURE_MAG_FILTER							 =	0x2800,
+	GL_TEXTURE_MIN_FILTER							 =	0x2801,
+	GL_TEXTURE_WRAP_S							 = 0x2802,
+	GL_TEXTURE_WRAP_T							 = 0x2803,
 	GL_CLAMP	       = 0x2900,
 	GL_REPEAT	       = 0x2901,
 }
 
-enum{
+enum  {
 	GL_TEXTURE_MAX_ANISOTROPY_EXT	= 0x84FE,
 	GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT	= 0x84FF,
 }
 
 //! GLU enums /////////////////////////////////////
 
-enum{// TessCallback ////////////////////////
+enum  {
+	//TessCallback ////////////////////////
 	GLU_TESS_BEGIN	          = 100100,
 	GLU_BEGIN	          = 100100,
 	GLU_TESS_VERTEX	          = 100101,
@@ -615,21 +637,24 @@ enum{// TessCallback ////////////////////////
 	GLU_TESS_COMBINE_DATA	          =	100111,
 }
 
-enum TessContour:int {// TessContour////////////////////////
+enum TessContour:int {
+	//TessContour////////////////////////
 	GLU_CW	                     = 100120,
 	GLU_CCW	                     = 100121,
-	GLU_INTERIOR					                 = 100122,
-	GLU_EXTERIOR					                 = 100123,
+	GLU_INTERIOR							               = 100122,
+	GLU_EXTERIOR							               = 100123,
 	GLU_UNKNOWN	                     = 100124,
 }
 
-enum{// TessProperty////////////////////////
+enum  {
+	//TessProperty////////////////////////
 	GLU_TESS_WINDING_RULE	           = 100140,
 	GLU_TESS_BOUNDARY_ONLY	           = 100141,
 	GLU_TESS_TOLERANCE	           = 100142,
 }
 
-enum{// TessError ////////////////////////
+enum  {
+	//TessError ////////////////////////
 	GLU_TESS_MISSING_BEGIN_POLYGON		= 100151,
 	GLU_TESS_MISSING_BEGIN_CONTOUR		= 100152,
 	GLU_TESS_MISSING_END_POLYGON			 =	100153,
@@ -640,7 +665,8 @@ enum{// TessError ////////////////////////
 	GLU_TESS_ERROR8			 = 100158,
 }
 
-enum TessWinding:int {// TessWinding ////////////////////////
+enum TessWinding:int {
+	//TessWinding ////////////////////////
 	odd	     = 100130,
 	nonZero	     = 100131,
 	positive					 = 100132,
@@ -650,474 +676,475 @@ enum TessWinding:int {// TessWinding ////////////////////////
 
 ///! GLFuncts class //////////////////////////////////////////////////////////////////////////
 
-private class GLFuncts{ //todo: roviditve a GLXxxxx elotag legyen GlXxxxx
-private: //original opengl api calls, private helpers
-	extern(Windows){
-		int function()                                                        glGetError;
-
-		void function()                                                       glFlush, glFinish;
-
-		void function(int val)                                                wglSwapIntervalEXT;
-
-		char* function(int name)	                               glGetString;
-		void function(int name, int* v)	                               glGetIntegerv;
-		void function(int pname, float *value)	                               glGetFloatv;
-
-		void function(int what)					                                          glEnable, glDisable;
-		bool function(int what)					                                          glIsEnabled;
-
-		void function(float r, float g, float b, float a)	                    glClearColor;
-		void function(float d)	                    glClearDepth;
-		void function(int mask)	                    glClear;
-
-		void function(int x, int y, int w, int h, int format, int type, int len, void* data) glReadnPixels;
-
-		void function(int what)					                                glFrontFace;
-		void function(int what)					                                glCullFace;
-		void function(int face, int what)	                                    glPolygonMode;
-		void function(float width)	                                    glLineWidth;
-		void function(int what)	                                    glDepthFunc;
-
-		void function(bool)	                    glDepthMask;
-		void function(bool, bool, bool, bool)	                    glColorMask;
-		void function(int sfactor, int dfactor)	                    glBlendFunc;
-		void function(float r, float g, float b, float a)	                    glBlendColor;
-		void function(int func, float reference)	                    glAlphaFunc;
-
-		void function(int x, int y, int width, int height)                    glViewport;
-
-		int function(int type)                                                glCreateShader;
-		void function(int shader, int count, const(char)** source, int* length) glShaderSource;
-		int function(int shader)	 glCompileShader;
-		void function(int shader)	 glDeleteShader;
-		void function(int shader, int pname, int* res)	 glGetShaderiv;
-		void function(int shader, int maxLength, int* length, char* infoLog)	 glGetShaderInfoLog;
-		int function()	 glCreateProgram;
-		void function(int prg, int shader)	 glAttachShader, glDetachShader;
-		int function(int prg, const(char)* name)	 glGetAttribLocation;
-		void function(int prg, int index, const(char)* name)	 glBindAttribLocation;
-		void function(int prg)	 glLinkProgram, glUseProgram, glDeleteProgram;
-		void function(int prg, int pname, int* res)	 glGetProgramiv;
-		void function(int prg, int maxLength, int* length, char* infoLog)	 glGetProgramInfoLog;
-		void function(int prg, int idx, int bufSize, int* length, int* size, int *type, char* name) glGetActiveAttrib;
-
-		void function(int index, int size, int type, bool normalized,	int stride, void* ptr) glVertexAttribPointer;
-		void function(int index, int size, int type,	int	stride, void* ptr) glVertexAttribIPointer;
-		void function(int index)		glEnableVertexAttribArray, glDisableVertexAttribArray;
-		void function(int mode, int first, int count)	                        glDrawArrays;
-
-		void function(int n, int* ids)	   glGenBuffers, glDeleteBuffers;
-		void function(int target, int id)	   glBindBuffer;
-		void function(int target, int size, const(void)* data, int usage)	   glBufferData;
-		void function(int target, int offset, int size, const(void)* data)	   glBufferSubData;
-
-		int function(int prg, const(char)* name)	   glGetUniformLocation;
-		void function(int loc, int cnt, const(float)* val)			 glUniform1fv , glUniform2fv , glUniform3fv , glUniform4fv ;
-		void function(int loc, int cnt, const(int  )* val)			 glUniform1iv , glUniform2iv , glUniform3iv , glUniform4iv ;
-		void function(int loc, int cnt, bool transpose, const(float)* val)	   glUniformMatrix4fv, glUniformMatrix3fv;
-
-//not supported on dell    void function(int loc, int cnt, const(uint )* val)                    glUniform1uiv, glUniform2uiv, glUniform3uiv, glUniform4uiv;
-
-		void function(int slot)	                            glActiveTexture;
-		void function(int cnt, const(int) *texId)	                            glDeleteTextures;
-
-		void function(int slot, int* handle)					                             glGenTextures;
-		void function(int slot, int texture)					                             glBindTexture;
-		void function(int what, int value)	                                 glPixelStorei;
-		void function(int target, int level, int format, int type, void* pixels)	 glGetTexImage;
-		void function(int target, int level, int internalFmt, int width, int height, int border, int format, int type, const(void)* data)	 glTexImage2D;
-		void function(int target, int levels, int internalFmt, int width, int height)	 glTexStorage2D;
-		void function(int target, int level, int xOffs, int yOffs, int width, int height, int format, int type, const(void)* data)	 glTexSubImage2D;
-//    void function(int target, int level, int xOffs, int yOffs, int zOffs, int width, int height, int depth, int bufSize, void* data)   glGetCompressedTextureSubImage_optional; //ver: 4.5
-
-		void function(int target)	                   glGenerateMipmap;
-		void function(int target, int pname, float pvalue)	                   glTexParameterf;
-
-	// GLU functs /////////////////////////////
-
-		void* function()	    gluNewTess;
-		void function(void* tess)		gluDeleteTess, gluTessBeginContour, gluTessEndContour, gluTessEndPolygon;
-		void function(void* tess, int	what, void* fn)	    gluTessCallback;
-		void function(void* tess, double x, double y, double z)	    gluTessNormal;
-		void function(void* tess, int prop, double value)	    gluTessProperty;
-		void function(void* tess, void* data)	    gluTessBeginPolygon;
-		void function(void* tess, TessContour)	    gluNextContour;
-		void function(void* tess, double* location, void* data)	    gluTessVertex;
+private class GLFuncts {
+	 //todo: roviditve a GLXxxxx elotag legyen GlXxxxx
+	private: //original opengl api calls, private helpers
+		extern(Windows) {
+				int function()                                                        glGetError;
+		
+				void function()                                                       glFlush, glFinish;
+		
+				void function(int val)                                                wglSwapIntervalEXT;
+		
+				char* function(int name)	                               glGetString;
+				void function(int name, int* v)			                             glGetIntegerv;
+				void function(int pname, float *value)			                             glGetFloatv;
+		
+				void function(int what)							                                        glEnable, glDisable;
+				bool function(int what)							                                        glIsEnabled;
+		
+				void function(float r, float g, float b, float a)			                  glClearColor;
+				void function(float d)			                  glClearDepth;
+				void function(int mask)			                  glClear;
+		
+				void function(int x, int y, int w, int h, int format, int type, int len, void* data) glReadnPixels;
+		
+				void function(int what)							                              glFrontFace;
+				void function(int what)							                              glCullFace;
+				void function(int face, int what)			                              glPolygonMode;
+				void function(float width)			                              glLineWidth;
+				void function(int what)			                              glDepthFunc;
+		
+				void function(bool)			                  glDepthMask;
+				void function(bool, bool, bool, bool)			                  glColorMask;
+				void function(int sfactor, int dfactor)			                  glBlendFunc;
+				void function(float r, float g, float b, float a)			                  glBlendColor;
+				void function(int func, float reference)			                  glAlphaFunc;
+		
+				void function(int x, int y, int width, int height)                    glViewport;
+		
+				int function(int type)                                                glCreateShader;
+				void function(int shader, int count, const(char)** source, int* length) glShaderSource;
+				int function(int shader)	 glCompileShader;
+				void function(int shader)	 glDeleteShader;
+				void function(int shader, int pname, int* res)	 glGetShaderiv;
+				void function(int shader, int maxLength, int* length, char* infoLog)	 glGetShaderInfoLog;
+				int function()	 glCreateProgram;
+				void function(int prg, int shader)	 glAttachShader, glDetachShader;
+				int function(int prg, const(char)* name)	 glGetAttribLocation;
+				void function(int prg, int index, const(char)* name)	 glBindAttribLocation;
+				void function(int prg)	 glLinkProgram, glUseProgram, glDeleteProgram;
+				void function(int prg, int pname, int* res)	 glGetProgramiv;
+				void function(int prg, int maxLength, int* length, char* infoLog)	 glGetProgramInfoLog;
+				void function(int prg, int idx, int bufSize, int* length, int* size, int *type, char* name) glGetActiveAttrib;
+		
+				void function(int index, int size, int type, bool normalized,	int stride, void* ptr) glVertexAttribPointer;
+				void function(int index, int size, int type,	int	stride, void* ptr) glVertexAttribIPointer;
+				void function(int index)		glEnableVertexAttribArray, glDisableVertexAttribArray;
+				void function(int mode, int first, int count)	                        glDrawArrays;
+		
+				void function(int n, int* ids)			 glGenBuffers, glDeleteBuffers;
+				void function(int target, int id)			 glBindBuffer;
+				void function(int target, int size, const(void)* data, int usage)			 glBufferData;
+				void function(int target, int offset, int size, const(void)* data)			 glBufferSubData;
+		
+				int function(int prg, const(char)* name)	   glGetUniformLocation;
+				void function(int loc, int cnt, const(float)* val)				glUniform1fv , glUniform2fv , glUniform3fv , glUniform4fv;
+				void function(int loc, int cnt, const(int  )* val)				glUniform1iv , glUniform2iv , glUniform3iv , glUniform4iv;
+				void function(int loc, int cnt, bool transpose, const(float)* val)		glUniformMatrix4fv, glUniformMatrix3fv;
+		
+		//not supported on dell    void function(int loc, int cnt, const(uint )* val)                    glUniform1uiv, glUniform2uiv, glUniform3uiv, glUniform4uiv;
+		
+				void function(int slot)			                          glActiveTexture;
+				void function(int cnt, const(int) *texId)			                          glDeleteTextures;
+		
+				void function(int slot, int* handle)							                           glGenTextures;
+				void function(int slot, int texture)							                           glBindTexture;
+				void function(int what, int value)		                            glPixelStorei;
+				void function(int target, int level, int format, int type, void* pixels)	 glGetTexImage;
+				void function(int target, int level, int internalFmt, int width, int height, int border, int format, int type, const(void)* data)	 glTexImage2D;
+				void function(int target, int levels, int internalFmt, int width, int height)	 glTexStorage2D;
+				void function(int target, int level, int xOffs, int yOffs, int width, int height, int format, int type, const(void)* data)	 glTexSubImage2D;
+		//void function(int target, int level, int xOffs, int yOffs, int zOffs, int width, int height, int depth, int bufSize, void* data)   glGetCompressedTextureSubImage_optional; //ver: 4.5
+		
+				void function(int target)			                 glGenerateMipmap;
+				void function(int target, int pname, float pvalue)			                 glTexParameterf;
+		
+			//GLU functs /////////////////////////////
+		
+				void* function()	    gluNewTess;
+				void function(void* tess)		gluDeleteTess, gluTessBeginContour, gluTessEndContour, gluTessEndPolygon;
+				void function(void* tess, int	what, void* fn)			  gluTessCallback;
+				void function(void* tess, double x, double y, double z)			  gluTessNormal;
+				void function(void* tess, int prop, double value)			  gluTessProperty;
+				void function(void* tess, void* data)			  gluTessBeginPolygon;
+				void function(void* tess, TessContour)			  gluNextContour;
+				void function(void* tess, double* location, void* data)			  gluTessVertex;
 	}
-
-	// function wrappers ////////////////////////////////////
-
-	private void loadFuncts() //must be called right after it got an active opengl contect
+	
+		//function wrappers ////////////////////////////////////
+	
+		private void loadFuncts() //must be called right after it got an active opengl contect
 	{
 		if(!&glGetError) return; //only if needed
-
+		
 		auto hGL = loadLibrary("OpenGL32.dll"),
 				 hGLU = loadLibrary("glu32.dll");
-
+		
 		//getProcAddress: works with opengl32.dll exports and also with wgl extensions
 		void GPA(T)(ref T func, string name) {
 			if(!name.startsWith("gl") && !name.startsWith("wgl")) return;
 			alias t = typeof(func);
-
+			
 			//check if the function is optional
 			const optPostfix = "_optional";
 			const isOptional = name.endsWith(optPostfix);
 			if(isOptional) name = name[0..$-optPostfix.length];
-
+			
 			//1. try from wgl
 			func = cast(t)wglGetProcAddress(toStringz(name));
 			//2. try from opengl32
 			if(!func) func = cast(t)GetProcAddress(hGL, toStringz(name));
 			//3. try from glu32
 			if(!func) func = cast(t)GetProcAddress(hGLU, toStringz(name));
-
+			
 			//otherwise error
 			if(!func && !isOptional)
-				throw new Exception("gl.getProcAddress fail: "~name);
+			throw new Exception("gl.getProcAddress fail: "~name);
 		}
-
+		
 		//load all the function pointers in this class
 		mixin([FieldNameTuple!GLFuncts].map!(x => `GPA(`~x~`,"`~x~`");` ).join);
 	}
-
-	static string glErrorStr(int err)
+	
+		static string glErrorStr(int err)
 	{
 		if(err==GL_NO_ERROR) return "";
-
-		switch(err){
+		
+		switch(err) {
 			case GL_INVALID_ENUM	: return "INVALID_ENUM";
 			case GL_INVALID_VALUE	: return "INVALID_VALUE";
 			case GL_INVALID_OPERATION	: return "INVALID_OPERATION";
 			case GL_STACK_OVERFLOW	: return "STACK_OVERFLOW";
 			case GL_STACK_UNDERFLOW	: return "STACK_UNDERFLOW";
 			case GL_OUT_OF_MEMORY	: return "OUT_OF_MEMORY";
-
+			
 			case GLU_TESS_MISSING_BEGIN_POLYGON		: return "TESS_MISSING_BEGIN_POLYGON";
 			case GLU_TESS_MISSING_BEGIN_CONTOUR		: return "TESS_MISSING_BEGIN_CONTOUR";
-			case GLU_TESS_MISSING_END_POLYGON		 :	return "TESS_MISSING_END_POLYGON";
-			case GLU_TESS_MISSING_END_CONTOUR		 :	return "TESS_MISSING_END_CONTOUR";
-			case GLU_TESS_COORD_TOO_LARGE	  : return "TESS_COORD_TOO_LARGE";
-			case GLU_TESS_NEED_COMBINE_CALLBACK	  : return "TESS_NEED_COMBINE_CALLBACK";
-			case GLU_TESS_ERROR7		 : return "TESS_ERROR7";
-			case GLU_TESS_ERROR8		 : return "TESS_ERROR8";
-
+			case GLU_TESS_MISSING_END_POLYGON		:	return "TESS_MISSING_END_POLYGON";
+			case GLU_TESS_MISSING_END_CONTOUR		:	return "TESS_MISSING_END_CONTOUR";
+			case GLU_TESS_COORD_TOO_LARGE	: return "TESS_COORD_TOO_LARGE";
+			case GLU_TESS_NEED_COMBINE_CALLBACK	: return "TESS_NEED_COMBINE_CALLBACK";
+			case GLU_TESS_ERROR7		: return "TESS_ERROR7";
+			case GLU_TESS_ERROR8		: return "TESS_ERROR8";
+			
 			default: return "UNKNOWN("~text(err)~")";
 		}
 	}
-
-	void glChk(string file = __FILE__, int line = __LINE__){  //todo: utils. customEnforce() template
+	
+		void glChk(string file = __FILE__, int line = __LINE__) {
+		  //todo: utils. customEnforce() template
 		int err = glGetError();
 		if(err) throw new Exception("GLError: "~glErrorStr(err), file, line);
 	}
-
-public://///////////////////////////////////////////////////////
-
-	private bool active_;
-	@property bool active()const { return active_; };
-	@property private void active(bool v) { active_ = v; }
-
-	void swapInterval(int intrvl) { wglSwapIntervalEXT(intrvl); }
-
-	string getString(int name) { string res = text(glGetString(name)); glChk("getString"); return res; }
-	string getVendor	 () { return getString(GL_VENDOR	 ); }
-	string getRenderer	 () { return getString(GL_RENDERER	 ); }
-	string getVersion	 () { return getString(GL_VERSION	 ); }
-	string getExtensions	 () { return getString(GL_EXTENSIONS); }
-
-	private static string getArrayv(string name, string T){
-		return format(q{
-			auto get%1$sv(int name, int len){
-				%2$s[] res;
-				res.length = len;
-				glGet%1$sv(name, res.ptr);
-				glChk;
-				return res;
-			}
-			auto get%1$s(int name){ return get%1$sv(name, 1)[0]; }
-		}, name, T);
+	
+	public://///////////////////////////////////////////////////////
+	
+		private bool active_;
+		@property bool active()const { return active_; };
+		@property private void active(bool v) { active_ = v; }
+	
+		void swapInterval(int intrvl) { wglSwapIntervalEXT(intrvl); }
+	
+		string getString(int name) { string res = text(glGetString(name)); glChk("getString"); return res; }
+		string getVendor	 () { return getString(GL_VENDOR	 ); }
+		string getRenderer	 () { return getString(GL_RENDERER	 ); }
+		string getVersion	 () { return getString(GL_VERSION	 ); }
+		string getExtensions	 () { return getString(GL_EXTENSIONS); }
+	
+		private static string getArrayv(string name, string T) {
+		return format(
+			q{
+				auto get%1$sv(int name, int len) {
+					%2$s[] res;
+					res.length = len;
+					glGet%1$sv(name, res.ptr);
+					glChk;
+					return res;
+				}
+				auto get%1$s(int name) { return get%1$sv(name, 1)[0]; }
+			}, name, T
+		);
 	}
-	mixin(getArrayv("Integer", "int"  ));
-	mixin(getArrayv("Float"  , "float"));
-
-	auto getViewport() {
+		mixin(getArrayv("Integer", "int"  ));
+		mixin(getArrayv("Float"  , "float"));
+	
+		auto getViewport() {
 		auto vp = getIntegerv(GL_VIEWPORT, 4);
 		return ibounds2(vp[0], vp[1], vp[0]+vp[2], vp[1]+vp[3]);
 	}
-
-	auto maxTextureSize() {
+	
+		auto maxTextureSize() {
 		static int v;
 		if(!v) v = getInteger(GL_MAX_TEXTURE_SIZE);
 		return v;
 	}
-
-	auto maxTextureImageUnits() { return getInteger(GL_MAX_TEXTURE_IMAGE_UNITS); }
-
-	void flush () { glFlush (); glChk; }
-	void finish() { glFinish(); glChk; }
-
-	void enable(int what, bool state = true){
-		if(state){
+	
+		auto maxTextureImageUnits() { return getInteger(GL_MAX_TEXTURE_IMAGE_UNITS); }
+	
+		void flush () { glFlush (); glChk; }
+		void finish() { glFinish(); glChk; }
+	
+		void enable(int what, bool state = true) {
+		if(state) {
 			glEnable(what);
 			glChk;
-		}else{
-			disable(what);
-		}
+		}else { disable(what); }
 	}
-	void disable(int what){
+		void disable(int what) {
 		glDisable(what);
 		glChk;
 	}
-	bool isEnabled(int what){
+		bool isEnabled(int what) {
 		bool res = glIsEnabled(what);
 		glChk;
 		return res;
 	}
-
-	void clearColor(float r, float g, float b, float a)	  { glClearColor(r, g, b, a); }
-	void clearColor(T)(in T color)		{ with(color.convertPixel!vec4) clearColor(r, g, b, a); }
-	void clearDepth(float depth)	  {	glClearDepth(depth); }
-	void clear(int mask)	  { glClear(mask); glChk; }
-
-	void readPixels(int x, int y, int w, int h, int format, int type, void[] data) { glReadnPixels(x, y, w, h, format, type, data.length.to!int, data.ptr); glChk; }
-
-	void frontFace(int what) { glFrontFace(what); glChk; }
-	void cullFace (int what) { glCullFace (what); glChk; }
-	void polygonMode(int face, int what) { glPolygonMode(face, what); glChk; }
-	void lineWidth(float width) { glLineWidth(width); glChk; }
-	void depthFunc(int what) { glDepthFunc(what); glChk; }
-
-	void depthMask(bool d) { glDepthMask(d); }
-	void colorMask(bool r, bool g, bool b, bool a) { glColorMask(r, g, b, a); }
-	void blendFunc(int sfactor, int dfactor) { glBlendFunc(sfactor, dfactor); glChk; }
-	void blendColor(float r, float g, float b, float a)	  { glBlendColor(r, g, b, a); }
-	void blendColor(T)(in T color)	  { with(color.convertPixel!vec4) blendColor(r, g, b, a); }
-	void alphaFunc(int func, float reference) { glAlphaFunc(func, reference); glChk; }
-
-	void viewport(int x, int y, int width, int height)    { glViewport(x, y, width, height); glChk; }
-
-	void shaderSource(int shader, string source){
+	
+		void clearColor(float r, float g, float b, float a)	  { glClearColor(r, g, b, a); }
+		void clearColor(T)(in T color)		 { with(color.convertPixel!vec4) clearColor(r, g, b, a); }
+		void clearDepth(float depth)	  { glClearDepth(depth); }
+		void clear(int mask)	  { glClear(mask); glChk; }
+	
+		void readPixels(int x, int y, int w, int h, int format, int type, void[] data) { glReadnPixels(x, y, w, h, format, type, data.length.to!int, data.ptr); glChk; }
+	
+		void frontFace(int what) { glFrontFace(what); glChk; }
+		void cullFace (int what) { glCullFace (what); glChk; }
+		void polygonMode(int face, int what) { glPolygonMode(face, what); glChk; }
+		void lineWidth(float width) { glLineWidth(width); glChk; }
+		void depthFunc(int what) { glDepthFunc(what); glChk; }
+	
+		void depthMask(bool d) { glDepthMask(d); }
+		void colorMask(bool r, bool g, bool b, bool a) { glColorMask(r, g, b, a); }
+		void blendFunc(int sfactor, int dfactor) { glBlendFunc(sfactor, dfactor); glChk; }
+		void blendColor(float r, float g, float b, float a)	  { glBlendColor(r, g, b, a); }
+		void blendColor(T)(in T color)	  { with(color.convertPixel!vec4) blendColor(r, g, b, a); }
+		void alphaFunc(int func, float reference) { glAlphaFunc(func, reference); glChk; }
+	
+		void viewport(int x, int y, int width, int height)    { glViewport(x, y, width, height); glChk; }
+	
+		void shaderSource(int shader, string source) {
 		auto s = source.toPChar;
 		glShaderSource(shader, 1, &s, null);
 		glChk;
 	}
-	void compileShader(int shader){
+		void compileShader(int shader) {
 		glCompileShader(shader);
 		glChk;
 	}
-	void getShaderiv(int shader, int pname, int* res){
+		void getShaderiv(int shader, int pname, int* res) {
 		glGetShaderiv(shader, pname, res);
 		glChk;
 	}
-	bool getShaderCompiled(int shader){
+		bool getShaderCompiled(int shader) {
 		int compiled;
 		getShaderiv(shader, GL_COMPILE_STATUS, &compiled);
 		return compiled!=0;
 	}
-	int getShaderInfoLen(int shader){
+		int getShaderInfoLen(int shader) {
 		int infoLen;
 		glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLen);
 		return infoLen;
 	}
-	void getShaderInfoLog(int shader, int maxLength, int* length, char* infoLog){
+		void getShaderInfoLog(int shader, int maxLength, int* length, char* infoLog) {
 		glGetShaderInfoLog(shader, maxLength, length, infoLog);
 		glChk;
 	}
-	string getShaderInfoLog(int shader){
+		string getShaderInfoLog(int shader) {
 		char[] infoLog;
 		infoLog.length = getShaderInfoLen(shader);
 		getShaderInfoLog(shader, cast(int)infoLog.length, null, infoLog.ptr);
 		return to!(string)(infoLog);
 	}
-	void attachShader(int prg, int shader){
+		void attachShader(int prg, int shader) {
 		glAttachShader(prg, shader);
 		glChk;
 	}
-	void detachShader(int prg, int shader){
+		void detachShader(int prg, int shader) {
 		glDetachShader(prg, shader);
 		glChk;
 	}
-	void bindAttribLocation(int prg, int index, string name){
+		void bindAttribLocation(int prg, int index, string name) {
 		glBindAttribLocation(prg, index, name.toPChar);
 		glChk;
 	}
-	int getAttribLocation(int prg, string name){
+		int getAttribLocation(int prg, string name) {
 		int res = glGetAttribLocation(prg, name.toPChar);
 		glChk;
 		return res;
 	}
-	void linkProgram(int prg){
+		void linkProgram(int prg) {
 		glLinkProgram(prg);
 		glChk;
 	}
-	void getProgramiv(int prg, int pname, int* res){
+		void getProgramiv(int prg, int pname, int* res) {
 		glGetProgramiv(prg, pname, res);
 		glChk;
 	}
-	bool getProgramLinked(int prg){
+		bool getProgramLinked(int prg) {
 		int linked;
 		gl.getProgramiv(prg, GL_LINK_STATUS, &linked);
 		return linked!=0;
 	}
-	int getProgramInfoLen(int prg){
+		int getProgramInfoLen(int prg) {
 		int infoLen;
 		glGetProgramiv(prg, GL_INFO_LOG_LENGTH, &infoLen);
 		return infoLen;
 	}
-	void getProgramInfoLog(int prg, int maxLength, int* length, char* infoLog){
+		void getProgramInfoLog(int prg, int maxLength, int* length, char* infoLog) {
 		glGetProgramInfoLog(prg, maxLength, length, infoLog);
 		glChk;
 	}
-	string getProgramInfoLog(int prg){
+		string getProgramInfoLog(int prg) {
 		char[] infoLog;
 		infoLog.length = getProgramInfoLen(prg);
 		getProgramInfoLog(prg, cast(int)infoLog.length, null, infoLog.ptr);
 		return to!(string)(infoLog);
 	}
-	void getActiveAttrib(int prg, int idx, ref int size, ref int type, ref string name){
+		void getActiveAttrib(int prg, int idx, ref int size, ref int type, ref string name) {
 		char[128] buf = void;
 		int len;
 		glGetActiveAttrib(prg, idx, buf.sizeof, &len, &size, &type, buf.ptr);
 		glChk;
 		name = to!string(buf[0..len]);
 	}
-
-	void useProgram(int prg){
+	
+		void useProgram(int prg) {
 		glUseProgram(prg);
 		glChk;
 	}
-	void vertexAttribPointer(int index, int size, int type, bool normalized, int stride, void* ptr){
+		void vertexAttribPointer(int index, int size, int type, bool normalized, int stride, void* ptr) {
 		glVertexAttribPointer(index, size, type, normalized, stride, ptr);
 		glChk;
 	}
-	void vertexAttribIPointer(int index, int size, int type, int stride, void* ptr){
+		void vertexAttribIPointer(int index, int size, int type, int stride, void* ptr) {
 		glVertexAttribIPointer(index, size, type, stride, ptr);
 		glChk;
 	}
-	void enableVertexAttribArray(int index, bool state=true){
-		if(state){
+		void enableVertexAttribArray(int index, bool state=true) {
+		if(state) {
 			glEnableVertexAttribArray(index);
 			glChk;
-		}else{
-			disableVertexAttribArray(index);
-		}
+		}else { disableVertexAttribArray(index); }
 	}
-	void disableVertexAttribArray(int index){
+		void disableVertexAttribArray(int index) {
 		glDisableVertexAttribArray(index);
 		glChk;
 	}
-	void drawArrays(int mode, int first, int count){
+		void drawArrays(int mode, int first, int count) {
 		glDrawArrays(mode, first, count);
 		glChk;
 	}
-
-	void bindBuffer(int target, int id){
+	
+		void bindBuffer(int target, int id) {
 		glBindBuffer(target, id);
 		glChk;
 	}
-	void bufferData(int target, int size, const(void)* data, int usage){
+		void bufferData(int target, int size, const(void)* data, int usage) {
 		glBufferData(target, size, data, usage);
 		glChk;
 	}
-	void bufferData(int target, const(float)[] data, int usage){ bufferData(target, cast(int)data.length*4, data.ptr, usage); }
-	void bufferSubData(int target, int offset, int size, const(void)* data){
+		void bufferData(int target, const(float)[] data, int usage) { bufferData(target, cast(int)data.length*4, data.ptr, usage); }
+		void bufferSubData(int target, int offset, int size, const(void)* data) {
 		glBufferSubData(target, offset, size, data);
 		glChk;
 	}
-	void bufferSubData(int target, int offset, const(float)[] data){ bufferSubData(target, offset, cast(int)data.length*4, data.ptr); }
-
-	int getUniformLocation(int prg, string name){
+		void bufferSubData(int target, int offset, const(float)[] data) { bufferSubData(target, offset, cast(int)data.length*4, data.ptr); }
+	
+		int getUniformLocation(int prg, string name) {
 		int res = glGetUniformLocation(prg, name.toPChar);
 		glChk;
 		return res;
 	}
-
-	void uniform(int loc, float v ){ glUniform1fv(loc, 1, &v  ); glChk; }
-	void uniform(int loc, in vec2 v){ glUniform2fv(loc, 1, v.array.ptr); glChk; }
-	void uniform(int loc, in vec3 v){ glUniform3fv(loc, 1, v.array.ptr); glChk; }
-
-	void uniform(int loc, int v	    ){ glUniform1iv(loc, 1, &v  ); glChk; }
-	void uniform(int loc, bool b	    ){ uniform(loc, b ? 1 : 0);}
-	void uniform(int loc, in ivec2 v, string file=__FILE__, int line=__LINE__){ glUniform2iv(loc, 1, v.array.ptr); glChk(file, line); }
-
-	void uniform(int loc, in float[4][4] v){ glUniformMatrix4fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
-	void uniform(int loc, in float[3][3] v){ glUniformMatrix3fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
-
-	void uniform(int loc, in float[4] v){ glUniform4fv(loc, 1, &v[0]); glChk; }
-	void uniform(int loc, in float[3] v){ glUniform3fv(loc, 1, &v[0]); glChk; }
-
-	void activeTexture(int slot) { glActiveTexture(slot); glChk; }
-	void bindTexture(int slot, int texture) { glBindTexture(slot, texture); glChk; }
-
-	void pixelStore(int what, int value){ glPixelStorei(what, value); glChk; }
-
-	void texImage2D(int target, int level, int internalFrmt, int width, int height, int border, int format, int type, const(void)[] data) {
+	
+		void uniform(int loc, float v ) { glUniform1fv(loc, 1, &v  ); glChk; }
+		void uniform(int loc, in vec2 v) { glUniform2fv(loc, 1, v.array.ptr); glChk; }
+		void uniform(int loc, in vec3 v) { glUniform3fv(loc, 1, v.array.ptr); glChk; }
+	
+		void uniform(int loc, int v	    ) { glUniform1iv(loc, 1, &v  ); glChk; }
+		void uniform(int loc, bool b	    ) { uniform(loc, b ? 1 : 0); }
+		void uniform(int loc, in ivec2 v, string file=__FILE__, int line=__LINE__) { glUniform2iv(loc, 1, v.array.ptr); glChk(file, line); }
+	
+		void uniform(int loc, in float[4][4] v) { glUniformMatrix4fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
+		void uniform(int loc, in float[3][3] v) { glUniformMatrix3fv(loc, 1, true/*transposed by default*/, &v[0][0]); glChk; }
+	
+		void uniform(int loc, in float[4] v) { glUniform4fv(loc, 1, &v[0]); glChk; }
+		void uniform(int loc, in float[3] v) { glUniform3fv(loc, 1, &v[0]); glChk; }
+	
+		void activeTexture(int slot) { glActiveTexture(slot); glChk; }
+		void bindTexture(int slot, int texture) { glBindTexture(slot, texture); glChk; }
+	
+		void pixelStore(int what, int value) { glPixelStorei(what, value); glChk; }
+	
+		void texImage2D(int target, int level, int internalFrmt, int width, int height, int border, int format, int type, const(void)[] data) {
 		glTexImage2D(target, level, internalFrmt, width, height, border, format, type, data.ptr);
 		glChk;
 	}
-
-	void texStorage2D(int target, int levels, int internalFmt, int width, int height) {
+	
+		void texStorage2D(int target, int levels, int internalFmt, int width, int height) {
 		glTexStorage2D(target, levels, internalFmt, width, height);
 		glChk;
 	}
-
-	void texSubImage2D(int target, int level, int xOffs, int yOffs, int width, int height, int format, int type, const(void)[] data) {
+	
+		void texSubImage2D(int target, int level, int xOffs, int yOffs, int width, int height, int format, int type, const(void)[] data) {
 		glTexSubImage2D(target, level, xOffs, yOffs, width, height, format, type, data.ptr);
 		glChk;
 	}
-
-	void getTexImage(int target, int level, int format, int type, void[] data){
+	
+		void getTexImage(int target, int level, int format, int type, void[] data) {
 		glGetTexImage(target, level, format, type, data.ptr);
 		glChk;
 	}
-
-	void generateMipmap(int target) { glGenerateMipmap(target); glChk; }
-	void texParameterf(int target, int pname, float pvalue) { glTexParameterf(target, pname, pvalue); glChk; }
-
-	//resource managed things
-
-	int genTexture()	          { int res; glGenTextures(1, &res);	glChk; return res; }
-	int genBuffer()	          { int res;	glGenBuffers (1, &res);	glChk; return res; }
-	int createShader(int type)		{	auto res = glCreateShader(type);	glChk; return res; }
-	int createProgram()		{ auto	res = glCreateProgram();	glChk; return res; }
-
-	void deleteTexture(int handle)					  { if(!handle) return; glDeleteTextures(1, &handle); glChk; }
-	void deleteBuffer (int handle)					  { if(!handle) return; glDeleteBuffers	(1, &handle); glChk; }
-	void deleteShader (int shader)					  { if(!shader) return; glDeleteShader	(shader	   ); glChk; }
-	void deleteProgram(int prg   )					  { if(!prg   ) return; glDeleteProgram	(prg	   ); glChk; }
+	
+		void generateMipmap(int target) { glGenerateMipmap(target); glChk; }
+		void texParameterf(int target, int pname, float pvalue) { glTexParameterf(target, pname, pvalue); glChk; }
+	
+		//resource managed things
+	
+		int genTexture()	          { int res; glGenTextures(1, &res);	glChk; return res; }
+		int genBuffer()	          { int res;	glGenBuffers (1, &res);	glChk; return res; }
+		int createShader(int type)		 { auto res = glCreateShader(type);	glChk; return res; }
+		int createProgram()		 { auto	res = glCreateProgram();	glChk; return res; }
+	
+		void deleteTexture(int handle)						 { if(!handle) return; glDeleteTextures(1, &handle); glChk; }
+		void deleteBuffer (int handle)						 { if(!handle) return; glDeleteBuffers	(1, &handle); glChk; }
+		void deleteShader (int shader)						 { if(!shader) return; glDeleteShader	(shader	   ); glChk; }
+		void deleteProgram(int prg   )						 { if(!prg ) return; glDeleteProgram	(prg	   ); glChk; }
 }
 
 //GLHandle, GlResource ////////////////////////////////////////
 
-class GLHandle(string resName, string gen, string del){
-	const{
+class GLHandle(string resName, string gen, string del) {
+	const {
 		string name;
 		size_t size;
 		int handle;
 	}
-
-	override string toString() const{ return format!"%d \"%s\" %d"(handle, name, size); }
-
-	this(string name, size_t size, int param=0){
+	
+	override string toString() const { return format!"%d \"%s\" %d"(handle, name, size); }
+	
+	this(string name, size_t size, int param=0) {
 		this.name = name.empty ? "<noname>" : name;
 		this.size = size;
 		mixin("handle = "~gen~";");
 		handles[handle] = this;
 	}
-
+	
 	private bool mustDelete;
-	void release(){ mustDelete = true; }
-
-	~this(){ //must NOT be called from GC
+	void release() { mustDelete = true; }
+	
+	~this() {
+		 //must NOT be called from GC
 		mixin(del~"(handle);");
 		handles.remove(handle);
 	}
-
-	__gshared static{
+	
+	__gshared static {
 		typeof(this)[int] handles;
-		auto sizeBytes(){ return handles.values.map!"a.size".sum; };
-		auto stats(){ return format!"%ss:(%s, %sKB)"(resName, handles.values.count, sizeBytes>>10); }
-		void update(){
-			foreach(h; handles.values.filter!(a => a.mustDelete).array){
+		auto sizeBytes() { return handles.values.map!"a.size".sum; };
+		auto stats() { return format!"%ss:(%s, %sKB)"(resName, handles.values.count, sizeBytes>>10); }
+		void update() {
+			foreach(h; handles.values.filter!(a => a.mustDelete).array) {
 				handles.remove(h.handle);
 				h.destroy;
 			}
@@ -1132,19 +1159,17 @@ alias GLShaderHandle	= GLHandle!("Shader" , "gl.createShader(param)", "gl.delete
 
 alias GLAllHandles = AliasSeq!(GLBufferHandle, GLTextureHandle, GLProgramHandle, GLShaderHandle);
 
-private void updateGLHandles(){
-	foreach(T; GLAllHandles) T.update;
-}
+private void updateGLHandles() { foreach(T; GLAllHandles) T.update; }
 
-auto glHandleStats(string separ=" "){
+auto glHandleStats(string separ=" ") {
 	string[] res;
 	foreach(T; GLAllHandles) res ~= T.stats;
 	return res.join(separ);
 }
 
-auto glHandleStats2(){
+auto glHandleStats2() {
 	string[] res;
-	foreach(T; GLAllHandles){
+	foreach(T; GLAllHandles) {
 		res ~= T.stats;
 		res ~= T.handles.values.sort!((a,b)=>a.handle<b.handle).map!(a=>"  "~a.text).array;
 	}
@@ -1152,7 +1177,7 @@ auto glHandleStats2(){
 }
 
 
-abstract class GlResource{
+abstract class GlResource {
 	string resName() const;
 	size_t resSize() const;
 	string resInfo() const; //resource specific stuff
@@ -1161,105 +1186,103 @@ abstract class GlResource{
 /// Shader class //////////////////////////////////////////////////////////////////////////
 
 class Shader:GlResource {
-public:
-	string shaderTypes() const{
+	public:
+		string shaderTypes() const {
 		string res;
-		if(vertexShader  ) res ~= "V";
+		if(vertexShader) res ~= "V";
 		if(geometryShader) res ~= "G";
 		if(fragmentShader) res ~= "F";
 		return res;
 	}
-
-	override string resName() const			 { return name; }
-	override size_t resSize() const			 { return [vertexShaderSrc, geometryShaderSrc, fragmentShaderSrc].map!(x=>x.length).sum; }
-	override string resInfo() const			 { return "["~shaderTypes~"] "~attribs.keys.to!string; }
-private:
-	mixin CustomEnforce!"GLShader error"; //todo: customEnforce
-
-	void error(string s){ throw new Exception(`Shader("`~name~`"): `~s); } //todo: ennek fatal errornak kene lenni, kiveve ha egy shadertoyszeruseget csinalok...
-
-	GLShaderHandle vertexShader, geometryShader, fragmentShader;
-	GLProgramHandle programObject;
-
-	struct AttribRec{ string name; int loc; int type; int count; }
-	AttribRec[string] attribs;
-
-	void splitUnifiedShader(string ush, out string vsh, out string gsh, out string fsh){
+	
+		override string resName() const			 { return name; }
+		override size_t resSize() const			 { return [vertexShaderSrc, geometryShaderSrc, fragmentShaderSrc].map!(x=>x.length).sum; }
+		override string resInfo() const			 { return "["~shaderTypes~"] "~attribs.keys.to!string; }
+	private:
+		mixin CustomEnforce!"GLShader error"; //todo: customEnforce
+	
+		void error(string s) { throw new Exception(`Shader("`~name~`"): `~s); } //todo: ennek fatal errornak kene lenni, kiveve ha egy shadertoyszeruseget csinalok...
+	
+		GLShaderHandle vertexShader, geometryShader, fragmentShader;
+		GLProgramHandle programObject;
+	
+		struct AttribRec { string name; int loc; int type; int count; }
+		AttribRec[string] attribs;
+	
+		void splitUnifiedShader(string ush, out string vsh, out string gsh, out string fsh) {
 		//markers
 		const mv = "@vertex:";
 		const mg = "@geometry:";
 		const mf = "@fragment:";
-
+		
 		auto pv = wordPos(ush, mv, 0	        );	 if(pv<0) error(`Can't split unified shader: "`~mv~`" marker not found.`);
 		auto pg = wordPos(ush, mg, pv	        );	 //can be empty
 		auto pf = wordPos(ush, mf, max(pv, pg));	 if(pf<0) error(`Can't split unified shader: "`~mf~`" marker not found.`);
-
+		
 		if(pv>pf) error(`Vertex shader must be the first.`);
 		if(pg>=0 && !(pv<pg && pg<pf)) error(`Geometry shader must be in the middle.`);
-
+		
 		string common = ush[0..pv];
-		if(pg>=0){
+		if(pg>=0) {
 			vsh = common~ush[pv+mv.length..pg];
 			gsh = common~ush[pg+mg.length..pf];
 			fsh = common~ush[pf+mf.length..$];
-		}else{
+		}else {
 			vsh = common~ush[pv+mv.length..pf];
 			fsh = common~ush[pf+mf.length..$];
 		}
-
+		
 		//TODO: a szetvalasztast ugy csinalja, hogy a sorok erintetlenek maradjanak es akkor a hibat ki tudja jelezni az IDE
 	}
-
-	string precompile(string src, string[] options){
-		return src;
-	}
-
-	auto loadShader(char typeChr, int type, string source)
+	
+		string precompile(string src, string[] options) { return src; }
+	
+		auto loadShader(char typeChr, int type, string source)
 	{
 		const t0 = QPS;
 		auto shader = new GLShaderHandle(resName~"."~typeChr, source.length, type);
-		try{
+		try {
 			gl.shaderSource(shader.handle, source);
 			gl.compileShader(shader.handle);
-			if(!gl.getShaderCompiled(shader.handle)){
+			if(!gl.getShaderCompiled(shader.handle)) {
 				auto err = gl.getShaderInfoLog(shader.handle);
 				File(appPath, "shader.error").write(source~"\n=============================================\n"~err);
 				error("Compile error:\n"~err);
 			}
 			if(LOG_shaderLoadingTimes) LOG(format!`Shader "%s" compile time %.3f sec`(resName~"."~typeChr, QPS-t0));
 			return shader;
-		}catch(Exception e){
+		}catch(Exception e) {
 			shader.release;
 			shader = null;
 			error(e.simpleMsg);
 		}
 		return null;
 	}
-
-	void build(){
+	
+		void build() {
 		const t0 = QPS;
 															vertexShader	= loadShader('v', GL_VERTEX_SHADER  , vertexShaderSrc  );
 		if(geometryShaderSrc!="") geometryShader	= loadShader('g', GL_GEOMETRY_SHADER, geometryShaderSrc);
 															fragmentShader	= loadShader('f', GL_FRAGMENT_SHADER, fragmentShaderSrc);
-
+		
 		programObject = new GLProgramHandle(resName, resSize);
-
+		
 											 gl.attachShader(programObject.handle, vertexShader  .handle);
 		if(geometryShader) gl.attachShader(programObject.handle, geometryShader.handle);
 											 gl.attachShader(programObject.handle, fragmentShader.handle);
-
+		
 		gl.linkProgram(programObject.handle);
-
+		
 		if(!gl.getProgramLinked(programObject.handle))
-			error("Link error\r\n"~gl.getProgramInfoLog(programObject.handle));
-
+		error("Link error\r\n"~gl.getProgramInfoLog(programObject.handle));
+		
 		if(LOG_shaderLoadingTimes) LOG(format!`Shader "%s" total build time: %.3f sec`(resName, QPS-t0));
 	}
-
-	void collectAttribs(){
+	
+		void collectAttribs() {
 		int n; gl.getProgramiv(programObject.handle, GL_ACTIVE_ATTRIBUTES, &n);
-
-		foreach(i; 0..n){
+		
+		foreach(i; 0..n) {
 			AttribRec r;
 			gl.getActiveAttrib(programObject.handle, i, r.count, r.type, r.name);
 			r.loc = gl.getAttribLocation(programObject.handle, r.name);
@@ -1267,86 +1290,79 @@ private:
 		}
 		attribs.rehash;
 	}
-public:
-	const string name, vertexShaderSrc, geometryShaderSrc, fragmentShaderSrc;
-
-	this(string name, string unifiedSrc){
+	public:
+		const string name, vertexShaderSrc, geometryShaderSrc, fragmentShaderSrc;
+	
+		this(string name, string unifiedSrc) {
 		this.name = name;
-
+		
 		string vs, gs, fs;
 		splitUnifiedShader(unifiedSrc, vs, gs, fs);
 		vertexShaderSrc	= vs;
 		geometryShaderSrc	= gs;
 		fragmentShaderSrc	= fs;
-
+		
 		build;
 		collectAttribs;
 	}
-
-	void use() { gl.useProgram(programObject.handle); }
-
-	//TODO: az use-ket csak akkor hivni, ha kell
-	//TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
-	void uniform(T)(string name, T val, bool mustSucceed=true, string file=__FILE__, int line=__LINE__){
+	
+		void use() { gl.useProgram(programObject.handle); }
+	
+		//TODO: az use-ket csak akkor hivni, ha kell
+		//TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
+		void uniform(T)(string name, T val, bool mustSucceed=true, string file=__FILE__, int line=__LINE__) {
 		use;
 		int loc = gl.getUniformLocation(programObject.handle, name);
-
-		if(loc<0){ //what if not found:
+		
+		if(loc<0) {
+			 //what if not found:
 			if(mustSucceed) error(`Uniform not found: "`~name~`"`);
-								 else return; //just hide the error
+			else return; //just hide the error
 		}
-
-		try{
-			gl.uniform(loc, val);
-		}catch(Throwable t){
-			throw new Exception("Error setting uniform: %s.%s = %s %s raised %s".format(this.name, name, T.stringof, val, t.msg), file, line);
-		}
+		
+		try { gl.uniform(loc, val); }catch(Throwable t) { throw new Exception("Error setting uniform: %s.%s = %s %s raised %s".format(this.name, name, T.stringof, val, t.msg), file, line); }
 	}
-
-	//TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
-	void uniform(T)(in T val, bool mustSucceed=true){
-		foreach(name; FieldNamesWithUDA!(T, UNIFORM, true)){
+	
+		//TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
+		void uniform(T)(in T val, bool mustSucceed=true) {
+		foreach(name; FieldNamesWithUDA!(T, UNIFORM, true)) {
 			auto u = getUDA!(mixin("T.", name), UNIFORM);
 			if(u.name == "") u.name = name;
 			uniform(u.name, __traits(getMember, val, name), mustSucceed);
 		}
 	}
-
-	int getAttribLocation(string name){
+	
+		int getAttribLocation(string name) {
 		int loc = gl.getAttribLocation(programObject.handle, name);
 		if(loc<0) error(`Attrib not found: "`~name~`"`);
 		return loc;
 	}
-
-	void attrib(VBO vbo, int loc, int type, int size, bool normalize = false, int offset = 0){
+	
+		void attrib(VBO vbo, int loc, int type, int size, bool normalize = false, int offset = 0) {
 		use; vbo.bind;
 		gl.vertexAttribPointer(loc, size, type, normalize, vbo.stride, cast(void*)offset);
 		gl.enableVertexAttribArray(loc); //TODO: disable it afterwards
 	}
-
-	void attrib(VBO vbo, string name, int type, int size, bool normalize = false, int offset = 0){
-		attrib(vbo, getAttribLocation(name), type, size, normalize, offset);
-	}
-
-	void attribI(VBO vbo, int loc, int type, int size, int offset = 0){
+	
+		void attrib(VBO vbo, string name, int type, int size, bool normalize = false, int offset = 0) { attrib(vbo, getAttribLocation(name), type, size, normalize, offset); }
+	
+		void attribI(VBO vbo, int loc, int type, int size, int offset = 0) {
 		use; vbo.bind;
 		gl.vertexAttribIPointer(loc, size, type, vbo.stride, cast(void*)offset);
 		gl.enableVertexAttribArray(loc); //TODO: disable it afterwards
 	}
-
-	void attribI(VBO vbo, string name, int type, int size, int offset = 0){
-		attribI(vbo, getAttribLocation(name), type, size, offset);
-	}
-
-	private bool attrib(VBO vbo, string name, string srcType, int offset, bool mustExists = false){
+	
+		void attribI(VBO vbo, string name, int type, int size, int offset = 0) { attribI(vbo, getAttribLocation(name), type, size, offset); }
+	
+		private bool attrib(VBO vbo, string name, string srcType, int offset, bool mustExists = false) {
 		if(name=="") return false;
 		auto dst = name in attribs;
-		if(!dst){
+		if(!dst) {
 			return false; //field not found in shader. Ignore this error.
 		}
-
+		
 		if(dst.count!=1) error("attrib("~name~") array attribs not supported yet.");
-
+		
 		//todo: working with typenames is compiler-implementation dependent.
 				 if(srcType.among("Vector!(float, 2)", "float[2]"	  )	&& (dst.type==GL_FLOAT_VEC2	 )) attrib (vbo, dst.loc, GL_FLOAT		,	2, false,	offset);
 		else if(srcType.among("Vector!(float, 3)", "float[3]"		) && (dst.type==GL_FLOAT_VEC3	 )) attrib (vbo, dst.loc, GL_FLOAT		, 3,	false,	offset);
@@ -1357,39 +1373,33 @@ public:
 		else if(srcType.among("int"	                          )	&& (dst.type==GL_INT	 )) attribI(vbo, dst.loc, GL_INT	, 1,	offset);
 		else if(srcType.among("uint"	                          ) && (dst.type==GL_UNSIGNED_INT)) attribI(vbo, dst.loc, GL_UNSIGNED_INT	, 1,	offset);
 		else error("attrib("~name~") unable to convert "~srcType~"->"~text(dst.type));
-
+		
 		return true;
 	}
-
-	void attrib(VBO vbo){
+	
+		void attrib(VBO vbo) {
 		bool any;
-		if(!vbo.attrName.empty){
-			any |= attrib(vbo, vbo.attrName, vbo.elementType, 0);
-		}else{
-			foreach(const ref f; vbo.elementFields){
-				any |= attrib(vbo, f.name, f.type, f.offset);
-			}
-		}
+		if(!vbo.attrName.empty) { any |= attrib(vbo, vbo.attrName, vbo.elementType, 0); }else { foreach(const ref f; vbo.elementFields) { any |= attrib(vbo, f.name, f.type, f.offset); } }
 		if(!any) error("attrib(VBO) failed to connect any attributes. "~vbo.attrName);
 	}
-
-	~this(){
-		if(vertexShader  ) vertexShader  .release;
+	
+		~this() {
+		if(vertexShader) vertexShader  .release;
 		if(geometryShader) geometryShader.release;
 		if(fragmentShader) fragmentShader.release;
-		if(programObject ) programObject .release;
+		if(programObject) programObject .release;
 	}
 }
 
 
 /// load a shader and cache it for frequent access.
-auto loadShader(File file){
-
-	static Shader shaderFromText(string text){
+auto loadShader(File file) {
+	
+	static Shader shaderFromText(string text) {
 		text = text.strip.strip2("q{", "}"); //put in a q{} string for the syntaxt highlighter. Quite lame... Ide should know how to deal with .glsl file.
 		return new Shader("unnamed/cached", text);
 	}
-
+	
 	return loadCachedTextFile!shaderFromText(file);
 }
 
@@ -1397,78 +1407,76 @@ auto loadShader(File file){
 /// VBO class ///////////////////////////////////////////////////////////////////////////////
 
 class VBO:GlResource {
-public:
-	override string resName() const			 { return elementFields.map!(a=>a.name).array.text; }
-	override size_t resSize() const			 { return count*stride; }
-	override string resInfo() const			 { return format("count:%s stride:%s elements:%s", count, stride, elementFields.map!(a=>a.name).array); }
-private:
-	alias Handle = GLBufferHandle;
-
-	Handle buffer; //TODO: readonly property
-	int stride, count;
-
-	struct Field { string name, type; int offset; }
-	Field[] elementFields;
-	string elementType;
-
-public:
-	@property auto handle() const { return buffer.handle; }
-	@property auto shortName() const { return format!"VBO(%d)"(handle); }
-	@property auto logName() const { return "\33\13"~shortName~"\33\7"; }
-
-	const string attrName; //only if VBO is not a struct
-
-	int getCount() const { return count; }
-
-	this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW){
+	public:
+		override string resName() const			 { return elementFields.map!(a=>a.name).array.text; }
+		override size_t resSize() const			 { return count*stride; }
+		override string resInfo() const			 { return format("count:%s stride:%s elements:%s", count, stride, elementFields.map!(a=>a.name).array); }
+	private:
+		alias Handle = GLBufferHandle;
+	
+		Handle buffer; //TODO: readonly property
+		int stride, count;
+	
+		struct Field { string name, type; int offset; }
+		Field[] elementFields;
+		string elementType;
+	
+	public:
+		@property auto handle() const { return buffer.handle; }
+		@property auto shortName() const { return format!"VBO(%d)"(handle); }
+		@property auto logName() const { return "\33\13"~shortName~"\33\7"; }
+	
+		const string attrName; //only if VBO is not a struct
+	
+		int getCount() const { return count; }
+	
+		this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW) {
 		this.stride = recordSize;
 		this.count = count;
 		this.attrName = attrName;
 		buffer = new Handle(resName, resSize);
 		if(logVBO) LOG(logName, "created", "resSize:", resSize);
-
+		
 		bind;
-
+		
 		//if(logVBO) LOG("bufferData", "count:", count, "stride:", stride, "fields:", "["~elementFields.map!"a.name".join(", ")~"]");
 		gl.bufferData(GL_ARRAY_BUFFER, count*stride, data, accessType);
-
+		
 		global_VPSCnt += resSize;
 	}
-
-	this(T)(const(T)[] data, string attrName="", int accessType = GL_STATIC_DRAW){
+	
+		this(T)(const(T)[] data, string attrName="", int accessType = GL_STATIC_DRAW) {
 		elementType = T.stringof;
-		static if(!isVector!T && !isMatrix!T){
+		static if(!isVector!T && !isMatrix!T) {
 			//search struct fields
-			foreach(i, n; FieldNameTuple!T){
-				static if(!n.empty) elementFields ~= Field(n, FieldTypeTuple!T[i].stringof, __traits(getMember, T, n).offsetof);
-			}
+			foreach(i, n; FieldNameTuple!T) { static if(!n.empty) elementFields ~= Field(n, FieldTypeTuple!T[i].stringof, __traits(getMember, T, n).offsetof); }
 		}
-
+		
 		this(data.ptr, cast(int)data.length, cast(int)data[0].sizeof, attrName, accessType);
 	}
-
-	void bind(){
+	
+		void bind() {
 		//if(logVBO) LOG("bind");
 		gl.bindBuffer(GL_ARRAY_BUFFER, handle); //TODO: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
 	}
-
-	void draw(int primitive, int start = 0, int end = int.max){
+	
+		void draw(int primitive, int start = 0, int end = int.max) {
 		if(start>=count) return;
 		if(start<0) start = 0;
 		if(end>count) end = count;
 		if(end<=start) return;
-
+		
 		bind;
-
+		
 		//if(logVBO) LOG("drawArrays", primitive.to!string(16), "[%d..%d]".format(start, end), "cnt:", end-start);
 		gl.drawArrays(primitive, start, end-start);
 	}
-
-	~this(){
+	
+		~this() {
 		//if(logVBO) LOG("release (destroy)");
 		buffer.release; //elvileg nem volna szabad hivatkozni erre a member classra
 	}
-
+	
 }
 
 
@@ -1476,134 +1484,163 @@ public:
 
 enum GLTextureFilter { Nearest, Linear, Mipmapped }
 
-// todo: this shit must be rethinked
-enum GLTextureType   { Unknown, RGBA8, RGBA16, L8}
+//todo: this shit must be rethinked
+enum GLTextureType   { Unknown, RGBA8, RGBA16, L8 }
 
-int GL_FORMAT(GLTextureType type){ with(GLTextureType)final switch(type){
-		case RGBA8	: return GL_RGBA  ;
-		case RGBA16	: return GL_RGBA16;
-		case L8	: return GL_LUMINANCE;
-case Unknown: return 0;}}
+int GL_FORMAT(GLTextureType type) {
+	with(GLTextureType)
+	final switch(type) {
+				case RGBA8	: return GL_RGBA;
+				case RGBA16	: return GL_RGBA16;
+				case L8	: return GL_LUMINANCE;
+		case Unknown: return 0;
+	}
+	
+}
 
-int GL_FORMAT2(GLTextureType type){ with(GLTextureType)final switch(type){ //for texStorage
-		case RGBA8	: return GL_RGBA8 ;
-		case RGBA16	: return GL_RGBA16;
-		case L8	: return -1;//GL_R8;
-case Unknown: return 0;}}
+int GL_FORMAT2(GLTextureType type) {
+	with(GLTextureType)
+	final switch(type) {
+		 //for texStorage
+				case RGBA8	: return GL_RGBA8;
+				case RGBA16	: return GL_RGBA16;
+				case L8	: return -1;//GL_R8;
+		case Unknown: return 0;
+	}
+	
+}
 
-int GL_DATATYPE(GLTextureType type){ with(GLTextureType )final switch(type){
-		case RGBA8	:
-		case L8	: return GL_UNSIGNED_BYTE ;
-		case RGBA16	: return GL_UNSIGNED_SHORT;
-case Unknown: return 0; }}
+int GL_DATATYPE(GLTextureType type) {
+	with(GLTextureType)
+	final switch(type) {
+				case RGBA8	:
+				case L8	: return GL_UNSIGNED_BYTE;
+				case RGBA16	: return GL_UNSIGNED_SHORT;
+		case Unknown: return 0; 
+	}
+	
+}
 
-int GL_COMPONENTSIZE(GLTextureType type){ with(GLTextureType )final switch(type){
-		case RGBA8	:
-		case L8	: return 1;
-		case RGBA16	: return 2;
-case Unknown: return 0; }}
+int GL_COMPONENTSIZE(GLTextureType type) {
+	with(GLTextureType)
+	final switch(type) {
+				case RGBA8	:
+				case L8	: return 1;
+				case RGBA16	: return 2;
+		case Unknown: return 0; 
+	}
+	
+}
 
-int GL_COMPONENTCOUNT(GLTextureType type){ with(GLTextureType )final switch(type){
-		case L8	: return 1;
-		case RGBA8	: return 4;
-		case RGBA16	: return 4;
-case Unknown: return 0; }}
+int GL_COMPONENTCOUNT(GLTextureType type) {
+	with(GLTextureType)
+	final switch(type) {
+				case L8	: return 1;
+				case RGBA8	: return 4;
+				case RGBA16	: return 4;
+		case Unknown: return 0; 
+	}
+	
+}
 
-int GL_TEXELSIZE(GLTextureType type){ return GL_COMPONENTSIZE(type)*GL_COMPONENTCOUNT(type); }
+int GL_TEXELSIZE(GLTextureType type) { return GL_COMPONENTSIZE(type)*GL_COMPONENTCOUNT(type); }
 
 class GLTexture:GlResource {
-public:
-	override string resName() const			 { return name; }
-	override size_t resSize() const			 { return size_t(width*GL_TEXELSIZE(type))*height; }
-	override string resInfo() const			 { return format("size:%sx%s format:%s isCustom:%s mipEnabled:%s mipBuilt:%s", width, height, type, isCustom, mipmapEnabled, mipmapBuilt); }
-
-	size_t sizeBytes() const { return resSize; }
-private:
-	GLTextureHandle handle;
-	bool mipmapBuilt, mipmapEnabled;
-	bool isCustom;
-
-	GLTextureType type_;
-	int width_, height_;
-
-	//data for rebind
-	int lastSlot;
-	GLTextureFilter lastFilter;
-	bool lastClamped=true;
-
-	public uint changedCnt; //for synching with players
-
-	void setup(bool isC, GLTextureType t, int w, int h, bool me){
+	public:
+		override string resName() const			 { return name; }
+		override size_t resSize() const			 { return size_t(width*GL_TEXELSIZE(type))*height; }
+		override string resInfo() const			 { return format("size:%sx%s format:%s isCustom:%s mipEnabled:%s mipBuilt:%s", width, height, type, isCustom, mipmapEnabled, mipmapBuilt); }
+	
+		size_t sizeBytes() const { return resSize; }
+	private:
+		GLTextureHandle handle;
+		bool mipmapBuilt, mipmapEnabled;
+		bool isCustom;
+	
+		GLTextureType type_;
+		int width_, height_;
+	
+		//data for rebind
+		int lastSlot;
+		GLTextureFilter lastFilter;
+		bool lastClamped=true;
+	
+		public uint changedCnt; //for synching with players
+	
+		void setup(bool isC, GLTextureType t, int w, int h, bool me) {
 		isCustom = isC;  //todo: every gltexture is custom because megaTexturing
 		type_ = t; width_ = w; height_ = h;
 		mipmapEnabled = me;
 	}
-
-	void enforce(bool c, lazy string msg, string file=__FILE__, int line=__LINE__){ //todo: enforce with template params
+	
+		void enforce(bool c, lazy string msg, string file=__FILE__, int line=__LINE__) {
+		 //todo: enforce with template params
 		.enforce(c, "GLTexture["~name~"] "~msg, file, line);
 	}
-
-public:
-	immutable string name;
-	@property width ()const { return width_ ; }
-	@property height()const { return height_; }
-	@property size	 ()const { return ivec2(width, height); }
-	@property type	 ()const { return type_  ; }
-
-	override string toString()const{ return `Texture("%s", %s, %s, mipmap(en=%s, built=%s), handle=%X)`.format(name, size, type, mipmapEnabled.to!int, mipmapBuilt.to!int, handle ? handle.handle : 0); }
-
-/*  //load from a file        since megaTexturing is implemented, this is obsolete.
-	this(string fileName, bool mipmapEnabled_ = true){ //todo: FileName type
-		glResources.register(this);
-		name = fileName; //will load on first bind
-		setup(false, GLTextureType.RGBA8, 0, 0, mipmapEnabled_);
-	}*/
-
-	//create a custom texture
-	this(string name_, int width_, int height_, GLTextureType type_, bool mipmapEnabled_ = false){
+	
+	public:
+		immutable string name;
+		@property width ()const { return width_; }
+		@property height()const { return height_; }
+		@property size	 ()const { return ivec2(width, height); }
+		@property type	 ()const { return type_; }
+	
+		override string toString()const { return `Texture("%s", %s, %s, mipmap(en=%s, built=%s), handle=%X)`.format(name, size, type, mipmapEnabled.to!int, mipmapBuilt.to!int, handle ? handle.handle : 0); }
+	
+	/*
+		  //load from a file	since megaTexturing is implemented, this is obsolete.
+			this(string fileName, bool	mipmapEnabled_ = true){ //todo: FileName type
+				glResources.register(this);
+				name = fileName; //will load on first bind
+				setup(false, GLTextureType.RGBA8, 0, 0, mipmapEnabled_);
+			}
+	*/
+	
+		//create a custom texture
+		this(string name_, int width_, int height_, GLTextureType type_, bool mipmapEnabled_ = false) {
 		name = name_;
 		setup(true, type_, width_, height_, mipmapEnabled_);
 	}
-
-	private void checkBinding(string file = __FILE__, int line = __LINE__){
+	
+		private void checkBinding(string file = __FILE__, int line = __LINE__) {
 		enforce(handle.handle!=0, "GLTexture not exists.", file, line);
 		enforce(gl.getInteger(GL_TEXTURE_BINDING_2D)==handle.handle, "GLTexture not bound.", file, line);
 	}
-
-	int texelSize()const{ return GL_TEXELSIZE(type); }
-
-	private bool prepareInputRect(int x, int y, ref int sx, ref int sy){
+	
+		int texelSize()const { return GL_TEXELSIZE(type); }
+	
+		private bool prepareInputRect(int x, int y, ref int sx, ref int sy) {
 		//set default size to texture.size
 		if(sx==int.min) sx = width -x;
 		if(sy==int.min) sy = height-y;
-
+		
 		enforce(x>=0 && x+sx<=width , "Out of range X");
 		enforce(y>=0 && y+sy<=height, "Out of range Y");
-
+		
 		return sx>0 && sy>0;
 	}
-
-	bool isCompatibleWith(in Bitmap bmp)const {
+	
+		bool isCompatibleWith(in Bitmap bmp)const {
 		//note: it is not used. Because everything is placed on a 4chn texture
 		return		bmp.channels==4 && type==GLTextureType.RGBA8
 			||	bmp.channels==1 && type==GLTextureType.L8;
 	}
-
-	bool isCompatibleType(T)(){ //todo: more texture type support
+	
+		bool isCompatibleType(T)() {
+		 //todo: more texture type support
 				 static if(is(T==ubyte)) return type==GLTextureType.L8;
 		else static if(is(T==RGBA )) return type==GLTextureType.RGBA8;
 		else static assert(0, "unhandled textureType");
 	}
-
-	void enforceType(T)(){
-		enforce(isCompatibleType!T, "incompatible texture type "~T.stringof~" and "~type.text);
-	}
-
-	//todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
-
-	void upload(in void[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0, bool bug=false){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+	
+		void enforceType(T)() { enforce(isCompatibleType!T, "incompatible texture type "~T.stringof~" and "~type.text); }
+	
+		//todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
+	
+		void upload(in void[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0, bool bug=false) {
+		 //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 		if(!prepareInputRect(x, y, xs, ys)) return;
-
+		
 		//check required buffer size
 		const bytes = (stride ? stride : xs)*ys*texelSize;
 		enforce(data.length>=bytes, "Insufficient input data x=%s, y=%s, sx=%s, sy=%s, stride=%s, reqBytes=%s data.length=%s".format(x, y, xs, ys, stride, bytes, data.length));
@@ -1611,297 +1648,301 @@ public:
 		checkBinding;
 		gl.pixelStore(GL_UNPACK_ROW_LENGTH, stride);
 		gl.texSubImage2D(GL_TEXTURE_2D, 0, x, y, xs, ys, GL_FORMAT(type), GL_DATATYPE(type), data);
-
+		
 		global_TPSCnt += resSize;
-
+		
 		mipmapBuilt = false; //todo: rebuild mipmap
 	}
-
-	void fill(T)(const T data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+	
+		void fill(T)(const T data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0) {
+		 //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 		enforceType!T;
 		if(!prepareInputRect(x, y, xs, ys)) return;
 		int bytes = (stride ? stride : xs)*ys*texelSize;
-
+		
 		auto dataArr = [data];
 		auto byteArr = cast(ubyte[])dataArr;
 		auto tmp = byteArr.replicate(bytes/byteArr.length.to!int).array;
 		upload(tmp, x, y, xs, ys, stride);
 	}
-
-	//upload a subrect from an image2D
-	void upload(T)(Image!(T, 2) img, int x=0, int y=0, int sx=int.min, int sy=int.min, bool bug=false){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
-		if(!isCompatibleType!T){ // incompatible format?
-			upload(new Bitmap(img), x, y, sx, sy); // Bitmap will automatically convert
-		}else{ // compatible
+	
+		//upload a subrect from an image2D
+		void upload(T)(Image!(T, 2) img, int x=0, int y=0, int sx=int.min, int sy=int.min, bool bug=false) {
+		 //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+		if(!isCompatibleType!T) {
+			 //incompatible format?
+			upload(new Bitmap(img), x, y, sx, sy); //Bitmap will automatically convert
+		}else {
+			 //compatible
 			//adjust size to image dimensions also, not just to the texture
 			if(sx==int.min) sx = min(width -x, img.width );
 			if(sy==int.min) sy = min(height-y, img.height);
-
+			
 			upload(img.impl, x, y, sx, sy, img.stride, bug);
 		}
 	}
-
-	void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min){
+	
+		void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min) {
 		//opt: bmp.GetForUpload should need a performance monitoring
-		switch(type){
-			case GLTextureType.L8   : upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
+		switch(type) {
+			case GLTextureType.L8 : upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
 			case GLTextureType.RGBA8: 
 				//T0;
-				try{ //it can be a preview texture too, so don't take errors seriously
-					convertOSExceptionsToNormalExceptions({
-						upload(bmp.getForUpload!RGBA , x, y, sx,sy); 
-					});
-				}catch(Exception e){
-					//WARN(e.simpleMsg);  //opt: This warning displays an unoptimal conversion through every project. Optimize it!
-				}
+				try {
+				 //it can be a preview texture too, so don't take errors seriously
+				convertOSExceptionsToNormalExceptions({ upload(bmp.getForUpload!RGBA , x, y, sx,sy); });
+			}catch(Exception e) {
+				//WARN(e.simpleMsg);  //opt: This warning displays an unoptimal conversion through every project. Optimize it!
+			}
 				//LOG(DT);
 			break;
 			default: raise("unhandled texture type: "~type.text);
 		}
 	}
-
-	// specual uploads for textures holding sequential data. Consider using 1D textures in the future?
-	void uploadRows(const(void)[] data, int startRow, int numRows){ //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+	
+		//specual uploads for textures holding sequential data. Consider using 1D textures in the future?
+		void uploadRows(const(void)[] data, int startRow, int numRows) {
+		 //todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 		upload(data, 0, startRow, width, numRows);
 	}
-
-	void uploadSeq(const(void)[] data, int byteOfs=0){ //seq is a byte array stored continuously in the texture
+	
+		void uploadSeq(const(void)[] data, int byteOfs=0) {
+		 //seq is a byte array stored continuously in the texture
 		if(data.length==0) return;
 		int ts = texelSize;
 		int bytes = width*height*ts;
 		enforce(byteOfs>=0 && byteOfs+data.length<=bytes, "Insufficient data");
 		enforce(data.length%ts==0, "Align error: data.length");
 		enforce(byteOfs%ts==0, "Align error: byteOfs");
-
+		
 		byteOfs/=ts;
-
+		
 		int y = byteOfs/width;
 		int f = byteOfs%width;
-		if(f!=0){ //first row
+		if(f!=0) {
+			 //first row
 			int xs = min(width-byteOfs, cast(int)(data.length/ts));
 			upload(data, byteOfs, y, xs, 1);
 			data = data[xs*ts..$];
 			y++;
 		}
-
+		
 		if(data.length==0) return;
-
+		
 		int ys = cast(int)data.length/(width*ts);
-		if(ys>0){ //whole rows
+		if(ys>0) {
+			 //whole rows
 			upload(data, 0, y, width, ys);
 			data = data[width*ys*ts..$];
 			y += ys;
 		}
-
+		
 		if(data.length==0) return;
-
+		
 		upload(data, 0, y, cast(int)data.length/ts, 1); //last row
 	}
-
-
-	// download a subrect from the texture. It's unsafe with the format!
-	auto downloadImage(T)(int x=0, int y=0, int xs=int.min, int ys=int.min){
+	
+	
+		//download a subrect from the texture. It's unsafe with the format!
+		auto downloadImage(T)(int x=0, int y=0, int xs=int.min, int ys=int.min) {
 		enforceType!T;
-
+		
 		if(!prepareInputRect(x, y, xs, ys))
-			return image2D(0, 0, T.init); //nothing to copy
-
+		return image2D(0, 0, T.init); //nothing to copy
+		
 		auto img = image2D(size, T(0)); //!!! only for 8 bit
 		checkBinding;
 		gl.pixelStore(GL_UNPACK_ROW_LENGTH, 0);
 		gl.getTexImage(GL_TEXTURE_2D, 0, GL_FORMAT(type), GL_DATATYPE(type), img.asArray);
-
-		// note: there is no such thing as glGetTexSubimage2D(), sigh...
+		
+		//note: there is no such thing as glGetTexSubimage2D(), sigh...
 		if(ivec2(xs, ys) != size)
-			img = img[x..x+xs, y..y+ys]; // subrect emulation. Fucking ineffective, had to load the whole tedture....
-
+		img = img[x..x+xs, y..y+ys]; //subrect emulation. Fucking ineffective, had to load the whole tedture....
+		
 		return img;
 	}
-
-	Bitmap downloadBitmap(int x=0, int y=0, int xs=int.min, int ys=int.min){
-		auto doit(T)(){ return new Bitmap(downloadImage!T(x, y, xs, ys)); }
-		switch(type){
-			case GLTextureType.L8	 : return doit!ubyte;
-			case GLTextureType.RGBA8	 : return doit!RGBA;
+	
+		Bitmap downloadBitmap(int x=0, int y=0, int xs=int.min, int ys=int.min) {
+		auto doit(T)() { return new Bitmap(downloadImage!T(x, y, xs, ys)); }
+		switch(type) {
+			case GLTextureType.L8	: return doit!ubyte;
+			case GLTextureType.RGBA8	: return doit!RGBA;
 			default: raise("unsupported TextureType: "~type.text); assert(0);
 		}
 	}
-
-	int mipmapLevels() const{ return mipmapEnabled ? 1 : 1; } //todo: mipmaps
-
-	void resize(in ivec2 size, bool preserve=true){ resize(size.x, size.y, preserve); }
-	void resize(int xs, int ys, bool preserve=true){
+	
+		int mipmapLevels() const { return mipmapEnabled ? 1 : 1; } //todo: mipmaps
+	
+		void resize(in ivec2 size, bool preserve=true) { resize(size.x, size.y, preserve); }
+		void resize(int xs, int ys, bool preserve=true) {
 		if(xs==width && ys==height) return;
-
+		
 		const maxs = gl.maxTextureSize;
 		enforce(xs.inRange(1, maxs) && ys.inRange(1, maxs), "Out of range");
-
+		
 		Bitmap bmp;
 		if(preserve) bmp = downloadBitmap(0, 0, min(xs, width ), min(ys, height));
-
+		
 		checkBinding;
 		width_ = xs; height_ = ys; mipmapBuilt = false;
-
-		static if(UseOldTexImage2D){
-			gl.texImage2D(GL_TEXTURE_2D, 0, GL_FORMAT(type), width, height, 0, GL_FORMAT(type), GL_DATATYPE(type), null);
-		}else{
+		
+		static if(UseOldTexImage2D) { gl.texImage2D(GL_TEXTURE_2D, 0, GL_FORMAT(type), width, height, 0, GL_FORMAT(type), GL_DATATYPE(type), null); }else {
 			//recreate the texture
 			if(handle) handle.release;
 			handle = new GLTextureHandle(resName, resSize);
 			gl.bindTexture(GL_TEXTURE_2D, handle.handle);
-
+			
 			gl.texStorage2D(GL_TEXTURE_2D, mipmapLevels, GL_FORMAT2(type), width, height);
 		}
-
+		
 		if(preserve) upload(bmp);
-
+		
 		bind(lastSlot, lastFilter, lastClamped); //rebind it for mipmap
 	}
-
-	void fastBind(){
+	
+		void fastBind() {
 		gl.activeTexture(GL_TEXTURE(0));
 		gl.bindTexture(GL_TEXTURE_2D, handle.handle);
 	}
-
-	void bind(int slot = 0, GLTextureFilter filter=GLTextureFilter.Mipmapped, bool clamped=true){
+	
+		void bind(int slot = 0, GLTextureFilter filter=GLTextureFilter.Mipmapped, bool clamped=true) {
 		enforce(inRange(slot, 0, 7), "Slot out of range");
-
+		
 		lastSlot = slot; lastFilter = filter; lastClamped = clamped;
-
+		
 		gl.activeTexture(GL_TEXTURE(slot));
-
-		if(!handle){
-			handle = new GLTextureHandle(resName, resSize);
-			gl.bindTexture(GL_TEXTURE_2D, handle.handle);
-
-			void[] dataToUpload;
-
-/*	     if(!isCustom){ //because of megaTexturing this is deprecated
-					 auto bmp = newBitmap(name);
-					 bmp.channels = 4; //todo: not just rgba8
-					 setup(isCustom, GLTextureType.RGBA8, bmp.width, bmp.height, mipmapEnabled);
-					 dataToUpload = bmp.data;
-			}*/
-
-			static if(UseOldTexImage2D){
-				gl.texImage2D(GL_TEXTURE_2D, 0, GL_FORMAT(type), width, height, 0, GL_FORMAT(type), GL_DATATYPE(type), dataToUpload);
-			}else{
-				gl.texStorage2D(GL_TEXTURE_2D, mipmapLevels, GL_FORMAT2(type), width, height);
-			}
+		
+		if(!handle) {
+						handle = new GLTextureHandle(resName, resSize);
+						gl.bindTexture(GL_TEXTURE_2D, handle.handle);
+			
+						void[] dataToUpload;
+			
+			/*
+				if(!isCustom){ //because of megaTexturing this is deprecated
+								auto bmp = newBitmap(name);
+								bmp.channels = 4; //todo: not just rgba8
+								setup(isCustom, GLTextureType.RGBA8, bmp.width, bmp.height, mipmapEnabled);
+								dataToUpload = bmp.data;
+					}
+			*/
+			
+						static if(UseOldTexImage2D) { gl.texImage2D(GL_TEXTURE_2D, 0, GL_FORMAT(type), width, height, 0, GL_FORMAT(type), GL_DATATYPE(type), dataToUpload); }else { gl.texStorage2D(GL_TEXTURE_2D, mipmapLevels, GL_FORMAT2(type), width, height); }
 		}
-
+		
 		if(!handle) return;
-
+		
 		gl.bindTexture(GL_TEXTURE_2D, handle.handle);
-
+		
 		//mipmap
 		if(filter==GLTextureFilter.Mipmapped && !mipmapEnabled) filter = GLTextureFilter.Linear;
-
+		
 		if(filter==GLTextureFilter.Mipmapped && !mipmapBuilt) {
 			gl.generateMipmap(GL_TEXTURE_2D);
 			mipmapBuilt = true;
 		}
-
+		
 		//min/mag filter
 		int minFilt, magFilt;
-		with(GLTextureFilter) final switch(filter){
+		with(GLTextureFilter)
+		final switch(filter) {
 			case Nearest	: minFilt = magFilt = GL_NEAREST; break;
-			case Linear	: minFilt = magFilt = GL_LINEAR ; break;
-			case Mipmapped	: minFilt = GL_LINEAR_MIPMAP_LINEAR; magFilt = GL_LINEAR ; break;
+			case Linear	: minFilt = magFilt = GL_LINEAR; break;
+			case Mipmapped	: minFilt = GL_LINEAR_MIPMAP_LINEAR; magFilt = GL_LINEAR; break;
 		}
-
+		
+		
 		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, minFilt);
 		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, magFilt);
-
-		if(filter==GLTextureFilter.Mipmapped){
+		
+		if(filter==GLTextureFilter.Mipmapped) {
 			auto maxAniso = gl.getFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
 			gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, maxAniso);
 		}
-
+		
 		//clamping
 		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S			 , clamped ? GL_CLAMP_TO_EDGE : GL_REPEAT);
 		gl.texParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T			 , clamped ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-
+		
 		gl.enable(GL_TEXTURE_2D);
 	}
-
-	void unBind(int slot=0)
+	
+		void unBind(int slot=0)
 	{
 		gl.activeTexture(GL_TEXTURE(slot));
 		gl.bindTexture(GL_TEXTURE_2D, 0);
 	}
-
-	~this(){
-		if(handle) handle.release;
-	}
+	
+		~this() { if(handle) handle.release; }
 }
 
 /// GLTesselator //////////////////////////////////////////////////////////////////////////////
 
-private{
-
-	struct TessVertex{
+private {
+	
+	struct TessVertex {
 		int idx;
 		vec2 v;
 	}
-
+	
 	TessVertex*[] tessVertices;
-
-	auto addVertex(in vec2 v){
+	
+	auto addVertex(in vec2 v) {
 		auto r = new TessVertex(cast(int)tessVertices.length, v);
 		tessVertices ~= r;
 		return r;
 	}
-
-	auto findAddVertex(in vec2 v){
+	
+	auto findAddVertex(in vec2 v) {
 		foreach(i; tessBaseVertexCount..tessVertices.length)
-			if(tessVertices[i].v==v)
-				return tessVertices[i];
-
+		if(tessVertices[i].v==v)
+		return tessVertices[i];
+		
 		return addVertex(v);
 	}
-
-	public struct TessResult{
+	
+	public struct TessResult {
 		vec2[] vertices;
 		int[3][] triangles;
 		int[2][] lines;
 		string error;
 	}
-
+	
 	TessResult tessResult;
-
+	
 	bool tessBoundaryPass;
 	size_t tessBaseVertexCount;
 	int tessActPrimitive;
 	int tessIdx;
 	int tessLast0;
 	int tessLast1;
-
-	extern(Windows){
-		void cbBegin(int type){
+	
+	extern(Windows) {
+		void cbBegin(int type) {
 			//GLU_TRIANGLE_FAN, GLU_TRIANGLE_STRIP, or GLU_TRIANGLES
 			//if(GLU_TESS_BOUNDARY_ONLY == 1) -> GLU_LINE_LOOP
 			//"glBegin(%d)".writefln(type);
-
+			
 			tessActPrimitive = type; tessIdx = 0;
 		}
 		//------------------------------------------------------------------------------
-
-		void cbEnd(){
+		
+		void cbEnd() {
 			//"glEnd".writeln;
-
-			if(tessActPrimitive==GL_LINE_LOOP && tessIdx>0){
+			
+			if(tessActPrimitive==GL_LINE_LOOP && tessIdx>0) {
 				tessResult.lines ~= [tessLast1, tessLast0]; //last looped segment
 			}
 			tessActPrimitive = 0; tessIdx = 0;
 		}
-
-		void cbVertex(in TessVertex v){
+		
+		void cbVertex(in TessVertex v) {
 			//"glVertex %d %s".writefln(v.idx, v.v);
-
-			switch(tessActPrimitive){  //todo: egybeagyazott switch()-ek. Ezeket lehetne grafikusan optolni...
+			
+			switch(tessActPrimitive) {
+				  //todo: egybeagyazott switch()-ek. Ezeket lehetne grafikusan optolni...
 				case GL_TRIANGLE_FAN:{
-					switch(tessIdx){
+						switch(tessIdx) {
 						case 0: tessLast0 = v.idx; break;//todo: case 0, case 1 mindegyiknel kozos, ha mar tesztelve van, akkor ki kell pakolni.
 						case 1: tessLast1 = v.idx; break;
 						default:{
@@ -1909,9 +1950,10 @@ private{
 							tessLast1 = v.idx;
 						}
 					}
-				break;}
+					break;
+				}
 				case GL_TRIANGLE_STRIP:{
-					switch(tessIdx){
+						switch(tessIdx) {
 						case 0: tessLast0 = v.idx; break;
 						case 1: tessLast1 = v.idx; break;
 						default:{
@@ -1921,51 +1963,54 @@ private{
 							tessLast1 = v.idx;
 						}
 					}
-				break;}
+					break;
+				}
 				case GL_TRIANGLES:{
-					switch(tessIdx%3){
+						switch(tessIdx%3) {
 						case 0: tessLast0 = v.idx; break;
 						case 1: tessLast1 = v.idx; break;
 						default: tessResult.triangles ~= [tessLast0, tessLast1, v.idx];
 					}
-				break;}
+					break;
+				}
 				case GL_LINE_LOOP:{
-					switch(tessIdx){
+						switch(tessIdx) {
 						case 0: tessLast0 = v.idx; break;
 						case 1: tessLast1 = v.idx; tessResult.lines ~= [tessLast0, tessLast1]; break;
 						default: tessResult.lines ~= [tessLast1, v.idx]; tessLast1 = v.idx;
 					}
-				break;}
+					break;
+				}
 				default: enforce(0, "tess: invalid primitive %s".format(tessActPrimitive));
 			}
-
+			
 			tessIdx++;
 		}
-
-		void cbCombine(double* coords, double* orig, float* weight, out TessVertex* dataOut){
+		
+		void cbCombine(double* coords, double* orig, float* weight, out TessVertex* dataOut) {
 			auto v = vec2(coords[0], coords[1]);
 			if(tessBoundaryPass) dataOut = findAddVertex(v);
-											else dataOut = addVertex    (v);
-
+			else dataOut = addVertex    (v);
+			
 			//"combine %d %s".writefln(dataOut.idx, dataOut.v);
 		}
-
-		void cbError(int err){
+		
+		void cbError(int err) {
 			tessResult.error = GLFuncts.glErrorStr(err);
 			//throw new Exception("GLTesselator.Error: "~GLFuncts.glErrorStr(err));
 		}
-
+		
 	}
-
+	
 	void* tess;
 	int tessError;
-
-	void tessInit(){
+	
+	void tessInit() {
 		tessResult = TessResult.init;
 		tessVertices = [];
-
+		
 		if(tess) return;
-		with(gl){
+		with(gl) {
 			tess = gluNewTess();
 			gluTessCallback(tess, GLU_TESS_BEGIN	, cast(void*)&cbBegin	);
 			gluTessCallback(tess, GLU_TESS_VERTEX	, cast(void*)&cbVertex	);
@@ -1978,81 +2023,83 @@ private{
 	}
 }
 
-TessResult tesselate(in vec2[][] contours, TessWinding winding = TessWinding.nonZero, bool boundary = true){ with(gl){
-	tessInit;
-	double[3] dv = [0, 0, 0];
-
-	gluTessProperty(tess, GLU_TESS_WINDING_RULE, winding);
-
-	//surface pass
-	tessBoundaryPass = false;
-	gluTessProperty(tess, GLU_TESS_BOUNDARY_ONLY, tessBoundaryPass);
-	gluTessBeginPolygon(tess, null);
-	foreach(const contour; contours){
-		gluTessBeginContour(tess); //note: gluTessNextContour is for more control
-		foreach(const vIn; contour){
-			dv[0] = vIn.x; dv[1] = vIn.y;
-			gluTessVertex(tess, dv.ptr, cast(void*)addVertex(vIn));
-		}
-		gluTessEndContour(tess);
-	}
-	tessBaseVertexCount = tessVertices.length; //save the base size here, the base vertices will be the same
-	gluTessEndPolygon(tess);
-
-	//boundary pass
-	if(boundary){
-		tessBoundaryPass = true;
+TessResult tesselate(in vec2[][] contours, TessWinding winding = TessWinding.nonZero, bool boundary = true) {
+	with(gl) {
+		tessInit;
+		double[3] dv = [0, 0, 0];
+		
+		gluTessProperty(tess, GLU_TESS_WINDING_RULE, winding);
+		
+		//surface pass
+		tessBoundaryPass = false;
 		gluTessProperty(tess, GLU_TESS_BOUNDARY_ONLY, tessBoundaryPass);
 		gluTessBeginPolygon(tess, null);
-		int n = 0;
-		foreach(const contour; contours){
+		foreach(const contour; contours) {
 			gluTessBeginContour(tess); //note: gluTessNextContour is for more control
-			foreach(const vIn; contour){
+			foreach(const vIn; contour) {
 				dv[0] = vIn.x; dv[1] = vIn.y;
-				gluTessVertex(tess, dv.ptr, cast(void*)(tessVertices[n++]));
+				gluTessVertex(tess, dv.ptr, cast(void*)addVertex(vIn));
 			}
 			gluTessEndContour(tess);
 		}
+		tessBaseVertexCount = tessVertices.length; //save the base size here, the base vertices will be the same
 		gluTessEndPolygon(tess);
+		
+		//boundary pass
+		if(boundary) {
+			tessBoundaryPass = true;
+			gluTessProperty(tess, GLU_TESS_BOUNDARY_ONLY, tessBoundaryPass);
+			gluTessBeginPolygon(tess, null);
+			int n = 0;
+			foreach(const contour; contours) {
+				gluTessBeginContour(tess); //note: gluTessNextContour is for more control
+				foreach(const vIn; contour) {
+					dv[0] = vIn.x; dv[1] = vIn.y;
+					gluTessVertex(tess, dv.ptr, cast(void*)(tessVertices[n++]));
+				}
+				gluTessEndContour(tess);
+			}
+			gluTessEndPolygon(tess);
+		}
+		
+		//enforce(dv[2]==0, "tess fatal error: dv[2]!=0");
+		
+		//transfer the vertices
+		tessResult.vertices = tessVertices.map!"a.v".array;
+		tessVertices = [];
+		
+		return tessResult;
 	}
+}
 
-	//enforce(dv[2]==0, "tess fatal error: dv[2]!=0");
-
-	//transfer the vertices
-	tessResult.vertices = tessVertices.map!"a.v".array;
-	tessVertices = [];
-
-	return tessResult;
-}}
-
-TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZero, bool boundary = true){ return tesselate([contour], winding, boundary); }
+TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZero, bool boundary = true) { return tesselate([contour], winding, boundary); }
 
 
 /// GLWindow class //////////////////////////////////////////////////////////////////////////
 
-class GLWindow: Window{
-	View2D view;
-	MouseState mouse;
-
-	//diagnostic stuff
-	bool showFPS, showMegaTextures;
-	float guiScale = 1;
-
-	private View2D viewGUI_;
-	auto viewGUI() {
+class GLWindow: Window {
+		View2D view;
+		MouseState mouse;
+	
+		//diagnostic stuff
+		bool showFPS, showMegaTextures;
+		float guiScale = 1;
+	
+		private View2D viewGUI_;
+		auto viewGUI() {
 		viewGUI_.scale = guiScale;
 		viewGUI_.origin = clientSizeHalf;
 		viewGUI_.skipAnimation;
 		return viewGUI_;
 	}
-
-private:
-	HGLRC frc;
-
-	void oldSetPixelFormat(HDC dc)
+	
+	private:
+		HGLRC frc;
+	
+		void oldSetPixelFormat(HDC dc)
 	{
 		PIXELFORMATDESCRIPTOR pfd;
-		with(pfd){
+		with(pfd) {
 			nSize = pfd.sizeof;
 			nVersion = 1;
 			dwFlags = PFD_SUPPORT_OPENGL | PFD_SWAP_EXCHANGE | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
@@ -2065,103 +2112,107 @@ private:
 		}
 		enforce(SetPixelFormat(dc, ChoosePixelFormat(dc, &pfd), &pfd), "SetPixelFormat fail");
 	}
-
-	void newSetPixelFormat(HDC dc, int samples){
+	
+		void newSetPixelFormat(HDC dc, int samples) {
 		retry:
-
-		if(samples<=1 || wglChoosePixelFormatARB is null){
+		
+		if(samples<=1 || wglChoosePixelFormatARB is null) {
 			oldSetPixelFormat(dc);
 			return;
 		}
-
-		const float[] attribFList = [ 0, 0, ];
+		
+		const float[] attribFList = [0, 0,];
 		const int[] attribIList = [
-				WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
-				WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
-				WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
-				WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
-				WGL_COLOR_BITS_ARB, 32,
-				WGL_DEPTH_BITS_ARB, 24,
-				WGL_STENCIL_BITS_ARB, 8,
-				WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
-				WGL_SAMPLES_ARB, samples,
-				0, 0, //End
+			WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
+			WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
+			WGL_DOUBLE_BUFFER_ARB, GL_TRUE,
+			WGL_PIXEL_TYPE_ARB, WGL_TYPE_RGBA_ARB,
+			WGL_COLOR_BITS_ARB, 32,
+			WGL_DEPTH_BITS_ARB, 24,
+			WGL_STENCIL_BITS_ARB, 8,
+			WGL_SAMPLE_BUFFERS_ARB, GL_TRUE,
+			WGL_SAMPLES_ARB, samples,
+			0, 0, //End
 		];
-
+		
 		int pixelFormat, numFormats;
 		bool ok = wglChoosePixelFormatARB(dc, attribIList.ptr, attribFList.ptr, 1, &pixelFormat, &numFormats);
-
-		if(!ok || numFormats<1){  //try again with smalle multisampling, or with the old shit
+		
+		if(!ok || numFormats<1) {
+			  //try again with smalle multisampling, or with the old shit
 			samples /= 2;  goto retry;
 		}
-
+		
 		PIXELFORMATDESCRIPTOR pfd;
 		enforce(SetPixelFormat(dc, pixelFormat, &pfd), "wglSetPixelFormat fail");
 	}
-
-	void createRenderingContext()
+	
+		void createRenderingContext()
 	{
 		if(frc) return;
-
+		
 		const multiSample = 6;
 		newSetPixelFormat(hdc, multiSample);
-
+		
 		frc = wglCreateContext(hdc);  if(!frc) error("GLVindow.CreateRenderingContext failed");
-
+		
 		wglMakeCurrent;
 		gl.loadFuncts;
-
+		
 		if(multiSample>1) gl.enable(GL_MULTISAMPLE);
 	}
-
-	void wglMakeCurrent(){
+	
+		void wglMakeCurrent() {
 		enforce(hdc, "hdc in null");
 		enforce(rc , "rc  is null");
 		enforce(.wglMakeCurrent(hdc, rc));
 	}
-
-protected:
-	override void onInitializeGLWindow(){
+	
+	protected:
+		override void onInitializeGLWindow() {
 		createRenderingContext;
-
+		
 		//init drawing, view, mouse
 		/*dr	= new Drawing;*/	 view	= new View2D;	 view    .owner = this;	view.centerCorrection = true;
 		/*drGUI	= new Drawing;*/	 viewGUI_	= new View2D;	 viewGUI_.owner =	this;
-
+		
 		mouse = new MouseState;
 	}
-
-	override void onWglMakeCurrent(bool state){
+	
+		override void onWglMakeCurrent(bool state) {
 		if(state) wglMakeCurrent;
-				 else .wglMakeCurrent(null, null);
+		else .wglMakeCurrent(null, null);
 		gl.active = state;
 	}
-
-	override void onFinalizeGLWindow(){
+	
+		override void onFinalizeGLWindow() {
 		if(!rc) return;
 		enforce(wglDeleteContext(rc));
 		frc = null;
 	}
-
-	override void onInitialZoomAll(){
-		//called right after onCreate
-		//todo: tryInitialZoom should work with the registry also
-		if(!view.workArea.empty){ //workarea already set
+	
+		override void onInitialZoomAll() {
+				//called right after onCreate
+				//todo: tryInitialZoom should work with the registry also
+				if(!view.workArea.empty) {
+			 //workarea already set
 			view.zoomAll_immediate;
 			return;
 		}
-
-/*	   if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
-			 view.workArea = dr.getBounds;
-			 view.zoomAll_immediate;
-		}*/
+		
+		/*
+			if(view.workArea.empty && !dr.getBounds.empty){ //get the workarea from the drawing
+					view.workArea = dr.getBounds;
+					view.zoomAll_immediate;
+			}
+		*/
 	}
-
-	override void onMouseUpdate(){
+	
+		override void onMouseUpdate() {
 		bool k(const string n) { return inputs[n].value!=0; }
-
+		
 		MouseState.MSAbsolute a;
-		with(a){
+		with(a) {
 			LMB	= k("LMB"	 );
 			RMB	= k("RMB"	 );
 			MMB	= k("MMB"	 );
@@ -2173,131 +2224,133 @@ protected:
 			wheel	= inputs["MW"].delta.iround;
 		}
 		mouse._updateInternal(a);
-
+		
 		mouse.screenRect = clientBounds;
 		mouse.worldRect = bounds2(view.invTrans(vec2(mouse.screenRect.topLeft)), view.invTrans(vec2(mouse.screenRect.bottomRight)));
-
+		
 		//todo: bad names: worldRect is "screenBounds in world coords"
 		//todo: bad names: screenRect is "screenBounds in client coords"
 	}
-
-	void updateViewClipBoundsAndMousePos(){
-		// set extra info about mouse and bounds for view and viewGUI
+	
+		void updateViewClipBoundsAndMousePos() {
+		//set extra info about mouse and bounds for view and viewGUI
 		vec2 mp = mouse.act.screen;
 		bounds2 bnd = clientBounds;
-
-		with(view   ){ mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
-		with(viewGUI){ mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
+		
+		with(view ) { mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
+		with(viewGUI) { mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
 	}
-
-	override void onUpdateViewAnimation(){
+	
+		override void onUpdateViewAnimation() {
 		view.updateAnimation(deltaTime.value(second), true/*invalidate*/);
 		updateViewClipBoundsAndMousePos;
 	}
-
-	override void onUpdateUIBeginFrame(){
+	
+		override void onUpdateUIBeginFrame() {
 		import het.ui:im;
 		im._beginFrame([im.TargetSurface(view), im.TargetSurface(viewGUI)]);
 	}
-
-	override void onUpdateUIEndFrame(){
+	
+		override void onUpdateUIEndFrame() {
 		import het.ui:im;
 		im._endFrame; //(bounds2(clientBounds))
 	}
-
-public:
-	HGLRC rc() { return frc; }
-
-	int VSynch = 1; //0:off, 1:on, -1:On when at max FrameRate(bogus)
-
-	override void onBeginPaint()
+	
+	public:
+		HGLRC rc() { return frc; }
+	
+		int VSynch = 1; //0:off, 1:on, -1:On when at max FrameRate(bogus)
+	
+		override void onBeginPaint()
 	{
-		super.onBeginPaint;
-		onWglMakeCurrent(true);
-
-		//dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not.
-
-		with(clientRect) gl.viewport(left, top, right-left, bottom-top);
-		gl.disable(GL_DEPTH_TEST); //no zbuffering by default
-
-//    textures.update; //upload pending textures.
-
-		{//todo: this is a fix: if the clientSize changes between update() and draw() this will update it. Must rethink the update() draw() thing completely.
+				super.onBeginPaint;
+				onWglMakeCurrent(true);
+		
+				//dr.drawCnt = drGUI.drawCnt = 0; //if the user draws it, then GlWindow will not.
+		
+				with(clientRect) gl.viewport(left, top, right-left, bottom-top);
+				gl.disable(GL_DEPTH_TEST); //no zbuffering by default
+		
+		//textures.update; //upload pending textures.
+		
+				{
+			//todo: this is a fix: if the clientSize changes between update() and draw() this will update it. Must rethink the update() draw() thing completely.
 			updateViewClipBoundsAndMousePos;
 			import het.ui: im;
 			im.setTargetSurfaceViews(view, viewGUI);
 		}
- }
-
-	override void onPaint()
+	}
+	
+		override void onPaint()
 	{
 		//descendants must not call super!
 		gl.clearColor(clFuchsia);
 		gl.clear(GL_COLOR_BUFFER_BIT);
 	}
-
-	void afterPaint(){
-	}
-
-	private bool firstPaint;
-
-	override void onEndPaint(){
+	
+		void afterPaint() {}
+	
+		private bool firstPaint;
+	
+		override void onEndPaint() {
 		if(showMegaTextures) drawMegaTextures;
-
+		
 		import het.ui: im; //this is a nasty entry point to imgui
 		im._drawFrame!"system call only";
-
+		
 		if(!view.workArea_accum.empty) view.workArea = view.workArea_accum;
-
+		
 		//todo: here should be an on OverlayPaint wich is paints on top of the UI
-
+		
 		if(showFPS) drawFPS();
-
+		
 		if(chkClear(view._mustZoomAll)) view.zoomAll;
-
-		/*if(!dr.drawCnt){
-			if(!firstPaint) onInitialZoomAll; //if dr has a painting
-			dr.glDraw(view   );
-		}
-		if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
-
-		lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
-		lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);*/
-
+		
+		/*
+			if(!dr.drawCnt){
+						if(!firstPaint) onInitialZoomAll; //if dr has a painting
+						dr.glDraw(view   );
+					}
+					if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
+			
+					lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
+					lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);
+		*/
+		
 		firstPaint = true;
-
+		
 		afterPaint;
 	}
-
-	override void onSwapBuffers(){
+	
+		override void onSwapBuffers() {
 		//must not call super!
 		gl.swapInterval(VSynch);
 		SwapBuffers(hdc);
-
+		
 		textures.update; //upload pending textures.
-
+		
 		updateGLHandles;
-
+		
 		onWglMakeCurrent(false);
 		super.onEndPaint;
 	}
-
-	void drawFPS(Drawing dr){
-		with(dr){
+	
+		void drawFPS(Drawing dr) {
+		with(dr) {
 			//FPS graph
 			translate(vec2(0, 64+4));
-
+			
 			fontHeight = 7;
-
+			
 			lineWidth = 1;
 			lineStyle = LineStyle.normal;
 			auto groups = timeLine.getGroups;
-			foreach(int idx; 1..groups.length.to!int){
+			foreach(int idx; 1..groups.length.to!int) {
 				auto group = groups[idx], prevGroup = groups[idx-1];
 				const scale = vec2(5000.0f, 4);
 				const origin = vec2(clientWidth-2, 2);
-
-				auto rect(double t0, double t1){
+				
+				auto rect(double t0, double t1) {
 					bounds2 b;
 					float base = prevGroup[$-1].t1.value(second);
 					float len = group[$-1].t1.value(second) - base;
@@ -2307,43 +2360,43 @@ public:
 					b.high.y	= b.low.y + scale.y*.9;
 					return b;
 				}
-
+				
 				auto rAll = rect(prevGroup[$-1].t1.value(second), group[$-1].t1.value(second));
 				color = clBlack;
 				fillRect(rAll);
-
-				foreach(pass; 0..2) foreach(g; group){
+				
+				foreach(pass; 0..2)
+				foreach(g; group) {
 					color = g.color;
 					auto r = rect(g.t0.value(second), g.t1.value(second));
-					if(pass==0){
-						fillRect(r);
-					}else{
+					if(pass==0) { fillRect(r); }else {
 						color = mix(color, clWhite, 0.5f);
 						line(r.topLeft, r.bottomLeft);
 					}
 				}
-
-				void mark(float f){
+				
+				
+				void mark(float f) {
 					auto r = rect(group[$-1].t1.value(second)-(1/f), group[$-1].t1.value(second));
 					color = clWhite;
 					line(r.topLeft, r.bottomLeft);
 				}
-
+				
 				mark(60); mark(30);
 			}
-
+			
 			pop;
-
+			
 		}
 	}
-
-	void drawFPS(){
+	
+		void drawFPS() {
 		auto drGUI = scoped!Drawing;
 		drawFPS(drGUI);
 		drGUI.glDraw(viewGUI);
 	}
-
-	void drawMegaTextures(){
+	
+		void drawMegaTextures() {
 		auto dr = scoped!Drawing;
 		import het.megatexturing: textures;
 		dr.translate(0, view.workArea.bottom+100);
@@ -2351,6 +2404,6 @@ public:
 		dr.pop;
 		dr.glDraw(view);
 	}
-
-
+	
+	
 }

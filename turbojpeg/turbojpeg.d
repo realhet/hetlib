@@ -1,47 +1,49 @@
 module turbojpeg.turbojpeg;
-
+ 
 //Source:        https://github.com/rtbo/turbojpeg-d/blob/master/source/turbojpeg/turbojpeg.d
 //Documentation: https://github.com/D-Programming-Deimos/jpeg-turbo/blob/master/source/libjpeg/turbojpeg.d
 
 
-/+MIT License
+/+
+	MIT License
+	
+	Copyright (c) 2018 Remi Thebault
+	
+	Permission is hereby granted, free of charge, to any person obtaining a copy
+	of this software and associated documentation files (the "Software"), to deal
+	in the Software without restriction, including without limitation the rights
+	to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+	copies of the Software, and to permit persons to whom the Software is
+	furnished to do so, subject to the following conditions:
+	
+	The above copyright notice and this permission notice shall be included in all
+	copies or substantial portions of the Software.
+	
+	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+	AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+	LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+	SOFTWARE.
++/
 
-Copyright (c) 2018 Remi Thebault
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.+/
-
-// extra stuff for the integration with hetlib ////////////////////////////////////
+//extra stuff for the integration with hetlib ////////////////////////////////////
 
 pragma(lib, "turbojpeg-static.lib");
 
-void tjChk(tjhandle h, int res, string what){
-  if(res==0) return;
-  import std.format;
-  throw new Exception(format!"TurboJpeg Error: %s %s"(what, tjGetErrorStr2(h)));
+void tjChk(tjhandle h, int res, string what) {
+	if(res==0) return;
+	import std.format;
+	throw new Exception(format!"TurboJpeg Error: %s %s"(what, tjGetErrorStr2(h)));
 }
 
 //Auto-create a separate instance for each thread
 import std.exception : enforce;
-auto tjDecoder(){ static tjhandle h; if(!h){ h = tjInitDecompress; enforce(h, "tjInitDecompress() fail."); } return h; }
-auto tjEncoder(){ static tjhandle h; if(!h){ h = tjInitCompress  ; enforce(h, "tjInitCompress() fail."  ); } return h; }
+auto tjDecoder() { static tjhandle h; if(!h) { h = tjInitDecompress; enforce(h, "tjInitDecompress() fail."); } return h; }
+auto tjEncoder() { static tjhandle h; if(!h) { h = tjInitCompress ; enforce(h, "tjInitCompress() fail."  ); } return h; }
 
-// original stuff //////////////////////////////////////////////////////////////////
+//original stuff //////////////////////////////////////////////////////////////////
 
 import core.stdc.config : c_ulong;
 
@@ -51,12 +53,12 @@ enum TJ_NUMSAMP = 6;
 
 enum TJSAMP
 {
-    TJSAMP_444 = 0,
-    TJSAMP_422,
-    TJSAMP_420,
-    TJSAMP_GRAY,
-    TJSAMP_440,
-    TJSAMP_411
+	TJSAMP_444 = 0,
+	TJSAMP_422,
+	TJSAMP_420,
+	TJSAMP_GRAY,
+	TJSAMP_440,
+	TJSAMP_411
 }
 
 alias TJSAMP_444 = TJSAMP.TJSAMP_444;
@@ -73,19 +75,19 @@ enum TJ_NUMPF = 12;
 
 enum TJPF
 {
-    TJPF_RGB = 0,
-    TJPF_BGR,
-    TJPF_RGBX,
-    TJPF_BGRX,
-    TJPF_XBGR,
-    TJPF_XRGB,
-    TJPF_GRAY,
-    TJPF_RGBA,
-    TJPF_BGRA,
-    TJPF_ABGR,
-    TJPF_ARGB,
-    TJPF_CMYK,
-    TJPF_UNKNOWN = -1
+	TJPF_RGB = 0,
+	TJPF_BGR,
+	TJPF_RGBX,
+	TJPF_BGRX,
+	TJPF_XBGR,
+	TJPF_XRGB,
+	TJPF_GRAY,
+	TJPF_RGBA,
+	TJPF_BGRA,
+	TJPF_ABGR,
+	TJPF_ARGB,
+	TJPF_CMYK,
+	TJPF_UNKNOWN = -1
 }
 
 alias TJPF_RGB = TJPF.TJPF_RGB;
@@ -112,11 +114,11 @@ enum TJ_NUMCS = 5;
 
 enum TJCS
 {
-    TJCS_RGB = 0,
-    TJCS_YCbCr,
-    TJCS_GRAY,
-    TJCS_CMYK,
-    TJCS_YCCK
+	TJCS_RGB = 0,
+	TJCS_YCbCr,
+	TJCS_GRAY,
+	TJCS_CMYK,
+	TJCS_YCCK
 }
 
 alias TJCS_RGB = TJCS.TJCS_RGB;
@@ -137,8 +139,8 @@ enum TJ_NUMERR = 2;
 
 enum TJERR
 {
-    TJERR_WARNING = 0,
-    TJERR_FATAL
+	TJERR_WARNING = 0,
+	TJERR_FATAL
 }
 
 alias TJERR_WARNING = TJERR.TJERR_WARNING;
@@ -148,14 +150,14 @@ enum TJ_NUMXOP = 8;
 
 enum TJXOP
 {
-    TJXOP_NONE = 0,
-    TJXOP_HFLIP,
-    TJXOP_VFLIP,
-    TJXOP_TRANSPOSE,
-    TJXOP_TRANSVERSE,
-    TJXOP_ROT90,
-    TJXOP_ROT180,
-    TJXOP_ROT270
+	TJXOP_NONE = 0,
+	TJXOP_HFLIP,
+	TJXOP_VFLIP,
+	TJXOP_TRANSPOSE,
+	TJXOP_TRANSVERSE,
+	TJXOP_ROT90,
+	TJXOP_ROT180,
+	TJXOP_ROT270
 }
 
 alias TJXOP_NONE = TJXOP.TJXOP_NONE;
@@ -177,52 +179,56 @@ enum TJXOPT_COPYNONE = 64;
 
 struct tjscalingfactor
 {
-    int num;
-    int denom;
+	int num;
+	int denom;
 }
 
 struct tjregion
 {
-    int x;
-    int y;
-    int w;
-    int h;
+	int x;
+	int y;
+	int w;
+	int h;
 }
 
 struct tjtransform
 {
-    tjregion r;
-    int op;
-    int options;
-    void* data;
-    int function(short* coeffs, tjregion arrayRegion, tjregion planeRegion,
-            int componentIndex, int transformIndex, tjtransform* transform) customFilter;
+	tjregion r;
+	int op;
+	int options;
+	void* data;
+	int function(
+		short* coeffs, tjregion arrayRegion, tjregion planeRegion,
+					int componentIndex, int transformIndex, tjtransform* transform
+	) customFilter;
 }
 
 alias tjhandle = void*;
 
 extern (D) auto TJPAD(W)(in W width)
-{
-    return (width + 3) & (~3);
-}
+{ return (width + 3) & (~3); }
 
 extern (D) auto TJSCALED(D)(in D dimension, in tjscalingfactor scalingFactor)
-{
-    return (dimension * scalingFactor.num + scalingFactor.denom - 1) / scalingFactor.denom;
-}
+{ return (dimension * scalingFactor.num + scalingFactor.denom - 1) / scalingFactor.denom; }
 
 tjhandle tjInitCompress();
 
-int tjCompress2(tjhandle handle, const(ubyte)* srcBuf, int width, int pitch,
-        int height, int pixelFormat, ubyte** jpegBuf, c_ulong* jpegSize,
-        int jpegSubsamp, int jpegQual, int flags);
+int tjCompress2(
+	tjhandle handle, const(ubyte)* srcBuf, int width, int pitch,
+		int height, int pixelFormat, ubyte** jpegBuf, c_ulong* jpegSize,
+		int jpegSubsamp, int jpegQual, int flags
+);
 
-int tjCompressFromYUV(tjhandle handle, const(ubyte)* srcBuf, int width, int pad,
-        int height, int subsamp, ubyte** jpegBuf, c_ulong* jpegSize, int jpegQual, int flags);
+int tjCompressFromYUV(
+	tjhandle handle, const(ubyte)* srcBuf, int width, int pad,
+		int height, int subsamp, ubyte** jpegBuf, c_ulong* jpegSize, int jpegQual, int flags
+);
 
-int tjCompressFromYUVPlanes(tjhandle handle, const(ubyte)** srcPlanes,
-        int width, const(int)* strides, int height, int subsamp, ubyte** jpegBuf,
-        c_ulong* jpegSize, int jpegQual, int flags);
+int tjCompressFromYUVPlanes(
+	tjhandle handle, const(ubyte)** srcPlanes,
+		int width, const(int)* strides, int height, int subsamp, ubyte** jpegBuf,
+		c_ulong* jpegSize, int jpegQual, int flags
+);
 
 c_ulong tjBufSize(int width, int height, int jpegSubsamp);
 
@@ -234,49 +240,71 @@ int tjPlaneWidth(int componentID, int width, int subsamp);
 
 int tjPlaneHeight(int componentID, int height, int subsamp);
 
-int tjEncodeYUV3(tjhandle handle, const(ubyte)* srcBuf, int width, int pitch,
-        int height, int pixelFormat, ubyte* dstBuf, int pad, int subsamp, int flags);
+int tjEncodeYUV3(
+	tjhandle handle, const(ubyte)* srcBuf, int width, int pitch,
+		int height, int pixelFormat, ubyte* dstBuf, int pad, int subsamp, int flags
+);
 
-int tjEncodeYUVPlanes(tjhandle handle, const(ubyte)* srcBuf, int width, int pitch,
-        int height, int pixelFormat, ubyte** dstPlanes, int* strides, int subsamp, int flags);
+int tjEncodeYUVPlanes(
+	tjhandle handle, const(ubyte)* srcBuf, int width, int pitch,
+		int height, int pixelFormat, ubyte** dstPlanes, int* strides, int subsamp, int flags
+);
 
 tjhandle tjInitDecompress();
 
-int tjDecompressHeader3(tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize,
-        int* width, int* height, int* jpegSubsamp, int* jpegColorspace);
+int tjDecompressHeader3(
+	tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize,
+		int* width, int* height, int* jpegSubsamp, int* jpegColorspace
+);
 
 tjscalingfactor* tjGetScalingFactors(int* numscalingfactors);
 
-int tjDecompress2(tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize,
-        ubyte* dstBuf, int width, int pitch, int height, int pixelFormat, int flags);
+int tjDecompress2(
+	tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize,
+		ubyte* dstBuf, int width, int pitch, int height, int pixelFormat, int flags
+);
 
-int tjDecompressToYUV2(tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize,
-        ubyte* dstBuf, int width, int pad, int height, int flags);
+int tjDecompressToYUV2(
+	tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize,
+		ubyte* dstBuf, int width, int pad, int height, int flags
+);
 
-int tjDecompressToYUVPlanes(tjhandle handle, const(ubyte)* jpegBuf,
-        c_ulong jpegSize, ubyte** dstPlanes, int width, int* strides, int height, int flags);
+int tjDecompressToYUVPlanes(
+	tjhandle handle, const(ubyte)* jpegBuf,
+		c_ulong jpegSize, ubyte** dstPlanes, int width, int* strides, int height, int flags
+);
 
-int tjDecodeYUV(tjhandle handle, const(ubyte)* srcBuf, int pad, int subsamp,
-        ubyte* dstBuf, int width, int pitch, int height, int pixelFormat, int flags);
+int tjDecodeYUV(
+	tjhandle handle, const(ubyte)* srcBuf, int pad, int subsamp,
+		ubyte* dstBuf, int width, int pitch, int height, int pixelFormat, int flags
+);
 
-int tjDecodeYUVPlanes(tjhandle handle, const(ubyte)** srcPlanes,
-        const int* strides, int subsamp, ubyte* dstBuf, int width, int pitch,
-        int height, int pixelFormat, int flags);
+int tjDecodeYUVPlanes(
+	tjhandle handle, const(ubyte)** srcPlanes,
+		const int* strides, int subsamp, ubyte* dstBuf, int width, int pitch,
+		int height, int pixelFormat, int flags
+);
 
 tjhandle tjInitTransform();
 
-int tjTransform(tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize, int n,
-        ubyte** dstBufs, c_ulong* dstSizes, tjtransform* transforms, int flags);
+int tjTransform(
+	tjhandle handle, const(ubyte)* jpegBuf, c_ulong jpegSize, int n,
+		ubyte** dstBufs, c_ulong* dstSizes, tjtransform* transforms, int flags
+);
 
 int tjDestroy(tjhandle handle);
 
 ubyte* tjAlloc(int bytes);
 
-ubyte* tjLoadImage(const(char)* filename, int* width, int alignment,
-        int* height, int* pixelFormat, int flags);
+ubyte* tjLoadImage(
+	const(char)* filename, int* width, int alignment,
+		int* height, int* pixelFormat, int flags
+);
 
-int tjSaveImage(const(char)* filename, ubyte* buffer, int width, int pitch,
-        int height, int pixelFormat, int flags);
+int tjSaveImage(
+	const(char)* filename, ubyte* buffer, int width, int pitch,
+		int height, int pixelFormat, int flags
+);
 
 void tjFree(ubyte* buffer);
 
@@ -293,34 +321,48 @@ c_ulong TJBUFSIZEYUV(int width, int height, int jpegSubsamp);
 
 c_ulong tjBufSizeYUV(int width, int height, int subsamp);
 
-int tjCompress(tjhandle handle, ubyte *srcBuf, int width,
-                         int pitch, int height, int pixelSize,
-                         ubyte *dstBuf, c_ulong *compressedSize,
-                         int jpegSubsamp, int jpegQual, int flags);
+int tjCompress(
+	tjhandle handle, ubyte *srcBuf, int width,
+							 int pitch, int height, int pixelSize,
+							 ubyte *dstBuf, c_ulong *compressedSize,
+							 int jpegSubsamp, int jpegQual, int flags
+);
 
-int tjEncodeYUV(tjhandle handle, ubyte *srcBuf, int width,
-                          int pitch, int height, int pixelSize,
-                          ubyte *dstBuf, int subsamp, int flags);
+int tjEncodeYUV(
+	tjhandle handle, ubyte *srcBuf, int width,
+							  int pitch, int height, int pixelSize,
+							  ubyte *dstBuf, int subsamp, int flags
+);
 
-int tjEncodeYUV2(tjhandle handle, ubyte *srcBuf, int width,
-                           int pitch, int height, int pixelFormat,
-                           ubyte *dstBuf, int subsamp, int flags);
+int tjEncodeYUV2(
+	tjhandle handle, ubyte *srcBuf, int width,
+							   int pitch, int height, int pixelFormat,
+							   ubyte *dstBuf, int subsamp, int flags
+);
 
-int tjDecompressHeader(tjhandle handle, ubyte *jpegBuf,
-                                 c_ulong jpegSize, int *width,
-                                 int *height);
+int tjDecompressHeader(
+	tjhandle handle, ubyte *jpegBuf,
+									 c_ulong jpegSize, int *width,
+									 int *height
+);
 
-int tjDecompressHeader2(tjhandle handle, ubyte *jpegBuf,
-                                  c_ulong jpegSize, int *width,
-                                  int *height, int *jpegSubsamp);
+int tjDecompressHeader2(
+	tjhandle handle, ubyte *jpegBuf,
+									  c_ulong jpegSize, int *width,
+									  int *height, int *jpegSubsamp
+);
 
-int tjDecompress(tjhandle handle, ubyte *jpegBuf,
-                           c_ulong jpegSize, ubyte *dstBuf,
-                           int width, int pitch, int height, int pixelSize,
-                           int flags);
+int tjDecompress(
+	tjhandle handle, ubyte *jpegBuf,
+							   c_ulong jpegSize, ubyte *dstBuf,
+							   int width, int pitch, int height, int pixelSize,
+							   int flags
+);
 
-int tjDecompressToYUV(tjhandle handle, ubyte *jpegBuf,
-                                c_ulong jpegSize, ubyte *dstBuf,
-                                int flags);
+int tjDecompressToYUV(
+	tjhandle handle, ubyte *jpegBuf,
+									c_ulong jpegSize, ubyte *dstBuf,
+									int flags
+);
 
 char *tjGetErrorStr();

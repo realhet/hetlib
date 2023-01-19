@@ -17,4 +17,3 @@ T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1",
 
 //__builtin_ia32_pcmpestri128
 T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); }
-

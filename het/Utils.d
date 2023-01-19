@@ -1,8 +1,8 @@
-module het.utils;
+module het.utils;/+DIDE+/
 
 version(/+$DIDE_REGION Global System stuff+/all)
-	{
-	version(/+$DIDE_REGION+/all){
+{
+	version(/+$DIDE_REGION+/all) {
 		__gshared logFileOps = false;
 		
 		pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
@@ -14,81 +14,81 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		//todo: UTILS lots of todes commented out, because of the compile log is small
 		/+
-		//todo: IDE: % as postFix operator: 25% -> (25)*.01
-		//todo: IDE: visszajatszo debugger/logger
-		//todo: IDE syntax highlight control chars in "" and ''. Also format %f in format strings
-		
-		//todo: error display: hibas parameterlistanal a jot meg a rosszat egymas melle parositani, hogy ne guvvadjon ki a szemem.
-		
-		//todo: uj todo kategoria: //fixme: //bug: if something is fucked up. todo is for new stuff
-		//todo: DIDE: Hibauzenetben a fileok elerhetove tetele: "Module not found: hetlib\debugclient.d referenced from: c:\d\libs\het\utils.d"
-		//todo: legyen //bug:comment is!
-		//todo: textformatter: egy grafikus ize, amivel a writefln()-t meg lehet formazni: tobbsoros is lehessen, meg egerrel menjen. Szinezni is lehessen!
-		//todo: editor: a commenteket nyelvtani elementhez kene kapcsolni. Es akkor mar lebeghetnenek, mint egy gondolatbuborek. Haszonlo szerkeszthetoseg kene, mint az onshape commentjeinel.
-		//todo: exception mutatasanal fatal exception kezelese: amikor a program mindenkeppen megall utana.
-		//todo: syntax level visualizalas 3d kiemelkedo effekttel.
-		//todo: syntax: visualize number literals: ad thousands and at 64K ranges. 0x12345678 -> 0x|1234|5678
-		//todo: editor: irja ki a selection hosszat, rect-meretet!
-		//todo: syntax: 0x2ef7fc2c0b4e5915; ennel bugzik a binary 0 1 highlight
-		
-		//todo: az absolut modulneveknek a ctrlklikket kezelni kell! Ha ugyanaz a prefix van az ugraskor, mint ami a current modul, akkor nem kell uj konyvtarban keresni
-		//todo: legyen nyilvantartva a main project es abban a searchpath es a navigalas akkor mehet azokhoz relativan is
-		
-		//todo: todo kijelzes: el vannak csuszva a sorok. multiline string bekavarhat.
-		//todo: todo kijelzes: legyen szurke a text, az errortype kozpontositas utan
-		
-		//todo: linker, dmd.exe elerese absolute path-al a builderbol.
-		//todo: DIDE Ctrl+F amikor raugrik egy talalatra, mutassa a korulotte levo sorokat is, mint a gotoError()
-		
-		//todo: syntax highlight std.string: ne legyen alap tipus szine a stringnek az importban
-		//todo: map file alapjan az accessviolat visszakuldeni a DIDE-be.
-		//todo: editor mutassa az indent hibakat!
-		
-		//todo: editor.exception: mutassa az std\stdio.d(404,1): Exception: blabla jellegu hibakat!
-		
-		//todo: editor: tablazatos kod rendberakasa
-		
-		//test tabs		12353124fewq	1342314	54321rt
-		//test tabs		34561243	gre12tg43	4321
-		//			splitted	by 3 tabs needed
-		
-		/*Poti("PolyOpt SmallSegLen"     ,	polyOpt_SmallSegLen        ,	1        ,	500     ,	10	),
-			Poti("PolyOpt Epsilon"	, polyOpt_Epsilon	, 0	, 500	,	1	),
-			Poti("PolyOpt parallelThreshold"	 , polyOpt_ParallelThreshold    , 0.0        , 1.0		,  0.01 ),
-			Poti("PolyOpt Removable Seg Len"	 , polyOpt_tinySegLen       , 1        , 300	,  1 ),
-			Poti("PolyOpt Seg Len Mult"  , polyOpt_tinySegLocalErrorFactor       , 0        ,	20     ,  0.5 ), */
-		
-		//todo: a bookmarkok is menjenek a tartalomjegyzek melle
-		//todo: tokenizer/syntax highlighter bexarik a unicode-tol
-		
-		//todo: version stringek osszegyujtese a programban es az IDE ajanlja fel, hogy mik a lehetosegek!
-		//todo: editor cursor over bigComments
-		//todo: editor: amikor kijelolok egy szovegreszt, szurkevel jelolje a kepernyon az ugyanolyan szovegreszeket! Egy special keyre odarakhatna a tobbihez is egy-egy kurzort
-		//todo: editor: accumulation clipboard: hozzacsapja a kijelolest a clipboard vegehez. Amikor sok szirszard szedek ossze es egy helyre akarom azokat rakni.
-		//todo: linker errort detektalni: Kell hozza csinalni egy classt, aminek csak forwardolva vannak a dolgai. " Error " a trigger. Elozo sor is kell. OPTLINK, Copyright, http://www.digitalmars kezdetu sorokkal nem foglalkozni.
-		//todo: preprocess: implement with(a,b,c,...)
-		//todo: multiline todo /* es / + commentekre
-		
-		//todo: logging automatizalasa class osszes functionjara
-		
-		//todo: ide: o'rajel summa'zo': a soroktol utasitasoktol jobbra irt szamokat osszeadogatja.
-		//todo: ide/debug: consolera vagy logba iraskor latszodjon a kibocsajto utasitas helye.
-		//todo: a main()-t automatikusan belerakni egy app.runconsole-ba
-		
-		//todo: File.write doesn't creates the path appPath~\temp
-		//todo: nyelvi bovites: ismerje fel a szamoknal az informatikai kilo, mega, giga, tera postfixeket! A decimalisakra ott van az e3 e6 e9 e12.
-		
-		//todo: az uj tokenizerben meg syntax highlighterben az x"string"-et hexString-et jelolni.
-		//todo: View2D: zoom to cursort es a nemlinearis follow()-ot osszehozni.
-		
-		//todo: IDE: ha nem release build van forditva, akkor az assert/in/out/invariant legyen jelolve szurkevel!
+			//todo: IDE: % as postFix operator: 25% -> (25)*.01
+			//todo: IDE: visszajatszo debugger/logger
+			//todo: IDE syntax highlight control chars in "" and ''. Also format %f in format strings
+			
+			//todo: error display: hibas parameterlistanal a jot meg a rosszat egymas melle parositani, hogy ne guvvadjon ki a szemem.
+			
+			//todo: uj todo kategoria: //fixme: //bug: if something is fucked up. todo is for new stuff
+			//todo: DIDE: Hibauzenetben a fileok elerhetove tetele: "Module not found: hetlib\debugclient.d referenced from: c:\d\libs\het\utils.d"
+			//todo: legyen //bug:comment is!
+			//todo: textformatter: egy grafikus ize, amivel a writefln()-t meg lehet formazni: tobbsoros is lehessen, meg egerrel menjen. Szinezni is lehessen!
+			//todo: editor: a commenteket nyelvtani elementhez kene kapcsolni. Es akkor mar lebeghetnenek, mint egy gondolatbuborek. Haszonlo szerkeszthetoseg kene, mint az onshape commentjeinel.
+			//todo: exception mutatasanal fatal exception kezelese: amikor a program mindenkeppen megall utana.
+			//todo: syntax level visualizalas 3d kiemelkedo effekttel.
+			//todo: syntax: visualize number literals: ad thousands and at 64K ranges. 0x12345678 -> 0x|1234|5678
+			//todo: editor: irja ki a selection hosszat, rect-meretet!
+			//todo: syntax: 0x2ef7fc2c0b4e5915; ennel bugzik a binary 0 1 highlight
+			
+			//todo: az absolut modulneveknek a ctrlklikket kezelni kell! Ha ugyanaz a prefix van az ugraskor, mint ami a current modul, akkor nem kell uj konyvtarban keresni
+			//todo: legyen nyilvantartva a main project es abban a searchpath es a navigalas akkor mehet azokhoz relativan is
+			
+			//todo: todo kijelzes: el vannak csuszva a sorok. multiline string bekavarhat.
+			//todo: todo kijelzes: legyen szurke a text, az errortype kozpontositas utan
+			
+			//todo: linker, dmd.exe elerese absolute path-al a builderbol.
+			//todo: DIDE Ctrl+F amikor raugrik egy talalatra, mutassa a korulotte levo sorokat is, mint a gotoError()
+			
+			//todo: syntax highlight std.string: ne legyen alap tipus szine a stringnek az importban
+			//todo: map file alapjan az accessviolat visszakuldeni a DIDE-be.
+			//todo: editor mutassa az indent hibakat!
+			
+			//todo: editor.exception: mutassa az std\stdio.d(404,1): Exception: blabla jellegu hibakat!
+			
+			//todo: editor: tablazatos kod rendberakasa
+			
+			//test tabs		12353124fewq	1342314	54321rt
+			//test tabs		34561243	gre12tg43	4321
+			//			splitted	by 3 tabs needed
+			
+			/*Poti("PolyOpt SmallSegLen"     ,	polyOpt_SmallSegLen        ,	1        ,	500     ,	10	),
+				Poti("PolyOpt Epsilon"	, polyOpt_Epsilon	, 0	, 500	,	1	),
+				Poti("PolyOpt parallelThreshold"	 , polyOpt_ParallelThreshold    , 0.0        , 1.0		,  0.01 ),
+				Poti("PolyOpt Removable Seg Len"	 , polyOpt_tinySegLen       , 1        , 300	,  1 ),
+				Poti("PolyOpt Seg Len Mult"  , polyOpt_tinySegLocalErrorFactor       , 0        ,	20     ,  0.5 ), */
+			
+			//todo: a bookmarkok is menjenek a tartalomjegyzek melle
+			//todo: tokenizer/syntax highlighter bexarik a unicode-tol
+			
+			//todo: version stringek osszegyujtese a programban es az IDE ajanlja fel, hogy mik a lehetosegek!
+			//todo: editor cursor over bigComments
+			//todo: editor: amikor kijelolok egy szovegreszt, szurkevel jelolje a kepernyon az ugyanolyan szovegreszeket! Egy special keyre odarakhatna a tobbihez is egy-egy kurzort
+			//todo: editor: accumulation clipboard: hozzacsapja a kijelolest a clipboard vegehez. Amikor sok szirszard szedek ossze es egy helyre akarom azokat rakni.
+			//todo: linker errort detektalni: Kell hozza csinalni egy classt, aminek csak forwardolva vannak a dolgai. " Error " a trigger. Elozo sor is kell. OPTLINK, Copyright, http://www.digitalmars kezdetu sorokkal nem foglalkozni.
+			//todo: preprocess: implement with(a,b,c,...)
+			//todo: multiline todo /* es / + commentekre
+			
+			//todo: logging automatizalasa class osszes functionjara
+			
+			//todo: ide: o'rajel summa'zo': a soroktol utasitasoktol jobbra irt szamokat osszeadogatja.
+			//todo: ide/debug: consolera vagy logba iraskor latszodjon a kibocsajto utasitas helye.
+			//todo: a main()-t automatikusan belerakni egy app.runconsole-ba
+			
+			//todo: File.write doesn't creates the path appPath~\temp
+			//todo: nyelvi bovites: ismerje fel a szamoknal az informatikai kilo, mega, giga, tera postfixeket! A decimalisakra ott van az e3 e6 e9 e12.
+			
+			//todo: az uj tokenizerben meg syntax highlighterben az x"string"-et hexString-et jelolni.
+			//todo: View2D: zoom to cursort es a nemlinearis follow()-ot osszehozni.
+			
+			//todo: IDE: ha nem release build van forditva, akkor az assert/in/out/invariant legyen jelolve szurkevel!
 		+/
 		
 		
-		// Imports /////////////////////////////
+		//Imports /////////////////////////////
 		version(/+$DIDE_REGION Imports+/all)
 		{
-			// std imports
+			//std imports
 			public import std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta; //het.math also imports std.string, std.uni, std.algorithm, std.functional
 			public import core.stdc.string : memcpy;
 			public import std.utf;
@@ -111,12 +111,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			import std.exception : stdEnforce = enforce;
 			import std.getopt;
 			
-			// hetlib imports
+			//hetlib imports
 			public import het.debugclient;
 			public import het.math;
 			public import het.color;
 			
-			// Windows imports
+			//Windows imports
 			public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
 				HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
 				BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
@@ -138,7 +138,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			import core.sys.windows.com : CoInitializeEx, CoUninitialize;
 			
 			
-			// LDC 1.28 bugfix:
+			//LDC 1.28 bugfix:
 			
 			import std.digest : toHexString;  //unknown id: toHexString   -> std.digest.digest is deprecated
 			public import std.array : join;  //het.utils:  blabla.join conflicts with blabla.join
@@ -162,83 +162,88 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		
-		// for main thread only, called from application class //
+		//for main thread only, called from application class //
 		
 		private void globalInitialize()
-		{//note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
+		{
+			//note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
 			//todo: a unittest alatt nem indul ez el.
 			//todo: functional tests: nem ide kene
 			//functional tests
-		
+					
 			application.tickTime = now;
-		
+					
 			installExceptionFilter;
-		
+					
 			DateTime.selftest;
-		
+					
 			const s1 = "hello", s2 = "Nobody inspects the spammish repetition";
 			enforce(xxh32(s1)==0xfb0077f9);
 			enforce(xxh32(s2, 123456) == 0xc2845cee);
 			enforce(crc32("Hello")==0xf7d18982);
 			enforce(crc32(s2) == 0xAD4270ED);
-		
+					
 			XXH3.selftest;
-		
+					
 			{ RNG rng; rng.seed = 0; enforce(iota(30).map!(i => rng.random(100).text).join(' ') == "0 3 86 20 27 67 31 16 37 42 8 47 7 84 5 29 91 36 77 32 69 84 71 30 16 32 46 24 82 27"); }
-		
+					
 			enforce(maskLowBits(0)==0);
 			enforce(maskLowBits(1)==1);
 			enforce(maskLowBits(2)==3);
 			enforce(maskLowBits(3)==3);
 			enforce(maskLowBits(4)==7);
-		
+					
 			enforce(countHighZeroBits(0)==32);
 			enforce(countHighZeroBits(1)==31);
 			enforce(countHighZeroBits(2)==30);
 			enforce(countHighZeroBits(0x7FFF0000)==1);
 			enforce(countHighZeroBits(0xFFFF0000)==0);
-		
+					
 			UpdateInterval()._testRepeater;
-		
+					
 			enforce([8,9,10,11,12,13].map!(a => alignUp(a, 4)).equal([8,12,12,12,12,16]));
-		
+					
 			//startup
-		
+					
 			CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
 			//before 220623 it was: CoInitialize(null);
-		
+					
 			ini.loadIni;
-		
+					
 			console.setUTF8;
-		
+					
 			test_SrcId;
 		}
 		
-		private void globalFinalize(){ //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
+		private void globalFinalize() {
+			 //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
 			//cleanup
 			ini.saveIni;
 			CoUninitialize;
 		}
 		
-		// static this for each thread ////////////////////////////
+		//static this for each thread ////////////////////////////
 		
-		static this(){ //for all threads <- bullshit!!! It's not shared!!!
+		static this() {
+			 //for all threads <- bullshit!!! It's not shared!!!
 			randomize; //randomices for every thread using QPC and thisThreadID
 			init__iob_func;
 		}
 		
-		// static this for process ////////////////////////////
+		//static this for process ////////////////////////////
 		
 		__gshared const DateTime appStarted, appStartedDay; //todo: how to make it readonly?
 		
-		shared static this(){
+		shared static this() {
 			cast()appStarted = now;
 			cast()appStartedDay = appStarted.localDayStart;
 		}
 	}struct application
-	{/// application /////////////////////////
+	{
+		/// application /////////////////////////
 		__gshared static private
-		{//__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
+		{
+			//__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
 			bool initialized, finalized;
 			
 			//Lets the executable stopped from DIDE when the windows message loop is not responding.
@@ -247,78 +252,83 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				bool over, finished;
 				this()
 				{
-					super({
-						auto t0	= 0.0 *second;
-						const timeOut	= 0.66*second; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
-						while(!over)
+					super(
 						{
-							if(t0 == 0*second)
+							auto t0	= 0.0 *second;
+							const timeOut	= 0.66*second; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
+							while(!over)
 							{
-								if(dbg.forceExit_check) t0 = QPS; //start timer
-							}
-							else
-							{
-								auto elapsed = QPS-t0;
-								if(!dbg.forceExit_check)
+								if(t0 == 0*second)
 								{
-									t0 = 0*second; //reset timer. exiting out normally.
+									if(dbg.forceExit_check) t0 = QPS; //start timer
 								}
 								else
 								{
-									if(elapsed>timeOut)
+									auto elapsed = QPS-t0;
+									if(!dbg.forceExit_check)
 									{
-										dbg.forceExit_clear; //timeout reached, exit drastically
-										application.exit;
+										t0 = 0*second; //reset timer. exiting out normally.
+									}
+									else
+									{
+										if(elapsed>timeOut)
+										{
+											dbg.forceExit_clear; //timeout reached, exit drastically
+											application.exit;
+										}
 									}
 								}
+								.sleep(15);
 							}
-							.sleep(15);
+							finished = true;
 						}
-						finished = true;
-					});
+					);
 				}
-			
+							
 				void stop()
 				{
 					over = true;
 					while(!finished) .sleep(5); //Have to wait the thread
 				}
 			}
-		
+					
 			KillerThread killerThread;
-		
+					
 		}
 		__gshared static public
 		{
 			uint tick; //enough	for 2 years @ 60Hz
 			DateTime tickTime;	//it is always behind one frame time compared to now(). But it is only accessed once per frame. If there is LAG, it is interpolated.
 			Time deltaTime;
-		
+					
 			import core.runtime : Runtime;
 			alias args = Runtime.args;
-		
+					
 			void function() _windowInitFunct; //todo: should be moved to win.d //Win.d call it from it's own main.
-		
+					
 			void exit(int code=0)
-			{//immediate exit
-				try{ _finalize; }catch(Throwable){}
+			{
+				//immediate exit
+				try { _finalize; }catch(Throwable) {}
 				ExitProcess(code);
 			}
-		
+					
 			void _initialize()
-			{//win.main() or runConsole() calls this.
+			{
+				//win.main() or runConsole() calls this.
 				if(chkSet(initialized))
 				{
 					SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS);
-		
+							
 					dbg; //start it up
 					killerThread = new KillerThread;  killerThread.start;
 					console.handleException({ globalInitialize; });
 				}
 			}
-		
+					
 			void _finalize()
-			{//win.main() or runConsole() calls this.
+			{
+				//win.main() or runConsole() calls this.
 				if(!initialized) return;
 				if(chkSet(finalized))
 				{
@@ -326,9 +336,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					killerThread.stop;
 					//dont! -> destroy(killerThread); note: Sometimes it is destroyed automatically, and this causes an access viole reading from addr 0
 				}else
-					enforce(false, "Application is already finalized"); 
+				enforce(false, "Application is already finalized"); 
 			}
-		
+					
 			int runConsole(void delegate() dg)
 			{
 				enforce(!initialized, "Application.run(): Already running.");
@@ -338,44 +348,43 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//here we wait all threads. In windowed mode we don't
 				return ret;
 			}
-		
+					
 			@property HWND handle()
 			{ return _mainWindowHandle; }
-		
+					
 			bool isForeground()
 			{ return _mainWindowIsForeground(); }
 		}
 	}version(/+$DIDE_REGION+/all)
 	{
 		struct console
-		{// Console //////////////////////////////////////////////////////////////////////
+		{
+			//Console //////////////////////////////////////////////////////////////////////
 			static private
 			{
 				__gshared bool visible_;
 				__gshared bool exceptionHandlerActive_;
-				HWND hwnd(){
+				HWND hwnd() {
 					__gshared void* handle;
-					if(handle is null){
-						handle = GetConsoleWindow;
-					}
+					if(handle is null) { handle = GetConsoleWindow; }
 					return handle;
 				}
-			
-				auto outputHandle(){ return GetStdHandle(STD_OUTPUT_HANDLE); }
-			
+							
+				auto outputHandle() { return GetStdHandle(STD_OUTPUT_HANDLE); }
+							
 				private int _textAttr = 7;
-				private void setTextAttr(){ flush; SetConsoleTextAttribute(outputHandle, cast(ushort)_textAttr); }
-				@property int	color()	{ return	_textAttr.getBits	( 0, 4); }
-				@property void	color(int c)	{ _textAttr =	_textAttr.setBits	( 0, 4, c); setTextAttr(); }
-				@property int	bkColor()	{ return	_textAttr.getBits	( 4, 4); }
-				@property void	bkColor(int c)	{ _textAttr =	_textAttr.setBits	( 4, 4, c); setTextAttr(); }
-				@property bool	reversevideo()	{ return	_textAttr.getBits	(14, 1)!=0; }
-				@property void	reversevideo(bool b)	{ _textAttr =	_textAttr.setBits	(14, 1, b); setTextAttr(); }
-				@property bool	underscore()	{ return	_textAttr.getBits	(15, 1)!=0; }
-				@property void	underscore(bool b)	{ _textAttr =	_textAttr.setBits	(15, 1, b); setTextAttr(); }
-			
-				void indentAdjust(int param){
-					switch(param){
+				private void setTextAttr() { flush; SetConsoleTextAttribute(outputHandle, cast(ushort)_textAttr); }
+				@property int	color()	 { return	_textAttr.getBits	(0, 4); }
+				@property void	color(int c)	 { _textAttr =	_textAttr.setBits	(0, 4, c); setTextAttr(); }
+				@property int	bkColor()	 { return	_textAttr.getBits	(4, 4); }
+				@property void	bkColor(int c)	 { _textAttr =	_textAttr.setBits	(4, 4, c); setTextAttr(); }
+				@property bool	reversevideo()	 { return	_textAttr.getBits	(14, 1)!=0; }
+				@property void	reversevideo(bool b)	 { _textAttr =	_textAttr.setBits	(14, 1, b); setTextAttr(); }
+				@property bool	underscore()	 { return	_textAttr.getBits	(15, 1)!=0; }
+				@property void	underscore(bool b)	 { _textAttr =	_textAttr.setBits	(15, 1, b); setTextAttr(); }
+							
+				void indentAdjust(int param) {
+					switch(param) {
 						case 0: indent = 0; break;
 						case 1: indent++; break;
 						case 2: indent--; break;
@@ -383,19 +392,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 					//stdWrite("[INDENT <- %d]".format(indent));
 				}
-			
+							
 				struct Recorder
 				{
 					string recordedStr;
 					bool recording;
-			
-					// recording ------------------
-					void start(){
+								
+					//recording ------------------
+					void start() {
 						if(recording) WARN("Already recording.");
 						recording = true;
 					}
-			
-					string stop(){
+								
+					string stop() {
 						if(!recording) WARN("Did not started recording.");
 						recording = false;
 						auto a = recordedStr; //todo: sync fails here
@@ -404,24 +413,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 				}
 				__gshared Recorder recorder;
-			
+							
 				private bool triggerFocusMainWindow;
-			
+							
 				void myWrite(string s)
 				{
 					if(s.empty) return;
-			
+								
 					void wr(string s)
 					{
-						if(indent>0){
+						if(indent>0) {
 							auto si = "\n" ~ "    ".replicate(indent.min(20));
 							s = s.safeUTF8.replace("\n", si);   //opt: safeUTF8 is fucking slow!!!!
 						}
-			
+									
 						stdWrite(s); //this is safe for UTF8 errors.
 						if(recorder.recording) synchronized recorder.recordedStr ~= s;
 					}
-			
+								
 					while(!s.empty)
 					{
 						auto i = (cast(ubyte[])s).countUntil!(a => a.inRange('\33', '\36'));  //works on ubyte[], so it can't raise UTF8 errors
@@ -431,7 +440,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						if(s.length>1)
 						{
 							auto param = cast(int)s[1];
-							switch(s[0]){
+							switch(s[0]) {
 								case '\33'	: color = param;	break;
 								case '\34'	: bkColor = param;	break;
 								case '\35'	: reversevideo = (param&1)!=0; underscore = (param&2)!=0; 	break;
@@ -445,58 +454,54 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						}
 					}
 					flush; //it is needed
-			
+								
 					if(chkSet(triggerFocusMainWindow) && afterFirstPrintFlushed) afterFirstPrintFlushed();
 				}
-			
+							
 			}static public
 			{
 				//todo: ha ezt a writeln-t hivja a gc.collect-bol egy destructor, akkor crash.
-			
+							
 				//execute program in hetlib console({ program }); (colorful console, debug and exception handling)
 				//args in application.args
-				static void opCall(void delegate() dg){
-					application.runConsole(dg);
-				}
+				static void opCall(void delegate() dg) { application.runConsole(dg); }
 				
 				__gshared int indent = 0;
-			
+							
 				void delegate() afterFirstPrintFlushed; //MainWindow can regain it's focus
-			
-				void flush(){ stdout.flush; }
-			
-				void setUTF8(){
+							
+				void flush() { stdout.flush; }
+							
+				void setUTF8() {
 					const cp = 65001;
 					SetConsoleCP(cp);
 					SetConsoleOutputCP(cp);
 				}
-			
-				void show()	{ if(chkSet	(visible_)	) ShowWindow (hwnd, SW_SHOW	); }
-				void hide(bool forced=false)	{ if(chkClear	(visible_) || forced	) ShowWindow (hwnd, SW_HIDE	); }
-			
-				void setFocus()	{ SetFocus(hwnd); } //it's only keyboard focus
-				void setForegroundWindow()	{ show; SetForegroundWindow(hwnd);	}
-				bool isForeground()	{ return GetForegroundWindow == hwnd; }	//this 3 funct is the same in Win class too.
-			
-				void setPos(int x, int y, int w, int h){ SetWindowPos(hwnd, null, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER); }
-			
-				@property bool visible()	{ return visible_; }
-				@property void visible(bool vis)	{ vis ? show : hide; }
-			
+							
+				void show()	 { if(chkSet	(visible_)	) ShowWindow (hwnd, SW_SHOW	); }
+				void hide(bool forced=false)	 { if(chkClear	(visible_) || forced	) ShowWindow (hwnd, SW_HIDE	); }
+							
+				void setFocus()	 { SetFocus(hwnd); } //it's only keyboard focus
+				void setForegroundWindow()	 { show; SetForegroundWindow(hwnd);	 }
+				bool isForeground()	 { return GetForegroundWindow == hwnd; }	//this 3 funct is the same in Win class too.
+							
+				void setPos(int x, int y, int w, int h) { SetWindowPos(hwnd, null, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER); }
+							
+				@property bool visible()	 { return visible_; }
+				@property void visible(bool vis)	 { vis ? show : hide; }
+							
 				@property bool exceptionHandlerActive() { return exceptionHandlerActive_; }
-			
+							
 				int handleException(void delegate() dg)
 				{
-					if(exceptionHandlerActive_){
-						dg();
-					}else{
+					if(exceptionHandlerActive_) { dg(); }else {
 						try
 						{
 							exceptionHandlerActive_ = true;
 							dg();
 							exceptionHandlerActive_ = false;
 						}
-						catch(Throwable e){
+						catch(Throwable e) {
 							showException(e);
 							exceptionHandlerActive_ = false;
 							return -1;
@@ -504,7 +509,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 					return 0;
 				}
-			
+							
 				int consoleStrLength(string s)
 				{
 					int len;
@@ -512,19 +517,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					foreach(ch; s)
 					{
 						if(chkClear(expectParam)) continue;
-						if(ch.inRange('\33', '\36')){ expectParam = true; continue; }
+						if(ch.inRange('\33', '\36')) { expectParam = true; continue; }
 						len++;
 					}
 					return len;
 				}
-			
-				string leftJustify(string s, int size){
-					return s ~ " ".replicate(max(size-consoleStrLength(s), 0));
-				}
-			
-				string rightJustify(string s, int size){
-					return " ".replicate(max(size-consoleStrLength(s), 0)) ~ s;
-				}
+							
+				string leftJustify(string s, int size) { return s ~ " ".replicate(max(size-consoleStrLength(s), 0)); }
+							
+				string rightJustify(string s, int size) { return " ".replicate(max(size-consoleStrLength(s), 0)) ~ s; }
 			}
 		}
 		
@@ -532,24 +533,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			console.show;
 			foreach(const s; args)
-				console.myWrite(to!string(s)); //calls own write with coloring
+			console.myWrite(to!string(s)); //calls own write with coloring
 		}
 		
-		void writeln	(T...)(auto ref T args)	{ write(args, '\n'	); 	}
-		void writef	(T...)(string fmt, auto ref T args)	{ write(format(fmt, args)	); 	}
-		void writefln	(T...)(string fmt, auto ref T args)	{ write(format(fmt, args), '\n'	); 	}
-		void writef	(string fmt, T...)(auto ref T args)	{ write(format!fmt(args)	); 	}
-		void writefln	(string fmt, T...)(auto ref T args) 	{ write(format!fmt(args), '\n'	); 	}
+		void writeln	(T...)(auto ref T args)	 { write(args, '\n'	); 	 }
+		void writef	(T...)(string fmt, auto ref T args)	 { write(format(fmt, args)	); 	 }
+		void writefln	(T...)(string fmt, auto ref T args)	 { write(format(fmt, args), '\n'	); 	 }
+		void writef	(string fmt, T...)(auto ref T args)	 { write(format!fmt(args)	); 	 }
+		void writefln	(string fmt, T...)(auto ref T args) 	 { write(format!fmt(args), '\n'	); 	 }
 		
-		void print(T...)(auto ref T args){ //like in python
+		void print(T...)(auto ref T args) {
+			 //like in python
 			string[] s;
-			static foreach(a; args){{
-				s ~= a.text;
-			}}
+			static foreach(a; args) { { s ~= a.text; } }
 			writeln(s.filter!(s => s.length).join(' '));
 		}
 		
-		void safePrint(T...)(auto ref T args){ //todo: ez nem safe, mert a T...-tol is fugg.
+		void safePrint(T...)(auto ref T args) {
+			 //todo: ez nem safe, mert a T...-tol is fugg.
 			synchronized
 				print(args);
 		}
@@ -557,35 +558,35 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		version(/+$DIDE_REGION UDAs+/all)
 		{
-			struct UDA{}
+			struct UDA {}
 			
 			enum VerbFlag { hold=1 }
 			
-			@UDA{
-				// het.stream
-				struct STORED{}
-			
-				struct VERB{ string keyCombo; int flags; }
-				auto HOLD( string keyCombo){ return VERB(keyCombo, VerbFlag.hold); }
-			
-				struct HEX{}
-				struct BASE64{}
-			
-				// het.ui
+			@UDA {
+				//het.stream
+				struct STORED {}
+							
+				struct VERB { string keyCombo; int flags; }
+				auto HOLD(string keyCombo) { return VERB(keyCombo, VerbFlag.hold); }
+							
+				struct HEX {}
+				struct BASE64 {}
+							
+				//het.ui
 				//struct UI{}    // similar to @Composable.  It alters the UI's state
 				//note: UI is ised for the default UI function. Conflicts with this UDA
-			
+							
 				//het.opengl
-				struct UNIFORM{ string name=""; } //marks a variable as gl.Shader attribute
-			
-				// het.ui
-				struct CAPTION{ string text; }
-				struct HINT{ string text; }
-				struct UNIT{ string text; }
-				struct RANGE{ float low, high; bool valid()const{ return !low.isnan && !high.isnan; } }
-				struct STEP{ float s = 1; }
-				struct INDENT{ }
-				struct HIDDEN{ }
+				struct UNIFORM { string name=""; } //marks a variable as gl.Shader attribute
+							
+				//het.ui
+				struct CAPTION { string text; }
+				struct HINT { string text; }
+				struct UNIT { string text; }
+				struct RANGE { float low, high; bool valid()const { return !low.isnan && !high.isnan; } }
+				struct STEP { float s = 1; }
+				struct INDENT {}
+				struct HIDDEN {}
 			}
 			
 		}
@@ -601,9 +602,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 			
 			auto loadLibrary(File fn, bool mustLoad = true)
-			{
-				return loadLibrary(fn.fullName, mustLoad);
-			}
+			{ return loadLibrary(fn.fullName, mustLoad); }
 			
 			void getProcAddress(T)(HMODULE hModule, string name, ref T func, bool mustSucceed = true)
 			{
@@ -620,48 +619,51 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string genLoadLibraryFuncts(T, alias hMod = "hModule", alias prefix=T.stringof ~ "_")()
 			{
 				string res;
-				void append(string s){ res ~= s ~ "\r\n"; }
-			
+				void append(string s) { res ~= s ~ "\r\n"; }
+							
 				import std.traits;
 				static foreach(f; __traits(allMembers, T))
 				with(T)
 				{
-					mixin(q{
-						static if(typeof($).stringof.startsWith("extern"))
+					mixin(
+						q{
+							static if(typeof($).stringof.startsWith("extern"))
 							append(hMod~`.getProcAddress("`~prefix~`" ~ "$".withoutEnding('_'), $);`);
-					}.replace("$", f));
+						}.replace("$", f)
+					);
 				}
-			
+							
 				return res;
 			}
 			
 		}
 		
 		version(/+$DIDE_REGION MSVC compatibility+/all)
-		{// MSVC compatibility /////////////////////////
+		{
+			//MSVC compatibility /////////////////////////
 			
-			// __iob_func - needed for turbojpeg
-			// https://stackoverflow.com/questions/30412951/unresolved-external-symbol-imp-fprintf-and-imp-iob-func-sdl2
-			extern (C){
+			//__iob_func - needed for turbojpeg
+			//https://stackoverflow.com/questions/30412951/unresolved-external-symbol-imp-fprintf-and-imp-iob-func-sdl2
+			extern (C) {
 				import core.stdc.stdio : FILE;
 				shared FILE[3] __iob_func;
 			}
 			
-			private void init__iob_func(){
+			private void init__iob_func() {
 				import core.stdc.stdio : stdin, stdout, stderr;
 				__iob_func = [*stdin, *stdout, *stderr];
 			}
 			
-			// Obj.Destroy is not clearing the reference
-			void free(T)(ref T o)if(is(T==class)){
-				if(o !is null){
+			//Obj.Destroy is not clearing the reference
+			void free(T)(ref T o)if(is(T==class)) {
+				if(o !is null) {
 					o.destroy;
 					o = null;
 				}
 			}
 			
-			void SafeRelease(T:IUnknown)(ref T i){
-				if (i !is null){
+			void SafeRelease(T:IUnknown)(ref T i) {
+				if(i !is null) {
 					i.Release;
 					i = null;
 				}
@@ -669,28 +671,31 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 		}
 		struct clipboard	
-		{ static: //clipboard //////////////////////////
-			import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT,
-				EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
-		
-			bool hasFormat(uint fmt)
+		{
+			 static: //clipboard //////////////////////////
+						import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT,
+							EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
+					
+						bool hasFormat(uint fmt)
 			{
 				bool res;
-				if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+				if(OpenClipboard(null)) {
+					 scope(exit) CloseClipboard;
 					res = IsClipboardFormatAvailable(fmt)!=0;
 				}
 				return res;
 			}
-		
-			bool hasText()
+					
+						bool hasText()
 			{ return hasFormat(CF_TEXT); }
-		
-			string getText()
+					
+						string getText()
 			{
 				string res;
-				if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+				if(OpenClipboard(null)) {
+					 scope(exit) CloseClipboard;
 					auto hData = GetClipboardData(CF_TEXT);
-					if(hData){
+					if(hData) {
 						auto pData = cast(char*)GlobalLock(hData);
 						scope(exit) GlobalUnlock(hData);
 						res = pData.toStr;
@@ -698,11 +703,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				}
 				return res;
 			}
-		
-			bool setText(string text, bool mustSucceed)
+					
+						bool setText(string text, bool mustSucceed)
 			{
 				bool success;
-				if(OpenClipboard(null)){ scope(exit) CloseClipboard;
+				if(OpenClipboard(null)) {
+					 scope(exit) CloseClipboard;
 					EmptyClipboard;
 					HGLOBAL hClipboardData;
 					auto hData = GlobalAlloc(0, text.length+1);
@@ -715,16 +721,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
 				return success;
 			}
-		
-			@property{
-				string asText(){ return getText; }
-				void asText(string s){ setText(s, true); }
+					
+						@property {
+				string asText() { return getText; }
+				void asText(string s) { setText(s, true); }
 			}
 		}
 	}version(/+$DIDE_REGION+/all)
 	{
 		version(/+$DIDE_REGION SysInfo+/all)
-		{//SysInfo////////////////////////////////////////////////
+		{
+			//SysInfo////////////////////////////////////////////////
 			
 			string computerName()
 			{
@@ -738,13 +745,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				string res = format("Target CPU: %s", __traits(targetCPU));
 				static foreach(f; ["sse", "sse2", "sse3", "ssse3", /*"sse4",*/ "sse4.1", "sse4.2"])
-					static if(__traits(targetHasFeature, f)) res ~= " "~f;
+				static if(__traits(targetHasFeature, f)) res ~= " "~f;
 				return res;
 			}
 			
 			import core.sys.windows.windef;
 			
-			extern(C){
+			extern(C) {
 				uint GetCurrentProcessorNumber();
 				bool SetProcessAffinityMask(HANDLE process, DWORD_PTR mask);
 			}
@@ -753,18 +760,18 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			private auto GetCPULoadPercent_internal()
 			{
-				// get tick counters
+				//get tick counters
 				ulong idle, kernel, user;
-				auto ft(ref ulong a){ return cast(FILETIME*)(&a); }
+				auto ft(ref ulong a) { return cast(FILETIME*)(&a); }
 				if(!GetSystemTimes(ft(idle), ft(kernel), ft(user))) return float.nan;
-			
-				// calculate  1 - (delta(Idle) / delta(kernel+user))
+							
+				//calculate  1 - (delta(Idle) / delta(kernel+user))
 				__gshared static ulong prevTotal, prevIdle;
 				auto total = kernel+user;
 				auto res = 1 - float(idle-prevIdle) / (total-prevTotal); //bug: can divide by zero when called too frequently
 				prevTotal	= total;
-				prevIdle	= idle ;
-			
+				prevIdle	= idle;
+							
 				return res*100;
 			}
 			
@@ -772,16 +779,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				__gshared static double lastTime = 0;
 				__gshared static float lastPercent = 0;
-			
+							
 				const interval = 0.33f; //seconds
-			
+							
 				auto actTime = QPS.value(second);
-				if(actTime-lastTime > interval){
+				if(actTime-lastTime > interval) {
 					lastTime = actTime;
 					auto a = GetCPULoadPercent_internal;
 					if(!isnan(a)) lastPercent = a;
 				}
-			
+							
 				return lastPercent;
 			}
 			
@@ -804,35 +811,37 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			//it was developed for running multiple compiler instances.
 			import std.process;
-		
+					
 			//create log files
 			StdFile[] logFiles;
-			foreach(i; 0..cmdLines.length){
+			foreach(i; 0..cmdLines.length) {
 				auto fn = File(tempPath, "spawnProcessMulti.$log"~to!string(i));
 				logFiles ~= StdFile(fn.fullName, "w");
 			}
-		
+					
 			//create pool of commands
 			Pid[] pool;
-			foreach(i, cmd; cmdLines){
-				pool ~= spawnProcess(cmd, stdin, logFiles[i], logFiles[i], env,
-														 Config.retainStdout | Config.retainStderr | Config.suppressConsole);
+			foreach(i, cmd; cmdLines) {
+				pool ~= spawnProcess(
+					cmd, stdin, logFiles[i], logFiles[i], env,
+																			 Config.retainStdout | Config.retainStderr | Config.suppressConsole
+				);
 			}
-		
+					
 			//execute
 			bool[] running;	//todo:bugzik az stdOut fileDelete itt, emiatt nem megy az, hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
 			running.length =	pool.length;
 			running[] = true;
-		
+					
 			int res = 0;
-			do{
+			do {
 				sleep(10);
-				foreach(i; 0..pool.length){
-					if(running[i]){
+				foreach(i; 0..pool.length) {
+					if(running[i]) {
 						auto w = tryWait(pool[i]);
-						if(w.terminated){
+						if(w.terminated) {
 							running[i] = false;
-							if(w.status != 0){
+							if(w.status != 0) {
 								res = w.status;
 								running[] = false;
 							}
@@ -841,74 +850,78 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 				}
 			}while(running.any);
-		
-			/*foreach(i, p; pool){
-				int r = wait(p);
-				if(r) res = r;
-				if(onProgress !is null) onProgress(i);
-			}*/
-		
+					
+			/*
+				foreach(i, p; pool){
+								int r = wait(p);
+								if(r) res = r;
+								if(onProgress !is null) onProgress(i);
+							}
+			*/
+					
 			//make sure every process is closed (when one of them yielded an error)
-			foreach(p; pool) { try{ kill(p);}catch(Exception e){} }
-		
+			foreach(p; pool) { try { kill(p); }catch(Exception e) {} }
+					
 			//read/clear logfiles
-			foreach(i, ref f; logFiles){
+			foreach(i, ref f; logFiles) {
 				File fn = File(f.name);
 				f.close;
 				sOutput ~= fn.readStr;
-		
+						
 				//fucking lame because tryWait doesn't wait the file to be closed;
-				foreach(k; 0..100){
-					if(fn.exists){ try{ fn.remove; }catch(Exception e){ sleep(10); } }
+				foreach(k; 0..100) {
+					if(fn.exists) { try { fn.remove; }catch(Exception e) { sleep(10); } }
 					if(!fn.exists) break;
 				}
 			}
 			logFiles.clear;
-		
+					
 			return res;
 		}
 	}version(/+$DIDE_REGION+/all)
 	{
 		class SharedMem(SharedDataType, string sharedFileName, bool isServer)
-		{// Shared Memory /////////////////////////////////////////////////////
-			HANDLE sharedFileHandle;
-			SharedDataType* sharedData;
-		
-			void initialize()
+		{
+			//Shared Memory /////////////////////////////////////////////////////
+				HANDLE sharedFileHandle;
+				SharedDataType* sharedData;
+			
+				void initialize()
 			{
 				if(isActive) return;
-		
+						
 				import core.sys.windows.windows;
 				sharedFileHandle = isServer	? CreateFileMappingW(
-					INVALID_HANDLE_VALUE,	// use paging file
-					null,	// default security
-					PAGE_READWRITE,	// read/write access
-					0,	// maximum object size (high)
-					SharedDataType.sizeof.to!uint,	// maximum object size (low)
-					sharedFileName.toPWChar	// name of mapping object
+					INVALID_HANDLE_VALUE,	//use paging file
+					null,	//default security
+					PAGE_READWRITE,	//read/write access
+					0,	//maximum object size (high)
+					SharedDataType.sizeof.to!uint,	//maximum object size (low)
+					sharedFileName.toPWChar	//name of mapping object
 				)
-					: OpenFileMappingW(FILE_MAP_ALL_ACCESS,	// read/write access
-					false,	// do not inherit the name
-					sharedFileName.toPWChar	// name of mapping object
+					: OpenFileMappingW(
+					FILE_MAP_ALL_ACCESS,	//read/write access
+										false,	//do not inherit the name
+										sharedFileName.toPWChar	//name of mapping object
 				);
-		
+						
 				sharedData = cast(SharedDataType*) MapViewOfFile(
-					sharedFileHandle,	// handle to map object
-					FILE_MAP_ALL_ACCESS,	// read/write permission
+					sharedFileHandle,	//handle to map object
+					FILE_MAP_ALL_ACCESS,	//read/write permission
 					0,
 					0,
 					SharedDataType.sizeof
 				);
 				//ensure(data, "DebugLogClient: Can't open mapFile.");
-		
+						
 				LOG(sharedData);
 			}
-		
-		public:
-			alias sharedData this;
-			bool isActive() { return sharedData !is null; }
-		
-			this(){ initialize; }
+			
+			public:
+				alias sharedData this;
+				bool isActive() { return sharedData !is null; }
+			
+				this() { initialize; }
 		}
 		
 		alias SharedMemServer(SharedDataType, string sharedFileName) = SharedMem!(SharedDataType, sharedFileName, true );
@@ -921,48 +934,42 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		struct ini
 		{
-		private:
-			static const useRegistry = true;
-			static File iniFile()
+			private:
+				static const useRegistry = true;
+				static File iniFile()
 			{ auto fn = appFile; fn.ext = ".ini"; return fn; }
-		
-			static string[string] map;
-		
-			static Key baseKey()
+			
+				static string[string] map;
+			
+				static Key baseKey()
 			{ return Registry.currentUser.getKey("Software"); }
-			static string companyName()
+				static string companyName()
 			{ return "realhet"; }
-			static string configName()
+				static string configName()
 			{ return "Config:"~appFile.fullName; }
-		
-			static string loadRegStr()
+			
+				static string loadRegStr()
 			{
 				string s;
 				if(useRegistry)
 				{
 					try
-					{
-						s = baseKey.getKey(companyName).getValue(configName).value_SZ;
-					}
-					catch(Exception){}
+					{ s = baseKey.getKey(companyName).getValue(configName).value_SZ; }
+					catch(Exception) {}
 				}
 				else
-				{
-					s = iniFile.readStr(false);
-				}
+				{ s = iniFile.readStr(false); }
 				return s;
 			}
-		
-			static void loadMap()
-			{
-				map = strToMap(loadRegStr);
-			}
-		
-			static void saveMap()
+			
+				static void loadMap()
+			{ map = strToMap(loadRegStr); }
+			
+				static void saveMap()
 			{
 				bool empty = map.length==0;
 				if(empty && !loadRegStr) return;
-		
+						
 				if(useRegistry)
 				{
 					auto key = baseKey.createKey(companyName);
@@ -984,30 +991,30 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					else iniFile.write(s);
 				}
 			}
-		public:
-			static void loadIni()
+			public:
+				static void loadIni()
 			{ loadMap; }
-			static void saveIni()
+				static void saveIni()
 			{ saveMap; }
-		
-			static void remove(string name)
+			
+				static void remove(string name)
 			{ map.remove(name); }
-			static void removeAll()
+				static void removeAll()
 			{ map =	null; }
-		
-			static void write(T)(string name, in T value)
+			
+				static void write(T)(string name, in T value)
 			{ map[name] = value.to!string; }
-		
-			static T read(T)(string name, in T def = T.init)
+			
+				static T read(T)(string name, in T def = T.init)
 			{
-				if(auto x = name in map) try{ return (*x).to!T; }catch(Throwable){}
+				if(auto x = name in map) try { return (*x).to!T; }catch(Throwable) {}
 				return def;
 			}
 		}
 	}
 }version(/+$DIDE_REGION Error hnd.+/all)
 {
-	version(/+$DIDE_REGION+/all){
+	version(/+$DIDE_REGION+/all) {
 		enum ErrorHandling { ignore, raise, track }
 		
 		alias enforce = stdEnforce;
@@ -1016,7 +1023,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		void enforceDiff(T)(in T expected, in T actual, lazy string caption="", string file = __FILE__, int line = __LINE__)
 		{
 			if(expected == actual) return;
-		
+					
 			auto	exp	= expected.text,
 				act	= actual.text,
 				diff	= strDiff(exp, act),
@@ -1026,8 +1033,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		template CustomEnforce(string prefix)
 		{
-			T enforce(T)(T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__
-				/+__PRETTY_FUNCTION__ <- is too verbose+/)
+			T enforce(T)(
+				T value, lazy string str="", string file = __FILE__, int line = __LINE__, string fn=__FUNCTION__
+								/+__PRETTY_FUNCTION__ <- is too verbose+/
+			)
 			{
 				if(!value) stdEnforce(0, "["~fn~"()] "~prefix~" "~str, file, line);
 				return value;
@@ -1035,23 +1044,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		void raise(string str="", string file = __FILE__, int line = __LINE__)
-		{
-			enforce(0, str, file, line);
-		}
+		{ enforce(0, str, file, line); }
 		
-		bool ignoreExceptions(void delegate() f){
+		bool ignoreExceptions(void delegate() f) {
 			bool res;
-			try{
-				f();
-			}catch(Throwable){
-				res = true;
-			}
+			try { f(); }catch(Throwable) { res = true; }
 			return res;
 		}
 		
 		void beep(int MBType = MB_OK)
 		{
-			version(/+$DIDE_REGION+/none){
+			version(/+$DIDE_REGION+/none) {
 				pragma(lib, "Winmm"); import core.sys.windopws.mmsystem; 
 				PlaySound(`c:\Windows\media\tada.wav`, NULL, SND_FILENAME | SND_ASYNC);
 			}
@@ -1068,19 +1071,21 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					auto addr = cast(void*) line[2..$].to!ulong(16);
 					auto mi = getModuleInfoByAddr(addr);
 					line ~= " " ~ mi.location;
-		
+							
 					if(line.isWild(`*"*.d", *`))
-					{ //search src line locations in the parameters
+					{
+						 //search src line locations in the parameters
 						auto fn = wild[1]~".d";
 						int srcLine;
-						try{ auto tmp = wild[2]; srcLine = parse!int(tmp); }catch(Throwable){}
+						try { auto tmp = wild[2]; srcLine = parse!int(tmp); }catch(Throwable) {}
 						if(srcLine>0 && File(fn).exists)
-							line = format!"%s(%s,1): Error: %s"(fn, srcLine, line);
+						line = format!"%s(%s,1): Error: %s"(fn, srcLine, line);
 					}
 					return line;
 				}
 				if(line.isWild("*@*.d(*): *"))
-				{//exception
+				{
+					//exception
 					return format!"%s.d(%s,1): Error: %s: %s"(wild[1], wild[2], wild[0], wild[3]);
 				}
 				return line;
@@ -1089,31 +1094,30 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			return lines.split("\n").map!processLine.filter!(not!empty).join("\n");
 		}
 		
-		string extendedMsg(Throwable t){ return t.msg.extendedMsg; }
+		string extendedMsg(Throwable t) { return t.msg.extendedMsg; }
 		
 		//cuts off traqce info
 		string simpleMsg(string exceptionMsg)
 		{
 			string[] s;
 			foreach(line; exceptionMsg.split("\n").map!strip)
-			{	//todo: use countUntil here!
+			{
+					//todo: use countUntil here!
 				if(line == "") break;
 				s ~= line;
 			}
 			return s.join("\n");
 		}
 		
-		string simpleMsg(Throwable t){ return t.msg.simpleMsg; }
+		string simpleMsg(Throwable t) { return t.msg.simpleMsg; }
 		
 		void showException(string s) nothrow
 		{
-			try{
+			try {
 				string err = s.extendedMsg;
-		
+						
 				if(dbg.isActive)
-				{
-					dbg.handleException(err);
-				}else
+				{ dbg.handleException(err); }else
 				{
 					import core.sys.windows.windows;
 					MessageBeep(MB_ICONERROR); //idegesit :D
@@ -1123,80 +1127,78 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					readln;
 					application.exit;
 				}
-			}catch(Throwable o){}
+			}catch(Throwable o) {}
 		}
 		
 		void showException(Throwable o) nothrow
 		{
 			string s;
-			try{ s = o.toString(); }catch(Throwable o){ s = "Unable to get exception.toString"; }
+			try { s = o.toString(); }catch(Throwable o) { s = "Unable to get exception.toString"; }
 			showException(s);
 		}
 		
 		void forceAssertions(string file=__FILE__, int line=__LINE__)()
-		{	//todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
+		{
+				//todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
 			enforce(ignoreExceptions({ assert(false); }), "Enable DEBUG compiler output! %s(%s)".format(file, line));
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		
 		pragma(lib, "Psapi.lib");
 		
 		class ExeMapFile
 		{
 			ulong baseAddr;
-		
-			struct Rec{
+					
+			struct Rec {
 				string mangledName;
 				ulong addr;
 				string objName;
-		
-				string name(){
+						
+				string name() {
 					import std.demangle;
 					return demangle(mangledName);
 				}
 			}
-		
+					
 			Rec[] list;
-		
+					
 			this(File fn = File("$ThisExeFile$"))
 			{
 				if(fn.fullName == "$ThisExeFile$")
-					fn = appFile.otherExt("map");
-		
+				fn = appFile.otherExt("map");
+						
 				bool active=false;
 				foreach(line; fn.readLines(false))
 				{
 					if(!active) active = line.isWild("*Address*Publics by Value*Rva+Base*Lib:Object");
 					auto p = line.split.array;
-					switch(p.length){
-						case 5:{
-							if(p[0]=="Preferred"){
-								baseAddr = p[4].to!ulong(16);
-							}
-						} break;
+					switch(p.length) {
+						case 5:{ if(p[0]=="Preferred") { baseAddr = p[4].to!ulong(16); } } break;
 						case 4:{
 							if(active && p[0].isWild("0001:*"))
-							{//LDC1.28+
+							{
+								//LDC1.28+
 								list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[3]);
 							}
 						} break;
 						default:
 					}
 				}
-		
+						
 				list = list.sort!"a.addr < b.addr".array; //not sure if already sorted
-		
+						
 				if(list.empty) ERR("EXEMAPFILE is fucked up.");
 			}
-		
+					
 			string locate(ulong relAddr)
 			{
 				//todo: Try core.runtime.defaultTraceHandler
-		
+						
 				foreach(idx; 1..list.length)
-					if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
-						return list[idx-1].name;
+				if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
+				return list[idx-1].name;
 				return "";
 			}
 		}
@@ -1217,9 +1219,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				"INVALID_HANDLE"
 			];
 			
-			switch(code){
-				static foreach(s ;names) 
-					mixin(q{ case EXCEPTION_*: return "*"; }.replace('*', s));
+			switch(code) {
+				static foreach(s ;names)
+				mixin(q{case EXCEPTION_*: return "*";}.replace('*', s));
 				
 				default: return format!"%X"(code);
 			}
@@ -1227,7 +1229,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		auto getModuleInfoByAddr(void* addr)
 		{
-			struct Res{
+			struct Res {
 				HMODULE handle;
 				File fileName;
 				void* base;
@@ -1239,13 +1241,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				import core.sys.windows.windows;
 				
-				if(GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-					GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, 
-					cast(wchar*)addr, &handle))
+				if(
+					GetModuleHandleEx(
+						GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+											GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, 
+											cast(wchar*)addr, &handle
+					)
+				)
 				{
 					wchar[256] tmp;
 					if(GetModuleFileNameW(handle, tmp.ptr, 256))
-						fileName = File(tmp.toStr);
+					fileName = File(tmp.toStr);
 					
 					import core.sys.windows.psapi;
 					MODULEINFO mi;
@@ -1255,10 +1261,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						size = mi.SizeOfImage;
 						
 						if(fileName==appFile)
-							res.location = exeMapFile.locate(addr-base);
+						res.location = exeMapFile.locate(addr-base);
 						
 						if(location.empty)
-							location = fileName.fullName.quoted;
+						location = fileName.fullName.quoted;
 					}
 				}
 				
@@ -1275,9 +1281,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			scope(exit) gDisableOSExceptionsCouinter--;
 			if(fun) fun();
 		}
-	
-	}version(/+$DIDE_REGION+/all){
-	
+			
+	}version(/+$DIDE_REGION+/all) {
+			
 		void installExceptionFilter()
 		{
 			__gshared static installed = false;
@@ -1311,8 +1317,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						//msg ~= "\n" ~ mi.location;  //not needed, already in stack trace
 					//}
 				}
-		
-				if(1){ //stacktrace
+						
+				if(1) {
+					 //stacktrace
 					import core.sys.windows.stacktrace;
 					auto st = new StackTrace(0/*skip frames*/, p.ContextRecord);
 					msg ~= "\n----------------\n"~st.text;
@@ -1328,7 +1335,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 								auto addr = cast(void*) s[2..$].to!ulong(16);
 								write(addr, " \33\13");
 								auto mi = getModuleInfoByAddr(addr);
-								if(mi.handle){
+								if(mi.handle) {
 									auto relAddr = cast(ulong) (addr-mi.base);
 									write(mi.fileName.name, ":", relAddr.format!"%X");
 									
@@ -1342,27 +1349,30 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					
 					//print(st);
 				}
-		
+						
 				//if(0) print((*(p.ContextRecord)).toJson);
-		
+						
 				//todo: Break point handling
-				// Decide what to do. On BREAKPOINT it is possible to continue.
-				/*if(p.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT){
-					console.setForegroundWindow;
-					write("Continue (y/n) ? ");
-					auto s = readln;
-					if(s.lc.strip == "y"){
-						if(mainWindow) mainWindow.setForegroundWindow;
-		
-						p.ContextRecord.Rip ++; //advance IP
-						return EXCEPTION_CONTINUE_EXECUTION;
-					}
-				}else{
-					write("Press enter to exit..."); readln;
-				}*/
-		
+				//Decide what to do. On BREAKPOINT it is possible to continue.
+				/*
+					if(p.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT){
+										console.setForegroundWindow;
+										write("Continue (y/n) ? ");
+										auto s = readln;
+										if(s.lc.strip == "y"){
+											if(mainWindow) mainWindow.setForegroundWindow;
+							
+											p.ContextRecord.Rip ++; //advance IP
+											return EXCEPTION_CONTINUE_EXECUTION;
+										}
+									}else{
+										write("Press enter to exit..."); readln;
+									}
+				*/
+						
 				static if(1)
-				{//1 = disable exception handling
+				{
+					//1 = disable exception handling
 					showException(msg);
 					
 					return
@@ -1377,16 +1387,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					return EXCEPTION_CONTINUE_EXECUTION;
 				}
 			}
-		
+					
 			auto res = SetUnhandledExceptionFilter(&customExceptionFilter);
 			//LOG("Exception filter installed: ", res);
-		
-		
-		}version(/+$DIDE_REGION+/all){
+					
+					
+		}version(/+$DIDE_REGION+/all) {
 			version(/+$DIDE_REGION Windows errors+/all)
-			{// Windows error handling //////////////////////////////
+			{
+				//Windows error handling //////////////////////////////
 				
-				string getLastErrorStr(){
+				string getLastErrorStr() {
 					auto e = GetLastError;
 					if(!e) return ""; //no error
 					char[512] error;
@@ -1395,7 +1406,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				}
 				
 				alias raiseLastError = throwLastError;
-				void throwLastError(string file = __FILE__, int line = __LINE__){
+				void throwLastError(string file = __FILE__, int line = __LINE__) {
 					auto error = getLastErrorStr;
 					enforce(error=="", "LastError: "~error, file, line);
 				}
@@ -1426,8 +1437,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			void selftest(T)(lazy const T a, uint xb, string name, string notes="", string file=__FILE__, int line=__LINE__)
 			{
 				version(disableselftest)
-					return;
-				else{
+				return;
+				else {
 					import het.inputs;
 					shared static bool skip; if(inputs["Shift"].active) skip = true;
 					//todo:selftest skippelesen gondolkozni... A problema, hogy csak akkor kezelheto belul, ha a selftest lazy parametereben tortenik minden.
@@ -1435,9 +1446,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					if(!notes.empty) notes = "\33\10 "~notes~"\33\7";
 					const sHoldShift = "Hold SHIFT to skip...";
 					write("SELFTEST [\33\17"~name~"\33\7"~notes~"]: \33\10"~sHoldShift~"\33\7"); console.flush;
-					void clearBack(){ write("\b \b".map!(a => [a].replicate(sHoldShift.length)).join); }
-				
-					if(skip){
+					void clearBack() { write("\b \b".map!(a => [a].replicate(sHoldShift.length)).join); }
+									
+					if(skip) {
 						clearBack;
 						writeln("\33\10SKIPPED\33\7");
 						return;
@@ -1448,7 +1459,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					clearBack;
 					
 					if(xa==xb)
-						writeln("\33\x0AOK\33\x07");
+					writeln("\33\x0AOK\33\x07");
 					else
 					{
 						writefln("\33\x0CFAILED\33\x07 (%d!=%d)", xa, xb);
@@ -1462,21 +1473,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	}
 }version(/+$DIDE_REGION Meta prg.+/all)
 {
-	version(/+$DIDE_REGION+/all){
+	version(/+$DIDE_REGION+/all) {
 		
 		static T Singleton(T)() if(is(T == class))
-		{// Singleton ////////////////////////
+		{
+			//Singleton ////////////////////////
 			import std.traits : SharedOf;
 			enum isShared = is(SharedOf!T == T);
 			enum log = false;
-		
+					
 			static if(isShared)
 			{
 				static T instance; //todo: initOnce does this locking too.
 				static bool initialized;
-				if(!initialized){
-					synchronized{
-						if(instance is null){
+				if(!initialized) {
+					synchronized {
+						if(instance is null) {
 							instance = new T;
 							if(log) LOG(`created.`);
 						}
@@ -1487,23 +1499,23 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			else
 			{
 				__gshared static T instance;
-				if(instance is null){
+				if(instance is null) {
 					instance = new T;
 					if(log) LOG(`created.`);
 				}
 			}
-		
+					
 			return instance;
 		}
 		
-		// structs to text /////////////////////////////////////
+		//structs to text /////////////////////////////////////
 		
 		string toString2(T)(in T obj)
 		if(isAggregateType!T)
 		{
 			string[] parts;
 			alias types = FieldTypeTuple!T;
-			foreach(idx, name; FieldNameTuple!T){
+			foreach(idx, name; FieldNameTuple!T) {
 				string value = mixin("obj."~name~".text;");
 				if(isSomeString!(types[idx])) value = value.quoted;
 				parts ~= format!"%s : %s"(name, value);
@@ -1513,11 +1525,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		void clearFields(T)(T obj)
 		if(isAggregateType!T)
-		{
-			foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f));
-		}
+		{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); }
 		
-		// Meta helpers ///////////////////////////
+		//Meta helpers ///////////////////////////
 		
 		auto getSymbolNamesByUDA(T, string uda)()
 		{
@@ -1527,30 +1537,33 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		/*
-		// this is a __traits only version for string UDAs
-		auto getSymbolNamesByUDA(T, string uda)(){
-			string[] res;
-			static foreach(n; __traits(allMembers, T)) {
-				// static, but don't use static foreach so you can break
-				foreach(u; __traits(getAttributes, __traits(getMember, T, n)))
-					static if(is(typeof(u) == string) && u == uda) {
-						res ~= n;
-						break;
-					}
-			 }
-			return res;
-		}*/
+			// this is a __traits only version for string UDAs
+			auto getSymbolNamesByUDA(T, string uda)(){
+				string[] res;
+				static foreach(n; __traits(allMembers, T)) {
+					// static, but don't use static foreach so you can break
+					foreach(u; __traits(getAttributes, __traits(getMember, T, n)))
+						static if(is(typeof(u) == string) && u == uda) {
+							res ~= n;
+							break;
+						}
+				 }
+				return res;
+			}
+		*/
 		
 		enum SameType(A, B) = is(Unqual!A == Unqual!B);
 		
 		/// returns only the last UDA if more than one exists.
 		template getUDA(alias a, U)
 		{
-			enum u = q{ getUDAs!(a, U)[$-1] };
-				static if(hasUDA!(a, U) && !is(mixin(u)))   //note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
-					enum getUDA = mixin(u);
-				else
-					enum getUDA = U.init;
+			enum u = q{getUDAs!(a, U)[$-1]};
+				static if(
+				hasUDA!(a, U) && !is(mixin(u))//note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
+			)
+			enum getUDA	= mixin(u);
+			else
+			enum getUDA = U.init;
 		}
 		
 		///helper templates to get all the inherited class fields, works for structs as well
@@ -1558,11 +1571,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			//todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
 			static if(is(T == Object))
-				alias AllClasses = AliasSeq!();
+			alias AllClasses = AliasSeq!();
 			else static if(is(T == class ))
-				alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
+			alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1]));
 			else
-				alias AllClasses = T;
+			alias AllClasses = T;
 		}
 		
 		/// returns the member names of only this child class only, not the ancestor classes.
@@ -1575,7 +1588,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				alias BM = __traits(allMembers, BaseClassesTuple!T[0]);
 				enum ThisClassMemberNameTuple = AM[0..AM.length-BM.length];
 			}else
-				enum ThisClassMemberNameTuple = AliasSeq!();
+			enum ThisClassMemberNameTuple = AliasSeq!();
 		}
 		
 		alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); //good order, but no member properties
@@ -1586,11 +1599,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			enum fields = AllFieldNames!T;
 			enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U);
-		
+					
 			static if(allIfNone && !anySatisfy!(hasThisUDA, fields))
-				enum FieldNamesWithUDA = fields;
+			enum FieldNamesWithUDA = fields;
 			else
-				enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
+			enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
 		}
 		
 		//todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
@@ -1601,17 +1614,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			enum bool isUda        (string name) = is(U==void) || hasUDA!(__traits(getMember, T, name), U);
 			enum bool isUdaFunction(string name) = isUda!name && isFunction!(__traits(getMember, T, name));
 			enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T));
-		
+					
 			static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
-				enum FieldAndFunctionNamesWithUDA = AllFieldNames!T;
+			enum FieldAndFunctionNamesWithUDA = AllFieldNames!T;
 			else
-				enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T);
+			enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T);
 		}
 		
 		enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false);
-	
-	}version(/+$DIDE_REGION+/all){
-	
+			
+	}version(/+$DIDE_REGION+/all) {
+			
 		string[] getEnumMembers(T)()
 		{
 			static if(is(T == enum)) return [__traits(allMembers, T)];
@@ -1624,87 +1637,81 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		void inspectSymbol(alias T)(string before="", int level=0)
 		{
 			enum maxInspectLevel = 10;
-		
-			// step 2
+					
+			//step 2
 			foreach(memberName; __traits(allMembers, T))
 			static if(__traits(compiles, toAlias!(__traits(getMember, T, memberName))))
 			{
-				// step 3
+				//step 3
 				alias member = toAlias!(__traits(getMember, T, memberName));  //sometimes this alias declaration fails.
-				// step 4 - inspecting types
+				//step 4 - inspecting types
 				static if(is(member))
 				{
 					string specifically;
 					static if(is(member == struct))
-						specifically = "struct";
+					specifically = "struct";
 					else static if(is(member == class))
-						specifically = "class";
+					specifically = "class";
 					else static if(is(member == enum))
-						specifically = "enum";
+					specifically = "enum";
 					writeln(before, fullyQualifiedName!member, " is a type (", specifically, ")");
-					// drill down (step 1 again)
+					//drill down (step 1 again)
 					static if(is(member == struct) || is(member == class) || is(member == enum))
 					{
 						static if(!is(T) || !is(member == T))
-						{ //ignore types that contain an alias for typeof(this)
-							if(level<maxInspectLevel){ //limit recursion
+						{
+							 //ignore types that contain an alias for typeof(this)
+							if(level<maxInspectLevel) {
+								 //limit recursion
 								inspectSymbol!member(before ~ "\t", level+1);
 							}
 						}
 					}
 					else
-					{
-						writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof);
-					}
+					{ writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof); }
 				}
 				else static if(is(typeof(member) == function))
 				{
-					// step 5, inspecting functions
+					//step 5, inspecting functions
 					writeln(before, fullyQualifiedName!member, " is a function typed ", typeof(member).stringof);
 				}
 				else
 				{
-					// step 6, everything else
-		
-						static if(__traits(compiles, member.stringof)) enum s = member.stringof; else enum s = "";
-		
+					//step 6, everything else
+							
+						static if(__traits(compiles, member.stringof)) enum s = member.stringof;else enum s = "";
+							
 						static if(s.startsWith("module "))
-							writeln(before, fullyQualifiedName!member, " is a module");
-						else static if(s.startsWith("package "))
-							writeln(before, fullyQualifiedName!member, " is a package");
-						else static if(is(typeof(member.init))){
-							static if(member.stringof.endsWith(')'))
-							{
-								writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof);
-							}
-							else
-							{
-								writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof);
-							}
-						}
+					writeln(before, fullyQualifiedName!member, " is a module");
+					else static if(s.startsWith("package "))
+					writeln(before, fullyQualifiedName!member, " is a package");
+					else static if(is(typeof(member.init))) {
+						static if(member.stringof.endsWith(')'))
+						{ writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof); }
 						else
-						{
-							string fn = memberName;
-							static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member;
-							writeln(before, fn, " is template ", s);
-						}
+						{ writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof); }
+					}
+					else
+					{
+						string fn = memberName;
+						static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member;
+						writeln(before, fn, " is template ", s);
+					}
 				}
 			}
 			else
-			{
-				print("!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", T.stringof ~ "." ~ memberName);
-			}
+			{ print("!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", T.stringof ~ "." ~ memberName); }
 		}
-	
+			
 		auto arraySwitch(alias sourceRange, alias targetRangeOrFunction, T = ElementType!(typeof(sourceRange)))(in T input)
 		{
-			static if(isInputRange!(typeof(targetRangeOrFunction))) 	alias targetRange = targetRangeOrFunction;
-			else	alias targetRange = sourceRange.map!targetRangeOrFunction;
+			static if(isInputRange!(typeof(targetRangeOrFunction))) alias targetRange = targetRangeOrFunction;
+			else alias targetRange = sourceRange.map!targetRangeOrFunction;
 			
-			switch(input){
+			switch(input) {
 				
 				static foreach(a; zip(StoppingPolicy.requireSameLength, sourceRange, targetRange))
-					case a[0]: return a[1];
+				case a[0]: return a[1];
 				
 				//todo: DIDE: the parser stops at case a[0]: and doesn't include return a[1]; inside this foreach
 				
@@ -1713,14 +1720,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		}
 		
-		auto functionSwitch(alias fun, E)(E e){
+		auto functionSwitch(alias fun, E)(E e) {
 			final switch(e)
-				static foreach(a; EnumMembers!E)
-					case a: return a.unaryFun!fun;
+			static foreach(a; EnumMembers!E)
+			case a: return a.unaryFun!fun;
 		}
 		
 		
-		// StaticParam ////////////////////
+		//StaticParam ////////////////////
 		
 		auto getStaticParamDef(T, Args...)(in T def, in Args args)
 		{
@@ -1738,12 +1745,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0;
 		
-	}version(/+$DIDE_REGION+/all){
-	
-		// GenericArg /////////////////////////////////////
+	}version(/+$DIDE_REGION+/all) {
+			
+		//GenericArg /////////////////////////////////////
 		
 		struct GenericArg(string N="", T)
-		{	
+		{
 			alias type = T; enum name = N;
 			
 			T value;
@@ -1754,20 +1761,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		/// pass a generic arg to a function
 		auto genericArg(string N="", T)(in T p)
-		{
-			return const GenericArg!(N, T)(p);
-		}
+		{ return const GenericArg!(N, T)(p); }
 		
 		/// cast anything to GenericArg
 		auto asGenericArg(A)(in A a)
-		{
-			static if(isGenericArg!A) return a; else return genericArg(a);
-		}
+		{ static if(isGenericArg!A) return a;else return genericArg(a); }
 		
 		auto asGenericArgValue(A)(in A a)
-		{
-			static if(isGenericArg!A) return a.value; else return a;
-		}
+		{ static if(isGenericArg!A) return a.value;else return a; }
 		
 		
 		string processGenericArgs(string code)
@@ -1777,50 +1778,50 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		string appendGenericIds(string idVariable)
-		{
-			return processGenericArgs(`static if(N=="id") `~idVariable~`.appendIdx(a.value);`);
-		}
+		{ return processGenericArgs(`static if(N=="id") `~idVariable~`.appendIdx(a.value);`); }
 		
 		
 		auto genericId(T)(in T a)
 		{
 			static if(is(T==class))
-				return genericArg!"id"(a.identityStr);
+			return genericArg!"id"(a.identityStr);
 			else
-				return genericArg!"id"(a);
+			return genericArg!"id"(a);
 		}
 		
-		// SrcId ////////////////////////////////////////////////////////////
+		//SrcId ////////////////////////////////////////////////////////////
 		
 		enum srcLocationStr(string srcModule, size_t srcLine) = srcModule ~ `.d(` ~ srcLine.text ~ ')';
 		
 		struct SrcId
 		{
-			/// select Id datatype. Default=string if debug, long if release
-				version(stringId	) alias T = string	;
-			else	version(longId	) alias T = ulong	;
-			else	version(intId	) alias T = uint	;
-			else{
+				/// select Id datatype. Default=string if debug, long if release
+					version(stringId	) alias T = string	;
+			else version(longId	) alias T = ulong	;
+			else version(intId	) alias T = uint	;
+			else {
 				alias T = ulong;
 				//todo: it could be string in debug mode. Needs a new ide to handle that.
 			}
-		
-			T value;
-		
-			bool opCast(B : bool)() const{ return value != T.init; }
-		
-		/*  bool opEquals(in SrcId b) const{ return value == b.value; }
-			size_t toHash() const{ return .toHash(value); }*/
-		
-			alias value this;
+			
+				T value;
+			
+				bool opCast(B : bool)() const { return value != T.init; }
+			
+			/*
+				  bool opEquals(in SrcId b) const{ return value == b.value; }
+							size_t toHash() const{ return .toHash(value); }
+			*/
+			
+				alias value this;
 		}
 		
 		static if(is(SrcId.T==uint) || is(SrcId.T==ulong))
 		{
 			//auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value)); }
 			
-			auto combine(T)(in SrcId i1, in T i2){ return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); }
-			void appendIdx(T)(ref SrcId id, in T idx){ id = combine(id, idx); }
+			auto combine(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); }
+			void appendIdx(T)(ref SrcId id, in T idx) { id = combine(id, idx); }
 			
 			//note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
 			auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
@@ -1835,20 +1836,20 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			//auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
 			
-			auto combine(T)(in SrcId i1, in T i2){ return SrcId(i1.value ~ '.' ~ i2.text); }
-			void appendIdx(T)(ref SrcId id, in T idx){ id ~= '[' ~ idx.text ~ ']'; }
+			auto combine(T)(in SrcId i1, in T i2) { return SrcId(i1.value ~ '.' ~ i2.text); }
+			void appendIdx(T)(ref SrcId id, in T idx) { id ~= '[' ~ idx.text ~ ']'; }
 			//for clarity string uses the [idx] form, instead of a.b;
 			
 			auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
 			{
 				auto id = SrcId(srcLocationStr!(srcModule, srcLine));
-				// .d is included to make sourceModule detection easier
+				//.d is included to make sourceModule detection easier
 				mixin(appendGenericIds("id"));
 				return id;
 			}
 		}
-		else 
-			static assert(0, "Invalid SrcId.T");
+		else
+		static assert(0, "Invalid SrcId.T");
 		
 		void test_SrcId()
 		{
@@ -1869,28 +1870,27 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				enforce(i1==i2 && i2!=i3 && i3!=i4 && i4!=i5 && i5!=i6 && i6!=i7);
 			}
 		}
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		///////////////////////////////////////////////////////////////////////////
 		/// RTTI                                                                ///
 		///////////////////////////////////////////////////////////////////////////
 		
 		struct StructInfo
 		{
-		
+					
 			struct FieldInfo
 			{
 				string uda, type, name, default_;
 				size_t ofs, size;
-		
+						
 				string toString()const
-				{
-					return (uda.empty ? `` : `@(`~uda~`) `) ~ "%s %s = %s; // ofs:%d size:%d".format(type, name, default_, ofs, size);
-				}
-		
+				{ return (uda.empty ? `` : `@(`~uda~`) `) ~ "%s %s = %s; // ofs:%d size:%d".format(type, name, default_, ofs, size); }
+						
 				string getoptLine(string ownerName)const
-				{ //returns a line used by std.getopt()
+				{
+					 //returns a line used by std.getopt()
 					//example: "w|WFPerCU"     , `Number of WaveFronts on each Compute Units. Default: `~defOptions.WFPerCU.text, &WFPerCU  ,
-		
+							
 					//split at param = descr
 					string param, descr;
 					if(!split2(uda, "=", param, descr))
@@ -1898,7 +1898,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						descr = param;
 						param = "";
 					}
-		
+							
 					//split at shortParam | longParam
 					string shortParam, longParam;
 					if(!split2(param, "|", shortParam, longParam))
@@ -1909,33 +1909,31 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							shortParam = "";
 						}
 					}
-		
+							
 					//default short and long param
 					if(shortParam=="") shortParam = name[0..1].lc;
 					if(longParam=="") longParam = name;
-		
+							
 					descr = descr.replace("$DEFAULT$", default_);
-		
+							
 					//format the final string that can be used in getopt()
 					return `"%s|%s", "%s", &%s.%s`.format(shortParam, longParam, descr.replace(`"`, `\"`), ownerName, name);
 				}
 			}
-		
+					
 			string name;
 			size_t size;
 			FieldInfo[] fields;
-		
+					
 			string toString()const
 			{
 				return "struct "~name~" {"~
 					fields.map!(f => "\r\n  "~f.text).join
 				~"\n\r} // size:%s \n\r".format(size);
 			}
-		
+					
 			string[] getoptLines(string ownerName)const
-			{
-				return fields.map!(f => f.getoptLine(ownerName)).array;
-			}
+			{ return fields.map!(f => f.getoptLine(ownerName)).array; }
 		}
 		
 		auto getStructInfo(T)()
@@ -1944,87 +1942,84 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			StructInfo si;
 			si.name = T.stringof;
 			si.size = T.sizeof;
-		
+					
 			T defStruct;
-		
+					
 			import std.traits;
 			foreach(name; FieldNameTuple!T)
 			{
 				//get some rtti
 				StructInfo.FieldInfo fi;
 				fi.name = name;
-				mixin(q{
-					fi.default_ = defStruct.*.text;
-					fi.type = typeof(T.*).stringof;
-					fi.uda = __traits(getAttributes, T.*).text;
-					fi.ofs = T.*.offsetof;
-					fi.size = typeof(T.*).sizeof;
-				}.replace("*", name));
+				mixin(
+					q{
+						fi.default_ = defStruct.*.text;
+						fi.type = typeof(T.*).stringof;
+						fi.uda = __traits(getAttributes, T.*).text;
+						fi.ofs = T.*.offsetof;
+						fi.size = typeof(T.*).sizeof;
+					}.replace("*", name)
+				);
 				si.fields ~= fi;
 			}
-		
+					
 			return si;
 		}
 		
 		auto getStructInfo(T)(const T t)
 		if(isAggregateType!T)
-		{
-			return getStructInfo!T;
-		}
+		{ return getStructInfo!T; }
 		
 		
 		//todo: list members of a module recursively. Adam Ruppe book
 		/*
-		pragma(msg, __traits(allMembers, thisModule));
-		
-		
-		struct S{}
-		enum E {asdf};
-		class C{}
-		
-		template symbols(alias mod){
-			alias symbols = staticMap!(__traits(getMember, mod, T), __traits(allMembers, mod));
-		}
-		
-		void listModuiles(){
-				static foreach(s; symbols!thisModule){
-					 pragma(msg, fullyQualifiedName!s);
-				}
-		
-				alias notmods = Filter!(templateNot!notmodule, symbols!thismodule);
-		
-		
-		}
+			pragma(msg, __traits(allMembers, thisModule));
+			
+			
+			struct S{}
+			enum E {asdf};
+			class C{}
+			
+			template symbols(alias mod){
+				alias symbols = staticMap!(__traits(getMember, mod, T), __traits(allMembers, mod));
+			}
+			
+			void listModuiles(){
+					static foreach(s; symbols!thisModule){
+						 pragma(msg, fullyQualifiedName!s);
+					}
+			
+					alias notmods = Filter!(templateNot!notmodule, symbols!thismodule);
+			
+			
+			}
 		*/
 	}
 }
 version(/+$DIDE_REGION Numeric+/all)
-{//Numeric ///////////////////////////////////////
-	version(/+$DIDE_REGION+/all){
+{
+	//Numeric ///////////////////////////////////////
+	version(/+$DIDE_REGION+/all) {
 		//enum PIf = 3.14159265358979323846f;
-		/+todo: not sure about where is it used or not used. 
-		      If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete. +/
+		/+
+			todo: not sure about where is it used or not used. 
+					      If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete. 
+		+/
 		
 		//it replaces the exception with a default value.
 		T safeConv(T, U)(const U src, lazy const T def)
-		{
-			try{
-				return src.to!T;
-			}catch(Throwable){
-				return def;
-			}
-		}
+		{ try { return src.to!T; }catch(Throwable) { return def; } }
 		
 		T safeDiv(T)(T a, T b, T def=0)
-		{
-			return b==0 ? def : a/b;
-		}
+		{ return b==0 ? def : a/b; }
 		
-		/*  it's het.math.mod auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){
-			auto c = a%b;
-			if(c<0) c += b;
-			return c;
-		}*/
+		/*
+			  it's het.math.mod auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){
+						auto c = a%b;
+						if(c<0) c += b;
+						return c;
+					}
+		*/
 		
 		
 		float wrapInRange(ref float p, float pMin, float pMax)
@@ -2036,11 +2031,12 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 		float wrapInRange(ref float p, float pMin, float pMax, ref int wrapCnt)
-		{//specialised version for endless sliders
+		{
+			//specialised version for endless sliders
 			float len = pMax-pMin, pOld = p;
 			wrapCnt = 0;
-			while(p<pMin){ p += len; wrapCnt++; }
-			while(p>pMax){ p -= len; wrapCnt--; }
+			while(p<pMin) { p += len; wrapCnt++; }
+			while(p>pMax) { p -= len; wrapCnt--; }
 			return p-pOld;
 		}
 		
@@ -2051,7 +2047,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		in(n>=3)
 		in(a.inRange(0, n))
 		in(b.inRange(0, n))
-		do{
+		do {
 			const m = (n-1)/2;
 			if(a==b) return 0;
 			auto d = b-a;
@@ -2061,24 +2057,24 @@ version(/+$DIDE_REGION Numeric+/all)
 		//todo: unittest on a 0..N+1 square. N e 3, 4, 5
 		
 		
-		T rcpf_fast(T)(const T x)if(__traits(isFloating, T)){
+		T rcpf_fast(T)(const T x)if(__traits(isFloating, T)) {
 			return 1.0f/x; //todo: Ezt megcsinalni SSE-vel
 		}
 		
 		struct percent
 		{
 			float value = 0;
-			@property multiplier() const{ return value*1e-2f; }
+			@property multiplier() const { return value*1e-2f; }
 			@property multiplier(float p) { value = p*1e2f; }
-		
-			string toString() const{ return "%6.2f%%".format(value); }
-		
+					
+			string toString() const { return "%6.2f%%".format(value); }
+					
 			percent opBinary(string op)(in percent b)	const
-			{ return mixin( q{percent(multiplier %s b.multiplier)}.format(op) ); }
+			{ return mixin(q{percent(multiplier %s b.multiplier)}.format(op)); }
 			float opBinary(string op)(in float b)	const
-			{ return mixin( q{multiplier %s b}.format(op) ); }
+			{ return mixin(q{multiplier %s b}.format(op)); }
 			float opBinaryRight(string op)(in float a)	const
-			{ return mixin( q{a %s multiplier}.format(op) ); }
+			{ return mixin(q{a %s multiplier}.format(op)); }
 		}
 		
 		
@@ -2093,17 +2089,13 @@ version(/+$DIDE_REGION Numeric+/all)
 			return tuple(m, c); //todo: use this in remap
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		
 		//todo: remap goes to math
 		T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{
 			float s = srcTo-srcFrom;
-			if(s==0){
-				return dstFrom;
-			}else{
-				return cast(T)((src-srcFrom)/s*(dstTo-dstFrom)+dstFrom);
-			}
+			if(s==0) { return dstFrom; }else { return cast(T)((src-srcFrom)/s*(dstTo-dstFrom)+dstFrom); }
 		}
 		
 		T remap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
@@ -2133,19 +2125,15 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		bool chkSet(ref bool b)
 		{
-			if(b) return false; else { b = true	; return true; }
+			if(b) return false;else { b = true	; return true; }
 			//todo: make it work with properties, bitfields
 		}
 		
 		bool chkClear(ref bool b)
-		{
-			if(!b) return false; else{ b = false; return true; }
-		}
+		{ if(!b) return false;else { b = false; return true; } }
 		
 		bool chkSet(T)(ref T a, in T b)
-		{
-			if(a==b) return false; else { a = b; return true; }
-		}
+		{ if(a==b) return false;else { a = b; return true; } }
 		
 		auto returnThenSet(T, U)(ref T a, in U b)
 		{
@@ -2185,7 +2173,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			return res;
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		
 		int nearest2NSize(int size)
 		{
@@ -2195,34 +2183,36 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		bool isPrime(uint num)
 		{
-			if (num == 2) return true;
-			if (num <= 1 || num % 2 == 0) return false; // 0, 1, and all even numbers
+			if(num == 2) return true;
+			if(num <= 1 || num % 2 == 0) return false; //0, 1, and all even numbers
 			uint snum = cast(uint)sqrt(cast(double)num);
 			
-			for (uint x = 3; x <= snum; x += 2)
-				if (num % x == 0)
-					return false;
+			for(uint x = 3; x <= snum; x += 2)
+			if(num % x == 0)
+			return false;
 					
 			return true;
 		}
 		
-		// max |error| > 0.01
+		//max |error| > 0.01
 		float atan_fast(float x, float y)
 		{
 			const float ONEQTR_PI = PIf / 4.0f;
 			const float THRQTR_PI = 3.0f * PIf / 4.0f;
 			float r, angle;
-			float abs_y = abs(y) + 1e-10f;      // kludge to prevent 0/0 condition
-			if(x < 0.0f){
+			float abs_y = abs(y) + 1e-10f;      //kludge to prevent 0/0 condition
+			if(x < 0.0f) {
 				r = (x + abs_y) / (abs_y - x);
 				angle = THRQTR_PI;
-			}else{
+			}else {
 				r = (x - abs_y) / (x + abs_y);
 				angle = ONEQTR_PI;
 			}
 			angle += (0.1963f * r * r - 0.9817f) * r;
-			if(y < 0.0f)	return -angle;     // negate if in quad III or IV
-			else	return  angle;
+			if(y < 0.0f) return -angle;
+			else
+			return  angle;
+			
 		}
 		
 		float peakLocation(float a, float b, float c, float* y=null)
@@ -2237,23 +2227,19 @@ version(/+$DIDE_REGION Numeric+/all)
 		//https://www.desmos.com/calculator/otwqwldvpj
 		auto logCodec(bool encode, T, float digits, int max)(float x)
 		{
-			enum	mul = (0.30101f*max)/digits,
+			enum 	mul = (0.30101f*max)/digits,
 				add = max/mul;
 			
 			static if(encode)
-				return cast(T)(iround((log2(x)+add)*mul).clamp(0, max));
+			return cast(T)(iround((log2(x)+add)*mul).clamp(0, max));
 			else
-				return 2.0f^^(x*(1/mul)-add);
+			return 2.0f^^(x*(1/mul)-add);
 		}
 		
 		auto logEncode(T, float digits)(float	x)
-		{
-			return logCodec!(true	, T, digits, T.max)(x);
-		}
+		{ return logCodec!(true	, T, digits, T.max)(x); }
 		auto logDecode(T, float digits)(int	x)
-		{
-			return logCodec!(false	, T, digits, T.max)(x);
-		}
+		{ return logCodec!(false	, T, digits, T.max)(x); }
 		
 		
 		float ease(float in_=2, float out_=2)(float x)
@@ -2266,7 +2252,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ return -c *(t/=d)*(t-2) + b; }
 		float easeInOutQuad(float t, float b, float c, float d)
 		{
-			if ((t/=d/2) < 1) return c/2*t*t + b;
+			if((t/=d/2) < 1) return c/2*t*t + b;
 			return -c/2 * ((--t)*(t-2) - 1) + b;
 		}
 		
@@ -2275,15 +2261,15 @@ version(/+$DIDE_REGION Numeric+/all)
 		//http://vitiy.info/easing-functions-for-your-animations/
 		float easeOutElastic(float t, float b, float c, float d)
 		{
-			// t: time elapsed from start of animation
-			// b: start value
-			// c: value change
-			// d: duration of animation
-			if (t==0) return b;  if ((t/=d)==1) return b+c;  
+			//t: time elapsed from start of animation
+			//b: start value
+			//c: value change
+			//d: duration of animation
+			if(t==0) return b;  if((t/=d)==1) return b+c;  
 			float p=d*.3f;
 			float a=c;
 			float s=p/4;
-			return (a*pow(2,-10*t) * sin( (t*d-s)*(2*PIf)/p ) + c + b);
+			return (a*pow(2,-10*t) * sin((t*d-s)*(2*PIf)/p) + c + b);
 		}
 		
 		unittest
@@ -2295,20 +2281,22 @@ version(/+$DIDE_REGION Numeric+/all)
 				auto f = i.logDecode!(ubyte, 3);
 				s ~= format("%4d -> %8.5f -> %4d\r\n", i, f, f.logEncode!(ubyte, 5/*on purpose*/));
 			}
-		
+					
 			//digit count test
 			static foreach(dig; 2..8)
-			{{
-				alias cfg = AliasSeq!(ubyte, dig);
-				s~= format("%d %f %f\r\n", dig, -log10(0.logDecode!cfg), 1.logDecode!cfg/0.logDecode!cfg);
-			}}
-		
+			{
+				{
+					alias cfg = AliasSeq!(ubyte, dig);
+					s~= format("%d %f %f\r\n", dig, -log10(0.logDecode!cfg), 1.logDecode!cfg/0.logDecode!cfg);
+				}
+			}
+					
 			assert(s.xxh==2704795724, "logEncoder/Decoder fucked up.");
 		}
 		
 	}version(/+$DIDE_REGION Bitwise+/all)
 	{
-		// Bitwise //////////////////////////////////////////////
+		//Bitwise //////////////////////////////////////////////
 		
 		public import core.bitop : rol, ror,
 			bitCount	= popcnt	,
@@ -2320,7 +2308,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		ushort byteSwap(ushort a)
 		{ return cast(ushort)((a>>>8)|(a<<8)); }
 		short byteSwap(short a)
-		{ return cast( short)((a>>>8)|(a<<8)); }
+		{ return cast(short)((a>>>8)|(a<<8)); }
 		
 		wstring byteSwap(wstring s)
 		{ return cast(wstring)((cast(ushort[])s).map!(c => cast(wchar)(c.byteSwap)).array); }
@@ -2336,20 +2324,22 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		T getBits(T)(T a, size_t idx, size_t cnt)
 		{ return (a>>idx)&((cast(T)1<<cnt)-1); }
-		T setBits(T)(T a, size_t idx, size_t cnt, T v){
+		T setBits(T)(T a, size_t idx, size_t cnt, T v) {
 			T msk0 = (cast(T)1<<cnt)-1,
 				msk = msk0<<idx;
 			return a&~msk|((v&msk0)<<idx);
 		}
 		
 		T maskLowBits(T)(T a)
-		{//opt: slow
+		{
+			//opt: slow
 			foreach_reverse(i; 0..T.sizeof*8) if(a.getBit(i)) return (cast(T)1<<(i+1))-1;
 			return 0;
 		}
 		
 		int countHighZeroBits(T)(T a)
-		{//opt: slow
+		{
+			//opt: slow
 			foreach_reverse(int i; 0..T.sizeof*8) if(a.getBit(i)) return cast(int)T.sizeof*8-1-i;
 			return T.sizeof*8;
 		}
@@ -2362,20 +2352,14 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ return a &  b | ~a & c; } //GCN style
 		
 		auto bitalign(uint lo, uint hi, uint ofs)
-		{
-			return cast(uint)((lo | (cast(ulong)hi<<32))>>ofs);
-		}
+		{ return cast(uint)((lo | (cast(ulong)hi<<32))>>ofs); }
 		
 		
 		uint hammondDist(uint a, uint b)
-		{
-			return bitCount(a^b);
-		}
+		{ return bitCount(a^b); }
 		
 		int boolMask(in bool[] arr...)
-		{
-			return arr.enumerate.map!(a => a.value<<a.index).sum;
-		}
+		{ return arr.enumerate.map!(a => a.value<<a.index).sum; }
 		
 		bool toggle(ref bool b)
 		{ b = !b; return b; }
@@ -2390,20 +2374,21 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		auto ifNotNull(alias fun, T)(T p)
 		{
-			if(p !is null)	return unaryFun!fun(p);
-			else	return typeof(return).init;
+			if(p !is null) return unaryFun!fun(p);
+			else return typeof(return).init;
 		}
 		
 		auto ifNotNull(alias fun, T, U)(T p, lazy U def)
 		{
-			if(p !is null)	return unaryFun!fun(p);
-			else	return def;
+			if(p !is null) return unaryFun!fun(p);
+			else return def;
 		}
 		
 	}
 }version(/+$DIDE_REGION Arrays Ranges+/all)
-{/// Arrays ops///////////////////////////////////////////////
-	version(/+$DIDE_REGION+/all){
+{
+	/// Arrays ops///////////////////////////////////////////////
+	version(/+$DIDE_REGION+/all) {
 		size_t sizeBytes(T)(in T a)
 		{
 			static if(isDynamicArray!T) return a.length * ElementType!T.sizeof;
@@ -2415,18 +2400,14 @@ version(/+$DIDE_REGION Numeric+/all)
 			return r.empty ? e : r.front; //todo: constness
 		}
 		@property auto backOr(R, T)(R r, T e)if(isBidirectionalRange!R)
-		{
-			return r.empty ? e : r.back;
-		}
+		{ return r.empty ? e : r.back; }
 		
 		@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class))
 		{
 			return r.empty ? null : r.front; //todo: constness
 		}
 		@property auto backOrNull(R)(R r)if(isBidirectionalRange!R && is(ElementType!R==class))
-		{
-			return r.empty ? null : r.back;
-		}
+		{ return r.empty ? null : r.back; }
 		
 		auto fetchFront(T)(ref T arr, lazy ElementType!T def = ElementType!T.init)
 		{
@@ -2439,13 +2420,11 @@ version(/+$DIDE_REGION Numeric+/all)
 			}
 			else static if(isDynamicArray!T)
 			{
-				if(arr.length){
+				if(arr.length) {
 					auto res = arr[0];
 					arr = arr[1..$];
 					return res;
-				}else{
-					return def;
-				}
+				}else { return def; }
 			}
 			else static assert(0, "unhandled type");
 		}
@@ -2469,13 +2448,11 @@ version(/+$DIDE_REGION Numeric+/all)
 			}
 			else static if(isDynamicArray!T)
 			{
-				if(arr.length){
+				if(arr.length) {
 					auto res = arr.back;
 					arr = arr[0..$-1];
 					return res;
-				}else{
-					return def;
-				}
+				}else { return def; }
 			}
 			else static assert(0, "unhandled type");
 		}
@@ -2511,8 +2488,8 @@ version(/+$DIDE_REGION Numeric+/all)
 			return result;
 		}
 		
-	}version(/+$DIDE_REGION+/all){
-	
+	}version(/+$DIDE_REGION+/all) {
+			
 		//safe assoc array lookup
 		
 		//todo: DIDE fails when opening object.d. It should know that's a system module.
@@ -2529,48 +2506,48 @@ version(/+$DIDE_REGION Numeric+/all)
 		/*inout*/V get(V, I)(/*inout*/V[] arr, I idx) if(isIntegral!I)
 		{
 			static if(isSigned!I)
-				return idx<arr.length && idx>=0 ? arr[idx] : V.init;
-			else 
-				return idx<arr.length	? arr[idx] : V.init;
+			return idx<arr.length && idx>=0 ? arr[idx] : V.init;
+			else
+			return idx<arr.length	? arr[idx] : V.init;
 		}
 		
 		//Default can be a different type. In that case, result	will be converted
 		/*inout*/D get(V, I, D)(/*inout*/V[] arr, I idx, lazy D	def) if(isIntegral!I)
 		{
 			static if(isSigned!I)
-				return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def;
-			else 
-				return idx<arr.length ? arr[idx].to!D.ifThrown(def) : def;
+			return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def;
+			else
+			return idx<arr.length ? arr[idx].to!D.ifThrown(def) : def;
 		}
 		
 		
-		/+todo: unittest    auto aa = ["cica": 5, "kutya": 10];
-				writeln( aa.get("cica") );
-				writeln( aa.get("haha") );
-				writeln( aa.get("hehe",  99) );+/
+		/+
+			todo: unittest    auto aa = ["cica": 5, "kutya": 10];
+			writeln( aa.get("cica") );
+			writeln( aa.get("haha") );
+			writeln( aa.get("hehe",  99) );
+		+/
 		
 		
-		// safely get an element ptr
+		//safely get an element ptr
 		auto getPtr(V, I)(inout(V[]) arr, I idx, lazy V* def = null) if(isIntegral!I)
 		{
 			static if(isSigned!I)
-				return idx<arr.length && idx>=0 ? &arr[idx] : def;
+			return idx<arr.length && idx>=0 ? &arr[idx] : def;
 			else
-				return idx<arr.length ? &arr[idx] : def;
+			return idx<arr.length ? &arr[idx] : def;
 		}
 		
-		// safely access and element, putting default values in front of it when needed
+		//safely access and element, putting default values in front of it when needed
 		ref V access(V)(ref V[] arr, size_t idx, lazy V def = V.init) if(isIntegral!I)
 		{
 			while(idx>=arr.length) arr ~= def; //optional extend
 			return arr[idx];
 		}
 		
-		// safely set an array element, extending with extra elements if idx is too high
+		//safely set an array element, extending with extra elements if idx is too high
 		void set(V)(ref V[] arr, size_t idx, V val, lazy V def = T.init)
-		{
-			arr.access(idx, def) = val;
-		}
+		{ arr.access(idx, def) = val; }
 		
 		//original dlang functionality: .clear removes all keys and values from associative array.
 		
@@ -2591,27 +2568,28 @@ version(/+$DIDE_REGION Numeric+/all)
 			void clear()
 			{
 				foreach(f; FieldNameTuple!(typeof(this)))
-					mixin("$ = $.init;".replace("$", f));
+				mixin("$ = $.init;".replace("$", f));
 			}
 		}
 		
 		auto nonNulls(R)(R r)
 		{ return r.filter!"a"; }
-	
-	}version(/+$DIDE_REGION+/all){
+			
+	}version(/+$DIDE_REGION+/all) {
 		
 		bool addIfCan(T)(ref T[] arr, in T item)
-		{ if(!arr.canFind(item)){ arr ~= item; return true; }else return false; }
+		{ if(!arr.canFind(item)) { arr ~= item; return true; }else return false; }
 		bool addIfCan(T)(ref T[] arr, in T[] items)
 		{ bool res; foreach(const item; items) if(arr.addIfCan(item)) res = true; return res; }
 		
 		deprecated("fetchFirst, not popFirst!")
-		{//todo: This is dumb... There is also popFront...
+		{
+			//todo: This is dumb... There is also popFront...
 			T popFirst(T)(ref T[] arr)
 			{ auto res = arr[0]; arr = arr[1..$  ]; return res; }
 			T popLast(T)(ref T[] arr)
 			{ auto res = arr.back; arr = arr[0..$-1]; return res; }
-		
+					
 			T popFirst(T)(ref T[] arr, T default_)
 			{ if(arr.empty) return default_; return popFirst(arr); }
 			T popLast(T)(ref T[] arr, T default_)
@@ -2622,10 +2600,10 @@ version(/+$DIDE_REGION Numeric+/all)
 		bool findAdd(K, V)(ref V[K] aa, in K key, void delegate(ref V) update)
 		{
 			auto p = key in aa;
-			if(p){
+			if(p) {
 				update(*p);
 				return true;
-			}else{
+			}else {
 				V value;
 				update(value);
 				aa[key] = value;
@@ -2637,7 +2615,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		uint[] toUints(in void[] data, ubyte filler=0)
 		{
 			import std.traits;
-			enum	unitSize	= ElementType!(typeof(return)).sizeof;
+			enum 	unitSize	= ElementType!(typeof(return)).sizeof;
 			const	dataLength	= data.length,
 				extLength	= dataLength.alignUp(unitSize);
 			return cast(uint[])((cast(ubyte[])data) ~ [ubyte(0)].replicate(extLength - dataLength));
@@ -2646,48 +2624,53 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		T[]	withoutDuplicates(alias pred = "a", T)(in T[] arr)
 		{
-		/*	auto getKey(in T item){ return unaryFun!pred(item); }
-		
-			bool[ReturnType!getKey] m;
-			T[] res;
-			auto app = appender(&res);
-			foreach(item; arr){
+			/*
+				auto getKey(in T item){ return unaryFun!pred(item); }
+					
+						bool[ReturnType!getKey] m;
+						T[] res;
+						auto app = appender(&res);
+						foreach(item; arr){
+							const key = getKey(item);
+							if(key !in m){
+								m[key] = true;
+								app ~= item;
+							}
+						}
+						return app[];
+			*/
+			
+				auto getKey(in T item) { return unaryFun!pred(item); }
+			
+				bool[ReturnType!getKey] m;
+				T[] res;
+				foreach(item; arr) {
 				const key = getKey(item);
-				if(key !in m){
-					m[key] = true;
-					app ~= item;
-				}
-			}
-			return app[];*/
-		
-			auto getKey(in T item){ return unaryFun!pred(item); }
-		
-			bool[ReturnType!getKey] m;
-			T[] res;
-			foreach(item; arr){
-				const key = getKey(item);
-				if(key !in m){
+				if(key !in m) {
 					m[key] = true;
 					res ~= item;
 				}
 			}
-			return res;
+				return res;
 		}
 		
 		
-		/* Ezek LDC-vel nem mennek!!!!
-		void appendUninitializedReserved(T)(ref T[] arr, size_t N = 1) {
-			auto length_p = cast(size_t*)(&arr);
-			*length_p += N;
-		}
-		
-		void appendUninitialized(T)(ref T[] arr, size_t N = 1) {
-			arr.reserve(arr.length + N);
-			auto length_p = cast(size_t*)(&arr);
-			*length_p += N;
-		}*/
+		/*
+			 Ezek LDC-vel nem mennek!!!!
+					void appendUninitializedReserved(T)(ref T[] arr, size_t N = 1) {
+						auto length_p = cast(size_t*)(&arr);
+						*length_p += N;
+					}
+					
+					void appendUninitialized(T)(ref T[] arr, size_t N = 1) {
+						arr.reserve(arr.length + N);
+						auto length_p = cast(size_t*)(&arr);
+						*length_p += N;
+					}
+		*/
 	}version(/+$DIDE_REGION st R/W+/all)
-	{//st R/W //////////////////////////////////////////////
+	{
+		//st R/W //////////////////////////////////////////////
 		
 		
 		T stRead(T)(ref ubyte[] st)
@@ -2699,9 +2682,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 		void stRead(T)(ref ubyte[] st, ref T res)
-		{
-			res = stRead!T(st);
-		}
+		{ res = stRead!T(st); }
 		
 		
 		T[] stReadArray(T)(ref ubyte[] st)
@@ -2714,9 +2695,10 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 		uint stReadSize(ref ubyte[] st)
-		{//read compressed 32bit
+		{
+			//read compressed 32bit
 			auto b = stRead!ubyte(st);
-			if(b&0x80){
+			if(b&0x80) {
 				uint s = b & 0x3f | (stRead!ubyte(st)<<8);
 				if(b&0x40) return s |= (stRead!ushort(st)<<16);
 				return s;
@@ -2725,16 +2707,19 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		void stWrite(T)(ref ubyte[] st, const T data)
 		{
-			/*auto siz = T.sizeof;
-			ubyte* dst = st.ptr+st.length;
-			st.length += siz;
-			memcpy(dst, &data, siz);*/
-		
+			/*
+				auto siz = T.sizeof;
+				ubyte* dst = st.ptr+st.length;
+				st.length += siz;
+				memcpy(dst, &data, siz);
+			*/
+					
 			st ~= (cast(ubyte*)&data)[0..T.sizeof];
 		}
 		
 		void stWriteSize(ref ubyte[] st, const uint s)
-		{//compressed 32bit
+		{
+			//compressed 32bit
 			if(s<0x80) stWrite(st, cast(ubyte)s);
 			if(s<0x4000) stWrite(st, cast(ushort)s | 0x8000);
 			if(s<0x4000_0000) stWrite(st, cast(ushort)s | 0xC000_0000);
@@ -2748,9 +2733,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		
 		void byteArrayAppend(T)(ref ubyte[] st, const T data)
-		{
-			st ~= (cast(ubyte*)&data)[0..T.sizeof];
-		}
+		{ st ~= (cast(ubyte*)&data)[0..T.sizeof]; }
 		
 		auto toBytes(T)(ref T data)
 		{ return (cast(ubyte*)&data)[0..T.sizeof]; }
@@ -2758,9 +2741,10 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		//todo: DIDE GotoError must show 5 lines up and down around the error.
 	}version(/+$DIDE_REGION byLineBlock+/all)
-	{// byLineBlock /////////////////////////////////////////////////
+	{
+		//byLineBlock /////////////////////////////////////////////////
 		
-		enum	DefaultLineBlockSize	=  1<<20,
+		enum 	DefaultLineBlockSize	=  1<<20,
 			MaxLineBlockSeekBack 	= 16<<10;
 		
 		struct FileBlock
@@ -2782,55 +2766,54 @@ version(/+$DIDE_REGION Numeric+/all)
 			{
 				File file;
 				size_t maxBlockSize, pos, size;
-		
+						
 				size_t actBlockSize;
-		
+						
 				bool empty() const
 				{ return pos>=size; }
-		
+						
 				auto front()
 				{
 					if(actBlockSize) return FileBlock(file, pos, actBlockSize); //already fetched
-		
+							
 					if(pos>=size) return FileBlock(file, size, 0); //eof
-		
+							
 					auto remaining = size-pos;
-		
+							
 					if(remaining<=maxBlockSize)
-					{
-						actBlockSize = remaining;
-					}
+					{ actBlockSize = remaining; }
 					else
 					{
 						auto endPos = pos + maxBlockSize;
-						const	seekBackSize	= min(maxBlockSize/2, MaxLineBlockSeekBack), // max 16K-val vissza, de csak a block 50%-ig.
+						const	seekBackSize	= min(maxBlockSize/2, MaxLineBlockSeekBack), //max 16K-val vissza, de csak a block 50%-ig.
 							seekBackLimit	= endPos-seekBackSize,
 							stepSize	= min(256, seekBackSize);
 						while(endPos > seekBackLimit)
 						{
 							auto idx = file.read(false, endPos-stepSize, stepSize)
 														 .retro.countUntil(0x0A);
-		
-							if(idx>=0){ //got a newline
+									
+							if(idx>=0) {
+								 //got a newline
 								actBlockSize = (endPos-idx)-pos;
 								break;
 							}
-		
+									
 							endPos -= stepSize; //try prev block...
 						}
-		
+								
 						if(!actBlockSize)
 						{
 							actBlockSize = maxBlockSize;
 							return FileBlock(file, pos, actBlockSize, true); //signal truncated with a true flag
 							//INFO("Unable to seek to a newline. Using maxBlockLength");
-		
+									
 						}
 					}
-		
+							
 					return FileBlock(file, pos, actBlockSize);
 				}
-		
+						
 				void popFront()
 				{
 					front; //make sure to seek
@@ -2838,72 +2821,69 @@ version(/+$DIDE_REGION Numeric+/all)
 					actBlockSize = 0;
 				}
 			}
-		
+					
 			assert(maxBlockSize>0);
-		
+					
 			auto res = TextFileBlockRange(file, maxBlockSize);
-			if(file.exists){
-				res.size = cast(size_t)(file.size);
-			}else{
-				WARN("File not found ", file);
-			}
-		
+			if(file.exists) { res.size = cast(size_t)(file.size); }else { WARN("File not found ", file); }
+					
 			return res;
 		}auto byLineBlock(string str, size_t maxBlockSize=DefaultLineBlockSize)
-		{//todo: egy kalap ala hozni a stringest meg a fileost
-		
+		{
+			//todo: egy kalap ala hozni a stringest meg a fileost
+					
 			static struct StringBlockRange
 			{
 				string str;
 				size_t maxBlockSize, pos;
 				auto size() const
 				{ return str.length; }
-		
+						
 				size_t actBlockSize;
-		
+						
 				bool empty() const
 				{ return pos>=size; }
-		
+						
 				auto front()
 				{
 					if(actBlockSize) return str[pos..pos+actBlockSize]; //already fetched
-		
+							
 					if(pos>=size) return "";
-		
+							
 					auto remaining = size-pos;
-		
+							
 					if(remaining<=maxBlockSize)
-					{
-						actBlockSize = remaining;
-					}
+					{ actBlockSize = remaining; }
 					else
 					{
 						auto endPos = pos + maxBlockSize;
-						const	seekBackSize	= min(maxBlockSize/2, MaxLineBlockSeekBack), // max 16K-val vissza, de csak a block 50%-ig.
+						const	seekBackSize	= min(maxBlockSize/2, MaxLineBlockSeekBack), //max 16K-val vissza, de csak a block 50%-ig.
 							seekBackLimit	= endPos-seekBackSize,
 							stepSize	= min(256, seekBackSize);
 						while(endPos > seekBackLimit)
 						{
 							auto idx = (cast(ubyte[])str[endPos-stepSize..endPos])
 												 .retro.countUntil(0x0A);
-		
-							if(idx>=0){ //got a newline
+									
+							if(idx>=0) {
+								 //got a newline
 								actBlockSize = (endPos-idx)-pos;
 								break;
 							}
-		
+									
 							endPos -= stepSize; //try prev block...
 						}
-		
-						if(!actBlockSize){ //truncated block
+								
+						if(!actBlockSize) {
+							 //truncated block
 							actBlockSize = maxBlockSize;
 						}
-		
+								
 					}
-		
+							
 					return str[pos..pos+actBlockSize];
 				}
-		
+						
 				void popFront()
 				{
 					front; //make sure to seek
@@ -2911,55 +2891,58 @@ version(/+$DIDE_REGION Numeric+/all)
 					actBlockSize = 0;
 				}
 			}
-		
+					
 			assert(maxBlockSize>0);
-		
+					
 			auto res = StringBlockRange(str, maxBlockSize);
-		
+					
 			return res;
-		}/*void testByLineBlock(){
-			auto file = File(tempPath, `testByLineBlocks.tmp`);
-			scope(exit) file.remove;
-		
-			RNG rng;
-			auto text = iota(10).map!(i => iota(rng(3)+(i==5 ? 30 : 2)).map!(j => j.text).join)
-													.join("\r\n");
-			text.saveTo(file);
-		
-			auto a = file.byLineBlock(12).map!readStr.array,
-					 b = file.readStr.byLineBlock(12).array;
-		
-			//writeln("text\n", text);
-		
-			//writeln("a\n", a.join('|'));
-			//writeln("b\n", b.join('|'));
-		
-			//writeln("a\n", a.map!"cast(ubyte[])a".array);
-			//writeln("b\n", b.map!"cast(ubyte[])a".array);
-		
-			enforce(a.join == text, "file.byLineBlocks fail1");
-			enforce(b.join == text, "string.byLineBlocks fail1");
-			enum h = 3496071129;
-			enforce(a.join('|').xxh == h, "file.byLineBlocks fail2");
-			enforce(b.join('|').xxh == h, "string.byLineBlocks fail2");
-		}*/
+		}/*
+			void testByLineBlock(){
+						auto file = File(tempPath, `testByLineBlocks.tmp`);
+						scope(exit) file.remove;
+					
+						RNG rng;
+						auto text = iota(10).map!(i => iota(rng(3)+(i==5 ? 30 : 2)).map!(j => j.text).join)
+																.join("\r\n");
+						text.saveTo(file);
+					
+						auto a = file.byLineBlock(12).map!readStr.array,
+								 b = file.readStr.byLineBlock(12).array;
+					
+						//writeln("text\n", text);
+					
+						//writeln("a\n", a.join('|'));
+						//writeln("b\n", b.join('|'));
+					
+						//writeln("a\n", a.map!"cast(ubyte[])a".array);
+						//writeln("b\n", b.map!"cast(ubyte[])a".array);
+					
+						enforce(a.join == text, "file.byLineBlocks fail1");
+						enforce(b.join == text, "string.byLineBlocks fail1");
+						enum h = 3496071129;
+						enforce(a.join('|').xxh == h, "file.byLineBlocks fail2");
+						enforce(b.join('|').xxh == h, "string.byLineBlocks fail2");
+					}
+		*/
 		
 	}
-
+	
 }version(/+$DIDE_REGION RNG+/all)
-{//RNG////////////////////////////////////
+{
+	//RNG////////////////////////////////////
 	version(/+$DIDE_REGION+/all)
 	{
 		struct RNG
 		{
 			auto seedStream = SeedStream_pascal(0x41974702);
-		
+					
 			ref uint seed()
 			{ return seedStream.seed; }
-		
+					
 			void randomize(uint seed)
 			{ this.seed = seed; }
-		
+					
 			void randomize()
 			{
 				long c;
@@ -2967,65 +2950,63 @@ version(/+$DIDE_REGION Numeric+/all)
 				c ^= thisThreadID;
 				seed = cast(uint)c*0x784921;
 			}
-		
+					
 			uint randomUint()
 			{
 				seedStream.popFront;
 				return seed;
 			}
-		
+					
 			int randomInt()
 			{
 				seedStream.popFront;
 				return int(seed);
 			}
-		
+					
 			float randomFloat()
 			{
 				seedStream.popFront;
 				return seed*0x1.0p-32;
 			}
-		
+					
 			uint random(uint n)
 			{
 				seedStream.popFront;
 				return (ulong(seed)*n)>>32;
 			}
-		
+					
 			int random(int n)
-			{
-				return int(random(uint(n)));
-			}
-		
+			{ return int(random(uint(n))); }
+					
 			ulong random(ulong n)
 			{
 				if(n<=0xFFFF_FFFF) return random(cast(uint)n);
-		
+						
 				return (ulong(randomUint)<<32 | randomUint)%n; //terribly slow
 			}
-		
+					
 			auto randomGaussPair()
 			{
 				float x1, x2, w;
-				do{
+				do {
 					x1 = randomFloat;
 					x2 = randomFloat;
 					w = x1*x1 + x2*x2;
 				}while(w>1);
 				w = sqrt((-2*log(w))/w);
-		
+						
 				return tuple(x1*w, x2*w);
 			}
-		
+					
 			auto randomGauss()
 			{ return randomGaussPair[0]; }
-		
+					
 			void randomFill(uint[] values)
 			{
 				foreach(ref uint v; values)
-					v = randomUint;
+				v = randomUint;
 			}
-		
+					
 			void randomFill(uint[] values, uint customSeed)
 			{
 				uint oldSeed = seed;
@@ -3033,8 +3014,8 @@ version(/+$DIDE_REGION Numeric+/all)
 				randomFill(values);
 				seed = oldSeed;
 			}
-		
-			// not good: disables default constructor. int opCall(int max){ return random(max); }
+					
+			//not good: disables default constructor. int opCall(int max){ return random(max); }
 		}
 		
 		RNG defaultRng; //Every thread get's its own, because of different QPC
@@ -3067,52 +3048,54 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ defaultRng.randomFill(values, customSeed); }
 		
 		
-		/+ Wonder what's this crap?!!
-		int getUniqueSeed(T)(in T ptr){ //gets a 32bit seed from a ptr and the current time
-			long cnt;	QueryPerformanceCounter(&cnt);
-			auto arr =	(cast(const void[])[ptr]) ~ (cast(const void[])[cnt]);
-			return arr.xxh_internal;
-		}+/
+		/+
+			 Wonder what's this crap?!!
+					int getUniqueSeed(T)(in T ptr){ //gets a 32bit seed from a ptr and the current time
+						long cnt;	QueryPerformanceCounter(&cnt);
+						auto arr =	(cast(const void[])[ptr]) ~ (cast(const void[])[cnt]);
+						return arr.xxh_internal;
+					}
+		+/
 		
-	}version(/+$DIDE_REGION+/all){
-		// a simple one from Delphi
+	}version(/+$DIDE_REGION+/all) {
+		//a simple one from Delphi
 		struct SeedStream
 		{
-			// https://en.wikipedia.org/wiki/Linear_congruential_generator
+			//https://en.wikipedia.org/wiki/Linear_congruential_generator
 			uint a, c;
-			uint seed; // modulo = 2^32 only
-		
+			uint seed; //modulo = 2^32 only
+					
 			enum empty = false; //infinite range
 			uint front() const
 			{ return seed; }
 			void popFront()
 			{ seed = seed * a + c; }
-		
+					
 			void test()
 			{
 				print("Testing SeedStream: a:", a, format!"(0x%x)"(a), "  c:", c, format!"(0x%x)"(c));
 				BitArray ba;
 				ba.length = 1L << 32;
-		
+						
 				{
 					auto s = this; s.seed=0;
 					print("First few values:", s.take(10).map!"a.to!string(10)".join(", "));
 					print("             hex:", s.take(10).map!"a.to!string(16)".join(", "));
 				}
-		
+						
 				print("seed = ", seed);
 				ba[] = false;
 				auto ss = this;
-				auto act(){ return ss.front; }
+				auto act() { return ss.front; }
 				long cnt = 0;
-				while(!ba[act]){
+				while(!ba[act]) {
 					ba[act] = true;
 					ss.popFront;
 					cnt++;
 					if((cnt & 0xFFFFFF)==0) write("\b\b\b", cnt>>24);
 				}
 				print;
-				long firstZero = -1; foreach(idx, b; ba) if(!b){ firstZero = idx; break; }
+				long firstZero = -1; foreach(idx, b; ba) if(!b) { firstZero = idx; break; }
 				print("cycle length =", cnt.format!"0x%x", "  first false at:", firstZero);
 			}
 		}
@@ -3120,10 +3103,10 @@ version(/+$DIDE_REGION Numeric+/all)
 		SeedStream SeedStream_numericalRecipes(uint seed)
 		{ return SeedStream(   1664525, 1013904223, seed); }
 		SeedStream SeedStream_pascal	       (uint seed)
-		{ return SeedStream( 0x8088405,	         1, seed); }
+		{ return SeedStream(0x8088405,	         1, seed); }
 		SeedStream SeedStream_borlandC	       (uint seed)
-		{ return SeedStream(  22695477,	         1, seed); }
-	
+		{ return SeedStream(22695477,	         1, seed); }
+			
 	}
 }version(/+$DIDE_REGION Cryptography+/all)
 {
@@ -3131,72 +3114,69 @@ version(/+$DIDE_REGION Numeric+/all)
 	alias norx6441 = norx!(64, 4, 1);
 	
 	struct norx(int w/*wordSize*/, int l/*loopCnt*/, int p/*parallelCnt*/)
-	{//! norx /////////////////////////////////////
-		version(/+$DIDE_REGION+/all){
-		private static:
-			static assert(w.among(32, 64) && l.inRange(1, 63) && p==1);
-		
-			//word type	 ror offsets
-			static if(w==32){ alias T = uint ;	 enum sh = [8, 11, 16, 31];	 }
-			static if(w==64){ alias T = ulong;	 enum sh = [8, 19, 40, 63];	 }
-		
-			enum t = w*4;	//tagSize in bits
-			enum r = T.sizeof*12;	//S[0..12] size in bytes
-		
-			enum instance = format!"NORX%d-%d-%d"(w, l, p);
-		
-			//some utils
-		
-			void fill(T)(T[] arr, T base=0)
+	{
+		//! norx /////////////////////////////////////
+		version(/+$DIDE_REGION+/all) {
+			private static:
+				static assert(w.among(32, 64) && l.inRange(1, 63) && p==1);
+			
+				//word type	 ror offsets
+				static if(w==32) { alias T = uint;	 enum sh = [8, 11, 16, 31];	 }
+				static if(w==64) { alias T = ulong;	 enum sh = [8, 19, 40, 63];	 }
+			
+				enum t = w*4;	//tagSize in bits
+				enum r = T.sizeof*12;	//S[0..12] size in bytes
+			
+				enum instance = format!"NORX%d-%d-%d"(w, l, p);
+			
+				//some utils
+			
+				void fill(T)(T[] arr, T base=0)
 			{ foreach(i, ref a; arr) a = cast(T)(i+base); }
-			string dump(in T[16] s)
+				string dump(in T[16] s)
 			{ return format!"%(%.8X %)"(s); }
-		
-		
-			//low level functions
-		
-			void G(ref T a, ref T b, ref T c, ref T d)
+			
+			
+				//low level functions
+			
+				void G(ref T a, ref T b, ref T c, ref T d)
 			{
 				import core.bitop : ror;
-		
+						
 				static T H(in T x, in T y)
-				{  return (x^y)^((x&y)<<1);  }
-		
+				{ return (x^y)^((x&y)<<1);  }
+						
 				a = H(a, b);	 d = ror((d^a), sh[0]);	 //aabdda
 				c = H(c, d);	 b = ror((b^c), sh[1]);	 //ccdbbc
 				a = H(a, b);	 d = ror((d^a), sh[2]);	 //aabdda
 				c = H(c, d);	 b = ror((b^c), sh[3]);	 //ccdbbc
 			}
-		
-			void col(ref T[16] S)
+			
+				void col(ref T[16] S)
 			{
 				static foreach(i; 0..4)
-					G(S[0+i], S[4+i], S[8+i], S[12+i]);
+				G(S[0+i], S[4+i], S[8+i], S[12+i]);
 			}
-		
-			void diag(ref T[16] S)
+			
+				void diag(ref T[16] S)
 			{
 				G(S[0], S[5], S[10], S[15]);
 				G(S[1], S[6], S[11], S[12]);
-				G(S[2], S[7], S[ 8], S[13]);
-				G(S[3], S[4], S[ 9], S[14]);
+				G(S[2], S[7], S[8], S[13]);
+				G(S[3], S[4], S[9], S[14]);
 			}
-		
-			void F(int l, ref T[16] S)
-			{
-				foreach(i; 0..l){
-					col(S); diag(S);
-				}
-			}
-		
-			enum u = uCalc;  auto	uCalc()
+			
+				void F(int l, ref T[16] S)
+			{ foreach(i; 0..l) { col(S); diag(S); } }
+			
+				enum u = uCalc;  auto	uCalc()
 			{ T[16] S;  fill(S);	F(2, S);  return S; }
-		
-			static assert(u[15] == (w==32 ? 0xD7C49104 : 0x86026AE8536F1501), "norx%d F() test failed".format(w));
-		
-			// high level functions
-		
-			const(void)[] pad(size_t len)(const(void)[] arr)
+			
+				static assert(u[15] == (w==32 ? 0xD7C49104 : 0x86026AE8536F1501), "norx%d F() test failed".format(w));
+			
+				//high level functions
+			
+				const(void)[] pad(size_t len)(const(void)[] arr)
 			{
 				if(arr.length >= len) return arr;
 				ubyte[] e; e.length = len-arr.length;
@@ -3204,27 +3184,28 @@ version(/+$DIDE_REGION Numeric+/all)
 				e.back |= 0x80;
 				return arr ~ e;
 			}
-		
-			T[4] prepareKey(in void[] K)
+			
+				T[4] prepareKey(in void[] K)
 			{
 				enum byteCnt = T[4].sizeof;
-		
+						
 				const(void)[] arr = K; //work on this slice
-		
-				if(arr.length > byteCnt){ //longer than needed: set the last dword to the hast of the remaining part.
+						
+				if(arr.length > byteCnt) {
+					 //longer than needed: set the last dword to the hast of the remaining part.
 					uint hash = arr[byteCnt-4..$].xxh32; //todo: ellenorizni ezt es az xxh-t is. Lehet, hogy le kene cserelni norx-ra.
 					arr = arr[0..byteCnt-4] ~ cast(void[])[hash];
 				}
-		
+						
 				arr = pad!byteCnt(arr); //pad if smaller
-		
+						
 				T[4] key;  key[] = (cast(T[])arr)[0..4];
 				return key;
 			}
-		
-		}version(/+$DIDE_REGION+/all){
-		private static:
-			T[16] initialize(in T[4] k, in T[4] n)
+			
+		}version(/+$DIDE_REGION+/all) {
+			private static:
+				T[16] initialize(in T[4] k, in T[4] n)
 			{
 				T[16] S = n ~ k ~ u[8..16];
 				S[12..16] ^= [w, l, p, t].to!(T[])[];
@@ -3232,27 +3213,27 @@ version(/+$DIDE_REGION Numeric+/all)
 				S[12..16] ^= k[];
 				return S;
 			}
-		
-			void absorb(ref T[16] S, const(void)[] X, in T v/*domain constant*/)
+			
+				void absorb(ref T[16] S, const(void)[] X, in T v/*domain constant*/)
 			{
-				for(; X.length; X = X[r..$]){
+				for(; X.length; X = X[r..$]) {
 					X = pad!r(X);
-		
+							
 					S[15] ^= v;
 					F(l, S);
 					S[0..12] ^= (cast(T[]) X[0..r])[];
 				}
 			}
-		
-			ubyte[] encrypt(ref T[16] S, const(void)[] M, in T v/*domain constant*/)
+			
+				ubyte[] encrypt(ref T[16] S, const(void)[] M, in T v/*domain constant*/)
 			{
 				void[] C; //ciphertext
 				C.reserve(M.length);
-		
-				for(; M.length; M = M[r..$]){
+						
+				for(; M.length; M = M[r..$]) {
 					const blockLen = min(M.length, r);
 					S[15] ^= v; F(l, S);
-		
+							
 					if(blockLen == r)
 					{
 						S[0..12] ^= (cast(T[]) M[0..r])[];
@@ -3265,23 +3246,24 @@ version(/+$DIDE_REGION Numeric+/all)
 						C ~= (cast(void[]) S)[0..blockLen];
 					}
 				}
-		
+						
 				return cast(ubyte[])C;
 			}
-		
-			ubyte[] decrypt(ref T[16] S, const(void)[] C, in T v/*domain constant*/)
+			
+				ubyte[] decrypt(ref T[16] S, const(void)[] C, in T v/*domain constant*/)
 			{
 				enum r = T.sizeof*12;
-		
+						
 				void[] M; //reconstructed message
 				M.reserve(C.length);
-		
-				while(C.length){
+						
+				while(C.length) {
 					const blockLen = min(C.length, r);
 					S[15] ^= v; F(l, S);
-		
+							
 					if(blockLen == r)
-					{//full block
+					{
+						//full block
 						S[0..12] ^= (cast(T[])C[0..r])[];
 						M ~= S[0..12];
 						S[0..12] = (cast(T[])C[0..r])[];
@@ -3293,14 +3275,14 @@ version(/+$DIDE_REGION Numeric+/all)
 						M ~= MLast;
 						S[0..12] ^= (cast(T[]) pad!r(MLast))[];
 					}
-		
+							
 					C = C[blockLen..$];
 				}
-		
+						
 				return cast(ubyte[])M;
 			}
-		
-			ubyte[] finalize(ref T[16] S, in T[4] k, in T v/*domain constant*/)
+			
+				ubyte[] finalize(ref T[16] S, in T[4] k, in T v/*domain constant*/)
 			{
 				S[15] ^= v;
 				F(l, S);
@@ -3309,15 +3291,15 @@ version(/+$DIDE_REGION Numeric+/all)
 				S[12..16] ^= k[];
 				return (cast(ubyte[]) S)[$-(t/8)..$].dup;  //kibaszott dup nagyon kell ide
 			}
-		
-			auto testVector()
+			
+				auto testVector()
 			{
-				struct Res{
+				struct Res {
 					ubyte[4*T.sizeof] K, N;
 					ubyte[128] A, M, Z;
 				}
 				Res res;
-				with(res){
+				with(res) {
 					fill(K);
 					fill(N, 0x20);
 					fill(A);
@@ -3326,12 +3308,12 @@ version(/+$DIDE_REGION Numeric+/all)
 				}
 				return res;
 			}
-		
-		}version(/+$DIDE_REGION+/all){
-		private static:
-			auto crypt(bool doTests=false, bool doDecrypt=false)(const(void)[] K, const(void)[] N, const(void)[] A, const(void)[] M, const(void)[] Z)
+			
+		}version(/+$DIDE_REGION+/all) {
+			private static:
+				auto crypt(bool doTests=false, bool doDecrypt=false)(const(void)[] K, const(void)[] N, const(void)[] A, const(void)[] M, const(void)[] Z)
 			{
-		
+						
 				static void test(int idx, string caption, T, string file=__FILE__, int line=__LINE__)(const T[] a)
 				{
 					static if(doTests)
@@ -3349,7 +3331,8 @@ version(/+$DIDE_REGION Numeric+/all)
 								"6C E9 4C B5 48 B2 0F ED 7B 68 C6 AC 60 AC 4C B5 EB B1 F0 9A EC 5A 75 0E CF 50 EC 0E 64 93 8B F2 40 17 A4 FF 06 84 F8 08 A6 7C 19 6C 31 A0 AF 12 56"
 								~" 9B E5 F7 C5 6A D3 BC AC 88 DA 36 86 57 5F 93 43 96 8D A2 20 77 EE CC E7 D6 63 17 49 08 A3 F7 3C 9E 9A C1 49 B5 CE 6B E6 9C 9E 31 7C D7 E7 E8 0C"~
 								" 85 69 97 74 02 24 41 3A E0 64 A2 5A 81 08 B8 D3 A6 85 92 74 C7 65 86 E2 9C 27 ED 11 FB 71 95",
-								"D5 54 E4 BC 6B 5B B7 89 54 77 59 EA CD FF CF 47"][idx];
+								"D5 54 E4 BC 6B 5B B7 89 54 77 59 EA CD FF CF 47"
+							][idx];
 						}
 						else static if(instance=="NORX64-4-1")
 						{
@@ -3368,7 +3351,8 @@ version(/+$DIDE_REGION Numeric+/all)
 								"C0 81 6E 50 8A E4 A0 50 0B 93 38 7B BB AB C2 41 AC 42 38 7E F5 E8 BF 0E C3 82 6C ED E1 66 A1 D5 CA A3 E8 D6 2C D6 41 B3 FA F2 AA 2A DD E3"~
 								" E5 ED 0A 13 BD 8B 96 D5 F0 FB 7F E3 9C A7 80 95 31 75 E2 45 BC 3E 53 4B 80 0E 96 46 77 1F 13 EA 40 85 CB 3E 26 7F 10 6F 5F 17 A0 64 FF 23 4A"~
 								" 02 7C 64 4B E7 86 65 DB 1C 46 A4 B0 1A 4F BF 52 76 DF BD 30 EB BF B8 84 66 F8 DC 89 7A 78 16 D0 D0 70 D8",
-								"D1 F2 FA 33 05 A3 23 76 E2 3A 61 D1 C9 89 30 3F BF BD 93 5A A5 5B 17 E4 E7 25 47 33 C4 73 40 8E"][idx];
+								"D1 F2 FA 33 05 A3 23 76 E2 3A 61 D1 C9 89 30 3F BF BD 93 5A A5 5B 17 E4 E7 25 47 33 C4 73 40 8E"
+							][idx];
 						}
 						else
 						{
@@ -3376,81 +3360,77 @@ version(/+$DIDE_REGION Numeric+/all)
 							return;
 						}
 						auto actual = format("%(%."~(T.sizeof*2).text~"X %)", a);
-		
+								
 						enforceDiff(expected, actual, format!"Test failed %s %s"(instance, caption), file, line);
 					}
 				}
-		
-				struct Res{
+						
+				struct Res {
 					ubyte[] data;
 					ubyte[] tag;
 					alias data this;
 				}
 				Res res;
-		
+						
 				const k = prepareKey(K),
 							n = prepareKey(N);
 				auto S = initialize(k, n);	 test!(0, "S after initialize")(S);
 								 absorb  (S, A, 1);	 test!(1, "S after header"    )(S);
-		
-				static if(doDecrypt){
-					res.data  = decrypt (S, M, 2);
-				}else{
-					res.data  = encrypt (S, M, 2);  test!(2, "S after message"   )(S);
-				}
-		
+						
+				static if(doDecrypt) { res.data  = decrypt (S, M, 2); }else { res.data  = encrypt (S, M, 2);  test!(2, "S after message"   )(S); }
+						
 									 absorb  (S, Z, 4);	 test!(3, "S after trailer"	 )(S);
 				res.tag  = finalize(S, k, 8);	 test!(4, "S after finalize"	 )(S);
-		
-				if(doTests){
+						
+				if(doTests) {
 					test!(5, "cipherText")(res.data);
 					test!(6, "tag"       )(res.tag);
 				}
-		
+						
 				return res;
 			}
-		
-		}version(/+$DIDE_REGION+/all){
-		public static: // public declarations ////////////////////////////////////
-		
-			auto encrypt(in void[] key, in void[] nonce, in void[] header, in void[] message, in void[] trailer)
+			
+		}version(/+$DIDE_REGION+/all) {
+			public static: //public declarations ////////////////////////////////////
+			
+				auto encrypt(in void[] key, in void[] nonce, in void[] header, in void[] message, in void[] trailer)
 			{ return crypt!(false, false)(key, nonce, header, message, trailer); } //todo: tag checking
-			auto decrypt(in void[] key, in void[] nonce, in void[] header, in void[] crypted, in void[] trailer)
+				auto decrypt(in void[] key, in void[] nonce, in void[] header, in void[] crypted, in void[] trailer)
 			{ return crypt!(false, true )(key, nonce, header, crypted, trailer); } //todo: tag checking
-		
-			//shorthands without header and trailer
-			auto encrypt(in void[] key, in void[] nonce, in void[] message)
+			
+				//shorthands without header and trailer
+				auto encrypt(in void[] key, in void[] nonce, in void[] message)
 			{ return encrypt(key, nonce, [], message, []); }
-			auto decrypt(in void[] key, in void[] nonce, in void[] crypted)
+				auto decrypt(in void[] key, in void[] nonce, in void[] crypted)
 			{ return decrypt(key, nonce, [], crypted, []); }
-		
-			bool test()
+			
+				bool test()
 			{
 				const tv = testVector;
 				with(tv)
 				{
 					//do the detailed tests
 					crypt!(true, false)(K, N, A, M, Z);
-		
+							
 					foreach(len; [48, 0, 128, 47, 49])
 					{
 						const X = M[0..len];
 						auto enc = encrypt(K, N, X, X, X);
 						const Y = enc.data;
 						auto dec = decrypt(K, N, X, Y, X);
-		
+								
 						auto expected	= format("%(%.2X %)", X),
 								 actual	= format("%(%.2X %)", dec.data);
 						enforceDiff(expected, actual, "Encrypt/Decrypt test failed. len=%d".format(len));
 					}
-		
+							
 				}
-		
+						
 				//LOG("All tests \33\12passed\33\7.");
 				return true;
 			}
-			
-			void benchmark()
+				
+				void benchmark()
 			{
 				const MB = 100;
 				auto plainText = iota((1<<(20-2))*MB).array;
@@ -3468,52 +3448,51 @@ version(/+$DIDE_REGION Numeric+/all)
 				auto t4 = QPS;
 				print("comparing");
 				enforce(cast(ubyte[])plainText == cast(ubyte[])dec);
-			
+							
 				print("MB/s: enc:", MB/(t1-t0), "dec:", MB/(t2-t1), "xxh:", MB/(t3-t2), "crc32:", MB/(t4-t3));
 			}
-		
-			shared static this(){
-				test;
-			}
 			
+				shared static this() { test; }
+				
 		}
 	}
 }version(/+$DIDE_REGION Signal p.+/all)
-{//Signal processing /////////////////////////////
-	version(/+$DIDE_REGION+/all){
+{
+	//Signal processing /////////////////////////////
+	version(/+$DIDE_REGION+/all) {
 		float[] gaussianBlur(float[] a, int kernelSize)
 		{
 			//http://dev.theomader.com/gaussian-kernel-calculator/
 			//todo: refactor this
-		
-			float g3(int i){
-			 return	(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.27901f +
-				a[i]*0.44198f;
+					
+			float g3(int i) {
+				 return	(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.27901f +
+					a[i]*0.44198f;
 			}
-		
-			float g5(int i){
+					
+			float g5(int i) {
 				return	(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.06136f +
 					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.24477f +
 					a[i]*0.38774f;
 			}
-		
-			float g7(int i){
+					
+			float g7(int i) {
 				return	(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.00598f +
 					(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060626f +
 					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241843f +
 					a[i]*0.383103f;
 			}
-		
-			float g9(int i){
+					
+			float g9(int i) {
 				return	(a[max(i-5, 0)]+a[min(i+5, $-1)])*0.000229f +
 					(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.005977f +
 					(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060598f +
 					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241732f +
 					a[i]*0.382928f;
 			}
-		
+					
 			float delegate(int) fv;
-			switch(kernelSize){
+			switch(kernelSize) {
 				case 1: return a;
 				case 3: fv = &g3; break;
 				case 5: fv = &g5; break;
@@ -3521,12 +3500,13 @@ version(/+$DIDE_REGION Numeric+/all)
 				case 9: fv = &g9; break;
 				default: enforce(0, "Unsupported kernel size "~kernelSize.text);
 			}
-		
+					
 			return iota(a.length.to!int).map!(i => fv(i)).array;
 		}
 		
 		class ResonantFilter
-		{//https://www.music.mcgill.ca/~gary/307/week2/filters.html
+		{
+			//https://www.music.mcgill.ca/~gary/307/week2/filters.html
 			float b0, b1, b2, a1,	a2;
 			float x, x1, x2, y, y1, y2;
 			
@@ -3538,7 +3518,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			
 			void	setup(float rate, float q)
 			{
-				//	enforce(q.inRange(0, 1) && rate.inRange(0, 1));
+				//enforce(q.inRange(0, 1) && rate.inRange(0, 1));
 				a1 = -2*q*cos(2*PIf*rate);
 				a2 = q^^2;
 				b0 = (1-a2)*.5f;
@@ -3569,15 +3549,15 @@ version(/+$DIDE_REGION Numeric+/all)
 				return res;
 			}
 		}
-	
-	}version(/+$DIDE_REGION+/all){
-	
+			
+	}version(/+$DIDE_REGION+/all) {
+			
 		T[] derived(T)(in T[] arr)
 		{
 			if(arr.empty) return [];
-			T[] res;  res.reserve(arr.length);
-			T last = arr[0];
-			foreach(a; arr){
+			T[] res;	res.reserve(arr.length);
+			T last =	arr[0];
+			foreach(a; arr) {
 				res ~= a-last;
 				last = a;
 			}
@@ -3593,14 +3573,14 @@ version(/+$DIDE_REGION Numeric+/all)
 			IV[] res;
 			foreach(i; 0..arr.length.to!int-1)
 			{
-				static if(positive){
+				static if(positive) {
 					if(arr[i]<=0 && arr[i+1]>0)
 					{
 						auto d = arr[i+1]-arr[i];
 							if(d>=minDelta) res ~= IV(i, d);
 					}
 				}
-				static if(negative){
+				static if(negative) {
 					if(arr[i]>=0 && arr[i+1]<0)
 					{
 						auto d = arr[i+1]-arr[i];
@@ -3618,29 +3598,29 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		//todo: implement mean for ranges
 		typeof(T.init/1) mean(T)(in T[] a)
-		{
-			return a.sum/a.length;
-		}
+		{ return a.sum/a.length; }
 		
-		/*auto auto mean(R) (R r) if(isInputRange!R && !isInfinite!R && is(typeof(r.front + r.front))){
-		}
-		
-		auto auto mean(R, E) (R r, E seed) if(isInputRange!R && !isInfinite!R && is(typeof(seed = seed + r.front))){
-		}*/
+		/*
+			auto auto mean(R) (R r) if(isInputRange!R && !isInfinite!R && is(typeof(r.front + r.front))){
+					}
+					
+					auto auto mean(R, E) (R r, E seed) if(isInputRange!R && !isInfinite!R && is(typeof(seed = seed + r.front))){
+					}
+		*/
 		
 		
 		///	returns 1.0 if all bytes are the same
-		//	common values: 0.5 for d source files, 0.25 for .exe, 0.05 for jpg, zip, below 0.01 for png
+		//common values: 0.5 for d source files, 0.25 for .exe, 0.05 for jpg, zip, below 0.01 for png
 		float calcRedundance(in void[] data)
 		{
 			int[8] bins;
-		
+					
 			foreach(b; cast(ubyte[])data)
-				foreach(i; 0..8)
-					bins[i] += (b>>i)&1;
-		
+			foreach(i; 0..8)
+			bins[i] += (b>>i)&1;
+					
 			auto invLen = 1.0f / data.length.to!int;
-		
+					
 			return sqrt(bins[].map!(b => sqr(b*invLen-0.5f)).sum * 0.5f);
 		}
 		
@@ -3654,40 +3634,41 @@ version(/+$DIDE_REGION Numeric+/all)
 			return sd;
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		
 		struct BinarySignalSmoother
 		{
-			private{
+			private {
 				int outSameCnt;
 				bool actOut, lastOut, lastIn;
 			}
-		
+					
 			bool process(bool actIn, int N=2)
 			{
 				if(outSameCnt>=N-1)
-					actOut = lastIn!=actIn ? !actOut : actIn;
-		
+				actOut = lastIn!=actIn ? !actOut : actIn;
+						
 				outSameCnt	= lastOut==actOut ? outSameCnt+1 : 0;
 				lastOut	= actOut;
 				lastIn  	= actIn;
 				return actOut;
 			}
-		
+					
 			@property bool output() const
 			{ return actOut; }
-		
+					
 			static void selfTest(int N=2)()
-			{//todo: unittest
+			{
+				//todo: unittest
 				BinarySignalSmoother bss;
-		
+						
 				const input = "..1.1.1..1.1.11.1.1..111111..11..111..111.1........1...11...1.11111111.1111.1";
 				auto output = input.map!(c => bss.process(c=='1', N) ? '1' : '.').array;
-		
+						
 				writeln("----");
 				writeln(input);
 				writeln(output);
-		
+						
 				BinarySignalSmootherNew!N bss2;
 				auto output2 = input.map!(c => bss2.process(c=='1') ? '1' : '.').array;
 				writeln(output2);
@@ -3695,35 +3676,35 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 		struct BinarySignalSmootherNew(int N)
-		{//different algo, also slower
+		{
+			//different algo, also slower
 			private bool[N] input, output;
-		
+					
 			bool process(bool newInput)
 			{
-		
+						
 				enum N = 15;
-		
+						
 				input[] = newInput ~ input[0..$-1];
-		
+						
 				const o1 = output[].all, o0 = !output[].any, oStable = o0 || o1;
-		
+						
 				bool newOutput;
 				if(oStable)
-				{ //output is stable so it's possible to change it now
+				{
+					 //output is stable so it's possible to change it now
 					const i1 = input[].all, i0 = !input[].any, iStable = i0 || i1;
 					newOutput = iStable 	? i1 	//input is stable, so update output
 						: !output[0] 	/+input is diverging, just toggle the output on and off+/;
 				}
 				else
-				{
-					newOutput = output[0];
-				}
-		
+				{ newOutput = output[0]; }
+						
 				output[] = newOutput ~ output[0..$-1];
-		
+						
 				return newOutput;
 			}
-		
+					
 		}
 		
 	}
@@ -3732,31 +3713,33 @@ version(/+$DIDE_REGION Numeric+/all)
 version(/+$DIDE_REGION Containers+/all)
 {
 	struct SparseArray(K, V, V Def=V.init)
-	{// SparseArray ///////////////////////////////////////////////////////////
-		version(/+$DIDE_REGION+/all){
+	{
+		//SparseArray ///////////////////////////////////////////////////////////
+		version(/+$DIDE_REGION+/all) {
 			//todo: bitarray-ra megcsinalni a bool-t. Array!bool
 			K[] keys;
 			V[] values;
-		
+					
 			V def = Def; //can overwrite if needed
-		
-			/*  this(){ clear; }*/
-		
+					
+			/*this(){ clear; }*/
+					
 			void clear()
 			{ keys = []; values = []; }
-		
+					
 			auto get(int key) const
 			{
 				auto bnd = keys.assumeSorted.lowerBound(key+1);
 				return bnd.length ? values[bnd.length-1] : def;
 			}
-		
+					
 			void append_unsafe(in K key, in V value)
-			{ //unsafe way to append
-				keys	~= key  ;
+			{
+				 //unsafe way to append
+				keys	~= key;
 				values	~= value;
 			}
-		
+					
 			void set(in K key, in V value)
 			{
 				if(keys.length && key>keys.back)
@@ -3765,28 +3748,27 @@ version(/+$DIDE_REGION Containers+/all)
 					if(values.back != value) append_unsafe(key, value);
 					return;
 				}
-		
+						
 				auto lo = keys.assumeSorted.lowerBound(key);
 				auto hi = keys[lo.length..$];
-		
+						
 				if(hi.length && keys[$-hi.length] == key) hi = hi[1..$]; //if the key exists
-		
+						
 				if(!lo.length ||	values[lo.length-1] !=	value)
-				{//must insert value in the middle
+				{
+					//must insert value in the middle
 					keys	= keys	[0..lo.length] ~ key	~ keys	[$-hi.length..$];
 					values	= values[0..lo.length] ~ value	~ values[$-hi.length..$];
 				}
 				else
 				{
 					if(lo.length && hi.length && values[lo.length-1]==values[$-hi.length])
-					{
-						hi = hi[1..$] /+the 2 side of the hole is the same. Keep the left one only.+/;
-					}
+					{ hi = hi[1..$] /+the 2 side of the hole is the same. Keep the left one only.+/; }
 					keys	= keys  [0..lo.length] ~ keys  [$-hi.length..$];
 					values	= values[0..lo.length] ~ values[$-hi.length..$];
 				}
 			}
-		
+					
 			auto opIndex(in K key) const
 			{ return get(key); }
 			auto opIndexAssign(in V value, in K key)
@@ -3800,16 +3782,16 @@ version(/+$DIDE_REGION Containers+/all)
 			bool isCompact() const
 			{
 				foreach(i; 1..keys.length)
-					if(keys[i-1]>=keys[i] || values[i-1]==values[i]) return false;
-		
+				if(keys[i-1]>=keys[i] || values[i-1]==values[i]) return false;
+						
 				return true;
 			}
-		
+					
 			void compact()
 			{
 				if(isCompact) return;
 				
-				K[] newKeys  ; newKeys  .reserve(keys.length);
+				K[] newKeys; newKeys  .reserve(keys.length);
 				V[] newValues; newValues.reserve(values.length);
 				K lastKey;
 				V lastValue;
@@ -3821,15 +3803,15 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				
 				add(keys[0], values[0]);
-		
+						
 				foreach(i; 1..keys.length)
 				{
 					const k = keys[i], v = values[i];
 					if(k >= lastKey && v != lastValue)
-						add(k, v);
+					add(k, v);
 				}
 				
-				keys	= newKeys  ;
+				keys	= newKeys;
 				values	= newValues;
 			}
 			
@@ -3837,8 +3819,8 @@ version(/+$DIDE_REGION Containers+/all)
 			{
 				enum N = 5;
 				SparseArray!(int, ubyte) sa;
-				auto dump(){ return iota(N).map!(i => sa[i].text).join; }
-			
+				auto dump() { return iota(N).map!(i => sa[i].text).join; }
+							
 				 assert(dump == "00000");
 				sa[3] = 1;	 assert(dump == "00011");
 				sa[4] = 2;	 assert(dump == "00012");
@@ -3851,7 +3833,7 @@ version(/+$DIDE_REGION Containers+/all)
 				sa[2] = 9;	 assert(dump == "91939");
 				sa[1] = 9;	 assert(dump == "99939" && sa.isCompact);
 				sa[3] = 9;	 assert(dump == "99999" && sa.isCompact);
-			
+							
 				sa.clear;
 				sa.append_unsafe(1, 1);
 				sa.append_unsafe(2, 1);
@@ -3862,21 +3844,22 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 		}
 	}struct CircBuf(size_type, size_type cap)
-	{// CircBuf class ///////////////////////////////////////////////////////////////
-		version(/+$DIDE_REGION+/all){
+	{
+		//CircBuf class ///////////////////////////////////////////////////////////////
+		version(/+$DIDE_REGION+/all) {
 			//size_type: for debugClient communication, it must be 32bit because it communicates with debugClient
-		
+					
 			size_type tail, head;
 			ubyte[cap] buf;
-		
+					
 			private auto truncate(size_type x) const
 			{
 				static if(cap&(cap-1))
-					return x % cap;
+				return x % cap;
 				else
-					return x & (cap-1);
+				return x & (cap-1);
 			}
-		
+					
 			auto length()	const 
 			{ return head-tail; }
 			bool empty()	const 
@@ -3887,15 +3870,16 @@ version(/+$DIDE_REGION Containers+/all)
 			{ return length; }
 			auto canStore()	const 
 			{ return capacity-length; }
-		
+					
 			bool store(void* src, size_type srcLen)
 			{
 				if(srcLen>canStore) return false;
-		
+						
 				auto o = head % capacity;
 				auto fullLen = srcLen;
 				if(o+srcLen>=capacity)
-				{//multipart
+				{
+					//multipart
 					auto i = capacity-o;
 					memcpy(&(buf[o]), src, i);
 					o = 0;
@@ -3903,27 +3887,26 @@ version(/+$DIDE_REGION Containers+/all)
 					srcLen -= i;
 				}
 				if(srcLen>0)
-				{
-					memcpy(&(buf[o]), src, srcLen);
-				}
-		
+				{ memcpy(&(buf[o]), src, srcLen); }
+						
 				//advance in one step
 				head += fullLen; //no atomic needed as one writes and the other reads
-		
+						
 				return true;
 			}
-		
+					
 			bool store(void[] data)
 			{ return store(data.ptr, cast(size_type)data.length); }
-
+			
 			bool get(void* dst, size_type dstLen)
 			{
 				if(dstLen>canGet) return false;
-		
+						
 				auto o = truncate(tail);
 				auto fullLen = dstLen;
 				if(o+dstLen>=capacity)
-				{//multipart
+				{
+					//multipart
 					auto i = capacity-o;
 					memcpy(dst, &(buf[o]), i);
 					o = 0;
@@ -3931,16 +3914,14 @@ version(/+$DIDE_REGION Containers+/all)
 					dstLen -= i;
 				}
 				if(dstLen>0)
-				{
-					memcpy(dst, &(buf[o]), dstLen);
-				}
-		
+				{ memcpy(dst, &(buf[o]), dstLen); }
+						
 				//advance in one step
 				tail += fullLen; //no atomic needed as one writes and the other reads
-		
+						
 				return true;
 			}
-		
+					
 			ubyte[] getBytes(size_type dstLen)
 			{
 				ubyte[] res;
@@ -3955,16 +3936,17 @@ version(/+$DIDE_REGION Containers+/all)
 				void doTest(uint N)()
 				{
 					CircBuf!(uint, N) cb;
-			
+								
 					RNG rng;
 					ubyte[] orig;  foreach(i;1..20) orig ~= cast(ubyte)i;
 					ubyte[] src = orig.dup, dst;
 					while(1)
 					{
-						if(src.empty && cb.empty)break;
+						if(src.empty && cb.empty) break;
 						//string s;
 						if(random(2))
-						{//store
+						{
+							//store
 							uint i = rng.random(min(cb.canStore+1, cast(uint)src.length+1));
 							ubyte[] buf;
 							foreach(a; 0..i) { buf ~= src[0]; src = src[1..$]; }
@@ -3972,7 +3954,8 @@ version(/+$DIDE_REGION Containers+/all)
 							assert(cb.store(buf));
 						}
 						else
-						{//get
+						{
+							//get
 							uint i = rng.random(cb.canGet+1);
 							auto buf = cb.getBytes(i);
 							assert(buf.length==i);
@@ -3983,49 +3966,50 @@ version(/+$DIDE_REGION Containers+/all)
 					}
 					assert(orig==dst, "Fatal Error in CircBuff.");
 				}
-			
+							
 				doTest!4; doTest!5; //test bo the & and the % case
 			}
 		}
 	}version(/+$DIDE_REGION+/all)
 	{
 		class BigArray(T)
-		{// BigArray //////////////////////////////////////////////////////////////////
-			version(/+$DIDE_REGION+/all){
-				//todo: a synchronizedet megcsinalni win32-re
-			private:
-				struct Block{
+		{
+			//BigArray //////////////////////////////////////////////////////////////////
+			version(/+$DIDE_REGION+/all) {
+					//todo: a synchronizedet megcsinalni win32-re
+				private:
+					struct Block {
 					T[] data;
 					size_t idxSt, idxEn;
 				}
-				size_t length_;
-			
-				File fileName_;
-				bool loading_;
-				Block[] blocks;
-				size_t blockSize;
-				bool doSeekForward;
-				T seekForwardUntil;
-			
-				struct Slice{ size_t st, en; }
-			
-			public:
-				this(size_t blockSize_, const T seekForwardUntil_=T.init)
+					size_t length_;
+				
+					File fileName_;
+					bool loading_;
+					Block[] blocks;
+					size_t blockSize;
+					bool doSeekForward;
+					T seekForwardUntil;
+				
+					struct Slice { size_t st, en; }
+				
+				public:
+					this(size_t blockSize_, const T seekForwardUntil_=T.init)
 				{
 					blockSize = blockSize_;
-					if(seekForwardUntil_!=T.init){
+					if(seekForwardUntil_!=T.init) {
 						doSeekForward = true;
 						seekForwardUntil = seekForwardUntil_;
 					}
 				}
-			
-				File fileName() const
+				
+					File fileName() const
 				{ return fileName_; }
-				bool loading() const
+					bool loading() const
 				{ return loading_; }
-			
-				// modifications ////////////
-				void appendBlock(T[] data)
+				
+					//modifications ////////////
+					void appendBlock(T[] data)
 				{
 					if(data.empty) return;
 					auto newLen = length_ + data.length;
@@ -4033,23 +4017,22 @@ version(/+$DIDE_REGION Containers+/all)
 					blocks ~= Block(data, length_, newLen);
 					length_ = newLen;
 				}
-			
-				void append(T[] data)
+				
+					void append(T[] data)
 				{
 					if(data.empty) return;
-			
+								
 					size_t len = data.length;
-			
-					if(len>blockSize){ //multiblock insert
+								
+					if(len>blockSize) {
+						 //multiblock insert
 						append(data[0..blockSize]);
 						append(data[blockSize..$]);
 						return;
 					}
-			
+								
 					if(blocks.empty || blocks.back.data.length>=blockSize)
-					{
-						appendBlock(data);
-					}
+					{ appendBlock(data); }
 					else
 					{
 						blocks.back.data ~= data;
@@ -4057,44 +4040,45 @@ version(/+$DIDE_REGION Containers+/all)
 						length_ += len;
 					}
 				}
-			}version(/+$DIDE_REGION+/all){
-				// array access ////////////
+			}version(/+$DIDE_REGION+/all) {
+				//array access ////////////
 				size_t length()const
 				{ return length_; } //todo: gecilassu
 				size_t opDollar()const
 				{ return length_; }
-			
+							
 				Slice opSlice(int idx)(size_t st, size_t en)const
 				{ return Slice(st, en); }
-			
+							
 				private auto findBlock(size_t idx)const
 				{
 					foreach(i, const b; blocks)
-						if(idx>=b.idxSt && idx<b.idxEn)
-							return i;
+					if(idx>=b.idxSt && idx<b.idxEn)
+					return i;
 					return -1;
 				}
 				private T getElement(size_t idx)const
 				{
 					auto i = findBlock(idx);
 					if(i>=0)
-						with(blocks[i]) return data[idx-idxSt];
+					with(blocks[i]) return data[idx-idxSt];
 					else
-						return T.init;
+					return T.init;
 				}
-			
+							
 				T opIndex(size_t idx)const
-				{//opt: cacheolni kene a poziciot es burst-ban nyomni
+				{
+					//opt: cacheolni kene a poziciot es burst-ban nyomni
 					enforce(idx<length);
 					return getElement(idx);
 				}
-			
+							
 				T[] opIndex(const Slice s)const
 				{
 					enforce(s.st<=s.en && s.en<=length_);
 					T[] res;
 					res.reserve(s.en-s.st);
-			
+								
 					size_t i = s.st; 
 					while(i<s.en)
 					{
@@ -4109,10 +4093,10 @@ version(/+$DIDE_REGION Containers+/all)
 					}
 					return res;
 				}
-			
+							
 				T[] opIndex()const
 				{ return this[0..$]; } //all
-			}version(/+$DIDE_REGION+/all){
+			}version(/+$DIDE_REGION+/all) {
 				///////////////////
 				static _loader(/*shared */BigArray!T bt, bool delegate(float percent) onPercent=null)
 				{
@@ -4123,55 +4107,53 @@ version(/+$DIDE_REGION Containers+/all)
 						ulong size = f.size,
 									maxBlockSize = bt.blockSize*3/2,
 									current;
-			
+									
 						while(1)
 						{
 							ulong toRead = maxBlockSize,
 										remaining = size-f.tell;
 							if(remaining>maxBlockSize) toRead = bt.blockSize;
-																		else toRead = remaining;
+							else toRead = remaining;
 							if(toRead>0)
 							{
 								auto data = f.rawRead(new T[cast(size_t)toRead]);
-			
+											
 								if(bt.doSeekForward && data.back!=bt.seekForwardUntil)
 								{
 									T[] extra;
 									char[1] buff;
-									while(!f.eof){
+									while(!f.eof) {
 										extra ~= f.rawRead(buff);
 										if(extra.back==bt.seekForwardUntil) break;
 									}
 									data ~= extra;
 								}
-			
+											
 								bt.appendBlock(data);
 								current += data.length*T.sizeof;
-			
-								if(onPercent){
-									if(!onPercent(current.to!double/size*100)) break;
-								}
-			
+											
+								if(onPercent) { if(!onPercent(current.to!double/size*100)) break; }
+											
 							}
 							else
-								break;
+							break;
 						}
-			
+									
 						if(!size && onPercent) onPercent(100);
-			
+									
 					}
-					catch(Throwable t){ showException(t); }
+					catch(Throwable t) { showException(t); }
 					//todo: ez multithread miatt.
 					
 					bt._notifyLoaded;
 				}
-			}version(/+$DIDE_REGION+/all){
+			}version(/+$DIDE_REGION+/all) {
 				void _notifyLoaded()
 				{
 					loading_ = false;
 					//...something should connect here
 				}
-			
+							
 				private void initLoad(File fileName)
 				{
 					enforce(!loading_,	format(`%s.load() already loading`    , typeof(this).stringof));
@@ -4179,33 +4161,31 @@ version(/+$DIDE_REGION Containers+/all)
 					fileName_ = fileName;
 					loading_ = true;
 				}
-			
+							
 				void	loadLater(File fileName, bool delegate(float percent) onPercent=null)
 				{
 					//initLoad(fileName);
 					//task!_loader(this, onPercent).executeInNewThread;
 					loadNow(fileName, onPercent);
 				}
-			
+							
 				void loadNow(File fileName, bool delegate(float percent) onPercent=null)
 				{
 					initLoad(fileName);
 					_loader(this, onPercent);
 				}
-			
+							
 				void saveNow(string fileName)
 				{
 					enforce(!loading_, format(`%s.save() already loading`, typeof(this).stringof));
 					StdFile f; //todo: sima file-ra lecserelni
 					f.open(fileName, "wb"); scope(exit) f.close;
 					foreach(ref b; blocks)
-						f.rawWrite(cast(T[])b.data);
+					f.rawWrite(cast(T[])b.data);
 				}
-			
+							
 				void dump()
-				{
-					writeln(blocks.map!(b => format("%s", b.data.length)).join(", "));
-				}
+				{ writeln(blocks.map!(b => format("%s", b.data.length)).join(", ")); }
 				
 				bool waitFor(Time timeOut = 9999*second)
 				{
@@ -4221,43 +4201,41 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 		}
 		class BigStream_: BigArray!ubyte
-		{// BigStream //////////////////////////////////////////////////////////////////////////
+		{
+			//BigStream //////////////////////////////////////////////////////////////////////////
 			this(size_t blockSize_ = 256<<10)
-			{
-				super(blockSize_);
-			}
-		
+			{ super(blockSize_); }
+					
 			private size_t position;
-		
+					
 			private ubyte[] rawRead(size_t len)
 			{
 				auto res = this[position..position+len];
 				cast(size_t)position += len;
 				return res;
 			}
-		
+					
 			private void rawWrite(ubyte[] data)
-			{//todo: const-nak kene lennie...
+			{
+				//todo: const-nak kene lennie...
 				append(data);
 			}
-		
+					
 			T read(T)()
-			{
-				return *cast(T*)rawRead(T.sizeof).ptr;
-			}
-		
+			{ return *cast(T*)rawRead(T.sizeof).ptr; }
+					
 			T[] readArray(T)()
 			{
 				uint len = read!uint;
 				return cast(T[])rawRead(len*T.sizeof);
 			}
-		
+					
 			void write(T)(const T src)
 			{
 				T[] temp = [src]; //todo: lame
 				rawWrite(cast(ubyte[])temp);
 			}
-		
+					
 			void writeArray(T)(const T[] src)
 			{
 				write(cast(int)src.length);
@@ -4270,42 +4248,41 @@ version(/+$DIDE_REGION Containers+/all)
 		
 	}version(/+$DIDE_REGION ImStorage+/all)
 	{
-		// ImStorage ///////////////////////////////////////////////
+		//ImStorage ///////////////////////////////////////////////
 		
-		// Usage:  ImStorage!float.set(srcId!("module", 123)(genericArg!"id"(456)), newValue)  //this is the most complicated one
+		//Usage:  ImStorage!float.set(srcId!("module", 123)(genericArg!"id"(456)), newValue)  //this is the most complicated one
 		
-				/+ImStorageManager.purge(10);
+				/+
+			ImStorageManager.purge(10);
+					
+			struct MyInt{ int value; }
+			auto a = ImStorage!MyInt.access(srcId(genericArg!"id"("fuck"))).value++;
+			if(inputs.Shift.down) ImStorage!int.access(srcId(genericArg!"id"("shit"))) += 10;
+					
+			print(ImStorageManager.detailedStats);
+		+/
 		
-				struct MyInt{ int value; }
-				auto a = ImStorage!MyInt.access(srcId(genericArg!"id"("fuck"))).value++;
-				if(inputs.Shift.down) ImStorage!int.access(srcId(genericArg!"id"("shit"))) += 10;
 		
-				print(ImStorageManager.detailedStats);+/
-		
-		
-		interface ImStorageInfo{
+		interface ImStorageInfo {
 			void purge(uint maxAge);
-		
+					
 			string name();
 			string infoSummary();
 			string[] infoDetails();
 		}
 		
 		struct ImStorageManager
-		{ static:
-			__gshared ImStorageInfo[string] storages;
-		
-			void registerStorage(ImStorageInfo info)
-			{
-				storages[info.name] = info;
-			}
-		
-			void purge(uint maxAge)
-			{
-				storages.values.each!(s => s.purge(maxAge));
-			}
-		
-			string stats(string details="")
+		{
+			 static:
+						__gshared ImStorageInfo[string] storages;
+					
+						void registerStorage(ImStorageInfo info)
+			{ storages[info.name] = info; }
+					
+						void purge(uint maxAge)
+			{ storages.values.each!(s => s.purge(maxAge)); }
+					
+						string stats(string details="")
 			{
 				string res;
 				foreach(name; storages.keys.sort)
@@ -4316,54 +4293,53 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				return res;
 			}
-		
-			string detailedStats(){ return stats("*"); }
+					
+						string detailedStats() { return stats("*"); }
 		}
 		
 		struct ImStorage(T)
-		{static:
-			alias Id = SrcId;
-		
-			struct Item{
+		{
+			static:
+						alias Id = SrcId;
+					
+						struct Item {
 				T data;
 				Id id;
 				uint tick;
 			}
-		
-			Item[Id] items; //by Id
-		
-			void purge(uint maxAge)
-			{ //age = 0 purge all
+					
+						Item[Id] items; //by Id
+					
+						void purge(uint maxAge)
+			{
+				 //age = 0 purge all
 				uint limit = application.tick-maxAge;
 				auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array;
 				toRemove.each!(k => items.remove(k));
 			}
-		
-			class InfoClass : ImStorageInfo
+					
+						class InfoClass : ImStorageInfo
 			{
 				string name()
 				{ return ImStorage!T.stringof; }
 				string infoSummary()
 				{
-					return format!("%s(count: %s, minAge = %s, maxAge = %s")(name, items.length,
-							application.tick - items.values.map!(a => a.tick).minElement(uint.max),
-							application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
+					return format!("%s(count: %s, minAge = %s, maxAge = %s")(
+						name, items.length,
+													application.tick - items.values.map!(a => a.tick).minElement(uint.max),
+													application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
 					);
 				}
 				string[] infoDetails()
-				{
-					return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%18s | %s"(application.tick-a.value.tick, a.key, a.value.data)).array.sort.array;
-				}
+				{ return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%18s | %s"(application.tick-a.value.tick, a.key, a.value.data)).array.sort.array; }
 				void purge(uint maxAge)
-				{
-					ImStorage!T.purge(maxAge);
-				}
+				{ ImStorage!T.purge(maxAge); }
 			}
-		
-			auto ref access(in Id id, lazy T default_ = T.init)
+					
+						auto ref access(in Id id, lazy T default_ = T.init)
 			{
 				auto p = id in items;
-				if(!p){
+				if(!p) {
 					items[id] = Item.init;
 					p = id in items;
 					p.data = default_;
@@ -4372,49 +4348,45 @@ version(/+$DIDE_REGION Containers+/all)
 				p.tick = application.tick;
 				return p.data;
 			}
-		
-			void set(in Id id, T data)
+					
+						void set(in Id id, T data)
 			{ access(id) = data; }
-		
-			bool exists(in Id id)
+					
+						bool exists(in Id id)
 			{ return (id in items) !is null; }
-		
-			uint age(in Id id)
-			{
-				if(auto p = id in items){
-					return application.tick-p.tick;
-				}else return typeof(return).max;
-			}
-		
-			//todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
-			//shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
+					
+						uint age(in Id id)
+			{ if(auto p = id in items) { return application.tick-p.tick; }else return typeof(return).max; }
+					
+						//todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
+						//shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
 		}
 		
 		
 		///note: This has been moved here to avoid circular module initialization in uiBase
-		ref auto imstVisibleBounds(in SrcId id){ return ImStorage!bounds2.access(id.combine("visibleBounds")); };
+		ref auto imstVisibleBounds(in SrcId id) { return ImStorage!bounds2.access(id.combine("visibleBounds")); };
 		
 	}class DynCharMap
 	{
-	private:
-		mixin CustomEnforce!"DynCharMap";
-		//static void enforce(bool b, lazy string s, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__){ if(!b) throw new Exception("DynCharMap: "~s, file, line, funct); }
-	
-		enum	bankSh	= 5,
-			bankSize	= 1<<bankSh,
-			bankMask	= bankSize-1,
-			invMapSize	= 1<<(21-bankSh),
-			invMapMask	= invMapSize-1,	//unicode is 21 bits max
-			maxBanks	= 0x200,	
-			maxChars	= maxBanks<<bankSh;  	//max symbol count is limited
-	
-		//it keeps growing by 32 char banks
-		ushort bankCnt;
-		ushort[maxBanks] map;   //tells the unicode bankIdx of a mapped bank. Bank0 is always mapped.
-		ushort[invMapSize] invMap; //tells where to find the maps backwards
-	
-	public:
-		this()
+		private:
+			mixin CustomEnforce!"DynCharMap";
+			//static void enforce(bool b, lazy string s, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__){ if(!b) throw new Exception("DynCharMap: "~s, file, line, funct); }
+		
+			enum 	bankSh	= 5,
+				bankSize	= 1<<bankSh,
+				bankMask	= bankSize-1,
+				invMapSize	= 1<<(21-bankSh),
+				invMapMask	= invMapSize-1,	//unicode is 21 bits max
+				maxBanks	= 0x200,	
+				maxChars	= maxBanks<<bankSh;  	//max symbol count is limited
+		
+			//it keeps growing by 32 char banks
+			ushort bankCnt;
+			ushort[maxBanks] map;   //tells the unicode bankIdx of a mapped bank. Bank0 is always mapped.
+			ushort[invMapSize] invMap; //tells where to find the maps backwards
+		
+		public:
+			this()
 		{
 			//bank 0 is always needed to be mapped
 			//map ascii charset, 128 chars
@@ -4422,8 +4394,8 @@ version(/+$DIDE_REGION Containers+/all)
 			foreach(ushort i; 0..bankCnt) map[i] =i;
 			invMap[0..bankCnt] = map[0..bankCnt];
 		}
-	
-		override string toString()
+		
+			override string toString()
 		{
 			return "DynCharMap(charCnt/Max=%d/%d, bankSize=%s, [%s])"	.format(
 				(map[].count!"a!=b"(0)+1)<<bankSh,
@@ -4432,63 +4404,65 @@ version(/+$DIDE_REGION Containers+/all)
 				map[].enumerate.filter!"a.value".map!(a => "%X:%X".format(a.index<<bankSh, a.value<<bankSh)).join(", ")
 			);
 		}
-	
-		ushort encode(dchar ch)
+		
+			ushort encode(dchar ch)
 		{
 			if(ch<0x80) return cast(ushort)ch; //fastpath... nem sokat gyorsit, simd kene
-	
+				
 			ushort uniBank = (cast(uint)ch)>>>bankSh;
-			if(uniBank>0){
-				if(!invMap[uniBank]){
+			if(uniBank>0) {
+				if(!invMap[uniBank]) {
 					enforce(bankCnt < maxBanks, "Ran out of banks.");
 					invMap[uniBank] = bankCnt;
 					map[bankCnt] = uniBank;
 					bankCnt++;
-	
+						
 					//writefln("Bank %.6x mapped to %.2x", map[bankCnt-1] << bankSh, bankCnt-1 << bankSh);
 				}
 			}
 			return cast(ushort)(invMap[uniBank]<<bankSh | (cast(ushort)ch)&bankMask);
 		}
-	
-		dchar decode(const ushort ch)
+		
+			dchar decode(const ushort ch)
 		{
 			if(ch<0x80) return cast(ushort)ch; //fastpath... nem sokat gyorsit, simd kene
-	
+				
 			ushort mapBank = ch>>bankSh;
 			ushort uniBank = map[mapBank & maxBanks-1];
 			return cast(dchar)((uniBank<<bankSh) | ch & bankMask);
 		}
-	
-		private enum utfInvalidCode = 0xFFFD; //replacement char
-	
-		auto encodeUTF8(ref ushort[] res, string s)
+		
+			private enum utfInvalidCode = 0xFFFD; //replacement char
+		
+			auto encodeUTF8(ref ushort[] res, string s)
 		{
 			import std.encoding;
 			//todo: ez bugos
-			while(s.length>=8){
+			while(s.length>=8) {
 				auto raw = cast(ulong*)s.ptr;
 				if(*raw & 0x80808080_80808080)
-				{//slow decode
+				{
+					//slow decode
 					foreach(i; 0..8) res ~= encode(s.decode);
 				}
 				else
-				{ //everyithing is <0x80
+				{
+					 //everyithing is <0x80
 					//res.appendUninitialized(8); //nem megy
 					res.length += 8;
 					foreach(i, ref c; res[$-8..$]) c = cast(ushort)((*raw>>(i<<3))&0xFF);  //todo: sse opt
 					s = s[8..$];
 				}
 			}
-	
+				
 			//remainder
 			while(!s.empty) res ~= encode(s.decode);
 		}
-	
-		ushort[] encode(string s, TextEncoding encoding)
+		
+			ushort[] encode(string s, TextEncoding encoding)
 		{
 			import std.encoding;
-	
+				
 			ushort[] res;
 			res.reserve(s.length/encodingCharSize[encoding]);                            //ascii  uni
 			switch(encoding)
@@ -4503,8 +4477,8 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 			return res;
 		}
-	
-		string decode(ushort[] s)
+		
+			string decode(ushort[] s)
 		{
 			string res;
 			res.reserve(s.length);
@@ -4512,85 +4486,86 @@ version(/+$DIDE_REGION Containers+/all)
 			{
 				auto raw = cast(ulong*)s.ptr;
 				if(*raw & 0xff80ff80_ff80ff80)
-				{//any of the 4 wchars are > 0x7F
+				{
+					//any of the 4 wchars are > 0x7F
 					foreach(i; 0..4) res ~= decode(s[i]);
 				}
 				else
-				{ //all 4 wchars are <= 0x7F, no conversion needed
+				{
+					 //all 4 wchars are <= 0x7F, no conversion needed
 					char[4] tmp;
 					foreach(i, ref c; tmp) c = cast(char)((*raw>>(i<<4))&0xFF);    //todo: sse opt
 					res ~= tmp;
 				}
 				s = s[4..$];
 			}
-	
+				
 			foreach(ch; s) res ~= decode(ch); //remaining
 			return res;
 		}
 	}
 }version(/+$DIDE_REGION String ops.+/all)
 {
-	version(/+$DIDE_REGION+/all){
-	// Strings //////////////////////////////////
-		
-		bool isUpper(A)(in A a)
-		{return a==a.toUpper;}
-		bool isLower(A)(in A a)
-		{return a==a.toLower;}
-		
-		bool isAsciiLower(char c) pure
-		{return c.inRange('a', 'z');}
-		bool isAsciiUpper(char c) pure
-		{return c.inRange('A', 'Z');}
-		
-		char asciiUpper(char c) pure
+	version(/+$DIDE_REGION+/all) {
+		//Strings //////////////////////////////////
+			
+			bool isUpper(A)(in A a)
+		{ return a==a.toUpper; }
+			bool isLower(A)(in A a)
+		{ return a==a.toLower; }
+			
+			bool isAsciiLower(char c) pure
+		{ return c.inRange('a', 'z'); }
+			bool isAsciiUpper(char c) pure
+		{ return c.inRange('A', 'Z'); }
+			
+			char asciiUpper(char c) pure
 		{ return cast(char)(cast(int)c + (c.isAsciiUpper ? 0 : 'A'-'a')); }
-		char asciiLower(char c) pure
+			char asciiLower(char c) pure
 		{ return cast(char)(cast(int)c + (c.isAsciiLower ? 0 : 'a'-'A')); }
-		
-		string asciiUpper(string s)
+			
+			string asciiUpper(string s)
 		{
 			//opt: this is terrible coding from the times when I was so dumb
 			char[] res = s.dup;
 			foreach(ref char ch; res) ch = ch.asciiUpper; 
 			return cast(string)res; 
 		}
-		string asciiLower(string s)
+			string asciiLower(string s)
 		{
 			char[] res = s.dup; 
 			foreach(ref char ch; res) ch = ch.asciiLower; 
 			return cast(string)res; 
 		}
-		
-		//todo: lc and uc is so redundant... Maybe I should use toUpper everywhere...
-		auto uc(char s) pure
+			
+			//todo: lc and uc is so redundant... Maybe I should use toUpper everywhere...
+			auto uc(char s) pure
 		{ return s.toUpper; }  
-		auto lc(char s) pure
+			auto lc(char s) pure
 		{ return s.toLower; }
-		
-		auto uc(wchar s) pure
+			
+			auto uc(wchar s) pure
 		{ return s.toUpper; }
-		auto lc(wchar s) pure
+			auto lc(wchar s) pure
 		{ return s.toLower; }
-		
-		auto uc(dchar s) pure
+			
+			auto uc(dchar s) pure
 		{ return s.toUpper; }
-		auto lc(dchar s) pure
+			auto lc(dchar s) pure
 		{ return s.toLower; }
-		
-		string uc(string s) pure
+			
+			string uc(string s) pure
 		{ return s.toUpper; }
-		string lc(string s) pure
+			string lc(string s) pure
 		{ return s.toLower; }
-		
-		///generates D source string format from values
-		string escape(T)(T s)
+			
+			///generates D source string format from values
+			string escape(T)(T s)
+		{ return format!"%(%s%)"([s]); }
+			
+			string capitalize(alias fv = toUpper)(string s)
 		{
-			return format!"%(%s%)"([s]);
-		}
-		
-		string capitalize(alias fv = toUpper)(string s)
-		{//todo: terrible looking solution, with NO unicode handling.
+			//todo: terrible looking solution, with NO unicode handling.
 			if(!s.empty)
 			{
 				char u = fv([s[0]])[0];
@@ -4598,67 +4573,70 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 			return s;
 		}
-		
-		void listAppend(ref string s, string what, string separ)
+			
+			void listAppend(ref string s, string what, string separ)
 		{
 			auto w = what.strip;
 			if(w.empty) return;
 			if(!s.strip.empty) s ~= separ;
 			s ~= w;
 		}
-		
-		string truncate(string ellipsis="...")(string s, size_t maxLen)
-		{//todo: string.truncate-t megcsinalni unicodeosra rendesen.
-			/*  enum ellipsisLen = ellipsis.walkLength;
-			auto len = s.walkLength;
-			return len<=maxLen 	? s
-				: len>ellipsisLen ? s.take(maxLen-ellipsisLen)~ellipsis
-				: s.take(maxLen);*/
+			
+			string truncate(string ellipsis="...")(string s, size_t maxLen)
+		{
+			//todo: string.truncate-t megcsinalni unicodeosra rendesen.
+			/*
+				  enum ellipsisLen = ellipsis.walkLength;
+				auto len = s.walkLength;
+				return len<=maxLen 	? s
+					: len>ellipsisLen ? s.take(maxLen-ellipsisLen)~ellipsis
+					: s.take(maxLen);
+			*/
 			enum ellipsisLen = ellipsis.length;
 			auto len = s.length;
 			return len<= 	maxLen 	? s
 				: maxLen>ellipsisLen 	? s[0..maxLen-ellipsisLen]~ellipsis
 					: s[0..maxLen];
 		}
-		
-		
-		string decapitalize()(string s)
+			
+			
+			string decapitalize()(string s)
 		{ return s.capitalize!toLower; }
-		
-		bool sameString(string a, string b)
+			
+			bool sameString(string a, string b)
 		{ return a==b; }
-		bool sameText(string a, string b) 
+			bool sameText(string a, string b) 
 		{ return icmp(a, b)==0; }
-		bool sameFile(File a, File b) 
+			bool sameFile(File a, File b) 
 		{ return sameText(a.normalized.fullName, b.normalized.fullName); }
-		
-		auto amongText(Values...)(string value, Values values)
+			
+			auto amongText(Values...)(string value, Values values)
 		{ return value.among!sameText(values); }
-		
-		/// Show the differences in 2 strings
-		string strDiff(char diffChar='^', char sameChar='_')(string a, string b)
+			
+			/// Show the differences in 2 strings
+			string strDiff(char diffChar='^', char sameChar='_')(string a, string b)
 		{
 			string res;
 			foreach(i; 0..min(a.length, b.length)) res ~= a[i]==b[i] ? sameChar : diffChar;
 			res ~= [diffChar].replicate(a.length>b.length ? a.length-b.length : b.length>a.length);
 			return res;
 		}
-		
-		//strips specific strings at both ends.
-		string strip2(string s, string start, string end)
+			
+			//strips specific strings at both ends.
+			string strip2(string s, string start, string end)
 		{
 			if(s.length >= start.length + end.length && s.startsWith(start) && s.endsWith(end))
-				return s[start.length..$-end.length];
+			return s[start.length..$-end.length];
 			else
-				return s;
+			return s;
 		}
-		
-		private S _withoutStarting(bool start, bool remove, S, T)(in S s, in T end)
+			
+			private S _withoutStarting(bool start, bool remove, S, T)(in S s, in T end)
 		{
-			static if(start) 
-				alias fv = startsWith;
+			static if(start)
+			alias fv = startsWith;
 			else
-				alias fv = endsWith;
+			alias fv = endsWith;
 			const e = end.to!S;
 			if(e != "" && fv(s, e) == remove)
 			{
@@ -4669,27 +4647,29 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 			else return s;
 		}
-		
-		//todo: inconvenience with includeTrailingPathDelimiter
-		S withoutStarting	(S, T)(in S s, in T end)
+			
+			//todo: inconvenience with includeTrailingPathDelimiter
+			S withoutStarting	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(1, 1)(s, end); }
-		S withoutEnding	(S, T)(in S s, in T end)
+			S withoutEnding	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(0, 1)(s, end); }
-		S withStarting	(S, T)(in S s, in T end)
+			S withStarting	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(1, 0)(s, end); }
-		S withEnding	(S, T)(in S s, in T end)
+			S withEnding	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(0, 0)(s, end); }
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		//todo: unittest
-		/*    assert("a/".withoutEnding("/") == .print;
-				"a/b".withoutEnding("/").print;
-				"a/".withoutStarting("/").print;
-				"/a".withoutStarting("/").print;
-		
-		a
-		a/b
-		a/
-		a*/
+		/*
+				assert("a/".withoutEnding("/") == .print;
+					"a/b".withoutEnding("/").print;
+					"a/".withoutStarting("/").print;
+					"/a".withoutStarting("/").print;
+			
+			a
+			a/b
+			a/
+			a
+		*/
 		
 		
 		string getFirstDir(char sep='\\')(string s)
@@ -4713,23 +4693,23 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		void removeLastEmpty(ref string[] lines)
-		{
-			lines = lines.withoutLastEmpty;
-		}
+		{ lines = lines.withoutLastEmpty; }
 		
 		//todo: revisit string pchar conversion
 		
 		auto toPChar(S)(S s) nothrow
-		{//converts to Windows' string
+		{
+			//converts to Windows' string
 			const(char)* r;
-			try { r = toUTFz!(char*)(s); }catch(Throwable){}
+			try { r = toUTFz!(char*)(s); }catch(Throwable) {}
 			return r;
 		}
 		
 		auto toPWChar(S)(S s) nothrow
-		{//converts to Windows' widestring
+		{
+			//converts to Windows' widestring
 			const(wchar)* r;
-			try { r = toUTF16z(s); }catch(Throwable){}
+			try { r = toUTF16z(s); }catch(Throwable) {}
 			return r;
 		}
 		
@@ -4746,7 +4726,7 @@ version(/+$DIDE_REGION Containers+/all)
 				auto res = appender!string;
 				size_t i, len = s.length;
 				while(i<len)
-					res ~= s.decode!(Yes.useReplacementDchar)(i);
+				res ~= s.decode!(Yes.useReplacementDchar)(i);
 				return res[];
 			}
 		}
@@ -4763,9 +4743,7 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		void strMake(string src, char[] dst)
-		{
-			strMake(src, dst.ptr, dst.length);
-		}
+		{ strMake(src, dst.ptr, dst.length); }
 		
 		string dataToStr(const(void)* src, size_t len)
 		{
@@ -4778,13 +4756,9 @@ version(/+$DIDE_REGION Containers+/all)
 			return s.to!string;
 		}
 		string dataToStr(const(void)[] src)
-		{
-			return dataToStr(src.ptr, src.length);
-		}
+		{ return dataToStr(src.ptr, src.length); }
 		string dataToStr(T)(const T src)
-		{
-			return dataToStr(&src, src.sizeof);
-		}
+		{ return dataToStr(&src, src.sizeof); }
 		
 		
 		string toStr(T)(const(T)* s)
@@ -4792,28 +4766,29 @@ version(/+$DIDE_REGION Containers+/all)
 		string toStr(T)(const(T)* s, size_t maxLen)
 		{ return toStr(s[0..maxLen]); }
 		string toStr(const char[] s)
-		{//safe version, handles well without zero too
+		{
+			//safe version, handles well without zero too
 			auto e = (cast(ubyte[])s).countUntil(0);
 			if(e<0) e = s.length;
 			return s[0..e].to!string;
 		}
 		string toStr(const wchar[] s)
-		{//safe version, handles well without zero too
+		{
+			//safe version, handles well without zero too
 			auto e = (cast(ushort[])s).countUntil(0);
 			if(e<0) e = s.length;
 			return s[0..e].to!string;
 		}
 		string toStr(const dchar[] s)
-		{//safe version, handles well without zero too
+		{
+			//safe version, handles well without zero too
 			auto e = (cast(uint[])s).countUntil(0);
 			if(e<0) e = s.length;
 			return s[0..e].to!string;
 		}
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		string binToHex(in void[] input)
-		{
-			return toHexString!(LetterCase.upper)(cast(ubyte[])input);
-		}
+		{ return toHexString!(LetterCase.upper)(cast(ubyte[])input); }
 		
 		string toHex(in void[] input)
 		{ return(binToHex(input)); }
@@ -4821,27 +4796,27 @@ version(/+$DIDE_REGION Containers+/all)
 		ubyte[] hexToBin(string s)
 		{
 			if(s.startsWith_ci("0x")) s = s[2..$];
-		
+					
 			ubyte[] r;
 			r.reserve(s.length/2);
-		
+					
 			bool state;
 			int tmp;
 			void append(int num)
 			{
 				if(state) r ~= cast(ubyte)(tmp<<4 | num);
-						 else tmp = num;
+				else tmp = num;
 				state = !state;
 			}
-		
-			foreach(ch; s){
-				if(ch.among(' ', '\r', '\n', '\t'))	{}
+					
+			foreach(ch; s) {
+				if(ch.among(' ', '\r', '\n', '\t')) {}
 				else if(inRange(ch, '0', '9'	)) append(ch-'0'	);
 				else if(inRange(ch, 'a', 'f'	)) append(ch-'a'	+10);
 				else if(inRange(ch, 'A', 'F'	)) append(ch-'A'	+10);
 				else break;
 			}
-		
+					
 			//state is true (odd number of digits) -> don't care
 			return r;
 		}
@@ -4849,24 +4824,26 @@ version(/+$DIDE_REGION Containers+/all)
 		string hexToStr(in string s)
 		{ return cast(string)hexToBin(s); }
 		
-		// hexDump ///////////////////////////
+		//hexDump ///////////////////////////
 		//import std.algorithm, std.stdio, std.file, std.range;
 		
-		/+void hexDump(in void[] data){
-			auto d = cast(const ubyte[])data;
-			int idx;
-			foreach(chunk; d.chunks(16)){
-				"%.4X %(%02X %)%*s  %s".writefln(idx++*16, chunk,
-					3 * (16 - chunk.length), "", // Padding
-					chunk.map!(c => // Replace non-printable
-						c < 0x20 || c > 0x7E ? '.' : char(c)));
-			}
-		}+/
+		/+
+			void hexDump(in void[] data){
+						auto d = cast(const ubyte[])data;
+						int idx;
+						foreach(chunk; d.chunks(16)){
+							"%.4X %(%02X %)%*s  %s".writefln(idx++*16, chunk,
+								3 * (16 - chunk.length), "", // Padding
+								chunk.map!(c => // Replace non-printable
+									c < 0x20 || c > 0x7E ? '.' : char(c)));
+						}
+					}
+		+/
 		
 		void hexDump(T=ubyte)(in void[] data, int width=16)
 		{
 				enum digits = T.sizeof*2;
-		
+					
 			string hexLine(in T[] buf)
 			{
 				return buf	.take(width)
@@ -4874,16 +4851,16 @@ version(/+$DIDE_REGION Containers+/all)
 					.padRight(" ".replicate(digits), width)
 					.join(' ');
 			}
-		
+					
 			string binaryLine(in void[] buf)
 			{
 				return (cast(ubyte[])buf)	.take(width*T.sizeof)
 					.map!`a>=32 && a<=127 ? char(a) : '.'`
 					.array;
 			}
-		
+					
 			foreach(i, a; (cast(T[])data).chunks(width).map!array.enumerate)
-				writefln!"%04X : %s : %s"(i*width, hexLine(a), binaryLine(a));
+			writefln!"%04X : %s : %s"(i*width, hexLine(a), binaryLine(a));
 		}
 		
 		bool isHexDigit(dchar ch) @safe
@@ -4894,25 +4871,23 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		bool isDigit(dchar ch) @safe
-		{//todo: also there is std.uni.isNumber
+		{
+			//todo: also there is std.uni.isNumber
 			return inRange(ch, '0', '9');
 		}
 		
 		bool isLetter(dchar ch) @safe 
-		{//todo: also there is std.uni.isAlpha
+		{
+			//todo: also there is std.uni.isAlpha
 			return	  inRange(ch, 'a', 'z')
 				|| inRange(ch, 'A', 'Z');
 		}
 		
 		bool isWordChar(dchar ch) @safe
-		{
-			return isLetter(ch) || isDigit(ch) || ch=='_';
-		}
+		{ return isLetter(ch) || isDigit(ch) || ch=='_'; }
 		
 		bool isWordCharExt(dchar ch) @safe
-		{
-			return isWordChar(ch) || ch.among('#', '$', '~');
-		}
+		{ return isWordChar(ch) || ch.among('#', '$', '~'); }
 		
 		bool isIdentifier(const string s) @safe
 		{
@@ -4925,18 +4900,20 @@ version(/+$DIDE_REGION Containers+/all)
 		//todo: this is ascii!!!! fails if isWordChar contains uni.isAlpha or uni.isNumber!!!!
 		{
 			if(!isWordChar(s.get(pos))) return "";
-		
+					
 			size_t st	= pos;	while(isWordChar(s.get(st-1	))) st--;
 			size_t en	= pos+1;	while(isWordChar(s.get(en	))) en++;
-		
+					
 			return s[st..en];
 		}
 		
-		ptrdiff_t wordPos(const string s, const string sub, size_t startIdx,
-		in std.string.CaseSensitive cs = Yes.caseSensitive) @safe
+		ptrdiff_t wordPos(
+			const string s, const string sub, size_t startIdx,
+					in std.string.CaseSensitive cs = Yes.caseSensitive
+		) @safe
 		{
 			ptrdiff_t res;
-			while(1){
+			while(1) {
 				res = indexOf(s, sub, startIdx, cs);
 				if(res<0) break;
 				if(!isWordChar(s.get(res-1)) && !isWordChar(s.get(res+sub.length))) break;
@@ -4946,21 +4923,20 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		ptrdiff_t wordPos(const string s, const string sub, in std.string.CaseSensitive cs = Yes.caseSensitive) @safe
-		{
-			return wordPos(s, sub, 0, cs);
-		}
+		{ return wordPos(s, sub, 0, cs); }
 		
 		T toInt(T=int)(string s)
-		{//todo: toLong
-			if(s.length>2 && s[0]=='0'){
+		{
+			//todo: toLong
+			if(s.length>2 && s[0]=='0') {
 				if(s[1].among('x', 'X')) return s[2..$].to!T(16);
-				if(s[1].among('b', 'B')) return s[2..$].to!T( 2);
+				if(s[1].among('b', 'B')) return s[2..$].to!T(2);
 			}
 			return s.to!T;
 		}
 		
 		bool isDLangWhitespace	(C)(in C ch)
-		{return !!ch.among(' ', '\t', '\x0b', '\x0c');}
+		{ return !!ch.among(' ', '\t', '\x0b', '\x0c'); }
 		
 		bool isDLangNewLine(T)(T ch)if(isSomeChar!T)
 		{ return !!ch.among('\n', '\r', '\u2028', '\u2029'); }
@@ -4978,23 +4954,24 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return isDLangIdentifierCont(ch); }
 		
 		bool isDLangSymbol(T)(T ch)if(isSomeChar!T)
-		{ 
+		{
 			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //todo: optimize this to a lookup
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		string replaceWords(alias fun = isWordChar)(string str, string from, string to)
 		{
 			auto src = (&str).refRange;
-		
+					
 			auto fetchAndReplace(bool isWord, uint len)
 			{
 				auto act = src.takeExactly(len).text;
 				return isWord && act==from ? to : act;
 			}
-		
+					
 			static if(0)
-			{//todo: compare the speed of this functional approach
+			{
+				//todo: compare the speed of this functional approach
 				return str	.map!fun
 					.group
 					.map!(p => fetchAndReplace(p[]));
@@ -5004,73 +4981,68 @@ version(/+$DIDE_REGION Containers+/all)
 			{
 				string res;
 				foreach(isWord, len; str.map!fun.group)
-					res ~= fetchAndReplace(isWord, len);
+				res ~= fetchAndReplace(isWord, len);
 				return(res);
 			}
 		}
 		
 		//todo: isWild variadic return parameters list, like formattedtext
 		struct WildResult
-		{static:
-			private string[] p;
-			void _reset()
+		{
+			static:
+						private string[] p;
+						void _reset()
 			{ p = []; }
-			void _append(string s)
+						void _append(string s)
 			{ p ~= s; }
-		
-			auto length()
+					
+						auto length()
 			{ return p.length; }
-			auto empty()
+						auto empty()
 			{ return p.empty; }
-			auto strings(size_t i, string def="")
+						auto strings(size_t i, string def="")
 			{ return i<length ? p[i] : def; }
-			auto opIndex(size_t i)
+						auto opIndex(size_t i)
 			{ return strings(i); }
-		
-			auto to(T)(size_t i, T def = T.init)
+					
+						auto to(T)(size_t i, T def = T.init)
 			{
-				try{
+				try {
 					auto s = strings(i).strip;
 					static if(isIntegral!T)
 					{
-						return s.toInt.to!T; // 😎
+						return s.toInt.to!T; //😎
 						//use toint for 0x hex and 0b bin. long is not supported yet
 					}
 					else
-					{
-						return s.to!T;
-					}
+					{ return s.to!T; }
 				}
-				catch(Throwable){ return def; }
+				catch(Throwable) { return def; }
 			}
-		
-			auto ints	(size_t i, int def = 0)
-			{ try return to!int	(i); catch(Throwable) return def; }
-			auto floats	(size_t i, float def = 0)
-			{ try return to!float	(i); catch(Throwable) return def; }
-		
-			void stripAll()
-			{
-				foreach(ref s; p) s = s.strip;
-			}
-		
-			string toString()
+					
+						auto ints	(size_t i, int def = 0)
+			{ try return to!int	(i);catch(Throwable) return def; }
+						auto floats	(size_t i, float def = 0)
+			{ try return to!float	(i);catch(Throwable) return def; }
+					
+						void stripAll()
+			{ foreach(ref s; p) s = s.strip; }
+					
+						string toString()
 			{ return p.text; }
 		}
 		
 		alias wild = WildResult;
 		
 		bool isWildMask(char chAny = '*', char chOne = '?')(string s)
-		{
-			return s.any!(a => a.among(chAny, chOne));
-		}
+		{ return s.any!(a => a.among(chAny, chOne)); }
 		
 		bool isWild(bool ignoreCase = true, char chAny = '*', char chOne = '?')(string input, string[] wildStrs)
 		{
 			foreach(w; wildStrs)
 			{
-				if(isWild!(ignoreCase, chAny, chOne)(input, w)) 
-					return true;
+				if(isWild!(ignoreCase, chAny, chOne)(input, w))
+				return true;
 			}
 			return false;
 		}
@@ -5079,8 +5051,8 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			foreach(w; wildStrs.splitter(chSepar))
 			{
-				if(isWild!(ignoreCase, chAny, chOne)(input, w)) 
-					return true;
+				if(isWild!(ignoreCase, chAny, chOne)(input, w))
+				return true;
 			}
 			return false;
 		}
@@ -5091,14 +5063,14 @@ version(/+$DIDE_REGION Containers+/all)
 			const cs = ignoreCase ? No.caseSensitive : Yes.caseSensitive;   
 			//note: kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.
 			if(1) wild._reset;
-		
+					
 			while(1)
 			{
 				string wildSuffix;	 //string precedding wildcards
 				size_t wildReq;	 //number of '?' in wild
 				bool wildAnyLength;	 //there is * in the wildcard
 				string actOutput;
-		
+						
 				//fetch wildBlock  [??*abc]
 				while(wildStr.length)
 				{
@@ -5107,44 +5079,47 @@ version(/+$DIDE_REGION Containers+/all)
 					else break;
 				}
 				while(wildStr.length && !wildStr[0].among(chAny, chOne))
-					wildSuffix ~= wildStr.popFirst; //slow
-		
+				wildSuffix ~= wildStr.popFirst; //slow
+						
 				//get the required minimal amount of chars
 				if(input.length<wildReq) return false;
 				if(1) actOutput = input[0..wildReq];
 				input = input[wildReq..$];
-		
+						
 				if(wildSuffix.empty)
-				{//search for end of input
+				{
+					//search for end of input
 					if(wildAnyLength)
-					{//if there is a * at the end
-						if(1){
+					{
+						//if there is a * at the end
+						if(1) {
 							actOutput ~= input;
 							wild._append(actOutput);
 						}
 						return true;
 					}
 					else
-					{//if not *
+					{
+						//if not *
 						if(wildReq>0 && 1) wild._append(actOutput);
 						return input.empty;
 					}
 				}
-		
+						
 				//there is a string to match
 				auto i = input.indexOf(wildSuffix, cs);
 				if(i<0) return false;
 				if(!wildAnyLength && i!=0) return false;
-		
-				if(1 && (wildAnyLength || wildReq)){
+						
+				if(1 && (wildAnyLength || wildReq)) {
 					actOutput ~= input[0..i];
 					wild._append(actOutput);
 				}
 				input = input[i+wildSuffix.length..$];
 			}
-		
+					
 		}
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		alias StrMap = string[string];
 		
 		auto mapToStr(const StrMap map)
@@ -5156,19 +5131,19 @@ version(/+$DIDE_REGION Containers+/all)
 		auto strToMap(const string str)
 		{
 			string[string] map;
-			try{
+			try {
 				auto j = str.parseJSON;
 				if(j.type==JSONType.OBJECT)
-					foreach(string key, ref val; j)
-						map[key] = val.str;
-			}catch(Exception){}
+				foreach(string key, ref val; j)
+				map[key] = val.str;
+			}catch(Exception) {}
 			return map;
 		}
 		
 		string withoutQuotes(string s, char q)
 		{
 			if(s.length>=2 && s.startsWith('\"') && s.endsWith('\"'))
-				s = s[1..$-1].replace([q, q], [q]);
+			s = s[1..$-1].replace([q, q], [q]);
 			return s;
 		}
 		
@@ -5176,7 +5151,7 @@ version(/+$DIDE_REGION Containers+/all)
 		auto splitQuotedStr(string line, char delim, char quote)
 		{
 			auto s = line.dup;
-		
+					
 			//mark non-quoted spaces
 			bool inQuote;
 			foreach(ref char ch; s)
@@ -5184,7 +5159,7 @@ version(/+$DIDE_REGION Containers+/all)
 				if(ch==quote) inQuote = !inQuote;
 				if(!inQuote && ch==delim) ch = '\1'; //use #1 as a marker for splitting
 			}
-		
+					
 			return s.split('\1').to!(string[]);
 		}
 		
@@ -5206,51 +5181,51 @@ version(/+$DIDE_REGION Containers+/all)
 			foreach(s; line.splitCommandLine)
 			{
 				string key, value;
-		
+						
 				//try to split at '='
 				bool keyValueFound;
 				foreach(i, ch; s)
 				{
 					if(ch=='"') break;
-					if(ch=='='){
+					if(ch=='=') {
 						key = s[0..i];
 						value = s[i+1..$].withoutQuotes('"');
 						keyValueFound = !key.empty;
 						break;
 					}
 				}
-		
+						
 				//unnamed parameter
-				if(!keyValueFound){
+				if(!keyValueFound) {
 					key = (paramIdx++).text;
 					value = s;
 				}
-		
+						
 				map[key] = value;
 			}
-		
+					
 			map.rehash;
 			return map;
 		}
 		
 		string helpText(in GetoptResult opts)
-		{
-			return opts.options.map!(o => format(`  %-20s %s`, [o.optShort, o.optLong].join(" "), o.help)).join("\n");
-		}
+		{ return opts.options.map!(o => format(`  %-20s %s`, [o.optShort, o.optLong].join(" "), o.help)).join("\n"); }
 		
 		auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp)
 		{
-			/* exampls struct: struct Options {
-				@(`Exits right after a solution.`)	     EarlyExit = false;
-				@(`t|BenchmarkTime = Minimum duration of the benchmark. Default: $DEFAULT$ sec`)	     BenchmarkMinTime = 12;
-				@(`WFPerCU = Number of WaveFronts on each Compute Units. Default: $DEFAULT$`)	     WFPerCU = 8;
-				@(`p = Calls the payload outside the mixer.`)	     SeparatePayload = false;
-			}*/
+			/*
+				 exampls struct: struct Options {
+								@(`Exits right after a solution.`)	     EarlyExit = false;
+								@(`t|BenchmarkTime = Minimum duration of the benchmark. Default: $DEFAULT$ sec`)	     BenchmarkMinTime = 12;
+								@(`WFPerCU = Number of WaveFronts on each Compute Units. Default: $DEFAULT$`)	     WFPerCU = 8;
+								@(`p = Calls the payload outside the mixer.`)	     SeparatePayload = false;
+							}
+			*/
 			
 			string[] getoptLines = getStructInfo(options).getoptLines("options");
 			auto opts = mixin("getopt(args, std.getopt.config.bundling,\r\n"~getStructInfo!T.getoptLines("options").join(",")~")");
 			
-			if(opts.helpWanted && handleHelp){
+			if(opts.helpWanted && handleHelp) {
 				writeln(opts.helpText);
 				application.exit;
 			}
@@ -5261,14 +5236,18 @@ version(/+$DIDE_REGION Containers+/all)
 		string quoted(string s, char q = '"')
 		{
 			if(q=='"') return format!"%(%s%)"([s]);
-			else if(q=='`') return s.canFind(q) ? quoted(s, '"') : q ~ s ~ q; //note: it's safe: uses " when ` is impossible
-			else ERR("Unsupported quote char: "~q);
+			else if(q=='`') return s.canFind(q) ? quoted(s, '"') : q ~ s ~ q;
+			else
+			ERR("Unsupported quote char: "~q);
+			
 			assert(0);
 		}
 		
-		/*string quoteForDos(){
-		
-		}*/
+		/*
+			string quoteForDos(){
+					
+					}
+		*/
 		
 		
 		auto joinCommandLine(string[] cmd)//todo: handling quotes
@@ -5318,24 +5297,25 @@ version(/+$DIDE_REGION Containers+/all)
 				.map!(l => l.empty ? "" : id~l)
 				.join("\r\n");
 		}
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		//std.algorithm.findsplit is similar
 		bool split2(string s, string delim, out string a, out string b, bool doStrip = true)
-		{//split to 2 parts
+		{
+			//split to 2 parts
 			auto i = s.countUntil(delim);
-			if(i>=0){
+			if(i>=0) {
 				a = s[0..i];
 				b = s[i+delim.length..$];
-			}else{
+			}else {
 				a = s;
 				b = "";
 			}
-		
-			if(doStrip){
+					
+			if(doStrip) {
 				a = a.strip;
 				b = b.strip;
 			}
-		
+					
 			return i>=0;
 		}
 		
@@ -5353,7 +5333,7 @@ version(/+$DIDE_REGION Containers+/all)
 			return b;
 		}
 		
-		string capitalizeFirstLetter(string s){
+		string capitalizeFirstLetter(string s) {
 			if(s.empty) return s;
 			return s[0..1].uc ~ s[1..$];
 		}
@@ -5368,7 +5348,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			string[] lines = text.split(delims[1]).array;
 			string[][]cells = lines.map!(s => s.stripRightReturn.split(delims[0]).map!strip.array).array;
-		
+					
 			//add empty cells where needed
 			auto maxCols = cells.map!(c => c.length).maxElement;
 			foreach(ref c; cells) c.length = maxCols;
@@ -5376,41 +5356,31 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		auto csvToCells(string text)
-		{
-			return tabTextToCells(text, ";\n");
-		}
+		{ return tabTextToCells(text, ";\n"); }
 		
 		//todo: import splitLines from std.string
 		
 		string[] splitLines(string s)
-		{
-			return s.split('\n').map!(a => a.withoutEnding('\r')).array;
-		}
+		{ return s.split('\n').map!(a => a.withoutEnding('\r')).array; }
 		
 		dstring[] splitLines(dstring s)
-		{
-			return s.split('\n').map!(a => a.withoutEnding('\r')).array;
-		}
+		{ return s.split('\n').map!(a => a.withoutEnding('\r')).array; }
 		
 		bool startsWith_ci(string s, string w) pure
 		{
 			if(w.length>s.length) return false; //todo: refactor functionally
 			foreach(i, ch; w)
-			{
-				if(uc(s[i]) != uc(ch)) return false;
-			}
+			{ if(uc(s[i]) != uc(ch)) return false; }
 			return true;
 		}
 		
 		string skipOver_ci(string s, string w) pure
-		{
-			return s.startsWith_ci(w) ? s[w.length..$] : s;
-		}
+		{ return s.startsWith_ci(w) ? s[w.length..$] : s; }
 		
 		auto splitSections(string sectionNameMarker="*")(ubyte[] data, string sectionDelim)
 		{
 			//example of a section delimiter: "\n\n$$$SECTION:*\n\n"
-			struct SectionRec{
+			struct SectionRec {
 				string key;
 				ubyte[] value;
 			}
@@ -5423,21 +5393,22 @@ version(/+$DIDE_REGION Containers+/all)
 			SectionRec[] res;
 			
 			if(parts.length && parts[0].length)
-				res ~= SectionRec("", parts[0]); //first noname section
+			res ~= SectionRec("", parts[0]); //first noname section
 			
-			if(parts.length>1) 
-				foreach(p; parts[1..$])
-				{
-					auto i = p.countUntil(cast(const ubyte[])d1);
-					if(i>=0) res ~= SectionRec(cast(string)(p[0..i]), p[i+d1.length..$]);
-				}
+			if(parts.length>1)
+			foreach(p; parts[1..$])
+			{
+				auto i = p.countUntil(cast(const ubyte[])d1);
+				if(i>=0) res ~= SectionRec(cast(string)(p[0..i]), p[i+d1.length..$]);
+			}
 			
 			return res;
 		}
 		
 		/// Because the one in std is bugging
 		string outdent(string s)
-		{//todo: this is lame
+		{
+			//todo: this is lame
 			return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n');
 		}
 		
@@ -5447,12 +5418,12 @@ version(/+$DIDE_REGION Containers+/all)
 			import std.uni;
 			if(s=="") return s; //empty
 			if(s[0].isUpper) return s; //starts with uppercase
-		
+					
 			//fetch a word
 			auto popWord()
 			{
 				string word;
-				while(s.length){
+				while(s.length) {
 					char ch = s[0]; //no unicode support
 					if(!word.empty && ch.isUpper) break;
 					s = s[1..$];
@@ -5460,12 +5431,12 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				return word;
 			}
-		
+					
 			string[] res;
-			while(s.length){ res ~= popWord; }
-		
+			while(s.length) { res ~= popWord; }
+					
 			foreach(idx, ref w; res) w = idx ? w.toLower : w.capitalize;
-		
+					
 			return res.join(' ');
 		}
 		
@@ -5474,32 +5445,28 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			V[K] _impl;
 			K[] keyOrder;
-		
+					
 			void opIndexAssign(V value, K key)
 			{
 				if(key !in _impl) keyOrder ~= key;
 				_impl[key] = value;
 			}
-		
+					
 			V opIndex(K key)
-			{
-				return _impl[key];
-			}
-		
+			{ return _impl[key]; }
+					
 			int opApply(int delegate(K,V) dg)
 			{
-				foreach (key; keyOrder)
-					if(dg(key, _impl[key])) return 1;
+				foreach(key; keyOrder)
+				if(dg(key, _impl[key])) return 1;
 				return 0;
 			}
-		
+					
 			auto byKeyValue()
-			{
-				return keyOrder.map!(k => tuple!("key", "value")(k, _impl[k]));
-			}
+			{ return keyOrder.map!(k => tuple!("key", "value")(k, _impl[k])); }
 		}
-	}version(/+$DIDE_REGION+/all){
-		struct UrlParams{
+	}version(/+$DIDE_REGION+/all) {
+		struct UrlParams {
 			string path;
 			OrderedAA!(string, string) params;
 		}
@@ -5507,15 +5474,15 @@ version(/+$DIDE_REGION Containers+/all)
 		UrlParams decodeUrlParams(string url)
 		{
 			string path, params; split2(url, "?", path, params);
-		
+					
 			auto res = UrlParams(path);
-		
+					
 			foreach(s; params.split('&'))
 			{
 				string name, value; split2(s, "=", name, value);
 				res.params[urlDecode(name)] = urlDecode(value);
 			}
-		
+					
 			return res;
 		}
 		
@@ -5529,10 +5496,10 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			if(!overrides.canFind('?')) overrides = '?' ~ overrides;
 			auto base = url.decodeUrlParams, ovr = overrides.decodeUrlParams;
-		
+					
 			foreach(k, v; ovr.params)
-				base.params[k] = v;
-		
+			base.params[k] = v;
+					
 			return encodeUrlParams(base);
 		}
 		
@@ -5544,35 +5511,36 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		void mergeUrlParams(ref string s1, string s2)
-		{//used by het.stream.proparray only. Kinda deprecated
+		{
+			//used by het.stream.proparray only. Kinda deprecated
 			string path1, params1; split2(s1, "?", path1, params1);
 			string path2, params2; split2(s2, "?", path2, params2); //s2 overrides the path!!!!
-		
+					
 			enforce(path1.empty || path1==path2);
-		
+					
 			string[string] m;
-		
+					
 			foreach(s; chain(params1.split('&'), params2.split('&')))
 			{
 				string name, value; split2(s, "=", name, value);
 				m[name] = value;
 			}
-		
+					
 			string[] res;
 			foreach(k, v; m)
-				res ~= k~'='~v;
-		
+			res ~= k~'='~v;
+					
 			s1 = path2~'?'~res.join('&');
 		}
 		
-		// strips off regex-like /flags off the input string.
+		//strips off regex-like /flags off the input string.
 		string fetchRegexFlags(ref string s)
 		{
 			string res;
 			foreach_reverse(idx, ch; s)
 			{
 				if(ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch.inRange('0', '9') || ch=='_') continue;
-				if(ch=='/'){
+				if(ch=='/') {
 					res = s[idx+1..$];
 					s = s[0..idx].stripRight;
 					return res;
@@ -5593,89 +5561,89 @@ version(/+$DIDE_REGION Containers+/all)
 			else static if(base==1000) enum divFactor(int n) = (0.0001)^^n;
 			else static assert(0, "invalid base");
 			
-			string s = n.text;	if(s.length<=4) 	return s~spacing;
-			s = format!"%.1f"(n*divFactor!1); 	if(s.length<=3)	return s~spacing~'k';
-			s = format!"%.0f"(n*divFactor!1);	if(s.length<=3)	return s~spacing~'k';
-			s = format!"%.1f"(n*divFactor!2);	if(s.length<=3)	return s~spacing~'M';
-			s = format!"%.0f"(n*divFactor!2);	if(s.length<=3)	return s~spacing~'M';
-			s = format!"%.1f"(n*divFactor!3);	if(s.length<=3)	return s~spacing~'G';
-			s = format!"%.0f"(n*divFactor!3);	if(s.length<=3)	return s~spacing~'G';
-			s = format!"%.1f"(n*divFactor!4);	if(s.length<=3)	return s~spacing~'T';
+			string s = n.text;	if(s.length<=4) return s~spacing;
+			s = format!"%.1f"(n*divFactor!1); 	if(s.length<=3) return s~spacing~'k';
+			s = format!"%.0f"(n*divFactor!1);	if(s.length<=3) return s~spacing~'k';
+			s = format!"%.1f"(n*divFactor!2);	if(s.length<=3) return s~spacing~'M';
+			s = format!"%.0f"(n*divFactor!2);	if(s.length<=3) return s~spacing~'M';
+			s = format!"%.1f"(n*divFactor!3);	if(s.length<=3) return s~spacing~'G';
+			s = format!"%.0f"(n*divFactor!3);	if(s.length<=3) return s~spacing~'G';
+			s = format!"%.1f"(n*divFactor!4);	if(s.length<=3) return s~spacing~'T';
 			s = format!"%.0f"(n*divFactor!4);		return s~spacing~'T';
 		}
-	
-		// UNICODE /////////////////////////////////////////////
+			
+		//UNICODE /////////////////////////////////////////////
 		
 		/*
 			int[] UnicodeEmojiBlocks = [
 				0x00A,           //Latin1 supplement
-	
+				
 				0x203, 0x204,			 //2000-206F General Punctuation
 				0x212, 0x213,			 //2100-214F Letterlike Symbols
 				0x219, 0x21A,			 //2190-21FF Arrows
-	
+				
 				0x231, 0x232,    //2300-23FF Miscellaneous Technical
 				0x23C,
 				0x23E, 0x23F,
-	
+				
 				0x24C,           //2460-24FF Enclosed Alphanumerics
-	
+				
 				0x25A, 0x25B, 0x25C, //25A0-25FF Geometric Shapes
 				0x25F,
-	
+				
 				0x260, 0x261, 0x262, 0x263, 0x264, 0x265, 0x266, 0x267,  //2600-26FF Miscellaneous Symbols
 				0x269, 0x26A, 0x26B, 0x26C, 0x26D, 0x26E, 0x26F,
-	
+				
 				0x270, 0x271, 0x272, 0x273, 0x274, 0x275, 0x276,         //2700-27BF Dingbats
 				0x279, 0x27A, 0x27B,
-	
+				
 				0x293,  //2900-297F Supplemental Arrows-B
-	
+				
 				0x2B0, 0x2B1, //2B00-2BFF Miscellaneous Symbols and Arrows
 				0x2B5,
-	
+				
 				0x303,        //3000-303FCJK Symbols and Punctuation
-	
+				
 				0x329,        //3200-32FF Enclosed CJK Letters and Months
-	
+				
 				0x1F00,       //1F000-1F02F Mahjong Tiles
-	
+				
 				0x1F0C,       //1F0A0-1F0FF Playing Cards
-	
+				
 				0x1F17, 0x1F18, 0x1F19, //1F100-1F1FF Enclosed Alphanumeric Supplement
-	
+				
 				0x1F20, 0x1F21, 0x1F22, 0x1F23, //1F200-1F2FF Enclosed Ideographic Supplement
 				0x1F25,
-	
+				
 				//1F300-1F5FF Miscellaneous Symbols and Pictographs
 				0x1F30, 0x1F31, 0x1F32, 0x1F33, 0x1F34, 0x1F35, 0x1F36, 0x1F37, 0x1F38, 0x1F39,
 				0x1F3A, 0x1F3B, 0x1F3C, 0x1F3D, 0x1F3E, 0x1F3F, 0x1F40, 0x1F41, 0x1F42, 0x1F43,
 				0x1F44, 0x1F45, 0x1F46, 0x1F47, 0x1F48, 0x1F49, 0x1F4A, 0x1F4B, 0x1F4C, 0x1F4D,
 				0x1F4E, 0x1F4F, 0x1F50, 0x1F51, 0x1F52, 0x1F53, 0x1F54, 0x1F55, 0x1F56, 0x1F57,
 				0x1F58, 0x1F59, 0x1F5A, 0x1F5B, 0x1F5C, 0x1F5D, 0x1F5E, 0x1F5F,
-	
+				
 				0x1F60, 0x1F61, 0x1F62, 0x1F63, 0x1F64, //1F600-1F64F Emoticons (Emoji)
-	
+				
 				0x1F68, 0x1F69, 0x1F6A, 0x1F6B, 0x1F6C, 0x1F6D, 0x1F6E, 0x1F6F, //1F680-1F6FF Transport and Map Symbols
-	
+				
 				//1F900-1F9FF Supplemental Symbols and Pictographs
 				0x1F91, 0x1F92, 0x1F93, 0x1F94, 0x1F95, 0x1F96, 0x1F97, 0x1F98, 0x1F99, 0x1F9A, 0x1F9B, 0x1F9C, 0x1F9D, 0x1F9E, 0x1F9F
 			];
 		*/
 		
-	}version(/+$DIDE_REGION+/all){
-	
+	}version(/+$DIDE_REGION+/all) {
+			
 		//unicodeStandardLetter: these can be stylized by fonts, such as Arial/Consolas/Times. Other characters are usually the same, eg.: Chineese chars.
-		//  containt ranges of latin, greek, cyril, armenian chars. These can have different representations across each fonts
+		//containt ranges of latin, greek, cyril, armenian chars. These can have different representations across each fonts
 		bool isUnicodeStandardLetter(dchar ch)
 		{
-			immutable unicodeStandardLetterRanges = [ 
+			immutable unicodeStandardLetterRanges = [
 				[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF],
 				[0x2C60, 0x2C7F], [0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF],
 				[0xAB30, 0xAB6F] 
 			];
 			foreach(const r; unicodeStandardLetterRanges)
-				if(ch.inRange(r[0], r[1])>=r[0] && ch<=r[1]) return true;
+			if(ch.inRange(r[0], r[1])>=r[0] && ch<=r[1]) return true;
 			return false;
 		}
 		
@@ -5687,15 +5655,17 @@ version(/+$DIDE_REGION Containers+/all)
 			return false;
 		}
 		
-		/*******************************
-		 * Return !=0 if unicode alpha.
-		 * Use table from C99 Appendix D.
-		 */
+		/*
+			******************************
+					 * Return !=0 if unicode alpha.
+					 * Use table from C99 Appendix D.
+		*/
 		///Copied from: ldc-master\dmd\root\utf.d
 		bool isUniAlpha(dchar c)
 		{
 			static immutable wchar[2][] ALPHA_TABLE =
-			[//todo: discover these chars. Decide if they are useful or not.
+			[
+				//todo: discover these chars. Decide if they are useful or not.
 				[0x00AA, 0x00AA],[0x00B5, 0x00B5],[0x00B7, 0x00B7],[0x00BA, 0x00BA],[0x00C0, 0x00D6],[0x00D8, 0x00F6],[0x00F8, 0x01F5],[0x01FA, 0x0217],
 				[0x0250, 0x02A8],[0x02B0, 0x02B8],[0x02BB, 0x02BB],[0x02BD, 0x02C1],[0x02D0, 0x02D1],[0x02E0, 0x02E4],[0x037A, 0x037A],[0x0386, 0x0386],
 				[0x0388, 0x038A],[0x038C, 0x038C],[0x038E, 0x03A1],[0x03A3, 0x03CE],[0x03D0, 0x03D6],[0x03DA, 0x03DA],[0x03DC, 0x03DC],[0x03DE, 0x03DE],
@@ -5728,18 +5698,18 @@ version(/+$DIDE_REGION Containers+/all)
 				[0x2128, 0x2128],[0x212A, 0x2131],[0x2133, 0x2138],[0x2160, 0x2182],[0x3005, 0x3007],[0x3021, 0x3029],[0x3041, 0x3093],[0x309B, 0x309C],
 				[0x30A1, 0x30F6],[0x30FB, 0x30FC],[0x3105, 0x312C],[0x4E00, 0x9FA5],[0xAC00, 0xD7A3],
 			];
-		
+					
 			size_t high = ALPHA_TABLE.length - 1;
-			// Shortcut search if c is out of range
+			//Shortcut search if c is out of range
 			size_t low = (c < ALPHA_TABLE[0][0] || ALPHA_TABLE[high][1] < c) ? high + 1 : 0;
-			// Binary search
-			while (low <= high)
+			//Binary search
+			while(low <= high)
 			{
 				size_t mid = (low + high) >> 1;
-				if (c < ALPHA_TABLE[mid][0])
-					high = mid - 1;
-				else if (ALPHA_TABLE[mid][1] < c)
-					low = mid + 1;
+				if(c < ALPHA_TABLE[mid][0])
+				high = mid - 1;
+				else if(ALPHA_TABLE[mid][1] < c)
+				low = mid + 1;
 				else
 				{
 					assert(ALPHA_TABLE[mid][0] <= c && c <= ALPHA_TABLE[mid][1]);
@@ -5749,7 +5719,7 @@ version(/+$DIDE_REGION Containers+/all)
 			return false;
 		}
 		
-		enum TextEncoding	{ ANSI, UTF8	,            UTF32BE,            UTF32LE,	UTF16BE, UTF16LE   } //UTF32 must be checked BEFORE UTF16
+		enum TextEncoding	 { ANSI, UTF8	,            UTF32BE,            UTF32LE,	UTF16BE, UTF16LE   } //UTF32 must be checked BEFORE UTF16
 		private const encodingHeaders =	[""	  ,	"\xEF\xBB\xBF", "\x00\x00\xFE\xFF",	"\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"];
 		private const encodingCharSize=	[1	  , 1             ,                  4,                  4,          2,          2];
 		
@@ -5763,7 +5733,7 @@ version(/+$DIDE_REGION Containers+/all)
 					return cast(TextEncoding)(i);
 				}
 			}
-		
+					
 			//default encoding
 			if(withoutEnc) *withoutEnc = s;
 			return def;
@@ -5777,17 +5747,14 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		string ansiToUTF8(string s)
-		{
-			wstring ws; .transcode(cast(Windows1252String)s, ws); return ws.toUTF8;
-		}
+		{ wstring ws; .transcode(cast(Windows1252String)s, ws); return ws.toUTF8; }
 		
 		dstring ansiToUTF32(string s)
-		{
-			wstring ws; .transcode(cast(Windows1252String)s, ws); return ws.toUTF32;
-		}
+		{ wstring ws; .transcode(cast(Windows1252String)s, ws); return ws.toUTF32; }
 		
 		string textToUTF8(string s, TextEncoding defaultEncoding=TextEncoding.UTF8)
-		{//my version handles BOM
+		{
+			//my version handles BOM
 			final switch(encodingOf(s, defaultEncoding, &s))
 			{
 				case TextEncoding.ANSI	: return s.ansiToUTF8;
@@ -5800,7 +5767,8 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		dstring textToUTF32(string s, TextEncoding defaultEncoding=TextEncoding.UTF8)
-		{//my version handles BOM
+		{
+			//my version handles BOM
 			final switch(encodingOf(s, defaultEncoding, &s))
 			{
 				case TextEncoding.ANSI	: return s.ansiToUTF32;
@@ -5814,20 +5782,22 @@ version(/+$DIDE_REGION Containers+/all)
 		
 	}
 }version(/+$DIDE_REGION Hashing+/all)
-{//Hashing//////////////////////////////////////////
-	version(/+$DIDE_REGION+/all){
+{
+	//Hashing//////////////////////////////////////////
+	version(/+$DIDE_REGION+/all) {
 		/// Returns a string that represents the identity of the parameter: and object or a pointer or a string
 		/// If a string is passed, the caller must ensure if it's system wide unique.
 		string identityStr(T)(in T a)
-		{ // identityStr /////////////////////////
-				static if(isSomeString!T	) 	return a;
-			else	static if(isPointer!T   	) 	return a is null ? "" : format!"%s(%s)"(PointerTarget!T.stringof, cast(void*)a);
-			else	static if(is(T == class)	) 	return a is null ? "" : format!"%s(%s)"(T.stringof, cast(void*)a);
-			else	static if(is(T == typeof(null))	) 	return "";
-			else			static assert(0, "identityStr() unhandled type: "~T.stringof);
+		{
+			 //identityStr /////////////////////////
+				static if(isSomeString!T	) return a;
+			else static if(isPointer!T   	) return a is null ? "" : format!"%s(%s)"(PointerTarget!T.stringof, cast(void*)a);
+			else static if(is(T == class)	) return a is null ? "" : format!"%s(%s)"(T.stringof, cast(void*)a);
+			else static if(is(T == typeof(null))	) return "";
+			else static assert(0, "identityStr() unhandled type: "~T.stringof);
 		}
 		
-		// some really symple hashes.
+		//some really symple hashes.
 		
 		uint uintHash(uint h0, string haFun)(string s)
 		{
@@ -5851,7 +5821,7 @@ version(/+$DIDE_REGION Containers+/all)
 		/// It's fast
 		uint tokenHash()(string s)
 		{
-			switch(s.length){
+			switch(s.length) {
 				case 0: return 0;
 				case 1: return *(cast(ubyte*)s.ptr)+7123u;
 				case 2: return *(cast(ushort*)s.ptr)+2541281u;
@@ -5862,27 +5832,28 @@ version(/+$DIDE_REGION Containers+/all)
 		enum bigPrime = 1515485863;
 		
 		uint hashCombine(uint c1, uint c2)
-		{
-			return c1*bigPrime+c2;
-		}
+		{ return c1*bigPrime+c2; }
 		
 		void testSmallHashes()
-		{//todo: unittest
-			auto data = [`(`, `{`, `[`, "/*", "/+", "//", `'`, `"`, "`", "r\"", "q\"", "q{", 
-			`#line `, `#!`, `)`, `}`, `]`, "\0", "\x1A", "__EOF__"].replicate(10);
+		{
+			//todo: unittest
+			auto data = [
+				`(`, `{`, `[`, "/*", "/+", "//", `'`, `"`, "`", "r\"", "q\"", "q{", 
+							`#line `, `#!`, `)`, `}`, `]`, "\0", "\x1A", "__EOF__"
+			].replicate(10);
 			
 			data.take(20).each!(s => print(s.djb2Hash!0, s.djb2Hash!1, s.sdbmHash!0, s.sdbmHash!1, s.xxh32, s.hashOf));
 			
 			
 			uint h;
-			void f0(){ h += data.map!(djb2Hash!0).sum; }
-			void f1(){ h += data.map!(djb2Hash!1).sum; }
-			void f2(){ h += data.map!(sdbmHash!0).sum; }
-			void f3(){ h += data.map!(sdbmHash!1).sum; }
-			void f4(){ h += data.map!(xxh32).sum; }
-			void f5(){ h += data.map!(hashOf).sum; }
-			void f6(){ h += data.map!(tokenHash).sum; }
-		
+			void f0() { h += data.map!(djb2Hash!0).sum; }
+			void f1() { h += data.map!(djb2Hash!1).sum; }
+			void f2() { h += data.map!(sdbmHash!0).sum; }
+			void f3() { h += data.map!(sdbmHash!1).sum; }
+			void f4() { h += data.map!(xxh32).sum; }
+			void f5() { h += data.map!(hashOf).sum; }
+			void f6() { h += data.map!(tokenHash).sum; }
+					
 			import std.datetime.stopwatch;
 			benchmark!(f0, f1, f2, f3, f4, f5, f6)(1000).each!print;
 		}
@@ -5939,766 +5910,760 @@ version(/+$DIDE_REGION Containers+/all)
 				0x54de5729, 0x23d967bf, 0xb3667a2e, 0xc4614ab8,	0x5d681b02, 0x2a6f2b94,
 				0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d
 			];
-		
+					
 			uint r = seed;
-		
+					
 			foreach(const d; cast(ubyte[])source)
-				r = CRC32tab[cast(ubyte)r^d]^(r>>>8);
-		
+			r = CRC32tab[cast(ubyte)r^d]^(r>>>8);
+					
 			return ~r;
 		}
 		
 		uint crc32uc(in void[] source, uint seed = 0xffffffff)
-		{
-			return crc32(uc(cast(string)source));
-		}
+		{ return crc32(uc(cast(string)source)); }
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		@trusted pure nothrow uint xxh32(in void[] source, uint seed = 0)//todo: it must run at compile time too
 		{
-		//! xxh32 //////////////////////////////////////////////////////
-		// a fast hashing function
-		
-		//Source:	https://github.com/repeatedly/xxhash-d/blob/master/src/xxhash.d
-		//	https://code.google.com/p/xxhash/
-		// Copyright: Masahiro Nakagawa 2014-.
-			enum 	Prime32_1 = 2654435761U,
-				Prime32_2 = 2246822519U,
-				Prime32_3 = 3266489917U,
-				Prime32_4 = 668265263U,
-				Prime32_5 = 374761393U;
+			//! xxh32 //////////////////////////////////////////////////////
+			//a fast hashing function
 			
-			enum UpdateValuesRound = q{
+			//Source:	https://github.com/repeatedly/xxhash-d/blob/master/src/xxhash.d
+			//https://code.google.com/p/xxhash/
+			//Copyright: Masahiro Nakagawa 2014-.
+				enum 	Prime32_1 = 2654435761U,
+					Prime32_2 = 2246822519U,
+					Prime32_3 = 3266489917U,
+					Prime32_4 = 668265263U,
+					Prime32_5 = 374761393U;
+				
+				enum UpdateValuesRound = q{
 				v1 += loadUint(srcPtr) * Prime32_2;	 v1 = rol(v1, 13);	 v1 *= Prime32_1;	 srcPtr++;
 				v2 += loadUint(srcPtr) * Prime32_2;	 v2 = rol(v2, 13);	 v2 *= Prime32_1;	 srcPtr++;
 				v3 += loadUint(srcPtr) * Prime32_2;	 v3 = rol(v3, 13);	 v3 *= Prime32_1;	 srcPtr++;
 				v4 += loadUint(srcPtr) * Prime32_2;	 v4 = rol(v4, 13);	 v4 *= Prime32_1;	 srcPtr++;
 			};
-			
-			enum FinishRound = q{
+				
+				enum FinishRound = q{
 				while (ptr < end) {
-						result += *ptr * Prime32_5;
-						result = rol(result, 11) * Prime32_1 ;
-						ptr++;
+					result += *ptr * Prime32_5;
+					result = rol(result, 11) * Prime32_1 ;
+					ptr++;
 				}
 				result ^= result >> 15;	 result *= Prime32_2;
 				result ^= result >> 13;	 result *= Prime32_3;
 				result ^= result >> 16;
 			};
-	
-			static void xxh_rounds(ref const(uint)*	src, const(uint)* limit, uint* v) nothrow
+				
+				static void xxh_rounds(ref const(uint)*	src, const(uint)* limit, uint* v) nothrow
 			{
-													 //	RCX,                RDX,      R8
+													 //RCX,                RDX,      R8
 				//Intel byteorder only!
 				if(1)
 				{
-					do{
+					do {
 						v[0] += *(src  ) * Prime32_2;	 v[0] = rol(v[0], 13);	 v[0] *= Prime32_1;
 						v[1] += *(src+1) * Prime32_2;	 v[1] = rol(v[1], 13);	 v[1] *= Prime32_1;
 						v[2] += *(src+2) * Prime32_2;	 v[2] = rol(v[2], 13);	 v[2] *= Prime32_1;
 						v[3] += *(src+3) * Prime32_2;	 v[3] = rol(v[3], 13);	 v[3] *= Prime32_1;  src+=4;
 					}
-					while (src <= limit);
+					while(src <= limit);
 				}
 				else
-				{//todo: this is not working
-					asm{
-						mov EAX, 2246822519;    	//XMM4 : Prime2
-						movd XMM4, EAX;	
-						pshufd XMM4, XMM4, 0;	
-							
-						mov EAX, 2654435761;	//XMM5 : Prime1
-						movd XMM5, EAX;	
-						pshufd XMM5, XMM5, 0;	
-							
-						movdqu XMM0, [R8];	//XMM0 : v
-							
-						mov RAX, [RCX];	//RAX : src
-							//RDX : limit
-							
-					loop:
-						movdqu XMM1, [RAX];  add RAX, 16;  //load src
-		
-						movdqa XMM2, XMM1;                  //mul with Prime2
-						punpckldq XMM1, XMM1;
-						punpckldq XMM2, XMM2;
-						pmuludq XMM1, XMM4;
-						pmuludq XMM2, XMM4;
-						pshufd XMM1, XMM2, 0x88;
-		
-						paddd XMM0, XMM1;                   //add to v
-		
-						movdqa XMM2, XMM0;
-						pslld XMM2, 13;              //rol(v, 13)
-						psrld XMM0, 32-13;
-						por XMM0, XMM2;
-		
-						movdqa XMM2, XMM0;                  //mul with Prime1
-						punpckldq XMM0, XMM0;
-						punpckldq XMM2, XMM2;
-						pmuludq XMM0, XMM5;
-						pmuludq XMM2, XMM5;
-						pshufd XMM0, XMM2, 0x88;
-		
-						cmp RAX, RDX;
-						jbe loop;
-		
-						mov [RCX], RAX;      //write back src
-		
-						movdqu [R8], XMM0;   //write back state
+				{
+					//todo: this is not working
+					asm {
+							mov EAX, 2246822519;    	//XMM4 : Prime2
+							movd XMM4, EAX;	
+							pshufd XMM4, XMM4, 0;	
+								
+							mov EAX, 2654435761;	//XMM5 : Prime1
+							movd XMM5, EAX;	
+							pshufd XMM5, XMM5, 0;	
+								
+							movdqu XMM0, [R8];	//XMM0 : v
+								
+							mov RAX, [RCX];	//RAX : src
+								//RDX : limit
+								
+						loop:
+							movdqu XMM1, [RAX];  add RAX, 16;  //load src
+								
+							movdqa XMM2, XMM1;                  //mul with Prime2
+							punpckldq XMM1, XMM1;
+							punpckldq XMM2, XMM2;
+							pmuludq XMM1, XMM4;
+							pmuludq XMM2, XMM4;
+							pshufd XMM1, XMM2, 0x88;
+								
+							paddd XMM0, XMM1;                   //add to v
+								
+							movdqa XMM2, XMM0;
+							pslld XMM2, 13;              //rol(v, 13)
+							psrld XMM0, 32-13;
+							por XMM0, XMM2;
+								
+							movdqa XMM2, XMM0;                  //mul with Prime1
+							punpckldq XMM0, XMM0;
+							punpckldq XMM2, XMM2;
+							pmuludq XMM0, XMM5;
+							pmuludq XMM2, XMM5;
+							pshufd XMM0, XMM2, 0x88;
+								
+							cmp RAX, RDX;
+							jbe loop;
+								
+							mov [RCX], RAX;      //write back src
+								
+							movdqu [R8], XMM0;   //write back state
 					}
 				}
 			}
-			
-			@safe pure nothrow
-			uint loadUint(in uint* source)
+				
+				@safe pure nothrow
+				uint loadUint(in uint* source)
 			{
-					version (LittleEndian)
-							return *source;
-					else
-							return swapEndian(*source);
+				version(LittleEndian)
+				return *source;
+				else
+				return swapEndian(*source);
 			}
-		
-			auto srcPtr = cast(const(uint)*)source.ptr;
-			auto srcEnd = cast(const(uint)*)(source.ptr + source.length);
-			uint result = void;
-		
-			if (source.length >= 16)
+			
+				auto srcPtr = cast(const(uint)*)source.ptr;
+				auto srcEnd = cast(const(uint)*)(source.ptr + source.length);
+				uint result = void;
+			
+				if(source.length >= 16)
 			{
 				auto limit = srcEnd - 4;
-				auto v = [seed + Prime32_1 + Prime32_2,
-									seed + Prime32_2,
-									seed,
-									seed - Prime32_1];
+				auto v = [
+					seed + Prime32_1 + Prime32_2,
+														seed + Prime32_2,
+														seed,
+														seed - Prime32_1
+				];
 				
 				xxh_rounds(srcPtr, limit, v.ptr);
 				
 				result = rol(v[0], 1) + rol(v[1], 7) + rol(v[2], 12) + rol(v[3], 18);
 			}
 			else
-			{
-				result = seed + Prime32_5;
-			}
-			
-			result += source.length;
-			
-			while (srcPtr+1 <= srcEnd) {
+			{ result = seed + Prime32_5; }
+				
+				result += source.length;
+				
+				while(srcPtr+1 <= srcEnd) {
 				result += loadUint(srcPtr) * Prime32_3;
 				result = rol(result, 17) * Prime32_4;
 				srcPtr++;
 			}
-		
-			auto ptr = cast(const(ubyte)*)srcPtr;
-			auto end = cast(const(ubyte)*)srcEnd;
-		
-			mixin(FinishRound);
-		
-			return result;
-			//todo: xxh unittest
+			
+				auto ptr = cast(const(ubyte)*)srcPtr;
+				auto end = cast(const(ubyte)*)srcEnd;
+			
+				mixin(FinishRound);
+			
+				return result;
+				//todo: xxh unittest
 		}
 		
 		uint xxh32uc(in void[] source, uint seed = 0)
-		{
-			return xxh32(uc(cast(string)source));
-		}
+		{ return xxh32(uc(cast(string)source)); }
 		
 		void benchmark_xxh32()
 		{
-			size_t len = 1;
-			while(len<2_000_000_000)
+				size_t len = 1;
+				while(len<2_000_000_000)
 			{
 				auto data = new ubyte[len];
 				auto t0 = QPS;
 				cast(void)xxh32(data);
 				auto t1 = QPS;
-		
+						
 				writefln("len = %10d   time = %6.3f   MB/s = %9.3f", len, t1-t0, len/(t1-t0)/1024/1024);
-		
+						
 				len = iceil(len*1.5);
 			}
-		
-		/+
-			string[] strings = File(`c:\d\libs\het\utils.d`).readLines;
-		
-			immutable str = "Hello";
-			import core.internal.hash;
-			enum test = bytesHash(str.ptr, str.length, 0);
-			print(test);
-		
-			foreach(batch; 0..5){
-				auto t0 = QPS;
-				foreach(const s; strings) s.xxh(0);
-				auto t1 = QPS;
-				foreach(const s; strings) hashOf(s);
-				auto t2 = QPS;
-		
-				print("xxh: ", t1-t0, "hashOf: ", t2-t1);
-			}
-		+/
+			
+			/+
+				string[] strings = File(`c:\d\libs\het\utils.d`).readLines;
+						
+				immutable str = "Hello";
+				import core.internal.hash;
+				enum test = bytesHash(str.ptr, str.length, 0);
+				print(test);
+						
+				foreach(batch; 0..5){
+					auto t0 = QPS;
+					foreach(const s; strings) s.xxh(0);
+					auto t1 = QPS;
+					foreach(const s; strings) hashOf(s);
+					auto t2 = QPS;
+						
+					print("xxh: ", t1-t0, "hashOf: ", t2-t1);
+				}
+			+/
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		struct XXH3
-		{static: //! xxh3 ///////////////////////////////////////////////////////////////////
-		version(/+$DIDE_REGION+/all){
-			enum	STRIPE_LEN 	=  64,
-				SECRET_CONSUME_RATE	=   8,  /* nb of secret bytes consumed at each accumulation */
-				ACC_NB	= STRIPE_LEN / ulong.sizeof,
-				SECRET_MERGEACCS_START 	=  11,
-				SECRET_LASTACC_START	=   7,  /* not aligned on 8, last secret is different from acc & scrambler */
-				MIDSIZE_STARTOFFSET	=   3,
-				MIDSIZE_LASTOFFSET	=  17,
-				SECRET_SIZE_MIN	= 136,
-				SECRET_DEFAULT_SIZE	= 192,
-				
-				PRIME32_1 = 0x9E3779B1U,	 PRIME64_1 = 0x9E3779B185EBCA87UL,
-				PRIME32_2 = 0x85EBCA77U,	 PRIME64_2 = 0xC2B2AE3D27D4EB4FUL,
-				PRIME32_3 = 0xC2B2AE3DU,	 PRIME64_3 = 0x165667B19E3779F9UL,
-				PRIME32_4 = 0x27D4EB2FU,	 PRIME64_4 = 0x85EBCA77C2B2AE63UL,
-				PRIME32_5 = 0x165667B1U,	 PRIME64_5 = 0x27D4EB2F165667C5UL;
-		
-			immutable ulong[ACC_NB] INIT_ACC = [PRIME32_3, PRIME64_1, PRIME64_2, PRIME64_3, PRIME64_4, PRIME32_2, PRIME64_5, PRIME32_1];
-		
-			immutable ubyte[SECRET_DEFAULT_SIZE] kSecret = 
-			[
-				0xb8, 0xfe, 0x6c, 0x39, 0x23, 0xa4, 0x4b, 0xbe, 0x7c, 0x01, 0x81, 0x2c, 0xf7, 0x21, 0xad, 0x1c,
-				0xde, 0xd4, 0x6d, 0xe9, 0x83, 0x90, 0x97, 0xdb, 0x72, 0x40, 0xa4, 0xa4, 0xb7, 0xb3, 0x67, 0x1f,
-				0xcb, 0x79, 0xe6, 0x4e, 0xcc, 0xc0, 0xe5, 0x78, 0x82, 0x5a, 0xd0, 0x7d, 0xcc, 0xff, 0x72, 0x21,
-				0xb8, 0x08, 0x46, 0x74, 0xf7, 0x43, 0x24, 0x8e, 0xe0, 0x35, 0x90, 0xe6, 0x81, 0x3a, 0x26, 0x4c,
-				0x3c, 0x28, 0x52, 0xbb, 0x91, 0xc3, 0x00, 0xcb, 0x88, 0xd0, 0x65, 0x8b, 0x1b, 0x53, 0x2e, 0xa3,
-				0x71, 0x64, 0x48, 0x97, 0xa2, 0x0d, 0xf9, 0x4e, 0x38, 0x19, 0xef, 0x46, 0xa9, 0xde, 0xac, 0xd8,
-				0xa8, 0xfa, 0x76, 0x3f, 0xe3, 0x9c, 0x34, 0x3f, 0xf9, 0xdc, 0xbb, 0xc7, 0xc7, 0x0b, 0x4f, 0x1d,
-				0x8a, 0x51, 0xe0, 0x4b, 0xcd, 0xb4, 0x59, 0x31, 0xc8, 0x9f, 0x7e, 0xc9, 0xd9, 0x78, 0x73, 0x64,
-				0xea, 0xc5, 0xac, 0x83, 0x34, 0xd3, 0xeb, 0xc3, 0xc5, 0x81, 0xa0, 0xff, 0xfa, 0x13, 0x63, 0xeb,
-				0x17, 0x0d, 0xdd, 0x51, 0xb7, 0xf0, 0xda, 0x49, 0xd3, 0x16, 0x55, 0x26, 0x29, 0xd4, 0x68, 0x9e,
-				0x2b, 0x16, 0xbe, 0x58, 0x7d, 0x47, 0xa1, 0xfc, 0x8f, 0xf8, 0xb8, 0xd1, 0x7a, 0xd0, 0x31, 0xce,
-				0x45, 0xcb, 0x3a, 0x8f, 0x95, 0x16, 0x04, 0x28, 0xaf, 0xd7, 0xfb, 0xca, 0xbb, 0x4b, 0x40, 0x7e,
-			];
-		
-			ulong readLE64(in void* memPtr)
-			{ return *cast(const ulong*)memPtr; }
-			uint readLE32(in void* memPtr)
-			{ return *cast(const uint*)memPtr; }
-			void writeLE64(void* memPtr, ulong val)
-			{ *cast(ulong*)memPtr = val; }
-		
-			ulong mult32to64(T, U)(T x, U y)
-			{ return (cast(ulong)cast(uint)(x) * cast(ulong)cast(uint)(y)); }
-		
-			ulong[2] mult64to128(ulong lhs, ulong rhs)
-			{
-				/* First calculate all of the cross products. */
-				const	lo_lo 	= mult32to64(lhs & 0xFFFFFFFF, rhs & 0xFFFFFFFF),
-					hi_lo 	= mult32to64(lhs >> 32       , rhs & 0xFFFFFFFF),
-					lo_hi 	= mult32to64(lhs & 0xFFFFFFFF, rhs >> 32),
-					hi_hi 	= mult32to64(lhs >> 32       , rhs >> 32),
+		{
+			static: //! xxh3 ///////////////////////////////////////////////////////////////////
+					version(/+$DIDE_REGION+/all) {
+				enum 	STRIPE_LEN 	=  64,
+					SECRET_CONSUME_RATE	=   8,  /*nb of secret bytes consumed at each accumulation*/
+					ACC_NB	= STRIPE_LEN / ulong.sizeof,
+					SECRET_MERGEACCS_START 	=  11,
+					SECRET_LASTACC_START	=   7,  /*not aligned on 8, last secret is different from acc & scrambler*/
+					MIDSIZE_STARTOFFSET	=   3,
+					MIDSIZE_LASTOFFSET	=  17,
+					SECRET_SIZE_MIN	= 136,
+					SECRET_DEFAULT_SIZE	= 192,
 					
-					/* Now add the products together. These will never overflow. */
-					cross 	= (lo_lo >> 32) + (hi_lo & 0xFFFFFFFF) + lo_hi,
-					upper 	= (hi_lo >> 32) + (cross >> 32       ) + hi_hi,
-					lower 	= (cross << 32) | (lo_lo & 0xFFFFFFFF);
-		
-				return [lower, upper];
-			}
-		
-			import std.bitmanip : swapEndian;
-			uint swap32(uint x)
-			{ return x.swapEndian; }
-			ulong swap64(ulong x)
-			{ return x.swapEndian; }
-		
-			uint rotl32(uint x, uint r)
-			{ return ((x << r) | (x >> (32 - r))); }
-			ulong rotl64(ulong x, uint r)
-			{ return ((x << r) | (x >> (64 - r))); }
-		
-			ulong mul128_fold64(ulong lhs, ulong rhs)
-			{
-				auto a = mult64to128(lhs, rhs);
-				return a[0] ^ a[1];
-			}
-		
-			ulong xorshift64(ulong v64, uint shift)
-			{
-				return v64 ^ (v64 >> shift);
-			}
-		
-			ulong avalanche(ulong h64)
-			{
-				h64 = xorshift64(h64, 37);
-				h64 *= 0x165667919E3779F9UL;
-				h64 = xorshift64(h64, 32);
-				return h64;
-			}
-		
-			ulong avalanche64(ulong h64)
-			{
-				h64 ^= h64 >> 33;
-				h64 *= PRIME64_2;
-				h64 ^= h64 >> 29;
-				h64 *= PRIME64_3;
-				h64 ^= h64 >> 32;
-				return h64;
-			}
-		
-			ulong rrmxmx(ulong h64, ulong len)
-			{
-				/* this mix is inspired by Pelle Evensen's rrmxmx */
-				h64 ^= rotl64(h64, 49) ^ rotl64(h64, 24);
-				h64 *= 0x9FB21C651E98DF25UL;
-				h64 ^= (h64 >> 35) + len;
-				h64 *= 0x9FB21C651E98DF25UL;
-				return xorshift64(h64, 28);
-			}
-		
-		}version(/+$DIDE_REGION+/all){
-		
-			ulong mix16B(in ubyte* input, in ubyte* secret, ulong seed64)
-			{
-				const 	input_lo = readLE64(input    ),
-					input_hi = readLE64(input + 8);
-				return mul128_fold64(
-					input_lo ^ (readLE64(secret    ) + seed64),
-					input_hi ^ (readLE64(secret + 8) - seed64)
-				);
-			}
-		
-			ulong mix2Accs(const ulong* acc, in ubyte* secret)
-			{
-				return mul128_fold64(	acc[0] ^ readLE64(secret    ),
-					acc[1] ^ readLE64(secret + 8) );
-			}
-		
-			ulong mergeAccs(in ulong* acc, in ubyte* secret, ulong start)
-			{
-				return avalanche(start + iota(4).map!(i => mix2Accs(acc + 2 * i, secret + 16 * i)).sum);
-			}
-		
-			void accumulate512_scalar(ulong* acc/+ presumed aligned +/, in ubyte* input, in ubyte* secret)
-			{
-				//note: a XXH3.readLE64 nem inlineolodik, csak akkor, ha az XXH3-on belulrol van meghivva!!!
-				foreach(i; 0..ACC_NB)
+					PRIME32_1 = 0x9E3779B1U,	 PRIME64_1 = 0x9E3779B185EBCA87UL,
+					PRIME32_2 = 0x85EBCA77U,	 PRIME64_2 = 0xC2B2AE3D27D4EB4FUL,
+					PRIME32_3 = 0xC2B2AE3DU,	 PRIME64_3 = 0x165667B19E3779F9UL,
+					PRIME32_4 = 0x27D4EB2FU,	 PRIME64_4 = 0x85EBCA77C2B2AE63UL,
+					PRIME32_5 = 0x165667B1U,	 PRIME64_5 = 0x27D4EB2F165667C5UL;
+						
+				immutable ulong[ACC_NB] INIT_ACC = [PRIME32_3, PRIME64_1, PRIME64_2, PRIME64_3, PRIME64_4, PRIME32_2, PRIME64_5, PRIME32_1];
+						
+				immutable ubyte[SECRET_DEFAULT_SIZE] kSecret = 
+				[
+					0xb8, 0xfe, 0x6c, 0x39, 0x23, 0xa4, 0x4b, 0xbe, 0x7c, 0x01, 0x81, 0x2c, 0xf7, 0x21, 0xad, 0x1c,
+					0xde, 0xd4, 0x6d, 0xe9, 0x83, 0x90, 0x97, 0xdb, 0x72, 0x40, 0xa4, 0xa4, 0xb7, 0xb3, 0x67, 0x1f,
+					0xcb, 0x79, 0xe6, 0x4e, 0xcc, 0xc0, 0xe5, 0x78, 0x82, 0x5a, 0xd0, 0x7d, 0xcc, 0xff, 0x72, 0x21,
+					0xb8, 0x08, 0x46, 0x74, 0xf7, 0x43, 0x24, 0x8e, 0xe0, 0x35, 0x90, 0xe6, 0x81, 0x3a, 0x26, 0x4c,
+					0x3c, 0x28, 0x52, 0xbb, 0x91, 0xc3, 0x00, 0xcb, 0x88, 0xd0, 0x65, 0x8b, 0x1b, 0x53, 0x2e, 0xa3,
+					0x71, 0x64, 0x48, 0x97, 0xa2, 0x0d, 0xf9, 0x4e, 0x38, 0x19, 0xef, 0x46, 0xa9, 0xde, 0xac, 0xd8,
+					0xa8, 0xfa, 0x76, 0x3f, 0xe3, 0x9c, 0x34, 0x3f, 0xf9, 0xdc, 0xbb, 0xc7, 0xc7, 0x0b, 0x4f, 0x1d,
+					0x8a, 0x51, 0xe0, 0x4b, 0xcd, 0xb4, 0x59, 0x31, 0xc8, 0x9f, 0x7e, 0xc9, 0xd9, 0x78, 0x73, 0x64,
+					0xea, 0xc5, 0xac, 0x83, 0x34, 0xd3, 0xeb, 0xc3, 0xc5, 0x81, 0xa0, 0xff, 0xfa, 0x13, 0x63, 0xeb,
+					0x17, 0x0d, 0xdd, 0x51, 0xb7, 0xf0, 0xda, 0x49, 0xd3, 0x16, 0x55, 0x26, 0x29, 0xd4, 0x68, 0x9e,
+					0x2b, 0x16, 0xbe, 0x58, 0x7d, 0x47, 0xa1, 0xfc, 0x8f, 0xf8, 0xb8, 0xd1, 0x7a, 0xd0, 0x31, 0xce,
+					0x45, 0xcb, 0x3a, 0x8f, 0x95, 0x16, 0x04, 0x28, 0xaf, 0xd7, 0xfb, 0xca, 0xbb, 0x4b, 0x40, 0x7e,
+				];
+						
+				ulong readLE64(in void* memPtr)
+				{ return *cast(const ulong*)memPtr; }
+				uint readLE32(in void* memPtr)
+				{ return *cast(const uint*)memPtr; }
+				void writeLE64(void* memPtr, ulong val)
+				{ *cast(ulong*)memPtr = val; }
+						
+				ulong mult32to64(T, U)(T x, U y)
+				{ return (cast(ulong)cast(uint)(x) * cast(ulong)cast(uint)(y)); }
+						
+				ulong[2] mult64to128(ulong lhs, ulong rhs)
 				{
-					auto data_val = readLE64(input + 8 * i), //todo: const
-							 data_key = data_val ^ readLE64(secret + i * 8);
-					acc[i ^ 1] += data_val; /* swap adjacent lanes */
-					acc[i    ] += mult32to64(data_key & 0xFFFFFFFF, data_key >> 32);
+					/*First calculate all of the cross products.*/
+					const	lo_lo 	= mult32to64(lhs & 0xFFFFFFFF, rhs & 0xFFFFFFFF),
+						hi_lo 	= mult32to64(lhs >> 32       , rhs & 0xFFFFFFFF),
+						lo_hi 	= mult32to64(lhs & 0xFFFFFFFF, rhs >> 32),
+						hi_hi 	= mult32to64(lhs >> 32       , rhs >> 32),
+						
+						/*Now add the products together. These will never overflow.*/
+						cross 	= (lo_lo >> 32) + (hi_lo & 0xFFFFFFFF) + lo_hi,
+						upper 	= (hi_lo >> 32) + (cross >> 32       ) + hi_hi,
+						lower 	= (cross << 32) | (lo_lo & 0xFFFFFFFF);
+							
+					return [lower, upper];
 				}
-			}
-		
-			void accumulate512_sse(ulong* acc/+ presumed aligned +/, in ubyte* input, in ubyte* secret)
-			{
-				enum ver = "opt";
-		
-				auto inp = cast(const ulong*) input, sec = cast(const ulong*) secret;
-		
-				static if(ver=="normal")
-				{//1250ms
-					foreach(i; 0..8)
+						
+				import std.bitmanip : swapEndian;
+				uint swap32(uint x)
+				{ return x.swapEndian; }
+				ulong swap64(ulong x)
+				{ return x.swapEndian; }
+						
+				uint rotl32(uint x, uint r)
+				{ return ((x << r) | (x >> (32 - r))); }
+				ulong rotl64(ulong x, uint r)
+				{ return ((x << r) | (x >> (64 - r))); }
+						
+				ulong mul128_fold64(ulong lhs, ulong rhs)
+				{
+					auto a = mult64to128(lhs, rhs);
+					return a[0] ^ a[1];
+				}
+						
+				ulong xorshift64(ulong v64, uint shift)
+				{ return v64 ^ (v64 >> shift); }
+						
+				ulong avalanche(ulong h64)
+				{
+					h64 = xorshift64(h64, 37);
+					h64 *= 0x165667919E3779F9UL;
+					h64 = xorshift64(h64, 32);
+					return h64;
+				}
+						
+				ulong avalanche64(ulong h64)
+				{
+					h64 ^= h64 >> 33;
+					h64 *= PRIME64_2;
+					h64 ^= h64 >> 29;
+					h64 *= PRIME64_3;
+					h64 ^= h64 >> 32;
+					return h64;
+				}
+						
+				ulong rrmxmx(ulong h64, ulong len)
+				{
+					/*this mix is inspired by Pelle Evensen's rrmxmx*/
+					h64 ^= rotl64(h64, 49) ^ rotl64(h64, 24);
+					h64 *= 0x9FB21C651E98DF25UL;
+					h64 ^= (h64 >> 35) + len;
+					h64 *= 0x9FB21C651E98DF25UL;
+					return xorshift64(h64, 28);
+				}
+						
+			}version(/+$DIDE_REGION+/all) {
+						
+				ulong mix16B(in ubyte* input, in ubyte* secret, ulong seed64)
+				{
+					const 	input_lo = readLE64(input    ),
+						input_hi = readLE64(input + 8);
+					return mul128_fold64(
+						input_lo ^ (readLE64(secret    ) + seed64),
+						input_hi ^ (readLE64(secret + 8) - seed64)
+					);
+				}
+						
+				ulong mix2Accs(const ulong* acc, in ubyte* secret)
+				{
+					return mul128_fold64(
+						acc[0] ^ readLE64(secret    ),
+										acc[1] ^ readLE64(secret + 8) 
+					);
+				}
+						
+				ulong mergeAccs(in ulong* acc, in ubyte* secret, ulong start)
+				{ return avalanche(start + iota(4).map!(i => mix2Accs(acc + 2 * i, secret + 16 * i)).sum); }
+						
+				void accumulate512_scalar(ulong* acc/+presumed aligned+/, in ubyte* input, in ubyte* secret)
+				{
+					//note: a XXH3.readLE64 nem inlineolodik, csak akkor, ha az XXH3-on belulrol van meghivva!!!
+					foreach(i; 0..ACC_NB)
 					{
-						const v = inp[i],  k = sec[i] ^ v;
-						acc[i  ] += (k & 0xFFFFFFFF) * (k >> 32);
-						acc[i^1] += v;
+						auto data_val = readLE64(input + 8 * i), //todo: const
+								 data_key = data_val ^ readLE64(secret + i * 8);
+						acc[i ^ 1] += data_val; /*swap adjacent lanes*/
+						acc[i    ] += mult32to64(data_key & 0xFFFFFFFF, data_key >> 32);
 					}
 				}
-		
-				static if(ver=="unroll2")
-				{//1150ms
-					for(int i; i<8; i+=2)
-					{ //a bit faster, because	only 1 write into acc
-						const v0 = inp[i	 ]	,	 v1 = inp[i+1]	,
-									k0 = sec[i	 ] ^ v0,		k1 = sec[i+1] ^ v1;
-						const a0 = k0 & 0xFFFFFFFF,	 a1 = k1 & 0xFFFFFFFF,
-									b0 = k0 >> 32       ,	 b1 = k1 >> 32       ;
-						acc[i  ] += a0*b0 + v1;
-						acc[i+1] += a1*b1 + v0;
+						
+				void accumulate512_sse(ulong* acc/+presumed aligned+/, in ubyte* input, in ubyte* secret)
+				{
+					enum ver = "opt";
+							
+					auto inp = cast(const ulong*) input, sec = cast(const ulong*) secret;
+							
+					static if(ver=="normal")
+					{
+						//1250ms
+						foreach(i; 0..8)
+						{
+							const v = inp[i],  k = sec[i] ^ v;
+							acc[i  ] += (k & 0xFFFFFFFF) * (k >> 32);
+							acc[i^1] += v;
+						}
+					}
+							
+					static if(ver=="unroll2")
+					{
+						//1150ms
+						for(int i; i<8; i+=2)
+						{
+							 //a bit faster, because	only 1 write into acc
+							const v0 = inp[i	 ]	,	 v1 = inp[i+1]	,
+										k0 = sec[i	 ] ^ v0,		k1 = sec[i+1] ^ v1;
+							const a0 = k0 & 0xFFFFFFFF,	 a1 = k1 & 0xFFFFFFFF,
+										b0 = k0 >> 32       ,	 b1 = k1 >> 32     ;
+							acc[i  ] += a0*b0 + v1;
+							acc[i+1] += a1*b1 + v0;
+						}
+					}
+							
+					static if(ver=="opt")
+					asm {
+						 //860ms
+						//R8 acc, RDX input, RCX secret
+						//free: RAX, RCX, RDX, R8, R9, R10, R11, XMM0-XMM5
+						prefetcht0 [R8 + 0x200];
+						mov R11, 0;  L0:;
+							movdqu	XMM0,	[RDX + R11];	  //v0, v1
+							movdqu	XMM1,	[RCX + R11]; pxor XMM1,	XMM0;	  //k0, k1,  also a0, a1
+							movdqa	XMM2,	XMM1; psrlq XMM2, 32;		//b0, b1
+							pmuludq	XMM1,	XMM2;
+							shufps	XMM0,	XMM0, 0b01_00_11_10;            //v1, v0 swapped
+							movdqu	XMM3,	[R8 + R11];
+							paddq	XMM0,	XMM1;
+							paddq	XMM0,	XMM3;
+							movdqu	[R8 +	R11], XMM0;
+						add R11, 0x10; cmp R11, 0x40;  jnz L0;
 					}
 				}
-		
-				static if(ver=="opt")
-				asm{ //860ms
-					//R8 acc, RDX input, RCX secret
-					//free: RAX, RCX, RDX, R8, R9, R10, R11, XMM0-XMM5
-					prefetcht0 [R8 + 0x200];
-					mov R11, 0;  L0:;
-						movdqu	XMM0,	[RDX + R11];	  //v0, v1
-						movdqu	XMM1,	[RCX + R11]; pxor XMM1,	XMM0;	  //k0, k1,  also a0, a1
-						movdqa	XMM2,	XMM1; psrlq XMM2, 32;		//b0, b1
-						pmuludq	XMM1,	XMM2;
-						shufps	XMM0,	XMM0, 0b01_00_11_10;            //v1, v0 swapped
-						movdqu	XMM3,	[R8 + R11];
-						paddq	XMM0,	XMM1;
-						paddq	XMM0,	XMM3;
-						movdqu	[R8 +	R11], XMM0;
-					add R11, 0x10; cmp R11, 0x40;  jnz L0;
+						
+				auto accumulate512 = &accumulate512_sse;
+						
+				void accumulate(ulong* acc,in ubyte* input,in ubyte* secret, size_t nbStripes)
+				{
+					foreach(n; 0..nbStripes) {
+						const inp = input + n * STRIPE_LEN;
+						//opt: PREFETCH(in + PREFETCH_DIST);
+						accumulate512(acc, inp, secret + n * SECRET_CONSUME_RATE);
+					}
 				}
-			}
-		
-			auto accumulate512 = &accumulate512_sse;
-		
-			void accumulate(ulong* acc,in ubyte* input,in ubyte* secret, size_t nbStripes)
-			{
-				foreach(n; 0..nbStripes){
-					const inp = input + n * STRIPE_LEN;
-					//opt: PREFETCH(in + PREFETCH_DIST);
-					accumulate512(acc, inp, secret + n * SECRET_CONSUME_RATE);
-				}
-			}
-		
-			void scrambleAcc_scalar(ulong* acc/+ presumed aligned +/, in ubyte* secret)
-			{
-				foreach(i; 0..ACC_NB)
+						
+				void scrambleAcc_scalar(ulong* acc/+presumed aligned+/, in ubyte* secret)
+				{
+					foreach(i; 0..ACC_NB)
 					acc[i] = (xorshift64(acc[i], 47) ^ readLE64(secret + 8 * i)) * PRIME32_1;
-			}
-		
-			void hashLong_internal_loop(ulong* acc, in ubyte* input, size_t len, in ubyte* secret, size_t secretSize)
-			{
-				const nbStripesPerBlock = (secretSize - STRIPE_LEN) / SECRET_CONSUME_RATE,
-							block_len = STRIPE_LEN * nbStripesPerBlock,
-							nb_blocks = (len - 1) / block_len;
-		
-				foreach(n; 0..nb_blocks){
-					accumulate(acc, input + n * block_len, secret, nbStripesPerBlock);
-					scrambleAcc_scalar(acc, secret + secretSize - STRIPE_LEN);
 				}
-		
-				/* last partial block */
-				const nbStripes = ((len - 1) - (block_len * nb_blocks)) / STRIPE_LEN;
-				accumulate(acc, input + nb_blocks * block_len, secret, nbStripes);
-		
-				/* last stripe */
-				const p = input + len - STRIPE_LEN;
-				accumulate512(acc, p, secret + secretSize - STRIPE_LEN - SECRET_LASTACC_START);
-			}
-		
-			void initCustomSecret_scalar(void* customSecret, ulong seed64)
-			{
-				const kSecretPtr = kSecret.ptr;
-		
-				const nbRounds = SECRET_DEFAULT_SIZE / 16;
-				foreach(i; 0..nbRounds){
-					auto lo = readLE64(kSecretPtr + 16	* i	) + seed64,
-							 hi = readLE64(kSecretPtr + 16	* i + 8)	- seed64;
-					writeLE64(customSecret + 16 * i	, lo);
-					writeLE64(customSecret + 16 * i + 8, hi);
-				}
-			}
-		}version(/+$DIDE_REGION+/all){
-			ulong generate64_internal(in ubyte* input, size_t len, ulong seed, in ubyte* secret, size_t secretLen)
-			{
-			
-				ulong len_0to16()
+						
+				void hashLong_internal_loop(ulong* acc, in ubyte* input, size_t len, in ubyte* secret, size_t secretSize)
 				{
-					ulong len_1to3()
-					{
-						const	c1	= input[0],
-							c2	= input[len >> 1],
-							c3	= input[len - 1],
-							combined	= (c1 << 16) | (c2	<< 24) | (c3 <<  0) | (len <<  8),
-							bitflip	= (readLE32(secret)	^ readLE32(secret + 4)) + seed,
-							keyed	= combined ^ bitflip;
-						return avalanche64(keyed);
+					const nbStripesPerBlock = (secretSize - STRIPE_LEN) / SECRET_CONSUME_RATE,
+								block_len = STRIPE_LEN * nbStripesPerBlock,
+								nb_blocks = (len - 1) / block_len;
+							
+					foreach(n; 0..nb_blocks) {
+						accumulate(acc, input + n * block_len, secret, nbStripesPerBlock);
+						scrambleAcc_scalar(acc, secret + secretSize - STRIPE_LEN);
 					}
-		
-					ulong len_4to8()
-					{
-						seed ^= cast(ulong)swap32(cast(uint)seed) << 32;
-						const 	input1	= readLE32(input),
-							input2	= readLE32(input + len - 4),
-							bitflip	= (readLE64(secret + 8) ^ readLE64(secret + 16)) - seed,
-							input64	= input2 + ((cast(ulong)input1) << 32),
-							keyed	= input64 ^ bitflip;
-						return rrmxmx(keyed, len);
+							
+					/*last partial block*/
+					const nbStripes = ((len - 1) - (block_len * nb_blocks)) / STRIPE_LEN;
+					accumulate(acc, input + nb_blocks * block_len, secret, nbStripes);
+							
+					/*last stripe*/
+					const p = input + len - STRIPE_LEN;
+					accumulate512(acc, p, secret + secretSize - STRIPE_LEN - SECRET_LASTACC_START);
+				}
+						
+				void initCustomSecret_scalar(void* customSecret, ulong seed64)
+				{
+					const kSecretPtr = kSecret.ptr;
+							
+					const nbRounds = SECRET_DEFAULT_SIZE / 16;
+					foreach(i; 0..nbRounds) {
+						auto lo = readLE64(kSecretPtr + 16	* i	) + seed64,
+								 hi = readLE64(kSecretPtr + 16	* i + 8)	- seed64;
+						writeLE64(customSecret + 16 * i	, lo);
+						writeLE64(customSecret + 16 * i + 8, hi);
 					}
-		
-					ulong len_9to16()
+				}
+			}version(/+$DIDE_REGION+/all) {
+				ulong generate64_internal(in ubyte* input, size_t len, ulong seed, in ubyte* secret, size_t secretLen)
+				{
+								
+					ulong len_0to16()
 					{
-						const 	bitflip1 = (readLE64(secret + 24) ^ readLE64(secret + 32)) + seed,
-							bitflip2	= (readLE64(secret + 40) ^ readLE64(secret + 48)) - seed,
-							input_lo	= readLE64(input) ^ bitflip1,
-							input_hi	= readLE64(input + len - 8) ^ bitflip2,
-							acc	= len + swap64(input_lo) + input_hi + mul128_fold64(input_lo, input_hi);
+						ulong len_1to3()
+						{
+							const	c1	= input[0],
+								c2	= input[len >> 1],
+								c3	= input[len - 1],
+								combined	= (c1 << 16) | (c2	<< 24) | (c3 <<  0) | (len <<  8),
+								bitflip	= (readLE32(secret)	^ readLE32(secret + 4)) + seed,
+								keyed	= combined ^ bitflip;
+							return avalanche64(keyed);
+						}
+								
+						ulong len_4to8()
+						{
+							seed ^= cast(ulong)swap32(cast(uint)seed) << 32;
+							const 	input1	= readLE32(input),
+								input2	= readLE32(input + len - 4),
+								bitflip	= (readLE64(secret + 8) ^ readLE64(secret + 16)) - seed,
+								input64	= input2 + ((cast(ulong)input1) << 32),
+								keyed	= input64 ^ bitflip;
+							return rrmxmx(keyed, len);
+						}
+								
+						ulong len_9to16()
+						{
+							const 	bitflip1 = (readLE64(secret + 24) ^ readLE64(secret + 32)) + seed,
+								bitflip2	= (readLE64(secret + 40) ^ readLE64(secret + 48)) - seed,
+								input_lo	= readLE64(input) ^ bitflip1,
+								input_hi	= readLE64(input + len - 8) ^ bitflip2,
+								acc	= len + swap64(input_lo) + input_hi + mul128_fold64(input_lo, input_hi);
+							return avalanche(acc);
+						}
+								
+						if(len >	8) return len_9to16;
+						if(len >=	4) return len_4to8;
+						if(len   ) return len_1to3;
+						return avalanche64(seed ^ (readLE64(secret + 56) ^ readLE64(secret + 64)));
+					}
+							
+					ulong len_17to128()
+					{
+						ulong acc = len * PRIME64_1;
+						if(len > 32) {
+							if(len > 64) {
+								if(len > 96) {
+									acc += mix16B(input + 48      , secret +  96, seed);
+									acc += mix16B(input + len - 64, secret + 112, seed);
+								}
+								acc += mix16B(input + 32      , secret + 64, seed);
+								acc += mix16B(input + len - 48, secret + 80, seed);
+							}
+							acc += mix16B(input + 16      , secret + 32, seed);
+							acc += mix16B(input + len - 32, secret + 48, seed);
+						}
+						acc += mix16B(input +        0, secret +  0, seed);
+						acc += mix16B(input + len - 16, secret + 16, seed);
+								
 						return avalanche(acc);
 					}
-		
-					if (len >	8) return len_9to16;
-					if (len >=	4) return len_4to8;
-					if (len     ) return len_1to3;
-					return avalanche64(seed ^ (readLE64(secret + 56) ^ readLE64(secret + 64)));
-				}
-		
-				ulong len_17to128()
-				{
-					ulong acc = len * PRIME64_1;
-					if (len > 32) {
-						if (len > 64) {
-							if (len > 96) {
-								acc += mix16B(input + 48      , secret +  96, seed);
-								acc += mix16B(input + len - 64, secret + 112, seed);
-							}
-							acc += mix16B(input + 32      , secret + 64, seed);
-							acc += mix16B(input + len - 48, secret + 80, seed);
-						}
-						acc += mix16B(input + 16      , secret + 32, seed);
-						acc += mix16B(input + len - 32, secret + 48, seed);
-					}
-					acc += mix16B(input +        0, secret +  0, seed);
-					acc += mix16B(input + len - 16, secret + 16, seed);
-		
-					return avalanche(acc);
-				}
-		
-				ulong len_129to240()
-				{
-					ulong acc = len * PRIME64_1;
-		
-					foreach(i; 0..8)
+							
+					ulong len_129to240()
+					{
+						ulong acc = len * PRIME64_1;
+								
+						foreach(i; 0..8)
 						acc += mix16B(input + (16 * i), secret + (16 * i), seed);
-					acc = avalanche(acc);
-		
-					const nbRounds = len / 16;
-					foreach(i; 8..nbRounds)
+						acc = avalanche(acc);
+								
+						const nbRounds = len / 16;
+						foreach(i; 8..nbRounds)
 						acc += mix16B(input + (16 * i), secret + (16 * (i - 8)) + MIDSIZE_STARTOFFSET, seed);
-		
-					/* last bytes */
-					acc += mix16B(input + len - 16, secret + SECRET_SIZE_MIN - MIDSIZE_LASTOFFSET, seed);
-					return avalanche(acc);
+								
+						/*last bytes*/
+						acc += mix16B(input + len - 16, secret + SECRET_SIZE_MIN - MIDSIZE_LASTOFFSET, seed);
+						return avalanche(acc);
+					}
+							
+					ulong hashLong_withSeed()
+					{
+						ubyte[SECRET_DEFAULT_SIZE] secret;
+						initCustomSecret_scalar(secret.ptr, seed);
+						ulong[ACC_NB] acc = INIT_ACC;
+								
+						hashLong_internal_loop(acc.ptr, input, len, secret.ptr, secret.length);
+						return mergeAccs(acc.ptr, secret.ptr + SECRET_MERGEACCS_START, len * PRIME64_1);
+					}
+							
+					if(len <=  16) return len_0to16;
+					if(len <= 128) return len_17to128;
+					if(len <= 240) return len_129to240;
+					return hashLong_withSeed;
 				}
-		
-				ulong hashLong_withSeed()
+						
+				ulong generate64(in void* input, size_t len, ulong seed=0)
+				{ return generate64_internal(cast(const ubyte*)input, len, seed, kSecret.ptr, kSecret.sizeof); }
+						
+				void selftest()
 				{
-					ubyte[SECRET_DEFAULT_SIZE] secret;
-					initCustomSecret_scalar(secret.ptr, seed);
-					ulong[ACC_NB] acc = INIT_ACC;
-		
-					hashLong_internal_loop(acc.ptr, input, len, secret.ptr, secret.length);
-					return mergeAccs(acc.ptr, secret.ptr + SECRET_MERGEACCS_START, len * PRIME64_1);
-				}
-		
-				if(len <=  16) return len_0to16;
-				if(len <= 128) return len_17to128;
-				if(len <= 240) return len_129to240;
-				return hashLong_withSeed;
-			}
-		
-			ulong generate64(in void* input, size_t len, ulong seed=0)
-			{
-				return generate64_internal(cast(const ubyte*)input, len, seed, kSecret.ptr, kSecret.sizeof);
-			}
-		
-			void selftest()
-			{
-				const lengths = [
-					0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 
-					64, 65, 95, 96, 97, 127, 128, 129, 239, 240, 241, 255, 256, 257, 511, 512, 513 ];
-				const results = [
-					0x2d06800538d394c2, 0x0fe498556034255e, 0xe72a1171b2f83a1a, 0x4366019a3823dccf, 
-					0x4b48e4f5d655d132, 0xd8fae3d7a0c3754b, 0x0f5f4187bb0b7b70, 0x9c84d18587e10b2c,
-					0x00d94b281bba523e, 0x127c8cf284a2ac8d, 0x7d553d9cba2010cb, 0xc6c419714f465d1b,
-					0x974813de6f540eb4, 0xf9e1b4199e9b6ccb, 0x35691ab299857461, 0x40fcd44dc3049173,
-					0x62cd23a00db02a2c, 0x969b2300ea907020, 0x8382b2fb55a25b3e, 0x9e0f9ae9891b607c,
-					0x86cf3e266cdbe658, 0xf529e83950d89de1, 0xf2e216f8f8e10db5, 0xfba432f419d27644,
-					0x3339807d2a21fd56, 0xc4bdbce6762c4ac7, 0x795d6a504c1cfecc, 0xa6bfe3904a35af5c,
-					0xeb5c4226460ec2c9, 0xcb803070815f2ab2, 0x21b7914a0ab293ec, 0xa56955aa7e5d2e12,
-					0x40273dbf31e227c9 ];
-				foreach(i, len; lengths)
-				{
-					const str = iota(len).map!(j => cast(char)(j*i % 51 + ' ')).to!string,
-								seed = i%5,
-								hash = .xxh3(str, seed);
-					enforce(hash==results[i], "FATAL ERROR: XXH3_64 failed at len:"~len.text);
+					const lengths = [
+						0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33, 63, 
+						64, 65, 95, 96, 97, 127, 128, 129, 239, 240, 241, 255, 256, 257, 511, 512, 513 
+					];
+					const results = [
+						0x2d06800538d394c2, 0x0fe498556034255e, 0xe72a1171b2f83a1a, 0x4366019a3823dccf, 
+						0x4b48e4f5d655d132, 0xd8fae3d7a0c3754b, 0x0f5f4187bb0b7b70, 0x9c84d18587e10b2c,
+						0x00d94b281bba523e, 0x127c8cf284a2ac8d, 0x7d553d9cba2010cb, 0xc6c419714f465d1b,
+						0x974813de6f540eb4, 0xf9e1b4199e9b6ccb, 0x35691ab299857461, 0x40fcd44dc3049173,
+						0x62cd23a00db02a2c, 0x969b2300ea907020, 0x8382b2fb55a25b3e, 0x9e0f9ae9891b607c,
+						0x86cf3e266cdbe658, 0xf529e83950d89de1, 0xf2e216f8f8e10db5, 0xfba432f419d27644,
+						0x3339807d2a21fd56, 0xc4bdbce6762c4ac7, 0x795d6a504c1cfecc, 0xa6bfe3904a35af5c,
+						0xeb5c4226460ec2c9, 0xcb803070815f2ab2, 0x21b7914a0ab293ec, 0xa56955aa7e5d2e12,
+						0x40273dbf31e227c9 
+					];
+					foreach(i, len; lengths)
+					{
+						const str = iota(len).map!(j => cast(char)(j*i % 51 + ' ')).to!string,
+									seed = i%5,
+									hash = .xxh3(str, seed);
+						enforce(hash==results[i], "FATAL ERROR: XXH3_64 failed at len:"~len.text);
+					}
 				}
 			}
-		}
 		}
 		
 		ulong xxh3_64(in void[] data, ulong seed=0)
-		{
-			return XXH3.generate64(data.ptr, data.length, seed);
-		}
+		{ return XXH3.generate64(data.ptr, data.length, seed); }
 		
 		alias xxh3 = xxh3_64;
 		
 		uint xxh3_32(in void[] data, ulong seed=0)
-		{
-			return cast(uint)xxh3(data, seed);
-		}
+		{ return cast(uint)xxh3(data, seed); }
 		
 	}
 }
 
 version(/+$DIDE_REGION Date Time+/all)
-{//Date/Time///////////////////////////////
+{
+	//Date/Time///////////////////////////////
 	version(/+$DIDE_REGION+/all)
 	{
-		void sleep(int ms){ Sleep(ms); }
+		void sleep(int ms) { Sleep(ms); }
 		
-		void sleep(in Time t){ sleep(t.value(milli(second)).to!int); }
+		void sleep(in Time t) { sleep(t.value(milli(second)).to!int); }
 		
 		immutable string[12] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 		
 		 //todo: delete old crap from datetime
 		
 		version(/+$DIDE_REGION Old routines+/all)
-		private
 		{
-			enum dateReference = 693594;
-			enum secsInDay = 24*60*60;
-			enum msecsInDay = secsInDay*1000;
-		
-			immutable monthDays = [[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-				[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]];
-		
-			deprecated bool isLeapYear(int year)
+			private
 			{
-				return year%4==0 && (year%100!=0 || year%400==0);
-			}
-		
-			deprecated double encodeTime(int hour, int min, int sec, double ms)
-			{
-				return (((ms/1000+sec)/60+min)/60+hour)/24;
-			}
-		
-			deprecated double encodeDate(int year, int month, int day)
-			{//returns NaN if invalid
-				auto dayTable = monthDays[isLeapYear(year)][];
-				if(inRange(year,  1, 9999) && inRange(month, 1, 12) && inRange(day, 1, dayTable[month-1]))
+				enum dateReference = 693594;
+				enum secsInDay = 24*60*60;
+				enum msecsInDay = secsInDay*1000;
+						
+				immutable monthDays = [
+					[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
+									[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+				];
+						
+				deprecated bool isLeapYear(int year)
+				{ return year%4==0 && (year%100!=0 || year%400==0); }
+						
+				deprecated double encodeTime(int hour, int min, int sec, double ms)
+				{ return (((ms/1000+sec)/60+min)/60+hour)/24; }
+						
+				deprecated double encodeDate(int year, int month, int day)
 				{
-					foreach(i; 0..month-1) day += dayTable[i];
-					int i = year-1;
-					return i*365 + i/4 - i/100 + i/400 + day - dateReference;
+					//returns NaN if invalid
+					auto dayTable = monthDays[isLeapYear(year)][];
+					if(inRange(year,  1, 9999) && inRange(month, 1, 12) && inRange(day, 1, dayTable[month-1]))
+					{
+						foreach(i; 0..month-1) day += dayTable[i];
+						int i = year-1;
+						return i*365 + i/4 - i/100 + i/400 + day - dateReference;
+					}
+					else
+					{ return double.nan; }
 				}
-				else
+						
+				deprecated public SYSTEMTIME decodeDate(double dateTime)
 				{
-					return double.nan;
+					enum 	D1 = 365,
+						D4 = D1 * 4 + 1,
+						D100 = D4 * 25 - 1,
+						D400 = D100 * 4 + 1;
+							
+					SYSTEMTIME result;
+					if(isnan(dateTime)) return result;
+					int D, I, T = ifloor(dateTime)+dateReference;
+					if(T<=0) return result;
+							
+					result.wDayOfWeek = cast(ushort)(T%7 + 1);
+					T--;
+					int Y = 1;
+					while(T>=D400) {
+						T -= D400;
+						Y += 400;
+					}
+					divMod(T, D100, I, D);
+					if(I==4) {
+						I--;
+						D += D100;
+					}
+					Y += I*100;
+					divMod(D, D4, I, D);
+					Y += I*4;
+					divMod(D, D1, I, D);
+					if(I==4) {
+						I--;
+						D += D1;
+					}
+					Y += I;
+							
+					auto dayTable = monthDays[isLeapYear(Y)][];
+					int M = 0;
+					while(1) {
+						I = dayTable[M];
+						if(D<I) break;
+						D -= I;
+						M++;
+					}
+					result.wYear	= cast(ushort)Y;
+					result.wMonth	= cast(ushort)(M+1);
+					result.wDay	= cast(ushort)(D+1);
+					return result;
 				}
-			}
-		
-			deprecated public SYSTEMTIME decodeDate(double dateTime)
-			{
-				enum	D1 = 365,
-					D4 = D1 * 4 + 1,
-					D100 = D4 * 25 - 1,
-					D400 = D100 * 4 + 1;
-		
-				SYSTEMTIME result;
-				if(isnan(dateTime)) return result;
-				int D, I, T = ifloor(dateTime)+dateReference;
-				if(T<=0) return result;
-		
-				result.wDayOfWeek = cast(ushort)(T%7 + 1);
-				T--;
-				int Y = 1;
-				while(T>=D400){
-					T -= D400;
-					Y += 400;
+						
+				deprecated SYSTEMTIME decodeTime(double dateTime)
+				{
+					SYSTEMTIME result;
+					if(isnan(dateTime)) return result;
+					int M, I = iround(fract(dateTime)*msecsInDay);
+					with(result) {
+						divMod(I, 1000, I, M); wMilliseconds	= cast(ushort)M;
+						divMod(I,		60, I, M); wSecond	= cast(ushort)M;
+						divMod(I,		60, I, M); wMinute	= cast(ushort)M;
+																		wHour	= cast(ushort)I;
+					}
+					return result;
 				}
-				divMod(T, D100, I, D);
-				if(I==4){
-					I--;
-					D += D100;
+						
+				deprecated SYSTEMTIME decodeDateTime(double dateTime)
+				{
+					auto d = decodeDate(dateTime),
+							 t = decodeTime(dateTime);
+					d.wMilliseconds	= t.wMilliseconds;
+					d.wSecond	= t.wSecond					;
+					d.wMinute	= t.wMinute					;
+					d.wHour	= t.wHour	   ;
+					return d;
 				}
-				Y += I*100;
-				divMod(D, D4, I, D);
-				Y += I*4;
-				divMod(D, D1, I, D);
-				if(I==4){
-					I--;
-					D += D1;
+						
+				int dblCmp(const double a, const double b) { return a>b ? 1 : a<b ? -1 : 0; }
+						
+				int year2k(int y) {
+					if(y< 50) y += 2000;
+					if(y<100) y += 1900;
+					return y;
 				}
-				Y += I;
-		
-				auto dayTable = monthDays[isLeapYear(Y)][];
-				int M = 0;
-				while(1){
-					I = dayTable[M];
-					if(D<I) break;
-					D -= I;
-					M++;
-				}
-				result.wYear	= cast(ushort)Y;
-				result.wMonth	= cast(ushort)(M+1);
-				result.wDay	= cast(ushort)(D+1);
-				return result;
-			}
-		
-			deprecated SYSTEMTIME decodeTime(double dateTime)
-			{
-				SYSTEMTIME result;
-				if(isnan(dateTime))return result;
-				int M, I = iround(fract(dateTime)*msecsInDay);
-				with(result){
-					divMod(I, 1000, I, M); wMilliseconds	= cast(ushort)M;
-					divMod(I,		60, I, M); wSecond	= cast(ushort)M;
-					divMod(I,		60, I, M); wMinute	= cast(ushort)M;
-																	wHour	= cast(ushort)I;
-				}
-				return result;
-			}
-		
-			deprecated SYSTEMTIME decodeDateTime(double dateTime)
-			{
-				auto d = decodeDate(dateTime),
-						 t = decodeTime(dateTime);
-				d.wMilliseconds	= t.wMilliseconds;
-				d.wSecond	= t.wSecond					 ;
-				d.wMinute	= t.wMinute					 ;
-				d.wHour	= t.wHour	     ;
-				return d;
-			}
-		
-			int dblCmp(const double a, const double b){ return a>b ? 1 : a<b ? -1 : 0; }
-		
-			int year2k(int y){
-				if(y< 50) y += 2000;
-				if(y<100) y += 1900;
-				return y;
 			}
 		}
 		
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		
-		struct TimeZone {
-			byte shift;
-		}
+		struct TimeZone { byte shift; }
 		
 		enum UTC = TimeZone(0);
 		enum Local = TimeZone(127);
 		
-		auto RawDateTime(ulong t){ DateTime a; a.raw = t; return a; }
-	
+		auto RawDateTime(ulong t) { DateTime a; a.raw = t; return a; }
+			
 		struct DateTime
 		{
 			version(/+$DIDE_REGION+/all)
 			{
 				///a 64-bit value representing the number of 100/64 nanosecond(!!!not 100ns!!!) intervals since January 1, 1601 (UTC).
 				private ulong raw;      //0 = null
-			
+							
 				void set(in TimeZone tz, in SYSTEMTIME a)
 				{
-					switch(tz.shift){
+					switch(tz.shift) {
 						case 0: utcSystemTime = a; break;
 						case 127: localSystemTime = a; break;
 						default: throw new Exception("Invalid "~tz.text);
 					}
 				}
-			
+							
 				void set(in TimeZone tz, in FILETIME a)
 				{
-					switch(tz.shift){
+					switch(tz.shift) {
 						case 0: utcFileTime = a; break;
 						case 127: localFileTime = a; break;
 						default: throw new Exception("Invalid "~tz.text);
 					}
 				}
-			
+							
 				void set(in TimeZone tz, in string s)
 				{ this = parseDateTime(tz, s); }
-			
+							
 				this(T)(in T a)
 				{ this(Local, a); }this(T)(in TimeZone tz, in T a)
 				{ set(tz, a); }
-			
+							
 				this(in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
 				{ this(Local, y, m, d, h, mi, s, ms); }
 				this(in TimeZone tz,	in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
@@ -6706,15 +6671,15 @@ version(/+$DIDE_REGION Date Time+/all)
 					//todo: adjust carry overflow
 					this(tz, SYSTEMTIME(year2k(y).to!ushort, m.to!ushort, 0, d.to!ushort, h.to!ushort, mi.to!ushort, s.to!ushort, ms.to!ushort));
 				}
-			
+							
 				this(in int y, in int m, in int d)
 				{ this(Local, y, m, d); }this(in TimeZone tz, in int y, in int m, in int d)
 				{ this(tz   , y, m, d, 0); }
-			
+							
 				this(in int y, in int m, in int d, in Time t)
 				{ this(Local, y, m, d, t); }this(in TimeZone tz, in int y, in int m, in int d, in Time t)
 				{ this(tz, y, m, d); this += t; }
-			
+							
 				bool isNull() const
 				{ return raw==0; }
 				bool opCast() const
@@ -6725,14 +6690,15 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return raw==b.raw; }
 				size_t toHash() const
 				{ return raw; }
-			
+							
 				enum RawShift = 6;
 				enum RawUnit : ulong 
-				{// 37ns is the fastest measurable interval. Using Windown 10 QPC
-					_100ns	= 1<<RawShift	, // 100ns = Unit of FILETIME.  6 extra bits of precision below 100ns. Useful time based unique id generation.
+				{
+					//37ns is the fastest measurable interval. Using Windown 10 QPC
+					_100ns	= 1<<RawShift	, //100ns = Unit of FILETIME.  6 extra bits of precision below 100ns. Useful time based unique id generation.
 					us	= 10 * _100ns	,
 					ms	= 1000 * us 	,
-					sec	= 1000 * ms 	, // 1 sec = Unit of quantities.SI
+					sec	= 1000 * ms 	, //1 sec = Unit of quantities.SI
 					min	= 60 * sec 	,
 					hour	= 60 * min 	,
 					day	= 24 * hour	,
@@ -6742,41 +6708,44 @@ version(/+$DIDE_REGION Date Time+/all)
 					_913year	= 913 * year	, //max years before overflow.  1601 + 913 = 2516
 				}
 				static assert(RawUnit._913year == 0xffe5c294_8e7f0000); //lock the above calculations
-			
+							
 				private enum UnixShift_sec = 11644473600;
 				private enum UnixShift_unit = UnixShift_sec*RawUnit.sec;
-			
+							
 				static private
-				{//Conversions between windows local/utc/filetime/systemtime/raw. Also throw exceptions.
-				
+				{
+					//Conversions between windows local/utc/filetime/systemtime/raw. Also throw exceptions.
+									
 					double rawToSeconds(in ulong a)
 					{ return a*(1.0/RawUnit.sec); }
 					ulong secondsToRaw(in double a)
 					{ return (a*RawUnit.sec).to!ulong; }
-			
+								
 					auto fileTimeToRaw(in FILETIME ft)
 					{
 						if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow.");
 						return	((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
 							((cast(ulong)ft.dwHighDateTime)<<(RawShift+32));
 					}
-			
+								
 					auto rawToFileTime(in ulong raw)
 					{
-						return FILETIME(cast(uint)(raw>>>(RawShift   )),
-														cast(uint)(raw>>>(RawShift+32)));
+						return FILETIME(
+							cast(uint)(raw>>>(RawShift   )),
+																					cast(uint)(raw>>>(RawShift+32))
+						);
 					}
-			
+								
 					import core.sys.windows.windows :
 						FileTimeToSystemTime, SystemTimeToFileTime, 
 						SystemTimeToTzSpecificLocalTime, TzSpecificLocalTimeToSystemTime;
-			
-					// unify 2 parameter form by adding a default null parameter in front
+								
+					//unify 2 parameter form by adding a default null parameter in front
 					int MySystemTimeToTzSpecificLocalTime(in SYSTEMTIME* a, SYSTEMTIME* b)
 					{ return SystemTimeToTzSpecificLocalTime(null, cast(SYSTEMTIME*)a, b); }
 					int MyTzSpecificLocalTimeToSystemTime(in SYSTEMTIME* a, SYSTEMTIME* b)
 					{ return TzSpecificLocalTimeToSystemTime(null, cast(SYSTEMTIME*)a, b); }
-			
+								
 					template tmpl(SRC, alias fun, DST)
 					{
 						auto tmpl()(in SRC src)
@@ -6786,7 +6755,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							return dst;
 						}
 					}
-			
+								
 					alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 					alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
 					alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime, SYSTEMTIME);
@@ -6795,7 +6764,8 @@ version(/+$DIDE_REGION Date Time+/all)
 			}version(/+$DIDE_REGION+/all)
 			{
 				private
-				{///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
+				{
+					///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
 					T _get(bool isLocal, T)() const
 					{
 						const ft = rawToFileTime(raw);
@@ -6811,7 +6781,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							static if(is(T==SYSTEMTIME)) return fileTimeToSystemTime(ft);
 						}
 					}
-			
+								
 					void _set(bool isLocal, T)(in T src)
 					{
 						static if(isLocal)
@@ -6828,7 +6798,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						}
 					}
 				}
-			
+							
 				@property
 				{
 					auto utcFileTime() const
@@ -6843,12 +6813,12 @@ version(/+$DIDE_REGION Date Time+/all)
 					auto localSystemTime() const
 					{ return _get!(true , SYSTEMTIME	)(); }	void localSystemTime	(in SYSTEMTIME	a)
 					{ _set!true(a); }
-			
+								
 					double unixTime() const
 					{ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; }
 					void unixTime(in double a)
 					{ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; }
-			
+								
 					private enum RawDelphiShift = 109205*RawUnit.day;
 					double localDelphiTime() const
 					{
@@ -6857,17 +6827,17 @@ version(/+$DIDE_REGION Date Time+/all)
 					}
 					void localDelphiTime(double d)
 					{
-						if(d.isnan || d==0) 
-							raw = 0;
+						if(d.isnan || d==0)
+						raw = 0;
 						else
-							localFileTime = rawToFileTime((d*RawUnit.day).to!ulong + RawDelphiShift);
+						localFileTime = rawToFileTime((d*RawUnit.day).to!ulong + RawDelphiShift);
 					}
-			
+								
 					DateTime utcDayStart() const
 					{ if(isNull) return	this; return RawDateTime(raw - raw%RawUnit.day); }
 					DateTime utcDayEnd	() const
 					{ if(isNull) return	this; return RawDateTime(utcDayStart.raw + RawUnit.day); }
-			
+								
 					DateTime localDayStart() const
 					{
 						if(isNull) return this;
@@ -6878,7 +6848,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						st.wMilliseconds	= 0;
 						return DateTime(st);
 					}
-			
+								
 					DateTime localDayEnd() const
 					{
 						if(isNull) return this;
@@ -6887,35 +6857,35 @@ version(/+$DIDE_REGION Date Time+/all)
 							st	= res.localSystemTime	,
 							diff_ms	= ((st.wHour*60L + st.wMinute)*60 + st.wSecond)*1000L + st.wMilliseconds	;
 						
-						if(diff_ms<12L*60*60*1000)	res -= 	diff_ms*milli(second);
-						else	res += day - 	diff_ms*milli(second);
+						if(diff_ms<12L*60*60*1000) res -= 	diff_ms*milli(second);
+						else res += day - 	diff_ms*milli(second);
 						
 						return res;
 						
-						/+todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
-							.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
-							.uniq
-							.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); +/
-			
+						/+
+							todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
+														.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
+														.uniq
+														.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); 
+						+/
+									
 					}
-			
+								
 					Time utcTime  () const
 					{ return this-utcDayStart; }
 					Time localTime() const
 					{ return this-localDayStart; }
-			
+								
 					Time time() const
 					{ return localTime; }
 					DateTime dayStart() const
 					{ return localDayStart; }
 				}
-			
+							
 				///calculate the difference between DateTimes
 				Time opBinary(string op : "-")(in DateTime b) const
-				{
-					return long(raw-b.raw)*(1.0/RawUnit.sec)*quantities.si.second;
-				}
-			
+				{ return long(raw-b.raw)*(1.0/RawUnit.sec)*quantities.si.second; }
+							
 				///adjust DateTime by si.Time
 				DateTime opBinary(string op)(in Time b) const if(op.among("+", "-"))
 				{
@@ -6923,30 +6893,32 @@ version(/+$DIDE_REGION Date Time+/all)
 					mixin("res.raw", op, "=(b.value(quantities.si.second)*RawUnit.sec).to!long;");
 					return res;
 				}
-			
+							
 				///adjust this DateTime by si.Time
 				DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))
 				{
 					mixin("raw", op,"= (b.value(quantities.si.second)*RawUnit.sec).to!long;");
 					return this;
 				}
-			
+							
 				private long timeZoneOffset_raw() const
-				{//todo: rename to utcOffset (read aboit it on web first!)
+				{
+					//todo: rename to utcOffset (read aboit it on web first!)
 					if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL");
 					DateTime dt = void; dt.utcFileTime = localFileTime;
 					return dt.raw-this.raw;
 				}
-			
+							
 				Time timeZoneOffset() const
 				{
 					if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL");
 					DateTime dt = void; dt.utcFileTime = localFileTime;
 					return dt-this;
 				}
-			
+							
 				@property
-				{//dayOfWeek stuff
+				{
+					//dayOfWeek stuff
 					//note: 0=sun, 6=sat
 					int localDayOfWeek()
 					{ return localSystemTime.wDayOfWeek; }	int utcDayOfWeek()
@@ -6963,7 +6935,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				/// This is the hash for bitmap objects
 				ulong toId_deprecated() const
 				{ return raw; }
-			
+							
 				/// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
 				void actualize()
 				{
@@ -6971,53 +6943,54 @@ version(/+$DIDE_REGION Date Time+/all)
 					if(isNull || c>raw) raw = c;
 					else raw++; //now it's the exact same as the previous one. Just increment.
 				}
-			
+							
 				string dateText(alias fun = localSystemTime)() const
-				{//todo: format
+				{
+					//todo: format
 					if(isNull) return "NULL Date";
 					with(fun) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay);
 				}
-			
+							
 				string timeText(alias fun = localSystemTime)() const
-				{//todo format
+				{
+					//todo format
 					if(isNull) return "NULL Time";
 					with(fun) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds);
 				}
-			
+							
 				string toString(alias fun = localSystemTime)()const
 				{
 					if(isNull) return "NULL DateTime";
 					with(fun) return format("%.4d.%.2d.%.2d %.2d:%.2d:%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
 				}
-			
+							
 				string timestamp(alias fun = localSystemTime)(in Flag!"shortened" shortened = No.shortened)const
 				{
 					if(isNull) return "null";
 					//4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
 					//return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
-			
-					// windows timestamp format (inserts it after duplicate files)
+								
+					//windows timestamp format (inserts it after duplicate files)
 					string s;
 					with(fun) s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
-			
-					if(shortened){ //todo: not so fast
-						if(s.endsWith(".000")){
+								
+					if(shortened) {
+						 //todo: not so fast
+						if(s.endsWith(".000")) {
 							s = s[0..$-4];
-							if(s.endsWith("00")){
+							if(s.endsWith("00")) {
 								s = s[0..$-2];
-								if(s.endsWith("0000")){
-									s = s[0..$-4];
-								}
+								if(s.endsWith("0000")) { s = s[0..$-4]; }
 							}
 						}
 					}
-			
+								
 					return s;
 				}
-			
+							
 				string timestamp_compact(alias fun = localSystemTime)()const
 				{ return timestamp!fun(Yes.shortened); }
-			
+							
 				//todo: utcXXX not good! should ude TimeZone as first param
 				string utcDateText() const
 				{ return dateText!utcSystemTime; }
@@ -7031,25 +7004,24 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return timestamp!utcSystemTime(shortened); }
 				string utcTtimestamp_compact()const
 				{ return utcTimestamp(Yes.shortened); }
-			
+							
 				static
-				{//self diagnostics
-			
+				{
+					//self diagnostics
+								
 					void selftest()
-					{
-						enforce(DateTime(2000, 1, 2) - DateTime(1601, 1, 2) == 145731 * day);
-					}
-			
+					{ enforce(DateTime(2000, 1, 2) - DateTime(1601, 1, 2) == 145731 * day); }
+								
 					void benchmark()
 					{
 						print("DateTime RawUnits");
 						foreach(a; EnumMembers!(DateTime.RawUnit))
-							format!"%-10s %29d %16x"(a, a, a).replace(' ', '_').print;
-			
+						format!"%-10s %29d %16x"(a, a, a).replace(' ', '_').print;
+									
 						print;
 						print("now() call frequency: ");
 						20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; });
-			
+									
 						void bench(string code, size_t N=1000)()
 						{
 							write(code, "   //");
@@ -7057,14 +7029,14 @@ version(/+$DIDE_REGION Date Time+/all)
 							mixin(code);
 							((now-t0)/N).siFormat!"%8.0f ns".print;
 						}
-			
+									
 						print;
-						bench!q{ foreach(i; 0..N) cast(void)now;	};
-						bench!q{ N.iota.each!((i){ cast(void)now; });	};
-						bench!q{ foreach(i; 0..N) cast(void)(now-now);	};
-						bench!q{ foreach(i; 0..N) cast(void).today;	};
-						bench!q{ foreach(i; 0..N) cast(void).time;	};
-			
+						bench!q{foreach(i; 0..N) cast(void)now;	};
+						bench!q{N.iota.each!((i){ cast(void)now; });	};
+						bench!q{foreach(i; 0..N) cast(void)(now-now);	};
+						bench!q{foreach(i; 0..N) cast(void).today;	};
+						bench!q{foreach(i; 0..N) cast(void).time;	};
+									
 						void dstTest()
 						{
 							void doit(bool summer)
@@ -7074,24 +7046,26 @@ version(/+$DIDE_REGION Date Time+/all)
 								print((m?"Winter":"Summer")~" DST test:");
 								print("  UTC   -> UTC   ", DateTime(UTC	 ,	21, m,30,12).toString!(DateTime.utcSystemTime));
 								print("  UTC   -> Local ", DateTime(UTC	 ,	21, m,30,12));
-								print("  Local -> UTC   ", DateTime(		21, m,30,12).toString!(DateTime.utcSystemTime));
-								print("  Local -> Local ", DateTime(	21, m,30,12));
+								print("  Local -> UTC   ", DateTime(21, m,30,12).toString!(DateTime.utcSystemTime));
+								print("  Local -> Local ", DateTime(21, m,30,12));
 							}
 							doit(0); doit(1);
-			
+										
 							print;
 							print("Test local-utc for 12 31*24hour steps.");
 							foreach(u; [UTC, Local])
-								iota(12)	.map!(i => DateTime(u, 21, 1, 30, 12) + i*31*day)
-								.enumerate.map!(a =>  //A month is not a real month!!!! it's 32*24 hours!!!!
-									format!"%2s %2s %2s"
-									(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour))
+							iota(12)	.map!(i => DateTime(u, 21, 1, 30, 12) + i*31*day)
+								.enumerate.map!(
+								a =>  //A month is not a real month!!!! it's 32*24 hours!!!!
+																	format!"%2s %2s %2s"
+																	(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour)
+							)
 								.each!print;
 						}
 						dstTest;
-			
+									
 					}
-			
+								
 				}
 			}
 		}
@@ -7111,17 +7085,17 @@ version(/+$DIDE_REGION Date Time+/all)
 		DateTime	today()
 		{ return now.localDayStart; }
 		Time	time ()
-		{ return now.localTime    ; }
+		{ return now.localTime  ; }
 		
 				Time QPS()
 		{ return now - appStartedDay; }
 		Time QPS_local()
-		{ return now - appStarted   ; }
+		{ return now - appStarted ; }
 		
 		private __gshared  Time _TLast;
 		
-		auto T0(){ _TLast = QPS; return QPS; }
-		auto DT()(){ const Q = QPS, res = Q-_TLast; _TLast = Q; return res; }
+		auto T0() { _TLast = QPS; return QPS; }
+		auto DT()() { const Q = QPS, res = Q-_TLast; _TLast = Q; return res; }
 		
 		DateTime parseDate(in TimeZone tz, string str)
 		{
@@ -7133,12 +7107,12 @@ version(/+$DIDE_REGION Date Time+/all)
 		Time parseTime(string str)
 		{
 			int h,m; double s=0;
-			try{
+			try {
 				const len = str.split(':').length;
 						 if(len==3) str.formattedRead!"%s:%s:%s"(h, m, s);
 				else if(len==2) str.formattedRead!"%s:%s"   (h, m   );
 				else raise("");
-			}catch(Throwable){ raise(`Invalid time format: "` ~ str ~ `"`); }
+			}catch(Throwable) { raise(`Invalid time format: "` ~ str ~ `"`); }
 			return h*hour + m*minute + s*second;
 		}
 		
@@ -7147,45 +7121,51 @@ version(/+$DIDE_REGION Date Time+/all)
 			if(str.canFind(' '))
 			{
 				auto parts = str.split(' '); //dateTime
-		
+						
 				if(parts.length==2)
+				{ return parseDate(tz, parts[0]) + parseTime(parts[1]); }else if(parts.length==5)
 				{
-					return parseDate(tz, parts[0]) + parseTime(parts[1]);
-				}else if(parts.length==5)
-				{ //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
+					 //__TIMESTAMP__   Sat Aug 14 09:51:45 2021
 					return DateTime(tz, parts[4].to!uint, parts[1].among("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), parts[2].to!int) + parseTime(parts[3]);
 				}
 			}
 			else
 			{
 				//todo:	check for digits here, not any chars!
-				if	(str.isWild("????-??-??T??????.???"))
-				{ //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
+				if(str.isWild("????-??-??T??????.???"))
+				{
+					 //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4));
 				}else if(str.isWild("????-??-??T??????"))
-				{ //windows timestamp
+				{
+					 //windows timestamp
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int);
 				}else if(str.isWild("????-??-??T????"))
-				{ //windows timestamp, no seconds
+				{
+					 //windows timestamp, no seconds
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int);
 				}else if(str.isWild("????-??-??T"))
-				{ //windows timestamp, no time
+				{
+					 //windows timestamp, no time
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2));
 				}else if(str.isWild("????-??-??"))
-				{ //windows timestamp, no time, no T
+				{
+					 //windows timestamp, no time, no T
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2));
 				}else if(str.isWild("????????-??????-???"))
-				{ //timestamp 4 digit year
+				{
+					 //timestamp 4 digit year
 					return DateTime(tz,        str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int);
 				}else if(str.isWild("??????-??????-???"))
-				{ //timestamp 2 digit year
-					return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[ 9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
+				{
+					 //timestamp 2 digit year
+					return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
 				}else
 				{
 					return parseDate(tz, str); //Date only
 				}
 			}
-		
+					
 			throw new Exception("Invalid datetime format: "~str);
 		}
 		
@@ -7195,52 +7175,51 @@ version(/+$DIDE_REGION Date Time+/all)
 		auto iota(in DateTime begin, in DateTime end, in Time step)
 		{
 			//https://forum.dlang.org/post/ivskeghrhbuhpiytesas@forum.dlang.org -> Ali's solution
-		
-			static struct Result{
+					
+			static struct Result {
 				DateTime current, end;
 				Time step;
-		
-				@property bool empty(){ return current >= end; }
-				@property auto front(){ return current; }
-				void popFront(){ assert(!empty); current += step; }
+						
+				@property bool empty() { return current >= end; }
+				@property auto front() { return current; }
+				void popFront() { assert(!empty); current += step; }
 			}
-		
+					
 			return Result(begin, end, step);
 		}
 		
 		auto by(in DateTime begin, in Time step)
 		{
-		
-			static struct Result{
+					
+			static struct Result {
 				DateTime current;
 				Time step;
-		
+						
 				enum empty = false;
-				@property auto front(){ return current; }
-				void popFront(){ current += step; }
+				@property auto front() { return current; }
+				void popFront() { current += step; }
 			}
-		
+					
 			return Result(begin, step);
 		}
 		
 		auto by(in DateTime begin, in Frequency f)
-		{
-			return begin.by(1/f);
-		}
+		{ return begin.by(1/f); }
 		
 		bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float periodLength_sec, size_t hash=0)
-		{//todo: use quantities.Time
+		{
+			//todo: use quantities.Time
 			enum staticHash = hashOf(moduleName, moduleLine);
 			hash ^= staticHash;
-		
+					
 			static DeltaTimer[size_t] timers;
-		
+					
 			auto a = hash in timers;
-			if(!a){
+			if(!a) {
 				timers[hash] = DeltaTimer.init;
 				a = hash in timers;
 			}
-		
+					
 			return a.update_periodic(periodLength_sec, false); //todo: result should be an int counting how many updates missed since last time
 		}
 		
@@ -7250,31 +7229,32 @@ version(/+$DIDE_REGION Date Time+/all)
 		{ return blinkf(freq) < duty; }
 		
 		synchronized class Perf
-		{//all is shared, this is not good.
+		{
+			//all is shared, this is not good.
 			//todo: revisit this crap
-			private{
+			private {
 				double[string] table;
 				double[string] firstAppearance;
 				string actName;
 				double T0;
 			}
-		
+					
 			void reset()
 			{
 				table = null;
 				firstAppearance = null;
 				actName = "";
 			}
-		
+					
 			void addTime(string name, in double time)
 			{
-				if(name !in table){
+				if(name !in table) {
 					table[name] = 0;
 					firstAppearance[name] = QPS.value(second);
 				}
 				table[name] = table[name]+time;
 			}
-		
+					
 			string report()
 			{
 				if(actName!="") end;
@@ -7282,30 +7262,29 @@ version(/+$DIDE_REGION Date Time+/all)
 				reset;
 				return r;
 			}
-		
+					
 			void opCall(string name, void delegate() dg = null)
 			{
 				auto T = QPS.value(second);
-				if(actName!=""){ //flush
+				if(actName!="") {
+					 //flush
 					addTime(actName, T-T0);
 					actName = "";
 				}
-				if(name!=""){
+				if(name!="") {
 					T0 = T;
 					actName = name;
 				}
-		
+						
 				//call with delegate
-				if(dg !is null){
+				if(dg !is null) {
 					dg();
 					end;
 				}
 			}
-		
+					
 			void end()
-			{
-				opCall("");
-			}
+			{ opCall(""); }
 		}
 		
 		shared PERF = new shared Perf;
@@ -7316,19 +7295,21 @@ version(/+$DIDE_REGION Date Time+/all)
 	{
 		struct DeltaTimer
 		{
-			double tLast = 0;
-		public:
-			float total = 0;
-			float delta = 0; //the time from the last update
-		
-			void reset()
-			{//resets the total elapsed time
+				double tLast = 0;
+			public:
+				float total = 0;
+				float delta = 0; //the time from the last update
+			
+				void reset()
+			{
+				//resets the total elapsed time
 				total = 0;
 				tLast = QPS.value(second);
 			}
-		
-			float update()
-			{//returns time since last update
+			
+				float update()
+			{
+				//returns time since last update
 				double tAct = QPS.value(second);
 				if(tLast==0) tLast = tAct;
 				delta = tAct-tLast;
@@ -7336,14 +7317,16 @@ version(/+$DIDE_REGION Date Time+/all)
 				tLast = tAct; //restart
 				return delta;
 			}
-		
-			bool update_periodic(float secs, bool enableOverflow)
-			{//enableOF: false for user-interface, true for physics simulations
+			
+				bool update_periodic(float secs, bool enableOverflow)
+			{
+				//enableOF: false for user-interface, true for physics simulations
 				update();
 				bool res = total>=secs;
-				if(res){
+				if(res) {
 					total -= secs;
-					if(!enableOverflow){ //todo: batch overflow when the callbact receives how many times it needs to update
+					if(!enableOverflow) {
+						 //todo: batch overflow when the callbact receives how many times it needs to update
 						if(total>=secs) total = 0;
 					}
 				}
@@ -7352,179 +7335,188 @@ version(/+$DIDE_REGION Date Time+/all)
 		};
 		
 		struct Sequencer(T)
-		{//Sequencer /////////////////////////////
+		{
+			//Sequencer /////////////////////////////
 			T[float] events;
-		
+					
 			void opIndexAssign(in T what, float t)
 			{ events[t] = what; }
 			T opIndex(float t) const
 			{ auto a = t in events; return a ? *a : T.init; }
-		
+					
 			void scale(float mult)
 			{
 				T[float] e;
 				foreach(i; events.byKeyValue) e[i.key*mult] = i.value;
 				events = e;
 			}
-		
+					
 			private auto getEvents(float tLast, float tAct)
 			{
 				return events	.keys
 					.filter!(k => tLast<k && k<=tAct)
 					.map!(k => events[k]).array;  //todo: this is slow
 			}
-		
+					
 			private bool anyEventsAfter(float tMin)
 			{
 				return events.keys.filter!(k => tMin<k).any; //todo: this is also slow
 			}
-		
+					
 			auto run(void delegate() onIdle = null)
 			{
 				static struct SequencerRunner(T)
-				{////todo: opApply a range helyett!
+				{
+					////todo: opApply a range helyett!
 					Sequencer!T seq;
 					void delegate() onIdle = null;
 					double t0;
 					float tLast = -1e30;
-		
+							
 					private T[] actEvents;
 					private bool eof;
-		
+							
 					private void fetch()
 					{
 						if(eof || actEvents.length) return;
-		
-						do{
+								
+						do {
 							auto tAct = QPS-t0;
 							actEvents = seq.getEvents(tLast, tAct);
 							tLast = tAct;
-		
-							if(actEvents.empty){ //wait more or break on EOS
-								if(!seq.anyEventsAfter(tLast)){
+									
+							if(actEvents.empty) {
+								 //wait more or break on EOS
+								if(!seq.anyEventsAfter(tLast)) {
 									eof = true;
 									break;
 								}
-		
+										
 								if(onIdle !is null) onIdle();
-															 else sleep(1);
+								else sleep(1);
 							}
 						}while(actEvents.empty);
 					}
-		
-		
+							
+							
 					bool empty()
 					{
 						fetch;
 						return eof && actEvents.empty;
 					}
-		
+							
 					T front()
 					{
 						fetch;
 						return actEvents.empty ? T.init : actEvents[0];
 					}
-		
+							
 					void popFront()
 					{
 						fetch;
 						if(!actEvents.empty)
-							actEvents.popFirst;
+						actEvents.popFirst;
 					}
 				}
-		
+						
 				return SequencerRunner!T(this, onIdle, QPS);
 			}
 		}
 		
 		struct UpdateInterval
 		{
-			// Note: these are old comments:
-			// Interval: Keeps an integer or float range. It can clamp values using that range,
-			// and can easily extend the range. Also manages the validity of the range (NULL range).
-			// There are 2 specializations: some FloatInterval/IntInterval.
+			//Note: these are old comments:
+			//Interval: Keeps an integer or float range. It can clamp values using that range,
+			//and can easily extend the range. Also manages the validity of the range (NULL range).
+			//There are 2 specializations: some FloatInterval/IntInterval.
 			
 			float tLast, tAct;
-		
-			private int test(float t){ return t>tLast && t<=tAct; } //open-closed interval
-		
+					
+			private int test(float t) { return t>tLast && t<=tAct; } //open-closed interval
+					
 			int repeater(float tBase, float dtFirst, float dt = 0)
 			{
 				if(dt==0) dt = dtFirst;
-		
+						
 				int res = test(tBase);
-				if(dtFirst>0){
+				if(dtFirst>0) {
 					tBase += dtFirst;
 					res += test(tBase);
 				}
-				if(dt>0){
+				if(dt>0) {
 					float idt = 1/dt;
-		
+							
 					//simple & stupid: foreach(i; max(1, iFloor((tLast-tBase)*idt))..1+iCeil((tAct-tBase)*idt)) res += chk(tBase+i*dt);
 					int st = max(1, ifloor((tLast-tBase)*idt));	//inclusive  0th is the base
 					int en = ifloor((tAct-tBase)*idt)+1;	//exclusive
-		
+							
 					//simple loop: foreach(i; st..en) res += test(tBase+i*dt);
-		
-					if(st<en){
+							
+					if(st<en) {
 						res += test(tBase+st*dt); st++; //check at start
-						if(st<en){
+						if(st<en) {
 							en--; res += test(tBase+en*dt); //check at end
 							res += en-st; //remaining inbetween is always 1
 						}
 					}
-		
+							
 				}
-		
+						
 				return res;
 			}
-		
+					
 			private static void _testRepeater(/*Drawing dr = null*/)
 			{
 				float tBase = 3, tDelta = 1, tFirstDelta = 5;
 				uint h;
-				foreach(i; 1..25){
+				foreach(i; 1..25) {
 					float step = i*0.2f;
 					float tLast = 0;
-					while(1){
+					while(1) {
 						float tAct = tLast+step;
 						if(tLast>40.5) break;
-		
+								
 						/*auto r = Bounds2f(tLast, i*0.2, tAct, (i+1)*0.2);  dr.color = clWhite;  dr.drawRect(r);*/
-		
+								
 						int n = UpdateInterval(tLast, tAct).repeater(tBase, tFirstDelta, tDelta);
-		
+								
 						h = xxh32([n], h);
-		
-						/*if(n){ dr.color = clVGA[n];  dr.fillRect(r); }
-						dr.color = clWhite;  dr.fontHeight = 0.1;  dr.textOut(r.x, r.y, n.text);*/
-		
+								
+						/*
+							if(n){ dr.color = clVGA[n];  dr.fillRect(r); }
+													dr.color = clWhite;  dr.fontHeight = 0.1;  dr.textOut(r.x, r.y, n.text);
+						*/
+								
 						tLast = tAct;
 					}
 				}
-		
+						
 				enforce(h==3069201956, "UpdateInterval.testRepeater test fail.");
-		
-				/*foreach(i; -1..40){
-					dr.color = clFuchsia;
-					float x = i==-1	? tBase
-									: i==0	? tBase+tFirstDelta
-			: tBase+tFirstDelta+i*tDelta;
-					dr.vline(x, 0, 10);
-				}*/
-		
+						
+				/*
+					foreach(i; -1..40){
+										dr.color = clFuchsia;
+										float x = i==-1	? tBase
+														: i==0	? tBase+tFirstDelta
+								: tBase+tFirstDelta+i*tDelta;
+										dr.vline(x, 0, 10);
+									}
+				*/
+						
 			}
 		}
-
+		
 	}
 }version(/+$DIDE_REGION File System+/all)
-{/// File System //////////////////////////////////////////////
+{
+	/// File System //////////////////////////////////////////////
 	version(/+$DIDE_REGION Path+/all)
-	{///  Path //////////////////////////////////////////////
+	{
+		///  Path //////////////////////////////////////////////
 		
 		//char pathDelimiter() {
 			//static __gshared c = dirSeparator[0]; return c;  <- After all I'm Windows only...
-		//  return '\\';
+		//return '\\';
 		//}
 		immutable pathDelimiter = '\\';
 		
@@ -7535,8 +7527,10 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		bool samePath(string a, string b)
 		{
-			return sameText(a.excludeTrailingPathDelimiter,
-				b.excludeTrailingPathDelimiter);
+			return sameText(
+				a.excludeTrailingPathDelimiter,
+								b.excludeTrailingPathDelimiter
+			);
 		}
 		
 		bool samePath(in Path a, in Path b)
@@ -7545,20 +7539,20 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		struct Path
 		{
-			version(/+$DIDE_REGION+/all){
+			version(/+$DIDE_REGION+/all) {
 				private static
 				{
 					bool dirExists(string dir)
 					{
 						bool res;
-						try{ res = isDir(dir); }catch(Throwable){}
+						try { res = isDir(dir); }catch(Throwable) {}
 						return res;
 					}
-			
+								
 				}
-			
+							
 				string fullPath;
-			
+							
 				this(string path_)
 				{ dir = path_; }
 				this(string path_, string name_)
@@ -7567,24 +7561,24 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ this(combinePath(path_.fullPath, name_)); }
 				this(Path path_)
 				{ this(path_.fullPath); }
-			
+							
 				string toString() const
 				{ return "Path("~fullPath.quoted('`')~")"; }
 				bool isNull() const
 				{ return fullPath==""; }
 				bool opCast() const
 				{ return !isNull(); }
-			
+							
 				bool exists() const
 				{ return dirExists(dir); }
-			
+							
 				string name() const
 				{
 					auto a = fullPath.withoutEnding(pathDelimiter),
 							 i = a.retro.countUntil(pathDelimiter);
 					return i<0 ? a : a[$-i..$];
 				}
-			
+							
 				@property string dir() const
 				{ return excludeTrailingPathDelimiter(fullPath); }
 				@property void dir(string dir_)
@@ -7597,35 +7591,35 @@ version(/+$DIDE_REGION Date Time+/all)
 				auto accessed()const
 				{ return times.accessed; }
 				auto created()const
-				{ return times.created ; }
-			
+				{ return times.created; }
+							
 				auto isAbsolute()const
 				{ return isAbsolutePath(fullPath); }
-			
+							
 				Path normalized()const
 				{ return Path(buildNormalizedPath(absolutePath(fullPath))); }
 				Path normalized(string base)const
 				{ return Path(buildNormalizedPath(absolutePath(fullPath, base))); }
 				Path normalized(in Path base)const
 				{ return normalized(base.fullPath); }
-			}version(/+$DIDE_REGION+/all){
+			}version(/+$DIDE_REGION+/all) {
 				string drive()const
 				{
-					foreach(i, ch; fullPath){
+					foreach(i, ch; fullPath) {
 						if(ch.isAlphaNum) continue;
 						if(ch==':') return fullPath[0..i+1];
 						return "";
 					}
 					return "";
 				}
-			
+							
 				size_t driveIs(in string[] drives...)const
 				{
 					string e0 = drive.lc.withoutEnding(':');
 					foreach(i, s; drives) if(s.lc.withoutEnding(':')==e0) return i+1;
 					return 0;
 				}
-			
+							
 				Path parent() const
 				{ string s = dir; while(s!="" && s.back!='\\') s.length--; return Path(s); }
 				
@@ -7633,7 +7627,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{
 					if(exists) return true;
 					ignoreExceptions({ mkdirRecurse(dir); });
-			
+								
 					const res = exists;
 					if(mustSucceed && !res) raise(format!`Unable to make directory : %s`(dir.quoted));
 					return res;
@@ -7643,34 +7637,32 @@ version(/+$DIDE_REGION Date Time+/all)
 				{
 					if(!exists) return true;
 					try
-					{
-						rmdirfunc(dir);
-					}
+					{ rmdirfunc(dir); }
 					catch(Throwable)
 					{
 						enforce(!mustSucceed, format(`Can't remove directory : "%s"`, dir)); //todo: common file errors
 					}
 					return !exists;
 				}
-			
+							
 				bool wipe(bool mustSucceed=true)const
 				{
 					if(dir.length==2 && dir.endsWith("\\"))
-						throw new Exception(`Unable to wipeing a whole drive "`~dir~`"`);
+					throw new Exception(`Unable to wipeing a whole drive "`~dir~`"`);
 					
 					return remove!rmdirRecurse(mustSucceed);
 				}
-			
+							
 				private static void preparePattern(ref string pattern)
 				{
 					//convert multiple filters to globMatch's format
 					if(pattern.canFind(';'))
-						pattern = pattern.replace(";", ",");
+					pattern = pattern.replace(";", ",");
 					
 					if(pattern.canFind(',') && !pattern.startsWith('{'))
-						pattern = '{'~pattern~'}';
+					pattern = '{'~pattern~'}';
 				}
-			
+							
 				File[] files(string pattern="*", bool recursive=false) const
 				{
 					preparePattern(pattern);
@@ -7678,7 +7670,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						.filter!isFile
 						.map!(e => File(e.name)).array;
 				}
-			
+							
 				Path[] paths(string pattern="*", bool recursive=false) const
 				{
 					preparePattern(pattern);
@@ -7686,12 +7678,10 @@ version(/+$DIDE_REGION Date Time+/all)
 						.filter!(e => !e.isFile)
 						.map!(e => Path(e.name)).array;
 				}
-			
+							
 				Path opBinary(string op:"~")(string p2)
-				{
-					return Path(this, p2);
-				}
-			
+				{ return Path(this, p2); }
+							
 				/+note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
 				int opCmp(in Path b)const
 				{ return cmp(fullPath, b.fullPath); }
@@ -7699,13 +7689,13 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return fullPath==b.fullPath; }
 				size_t toHash()const
 				{ return fullPath.hashOf; }
-			
+							
 			}
 		}
 		
 		Path tempPath() {
 			static __gshared string s;
-			if(!s){
+			if(!s) {
 				wchar[512] buf;
 				GetTempPathW(buf.length, buf.ptr);
 				s = includeTrailingPathDelimiter(buf.toStr);
@@ -7713,8 +7703,8 @@ version(/+$DIDE_REGION Date Time+/all)
 			return Path(s);
 		}
 		
-		Path programFilesPath32(){ static __gshared Path s; if(!s){ s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles(x86)", `c:\program Files(x86)\`))); } return s; }
-		Path programFilesPath64(){ static __gshared Path s; if(!s){ s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles"     , `c:\program Files\`     ))); } return s; }
+		Path programFilesPath32() { static __gshared Path s; if(!s) { s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles(x86)", `c:\program Files(x86)\`))); } return s; }
+		Path programFilesPath64() { static __gshared Path s; if(!s) { s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles"     , `c:\program Files\`     ))); } return s; }
 		
 		Path programFilesPath() {
 			version(Win32) return programFilesPath32;
@@ -7724,28 +7714,25 @@ version(/+$DIDE_REGION Date Time+/all)
 	}struct File
 	{
 		private static
-		{/////////////////////////////////////////////////////////////////
+		{
+			/////////////////////////////////////////////////////////////////
 			bool fileExists(string fn)
 			{
 				if(fn.empty) return false;
 				if(fn.isVirtualFileName) return virtualFileQuery(VirtualFileCommand.getInfo, fn).exists;
-				try{
+				try {
 					auto f = StdFile(fn, "rb");
 					return true;
-				}catch(Throwable){
-					return false;
-				}
+				}catch(Throwable) { return false; }
 			}
 			
 			ulong fileSize(string fn)
 			{
 				if(fn.isVirtualFileName) return virtualFileQuery(VirtualFileCommand.getInfo, fn).size;
-				try{
+				try {
 					auto f = StdFile(fn, "rb");
 					return f.size;
-				}catch(Throwable){
-					return 0;
-				}
+				}catch(Throwable) { return 0; }
 			}
 			
 			bool fileReadOnly(string fn)
@@ -7759,9 +7746,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			struct FileTimes
 			{
 				DateTime created, modified, accessed;
-				DateTime latest() const{
-					return max(created, modified, accessed);
-				}
+				DateTime latest() const { return max(created, modified, accessed); }
 			}
 			
 			FileTimes fileTimes(string fn)
@@ -7770,15 +7755,11 @@ version(/+$DIDE_REGION Date Time+/all)
 				if(fn=="") return res;
 				
 				if(fn.isVirtualFileName)
-					return virtualFileQuery(VirtualFileCommand.getInfo, fn).fileTimes;
+				return virtualFileQuery(VirtualFileCommand.getInfo, fn).fileTimes;
 				
 				StdFile f;
-				try{
-					f = StdFile(fn, "rb");
-				}catch(Exception e){
-					return res;
-				}
-	
+				try { f = StdFile(fn, "rb"); }catch(Exception e) { return res; }
+					
 				FILETIME cre, acc, wri;
 				if(GetFileTime(f.windowsHandle, &cre, &acc, &wri))
 				{
@@ -7795,28 +7776,24 @@ version(/+$DIDE_REGION Date Time+/all)
 				if(fn=="") return;
 				
 				if(fn.isVirtualFileName)
-					throw new Exception("Can't set time of virtual files");
+				throw new Exception("Can't set time of virtual files");
 				
 				StdFile f;
 				try
-				{
-					f = StdFile(fn, "a+b");
-				}
+				{ f = StdFile(fn, "a+b"); }
 				catch(Exception e)
-				{
-					throw new Exception("Can't open file "~fn.quoted);
-				}
+				{ throw new Exception("Can't open file "~fn.quoted); }
 				
 				FILETIME wri = modified.utcFileTime;
 				if(!SetFileTime(f.windowsHandle, null, null, &wri))
-					throw new Exception("Error setting filetime "~fn.quoted);
+				throw new Exception("Error setting filetime "~fn.quoted);
 			}
 			
 			string extractFilePath(string fn)
 			{
 				auto s = dirName(fn);
 				if(s==".") return "";
-							else return includeTrailingPathDelimiter(s);
+				else return includeTrailingPathDelimiter(s);
 			}
 			string extractFileDir(string fn)
 			{ return excludeTrailingPathDelimiter(extractFilePath(fn)); }
@@ -7826,7 +7803,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			{ return extension(fn); }
 			string changeFileExt(const string fn, const string ext)
 			{ return setExtension(fn, ext); }
-		}    version(/+$DIDE_REGION+/all){
+		}    version(/+$DIDE_REGION+/all) {
 			this(string fullName_)
 			{ fullName = fullName_; }
 			this(string path_, string name_)
@@ -7871,7 +7848,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			auto accessed()const
 			{ return times.accessed; }
 			auto created()const
-			{ return times.created ; }
+			{ return times.created; }
 			
 			@property void modified(in DateTime m)
 			{ setFileTimes_modified(fullName, m); }
@@ -7912,28 +7889,27 @@ version(/+$DIDE_REGION Date Time+/all)
 			{ File a = this; a.ext = ext_; return a;  }
 			
 			size_t extIs(in string[] exts...)const
-			{//todo: ez full ganyolas...
+			{
+				//todo: ez full ganyolas...
 				string e0 = lc(ext);
-				foreach(i, s; exts){
+				foreach(i, s; exts) {
 					string e = s;
 					if(e!="" && e[0]!='.') e = '.'~e;
 					if(lc(e)==e0) return i+1;
 				}
 				return 0;
 			}
-		}version(/+$DIDE_REGION+/all){
+		}version(/+$DIDE_REGION+/all) {
 			bool remove(bool mustSucceed = true) const
 			{
-				if(exists){
+				if(exists) {
 					try
 					{
 						if(this.isVirtual) virtualFileQuery(VirtualFileCommand.remove, fullName);
 						else std.file.remove(fullName);
 					}
 					catch(Exception)
-					{
-						enforce(!mustSucceed, format(`Can't delete file: "%s"`, fullName));
-					}
+					{ enforce(!mustSucceed, format(`Can't delete file: "%s"`, fullName)); }
 				}
 				return !exists;
 			}
@@ -7943,7 +7919,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				foreach(k; 0..500)
 				{
-					if(exists){ try{ remove; }catch(Exception e){ sleep(10); } }
+					if(exists) { try { remove; }catch(Exception e) { sleep(10); } }
 					if(!exists) return;
 				}
 				ERR("Failed to forcedRemove file ", this);
@@ -7953,32 +7929,33 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				foreach(k; 0..500)
 				{
-					try{
+					try {
 						auto res = read(true);
 						return res;
-					}catch(Exception e){ sleep(10); }
+					}catch(Exception e) { sleep(10); }
 				}
 				ERR("Failed to forcedRead file ", this);
 				assert(0);
 			}
 			
-			ubyte[] read(bool mustExists = true, ulong offset = 0, size_t len = size_t.max,
-				string srcFile=__FILE__, int srcLine=__LINE__)const
-			{//todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
+			ubyte[] read(
+				bool mustExists = true, ulong offset = 0, size_t len = size_t.max,
+								string srcFile=__FILE__, int srcLine=__LINE__
+			)const
+			{
+				//todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
 				ubyte[] data;
-			
-				if(!exists){
+							
+				if(!exists) {
 					if(mustExists) raise(format!`Can't read file: "%s"`(fullName), srcFile, srcLine);
 					return data;
 				}
-			
+							
 				if(!mustExists && !exists) return data;
 				try
 				{
 					if(this.isVirtual)
-					{
-						data = virtualFileQuery_raise(VirtualFileCommand.read, fullName, data, offset, len).dataOut;
-					}
+					{ data = virtualFileQuery_raise(VirtualFileCommand.read, fullName, data, offset, len).dataOut; }
 					else
 					{
 						auto f = StdFile(fullName, "rb");
@@ -7989,7 +7966,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						ulong avail = offset<siz ? siz-offset : 0;
 						ulong actualSiz = min(len, avail);
 						
-						if(actualSiz>0){
+						if(actualSiz>0) {
 							data.length = cast(size_t)actualSiz;
 							data = f.rawRead(data);
 						}
@@ -8005,40 +7982,46 @@ version(/+$DIDE_REGION Date Time+/all)
 				return data;
 			}
 			
-			string readStr(bool mustExists = true,
-				ulong offset = 0, size_t len = size_t.max) const
+			string readStr(
+				bool mustExists = true,
+								ulong offset = 0, size_t len = size_t.max
+			) const
 			{
 				auto s = cast(string)(read(mustExists, offset, len));
 				return s;
 			}
 			
-			string readText(bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-				ulong offset = 0, size_t len = size_t.max) const
+			string readText(
+				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+								ulong offset = 0, size_t len = size_t.max
+			) const
 			{
 				auto s = readStr(mustExists, offset, len);
 				return textToUTF8(s, defaultEncoding); //own converter. Handles BOM
 			}
 			
-			string[] readLines(bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-				ulong offset = 0, size_t len = size_t.max) const
-			{
-				return readText(mustExists, defaultEncoding, offset, len).splitLines;
-			}
+			string[] readLines(
+				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+								ulong offset = 0, size_t len = size_t.max
+			) const
+			{ return readText(mustExists, defaultEncoding, offset, len).splitLines; }
 			
 			//utf32 versions
-			dstring readText32(bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-				ulong offset = 0, size_t len = size_t.max) const
+			dstring readText32(
+				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+								ulong offset = 0, size_t len = size_t.max
+			) const
 			{
 				auto s = readStr(mustExists, offset, len);
 				return textToUTF32(s, defaultEncoding); //own converter. Handles BOM
 			}
 			
-			dstring[] readLines32(bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-				ulong offset = 0, size_t len = size_t.max) const
-			{
-				return readText32(mustExists, defaultEncoding, offset, len).splitLines;
-			}
-		}version(/+$DIDE_REGION+/all){
+			dstring[] readLines32(
+				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+								ulong offset = 0, size_t len = size_t.max
+			) const
+			{ return readText32(mustExists, defaultEncoding, offset, len).splitLines; }
+		}version(/+$DIDE_REGION+/all) {
 			private void write_internal(const void[] data, bool rewriteAll, ulong offset, Flag!"preserveTimes" preserveTimes)const
 			{
 				try
@@ -8048,7 +8031,8 @@ version(/+$DIDE_REGION Date Time+/all)
 						enforce(!preserveTimes, "preserveTimes not supported with virtual files.");
 						auto v = virtualFileQuery_raise(
 							rewriteAll ? VirtualFileCommand.writeAndTruncate : VirtualFileCommand.write,
-							fullName, cast(ubyte[])data, rewriteAll ? 0 : offset);
+							fullName, cast(ubyte[])data, rewriteAll ? 0 : offset
+						);
 					}
 					else
 					{
@@ -8066,29 +8050,21 @@ version(/+$DIDE_REGION Date Time+/all)
 						if(logFileOps) LOG(fullName);
 						
 						if(preserveTimes && getTimeSuccess)
-							enforce(SetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0, "Error writing file times.");
+						enforce(SetFileTime(f.windowsHandle, &cre, &acc, &wri)!=0, "Error writing file times.");
 					}
 				}
 				catch(Exception)
-				{
-					enforce(false, format(`Can't write file: "%s"`, fullName));
-				}
+				{ enforce(false, format(`Can't write file: "%s"`, fullName)); }
 			}
 			
 			void write(const void[] data, Flag!"preserveTimes" preserveTimes=No.preserveTimes)const
-			{
-				write_internal(data, true, 0, preserveTimes);
-			}
+			{ write_internal(data, true, 0, preserveTimes); }
 			
 			void write(const void[] data, ulong offset, Flag!"preserveTimes" preserveTimes=No.preserveTimes)const
-			{
-				write_internal(data, false, offset, preserveTimes);
-			}
+			{ write_internal(data, false, offset, preserveTimes); }
 			
 			bool sameContents(const void[] data)
-			{
-				return size==data.length && equal(cast(const ubyte[])data, read(false));
-			}
+			{ return size==data.length && equal(cast(const ubyte[])data, read(false)); }
 			
 			bool writeIfNeeded(const void[] data)
 			{
@@ -8111,9 +8087,11 @@ version(/+$DIDE_REGION Date Time+/all)
 			}
 			
 			
-			/+note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.
-							`font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
-							Also avoid normalization because it is depends on the contents of the HDD.+/
+			/+
+				note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.
+											`font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
+											Also avoid normalization because it is depends on the contents of the HDD.
+			+/
 			
 			int opCmp(in File b) const
 			{ return cmp(fullName, b.fullName); }
@@ -8129,7 +8107,8 @@ version(/+$DIDE_REGION Date Time+/all)
 			}
 			
 			@property string queryString() const
-			{//todo: test querystrings with bitmap/font renderer
+			{
+				//todo: test querystrings with bitmap/font renderer
 				auto i = fullName.indexOf('?');
 				return i>=0 ? fullName[i+1..$] : "";
 			}
@@ -8143,12 +8122,11 @@ version(/+$DIDE_REGION Date Time+/all)
 			}
 			
 			auto queryItems()
-			{
-				return queryString.splitter('&').map!(s => s.split2("=", false));
-			}
+			{ return queryString.splitter('&').map!(s => s.split2("=", false)); }
 			
 			@property string query(T=string)(string name, lazy T def=T.init)
-			{//note: it is slow, but requre no additional memory (map structure)
+			{
+				//note: it is slow, but requre no additional memory (map structure)
 				foreach(a; queryItems) if(sameText(a[0], name)) return a[1].to!T;
 				return def;
 			}
@@ -8165,7 +8143,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			File opBinary(string op)(string s) const if(op == "~")
 			{ return File(fullName~s); }
 		}
-	}version(/+$DIDE_REGION+/all){
+	}version(/+$DIDE_REGION+/all) {
 		
 		private bool isAbsolutePath(string fn)
 		{ return std.path.isAbsolute(fn); }
@@ -8174,10 +8152,10 @@ version(/+$DIDE_REGION Date Time+/all)
 		{
 			if(!a) return b;
 			if(!b) return a;
-		
+					
 			//note: in buildPath() "c:\a" + "\xyz" equals "c:\syz". This is bad.
 			b = b.withoutStarting(`\`);
-		
+					
 			return std.path.buildPath(a, b);
 		}
 		
@@ -8191,10 +8169,10 @@ version(/+$DIDE_REGION Date Time+/all)
 		{
 			char[MAX_PATH] buf;
 			auto len = GetShortPathNameA(f.normalized.fullName.toPChar, buf.ptr, MAX_PATH);
-			if(len && len<MAX_PATH){
+			if(len && len<MAX_PATH) {
 				auto fs = File(buf[0..len].idup);
 				len = GetLongPathNameA(fs.fullName.toPChar, buf.ptr, MAX_PATH);
-				if(len && len<MAX_PATH){
+				if(len && len<MAX_PATH) {
 					import std.ascii : toLower;
 					buf[0] = toLower(buf[0]);
 					return File(buf[0..len].idup);
@@ -8205,7 +8183,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		
 		//helpers for saving and loading
-		void saveTo(T)(const T[] data, const File file)if( is(T == char))
+		void saveTo(T)(const T[] data, const File file)if(is(T == char))
 		{ file.write(cast(string)data); }
 		void saveTo(T)(const T[] data, const File file)if(!is(T == char))
 		{ file.write(data); }
@@ -8213,11 +8191,10 @@ version(/+$DIDE_REGION Date Time+/all)
 		{ file .write([data]); }
 		
 		void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged)
-		{//todo: combine all saveTo functions into one funct.
+		{
+			//todo: combine all saveTo functions into one funct.
 			if(FOnlyIfChanged == Yes.onlyIfChanged)
-			{
-				if(file.size == data.length && file.readStr == data) return;
-			}
+			{ if(file.size == data.length && file.readStr == data) return; }
 			file.write(data);
 		}
 		
@@ -8226,7 +8203,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)
 		{ [data].saveTo(File(fileName)); }
 		
-		void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if( is(T == char))
+		void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(is(T == char))
 		{ data = fileName.readStr(mustExists); }
 		void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))
 		{ data = cast(T[])fileName.read(mustExists); }
@@ -8245,73 +8222,68 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		auto loadCachedTextFile(alias fun)(File file)
 		if(__traits(isStaticFunction, fun))
-		{// loadCachedFile /////////////////////////////////////////////////////
+		{
+			//loadCachedFile /////////////////////////////////////////////////////
 			alias T = ReturnType!fun;
-		
+					
 			static struct Rec
 			{
 				File file;
 				DateTime modified;
 				T payload; 
-				/+todo: tesztelni, hogy a Shader-eket felszabaditja-e es mikor.
-				Elvileg onalloan jol fog mukodni. +/
+				/+
+					todo: tesztelni, hogy a Shader-eket felszabaditja-e es mikor.
+									Elvileg onalloan jol fog mukodni. 
+				+/
 				string error;
 			}
-		
+					
 			static Rec[File] loaded;
-		
+					
 			auto p = file in loaded,
 					 actModified = file.modified;
-		
+					
 			//found but too old.
-			if(p !is null && file.modified != p.modified){
+			if(p !is null && file.modified != p.modified) {
 				loaded.remove(file);
 				p = null;
 			}//p is valid
-		
+					
 			if(p is null)
 			{
 				//1. load
 				string text;
 				try
-				{
-					text = file.readText;
-				}
+				{ text = file.readText; }
 				catch(Exception)
-				{
-					throw new Exception("Unable to load cached file: "~file.fullName);
-				}
+				{ throw new Exception("Unable to load cached file: "~file.fullName); }
 				//it will try again later
-		
+						
 				//2. create
 				T obj;  string error;
 				try
-				{
-					obj = fun(text);
-				}
+				{ obj = fun(text); }
 				catch(Exception t)
-				{
-					error = t.simpleMsg;
-				}
-		
+				{ error = t.simpleMsg; }
+						
 				loaded[file] = Rec(file, actModified, obj, error);
 				//todo: fileRead and getDate should be system-wide-atomic
 				p = &loaded[file];
 			}
 			//p is valid
-		
+					
 			//return the latest object if can
 			assert(p !is null);
 			if(p.payload !is null)
-				return p.payload;
+			return p.payload;
 			else
-				throw new Exception(p.error);
+			throw new Exception(p.error);
 		}
 		
 	}version(/+$DIDE_REGION Compress+/all)
 	{
-		// Base64 //////////////////////////////////
-	
+		//Base64 //////////////////////////////////
+			
 		import std.base64;
 		alias toBase64 = Base64.encode;
 		alias fromBase64 = Base64.decode;
@@ -8319,11 +8291,12 @@ version(/+$DIDE_REGION Date Time+/all)
 		/// Helps to track a value whick can be updated. Remembers the
 		/// last falue too. Has boolean and autoinc notification options.
 		struct ChangingValue(T)
-		{// ChangingValue /////////////////////////////////
+		{
+			//ChangingValue /////////////////////////////////
 			T actValue, lastValue;
 			uint changedCount;
 			bool changed;
-		
+					
 			@property T value() const 
 			{ return actValue; }
 			@property void value(in T newValue)
@@ -8332,16 +8305,16 @@ version(/+$DIDE_REGION Date Time+/all)
 				actValue = newValue;
 				changed = actValue != lastValue;
 				if(changed)
-					changedCount++;
+				changedCount++;
 			}
-		
+					
 			alias value this;
 		}
 		
 		
-		// Time series compression /////////////////////////////////////////
+		//Time series compression /////////////////////////////////////////
 		
-		// https://www.timescale.com/blog/time-series-compression-algorithms-explained/
+		//https://www.timescale.com/blog/time-series-compression-algorithms-explained/
 		
 		struct DeltaCompressor(T)
 		{
@@ -8349,10 +8322,10 @@ version(/+$DIDE_REGION Date Time+/all)
 			enum initial = T.init;
 			T last = initial;
 			
-			void reset(){ this = typeof(this).init; }
+			void reset() { this = typeof(this).init; }
 			
 			T compress(T act)
-			{ 
+			{
 				T res;
 				if(threshold==0)
 				{
@@ -8367,29 +8340,21 @@ version(/+$DIDE_REGION Date Time+/all)
 						last = act;
 					}
 					else
-					{
-						res = 0;
-					}
+					{ res = 0; }
 				}
 				return res;
 			}
-		
+					
 			T uncompress(T input)
-			{ 
+			{
 				if(threshold==0)
-				{
-					last += input;
-				}
+				{ last += input; }
 				else
 				{
 					if(input>0)
-					{
-						last += input + threshold;
-					}
+					{ last += input + threshold; }
 					else if(input<0)
-					{
-						last += input - threshold;
-					}
+					{ last += input - threshold; }
 				}
 				return last;
 			}
@@ -8414,24 +8379,25 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		alias DeltaDeltaCompressor(T) = CompressorChain!(DeltaCompressor!T, DeltaCompressor!T);
 		
-		// zip files ////////////////////////////////
-	
+		//zip files ////////////////////////////////
+			
 		/// extrazt a zip stream appended to the end.
 		ubyte[] trailingZip(ubyte[] buf)
 		{
 			ubyte[] res;
-		
+					
 			//find central directory signature from the back
 			struct PKCentralDirectoryRecord
-			{align(1):
-				uint signature;
-				ushort diskNumber, diskCD, diskEntries, totalEntries;
-				uint cdSize, cdOfs;
-				ushort commentLen;
+			{
+				align(1):
+								uint signature;
+								ushort diskNumber, diskCD, diskEntries, totalEntries;
+								uint cdSize, cdOfs;
+								ushort commentLen;
 			}
-		
+					
 			if(buf.length < PKCentralDirectoryRecord.sizeof) return res;
-		
+					
 			auto cdr = cast(PKCentralDirectoryRecord*)&buf[$-PKCentralDirectoryRecord.sizeof];
 			auto zipSize = cdr.cdOfs+cdr.cdSize+PKCentralDirectoryRecord.sizeof;
 			auto cdrGood = cdr.signature == 0x06054b50 
@@ -8439,17 +8405,18 @@ version(/+$DIDE_REGION Date Time+/all)
 				&& cdr.diskCD==0	//signature  &&  one dist only
 				&& cdr.diskEntries==cdr.totalEntries 	
 				&& cdr.commentLen==0	//entries are ok	&&  no comment
-				&& buf.length >= zipSize	/+buf size is	sufficient+/ ;
+				&& buf.length >= zipSize	/+buf size is	sufficient+/;
 			
 			if(!cdrGood) return res;
-		
+					
 			buf = buf[buf.length-zipSize..$];
 			if(buf[0]==0x50 && buf[1]==0x4b) res = buf; //must be something with PK
-		
+					
 			return res;
 		}
 	}version(/+$DIDE_REGION Virtual files+/all)
-	{///  Virtual files //////////////////////////////////////////////
+	{
+		///  Virtual files //////////////////////////////////////////////
 		
 		__gshared size_t VirtualFileCacheMaxSizeBytes = 64<<20;
 		
@@ -8467,7 +8434,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			return res;
 		}
 		
-		struct VirtualFileCacheStats{
+		struct VirtualFileCacheStats {
 			size_t count;
 			size_t allSizeBytes, residentSizeBytes;
 		}
@@ -8475,78 +8442,79 @@ version(/+$DIDE_REGION Date Time+/all)
 		private VirtualFileCacheStats _virtualFileCacheStats; //used as a result
 		
 		private auto virtualFileQuery(in VirtualFileCommand cmd, string fileName, const void[] dataIn=null, size_t offset=0, size_t size=size_t.max)
-		{ synchronized
 		{
-			struct Res{
-				string error;
-				bool success(){ return error==""; }
-				alias success this;
-		
-				//query results
-				bool exists;
-				ulong size;
-				File.FileTimes fileTimes;
-				ubyte[] dataOut;
-				bool resident;
-			}
-		
-			struct Rec{
-				string fileName;
-				File.FileTimes fileTimes;
-				ubyte[] data;
-				bool resident; //garbageCollect will not free this file
-											 //todo: make a way to set 'resident' bit
-			}
-		
-			__gshared static Rec[string] files;
-		
-			enum log = 0;
-			Res res;
-			final switch(cmd)
+			 synchronized
 			{
-				case VirtualFileCommand.getInfo:	{
+				struct Res {
+					string error;
+					bool success() { return error==""; }
+					alias success this;
+							
+					//query results
+					bool exists;
+					ulong size;
+					File.FileTimes fileTimes;
+					ubyte[] dataOut;
+					bool resident;
+				}
+						
+				struct Rec {
+					string fileName;
+					File.FileTimes fileTimes;
+					ubyte[] data;
+					bool resident; //garbageCollect will not free this file
+												 //todo: make a way to set 'resident' bit
+				}
+						
+				__gshared static Rec[string] files;
+						
+				enum log = 0;
+				Res res;
+				final switch(cmd)
+				{
+					case VirtualFileCommand.getInfo:	{
 						auto p = fileName in files;
 						res.exists = p !is null;
-						if(res.exists){
+						if(res.exists) {
 							res.size = p.data.length;
 							res.fileTimes = p.fileTimes;
 							res.resident = p.resident;
 						}
 					}break;
-					
-				case VirtualFileCommand.stats:	{
+						
+					case VirtualFileCommand.stats:	{
 						_virtualFileCacheStats.count = files.length;
 						_virtualFileCacheStats.allSizeBytes	= files.byValue                         .map!(f => f.data.length).sum;
 						_virtualFileCacheStats.residentSizeBytes	= files.byValue.filter!(f => f.resident).map!(f => f.data.length).sum;
 					}break;
-					
-				case VirtualFileCommand.remove:	{
+						
+					case VirtualFileCommand.remove:	{
 						auto p = fileName in files;
 						res.exists = p !is null;
 						if(res.exists) files.remove(fileName);
 						else res.error = "Can't remove Virtual File: "~fileName.quoted;
 					}break;
-					
-				case VirtualFileCommand.read:	{
-						auto p = fileName in files;
-						if(p is null){ res.error = "Virtual File not found: "~fileName.quoted; return res; }
 						
-						if(offset<p.data.length){
+					case VirtualFileCommand.read:	{
+						auto p = fileName in files;
+						if(p is null) { res.error = "Virtual File not found: "~fileName.quoted; return res; }
+						
+						if(offset<p.data.length) {
 							const actSize = min(size, p.data.length-offset);
 							if(actSize>0)
-								res.dataOut = p.data[offset..offset+actSize];
+							res.dataOut = p.data[offset..offset+actSize];
 						}
 						p.fileTimes.accessed = now;
 						
 						if(log) LOG("Accessed", fileName.quoted);
 					}break;
-					
-				case VirtualFileCommand.write, 
-				VirtualFileCommand.writeAndTruncate:	{
-						if(!fileName.isVirtualFileName){ res.error = "Invalid virtual fileName: "~fileName.quoted; return res; }
+						
+					case VirtualFileCommand.write, 
+					VirtualFileCommand.writeAndTruncate:	{
+						if(!fileName.isVirtualFileName) { res.error = "Invalid virtual fileName: "~fileName.quoted; return res; }
 						
 						auto p = fileName in files;
-						if(p is null){
+						if(p is null) {
 							auto dt = now;
 							files[fileName] = Rec(fileName, File.FileTimes(dt, dt, DateTime.init), []);
 							if(log) LOG("Created", fileName.quoted);
@@ -8556,25 +8524,26 @@ version(/+$DIDE_REGION Date Time+/all)
 						}
 						
 						auto end = offset + dataIn.length;
-						if(end<offset){ res.error = "Offset overflow: "~fileName.quoted; return res; }
+						if(end<offset) { res.error = "Offset overflow: "~fileName.quoted; return res; }
 						
 						p.data.length = max(p.data.length, end); //enlarge
 						p.data[offset..end] = cast(const ubyte[])dataIn[]; //copy
 						
 						if(cmd == VirtualFileCommand.writeAndTruncate)
-							p.data.length = end; //truncate
+						p.data.length = end; //truncate
 						
 						p.fileTimes.modified = now;
 						if(log) LOG("Updated", fileName.quoted);
 						
 					}	break;
-					
-				case VirtualFileCommand.garbageCollect:	{
+						
+					case VirtualFileCommand.garbageCollect:	{
 						//auto T0 = QPS;
 						const sizeBytes = files.byValue.filter!(f => !f.resident).map!(f => f.data.length).sum; //sum of non-resident size
 						
 						if(sizeBytes > VirtualFileCacheMaxSizeBytes)
-						{ //LOG("Bitmap cache GC");
+						{
+							 //LOG("Bitmap cache GC");
 							const t = now;
 							
 							//ascending by access time
@@ -8583,7 +8552,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							const targetSize = VirtualFileCacheMaxSizeBytes;
 							size_t remaining = sizeBytes;
 							string[] toRemove;
-							foreach(f; list){
+							foreach(f; list) {
 								toRemove ~= f.fileName;
 								remaining -= f.data.length;
 								if(remaining<=targetSize) break;
@@ -8594,10 +8563,11 @@ version(/+$DIDE_REGION Date Time+/all)
 							//LOG(QPS-T0);
 						}
 					}break;
+				}
+				
+				return res; //no error
 			}
-			
-			return res; //no error
-		}}
+		}
 		
 		void unittest_virtualFileReadWrite()
 		{
@@ -8609,21 +8579,21 @@ version(/+$DIDE_REGION Date Time+/all)
 			f.remove;
 		}
 		
-		// globally accessible virtual file stuff
-		struct virtualFiles{ __gshared static:
-		
-			auto stats(){
+		//globally accessible virtual file stuff
+		struct virtualFiles {
+			 __gshared static:
+					
+						auto stats() {
 				virtualFileQuery(VirtualFileCommand.stats, "");
 				return _virtualFileCacheStats;
 			}
-		
-			void garbageCollect(){
-				virtualFileQuery(VirtualFileCommand.garbageCollect, "");
-			}
+					
+						void garbageCollect() { virtualFileQuery(VirtualFileCommand.garbageCollect, ""); }
 		}
 		
 	}version(/+$DIDE_REGION File listing+/all)
-	{// FileEntry, listFiles, findFiles //////////////////////////////////
+	{
+		//FileEntry, listFiles, findFiles //////////////////////////////////
 		version(/+$DIDE_REGION+/all)
 		{
 			
@@ -8634,16 +8604,16 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				Path path;
 				string name;
-			
+							
 				string fullName()
-				const{ return path.fullPath~name; }
+				const { return path.fullPath~name; }
 				File file()const
 				{ return File(fullName); }
-			
+							
 				FILETIME ftCreationTime, ftLastWriteTime, ftLastAccessTime;
 				long size;
 				uint dwFileAttributes;
-			
+							
 				@property
 				{
 					string ext() const
@@ -8659,7 +8629,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					bool isHidden() const
 					{ return (dwFileAttributes & FILE_ATTRIBUTE_HIDDEN	)!=0; }
 				}
-			
+							
 				this(in WIN32_FIND_DATAW data, in Path path)
 				{
 					this.path	= path;
@@ -8669,54 +8639,59 @@ version(/+$DIDE_REGION Date Time+/all)
 					this.ftLastAccessTime 	= data.ftLastAccessTime;
 					this.size	= data.nFileSizeLow | (long(data.nFileSizeHigh)<<32);
 					this.dwFileAttributes	= data.dwFileAttributes;
-			
+								
 				}
-			
+							
 				string toString() const
-				{return format!"%-80s %s%s%s%s%s %12d cre:%s mod:%s"
-				(File(path, name).fullName,
-					isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".",
-					size, DateTime(UTC, ftCreationTime), DateTime(UTC, ftLastWriteTime));}
-			
+				{
+					return format!"%-80s %s%s%s%s%s %12d cre:%s mod:%s"
+									(
+						File(path, name).fullName,
+											isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".",
+											size, DateTime(UTC, ftCreationTime), DateTime(UTC, ftLastWriteTime)
+					);
+				}
+							
 				auto created () const
 				{ return DateTime(UTC, ftCreationTime  ); }
 				auto accessed() const
 				{ return DateTime(UTC, ftLastAccessTime); }
 				auto modified() const
 				{ return DateTime(UTC, ftLastWriteTime ); }
-			}FileEntry[] listFiles(Path path, string mask="", string order="name",
-				Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive)
-			{///similar directory listing like the one in totalcommander
+			}FileEntry[] listFiles(
+				Path path, string mask="", string order="name",
+								Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive
+			)
+			{
+				///similar directory listing like the one in totalcommander
 				path = path.normalized;
-			
+							
 				enforce(!(!onlyFiles && recursive), "Invalid params");
-			
+							
 				FileEntry[] files, paths, parent;
-			
+							
 				WIN32_FIND_DATAW data;
 				HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data);
 				if(hFind != INVALID_HANDLE_VALUE)
 				{
-					do{
+					do {
 						auto entry = FileEntry(data, path);
 						if(entry.isDirectory)
 						{
 							if(entry.name == ".") continue;
-							if(entry.name == ".."){ if(!onlyFiles) parent ~= entry; continue; }
+							if(entry.name == "..") { if(!onlyFiles) parent ~= entry; continue; }
 							if(!onlyFiles || recursive) paths ~= entry;
 						}
 						else
-						{
-							if(mask=="" || entry.name.isWildMulti(mask)) files ~= entry;
-						}
+						{ if(mask=="" || entry.name.isWildMulti(mask)) files ~= entry; }
 					}
 					while(FindNextFileW(hFind, &data));
 					FindClose(hFind);
 				}
-			
+							
 				//todo: implement recursive
 				//todo: onlyFiles && recursive, watch out for ".."!!!
-			
+							
 				if(recursive)
 				{
 					foreach(p; paths.map!(a => Path(path, a.name)))
@@ -8729,23 +8704,24 @@ version(/+$DIDE_REGION Date Time+/all)
 				}
 				
 				if(order=="")
-				{ //fast exit when no ordering needed
-					if(onlyFiles)	return files;
+				{
+					 //fast exit when no ordering needed
+					if(onlyFiles) return files;
 					return chain(parent, paths, files).array;
 				}
 				
 				auto pathIdx = new int[paths.length];
 				paths.makeIndex!((a, b) => icmp(a.name, b.name)<0)(pathIdx);
-			
+							
 				auto fileIdx = new int[files.length];
-			
+							
 				auto ascending = 1;
-				if(order.startsWith("-")){ order = order[1..$]; ascending = -1; }
+				if(order.startsWith("-")) { order = order[1..$]; ascending = -1; }
 				order = order.withoutStarting("+");
-			
-				static auto cmpSize(long a, long b){ return a==b?0:a<b?1:-1; }
-				static auto cmpTime(FILETIME a, FILETIME b){ return cmpSize(*cast(long*)&a, *cast(long*)&b); }
-			
+							
+				static auto cmpSize(long a, long b) { return a==b?0:a<b?1:-1; }
+				static auto cmpTime(FILETIME a, FILETIME b) { return cmpSize(*cast(long*)&a, *cast(long*)&b); }
+							
 				switch(order.lc)
 				{
 					case "name":	files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx);	break;
@@ -8754,24 +8730,25 @@ version(/+$DIDE_REGION Date Time+/all)
 					case "date":	files.makeIndex!((a, b) => cmpChain(ascending*cmpTime(a.ftLastWriteTime, b.ftLastWriteTime), icmp(b.name, a.name))>0)(fileIdx);	break;
 					default:	raise("Invalid sort order: " ~ order.quoted);
 				}
-			
+							
 				if(onlyFiles) return fileIdx.map!(i => files[i]).array;
 				return chain(parent, pathIdx.map!(i => paths[i]), fileIdx.map!(i => files[i])).array;
 			}
 			
 			FileEntry[] findFiles(Path path, string mask="", string order="name", int level=0)
-			{///this is a recursive search
+			{
+				///this is a recursive search
 				path = path.normalized;
-			
+							
 				FileEntry[] files, paths;
-			
+							
 				if(mask=="*") mask = "";
-			
+							
 				WIN32_FIND_DATAW data;
 				HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data);
 				if(hFind != INVALID_HANDLE_VALUE)
 				{
-					do{
+					do {
 						auto entry = FileEntry(data, path);
 						if(entry.isDirectory)
 						{
@@ -8779,31 +8756,29 @@ version(/+$DIDE_REGION Date Time+/all)
 							paths ~= entry;
 						}
 						else
-						{
-							if(mask=="" || entry.name.isWild(mask)) files ~= entry;
-						}
+						{ if(mask=="" || entry.name.isWild(mask)) files ~= entry; }
 					}
 					while(FindNextFileW(hFind, &data));
 					FindClose(hFind);
 				}
-			
+							
 				//recursion
 				files ~= paths.map!(p => findFiles(Path(p.path, p.name), mask, order, level+1)).join;
-			
+							
 				//only sort on root level
 				if(level==0)
 				{
 					PERF("makeIndex");
 					auto fileIdx = new int[files.length];
-			
+								
 					auto ascending = 1;
-					if(order.startsWith("-")){ order = order[1..$]; ascending = -1; }
+					if(order.startsWith("-")) { order = order[1..$]; ascending = -1; }
 					order = order.withoutStarting("+");
-			
-					static auto cmpChain(int c1, lazy int c2){ return c1 ? c1 : c2; }
-					static auto cmpSize(long a, long b){ return a==b?0:a<b?1:-1; }
-					static auto cmpTime(FILETIME a, FILETIME b){ return cmpSize(*cast(long*)&a, *cast(long*)&b); }
-			
+								
+					static auto cmpChain(int c1, lazy int c2) { return c1 ? c1 : c2; }
+					static auto cmpSize(long a, long b) { return a==b?0:a<b?1:-1; }
+					static auto cmpTime(FILETIME a, FILETIME b) { return cmpSize(*cast(long*)&a, *cast(long*)&b); }
+								
 					switch(order.lc)
 					{
 						case "name":	files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx);	break;
@@ -8813,26 +8788,24 @@ version(/+$DIDE_REGION Date Time+/all)
 						default:	raise("Invalid sort order: " ~ order.quoted);
 					}
 					PERF("buildArray");
-			
+								
 					files = fileIdx.map!(i => files[i]).array;
-			
+								
 					print(PERF.report);
-			
+								
 					return files;
 				}
 				else
-				{
-					return files;
-				}
-			
-			}    struct DirResult
+				{ return files; }
+							
+			}		  struct DirResult
 			{
 				static struct DirFile
 				{
 					File file;
 					ulong size;
 					DateTime modified;
-				
+									
 					string toString() const
 					{ return format!"%s %12d %s"(modified, size, file.fullName); }
 				}
@@ -8862,12 +8835,15 @@ version(/+$DIDE_REGION Date Time+/all)
 						paths	.map!text.join('\n')~'\n'~
 						exts	.map!text.join('\n')~'\n';
 				}
-			}    auto dirPerS(in Path path, string pattern = "*")
-			{// dirPerS//////////////////////////
+			}		  auto dirPerS(in Path path, string pattern = "*")
+			{
+				//dirPerS//////////////////////////
 				
-				/+ List files using dir DOS command
-				note: this is bad: it's fast, but no second and millisecond precision, only hour:minute.
-				use listFiles with recursion +/
+				/+
+					 List files using dir DOS command
+									note: this is bad: it's fast, but no second and millisecond precision, only hour:minute.
+									use listFiles with recursion 
+				+/
 				
 				DirResult res;
 				with(res)
@@ -8884,8 +8860,8 @@ version(/+$DIDE_REGION Date Time+/all)
 									 d = DateTime(wild.ints(0), wild.ints(1), wild.ints(2), wild.ints(3), wild.ints(4), 0);
 							if(f.name.isWildMulti(pattern)) files ~= DirFile(f, s, d);
 						}
-						else if(line.isWild(" Directory of *")) 
-							actPath = Path(wild[0]);
+						else if(line.isWild(" Directory of *"))
+						actPath = Path(wild[0]);
 					}
 					
 					files = files.sort!((a, b) => a.modified < b.modified).array;
@@ -8894,24 +8870,26 @@ version(/+$DIDE_REGION Date Time+/all)
 					files.each!((f){ if(f.file.fullPath !in pathTimes) pathTimes[f.file.fullPath] = f.modified; });
 					
 					foreach(k, v; pathTimes)
-						paths ~= DirPath(Path(k), v);
+					paths ~= DirPath(Path(k), v);
 					paths = paths.sort!((a, b) => a.modified<b.modified).array;
 					
 					ulong[string] extCnt, extSize;
-					files.each!((f){
-						extCnt[f.file.ext.lc]++;
-						extSize[f.file.ext.lc]+=f.size;
-					});
+					files.each!(
+						(f){
+							extCnt[f.file.ext.lc]++;
+							extSize[f.file.ext.lc]+=f.size;
+						}
+					);
 					
 					foreach(k; extCnt.keys)
-						exts ~= DirExt(k, extCnt[k], extSize[k]);
+					exts ~= DirExt(k, extCnt[k], extSize[k]);
 					
 					exts = exts.sort!((a, b) => a.size > b.size).array;
 					
 				}
 				return res;
 			}
-		
+					
 		}
 	}
 }
