@@ -191,7 +191,7 @@ struct RectAlign {
 		if(keepAspect) {
 			float a1 = rdst2.right-rdst2.left  , b1 = rdst2.bottom-rdst2.top  ,
 						a2 = rImage.right-rImage.left, b2 = rImage.bottom-rImage.top,
-						r1 = a1/max(1, b1)           , r2 = a2/max(1, b2)         ;
+						r1 = a1/max(1, b1)           , r2 = a2/max(1, b2)        ;
 			if(r1<r2) {
 				b1 = a1/max(0.000001f,r2);
 				final switch(cast(int)vAlign) {
@@ -358,8 +358,8 @@ class Drawing {
 	//@property RGB fillColor()	     { return actState.fillColor; }
 	//@property void fillColor(RGB c)	     { actState.fillColor = c; }
 	
-		ref float pointSize()							  { return actState.pointSize; }
-		ref float lineWidth()							  { return actState.lineWidth; }
+		ref float pointSize()								 { return actState.pointSize; }
+		ref float lineWidth()								 { return actState.lineWidth; }
 		ref lineStyle()           { return actState.lineStyle; }
 	
 		ref arrowStyle() { return actState.arrowStyle; }
@@ -367,14 +367,14 @@ class Drawing {
 		ref scaleFactor()	 { return actState.drawScale; }
 		ref origin()	 { return actState.drawOrigin; }
 	
-		ref fontHeight					 () { return actState.fontHeight					    ; }
-		ref fontWeight					 () { return actState.fontWeight					    ; }
-		@property bool	fontMonoSpace		() const { return actState.fontMonoSpace	 ; }
-		@property bool	fontItalic	  ()	const { return actState.fontItalic	 ; }
+		ref fontHeight					 () { return actState.fontHeight					   ; }
+		ref fontWeight					 () { return actState.fontWeight					   ; }
+		@property bool	fontMonoSpace		() const { return actState.fontMonoSpace	; }
+		@property bool	fontItalic	  ()	const { return actState.fontItalic	; }
 		@property bool	fontUnderline		() const { return actState.fontUnderline			; }
 		@property bool	fontStrikeOut		() const { return actState.fontStrikeOut			; }
 		@property	fontMonoSpace	  (bool b) { return actState.fontMonoSpace	= b		; }
-		@property	fontItalic	  (bool b) { return actState.fontItalic	= b	 ; }
+		@property	fontItalic	  (bool b) { return actState.fontItalic	= b	; }
 		@property	fontUnderline		 (bool b) { return actState.fontUnderline	= b			; }
 		@property	fontStrikeOut		 (bool b) { return actState.fontStrikeOut	= b			; }
 	
@@ -629,20 +629,20 @@ class Drawing {
 		void lineTo(in ivec2 p)	                   { lineTo(p);	 }
 		void lineTo(in ivec2 p, bool isMove)		 { lineTo(p, isMove); }
 	
-		void moveTo(in vec2 p)		                               { lineCursor = p; }
-		void moveTo(in ivec2 p)		                               { moveTo(p); }
+		void moveTo(in vec2 p)			                              { lineCursor = p; }
+		void moveTo(in ivec2 p)			                              { moveTo(p); }
 	
-		void lineRel(in vec2 p)							                         { lineTo(lineCursor+p); }  //kinda slow, but can change transformations between relative movements
-		void moveRel(in vec2 p)							                         { moveTo(lineCursor+p); }
+		void lineRel(in vec2 p)								                        { lineTo(lineCursor+p); }  //kinda slow, but can change transformations between relative movements
+		void moveRel(in vec2 p)								                        { moveTo(lineCursor+p); }
 		void line(in vec2 p0, in vec2 p1)                       { lineCursor = p0; lineTo(p1); }
 	
 		void line(in ivec2 p0, in ivec2 p1)                       { line(p0, p1); }
 		void line(in seg2 s)	                              { line(s.p[0], s.p[1]); }
 		void line(in seg2[] a)		 { foreach(const s; a) line(s); }
 	
-		void lineTo(float x, float y)			  { lineTo(vec2(x, y)); }
-		void lineTo(float x, float y, bool isMove)			  { lineTo(vec2(x, y), isMove); }
-		void moveTo(float x, float y)			  { moveTo(vec2(x, y)); }
+		void lineTo(float x, float y)				 { lineTo(vec2(x, y)); }
+		void lineTo(float x, float y, bool isMove)				 { lineTo(vec2(x, y), isMove); }
+		void moveTo(float x, float y)				 { moveTo(vec2(x, y)); }
 		void lineRel(float x, float y)				 { lineRel(vec2(x, y)); }
 		void moveRel(float x, float y)				 { moveRel(vec2(x, y)); }
 		void line(float x0, float y0, float x1, float y1)	    { line(vec2(x0, y0), vec2(x1, y1)); }
@@ -753,17 +753,17 @@ class Drawing {
 		void drawRect(in ibounds2 b)                       { drawRect(bounds2(b)); }
 	
 		void drawX(float x0, float y0, float x1, float y1)    { line(x0, y0, x1, y1); line(x0, y1, x1, y0); }
-		void drawX(in vec2 a, in vec2 b)			               { drawX(a.x, a.y, b.x, b.y); }
-		void drawX(in bounds2 b)			               { drawX(b.low, b.high); }
+		void drawX(in vec2 a, in vec2 b)				              { drawX(a.x, a.y, b.x, b.y); }
+		void drawX(in bounds2 b)				              { drawX(b.low, b.high); }
 		void drawX(in ibounds2 b)                          { drawX(bounds2(b)); }
 	
 		void fillRect(float x0, float y0, float x1, float y1) {
 		auto c = realDrawColor;
 		myAppend(DrawingObj(67, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c));
 	}
-		void fillRect(in vec2 a, in vec2 b)			            { fillRect(a.x, a.y, b.x, b.y); }
-		void fillRect(in bounds2 b)			            { fillRect(b.low, b.high); }
-		void fillRect(in ibounds2 b)			            { fillRect(bounds2(b)); } //todo: ibounds2 automatikusan atalakulhasson bounds2-re
+		void fillRect(in vec2 a, in vec2 b)				           { fillRect(a.x, a.y, b.x, b.y); }
+		void fillRect(in bounds2 b)				           { fillRect(b.low, b.high); }
+		void fillRect(in ibounds2 b)				           { fillRect(bounds2(b)); } //todo: ibounds2 automatikusan atalakulhasson bounds2-re
 	
 		void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args) {
 		if(idx<0) return;
@@ -810,10 +810,10 @@ class Drawing {
 		//Img can be int or Bmp File or string or CustomTexture
 		//todo: Bitmap, Image2D
 		int idx = -1;
-				 static if(isSomeString!Img     ) idx = textures[img];
+				 static if(isSomeString!Img    ) idx = textures[img];
 		else static if(is(Img == File        )) idx = textures[img];
 		else static if(is(Img == Bitmap        )) idx = textures[img.file];
-		else static if(isIntegral!Img       ) idx = img;
+		else static if(isIntegral!Img      ) idx = img;
 		else static if(is(Img : CustomTexture)) { if(img) idx = img.texIdx; }
 		else static assert(0, "Unsupported Img param: "~Img.stringof);
 		
@@ -835,8 +835,8 @@ class Drawing {
 			/*  void drawGlyph(int idx	, in bounds2 b, in RGB8 bkColor = clBlack){
 			void drawGlyph(in File fileName,	in bounds2 b, in RGB8 bkColor = clBlack){
 			void drawGlyph(in File fileName,	in vec2 p, in RGB8 bkColor = clBlack){
-			void drawGlyph(int idx							  ,	in vec2 p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
-			void drawGlyph(int idx							  ,	float x=0, float y=0, in RGB8 bkColor = clBlack){ */
+			void drawGlyph(int idx								 ,	in vec2 p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
+			void drawGlyph(int idx								 ,	float x=0, float y=0, in RGB8 bkColor = clBlack){ */
 		
 			void drawGlyph(int idx, in bounds2 b, in RGB8 bkColor = clBlack){
 				auto c = realDrawColor;
@@ -906,16 +906,16 @@ class Drawing {
 				 y1 = (y0+y2)*0.5f;
 		moveTo(x0, y1); lineTo(x1, y0); lineTo(x2, y1); lineTo(x1, y2); lineTo(x0, y1);
 	}
-		void drawRombus(in vec2 a, in vec2 b)			            { drawRombus(a.x, a.y, b.x, b.y); }
-		void drawRombus(in bounds2 b)			            { drawRombus(b.low, b.high); }
+		void drawRombus(in vec2 a, in vec2 b)				           { drawRombus(a.x, a.y, b.x, b.y); }
+		void drawRombus(in bounds2 b)				           { drawRombus(b.low, b.high); }
 	
 		void fillRombus(float x0, float y0, float x2, float y2) {
 		auto x1 = (x0+x2)*0.5f,
 				 y1 = (y0+y2)*0.5f;
 		fillConvexPoly([vec2(x0,y1), vec2(x1, y0), vec2(x2, y1), vec2(x1, y2)]);
 	}
-		void fillRombus(in vec2 a, in vec2 b)			            { fillRombus(a.x, a.y, b.x, b.y); }
-		void fillRombus(in bounds2 b)			            { fillRombus(b.low, b.high); }
+		void fillRombus(in vec2 a, in vec2 b)				           { fillRombus(a.x, a.y, b.x, b.y); }
+		void fillRombus(in bounds2 b)				           { fillRombus(b.low, b.high); }
 	
 	//gridLines ////////////////////////////////////////////////////
 	
@@ -1190,8 +1190,8 @@ class Drawing {
 			flat out vec4 fColor2; //alpha holds special stuff	                                             // 4
 			out vec2 fTexCoord; //todo: osszevonhato lenne az fStipple-vel	                                             // 2
 		
-			flat out ivec2 stPos, stSize;							                                                                    //4
-			flat out int stConfig, stIdx;							                                                                    //2
+			flat out ivec2 stPos, stSize;								                                                                   //4
+			flat out int stConfig, stIdx;								                                                                   //2
 			flat out vec2 texelPerPixel;	                                                                          //2
 			flat out float boldTexelOffset;		//1
 			flat out int fontFlags;	                                                                          //1
@@ -1256,9 +1256,9 @@ class Drawing {
 		
 			void emitSubTexInfo(SubTexInfo info) {
 			stIdx	= info.megaTexIdx;
-			stConfig	= info.config	 ;
-			stPos	= info.pos	 ;
-			stSize	= info.size	 ;
+			stConfig	= info.config	;
+			stPos	= info.pos	;
+			stSize	= info.size	;
 		}
 		
 			//common math stuff
@@ -1993,14 +1993,14 @@ deprecated class Logger {
 		
 		if(dr) {
 			auto oldc	= dr.color	;		 dr.color	= clSilver;
-			auto oldfh	= dr.fontHeight		;	    dr.fontHeight	= 1     ;
+			auto oldfh	= dr.fontHeight		;	    dr.fontHeight	= 1    ;
 			auto oldFontMonoSpace	= dr.fontMonoSpace;	    dr.fontMonoSpace	= type!=LogType.Text;
 			
 			dr.textOut(0, 0, s);
 			dr.origin = dr.origin+vec2(0, 1);
 			
-			dr.color	= oldc	        ;
-			dr.fontHeight	= oldfh	        ;
+			dr.color	= oldc	       ;
+			dr.fontHeight	= oldfh	       ;
 			dr.fontMonoSpace	= oldFontMonoSpace;
 		}
 		if(wr) writeln(s);
@@ -2158,14 +2158,15 @@ struct plotFont {
 		struct CharRec { char ch; CharGfx gfx; }
 		//data source: https://hackage.haskell.org/package/plotfont
 		//todo: Editor: linkek highlightolasa es raugras.
-		const CharRec[] chars =[
+		const CharRec[] chars =
+	[
 		{ ' ',{ 16,[] } }
 		 ,{ '!',{ 10,[[{ 5,2 },{ 4,1 },{ 5,0 },{ 6,1 },{ 5,2 }],[{ 5,7 },{ 5,21 }]] } }
 		 ,{
 			'"',{
 				16,[
 					[{ 4,15 },{ 5,16 },{ 6,18 },{ 6,20 },{ 5,21 },{ 4,20 },{ 5,19 }],
-														[{ 10,15 },{ 11,16 },{ 12,18 },{ 12,20 },{ 11,21 },{ 10,20 },{ 11,19 }]
+					[{ 10,15 },{ 11,16 },{ 12,18 },{ 12,20 },{ 11,21 },{ 10,20 },{ 11,19 }]
 				]
 			}
 		}
@@ -2174,7 +2175,7 @@ struct plotFont {
 			'#',{
 				21,[
 					[{ 10,-7 },{ 17,25 }],[{ 11,25 },{ 4,-7 }],[{ 3,6 },{ 17,6 }],
-																												 [{ 18,12 },{ 4,12 }]
+					[{ 18,12 },{ 4,12 }]
 				]
 			}
 		}
@@ -2183,10 +2184,10 @@ struct plotFont {
 				20,[
 					[
 						{ 3,3 },{ 5,1 },{ 8,0 },{ 12,0 },{ 15,1 },{ 17,3 },{ 17,6 }
-															,{ 16,8 },{ 15,9 },{ 13,10 },{ 7,12 },{ 5,13 },{ 4,14 },{ 3,16 }
-															,{ 3,18 },{ 5,20 },{ 8,21 },{ 12,21 },{ 15,20 },{ 17,18 }
-					]
-													 ,[{ 12,25 },{ 12,-4 }],[{ 8,-4 },{ 8,25 }]
+						,{ 16,8 },{ 15,9 },{ 13,10 },{ 7,12 },{ 5,13 },{ 4,14 },{ 3,16 }
+						,{ 3,18 },{ 5,20 },{ 8,21 },{ 12,21 },{ 15,20 },{ 17,18 }
+					],
+					[{ 12,25 },{ 12,-4 }],[{ 8,-4 },{ 8,25 }]
 				]
 			}
 		}
@@ -2194,13 +2195,13 @@ struct plotFont {
 			'%',{
 				24,[
 					[
-						{ 8,21 },{ 10,19 },{ 10,17 },{ 9,15 },{ 7,14 },{ 5,14 }
-															,{ 3,16 },{ 3,18 },{ 4,20 },{ 6,21 },{ 8,21 },{ 10,20 }
-															,{ 13,19 },{ 16,19 },{ 19,20 },{ 21,21 },{ 3,0 }
-					]
-													 ,[
-						{ 17,7 },{ 15,6 },{ 14,4 },{ 14,2 },{ 16,0 },{ 18,0 }
-															,{ 20,1 },{ 21,3 },{ 21,5 },{ 19,7 },{ 17,7 }
+						{ 8,21 },{ 10,19 },{ 10,17 },{ 9,15 },{ 7,14 },{ 5,14 },
+						{ 3,16 },{ 3,18 },{ 4,20 },{ 6,21 },{ 8,21 },{ 10,20 },
+						{ 13,19 },{ 16,19 },{ 19,20 },{ 21,21 },{ 3,0 }
+					],
+					[
+						{ 17,7 },{ 15,6 },{ 14,4 },{ 14,2 },{ 16,0 },{ 18,0 },
+						{ 20,1 },{ 21,3 },{ 21,5 },{ 19,7 },{ 17,7 }
 					]
 				]
 			}
@@ -2209,12 +2210,12 @@ struct plotFont {
 			'&',{
 				26,[
 					[
-						{ 23,2 },{ 23,1 },{ 22,0 },{ 20,0 },{ 18,1 },{ 16,3 }
-															,{ 11,10 },{ 9,13 },{ 8,16 },{ 8,18 },{ 9,20 },{ 11,21 }
-															,{ 13,20 },{ 14,18 },{ 14,16 },{ 13,14 },{ 12,13 },{ 5,9 }
-															,{ 4,8 },{ 3,6 },{ 3,4 },{ 4,2 },{ 5,1 },{ 7,0 },{ 11,0 }
-															,{ 13,1 },{ 15,3 },{ 17,6 },{ 19,11 },{ 20,13 },{ 21,14 }
-															,{ 22,14 },{ 23,13 },{ 23,12 }
+						{ 23,2 },{ 23,1 },{ 22,0 },{ 20,0 },{ 18,1 },{ 16,3 },
+						{ 11,10 },{ 9,13 },{ 8,16 },{ 8,18 },{ 9,20 },{ 11,21 },
+						{ 13,20 },{ 14,18 },{ 14,16 },{ 13,14 },{ 12,13 },{ 5,9 },
+						{ 4,8 },{ 3,6 },{ 3,4 },{ 4,2 },{ 5,1 },{ 7,0 },{ 11,0 },
+						{ 13,1 },{ 15,3 },{ 17,6 },{ 19,11 },{ 20,13 },{ 21,14 },
+						{ 22,14 },{ 23,13 },{ 23,12 }
 					]
 				]
 			}
@@ -2223,8 +2224,8 @@ struct plotFont {
 			'(',{
 				14,[
 					[
-						{ 11,-7 },{ 9,-5 },{ 7,-2 },{ 5,2 },{ 4,7 },{ 4,11 }
-															,{ 5,16 },{ 7,20 },{ 9,23 },{ 11,25 }
+						{ 11,-7 },{ 9,-5 },{ 7,-2 },{ 5,2 },{ 4,7 },{ 4,11 },
+						{ 5,16 },{ 7,20 },{ 9,23 },{ 11,25 }
 					]
 				]
 			}
@@ -2233,8 +2234,8 @@ struct plotFont {
 			')',{
 				14,[
 					[
-						{ 3,-7 },{ 5,-5 },{ 7,-2 },{ 9,2 },{ 10,7 },{ 10,11 }
-															,{ 9,16 },{ 7,20 },{ 5,23 },{ 3,25 }
+						{ 3,-7 },{ 5,-5 },{ 7,-2 },{ 9,2 },{ 10,7 },{ 10,11 },
+						{ 9,16 },{ 7,20 },{ 5,23 },{ 3,25 }
 					]
 				]
 			}
@@ -2406,17 +2407,7 @@ struct plotFont {
 				]
 			}
 		}
-		 ,{
-			'C',{
-				21,[
-					[
-						{ 18,5 },{ 17,3 },{ 15,1 },{ 13,0 },{ 9,0 },{ 7,1 }
-															,{ 5,3 },{ 4,5 },{ 3,8 },{ 3,13 },{ 4,16 },{ 5,18 }
-															,{ 7,20 },{ 9,21 },{ 13,21 },{ 15,20 },{ 17,18 },{ 18,16 }
-					]
-				]
-			}
-		}
+		 ,{ 'C',{ 21,[[{ 18,5 },{ 17,3 },{ 15,1 },{ 13,0 },{ 9,0 },{ 7,1 },{ 5,3 },{ 4,5 },{ 3,8 },{ 3,13 },{ 4,16 },{ 5,18 },{ 7,20 },{ 9,21 },{ 13,21 },{ 15,20 },{ 17,18 },{ 18,16 }]] } }
 		 ,{
 			'D',{
 				21,[
@@ -2681,10 +2672,10 @@ struct plotFont {
 			'p',{
 				19,[
 					[{ 4,-7 },{ 4,14 }],[
-						{ 4,11 },{ 6,13 },{ 8,14 }
-																											,{ 11,14 },{ 13,13 },{ 15,11 }
-																											,{ 16,8 },{ 16,6 },{ 15,3 },{ 13,1 }
-																											,{ 11,0 },{ 8,0 },{ 6,1 },{ 4,3 }
+						{ 4,11 },{ 6,13 },{ 8,14 },
+						{ 11,14 },{ 13,13 },{ 15,11 },
+						{ 16,8 },{ 16,6 },{ 15,3 },{ 13,1 },
+						{ 11,0 },{ 8,0 },{ 6,1 },{ 4,3 }
 					]
 				]
 			}
@@ -2693,10 +2684,10 @@ struct plotFont {
 			'q',{
 				19,[
 					[{ 15,-7 },{ 15,14 }],[
-						{ 15,11 },{ 13,13 },{ 11,14 }
-																												,{ 8,14 },{ 6,13 },{ 4,11 },{ 3,8 }
-																												,{ 3,6 },{ 4,3 },{ 6,1 },{ 8,0 }
-																												,{ 11,0 },{ 13,1 },{ 15,3 }
+						{ 15,11 },{ 13,13 },{ 11,14 },
+						{ 8,14 },{ 6,13 },{ 4,11 },{ 3,8 },
+						{ 3,6 },{ 4,3 },{ 6,1 },{ 8,0 },
+						{ 11,0 },{ 13,1 },{ 15,3 }
 					]
 				]
 			}

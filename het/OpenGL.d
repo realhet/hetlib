@@ -30,33 +30,39 @@ alias gl = Singleton!GLFuncts;
 
 //! GL enums///////////////////////////////////////////////////////////
 
-enum  {
-	//ErrorCode////////////////////////
-	GL_NO_ERROR	           = 0     ,
-	GL_INVALID_ENUM	           = 0x0500,
-	GL_INVALID_VALUE	           = 0x0501,
-	GL_INVALID_OPERATION	           = 0x0502,
-	GL_STACK_OVERFLOW	           = 0x0503,
-	GL_STACK_UNDERFLOW		= 0x0504,
-	GL_OUT_OF_MEMORY	           =	0x0505,
+version(/+$DIDE_REGION ErrorCode+/all)
+{
+	enum 
+	{
+		GL_NO_ERROR	=      0,
+		GL_INVALID_ENUM	= 0x0500,
+		GL_INVALID_VALUE	= 0x0501,
+		GL_INVALID_OPERATION	= 0x0502,
+		GL_STACK_OVERFLOW	= 0x0503,
+		GL_STACK_UNDERFLOW	= 0x0504,
+		GL_OUT_OF_MEMORY	= 0x0505,
+	}
 }
 
-enum  {
-	//Primitives////////////////////////
-	GL_POINTS	    =	 0,
-	GL_LINES	    =	 1,
-	GL_LINE_LOOP	    =	 2,
-	GL_LINE_STRIP	    =	 3,
-	GL_TRIANGLES	    =	 4,
-	GL_TRIANGLE_STRIP	    =	 5,
-	GL_TRIANGLE_FAN	    =	 6,
-	GL_QUADS	    =	 7,
-	GL_QUAD_STRIP		=	 8,
-	GL_POLYGON	    =		9,
-	GL_LINES_ADJACENCY	    = 10,
-	GL_LINE_STRIP_ADJACENCY	    = 11,
-	GL_TRIANGLES_ADJACENCY	    = 12,
-	GL_TRIANGLE_STRIP_ADJACENCY	    = 13,
+version(/+$DIDE_REGION Primitives+/all)
+{
+	enum
+	{
+		GL_POINTS	= 0,
+		GL_LINES	= 1,
+		GL_LINE_LOOP	= 2,
+		GL_LINE_STRIP	= 3,
+		GL_TRIANGLES	= 4,
+		GL_TRIANGLE_STRIP	= 5,
+		GL_TRIANGLE_FAN	= 6,
+		GL_QUADS	= 7,
+		GL_QUAD_STRIP	= 8,
+		GL_POLYGON	= 9,
+		GL_LINES_ADJACENCY	= 10,
+		GL_LINE_STRIP_ADJACENCY	= 11,
+		GL_TRIANGLES_ADJACENCY	= 12,
+		GL_TRIANGLE_STRIP_ADJACENCY	= 13,
+	}
 }
 
 enum  {
@@ -82,8 +88,8 @@ enum  {
 	GL_LEQUAL	                    = 0x0203,
 	GL_GREATER	                    = 0x0204,
 	GL_NOTEQUAL		= 0x0205,
-	GL_GEQUAL							              =	0x0206,
-	GL_ALWAYS							              =	0x0207,
+	GL_GEQUAL														       =	0x0206,
+	GL_ALWAYS														       =	0x0207,
 }
 
 enum  {
@@ -104,18 +110,18 @@ enum  {
 	GL_PIXEL_MODE_BIT		= 0x00000020,
 	GL_LIGHTING_BIT	         =	0x00000040,
 	GL_FOG_BIT	         = 0x00000080,
-	GL_DEPTH_BUFFER_BIT							   =	0x00000100,
-	GL_ACCUM_BUFFER_BIT							   =	0x00000200,
+	GL_DEPTH_BUFFER_BIT									 =	0x00000100,
+	GL_ACCUM_BUFFER_BIT									 =	0x00000200,
 	GL_STENCIL_BUFFER_BIT		=	0x00000400,
 	GL_VIEWPORT_BIT		= 0x00000800,
 	GL_TRANSFORM_BIT	         = 0x00001000,
 	GL_ENABLE_BIT	         = 0x00002000,
 	GL_COLOR_BUFFER_BIT	         = 0x00004000,
-	GL_HINT_BIT							   = 0x00008000,
-	GL_EVAL_BIT							   = 0x00010000,
-	GL_LIST_BIT							   = 0x00020000,
-	GL_TEXTURE_BIT							   = 0x00040000,
-	GL_SCISSOR_BIT							   = 0x00080000,
+	GL_HINT_BIT									 = 0x00008000,
+	GL_EVAL_BIT									 = 0x00010000,
+	GL_LIST_BIT									 = 0x00020000,
+	GL_TEXTURE_BIT									 = 0x00040000,
+	GL_SCISSOR_BIT									 = 0x00080000,
 	GL_ALL_ATTRIB_BITS	         = 0x000fffff,
 }
 
@@ -184,8 +190,8 @@ enum  {
 enum  {
 	//PolygonMode////////////////////////
 	GL_POINT	                       = 0x1B00,
-	GL_LINE							                 = 0x1B01,
-	GL_FILL							                 = 0x1B02,
+	GL_LINE														          = 0x1B01,
+	GL_FILL														          = 0x1B02,
 }
 
 enum  {
@@ -416,8 +422,8 @@ enum  {
 	GL_OBJECT_DELETE_STATUS	          = 0x8B80,
 	GL_OBJECT_COMPILE_STATUS	          = 0x8B81,
 	GL_OBJECT_LINK_STATUS	          = 0x8B82,
-	GL_OBJECT_VALIDATE_STATUS							    = 0x8B83,
-	GL_OBJECT_INFO_LOG_LENGTH							    = 0x8B84,
+	GL_OBJECT_VALIDATE_STATUS										 = 0x8B83,
+	GL_OBJECT_INFO_LOG_LENGTH										 = 0x8B84,
 	GL_OBJECT_ATTACHED_OBJECTS	          = 0x8B85,
 	GL_OBJECT_ACTIVE_UNIFORMS	          = 0x8B86,
 	GL_OBJECT_ACTIVE_UNIFORM_MAX_LENGTH	          = 0x8B87,
@@ -426,16 +432,16 @@ enum  {
 	GL_FLOAT_VEC2		= 0x8B50,
 	GL_FLOAT_VEC3		= 0x8B51,
 	GL_FLOAT_VEC4		= 0x8B52,
-	GL_INT_VEC2							    =	0x8B53,
-	GL_INT_VEC3							    =	0x8B54,
-	GL_INT_VEC4							    =	0x8B55,
+	GL_INT_VEC2										 =	0x8B53,
+	GL_INT_VEC3										 =	0x8B54,
+	GL_INT_VEC4										 =	0x8B55,
 	GL_BOOL	          = 0x8B56,
-	GL_BOOL_VEC2							    = 0x8B57,
-	GL_BOOL_VEC3							    = 0x8B58,
-	GL_BOOL_VEC4							    = 0x8B59,
-	GL_FLOAT_MAT2							    = 0x8B5A,
-	GL_FLOAT_MAT3							    = 0x8B5B,
-	GL_FLOAT_MAT4							    = 0x8B5C,
+	GL_BOOL_VEC2										 = 0x8B57,
+	GL_BOOL_VEC3										 = 0x8B58,
+	GL_BOOL_VEC4										 = 0x8B59,
+	GL_FLOAT_MAT2										 = 0x8B5A,
+	GL_FLOAT_MAT3										 = 0x8B5B,
+	GL_FLOAT_MAT4										 = 0x8B5C,
 	GL_ACTIVE_ATTRIBUTES	          = 35721,
 }
 
@@ -479,8 +485,8 @@ enum  {
 	WGL_NUMBER_PIXEL_FORMATS_ARB	              = 0x2000,
 	WGL_DRAW_TO_WINDOW_ARB		= 0x2001,
 	WGL_DRAW_TO_BITMAP_ARB		= 0x2002,
-	WGL_ACCELERATION_ARB							        =	0x2003,
-	WGL_NEED_PALETTE_ARB							        =	0x2004,
+	WGL_ACCELERATION_ARB														 =	0x2003,
+	WGL_NEED_PALETTE_ARB														 =	0x2004,
 	WGL_NEED_SYSTEM_PALETTE_ARB	              = 0x2005,
 	WGL_SWAP_LAYER_BUFFERS_ARB	              = 0x2006,
 	WGL_SWAP_METHOD_ARB	              = 0x2007,
@@ -490,12 +496,12 @@ enum  {
 	WGL_TRANSPARENT_RED_VALUE_ARB	              =	0x2037,
 	WGL_TRANSPARENT_GREEN_VALUE_ARB		= 0x2038,
 	WGL_TRANSPARENT_BLUE_VALUE_ARB	              = 0x2039,
-	WGL_TRANSPARENT_ALPHA_VALUE_ARB							        = 0x203A,
-	WGL_TRANSPARENT_INDEX_VALUE_ARB							        = 0x203B,
+	WGL_TRANSPARENT_ALPHA_VALUE_ARB														 = 0x203A,
+	WGL_TRANSPARENT_INDEX_VALUE_ARB														 = 0x203B,
 	WGL_SHARE_DEPTH_ARB	              =	0x200C,
 	WGL_SHARE_STENCIL_ARB		= 0x200D,
-	WGL_SHARE_ACCUM_ARB							        =	0x200E,
-	WGL_SUPPORT_GDI_ARB							        =	0x200F,
+	WGL_SHARE_ACCUM_ARB														 =	0x200E,
+	WGL_SUPPORT_GDI_ARB														 =	0x200F,
 	WGL_SUPPORT_OPENGL_ARB	              = 0x2010,
 	WGL_DOUBLE_BUFFER_ARB	              = 0x2011,
 	WGL_STEREO_ARB	              = 0x2012,
@@ -506,8 +512,8 @@ enum  {
 	WGL_GREEN_BITS_ARB	              = 0x2017,
 	WGL_GREEN_SHIFT_ARB		= 0x2018,
 	WGL_BLUE_BITS_ARB	              =	0x2019,
-	WGL_BLUE_SHIFT_ARB							        = 0x201A,
-	WGL_ALPHA_BITS_ARB							        = 0x201B,
+	WGL_BLUE_SHIFT_ARB														 = 0x201A,
+	WGL_ALPHA_BITS_ARB														 = 0x201B,
 	WGL_ALPHA_SHIFT_ARB	              = 0x201C,
 	WGL_ACCUM_BITS_ARB	              = 0x201D,
 	WGL_ACCUM_RED_BITS_ARB	              =	0x201E,
@@ -537,8 +543,8 @@ enum  {
 
 enum  {
 	//texture_object////////////////////////
-	GL_TEXTURE_PRIORITY							                  =	0x8066,
-	GL_TEXTURE_RESIDENT							                  =	0x8067,
+	GL_TEXTURE_PRIORITY														           =	0x8066,
+	GL_TEXTURE_RESIDENT														           =	0x8067,
 	GL_TEXTURE_BINDING_1D		= 0x8068,
 	GL_TEXTURE_BINDING_2D		= 0x8069,
 	
@@ -549,47 +555,47 @@ enum  {
 
 enum  {
 	//texture format////////////////////////
-	GL_ALPHA4							              = 0x803B,
-	GL_ALPHA8							              = 0x803C,
-	GL_ALPHA12							              = 0x803D,
-	GL_ALPHA16							              = 0x803E,
-	GL_LUMINANCE4							              = 0x803F,
-	GL_LUMINANCE8							              = 0x8040,
-	GL_LUMINANCE12							              = 0x8041,
-	GL_LUMINANCE16							              = 0x8042,
-	GL_LUMINANCE4_ALPHA4							              = 0x8043,
-	GL_LUMINANCE6_ALPHA2							              = 0x8044,
-	GL_LUMINANCE8_ALPHA8							              = 0x8045,
+	GL_ALPHA4														       = 0x803B,
+	GL_ALPHA8														       = 0x803C,
+	GL_ALPHA12														       = 0x803D,
+	GL_ALPHA16														       = 0x803E,
+	GL_LUMINANCE4														       = 0x803F,
+	GL_LUMINANCE8														       = 0x8040,
+	GL_LUMINANCE12														       = 0x8041,
+	GL_LUMINANCE16														       = 0x8042,
+	GL_LUMINANCE4_ALPHA4														       = 0x8043,
+	GL_LUMINANCE6_ALPHA2														       = 0x8044,
+	GL_LUMINANCE8_ALPHA8														       = 0x8045,
 	GL_LUMINANCE12_ALPHA4	                    = 0x8046,
-	GL_LUMINANCE12_ALPHA12							              = 0x8047,
-	GL_LUMINANCE16_ALPHA16							              = 0x8048,
+	GL_LUMINANCE12_ALPHA12														       = 0x8047,
+	GL_LUMINANCE16_ALPHA16														       = 0x8048,
 	GL_INTENSITY	                    = 0x8049,
-	GL_INTENSITY4							              = 0x804A,
-	GL_INTENSITY8							              = 0x804B,
-	GL_INTENSITY12							              = 0x804C,
-	GL_INTENSITY16							              = 0x804D,
+	GL_INTENSITY4														       = 0x804A,
+	GL_INTENSITY8														       = 0x804B,
+	GL_INTENSITY12														       = 0x804C,
+	GL_INTENSITY16														       = 0x804D,
 	GL_R3_G3_B2	                    = 0x2A10,
-	GL_RGB4							              = 0x804F,
-	GL_RGB5							              = 0x8050,
-	GL_RGB8							              = 0x8051,
-	GL_RGB10							              =	0x8052,
-	GL_RGB12							              =	0x8053,
-	GL_RGB16							              =	0x8054,
-	GL_RGBA2							              =	0x8055,
-	GL_RGBA4							              =	0x8056,
+	GL_RGB4														       = 0x804F,
+	GL_RGB5														       = 0x8050,
+	GL_RGB8														       = 0x8051,
+	GL_RGB10														       =	0x8052,
+	GL_RGB12														       =	0x8053,
+	GL_RGB16														       =	0x8054,
+	GL_RGBA2														       =	0x8055,
+	GL_RGBA4														       =	0x8056,
 	GL_RGB5_A1		= 0x8057,
 	GL_RGBA8	                    =	0x8058,
 	GL_RGB10_A2			= 0x8059,
-	GL_RGBA12							              =	0x805A,
-	GL_RGBA16							              =	0x805B,
+	GL_RGBA12														       =	0x805A,
+	GL_RGBA16														       =	0x805B,
 	GL_TEXTURE_RED_SIZE	                    =	0x805C,
 	GL_TEXTURE_GREEN_SIZE		= 0x805D,
 	GL_TEXTURE_BLUE_SIZE	                    = 0x805E,
 	GL_TEXTURE_ALPHA_SIZE	                    = 0x805F,
-	GL_TEXTURE_LUMINANCE_SIZE							              = 0x8060,
-	GL_TEXTURE_INTENSITY_SIZE							              = 0x8061,
-	GL_PROXY_TEXTURE_1D							              = 0x8063,
-	GL_PROXY_TEXTURE_2D							              = 0x8064,
+	GL_TEXTURE_LUMINANCE_SIZE														       = 0x8060,
+	GL_TEXTURE_INTENSITY_SIZE														       = 0x8061,
+	GL_PROXY_TEXTURE_1D														       = 0x8063,
+	GL_PROXY_TEXTURE_2D														       = 0x8064,
 }
 
 enum  { GL_TEXTURE0                                   = 0x84C0, }
@@ -641,8 +647,8 @@ enum TessContour:int {
 	//TessContour////////////////////////
 	GLU_CW	                     = 100120,
 	GLU_CCW	                     = 100121,
-	GLU_INTERIOR							               = 100122,
-	GLU_EXTERIOR							               = 100123,
+	GLU_INTERIOR														        = 100122,
+	GLU_EXTERIOR														        = 100123,
 	GLU_UNKNOWN	                     = 100124,
 }
 
@@ -687,29 +693,29 @@ private class GLFuncts {
 				void function(int val)                                                wglSwapIntervalEXT;
 		
 				char* function(int name)	                               glGetString;
-				void function(int name, int* v)			                             glGetIntegerv;
-				void function(int pname, float *value)			                             glGetFloatv;
+				void function(int name, int* v)									                       glGetIntegerv;
+				void function(int pname, float *value)									                       glGetFloatv;
 		
-				void function(int what)							                                        glEnable, glDisable;
-				bool function(int what)							                                        glIsEnabled;
+				void function(int what)														                                 glEnable, glDisable;
+				bool function(int what)														                                 glIsEnabled;
 		
-				void function(float r, float g, float b, float a)			                  glClearColor;
-				void function(float d)			                  glClearDepth;
-				void function(int mask)			                  glClear;
+				void function(float r, float g, float b, float a)									            glClearColor;
+				void function(float d)									            glClearDepth;
+				void function(int mask)									            glClear;
 		
 				void function(int x, int y, int w, int h, int format, int type, int len, void* data) glReadnPixels;
 		
-				void function(int what)							                              glFrontFace;
-				void function(int what)							                              glCullFace;
-				void function(int face, int what)			                              glPolygonMode;
-				void function(float width)			                              glLineWidth;
-				void function(int what)			                              glDepthFunc;
+				void function(int what)														                       glFrontFace;
+				void function(int what)														                       glCullFace;
+				void function(int face, int what)									                        glPolygonMode;
+				void function(float width)									                        glLineWidth;
+				void function(int what)									                        glDepthFunc;
 		
-				void function(bool)			                  glDepthMask;
-				void function(bool, bool, bool, bool)			                  glColorMask;
-				void function(int sfactor, int dfactor)			                  glBlendFunc;
-				void function(float r, float g, float b, float a)			                  glBlendColor;
-				void function(int func, float reference)			                  glAlphaFunc;
+				void function(bool)									            glDepthMask;
+				void function(bool, bool, bool, bool)									            glColorMask;
+				void function(int sfactor, int dfactor)									            glBlendFunc;
+				void function(float r, float g, float b, float a)									            glBlendColor;
+				void function(int func, float reference)									            glAlphaFunc;
 		
 				void function(int x, int y, int width, int height)                    glViewport;
 		
@@ -745,11 +751,11 @@ private class GLFuncts {
 		
 		//not supported on dell    void function(int loc, int cnt, const(uint )* val)                    glUniform1uiv, glUniform2uiv, glUniform3uiv, glUniform4uiv;
 		
-				void function(int slot)			                          glActiveTexture;
-				void function(int cnt, const(int) *texId)			                          glDeleteTextures;
+				void function(int slot)									                    glActiveTexture;
+				void function(int cnt, const(int) *texId)									                    glDeleteTextures;
 		
-				void function(int slot, int* handle)							                           glGenTextures;
-				void function(int slot, int texture)							                           glBindTexture;
+				void function(int slot, int* handle)														                    glGenTextures;
+				void function(int slot, int texture)														                    glBindTexture;
 				void function(int what, int value)		                            glPixelStorei;
 				void function(int target, int level, int format, int type, void* pixels)	 glGetTexImage;
 				void function(int target, int level, int internalFmt, int width, int height, int border, int format, int type, const(void)* data)	 glTexImage2D;
@@ -757,19 +763,19 @@ private class GLFuncts {
 				void function(int target, int level, int xOffs, int yOffs, int width, int height, int format, int type, const(void)* data)	 glTexSubImage2D;
 		//void function(int target, int level, int xOffs, int yOffs, int zOffs, int width, int height, int depth, int bufSize, void* data)   glGetCompressedTextureSubImage_optional; //ver: 4.5
 		
-				void function(int target)			                 glGenerateMipmap;
-				void function(int target, int pname, float pvalue)			                 glTexParameterf;
+				void function(int target)									           glGenerateMipmap;
+				void function(int target, int pname, float pvalue)									           glTexParameterf;
 		
 			//GLU functs /////////////////////////////
 		
 				void* function()	    gluNewTess;
 				void function(void* tess)		gluDeleteTess, gluTessBeginContour, gluTessEndContour, gluTessEndPolygon;
-				void function(void* tess, int	what, void* fn)			  gluTessCallback;
-				void function(void* tess, double x, double y, double z)			  gluTessNormal;
-				void function(void* tess, int prop, double value)			  gluTessProperty;
-				void function(void* tess, void* data)			  gluTessBeginPolygon;
-				void function(void* tess, TessContour)			  gluNextContour;
-				void function(void* tess, double* location, void* data)			  gluTessVertex;
+				void function(void* tess, int	what, void* fn)				 gluTessCallback;
+				void function(void* tess, double x, double y, double z)				 gluTessNormal;
+				void function(void* tess, int prop, double value)				 gluTessProperty;
+				void function(void* tess, void* data)				 gluTessBeginPolygon;
+				void function(void* tess, TessContour)				 gluNextContour;
+				void function(void* tess, double* location, void* data)				 gluTessVertex;
 	}
 	
 		//function wrappers ////////////////////////////////////
@@ -1109,7 +1115,7 @@ private class GLFuncts {
 		void deleteTexture(int handle)						 { if(!handle) return; glDeleteTextures(1, &handle); glChk; }
 		void deleteBuffer (int handle)						 { if(!handle) return; glDeleteBuffers	(1, &handle); glChk; }
 		void deleteShader (int shader)						 { if(!shader) return; glDeleteShader	(shader	   ); glChk; }
-		void deleteProgram(int prg   )						 { if(!prg ) return; glDeleteProgram	(prg	   ); glChk; }
+		void deleteProgram(int prg   )						 { if(!prg) return; glDeleteProgram	(prg	   ); glChk; }
 }
 
 //GLHandle, GlResource ////////////////////////////////////////
@@ -1685,7 +1691,7 @@ class GLTexture:GlResource {
 		void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min) {
 		//opt: bmp.GetForUpload should need a performance monitoring
 		switch(type) {
-			case GLTextureType.L8 : upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
+			case GLTextureType.L8: upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
 			case GLTextureType.RGBA8: 
 				//T0;
 				try {
@@ -2237,7 +2243,7 @@ class GLWindow: Window {
 		vec2 mp = mouse.act.screen;
 		bounds2 bnd = clientBounds;
 		
-		with(view ) { mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
+		with(view) { mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
 		with(viewGUI) { mouseLast = mousePos; mousePos = invTrans(mp); screenBounds_anim = invTrans(bnd, true); screenBounds_dest = invTrans(bnd, false); workArea_accum = bounds2.init; }
 	}
 	

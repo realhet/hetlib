@@ -528,8 +528,8 @@ TextStyle newTextStyle(string name)(in TextStyle base, string props) {
 
 //https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
 const
-			clChapter	              = RGB(221,   3,  48),
-			clAccent														 = RGB(0, 120, 215),
+			clChapter	              = RGB(221,	3,  48),
+			clAccent														 = RGB(0, 120,	215),
 			clMenuBk														 = RGB(235, 235, 236),
 			clMenuHover	              = RGB(222, 222, 222),
 			clLink	              = RGB(0, 120, 215),
@@ -1297,8 +1297,8 @@ struct TextPos {
 	}
 	
 	this(int idx	     ) { type = Type.idx	;	 fIdx	 = idx	;                     }
-	this(int line, int column	     ) { type = Type.lc	;	 fLine	 = line	;  fColumn = column; }
-	this(in vec2 point, float height) { type = Type.xy;  fPoint = point;  fHeight = height;  }
+	this(int line, int column	     ) { type = Type.lc	;		fLine	 = line	;	 fColumn = column; }
+	this(in vec2 point, float height) { type = Type.xy;	fPoint = point;	 fHeight = height;  }
 	
 	bool valid() const { return type != Type.none; }
 	bool isIdx() const { return type == Type.idx	; }
@@ -1679,8 +1679,8 @@ struct TextEditorState {
 //markup parser /////////////////////////////////////////
 
 void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle ts) {
-	if(cmdLine=="") { ts = tsNormal; }else if(auto t = cmdLine in textStyles) {
-		 //standard style.  Should be mentioned by an index
+	if(cmdLine=="") { ts	= tsNormal; }else if(auto t = cmdLine in textStyles) {
+		 //standard style.	Should be mentioned by an index
 		ts = **t; //now it is a copy;
 	}else {
 		try {
