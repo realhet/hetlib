@@ -347,11 +347,11 @@ struct StructureScanner_DLang {
 		auto PopCWD	(string s	) { return Pop(extendCWD(s)); }
 		
 		enum structuredAttrs = q{
-		@Push("{"	, structuredBlock	) @Push("("	, structuredList	) @Push("["	, structuredIndex	) @Push("q{"	, structuredString)
-		@Push("//"	, slashComment	) @Push("/*"	, cComment	) @Push("/+"	, dComment	)
-		@Push("'"	, cChar	) @Push(`"`	, cString	) @Push("`"	, dString	) @Push(`r"`	, rString	)
-		@Push(`q"/`	, qStringSlash	) @Push(`q"{`	, qStringCurly	) @Push(`q"(`	, qStringRound	) 
-		@Push(`q"[`	, qStringSquare	) @Push(`q"<`	, qStringAngle	) @Push(`q"`	, qStringBegin	)
+		@Push("{", structuredBlock)	@Push("(", structuredList)	@Push("[", structuredIndex)	@Push("q{"	, structuredString)
+		@Push("//", slashComment)	@Push("/*", cComment)	@Push("/+", dComment)	
+		@Push("'", cChar)	@Push(`"`, cString)	@Push("`", dString)	@Push(`r"`	, rString	)
+		@Push(`q"/`, qStringSlash)	@Push(`q"{`, qStringCurly)	@Push(`q"(`, qStringRound)	
+		@Push(`q"[`, qStringSquare)	@Push(`q"<`, qStringAngle)	@Push(`q"`, qStringBegin)	
 		@StructuredEOF
 	};
 		
