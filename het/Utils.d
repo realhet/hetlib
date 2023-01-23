@@ -673,10 +673,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		struct clipboard	
 		{
 			 static: //clipboard //////////////////////////
-						import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT,
-							EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc;
-					
-						bool hasFormat(uint fmt)
+				import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT,
+					EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc, 
+					GetClipboardSequenceNumber;
+			
+			bool hasFormat(uint fmt)
 			{
 				bool res;
 				if(OpenClipboard(null)) {
@@ -722,9 +723,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return success;
 			}
 					
-						@property {
+			@property {
 				string asText() { return getText; }
 				void asText(string s) { setText(s, true); }
+				
+				auto sequenceNumber() { return GetClipboardSequenceNumber; }
 			}
 		}
 	}version(/+$DIDE_REGION+/all)
@@ -3763,8 +3766,8 @@ version(/+$DIDE_REGION Containers+/all)
 				else
 				{
 					if(lo.length && hi.length && values[lo.length-1]==values[$-hi.length])
-					{ hi = hi[1..$] /+the 2 side of the hole is the same. Keep the left one only.+/; }
-					keys	= keys  [0..lo.length] ~ keys  [$-hi.length..$];
+					{ hi = hi[1..$] /+the 2 side of the	hole is the same. Keep the left one only.+/; }
+					keys	= keys  [0..lo.length] ~ keys	[$-hi.length..$];
 					values	= values[0..lo.length] ~ values[$-hi.length..$];
 				}
 			}

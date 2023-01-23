@@ -15,23 +15,28 @@ struct Blob {
 }
 
 static if(1)
-struct findBlobsDebug {
-	 import het.draw2d, het.ui; static:
-		struct Event {
+struct findBlobsDebug
+{
+	import het.draw2d, het.ui; static:
+	struct Event
+	{
 		ivec2 actPos;
 		Image!(ubyte, 2) src;
 		Image!(int, 2) dst;
 		int[int] idMap;
 		Blob[int] blobs;
 		
-		void draw(Drawing dr) {
+		void draw(Drawing dr)
+		{
 			with(dr) {
-				  fontHeight = .8;
+				fontHeight = .8;
 				
-				  void setColor(int i) { color = hsvToRgb(([i].xxh32&255)/255.0f, 1, 1).floatToRgb; }
+				void setColor(int i)
+				{ color = hsvToRgb(([i].xxh32&255)/255.0f, 1, 1).floatToRgb; }
 				
-				  foreach(y; 0..src.height)
-				foreach(x; 0..src.width) {
+				foreach(y; 0..src.height)
+				foreach(x; 0..src.width)
+				{
 					translate(x, y);
 					
 					if(src[x, y]) setColor(dst[x, y]);else color = clBlack;
@@ -43,15 +48,17 @@ struct findBlobsDebug {
 				}
 				
 				
-					 color = clWhite;
-					 foreach(i, k; idMap.keys.sort.array) {
+				color = clWhite;
+				foreach(i, k; idMap.keys.sort.array)
+				{
 					translate(src.width+2, i);
 					textOut(0, 0, k.to!string(36) ~ " -> " ~ idMap[k].to!string(36));
 					pop;
 				}
 				
 				
-				  foreach(k, v; blobs) {
+				foreach(k, v; blobs)
+				{
 					translate(v.pos);
 					setColor(k);
 					fontHeight = 0.8;
@@ -67,13 +74,15 @@ struct findBlobsDebug {
 		}
 	}
 	
-		Event[] events;
+	Event[] events;
 	
-		void log(A...)(A a) { events ~= Event(a); }
+	void log(A...)(A a)
+	{ events ~= Event(a); }
 	
-		int actEventIdx;
+	int actEventIdx;
 	
-		void UI() {
+	void UI()
+	{
 		with(im)
 		Row(
 			{
@@ -84,13 +93,16 @@ struct findBlobsDebug {
 			}
 		);
 		
+		
 	}
 	
-		void draw(Drawing dr) { events.get(actEventIdx).draw(dr); }
+	void draw(Drawing dr)
+	{ events.get(actEventIdx).draw(dr); }
 }
 
 
-auto findBlobs(T1)(Image!(T1, 2) src) {
+auto findBlobs(T1)(Image!(T1, 2) src)
+{
 	struct Res {
 		Image!(int, 2) img;
 		Blob[int] blobs;
@@ -108,30 +120,41 @@ auto findBlobs(T1)(Image!(T1, 2) src) {
 	//first pass: find the blobs based on top and left neighbors
 	foreach(y; 0..src.height)
 	foreach(x; 0..src.width)
-	if(src[x, y]) {
-		bool leftSet() { return x ? src[x-1, y]!=0 : false; }
-		bool topSet () { return y ? src[x, y-1]!=0 : false; }
-		int leftId() { return res.img[x-1, y]; }
-		int topId () { return res.img[x, y-1]; }
+	if(src[x, y])
+	{
+		bool leftSet()
+		{ return x ? src[x-1, y]!=0 : false; }	bool topSet ()
+		{ return y ? src[x, y-1]!=0 : false; }
+		int leftId()
+		{ return res.img[x-1, y]; }	int topId ()
+		{ return res.img[x, y-1]; }
 		int p;
 		
-		if(leftSet && topSet) {
-			p = map(topId);   //map is important for topId
-			int l = leftId;   //leftId is alrteady mapped
+		if(leftSet && topSet)
+		{
+			p = map(topId);	//map is important for topId
+			int l = leftId;	//leftId is alrteady mapped
 			if(p!=l) {
-				sort(p, l);     //sort is to eliminate cyclic loops im map_[]
-				map_[l] = p;    //from unmapped to mapped is good
+				sort(p, l);	//sort is to eliminate cyclic loops im map_[]
+				map_[l] = p;	//from unmapped to mapped is good
 			}
-		}else if(topSet ) {
-			p = map(topId ); //map is important for topId
-		}else if(leftSet) {
-			p = leftId;      //leftId is already mapped
-		}else { p = ++actId; res.blobs[p] = Blob(ivec2(x, y), p); }
+		}
+		else if(topSet)
+		{
+			p = map(topId );	//map is important for topId
+		}
+		else if(leftSet)
+		{
+			p = leftId;	//leftId is already mapped
+		}
+		else
+		{ p = ++actId; res.blobs[p] = Blob(ivec2(x, y), p); }
 		
 		res.img[x, y] = p;
 		res.blobs[p].area++;
 		
-		static if(is(findBlobsDebug)) findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup);
+		static if(is(findBlobsDebug))
+		findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup);
 	}
 		
 	
@@ -139,8 +162,10 @@ auto findBlobs(T1)(Image!(T1, 2) src) {
 	{
 		//make the map recursive
 		//print("FUCK"); map_.keys.sort.each!(k => print(k, "->", map_[k]));
-		int map_recursive(int id) {
-			while(1) if(auto a = id in map_) id = *a;else break; //todo: install latest LDC
+		int map_recursive(int id)
+		{
+			while(1) if(auto a = id in map_) id = *a;else break;
+			//todo: install latest LDC
 			return id;
 		}
 		foreach(k; map_.keys) map_[k] = map_recursive(k);
@@ -162,7 +187,8 @@ auto findBlobs(T1)(Image!(T1, 2) src) {
 		rem.each!(k => res.blobs.remove(k));
 	}
 	
-	static if(is(findBlobsDebug)) findBlobsDebug.log(ivec2(-1), src.dup, res.img.dup, map_.dup, res.blobs.dup);
+	static if(is(findBlobsDebug))
+	findBlobsDebug.log(ivec2(-1), src.dup, res.img.dup, map_.dup, res.blobs.dup);
 	
 	return res;
 }
@@ -197,48 +223,60 @@ auto findBlobs(T1)(Image!(T1, 2) src) {
 
 alias RectangleData = int; //todo: a rectangle bele mehetne a binPacker classba es lehetne generic tipusu a data
 
-class Rectangle {
+class Rectangle
+{
 	int x, y, width, height;
 	RectangleData data;
 	
-	this(int x, int y, int width, int height) {
+	this(int x, int y, int width, int height)
+	{
 		this.x = x;
 		this.y = y;
 		this.width = width;
 		this.height = height;
 	}
 	
-	bool opEquals(const Rectangle r) const { return (this !is null) && (r !is null) && x==r.x && y==r.y && width==r.width && height==r.height; }
+	bool opEquals(const Rectangle r) const
+	{ return (this !is null) && (r !is null) && x==r.x && y==r.y && width==r.width && height==r.height; }
 	
-	int area() const { return this.width * this.height; }
+	int area() const
+	{ return this.width * this.height; }
 	
-	auto bounds() const { return ibounds2(x, y, x+width, y+height); }
+	auto bounds() const
+	{ return ibounds2(x, y, x+width, y+height); }
 	
-	bool collide(Rectangle rect) {
-			//intersection.area > 0
+	bool collide(Rectangle rect)
+	{
+		//intersection.area > 0
 		return !(
 			rect.x >= this.x + this.width || rect.x + rect.width <= this.x ||
-						rect.y >= this.y + this.height || rect.y + rect.height <= this.y
+			rect.y >= this.y + this.height || rect.y + rect.height <= this.y
 		);
 	}
 	
-	bool contain(Rectangle rect) {
-			//the whole rect is inside this.
+	bool contain(Rectangle rect)
+	{
+		//the whole rect is inside this.
 		return (
 			rect.x >= this.x && rect.y >= this.y &&
-						rect.x + rect.width <= this.x + this.width && rect.y + rect.height <= this.y + this.height
+			rect.x + rect.width <= this.x + this.width && rect.y + rect.height <= this.y + this.height
 		);
 	}
 	
-	override string toString() const { return bounds.text; }
+	override string toString() const
+	{ return bounds.text; }
 }
 
-private void splice(T)(ref T[] a, size_t i, size_t del = 0, T[] ins = []) { a = a[0..i]~ins~a[i+del..$]; }
+private void splice(T)(ref T[] a, size_t i, size_t del = 0, T[] ins = [])
+{ a = a[0..i]~ins~a[i+del..$]; }
 
-private bool collide(Rectangle first, Rectangle second) { return first.collide(second); }
-private bool contain(Rectangle first, Rectangle second) { return first.contain(second); }
+private bool collide(Rectangle first, Rectangle second)
+{ return first.collide(second); }
+private bool contain(Rectangle first, Rectangle second)
+{ return first.contain(second); }
 
-class MaxRectsBin {
+class MaxRectsBin
+{
 		int width, height;
 		const int maxWidth, maxHeight;
 		Rectangle[] freeRects, rects;
@@ -250,7 +288,11 @@ class MaxRectsBin {
 		private bool verticalExpand;
 		private Rectangle stage;
 	
-		this(int initialWidth, int initialHeight, int maxWidth, int maxHeight, int padding=0, Options options = Options(true, true, false)) {
+		this(
+		int initialWidth, int initialHeight, int maxWidth, int maxHeight, int padding=0,
+		Options options = Options(true, true, false)
+	)
+	{
 		this.maxWidth = maxWidth;
 		this.maxHeight = maxHeight;
 		this.options = options;
@@ -262,19 +304,23 @@ class MaxRectsBin {
 		this.stage = new Rectangle(0, 0, this.width, this.height);
 	}
 	
-		void reinitialize() {
+		void reinitialize()
+	{
 		this.rects = [];
 		this.freeRects = [new Rectangle(0, 0, this.maxWidth + this.padding, this.maxHeight + this.padding)];
 		this.stage = new Rectangle(0, 0, this.width, this.height);
 	}
 	
-		Rectangle add(int width, int height, RectangleData data = RectangleData.init) {
+		Rectangle add(int width, int height, RectangleData data = RectangleData.init)
+	{
 		auto node = this.findNode(width + this.padding, height + this.padding);
-		if(node) {
+		if(node)
+		{
 			this.updateBinSize(node);
 			auto numRectToProcess = this.freeRects.length;
 			auto i = 0;
-			while(i < numRectToProcess) {
+			while(i < numRectToProcess)
+			{
 				if(this.splitNode(this.freeRects[i], node)) {
 					this.freeRects.splice(i, 1);
 					numRectToProcess--;
@@ -288,33 +334,42 @@ class MaxRectsBin {
 			rect.data = data;
 			this.rects ~= rect;
 			return rect;
-		}else if(!this.verticalExpand) {
+		}
+		else if(!this.verticalExpand)
+		{
 			if(
-				this.updateBinSize(new Rectangle(this.width + this.padding, 0, width + this.padding, height + this.padding))
-								|| this.updateBinSize(new Rectangle(0, this.height + this.padding, width + this.padding, height + this.padding))
-			) { return this.add(width, height, data); }
-		}else {
+				this.updateBinSize(new Rectangle(this.width + this.padding, 0, width + this.padding, height + this.padding)) ||
+				this.updateBinSize(new Rectangle(0, this.height + this.padding, width + this.padding, height + this.padding))
+			)
+			{ return this.add(width, height, data); }
+		}
+		else
+		{
 			if(
 				this.updateBinSize(
 					new Rectangle(
 						0, this.height + this.padding,
 						width + this.padding, height + this.padding
 					)
-				) || this.updateBinSize(
+				) ||
+				this.updateBinSize(
 					new Rectangle(
 						this.width + this.padding, 0,
 						width + this.padding, height + this.padding
 					)
 				)
-			) { return this.add(width, height, data); }
+			)
+			{ return this.add(width, height, data); }
 		}
 		return null;
 	}
 	
-	//it bugs    sizediff_t find(in Rectangle     r)const { return rects.countUntil(r); }
-		sizediff_t find(in RectangleData d)const { return rects.map!(r=>r.data).countUntil(d); }
+		//it bugs    sizediff_t find(in Rectangle     r)const { return rects.countUntil(r); }
+		sizediff_t find(in RectangleData d)const
+	{ return rects.map!(r=>r.data).countUntil(d); }
 	
-		bool remove(sizediff_t idx) {
+		bool remove(sizediff_t idx)
+	{
 		if(idx>=0) {
 			freeRects ~= rects[idx];
 			rects = rects.remove(idx);
@@ -322,18 +377,22 @@ class MaxRectsBin {
 		}else { return false; }
 	}
 	
-	//it bogs    bool remove(in Rectangle     r){ return remove(find(r)); }
-		bool remove(in RectangleData d) { return remove(find(d)); }
+		//it bogs    bool remove(in Rectangle	r){ return remove(find(r)); }
+		bool remove(in RectangleData d)
+	{ return	remove(find(d)); }
 	
-	  private:
+	private:
 	
-		Rectangle findNode(int width, int height) {
+		Rectangle findNode(int width, int height)
+	{
 		auto score = int.max;
 		int areaFit;
 		Rectangle bestNode;
-		foreach(r; freeRects) {
+		foreach(r; freeRects)
+		{
 				//todo: ref if struct!!!
-			if(r.width >= width && r.height >= height) {
+			if(r.width >= width && r.height >= height)
+			{
 				areaFit = r.width * r.height - width * height;
 				if(areaFit < score) {
 					//bestNode.x = r.x;
@@ -348,19 +407,23 @@ class MaxRectsBin {
 		return bestNode;
 	}
 	
-		bool splitNode(Rectangle freeRect, Rectangle usedNode) {
+		bool splitNode(Rectangle freeRect, Rectangle usedNode)
+	{
 		//Test if usedNode intersect with freeRect
 		if(!freeRect.collide(usedNode)) return false;
 		
 		//Do vertical split
-		if(usedNode.x < freeRect.x + freeRect.width && usedNode.x + usedNode.width > freeRect.x) {
+		if(usedNode.x < freeRect.x + freeRect.width && usedNode.x + usedNode.width > freeRect.x)
+		{
 			//New node at the top side of the used node
-			if(usedNode.y > freeRect.y && usedNode.y < freeRect.y + freeRect.height) {
+			if(usedNode.y > freeRect.y && usedNode.y < freeRect.y + freeRect.height)
+			{
 				auto newNode = new Rectangle(freeRect.x, freeRect.y, freeRect.width, usedNode.y - freeRect.y);
 				this.freeRects ~= newNode;
 			}
 			//New node at the bottom side of the used node
-			if(usedNode.y + usedNode.height < freeRect.y + freeRect.height) {
+			if(usedNode.y + usedNode.height < freeRect.y + freeRect.height)
+			{
 				auto newNode = new Rectangle(
 					freeRect.x,
 					usedNode.y + usedNode.height,
@@ -374,15 +437,18 @@ class MaxRectsBin {
 		//Do Horizontal split
 		if(
 			usedNode.y < freeRect.y + freeRect.height &&
-						usedNode.y + usedNode.height > freeRect.y
-		) {
+			usedNode.y + usedNode.height > freeRect.y
+		)
+		{
 			//New node at the left side of the used node.
-			if(usedNode.x > freeRect.x && usedNode.x < freeRect.x + freeRect.width) {
+			if(usedNode.x > freeRect.x && usedNode.x < freeRect.x + freeRect.width)
+			{
 				auto newNode = new Rectangle(freeRect.x, freeRect.y, usedNode.x - freeRect.x, freeRect.height);
 				this.freeRects ~= newNode;
 			}
 			//New node at the right side of the used node.
-			if(usedNode.x + usedNode.width < freeRect.x + freeRect.width) {
+			if(usedNode.x + usedNode.width < freeRect.x + freeRect.width)
+			{
 				auto newNode = new Rectangle(
 					usedNode.x + usedNode.width,
 					freeRect.y,
@@ -395,14 +461,17 @@ class MaxRectsBin {
 		return true;
 	}
 	
-		void pruneFreeList () {
+		void pruneFreeList ()
+	{
 		//Go through each pair of freeRects and remove any rects that is redundant
 		int i, j;
 		auto len = this.freeRects.length;
-		while(i < len) {
+		while(i < len)
+		{
 			j = i + 1;
 			auto tmpRect1 = this.freeRects[i];
-			while(j < len) {
+			while(j < len)
+			{
 				auto tmpRect2 = this.freeRects[j];
 				if(tmpRect2.contain(tmpRect1)) {
 					this.freeRects.splice(i, 1);
@@ -421,7 +490,8 @@ class MaxRectsBin {
 		}
 	}
 	
-		bool updateBinSize(Rectangle node) {
+		bool updateBinSize(Rectangle node)
+	{
 		if(!this.options.smart) return false;
 		if(this.stage.contain(node)) return false;
 		auto tmpWidth	= max(this.width , node.x + node.width  - this.padding);
@@ -438,8 +508,10 @@ class MaxRectsBin {
 		return true;
 	}
 	
-		void expandFreeRects(int width, int height) {
-		foreach(freeRect; this.freeRects) {
+		void expandFreeRects(int width, int height)
+	{
+		foreach(freeRect; this.freeRects)
+		{
 			if(freeRect.x + freeRect.width >= min(this.width + this.padding, width)) { freeRect.width = width - freeRect.x; }
 			if(freeRect.y + freeRect.height >= min(this.height + this.padding, height)) { freeRect.height = height - freeRect.y; }
 		}
@@ -451,15 +523,17 @@ class MaxRectsBin {
 	
 	public:
 	
-	  void dump() const {
+		void dump() const
+	{
 		writefln("BinPacker %s, %s, %s, %s", width, height, maxWidth, maxHeight);
 		writeln("  rects: ", rects);
 		writeln("  freeRects:", freeRects);
 	}
 	
 	
-	  static string test(Drawing dr) {
-		 //test /////////////////////////////////
+		static string test(Drawing dr)
+	{
+			//test /////////////////////////////////
 		import het.draw2d;
 		
 		auto mrb = new MaxRectsBin(0, 0, 1024, 1024);
@@ -472,7 +546,8 @@ class MaxRectsBin {
 		foreach(i; 0..550)
 		adds ~= ivec2(rng.random(2)+1,rng.random(2)+1);
 		
-		foreach(i, a; adds) {
+		foreach(i, a; adds)
+		{
 			mrb.add(a.x, a.y);
 			
 			if((i&3)==3) { mrb.remove(rng.random(mrb.rects.length)); }
@@ -507,9 +582,8 @@ class MaxRectsBin {
 	
 }
 
-
-//!PositionExtrapolator ////////////////////////////////////
-struct PositionExtrapolator {
+struct PositionExtrapolator
+	{
 	private:
 		struct HistoryRec {
 		DateTime t;
@@ -521,16 +595,20 @@ struct PositionExtrapolator {
 	
 		Time historyDuration = 1*second;
 	
-		void reset() { history = []; }
+		void reset()
+	 { history = []; }
 	
-		void update() {
+		void update()
+	 {
 		const tz = now - historyDuration;
 		history = history.remove!(a => a.t<tz);
 	}
 	
-		void appendPosition(double pos, DateTime t = now) { history ~= HistoryRec(t, pos); }
+		void appendPosition(double pos, DateTime t = now)
+	 { history ~= HistoryRec(t, pos); }
 	
-		double position(DateTime t = now) const {
+		double position(DateTime t = now) const
+	 {
 		//no data
 		if(history.empty) return typeof(return).nan;
 		
@@ -538,7 +616,8 @@ struct PositionExtrapolator {
 		if(history.length==1) return history[0].position;
 		
 		//interpolate
-		if(t.inRange(history[0].t, history[$-1].t)) {
+		if(t.inRange(history[0].t, history[$-1].t))
+		{
 			foreach(a; history.slide(2))
 			if(t.inRange(a[0].t, a[1].t))
 			return remap(0, (a[0].t-t).value(second), (a[1].t-t).value(second), a[0].position, a[1].position);
@@ -548,14 +627,18 @@ struct PositionExtrapolator {
 		return remap(0, (history[0].t-t).value(second), (history[$-1].t-t).value(second), history[0].position, history[$-1].position);
 	}
 	
-		double speed() const {
+		double speed() const
+	 {
 		if(history.length<2) return 0;
 		return safeDiv(history[$-1].position - history[0].position, (history[$-1].t - history[0].t).value(second));
 	}
 	
-		void selfTest() {
+		void selfTest()
+	 {
 		PositionExtrapolator pe;
-		[100, 125, 150, 0, 0, 300, 300, 300, 300, 300, 300, 500, 505].chain([0].replicate(20)).each!(
+		[100, 125, 150, 0, 0, 300, 300, 300, 300, 300, 300, 500, 505]
+			.chain([0].replicate(20))
+			.each!(
 			(a){
 				sleep(100);
 				if(a) pe.appendPosition(a);
