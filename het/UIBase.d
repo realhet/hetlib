@@ -868,7 +868,7 @@ struct CellLocation {
 	vec2 localPos;	//innerPos is the origin, not outerPos. It's on the containers client area.
 	bounds2 globalOuterBounds;	//absolute outerBounds
 	
-	vec2 calcSnapOffsetFromPadding(float epsilon = 1) {
+	vec2 calcSnapOffsetFromPadding(float epsilon) {
 		
 		static float doit(float coord, float innerSize, float pad0, float pad1, float epsilon) {
 			epsilon = min(innerSize*.5f, epsilon);
@@ -970,8 +970,8 @@ class Cell {
 		 //calculated prioperties. No += operators are allowed.
 		
 		//todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az	outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
-		const(vec2) innerPos () const { return outerPos+topLeftGapSize;	 }			               void innerPos (in vec2 p) { outerPos	= p-topLeftGapSize; }
-		const(vec2) innerSize() const { return outerSize-totalGapSize;	 }			               void innerSize(in vec2 s) { outerSize	= s+totalGapSize; }
+		const(vec2) innerPos () const { return outerPos+topLeftGapSize;	 }											       void innerPos (in vec2 p) { outerPos	= p-topLeftGapSize; }
+		const(vec2) innerSize() const { return outerSize-totalGapSize;	 }											       void innerSize(in vec2 s) { outerSize	= s+totalGapSize; }
 		auto innerBounds() const { return bounds2(innerPos, innerPos+innerSize); }	 void innerBounds(in bounds2 b) { innerPos =	b.low; innerSize = b.size; }
 		auto outerBounds() const { return bounds2(outerPos, outerPos+outerSize); }	 void outerBounds(in bounds2 b) { outerPos =	b.low; outerSize = b.size; }
 		
@@ -1178,12 +1178,16 @@ class Glyph : Cell {
 		isNewLine = ch==10;
 		isReturn = ch==13;         //todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. ossz 16byte all rendelkezeser ugyis.
 		
+		dchar visibleCh = ch;
 		if(VisualizeGlyphs) {
-			if(isReturn) ch = 0x240D;else if(isNewLine)
-			ch = 0x240A; //0x23CE;
-		}else { if(isReturn || isNewLine) ch = ' '; }
+			if(isReturn) visibleCh = 0x240D;else if(isNewLine)
+			visibleCh = 0x240A; //0x23CE;
+		}else {
+			if(isReturn || isNewLine) visibleCh = ' '; 
+			else if(ch==0xb) visibleCh = 0x240B; //vertical tab. It is used for multiColumns
+		}
 		
-		stIdx = ch.fontTexture(ts);
+		stIdx = visibleCh.fontTexture(ts);
 		
 		fontFlags = ts.fontFlags;
 		fontColor = ts.fontColor;
@@ -1297,8 +1301,8 @@ struct TextPos {
 	}
 	
 	this(int idx	     ) { type = Type.idx	;	 fIdx	 = idx	;                     }
-	this(int line, int column	     ) { type = Type.lc	;		fLine	 = line	;	 fColumn = column; }
-	this(in vec2 point, float height) { type = Type.xy;	fPoint = point;	 fHeight = height;  }
+	this(int line, int column	     ) { type = Type.lc	;		fLine	 = line	;	 fColumn = column;	 }
+	this(in vec2 point, float height) { type = Type.xy;	fPoint = point;	 fHeight = height;	 }
 	
 	bool valid() const { return type != Type.none; }
 	bool isIdx() const { return type == Type.idx	; }
@@ -1510,7 +1514,7 @@ struct TextEditorState {
 		if(!tp.valid) return tp;
 		
 		if(!cellCount) return TextPos(vec2(0, 0), defaultFontHeight);
-		if(tp.isXY ) return tp;
+		if(tp.isXY) return tp;
 		
 		TextPos lc;
 		if(tp.isIdx	) lc = toLC(tp);
@@ -1627,11 +1631,11 @@ struct TextEditorState {
 		with(eCmd)
 		final switch(cmd) {
 			case Cmd.nop: break;
-			case Cmd.cInsert					: caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
-			case Cmd.cDelete					: deleteAtCaret(false); break;
-			case Cmd.cDeleteBack	   : deleteAtCaret(true ); break;
-			case Cmd.cLeft	   : caretMoveRel(-intParam(1)); break;
-			case Cmd.cRight	   : caretMoveRel(intParam(1)); break;
+			case Cmd.cInsert					:	caretRestrict; modify(toIdx(caret).idx, 0, strParam); break;
+			case Cmd.cDelete					:	deleteAtCaret(false); break;
+			case Cmd.cDeleteBack		: deleteAtCaret(true ); break;
+			case Cmd.cLeft	: caretMoveRel(-intParam(1)); break;
+			case Cmd.cRight	: caretMoveRel(intParam(1)); break;
 			case Cmd.cUp		:	caretMoveVert(-intParam(1)); break;
 			case Cmd.cDown		:	caretMoveVert(intParam(1)); break;
 			case Cmd.cHome		:	caretMoveAbs(0); break;
@@ -1686,7 +1690,7 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
 		try {
 			auto params = cmdLine.commandLineToMap;
 			auto cmd = params.get("0", "");
-			if(cmd=="row" ) {
+			if(cmd=="row") {
 				auto a = new Row(params["1"], tsNormal);
 				a.setProps(params);
 				container.appendCell(a);
@@ -1694,7 +1698,7 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
 				auto img = new Img(File(params["1"]), ts.bkColor);
 				img.setProps(params);
 				container.appendCell(img);
-			}else if(cmd=="char" ) { container.appendChar(dchar(params["1"].toInt), ts); }else if(cmd=="symbol"  ) {
+			}else if(cmd=="char") { container.appendChar(dchar(params["1"].toInt), ts); }else if(cmd=="symbol") {
 				auto name = params["1"];
 				auto ch = segoeSymbolByName(name);
 				auto oldFont = ts.font;
@@ -1707,13 +1711,13 @@ void processMarkupCommandLine(Container container, string cmdLine, ref TextStyle
 				r.outerWidth = params["1"].toWidthHeight(g_actFontHeight);
 				r.setProps(params);
 				container.appendCell(r);
-			}else if(cmd=="flex") { container.appendCell(new Row(tag("prop flex=1"), ts)); }else if(cmd=="link" ) {
+			}else if(cmd=="flex") { container.appendCell(new Row(tag("prop flex=1"), ts)); }else if(cmd=="link") {
 				/*
 					import het.ui: Link;
 					container.append(new Link(params["1"], 0, false, null));
 				*/
 				raise("not impl");
-			}else if(cmd=="btn" || cmd=="button" ) {
+			}else if(cmd=="btn" || cmd=="button") {
 				/*
 					auto btn = new Clickable(params["1"], 0, false, null);
 					btn.setProps(params);
@@ -2720,7 +2724,7 @@ class Container : Cell {
 	
 		protected auto getScrollResizeBounds(in Cell hb, in Cell vb) const { return bounds2(vb.outerPos.x, hb.outerPos.y, innerWidth, innerHeight); }
 	
-		Cell[] sortedSubCellsAroundAxis(int axis)(vec2 p) {
+		static Cell[] sortedSubCellsAroundAxis(int axis)(Cell[] subCells, vec2 p) {
 		 //note: only tests for the given direction. It's a speedup for internal_hitTest.
 		auto sc = subCells;
 		if(sc.length) {
@@ -2735,12 +2739,13 @@ class Container : Cell {
 		return sc;
 	}
 	
-		Cell[] sortedSubCellsAroundX(vec2 p) { return sortedSubCellsAroundAxis!0(p); }
-		Cell[] sortedSubCellsAroundY(vec2 p) { return sortedSubCellsAroundAxis!1(p); }
+		static Cell[] sortedSubCellsAroundX(Cell[] subCells, vec2 p) { return sortedSubCellsAroundAxis!0(subCells, p); }
+		static Cell[] sortedSubCellsAroundY(Cell[] subCells, vec2 p) { return sortedSubCellsAroundAxis!1(subCells, p); }
 	
 		Cell[] internal_hitTest_filteredSubCells(vec2 p) {
 		 //note: for column, it only needs to filter the y direction because this is just an optimization.
 		//slow linear filter
+		//todo: this should return a range not an array
 		return subCells.filter!(c => c.outerBounds.contains!"[)"(p)).array; //otp: what if I unroll it to 4 comparations?
 	}
 	
@@ -3362,7 +3367,7 @@ class Row : Container {
 		if(rearrangedLineCount!=1) {
 			return super.internal_hitTest_filteredSubCells(p); //todo: wrapped filter support
 		}else {
-			return sortedSubCellsAroundX(p); //bug: it wont work for multiline
+			return sortedSubCellsAroundX(subCells, p); //bug: it wont work for multiline
 		}
 	}
 	
@@ -3387,24 +3392,33 @@ class Row : Container {
 	
 }
 
-class Column : Container {
-	 //Column ////////////////////////////////////
-	
-	override void rearrange() {
+class Column : Container
+{
+	override void rearrange()
+	{
 		
 		//measure the subCells and stretch them to a maximum width
-		if(flags.dontStretchSubCells) {
+		if(flags.dontStretchSubCells)
+		{
 			measureSubCells;
 			innerWidth = calcContentWidth;
-		}else if(flags.autoWidth) {
+		}
+		else if(flags.autoWidth)
+		{
 			//measure maxWidth
 			measureSubCells;
 			innerWidth = calcContentWidth;
 			//at this point all the subCells are measured
 			//now set the width of every subcell in this column if it differs, and remeasure only when necessary
 			setSubContainerWidths_differentOnly(innerWidth);
-			//note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. But that's not an usual case: ListBox: all textCells are fixedWidth, Document: all paragraphs are autoWidth.
-		}else {
+			/+
+				note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. 
+							But that's not an usual case: ListBox: all textCells are fixedWidth, 
+							Document: all paragraphs are autoWidth.
+			+/
+		}
+		else
+		{
 			//first set the width of every subcell in this column, and measure all (for the first time).
 			setSubContainerWidths(innerWidth);
 		}
@@ -3412,20 +3426,25 @@ class Column : Container {
 		if(flags.columnElasticTabs) processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.
 		
 		//process vertically flexible items
-		if(!flags.autoHeight) {
+		if(!flags.autoHeight)
+		{
 			auto flexSum = subCells.calcFlexSum;
 			
-			if(flexSum > 0) {
+			if(flexSum > 0)
+			{
 				//calc remaining space from nonflex cells
 				float remaining = innerHeight - subCells.filter!"!a.flex".map!"a.outerHeight".sum;
 				
 				//distrubute among flex cells
-				if(remaining > AlignEpsilon) {
+				if(remaining > AlignEpsilon)
+				{
 					remaining /= flexSum;
 					foreach(sc; subCells)
-					if(sc.flex) {
+					if(sc.flex)
+					{
 						sc.outerHeight = sc.flex*remaining;
-						if(auto co = cast(Container)sc) { co.flags.autoHeight = false; co.measure; } //height changed, measure again
+						if(auto co = cast(Container)sc) { co.flags.autoHeight = false; co.measure; } 
+						//height changed, measure again
 					}
 					
 				}
@@ -3437,28 +3456,139 @@ class Column : Container {
 		if(flags.autoHeight) innerHeight = calcContentHeight;
 	}
 	
-	override void drawSubCells_cull(Drawing dr) {
-		//this uses linear search. It can be optimized in subClasses.
-		if(auto b = dr.clipBounds) {
+	override void drawSubCells_cull(Drawing dr)
+	{
+		if(auto b = dr.clipBounds)
+		{
 			b = dr.inverseInputTransform(b);
 			
-			const ub = subCells.map!(c => c.outerPos.y + c.outerSize.y).assumeSorted.upperBound(b.top).length;
-			if(ub>0) {
-				auto scUpper = subCells[$-ub..$];
-				const lb = scUpper.map!(c => c.outerPos.y).assumeSorted.lowerBound(b.bottom).length;
-				if(lb>0) {
-					foreach(c; scUpper[0..lb])
-					if(b.overlaps((c.outerBounds))) c.draw(dr);
+			void drawPage(Cell[] subCells)
+			{
+				const ub = subCells.map!(c => c.outerBottom).assumeSorted.upperBound(b.top).length;
+				if(ub>0) {
+					auto scUpper = subCells[$-ub..$];
+					const lb = scUpper.map!(c => c.outerTop).assumeSorted.lowerBound(b.bottom).length;
+					if(lb>0) {
+						foreach(c; scUpper[0..lb])
+						if(b.overlaps((c.outerBounds))) c.draw(dr);
+					}
 				}
 			}
+			
+			void drawPages(Cell[][] pages)
+			{
+				if(flags.dontStretchSubCells)
+				WARN("flags.dontStretchSubCells should be disabled for multiPage Column.");
+				
+				const ub = pages.map!(c => c.front.outerRight).assumeSorted.upperBound(b.left).length;
+				//note: SubRows must be stretched.
+				if(ub>0) {
+					auto pgUpper = pages[$-ub..$];
+					const lb = pgUpper.map!(c => c.front.outerLeft).assumeSorted.lowerBound(b.right).length;
+					if(lb>0) {
+						foreach(p; pgUpper[0..lb])
+						if(b.overlaps(bounds2(p.front.outerTopLeft, p.back.outerBottomRight))) drawPage(p);
+					}
+				}
+			}
+			
+			auto pages = getPageRowRanges;
+			if(pages.length>1) drawPages(cast(Cell[][]) pages);
+			else drawPage(subCells);
 		}
 	}
 	
-	override Cell[] internal_hitTest_filteredSubCells(vec2 p) {
-		return sortedSubCellsAroundY(p);
-		//note: no wrapping in  columns (yet)
+	override Cell[] internal_hitTest_filteredSubCells(vec2 p)
+	{
+		auto pages = getPageRowRanges;
+		if(pages.length>1)
+		{
+			auto xStarts = pages.map!(p => p.front.outerPos.x).assumeSorted;
+			size_t idx = (xStarts.length - xStarts.upperBound(p.x).length - 1);
+			return idx<pages.length 	? sortedSubCellsAroundY(cast(Cell[]) pages[idx], p)
+				: null;
+		}
+		else
+		return sortedSubCellsAroundY(subCells, p);
 	}
 	
+	version(/+$DIDE_REGION Multiple page support+/all)
+	{
+		Row[][] getPageRowRanges()
+		{
+			/+
+				To implement a multiPage Column,
+					* override this method.
+					* make a cached storage for Row[][] and return it.
+					* at the end of rearrange(), call rearrangePages_ to refresh the Row[][] cache.
+					
+				drawSubCells_cull(), internal_hitTest_filteredSubCells() will use this overridden method.
+			+/
+			return null;
+		}
+		
+		Row[][] rearrangePages_byLastRows(alias isLastRow)(float pageGapWidth)
+		{
+			if(flags.dontStretchSubCells)
+			WARN("flags.dontStretchSubCells should be disabled for multiPage Column.");
+			
+			auto rows = cast(Row[]) subCells;
+			if(rows.empty) return null;
+			
+			int[] breakRowIndices;
+			foreach(i, r; rows) if(unaryFun!isLastRow(r)) breakRowIndices ~= cast(int) i;
+			
+			if(breakRowIndices.length)
+			{
+				Row[][] result;
+				result.reserve(breakRowIndices.length+1);
+				
+				float x0 = 0, maxY = 0;
+				void processPage(size_t st, size_t en)
+				{
+					assert(
+						en>st, "Empty pages are not allowed. "~
+						"Because the pages are delimited by marker rows, minimum pageSize is 1 row."
+					);
+					
+					auto pageRows = rows[st..en];
+					const emptyWidth = pageRows.map!(r => r.innerWidth - r.contentInnerWidth).minElement;
+					
+					const y0 = pageRows.front.outerY;
+					foreach(r; pageRows) {
+						r.outerPos.x = x0;
+						r.outerSize.x -= emptyWidth;
+						r.outerPos.y -= y0;
+					}
+					
+					with(pageRows.back) {
+						x0 = outerRight + pageGapWidth;
+						maxY.maximize(outerBottom);
+					}
+					
+					result ~= pageRows;
+				}
+				
+				version(/+$DIDE_REGION Go through all pages+/all) {
+					const rowCount = rows.length;
+					size_t lastIdx = 0;
+					foreach(i; breakRowIndices)
+					{
+						processPage(lastIdx, i+1);
+						lastIdx = i+1;
+					}
+					if(lastIdx < rowCount)
+					processPage(lastIdx, rowCount);
+				}
+				
+				innerSize = vec2(rows.back.outerRight, maxY);
+				
+				return result;
+			}
+			else
+			return null;
+		}
+	}
 }
 
 
@@ -3568,7 +3698,7 @@ class SelectionManager(T : Cell) {
 		
 		//update dragBounds
 		if(LMB_pressed) dragSource = mouseAct;
-		if(LMB      ) dragBounds = bounds2(dragSource, mouseAct).sorted;
+		if(LMB) dragBounds = bounds2(dragSource, mouseAct).sorted;
 		
 		//update hovered item
 		hoveredItem = null;
@@ -3621,4 +3751,3 @@ class SelectionManager(T : Cell) {
 	}
 	
 }
-
