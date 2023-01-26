@@ -423,7 +423,8 @@ class InfoTexture
 }
 
 //todo: make the texture class
-class Texture {
+class Texture
+{
 	 //Texture class /////////////////////////////////
 	//this holds all the info to access a subTexture
 	private:
@@ -431,19 +432,22 @@ class Texture {
 		int idx;
 		File file;
 	
-		private this(TextureManager owner, int idx) {
+		private this(TextureManager owner, int idx)
+	{
 		 //this is unnamed and empty
 		this.owner = owner;
 		this.idx = idx;
 	}
 	
 	public:
-		this(TextureManager owner, int idx, File file, bool delayed = false) {
+		this(TextureManager owner, int idx, File file, bool delayed = false)
+	{
 		this(owner, idx);
 		this.file = file;
 	}
 	
-		override string toString() const { return "Texture(#%d, %s)".format(idx, file); }
+		override string toString() const
+	{ return "Texture(#%d, %s)".format(idx, file); }
 }
 
 
@@ -560,18 +564,24 @@ class TextureManager
 		
 		//at this point failed to add to the current set of megatextures.
 		
-		if(megaTextures.length>=MegaTexMaxCnt) {
+		if(megaTextures.length>=MegaTexMaxCnt)
+		{
 			if(0) {
 				raise("Out of megatextures"); //todo: make a texture garbage collect cycle here
-			}else {
-				foreach(i; 0..MegaTexMaxCnt) {
+			}
+			else {
+				foreach(i; 0..MegaTexMaxCnt)
+				{
 					garbageCollect;
 					foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
 				}
 			}
-		}else {
+		}
+		else {
 			
-			if(megaTextures.length) MegaTexMinSize = MegaTexMaxSize; //All textures use the max size expect the first. (small apps ned only 512*512)
+			if(megaTextures.length) MegaTexMinSize = MegaTexMaxSize;
+			//All textures use the max size expect the first. (small apps ned only 512*512)
+			
 			addNewMegaTexture(4);
 			foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
 		}
@@ -625,9 +635,9 @@ class TextureManager
 		
 		/+
 			 old and bogus version
-					auto idx = infoTexture.peekNextIdx;		//returns 8
-					auto info = allocSpace(idx, bmp);		//GC	deletes info[0..4], and allocspace if susseeded, stores the subtexIdx in info.
-					infoTexture.add(info);	    //and this	allocates on 3 (last freed) not 8.  BUG!!!!!!!!!!!
+			auto idx = infoTexture.peekNextIdx; 	//returns 8
+			auto info = allocSpace(idx, bmp);	//GC deletes info[0..4], and allocspace if susseeded, stores the subtexIdx in info.
+			infoTexture.add(info);	//and this allocates on 3 (last freed) not 8.  BUG!!!!!!!!!!!
 		+/
 		
 		//new version allowing GC to manipulate subTexInfos.
@@ -677,7 +687,8 @@ class TextureManager
 		enum UploadTextureMaxTime = 1.0*second/60;
 		size_t uploadedSize;
 		enum TextureFlushLimit = 8 << 20;
-		do {
+		do
+		{
 			
 			Bitmap bmp;
 			synchronized(textures) {
@@ -692,10 +703,12 @@ class TextureManager
 			
 			pendingIndices.remove(idx); //not pending anymore so it can be reinvalidated
 			
-			if(idx in invalidateAgain) {
+			if(idx in invalidateAgain)
+			{
 				//WARN("Delayed loaded bmp is in invalidateAgain.", idx);
 				
-				uploadSubTex(idx, bmp, true); //this is here to finalize the allocation of the texture before the invalidation
+				uploadSubTex(idx, bmp, true);
+				//this is here to finalize the allocation of the texture before the invalidation
 				//opt: disable the upload of this texture data
 				
 				invalidateAgain.remove(idx);
@@ -707,7 +720,9 @@ class TextureManager
 					break;
 				}
 				
-			}else {
+			}
+			else
+			{
 				uploadSubTex(idx, bmp);
 				
 				//flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
@@ -720,14 +735,16 @@ class TextureManager
 			
 			inv = true;
 			
-		}while(QPS-t0<UploadTextureMaxTime/*sec*/);
+		}
+		while(QPS-t0<UploadTextureMaxTime/*sec*/);
 		
 		return inv;
 	}
 	
 		void invalidate(in File fileName)
 	{
-		if(auto idx = (fileName in byFileName)) {
+		if(auto idx = (fileName in byFileName))
+		{
 			if(*idx in pendingIndices) {
 				//WARN("Texture loader is pending", fileName, *idx);
 				invalidateAgain[*idx] = true;
@@ -736,7 +753,9 @@ class TextureManager
 			enforce(byFileName.remove(fileName), "Unable to remove "~fileName.fullName);
 			removeSubTex(*idx);
 			//LOG("invalidated ", fileName, "  idx:", *idx);
-		}else {
+		}
+		else
+		{
 			//LOG("no need to invalidate, doesn't exists", fileName);
 		}
 	}
@@ -750,11 +769,15 @@ class TextureManager
 		
 		//todo: nonexisting file and/or exception is not handling well here.
 		
-		if(!(fileName in byFileName)) {
+		if(!(fileName in byFileName))
+		{
 			
-						if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false; //todo: delayed restriction. should refactor this nicely
+			if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false;
+			//todo: delayed restriction. should refactor this nicely
+			
 			//delayed = false;
-						if(delayed) {
+			if(delayed)
+			{
 				
 				//ez egy bug miatt, ami a 0. megatextura garbageCollectje utan fordul elo
 				//nem jo, ha a 0-as megaTex-re van egy betoltes alatt levo textura 'rakva'
@@ -768,35 +791,40 @@ class TextureManager
 				{
 					//enforce(SetProcessAffinityMask(GetCurrentProcess, 0xFE), getLastErrorStr);
 					//sleep(random(1000));
-										//SetPriorityClass(GetCurrentProcess, BELOW_NORMAL_PRIORITY_CLASS);
+					//SetPriorityClass(GetCurrentProcess, BELOW_NORMAL_PRIORITY_CLASS);
 					
-										//import core.sys.windows.windows;
-										//SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
+					//import core.sys.windows.windows;
+					//SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
 					
 					//"fuck".writeln;
 					
 					//"Loader.start %.2d %s".writefln(idx, GetCurrentProcessorNumber);
 					//"B%s ".writef(idx);
 					
-										/*if(GetCurrentProcessorNumber==mainThreadProcessorNumber) */
+					/*if(GetCurrentProcessorNumber==mainThreadProcessorNumber) */
 					
 					//sleep(100);
-										Bitmap bmp;
-										try {
-						bmp = newBitmap_internal(fileName); //<- this takes time. This should be delayed
-					}catch(Exception e) {
+					Bitmap bmp;
+					try
+					{
+						bmp = newBitmap_internal(fileName);
+						//<- this takes time. This should be delayed
+					}
+					catch(Exception e)
+					{
 						//todo: Nem jo!!! Nem thread safe !!!	WARN("Bitmap decode error. Using errorBitmap", fileName);
 						//Ez nem thread safe!!!! multithreaded	modban vegtelen loopba tud kerulni.
 						//todo: ezt megoldani a placeholder bitmappal rendesen
 						bmp = newErrorBitmap(e.simpleMsg);
 					}
 					
-										//bmp.channels = 4; //todo: not just 4 chn bitmap support
-										bmp.tag = idx; //tag = SubTexIdx
+					//bmp.channels = 4; //todo: not just 4 chn bitmap support
+					bmp.tag = idx; //tag = SubTexIdx
 					
 					//"E%s ".writef(idx);
 					
-										synchronized(textures) {
+					synchronized(textures)
+					{
 						if(synchLog) LOG("textures.bmpQueue ~= bmp; before");
 						textures.bmpQueue ~= bmp;
 						if(synchLog) LOG("textures.bmpQueue ~= bmp; after");
@@ -811,7 +839,8 @@ class TextureManager
 					
 					//LOG("LOADING bmp", fileName);
 					spawn(&loader, idx, fileName);   //crashes after 5 min
-				}else {
+				}
+				else {
 										import std.parallelism;
 										auto t = task!loader(idx, fileName);
 										taskPool.put(t);
@@ -831,13 +860,17 @@ class TextureManager
 					
 				}
 				
-			}else {
+			}
+			else
+			{
 				 //immediate loader
 				Bitmap bmp;
 				try {
 					bmp = newBitmap_internal(fileName); //<- this takes time. This should be delayed
-				}catch(Exception e) {
-					WARN("Bitmap decode error. Using errorBitmap", fileName); //todo: ezt megoldani a placeholder bitmappal rendesen
+				}
+				catch(Exception e) {
+					WARN("Bitmap decode error. Using errorBitmap", fileName);
+					//todo: ezt megoldani a placeholder bitmappal rendesen
 					bmp = newErrorBitmap(e.simpleMsg);
 				}
 				
@@ -870,7 +903,8 @@ class TextureManager
 		
 				auto fileName = File(`custom:\`~name);
 		
-				if(auto a = (fileName in byFileName)) {
+		if(auto a = (fileName in byFileName))
+		{
 			 //already exists?
 			if(bmp) {
 				 //reupdate existing
@@ -880,15 +914,20 @@ class TextureManager
 								mustRehash = true;
 				if(log) "Updated subtex %s:".writefln(fileName);
 								return idx;
-			}else {
+			}
+			else {
 				 //no change, just return the existing handle
 				if(log) "Found subtex %s:".writefln(fileName);
 								return *a;
 			}
-		}else {
+		}
+		else
+		{
 			 //this is a new entry
-						if(bmp is null) {
-				bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));  //if no bmp, just create a purple placeholder
+						if(bmp is null)
+			{
+				bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia)));
+				//if no bmp, just create a purple placeholder
 			}
 						auto idx = createSubTex(bmp);
 						byFileName[fileName] = idx;
@@ -1001,7 +1040,8 @@ class TextureManager
 		auto subTexInfos = collectSubTexInfo2;
 		
 		int ofs;
-		foreach(megaIdx, mt; megaTextures) {
+		foreach(megaIdx, mt; megaTextures)
+		{
 			dr.translate(0, ofs); scope(exit) { dr.pop; ofs += mt.texSize.y + 16; }
 			
 			//draw background
@@ -1011,9 +1051,12 @@ class TextureManager
 			
 			//draw subtextures
 			foreach(const si; subTexInfos)
-			if(si.info.texIdx==megaIdx) {
+			if(si.info.texIdx==megaIdx)
+			{
 				dr.color = clWhite;
-				dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); //todo: drawRect support for ibounds2
+				dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray);
+				//todo: drawRect support for ibounds2
+				
 				if(!si.canUnload) {
 					dr.lineWidth=-3; dr.color = clYellow;
 					dr.drawX(bounds2(si.info.bounds));
@@ -1037,16 +1080,23 @@ class TextureManager
 		enum log = 0;
 		
 		bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
-		auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  //opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
+		auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  
+		//opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
 		auto modified = bmp.modified.toId_deprecated; //todo: deprecate toId and use the DateTime itself
 		
 		if(log) LOG(bmp);
-		if(auto existing = file in byFileName) {
+		if(auto existing = file in byFileName)
+		{
 			
 			//todo: ennel az egyenlosegjelnel 2 bug van:
 			//1: ha ==, akkor a thumbnailnak 0 a datetime-je
-			//2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a nearest sampling bugja tapasztalhato a folyamatosan athelyezett thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
-			if(modified == bitmapModified.get(file, 0)) {
+			/+
+				2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a 
+							nearest sampling bugja tapasztalhato a folyamatosan athelyezett 
+							thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
+			+/
+			if(modified == bitmapModified.get(file, 0))
+			{
 				if(log) LOG("\33\12existing\33\7");
 				return *existing; //existing texture and matching modified datetime
 			}
