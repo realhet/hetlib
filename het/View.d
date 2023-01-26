@@ -65,7 +65,7 @@ class View2D
 		{ return m_invScale; }	void invScale(float s)
 		{ logScale = log2(1/s); }	
 	}
-	
+	
 		//animated stuff
 		float animSpeed = 0.3; //0=off, 0.3=normal, 0.9=slow
 		auto origin_anim()const
@@ -143,7 +143,7 @@ class View2D
 			ma = invTrans(clientSize,	animated);
 		return bounds2(mi, ma).sorted;
 	}
-	
+	
 		bool centerCorrection; /+
 		it is needed for center aligned images.
 				Prevents aliasing effect on odd client widths/heights.
@@ -190,7 +190,7 @@ class View2D
 		vec2 subScreenClientCenter() {
 		return clientSize * subScreenArea.center;//in pixels
 	}
-		
+	
 		void zoom(in bounds2 bb, float overZoomPercent = DefaultOverZoomPercent)
 	{
 		if(!bb.valid || !subScreenArea.valid) return;
@@ -207,7 +207,7 @@ class View2D
 		//corrigate according to subScreenArea: shift
 		origin -= subScreenShift * invScale;
 	}
-	
+	
 		void scrollZoom(in bounds2 target, float overZoomPercent = DefaultOverZoomPercent)
 	{
 		if(!target.valid || !subScreenArea.valid) return;
@@ -278,7 +278,7 @@ class View2D
 		}
 		return false;
 	}
-	
+	
 		//navigate 2D view with the keyboard and the mouse
 		//it optionally calls invalidate
 		bool navigate(bool keyboardEnabled, bool mouseEnabled)
@@ -349,7 +349,7 @@ class View2D
 		if(res) owner.invalidate;
 		return res;
 	}
-	
+	
 		bool updateAnimation(float deltaTime, bool callInvalidate)
 	{
 		  //todo: use quantities.time
@@ -429,7 +429,7 @@ class View2D
 	}
 	
 }
-
+
 /// Clamps worldCoord points into a view's visible subSurface
 struct RectClamper {
 	const {

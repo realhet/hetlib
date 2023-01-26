@@ -6,7 +6,8 @@ pragma(lib, "comdlg32.lib");
 pragma(lib, "ole32.lib");  //CoTaskMemFree needs it
 
 //copy paste from winuser.d to compile faster
-enum  {
+enum 
+{
 	MB_OK                        = 0,
 	MB_OKCANCEL,
 	MB_ABORTRETRYIGNORE,
@@ -26,10 +27,10 @@ enum  {
 	MB_USERICON	= 0x00000080,
 	MB_ICONMASK	= 0x000000F0,
 	
-	MB_DEFBUTTON1			             = 0,
-	MB_DEFBUTTON2			             = 0x00000100,
-	MB_DEFBUTTON3			             = 0x00000200,
-	MB_DEFBUTTON4			             = 0x00000300,
+	MB_DEFBUTTON1											     = 0,
+	MB_DEFBUTTON2											     = 0x00000100,
+	MB_DEFBUTTON3											     = 0x00000200,
+	MB_DEFBUTTON4											     = 0x00000300,
 	MB_DEFMASK	               = 0x00000F00,
 	
 	MB_APPLMODAL	              =	0,
@@ -50,7 +51,8 @@ enum  {
 	MB_SERVICE_NOTIFICATION	= 0x00200000
 }
 
-enum  {
+enum 
+{
 	IDOK          = 1,
 	IDCANCEL,
 	IDABORT,
@@ -64,20 +66,23 @@ enum  {
 	IDCONTINUE //= 11
 }
 
-uint messageBox(HWND hwnd, string text, string caption, uint flags) {
+uint messageBox(HWND hwnd, string text, string caption, uint flags)
+{
 	//todo:!!!!!!!!!!!!!! zero terminate strings!!!
 	return MessageBoxW(hwnd, text.toUTF16z, caption.toUTF16z, flags);
 }
 
-void showMessage(string text) { messageBox(null, text, "", MB_OK); }
+void showMessage(string text)
+{ messageBox(null, text, "", MB_OK); }
 
 //browseForFolder /////////////////////////////////////////////////////////////////////////
 
 
-extern (Windows) int _browseCallback(HWND hwnd, uint uMsg, LPARAM lParam, LPARAM lpData) {
+extern (Windows) int _browseCallback(HWND hwnd, uint uMsg, LPARAM lParam, LPARAM lpData)
+{
 	switch(uMsg) {
 		case BFFM_INITIALIZED:{
-				if(lpData)
+			if(lpData)
 			SendMessage(hwnd, BFFM_SETSELECTION, 1, lpData);
 			break;
 		}
@@ -86,7 +91,8 @@ extern (Windows) int _browseCallback(HWND hwnd, uint uMsg, LPARAM lParam, LPARAM
 	return 0;
 }
 
-Path browseForFolder(HWND hwnd, string title, Path foldr) {
+Path browseForFolder(HWND hwnd, string title, Path foldr)
+{
 	Path res;
 	BROWSEINFO bi;
 	with(bi) {
@@ -106,7 +112,8 @@ Path browseForFolder(HWND hwnd, string title, Path foldr) {
 	return res;
 }
 
-class FileDialog {
+class FileDialog
+{
 	 //FileDialog /////////////////////////////////////////////////////////////////////////
 		HWND owner;
 		string what;	//the name of the thing. Title is auto-generated.
@@ -114,7 +121,8 @@ class FileDialog {
 		string filter;	//in custom format. See -> processExtFilter()
 		Path initialPath;
 		
-		this(HWND owner_, string what_, string defaultExt_, string filter_, Path initialPath_ = Path.init) {
+		this(HWND owner_, string what_, string defaultExt_, string filter_, Path initialPath_ = Path.init)
+	{
 		//bah... this sucks in D
 		owner = owner_;
 		what = what_;
@@ -124,15 +132,51 @@ class FileDialog {
 	}
 	
 	
-		auto open     (File fileName=File.init) { return File  (getFileName(GetFileNameMode.Open     , owner, what, fileName.fullName, defaultExt, filter, initialPath.dir)); }
-		auto openMulti(File fileName=File.init) { return toList(getFileName(GetFileNameMode.OpenMulti, owner, what, fileName.fullName, defaultExt, filter, initialPath.dir)); }
-		auto saveAs	(File fileName=File.init) { return File	 (getFileName(GetFileNameMode.SaveAs	, owner, what, fileName.fullName, defaultExt, filter, initialPath.dir)); }
-		auto renameTo	(File fileName=File.init) { return File	 (getFileName(GetFileNameMode.RenameTo	, owner, what, fileName.fullName, defaultExt, filter, initialPath.dir)); }
+		auto open(File fileName=File.init)
+	{
+		return File  (
+			getFileName(
+				GetFileNameMode.Open, 
+				owner, what, fileName.fullName, defaultExt, filter, initialPath.dir
+			)
+		);
+	}
+		auto openMulti(File fileName=File.init)
+	{
+		return toList(
+			getFileName(
+				GetFileNameMode.OpenMulti, 
+				owner, what, fileName.fullName, defaultExt, filter, initialPath.dir
+			)
+		);
+	}
+		auto saveAs(File fileName=File.init)
+	{
+		return File	 (
+			getFileName(
+				GetFileNameMode.SaveAs, 
+				owner, what, fileName.fullName, defaultExt, filter, initialPath.dir
+			)
+		);
+	}
+		auto renameTo	(File fileName=File.init)
+	{
+		return File	 (
+			getFileName(
+				GetFileNameMode.RenameTo, 
+				owner, what, fileName.fullName, defaultExt, filter, initialPath.dir
+			)
+		);
+	}
 	
 	private:
 		enum GetFileNameMode { Open, OpenMulti, Save, SaveAs, RenameTo }
 	
-		static private string getFileName(GetFileNameMode mode, HWND owner, string what, string fileName, string defaultExt, string filter, string initialDir) {
+		static private string getFileName(
+		GetFileNameMode mode, HWND owner, string what, string fileName, 
+		string defaultExt, string filter, string initialDir
+	)
+	{
 		import core.sys.windows.commdlg;
 		
 		bool isOpen = mode==GetFileNameMode.Open || mode==GetFileNameMode.OpenMulti;
@@ -146,14 +190,19 @@ class FileDialog {
 		//note: this is commented out to allow using virtual files in hetLib.
 		//if(isOpen	) ofn.Flags |= OFN_FILEMUSTEXIST;
 		ofn.Flags |= OFN_NOVALIDATE;
-		//todo: this workaround is needed to extract `virtual:\file.ext` files. Because there will be the current path in front of that.
+		/+
+			todo: this workaround is needed to extract `virtual:\file.ext` files. 
+					Because there will be the current path in front of that.
+		+/
 		//-> if(f.fullName.isWild(`*\?*:*`)) f.fullName = wild[1].split('\\').back~':'~wild[2];
 		//todo: make options for this:  mustExists, noValidate
 		
 		if(!isOpen	) ofn.Flags |= OFN_NOREADONLYRETURN;
 		
-		//note: change file type won't refresh folder bug -> https://stackoverflow.com/questions/922204/getopenfilename-does-not-refresh-when-changing-filter
-		
+		/+
+			note: change file type won't refresh folder bug -> 
+					https://stackoverflow.com/questions/922204/getopenfilename-does-not-refresh-when-changing-filter
+		+/
 		//filename
 		wchar[0x1000] fileStr;
 		fileStr[] = 0;
@@ -176,12 +225,14 @@ class FileDialog {
 		
 		//title
 		string title;
-		if(what!="") {
+		if(what!="")
+		{
 			string fn = File(fileName).name;
 			if(fn!="") fn = `"`~fn~`"`;
 			
 			with(GetFileNameMode)
-			final switch(mode) {
+			final switch(mode)
+			{
 				case Open	: title = "Open "~what; break;
 				case OpenMulti	: title = "Open "~what~" (multiple files can be selected)"; break;
 				case Save	: title = "Save "~what; break; //this is the first save
@@ -193,8 +244,8 @@ class FileDialog {
 		}
 		
 		//execute
-		auto res = isOpen ? GetOpenFileNameW(&ofn)
-											: GetSaveFileNameW(&ofn);
+		auto res = isOpen 	? GetOpenFileNameW(&ofn)
+			: GetSaveFileNameW(&ofn);
 		
 		string err = checkCommDlgError(res);
 		bool ok = err=="";
@@ -217,14 +268,18 @@ class FileDialog {
 					if(zcnt==2) break;
 					fileName ~= ch;
 				}
-				if(!fileName.empty) fileName = fileName[0..$-1]; //remove last '\0', make it az a zero separated list.
-			}else { fileName = ofn.lpstrFile.to!string; }
-		}else { fileName=""; }
+				if(!fileName.empty) fileName = fileName[0..$-1];
+				//remove last '\0', make it az a zero separated list.
+			}
+			else { fileName = ofn.lpstrFile.to!string; }
+		}
+		else { fileName=""; }
 		
 		return fileName;
 	}
 	
-		File[] toList(string s) {
+		File[] toList(string s)
+	{
 		
 		const list = s.split('\0');
 		return list.length.predSwitch(
@@ -266,18 +321,23 @@ class FileDialog {
 		* Example input: "All files(Pictures(*.bmp;*.jpg),Sound files(*.wav;*.mp3))"
 		* Returns: double zero terminated list of (filterName, filterExtList) pairs later used by getOpenFileName and others.
 */
-private string processExtFilter(string filter, bool includeExts) {
-	void enforce(bool b, lazy string s) { if(!b) .enforce(b, "processExtFilter(): "~s); }
+private string processExtFilter(string filter, bool includeExts)
+{
+	void enforce(bool b, lazy string s)
+	{ if(!b) .enforce(b, "processExtFilter(): "~s); }
 	
 	//test filter=`All Files(Program files(Sources(*.d),Executables(*.exe;*.com;*.bat)),Graphic Files(Bitmaps(*.bmp),Jpeg files(*.jpg;*.jpeg))))`;
 	string[] names;
 	string[] filterNames, filterExts;
 	string act;
 	
-	void emit() {
+	void emit()
+	{
 		string a = act.strip;
-		if(!a.empty) {
-			foreach(n; names) {
+		if(!a.empty)
+		{
+			foreach(n; names)
+			{
 				int idx = cast(int)filterNames.countUntil(n);
 				if(idx<0) { filterNames ~= n; filterExts ~= ""; idx = cast(int)filterNames.length-1; }
 				if(!filterExts[idx].empty) filterExts[idx] ~= ";";
@@ -288,8 +348,10 @@ private string processExtFilter(string filter, bool includeExts) {
 		act = "";
 	}
 	
-	foreach(ch; filter) {
-		switch(ch) {
+	foreach(ch; filter)
+	{
+		switch(ch)
+		{
 			case '(':
 				names ~= act.strip;
 				act = "";
@@ -322,7 +384,8 @@ private string processExtFilter(string filter, bool includeExts) {
 	return filterStr;
 }
 
-private string checkCommDlgError(int res) {
+private string checkCommDlgError(int res)
+{
 	
 	if(res) return ""; //no error
 	
@@ -358,7 +421,8 @@ private string checkCommDlgError(int res) {
 
 //chooseColor /////////////////////////////////
 
-RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen) {
+RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen)
+{
 	import core.sys.windows.commdlg;
 	static uint[16] customColors; //todo: save/load ini
 	CHOOSECOLOR cc = {
@@ -375,7 +439,8 @@ RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen) {
 
 //testing /////////////////////////////////
 
-void testDialogs()    {
+void testDialogs()
+{
 	print(browseForFolder(null, "title", appPath));
 	
 	print(new FileDialog(null, "Dlang source file", ".d", "Sources(*.d)", appPath).open);

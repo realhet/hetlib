@@ -100,7 +100,7 @@ struct findBlobsDebug
 	{ events.get(actEventIdx).draw(dr); }
 }
 
-
+
 auto findBlobs(T1)(Image!(T1, 2) src)
 {
 	struct Res {
@@ -192,7 +192,7 @@ auto findBlobs(T1)(Image!(T1, 2) src)
 	
 	return res;
 }
-
+
 //////////////////////////////////////////////////////////////////////
 ///  2D MaxRects Bin Packer                                        ///
 //////////////////////////////////////////////////////////////////////
@@ -274,7 +274,7 @@ private bool collide(Rectangle first, Rectangle second)
 { return first.collide(second); }
 private bool contain(Rectangle first, Rectangle second)
 { return first.contain(second); }
-
+
 class MaxRectsBin
 {
 		int width, height;
@@ -380,7 +380,7 @@ class MaxRectsBin
 		//it bogs    bool remove(in Rectangle	r){ return remove(find(r)); }
 		bool remove(in RectangleData d)
 	{ return	remove(find(d)); }
-	
+	
 	private:
 	
 		Rectangle findNode(int width, int height)
@@ -489,7 +489,7 @@ class MaxRectsBin
 			i++;
 		}
 	}
-	
+	
 		bool updateBinSize(Rectangle node)
 	{
 		if(!this.options.smart) return false;
@@ -581,9 +581,9 @@ class MaxRectsBin
 	}
 	
 }
-
+
 struct PositionExtrapolator
-	{
+{
 	private:
 		struct HistoryRec {
 		DateTime t;
@@ -596,19 +596,19 @@ struct PositionExtrapolator
 		Time historyDuration = 1*second;
 	
 		void reset()
-	 { history = []; }
+	{ history = []; }
 	
 		void update()
-	 {
+	{
 		const tz = now - historyDuration;
 		history = history.remove!(a => a.t<tz);
 	}
 	
 		void appendPosition(double pos, DateTime t = now)
-	 { history ~= HistoryRec(t, pos); }
+	{ history ~= HistoryRec(t, pos); }
 	
 		double position(DateTime t = now) const
-	 {
+	{
 		//no data
 		if(history.empty) return typeof(return).nan;
 		
@@ -628,13 +628,13 @@ struct PositionExtrapolator
 	}
 	
 		double speed() const
-	 {
+	{
 		if(history.length<2) return 0;
 		return safeDiv(history[$-1].position - history[0].position, (history[$-1].t - history[0].t).value(second));
 	}
 	
 		void selfTest()
-	 {
+	{
 		PositionExtrapolator pe;
 		[100, 125, 150, 0, 0, 300, 300, 300, 300, 300, 300, 500, 505]
 			.chain([0].replicate(20))

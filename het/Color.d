@@ -67,7 +67,7 @@ version(/+$DIDE_REGION+/all)
 			else return val.rgbToFloat.hsvToRgb.floatToRgb;
 		}
 	}
-	
+	
 	auto hsvToRgb(float H, float S, float V)
 	{
 		//0..1 range
@@ -185,7 +185,8 @@ version(/+$DIDE_REGION+/all)
 		clGold	= 0x00D7FF,
 		clBronze	= 0x327FCD,
 		clPink	= 0xCBC0FF;
-	}version(/+$DIDE_REGION standard vga palette+/all)
+	}
+	version(/+$DIDE_REGION standard vga palette+/all)
 	{
 		immutable RGB
 		clVgaBlack	= 0x000000,
@@ -204,7 +205,8 @@ version(/+$DIDE_REGION+/all)
 		clVgaYellow	= 0x55FFFF,
 		clVgaLightGray	= 0xAAAAAA,
 		clVgaWhite	= 0xFFFFFF;
-	}version(/+$DIDE_REGION C64 palette+/all)
+	}
+	version(/+$DIDE_REGION C64 palette+/all)
 	{
 		immutable RGB
 		clC64Black	= 0x000000,
@@ -234,7 +236,8 @@ version(/+$DIDE_REGION+/all)
 		clWowPurple	= 0xee35a3,
 		clWowRed	= 0x0080ff,
 		clWowRed2	= 0x80cce5;
-	}version(/+$DIDE_REGION VIMpalette+/all)
+	}
+	version(/+$DIDE_REGION VIMpalette+/all)
 	{
 		immutable RGB
 		clVimBlack	= 0x141312,
@@ -260,7 +263,8 @@ version(/+$DIDE_REGION+/all)
 		clRainbowBlue	= 0xFF0000,
 		clRainbowPurple	= 0xAA0055,
 		clRainbowPing	= 0x5500AA;
-	}version(/+$DIDE_REGION Rainbow palette+/all)
+	}
+	version(/+$DIDE_REGION Rainbow palette+/all)
 	{
 		//More distinct colors for the human eye.
 		//This is a better version.
@@ -295,7 +299,8 @@ version(/+$DIDE_REGION+/all)
 		clSolBlue	= 0xd28b26,
 		clSolCyan	= 0x98a12a,
 		clSolGreen	= 0x009985;
-	}version(/+$DIDE_REGION Other colors+/all)
+	}
+	version(/+$DIDE_REGION Other colors+/all)
 	{
 		immutable RGB
 		clAxisX	= RGB(213, 40, 40),
@@ -366,7 +371,7 @@ version(/+$DIDE_REGION+/all)
 			return clFuchsia;
 		}
 		return *a;
-	}
+	}
 	
 	//toRGB //////////////////////////////////
 	
@@ -408,11 +413,6 @@ version(/+$DIDE_REGION+/all)
 		todo: pragma(msg, "Megcsinalni a szinek listazasat traits-al." ~
 		[__traits(allMembers, het.color)].filter!(s => s.startsWith("cl")).array);
 	+/
-}version(/+$DIDE_REGION+/all)
-{
-	
-	
-	
 }version(/+$DIDE_REGION ColorMaps+/all)
 {
 	
@@ -524,7 +524,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			return result;
 		}
-	}
+	}
 	class ColorMaps
 	{
 		ColorMap[string] byName;
@@ -568,7 +568,6 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 }
-
 class StandardColorMaps : ColorMaps
 {
 	
@@ -716,7 +715,7 @@ class StandardColorMaps : ColorMaps
 					[0.1491436,-3.728705,327.0102,-10811.14,187471.3,-1971161,1.368395e+07,-6.595642e+07,2.275601e+08,-5.719496e+08,1.055226e+09,-1.426568e+09,1.395522e+09,-9.608228e+08,4.413951e+08,-1.214213e+08,1.51253e+07]
 				]
 			)
-		);
+		);
 		add(
 			new RegressionColorMap(
 				"Spectral", "Diverging", [

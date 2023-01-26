@@ -75,7 +75,7 @@ auto fittingSquare(in bounds2 b)
 }
 
 //float - int combinations ///////////////////////////////////////
-
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 ///  Graphics algorithms                                                                 ///
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -161,7 +161,7 @@ bool intersectSegs_falseParallel_prec(in seg2 S0, in seg2 S1)
 	}
 	return false;
 }
-
+
 float segmentPointDistance_prec(const vec2 v, const vec2 w, const vec2 p)
 {
 	//Return minimum distance between line segment vw and point p
@@ -211,7 +211,46 @@ vec2 restrictPos_editor(T1, T2)(in Vector!(T1, 2) p, in Bounds!(Vector!(T2, 2)) 
 		vec2(p.x.clamp(bnd.left, bnd.right), p.y);
 }
 
+///  Bresenham line drawing /////////////////////////////////////////////////////////////////////
 
+void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ivec2) dot)
+{
+	auto d = b-a,
+			 d1 = abs(d),
+			 p = ivec2(
+		2*d1.y-d1.x,
+										 2*d1.x-d1.y
+	),
+			 i = (d.x<0)==(d.y<0) ? 1 : -1;
+	d1 *= 2;
+	
+	void dot2(in ivec2 p) { if(!skipFirst || p!=a) dot(p); }
+	
+	int e; ivec2 v;
+	if(d1.y<=d1.x) {
+		if(d.x>=0) { v=a; e=b.x; }
+		else { v=b; e=a.x; }
+		dot2(v);
+		while(v.x<e) {
+			++v.x;
+			if(p.x<0) { p.x += d1.y;	 }
+			else { p.x += d1.y-d1.x;  v.y += i;	 }
+			dot2(v);
+		}
+	}
+	else {
+		if(d.y>=0) { v=a; e=b.y; }
+		else { v=b; e=a.y; }
+		dot2(v);
+		while(v.y<e) {
+			++v.y;
+			if(p.y<0) { p.y += d1.x;	 }
+			else { p.y += d1.x-d1.y;  v.x += i;	 }
+			dot2(v);
+		}
+	}
+}
+
 ///	 Cohen Sutherland line-rect Clipping ///////////////////////////////////////////////////////////////
 ///	 Ported to Delphi from wikipedia C code by Omar Reis - 2012	                         ///
 ///	 Ported back to C by realhet 2013, lol	                         ///
@@ -314,46 +353,8 @@ bool _lineClip(V, E, F)(in V bMin, in V bMax, ref V a, ref V b)
 }
 //lineClip()
 
-///  Bresenham line drawing /////////////////////////////////////////////////////////////////////
 
-void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ivec2) dot)
-{
-	auto d = b-a,
-			 d1 = abs(d),
-			 p = ivec2(
-		2*d1.y-d1.x,
-										 2*d1.x-d1.y
-	),
-			 i = (d.x<0)==(d.y<0) ? 1 : -1;
-	d1 *= 2;
-	
-	void dot2(in ivec2 p) { if(!skipFirst || p!=a) dot(p); }
-	
-	int e; ivec2 v;
-	if(d1.y<=d1.x) {
-		if(d.x>=0) { v=a; e=b.x; }
-		else { v=b; e=a.x; }
-		dot2(v);
-		while(v.x<e) {
-			++v.x;
-			if(p.x<0) { p.x += d1.y;	 }
-			else { p.x += d1.y-d1.x;  v.y += i;	 }
-			dot2(v);
-		}
-	}
-	else {
-		if(d.y>=0) { v=a; e=b.y; }
-		else { v=b; e=a.y; }
-		dot2(v);
-		while(v.y<e) {
-			++v.y;
-			if(p.y<0) { p.y += d1.x;	 }
-			else { p.y += d1.x-d1.y;  v.x += i;	 }
-			dot2(v);
-		}
-	}
-}
-
+
 /// Nearest finders ///////////////////////////////////////////////////////////////
 
 int distManh(in ibounds2 b, in ivec2 p)
@@ -436,7 +437,7 @@ auto linearFit(in vec2[] data, int requiredPoints, float maxDeviation)
 	
 	return fit;
 }
-
+
 //Quadratic fit ///////////////////////////////////////////////////////////////////////
 
 struct QuadraticFitResult
