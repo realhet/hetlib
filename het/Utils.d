@@ -1055,6 +1055,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			return res;
 		}
 		
+		/// Plays a wav file in the windows media folder
+		void winSnd(string name)
+		{
+			import core.sys.windows.mmsystem; 
+			PlaySound(name.format!`c:\Windows\media\%s.wav`.toPWChar, null, SND_FILENAME | SND_ASYNC);
+		}
+		
 		void beep(int MBType = MB_OK)
 		{
 			version(/+$DIDE_REGION+/none) {
@@ -6282,7 +6289,7 @@ version(/+$DIDE_REGION Containers+/all)
 							const v0 = inp[i	 ]	,	 v1 = inp[i+1]	,
 										k0 = sec[i	 ] ^ v0,		k1 = sec[i+1] ^ v1;
 							const a0 = k0 & 0xFFFFFFFF,	 a1 = k1 & 0xFFFFFFFF,
-										b0 = k0 >> 32       ,	 b1 = k1 >> 32     ;
+										b0 = k0 >> 32       ,	 b1 = k1 >> 32    ;
 							acc[i  ] += a0*b0 + v1;
 							acc[i+1] += a1*b1 + v0;
 						}
@@ -6397,7 +6404,7 @@ version(/+$DIDE_REGION Containers+/all)
 								
 						if(len >	8) return len_9to16;
 						if(len >=	4) return len_4to8;
-						if(len   ) return len_1to3;
+						if(len  ) return len_1to3;
 						return avalanche64(seed ^ (readLE64(secret + 56) ^ readLE64(secret + 64)));
 					}
 							
@@ -6612,7 +6619,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					d.wMilliseconds	= t.wMilliseconds;
 					d.wSecond	= t.wSecond					;
 					d.wMinute	= t.wMinute					;
-					d.wHour	= t.wHour	   ;
+					d.wHour	= t.wHour	  ;
 					return d;
 				}
 						
@@ -7088,12 +7095,12 @@ version(/+$DIDE_REGION Date Time+/all)
 		DateTime	today()
 		{ return now.localDayStart; }
 		Time	time ()
-		{ return now.localTime  ; }
+		{ return now.localTime ; }
 		
 				Time QPS()
 		{ return now - appStartedDay; }
 		Time QPS_local()
-		{ return now - appStarted ; }
+		{ return now - appStarted; }
 		
 		private __gshared  Time _TLast;
 		
@@ -8801,7 +8808,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				else
 				{ return files; }
 							
-			}		  struct DirResult
+			}			 struct DirResult
 			{
 				static struct DirFile
 				{
@@ -8838,7 +8845,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						paths	.map!text.join('\n')~'\n'~
 						exts	.map!text.join('\n')~'\n';
 				}
-			}		  auto dirPerS(in Path path, string pattern = "*")
+			}			 auto dirPerS(in Path path, string pattern = "*")
 			{
 				//dirPerS//////////////////////////
 				
