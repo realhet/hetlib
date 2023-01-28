@@ -1508,6 +1508,8 @@ version(/+$DIDE_REGION+/all)
 				auto shader = new GLShaderHandle(resName~"."~typeChr, source.length, type);
 				try
 				{
+					source = source.replace('\v', ' '); //replace vertical tabs with space.
+					
 					gl.shaderSource(shader.handle, source);
 					gl.compileShader(shader.handle);
 					if(!gl.getShaderCompiled(shader.handle))
@@ -1532,9 +1534,9 @@ version(/+$DIDE_REGION+/all)
 			void build()
 			{
 				const t0 = QPS;
-				                          vertexShader	= loadShader('v', GL_VERTEX_SHADER  , vertexShaderSrc  );
-				if(geometryShaderSrc!="") geometryShader	= loadShader('g', GL_GEOMETRY_SHADER, geometryShaderSrc);
-				                          fragmentShader	= loadShader('f', GL_FRAGMENT_SHADER, fragmentShaderSrc);
+					vertexShader	= loadShader('v', GL_VERTEX_SHADER  , vertexShaderSrc  );
+				if(geometryShaderSrc!="")	geometryShader	= loadShader('g', GL_GEOMETRY_SHADER, geometryShaderSrc);
+					fragmentShader	= loadShader('f', GL_FRAGMENT_SHADER, fragmentShaderSrc);
 				
 				programObject = new GLProgramHandle(resName, resSize);
 				

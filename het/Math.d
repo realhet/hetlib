@@ -498,6 +498,12 @@ version(/+$DIDE_REGION+/all)
 				static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false; //todo: refact
 				return true;
 			}
+			
+			static if(N==2) auto area() const
+			{ return x*y; }
+			static if(N==3) auto volume() const
+			{ return x*y*z; }
+		
 		}
 	}
 	

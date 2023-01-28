@@ -6,7 +6,7 @@
 	Authors: Nicolas Sicard  
 	License: $(LINK www.boost.org/LICENSE_1_0.txt, Boost License 1.0)  
 	Source: $(LINK https://github.com/biozic/quantities)  
-+/
++/ 
 module quantities.parsing;
  
 import quantities.internal.dimensions;
@@ -39,10 +39,8 @@ struct SymbolList(N)
 	{
 		static if(isQVariant!Q)
 		units[symbol] = unit;
-		else static if(isQuantity!Q)
-		units[symbol] = unit.qVariant;
-		else
-		static assert(false);
+		else static if(isQuantity!Q) units[symbol] = unit.qVariant;
+		else static assert(false);
 		return this;
 	}
 	
@@ -112,15 +110,14 @@ QVariant!N parseQuantityImpl(N, alias numberParser, S)(S input, SymbolList!N sym
 	N value;
 	try
 	value = numberParser(input);
-	catch(Exception)
-	value = 1;
+	catch(Exception) value = 1;
 	
 	if(input.empty)
 	return QVariant!N(value, Dimensions.init);
 	
 	auto parser = QuantityParser!(N, S)(input, symbolList);
 	return value * parser.parsedQuantity();
-}
+}
 
 //A parser that can parse a text for a unit or a quantity
 struct QuantityParser(N, S)
@@ -173,8 +170,7 @@ struct QuantityParser(N, S)
 			QVariant!N rhs = parseExponentUnit();
 			if(multiply)
 			ret *= rhs;
-			else
-			ret /= rhs;
+			else ret /= rhs;
 			
 			if(tokens.empty || (inParens && tokens.front.type == Tok.rparen))
 			break;
@@ -241,9 +237,8 @@ struct QuantityParser(N, S)
 			advance();
 			return ret;
 		}
-		else
-		return parsePrefixUnit();
-	}
+		else return parsePrefixUnit();
+	}
 	
 	QVariant!N parsePrefixUnit()
 	{
@@ -302,7 +297,7 @@ struct QuantityParser(N, S)
 		size_t end;
 		int integer = int.max;
 	}
-	
+	
 	void lex(S input) @safe
 	{
 		import std.array : appender;
@@ -339,8 +334,7 @@ struct QuantityParser(N, S)
 				n = parse!int(slice);
 				assert(slice.empty);
 			}
-			catch(Exception)
-			throw new ParsingException("Unexpected integer format: %s".format(slice));
+			catch(Exception) throw new ParsingException("Unexpected integer format: %s".format(slice));
 			
 			tokapp.put(Token(type, i, j, n));
 			i = j;
@@ -352,10 +346,8 @@ struct QuantityParser(N, S)
 		{
 			if(state == State.symbol)
 			pushToken(Tok.symbol);
-			else if(state == State.integer)
-			pushInteger(Tok.integer);
-			else if(state == State.supinteger)
-			pushInteger(Tok.supinteger);
+			else if(state == State.integer) pushInteger(Tok.integer);
+			else if(state == State.supinteger) pushInteger(Tok.supinteger);
 		}
 		
 		foreach(dchar cur; input)
@@ -421,7 +413,7 @@ struct QuantityParser(N, S)
 				case '+': //Plus sign
 					intapp.put('+');
 					goto PushIntChar;
-				case '0': .. case '9':
+				case '0': .. case '9':
 					intapp.put(cur);
 				PushIntChar:
 					if(state != State.integer)
@@ -478,11 +470,11 @@ struct QuantityParser(N, S)
 					state = State.symbol;
 					j += len;
 					break;
-			}
-		}
+			}
+		}
 		push();
 		tokens = tokapp.data;
-	}
+	}
 	
 	void advance(Types...)(Types types)
 	{
@@ -519,12 +511,14 @@ struct QuantityParser(N, S)
 			)
 		);
 	}
-}
+}
 
 //Tests
 
 
+	
 	@("Generic parsing")
+		
 	
  unittest
 {
@@ -587,4 +581,4 @@ struct QuantityParser(N, S)
 	assertThrown!ParsingException(checkParse("1 m * m) m", unknown));
 	assertThrown!ParsingException(checkParse("1 m^²", unknown));
 	assertThrown!ParsingException(checkParse("1-⁺⁵", unknown));
-}
+}

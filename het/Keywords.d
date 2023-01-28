@@ -1,4 +1,4 @@
-module het.keywords;/+DIDE+/
+module het.keywords;/+DIDE+/ 
 
 import het.utils;
 
@@ -8,18 +8,27 @@ import het.utils;
 
 //todo: some types are no more. Complex numbers for example.
 	 //|---> maps exactly to kwEnums
-enum BasicType:byte	 { Unknown,	Byte, UByte, Short, UShort, Int, UInt, Long, ULong, Cent, UCent, Float, Double, Real, IFloat, IDouble, IReal, CFloat, CDouble, CReal, Bool, Char, WChar, DChar, Void }
+enum BasicType:byte	
+{ Unknown,	Byte, UByte, Short, UShort, Int, UInt, Long, ULong, Cent, UCent, Float, Double, Real, IFloat, IDouble, IReal, CFloat, CDouble, CReal, Bool, Char, WChar, DChar, Void }
 auto BasicTypeBytes	 =[0,	   1,	    1,     2,      2,   4,    4,    8,     8,   16,    16,     4,      8,	  10,      4,       8,	   10,      8,      16,    20,	   1,	   1,     2,     4,	   0];
 auto BasicTypeBits	 =[0,	   8,	    8,    16,     16,  32,   32,   64,    64,  128,   128,    32,     64,	  80,     32,      64,	   80,     64,     128,   160,	   8,	   8,    16,    32,	   0];
 
-bool isInteger	 (BasicType b) { return b>=BasicType.Byte   && b<=BasicType.UCent; }
-bool isSigned	 (BasicType b) { return b&1; }
-bool isFloat	 (BasicType b) { return b>=BasicType.Float	&& b<=BasicType.CReal; }
-bool isImag	 (BasicType b) { return b>=BasicType.IFloat	&& b<=BasicType.IReal; }
-bool isComplex	 (BasicType b) { return b>=BasicType.CFloat	&& b<=BasicType.CReal; }
-bool isBool	 (BasicType b) { return b==BasicType.Bool; }
-bool isChar	 (BasicType b) { return b>=BasicType.Char   && b<=BasicType.DChar; }
-bool isVoid	 (BasicType b) { return b==BasicType.Void; }
+bool isInteger	 (BasicType b)
+{ return b>=BasicType.Byte   && b<=BasicType.UCent; }
+bool isSigned	 (BasicType b)
+{ return b&1; }
+bool isFloat	 (BasicType b)
+{ return b>=BasicType.Float	&& b<=BasicType.CReal; }
+bool isImag	 (BasicType b)
+{ return b>=BasicType.IFloat	&& b<=BasicType.IReal; }
+bool isComplex	 (BasicType b)
+{ return b>=BasicType.CFloat	&& b<=BasicType.CReal; }
+bool isBool	 (BasicType b)
+{ return b==BasicType.Bool; }
+bool isChar	 (BasicType b)
+{ return b>=BasicType.Char   && b<=BasicType.DChar; }
+bool isVoid	 (BasicType b)
+{ return b==BasicType.Void; }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Keywords                                                                ///
@@ -90,33 +99,53 @@ private enum _keywordStrs = [
 //enum declaration
 mixin("enum {kwUnknown, kw"~_keywordStrs.join(",kw")~"}");
 
-enum KeywordCat { Unknown, Attribute, Value, BasicType, UserDefiniedType, Keyword, SpecialFunct, SpecialKeyword, Operator }
+enum KeywordCat
+{ Unknown, Attribute, Value, BasicType, UserDefiniedType, Keyword, SpecialFunct, SpecialKeyword, Operator }
 
 KeywordCat kwCatOf(int k)
 {
-	with(KeywordCat) {
-		if(k<=kwUnknown		) return Unknown	;
-		if(k<=kwpackage		) return Attribute	;
-		if(k<=kwsuper	) return Value	;
-		if(k<=kwvoid	) return BasicType	;
-		if(k<=kwfunction	) return UserDefiniedType	;
-		if(k<=kwversion	) return Keyword	;
-		if(k<=kw__vector	) return SpecialFunct	;
-		if(k<=kw__PRETTY_FUNCTION__	) return SpecialKeyword	;
-		if(k<=kwnew	) return Operator	;
+	with(KeywordCat)
+	{
+		if(k<=kwUnknown		)
+		return Unknown	;
+		if(k<=kwpackage		)
+		return Attribute	;
+		if(k<=kwsuper	)
+		return Value	;
+		if(k<=kwvoid	)
+		return BasicType	;
+		if(k<=kwfunction	)
+		return UserDefiniedType	;
+		if(k<=kwversion	)
+		return Keyword	;
+		if(k<=kw__vector	)
+		return SpecialFunct	;
+		if(k<=kw__PRETTY_FUNCTION__	)
+		return SpecialKeyword	;
+		if(k<=kwnew	)
+		return Operator	;
 		return Unknown;
 	}
 }
-
-bool kwIsValid	  (int k) { return kwCatOf(k)!=KeywordCat.Unknown	 ; }
-bool kwIsAttribute	  (int k) { return kwCatOf(k)==KeywordCat.Attribute	 ; }
-bool kwIsValue	  (int k) { return kwCatOf(k)==KeywordCat.Value	 ; }
-bool kwIsBasicType	  (int k) { return kwCatOf(k)==KeywordCat.BasicType	 ; }
-bool kwIsUserDefiniedType	  (int k) { return kwCatOf(k)==KeywordCat.UserDefiniedType	 ; }
-bool kwIsKeyword	  (int	k) { return kwCatOf(k)==KeywordCat.Keyword	 ; }
-bool kwIsSpecialFunct		(int k) { return kwCatOf(k)==KeywordCat.SpecialFunct	 ; }
-bool kwIsSpecialKeyword	  (int k) { return kwCatOf(k)==KeywordCat.SpecialKeyword	 ; }
-bool kwIsOperator	  (int k) { return kwCatOf(k)==KeywordCat.Operator	 ; }
+
+bool kwIsValid	  (int k)
+{ return kwCatOf(k)!=KeywordCat.Unknown	; }
+bool kwIsAttribute	  (int k)
+{ return kwCatOf(k)==KeywordCat.Attribute	; }
+bool kwIsValue	  (int k)
+{ return kwCatOf(k)==KeywordCat.Value	; }
+bool kwIsBasicType	  (int k)
+{ return kwCatOf(k)==KeywordCat.BasicType	; }
+bool kwIsUserDefiniedType	  (int k)
+{ return kwCatOf(k)==KeywordCat.UserDefiniedType	; }
+bool kwIsKeyword	  (int	k)
+{ return kwCatOf(k)==KeywordCat.Keyword	; }
+bool kwIsSpecialFunct		(int k)
+{ return kwCatOf(k)==KeywordCat.SpecialFunct	; }
+bool kwIsSpecialKeyword	  (int k)
+{ return kwCatOf(k)==KeywordCat.SpecialKeyword	; }
+bool kwIsOperator	  (int k)
+{ return kwCatOf(k)==KeywordCat.Operator	; }
 
 int kwLookup(string s)
 {
@@ -127,7 +156,8 @@ int kwLookup(string s)
 KeywordCat kwCatOf(string s)
 { return kwCatOf(kwLookup(s)); }
 
-string kwStr(int kw) { return tdKeywords.keyOf(kw); }
+string kwStr(int kw)
+{ return tdKeywords.keyOf(kw); }
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -147,6 +177,7 @@ string kwStr(int kw) { return tdKeywords.keyOf(kw); }
 //% %=
 //& &= &&
 //* *=
+
 //+ += ++
 //- -= --
 //. .. ...
@@ -208,15 +239,19 @@ private enum _operatorStrs = [
 		"in"	 ,"in"	, "is"	, "is"	, "new"	, "new"	, "delete"	, "delete"
 ];
 
-string[] _operatorEnums() {
+string[] _operatorEnums()
+{
 		string[] r;
-		foreach(idx, s; _operatorStrs) if(idx&1) r ~= "op"~s;
+		foreach(idx, s; _operatorStrs)
+	if(idx&1)
+	r ~= "op"~s;
 	return r; 
-}
-
-string[] _operatorMaps() {
+} string[] _operatorMaps()
+{
 		string[] r;
-		foreach(idx, s; _operatorStrs) if(idx&1) r ~= '`'~_operatorStrs[idx-1]~"`:op"~s;
+		foreach(idx, s; _operatorStrs)
+	if(idx&1)
+	r ~= '`'~_operatorStrs[idx-1]~"`:op"~s;
 	return r; 
 }
 
@@ -227,15 +262,14 @@ int opParse(string s, ref int len)
 {
 	auto p = tdOperators.parse(s, len);
 	return p ? *p : opUnknown;
-}
-
-int opParse(string s)
+} int opParse(string s)
 {
 	int len;
 	return opParse(s, len);
 }
-
-string opStr(int op) { return tdOperators.keyOf(op); }
+
+string opStr(int op)
+{ return tdOperators.keyOf(op); }
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Named Character Entries                                                 ///
@@ -253,19 +287,25 @@ dchar nceLookup(string s)
 ////////////////////////////////////////////////////////////////////////////////
 
 private: __gshared:
-struct TokenDictionary(T) {
+struct TokenDictionary(T)
+{
 	T[string] arr;
 	int maxLen;
 	
-	void postInit() {
+	void postInit()
+	{
 		arr.rehash;
 		maxLen = 0;
-		foreach(s; arr.keys) maximize(maxLen, cast(int)s.length);
+		foreach(s; arr.keys)
+		maximize(maxLen, cast(int)s.length);
 	}
 	
-	T* parse(string s, ref int resLen) {
-		foreach_reverse(len; 1..min(maxLen, s.length)+1) {
-			if(auto p = s[0..len] in arr) {
+	T* parse(string s, ref int resLen)
+	{
+		foreach_reverse(len; 1..min(maxLen, s.length)+1)
+		{
+			if(auto p = s[0..len] in arr)
+			{
 				resLen = len;
 				return p;
 			}
@@ -273,20 +313,27 @@ struct TokenDictionary(T) {
 		return null;
 	}
 	
-	T* lookup(string s) { return s in arr; }
+	T* lookup(string s)
+	{ return s in arr; }
 	
-	string keyOf(const T value) {
-		foreach(const kv; arr.byKeyValue) if(kv.value==value) return kv.key;
+	string keyOf(const T value)
+	{
+		foreach(const kv; arr.byKeyValue)
+		if(kv.value==value)
+		return kv.key;
 		return "";
 	}
 }
 
 __gshared TokenDictionary!(int) tdKeywords, tdOperators, tdNamedCharEntries;
 
-struct moduleInit {
-	shared static this() {
+struct moduleInit
+{
+	shared static this()
+	{
 		//initKeywords;
-		foreach(idx, s; _keywordStrs) tdKeywords.arr[s] = idx.to!int;
+		foreach(idx, s; _keywordStrs)
+		tdKeywords.arr[s] = idx.to!int;
 		tdKeywords.postInit;
 		
 		//init operators
@@ -294,7 +341,8 @@ struct moduleInit {
 		tdOperators.postInit;
 		
 		//init named char entries
-		tdNamedCharEntries.arr = [
+		tdNamedCharEntries.arr = 
+		[
 			"quot":34,"amp":38,"lt":60,"gt":62,"OElig":338,"oelig":339,"Scaron":352,"scaron":353,"Yuml":376,"circ":710,"tilde":732,"ensp":8194,"emsp":8195,"thinsp":8201,
 			"zwnj":8204,"zwj":8205,"lrm":8206,"rlm":8207,"ndash":8211,"mdash":8212,"lsquo":8216,"rsquo":8217,"sbquo":8218,"ldquo":8220,"rdquo":8221,"bdquo":8222,
 			"dagger":8224,"Dagger":8225,"permil":8240,"lsaquo":8249,"rsaquo":8250,"euro":8364,"nbsp":160,"iexcl":161,"cent":162,"pound":163,"curren":164,"yen":165,
@@ -318,7 +366,7 @@ struct moduleInit {
 		];
 		tdNamedCharEntries.postInit;
 	}
-}
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -327,10 +375,12 @@ struct moduleInit {
 
 public:
 
-bool isGCNInstruction(string s) { return GCNInstructionKind(s)!=0; }
+bool isGCNInstruction(string s)
+{ return GCNInstructionKind(s)!=0; }
 
 //returns nonzero if found something. 1=vector, 2=scalar 3=misc
-ubyte GCNInstructionKind(string s) {
+ubyte GCNInstructionKind(string s)
+{
 										 //0	1	2	3	4	5	6
 	static GCNPrefix1 = ["buffer_",	"ds_",	"flat_",	"image_",	"s_",	"tbuffer_",	"v_"];
 	
@@ -338,13 +388,15 @@ ubyte GCNInstructionKind(string s) {
 	bool found;
 	
 	foreach(i, p; GCNPrefix1)
-	if(s.startsWith(p)) {
+	if(s.startsWith(p))
+	{
 		found = true;
 		type = i==6 ? 1 : i==4 ? 2 : 3; //vector, scalar, misc
 		break;
 	}
 	
-	if(!found) return 0;
+	if(!found)
+	return 0;
 	
 	static GCNPrefix2 = [
 		"buffer_atomic", "buffer_load", "buffer_store", "buffer_wbinvl1", "ds_add", "ds_and", "ds_append", "ds_bpermute", "ds_cmpst",
@@ -366,8 +418,11 @@ ubyte GCNInstructionKind(string s) {
 	];
 	
 	found = false;
-	foreach(p; GCNPrefix2) if(s.startsWith(p)) { found = true; break; }
-	if(!found) return 0;
+	foreach(p; GCNPrefix2)
+	if(s.startsWith(p))
+	{ found = true; break; }
+	if(!found)
+	return 0;
 	
 	static GCNSuffix = [
 		"add", "all", "and", "append", "b", "b128", "b16", "b32", "b64", "b8", "b96", "barrier", "br", "branch", "buffer", "byte", "c", "cd",
@@ -380,8 +435,11 @@ ubyte GCNInstructionKind(string s) {
 	];
 	
 	found = false;
-	foreach(p; GCNSuffix) if(s.endsWith("_"~p)) { found = true; break; }
-	if(!found) return 0;
+	foreach(p; GCNSuffix)
+	if(s.endsWith("_"~p))
+	{ found = true; break; }
+	if(!found)
+	return 0;
 	
 	return type;
 }
@@ -391,11 +449,13 @@ ubyte GCNInstructionKind(string s) {
 ///  GLSL instruction detector                                               ///
 ////////////////////////////////////////////////////////////////////////////////
 
-bool isGLSLInstruction(string s) {
+bool isGLSLInstruction(string s)
+{
 	return ["gl_Position", "gl_FragColor"].canFind(s); //todo: atirni among()-ra
 }
 
-ubyte GLSLInstructionKind(string s) {
+ubyte GLSLInstructionKind(string s)
+{
 	 //0:do nothing, 1:keyword, 2:typeQual, 3:types, 4:values, 5:functs, 6:vars
 	static GLSLKeywords = ["break","case","continue","default","do","else","for","if","discard","return","struct","switch","while"];
 	static GLSLTypeQualifiers = ["attribute","const","inout","invariant","in","out","varying","uniform","flat","noperspective","smooth","centroid","layout","patch","subroutine", "half"];
@@ -415,26 +475,34 @@ ubyte GLSLInstructionKind(string s) {
 	
 	//TODO: make it faster with a map
 	
-	if(GLSLKeywords.canFind(s)) return 1;
-	if(GLSLTypeQualifiers.canFind(s)) return 2;
-	if(GLSLTypes.canFind(s)) return 3;
-	if(GLSLValues.canFind(s)) return 4;
-	if(GLSLFuncts.canFind(s)) return 5;
-	if(GLSLVars.canFind(s)) return 6;
+	if(GLSLKeywords.canFind(s))
+	return 1;
+	if(GLSLTypeQualifiers.canFind(s))
+	return 2;
+	if(GLSLTypes.canFind(s))
+	return 3;
+	if(GLSLValues.canFind(s))
+	return 4;
+	if(GLSLFuncts.canFind(s))
+	return 5;
+	if(GLSLVars.canFind(s))
+	return 6;
 	return 0;
-}
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 ///  Syntax highlight presets                                                ///
 ////////////////////////////////////////////////////////////////////////////////
 
-struct SyntaxStyle {
+struct SyntaxStyle
+{
 	RGB fontColor, bkColor;
 	int fontFlags; //1:b, 2:i, 4:u
 }
 
 static if(0)
-class SyntaxPreset_future {
+class SyntaxPreset_future
+{
 	 //future
 	SyntaxStyle
 	//standard language things
@@ -450,7 +518,8 @@ class SyntaxPreset_future {
 	//testCode
 	
 	immutable testCode = q{
-		@directive void get() const {
+		@directive void get() const
+		{
 			 //comment
 			return value + 123 + 5.6 + 0b1100101 * "42".to!int;
 		}
@@ -467,7 +536,8 @@ class SyntaxPreset_future {
 }
 
 
-struct SyntaxStyleRow {
+struct SyntaxStyleRow
+{
 	string kindName;
 	SyntaxStyle[] formats;
 }
@@ -504,24 +574,35 @@ immutable SyntaxStyleRow[] syntaxTable =[
 mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(',')));
 mixin(format!"enum SyntaxPreset {%s}"(syntaxPresetNames.join(',')));
 
-static foreach(m; EnumMembers!SyntaxKind) mixin("alias sk* = SyntaxKind.*;".replace('*', m.text));
+static foreach(m; EnumMembers!SyntaxKind)
+mixin("alias sk* = SyntaxKind.*;".replace('*', m.text));
 
 __gshared defaultSyntaxPreset = SyntaxPreset.Dark;
 
 //todo: slow, needs a color theme struct
-auto syntaxFontColor(string syntax) { return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].fontColor; }
-auto syntaxBkColor  (string syntax) { return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].bkColor; }
+auto syntaxFontColor(string syntax)
+{ return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].fontColor; }
+auto syntaxBkColor  (string syntax)
+{ return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].bkColor; }
 
-auto syntaxFontColor(SyntaxKind syntax) { return syntaxTable[syntax].formats[defaultSyntaxPreset].fontColor; }
-auto syntaxBkColor  (SyntaxKind syntax) { return syntaxTable[syntax].formats[defaultSyntaxPreset].bkColor; }
+auto syntaxFontColor(SyntaxKind syntax)
+{ return syntaxTable[syntax].formats[defaultSyntaxPreset].fontColor; }
+auto syntaxBkColor  (SyntaxKind syntax)
+{ return syntaxTable[syntax].formats[defaultSyntaxPreset].bkColor; }
 
 //opt: slow, needs a color theme struct, and needs an enum for the syntaxkind.
 //todo: this is a good example for table view in DIDE2
 
-deprecated auto clEmptyLine() { return mix(syntaxBkColor("Whitespace"), syntaxBkColor("Whitespace").l>0x80 ? clWhite : clBlack, 0.0625f); }
+deprecated auto clEmptyLine()
+{ return mix(syntaxBkColor("Whitespace"), syntaxBkColor("Whitespace").l>0x80 ? clWhite : clBlack, 0.0625f); }
 
-auto clCodeBackground	() { return syntaxBkColor("Whitespace"); }
-auto clCodeFont	() { return syntaxFontColor("Identifier1"); }
-auto clCodeBorder	() { return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); }
-auto clGroupBackground() { return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .1f); }
-auto clGroupBorder    () { return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); }
+auto clCodeBackground	()
+{ return syntaxBkColor("Whitespace"); }
+auto clCodeFont	()
+{ return syntaxFontColor("Identifier1"); }
+auto clCodeBorder	()
+{ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); }
+auto clGroupBackground()
+{ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .1f); }
+auto clGroupBorder    ()
+{ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); }

@@ -10,7 +10,7 @@
 	Authors: Nicolas Sicard
 	License: $(LINK www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
 	Source: $(LINK https://github.com/biozic/quantities)
-+/
++/ 
 module quantities.compiletime;
  
 ///
@@ -104,7 +104,7 @@ unittest
 		auto distance = parseSI!Length(data["distance-to-the-moon"]);
 		auto speed = parseSI!Speed(data["speed-of-light"]);
 	}
-}
+}
 
 import quantities.internal.dimensions;
 import quantities.common;
@@ -127,7 +127,8 @@ struct Quantity(N, alias dims)
 {
 	
 	//het 22.05.09:
-		bool opCast() const { return _value!=0; }
+		bool opCast() const
+	{ return _value!=0; }
 	
 		static assert(isNumeric!N);
 		static assert(is(typeof(dims) : Dimensions));
@@ -218,7 +219,7 @@ struct Quantity(N, alias dims)
 			If Q is a QVariant, throws a DimensionException if the parsed quantity
 			doesn't have the same dimensions as Q. If Q is a Quantity, inconsistent
 			dimensions produce a compilation error.
-	+/
+	+/
 		N value(Q)(auto ref const Q target) const
 				if (isQuantity!Q)
 	{
@@ -316,6 +317,7 @@ struct Quantity(N, alias dims)
 	
 		//Unary ++ and --
 		/// ditto
+	
 		Quantity opUnary(string op)()
 				if (op == "++" || op == "--")
 	{
@@ -393,7 +395,7 @@ struct Quantity(N, alias dims)
 		ensureSameDim!(Q.dimensions);
 		mixin("_value " ~ op ~ "= qty._value;");
 	}
-	
+	
 		//Add/sub assign a number to a dimensionless quantity
 		/// ditto
 		void opOpAssign(string op, T)(T scalar)
@@ -476,7 +478,7 @@ struct Quantity(N, alias dims)
 		sink(" ");
 		sink.formattedWrite!"%s"(dimensions);
 	}
-}
+}
 
 /+
 	+
@@ -511,8 +513,7 @@ template isQuantity(T)
 	alias U = Unqual!T;
 	static if(is(U == Quantity!X, X...))
 	enum isQuantity = true;
-	else
-	enum isQuantity = false;
+	else enum isQuantity = false;
 }
 
 /// Basic math functions that work with Quantity.

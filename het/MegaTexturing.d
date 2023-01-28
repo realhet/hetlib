@@ -64,7 +64,7 @@ SubTexIdxCnt	= 1<<SubTexIdxBits;
 enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits
 //todo: !!!!!!!! must be set when app starts
 
-
+
 //SubTexInfo struct ////////////////////////
 
 enum SubTexChannelConfig
@@ -144,7 +144,7 @@ private struct SubTexInfo
 			: "SubTexInfo(pos:(%-4d, %-4d), size:(%-4d, %-4d), mega:%d, chn:%4s)"
 			.format(pos.x, pos.y, size.x, size.y, texIdx, channelConfig);
 	}
-}
+}
 
 auto longToSubTexInfo(long val)
 {
@@ -262,7 +262,7 @@ class MegaTexture
 	}
 	
 		size_t sizeBytes() const { return glTexture ? glTexture.sizeBytes : 0; }
-}
+}
 
 
 class InfoTexture
@@ -345,6 +345,7 @@ class InfoTexture
 	*/
 	
 		//allocates a new subTexture slot
+	
 		int add(in SubTexInfo info, Flag!"uploadNow" uploadNow= Yes.uploadNow)
 	{
 		//ez nem kell, mert a delayed loader pont null-t allokal eloszor: 
@@ -448,8 +449,42 @@ class Texture
 	
 		override string toString() const
 	{ return "Texture(#%d, %s)".format(idx, file); }
+}    deprecated(`Use bitmaps("name", bitmap)")`) class CustomTexture
+{
+	 //CustomTexture ///////////////////////////////
+	const string name;
+	protected {
+		Bitmap bmp;
+		bool mustUpload;
+	}
+	
+	this(string name="")
+	{ this.name = name.strip.length ? name : this.identityStr; }
+	
+	void clear()
+	{ bmp.free; mustUpload = false; }
+	void update()
+	{ mustUpload = true; }
+	void update(Bitmap bmp)
+	{ this.bmp = bmp; mustUpload = true; }
+	
+	int texIdx()
+	{
+		if(bmp is null) return -1; //nothing to draw
+		if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
+		Bitmap b = chkClear(mustUpload) ? bmp : null;
+		return textures.custom(name, b);
+	}
+	
+	ivec2 size()const
+	{ return bmp ? bmp.size : ivec2(0); }
+	
+	auto getFile()
+	{ return File(`custom:\`~name); }
+	auto getBmp()
+	{ return bmp; }
 }
-
+
 
 class TextureManager
 {
@@ -588,7 +623,7 @@ class TextureManager
 		
 		enforce("Unable to allocate subTexture. "~bmp.size.text);
 		assert(0);
-	}
+	}
 	
 		void uploadData(SubTexInfo info, Bitmap bmp, bool dontUploadData=false)
 	{
@@ -739,7 +774,7 @@ class TextureManager
 		while(QPS-t0<UploadTextureMaxTime/*sec*/);
 		
 		return inv;
-	}
+	}
 	
 		void invalidate(in File fileName)
 	{
@@ -882,10 +917,10 @@ class TextureManager
 				byFileName[fileName] = idx;
 				mustRehash = true;
 			}
-		}
+		}
 		
 		return byFileName[fileName];
-	}
+	}
 	
 		bool isCustomExists(string name)
 	{ return (File(`custom:\`~name) in byFileName) !is null; }
@@ -987,7 +1022,7 @@ class TextureManager
 		foreach(i, info; infoTexture.infoArray)
 		print(format!"%-3d : %-20s "(i, info));
 		foreach(f; byFileName.keys.sort) { print(format!"%-3d : %-20s "(byFileName[f], f.nameWithoutExt)); }
-	}
+	}
 	
 		int length() const
 	{ return byFileName.length.to!int; }
@@ -1111,42 +1146,6 @@ class TextureManager
 		bitmapModified[file] = modified;
 		mustRehash = true;
 		return idx;
-	}
-}
+	}
+}
 
-
-deprecated(`Use bitmaps("name", bitmap)")`) class CustomTexture
-{
-	 //CustomTexture ///////////////////////////////
-	const string name;
-	protected {
-		Bitmap bmp;
-		bool mustUpload;
-	}
-	
-	this(string name="")
-	{ this.name = name.strip.length ? name : this.identityStr; }
-	
-	void clear()
-	{ bmp.free; mustUpload = false; }
-	void update()
-	{ mustUpload = true; }
-	void update(Bitmap bmp)
-	{ this.bmp = bmp; mustUpload = true; }
-	
-	int texIdx()
-	{
-		if(bmp is null) return -1; //nothing to draw
-		if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
-		Bitmap b = chkClear(mustUpload) ? bmp : null;
-		return textures.custom(name, b);
-	}
-	
-	ivec2 size()const
-	{ return bmp ? bmp.size : ivec2(0); }
-	
-	auto getFile()
-	{ return File(`custom:\`~name); }
-	auto getBmp()
-	{ return bmp; }
-}

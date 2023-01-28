@@ -8,9 +8,9 @@
 	Authors: Nicolas Sicard
 	License: $(LINK www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
 	Source: $(LINK https://github.com/biozic/quantities)
-+/
++/ 
 module quantities.internal.si;
- 
+	
 /+
 	+
 	Generates SI units, prefixes and several utility functions
@@ -104,7 +104,7 @@ mixin template SIDefinitions(N)
 	
 	/// Predefined quantity type templates for SI quantities
 	alias Dimensionless = typeof(one);
-	alias Length = typeof(meter);
+	alias Length = typeof(meter);
 	alias Mass = typeof(kilogram); /// ditto
 	alias Time = typeof(second); /// ditto
 	alias ElectricCurrent = typeof(ampere); /// ditto
@@ -210,7 +210,7 @@ mixin template SIDefinitions(N)
 		.addPrefix("f", 1e-15)
 		.addPrefix("a", 1e-18)
 		.addPrefix("z", 1e-21)
-		.addPrefix("y", 1e-24);
+		.addPrefix("y", 1e-24);
 	//dfmt on
 	
 	/// A list of common SI symbols and prefixes
@@ -323,8 +323,8 @@ mixin template SIDefinitions(N)
 			
 				Params:
 				format = The format string. Must start with a format specification
-				      for the value of the quantity (a numeric type), that must be 
-				      followed by the symbol of a SI unit.
+					     for the value of the quantity (a numeric type), that must be 
+					     followed by the symbol of a SI unit.
 		+/
 		this(S format)
 		{
@@ -345,7 +345,7 @@ mixin template SIDefinitions(N)
 			
 			formattedWrite(writer, fmt, quantity.value(unit));
 		}
-	}
+	}
 	
 	/+
 		+
@@ -353,8 +353,8 @@ mixin template SIDefinitions(N)
 		
 			Params:
 				format = The format string. Must start with a format specification
-					  for the value of the quantity (a numeric type), that must be 
-					  followed by the symbol of a SI unit.
+						 for the value of the quantity (a numeric type), that must be 
+						 followed by the symbol of a SI unit.
 				quantity = The quantity that must be formatted.
 	+/
 	S siFormat(S, Q)(S format, Q quantity)
@@ -380,8 +380,8 @@ mixin template SIDefinitions(N)
 		
 			Params:
 				format = The format string. Must start with a format specification
-					  for the value of the quantity (a numeric type), that must be 
-					  followed by the symbol of a SI unit.
+						 for the value of the quantity (a numeric type), that must be 
+						 followed by the symbol of a SI unit.
 				quantity = The quantity that must be formatted.
 	+/
 	auto siFormat(alias format, Q)(Q quantity)
@@ -393,4 +393,4 @@ mixin template SIDefinitions(N)
 		enum speed = 12.5 * kilo(meter) / hour;
 		assert(siFormat!"%.2f m/s"(speed) == "3.47 m/s");
 	}
-}
+}

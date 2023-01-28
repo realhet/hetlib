@@ -1,5 +1,5 @@
-module quantities.common;
- 
+module quantities.common; 
+	
 import quantities.runtime : isQVariantOrQuantity, unit;
 
 /+

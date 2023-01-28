@@ -6,9 +6,9 @@
 	Authors: Nicolas Sicard
 	License: $(LINK www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
 	Source: $(LINK https://github.com/biozic/quantities)
-+/
++/ 
 module quantities.internal.dimensions;
- 
+	
 import std.algorithm : countUntil, remove, isSorted;
 import std.array;
 import std.conv;
@@ -93,7 +93,7 @@ struct Rational
 		out (result)
 	{ assert(result.isNormalized); }
 		body
-	{ return Rational(mixin(op ~ "num"), den); }
+	{ return Rational(mixin(op ~ "num"), den); }
 	
 		Rational opBinary(string op)(Rational other) @safe pure nothrow const
 				if (op == "+" || op == "-")
@@ -158,7 +158,7 @@ struct Rational
 			sink.formattedWrite!"%d"(den);
 		}
 	}
-}
+}
 
 private int gcd(int x, int y) @safe pure nothrow
 {
@@ -200,19 +200,14 @@ struct Dim
 		{
 			if(symbol < other.symbol)
 			return -1;
-			else if(symbol > other.symbol)
-			return 1;
-			else
-			return 0;
+			else if(symbol > other.symbol) return 1;
+			else return 0;
 		}
-		else
-		{
+		else {
 			if(rank < other.rank)
 			return -1;
-			else if(rank > other.rank)
-			return 1;
-			else
-			assert(false);
+			else if(rank > other.rank) return 1;
+			else assert(false);
 		}
 	}
 	
@@ -223,8 +218,7 @@ struct Dim
 		return;
 		if(power == 1)
 		sink(symbol);
-		else
-		{
+		else {
 			sink.formattedWrite!"%s"(symbol);
 			sink("^");
 			sink.formattedWrite!"%s"(power);
@@ -253,16 +247,14 @@ private void insertAndSort(ref Dim[] list, string symbol, Rational power, size_t
 			list = list.remove(pos);
 			catch(
 				Exception//remove only throws when it has multiple arguments
-			)
-			assert(false);
+			) assert(false);
 			
 			//Necessary to compare dimensionless values
 			if(!list.length)
 			list = null;
 		}
 	}
-	else
-	{
+	else {
 		//Insert the new dimension
 		auto dim = Dim(symbol, power, rank);
 		pos = list.countUntil!(d => d > dim);
@@ -277,9 +269,8 @@ private immutable(Dim)[] immut(Dim[] source) @trusted pure nothrow
 {
 	if(__ctfe)
 	return source.idup;
-	else
-	return source.assumeUnique;
-}
+	else return source.assumeUnique;
+}
 
 private immutable(Dim)[] insertSorted(
 	immutable(Dim)[] source, string symbol,
@@ -380,13 +371,15 @@ struct Dimensions
 	
 		void toString(scope void delegate(const(char)[]) sink) const
 	{ sink.formattedWrite!"[%(%s %)]"(_dims); }
-}
+}
 
 //Tests
 
 
-	@("Rational")
 	
+	@("Rational")
+		
+		
  unittest
 {
 	const r = Rational(6, -8);
@@ -416,8 +409,10 @@ struct Dimensions
 }
 
 
+	
 	@("Dim[].inverted")
-	@safe pure nothrow
+		@safe pure nothrow
+		
  unittest
 {
 	auto list = [Dim("A", 2), Dim("B", -2)].idup;
@@ -425,8 +420,10 @@ struct Dimensions
 	assert(list.inverted == inv);
 }
 
+	
 	@("Dim[].insertAndSort")
-	@safe pure
+		@safe pure
+		
  unittest
 {
 	Dim[] list;
@@ -444,8 +441,10 @@ struct Dimensions
 }
 
 
+	
 	@("Dimensions *")
-	@safe pure
+		@safe pure
+		
  unittest
 {
 	auto dim1 = Dimensions([Dim("a", 1), Dim("b", -2)]);
@@ -453,17 +452,21 @@ struct Dimensions
 	assert(dim1 * dim2 == Dimensions([Dim("b", -2), Dim("c", 2)]));
 }
 
+	
 	@("Dimensions /")
-	@safe pure
+		@safe pure
+		
  unittest
 {
 	auto dim1 = Dimensions([Dim("a", 1), Dim("b", -2)]);
 	auto dim2 = Dimensions([Dim("a", 1), Dim("c", 2)]);
 	assert(dim1 / dim2 == Dimensions([Dim("b", -2), Dim("c", -2)]));
-}
+}
 
+	
 	@("Dimensions pow")
-	@safe pure nothrow
+		@safe pure nothrow
+		
  unittest
 {
 	auto dim = Dimensions([Dim("a", 5), Dim("b", -2)]);
@@ -472,8 +475,10 @@ struct Dimensions
 }
 
 
+	
 	@("Dimensions.powinverse")
-	@safe pure nothrow
+		@safe pure nothrow
+		
  unittest
 {
 	auto dim = Dimensions([Dim("a", 6), Dim("b", -2)]);
@@ -481,8 +486,10 @@ struct Dimensions
 }
 
 
-	@("Dimensions.toString")
 	
+	@("Dimensions.toString")
+		
+		
  unittest
 {
 	auto dim = Dimensions([Dim("a", 1), Dim("b", -2)]);

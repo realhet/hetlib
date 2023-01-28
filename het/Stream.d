@@ -147,7 +147,7 @@ if(is(Type == class))
 }
 
 //errorHandling: 0: no errors, 1:just collect the errors, 2:raise
-
+
 void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data) 
 {
 	ref Token actToken() { return state.tokens[idx]; }
@@ -247,7 +247,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 	}
 	
 	alias T = Unqual!Type;
-	
+	
 	try {
 		 //the outermost exception handler calls state.onError
 		
@@ -505,11 +505,11 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 			
 		}
 		else
-		{ static assert(0, "Unhandled type: "~T.stringof); }
+		{ static assert(0, "Unhandled type: "~T.stringof); }
 		
 	}
-	catch(Throwable t) { state.onError(t.msg, idx); }
-}
+	catch(Throwable t) { state.onError(t.msg, idx); }
+}
 
 
 //! toJson ///////////////////////////////////
@@ -643,7 +643,7 @@ void streamAppend_json(Type)(
 		st ~= dense ? "}" : "\n"~indent~"}";        //closing bracket }
 	}
 	else
-	{ static assert(0, "Unhandled type: "~T.stringof); }
+	{ static assert(0, "Unhandled type: "~T.stringof); }
 }
 
 
@@ -703,7 +703,7 @@ if(is(Type==class) || __traits(isRef, data)) //only let classes not to be refere
 }
 
 
-
+
 version(/+$DIDE_REGION Properties+/all)
 {
 	
@@ -807,7 +807,7 @@ version(/+$DIDE_REGION Properties+/all)
 			s ~= ";\n";
 			return s;
 		}
-	}
+	}
 	
 	class PropertySet : Property
 	{
@@ -912,7 +912,7 @@ version(/+$DIDE_REGION Properties+/all)
 			else	{ if(mixin(filter)) { res ~= fullName ~ '=' ~ a.asText; } }
 		}
 		return res;
-	}
+	}
 	
 	Property findProperty(Property[] props, string nameFilter, string rootPath="")
 	{
@@ -959,7 +959,7 @@ version(/+$DIDE_REGION Properties+/all)
 		bool empty() { return props.empty; }
 		
 		auto access(T=void, bool mustExists=true)(string name)
-		 {
+		{
 			static if(is(T==void))	alias PT = Property;
 			else static if(is(T : Property))	alias PT = T;
 			else	mixin("alias PT = ", T.stringof.capitalize ~ "Property;");
@@ -970,10 +970,10 @@ version(/+$DIDE_REGION Properties+/all)
 		}
 		
 		auto get(T=void)(string name)
-		 { return access!(T, false)(name); }
+		{ return access!(T, false)(name); }
 		
 		auto get(string name, string def)
-		 {
+		{
 			auto p = get(name);
 			if(p is null) return def;
 			return p.asText;
@@ -981,22 +981,22 @@ version(/+$DIDE_REGION Properties+/all)
 		
 		//todo: getDef is a bad name. Should be combined with normal get()
 		auto getDef(string name, string def)
-		 {
+		{
 			if(auto p = get(name)) return p.asText;
 			return def;
 		}
 		
 		auto getDef(string name, int def)
-		 {
+		{
 			if(auto p = get(name)) try { return p.asText.to!int; }catch(Exception) {}
 			return def;
 		}
 		
 		bool exists(string name)
-		 { return get(name) !is null; }
+		{ return get(name) !is null; }
 		
 		void update()
-		 {
+		{
 			if(queryName=="") ERR("Unspecified queryname");
 			
 			auto s = props.getChangedPropertyValues;
@@ -1007,7 +1007,7 @@ version(/+$DIDE_REGION Properties+/all)
 		}
 		
 		string fetchPendingQuery()
-		 {
+		{
 			auto res = pendingQuery;
 			pendingQuery = "";
 			return res;
@@ -1022,12 +1022,12 @@ version(/+$DIDE_REGION Properties+/all)
 //cache data to files /////////////////////////////////
 
 T cache(T)(lazy T data, File file, bool refresh=false)
-	{
+{
 	T res;
 	if(refresh) file.remove;
 	
 	if(file.exists) {
-		try{
+		try {
 			string s = file.read.uncompress.to!string;
 			res.fromJson(s, "", ErrorHandling.raise);
 			LOG("Cache loaded:", file);
@@ -1048,10 +1048,10 @@ T cache(T)(lazy T data, File file, bool refresh=false)
 }
 
 void unittest_property_inherited()
-	{
+{
 	
 	static class C1
-	 {
+	{
 		int a;
 		@STORED int i;
 		@STORED @property {
@@ -1062,7 +1062,7 @@ void unittest_property_inherited()
 	}
 	
 	static class C2:C1
-	 {
+	{
 		@STORED {
 			int b, c;
 			@property {

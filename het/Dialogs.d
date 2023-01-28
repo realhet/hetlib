@@ -26,11 +26,11 @@ enum
 	MB_ICONINFORMATION	= MB_ICONASTERISK,
 	MB_USERICON	= 0x00000080,
 	MB_ICONMASK	= 0x000000F0,
-	
-	MB_DEFBUTTON1											     = 0,
-	MB_DEFBUTTON2											     = 0x00000100,
-	MB_DEFBUTTON3											     = 0x00000200,
-	MB_DEFBUTTON4											     = 0x00000300,
+	
+	MB_DEFBUTTON1														  = 0,
+	MB_DEFBUTTON2														  = 0x00000100,
+	MB_DEFBUTTON3														  = 0x00000200,
+	MB_DEFBUTTON4														  = 0x00000300,
 	MB_DEFMASK	               = 0x00000F00,
 	
 	MB_APPLMODAL	              =	0,
@@ -112,16 +112,50 @@ Path browseForFolder(HWND hwnd, string title, Path foldr)
 	return res;
 }
 
+private string checkCommDlgError(int res)
+{
+	
+	if(res) return ""; //no error
+	
+	import core.sys.windows.commdlg, core.sys.windows.cderr;
+	auto err = CommDlgExtendedError;
+	
+	if(err==0) return "CDERR_CANCEL";
+	
+	immutable errorStrs = [
+		"CDERR_DIALOGFAILURE",
+		"CDERR_FINDRESFAILURE",
+		"CDERR_INITIALIZATION",
+		"CDERR_LOADRESFAILURE",
+		"CDERR_LOADSTRFAILURE",
+		"CDERR_LOCKRESFAILURE",
+		"CDERR_MEMALLOCFAILURE",
+		"CDERR_MEMLOCKFAILURE",
+		"CDERR_NOHINSTANCE",
+		"CDERR_NOHOOK",
+		"CDERR_NOTEMPLATE",
+		"CDERR_STRUCTSIZE",
+		"FNERR_BUFFERTOOSMALL",
+		"FNERR_INVALIDFILENAME",
+		"FNERR_SUBCLASSFAILURE"
+	];
+	
+	static foreach(e; errorStrs)
+	mixin(format(q{if(err==%s) return "%s";}, e, e));
+	
+	return "CDERR_UNKNOWN";
+}
+
+
 class FileDialog
 {
-	 //FileDialog /////////////////////////////////////////////////////////////////////////
-		HWND owner;
-		string what;	//the name of the thing. Title is auto-generated.
-		string defaultExt;	//up to 3 letters without leading '.'
-		string filter;	//in custom format. See -> processExtFilter()
-		Path initialPath;
-		
-		this(HWND owner_, string what_, string defaultExt_, string filter_, Path initialPath_ = Path.init)
+	HWND owner;
+	string what;	//the name of the thing. Title is auto-generated.
+	string defaultExt;	//up to 3 letters without leading '.'
+	string filter;	//in custom format. See -> processExtFilter()
+	Path initialPath;
+	
+	this(HWND owner_, string what_, string defaultExt_, string filter_, Path initialPath_ = Path.init)
 	{
 		//bah... this sucks in D
 		owner = owner_;
@@ -132,7 +166,7 @@ class FileDialog
 	}
 	
 	
-		auto open(File fileName=File.init)
+	auto open(File fileName=File.init)
 	{
 		return File  (
 			getFileName(
@@ -141,7 +175,7 @@ class FileDialog
 			)
 		);
 	}
-		auto openMulti(File fileName=File.init)
+	auto openMulti(File fileName=File.init)
 	{
 		return toList(
 			getFileName(
@@ -150,7 +184,7 @@ class FileDialog
 			)
 		);
 	}
-		auto saveAs(File fileName=File.init)
+	auto saveAs(File fileName=File.init)
 	{
 		return File	 (
 			getFileName(
@@ -159,7 +193,7 @@ class FileDialog
 			)
 		);
 	}
-		auto renameTo	(File fileName=File.init)
+	auto renameTo	(File fileName=File.init)
 	{
 		return File	 (
 			getFileName(
@@ -170,6 +204,38 @@ class FileDialog
 	}
 	
 	private:
+	
+	File[] toList(string s)
+	{
+		
+		const list = s.split('\0');
+		return list.length.predSwitch(
+			0, File[].init,
+					1,	[File(list[0])],
+						list[1..$].map!(a => File(list[0], a)).array
+		);
+		
+		/*
+			 Example of why old school programming is bad.
+			
+					File[] res;
+					if(s.empty) return res;
+			
+					//converts zero separated list from the form [basePath,name1,name2...] to [file1,file2...]
+					auto list = s.split('\0');
+					if(list.length==1){
+						res = [File(list[0])];
+					}else{
+						res.reserve(list.length-1);
+						if(list.length<2) return res;
+						foreach(i; 1..list.length)
+							res ~= File(list[0], list[i]);
+					}
+			
+					return res;
+		*/
+	}
+	
 		enum GetFileNameMode { Open, OpenMulti, Save, SaveAs, RenameTo }
 	
 		static private string getFileName(
@@ -222,7 +288,7 @@ class FileDialog
 		
 		//default ext
 		ofn.lpstrDefExt = defaultExt.toPWChar;
-		
+		
 		//title
 		string title;
 		if(what!="")
@@ -276,40 +342,11 @@ class FileDialog
 		else { fileName=""; }
 		
 		return fileName;
-	}
+	}
 	
-		File[] toList(string s)
-	{
 		
-		const list = s.split('\0');
-		return list.length.predSwitch(
-			0, File[].init,
-					1,	[File(list[0])],
-						list[1..$].map!(a => File(list[0], a)).array
-		);
-		
-		/*
-			 Example of why old school programming is bad.
-			
-					File[] res;
-					if(s.empty) return res;
-			
-					//converts zero separated list from the form [basePath,name1,name2...] to [file1,file2...]
-					auto list = s.split('\0');
-					if(list.length==1){
-						res = [File(list[0])];
-					}else{
-						res.reserve(list.length-1);
-						if(list.length<2) return res;
-						foreach(i; 1..list.length)
-							res ~= File(list[0], list[i]);
-					}
-			
-					return res;
-		*/
-	}
 	
-}
+}
 
 
 //utility stuff ///////////////////////////////////////////////////////////////////////////////
@@ -384,39 +421,7 @@ private string processExtFilter(string filter, bool includeExts)
 	return filterStr;
 }
 
-private string checkCommDlgError(int res)
-{
-	
-	if(res) return ""; //no error
-	
-	import core.sys.windows.commdlg, core.sys.windows.cderr;
-	auto err = CommDlgExtendedError;
-	
-	if(err==0) return "CDERR_CANCEL";
-	
-	immutable errorStrs = [
-		"CDERR_DIALOGFAILURE",
-		"CDERR_FINDRESFAILURE",
-		"CDERR_INITIALIZATION",
-		"CDERR_LOADRESFAILURE",
-		"CDERR_LOADSTRFAILURE",
-		"CDERR_LOCKRESFAILURE",
-		"CDERR_MEMALLOCFAILURE",
-		"CDERR_MEMLOCKFAILURE",
-		"CDERR_NOHINSTANCE",
-		"CDERR_NOHOOK",
-		"CDERR_NOTEMPLATE",
-		"CDERR_STRUCTSIZE",
-		"FNERR_BUFFERTOOSMALL",
-		"FNERR_INVALIDFILENAME",
-		"FNERR_SUBCLASSFAILURE"
-	];
-	
-	static foreach(e; errorStrs)
-	mixin(format(q{if(err==%s) return "%s";}, e, e));
-	
-	return "CDERR_UNKNOWN";
-}
+
 
 
 //chooseColor /////////////////////////////////

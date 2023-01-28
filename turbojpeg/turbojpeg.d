@@ -1,5 +1,5 @@
-module turbojpeg.turbojpeg;
- 
+module turbojpeg.turbojpeg; 
+	
 //Source:        https://github.com/rtbo/turbojpeg-d/blob/master/source/turbojpeg/turbojpeg.d
 //Documentation: https://github.com/D-Programming-Deimos/jpeg-turbo/blob/master/source/libjpeg/turbojpeg.d
 
@@ -32,16 +32,26 @@ module turbojpeg.turbojpeg;
 
 pragma(lib, "turbojpeg-static.lib");
 
-void tjChk(tjhandle h, int res, string what) {
-	if(res==0) return;
+void tjChk(tjhandle h, int res, string what)
+{
+	if(res==0)
+	return;
 	import std.format;
 	throw new Exception(format!"TurboJpeg Error: %s %s"(what, tjGetErrorStr2(h)));
 }
 
 //Auto-create a separate instance for each thread
 import std.exception : enforce;
-auto tjDecoder() { static tjhandle h; if(!h) { h = tjInitDecompress; enforce(h, "tjInitDecompress() fail."); } return h; }
-auto tjEncoder() { static tjhandle h; if(!h) { h = tjInitCompress ; enforce(h, "tjInitCompress() fail."  ); } return h; }
+auto tjDecoder()
+{
+	static tjhandle h; if(!h)
+	{ h = tjInitDecompress; enforce(h, "tjInitDecompress() fail."); } return h;
+}
+auto tjEncoder()
+{
+	static tjhandle h; if(!h)
+	{ h = tjInitCompress; enforce(h, "tjInitCompress() fail."  ); } return h;
+}
 
 //original stuff //////////////////////////////////////////////////////////////////
 
@@ -88,7 +98,7 @@ enum TJPF
 	TJPF_ARGB,
 	TJPF_CMYK,
 	TJPF_UNKNOWN = -1
-}
+}
 
 alias TJPF_RGB = TJPF.TJPF_RGB;
 alias TJPF_BGR = TJPF.TJPF_BGR;
@@ -172,7 +182,7 @@ alias TJXOP_ROT270 = TJXOP.TJXOP_ROT270;
 enum TJXOPT_PERFECT = 1;
 enum TJXOPT_TRIM = 2;
 enum TJXOPT_CROP = 4;
-enum TJXOPT_GRAY = 8;
+enum TJXOPT_GRAY = 8;
 enum TJXOPT_NOOUTPUT = 16;
 enum TJXOPT_PROGRESSIVE = 32;
 enum TJXOPT_COPYNONE = 64;
@@ -272,7 +282,7 @@ int tjDecompressToYUV2(
 int tjDecompressToYUVPlanes(
 	tjhandle handle, const(ubyte)* jpegBuf,
 		c_ulong jpegSize, ubyte** dstPlanes, int width, int* strides, int height, int flags
-);
+);
 
 int tjDecodeYUV(
 	tjhandle handle, const(ubyte)* srcBuf, int pad, int subsamp,
@@ -330,14 +340,14 @@ int tjCompress(
 
 int tjEncodeYUV(
 	tjhandle handle, ubyte *srcBuf, int width,
-							  int pitch, int height, int pixelSize,
-							  ubyte *dstBuf, int subsamp, int flags
+								 int pitch, int height, int pixelSize,
+								 ubyte *dstBuf, int subsamp, int flags
 );
 
 int tjEncodeYUV2(
-	tjhandle handle, ubyte *srcBuf, int width,
-							   int pitch, int height, int pixelFormat,
-							   ubyte *dstBuf, int subsamp, int flags
+	tjhandle	handle, ubyte *srcBuf, int width,
+								int pitch, int height, int pixelFormat,
+								ubyte *dstBuf, int subsamp, int flags
 );
 
 int tjDecompressHeader(
@@ -348,15 +358,15 @@ int tjDecompressHeader(
 
 int tjDecompressHeader2(
 	tjhandle handle, ubyte *jpegBuf,
-									  c_ulong jpegSize, int *width,
-									  int *height, int *jpegSubsamp
+										 c_ulong jpegSize, int *width,
+										 int *height, int *jpegSubsamp
 );
 
 int tjDecompress(
-	tjhandle handle, ubyte *jpegBuf,
-							   c_ulong jpegSize, ubyte *dstBuf,
-							   int width, int pitch, int height, int pixelSize,
-							   int flags
+	tjhandle	handle, ubyte *jpegBuf,
+								c_ulong jpegSize, ubyte *dstBuf,
+								int width, int pitch, int height, int pixelSize,
+								int flags
 );
 
 int tjDecompressToYUV(

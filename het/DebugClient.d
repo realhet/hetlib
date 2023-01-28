@@ -24,17 +24,21 @@ string makeSrcLocation(string file, string funct, int line)
 			 fu = funct.split(`.`);
 	
 	//ignore extension
-	if(fi.length) fi[$-1] = fi[$-1].withoutEnding(".d");
+	if(fi.length)
+	fi[$-1] = fi[$-1].withoutEnding(".d");
 	
-	foreach_reverse(i;  1..min(fi.length, fu.length)) {
-		if(fi[$-i..$].equal(fu[0..i])) {
+	foreach_reverse(i;  1..min(fi.length, fu.length))
+	{
+		if(fi[$-i..$].equal(fu[0..i]))
+		{
 			funct = fu[i..$].join('.');
 			break;
 		}
 	}
 	
 	auto res = format!"%s(%d):"(file, line);
-	if(funct!="") res ~= " @"~funct;
+	if(funct!="")
+	res ~= " @"~funct;
 	
 	return res;
 }
@@ -45,12 +49,18 @@ void DBG (int level = 10, string file = __FILE__, int line = __LINE__, string fu
 	enum location = makeSrcLocation(file, funct, line);
 	//format colorful message
 	string s = format!"%s\33\10: T%0.4f: C%x: %s:  \33\7"(LOGLevelString!level, QPS_local, GetCurrentProcessorNumber, location);
-	static foreach(idx, a; args) { if(idx) s ~= " "; s ~= a.text; }
+	static foreach(idx, a; args)
+	{
+		if(idx)
+		s ~= " "; s ~= a.text;
+	}
 	s ~= "\33\7";
 	
-	if(level>=LOG_console) synchronized(dbg) writeln(s);
+	if(level>=LOG_console)
+	synchronized(dbg) writeln(s);
 	//if(level>=LOG_dide	) synchronized(dbg) dbg.sendLog(s);
-	if(level>=LOG_throw) throw new Exception(s);
+	if(level>=LOG_throw)
+	throw new Exception(s);
 }
 
 void LOG(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args)
@@ -64,12 +74,14 @@ void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION
 
 void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args)
 {
-	synchronized {
+	synchronized
+	{
 		
 		//show this error only once
 		const h = file.hashOf(line);
 		__gshared bool[size_t] map;
-		if(h in map) return;
+		if(h in map)
+		return;
 		
 		map[h] = true;
 		ERR!(file, line, funct)("NOT IMPLEMENTED");
@@ -85,26 +97,30 @@ T HIST(size_t N, size_t M=0x10000, string name="", T)(T value)
 	
 	bucketCnt[value.clamp(0, N-1)] ++;
 	totalCnt++;
-	if(totalCnt%M == 0) {
+	if(totalCnt%M == 0)
+	{
 		writeln("HIST.totalCnt=", totalCnt);
 		bucketCnt[].each!writeln;
 		writeln;
 	}
 	return value;
-}
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////////
 
-void PING(int index = 0) { dbg.ping(index); }
-void PING0() { PING(0); }
-void PING1() { PING(1); }
-void PING2() { PING(2); }
-void PING3() { PING(3); }
-void PING4() { PING(4); }
-void PING5() { PING(5); }
-void PING6() { PING(6); }
-void PING7() { PING(7); }
+void PING(int index = 0)
+{ dbg.ping(index); }
+void PING0()
+{ PING(0); }void PING1()
+{ PING(1); }void PING2()
+{ PING(2); }void PING3()
+{ PING(3); }
+void PING4()
+{ PING(4); }void PING5()
+{ PING(5); }void PING6()
+{ PING(6); }void PING7()
+{ PING(7); }
 
 //todo: (forceExit) a thread which kills the process. for example when readln is active.
 
@@ -146,9 +162,11 @@ class DebugLogClient
 	private:
 		enum cBufSize = 1<<16; //the same as in DIDE.exe
 	
-		struct BreakRec { uint locationHash, state; }
+		struct BreakRec
+	{ uint locationHash, state; }
 	
-		struct BreakTable {
+		struct BreakTable
+	{
 		BreakRec[64] records;
 		
 		void waitFor(uint locationHash);
@@ -197,7 +215,9 @@ class DebugLogClient
 	public:
 		this()
 	{
-		version(noDebugClient) { return; }else {
+		version(noDebugClient)
+		{ return; }else
+		{
 			tryOpen;
 			sendLog("START:"~appFile.toString);
 		}
@@ -205,36 +225,43 @@ class DebugLogClient
 	
 		void ping(int index = 0)
 	{
-		if(!data) return;
+		if(!data)
+		return;
 		data.ping |= 1<<index;
 	}
 	
 		void sendLog(string s)
 	{
-		if(!data) return;
+		if(!data)
+		return;
 		ubyte[] packet;
 		packet.length = 4+s.length;
 		*cast(uint*)(packet.ptr) = cast(uint)s.length;
 		memcpy(&packet[4], s.ptr, s.length);
-		while(!data.buf.store(packet)) sleep(1);
-	}
+		while(!data.buf.store(packet))
+		sleep(1);
+	}
 	
 		string getLog()
 	{
 		 //not needed on exe side. It's needed on dide side. Only for testing.
-		if(!data) return "";
+		if(!data)
+		return "";
 		
-		uint siz;  if(!data.buf.get(&siz, 4)) return "";
+		uint siz;  if(!data.buf.get(&siz, 4))
+		return "";
 		
 		ubyte[] buf;  buf.length = siz;
 		
-		while(!data.buf.get(buf.ptr, siz)) sleep(1); //probably an error+deadlock...
+		while(!data.buf.get(buf.ptr, siz))
+		sleep(1); //probably an error+deadlock...
 		return cast(string)buf;
 	}
 	
 		float getPotiValue(size_t idx)
 	{
-		if(data && idx>=0 && idx<data.poti.length) return data.poti[idx];
+		if(data && idx>=0 && idx<data.poti.length)
+		return data.poti[idx];
 		else return 0;
 	}
 	
@@ -242,15 +269,26 @@ class DebugLogClient
 	{ return data !is null; }
 	
 		bool forceExit_set()
-	{ if(!data) return false; data.forceExit = 1; return true; }
+	{
+		if(!data)
+		return false; data.forceExit = 1; return true;
+	}
 		void forceExit_clear()
-	{ if(data) data.forceExit = 0; }
+	{
+		if(data)
+		data.forceExit = 0;
+	}
 		bool forceExit_check()
-	{ if(data) return data.forceExit!=0;else return false; }
+	{
+		if(data)
+		return data.forceExit!=0;else
+		return false;
+	}
 	
 		void handleException(string msg)
 	{
-		if(!data) return;
+		if(!data)
+		return;
 		
 		data.dide_ack = 0;
 		data.exe_waiting = 1;
@@ -261,11 +299,13 @@ class DebugLogClient
 		string s = "EXCEPTION:"~msg;
 		dbg.sendLog(s);
 		
-		while(!data.dide_ack) sleep(1); //wait for dide
+		while(!data.dide_ack)
+		sleep(1); //wait for dide
 		
 		data.exe_waiting = 0;
 		
-		if(data.dide_ack<0) {
+		if(data.dide_ack<0)
+		{
 			data.dide_ack = 0;
 			application.exit;
 		}
@@ -274,8 +314,11 @@ class DebugLogClient
 	}
 	
 		void setExeHwnd(void* hwnd)
-	{ if(data) data.exe_hwnd = cast(int)hwnd; }
-}
+	{
+		if(data)
+		data.exe_hwnd = cast(int)hwnd;
+	}
+}
 
 
 
@@ -316,12 +359,14 @@ class DebugLogServer
 			Data.sizeof
 		);
 		
-		if(!dataFile || !data) ERR(`dbgsrv: Could not map create debug fileMapping. Run this as Admin!`);
+		if(!dataFile || !data)
+		ERR(`dbgsrv: Could not map create debug fileMapping. Run this as Admin!`);
 	}
 	
 	void updatePingLeds()
 	{
-		if(!data) return;
+		if(!data)
+		return;
 		
 		auto st = data.ping;  data.ping = 0; //latch
 		
@@ -351,11 +396,13 @@ class DebugLogServer
 		bool get(ubyte* dst, uint dstLen)
 		{
 			//var i, o, fullLen:cardinal;
-			if(dstLen>canGet) return false;
+			if(dstLen>canGet)
+			return false;
 			
 			uint o = truncate(tail),
 						 fullLen = dstLen;
-			if(o+dstLen >= capacity) {
+			if(o+dstLen >= capacity)
+			{
 				//multipart
 				uint i = capacity-o;
 				Move(&(buf[o]), dst, i);
@@ -363,7 +410,8 @@ class DebugLogServer
 				dst += i;
 				dstLen -= i;
 			}
-			if(dstLen>0) { Move(&(buf[o]), dst, dstLen); }
+			if(dstLen>0)
+			{ Move(&(buf[o]), dst, dstLen); }
 			
 			//advance in one step
 			tail += fullLen; //no atomic needed as one writes and the other reads
@@ -371,29 +419,34 @@ class DebugLogServer
 			return true;
 		}
 		
-		void flush() { tail += canGet; }
+		void flush()
+		{ tail += canGet; }
 		
 		uint siz;
-		if(!get(cast(ubyte*)(&siz), 4)) return [];
+		if(!get(cast(ubyte*)(&siz), 4))
+		return [];
 		//todo: sanity check for siz
 		auto res = new ubyte[siz]; //opt: uninitialized
 		auto t0 = now;
-		while(!get(res.ptr, siz)) {
+		while(!get(res.ptr, siz))
+		{
 			sleep(1); //probably an error+deadlock...
-			if(now-t0>0.1*second) {
+			if(now-t0>0.1*second)
+			{
 				flush;
 				return [];
 			}
 		}
 		return res;
-	}
+	}
 	
 	void processLogMessage(string s)
 	{
 		logEvents ~= s;
 		logChanged_ = true;
 		
-		if(s.isWild("LOG:*")) {
+		if(s.isWild("LOG:*"))
+		{
 			if(onDebugLog)
 			onDebugLog(wild[0]);
 		}
@@ -406,15 +459,20 @@ class DebugLogServer
 	
 	void updateLog()
 	{
-		if(!data) return;
+		if(!data)
+		return;
 		
-		while(1) {
+		while(1)
+		{
 			auto d = CircBuf_getLog(data.buf.tail, data.buf.head, data.buf.capacity, data.buf.buf.ptr);
-			if(d.empty) break;
+			if(d.empty)
+			break;
 			
 			//safely interpret it as UTF8. If fails, convert it from Latin1
 			auto s = cast(string)d;
-			try { validate(s); }catch(Exception) {
+			try
+			{ validate(s); }catch(Exception)
+			{
 				import std.encoding;
 				transcode(cast(Latin1String)d, s);
 			}
@@ -433,7 +491,8 @@ class DebugLogServer
 	
 	bool update()
 	{
-		if(!data) return false;
+		if(!data)
+		return false;
 		updatePingLeds;
 		updateLog;
 		return true; //todo: only when chg...
@@ -456,7 +515,10 @@ class DebugLogServer
 	{ return logChanged_; } //signal to redraw log list
 	
 	void setPotiValue(int idx, float val)
-	{ if(data && idx.inRange(data.poti)) data.poti[idx] = val; }
+	{
+		if(data && idx.inRange(data.poti))
+		data.poti[idx] = val;
+	}
 	
 	void clearExit()
 	{ data.forceExit = 0; }
@@ -465,8 +527,10 @@ class DebugLogServer
 	
 	void resetBeforeRun()
 	{
-		if(!data) return;
-		with(data) {
+		if(!data)
+		return;
+		with(data)
+		{
 			dide_hwnd = cast(uint)application.handle;
 			exe_hwnd = 0;
 			forceExit = 0;
@@ -477,8 +541,10 @@ class DebugLogServer
 	
 	void forcedStop()
 	{
-		if(!data) return;
-		with(data) {
+		if(!data)
+		return;
+		with(data)
+		{
 			dide_ack = -1;
 			forceExit = 1;
 			exe_waiting = 0;
@@ -489,4 +555,4 @@ class DebugLogServer
 	bool isExeWaiting()
 	{ return data && data.exe_waiting!=0; }
 	
-}
+}

@@ -10,7 +10,7 @@
 	Authors: Nicolas Sicard
 	License: $(LINK www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
 	Source: $(LINK https://github.com/biozic/quantities)
-+/
++/ 
 module quantities.runtime;
  
 ///
@@ -119,7 +119,7 @@ class DimensionException : Exception
 		this.thisDim = thisDim;
 		this.otherDim = otherDim;
 	}
-}
+}
 ///
 unittest
 {
@@ -248,7 +248,7 @@ struct QVariant(N)
 	+/
 		bool isDimensionless() @property const
 	{ return _dimensions.empty; }
-	
+	
 		/+
 		+
 			Tests wheter this quantity has the same dimensions as another one.
@@ -347,7 +347,7 @@ struct QVariant(N)
 	{
 		checkDimensionless;
 		return QVariant(mixin("_value" ~ op ~ "scalar"), _dimensions);
-	}
+	}
 	
 		/// ditto
 		QVariant!N opBinaryRight(string op, T)(T scalar) const 
@@ -421,10 +421,8 @@ struct QVariant(N)
 	{
 		static if(isIntegral!N)
 		auto newValue = std.math.pow(_value, cast(real) power).roundTo!N;
-		else static if(isFloatingPoint!N)
-		auto newValue = std.math.pow(_value, cast(real) power);
-		else
-		static assert(false, "Operation not defined for " ~ QVariant!N.stringof);
+		else static if(isFloatingPoint!N) auto newValue = std.math.pow(_value, cast(real) power);
+		else static assert(false, "Operation not defined for " ~ QVariant!N.stringof);
 		return QVariant(newValue, _dimensions.pow(power));
 	}
 	
@@ -435,7 +433,7 @@ struct QVariant(N)
 	{
 		checkDim(qty.dimensions);
 		mixin("_value " ~ op ~ "= qty.rawValue;");
-	}
+	}
 	
 		//Add/sub assign a number to a dimensionless quantity
 		/// ditto
@@ -454,8 +452,7 @@ struct QVariant(N)
 		mixin("_value" ~ op ~ "= qty.rawValue;");
 		static if(op == "*")
 		_dimensions = _dimensions * qty.dimensions;
-		else
-		_dimensions = _dimensions / qty.dimensions;
+		else _dimensions = _dimensions / qty.dimensions;
 	}
 	
 		//Mul/div assign a number to a quantity
@@ -522,7 +519,7 @@ struct QVariant(N)
 		sink(" ");
 		sink.formattedWrite!"%s"(_dimensions);
 	}
-}
+}
 
 /+
 	+
@@ -552,8 +549,7 @@ template isQVariant(T)
 	alias U = Unqual!T;
 	static if(is(U == QVariant!X, X...))
 	enum isQVariant = true;
-	else
-	enum isQVariant = false;
+	else enum isQVariant = false;
 }
 
 enum isQVariantOrQuantity(T) = isQVariant!T || isQuantity!T;

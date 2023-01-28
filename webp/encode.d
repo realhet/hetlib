@@ -1,4 +1,4 @@
-module webp.encode;
+module webp.encode; 
 //Copyright 2011 Google Inc. All Rights Reserved.
 //
 //Use of this source code is governed by a BSD-style license
@@ -11,12 +11,13 @@ module webp.encode;
 //   WebP encoder: main interface
 //
 //Author: Skal (pascal.massimino@gmail.com)
- 
+	
 //public import webp.types;
 
 pragma(lib, "libwebp.lib");
 
-extern (C) {
+extern (C)
+{
 	
 	enum WEBP_ENCODER_ABI_VERSION = 0x0202;    //MAJOR(8b) + MINOR(8b)
 	
@@ -34,24 +35,24 @@ extern (C) {
 	//can go from 0 (smaller output, lower quality) to 100 (best quality,
 	//larger output).
 	size_t WebPEncodeRGB(
-		in ubyte* rgb,
-										  int width, int height, int stride,
-										  float quality_factor, ubyte** output
+		in ubyte*	rgb,
+											int width, int height, int stride,
+											float quality_factor, ubyte** output
 	);
 	size_t WebPEncodeBGR(
-		in ubyte* bgr,
-										  int width, int height, int stride,
-										  float quality_factor, ubyte** output
+		in ubyte*	bgr,
+											int width, int height, int stride,
+											float quality_factor, ubyte** output
 	);
 	size_t WebPEncodeRGBA(
 		in ubyte* rgba,
-										   int width, int height, int stride,
-										   float quality_factor, ubyte** output
+											  int width, int height, int stride,
+											  float quality_factor, ubyte** output
 	);
 	size_t WebPEncodeBGRA(
 		in ubyte* bgra,
-										   int width, int height, int stride,
-										   float quality_factor, ubyte** output
+											  int width, int height, int stride,
+											  float quality_factor, ubyte** output
 	);
 	
 	//These functions are the equivalent of the above, but compressing in a
@@ -59,30 +60,31 @@ extern (C) {
 	//not suffer any compression loss.
 	size_t WebPEncodeLosslessRGB(
 		in ubyte* rgb,
-												  int width, int height, int stride,
-												  ubyte** output
+													 int width, int height, int stride,
+													 ubyte** output
 	);
 	size_t WebPEncodeLosslessBGR(
 		in ubyte* bgr,
-												  int width, int height, int stride,
-												  ubyte** output
+													 int width, int height, int stride,
+													 ubyte** output
 	);
 	size_t WebPEncodeLosslessRGBA(
 		in ubyte* rgba,
-												   int width, int height, int stride,
-												   ubyte** output
+													  int width, int height, int stride,
+													  ubyte** output
 	);
 	size_t WebPEncodeLosslessBGRA(
 		in ubyte* bgra,
-												   int width, int height, int stride,
-												   ubyte** output
+													  int width, int height, int stride,
+													  ubyte** output
 	);
 	
 	//------------------------------------------------------------------------------
 	//Coding parameters
 	
 	//Image characteristics hint for the underlying encoder.
-	enum WebPImageHint {
+	enum WebPImageHint
+	{
 		WEBP_HINT_DEFAULT = 0,	 //default preset.
 		WEBP_HINT_PICTURE,	 //digital picture, like portrait, inner shot
 		WEBP_HINT_PHOTO,	 //outdoor photograph, with natural lighting
@@ -91,55 +93,57 @@ extern (C) {
 	}
 	
 	//Compression parameters.
-	struct WebPConfig {
-		  int lossless;	         //Lossless encoding (0=lossy(default), 1=lossless).
-		  float quality;	         //between 0 (smallest file) and 100 (biggest)
-		  int method;	         //quality/speed trade-off (0=fast, 6=slower-better)
+	struct WebPConfig
+	{
+			 int lossless;	         //Lossless encoding (0=lossy(default), 1=lossless).
+			 float quality;	         //between 0 (smallest file) and 100 (biggest)
+			 int method;	         //quality/speed trade-off (0=fast, 6=slower-better)
 		
 		  WebPImageHint image_hint;  //Hint for image type (lossless only for now).
 		
-		  //Parameters related to lossy compression only:
-		  int target_size;	 //if non-zero, set the desired target size in bytes.
-			 //Takes precedence over the 'compression' parameter.
-		  float target_PSNR;	 //if non-zero, specifies the minimal distortion to
-			 //try to achieve. Takes precedence over target_size.
-		  int segments;	 //maximum number of segments to use, in [1..4]
-		  int sns_strength;	 //Spatial Noise Shaping. 0=off, 100=maximum.
-		  int filter_strength;	 //range: [0 = off .. 100 = strongest]
-		  int filter_sharpness;	 //range: [0 = off .. 7 = least sharp]
-		  int filter_type;	 //filtering type: 0 = simple, 1 = strong (only used
-			 //if filter_strength > 0 or autofilter > 0)
-		  int autofilter;	 //Auto adjust filter's strength [0 = off, 1 = on]
-		  int alpha_compression;	 //Algorithm for encoding the alpha plane (0 = none,
-			 //1 = compressed with WebP lossless). Default is 1.
-		  int alpha_filtering;	 //Predictive filtering method for alpha plane.
-			 //0: none, 1: fast, 2: best. Default if 1.
-		  int alpha_quality;	 //Between 0 (smallest size) and 100 (lossless).
-			 //Default is 100.
-		  int pass;	 //number of entropy-analysis passes (in [1..10]).
+			//Parameters related to lossy compression only:
+			int target_size;	 //if non-zero, set the desired target size in bytes.
+				//Takes precedence over the 'compression' parameter.
+			float target_PSNR;	 //if non-zero, specifies the minimal distortion to
+				//try to achieve. Takes precedence over target_size.
+			int segments;	 //maximum number of segments to use, in [1..4]
+			int sns_strength;	 //Spatial Noise Shaping. 0=off, 100=maximum.
+			int filter_strength;	 //range: [0 = off .. 100 = strongest]
+			int filter_sharpness;	 //range: [0 = off .. 7 = least sharp]
+			int filter_type;	 //filtering type: 0 = simple, 1 = strong (only used
+				//if filter_strength > 0 or autofilter > 0)
+			int autofilter;	 //Auto adjust filter's strength [0 = off, 1 = on]
+			int alpha_compression;	 //Algorithm for encoding the alpha plane (0 = none,
+				//1 = compressed with WebP lossless). Default is 1.
+			int alpha_filtering;	 //Predictive filtering method for alpha plane.
+				//0: none, 1: fast, 2: best. Default if 1.
+			int alpha_quality;	 //Between 0 (smallest size) and 100 (lossless).
+				//Default is 100.
+			int pass;	 //number of entropy-analysis passes (in [1..10]).
 		
-		  int show_compressed;	 //if true, export the compressed picture back.
-			 //In-loop filtering is not applied.
-		  int preprocessing;	 //preprocessing filter:
-			 //0=none, 1=segment-smooth, 2=pseudo-random dithering
-		  int partitions;	 //log2(number of token partitions) in [0..3]. Default
-			 //is set to 0 for easier progressive decoding.
-		  int partition_limit;	 //quality degradation allowed to fit the 512k limit
-			 //on prediction modes coding (0: no degradation,
-			 //100: maximum possible degradation).
-		  int emulate_jpeg_size;	 //If true, compression parameters will be remapped
-			 //to better match the expected output size from
-			 //JPEG compression. Generally, the output size will
-			 //be similar but the degradation will be lower.
-		  int thread_level;	 //If non-zero, try and use multi-threaded encoding.
-		  int low_memory;	 //If set, reduce memory usage (but increase CPU use).
+			int show_compressed;	 //if true, export the compressed picture back.
+				//In-loop filtering is not applied.
+			int preprocessing;	 //preprocessing filter:
+				//0=none, 1=segment-smooth, 2=pseudo-random dithering
+			int partitions;	 //log2(number of token partitions) in [0..3]. Default
+				//is set to 0 for easier progressive decoding.
+			int partition_limit;	 //quality degradation allowed to fit the 512k limit
+				//on prediction modes coding (0: no degradation,
+				//100: maximum possible degradation).
+			int emulate_jpeg_size;	 //If true, compression parameters will be remapped
+				//to better match the expected output size from
+				//JPEG compression. Generally, the output size will
+				//be similar but the degradation will be lower.
+			int thread_level;	 //If non-zero, try and use multi-threaded encoding.
+			int low_memory;	 //If set, reduce memory usage (but increase CPU use).
 		
 		  uint[5] pad;            //padding for later use
-	}
+	}
 	
 	//Enumerate some predefined settings for WebPConfig, depending on the type
 	//of source picture. These presets are used when calling WebPConfigPreset().
-	enum WebPPreset {
+	enum WebPPreset
+	{
 		WEBP_PRESET_DEFAULT = 0,	 //default preset.
 		WEBP_PRESET_PICTURE,	 //digital picture, like portrait, inner shot
 		WEBP_PRESET_PHOTO,	 //outdoor photograph, with natural lighting
@@ -155,7 +159,8 @@ extern (C) {
 	//modification. Returns false in case of version mismatch. WebPConfigInit()
 	//must have succeeded before using the 'config' object.
 	//Note that the default values are lossless=0 and quality=75.
-	int WebPConfigInit(WebPConfig* config) {
+	int WebPConfigInit(WebPConfig* config)
+	{
 		return WebPConfigInitInternal(
 			config, WebPPreset.WEBP_PRESET_DEFAULT, 75.0f,
 											WEBP_ENCODER_ABI_VERSION
@@ -169,7 +174,8 @@ extern (C) {
 	int WebPConfigPreset(
 		WebPConfig* config,
 												WebPPreset preset, float quality
-	) {
+	)
+	{
 		return WebPConfigInitInternal(
 			config, preset, quality,
 											WEBP_ENCODER_ABI_VERSION
@@ -184,7 +190,8 @@ extern (C) {
 	//Input / Output
 	//Structure for storing auxiliary statistics (mostly for lossy encoding).
 	
-	struct WebPAuxStats {
+	struct WebPAuxStats
+	{
 		int coded_size;         //final size
 		
 		float[5] PSNR;	   //peak-signal-to-noise ratio for Y/U/V/All/Alpha
@@ -194,17 +201,17 @@ extern (C) {
 		int[3][4] residual_bytes;  //approximate number of bytes spent for
 															 //DC/AC/uv coefficients for each (0..3) segments.
 		int[4] segment_size;	  //number of macroblocks in each segments
-		int[4] segment_quant;	  //quantizer values for each segments
-		int[4] segment_level;	  //filtering strength for each segments [0..63]
+		int[4] segment_quant;		 //quantizer values for each segments
+		int[4] segment_level;		 //filtering strength for each segments [0..63]
 		
-		int alpha_data_size;	   //size of the transparency data
-		int layer_data_size;	   //size of the enhancement layer data
+		int alpha_data_size;		  //size of the transparency data
+		int layer_data_size;		  //size of the enhancement layer data
 		
 		//lossless encoder statistics
 		uint lossless_features;  //bit0:predictor bit1:cross-color transform
 		         //bit2:subtract-green bit3:color indexing
-		int histogram_bits;	         //number of precision bits of histogram
-		int transform_bits;	         //precision bits for transform
+		int histogram_bits;		        //number of precision bits of histogram
+		int transform_bits;		        //precision bits for transform
 		int cache_bits;	         //number of bits for color cache lookup
 		int palette_size;	         //number of color in palette, if used
 		int lossless_size;	         //final lossless size
@@ -216,16 +223,17 @@ extern (C) {
 	//data/data_size is the segment of data to write, and 'picture' is for
 	//reference (and so one can make use of picture->custom_ptr).
 	alias int function(
-		in ubyte* data, size_t data_size,
-										  in WebPPicture* picture
+		in ubyte*	data, size_t data_size,
+											in WebPPicture* picture
 	) WebPWriterFunction;
 	
 	//WebPMemoryWrite: a special WebPWriterFunction that writes to memory using
 	//the following WebPMemoryWriter object (to be set as a custom_ptr).
-	struct WebPMemoryWriter {
+	struct WebPMemoryWriter
+	{
 		ubyte* mem;	 //final buffer (of size 'max_size', larger than 'size').
-		size_t	  size;	 //final size
-		size_t	  max_size;	 //total capacity
+		size_t		 size;	 //final size
+		size_t		 max_size;	 //total capacity
 		uint[1] pad;        //padding for later use
 	}
 	
@@ -236,6 +244,7 @@ extern (C) {
 	//completion, writer.mem and writer.size will hold the coded data.
 	//if (WEBP_ENCODER_ABI_VERSION > 0x0203)
 	//writer.mem must be freed by calling WebPMemoryWriterClear.
+	
 	//} else {
 	//writer.mem must be freed by calling 'free(writer.mem)'.
 	//}
@@ -250,7 +259,8 @@ extern (C) {
 	alias int function(int percent, in WebPPicture* picture) WebPProgressHook;
 	
 	//Color spaces.
-	enum WebPEncCSP {
+	enum WebPEncCSP
+	{
 		//chroma sampling
 		WEBP_YUV420	= 0,	  //4:2:0
 		WEBP_YUV420A	= 4,	  //alpha channel variant
@@ -259,7 +269,8 @@ extern (C) {
 	}
 	
 	//Encoding error conditions.
-	enum WebPEncodingError {
+	enum WebPEncodingError
+	{
 		VP8_ENC_OK = 0,
 		VP8_ENC_ERROR_OUT_OF_MEMORY,	 //memory error allocating objects
 		VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY,	 //memory error while flushing bits
@@ -278,7 +289,8 @@ extern (C) {
 	enum WEBP_MAX_DIMENSION = 16383;
 	
 	//Main exchange structure (input samples, output bytes, statistics)
-	struct WebPPicture {
+	struct WebPPicture
+	{
 		//   INPUT
 		//////////////
 		//Main flag for encoder selecting between ARGB or YUV input.
@@ -309,13 +321,13 @@ extern (C) {
 		
 		//map for extra information (only for lossy compression mode)
 		int extra_info_type;	   //1: intra type, 2: segment, 3: quant
-		   //4: intra-16 prediction mode,
-		   //5: chroma prediction mode,
-		   //6: bit cost, 7: distortion
+			  //4: intra-16 prediction mode,
+			  //5: chroma prediction mode,
+			  //6: bit cost, 7: distortion
 		ubyte* extra_info;	   //if not NULL, points to an array of size
-		   //((width + 15) / 16) * ((height + 15) / 16) that
-		   //will be filled with a macroblock map, depending
-		   //on extra_info_type.
+			  //((width + 15) / 16) * ((height + 15) / 16) that
+			  //will be filled with a macroblock map, depending
+			  //on extra_info_type.
 		
 		//   STATS AND REPORTS
 		///////////////////////////
@@ -342,7 +354,7 @@ extern (C) {
 		void* memory_;	    //row chunk of memory for yuva planes
 		void* memory_argb_;	    //and for argb too.
 		void*[2] pad7;          //padding for later use
-	}
+	}
 	
 	//Internal, version-checked, entry point
 	int WebPPictureInitInternal(WebPPicture*, int);
@@ -351,7 +363,8 @@ extern (C) {
 	//of version mismatch. WebPPictureInit() must have succeeded before using the
 	//'picture' object.
 	//Note that, by default, use_argb is false and colorspace is WEBP_YUV420.
-	int WebPPictureInit(WebPPicture* picture) { return WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION); }
+	int WebPPictureInit(WebPPicture* picture)
+	{ return WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION); }
 	
 	//------------------------------------------------------------------------------
 	//WebPPicture utils
@@ -436,6 +449,7 @@ extern (C) {
 	//Same, but for RGBA buffer. Imports the RGB direct from the 32-bit format
 	//input buffer ignoring the alpha channel. Avoids needing to copy the data
 	//to a temporary 24-bit RGB buffer to import the RGB only.
+	
 	int WebPPictureImportRGBX(WebPPicture* picture, in ubyte* rgbx, int rgbx_stride);
 	
 	//Variants of the above, but taking BGR(A|X) input.
@@ -501,3 +515,4 @@ extern (C) {
 	//------------------------------------------------------------------------------
 	
 }    //extern (C)
+
