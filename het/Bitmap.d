@@ -899,7 +899,7 @@ version(/+$DIDE_REGION+/all)
 		 //unoptimized recursive version
 		T[2] a = [
 			linearInterpolate(p[0], x),
-				linearInterpolate(p[1], x) 
+			linearInterpolate(p[1], x) 
 		];
 		return linearInterpolate(a, y);
 	}

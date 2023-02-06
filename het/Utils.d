@@ -2067,7 +2067,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		//todo: unittest on a 0..N+1 square. N e 3, 4, 5
 		
 		
-		T rcpf_fast(T)(const T x)if(__traits(isFloating, T)) {
+		T rcpf_fast(T)(const T x)if(__traits(isFloating, T))
+		 {
 			return 1.0f/x; //todo: Ezt megcsinalni SSE-vel
 		}
 		
@@ -2227,9 +2228,10 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		float peakLocation(float a, float b, float c, float* y=null)
 		{
+			NOTIMPL;//todo: this is possibly buggy. must refactor.
 			//https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
-			auto d = (a-2*b+c),
-					 p = abs(d)<1e-4 ? 0 : 0.5f*(a-c)/d;
+			auto 	d = (a-2*b+c),
+				p = abs(d)<1e-4 ? 0 : 0.5f*(a-c)/d;
 			if(y) *y = b-0.25f*(a-c)*p;
 			return p;
 		}
@@ -6289,7 +6291,7 @@ version(/+$DIDE_REGION Containers+/all)
 							const v0 = inp[i	 ]	,	 v1 = inp[i+1]	,
 										k0 = sec[i	 ] ^ v0,		k1 = sec[i+1] ^ v1;
 							const a0 = k0 & 0xFFFFFFFF,	 a1 = k1 & 0xFFFFFFFF,
-										b0 = k0 >> 32       ,	 b1 = k1 >> 32    ;
+										b0 = k0 >> 32       ,	 b1 = k1 >> 32   ;
 							acc[i  ] += a0*b0 + v1;
 							acc[i+1] += a1*b1 + v0;
 						}
@@ -6404,7 +6406,7 @@ version(/+$DIDE_REGION Containers+/all)
 								
 						if(len >	8) return len_9to16;
 						if(len >=	4) return len_4to8;
-						if(len  ) return len_1to3;
+						if(len ) return len_1to3;
 						return avalanche64(seed ^ (readLE64(secret + 56) ^ readLE64(secret + 64)));
 					}
 							
@@ -6619,7 +6621,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					d.wMilliseconds	= t.wMilliseconds;
 					d.wSecond	= t.wSecond					;
 					d.wMinute	= t.wMinute					;
-					d.wHour	= t.wHour	  ;
+					d.wHour	= t.wHour	 ;
 					return d;
 				}
 						
@@ -7095,7 +7097,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		DateTime	today()
 		{ return now.localDayStart; }
 		Time	time ()
-		{ return now.localTime ; }
+		{ return now.localTime; }
 		
 				Time QPS()
 		{ return now - appStartedDay; }

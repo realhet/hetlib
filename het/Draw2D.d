@@ -590,16 +590,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			 ,{ '*',{ 16,[[{ 3,12 },{ 13,18 }],[{ 8,21 },{ 8,9 }],[{ 13,12 },{ 3,18 }]] } }
 			 ,{ '+',{ 26,[[{ 4,9 },{ 22,9 }],[{ 13,0 },{ 13,18 }]] } }
-			 ,{
-				',',{
-					10,[
-						[
-							{ 4,-4 },{ 5,-3 },{ 6,-1 },{ 6,1 },{ 5,2 },{ 4,1 },{ 5,0 }
-																,{ 6,1 }
-						]
-					]
-				}
-			}
+			 ,{ ',',{ 10,[[{ 4,-4 },{ 5,-3 },{ 6,-1 },{ 6,1 },{ 5,2 },{ 4,1 },{ 5,0 },{ 6,1 }]] } }
 			 ,{ '-',{ 26,[[{ 4,9 },{ 22,9 }]] } }
 			 ,{ '.',{ 10,[[{ 5,2 },{ 4,1 },{ 5,0 },{ 6,1 },{ 5,2 }]] } }
 			 ,{ '/',{ 22,[[{ 2,-7 },{ 20,25 }]] } }
@@ -698,14 +689,8 @@ version(/+$DIDE_REGION+/all)
 			 ,{
 				';',{
 					10,[
-						[
-							{ 4,-4 },{ 5,-3 },{ 6,-1 },{ 6,1 },{ 5,2 },{ 4,1 }
-							,{ 5,0 },{ 6,1 }
-						],
-						[
-							{ 5,14 },{ 4,13 },{ 5,12 },{ 6,13 }
-							,{ 5,14 }
-						]
+						[{ 4,-4 },{ 5,-3 },{ 6,-1 },{ 6,1 },{ 5,2 },{ 4,1 },{ 5,0 },{ 6,1 }],
+						[{ 5,14 },{ 4,13 },{ 5,12 },{ 6,13 },{ 5,14 }]
 					]
 				}
 			}
@@ -716,9 +701,9 @@ version(/+$DIDE_REGION+/all)
 				'?',{
 					18,[
 						[
-							{ 3,16 },{ 3,17 },{ 4,19 },{ 5,20 },{ 7,21 },{ 11,21 }
-							,{ 13,20 },{ 14,19 },{ 15,17 },{ 15,15 },{ 14,13 }
-							,{ 13,12 },{ 9,10 },{ 9,7 }
+							{ 3,16 },{ 3,17 },{ 4,19 },{ 5,20 },{ 7,21 },{ 11,21 },{ 13,20 },
+							{ 14,19 },{ 15,17 },{ 15,15 },{ 14,13 },{ 13,12 },{ 9,10 },
+							{ 9,7 }
 						]
 						,[{ 9,2 },{ 8,1 },{ 9,0 },{ 10,1 },{ 9,2 }]
 					]
@@ -730,8 +715,7 @@ version(/+$DIDE_REGION+/all)
 						[{ 11,5 },{ 10,6 },{ 9,8 },{ 9,11 },{ 10,14 },{ 12,16 }]
 						,[
 							{ 18,13 },{ 17,15 },{ 15,16 },{ 12,16 },{ 10,15 },{ 9,14 }
-							,{ 8,11 },{ 8,8 },{ 9,6 },{ 11,5 },{ 14,5 },{ 16,6 }
-							,{ 17,8 }
+							,{ 8,11 },{ 8,8 },{ 9,6 },{ 11,5 },{ 14,5 },{ 16,6 },{ 17,8 }
 						],
 						[{ 19,5 },{ 18,6 },{ 18,8 },{ 19,16 }]
 						,[
@@ -979,14 +963,7 @@ version(/+$DIDE_REGION+/all)
 					]
 				}
 			}
-			 ,{
-				'i',{
-					8,[
-						[{ 3,21 },{ 4,20 },{ 5,21 },{ 4,22 },{ 3,21 }]
-						,[{ 4,14 },{ 4,0 }]
-					]
-				}
-			}
+			 ,{ 'i',{ 8,[[{ 3,21 },{ 4,20 },{ 5,21 },{ 4,22 },{ 3,21 }],[{ 4,14 },{ 4,0 }]] } }
 			 ,{
 				'j',{
 					10,[
@@ -2648,13 +2625,13 @@ class Drawing
 			float minRadius = min(radius.x, radius.y);
 			if(minRadius>0.75)
 			{
-				float segCnt	= calcSegCnt(minRadius, maxVerts),
-							incr	= 1/segCnt;
+				float 	segCnt	= calcSegCnt(minRadius, maxVerts),
+					incr	= 1/segCnt;
 				emit(p.x, p.y+radius.y);
 				for(float i=1; i<segCnt; i += 1.0) {
-					float ph = i*incr*3.14159265,
-								xa = sin(ph)*radius.x,
-								ya = cos(ph)*radius.y;
+					float 	ph = i*incr*3.14159265,
+						xa = sin(ph)*radius.x,
+						ya = cos(ph)*radius.y;
 					emit(p.x+xa, p.y+ya);
 					emit(p.x-xa, p.y+ya);
 				}
@@ -2675,16 +2652,17 @@ class Drawing
 			//p0
 			///--|--\   --> s0
 			///   |   \        
-			//   /----|----\ ----> s1
+			///----|----\ ----> s1
 			//p1
 			/*
-				todo: DIDE this comment should not convert tabs to spaces.
-							There should be an option to make ascii art in comments.
+				todo:	DIDE this comment should not convert tabs to spaces.
+					There should be an option to make ascii art in comments.
 			*/
 			emit(p0-s0);	 emit(p0+s0);
 			emit(p1-s1);	 emit(p1+s1);
 			EndPrimitive();
 		}
+		
 		
 		void emitLine(vec2 u0, vec2 u1, float lineWidth, float stipple, int maxVerts, float arrowStyle)
 		{
@@ -3056,7 +3034,7 @@ class Drawing
 				float L = length(texelPerPixel);
 				samplingLevel = 	L>32 ? 	2: //minify
 					L< 1 ? 	1: //magnify
-						(isTransparent ? 2 : 3/*cleartype*/); //medium zoom
+						(isTransparent ? 2 : 3/*cleartype*/)/*medium zoom*/;
 			}
 			
 			if(samplingLevel==-1)
@@ -3074,7 +3052,7 @@ class Drawing
 				if(stConfig==8)	finalColor = vec4(texel.rgb, fontColor.a);
 				else if(stConfig==12)
 				finalColor = isTransparent 	? vec4(texel.rgb, texel.a)
-						: mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
+					: mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
 				else if(stConfig==0)
 				{
 					if(isImage) finalColor = vec4(texel.rrr, 1);
@@ -3094,8 +3072,8 @@ class Drawing
 				//experimental grid
 				/*
 					it's broken if(fontFlags&2) if(texelPerPixel.x < 0.1){
-										if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
-									}
+						if(fract(tc).x<0.1 && fract(tc).y<0.1) finalColor = vec4(0, 0, 0, 0.5);
+					}
 				*/
 			}
 			else if(samplingLevel==2)
@@ -3105,10 +3083,10 @@ class Drawing
 				if(stConfig==8) finalColor = vec4(texel.rgb, fontColor.a);  //wtf is this????
 				if(stConfig==12)
 				finalColor = isTransparent 	? vec4(texel.rgb, texel.a)
-						: mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
+					: mix(bkColor, vec4(texel.rgb, fontColor.a), texel.a);
 				else if(stConfig==0)
 				finalColor = isTransparent 	? vec4(fontColor.rgb, texel.a)
-						: mix(bkColor, fontColor, texel.a);
+					: mix(bkColor, fontColor, texel.a);
 				 //FONT
 			}
 			else
@@ -3127,12 +3105,12 @@ class Drawing
 			return finalColor;
 		}
 		
-		vec4 customShader()	 { return vec4(((int(tc.x)^int(tc.y))&255)/255.0 * vec3(1, 0, 1), 1); }
-		//note: ^^^^^^^^^^	this single line marks the place of the custom shader
+		vec4 customShader() { return vec4(((int(tc.x)^int(tc.y))&255)/255.0 * vec3(1, 0, 1), 1); }
+		//note: ^^^^^^^^^^	this SINGLE(!) line marks the place of the custom shader
 		
 		void main()
 		{
-			if(chkClip(fClipMin, fClipMax)) discard;
+			if(chkClip(fClipMin, fClipMax)) discard; //I think this is not subpixel accurate
 			
 			if(fColor2.w==0)
 			{
@@ -3190,7 +3168,7 @@ class Drawing
 				}
 				
 				if(!isCustomShader) {
-					 //default shader form images and text
+					 //default shader for images and text
 					FragColor = defaultShader();
 				}
 				else {

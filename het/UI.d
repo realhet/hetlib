@@ -636,8 +636,8 @@ version(/+$DIDE_REGION+/all)
 					VirtualFileGraph;				 Spacer;
 					BitmapCacheGraph;				 Spacer;
 					TextureCacheGraph;	                 Spacer;
-					TPSGraph;																  Spacer;
-					FPSGraph;																  Spacer;
+					TPSGraph;																	 Spacer;
+					FPSGraph;																	 Spacer;
 					GCGraph;	                 Spacer;
 					GCRateGraph;	                 Spacer;
 					SelectTimeIdx(timeIdx);
@@ -1064,16 +1064,16 @@ struct im
 		{
 			
 			//PING(7);
-					static if(doTiming)
+			static if(doTiming)
 			{
 				const T0 = QPS; scope(exit)
 				{ tDraw = QPS-T0; print(format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)); }
 			}
 			
-					static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");
-					enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
+			static assert(restrict=="system call only", "im.draw() is restricted to call by system only.");
+			enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now.");
 			
-					static if(reuseDr)
+			static if(reuseDr)
 			{
 				if(!staticDr[0])
 				staticDr = [new Drawing("im0"), new Drawing("im1")];
@@ -1081,8 +1081,8 @@ struct im
 			}else
 			{ auto dr = [new Drawing, new Drawing]; }
 			
-					//init clipbounds
-					foreach(i, ref d;	dr)
+			//init clipbounds
+			foreach(i, ref d;	dr)
 			{
 				ref view()
 				{ return targetSurfaces[i].view; }
@@ -1091,9 +1091,9 @@ struct im
 					d.pushClipBounds(view.screenBounds_anim.inflated(-view.screenBounds_anim.size*0));
 			}
 			
-					foreach(i; 0..2)
+			foreach(i; 0..2)
 			surfaceBounds[i] = bounds2.init;
-					foreach(a; rootContainers(true))
+			foreach(a; rootContainers(true))
 			{
 				const s = a.flags.targetSurface;
 				surfaceBounds[s] |= a.outerBounds;
@@ -1101,7 +1101,7 @@ struct im
 				a.draw(dr[s]); //draw in zOrder
 			}
 			
-					foreach(i, d; dr)
+			foreach(i, d; dr)
 			{
 				//it's not good because of invisible scrollable elements. -> surfaceBounds[i] |= dr[i].bounds;
 				d.popClipBounds;
@@ -1109,16 +1109,16 @@ struct im
 				d.clear;
 			}
 			
-					if(VisualizeHitStack && drVisualizeHitStack)
+			if(VisualizeHitStack && drVisualizeHitStack)
 			{
 				drVisualizeHitStack.glDraw(targetSurfaces[1].view); //todo: problem with hitStack: it is assumed to be on GUI view
 			}
-					drVisualizeHitStack.free;
+			drVisualizeHitStack.free;
 			
-					//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
-					//todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
+			//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
+			//todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
 			
-					//todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
+			//todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
 		}
 		
 			//PanelPosition ///////////////////////////////////////////

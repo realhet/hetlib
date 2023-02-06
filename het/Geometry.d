@@ -233,8 +233,8 @@ void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ive
 		dot2(v);
 		while(v.x<e) {
 			++v.x;
-			if(p.x<0) { p.x += d1.y;	 }
-			else { p.x += d1.y-d1.x;  v.y += i;	 }
+			if(p.x<0) { p.x += d1.y;		 }
+			else { p.x += d1.y-d1.x;	v.y += i;	 }
 			dot2(v);
 		}
 	}
@@ -244,8 +244,8 @@ void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ive
 		dot2(v);
 		while(v.y<e) {
 			++v.y;
-			if(p.y<0) { p.y += d1.x;	 }
-			else { p.y += d1.x-d1.y;  v.x += i;	 }
+			if(p.y<0) { p.y += d1.x;		 }
+			else { p.y += d1.x-d1.y;	v.x += i;	 }
 			dot2(v);
 		}
 	}
@@ -452,7 +452,17 @@ struct QuadraticFitResult
 	
 	bool isNull() const { return !a && !b && !c; }
 	
-	float y(float x) { return a*x^^2 + b*x + c; }
+	float y(float x) const { return a*x^^2 + b*x + c; }
+	
+	vec2 location() const
+	{
+		float ly = 0; 
+		const lx = peakLocation(a, b, c, &ly);
+		return vec2(lx, ly);
+	}
+	
+	float location_x() const
+	{ return peakLocation(a, b, c); }
 }
 
 private float det(float a, float b, float c, float d)
@@ -466,6 +476,8 @@ private float det(float a, float b, float c, float d, float e, float f, float g,
 
 auto quadraticFit(in vec2[] data)
 {
+	NOTIMPL;//todo: this is possibly buggy. must refactor.
+	
 	QuadraticFitResult res;
 	if(data.length<3) {
 		if(data.length==2) {
@@ -485,7 +497,7 @@ auto quadraticFit(in vec2[] data)
 		s30 = data.map!"a.x^^3".sum,	//sum of x^3
 		s20 = data.map!"a.x^^2".sum,	//sum of x^2
 		s10 = data.map!"a.x".sum,	//sum of x
-		s00 = data.length,	//sum of x^0 * y^0  ie 1 * number of entries
+		s00 = data.length,	//sum of x^0 * y^0	ie 1 * number of entries
 		s21 = data.map!"a.x^^2*a.y".sum,	//sum of x^2*y
 		s11 = data.map!"a.x*a.y".sum,	//sum of x*y
 		s01 = data.map!"a.y".sum	//sum of y

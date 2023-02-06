@@ -499,11 +499,15 @@ version(/+$DIDE_REGION+/all)
 				return true;
 			}
 			
-			static if(N==2) auto area() const
-			{ return x*y; }
-			static if(N==3) auto volume() const
-			{ return x*y*z; }
-		
+			static if(N==2) 
+				auto area() const
+				{ return x*y; }
+			
+			static if(N==3) 
+				auto volume() const
+				{ return x*y*z; }
+			
+					
 		}
 	}
 	
@@ -1701,7 +1705,7 @@ version(/+$DIDE_REGION+/all)
 				static assert(cfg.length==2 && "[(".canFind(cfg[0]) && "])".canFind(cfg[1]), "invalid open/close config. // [] closed, () open");
 						
 				static if(cfg[0]=='[') alias f1 = greaterThanEqual;else alias f1 = greaterThan;
-				static if(cfg[1]==']') alias f2 = lessThanEqual ;else alias f2 = lessThan ;
+				static if(cfg[1]==']') alias f2 = lessThanEqual;else alias f2 = lessThan;
 						
 				static if(isBounds!T)
 				return contains!cfg(other.low) && contains!cfg(other.high);
@@ -2057,7 +2061,7 @@ version(/+$DIDE_REGION+/all)
 				
 				return image2D(
 					size, (ivec2 pos)
-									{
+					{
 						//generate all the access functions
 						static auto importArg(T)(int i)
 						{
