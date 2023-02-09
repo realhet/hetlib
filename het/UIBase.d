@@ -10,6 +10,7 @@ version(/+$DIDE_REGION+/all)
 	import het.ui : im; //todo: bad crosslink for scrollInfo
 	
 	//todo: rename "hovered" -> "hot"
+	//todo: multiple 2D view controls in hetlib
 	
 	//enums/constants ///////////////////////////////////////
 	

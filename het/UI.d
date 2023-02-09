@@ -238,9 +238,7 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	
-	///////////////////////////////////////////////////////////////////////////
-	/// ResourceMonitor                                                     ///
-	///////////////////////////////////////////////////////////////////////////
+	__gshared ResourceMonitor resourceMonitor; //automatically updated
 	
 	struct ResourceMonitor
 	{
@@ -248,11 +246,20 @@ version(/+$DIDE_REGION+/all)
 		{
 			bool isAccumulator=true;
 			
-			enum M = 4;
-			enum string[M]	timeStepNames	 = [   "1 sec",     "10 sec",     "2 min",    "24 min"];
-			enum int[M]	counterMax	 = [1,         10,            12,         12          ];
-			enum N = 300;
-			enum string[M] timeRangeNames = [   "5 min",    "50 min",     "10 hour",   "5 day" ];
+			enum timeStepNames 	= [	  "1 sec",   "10 sec",   "2 min",    "24 min"],
+			counterMax	= [1,	  10,          12,          12         ],
+			timeRangeNames	= [   "5 min",   "50 min",  "10 hour",   "5 day"],
+			M	= timeStepNames.length.to!int,
+			N	= 300;
+			static assert(counterMax.length == M && timeRangeNames.length == M);
+			
+			/+
+				enum M = 4;
+				enum string[M] timeStepNames = [   "1 sec",     "10	sec",     "2	min",    "24 min"];
+				enum int[M] counterMax = [1,         10,	12,         12	];
+				enum N = 300;
+				enum string[M] timeRangeNames = ["5 min",    "50 min",     "10 hour",   "5 day" ];
+			+/
 			float[M] act;
 			float[N][M] history;
 			int[M] counter;
@@ -306,7 +313,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 		}
-		
+		
 		Item
 			textureCount, texturePoolSize, textureUsedSize,
 		
@@ -365,7 +372,7 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 			
-		}
+		}
 		
 		void update()
 		{
@@ -409,245 +416,240 @@ version(/+$DIDE_REGION+/all)
 				}
 			);
 		}
-		
-	}
-	
-	__gshared ResourceMonitor resourceMonitor;
-	
-	void UI(ref ResourceMonitor m, float graphWidth)
-	{
-		with(im)
-		with(m)
+		
+		void UI(float graphWidth)
 		{
-			
-			immutable
-				clTexturePool = RGB(255, 180, 40),
-				clTextureUsed = RGB(180, 255, 40),
-			
-				clBitmap	= clAqua,
-				clHotBitmap	= mix(clGray, clBitmap, .5),
-				clResidentBitmap	= mix(clGray, clBitmap, .25),
-			
-				clVirtualFile	= RGB(100, 150, 255),
-				clResidentVirtualFile	= mix(clGray, clVirtualFile, .25),
-			
-				clUPS								 = RGB(180, 40, 255),
-				clFPS								 = RGB(255, 40, 180),
-			
-				clTPS								 = RGB(40,  80, 255),
-				clVPS								 = RGB(40, 255,  80),
-			
-				clGcUsed	     = RGB(120, 180, 40),
-				clGcAll	     = RGB(40, 220, 120),
-				clGcRate	     = RGB(80, 160,  90);
-			
-			static int timeIdx = 0;
-			int gridXStepSize = Item.N/(timeIdx==2 ? 10 : 5);
-			
-			
-			void Legend(string title, float size=float.nan, RGB color = RGB(1, 2, 3), string suffix="")
+			with(im)
 			{
-				if(color != RGB(1, 2, 3))
-				Text(color, symbol("CheckboxFill"), tsNormal.fontColor, " ");
-				Text(title);
-				if(!isnan(size))
-				Row(HAlign.right, shortSizeText!1024(size)~suffix, { width = fh*(2.25 + suffix.length*0.3); });
-			}
-			
-			struct Data
-			{ float[] values; RGB color; }
-			
-			void Graph(string name, Data[] data, int gridXStepSize = 0, int gridYDivisions=4)
-			{
-				Btn(
-					{
-						bkColor = RGB(40, 40, 40);
-						padding = "3";
-						margin = "2 0";
-						innerWidth = graphWidth;
-						innerHeight = fh*3.5;
+				
+				immutable
+					clTexturePool 	= RGB(255, 180, 40),
+					clTextureUsed 	= RGB(180, 255, 40),
 						
-						/*
-							auto hit = hitTest(actContainer, true);
-							const w = hit.hitBounds.width-actContainer.totalGapSize.x;
-							const h = innerHeight;
-						*/
+					clBitmap	= clAqua,
+					clHotBitmap	= mix(clGray, clBitmap, .5),
+					clResidentBitmap	= mix(clGray, clBitmap, .25),
 						
-						const w = innerWidth;
-						const h = innerHeight;
+					clVirtualFile	= RGB(100, 150, 255),
+					clResidentVirtualFile	= mix(clGray, clVirtualFile, .25),
 						
-						auto dr = new Drawing;
-						with(dr)
-						{
-							const
-								dataWidth = data.map!(d => d.values.length).maxElement(1),
-								dataHeight = data.map!(d => d.values.maxElement(1)).maxElement(1),
-								sx =  (w+1) / dataWidth,
-								sy = -(h) / dataHeight;
-							
-							dr.color = RGB(70, 70, 70);
-							dr.lineWidth = 1;
-							if(gridXStepSize)
-							iota(0, dataWidth+1, gridXStepSize).each!(i => vLine(round(sx*i)-.5f, 0, h));
-							if(gridYDivisions)
-							iota(gridYDivisions+1).each!(i => hLine(0, (h*i/gridYDivisions).round-.5f, w));
-							
-							dr.lineWidth = 2;
-							foreach(d; data)
-							{ color = d.color;  hGraph(0, h, d.values, sx, sy); }
-						}
-						addOverlayDrawing(dr);
-					}, genericId(name)
-				);
-			}
-			
-			void VirtualFileGraph()
-			{
-				Row(
-					{
-						Text(format!"Virtual files[] (%s)"(virtualFileCount.val));                      Flex;
-						Legend("Resident", residentVirtualFileSize.val, clResidentVirtualFile, "B");  Spacer;
-						Legend("All"     , allVirtualFileSize.val     , clVirtualFile        , "B");
-					}
-				);
-				Graph(
-					"VirtualFiles", [
-						Data(residentVirtualFileSize.history[timeIdx][], clResidentVirtualFile),
-																			 Data(allVirtualFileSize     .history[timeIdx][], clVirtualFile        )
-					], gridXStepSize
-				);
-			}
-			
-			void BitmapCacheGraph()
-			{
-				Row(
-					{
-						Text(format!"Bitmaps (%s)"(bitmapCount.val));                        Flex;
-						Legend("Res" , residentBitmapSize.val	, clResidentBitmap	, "B");	 Spacer;
-						Legend("Hot" , nonUnloadableBitmapSize.val	, clHotBitmap	, "B");	 Spacer;
-						Legend("All" , allBitmapSize.val	, clBitmap	, "B");
-					}
-				);
-				Graph(
-					"BitmapCache", [
-						Data(residentBitmapSize     .history[timeIdx][], clResidentBitmap),
-																			Data(nonUnloadableBitmapSize.history[timeIdx][], clHotBitmap	    ),
-																			Data(allBitmapSize          .history[timeIdx][], clBitmap	    )
-					], gridXStepSize
-				);
-			}
-			
-			void TextureCacheGraph()
-			{
-				Row(
-					{
-						Text(format!"Textures (%s)"(textureCount.val));  Flex;
-						Legend("Used", textureUsedSize.val, clTextureUsed, "B");   Text("   ");
-						Legend("Pool", texturePoolSize.val, clTexturePool, "B");
-					}
-				);
-				//Text("Config: "~textures.megaTextureConfig);
-				Graph(
-					"TextureCache", [
-						Data(texturePoolSize.history[timeIdx][], clTexturePool),
-																			 Data(textureUsedSize.history[timeIdx][], clTextureUsed)
-					], gridXStepSize
-				);
-			}
-			
-			void FPSGraph()
-			{
-				Row(
-					{
-						Text("Refresh rate");           Flex;
-						Legend("UPS", UPS.val, clUPS, "Hz");  Text("   ");
-						Legend("FPS", FPS.val, clFPS, "Hz");
-					}
-				);
-				Graph(
-					"FPS", [
-						Data(UPS.history[timeIdx][], clUPS),
-															Data(FPS.history[timeIdx][], clFPS)
-					], gridXStepSize
-				);
-			}
-			
-			void TPSGraph()
-			{
-				Row(
-					{
-						Text("GPU data upload");                   Flex;
-						Legend("TEX", TPS.val, clTPS, "B/s");  Text("   ");
-						Legend("VBO", VPS.val, clVPS, "B/s");
-					}
-				);
-				Graph(
-					"TPS", [
-						Data(TPS.history[timeIdx][], clTPS),
-															Data(VPS.history[timeIdx][], clVPS)
-					], gridXStepSize
-				);
-			}
-			
-			void GCGraph()
-			{
-				Row(
-					{
-						Text("GC memory");	Flex;
-						Legend("Used", gcUsed.val,	clGcUsed,	"B");  Text("   ");
-						Legend("All" , gcAll.val,	clGcAll ,	"B");
-					}
-				);
-				Graph(
-					"GC", [
-						Data(gcUsed.history[timeIdx][], clGcUsed),
-														 Data(gcAll .history[timeIdx][], clGcAll)
-					], gridXStepSize
-				);
-			}
-			
-			void GCRateGraph()
-			{
-				Row(
-					{
-						Text("GC memory (main thread)"); Flex;
-						Legend("allocation rate", gcRate.val, clGcRate, "B/s");
-					}
-				);
-				Graph("GCRate", [Data(gcRate.history[timeIdx][], clGcRate)], gridXStepSize);
-			}
-			
-			void SelectTimeIdx(ref int t)
-			{
-				Row(
-					HAlign.right, {
-						Text("Time step");					 ComboBox(timeIdx, ResourceMonitor.Item.timeStepNames , { width = fh*4; });
-						Text("   Visible interval");					 ComboBox(timeIdx, ResourceMonitor.Item.timeRangeNames, { width = fh*4; });
-					}
-				);
-			}
-			
-			Column(
+					clUPS	= RGB(180, 40, 255),
+					clFPS	= RGB(255, 40, 180),
+						
+					clTPS	= RGB(40,  80, 255),
+					clVPS	= RGB(40, 255,  80),
+						
+					clGcUsed	= RGB(120, 180, 40),
+					clGcAll	= RGB(40, 220, 120),
+					clGcRate	= RGB(80, 160,  90);
+				
+				static int timeIdx = 0;
+				int gridXStepSize = Item.N/(timeIdx==2 ? 10 : 5);
+				
+				
+				void Legend(string title, float size=float.nan, RGB color = RGB(1, 2, 3), string suffix="")
 				{
-					padding = "4";
-					border = "1 normal silver";
-					theme = "tool";
-					Text(bold("Resource Monitor"));	   Spacer;
-					VirtualFileGraph;				 Spacer;
-					BitmapCacheGraph;				 Spacer;
-					TextureCacheGraph;	                 Spacer;
-					TPSGraph;																	 Spacer;
-					FPSGraph;																	 Spacer;
-					GCGraph;	                 Spacer;
-					GCRateGraph;	                 Spacer;
-					SelectTimeIdx(timeIdx);
+					if(color != RGB(1, 2, 3))
+					Text(color, symbol("CheckboxFill"), tsNormal.fontColor, " ");
+					Text(title);
+					if(!isnan(size))
+					Row(HAlign.right, shortSizeText!1024(size)~suffix, { width = fh*(2.25 + suffix.length*0.3); });
 				}
-			);
-			
-		}
-		
+				
+				struct Data
+				{ float[] values; RGB color; }
+				
+				void Graph(string name, Data[] data, int gridXStepSize = 0, int gridYDivisions=4)
+				{
+					Btn(
+						{
+							bkColor = RGB(40, 40, 40);
+							padding = "3";
+							margin = "2 0";
+							innerWidth = graphWidth;
+							innerHeight = fh*3.5;
+							
+							/*
+								auto hit = hitTest(actContainer, true);
+								const w = hit.hitBounds.width-actContainer.totalGapSize.x;
+								const h = innerHeight;
+							*/
+							
+							const w = innerWidth;
+							const h = innerHeight;
+							
+							auto dr = new Drawing;
+							with(dr)
+							{
+								const
+									dataWidth	= data.map!(d => d.values.length).maxElement(1),
+									dataHeight 	= data.map!(d => d.values.maxElement(1)).maxElement(1),
+									sx	=  (w+1) / dataWidth,
+									sy	= -(h) / dataHeight;
+								
+								dr.color = RGB(70, 70, 70);
+								dr.lineWidth = 1;
+								if(gridXStepSize)
+								iota(0, dataWidth+1, gridXStepSize).each!(i => vLine(round(sx*i)-.5f, 0, h));
+								if(gridYDivisions)
+								iota(gridYDivisions+1).each!(i => hLine(0, (h*i/gridYDivisions).round-.5f, w));
+								
+								dr.lineWidth = 2;
+								foreach(d; data)
+								{ color = d.color;  hGraph(0, h, d.values, sx, sy); }
+							}
+							addOverlayDrawing(dr);
+						},
+						genericId(name)
+					);
+				}
+				
+				void VirtualFileGraph()
+				{
+					Row(
+						{
+							Text(format!"Virtual files[] (%s)"(virtualFileCount.val));	Flex;
+							Legend("Resident", residentVirtualFileSize.val, clResidentVirtualFile, "B");	Spacer;
+							Legend("All"     , allVirtualFileSize.val     , clVirtualFile        , "B");	
+						}
+					);
+					Graph(
+						"VirtualFiles", [
+							Data(residentVirtualFileSize.history[timeIdx][], clResidentVirtualFile),
+							Data(allVirtualFileSize     .history[timeIdx][], clVirtualFile        )
+						], gridXStepSize
+					);
+				}
+				
+				void BitmapCacheGraph()
+				{
+					Row(
+						{
+							Text(format!"Bitmaps (%s)"(bitmapCount.val));	Flex;
+							Legend("Res" , residentBitmapSize.val	, clResidentBitmap	, "B");	Spacer;
+							Legend("Hot" , nonUnloadableBitmapSize.val	, clHotBitmap	, "B");	Spacer;
+							Legend("All" , allBitmapSize.val	, clBitmap	, "B");
+						}
+					);
+					Graph(
+						"BitmapCache", [
+							Data(residentBitmapSize     .history[timeIdx][], clResidentBitmap),
+							Data(nonUnloadableBitmapSize.history[timeIdx][], clHotBitmap	    ),
+							Data(allBitmapSize          .history[timeIdx][], clBitmap	    )
+						], gridXStepSize
+					);
+				}
+				
+				void TextureCacheGraph()
+				{
+					Row(
+						{
+							Text(format!"Textures (%s)"(textureCount.val));  Flex;
+							Legend("Used", textureUsedSize.val, clTextureUsed, "B");   Text("   ");
+							Legend("Pool", texturePoolSize.val, clTexturePool, "B");
+						}
+					);
+					//Text("Config: "~textures.megaTextureConfig);
+					Graph(
+						"TextureCache", [
+							Data(texturePoolSize.history[timeIdx][], clTexturePool),
+							Data(textureUsedSize.history[timeIdx][], clTextureUsed)
+						], gridXStepSize
+					);
+				}
+				
+				void FPSGraph()
+				{
+					Row(
+						{
+							Text("Refresh rate");	Flex;
+							Legend("UPS", UPS.val, clUPS, "Hz");	Text("   ");
+							Legend("FPS", FPS.val, clFPS, "Hz");	
+						}
+					);
+					Graph(
+						"FPS", [
+							Data(UPS.history[timeIdx][], clUPS),
+							Data(FPS.history[timeIdx][], clFPS)
+						], gridXStepSize
+					);
+				}
+				
+				void TPSGraph()
+				{
+					Row(
+						{
+							Text("GPU data upload");	Flex;
+							Legend("TEX", TPS.val, clTPS, "B/s");	Text("   ");
+							Legend("VBO", VPS.val, clVPS, "B/s");	
+						}
+					);
+					Graph(
+						"TPS", [
+							Data(TPS.history[timeIdx][], clTPS),
+							Data(VPS.history[timeIdx][], clVPS)
+						], gridXStepSize
+					);
+				}
+				
+				void GCGraph()
+				{
+					Row(
+						{
+							Text("GC memory");	Flex;
+							Legend("Used", gcUsed.val,	clGcUsed,	"B");	Text("   ");
+							Legend("All" , gcAll.val,	clGcAll ,	"B");	
+						}
+					);
+					Graph(
+						"GC", [
+							Data(gcUsed.history[timeIdx][], clGcUsed),
+							Data(gcAll .history[timeIdx][], clGcAll)
+						], gridXStepSize
+					);
+				}
+				
+				void GCRateGraph()
+				{
+					Row(
+						{
+							Text("GC memory (main thread)");	Flex;
+							Legend("allocation rate", gcRate.val, clGcRate, "B/s");	
+						}
+					);
+					Graph("GCRate", [Data(gcRate.history[timeIdx][], clGcRate)], gridXStepSize);
+				}
+				
+				void SelectTimeIdx(ref int t)
+				{
+					Row(
+						HAlign.right, {
+							Text("Time step");	ComboBox(timeIdx, Item.timeStepNames , { width = fh*4; });
+							Text("   Visible interval");	ComboBox(timeIdx, Item.timeRangeNames, { width = fh*4; });
+						}
+					);
+				}
+				
+				Column(
+					{
+						padding = "4";
+						border = "1 normal silver";
+						theme = "tool";
+						Text(bold("Resource Monitor"));	Spacer;
+						VirtualFileGraph;	Spacer;
+						BitmapCacheGraph;	Spacer;
+						TextureCacheGraph;	Spacer;
+						TPSGraph;	Spacer;
+						FPSGraph;	Spacer;
+						GCGraph;	Spacer;
+						GCRateGraph;	Spacer;
+						SelectTimeIdx(timeIdx);
+					}
+				);
+				
+			}
+		}
 	}
-	
 	void UI_SystemDiagnostics()
 	{
 		with(im)
@@ -663,8 +665,8 @@ version(/+$DIDE_REGION+/all)
 					Column(
 						{
 							if(auto w = cast(GLWindow)mainWindow)
-							ChkBox(w.showFPS       , "Show FPS Graph"       );
-							ChkBox(showResMonitor, "Show Resource Monitor");
+							ChkBox(w.showFPS	, "Show FPS Graph"       );
+							ChkBox(showResMonitor,	"Show Resource Monitor");
 						}
 					);
 				}
@@ -1990,9 +1992,9 @@ struct im
 			processContainerArgs(args);
 		}
 		
-			void Row   (string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
-		{ Container!(.Row   , srcModule, srcLine)(args); }
-			void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+			void Row   (string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		{ Container!(.Row	, srcModule, srcLine)(args); }
+			void Column(string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{ Container!(.Column, srcModule, srcLine)(args); }
 		
 			/// It is used to put cached cells or subcells into the imgui.
@@ -2561,9 +2563,9 @@ struct im
 										if(flags.acceptEditorKeys)
 										cmdQueue ~= EditCmd(cInsert, [ch].to!string);
 									}else if(ch>=32)
-									{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }else
-									{ unprocessed ~= ch; }
-								}  //jajj de korulmenyes ez a switch case fos....
+									{	cmdQueue ~= EditCmd(cInsert, [ch].to!string); }else
+									{	unprocessed ~= ch; }
+								}	//jajj de korulmenyes ez a switch case fos....
 							}
 							
 							{

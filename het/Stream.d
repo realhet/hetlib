@@ -324,7 +324,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 		}
 		else static if(isAggregateType!T)
 		{
-			 //Struct, Class
+			//Struct, Class
 			//handle null
 			if(actToken.isKeyword(kwnull))
 			{
@@ -422,6 +422,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 				}
 			}
 			
+			static if(__traits(compiles, { data.afterLoad(); })) data.afterLoad();
 		}
 		else static if(isArray!T)
 		{
@@ -590,6 +591,11 @@ void streamAppend_json(Type)(
 		//Struct, Class
 		//handle null for class
 		static if(is(T == class)) { if(data is null) { st ~= "null"; return; } }
+		
+		static if(__traits(compiles, { (cast()data).beforeSave(); }))
+		{
+			(cast()data).beforeSave(); //todo: this violates constness.
+		}
 		
 		st ~= dense ? "{" : "{\n";                  //opening bracket {
 		const nextIndent = dense ? "" : indent~"  ";
