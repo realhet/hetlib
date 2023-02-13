@@ -155,66 +155,72 @@ void test_predecodeLdcOutput()
 		
 				
 						
-								the first pragma
-								c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-								    body
-								    ^
-								c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-								    body
-								    ^
-								c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-								  depr1; depr1;
-								  ^
-								c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
-								  depr1; depr1;
-								         ^
-								c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-								  depr1;
-								  ^
-								c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-								  depr1;
-								  ^
-								this is just a pragma
-								c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
-								c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
-								        return fun(_input.front);
-								                  ^
-								c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
-								        return MapResult!(_fun, Range)(r);
-								               ^
-								c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
-								  iota(5).map!"b+5".print;
-								         ^
-								c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
-								this is just a pragma
-								with multiple lines
-								c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
-								  iota(5).countUntil!((a, b)=>c>d)(5);
-								                                  ^
-								c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
-								  with `pred = __lambda1,
-								       R = Result,
-								       Rs = (int)`
-								  must satisfy the following constraint:
-								`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
-								ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
-								          ^
-								c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
-								  with `pred = __lambda1,
-								       R = Result,
-								       N = int`
-								  must satisfy the following constraint:
-								`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
-								ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
-								          ^
-								c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
-								ptrdiff_t countUntil(alias pred, R)(R haystack)
-								          ^
-								also a pragma
-								fake markes here
-								       ^
-								end of file
 								
+										
+												
+														the first pragma
+														c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+														    body
+														    ^
+														c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+														    body
+														    ^
+														c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1; depr1;
+														  ^
+														c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1; depr1;
+														         ^
+														c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1;
+														  ^
+														c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1;
+														  ^
+														this is just a pragma
+														c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
+														c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
+														        return fun(_input.front);
+														                  ^
+														c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
+														        return MapResult!(_fun, Range)(r);
+														               ^
+														c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
+														  iota(5).map!"b+5".print;
+														         ^
+														c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
+														this is just a pragma
+														with multiple lines
+														c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
+														  iota(5).countUntil!((a, b)=>c>d)(5);
+														                                  ^
+														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
+														  with `pred = __lambda1,
+														       R = Result,
+														       Rs = (int)`
+														  must satisfy the following constraint:
+														`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
+														ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
+														          ^
+														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
+														  with `pred = __lambda1,
+														       R = Result,
+														       N = int`
+														  must satisfy the following constraint:
+														`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
+														ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
+														          ^
+														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
+														ptrdiff_t countUntil(alias pred, R)(R haystack)
+														          ^
+														also a pragma
+														fake markes here
+														       ^
+														end of file
+														
+													
+											
+									
 							
 					
 			
@@ -2072,19 +2078,22 @@ struct CodeLocation
 	{ return icmp(file.fullName, b.file.fullName).cmpChain(cmp(line, b.line)).cmpChain(cmp(column, b.column)); }
 	
 	string toString() const
-	{ return file.fullName ~ (column ? format!"(%d,%d)"(line, column) : line ? format!"(%d)"(line) : ""); }
+	{ return file.fullName ~ (line && column ? format!"(%d,%d)"(line, column) : line ? format!"(%d)"(line) : ""); }
 }
 
 enum BuildMessageType
-{ find, error, bug, warning, deprecation, todo, opt } //todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");
+{ find, error, bug, warning, deprecation, todo, opt } 
+//todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");
 
-auto buildMessageTypeColors = [clPink/*clWhite*/, clRed, RGB(0x0040FF)/*clOrange*/, clYellow, clAqua, clWowBlue, clWowPurple];
+auto buildMessageTypeColors = [clPink, clRed, RGB(0x0040FF), clYellow, clAqua, clWowBlue, clWowPurple];
 auto color(in BuildMessageType t)
 { return buildMessageTypeColors[t]; }
 
-auto buildMessageTypeCaptions = [/+im.symbol("Zoom")+/"Find", "Err", "Bug", "Warn", "Depr", "Todo", "Opt"];
+auto buildMessageTypeCaptions = ["Find", "Err", "Bug", "Warn", "Depr", "Todo", "Opt"];
 auto caption(in BuildMessageType t)
 { return buildMessageTypeCaptions[t]; }
+
+
 
 
 struct BuildMessage
@@ -2097,8 +2106,8 @@ struct BuildMessage
 	
 	string toString() const
 	{
-		return parentLocation ? format!"%s: %s:        %s"(location, type.text.capitalize, message)
-													: format!"%s: %s: %s"       (location, type.text.capitalize, message);
+		return parentLocation 	? format!"%s: %s:        %s"	(location, type.text.capitalize, message)
+			: format!"%s: %s: %s"	(location, type.text.capitalize, message);
 	}
 }
 
@@ -2227,7 +2236,7 @@ class BuildResult
 		while(
 			receiveTimeout(
 				0.msecs,
-							(in MsgBuildStarted msg){
+				(in MsgBuildStarted msg)	{
 					clear;
 					mainFile	= msg.mainFile;
 					filesToCompile	= msg.filesToCompile.dup;
@@ -2238,12 +2247,14 @@ class BuildResult
 					
 					msg.todos.each!(t => _processLine(t));
 				},
-							(in MsgCompileStarted msg){
+					
+				(in MsgCompileStarted msg)	{
 					auto f = filesToCompile.get(msg.fileIdx);
 					assert(f);
 					filesInFlight[f] = true;
 				},
-							(in MsgCompileProgress msg){
+					
+				(in MsgCompileProgress msg)	{
 					
 					auto f = msg.file;
 					filesInFlight.remove(f);
@@ -2272,8 +2283,8 @@ class BuildResult
 					outputs[f] = msg.output.splitLines; //todo: not used anymore. Everything is in messages[]
 					remainings[f] = o.pragmas;  //todo: rename remainings to pragmas
 				},
-				
-							(in MsgBuildFinished msg){
+					
+				(in MsgBuildFinished msg)	{
 					filesInFlight.clear;
 					
 					//todo: clear currently compiling modules.
