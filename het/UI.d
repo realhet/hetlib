@@ -246,7 +246,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			bool isAccumulator=true;
 			
-			enum timeStepNames 	= [	  "1 sec",   "10 sec",   "2 min",    "24 min"],
+			enum timeStepNames 	= [  "1 sec",   "10 sec",   "2 min",    "24 min"],
 			counterMax	= [1,	  10,          12,          12         ],
 			timeRangeNames	= [   "5 min",   "50 min",  "10 hour",   "5 day"],
 			M	= timeStepNames.length.to!int,
@@ -2563,8 +2563,8 @@ struct im
 										if(flags.acceptEditorKeys)
 										cmdQueue ~= EditCmd(cInsert, [ch].to!string);
 									}else if(ch>=32)
-									{	cmdQueue ~= EditCmd(cInsert, [ch].to!string); }else
-									{	unprocessed ~= ch; }
+									{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }else
+									{ unprocessed ~= ch; }
 								}	//jajj de korulmenyes ez a switch case fos....
 							}
 							
@@ -4431,7 +4431,8 @@ struct im
 				Cell[] cells;
 				
 				cache.update(
-					ext, {
+					ext, 
+					{
 						Container(
 							{
 								Text(tag(format!`img "icon:\%s" height=%f`(ext, iconHeight)));  //note: this is fucking slow, but works
@@ -4441,7 +4442,7 @@ struct im
 						cells = cntr.subCells;  //note: this retirns the last char or a whole error string produced by text markup processor.
 						return cells;
 					},
-								(ref Cell[] c){ cells = c; }
+					(ref Cell[] c){ cells = c; }
 				);
 				
 				CellRef(cells);

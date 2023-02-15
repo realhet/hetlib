@@ -993,13 +993,16 @@ version(/+$DIDE_REGION+/all)
 				} 
 		+/
 		
-			///Optionally the container can have a parent.
-			inout(Container) getParent() inout
+		///Optionally the container can have a parent.
+		inout(Container) getParent() inout
 		{ return null; }
-			void setParent(Container p)
+		void setParent(Container p)
 		{}
 		
-			auto thisAndAllParents(Base : Cell = Cell, bool thisToo = true, bool isConst=is(typeof(this)==const))() inout
+		auto thisAndAllParents(
+			Base : Cell = Cell, bool thisToo = true, 
+			bool isConst=is(typeof(this)==const)
+		)() inout
 		{
 			
 			struct ParentRange
@@ -1035,38 +1038,44 @@ version(/+$DIDE_REGION+/all)
 			return ParentRange(thisToo ? this : getParent);
 		}
 		
-			auto allParents(Base : Cell = Container)() inout
+		auto allParents(Base : Cell = Container)() inout
 		{ return thisAndAllParents!(Base, false); }
 		
-			vec2 outerPos, outerSize;
+		vec2 outerPos, outerSize;
 		
-			ref _FlexValue flex()
+		ref _FlexValue flex()
 		{ static _FlexValue nullFlex; return nullFlex	; } //todo: this is bad, but fast. maybe do it with a setter and const ref.
-			ref Margin	margin ()
+		ref Margin	margin ()
 		{ static Margin	nullMargin; return nullMargin	; }
-			ref Border	border ()
+		ref Border	border ()
 		{ static Border	nullBorder; return nullBorder	; }
-			ref Padding	padding()
+		ref Padding	padding()
 		{ static Padding	nullPadding; return nullPadding; }  //todo: inout ref
 		
-			float extraMargin()	const
+		float extraMargin()	const
 		{ return (VisualizeContainers && cast(Container)this)? 3:0; }
-			vec2 topLeftGapSize()	const
+		vec2 topLeftGapSize()	const
 		{
 			with(cast()this)
-			return vec2(margin.left +extraMargin+border.gapWidth+padding.left , margin.top   +extraMargin+border.gapWidth+padding.top   );
+			return vec2(
+				margin.left	+ extraMargin + border.gapWidth+padding.left ,
+				margin.top 	+ extraMargin + border.gapWidth+padding.top   
+			);
 		}
-			vec2 bottomRightGapSize()	const
+		vec2 bottomRightGapSize()	const
 		{
 			with(cast()this)
-			return vec2(margin.right+extraMargin+border.gapWidth+padding.right, margin.bottom+extraMargin+border.gapWidth+padding.bottom);
+			return vec2(
+				margin.right	+ extraMargin + border.gapWidth+padding.right,
+				margin.bottom 	+ extraMargin + border.gapWidth+padding.bottom
+			);
 		}
-			vec2 totalGapSize()	const
+		vec2 totalGapSize()	const
 		{ return topLeftGapSize + bottomRightGapSize; }
-		
-			@property
+		
+		@property
 		{
-			 //accessing the raw values as an lvalue
+			//accessing the raw values as an lvalue
 			//version 1: property setters+getters. No += support.
 			/*
 				auto outerX	() const { return outerPos.x; } void outerX(float v) { outerPos.x = v; }
@@ -1077,35 +1086,38 @@ version(/+$DIDE_REGION+/all)
 			
 			//version 2: "auto ref const" and "auto ref" lvalues. Better but the code is redundant.
 			auto ref outerX	() const
-			{ return outerPos .x; }			 auto ref outerX	()
+			{ return outerPos .x; }	auto ref outerX	()
 			{ return outerPos .x; }
 			auto ref outerY	() const
-			{ return outerPos .y; }			 auto ref outerY	()
+			{ return outerPos .y; }	auto ref outerY	()
 			{ return outerPos .y; }
 			auto ref outerWidth	() const
-			{ return outerSize.x; }			 auto ref outerWidth	()
+			{ return outerSize.x; }	auto ref outerWidth	()
 			{ return outerSize.x; }
 			auto ref outerHeight() const
-			{ return outerSize.y; }			 auto ref outerHeight()
+			{ return outerSize.y; }	auto ref outerHeight()
 			{ return outerSize.y; }
-		}
+		}
 		
-			@property
+		@property
 		{
-			 //calculated prioperties. No += operators are allowed.
+			//calculated prioperties. No += operators are allowed.
 			
-			//todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az	outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
+			/+
+				todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az
+							outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
+			+/
 			const(vec2) innerPos () const
-			{ return outerPos+topLeftGapSize;	 }												      void innerPos (in vec2 p)
+			{ return outerPos+topLeftGapSize; }	void innerPos (in vec2 p)
 			{ outerPos	= p-topLeftGapSize; }
 			const(vec2) innerSize() const
-			{ return outerSize-totalGapSize;	 }												      void innerSize(in vec2 s)
+			{ return outerSize-totalGapSize; }	void innerSize(in vec2 s)
 			{ outerSize	= s+totalGapSize; }
 			auto innerBounds() const
-			{ return bounds2(innerPos, innerPos+innerSize); }	 void innerBounds(in bounds2 b)
+			{ return bounds2(innerPos, innerPos+innerSize); }	void innerBounds(in bounds2 b)
 			{ innerPos =	b.low; innerSize = b.size; }
 			auto outerBounds() const
-			{ return bounds2(outerPos, outerPos+outerSize); }	 void outerBounds(in bounds2 b)
+			{ return bounds2(outerPos, outerPos+outerSize); } 	void outerBounds(in bounds2 b)
 			{ outerPos =	b.low; outerSize = b.size; }
 			
 			auto outerBottomRight()
@@ -1114,7 +1126,10 @@ version(/+$DIDE_REGION+/all)
 			auto borderBounds(float location=0.5f)()
 			{
 				const hb = border.width*location;
-				return bounds2(outerPos+vec2(margin.left+extraMargin+hb, margin.top+extraMargin+hb), outerBottomRight-vec2(margin.right+extraMargin+hb, margin.bottom+extraMargin+hb));
+				return bounds2(
+					outerPos	+ vec2(margin.left  + extraMargin + hb, margin.top    + extraMargin + hb),
+					outerBottomRight 	- vec2(margin.right + extraMargin + hb, margin.bottom + extraMargin + hb)
+				);
 			}
 			auto borderBounds_inner()
 			{ return borderBounds!1; }
@@ -1122,16 +1137,16 @@ version(/+$DIDE_REGION+/all)
 			{ return borderBounds!0; }
 			
 			auto innerX() const
-			{ return innerPos.x; }			 void innerX(float v)
+			{ return innerPos.x; }	void innerX(float v)
 			{ outerPos.x = v-topLeftGapSize.x; }
 			auto innerY() const
-			{ return innerPos.y; }			 void innerY(float v)
+			{ return innerPos.y; }	void innerY(float v)
 			{ outerPos.y = v-topLeftGapSize.y; }
 			auto innerWidth () const
-			{ return innerSize.x; }			 void innerWidth (float v)
+			{ return innerSize.x; } 	void innerWidth (float v)
 			{ outerSize.x = v+totalGapSize.x; }
 			auto innerHeight() const
-			{ return innerSize.y; }			 void innerHeight(float v)
+			{ return innerSize.y; }	void innerHeight(float v)
 			{ outerSize.y = v+totalGapSize.y; }
 			
 			auto outerLeft	() const
@@ -1154,21 +1169,25 @@ version(/+$DIDE_REGION+/all)
 			auto outerBottomLeft () const
 			{ return outerPos + vec2(0, outerHeight); }
 			
-			//note when working with controls, it is like specify border and then the width, not including the border. So width is mostly means innerWidth
+			/+
+				note: when working with controls, it is like specify border and then the width, 
+				not including the border. So width is mostly means innerWidth
+			+/
+			
 			alias pos = outerPos;
 			alias size = innerSize;
 			alias width = innerWidth;
 			alias height = innerHeight;
 		}
 		
-			bounds2 getHitBounds()
+		bounds2 getHitBounds()
 		{ return borderBounds_outer; } //Used by hittest. Can override.
 		
-			private void notImpl(string s)
+		private void notImpl(string s)
 		{ raise(s~" in "~typeof(this).stringof); }
-		
-			//params
-			void setProps(string[string] p)
+		
+		//params
+		void setProps(string[string] p)
 		{
 			p.setParam("width" , (string s){ width	= s.toWidthHeight(g_actFontHeight); });
 			p.setParam("height", (string s){ height	= s.toWidthHeight(g_actFontHeight); });
@@ -1176,14 +1195,15 @@ version(/+$DIDE_REGION+/all)
 			p.setParam("innerHeight", (string s){ innerHeight	= s.toWidthHeight(g_actFontHeight); });
 			p.setParam("outerWidth" , (string s){ outerWidth	= s.toWidthHeight(g_actFontHeight); });
 			p.setParam("outerHeight", (string s){ outerHeight	= s.toWidthHeight(g_actFontHeight); });
-		}
-			final void setProps(string cmdLine)
+		}
+		
+		final void setProps(string cmdLine)
 		{ setProps(cmdLine.commandLineToMap); }
 		
-			void draw(Drawing dr)
+		void draw(Drawing dr)
 		{}
 		
-			bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0))
+		bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0))
 		{
 			auto hitBnd = getHitBounds + ofs;
 			if(hitBnd.contains!"[)"(mouse))
@@ -1202,8 +1222,8 @@ version(/+$DIDE_REGION+/all)
 			{ return false; }
 		}
 		
-			///this hitTest is only works after measure.
-			Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init)
+		///this hitTest is only works after measure.
+		Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init)
 		{
 			Tuple!(Cell, vec2)[] res;
 			
@@ -1213,8 +1233,8 @@ version(/+$DIDE_REGION+/all)
 			return res;
 		}
 		
-			//this is the third version: it returns
-			CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2.init)
+		//this is the third version: it returns
+		CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2.init)
 		{
 			auto bnd = outerBounds + ofs;//note: locate() searches in outerBounds, not just the borderBounds.
 			if(bnd.contains!"[)"(mouse))
@@ -1222,7 +1242,7 @@ version(/+$DIDE_REGION+/all)
 			return [];
 		}
 		
-			final void drawBorder(Drawing dr)
+		final void drawBorder(Drawing dr)
 		{
 			if(!border.width || border.style == BorderStyle.none)
 			return;
@@ -1252,7 +1272,7 @@ version(/+$DIDE_REGION+/all)
 			else { doit;	 }
 		}
 		
-			void dump(int indent=0)
+		void dump(int indent=0)
 		{
 			print(
 				"  ".replicate(indent), this.classinfo.name.split('.').back, " ",
@@ -1468,6 +1488,50 @@ version(/+$DIDE_REGION+/all)
 					break;
 				}
 			}
+		}
+	}
+	class Img : Container
+	{
+		 //Img ////////////////////////////////////
+		int stIdx;
+		bool transparent;
+		
+		this(File fn)
+		{
+			stIdx = textures[fn];
+			id = srcId(genericId("Img")); //todo: this is bad
+		}
+		
+		this(File fn, RGB bkColor)
+		{
+			this.bkColor = bkColor;
+			this(fn);
+		}
+		
+		override void rearrange()
+		{
+			//note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
+			//todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
+			const siz = calcGlyphSize_image(stIdx);
+			
+			if(flags.autoHeight && flags.autoWidth)
+			{ innerSize = siz; }
+			else if(flags.autoHeight)
+			{ innerHeight = innerWidth/max(siz.x, 1)*siz.y; }
+			else if(flags.autoWidth)
+			{ innerWidth = innerHeight/max(siz.y, 1)*siz.x; }
+		}
+		
+		override void draw(Drawing dr)
+		{
+			if(flags.hidden)
+			return;
+			
+			drawBorder(dr);
+			
+			if(transparent)
+			dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/);
+			else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
 		}
 	}
 }
@@ -2953,20 +3017,20 @@ version(/+$DIDE_REGION+/all)
 	class Container : Cell
 	{
 		 //Container ////////////////////////////////////
-			SrcId id; //Scrolling needs it. Also useful for debugging.
+		SrcId id; //Scrolling needs it. Also useful for debugging.
 		
-			auto getHScrollBar()
+		auto getHScrollBar()
 		{ return flags.hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; }
-			auto getVScrollBar()
+		auto getVScrollBar()
 		{ return flags.hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; }
-			auto getHScrollOffset()
+		auto getHScrollOffset()
 		{ return flags.hasHScrollBar ? im.hScrollInfo.getScrollOffset(id) : 0; }
-			auto getVScrollOffset()
+		auto getVScrollOffset()
 		{ return flags.hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; }
-			auto getScrollOffset()
+		auto getScrollOffset()
 		{ return vec2(getHScrollOffset, getVScrollOffset); }
 		
-			protected
+		protected
 		{
 			public
 			{
@@ -2986,76 +3050,76 @@ version(/+$DIDE_REGION+/all)
 			}
 		*/
 		
-			//subCells
-			Cell[] subCells;
-			void clearSubCells()
+		//subCells
+		Cell[] subCells;
+		void clearSubCells()
 		{ subCells = []; }
-			final auto subContainers()
+		final auto subContainers()
 		{ return subCells.map!(c => cast(Container)c).filter!"a"; }
 		
-			void appendCell (Cell c)
+		void appendCell (Cell c)
 		{
 			if(c)
 			subCells ~= c;
 		}
 		
-			int cellCount()
+		int cellCount()
 		{ return cast(int)subCells.length; }
 		
-			int subCellIndex(in Cell c) const
+		int subCellIndex(in Cell c) const
 		{
 			//note: overflows at 2G items, I don't care because that would be 128GB memory usage.
 			return cast(int)subCells.countUntil(c);
 		}
 		
-			void adoptSubCells()
+		void adoptSubCells()
 		{ subCells.each!(c => c.setParent(this)); }
 		
-			final void append(Cell c)
+		final void append(Cell c)
 		{ appendCell(c); }
-			final void append(Cell[] r)
+		final void append(Cell[] r)
 		{ r.each!(c => appendCell(c)); }
 		
-			final void append(void delegate() fun)
+		final void append(void delegate() fun)
 		{
 			import het.ui : im;
 			append(im.build(fun));
 		}
 		
-			void appendImg (File	fn, in TextStyle ts)
-		{ appendCell(new Img(fn, ts.bkColor)); }    //todo: ezeknek az appendeknek a Container-ben lenne a helyuk
-			void appendChar(dchar	ch, in TextStyle ts)
+		void	appendImg (File	fn, in TextStyle ts)
+		{ appendCell(new Img(fn, ts.bkColor)); }	//todo: ezeknek az appendeknek a Container-ben lenne a helyuk
+		void	appendChar(dchar	ch, in TextStyle ts)
 		{ appendCell(new Glyph(ch, ts)); }
-			void appendStr (string s, in TextStyle ts)
+		void appendStr (string s, in TextStyle ts)
 		{
 			foreach(ch; s.byDchar)
 			appendChar(ch, ts);
 		} //todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
-			
-			void appendCodeChar(dchar	ch, in TextStyle ts, SyntaxKind sk)
+		
+		void appendCodeChar(dchar	ch, in TextStyle ts, SyntaxKind sk)
 		{ appendCell(new Glyph(ch, ts, sk)); }
-			void appendCodeStr(string s, in TextStyle ts, SyntaxKind sk)
+		void appendCodeStr(string s, in TextStyle ts, SyntaxKind sk)
 		{
 			foreach(ch; s.byDchar)
 			appendCodeChar(ch, ts, sk);
 		}
-			
-			void appendCodeStr(string s, SyntaxKind sk)
+		
+		void appendCodeStr(string s, SyntaxKind sk)
 		{
 			static TextStyle style;
 			style.applySyntax(sk);
 			appendCodeStr(s, style, sk);  //todo: syntax and style are redundant: syntax defines the style (more or less)
 		}
 		
-			void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax)
+		void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax)
 		{
 			 //todo: redundant: there is appendCodeChar too
 			auto g = new Glyph(ch, ts);
 			g.syntax = syntax;
 			appendCell(g);
 		}
-			
-			void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, ubyte syntax, int line)
+		
+		void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, ubyte syntax, int line)
 		{
 			 //todo: this is used from CodeCOlumnBuildet.
 			auto g = new Glyph(ch, ts);
@@ -3063,13 +3127,13 @@ version(/+$DIDE_REGION+/all)
 			g.line = line;
 			appendCell(g);
 		}
-			
-			auto removeLast(T = Cell)()
+		
+		auto removeLast(T = Cell)()
 		{ return cast(T)(subCells.fetchBack); }
-			auto removeLastContainer()
+		auto removeLastContainer()
 		{ return removeLast!Container; }
 		
-			bool removeLastChar(dchar ch)
+		bool removeLastChar(dchar ch)
 		{
 			if(subCells.length)
 			if(auto c = cast(Glyph)subCells.back)
@@ -3083,7 +3147,7 @@ version(/+$DIDE_REGION+/all)
 			return false;
 		}
 		
-			bool removeLastNewLine()
+		bool removeLastNewLine()
 		{
 			if(removeLastChar('\n'))
 			{
@@ -3093,13 +3157,13 @@ version(/+$DIDE_REGION+/all)
 			return false;
 		}
 		
-			void internal_setSubCells(Cell[] c)
+		void internal_setSubCells(Cell[] c)
 		{
 			 //todo: remove this
 			subCells = c;
 		}
 		
-			final override
+		final override
 		{
 			ref _FlexValue flex()
 			{ return flex_	; }
@@ -3111,10 +3175,10 @@ version(/+$DIDE_REGION+/all)
 			{ return border_; }
 		}
 		
-			RGB bkColor=clWhite; //todo: background struct
-			ContainerFlags flags;
+		RGB bkColor=clWhite; //todo: background struct
+		ContainerFlags flags;
 		
-			override void setProps(string[string] p)
+		override void setProps(string[string] p)
 		{
 			super.setProps(p);
 			
@@ -3128,10 +3192,10 @@ version(/+$DIDE_REGION+/all)
 			//todo: flags.setProps param
 		}
 		
-			void parse(string s, TextStyle ts = tsNormal)
+		void parse(string s, TextStyle ts = tsNormal)
 		{ enforce("notimpl"); }
 		
-			protected
+		protected
 		{
 			auto getHFlowConfig()	const
 			{ return .getHFlowConfig     (flags.autoWidth , flags.wordWrap,	flags.hScrollState); }
@@ -3143,14 +3207,14 @@ version(/+$DIDE_REGION+/all)
 			{ return .getEffectiveVScroll(flags.autoHeight,	flags.vScrollState); }
 		}
 		
-			float	calcContentWidth ()
+		float	calcContentWidth ()
 		{ return subCells.map!(c => c.outerRight ).maxElement(0); }
-			float	calcContentHeight()
+		float	calcContentHeight()
 		{ return subCells.map!(c => c.outerBottom).maxElement(0); }
-			vec2	calcContentSize  ()
+		vec2	calcContentSize  ()
 		{ return vec2(calcContentWidth, calcContentHeight); }
 		
-			final void setSubContainerWidths(bool setAll=true)(float targetWidth)
+		final void setSubContainerWidths(bool setAll=true)(float targetWidth)
 		{
 			foreach(c; subContainers)
 			if(setAll ? true : c.outerWidth!=targetWidth)
@@ -3161,12 +3225,12 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 		
-			final void setSubContainerWidths_differentOnly(float targetWidth)
+		final void setSubContainerWidths_differentOnly(float targetWidth)
 		{ setSubContainerWidths!false(targetWidth); }
 		
-			/// this must overrided by every descendant. Its task is to measure and then place all the subcells.
-			/// must update innerSize if autoWidth or autoHeight is specified.
-			void rearrange()
+		/// this must overrided by every descendant. Its task is to measure and then place all the subcells.
+		/// must update innerSize if autoWidth or autoHeight is specified.
+		void rearrange()
 		{
 			measureSubCells;
 			if(flags.autoWidth)
@@ -3175,10 +3239,10 @@ version(/+$DIDE_REGION+/all)
 			innerHeight	= calcContentHeight;
 		}
 		
-			/// Mark the container, so it will be re-measured on the next measure() call.
-			/// Normal behaviour is ALWAYS measure. (It is the normal behaviour for immediate mode UI)
-			/// returns: If it was effective. So it could do more things recursively.
-			bool needMeasure()
+		/// Mark the container, so it will be re-measured on the next measure() call.
+		/// Normal behaviour is ALWAYS measure. (It is the normal behaviour for immediate mode UI)
+		/// returns: If it was effective. So it could do more things recursively.
+		bool needMeasure()
 		{
 			flags._measureOnlyOnce = true;
 			
@@ -3204,8 +3268,8 @@ version(/+$DIDE_REGION+/all)
 			return effective;
 		}
 		
-			/// this must be called from outside. It calls rearrange and measures subContainers if needed.
-			final void measure()
+		/// this must be called from outside. It calls rearrange and measures subContainers if needed.
+		final void measure()
 		{
 			if(flags._measureOnlyOnce && flags._measured)
 			return;
@@ -3348,20 +3412,20 @@ version(/+$DIDE_REGION+/all)
 				if(flags.hasVScrollBar)
 				outerSize.x += scrollThickness;
 				
-			}
+			}
 			
 			flags._measured = true;
 		}
 		
-			protected void measureSubCells()
+		protected void measureSubCells()
 		{
 			subContainers.each!"a.measure"; //recursive in the front
 		}
 		
-			protected auto getScrollResizeBounds(in Cell hb, in Cell vb) const
+		protected auto getScrollResizeBounds(in Cell hb, in Cell vb) const
 		{ return bounds2(vb.outerPos.x, hb.outerPos.y, innerWidth, innerHeight); }
 		
-			static Cell[] sortedSubCellsAroundAxis(int axis)(Cell[] subCells, vec2 p)
+		static Cell[] sortedSubCellsAroundAxis(int axis)(Cell[] subCells, vec2 p)
 		{
 			 //note: only tests for the given direction. It's a speedup for internal_hitTest.
 			auto sc = subCells;
@@ -3379,12 +3443,12 @@ version(/+$DIDE_REGION+/all)
 			return sc;
 		}
 		
-			static Cell[] sortedSubCellsAroundX(Cell[] subCells, vec2 p)
+		static Cell[] sortedSubCellsAroundX(Cell[] subCells, vec2 p)
 		{ return sortedSubCellsAroundAxis!0(subCells, p); }
-			static Cell[] sortedSubCellsAroundY(Cell[] subCells, vec2 p)
+		static Cell[] sortedSubCellsAroundY(Cell[] subCells, vec2 p)
 		{ return sortedSubCellsAroundAxis!1(subCells, p); }
 		
-			Cell[] internal_hitTest_filteredSubCells(vec2 p)
+		Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
 			 //note: for column, it only needs to filter the y direction because this is just an optimization.
 			//slow linear filter
@@ -3392,7 +3456,7 @@ version(/+$DIDE_REGION+/all)
 			return subCells.filter!(c => c.outerBounds.contains!"[)"(p)).array; //otp: what if I unroll it to 4 comparations?
 		}
 		
-			override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0))
+		override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0))
 		{
 			if(super.internal_hitTest(mouse, ofs))
 			{
@@ -3431,8 +3495,8 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 		
-			///This version of hit_test is for static stuff. It ignores scrollbars but has a fast optimizes search in rows and columns
-			override CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2(0))
+		///This version of hit_test is for static stuff. It ignores scrollbars but has a fast optimizes search in rows and columns
+		override CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2(0))
 		{
 			if(flags.dontLocate)
 			return [];
@@ -3447,8 +3511,8 @@ version(/+$DIDE_REGION+/all)
 			return res;
 		}
 		
-			///this hitTest only works after measure.
-			override Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init)
+		///this hitTest only works after measure.
+		override Tuple!(Cell, vec2)[] contains(in vec2 p, vec2 ofs=vec2.init)
 		{
 			auto res = super.contains(p, ofs);
 			
@@ -3469,11 +3533,11 @@ version(/+$DIDE_REGION+/all)
 			return res;
 		}
 		
-			void onDraw(Drawing dr)
+		void onDraw(Drawing dr)
 		{} //can override to draw some custom things.
 		
 		
-			protected void drawSubCells_cull(Drawing dr)
+		protected void drawSubCells_cull(Drawing dr)
 		{
 			//this uses linear search. It can be optimized in subClasses.
 			if(auto b = dr.clipBounds)
@@ -3485,9 +3549,9 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 		
-			static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
+		static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 		
-			override void draw(Drawing dr)
+		override void draw(Drawing dr)
 		{
 			if(flags.hidden)
 			return;
@@ -3587,7 +3651,7 @@ version(/+$DIDE_REGION+/all)
 			drawDebug(dr);
 		}
 		
-			void drawDebug(Drawing dr)
+		void drawDebug(Drawing dr)
 		{
 			if(VisualizeContainers)
 			{
@@ -3612,7 +3676,7 @@ version(/+$DIDE_REGION+/all)
 		
 		//these can mixed in
 		
-			mixin template CachedDrawing()
+		mixin template CachedDrawing()
 		{
 			Drawing cachedDrawing;
 			
@@ -3636,7 +3700,7 @@ version(/+$DIDE_REGION+/all)
 		};
 		
 		
-			struct SearchResult
+		struct SearchResult
 		{
 			Container container;
 			vec2 absInnerPos;
@@ -3662,80 +3726,8 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 		
-			/// Search for a text recursively in the Cell structure
-		/+
-			  auto search(string searchText, vec2 origin = vec2.init){
-			
-					static struct SearchContext{
-						dstring searchText;
-						vec2 absInnerPos;
-						Cell[] cellPath;
-			
-						SearchResult[] results;
-						int maxResults = 9999;
-			
-						bool canStop() const { return results.length >= maxResults; }
-					}
-			
-					static bool cntrSearchImpl(Container thisC, ref SearchContext context){  //returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
-						if(thisC.flags.dontSearch) return false;
-			
-						//recursive entry/leave
-						context.cellPath ~= thisC;
-						context.absInnerPos += thisC.innerPos;
-			
-						scope(exit){
-							context.absInnerPos -= thisC.innerPos;
-							context.cellPath.popBack;
-						}
-			
-					//print("enter");
-			
-						Cell[] cells = thisC.subCells;
-						size_t baseIdx;
-						foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group){
-							auto act = cells[baseIdx..baseIdx+len];
-			
-							if(!isGlyph){
-								foreach(c; act.map!(c => cast(Container)c).filter!"a"){
-									if(cntrSearchImpl(c, context)) return true; //end recursive call
-								}
-							}else{
-								auto chars = act.map!(c => (cast(Glyph)c).ch);
-			
-					//print("searching in", chars.text);
-			
-								size_t searchBaseIdx = 0;
-								while(1){
-									auto idx = chars.indexOf(context.searchText, No.caseSensitive); //this is the actual search
-									if(idx<0) break;
-			
-									context.results ~= SearchResult(thisC, context.absInnerPos, cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]);
-									if(context.canStop) return true;
-			
-									const skip = idx + context.searchText.length;
-									chars.popFrontExactly(skip);
-									searchBaseIdx += skip;
-								}
-							}
-			
-					//readln;
-					//print("advance", len);
-							baseIdx += len;
-						}
-			
-						return false;
-					}
-			
-					auto context = SearchContext(searchText.to!dstring, origin);
-					if(!searchText.empty)
-						cntrSearchImpl(this, context);
-					return context.results;
-				} 
-		+/
-		
-			/// do a recursive visit. Search result and continuation is supplied by alias functions
-			auto search(string searchText, vec2 origin = vec2.init)
+		/// do a recursive visit. Search result and continuation is supplied by alias functions
+		auto search(string searchText, vec2 origin = vec2.init)
 		{
 			
 			static struct SearchContext
@@ -3753,15 +3745,15 @@ version(/+$DIDE_REGION+/all)
 			
 			static bool cntrSearchImpl(Container thisC, ref SearchContext context)
 			{
-				  //returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
-					if(thisC.flags.dontSearch)
+				//returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
+				if(thisC.flags.dontSearch)
 				return false;
 				
-					//recursive entry/leave
-					context.cellPath ~= thisC;
-					context.absInnerPos += thisC.innerPos;
+				//recursive entry/leave
+				context.cellPath ~= thisC;
+				context.absInnerPos += thisC.innerPos;
 				
-					scope(exit)
+				scope(exit)
 				{
 					context.absInnerPos -= thisC.innerPos;
 					context.cellPath.popBack;
@@ -3769,13 +3761,13 @@ version(/+$DIDE_REGION+/all)
 				
 				//print("enter");
 				
-					Cell[] cells = thisC.subCells;
-					size_t baseIdx;
-					foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group)
+				Cell[] cells = thisC.subCells;
+				size_t baseIdx;
+				foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group)
 				{
-							auto act = cells[baseIdx..baseIdx+len];
+					auto act = cells[baseIdx..baseIdx+len];
 					
-							if(!isGlyph)
+					if(!isGlyph)
 					{
 						foreach(c; act.map!(c => cast(Container)c).filter!"a")
 						{
@@ -3785,18 +3777,22 @@ version(/+$DIDE_REGION+/all)
 					}
 					else
 					{
-									auto chars = act.map!(c => (cast(Glyph)c).ch);
+						auto chars = act.map!(c => (cast(Glyph)c).ch);
 						
 						//print("searching in", chars.text);
 						
-									size_t searchBaseIdx = 0;
-									while(1)
+						size_t searchBaseIdx = 0;
+						while(1)
 						{
 							auto idx = chars.indexOf(context.searchText, No.caseSensitive);
 							if(idx<0)
 							break;
 							
-							context.results ~= SearchResult(thisC, context.absInnerPos, cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]);
+							context.results ~= SearchResult(
+								thisC, 
+								context.absInnerPos, 
+								cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]
+							);
 							if(context.canStop)
 							return true;
 							
@@ -3808,10 +3804,10 @@ version(/+$DIDE_REGION+/all)
 					
 					//readln;
 					//print("advance", len);
-							baseIdx += len;
+					baseIdx += len;
 				}
 				
-					return false;
+				return false;
 			}
 			
 			auto context = SearchContext(searchText.to!dstring, origin);
@@ -3819,9 +3815,9 @@ version(/+$DIDE_REGION+/all)
 			cntrSearchImpl(this, context);
 			return context.results;
 		}
+		
 		
-		
-			private enum genSetChanged = q{
+		private enum genSetChanged = q{
 			if(!flags.changed#){
 				flags.changed# = true;
 				if(auto p = getParent) if(p)
@@ -3829,43 +3825,43 @@ version(/+$DIDE_REGION+/all)
 			}
 		};
 		
-			//changed tracking for file change detection //////////////////////////////////
+		//changed tracking for file change detection //////////////////////////////////
 		
-			/// Sets flags.changed* if needed. Also sets it for the parents recursively.
-			void setChangedCreated()
+		/// Sets flags.changed* if needed. Also sets it for the parents recursively.
+		void setChangedCreated()
 		{ mixin(genSetChanged.replace("#", "Created")); }
-			void setChangedRemoved()
+		void setChangedRemoved()
 		{ mixin(genSetChanged.replace("#", "Removed")); } //Ditto
 		
-			private enum genClearChanged = q{
+		private enum genClearChanged = q{
 			if(flags.changed#){
 				flags.changed# = false;
 				subContainers.each!"a.clearChanged#";
 			}
 		};
 		
-			/// Clears flags.changed* if needed. Also clears it for all the children recursively.
-			void clearChangedCreated()
+		/// Clears flags.changed* if needed. Also clears it for all the children recursively.
+		void clearChangedCreated()
 		{ mixin(genClearChanged.replace("#", "Created")); }
-			void clearChangedRemoved()
+		void clearChangedRemoved()
 		{ mixin(genClearChanged.replace("#", "Removed")); }
 		
-			@property int changedMask() const
+		@property int changedMask() const
 		{ return (flags.changedCreated?1:0) | (flags.changedRemoved?2:0); }
 		
-			@property bool changed() const
+		@property bool changed() const
 		{ return flags.changedCreated || flags.changedRemoved; }
 		
-			void clearChanged()
+		void clearChanged()
 		{
 			clearChangedCreated;
 			clearChangedRemoved;
 		}
 		
-			//changed tracking for syntax highlight /////////////////////////////
+		//changed tracking for syntax highlight /////////////////////////////
 		
-			///Override these to implement changedTime tracking.
-			/+
+		///Override these to implement changedTime tracking.
+		/+
 			int getThisChangedTime(){ return 0; }
 				void setThisChangedTime(int i){ } ///Ditto
 			
@@ -4396,50 +4392,7 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	//todo: Ezt le kell valtani egy container.backgroundImage-al.
-	class Img : Container
-	{
-		 //Img ////////////////////////////////////
-		int stIdx;
-		bool transparent;
-		
-		this(File fn)
-		{
-			stIdx = textures[fn];
-			id = srcId(genericId("Img")); //todo: this is bad
-		}
-		
-		this(File fn, RGB bkColor)
-		{
-			this.bkColor = bkColor;
-			this(fn);
-		}
-		
-		override void rearrange()
-		{
-			//note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
-			//todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
-			const siz = calcGlyphSize_image(stIdx);
-			
-			if(flags.autoHeight && flags.autoWidth)
-			{ innerSize = siz; }
-			else if(flags.autoHeight)
-			{ innerHeight = innerWidth/max(siz.x, 1)*siz.y; }
-			else if(flags.autoWidth)
-			{ innerWidth = innerHeight/max(siz.y, 1)*siz.x; }
-		}
-		
-		override void draw(Drawing dr)
-		{
-			if(flags.hidden)
-			return;
-			
-			drawBorder(dr);
-			
-			if(transparent)
-			dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/);
-			else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
-		}
-	}class Document : Column
+	class Document : Column
 	{
 		 //Document /////////////////////////////////
 		this()
