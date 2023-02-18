@@ -110,10 +110,12 @@ version(/+$DIDE_REGION+/all)
 	auto blackOrWhiteFor(RGB c)
 	{ return textColorFor(c); }
 	
+	auto darken(in RGB a, float t) { return mix(a, clBlack, t); }
+	auto lighten(in RGB a, float t) { return mix(a, clWhite, t); }
+	
 	/+
 		
-		auto darken (T, U)(in T a, U f)if(isColor8!T){ return lerp(a, clBlack, f); }
-		auto lighten(T, U)(in T a, U f)if(isColor8!T){ return lerp(a, clWhite, f); }
+		
 		
 		int rgbSad(const RGB a, const RGB b){
 			int res;
@@ -180,11 +182,7 @@ version(/+$DIDE_REGION+/all)
 		clWhite	= 0xFFFFFF,
 			
 		clSkyBlue	= 0xF0CAA6,
-		clMoneyGreen	= 0xC0DCC0,
-			
-		clGold	= 0x00D7FF,
-		clBronze	= 0x327FCD,
-		clPink	= 0xCBC0FF;
+		clMoneyGreen	= 0xC0DCC0;
 	}
 	version(/+$DIDE_REGION standard vga palette+/all)
 	{
@@ -307,12 +305,16 @@ version(/+$DIDE_REGION+/all)
 		clAxisY	= RGB(40, 166, 40),
 		clAxisZ	= RGB(40, 40, 215),
 			
-		clOrange	= clRainbowOrange;
+		clOrange	= clRainbowOrange,
+		clGold	= 0x00D7FF,
+		clBronze	= 0x327FCD,
+		clPink	= 0xCBC0FF,
+		clPostit	= 0x99FFFF;
 	}
 	immutable RGB8[]
 		clDelphi	= [
 		clBlack, clMaroon, clGreen, clOlive, clNavy, clPurple, clTeal, clGray, clSilver, clRed,
-		clLime, clYellow, clBlue, clFuchsia, clAqua, clLtGray, clDkGray, clWhite
+		clLime, clYellow, clBlue, clFuchsia, clAqua, clLtGray, clDkGray, clWhite, clSkyBlue, clMoneyGreen
 	],
 		clVga	= [
 		clVgaBlack, clVgaLowBlue, clVgaLowGreen, clVgaLowCyan, clVgaLowRed,

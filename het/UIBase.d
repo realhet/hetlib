@@ -3721,8 +3721,6 @@ version(/+$DIDE_REGION+/all)
 					dr.color = bkColor;
 					dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags);
 				}
-					
-				
 			}
 		}
 		

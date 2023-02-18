@@ -1446,15 +1446,15 @@ class Tokenizer
 		ulong toULong(string s, int base)
 		{
 			ulong a;
-			if(base ==  2)
-			foreach(ch; s)
+			if(base ==	2)
+			foreach(ch;	s)
 			{ a <<=  1;	 a += ch-'0'; }else if(base == 10)
 			foreach(ch; s)
 			{ a *=  10;	 a += ch-'0'; }else if(base == 16)
 			foreach(ch; s)
 			{
-				 a <<=  4;	 a += ch>='a' ? ch-'a'+10 :
-				ch>='A' ? ch-'A'+10 : ch-'0'; 
+				 a <<=	4;	 a += ch>='a' ? ch-'a'+10 :
+				ch>='A' ?	ch-'A'+10 : ch-'0'; 
 			}
 			return a;
 		}
@@ -1574,7 +1574,7 @@ class Tokenizer
 			if(!isLong && !isUnsigned)
 			{
 				 //no postfixes
-				if(num<=					     0x7FFF_FFFF        )
+				if(num<=					     0x7FFF_FFFF       )
 				v = cast(int)num;else if(num<=					     0xFFFF_FFFF && base!=10)
 				v = cast(uint)num;else if(
 					num<=0x7FFF_FFFF_FFFF_FFFF           //hex/bin can be unsigned too to use the smallest size as possible
