@@ -9,8 +9,8 @@ import het.utils;
 //todo: some types are no more. Complex numbers for example.
 	 //|---> maps exactly to kwEnums
 enum BasicType:byte	
-{ Unknown,	Byte, UByte, Short, UShort, Int, UInt, Long, ULong, Cent, UCent, Float, Double, Real, IFloat, IDouble, IReal, CFloat, CDouble, CReal, Bool, Char, WChar, DChar, Void }
-auto BasicTypeBytes	 =[0,	   1,	    1,     2,      2,   4,    4,    8,     8,   16,    16,     4,      8,	  10,      4,       8,	   10,      8,      16,    20,	   1,	   1,     2,     4,	   0];
+{ Unknown,	Byte, UByte, Short, UShort, Int, UInt, Long,	ULong, Cent, UCent, Float, Double, Real, IFloat, IDouble, IReal, CFloat, CDouble, CReal, Bool, Char, WChar, DChar, Void	 }
+auto BasicTypeBytes	 =[0,	   1,	    1,     2,      2,	4,    4,    8,     8,   16,    16,     4,      8,	  10,      4,       8,	   10,      8,      16,    20,	   1,	   1,	2,     4,	   0];
 auto BasicTypeBits	 =[0,	   8,	    8,    16,     16,  32,   32,   64,    64,  128,   128,    32,     64,	  80,     32,      64,	   80,     64,     128,   160,	   8,	   8,    16,    32,	   0];
 
 bool isInteger	 (BasicType b)
@@ -573,8 +573,10 @@ immutable SyntaxStyleRow[] syntaxTable =[
 	{ "Deprecation"	, [SyntaxStyle(clBlack	,clAqua      ,0)].replicate(4) },
 	{ "Note"	, [SyntaxStyle(clBlack	,clPostit,2)].replicate(4) },
 	{ "Todo"	, [SyntaxStyle(clWhite	,clWowBlue   ,2)].replicate(4) },
-	{ "Opt"	, [SyntaxStyle(clWhite	,clWowPurple ,2)].replicate(4) },
-	{ "Bug"	, [SyntaxStyle(clWhite	,clOrange    ,2)].replicate(4) },
+	{ "Opt"	, [SyntaxStyle(clWhite	,clWowPurple	,2)].replicate(4) },
+	{ "Bug"	, [SyntaxStyle(clWhite	,clOrange	,2)].replicate(4) },
+	{ "Link"	, [SyntaxStyle(clWowBlue	,clWhite    ,4)].replicate(4) },
+	{ "Code"	, [SyntaxStyle(RGB(0xc7c5c5)	, mix(RGB(0x2f2f2f), RGB(0x442d44), .33) ,0)].replicate(4) }, //code is actually a codeComment, not compileable code.
 ];
 
 mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(',')));

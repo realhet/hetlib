@@ -246,7 +246,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			bool isAccumulator=true;
 			
-			enum timeStepNames 	= [  "1 sec",   "10 sec",   "2 min",    "24 min"],
+			enum timeStepNames 	= ["1 sec",   "10 sec",   "2 min",    "24 min"],
 			counterMax	= [1,	  10,          12,          12         ],
 			timeRangeNames	= [   "5 min",   "50 min",  "10 hour",   "5 day"],
 			M	= timeStepNames.length.to!int,
@@ -870,6 +870,17 @@ struct im
 	static:
 	version(/+$DIDE_REGION+/all)
 	{
+			/+
+			Note: 	This is also a way to create a 'namespace' in D, with a template.
+				template Algo_ns()
+				{
+				   void drawLine() { writeln("drawLine"); }
+				}
+				
+				// need this to avoid the instantiation syntax
+				alias Algo = Algo_ns!();
+		+/
+		
 			alias Id = het.utils.SrcId;
 		
 			//Frame handling
