@@ -4,15 +4,15 @@ module buildsys;/+DIDE+/
 //[ ] hldc bug: use a fresh hldc daemon or Shift+F9 -> karc2 rebuild -> it wont kill other compilers after the first error in karc2.d
 //[ ] access viola, map file interpreter is broken
 
-//todo: syntaxHighlight() returns errors! Build system it must handle those!
-//todo: RUN: set working directory to the main.d
-//todo: editor: goto line
-//TODO: a todokat, meg optkat meg warningokat, ne jelolje mar pirossal az editorban a filenevek tabjainal.
-//TODO: editor find in project files.
-//TODO: editor clear errorline when compiling
-//TODO: -g flag: symbolic debug info
-//TODO: invalid //@ direktivaknal error
-//TODO: a dll kilepeskor takaritsa el az obj fileokat
+//Todo: syntaxHighlight() returns errors! Build system it must handle those!
+//Todo: RUN: set working directory to the main.d
+//Todo: editor: goto line
+//Todo: a todokat, meg optkat meg warningokat, ne jelolje mar pirossal az editorban a filenevek tabjainal.
+//Todo: editor find in project files.
+//Todo: editor clear errorline when compiling
+//Todo: -g flag: symbolic debug info
+//Todo: invalid //@ direktivaknal error
+//Todo: a dll kilepeskor takaritsa el az obj fileokat
 
 /*
 	[ ] irja ki, hogy mi van a cache-ban.
@@ -169,66 +169,80 @@ void test_predecodeLdcOutput()
 																														
 																																
 																																		
-																																				the first pragma
-																																				c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-																																				    body
-																																				    ^
-																																				c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-																																				    body
-																																				    ^
-																																				c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-																																				  depr1; depr1;
-																																				  ^
-																																				c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
-																																				  depr1; depr1;
-																																				         ^
-																																				c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-																																				  depr1;
-																																				  ^
-																																				c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-																																				  depr1;
-																																				  ^
-																																				this is just a pragma
-																																				c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
-																																				c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
-																																				        return fun(_input.front);
-																																				                  ^
-																																				c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
-																																				        return MapResult!(_fun, Range)(r);
-																																				               ^
-																																				c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
-																																				  iota(5).map!"b+5".print;
-																																				         ^
-																																				c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
-																																				this is just a pragma
-																																				with multiple lines
-																																				c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
-																																				  iota(5).countUntil!((a, b)=>c>d)(5);
-																																				                                  ^
-																																				c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
-																																				  with `pred = __lambda1,
-																																				       R = Result,
-																																				       Rs = (int)`
-																																				  must satisfy the following constraint:
-																																				`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
-																																				ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
-																																				          ^
-																																				c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
-																																				  with `pred = __lambda1,
-																																				       R = Result,
-																																				       N = int`
-																																				  must satisfy the following constraint:
-																																				`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
-																																				ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
-																																				          ^
-																																				c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
-																																				ptrdiff_t countUntil(alias pred, R)(R haystack)
-																																				          ^
-																																				also a pragma
-																																				fake markes here
-																																				       ^
-																																				end of file
 																																				
+																																						
+																																								
+																																										
+																																												
+																																														
+																																																
+																																																		the first pragma
+																																																		c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+																																																		    body
+																																																		    ^
+																																																		c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+																																																		    body
+																																																		    ^
+																																																		c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+																																																		  depr1; depr1;
+																																																		  ^
+																																																		c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
+																																																		  depr1; depr1;
+																																																		         ^
+																																																		c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+																																																		  depr1;
+																																																		  ^
+																																																		c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+																																																		  depr1;
+																																																		  ^
+																																																		this is just a pragma
+																																																		c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
+																																																		c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
+																																																		        return fun(_input.front);
+																																																		                  ^
+																																																		c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
+																																																		        return MapResult!(_fun, Range)(r);
+																																																		               ^
+																																																		c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
+																																																		  iota(5).map!"b+5".print;
+																																																		         ^
+																																																		c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
+																																																		this is just a pragma
+																																																		with multiple lines
+																																																		c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
+																																																		  iota(5).countUntil!((a, b)=>c>d)(5);
+																																																		                                  ^
+																																																		c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
+																																																		  with `pred = __lambda1,
+																																																		       R = Result,
+																																																		       Rs = (int)`
+																																																		  must satisfy the following constraint:
+																																																		`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
+																																																		ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
+																																																		          ^
+																																																		c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
+																																																		  with `pred = __lambda1,
+																																																		       R = Result,
+																																																		       N = int`
+																																																		  must satisfy the following constraint:
+																																																		`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
+																																																		ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
+																																																		          ^
+																																																		c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
+																																																		ptrdiff_t countUntil(alias pred, R)(R haystack)
+																																																		          ^
+																																																		also a pragma
+																																																		fake markes here
+																																																		       ^
+																																																		end of file
+																																																		
+																																																	
+																																															
+																																													
+																																											
+																																									
+																																							
+																																					
 																																			
 																																	
 																															
@@ -343,7 +357,7 @@ class Executor
 			
 			//launch the process
 			pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole, workPath.fullPath);
-			//note: Config.retainStdout makes it impossible to remove the file after.
+			//Note: Config.retainStdout makes it impossible to remove the file after.
 		}catch(Exception e)
 		{
 			result = -1;
@@ -371,7 +385,7 @@ class Executor
 				//LOG(mainFile, "CMD", cmd);
 				//LOG(mainFile, "OUTPUT", output);
 				//LOG(mainFile, "ERROR", error);
-				//todo: this is only specific for compilers!!!
+				//Todo: this is only specific for compilers!!!
 				//output = output.splitLines.enumerate.map!(a => format!"%s(%d, 1): Message: %s\n"(mainFile.fullName, a.index+1, a.value)).join ~ error;
 				
 				ignoreExceptions({ logFile.forcedRemove; });
@@ -478,7 +492,7 @@ int spawnProcessMulti2(
 			)
 		)
 		{
-			 //todo: make these settings configurable
+			 //Todo: make these settings configurable
 			//find something to launch
 			foreach(i, e; executors)
 			if(e.isIdle)
@@ -497,7 +511,7 @@ int spawnProcessMulti2(
 		if(cancelled && runningCnt==0)
 		break;
 		
-		sleep(10); //todo: config
+		sleep(10); //Todo: config
 	}
 	
 	sOutput = [];
@@ -520,7 +534,7 @@ int spawnProcessMulti2(
 
 immutable
 	versionStr = "1.06",
-	mainHelpStr =  //todo: ehhez edditort csinalni az ide-ben
+	mainHelpStr =  //Todo: ehhez edditort csinalni az ide-ben
 	"\33\16HLDC\33\7 "~versionStr~" - An automatic build tool for the \33\17LDC "~
 	{ auto s = LDCVER.text; return s[0]~"."~s[1..$]; }()~
 	"\33\7  compiler.
@@ -611,8 +625,8 @@ Experimental:
 //Common structs                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
-//todo: editor: amikor higlightolja a szot, amin allok, akkor .-al egyutt is meg . nelkul is kene csinalni.
-//todo: info/error logging kozpontositasa.
+//Todo: editor: amikor higlightolja a szot, amin allok, akkor .-al egyutt is meg . nelkul is kene csinalni.
+//Todo: info/error logging kozpontositasa.
 
 struct EditorFile
 {
@@ -624,7 +638,7 @@ struct EditorFile
 
 struct BuildSettings
 {
-	 //todo: mi a faszert irja ki allandoan az 1 betus roviditest mindenhez???
+	 //Todo: mi a faszert irja ki allandoan az 1 betus roviditest mindenhez???
 	@("v|verbose     = Verbose output. Otherwise it will only display the errors.") bool verbose	;
 	@("m|map         = Generate map file.",	   ) bool generateMap		;
 	@("c|compileOnly = Compile and link only, do not run."	   ) bool	compileOnly	;
@@ -725,7 +739,7 @@ private struct MSVCEnv
 //Hash calculation                                                        //
 //////////////////////////////////////////////////////////////////////////////
 
-private string calcHash(string data, string data2 = "") //todo: XXH-ra atirni ezt
+private string calcHash(string data, string data2 = "") //Todo: XXH-ra atirni ezt
 {
 		return [(data~data2).xxh3_64].binToHex;
 	/*
@@ -782,7 +796,7 @@ private struct BuildCache
 	{
 		foreach(ref ch; cache)
 		writeln(ch.file);
-	} //todo: editor: ha typo-t ejtek, es egy nekifutasra irtam be a szot, akkor magatol korrigaljon!
+	} //Todo: editor: ha typo-t ejtek, es egy nekifutasra irtam be a szot, akkor magatol korrigaljon!
 	
 		void setEditorFiles(int count, EditorFile* data)
 	{
@@ -827,7 +841,7 @@ private struct BuildCache
 		{
 			 //not in cache
 			cache[file] = Content(file);
-			ch = file in cache; //opt: unoptimal
+			ch = file in cache; //Opt: unoptimal
 			refresh;
 		}else
 		{
@@ -858,11 +872,11 @@ private struct BuildCache
 
 class ModuleInfo
 {
-	File file; //todo: rename it to just 'file'
+	File file; //Todo: rename it to just 'file'
 	string fileHash;
 	string moduleFullName;
 	File[] importedFiles;
-	string[] importedModuleNames; //todo: it's fucking lame
+	string[] importedModuleNames; //Todo: it's fucking lame
 	File[] deps; //dependencies
 	string objHash; //calculated by hashing the dependencies and the compiler flags
 	
@@ -881,10 +895,10 @@ class ModuleInfo
 	}
 }
 
-//todo: editor ha egy wordon allok, akkor a tobbi wordot case sensitiven keresse! Ez mar nem pascal!
+//Todo: editor ha egy wordon allok, akkor a tobbi wordot case sensitiven keresse! Ez mar nem pascal!
 
-//todo: editor: ha kijelolok egy szovegreszt es replacezni akarok akkor az autocomplete legordulobe csak az ott elofordulo szavakat rakja ki!
-//todo: editorban ha typo error van es mar nincs rajta a cursor, akkor villogjon az az error, meg legyen egy gomb, ami javitja is az
+//Todo: editor: ha kijelolok egy szovegreszt es replacezni akarok akkor az autocomplete legordulobe csak az ott elofordulo szavakat rakja ki!
+//Todo: editorban ha typo error van es mar nincs rajta a cursor, akkor villogjon az az error, meg legyen egy gomb, ami javitja is az
 
 //////////////////////////////////////////////////////////////////////////////
 //Module Import Dependency Solver                                         //
@@ -892,7 +906,7 @@ class ModuleInfo
 
 void resolveModuleImportDependencies(ref ModuleInfo[] modules)
 {
-	//todo: az addIfCan linearis kereses miatt ez igy szornyen lassu: 209 file-t 1.8sec alatt csinalt meg: kesobb majd meg kell csinalni binaris keresesre vagy ami megjobb: NxN-es boolean matrixosra.
+	//Todo: az addIfCan linearis kereses miatt ez igy szornyen lassu: 209 file-t 1.8sec alatt csinalt meg: kesobb majd meg kell csinalni binaris keresesre vagy ami megjobb: NxN-es boolean matrixosra.
 	
 	//extend module imports to dependency lists
 	foreach(ref m; modules)
@@ -931,7 +945,7 @@ void calculateObjHashes(ref ModuleInfo[] modules, string salt)
 		string s = salt~"|"~m.file.fullName;
 		foreach(dep; m.deps)
 		{
-			s ~= modules.filter!(m => m.file==dep).map!"a.file.fullName~a.fileHash".reduce!"a~b"; //opt: ez 2x olyan gyors lehetne filter nelkul
+			s ~= modules.filter!(m => m.file==dep).map!"a.file.fullName~a.fileHash".reduce!"a~b"; //Opt: ez 2x olyan gyors lehetne filter nelkul
 		}
 		m.objHash = calcHash(s);
 		//contains hash of all the required filenames and fileContents plus a salt (compiler options)
@@ -1023,7 +1037,7 @@ struct BuildSystem
 		{ mapFile = mf; }
 		
 		//defFile
-		File df = targetFile.otherExt(".def"); //todo:redundant
+		File df = targetFile.otherExt(".def"); //Todo: redundant
 		df.remove;
 		if(!defLines.empty)
 		{
@@ -1063,7 +1077,7 @@ struct BuildSystem
 	
 		static bool removePath(ref File fn, Path path)
 	{
-		 //todo: belerakni az utils-ba, megcsinalni path-osra a DPath-ot.
+		 //Todo: belerakni az utils-ba, megcsinalni path-osra a DPath-ot.
 		bool res = fn.fullName.startsWith(path.fullPath);
 		if(res)
 		fn.fullName = fn.fullName[path.fullPath.length..$];
@@ -1122,7 +1136,7 @@ struct BuildSystem
 				
 				auto ext = "."~cmd;
 				targetFile = param1.empty ? mainFile.otherExt(ext)
-																	: File(mainFile.path, param1~ext); //todo: pathosra
+																	: File(mainFile.path, param1~ext); //Todo: pathosra
 				
 				if(isDll)
 				{
@@ -1158,7 +1172,7 @@ struct BuildSystem
 					pattern = "*.*";
 					try
 					{
-						//todo: filekeresest belerakni a filePath-ba.
+						//Todo: filekeresest belerakni a filePath-ba.
 						foreach(f; dirEntries(src.path.fullPath, pattern, SpanMode.shallow))
 						{
 							 //many files
@@ -1172,7 +1186,7 @@ struct BuildSystem
 					}catch(Throwable)
 					{}
 				}
-				enforce(any, format(`Can't find any resources at: "%s"`, src)); //todo: source file/line number visszajelzes
+				enforce(any, format(`Can't find any resources at: "%s"`, src)); //Todo: source file/line number visszajelzes
 				
 				break;
 			}
@@ -1216,7 +1230,7 @@ struct BuildSystem
 			foreach(const imp; act.parser.importDecls)
 			if(imp.isCoreModule)
 			{
-				addIfCan(settings.linkArgs, ["kernel32.lib", "user32.lib"]); //todo: not needed to add these, they're implicit -> try it out!
+				addIfCan(settings.linkArgs, ["kernel32.lib", "user32.lib"]); //Todo: not needed to add these, they're implicit -> try it out!
 				hasCoreModule = true;
 				break;
 			}
@@ -1294,7 +1308,7 @@ struct BuildSystem
 	{
 		//for incremental builds: main file is OBJ, all others are LIBs
 		//auto ext = srcFile==mainFile ? ".obj" : ".lib";
-		//note: no lib support at the moment.
+		//Note: no lib support at the moment.
 		
 		//this is the simplest strategy
 		if(!workPath)
@@ -1321,7 +1335,7 @@ struct BuildSystem
 		foreach(ref a; args)
 		{
 			if(a=="-inline")
-			a = "-enable-inlining=true";  //note: this is the default in -O2
+			a = "-enable-inlining=true";  //Note: this is the default in -O2
 		}
 	}
 	
@@ -1350,8 +1364,8 @@ struct BuildSystem
 	
 		string[][] makeCompileCmdLines(File[] srcFiles, string[] commonCompilerArgs)
 	{
-		 //todo: refact multi
-		//note: filenames are normalCase, but LDC2 must get lowercase filenames.
+		 //Todo: refact multi
+		//Note: filenames are normalCase, but LDC2 must get lowercase filenames.
 		
 		string[][] cmdLines;
 		if(isIncremental)
@@ -1378,7 +1392,7 @@ struct BuildSystem
 			foreach(fn; settings.linkArgs)
 			switch(lc(File(fn).ext))
 			{
-				 //todo: ezt osszevonni a linkerrel
+				 //Todo: ezt osszevonni a linkerrel
 				case ".lib": libFiles ~= fn; break;
 				default: break;
 			}
@@ -1469,7 +1483,7 @@ struct BuildSystem
 		
 				enforce(!cancelled, "Compillation cancelled.");
 		
-				//todo: refactor cancel/kill functionality.. onIdle should be able to kill too.
+				//Todo: refactor cancel/kill functionality.. onIdle should be able to kill too.
 		
 				logln;
 				logln;
@@ -1503,7 +1517,7 @@ struct BuildSystem
 		logln(bold("WRITING CACHE -> OBJ: "), objWritten.map!(a=>smallName(a)).join(", "));
 	}
 	
-		void resCompile(File resFile, string resHash) //todo: ez igy csunya, ahogy at van passzolva
+		void resCompile(File resFile, string resHash) //Todo: ez igy csunya, ahogy at van passzolva
 	{
 		mixin(perf("res"));
 		resFile.remove;
@@ -1537,7 +1551,7 @@ struct BuildSystem
 				auto line = joinCommandLine(rcCmd);
 				logln(bold("CALLING RC: "), line);
 				auto rc = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
-				//todo: resource compiler totally bugs on 64bit. Workaround: use resource hacker manually
+				//Todo: resource compiler totally bugs on 64bit. Workaround: use resource hacker manually
 				
 				//cleanup
 				rcFile.remove;
@@ -1561,7 +1575,7 @@ struct BuildSystem
 		
 		string[] objFiles = modules.map!(m => objFileOf(m.file).fullName).array,
 						 libFiles,           //user32, kernel32 nem kell, megtalalja magatol
-						 linkOpts; //todo: kideriteni, hogy ez miert kell a windowsos cuccokhoz
+						 linkOpts; //Todo: kideriteni, hogy ez miert kell a windowsos cuccokhoz
 		
 		if(settings.generateMap)
 		addIfCan(linkOpts, "/MAP");
@@ -1577,7 +1591,7 @@ struct BuildSystem
 		}
 		
 		
-		//todo: /ENTRY, /SUBSYSTEM=CONSOLE/WINDOWS  -> VisualD has help.
+		//Todo: /ENTRY, /SUBSYSTEM=CONSOLE/WINDOWS  -> VisualD has help.
 		
 		string[] cmd;
 		static if(LDCVER>=128)
@@ -1592,7 +1606,7 @@ struct BuildSystem
 		}else
 		{
 			cmd = [
-				"link",	 `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //todo: the place for these is in DPath
+				"link",	 `/LIBPATH:`~(is64bit?`c:\D\ldc2\lib64`:`c:\D\ldc2\lib32`), //Todo: the place for these is in DPath
 					 `/OUT:`~targetFile.fullName,
 					 `/MACHINE:`~(is64bit ? "X64" : "X86")
 			]
@@ -1608,7 +1622,7 @@ struct BuildSystem
 		
 		//add libs for LDC
 		/+
-			note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
+			Note: LDC 1.20.0: "msvcrt.lib": gives a warning in the linker.
 						https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
 							libcmt.lib: static CRT link library for a release build (/MT)
 							msvcrt.lib: import library for the	release DLL version of the CRT (/MD)
@@ -2011,7 +2025,7 @@ void buildSystemWorker()
 	
 	void onBuildStarted(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos)
 	{
-		 //todo: rename to buildStart
+		 //Todo: rename to buildStart
 		with(state)
 		{
 			totalModules = (filesToCompile.length + filesInCache.length).to!int;
@@ -2067,7 +2081,7 @@ void buildSystemWorker()
 				try
 				{
 					state.building = true;
-					//todo: onIdle
+					//Todo: onIdle
 					buildSystem.build(req.mainFile, req.settings);
 				}catch(Exception e)
 				{ error = e.simpleMsg; }
@@ -2184,7 +2198,7 @@ enum BuildMessageType
 	{ skBug	, "Bug"	 },
 ];
 
-//todo: the UDA version of buildMessageInfo is a fucking piece of crap
+//Todo: the UDA version of buildMessageInfo is a fucking piece of crap
 /+
 	auto buildMessageInfo(BuildMessageType bmt)
 	{
@@ -2192,7 +2206,7 @@ enum BuildMessageType
 	}
 +/
 
-//todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");
+//Todo: In the future it could handle special pragmas: pragma(msg, __FILE__~"("~__LINE__.text~",1): Message: ...");
 
 
 struct BuildMessage
@@ -2203,9 +2217,15 @@ struct BuildMessage
 	string message;
 	CodeLocation parentLocation;  //multiline message lines are linked together using parentLocation
 	
+	@property bool isMain() const
+	{ return !parentLocation; }
+	
+	@property bool isSupplemental() const
+	{ return !isMain; }
+	
 	string toString() const
 	{
-		return parentLocation 	? format!"%s: %s:        %s"	(location, type.text.capitalize, message)
+		return isSupplemental 	? format!"%s: %s:        %s"	(location, type.text.capitalize, message)
 			: format!"%s: %s: %s"	(location, type.text.capitalize, message);
 	}
 }
@@ -2250,7 +2270,7 @@ class BuildResult
 			{
 				if(*r)
 				return hasErrors;
-				return hasWarnings; //todo: detect hasDeprecations, flawless
+				return hasWarnings; //Todo: detect hasDeprecations, flawless
 			}
 			return f in filesInFlight ? compiling : queued;
 		}
@@ -2315,7 +2335,7 @@ class BuildResult
 					//filter out useless meddages
 					if(type == BuildMessageType.warning && msg.isWild("C preprocessor directive `#*` is not supported"))
 					return false;
-					//todo: make this filtering accessible from the IDE. Let te used see the dropped messages too.
+					//Todo: make this filtering accessible from the IDE. Let te used see the dropped messages too.
 					
 					add(BuildMessage(location, type, msg)); //this is a true original message
 					
@@ -2377,16 +2397,16 @@ class BuildResult
 					foreach(m; o.messages)
 					_processLine(m.join('\n'));
 					
-					outputs[f] = msg.output.splitLines; //todo: not used anymore. Everything is in messages[]
-					remainings[f] = o.pragmas;  //todo: rename remainings to pragmas
+					outputs[f] = msg.output.splitLines; //Todo: not used anymore. Everything is in messages[]
+					remainings[f] = o.pragmas;  //Todo: rename remainings to pragmas
 				},
 					
 				(in MsgBuildFinished msg)	{
 					filesInFlight.clear;
 					
-					//todo: clear currently compiling modules.
+					//Todo: clear currently compiling modules.
 					//decide the global success of the build procedure
-					//todo: there are errors whose source are not specified or not loaded, those must be displayed too. Also the compiler output.
+					//Todo: there are errors whose source are not specified or not loaded, those must be displayed too. Also the compiler output.
 					
 					//dump.print;
 				}
@@ -2416,7 +2436,8 @@ class BuildResult
 		if(const bm = location in messages)
 		return dumpMessage(*bm, indent);
 		return "";
-	}
+	}
+	
 	
 	
 	string dump()
@@ -2459,10 +2480,119 @@ class BuildResult
 		return res;
 	}
 	
+	string sourceText()
+	{
+		//Note: This produces a compiler message list out of advanced DIDE comments.
+		
+		static string safeText(string s)
+		{ return s.replace("/+", "/ +").replace("+/", "+ /"); }
+		
+		string fixDuplicatedMessages(string msg, string prefix)
+		{
+			auto lines = msg.splitLines;
+			if(lines.length>1)
+			{
+				const s = prefix ~ lines[0];
+				if(lines[1..$].all!(line => line == s))
+				return lines[0] ~ " (x"~lines.length.text~")";
+			}
+			
+			return msg;
+		}
+		
+		string formatErrorMessage(string msg)
+		{
+			{
+				/+
+					Bug: Find a way to encode comment characters without ruining the syntax of the comment.
+					$ DIDE_CHAR(ind charcode) seems good.
+					
+					The following is a cheap workaround only:
+				+/
+				msg = safeText(msg);
+			}
+			
+			//locate all the code snippets inside `` and surround them with / +Code: ... + /
+			int[] indices;
+			
+			foreach(i, char ch; msg) if(ch=='`') indices ~= i.to!int;
+			
+			if(indices.length & 1)
+			{
+				indices = indices.remove(max(indices.length.to!int - 2, 0));
+				//it removes the second rightmost element. The leftmost and the rightmost are always valid.
+			}
+			
+			bool opening = false;
+			foreach_reverse(i; indices)
+			{
+				const s = opening ? "/+Code: " : "+/";
+				msg = msg[0 .. i] ~ s ~ msg[i+1 .. $];
+				opening = !opening;
+			}
+			
+			//find filenames and transform them into / + $DIDE_LOC ... + /
+			
+			static rxCodeLocation = ctRegex!(`[a-z]:\\[a-z0-9_\.\-\\!#$%^@~]+.d(-mixin-[0-9]+)?\([0-9]+,[0-9]+\)`, `gim`);
+			//Todo: this filename parser regex fails with accented chars and with space.
+			
+			auto fileNames = msg.matchAll(rxCodeLocation).map!"a[0]".array;
+			foreach(fn; fileNames.sort.uniq)
+			{ msg = msg.replace(fn, "/+$DIDE_LOC " ~ repairFileCase(fn) ~ "+/"); }
+			
+			
+			return msg;
+		}
+		
+		string innerSourceText(in BuildMessage msg)
+		{
+			with(msg) {
+				if(location.text.canFind(' ')) WARN("Space is not allowed in the code location paths.");
+				//Todo: Handle modern "" filenames with space characters in $ DIDE_LOC
+				
+				const t = type.text.capitalize ~ ':';
+				const s = formatErrorMessage(fixDuplicatedMessages(message, t~" "));
+				
+				if(isMain)	return format!"%s/+$DIDE_LOC %s+/ %s"(t, location, s);
+				else if(location)	return format!"/+$DIDE_LOC %s+/ %s"(location, s);
+				else	return s;
+			}
+		}
+		
+		string res;
+		
+		foreach(f; remainings.keys.sort)
+		{
+			if(f in remainings && remainings[f].length)
+			{
+				res ~= "/+Output:/+$DIDE_LOC "~f.fullName~"+/\n/+Plain:";
+				remainings[f].each!(a => res ~= safeText(a)~"\n");
+				res ~= "+/+/\n";
+			}
+		}
+		
+		foreach(loc; messages.keys.sort)
+		{
+			const bm = messages[loc];
+			
+			if(bm.isMain)
+			{
+				res ~= "/+"~innerSourceText(bm);
+				
+				foreach(const sm; subMessagesOf(bm.location))
+				res ~= "\n"~innerSourceText(sm);
+				
+				res ~= "+/\n";
+			}
+		}
+		
+		return res;
+	}
+	
 	//find sub-messages recursively
 	auto subMessagesOf(in CodeLocation loc)
 	{
-		BuildMessage[] subMessages;  //todo: this is an array of struct. It's unoptimal
+		BuildMessage[] subMessages;  //Todo: this is an array of struct. It's unoptimal
 		void doit(in CodeLocation parentLocation)
 		{
 			auto sm = messages.byValue.filter!(m => m.parentLocation==parentLocation).array;
