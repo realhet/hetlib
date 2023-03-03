@@ -18,7 +18,7 @@ version(/+$DIDE_REGION+/all)
 	GLTexture debugTexture;
 	
 	/+
-		todo: A shader errorokat visszakovetni valahogy: Annyit tudunk rola, hogy a neve az, 
+		Todo: A shader errorokat visszakovetni valahogy: Annyit tudunk rola, hogy a neve az, 
 		hogy pl. DrawingShader, ezt a nevet lehetne magabol a shader szovegebol generalni. 
 		A GCN compilerbol kell lopkodni, ott mar megy.
 	+/
@@ -32,35 +32,26 @@ version(/+$DIDE_REGION+/all)
 	*/
 	
 	
-	/*
-		 GPU Data format
+	/+
+		Note: GPU Data format
 		
-		todo:
-			Shadow/Outline for everything
+			0	1	2	3	4	5	6	7	8	9	10	11	12	13	14	15	//4*16 = 64bytes/primitive
+			Ax	Ay	Bx	By	Cx	Cy	Col	Typ	Dx	Dy	col2	unused	ClipX0	ClipY0	ClipX1	ClipY1	
+		Primitive																	
+		Point	X	Y	Siz	Col	Siz			1				...	...	...	...	...	//-Siz = screen_relative
+		Point2	X1	Y1	X2	Y2	Siz1	Siz2	Col	2				...	...	...	...	...	//-Siz = screen_relative
+		Line	X1	Y1	X1	Y1	Width	L.Style	Col	3..3+63				...	...	...	...	...	//arrowStyle
+		Rect	X1	Y1	X2	Y2	Width	L.Style	Col	67				...	...	...	...	...	//Id: symbol id in texture  sc:symScale(1 = (xs, ys))
+		Tri	X0	Y0	X1	Y1	X2	Y2	col	68				...	...	...	...	...	
+		Glyph	X0	Y0	X1	Y1	TX0	TY0	col	256	TX1	TY1	col2	...	...	...	...	...	//TX0 MSBs: fontFlags
+		Bez2	Ax	Ay	Bx	By	Cx	Cy	col	69	Width			...	...	...	...	...	
+																			
+		Text(new)	X0	X1	SF	STR	STR	STR	col	70?	STR	STR	col2	...	...	...	...	...	 SF=size+flags, STR: 4 chas strings = 20 total chars
 		
+		/+Note: SubTextIdx is encoded in the MSB of  Typ+/
 		
-		Data record:
-		
-		
-					 0	  1	  2	  3		4	   5	6	  7	    8	9	 10     8*4 = 32bytes/primitive
-					 Ax	  Ay	  Bx		By	 Cx	   Cy	Col	  Typ	    Dx	Dy	 col2
-		Point: X	  Y			 Siz	Col	  1	   //-Siz	=	screen_relative
-		Point2:X1		 Y1		 X2	Y2	 Siz1	Siz2	Col		2	   //-Siz	= screen_relative
-		Line : X1		 Y1		 X1,	Y1,	 Width	L.Style	Col	  3..3+63   //arrowStyle
-		Rect : X1		 Y1		 X2,	Y2,			Col	  67   //Id: symbol id in texture  sc:symScale(1 = (xs, ys))
-		
-		Tri  : X0   Y0   X1, Y1, X2     Y2      col,  68
-		
-		Glyph: x0,  y0,  x1, y1,	 tx0, ty0      col,  256     tx1, ty1, col2
-			 tx0:fontFlags
-		
-		Bez2 : Ax   Ay   Bx  By   Cx    Cy      Col   69      Width - -
-		
-		
-		////////////Text:  x0,  y0,  sf, c4,  c4,  c4,      c4 ,  69,     c4,  c4,  c4   //sf = size+flags
-		
-	*/
-	
+		/+Todo: Shadow/Outline for everything+/
+	+/
 	
 	//Standard LineStyles
 	enum LineStyle:ubyte
@@ -111,7 +102,7 @@ version(/+$DIDE_REGION+/all)
 	struct DrawingBuffersOld(T)
 	{
 		private const bufferMax =	(2<<20)/T.sizeof;
-		private T[][] buffers;	//todo: immutable
+		private T[][] buffers;	//Todo: immutable
 		
 		void initialize()
 		{}
@@ -189,7 +180,7 @@ version(/+$DIDE_REGION+/all)
 		{ return app[].empty; }
 		void clear()
 		{ app.clear; } /+
-			todo: This keeps the buffer capacity in memory. 
+			Todo: This keeps the buffer capacity in memory. 
 				For 24/7 operation, in every minute is 
 				should be shrinked to the half if possible.
 		+/
@@ -220,7 +211,7 @@ version(/+$DIDE_REGION+/all)
 		
 		this(HAlign hAlign, VAlign vAlign, bool canShrink, bool canEnlarge, bool keepAspect)
 		{
-			//todo: dumb stupid copy paste constructor
+			//Todo: dumb stupid copy paste constructor
 			this.hAlign = hAlign;
 			this.vAlign = vAlign;
 			this.canShrink = canShrink;
@@ -461,7 +452,7 @@ version(/+$DIDE_REGION+/all)
 		
 			auto drawTextStrokes(vec2 pos, string text, float scale=1, DrawTextOption[] options=[])
 		{
-			vec2[][] res;    //todo: refactor this funct
+			vec2[][] res;    //Todo: refactor this funct
 			pos.y += scale*fontYAdjust;
 			
 			const monoSpace	= options.canFind(DrawTextOption.monoSpace);
@@ -504,7 +495,7 @@ version(/+$DIDE_REGION+/all)
 			struct CharGfx { float width; CharPoint[][] points; }
 			struct CharRec { char ch; CharGfx gfx; }
 			//data source: https://hackage.haskell.org/package/plotfont
-			//todo: Editor: linkek highlightolasa es raugras.
+			//Todo: Editor: linkek highlightolasa es raugras.
 			
 			const CharRec[] chars =
 		[
@@ -1194,10 +1185,10 @@ class Drawing
 		
 		void subDraw(Drawing src)
 		{
-			//todo: revisit this subdrawing thing
+			//Todo: revisit this subdrawing thing
 			if(!src.isClone) CRIT("src must be a clone (at least for now.)");
 			
-			//note: potential problem, the subDrawing has no location. It is useless for dynamic changes.
+			//Note: potential problem, the subDrawing has no location. It is useless for dynamic changes.
 			
 			if(logDrawing) LOG(shortName, "queued subDrawing", cast(void*) src, src.totalDrawObj);
 			subDrawings ~= src;
@@ -1212,7 +1203,7 @@ class Drawing
 			
 			foreach(o; src.exportDrawingObjs) {
 				o.applyTransform(&inputTransform);
-				myAppend(o); //todo: this is a terrible slow copy
+				myAppend(o); //Todo: this is a terrible slow copy
 			}
 		}
 		
@@ -1292,7 +1283,7 @@ class Drawing
 		private DrawState actState;
 		private DrawState[] stateStack;
 		
-		//todo: Examine push VS saveState, seems redundant. UI uses only translate() and pop()
+		//Todo: Examine push VS saveState, seems redundant. UI uses only translate() and pop()
 		private vec2[2][] stack; //matrix stack
 		
 		
@@ -1401,7 +1392,7 @@ class Drawing
 		
 		auto scale(float s)
 		{
-			 //todo: ezt meg kell csinalni matrixosra.
+			 //Todo: ezt meg kell csinalni matrixosra.
 			push;
 			origin *= scaleFactor;
 			scaleFactor *= s;
@@ -1513,15 +1504,15 @@ class Drawing
 		{ return bounds2(inputTransform(b.low), inputTransform(b.high)); }
 		
 		vec2 inverseInputTransform(in vec2 v)
-		{ return v/actState.drawScale-actState.drawOrigin; } //todo: slow divide
+		{ return v/actState.drawScale-actState.drawOrigin; } //Todo: slow divide
 		bounds2 inverseInputTransform(in bounds2 b)
 		{ return bounds2(inverseInputTransform(b.low), inverseInputTransform(b.high)); }
 		
 		float zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
 		float invZoomFactor = 1; //comes from outside view
-		//todo: rename invScale and invZoomFactor to pixelSize, scale and zoomFactor to scaleFactor.
+		//Todo: rename invScale and invZoomFactor to pixelSize, scale and zoomFactor to scaleFactor.
 		
-		//todo: zoomFactor naming is incompatible with view.scale
+		//Todo: zoomFactor naming is incompatible with view.scale
 		
 		private enum clipBounds_init = bounds2(-1e30, -1e30, 1e30, 1e30);
 		bounds2 clipBounds = clipBounds_init;
@@ -1580,7 +1571,7 @@ class Drawing
 					return;
 				}
 			*/
-			//todo: point2 is not working with appender. should use vec2[]
+			//Todo: point2 is not working with appender. should use vec2[]
 			
 			//Create a new Point1
 			myAppend(DrawingObj(1, inputTransform(p), vec2(0), vec2(s, 0), c));
@@ -1588,7 +1579,7 @@ class Drawing
 		
 		void point(in RGB c, in vec2 p)
 		{
-			 //todo: refactor this
+			 //Todo: refactor this
 			const oldc = color; scope(exit) color = oldc;
 			color = c;
 			point(p);
@@ -1626,7 +1617,7 @@ class Drawing
 		
 		void lineTo(in vec2 p_)
 		{
-			 //todo: const struct->in struct
+			 //Todo: const struct->in struct
 			vec2 p = inputTransform(p_);
 			markDirty;
 			auto c = realDrawColor, w = lineWidth;
@@ -1698,7 +1689,7 @@ class Drawing
 			
 			//backup current drawState (only a	subset of it)
 			auto backup = actState.quickSave;	scope(exit) actState.quickRestore(backup);
-			//todo: only do this when tere are	colors, or styles in the args
+			//Todo: only do this when tere are	colors, or styles in the args
 			
 			bool first = true;
 			float coord; //it remembers the first coordinate
@@ -1743,7 +1734,7 @@ class Drawing
 			return 
 			q{
 				auto oldColor = color;
-				//note: this is not sure if black or white, or ignored. color = clWhite; @(x0, y0, data.map!"a.l".array, xScale, yScale);
+				//Note: this is not sure if black or white, or ignored. color = clWhite; @(x0, y0, data.map!"a.l".array, xScale, yScale);
 				color = clRed	; @(x0, y0, data.map!"a.r".array, xScale, yScale);
 				color = clLime	; @(x0, y0, data.map!"a.g".array, xScale, yScale);
 				color = clBlue	; @(x0, y0, data.map!"a.b".array, xScale, yScale);
@@ -1818,7 +1809,7 @@ class Drawing
 		{ fillRect(a.x, a.y, b.x, b.y); } void fillRect(in bounds2 b)
 		{ fillRect(b.low, b.high); } void fillRect(in ibounds2 b)
 		{ fillRect(bounds2(b)); }
-		//todo: ibounds2 automatikusan atalakulhasson bounds2-re
+		//Todo: ibounds2 automatikusan atalakulhasson bounds2-re
 		
 		void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args)
 		{
@@ -1849,7 +1840,7 @@ class Drawing
 			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
 				tx1 = vec2(1, 1);
 			
-			auto info = textures.accessInfo(idx); //todo: csunya, kell egy texture wrapper erre
+			auto info = textures.accessInfo(idx); //Todo: csunya, kell egy texture wrapper erre
 			
 			auto b2 = rectAlign.apply(bnd, bounds2(0, 0, info.width, info.height));
 			
@@ -1860,14 +1851,14 @@ class Drawing
 		{
 			 //autosize version
 			if(idx<0) return;
-			auto info = textures.accessInfo(idx); //opt: double call to accessInfo
+			auto info = textures.accessInfo(idx); //Opt: double call to accessInfo
 			drawGlyph_impl(idx, bounds2(topLeft, topLeft+info.size), args);
 		}
 		
 		void drawGlyph(Img, T...)(/+Not const because CustomTexture.texIdx is mutable+/Img img, in T args)
 		{
 			//Img can be int or Bmp File or string or CustomTexture
-			//todo: Bitmap, Image2D
+			//Todo: Bitmap, Image2D
 			int idx = -1;
 			static if(isSomeString!Img)	idx = textures[img];
 			else static if(is(Img == File))	idx = textures[img];
@@ -1897,7 +1888,7 @@ class Drawing
 			else static assert(0, "Unsupported Bounds param: "~Img.stringof);
 			
 			/+
-				todo: DIDE bug with double nested "else static if"s when there is no {}
+				Todo: DIDE bug with double nested "else static if"s when there is no {}
 						The else static if is lost after an inner else
 			+/
 		}
@@ -1955,7 +1946,7 @@ class Drawing
 			auto 	tx0 = vec2(fontFlags, 0),
 				tx1 = vec2(0, 0);
 			
-			//todo: must combine this with drawGlyph
+			//Todo: must combine this with drawGlyph
 			
 			//align proportiolally
 			//auto al = RectAlign(HAlign.center, VAlign.center, true, true, false); //shrink, enlarge, aspect
@@ -2014,7 +2005,7 @@ class Drawing
 			float width=-1, LineStyle style = LineStyle.normal, string hv = "hv"
 		)
 		{
-			//todo: this is not working with translate()
+			//Todo: this is not working with translate()
 			auto horz = hv.canFind('h'), vert = hv.canFind('v');
 			if(!horz && !vert) return;
 			
@@ -2045,7 +2036,7 @@ class Drawing
 				}
 			}
 			
-			alpha = 1; //todo: nem tul jo
+			alpha = 1; //Todo: nem tul jo
 		}
 		
 		void mmGrid(View2D view)
@@ -2067,7 +2058,7 @@ class Drawing
 		
 		void ellipse(float x, float y, float ra, float rb, float arc0=0, float arc1=2*PI)
 		{
-			while(arc0>arc1) arc1 += 2*PI; //todo: lame
+			while(arc0>arc1) arc1 += 2*PI; //Todo: lame
 			
 			float rounds = (arc1-arc0)*(0.5f/PI);
 			int cnt = iround(rounds*64);  //resolution  //todo: it should be done in the shader
@@ -2092,17 +2083,17 @@ class Drawing
 		float textWidth(string text)
 		{
 			auto scale = fontHeight*(1.0f/40);
-			//todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
+			//Todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
 			
 			return plotFont.textWidth(scale, fontMonoSpace, text);
 		}
 		
 		void textOut(vec2 p, string text, float width = 0, HAlign align_ = HAlign.left, bool vertFlip = false)
 		{
-			saveState; scope(exit) restoreState; //opt:slow
+			saveState; scope(exit) restoreState; //Opt: slow
 			
 			auto scale = fontHeight*(1.0f/40);
-			//todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
+			//Todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
 			
 			lineWidth = 3*scale*fontWeight*scaleFactor.x;
 			lineStyle = LineStyle.normal;
@@ -2193,7 +2184,7 @@ class Drawing
 		
 		void drawAlpha(Bitmap bmp, float x0=0, float y0=0)
 		{
-			//todo: bmp.to    auto tmp = bmp.to!LA8;
+			//Todo: bmp.to    auto tmp = bmp.to!LA8;
 			enforce("not impl");
 			/*
 				auto tmp = bmp.dup;
@@ -2346,7 +2337,7 @@ class Drawing
 			
 			auto shader = getShader;
 			
-			auto vpSize = gl.getViewport.size;  //todo: ezek a vbo hivas elott mehetnek kifele
+			auto vpSize = gl.getViewport.size;  //Todo: ezek a vbo hivas elott mehetnek kifele
 			
 			auto uScale = vec2(scale, scale),
 							 uShift = -center;
@@ -2368,7 +2359,7 @@ class Drawing
 			
 			if(onCustomShaderSetup) onCustomShaderSetup(shader);
 			
-			//todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
+			//Todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
 			gl.enable(GL_CULL_FACE);
 			gl.enable(GL_BLEND);		 gl.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			gl.enable(GL_ALPHA_TEST);		 gl.alphaFunc(GL_GREATER, 0);
@@ -2383,8 +2374,8 @@ class Drawing
 			
 			foreach(sd; subDrawings) { sd.glDraw(center, scale, translate); }
 		}
-			//todo: A binaris konstansokat is szemleltethetne az ide!
-			//todo: az IDE automatikusan irhatna a bezaro } jelek utan, hogy mit zar az be. Csak annak a scopenak, amiben a cursor van.
+			//Todo: A binaris konstansokat is szemleltethetne az ide!
+			//Todo: az IDE automatikusan irhatna a bezaro } jelek utan, hogy mit zar az be. Csak annak a scopenak, amiben a cursor van.
 		
 	}
 	
@@ -2426,7 +2417,7 @@ class Drawing
 			
 			//all
 			ClipMin = aClipMin;
-			ClipMax = aClipMax; //todo: culling in geometry shader
+			ClipMax = aClipMax; //Todo: culling in geometry shader
 		} //just shovels the data through
 		
 		
@@ -2443,7 +2434,7 @@ class Drawing
 		//GL_MAX_GEOMETRY_OUTPUT_COMPONENTS
 		
 		/*
-			todo: 200909 Csobi kartyajan nem megy az uj vertex attribok miatt. -> attribok tomoritese 
+			Todo: 200909 Csobi kartyajan nem megy az uj vertex attribok miatt. -> attribok tomoritese 
 			-> MaxCurveRertices hardvertol fuggo szamitasa.
 		*/
 		layout(points) in;
@@ -2460,7 +2451,7 @@ class Drawing
 		
 		//glyph only
 		flat out vec4 fColor2; //alpha holds special stuff	                                             // 4
-		out vec2 fTexCoord; //todo: osszevonhato lenne az fStipple-vel	                                             // 2
+		out vec2 fTexCoord; //Todo: osszevonhato lenne az fStipple-vel	                                             // 2
 		
 		flat out ivec2 stPos, stSize;	//4
 		flat out int stConfig, stIdx;	//2
@@ -2655,8 +2646,8 @@ class Drawing
 			///----|----\ ----> s1
 			//p1
 			/*
-				todo:	DIDE this comment should not convert tabs to spaces.
-					There should be an option to make ascii art in comments.
+				Todo: DIDE this comment should not convert tabs to spaces.
+				There should be an option to make ascii art in comments.
 			*/
 			emit(p0-s0);	 emit(p0+s0);
 			emit(p1-s1);	 emit(p1+s1);
@@ -2884,7 +2875,7 @@ class Drawing
 			return (tcy>base && tcy<base+h);
 		}
 		
-		//todo: megatexture error: Maybe it's a fix: wiki glsl samples Non-uniform flow control !!!!!
+		//Todo: megatexture error: Maybe it's a fix: wiki glsl samples Non-uniform flow control !!!!!
 		
 		vec4 megaSample_nearest(vec2 tc)
 		{
@@ -3028,7 +3019,7 @@ class Drawing
 			int samplingLevel = 0;
 			if(isImage) {
 				samplingLevel = fontFlags & 1; //nearest or linear
-				//todo: nearest when close and linear when far
+				//Todo: nearest when close and linear when far
 			}
 			else {
 				float L = length(texelPerPixel);
@@ -3106,7 +3097,7 @@ class Drawing
 		}
 		
 		vec4 customShader() { return vec4(((int(tc.x)^int(tc.y))&255)/255.0 * vec3(1, 0, 1), 1); }
-		//note: ^^^^^^^^^^	this SINGLE(!) line marks the place of the custom shader
+		//Note: ^^^^^^^^^^	this SINGLE(!) line marks the place of the custom shader
 		
 		void main()
 		{
@@ -3180,11 +3171,11 @@ class Drawing
 		}
 		
 		
-		//todo: megaTexMaxCount-ot meg a tobbi konstanst kivulrol szedni
-		//todo: arrowless curves could use max vertices
-		//todo: arrows -> triangles instead of trapezoids
-		//todo: arrows: no curcature needed
-		//todo: compress geom shader output size
+		//Todo: megaTexMaxCount-ot meg a tobbi konstanst kivulrol szedni
+		//Todo: arrowless curves could use max vertices
+		//Todo: arrows -> triangles instead of trapezoids
+		//Todo: arrows: no curcature needed
+		//Todo: compress geom shader output size
 		
 		
 	};

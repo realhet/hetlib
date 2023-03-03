@@ -7,10 +7,10 @@ version(/+$DIDE_REGION+/all)
 	
 	import std.bitmanip: bitfields;
 	
-	import het.ui : im; //todo: bad crosslink for scrollInfo
+	import het.ui : im; //Todo: bad crosslink for scrollInfo
 	
-	//todo: rename "hovered" -> "hot"
-	//todo: multiple 2D view controls in hetlib
+	//Todo: rename "hovered" -> "hot"
+	//Todo: multiple 2D view controls in hetlib
 	
 	//enums/constants ///////////////////////////////////////
 	
@@ -19,14 +19,14 @@ version(/+$DIDE_REGION+/all)
 		VisualizeContainers	= 0,
 		VisualizeContainerIds	= 0,
 		VisualizeGlyphs	= 0,
-		VisualizeTabColors	= 0, //todo: spaces at row ends
+		VisualizeTabColors	= 0, //Todo: spaces at row ends
 		VisualizeHitStack	= 0,
 		VisualizeSliders	= 0,
-		VisualizeCodeLineNumbers 	= 0,
+		VisualizeCodeLineIndices 	= 0,
+			
+		addHitRectAsserts	= 0; //Verifies that Cell.Id is non null and unique
 	
-		addHitRectAsserts        = 0; //Verifies that Cell.Id is non null and unique
-	
-	//todo: bug: NormalFontHeight = 18*4	-> RemoteUVC.d crashes.
+	//Todo: bug: NormalFontHeight = 18*4	-> RemoteUVC.d crashes.
 	immutable DefaultFontName = //this is	the cached font
 		"Segoe UI"
 	//"Lucida Console"
@@ -70,7 +70,7 @@ version(/+$DIDE_REGION+/all)
 	
 	//Global dependency injection shit //////////////////////////////
 	
-	//todo: these ugly things are only here to separate uiBase for ui.
+	//Todo: these ugly things are only here to separate uiBase for ui.
 	
 	__gshared RGB function() g_actFontColorFunct;
 	
@@ -98,7 +98,7 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	
-	//todo: Eliminate this dependency injection: addDrawCallback() should be maintained by het.uibase and not het.ui!!
+	//Todo: Eliminate this dependency injection: addDrawCallback() should be maintained by het.uibase and not het.ui!!
 	__gshared void function(Drawing, Container) function(Container) g_getDrawCallbackFunct;
 	
 	auto g_getDrawCallback(Container cntr)
@@ -146,7 +146,7 @@ version(/+$DIDE_REGION+/all)
 	///Also used by CodeColumnBuilder
 	float adjustBoldWidth(Glyph g, int prevFontFlags)
 	{
-		   //todo: also check monospaceness
+		   //Todo: also check monospaceness
 		enum boldMask = 1;
 		if((prevFontFlags&boldMask) == (g.fontFlags&boldMask))
 		return 0;
@@ -161,7 +161,7 @@ version(/+$DIDE_REGION+/all)
 	{
 		auto info = textures.accessInfo(stIdx);
 		
-		float	aspect	= float(info.width)/(info.height*3/*clearType x3*/); //opt: rcp_fast
+		float	aspect	= float(info.width)/(info.height*3/*clearType x3*/); //Opt: rcp_fast
 		auto	size	= vec2(ts.fontHeight*aspect, ts.fontHeight);
 		
 		if(ts.bold)
@@ -248,7 +248,7 @@ version(/+$DIDE_REGION+/all)
 		bool repeated() const
 		{
 			return pressed || captured && inputs.LMB.repeated;
-			//todo: architectural bug: captured is delayed by 1 frame according to repeated
+			//Todo: architectural bug: captured is delayed by 1 frame according to repeated
 		}
 	}
 	
@@ -305,10 +305,10 @@ version(/+$DIDE_REGION+/all)
 			
 			with(cast(GLWindow)mainWindow)
 			{
-				 //todo: get the mouse state from elsewhere!!!!!!!!!!!!!
+				 //Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
 				if(topId && mouse.LMB && mouse.justPressed && isForeground)
 				{
-					 //note: isForeground will not work with a toolwindow
+					 //Note: isForeground will not work with a toolwindow
 					pressedId = capturedId = topId;
 				}
 				if(mouse.justReleased)
@@ -354,7 +354,7 @@ version(/+$DIDE_REGION+/all)
 			h.pressed		=	pressedId ==id;
 			h.released		= releasedId==id;
 			h.clicked	  = clickedId ==id;
-			h.captured	  = h.pressed || capturedId==id && h.hover; //todo: architectural bug: captured is delayed by 1 frame according to repeated
+			h.captured	  = h.pressed || capturedId==id && h.hover; //Todo: architectural bug: captured is delayed by 1 frame according to repeated
 			h.hover_smooth	  = smoothHover.get(id, 0);
 			h.captured_smooth	  = max(h.hover_smooth, h.captured);
 			h.hitBounds	  = lastHitStack.get(lastHitStack.map!"a.id".countUntil(id)).hitBounds;
@@ -500,10 +500,10 @@ version(/+$DIDE_REGION+/all)
 		
 		ubyte fontFlags() const
 		{ return cast(ubyte)boolMask(bold, italic, underline, strikeout, 0/+isImage+/, transparent); }
-		//todo: implement monospaced font style for string literals, but firts I must refactor fontFlags.
+		//Todo: implement monospaced font style for string literals, but firts I must refactor fontFlags.
 		
 		bool isDefaultFont() const
-		{ return font == DefaultFontName; } //todo: slow. 'font' Should be a property.
+		{ return font == DefaultFontName; } //Todo: slow. 'font' Should be a property.
 		
 		void modify(string[string] map)
 		{
@@ -612,7 +612,7 @@ version(/+$DIDE_REGION+/all)
 		a("bold"	, tsBold	, tsNormal, { tsBold.bold = true; });
 		a("bold2"	, tsBold2	, tsBold	, { tsBold2.fontColor = clChapter; });
 		a("quote"	, tsQuote	, tsNormal,	{ tsQuote.italic = true; });
-		a("code"	, tsCode	, tsNormal, { tsCode.font = "Lucida Console"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //todo: should be half bold?
+		a("code"	, tsCode	, tsNormal, { tsCode.font = "Lucida Console"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //Todo: should be half bold?
 		a("link"	, tsLink	, tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; });
 		a("title"	, tsTitle	, tsNormal,	{ tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); });
 		a("chapter"	, tsChapter	, tsTitle , { tsChapter.fontHeight = rfh(40); });
@@ -851,7 +851,7 @@ version(/+$DIDE_REGION+/all)
 	struct Border
 	{
 		float width = 0;
-		BorderStyle style = BorderStyle.normal;  //todo: too many bits
+		BorderStyle style = BorderStyle.normal;  //Todo: too many bits
 		RGB color = clBlack;
 		
 		bool inset;  //border has a size inside gap and margin
@@ -874,8 +874,8 @@ version(/+$DIDE_REGION+/all)
 			if(p.empty)
 			return;
 			
-			//todo: the properties can be in any order.
-			//todo: support the inset property
+			//Todo: the properties can be in any order.
+			//Todo: support the inset property
 			
 			//width
 			bool hasWidth;
@@ -1044,13 +1044,13 @@ version(/+$DIDE_REGION+/all)
 		vec2 outerPos, outerSize;
 		
 		ref _FlexValue flex()
-		{ static _FlexValue nullFlex; return nullFlex	; } //todo: this is bad, but fast. maybe do it with a setter and const ref.
+		{ static _FlexValue nullFlex; return nullFlex	; } //Todo: this is bad, but fast. maybe do it with a setter and const ref.
 		ref Margin	margin ()
 		{ static Margin	nullMargin; return nullMargin	; }
 		ref Border	border ()
 		{ static Border	nullBorder; return nullBorder	; }
 		ref Padding	padding()
-		{ static Padding	nullPadding; return nullPadding; }  //todo: inout ref
+		{ static Padding	nullPadding; return nullPadding; }  //Todo: inout ref
 		
 		float extraMargin()	const
 		{ return (VisualizeContainers && cast(Container)this)? 3:0; }
@@ -1104,7 +1104,7 @@ version(/+$DIDE_REGION+/all)
 			//calculated prioperties. No += operators are allowed.
 			
 			/+
-				todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az
+				Todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az
 							outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
 			+/
 			const(vec2) innerPos () const
@@ -1170,7 +1170,7 @@ version(/+$DIDE_REGION+/all)
 			{ return outerPos + vec2(0, outerHeight); }
 			
 			/+
-				note: when working with controls, it is like specify border and then the width, 
+				Note: when working with controls, it is like specify border and then the width, 
 				not including the border. So width is mostly means innerWidth
 			+/
 			
@@ -1211,7 +1211,7 @@ version(/+$DIDE_REGION+/all)
 				if(auto container = cast(Container)this)
 				{
 					if(container.flags.noHitTest)
-					return false; //note: false means -> keep continue the search
+					return false; //Note: false means -> keep continue the search
 					hitTestManager.addHitRect(container.id, hitBnd, mouse-(innerPos+ofs), container.flags.clickable);
 				}else
 				{
@@ -1236,7 +1236,7 @@ version(/+$DIDE_REGION+/all)
 		//this is the third version: it returns
 		CellLocation[] locate(in vec2 mouse, vec2 ofs=vec2.init)
 		{
-			auto bnd = outerBounds + ofs;//note: locate() searches in outerBounds, not just the borderBounds.
+			auto bnd = outerBounds + ofs;//Note: locate() searches in outerBounds, not just the borderBounds.
 			if(bnd.contains!"[)"(mouse))
 			return [CellLocation(this, mouse-(innerPos+ofs), bnd)];
 			return [];
@@ -1262,7 +1262,7 @@ version(/+$DIDE_REGION+/all)
 				auto r = bb.inflated(m, m);
 				if(r.width<=0 || r.height<=0)
 				{
-					dr.line(r.topLeft, r.bottomRight); //todo: just a line. Used for Spacer, but it's wrond, because it goes negative
+					dr.line(r.topLeft, r.bottomRight); //Todo: just a line. Used for Spacer, but it's wrond, because it goes negative
 				}else
 				{ dr.drawRect(r); }
 			}
@@ -1364,17 +1364,16 @@ version(/+$DIDE_REGION+/all)
 	
 	class Glyph : Cell
 	{
-		 //Glyph ////////////////////////////////////
 		int stIdx;
 		dchar ch;
 		
 		RGB fontColor, bkColor;
-		ubyte fontFlags; //todo: compress information
+		ubyte fontFlags; //Todo: compress information
 		
 		bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
 		
 		ubyte syntax; //needed for DIDE
-		int line; //1based. needed for DIDE.
+		int lineIdx; //1based. needed for DIDE.
 		
 		this(dchar ch, in TextStyle ts)
 		{
@@ -1384,7 +1383,7 @@ version(/+$DIDE_REGION+/all)
 			isTab = ch==9;
 			isWhite = isTab || ch==32;
 			isNewLine = ch==10;
-			isReturn = ch==13;         //todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. ossz 16byte all rendelkezeser ugyis.
+			isReturn = ch==13;         //Todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. ossz 16byte all rendelkezeser ugyis.
 			
 			dchar visibleCh = ch;
 			if(VisualizeGlyphs)
@@ -1420,15 +1419,15 @@ version(/+$DIDE_REGION+/all)
 		
 		override void draw(Drawing dr)
 		{
-			drawBorder(dr); //todo: csak a containernek kell border elvileg, ez hatha gyorsit.
+			drawBorder(dr); //Todo: csak a containernek kell border elvileg, ez hatha gyorsit.
 			dr.color = fontColor;
 			dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags);
 			
-			if(VisualizeCodeLineNumbers)
+			if(VisualizeCodeLineIndices)
 			{
 				dr.color = clWhite;
 				dr.fontHeight = 1.25;
-				dr.textOut(outerPos, format!"%s"(line));
+				dr.textOut(outerPos, format!"%s"(lineIdx));
 			}
 			
 			if(VisualizeGlyphs)
@@ -1499,7 +1498,7 @@ version(/+$DIDE_REGION+/all)
 		this(File fn)
 		{
 			stIdx = textures[fn];
-			id = srcId(genericId("Img")); //todo: this is bad
+			id = srcId(genericId("Img")); //Todo: this is bad
 		}
 		
 		this(File fn, RGB bkColor)
@@ -1510,8 +1509,8 @@ version(/+$DIDE_REGION+/all)
 		
 		override void rearrange()
 		{
-			//note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
-			//todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
+			//Note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
+			//Todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
 			const siz = calcGlyphSize_image(stIdx);
 			
 			if(flags.autoHeight && flags.autoWidth)
@@ -1568,7 +1567,7 @@ version(/+$DIDE_REGION+/all)
 		private
 		{
 			Type type;
-			int fIdx, fLine, fColumn; //todo: union
+			int fIdx, fLine, fColumn; //Todo: union
 			vec2 fPoint;
 			float fHeight=0;
 			
@@ -1733,7 +1732,7 @@ version(/+$DIDE_REGION+/all)
 			if(line>=wrappedLines.length)
 			return cellCount; //below last line
 			
-			int baseIdx = wrappedLines[0..line].map!(l => l.cellCount).sum; //todo: opt
+			int baseIdx = wrappedLines[0..line].map!(l => l.cellCount).sum; //Todo: opt
 			int clampedColumn = col.clamp(0, wrappedLines[line].cellCount);
 			return clampIdx(baseIdx + clampedColumn);
 		}
@@ -1767,7 +1766,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 					//search the line
-					int line; //opt: binary search? (not important: only 1 screen of information)
+					int line; //Opt: binary search? (not important: only 1 screen of information)
 					foreach_reverse(int i; 0..wrappedLineCount)
 			{
 				if(y >= wrappedLines[i].y0)
@@ -1872,7 +1871,7 @@ version(/+$DIDE_REGION+/all)
 			if(tp.isIdx	)
 			lc = toLC(tp);
 			if(tp.isLC	)
-			lc = tp;    //todo: more error checking
+			lc = tp;    //Todo: more error checking
 			
 			int line = lc.line.clamp(0, wrappedLineCount-1);
 			int col = lc.column.clamp(0, wrappedLines[line].cellCount);
@@ -1883,7 +1882,7 @@ version(/+$DIDE_REGION+/all)
 				isRight = true;
 			}
 			
-			auto cell = wrappedLines[line].cells[col];  //todo: refactor
+			auto cell = wrappedLines[line].cells[col];  //Todo: refactor
 			auto pos = vec2(cell.outerPos.x + (isRight ? cell.outerWidth : 0), wrappedLines[line].top);
 			return TextPos(pos, wrappedLines[line].height);
 		}
@@ -1902,7 +1901,7 @@ version(/+$DIDE_REGION+/all)
 			
 			void caretRestrict()
 			{
-				//todo: this should work all the 3 types of carets: idx, lc and xy
+				//Todo: this should work all the 3 types of carets: idx, lc and xy
 				int i	= toIdx(caret).idx,
 						mi	= 0,
 						ma	= cellCount;
@@ -1927,7 +1926,7 @@ version(/+$DIDE_REGION+/all)
 				return;
 				auto c = toXY(caret);
 				
-				caret = toIdx(TextPos(vec2(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); //todo: it only works for the same fontHeight and  monospaced stuff
+				caret = toIdx(TextPos(vec2(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); //Todo: it only works for the same fontHeight and  monospaced stuff
 				caretRestrict;
 			}
 			
@@ -2013,8 +2012,8 @@ version(/+$DIDE_REGION+/all)
 				case Cmd.cHome		:	caretMoveAbs(0); break;
 				case Cmd.cEnd			:	caretMoveAbs(cellCount); break;
 				case Cmd.cMouse		:	caret = toIdx(TextPos(pointParam, 0)); break;
-				//todo: cMouse pontatlan.
-				//todo: minden cursor valtozaskor a caret legyen teljesen fekete
+				//Todo: cMouse pontatlan.
+				//Todo: minden cursor valtozaskor a caret legyen teljesen fekete
 			}
 			
 			
@@ -2307,7 +2306,7 @@ version(/+$DIDE_REGION+/all)
 								wasBoldShift = true;
 							}
 							
-							wasUpdate = true; //todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
+							wasUpdate = true; //Todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
 						}
 					}
 					else
@@ -2329,7 +2328,7 @@ version(/+$DIDE_REGION+/all)
 		
 		while(text.length)
 		{
-				//todo: combine and refactor this with appendCode
+				//Todo: combine and refactor this with appendCode
 			auto actSyntax = syntax[currentOfs];
 			auto ch = text.decodeFront!(Yes.useReplacementDchar)(numCodeUnits);
 			currentOfs += numCodeUnits;
@@ -2350,7 +2349,7 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		
-		wasWidthChange = wasBoldShift;  //bug: this only works with elastic tabs when the whole line grows, not when shrinks.
+		wasWidthChange = wasBoldShift;  //Bug: this only works with elastic tabs when the whole line grows, not when shrinks.
 		return !wasError && cntrSubCellsLength == dstIdx;
 	}
 	
@@ -2472,7 +2471,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			assert(left==0, "Trying to rearrange subCells of a Row that were already realigned."); 
 			return right; 
-		} //todo: assume left is 0
+		} //Todo: assume left is 0
 		//}
 		
 		int cellCount() const
@@ -2627,7 +2626,7 @@ version(/+$DIDE_REGION+/all)
 		
 		float calcHeight(WrappedLine[] lines)
 		{
-			return lines.length	? lines.back.bottom - lines[0].y0 //todo: ezt nem menet kozben, hanem egy eloszamitaskent kene meghivni
+			return lines.length	? lines.back.bottom - lines[0].y0 //Todo: ezt nem menet kozben, hanem egy eloszamitaskent kene meghivni
 				: 0;
 		}
 		
@@ -2656,7 +2655,7 @@ version(/+$DIDE_REGION+/all)
 				act	= step*.5;
 			
 			if(step<=0)
-			return; //todo: shrink?
+			return; //Todo: shrink?
 			
 			foreach(ref l; lines)
 			{
@@ -2757,7 +2756,7 @@ version(/+$DIDE_REGION+/all)
 	
 	int tabCnt(Cell c)
 	{
-		return cast(int)c.tabIdx.length; //todo: int -> size_t
+		return cast(int)c.tabIdx.length; //Todo: int -> size_t
 	}
 	
 	float tabPos(Cell c, int i)
@@ -2808,9 +2807,9 @@ version(/+$DIDE_REGION+/all)
 				
 				if(delta)
 				{
-					tab.innerWidth = tab.innerWidth + delta; //todo: after this, the flex width are fucked up.
+					tab.innerWidth = tab.innerWidth + delta; //Todo: after this, the flex width are fucked up.
 					
-					//todo: itt ha tordeles van, akkor ez szar.
+					//Todo: itt ha tordeles van, akkor ez szar.
 					float flexRatioSum = 0;
 					foreach(g; (cast(Container)row).subCells[tIdx+1..$])
 					{
@@ -2822,7 +2821,7 @@ version(/+$DIDE_REGION+/all)
 					if(flexRatioSum>0)
 					{
 						//WARN("flex and tab processing not implemented yet");
-						//todo: flex and tab processing
+						//Todo: flex and tab processing
 					}
 				}
 				
@@ -2838,7 +2837,7 @@ version(/+$DIDE_REGION+/all)
 		}
 	}
 	
-	//todo: this WrappedLine tab processing is terribly unoptimal
+	//Todo: this WrappedLine tab processing is terribly unoptimal
 	private bool isTab(in Cell c)
 	{
 		if(const g = cast(Glyph)c)
@@ -2898,7 +2897,7 @@ version(/+$DIDE_REGION+/all)
 				{
 									tab.innerWidth = tab.innerWidth + delta;
 					
-									//todo: itt ha tordeles van, akkor ez szar.
+									//Todo: itt ha tordeles van, akkor ez szar.
 									foreach(g; row.cells[tIdx+1..$])
 					g.outerPos.x += delta;
 					//row.innerWidth += delta;
@@ -2928,8 +2927,8 @@ version(/+$DIDE_REGION+/all)
 	union ContainerFlags
 	{
 		 //------------------------------ ContainerFlags /////////////////////////////////
-		//todo: do this nicer with a table
-		ulong _data = 0b_000_00000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //todo: ui editor for this
+		//Todo: do this nicer with a table
+		ulong _data = 0b_000_00000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //Todo: ui editor for this
 		mixin(
 			bitfields!(
 				bool	, "wordWrap"	, 1,
@@ -3034,7 +3033,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			public
 			{
-				 //todo: ezt a publicot leszedni es megoldani szepen
+				 //Todo: ezt a publicot leszedni es megoldani szepen
 				_FlexValue flex_;
 				Margin margin_;
 				Padding	padding_;
@@ -3068,7 +3067,7 @@ version(/+$DIDE_REGION+/all)
 		
 		int subCellIndex(in Cell c) const
 		{
-			//note: overflows at 2G items, I don't care because that would be 128GB memory usage.
+			//Note: overflows at 2G items, I don't care because that would be 128GB memory usage.
 			return cast(int)subCells.countUntil(c);
 		}
 		
@@ -3087,14 +3086,14 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		void	appendImg (File	fn, in TextStyle ts)
-		{ appendCell(new Img(fn, ts.bkColor)); }	//todo: ezeknek az appendeknek a Container-ben lenne a helyuk
+		{ appendCell(new Img(fn, ts.bkColor)); }	//Todo: ezeknek az appendeknek a Container-ben lenne a helyuk
 		void	appendChar(dchar	ch, in TextStyle ts)
 		{ appendCell(new Glyph(ch, ts)); }
 		void appendStr (string s, in TextStyle ts)
 		{
 			foreach(ch; s.byDchar)
 			appendChar(ch, ts);
-		} //todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
+		} //Todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
 		
 		void appendCodeChar(dchar	ch, in TextStyle ts, SyntaxKind sk)
 		{ appendCell(new Glyph(ch, ts, sk)); }
@@ -3108,23 +3107,23 @@ version(/+$DIDE_REGION+/all)
 		{
 			static TextStyle style;
 			style.applySyntax(sk);
-			appendCodeStr(s, style, sk);  //todo: syntax and style are redundant: syntax defines the style (more or less)
+			appendCodeStr(s, style, sk);  //Todo: syntax and style are redundant: syntax defines the style (more or less)
 		}
 		
 		void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax)
 		{
-			 //todo: redundant: there is appendCodeChar too
+			 //Todo: redundant: there is appendCodeChar too
 			auto g = new Glyph(ch, ts);
 			g.syntax = syntax;
 			appendCell(g);
 		}
 		
-		void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, ubyte syntax, int line)
+		void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, ubyte syntax, int lineIdx)
 		{
-			 //todo: this is used from CodeCOlumnBuildet.
+			 //Todo: this is used from CodeCOlumnBuildet.
 			auto g = new Glyph(ch, ts);
 			g.syntax = syntax;
-			g.line = line;
+			g.lineIdx = lineIdx;
 			appendCell(g);
 		}
 		
@@ -3159,7 +3158,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void internal_setSubCells(Cell[] c)
 		{
-			 //todo: remove this
+			 //Todo: remove this
 			subCells = c;
 		}
 		
@@ -3168,14 +3167,14 @@ version(/+$DIDE_REGION+/all)
 			ref _FlexValue flex()
 			{ return flex_	; }
 			ref Margin	margin ()
-			{ return margin_	; } //todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
+			{ return margin_	; } //Todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
 			ref Padding	padding()
 			{ return padding_; }
 			ref Border	border ()
 			{ return border_; }
 		}
 		
-		RGB bkColor=clWhite; //todo: background struct
+		RGB bkColor=clWhite; //Todo: background struct
 		ContainerFlags flags;
 		
 		override void setProps(string[string] p)
@@ -3189,7 +3188,7 @@ version(/+$DIDE_REGION+/all)
 			p.setParam("flex"   , (float	f){ flex_	= f; });
 			p.setParam("bkColor", (RGB	c){ bkColor	= c; });
 			
-			//todo: flags.setProps param
+			//Todo: flags.setProps param
 		}
 		
 		void parse(string s, TextStyle ts = tsNormal)
@@ -3249,7 +3248,7 @@ version(/+$DIDE_REGION+/all)
 			if(flags._measured)
 			{
 				//preserve autoWidth and autoHeight for the next measure
-				//todo: this is not completely sane...
+				//Todo: this is not completely sane...
 				//if(flags.autoWidth ) outerSize.x = 0;
 				//if(flags.autoHeight) outerSize.y = 0;
 			}
@@ -3296,8 +3295,8 @@ version(/+$DIDE_REGION+/all)
 			{
 				 //scr9ollbars are a possibility from here
 				
-				//opt: cache calcContentSize. It is called too much
-				//opt: rearrange should optionally return contentSize
+				//Opt: cache calcContentSize. It is called too much
+				//Opt: rearrange should optionally return contentSize
 				
 				const scrollThickness = DefaultScrollThickness,
 							e = 1; //minimum area that must remain after the scrollbar.
@@ -3388,7 +3387,7 @@ version(/+$DIDE_REGION+/all)
 						 //only auto vscroll
 						if(hFlow==FlowConfig.scroll)
 						alloc!'H'; //alloc fixed if needed
-						rearrange;    //opt: this rearrange can exit early when the wordWrap and contentheight becomes too much.
+						rearrange;    //Opt: this rearrange can exit early when the wordWrap and contentheight becomes too much.
 						if(calcContentHeight > innerHeight)
 						{
 							if(alloc!'V' && (hFlow==FlowConfig.wrap || cast(Column)this/*column also changes the width!*/))
@@ -3427,7 +3426,7 @@ version(/+$DIDE_REGION+/all)
 		
 		static Cell[] sortedSubCellsAroundAxis(int axis)(Cell[] subCells, vec2 p)
 		{
-			 //note: only tests for the given direction. It's a speedup for internal_hitTest.
+			 //Note: only tests for the given direction. It's a speedup for internal_hitTest.
 			auto sc = subCells;
 			if(sc.length)
 			{
@@ -3450,9 +3449,9 @@ version(/+$DIDE_REGION+/all)
 		
 		Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
-			 //note: for column, it only needs to filter the y direction because this is just an optimization.
+			 //Note: for column, it only needs to filter the y direction because this is just an optimization.
 			//slow linear filter
-			//todo: this should return a range not an array
+			//Todo: this should return a range not an array
 			return subCells.filter!(c => c.outerBounds.contains!"[)"(p)).array; //otp: what if I unroll it to 4 comparations?
 		}
 		
@@ -3476,7 +3475,7 @@ version(/+$DIDE_REGION+/all)
 					const bnd = getScrollResizeBounds(hb, vb);
 					if(bnd.contains!"[)"(mouse-ofs))
 					{
-						//todo: resizeButton area between 2 scrollBars. It is now just ignored.
+						//Todo: resizeButton area between 2 scrollBars. It is now just ignored.
 						return true;
 					}
 				}
@@ -3555,7 +3554,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(flags.hidden)
 			return;
-			//todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
+			//Todo: automatic measure when needed. Currently it is not so well. Because of elastic tabs.
 			//if(chkSet(measured)) measure;
 			
 			if(border.borderFirst)
@@ -3567,7 +3566,7 @@ version(/+$DIDE_REGION+/all)
 			//autofill background
 			if(!flags.noBackground)
 			{
-				dr.color = bkColor;          //todo: refactor backgorund and border drawing to functions
+				dr.color = bkColor;          //Todo: refactor backgorund and border drawing to functions
 				
 				if(border.borderFirst)
 				{ dr.fillRect(innerBounds); }
@@ -3628,7 +3627,7 @@ version(/+$DIDE_REGION+/all)
 				if(hb || vb)
 				{
 					if(hb)
-					hb.draw(dr);  //todo: getHScrollBar?.draw(gl);
+					hb.draw(dr);  //Todo: getHScrollBar?.draw(gl);
 					if(vb)
 					vb.draw(dr);
 					
@@ -3704,8 +3703,13 @@ version(/+$DIDE_REGION+/all)
 		{
 			Container container;
 			vec2 absInnerPos;
-			Cell[] cells;
+			Cell[] cells; //Todo: if this is empty, the whole container should be marked
 			string reference; //user can use it to identify the search result
+			
+			
+			bool valid() const
+			{ return !!container; } bool opCast(T : bool)() const
+			{ return valid; }
 			
 			auto cellBounds() const
 			{ return cells.map!(c => c.outerBounds + absInnerPos); }
@@ -4051,7 +4055,7 @@ version(/+$DIDE_REGION+/all)
 		//this handles multiple lines. Must count	newline chars too, so the tabIdx[] array is useless here.
 		private void adjustTabSizes_multiLine()
 		{
-			//todo: refactor this
+			//Todo: refactor this
 			int tabCnt, colCnt;
 			foreach(c; subCells)
 			{
@@ -4076,7 +4080,7 @@ version(/+$DIDE_REGION+/all)
 			adjustTabSizes_multiLine;
 			else adjustTabSizes_singleLine;
 			
-			solveFlexAndMeasureAll();  //opt: a containerFlag to disable the slow flexSum calculation
+			solveFlexAndMeasureAll();  //Opt: a containerFlag to disable the slow flexSum calculation
 			
 			const doWrap = flags.wordWrap && !flags.autoWidth;
 			
@@ -4087,7 +4091,7 @@ version(/+$DIDE_REGION+/all)
 			processElasticTabs(wrappedLines);
 			
 			//hide spaces on the sides by wetting width to 0. This needs for size calculation.
-			//todo: don't do this for the line being edited!!!
+			//Todo: don't do this for the line being edited!!!
 			if(doWrap && !flags.dontHideSpaces)
 			wrappedLines.hideSpaces(flags.hAlign);
 			
@@ -4098,7 +4102,7 @@ version(/+$DIDE_REGION+/all)
 			//horizontal text align on every line
 			if(!flags.autoWidth || wrappedLines.length>1)
 			wrappedLines.applyHAlign(flags.hAlign, innerWidth);
-																				//note: >1 because autoWidth and 1 line is already aligned
+																				//Note: >1 because autoWidth and 1 line is already aligned
 			
 			//vertical alignment, sizing
 			if(flags.autoHeight)
@@ -4141,16 +4145,16 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(rearrangedLineCount!=1)
 			{
-				return super.internal_hitTest_filteredSubCells(p); //todo: wrapped filter support
+				return super.internal_hitTest_filteredSubCells(p); //Todo: wrapped filter support
 			}
 			else
 			{
-				return sortedSubCellsAroundX(subCells, p); //bug: it wont work for multiline
+				return sortedSubCellsAroundX(subCells, p); //Bug: it wont work for multiline
 			}
 		}
 		
 		//fast content size calculations (after measure)
-		//todo: these content calculations should be universal along all Containers.
+		//Todo: these content calculations should be universal along all Containers.
 		float contentInnerWidth () const
 		{ return subCells.length ? subCells.back.outerRight : DefaultFontEmptyEditorSize.x; }
 		float contentInnerHeight() const
@@ -4160,7 +4164,7 @@ version(/+$DIDE_REGION+/all)
 		
 		Cell subCellAtX(float x, Flag!"snapToNearest" snapToNearest = No.snapToNearest)
 		{
-			assert(!flags.wordWrap); //todo: no multiline either
+			assert(!flags.wordWrap); //Todo: no multiline either
 			
 			if(subCells.empty)
 			return null;
@@ -4196,7 +4200,7 @@ version(/+$DIDE_REGION+/all)
 				//now set the width of every subcell in this column if it differs, and remeasure only when necessary
 				setSubContainerWidths_differentOnly(innerWidth);
 				/+
-					note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. 
+					Note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. 
 								But that's not an usual case: ListBox: all textCells are fixedWidth, 
 								Document: all paragraphs are autoWidth.
 				+/
@@ -4207,7 +4211,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 			if(flags.columnElasticTabs)
-			processElasticTabs(subCells); //todo: ez a flex=1 -el egyutt bugzik.
+			processElasticTabs(subCells); //Todo: ez a flex=1 -el egyutt bugzik.
 			
 			//process vertically flexible items
 			if(!flags.autoHeight)
@@ -4270,7 +4274,7 @@ version(/+$DIDE_REGION+/all)
 					WARN("flags.dontStretchSubCells should be disabled for multiPage Column.");
 					
 					const ub = pages.map!(c => c.front.outerRight).assumeSorted.upperBound(b.left).length;
-					//note: SubRows must be stretched.
+					//Note: SubRows must be stretched.
 					if(ub>0)
 					{
 						auto pgUpper = pages[$-ub..$];
@@ -4389,7 +4393,7 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	
-	//todo: Ezt le kell valtani egy container.backgroundImage-al.
+	//Todo: Ezt le kell valtani egy container.backgroundImage-al.
 	class Document : Column
 	{
 		 //Document /////////////////////////////////

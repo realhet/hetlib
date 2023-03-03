@@ -7,12 +7,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 		
-		//todo: ref const for opCmp and opEquals
+		//Todo: ref const for opCmp and opEquals
 		
-		//todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
+		//Todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
 				 //https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
 		
-		//todo: UTILS lots of todes commented out, because of the compile log is small
+		//Todo: UTILS lots of todes commented out, because of the compile log is small
 		/+
 			//todo: IDE: % as postFix operator: 25% -> (25)*.01
 			//todo: IDE: visszajatszo debugger/logger
@@ -166,9 +166,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		private void globalInitialize()
 		{
-			//note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
-			//todo: a unittest alatt nem indul ez el.
-			//todo: functional tests: nem ide kene
+			//Note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
+			//Todo: a unittest alatt nem indul ez el.
+			//Todo: functional tests: nem ide kene
 			//functional tests
 					
 			application.tickTime = now;
@@ -216,7 +216,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		private void globalFinalize() {
-			 //note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
+			 //Note: ezek a runConsole-bol vagy a winmainbol hivodnak es csak egyszer.
 			//cleanup
 			ini.saveIni;
 			CoUninitialize;
@@ -232,7 +232,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		//static this for process ////////////////////////////
 		
-		__gshared const DateTime appStarted, appStartedDay; //todo: how to make it readonly?
+		__gshared const DateTime appStarted, appStartedDay; //Todo: how to make it readonly?
 		
 		shared static this() {
 			cast()appStarted = now;
@@ -304,7 +304,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			import core.runtime : Runtime;
 			alias args = Runtime.args;
 					
-			void function() _windowInitFunct; //todo: should be moved to win.d //Win.d call it from it's own main.
+			void function() _windowInitFunct; //Todo: should be moved to win.d //Win.d call it from it's own main.
 					
 			void exit(int code=0)
 			{
@@ -407,7 +407,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					string stop() {
 						if(!recording) WARN("Did not started recording.");
 						recording = false;
-						auto a = recordedStr; //todo: sync fails here
+						auto a = recordedStr; //Todo: sync fails here
 						recordedStr = "";
 						return a;
 					}
@@ -424,7 +424,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					{
 						if(indent>0) {
 							auto si = "\n" ~ "    ".replicate(indent.min(20));
-							s = s.safeUTF8.replace("\n", si);   //opt: safeUTF8 is fucking slow!!!!
+							s = s.safeUTF8.replace("\n", si);   //Opt: safeUTF8 is fucking slow!!!!
 						}
 									
 						stdWrite(s); //this is safe for UTF8 errors.
@@ -460,7 +460,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							
 			}static public
 			{
-				//todo: ha ezt a writeln-t hivja a gc.collect-bol egy destructor, akkor crash.
+				//Todo: ha ezt a writeln-t hivja a gc.collect-bol egy destructor, akkor crash.
 							
 				//execute program in hetlib console({ program }); (colorful console, debug and exception handling)
 				//args in application.args
@@ -550,7 +550,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		void safePrint(T...)(auto ref T args) {
-			 //todo: ez nem safe, mert a T...-tol is fugg.
+			 //Todo: ez nem safe, mert a T...-tol is fugg.
 			synchronized
 				print(args);
 		}
@@ -574,7 +574,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							
 				//het.ui
 				//struct UI{}    // similar to @Composable.  It alters the UI's state
-				//note: UI is ised for the default UI function. Conflicts with this UDA
+				//Note: UI is ised for the default UI function. Conflicts with this UDA
 							
 				//het.opengl
 				struct UNIFORM { string name=""; } //marks a variable as gl.Shader attribute
@@ -771,7 +771,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//calculate  1 - (delta(Idle) / delta(kernel+user))
 				__gshared static ulong prevTotal, prevIdle;
 				auto total = kernel+user;
-				auto res = 1 - float(idle-prevIdle) / (total-prevTotal); //bug: can divide by zero when called too frequently
+				auto res = 1 - float(idle-prevIdle) / (total-prevTotal); //Bug: can divide by zero when called too frequently
 				prevTotal	= total;
 				prevIdle	= idle;
 							
@@ -832,7 +832,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 					
 			//execute
-			bool[] running;	//todo:bugzik az stdOut fileDelete itt, emiatt nem megy az, hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
+			bool[] running;	//Todo: bugzik az stdOut fileDelete itt, emiatt nem megy az, hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
 			running.length =	pool.length;
 			running[] = true;
 					
@@ -1112,7 +1112,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string[] s;
 			foreach(line; exceptionMsg.split("\n").map!strip)
 			{
-					//todo: use countUntil here!
+					//Todo: use countUntil here!
 				if(line == "") break;
 				s ~= line;
 			}
@@ -1149,7 +1149,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		void forceAssertions(string file=__FILE__, int line=__LINE__)()
 		{
-				//todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
+				//Todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
 			enforce(ignoreExceptions({ assert(false); }), "Enable DEBUG compiler output! %s(%s)".format(file, line));
 		}
 		
@@ -1204,7 +1204,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					
 			string locate(ulong relAddr)
 			{
-				//todo: Try core.runtime.defaultTraceHandler
+				//Todo: Try core.runtime.defaultTraceHandler
 						
 				foreach(idx; 1..list.length)
 				if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
@@ -1306,8 +1306,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(gDisableOSExceptionsCouinter)
 				{
 					throw new Exception("OS Exception Ignored: "~(*p).ExceptionRecord.text);
-					//todo: Decode the message properly.
-					//todo: lehet hogy kellene egyb sajat OSExceptiont csinalnom es nem tovabbengedni a Winapi Exception Filteren
+					//Todo: Decode the message properly.
+					//Todo: lehet hogy kellene egyb sajat OSExceptiont csinalnom es nem tovabbengedni a Winapi Exception Filteren
 					//return EXCEPTION_CONTINUE_EXECUTION;
 				}
 				
@@ -1362,7 +1362,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						
 				//if(0) print((*(p.ContextRecord)).toJson);
 						
-				//todo: Break point handling
+				//Todo: Break point handling
 				//Decide what to do. On BREAKPOINT it is possible to continue.
 				/*
 					if(p.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT){
@@ -1451,7 +1451,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				else {
 					import het.inputs;
 					shared static bool skip; if(inputs["Shift"].active) skip = true;
-					//todo:selftest skippelesen gondolkozni... A problema, hogy csak akkor kezelheto belul, ha a selftest lazy parametereben tortenik minden.
+					//Todo: selftest skippelesen gondolkozni... A problema, hogy csak akkor kezelheto belul, ha a selftest lazy parametereben tortenik minden.
 					
 					if(!notes.empty) notes = "\33\10 "~notes~"\33\7";
 					const sHoldShift = "Hold SHIFT to skip...";
@@ -1475,7 +1475,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						writefln("\33\x0CFAILED\33\x07 (%d!=%d)", xa, xb);
 						auto e = new Exception(format("Error: selftest [%s] failed (%d!=%d)", name, xa, xb), file, line);
 						console.handleException({ throw e; });
-						application.exit; //todo: this is a fatal exception, should the IDE know about this also...
+						application.exit; //Todo: this is a fatal exception, should the IDE know about this also...
 					}
 				}
 			}
@@ -1494,7 +1494,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					
 			static if(isShared)
 			{
-				static T instance; //todo: initOnce does this locking too.
+				static T instance; //Todo: initOnce does this locking too.
 				static bool initialized;
 				if(!initialized) {
 					synchronized {
@@ -1569,7 +1569,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			enum u = q{getUDAs!(a, U)[$-1]};
 				static if(
-				hasUDA!(a, U) && !is(mixin(u))//note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
+				hasUDA!(a, U) && !is(mixin(u))//Note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
 			)
 			enum getUDA	= mixin(u);
 			else
@@ -1579,7 +1579,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		///helper templates to get all the inherited class fields, works for structs as well
 		template AllClasses(T)
 		{
-			//todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
+			//Todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
 			static if(is(T == Object))
 			alias AllClasses = AliasSeq!();
 			else static if(is(T == class ))
@@ -1616,7 +1616,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			enum FieldNamesWithUDA = Filter!(hasThisUDA, fields);
 		}
 		
-		//todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
+		//Todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
 		
 		/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
 		template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
@@ -1642,7 +1642,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		
-		alias toAlias(alias T) = T; //todo: Alias!T alreadyb exists
+		alias toAlias(alias T) = T; //Todo: Alias!T alreadyb exists
 		
 		void inspectSymbol(alias T)(string before="", int level=0)
 		{
@@ -1723,7 +1723,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				static foreach(a; zip(StoppingPolicy.requireSameLength, sourceRange, targetRange))
 				case a[0]: return a[1];
 				
-				//todo: DIDE: the parser stops at case a[0]: and doesn't include return a[1]; inside this foreach
+				//Todo: DIDE: the parser stops at case a[0]: and doesn't include return a[1]; inside this foreach
 				
 				default: 
 					throw new Exception(__FUNCTION__~": Invalid input value: "~input);
@@ -1811,7 +1811,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			else version(intId	) alias T = uint	;
 			else {
 				alias T = ulong;
-				//todo: it could be string in debug mode. Needs a new ide to handle that.
+				//Todo: it could be string in debug mode. Needs a new ide to handle that.
 			}
 			
 				T value;
@@ -1833,11 +1833,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			auto combine(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); }
 			void appendIdx(T)(ref SrcId id, in T idx) { id = combine(id, idx); }
 			
-			//note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
+			//Note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
 			auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
 			{
 				auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule)));
-				//note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
+				//Note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
 				mixin(appendGenericIds("id"));
 				return id;
 			}
@@ -1981,7 +1981,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{ return getStructInfo!T; }
 		
 		
-		//todo: list members of a module recursively. Adam Ruppe book
+		//Todo: list members of a module recursively. Adam Ruppe book
 		/*
 			pragma(msg, __traits(allMembers, thisModule));
 			
@@ -2012,7 +2012,7 @@ version(/+$DIDE_REGION Numeric+/all)
 	version(/+$DIDE_REGION+/all) {
 		//enum PIf = 3.14159265358979323846f;
 		/+
-			todo: not sure about where is it used or not used. 
+			Todo: not sure about where is it used or not used. 
 					      If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete. 
 		+/
 		
@@ -2035,7 +2035,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		float wrapInRange(ref float p, float pMin, float pMax)
 		{
 			float len = pMax-pMin, pOld = p;
-			while(p<pMin) p += len; //todo: opt with fract
+			while(p<pMin) p += len; //Todo: opt with fract
 			while(p>pMax) p -= len;
 			return p-pOld;
 		}
@@ -2064,12 +2064,12 @@ version(/+$DIDE_REGION Numeric+/all)
 			d = d>m ? d-n : d<-m ? d+n : d;
 			return d;
 		}
-		//todo: unittest on a 0..N+1 square. N e 3, 4, 5
+		//Todo: unittest on a 0..N+1 square. N e 3, 4, 5
 		
 		
 		T rcpf_fast(T)(const T x)if(__traits(isFloating, T))
 		{
-			return 1.0f/x; //todo: Ezt megcsinalni SSE-vel
+			return 1.0f/x; //Todo: Ezt megcsinalni SSE-vel
 		}
 		
 		struct percent
@@ -2089,20 +2089,20 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 		
-		//todo: unittest nem megy. lehet, hogy az egesz projectet egyszerre kell forditani a DMD-ben?!!!
-		//todo: 'in' operator piros, de annak ciankeiknek kene lennie, mint az out-nak. Azazhogy helyzettol figg annak a szine
+		//Todo: unittest nem megy. lehet, hogy az egesz projectet egyszerre kell forditani a DMD-ben?!!!
+		//Todo: 'in' operator piros, de annak ciankeiknek kene lennie, mint az out-nak. Azazhogy helyzettol figg annak a szine
 		
 		
 		auto calcLinearCoefficients(T1, T2, T3, T4 )(T1 x1, T2 y1, T3 x2, T4 y2)
 		{
 			auto m = safeDiv(y2 - y1, x2 - x1),
 					 c = y1 - x1*m;
-			return tuple(m, c); //todo: use this in remap
+			return tuple(m, c); //Todo: use this in remap
 		}
 		
 	}version(/+$DIDE_REGION+/all) {
 		
-		//todo: remap goes to math
+		//Todo: remap goes to math
 		T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{
 			float s = srcTo-srcFrom;
@@ -2115,7 +2115,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		int iRemap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{ return cast(int)remap_clamp(src, srcFrom, srcTo, dstFrom, dstTo); }
 		
-		//todo: rewrite to greaterThan, lessThan
+		//Todo: rewrite to greaterThan, lessThan
 		bool isAscending	(T0, T1)(in T0 a, in T1 b)
 		{ return a < b; }
 		
@@ -2137,7 +2137,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		bool chkSet(ref bool b)
 		{
 			if(b) return false;else { b = true	; return true; }
-			//todo: make it work with properties, bitfields
+			//Todo: make it work with properties, bitfields
 		}
 		
 		bool chkClear(ref bool b)
@@ -2188,7 +2188,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		int nearest2NSize(int size)
 		{
-			return size>0	? 2^^iceil(log2(size)) //todo: slow
+			return size>0	? 2^^iceil(log2(size)) //Todo: slow
 				: 0;
 		}
 		
@@ -2228,7 +2228,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		float peakLocation(float a, float b, float c, float* y=null)
 		{
-			NOTIMPL;//todo: this is possibly buggy. must refactor.
+			NOTIMPL;//Todo: this is possibly buggy. must refactor.
 			//https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
 			auto 	d = (a-2*b+c),
 				p = abs(d)<1e-4 ? 0 : 0.5f*(a-c)/d;
@@ -2344,14 +2344,14 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		T maskLowBits(T)(T a)
 		{
-			//opt: slow
+			//Opt: slow
 			foreach_reverse(i; 0..T.sizeof*8) if(a.getBit(i)) return (cast(T)1<<(i+1))-1;
 			return 0;
 		}
 		
 		int countHighZeroBits(T)(T a)
 		{
-			//opt: slow
+			//Opt: slow
 			foreach_reverse(int i; 0..T.sizeof*8) if(a.getBit(i)) return cast(int)T.sizeof*8-1-i;
 			return T.sizeof*8;
 		}
@@ -2409,14 +2409,14 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		@property auto frontOr(R, T)(R r, T e)if(isInputRange!R)
 		{
-			return r.empty ? e : r.front; //todo: constness
+			return r.empty ? e : r.front; //Todo: constness
 		}
 		@property auto backOr(R, T)(R r, T e)if(isBidirectionalRange!R)
 		{ return r.empty ? e : r.back; }
 		
 		@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class))
 		{
-			return r.empty ? null : r.front; //todo: constness
+			return r.empty ? null : r.front; //Todo: constness
 		}
 		@property auto backOrNull(R)(R r)if(isBidirectionalRange!R && is(ElementType!R==class))
 		{ return r.empty ? null : r.back; }
@@ -2504,7 +2504,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			
 		//safe assoc array lookup
 		
-		//todo: DIDE fails when opening object.d. It should know that's a system module.
+		//Todo: DIDE fails when opening object.d. It should know that's a system module.
 		
 		/*inout(*/V/*)*/ get(K, V)(/*inout(*/V[K]/*)*/ aa, K key)
 		{
@@ -2514,7 +2514,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		//safe array access
 		
-		//note: inout(V) doesn't work with class[]: it says can't convert const(Class) to inout(Class)
+		//Note: inout(V) doesn't work with class[]: it says can't convert const(Class) to inout(Class)
 		/*inout*/V get(V, I)(/*inout*/V[] arr, I idx) if(isIntegral!I)
 		{
 			static if(isSigned!I)
@@ -2534,7 +2534,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		
 		/+
-			todo: unittest    auto aa = ["cica": 5, "kutya": 10];
+			Todo: unittest    auto aa = ["cica": 5, "kutya": 10];
 			writeln( aa.get("cica") );
 			writeln( aa.get("haha") );
 			writeln( aa.get("hehe",  99) );
@@ -2573,7 +2573,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		void clear(T)(T* a)if(is(T==struct))
 		{ if(a) (*a).clear; }
 		
-		//note: clear for classes is not OK, because it can't clear protected fields. Solution: mixin ClassMixin_clear
+		//Note: clear for classes is not OK, because it can't clear protected fields. Solution: mixin ClassMixin_clear
 		//void clear(T)(T cla)if(is(T==class)){ with(cla) foreach(f; FieldNameTuple!(T)) mixin("$ = $.init;".replace("$", f)); }
 		mixin template ClassMixin_clear()
 		{
@@ -2596,7 +2596,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		deprecated("fetchFirst, not popFirst!")
 		{
-			//todo: This is dumb... There is also popFront...
+			//Todo: This is dumb... There is also popFront...
 			T popFirst(T)(ref T[] arr)
 			{ auto res = arr[0]; arr = arr[1..$  ]; return res; }
 			T popLast(T)(ref T[] arr)
@@ -2751,7 +2751,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ return (cast(ubyte*)&data)[0..T.sizeof]; }
 		
 		
-		//todo: DIDE GotoError must show 5 lines up and down around the error.
+		//Todo: DIDE GotoError must show 5 lines up and down around the error.
 	}version(/+$DIDE_REGION byLineBlock+/all)
 	{
 		//byLineBlock /////////////////////////////////////////////////
@@ -2761,7 +2761,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		struct FileBlock
 		{
-			//todo: kiprobalni stdFile-val is, hogy gyorsabb-e
+			//Todo: kiprobalni stdFile-val is, hogy gyorsabb-e
 			File file;
 			size_t pos, size;
 			bool truncated; //The block is not on boundary, because it was unable to seek back
@@ -2842,7 +2842,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			return res;
 		}auto byLineBlock(string str, size_t maxBlockSize=DefaultLineBlockSize)
 		{
-			//todo: egy kalap ala hozni a stringest meg a fileost
+			//Todo: egy kalap ala hozni a stringest meg a fileost
 					
 			static struct StringBlockRange
 			{
@@ -3205,7 +3205,7 @@ version(/+$DIDE_REGION Numeric+/all)
 						
 				if(arr.length > byteCnt) {
 					 //longer than needed: set the last dword to the hast of the remaining part.
-					uint hash = arr[byteCnt-4..$].xxh32; //todo: ellenorizni ezt es az xxh-t is. Lehet, hogy le kene cserelni norx-ra.
+					uint hash = arr[byteCnt-4..$].xxh32; //Todo: ellenorizni ezt es az xxh-t is. Lehet, hogy le kene cserelni norx-ra.
 					arr = arr[0..byteCnt-4] ~ cast(void[])[hash];
 				}
 						
@@ -3282,7 +3282,7 @@ version(/+$DIDE_REGION Numeric+/all)
 					}
 					else
 					{
-						auto MLast = (cast(ubyte[]) S[])[0..blockLen].dup;  //todo: ez qrvalassu
+						auto MLast = (cast(ubyte[]) S[])[0..blockLen].dup;  //Todo: ez qrvalassu
 						MLast[] ^= (cast(ubyte[])C)[0..blockLen];
 						M ~= MLast;
 						S[0..12] ^= (cast(T[]) pad!r(MLast))[];
@@ -3406,9 +3406,9 @@ version(/+$DIDE_REGION Numeric+/all)
 			public static: //public declarations ////////////////////////////////////
 			
 				auto encrypt(in void[] key, in void[] nonce, in void[] header, in void[] message, in void[] trailer)
-			{ return crypt!(false, false)(key, nonce, header, message, trailer); } //todo: tag checking
+			{ return crypt!(false, false)(key, nonce, header, message, trailer); } //Todo: tag checking
 				auto decrypt(in void[] key, in void[] nonce, in void[] header, in void[] crypted, in void[] trailer)
-			{ return crypt!(false, true )(key, nonce, header, crypted, trailer); } //todo: tag checking
+			{ return crypt!(false, true )(key, nonce, header, crypted, trailer); } //Todo: tag checking
 			
 				//shorthands without header and trailer
 				auto encrypt(in void[] key, in void[] nonce, in void[] message)
@@ -3475,7 +3475,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		float[] gaussianBlur(float[] a, int kernelSize)
 		{
 			//http://dev.theomader.com/gaussian-kernel-calculator/
-			//todo: refactor this
+			//Todo: refactor this
 					
 			float g3(int i) {
 				 return	(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.27901f +
@@ -3534,7 +3534,7 @@ version(/+$DIDE_REGION Numeric+/all)
 				a1 = -2*q*cos(2*PIf*rate);
 				a2 = q^^2;
 				b0 = (1-a2)*.5f;
-				b1 = 0; //todo: opt for b1
+				b1 = 0; //Todo: opt for b1
 				b2 = -b0;
 			}
 			
@@ -3608,7 +3608,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		auto zeroCrossings_negative	(T)(in T[] arr, T minDelta=0)
 		{ return zeroCrossings!(T, false, true)(arr, minDelta); }
 		
-		//todo: implement mean for ranges
+		//Todo: implement mean for ranges
 		typeof(T.init/1) mean(T)(in T[] a)
 		{ return a.sum/a.length; }
 		
@@ -3671,7 +3671,7 @@ version(/+$DIDE_REGION Numeric+/all)
 					
 			static void selfTest(int N=2)()
 			{
-				//todo: unittest
+				//Todo: unittest
 				BinarySignalSmoother bss;
 						
 				const input = "..1.1.1..1.1.11.1.1..111111..11..111..111.1........1...11...1.11111111.1111.1";
@@ -3728,7 +3728,7 @@ version(/+$DIDE_REGION Containers+/all)
 	{
 		//SparseArray ///////////////////////////////////////////////////////////
 		version(/+$DIDE_REGION+/all) {
-			//todo: bitarray-ra megcsinalni a bool-t. Array!bool
+			//Todo: bitarray-ra megcsinalni a bool-t. Array!bool
 			K[] keys;
 			V[] values;
 					
@@ -3940,7 +3940,7 @@ version(/+$DIDE_REGION Containers+/all)
 				if(dstLen>canGet) return res;
 				res.length = dstLen;
 				get(res.ptr, dstLen);
-				return res; //todo: tail,head tulcsordulhat 4gb-nel!
+				return res; //Todo: tail,head tulcsordulhat 4gb-nel!
 			}
 			
 			unittest
@@ -3988,7 +3988,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			//BigArray //////////////////////////////////////////////////////////////////
 			version(/+$DIDE_REGION+/all) {
-					//todo: a synchronizedet megcsinalni win32-re
+					//Todo: a synchronizedet megcsinalni win32-re
 				private:
 					struct Block {
 					T[] data;
@@ -4055,7 +4055,7 @@ version(/+$DIDE_REGION Containers+/all)
 			}version(/+$DIDE_REGION+/all) {
 				//array access ////////////
 				size_t length()const
-				{ return length_; } //todo: gecilassu
+				{ return length_; } //Todo: gecilassu
 				size_t opDollar()const
 				{ return length_; }
 							
@@ -4080,7 +4080,7 @@ version(/+$DIDE_REGION Containers+/all)
 							
 				T opIndex(size_t idx)const
 				{
-					//opt: cacheolni kene a poziciot es burst-ban nyomni
+					//Opt: cacheolni kene a poziciot es burst-ban nyomni
 					enforce(idx<length);
 					return getElement(idx);
 				}
@@ -4155,7 +4155,7 @@ version(/+$DIDE_REGION Containers+/all)
 									
 					}
 					catch(Throwable t) { showException(t); }
-					//todo: ez multithread miatt.
+					//Todo: ez multithread miatt.
 					
 					bt._notifyLoaded;
 				}
@@ -4190,7 +4190,7 @@ version(/+$DIDE_REGION Containers+/all)
 				void saveNow(string fileName)
 				{
 					enforce(!loading_, format(`%s.save() already loading`, typeof(this).stringof));
-					StdFile f; //todo: sima file-ra lecserelni
+					StdFile f; //Todo: sima file-ra lecserelni
 					f.open(fileName, "wb"); scope(exit) f.close;
 					foreach(ref b; blocks)
 					f.rawWrite(cast(T[])b.data);
@@ -4229,7 +4229,7 @@ version(/+$DIDE_REGION Containers+/all)
 					
 			private void rawWrite(ubyte[] data)
 			{
-				//todo: const-nak kene lennie...
+				//Todo: const-nak kene lennie...
 				append(data);
 			}
 					
@@ -4244,7 +4244,7 @@ version(/+$DIDE_REGION Containers+/all)
 					
 			void write(T)(const T src)
 			{
-				T[] temp = [src]; //todo: lame
+				T[] temp = [src]; //Todo: lame
 				rawWrite(cast(ubyte[])temp);
 			}
 					
@@ -4370,7 +4370,7 @@ version(/+$DIDE_REGION Containers+/all)
 						uint age(in Id id)
 			{ if(auto p = id in items) { return application.tick-p.tick; }else return typeof(return).max; }
 					
-						//todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
+						//Todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
 						//shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
 		}
 		
@@ -4449,7 +4449,7 @@ version(/+$DIDE_REGION Containers+/all)
 			auto encodeUTF8(ref ushort[] res, string s)
 		{
 			import std.encoding;
-			//todo: ez bugos
+			//Todo: ez bugos
 			while(s.length>=8) {
 				auto raw = cast(ulong*)s.ptr;
 				if(*raw & 0x80808080_80808080)
@@ -4462,7 +4462,7 @@ version(/+$DIDE_REGION Containers+/all)
 					 //everyithing is <0x80
 					//res.appendUninitialized(8); //nem megy
 					res.length += 8;
-					foreach(i, ref c; res[$-8..$]) c = cast(ushort)((*raw>>(i<<3))&0xFF);  //todo: sse opt
+					foreach(i, ref c; res[$-8..$]) c = cast(ushort)((*raw>>(i<<3))&0xFF);  //Todo: sse opt
 					s = s[8..$];
 				}
 			}
@@ -4506,7 +4506,7 @@ version(/+$DIDE_REGION Containers+/all)
 				{
 					 //all 4 wchars are <= 0x7F, no conversion needed
 					char[4] tmp;
-					foreach(i, ref c; tmp) c = cast(char)((*raw>>(i<<4))&0xFF);    //todo: sse opt
+					foreach(i, ref c; tmp) c = cast(char)((*raw>>(i<<4))&0xFF);    //Todo: sse opt
 					res ~= tmp;
 				}
 				s = s[4..$];
@@ -4538,7 +4538,7 @@ version(/+$DIDE_REGION Containers+/all)
 			
 			string asciiUpper(string s)
 		{
-			//opt: this is terrible coding from the times when I was so dumb
+			//Opt: this is terrible coding from the times when I was so dumb
 			char[] res = s.dup;
 			foreach(ref char ch; res) ch = ch.asciiUpper; 
 			return cast(string)res; 
@@ -4550,7 +4550,7 @@ version(/+$DIDE_REGION Containers+/all)
 			return cast(string)res; 
 		}
 			
-			//todo: lc and uc is so redundant... Maybe I should use toUpper everywhere...
+			//Todo: lc and uc is so redundant... Maybe I should use toUpper everywhere...
 			auto uc(char s) pure
 		{ return s.toUpper; }  
 			auto lc(char s) pure
@@ -4577,8 +4577,8 @@ version(/+$DIDE_REGION Containers+/all)
 			
 			string capitalize(alias fv = toUpper)(string s)
 		{
-			//todo: terrible looking solution, with NO unicode handling.
-			//todo: use std.string.capitalize or std.uni.asCapitalized
+			//Todo: terrible looking solution, with NO unicode handling.
+			//Todo: use std.string.capitalize or std.uni.asCapitalized
 			if(!s.empty)
 			{
 				char u = fv([s[0]])[0];
@@ -4597,7 +4597,7 @@ version(/+$DIDE_REGION Containers+/all)
 			
 			string truncate(string ellipsis="...")(string s, size_t maxLen)
 		{
-			//todo: string.truncate-t megcsinalni unicodeosra rendesen.
+			//Todo: string.truncate-t megcsinalni unicodeosra rendesen.
 			/*
 				  enum ellipsisLen = ellipsis.walkLength;
 				auto len = s.walkLength;
@@ -4661,7 +4661,7 @@ version(/+$DIDE_REGION Containers+/all)
 			else return s;
 		}
 			
-			//todo: inconvenience with includeTrailingPathDelimiter
+			//Todo: inconvenience with includeTrailingPathDelimiter
 			S withoutStarting	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(1, 1)(s, end); }
 			S withoutEnding	(S, T)(in S s, in T end)
@@ -4671,7 +4671,7 @@ version(/+$DIDE_REGION Containers+/all)
 			S withEnding	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(0, 0)(s, end); }
 	}version(/+$DIDE_REGION+/all) {
-		//todo: unittest
+		//Todo: unittest
 		/*
 				assert("a/".withoutEnding("/") == .print;
 					"a/b".withoutEnding("/").print;
@@ -4708,7 +4708,7 @@ version(/+$DIDE_REGION Containers+/all)
 		void removeLastEmpty(ref string[] lines)
 		{ lines = lines.withoutLastEmpty; }
 		
-		//todo: revisit string pchar conversion
+		//Todo: revisit string pchar conversion
 		
 		auto toPChar(S)(S s) nothrow
 		{
@@ -4751,7 +4751,7 @@ version(/+$DIDE_REGION Containers+/all)
 			assert(dstLen>=1);
 			
 			size_t sLen = min(dstLen-1, src.length);
-			memcpy(dst, src.ptr, sLen);           //todo: this is so naive. Must revisit...
+			memcpy(dst, src.ptr, sLen);           //Todo: this is so naive. Must revisit...
 			dst[sLen] = 0; //zero terminated
 		}
 		
@@ -4760,7 +4760,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		string dataToStr(const(void)* src, size_t len)
 		{
-			//todo: this is ultra-lame: (cast(char[])src)[0..len].to!string
+			//Todo: this is ultra-lame: (cast(char[])src)[0..len].to!string
 			//https://stackoverflow.com/questions/32220621/converting-a-temporary-character-array-to-a-string-in-d    .idup
 			//this would be the good solution.  Now Testing with file.originalCasing()	 return (cast(const(char)*) src)[0..len].idup;
 			char[] s;
@@ -4885,13 +4885,13 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		bool isDigit(dchar ch) @safe
 		{
-			//todo: also there is std.uni.isNumber
+			//Todo: also there is std.uni.isNumber
 			return inRange(ch, '0', '9');
 		}
 		
 		bool isLetter(dchar ch) @safe 
 		{
-			//todo: also there is std.uni.isAlpha
+			//Todo: also there is std.uni.isAlpha
 			return	  inRange(ch, 'a', 'z')
 				|| inRange(ch, 'A', 'Z');
 		}
@@ -4910,7 +4910,7 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 		
 		string wordAt(const string s, const ptrdiff_t pos) @safe 
-		//todo: this is ascii!!!! fails if isWordChar contains uni.isAlpha or uni.isNumber!!!!
+		//Todo: this is ascii!!!! fails if isWordChar contains uni.isAlpha or uni.isNumber!!!!
 		{
 			if(!isWordChar(s.get(pos))) return "";
 					
@@ -4940,7 +4940,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		T toInt(T=int)(string s)
 		{
-			//todo: toLong
+			//Todo: toLong
 			if(s.length>2 && s[0]=='0') {
 				if(s[1].among('x', 'X')) return s[2..$].to!T(16);
 				if(s[1].among('b', 'B')) return s[2..$].to!T(2);
@@ -4968,7 +4968,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		bool isDLangSymbol(T)(T ch)if(isSomeChar!T)
 		{
-			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //todo: optimize this to a lookup
+			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //Todo: optimize this to a lookup
 		}
 		
 	}version(/+$DIDE_REGION+/all) {
@@ -4984,7 +4984,7 @@ version(/+$DIDE_REGION Containers+/all)
 					
 			static if(0)
 			{
-				//todo: compare the speed of this functional approach
+				//Todo: compare the speed of this functional approach
 				return str	.map!fun
 					.group
 					.map!(p => fetchAndReplace(p[]));
@@ -4999,7 +4999,7 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 		}
 		
-		//todo: isWild variadic return parameters list, like formattedtext
+		//Todo: isWild variadic return parameters list, like formattedtext
 		struct WildResult
 		{
 			static:
@@ -5074,7 +5074,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			//bool cmp(char a, char b){ return ignoreCase ? a.toLower==b.toLower : a==b; }
 			const cs = ignoreCase ? No.caseSensitive : Yes.caseSensitive;   
-			//note: kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.
+			//Note: kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.
 			if(1) wild._reset;
 					
 			while(1)
@@ -5263,7 +5263,7 @@ version(/+$DIDE_REGION Containers+/all)
 		*/
 		
 		
-		auto joinCommandLine(string[] cmd)//todo: handling quotes
+		auto joinCommandLine(string[] cmd)//Todo: handling quotes
 		{
 			auto wcmd = cmd.map!(a => to!wstring(a)).array; //convert to wstrings
 			foreach(ref a; wcmd)
@@ -5371,7 +5371,7 @@ version(/+$DIDE_REGION Containers+/all)
 		auto csvToCells(string text)
 		{ return tabTextToCells(text, ";\n"); }
 		
-		//todo: import splitLines from std.string
+		//Todo: import splitLines from std.string
 		
 		string[] splitLines(string s)
 		{ return s.split('\n').map!(a => a.withoutEnding('\r')).array; }
@@ -5381,7 +5381,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		bool startsWith_ci(string s, string w) pure
 		{
-			if(w.length>s.length) return false; //todo: refactor functionally
+			if(w.length>s.length) return false; //Todo: refactor functionally
 			foreach(i, ch; w)
 			{ if(uc(s[i]) != uc(ch)) return false; }
 			return true;
@@ -5421,7 +5421,7 @@ version(/+$DIDE_REGION Containers+/all)
 		/// Because the one in std is bugging
 		string outdent(string s)
 		{
-			//todo: this is lame
+			//Todo: this is lame
 			return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n');
 		}
 		
@@ -5566,8 +5566,8 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		string shortSizeText(int base, string spacing="", T)(in T n)
 		{
-			//todo: optimize this
-			//todo: 4096 -> 4k
+			//Todo: optimize this
+			//Todo: 4096 -> 4k
 			//toso: 4.0k -> 4k
 			
 			static if(base==1024) enum divFactor(int n) = (1.0/1024)^^n;
@@ -5678,7 +5678,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			static immutable wchar[2][] ALPHA_TABLE =
 			[
-				//todo: discover these chars. Decide if they are useful or not.
+				//Todo: discover these chars. Decide if they are useful or not.
 				[0x00AA, 0x00AA],[0x00B5, 0x00B5],[0x00B7, 0x00B7],[0x00BA, 0x00BA],[0x00C0, 0x00D6],[0x00D8, 0x00F6],[0x00F8, 0x01F5],[0x01FA, 0x0217],
 				[0x0250, 0x02A8],[0x02B0, 0x02B8],[0x02BB, 0x02BB],[0x02BD, 0x02C1],[0x02D0, 0x02D1],[0x02E0, 0x02E4],[0x037A, 0x037A],[0x0386, 0x0386],
 				[0x0388, 0x038A],[0x038C, 0x038C],[0x038E, 0x03A1],[0x03A3, 0x03CE],[0x03D0, 0x03D6],[0x03DA, 0x03DA],[0x03DC, 0x03DC],[0x03DE, 0x03DE],
@@ -5772,7 +5772,7 @@ version(/+$DIDE_REGION Containers+/all)
 			{
 				case TextEncoding.ANSI	: return s.ansiToUTF8;
 				case TextEncoding.UTF8	: return s;
-				case TextEncoding.UTF16LE	: auto ws 	= cast(wstring	)s; return ws	.toUTF8;  //todo: cast can fail. What to do then?
+				case TextEncoding.UTF16LE	: auto ws 	= cast(wstring	)s; return ws	.toUTF8;  //Todo: cast can fail. What to do then?
 				case TextEncoding.UTF16BE	: auto ws 	= cast(wstring	)s; return ws.byteSwap	.toUTF8;
 				case TextEncoding.UTF32LE	: auto ds 	= cast(dstring	)s; return ds	.toUTF8;
 				case TextEncoding.UTF32BE	: auto ds 	= cast(dstring	)s; return ds.byteSwap	.toUTF8;
@@ -5786,7 +5786,7 @@ version(/+$DIDE_REGION Containers+/all)
 			{
 				case TextEncoding.ANSI	: return s.ansiToUTF32;
 				case TextEncoding.UTF8	: return s.toUTF32;
-				case TextEncoding.UTF16LE	: auto ws = cast(wstring)s; return ws	.toUTF32;  //todo: cast can fail. What to do then?
+				case TextEncoding.UTF16LE	: auto ws = cast(wstring)s; return ws	.toUTF32;  //Todo: cast can fail. What to do then?
 				case TextEncoding.UTF16BE	: auto ws = cast(wstring)s; return ws.byteSwap	.toUTF32;
 				case TextEncoding.UTF32LE	: return cast(dstring)s;
 				case TextEncoding.UTF32BE	: auto ds = cast(dstring)s; return ds.byteSwap.toUTF32;
@@ -5849,7 +5849,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		void testSmallHashes()
 		{
-			//todo: unittest
+			//Todo: unittest
 			auto data = [
 				`(`, `{`, `[`, "/*", "/+", "//", `'`, `"`, "`", "r\"", "q\"", "q{", 
 							`#line `, `#!`, `)`, `}`, `]`, "\0", "\x1A", "__EOF__"
@@ -5876,7 +5876,7 @@ version(/+$DIDE_REGION Containers+/all)
 		@trusted pure nothrow
 		uint crc32(in void[] source, uint seed = 0xffffffff)
 		{
-			//todo: 0b binary syntax highlight bug in 0x hex literals
+			//Todo: 0b binary syntax highlight bug in 0x hex literals
 			immutable uint[256] CRC32tab = 
 			[
 				0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,	0x076dc419, 0x706af48f,
@@ -5936,7 +5936,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return crc32(uc(cast(string)source)); }
 		
 	}version(/+$DIDE_REGION+/all) {
-		@trusted pure nothrow uint xxh32(in void[] source, uint seed = 0)//todo: it must run at compile time too
+		@trusted pure nothrow uint xxh32(in void[] source, uint seed = 0)//Todo: it must run at compile time too
 		{
 			//! xxh32 //////////////////////////////////////////////////////
 			//a fast hashing function
@@ -5984,7 +5984,7 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				else
 				{
-					//todo: this is not working
+					//Todo: this is not working
 					asm {
 							mov EAX, 2246822519;    	//XMM4 : Prime2
 							movd XMM4, EAX;	
@@ -6077,7 +6077,7 @@ version(/+$DIDE_REGION Containers+/all)
 				mixin(FinishRound);
 			
 				return result;
-				//todo: xxh unittest
+				//Todo: xxh unittest
 		}
 		
 		uint xxh32uc(in void[] source, uint seed = 0)
@@ -6256,10 +6256,10 @@ version(/+$DIDE_REGION Containers+/all)
 						
 				void accumulate512_scalar(ulong* acc/+presumed aligned+/, in ubyte* input, in ubyte* secret)
 				{
-					//note: a XXH3.readLE64 nem inlineolodik, csak akkor, ha az XXH3-on belulrol van meghivva!!!
+					//Note: a XXH3.readLE64 nem inlineolodik, csak akkor, ha az XXH3-on belulrol van meghivva!!!
 					foreach(i; 0..ACC_NB)
 					{
-						auto data_val = readLE64(input + 8 * i), //todo: const
+						auto data_val = readLE64(input + 8 * i), //Todo: const
 								 data_key = data_val ^ readLE64(secret + i * 8);
 						acc[i ^ 1] += data_val; /*swap adjacent lanes*/
 						acc[i    ] += mult32to64(data_key & 0xFFFFFFFF, data_key >> 32);
@@ -6292,7 +6292,7 @@ version(/+$DIDE_REGION Containers+/all)
 							const v0 = inp[i	 ]	,	 v1 = inp[i+1]	,
 										k0 = sec[i	 ] ^ v0,		k1 = sec[i+1] ^ v1;
 							const a0 = k0 & 0xFFFFFFFF,	 a1 = k1 & 0xFFFFFFFF,
-										b0 = k0 >> 32       ,	 b1 = k1 >> 32 ;
+										b0 = k0 >> 32       ,	 b1 = k1 >> 32;
 							acc[i  ] += a0*b0 + v1;
 							acc[i+1] += a1*b1 + v0;
 						}
@@ -6324,7 +6324,7 @@ version(/+$DIDE_REGION Containers+/all)
 				{
 					foreach(n; 0..nbStripes) {
 						const inp = input + n * STRIPE_LEN;
-						//opt: PREFETCH(in + PREFETCH_DIST);
+						//Opt: PREFETCH(in + PREFETCH_DIST);
 						accumulate512(acc, inp, secret + n * SECRET_CONSUME_RATE);
 					}
 				}
@@ -6518,7 +6518,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		immutable string[12] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 		
-		 //todo: delete old crap from datetime
+		 //Todo: delete old crap from datetime
 		
 		version(/+$DIDE_REGION Old routines+/all)
 		{
@@ -6681,7 +6681,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ this(Local, y, m, d, h, mi, s, ms); }
 				this(in TimeZone tz,	in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
 				{
-					//todo: adjust carry overflow
+					//Todo: adjust carry overflow
 					this(tz, SYSTEMTIME(year2k(y).to!ushort, m.to!ushort, 0, d.to!ushort, h.to!ushort, mi.to!ushort, s.to!ushort, ms.to!ushort));
 				}
 							
@@ -6876,10 +6876,10 @@ version(/+$DIDE_REGION Date Time+/all)
 						return res;
 						
 						/+
-							todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
-														.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
-														.uniq
-														.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); 
+							Todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
+								.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
+								.uniq
+								.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); 
 						+/
 									
 					}
@@ -6916,7 +6916,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							
 				private long timeZoneOffset_raw() const
 				{
-					//todo: rename to utcOffset (read aboit it on web first!)
+					//Todo: rename to utcOffset (read aboit it on web first!)
 					if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL");
 					DateTime dt = void; dt.utcFileTime = localFileTime;
 					return dt.raw-this.raw;
@@ -6932,7 +6932,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				@property
 				{
 					//dayOfWeek stuff
-					//note: 0=sun, 6=sat
+					//Note: 0=sun, 6=sat
 					int localDayOfWeek()
 					{ return localSystemTime.wDayOfWeek; }	int utcDayOfWeek()
 					{ return utcSystemTime.wDayOfWeek; }
@@ -6959,7 +6959,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							
 				string dateText(alias fun = localSystemTime)() const
 				{
-					//todo: format
+					//Todo: format
 					if(isNull) return "NULL Date";
 					with(fun) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay);
 				}
@@ -6988,7 +6988,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					with(fun) s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
 								
 					if(shortened) {
-						 //todo: not so fast
+						 //Todo: not so fast
 						if(s.endsWith(".000")) {
 							s = s[0..$-4];
 							if(s.endsWith("00")) {
@@ -7004,7 +7004,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				string timestamp_compact(alias fun = localSystemTime)()const
 				{ return timestamp!fun(Yes.shortened); }
 							
-				//todo: utcXXX not good! should ude TimeZone as first param
+				//Todo: utcXXX not good! should ude TimeZone as first param
 				string utcDateText() const
 				{ return dateText!utcSystemTime; }
 				string utcTimeText() const
@@ -7144,7 +7144,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			}
 			else
 			{
-				//todo:	check for digits here, not any chars!
+				//Todo: check for digits here, not any chars!
 				if(str.isWild("????-??-??T??????.???"))
 				{
 					 //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
@@ -7172,7 +7172,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				}else if(str.isWild("??????-??????-???"))
 				{
 					 //timestamp 2 digit year
-					return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[9..11].to!int, str[11..13].to!int, str[14..17].to!int); //todo: ugly but works
+					return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[9..11].to!int, str[11..13].to!int, str[14..17].to!int); //Todo: ugly but works
 				}else
 				{
 					return parseDate(tz, str); //Date only
@@ -7221,7 +7221,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float periodLength_sec, size_t hash=0)
 		{
-			//todo: use quantities.Time
+			//Todo: use quantities.Time
 			enum staticHash = hashOf(moduleName, moduleLine);
 			hash ^= staticHash;
 					
@@ -7233,7 +7233,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				a = hash in timers;
 			}
 					
-			return a.update_periodic(periodLength_sec, false); //todo: result should be an int counting how many updates missed since last time
+			return a.update_periodic(periodLength_sec, false); //Todo: result should be an int counting how many updates missed since last time
 		}
 		
 		auto blinkf(float freq=3)
@@ -7244,7 +7244,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		synchronized class Perf
 		{
 			//all is shared, this is not good.
-			//todo: revisit this crap
+			//Todo: revisit this crap
 			private {
 				double[string] table;
 				double[string] firstAppearance;
@@ -7297,12 +7297,15 @@ version(/+$DIDE_REGION Date Time+/all)
 			}
 					
 			void end()
-			{ opCall(""); }
+			{
+				opCall("")
+				;
+			}
 		}
 		
 		shared PERF = new shared Perf;
 		
-		//TODO: strToDateTime, creators
+		//Todo: strToDateTime, creators
 		
 	}version(/+$DIDE_REGION+/all)
 	{
@@ -7339,7 +7342,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				if(res) {
 					total -= secs;
 					if(!enableOverflow) {
-						 //todo: batch overflow when the callbact receives how many times it needs to update
+						 //Todo: batch overflow when the callbact receives how many times it needs to update
 						if(total>=secs) total = 0;
 					}
 				}
@@ -7368,12 +7371,12 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				return events	.keys
 					.filter!(k => tLast<k && k<=tAct)
-					.map!(k => events[k]).array;  //todo: this is slow
+					.map!(k => events[k]).array;  //Todo: this is slow
 			}
 					
 			private bool anyEventsAfter(float tMin)
 			{
-				return events.keys.filter!(k => tMin<k).any; //todo: this is also slow
+				return events.keys.filter!(k => tMin<k).any; //Todo: this is also slow
 			}
 					
 			auto run(void delegate() onIdle = null)
@@ -7653,7 +7656,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					{ rmdirfunc(dir); }
 					catch(Throwable)
 					{
-						enforce(!mustSucceed, format(`Can't remove directory : "%s"`, dir)); //todo: common file errors
+						enforce(!mustSucceed, format(`Can't remove directory : "%s"`, dir)); //Todo: common file errors
 					}
 					return !exists;
 				}
@@ -7695,7 +7698,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				Path opBinary(string op:"~")(string p2)
 				{ return Path(this, p2); }
 							
-				/+note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
+				/+Note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
 				int opCmp(in Path b)const
 				{ return cmp(fullPath, b.fullPath); }
 				bool opEquals(in Path b)const
@@ -7750,7 +7753,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			bool fileReadOnly(string fn)
 			{
-				if(fn.isVirtualFileName) return false; //todo: virtual files / readOnly
+				if(fn.isVirtualFileName) return false; //Todo: virtual files / readOnly
 				auto a = GetFileAttributesW(toPWChar(fn));
 				if(a==INVALID_FILE_ATTRIBUTES) return false;
 				return a & FILE_ATTRIBUTE_READONLY;
@@ -7903,7 +7906,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			size_t extIs(in string[] exts...)const
 			{
-				//todo: ez full ganyolas...
+				//Todo: ez full ganyolas...
 				string e0 = lc(ext);
 				foreach(i, s; exts) {
 					string e = s;
@@ -7956,7 +7959,7 @@ version(/+$DIDE_REGION Date Time+/all)
 								string srcFile=__FILE__, int srcLine=__LINE__
 			)const
 			{
-				//todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
+				//Todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
 				ubyte[] data;
 							
 				if(!exists) {
@@ -7988,7 +7991,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				catch(Exception)
 				{
 					enforce(!mustExists, format!`Can't read file: "%s"`(fullName), srcFile, srcLine);
-					//todo: egysegesiteni a file hibauzeneteket
+					//Todo: egysegesiteni a file hibauzeneteket
 				}
 				
 				if(logFileOps) LOG(fullName);
@@ -8096,12 +8099,12 @@ version(/+$DIDE_REGION Date Time+/all)
 			void append(const void[] data)const
 			{
 				write(data, size); 
-				//todo: compression, automatic uncompression
+				//Todo: compression, automatic uncompression
 			}
 			
 			
 			/+
-				note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.
+				Note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.
 											`font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
 											Also avoid normalization because it is depends on the contents of the HDD.
 			+/
@@ -8121,7 +8124,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			@property string queryString() const
 			{
-				//todo: test querystrings with bitmap/font renderer
+				//Todo: test querystrings with bitmap/font renderer
 				auto i = fullName.indexOf('?');
 				return i>=0 ? fullName[i+1..$] : "";
 			}
@@ -8139,7 +8142,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			@property string query(T=string)(string name, lazy T def=T.init)
 			{
-				//note: it is slow, but requre no additional memory (map structure)
+				//Note: it is slow, but requre no additional memory (map structure)
 				foreach(a; queryItems) if(sameText(a[0], name)) return a[1].to!T;
 				return def;
 			}
@@ -8151,7 +8154,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				queryString = arr.join('&');
 			}
 			
-			//todo: query to map string[string]. It's something like the commandline args and also like the wildcard result struct
+			//Todo: query to map string[string]. It's something like the commandline args and also like the wildcard result struct
 			
 			File opBinary(string op)(string s) const if(op == "~")
 			{ return File(fullName~s); }
@@ -8166,7 +8169,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			if(!a) return b;
 			if(!b) return a;
 					
-			//note: in buildPath() "c:\a" + "\xyz" equals "c:\syz". This is bad.
+			//Note: in buildPath() "c:\a" + "\xyz" equals "c:\syz". This is bad.
 			b = b.withoutStarting(`\`);
 					
 			return std.path.buildPath(a, b);
@@ -8205,7 +8208,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		void saveTo(string data, const File file, Flag!"onlyIfChanged" FOnlyIfChanged = No.onlyIfChanged)
 		{
-			//todo: combine all saveTo functions into one funct.
+			//Todo: combine all saveTo functions into one funct.
 			if(FOnlyIfChanged == Yes.onlyIfChanged)
 			{ if(file.size == data.length && file.readStr == data) return; }
 			file.write(data);
@@ -8245,7 +8248,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				DateTime modified;
 				T payload; 
 				/+
-					todo: tesztelni, hogy a Shader-eket felszabaditja-e es mikor.
+					Todo: tesztelni, hogy a Shader-eket felszabaditja-e es mikor.
 									Elvileg onalloan jol fog mukodni. 
 				+/
 				string error;
@@ -8280,7 +8283,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ error = t.simpleMsg; }
 						
 				loaded[file] = Rec(file, actModified, obj, error);
-				//todo: fileRead and getDate should be system-wide-atomic
+				//Todo: fileRead and getDate should be system-wide-atomic
 				p = &loaded[file];
 			}
 			//p is valid
@@ -8476,7 +8479,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					File.FileTimes fileTimes;
 					ubyte[] data;
 					bool resident; //garbageCollect will not free this file
-												 //todo: make a way to set 'resident' bit
+												 //Todo: make a way to set 'resident' bit
 				}
 						
 				__gshared static Rec[string] files;
@@ -8702,8 +8705,8 @@ version(/+$DIDE_REGION Date Time+/all)
 					FindClose(hFind);
 				}
 							
-				//todo: implement recursive
-				//todo: onlyFiles && recursive, watch out for ".."!!!
+				//Todo: implement recursive
+				//Todo: onlyFiles && recursive, watch out for ".."!!!
 							
 				if(recursive)
 				{
