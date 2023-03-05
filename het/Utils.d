@@ -7564,11 +7564,11 @@ version(/+$DIDE_REGION Date Time+/all)
 						try { res = isDir(dir); }catch(Throwable) {}
 						return res;
 					}
-								
+					
 				}
-							
+				
 				string fullPath;
-							
+				
 				this(string path_)
 				{ dir = path_; }
 				this(string path_, string name_)
@@ -7705,7 +7705,6 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return fullPath==b.fullPath; }
 				size_t toHash()const
 				{ return fullPath.hashOf; }
-							
 			}
 		}
 		
