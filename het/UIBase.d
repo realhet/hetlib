@@ -3705,6 +3705,7 @@ version(/+$DIDE_REGION+/all)
 			vec2 absInnerPos;
 			Cell[] cells; //Todo: if this is empty, the whole container should be marked
 			string reference; //user can use it to identify the search result
+			bool showArrow = true; //The searchresult is amade out of multiple parts. Only one of those should display an arrow.
 			
 			
 			bool valid() const
