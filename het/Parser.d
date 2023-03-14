@@ -2,13 +2,13 @@ module het.parser;/+DIDE+/
 
 import het.utils, het.tokenizer, het.keywords, std.regex;
 
-//todo: editor: mouse back/fwd navigalas, mint delphiben
-//todo: 8K, 8M, 8G should be valid numbers! Preprocessing job...
+//Todo: editor: mouse back/fwd navigalas, mint delphiben
+//Todo: 8K, 8M, 8G should be valid numbers! Preprocessing job...
 
 //global thing to share compiler specific paths stuff
 struct DPaths
 {
-	   //todo: Path-osra atirni
+	   //Todo: Path-osra atirni
 	static __gshared:
 	/*
 		  string installPath = `c:\D\dmd2\`; //todo: it's not good for LDC2
@@ -222,7 +222,7 @@ struct ImportDecl
 	private bool nameStartsWith(string s) const
 	{ return name.identifiers.length && name.identifiers[0]==s; }
 	bool isStdModule () const
-	{ return nameStartsWith("std"); } //todo: make these automatic from list like "std, etc, ldc, code"
+	{ return nameStartsWith("std"); } //Todo: make these automatic from list like "std, etc, ldc, code"
 	bool isEtcModule () const
 	{ return nameStartsWith("etc"); }
 	bool isCoreModule() const
@@ -234,7 +234,7 @@ struct ImportDecl
 	
 	File resolveFile(Path mainPath, string baseFileName, bool mustExists) const //returns "" if not found. Must handle outside.
 	{
-		 //todo: use FileName, FilePath
+		 //Todo: use FileName, FilePath
 		const fn = name.fileName;
 		string[] paths	= (
 			 isStdModule	? [DPaths.stdPath] 
@@ -378,6 +378,9 @@ class Parser
 		//parse all module imports in the file   //todo: errol syntax highlight
 		auto collectBuildMacrosAndTodos(out string[] macros, out string[] todos) //updates Token.isBuildCommant
 	{
+		//Todo: Multiline Todo: is NOT recognized by this preprocessor
+		//Todo: Only slashcomment todos are recognized by this preprocessor
+		//Note: It is better to keep do the detection here, because it collects all the todos for the compiled project, not just the opened structured files in DIDE.
 		auto rxTodo	= ctRegex!(`\/\/todo:(.*)`, `gi`);
 		auto rxOpt	= ctRegex!(`\/\/opt:(.*)`, `gi`);
 		auto rxBug	= ctRegex!(`\/\/bug:(.*)`, `gi`);
@@ -388,7 +391,7 @@ class Parser
 			{
 				if(cmt.posInLine==0 && cmt.source.startsWith("//@"))
 				{
-					  //todo: ezt berakni a tokenizerbe
+					  //Todo: ezt berakni a tokenizerbe
 					auto line = cmt.source[3..$];
 					
 					//extract command word
@@ -398,7 +401,7 @@ class Parser
 					string command = lc(line[0..i]);
 					
 					//check if command is valid
-					const validCmds = ["exe", "dll", "res", "def", "win", "compile", "link", "run", "import", "release", "single", "ldc"]; //todo: ezt szepen megcsinalni IDkkel
+					const validCmds = ["exe", "dll", "res", "def", "win", "compile", "link", "run", "import", "release", "single", "ldc"]; //Todo: ezt szepen megcsinalni IDkkel
 					if(validCmds.canFind(command))
 					{
 						cmt.isBuildMacro = true;
@@ -462,7 +465,7 @@ class Parser
 		nextSym; return b;
 	}
 	
-		//todo: ezt megcsinalni, hogy kozos id-je legyen az operatoroknak meg a keyworokdnek is
+		//Todo: ezt megcsinalni, hogy kozos id-je legyen az operatoroknak meg a keyworokdnek is
 		void expectKw(int kw)
 	{
 		if(sym.isKeyword (kw))
@@ -517,7 +520,7 @@ class Parser
 		//parse all module imports in the file
 		auto collectImports()
 	{
-		//TODO:public/static/private imports
+		//Todo: public/static/private imports
 		ImportDecl[] res;
 		
 		auto importTokensIndices = findAllKeywordIndices(kwimport, true);
