@@ -6650,7 +6650,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			version(/+$DIDE_REGION+/all)
 			{
 				///a 64-bit value representing the number of 100/64 nanosecond(!!!not 100ns!!!) intervals since January 1, 1601 (UTC).
-				private ulong raw;      //0 = null
+				ulong raw;      //0 = null
 							
 				void set(in TimeZone tz, in SYSTEMTIME a)
 				{
@@ -7095,12 +7095,14 @@ version(/+$DIDE_REGION Date Time+/all)
 			return dt;
 		}
 		
+		//todo: a synchronized function called uniqueNow().
+		
 		DateTime	today()
 		{ return now.localDayStart; }
 		Time	time ()
 		{ return now.localTime; }
 		
-				Time QPS()
+		Time QPS()
 		{ return now - appStartedDay; }
 		Time QPS_local()
 		{ return now - appStarted; }

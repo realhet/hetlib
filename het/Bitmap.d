@@ -6,7 +6,7 @@ version(/+$DIDE_REGION+/all)
 	
 	pragma(lib, "gdi32.lib");
 	
-	//todo: icons have a black background since windows update installed near 22.11.15
+	//Todo: icons have a black background since windows update installed near 22.11.15
 	
 	import het.utils;
 	
@@ -20,7 +20,7 @@ version(/+$DIDE_REGION+/all)
 		HRESULT, WCHAR, BOOL, RECT, IID;
 	
 	//png, tga, jpg(read_jpeg_info only)
-	import imageformats; //todo: a jpeg ebbol mar nem kell.
+	import imageformats; //Todo: a jpeg ebbol mar nem kell.
 	
 	//webp
 	import webp.encode, webp.decode;
@@ -32,7 +32,7 @@ version(/+$DIDE_REGION+/all)
 	version = D2D_FONT_RENDERER;
 	
 	enum BitmapQueryCommand
-	{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect }
+	{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect, set }
 	
 	/+
 		{ //handle thumbnails
@@ -110,14 +110,14 @@ version(/+$DIDE_REGION+/all)
 		//?thumb32h		 specifies maximum height
 		//?thumb32wh	  specifies maximum width and maximum height
 		//?thumb32	  ditto
-		//todo: ?thumb32x24  different maxwidth and maxheight
-		//todo: keep aspect or not
+		//Todo: ?thumb32x24  different maxwidth and maxheight
+		//Todo: keep aspect or not
 		/+
-			todo: ?thumb=32w is not possible because processMarkupCommandLine() 
+			Todo: ?thumb=32w is not possible because processMarkupCommandLine() 
 				uses the = pro parameters and it can't passed into this filename.
 		+/
-		//todo: cache decoded full size image
-		//todo: turboJpeg small size extract
+		//Todo: cache decoded full size image
+		//Todo: turboJpeg small size extract
 		
 		File originalFile, transformedFile;
 		int thumbMaxSize;
@@ -127,7 +127,7 @@ version(/+$DIDE_REGION+/all)
 		
 		bool isThumb() const { return thumbMaxSize>0; }
 		
-		bool isHistogram, isGrayHistogram; //todo: this is lame. This should be solved by registered plugins.
+		bool isHistogram, isGrayHistogram; //Todo: this is lame. This should be solved by registered plugins.
 		
 		this(File file)
 		{
@@ -184,7 +184,7 @@ version(/+$DIDE_REGION+/all)
 					if(minScale < 1) {
 						ivec2 newSize = round(orig.size*minScale);
 						//print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
-						return orig.resize_nearest(newSize); //todo: mipmapped bilinear/trilinear
+						return orig.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
 					}
 				}
 				else if(isHistogram)
@@ -306,7 +306,7 @@ version(/+$DIDE_REGION+/all)
 				
 				bool delayed = cmd==BitmapQueryCommand.access_delayed;
 				if(file.driveIs(`font`) || file.driveIs(`temp`) || file.driveIs(`icon`)) delayed = false; 
-				//todo: delayed restriction. should refactor this nicely. Use hash map and centralize nondelayed file types.
+				//Todo: delayed restriction. should refactor this nicely. Use hash map and centralize nondelayed file types.
 				
 				auto tr = file.BitmapTransformation;
 				
@@ -352,7 +352,7 @@ version(/+$DIDE_REGION+/all)
 					if(tr) {
 						//get the original file
 						/+
-							note: it doesn't look at delayed caches: loaded[] and transformQueue[]. 
+							Note: it doesn't look at delayed caches: loaded[] and transformQueue[]. 
 												Those will complete later if there are any.
 						+/
 						Bitmap orig;
@@ -532,6 +532,18 @@ version(/+$DIDE_REGION+/all)
 					}
 				}
 				break;
+				case BitmapQueryCommand.set:
+				{
+					if(bmpIn)
+					{
+						cache[file] = bmpIn;
+						
+						bmpIn.loading = false;
+						loading.remove(file);
+						transformationQueue.remove(file);
+					}
+				}
+				break;
 			}
 			
 			if(res) res.accessed_tick = application.tick;
@@ -567,6 +579,14 @@ version(/+$DIDE_REGION+/all)
 		
 			void garbageCollect()
 		{ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); }
+			
+			void set(File f, Bitmap bmp)
+			{
+				enforce(f);
+				enforce(bmp);
+				
+				bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp);
+			}
 	}
 	
 	void testBitmaps()
@@ -629,7 +649,7 @@ version(/+$DIDE_REGION+/all)
 	
 	private __gshared Bitmap function(string)[string] customBitmapLoaders;
 	
-	void registerCustomBitmapLoader(string prefix, Bitmap function(string) loader) //todo: make it threadsafe
+	void registerCustomBitmapLoader(string prefix, Bitmap function(string) loader) //Todo: make it threadsafe
 	in(prefix.length>=2, "invalid prefix string")
 	{
 		prefix = prefix.lc;
@@ -674,7 +694,7 @@ version(/+$DIDE_REGION+/all)
 		return res;
 	}
 	
-	//todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
+	//Todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
 	auto isFontDeclaration(string s)
 	{ return s.startsWith(`font:\`); }
 	
@@ -700,7 +720,7 @@ version(/+$DIDE_REGION+/all)
 	
 	/// Gets the modified time of any given filename. Including real/virtual files, fonts, transformed images, thumbnails
 	/// returns null if unknown
-	auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.virtualOnly/*todo: preproc*/)
+	auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.virtualOnly/*Todo: preproc*/)
 	{
 		if(file) {
 			auto drive = file.drive;
@@ -711,7 +731,7 @@ version(/+$DIDE_REGION+/all)
 	
 	Bitmap newBitmap_internal(string fn, bool mustSucceed=true)
 	{
-		//todo:	handle mustSuccess with an outer try catch{}, not with lots of ifs.
+		//Todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
 		//when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
 		
 		//split prefix:\line
@@ -723,17 +743,17 @@ version(/+$DIDE_REGION+/all)
 			prefix = prefix.lc;
 		}else { prefix = ""; }
 		
-		//opt: this if chain is slow
+		//Opt: this if chain is slow
 		
 		if(prefix=="")	{
 			//threat it as a simple filename
 			return File(fn).deserialize!Bitmap(mustSucceed);
 		}
 		else if(prefix=="font")	{
-			//todo: font and icon should be put in a list that ensures the following: bitmap.resident, no delayed load
+			//Todo: font and icon should be put in a list that ensures the following: bitmap.resident, no delayed load
 			version(D2D_FONT_RENDERER)
 			{
-				auto res = bitmapFontRenderer.renderDecl(fn); //todo: error handling, mustExists
+				auto res = bitmapFontRenderer.renderDecl(fn); //Todo: error handling, mustExists
 				if(res.valid) res.resident = true; //dont garbagecollect fonts because they are slow to generate
 				return res;
 			}
@@ -743,7 +763,7 @@ version(/+$DIDE_REGION+/all)
 		else if(prefix=="virtual")	{ return File(fn).deserialize!Bitmap(mustSucceed); }
 		else if(prefix=="desktop")	{ return getDesktopSnapshot; }
 		else if(prefix=="monitor")	{
-			return getPrimaryMonitorSnapshot; //todo: monitor indexing
+			return getPrimaryMonitorSnapshot; //Todo: monitor indexing
 		}
 		else if(prefix=="debug")	{
 			 //debug images
@@ -756,7 +776,7 @@ version(/+$DIDE_REGION+/all)
 			//drive: icon:\d:\
 			//file: icon:\.bat
 			
-			//todo: LoadIcon from dll/exe
+			//Todo: LoadIcon from dll/exe
 			
 			//options: ?small ?16 ?large ?32
 			
@@ -776,14 +796,14 @@ version(/+$DIDE_REGION+/all)
 		return null; //raise is not enough
 		
 		//if(fn.startsWith(`screenShot:\`)){
-		//todo: screenshot implementalasa
+		//Todo: screenshot implementalasa
 		
 		/*
 			   auto gBmp = new GdiBitmap(ivec2(screenWidth, screenHeight), 4);
 			BitBlt(gBmp.hdcMem, 0, 0, gBmp.size.x, gBmp.size.y, GetDC(NULL), 0, 0, SRCCOPY).writeln;
 		*/
 		
-		//todo: bitmap clipboard operations
+		//Todo: bitmap clipboard operations
 		/*
 			// save bitmap to clipboard
 				OpenClipboard(NULL);
@@ -935,7 +955,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto sample_nearest(T)(Image!(T, 2) iSrc, ivec2 p)
 	{
-		  //todo: unsafe/safe versions, safe with boundary mode and color -> openCV
+		  //Todo: unsafe/safe versions, safe with boundary mode and color -> openCV
 		if(p.x<0 || p.y<0 || p.x>=iSrc.width || p.y>=iSrc.height) return T.init;
 		return iSrc[p];
 	}
@@ -945,7 +965,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1)
 	{
-		return image2D(w, h, (ivec2 p) => iSrc.sample_nearest(p*vec2(xs, ys)+vec2(x0, y0))); //opt: it's slow, but universal
+		return image2D(w, h, (ivec2 p) => iSrc.sample_nearest(p*vec2(xs, ys)+vec2(x0, y0))); //Opt: it's slow, but universal
 		
 		/*
 			Image!(T, 2) resize_halve(T)(Image!(T, 2) iSrc, ivec2 newSize){
@@ -981,12 +1001,12 @@ version(/+$DIDE_REGION+/all)
 	
 	Image!(T, 2) resize_nearest(T)(Image!(T, 2) iSrc, ivec2 newSize)
 	{
-		//todo: What about pixel center 0.5?  It is now shifting the image.
+		//Todo: What about pixel center 0.5?  It is now shifting the image.
 		return extract_nearest(iSrc, 0, 0, newSize.x, newSize.y, iSrc.size.x/float(newSize.x), iSrc.size.y/float(newSize.y));
 	}
 	
 	//This is a special one: it only processes the first 2 ubytes of an uint
-	//todo: should be refactored to an image that handles RGBA types
+	//Todo: should be refactored to an image that handles RGBA types
 	/+
 		Image!(uint, 2) extract_bilinear_rg00(Image!(uint, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1){
 			auto res = image2D(w, h, 0u);
@@ -1366,7 +1386,7 @@ version(/+$DIDE_REGION+/all)
 			File file;
 			DateTime modified;
 			string error;
-			bool loading, removed;	//todo: these are managed by bitmaps(). Should be protected and readonly.
+			bool loading, removed;	//Todo: these are managed by bitmaps(). Should be protected and readonly.
 			bool processed;	//user flag. Can do postprocessing after the image is loaded
 			bool resident;	//if true, garbageCollector will nor free this
 		
@@ -1402,7 +1422,7 @@ version(/+$DIDE_REGION+/all)
 		
 			bool valid()
 		{ return !empty && !loading && error==""; }
-			//todo: this is not the best because first must check for (this !is null) from the outside
+			//Todo: this is not the best because first must check for (this !is null) from the outside
 			
 			bool canProcess()
 		{ return valid && !processed; }
@@ -1410,11 +1430,11 @@ version(/+$DIDE_REGION+/all)
 			void markChanged()
 		{ modified.actualize; }
 		
-			//todo: constraints
-			//todo: fileName
-			//todo: GLResource linking
-			//todo: subTexture ID linking
-			//todo: delayed load
+			//Todo: constraints
+			//Todo: fileName
+			//Todo: GLResource linking
+			//Todo: subTexture ID linking
+			//Todo: delayed load
 		
 			//constructors
 			this()
@@ -1427,6 +1447,11 @@ version(/+$DIDE_REGION+/all)
 		{ return data_.length==0 || width<=0 || height<=0 || channels<=0; }
 			size_t sizeBytes() const
 		{ return data_.length; }
+		
+			void waitFor()
+			{
+				while(loading) sleep(3);
+			}
 		
 			@property width	 () const
 		{ return width_	; }
@@ -1514,9 +1539,9 @@ version(/+$DIDE_REGION+/all)
 			
 			auto getForUpload(E)()
 		{
-			//todo: performance counters for this.
+			//Todo: performance counters for this.
 			//optimized versions
-			//opt: to this properly with a benchmark
+			//Opt: to this properly with a benchmark
 			static if(is(E==RGBA)) { if(channels==4) { return access!RGBA; }else if(channels==3) { NOTIMPL; } }
 			
 			//WARN("Unoptimized bitmap getForUpload");  //opt: optimize this warn.
@@ -1563,12 +1588,12 @@ version(/+$DIDE_REGION+/all)
 			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 			{
 				{
-					 //todo: redundant
+					 //Todo: redundant
 					alias CT = ScalarType   !T,
 								len = VectorLength!T;
 					if(CT.stringof == type && len==channels) {
 						auto b = new Bitmap(access!T.resize_nearest(newSize));
-						b.file = file; //todo: redundant
+						b.file = file; //Todo: redundant
 						b.modified = modified;
 						b.error = error;
 						return b;
@@ -1629,7 +1654,7 @@ version(/+$DIDE_REGION+/all)
 	private static ubyte[] write_webp_to_mem(int width, int height, ubyte[] data, int quality)
 	{
 		  //Reasonable quality = 95,  lossless = 100
-		//note: the header is in the same syntax like in the imageformats module.
+		//Note: the header is in the same syntax like in the imageformats module.
 		
 		ubyte* output;
 		size_t size;
@@ -1642,10 +1667,10 @@ version(/+$DIDE_REGION+/all)
 				: WebPEncodeLosslessRGBA	(data.ptr, width, height, width*channels, &output);	break;
 			case 3:	size = lossy 	? WebPEncodeRGB	(data.ptr, width, height, width*channels, quality, &output)
 				: WebPEncodeLosslessRGB	(data.ptr, width, height, width*channels, &output);	break;
-			default:	enforce(0, "8/16bit webp not supported"); //todo: Y, YA plane-kkal megoldani ezeket is
+			default:	enforce(0, "8/16bit webp not supported"); //Todo: Y, YA plane-kkal megoldani ezeket is
 		}
 		
-		//todo: tovabbi info a webp-rol: az alpha az csak lossless modon van tomoritve. Lehet, hogy azt is egy Y-al kene megoldani...
+		//Todo: tovabbi info a webp-rol: az alpha az csak lossless modon van tomoritve. Lehet, hogy azt is egy Y-al kene megoldani...
 		
 		enforce(size, "WebPEncode failed.");
 		
@@ -1662,8 +1687,8 @@ version(/+$DIDE_REGION+/all)
 		const channels = data.length.to!int/(width*height),
 					pitch = width*channels;
 		enforce(data.length = pitch*height, "invalid image data");
-		const pixelFormat = channels.predSwitch(1, TJPF_GRAY, 3, TJPF_RGB); //todo: alpha
-		const subsamp = TJSAMP_420; //todo: subsamp-ot kihozni
+		const pixelFormat = channels.predSwitch(1, TJPF_GRAY, 3, TJPF_RGB); //Todo: alpha
+		const subsamp = TJSAMP_420; //Todo: subsamp-ot kihozni
 		
 		ubyte* jpegBuf;
 		uint jpegSize;
@@ -1731,7 +1756,7 @@ version(/+$DIDE_REGION+/all)
 	{
 		//runtime version
 		
-		//todo: this runtime code generator should be centralized in Bitmap
+		//Todo: this runtime code generator should be centralized in Bitmap
 		static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 		{
 			{
@@ -1759,7 +1784,7 @@ version(/+$DIDE_REGION+/all)
 		
 	}
 	
-	//todo: implement PPM image codec /////////////////////////////////
+	//Todo: implement PPM image codec /////////////////////////////////
 	/*
 		class Bitmap {
 			int width;
@@ -1865,7 +1890,7 @@ version(/+$DIDE_REGION+/all)
 						WebPDecodeRGBAInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*4, info.size.x*4);
 						bmp.set(image2D(info.size, data));
 					} break;
-					//todo: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
+					//Todo: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
 					default: raise("webp 1-2chn not impl");
 				}
 			}
@@ -1927,7 +1952,7 @@ version(/+$DIDE_REGION+/all)
 						}
 						
 					} break;
-					//todo: Tobb jpeg-bol osszekombinalni a 2-4 channelt.
+					//Todo: Tobb jpeg-bol osszekombinalni a 2-4 channelt.
 					default: raise("jpg 2-4chn not impl");
 				}
 			}
@@ -2003,7 +2028,7 @@ version(/+$DIDE_REGION+/all)
 	
 	void testImageBilinearAndSerialize()
 	{
-		//todo: make a unittest out of these
+		//Todo: make a unittest out of these
 		//makeConversionTestImage(32).serialize("webp quality=20").saveTo(File(`c:\dl\imageConvTest.webp`));
 		
 		/*
@@ -2049,7 +2074,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto getPrimaryMonitorSize()
 	{
-		 //note: it's just the primary monitor area
+		 //Note: it's just the primary monitor area
 		HDC hScreenDC = GetDC(null);//CreateDC("DISPLAY", NULL, NULL, NULL);
 		scope(exit) ReleaseDC(null, hScreenDC);  //This is needed and returns 1, so it is working.
 		return ivec2(GetDeviceCaps(hScreenDC, HORZRES), GetDeviceCaps(hScreenDC, VERTRES));
@@ -2125,12 +2150,12 @@ version(/+$DIDE_REGION+/all)
 		//https://stackoverflow.com/questions/524137/get-icons-for-common-file-types
 		SHFILEINFOW fi;
 		uint file_attribute = FILE_ATTRIBUTE_NORMAL;
-		//todo: specify file attributes too that was accessed in FileEntry -> SHGFI_USEFILEATTRIBUTES
+		//Todo: specify file attributes too that was accessed in FileEntry -> SHGFI_USEFILEATTRIBUTES
 		
 		if(fn.endsWith(pathDelimiter))
 		file_attribute = FILE_ATTRIBUTE_DIRECTORY;
 		
-		//note: SHGFI_USEFILEATTRIBUTES means: do not access the disk, just the filename
+		//Note: SHGFI_USEFILEATTRIBUTES means: do not access the disk, just the filename
 		
 		if(
 			SHGetFileInfoW(
@@ -2144,9 +2169,9 @@ version(/+$DIDE_REGION+/all)
 		hIcon = fi.hIcon;
 		//must free it with DestroyIcon
 		
-		//note: this is not the same icon as in TotalCmd
-		//todo: large 48*48 icon with proper alpha channel.
-		//note: fi.szTypeName -> when SHGFI_TYPENAME used, it returns the typename
+		//Note: this is not the same icon as in TotalCmd
+		//Todo: large 48*48 icon with proper alpha channel.
+		//Note: fi.szTypeName -> when SHGFI_TYPENAME used, it returns the typename
 		return hIcon;
 	}
 	
@@ -2469,7 +2494,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			extern(Windows):
 			void SetColor(in D2D1_COLOR_F color);
-			ref D2D1_COLOR_F GetColor() const; //BUG: got crash? see ID2D1RenderTarget.GetSize()
+			ref D2D1_COLOR_F GetColor() const; //Bug: got crash? see ID2D1RenderTarget.GetSize()
 		}
 		
 			mixin(uuid!(ID2D1Resource, "2cd90691-12e2-11dc-9fed-001143a055f9"));
@@ -2526,7 +2551,7 @@ version(/+$DIDE_REGION+/all)
 			void SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE textAntialiasMode);
 			D2D1_TEXT_ANTIALIAS_MODE GetTextAntialiasMode() const;
 			void SetTextRenderingParams(/**/); /*
-				todo: SetTextRenderingParams gdi classic-ra allitani, 
+				Todo: SetTextRenderingParams gdi classic-ra allitani, 
 								hogy szebb legyen az ui font, ekkor a 3x 
 								miatt pont cleartype-ra fog illeszkedni.
 			*/
@@ -2764,13 +2789,13 @@ version(/+$DIDE_REGION+/all)
 				
 				//a single space character needs special care
 				const spaceIdx = text.among(" ", /*"\u2000", "\u2001", "\u2004",*/ smallSpace);
-				//todo: measure the width of spaces. For example put 2 well known chars around it.
+				//Todo: measure the width of spaces. For example put 2 well known chars around it.
 				
 				const spaceScale =  [1,	1 , /*2	    , 4	      , 0.666f	 ,*/ 0.4f    ][spaceIdx];
 								 //1/4em	1/2em	    1em	      1/6em	 1/4em      thin
 				const isSpace = spaceIdx>0;
 				if(isSpace) text = "j";  //a letter used to emulate the width of a space.
-				//todo: get space width from DirectWrite
+				//Todo: get space width from DirectWrite
 				
 				//Create text layout
 				IDWriteTextLayout textLayout;
@@ -2797,7 +2822,7 @@ version(/+$DIDE_REGION+/all)
 					scope(exit) gBmp.free;
 					
 					//draw
-					auto rect = RECT(0, 0, gBmp.size.x, gBmp.size.y); //todo: this can be null???
+					auto rect = RECT(0, 0, gBmp.size.x, gBmp.size.y); //Todo: this can be null???
 					dcrt.BindDC(gBmp.hdcMem, &rect).hrChk("BindDC");
 					
 					dcrt.BeginDraw;

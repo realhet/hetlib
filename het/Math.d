@@ -4,8 +4,8 @@ version(/+$DIDE_REGION+/all)
 {
 	//Vector ////////////////////////////////////
 	
-	//todo: vec2 lvalue-be lehessen assignolni ivec2 rvalue-t!
-	//todo: ldc fast math http://johanengelen.github.io/ldc/2016/10/11/Math-performance-LDC.html
+	//Todo: vec2 lvalue-be lehessen assignolni ivec2 rvalue-t!
+	//Todo: ldc fast math http://johanengelen.github.io/ldc/2016/10/11/Math-performance-LDC.html
 	
 	//This module replaces and extends the interface of std.math.
 	//Anything usefull in std.math should wrapped here to support vector/scalar operations.
@@ -53,7 +53,7 @@ version(/+$DIDE_REGION+/all)
 	
 	private enum approxEqualDefaultDiff = 1e-3f;
 	
-	//todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
+	//Todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 	
 	/// myTo: scalar conversion used in smart-constructors
 	private alias myto(T) = stdto!T;
@@ -64,7 +64,7 @@ version(/+$DIDE_REGION+/all)
 	{
 		static if(isFloatingPoint!T)
 		{
-			//note: Dlang .dig property reports less digits than actually needed to cover all mantissa bits.
+			//Note: Dlang .dig property reports less digits than actually needed to cover all mantissa bits.
 			static if(is(Unqual!T == float ))
 			return a.format!"%.8g";
 			else
@@ -117,7 +117,7 @@ version(/+$DIDE_REGION+/all)
 	
 	private template CommonType(A...)
 	{
-		//todo: ubyte + ushort should be ushort, not int
+		//Todo: ubyte + ushort should be ushort, not int
 		alias CommonType = stdCommonType!(A);
 	}
 	
@@ -259,7 +259,7 @@ version(/+$DIDE_REGION+/all)
 				}
 				else
 				{
-					//todo: it sometimes give this as false error
+					//Todo: it sometimes give this as false error
 					static assert(false, "Vector constructor: Unable to process argument of type: " ~ T.stringof);
 				}
 			}
@@ -273,7 +273,7 @@ version(/+$DIDE_REGION+/all)
 				}
 				else {
 					static assert(i == length, "Vector constructor: Not enough arguments"); 
-					//todo: show the error's place in source: __ctor!(int, int, int)
+					//Todo: show the error's place in source: __ctor!(int, int, int)
 				}
 			}
 					
@@ -290,11 +290,11 @@ version(/+$DIDE_REGION+/all)
 					else static if(is(A[0]==int) || is(A[0]==uint))
 					{
 						//raw data copy
-						//todo: kulonvalasztani a compile time es a runtime konvertalast. Ha egyaltalan lehet.
+						//Todo: kulonvalasztani a compile time es a runtime konvertalast. Ha egyaltalan lehet.
 						//runtime: components = *(cast(typeof(components)*) &(args[0]));
 								
 						//CTFE version
-						//todo: put this in a loop
+						//Todo: put this in a loop
 						//static foreach(i; 0..length) components[i] == 128;//cast(ubyte)(((args[0]>>(i*8)) & 0xFF));
 						static if(length==2) { components = [args[0]&0xFF, (args[0]>>>8)&0xFF]; }
 						static if(length==3) { components = [args[0]&0xFF, (args[0]>>>8)&0xFF, (args[0]>>>16)&0xFF]; }
@@ -340,6 +340,9 @@ version(/+$DIDE_REGION+/all)
 				else
 				static assert(0, "Incompatible types: "~typeof(this).stringof~" and "~T.stringof);
 			}
+			
+			size_t toHash() const nothrow @safe
+			{ return hashOf(components); }
 		}version(/+$DIDE_REGION+/all)
 		{
 			//raw data access for ubyte vectors.
@@ -370,7 +373,7 @@ version(/+$DIDE_REGION+/all)
 					
 			//swizzling ///////////////////////
 			
-			//todo: syntax highlight the swizzles. Colorize + monospace. Red, Green, Blue, Gray(Luma), White(1), Black(0)
+			//Todo: syntax highlight the swizzles. Colorize + monospace. Red, Green, Blue, Gray(Luma), White(1), Black(0)
 					
 			static foreach(regs; swizzleRegs)
 			static foreach(len; 1..N+1)
@@ -459,9 +462,11 @@ version(/+$DIDE_REGION+/all)
 				alias CT = OperationResultType!(op, ScalarType!A, ScalarType!B);
 				return generateVector!(CT, (a, b) => mixin("a", op, "b") )(a, b);
 			}
-					
+			
 			auto opBinary(string op, T)(in T other) const
 			{
+				//todo: associative array for right operand
+				
 				static if(isNumeric!T || isVector!T)
 				{
 					//vector * (vector/scalar)
@@ -495,17 +500,17 @@ version(/+$DIDE_REGION+/all)
 			bool approxEqual(T)(in T other, float maxDiff = approxEqualDefaultDiff) const
 			{
 				static assert(isVector!T && T.length==length);
-				static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false; //todo: refact
+				static foreach(i; 0..length) if(abs(this[i]-other[i]) > maxDiff) return false; //Todo: refact
 				return true;
 			}
 			
-			static if(N==2) 
-				auto area() const
-				{ return x*y; }
+			static if(N==2)
+			auto area() const
+			{ return x*y; }
 			
-			static if(N==3) 
-				auto volume() const
-				{ return x*y*z; }
+			static if(N==3)
+			auto volume() const
+			{ return x*y*z; }
 			
 					
 		}
@@ -669,7 +674,7 @@ version(/+$DIDE_REGION+/all)
 {
 	//Vector relational functions //////////////////////////////////////////
 	
-	//todo: !!!!!!!!!!!!!!! atirni az osszes in-t auto ref-re es merni a sebesseget egy reprezentativ teszt segitsegevel.
+	//Todo: !!!!!!!!!!!!!!! atirni az osszes in-t auto ref-re es merni a sebesseget egy reprezentativ teszt segitsegevel.
 	//A lessThan-ra eleg az in is. nem kell a safeOp!">"-ban levo auto ref.
 	//Asm-ban a lessThan-t megneztem: azt szanaszet optimizalta, nem is volt lessThan a belso loopban.
 	//de lehet, hogy az auto ref valamiert jobb. Nem veletlenul azt hasznaljak az std.functional.safeOp-ban.
@@ -974,7 +979,7 @@ version(/+$DIDE_REGION+/all)
 				static foreach(j; 0..height)
 				static foreach(i; 0..width)
 				if(abs(this[i][j]-other[i][j]) > maxDiff) return false;
-				  //todo: verify abs
+				  //Todo: verify abs
 				return true;
 			}
 					
@@ -1433,7 +1438,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto determinant(T)(in T m) if(isMatrix!T && T.width==T.height)
 	{
-		enum N = T.width; //todo: check mat4.det in asm
+		enum N = T.width; //Todo: check mat4.det in asm
 		//https://www.mathsisfun.com/algebra/matrix-determinant.html
 		typeof(m[0][0]+1) res = 0;
 		static if(N==2)
@@ -1640,7 +1645,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						 //extend to array elements
 						Unqual!(typeof(this)) bnd = this;
-						other.each!(a => bnd|=a); //opt: can be optimized for valid() checking
+						other.each!(a => bnd|=a); //Opt: can be optimized for valid() checking
 						return bnd;
 					}
 					else
@@ -1768,7 +1773,7 @@ version(/+$DIDE_REGION+/all)
 	static foreach(N; [1, 2, 3])
 	static if(N==1) mixin(format!q{alias %sbounds = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
 	else mixin(format!q{alias %sbounds%s = %s;}(ComponentTypePrefix!T, N, Bounds!(Vector!(T, N)).stringof));
-	//todo: bounds helyett bounds1 jobb lenne, mert a bounds az sokszor masra is hasznalva van: pl. bmp.bounds
+	//Todo: bounds helyett bounds1 jobb lenne, mert a bounds az sokszor masra is hasznalva van: pl. bmp.bounds
 	
 	//functions with bounds ////////////////////////////////
 	
@@ -1987,7 +1992,7 @@ version(/+$DIDE_REGION+/all)
 			auto arr = join(range.take(size.y).map!(a => a.padRight(filler, size.x).array));
 			else
 			auto arr = range.array;
-			arr = arr.padRight(filler, size[].product).array; //opt: this is fucking unoptimal!
+			arr = arr.padRight(filler, size[].product).array; //Opt: this is fucking unoptimal!
 			return Image!(T, 2)(size, arr);
 		}
 		else
@@ -2001,8 +2006,8 @@ version(/+$DIDE_REGION+/all)
 		//image2D constructor //////////////////////////////////
 		static assert(A.length>0, "invalid args");
 		
-		//todo: nem lehet kombinalni az img.retro-t az img.rgb swizzlinggel.   img2 = img.rows.retro.image2D.image2D!"a.b1g";   <-  2x image2D needed
-		//todo: img2 = image2D(img.size, (x, y) => img[x, img.height-1-y].lll);  az (x, y) forma sem megy csak az (ivec2 p)
+		//Todo: nem lehet kombinalni az img.retro-t az img.rgb swizzlinggel.   img2 = img.rows.retro.image2D.image2D!"a.b1g";   <-  2x image2D needed
+		//Todo: img2 = image2D(img.size, (x, y) => img[x, img.height-1-y].lll);  az (x, y) forma sem megy csak az (ivec2 p)
 		
 		static if(A.length>=2 && isIntOrUint!(A[0]) && isIntOrUint!(A[1]))
 		{
@@ -2077,7 +2082,7 @@ version(/+$DIDE_REGION+/all)
 							static if(isStatement)
 							{
 								mixin(fun);
-								//note: if the fun has a return statement, it will make an image. Otherwise return void.
+								//Note: if the fun has a return statement, it will make an image. Otherwise return void.
 							}
 							else
 							{ return mixin(fun); }
@@ -2088,7 +2093,7 @@ version(/+$DIDE_REGION+/all)
 								"fun(", (
 									(A.length-1)	.iota
 									.map!(i => cast(string)[cast(char)('a'+i)])
-									//todo: use .text
+									//Todo: use .text
 									.join(",")
 								), ")"
 							);
@@ -2119,7 +2124,7 @@ version(/+$DIDE_REGION+/all)
 			static if(N>1)
 			{
 				Vector!(int, N) size;
-				//todo: it's not 1D compatible.  Vector!(T, 1) should be equal to an alias=T.  In Bounds as well.
+				//Todo: it's not 1D compatible.  Vector!(T, 1) should be equal to an alias=T.  In Bounds as well.
 			}
 			else
 			{ int size; }
@@ -2200,7 +2205,7 @@ version(/+$DIDE_REGION+/all)
 				
 			@property auto asArray() const
 			{
-				//todo: ezt nem lehet egyszerubben? const vagy nem const. Peldaul "const auto"
+				//Todo: ezt nem lehet egyszerubben? const vagy nem const. Peldaul "const auto"
 				if(size.x==stride) return impl;else return rows.join;
 			}
 				
@@ -2216,8 +2221,8 @@ version(/+$DIDE_REGION+/all)
 					if(stride==width)
 					return Image!(E, N)(size, impl.dup);
 					else
-					return Image!(E, N)(size, rows.map!(r => r.dup).join); //todo:2D only
-					//todo: check this r.dup.join in disassembler
+					return Image!(E, N)(size, rows.map!(r => r.dup).join); //Todo: 2D only
+					//Todo: check this r.dup.join in disassembler
 				}
 				else
 				{
@@ -2263,7 +2268,7 @@ version(/+$DIDE_REGION+/all)
 			//Support for `x..y` notation in slicing operator for the given dimension.
 			int[2] opSlice(size_t dim)(int start, int end)
 			if (dim >= 0 && dim < 2)
-			in //todo: DIDE interpret invariants
+			in //Todo: DIDE interpret invariants
 			{ assert(start >= 0 && end <= this.opDollar!dim); }
 			do { return [start, end]; }
 				
@@ -2299,7 +2304,7 @@ version(/+$DIDE_REGION+/all)
 				
 			private void assignHorizontal(string op, A)(A a, int[2] r1, int j)
 			{
-				//todo: optimizalasi kiserlet: tesztelni az optimizalt eredmenyt,
+				//Todo: optimizalasi kiserlet: tesztelni az optimizalt eredmenyt,
 				//ha ezt kivaltom az assignRectangular-al.
 				static if(isImage2D!A)
 				{ return assignHorizontal!op(a.rows.join, r1, j); }
@@ -2452,7 +2457,7 @@ version(/+$DIDE_REGION+/all)
 			
 			auto opBinary(string op, bool reverse=false, A)(in A a)
 			{
-				//todo: refactor this in the same way as generateVector()
+				//Todo: refactor this in the same way as generateVector()
 				static if(isImage2D!A)
 				{
 					alias T = Unqual!(typeof(mixin("this[0,0]", op, "a[0,0]")));
@@ -2464,7 +2469,7 @@ version(/+$DIDE_REGION+/all)
 													{
 								return reverse	? mixin("a   [p.x, p.y]", op, "this[p.x, p.y]")
 									: mixin("this[p.x, p.y]", op, "a   [p.x, p.y]");
-								//opt: too much index calculations
+								//Opt: too much index calculations
 							}
 						);
 					}
@@ -2483,7 +2488,7 @@ version(/+$DIDE_REGION+/all)
 										{
 							return reverse 	? mixin("a", op, "this[p.x, p.y]")
 								: mixin("this[p.x, p.y]", op, "a");
-							//opt: too much index calculations
+							//Opt: too much index calculations
 						}
 					);
 				}
@@ -2529,11 +2534,11 @@ version(/+$DIDE_REGION+/all)
 			{
 				void saveTo(F)(in F file)
 				{
-					//todo:	make it const
-					//note:	saveTo() must be a member function in order to work
-					//todo:	this is fucking nasty! Should not import hetlib into here!!!
+					//Todo: make it const
+					//Note: saveTo() must be a member function in order to work
+					//Todo: this is fucking nasty! Should not import hetlib into here!!!
 					//Should use a global funct instead which is initialized by het.bitmaps.
-					//todo:	must do this with a global function!!! 
+					//Todo: must do this with a global function!!! 
 					//The problem is that need to pass the type and elementcount to it.
 					mixin("import het.bitmap : serialize;");
 					mixin("import het.utils : File, saveTo, withoutStarting;");
@@ -2707,7 +2712,7 @@ version(/+$DIDE_REGION+/all)
 			subImg[10, 10] = subImg[0..4, 0..5]; //also copy rectangle. Size is taken form source image
 				
 			//display the image (it's upside down)
-			import std.digest.crc; //todo: use own crc32
+			import std.digest.crc; //Todo: use own crc32
 			assert(subImg.asArray.hexDigest!CRC32 == "BB6C00F4");
 		}
 	}
@@ -2867,7 +2872,7 @@ version(/+$DIDE_REGION+/all)
 			return sum;
 		}
 		
-		//todo: check these in asm and learn about the compiler.
+		//Todo: check these in asm and learn about the compiler.
 		auto length(T, int N)(in Vector!(T, N) a)
 		{ return sqrt(sqrLength(a)); }
 		auto sqrLength(T, int N)(in Vector!(T, N) a)
@@ -2884,7 +2889,7 @@ version(/+$DIDE_REGION+/all)
 		
 		auto dot(A, B)(in A a, in B b)
 		{
-			//todo: make prettier errors, this needs more IDE integration
+			//Todo: make prettier errors, this needs more IDE integration
 			static assert(CommonVectorLength!(A, B) > 1, "Dot product needs at least 1 vector argument.");
 			return (a*b)[].sum;
 		}
@@ -2955,7 +2960,7 @@ version(/+$DIDE_REGION+/all)
 		auto rotate90 (T)(in Vector!(T, 2) v)
 		{ return v.Yx; } auto rotate270(T)(in Vector!(T, 2) v)
 		{ return v.yX; }
-		//todo: unittest this with mat2.rotation270*v
+		//Todo: unittest this with mat2.rotation270*v
 		
 		private void unittest_GeometricFunctions()
 		{
@@ -2997,7 +3002,7 @@ version(/+$DIDE_REGION+/all)
 			
 			assert(normalize(vec2(-0.5, 2)).approxEqual(vec2(-0.242536, 0.970143)));
 			
-			//todo: faceforward, reflect, refract
+			//Todo: faceforward, reflect, refract
 			
 			//minorVector
 			assert(vec3(1,2,3).minorVector!0 == vec2(2,3));
@@ -3067,7 +3072,7 @@ version(/+$DIDE_REGION+/all)
 		auto round(A, CT=ScalarType!A)(in A a)
 		{ return a.floatReductionOp!(std.math.round	, CT, A); }
 		auto roundEven(A, CT=ScalarType!A)(in A a)
-		{ return a.floatReductionOp!(std.math.lrint	, CT, A); } //note: depens on roundingMode: default is even
+		{ return a.floatReductionOp!(std.math.lrint	, CT, A); } //Note: depens on roundingMode: default is even
 		
 		//generate int, and long versions
 		static foreach(T; AliasSeq!(int, long))
@@ -3113,7 +3118,7 @@ version(/+$DIDE_REGION+/all)
 		
 		auto min(T...)(in T args)
 		{
-			//note: std.algorithm.min is (T t)
+			//Note: std.algorithm.min is (T t)
 			static if(T.length==1 && isInputRange!(T[0]))
 			{ return args[0].fold!((a, b) => min(a, b)); }
 			else static if(anyVector!T)
@@ -3129,7 +3134,7 @@ version(/+$DIDE_REGION+/all)
 		
 		auto max(T...)(in T args)
 		{
-			//note: std.algorithm.max is (T t)
+			//Note: std.algorithm.max is (T t)
 			static if(T.length==1 && isInputRange!(T[0]))
 			{ return args[0].fold!((a, b) => max(a, b)); }
 			else static if(anyVector!T)
@@ -3210,7 +3215,7 @@ version(/+$DIDE_REGION+/all)
 		{ return c1 ? c1 : c2 ? c2 : c3; }
 		auto cmpChain(int c1, lazy int c2, lazy int c3, lazy int c4)
 		{ return c1 ? c1 : c2 ? c2 : c3 ? c3 : c4; }
-		//todo: make cmpChain recursive
+		//Todo: make cmpChain recursive
 		
 		
 		public import std.algorithm: sort;
@@ -3253,7 +3258,7 @@ version(/+$DIDE_REGION+/all)
 				assert(A.length == 1);
 				alias RT = Unqual!(ElementType!(A[0]));
 				return cast(RT) (a[0][].sum * (1.0f / a[0].length));
-				//todo: it's not for ranges, just arrays because []!!! MSE() can't use it.
+				//Todo: it's not for ranges, just arrays because []!!! MSE() can't use it.
 			}
 			else
 			{
@@ -3422,7 +3427,7 @@ version(/+$DIDE_REGION+/all)
 		auto iota2(E)(in E e)
 		{ return iota2(0, e); }
 		
-		//todo: Make better animater following using Euler interpolation
+		//Todo: Make better animater following using Euler interpolation
 		
 		/*
 			**********************************
@@ -3442,7 +3447,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			return dt<maxDt 	? 1-pow(speed, dt*30)
 				: 1;
-			//todo: Upgrade to https://val-sagrario.github.io/Dynamics%20of%20First%20Order%20Systems%20for%20game%20devs%20-%20Jan%202020.pdf
+			//Todo: Upgrade to https://val-sagrario.github.io/Dynamics%20of%20First%20Order%20Systems%20for%20game%20devs%20-%20Jan%202020.pdf
 		}
 		
 		/*
@@ -3657,7 +3662,7 @@ version(/+$DIDE_REGION+/all)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-//todo: when the ide supports unit testing, this should be private. Also needs real unittest{} blocks.
+//Todo: when the ide supports unit testing, this should be private. Also needs real unittest{} blocks.
 void unittest_main() {
 	version(assert) {}else enforce(0, "Turn on debug build for asserts.");
 	
