@@ -3720,6 +3720,36 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 	}
+}version(/+$DIDE_REGION Multithread+/all)
+{
+	auto futureFetch(alias fun, RT = ReturnType!fun)(RT* data = null)
+	{
+		__gshared RT[] queue;
+		
+		RT[] res;
+		synchronized
+		{
+			if(data)
+			{ queue ~= *data; }
+			else
+			{
+				res = queue;
+				queue = [];
+			}
+		}	
+		return res;
+	}
+	
+	void future(alias fun, Args...)(Args args)
+	{
+		static void futureWrapper(alias fun, Args...)(Args args)
+		{
+			auto res = fun(args);
+			futureFetch!fun(&res);
+		}
+		
+		taskPool.put(task!(futureWrapper!(fun, Args))(args));
+	}
 }
 
 version(/+$DIDE_REGION Containers+/all)
@@ -7095,7 +7125,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			return dt;
 		}
 		
-		//todo: a synchronized function called uniqueNow().
+		//Todo: a synchronized function called uniqueNow().
 		
 		DateTime	today()
 		{ return now.localDayStart; }
