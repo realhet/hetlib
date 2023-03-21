@@ -20,32 +20,32 @@ enum
 	MB_ICONSTOP	= MB_ICONHAND,
 	MB_ICONERROR	= MB_ICONHAND,
 	MB_ICONQUESTION	= 0x00000020,
-	MB_ICONEXCLAMATION	= 0x00000030,
+	MB_ICONEXCLAMATION 	= 0x00000030,
 	MB_ICONWARNING	= MB_ICONEXCLAMATION,
 	MB_ICONASTERISK	= 0x00000040,
 	MB_ICONINFORMATION	= MB_ICONASTERISK,
 	MB_USERICON	= 0x00000080,
 	MB_ICONMASK	= 0x000000F0,
 	
-	MB_DEFBUTTON1														  = 0,
-	MB_DEFBUTTON2														  = 0x00000100,
-	MB_DEFBUTTON3														  = 0x00000200,
-	MB_DEFBUTTON4														  = 0x00000300,
-	MB_DEFMASK	               = 0x00000F00,
-	
-	MB_APPLMODAL	              =	0,
-	MB_SYSTEMMODAL		= 0x00001000,
-	MB_TASKMODAL	              =	0x00002000,
-	MB_MODEMASK	              = 0x00003000,
-	
-	MB_HELP	                 = 0x00004000,
-	MB_NOFOCUS	                 = 0x00008000,
-	MB_MISCMASK	                 = 0x0000C000,
-	
+	MB_DEFBUTTON1 	= 0,
+	MB_DEFBUTTON2	= 0x00000100,
+	MB_DEFBUTTON3	= 0x00000200,
+	MB_DEFBUTTON4	= 0x00000300,
+	MB_DEFMASK	= 0x00000F00,
+		
+	MB_APPLMODAL	= 0,
+	MB_SYSTEMMODAL 	= 0x00001000,
+	MB_TASKMODAL	= 0x00002000,
+	MB_MODEMASK	= 0x00003000,
+		
+	MB_HELP	= 0x00004000,
+	MB_NOFOCUS	= 0x00008000,
+	MB_MISCMASK 	= 0x0000C000,
+		
 	MB_SETFOREGROUND	= 0x00010000,
 	MB_DEFAULT_DESKTOP_ONLY	= 0x00020000,
 	MB_TOPMOST	= 0x00040000,
-	MB_SERVICE_NOTIFICATION_NT3X	= 0x00040000,
+	MB_SERVICE_NOTIFICATION_NT3X 	= 0x00040000,
 	MB_RIGHT	= 0x00080000,
 	MB_RTLREADING	= 0x00100000,
 	MB_SERVICE_NOTIFICATION	= 0x00200000
@@ -53,7 +53,7 @@ enum
 
 enum 
 {
-	IDOK          = 1,
+	IDOK = 1,
 	IDCANCEL,
 	IDABORT,
 	IDRETRY,
@@ -68,7 +68,7 @@ enum
 
 uint messageBox(HWND hwnd, string text, string caption, uint flags)
 {
-	//todo:!!!!!!!!!!!!!! zero terminate strings!!!
+	//Todo: !!!!!!!!!!!!!! zero terminate strings!!!
 	return MessageBoxW(hwnd, text.toUTF16z, caption.toUTF16z, flags);
 }
 
@@ -236,9 +236,9 @@ class FileDialog
 		*/
 	}
 	
-		enum GetFileNameMode { Open, OpenMulti, Save, SaveAs, RenameTo }
+	enum GetFileNameMode { Open, OpenMulti, Save, SaveAs, RenameTo }
 	
-		static private string getFileName(
+	static private string getFileName(
 		GetFileNameMode mode, HWND owner, string what, string fileName, 
 		string defaultExt, string filter, string initialDir
 	)
@@ -253,20 +253,20 @@ class FileDialog
 		ofn.Flags = OFN_OVERWRITEPROMPT | OFN_EXPLORER | OFN_EXTENSIONDIFFERENT;
 		if(isMulti	) ofn.Flags |= OFN_ALLOWMULTISELECT;
 		
-		//note: this is commented out to allow using virtual files in hetLib.
+		//Note: this is commented out to allow using virtual files in hetLib.
 		//if(isOpen	) ofn.Flags |= OFN_FILEMUSTEXIST;
 		ofn.Flags |= OFN_NOVALIDATE;
 		/+
-			todo: this workaround is needed to extract `virtual:\file.ext` files. 
+			Todo: this workaround is needed to extract `virtual:\file.ext` files. 
 					Because there will be the current path in front of that.
 		+/
 		//-> if(f.fullName.isWild(`*\?*:*`)) f.fullName = wild[1].split('\\').back~':'~wild[2];
-		//todo: make options for this:  mustExists, noValidate
+		//Todo: make options for this:  mustExists, noValidate
 		
 		if(!isOpen	) ofn.Flags |= OFN_NOREADONLYRETURN;
 		
 		/+
-			note: change file type won't refresh folder bug -> 
+			Note: change file type won't refresh folder bug -> 
 					https://stackoverflow.com/questions/922204/getopenfilename-does-not-refresh-when-changing-filter
 		+/
 		//filename
@@ -429,7 +429,7 @@ private string processExtFilter(string filter, bool includeExts)
 RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen)
 {
 	import core.sys.windows.commdlg;
-	static uint[16] customColors; //todo: save/load ini
+	static uint[16] customColors; //Todo: save/load ini
 	CHOOSECOLOR cc = {
 		hwndOwner: hwnd,
 		rgbResult: color.raw,

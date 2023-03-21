@@ -1495,6 +1495,11 @@ class Drawing
 		@property bounds2 bounds()const
 		{ return bounds_; }
 		
+		float inputTransformSize(float s)
+		{
+			return s<=0 ? s : s*actState.drawScale.x;
+		}
+		
 		vec2 inputTransformRel(in vec2 p)
 		{ return p*actState.drawScale; } //for relative movements
 		
@@ -1562,7 +1567,7 @@ class Drawing
 		void point(in vec2 p)
 		{
 			markDirty;
-			auto c = realDrawColor, s = pointSize;
+			auto c = realDrawColor, s = inputTransformSize(pointSize);
 			/*
 				if(data_.length) with(data[$-1]) if(aType==1 && aColor==c) {//extend the last Point1 to Point2
 					aType = 2;
@@ -1597,7 +1602,7 @@ class Drawing
 		{
 			if(p.length==0) return;
 			markDirty;
-			auto c = realDrawColor, s = pointSize;
+			auto c = realDrawColor, s = inputTransformSize(pointSize);
 			int idx = 0;
 			if(p.length&1) {
 				 //first odd element. Try to snap to the prev point
@@ -1620,7 +1625,7 @@ class Drawing
 			 //Todo: const struct->in struct
 			vec2 p = inputTransform(p_);
 			markDirty;
-			auto c = realDrawColor, w = lineWidth;
+			auto c = realDrawColor, w = inputTransformSize(lineWidth);
 			myAppend(DrawingObj(3+actState.arrowStyle, inputTransform(lineCursor), p, vec2(w, lineStyle), c));
 			lineCursor = p_;
 		}
@@ -1725,7 +1730,7 @@ class Drawing
 		void bezier2(in vec2 A, in vec2 B, in vec2 C)
 		{
 			markDirty;
-			auto c = realDrawColor, w = lineWidth;
+			auto c = realDrawColor, w = inputTransformSize(lineWidth);
 			myAppend(DrawingObj(69, inputTransform(A), inputTransform(B), inputTransform(C), c,vec2(w, lineStyle)));
 		}
 		
@@ -2095,7 +2100,7 @@ class Drawing
 			auto scale = fontHeight*(1.0f/40);
 			//Todo: nem mukodik a negativ lineWidth itt! Sot! Egyaltalan nem mukodik a linewidth
 			
-			lineWidth = 3*scale*fontWeight*scaleFactor.x;
+			lineWidth = 3*scale*fontWeight;
 			lineStyle = LineStyle.normal;
 			
 			//align
