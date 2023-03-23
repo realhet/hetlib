@@ -465,7 +465,7 @@ version(/+$DIDE_REGION+/all)
 			
 			auto opBinary(string op, T)(in T other) const
 			{
-				//todo: associative array for right operand
+				//Todo: associative array for right operand
 				
 				static if(isNumeric!T || isVector!T)
 				{
@@ -1773,7 +1773,7 @@ version(/+$DIDE_REGION+/all)
 	static foreach(N; [1, 2, 3])
 	static if(N==1) mixin(format!q{alias %sbounds = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
 	else mixin(format!q{alias %sbounds%s = %s;}(ComponentTypePrefix!T, N, Bounds!(Vector!(T, N)).stringof));
-	//Todo: bounds helyett bounds1 jobb lenne, mert a bounds az sokszor masra is hasznalva van: pl. bmp.bounds
+	//Todo: bounds helyett bounds1 jobb lenne, mert a bounds az sokszor masra is hasznalva van: pl. bmp.bounds.  Esetleg interval lehetne a neve.
 	
 	//functions with bounds ////////////////////////////////
 	
@@ -2121,41 +2121,33 @@ version(/+$DIDE_REGION+/all)
 			alias ElementType = E;
 			enum Dimension = N;
 			
-			static if(N>1)
-			{
+			static if(N>1) {
 				Vector!(int, N) size;
 				//Todo: it's not 1D compatible.  Vector!(T, 1) should be equal to an alias=T.  In Bounds as well.
 			}
-			else
-			{ int size; }
+			else { int size; }
 			
 			int stride;
 			//here 4 bytes extra data can fit: a change-hash for example
 			E[] impl;
 				
 			//size properties
-			static foreach(i, name; ["width", "height", "depth"].take(N))
-			mixin(
-				"ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
-							.replace("@", name).replace("#", i.text) 
-			);
+			static foreach(i, name; ["width", "height", "depth"].take(N)) 
+				mixin(
+					"ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
+								.replace("@", name).replace("#", i.text) 
+				);
 			
-			static if(N>=2)
-			auto area() const
-			{ return width*height; }
 			
-			static if(N>=3)
-			auto volume() const
-			{ return area*depth; }
+			static if(N>=2) auto area() const { return width*height; }
+			
+			static if(N>=3) auto volume() const { return area*depth; }
 			
 				
-			this(in ivec2 size, E[] initialData = [], int stride=0)
-			{
+			this(in ivec2 size, E[] initialData = [], int stride=0) {
 				//from array. stride is optional
-				if(stride<=0)
-				stride = size.x;
-				else
-				enforce(stride>=size.x);
+				if(stride<=0) stride = size.x;
+				else enforce(stride>=size.x);
 				
 				this.size = size;
 				this.stride = stride;
@@ -2163,87 +2155,61 @@ version(/+$DIDE_REGION+/all)
 				impl.length = stride * size.y;
 			}
 			
-			bool empty()
-			{ return size.lessThanEqual(0).any; }
+			bool empty() { return size.lessThanEqual(0).any; }
 			
-			auto toString() const
-			{
-				static if(N==1)
-				return format!"image1D(%s)"(impl);
-				else static if(N==2)
-				return "image2D([\n" ~ rows.map!(r => "  " ~ r.text).join(",\n") ~ "\n])";
-				else
-				static assert(0, "not impl");
+			auto toString() const {
+				static if(N==1) return format!"image1D(%s)"(impl);
+				else static if(N==2) return "image2D([\n" ~ rows.map!(r => "  " ~ r.text).join(",\n") ~ "\n])";
+				else static assert(0, "not impl");
 			}
 			
-			auto bounds() const
-			{
+			auto bounds() const {
 				Bounds!(Unqual!(typeof(size))) b;
 				b.high = size;
 				return b;
 			}
 				
 			//these returning single arrays / maps of arrays
-			auto row(int y) const
-			{ return impl[stride*y .. stride*y + width]; }	auto row(int y)
-			{ return impl[stride*y .. stride*y + width]; }
+			auto row(int y) const { return impl[stride*y .. stride*y + width]; }	auto row(int y) { return impl[stride*y .. stride*y + width]; }
 			
-			auto rows() const
-			{ return height.iota.map!(y => row(y)); }	auto rows()
-			{ return height.iota.map!(y => row(y)); }
+			auto rows() const { return height.iota.map!(y => row(y)); }	auto rows() { return height.iota.map!(y => row(y)); }
 			
-			auto column(int x) const
-			{ return height.iota.map!(y => cast(E)(impl[stride*y + x])).array; } //cast needed to remove constness
-			auto columns() const
-			{ return width.iota.map!(x => column(x)); }
+			auto column(int x) const { return height.iota.map!(y => cast(E)(impl[stride*y + x])).array; } //cast needed to remove constness
+			auto columns() const { return width.iota.map!(x => column(x)); }
 				
-			void regenerate(E delegate(ivec2) generator)
-			{ impl = size.iota2.map!generator.array; }
+			void regenerate(E delegate(ivec2) generator) { impl = size.iota2.map!generator.array; }
 				
-			@property auto asArray()
-			{ if(size.x==stride) return impl;else return rows.join; }
+			@property auto asArray() { if(size.x==stride) return impl;else return rows.join; }
 				
-			@property auto asArray() const
-			{
+			@property auto asArray() const {
 				//Todo: ezt nem lehet egyszerubben? const vagy nem const. Peldaul "const auto"
 				if(size.x==stride) return impl;else return rows.join;
 			}
 				
 			@property void asArray(A)(A a) //creates a same size image from 'a' and copies it into itself.
-			{ this[0, 0] = image2D(size, a); }
+			 { this[0, 0] = image2D(size, a); }
 				
-			auto dup(string op="")() const
-			{
+			auto dup(string op="")() const {
 				//optional predfix op
-				static if(op=="")
-				{
+				static if(op=="") {
 					//return Image!(E, N)(size, height.iota.map!(i => impl[i*stride..i*stride+width].dup).join); //todo:2D only
-					if(stride==width)
-					return Image!(E, N)(size, impl.dup);
-					else
-					return Image!(E, N)(size, rows.map!(r => r.dup).join); //Todo: 2D only
+					if(stride==width) return Image!(E, N)(size, impl.dup);
+					else return Image!(E, N)(size, rows.map!(r => r.dup).join); //Todo: 2D only
 					//Todo: check this r.dup.join in disassembler
 				}
-				else
-				{
+				else {
 					auto tmp = this.dup;
-					foreach(ref a; tmp.impl)
-					a = cast(E) (mixin(op, "a")); //transform all the elements manually
+					foreach(ref a; tmp.impl) a = cast(E) (mixin(op, "a")); //transform all the elements manually
 					return tmp;
 				}
 			}
 				
 			//Index a single element, e.g., arr[0, 1]
-			ref E opIndex(int i, int j)
-			{ return impl[i + stride*j]; }	E opIndex(int i, int j) const
-			{ return impl[i + stride*j]; }
-			ref E opIndex(in ivec2 p)
-			{ return this[p.x, p.y]; }	E opIndex(in ivec2 p) const
-			{ return this[p.x, p.y]; }
+			ref E opIndex(int i, int j) { return impl[i + stride*j]; }	E opIndex(int i, int j) const { return impl[i + stride*j]; }
+			ref E opIndex(in ivec2 p) { return this[p.x, p.y]; }	E opIndex(in ivec2 p) const { return this[p.x, p.y]; }
 				
 			//Array slicing, e.g., arr[1..2, 1..2], arr[2, 0..$], arr[0..$, 1].
-			auto opIndex(int[2] r1, int[2] r2)
-			{
+			auto opIndex(int[2] r1, int[2] r2) {
 				ImageType result;
 					
 				auto startOffset = r1[0] + r2[0]*stride;
@@ -2256,14 +2222,10 @@ version(/+$DIDE_REGION+/all)
 					
 				return result;
 			}
-			auto opIndex(int[2] r1, int j)
-			{ return opIndex(r1, [j, j+1]); } auto opIndex(int i, int[2] r2)
-			{ return opIndex([i, i+1], r2); }
+			auto opIndex(int[2] r1, int j) { return opIndex(r1, [j, j+1]); } auto opIndex(int i, int[2] r2) { return opIndex([i, i+1], r2); }
 				
 			//ivec and ibounds slicing
-			auto opIndex(in ivec2 mi, in ivec2 ma)
-			{ return opIndex([mi.x, ma.x], [mi.y, ma.y]); } auto opIndex(in ibounds2 b)
-			{ return opIndex(b.low, b.high); }
+			auto opIndex(in ivec2 mi, in ivec2 ma) { return opIndex([mi.x, ma.x], [mi.y, ma.y]); } auto opIndex(in ibounds2 b) { return opIndex(b.low, b.high); }
 				
 			//Support for `x..y` notation in slicing operator for the given dimension.
 			int[2] opSlice(size_t dim)(int start, int end)
@@ -2272,25 +2234,27 @@ version(/+$DIDE_REGION+/all)
 			{ assert(start >= 0 && end <= this.opDollar!dim); }
 			do { return [start, end]; }
 				
-			auto opSlice() const
-			{ return this; }
+			auto opSlice() const { return this; }
 				
 			//Support `$` in slicing notation, e.g., arr[1..$, 0..$-1].
 			@property {
-				static if(N==1)
-				int opDollar(size_t dim : 0)()
-				{ return size; }else
-				int opDollar(size_t dim : 0)()
-				{ return size[0];	 }
+				static if(N==1) int opDollar(size_t dim : 0)() { return size; }else int opDollar(size_t dim : 0)() { return size[0];	 }
 				
-				static if(N>=2)
-				int opDollar(size_t dim : 1)()
-				{ return size[1]; }
+				static if(N>=2) int opDollar(size_t dim : 1)() { return size[1]; }
 				
-				static if(N>=3)
-				int opDollar(size_t dim : 2)()
-				{ return size[2]; }
+				static if(N>=3) int opDollar(size_t dim : 2)() { return size[2]; }
 				
+			}
+			
+			auto safeGet(int x, int y, E def = E.init)
+			{
+				if(x<0 || y<0 || x>=width || y>=height) return def;
+				return this[x, y];
+			}
+			
+			auto safeGet(ivec2 p, E def = E.init)
+			{
+				return safeGet(p.x, p.y, def);
 			}
 		}version(/+$DIDE_REGION+/all) {
 			//Index/Slice assign

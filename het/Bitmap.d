@@ -581,12 +581,12 @@ version(/+$DIDE_REGION+/all)
 		{ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); }
 			
 			void set(File f, Bitmap bmp)
-			{
-				enforce(f);
-				enforce(bmp);
-				
-				bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp);
-			}
+		{
+			enforce(f);
+			enforce(bmp);
+			
+			bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp);
+		}
 	}
 	
 	void testBitmaps()
@@ -1375,24 +1375,26 @@ version(/+$DIDE_REGION+/all)
 	
 	class Bitmap
 	{
-		private:
+		private
+		{
 			void[] data_;
 			string type_ = "ubyte";
 			int width_, height_, channels_=4;
-		public:
-			deprecated int tag;	//can be an external id
-			deprecated int counter;	//can notify of cnahges
+		}
 		
-			File file;
-			DateTime modified;
-			string error;
-			bool loading, removed;	//Todo: these are managed by bitmaps(). Should be protected and readonly.
-			bool processed;	//user flag. Can do postprocessing after the image is loaded
-			bool resident;	//if true, garbageCollector will nor free this
+		deprecated int tag;	//can be an external id
+		deprecated int counter;	//can notify of cnahges
 		
-			uint accessed_tick; //garbageCollect using it
+		File file;
+		DateTime modified;
+		string error;
+		bool loading, removed;	//Todo: these are managed by bitmaps(). Should be protected and readonly.
+		bool processed;	//user flag. Can do postprocessing after the image is loaded
+		bool resident;	//if true, garbageCollector will nor free this
 		
-			@property bool unloadable() const
+		uint accessed_tick; //garbageCollect using it
+		
+		@property bool unloadable() const
 		{
 			enum recentlyUsedTicks = 3;
 			return 	!resident
@@ -1401,7 +1403,7 @@ version(/+$DIDE_REGION+/all)
 				&& accessed_tick+recentlyUsedTicks <= application.tick;
 		}
 		
-			auto dup()
+		auto dup()
 		{
 			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 			{
@@ -1420,53 +1422,51 @@ version(/+$DIDE_REGION+/all)
 			raise("unsupported bitmap format"); assert(0);
 		}
 		
-			bool valid()
+		bool valid()
 		{ return !empty && !loading && error==""; }
-			//Todo: this is not the best because first must check for (this !is null) from the outside
-			
-			bool canProcess()
+		//Todo: this is not the best because first must check for (this !is null) from the outside
+		
+		bool canProcess()
 		{ return valid && !processed; }
 		
-			void markChanged()
+		void markChanged()
 		{ modified.actualize; }
 		
-			//Todo: constraints
-			//Todo: fileName
-			//Todo: GLResource linking
-			//Todo: subTexture ID linking
-			//Todo: delayed load
+		//Todo: constraints
+		//Todo: fileName
+		//Todo: GLResource linking
+		//Todo: subTexture ID linking
+		//Todo: delayed load
 		
-			//constructors
-			this()
+		//constructors
+		this()
 		{}
-			this(T)(Image!(T, 2) img)
+		this(T)(Image!(T, 2) img)
 		{ set(img); }
-			//in general: use newBitmap() to create a bitmap
+		//in general: use newBitmap() to create a bitmap
 		
-			bool empty()
+		bool empty()
 		{ return data_.length==0 || width<=0 || height<=0 || channels<=0; }
-			size_t sizeBytes() const
+		size_t sizeBytes() const
 		{ return data_.length; }
 		
-			void waitFor()
-			{
-				while(loading) sleep(3);
-			}
+		void waitFor()
+		{ while(loading) sleep(3); }
 		
-			@property width	 () const
+		@property width	 () const
 		{ return width_	; }
-			@property height	 () const
+		@property height () const
 		{ return height_	; }
-			@property size	 () const
+		@property size () const
 		{ return ivec2(width, height); }
-			@property bounds	 () const
+		@property bounds	 () const
 		{ return ibounds2(ivec2(0), size); }
-			@property channels() const
+		@property channels() const
 		{ return channels_; }
-			@property type    () const
+		@property type    () const
 		{ return type_; }
 		
-			void setRaw(void[] data, int width, int height, int channels, string type)
+		void setRaw(void[] data, int width, int height, int channels, string type)
 		{
 			//check consistency
 			auto chSize = type.predSwitch("ubyte", 1, "float", 4, "int", 4, "ushort", 2, 0);
@@ -1500,17 +1500,17 @@ version(/+$DIDE_REGION+/all)
 			counter++;
 		}
 		
-			void set(E)(Image!(E, 2) im)
+		void set(E)(Image!(E, 2) im)
 		{
 			setRaw(im.asArray, im.width, im.height, VectorLength!E, (ScalarType!E).stringof);
 			
 			counter++;
 		}
 		
-			auto castedImage(E)()
+		auto castedImage(E)()
 		{ return Image2D!(Unqual!E)(ivec2(width_, height_), cast(Unqual!E[]) data_); }
 		
-			auto access(E)()
+		auto access(E)()
 		{
 			enforce(
 				VectorLength!E == channels,
@@ -1522,8 +1522,8 @@ version(/+$DIDE_REGION+/all)
 			);
 			return castedImage!E;
 		}
-			
-			/*
+		
+		/*
 			auto getFast(E)(){ //it is only a few optimized combinations.
 				static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
 					alias CT = ScalarType   !T,
@@ -1536,8 +1536,8 @@ version(/+$DIDE_REGION+/all)
 				raise("unsupported bitmap format"); assert(0);
 			}
 		*/
-			
-			auto getForUpload(E)()
+		
+		auto getForUpload(E)()
 		{
 			//Todo: performance counters for this.
 			//optimized versions
@@ -1547,8 +1547,8 @@ version(/+$DIDE_REGION+/all)
 			//WARN("Unoptimized bitmap getForUpload");  //opt: optimize this warn.
 			return get!E;
 		}
-			
-			auto get(E)()
+		
+		auto get(E)()
 		{
 			 //it converts and duplicates
 			
@@ -1566,7 +1566,7 @@ version(/+$DIDE_REGION+/all)
 			raise("unsupported bitmap format"); assert(0);
 		}
 		
-			void resizeInPlace_nearest(ivec2 newSize)
+		void resizeInPlace_nearest(ivec2 newSize)
 		{
 			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 			{
@@ -1583,7 +1583,7 @@ version(/+$DIDE_REGION+/all)
 			raise("unsupported bitmap format"); assert(0);
 		}
 		
-			auto resize_nearest(ivec2 newSize)
+		auto resize_nearest(ivec2 newSize)
 		{
 			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 			{
@@ -1603,7 +1603,7 @@ version(/+$DIDE_REGION+/all)
 			raise("unsupported bitmap format"); assert(0);
 		}
 		
-			override string toString() const
+		override string toString() const
 		{
 			return format(
 				"Bitmap(%s, %d, %d, %d, %s, %s, %s, %s)",
@@ -1613,7 +1613,7 @@ version(/+$DIDE_REGION+/all)
 			); 
 		}
 		
-			string details()
+		string details()
 		{
 			return format!"%-50s   res: %-11s   MP: %5.1f   chn: %s   compr.size: %4sB   uncompr.size: %4sB   ratio:%4.1f%%   bpp:%6.2f"
 			(
@@ -1622,7 +1622,7 @@ version(/+$DIDE_REGION+/all)
 			);
 		}
 		
-			void copyFrom(Bitmap b)
+		void copyFrom(Bitmap b)
 		{
 			enforce(b && b.valid);
 			setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_);
@@ -1630,13 +1630,13 @@ version(/+$DIDE_REGION+/all)
 			markChanged;
 		}
 		
-			void saveTo(F)(in F file)
+		void saveTo(F)(in F file)
 		{
 			auto f = File(file);
 			this.serialize(f.ext.withoutStarting('.')).saveTo(f);
 		}
 		
-			void loadFrom(F)(in F file)
+		void loadFrom(F)(in F file)
 		{
 			auto f = File(file);
 			auto b = f.read.deserialize!Bitmap;

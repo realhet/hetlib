@@ -1222,7 +1222,8 @@ struct im
 					cntr = actContainer;
 					
 					//preparations
-					initializePanelPosition(cntr, pp, clientArea); //Todo: outerSize should be stored, not innerSize, because the padding/border/margin settings after this can fuck up the alignment.
+					initializePanelPosition(cntr, pp, clientArea);
+					//Todo: outerSize should be stored, not innerSize, because the padding/border/margin settings after this can fuck up the alignment.
 					
 					//default panel frame
 					padding = "4";
@@ -1262,7 +1263,10 @@ struct im
 		}
 		
 			/// internal use only
-			bool focusUpdate(.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, void delegate() onEnter, void delegate() onFocused, void delegate() onExit)
+			bool focusUpdate(
+			.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, 
+			void delegate() onEnter, void delegate() onFocused, void delegate() onExit
+		)
 		{
 			if(focusedState.id==id)
 			{
@@ -3818,7 +3822,11 @@ struct im
 					auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2;
 					if(lockedDirection==0 && length(diff)>=3)
 					lockedDirection = act_dir;
-					auto delta = (lockedDirection ? lockedDirection : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
+					
+					const omniDirection = true; //right or up is the positive side
+					auto delta = omniDirection 	? inputs.MXraw.delta -inputs.MYraw.delta
+						: (lockedDirection ? lockedDirection : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta;
+					
 					pressed_nPos += delta*(adjustSpeed*(1.0f/180)); //it adds small delta's, so it could be overdriven
 					pressed_nPos = pressed_nPos.clamp(0, 1);
 					nPos = pressed_nPos; //Todo: it can't modify npos because npos can be an integer too. In this case, the pressed_nPos name is bad.
@@ -3880,7 +3888,7 @@ struct im
 				
 				if(hit.pressed && enabled)
 				{
-					  //Todo: enabled handling
+					//Todo: enabled handling
 					userModified = true;
 					
 					onPress(id, nPos, mousePos);
@@ -3965,7 +3973,10 @@ struct im
 			
 			bool focused;
 			
-			this(in Id id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init)
+			this(
+				in Id id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, 
+				TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
+			)
 			{
 				this.id = id;
 				this.orientation = orientation;
@@ -3982,12 +3993,12 @@ struct im
 				if(1 || sliderStyle==SliderStyle.slider)
 				focused = im.focusUpdate(
 					this, id,
-									enabled,
-									hit.pressed/*|| manualFocus*/, //when to enter
-									inputs["Esc"].pressed,  //when to exit
-									/*onEnter	*/ {},
-									/*onFocus	*/ {},
-									/*onExit	*/ {}
+					enabled,
+					hit.pressed/*|| manualFocus*/, //when to enter
+					inputs["Esc"].pressed,  //when to exit
+					/*onEnter	*/ {},
+					/*onFocus	*/ {},
+					/*onExit	*/ {}
 				);
 				
 				//res.focused = focused;
