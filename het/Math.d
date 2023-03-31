@@ -2132,11 +2132,11 @@ version(/+$DIDE_REGION+/all)
 			E[] impl;
 				
 			//size properties
-			static foreach(i, name; ["width", "height", "depth"].take(N)) 
-				mixin(
-					"ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
-								.replace("@", name).replace("#", i.text) 
-				);
+			static foreach(i, name; ["width", "height", "depth"].take(N))
+			mixin(
+				"ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
+							.replace("@", name).replace("#", i.text) 
+			);
 			
 			
 			static if(N>=2) auto area() const { return width*height; }
@@ -2156,6 +2156,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 			bool empty() { return size.lessThanEqual(0).any; }
+			bool opCast(B : bool)() const{ return !empty; }
 			
 			auto toString() const {
 				static if(N==1) return format!"image1D(%s)"(impl);
@@ -2187,7 +2188,7 @@ version(/+$DIDE_REGION+/all)
 			}
 				
 			@property void asArray(A)(A a) //creates a same size image from 'a' and copies it into itself.
-			 { this[0, 0] = image2D(size, a); }
+			{ this[0, 0] = image2D(size, a); }
 				
 			auto dup(string op="")() const {
 				//optional predfix op
@@ -2253,9 +2254,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 			auto safeGet(ivec2 p, E def = E.init)
-			{
-				return safeGet(p.x, p.y, def);
-			}
+			{ return safeGet(p.x, p.y, def); }
 		}version(/+$DIDE_REGION+/all) {
 			//Index/Slice assign
 				

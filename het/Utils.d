@@ -117,7 +117,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import het.color;
 			
 			//Windows imports
-			public import core.sys.windows.windows : GetCurrentProcess, SetPriorityClass,
+			public import core.sys.windows.windows : HANDLE, GetCurrentProcess, SetPriorityClass,
 				HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
 				BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
 				HRESULT, HWND, GUID, SYSTEMTIME, FILETIME, MB_OK, STD_OUTPUT_HANDLE, HMODULE,
@@ -129,7 +129,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
 				GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
 				HICON,
-				GetLongPathNameA, GetShortPathNameA;
+				GetLongPathNameA, GetShortPathNameA,
+				CreateEventA, CloseHandle, WaitForSingleObject, WAIT_OBJECT_0;
 			
 			import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
 				std.json, std.parallelism, core.runtime;
@@ -8644,8 +8645,8 @@ version(/+$DIDE_REGION Date Time+/all)
 		version(/+$DIDE_REGION+/all)
 		{
 			
-			import core.sys.windows.windows : WIN32_FIND_DATAW, HANDLE, INVALID_HANDLE_VALUE, FindFirstFileW, FileTimeToSystemTime, FindNextFileW, FindClose,
-				FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_ARCHIVE, FILE_ATTRIBUTE_SYSTEM, FILE_ATTRIBUTE_HIDDEN;
+			import core.sys.windows.windows : WIN32_FIND_DATAW, INVALID_HANDLE_VALUE, FindFirstFileW, FileTimeToSystemTime, FindNextFileW, FindClose,
+			FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_READONLY, FILE_ATTRIBUTE_ARCHIVE, FILE_ATTRIBUTE_SYSTEM, FILE_ATTRIBUTE_HIDDEN;
 			
 			struct FileEntry
 			{

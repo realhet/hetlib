@@ -62,7 +62,7 @@ version(/+$DIDE_REGION+/all)
 		dashDot	= 29,
 		dash2	= 35,
 		dashDot2	= 44
-	}
+	}//todo: this is a piece of shit. dot is so long that it is already a fucking dash. And what fucking format is this anyways???
 	
 	//these are also used in ui.d
 	enum HAlign
@@ -1496,9 +1496,7 @@ class Drawing
 		{ return bounds_; }
 		
 		float inputTransformSize(float s)
-		{
-			return s<=0 ? s : s*actState.drawScale.x;
-		}
+		{ return s<=0 ? s : s*actState.drawScale.x; }
 		
 		vec2 inputTransformRel(in vec2 p)
 		{ return p*actState.drawScale; } //for relative movements

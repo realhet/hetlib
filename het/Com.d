@@ -18,7 +18,7 @@ struct ComPortSettings
 
 HANDLE open(in ComPortSettings settings)
 {
-	enforce(settings.params.sameText("8N1"), "Only 8N1 supported"); //todo: interpret params
+	enforce(settings.params.sameText("8N1"), "Only 8N1 supported"); //Todo: interpret params
 	
 	string s = settings.port;
 	if(s.map!isDigit.all)
@@ -179,7 +179,7 @@ private void comPortWorker(shared ComPort owner_)
 			{
 				if(bytesRead>0)
 				{
-					inBuf ~= buf[0..bytesRead]; //todo: appender???
+					inBuf ~= buf[0..bytesRead]; //Todo: appender???
 					goto again;
 				}
 				
@@ -223,7 +223,7 @@ private void comPortWorker(shared ComPort owner_)
 			uint bytesWritten;
 			if(WriteFile(hCom, outBuf.ptr, cast(uint)outBuf.length, &bytesWritten, null))
 			{
-				//todo: verify bytesWritten
+				//Todo: verify bytesWritten
 				synchronized(owner)
 				{ owner.stats.bytesOut += bytesWritten; }
 			}
@@ -242,7 +242,6 @@ private void comPortWorker(shared ComPort owner_)
 
 class ComPort
 {
-	 //ComPort /////////////////////////////////////////
 	import std.concurrency;
 	
 	@STORED ComPortSettings settings;
@@ -321,6 +320,8 @@ class ComPort
 	
 	void send(in void[] msg)
 	{
+		synchronized(this)
+		{
 		final switch(protocol)
 		{
 			case ComPortProtocol.raw:
@@ -335,6 +336,7 @@ class ComPort
 				outBuf ~= cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n");
 				stats.messagesOut ++;
 			break;
+		}
 		}
 	}
 	
@@ -367,9 +369,8 @@ class ComPort
 				
 				static if(is(T==string) && !is(U==string))
 				fun((cast(string)data).safeUTF8);
-				else	
-					//make sure that the string is valid
-					fun(cast(T)data);
+				else
+				fun(cast(T)data);
 				
 				
 			}catch(Exception e)
@@ -413,7 +414,7 @@ class ComPort
 			
 			if(binaryBuf.length>maxLineBufSize)
 			{
-				 //todo: refactor: maxMessageBytes
+				 //Todo: refactor: maxMessageBytes
 				binaryBuf = [];
 				stats.dataErrorCnt++;
 				error("Receiving garbage instead of valid packages: "~prefix.quoted);
@@ -426,9 +427,9 @@ class ComPort
 			
 			while(1)
 			{
-				const idx = lineBuf.indexOf('\n'); //todo: variable declaration in while condition. Needs latest LDC.
+				const idx = lineBuf.indexOf('\n'); //Todo: variable declaration in while condition. Needs latest LDC.
 				if(idx<0)
-				break; //todo: if no \n received after a timeout, that's an error too.
+				break; //Todo: if no \n received after a timeout, that's an error too.
 				const actLine = lineBuf[0..idx];
 				lineBuf = lineBuf[idx+1..$];
 				
@@ -467,9 +468,9 @@ class ComPort
 		
 		final switch(protocol)
 		{
-			case ComPortProtocol.raw         : processRaw	; break;
+			case ComPortProtocol.raw        : processRaw	; break;
 			case ComPortProtocol.binaryPackets: processBinaryPackets	; break;
-			case ComPortProtocol.textPackets : processTextPackets	; break;
+			case ComPortProtocol.textPackets: processTextPackets	; break;
 		} //end switch
 	}
 	
@@ -480,8 +481,8 @@ class ComPort
 	{
 		if(thereWasAnError)
 		return false;
-		const t = stats.lastIncomingMessageTime,
-					t0 = now;
+		const 	t = stats.lastIncomingMessageTime,
+			t0 = now;
 		return t && t>=t0-since && t<t0-blink;;
 	}
 	
@@ -494,7 +495,7 @@ class ComPort
 			Row(
 				bold(title=="" ? "Serial Communication" : title), "  ", 
 				{
-					ChkBox(this.enabled, "Enabled");  //todo: enabled conflicts with im.enable
+					ChkBox(this.enabled, "Enabled");  //Todo: enabled conflicts with im.enable
 					
 					Text("  ");
 					
@@ -507,9 +508,8 @@ class ComPort
 							if(!this.enabled)
 							Led(false, clGray);
 							else if(thereWasAnError) Led(true, clRed);
-							else 
-								//note: toSeconds needed for nan->0
-								Led(thereWasAMessage(1*hour, (1.0f/20)*second), clLime);
+							else
+							Led(thereWasAMessage(1*hour, (1.0f/20)*second), clLime);
 							
 							Text("Comm");
 						}
@@ -560,7 +560,7 @@ class ComPort
 				}
 			);
 			
-			//todo: statistics
+			//Todo: statistics
 		}
 	}
 }
@@ -607,7 +607,7 @@ class ComPortInfo
 		
 		void config(string s)
 		{
-			  //todo: refactor com port config
+			  //Todo: refactor com port config
 			baud = defaultBaud;
 			bits = defaultBits;
 			parity = Parity.none;
@@ -866,9 +866,9 @@ class ComPorts
 		
 		static void set(ComPortInfo p, bool exists, string description="", string deviceId="")
 		{
-			p._exists	= exists    ;
+			p._exists	= exists   ;
 			p._description	= description;
-			p._deviceId	= deviceId  ;
+			p._deviceId	= deviceId ;
 		}
 		
 		//unplugged ports
@@ -900,7 +900,7 @@ class ComPorts
 		}
 		
 		auto changed = plugged.length || unplugged.length || replugged.length;
-		//todo: process changes
+		//Todo: process changes
 	}
 	
 }

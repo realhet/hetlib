@@ -26,7 +26,7 @@ RGB toWireColor(string s)
 }
 
 /// Displays a wire color with it's name
-@UI void ColorRow(string colorName, float hScale = 1)
+void ColorRow(string colorName, float hScale = 1)
 {
 	with(im)
 	{
@@ -247,7 +247,7 @@ struct ConnectorInfo
 			  auto a = unit*1.8f;
 			
 				 dr.color = hasRingColor ? cRing : clOutline;
-				 dr.pointSize = a*(hasRingColor ? 1.25f : 1.1f); //todo: intelligent point() function
+				 dr.pointSize = a*(hasRingColor ? 1.25f : 1.1f); //Todo: intelligent point() function
 				 dr.point(tr(p));
 			
 				if(hasRingColor)
@@ -301,7 +301,7 @@ struct ConnectorInfo
 			const h = (numPins+1)/2;
 			
 			drawDSubBody(1, .25f);
-			foreach(i; 0..h  )
+			foreach(i; 0..h)
 			drawPin(vec2(i*2+2    , 1.5)*unit, (i+1).text);
 			foreach(i; h..numPins)
 			drawPin(vec2((i-h)*2+3, 3.5)*unit, (i+1).text);
@@ -313,9 +313,9 @@ struct ConnectorInfo
 			drawDSubBody(1, .25f);
 			if(numPins==50)
 			{
-				foreach(i; 0..t      )
+				foreach(i; 0..t    )
 				drawPin(vec2(i*2+2.5          , 1.5)*unit, (i+1).text);
-				foreach(i; t..t*2-1  )
+				foreach(i; t..t*2-1)
 				drawPin(vec2((i-t)*2+3.5      , 3.5)*unit, (i+1).text);
 				foreach(i; t*2-1..numPins)
 				drawPin(vec2((i-(t*2-1))*2+2.5, 5.5)*unit, (i+1).text);
@@ -331,9 +331,9 @@ struct ConnectorInfo
 				drawPin(vec2((i-59)*2+3.5, 7.5)*unit, (i+1).text);
 			}else
 			{
-				foreach(i; 0..t    )
+				foreach(i; 0..t  )
 				drawPin(vec2(i*2+3      , 1.5)*unit, (i+1).text);
-				foreach(i; t..t*2  )
+				foreach(i; t..t*2)
 				drawPin(vec2((i-t)*2+2  , 3.5)*unit, (i+1).text);
 				foreach(i; t*2..numPins)
 				drawPin(vec2((i-t*2)*2+3, 5.5)*unit, (i+1).text);
@@ -393,7 +393,7 @@ struct ConnectorInfo
 //A clickable button with the connector type. Clicking shows a ConnectorPanel.
 
 //ConnectorBtn //////////////////////////////////////////////////
-@UI void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T...)(string conn, T args)
+void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T...)(string conn, T args)
 {
 	with(im)
 	{
@@ -521,9 +521,9 @@ struct ConnectorInfo
 /// This class contains common things around an Arduino Nano controller project.
 class ArduinoNanoProject
 {
-	 //ArduinoNanoProject /////////////////////////////////////////////////////
 	
-	struct Wire
+	
+	static struct Wire
 	{
 		 //Wire ////////////////////////////////////////////////////////
 		string identifier;
@@ -603,7 +603,7 @@ class ArduinoNanoProject
 		}
 	}
 	
-	struct Cable
+	static struct Cable
 	{
 		 //Cable /////////////////////////////////////////////////
 		string name, color, connector_A, connector_B;
@@ -667,20 +667,6 @@ class ArduinoNanoProject
 	static string[] AllWireLabels(Cable[] cables)
 	{ return AllWires(cables).map!"a.label".array; }
 	
-	Cable[] cables; //all the cables connected to the MCU
-	
-	void updateWireStates(bool[string] map)
-	{
-		foreach(ref c; cables)
-		foreach(ref w; c.wires)
-		if(auto a = w.label in map)
-		w.state = *a ? '1' : '0';
-		else w.state = '?';
-	}
-	
-	
-	abstract string generateProgram();
-	
 	//helper functs /////////////////////////////////////////////////////
 	
 	static bool arduinoPinLessThan(string a, string b)
@@ -699,7 +685,7 @@ class ArduinoNanoProject
 	}
 	
 	
-	struct PinReg
+	static struct PinReg
 	{ char regName; ubyte regBit; }
 	
 	static auto getNanoPinReg(string pin)
@@ -732,27 +718,36 @@ class ArduinoNanoProject
 		assert(0);
 	}
 	
-	static @UI
+	static void CableFrame(T...)(in T args )
 	{
-			//ui /////////////////////////////////////////////
+		with(im)
+		Row(
+			{
+				theme = "tool";
+				margin = "2 4";
+				border = "2 normal gray";
+				padding = "4";
+				style.bkColor = bkColor = RGB(230, 230, 230);
+				flags.yAlign = YAlign.baseline;
+			}, args
+		);
 		
-		void CableFrame(T...)(in T args )
-		{
-			with(im)
-			Row(
-				{
-					theme = "tool";
-					margin = "2 4";
-					border = "2 normal gray";
-					padding = "4";
-					style.bkColor = bkColor = RGB(230, 230, 230);
-					flags.yAlign = YAlign.baseline;
-				}, args
-			);
-			
-		}
-		
-	}//static @UI
+	}
+	
+	
+	Cable[] cables; //all the cables connected to the MCU
+	@STORED int cablesTabsIdx;
+	
+	void updateWireStates(bool[string] map)
+	{
+		foreach(ref c; cables)
+		foreach(ref w; c.wires)
+		if(auto a = w.label in map)
+		w.state = *a ? '1' : '0';
+		else w.state = '?';
+	}
+	
+	abstract string generateProgram();
 	
 	void BtnGenerateProgram()
 	{
@@ -765,8 +760,6 @@ class ArduinoNanoProject
 		}
 		
 	}
-	
-	@STORED int cablesTabsIdx;
 	
 	void TabsCables()
 	{
