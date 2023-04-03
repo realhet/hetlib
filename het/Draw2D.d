@@ -62,7 +62,7 @@ version(/+$DIDE_REGION+/all)
 		dashDot	= 29,
 		dash2	= 35,
 		dashDot2	= 44
-	}//todo: this is a piece of shit. dot is so long that it is already a fucking dash. And what fucking format is this anyways???
+	}//Todo: this is a piece of shit. dot is so long that it is already a fucking dash. And what fucking format is this anyways???
 	
 	//these are also used in ui.d
 	enum HAlign
@@ -1135,6 +1135,47 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 		];
+	}
+	static void drawProbes(Drawing dr, PROBE.Event[][string] events)
+	{
+		if(events.empty) return;
+		
+		const t0 = events.values.map!(a => a[0].when).minElement;
+		
+		string[] keys = events.keys.sort.array;
+		foreach(y, key; keys)
+		{
+			float y0 = y;
+			auto 	arr	= events[key],
+				values 	= arr.map!"a.value";
+			const 	max 	= values.maxElement(0),
+				min	= values.minElement(0);
+			
+			dr.color = clWhite;
+			dr.fontHeight = 1;
+			dr.textOut(-5, y0, key);
+			
+			vec2 p(in PROBE.Event a) { return vec2((a.when-t0).value(second/60), y0+0.9f-a.value*0.8f); }
+			
+			vec2 lastP = p(PROBE.Event(0)); lastP.x = 0;
+			
+			dr.lineWidth = -1;
+			dr.pointSize = -4;
+			dr.moveTo(lastP);
+			foreach(a; arr)
+			{
+				auto c = clRainbow[a.coreIdx % clRainbow.length];
+				
+				auto nextP = p(a);
+				dr.color = c;
+				dr.fillRect(lastP.x, lastP.y, nextP.x, y0+0.9f);
+				dr.color = c.lighten(0.5f);
+				dr.lineTo(nextP.x, lastP.y);
+				dr.lineTo(nextP);
+				//dr.point(nextP);
+				lastP = nextP;
+			}
+		}
 	}
 }
 class Drawing

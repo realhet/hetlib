@@ -3751,6 +3751,95 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		taskPool.put(task!(futureWrapper!(fun, Args))(args));
 	}
+	
+	struct PROBE
+	{
+		string name;
+		bool logZeroOnExit;
+		
+		static struct Event {
+			DateTime when;
+			float value;
+			ubyte coreIdx;
+			this(float value)
+			{
+				when = now;
+				this.value = value;
+				coreIdx = cast(ubyte) GetCurrentProcessorNumber;
+			}
+		}
+		
+		__gshared Event[][string] events, recordedEvents;
+		__gshared bool enabled;
+		
+		static start()
+		{
+			synchronized(typeid(typeof(this)))
+			{
+				recordedEvents = null;
+				events = null;
+				enabled = true;
+			}
+		}
+		
+		static stop()
+		{
+			synchronized(typeid(typeof(this)))
+			{
+				enabled = false;
+				recordedEvents = events;
+				events = null;
+				LOG(recordedEvents.length);
+			}
+		}
+		
+		static void log(string name, float value)
+		{
+			if(!enabled) return;
+			synchronized(typeid(typeof(this)))
+			{ events[name] ~= Event(value); }
+		}
+		
+		/+
+			+ Register an event which have a duration.
+				It will log '1' immediatelly.
+				Later when the scope exits, it will log '0'.
+		+/
+		static if(0)
+		{
+			this(string name)
+			{
+				this.name = name;
+				logZeroOnExit = true;
+				log(name, 1);
+			}
+			
+			/// Register a current value for of name
+			this(string name, float value)
+			{ log(name, value); }
+		}
+		else
+		{
+			static auto opCall(string name)
+			{
+				PROBE p;
+				p.name = name;
+				p.logZeroOnExit = true;
+				log(name, 1);
+				return p;
+			}
+			
+			static void opCall(string name, float value)
+			{ log(name, value); }
+		}
+		~this()
+		{
+			if(logZeroOnExit)
+			log(name, 0);
+		}
+		
+		
+	}
 }
 
 version(/+$DIDE_REGION Containers+/all)

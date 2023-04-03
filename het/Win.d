@@ -217,10 +217,10 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	
-	//TODO: ezek a specialis commentek szekciokra oszthatnak a filet es az editorban lehetne maszkalni a szekciok kozott
-	//todo: Ha a console ablak bezarodik, az ablakozorendszer destruktora akkor is hivodjon meg!
+	//Todo: ezek a specialis commentek szekciokra oszthatnak a filet es az editorban lehetne maszkalni a szekciok kozott
+	//Todo: Ha a console ablak bezarodik, az ablakozorendszer destruktora akkor is hivodjon meg!
 	
-	//todo: a sysmenu hasznalatakor ne klikkeljen az alkalmazasba bele
+	//Todo: a sysmenu hasznalatakor ne klikkeljen az alkalmazasba bele
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  Global Application entry point                                          ///
@@ -403,8 +403,8 @@ version(/+$DIDE_REGION+/all)
 			
 			while(1)
 			{
-				//note: GetMessage waits, if there is nothing;
-				//note: PeekMessage returns even if there is nothing.
+				//Note: GetMessage waits, if there is nothing;
+				//Note: PeekMessage returns even if there is nothing.
 				
 				//PING(2);
 				
@@ -697,7 +697,7 @@ class Window
 	}
 	
 		private void destroy_impl()
-	//todo: multiWindow: szolni kene a tobbinek, hogy destroyozzon, vagy nemtom...
+	//Todo: multiWindow: szolni kene a tobbinek, hogy destroyozzon, vagy nemtom...
 	{
 		enforce(hwnd, format(`Window "%s" already destroyed.`, name));
 		
@@ -714,7 +714,7 @@ class Window
 		onFinalizeGLWindow;
 		ReleaseDC(hwnd, hdc); fhdc  = null;
 		
-		windowList.remove(hwnd); //TODO: WRONG PLACE!
+		windowList.remove(hwnd); //Todo: WRONG PLACE!
 		DestroyWindow(hwnd);  fhwnd = null;
 		
 		if(isMain) {
@@ -729,7 +729,7 @@ class Window
 		~this()
 	{
 		destroy_impl;
-		//todo: multiwindownal a destructort osszerakni, mert most az le van xarva...
+		//Todo: multiwindownal a destructort osszerakni, mert most az le van xarva...
 		//auto className = getClassName;
 		//DestroyWindow(hwnd);
 		//UnregisterClassW(className.toPWChar, GetModuleHandle(NULL));
@@ -776,9 +776,11 @@ class Window
 	
 		protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam)
 	{
+		auto _ = PROBE("WndProc");
+		
 		if(0) LOG(message.winMsgToString, wParam, lParam);
 		
-		//todo: rendesen megcsinalni a game loopot.
+		//Todo: rendesen megcsinalni a game loopot.
 		/+
 			https://www.google.com/search?q=win32+game+loop&rlz=1C1CHBF_enHU813HU813
 					&oq=win32+game+loop&aqs=chrome..69i57.3265j0j4&sourceid=chrome&ie=UTF-8
@@ -803,7 +805,7 @@ class Window
 				}
 				else
 				{
-					//todo: window resize eseten nincs update, csak paint. Emiatt az UI szarul frissul.
+					//Todo: window resize eseten nincs update, csak paint. Emiatt az UI szarul frissul.
 					//if(!wasUpdateAfterPaint) internalUpdate;  // <--- Ez meg mouse input bugokat okoz.
 					
 					if(updatesSinceLastDraw==0) internalUpdate;
@@ -947,7 +949,7 @@ class Window
 			hwnd, null, 0, 0, adjustedSize.x, adjustedSize.y,
 			SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW
 		);
-		//todo: if this is called always, disable the resizeableness of the window automatically
+		//Todo: if this is called always, disable the resizeableness of the window automatically
 	}
 	
 		@property auto clientPos()
@@ -1054,7 +1056,7 @@ class Window
 	
 		float targetUpdateRate=70; //must be slightly higher than target display freq.
 															 //Or much higher if it is a physical simulation.
-															 //todo: ezt is meg kell csinalni jobban.
+															 //Todo: ezt is meg kell csinalni jobban.
 	
 		private Time time0=0*second, timeAct=0*second, timeLast=0*second; //internal vars for timing
 		private int FPSCnt, UPSCnt; //internal counters for statistics
@@ -1071,6 +1073,8 @@ class Window
 	
 		private void updateWithActionManager()
 	{
+		auto _ = PROBE("updateWAM");
+		
 		//const A = QPS;
 		//scope(exit) print((QPS-A)*1000);
 				//this calls the update on every window. But right now it is only for one window.
@@ -1139,7 +1143,7 @@ class Window
 		}
 		
 		//handle debug.kill
-		if(dbg.forceExit_check) { dbg.forceExit_clear; this.destroy; } //todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
+		if(dbg.forceExit_check) { dbg.forceExit_clear; this.destroy; } //Todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
 		
 		const timeTarget = (1.0f/targetUpdateRate)*second;
 		
@@ -1178,7 +1182,7 @@ class Window
 				application.tickTime	= tickNow - deltaTime*(updateCnt-i);
 				application.deltaTime	= deltaTime;
 				
-				inputs.update; //note: it's main window only
+				inputs.update; //Note: it's main window only
 				
 				updateWithActionManager; //update Main
 				foreach(w; windowList)

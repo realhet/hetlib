@@ -25,7 +25,7 @@ __gshared
 
 	MegaTexMinSize = 1<< 9, //can set by the application before any textures being used
 	MegaTexMaxSize = 1<<13;
-//todo: ensure the safety of this with a setter.
+//Todo: ensure the safety of this with a setter.
 
 bool canUnloadTexture(File f, int age)
 {
@@ -62,7 +62,7 @@ SubTexIdxCnt	= 1<<SubTexIdxBits;
 
 //MegaTexIdxBits = 4,                 //in the shader, it is max 8. -> samplerArray[8]
 enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits
-//todo: !!!!!!!! must be set when app starts
+//Todo: !!!!!!!! must be set when app starts
 
 
 //SubTexInfo struct ////////////////////////
@@ -191,7 +191,7 @@ class MegaTexture
 			texSize.x, texSize.y, GLTextureType.RGBA8, 
 			false/*no mipmap*/
 		);
-		//todo: MegaTexture.mipmap
+		//Todo: MegaTexture.mipmap
 		
 		glTexture.bind;
 	}
@@ -211,7 +211,7 @@ class MegaTexture
 				 rect = bin.add(cellSize.x, cellSize.y, data);
 		
 		if(rect is null) {
-			//todo: MegaTexture.repack()
+			//Todo: MegaTexture.repack()
 			return false; //unable to allocate because out of space.
 		}
 		
@@ -219,7 +219,7 @@ class MegaTexture
 		
 		auto pos = ivec2(rect.x, rect.y)<<SubTexCellBits;
 		info = SubTexInfo(pos, size, texIdx, cast(SubTexChannelConfig)((channels-1)*4));
-		//todo: MegaTexture.channels = 1, 2, 3, not just 4
+		//Todo: MegaTexture.channels = 1, 2, 3, not just 4
 		
 		return true;
 	}
@@ -287,7 +287,7 @@ class InfoTexture
 	
 		void upload(int idx)
 	{
-		 //opt: ezt megcsinalni kotegelt feldolgozasura
+		 //Opt: ezt megcsinalni kotegelt feldolgozasura
 		glTexture.fastBind;
 		glTexture.upload(infoArray[idx..idx+1], idx % InfoPerLine * TexelsPerInfo, idx / InfoPerLine, 2, 1);
 	}
@@ -303,7 +303,7 @@ class InfoTexture
 	
 		void checkValidIdx(int idx) const
 	{
-		 //todo: refactor to isValidIdx
+		 //Todo: refactor to isValidIdx
 		enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx));
 		//ez nem kell, mert a delayed loader null-t allokal eloszor. 
 		//enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
@@ -333,7 +333,7 @@ class InfoTexture
 	{ glTexture.free; }
 	
 		//peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
-		//note: this technique is too dangerous. Must add the info, but not upload.
+		//Note: this technique is too dangerous. Must add the info, but not upload.
 		/*
 		int peekNextIdx() const{
 				if(!freeIndices.empty){//reuse a free slot
@@ -385,7 +385,7 @@ class InfoTexture
 		freeIndices ~= idx;
 		
 		upload(idx); //upload the null for safety
-		//todo: feltetelesen fordithatova tenni ezeket a felszabaditas utani zero filleket
+		//Todo: feltetelesen fordithatova tenni ezeket a felszabaditas utani zero filleket
 	}
 	
 		//gets a subTexInfo by idx
@@ -423,7 +423,7 @@ class InfoTexture
 	{ return glTexture ? glTexture.sizeBytes : 0; }
 }
 
-//todo: make the texture class
+//Todo: make the texture class
 class Texture
 {
 	 //Texture class /////////////////////////////////
@@ -495,7 +495,7 @@ class TextureManager
 	
 		int[File] byFileName; //texIdx of File
 	
-		bool mustRehash; //todo: this is useless i think
+		bool mustRehash; //Todo: this is useless i think
 	
 		bool[int] pendingIndices; //files being loaded by a worker thread
 		bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
@@ -551,6 +551,8 @@ class TextureManager
 	
 		void garbageCollect()
 	{
+		auto _ = PROBE("Textures.GC");
+		
 		 //garbageCollect() /////////////////////////////////////////
 		int mtIdx = garbageCycle % cast(int)megaTextures.length;
 		chkMtIdx(mtIdx);
@@ -573,14 +575,14 @@ class TextureManager
 		
 		//LOG("MegaTexture.GC   mtIdx:", mtIdx, "  removing:", infosToUnload.length, "  keeping:", infosToSave.length, "   total:", collectSubTexInfo2.count);
 		
-		//note: Tere is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
+		//Note: Tere is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
 		//raise("notImpl " ~ info.text);
 		
 		foreach(info; allInfos) { invalidate(info.file); }
 		
 		megaTextures[mtIdx].reinitialize;
 		
-		//todo: Ugly lag and one frame of garbage when the DefaultFont_subTexIdxMap is cleared.
+		//Todo: Ugly lag and one frame of garbage when the DefaultFont_subTexIdxMap is cleared.
 		//Not nice. But seems safe. It takes a lot of time, to draw the fonts again and it is impossible to read them back from the reinitialized texture.
 		//solution -> dedicated megatexture to the defaultfont
 		DefaultFont_subTexIdxMap.clear; //UI uses this cache, and now it is invalid because of the GC
@@ -602,7 +604,7 @@ class TextureManager
 		if(megaTextures.length>=MegaTexMaxCnt)
 		{
 			if(0) {
-				raise("Out of megatextures"); //todo: make a texture garbage collect cycle here
+				raise("Out of megatextures"); //Todo: make a texture garbage collect cycle here
 			}
 			else {
 				foreach(i; 0..MegaTexMaxCnt)
@@ -635,8 +637,8 @@ class TextureManager
 		if(!dontUploadData) {
 			mt.glTexture.fastBind;
 			
-			//todo: this is wasting ram and not work with custom non 4ch bitmaps
-			//note: temporary solution: there is a nondestructive converter inside
+			//Todo: this is wasting ram and not work with custom non 4ch bitmaps
+			//Note: temporary solution: there is a nondestructive converter inside
 			//bmp.channels = 4;
 			mt.glTexture.upload(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y);
 		}
@@ -712,9 +714,10 @@ class TextureManager
 	
 		bool update()
 	{
+		auto _ = PROBE("Textures.Update");
 		bool inv;
 		
-		//todo: is this rehash useful at all?
+		//Todo: is this rehash useful at all?
 		//if(mustRehash) byFileName.rehash;
 		
 		auto t0 = QPS;
@@ -744,12 +747,12 @@ class TextureManager
 				
 				uploadSubTex(idx, bmp, true);
 				//this is here to finalize the allocation of the texture before the invalidation
-				//opt: disable the upload of this texture data
+				//Opt: disable the upload of this texture data
 				
 				invalidateAgain.remove(idx);
 				foreach(f, i; byFileName)
 				if(i == idx) {
-					 //opt: slow linear search
+					 //Opt: slow linear search
 					//WARN("Reinvalidating", f, idx);
 					invalidate(f);
 					break;
@@ -797,18 +800,18 @@ class TextureManager
 	
 		int access_old(in File fileName, Flag!"delayed" fDelayed = Yes.delayed)
 	{
-		 //todo: bugos a delayed leader
+		 //Todo: bugos a delayed leader
 		bool delayed = fDelayed;
 		
 		delayed &= EnableMultiThreadedTextureLoading;
 		
-		//todo: nonexisting file and/or exception is not handling well here.
+		//Todo: nonexisting file and/or exception is not handling well here.
 		
 		if(!(fileName in byFileName))
 		{
 			
 			if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false;
-			//todo: delayed restriction. should refactor this nicely
+			//Todo: delayed restriction. should refactor this nicely
 			
 			//delayed = false;
 			if(delayed)
@@ -847,9 +850,9 @@ class TextureManager
 					}
 					catch(Exception e)
 					{
-						//todo: Nem jo!!! Nem thread safe !!!	WARN("Bitmap decode error. Using errorBitmap", fileName);
+						//Todo: Nem jo!!! Nem thread safe !!!	WARN("Bitmap decode error. Using errorBitmap", fileName);
 						//Ez nem thread safe!!!! multithreaded	modban vegtelen loopba tud kerulni.
-						//todo: ezt megoldani a placeholder bitmappal rendesen
+						//Todo: ezt megoldani a placeholder bitmappal rendesen
 						bmp = newErrorBitmap(e.simpleMsg);
 					}
 					
@@ -869,7 +872,7 @@ class TextureManager
 				}
 				
 				if(1) {
-					//todo: upgrade this to be able to prioritize loading order in realtime.
+					//Todo: upgrade this to be able to prioritize loading order in realtime.
 					import std.concurrency;
 					
 					//LOG("LOADING bmp", fileName);
@@ -905,7 +908,7 @@ class TextureManager
 				}
 				catch(Exception e) {
 					WARN("Bitmap decode error. Using errorBitmap", fileName);
-					//todo: ezt megoldani a placeholder bitmappal rendesen
+					//Todo: ezt megoldani a placeholder bitmappal rendesen
 					bmp = newErrorBitmap(e.simpleMsg);
 				}
 				
@@ -1044,7 +1047,7 @@ class TextureManager
 	
 		auto collectSubTexInfo2()
 	{
-		//todo: this should be the main list.
+		//Todo: this should be the main list.
 		//although it's fast: For 2GB textures, it's only 0.2ms to collect. (Standard test images)
 		
 		//LOG("attempting to get subtexInfo2");
@@ -1090,7 +1093,7 @@ class TextureManager
 			{
 				dr.color = clWhite;
 				dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray);
-				//todo: drawRect support for ibounds2
+				//Todo: drawRect support for ibounds2
 				
 				if(!si.canUnload) {
 					dr.lineWidth=-3; dr.color = clYellow;
@@ -1116,14 +1119,14 @@ class TextureManager
 		
 		bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
 		auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  
-		//opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
-		auto modified = bmp.modified.toId_deprecated; //todo: deprecate toId and use the DateTime itself
+		//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
+		auto modified = bmp.modified.toId_deprecated; //Todo: deprecate toId and use the DateTime itself
 		
 		if(log) LOG(bmp);
 		if(auto existing = file in byFileName)
 		{
 			
-			//todo: ennel az egyenlosegjelnel 2 bug van:
+			//Todo: ennel az egyenlosegjelnel 2 bug van:
 			//1: ha ==, akkor a thumbnailnak 0 a datetime-je
 			/+
 				2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a 
@@ -1148,4 +1151,3 @@ class TextureManager
 		return idx;
 	}
 }
-

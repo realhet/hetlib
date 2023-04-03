@@ -224,6 +224,7 @@ version(/+$DIDE_REGION+/all)
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
+		auto _ = PROBE("bitmapQuery");
 		synchronized
 		{
 			
@@ -511,6 +512,7 @@ version(/+$DIDE_REGION+/all)
 					
 					if(sizeBytes > BitmapCacheMaxSizeBytes)
 					{
+						auto _2 = PROBE("bitmapQuery.GC");
 						
 						//ascending by access time
 						list = list.sort!((a, b)=>a.accessed_tick<b.accessed_tick).array;

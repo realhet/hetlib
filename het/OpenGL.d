@@ -7,8 +7,8 @@ __gshared { bool logVBO = 0; }
 enum UseOldTexImage2D = false; //otherwise use TexStorage2D instead!
 enum LOG_shaderLoadingTimes = false;
 
-//todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
-//todo: nincs doUpdate formresize kozben
+//Todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
+//Todo: nincs doUpdate formresize kozben
 
 public import het.utils, het.win, het.geometry, het.view, het.bitmap, het.draw2d;
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits;
@@ -27,7 +27,7 @@ version(/+$DIDE_REGION OpenGL enums+/all)
 		enum /+Errorcode+/
 		{
 			/+
-				todo: DIDE if the enum has no name, 
+				Todo: DIDE if the enum has no name, 
 							show it's comment instead. (From far zoom)
 			+/
 			
@@ -989,7 +989,7 @@ version(/+$DIDE_REGION OpenGL enums+/all)
 	
 	void glChk(string file = __FILE__, int line = __LINE__)
 	{
-		  //todo: utils. customEnforce() template
+		  //Todo: utils. customEnforce() template
 		int err = glGetError();
 		if(err) throw new Exception("GLError: "~glErrorStr(err), file, line);
 	}
@@ -1458,11 +1458,11 @@ version(/+$DIDE_REGION+/all)
 	{
 		private
 		{
-			mixin CustomEnforce!"GLShader error"; //todo: customEnforce
+			mixin CustomEnforce!"GLShader error"; //Todo: customEnforce
 			
 			void error(string s)
 			{ throw new Exception(`Shader("`~name~`"): `~s); }
-			//todo: ennek fatal errornak kene lenni, kiveve ha egy shadertoyszeruseget csinalok...
+			//Todo: ennek fatal errornak kene lenni, kiveve ha egy shadertoyszeruseget csinalok...
 			
 			GLShaderHandle vertexShader, geometryShader, fragmentShader;
 			GLProgramHandle programObject;
@@ -1495,7 +1495,7 @@ version(/+$DIDE_REGION+/all)
 					fsh = common~ush[pf+mf.length..$];
 				}
 				
-				//TODO: a szetvalasztast ugy csinalja, hogy a sorok erintetlenek maradjanak es akkor a hibat ki tudja jelezni az IDE
+				//Todo: a szetvalasztast ugy csinalja, hogy a sorok erintetlenek maradjanak es akkor a hibat ki tudja jelezni az IDE
 			}
 			
 			string precompile(string src, string[] options)
@@ -1601,8 +1601,8 @@ version(/+$DIDE_REGION+/all)
 		void use()
 		{ gl.useProgram(programObject.handle); }
 		
-		//TODO: az use-ket csak akkor hivni, ha kell
-		//TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
+		//Todo: az use-ket csak akkor hivni, ha kell
+		//Todo: a getUniformLocation-bol kompilalas kozben listat felepiteni!
 		void uniform(T)(string name, T val, bool mustSucceed=true, string file=__FILE__, int line=__LINE__)
 		{
 			use;
@@ -1625,7 +1625,7 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 		
-		//TODO: a getUniformLocation-bol kompilalas kozben listat felepiteni!
+		//Todo: a getUniformLocation-bol kompilalas kozben listat felepiteni!
 		void uniform(T)(in T val, bool mustSucceed=true)
 		{
 			foreach(name; FieldNamesWithUDA!(T, UNIFORM, true))
@@ -1647,7 +1647,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			use; vbo.bind;
 			gl.vertexAttribPointer(loc, size, type, normalize, vbo.stride, cast(void*)offset);
-			gl.enableVertexAttribArray(loc); //TODO: disable it afterwards
+			gl.enableVertexAttribArray(loc); //Todo: disable it afterwards
 		}
 		
 		void attrib(VBO vbo, string name, int type, int size, bool normalize = false, int offset = 0)
@@ -1657,7 +1657,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			use; vbo.bind;
 			gl.vertexAttribIPointer(loc, size, type, vbo.stride, cast(void*)offset);
-			gl.enableVertexAttribArray(loc); //TODO: disable it afterwards
+			gl.enableVertexAttribArray(loc); //Todo: disable it afterwards
 		}
 		
 		void attribI(VBO vbo, string name, int type, int size, int offset = 0)
@@ -1673,7 +1673,7 @@ version(/+$DIDE_REGION+/all)
 			
 			if(dst.count!=1) error("attrib("~name~") array attribs not supported yet.");
 			
-			//todo: working with typenames is compiler-implementation dependent.
+			//Todo: working with typenames is compiler-implementation dependent.
 			if(srcType.among("Vector!(float, 2)", "float[2]")&& (dst.type==GL_FLOAT_VEC2 ))	attrib (vbo, dst.loc, GL_FLOAT		,	2, false,	offset);
 			else if(srcType.among("Vector!(float, 3)", "float[3]") && (dst.type==GL_FLOAT_VEC3))	attrib (vbo, dst.loc, GL_FLOAT		, 3,	false,	offset);
 			else if(srcType.among("Vector!(float, 4)", "float[4]") && (dst.type==GL_FLOAT_VEC4))	attrib (vbo, dst.loc, GL_FLOAT		, 4,	false,	offset);
@@ -1683,7 +1683,7 @@ version(/+$DIDE_REGION+/all)
 			else if(srcType.among("int")	&& (dst.type==GL_INT	 ))	attribI(vbo, dst.loc, GL_INT, 1, offset);
 			else if(srcType.among("uint") && (dst.type==GL_UNSIGNED_INT))	attribI(vbo, dst.loc, GL_UNSIGNED_INT, 1,	offset);
 			else	error("attrib("~name~") unable to convert "~srcType~"->"~text(dst.type));
-			//todo: use 'switch' instead of 'if'
+			//Todo: use 'switch' instead of 'if'
 			
 			return true;
 		}
@@ -1732,7 +1732,7 @@ version(/+$DIDE_REGION+/all)
 		private:
 			alias Handle = GLBufferHandle;
 		
-			Handle buffer; //TODO: readonly property
+			Handle buffer; //Todo: readonly property
 			int stride, count;
 		
 			struct Field
@@ -1789,7 +1789,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			//if(logVBO) LOG("bind");
 			gl.bindBuffer(GL_ARRAY_BUFFER, handle);
-			//TODO: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
+			//Todo: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
 		}
 		
 			void draw(int primitive, int start = 0, int end = int.max)
@@ -1939,7 +1939,7 @@ version(/+$DIDE_REGION+/all)
 		override void onInitialZoomAll()
 	{
 		//called right after onCreate
-		//todo: tryInitialZoom should work with the registry also
+		//Todo: tryInitialZoom should work with the registry also
 		if(!view.workArea.empty) {
 			 //workarea already set
 			view.zoomAll_immediate;
@@ -1978,8 +1978,8 @@ version(/+$DIDE_REGION+/all)
 			view.invTrans(vec2(mouse.screenRect.bottomRight))
 		);
 		
-		//todo: bad names: worldRect is "screenBounds in world coords"
-		//todo: bad names: screenRect is "screenBounds in client coords"
+		//Todo: bad names: worldRect is "screenBounds in world coords"
+		//Todo: bad names: screenRect is "screenBounds in client coords"
 	}
 	
 		void updateViewClipBoundsAndMousePos()
@@ -2043,7 +2043,7 @@ version(/+$DIDE_REGION+/all)
 		
 		{
 			/+
-				todo: this is a fix: if the clientSize changes between update() and draw() this will update it.
+				Todo: this is a fix: if the clientSize changes between update() and draw() this will update it.
 							Must rethink the update() draw() thing completely.
 			+/
 			updateViewClipBoundsAndMousePos;
@@ -2073,7 +2073,7 @@ version(/+$DIDE_REGION+/all)
 		
 		if(!view.workArea_accum.empty) view.workArea = view.workArea_accum;
 		
-		//todo: here should be an on OverlayPaint wich is paints on top of the UI
+		//Todo: here should be an on OverlayPaint wich is paints on top of the UI
 		
 		if(showFPS) drawFPS();
 		
@@ -2097,16 +2097,30 @@ version(/+$DIDE_REGION+/all)
 	
 		override void onSwapBuffers()
 	{
-		//must not call super!
-		gl.swapInterval(VSynch);
-		SwapBuffers(hdc);
-		
-		textures.update; //upload pending textures.
-		
-		updateGLHandles;
-		
-		onWglMakeCurrent(false);
-		super.onEndPaint;
+		static if(0){
+			auto probe = PROBE("GC.collect");
+			import core.memory;
+			GC.collect;
+			/+
+				Note: This is bad, because it also breaks the camera threads 
+				which are not in synch with the main dosplay frame rate.
+			+/
+		}
+		{
+			auto probe = PROBE("SwapBuffers");
+			//must not call super!
+			gl.swapInterval(VSynch);
+			SwapBuffers(hdc);
+		}
+		{
+			auto probe = PROBE("TexUpdate");
+			textures.update; //upload pending textures.
+			
+			updateGLHandles;
+			
+			onWglMakeCurrent(false);
+			super.onEndPaint;
+		}
 	}
 	
 		void drawFPS(Drawing dr)
@@ -2194,7 +2208,7 @@ version(/+$DIDE_REGION+/all)
 	enum GLTextureFilter
 	{ Nearest, Linear, Mipmapped }
 	
-	//todo: this shit must be rethinked
+	//Todo: this shit must be rethinked
 	enum GLTextureType
 	{ Unknown, RGBA8, RGBA16, L8 }
 	
@@ -2281,14 +2295,14 @@ version(/+$DIDE_REGION+/all)
 			
 			void setup(bool isC, GLTextureType t, int w, int h, bool me)
 			{
-				isCustom = isC;  //todo: every gltexture is custom because megaTexturing
+				isCustom = isC;  //Todo: every gltexture is custom because megaTexturing
 				type_ = t; width_ = w; height_ = h;
 				mipmapEnabled = me;
 			}
 			
 			void enforce(bool c, lazy string msg, string file=__FILE__, int line=__LINE__)
 			{
-				 //todo: enforce with template params
+				 //Todo: enforce with template params
 				.enforce(c, "GLTexture["~name~"] "~msg, file, line);
 			}
 			
@@ -2364,14 +2378,14 @@ version(/+$DIDE_REGION+/all)
 		
 		bool isCompatibleWith(in Bitmap bmp)const
 		{
-			//note: it is not used. Because everything is placed on a 4chn texture
+			//Note: it is not used. Because everything is placed on a 4chn texture
 			return		bmp.channels==4 && type==GLTextureType.RGBA8
 				||	bmp.channels==1 && type==GLTextureType.L8;
 		}
 		
 		bool isCompatibleType(T)()
 		{
-			 //todo: more texture type support
+			 //Todo: more texture type support
 			static if(is(T==ubyte)) return type==GLTextureType.L8;
 			else static if(is(T==RGBA )) return type==GLTextureType.RGBA8;
 			else static assert(0, "unhandled textureType");
@@ -2380,11 +2394,11 @@ version(/+$DIDE_REGION+/all)
 		void enforceType(T)()
 		{ enforce(isCompatibleType!T, "incompatible texture type "~T.stringof~" and "~type.text); }
 		
-		//todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
+		//Todo: ha nincs binding, akkor az access violation megsemmisul, a program meg crashol.
 		
 		void upload(in void[] data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0, bool bug=false)
 		{
-			//todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+			//Todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 			if(!prepareInputRect(x, y, xs, ys)) return;
 			
 			//check required buffer size
@@ -2401,12 +2415,12 @@ version(/+$DIDE_REGION+/all)
 			
 			global_TPSCnt += resSize;
 			
-			mipmapBuilt = false; //todo: rebuild mipmap
+			mipmapBuilt = false; //Todo: rebuild mipmap
 		}
 		
 		void fill(T)(const T data, int x=0, int y=0, int xs=int.min, int ys=int.min, int stride=0)
 		{
-			//todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+			//Todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 			enforceType!T;
 			if(!prepareInputRect(x, y, xs, ys)) return;
 			int bytes = (stride ? stride : xs)*ys*texelSize;
@@ -2420,7 +2434,7 @@ version(/+$DIDE_REGION+/all)
 		//upload a subrect from an image2D
 		void upload(T)(Image!(T, 2) img, int x=0, int y=0, int sx=int.min, int sy=int.min, bool bug=false)
 		{
-			//todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+			//Todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 			if(!isCompatibleType!T)
 			{
 				 //incompatible format?
@@ -2439,7 +2453,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min)
 		{
-			//opt: bmp.GetForUpload should need a performance monitoring
+			//Opt: bmp.GetForUpload should need a performance monitoring
 			switch(type)
 			{
 				case GLTextureType.L8: upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
@@ -2453,7 +2467,7 @@ version(/+$DIDE_REGION+/all)
 				catch(Exception e)
 				{
 					//WARN(e.simpleMsg);
-					//opt: This warning displays an unoptimal conversion through every project. Optimize it!
+					//Opt: This warning displays an unoptimal conversion through every project. Optimize it!
 				}
 					//LOG(DT);
 				break;
@@ -2464,7 +2478,7 @@ version(/+$DIDE_REGION+/all)
 		//specual uploads for textures holding sequential data. Consider using 1D textures in the future?
 		void uploadRows(const(void)[] data, int startRow, int numRows)
 		{
-			//todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
+			//Todo: must bind first! Ez maceras igy, kell valami automatizalas erre.
 			upload(data, 0, startRow, width, numRows);
 		}
 		
@@ -2519,7 +2533,7 @@ version(/+$DIDE_REGION+/all)
 			gl.pixelStore(GL_UNPACK_ROW_LENGTH, 0);
 			gl.getTexImage(GL_TEXTURE_2D, 0, GL_FORMAT(type), GL_DATATYPE(type), img.asArray);
 			
-			//note: there is no such thing as glGetTexSubimage2D(), sigh...
+			//Note: there is no such thing as glGetTexSubimage2D(), sigh...
 			if(ivec2(xs, ys) != size)
 			img = img[x..x+xs, y..y+ys]; //subrect emulation. Fucking ineffective, had to load the whole tedture....
 			
@@ -2537,7 +2551,7 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		int mipmapLevels() const
-		{ return mipmapEnabled ? 1 : 1; } //todo: mipmaps
+		{ return mipmapEnabled ? 1 : 1; } //Todo: mipmaps
 		
 		void resize(in ivec2 size, bool preserve=true)
 		{ resize(size.x, size.y, preserve); }
@@ -2738,13 +2752,13 @@ version(/+$DIDE_REGION+/all)
 				
 				switch(tessActPrimitive)
 				{
-					//todo: egybeagyazott switch()-ek. Ezeket lehetne grafikusan optolni...
+					//Todo: egybeagyazott switch()-ek. Ezeket lehetne grafikusan optolni...
 					case GL_TRIANGLE_FAN:
 						{
 						switch(tessIdx)
 						{
 							case 0:	tessLast0 = v.idx;	break;
-								//todo: case 0, case 1 mindegyiknel kozos, ha mar tesztelve van, akkor ki kell pakolni.
+								//Todo: case 0, case 1 mindegyiknel kozos, ha mar tesztelve van, akkor ki kell pakolni.
 							case 1:	tessLast1 = v.idx;	break;
 							default:	{
 								tessResult. triangles ~= [tessLast0, tessLast1, v.idx];
@@ -2847,7 +2861,7 @@ version(/+$DIDE_REGION+/all)
 			gluTessBeginPolygon(tess, null);
 			foreach(const contour; contours)
 			{
-				gluTessBeginContour(tess); //note: gluTessNextContour is for more control
+				gluTessBeginContour(tess); //Note: gluTessNextContour is for more control
 				foreach(const vIn; contour)
 				{
 					dv[0] = vIn.x; dv[1] = vIn.y;
@@ -2867,7 +2881,7 @@ version(/+$DIDE_REGION+/all)
 				int n = 0;
 				foreach(const contour; contours)
 				{
-					gluTessBeginContour(tess); //note: gluTessNextContour is for more control
+					gluTessBeginContour(tess); //Note: gluTessNextContour is for more control
 					foreach(const vIn; contour)
 					{
 						dv[0] = vIn.x; dv[1] = vIn.y;
