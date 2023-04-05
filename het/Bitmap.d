@@ -1626,7 +1626,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void copyFrom(Bitmap b)
 		{
-			enforce(b && b.valid);
+			enforce(b);
 			setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_);
 			error = b.error;
 			markChanged;
