@@ -1405,25 +1405,6 @@ version(/+$DIDE_REGION+/all)
 				&& accessed_tick+recentlyUsedTicks <= application.tick;
 		}
 		
-		auto dup()
-		{
-			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
-			{
-				{
-					alias CT = ScalarType   !T,
-								len = VectorLength!T;
-					if(CT.stringof == type && len==channels) {
-						auto b = new Bitmap(access!T);
-						b.file = file;
-						b.modified = modified;
-						b.error = error;
-						return b;
-					}
-				}
-			}
-			raise("unsupported bitmap format"); assert(0);
-		}
-		
 		bool valid()
 		{ return !empty && !loading && error==""; }
 		//Todo: this is not the best because first must check for (this !is null) from the outside
@@ -1624,12 +1605,22 @@ version(/+$DIDE_REGION+/all)
 			);
 		}
 		
-		void copyFrom(Bitmap b)
+		void assign(Bitmap b)
 		{
 			enforce(b);
 			setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_);
 			error = b.error;
 			markChanged;
+		}
+		
+		Bitmap dup()
+		{
+			auto b = new Bitmap;
+			b.file = file;
+			b.modified = modified;
+			b.error = error;
+			b.setRaw(data_.dup, width, height, channels, type);
+			return b;
 		}
 		
 		void saveTo(F)(in F file)
