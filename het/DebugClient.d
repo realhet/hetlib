@@ -91,7 +91,7 @@ void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCT
 T HIST(size_t N, size_t M=0x10000, string name="", T)(T value)
 {
 	static assert(M.isPowerOf2);
-	//todo: this should be a measurement tool in DIDE
+	//Todo: this should be a measurement tool in DIDE
 	static size_t[N] bucketCnt;
 	static size_t totalCnt;
 	
@@ -122,7 +122,7 @@ void PING4()
 { PING(6); }void PING7()
 { PING(7); }
 
-//todo: (forceExit) a thread which kills the process. for example when readln is active.
+//Todo: (forceExit) a thread which kills the process. for example when readln is active.
 
 /*
 	void log(string s, string f = __FUNCTION__){
@@ -147,32 +147,31 @@ string _DATALOGMIXIN(string p)
 string _DATABRKMIXIN(string p)
 { return `_DATALOGMIXINFUNCT(`~p~`, q{`~p~`})`; }
 
-
+
 //DebugLogClient ////////////////////////////////////////////////////////////////////////////////////
 
 alias dbg = Singleton!DebugLogClient;
 
-//todo: ha relativ a hibauzenetben a filename, akkor egeszitse ki! hdmd!
+//Todo: ha relativ a hibauzenetben a filename, akkor egeszitse ki! hdmd!
 
 class DebugLogClient
 {
-	//todo: rewrite it with utils.sharedMemClient
-	public:
-		enum potiCount = 8;
-	private:
-		enum cBufSize = 1<<16; //the same as in DIDE.exe
+	//Todo: rewrite it with utils.sharedMemClient
 	
-		struct BreakRec
+	private:
+	enum cBufSize = 1<<16; //the same as in DIDE.exe
+	
+	static struct BreakRec
 	{ uint locationHash, state; }
 	
-		struct BreakTable
+	static struct BreakTable
 	{
 		BreakRec[64] records;
 		
 		void waitFor(uint locationHash);
 	}
 	
-		struct Data
+	static struct Data
 	{
 		 //raw shared data. Careful with 64/32bit stuff!!!!!!
 		uint ping;
@@ -189,11 +188,11 @@ class DebugLogClient
 		int exe_hwnd;
 	}
 	
-		static immutable dataFileName = `Global\DIDE_DebugFileMappingObject`;
-		HANDLE dataFile;
-		Data* data;
+	static immutable dataFileName = `Global\DIDE_DebugFileMappingObject`;
+	HANDLE dataFile;
+	Data* data;
 	
-		void tryOpen()
+	void tryOpen()
 	{
 		
 		dataFile = OpenFileMappingW(
@@ -211,9 +210,11 @@ class DebugLogClient
 		);
 		//ensure(data, "DebugLogClient: Can't open mapFile.");
 	}
-	
+	
 	public:
-		this()
+	
+	enum potiCount = 8;
+	this()
 	{
 		version(noDebugClient)
 		{ return; }else
@@ -223,14 +224,14 @@ class DebugLogClient
 		}
 	}
 	
-		void ping(int index = 0)
+	void ping(int index = 0)
 	{
 		if(!data)
 		return;
 		data.ping |= 1<<index;
 	}
 	
-		void sendLog(string s)
+	void sendLog(string s)
 	{
 		if(!data)
 		return;
@@ -240,9 +241,9 @@ class DebugLogClient
 		memcpy(&packet[4], s.ptr, s.length);
 		while(!data.buf.store(packet))
 		sleep(1);
-	}
+	}
 	
-		string getLog()
+	string getLog()
 	{
 		 //not needed on exe side. It's needed on dide side. Only for testing.
 		if(!data)
@@ -258,34 +259,34 @@ class DebugLogClient
 		return cast(string)buf;
 	}
 	
-		float getPotiValue(size_t idx)
+	float getPotiValue(size_t idx)
 	{
 		if(data && idx>=0 && idx<data.poti.length)
 		return data.poti[idx];
 		else return 0;
 	}
 	
-		bool isActive()
+	bool isActive()
 	{ return data !is null; }
 	
-		bool forceExit_set()
+	bool forceExit_set()
 	{
 		if(!data)
 		return false; data.forceExit = 1; return true;
 	}
-		void forceExit_clear()
+	void forceExit_clear()
 	{
 		if(data)
 		data.forceExit = 0;
 	}
-		bool forceExit_check()
+	bool forceExit_check()
 	{
 		if(data)
 		return data.forceExit!=0;else
 		return false;
 	}
 	
-		void handleException(string msg)
+	void handleException(string msg)
 	{
 		if(!data)
 		return;
@@ -313,7 +314,7 @@ class DebugLogClient
 		data.dide_ack = 0;
 	}
 	
-		void setExeHwnd(void* hwnd)
+	void setExeHwnd(void* hwnd)
 	{
 		if(data)
 		data.exe_hwnd = cast(int)hwnd;
@@ -324,7 +325,7 @@ class DebugLogClient
 
 //DebugLogServer ////////////////////////////////////////////////
 
-//todo: Set a unique name to the dbgserver's Shared Memory, and pass it to the launched program.
+//Todo: Set a unique name to the dbgserver's Shared Memory, and pass it to the launched program.
 
 alias dbgsrv = Singleton!DebugLogServer;
 
@@ -425,8 +426,8 @@ class DebugLogServer
 		uint siz;
 		if(!get(cast(ubyte*)(&siz), 4))
 		return [];
-		//todo: sanity check for siz
-		auto res = new ubyte[siz]; //opt: uninitialized
+		//Todo: sanity check for siz
+		auto res = new ubyte[siz]; //Opt: uninitialized
 		auto t0 = now;
 		while(!get(res.ptr, siz))
 		{
@@ -495,7 +496,7 @@ class DebugLogServer
 		return false;
 		updatePingLeds;
 		updateLog;
-		return true; //todo: only when chg...
+		return true; //Todo: only when chg...
 	}
 	
 	string pingLedStateText()
