@@ -1731,7 +1731,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		}
 		
-		auto functionSwitch(alias fun, E)(E e) {
+		auto functionSwitch(alias fun, E)(E e)
+		/+todo: bad naming.+/
+		/+todo: DIDE jopinpreposition bug above+/
+		 {
 			final switch(e)
 			static foreach(a; EnumMembers!E)
 			case a: return a.unaryFun!fun;
@@ -6171,9 +6174,9 @@ version(/+$DIDE_REGION Containers+/all)
 				auto limit = srcEnd - 4;
 				auto v = [
 					seed + Prime32_1 + Prime32_2,
-														seed + Prime32_2,
-														seed,
-														seed - Prime32_1
+					seed + Prime32_2,
+					seed,
+					seed - Prime32_1
 				];
 				
 				xxh_rounds(srcPtr, limit, v.ptr);
