@@ -1732,9 +1732,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		auto functionSwitch(alias fun, E)(E e)
-		/+todo: bad naming.+/
-		/+todo: DIDE jopinpreposition bug above+/
-		 {
+		/+Todo: bad naming.+/
+		/+Todo: DIDE jopinpreposition bug above+/
+		{
 			final switch(e)
 			static foreach(a; EnumMembers!E)
 			case a: return a.unaryFun!fun;
@@ -5694,7 +5694,7 @@ version(/+$DIDE_REGION Containers+/all)
 			//toso: 4.0k -> 4k
 			
 			static if(base==1024) enum divFactor(int n) = (1.0/1024)^^n;
-			else static if(base==1000) enum divFactor(int n) = (0.0001)^^n;
+			else static if(base==1000) enum divFactor(int n) = (1.0/1000)^^n;
 			else static assert(0, "invalid base");
 			
 			string s = n.text;	if(s.length<=4) return s~spacing;
@@ -7207,7 +7207,6 @@ version(/+$DIDE_REGION Date Time+/all)
 		}
 	}version(/+$DIDE_REGION+/all)
 	{
-		
 		private extern(Windows) nothrow @nogc void GetSystemTimePreciseAsFileTime(FILETIME*);
 		
 		DateTime now()
