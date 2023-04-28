@@ -6766,6 +6766,9 @@ version(/+$DIDE_REGION Date Time+/all)
 		enum UTC = TimeZone(0);
 		enum Local = TimeZone(127);
 		
+		enum gregorianDaysInYear 	= 365.2524, 
+		gregorianDaysInMonth 	= gregorianDaysInYear/12;
+		
 		auto RawDateTime(ulong t) { DateTime a; a.raw = t; return a; }
 			
 		struct DateTime
@@ -6774,7 +6777,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				///a 64-bit value representing the number of 100/64 nanosecond(!!!not 100ns!!!) intervals since January 1, 1601 (UTC).
 				ulong raw;      //0 = null
-							
+				
 				void set(in TimeZone tz, in SYSTEMTIME a)
 				{
 					switch(tz.shift) {
@@ -6783,7 +6786,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						default: throw new Exception("Invalid "~tz.text);
 					}
 				}
-							
+				
 				void set(in TimeZone tz, in FILETIME a)
 				{
 					switch(tz.shift) {
@@ -6792,14 +6795,14 @@ version(/+$DIDE_REGION Date Time+/all)
 						default: throw new Exception("Invalid "~tz.text);
 					}
 				}
-							
+				
 				void set(in TimeZone tz, in string s)
 				{ this = parseDateTime(tz, s); }
-							
+				
 				this(T)(in T a)
 				{ this(Local, a); }this(T)(in TimeZone tz, in T a)
 				{ set(tz, a); }
-							
+				
 				this(in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
 				{ this(Local, y, m, d, h, mi, s, ms); }
 				this(in TimeZone tz,	in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
@@ -6807,15 +6810,15 @@ version(/+$DIDE_REGION Date Time+/all)
 					//Todo: adjust carry overflow
 					this(tz, SYSTEMTIME(year2k(y).to!ushort, m.to!ushort, 0, d.to!ushort, h.to!ushort, mi.to!ushort, s.to!ushort, ms.to!ushort));
 				}
-							
+				
 				this(in int y, in int m, in int d)
 				{ this(Local, y, m, d); }this(in TimeZone tz, in int y, in int m, in int d)
 				{ this(tz   , y, m, d, 0); }
-							
+				
 				this(in int y, in int m, in int d, in Time t)
 				{ this(Local, y, m, d, t); }this(in TimeZone tz, in int y, in int m, in int d, in Time t)
 				{ this(tz, y, m, d); this += t; }
-							
+				
 				bool isNull() const
 				{ return raw==0; }
 				bool opCast() const
@@ -6826,7 +6829,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return raw==b.raw; }
 				size_t toHash() const
 				{ return raw; }
-							
+				
 				enum RawShift = 6;
 				enum RawUnit : ulong 
 				{
@@ -6839,49 +6842,49 @@ version(/+$DIDE_REGION Date Time+/all)
 					hour	= 60 * min 	,
 					day	= 24 * hour	,
 					week	= 7 * day	,
-					month	= cast(ulong)(365.2425 * day/12)	, //Gregorian average
-					year	= 12* month	,
+					month	= cast(ulong)(gregorianDaysInMonth * day)	, //Gregorian average
+					year	= cast(ulong)(gregorianDaysInYear * day)	,
 					_913year	= 913 * year	, //max years before overflow.  1601 + 913 = 2516
 				}
-				static assert(RawUnit._913year == 0xffe5c294_8e7f0000); //lock the above calculations
-							
+				static assert(RawUnit._913year == 0xffe78926_3bb40000); //lock the above calculations
+				
 				private enum UnixShift_sec = 11644473600;
 				private enum UnixShift_unit = UnixShift_sec*RawUnit.sec;
-							
+				
 				static private
 				{
 					//Conversions between windows local/utc/filetime/systemtime/raw. Also throw exceptions.
-									
+					
 					double rawToSeconds(in ulong a)
 					{ return a*(1.0/RawUnit.sec); }
 					ulong secondsToRaw(in double a)
 					{ return (a*RawUnit.sec).to!ulong; }
-								
+					
 					auto fileTimeToRaw(in FILETIME ft)
 					{
 						if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow.");
 						return	((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
 							((cast(ulong)ft.dwHighDateTime)<<(RawShift+32));
 					}
-								
+					
 					auto rawToFileTime(in ulong raw)
 					{
 						return FILETIME(
 							cast(uint)(raw>>>(RawShift   )),
-																					cast(uint)(raw>>>(RawShift+32))
+							cast(uint)(raw>>>(RawShift+32))
 						);
 					}
-								
+					
 					import core.sys.windows.windows :
 						FileTimeToSystemTime, SystemTimeToFileTime, 
 						SystemTimeToTzSpecificLocalTime, TzSpecificLocalTimeToSystemTime;
-								
+					
 					//unify 2 parameter form by adding a default null parameter in front
 					int MySystemTimeToTzSpecificLocalTime(in SYSTEMTIME* a, SYSTEMTIME* b)
 					{ return SystemTimeToTzSpecificLocalTime(null, cast(SYSTEMTIME*)a, b); }
 					int MyTzSpecificLocalTimeToSystemTime(in SYSTEMTIME* a, SYSTEMTIME* b)
 					{ return TzSpecificLocalTimeToSystemTime(null, cast(SYSTEMTIME*)a, b); }
-								
+					
 					template tmpl(SRC, alias fun, DST)
 					{
 						auto tmpl()(in SRC src)
@@ -6891,7 +6894,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							return dst;
 						}
 					}
-								
+					
 					alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME);
 					alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME);
 					alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime, SYSTEMTIME);
@@ -7172,7 +7175,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						bench!q{foreach(i; 0..N) cast(void)(now-now);	};
 						bench!q{foreach(i; 0..N) cast(void).today;	};
 						bench!q{foreach(i; 0..N) cast(void).time;	};
-									
+						
 						void dstTest()
 						{
 							void doit(bool summer)
