@@ -1512,7 +1512,7 @@ version(/+$DIDE_REGION+/all)
 		version(/+$DIDE_REGION+/all)
 		{
 			VT low = 0, high = -1; //A bounds is invalid when high<low. And empty when high<=low. The extend operator '|' handles these cases accordingly.
-					
+			
 			alias BoundsType = typeof(this);
 			alias ComponentType = ScalarType!VT;
 			enum VectorLength = CommonVectorLength!VT;
@@ -1520,11 +1520,11 @@ version(/+$DIDE_REGION+/all)
 				? VT.stringof
 				: ComponentTypePrefix!ComponentType ~ "bounds" ~ (VectorLength>1 ? VectorLength.stringof : "");
 			enum Null = Bounds!VT.init;
-					
+			
 			this(A...)(in A a)
 			{
 				alias CT = ComponentType;
-						
+				
 				static if(A.length==0)
 				{
 					//default invalid bounds
@@ -1558,7 +1558,7 @@ version(/+$DIDE_REGION+/all)
 				else
 				{ static assert(0, "invalid arguments"); }
 			}
-					
+			
 			this(R)(R r)
 			if(isInputRange!R)
 			{
@@ -1566,7 +1566,7 @@ version(/+$DIDE_REGION+/all)
 				r.each!(v => bnd |= v);
 				this = bnd;
 			}
-					
+			
 			static if(VectorLength==2)
 			{
 				auto width	() const { return high.x-low.x; 	 }   	auto halfWidth	() const { return cast(ComponentType) width	*0.5f; }
@@ -1593,14 +1593,14 @@ version(/+$DIDE_REGION+/all)
 				auto leftCenter	() const { return VT(left , center.y); 	 }
 				auto rightCenter	() const { return VT(right, center.y); 	 }
 			}
-					
-					
+			
+			
 			auto sorted()
 			{
 				//it ignores validity! Don't use on invalid bounds!
 				return typeof(this)(min(low, high), max(low, high));
 			}
-					
+			
 			string toString() const
 			{
 				static if(VectorLength==1)
@@ -1608,13 +1608,13 @@ version(/+$DIDE_REGION+/all)
 				else
 				return format!"%s(%(%s, %))"(BoundsTypeName, low[]~high[]);
 			}
-					
+			
 			bool valid() const
 			{
 				return all(lessThanEqual(low, high));
 				//a zero size bounds is valid because it contains the first point of expansion
 			}
-					
+			
 			auto opCast(T)() const
 			{
 				static if(is(T==bool))
@@ -1622,11 +1622,11 @@ version(/+$DIDE_REGION+/all)
 				else
 				return T(this);
 			}
-					
+			
 			//multidimensional size
 			auto size() const
 			{ return max(high-low, 0); }
-					
+			
 			bool empty() const
 			{ return size.lessThanEqual(0).any; } //not empty means, that it has an >0 area
 		}version(/+$DIDE_REGION+/all)
@@ -1791,6 +1791,17 @@ version(/+$DIDE_REGION+/all)
 	
 	auto manhattanDistance(B, V)(in B bnd, in V v) if(isBounds!B && isVector!V)
 	{ ERR("TODO"); }
+	
+	auto ifloorceil(VT)(in Bounds!VT b)
+	{
+		return Bounds!(Vector!(int, VT.length))(b.low.ifloor, b.high.iceil);
+	}
+	
+	auto lfloorceil(VT)(in Bounds!VT b)
+	{
+		return Bounds!(Vector!(long, VT.length))(b.low.lfloor, b.high.lceil);
+	}
+	
 	
 	private void unittest_Bounds()
 	{
@@ -2156,7 +2167,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 			bool empty() { return size.lessThanEqual(0).any; }
-			bool opCast(B : bool)() const{ return !empty; }
+			bool opCast(B : bool)() const { return !empty; }
 			
 			auto toString() const {
 				static if(N==1) return format!"image1D(%s)"(impl);

@@ -6730,10 +6730,10 @@ version(/+$DIDE_REGION Date Time+/all)
 					if(isnan(dateTime)) return result;
 					int M, I = iround(fract(dateTime)*msecsInDay);
 					with(result) {
-						divMod(I, 1000, I, M); wMilliseconds	= cast(ushort)M;
-						divMod(I,		60, I, M); wSecond	= cast(ushort)M;
-						divMod(I,		60, I, M); wMinute	= cast(ushort)M;
-																		wHour	= cast(ushort)I;
+						divMod(I, 1000, I, M);	wMilliseconds	= cast(ushort)M;
+						divMod(I,		60, I, M);	wSecond	= cast(ushort)M;
+						divMod(I,		60, I, M);	wMinute	= cast(ushort)M;
+							wHour	= cast(ushort)I;
 					}
 					return result;
 				}
@@ -6846,7 +6846,10 @@ version(/+$DIDE_REGION Date Time+/all)
 					year	= cast(ulong)(gregorianDaysInYear * day)	,
 					_913year	= 913 * year	, //max years before overflow.  1601 + 913 = 2516
 				}
-				static assert(RawUnit._913year == 0xffe78926_3bb40000); //lock the above calculations
+				
+				//lock the above calculations
+				static assert(RawUnit._913year == 0xffe78926_3bb40000);
+				static assert(format!"%.16f"(double(DateTime.RawUnit.year) / DateTime.RawUnit.day) == "365.2524000000000228");
 				
 				private enum UnixShift_sec = 11644473600;
 				private enum UnixShift_unit = UnixShift_sec*RawUnit.sec;
@@ -6865,6 +6868,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow.");
 						return	((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
 							((cast(ulong)ft.dwHighDateTime)<<(RawShift+32));
+						//Opt: optimize this. one shift should be enough. High and LowDateTime is in order anyways.
 					}
 					
 					auto rawToFileTime(in ulong raw)
@@ -8746,16 +8750,16 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				Path path;
 				string name;
-							
+				
 				string fullName()
 				const { return path.fullPath~name; }
 				File file()const
 				{ return File(fullName); }
-							
+				
 				FILETIME ftCreationTime, ftLastWriteTime, ftLastAccessTime;
 				long size;
 				uint dwFileAttributes;
-							
+				
 				@property
 				{
 					string ext() const
@@ -8771,7 +8775,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					bool isHidden() const
 					{ return (dwFileAttributes & FILE_ATTRIBUTE_HIDDEN	)!=0; }
 				}
-							
+				
 				this(in WIN32_FIND_DATAW data, in Path path)
 				{
 					this.path	= path;
@@ -8781,19 +8785,18 @@ version(/+$DIDE_REGION Date Time+/all)
 					this.ftLastAccessTime 	= data.ftLastAccessTime;
 					this.size	= data.nFileSizeLow | (long(data.nFileSizeHigh)<<32);
 					this.dwFileAttributes	= data.dwFileAttributes;
-								
 				}
-							
+				
 				string toString() const
 				{
 					return format!"%-80s %s%s%s%s%s %12d cre:%s mod:%s"
-									(
+					(
 						File(path, name).fullName,
-											isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".",
-											size, DateTime(UTC, ftCreationTime), DateTime(UTC, ftLastWriteTime)
+						isDirectory?"D":".", isReadOnly?"R":".", isArchive?"A":".", isSystem?"S":".", isHidden?"H":".",
+						size, DateTime(UTC, ftCreationTime), DateTime(UTC, ftLastWriteTime)
 					);
 				}
-							
+				
 				auto created () const
 				{ return DateTime(UTC, ftCreationTime  ); }
 				auto accessed() const
@@ -8807,11 +8810,11 @@ version(/+$DIDE_REGION Date Time+/all)
 			{
 				///similar directory listing like the one in totalcommander
 				path = path.normalized;
-							
+				
 				enforce(!(!onlyFiles && recursive), "Invalid params");
-							
+				
 				FileEntry[] files, paths, parent;
-							
+				
 				WIN32_FIND_DATAW data;
 				HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data);
 				if(hFind != INVALID_HANDLE_VALUE)
@@ -8830,10 +8833,10 @@ version(/+$DIDE_REGION Date Time+/all)
 					while(FindNextFileW(hFind, &data));
 					FindClose(hFind);
 				}
-							
+				
 				//Todo: implement recursive
 				//Todo: onlyFiles && recursive, watch out for ".."!!!
-							
+				
 				if(recursive)
 				{
 					foreach(p; paths.map!(a => Path(path, a.name)))
@@ -8854,16 +8857,17 @@ version(/+$DIDE_REGION Date Time+/all)
 				
 				auto pathIdx = new int[paths.length];
 				paths.makeIndex!((a, b) => icmp(a.name, b.name)<0)(pathIdx);
-							
+				
 				auto fileIdx = new int[files.length];
-							
+				
 				auto ascending = 1;
 				if(order.startsWith("-")) { order = order[1..$]; ascending = -1; }
 				order = order.withoutStarting("+");
-							
+				
+				//Todo: these sorting routines are bad.  I should use DateTime, lessThan
 				static auto cmpSize(long a, long b) { return a==b?0:a<b?1:-1; }
 				static auto cmpTime(FILETIME a, FILETIME b) { return cmpSize(*cast(long*)&a, *cast(long*)&b); }
-							
+				
 				switch(order.lc)
 				{
 					case "name":	files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx);	break;
@@ -8872,7 +8876,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					case "date":	files.makeIndex!((a, b) => cmpChain(ascending*cmpTime(a.ftLastWriteTime, b.ftLastWriteTime), icmp(b.name, a.name))>0)(fileIdx);	break;
 					default:	raise("Invalid sort order: " ~ order.quoted);
 				}
-							
+				
 				if(onlyFiles) return fileIdx.map!(i => files[i]).array;
 				return chain(parent, pathIdx.map!(i => paths[i]), fileIdx.map!(i => files[i])).array;
 			}
@@ -8910,7 +8914,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				//only sort on root level
 				if(level==0)
 				{
-					PERF("makeIndex");
+					//PERF("makeIndex");
 					auto fileIdx = new int[files.length];
 								
 					auto ascending = 1;
@@ -8929,11 +8933,11 @@ version(/+$DIDE_REGION Date Time+/all)
 						case "date":	files.makeIndex!((a, b) => ascending*(*cast(long*)&a.ftLastWriteTime-*cast(long*)&b.ftLastWriteTime)>0)(fileIdx);	break;
 						default:	raise("Invalid sort order: " ~ order.quoted);
 					}
-					PERF("buildArray");
+					//PERF("buildArray");
 								
 					files = fileIdx.map!(i => files[i]).array;
 								
-					print(PERF.report);
+					//print(PERF.report);
 								
 					return files;
 				}

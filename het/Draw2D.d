@@ -1854,7 +1854,7 @@ class Drawing
 		{ fillRect(b.low, b.high); } void fillRect(in ibounds2 b)
 		{ fillRect(bounds2(b)); }
 		//Todo: ibounds2 automatikusan atalakulhasson bounds2-re
-		
+		struct DrawGlyphScale{ float value=1; }
 		void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args)
 		{
 			if(idx<0) return;
@@ -1864,6 +1864,7 @@ class Drawing
 			auto nearest = No.nearest;
 			
 			int shaderIdx = -1;
+			float drawScale = 1;
 			
 			static foreach(i, A_; T)
 			{
@@ -1873,6 +1874,7 @@ class Drawing
 					else static if(is(A==RGBA8	))	bkColor = a;
 					else static if(is(A==Flag!"nearest"	))	nearest = a;
 					else static if(is(A==RectAlign	))	rectAlign = a;
+					else static if(is(A==DrawGlyphScale	))	drawScale = a.value;
 					else static if(is(A==GenericArg!(N,	T), string N, T))	shaderIdx = a.value;
 					else static assert(0, "Unhandled parameter "~typeof(a).stringof);
 				}
@@ -1886,7 +1888,7 @@ class Drawing
 			
 			auto info = textures.accessInfo(idx); //Todo: csunya, kell egy texture wrapper erre
 			
-			auto b2 = rectAlign.apply(bnd, bounds2(0, 0, info.width, info.height));
+			auto b2 = rectAlign.apply(bnd, bounds2(0, 0, info.width*drawScale, info.height*drawScale));
 			
 			myAppend(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw));
 		}

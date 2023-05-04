@@ -3543,7 +3543,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				b = dr.inverseInputTransform(b);
 				foreach(c; subCells)
-				if(b.overlaps(/+dr.inputTransform+/(c.outerBounds)))
+				if(b.overlaps(c.outerBounds))
 				c.draw(dr);
 			}
 		}
@@ -4263,7 +4263,10 @@ version(/+$DIDE_REGION+/all)
 						if(lb>0)
 						{
 							foreach(c; scUpper[0..lb])
-							if(b.overlaps((c.outerBounds)))
+							if(
+								b.overlaps(c.outerBounds)
+								/+opt: There is overlaps() check and binary search too. I think only one is enough.+/
+							)
 							c.draw(dr);
 						}
 					}
@@ -4283,7 +4286,10 @@ version(/+$DIDE_REGION+/all)
 						if(lb>0)
 						{
 							foreach(p; pgUpper[0..lb])
-							if(b.overlaps(bounds2(p.front.outerTopLeft, p.back.outerBottomRight)))
+							if(
+								b.overlaps(bounds2(p.front.outerTopLeft, p.back.outerBottomRight))
+								/+opt: There is overlap check and binary search too. I think only one is enough.+/
+							)
 							drawPage(p);
 						}
 					}
