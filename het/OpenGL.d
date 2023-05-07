@@ -2097,7 +2097,7 @@ version(/+$DIDE_REGION+/all)
 	
 		override void onSwapBuffers()
 	{
-		static if(0){
+		static if(0) {
 			auto probe = PROBE("GC.collect");
 			import core.memory;
 			GC.collect;
@@ -2456,13 +2456,13 @@ version(/+$DIDE_REGION+/all)
 			//Opt: bmp.GetForUpload should need a performance monitoring
 			switch(type)
 			{
-				case GLTextureType.L8: upload(bmp.getForUpload!ubyte, x, y, sx,sy); break;
+				case GLTextureType.L8: upload(bmp.accessOrGet!ubyte, x, y, sx,sy); break;
 				case GLTextureType.RGBA8: 
 					//T0;
 					try
 				{
 					 //it can be a preview texture too, so don't take errors seriously
-					convertOSExceptionsToNormalExceptions({ upload(bmp.getForUpload!RGBA , x, y, sx,sy); });
+					convertOSExceptionsToNormalExceptions({ upload(bmp.accessOrGet!RGBA , x, y, sx,sy); });
 				}
 				catch(Exception e)
 				{

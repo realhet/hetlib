@@ -2,7 +2,11 @@ module het.assembly;
 
 import het.utils;
 
-public import core.simd, ldc.llvmasm;
+public import ldc.llvmasm;
+public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
+loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
+
+
 
 //Imported builtins ////////////////////////////////////////////
 

@@ -7,6 +7,100 @@ version(/+$DIDE_REGION+/all)
 	auto rgbToFloat(T, int N)(in Vector!(T, N) x)	 if(is(T == ubyte))
 	{ return x * (1.0f/255);	 }
 	
+	
+	template transformArray(alias fun, alias sseFun)
+	{
+		alias SrcElementType = const(Parameters!fun[0]), 	SrcElementTypeSSE = const(Parameters!sseFun[0]),
+		DstElementType = Parameters!fun[1],	DstElementTypeSSE = Parameters!sseFun[1];
+		
+		enum batchSize = SrcElementTypeSSE.sizeof / SrcElementType.sizeof;
+		static assert(SrcElementType.sizeof * batchSize == SrcElementTypeSSE.sizeof);
+		static assert(DstElementType.sizeof * batchSize == DstElementTypeSSE.sizeof);
+		
+		auto transformArray(in SrcElementType[] src)
+		{
+			auto dst = uninitializedArray!(DstElementType[])(src.length);
+			
+			size_t 	i = 0;
+			const 	len = src.length;
+			
+			//do non-simd until src is aligned
+			enum alignMask = 0xF;
+			while(i<len)
+			{
+				auto p = src.ptr+i;
+				if((cast(size_t)p & alignMask) == 0) break;
+				fun(src[i], dst[i]);
+				i++;
+			}
+			
+			//do simd until possible
+			const batchLen = i+(len-i)/batchSize*batchSize;
+			while(i<batchLen)
+			{
+				auto pSrc = cast(SrcElementTypeSSE*)(&src[i]);
+				auto pDst = cast(DstElementTypeSSE*)(&dst[i]);
+				sseFun(*pSrc, *pDst);
+				i += batchSize;
+			}
+			
+			//do the remaining with non-simd
+			while(i<len)
+			{
+				fun(src[i], dst[i]);
+				i++;
+			}
+			
+			return dst;
+		}
+		
+		auto classic(in SrcElementType[] src)
+		{
+			auto dst = uninitializedArray!(DstElementType[])(src.length);
+			for(
+				auto 	pSrc	= src.ptr,
+					pEnd 	= pSrc + src.length,
+					pDst	= dst.ptr
+				; pSrc<pEnd 
+				; pDst++, pSrc++
+			)
+			{ fun(*pSrc, *pDst); }
+			return dst;
+		}
+	}
+	
+	import het.assembly;
+	alias rgb_to_rgba = transformArray!(
+		(const ref RGB src, ref RGBA dst) { dst = src.rgb1; },
+		
+		(const ref ubyte16[3] src, ref ubyte16[4] dst)
+		{
+			enum _ = 255;
+			enum ubyte16 	mask0	= mixin([0, 1, 2, _, 3, 4, 5, _, 6, 7, 8, _, 9, 10, 11, _]),
+				mask1a	= mixin([12, 13, 14, _, 15, _, _, _, _, _, _, _, _, _, _, _]),
+				mask1b	= mixin([_, _, _, _, _, 0, 1, _, 2, 3, 4, _, 5, 6, 7, _]),
+				mask2a	= mixin([8, 9, 10, _, 11, 12, 13, _, 14, 15, _, _, _, _, _, _]),
+				mask2b 	= mixin([_, _, _, _, _, _, _, _, _, _, 0, _, 1, 2, 3, _]),
+				mask3	= mixin([4, 5, 6, _, 7, 8, 9, _, 10, 11, 12, _, 13, 14, 15, _]),
+				alpha	= mixin([0, 0, 0, 255].replicate(4));
+			
+			dst[0] = pshufb(src[0], mask0) 	| alpha;
+			dst[1] = pshufb(src[0], mask1a) | pshufb(src[1], mask1b) 	| alpha;
+			dst[2] = pshufb(src[1], mask2a) | pshufb(src[2], mask2b) 	| alpha;
+			dst[3] = pshufb(src[2], mask3) 	| alpha;
+			//Todo: test this with a big test pattern
+		}
+	);
+	
+	
+	/+
+		RGBA[] rgb_to_rgba(in RGB[] src)
+				{
+					T0; scope(exit) DT.print;
+					return src.map!"a.rgb1".array;
+				}
+	+/
+	
 	/// changes/converts the ComponentType of a color  support float and ubyte, ignores others.
 	auto convertPixelComponentType(CT, A)(auto ref A a)
 	{
@@ -50,11 +144,22 @@ version(/+$DIDE_REGION+/all)
 	//converts a color to another color type (different channels and type)
 	auto convertPixel(B, A)(auto ref A a)
 	{
+		/+
+			Todo: auto ref is not good, because it wont work with const(RGB).
+					If I replace auto ref with const ref, 100 errors will pop.
+		+/
+		
 		alias DstType	= ScalarType	!B,
 		DstLen	= VectorLength!B;
 		
 		return a.	convertPixelComponentType!DstType //2 step conversion: type and channels
 			.convertPixelChannels!DstLen;
+	}
+	
+	auto convertPixel(B, A)(in A a)
+	{
+		/+Todo: auto ref thing is fixed with this, but it seems lame...+/
+		return convertPixel(cast()a);
 	}
 	
 	auto hsvToRgb(A)(in A val) if(isColor!A)
@@ -355,17 +460,17 @@ version(/+$DIDE_REGION+/all)
 		
 		if(map is null)
 		{
-			 //todo: user driendly editing of all the colors
+			 //Todo: user driendly editing of all the colors
 			import std.traits;
 			static foreach(member; __traits(allMembers, mixin(__MODULE__)))
 			static if(is(Unqual!(typeof(mixin(member)))==RGB))
 			map[member.withoutStarting("cl").decapitalize] = mixin(member);
-			//todo: utils
+			//Todo: utils
 			
 			map.rehash;
 		}
 		
-		//todo: decapitalize, enforce
+		//Todo: decapitalize, enforce
 		auto a = name.decapitalize in map;
 		if(a is null)
 		{
@@ -412,13 +517,13 @@ version(/+$DIDE_REGION+/all)
 	
 	//import std.traits;
 	/+
-		todo: pragma(msg, "Megcsinalni a szinek listazasat traits-al." ~
+		Todo: pragma(msg, "Megcsinalni a szinek listazasat traits-al." ~
 		[__traits(allMembers, het.color)].filter!(s => s.startsWith("cl")).array);
 	+/
 }version(/+$DIDE_REGION ColorMaps+/all)
 {
 	
-	//todo: there should be a bezier interpolated colormap too. RegressionColorMap is so bad for HSV and JET for example.
+	//Todo: there should be a bezier interpolated colormap too. RegressionColorMap is so bad for HSV and JET for example.
 	
 	class ColorMap
 	{
@@ -470,7 +575,7 @@ version(/+$DIDE_REGION+/all)
 			
 			if(isLinear) {
 				x *= pal.length-1;
-				const i = x.ifloor, fr = x.fract; //todo: modf
+				const i = x.ifloor, fr = x.fract; //Todo: modf
 				return mix(pal[i], pal[i+1], fr);
 			}else {
 				 //nearest
@@ -515,7 +620,7 @@ version(/+$DIDE_REGION+/all)
 		auto opDispatch(string name)()
 		{ return byName[name]; }
 		
-		//todo: Range
+		//Todo: Range
 		
 		int opApply(int delegate(ColorMapCategory) dg)
 		{

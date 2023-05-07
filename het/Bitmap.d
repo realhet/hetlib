@@ -236,8 +236,9 @@ version(/+$DIDE_REGION+/all)
 			
 			Bitmap res;
 			
-			__gshared static Bitmap[File] cache, loading;
-			__gshared static BitmapTransformation[File] transformationQueue;
+			__gshared Bitmap[File] cache, loading;
+			__gshared  BitmapTransformation[File] transformationQueue;
+			shared static int activeBackgroundLoaderCount = 0;
 			
 			/// Allocate new file in cache , mark it as "loading"
 			static auto startLoading(File file)
@@ -259,17 +260,37 @@ version(/+$DIDE_REGION+/all)
 					const errorHandling = ErrorHandling.ignore; //track;
 					
 					auto file = bmp.file; //it receives the original unloaded Bitmap and monitors the .removed field too.
+					
+					const maxWorkers = 9999;
+					//Todo: no need to limit parallelism, taskPool is good. The slow bottleneck is convert and upload to gpu.
+					
+					while(cast()activeBackgroundLoaderCount >= maxWorkers)
+					{
+						sleep(3);
+						//Todo: this sleep is not threadsafe
+					}
+					
 					if(bmp.removed)
 					{
 						if(log)
 						LOG("Bitmap has been removed before delayed loader. Cancelling operation.", bmp);
 						return;
 					}
+					
+					import core.atomic;
+					
+					atomicOp!"+="(activeBackgroundLoaderCount, 1);
+					//LOG(cast()activeBackgroundLoaderCount, bmp.file.name);
+					
 					auto newBmp = newBitmap(file, errorHandling);
+					
+					atomicOp!"-="(activeBackgroundLoaderCount, 1);
+					
 					bitmapQuery(BitmapQueryCommand.finishWork, file, errorHandling, newBmp);
 				}
 				
 				taskPool.put(task!worker_load(bmp));
+				
 				return bmp; //returns a "loading" placeholder bitmap
 			}
 			
@@ -1490,11 +1511,12 @@ version(/+$DIDE_REGION+/all)
 			counter++;
 		}
 		
-		auto castedImage(E)()
+		private auto getImage_unsafe(E)()
 		{ return Image2D!(Unqual!E)(ivec2(width_, height_), cast(Unqual!E[]) data_); }
 		
 		auto access(E)()
 		{
+			//If the format is matching, it retuns a reference to the stored image. Otherwise it throws.
 			enforce(
 				VectorLength!E == channels,
 				format!"channel mismatch (reqd, present): (%s, %s)"(VectorLength!E, channels)
@@ -1503,50 +1525,38 @@ version(/+$DIDE_REGION+/all)
 				(ScalarType!E).stringof == type,
 				"type mismatch"
 			);
-			return castedImage!E;
+			return getImage_unsafe!E;
 		}
 		
-		/*
-			auto getFast(E)(){ //it is only a few optimized combinations.
-				static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4)){{
-					alias CT = ScalarType   !T,
-								len = VectorLength!T;
-					if(CT.stringof == type && len==channels)
-						return access!T.image2D!(a => a.convertPixel!E);
-						//return mixin("access!(", T.stringof, ").image2D!(a => a.convertPixel!(", E.stringof, "))");
-				}}
-			
-				raise("unsupported bitmap format"); assert(0);
-			}
-		*/
-		
-		auto getForUpload(E)()
+		auto get(E)() const
 		{
-			//Todo: performance counters for this.
-			//optimized versions
-			//Opt: to this properly with a benchmark
-			static if(is(E==RGBA)) { if(channels==4) { return access!RGBA; }else if(channels==3) { NOTIMPL; } }
-			
-			//WARN("Unoptimized bitmap getForUpload");  //opt: optimize this warn.
-			return get!E;
-		}
-		
-		auto get(E)()
-		{
-			 //it converts and duplicates
+			//it duplicates and converts if needed
 			
 			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 			{
 				{
 					alias CT = ScalarType   !T,
-								len = VectorLength!T;
+					len = VectorLength!T;
 					if(CT.stringof == type && len==channels)
-					return access!T.image2D!(a => a.convertPixel!E);
-						//return mixin("access!(", T.stringof, ").image2D!(a => a.convertPixel!(", E.stringof, "))");
+					{
+						auto im = (cast()this).getImage_unsafe!T;
+						static if(is(T==E)) return im.dup;
+						else static if(is(T==RGB) && is(E==RGBA))
+						{ return image2D(size, im.asArray.rgb_to_rgba); }
+						else return im.image2D!(a => a.convertPixel!E);
+					}
 				}
 			}
 			
 			raise("unsupported bitmap format"); assert(0);
+		}
+		
+		auto accessOrGet(E)()
+		{
+			//First it tries to access(), and if is not possible uses get() to convert.
+			//It always returns somthing, and when the format matches, it returns the reference of the stored image.
+			if(VectorLength!E == channels && (ScalarType!E).stringof == type) return getImage_unsafe!E;
+			return get!E;
 		}
 		
 		void resizeInPlace_nearest(ivec2 newSize)
@@ -1554,8 +1564,8 @@ version(/+$DIDE_REGION+/all)
 			static foreach(T; AliasSeq!(ubyte, RG, RGB, RGBA, float, vec2, vec3, vec4))
 			{
 				{
-					alias 	CT = ScalarType   !T,
-						len = VectorLength!T;
+					alias CT = ScalarType   !T,
+					len = VectorLength!T;
 					if(CT.stringof == type && len==channels) {
 						set(access!T.resize_nearest(newSize));
 						return;
@@ -1572,8 +1582,8 @@ version(/+$DIDE_REGION+/all)
 			{
 				{
 					 //Todo: redundant
-					alias CT = ScalarType   !T,
-								len = VectorLength!T;
+					alias CT = ScalarType!T,
+					len = VectorLength!T;
 					if(CT.stringof == type && len==channels) {
 						auto b = new Bitmap(access!T.resize_nearest(newSize));
 						b.file = file; //Todo: redundant
