@@ -6,7 +6,14 @@ public import ldc.llvmasm;
 public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
 loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
 
-
+/+
+	Note: Important note on SSE constants:
+		/+Code: enum          ubyte16 a = [1, 2, 3];+/	⛔ It calculates BAD results!!!
+		/+Code: static immutable ubyte16 a = [1, 2, 3];+/ 	⚠ It works, but the compiler crashes when used in pragma(msg).
+	Possible workarounds:
+		/+Code: mixin([1, 2, 3])+/ 	put the array literal inside mixin().
+		/+Code: [1, 2, 3].dup+/	pass it through the std library. array(), dup() template functions will work.
++/
 
 //Imported builtins ////////////////////////////////////////////
 

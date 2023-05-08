@@ -1542,7 +1542,7 @@ version(/+$DIDE_REGION+/all)
 						auto im = (cast()this).getImage_unsafe!T;
 						static if(is(T==E)) return im.dup;
 						else static if(is(T==RGB) && is(E==RGBA))
-						{ return image2D(size, im.asArray.rgb_to_rgba); }
+						{ return image2D(size, im.asArray.rgb_to_rgba.rgba_to_bgra); }
 						else return im.image2D!(a => a.convertPixel!E);
 					}
 				}

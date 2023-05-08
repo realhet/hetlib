@@ -17,6 +17,8 @@ version(/+$DIDE_REGION+/all)
 		static assert(SrcElementType.sizeof * batchSize == SrcElementTypeSSE.sizeof);
 		static assert(DstElementType.sizeof * batchSize == DstElementTypeSSE.sizeof);
 		
+		//Todo: Do automatic tests using scalar and simd versions.
+		
 		auto transformArray(in SrcElementType[] src)
 		{
 			auto dst = uninitializedArray!(DstElementType[])(src.length);
@@ -70,27 +72,57 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	import het.assembly;
-	alias rgb_to_rgba = transformArray!(
-		(const ref RGB src, ref RGBA dst) { dst = src.rgb1; },
-		
-		(const ref ubyte16[3] src, ref ubyte16[4] dst)
-		{
-			enum _ = 255;
-			enum ubyte16 	mask0	= mixin([0, 1, 2, _, 3, 4, 5, _, 6, 7, 8, _, 9, 10, 11, _]),
-				mask1a	= mixin([12, 13, 14, _, 15, _, _, _, _, _, _, _, _, _, _, _]),
-				mask1b	= mixin([_, _, _, _, _, 0, 1, _, 2, 3, 4, _, 5, 6, 7, _]),
-				mask2a	= mixin([8, 9, 10, _, 11, 12, 13, _, 14, 15, _, _, _, _, _, _]),
-				mask2b 	= mixin([_, _, _, _, _, _, _, _, _, _, 0, _, 1, 2, 3, _]),
-				mask3	= mixin([4, 5, 6, _, 7, 8, 9, _, 10, 11, 12, _, 13, 14, 15, _]),
-				alpha	= mixin([0, 0, 0, 255].replicate(4));
-			
-			dst[0] = pshufb(src[0], mask0) 	| alpha;
-			dst[1] = pshufb(src[0], mask1a) | pshufb(src[1], mask1b) 	| alpha;
-			dst[2] = pshufb(src[1], mask2a) | pshufb(src[2], mask2b) 	| alpha;
-			dst[3] = pshufb(src[2], mask3) 	| alpha;
-			//Todo: test this with a big test pattern
-		}
-	);
+	
+	void rgb_to_rgba_scalar(const ref RGB src, ref RGBA dst)
+	{ dst = src.rgb1; }
+	void rgb_to_rgba_simd(const ref ubyte16[3] src, ref ubyte16[4] dst)
+	{
+		enum _ = 255;
+		enum ubyte16 	mask0	= mixin([0, 1, 2, _, 3, 4, 5, _, 6, 7, 8, _, 9, 10, 11, _]),
+			mask1a	= mixin([12, 13, 14, _, 15, _, _, _, _, _, _, _, _, _, _, _]),
+			mask1b	= mixin([_, _, _, _, _, 0, 1, _, 2, 3, 4, _, 5, 6, 7, _]),
+			mask2a	= mixin([8, 9, 10, _, 11, 12, 13, _, 14, 15, _, _, _, _, _, _]),
+			mask2b 	= mixin([_, _, _, _, _, _, _, _, _, _, 0, _, 1, 2, 3, _]),
+			mask3	= mixin([4, 5, 6, _, 7, 8, 9, _, 10, 11, 12, _, 13, 14, 15, _]),
+			alpha	= mixin([0, 0, 0, 255].replicate(4));
+		dst[0] = pshufb(src[0], mask0) | alpha;
+		dst[1] = pshufb(src[0], mask1a) | pshufb(src[1], mask1b) | alpha;
+		dst[2] = pshufb(src[1], mask2a) | pshufb(src[2], mask2b) | alpha;
+		dst[3] = pshufb(src[2], mask3) | alpha;
+	}
+	alias rgb_to_rgba = transformArray!(rgb_to_rgba_scalar, rgb_to_rgba_simd);
+	
+	void rgba_to_bgra_scalar(const ref RGBA src, ref RGBA dst)
+	{ dst = src.bgra; }
+	void rgba_to_bgra_simd(const ref ubyte16 src, ref ubyte16 dst)
+	{
+		static immutable ubyte16 mask = [2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15].dup;
+		pragma(msg, mask);
+		dst = pshufb(src, mask);
+	}
+	alias rgba_to_bgra = transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd);
+	
+	void rgb_to_bgra_scalar(const ref RGB src, ref RGBA dst)
+	{ dst = src.bgr1; }
+	void rgb_to_bgra_simd(const ref ubyte16[3] src, ref ubyte16[4] dst)
+	{
+		enum _ = 255;
+		enum ubyte16 	mask0	= mixin([2, 1, 0, _, 5, 4, 3, _, 8, 7, 6, _, 11, 10, 9, _]),
+			mask1a	= mixin([14, 13, 12, _, _, _, 15, _, _, _, _, _, _, _, _, _]),
+			mask1b	= mixin([_, _, _, _, 1, 0, _, _, 4, 3, 2, _, 7, 6, 5, _]),
+			mask2a	= mixin([10, 9, 8, _, 13, 12, 11, _, _, 15, 14, _, _, _, _, _]),
+			mask2b 	= mixin([_, _, _, _, _, _, _, _, 0, _, _, _, 3, 2, 1, _]),
+			mask3	= mixin([6, 5, 4, _, 9, 8, 7, _, 12, 11, 10, _, 15, 14, 13, _]),
+			alpha	= mixin([0, 0, 0, 255].replicate(4));
+		dst[0] = pshufb(src[0], mask0) | alpha;
+		dst[1] = pshufb(src[0], mask1a) | pshufb(src[1], mask1b) | alpha;
+		dst[2] = pshufb(src[1], mask2a) | pshufb(src[2], mask2b) | alpha;
+		dst[3] = pshufb(src[2], mask3) | alpha;
+	}
+	alias rgb_to_bgra = transformArray!(rgb_to_bgra_scalar, rgb_to_bgra_simd);
+	
+	
+	//Todo: test suite for all the bitmap stuff
 	
 	
 	/+
