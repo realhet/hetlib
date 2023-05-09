@@ -8155,7 +8155,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			//utf32 versions
 			dstring readText32(
 				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-								ulong offset = 0, size_t len = size_t.max
+				ulong offset = 0, size_t len = size_t.max
 			) const
 			{
 				auto s = readStr(mustExists, offset, len);
@@ -8235,8 +8235,8 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			/+
 				Note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.
-											`font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
-											Also avoid normalization because it is depends on the contents of the HDD.
+				`font:\Arial\a` MUST NOT EQUAL TO `font:\Arial\A`
+				Also avoid normalization because it is depends on the contents of the HDD.
 			+/
 			
 			int opCmp(in File b) const

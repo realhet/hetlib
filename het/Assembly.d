@@ -13,6 +13,7 @@ loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is
 	Possible workarounds:
 		/+Code: mixin([1, 2, 3])+/ 	put the array literal inside mixin().
 		/+Code: [1, 2, 3].dup+/	pass it through the std library. array(), dup() template functions will work.
+	/+link: https://forum.dlang.org/post/ekicvpjxpjwwsdallwnk@forum.dlang.org+/
 +/
 
 //Imported builtins ////////////////////////////////////////////

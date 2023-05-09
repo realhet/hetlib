@@ -104,7 +104,7 @@ version(/+$DIDE_REGION+/all)
 	
 	struct BitmapTransformation
 	{
-		 //BitmapTransformation (thumb) ////////////////////////////////////
+		//BitmapTransformation (thumb) ////////////////////////////////////
 		enum thumbKeyword = "?thumb";
 		//?thumb32w		 specifies maximum width
 		//?thumb32h		 specifies maximum height
@@ -127,13 +127,15 @@ version(/+$DIDE_REGION+/all)
 		
 		bool isThumb() const { return thumbMaxSize>0; }
 		
-		bool isHistogram, isGrayHistogram; //Todo: this is lame. This should be solved by registered plugins.
+		bool isHistogram, isGrayHistogram;
+		//Todo: this is lame. This should be solved by registered plugins.
+		
+		bool isCustom;
+		BitmapTransformer customBitmapTransformer;
 		
 		this(File file)
 		{
-			
 			transformedFile = file;
-			auto s = file.fullName;
 			
 			//try to decode thumbnail params
 			string thumbDef, orig;
@@ -161,11 +163,35 @@ version(/+$DIDE_REGION+/all)
 				originalFile = File(orig[0..orig.countUntil('?')]);
 				isGrayHistogram = true;
 			}
+			else {
+				if(
+					!file.driveIs(`font`)
+					/+
+						Todo: 🛑 Ez igy osszeutkozne.
+						A fontban a kerdojel utan nem effekt van, hanem a karaktersorozat nyersen.
+						Ezt a kivetelt meg kell szuntetni.
+					+/
+				)
+				{
+					const prefix = file.queryString.wordAt(0).lc;
+					if(auto a = prefix in customBitmapTransformers)
+					{
+						customBitmapTransformer = *a;
+						originalFile = file.withoutQueryString;
+						isCustom = true;
+					}
+					else
+					{
+						LOG(file);
+						WARN("Unknown customBitmapTransforer: "~prefix.quoted);
+					}
+				}
+			}
 		}
 		
 		alias needTransform this;
 		bool needTransform()
-		{ return isThumb|| isHistogram || isGrayHistogram; }
+		{ return isThumb|| isHistogram || isGrayHistogram || isCustom; }
 		
 		Bitmap transform(Bitmap orig)
 		{
@@ -173,39 +199,46 @@ version(/+$DIDE_REGION+/all)
 			
 			sizeBytes = orig.sizeBytes; //used by bitmapQuery/detailed stats
 			
-			auto doIt()
+			Bitmap doIt()
 			{
-				if(isThumb)
+				try
 				{
-					float minScale = 1;
-					if(maxWidthSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.x);
-					if(maxHeightSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.y);
-					
-					if(minScale < 1) {
-						ivec2 newSize = round(orig.size*minScale);
-						//print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
-						return orig.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
+					if(isThumb)
+					{
+						float minScale = 1;
+						if(maxWidthSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.x);
+						if(maxHeightSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.y);
+						
+						if(minScale < 1) {
+							ivec2 newSize = round(orig.size*minScale);
+							//print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
+							return orig.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
+						}
 					}
+					else if(isHistogram)
+					{
+						auto img = orig.get!RGB;
+						int[3][256] histogram;
+						foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++;
+						int histogramMax = histogram[].map!(h => h[].max).array.max;
+						float sc = 255.0f/histogramMax;
+						return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc))));
+					}
+					else if(isGrayHistogram)
+					{
+						auto img = orig.get!ubyte;
+						int[256] histogram;
+						foreach(p; img.asArray) histogram[p]++;
+						int histogramMax = histogram[].max;
+						float sc = 255.0f/histogramMax;
+						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
+					}
+					else if(isCustom)
+					{ return customBitmapTransformer(orig, transformedFile); }
 				}
-				else if(isHistogram)
-				{
-					auto img = orig.get!RGB;
-					int[3][256] histogram;
-					foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++;
-					int histogramMax = histogram[].map!(h => h[].max).array.max;
-					float sc = 255.0f/histogramMax;
-					return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc))));
-				}
-				else if(isGrayHistogram)
-				{
-					auto img = orig.get!ubyte;
-					int[256] histogram;
-					foreach(p; img.asArray) histogram[p]++;
-					int histogramMax = histogram[].max;
-					float sc = 255.0f/histogramMax;
-					return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
-				}
+				catch(Exception e) WARN(e.simpleMsg);
 				
+				//Todo: handle errors
 				return orig.dup;
 			}
 			
@@ -216,7 +249,19 @@ version(/+$DIDE_REGION+/all)
 			return res;
 		}
 		
-	}
+	}
+	
+	alias BitmapTransformer = Bitmap function(Bitmap, File);
+	
+	private __gshared BitmapTransformer[string] customBitmapTransformers;
+	
+	void registerCustomBitmapTransformer(string prefix, BitmapTransformer transformer)
+	{
+		prefix = prefix.lc;
+		enforce(!(prefix in customBitmapTransformers), "Already registered customBitmapTransformer. Prefix: "~prefix);
+		customBitmapTransformers[prefix] = transformer;
+	}
+	
 	
 	
 	
@@ -346,12 +391,12 @@ version(/+$DIDE_REGION+/all)
 						{
 							if(checkRequiredModifiedTime(*originalBmp))
 							{
-								 //original bmp is up to date
+								//original bmp is up to date
 								startDelayedTransformation(*originalBmp, res, tr);
 							}
 							else
 							{
-								 //original is an old version
+								//original is an old version
 								auto lastBmp = *originalBmp; 
 								//preserve it in the cache, so it can be displayed while loading the new
 								
@@ -1542,7 +1587,10 @@ version(/+$DIDE_REGION+/all)
 						auto im = (cast()this).getImage_unsafe!T;
 						static if(is(T==E)) return im.dup;
 						else static if(is(T==RGB) && is(E==RGBA))
-						{ return image2D(size, im.asArray.rgb_to_rgba.rgba_to_bgra); }
+						{
+							//fast path
+							return image2D(size, im.asArray.rgb_to_rgba);
+						}
 						else return im.image2D!(a => a.convertPixel!E);
 					}
 				}
