@@ -5126,22 +5126,22 @@ version(/+$DIDE_REGION Containers+/all)
 		struct WildResult
 		{
 			static:
-						private string[] p;
-						void _reset()
+			private string[] p;
+			void _reset()
 			{ p = []; }
-						void _append(string s)
+			void _append(string s)
 			{ p ~= s; }
-					
-						auto length()
+			
+			auto length()
 			{ return p.length; }
-						auto empty()
+			auto empty()
 			{ return p.empty; }
-						auto strings(size_t i, string def="")
+			auto strings(size_t i, string def="")
 			{ return i<length ? p[i] : def; }
-						auto opIndex(size_t i)
+			auto opIndex(size_t i)
 			{ return strings(i); }
-					
-						auto to(T)(size_t i, T def = T.init)
+			
+			auto to(T)(size_t i, T def = T.init)
 			{
 				try {
 					auto s = strings(i).strip;
@@ -5155,16 +5155,16 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				catch(Throwable) { return def; }
 			}
-					
-						auto ints	(size_t i, int def = 0)
+			
+			auto ints	(size_t i, int def = 0)
 			{ try return to!int	(i);catch(Throwable) return def; }
-						auto floats	(size_t i, float def = 0)
+			auto floats	(size_t i, float def = 0)
 			{ try return to!float	(i);catch(Throwable) return def; }
-					
-						void stripAll()
+			
+			void stripAll()
 			{ foreach(ref s; p) s = s.strip; }
-					
-						string toString()
+			
+			string toString()
 			{ return p.text; }
 		}
 		
@@ -5287,7 +5287,7 @@ version(/+$DIDE_REGION Containers+/all)
 		auto splitQuotedStr(string line, char delim, char quote)
 		{
 			auto s = line.dup;
-					
+			
 			//mark non-quoted spaces
 			bool inQuote;
 			foreach(ref char ch; s)
@@ -5295,8 +5295,8 @@ version(/+$DIDE_REGION Containers+/all)
 				if(ch==quote) inQuote = !inQuote;
 				if(!inQuote && ch==delim) ch = '\1'; //use #1 as a marker for splitting
 			}
-					
-			return s.split('\1').to!(string[]);
+			
+			return cast(string[]) s.split('\1');
 		}
 		
 		
@@ -5309,15 +5309,14 @@ version(/+$DIDE_REGION Containers+/all)
 				.array;
 		}
 		
-		
-		auto commandLineToMap(string line)
+		auto commandLineToMap(string[] parts)
 		{
 			string[string] map;
 			int paramIdx;
-			foreach(s; line.splitCommandLine)
+			foreach(s; parts)
 			{
 				string key, value;
-						
+				
 				//try to split at '='
 				bool keyValueFound;
 				foreach(i, ch; s)
@@ -5330,19 +5329,22 @@ version(/+$DIDE_REGION Containers+/all)
 						break;
 					}
 				}
-						
+				
 				//unnamed parameter
 				if(!keyValueFound) {
 					key = (paramIdx++).text;
 					value = s;
 				}
-						
+				
 				map[key] = value;
 			}
-					
+			
 			map.rehash;
 			return map;
 		}
+		
+		auto commandLineToMap(string line)
+		{ return commandLineToMap(line.splitCommandLine); }
 		
 		string helpText(in GetoptResult opts)
 		{ return opts.options.map!(o => format(`  %-20s %s`, [o.optShort, o.optLong].join(" "), o.help)).join("\n"); }
@@ -5350,12 +5352,12 @@ version(/+$DIDE_REGION Containers+/all)
 		auto parseOptions(T)(string[] args, ref T options, Flag!"handleHelp" handleHelp)
 		{
 			/*
-				 exampls struct: struct Options {
-								@(`Exits right after a solution.`)	     EarlyExit = false;
-								@(`t|BenchmarkTime = Minimum duration of the benchmark. Default: $DEFAULT$ sec`)	     BenchmarkMinTime = 12;
-								@(`WFPerCU = Number of WaveFronts on each Compute Units. Default: $DEFAULT$`)	     WFPerCU = 8;
-								@(`p = Calls the payload outside the mixer.`)	     SeparatePayload = false;
-							}
+				exampls struct: struct Options {
+					@(`Exits right after a solution.`)	     EarlyExit = false;
+					@(`t|BenchmarkTime = Minimum duration of the benchmark. Default: $DEFAULT$ sec`)	     BenchmarkMinTime = 12;
+					@(`WFPerCU = Number of WaveFronts on each Compute Units. Default: $DEFAULT$`)	     WFPerCU = 8;
+					@(`p = Calls the payload outside the mixer.`)	     SeparatePayload = false;
+				}
 			*/
 			
 			string[] getoptLines = getStructInfo(options).getoptLines("options");
@@ -5419,6 +5421,127 @@ version(/+$DIDE_REGION Containers+/all)
 			assert(joinCommandLine(splitCommandLine(s))==s);
 			assert(joinCommandLine([`/OUT:file name.exe`])==`/OUT:"file name.exe"`);
 		}
+		
+		private mixin template ComandLineTemplate(char chDelim, char chQuote , char chEqu)
+		{
+			struct Item {
+				bool hasValue;
+				string name, value;
+				//Todo: toString() with proper quotes and error checking
+				
+				string toString() const
+				{
+					static string autoQuote(string s)
+					{
+						//Todo: what if " is in the string
+						//Todo: what if space is in QueryString
+						//Todo: QueryString don't even have quotes anyways
+						
+						//now this is fixed like this:
+						if(s.canFind(' '))
+						return chQuote ~ s ~ chQuote;
+						
+						return s;
+					}
+					
+					return hasValue 	? autoQuote(name) ~ chEqu ~ autoQuote(value)
+						:autoQuote(name);
+				}
+			}
+			
+			Item[] items; //all items
+			string[] names; //only names without values
+			string[string] options; //all name/value pairs
+			
+			auto files() const { return names.map!File; }
+			
+			this(string line)
+			{
+				foreach(s; line.splitQuotedStr(chDelim, chQuote))
+				{
+					string key, value;
+					
+					bool keyValueFound;
+					foreach(i, ch; s)
+					{
+						if(ch==chQuote) break;
+						
+						if(ch=='?') break; 
+						/+
+							Don't look after '?' because the there could be '=' too.
+							Example: c:\a.bmp?thumb&h=64
+						+/
+						
+						if(ch==chEqu) {
+							key = s[0..i];
+							value = s[i+1..$].withoutQuotes(chQuote);
+							keyValueFound = !key.empty;
+							break;
+						}
+					}
+					
+					if(keyValueFound)
+					{
+						items ~= Item(true, key, value);
+						options[key] = value;
+					}
+					else
+					{
+						const name = s.withoutQuotes(chQuote);
+						items ~= Item(false, name);
+						names ~= name;
+					}
+				}
+			}
+			
+			T option(T)(string name, in T def) const
+			{
+				if(auto a = name in options)
+				try { return (*a).to!T; }catch(Exception) {}
+				return def;
+			}
+			
+			string option(string name) const
+			{ return option(name, ""); }
+			
+			string opCall(string name) const
+			{ return option(name); }
+			
+			T opCall(T)(string name, in T def) const
+			{ return option(name, def); }
+			
+			alias items this;
+			
+			string command() const
+			{
+				if(items.empty) return "";
+				return items[0].name;
+			}
+			
+			string toString() const
+			{ return items.map!text.join(chDelim); }
+		}
+		
+		//Todo: Use this instead of CommandLineToMap
+		struct CommandLine
+		{ mixin ComandLineTemplate!(' ', '"', '='); }
+		struct QueryString
+		{ mixin ComandLineTemplate!('&', '"', '='); }
+		
+		//Todo: make unittest for CommandLine and QueryString
+		void testCommandLineQueryString()
+		{
+			const cmd = CommandLine(`dir "C:\Program Files" > C:\lists.txt param=" abc def " float=5.4 "c:\a.b?thumb&h=64"`);
+			cmd.each!print;
+			cmd.command.print;
+			cmd("param").print;
+			cmd("float", 0.0f).print;
+			cmd.names.each!print;
+			cmd.files.each!print;
+			print;
+			cmd.files.back.queryString.each!print;
+		}
+		
 		
 		public import std.net.isemail : isEmail;
 		
@@ -8130,7 +8253,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			string readStr(
 				bool mustExists = true,
-								ulong offset = 0, size_t len = size_t.max
+				ulong offset = 0, size_t len = size_t.max
 			) const
 			{
 				auto s = cast(string)(read(mustExists, offset, len));
@@ -8139,7 +8262,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			string readText(
 				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-								ulong offset = 0, size_t len = size_t.max
+				ulong offset = 0, size_t len = size_t.max
 			) const
 			{
 				auto s = readStr(mustExists, offset, len);
@@ -8148,7 +8271,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			string[] readLines(
 				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-								ulong offset = 0, size_t len = size_t.max
+				ulong offset = 0, size_t len = size_t.max
 			) const
 			{ return readText(mustExists, defaultEncoding, offset, len).splitLines; }
 			
@@ -8164,7 +8287,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			dstring[] readLines32(
 				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
-								ulong offset = 0, size_t len = size_t.max
+				ulong offset = 0, size_t len = size_t.max
 			) const
 			{ return readText32(mustExists, defaultEncoding, offset, len).splitLines; }
 		}version(/+$DIDE_REGION+/all) {
@@ -8246,17 +8369,18 @@ version(/+$DIDE_REGION Date Time+/all)
 			size_t toHash() const
 			{ return fullName.hashOf; }
 			
+			
 			File withoutQueryString() const
 			{
 				auto i = fullName.indexOf('?');
 				return File(i>=0 ? fullName[0..i] : fullName);
 			}
 			
-			@property string queryString() const
+			@property QueryString queryString() const
 			{
 				//Todo: test querystrings with bitmap/font renderer
 				auto i = fullName.indexOf('?');
-				return i>=0 ? fullName[i+1..$] : "";
+				return QueryString(i>=0 ? fullName[i+1..$] : "");
 			}
 			
 			@property void queryString(string s)
@@ -8267,24 +8391,9 @@ version(/+$DIDE_REGION Date Time+/all)
 				fullName = fn;
 			}
 			
-			auto queryItems()
-			{ return queryString.splitter('&').map!(s => s.split2("=", false)); }
+			@property void queryString(in QueryString qs)
+			{ queryString = qs.text; }
 			
-			@property string query(T=string)(string name, lazy T def=T.init)
-			{
-				//Note: it is slow, but requre no additional memory (map structure)
-				foreach(a; queryItems) if(sameText(a[0], name)) return a[1].to!T;
-				return def;
-			}
-			
-			@property void query(T=string)(string name, in T val)
-			{
-				string[] arr;
-				foreach(a; queryItems) arr ~= a[0]~"="~  (sameText(a[0], name) ? val.to!string : a[1]);
-				queryString = arr.join('&');
-			}
-			
-			//Todo: query to map string[string]. It's something like the commandline args and also like the wildcard result struct
 			
 			File opBinary(string op)(string s) const if(op == "~")
 			{ return File(fullName~s); }

@@ -96,8 +96,7 @@ version(/+$DIDE_REGION+/all)
 	{ dst = src.bgra; }
 	void rgba_to_bgra_simd(const ref ubyte16 src, ref ubyte16 dst)
 	{
-		static immutable ubyte16 mask = [2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15].dup;
-		pragma(msg, mask);
+		static immutable ubyte16 mask = [2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15];
 		dst = pshufb(src, mask);
 	}
 	alias rgba_to_bgra = transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd);
