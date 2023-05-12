@@ -798,132 +798,7 @@ class TextureManager
 		}
 	}
 	
-		int access_old(in File fileName, Flag!"delayed" fDelayed = Yes.delayed)
-	{
-		 //Todo: bugos a delayed leader
-		bool delayed = fDelayed;
-		
-		delayed &= EnableMultiThreadedTextureLoading;
-		
-		//Todo: nonexisting file and/or exception is not handling well here.
-		
-		if(!(fileName in byFileName))
-		{
-			
-			if(fileName.fullName.startsWith(`font:\`) || fileName.fullName.startsWith(`custom:\`)) delayed = false;
-			//Todo: delayed restriction. should refactor this nicely
-			
-			//delayed = false;
-			if(delayed)
-			{
-				
-				//ez egy bug miatt, ami a 0. megatextura garbageCollectje utan fordul elo
-				//nem jo, ha a 0-as megaTex-re van egy betoltes alatt levo textura 'rakva'
-				auto idx = allocSubTexInfo(longToSubTexInfo(-1)); //az allocSubTexInfo ez kizarolag innen van hivva
-				
-				pendingIndices[idx] = true;
-				byFileName[fileName] = idx;
-				mustRehash = true;
-				
-				static void loader(int idx, File fileName)
-				{
-					//enforce(SetProcessAffinityMask(GetCurrentProcess, 0xFE), getLastErrorStr);
-					//sleep(random(1000));
-					//SetPriorityClass(GetCurrentProcess, BELOW_NORMAL_PRIORITY_CLASS);
-					
-					//import core.sys.windows.windows;
-					//SetThreadPriority(GetCurrentThread, THREAD_PRIORITY_BELOW_NORMAL);
-					
-					//"fuck".writeln;
-					
-					//"Loader.start %.2d %s".writefln(idx, GetCurrentProcessorNumber);
-					//"B%s ".writef(idx);
-					
-					/*if(GetCurrentProcessorNumber==mainThreadProcessorNumber) */
-					
-					//sleep(100);
-					Bitmap bmp;
-					try
-					{
-						bmp = newBitmap_internal(fileName);
-						//<- this takes time. This should be delayed
-					}
-					catch(Exception e)
-					{
-						//Todo: Nem jo!!! Nem thread safe !!!	WARN("Bitmap decode error. Using errorBitmap", fileName);
-						//Ez nem thread safe!!!! multithreaded	modban vegtelen loopba tud kerulni.
-						//Todo: ezt megoldani a placeholder bitmappal rendesen
-						bmp = newErrorBitmap(e.simpleMsg);
-					}
-					
-					//bmp.channels = 4; //todo: not just 4 chn bitmap support
-					bmp.tag = idx; //tag = SubTexIdx
-					
-					//"E%s ".writef(idx);
-					
-					synchronized(textures)
-					{
-						if(synchLog) LOG("textures.bmpQueue ~= bmp; before");
-						textures.bmpQueue ~= bmp;
-						if(synchLog) LOG("textures.bmpQueue ~= bmp; after");
-						//mainWindow.invalidate;  //todo: issue a redraw. it only works for one window apps.
-					}
-					
-				}
-				
-				if(1) {
-					//Todo: upgrade this to be able to prioritize loading order in realtime.
-					import std.concurrency;
-					
-					//LOG("LOADING bmp", fileName);
-					spawn(&loader, idx, fileName);   //crashes after 5 min
-				}
-				else {
-										import std.parallelism;
-										auto t = task!loader(idx, fileName);
-										taskPool.put(t);
-					//t.yieldForce;
-					//loader(idx, fileName);
-					
-					/*
-								  Bitmap[int] queue;
-						synchronized(textures){
-							queue = bmpQueue.dup;
-							bmpQueue.clear;
-						}
-						
-						foreach(kv; queue.byKeyValue)
-							uploadSubTex(kv.key, kv.value);
-					*/
-					
-				}
-				
-			}
-			else
-			{
-				 //immediate loader
-				Bitmap bmp;
-				try {
-					bmp = newBitmap_internal(fileName); //<- this takes time. This should be delayed
-				}
-				catch(Exception e) {
-					WARN("Bitmap decode error. Using errorBitmap", fileName);
-					//Todo: ezt megoldani a placeholder bitmappal rendesen
-					bmp = newErrorBitmap(e.simpleMsg);
-				}
-				
-				//auto bmp = newBitmap(fileName); // <- this takes time. This should be delayed
-				//bmp.channels = 4; //todo: not just 4 chn bitmap support
-				
-				auto idx = createSubTex(bmp); //it uploads immediatelly
-				
-				byFileName[fileName] = idx;
-				mustRehash = true;
-			}
-		}
-		
-		return byFileName[fileName];
-	}
+	
 	
 		bool isCustomExists(string name)
 	{ return (File(`custom:\`~name) in byFileName) !is null; }
@@ -1114,7 +989,6 @@ class TextureManager
 		/// NOT threadsafe by design!!! Gfx is mainthread only anyways.
 		int access2(File file, Flag!"delayed" fDelayed = Yes.delayed)
 	{
-		  //access2 //////////////////////////
 		enum log = 0;
 		
 		bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
@@ -1130,8 +1004,8 @@ class TextureManager
 			//1: ha ==, akkor a thumbnailnak 0 a datetime-je
 			/+
 				2: ha != (allandoan ujrafoglalja, nem a kivant mukodes), akkor a 
-							nearest sampling bugja tapasztalhato a folyamatosan athelyezett 
-							thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
+					nearest sampling bugja tapasztalhato a folyamatosan athelyezett 
+					thumbnail image-k miatt. Mint egy hernyo, ciklikusan 1 pixelt csuszik.
 			+/
 			if(modified == bitmapModified.get(file, 0))
 			{

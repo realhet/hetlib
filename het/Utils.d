@@ -673,10 +673,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		struct clipboard	
 		{
-			 static: //clipboard //////////////////////////
-				import core.sys.windows.windows : OpenClipboard, CloseClipboard, IsClipboardFormatAvailable, CF_TEXT,
-					EmptyClipboard, GetClipboardData, SetClipboardData, HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc, 
-					GetClipboardSequenceNumber;
+			static:
+			import core.sys.windows.windows: 	OpenClipboard, CloseClipboard, IsClipboardFormatAvailable,
+				EmptyClipboard, GetClipboardData, SetClipboardData, 
+				HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc, 
+				GetClipboardSequenceNumber,
+				
+				CF_TEXT, /+Todo: Support CF_UNICODETEXT+/
+				
+				CF_BITMAP, HBITMAP;
 			
 			bool hasFormat(uint fmt)
 			{
@@ -687,15 +692,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				}
 				return res;
 			}
-					
-						bool hasText()
+			
+			bool hasText()
 			{ return hasFormat(CF_TEXT); }
-					
-						string getText()
+			
+			string getText()
 			{
 				string res;
 				if(OpenClipboard(null)) {
-					 scope(exit) CloseClipboard;
+					scope(exit) CloseClipboard;
 					auto hData = GetClipboardData(CF_TEXT);
 					if(hData) {
 						auto pData = cast(char*)GlobalLock(hData);
@@ -705,8 +710,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				}
 				return res;
 			}
-					
-						bool setText(string text, bool mustSucceed)
+			
+			bool setText(string text, bool mustSucceed)
 			{
 				bool success;
 				if(OpenClipboard(null)) {
@@ -723,7 +728,25 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
 				return success;
 			}
-					
+			
+			bool hasBitmap()
+			{ return hasFormat(CF_BITMAP); }
+			
+			bool getBitmapHandle(void delegate(HBITMAP) onGetHandle)
+			{
+				if(hasBitmap)
+				if(OpenClipboard(null/+clipboard is associated with the current task.+/))
+				{
+					scope(exit) CloseClipboard;
+					if(auto hbm = cast(HBITMAP)(GetClipboardData(CF_BITMAP)))
+					{
+						onGetHandle(hbm);
+						return true;
+					}
+				}
+				return false;
+			}
+			
 			@property {
 				string asText() { return getText; }
 				void asText(string s) { setText(s, true); }
@@ -5531,15 +5554,35 @@ version(/+$DIDE_REGION Containers+/all)
 		//Todo: make unittest for CommandLine and QueryString
 		void testCommandLineQueryString()
 		{
-			const cmd = CommandLine(`dir "C:\Program Files" > C:\lists.txt param=" abc def " float=5.4 "c:\a.b?thumb&h=64"`);
-			cmd.each!print;
-			cmd.command.print;
-			cmd("param").print;
-			cmd("float", 0.0f).print;
-			cmd.names.each!print;
-			cmd.files.each!print;
-			print;
-			cmd.files.back.queryString.each!print;
+			const a = CommandLine(`dir "C:\Program Files" > C:\lists.txt param=" abc def " float=5.4 "c:\a.b?thumb&h=64"`);
+			
+			static if(1)
+			{
+				write("Command "); a.command.print;
+				write("Items "); a.each.print;
+				write("Names "); a.names.each!print;
+				write("Files "); a.files.each!print;
+				write("Param access "); a("param").print;
+				write("Float access "); a("float", 0.0f).print;
+				print;
+				write("QueryString access"); a.files.back.queryString.each!print;
+			}
+			
+			static if(0)
+			testConsole(
+				q{
+					Comment //Code: a.command
+					Items //Code: a.each
+					Names //Code: a.names.each
+					Files //Code: a.files.each
+					Param access //Code: a("param")
+					Float access //Code: a("float", 0.0f)
+					
+					QueryString access //Code: a.files.back.queryString.each
+				}
+			);
+			
+			
 		}
 		
 		
@@ -7877,7 +7920,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{
 					foreach(i, ch; fullPath) {
 						if(ch.isAlphaNum) continue;
-						if(ch==':') return fullPath[0..i+1];
+						if(ch==':') return fullPath[0..i + 1/+including ':'+/];
 						return "";
 					}
 					return "";

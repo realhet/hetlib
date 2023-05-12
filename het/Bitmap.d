@@ -17,7 +17,8 @@ version(/+$DIDE_REGION+/all)
 	import std.uni: isAlphaNum;
 	import core.sys.windows.windows :	HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, 
 		SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, DIB_RGB_COLORS,
-		HRESULT, WCHAR, BOOL, RECT, IID;
+		HRESULT, WCHAR, BOOL, RECT, IID,
+		BITMAP, GetObject;
 	
 	//png, tga, jpg(read_jpeg_info only)
 	import imageformats; //Todo: a jpeg ebbol mar nem kell.
@@ -102,6 +103,303 @@ version(/+$DIDE_REGION+/all)
 		}
 	}
 	
+	//Load a bitmap immediately with optional error handling. No caching, no thumbnail/transformations.
+	auto newBitmap(File file, ErrorHandling errorHandling)
+	{
+		
+		static Bitmap newBitmap_internal(File file)
+		{
+			enum mustSucceed=true; //This function either must return a non-null bitmap or throw an exception.
+			auto fn = file.fullName;
+			auto prefix = fn.until!(not!isAlphaNum).text;
+			if(prefix.length>1 && fn[prefix.length..$].startsWith(`:\`))
+			{
+				//strip off prefix:\ and call a loader with the remaining text
+				fn = fn[prefix.length+2..$];
+				auto loader = prefix in customBitmapLoaders;
+				if(loader) return (*loader)(fn).enforce("Unable to load bitmap (null returned by loader): "~fn.quoted);
+			}
+			else
+			{
+				//threat it as a normal file
+				return File(fn).deserialize!Bitmap(mustSucceed);
+			}
+			
+			raise("Unknown BitmapLoader prefix: "~prefix~`:\`);
+			assert(0);
+		}
+		
+		Bitmap res;
+		final switch(errorHandling)
+		{
+			case ErrorHandling.raise:{
+				try { res = newBitmap_internal(file); }
+				catch(Exception e) { throw e; }
+			}	break;
+			case ErrorHandling.track:{
+				try { res = newBitmap_internal(file); }
+				catch(Exception e) { WARN(e.simpleMsg); res = newErrorBitmap(e.simpleMsg); }
+			}	break;
+			case ErrorHandling.ignore:{
+				try { res = newBitmap_internal(file); }
+				catch(Exception e) { res = newErrorBitmap(e.simpleMsg); }
+			}	break;
+		}
+		res.file = file;
+		res.modified = file.modified;
+		return res;
+	}
+	
+	Bitmap newBitmap(HBITMAP hBitmap)
+	{
+		Bitmap res;
+		BITMAP bmp;
+		ivec2 size;
+		int bits;
+		if(GetObject(hBitmap, BITMAP.sizeof, &bmp))
+		{
+			size = ivec2(bmp.bmWidth, bmp.bmHeight);
+			bits = bmp.bmBitsPixel;
+			
+			__gshared HDC hdcMem;
+			if(!hdcMem) hdcMem  = CreateCompatibleDC(GetDC(null));
+			
+			BITMAPINFO bmi;
+			with(bmi.bmiHeader) {
+				biSize	= BITMAPINFOHEADER.sizeof;
+				biWidth	= size.x;
+				biHeight	= -size.y;
+				biPlanes	= 1;
+				biBitCount	= 32;
+				biCompression	= BI_RGB;
+				biSizeImage	= size.x*size.y*4;
+			}
+			
+			auto img = image2D(size, RGBA(0)); //Todo: uninitialized image, or copy manually
+			if(!img.empty)
+			{
+				if(!GetDIBits(hdcMem, hBitmap, 0, size.y, img.asArray.ptr, &bmi, DIB_RGB_COLORS))
+				raiseLastError;
+				img.asArray.rgba_to_bgra_inplace;
+			}
+			
+			res = new Bitmap(img);
+		}
+		return res;
+	}
+	
+	//Todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
+	auto isFontDeclaration(string s)
+	{ return s.startsWith(`font:\`); }
+	
+	private Bitmap newSpecialBitmap(string error="")
+	{
+		const loading = error=="loading";
+		auto bmp = new Bitmap(image2D(1, 1, loading ? RGBA(0xFFC0C0C0) : RGBA(0xFFFF00FF)));
+		bmp.markChanged;
+		if(loading) { bmp.loading = true; }else { if(error) bmp.error = error; }
+		return bmp;
+	}
+	
+	Bitmap newErrorBitmap(string cause)
+	{ return newSpecialBitmap(cause); }
+	private Bitmap newLoadingBitmap()
+	{ return newSpecialBitmap("loading"); }
+	
+	/// Gets the modified time of any given filename. Including real/virtual files, fonts, transformed images, thumbnails
+	/// returns null if unknown
+	auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.virtualOnly/*Todo: preproc*/)
+	{
+		if(file) {
+			auto drive = file.drive;
+			if(!virtualOnly || drive!="virtual:") { return file.withoutQueryString.modified; }
+		}
+		return DateTime.init;
+	}
+	
+	
+	
+	private __gshared Bitmap function(string)[string] customBitmapLoaders;
+	
+	void registerBitmapLoader(string prefix, Bitmap function(string) loader) //Todo: make it threadsafe
+	in(prefix.length>=2, "invalid prefix string")
+	{
+		prefix = prefix.lc;
+		enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
+		customBitmapLoaders[prefix] = loader;
+		LOG("BitmapLoader registered:", prefix);
+	}
+	
+	struct BITMAPLOADER; //uda
+	
+	void registerBitmapLoader(alias fun)()
+	{
+		static assert(__traits(isStaticFunction, fun));
+		enum name = __traits(identifier, fun);static assert(name.endsWith("Bitmap"));
+		enum prefix = name.withoutEnding("Bitmap");static assert(prefix == prefix.lc);
+		registerBitmapLoader(prefix, &fun);
+	}
+	
+	private void registerDefaultBitmapLoaders()
+	{
+		foreach(name; __traits(allMembers, mixin(__MODULE__)))
+		{
+			alias member = __traits(getMember, mixin(__MODULE__), name);
+			static if(__traits(isStaticFunction, member) && hasUDA!(member, BITMAPLOADER))
+			registerBitmapLoader!member;
+		}
+	}
+	
+	@BITMAPLOADER
+	{
+		
+		Bitmap fontBitmap(string name)
+		{
+			//Todo: font and icon should be put in a list that ensures the following: bitmap.resident, no delayed load
+			version(D2D_FONT_RENDERER)
+			{
+				auto res = bitmapFontRenderer.renderDecl(`font:\` ~ name);
+				if(res.valid) res.resident = true;//dont garbagecollect fonts because they are slow to generate
+				return res;
+			}
+			else {
+				enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!");
+				return null;
+			}
+		}
+		
+		Bitmap tempBitmap(string name)
+		{
+			auto b = new Bitmap;
+			b.resident = true;
+			b.file = File(name);
+			return b;
+		}
+		
+		Bitmap virtualBitmap(string name)
+		{
+			//Just forward it to the fileSystem, that will handle the 'virtual:\' prefix.
+			return File(name).deserialize!Bitmap(true);
+		}
+		
+		Bitmap desktopBitmap(string name)
+		{ return getDesktopSnapshot; }
+		
+		Bitmap monitorBitmap(string name)
+		{
+			//Todo: monitor indexing
+			return getPrimaryMonitorSnapshot;
+		}
+		
+		Bitmap clipboardBitmap(string name)
+		{
+			if(clipboard.hasBitmap)
+			{
+				Bitmap res;
+				clipboard.getBitmapHandle((HBITMAP hBitmap){ res = newBitmap(hBitmap); });
+				if(!res) raise("Clipboard has no bitmap.");
+				return res;
+			}
+			
+			return null;
+		}
+		
+		Bitmap debugBitmap(string name)
+		{
+			//debug images
+			uint color = (name.to!int)>>1;
+			color = color | (255-color)<<8;
+			return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color)));
+		}
+		
+		Bitmap iconBitmap(string name)
+		{
+			//folder: icon:\folder\    //"folder" is a literal!!!
+			//drive: icon:\d:\
+			//file: icon:\.bat
+			//Todo: not works for individual files
+			
+			//Todo: LoadIcon from dll/exe
+			
+			//options: ?small ?16 ?large ?32
+			
+			auto res = getAssociatedIconBitmap(name);
+			if(!res) raise("Unable to get associated icon for " ~ name.quoted);
+			
+			if(res.valid) res.resident = true;
+			return res;
+		}
+		
+		Bitmap colormapBitmap(string name)
+		{
+			enforce(name in colorMaps);
+			auto 	width = 128,
+				raw = colorMaps[name].toArray!RGBA(width),
+				img = image2D(width, 1, raw),
+				bmp = new Bitmap(img);
+			return bmp;
+		}
+		
+		/+
+			Note: HETLIB Resource Identifier format specification
+			
+			/+Code: customLoaderId:\+//+Code: drive:\path\name.ext+//+Code: &opt1&opt2=val+//+Code: ?opt3&opt4=val+/
+			
+			* optional custom loader:	/+Code: customLoaderId:\+/	(a..z are reserved for drive letters)
+			* required filename:   	/+Code: dirve:\path\name.ext+/ or /+Code: http://a.com/index.html+/	
+			* optional resource options: 	/+Code: &name&key=value& ...+/	(up until this it can be processed as a queryString)
+			* optional queryString:	/+Code: ?name&key=value& ...+/ (this is thequeryString after the ?)
+			
+			Restrictions: ⚠Some CustomLoaders are using '&' to locate their parameters. Avoid using '&' in those filenames!
+			
+			Custom loaders:
+			
+			/+Code: font:\+//+Code: Times New Roman\64\x3\ct+//+Code: &ABC 123+/   Note: No queryString is processed after font:/
+			path elements:
+				 * fontname:	(req.)
+				 * number:	(req.) height in pixels
+				 * x2:	horizontal resolution: double
+				 * x3:	horizontal resolution: triple
+				 * ct	ClearType (otherwise: RGB)
+				& marks the beginning of the text to be rendered.
+				⚠No ?queryString is processed after the "font" customloader. <- This is an odd behavior.
+				/+Todo: Encode special with url percent encoder  %20, ....  &, ?, % must be encoded at least.+/
+			
+			/+Code: temp:\+//+Code: custom filename+/
+			A new bitmap is created and returned.
+			The bitmap is resident in memory, it will never be deallocated upon GC.
+			Application must ensure thread safety or create a new bitmap and update it with bitmaps.set(...).
+			
+			/+Code: virtual:\+//+Code: custom filename+/
+			Virtual files are not just bitmaps, they are stored in memory. 
+			Bitmap system can access them like OS files. 
+			Most File() operations are working on them and they generate automatic change/refresh cotifications.
+			
+			/+Code: desktop:\+/ Captures the current desktop image.
+			/+Code: monitor:\+/ Captures the current main monitor image.
+			
+			/+Code: clipboard:\+/ Reads the bitmap from the clipboard, if there is one.
+			
+			/+Code: debug:\+/ 	Some kind if calculated test patterns.	/+Todo: These are the example of why a plugin system is needed here.+/
+			
+			/+Code: icon:\+//+Code: .bat+/	extension icon
+			/+Code: icon:\+//+Code: c:\+/	dive icon
+			/+Code: icon:\+//+Code: folder\+/	general folder icon ("folder" is a literal text, not a specific, existing folder)
+			options:
+				* /+Code: &large+/, /+Code: &32+/ (default)
+				* /+Code: &small+/, /+Code: &16+/
+				
+			/+Code: colormap:\+/ Generates a palette from a named Python matplotlib ColorMap. Example: viridis
+		+/
+		
+	}
+	
+	
+	
+	
+	
+	
+	
 	struct BitmapTransformation
 	{
 		//BitmapTransformation (thumb) ////////////////////////////////////
@@ -174,16 +472,19 @@ version(/+$DIDE_REGION+/all)
 				)
 				{
 					const prefix = file.queryString.command;
-					if(auto a = prefix in customBitmapTransformers)
+					if(prefix!="")
 					{
-						customBitmapTransformer = *a;
-						originalFile = file.withoutQueryString;
-						isCustom = true;
-					}
-					else
-					{
-						LOG(file);
-						WARN("Unknown customBitmapTransforer: "~prefix.quoted);
+						if(auto a = prefix in customBitmapTransformers)
+						{
+							customBitmapTransformer = *a;
+							originalFile = file.withoutQueryString;
+							isCustom = true;
+						}
+						else
+						{
+							LOG(file);
+							WARN("Unknown customBitmapTransforer: "~prefix.quoted);
+						}
 					}
 				}
 			}
@@ -261,9 +562,6 @@ version(/+$DIDE_REGION+/all)
 		enforce(!(prefix in customBitmapTransformers), "Already registered customBitmapTransformer. Prefix: "~prefix);
 		customBitmapTransformers[prefix] = transformer;
 	}
-	
-	
-	
 	
 	private BitmapCacheStats _bitmapCacheStats; //this is a result
 	
@@ -370,9 +668,14 @@ version(/+$DIDE_REGION+/all)
 			{
 				Bitmap res;
 				
-				bool delayed = cmd==BitmapQueryCommand.access_delayed;
-				if(file.driveIs(`font`) || file.driveIs(`temp`) || file.driveIs(`icon`)) delayed = false; 
-				//Todo: delayed restriction. should refactor this nicely. Use hash map and centralize nondelayed file types.
+				const delayed = (){
+					if(cmd==BitmapQueryCommand.access_delayed)
+					{
+						const d = file.drive.withoutEnding(':');
+						return d.length<=1 || d.among("virtual");
+					}
+					return false;
+				}();
 				
 				auto tr = file.BitmapTransformation;
 				
@@ -617,227 +920,37 @@ version(/+$DIDE_REGION+/all)
 			
 			return res;
 		}
-	}
-	Bitmap newBitmap_internal(string fn, bool mustSucceed=true)
-	{
-		//Todo: handle mustSuccess with an outer try catch{}, not with lots of ifs.
-		//when tere is an error, always raise an exception, catch will handle it. If mustSuccess, it will reraise. Otherwise it can drop a WARN.
-		
-		//split prefix:\line
-		auto prefix = fn.until!(not!isAlphaNum).text;
-		auto line = fn;
-		if(prefix.length>1 && fn[prefix.length..$].startsWith(`:\`))
-		{
-			line = fn[prefix.length+2..$];
-			prefix = prefix.lc;
-		}else { prefix = ""; }
-		
-		//Opt: this if chain is slow
-		
-		if(prefix=="")	{
-			//threat it as a simple filename
-			return File(fn).deserialize!Bitmap(mustSucceed);
-		}
-		else if(prefix=="font")	{
-			//Todo: font and icon should be put in a list that ensures the following: bitmap.resident, no delayed load
-			version(D2D_FONT_RENDERER)
-			{
-				auto res = bitmapFontRenderer.renderDecl(fn); //Todo: error handling, mustExists
-				if(res.valid) res.resident = true; //dont garbagecollect fonts because they are slow to generate
-				return res;
-			}
-			else { enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!"); }
-		}
-		else if(prefix=="temp")	{ auto b = new Bitmap; b.resident = true; b.file = File(fn); return b; }
-		else if(prefix=="virtual")	{ return File(fn).deserialize!Bitmap(mustSucceed); }
-		else if(prefix=="desktop")	{ return getDesktopSnapshot; }
-		else if(prefix=="monitor")	{
-			return getPrimaryMonitorSnapshot; //Todo: monitor indexing
-		}
-		else if(prefix=="debug")	{
-			 //debug images
-			uint color = (line.to!int)>>1;
-			color = color | (255-color)<<8;
-			return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color)));
-		}
-		else if(prefix=="icon")	{
-			//folder: icon:\folder\    //"folder" is a literal!!!
-			//drive: icon:\d:\
-			//file: icon:\.bat
-			
-			//Todo: LoadIcon from dll/exe
-			
-			//options: ?small ?16 ?large ?32
-			
-			auto res = getAssociatedIconBitmap(line);
-			if(mustSucceed & !res) raise("Unable to get associated icon for `"~fn~"`");
-			
-			if(res.valid) res.resident = true;
-			return res;
-		}
-		else	{
-			auto loader = prefix in customBitmapLoaders;
-			if(loader)
-			return (*loader)(line);
-		}
-		
-		raise("Unknown prefix: "~prefix~`:\`);
-		return null; //raise is not enough
-		
-		//if(fn.startsWith(`screenShot:\`)){
-		//Todo: screenshot implementalasa
-		
-		/*
-			   auto gBmp = new GdiBitmap(ivec2(screenWidth, screenHeight), 4);
-			BitBlt(gBmp.hdcMem, 0, 0, gBmp.size.x, gBmp.size.y, GetDC(NULL), 0, 0, SRCCOPY).writeln;
-		*/
-		
-		//Todo: bitmap clipboard operations
-		/*
-			// save bitmap to clipboard
-				OpenClipboard(NULL);
-				EmptyClipboard();
-				SetClipboardData(CF_BITMAP, hBitmap);
-				CloseClipboard();
-		*/
-		
-		
-		/*
-			HDC	hScreen = GetDC(NULL);
-				HDC	hDC	=	CreateCompatibleDC(hScreen);
-				HBITMAP	hBitmap	= CreateCompatibleBitmap(hScreen, abs(b.x-a.x), abs(b.y-a.y));
-				HGDIOBJ	old_obj	= SelectObject(hDC, hBitmap);
-				BOOL	bRet	= BitBlt(hDC, 0, 0, abs(b.x-a.x), abs(b.y-a.y), hScreen, a.x, a.y, SRCCOPY);
-			
-				// save bitmap to clipboard
-				OpenClipboard(NULL);
-				EmptyClipboard();
-				SetClipboardData(CF_BITMAP, hBitmap);
-				CloseClipboard();
-			
-			 // clean up
-			 SelectObject(hDC, old_obj);
-			 DeleteDC(hDC);
-			 ReleaseDC(NULL, hScreen);
-			 DeleteObject(hBitmap);
-		*/
-		//}
-		
-		//debug images
-		
-		//otherwise File
-		//return new Bitmap(File(fn).read(mustExist));
-	}
-	
-	private __gshared Bitmap function(string)[string] customBitmapLoaders;
-	
-	void registerCustomBitmapLoader(string prefix, Bitmap function(string) loader) //Todo: make it threadsafe
-	in(prefix.length>=2, "invalid prefix string")
-	{
-		prefix = prefix.lc;
-		enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
-		customBitmapLoaders[prefix] = loader;
-	}
-	
-	Bitmap colorMapBitmapLoader(string name)
-	{
-		enforce(name in colorMaps);
-		auto 	width = 128,
-			raw = colorMaps[name].toArray!RGBA(width),
-			img = image2D(width, 1, raw),
-			bmp = new Bitmap(img);
-		return bmp;
-	}
-	
-	//Load a bitmap immediately with optional error handling. No caching, no thumbnail/transformations.
-	auto newBitmap(File file, ErrorHandling errorHandling)
-	{
-		 //newBitmap() ////////////////////////////
-		Bitmap res;
-		final switch(errorHandling)
-		{
-			case ErrorHandling.raise 	:{
-				try { res = newBitmap_internal(file, true); }
-				catch(Exception e) { throw e; }
-			}	break;
-			case ErrorHandling.track 	:{
-				try { res = newBitmap_internal(file, true); }
-				catch(Exception e) { WARN(e.simpleMsg); res = newErrorBitmap(e.simpleMsg); }
-			}	break;
-			case ErrorHandling.ignore	:{
-				try { res = newBitmap_internal(file, true); }
-				catch(Exception e) { res = newErrorBitmap(e.simpleMsg); }
-			}	break;
-		}
-		res.file = file;
-		res.modified = file.modified;
-		return res;
-	}
-	
-	//Todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
-	auto isFontDeclaration(string s)
-	{ return s.startsWith(`font:\`); }
-	
-	private Bitmap newSpecialBitmap(string error="")
-	{
-		const loading = error=="loading";
-		auto bmp = new Bitmap(image2D(1, 1, loading ? RGBA(0xFFC0C0C0) : RGBA(0xFFFF00FF)));
-		bmp.markChanged;
-		if(loading) { bmp.loading = true; }else { if(error) bmp.error = error; }
-		return bmp;
-	}
-	
-	Bitmap newErrorBitmap(string cause)
-	{ return newSpecialBitmap(cause); }
-	private Bitmap newLoadingBitmap()
-	{ return newSpecialBitmap("loading"); }
-	
-	private Bitmap newBitmap_internal(in ubyte[] data, bool mustSucceed=true)
-	{ return data.deserialize!Bitmap(mustSucceed); }
-	
-	private Bitmap newBitmap_internal(in File file, bool mustSucceed=true)
-	{ return newBitmap_internal(file.fullName, mustSucceed); }
-	
-	/// Gets the modified time of any given filename. Including real/virtual files, fonts, transformed images, thumbnails
-	/// returns null if unknown
-	auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.virtualOnly/*Todo: preproc*/)
-	{
-		if(file) {
-			auto drive = file.drive;
-			if(!virtualOnly || drive!="virtual") { return file.withoutQueryString.modified; }
-		}
-		return DateTime.init;
 	}
 	
 	__gshared struct bitmaps
 	{
-		static: //bitmaps() ///////////////////////////////////////////
-			auto opCall(F)(F file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null)
+		static:
+		auto opCall(F)(F file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null)
 		{ return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling, bmp); }
-			auto opCall(F)(F file, ErrorHandling errorHandling, Flag!"delayed" delayed=No.delayed, Bitmap bmp=null)
+		auto opCall(F)(F file, ErrorHandling errorHandling, Flag!"delayed" delayed=No.delayed, Bitmap bmp=null)
 		{ return opCall(file, delayed, errorHandling, bmp); }
 		
-			auto opIndex(F)(F file)
+		auto opIndex(F)(F file)
 		{ return opCall(file, No.delayed, ErrorHandling.raise); }
 		
-			auto opIndexAssign(F)(Bitmap bmp, F file)
+		auto opIndexAssign(F)(Bitmap bmp, F file)
 		{ /*enforce(bmp && bmp.valid);*/ return opCall(file, No.delayed, ErrorHandling.raise, bmp); }
 		
-			auto opIndexAssign(F, I)(I img, F file) if(isImage2D!I)
+		auto opIndexAssign(F, I)(I img, F file) if(isImage2D!I)
 		{ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); }
 		
-			void remove (F)(F file)
+		void remove (F)(F file)
 		{ bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
 		
-			BitmapCacheStats stats()
+		BitmapCacheStats stats()
 		{ bitmapQuery(BitmapQueryCommand.stats  , File(), ErrorHandling.ignore); return _bitmapCacheStats; }
-			BitmapCacheStats details()
+		BitmapCacheStats details()
 		{ bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); return _bitmapCacheStats; }
 		
-			void garbageCollect()
+		void garbageCollect()
 		{ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); }
-			
-			void set(File f, Bitmap bmp)
+		
+		void set(File f, Bitmap bmp)
 		{
 			enforce(f);
 			enforce(bmp);
@@ -1285,10 +1398,6 @@ version(/+$DIDE_REGION+/all)
 }
 version(/+$DIDE_REGION+/all)
 {
-	
-	
-	//BitmapInfo ///////////////////////////////////
-	
 	immutable supportedBitmapExts = ["webp", "png", "jpg", "jpeg", "bmp", "tga", "gif"];
 	immutable supportedBitmapFilter = supportedBitmapExts.map!(a=>"*."~a).join(';');
 	
@@ -2140,23 +2249,23 @@ version(/+$DIDE_REGION+/all)
 		return ibounds2(pos, pos+getDesktopSize);
 	}
 	
-	auto getSnapshot(in ibounds2 bnd)
+	auto getDesktopSnapshot(in ibounds2 bnd)
 	{
 		auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.free;
 		auto dc = GetDC(null); scope(exit) ReleaseDC(null, dc);
 		BitBlt(gBmp.hdcMem, 0, 0, bnd.width, bnd.height, dc, bnd.left, bnd.top, SRCCOPY);
-		
-		auto bmp = new Bitmap(gBmp.toImage);
+		auto img = gBmp.toImage;
+		img.asArray.rgba_to_bgra_inplace;
+		auto bmp = new Bitmap(img);
 		bmp.modified = now;
 		return bmp;
 	}
 	
 	auto getDesktopSnapshot()
-	{ return getSnapshot(getDesktopBounds); }
+	{ return getDesktopSnapshot(getDesktopBounds); }
 	auto getPrimaryMonitorSnapshot()
-	{ return getSnapshot(getPrimaryMonitorBounds); }
+	{ return getDesktopSnapshot(getPrimaryMonitorBounds); }
 	
-	//Icon /////////////////////////////////////
 	
 	private HICON getAssociatedIcon(string fn)
 	{
@@ -2266,14 +2375,9 @@ version(/+$DIDE_REGION+/all)
 		
 		return null;
 	}
-	
-	
-	
-	//GdiBitmap class ////////////////////////////////////
-	
 	class GdiBitmap
 	{
-		 //holds a windows gdi bitmap and makes it accessible as a normal RGBA Image or Bitmap object
+		//holds a windows gdi bitmap and makes it accessible as a normal RGBA Image or Bitmap object
 		ivec2 size;
 		HBITMAP hBitmap;
 		static HDC hdcMem, hdcScreen; //needs only one of these
@@ -2316,8 +2420,11 @@ version(/+$DIDE_REGION+/all)
 		{
 			auto img = image2D(size, RGBA(0));
 			if(!img.empty)
-			if(!GetDIBits(hdcMem, hBitmap, 0, size.y, img.asArray.ptr, &bmi, DIB_RGB_COLORS))
-			raiseLastError;
+			{
+				if(!GetDIBits(hdcMem, hBitmap, 0, size.y, img.asArray.ptr, &bmi, DIB_RGB_COLORS))
+				raiseLastError;
+			}
+			
 			return img;
 		}
 		
@@ -3169,5 +3276,5 @@ version(/+$DIDE_REGION+/all)
 	*/
 	
 	shared static this()
-	{ registerCustomBitmapLoader("colormap", &colorMapBitmapLoader); }
+	{ registerDefaultBitmapLoaders; }
 }

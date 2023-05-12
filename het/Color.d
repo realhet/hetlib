@@ -8,7 +8,7 @@ version(/+$DIDE_REGION+/all)
 	{ return x * (1.0f/255);	 }
 	
 	
-	template transformArray(alias fun, alias sseFun)
+	template transformArray(alias fun, alias sseFun, bool inplace=false)
 	{
 		alias SrcElementType = const(Parameters!fun[0]), 	SrcElementTypeSSE = const(Parameters!sseFun[0]),
 		DstElementType = Parameters!fun[1],	DstElementTypeSSE = Parameters!sseFun[1];
@@ -21,7 +21,15 @@ version(/+$DIDE_REGION+/all)
 		
 		auto transformArray(in SrcElementType[] src)
 		{
-			auto dst = uninitializedArray!(DstElementType[])(src.length);
+			static if(inplace)
+			{
+				static assert(SrcElementType.sizeof==DstElementType.sizeof);
+				auto dst = cast(DstElementType[])src;
+			}
+			else
+			{
+				auto dst = uninitializedArray!(DstElementType[])(src.length);
+			};
 			
 			size_t 	i = 0;
 			const 	len = src.length;
@@ -58,7 +66,17 @@ version(/+$DIDE_REGION+/all)
 		
 		auto classic(in SrcElementType[] src)
 		{
-			auto dst = uninitializedArray!(DstElementType[])(src.length);
+			static if(inplace)
+			{
+				static assert(SrcElementType.sizeof==DstElementType.sizeof);
+				auto dst = cast(DstElementType[])src;
+			}
+			else
+			{
+				auto dst = uninitializedArray!(DstElementType[])(src.length);
+			}
+			//todo: copy paste suxxx
+			
 			for(
 				auto 	pSrc	= src.ptr,
 					pEnd 	= pSrc + src.length,
@@ -99,7 +117,8 @@ version(/+$DIDE_REGION+/all)
 		static immutable ubyte16 mask = [2, 1, 0, 3, 6, 5, 4, 7, 10, 9, 8, 11, 14, 13, 12, 15];
 		dst = pshufb(src, mask);
 	}
-	alias rgba_to_bgra = transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd);
+	alias rgba_to_bgra 	= transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd),
+	rgba_to_bgra_inplace 	= transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd, true);
 	
 	void rgb_to_bgra_scalar(const ref RGB src, ref RGBA dst)
 	{ dst = src.bgr1; }
