@@ -345,9 +345,9 @@ version(/+$DIDE_REGION+/all)
 			
 			/+Code: customLoaderId:\+//+Code: drive:\path\name.ext+//+Code: &opt1&opt2=val+//+Code: ?opt3&opt4=val+/
 			
-			* optional custom loader:	/+Code: customLoaderId:\+/	(a..z are reserved for drive letters)
+			* optional custom loader:	/+Code: customLoaderId:\+/ (a..z are reserved for drive letters)
 			* required filename:   	/+Code: dirve:\path\name.ext+/ or /+Code: http://a.com/index.html+/	
-			* optional resource options: 	/+Code: &name&key=value& ...+/	(up until this it can be processed as a queryString)
+			* optional resource options: 	/+Code: &name&key=value& ...+/ (up until this it can be processed as a queryString)
 			* optional queryString:	/+Code: ?name&key=value& ...+/ (this is thequeryString after the ?)
 			
 			Restrictions: ⚠Some CustomLoaders are using '&' to locate their parameters. Avoid using '&' in those filenames!

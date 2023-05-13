@@ -751,7 +751,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				string asText() { return getText; }
 				void asText(string s) { setText(s, true); }
 				
-				auto sequenceNumber() { return GetClipboardSequenceNumber; }
+				uint sequenceNumber() { return GetClipboardSequenceNumber; }
 			}
 		}
 	}version(/+$DIDE_REGION+/all)
