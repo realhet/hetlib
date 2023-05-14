@@ -321,7 +321,7 @@ version(/+$DIDE_REGION+/all)
 		
 			virtualFileCount, allVirtualFileSize, residentVirtualFileSize,
 		
-			UPS, FPS, TPS, VPS,
+			UPS, FPS, TPS/+Bug: TPS calculation is bogus, it shows too big values+/, VPS,
 		
 			gcUsed, gcFree, gcAll, gcRate;
 		

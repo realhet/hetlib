@@ -116,7 +116,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				//strip off prefix:\ and call a loader with the remaining text
 				fn = fn[prefix.length+2..$];
-				auto loader = prefix in customBitmapLoaders;
+				auto loader = prefix in bitmapLoaders.functions;
 				if(loader) return (*loader)(fn).enforce("Unable to load bitmap (null returned by loader): "~fn.quoted);
 			}
 			else
@@ -218,40 +218,106 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	
-	
-	private __gshared Bitmap function(string)[string] customBitmapLoaders;
-	
-	void registerBitmapLoader(string prefix, Bitmap function(string) loader) //Todo: make it threadsafe
-	in(prefix.length>=2, "invalid prefix string")
+	mixin template PluginTemplate(string name, string postfix, alias Function_, alias UDA)
 	{
-		prefix = prefix.lc;
-		enforce(!(prefix in customBitmapLoaders), "Already registered customBitmapLoader. Prefix: "~prefix);
-		customBitmapLoaders[prefix] = loader;
-		LOG("BitmapLoader registered:", prefix);
+		static:
+		
+		alias Function = Function_;
+		
+		private __gshared Function[string] functions;
+		
+		void register(string prefix, Function fun) //Todo: make it threadsafe
+		{
+			enforce(prefix.length>=2, "Invalid prefix string.");
+			prefix = prefix.lc;
+			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix);
+			functions[prefix] = fun;
+			LOG(name ~ " successfully registered:", prefix);
+		}
+		
+		void register(alias fun)()
+		{
+			static assert(__traits(isStaticFunction, fun));
+			enum name = __traits(identifier, fun);static assert(name.endsWith(postfix));
+			enum prefix = name.withoutEnding(postfix);static assert(prefix == prefix.lc);
+			register(prefix, &fun);
+		}
+		
+		private void registerMarkedFunctions(alias obj)()
+		{
+			foreach(name; __traits(allMembers, obj))
+			{
+				alias member = __traits(getMember, obj, name);
+				static if(__traits(isStaticFunction, member) && hasUDA!(member, UDA))
+				register!member;
+			}
+		}
 	}
 	
 	struct BITMAPLOADER; //uda
+	struct bitmapLoaders
+	{ mixin PluginTemplate!("BitmapLoader", "Bitmap", Bitmap function(string), BITMAPLOADER); }
 	
-	void registerBitmapLoader(alias fun)()
-	{
-		static assert(__traits(isStaticFunction, fun));
-		enum name = __traits(identifier, fun);static assert(name.endsWith("Bitmap"));
-		enum prefix = name.withoutEnding("Bitmap");static assert(prefix == prefix.lc);
-		registerBitmapLoader(prefix, &fun);
-	}
+	struct BITMAPEFFECT; //uda
+	struct bitmapEffects
+	{ mixin PluginTemplate!("BitmapEffect", "Effect", Bitmap function(Bitmap, in QueryString), BITMAPEFFECT); }
 	
-	private void registerDefaultBitmapLoaders()
-	{
-		foreach(name; __traits(allMembers, mixin(__MODULE__)))
-		{
-			alias member = __traits(getMember, mixin(__MODULE__), name);
-			static if(__traits(isStaticFunction, member) && hasUDA!(member, BITMAPLOADER))
-			registerBitmapLoader!member;
-		}
-	}
+	
+	
 	
 	@BITMAPLOADER
 	{
+		/+
+			Note: HETLIB Resource Identifier format specification
+			
+			/+Code: customLoaderId:\+//+Code: drive:\path\name.ext+//+Code: &opt1&opt2=val+//+Code: ?opt3&opt4=val+/
+			
+			* optional custom loader:	/+Code: customLoaderId:\+/ (a..z are reserved for drive letters)
+			* required filename:   	/+Code: dirve:\path\name.ext+/ or /+Code: http://a.com/index.html+/	
+			* optional resource options: 	/+Code: &name&key=value& ...+/ (up until this it can be processed as a queryString)
+			* optional queryString:	/+Code: ?name&key=value& ...+/ (this is thequeryString after the ?)
+			
+			Restrictions: ⚠Some CustomLoaders are using '&' to locate their parameters. Avoid using '&' in those filenames!
+			
+			Custom loaders:
+			
+			/+Code: font:\+//+Code: Times New Roman\64\x3\ct+//+Code: &ABC 123+/   Note: No queryString is processed after font:/
+			path elements:
+				 * fontname:	(req.)
+				 * number:	(req.) height in pixels
+				 * x2:	horizontal resolution: double
+				 * x3:	horizontal resolution: triple
+				 * ct	ClearType (otherwise: RGB)
+				& marks the beginning of the text to be rendered.
+				⚠No ?queryString is processed after the "font" customloader. <- This is an odd behavior.
+				/+Todo: Encode special with url percent encoder  %20, ....  &, ?, % must be encoded at least.+/
+			
+			/+Code: temp:\+//+Code: custom filename+/
+			A new bitmap is created and returned.
+			The bitmap is resident in memory, it will never be deallocated upon GC.
+			Application must ensure thread safety or create a new bitmap and update it with bitmaps.set(...).
+			
+			/+Code: virtual:\+//+Code: custom filename+/
+			Virtual files are not just bitmaps, they are stored in memory. 
+			Bitmap system can access them like OS files. 
+			Most File() operations are working on them and they generate automatic change/refresh cotifications.
+			
+			/+Code: desktop:\+/ Captures the current desktop image.
+			/+Code: monitor:\+/ Captures the current main monitor image.
+			
+			/+Code: clipboard:\+/ Reads the bitmap from the clipboard, if there is one.
+			
+			/+Code: debug:\+/ 	Some kind if calculated test patterns.	/+Todo: These are the example of why a plugin system is needed here.+/
+			
+			/+Code: icon:\+//+Code: .bat+/	extension icon
+			/+Code: icon:\+//+Code: c:\+/	dive icon
+			/+Code: icon:\+//+Code: folder\+/	general folder icon ("folder" is a literal text, not a specific, existing folder)
+			options:
+				* /+Code: &large+/, /+Code: &32+/ (default)
+				* /+Code: &small+/, /+Code: &16+/
+				
+			/+Code: colormap:\+/ Generates a palette from a named Python matplotlib ColorMap. Example: viridis
+		+/
 		
 		Bitmap fontBitmap(string name)
 		{
@@ -323,7 +389,10 @@ version(/+$DIDE_REGION+/all)
 			
 			//options: ?small ?16 ?large ?32
 			
-			auto res = getAssociatedIconBitmap(name);
+			auto res = getAssociatedIconBitmap(
+				name.replace('&', '?')
+				/+Todo: This is a nasty and inefficient  hack+/
+			);
 			if(!res) raise("Unable to get associated icon for " ~ name.quoted);
 			
 			if(res.valid) res.resident = true;
@@ -339,59 +408,6 @@ version(/+$DIDE_REGION+/all)
 				bmp = new Bitmap(img);
 			return bmp;
 		}
-		
-		/+
-			Note: HETLIB Resource Identifier format specification
-			
-			/+Code: customLoaderId:\+//+Code: drive:\path\name.ext+//+Code: &opt1&opt2=val+//+Code: ?opt3&opt4=val+/
-			
-			* optional custom loader:	/+Code: customLoaderId:\+/ (a..z are reserved for drive letters)
-			* required filename:   	/+Code: dirve:\path\name.ext+/ or /+Code: http://a.com/index.html+/	
-			* optional resource options: 	/+Code: &name&key=value& ...+/ (up until this it can be processed as a queryString)
-			* optional queryString:	/+Code: ?name&key=value& ...+/ (this is thequeryString after the ?)
-			
-			Restrictions: ⚠Some CustomLoaders are using '&' to locate their parameters. Avoid using '&' in those filenames!
-			
-			Custom loaders:
-			
-			/+Code: font:\+//+Code: Times New Roman\64\x3\ct+//+Code: &ABC 123+/   Note: No queryString is processed after font:/
-			path elements:
-				 * fontname:	(req.)
-				 * number:	(req.) height in pixels
-				 * x2:	horizontal resolution: double
-				 * x3:	horizontal resolution: triple
-				 * ct	ClearType (otherwise: RGB)
-				& marks the beginning of the text to be rendered.
-				⚠No ?queryString is processed after the "font" customloader. <- This is an odd behavior.
-				/+Todo: Encode special with url percent encoder  %20, ....  &, ?, % must be encoded at least.+/
-			
-			/+Code: temp:\+//+Code: custom filename+/
-			A new bitmap is created and returned.
-			The bitmap is resident in memory, it will never be deallocated upon GC.
-			Application must ensure thread safety or create a new bitmap and update it with bitmaps.set(...).
-			
-			/+Code: virtual:\+//+Code: custom filename+/
-			Virtual files are not just bitmaps, they are stored in memory. 
-			Bitmap system can access them like OS files. 
-			Most File() operations are working on them and they generate automatic change/refresh cotifications.
-			
-			/+Code: desktop:\+/ Captures the current desktop image.
-			/+Code: monitor:\+/ Captures the current main monitor image.
-			
-			/+Code: clipboard:\+/ Reads the bitmap from the clipboard, if there is one.
-			
-			/+Code: debug:\+/ 	Some kind if calculated test patterns.	/+Todo: These are the example of why a plugin system is needed here.+/
-			
-			/+Code: icon:\+//+Code: .bat+/	extension icon
-			/+Code: icon:\+//+Code: c:\+/	dive icon
-			/+Code: icon:\+//+Code: folder\+/	general folder icon ("folder" is a literal text, not a specific, existing folder)
-			options:
-				* /+Code: &large+/, /+Code: &32+/ (default)
-				* /+Code: &small+/, /+Code: &16+/
-				
-			/+Code: colormap:\+/ Generates a palette from a named Python matplotlib ColorMap. Example: viridis
-		+/
-		
 	}
 	
 	
@@ -403,7 +419,7 @@ version(/+$DIDE_REGION+/all)
 	struct BitmapTransformation
 	{
 		//BitmapTransformation (thumb) ////////////////////////////////////
-		enum thumbKeyword = "?thumb";
+		enum thumbKeyword = "?thumbOld";
 		//?thumb32w		 specifies maximum width
 		//?thumb32h		 specifies maximum height
 		//?thumb32wh	  specifies maximum width and maximum height
@@ -428,8 +444,8 @@ version(/+$DIDE_REGION+/all)
 		bool isHistogram, isGrayHistogram;
 		//Todo: this is lame. This should be solved by registered plugins.
 		
-		bool isCustom;
-		BitmapTransformer customBitmapTransformer;
+		bool isEffect;
+		bitmapEffects.Function bitmapEffectFunction;
 		
 		this(File file)
 		{
@@ -453,11 +469,11 @@ version(/+$DIDE_REGION+/all)
 				
 				ignoreExceptions({ thumbMaxSize = thumbDef.to!int; });
 			}
-			else if(file.fullName.canFind("?histogram"))	{
+			else if(file.fullName.canFind("?histogramOld"))	{
 				originalFile = File(orig[0..orig.countUntil('?')]);
 				isHistogram = true;
 			}
-			else if(file.fullName.canFind("?grayHistogram"))	{
+			else if(file.fullName.canFind("?grayHistogramOld"))	{
 				originalFile = File(orig[0..orig.countUntil('?')]);
 				isGrayHistogram = true;
 			}
@@ -474,16 +490,16 @@ version(/+$DIDE_REGION+/all)
 					const prefix = file.queryString.command;
 					if(prefix!="")
 					{
-						if(auto a = prefix in customBitmapTransformers)
+						if(auto a = prefix in bitmapEffects.functions)
 						{
-							customBitmapTransformer = *a;
+							bitmapEffectFunction = *a;
 							originalFile = file.withoutQueryString;
-							isCustom = true;
+							isEffect = true;
 						}
 						else
 						{
 							LOG(file);
-							WARN("Unknown customBitmapTransforer: "~prefix.quoted);
+							WARN("Unknown customBitmapTransformer: "~prefix.quoted);
 						}
 					}
 				}
@@ -492,7 +508,7 @@ version(/+$DIDE_REGION+/all)
 		
 		alias needTransform this;
 		bool needTransform()
-		{ return isThumb|| isHistogram || isGrayHistogram || isCustom; }
+		{ return isThumb|| isHistogram || isGrayHistogram || isEffect; }
 		
 		Bitmap transform(Bitmap orig)
 		{
@@ -534,8 +550,8 @@ version(/+$DIDE_REGION+/all)
 						float sc = 255.0f/histogramMax;
 						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
 					}
-					else if(isCustom)
-					{ return customBitmapTransformer(orig, transformedFile); }
+					else if(isEffect)
+					{ return bitmapEffectFunction(orig, transformedFile.queryString); }
 				}
 				catch(Exception e) WARN(e.simpleMsg);
 				
@@ -552,15 +568,77 @@ version(/+$DIDE_REGION+/all)
 		
 	}
 	
-	alias BitmapTransformer = Bitmap function(Bitmap, File);
-	
-	private __gshared BitmapTransformer[string] customBitmapTransformers;
-	
-	void registerCustomBitmapTransformer(string prefix, BitmapTransformer transformer)
+	@BITMAPEFFECT
 	{
-		prefix = prefix.lc;
-		enforce(!(prefix in customBitmapTransformers), "Already registered customBitmapTransformer. Prefix: "~prefix);
-		customBitmapTransformers[prefix] = transformer;
+		/+
+			Note: BitmapTransformers:
+			
+			/+Code: ?thumb+/
+				* number: (req.) Is the size of the thumbnail image.
+				* postfixes:
+					* /+Code: ?thumb&w=n+/ number specifies maximum width
+					* /+Code: ?thumb&h=n+/ number specifies maximum height
+					* /+Code: ?thumb=n+/ number specifies maximum width and height.
+			
+			/+Code: ?histogram+/	 Calculate RGB histogram of the image.
+			/+Code: ?histogram&gray+/	 Calculate lumonocity histogram og the image.
+			/+Code: ?grayscale+/	 Calculate grayscale image.
+		+/
+		
+		Bitmap thumbEffect(Bitmap original, in QueryString params)
+		{
+			if(original.size.area<=1) return original;
+			
+			//Todo: If the original bitmap is refreshed, this bitmap should be also invalidated.
+			//Todo: Find a way to weekly link this image to the original image to detect changes.
+			
+			ivec2 maxSize;
+			params("thumb", (int a){ maxSize = ivec2(a); });
+			params("w", maxSize.x);
+			params("h", maxSize.y);
+			
+			float scale = 1;
+			if(maxSize.x>0) scale.minimize(float(maxSize.x) / original.size.x);
+			if(maxSize.y>0) scale.minimize(float(maxSize.y) / original.size.y);
+			
+			//print(maxSize, original.size, scale, params);
+			
+			enum rationalScale = false;
+			if(rationalScale) scale = 1/floor(1/scale); //divide it to even parts
+			
+			if(scale<=.5f) {
+				ivec2 newSize = iround(original.size*scale);
+				return original.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
+			}
+			else
+			{ return original.shallowDup; }
+		}
+		
+		Bitmap histogramEffect(Bitmap original, in QueryString params)
+		{
+			const isGray = params.names.canFind("gray");
+			
+			if(!isGray)
+			{
+				auto img = original.accessOrGet!RGB;
+				uint[3][256] histogram;
+				foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++;
+				uint histogramMax = histogram[].map!(h => h[].max).array.max;
+				float sc = 255.0f/histogramMax;
+				return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc))));
+			}
+			else
+			{
+				auto img = original.accessOrGet!ubyte;
+				uint[256] histogram;
+				foreach(p; img.asArray) histogram[p]++;
+				uint histogramMax = histogram[].max;
+				float sc = 255.0f/histogramMax;
+				return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
+			}
+		}
+		Bitmap grayscaleEffect(Bitmap original, in QueryString params)
+		{ return new Bitmap(original.accessOrGet!ubyte); }
 	}
 	
 	private BitmapCacheStats _bitmapCacheStats; //this is a result
@@ -950,13 +1028,23 @@ version(/+$DIDE_REGION+/all)
 		void garbageCollect()
 		{ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); }
 		
-		void set(File f, Bitmap bmp)
+		void set(F)(F file, Bitmap bmp)
 		{
+			auto f = File(file);
 			enforce(f);
 			enforce(bmp);
 			
 			bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp);
 		}
+		
+		void refresh(F)(F file)
+		{
+			auto f = File(file);
+			auto b = newBitmap(f, ErrorHandling.track); //Todo: this reallocates the buffer, it's a waste of GC
+			b.modified = now;
+			bitmaps.set(f, b);
+		}
+		
 	}
 	
 	void testBitmaps()
@@ -1549,6 +1637,8 @@ version(/+$DIDE_REGION+/all)
 	
 	class Bitmap
 	{
+		//Todo: Bitmaps as const (in) parameters. Currentrly they are useles.
+		
 		private
 		{
 			void[] data_;
@@ -1777,15 +1867,18 @@ version(/+$DIDE_REGION+/all)
 			markChanged;
 		}
 		
-		Bitmap dup()
+		Bitmap dup(Flag!"shallow" shallow = No.shallow)
 		{
 			auto b = new Bitmap;
 			b.file = file;
 			b.modified = modified;
 			b.error = error;
-			b.setRaw(data_.dup, width, height, channels, type);
+			b.setRaw(shallow ? data_ : data_.dup, width, height, channels, type);
 			return b;
 		}
+		
+		Bitmap shallowDup()
+		{ return dup(Yes.shallow); }
 		
 		void saveTo(F)(in F file)
 		{
@@ -3276,5 +3369,8 @@ version(/+$DIDE_REGION+/all)
 	*/
 	
 	shared static this()
-	{ registerDefaultBitmapLoaders; }
+	{
+		bitmapLoaders.registerMarkedFunctions!(mixin(__MODULE__));
+		bitmapEffects.registerMarkedFunctions!(mixin(__MODULE__));
+	}
 }

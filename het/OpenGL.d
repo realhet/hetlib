@@ -2413,7 +2413,8 @@ version(/+$DIDE_REGION+/all)
 			gl.pixelStore(GL_UNPACK_ROW_LENGTH, stride);
 			gl.texSubImage2D(GL_TEXTURE_2D, 0, x, y, xs, ys, GL_FORMAT(type), GL_DATATYPE(type), data);
 			
-			global_TPSCnt += resSize;
+			//update statistics
+			global_TPSCnt += xs * ys * GL_COMPONENTSIZE(type_);
 			
 			mipmapBuilt = false; //Todo: rebuild mipmap
 		}

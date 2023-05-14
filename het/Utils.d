@@ -106,6 +106,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			public import quantities.si;
 			
+			public import std.concurrency :  spawn, initOnce;
 			
 			import std.encoding : transcode, Windows1252String;
 			import std.exception : stdEnforce = enforce;
@@ -245,7 +246,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		__gshared static private
 		{
 			//__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
-			bool initialized, finalized;
+			bool initialized, finalized, running_;
 			
 			//Lets the executable stopped from DIDE when the windows message loop is not responding.
 			class KillerThread: Thread
@@ -294,39 +295,42 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 					
 			KillerThread killerThread;
-					
+			
 		}
 		__gshared static public
 		{
 			uint tick; //enough	for 2 years @ 60Hz
 			DateTime tickTime;	//it is always behind one frame time compared to now(). But it is only accessed once per frame. If there is LAG, it is interpolated.
 			Time deltaTime;
-					
+			
 			import core.runtime : Runtime;
 			alias args = Runtime.args;
-					
+			
+			@property bool running()
+			{ return running_; }
+			
 			void function() _windowInitFunct; //Todo: should be moved to win.d //Win.d call it from it's own main.
-					
+			
 			void exit(int code=0)
 			{
 				//immediate exit
 				try { _finalize; }catch(Throwable) {}
 				ExitProcess(code);
 			}
-					
+			
 			void _initialize()
 			{
 				//win.main() or runConsole() calls this.
 				if(chkSet(initialized))
 				{
+					running_ = true;
 					SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS);
-							
 					dbg; //start it up
 					killerThread = new KillerThread;  killerThread.start;
 					console.handleException({ globalInitialize; });
 				}
 			}
-					
+			
 			void _finalize()
 			{
 				//win.main() or runConsole() calls this.
@@ -336,10 +340,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					console.handleException({ globalFinalize; });
 					killerThread.stop;
 					//dont! -> destroy(killerThread); note: Sometimes it is destroyed automatically, and this causes an access viole reading from addr 0
+					running_ = false;
 				}else
 				enforce(false, "Application is already finalized"); 
 			}
-					
+			
 			int runConsole(void delegate() dg)
 			{
 				enforce(!initialized, "Application.run(): Already running.");
@@ -5474,6 +5479,7 @@ version(/+$DIDE_REGION Containers+/all)
 			
 			Item[] items; //all items
 			string[] names; //only names without values
+			//Todo: accelerate with assoc array
 			string[string] options; //all name/value pairs
 			
 			auto files() const { return names.map!File; }
@@ -5517,6 +5523,9 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 			}
 			
+			string option(string name) const
+			{ return option(name, ""); }
+			
 			T option(T)(string name, in T def) const
 			{
 				if(auto a = name in options)
@@ -5524,14 +5533,11 @@ version(/+$DIDE_REGION Containers+/all)
 				return def;
 			}
 			
-			string option(string name) const
-			{ return option(name, ""); }
+			void opCall(T)(string name, void delegate(T) fun) const
+			{ if(auto a = name in options) fun((*a).to!T); }
 			
-			string opCall(string name) const
-			{ return option(name); }
-			
-			T opCall(T)(string name, in T def) const
-			{ return option(name, def); }
+			void opCall(T)(string name, ref T var) const
+			{ if(auto a = name in options) var = (*a).to!T; }
 			
 			alias items this;
 			
@@ -5562,8 +5568,8 @@ version(/+$DIDE_REGION Containers+/all)
 				write("Items "); a.each.print;
 				write("Names "); a.names.each!print;
 				write("Files "); a.files.each!print;
-				write("Param access "); a("param").print;
-				write("Float access "); a("float", 0.0f).print;
+				write("Param access "); a.option("param").print;
+				write("Float access "); a.option("float", 0.0f).print;
 				print;
 				write("QueryString access"); a.files.back.queryString.each!print;
 			}
