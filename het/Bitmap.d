@@ -576,6 +576,7 @@ version(/+$DIDE_REGION+/all)
 			/+Code: ?thumb+/
 				* number: (req.) Is the size of the thumbnail image.
 				* postfixes:
+					* /+Code: ?thumb&d=n+/ float number, max width and height = original.size / n
 					* /+Code: ?thumb&w=n+/ number specifies maximum width
 					* /+Code: ?thumb&h=n+/ number specifies maximum height
 					* /+Code: ?thumb=n+/ number specifies maximum width and height.
@@ -593,6 +594,11 @@ version(/+$DIDE_REGION+/all)
 			//Todo: Find a way to weekly link this image to the original image to detect changes.
 			
 			ivec2 maxSize;
+			
+			float divisor=0;
+			params("d", divisor);
+			if(divisor) {maxSize = iround(original.size / divisor); maxSize.LOG("D"); }
+			
 			params("thumb", (int a){ maxSize = ivec2(a); });
 			params("w", maxSize.x);
 			params("h", maxSize.y);

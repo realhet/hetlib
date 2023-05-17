@@ -1793,14 +1793,10 @@ version(/+$DIDE_REGION+/all)
 	{ ERR("TODO"); }
 	
 	auto ifloorceil(VT)(in Bounds!VT b)
-	{
-		return Bounds!(Vector!(int, VT.length))(b.low.ifloor, b.high.iceil);
-	}
+	{ return Bounds!(Vector!(int, VT.length))(b.low.ifloor, b.high.iceil); }
 	
 	auto lfloorceil(VT)(in Bounds!VT b)
-	{
-		return Bounds!(Vector!(long, VT.length))(b.low.lfloor, b.high.lceil);
-	}
+	{ return Bounds!(Vector!(long, VT.length))(b.low.lfloor, b.high.lceil); }
 	
 	
 	private void unittest_Bounds()
@@ -2783,6 +2779,13 @@ version(/+$DIDE_REGION+/all)
 		{
 			alias CT = typeof(ScalarType!A.init ^^ ScalarType!B.init);
 			alias fun = (a, b) => a ^^ b;
+			return generateVector!(CT, fun)(a, b);
+		}
+		
+		auto root(A, B)(in A a, in B b)
+		{
+			alias CT = typeof(ScalarType!A.init ^^ ScalarType!B.init);
+			alias fun = (a, b) => a ^^ (1.0f/b);
 			return generateVector!(CT, fun)(a, b);
 		}
 		
