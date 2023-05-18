@@ -8418,6 +8418,8 @@ version(/+$DIDE_REGION Date Time+/all)
 			size_t toHash() const
 			{ return fullName.hashOf; }
 			
+			@property bool hasQueryString() const
+			{ return fullName.canFind('?'); }
 			
 			File withoutQueryString() const
 			{
@@ -8431,6 +8433,9 @@ version(/+$DIDE_REGION Date Time+/all)
 				auto i = fullName.indexOf('?');
 				return QueryString(i>=0 ? fullName[i+1..$] : "");
 			}
+			
+			@property auto queryStringMulti() const
+			{ return fullName.splitter('?').drop(1).map!QueryString; }
 			
 			@property void queryString(string s)
 			{

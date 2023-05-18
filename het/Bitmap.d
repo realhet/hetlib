@@ -243,7 +243,7 @@ version(/+$DIDE_REGION+/all)
 			register(prefix, &fun);
 		}
 		
-		private void registerMarkedFunctions(alias obj)()
+		void registerMarkedFunctions(alias obj)()
 		{
 			foreach(name; __traits(allMembers, obj))
 			{
@@ -445,7 +445,6 @@ version(/+$DIDE_REGION+/all)
 		//Todo: this is lame. This should be solved by registered plugins.
 		
 		bool isEffect;
-		bitmapEffects.Function bitmapEffectFunction;
 		
 		this(File file)
 		{
@@ -487,20 +486,10 @@ version(/+$DIDE_REGION+/all)
 					+/
 				)
 				{
-					const prefix = file.queryString.command;
-					if(prefix!="")
+					if(file.hasQueryString)
 					{
-						if(auto a = prefix in bitmapEffects.functions)
-						{
-							bitmapEffectFunction = *a;
-							originalFile = file.withoutQueryString;
-							isEffect = true;
-						}
-						else
-						{
-							LOG(file);
-							WARN("Unknown customBitmapTransformer: "~prefix.quoted);
-						}
+						originalFile = file.withoutQueryString;
+						isEffect = true;
 					}
 				}
 			}
@@ -551,7 +540,24 @@ version(/+$DIDE_REGION+/all)
 						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
 					}
 					else if(isEffect)
-					{ return bitmapEffectFunction(orig, transformedFile.queryString); }
+					{
+						auto bmp = orig;
+						foreach(qs; transformedFile.queryStringMulti)
+						{
+							const prefix = qs.command;
+							if(prefix!="")
+							{
+								if(auto a = prefix in bitmapEffects.functions)
+								bmp = (*a)(bmp, qs);
+								else
+								WARN("Unknown prefix: "~prefix.quoted~" "~transformedFile.text);
+							}
+							else
+							WARN("Missing prefix: "~transformedFile.text);
+						}
+						
+						return bmp;
+					}
 				}
 				catch(Exception e) WARN(e.simpleMsg);
 				
@@ -597,7 +603,7 @@ version(/+$DIDE_REGION+/all)
 			
 			float divisor=0;
 			params("d", divisor);
-			if(divisor) {maxSize = iround(original.size / divisor); maxSize.LOG("D"); }
+			if(divisor) { maxSize = iround(original.size / divisor); maxSize.LOG("D"); }
 			
 			params("thumb", (int a){ maxSize = ivec2(a); });
 			params("w", maxSize.x);
