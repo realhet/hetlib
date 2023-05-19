@@ -914,11 +914,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		class SharedMem(SharedDataType, string sharedFileName, bool isServer)
 		{
-			//Shared Memory /////////////////////////////////////////////////////
-				HANDLE sharedFileHandle;
-				SharedDataType* sharedData;
+			//todo: Creating a shared memory block that can grow in size
+			//SEC_RESERVE, VirtualAlloc  https://devblogs.microsoft.com/oldnewthing/20150130-00/?p=44793
 			
-				void initialize()
+			private:
+			HANDLE sharedFileHandle;
+			SharedDataType* sharedData;
+			
+			void initialize()
 			{
 				if(isActive) return;
 						
@@ -933,10 +936,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				)
 					: OpenFileMappingW(
 					FILE_MAP_ALL_ACCESS,	//read/write access
-										false,	//do not inherit the name
-										sharedFileName.toPWChar	//name of mapping object
+					false,	//do not inherit the name
+					sharedFileName.toPWChar	//name of mapping object
 				);
-						
+				
 				sharedData = cast(SharedDataType*) MapViewOfFile(
 					sharedFileHandle,	//handle to map object
 					FILE_MAP_ALL_ACCESS,	//read/write permission
@@ -945,15 +948,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					SharedDataType.sizeof
 				);
 				//ensure(data, "DebugLogClient: Can't open mapFile.");
-						
+				
 				LOG(sharedData);
 			}
 			
 			public:
-				alias sharedData this;
-				bool isActive() { return sharedData !is null; }
+			alias sharedData this;
+			bool isActive() { return sharedData !is null; }
 			
-				this() { initialize; }
+			this() { initialize; }
 		}
 		
 		alias SharedMemServer(SharedDataType, string sharedFileName) = SharedMem!(SharedDataType, sharedFileName, true );
