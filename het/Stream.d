@@ -2,19 +2,21 @@ module het.stream;/+DIDE+/
 
 import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 
-//todo: auto ref parameters.
-//todo: srcFunct seems obsolete.
-//todo: srcFunct seems obsolete.
+//todo: Try binary serialization: https://github.com/atilaneves/cerealed
+
+//Todo: auto ref parameters.
+//Todo: srcFunct seems obsolete.
+//Todo: srcFunct seems obsolete.
 
 //21.02.03
-//todo: propertySet getters with typed defaults
-//todo: propertySet getters with reference output
-//todo: propertySet export to json with act values (or defaults)
-//todo: propertySet import from json with act values (or defaults)
-//todo: string.fromJson(`"hello"`),   int.fromJson("124");	 ...
-//todo: "hello".toJson(),   1234.toJson("fieldName");  ...	 //must work on const!
-//todo: import a struct from a propertySet
-//todo: HitInfo.toJson is fucked up.
+//Todo: propertySet getters with typed defaults
+//Todo: propertySet getters with reference output
+//Todo: propertySet export to json with act values (or defaults)
+//Todo: propertySet import from json with act values (or defaults)
+//Todo: string.fromJson(`"hello"`),   int.fromJson("124");	 ...
+//Todo: "hello".toJson(),   1234.toJson("fieldName");  ...	 //must work on const!
+//Todo: import a struct from a propertySet
+//Todo: HitInfo.toJson is fucked up.
 
 private __gshared string[string] classFullNameMap;
 
@@ -33,7 +35,7 @@ void registerStoredClass(T)()
 }
 
 private auto quoteIfNeeded(string s)
-{ return s.canFind(" ") ? quoted(s) : s; } //todo: this is lame, must make it better in utils/filename routines
+{ return s.canFind(" ") ? quoted(s) : s; } //Todo: this is lame, must make it better in utils/filename routines
 
 struct JsonDecoderState
 {
@@ -98,7 +100,7 @@ string[] fromJson/*_ignore*/(Type)
 	try
 	{
 		//1. tokenize
-		auto err = tokenize(state.moduleName, state.stream, state.tokens); //todo: tokenize throw errors
+		auto err = tokenize(state.moduleName, state.stream, state.tokens); //Todo: tokenize throw errors
 		if(err!="") throw new Exception(err);
 		if(state.tokens.empty) throw new Exception("Empty json document.");
 		
@@ -120,8 +122,8 @@ string[] fromJson/*_ignore*/(Type)
 	return	fromJson!(Type)(data, st, moduleName, ErrorHandling.track, srcFile, srcFunct, srcLine); }
 +/
 
-//todo: this should be a nonDestructive overwrite for not just classes but for assocArrays too.
-//todo: New name: addJson or includeJson
+//Todo: this should be a nonDestructive overwrite for not just classes but for assocArrays too.
+//Todo: New name: addJson or includeJson
 auto fromJsonProps(Type)
 (
 	Type data, string st, string moduleName="unnamed_json",
@@ -135,7 +137,7 @@ if(is(Type == class))
 	
 	if(data is null) {
 		auto msg = "fromJsonProps: Object was set to null. Did nothing...";
-		//todo: null should reset all fields
+		//Todo: null should reset all fields
 		with(ErrorHandling)
 		final switch(errorHandling) {
 			case ignore: return;
@@ -152,7 +154,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 {
 	ref Token actToken() { return state.tokens[idx]; }
 	
-	//todo: this mapping is lame
+	//Todo: this mapping is lame
 	bool isOp(char b)()
 	{
 		static if(b=='[') return actToken.isOperator(opsquareBracketOpen);
@@ -201,7 +203,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 		idx++;
 	}
 	
-	bool isNegative; //opt: is multiply with 1/-1 better?
+	bool isNegative; //Opt: is multiply with 1/-1 better?
 	void getSign()
 	{ if(isOp!'-') { isNegative = true; idx++; } }
 	
@@ -226,7 +228,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 			expect!':';
 			
 			//remember the start of the element
-			elementMap[fieldName] = idx;              //opt: ez a megoldas igy qrvalassu
+			elementMap[fieldName] = idx;              //Opt: ez a megoldas igy qrvalassu
 			if(log) write(fieldName, " ", idx, " ");
 			
 			//skip until the next '}' or ','
@@ -287,7 +289,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 				}
 			+/
 			
-			//todo: fix this variant long/ulong bug
+			//Todo: fix this variant long/ulong bug
 			/+
 				void variantError(){
 					import std.variant;
@@ -337,7 +339,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 				{
 					data = T.init; //if it's a struct, reset it
 					/+
-						todo: Need an own struct initializer because assignment doesn't work: 
+						Todo: Need an own struct initializer because assignment doesn't work: 
 						"cannot modify strict instance 'data' of type ... because it contains 'const' or 'immutable' members.
 					+/
 				}
@@ -346,7 +348,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 			
 			auto oldIdx = idx;
 			auto elementMap = extractElements;
-			//opt: with inherited classes it seeks twice. If the tokenizer would be hierarchical then it wouldn't take any time to extract.
+			//Opt: with inherited classes it seeks twice. If the tokenizer would be hierarchical then it wouldn't take any time to extract.
 			
 			idx = oldIdx; //keep idx on the class instance,
 			
@@ -364,7 +366,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 							 classFullName = p ? *p : "",
 							 currentClassFullName = data !is null ? typeid(data).to!string : "";
 					
-					//todo: error handling when there is no classloader for the class in json
+					//Todo: error handling when there is no classloader for the class in json
 					
 					/*
 						print("className in Json:", className);
@@ -378,10 +380,10 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 					{
 						//print("Calling appropriate loader", classFullName);
 						
-						//todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
-						//todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
+						//Todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
+						//Todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
 						
-						auto fv = classLoaderFunc[classFullName]; //opt: inside here, elementMap is extracted once more
+						auto fv = classLoaderFunc[classFullName]; //Opt: inside here, elementMap is extracted once more
 						fv(state, idx, &data);
 						return;
 					}
@@ -418,7 +420,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 							mixin("data.", fieldName, "=tmp;");
 						}
 						else { streamDecode_json(state, *p, __traits(getMember, data, fieldName)); }
-					}//todo: error handling
+					}//Todo: error handling
 				}
 			}
 			
@@ -475,7 +477,7 @@ void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data)
 			static if(isDynamicArray!T)
 			{
 				data.length = cnt;
-				//todo: cut back the array  !!!!!!!!!!!!!!!! what if these are linked classes !!!!!!!!!!!!!!! managed resize array needed
+				//Todo: cut back the array  !!!!!!!!!!!!!!!! what if these are linked classes !!!!!!!!!!!!!!! managed resize array needed
 			}
 			else
 			{
@@ -536,7 +538,7 @@ void streamAppend_json(Type)(
 	{
 		if(data !is null)
 		{
-			const currentFullName = typeid(data).to!string; //todo: try to understand this
+			const currentFullName = typeid(data).to!string; //Todo: try to understand this
 			if(currentFullName != fullyQualifiedName!T)
 			{
 				 //use a different writer if needed
@@ -546,7 +548,7 @@ void streamAppend_json(Type)(
 					return;
 				}
 				else	{
-					//todo: error if there is no classSaver, throw error
+					//Todo: error if there is no classSaver, throw error
 					raise(
 						"toJson: unregisteded inherited class. Must call registerStoredClass!%s"
 						.format(currentFullName)
@@ -562,7 +564,7 @@ void streamAppend_json(Type)(
 		char lastSymbol;
 		auto s = st.stripRight;
 		if(s.length) lastSymbol = s[$-1];
-		//todo: this is unoptimal, but at least safe. It is possible to put this inside the [] and {} loop.
+		//Todo: this is unoptimal, but at least safe. It is possible to put this inside the [] and {} loop.
 		
 		const needComma = !lastSymbol.among('{', '[', ',', ':', '\xff');
 		//ff is empty stream, no comma needed
@@ -594,7 +596,7 @@ void streamAppend_json(Type)(
 		
 		static if(__traits(compiles, { (cast()data).beforeSave(); }))
 		{
-			(cast()data).beforeSave(); //todo: this violates constness.
+			(cast()data).beforeSave(); //Todo: this violates constness.
 		}
 		
 		st ~= dense ? "{" : "{\n";                  //opening bracket {
@@ -696,7 +698,7 @@ if(is(Type==class) || __traits(isRef, data)) //only let classes not to be refere
 {
 	static if(is(Type==class)) if(data is null) return; //ignore empty null instances
 	
-	static string savedData = "\0"; //todo: use binaryJson
+	static string savedData = "\0"; //Todo: use binaryJson
 	if(savedData=="\0") {
 		static Type temp;
 		static if(is(Type==class)) temp = new Type;
@@ -721,7 +723,7 @@ version(/+$DIDE_REGION Properties+/all)
 		}
 		
 		bool uiChanged; //stdUi sets this to true
-		//todo: would be better to save the last value, than update this (and sometimes forget to update)
+		//Todo: would be better to save the last value, than update this (and sometimes forget to update)
 		
 		string asText()
 		{ return ""; }
@@ -885,7 +887,7 @@ version(/+$DIDE_REGION Properties+/all)
 			
 			if(dir.length)
 			{
-				auto set = dir in sets;  //todo: associativearray.update
+				auto set = dir in sets;  //Todo: associativearray.update
 				if(!set) {
 					auto ps = new PropertySet;
 					ps.name = dir;
@@ -985,7 +987,7 @@ version(/+$DIDE_REGION Properties+/all)
 			return p.asText;
 		}
 		
-		//todo: getDef is a bad name. Should be combined with normal get()
+		//Todo: getDef is a bad name. Should be combined with normal get()
 		auto getDef(string name, string def)
 		{
 			if(auto p = get(name)) return p.asText;
@@ -1106,7 +1108,7 @@ void unittest_property_inherited()
 
 void unittest_main()
 {
-	//todo: more tests!
+	//Todo: more tests!
 	unittest_JsonClassInheritance;
 	unittest_toJson;
 	unittest_property_inherited;

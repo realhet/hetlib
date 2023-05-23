@@ -101,7 +101,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.bitmanip;
 			public import std.typecons: Typedef;
 			public import std.path: baseName;
-			public import std.exception : collectException, ifThrown;
+			public import std.exception : collectException, ifThrown, assertThrown;
 			public import std.system : endian, os;
 			
 			public import quantities.si;
@@ -684,7 +684,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc, 
 				GetClipboardSequenceNumber,
 				
-				CF_TEXT, /+Todo: Support CF_UNICODETEXT+/
+				CF_UNICODETEXT, /+Todo: Support CF_UNICODETEXT+/
 				
 				CF_BITMAP, HBITMAP;
 			
@@ -699,16 +699,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 			
 			bool hasText()
-			{ return hasFormat(CF_TEXT); }
+			{ return hasFormat(CF_UNICODETEXT); }
 			
 			string getText()
 			{
 				string res;
 				if(OpenClipboard(null)) {
 					scope(exit) CloseClipboard;
-					auto hData = GetClipboardData(CF_TEXT);
+					auto hData = GetClipboardData(CF_UNICODETEXT);
 					if(hData) {
-						auto pData = cast(char*)GlobalLock(hData);
+						auto pData = cast(wchar*)GlobalLock(hData);
 						scope(exit) GlobalUnlock(hData);
 						res = pData.toStr;
 					}
@@ -716,19 +716,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return res;
 			}
 			
-			bool setText(string text, bool mustSucceed)
+			bool setText(string btext, bool mustSucceed)
 			{
 				bool success;
 				if(OpenClipboard(null)) {
-					 scope(exit) CloseClipboard;
+					auto wtext = btext.to!wstring;
+					
+					scope(exit) CloseClipboard;
 					EmptyClipboard;
 					HGLOBAL hClipboardData;
-					auto hData = GlobalAlloc(0, text.length+1);
-					auto pData = cast(char*)GlobalLock(hData);
-					pData[0..text.length] = text[];
-					pData[text.length] = 0;
+					
+					auto hData = GlobalAlloc(0, (wtext.length+1)*2);
+					auto pData = cast(wchar*)GlobalLock(hData);
+					pData[0..wtext.length] = wtext[];
+					pData[wtext.length] = 0;
 					GlobalUnlock(hClipboardData);
-					success = SetClipboardData(CF_TEXT, hData) !is null;
+					success = SetClipboardData(CF_UNICODETEXT, hData) !is null;
 				}
 				if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
 				return success;
@@ -914,7 +917,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		class SharedMem(SharedDataType, string sharedFileName, bool isServer)
 		{
-			//todo: Creating a shared memory block that can grow in size
+			//Todo: Creating a shared memory block that can grow in size
 			//SEC_RESERVE, VirtualAlloc  https://devblogs.microsoft.com/oldnewthing/20150130-00/?p=44793
 			
 			private:
@@ -1079,7 +1082,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		void raise(string str="", string file = __FILE__, int line = __LINE__)
-		{ enforce(0, str, file, line); }
+		{
+			enforce(0, str, file, line);
+			
+			//todo: use noreturn and/or learn about abort.
+			//link:https://dlang.org/spec/type.html#noreturn
+		}
 		
 		bool ignoreExceptions(void delegate() f) {
 			bool res;
@@ -1794,6 +1802,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 		//GenericArg /////////////////////////////////////
 		
+		//Todo: rename to NamedParameter
+		
+		//overloadable arguments. args!(fun, param1 => x, param2 => y)   fun must be a struct, not a function. It's not what I want.
+		//Link: https://github.com/CyberShadow/ae/blob/master/utils/meta/args.d
+		
+		//They never made it:
+		//Link: https://wiki.dlang.org/DIP88
+		
+		
 		struct GenericArg(string N="", T)
 		{
 			alias type = T; enum name = N;
@@ -1840,8 +1857,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		struct SrcId
 		{
-				/// select Id datatype. Default=string if debug, long if release
-					version(stringId	) alias T = string	;
+			/// select Id datatype. Default=string if debug, long if release
+			version(stringId	) alias T = string	;
 			else version(longId	) alias T = ulong	;
 			else version(intId	) alias T = uint	;
 			else {
@@ -1849,16 +1866,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Todo: it could be string in debug mode. Needs a new ide to handle that.
 			}
 			
-				T value;
+			T value;
 			
-				bool opCast(B : bool)() const { return value != T.init; }
+			bool opCast(B : bool)() const { return value != T.init; }
 			
 			/*
 				  bool opEquals(in SrcId b) const{ return value == b.value; }
 							size_t toHash() const{ return .toHash(value); }
 			*/
 			
-				alias value this;
+			alias value this;
 		}
 		
 		static if(is(SrcId.T==uint) || is(SrcId.T==ulong))
@@ -2015,6 +2032,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		if(isAggregateType!T)
 		{ return getStructInfo!T; }
 		
+		static string[] tupleToStringArray(A...)()
+		{
+			string[] res;
+			static foreach(i; 0..A.length) res ~= A[i].stringof;
+			return res;
+		}
+		
+		enum FieldDeclarations(T) = zip(tupleToStringArray!(FieldTypeTuple!T), [FieldNameTuple!T]).map!"a[0]~' '~a[1]~';'".join('\n');
 		
 		//Todo: list members of a module recursively. Adam Ruppe book
 		/*
@@ -6998,12 +7023,14 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return raw==0; }
 				bool opCast() const
 				{ return !isNull(); }
-				int opCmp(in DateTime b) const
-				{ return cmp(raw, b.raw); }
-				bool opEquals(in DateTime b) const
-				{ return raw==b.raw; }
-				size_t toHash() const
-				{ return raw; }
+				nothrow @safe {
+					int opCmp(in DateTime b) const
+					{ return cmp(raw, b.raw); }
+					bool opEquals(in DateTime b) const
+					{ return raw==b.raw; }
+					size_t toHash() const
+					{ return raw; }
+				}
 				
 				enum RawShift = 6;
 				enum RawUnit : ulong 
@@ -7281,9 +7308,12 @@ version(/+$DIDE_REGION Date Time+/all)
 					if(isNull) return "NULL DateTime";
 					with(fun) return format("%.4d.%.2d.%.2d %.2d:%.2d:%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds);
 				}
-							
+				
 				string timestamp(alias fun = localSystemTime)(in Flag!"shortened" shortened = No.shortened)const
 				{
+					//Note: ⚠TimeView depends on this format!!!!
+					//Todo: make a proper datetimeformatter tool.
+					
 					if(isNull) return "null";
 					//4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
 					//return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
@@ -7305,7 +7335,7 @@ version(/+$DIDE_REGION Date Time+/all)
 								
 					return s;
 				}
-							
+				
 				string timestamp_compact(alias fun = localSystemTime)()const
 				{ return timestamp!fun(Yes.shortened); }
 							
