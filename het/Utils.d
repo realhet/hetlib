@@ -1085,8 +1085,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			enforce(0, str, file, line);
 			
-			//todo: use noreturn and/or learn about abort.
-			//link:https://dlang.org/spec/type.html#noreturn
+			//Todo: use noreturn and/or learn about abort.
+			//Link: https://dlang.org/spec/type.html#noreturn
 		}
 		
 		bool ignoreExceptions(void delegate() f) {
@@ -8433,8 +8433,11 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			void append(const void[] data)const
 			{
-				write(data, size); 
+				if(!exists) write(data);
+				else write(data, size);
 				//Todo: compression, automatic uncompression
+				
+				//todo: this is lame and slow.
 			}
 			
 			
@@ -8732,10 +8735,10 @@ version(/+$DIDE_REGION Date Time+/all)
 			struct PKCentralDirectoryRecord
 			{
 				align(1):
-								uint signature;
-								ushort diskNumber, diskCD, diskEntries, totalEntries;
-								uint cdSize, cdOfs;
-								ushort commentLen;
+				uint signature;
+				ushort diskNumber, diskCD, diskEntries, totalEntries;
+				uint cdSize, cdOfs;
+				ushort commentLen;
 			}
 					
 			if(buf.length < PKCentralDirectoryRecord.sizeof) return res;

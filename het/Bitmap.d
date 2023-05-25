@@ -232,7 +232,7 @@ version(/+$DIDE_REGION+/all)
 			prefix = prefix.lc;
 			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix);
 			functions[prefix] = fun;
-			LOG(name ~ " successfully registered:", prefix);
+			static if(0)LOG(name ~ " successfully registered:", prefix);
 		}
 		
 		void register(alias fun)()
