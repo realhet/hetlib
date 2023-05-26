@@ -6116,6 +6116,19 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 		}
 		
+		char[4] fourC(string s)
+		{
+			//Link: https://forum.dlang.org/post/aypjoqdrwglcufdgseex@forum.dlang.org
+			if(s.length >= 4)
+			return s[0 .. 4];
+			char[4] res = 0;
+			res[0 .. s.length] = s;
+			return res;
+		}
+		
+		uint fourCC(string s)
+		{ return s.take(4).enumerate.map!(a => a.value << cast(uint)a.index*8).sum; }
+		
 	}
 }version(/+$DIDE_REGION Hashing+/all)
 {
@@ -8437,7 +8450,14 @@ version(/+$DIDE_REGION Date Time+/all)
 				else write(data, size);
 				//Todo: compression, automatic uncompression
 				
-				//todo: this is lame and slow.
+				//Todo: this is lame and slow.
+			}
+			
+			void truncate(size_t desiredSize)
+			{
+				if(size>desiredSize)
+				write(read(true, 0, desiredSize));
+				//Opt: it's very ineffective
 			}
 			
 			

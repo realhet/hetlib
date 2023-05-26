@@ -26,7 +26,7 @@ version(/+$DIDE_REGION+/all)
 	
 	//publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
 	public import std.string, std.uni;    //std.string publicly imports std.algorithm, so it MUST be publicly imported from here.
-	public import std.algorithm; //extends : cmp, any, all, equal, min, max;
+	public import std.algorithm; //extends : cmp, any, all, equal, min, max, sort
 	public import std.functional; //extends: lessThan, greaterThan, not
 	
 	//import locally	used things.     //must not import het.utils to keep het.math simle and standalone
@@ -3192,8 +3192,7 @@ version(/+$DIDE_REGION+/all)
 		{ return c1 ? c1 : c2 ? c2 : c3; }
 		auto cmpChain(int c1, lazy int c2, lazy int c3, lazy int c4)
 		{ return c1 ? c1 : c2 ? c2 : c3 ? c3 : c4; }
-		//Todo: make cmpChain recursive
-		
+		//Note: Use multiSort instead of cmpChain!
 		
 		public import std.algorithm: sort;
 		void sort(T)(ref T a, ref T b)
@@ -3206,6 +3205,22 @@ version(/+$DIDE_REGION+/all)
 			sort(b, c);
 		}
 		
+		
+		import std.range : hasSwappableElements;
+		auto mySort(string Order, SwapStrategy ss=SwapStrategy.unstable, Range)(Range r)
+		if (hasSwappableElements!Range)
+		{
+			//Order example:  "value -name"
+			auto fieldName(string s)
+			{ return ((s.startsWith('-'))?(s[1..$]):(s)); }
+			auto relation(string s)
+			{ return ((s.startsWith('-'))?('>'):('<')); }
+			enum preds = Order.splitter(' ').map!(
+				s => format!`"a.%1$s%2$sb.%1$s"`
+				(fieldName(s), relation(s))
+			).join(',');
+			return mixin(`multiSort!(`, preds, `,ss)(r)`);
+		}
 		
 		auto mix(A, B, T)(in A a, in B b, in T t)
 		{
