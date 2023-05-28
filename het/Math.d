@@ -2139,11 +2139,12 @@ version(/+$DIDE_REGION+/all)
 			E[] impl;
 				
 			//size properties
-			static foreach(i, name; ["width", "height", "depth"].take(N))
-			mixin(
-				"ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
-							.replace("@", name).replace("#", i.text) 
-			);
+			static foreach(i, name; ["width", "height", "depth"].take(N)) 
+				mixin(
+					"ref auto @(){ return size[#]; }  auto @() const { return size[#]; }"
+								.replace("@", name).replace("#", i.text) 
+				);
+			
 			
 			
 			static if(N>=2) auto area() const { return width*height; }
@@ -2195,7 +2196,7 @@ version(/+$DIDE_REGION+/all)
 			}
 				
 			@property void asArray(A)(A a) //creates a same size image from 'a' and copies it into itself.
-			{ this[0, 0] = image2D(size, a); }
+			 { this[0, 0] = image2D(size, a); }
 				
 			auto dup(string op="")() const {
 				//optional predfix op
@@ -2254,14 +2255,11 @@ version(/+$DIDE_REGION+/all)
 				
 			}
 			
-			auto safeGet(int x, int y, E def = E.init)
-			{
-				if(x<0 || y<0 || x>=width || y>=height) return def;
-				return this[x, y];
-			}
+			bool isInside(ivec2 p) { return (cast(uint)(p.x)) < width && (cast(uint)(p.y)) < height; }	bool isInside(int x, int y) { return isInside(ivec2(x, y)); }
+			auto safeGet(ivec2 p, E def = E.init) { return ((isInside(p))?(this[p]):(def)); }	auto safeGet(int x, int y, E def = E.init) { return safeGet(ivec2(x, y), def); }
 			
-			auto safeGet(ivec2 p, E def = E.init)
-			{ return safeGet(p.x, p.y, def); }
+			
+			
 		}version(/+$DIDE_REGION+/all) {
 			//Index/Slice assign
 				
@@ -2385,7 +2383,7 @@ version(/+$DIDE_REGION+/all)
 					opIndex(i, j) = cast(E) a;
 				}
 			}
-				
+			
 			void opIndexAssign(A)(in	A a,	int[2] r1, int j)
 			{ assignHorizontal!""(a,	r1,	j); }
 			void opIndexAssign(A)(in	A a,	int i, int[2] r2)

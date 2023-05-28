@@ -232,7 +232,7 @@ version(/+$DIDE_REGION+/all)
 			prefix = prefix.lc;
 			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix);
 			functions[prefix] = fun;
-			static if(0)LOG(name ~ " successfully registered:", prefix);
+			static if(0) LOG(name ~ " successfully registered:", prefix);
 		}
 		
 		void register(alias fun)()
@@ -573,7 +573,7 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 	}
-	
+	
 	@BITMAPEFFECT
 	{
 		/+
@@ -652,6 +652,25 @@ version(/+$DIDE_REGION+/all)
 		Bitmap grayscaleEffect(Bitmap original, in QueryString params)
 		{ return new Bitmap(original.accessOrGet!ubyte); }
 	}
+	
+	/+
+		Todo: Implement this monitor, clipboard auto updater somehow.
+		/+
+			Code: spawn(
+				{
+					while(1)
+					{
+						static uint cSeq = -1;
+						if(cSeq.chkSet(clipboard.sequenceNumber))
+						{ bitmaps.refresh(`clipboard:\`); }
+						bitmaps.refresh(`monitor:\`);
+						sleep(100);
+					}
+				}
+			);
+		+/
+		
+	+/
 	
 	private BitmapCacheStats _bitmapCacheStats; //this is a result
 	
@@ -670,7 +689,7 @@ version(/+$DIDE_REGION+/all)
 			Bitmap res;
 			
 			__gshared Bitmap[File] cache, loading;
-			__gshared  BitmapTransformation[File] transformationQueue;
+			__gshared  BitmapTransformation[][File] transformationQueue;
 			shared static int activeBackgroundLoaderCount = 0;
 			
 			/// Allocate new file in cache , mark it as "loading"
@@ -781,7 +800,7 @@ version(/+$DIDE_REGION+/all)
 						res = startLoading(tr.transformedFile);
 						if(auto originalBmp = tr.originalFile in cache)
 						{
-							if(checkRequiredModifiedTime(*originalBmp))
+							if(checkRequiredModifiedTime(*originalBmp) && !(*originalBmp).loading)
 							{
 								//original bmp is up to date
 								startDelayedTransformation(*originalBmp, res, tr);
@@ -792,7 +811,7 @@ version(/+$DIDE_REGION+/all)
 								auto lastBmp = *originalBmp; 
 								//preserve it in the cache, so it can be displayed while loading the new
 								
-								transformationQueue[tr.originalFile] = tr;
+								transformationQueue[tr.originalFile] ~= tr;
 								startDelayedLoad(tr.originalFile);
 								
 								cache[tr.originalFile] = lastBmp;
@@ -800,7 +819,7 @@ version(/+$DIDE_REGION+/all)
 							}
 						}
 						else {
-							transformationQueue[tr.originalFile] = tr;
+							transformationQueue[tr.originalFile] ~= tr;
 							startDelayedLoad(tr.originalFile);
 						}
 					}
@@ -904,7 +923,7 @@ version(/+$DIDE_REGION+/all)
 						if(cmd==BitmapQueryCommand.finishWork)
 						if(auto tr = file in transformationQueue)
 						{
-							startDelayedTransformation(bmpIn, cache[(*tr).transformedFile], *tr);
+							foreach(t; *tr) startDelayedTransformation(bmpIn, cache[t.transformedFile], t);
 							transformationQueue.remove(file);
 						}
 						
@@ -1000,6 +1019,8 @@ version(/+$DIDE_REGION+/all)
 						
 						bmpIn.loading = false;
 						loading.remove(file);
+						
+						//file removed, -> also the transformations quued for the file
 						transformationQueue.remove(file);
 					}
 				}
