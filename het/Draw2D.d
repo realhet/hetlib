@@ -1669,7 +1669,10 @@ class Drawing
 			lineCursor = p_;
 		}
 		void lineTo(in vec2 p, bool isMove)
-		{ if(isMove) moveTo(p);else lineTo(p); }
+		{
+			//todo: isMove flag is bad. isLine flag would be better because that flag has the same meaning as the index of a for loop.
+			if(isMove) moveTo(p);else lineTo(p);
+		}
 		
 		void lineTo(in ivec2 p)
 		{ lineTo(p);	 } void lineTo(in ivec2 p, bool isMove)
@@ -1854,7 +1857,7 @@ class Drawing
 		{ fillRect(b.low, b.high); } void fillRect(in ibounds2 b)
 		{ fillRect(bounds2(b)); }
 		//Todo: ibounds2 automatikusan atalakulhasson bounds2-re
-		struct DrawGlyphScale{ float value=1; }
+		struct DrawGlyphScale { float value=1; }
 		void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args)
 		{
 			if(idx<0) return;

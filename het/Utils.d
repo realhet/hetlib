@@ -3532,7 +3532,7 @@ version(/+$DIDE_REGION Numeric+/all)
 {
 	//Signal processing /////////////////////////////
 	version(/+$DIDE_REGION+/all) {
-		float[] gaussianBlur(float[] a, int kernelSize)
+		float[] gaussianBlur(in float[] a, int kernelSize)
 		{
 			//http://dev.theomader.com/gaussian-kernel-calculator/
 			//Todo: refactor this
@@ -3565,7 +3565,7 @@ version(/+$DIDE_REGION Numeric+/all)
 					
 			float delegate(int) fv;
 			switch(kernelSize) {
-				case 1: return a;
+				case 1: return a.dup;
 				case 3: fv = &g3; break;
 				case 5: fv = &g5; break;
 				case 7: fv = &g7; break;

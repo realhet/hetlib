@@ -104,8 +104,12 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	//Load a bitmap immediately with optional error handling. No caching, no thumbnail/transformations.
-	auto newBitmap(File file, ErrorHandling errorHandling)
+	auto newBitmap(File file, ErrorHandling errorHandling, Flag!"fx" fx = No.fx)
 	{
+		
+		const hasFx = !file.driveIs("font") & file.hasQueryString;
+		
+		if(hasFx && !fx) WARN("newBitmap fileName has fx but fx flag is not set. "~file.text);
 		
 		static Bitmap newBitmap_internal(File file)
 		{
@@ -145,9 +149,17 @@ version(/+$DIDE_REGION+/all)
 				catch(Exception e) { res = newErrorBitmap(e.simpleMsg); }
 			}	break;
 		}
+		
+		if(hasFx && fx) res = applyEffects(res, file);
+		
 		res.file = file;
 		res.modified = file.modified;
 		return res;
+	}
+	
+	auto newBitmap(File file, Flag!"fx" fx = No.fx)
+	{
+		return newBitmap(file, ErrorHandling.track, fx);
 	}
 	
 	Bitmap newBitmap(HBITMAP hBitmap)
@@ -439,7 +451,7 @@ version(/+$DIDE_REGION+/all)
 		
 		size_t sizeBytes; //used by bitmapQuery/detailed stats
 		
-		bool isThumb() const { return thumbMaxSize>0; }
+		deprecated bool isThumb() const { return thumbMaxSize>0; }
 		
 		bool isHistogram, isGrayHistogram;
 		//Todo: this is lame. This should be solved by registered plugins.
@@ -540,24 +552,7 @@ version(/+$DIDE_REGION+/all)
 						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
 					}
 					else if(isEffect)
-					{
-						auto bmp = orig;
-						foreach(qs; transformedFile.queryStringMulti)
-						{
-							const prefix = qs.command;
-							if(prefix!="")
-							{
-								if(auto a = prefix in bitmapEffects.functions)
-								bmp = (*a)(bmp, qs);
-								else
-								WARN("Unknown prefix: "~prefix.quoted~" "~transformedFile.text);
-							}
-							else
-							WARN("Missing prefix: "~transformedFile.text);
-						}
-						
-						return bmp;
-					}
+					{ return orig.applyEffects(transformedFile); }
 				}
 				catch(Exception e) WARN(e.simpleMsg);
 				
@@ -573,6 +568,29 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 	}
+	
+	Bitmap applyEffects(Bitmap bmp, File effects)
+	{ return bmp.applyEffects(effects.queryStringMulti); }
+	
+	Bitmap applyEffects(R)(Bitmap bmp, R effects)
+	if(is(ElementType!R==QueryString))
+	{
+		foreach(qs; effects)
+		{
+			const prefix = qs.command;
+			if(prefix!="")
+			{
+				if(auto a = prefix in bitmapEffects.functions)
+				bmp = (*a)(bmp, qs);
+				else
+				WARN("Unknown prefix: "~prefix.quoted~" "~qs.text);
+			}
+			else
+			WARN("Missing prefix: "~qs.text);
+		}
+		return bmp;
+	}
+	
 	
 	@BITMAPEFFECT
 	{
