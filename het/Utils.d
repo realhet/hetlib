@@ -106,11 +106,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			public import quantities.si;
 			
-			public import std.concurrency :  spawn, initOnce;
+			public import std.concurrency, std.signals;
 			
 			import std.encoding : transcode, Windows1252String;
 			import std.exception : stdEnforce = enforce;
 			import std.getopt;
+			
 			
 			//hetlib imports
 			public import het.debugclient;
@@ -564,35 +565,54 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		version(/+$DIDE_REGION UDAs+/all)
 		{
-			struct UDA {}
+			struct UDA
+			{}
 			
-			enum VerbFlag { hold=1 }
+			enum VerbFlag
+			{ hold=1 }
 			
-			@UDA {
+			@UDA
+			{
 				//het.stream
-				struct STORED {}
+				struct STORED
+				{}
 							
-				struct VERB { string keyCombo; int flags; }
-				auto HOLD(string keyCombo) { return VERB(keyCombo, VerbFlag.hold); }
+				struct VERB
+				{ string keyCombo; int flags; }
+				auto HOLD(string keyCombo)
+				{ return VERB(keyCombo, VerbFlag.hold); }
 							
-				struct HEX {}
-				struct BASE64 {}
+				struct HEX
+				{}
+				struct BASE64
+				{}
 							
 				//het.ui
 				//struct UI{}    // similar to @Composable.  It alters the UI's state
 				//Note: UI is ised for the default UI function. Conflicts with this UDA
 							
 				//het.opengl
-				struct UNIFORM { string name=""; } //marks a variable as gl.Shader attribute
+				struct UNIFORM
+				{ string name=""; } //marks a variable as gl.Shader attribute
 							
 				//het.ui
-				struct CAPTION { string text; }
-				struct HINT { string text; }
-				struct UNIT { string text; }
-				struct RANGE { float low, high; bool valid()const { return !low.isnan && !high.isnan; } }
-				struct STEP { float s = 1; }
-				struct INDENT {}
-				struct HIDDEN {}
+				struct CAPTION
+				{ string text; }
+				struct HINT
+				{ string text; }
+				struct UNIT
+				{ string text; }
+				struct RANGE
+				{
+					float low, high; bool valid()const
+					{ return !low.isnan && !high.isnan; }
+				}
+				struct STEP
+				{ float s = 1; }
+				struct INDENT
+				{}
+				struct HIDDEN
+				{}
 			}
 			
 		}
@@ -603,7 +623,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			auto loadLibrary(string fn, bool mustLoad = true)
 			{
 				auto h = Runtime.loadLibrary(fn);
-				if(mustLoad) enforce(h, "("~fn~") "~getLastErrorStr);
+				if(mustLoad)
+				enforce(h, "("~fn~") "~getLastErrorStr);
 				return h;
 			}
 			
@@ -613,19 +634,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			void getProcAddress(T)(HMODULE hModule, string name, ref T func, bool mustSucceed = true)
 			{
 				func = cast(T)GetProcAddress(hModule, toStringz(name));
-				if(mustSucceed) enforce(func, "getProcAddress() fail: "~name);
+				if(mustSucceed)
+				enforce(func, "getProcAddress() fail: "~name);
 			}
 			
 			void getProcAddress(T)(HMODULE hModule, size_t idx, ref T func, bool mustSucceed = true)
 			{
 				func = cast(T)GetProcAddress(hModule, cast(char*)idx);
-				if(mustSucceed) enforce(func, "getProcAddress() fail: idx("~idx.text~")");
+				if(mustSucceed)
+				enforce(func, "getProcAddress() fail: idx("~idx.text~")");
 			}
 			
 			string genLoadLibraryFuncts(T, alias hMod = "hModule", alias prefix=T.stringof ~ "_")()
 			{
 				string res;
-				void append(string s) { res ~= s ~ "\r\n"; }
+				void append(string s)
+				{ res ~= s ~ "\r\n"; }
 							
 				import std.traits;
 				static foreach(f; __traits(allMembers, T))
@@ -650,35 +674,67 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			//__iob_func - needed for turbojpeg
 			//https://stackoverflow.com/questions/30412951/unresolved-external-symbol-imp-fprintf-and-imp-iob-func-sdl2
-			extern (C) {
+			extern (C)
+			{
 				import core.stdc.stdio : FILE;
 				shared FILE[3] __iob_func;
 			}
 			
-			private void init__iob_func() {
+			private void init__iob_func()
+			{
 				import core.stdc.stdio : stdin, stdout, stderr;
 				__iob_func = [*stdin, *stdout, *stderr];
 			}
 			
 			//Obj.Destroy is not clearing the reference
-			void free(T)(ref T o)if(is(T==class)) {
-				if(o !is null) {
+			void free(T)(ref T o)if(is(T==class))
+			{
+				if(o !is null)
+				{
 					o.destroy;
 					o = null;
 				}
 			}
 			
-			void SafeRelease(T:IUnknown)(ref T i) {
-				if(i !is null) {
+			void SafeRelease(T:IUnknown)(ref T i)
+			{
+				if(i !is null)
+				{
 					i.Release;
 					i = null;
 				}
 			}
 			
 		}
-		struct clipboard	
+		
+		File[] hDropToFiles(HANDLE hDrop)
 		{
-			static:
+			import core.sys.windows.windows: DragQueryFile;
+			//Link: https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-dragqueryfilea
+			File[] res;
+			if(hDrop)
+			{
+				foreach(i; 0..DragQueryFile(hDrop, uint.max, null, 0))
+				{
+					if(auto cc = DragQueryFile(hDrop, i, null, 0))
+					{
+						cc++; //Needed to fit trailing zero.
+						auto tmp = new wchar[cc];
+						if(DragQueryFile(hDrop, i.to!uint, tmp.ptr, cc))
+						{
+							tmp.popBack; //Remove trailing zero
+							res ~= File(tmp.text);
+						}
+					}
+				}
+			}
+			return res;
+		}
+		
+		alias clipboard = Singleton!Clipboard;
+		
+		class Clipboard	
+		{
 			import core.sys.windows.windows: 	OpenClipboard, CloseClipboard, IsClipboardFormatAvailable,
 				EmptyClipboard, GetClipboardData, SetClipboardData, 
 				HGLOBAL, GlobalLock, GlobalUnlock, GlobalAlloc, 
@@ -686,12 +742,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				
 				CF_UNICODETEXT, /+Todo: Support CF_UNICODETEXT+/
 				
-				CF_BITMAP, HBITMAP;
+				CF_BITMAP, HBITMAP,
+				
+				CF_HDROP;
 			
 			bool hasFormat(uint fmt)
 			{
 				bool res;
-				if(OpenClipboard(null)) {
+				if(OpenClipboard(null))
+				{
 					 scope(exit) CloseClipboard;
 					res = IsClipboardFormatAvailable(fmt)!=0;
 				}
@@ -704,10 +763,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string getText()
 			{
 				string res;
-				if(OpenClipboard(null)) {
+				if(OpenClipboard(null))
+				{
 					scope(exit) CloseClipboard;
 					auto hData = GetClipboardData(CF_UNICODETEXT);
-					if(hData) {
+					if(hData)
+					{
 						auto pData = cast(wchar*)GlobalLock(hData);
 						scope(exit) GlobalUnlock(hData);
 						res = pData.toStr;
@@ -716,10 +777,26 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return res;
 			}
 			
+			bool hasHDrop()
+			{ return hasFormat(CF_HDROP); } 
+			
+			File[] getHDrop()
+			{
+				File[] res;
+				if(OpenClipboard(null))
+				{
+					scope(exit) CloseClipboard;
+					auto hDrop = GetClipboardData(CF_HDROP);
+					return hDropToFiles(hDrop);
+				}
+				return res;
+			}
+			
 			bool setText(string btext, bool mustSucceed)
 			{
 				bool success;
-				if(OpenClipboard(null)) {
+				if(OpenClipboard(null))
+				{
 					auto wtext = btext.to!wstring;
 					
 					scope(exit) CloseClipboard;
@@ -733,7 +810,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					GlobalUnlock(hClipboardData);
 					success = SetClipboardData(CF_UNICODETEXT, hData) !is null;
 				}
-				if(mustSucceed && !success) ERR("clipBoard.setText fail: "~getLastErrorStr);
+				if(mustSucceed && !success)
+				ERR("clipBoard.setText fail: "~getLastErrorStr);
 				return success;
 			}
 			
@@ -752,16 +830,36 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						return true;
 					}
 				}
+				
 				return false;
 			}
 			
-			@property {
-				string asText() { return getText; }
-				void asText(string s) { setText(s, true); }
+			@property
+			{
+				string text()
+				{ return getText; }
+				void text(string s)
+				{ setText(s, true); }
 				
-				uint sequenceNumber() { return GetClipboardSequenceNumber; }
+				File[] files()
+				{ return getHDrop; }
+				File file()
+				{ return files.frontOr(File.init); }
+				
+				uint sequenceNumber()
+				{ return GetClipboardSequenceNumber; }
+			}
+			
+			mixin Signal;
+			
+			void update()
+			{
+				static uint seq;
+				if(seq.chkSet(sequenceNumber))
+					emit;
 			}
 		}
+		
 	}version(/+$DIDE_REGION+/all)
 	{
 		version(/+$DIDE_REGION SysInfo+/all)
@@ -849,17 +947,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					
 			//create log files
 			StdFile[] logFiles;
-			foreach(i; 0..cmdLines.length) {
+			foreach(i; 0..cmdLines.length)
+			{
 				auto fn = File(tempPath, "spawnProcessMulti.$log"~to!string(i));
 				logFiles ~= StdFile(fn.fullName, "w");
 			}
 					
 			//create pool of commands
 			Pid[] pool;
-			foreach(i, cmd; cmdLines) {
+			foreach(i, cmd; cmdLines)
+			{
 				pool ~= spawnProcess(
 					cmd, stdin, logFiles[i], logFiles[i], env,
-																			 Config.retainStdout | Config.retainStderr | Config.suppressConsole
+					Config.retainStdout | Config.retainStderr | Config.suppressConsole
 				);
 			}
 					
@@ -869,18 +969,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			running[] = true;
 					
 			int res = 0;
-			do {
+			do
+			{
 				sleep(10);
-				foreach(i; 0..pool.length) {
-					if(running[i]) {
+				foreach(i; 0..pool.length)
+				{
+					if(running[i])
+					{
 						auto w = tryWait(pool[i]);
-						if(w.terminated) {
+						if(w.terminated)
+						{
 							running[i] = false;
-							if(w.status != 0) {
+							if(w.status != 0)
+							{
 								res = w.status;
 								running[] = false;
 							}
-							if(onProgress !is null) onProgress(cast(int)i);
+							if(onProgress !is null)
+							onProgress(cast(int)i);
 						}
 					}
 				}
@@ -895,18 +1001,31 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			*/
 					
 			//make sure every process is closed (when one of them yielded an error)
-			foreach(p; pool) { try { kill(p); }catch(Exception e) {} }
+			foreach(p; pool)
+			{
+				try
+				{ kill(p); }catch(Exception e)
+				{}
+			}
 					
 			//read/clear logfiles
-			foreach(i, ref f; logFiles) {
+			foreach(i, ref f; logFiles)
+			{
 				File fn = File(f.name);
 				f.close;
 				sOutput ~= fn.readStr;
 						
 				//fucking lame because tryWait doesn't wait the file to be closed;
-				foreach(k; 0..100) {
-					if(fn.exists) { try { fn.remove; }catch(Exception e) { sleep(10); } }
-					if(!fn.exists) break;
+				foreach(k; 0..100)
+				{
+					if(fn.exists)
+					{
+						try
+						{ fn.remove; }catch(Exception e)
+						{ sleep(10); }
+					}
+					if(!fn.exists)
+					break;
 				}
 			}
 			logFiles.clear;
@@ -7909,6 +8028,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{
 					bool dirExists(string dir)
 					{
+						if(dir.empty) return false;
 						bool res;
 						try { res = isDir(dir); }catch(Throwable) {}
 						return res;
@@ -7935,7 +8055,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return !isNull(); }
 							
 				bool exists() const
-				{ return dirExists(dir); }
+				{ return fullPath.length && dirExists(dir); }
 							
 				string name() const
 				{

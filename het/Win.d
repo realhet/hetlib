@@ -644,6 +644,20 @@ class Window
 	
 		void setForegroundWindowIfVisible()
 	{ if(isVisible) SetForegroundWindow(hwnd); }
+		
+		@property void dragAcceptFiles(bool val)
+	{ DragAcceptFiles(hwnd, val); }
+	
+		mixin Signal!(File[]) whenFilesDropped;
+		
+		private bool dragAcceptFilesState;
+		void updateDragAcceptFilesState()
+		{
+			auto newState = whenFilesDropped.slots_idx>0;
+			if(dragAcceptFilesState.chkSet(newState))
+				dragAcceptFiles = newState;
+		}
+	
 	
 		this()
 	{
@@ -859,10 +873,22 @@ class Window
 			case WM_SETCURSOR:	if(!isMouseInside) DefWindowProc(hwnd, message, wParam, lParam);
 				internalUpdateMouseCursor(Yes.forced); return 1;
 			
+			case WM_DROPFILES: {
+				auto files = hDropToFiles(cast(HANDLE)wParam);
+				if(files.length)
+					whenFilesDropped.emit(files);
+				
+				//Note: the sending and the receiving process must have the same elevation.
+				/+Todo: get precise drop position with: DragQueryPoint+/
+				return 0;
+			}
 			default:	if(message.inRange(WM_USER, 0x7FFF))
 			return onWmUser(message-WM_USER, wParam, lParam);
 		}
 		return DefWindowProc(hwnd, message, wParam, lParam);
+		
+		//Todo: Beautify this sugly switch
+		
 	}
 	
 	
@@ -1183,6 +1209,8 @@ class Window
 				application.deltaTime	= deltaTime;
 				
 				inputs.update; //Note: it's main window only
+				clipboard.update;
+				updateDragAcceptFilesState;
 				
 				updateWithActionManager; //update Main
 				foreach(w; windowList)
@@ -1238,5 +1266,6 @@ class Window
 			if(autoUpdate) invalidate;
 		*/
 	}
+	
 	
 }

@@ -2606,7 +2606,7 @@ struct im
 								
 								if(KeyCombo("Ctrl+V Shift+Ins").typed)
 								{
-									cmdQueue ~= EditCmd(cInsert, clipboard.asText);
+									cmdQueue ~= EditCmd(cInsert, clipboard.text);
 									//LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
 								}
 							}
@@ -4368,7 +4368,7 @@ struct im
 			void AdvancedSlider(Property prop, void delegate() fun=null)
 		{
 			//this just casts the Property and	calls the appropriate implementation
-					 if(auto p = cast(IntProperty	)prop)
+			if(auto p = cast(IntProperty	)prop)
 			AdvancedSlider_impl(p, fun);
 			else if(auto p = cast(FloatProperty)prop) AdvancedSlider_impl(p, fun);
 			else raise("Invalid type");
