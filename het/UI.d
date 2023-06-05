@@ -1796,11 +1796,18 @@ struct im
 		{ return tag(`symbol `~def); }
 			void Symbol(string def)
 		{ Text(symbol(def)); }
-		
+			
 			void Img(string def)
-		{ Text(tag(`img `~def)); }
+		{ Img(File(def)); }
+			
 			void Img(File f)
-		{ Text(tag(`img `~f.fullName)); }  //Todo: quoted filename not works
+		{
+			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
+			//todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
+			
+			bitmaps(f); //need to pull this crap
+			append(new .Img(f));
+		}
 		
 			struct ScrollInfo
 		{

@@ -95,6 +95,8 @@ class View2D
 	
 	auto origin_anim()const
 	{ return m_origin_anim; }
+	auto logScale_anim()const
+	{ return m_logScale_anim; }
 	auto scale_anim()const
 	{ return pow(2, m_logScale_anim); }	//zoomFactor
 	auto invScale_anim()const

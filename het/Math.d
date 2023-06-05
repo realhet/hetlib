@@ -2022,14 +2022,14 @@ version(/+$DIDE_REGION+/all)
 		enum Dim = RangeDimension!R;
 		static if(Dim.among(1, 2))
 		{
-			alias T = InnerElementType!R;
+			alias T = Unqual!(InnerElementType!R);
 			Unqual!T filler = getDefaultArg!T(def); //Unqual needed for padRight
 			static if(Dim == 2)
 			auto arr = join(range.take(size.y).map!(a => a.padRight(filler, size.x).array));
 			else
 			auto arr = range.array;
 			arr = arr.padRight(filler, size[].product).array; //Opt: this is fucking unoptimal!
-			return Image!(T, 2)(size, arr);
+			return Image!(T, 2)(size, cast()cast(T[])arr);
 		}
 		else
 		static assert(0, "invalid args");
@@ -2062,7 +2062,7 @@ version(/+$DIDE_REGION+/all)
 			static if(funIsStr && fun=="")
 			{
 				//default behaviour: one bitmap, optional default
-				alias R = A[1];
+				alias R = Unqual!(A[1]);
 				static if(RangeDimension!R.among(1, 2))
 				{
 					return image2DfromRanges(size, args[1..$]); //1D, 2D range
@@ -2072,17 +2072,17 @@ version(/+$DIDE_REGION+/all)
 					static assert(A.length<=2, "too many args");
 					static if(__traits(compiles, args[1](size)))
 					{
-						 //delegate or function (ivec2)
-						alias RT = ReturnType!R;
+						//delegate or function (ivec2)
+						alias RT = Unqual!(typeof(args[1](size)));
 						static if(is(RT == void))
 						{
-							 //return is void, just call the delegate.
+							//return is void, just call the delegate.
 							foreach(pos; size.iota2) args[1](pos);
 							return; //the result is void
 						}
 						else
 						{
-							return Image!(RT, 2)(size, size.iota2.map!(p => args[1](p)).array);
+							return Image!(RT, 2)(size, cast(RT[])(size.iota2.map!(p => args[1](p)).array));
 							//return type is something, make an Image out of it.
 						}
 					}
@@ -2351,9 +2351,9 @@ version(/+$DIDE_REGION+/all)
 			
 			void safeSet(ivec2 p, E val)
 			{
-				if(contains(p)) 
+				if(contains(p))
 				cast()impl[p.y*stride + p.x] = val;
-				//bug: This fucking fucker wont compile without the fucking cast(). Prolly some immutable debug fuck calls it...
+				//Bug: This fucking fucker wont compile without the fucking cast(). Prolly some immutable debug fuck calls it...
 			}
 			
 			void safeSet(int x, int y, E val)

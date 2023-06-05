@@ -64,6 +64,7 @@ SubTexIdxCnt	= 1<<SubTexIdxBits;
 enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits
 //Todo: !!!!!!!! must be set when app starts
 
+
 
 //SubTexInfo struct ////////////////////////
 
@@ -850,15 +851,19 @@ class TextureManager
 		}
 	}
 	
-		int opIndex(File fileName)
-	{ return access2(fileName); }
-	
 		SubTexInfo accessInfo(int idx)
 	{
 		 //todo ez egy texture class-ba kell, hogy benne legyen
 		return infoTexture.access(idx);
 	}
+		
+		int opIndex(F)(F file)
+		{ return access(file, Yes.delayed); }
 	
+		int accessNow(F)(F file)
+		{ return access(file, No.delayed); }
+	
+		
 		SubTexInfo opIndex(int idx)
 	{ return infoTexture.access(idx); }
 	
@@ -875,7 +880,7 @@ class TextureManager
 	}
 	
 		ivec2 textureSize(File file)
-	{ return textureSize(access2(file)); }
+	{ return textureSize(access(file, Yes.delayed)); }
 	
 		void uploadInplace(int idx, Bitmap bmp)
 	{ uploadData(accessInfo(idx), bmp); }
@@ -987,11 +992,12 @@ class TextureManager
 		ulong[File] bitmapModified;
 	
 		/// NOT threadsafe by design!!! Gfx is mainthread only anyways.
-		int access2(File file, Flag!"delayed" fDelayed = Yes.delayed)
+		int access(File file, Flag!"delayed" fDelayed)
 	{
 		enum log = 0;
 		
 		bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
+		
 		auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  
 		//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
 		auto modified = bmp.modified.toId_deprecated; //Todo: deprecate toId and use the DateTime itself

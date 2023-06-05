@@ -856,7 +856,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				static uint seq;
 				if(seq.chkSet(sequenceNumber))
-					emit;
+				emit;
 			}
 		}
 		
@@ -1210,7 +1210,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		bool ignoreExceptions(void delegate() f) {
 			bool res;
-			try { f(); }catch(Throwable) { res = true; }
+			try { f(); }catch(Exception) { res = true; }
+			return res;
+		}
+		bool warnExceptions(void delegate() f) {
+			bool res;
+			try { f(); }catch(Exception e) { WARN(e.simpleMsg); res = true; }
 			return res;
 		}
 		
@@ -5556,12 +5561,11 @@ version(/+$DIDE_REGION Containers+/all)
 			assert(0);
 		}
 		
-		/*
-			string quoteForDos(){
-					
-					}
-		*/
-		
+		string optionallyQuotedFileName(string s)
+		{
+			//Bug: Don't give a fuck about quoting quotes.
+			return s.canFind(' ') ? '"' ~ s ~ '"' : s;
+		}
 		
 		auto joinCommandLine(string[] cmd)//Todo: handling quotes
 		{
@@ -7561,7 +7565,26 @@ version(/+$DIDE_REGION Date Time+/all)
 			return dt;
 		}
 		
-		//Todo: a synchronized function called uniqueNow().
+		DateTime uniqueNow()
+		{
+			/+
+				Note: The average difference between consecutive valies is qaround 150.
+				(Measured on AMD FX-8350)
+				
+				{ ulong prev; iota(10).map!(a => uniqueNow).array.map!((a)
+				{ auto res = a.raw-prev; prev = a.raw; return iround(res*1.5625); }).array.drop(1).print; }
+				
+				[100, 100, 2, 98, 200, 2, 98, 100, 2] <- consecutive delta times in nanoseconds.
+			+/
+			synchronized
+			{
+				__gshared DateTime state;
+				auto act = now;
+				//increment it at least by 1
+				if(act>state) state = act;else state.raw++;
+				return state;
+			}
+		}
 		
 		DateTime	today()
 		{ return now.localDayStart; }

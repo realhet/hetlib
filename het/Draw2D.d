@@ -1670,7 +1670,7 @@ class Drawing
 		}
 		void lineTo(in vec2 p, bool isMove)
 		{
-			//todo: isMove flag is bad. isLine flag would be better because that flag has the same meaning as the index of a for loop.
+			//Todo: isMove flag is bad. isLine flag would be better because that flag has the same meaning as the index of a for loop.
 			if(isMove) moveTo(p);else lineTo(p);
 		}
 		
@@ -1969,11 +1969,11 @@ class Drawing
 				}
 			
 				void drawGlyph(in File fileName, in bounds2 b, in RGB8 bkColor = clBlack){
-					drawGlyph(textures[fileName], b, bkColor);
+					drawGlyph(textures(fileName), b, bkColor);
 				}
 			
 				void drawGlyph(in File fileName, in vec2 p, in RGB8 bkColor = clBlack){
-					drawGlyph(textures[fileName], p, bkColor);
+					drawGlyph(textures(fileName), p, bkColor);
 				}
 			
 				void drawGlyph(int idx, in vec2 p, in RGB8 bkColor = clBlack){ //todo: ezeket az fv headereket racionalizalni kell
@@ -2409,9 +2409,10 @@ class Drawing
 			if(onCustomShaderSetup) onCustomShaderSetup(shader);
 			
 			//Todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
-			gl.enable(GL_CULL_FACE);
-			gl.enable(GL_BLEND);		 gl.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			gl.enable(GL_ALPHA_TEST);		 gl.alphaFunc(GL_GREATER, 0);
+			
+			gl.enable(GL_CULL_FACE);	gl.cullFace(	GL_BACK); gl.frontFace(GL_CCW);
+			gl.enable(GL_BLEND);	gl.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			gl.enable(GL_ALPHA_TEST);	gl.alphaFunc(GL_GREATER, 0);
 			gl.disable(GL_DEPTH_TEST);
 			
 			foreach(vbo; vboList) {

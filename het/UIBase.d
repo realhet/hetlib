@@ -1491,26 +1491,26 @@ version(/+$DIDE_REGION+/all)
 	}
 	class Img : Container
 	{
-		 //Img ////////////////////////////////////
-		int stIdx;
+		File file;
 		bool transparent;
 		
-		this(File fn)
+		this(File file)
 		{
-			stIdx = textures[fn];
+			this.file = file;
 			id = srcId(genericId("Img")); //Todo: this is bad
 		}
 		
-		this(File fn, RGB bkColor)
+		this(File file, RGB bkColor)
 		{
 			this.bkColor = bkColor;
-			this(fn);
+			this(file);
 		}
 		
 		override void rearrange()
 		{
 			//Note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
 			//Todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
+			const stIdx = textures[file];
 			const siz = calcGlyphSize_image(stIdx);
 			
 			if(flags.autoHeight && flags.autoWidth)
@@ -1528,6 +1528,7 @@ version(/+$DIDE_REGION+/all)
 			
 			drawBorder(dr);
 			
+			const stIdx = textures[file];
 			if(transparent)
 			dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/);
 			else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/);
@@ -4265,7 +4266,7 @@ version(/+$DIDE_REGION+/all)
 							foreach(c; scUpper[0..lb])
 							if(
 								b.overlaps(c.outerBounds)
-								/+opt: There is overlaps() check and binary search too. I think only one is enough.+/
+								/+Opt: There is overlaps() check and binary search too. I think only one is enough.+/
 							)
 							c.draw(dr);
 						}
@@ -4288,7 +4289,7 @@ version(/+$DIDE_REGION+/all)
 							foreach(p; pgUpper[0..lb])
 							if(
 								b.overlaps(bounds2(p.front.outerTopLeft, p.back.outerBottomRight))
-								/+opt: There is overlap check and binary search too. I think only one is enough.+/
+								/+Opt: There is overlap check and binary search too. I think only one is enough.+/
 							)
 							drawPage(p);
 						}

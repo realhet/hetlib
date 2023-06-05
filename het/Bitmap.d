@@ -121,16 +121,16 @@ version(/+$DIDE_REGION+/all)
 				//strip off prefix:\ and call a loader with the remaining text
 				fn = fn[prefix.length+2..$];
 				auto loader = prefix in bitmapLoaders.functions;
-				if(loader) return (*loader)(fn).enforce("Unable to load bitmap (null returned by loader): "~fn.quoted);
+				if(!loader) raise("Unknown BitmapLoader prefix: "~prefix~`:\`);
+				return (*loader)(fn).enforce("Unable to load bitmap (null returned by loader): "~fn.quoted);
 			}
 			else
 			{
 				//threat it as a normal file
-				return File(fn).deserialize!Bitmap(mustSucceed);
+				auto bmp = File(fn).deserialize!Bitmap(mustSucceed);
+				bmp.modified = File(fn).modified;
+				return bmp;
 			}
-			
-			raise("Unknown BitmapLoader prefix: "~prefix~`:\`);
-			assert(0);
 		}
 		
 		Bitmap res;
@@ -152,15 +152,14 @@ version(/+$DIDE_REGION+/all)
 		
 		if(hasFx && fx) res = applyEffects(res, file);
 		
+		//bitmap.name is always the same as the name passed to this loader
 		res.file = file;
-		res.modified = file.modified;
+		
 		return res;
 	}
 	
 	auto newBitmap(File file, Flag!"fx" fx = No.fx)
-	{
-		return newBitmap(file, ErrorHandling.track, fx);
-	}
+	{ return newBitmap(file, ErrorHandling.track, fx); }
 	
 	Bitmap newBitmap(HBITMAP hBitmap)
 	{
@@ -241,7 +240,7 @@ version(/+$DIDE_REGION+/all)
 		void register(string prefix, Function fun) //Todo: make it threadsafe
 		{
 			enforce(prefix.length>=2, "Invalid prefix string.");
-			prefix = prefix.lc;
+			//Note: prefix names are case sensitive. File drives are NOT.
 			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix);
 			functions[prefix] = fun;
 			static if(0) LOG(name ~ " successfully registered:", prefix);
@@ -350,7 +349,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			auto b = new Bitmap;
 			b.resident = true;
-			b.file = File(name);
+			b.modified = now;
 			return b;
 		}
 		
@@ -358,6 +357,8 @@ version(/+$DIDE_REGION+/all)
 		{
 			//Just forward it to the fileSystem, that will handle the 'virtual:\' prefix.
 			return File(name).deserialize!Bitmap(true);
+			
+			//Todo: this forwarding should only be don inside the filesystem.
 		}
 		
 		Bitmap desktopBitmap(string name)
@@ -697,7 +698,6 @@ version(/+$DIDE_REGION+/all)
 		auto _ = PROBE("bitmapQuery");
 		synchronized
 		{
-			
 			//disable delayed
 			//if(cmd==BitmapQueryCommand.access_delayed) cmd = BitmapQueryCommand.access;
 			
@@ -944,7 +944,6 @@ version(/+$DIDE_REGION+/all)
 							foreach(t; *tr) startDelayedTransformation(bmpIn, cache[t.transformedFile], t);
 							transformationQueue.remove(file);
 						}
-						
 					}
 					else
 					{ if(log) LOG("Bitmap was removed after delayed ", cmd.text.withoutStarting("finish").lc, " has started. ", bmpIn); }
@@ -1054,9 +1053,11 @@ version(/+$DIDE_REGION+/all)
 	__gshared struct bitmaps
 	{
 		static:
-		auto opCall(F)(F file, Flag!"delayed" delayed=No.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null)
+		//bitmaps(fn) = delayed access
+		//bitmaps[fn] = immediate access
+		auto opCall(F)(F file, Flag!"delayed" delayed=Yes.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null)
 		{ return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling, bmp); }
-		auto opCall(F)(F file, ErrorHandling errorHandling, Flag!"delayed" delayed=No.delayed, Bitmap bmp=null)
+		auto opCall(F)(F file, ErrorHandling errorHandling, Flag!"delayed" delayed=Yes.delayed, Bitmap bmp=null)
 		{ return opCall(file, delayed, errorHandling, bmp); }
 		
 		auto opIndex(F)(F file)
@@ -1709,6 +1710,8 @@ version(/+$DIDE_REGION+/all)
 		
 		uint accessed_tick; //garbageCollect using it
 		
+		Object extraData;
+		
 		@property bool unloadable() const
 		{
 			enum recentlyUsedTicks = 3;
@@ -1798,7 +1801,8 @@ version(/+$DIDE_REGION+/all)
 		
 		void set(E)(Image!(E, 2) im)
 		{
-			setRaw(im.asArray, im.width, im.height, VectorLength!E, (ScalarType!E).stringof);
+			const typeStr = (ScalarType!E).stringof;
+			setRaw(im.asArray, im.width, im.height, VectorLength!E, typeStr);
 			
 			counter++;
 		}
@@ -2021,6 +2025,8 @@ version(/+$DIDE_REGION+/all)
 			return ("quality" in fmt) 	? fmt["quality"].to!int.clamp(0, 100)
 				: 95 /+Default quality for jpeg and webp+/;
 		}
+		
+		//Todo: validate parameters for each formats
 		
 		switch(fmt["0"])
 		{
