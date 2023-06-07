@@ -858,10 +858,10 @@ class TextureManager
 	}
 		
 		int opIndex(F)(F file)
-		{ return access(file, Yes.delayed); }
+	{ return access(file, Yes.delayed); }
 	
 		int accessNow(F)(F file)
-		{ return access(file, No.delayed); }
+	{ return access(file, No.delayed); }
 	
 		
 		SubTexInfo opIndex(int idx)
@@ -989,7 +989,9 @@ class TextureManager
 	}
 	
 	
-		ulong[File] bitmapModified;
+		ulong[File] bitmapModified; 
+		//todo: this change detection is lame
+		//bug: this is also a memory leak.
 	
 		/// NOT threadsafe by design!!! Gfx is mainthread only anyways.
 		int access(File file, Flag!"delayed" fDelayed)
@@ -1029,5 +1031,11 @@ class TextureManager
 		bitmapModified[file] = modified;
 		mustRehash = true;
 		return idx;
-	}
+	}
+		
+		auto _getInternalFileToSubTexIdxAA()
+		{
+			//Note: TimeView/KarcLogger needs this, to do fast bulk processing.
+			return byFileName;
+		}
 }

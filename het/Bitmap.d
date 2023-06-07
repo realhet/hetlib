@@ -796,11 +796,12 @@ version(/+$DIDE_REGION+/all)
 				Bitmap res;
 				
 				const delayed = (){
-					if(cmd==BitmapQueryCommand.access_delayed)
-					{
-						const d = file.drive.withoutEnding(':');
-						return d.length<=1 || d.among("virtual");
-					}
+					if(cmd!=BitmapQueryCommand.access_delayed) return false;
+					const fn = file.fullName;
+					if(fn.length>=2 && fn[1]==':') return true; //simple drive
+					const drv = file.drive.withoutEnding(':');
+					if(drv.among("virtual")) return true;
+					if(1) if(drv.among("S1", "S2", "S3")) return true;
 					return false;
 				}();
 				

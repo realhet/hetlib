@@ -6,7 +6,7 @@ import het.utils;
 ///  Basic Types                                                             ///
 ////////////////////////////////////////////////////////////////////////////////
 
-//todo: some types are no more. Complex numbers for example.
+//Todo: some types are no more. Complex numbers for example.
 	 //|---> maps exactly to kwEnums
 enum BasicType:byte	
 { Unknown,	Byte, UByte, Short, UShort, Int, UInt, Long,	ULong, Cent, UCent, Float, Double, Real, IFloat, IDouble, IReal, CFloat, CDouble, CReal, Bool, Char, WChar, DChar, Void	 }
@@ -70,7 +70,7 @@ private enum _keywordStrs = [
 			"dmat2", "dmat3", "dmat4", "dmat2x3", "dmat2x4", "dmat3x2", "dmat3x4",	"dmat4x2",	"dmat4x3",
 	
 			"Bounds",
-			"bounds" , "dbounds" , "ibounds" ,
+			"bounds1", "dbounds1", "ibounds1",
 			"bounds2", "dbounds2", "ibounds2",
 			"bounds3", "dbounds3", "ibounds3",
 	
@@ -195,7 +195,7 @@ string kwStr(int kw)
 //in is new delete
 
 private enum _operatorStrs = [
-	 //TODO: make it a Map, after it has a working static initializer.
+	 //Todo: make it a Map, after it has a working static initializer.
 		"."	, "dot"	, ".."	, "dotDot"	,	"..."	, "dotDotDot"	,
 		"?"	, "question"	, ","	, "comma"	, ";"	, "semiColon"	,
 		":"	, "colon"	, "$"	, "dollar"	, "@"	, "atSign"	,
@@ -451,7 +451,7 @@ ubyte GCNInstructionKind(string s)
 
 bool isGLSLInstruction(string s)
 {
-	return ["gl_Position", "gl_FragColor"].canFind(s); //todo: atirni among()-ra
+	return ["gl_Position", "gl_FragColor"].canFind(s); //Todo: atirni among()-ra
 }
 
 ubyte GLSLInstructionKind(string s)
@@ -473,7 +473,7 @@ ubyte GLSLInstructionKind(string s)
 				"gl_TessLevelInner","gl_out","gl_TessCoord","gl_PrimitiveIDIn","gl_FragColor","gl_FragCoord","gl_FragDepth","gl_FrontFacing","gl_PointCoord","gl_SamplePosition","gl_SampleMaskIn","gl_Layer","gl_ViewportIndex","gl_SampleMask"
 	];
 	
-	//TODO: make it faster with a map
+	//Todo: make it faster with a map
 	
 	if(GLSLKeywords.canFind(s))
 	return 1;
@@ -523,7 +523,7 @@ class SyntaxPreset_future
 			 //comment
 			return value + 123 + 5.6 + 0b1100101 * "42".to!int;
 		}
-		/*comment*/ /*todo:	...*/ /*opt: ...*/
+		/*comment*/ /*Todo: ...*/ /*Opt: ...*/
 		selected  foundAct	foundAlso  navLink
 		error  warning  deprecation
 		
@@ -543,8 +543,8 @@ struct SyntaxStyleRow
 }
 
 
-//todo: these should be uploaded to the gpu
-//todo: from the program this is NOT extendable
+//Todo: these should be uploaded to the gpu
+//Todo: from the program this is NOT extendable
 immutable syntaxPresetNames =	             ["Default"             , "Classic"                         , "C64"                   , "Dark"                     ];
 immutable SyntaxStyleRow[] syntaxTable =[
 	{ "Whitespace"	, [{ clBlack	,clWhite	,0 }, { clVgaYellow	,clVgaLowBlue	,0 }, { clC64LBlue	,clC64Blue	,0 }, { 0xc7c5c5	,0x2f2f2f ,0 }] },
@@ -587,7 +587,7 @@ mixin("alias sk* = SyntaxKind.*;".replace('*', m.text));
 
 __gshared defaultSyntaxPreset = SyntaxPreset.Dark;
 
-//todo: slow, needs a color theme struct
+//Todo: slow, needs a color theme struct
 auto syntaxFontColor(string syntax)
 { return syntaxTable[syntax.to!SyntaxKind.to!int].formats[defaultSyntaxPreset].fontColor; }
 auto syntaxBkColor  (string syntax)
@@ -598,8 +598,8 @@ auto syntaxFontColor(SyntaxKind syntax)
 auto syntaxBkColor  (SyntaxKind syntax)
 { return syntaxTable[syntax].formats[defaultSyntaxPreset].bkColor; }
 
-//opt: slow, needs a color theme struct, and needs an enum for the syntaxkind.
-//todo: this is a good example for table view in DIDE2
+//Opt: slow, needs a color theme struct, and needs an enum for the syntaxkind.
+//Todo: this is a good example for table view in DIDE2
 
 deprecated auto clEmptyLine()
 { return mix(syntaxBkColor("Whitespace"), syntaxBkColor("Whitespace").l>0x80 ? clWhite : clBlack, 0.0625f); }

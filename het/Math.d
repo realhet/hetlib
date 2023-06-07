@@ -1800,7 +1800,7 @@ version(/+$DIDE_REGION+/all)
 	
 	static foreach(T; AliasSeq!(float, double, int))
 	static foreach(N; [1, 2, 3])
-	static if(N==1) mixin(format!q{alias %sbounds = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
+	static if(N==1) mixin(format!q{alias %sbounds1 = %s;}(ComponentTypePrefix!T, (Bounds!T).stringof));
 	else mixin(format!q{alias %sbounds%s = %s;}(ComponentTypePrefix!T, N, Bounds!(Vector!(T, N)).stringof));
 	//Todo: bounds helyett bounds1 jobb lenne, mert a bounds az sokszor masra is hasznalva van: pl. bmp.bounds.  Esetleg interval lehetne a neve.
 	
@@ -1834,7 +1834,7 @@ version(/+$DIDE_REGION+/all)
 		static assert(!__traits(compiles, bounds3(1, 2, 3, 4)));
 		static assert(__traits(compiles, bounds3(1, 2, 3, 4, 5, 6)));
 			
-		auto b1 = bounds(1, 2);
+		auto b1 = bounds1(1, 2); //must include dimension=1, so the word 'bounds' can be used for general purposes
 		assert(b1.text == "bounds(1, 2)");
 			
 		auto b3 = ibounds3(1, 2, 3, 4, 5, 6);
@@ -1875,7 +1875,7 @@ version(/+$DIDE_REGION+/all)
 			//opApply tests
 			int[] a; foreach(x, y; ibounds2(ivec2(1, 5), ivec2(3, 8))) a ~= [x, y]; assert(a.equal([1, 5, 2, 5, 1, 6, 2, 6, 1, 7, 2, 7]));
 			int[] b; foreach(p		 ; ibounds2(1, 5, 3, 8)) with(p) b ~= [x, y]; assert(b.equal(a));
-			int[] c; foreach(i		 ; ibounds (2, 6)) c ~= i; assert(c.equal([2, 3, 4, 5]));
+			int[] c; foreach(i		 ; ibounds1 (2, 6)) c ~= i; assert(c.equal([2, 3, 4, 5]));
 		}
 	}
 	

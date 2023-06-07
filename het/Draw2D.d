@@ -1544,7 +1544,11 @@ class Drawing
 		
 		vec2 inputTransform(in vec2 p)
 		{ return (p+actState.drawOrigin)*actState.drawScale; }
+		vec2 inputTransform(in ivec2 p)
+		{ return (p+actState.drawOrigin)*actState.drawScale; }
 		bounds2 inputTransform(in bounds2 b)
+		{ return bounds2(inputTransform(b.low), inputTransform(b.high)); }
+		bounds2 inputTransform(in ibounds2 b)
 		{ return bounds2(inputTransform(b.low), inputTransform(b.high)); }
 		
 		vec2 inverseInputTransform(in vec2 v)
@@ -1878,7 +1882,7 @@ class Drawing
 					else static if(is(A==Flag!"nearest"	))	nearest = a;
 					else static if(is(A==RectAlign	))	rectAlign = a;
 					else static if(is(A==DrawGlyphScale	))	drawScale = a.value;
-					else static if(is(A==GenericArg!(N,	T), string N, T))	shaderIdx = a.value;
+					else static if(is(A==GenericArg!(N,	T), string N, T) && N=="shaderIdx")	shaderIdx = a.value;
 					else static assert(0, "Unhandled parameter "~typeof(a).stringof);
 				}
 			}
@@ -1985,6 +1989,35 @@ class Drawing
 					drawGlyph(idx, vec2(x, y), bkColor);
 				} 
 		+/
+		
+		void drawTexture(B, T...)(int stIdx, in B bnd, in T args)
+		{
+			//Note: This simplified version is used in TimeView/KarcLogger
+			if(stIdx<0) return;
+			
+			auto nearest = No.nearest;
+			int shaderIdx = -1;
+			
+			static foreach(i, A_; T)
+			{
+				{
+					alias A = Unqual!A_; auto a() { return args[i]; }
+					static if(is(A==Flag!"nearest"	))	nearest = a;
+					else static if(is(A==GenericArg!(N,	T), string N, T) && N=="shaderIdx")	shaderIdx = a.value;
+					else static assert(0, "Unhandled parameter "~typeof(a).stringof);
+				}
+			}
+			
+			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
+				tx1 = vec2(1, 1);
+			
+			myAppend(
+				DrawingObj(
+					256+stIdx, inputTransform(bnd.low), inputTransform(bnd.high), 
+					tx0, 0xFF000000/+color+/, tx1, 0xFF000000/+bkColor+/
+				)
+			);
+		}
 		
 		void drawFontGlyph(int idx, in bounds2 b, in RGB8 bkColor = clBlack, in int fontFlags = 0)
 		{
@@ -2410,7 +2443,7 @@ class Drawing
 			
 			//Todo: ezeket az allapotokat elmenteni es visszacsinalni, ha kell, de leginkabb bele kene rakni egy nagy functba az egesz hobelevancot...
 			
-			gl.enable(GL_CULL_FACE);	gl.cullFace(	GL_BACK); gl.frontFace(GL_CCW);
+			gl.enable(GL_CULL_FACE);	gl.cullFace(GL_BACK); gl.frontFace(GL_CCW);
 			gl.enable(GL_BLEND);	gl.blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			gl.enable(GL_ALPHA_TEST);	gl.alphaFunc(GL_GREATER, 0);
 			gl.disable(GL_DEPTH_TEST);
