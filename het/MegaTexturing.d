@@ -496,8 +496,6 @@ class TextureManager
 	
 		int[File] byFileName; //texIdx of File
 	
-		bool mustRehash; //Todo: this is useless i think
-	
 		bool[int] pendingIndices; //files being loaded by a worker thread
 		bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
 	
@@ -718,9 +716,6 @@ class TextureManager
 		auto _ = PROBE("Textures.Update");
 		bool inv;
 		
-		//Todo: is this rehash useful at all?
-		//if(mustRehash) byFileName.rehash;
-		
 		auto t0 = QPS;
 		
 		enum UploadTextureMaxTime = 1.0*second/60;
@@ -825,7 +820,6 @@ class TextureManager
 								removeSubTex(*a);
 								auto idx = createSubTex(bmp);
 								byFileName[fileName] = idx;
-								mustRehash = true;
 				if(log) "Updated subtex %s:".writefln(fileName);
 								return idx;
 			}
@@ -845,7 +839,6 @@ class TextureManager
 			}
 						auto idx = createSubTex(bmp);
 						byFileName[fileName] = idx;
-						mustRehash = true;
 			if(log) "Created subtex %s:".writefln(fileName);
 						return idx;
 		}
@@ -990,15 +983,15 @@ class TextureManager
 	
 	
 		ulong[File] bitmapModified; 
-		//todo: this change detection is lame
-		//bug: this is also a memory leak.
+		//Todo: this change detection is lame
+		//Bug: this is also a memory leak.
 	
 		/// NOT threadsafe by design!!! Gfx is mainthread only anyways.
 		int access(File file, Flag!"delayed" fDelayed)
 	{
-		enum log = 0;
+		enum log = false;
 		
-		bool delayed = fDelayed & EnableMultiThreadedTextureLoading & true;
+		const delayed = fDelayed && EnableMultiThreadedTextureLoading;
 		
 		auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  
 		//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
@@ -1029,13 +1022,48 @@ class TextureManager
 		auto idx = createSubTex(bmp);
 		byFileName[file] = idx;
 		bitmapModified[file] = modified;
-		mustRehash = true;
 		return idx;
 	}
-		
-		auto _getInternalFileToSubTexIdxAA()
+	
+	void refresh_timeView(File file)
+	{
+		auto bmp = bitmaps(file, Yes.delayed, ErrorHandling.ignore);  
+		if(bmp.loading) return;
+		byFileName.update(
+			file,
+			() => createSubTex(bmp),
+			(ref int idx){
+				removeSubTex(idx);
+				idx = createSubTex(bmp);
+			}
+		);
+	}
+	
+	void refresh_timeView_multi(File[] files)
+	{
+		void update(Bitmap bmp)
 		{
-			//Note: TimeView/KarcLogger needs this, to do fast bulk processing.
-			return byFileName;
+			if(bmp && !bmp.loading)
+			byFileName.update(
+				bmp.file,
+				() => createSubTex(bmp),
+				(ref int idx){
+					removeSubTex(idx);
+					idx = createSubTex(bmp);
+				}
+			);
 		}
+		
+		foreach(bmp; bitmapQuery_accessDelayedMulti(files)) update(bmp);
+		
+		//foreach(bmp; files.map!(file => bitmaps(file, Yes.delayed, ErrorHandling.ignore))) update(bmp);
+	}
+	
+	
+	
+		auto _getInternalFileToSubTexIdxAA()
+	{
+		//Note: TimeView/KarcLogger needs this, to do fast bulk processing.
+		return byFileName;
+	}
 }

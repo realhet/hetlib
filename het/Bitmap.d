@@ -33,7 +33,7 @@ version(/+$DIDE_REGION+/all)
 	version = D2D_FONT_RENDERER;
 	
 	enum BitmapQueryCommand
-	{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect, set }
+	{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect, set, access_delayed_multi }
 	
 	/+
 		{ //handle thumbnails
@@ -693,9 +693,20 @@ version(/+$DIDE_REGION+/all)
 	
 	private BitmapCacheStats _bitmapCacheStats; //this is a result
 	
+	private __gshared File[] bitmap_access_delayed_multi_files;
+	private __gshared Bitmap[] bitmap_access_delayed_multi_bitmaps;
+	
+	Bitmap[] bitmapQuery_accessDelayedMulti(File[] files)
+	{
+		//this must be called from main thread only!!!
+		bitmap_access_delayed_multi_files = files;
+		bitmapQuery(BitmapQueryCommand.access_delayed_multi, File.init, ErrorHandling.ignore);
+		return bitmap_access_delayed_multi_bitmaps;
+	}
+	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		auto _ = PROBE("bitmapQuery");
+		//auto _ = PROBE("bitmapQuery");
 		synchronized
 		{
 			//disable delayed
@@ -791,17 +802,20 @@ version(/+$DIDE_REGION+/all)
 			
 			//Loads and transforms a file, and updates the caches. Works in delayed and immediate mode.
 			//   requiredOriginalTime : optional check for the transformation's original file modified time
-			Bitmap loadAndTransform(File file, DateTime requiredOriginalTime = DateTime.init)
+			Bitmap loadAndTransform(File file, bool delayed_, DateTime requiredOriginalTime = DateTime.init)
 			{
 				Bitmap res;
 				
 				const delayed = (){
-					if(cmd!=BitmapQueryCommand.access_delayed) return false;
+					if(!delayed_) return false;
 					const fn = file.fullName;
 					if(fn.length>=2 && fn[1]==':') return true; //simple drive
 					const drv = file.drive.withoutEnding(':');
 					if(drv.among("virtual")) return true;
-					if(1) if(drv.among("S1", "S2", "S3")) return true;
+					if(1)
+					if(drv.among("S1", "S2", "S3")) return true;
+						/+Todo: plugins should provide delayed flag+/
+					
 					return false;
 				}();
 				
@@ -872,7 +886,50 @@ version(/+$DIDE_REGION+/all)
 				}
 				
 				return res;
-			}
+			}
+			
+			Bitmap access(bool autoRefresh)(File file, bool delayed)
+			{
+				if(auto p = file in cache)
+				{
+					 //already in cache
+					auto res = *p;
+					
+					//check for a refreshed version
+					static if(autoRefresh)
+					{
+						if(!res.loading)
+						{
+							//current bitmap is NOT loading
+							if(auto t = file.getLatestModifiedTime)
+							{
+								//the modified time is accessible
+								if(t != res.modified)
+								{
+									//it has a new version, must load...
+									if(delayed)
+									{
+										loadAndTransform(file, delayed, t);
+										//put back the original file into the cache and mark that it is loading
+										cache[file] = res;
+										res.loading = true;
+									}
+									else
+									{ res = loadAndTransform(file, delayed, t); }
+								}
+							}
+						}
+					}
+					return res;
+				}
+				else
+				{
+					//new thing, must be loaded
+					return loadAndTransform(file, delayed);
+				}
+			}
+			
+			
 			
 			
 			final switch(cmd)
@@ -880,52 +937,31 @@ version(/+$DIDE_REGION+/all)
 				
 				case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed:
 				{
-					
 					if(bmpIn) {
-						 //just put the image into the cache
+						//just put the image into the cache
 						
 						res = bmpIn;
 						cache[file] = res;
 						
 					}
 					else {
-						 //try to load the file from the fileSystem
-						
-						if(auto p = file in cache)
-						{
-							 //already in cache
-							res = *p;
-							
-							//check for a refreshed version
-							if(!res.loading)
-							{
-								//current bitmap is NOT loading
-								if(auto t = file.getLatestModifiedTime)
-								{
-									//the modified time is accessible
-									if(t != res.modified)
-									{
-										//it has a new version, must load...
-										if(cmd == BitmapQueryCommand.access_delayed)
-										{
-											loadAndTransform(file, t);
-											//put back the original file into the cache and mark that it is loading
-											cache[file] = res;
-											res.loading = true;
-										}
-										else
-										{ res = loadAndTransform(file, t); }
-									}
-								}
-							}
-							
-						}
-						else
-						{
-							//new thing, must be loaded
-							res = loadAndTransform(file);
-						}
+						//try to load the file from the fileSystem
+						res = access!true(file, cmd==BitmapQueryCommand.access_delayed);
 					}
+				}
+				break;
+				
+				case BitmapQueryCommand.access_delayed_multi:
+				{
+					//batch processing used bny timeview.
+					bitmap_access_delayed_multi_bitmaps = bitmap_access_delayed_multi_files
+					.map!(
+						(file){
+							res = access!false(file, true);
+							if(res) res.accessed_tick = application.tick;
+							return res;
+						}
+					).array;
 				}
 				break;
 				
