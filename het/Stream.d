@@ -2,7 +2,7 @@ module het.stream;/+DIDE+/
 
 import het.utils, het.tokenizer, het.keywords, std.traits, std.meta;
 
-//todo: Try binary serialization: https://github.com/atilaneves/cerealed
+//Todo: Try binary serialization: https://github.com/atilaneves/cerealed
 
 //Todo: auto ref parameters.
 //Todo: srcFunct seems obsolete.
@@ -1026,7 +1026,7 @@ version(/+$DIDE_REGION Properties+/all)
 //! Archiver //////////////////////////////////////////////////////
 
 
-
+/+
 //cache data to files /////////////////////////////////
 
 T cache(T)(lazy T data, File file, bool refresh=false)
@@ -1054,6 +1054,7 @@ T cache(T)(lazy T data, File file, bool refresh=false)
 	LOG("Cache recalculated:", file);
 	return res;
 }
++/
 
 void unittest_property_inherited()
 {

@@ -799,7 +799,7 @@ version(/+$DIDE_REGION+/all)
 				
 				taskPool.put(task!worker_transform(originalBmp, transformedBmp, tr));
 			}
-			
+			
 			//Loads and transforms a file, and updates the caches. Works in delayed and immediate mode.
 			//   requiredOriginalTime : optional check for the transformation's original file modified time
 			Bitmap loadAndTransform(File file, bool delayed_, DateTime requiredOriginalTime = DateTime.init)

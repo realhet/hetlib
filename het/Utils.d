@@ -8447,17 +8447,17 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			ubyte[] read(
 				bool mustExists = true, ulong offset = 0, size_t len = size_t.max,
-								string srcFile=__FILE__, int srcLine=__LINE__
+				string srcFile=__FILE__, int srcLine=__LINE__
 			)const
 			{
 				//Todo: void[] kellene ide talan, nem ubyte[] es akkor stringre is menne?
 				ubyte[] data;
-							
+				
 				if(!exists) {
 					if(mustExists) raise(format!`Can't read file: "%s"`(fullName), srcFile, srcLine);
 					return data;
 				}
-							
+				
 				if(!mustExists && !exists) return data;
 				try
 				{

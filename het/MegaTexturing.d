@@ -29,8 +29,10 @@ __gshared
 
 bool canUnloadTexture(File f, int age)
 {
-	if(age<=3) return false;
-	if(f.drive.among("custom", "font")) return false;
+	if(age<=3)
+	return false;
+	if(f.drive.among("custom", "font"))
+	return false;
 	return true;
 }
 
@@ -65,7 +67,7 @@ enum MegaTexMaxCnt = 3; //max = 1<<MegaTexIdxBits
 //Todo: !!!!!!!! must be set when app starts
 
 
-
+
 //SubTexInfo struct ////////////////////////
 
 enum SubTexChannelConfig
@@ -79,7 +81,7 @@ enum SubTexChannelConfig
 //packed data struct that
 private struct SubTexInfo
 {
-	 align(1): import std.bitmanip;
+	align(1): import std.bitmanip;
 	mixin(
 		bitfields!(
 			uint, "cellX",	 14, uint, "texIdx_lo",	 2,
@@ -163,7 +165,8 @@ class MegaTexture
 	
 		void resizeGLTexture()
 	{
-		if(glTexture.size!=texSize) {
+		if(glTexture.size!=texSize)
+		{
 			glTexture.fastBind;
 			glTexture.resize(texSize);
 		}
@@ -197,21 +200,25 @@ class MegaTexture
 		glTexture.bind;
 	}
 	
-		~this() {
+		~this()
+	{
 		glTexture.free;
 		bin.free;
 	}
 	
-		void reinitialize() { bin.reinitialize; }
+		void reinitialize()
+	{ bin.reinitialize; }
 	
-		override string toString() { return "MegaTexture(%s)".format(glTexture); }
+		override string toString()
+	{ return "MegaTexture(%s)".format(glTexture); }
 	
 		bool add(in ivec2 size, int channels, int data/*subTexIdx*/, out SubTexInfo info)
 	{
-		auto cellSize = (size+SubTexCellMask)>>SubTexCellBits,
-				 rect = bin.add(cellSize.x, cellSize.y, data);
+		auto 	cellSize = (size+SubTexCellMask)>>SubTexCellBits,
+			rect = bin.add(cellSize.x, cellSize.y, data);
 		
-		if(rect is null) {
+		if(rect is null)
+		{
 			//Todo: MegaTexture.repack()
 			return false; //unable to allocate because out of space.
 		}
@@ -225,9 +232,9 @@ class MegaTexture
 		return true;
 	}
 	
-		void remove(in int data)
+		void remove(int data)
 	{
-		bin.remove(data).enforce("nothing to remove");
+		bin.remove(data).enforce(format!"nothing to remove: %s"(data));
 		//if(!bin.remove(data)) WARN("bin: nothing to remove ", data);
 	}
 	
@@ -241,13 +248,15 @@ class MegaTexture
 		dr.lineWidth = -1;
 		
 		dr.lineStyle = LineStyle.normal;
-		foreach(r; bin.freeRects) {
+		foreach(r; bin.freeRects)
+		{
 			dr.color = clWhite;
 			dr.drawRect(r.bounds.inflated(-0.25f));
 		}
 		
 		dr.lineStyle = LineStyle.dash;
-		foreach(j, r; bin.rects) {
+		foreach(j, r; bin.rects)
+		{
 			dr.color = clBlack; //clVga[(cast(int)j % ($-1))+1];
 			dr.alpha = 0.25;
 			dr.fillRect(r.bounds);
@@ -262,7 +271,8 @@ class MegaTexture
 		dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height);
 	}
 	
-		size_t sizeBytes() const { return glTexture ? glTexture.sizeBytes : 0; }
+		size_t sizeBytes() const
+	{ return glTexture ? glTexture.sizeBytes : 0; }
 }
 
 
@@ -355,24 +365,27 @@ class InfoTexture
 		int actIdx;
 		
 		//this must be analogous with peekNextIdx
-		if(!freeIndices.empty) {
+		if(!freeIndices.empty)
+		{
 			//reuse a free slot
 			actIdx = freeIndices.popLast;
 			infoArray[actIdx] = info;
 		}
 		else {
-			 //add an extra slot
+			//add an extra slot
+			actIdx = cast(int)infoArray.length;
 			infoArray ~= info;
-			actIdx = cast(int)infoArray.length-1;
 			
 			enforce(actIdx<SubTexIdxCnt, "FATAL: SubTexIdxCnt limit reached");
 			
-			if(capacity<infoArray.length) grow;
+			if(capacity<infoArray.length)
+			grow;
 		}
 		
 		accessedNow(actIdx);
 		
-		if(uploadNow) upload(actIdx);
+		if(uploadNow)
+		upload(actIdx);
 		
 		return actIdx;
 	}
@@ -417,7 +430,8 @@ class InfoTexture
 		//foreach(i, a; infoArray) writeln(tuple(i, i+1));
 		//!!! this is bad as well, the problem is not related to own structs, just to tuples
 		
-		foreach(i, a; infoArray) writefln("(%s, %s)", i, a);  //this works
+		foreach(i, a; infoArray)
+		writefln("(%s, %s)", i, a);  //this works
 	}
 	
 		size_t sizeBytes() const
@@ -454,7 +468,8 @@ class Texture
 {
 	 //CustomTexture ///////////////////////////////
 	const string name;
-	protected {
+	protected
+	{
 		Bitmap bmp;
 		bool mustUpload;
 	}
@@ -471,8 +486,10 @@ class Texture
 	
 	int texIdx()
 	{
-		if(bmp is null) return -1; //nothing to draw
-		if(!textures.isCustomExists(name)) mustUpload = true; //prepare for megaTexture GC
+		if(bmp is null)
+		return -1; //nothing to draw
+		if(!textures.isCustomExists(name))
+		mustUpload = true; //prepare for megaTexture GC
 		Bitmap b = chkClear(mustUpload) ? bmp : null;
 		return textures.custom(name, b);
 	}
@@ -527,7 +544,8 @@ class TextureManager
 	
 		void addNewMegaTexture(int channels)
 	{
-		if(megaTextures.length>=MegaTexMaxCnt) { raise("Out of megatextures"); }
+		if(megaTextures.length>=MegaTexMaxCnt)
+		{ raise("Out of megatextures. Can't add more."); }
 		megaTextures ~= new MegaTexture(megaTextures.length.to!int, channels);
 	}
 	
@@ -550,7 +568,7 @@ class TextureManager
 	
 		void garbageCollect()
 	{
-		auto _ = PROBE("Textures.GC");
+		//auto _ = PROBE("Textures.GC");
 		
 		 //garbageCollect() /////////////////////////////////////////
 		int mtIdx = garbageCycle % cast(int)megaTextures.length;
@@ -560,7 +578,11 @@ class TextureManager
 		
 		//LOG("GCycle", garbageCycle);
 		
-		auto allInfos = collectSubTexInfo2.filter!(i => i.info.texIdx==mtIdx).array; //on the current megatexture
+		//megaTextures[mtIdx].bin.dump;
+		//infoDump;
+		
+		//auto allInfos = collectSubTexInfo2.filter!(i => i.info.texIdx==mtIdx); //on the current megatexture
+		
 		//auto infosToUnload	= allInfos.filter!(i =>  i.canUnload).array;
 		//auto infosToSave	= allInfos.filter!(i => !i.canUnload).array;
 		
@@ -574,10 +596,11 @@ class TextureManager
 		
 		//LOG("MegaTexture.GC   mtIdx:", mtIdx, "  removing:", infosToUnload.length, "  keeping:", infosToSave.length, "   total:", collectSubTexInfo2.count);
 		
-		//Note: Tere is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
+		//Note: There is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
 		//raise("notImpl " ~ info.text);
 		
-		foreach(info; allInfos) { invalidate(info.file); }
+		foreach(file; byFileName.byKeyValue.filter!(a=>infoTexture.infoArray[a.value].texIdx==mtIdx).map!"a.key")
+		{ invalidate(file); }
 		
 		megaTextures[mtIdx].reinitialize;
 		
@@ -589,40 +612,48 @@ class TextureManager
 	
 		SubTexInfo allocSpace(int subTexIdx, in Bitmap bmp)
 	{
-		enforce(bmp);
-		enforceSize(bmp.size);
+		enforce(bmp);enforceSize(bmp.size);
 		
 		SubTexInfo info;
-		bool tryAdd(MegaTexture mt) { return isCompatible(bmp, mt) && mt.add(bmp.size, bmp.channels, subTexIdx, info); }
+		bool tryAdd()
+		{
+			const res = megaTextures.any!(mt => isCompatible(bmp, mt) && mt.add(bmp.size, bmp.channels, subTexIdx, info));
+			if(res) {
+				//added succesfully
+			}
+			return res;
+		}
 		
 		//the order could be improved
-		foreach(mt; megaTextures) if(tryAdd(mt)) return info;
+		if(tryAdd) return info;
 		
 		//at this point failed to add to the current set of megatextures.
 		
 		if(megaTextures.length>=MegaTexMaxCnt)
 		{
-			if(0) {
+			if(0)
+			{
 				raise("Out of megatextures"); //Todo: make a texture garbage collect cycle here
 			}
 			else {
-				foreach(i; 0..MegaTexMaxCnt)
+				foreach(i; 0..MegaTexMaxCnt/+try until any megaTexture fits+/)
 				{
 					garbageCollect;
-					foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
+					if(tryAdd) return info;
 				}
 			}
 		}
 		else {
+			if(megaTextures.length)
+			MegaTexMinSize = MegaTexMaxSize;
+			//Todo: this is bad because it modifies the configuration data: MegaTexMinSize
 			
-			if(megaTextures.length) MegaTexMinSize = MegaTexMaxSize;
 			//All textures use the max size expect the first. (small apps ned only 512*512)
-			
 			addNewMegaTexture(4);
-			foreach(mt; megaTextures) if(tryAdd(mt)) return info; //try again
+			if(tryAdd) return info;
 		}
 		
-		enforce("Unable to allocate subTexture. "~bmp.size.text);
+		raise("Unable to allocate subTexture. "~bmp.size.text);
 		assert(0);
 	}
 	
@@ -633,7 +664,8 @@ class TextureManager
 		chkMtIdx(mtIdx);
 		auto mt = megaTextures[mtIdx];
 		
-		if(!dontUploadData) {
+		if(!dontUploadData)
+		{
 			mt.glTexture.fastBind;
 			
 			//Todo: this is wasting ram and not work with custom non 4ch bitmaps
@@ -677,11 +709,37 @@ class TextureManager
 		+/
 		
 		//new version allowing GC to manipulate subTexInfos.
-		auto idx = infoTexture.add(longToSubTexInfo(-1)/+just a marking, that it's not null+/, No.uploadNow);
-		auto info = allocSpace(idx, bmp);
-		infoTexture.modify(idx, info);
 		
+		
+		//Todo: DIDE TimeMeasurements
+		static auto tInfoAdd = 0*second;
+		static auto tAllocSpace = 0*second;
+		static auto tInfoModify = 0*second;
+		static auto tUpload = 0*second;
+		static auto tCnt = 0;
+		T0;
+		auto idx = infoTexture.add(longToSubTexInfo(-1)/+just a marking, that it's not null+/, No.uploadNow);
+		tInfoAdd += DT;
+		auto info = allocSpace(idx, bmp);
+		tAllocSpace += DT;
+		infoTexture.modify(idx, info);
+		tInfoModify += DT;
 		uploadData(info, bmp);
+		tUpload += DT;
+		
+		tCnt++;
+		if(tCnt>=2048)
+		{
+			print(
+				siFormat("%6.3f µs", tInfoAdd/tCnt), 
+				siFormat("%6.3f µs", tAllocSpace/tCnt), 
+				siFormat("%6.3f µs", tInfoModify/tCnt), 
+				siFormat("%6.3f µs", tUpload/tCnt)
+			);
+			tCnt = 0;
+			tInfoAdd = tAllocSpace = tInfoModify = tUpload = 0*second;
+		}
+		
 		return idx;
 	}
 	
@@ -696,7 +754,8 @@ class TextureManager
 		
 		//clear the area with clFuchsia for debug
 		if(DEBUG_clearRemovedSubtexArea)
-		with(megaTextures[mtIdx].glTexture) {
+		with(megaTextures[mtIdx].glTexture)
+		{
 			fastBind;
 			fill(RGBA(0xFFFF00FF), info.pos.x, info.pos.y, info.size.x, info.size.y);
 		}
@@ -707,9 +766,10 @@ class TextureManager
 	}
 	
 		Bitmap[] bmpQueue;
-	
+	
 	public:
-		this() { infoTexture = new InfoTexture; }
+		this()
+	{ infoTexture = new InfoTexture; }
 	
 		bool update()
 	{
@@ -725,13 +785,17 @@ class TextureManager
 		{
 			
 			Bitmap bmp;
-			synchronized(textures) {
-				if(synchLog) LOG("bmpQueue.popFirst(null) before");
+			synchronized(textures)
+			{
+				if(synchLog)
+				LOG("bmpQueue.popFirst(null) before");
 				bmp = bmpQueue.popFirst(null);
-				if(synchLog) LOG("bmpQueue.popFirst(null) after");
+				if(synchLog)
+				LOG("bmpQueue.popFirst(null) after");
 			}
 			
-			if(!bmp) break;
+			if(!bmp)
+			break;
 			
 			auto idx = bmp.tag;
 			
@@ -747,7 +811,8 @@ class TextureManager
 				
 				invalidateAgain.remove(idx);
 				foreach(f, i; byFileName)
-				if(i == idx) {
+				if(i == idx)
+				{
 					 //Opt: slow linear search
 					//WARN("Reinvalidating", f, idx);
 					invalidate(f);
@@ -755,13 +820,13 @@ class TextureManager
 				}
 				
 			}
-			else
-			{
+			else {
 				uploadSubTex(idx, bmp);
 				
 				//flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
 				uploadedSize += bmp.sizeBytes;
-				if(uploadedSize >= TextureFlushLimit) {
+				if(uploadedSize >= TextureFlushLimit)
+				{
 					uploadedSize -= TextureFlushLimit;
 					gl.flush;
 				}
@@ -779,7 +844,8 @@ class TextureManager
 	{
 		if(auto idx = (fileName in byFileName))
 		{
-			if(*idx in pendingIndices) {
+			if(*idx in pendingIndices)
+			{
 				//WARN("Texture loader is pending", fileName, *idx);
 				invalidateAgain[*idx] = true;
 				return;
@@ -788,8 +854,7 @@ class TextureManager
 			removeSubTex(*idx);
 			//LOG("invalidated ", fileName, "  idx:", *idx);
 		}
-		else
-		{
+		else {
 			//LOG("no need to invalidate, doesn't exists", fileName);
 		}
 	}
@@ -808,29 +873,32 @@ class TextureManager
 	{
 		 //if bitmap != null then refresh
 		enum log = false;
-		if(log) "testures.custom(%s, %s)".writefln(name, bmp);
+		if(log)
+		"testures.custom(%s, %s)".writefln(name, bmp);
 		
 				auto fileName = File(`custom:\`~name);
 		
 		if(auto a = (fileName in byFileName))
 		{
 			 //already exists?
-			if(bmp) {
+			if(bmp)
+			{
 				 //reupdate existing
 								removeSubTex(*a);
 								auto idx = createSubTex(bmp);
 								byFileName[fileName] = idx;
-				if(log) "Updated subtex %s:".writefln(fileName);
+				if(log)
+				"Updated subtex %s:".writefln(fileName);
 								return idx;
 			}
 			else {
 				 //no change, just return the existing handle
-				if(log) "Found subtex %s:".writefln(fileName);
+				if(log)
+				"Found subtex %s:".writefln(fileName);
 								return *a;
 			}
 		}
-		else
-		{
+		else {
 			 //this is a new entry
 						if(bmp is null)
 			{
@@ -839,7 +907,8 @@ class TextureManager
 			}
 						auto idx = createSubTex(bmp);
 						byFileName[fileName] = idx;
-			if(log) "Created subtex %s:".writefln(fileName);
+			if(log)
+			"Created subtex %s:".writefln(fileName);
 						return idx;
 		}
 	}
@@ -873,7 +942,7 @@ class TextureManager
 	}
 	
 		ivec2 textureSize(File file)
-	{ return textureSize(access(file, Yes.delayed)); }
+	{ return textureSize(access(file, Yes.delayed)); }
 	
 		void uploadInplace(int idx, Bitmap bmp)
 	{ uploadData(accessInfo(idx), bmp); }
@@ -897,8 +966,9 @@ class TextureManager
 		print("--------------- MegaTexture dump ----------------");
 		foreach(i, info; infoTexture.infoArray)
 		print(format!"%-3d : %-20s "(i, info));
-		foreach(f; byFileName.keys.sort) { print(format!"%-3d : %-20s "(byFileName[f], f.nameWithoutExt)); }
-	}
+		foreach(f; byFileName.keys.sort)
+		{ print(format!"%-3d : %-20s "(byFileName[f], f.fullName)); }
+	}
 	
 		int length() const
 	{ return byFileName.length.to!int; }
@@ -928,10 +998,11 @@ class TextureManager
 		
 		SubTexInfo2[] res;
 		
-		foreach(file, idx; byFileName) {
+		foreach(file, idx; byFileName)
+		{
 			//LOG("retrieving ", file, "  idx:", idx);
 			const info = infoTexture.infoArray[idx],
-						lastAccessed = infoTexture.lastAccessed[idx];
+			lastAccessed = infoTexture.lastAccessed[idx];
 			res ~= SubTexInfo2(idx, lastAccessed, file, info);
 		}
 		
@@ -953,7 +1024,8 @@ class TextureManager
 		int ofs;
 		foreach(megaIdx, mt; megaTextures)
 		{
-			dr.translate(0, ofs); scope(exit) { dr.pop; ofs += mt.texSize.y + 16; }
+			dr.translate(0, ofs); scope(exit)
+			{ dr.pop; ofs += mt.texSize.y + 16; }
 			
 			//draw background
 			dr.color = clFuchsia;
@@ -968,7 +1040,8 @@ class TextureManager
 				dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray);
 				//Todo: drawRect support for ibounds2
 				
-				if(!si.canUnload) {
+				if(!si.canUnload)
+				{
 					dr.lineWidth=-3; dr.color = clYellow;
 					dr.drawX(bounds2(si.info.bounds));
 				}
@@ -979,7 +1052,7 @@ class TextureManager
 			mt.debugDraw(dr);
 		}
 		
-	}
+	}
 	
 	
 		ulong[File] bitmapModified; 
@@ -997,7 +1070,8 @@ class TextureManager
 		//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
 		auto modified = bmp.modified.toId_deprecated; //Todo: deprecate toId and use the DateTime itself
 		
-		if(log) LOG(bmp);
+		if(log)
+		LOG(bmp);
 		if(auto existing = file in byFileName)
 		{
 			
@@ -1010,14 +1084,17 @@ class TextureManager
 			+/
 			if(modified == bitmapModified.get(file, 0))
 			{
-				if(log) LOG("\33\12existing\33\7");
+				if(log)
+				LOG("\33\12existing\33\7");
 				return *existing; //existing texture and matching modified datetime
 			}
-			if(log) LOG("\33\14removing\33\7");
+			if(log)
+			LOG("\33\14removing\33\7");
 			removeSubTex(*existing); //It's changed, must remove
 		}
 		//upload new texture
-		if(log) LOG("\33\16creating\33\7", modified);
+		if(log)
+		LOG("\33\16creating\33\7", modified);
 		
 		auto idx = createSubTex(bmp);
 		byFileName[file] = idx;
@@ -1025,45 +1102,75 @@ class TextureManager
 		return idx;
 	}
 	
-	void refresh_timeView(File file)
+	
+	void refreshFile(File file, Bitmap bmp)
 	{
-		auto bmp = bitmaps(file, Yes.delayed, ErrorHandling.ignore);  
-		if(bmp.loading) return;
-		byFileName.update(
-			file,
-			() => createSubTex(bmp),
-			(ref int idx){
-				removeSubTex(idx);
-				idx = createSubTex(bmp);
-			}
-		);
+		/+
+			Note: Used by timeview. 
+			AA.update is not good because it creates a subTexIdx=0 before it assigns the actual subTextIdx. 
+			This causes a bug in GC, because there could be two 0 subTextIndices.
+		+/
+		if(!bmp || bmp.loading) return;
+		if(auto idx = file in byFileName)
+		{
+			//Opt: try to refresh the image inplace, instead of remove+create
+			removeSubTex(*idx);
+			*idx = createSubTex(bmp);
+		}
+		else
+		{ byFileName[file] = createSubTex(bmp); }
 	}
 	
-	void refresh_timeView_multi(File[] files)
+	void refreshFiles(File[] files)
 	{
-		void update(Bitmap bmp)
+		/+Note: Used by TimeView.+/
+		
+		//Todo: DIDE TimeMeasurements
+		const tStart = now;
+		static auto
+			tSegment = DateTime.init,
+			tTotal = 0*second,
+			tUpdate = 0*second,
+			tCreate = 0*second,
+			tRemove = 0*second,
+			tCnt = 0;
+		
+		auto accumulateTime(alias fun, alias time, T...)(T args)
 		{
-			if(bmp && !bmp.loading)
-			byFileName.update(
-				bmp.file,
-				() => createSubTex(bmp),
-				(ref int idx){
-					removeSubTex(idx);
-					idx = createSubTex(bmp);
-				}
-			);
+			const t0 = now;
+			scope(exit) time += now-t0;
+			return fun(args);
 		}
 		
-		foreach(bmp; bitmapQuery_accessDelayedMulti(files)) update(bmp);
+		scope(exit)
+		{
+			tTotal += now-tStart;
+			tCnt += cast(int) files.length;
+			
+			if(tCnt>=2048)
+			{
+				print(
+					tCnt,
+					siFormat("bitmap.access: %6.1f µs", ((tTotal)/(tCnt))), 
+					format("  update: %6.1f %%", ((100 * tUpdate)/(tTotal)).get),
+					format("  create: %6.1f %%", ((100 * tCreate)/(tUpdate)).get),
+					format("  remove: %6.1f %%", ((100 * tRemove)/(tUpdate)).get)
+				);
+				tCnt = 0; tTotal = tUpdate = tCreate = tRemove = 0*second;
+			}
+		}
+		
+		foreach(bmp; bitmapQuery_accessDelayedMulti(files))
+		accumulateTime!(refreshFile, tUpdate)(bmp.file, bmp);
 		
 		//foreach(bmp; files.map!(file => bitmaps(file, Yes.delayed, ErrorHandling.ignore))) update(bmp);
 	}
 	
 	
 	
-		auto _getInternalFileToSubTexIdxAA()
+	auto _getInternalFileToSubTexIdxAA()
 	{
 		//Note: TimeView/KarcLogger needs this, to do fast bulk processing.
 		return byFileName;
-	}
+	}
 }
