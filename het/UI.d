@@ -1803,7 +1803,7 @@ struct im
 			void Img(File f)
 		{
 			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
-			//todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
+			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
 			
 			bitmaps(f); //need to pull this crap
 			append(new .Img(f));

@@ -464,14 +464,14 @@ class Window
 	///  WINDOW CLASS STATIC FUNCTIONS                                           ///
 	////////////////////////////////////////////////////////////////////////////////
 	private:
-		static string _upcomingWindowName;
-		static Window[HWND] windowList;
-		static int windowCntr;
-		static bool mainWindowDestroyed;
-		static Window windowByName(string name)
+	static string _upcomingWindowName;
+	static Window[HWND] windowList;
+	static int windowCntr;
+	static bool mainWindowDestroyed;
+	static Window windowByName(string name)
 	{ foreach(w; windowList) if(w.name==name) return w; return null; }
 	
-		static string getUniqueName(string name)
+	static string getUniqueName(string name)
 	{
 		foreach(i; 0..int.max) {
 			string n = name~(i ? format("(%s)", i) : "");
@@ -480,7 +480,7 @@ class Window
 		throw new Exception("Window.getUniqueName() failed.");
 	}
 	
-		static extern(Windows) LRESULT GlobalWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) nothrow
+	static extern(Windows) LRESULT GlobalWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) nothrow
 	{
 		LRESULT res;
 		try {
@@ -494,7 +494,7 @@ class Window
 		return DefWindowProc(hwnd, message, wParam, lParam);
 	}
 	
-		static HWND createWin(
+	static HWND createWin(
 		string className, string caption, 
 		uint style = WS_OVERLAPPEDWINDOW, uint exStyle = WS_EX_OVERLAPPEDWINDOW
 	)
@@ -548,33 +548,33 @@ class Window
 		return hwnd;
 	}
 	
-		static void destroyAllWindows()
+	static void destroyAllWindows()
 	{
 		while(windowList.length)
 		windowList.values[$-1].destroy;
 	}
 	
-		//update control
-		private static uint disableCounter;
-		public static void disableUpdate()
+	//update control
+	private static uint disableCounter;
+	public static void disableUpdate()
 	{ disableCounter++; }
-		public static void enableUpdate ()
+	public static void enableUpdate ()
 	{ disableCounter--; }
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS PRIVATE STUFF                                              ///
 	////////////////////////////////////////////////////////////////////////////////
 	private:
-		HWND fhwnd;
-		HDC fhdc;
-		string fName;
-		string paintErrorStr;
-		bool 	isMain, //this is the main windows
+	HWND fhwnd;
+	HDC fhdc;
+	string fName;
+	string paintErrorStr;
+	bool 	isMain, //this is the main windows
 		pendingInvalidate, //invalidate() was called. Timer checks it and clears it.
 		canSleep /+In the last update, there was no invalidate() calls, so it can sleep in the main loop.+/;
-		enum WM_MyStartup = WM_USER+0;
+	enum WM_MyStartup = WM_USER+0;
 	
-		string getClassName()
+	string getClassName()
 	{
 		char[256] s;
 		GetClassNameA(hwnd, s.ptr, s.length);
@@ -585,27 +585,27 @@ class Window
 	///  WINDOW CLASS PUBLIC STUFF                                               ///
 	////////////////////////////////////////////////////////////////////////////////
 	public:
-		static error(string s)
+	static error(string s)
 	{ throw new Exception(s); }
 	
-		HWND hwnd()
+	HWND hwnd()
 	{ return fhwnd; }
-		HDC hdc()
+	HDC hdc()
 	{ return fhdc; }
-		string inputChars; //aaccumulated WM_CHAR input flushed in update()
-		string lastFrameStats;
-		//bool autoUpdate;  deprecated: es csak a
+	string inputChars; //aaccumulated WM_CHAR input flushed in update()
+	string lastFrameStats;
+	//bool autoUpdate;  deprecated: es csak a
 	
-		@property string name()
+	@property string name()
 	{ return fName; }
-		@property void name(string name_)
+	@property void name(string name_)
 	{
 		bool setCapt = name==caption;
 		fName = name_;
 		if(setCapt) caption = name;
 	}
 	
-		template autoCreate()
+	template autoCreate()
 	{
 		//include this into any window ant it will be the mainWindow
 		static this()
@@ -626,40 +626,40 @@ class Window
 		}
 	}
 	
-		protected void onInitialZoomAll()
+	protected void onInitialZoomAll()
 	{}
-		protected void onInitializeGLWindow()
+	protected void onInitializeGLWindow()
 	{}
-		protected void onFinalizeGLWindow()
+	protected void onFinalizeGLWindow()
 	{}
-		protected void onWglMakeCurrent(bool activate)
+	protected void onWglMakeCurrent(bool activate)
 	{}
 	
-		uint getWindowStyle()
+	uint getWindowStyle()
 	{ return WS_OVERLAPPEDWINDOW; }
-		uint getWindowStyleEx()
+	uint getWindowStyleEx()
 	{ return 0; }
 	
-		TimeLine timeLine;
+	TimeLine timeLine;
 	
-		void setForegroundWindowIfVisible()
+	void setForegroundWindowIfVisible()
 	{ if(isVisible) SetForegroundWindow(hwnd); }
-		
-		@property void dragAcceptFiles(bool val)
+	
+	@property void dragAcceptFiles(bool val)
 	{ DragAcceptFiles(hwnd, val); }
 	
-		mixin Signal!(File[]) whenFilesDropped;
-		
-		private bool dragAcceptFilesState;
-		void updateDragAcceptFilesState()
-		{
-			auto newState = whenFilesDropped.slots_idx>0;
-			if(dragAcceptFilesState.chkSet(newState))
-				dragAcceptFiles = newState;
-		}
+	mixin Signal!(File[]) whenFilesDropped;
+	
+	private bool dragAcceptFilesState;
+	void updateDragAcceptFilesState()
+	{
+		auto newState = whenFilesDropped.slots_idx>0;
+		if(dragAcceptFilesState.chkSet(newState))
+		dragAcceptFiles = newState;
+	}
 	
 	
-		this()
+	this()
 	{
 		//acquire window name
 		fName = _upcomingWindowName;
@@ -710,7 +710,7 @@ class Window
 		PostMessage(hwnd, WM_MyStartup, 0, 0);
 	}
 	
-		private void destroy_impl()
+	private void destroy_impl()
 	//Todo: multiWindow: szolni kene a tobbinek, hogy destroyozzon, vagy nemtom...
 	{
 		enforce(hwnd, format(`Window "%s" already destroyed.`, name));
@@ -740,7 +740,7 @@ class Window
 	}
 	
 	
-		~this()
+	~this()
 	{
 		destroy_impl;
 		//Todo: multiwindownal a destructort osszerakni, mert most az le van xarva...
@@ -749,22 +749,22 @@ class Window
 		//UnregisterClassW(className.toPWChar, GetModuleHandle(NULL));
 	}
 	
-		//virtuals
-		void onCreate() {};
-		void onDestroy() {};
+	//virtuals
+	void onCreate() {};
+	void onDestroy() {};
 	
 	//static bool wasUpdateAfterPaint;
 	
-		LRESULT onWmUser(UINT message, WPARAM wParam, LPARAM lParam)
+	LRESULT onWmUser(UINT message, WPARAM wParam, LPARAM lParam)
 	{ return 0; }
 	
-		protected bool inRedraw;
-		protected bool _isSizingMoving;
-		protected int updatesSinceLastDraw;
+	protected bool inRedraw;
+	protected bool _isSizingMoving;
+	protected int updatesSinceLastDraw;
 	
-		private enum showWarnings = false;
+	private enum showWarnings = false;
 	
-		protected void internalRedraw()
+	protected void internalRedraw()
 	{
 		if(inRedraw) { if(showWarnings) WARN("Already in internalRedraw()"); return; }
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
@@ -783,12 +783,12 @@ class Window
 		timeLine.restrictSize(60);
 	}
 	
-		protected void forceRedraw()
+	protected void forceRedraw()
 	{ RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); }
 	
-		protected wchar lastSurrogateHi;
+	protected wchar lastSurrogateHi;
 	
-		protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam)
+	protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		auto _ = PROBE("WndProc");
 		
@@ -876,7 +876,7 @@ class Window
 			case WM_DROPFILES: {
 				auto files = hDropToFiles(cast(HANDLE)wParam);
 				if(files.length)
-					whenFilesDropped.emit(files);
+				whenFilesDropped.emit(files);
 				
 				//Note: the sending and the receiving process must have the same elevation.
 				/+Todo: get precise drop position with: DragQueryPoint+/
@@ -896,41 +896,41 @@ class Window
 	///  BASIC WINDOW HANDLING, PROPERTIES                                       ///
 	////////////////////////////////////////////////////////////////////////////////
 	
-		//window management
-		void show()
+	//window management
+	void show()
 	{ ShowWindow(hwnd, SW_SHOW); }
-		void hide()
+	void hide()
 	{ ShowWindow(hwnd, SW_HIDE); }
-		bool isHidden()
+	bool isHidden()
 	{ WINDOWPLACEMENT wp; wp.length = wp.sizeof; enforce(GetWindowPlacement(hwnd, &wp)); return ~wp.showCmd & 1; }
-		bool isVisible()
+	bool isVisible()
 	{ return !isHidden; }
-		void maximizeWin()
+	void maximizeWin()
 	{ ShowWindow(hwnd, SW_MAXIMIZE); }
-		void minimizeWin()
+	void minimizeWin()
 	{ ShowWindow(hwnd, SW_MINIMIZE); }
-		void setFocus()
+	void setFocus()
 	{ SetFocus(hwnd); } //it's only keyboard focus
-		void setForegroundWindow()
+	void setForegroundWindow()
 	{ show; SetForegroundWindow(hwnd); }
-		bool isForeground()
+	bool isForeground()
 	{ return GetForegroundWindow == hwnd; }
-		bool isSizingMoving()
+	bool isSizingMoving()
 	{ return _isSizingMoving; }
 	
-		bool isMouseInside() {
+	bool isMouseInside() {
 		if(isSizingMoving || isHidden) return false;
 		return clientBounds.contains!"[)"(inputs.mouseAct);
 	}
 	
-		bool canProcessUserInput()
+	bool canProcessUserInput()
 	{ return isForeground && !isSizingMoving; }
 	
-		RECT windowRect()
+	RECT windowRect()
 	{ RECT r; GetWindowRect(hwnd, &r); return r; }
-		@property auto windowBounds()
+	@property auto windowBounds()
 	{ with(windowRect) return ibounds2(left, top, right, bottom); }
-		@property void windowBounds(in ibounds2 b)
+	@property void windowBounds(in ibounds2 b)
 	{
 		SetWindowPos(
 			hwnd, null, b.left, b.top, b.width, b.height,
@@ -938,9 +938,9 @@ class Window
 		);
 	}
 	
-		@property auto windowSize()
+	@property auto windowSize()
 	{ return windowBounds.size; }
-		@property void windowSize(in ivec2 newSize)
+	@property void windowSize(in ivec2 newSize)
 	{
 		SetWindowPos(
 			hwnd, null, 0, 0, newSize.x, newSize.y,
@@ -948,9 +948,9 @@ class Window
 		);
 	}
 	
-		@property auto windowPos()
+	@property auto windowPos()
 	{ return windowBounds.topLeft; }
-		@property void windowPos(in ivec2 p)
+	@property void windowPos(in ivec2 p)
 	{
 		SetWindowPos(
 			hwnd, null, p.x, p.y, 0, 0,
@@ -958,14 +958,14 @@ class Window
 		);
 	}
 	
-		RECT clientRect()
+	RECT clientRect()
 	{ RECT r; GetClientRect(hwnd, &r); return r; }
-		auto clientBounds()
+	auto clientBounds()
 	{ with(clientRect) return ibounds2(left, top, right, bottom); }
 	
-		@property auto clientSize()
+	@property auto clientSize()
 	{ return clientBounds.size; }
-		@property void clientSize(in ivec2 newSize)
+	@property void clientSize(in ivec2 newSize)
 	{
 		auto r = RECT(0, 0, newSize.x, newSize.y);
 		AdjustWindowRect(&r, getWindowStyle, false);
@@ -978,24 +978,24 @@ class Window
 		//Todo: if this is called always, disable the resizeableness of the window automatically
 	}
 	
-		@property auto clientPos()
+	@property auto clientPos()
 	{ with(clientRect) return ivec2(left, top); }
-		auto clientSizeHalf()
+	auto clientSizeHalf()
 	{ return clientSize * 0.5f;  }
-		int clientWidth()
+	int clientWidth()
 	{ return clientSize.x; }
-		int clientHeight()
+	int clientHeight()
 	{ return clientSize.y; }
 	
-		//matches both error! Bounds2f clientBounds() { with(clientRect) return Bounds2f(left, top, right, bottom); }
-		auto screenPos()
+	//matches both error! Bounds2f clientBounds() { with(clientRect) return Bounds2f(left, top, right, bottom); }
+	auto screenPos()
 	{ ivec2 p;MapWindowPoints(hwnd, null, cast(LPPOINT)&p, 1);return p; }
-		auto screenToClient(T)(in T p)
+	auto screenToClient(T)(in T p)
 	{ return p-screenPos; }
-		auto clientToScreen(T)(in T p)
+	auto clientToScreen(T)(in T p)
 	{ return p+screenPos; }
 	
-		void invalidate()
+	void invalidate()
 	{
 		if(chkSet(pendingInvalidate))
 		{
@@ -1006,8 +1006,8 @@ class Window
 		}
 	}
 	
-		private string lastCaption = "\0";
-		@property string caption()
+	private string lastCaption = "\0";
+	@property string caption()
 	{
 		if(lastCaption!="\0") return lastCaption;
 		wchar[] s;
@@ -1016,7 +1016,7 @@ class Window
 		lastCaption = s.to!string;
 		return lastCaption;
 	}
-		@property caption(string value)
+	@property caption(string value)
 	{
 		if(lastCaption==value) return;
 		lastCaption = value;
@@ -1027,10 +1027,10 @@ class Window
 	///  PAINT                                                                   ///
 	////////////////////////////////////////////////////////////////////////////////
 	
-		void onBeginPaint()
+	void onBeginPaint()
 	{ lastFrameStats = ""; };
 	
-		private final void internalPaint()
+	private final void internalPaint()
 	{
 		auto t0 = QPS; scope(exit) { timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); }
 		
@@ -1052,13 +1052,13 @@ class Window
 		}
 	}
 	
-		void onPaint()
+	void onPaint()
 	{
 		auto rect = clientRect;
 		DrawText(hdc, "Default Window.doPaint()", -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
 	};
 	
-		void onEndPaint()
+	void onEndPaint()
 	{
 		auto rect = clientRect;
 		ValidateRect(hwnd, &rect);
@@ -1069,7 +1069,7 @@ class Window
 		}
 	};
 	
-		void onSwapBuffers()
+	void onSwapBuffers()
 	{
 		 //for opengl. the latest step with the optional sleep
 	}
@@ -1078,26 +1078,26 @@ class Window
 	///  UPDATE                                                                  ///
 	////////////////////////////////////////////////////////////////////////////////
 	
-		ActionManager actions; //every form has this
+	ActionManager actions; //every form has this
 	
-		float targetUpdateRate=70; //must be slightly higher than target display freq.
-															 //Or much higher if it is a physical simulation.
-															 //Todo: ezt is meg kell csinalni jobban.
+	float targetUpdateRate=70; //must be slightly higher than target display freq.
+														 //Or much higher if it is a physical simulation.
+														 //Todo: ezt is meg kell csinalni jobban.
 	
-		private Time time0=0*second, timeAct=0*second, timeLast=0*second; //internal vars for timing
-		private int FPSCnt, UPSCnt; //internal counters for statistics
-		private long PSSec; //second tetection
+	private Time time0=0*second, timeAct=0*second, timeLast=0*second; //internal vars for timing
+	private int FPSCnt, UPSCnt; //internal counters for statistics
+	private long PSSec; //second tetection
 	
-		Time totalTime=0*second, deltaTime=0*second, lagTime=0*second; //
-		int FPS, UPS, lagCnt; //FramesPerSec, UpdatePerSec
+	Time totalTime=0*second, deltaTime=0*second, lagTime=0*second; //
+	int FPS, UPS, lagCnt; //FramesPerSec, UpdatePerSec
 	
-		protected void onMouseUpdate() {} //forwarded to GLWindow. Must be called right after view.update
-		protected void onUpdateViewAnimation() {} //forwarded to GLWindow
+	protected void onMouseUpdate() {} //forwarded to GLWindow. Must be called right after view.update
+	protected void onUpdateViewAnimation() {} //forwarded to GLWindow
 	
-		protected void onUpdateUIBeginFrame() {} //GLWindow implements these too
-		protected void onUpdateUIEndFrame() {}
+	protected void onUpdateUIBeginFrame() {} //GLWindow implements these too
+	protected void onUpdateUIEndFrame() {}
 	
-		private void updateWithActionManager()
+	private void updateWithActionManager()
 	{
 		auto _ = PROBE("updateWAM");
 		
@@ -1137,18 +1137,18 @@ class Window
 				onWglMakeCurrent(false);
 	}
 	
-		MouseCursor mouseCursor;
-		private MouseCursor lastMouseCursor;
-		private void internalUpdateMouseCursor(Flag!"forced" forced = No.forced)
+	MouseCursor mouseCursor;
+	private MouseCursor lastMouseCursor;
+	private void internalUpdateMouseCursor(Flag!"forced" forced = No.forced)
 	{
 		if(!isMouseInside) return;
 		if(lastMouseCursor.chkSet(mouseCursor) || forced)
 		SetCursor(mouseCursor);
 	}
 	
-		private bool inUpdate;
+	private bool inUpdate;
 	
-		private final void internalUpdate()
+	private final void internalUpdate()
 	{
 		//static if(1){ const T0 = QPS; scope(exit) print("IU", (QPS-T0)*1000); }
 		
@@ -1252,7 +1252,7 @@ class Window
 		finally { timeLast = timeAct; }
 	}
 	
-		void onUpdate()
+	void onUpdate()
 	{
 		 //this is just an example
 		/*

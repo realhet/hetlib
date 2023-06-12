@@ -599,7 +599,7 @@ class TextureManager
 		//Note: There is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
 		//raise("notImpl " ~ info.text);
 		
-		foreach(file; byFileName.byKeyValue.filter!(a=>infoTexture.infoArray[a.value].texIdx==mtIdx).map!"a.key")
+		foreach(file; byFileName.byKeyValue.array.filter!(a=>infoTexture.infoArray[a.value].texIdx==mtIdx).map!"a.key")
 		{ invalidate(file); }
 		
 		megaTextures[mtIdx].reinitialize;

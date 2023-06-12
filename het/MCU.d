@@ -313,7 +313,7 @@ struct ConnectorInfo
 			drawDSubBody(1, .25f);
 			if(numPins==50)
 			{
-				foreach(i; 0..t    )
+				foreach(i; 0..t   )
 				drawPin(vec2(i*2+2.5          , 1.5)*unit, (i+1).text);
 				foreach(i; t..t*2-1)
 				drawPin(vec2((i-t)*2+3.5      , 3.5)*unit, (i+1).text);
@@ -331,7 +331,7 @@ struct ConnectorInfo
 				drawPin(vec2((i-59)*2+3.5, 7.5)*unit, (i+1).text);
 			}else
 			{
-				foreach(i; 0..t  )
+				foreach(i; 0..t )
 				drawPin(vec2(i*2+3      , 1.5)*unit, (i+1).text);
 				foreach(i; t..t*2)
 				drawPin(vec2((i-t)*2+2  , 3.5)*unit, (i+1).text);
@@ -755,7 +755,7 @@ class ArduinoNanoProject
 		if(Btn("GenPrg"))
 		{
 			auto s = generateProgram;
-			clipboard.asText = s;
+			clipboard.text = s;
 			beep;
 		}
 		

@@ -814,21 +814,21 @@ class TextDBFile : DBFileInterface {
 }
 
 class AMDBCore {
-		enum versionStr = "1.00";
+	enum versionStr = "1.00";
 	
-		private uint lastIdIndex;
-		Items items;
-		Links links;
+	private uint lastIdIndex;
+	Items items;
+	Links links;
 	
-		private DBFileInterface dbFileInterface;
+	private DBFileInterface dbFileInterface;
 	
-		bool autoCreateETypes	= true ,
+	bool autoCreateETypes	= true ,
 				 autoCreateVerbs	= true ,
 				 autoCreateEntities	= false;
 	
-		//----------------------------------------------------------------------------------
+	//----------------------------------------------------------------------------------
 	
-		this()
+	this()
 	{
 		items.db = links.db = transaction.db = this;
 		
@@ -838,33 +838,33 @@ class AMDBCore {
 		unittest_splitSentences;
 	}
 	
-		this(DBFileInterface dbFileInterface)
+	this(DBFileInterface dbFileInterface)
 	{
 		this();
 		this.dbFileInterface = dbFileInterface;
 		load;
 	}
 	
-		this(File file)
+	this(File file)
 	{ this(new TextDBFile(file)); }
-		this(string fileName)
+	this(string fileName)
 	{ this(File(fileName)); }
 	
-		//clear all the internal data. Does not change the dbFile.
-		private void clear()
+	//clear all the internal data. Does not change the dbFile.
+	private void clear()
 	{
 		lastIdIndex = 0;
 		links.clear;
 		items.clear;
 	}
 	
-		File file()
+	File file()
 	{ return dbFileInterface ? dbFileInterface.file : File(""); }
 	
-		void error(string s) const
+	void error(string s) const
 	{ throw new AMDBException(s); }
 	
-		static string autoQuoted(string s)
+	static string autoQuoted(string s)
 	{
 		//Todo: slow
 		if(s.canFind!(ch => ch<32 || ch.among('"', '\'', '`', '\\')) || s.canFind("  ") || s.canFind("..."))
@@ -872,7 +872,7 @@ class AMDBCore {
 		else return s;
 	}
 	
-		static string autoUnquoted(string s)
+	static string autoUnquoted(string s)
 	{
 		if(s.startsWith('"'))
 		{
@@ -885,9 +885,9 @@ class AMDBCore {
 		return s;
 	}
 	
-		//Id ////////////////////////////////////
+	//Id ////////////////////////////////////
 	
-		struct Id
+	struct Id
 	{
 		uint id;
 		
@@ -911,18 +911,17 @@ class AMDBCore {
 		{ return id.to!string(10); }
 		void deserializeText(string s)
 		{ id = s.to!uint(10); }
-	}
+	}
 	
-		private Id _internal_generateNextId()
+	private Id _internal_generateNextId()
 	{ return Id(++lastIdIndex); }
 	
-		/// When an item is loaded
-		private void _internal_maximizeNextId(in Id id)
+	/// When an item is loaded
+	private void _internal_maximizeNextId(in Id id)
 	{ lastIdIndex.maximize(id.id); }
+	
 	
-		//Items /////////////////////////////
-	
-		struct Items
+	struct Items
 	{
 		private AMDBCore db;
 		private string[Id] byId;
@@ -975,7 +974,7 @@ class AMDBCore {
 		{
 			if(auto a = str in byItem)
 			return *a;else
-			return def ;
+			return def;
 		}
 		
 		Id require(string str                 ) const
@@ -1075,9 +1074,9 @@ class AMDBCore {
 		}
 	}
 	
-		//Links //////////////////////////////////////
+	//Links //////////////////////////////////////
 	
-		struct Link
+	struct Link
 	{
 		Id sourceId, verbId, targetId;
 		
@@ -1097,12 +1096,12 @@ class AMDBCore {
 		{ return valid; }
 	}
 	
-		struct VerbTarget
+	struct VerbTarget
 	{ Id verbId, targetId; }
-		struct SourceVerb
+	struct SourceVerb
 	{ Id sourceId, verbId; }
 	
-		struct Links
+	struct Links
 	{
 		private AMDBCore db;
 		private Link[Id] byId;
@@ -1134,7 +1133,7 @@ class AMDBCore {
 		{
 			if(auto a = id in byId)
 			return *a;else
-			return def   ;
+			return def;
 		}
 		
 		Link require(in Id id                 ) const
@@ -1263,9 +1262,9 @@ class AMDBCore {
 		
 	}
 	
-		//Transaction ////////////////////
+	//Transaction ////////////////////
 	
-		struct Transaction
+	struct Transaction
 	{
 		private AMDBCore db;
 		private string[] commitBuffer, cancelBuffer;
@@ -1325,18 +1324,18 @@ class AMDBCore {
 		}
 		
 	}
-		Transaction transaction;
+	Transaction transaction;
 	
-		@property bool canCommit() const
+	@property bool canCommit() const
 	{ return transaction.active; }
-		void commit()
+	void commit()
 	{ transaction.commit; }
-		void cancel()
+	void cancel()
 	{ transaction.cancel; }
 	
-		//toStr, prettyStr //////////////////////////////////////////////////////////////////
+	//toStr, prettyStr //////////////////////////////////////////////////////////////////
 	
-		string toStr(in Id id, int recursion=0)
+	string toStr(in Id id, int recursion=0)
 	{
 		if(!id)
 		return "Null";
@@ -1352,7 +1351,7 @@ class AMDBCore {
 		return format!"Unknown(%s)"(id);
 	}
 	
-		string prettyStr(Flag!"color" color = Yes.color)(in Id id)
+	string prettyStr(Flag!"color" color = Yes.color)(in Id id)
 	{
 		if(!id)
 		{
@@ -1393,7 +1392,7 @@ class AMDBCore {
 		}
 	}
 	
-		string prettyStr(Flag!"color" color = Yes.color)(in Id id, const ColumnInfo ci)
+	string prettyStr(Flag!"color" color = Yes.color)(in Id id, const ColumnInfo ci)
 	{
 		if(!id)
 		{
@@ -1438,7 +1437,7 @@ class AMDBCore {
 		}
 	}
 	
-		struct ColumnInfo
+	struct ColumnInfo
 	{
 		bool anySourceIsNoLink;
 		int maxSourceWidth, maxVerbWidth, maxTargetWidth;
@@ -1472,7 +1471,7 @@ class AMDBCore {
 		}
 	}
 	
-		private void calcColumnInfoExtra(ColumnInfo[] columns)
+	private void calcColumnInfoExtra(ColumnInfo[] columns)
 	{
 		foreach(idx, ref c; columns)
 		with(c)
@@ -1484,7 +1483,7 @@ class AMDBCore {
 		
 	}
 	
-		string prettyStr(Flag!"color" color = Yes.color)(in IdSequence seq)
+	string prettyStr(Flag!"color" color = Yes.color)(in IdSequence seq)
 	{
 		//Todo: Use sentenceColumnIndices!
 		return iota(seq.ids.length.to!int).map!(
@@ -1499,7 +1498,7 @@ class AMDBCore {
 		).join("  ");
 	}
 	
-		void printTable(in IdSequence[] seqs)
+	void printTable(in IdSequence[] seqs)
 	{
 		const sentenceColumnIndices = seqs.map!(seq => seq.coulmnIndices(this)).array;
 		
@@ -1551,9 +1550,9 @@ class AMDBCore {
 		
 	}
 	
-		//serialization ////////////////////////////////////////////
+	//serialization ////////////////////////////////////////////
 	
-		string serializeText(in Id id)
+	string serializeText(in Id id)
 	{
 		if(auto link = id in links)
 		{
@@ -1569,10 +1568,10 @@ class AMDBCore {
 		assert(0);
 	}
 	
-		string serializeText(R)(in R r)
+	string serializeText(R)(in R r)
 	{ return r.map!(i => serializeText(i)~"\n").join; }
 	
-		void deserializeLine(string line)
+	void deserializeLine(string line)
 	{
 		line = line.strip;
 		if(line=="")
@@ -1604,7 +1603,7 @@ class AMDBCore {
 		}
 	}
 	
-		private void load()
+	private void load()
 	{
 		try
 		{
@@ -1617,9 +1616,9 @@ class AMDBCore {
 	}
 	
 	
-		//find referrers ///////////////////////////////////////////////////
+	//find referrers ///////////////////////////////////////////////////
 	
-		auto referrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id)
+	auto referrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id)
 	{
 		//Opt: linear
 		return links.byId.byKeyValue.filter!(
@@ -1629,21 +1628,21 @@ class AMDBCore {
 		).map!retExpr;
 	}
 	
-		auto sourceReferrers(in Id id)
+	auto sourceReferrers(in Id id)
 	{ return referrers!(Yes.source, No .verb, No .target)(id); }
-		auto verbReferrers  (in Id id)
+	auto verbReferrers  (in Id id)
 	{ return referrers!(No .source, Yes.verb, No .target)(id); }
-		auto targetReferrers(in Id id)
+	auto targetReferrers(in Id id)
 	{ return referrers!(No .source, No .verb, Yes.target)(id); }
 	
-		bool hasReferrers(in Id id)
+	bool hasReferrers(in Id id)
 	{
 		if(!id)
 		return false;
 		return !referrers(id).empty;
 	}
 	
-		auto allReferrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id)
+	auto allReferrers(Flag!"source" chkSource = Yes.source, Flag!"verb" chkVerb = Yes.verb, Flag!"target" chkTarget = Yes.target, alias retExpr="a.key")(in Id id)
 	{
 		bool[Id] found;
 		
@@ -1662,14 +1661,14 @@ class AMDBCore {
 		return found.keys.sort.array;
 	}
 	
-		auto allSourceReferrers(in Id id)
+	auto allSourceReferrers(in Id id)
 	{ return referrers!(Yes.source, No .verb, No .target)(id); }
-		auto allTargetReferrers(in Id id)
+	auto allTargetReferrers(in Id id)
 	{ return referrers!(No .source, No .verb, Yes.target)(id); }
 	
-		//delete ///////////////////////////////////////////////////////////////
+	//delete ///////////////////////////////////////////////////////////////
 	
-		void deleteThing(in Id id)
+	void deleteThing(in Id id)
 	{
 			//used by transaction.cancel
 		if(!id)
@@ -1702,11 +1701,11 @@ class AMDBCore {
 		}
 	*/
 	
-		//Central notification handling ////////////////////////////
+	//Central notification handling ////////////////////////////
 	
-		//translations /////////////////////////////////////////
+	//translations /////////////////////////////////////////
 	
-		string inputTranslateVerb(string s)
+	string inputTranslateVerb(string s)
 	{
 		if(s=="is an")
 		s="is a";
@@ -1714,11 +1713,11 @@ class AMDBCore {
 	}
 	
 	
-		//systemTypes //////////////////////////////////////////
+	//systemTypes //////////////////////////////////////////
 	
-		immutable allSystemTypes = ["Verb", "EType", "AType", "String", "Int", "Long", "UInt", "ULong", "Float", "Double", "DateTime", "Date", "Time"];
+	immutable allSystemTypes = ["Verb", "EType", "AType", "String", "Int", "Long", "UInt", "ULong", "Float", "Double", "DateTime", "Date", "Time"];
 	
-		auto systemTypeMap()
+	auto systemTypeMap()
 	{
 		static int[string] m;
 		if(!m)
@@ -1729,16 +1728,16 @@ class AMDBCore {
 		return m;
 	}
 	
-		int systemTypeIdx(string name)
+	int systemTypeIdx(string name)
 	{ return systemTypeMap.get(name, 0); }
-		bool isSystemType(string name)
+	bool isSystemType(string name)
 	{ return (name in systemTypeMap)!is null; }
 	
-		//systemVerbs //////////////////////////////////////////
+	//systemVerbs //////////////////////////////////////////
 	
-		immutable allSystemVerbs = ["is a"];
+	immutable allSystemVerbs = ["is a"];
 	
-		auto systemVerbMap()
+	auto systemVerbMap()
 	{
 		static int[string] m;
 		if(!m)
@@ -1749,12 +1748,12 @@ class AMDBCore {
 		return m;
 	}
 	
-		int systemVerbIdx(string name)
+	int systemVerbIdx(string name)
 	{ return systemVerbMap.get(name, 0); }
-		bool isSystemVerb(string name)
+	bool isSystemVerb(string name)
 	{ return (name in systemVerbMap)!is null; }
 	
-		Id sysId(string name)
+	Id sysId(string name)
 	{
 		if(auto id = name in items)
 		return id;
@@ -1765,9 +1764,9 @@ class AMDBCore {
 		assert(0);
 	}
 	
-		//input verifications ///////////////////////////////////////////////////
+	//input verifications ///////////////////////////////////////////////////
 	
-		private void verifyETypeName(string s)
+	private void verifyETypeName(string s)
 	{
 		enforce(s.length, "Invalid entity name. Empty string. "~s.quoted);
 		auto ch = s.decodeFront;
@@ -1776,7 +1775,7 @@ class AMDBCore {
 		enforce(!isSystemVerb(s), "Invalid entity name. Can't be a system verb. "~s.quoted);
 	}
 	
-		private void verifyVerbName(string s)
+	private void verifyVerbName(string s)
 	{
 		enforce(s.length, "Invalid verb name. Empty string. "~s.quoted);
 		auto olds = s; //Todo: it's ugly
@@ -1786,10 +1785,10 @@ class AMDBCore {
 		enforce(!isSystemVerb(s), "Invalid verb name. Can't be a system verb. "~olds.quoted);
 	}
 	
-		//filter, exists ///////////////////////////////////////////////////////
+	//filter, exists ///////////////////////////////////////////////////////
 	
-		/// this is kinda fast
-		bool exists(S, V, T)(in S s, in V v, in T t)
+	/// this is kinda fast
+	bool exists(S, V, T)(in S s, in V v, in T t)
 	{
 		static if(is(S==Id))
 		auto si = s;else
@@ -1803,11 +1802,11 @@ class AMDBCore {
 		return (Link(si, vi, ti) in links).valid; //this is fast
 	}
 	
-		bool exists(S, V)(in S s, in V v)
+	bool exists(S, V)(in S s, in V v)
 	{ return exists(s, v, Id.init); }
 	
-		/// this is fucking slow but only needed for queryes
-		auto filter2(S, V, T)(in S source, in V verb, in T target)
+	/// this is fucking slow but only needed for queryes
+	auto filter2(S, V, T)(in S source, in V verb, in T target)
 	{
 		 //Opt: linear
 		//print("Filter is fucking slow!");
@@ -1842,23 +1841,23 @@ class AMDBCore {
 		return links.byId.byKeyValue.filter!(a => test(a.value)).map!"a.key";
 	}
 	
-		bool isAType(T)(in T a)
+	bool isAType(T)(in T a)
 	{ return exists(a, "is a", "AType"); }
-		bool isEType(T)(in T a)
+	bool isEType(T)(in T a)
 	{ return exists(a, "is a", "EType"); }
-		bool isVerb (T)(in T a)
+	bool isVerb (T)(in T a)
 	{ return exists(a, "is a", "Verb" ); }
 	
-		bool isEntity(in Id id)
+	bool isEntity(in Id id)
 	{ return filter2(id, "is a", "*").any!(a => isEType(links[a].targetId)); }
 	
-		bool isInstanceOf(T, U)(in T entity, in U eType)
+	bool isInstanceOf(T, U)(in T entity, in U eType)
 	{ return exists(entity, "is a", eType); } //Todo: subtype handling
 	
-		auto things() 
+	auto things() 
 	{ return chain(items.ids, links.ids); }
 	
-		Id[] idArrayOfIsASomething(T)(in T t)
+	Id[] idArrayOfIsASomething(T)(in T t)
 	{
 		VerbTarget vt;
 		static if(is(T==Id))
@@ -1871,19 +1870,19 @@ class AMDBCore {
 		else	return [];
 	}
 	
-		Id[] verbs()	
+	Id[] verbs()	
 	{ return idArrayOfIsASomething("Verb");  }
-		Id[] eTypes()	
+	Id[] eTypes()	
 	{ return idArrayOfIsASomething("EType"); }
-		Id[] aTypes()	
+	Id[] aTypes()	
 	{ return idArrayOfIsASomething("AType"); } //previously it was: return filter("*", "is a", "AType").map!(a => links[a].sourceId);
 	
-		auto entities()          
+	auto entities()          
 	{ return eTypes                             .map!(e => filter2("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
-		auto entities(string mask)
+	auto entities(string mask)
 	{ return eTypes.filter!(e => chkId(e, mask)).map!(e => filter2("*", "is a", e).map!(e => links.get(e).sourceId)).join; }
 	
-		char thingCategory(in Id id)
+	char thingCategory(in Id id)
 	{
 		if(!id)
 		return 0;
@@ -1902,24 +1901,24 @@ class AMDBCore {
 		return 'i';
 	}
 	
-		bool isSchema	     (in Id id)
+	bool isSchema	     (in Id id)
 	{ return thingCategory(id)=='s'; }
-		bool isEntityAssociation	     (in Id id)
+	bool isEntityAssociation	     (in Id id)
 	{ return thingCategory(id)=='e'; }
-		bool isData			   (in Id id)
+	bool isData			   (in Id id)
 	{ return thingCategory(id)=='d'; }
-		bool isItem			   (in Id id)
+	bool isItem			   (in Id id)
 	{ return thingCategory(id)=='i'; }
 	
-		//create system things /////////////////////////////
+	//create system things /////////////////////////////
 	
-		private Id createEType(string s)
+	private Id createEType(string s)
 	{
 		verifyETypeName(s);
 		return items.create(s, (id){ links.create(id, sysId("is a"), sysId("EType")); }); //implicit "* is a EType"
 	}
 	
-		private Id resolveType(string s)
+	private Id resolveType(string s)
 	{
 		if(isSystemType(s))
 		return sysId(s);
@@ -1936,13 +1935,13 @@ class AMDBCore {
 		}
 	}
 	
-		private Id createVerb(string s)
+	private Id createVerb(string s)
 	{
 		verifyVerbName(s);
 		return items.create(s, (id){ links.create(id, sysId("is a"), sysId("Verb")); } ); //implicit "* is a Verb"
 	}
 	
-		private Id resolveVerb(string s)
+	private Id resolveVerb(string s)
 	{
 		if(isSystemVerb(s))
 		return sysId(s); //system verbs are not asserted
@@ -1959,7 +1958,7 @@ class AMDBCore {
 		}
 	}
 	
-		private Id createVerbAssertion(string name)
+	private Id createVerbAssertion(string name)
 	{
 		enforce(name!="...", "Verb Assertion source can't be a \"...\" association.");
 		enforce(!isSystemType(name), "Verb Assertion source can't be a SystemType: "~name.quoted);
@@ -1967,7 +1966,7 @@ class AMDBCore {
 		return createVerb(name);
 	}
 	
-		private Id createETypeAssertion(string name)
+	private Id createETypeAssertion(string name)
 	{
 		enforce(name!="...", "EType Assertion source can't be a \"...\" association.");
 		enforce(!isSystemType(name), "EType Assertion source can't be a SystemType: "~name.quoted);
@@ -1975,7 +1974,7 @@ class AMDBCore {
 		return createEType(name);
 	}
 	
-		private Id createEntityAssertion(string name, string type)
+	private Id createEntityAssertion(string name, string type)
 	{
 		enforce(name!="...", "Entity assertion source can't be a \"...\" association.");
 		
@@ -1987,9 +1986,9 @@ class AMDBCore {
 		return links.create(items.create(name), sysId("is a"), items[type]);
 	}
 	
-		//input text, sentence processing //////////////////////////////
+	//input text, sentence processing //////////////////////////////
 	
-		static string[][] textToSentences(string input)
+	static string[][] textToSentences(string input)
 	{
 		import het.tokenizer : collectAndReplaceQuotedStrings;
 		auto quotedStrings = collectAndReplaceQuotedStrings(input, `  "  `);
@@ -2021,16 +2020,16 @@ class AMDBCore {
 		return input.splitLines.map!(line => lineToSentences(line)).join;
 	}
 	
-		static string[][] toSentences(T)(T s)
+	static string[][] toSentences(T)(T s)
 	{
 		static if(isSomeString!T)
 		return textToSentences(s);
 		else	return s;
 	}
 	
-		//schema, data entry ///////////////////////////////////////////////////////
+	//schema, data entry ///////////////////////////////////////////////////////
 	
-		bool typeCheck(in Id typeId, string data)
+	bool typeCheck(in Id typeId, string data)
 	{
 		if(const typeName = typeId in items)
 		{
@@ -2059,7 +2058,7 @@ class AMDBCore {
 		return false;
 	}
 	
-		private Id[] findATypesForSentence(string[] p, in Id lastTypeId)
+	private Id[] findATypesForSentence(string[] p, in Id lastTypeId)
 	{
 		//const T0 = QPS; scope(exit) print("FAFS", p, QPS-T0);
 		
@@ -2090,7 +2089,7 @@ class AMDBCore {
 		return res;
 	}
 	
-		private bool walkToSourceAType(ref Id id)
+	private bool walkToSourceAType(ref Id id)
 	{
 		if(auto link = id in links)
 		if(isAType(link.sourceId))
@@ -2102,7 +2101,7 @@ class AMDBCore {
 		return false;
 	}
 	
-		private bool walkToSourceLink(ref Id id)
+	private bool walkToSourceLink(ref Id id)
 	{
 		if(auto link = id in links)
 		if(link.sourceId in links)
@@ -2115,7 +2114,7 @@ class AMDBCore {
 	}
 	
 	
-		void processSchemaSentence(string[] p, ref Id id)
+	void processSchemaSentence(string[] p, ref Id id)
 	{
 		enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
 		enforce(id || p[0]!="...", "Last Id is null at sentence:"~p.text);
@@ -2150,7 +2149,7 @@ class AMDBCore {
 		}
 	}
 	
-		void processDataSentence(string[] p, ref Id tid, ref Id id)
+	void processDataSentence(string[] p, ref Id tid, ref Id id)
 	{
 		enforce(p.length.among(2, 3), "Invalid sentence length: "~p.text);
 		enforce(id || p[0]!="...", "Last Id is null at sentence:"~p.text);  //same until this point!!!!
@@ -2197,11 +2196,11 @@ class AMDBCore {
 	}
 	
 	
-		//multiline bulk processing
+	//multiline bulk processing
 	
-		private Id lastSchemaId;
+	private Id lastSchemaId;
 	
-		void schema(string input)
+	void schema(string input)
 	{
 		lastDataTypeId = lastDataId = Id.init; //reset the state of other input categories
 		
@@ -2209,9 +2208,9 @@ class AMDBCore {
 		processSchemaSentence(s, lastSchemaId);
 	}
 	
-		private Id lastDataId, lastDataTypeId;
+	private Id lastDataId, lastDataTypeId;
 	
-		void data(string input)
+	void data(string input)
 	{
 		lastSchemaId = Id.init; //reset the state of other input categories
 		
@@ -2219,9 +2218,9 @@ class AMDBCore {
 		processDataSentence(s, lastDataTypeId, lastDataId);
 	}
 	
-		//query ////////////////////////////////////////////////////////
+	//query ////////////////////////////////////////////////////////
 	
-		struct QueryInputSources
+	struct QueryInputSources
 	{
 		bool items, schema, entities, data;
 		
@@ -2273,13 +2272,13 @@ class AMDBCore {
 		}
 	}
 	
-		struct QueryOptions
+	struct QueryOptions
 	{
 		QueryInputSources sources;  alias sources this;
 		bool extendLeft, extendRight;
 	}
 	
-		private auto fetchQueryOptions(ref string input)
+	private auto fetchQueryOptions(ref string input)
 	{
 		auto flags = input.fetchRegexFlags;
 		QueryOptions res;
@@ -2296,11 +2295,11 @@ class AMDBCore {
 	}
 	
 	
-		/// own version of wildcard check specialized to AMDB
-		private bool chkStr(string s, string mask)
+	/// own version of wildcard check specialized to AMDB
+	private bool chkStr(string s, string mask)
 	{ return s.isWild(mask); }
 	
-		private bool chkId(in Id id, string mask)
+	private bool chkId(in Id id, string mask)
 	{
 		 //Todo: ez mehetne a filter-be is, mert hasonlo
 		string s;
@@ -2325,10 +2324,10 @@ class AMDBCore {
 		return chkStr(s, mask);
 	}
 	
-		enum QuerySource
+	enum QuerySource
 	{ all, data, schema, items }
 	
-		Id[] query(string[] p, in QueryInputSources qs)
+	Id[] query(string[] p, in QueryInputSources qs)
 	{
 		 //works on a single sentence
 		
@@ -2385,8 +2384,8 @@ class AMDBCore {
 		return res;
 	}
 	
-		/// Extends srcIds with referencing child links. Sentence must start with "..."
-		Id[] query(Id[] sourceIds, string[] p)
+	/// Extends srcIds with referencing child links. Sentence must start with "..."
+	Id[] query(Id[] sourceIds, string[] p)
 	{
 		Id[] res;
 		enforce(p.length.among(2, 3), `Invalid sentence for srcId based query. Invalid sentence length. `~p.text);
@@ -2418,15 +2417,15 @@ class AMDBCore {
 		return res;
 	}
 	
-		/// Extends srcIds with referencing child links. generalized recursive version, works with more than one sentence
-		Id[] query(Id[] sourceIds, string[][] sentences)
+	/// Extends srcIds with referencing child links. generalized recursive version, works with more than one sentence
+	Id[] query(Id[] sourceIds, string[][] sentences)
 	{
 		while(sentences.length)
 		sourceIds = query(sourceIds, sentences.fetchFront);
 		return sourceIds;
 	}
 	
-		Id[] query(T)(T sentences, in QueryInputSources qs)
+	Id[] query(T)(T sentences, in QueryInputSources qs)
 	{
 			//works on sentences
 		Id[] res;
@@ -2438,7 +2437,7 @@ class AMDBCore {
 		return query(query(s[0], qs), s[1..$]); //many sentences in a chain
 	}
 	
-		IdSequence extend(in Id id, in QueryOptions queryOptions)
+	IdSequence extend(in Id id, in QueryOptions queryOptions)
 	{
 		auto seq = IdSequence([id]);
 		if(queryOptions.extendRight)
@@ -2448,13 +2447,13 @@ class AMDBCore {
 		return seq;
 	}
 	
-		IdSequence[] query(T)(T sentences, in QueryOptions queryOptions)
+	IdSequence[] query(T)(T sentences, in QueryOptions queryOptions)
 	{
 			//this version does left/right extensions too
 		return query(sentences, queryOptions.sources).sort.map!(i => extend(i, queryOptions)).array;
 	}
 	
-		static struct IdSequence
+	static struct IdSequence
 	{
 		 //IdSequence ///////////////////////////////////////
 		Id[] ids;
@@ -2464,11 +2463,11 @@ class AMDBCore {
 		{ return ids.length.to!int-1-rightExtension; }
 		
 		void appendLeft (Id   ext)
-		{ ids = ext ~ ids   ; leftExtension  ++; }
+		{ ids = ext ~ ids; leftExtension  ++; }
 		void appendRight(Id   ext)
 		{ ids =       ids ~ ext; rightExtension ++; }
 		void appendLeft (Id[] ext)
-		{ ids = ext ~ ids   ; leftExtension  += ext.length.to!int; }
+		{ ids = ext ~ ids; leftExtension  += ext.length.to!int; }
 		void appendRight(Id[] ext)
 		{ ids =       ids ~ ext; rightExtension += ext.length.to!int; }
 		
@@ -2500,11 +2499,11 @@ class AMDBCore {
 		}
 	}
 	
-		//extend Left/Right //////////////////////////////////////////////////////////
+	//extend Left/Right //////////////////////////////////////////////////////////
 	
-		private enum defaultExtendLeftRecursion = 100;
+	private enum defaultExtendLeftRecursion = 100;
 	
-		IdSequence extendLeft(IdSequence seq, int recursion=defaultExtendLeftRecursion)
+	IdSequence extendLeft(IdSequence seq, int recursion=defaultExtendLeftRecursion)
 	{
 		foreach(i; 0..recursion)
 		{
@@ -2522,7 +2521,7 @@ class AMDBCore {
 		return seq;
 	}
 	
-		IdSequence extendRight(IdSequence seq)
+	IdSequence extendRight(IdSequence seq)
 	{
 		Id[] sourceExtension(in Id sourceId)
 		{ return sourceReferrers(sourceId).map!(i => i ~ sourceExtension(i)).join.sort.array; }
@@ -2531,8 +2530,8 @@ class AMDBCore {
 		return seq;
 	}
 	
-		//pads with empty sentences from the left to equalize the lengths of the left-extensions
-		IdSequence[] padLeft(IdSequence[] seqs)
+	//pads with empty sentences from the left to equalize the lengths of the left-extensions
+	IdSequence[] padLeft(IdSequence[] seqs)
 	{
 		if(seqs.empty)
 		return seqs;
@@ -2549,12 +2548,12 @@ class AMDBCore {
 		return seqs;
 	}
 	
-		//text mode interface ////////////////////////////////////////////
+	//text mode interface ////////////////////////////////////////////
 	
-		void printFilteredSortedItems(R)(R r, string mask="")
+	void printFilteredSortedItems(R)(R r, string mask="")
 	{ r.filter!(i => mask=="" || chkId(i, mask)).array.sort!((a,b)=>icmp(items.get(a, ""), items.get(b, ""))<0).each!(i => print(prettyStr(i))); }
 	
-		void tryDelete(Id[] ids)
+	void tryDelete(Id[] ids)
 	{
 		print("-------------------------------------------------------");
 		Id[] remaining;
@@ -2579,13 +2578,13 @@ class AMDBCore {
 		WARN("Unable to delete all"); //Todo: wipe
 	}
 	
-		auto query(string input)
+	auto query(string input)
 	{
 		const options = fetchQueryOptions(input);
 		return query(input, options);
 	}
 	
-		int execTextCommand(string input)
+	int execTextCommand(string input)
 	{
 		input = input.strip;
 		
@@ -2644,9 +2643,9 @@ class AMDBCore {
 		
 		writeln;
 		return true;
-	}
+	}
 	
-		string inputTextCommand()
+	string inputTextCommand()
 	{
 			//prompt
 			write(EgaColor.white(">"), format!" I:%d + L:%d = %d %s"(items.count, links.count, items.count+links.count, transaction.commitBuffer.length ? EgaColor.red("*"~transaction.commitBuffer.length.text~" ") : ""));
@@ -2664,7 +2663,7 @@ class AMDBCore {
 			return readln;
 	}
 	
-		void textCommandLoop()
+	void textCommandLoop()
 	{
 		while(execTextCommand(inputTextCommand))
 		{}
@@ -2912,33 +2911,1226 @@ class PictureLibrary
 		}
 	}
 	
-}
-//! Unittest //////////////////////////////////////
-
-void unittest_splitSentences() {
-	uint h;
-	void a(string s) {
-		auto r = AMDBCore.textToSentences(s).text; h = r.xxh32(h);
-		//print(s, "|", r);
+}version(/+$DIDE_REGION DataSet+/all)
+{
+		mixin  template DatasetTemplate(K, R)
+	{
+		private
+		{
+			alias This = typeof(this);
+			enum isSimpleField(T) 	= __traits(isPOD, T) 
+				&& !isDynamicArray!T 
+				&& !isAssociativeArray!T;
+			//Todo: it can't look inside structs: It says it's circular, but I think it's NOT!!!
+			
+			enum isMainAACustom = __traits(hasMember, This, "MainAA");
+			static if(isMainAACustom)	public MainAA!(K, R) _aa;
+			else	R[K] _aa;
+			
+			auto _set(T)(K key, T value_)
+			{
+				static if(__traits(compiles, cast(R) value_))
+				auto value = cast(R) value_;
+				else
+				auto value = R(value_);
+				
+				const creating = key !in _aa, modifying = !creating;
+				
+				static if(__traits(compiles, _rb))
+				if(_rb && creating)	_rb.insert(key);
+				_aa[key] = value;
+				
+				static if(__traits(hasMember, This, "afterCreate"))
+				if(creating) afterCreate(key, value);
+				static if(__traits(hasMember, This, "afterModify"))
+				if(modifying) afterModify(key, value);
+				static if(__traits(hasMember, This, "afterAssign"))
+				afterAssign(key, value);
+				
+				return _recordAccessor(key, key in _aa);
+			}
+			
+			auto _get(Flag!"raise" raise)(K key)
+			{
+				auto a = key in _aa;
+				if(raise) enforce(a, "Key not found.");
+				return _recordAccessor(key, a);
+			}
+			
+			auto _unorderedKeys()
+			{ return _aa.byKey; }
+			
+			enum isBlobAACustom = __traits(hasMember, This, "BlobAA");
+			
+			static if(is(R.Blobs))
+			{
+				static immutable _blobNames = [FieldNameTuple!(R.Blobs)];
+				alias _blobTypes = FieldTypeTuple!(R.Blobs);
+			}
+			else
+			{
+				static immutable _blobNames = (string[]).init;
+				alias _blobTypes = AliasSeq!();
+			}
+			
+			static foreach(i, T; _blobTypes)
+			mixin(
+				format!
+				(((isBlobAACustom)?(q{BlobAA!(K, %s) _blobAA_%s;}) :(q{%s[K] _blobAA_%s;})))
+				(T.stringof, _blobNames[i])
+			);
+			
+			
+			final void _blobSet(string field, T)(K key, T value)
+			{
+				const creating = key !in mixin("_blobAA_"~field), modifying = !creating;
+				
+				mixin("_blobAA_"~field)[key] = value;
+				
+				static if(__traits(hasMember, This, "afterCreateBlob"))
+				if(creating) afterCreateBlob!field(key, value);
+				static if(__traits(hasMember, This, "afterModifyBlob"))
+				if(modifying) afterModifyBlob!field(key, value);
+				static if(__traits(hasMember, This, "afterAssignBlob"))
+				afterAssignBlob!field(key, value);
+			}
+			
+			final auto _blobGet(string field)(K key)
+			{
+				auto a = key in mixin("_blobAA_"~field);
+				return a;
+				//Note: No unpacking done here! It must be consequent.
+			}
+			
+			auto _recordAccessor(K key, R* record)
+			{
+				static struct RecordAccessor
+				{
+					This _logger;
+					K key;
+					const(R)* _record;
+					
+					bool opCast(B : bool)() const
+					{ return _record !is null; }
+					
+					static foreach(i, T; FieldTypeTuple!R)
+					static if(isSimpleField!T)
+					mixin(
+						q{
+							@property auto $()
+							{ return _record.$; }
+						}.replace("$", FieldNameTuple!R[i])
+					);
+					else static assert(0, format!"Invalid DataLogger field: %s %s;"(T.stringof, FieldNameTuple!R[i]));
+					
+					static foreach(name; _blobNames)
+					{
+						mixin(
+							q{
+								@property auto $()
+								{ return _logger._blobGet!`$`(key); }
+								@property void $(T)(T data)
+								{ _logger._blobSet!`$`(key, data); }
+							}.replace("$", name)
+						);
+					}
+				}
+				
+				return RecordAccessor(this, key, record);
+			}
+			
+			enum OrderedKeysEnabled = __traits(hasMember, This, "OrderedKeys") && OrderedKeys;
+			static if(OrderedKeysEnabled)
+			{
+				import std.container.rbtree;
+				RedBlackTree!(K, "a<b", false/+no duplicates+/) _rb;
+				
+				auto _rb_access()
+				{
+					if(!_rb) _rb = new typeof(_rb)(_aa.byKey);
+					return _rb;
+				}
+				
+				auto _orderedKeys()
+				{
+					if(!_rb) _rb = new typeof(_rb)(_unorderedKeys);
+					return _rb_access[];
+				}
+				
+				auto _orderedKeyInterval(K key0, K key1)
+				{
+					//dec key0 just a little bit, because RBTree.upperBound() is exclusive
+					static if(is(K==DateTime)) key0 = key0 ? RawDateTime(key0.raw-1) : key0;
+					else static if(isFloatingPoint!K) key0 = key0.nextDown;
+					else key0--;
+					
+					return _rb_access	.upperBound(key0)
+						.until!(k=>k >= key1);
+				}
+			}
+		}
+		auto length()
+		{ return _aa.length; } auto empty()
+		{ return !length; } 
+		
+		auto keys()
+		{
+			static if(OrderedKeysEnabled) return _orderedKeys;
+			else return _unorderedKeys;
+		}
+		
+		auto opIndex(K key)
+		{ return _get!(Yes.raise)(key); } auto opIndexAssign(T)(T value, K key)
+		{ return _set(key, value); }
+		
+		auto opIndex()
+		{ return keys.map!(k => _get!(No.raise)(k)); }
+		
+		auto opBinaryRight(string op : "in")(K key)
+		{ return _get!(No.raise)(key); }
+		
+		K[2] opSlice(size_t dim)(K key0, K key1)
+		{ return [key0, key1]; }
+		
+		static if(OrderedKeysEnabled)
+		{
+			auto keys(K k0, K k1)
+			{ return _orderedKeyInterval(k0, k1); }
+			
+			auto minKey()
+			{ return empty ? K.init : _orderedKeys.front; }
+			
+			auto maxKey()
+			{ return empty ? K.init : _orderedKeys.back; }
+			
+			auto opIndex(K[2] k /+[incl..excl) range+/)
+			{ return _orderedKeyInterval(k[0], k[1]).map!(k => _get!(No.raise)(k)); }
+		}
+		
 	}
+		version(/+$DIDE_REGION DataSet tests+/all)
+	{
+		void testDataset()
+		{
+			struct TestRecord
+			{
+				align(1)
+				{
+					char[4] type;
+					int width, height;
+					vec3 v;
+				}
+				struct Blobs
+				{
+					string descr;
+					const(void)[] data;
+				}
+			} struct DummyAA(K, V)
+			{
+				V[K] aa;
+				auto opBinaryRight(string op : "in")(K key) { return key in aa; }
+				auto opIndexAssign(in V value, in K key) { return aa[key] = value; }
+				auto length() { return aa.length; }
+				auto byKey() { return aa.byKey; }
+			}
+			
+			class TestDataset(K, R)
+			{
+				enum OrderedKeys = true;
+				alias MainAA = DummyAA,
+				BlobAA = DummyAA;
+				
+				mixin DatasetTemplate!(K, R);
+				
+				void afterCreate(K, R)(K key, R value) { print("\33\14Record created:\33\7", key, value); }
+				void afterModify(K, R)(K key, R value) { print("\33\14Record modified:\33\7", key, value); }
+				void afterAssign(K, R)(K key, R value) { print("\33\14Record assigned:\33\7", key, value); }
+				void afterCreateBlob(string field, K, R)(K key, R value) { print("\33\14Blob created:\33\7", field, key, value); }
+				void afterModifyBlob(string field, K, R)(K key, R value) { print("\33\14Blob modified:\33\7", field, key, value); }
+				void afterAssignBlob(string field, K, R)(K key, R value) { print("\33\14Blob assigned:\33\7", field, key, value); }
+			}
+			
+			auto logger = new TestDataset!(DateTime, TestRecord);
+			
+			//feed some data
+			TestRecord record = { "HELL", 320, 200, vec3(5) };
+			logger[DateTime(UTC, 2000, 1, 9)] = record;
+			logger[DateTime(UTC, 2000, 1, 9)] = record; //this one is a modification
+			logger[DateTime(UTC, 2000, 1, 3)] = record;
+			logger[DateTime(UTC, 2000, 1, 7)] = record;
+			logger[DateTime(UTC, 2000, 1, 8)] = record;
+			
+			
+			//access specific data
+			with(logger[DateTime(UTC, 2000, 1, 9)])
+			print(key, type, width, height, v);
+			
+			if(auto a = DateTime(UTC, 2000, 1, 8) in logger)
+			with(a)
+			print(key, type, width, height, v);
+			
+			//check if data is not in
+			if(DateTime(UTC, 2000, 1, 4) !in logger)
+			print("not found");
+			
+			//access range of keys  (uses optionally built rbTree)
+			logger.keys.each!print;
+			logger.keys(DateTime(UTC, 2000, 1, 7), DateTime(UTC, 2000, 1, 9)).each!print;
+			
+			//access data of key ranges
+			logger[DateTime(UTC, 2000, 1, 7) .. DateTime(UTC, 2000, 1, 9)].each!print;
+			logger[].each!print;
+			
+			//set blobs
+			logger[DateTime(UTC, 2000, 1, 9)].descr = "Description";
+			logger[DateTime(UTC, 2000, 1, 8)].data = [1, 2, 3];
+			
+			//get blobs
+			logger[DateTime(UTC, 2000, 1, 9)].descr.print;
+			logger[DateTime(UTC, 2000, 1, 8)].data().print;
+			
+			//get properties of blobs
+			logger[DateTime(UTC, 2000, 1, 9)].descr().length.print;
+			logger[DateTime(UTC, 2000, 1, 8)].data.length.print;
+			
+			//access to the whole record
+			(*(logger[DateTime(UTC, 2000, 1, 8)]._record)).toJson.print;
+			
+		} mixin template _DatasetTemplateDebug(K, R)
+		{
+			/+
+				Note: This thing was used to solve the lod0().property problem.
+				Probably the fix was that all properties started using generic (T) type.
+				Same type, same unknown alias name.
+				/+Link: https://forum.dlang.org/post/cyvewilqnctwohcexfpc@forum.dlang.org+/
+			+/
+			alias This = typeof(this);
+			R[K] _aa;
+			
+			static immutable _blobNames = [FieldNameTuple!(R.Blobs)];
+			alias _blobTypes = FieldTypeTuple!(R.Blobs);
+			
+			static foreach(i, T; _blobTypes)
+			mixin(format!q{%s[K] _blobAA_%s;}(T.stringof, _blobNames[i]));
+			
+			
+			auto _recordAccessor(K key, R* record)
+			{
+				static struct RecordAccessor
+				{
+					This _logger;
+					K key;
+					const(R)* _record;
+					
+					bool opCast(B : bool)() const
+					{ return _record !is null; }
+					
+					static foreach(name; FieldNameTuple!(R.Blobs))
+					{
+						mixin(
+							format!q{
+								@property auto %1$s()
+								{ return key in _logger._blobAA_%1$s; }
+								@property void %1$s(T)(T data)
+								{ _logger._blobAA_%1$s[key] = data; }
+							}(name)
+						);
+					}
+				}
+				
+				return RecordAccessor(this, key, record);
+			}
+			
+			auto opIndex(K key)
+			{
+				auto a = key in _aa;
+				return _recordAccessor(key, a);
+				
+			}
+			
+			auto opIndexAssign(T)(T value, K key)
+			{
+				_aa[key] = value;
+				return _recordAccessor(key, key in _aa);
+			}
+			
+		}  void testDatasetPropertyAccess()
+		{
+			struct TestRecord2
+			{
+				align(1)
+				{ int width, height; }
+				struct Blobs
+				{ string descr; }
+			}
+			
+			class TestDataset2(K, R)
+			{ mixin _DatasetTemplateDebug!(K, R); }
+			
+			auto logger = new TestDataset2!(ulong, TestRecord2);
+			
+			//feed some data
+			TestRecord2 record = { 320, 200 };
+			logger[42] = record;
+			
+			//set blobs
+			logger[42].descr = "Description";
+			
+			//get blobs
+			logger[42].descr.print;
+			logger[42].descr().print;
+			
+			//get properties of blobs
+			//static assert(!__traits(compiles, logger[42].descr.length));
+			logger[42].descr().length.print;
+			logger[42].descr.length.print;
+			//Todo: "zero arg functions passed through properties" are broken.
+		}
+	}
+}version(/+$DIDE_REGION DataLogger+/all)
+{
 	
-	a("One part");
-	a("Part one  Part two");
-	a("Part 1  Part 2     Part 3");
-	a("Part 1  Part 2  Part 3  Part 4");
-	
-	a("One part...2nd sentence.");
-	a("Part one  Part two...2nd");
-	a("Part 1  Part 2     Part 3  ...  2nd");
-	
-	a("Part one  Part two\n...2nd");
-	
-	a("Part one  Part two\nNew     sentence  ...next");
-	
-	a(`a"c"d"e  e"..."f  f\""""g`);   //c style "" string literals are decoded as a word.
-	
-	//print(h);
-	enforce(h==1522071754, "AMDB.textToSentences test FAIL");
+	class DataLogger(K, R)
+	{
+		public
+		{
+			/+
+				Note: 
+							𝐅𝐢𝐥𝐞𝐧𝐚𝐦𝐞 𝐬𝐩𝐞𝐜𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧
+				
+					path\namePrefix[.index].timestamp[.field].ext
+				
+				 • namePrefix	example: Log
+				 • index	autoincrement, 5 digits
+				 • timestamp 	23-01-01T18-26-32U      easily readable UTC
+				 • field	optional blob field
+				 • ext	 • .main	Main stream of records
+					 • .blob 	Blob data (string or const(ubyte)[])
+					 • .bidx 	Index for blobs
+				
+			+/struct DataLoggerUtils
+			{
+				static immutable timestampWildMask = "????-??-??T??-??-??Z";
+				
+				static string encodeTimestamp(DateTime t)
+				{
+					if(!t) return "NULL";
+					with(t.utcSystemTime)
+					return 	format!"%04d-%02d-%02dT%02d-%02d-%02dZ"
+						(wYear, wMonth, wDay, wHour, wMinute, wSecond);
+				}
+				
+				static string extractWildMask(File file)
+				{
+					return file.name	.splitter('.')
+						.enumerate
+						.map!(a=>((a.index==1)?(timestampWildMask) :(a.value)))
+						.join('.');
+				}
+			} struct DataLoggerAA(K, V)
+			{
+				V[K] aa;
+				File logFile;
+				auto opBinaryRight(string op : "in")(K key) { return key in aa; }
+				auto length() { return aa.length; }
+				auto byKey() { return aa.byKey; }
+				auto opIndexAssign(in V value, in K key)
+				{
+					logFile.append([key]);
+					logFile.append([value]);
+					//Todo: Use winapi files
+					return aa[key] = value;
+				}
+				
+				void load()
+				{
+					aa.clear;
+					const mask = DataLoggerUtils.extractWildMask(logFile);
+					foreach(f; logFile.path.files(mask).sort)
+					{
+						static struct KV { align(1): K key; V value; }
+						size_t loadSize = f.size;
+						if(loadSize%KV.sizeof)
+						{
+							loadSize = loadSize/KV.sizeof*KV.sizeof;
+							WARN("DataLogger.mainFile truncated:", f);
+							//Todo: this minimal integrity check is for the dynamic array cast.
+						}
+						foreach(const a; cast(KV[])f.read(true, 0, loadSize))
+						aa[a.key] = a.value;
+						aa.rehash;
+					}
+				}
+			}
+			struct DataLoggerBlobAA(K, V)
+			{
+				struct FileRef
+				{ File file; size_t offset, size; }
+				FileRef[K] aaIdx;
+				File idxFile, dataFile;
+				auto length() { return aaIdx.length; }
+				auto byKey() { return aaIdx.byKey; }
+				auto opIndexAssign(in V value, in K key)
+				{
+					auto raw = cast(void[]) value;
+					const 	offset 	= dataFile.size, 
+						size	= raw.length;
+					
+					//Content must be written first, if HDD is full, this will fail first.
+					dataFile.append(raw);
+					
+					idxFile.append([key]);
+					idxFile.append([offset, size]);
+					
+					//Todo: Use winapi files
+					
+					aaIdx[key] = FileRef(dataFile, offset, size);
+					//Bug: try to do atomic operation with proper exception handling
+					//Todo: implement locked file operations.
+					//Opt: also it's fcking slow to open and close all the time.
+					
+					return value;
+				}
+				
+				auto opBinaryRight(string op : "in")(K key)
+				{
+					static struct BlobLoader
+					{
+						/+
+							Note: This voldemort struct is required to emulate the AA's pointer access.
+							This result must not be dereferenced.
+						+/
+						const FileRef _fileRef;
+						@property
+						{
+							auto _file() const
+							{ return _fileRef.file; } auto _offset() const
+							{ return _fileRef.offset; } auto _size() const
+							{ return _fileRef.size; }
+							
+							auto _data()
+							{ return _file.read(true, _offset, _size); }
+							
+							bool _valid() const
+							{ return !!_file; } bool _exists() const
+							{ return _offset + _size <= _file.size; }
+						}
+						
+						alias _data this;
+						
+						auto opCast(B : bool)() const { return _valid; }
+					}
+					
+					if(const a = key in aaIdx)	{ return BlobLoader(*a); }
+					else	{ return BlobLoader(); }
+				}
+				
+				void load()
+				{
+					//Todo: maintenance: delete orphan bidx and blob files.
+					
+					aaIdx.clear;
+					const mask = DataLoggerUtils.extractWildMask(idxFile);
+					foreach(f; idxFile.path.files(mask).sort)
+					{
+						const 	fData = f.otherExt(".blob"),
+							fDataSize = fData.size;
+						
+						static struct KF { align(1): K key;size_t offset, size; }
+						size_t loadSize = f.size;
+						if(loadSize%KF.sizeof)
+						{
+							loadSize = loadSize/KF.sizeof*KF.sizeof;
+							WARN("DataLogger.idxFile truncated:", f);
+						}
+						foreach(const a; cast(KF[]) f.read(true, 0, loadSize))
+						{
+							if(a.offset + a.size <= fDataSize)
+							aaIdx[a.key] = FileRef(fData, a.offset, a.size);
+							else
+							WARN("Blob missing: "~FileRef(fData, a.offset, a.size).text);
+							//Todo: FileRef could be a smart reference to a specific block of a file with verification/loading.
+							//Todo: FileBlock seems like a better name.
+							//Todo: FileBlock should have a text format too.  fileName?offset=432143&length=32143
+						}
+						aaIdx.rehash;
+					}
+				}
+			}
+		}
+		
+		enum OrderedKeys = true;
+		alias MainAA = DataLoggerAA,
+		BlobAA = DataLoggerBlobAA;
+		
+		mixin DatasetTemplate!(K, R);
+		
+		const
+		{
+			Path _path;
+			string _namePrefix;
+			DateTime _logTime;
+			string _timestamp;
+		}
+		
+		void _initialize()
+		{
+			string encodeFn(string timestamp, string field, string ext)
+			{
+				return only(
+					_namePrefix,
+					timestamp,
+					field,
+					ext.withoutStarting('.')
+				).filter!(a=>a!="").join(".");
+			}
+			
+			File encodeFile(string field, string ext)
+			{ return File(_path, encodeFn(_timestamp, field, ext)); }
+			
+			//assign filenames
+			_aa.logFile = encodeFile("", ".main");;
+			static foreach(name; _blobNames)
+			{
+				mixin("_blobAA_"~name).idxFile = encodeFile(name, ".bidx");
+				mixin("_blobAA_"~name).dataFile = encodeFile(name, ".blob");
+			}
+		}
+		
+		void _load()
+		{
+			_aa.load;
+			static foreach(name; _blobNames) mixin("_blobAA_"~name).load;
+		}
+		
+		this(Path path, string namePrefix)
+		{
+			_path = path;
+			_namePrefix = namePrefix;
+			_logTime = now;
+			_timestamp = DataLoggerUtils.encodeTimestamp(_logTime);
+			
+			enforce(!_namePrefix.canFind('.'), "Invalie namePrefix. Must not contain '.'!");
+			enforce(_path.exists);
+			
+			_initialize;
+			_load;
+			/+
+				Note: It's no problem when _timestamp is the same as the latest file piexes,
+				because it is OK to appent to them as well.
+				It could be solved using an incremental index.
+			+/
+			//Todo: There should be an incremental index next to the timestamp as well!
+		}
+	}
+	version(/+$DIDE_REGION DataLogger tests+/all)
+	{
+		void dataLoggerTest()
+		{
+			struct Data
+			{
+				align(1)	 {
+					char[4] type;
+					RGBA avgColor;
+					ivec2 size;
+				}
+				struct Blobs	 { const(void)[] lod0, lod3, lod6; }
+			}
+			
+			auto logger = new DataLogger!(DateTime, Data)(Path(`c:\!!!!!test`), `DataLog`);
+			
+			with(logger[now] = Data("C1", clRed.rgb1, ivec2(1280, 720)))
+			{
+				print(*_record);
+				lod0 = "-= LOD0 TEST DATA =-";
+				lod3 = "-= LOD33333333333333333333 TEST DATA =-";
+				print(lod0);
+				print(lod3);
+			}
+		}
+		
+		void oldDelphiTest_recreated()
+		{
+			struct SelfTest
+			{ int value; }
+			
+			class SelfTests { mixin DatasetTemplate!(string, SelfTest); }
+			
+			auto selfTests = new SelfTests;
+			
+			selfTests["Denes"] = 5;
+			selfTests["Bea"] = 3;
+			selfTests["Aladar"] = 2;
+			selfTests["Zoltan"] = 1;
+			selfTests["Emese"] = 3;
+			
+			const res = selfTests[]	.filter!"a.value>1"
+				.array.sort!((a, b) => cmp(b.value, a.value).cmpChain(cmp(a.key, b.key))<0)
+				.array.multiSort!("a.value>b.value", "a.key<b.key")
+				.array.mySort!("-value key")
+				.map!"a.key ~ a.value.text"
+				.join;
+			
+			print(res);
+			print(res==`Denes5Bea3Emese3Aladar2`);
+		}
+		
+		void personSortTest()
+		{
+			//ChatGPT: How to sort a range by multiple fields in DLang?
+			
+			struct Person
+			{
+				string name;
+				int age;
+			}
+			
+			//Create an array of Person objects
+			Person[] people = [
+				{ "Alice", 25 },
+				{ "Bob", 30 },
+				{ "Charlie", 20 },
+				{ "Alice", 30 },
+				{ "Bob", 25 }
+			];
+			
+			//Sort the array by name and age
+			people.mySort!"name age";
+			
+			//Print the sorted array
+			people	.map!`a.name ~ ", " ~ a.age.text`
+				.each!writeln;
+		}
+		
+			struct SimulatedSample { DateTime when; File file; }
+			auto simulatedSampleStream(DateTime base, Time interval, Time delay1, Time delay2, Time howLong)
+		{
+			struct ScheduledFile { File file; }
+			class ScheduledFiles { enum OrderedKeys = true; mixin DatasetTemplate!(DateTime, ScheduledFile); }
+			auto scheduledFiles = new ScheduledFiles;
+			
+			const srcFiles = [
+				Path(`c:\D\projects\Karc\Log\230406T11`).files(`*C1.webp`),
+				Path(`c:\D\projects\Karc\Log\221201T11`).files(`*C2.webp`),
+				Path(`c:\D\projects\Karc\Log\221201T11`).files(`*C3.webp`)
+			];
+			
+			foreach(i; 0..((howLong)/(interval)).get.iround)
+			{
+				void add(DateTime t, File f)
+				{ scheduledFiles[t] = f; }
+				
+				add(base + i*interval, srcFiles[0][i * 101 % $]);
+				add(base + i*interval + delay1, srcFiles[1][i * 107 % $]);
+				add(base + i*interval + delay2, srcFiles[2][i * 127 % $]);
+			}
+			
+			return scheduledFiles[].map!(a => SimulatedSample(a.key, a.file)).array;
+		}
+			auto simulatedSampleStream(DateTime base, Time howLong)
+		{
+			return simulatedSampleStream(
+				base, 
+				4.18243 * second,	//interval between workpieces
+				7.03154 * second,	//Delay from C1 to C2
+				7.53234 * second, 	//Delay from C1 to C3
+				howLong	//Total duration of this test
+			);
+		}
+			void karcDataLoggerTest()
+		{
+			
+			struct KarcSample
+			{
+				align(1)	 {
+					char[4] type;
+					ivec2 size;
+					RGBA avgColor;
+				}
+				struct Blobs { const(void)[] lod0, lod3, lod6; }
+			}
+			
+			auto karcSamples = new DataLogger!(DateTime, KarcSample)(Path(`c:\!!!!!test`), `KarcSamples`);
+			
+			foreach(i, a; simulatedSampleStream(now, 1*hour).enumerate)
+			{
+				print(i.format!"%6d", a.when, a.file);
+				
+				import het.bitmap;
+				Bitmap bmp;
+				void loadBmp() { if(!bmp) bmp = newBitmap(a.file, ErrorHandling.raise); }
+				
+				if(a.when !in karcSamples)
+				{
+					print("  Creating main record...");
+					loadBmp;
+					auto type = "C"~a.file.nameWithoutExt[$-1];
+					karcSamples[a.when] = KarcSample(type.fourC, bmp.size, RGBA(255, 0, 255, 255));
+				}
+				
+				with(karcSamples[a.when])
+				{
+					if(!lod0)
+					{
+						print("Importing lod0...");
+						lod0 = a.file.read(true);
+					}
+				}
+			}
+			
+			karcSamples[].map!"a.lod0._size>0".sum.print;
+		}
+			void allDataLoggerTests()
+		{
+			testDataset;
+			testDatasetPropertyAccess;
+			dataLoggerTest;
+			oldDelphiTest_recreated;
+			karcDataLoggerTest;
+		}
+	}
+}version(/+$DIDE_REGION TimeView+/all)
+{
+	version(/+$DIDE_REGION+/all)
+	{
+		enum TimeUnit : ubyte
+		{ year, month, day, hour, minute }
+		
+		struct TimeUnitInfo
+		{
+			TimeUnit unit;
+			string name, symbol;
+			Time avgDuration;
+		}
+		
+		auto info(TimeUnit unit)
+		{
+			static immutable TimeUnitInfo[] arr = 
+			[
+				{ TimeUnit.year	, "year"	, "Y"	, gregorianDaysInYear*day	 },
+				{ TimeUnit.month	, "month"	, "M"	, gregorianDaysInMonth*day	 },
+				{ TimeUnit.day	, "day"	, "D"	, day	 },
+				{ TimeUnit.hour	, "hour"	, "h"	, hour	 },
+				{ TimeUnit.minute	, "minute"	, "m"	, minute	 },
+			];
+			return arr[unit];
+		}
+		
+		TimeUnit timeUnitFromStr(string s)
+		{
+			foreach(u; EnumMembers!TimeUnit)
+			if(s.among(u.info.name, u.info.symbol))
+			return u;
+			throw new Exception("Unknown TimeUnit: "~s.quoted);
+		}
+		
+		struct TimeStep
+		{
+			ushort count;
+			TimeUnit unit;
+			bool isVert;
+			
+			int maxSubSteps; //calculated from this and next level. This is also the scaing of 'size' between levels.
+			int levelIdx;
+			ivec2 size; //calculated pixel area
+			
+			
+			bool isHorz() const
+			{ return !isVert; }
+			bool isSummary() const
+			{ return !!maxSubSteps; }
+			vec2 dir() const
+			{ return isVert ? vec2(0, 1) : vec2(1, 0); }
+			Time avgDuration() const
+			{ return count * unit.info.avgDuration; }
+			
+			string calcTimeRangeText(DateTime[2] tr) const
+			{
+				//Note: This only calculates the lowest unit, and the beginning of the time frame.
+				const 	s0 = tr[0].utcSystemTime;
+				
+				//Todo: it's UTC only. Later it should be localtime. But that's complicated.
+				final switch(unit)
+				{
+					case TimeUnit.year:	switch(count)	{
+						case 1: 	return format!"%04d"(s0.wYear); 
+						case 10: 	return format!"%04d'"(s0.wYear);
+						case 100: 	return format!"%04d''"(s0.wYear);
+						default: 	return format!"%04d.."(s0.wYear);
+					}
+					case TimeUnit.month:	switch(count)	{
+						case 1: 	return format!"%04d.%02d"(s0.wYear, s0.wMonth);
+						case 3: 	return format!"%04dQ%d"(s0.wYear, (s0.wMonth-1)/3+1);
+						case 6: 	return format!"%04dH%d"(s0.wYear, (s0.wMonth-1)/6+1);
+						default: 	return format!"%04d.%02d.."(s0.wYear, s0.wMonth);
+					}
+					case TimeUnit.day:	switch(count)	{
+						case 1: 	return format!"%2d"(s0.wDay);
+						default: 	return format!"%02d.."(s0.wDay);
+					}
+					case TimeUnit.hour:	switch(count)	{
+						case 1: 	return format!"%2d:"(s0.wHour);
+						default: 	return format!"%02d:.."(s0.wDay);
+					}
+					case TimeUnit.minute:	switch(count)	{
+						case 1: 	return format!"%2d:%2d'"(s0.wHour, s0.wMinute);
+						default: 	return format!"%2d:%2d'.."(s0.wHour, s0.wMinute);
+					}
+				}
+			}
+			
+		}
+		
+		private auto decodeTimeStepConfig(string config)
+		{
+			TimeStep[] res;
+			
+			bool isVert, hasCnt;
+			int cnt;
+			foreach(ch; config)
+			{
+				switch(ch)
+				{
+					case ' ':	continue;
+					case '|':	isVert = true; continue;
+					case '-':	isVert = false; continue;
+					case '0': .. case '9': 	hasCnt = true; cnt = cnt*10 + (ch-'0'); continue;
+					
+					default:
+					
+					res ~= TimeStep((hasCnt ? cnt : 1).to!ushort, timeUnitFromStr(ch.text), isVert);
+					
+					//reset temporary state
+					hasCnt = false; cnt = 0;
+				}
+			}
+			return res;
+		}
+		
+		int timeStepDivide(in TimeStep a, in TimeStep b)
+		{
+			int ac = a.count, bc = b.count, sc = 1;
+			if(a.unit != b.unit)
+			with(TimeUnit)
+			{
+				//must return the maximums. Example: for months it's 31.
+				if(a.unit == year && b.unit == month) sc = 12;
+				else if(a.unit == month && b.unit == day) sc = 31 /+31 for unaligned and 37 for aligned weekdays+/;
+				else if(a.unit == day && b.unit == hour) sc = 24;
+				else if(a.unit == hour && b.unit == minute) sc = 60;
+				else if(a.unit == year && b.unit == day) sc = 366;
+				else throw new Exception("Unhandled TimeStep division: "~a.text~" "~b.text);
+			}
+			
+			ac *= sc; //scale a to the unit of b
+			
+			const res = ac / bc;
+			enforce(res * bc == ac, "Invalid TimeStep ratio (must be evenly divisible): "~a.text~" "~b.text);
+			
+			return res;
+		}
+		
+		private void calcTimeLevelSizes(TimeStep[] levels, ivec2 baseSize)
+		{
+			if(levels.empty) return;
+			levels.back.size = baseSize;
+			levels.back.maxSubSteps = 0; //this is the last level, no more subdivisions from here.
+			foreach_reverse(lo; 1..levels.length)
+			{
+				const hi = lo-1;
+				const scale = timeStepDivide(levels[hi], levels[lo]);
+				
+				levels[hi].maxSubSteps = scale;
+				
+				auto s = levels[lo].size;
+				(levels[lo].isVert ? s.y : s.x) *= scale;
+				levels[hi].size = s;
+			}
+		}
+		
+		
+	}
+	class TimeView(Payload)
+	{
+		class TimeBlock
+		{
+			Payload payload;
+			
+			const TimeStep* level;
+			DateTime[2] timeRange; //Todo: These data could be produced by a visitor, but I don't care ATM.
+			ibounds2 rect; //this is a difficult recursive calculation, it must be stored.
+			
+			TimeBlock[] subBlocks;
+			
+			string timeRangeText;
+			
+			int levelIdx() const
+			{ return level.levelIdx; }
+			
+			bool isSummary() const
+			{ return level.isSummary; } bool isDetail() const
+			{ return !isSummary; }
+			
+			int opCmp(in TimeBlock b) const
+			{ return timeRange[0].opCmp(b.timeRange[0]); }
+			bool opEquals(in TimeBlock b) const
+			{ return timeRange[0]==b.timeRange[0]; }
+			
+			auto duration() const
+			{ return timeRange[1] - timeRange[0]; }
+			
+			auto rawDuration() const
+			{ return timeRange[1].raw - timeRange[0].raw; }
+			
+			this(in ref TimeStep level, in DateTime[2] timeRange, in ibounds2 rect)
+			{
+				this.level = &level;
+				this.timeRange = timeRange;
+				this.rect =rect;
+				
+				{
+					const len = level.maxSubSteps;
+					enforce(len.inRange(0, 10000), "subBlocks.length: Out of range");
+					subBlocks.length = len;
+				}
+				
+				timeRangeText = level.calcTimeRangeText(timeRange);
+				//print("TimeBlock created:", levelIdx, idx, blk.timeRange, blk.rect);
+			}
+		}
+		
+		TimeStep[] levels;	/+Note: From largest to lowest time step level.+/
+		DateTime timeOrigin;	/+
+			Note: The current largest level is aligned to the geometric origin.  Everything else is relative to that.
+			⚠Do not share geometric coordinates between different timeViews.  Only share DateTimes.
+		+/
+		TimeBlock[DateTime] root;	/+Note: Largest level is a map, all remaining sublevels are arrays.+/
+		
+		this(string config, ivec2 cellSize)
+		{
+			//example config string: "|100Y|10Y|Y-3M-M|D-h|2m"
+			
+			levels = decodeTimeStepConfig(config);enforce(levels.length);
+			foreach(i, ref level; levels) level.levelIdx = i.to!int;
+			calcTimeLevelSizes(levels, cellSize);
+			timeOrigin = calcTimeBounds(now, 0)[0];
+			
+			dump;
+		}
+		
+		DateTime[2] calcTimeBounds(in DateTime t, size_t levelIdx = size_t.max)
+		{
+			if(!t) return (DateTime[2]).init;
+			
+			enforce(levels.length);
+			levelIdx.minimize(levels.length-1);
+			
+			const 	level = &levels[levelIdx],
+				isSimple = 	(level.unit > TimeUnit.day /+Note: '>' because timeUnits are in descending order.+/) ||
+					(level.unit == TimeUnit.day && level.count==1);
+			if(isSimple)
+			{
+				const 	rawUnits = level.unit.predSwitch(
+					TimeUnit.minute	, DateTime.RawUnit.min,
+					TimeUnit.hour	, DateTime.RawUnit.hour,
+					TimeUnit.day	, DateTime.RawUnit.day
+				),
+					m = rawUnits * level.count,
+					t0 = t.raw - t.raw % m,
+					t1 = t0 + m;
+				return [RawDateTime(t0), RawDateTime(t1)];
+			}
+			else
+			{
+				const st = t.utcSystemTime;
+				if(level.unit==TimeUnit.year) {
+					const y = st.wYear,
+						y0 = y - y%level.count,
+						y1 = y0 + level.count;
+					return [
+						DateTime(UTC, y0, 1, 1), 
+						DateTime(UTC, y1, 1, 1)
+					];
+				}
+				if(level.unit==TimeUnit.month) {
+					const 	ym = (st.wYear)*12 + (st.wMonth-1),
+						ym0 = ym - ym%level.count,
+						ym1 = ym0 + level.count;
+					return [
+						DateTime(UTC, ym0/12, ym0%12+1, 1), 
+						DateTime(UTC, ym1/12, ym1%12+1, 1)
+					];
+				}
+			}
+			
+			//Todo: Must handle situations when the lower bound is equal to or below 1600.01.01. That's a NULL datetime.
+			
+			throw new Exception("calcTimeBounds fail");
+		}
+		
+		alias peek = access!false;
+		bool access(bool autoCreate=true)(DateTime t, bool delegate(TimeBlock) fun)
+		{
+			TimeBlock prevBlock;
+			auto prevT0 = timeOrigin;
+			auto prevTopLeft = ivec2(0);
+			
+			foreach(levelIdx, const ref level; levels)
+			{
+				auto actTimeRange = calcTimeBounds(t, levelIdx);
+				const idx = ((actTimeRange[0] - prevT0) / level.avgDuration).get.round.to!int; //Opt: Div -> invMul
+				
+				TimeBlock blk;
+				void createNewBlk()
+				{
+					const ofs = prevTopLeft + (
+						level.isVert 	? ivec2(0, idx*level.size.y)
+							: ivec2(idx*level.size.x, 0)
+					);
+					blk = new TimeBlock(
+						level, actTimeRange, 
+						ibounds2(ivec2(0), level.size) + ofs
+					);
+				}
+				
+				if(levelIdx==0)
+				{
+					//Note: Get the block from the root level hashTable
+					
+					const key = actTimeRange[0];
+					
+					auto a = key in root;
+					if(!a)
+					{
+						if(autoCreate)
+						{
+							createNewBlk;
+							root[key] = blk;
+							a = key in root;
+						}
+						else
+						return false;
+					}
+					else
+					blk = *a;
+				}else {
+					//Note: Get a subBlock from the previous TimeBlock
+					//always do rangeChecking. I don't trust in this.
+					enforce(
+						idx.inRange(prevBlock.subBlocks), 
+						"Unable to fit subBlock into TimeBlock."
+					);
+					
+					auto a = &prevBlock.subBlocks[idx];
+					if(*a is null)
+					{
+						if(autoCreate)
+						{
+							createNewBlk;
+							*a = blk;
+						}
+						else
+						return false;
+					}
+					else
+					blk = *a;
+				}
+				
+				//got the TimeBlock, call the delegate
+				assert(blk);
+				if(!fun(blk)) return true;
+				//returns true, because it exists, just breaking as it was request of the fun()
+				
+				//advance
+				prevBlock = blk;
+				prevT0 = prevBlock.timeRange[0];
+				prevTopLeft = prevBlock.rect.topLeft;
+			}
+			
+			return true;//success
+		}
+		
+		ibounds2 calcBounds()
+		{
+			auto a = root.values.sort;
+			if(a.empty) return ibounds2.init;
+			
+			return ibounds2(a.front.rect.topLeft, a.back.rect.bottomRight);
+		}
+		
+		void visit(ibounds2 clipBounds, bool delegate(TimeBlock) fun1, void delegate(TimeBlock) fun2)
+		{
+			void visitBlocks(R)(R blocks)
+			{
+				foreach(blk; blocks)
+				{
+					if(blk && clipBounds.overlaps(blk.rect))
+					{
+						if(fun1(blk))
+						{
+							visitBlocks(blk.subBlocks);
+							fun2(blk);
+						}
+					}
+				}
+			}
+			visitBlocks(root.values.sort);
+			
+			/+Opt: Detect horz/vert direction and do binary filtering on clipBounds+/
+		}
+		
+		void dump()
+		{
+			const t = now;
+			print(
+				format!"\nListing %s TimeStep levels.  Now = %s\n"(levels.length, t) ~
+				levels	.enumerate
+					.map!(
+					a => format!"  \33\10#\33\7%d  \33\16%s%3s%s\33\7 %5s * %-5s  ->%-3s  %s .. %s"
+					(
+						a.index,
+						a.value.isVert ? "\u2193" : "\u2192",
+						a.value.count,
+						a.value.unit.info.symbol,
+						a.value.size.x.shortSizeText!1000,
+						a.value.size.y.shortSizeText!1000,
+						a.value.maxSubSteps,
+						calcTimeBounds(t, a.index)[0],
+						calcTimeBounds(t, a.index)[1] - milli(second)
+					)
+				)
+					.join('\n')
+			);
+		}
+		
+		
+	}
+}version(all)
+{
+	void unittest_splitSentences() {
+		uint h;
+		void a(string s) {
+			auto r = AMDBCore.textToSentences(s).text; h = r.xxh32(h);
+			//print(s, "|", r);
+		}
+		
+		a("One part");
+		a("Part one  Part two");
+		a("Part 1  Part 2     Part 3");
+		a("Part 1  Part 2  Part 3  Part 4");
+		
+		a("One part...2nd sentence.");
+		a("Part one  Part two...2nd");
+		a("Part 1  Part 2     Part 3  ...  2nd");
+		
+		a("Part one  Part two\n...2nd");
+		
+		a("Part one  Part two\nNew     sentence  ...next");
+		
+		a(`a"c"d"e  e"..."f  f\""""g`);   //c style "" string literals are decoded as a word.
+		
+		//print(h);
+		enforce(h==1522071754, "AMDB.textToSentences test FAIL");
+	}
+	void unittest_main() { unittest_splitSentences; }
 }
-
-void unittest_main() { unittest_splitSentences; }

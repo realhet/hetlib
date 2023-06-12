@@ -1760,7 +1760,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				alias AM = __traits(allMembers, T);
 				alias BM = __traits(allMembers, BaseClassesTuple!T[0]);
-				enum ThisClassMemberNameTuple = AM[0..AM.length-BM.length];
+				
+				enum validateName(string name) = !name.among("slot_t");
+				//Note: This is a bugfix. There is std.signals.Signal in het.win.Window. That causes hasUDA to fail.
+				
+				enum ThisClassMemberNameTuple = Filter!(validateName, AM[0..AM.length-BM.length]);
 			}else
 			enum ThisClassMemberNameTuple = AliasSeq!();
 		}
@@ -1785,10 +1789,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
 		template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
 		{
-			enum bool isUda        (string name) = is(U==void) || hasUDA!(__traits(getMember, T, name), U);
-			enum bool isUdaFunction(string name) = isUda!name && isFunction!(__traits(getMember, T, name));
+			enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA!(__traits(getMember, T, name), U));
+			enum bool isUdaFunction(string name) = name!="slot_t" && isUda!name && isFunction!(__traits(getMember, T, name));
 			enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T));
-					
+			
 			static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
 			enum FieldAndFunctionNamesWithUDA = AllFieldNames!T;
 			else
