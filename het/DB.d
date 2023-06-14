@@ -3336,8 +3336,13 @@ class PictureLibrary
 				auto byKey() { return aa.byKey; }
 				auto opIndexAssign(in V value, in K key)
 				{
-					logFile.append([key]);
-					logFile.append([value]);
+					if(logFile)
+					{
+						logFile.append([key]);
+						logFile.append([value]);
+					}
+					else raise("Can't write data: No log file specified.");
+					
 					//Todo: Use winapi files
 					return aa[key] = value;
 				}
@@ -3377,10 +3382,14 @@ class PictureLibrary
 						size	= raw.length;
 					
 					//Content must be written first, if HDD is full, this will fail first.
-					dataFile.append(raw);
-					
-					idxFile.append([key]);
-					idxFile.append([offset, size]);
+					if(dataFile && idxFile)
+					{
+						dataFile.append(raw);
+						
+						idxFile.append([key]);
+						idxFile.append([offset, size]);
+					}
+					else raise("Can't write data: No data and/or idx file specified.");
 					
 					//Todo: Use winapi files
 					
@@ -3486,7 +3495,7 @@ class PictureLibrary
 			}
 			
 			File encodeFile(string field, string ext)
-			{ return File(_path, encodeFn(_timestamp, field, ext)); }
+			{ return _path ? File(_path, encodeFn(_timestamp, field, ext)) : File.init; }
 			
 			//assign filenames
 			_aa.logFile = encodeFile("", ".main");;
@@ -3510,8 +3519,8 @@ class PictureLibrary
 			_logTime = now;
 			_timestamp = DataLoggerUtils.encodeTimestamp(_logTime);
 			
-			enforce(!_namePrefix.canFind('.'), "Invalie namePrefix. Must not contain '.'!");
-			enforce(_path.exists);
+			enforce(!_namePrefix.canFind('.'), "Invalid namePrefix. Must not contain '.'!");
+			enforce(!_path || _path.exists, "Path must be either NULL or an existing path. "~_path.text);
 			
 			_initialize;
 			_load;

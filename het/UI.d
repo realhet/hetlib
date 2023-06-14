@@ -930,94 +930,94 @@ struct im
 			//Todo: package visibility is not working as it should -> remains public
 			void _beginFrame(TargetSurface[2] targetSurfaces)
 		{
-			 //called from mainform.update
+			//called from mainform.update
 			//PING(5);
 			
-					static if(doTiming)
+			static if(doTiming)
 			{ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
-					enforce(!inFrame, "im.beginFrame() already called.");
+			enforce(!inFrame, "im.beginFrame() already called.");
 			
-					this.targetSurfaces = targetSurfaces;
-					selectTargetSurface(1); //default is the GUI surface
+			this.targetSurfaces = targetSurfaces;
+			selectTargetSurface(1); //default is the GUI surface
 			
-					//inject stuff into het.uibase. So no import het.ui is needed there.
-					static auto getActFontHeight()
+			//inject stuff into het.uibase. So no import het.ui is needed there.
+			static auto getActFontHeight()
 			{ return float(textStyle.fontHeight);	 }	 het.uibase.g_actFontHeightFunct	= &getActFontHeight;
-					static auto getActFontColor ()
+			static auto getActFontColor ()
 			{ return textStyle.fontColor;	 }	 het.uibase.g_actFontColorFunct	= &getActFontColor;
-					het.uibase.g_getOverlayDrawingFunct = &getOverlayDrawing;
-					het.uibase.g_getDrawCallbackFunct = &getDrawCallback;
+			het.uibase.g_getOverlayDrawingFunct = &getOverlayDrawing;
+			het.uibase.g_getDrawCallbackFunct = &getDrawCallback;
 			
-					//update building/measuring/drawing state
-					inFrame = true;
-					canDraw = false;
+			//update building/measuring/drawing state
+			inFrame = true;
+			canDraw = false;
 			
-					im.reset;
-					//this goes into endFrame, so the latest hit data will be accessible more early. hitTestManager.initFrame;
+			im.reset;
+			//this goes into endFrame, so the latest hit data will be accessible more early. hitTestManager.initFrame;
 			
-					//clear last frame's object references
-					focusedState.container = null;
-					textEditorState.beginFrame;
+			//clear last frame's object references
+			focusedState.container = null;
+			textEditorState.beginFrame;
 			
-					popupState.reset;
-					comboOpening = false;
+			popupState.reset;
+			comboOpening = false;
 			
-					//this is needed for PanelPosition
-					clientArea = targetSurfaces[1].view.screenBounds_anim; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
+			//this is needed for PanelPosition
+			clientArea = targetSurfaces[1].view.screenBounds_anim; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 			
-					static DeltaTimer dt;
-					deltaTime = dt.update;
+			static DeltaTimer dt;
+			deltaTime = dt.update;
 			
-					ImStorageManager.purge(200);
+			ImStorageManager.purge(200);
 			
-					{
+			{
 				static uint	tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
 				bitmaps	.garbageCollect;
 			}
-					{
+			{
 				static uint tvf; if(tvf .chkSet((QPS.value(second).ifloor+1)/2))
 				virtualFiles.garbageCollect;
 			}
 			
-					resourceMonitor.update;
+			resourceMonitor.update;
 		}
 		
 			void _endFrame()
 		{
-			 //called from end of update
+			//called from end of update
 			//PING(6);
 			
-					static if(doTiming)
+			static if(doTiming)
 			{ const T0 = QPS; scope(exit) tEndFrame = QPS-T0; }
 			
-					enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
-					enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
+			enforce(inFrame, "im.endFrame(): must call beginFrame() first.");
+			enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text);
 			
-					selectTargetSurface(1); //GUI surface by default
+			selectTargetSurface(1); //GUI surface by default
 			
-					auto rc = rootContainers(true);
-					rc = rc.sort!((a, b) => a.flags.targetSurface < b.flags.targetSurface, SwapStrategy.stable).array;
+			auto rc = rootContainers(true);
+			rc = rc.sort!((a, b) => a.flags.targetSurface < b.flags.targetSurface, SwapStrategy.stable).array;
 			
-					//measure
-					foreach(a; rc)
+			//measure
+			foreach(a; rc)
 			if(!a.flags._measured)
 			a.measure; //some panels are already have been measured
 			
-					const screenBounds = targetSurfaces[1].view.screenBounds_anim;
+			const screenBounds = targetSurfaces[1].view.screenBounds_anim;
 			
-					//Todo: remove this: applyScrollers(screenBounds);
+			//Todo: remove this: applyScrollers(screenBounds);
 			
-					hScrollInfo.createBars(true);
-					vScrollInfo.createBars(true);
+			hScrollInfo.createBars(true);
+			vScrollInfo.createBars(true);
 			
-					popupState.doAlign;
+			popupState.doAlign;
 			
-					//from here, all positions are valid
+			//from here, all positions are valid
 			
-					//hittest in zOrder (currently in reverse creation order)
-					bool[2] mouseOverUI;
-					bool mouseOverPopup;
-					foreach_reverse(a; rc)
+			//hittest in zOrder (currently in reverse creation order)
+			bool[2] mouseOverUI;
+			bool mouseOverPopup;
+			foreach_reverse(a; rc)
 			{
 				const surf = a.flags.targetSurface; //1: gui, 0:view
 				
@@ -1033,35 +1033,35 @@ struct im
 				}
 			}
 			
-					if(VisualizeHitStack)
+			if(VisualizeHitStack)
 			{
 				drVisualizeHitStack = new Drawing;
 				hitTestManager.draw(drVisualizeHitStack);
 			}
 			
-					//all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
-					hitTestManager.nextFrame;
+			//all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
+			hitTestManager.nextFrame;
 			
-					//clicking away from popup closes the popup
-					if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
+			//clicking away from popup closes the popup
+			if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
 			comboState = false;
 			
-					//the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
-					wantMouse = mouseOverUI[1];
+			//the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
+			wantMouse = mouseOverUI[1];
 			
-					if(textEditorState.active)
+			if(textEditorState.active)
 			{
 				 //an edit control is active.
 				//Todo: mainWindow.isForeground check
 				auto err = textEditorState.processQueue;
 			}
-					wantKeys = textEditorState.active;
+			wantKeys = textEditorState.active;
 			
-					generateHints(screenBounds);
+			generateHints(screenBounds);
 			
-					//update building/measuring/drawing state
-					canDraw = true;
-					inFrame = false;
+			//update building/measuring/drawing state
+			canDraw = true;
+			inFrame = false;
 		}
 		
 			bounds2[2] surfaceBounds;
@@ -2729,6 +2729,7 @@ struct im
 					{
 						if(res.changed)
 						{
+							//todo: These buttons ain't work with mouse. Only Enter/Esc works.
 							if(Btn(symbol("Accept"), enable(res.valid)))
 							{ actPath = *editedPath; res.editing = false; res.valid = validate(actPath); res.mustRefresh = true; focusedState.reset; }
 							if(Btn(symbol("Cancel")))
@@ -2857,7 +2858,7 @@ struct im
 						a();
 						
 						//set minimal height for the control if empty
-						if(actContainer.subCells.empty && innerHeight==0)
+						if(actContainer.subCells.empty && innerHeight<=0)
 						innerHeight = fh;
 					}
 				);
