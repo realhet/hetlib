@@ -1951,7 +1951,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		/// pass a generic arg to a function
 		auto genericArg(string N="", T)(in T p)
-		{ return const GenericArg!(N, T)(p); }
+		{ return GenericArg!(N, T)(p); }
 		
 		/// cast anything to GenericArg
 		auto asGenericArg(A)(in A a)
@@ -8363,6 +8363,12 @@ version(/+$DIDE_REGION Date Time+/all)
 			
 			@property void modified(in DateTime m)
 			{ setFileTimes_modified(fullName, m); }
+			
+			@property bool isPath()const
+			{ return asPath.exists; }
+			
+			@property Path asPath()const
+			{ return Path(fullName); }
 			
 			@property string dir()const
 			{ return extractFileDir(fullName); }

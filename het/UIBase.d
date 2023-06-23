@@ -1489,6 +1489,7 @@ version(/+$DIDE_REGION+/all)
 			}
 		}
 	}
+	
 	class Img : Container
 	{
 		File file;
@@ -4460,15 +4461,15 @@ version(/+$DIDE_REGION+/all)
 	
 	class SelectionManager(T : Cell)
 	{
-		 //SelectionManager ///////////////////////////////////////////////
+		//SelectionManager ///////////////////////////////////////////////
 		
 		//T must have some bool properties:
 		static assert(
 			__traits(
 				compiles, {
-					 T a;
-					a.isSelected	= true;
-					a.oldSelected	= true;
+					T a;
+					a.isSelected = true;
+					a.oldSelected = true;
 				}
 			), "Field requirements not met."
 		);
@@ -4621,6 +4622,7 @@ version(/+$DIDE_REGION+/all)
 				if(a.isSelected)
 				{
 					a.outerPos += mouseDelta;
+					static if(__traits(compiles, { a.cachedDrawing.free; }))
 					a.cachedDrawing.free;
 				}
 				

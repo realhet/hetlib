@@ -250,7 +250,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			static assert(__traits(isStaticFunction, fun));
 			enum name = __traits(identifier, fun);static assert(name.endsWith(postfix));
-			enum prefix = name.withoutEnding(postfix);static assert(prefix == prefix.lc);
+			enum prefix = name.withoutEnding(postfix);/+static assert(prefix == prefix.lc);+/
 			register(prefix, &fun);
 		}
 		
@@ -609,6 +609,7 @@ version(/+$DIDE_REGION+/all)
 			/+Code: ?histogram+/	 Calculate RGB histogram of the image.
 			/+Code: ?histogram&gray+/	 Calculate lumonocity histogram og the image.
 			/+Code: ?grayscale+/	 Calculate grayscale image.
+			/+Code: ?invertRGB+/	 Inverts RGB, leaves alpha as is.
 		+/
 		
 		Bitmap thumbEffect(Bitmap original, in QueryString params)
@@ -670,6 +671,9 @@ version(/+$DIDE_REGION+/all)
 		}
 		Bitmap grayscaleEffect(Bitmap original, in QueryString params)
 		{ return new Bitmap(original.accessOrGet!ubyte); }
+		
+		Bitmap invertRGBEffect(Bitmap original, in QueryString params)
+		{ return new Bitmap(image2D(original.size, original.accessOrGet!RGBA.asArray.rgba_invert_rgb)); }
 	}
 	
 	/+

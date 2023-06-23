@@ -1882,8 +1882,10 @@ class Drawing
 					else static if(is(A==Flag!"nearest"	))	nearest = a;
 					else static if(is(A==RectAlign	))	rectAlign = a;
 					else static if(is(A==DrawGlyphScale	))	drawScale = a.value;
-					else static if(is(A==GenericArg!(N,	T), string N, T) && N=="shaderIdx")	shaderIdx = a.value;
-					else static assert(0, "Unhandled parameter "~typeof(a).stringof);
+					else static if(is(A==GenericArg!(N, T), string N, T) && N=="shaderIdx")	shaderIdx = a.value;
+					else
+					{ static assert(0, "Unhandled parameter: " ~ A.stringof); }
+					
 				}
 			}
 			
@@ -2341,6 +2343,8 @@ class Drawing
 					if(!ignoreCustomShader && customShader_!="")
 					{
 						auto p = code.split("vec4 customShader(){");
+						if(p.length!=2) p = code.split("vec4 customShader() {");
+						if(p.length!=2) p = code.split("vec4 customShader()\r\n{");
 						enforce(p.length==2);
 						auto i = p[1].map!(ch => ch.among('\r', '\n')).countUntil(true);
 						enforce(i>0);
@@ -2485,7 +2489,7 @@ class Drawing
 		}
 		
 		#define sqr(a)  ((a)*(a))
-		
+		#define PI 3.14159265359
 		
 		@vertex://////////////////////////////////////////////////////////////////////////
 		in float aType; in vec2 aA, aB, aC, aD; in  vec4 aColor, aColor2; in vec2 aClipMin, aClipMax;

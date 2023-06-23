@@ -116,6 +116,17 @@ version(/+$DIDE_REGION+/all)
 	alias rgba_to_bgra 	= transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd),
 	rgba_to_bgra_inplace 	= transformArray!(rgba_to_bgra_scalar, rgba_to_bgra_simd, true);
 	
+	void rgba_invert_rgb_scalar(const ref RGBA src, ref RGBA dst)
+	{ dst = RGBA(dst.raw ^ 0xFFFFFF); }
+	void rgba_invert_rgb_simd(const ref ubyte16 src, ref ubyte16 dst)
+	{
+		static immutable ubyte16 mask = mixin([255, 255, 255, 0].replicate(4));
+		dst = src ^ mask;
+	}
+	alias rgba_invert_rgb 	= transformArray!(rgba_invert_rgb_scalar, rgba_invert_rgb_simd),
+	rgba_invert_rgb_inplace 	= transformArray!(rgba_invert_rgb_scalar, rgba_invert_rgb_simd, true);
+	
+	
 	void rgb_to_bgra_scalar(const ref RGB src, ref RGBA dst)
 	{ dst = src.bgr1; }
 	void rgb_to_bgra_simd(const ref ubyte16[3] src, ref ubyte16[4] dst)
@@ -253,20 +264,20 @@ version(/+$DIDE_REGION+/all)
 	
 	vec3 rgb2hsv(vec3 c)
 	{
-		   vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-		   vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-		   vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
-			
-		   float d = q.x - min(q.w, q.y);
-		   float e = 1.0e-10;
-		   return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+		 vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+		 vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+		 vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+				
+		 float d = q.x - min(q.w, q.y);
+		 float e = 1.0e-10;
+		 return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
 	}
 	
 	vec3 hsv2rgb(vec3 c)
 	{
-		   vec4 K = vec4(1.0f, 2.0f / 3.0f, 1.0f / 3.0f, 3.0f);
-		   vec3 p = abs(fract(c.xxx + K.xyz) * 6.0f - K.www);
-		   return mix(K.xxx, clamp(p - K.xxx, 0.0f, 1.0f), c.y) * c.z;
+		 vec4 K = vec4(1.0f, 2.0f / 3.0f, 1.0f / 3.0f, 3.0f);
+		 vec3 p = abs(fract(c.xxx + K.xyz) * 6.0f - K.www);
+		 return mix(K.xxx, clamp(p - K.xxx, 0.0f, 1.0f), c.y) * c.z;
 	}
 	
 	
@@ -339,50 +350,50 @@ version(/+$DIDE_REGION+/all)
 	
 	void drawPhaseAveragingTests(Dr)(Dr dr)
 	{
-	const π = PIf;
-	
-	auto range = iota(0, 2*π, 0.01f);
-	void plot(alias fun)(float y0=0, float ySize=1)
-	{
-		foreach(i, y; range.map!(fun).enumerate)
-		dr.lineTo(i*0.05f, (y0 + y/ySize)*-10, i==0);
-	}
-	
-	dr.lineWidth = .1;
-	dr.color = clAqua;	plot!(α=>cos(α).remap(-1, 1, 0, 1));
-	dr.color = clYellow;	plot!(α=>sin(α).remap(-1, 1, 0, 1));
-	dr.color = clWhite;	plot!(α=>((atan(-sin(α), -cos(α)) + π)/(π*2)));
-	
-	dr.translate(0, 10);
-	dr.color = clRed;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.r);
-	dr.color = clLime;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.g);
-	dr.color = clBlue;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.b);
-	dr.color = clWhite;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.rgbToHsv.x);
-	dr.translate(0, 10);
-	
-	const β = time.value(10*second).fract.remap(0, 1, 0, 2*π).sin*π/2;
-	dr.color = clWhite;	plot!(α=>((atan(-sin(avg(α, β)), -cos(avg(α, β))) + π)/(π*2)));
-	dr.color = clFuchsia;	plot!(
-		(α){
-			auto v = vec2(
-				avg(sin(α), sin(β)), 
-				avg(cos(α), cos(β))
-			).normalize;
-			return ((atan(-v.x, -v.y) + π)/(π*2));
+		const π = PIf;
+		
+		auto range = iota(0, 2*π, 0.01f);
+		void plot(alias fun)(float y0=0, float ySize=1)
+		{
+			foreach(i, y; range.map!(fun).enumerate)
+			dr.lineTo(i*0.05f, (y0 + y/ySize)*-10, i==0);
 		}
-	);
-	dr.color = clOrange;	plot!(
-		(α){
-			auto v = avg(
-				vec3(α/π/2, 1, 1).hsvToRgb,
-				vec3(β/π/2, 1, 1).hsvToRgb
-			);
-			return v.rgbToHsv.x;
-		}
-	);
-	
-	dr.pop;dr.pop;
-	//conclusion: 2 phase sin+cos is the best and sin(a+b) = sin(a)+sin(b)
+		
+		dr.lineWidth = .1;
+		dr.color = clAqua;	plot!(α=>cos(α).remap(-1, 1, 0, 1));
+		dr.color = clYellow;	plot!(α=>sin(α).remap(-1, 1, 0, 1));
+		dr.color = clWhite;	plot!(α=>((atan(-sin(α), -cos(α)) + π)/(π*2)));
+		
+		dr.translate(0, 10);
+		dr.color = clRed;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.r);
+		dr.color = clLime;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.g);
+		dr.color = clBlue;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.b);
+		dr.color = clWhite;	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.rgbToHsv.x);
+		dr.translate(0, 10);
+		
+		const β = time.value(10*second).fract.remap(0, 1, 0, 2*π).sin*π/2;
+		dr.color = clWhite;	plot!(α=>((atan(-sin(avg(α, β)), -cos(avg(α, β))) + π)/(π*2)));
+		dr.color = clFuchsia;	plot!(
+			(α){
+				auto v = vec2(
+					avg(sin(α), sin(β)), 
+					avg(cos(α), cos(β))
+				).normalize;
+				return ((atan(-v.x, -v.y) + π)/(π*2));
+			}
+		);
+		dr.color = clOrange;	plot!(
+			(α){
+				auto v = avg(
+					vec3(α/π/2, 1, 1).hsvToRgb,
+					vec3(β/π/2, 1, 1).hsvToRgb
+				);
+				return v.rgbToHsv.x;
+			}
+		);
+		
+		dr.pop;dr.pop;
+		//conclusion: 2 phase sin+cos is the best and sin(a+b) = sin(a)+sin(b)
 	}
 } version(/+$DIDE_REGION Color constants+/all)
 {
