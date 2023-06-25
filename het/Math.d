@@ -3037,8 +3037,25 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		auto rotate90 (T)(in Vector!(T, 2) v)
-		{ return v.Yx; } auto rotate270(T)(in Vector!(T, 2) v)
+		{ return v.Yx; }
+		
+		auto rotate270(T)(in Vector!(T, 2) v)
 		{ return v.yX; }
+		
+		auto rotate180 (T)(in Vector!(T, 2) v)
+		{ return -v; }
+		
+		auto rotate90 (T)(in Vector!(T, 2) v, int n)
+		{
+			switch(n&3)
+			{
+				case 1:	return v.rotate90;
+				case 2:	return v.rotate180;
+				case 3:	return v.rotate270;
+				default:	return v;
+			}
+		}
+		
 		//Todo: unittest this with mat2.rotation270*v
 		
 		private void unittest_GeometricFunctions()

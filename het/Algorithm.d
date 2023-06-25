@@ -442,15 +442,15 @@ class MaxRectsBin
 				//Todo: ref if struct!!!
 			if(r.width >= width && r.height >= height)
 			{
-				areaFit = r.width * r.height - width * height; //opt: do the mult outside
+				areaFit = r.width * r.height - width * height; //Opt: do the mult outside
 				if(areaFit < score) {
 					//bestNode.x = r.x;
 					//bestNode.y = r.y;
 					//bestNode.width = width;
 					//bestNode.height = height;
 					bestNode = new Rectangle(r.x, r.y, width, height);
-					//opt: dont make a new allocation here.
-					//opt: rectangle shouldnt be a class
+					//Opt: dont make a new allocation here.
+					//Opt: rectangle shouldnt be a class
 					score = areaFit;
 				}
 			}
@@ -702,4 +702,107 @@ struct PositionExtrapolator
 			}
 		);
 	}
+}
+float waveLengthStrength(float[] arr, int wl)
+{
+	enforce(wl>1);
+	static float[] createTab(alias fun)(int res)
+	{
+		const invRes = (2*PIf)/res;
+		return iota(res).map!(i => fun(i*invRes)).array;
+		//Opt: cache these tables
+	}
+	
+	const 	sinTab = createTab!sin(wl),
+		cosTab = createTab!cos(wl);
+	
+	int j = 0;
+	float sinSum = 0, cosSum = 0;
+	foreach(a; arr)
+	{
+		sinSum += a * sinTab[j];
+		cosSum += a * cosTab[j];
+		j++; if(j==wl) j=0;
+	}
+	
+	return length(vec2(sinSum, cosSum));
+}
+
+struct WaveLengthDetectionResult
+{
+	int waveLength, waveLengthMin, waveLengthMax, waveLengthStep;
+	float[] samples, spectrum;
+	alias waveLength this;
+}
+
+auto detectWaveLength(string method)(float[] arr, int wlMin, int wlMax, int wlStep=1)
+{
+	auto waveLengthRange = iota(wlMin, wlMax+wlStep, wlStep);
+	enforce(!waveLengthRange.empty);
+	
+	static if(method=="sincos")
+	{
+		float[] scores = waveLengthRange	.map!(wl => waveLengthStrength(arr, wl))
+			.array;
+	}
+	else static if(method=="pulse")
+	{
+		float[] scores = [0.0f].replicate(waveLengthRange.length);
+		float lo=arr.front, hi=arr.front;
+		bool lastSt;
+		int counter;
+		foreach(i, act; arr)
+		{
+			counter++;
+			hi = hi.mix(act, 0.5f);
+			lo = lo.mix(act, 0.02f);
+			const actSt = hi>(lo+10/+noise threshold+/);
+			
+			if(lastSt.chkSet(actSt))
+			{
+				if(actSt) {
+					const idx = (counter-wlMin)/wlStep;
+					if(idx.inRange(scores)) scores[idx] += counter;
+					counter = 0;
+				}
+			}
+		}
+		
+		scores[] /= waveLengthRange.map!"0.01f".array[]; //scale it up to look nice
+	}
+	else static assert(0, "Unknown method");
+	
+	scores = scores.gaussianBlur(3);
+	const idx = scores.maxIndex.to!int;
+	
+	return WaveLengthDetectionResult(idx<0 ? 0 : idx*wlStep+wlMin, wlMin, wlMax, wlStep, arr, scores);
+}
+
+float[][2] getCenterLineSamples(T)(T im, int thickness, int periods=20, ivec2 centerPercent=ivec2(50))
+if(isImage2D!T)
+{
+	const t = max(1, thickness/2), scale = 1.0f/(t*2);
+	const p = periods*t;
+	ivec2 c = iround(im.size*centerPercent*0.01f).clamp(ivec2(t), im.size-t);
+	auto extract(A)(A arr)
+	{ return arr.map!(a => a.map!(p => p.l).sum*scale).array; }
+	return 	[
+		extract(im[max(0, c.x-p) .. min($, c.x+p), c.y-t .. c.y+t].columns),
+		extract(im[c.x-t .. c.x+t, max(0, c.y-p) .. min($, c.y+p)].rows)
+	];
+}
+
+
+auto detectWaveLength(string method="pulse", T)(
+	T img, int wlMin, int wlMax, int wlStep=1, 
+	int periods=40, ivec2 centerPercent=ivec2(50)
+)
+if(isImage2D!T)
+{
+	auto samples = getCenterLineSamples(img, wlMax, periods, centerPercent);
+	auto res = [
+		detectWaveLength!method(samples[0], wlMin, wlMax, wlStep),
+		detectWaveLength!method(samples[1], wlMin, wlMax, wlStep)
+	];
+	return res;
 }

@@ -3534,6 +3534,14 @@ version(/+$DIDE_REGION+/all)
 			return res;
 		}
 		
+		T pick(T : Cell = Cell)(in vec2 p)
+		{
+			//it returns the topmost subCell. It's not recursive. coordinate is local.
+			foreach_reverse(sc; cubCells)
+			if(sc.outerBounds.contains!"[)"(p)) return sc;
+			return null;
+		}
+		
 		void onDraw(Drawing dr)
 		{} //can override to draw some custom things.
 		
@@ -4648,13 +4656,13 @@ version(/+$DIDE_REGION+/all)
 		
 		if(selectAbove)
 		{
-		foreach(i, p; items) p.zIndex = cast(int) i;
-		void selectMoreOnTopOf(T base)
-		{
-			foreach(p; unselectedItems.filter!(p=>p.zIndex>base.zIndex && base.outerBounds.overlaps(p.outerBounds)))
-			{ p.isSelected = true; selectMoreOnTopOf(p); }
-		}
-		foreach(p; selectedItems) selectMoreOnTopOf(p);
+			foreach(i, p; items) p.zIndex = cast(int) i;
+			void selectMoreOnTopOf(T base)
+			{
+				foreach(p; unselectedItems.filter!(p=>p.zIndex>base.zIndex && base.outerBounds.overlaps(p.outerBounds)))
+				{ p.isSelected = true; selectMoreOnTopOf(p); }
+			}
+			foreach(p; selectedItems) selectMoreOnTopOf(p);
 		}
 		
 		return chain(unselectedItems, selectedItems).array;
