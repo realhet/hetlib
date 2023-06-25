@@ -4461,7 +4461,7 @@ version(/+$DIDE_REGION+/all)
 	
 	class SelectionManager(T : Cell)
 	{
-		//SelectionManager ///////////////////////////////////////////////
+		//Todo: Combine and refactor this with the one inside DIDE
 		
 		//T must have some bool properties:
 		static assert(
@@ -4500,12 +4500,12 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		//notification functions: the manager must know when an item is deleted
-		void notifyRemove(T	cell )
+		void notifyRemove(T cell)
 		{
 			if(hoveredItem && hoveredItem is cell)
 			hoveredItem = null;
 		}
-		void notifyRemove(T[]	cells)
+		void notifyRemove(T[] cells)
 		{
 			if(hoveredItem)
 			cells.each!(c => notifyRemove(c));
@@ -4513,22 +4513,22 @@ version(/+$DIDE_REGION+/all)
 		void notifyRemoveAll()
 		{ hoveredItem = null; }
 		
+		T[] delegate() onBringToFront; //Use bringSelectedItemsToFront() for default behavior
+		
 		void update(bool mouseEnabled, View2D view, T[] items)
 		{
 			
-			void selectNone()			
+			void selectNone()
 			{
 				foreach(a; items)
 				a.isSelected = false;
-			}
-			void selectOnly(T item)			
+			}	void selectOnly(T item)
 			{
 				selectNone; if(item)
 				item.isSelected = true;
 			}
-			void selectHoveredOnly()		
-			{ selectOnly(hoveredItem); }
-			void saveOldSelected()	  
+			void selectHoveredOnly()
+			{ selectOnly(hoveredItem); }	void saveOldSelected()
 			{
 				foreach(a; items)
 				a.oldSelected = a.isSelected;
@@ -4539,27 +4539,23 @@ version(/+$DIDE_REGION+/all)
 			auto mouseDelta = mouseAct-mouseLast;
 			scope(exit) mouseLast = mouseAct;
 			
-			const LMB	= inputs.LMB.down,
-						LMB_pressed	= inputs.LMB.pressed,
-						LMB_released	= inputs.LMB.released,
-						Shift	= inputs.Shift.down,
-						Ctrl	= inputs.Ctrl.down;
-			
-			const modNone	 = !Shift && !Ctrl,
-						modShift	 =  Shift && !Ctrl,
-						modCtrl	 = !Shift &&	 Ctrl,
-						modShiftCtrl	 =  Shift &&	 Ctrl;
+			const 	LMB	= inputs.LMB.down,
+				LMB_pressed	= inputs.LMB.pressed,
+				LMB_released 	= inputs.LMB.released,
+				Shift	= inputs.Shift.down,
+				Ctrl	= inputs.Ctrl.down;	const 	modNone	= !Shift 	&& !Ctrl,
+				modShift	= Shift	&& !Ctrl,
+				modCtrl	= !Shift	&& Ctrl,
+				modShiftCtrl 	= Shift	&& Ctrl;
 			
 			const inputChanged = mouseDelta || inputs.LMB.changed || inputs.Shift.changed || inputs.Ctrl.changed;
 			
 			//update current selection mode
-			if(modNone	)
-			selectOp = SelectOp.clearAdd;
-			if(modShift	)
+			if(modNone)
+			selectOp = SelectOp.clearAdd;	if(modShift)
 			selectOp = SelectOp.add;
-			if(modCtrl	)
-			selectOp = SelectOp.sub;
-			if(modShiftCtrl	)
+			if(modCtrl)
+			selectOp = SelectOp.sub;	if(modShiftCtrl)
 			selectOp = SelectOp.toggle;
 			
 			//update dragBounds
@@ -4577,13 +4573,14 @@ version(/+$DIDE_REGION+/all)
 			
 			if(LMB_pressed && mouseEnabled)
 			{
-				 //Left Mouse pressed //
+				//Left Mouse pressed //
 				if(hoveredItem)
 				{
 					if(modNone)
 					{
-						if(!hoveredItem.isSelected)
-						selectHoveredOnly;  mouseOp = MouseOp.move;
+						if(!hoveredItem.isSelected) selectHoveredOnly;
+						mouseOp = MouseOp.move;
+						if(onBringToFront) items = onBringToFront();
 					}
 					if(modShift || modCtrl || modShiftCtrl)
 					hoveredItem.isSelected.toggle;
@@ -4604,10 +4601,11 @@ version(/+$DIDE_REGION+/all)
 					{
 						final switch(selectOp)
 						{
-							case SelectOp.add, SelectOp.clearAdd	: a.isSelected = true;	break;
-							case SelectOp.sub	: a.isSelected = false;	break;
-							case SelectOp.toggle	: a.isSelected = !a.oldSelected;	break;
-							case SelectOp.none	:	break;
+							case 	SelectOp.add,
+								SelectOp.clearAdd:	a.isSelected = true;	break;
+							case SelectOp.sub:	a.isSelected = false;	break;
+							case SelectOp.toggle:	a.isSelected = !a.oldSelected;	break;
+							case SelectOp.none:		break;
 						}
 					}
 					else
@@ -4637,7 +4635,28 @@ version(/+$DIDE_REGION+/all)
 				
 				mouseOp = MouseOp.idle;
 			}
-		}
+		}
+	}
+	
+	T[] bringSelectedItemsToFront(T)(T[] items, bool selectAbove)
+	{
+		static assert(__traits(compiles, { items[0].isSelected.toggle; }), "Missing bool property: Item.isSelected");
+		static assert(__traits(compiles, { items[0].zIndex = 0; }), "Missing int property: Item.zIndex");
 		
+		auto selectedItems() { return items.filter!"a.isSelected"; }
+		auto unselectedItems() { return items.filter!"!a.isSelected"; }
+		
+		if(selectAbove)
+		{
+		foreach(i, p; items) p.zIndex = cast(int) i;
+		void selectMoreOnTopOf(T base)
+		{
+			foreach(p; unselectedItems.filter!(p=>p.zIndex>base.zIndex && base.outerBounds.overlaps(p.outerBounds)))
+			{ p.isSelected = true; selectMoreOnTopOf(p); }
+		}
+		foreach(p; selectedItems) selectMoreOnTopOf(p);
+		}
+		
+		return chain(unselectedItems, selectedItems).array;
 	}
 }
