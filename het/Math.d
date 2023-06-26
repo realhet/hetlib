@@ -1733,14 +1733,14 @@ version(/+$DIDE_REGION+/all)
 				return low.approxEqual(other.low) && high.approxEqual(other.high);
 			}
 					
-			bool contains(string cfg = "[]", T)(in T other) const
+			bool contains(string cfg = "[)", T)(in T other) const
 			{
-				//closed closed
+				//from 230626: inclusive..exclusive.  Before it was incl incl.  It is now better for window handling.
 				static assert(cfg.length==2 && "[(".canFind(cfg[0]) && "])".canFind(cfg[1]), "invalid open/close config. // [] closed, () open");
-						
+				
 				static if(cfg[0]=='[') alias f1 = greaterThanEqual;else alias f1 = greaterThan;
 				static if(cfg[1]==']') alias f2 = lessThanEqual;else alias f2 = lessThan;
-						
+				
 				static if(isBounds!T)
 				return contains!cfg(other.low) && contains!cfg(other.high);
 				else
@@ -3420,6 +3420,9 @@ version(/+$DIDE_REGION+/all)
 		{ return a.generateVector!(bool, a => std.math.isInfinity(a) ); }
 		auto isfin(A)(in A a)
 		{ return a.generateVector!(bool, a => std.math.isFinite	(a) ); }
+		
+		//todo: ifnan(a, 0) -> returns 0 if a is nan. For vectors is shouls use .any automatically.
+		
 		
 		auto isnull(A)(in A a)
 		{

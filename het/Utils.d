@@ -2297,6 +2297,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			if(s==0) { return dstFrom; }else { return cast(T)((src-srcFrom)/s*(dstTo-dstFrom)+dstFrom); }
 		}
 		
+		//todo: Decide what to return when input is NAN. Result is now NAN.
 		T remap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{ return clamp(remap(src, srcFrom, srcTo, dstFrom, dstTo), dstFrom, dstTo); }
 		
