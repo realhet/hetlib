@@ -299,7 +299,7 @@ class View2D
 		
 		with(owner.actions)
 		{
-			const 	scrollSpeed	= owner.deltaTime.value(second)*800,
+			const 	scrollSpeed	= owner.deltaTime.value(second)*800*4,
 				zoomSpeed	= owner.deltaTime.value(second)*6,
 				wheelSpeed	= 0.375f;
 			

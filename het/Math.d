@@ -2538,7 +2538,7 @@ version(/+$DIDE_REGION+/all)
 						 //elementwise operations
 						return image2D(
 							size, (ivec2 p)
-													{
+							{
 								return reverse	? mixin("a   [p.x, p.y]", op, "this[p.x, p.y]")
 									: mixin("this[p.x, p.y]", op, "a   [p.x, p.y]");
 								//Opt: too much index calculations
@@ -2557,7 +2557,7 @@ version(/+$DIDE_REGION+/all)
 					alias T = Unqual!(typeof(mixin("this[0,0]", op, "a")));
 					return image2D(
 						size, (ivec2 p)
-										{
+						{
 							return reverse 	? mixin("a", op, "this[p.x, p.y]")
 								: mixin("this[p.x, p.y]", op, "a");
 							//Opt: too much index calculations
@@ -3421,7 +3421,7 @@ version(/+$DIDE_REGION+/all)
 		auto isfin(A)(in A a)
 		{ return a.generateVector!(bool, a => std.math.isFinite	(a) ); }
 		
-		//todo: ifnan(a, 0) -> returns 0 if a is nan. For vectors is shouls use .any automatically.
+		//Todo: ifnan(a, 0) -> returns 0 if a is nan. For vectors is shouls use .any automatically.
 		
 		
 		auto isnull(A)(in A a)

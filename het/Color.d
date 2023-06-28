@@ -356,7 +356,7 @@ version(/+$DIDE_REGION+/all)
 		void plot(alias fun)(float y0=0, float ySize=1)
 		{
 			foreach(i, y; range.map!(fun).enumerate)
-			dr.lineTo(i*0.05f, (y0 + y/ySize)*-10, i==0);
+			dr.lineTo(i*0.05f, (y0 + y/ySize)*-10, i);
 		}
 		
 		dr.lineWidth = .1;

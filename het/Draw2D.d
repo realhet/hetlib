@@ -443,7 +443,7 @@ version(/+$DIDE_REGION+/all)
 					if(!vertFlip) v.y = fontHeight-v.y;
 					if(monoSpace) v.x += (fontMonoWidth-cg.width)*0.5;
 					if(italic) v.x += 4 - v.y*0.25;
-					dr.lineTo(pos+v*scale, i==0);
+					dr.lineTo(pos+v*scale, !!i);
 				}
 				
 				pos.x += (monoSpace ? fontMonoWidth : cg.width)*scale;
@@ -1672,15 +1672,12 @@ class Drawing
 			myAppend(DrawingObj(3+actState.arrowStyle, inputTransform(lineCursor), p, vec2(w, lineStyle), c));
 			lineCursor = p_;
 		}
-		void lineTo(in vec2 p, bool isMove)
-		{
-			//Todo: isMove flag is bad. isLine flag would be better because that flag has the same meaning as the index of a for loop.
-			if(isMove) moveTo(p);else lineTo(p);
-		}
+		void lineTo(in vec2 p, bool isLine)
+		{ if(isLine) lineTo(p);else moveTo(p); }
 		
 		void lineTo(in ivec2 p)
-		{ lineTo(p);	 } void lineTo(in ivec2 p, bool isMove)
-		{ lineTo(p, isMove); }
+		{ lineTo(p);	 } void lineTo(in ivec2 p, bool isLine)
+		{ lineTo(p, isLine); }
 		
 		void moveTo(in vec2 p)
 		{ lineCursor = p; } void moveTo(in ivec2 p)
@@ -1693,13 +1690,13 @@ class Drawing
 		{ lineCursor = p0; lineTo(p1); }
 		
 		void line(in ivec2 p0, in ivec2 p1)
-		{ line(p0, p1); } void line(in seg2 s)
+		{ line(vec2(p0), vec2(p1)); } void line(in seg2 s)
 		{ line(s.p[0], s.p[1]); } void line(in seg2[] a)
 		{ foreach(const s; a) line(s); }
 		
 		void lineTo(float x, float y)
-		{ lineTo(vec2(x, y)); }	void lineTo(float x, float y, bool isMove)
-		{ lineTo(vec2(x, y), isMove); } 	
+		{ lineTo(vec2(x, y)); }	void lineTo(float x, float y, bool isLine)
+		{ lineTo(vec2(x, y), isLine); } 	
 		void moveTo(float x, float y)
 		{ moveTo(vec2(x, y)); } 	void lineRel(float x, float y)
 		{ lineRel(vec2(x, y)); } 	void moveRel(float x, float y)
@@ -1742,7 +1739,7 @@ class Drawing
 			auto backup = actState.quickSave;	scope(exit) actState.quickRestore(backup);
 			//Todo: only do this when tere are	colors, or styles in the args
 			
-			bool first = true;
+			bool first = false;
 			float coord; //it remembers the first coordinate
 			
 			static foreach(a; args)
@@ -1753,9 +1750,9 @@ class Drawing
 					else static if(is(T == RGBA	))	{ color = a.rgb; alpha = a.a/255.0f; }
 					else static if(is(T == LineStyle))	{ lineStyle = a; }
 					else static if(is(T == ArrowStyle))	{ arrowStyle = a; }
-					else static if(is(T == vec2	))	{ lineTo(a, first); first = false; }
-					else static if(is(T == ivec2	))	{ lineTo(a, first); first = false; }
-					else static if(is(T == seg2	))	{ lineTo(a[0], first); first = false; lineTo(a[1]); }
+					else static if(is(T == vec2	))	{ lineTo(a, first); first = true; }
+					else static if(is(T == ivec2	))	{ lineTo(a, first); first = true; }
+					else static if(is(T == seg2	))	{ lineTo(a[0], first); first = true; lineTo(a[1]); }
 					else static if(is(T == bounds2	))	{
 						lineTo(a.topLeft, first); lineTo(a.topRight);
 						lineTo(a.bottomRight), lineTo(a.bottomLeft), lineTo(a.topLeft);
@@ -1766,7 +1763,7 @@ class Drawing
 					}
 					else static if(isNumeric!T	)	{
 						if(isnan(coord)) coord = a;
-						else { lineTo(coord, a, first); first = false; coord = float.init; }
+						else { lineTo(coord, a, first); first = true; coord = float.init; }
 					}
 					else	static assert(0, "invalid type: "~T.stringof);
 				}
@@ -1799,7 +1796,7 @@ class Drawing
 		{
 			if(data.empty) return;
 			static if(is(T==RGB8)||is(T==RGBA8))	{ mixin(genRgbGraph!"vGraph"); }
-			else static if(is(T==vec2) || is(T==ivec2))	{ foreach(i, const v; data) lineTo(x0+v.y*xScale, y0+v.x*yScale, !i); }
+			else static if(is(T==vec2) || is(T==ivec2))	{ foreach(i, const v; data) lineTo(x0+v.y*xScale, y0+v.x*yScale, i); }
 			else	{
 				moveTo(x0+data[0]*xScale, y0);
 				foreach(d; data[1..$]) {
@@ -1813,7 +1810,7 @@ class Drawing
 		{
 			if(data.empty) return;
 			static if(is(T==RGB8)||is(T==RGBA8))	{ mixin(genRgbGraph!"hGraph"); }
-			else static if(is(T==vec2) || is(T==ivec2))	{ foreach(i, const v; data) lineTo(x0+v.x*xScale, y0+v.y*yScale, !i); }
+			else static if(is(T==vec2) || is(T==ivec2))	{ foreach(i, const v; data) lineTo(x0+v.x*xScale, y0+v.y*yScale, i); }
 			else	{
 				moveTo(x0, y0+data[0]*yScale);
 				foreach(d; data[1..$]) {
@@ -2149,7 +2146,7 @@ class Drawing
 			float incr = cnt ? (arc1-arc0)/cnt : 0;
 			foreach(i; 0..cnt+1) {
 				float a = arc0+incr*i;
-				lineTo(x+sin(a)*ra, y+cos(a)*rb, !i);
+				lineTo(x+sin(a)*ra, y+cos(a)*rb, !!i);
 			}
 		}
 		void ellipse(in vec2 p, float r, float arc0=0, float arc1=2*PI)

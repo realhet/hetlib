@@ -4574,7 +4574,6 @@ version(/+$DIDE_REGION+/all)
 			
 			//update hovered item
 			hoveredItem = null;
-			if(mouseEnabled)
 			foreach(item; items)
 			if(getBounds(item).contains!"[)"(mouseAct))
 			hoveredItem = item;

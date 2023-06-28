@@ -576,18 +576,27 @@ version(/+$DIDE_REGION+/all)
 	Bitmap applyEffects(R)(Bitmap bmp, R effects)
 	if(is(ElementType!R==QueryString))
 	{
+		auto file = bmp.file;
+		
 		foreach(qs; effects)
 		{
 			const prefix = qs.command;
 			if(prefix!="")
 			{
 				if(auto a = prefix in bitmapEffects.functions)
-				bmp = (*a)(bmp, qs);
+				{
+					bmp = (*a)(bmp, qs);
+					
+					//always update the proper filename of the bitmap. Some effects may use it.
+					file = file ~ ("?" ~qs.text);
+					bmp.file = file;
+					bmp.modified = now;//As the effect just modified it.
+				}
 				else
-				WARN("Unknown prefix: "~prefix.quoted~" "~qs.text);
+				WARN("Unknown bitmapEffect prefix: "~prefix.quoted~" "~qs.text);
 			}
 			else
-			WARN("Missing prefix: "~qs.text);
+			WARN("Missing bitmapEffect prefix: "~qs.text);
 		}
 		return bmp;
 	}
@@ -795,7 +804,6 @@ version(/+$DIDE_REGION+/all)
 					(
 						{
 							auto newBmp = tr.transform(originalBmp);
-							//LOG(originalBmp, transformedBmp, newBmp, tr);
 							bitmapQuery(BitmapQueryCommand.finishTransformation, tr.transformedFile, ErrorHandling.track, newBmp);
 						}
 					);
@@ -1602,7 +1610,8 @@ version(/+$DIDE_REGION+/all)
 			const ref auto height()
 		{ return size.y; }
 		
-		private static {
+		private static
+		{
 			
 			bool isWebp(in ubyte[] s)
 			{
