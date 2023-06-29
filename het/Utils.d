@@ -1803,6 +1803,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 	}version(/+$DIDE_REGION+/all) {
 			
+		static if(0)
 		string[] getEnumMembers(T)()
 		{
 			static if(is(T == enum)) return [__traits(allMembers, T)];
@@ -1810,12 +1811,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		}
 		
 		
+		enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : [];
+		
+		
 		alias toAlias(alias T) = T; //Todo: Alias!T alreadyb exists
 		
 		void inspectSymbol(alias T)(string before="", int level=0)
 		{
 			enum maxInspectLevel = 10;
-					
+			
 			//step 2
 			foreach(memberName; __traits(allMembers, T))
 			static if(__traits(compiles, toAlias!(__traits(getMember, T, memberName))))
@@ -1856,18 +1860,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				else
 				{
 					//step 6, everything else
-							
-						static if(__traits(compiles, member.stringof)) enum s = member.stringof;else enum s = "";
-							
-						static if(s.startsWith("module "))
+					
+					static if(__traits(compiles, member.stringof)) enum s = member.stringof;else enum s = "";
+					
+					static if(s.startsWith("module "))
 					writeln(before, fullyQualifiedName!member, " is a module");
 					else static if(s.startsWith("package "))
 					writeln(before, fullyQualifiedName!member, " is a package");
-					else static if(is(typeof(member.init))) {
-						static if(member.stringof.endsWith(')'))
-						{ writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof); }
+					else static if(is(typeof(member.init)))
+					{
+						static if(__traits(compiles, member.stringof))
+						{
+							static if(member.stringof.endsWith(')'))
+							{ writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof); }
+							else
+							{ writeln(before, fullyQualifiedName!member, " is a non-property typed ", typeof(member).stringof); }
+						}
 						else
-						{ writeln(before, fullyQualifiedName!member, " is a variable typed ", typeof(member).stringof); }
+						{ writeln(before, fullyQualifiedName!member, " is a member, but unable access its .stringof ", memberName); }
 					}
 					else
 					{
@@ -1878,7 +1888,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				}
 			}
 			else
-			{ print("!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", T.stringof ~ "." ~ memberName); }
+			{
+				print(
+					"!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", 
+					T.stringof ~ "." ~ memberName
+				);
+			}
 		}
 			
 		auto arraySwitch(alias sourceRange, alias targetRangeOrFunction, T = ElementType!(typeof(sourceRange)))(in T input)
@@ -2297,7 +2312,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			if(s==0) { return dstFrom; }else { return cast(T)((src-srcFrom)/s*(dstTo-dstFrom)+dstFrom); }
 		}
 		
-		//todo: Decide what to return when input is NAN. Result is now NAN.
+		//Todo: Decide what to return when input is NAN. Result is now NAN.
 		T remap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{ return clamp(remap(src, srcFrom, srcTo, dstFrom, dstTo), dstFrom, dstTo); }
 		
