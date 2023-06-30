@@ -2729,7 +2729,7 @@ struct im
 					{
 						if(res.changed)
 						{
-							//todo: These buttons ain't work with mouse. Only Enter/Esc works.
+							//Todo: These buttons ain't work with mouse. Only Enter/Esc works.
 							if(Btn(symbol("Accept"), enable(res.valid)))
 							{ actPath = *editedPath; res.editing = false; res.valid = validate(actPath); res.mustRefresh = true; focusedState.reset; }
 							if(Btn(symbol("Cancel")))
@@ -2963,7 +2963,7 @@ struct im
 			//KeyCombo in click mode.
 			static foreach(a; args)
 			static if(is(typeof(a) == KeyCombo))
-			if(a.pressed)
+			if(mainWindow.canProcessUserInput && a.pressed)
 			hit.clicked = true;
 			
 			return hit;
@@ -3229,7 +3229,7 @@ struct im
 			//KeyCombo in click mode.
 			static foreach(a; args)
 			static if(is(typeof(a) == KeyCombo))
-			if(a.pressed)
+			if(mainWindow && a.pressed)
 			hit.clicked = true;
 			
 			return hit;

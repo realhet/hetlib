@@ -13,6 +13,7 @@ version(/+$DIDE_REGION+/all)
 	enum smallSpace = "\u2008";
 	
 	__gshared size_t BitmapCacheMaxSizeBytes = 768<<20;
+	__gshared BitmapLoaderUsesTaskPool = true;
 	
 	import std.uni: isAlphaNum;
 	import core.sys.windows.windows :	HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, 
@@ -749,7 +750,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				auto bmp = startLoading(file);
 				
-				static void worker_load(Bitmap bmp/+"loading" bitmap that is holding filename to load+/)
+				static void worker_load(shared Bitmap bmp/+"loading" bitmap that is holding filename to load+/)
 				{
 					const errorHandling = ErrorHandling.ignore; //track;
 					
@@ -782,7 +783,8 @@ version(/+$DIDE_REGION+/all)
 					bitmapQuery(BitmapQueryCommand.finishWork, file, errorHandling, newBmp);
 				}
 				
-				taskPool.put(task!worker_load(bmp));
+				if(BitmapLoaderUsesTaskPool) taskPool.put(task!worker_load(cast(shared)bmp));
+				else spawn(&worker_load, cast(shared)bmp);
 				
 				return bmp; //returns a "loading" placeholder bitmap
 			}
@@ -791,25 +793,26 @@ version(/+$DIDE_REGION+/all)
 			static auto startDelayedTransformation(Bitmap originalBmp, Bitmap transformedBmp, BitmapTransformation tr)
 			{
 				
-				static void worker_transform(Bitmap originalBmp, Bitmap transformedBmp, BitmapTransformation tr)
+				static void worker_transform(shared Bitmap originalBmp, shared Bitmap transformedBmp, shared BitmapTransformation tr)
 				{
 					if(transformedBmp.removed)
 					{
 						if(log)
-						LOG("Bitmap has been removed before delayed transformation. Canceling operation.", transformedBmp);
+						LOG("Bitmap has been removed before delayed transformation. Canceling operation.", cast()transformedBmp);
 						return;
 					}
 					
 					ignoreExceptions
 					(
 						{
-							auto newBmp = tr.transform(originalBmp);
-							bitmapQuery(BitmapQueryCommand.finishTransformation, tr.transformedFile, ErrorHandling.track, newBmp);
+							auto newBmp = (cast()tr).transform(cast()originalBmp);
+							bitmapQuery(BitmapQueryCommand.finishTransformation, (cast()tr).transformedFile, ErrorHandling.track, newBmp);
 						}
 					);
 				}
 				
-				taskPool.put(task!worker_transform(originalBmp, transformedBmp, tr));
+				if(BitmapLoaderUsesTaskPool) taskPool.put(task!worker_transform(cast(shared)originalBmp, cast(shared)transformedBmp, cast(shared)tr));
+				else spawn(&worker_transform, cast(shared)originalBmp, cast(shared)transformedBmp, cast(shared)tr);
 			}
 			
 			//Loads and transforms a file, and updates the caches. Works in delayed and immediate mode.
