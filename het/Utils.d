@@ -3812,17 +3812,14 @@ version(/+$DIDE_REGION Numeric+/all)
 		auto zeroCrossings_negative	(T)(in T[] arr, T minDelta=0)
 		{ return zeroCrossings!(T, false, true)(arr, minDelta); }
 		
-		//Todo: implement mean for ranges
-		typeof(T.init/1) mean(T)(in T[] a)
-		{ return a.sum/a.length; }
 		
-		/*
-			auto auto mean(R) (R r) if(isInputRange!R && !isInfinite!R && is(typeof(r.front + r.front))){
-					}
-					
-					auto auto mean(R, E) (R r, E seed) if(isInputRange!R && !isInfinite!R && is(typeof(seed = seed + r.front))){
-					}
-		*/
+		public import std.algorithm : mean;
+		auto mean(R)(R r)
+		if(isInputRange!R && !isNumeric!(ElementType!R))
+		{
+			//Note: this version adds an automatic seed for user types: T.init
+			return std.algorithm.mean(r, ElementType!R.init);
+		}
 		
 		
 		///	returns 1.0 if all bytes are the same
