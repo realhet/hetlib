@@ -2959,6 +2959,24 @@ class Drawing
 			return (tcy>base && tcy<base+h);
 		}
 		
+		vec2 calcNearestTc(vec2 tc)
+		{
+			/*
+				sampling forrection for nearest filtering:
+				linear: the coords on the edge must fall into the center of the textels.
+				nearest: the coords on the edge must fall into the very edge the textels.
+			*/
+			
+			tc -= 0.5;tc -= stPos;tc /= stSize-1;tc *= stSize;tc += stPos;
+			return tc;
+		}
+		
+		vec2 calcLinearTc(vec2 tc)
+		{
+			tc -= 0.5;
+			return tc;
+		}
+		
 		//Todo: megatexture error: Maybe it's a fix: wiki glsl samples Non-uniform flow control !!!!!
 		
 		vec4 megaSample_nearest(vec2 tc)
@@ -3079,7 +3097,7 @@ class Drawing
 		
 		//global variables for default and custom shader
 		vec4 bkColor, fontColor;
-		vec2 tc, originalTc;
+		vec2 tc;
 		
 		bool isImage, isFont, isItalic;
 		
@@ -3091,25 +3109,26 @@ class Drawing
 		{
 			vec4 finalColor, texel;
 			
-			originalTc = tc;
-			
 			//italic
 			if(isFont && isItalic) {
 				float dy = tc.y-(stPos.y+stSize.y*0.5);
-				tc.x += dy*0.5;
+				tc.x += dy*0.5;//Bug: it alters tc!!!
 			}
 			
 			//samplingLevel : 0 = nearest, 1 = linear, 2 = rooks6, 3 = cleartype
 			int samplingLevel = 0;
+			float L = length(texelPerPixel);
 			if(isImage) {
-				samplingLevel = fontFlags & 1; //nearest or linear
-				//Todo: nearest when close and linear when far
+				if(L<=2) samplingLevel = fontFlags & 1;
+				else 
+					//nearest or linear
+					samplingLevel = 2;
+				
 			}
 			else {
-				float L = length(texelPerPixel);
 				samplingLevel = 	L>32 ? 	2: //minify
 					L< 1 ? 	1: //magnify
-						(isTransparent ? 2 : 3/*cleartype*/)/*medium zoom*/;
+					(isTransparent ? 2 : 3/*cleartype*/)/*medium zoom*/;
 			}
 			
 			if(samplingLevel==-1)
@@ -3121,8 +3140,8 @@ class Drawing
 			{
 				//nearest, linear
 				
-				if(samplingLevel==0) texel = megaSample_nearest(tc);
-				else texel = megaSample_linear(tc-vec2(0.5, 0.5));
+				if(samplingLevel==0) texel = megaSample_nearest(calcNearestTc(tc));
+				else texel = megaSample_linear(calcLinearTc(tc));
 				
 				if(stConfig==8)	finalColor = vec4(texel.rgb, fontColor.a);
 				else if(stConfig==12)
@@ -3173,9 +3192,6 @@ class Drawing
 				if(stConfig==12) finalColor = clearTypeMix(bkColor, vec4(smp, fontColor.a), alpha);
 				else if(stConfig==0) finalColor = clearTypeMix(bkColor, fontColor             , alpha); //FONT
 			}
-			
-			//border
-			//if(isFont) finalColor = applyBorder(finalColor, originalTc, 4);
 			
 			return finalColor;
 		}
