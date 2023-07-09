@@ -2794,9 +2794,15 @@ version(/+$DIDE_REGION Numeric+/all)
 	}version(/+$DIDE_REGION+/all) {
 		
 		bool addIfCan(T)(ref T[] arr, in T item)
-		{ if(!arr.canFind(item)) { arr ~= item; return true; }else return false; }
+		{ if(arr.countUntil(item)<0) { arr ~= item; return true; }else return false; }
 		bool addIfCan(T)(ref T[] arr, in T[] items)
 		{ bool res; foreach(const item; items) if(arr.addIfCan(item)) res = true; return res; }
+		
+		bool toggle(T)(ref T[] arr, in T item)
+		{
+			const idx = arr.countUntil(item);
+			if(idx<0) { arr ~= item; return true; }else { arr = arr.remove(idx); return false; }
+		}
 		
 		deprecated("fetchFirst, not popFirst!")
 		{
