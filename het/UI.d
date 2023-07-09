@@ -987,6 +987,8 @@ struct im
 			//called from end of update
 			//PING(6);
 			
+			updateFlashMessages_internal_onEndFrame;
+			
 			static if(doTiming)
 			{ const T0 = QPS; scope(exit) tEndFrame = QPS-T0; }
 			
@@ -3025,7 +3027,7 @@ struct im
 		auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum))
 		{
 			string s = e.text;
-			auto res = BtnRow!(srcModule, srcLine)(s, getEnumMembers!E, args);
+			auto res = BtnRow!(srcModule, srcLine)(s, EnumMemberNames!E, args);
 			if(res)
 			ignoreExceptions({ e = s.to!E; });
 			return res;
@@ -4569,5 +4571,104 @@ struct im
 			);
 		}
 		
+	}version(/+$DIDE_REGION Flash meggages+/all)
+	{
+		///Brings up an error message on the center of the screen for a short duration
+		struct FlashMessage {
+			DateTime when;
+			enum Type { info, warning, error }
+			Type type;
+			string msg;
+			
+			RGB color()
+			{
+				with(Type)
+				final switch(type)
+				{
+					case info: 	return clWhite;
+					case warning: 	return clYellow;
+					case error:	return clRed;
+				}
+				
+			}
+		}
+		
+		FlashMessage[] flashMessages;
+		
+		void flashMessage(FlashMessage.Type type, string msg)
+		{
+			if(msg=="") return;
+			//Todo: implement flashing error UI
+			enum maxLen = 10;
+			if(flashMessages.length>maxLen)
+			flashMessages = flashMessages[$-maxLen..$];
+			flashMessages ~= FlashMessage(now, type, msg);
+			
+			with(FlashMessage.Type)
+			final switch(type)
+			{
+				case error:	winSnd("Windows Critical Stop");	break;
+				case warning:	winSnd("Windows Default");	break;
+				case info: 	winSnd("Windows Information Bar");	
+			}
+		}
+		
+		void flashInfo(string msg)
+		{ flashMessage(FlashMessage.Type.info, msg); }
+		
+		void flashWarning(string msg)
+		{ flashMessage(FlashMessage.Type.warning, msg); }
+		
+		void flashError(string msg)
+		{ flashMessage(FlashMessage.Type.error, msg); }
+		
+		enum flashMessageDuration = 4*second;
+		
+		private bool flashMessagesInvoked;
+		
+		private void updateFlashMessages_internal_onEndFrame()
+		{
+			const t = now-flashMessageDuration;
+			flashMessages = flashMessages.remove!(a => a.when<t);
+			
+			if(!flashMessagesInvoked)
+			UI_FlashMessages;
+			flashMessagesInvoked = false;
+		}
+		
+		void UI_FlashMessages()
+		{
+			flashMessagesInvoked = true;
+			//Note: User can call it wherever, but if not, it will drawn automatically.
+			with(im) {
+				if(flashMessages.empty) return;
+				Panel(
+					PanelPosition.bottomCenter, 
+					{
+						bkColor = clWhite;
+						style.bold = true;
+						foreach(m; flashMessages)
+						Row(
+							{
+								style.bkColor = m.color;
+								style.fontColor = blackOrWhiteFor(style.bkColor);
+								
+								if(m.type == FlashMessage.Type.error)
+								style.fontColor = mix(style.fontColor, style.bkColor, blink^^2);
+								
+								padding = "4 24";
+								flags.hAlign = HAlign.center;
+								const 	tIn = (now-m.when).value(.5f*second),
+									tOut = (m.when+flashMessageDuration-now).value(.25f*second);
+								
+								fh = DefaultFontHeight*2 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
+									* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1);
+								Text(m.msg);
+							}
+						);
+					}
+				);
+			}
+		}
 	}
 }

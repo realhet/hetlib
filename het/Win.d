@@ -918,9 +918,10 @@ class Window
 	bool isSizingMoving()
 	{ return _isSizingMoving; }
 	
-	bool isMouseInside() {
+	bool isMouseInside()
+	{
 		if(isSizingMoving || isHidden) return false;
-		return clientBounds.contains!"[)"(inputs.mouseAct);
+		return clientBounds.contains!"[)"(screenToClient(inputs.mouseAct));
 	}
 	
 	bool canProcessUserInput()
@@ -961,7 +962,10 @@ class Window
 	RECT clientRect()
 	{ RECT r; GetClientRect(hwnd, &r); return r; }
 	auto clientBounds()
-	{ with(clientRect) return ibounds2(left, top, right, bottom); }
+	{
+		//Note: the topleft is always 0,0.  Use clientToScreen on this to get the client bounds in screenSpace.
+		with(clientRect) return ibounds2(left, top, right, bottom);
+	}
 	
 	@property auto clientSize()
 	{ return clientBounds.size; }
@@ -988,12 +992,12 @@ class Window
 	{ return clientSize.y; }
 	
 	//matches both error! Bounds2f clientBounds() { with(clientRect) return Bounds2f(left, top, right, bottom); }
-	auto screenPos()
+	auto _clientToScreenOfs()
 	{ ivec2 p;MapWindowPoints(hwnd, null, cast(LPPOINT)&p, 1);return p; }
 	auto screenToClient(T)(in T p)
-	{ return p-screenPos; }
+	{ return p-_clientToScreenOfs; }
 	auto clientToScreen(T)(in T p)
-	{ return p+screenPos; }
+	{ return p+_clientToScreenOfs; }
 	
 	void invalidate()
 	{
