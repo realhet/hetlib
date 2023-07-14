@@ -4522,6 +4522,7 @@ version(/+$DIDE_REGION+/all)
 		{ hoveredItem = null; }
 		
 		T[] delegate() onBringToFront; //Use bringSelectedItemsToFront() for default behavior
+		bool deselectBelow;
 		
 		void update(bool mouseEnabled, View2D view, T[] items)
 		{
@@ -4587,6 +4588,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						if(!hoveredItem.isSelected) selectHoveredOnly;
 						mouseOp = MouseOp.move;
+						if(deselectBelow) .deselectBelow(items, hoveredItem);
 						if(onBringToFront) items = onBringToFront();
 					}
 					if(modShift || modCtrl || modShiftCtrl)
@@ -4665,5 +4667,22 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		return chain(unselectedItems, selectedItems).array;
+	}
+	
+	void deselectBelow(T)(T[] items, T actItem)
+	{
+		foreach(i, p; items) p.zIndex = cast(int) i;
+		
+		void doit(T actItem)
+		{
+			foreach(item; items)
+			if(item.isSelected && (item.zIndex < actItem.zIndex) && item.outerBounds.overlaps(actItem.outerBounds))
+			{
+				item.isSelected = false;
+				doit(item);
+			}
+		}
+		
+		doit(actItem);
 	}
 }

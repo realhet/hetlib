@@ -3203,10 +3203,12 @@ version(/+$DIDE_REGION Numeric+/all)
 			ulong random(ulong n)
 			{
 				if(n<=0xFFFF_FFFF) return random(cast(uint)n);
-						
 				return (ulong(randomUint)<<32 | randomUint)%n; //terribly slow
 			}
-					
+			
+			auto randomElement(T)(T t)
+			{ return t[random(t.length)]; }
+			
 			auto randomGaussPair()
 			{
 				float x1, x2, w;
@@ -3254,6 +3256,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ return defaultRng.random(n); }
 		ulong random(ulong n)
 		{ return defaultRng.random(n); }
+		auto randomElement(T)(T t)
+		{ return defaultRng.randomElement(t); }
 		uint randomUint()
 		{ return defaultRng.randomUint; }
 		uint randomInt()
@@ -8951,6 +8955,31 @@ version(/+$DIDE_REGION Date Time+/all)
 					
 			return res;
 		}
+		
+		void unzip(ubyte[] zipData, void delegate(string, lazy ubyte[]) fun)
+		{
+			import std.zip;
+			auto zip = scoped!ZipArchive(zipData);
+			foreach(member; zip.directory)
+			fun(member.name, cast(ubyte[])zip.expand(member));
+		}
+		
+		void unzip(ubyte[] zipData, string filter, string prefix)
+		{
+			zipData.unzip(
+				(string name, lazy ubyte[] data)
+				{
+					if(name.isWild(filter))
+					{
+						auto outFile = File(prefix~name);
+						outFile.write(data);
+					}
+				}
+			);
+		}
+		
+		void unzip(ubyte[] zipData, string prefix)
+		{ zipData.unzip("*", prefix); }
 	}version(/+$DIDE_REGION Virtual files+/all)
 	{
 		///  Virtual files //////////////////////////////////////////////

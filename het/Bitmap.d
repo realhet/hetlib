@@ -357,7 +357,7 @@ version(/+$DIDE_REGION+/all)
 		Bitmap virtualBitmap(string name)
 		{
 			//Just forward it to the fileSystem, that will handle the 'virtual:\' prefix.
-			return File(name).deserialize!Bitmap(true);
+			return File(`virtual:\` ~ name).deserialize!Bitmap(true);
 			
 			//Todo: this forwarding should only be don inside the filesystem.
 		}
