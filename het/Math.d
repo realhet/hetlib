@@ -3574,15 +3574,14 @@ version(/+$DIDE_REGION+/all)
 					 *		 Use calcAnimationT() to calculate it from deltaTime.
 					 *      snapDistance =	 Below this distance, act will immediatelly snap to target.
 					 *
-					 * Returns:	            True if the act is still not reached target, so more animation
-					 *	            frames will needed in the future.
+					 * Returns:	            True if the act reached the target
 					 *
 					 * See_Also:            calcAnimationT
 		*/
 		
 		bool follow(A)(ref A act, in A target, float t, float snapDistance)
 		{
-			if(act==target) return false; //fast path, nothing to do
+			if(act==target) return true; //fast path, nothing to do
 					
 			static if(isFloatingPoint!A)
 			{
@@ -3590,14 +3589,14 @@ version(/+$DIDE_REGION+/all)
 				auto last = act;
 				act = mix(act, target, t);
 				if(absDiff(act, target) <= snapDistance) act = target;
-				return act != last;
+				return act == target;
 			}
 			else static if(isVector!A)
 			{
 				//vector, including colors. Works with RGB(ubyte) too because absDiff
-				bool res;
+				bool res = true;
 				static foreach(i; 0..A.length) {
-					if(follow(act[i], target[i], t, snapDistance)) res |= true;
+					if(!follow(act[i], target[i], t, snapDistance)) res = false;
 					//no escape here, must do all the interpolations!
 				}
 				return res;

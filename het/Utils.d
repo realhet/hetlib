@@ -3238,7 +3238,14 @@ version(/+$DIDE_REGION Numeric+/all)
 				randomFill(values);
 				seed = oldSeed;
 			}
-					
+			
+			T[] randomShuffle(T)(T[] arr)
+			{
+				auto idx = iota(arr.length).array;
+				foreach(i; 0..idx.length) swap(idx[i], idx[random(idx.length)]);
+				return idx.map!(i=>arr[i]).array;
+			}
+			
 			//not good: disables default constructor. int opCall(int max){ return random(max); }
 		}
 		
@@ -3272,6 +3279,10 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ defaultRng.randomFill(values); }
 		void randomFill(uint[] values, uint customSeed)
 		{ defaultRng.randomFill(values, customSeed); }
+		T[] randomShuffle(T)(T[] arr)
+		{
+			return defaultRng.randomShuffle(arr);
+		}
 		
 		
 		/+
