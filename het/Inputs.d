@@ -35,9 +35,9 @@ version(/+$DIDE_REGION+/all)
 		
 	+/
 	
-	//TODO: atnevezni het.inputs-ra;
-	//TODO: tesztelni, hogy 'F5' es 'Shift F5' jol mukodik-e egyutt.
-	//TODO: improve mousewheel precision: it is only giving 1's and 2's on 60FPS.
+	//Todo: atnevezni het.inputs-ra;
+	//Todo: tesztelni, hogy 'F5' es 'Shift F5' jol mukodik-e egyutt.
+	//Todo: improve mousewheel precision: it is only giving 1's and 2's on 60FPS.
 	
 	import het.utils,
 	core.sys.windows.windows, core.sys.windows.winuser, std.json;
@@ -53,7 +53,7 @@ version(/+$DIDE_REGION+/all)
 	void spiGetKeyboardDelays(ref Time d1, ref Time d2)
 	{
 		//Gets windows keyboard delays in seconds
-		//note: The query takes 6microsecs only, so it can go into the update loop
+		//Note: The query takes 6microsecs only, so it can go into the update loop
 		int val;
 		
 		SystemParametersInfoW(SPI_GETKEYBOARDDELAY, 0, &val, 0);
@@ -149,7 +149,7 @@ version(/+$DIDE_REGION+/all)
 	{
 		 //ClickDetector ///////////////////////////////
 		
-		enum doubleDuration	= .25f	* second,   //todo: use winuser.GetDoubleClickTime()
+		enum doubleDuration	= .25f	* second,   //Todo: use winuser.GetDoubleClickTime()
 				 longDuration	= .5f	* second;
 		
 		bool pressing, pressed, released;
@@ -270,11 +270,13 @@ version(/+$DIDE_REGION+/all)
 		) return key[1..$];
 		return key;
 	}
+	
+	
 	
 	struct KeyComboEntry
 	{
 		//a single keycombo like F1, LShift+RShift, Ctrl+Alt, Ctrl+Num+, Ctrl+K+U
-		//todo: Ctrl+KU is sequential!
+		//Todo: Ctrl+KU is sequential!
 		string[] keys;
 		
 		this(string s)
@@ -348,12 +350,12 @@ version(/+$DIDE_REGION+/all)
 	void callVerbs(T)(T a)
 	{
 		///calls all member functions marked with VERB, that has a pressed KeyCombo
-		//todo: hova a faszba rakjam ezt...
+		//Todo: hova a faszba rakjam ezt...
 		static foreach(Member; getSymbolsByUDA!(T, VERB))
 		{
 			{
 				enum verb = getUDA!(Member, VERB);
-				//note: het.utils.getUDA will not fail with @VERB too, which is a type, not a VERB value.
+				//Note: het.utils.getUDA will not fail with @VERB too, which is a type, not a VERB value.
 				
 				 static if(verb.keyCombo!="")
 				{
@@ -368,7 +370,7 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		/+
-			note: this version fails with overloaded parameters!
+			Note: this version fails with overloaded parameters!
 				//class C{
 				//	 void openFile(string fn){ } //<- because of this
 				//	 @VERB("Alt+F4") void closeApp		 (){ }
@@ -390,7 +392,7 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	/+
-		TODO: az egerklikkeles (pressed) csak akkor megy at, 
+		Todo: az egerklikkeles (pressed) csak akkor megy at, 
 		ha az update interval rovidebb volt a klikkeles hosszanal. Ezt valahogy javitani.
 	+/
 	
@@ -511,7 +513,7 @@ version(/+$DIDE_REGION+/all)
 			{ throw new Exception("InputManager: "~s); }
 			
 			Time now; //local fast time in seconds
-			//todo: replace this with DateTime and prioper seconds handling.
+			//Todo: replace this with DateTime and prioper seconds handling.
 		}
 		
 		InputHandlerBase[string] handlers;
@@ -571,7 +573,7 @@ version(/+$DIDE_REGION+/all)
 			foreach(h; handlers) h.update;
 			
 			spiGetKeyboardDelays(repeatDelay1, repeatDelay2);
-			//todo: this is only needed once a sec, dunno how slow it is.
+			//Todo: this is only needed once a sec, dunno how slow it is.
 			
 			mouseSpeed = spiGetMouseSpeed;
 			mouseThresholds = spiGetMouse;
@@ -588,12 +590,12 @@ version(/+$DIDE_REGION+/all)
 		
 		auto opIndex(string name)
 		{
-			 //todo: this should be const. And there should be access(name) which has read/write access.
+			 //Todo: this should be const. And there should be access(name) which has read/write access.
 			
 			struct InpitEntryWrapper
 			{
 				/+
-					note: this wrapper is needed for opCast!(bool) to work properly.
+					Note: this wrapper is needed for opCast!(bool) to work properly.
 								For classes, D doesn't call opCast, it checks the pointer.
 				+/
 				alias entry this;
@@ -680,7 +682,7 @@ version(/+$DIDE_REGION+/all)
 		private
 		{
 			
-			//todo: use KeyCombo struct!
+			//Todo: use KeyCombo struct!
 			enum QueryMode { Active, Pressed, Typed }
 			bool _query(string keys, QueryMode mode)
 			{
@@ -705,8 +707,8 @@ version(/+$DIDE_REGION+/all)
 				final switch(mode)
 				{
 					case QueryMode.Active:	return true;
-					case QueryMode.Pressed:	return this[keyList[$-1]].pressed;	//todo: wrong
-					case QueryMode.Typed:	return this[keyList[$-1]].repeated;	//todo: wrong
+					case QueryMode.Pressed:	return this[keyList[$-1]].pressed;	//Todo: wrong
+					case QueryMode.Typed:	return this[keyList[$-1]].repeated;	//Todo: wrong
 					//case QueryMode.Released:return this[k[$-1]].released; //todo: wrong
 				}
 			}
@@ -750,7 +752,7 @@ version(/+$DIDE_REGION+/all)
 				VK_LBUTTON, VK_RBUTTON, VK_MBUTTON,
 				VK_XBUTTON1, VK_XBUTTON2
 			)>0;
-		}//todo: these are slow...
+		}//Todo: these are slow...
 		static bool isExtendedKey(int vk)
 		{
 			return vk.among(
@@ -760,7 +762,7 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		bool isMouseBtn(string key)
-		{ return isMouseBtn(strToVk(key)); } //todo: these are slow...
+		{ return isMouseBtn(strToVk(key)); } //Todo: these are slow...
 		
 		void pressKey(ubyte vk, bool press=true)
 		{
@@ -836,8 +838,8 @@ version(/+$DIDE_REGION+/all)
 		{
 			with(KeyComboEntry(combo))
 			{
-				//todo: release already pressed modifiers
-				//todo: delays between presses
+				//Todo: release already pressed modifiers
+				//Todo: delays between presses
 				if(keys.length) {
 					foreach(mod; keys[0..$-1]) pressKey(mod);
 					clickKey(keys.back);
@@ -848,8 +850,8 @@ version(/+$DIDE_REGION+/all)
 		
 		void typeKey(string key)
 		{
-			//todo: accent handling
-			//todo: shift symbol handling
+			//Todo: accent handling
+			//Todo: shift symbol handling
 			const needShift = 	key.length==1 && 
 				(
 				key[0].isLetter && 
@@ -882,7 +884,7 @@ version(/+$DIDE_REGION+/all)
 			keymap[VK_CONTROL] = altGr ? 0xff : 0;
 			keymap[VK_MENU   ] = altGr ? 0xff : 0;
 			
-			wchar[32] buf;
+			wchar[256] buf;
 			const res = ToUnicode(vk, 0, keymap.ptr, buf.ptr, buf.length, 0);
 			if(res!=1) return "";//"\uFFFD";
 			return buf.toStr;
@@ -898,7 +900,7 @@ version(/+$DIDE_REGION+/all)
 		//this version uses the current keystate
 		string vkToUni(ubyte vk)
 		{
-			wchar[32] buf;
+			wchar[256] buf;
 			const res = ToUnicode(vk, 0, keyboardInputHandler.keys.ptr, buf.ptr, buf.length, 0);
 			if(res!=1) return "";//"\uFFFD";
 			return buf.toStr;
@@ -914,8 +916,8 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(active)
 			{
-				 //todo: at kene terni tick-re...
-				//note: 'now' is saved in every update cycle. That's why this fucnt is not static.
+				 //Todo: at kene terni tick-re...
+				//Note: 'now' is saved in every update cycle. That's why this fucnt is not static.
 				if(pressed) {
 					repeatNextTime = now+repeatDelay1;
 					return true;
@@ -1975,7 +1977,7 @@ version(/+$DIDE_REGION+/all)
 			int 	actAbxyState, lastAbxyState,	//current and last state of ABXY buttons
 			processedAbxyState, abxyPhase, 	//latched state after the delay
 			summedAbxyState	/+for small clicks+/;
-			enum abxyDelay = 10; //todo: It is 60 FPS based, not time based
+			enum abxyDelay = 10; //Todo: It is 60 FPS based, not time based
 		
 			void addButton(int idx, string name)
 		{
@@ -2028,7 +2030,7 @@ version(/+$DIDE_REGION+/all)
 			//this hack gets the guide button state.
 			bool guideButtonState;
 			static if(1) {
-				//todo: guide button poller: https://forums.tigsource.com/index.php?topic=26792.0
+				//Todo: guide button poller: https://forums.tigsource.com/index.php?topic=26792.0
 					//LoadLibrary("C:/Windows/System32/xinput1_3.dll");
 					//Get the address of ordinal 100.
 				struct SecretStruct
@@ -2062,7 +2064,7 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 			
-			//todo: get all the states from xinput1_3, not just the guide button
+			//Todo: get all the states from xinput1_3, not just the guide button
 			
 			guideButton.value = guideButtonState ? 1 : 0;
 			
@@ -2116,7 +2118,7 @@ version(/+$DIDE_REGION+/all)
 {
 	struct Action
 	{
-		  //todo: this is kinda deprecated: the new thing is MenuItem/KeyCombo.
+		  //Todo: this is kinda deprecated: the new thing is MenuItem/KeyCombo.
 		private:
 		//these fields are specified from the constructors
 			ActionGroup* group;
@@ -2418,21 +2420,121 @@ version(/+$DIDE_REGION+/all)
 	
 	version(/+$DIDE_REGION Keyboard/Mouse hooks+/all)
 	{
-		//todo: which is faster?	import core.sys.windows.windows;  or
+		//Todo: which is faster?	import core.sys.windows.windows;  or
 		import core.sys.windows.windef, core.sys.windows.winuser, core.sys.windows.winbase;
 		
+		bool hookedKeyboardLog = false;
+		bool hookedMouseLog = false;
+		
+		bool[0x100] hookedKeyboardState;
+		ivec2 hookedMousePos;
+		int hookedMouseWheelAbs;
+		private int _hookedMouseWheelDelta;
+		
+		enum HookedLogAccess { peek, fetch, _update }
+		
+		struct KBMLogItem
+		{
+			DateTime when;
+			string[] keys;
+			ivec2 mousePos;
+			int wheelDelta;
+		}
+		
+		auto kbmHookLog(HookedLogAccess access = HookedLogAccess.fetch)
+		{
+			synchronized
+			{
+				__gshared KBMLogItem[] items;
+				__gshared bool[0x100] lastState;
+				
+				auto encodeVkState(ref bool[0x100] arr)
+				{
+					auto codeToStr(size_t code)
+					{
+						auto s = inputs.vkToStr(cast(ubyte)code);
+						
+						//try to add localized chars
+						if(s.length==1)
+						{
+							auto s2 = inputs.vkToUni(cast(ubyte)code);
+							if(s2!="" && s2[0]>' ' && s2!=s) s = s~" "~s2;
+						}
+						
+						if(s.empty) s = code.format!"code(%d)";
+						return s;
+					}
+					
+					bool lessThan(string a, string b)
+					{
+						char code(string s)
+						{
+							if(s.endsWith("Ctrl")) return '1';
+							if(s.endsWith("Alt")) return '2';
+							if(s.endsWith("Win")) return '3';
+							if(s.endsWith("Shift")) return '4';
+							if(s.among("LMB", "RMB", "MMB", "MB4", "MB5")) return '6';
+							return '5';
+						}
+						
+						return code(a)~a < code(b)~b;
+					}
+					
+					return arr[]	.enumerate
+						.filter!"a.value"
+						.map!(a=>codeToStr(a.index))
+						.array.sort!((a,b)=>lessThan(a,b)).array;
+				}
+				
+				auto res = items;
+				
+				final switch(access)
+				{
+					case HookedLogAccess.peek:
+					break;
+					
+					case HookedLogAccess.fetch:
+					{ items = []; }
+					break;
+					
+					case HookedLogAccess._update:
+					{
+						if(
+							true 
+							/+Always update, it can be a repeated key too!!!+/
+							/+!equal(lastState[], hookedKeyboardState[])+/
+						)
+						{
+							items ~= KBMLogItem(now, encodeVkState(hookedKeyboardState), hookedMousePos, _hookedMouseWheelDelta);
+							lastState = hookedKeyboardState;
+						}
+					}
+					break;
+				}
+				
+				return res;
+			}
+		}
+		
+		void kbmHookLogUpdate()
+		{ kbmHookLog(HookedLogAccess._update); }
+		
 		extern(Windows) LRESULT LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) nothrow
 		{
-			bool log = 1;
+			const log = hookedKeyboardLog;
 			try {
-				if(wParam==WM_KEYDOWN)
+				if(wParam.among(WM_KEYDOWN, WM_SYSKEYDOWN))
 				{
 					auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam;
+					hookedKeyboardState[cast(ubyte)(pKeyBoard.vkCode)] = true;
+					kbmHookLogUpdate;
 					if(log) writeln("down", pKeyBoard.vkCode);
 				}
-				else if(wParam==WM_KEYUP)
+				else if(wParam.among(WM_KEYUP, WM_SYSKEYUP))
 				{
 					auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam;
+					hookedKeyboardState[cast(ubyte)(pKeyBoard.vkCode)] = false;
+					kbmHookLogUpdate;
 					if(log) writeln("up", pKeyBoard.vkCode);
 				}
 				else
@@ -2445,27 +2547,49 @@ version(/+$DIDE_REGION+/all)
 		
 		auto installGlobalKeyboardHook()
 		{
-			auto a = SetWindowsHookEx(WH_KEYBOARD_LL, &LowLevelKeyboardProc, GetModuleHandle(null), 0);
-			if(!a) writeln("fail:k0");
-			return a;
+			return SetWindowsHookEx(WH_KEYBOARD_LL, &LowLevelKeyboardProc, GetModuleHandle(null), 0)
+			.enforce("Unable to install GlobalKeyboardHook");
 		}
 		
 		extern(Windows) LRESULT LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) nothrow
 		{
 			try
 			{
-				bool log = false;
+				const log = hookedMouseLog;
 				const hs = cast(MSLLHOOKSTRUCT*)lParam;
+				
+				void press(ubyte vk, bool st)
+				{
+					hookedKeyboardState[vk] = st;
+					kbmHookLogUpdate;
+				}
+				
+				ubyte XBUTTON()
+				{ return hs.mouseData>>16 ==XBUTTON2 ? VK_XBUTTON2 : VK_XBUTTON1; }
+				
 				if(hs) {
-					switch(wParam) {
-						case WM_LBUTTONDOWN: break;
-						case WM_LBUTTONUP: break;
-						case WM_MOUSEMOVE: break;
-						case WM_MOUSEWHEEL: break;
-						case WM_RBUTTONDOWN: break;
-						case WM_RBUTTONUP: break;
-						default: break;
+					switch(wParam)
+					{
+						case WM_LBUTTONDOWN:	press(VK_LBUTTON, 1);	break;
+						case WM_LBUTTONUP:	press(VK_LBUTTON, 0);	break;
+						case WM_RBUTTONDOWN:	press(VK_RBUTTON, 1);	break;
+						case WM_RBUTTONUP:	press(VK_RBUTTON, 0);	break;
+						case WM_MBUTTONDOWN:	press(VK_MBUTTON, 1);	break;
+						case WM_MBUTTONUP:	press(VK_MBUTTON, 0);	break;
+						case 	WM_XBUTTONDOWN,
+							WM_NCXBUTTONDOWN:	press(XBUTTON, 1);	break;
+						case 	WM_XBUTTONUP,
+							WM_NCXBUTTONUP:	press(XBUTTON, 0);	break;
+						case WM_MOUSEWHEEL:	{
+							_hookedMouseWheelDelta = ((cast(int)hs.mouseData)/(WHEEL_DELTA<<16));
+							hookedMouseWheelAbs += _hookedMouseWheelDelta;
+							kbmHookLogUpdate;
+							_hookedMouseWheelDelta = 0;
+						}	break;
+						case WM_MOUSEMOVE:		break;
+						default:		break;
 					}
+					with(hs.pt) hookedMousePos = ivec2(x, y);
 					if(log) print("mouse:", nCode, wParam, *hs);
 				}
 			}
@@ -2476,9 +2600,8 @@ version(/+$DIDE_REGION+/all)
 		
 		auto installGlobalMouseHook()
 		{
-			auto a = SetWindowsHookEx(WH_MOUSE_LL, &LowLevelMouseProc, GetModuleHandle(null), 0);
-			if(!a) writeln("fail:k0");
-			return a;
+			return SetWindowsHookEx(WH_MOUSE_LL, &LowLevelMouseProc, GetModuleHandle(null), 0)
+			.enforce("Unable to install GlobalMouseHook");
 		}
 		
 	}

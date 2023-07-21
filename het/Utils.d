@@ -3280,9 +3280,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		void randomFill(uint[] values, uint customSeed)
 		{ defaultRng.randomFill(values, customSeed); }
 		T[] randomShuffle(T)(T[] arr)
-		{
-			return defaultRng.randomShuffle(arr);
-		}
+		{ return defaultRng.randomShuffle(arr); }
 		
 		
 		/+
@@ -7748,21 +7746,21 @@ version(/+$DIDE_REGION Date Time+/all)
 		auto by(in DateTime begin, in Frequency f)
 		{ return begin.by(1/f); }
 		
-		bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(float periodLength_sec, size_t hash=0)
+		bool PERIODIC(string moduleName=__MODULE__, size_t moduleLine=__LINE__)(Time periodLength, size_t hash=0)
 		{
-			//Todo: use quantities.Time
 			enum staticHash = hashOf(moduleName, moduleLine);
 			hash ^= staticHash;
-					
+			
 			static DeltaTimer[size_t] timers;
-					
+			
 			auto a = hash in timers;
 			if(!a) {
 				timers[hash] = DeltaTimer.init;
 				a = hash in timers;
 			}
-					
-			return a.update_periodic(periodLength_sec, false); //Todo: result should be an int counting how many updates missed since last time
+			
+			return a.update_periodic(periodLength.value(second), false);
+			//Todo: result should be an int counting how many updates missed since last time
 		}
 		
 		auto blinkf(float freq=3)
@@ -8248,13 +8246,28 @@ version(/+$DIDE_REGION Date Time+/all)
 			return Path(s);
 		}
 		
-		Path programFilesPath32() { static __gshared Path s; if(!s) { s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles(x86)", `c:\program Files(x86)\`))); } return s; }
-		Path programFilesPath64() { static __gshared Path s; if(!s) { s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles"     , `c:\program Files\`     ))); } return s; }
+		Path programFilesPath32() { __gshared Path s; if(!s) { s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles(x86)", `c:\Program Files(x86)\`))); } return s; }
+		Path programFilesPath64() { __gshared Path s; if(!s) { s = Path(includeTrailingPathDelimiter(environment.get("ProgramFiles"     , `c:\Program Files\`     ))); } return s; }
 		
 		Path programFilesPath() {
 			version(Win32) return programFilesPath32;
 			version(Win64) return programFilesPath64;
 		}
+		
+		import core.sys.windows.shlobj;
+		
+		Path knownPath(int CSIDL)()
+		{
+			__gshared Path p; 
+			if(!p) {
+				wchar[MAX_PATH ] szPath;
+				if(S_OK==SHGetFolderPath(null, CSIDL_APPDATA, null, 0, szPath.ptr))
+				p = Path(szPath.toStr);
+			}
+			return p;
+		}
+		
+		alias appDataPath = knownPath!CSIDL_APPDATA;
 		
 	}struct File
 	{

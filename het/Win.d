@@ -972,7 +972,7 @@ class Window
 	@property void clientSize(in ivec2 newSize)
 	{
 		auto r = RECT(0, 0, newSize.x, newSize.y);
-		AdjustWindowRect(&r, getWindowStyle, false);
+		AdjustWindowRectEx(&r, getWindowStyle, false, getWindowStyleEx);
 		
 		auto adjustedSize = ivec2(r.right-r.left, r.bottom-r.top);
 		SetWindowPos(
@@ -1076,6 +1076,35 @@ class Window
 	void onSwapBuffers()
 	{
 		 //for opengl. the latest step with the optional sleep
+	}
+	
+	void offscreenPaint(void delegate() fun)
+	{
+		/+
+			Paint into an offscreen GDI bitmap to avoid flicker.
+			Because WS_LAYERED+WS_COMPOSITE is too slow, sometimes it has 0.5 lags.
+			/+Link: https://learn.microsoft.com/en-us/previous-versions/ms969905(v=msdn.10)?redirectedfrom=MSDN+/
+		+/
+		
+		HANDLE hdcMem, hbmMem, hbmOld, hdcOld;
+		
+		RECT rc;GetClientRect(hwnd, &rc);
+		hdcMem = CreateCompatibleDC(hdc);
+		hbmMem = CreateCompatibleBitmap(hdc, rc.right-rc.left, rc.bottom-rc.top);
+		hbmOld = SelectObject(hdcMem, hbmMem);
+		hdcOld = this.fhdc;
+		this.fhdc = hdcMem;
+		
+		scope(exit)
+		{
+			this.fhdc = hdcOld;
+			BitBlt(hdc, rc.left, rc.top, rc.right-rc.left, rc.bottom-rc.top, hdcMem, 0, 0, SRCCOPY);
+			SelectObject(hdcMem, hbmOld);
+			DeleteObject(hbmMem);
+			DeleteDC(hdcMem);
+		}
+		
+		fun();
 	}
 	
 	////////////////////////////////////////////////////////////////////////////////
@@ -1270,6 +1299,6 @@ class Window
 			if(autoUpdate) invalidate;
 		*/
 	}
-	
+	
 	
 }

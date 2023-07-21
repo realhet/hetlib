@@ -3200,7 +3200,7 @@ version(/+$DIDE_REGION+/all)
 			//cyclic (wrapped) modulo for ints
 			return generateVector!(
 				CommonScalarType!(A, B),
-								(a, b) => a>=0 ? a%b : b-1+(a+1)%b
+				(a, b) => a>=0 ? a%b : b-1+(a+1)%b
 			)(a, b);
 		}
 		
