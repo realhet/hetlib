@@ -271,6 +271,16 @@ version(/+$DIDE_REGION+/all)
 		return key;
 	}
 	
+	string keyWithoutLR(string k)
+	{
+		if(k.length && k[0].among('L', 'R'))
+		{
+			const simple = k[1..$];
+			if(keyModifiers.canFind(simple)) return simple;
+		}
+		return k;
+	}
+	
 	
 	
 	struct KeyComboEntry

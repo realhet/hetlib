@@ -78,7 +78,7 @@ version(/+$DIDE_REGION+/all)
 		p.unit	    = getUDA!(f, UNIT   ).text;
 		p.range	    = getUDA!(f, RANGE);
 		p.indent	    = hasUDA!(f, INDENT);
-		p.choices	    = getEnumMembers!T;
+		p.choices	    = EnumMemberNames!T;
 		
 		return p;
 	}

@@ -2,6 +2,8 @@ module het.debugclient;/+DIDE+/
 
 import het.utils, core.sys.windows.windows, std.regex, std.demangle;
 
+//Note: LLVM debugging: https://llvm.org/docs/SourceLevelDebugging.html
+
 //LOGGER /////////////////////////////////////////////////////////////
 
 __gshared int

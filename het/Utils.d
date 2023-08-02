@@ -940,6 +940,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 		}
 		
+		//Todo: process snapshots : https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes?redirectedfrom=MSDN
+		
 		int spawnProcessMulti(const string[][] cmdLines, const string[string] env, out string[] sOutput, void delegate(int i) onProgress = null)
 		{
 			//it was developed for running multiple compiler instances.
@@ -2653,6 +2655,16 @@ version(/+$DIDE_REGION Numeric+/all)
 			return res;
 		}
 		
+		string fetchStringZ(T)(ref T[] arr)
+		{
+			static assert(T.sizeof==1);
+			const len = arr.countUntil(0);
+			enforce(len>=0, "Unable to fetch zero terminated string. Run out of buffer.");
+			auto res = cast(string)arr.fetchFrontN(len);
+			arr.fetchFront; //fetch the zero
+			return res;
+		}
+		
 		auto fetchBack(T)(ref T arr, lazy ElementType!T def = ElementType!T.init)
 		{
 			static if(isInputRange!T)
@@ -2898,6 +2910,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		T stRead(T)(ref ubyte[] st)
 		{
 			auto siz = T.sizeof;
+			enforce(st.length >= siz, "stRead: Out of stream.");
 			auto res = (cast(T[])st[0..siz])[0];
 			st = st[siz..$];
 			return res;
@@ -6066,7 +6079,44 @@ version(/+$DIDE_REGION Containers+/all)
 			s = format!"%.1f"(n*divFactor!4);	if(s.length<=3) return s~spacing~'T';
 			s = format!"%.0f"(n*divFactor!4);		return s~spacing~'T';
 		}
-			
+		
+		string shortDurationText(Time t)
+		{
+			if(!t) return "";
+			if(t<0*second) return "-" ~ shortDurationText(-t);
+			if(t<1000*nano(second)) return siFormat("%.0f ns", t);
+			if(t<1000*micro(second)) return siFormat("%.0f µs", t);
+			if(t<1000*milli(second)) return siFormat("%.0f ms", t);
+			if(t<60*second) return siFormat("%.1f s", t);
+			if(t<60*minute) return siFormat("%.1f min", t);
+			if(t<24*hour) return siFormat("%.1f h", t);
+			auto d = t.value(day);
+			if(d<7) return d.format!"%.1f d";
+			if(d<31) return d.format!"%.1f week";
+			if(d<365) return d.format!"%.1f month";
+			return (d/gregorianDaysInYear).format!"%.1f year";
+		} void test_shortDurationText()
+		{
+		Time[] t = [
+		123*pico(second),
+		123*nano(second),
+		123*micro(second),
+		123*milli(second),
+		12*second,
+		129*second,
+		12*minute,
+		123*minute,
+		12*hour,
+		123*hour,
+		10*day,
+		100*day,
+		1000*day,
+		10000*day];
+		
+		t.map!shortDurationText.each!print;
+		}
+		
+		
 		//UNICODE /////////////////////////////////////////////
 		
 		/*
@@ -8588,6 +8638,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		}version(/+$DIDE_REGION+/all) {
 			private void write_internal(const void[] data, bool rewriteAll, ulong offset, Flag!"preserveTimes" preserveTimes)const
 			{
+				//Bug: Ha nincs path a file elott, akkor nem a .-ba irja, hanem lefagy.
 				try
 				{
 					if(this.isVirtual)

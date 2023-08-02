@@ -1080,6 +1080,8 @@ class Window
 	
 	void offscreenPaint(void delegate() fun)
 	{
+		//Todo: BeginBufferedPaint!!! ilyen van: https://learn.microsoft.com/en-us/windows/win32/api/uxtheme/nf-uxtheme-beginbufferedpaint   BPBF_DIB
+		
 		/+
 			Paint into an offscreen GDI bitmap to avoid flicker.
 			Because WS_LAYERED+WS_COMPOSITE is too slow, sometimes it has 0.5 lags.
