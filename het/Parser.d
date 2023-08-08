@@ -265,8 +265,13 @@ struct ImportDecl
 //Parser                                                                  //
 //////////////////////////////////////////////////////////////////////////////
 
+//todo: This must be realized with a table and include the help text too.
+enum BuildMacroCommand { exe, dll, res, def, win, compile, link, ldclink, run, import_, release, debug_, single, ldc }
+static immutable validBuildMacroCommands = EnumMemberNames!BuildMacroCommand.map!(a=>a.withoutEnding('_')).array;
+
 class Parser
 {
+		
 		string fileName, source;
 		Token[] tokens;
 	
@@ -401,8 +406,7 @@ class Parser
 					string command = lc(line[0..i]);
 					
 					//check if command is valid
-					const validCmds = ["exe", "dll", "res", "def", "win", "compile", "link", "run", "import", "release", "single", "ldc"]; //Todo: ezt szepen megcsinalni IDkkel
-					if(validCmds.canFind(command))
+					if(validBuildMacroCommands.canFind(command))
 					{
 						cmt.isBuildMacro = true;
 						macros ~= line;

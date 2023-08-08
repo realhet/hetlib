@@ -10,9 +10,9 @@ module buildsys;/+DIDE+/
 //Todo: a todokat, meg optkat meg warningokat, ne jelolje mar pirossal az editorban a filenevek tabjainal.
 //Todo: editor find in project files.
 //Todo: editor clear errorline when compiling
-//Todo: -g flag: symbolic debug info
 //Todo: invalid //@ direktivaknal error
 //Todo: a dll kilepeskor takaritsa el az obj fileokat
+//Todo: use shebang hashbang #! at the beginning of the file to mark that is is a main file.
 
 /*
 	[ ] irja ki, hogy mi van a cache-ban.
@@ -156,71 +156,65 @@ void test_predecodeLdcOutput()
 		
 				
 						
-								
-										
-												
-														the first pragma
-														c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-														    body
-														    ^
-														c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-														    body
-														    ^
-														c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-														  depr1; depr1;
-														  ^
-														c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
-														  depr1; depr1;
-														         ^
-														c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-														  depr1;
-														  ^
-														c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-														  depr1;
-														  ^
-														this is just a pragma
-														c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
-														c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
-														        return fun(_input.front);
-														                  ^
-														c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
-														        return MapResult!(_fun, Range)(r);
-														               ^
-														c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
-														  iota(5).map!"b+5".print;
-														         ^
-														c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
-														this is just a pragma
-														with multiple lines
-														c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
-														  iota(5).countUntil!((a, b)=>c>d)(5);
-														                                  ^
-														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
-														  with `pred = __lambda1,
-														       R = Result,
-														       Rs = (int)`
-														  must satisfy the following constraint:
-														`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
-														ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
-														          ^
-														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
-														  with `pred = __lambda1,
-														       R = Result,
-														       N = int`
-														  must satisfy the following constraint:
-														`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
-														ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
-														          ^
-														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
-														ptrdiff_t countUntil(alias pred, R)(R haystack)
-														          ^
-														also a pragma
-														fake markes here
-														       ^
-														end of file
-													
-											
-									
+								the first pragma
+								c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+								    body
+								    ^
+								c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+								    body
+								    ^
+								c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+								  depr1; depr1;
+								  ^
+								c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
+								  depr1; depr1;
+								         ^
+								c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+								  depr1;
+								  ^
+								c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+								  depr1;
+								  ^
+								this is just a pragma
+								c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
+								c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
+								        return fun(_input.front);
+								                  ^
+								c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
+								        return MapResult!(_fun, Range)(r);
+								               ^
+								c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
+								  iota(5).map!"b+5".print;
+								         ^
+								c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
+								this is just a pragma
+								with multiple lines
+								c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
+								  iota(5).countUntil!((a, b)=>c>d)(5);
+								                                  ^
+								c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
+								  with `pred = __lambda1,
+								       R = Result,
+								       Rs = (int)`
+								  must satisfy the following constraint:
+								`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
+								ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
+								          ^
+								c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
+								  with `pred = __lambda1,
+								       R = Result,
+								       N = int`
+								  must satisfy the following constraint:
+								`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
+								ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
+								          ^
+								c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
+								ptrdiff_t countUntil(alias pred, R)(R haystack)
+								          ^
+								also a pragma
+								fake markes here
+								       ^
+								end of file
 							
 					
 			
@@ -584,7 +578,8 @@ Experimental:
 
 \33\17//@SINGLE\33\7
   Single pass compilation without caching. At the moment it's quite broken.
-";
+"
+	/+Todo: Make this with Table based programming+/;
 
 //////////////////////////////////////////////////////////////////////////////
 //Common structs                                                          //
@@ -612,6 +607,7 @@ struct BuildSettings
 	@("I|include     = Add include path to search for .d files."	   ) string[]	importPaths	;
 	@("o|compileOpt  = Pass extra compiler option."		) string[] compileArgs		;
 	@("L|linkOpt     = Pass extra linker option."	   )	string[] linkArgs	;
+	@("y|ldcLinkOpt     = Pass extra LDC linker option."	   )	string[] ldcLinkArgs	;
 	@("k|kill        = Kill currently running executable before compile."	   ) bool killExe	;
 	@("t|todo        = Collect //Todo: and //Opt: comments."	   ) bool collectTodos	;
 	@("n|single      = Single step compilation."	   ) bool singleStepCompilation		;
@@ -704,17 +700,8 @@ private struct MSVCEnv
 //Hash calculation                                                        //
 //////////////////////////////////////////////////////////////////////////////
 
-private string calcHash(string data, string data2 = "") //Todo: XXH-ra atirni ezt
-{
-		return [(data~data2).xxh3_64].binToHex;
-	/*
-		  auto sha = new SHA1Digest;
-		sha.reset;
-		sha.put(cast(ubyte[])data);
-		sha.put(cast(ubyte[])data2);
-		return toHexString(sha.finish);
-	*/
-}
+private string calcHash(string data, string data2 = "")
+{ return [(data~data2).xxh3_64].binToHex; }
 
 //////////////////////////////////////////////////////////////////////////////
 //BuildSys Source File Cache                                              //
@@ -810,9 +797,9 @@ private struct BuildCache
 			refresh;
 		}else
 		{
-			 //already in cache
-			auto dt = ef ? ef.dateTime
-									 : file.modified;
+			//already in cache
+			auto dt = ef 	? ef.dateTime
+				: file.modified;
 			if(ch.dateTime<dt)
 			refresh;
 		}
@@ -993,13 +980,16 @@ struct BuildSystem
 		static perf(string f)
 	{ return "auto _perfMeasurerStruct = Perf(times."~f~");"; }
 	
-		void prepareMapResDef()
+		void prepareMapPdbResDef()
 	{
 		//mapFile
 		File mf = targetFile.otherExt(".map");
 		mf.remove;
 		if(settings.generateMap)
 		{ mapFile = mf; }
+		
+		//pdb file
+		targetFile.otherExt(".pdb").remove; //just remove it.
 		
 		//defFile
 		File df = targetFile.otherExt(".def"); //Todo: redundant
@@ -1069,20 +1059,16 @@ struct BuildSystem
 	
 		void processBuildMacro(string buildMacro)
 	{
-		void addCompileArgs(const string[] args)
-		{
-			foreach(p; args)
-			settings.compileArgs.addIfCan(p);
-		}
-		void addLinkArgs   (const string[] args)
-		{
-			foreach(p; args)
-			settings.linkArgs   .addIfCan(p);
-		}
+		void addCompileArgs(in string[] args)
+		{ settings.compileArgs.addIfCan(args); } void addLinkArgs(in string[] args)
+		{ settings.linkArgs.addIfCan(args); } void addLdcLinkArgs(in string[] args)
+		{ settings.ldcLinkArgs.addIfCan(args); }
 		
-		const args = splitCommandLine(buildMacro),
-					cmd = lc(args[0]),
-					param1 = args.length>1 ? args[1] : "";
+		version(none) scope(exit) { import het.stream; LOG("buildMacro processed:", buildMacro.quoted, "settings:", settings.toJson); }
+		
+		const 	args	= splitCommandLine(buildMacro),
+			cmd	= lc(args[0]),
+			param1 	= args.length>1 ? args[1] : "";
 		
 		const isMain = modules.length==1;
 		
@@ -1091,9 +1077,11 @@ struct BuildSystem
 		{ enforce(isTarget, "Main project file must start with target declaration (//@EXE or //@DLL) with an optional projectName."); }else
 		{ enforce(!isTarget, "Target declaration (//@EXE or //@DLL) is already specified."); }
 		
-		switch(cmd)
+		alias CMD = het.parser.BuildMacroCommand;
+		final switch(cmd.to!CMD.ifThrown((cmd~'_').to!CMD))
 		{
-			case "exe": case "dll":{
+			case 	CMD.exe,
+				CMD.dll:{
 				enforce(isMain, "Target declaration (//@EXE or //@DLL) is not in the main file.");
 				
 				isExe = cmd=="exe";
@@ -1115,7 +1103,7 @@ struct BuildSystem
 				}
 				break;
 			}
-			case "res":{
+			case CMD.res:{
 				string id = args.length>2 ? args[2] : "";
 				auto src = File(param1);
 				
@@ -1155,16 +1143,43 @@ struct BuildSystem
 				
 				break;
 			}
-			case "def"			:{ defLines ~= buildMacro[3..$].strip;	   break; }
-			case "win"			:{ isWindowedApp = true;	   break; }
-			case "compile":{ settings.compileArgs.addIfCan(args[1..$]);	   break; }
-			case "link"	:{ addLinkArgs(args[1..$]);	   break; }
-			case "run"	:{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);	   break; }
-			case "import"	:{ DPaths.addImportPathList(buildMacro[6..$]);	   break; }
-			case "release":{ addCompileArgs(["-release", "-O", "-inline", "-boundscheck=off"]);	   break; }
-			case "single"	:{ settings.singleStepCompilation = true;	   break; }
-			case "ldc"	:{ logln("Deprecated build macro: //@LDC");	   break; }
-			default: enforce(false, "Unknown BuildMacro command: "~cmd);
+			case CMD.def:{ defLines ~= buildMacro[3..$].strip;	   break; }
+			case CMD.win:{ isWindowedApp = true;	   break; }
+			case CMD.compile:{ addCompileArgs(args[1..$]);break; }
+			case CMD.link:{ addLinkArgs(args[1..$]);break; }
+			case CMD.ldclink:{ addLdcLinkArgs(args[1..$]);break; }
+			
+			case CMD.run:{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);	   break; }
+			//Todo: Revisit the obj file hash calculation. It should only include the options that are make the obj different. Must exclude RUN commands for example.
+			
+			case CMD.import_:{ DPaths.addImportPathList(buildMacro[6..$]);	   break; }
+			
+			case CMD.release:{
+				enum releaseArgs = ["-release", "-O", "-inline", "-boundscheck=off"];
+				addCompileArgs(releaseArgs);
+				break;
+			}
+			case CMD.debug_:{
+				enum debugArgs = ["-g"/+, "--gline-tables-only"+/];
+				addCompileArgs(debugArgs);
+				addLdcLinkArgs(debugArgs);
+				break;
+			}
+			//Todo: The release and debug macro should be system-wide configurable. Now it seems better to hardwire the most common options
+			
+			case CMD.single:{ settings.singleStepCompilation = true;	   break; }
+			case CMD.ldc:{ logln("Deprecated build macro: //@LDC");	   break; }
+			/+default: enforce(false, "Unknown BuildMacro command: "~cmd);+/
+			
+			/+
+				Optional build macros:
+							this is what ///@debug does:
+								///@command -g
+								///@ldclink -g
+							This is houw to emit only line info:
+								///@compile --gline-tables-only
+			+/
+			
 		}
 	}
 	
@@ -1368,6 +1383,10 @@ struct BuildSystem
 		return cmdLines;
 	}
 	
+		string[] compileCommands;
+		
+		enum printCommands = false;
+		
 		void compile(File[] srcFiles, File[] cachedFiles) //Compile ////////////////////////
 	{
 				if(srcFiles.empty)
@@ -1387,8 +1406,13 @@ struct BuildSystem
 		
 				logln;
 		
-		print;
-		foreach(line; cmdLines) print(joinCommandLine(line));
+		//Todo: it's a big mess.
+		compileCommands = cmdLines.map!joinCommandLine.array; //this is passed to the link() where the $build.bat file will be exported.
+		if(printCommands)
+		{
+			print;
+			compileCommands.each!print;
+		}
 		
 		//////////////////////////////////////////////////////////////////////////////////////
 		
@@ -1422,9 +1446,9 @@ struct BuildSystem
 				//storing obj into objCache
 				if(isIncremental && result==0)
 				{
-					const srcFile = srcFiles[idx],
-								objFile = objFileOf(srcFile),
-								objHash = findModule(srcFile).objHash;
+					const 	srcFile	= srcFiles[idx],
+						objFile	= objFileOf(srcFile),
+						objHash 	= findModule(srcFile).objHash;
 					objCache[objHash] = objFile.forcedRead;
 					outputCache[objHash] = output;
 				}
@@ -1536,7 +1560,7 @@ struct BuildSystem
 		}
 	}
 	
-		void link(string[] linkArgs)//Link ////////////////////////
+		void link(string[] linkArgs, string[] ldcLinkArgs)//Link ////////////////////////
 	{
 		mixin(perf("link"));
 		if(modules.empty)
@@ -1566,10 +1590,11 @@ struct BuildSystem
 		static if(LDCVER>=128)
 		{
 			cmd = 	[
-				"ldc2", `-g`/+Generate PDB file+/, `-of=` ~ targetFile.fullName,
+				"ldc2", `-of=` ~ targetFile.fullName,
 				`--link-internally`, //default = ms link
 				`--mscrtlib=libcmt`
 			] //default = libcmt
+				~ ldcLinkArgs
 				~ linkOpts.map!"`-L=`~a".array
 				~ objFiles;
 		}else
@@ -1603,7 +1628,12 @@ struct BuildSystem
 		logln(bold("LINKING: "), line);
 		auto link = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
 		//Todo: I think MSVCENV not needed anymore
-		print(line);
+		
+		//Todo: Linker error is not processed at all!!!
+		
+		if(printCommands) print(line);
+		
+		File(targetFile.path, "$build.bat").write(chain(compileCommands, line.only).join("\r\n"));
 		
 		//cleanup
 		defFile.remove;
@@ -1613,8 +1643,7 @@ struct BuildSystem
 			targetFile.otherExt("lib").remove;
 		}
 		
-		enforce(link.status==0, link.output);  if(!link.output.empty)
-		logln(link.output);
+		enforce(link.status==0, "Link Error: "~link.status.text~" "~link.output); //stop the compiling process
 	}
 	
 	
@@ -1689,7 +1718,8 @@ struct BuildSystem
 			
 			//calculate dependency hashed of obj files to lookup in the objCache
 			modules.resolveModuleImportDependencies;
-			modules.calculateObjHashes(joinCommandLine(settings.compileArgs)~" useLDC:"~text(true)); //Note: compuler specific hash generation. Now it is only uses LDC2
+			const compilerSalt = joinCommandLine(settings.compileArgs);
+			modules.calculateObjHashes(compilerSalt);//Note: Compiler specific hash generation.
 			
 			//ensure that no std or core files are going to be recompiled
 			foreach(const m; modules)
@@ -1782,12 +1812,12 @@ struct BuildSystem
 				mapFile.write(mapCache[exeHash]);
 			}else
 			{
-				prepareMapResDef;
+				prepareMapPdbResDef;
 				resCompile(resFile, resHash);
 				
 				compile(filesToCompile, filesInCache);
 				overwriteObjsFromCache(filesInCache);
-				link(settings.linkArgs);
+				link(settings.linkArgs, settings.ldcLinkArgs);
 				
 				logln(bold("STORING EXE -> CACHE: "), targetFile);
 				exeCache[exeHash] = targetFile.read;
@@ -1900,7 +1930,7 @@ struct BuildSystem
 		}catch(Exception e)
 		{
 			//sError = format("Exception in %s(%s): %s", e.file, e.line, e.msg);
-			sError = e.msg;
+			sError = e.simpleMsg;
 			sOutput = sLog;
 			return -1;
 		}
@@ -2027,12 +2057,12 @@ void buildSystemWorker()
 		bool cancelRequest = false;
 		receiveTimeout(
 			0.msecs,
-						(MsgBuildCommand cmd){
+			(MsgBuildCommand cmd){
 				if(cmd==MsgBuildCommand.shutDown)
 				{ cancelRequest = true; isDone = true;	state.cancelling = true; }
 				else if(cmd==MsgBuildCommand.cancel) { cancelRequest = true;	state.cancelling = true; }
 			},
-						(immutable MsgBuildRequest req){ WARN("Build request ignored: already building..."); }
+			(immutable MsgBuildRequest req){ WARN("Build request ignored: already building..."); }
 		);
 		
 		return cancelRequest;
@@ -2377,7 +2407,15 @@ class BuildResult
 				(in MsgBuildFinished msg)	{
 					filesInFlight.clear;
 					
-					//Todo: clear currently compiling modules.
+					if(msg.error!="")
+					{
+					beep; ERR("BUILDERROR", msg.error); 
+					remainings[mainFile] ~= msg.error.splitLines;
+					//todo: Show this linker error in DIDE properly
+					}
+					
+					
+					
 					//decide the global success of the build procedure
 					//Todo: there are errors whose source are not specified or not loaded, those must be displayed too. Also the compiler output.
 					
