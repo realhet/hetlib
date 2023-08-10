@@ -1326,27 +1326,26 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		class ExeMapFile
 		{
 			ulong baseAddr;
-					
+			
 			struct Rec {
 				string mangledName;
 				ulong addr;
 				string objName;
-						
+				
 				string name() {
 					import std.demangle;
 					return demangle(mangledName);
 				}
 			}
-					
+			
 			Rec[] list;
-					
-			this(File fn = File("$ThisExeFile$"))
+			
+			this(File f = File.init)
 			{
-				if(fn.fullName == "$ThisExeFile$")
-				fn = appFile.otherExt("map");
-						
+				if(!f) f = appFile.otherExt("map");
+				
 				bool active=false;
-				foreach(line; fn.readLines(false))
+				foreach(line; f.readLines(false))
 				{
 					if(!active) active = line.isWild("*Address*Publics by Value*Rva+Base*Lib:Object");
 					auto p = line.split.array;
@@ -1362,12 +1361,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						default:
 					}
 				}
-						
+				
 				list = list.sort!"a.addr < b.addr".array; //not sure if already sorted
-						
+				
 				if(list.empty) ERR("EXEMAPFILE is fucked up.");
 			}
-					
+			
 			string locate(ulong relAddr)
 			{
 				//Todo: Try core.runtime.defaultTraceHandler
@@ -1420,8 +1419,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(
 					GetModuleHandleEx(
 						GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-											GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, 
-											cast(wchar*)addr, &handle
+						GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, 
+						cast(wchar*)addr, &handle
 					)
 				)
 				{
@@ -2215,6 +2214,12 @@ version(/+$DIDE_REGION Numeric+/all)
 {
 	//Numeric ///////////////////////////////////////
 	version(/+$DIDE_REGION+/all) {
+		alias 	uint64_t 	= ulong	, int64_t 	= long	,
+			uint32_t	= uint	, int32_t	= int	,
+			uint16_t	= ushort	, int16_t	= short	,
+			uint8_t	= ubyte	, int8_t	= byte	;
+		//Todo: Table based programming. definition: : rowmajor col=2 "alias %1s = %2s, ...; "
+		
 		//enum PIf = 3.14159265358979323846f;
 		/+
 			Todo: not sure about where is it used or not used. 
@@ -6097,23 +6102,24 @@ version(/+$DIDE_REGION Containers+/all)
 			return (d/gregorianDaysInYear).format!"%.1f year";
 		} void test_shortDurationText()
 		{
-		Time[] t = [
-		123*pico(second),
-		123*nano(second),
-		123*micro(second),
-		123*milli(second),
-		12*second,
-		129*second,
-		12*minute,
-		123*minute,
-		12*hour,
-		123*hour,
-		10*day,
-		100*day,
-		1000*day,
-		10000*day];
-		
-		t.map!shortDurationText.each!print;
+			Time[] t = [
+				123*pico(second),
+				123*nano(second),
+				123*micro(second),
+				123*milli(second),
+				12*second,
+				129*second,
+				12*minute,
+				123*minute,
+				12*hour,
+				123*hour,
+				10*day,
+				100*day,
+				1000*day,
+				10000*day
+			];
+			
+			t.map!shortDurationText.each!print;
 		}
 		
 		
