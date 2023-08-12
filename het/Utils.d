@@ -2618,11 +2618,17 @@ version(/+$DIDE_REGION Numeric+/all)
 			else return T.sizeof;
 		}
 		
-		@property auto frontOr(R, T)(R r, T e)if(isInputRange!R)
+		void requireLength(T, L)(ref T[] arr, L len)
+		{
+			if(arr.length<len)
+			arr.length = len;
+		}
+		
+		@property auto frontOr(R, T)(R r, T e = ElementType!R.init)if(isInputRange!R)
 		{
 			return r.empty ? e : r.front; //Todo: constness
 		}
-		@property auto backOr(R, T)(R r, T e)if(isBidirectionalRange!R)
+		@property auto backOr(R, T)(R r, T e = ElementType!R.init)if(isBidirectionalRange!R)
 		{ return r.empty ? e : r.back; }
 		
 		@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class))
