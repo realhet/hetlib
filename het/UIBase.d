@@ -1313,7 +1313,7 @@ version(/+$DIDE_REGION+/all)
 		void lookupSubTexIdx()
 		{
 			string glyphSpec = `font:\`~fontName~`\72\x3\?`~[ch].toUTF8;
-			stIdx = textures[File(glyphSpec)];
+			stIdx = textures[File(glyphSpec)];//fonts are loaded immediatelly
 		}
 		
 		if(isDefault)
@@ -1511,7 +1511,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			//Note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
 			//Todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
-			const stIdx = textures[file];
+			const stIdx = textures[file]; //todo: no delayed load support
 			const siz = calcGlyphSize_image(stIdx);
 			
 			if(flags.autoHeight && flags.autoWidth)

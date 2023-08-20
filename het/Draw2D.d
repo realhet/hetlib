@@ -1912,9 +1912,9 @@ class Drawing
 			//Img can be int or Bmp File or string or CustomTexture
 			//Todo: Bitmap, Image2D
 			int idx = -1;
-			static if(isSomeString!Img)	idx = textures[img];
-			else static if(is(Img == File))	idx = textures[img];
-			else static if(is(Img == Bitmap))	idx = textures[img.file];
+			static if(isSomeString!Img)	idx = textures.accessLater(img);
+			else static if(is(Img == File))	idx = textures.accessLater(img);
+			else static if(is(Img == Bitmap))	idx = textures.accessLater(img.file);
 			else static if(isIntegral!Img) idx =	img;
 			else static if(is(Img : CustomTexture))	{ if(img) idx = img.texIdx; }
 			else	static assert(0, "Unsupported Img param: "~Img.stringof);
@@ -3120,9 +3120,8 @@ class Drawing
 			float L = length(texelPerPixel);
 			if(isImage) {
 				if(L<=2) samplingLevel = fontFlags & 1;
-				else 
-					//nearest or linear
-					samplingLevel = 2;
+				else
+				samplingLevel = 2;
 				
 			}
 			else {

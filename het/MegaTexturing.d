@@ -919,15 +919,23 @@ class TextureManager
 		return infoTexture.access(idx);
 	}
 		
-		int opIndex(F)(F file)
+		int accessLater(File file)
 	{ return access(file, Yes.delayed); }
-	
-		int accessNow(F)(F file)
-	{ return access(file, No.delayed); }
-	
 		
+		int accessNow(File file)
+	{ return access(file, No.delayed); }
+		
+		//textures[] immediate
+		int opIndex(F)(F file)
+	{ return accessNow(file); }
+		
+		//textures() delayed
+		/+int opCall(F)(F file)
+	{ return accessLater(file); }+/
+		//todo: This is not possible because this object is a singleton, ant that is not forwarding opCall
+	
 		SubTexInfo opIndex(int idx)
-	{ return infoTexture.access(idx); }
+	{ return accessInfo(idx); }
 	
 		void dump() const
 	{ infoTexture.dump; }

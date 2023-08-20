@@ -114,7 +114,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			
 			//hetlib imports
-			public import het.debugclient;
+			public import het.dbg;
 			public import het.math;
 			public import het.color;
 			
@@ -1245,7 +1245,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(line.isWild("0x????????????????"))
 				{
 					auto addr = cast(void*) line[2..$].to!ulong(16);
-					auto mi = getModuleInfoByAddr(addr);
+					auto mi = getModuleInfoByAddr(addr, true);
 					line ~= " " ~ mi.location;
 							
 					if(line.isWild(`*"*.d", *`))
@@ -1402,20 +1402,23 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		}
 		
-		auto getModuleInfoByAddr(void* addr)
+		auto getModuleInfoByAddr(void* addr_, bool locateInMapFile=false)
 		{
 			struct Res {
 				HMODULE handle;
 				File fileName;
-				void* base;
+				void* addr, base;
 				size_t size;
 				string location;
-			} Res res;
+				uint offset() const
+				{ return (addr-base).to!uint.ifThrown(uint.max); }
+			}
+			Res res;
 			
 			with(res)
 			{
 				import core.sys.windows.windows;
-				
+				addr = addr_;
 				if(
 					GetModuleHandleEx(
 						GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
@@ -1435,11 +1438,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						base = mi.lpBaseOfDll;
 						size = mi.SizeOfImage;
 						
-						if(fileName==appFile)
-						res.location = exeMapFile.locate(addr-base);
-						
 						if(location.empty)
 						location = fileName.fullName.quoted;
+						
+						if(locateInMapFile)
+						{
+							if(fileName==appFile)
+							res.location = exeMapFile.locate(addr-base);
+						}
 					}
 				}
 				
@@ -1479,7 +1485,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				string msg;
 				with(p.ExceptionRecord)
 				{
-					auto mi = getModuleInfoByAddr(ExceptionAddress);
+					auto mi = getModuleInfoByAddr(ExceptionAddress, true);
 					
 					string excInfo;
 					if(NumberParameters) excInfo = "info: " ~ ExceptionInformation[0..NumberParameters].map!(a => a.format!"%X").join(", ");
@@ -1509,7 +1515,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							{
 								auto addr = cast(void*) s[2..$].to!ulong(16);
 								write(addr, " \33\13");
-								auto mi = getModuleInfoByAddr(addr);
+								auto mi = getModuleInfoByAddr(addr, true);
 								if(mi.handle) {
 									auto relAddr = cast(ulong) (addr-mi.base);
 									write(mi.fileName.name, ":", relAddr.format!"%X");
@@ -2214,10 +2220,11 @@ version(/+$DIDE_REGION Numeric+/all)
 {
 	//Numeric ///////////////////////////////////////
 	version(/+$DIDE_REGION+/all) {
-		alias 	uint64_t 	= ulong	, int64_t 	= long	,
-			uint32_t	= uint	, int32_t	= int	,
-			uint16_t	= ushort	, int16_t	= short	,
-			uint8_t	= ubyte	, int8_t	= byte	;
+		alias uint64_t 	= ulong	, int64_t 	= long	,
+		uint32_t	= uint	, int32_t	= int	,
+		uint16_t	= ushort	, int16_t	= short	,
+		uint8_t	= ubyte	, int8_t	= byte	;
+		
 		//Todo: Table based programming. definition: : rowmajor col=2 "alias %1s = %2s, ...; "
 		
 		//enum PIf = 3.14159265358979323846f;
@@ -2915,6 +2922,9 @@ version(/+$DIDE_REGION Numeric+/all)
 		*/
 	}version(/+$DIDE_REGION st R/W+/all)
 	{
+		//rather use bitmanip stuff!!!
+		
+		
 		//st R/W //////////////////////////////////////////////
 		
 		
@@ -2942,6 +2952,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		uint stReadSize(ref ubyte[] st)
 		{
+			//This crap is for the opposite byte order!!!!!!!
 			//read compressed 32bit
 			auto b = stRead!ubyte(st);
 			if(b&0x80) {
@@ -2967,8 +2978,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		{
 			//compressed 32bit
 			if(s<0x80) stWrite(st, cast(ubyte)s);
-			if(s<0x4000) stWrite(st, cast(ushort)s | 0x8000);
-			if(s<0x4000_0000) stWrite(st, cast(ushort)s | 0xC000_0000);
+			else if(s<0x4000) stWrite(st, cast(ushort)s | 0x8000);
+			else if(s<0x4000_0000) stWrite(st, cast(ushort)s | 0xC000_0000);
 		}
 		
 		void stWrite(T)(ref ubyte[] st, const T[] data)
@@ -2999,12 +3010,12 @@ version(/+$DIDE_REGION Numeric+/all)
 			File file;
 			size_t pos, size;
 			bool truncated; //The block is not on boundary, because it was unable to seek back
+			
+			auto read(bool mustExists=true) const
+			{ return file.read	(mustExists, pos, size); }
+			auto readStr(bool mustExists=true) const
+			{ return file.readStr(mustExists, pos, size); }
 		}
-		
-		auto read(in FileBlock fb, bool mustExists=true)
-		{ with(fb) return file.read	(mustExists, pos, size); }
-		auto readStr(in FileBlock fb,	bool mustExists=true)
-		{ with(fb) return file.readStr(mustExists, pos, size); }
 		
 		auto byLineBlock(File file, size_t maxBlockSize=DefaultLineBlockSize)
 		{
@@ -3993,6 +4004,66 @@ version(/+$DIDE_REGION Numeric+/all)
 		}
 		
 		taskPool.put(task!(futureWrapper!(fun, Args))(args));
+	}
+	
+	class MainThreadJob
+	{
+		/+
+			Note: This can be used to implement the following:
+			In a worker thread there are image processung stuff that 
+			can only be done in the main thread inside the onPaint event.
+			Implementation details for this example:
+			   /+
+				Code: onPaintJob = new MainThreadJob;
+				...
+				onPaint()
+				{
+					...
+					onPaintJob.update;
+					...
+				}
+			+/   /+
+				Code: worker()
+				{
+					...
+					onPaintJob({ process; });
+					...
+				}
+			+/   
+		+/
+		
+		private void delegate()[] queue;
+		
+		//queue work and wait for it to finish.
+		void opCall(void delegate() f)
+		{
+			synchronized(this) queue ~= f;
+			while(1)
+			{
+				sleep(3);
+				bool found;
+				synchronized(this) found = queue.canFind(f);
+				if(!found) break;
+			}
+		}
+		
+		//must call tis periodically from the main thread
+		void update()
+		{
+			synchronized(this)
+			{
+				void delegate() job;
+				if(queue.length)
+				{
+					job = queue.front;
+					job();/+
+						other requests will wait, but not a problem 
+						because there is only one thread serving the queue
+					+/
+					queue.popFront; //it's also the signal to the caller
+				}
+			}
+		}
 	}
 	
 	struct PROBE
@@ -5147,6 +5218,8 @@ version(/+$DIDE_REGION Containers+/all)
 			auto e = (cast(ubyte[])s).countUntil(0);
 			if(e<0) e = s.length;
 			return s[0..e].to!string;
+			
+			//Todo: use proper string api
 		}
 		string toStr(const wchar[] s)
 		{
