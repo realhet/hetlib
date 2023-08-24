@@ -5473,6 +5473,8 @@ version(/+$DIDE_REGION Containers+/all)
 			{ try return to!int	(i);catch(Throwable) return def; }
 			auto floats	(size_t i, float def = 0)
 			{ try return to!float	(i);catch(Throwable) return def; }
+			auto doubles	(size_t i, double def = 0)
+			{ try return to!double	(i);catch(Throwable) return def; }
 			
 			void stripAll()
 			{ foreach(ref s; p) s = s.strip; }
