@@ -460,7 +460,7 @@ version(/+$DIDE_REGION+/all)
 }
 class Window 
 {
-	//todo: opPaint can't process KeyCombo().pressed events
+	//Todo: opPaint can't process KeyCombo().pressed events
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS STATIC FUNCTIONS                                           ///
@@ -653,7 +653,7 @@ class Window
 	mixin Signal!(File[]) whenFilesDropped;
 	
 	private bool dragAcceptFilesState;
-	void updateDragAcceptFilesState()
+	protected void updateDragAcceptFilesState()
 	{
 		auto newState = whenFilesDropped.slots_idx>0;
 		if(dragAcceptFilesState.chkSet(newState))
@@ -881,6 +881,7 @@ class Window
 				whenFilesDropped.emit(files);
 				
 				//Note: the sending and the receiving process must have the same elevation.
+				//Todo: detect if there was a failed drop and tell the user to solve elevation issues.
 				/+Todo: get precise drop position with: DragQueryPoint+/
 				return 0;
 			}

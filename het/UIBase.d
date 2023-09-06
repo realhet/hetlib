@@ -1511,7 +1511,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			//Note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
 			//Todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
-			const stIdx = textures[file]; //todo: no delayed load support
+			const stIdx = textures[file]; //Todo: no delayed load support
 			const siz = calcGlyphSize_image(stIdx);
 			
 			if(flags.autoHeight && flags.autoWidth)
@@ -2572,10 +2572,10 @@ version(/+$DIDE_REGION+/all)
 		{
 			final switch(hAlign)
 			{
-				case HAlign.left	: hideLeftSpace;	break;
-				case HAlign.right	: hideRightSpace;	break;
-				case HAlign.center	: hideBothSpaces;	break;
-				case HAlign.justify	: hideBothSpaces;	break;
+				case HAlign.left:	hideLeftSpace;	break;
+				case HAlign.right:	hideRightSpace;	break;
+				case HAlign.center:	hideBothSpaces;	break;
+				case HAlign.justify:	hideBothSpaces;	break;
 			}
 		}
 		
