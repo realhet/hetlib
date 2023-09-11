@@ -2090,7 +2090,13 @@ class Drawing
 			auto horz = hv.canFind('h'), vert = hv.canFind('v');
 			if(!horz && !vert) return;
 			
-			saveState; scope(exit) restoreState;
+			saveState;
+			const savedBounds = bounds_;
+			
+			scope(exit){
+			bounds_ = savedBounds;
+			restoreState;
+			}
 			
 			this.color = color;
 			lineWidth = width;

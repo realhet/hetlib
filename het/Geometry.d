@@ -5,7 +5,7 @@ import het.utils;
 
 struct seg2
 {
-	 //todo: make a Segment template struct
+	 //Todo: make a Segment template struct
 	vec2[2] p;
 	alias p this;
 	
@@ -19,7 +19,7 @@ struct seg2
 
 auto toSegs(in vec2[] p, bool circular)
 {
-	 //todo: rewrite with functional.slide
+	 //Todo: rewrite with functional.slide
 	seg2[] res;
 	res.reserve(p.length);
 	if(p.length<=1) return res;
@@ -44,28 +44,28 @@ auto toSegs(in bounds2 bnd, bool clockwise=true)
 { return bnd.toPoints(clockwise).toSegs(true); }
 
 
-//todo: these should be done with CTCG
-//todo: put these into het.math
+//Todo: these should be done with CTCG
+//Todo: put these into het.math
 bounds2 inflated(in bounds2 b, in vec2 v)
-{ return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //todo: support this for all bounds
+{ return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //Todo: support this for all bounds
 bounds2 inflated(in bounds2 b, in float x, in float y)
 { return b.inflated(vec2(x, y)); }
 bounds2 inflated(in bounds2 b, float f)
-{ return b.inflated(f, f); } //todo: support this for all bounds
+{ return b.inflated(f, f); } //Todo: support this for all bounds
 
 bounds2 inflated(in ibounds2 b, in vec2 v)
-{ return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //todo: support this for all bounds
+{ return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //Todo: support this for all bounds
 bounds2 inflated(in ibounds2 b, in float x, in float y)
 { return b.inflated(vec2(x, y)); }
 bounds2 inflated(in ibounds2 b, float f)
-{ return b.inflated(f, f); } //todo: support this for all bounds
+{ return b.inflated(f, f); } //Todo: support this for all bounds
 
 ibounds2 inflated(in ibounds2 b, in ivec2 v)
-{ return b.valid ? ibounds2(b.low-v, b.high+v) : ibounds2.init; } //todo: support this for all bounds
+{ return b.valid ? ibounds2(b.low-v, b.high+v) : ibounds2.init; } //Todo: support this for all bounds
 ibounds2 inflated(in ibounds2 b, int x, int y)
-{ return b.inflated(ivec2(x, y)); } //todo: support this for all bounds
+{ return b.inflated(ivec2(x, y)); } //Todo: support this for all bounds
 ibounds2 inflated(in ibounds2 b, int a)
-{ return b.inflated(a, a); } //todo: support this for all bounds
+{ return b.inflated(a, a); } //Todo: support this for all bounds
 
 auto fittingSquare(in bounds2 b)
 {
@@ -83,14 +83,14 @@ auto fittingSquare(in bounds2 b)
 ///  Intersections, primitive distances  ///////////////////////////////////////////////////
 
 vec2 intersectLines_noParallel_prec(in seg2 S0, in seg2 S1)
-//todo: all of these variation should be refactored with static ifs.
+//Todo: all of these variation should be refactored with static ifs.
 {
 	auto S	= S1.p[0]-S0.p[0],
 			 T	= S0.p[1]-S0.p[0],
 			 U	= S1.p[0]-S1.p[1],
 			 det	= crossZ(T, U),
 			 detA	= crossZ(S, U),
-			 alpha	= detA/det;//opt: alpha = detA*rcpf_fast(det);
+			 alpha	= detA/det;//Opt: alpha = detA*rcpf_fast(det);
 	
 	return S0.p[0]+T*alpha;
 }
@@ -146,7 +146,7 @@ bool intersectSegs_falseParallel_prec(in seg2 S0, in seg2 S1)
 			U = S1.p[0]-S1.p[1];
 	float det  = crossZ(T, U);
 	
-	if(abs(det)<0.001f) return false;  //todo: this is lame
+	if(abs(det)<0.001f) return false;  //Todo: this is lame
 	
 	float detA = crossZ(S, U);
 	
@@ -176,7 +176,7 @@ float segmentPointDistance_prec(const vec2 v, const vec2 w, const vec2 p)
 	return distance(p, projection);
 }
 
-//todo: segmentPointDistance 3d
+//Todo: segmentPointDistance 3d
 /*
 	vec3 segmentNearestPoint(vec3 S0, vec3 S1, vec3 P){
 		vec3 v = S1 - S0;
@@ -329,11 +329,11 @@ bool _lineClip(V, E, F)(in V bMin, in V bMax, ref V a, ref V b)
 			}
 			
 			/*
-				NOTE: 	if you follow this algorithm exactly(at least for c#),
-					then you will fall into an infinite loop
-					in case a line crosses more than two segments. 
-					To avoid that problem, leave out the last else
-					if(outcodeOut & LEFT) and just make it else 
+				Note: if you follow this algorithm exactly(at least for c#),
+				then you will fall into an infinite loop
+				in case a line crosses more than two segments. 
+				To avoid that problem, leave out the last else
+				if(outcodeOut & LEFT) and just make it else 
 			*/
 			
 			//Now we move outside point to intersection point to clip
@@ -442,7 +442,7 @@ auto linearFit(in vec2[] data, int requiredPoints, float maxDeviation)
 
 struct QuadraticFitResult
 {
-	//todo: combine Quadratic and linear fitter
+	//Todo: combine Quadratic and linear fitter
 	vec2[] points;
 	float a=0, b=0, c=0;
 	
@@ -466,7 +466,7 @@ struct QuadraticFitResult
 }
 
 private float det(float a, float b, float c, float d)
-{ return a*d-c*b; } //todo: combine this with math.det
+{ return a*d-c*b; } //Todo: combine this with math.det
 private float det(float a, float b, float c, float d, float e, float f, float g, float h, float i)
 {
 	return 	+a*det(e, f, h, i)
@@ -476,7 +476,7 @@ private float det(float a, float b, float c, float d, float e, float f, float g,
 
 auto quadraticFit(in vec2[] data)
 {
-	NOTIMPL;//todo: this is possibly buggy. must refactor.
+	NOTIMPL;//Todo: this is possibly buggy. must refactor.
 	
 	QuadraticFitResult res;
 	if(data.length<3) {
@@ -492,7 +492,7 @@ auto quadraticFit(in vec2[] data)
 	
 	//https://www.codeproject.com/Articles/63170/Least-Squares-Regression-for-Quadratic-Curve-Fitti
 	//notation sjk to mean the sum of x_i^j*y_i^k.
-	//todo: optimize this with .tee or	something to access x and y only once
+	//Todo: optimize this with .tee or	something to access x and y only once
 	float 	s40 = data.map!"a.x^^4".sum,	//sum of x^4
 		s30 = data.map!"a.x^^3".sum,	//sum of x^3
 		s20 = data.map!"a.x^^2".sum,	//sum of x^2
@@ -532,4 +532,110 @@ auto quadraticFit(in vec2[] data)
 	res.worstIdx = data.map!(p => abs(error(p))).maxIndex.to!int;
 	
 	return res;
+}
+auto mirrorPointOverLine(V, T2, T3)(V P, T2 A, T3 B)
+{
+	const 	d = B - A,
+		mx = ((V(d.x*d.x - d.y*d.y, d.x*d.y*2))/(d.x*d.x + d.y*d.y)),
+		my = mx.rotate270,
+		a = P - A;
+	return mx*a.x + my*a.y + A;
+}
+
+auto extrapolateCurve(V)(V A, V B, V C)
+{
+	//Continuity: C1
+	static if(1)
+	{
+		//this is simpler, only uses 1 div and no trigonometryc functions
+		//Opt: Measure how fast and precise it is.
+		const M1 = (B+C)/2, M2 = M1 + (B-C).rotate90;
+		return mirrorPointOverLine(A, M1, M2);
+	}
+	else
+	{
+		const 	v1 = (B-A).normalize,
+			v2 = (C-B).normalize,
+			a = asin(cross(v1, v2).z);
+		return C + (C-B).rotate(a);
+	}
+}
+
+auto extrapolateCurve(V)(V A, V B, V C, V D)
+{
+	//Continuity: C2
+	const 	v1 = (B-A).normalize,
+		v2 = (C-B).normalize,
+		v3 = (D-C).normalize,
+		a1 = asin(cross(v1, v2).z),
+		a2 = asin(cross(v2, v3).z),
+		a3 = a2 + (a2-a1);
+	return D + (D-C).rotate(a3);
+}
+
+T[2] linearBezierWeights(T)(T t)
+{
+	const u = 1-t;
+	return [u, t];
+}
+
+T[3] quadraticBezierWeights(T)(T t)
+{
+	const u = 1-t;
+	return [((u)^^(2)), 2*u*t, ((t)^^(2))];
+}
+
+T[4] cubicBezierWeights(T)(T t)
+{
+	const u = 1-t;
+	return [((u)^^(3)), 3*t*((u)^^(2)), 3*u*((t)^^(2)), ((t)^^(3))];
+}
+
+
+void turtleLine(V, F)(
+	ref V pos, ref V dir, 
+	in F length, //negative goes backwards
+	in F stepSize, void delegate(V) sink
+)
+{
+	if(!length) return;
+	const 	segmentCount = ((abs(length))/(stepSize)).iround.max(1),
+		endPos = pos + dir*length,
+		step = (endPos-pos) * (F(1)/segmentCount);
+	
+	sink(pos);
+	foreach(i; 0..segmentCount-1)
+	{ pos += step; sink(pos); }
+	pos = endPos;sink(pos);
+}
+
+void turtleArc(V, F)(
+	ref V pos, ref V dir, 
+	F angle, //negative goes backwards on the same side
+	F radius, //-left, +right
+	in F stepSize, void delegate(V) sink
+)
+{
+	if(!angle) return;
+	if(angle<0) {
+		//negative angle: backwards, same side
+		angle *= -1;dir *= -1;radius *= -1;
+	}
+	const 	length	= radius.abs * angle.radians,
+		segmentCount	= ((length)/(stepSize)).iround.max(1),
+		segmentLength 	= ((length)/(segmentCount)),
+		center	= pos + dir.rotate90 * (radius),
+		alpha	= angle.radians * sign(radius),
+		endPos	= (pos-center).rotate(alpha) + center,
+		endDir	= dir.rotate(alpha).normalize,
+		angleStep 	= alpha/segmentCount;
+	dir = dir.rotate(angleStep/2).normalize * segmentLength;
+	sink(pos);
+	foreach(i; 0..segmentCount-1)
+	{
+		pos += dir;sink(pos);
+		dir = dir.rotate(angleStep);
+	}
+	pos = endPos;dir = endDir;
+	sink(pos);
 }

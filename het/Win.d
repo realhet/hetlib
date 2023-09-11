@@ -342,7 +342,7 @@ version(/+$DIDE_REGION+/all)
 		int nMaxFormats, int* piFormats, int* nNumFormats
 	) wglChoosePixelFormatARB;
 	
-	private void initWglChoosePixelFormat()
+	private bool initWglChoosePixelFormat()
 	//gets it with a dummy window, so the first opengl window can use it. Losing 250ms for nothing by this shit.
 	{
 		void error(string err) { throw new Exception("initWglChoosePixelFormat() "~err); }
@@ -357,10 +357,12 @@ version(/+$DIDE_REGION+/all)
 		wglMakeCurrent(dc, rc);
 		
 		wglChoosePixelFormatARB = cast(typeof(wglChoosePixelFormatARB))wglGetProcAddress("wglChoosePixelFormatARB");
-		if(wglChoosePixelFormatARB is null) error("getProcAddress failed");
+		//when it's null, multisampling will not be used.  But now at the initialization it's not az exception.
 		
 		wglMakeCurrent(null, null);
 		wglDeleteContext(rc);
+		
+		return wglChoosePixelFormatARB !is null;
 	}
 	
 	
@@ -397,7 +399,16 @@ version(/+$DIDE_REGION+/all)
 		
 		try {
 			SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS);
-			initWglChoosePixelFormat(); //hack
+			
+			{
+				initWglChoosePixelFormat();
+				/+
+					Note: This creates another window just to access wglChoosePixelFormat.
+					If wglChoosePixelFormat is not accessible (returns false), it will not exit with an error right now.
+					Later when it fails to setup multisampling, it will just show a warning.
+					And revert to the old choosePixelFormat.
+				+/
+			}
 			
 			if(application._windowInitFunct) application._windowInitFunct();
 			

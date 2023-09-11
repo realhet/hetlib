@@ -855,8 +855,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			void update()
 			{
 				static uint seq;
+				const isFirst = !seq;
 				if(seq.chkSet(sequenceNumber))
-				emit;
+				if(!isFirst)emit;
 			}
 		}
 		
@@ -2315,6 +2316,20 @@ version(/+$DIDE_REGION Numeric+/all)
 			auto m = safeDiv(y2 - y1, x2 - x1),
 					 c = y1 - x1*m;
 			return tuple(m, c); //Todo: use this in remap
+		}
+		
+		struct SquaredByte
+		{
+			/+
+				Note: This applies quadratic compression on a byte
+				stored range: -128 .. 127
+				unpacked range: -1.0 .. 1.0  (not inclusive at the end.)
+			+/
+			
+			@STORED byte storage;
+			@property value() { return ((((float(storage))^^(2)))/(0x4000))*sign(storage); }
+			@property value(float f) { storage = cast(byte)(sqrt(abs(f)*0x4000)*sign(f)); }
+			alias value this;
 		}
 		
 	}version(/+$DIDE_REGION+/all) {
@@ -5510,6 +5525,8 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		bool isWild(bool ignoreCase = true, char chAny = '*', char chOne = '?')(string input, string wildStr)
 		{
+			//Bug: isWild invalid utf sequence bug!!!  with string: `Árak` mask `?* Ft?* Ft/?*`
+			
 			//bool cmp(char a, char b){ return ignoreCase ? a.toLower==b.toLower : a==b; }
 			const cs = ignoreCase ? No.caseSensitive : Yes.caseSensitive;   
 			//Note: kibaszott kisbetu a caseSensitive c-je. Kulonben osszeakad az std.path.CaseSensitive enummal.

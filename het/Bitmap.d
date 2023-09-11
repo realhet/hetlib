@@ -1221,7 +1221,7 @@ version(/+$DIDE_REGION+/all)
 	
 	T cubicInterpolate(T)(T[4] p, float x) if(__traits(isIntegral, T))
 	{
-		 //http://www.paulinternet.nl/?page=bicubic
+		//http://www.paulinternet.nl/?page=bicubic
 		float f = (p[1] + 0.5f * x*(p[2] - p[0] + x*(2*p[0] - 5*p[1] + 4*p[2] - p[3] + x*(3*(p[1] - p[2]) + p[3] - p[0]))));
 		return cast(T) f.iround.clamp(T.min, T.max);
 	}

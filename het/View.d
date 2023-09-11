@@ -49,7 +49,7 @@ class View2D
 	+/
 	bool scrollSlower;	//It's the current 'shift' modifier state. also affects zoom
 	bool _mustZoomAll;	//schedule zoom all on the next draw
-	
+	
 	public:
 	@property auto owner()
 	{
@@ -434,7 +434,8 @@ class View2D
 }
 
 /// Clamps worldCoord points into a view's visible subSurface
-struct RectClamper {
+struct RectClamper
+ {
 	const {
 		bounds2 outerBnd, innerBnd;
 		vec2 center, innerHalfSize;

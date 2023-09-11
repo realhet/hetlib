@@ -1857,7 +1857,11 @@ version(/+$DIDE_REGION+/all)
 	{
 		retry:
 		
-		if(samples<=1 || wglChoosePixelFormatARB is null) {
+		if(samples<=1 || wglChoosePixelFormatARB is null)
+		{
+			if(wglChoosePixelFormatARB is null)
+			WARN("wglChoosePixelFormatARB is NOT accessible. MultiSampling is not possible.");
+			
 			oldSetPixelFormat(dc);
 			return;
 		}
@@ -1880,7 +1884,7 @@ version(/+$DIDE_REGION+/all)
 		bool ok = wglChoosePixelFormatARB(dc, attribIList.ptr, attribFList.ptr, 1, &pixelFormat, &numFormats);
 		
 		if(!ok || numFormats<1) {
-			  //try again with smalle multisampling, or with the old shit
+			//try again with smalle multisampling, or with the old shit
 			samples /= 2;  goto retry;
 		}
 		
