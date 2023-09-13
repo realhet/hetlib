@@ -3000,6 +3000,13 @@ version(/+$DIDE_REGION+/all)
 			return a*(1.0f/length(a));
 		}
 		
+		auto magnitude(A)(in A a)
+		{
+			static if(isVector!A) return length(a);
+			else return abs(a);
+			//todo: magnitude of complex numbers
+		}
+		
 		/// Orients a vector to point away from a surface as defined by its normal.
 		auto faceforward(A, B, C)(in A N, in B I, in C Nref)
 		{ return dot(Nref, I) < 0 ? N : -N; }
@@ -3097,6 +3104,9 @@ version(/+$DIDE_REGION+/all)
 			assert(crossZ(vec2(1, 0), vec2(0, 1)) == 1);
 			
 			assert(normalize(vec2(-0.5, 2)).approxEqual(vec2(-0.242536, 0.970143)));
+			
+			assert(magnitude(vec2(1, -1)).approxEqual(sqrt(2)));
+			assert(magnitude(-5) == 5);
 			
 			//Todo: faceforward, reflect, refract
 			
