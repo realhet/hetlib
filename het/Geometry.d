@@ -669,22 +669,44 @@ struct Turtle_(T)
 		state = stack.back; stack.popBack; 
 	} 
 	
-	V[] capture(void delegate() fun)
+	struct Path
 	{
-		V[] res; 
-		
-		auto realSink = sink; 
-		sink = (V p){ if(res.empty || res.back!=p) res ~= p; }; 
-		push; 
-		scope(exit) { sink = realSink; pop; } 
+		V[] points; 
+		V dir_start, dir_end; 
+		alias points this; 
+	} 
+	
+	auto capture(void delegate() fun)
+	{
+		Path path; 
+		with(path)
+		{
+			dir_start = dir; 
+			
+			auto originalSink = sink; 
+			sink = (V p){ if(points.empty || points.back!=p) points ~= p; }; 
+			push; 
+			
+			scope(exit)
+			{
+				sink = originalSink; 
+				dir_end = dir; 
+				pop; 
+			} 
+		}
 		
 		fun(); 
 		
-		return res; 
+		return path; 
 	} 
 	
-	void emit(V[] arr)
-	{ arr.each!((a){ sink(a); }); } 
+	void emit(in Path path)
+	{
+		if(path.empty) return; 
+		path.each!((a){ sink(a); }); 
+		pos = path.back; 
+		dir = path.dir_end; 
+	} 
 	
 	void line(
 		in T length //negative goes backwards
@@ -702,7 +724,8 @@ struct Turtle_(T)
 	
 	void arc_angle(
 		T θ, //negative: goes backwards on the same side
-		T r //-left, +right
+		T r, //-left, +right
+		float adjust = 0 //clothoidal bending
 	)
 	{
 		if(!θ) return; 
@@ -719,27 +742,56 @@ struct Turtle_(T)
 			endPos	= (pos-center).rotate(θ) + center,
 			endDir	= (normalize(dir.rotate(θ))),
 			Δθ 	= ((θ)/(segmentCount)); 
-		
-		dir = (normalize(dir.rotate(Δθ / 2))) * segmentLength; 
-		sink(pos); 
-		foreach(i; 0..segmentCount-1)
+		if(adjust==0)
 		{
-			pos += dir; sink(pos); 
-			dir = dir.rotate(Δθ); 
+			dir = (normalize(dir.rotate(Δθ / 2))) * segmentLength; 
+			sink(pos); 
+			foreach(i; 0..segmentCount-1)
+			{
+				pos += dir; sink(pos); 
+				dir = dir.rotate(Δθ); 
+			}
+			pos = endPos; dir = endDir; 
+			sink(pos); 
 		}
-		pos = endPos; dir = endDir; 
-		sink(pos); 
+		else
+		{ bezier4(endPos, endDir, adjust); }
 	} 
 	
 	void arc_length(
 		T length, //negative: goes backwards on the same side
-		T r //-left, +right
+		T r, //-left, +right
+		float adjust = 0 //clothoidal bending
 	)
 	{
 		if(!length) return; 
 		const θ = ((length)/((magnitude(r)))).degrees; 
-		arc_angle(θ, r); 
+		arc_angle(θ, r, adjust); 
 	} 
+	
+	void bezier4(V pos_end, V dir_end, float adjust=0)
+	{
+		/+
+			Draw a cubic bezier curve from current pos/dir to a given pos/dir.
+			The middle points can be adjusted to move close to each other, so it is 
+			possible to emulate a clothoid using cubic bezier interpolation.
+		+/
+		V[4] cp; //The 4 control points
+		{
+			const len = (magnitude(pos_end - pos)) * 0.33333f * (1 + adjust); 
+			
+			cp[0] = pos; 
+			cp[1]	= pos     + (normalize(dir    ))*len,
+			cp[2]	= pos_end - (normalize(dir_end))*len; 
+			cp[3] = pos_end; 
+		}
+		
+		generateBezierPolyline(cp, stepSize).each!((p){ sink(p); }); 
+		
+		pos = pos_end; 
+		dir = (normalize(dir_end)); 
+	} 
+	
 	
 	void clothoid_accel(
 		T ΔΔθ, //angle step increase between steps.
@@ -782,4 +834,5 @@ struct Turtle_(T)
 		pos += dir; sink(pos); 
 		dir = (normalize(dir.rotate(Δθ/2))); //restore dir.length
 	} 
+	
 } 
