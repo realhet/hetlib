@@ -9,7 +9,7 @@
 	License: $(LINK www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
 	Source: $(LINK https://github.com/biozic/quantities)
 +/ 
-module quantities.internal.si;
+module quantities.internal.si; 
 	
 /+
 	+
@@ -18,21 +18,21 @@ module quantities.internal.si;
 +/
 mixin template SIDefinitions(N)
 {
-	import quantities.common : prefix;
-	import quantities.compiletime : Quantity, isQuantity, unit, square, cubic;
-	import quantities.runtime : QVariant, isQVariantOrQuantity;
-	import quantities.parsing : SymbolList, Parser;
-	import std.conv : parse;
-	import std.math : PI;
-	import std.traits : isNumeric, isSomeString;
+	import quantities.common : prefix; 
+	import quantities.compiletime : Quantity, isQuantity, unit, square, cubic; 
+	import quantities.runtime : QVariant, isQVariantOrQuantity; 
+	import quantities.parsing : SymbolList, Parser; 
+	import std.conv : parse; 
+	import std.math : PI; 
+	import std.traits : isNumeric, isSomeString; 
 	
-	static assert(isNumeric!N);
+	static assert(isNumeric!N); 
 	
 	/// The dimensionless unit 1.
-	enum one = unit!(N, "", 0);
+	enum one = unit!(N, "", 0); 
 	
 	/// Base SI units.
-	enum meter = unit!(N, "L", 1);
+	enum meter = unit!(N, "L", 1); 
 	alias metre = meter; /// ditto
 	enum kilogram = unit!(N, "M", 2); /// ditto
 	enum second = unit!(N, "T", 3); /// ditto
@@ -57,7 +57,11 @@ mixin template SIDefinitions(N)
 	enum weber = volt * second; /// ditto
 	enum tesla = weber / square(meter); /// ditto
 	enum henry = weber / ampere; /// ditto
-	enum celsius = kelvin; /// ditto
+	/+
+		enum celsius = kelvin ; /// ditto
+		230916 realhet: 	It's wrong, because no way to implement 
+			the 273.15 shift in this system.
+	+/
 	enum lumen = candela / steradian; /// ditto
 	enum lux = lumen / square(meter); /// ditto
 	enum becquerel = 1 / second; /// ditto
@@ -66,7 +70,7 @@ mixin template SIDefinitions(N)
 	enum katal = mole / second; /// ditto
 	
 	/// Units compatible with the SI
-	enum gram = 1e-3 * kilogram;
+	enum gram = 1e-3 * kilogram; 
 	enum minute = 60 * second; /// ditto
 	enum hour = 60 * minute; /// ditto
 	enum day = 24 * hour; /// ditto
@@ -81,7 +85,7 @@ mixin template SIDefinitions(N)
 	enum dalton = 1.66053886e-27 * kilogram; /// ditto
 	
 	/// SI prefixes.
-	alias yotta = prefix!1e24;
+	alias yotta = prefix!1e24; 
 	alias zetta = prefix!1e21; /// ditto
 	alias exa = prefix!1e18; /// ditto
 	alias peta = prefix!1e15; /// ditto
@@ -103,8 +107,8 @@ mixin template SIDefinitions(N)
 	alias yocto = prefix!1e-24; /// ditto
 	
 	/// Predefined quantity type templates for SI quantities
-	alias Dimensionless = typeof(one);
-	alias Length = typeof(meter);
+	alias Dimensionless = typeof(one); 
+	alias Length = typeof(meter); 
 	alias Mass = typeof(kilogram); /// ditto
 	alias Time = typeof(second); /// ditto
 	alias ElectricCurrent = typeof(ampere); /// ditto
@@ -113,7 +117,7 @@ mixin template SIDefinitions(N)
 	alias LuminousIntensity = typeof(candela); /// ditto
 	
 	alias Area = typeof(square(meter)); /// ditto
-	alias Surface = Area;
+	alias Surface = Area; 
 	alias Volume = typeof(cubic(meter)); /// ditto
 	alias Speed = typeof(meter / second); /// ditto
 	alias Acceleration = typeof(meter / square(second)); /// ditto
@@ -145,7 +149,11 @@ mixin template SIDefinitions(N)
 	alias Inductance = typeof(henry); /// ditto
 	alias LuminousFlux = typeof(lumen); /// ditto
 	alias Illuminance = typeof(lux); /// ditto
+	/+
 	alias CelsiusTemperature = typeof(celsius); /// ditto
+	230916 realhet: 	Removed because the 273.15 shift is not implemented.
+		Until that use kelvin for everything.
+	+/
 	alias Radioactivity = typeof(becquerel); /// ditto
 	alias AbsorbedDose = typeof(gray); /// ditto
 	alias DoseEquivalent = typeof(sievert); /// ditto
@@ -162,6 +170,7 @@ mixin template SIDefinitions(N)
 		.addUnit("mol", mole)
 		.addUnit("cd", candela)
 		.addUnit("rad", radian)
+		.addUnit("°", degreeOfAngle) /+230916 realhet+/
 		.addUnit("sr", steradian)
 		.addUnit("Hz", hertz)
 		.addUnit("N", newton)
@@ -210,20 +219,20 @@ mixin template SIDefinitions(N)
 		.addPrefix("f", 1e-15)
 		.addPrefix("a", 1e-18)
 		.addPrefix("z", 1e-21)
-		.addPrefix("y", 1e-24);
+		.addPrefix("y", 1e-24); 
 	//dfmt on
 	
 	/// A list of common SI symbols and prefixes
 	static
 	{
-		SymbolList!N siSymbols;
-		Parser!(N, (ref s) => parse!N(s)) siParser;
-	}
+		SymbolList!N siSymbols; 
+		Parser!(N, (ref s) => parse!N(s)) siParser; 
+	} 
 	static this()
 	{
-		siSymbols = siSymbolList;
-		siParser = typeof(siParser)(siSymbols);
-	}
+		siSymbols = siSymbolList; 
+		siParser = typeof(siParser)(siSymbols); 
+	} 
 	
 	/+
 		+
@@ -238,16 +247,16 @@ mixin template SIDefinitions(N)
 	+/
 	Q parseSI(Q, S)(S str)
 			if (isQuantity!Q && isSomeString!S)
-	{ return Q(siParser.parse(str)); }
+	{ return Q(siParser.parse(str)); } 
 	///
 	unittest
 	{
-		alias Time = typeof(second);
-		Time t = parseSI!Time("90 min");
-		assert(t == 90 * minute);
-		t = parseSI!Time("h");
-		assert(t == 1 * hour);
-	}
+		alias Time = typeof(second); 
+		Time t = parseSI!Time("90 min"); 
+		assert(t == 90 * minute); 
+		t = parseSI!Time("h"); 
+		assert(t == 1 * hour); 
+	} 
 	
 	/+
 		+
@@ -255,18 +264,18 @@ mixin template SIDefinitions(N)
 	+/
 	template si(string str)
 	{
-		enum ctSIParser = Parser!(N, (ref s) => parse!N(s))(siSymbolList);
-		enum qty = ctSIParser.parse(str);
-		enum si = Quantity!(N, qty.dimensions())(qty);
-	}
+		enum ctSIParser = Parser!(N, (ref s) => parse!N(s))(siSymbolList); 
+		enum qty = ctSIParser.parse(str); 
+		enum si = Quantity!(N, qty.dimensions())(qty); 
+	} 
 	///
 	unittest
 	{
-		alias Time = typeof(second);
-		enum t = si!"90 min";
-		assert(is(typeof(t) == Time));
-		assert(si!"h" == 60 * 60 * second);
-	}
+		alias Time = typeof(second); 
+		enum t = si!"90 min"; 
+		assert(is(typeof(t) == Time)); 
+		assert(si!"h" == 60 * 60 * second); 
+	} 
 	
 	/+
 		+
@@ -280,25 +289,25 @@ mixin template SIDefinitions(N)
 	{
 		if(__ctfe)
 		{
-			import quantities.parsing : Parser;
-			import std.conv : parse;
+			import quantities.parsing : Parser; 
+			import std.conv : parse; 
 			
-			auto ctSIParser = Parser!(N, (ref s) => parse!N(s))(siSymbolList);
-			return ctSIParser.parse(str);
+			auto ctSIParser = Parser!(N, (ref s) => parse!N(s))(siSymbolList); 
+			return ctSIParser.parse(str); 
 		}
-		return siParser.parse(str);
-	}
+		return siParser.parse(str); 
+	} 
 	///
 	unittest
 	{
-		auto t = parseSI("90 min");
-		assert(t == 90 * minute);
-		t = parseSI("h");
-		assert(t == 1 * hour);
+		auto t = parseSI("90 min"); 
+		assert(t == 90 * minute); 
+		t = parseSI("h"); 
+		assert(t == 1 * hour); 
 		
-		auto v = parseSI("2");
-		assert(v == (2 * meter) / meter);
-	}
+		auto v = parseSI("2"); 
+		assert(v == (2 * meter) / meter); 
+	} 
 	
 	/+
 		+
@@ -307,15 +316,15 @@ mixin template SIDefinitions(N)
 	struct SIFormatter(S)
 			if (isSomeString!S)
 	{
-		import std.range : ElementEncodingType;
+		import std.range : ElementEncodingType; 
 		
-		alias Char = ElementEncodingType!S;
+		alias Char = ElementEncodingType!S; 
 		
 		private
 		{
-			S fmt;
-			QVariant!double unit;
-		}
+			S fmt; 
+			QVariant!double unit; 
+		} 
 		
 		/+
 			+
@@ -323,29 +332,29 @@ mixin template SIDefinitions(N)
 			
 				Params:
 				format = The format string. Must start with a format specification
-					     for the value of the quantity (a numeric type), that must be 
-					     followed by the symbol of a SI unit.
+								  for the value of the quantity (a numeric type), that must be 
+								  followed by the symbol of a SI unit.
 		+/
 		this(S format)
 		{
-			import std.format : FormatSpec;
-			import std.array : appender;
+			import std.format : FormatSpec; 
+			import std.array : appender; 
 			
-			fmt = format;
-			auto spec = FormatSpec!Char(format);
-			auto app = appender!S;
-			spec.writeUpToNextSpec(app);
-			unit = parseSI(spec.trailing);
-		}
+			fmt = format; 
+			auto spec = FormatSpec!Char(format); 
+			auto app = appender!S; 
+			spec.writeUpToNextSpec(app); 
+			unit = parseSI(spec.trailing); 
+		} 
 		
 		void write(Writer, Q)(auto ref Writer writer, auto ref Q quantity) const 
 			if (isQVariantOrQuantity!Q)
 		{
-			import std.format : formattedWrite;
+			import std.format : formattedWrite; 
 			
-			formattedWrite(writer, fmt, quantity.value(unit));
-		}
-	}
+			formattedWrite(writer, fmt, quantity.value(unit)); 
+		} 
+	} 
 	
 	/+
 		+
@@ -360,19 +369,19 @@ mixin template SIDefinitions(N)
 	S siFormat(S, Q)(S format, Q quantity)
 			if (isSomeString!S && isQVariantOrQuantity!Q)
 	{
-		import std.array : appender;
+		import std.array : appender; 
 		
-		auto formatter = SIFormatter!S(format);
-		auto app = appender!S;
-		formatter.write(app, quantity);
-		return app.data;
-	}
+		auto formatter = SIFormatter!S(format); 
+		auto app = appender!S; 
+		formatter.write(app, quantity); 
+		return app.data; 
+	} 
 	///
 	unittest
 	{
-		QVariant!double speed = 12.5 * kilo(meter) / hour;
-		assert("%.2f m/s".siFormat(speed) == "3.47 m/s");
-	}
+		QVariant!double speed = 12.5 * kilo(meter) / hour; 
+		assert("%.2f m/s".siFormat(speed) == "3.47 m/s"); 
+	} 
 	
 	/+
 		+
@@ -386,11 +395,11 @@ mixin template SIDefinitions(N)
 	+/
 	auto siFormat(alias format, Q)(Q quantity)
 			if (isSomeString!(typeof(format)) && isQVariantOrQuantity!Q)
-	{ return siFormat(format, quantity); }
+	{ return siFormat(format, quantity); } 
 	///
 	unittest
 	{
-		enum speed = 12.5 * kilo(meter) / hour;
-		assert(siFormat!"%.2f m/s"(speed) == "3.47 m/s");
-	}
-}
+		enum speed = 12.5 * kilo(meter) / hour; 
+		assert(siFormat!"%.2f m/s"(speed) == "3.47 m/s"); 
+	} 
+} 

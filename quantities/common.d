@@ -1,6 +1,6 @@
 module quantities.common; 
 	
-import quantities.runtime : isQVariantOrQuantity, unit;
+import quantities.runtime : isQVariantOrQuantity, unit; 
 
 /+
 	+
@@ -8,23 +8,23 @@ import quantities.runtime : isQVariantOrQuantity, unit;
 +/
 template prefix(alias fact)
 {
-	import std.traits : isNumeric;
+	import std.traits : isNumeric; 
 	
-	alias N = typeof(fact);
-	static assert(isNumeric!N, "Incompatible type: " ~ N.stringof);
+	alias N = typeof(fact); 
+	static assert(isNumeric!N, "Incompatible type: " ~ N.stringof); 
 	
 	/// The prefix factor
-	enum factor = fact;
+	enum factor = fact; 
 	
 	/// The prefix function
 	auto prefix(Q)(auto ref const Q base)
 			if (isQVariantOrQuantity!Q)
-	{ return base * fact; }
-}
+	{ return base * fact; } 
+} 
 ///
 @safe pure unittest
 {
-	auto meter = unit!double("L");
-	alias milli = prefix!1e-3;
-	assert(milli(meter) == 1e-3 * meter);
-}
+	auto meter = unit!double("L"); 
+	alias milli = prefix!1e-3; 
+	assert(milli(meter) == 1e-3 * meter); 
+} 

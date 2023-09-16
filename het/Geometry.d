@@ -223,19 +223,19 @@ vec2 restrictPos_editor(T1, T2)(in Vector!(T1, 2) p, in Bounds!(Vector!(T2, 2)) 
 
 void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ivec2) dot)
 {
-	auto d = b-a,
-			 d1 = abs(d),
-			 p = ivec2(
+	auto 	d	= b-a,
+		d1 	= abs(d),
+		p	= ivec2(
 		2*d1.y-d1.x,
-										 2*d1.x-d1.y
+		2*d1.x-d1.y
 	),
-			 i = (d.x<0)==(d.y<0) ? 1 : -1; 
+		i	= (d.x<0)==(d.y<0) ? 1 : -1; 
 	d1 *= 2; 
 	
 	void dot2(in ivec2 p) { if(!skipFirst || p!=a) dot(p); } 
 	
 	int e; ivec2 v; 
-	if(d1.y<=d1.x) {
+	if(d1.y<=d1.x)	{
 		if(d.x>=0) { v=a; e=b.x; }
 		else { v=b; e=a.x; }
 		dot2(v); 
@@ -246,7 +246,7 @@ void line_bresenham(in ivec2 a, in ivec2 b, bool skipFirst, void delegate(in ive
 			dot2(v); 
 		}
 	}
-	else {
+	else	{
 		if(d.y>=0) { v=a; e=b.y; }
 		else { v=b; e=a.y; }
 		dot2(v); 
@@ -781,8 +781,8 @@ struct Turtle_(T)
 			const len = (magnitude(pos_end - pos)) * 0.33333f * (1 + adjust); 
 			
 			cp[0] = pos; 
-			cp[1]	= pos     + (normalize(dir    ))*len,
-			cp[2]	= pos_end - (normalize(dir_end))*len; 
+			cp[1]	= pos	+ (normalize(dir    ))*len,
+			cp[2]	= pos_end	- (normalize(dir_end))*len; 
 			cp[3] = pos_end; 
 		}
 		
