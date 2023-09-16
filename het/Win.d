@@ -1,4 +1,4 @@
-module het.win;/+DIDE+/
+module het.win; /+DIDE+/
 
 //The next @comment is important: It marks the app as a windowed app.
 //@win
@@ -6,11 +6,11 @@ module het.win;/+DIDE+/
 version(/+$DIDE_REGION+/all)
 {
 	
-	pragma(lib, "gdi32.lib");
-	pragma(lib, "winmm.lib");
+	pragma(lib, "gdi32.lib"); 
+	pragma(lib, "winmm.lib"); 
 	pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 	
-	public import het.utils, het.geometry, het.inputs;
+	public import het, het.geometry, het.inputs; 
 	
 	//moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
 	__gshared size_t global_TPSCnt, TPS; //texture upload bytes /sec
@@ -24,7 +24,7 @@ version(/+$DIDE_REGION+/all)
 	core.sys.windows.winuser,
 	core.sys.windows.wingdi,
 	core.sys.windows.wincon,
-	core.sys.windows.mmsystem;
+	core.sys.windows.mmsystem; 
 	
 	public import core.sys.windows.winuser:
 		WS_OVERLAPPED, WS_TILED, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_TABSTOP, WS_GROUP, WS_THICKFRAME,
@@ -36,7 +36,7 @@ version(/+$DIDE_REGION+/all)
 		WS_EX_LEFTSCROLLBAR, WS_EX_LTRREADING, WS_EX_MDICHILD, WS_EX_NOACTIVATE, WS_EX_NOINHERITLAYOUT,
 		WS_EX_NOPARENTNOTIFY, WS_EX_OVERLAPPEDWINDOW, WS_EX_PALETTEWINDOW, WS_EX_RIGHT, 
 		WS_EX_RIGHTSCROLLBAR, WS_EX_RTLREADING, WS_EX_STATICEDGE, 	WS_EX_TOOLWINDOW, WS_EX_TOPMOST, 
-		WS_EX_TRANSPARENT, WS_EX_WINDOWEDGE;
+		WS_EX_TRANSPARENT, WS_EX_WINDOWEDGE; 
 	
 	
 	//use het.bitmap.getDesktopBounds instead!
@@ -48,57 +48,57 @@ version(/+$DIDE_REGION+/all)
 	
 	string getWindowText(HWND handle)
 	{
-		wchar[256] buf;
-		auto n = GetWindowTextW(handle, buf.ptr, buf.length);
-		return buf[0..n].toStr;
-	}
+		wchar[256] buf; 
+		auto n = GetWindowTextW(handle, buf.ptr, buf.length); 
+		return buf[0..n].toStr; 
+	} 
 	
 	string getClassName(HWND handle)
 	{
-		wchar[256] buf;
-		auto n = GetClassNameW(handle, buf.ptr, buf.length);
-		return buf[0..n].toStr;
-	}
+		wchar[256] buf; 
+		auto n = GetClassNameW(handle, buf.ptr, buf.length); 
+		return buf[0..n].toStr; 
+	} 
 	
 	uint getWindowThreadProcessId(HWND handle)
 	{
-		uint pid;
-		GetWindowThreadProcessId(handle, &pid);
-		return pid;
-	}
+		uint pid; 
+		GetWindowThreadProcessId(handle, &pid); 
+		return pid; 
+	} 
 	
 	struct WindowInfo
 	{
-		HWND handle;
-		string title, className;
-		uint pid;
-		File file;
-	}
+		HWND handle; 
+		string title, className; 
+		uint pid; 
+		File file; 
+	} 
 	
 	auto getWindowInfo(HWND handle)
 	{
 		//const t0 = QPS;
 		
-		WindowInfo res;
-		res.handle = handle;
-		res.title = getWindowText(handle);
-		res.className = getClassName(handle);
-		res.pid = getWindowThreadProcessId(handle);
+		WindowInfo res; 
+		res.handle = handle; 
+		res.title = getWindowText(handle); 
+		res.className = getClassName(handle); 
+		res.pid = getWindowThreadProcessId(handle); 
 		
 		if(res.pid)
 		if(auto hProc = OpenProcess(0x1000/+PROCESS_QUERY_LIMITED_INFORMATION+/, false, res.pid))
 		{
-			wchar[256] buf;
-			import core.sys.windows.psapi;
-			auto n = GetModuleFileNameExW(hProc, null, buf.ptr, buf.length);
-			res.file.fullName = buf.toStr;
+			wchar[256] buf; 
+			import core.sys.windows.psapi; 
+			auto n = GetModuleFileNameExW(hProc, null, buf.ptr, buf.length); 
+			res.file.fullName = buf.toStr; 
 		}
 		
 		
 		//print(QPS-t0); // .1 ms
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	
 	//windows message decoding //////////////////////////////////////////////
@@ -138,14 +138,14 @@ version(/+$DIDE_REGION+/all)
 			"EXITMENULOOP", "ENTERMENULOOP", "DISPLAYCHANGE", "STYLECHANGED", "STYLECHANGING",
 			"GETICON", "SETICON", "SIZING", "MOVING", "CAPTURECHANGED", "DEVICECHANGE", 
 			"PRINT", "PRINTCLIENT"
-		];
+		]; 
 		
-		static string[uint] map;
-		if(map.empty) static foreach(s; list) map[mixin("WM_", s)] = s;
+		static string[uint] map; 
+		if(map.empty) static foreach(s; list) map[mixin("WM_", s)] = s; 
 		
-		if(auto a = msg in map) return "WM_" ~ *a;
-		else return "WM_0x"~format!"%X"(msg);
-	}
+		if(auto a = msg in map) return "WM_" ~ *a; 
+		else return "WM_0x"~format!"%X"(msg); 
+	} 
 	
 	
 	//timeLine //////////////////////////////
@@ -156,47 +156,47 @@ version(/+$DIDE_REGION+/all)
 		struct Event
 		{
 			enum Type
-			{ update, beginPaint, paint, endPaint, swapBuffers }
-			Type type;
-			Time t0, t1;
+			{ update, beginPaint, paint, endPaint, swapBuffers} 
+			Type type; 
+			Time t0, t1; 
 			
 			auto color()
 			{
-				enum typeColors = [clBlue, clLime, clYellow, clRed, clGray];
-				return typeColors[cast(int)type];
-			}
-		}
+				enum typeColors = [clBlue, clLime, clYellow, clRed, clGray]; 
+				return typeColors[cast(int)type]; 
+			} 
+		} 
 		
-		private Event[][] groups;
+		private Event[][] groups; 
 		
 		bool isComplete(in Event[] group)
 		{
 			 //Group Completeness: there must be a paint event at the end.
-			return !group.empty && group[$-1].type == Event.Type.max;
-		}
+			return !group.empty && group[$-1].type == Event.Type.max; 
+		} 
 		
 		void addEvent(Event.Type type, Time t0, Time t1=QPS)
 		{
-			auto ev = Event(type, t0, t1);
+			auto ev = Event(type, t0, t1); 
 			
-			const  newGroup = groups.empty || isComplete(groups[$-1]);
-			if(newGroup) groups ~= [ev];
-			else groups[$-1] ~= ev;
-		}
+			const  newGroup = groups.empty || isComplete(groups[$-1]); 
+			if(newGroup) groups ~= [ev]; 
+			else groups[$-1] ~= ev; 
+		} 
 		
 		void restrictSize(int maxGroups)
 		{
-			const n = maxGroups+1;
-			if(n<groups.length) groups = groups[groups.length-n..$];
-		}
+			const n = maxGroups+1; 
+			if(n<groups.length) groups = groups[groups.length-n..$]; 
+		} 
 		
 		Event[][] getGroups()
 		{
-			if(groups.length>1) return groups[0..$-1];
-			else return [];
-		}
+			if(groups.length>1) return groups[0..$-1]; 
+			else return []; 
+		} 
 		
-	}
+	} 
 	
 	
 	//MouseCursor /////////////////////////////////////////////////////////////////////
@@ -204,17 +204,17 @@ version(/+$DIDE_REGION+/all)
 	enum MouseCursor {
 		ARROW, IBEAM, WAIT, CROSS, UPARROW, /+SIZE, ICON,+/ 
 		SIZENWSE, SIZENESW, SIZEWE, SIZENS, SIZEALL, NO, HAND, APPSTARTING, HELP
-	}
+	} 
 	
 	private void SetCursor(MouseCursor c)
 	{
-		immutable _cursorIds = mixin("[", [EnumMembers!MouseCursor].map!`"IDC_"~a.text`.join(','), "]");
-		__gshared HCURSOR[MouseCursor.max] _loadedCursors;
+		immutable _cursorIds = mixin("[", [EnumMembers!MouseCursor].map!`"IDC_"~a.text`.join(','), "]"); 
+		__gshared HCURSOR[MouseCursor.max] _loadedCursors; 
 		
-		auto ref h() { return _loadedCursors[c]; }
+		auto ref h() { return _loadedCursors[c]; } 
 		if(!h) { h = LoadCursorW(null, _cursorIds[c]); }
-		core.sys.windows.winuser.SetCursor(h);
-	}
+		core.sys.windows.winuser.SetCursor(h); 
+	} 
 	
 	
 	//Todo: ezek a specialis commentek szekciokra oszthatnak a filet es az editorban lehetne maszkalni a szekciok kozott
@@ -233,46 +233,46 @@ version(/+$DIDE_REGION+/all)
 	+/
 	T createWindow(T)(string name = Window.getUniqueName(__traits(identifier, T)) )
 	{
-		Window._upcomingWindowName = name;
-		return new T;
-	}
+		Window._upcomingWindowName = name; 
+		return new T; 
+	} 
 	
 	__gshared Window mainWindow; //global access to mainWindow. Lame
 	
-	__gshared uint mainThreadProcessorNumber;
+	__gshared uint mainThreadProcessorNumber; 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS REGISTRATION                                               ///
 	////////////////////////////////////////////////////////////////////////////////
 	
-	private __gshared static string[] _registeredClasses;
+	private __gshared static string[] _registeredClasses; 
 	
 	void registerWindowClass(string className, wchar* icon = IDI_APPLICATION)
 	{
-		if(_registeredClasses.canFind(className)) return;
+		if(_registeredClasses.canFind(className)) return; 
 		
-		WNDCLASS wndclass;
+		WNDCLASS wndclass; 
 		with(wndclass) {
-			style	= CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-			lpfnWndProc	= &Window.GlobalWndProc;
-			cbClsExtra	= 0;
-			cbWndExtra	= 0;
-			hInstance	= GetModuleHandleW(null);
-			hIcon	= LoadIcon(null, icon);
-			hCursor	= LoadCursor(null, IDC_ARROW);
-			hbrBackground	= null;
-			lpszMenuName	= null;
-			lpszClassName	= toPWChar(className);
+			style	= CS_HREDRAW | CS_VREDRAW | CS_OWNDC; 
+			lpfnWndProc	= &Window.GlobalWndProc; 
+			cbClsExtra	= 0; 
+			cbWndExtra	= 0; 
+			hInstance	= GetModuleHandleW(null); 
+			hIcon	= LoadIcon(null, icon); 
+			hCursor	= LoadCursor(null, IDC_ARROW); 
+			hbrBackground	= null; 
+			lpszMenuName	= null; 
+			lpszClassName	= toPWChar(className); 
 		}
-		RegisterClassW(&wndclass);
-	}
+		RegisterClassW(&wndclass); 
+	} 
 	
 	void unregisterWindowClass(string className)
 	{
-		if(!_registeredClasses.canFind(className)) return;
-		_registeredClasses = _registeredClasses.remove(_registeredClasses.countUntil(className));
-		UnregisterClassW(toPWChar(className), GetModuleHandleW(NULL));
-	}
+		if(!_registeredClasses.canFind(className)) return; 
+		_registeredClasses = _registeredClasses.remove(_registeredClasses.countUntil(className)); 
+		UnregisterClassW(toPWChar(className), GetModuleHandleW(NULL)); 
+	} 
 	
 	
 	////////////////////////////////////////////////////////////////////////////////
@@ -281,11 +281,11 @@ version(/+$DIDE_REGION+/all)
 	
 	HWND helperWindow() //Source: GLFW3
 	{
-		__gshared static HWND window;
-		if(window) return window;
+		__gshared static HWND window; 
+		if(window) return window; 
 		
-		string className = "Helper window class";
-		registerWindowClass(className);
+		string className = "Helper window class"; 
+		registerWindowClass(className); 
 		window = CreateWindowExW(
 			WS_EX_OVERLAPPEDWINDOW,
 			toPWChar(className),
@@ -295,75 +295,75 @@ version(/+$DIDE_REGION+/all)
 			HWND_MESSAGE, NULL,
 			GetModuleHandleW(NULL),
 			NULL
-		);
+		); 
 		
 		//HACK:	The first call to ShowWindow is ignored if the parent process
 		//passed along a STARTUPINFO, so clear that flag with a no-op call
-		ShowWindow(window, SW_HIDE);
+		ShowWindow(window, SW_HIDE); 
 		
-		MSG msg;
+		MSG msg; 
 		while(PeekMessageW(&msg, window, 0, 0, PM_REMOVE))
 		{
 			try
 			{
-				TranslateMessage(&msg);
-				DispatchMessageW(&msg);
+				TranslateMessage(&msg); 
+				DispatchMessageW(&msg); 
 			}
 			catch(Throwable e)
 			{ writeln("Unhandled Exception: "~__traits(identifier, typeof(e))~"\r\n"~e.toString); }
 		}
 		
-		return window;
-	}
+		return window; 
+	} 
 	
 	
 	auto createSimplePFD()
 	{
-		PIXELFORMATDESCRIPTOR pfd;
+		PIXELFORMATDESCRIPTOR pfd; 
 		with(pfd) {
-			nSize	= pfd.sizeof;
+			nSize	= pfd.sizeof; 
 				
-			nVersion	= 1;
+			nVersion	= 1; 
 			dwFlags	= PFD_SUPPORT_OPENGL | PFD_SWAP_EXCHANGE |
-				PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
-			iPixelType	= PFD_TYPE_RGBA;
+				PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER; 
+			iPixelType	= PFD_TYPE_RGBA; 
 				
-			cColorBits	= 32;
-			cAccumBits	= 0;
-			cDepthBits	= 24;
-			cStencilBits	= 8;
-			iLayerType	= PFD_MAIN_PLANE;
+			cColorBits	= 32; 
+			cAccumBits	= 0; 
+			cDepthBits	= 24; 
+			cStencilBits	= 8; 
+			iLayerType	= PFD_MAIN_PLANE; 
 		}
-		return pfd;
-	}
+		return pfd; 
+	} 
 	
 	extern(Windows) bool function(
 		HDC hdc, const(int*) piAttribIList, const(float*) pfAttribFList, 
 		int nMaxFormats, int* piFormats, int* nNumFormats
-	) wglChoosePixelFormatARB;
+	) wglChoosePixelFormatARB; 
 	
 	private bool initWglChoosePixelFormat()
 	//gets it with a dummy window, so the first opengl window can use it. Losing 250ms for nothing by this shit.
 	{
-		void error(string err) { throw new Exception("initWglChoosePixelFormat() "~err); }
-		auto w = helperWindow;
-		auto dc = GetDC(w);
+		void error(string err) { throw new Exception("initWglChoosePixelFormat() "~err); } 
+		auto w = helperWindow; 
+		auto dc = GetDC(w); 
 		
-		auto pfd = createSimplePFD;
-		if(!SetPixelFormat(dc, ChoosePixelFormat(dc, &pfd), &pfd)) error("SetPixelFormat failed");
+		auto pfd = createSimplePFD; 
+		if(!SetPixelFormat(dc, ChoosePixelFormat(dc, &pfd), &pfd)) error("SetPixelFormat failed"); 
 		
-		auto rc = wglCreateContext(dc);
-		if(!rc) error("createContext failed");
-		wglMakeCurrent(dc, rc);
+		auto rc = wglCreateContext(dc); 
+		if(!rc) error("createContext failed"); 
+		wglMakeCurrent(dc, rc); 
 		
-		wglChoosePixelFormatARB = cast(typeof(wglChoosePixelFormatARB))wglGetProcAddress("wglChoosePixelFormatARB");
+		wglChoosePixelFormatARB = cast(typeof(wglChoosePixelFormatARB))wglGetProcAddress("wglChoosePixelFormatARB"); 
 		//when it's null, multisampling will not be used.  But now at the initialization it's not az exception.
 		
-		wglMakeCurrent(null, null);
-		wglDeleteContext(rc);
+		wglMakeCurrent(null, null); 
+		wglDeleteContext(rc); 
 		
-		return wglChoosePixelFormatARB !is null;
-	}
+		return wglChoosePixelFormatARB !is null; 
+	} 
 	
 	
 	////////////////////////////////////////////////////////////////////////////////
@@ -393,15 +393,15 @@ version(/+$DIDE_REGION+/all)
 	
 	int main(string[] args)
 	{
-		MSG  msg;
-		Runtime.initialize;
-		application._initialize;
+		MSG  msg; 
+		Runtime.initialize; 
+		application._initialize; 
 		
 		try {
-			SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS);
+			SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS); 
 			
 			{
-				initWglChoosePixelFormat();
+				initWglChoosePixelFormat(); 
 				/+
 					Note: This creates another window just to access wglChoosePixelFormat.
 					If wglChoosePixelFormat is not accessible (returns false), it will not exit with an error right now.
@@ -410,7 +410,7 @@ version(/+$DIDE_REGION+/all)
 				+/
 			}
 			
-			if(application._windowInitFunct) application._windowInitFunct();
+			if(application._windowInitFunct) application._windowInitFunct(); 
 			
 			while(1)
 			{
@@ -423,25 +423,25 @@ version(/+$DIDE_REGION+/all)
 				{
 					//PING(3);
 					
-					TranslateMessage(&msg);
-					DispatchMessage(&msg);
+					TranslateMessage(&msg); 
+					DispatchMessage(&msg); 
 					
-					if(Window.mainWindowDestroyed) goto done;
+					if(Window.mainWindowDestroyed) goto done; 
 				}
 				
-				const isMainWindowHidden = mainWindow && mainWindow.isHidden;
-				bool canSleep;
+				const isMainWindowHidden = mainWindow && mainWindow.isHidden; 
+				bool canSleep; 
 				if(isMainWindowHidden)
 				{
-					canSleep = true;
+					canSleep = true; 
 					foreach(w; Window.windowList.values) w.internalUpdate; //WM_TIMER just sucks....
 				}
 				else
 				{
-					canSleep = true;
+					canSleep = true; 
 					foreach(w; Window.windowList.values) {
 						w.internalUpdate; //This is forced 100%cpu update.
-						if(!w.canSleep) canSleep = false;
+						if(!w.canSleep) canSleep = false; 
 					}
 				}
 				
@@ -451,23 +451,23 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 			
-			done:
+			done: 
 			
-			Window.destroyAllWindows;
+			Window.destroyAllWindows; 
 		}
 		catch(Throwable o) { showException(o); }
 		
-		application._finalize;
-		Runtime.terminate;
+		application._finalize; 
+		Runtime.terminate; 
 		
 		//Todo: Mark the unused threads as daemon threads (in karc2.d, utils.d, bitmap.d) and remove this application.exit!!!!
 		application.exit; //let it exit even if there are threads stuck in
 		
-		return cast(int)msg.wParam;
-	}
+		return cast(int)msg.wParam; 
+	} 
 	
 	
-	struct WindowStyle { DWORD style=WS_OVERLAPPEDWINDOW, styleEx=0; }
+	struct WindowStyle { DWORD style=WS_OVERLAPPEDWINDOW, styleEx=0; } 
 }
 class Window 
 {
@@ -476,36 +476,36 @@ class Window
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS STATIC FUNCTIONS                                           ///
 	////////////////////////////////////////////////////////////////////////////////
-	private:
-	static string _upcomingWindowName;
-	static Window[HWND] windowList;
-	static int windowCntr;
-	static bool mainWindowDestroyed;
+	private: 
+	static string _upcomingWindowName; 
+	static Window[HWND] windowList; 
+	static int windowCntr; 
+	static bool mainWindowDestroyed; 
 	static Window windowByName(string name)
-	{ foreach(w; windowList) if(w.name==name) return w; return null; }
+	{ foreach(w; windowList) if(w.name==name) return w; return null; } 
 	
 	static string getUniqueName(string name)
 	{
 		foreach(i; 0..int.max) {
-			string n = name~(i ? format("(%s)", i) : "");
-			if(!windowByName(n)) return n;
+			string n = name~(i ? format("(%s)", i) : ""); 
+			if(!windowByName(n)) return n; 
 		}
-		throw new Exception("Window.getUniqueName() failed.");
-	}
+		throw new Exception("Window.getUniqueName() failed."); 
+	} 
 	
 	static extern(Windows) LRESULT GlobalWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) nothrow
 	{
-		LRESULT res;
+		LRESULT res; 
 		try {
 			//find the window by handle
-			auto w = hwnd in windowList;
+			auto w = hwnd in windowList; 
 			
 			//call the windows message handler
-			if(w) return w.WndProc(message, wParam, lParam);
+			if(w) return w.WndProc(message, wParam, lParam); 
 			
 		}catch(Throwable o) { showException(o); }
-		return DefWindowProc(hwnd, message, wParam, lParam);
-	}
+		return DefWindowProc(hwnd, message, wParam, lParam); 
+	} 
 	
 	static HWND createWin(
 		string className, string caption, 
@@ -534,7 +534,7 @@ class Window
 			}
 		*/
 		
-		registerWindowClass(className);
+		registerWindowClass(className); 
 		HWND hwnd = CreateWindowExW
 			(
 			exStyle,	/+
@@ -555,257 +555,257 @@ class Window
 			NULL,	//window menu handle
 			GetModuleHandle(NULL),	//program instance handle
 			NULL
-		);
+		); 
 		
-		if(!hwnd) error("CreateWindow() failed "~text(GetLastError));
-		return hwnd;
-	}
+		if(!hwnd) error("CreateWindow() failed "~text(GetLastError)); 
+		return hwnd; 
+	} 
 	
 	static void destroyAllWindows()
 	{
 		while(windowList.length)
-		windowList.values[$-1].destroy;
-	}
+		windowList.values[$-1].destroy; 
+	} 
 	
 	//update control
-	private static uint disableCounter;
+	private static uint disableCounter; 
 	public static void disableUpdate()
-	{ disableCounter++; }
+	{ disableCounter++; } 
 	public static void enableUpdate ()
-	{ disableCounter--; }
+	{ disableCounter--; } 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS PRIVATE STUFF                                              ///
 	////////////////////////////////////////////////////////////////////////////////
-	private:
-	HWND fhwnd;
-	HDC fhdc;
-	string fName;
-	string paintErrorStr;
+	private: 
+	HWND fhwnd; 
+	HDC fhdc; 
+	string fName; 
+	string paintErrorStr; 
 	bool 	isMain, //this is the main windows
 		pendingInvalidate, //invalidate() was called. Timer checks it and clears it.
-		canSleep /+In the last update, there was no invalidate() calls, so it can sleep in the main loop.+/;
-	enum WM_MyStartup = WM_USER+0;
+		canSleep /+In the last update, there was no invalidate() calls, so it can sleep in the main loop.+/; 
+	enum WM_MyStartup = WM_USER+0; 
 	
 	string getClassName()
 	{
-		char[256] s;
-		GetClassNameA(hwnd, s.ptr, s.length);
+		char[256] s; 
+		GetClassNameA(hwnd, s.ptr, s.length); 
 		return to!string(fromStringz(s.ptr)); //ez eleg nagy buzisag...
-	}
+	} 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS PUBLIC STUFF                                               ///
 	////////////////////////////////////////////////////////////////////////////////
-	public:
+	public: 
 	static error(string s)
-	{ throw new Exception(s); }
+	{ throw new Exception(s); } 
 	
 	HWND hwnd()
-	{ return fhwnd; }
+	{ return fhwnd; } 
 	HDC hdc()
-	{ return fhdc; }
+	{ return fhdc; } 
 	string inputChars; //aaccumulated WM_CHAR input flushed in update()
-	string lastFrameStats;
+	string lastFrameStats; 
 	//bool autoUpdate;  deprecated: es csak a
 	
 	@property string name()
-	{ return fName; }
+	{ return fName; } 
 	@property void name(string name_)
 	{
-		bool setCapt = name==caption;
-		fName = name_;
-		if(setCapt) caption = name;
-	}
+		bool setCapt = name==caption; 
+		fName = name_; 
+		if(setCapt) caption = name; 
+	} 
 	
 	template autoCreate()
 	{
 		//include this into any window ant it will be the mainWindow
 		static this()
-		{ application._windowInitFunct = { createWindow!(typeof(this)); }; }
+		{ application._windowInitFunct = { createWindow!(typeof(this)); }; } 
 		
 		override uint getWindowStyle()
 		{
-			uint res = WS_OVERLAPPEDWINDOW;
-			foreach(t; __traits(getAttributes, typeof(this))) if(is(typeof(t)==WindowStyle)) res = t.style;
-			return res;
-		}
+			uint res = WS_OVERLAPPEDWINDOW; 
+			foreach(t; __traits(getAttributes, typeof(this))) if(is(typeof(t)==WindowStyle)) res = t.style; 
+			return res; 
+		} 
 		
 		override uint getWindowStyleEx()
 		{
-			uint res;
-			foreach(t; __traits(getAttributes, typeof(this))) if(is(typeof(t)==WindowStyle)) res = t.styleEx;
-			return res;
-		}
-	}
+			uint res; 
+			foreach(t; __traits(getAttributes, typeof(this))) if(is(typeof(t)==WindowStyle)) res = t.styleEx; 
+			return res; 
+		} 
+	} 
 	
 	protected void onInitialZoomAll()
-	{}
+	{} 
 	protected void onInitializeGLWindow()
-	{}
+	{} 
 	protected void onFinalizeGLWindow()
-	{}
+	{} 
 	protected void onWglMakeCurrent(bool activate)
-	{}
+	{} 
 	
 	uint getWindowStyle()
-	{ return WS_OVERLAPPEDWINDOW; }
+	{ return WS_OVERLAPPEDWINDOW; } 
 	uint getWindowStyleEx()
-	{ return 0; }
+	{ return 0; } 
 	
-	TimeLine timeLine;
+	TimeLine timeLine; 
 	
 	void setForegroundWindowIfVisible()
-	{ if(isVisible) SetForegroundWindow(hwnd); }
+	{ if(isVisible) SetForegroundWindow(hwnd); } 
 	
 	@property void dragAcceptFiles(bool val)
-	{ DragAcceptFiles(hwnd, val); }
+	{ DragAcceptFiles(hwnd, val); } 
 	
-	mixin Signal!(File[]) whenFilesDropped;
+	mixin Signal!(File[]) whenFilesDropped; 
 	
-	private bool dragAcceptFilesState;
+	private bool dragAcceptFilesState; 
 	protected void updateDragAcceptFilesState()
 	{
-		auto newState = whenFilesDropped.slots_idx>0;
+		auto newState = whenFilesDropped.slots_idx>0; 
 		if(dragAcceptFilesState.chkSet(newState))
-		dragAcceptFiles = newState;
-	}
+		dragAcceptFiles = newState; 
+	} 
 	
 	
 	this()
 	{
 		//acquire window name
-		fName = _upcomingWindowName;
-		_upcomingWindowName = "";
-		enforce(fName!="", "Window.create() Error: You must use createWindow() and specify a name.");
-		enforce(!windowByName(fName), format(`Window.create() Error: Window "%s" already exists.`, fName));
+		fName = _upcomingWindowName; 
+		_upcomingWindowName = ""; 
+		enforce(fName!="", "Window.create() Error: You must use createWindow() and specify a name."); 
+		enforce(!windowByName(fName), format(`Window.create() Error: Window "%s" already exists.`, fName)); 
 		
-		isMain = windowList.length==0;
+		isMain = windowList.length==0; 
 		
-		fhwnd = createWin(name, name, getWindowStyle, getWindowStyleEx);
+		fhwnd = createWin(name, name, getWindowStyle, getWindowStyleEx); 
 		windowList[hwnd] = this; //after this, the window can accept wm_messages
 		
 		if(isMain) {
-			mainWindow = this;
-			_mainWindowHandle = hwnd;
-			_mainWindowIsForeground = ()=>mainWindow.isForeground;
+			mainWindow = this; 
+			_mainWindowHandle = hwnd; 
+			_mainWindowIsForeground = ()=>mainWindow.isForeground; 
 			
-			console.afterFirstPrintFlushed = &setForegroundWindowIfVisible;
+			console.afterFirstPrintFlushed = &setForegroundWindowIfVisible; 
 		}
 		
-		dbg.setExeHwnd(hwnd);
+		dbg.setExeHwnd(hwnd); 
 		
-		fhdc = GetDC(hwnd);
+		fhdc = GetDC(hwnd); 
 		
-		onInitializeGLWindow;
+		onInitializeGLWindow; 
 		
 		//load configs from ini
-		actions.config = ini.read(name~".actions", "");
+		actions.config = ini.read(name~".actions", ""); 
 		
 		//call the user defined creator
 		{
-			onWglMakeCurrent(true); scope(exit) onWglMakeCurrent(false);
+			onWglMakeCurrent(true); scope(exit) onWglMakeCurrent(false); 
 			
-			onCreate;
-			onInitialZoomAll;
+			onCreate; 
+			onInitialZoomAll; 
 			//it zooms if there is a drawing that was made in the onCreate... From now it is handled by GlWindow
 		}
 		
 		if(isMain) {
 			//By default the console is visible. Hide it at start if there is no writeln() in mainform.doCreate
-			if(!console.visible) console.hide(true);
+			if(!console.visible) console.hide(true); 
 			
 			//show the main window automatically
-			show;
+			show; 
 		}
 		
 		//this will launch the update timer a bit later.
-		PostMessage(hwnd, WM_MyStartup, 0, 0);
-	}
+		PostMessage(hwnd, WM_MyStartup, 0, 0); 
+	} 
 	
 	private void destroy_impl()
 	//Todo: multiWindow: szolni kene a tobbinek, hogy destroyozzon, vagy nemtom...
 	{
-		enforce(hwnd, format(`Window "%s" already destroyed.`, name));
+		enforce(hwnd, format(`Window "%s" already destroyed.`, name)); 
 		
 		{
-			onWglMakeCurrent(true); scope(exit) onWglMakeCurrent(false);
+			onWglMakeCurrent(true); scope(exit) onWglMakeCurrent(false); 
 			
 			onDestroy; //call user definied destroy
 		}
 		
 		//save keyboard config
 		if(!actions.isDefault || ini.read(name~".actions", ""))
-		ini.write(name~".actions", actions.config);
+		ini.write(name~".actions", actions.config); 
 		
-		onFinalizeGLWindow;
-		ReleaseDC(hwnd, hdc); fhdc  = null;
+		onFinalizeGLWindow; 
+		ReleaseDC(hwnd, hdc); fhdc  = null; 
 		
 		windowList.remove(hwnd); //Todo: WRONG PLACE!
-		DestroyWindow(hwnd);  fhwnd = null;
+		DestroyWindow(hwnd);  fhwnd = null; 
 		
 		if(isMain) {
-			mainWindow = null;
-			_mainWindowHandle = null;
-			_mainWindowIsForeground = ()=>false;
-			mainWindowDestroyed = true;
+			mainWindow = null; 
+			_mainWindowHandle = null; 
+			_mainWindowIsForeground = ()=>false; 
+			mainWindowDestroyed = true; 
 		}
-	}
+	} 
 	
 	
 	~this()
 	{
-		destroy_impl;
+		destroy_impl; 
 		//Todo: multiwindownal a destructort osszerakni, mert most az le van xarva...
 		//auto className = getClassName;
 		//DestroyWindow(hwnd);
 		//UnregisterClassW(className.toPWChar, GetModuleHandle(NULL));
-	}
+	} 
 	
 	//virtuals
-	void onCreate() {};
-	void onDestroy() {};
+	void onCreate() {} ; 
+	void onDestroy() {} ; 
 	
 	//static bool wasUpdateAfterPaint;
 	
 	LRESULT onWmUser(UINT message, WPARAM wParam, LPARAM lParam)
-	{ return 0; }
+	{ return 0; } 
 	
-	protected bool inRedraw;
-	protected bool _isSizingMoving;
-	protected int updatesSinceLastDraw;
+	protected bool inRedraw; 
+	protected bool _isSizingMoving; 
+	protected int updatesSinceLastDraw; 
 	
-	private enum showWarnings = false;
+	private enum showWarnings = false; 
 	
 	protected void internalRedraw()
 	{
 		if(inRedraw) { if(showWarnings) WARN("Already in internalRedraw()"); return; }
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
 		
-		inRedraw = true; scope(exit) { inRedraw = false; updatesSinceLastDraw = 0; }
+		inRedraw = true; scope(exit) { inRedraw = false; updatesSinceLastDraw = 0; } 
 		
-		auto t0 = QPS;
-		onBeginPaint;
-		timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0);  t0 = QPS;
-		internalPaint;
-		timeLine.addEvent(TimeLine.Event.Type.paint      , t0);  t0 = QPS;
-		onEndPaint;
-		timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0);  t0 = QPS;
-		onSwapBuffers;
+		auto t0 = QPS; 
+		onBeginPaint; 
+		timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0);  t0 = QPS; 
+		internalPaint; 
+		timeLine.addEvent(TimeLine.Event.Type.paint      , t0);  t0 = QPS; 
+		onEndPaint; 
+		timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0);  t0 = QPS; 
+		onSwapBuffers; 
 		timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0);  //t0 = QPS;
-		timeLine.restrictSize(60);
-	}
+		timeLine.restrictSize(60); 
+	} 
 	
 	protected void forceRedraw()
-	{ RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); }
+	{ RedrawWindow(hwnd, null, null, RDW_INVALIDATE | RDW_UPDATENOW); } 
 	
-	protected wchar lastSurrogateHi;
+	protected wchar lastSurrogateHi; 
 	
 	protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam)
 	{
-		auto _ = PROBE("WndProc");
+		auto _ = PROBE("WndProc"); 
 		
-		if(0) LOG(message.winMsgToString, wParam, lParam);
+		if(0) LOG(message.winMsgToString, wParam, lParam); 
 		
 		//Todo: rendesen megcsinalni a game loopot.
 		/+
@@ -819,13 +819,13 @@ class Window
 		switch(message)
 		{
 			
-			case WM_ERASEBKGND: return 1;
+			case WM_ERASEBKGND: return 1; 
 			case WM_PAINT: {
-				pendingInvalidate = false;
+				pendingInvalidate = false; 
 				
-				FPSCnt++;
+				FPSCnt++; 
 				
-				static bool running;
+				static bool running; 
 				if(chkSet(running))
 				{
 					internalUpdate; //this will cause an invalidate. But don't redraw right now, or it freezes.
@@ -835,36 +835,36 @@ class Window
 					//Todo: window resize eseten nincs update, csak paint. Emiatt az UI szarul frissul.
 					//if(!wasUpdateAfterPaint) internalUpdate;  // <--- Ez meg mouse input bugokat okoz.
 					
-					if(updatesSinceLastDraw==0) internalUpdate;
+					if(updatesSinceLastDraw==0) internalUpdate; 
 					//fix: move window with mouse, no update called. 220324
-					internalRedraw;
+					internalRedraw; 
 				}
 				
-				return 0;
+				return 0; 
 			}
 			
-			case WM_DESTROY: 	this.destroy; if(isMain) PostQuitMessage(0); return 0;
+			case WM_DESTROY: 	this.destroy; if(isMain) PostQuitMessage(0); return 0; 
 			
-			case WM_MyStartup:	if(isMain) SetTimer(hwnd, 999, 10, null); return 0; 
+			case WM_MyStartup: 	if(isMain) SetTimer(hwnd, 999, 10, null); return 0; 
 				//this is a good time to launch the timer. Called by a delayed PostMessage
 			
-			case WM_TIMER:	if(wParam==999) { internalUpdate; if(chkClear(pendingInvalidate)) forceRedraw; } return 0;
-			case WM_SIZE:	internalUpdate; forceRedraw; return 0;
+			case WM_TIMER: 	if(wParam==999) { internalUpdate; if(chkClear(pendingInvalidate)) forceRedraw; }return 0; 
+			case WM_SIZE: 	internalUpdate; forceRedraw; return 0; 
 			
-			case WM_MOUSEWHEEL:	_notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0;
+			case WM_MOUSEWHEEL: 	_notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0; 
 			
-			case WM_CHAR:{
+			case WM_CHAR: {
 				try
 				{
-					const ch = cast(wchar)wParam;
+					const ch = cast(wchar)wParam; 
 					if(ch.isSurrogateHi)
 					{ lastSurrogateHi = ch; }
 					else if(ch.isSurrogateLo)
 					{
 						if(lastSurrogateHi != wchar.init)
 						{
-							inputChars ~= ([lastSurrogateHi, ch]).text;
-							lastSurrogateHi = wchar.init;
+							inputChars ~= ([lastSurrogateHi, ch]).text; 
+							lastSurrogateHi = wchar.init; 
 						}
 					}
 					else
@@ -872,38 +872,38 @@ class Window
 				}
 				catch(Exception e) { WARN(e.simpleMsg); }
 				
-				return 0;
+				return 0; 
 			}
 			
 			//Disable beeps when Alt+keypress and F10
-			case WM_SYSKEYDOWN:	return 0;  //just ignore these. It let's me handle Alt and F10 properly.
-			case WM_SYSCHAR:	if(wParam==' ') break;else return 0; //Only enable Alt+Space
-			case WM_MENUCHAR:	return MNC_CLOSE; //It disables beeps when Alt+keypress
+			case WM_SYSKEYDOWN: 	return 0;  //just ignore these. It let's me handle Alt and F10 properly.
+			case WM_SYSCHAR: 	if(wParam==' ') break; else return 0; //Only enable Alt+Space
+			case WM_MENUCHAR: 	return MNC_CLOSE; //It disables beeps when Alt+keypress
 			
-			case WM_ENTERSIZEMOVE:	_isSizingMoving = true; return 0;
-			case WM_EXITSIZEMOVE:	_isSizingMoving = false; return 0;
+			case WM_ENTERSIZEMOVE: 	_isSizingMoving = true; return 0; 
+			case WM_EXITSIZEMOVE: 	_isSizingMoving = false; return 0; 
 			
-			case WM_SETCURSOR:	if(!isMouseInside) DefWindowProc(hwnd, message, wParam, lParam);
-				internalUpdateMouseCursor(Yes.forced); return 1;
+			case WM_SETCURSOR: 	if(!isMouseInside) DefWindowProc(hwnd, message, wParam, lParam); 
+				internalUpdateMouseCursor(Yes.forced); return 1; 
 			
 			case WM_DROPFILES: {
-				auto files = hDropToFiles(cast(HANDLE)wParam);
+				auto files = hDropToFiles(cast(HANDLE)wParam); 
 				if(files.length)
-				whenFilesDropped.emit(files);
+				whenFilesDropped.emit(files); 
 				
 				//Note: the sending and the receiving process must have the same elevation.
 				//Todo: detect if there was a failed drop and tell the user to solve elevation issues.
 				/+Todo: get precise drop position with: DragQueryPoint+/
-				return 0;
+				return 0; 
 			}
-			default:	if(message.inRange(WM_USER, 0x7FFF))
-			return onWmUser(message-WM_USER, wParam, lParam);
+			default: 	if(message.inRange(WM_USER, 0x7FFF))
+			return onWmUser(message-WM_USER, wParam, lParam); 
 		}
-		return DefWindowProc(hwnd, message, wParam, lParam);
+		return DefWindowProc(hwnd, message, wParam, lParam); 
 		
 		//Todo: Beautify this sugly switch
 		
-	}
+	} 
 	
 	
 	////////////////////////////////////////////////////////////////////////////////
@@ -912,106 +912,106 @@ class Window
 	
 	//window management
 	void show()
-	{ ShowWindow(hwnd, SW_SHOW); }
+	{ ShowWindow(hwnd, SW_SHOW); } 
 	void hide()
-	{ ShowWindow(hwnd, SW_HIDE); }
+	{ ShowWindow(hwnd, SW_HIDE); } 
 	bool isHidden()
-	{ WINDOWPLACEMENT wp; wp.length = wp.sizeof; enforce(GetWindowPlacement(hwnd, &wp)); return ~wp.showCmd & 1; }
+	{ WINDOWPLACEMENT wp; wp.length = wp.sizeof; enforce(GetWindowPlacement(hwnd, &wp)); return ~wp.showCmd & 1; } 
 	bool isVisible()
-	{ return !isHidden; }
+	{ return !isHidden; } 
 	void maximizeWin()
-	{ ShowWindow(hwnd, SW_MAXIMIZE); }
+	{ ShowWindow(hwnd, SW_MAXIMIZE); } 
 	void minimizeWin()
-	{ ShowWindow(hwnd, SW_MINIMIZE); }
+	{ ShowWindow(hwnd, SW_MINIMIZE); } 
 	void setFocus()
 	{ SetFocus(hwnd); } //it's only keyboard focus
 	void setForegroundWindow()
-	{ show; SetForegroundWindow(hwnd); }
+	{ show; SetForegroundWindow(hwnd); } 
 	bool isForeground()
-	{ return GetForegroundWindow == hwnd; }
+	{ return GetForegroundWindow == hwnd; } 
 	bool isSizingMoving()
-	{ return _isSizingMoving; }
+	{ return _isSizingMoving; } 
 	
 	bool isMouseInside()
 	{
-		if(isSizingMoving || isHidden) return false;
-		return clientBounds.contains!"[)"(screenToClient(inputs.mouseAct));
-	}
+		if(isSizingMoving || isHidden) return false; 
+		return clientBounds.contains!"[)"(screenToClient(inputs.mouseAct)); 
+	} 
 	
 	bool canProcessUserInput()
-	{ return isForeground && !isSizingMoving; }
+	{ return isForeground && !isSizingMoving; } 
 	
 	RECT windowRect()
-	{ RECT r; GetWindowRect(hwnd, &r); return r; }
+	{ RECT r; GetWindowRect(hwnd, &r); return r; } 
 	@property auto windowBounds()
-	{ with(windowRect) return ibounds2(left, top, right, bottom); }
+	{ with(windowRect) return ibounds2(left, top, right, bottom); } 
 	@property void windowBounds(in ibounds2 b)
 	{
 		SetWindowPos(
 			hwnd, null, b.left, b.top, b.width, b.height,
 			SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW
-		);
-	}
+		); 
+	} 
 	
 	@property auto windowSize()
-	{ return windowBounds.size; }
+	{ return windowBounds.size; } 
 	@property void windowSize(in ivec2 newSize)
 	{
 		SetWindowPos(
 			hwnd, null, 0, 0, newSize.x, newSize.y,
 			SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW
-		);
-	}
+		); 
+	} 
 	
 	@property auto windowPos()
-	{ return windowBounds.topLeft; }
+	{ return windowBounds.topLeft; } 
 	@property void windowPos(in ivec2 p)
 	{
 		SetWindowPos(
 			hwnd, null, p.x, p.y, 0, 0,
 			SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW
-		);
-	}
+		); 
+	} 
 	
 	RECT clientRect()
-	{ RECT r; GetClientRect(hwnd, &r); return r; }
+	{ RECT r; GetClientRect(hwnd, &r); return r; } 
 	auto clientBounds()
 	{
 		//Note: the topleft is always 0,0.  Use clientToScreen on this to get the client bounds in screenSpace.
-		with(clientRect) return ibounds2(left, top, right, bottom);
-	}
+		with(clientRect) return ibounds2(left, top, right, bottom); 
+	} 
 	
 	@property auto clientSize()
-	{ return clientBounds.size; }
+	{ return clientBounds.size; } 
 	@property void clientSize(in ivec2 newSize)
 	{
-		auto r = RECT(0, 0, newSize.x, newSize.y);
-		AdjustWindowRectEx(&r, getWindowStyle, false, getWindowStyleEx);
+		auto r = RECT(0, 0, newSize.x, newSize.y); 
+		AdjustWindowRectEx(&r, getWindowStyle, false, getWindowStyleEx); 
 		
-		auto adjustedSize = ivec2(r.right-r.left, r.bottom-r.top);
+		auto adjustedSize = ivec2(r.right-r.left, r.bottom-r.top); 
 		SetWindowPos(
 			hwnd, null, 0, 0, adjustedSize.x, adjustedSize.y,
 			SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOOWNERZORDER | SWP_NOZORDER | SWP_NOREDRAW
-		);
+		); 
 		//Todo: if this is called always, disable the resizeableness of the window automatically
-	}
+	} 
 	
 	@property auto clientPos()
-	{ with(clientRect) return ivec2(left, top); }
+	{ with(clientRect) return ivec2(left, top); } 
 	auto clientSizeHalf()
-	{ return clientSize * 0.5f;  }
+	{ return clientSize * 0.5f;  } 
 	int clientWidth()
-	{ return clientSize.x; }
+	{ return clientSize.x; } 
 	int clientHeight()
-	{ return clientSize.y; }
+	{ return clientSize.y; } 
 	
 	//matches both error! Bounds2f clientBounds() { with(clientRect) return Bounds2f(left, top, right, bottom); }
 	auto _clientToScreenOfs()
-	{ ivec2 p;MapWindowPoints(hwnd, null, cast(LPPOINT)&p, 1);return p; }
+	{ ivec2 p; MapWindowPoints(hwnd, null, cast(LPPOINT)&p, 1); return p; } 
 	auto screenToClient(T)(in T p)
-	{ return p-_clientToScreenOfs; }
+	{ return p-_clientToScreenOfs; } 
 	auto clientToScreen(T)(in T p)
-	{ return p+_clientToScreenOfs; }
+	{ return p+_clientToScreenOfs; } 
 	
 	void invalidate()
 	{
@@ -1022,37 +1022,37 @@ class Window
 			//RedrawWindow(hwnd, null, null, RDW_INVALIDATE);
 			//https://stackoverflow.com/questions/2325894/difference-between-invalidaterect-and-redrawwindow
 		}
-	}
+	} 
 	
-	private string lastCaption = "\0";
+	private string lastCaption = "\0"; 
 	@property string caption()
 	{
-		if(lastCaption!="\0") return lastCaption;
-		wchar[] s;
-		s.length = GetWindowTextLength(hwnd);
-		GetWindowText(hwnd, s.ptr, cast(int)s.length+1);
-		lastCaption = s.to!string;
-		return lastCaption;
-	}
+		if(lastCaption!="\0") return lastCaption; 
+		wchar[] s; 
+		s.length = GetWindowTextLength(hwnd); 
+		GetWindowText(hwnd, s.ptr, cast(int)s.length+1); 
+		lastCaption = s.to!string; 
+		return lastCaption; 
+	} 
 	@property caption(string value)
 	{
-		if(lastCaption==value) return;
-		lastCaption = value;
-		SetWindowText(hwnd, value.toPWChar);
-	}
+		if(lastCaption==value) return; 
+		lastCaption = value; 
+		SetWindowText(hwnd, value.toPWChar); 
+	} 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  PAINT                                                                   ///
 	////////////////////////////////////////////////////////////////////////////////
 	
 	void onBeginPaint()
-	{ lastFrameStats = ""; };
+	{ lastFrameStats = ""; } ; 
 	
 	private final void internalPaint()
 	{
-		auto t0 = QPS; scope(exit) { timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); }
+		auto t0 = QPS; scope(exit) { timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); } 
 		
-		paintErrorStr = "";
+		paintErrorStr = ""; 
 		try
 		{ onPaint; }
 		catch(Throwable o)
@@ -1066,31 +1066,31 @@ class Window
 				}
 			*/
 			
-			showException(o);
+			showException(o); 
 		}
-	}
+	} 
 	
 	void onPaint()
 	{
-		auto rect = clientRect;
-		DrawText(hdc, "Default Window.doPaint()", -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-	};
+		auto rect = clientRect; 
+		DrawText(hdc, "Default Window.doPaint()", -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER); 
+	} ; 
 	
 	void onEndPaint()
 	{
-		auto rect = clientRect;
-		ValidateRect(hwnd, &rect);
+		auto rect = clientRect; 
+		ValidateRect(hwnd, &rect); 
 		
 		if(!paintErrorStr.empty) {
-			int c = (rect.bottom+rect.top)/2;
-			DrawText(hdc, toPWChar("Error: "~paintErrorStr), -1, &rect, DT_LEFT | DT_VCENTER);
+			int c = (rect.bottom+rect.top)/2; 
+			DrawText(hdc, toPWChar("Error: "~paintErrorStr), -1, &rect, DT_LEFT | DT_VCENTER); 
 		}
-	};
+	} ; 
 	
 	void onSwapBuffers()
 	{
 		 //for opengl. the latest step with the optional sleep
-	}
+	} 
 	
 	void offscreenPaint(void delegate() fun)
 	{
@@ -1102,26 +1102,26 @@ class Window
 			/+Link: https://learn.microsoft.com/en-us/previous-versions/ms969905(v=msdn.10)?redirectedfrom=MSDN+/
 		+/
 		
-		HANDLE hdcMem, hbmMem, hbmOld, hdcOld;
+		HANDLE hdcMem, hbmMem, hbmOld, hdcOld; 
 		
-		RECT rc;GetClientRect(hwnd, &rc);
-		hdcMem = CreateCompatibleDC(hdc);
-		hbmMem = CreateCompatibleBitmap(hdc, rc.right-rc.left, rc.bottom-rc.top);
-		hbmOld = SelectObject(hdcMem, hbmMem);
-		hdcOld = this.fhdc;
-		this.fhdc = hdcMem;
+		RECT rc; GetClientRect(hwnd, &rc); 
+		hdcMem = CreateCompatibleDC(hdc); 
+		hbmMem = CreateCompatibleBitmap(hdc, rc.right-rc.left, rc.bottom-rc.top); 
+		hbmOld = SelectObject(hdcMem, hbmMem); 
+		hdcOld = this.fhdc; 
+		this.fhdc = hdcMem; 
 		
 		scope(exit)
 		{
-			this.fhdc = hdcOld;
-			BitBlt(hdc, rc.left, rc.top, rc.right-rc.left, rc.bottom-rc.top, hdcMem, 0, 0, SRCCOPY);
-			SelectObject(hdcMem, hbmOld);
-			DeleteObject(hbmMem);
-			DeleteDC(hdcMem);
-		}
+			this.fhdc = hdcOld; 
+			BitBlt(hdc, rc.left, rc.top, rc.right-rc.left, rc.bottom-rc.top, hdcMem, 0, 0, SRCCOPY); 
+			SelectObject(hdcMem, hbmOld); 
+			DeleteObject(hbmMem); 
+			DeleteDC(hdcMem); 
+		} 
 		
-		fun();
-	}
+		fun(); 
+	} 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  UPDATE                                                                  ///
@@ -1144,162 +1144,162 @@ class Window
 	protected void onUpdateViewAnimation() {} //forwarded to GLWindow
 	
 	protected void onUpdateUIBeginFrame() {} //GLWindow implements these too
-	protected void onUpdateUIEndFrame() {}
+	protected void onUpdateUIEndFrame() {} 
 	
 	private void updateWithActionManager()
 	{
-		auto _ = PROBE("updateWAM");
+		auto _ = PROBE("updateWAM"); 
 		
 		//const A = QPS;
 		//scope(exit) print((QPS-A)*1000);
 				//this calls the update on every window. But right now it is only for one window.
 		
 				//timing
-				auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS);
+				auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS); 
 		
 				//flush the keyboard input queue (WM_CHAR event)
-				scope(exit) inputChars = "";
+				scope(exit) inputChars = ""; 
 		
 				//make openGL accessible
-				onWglMakeCurrent(true);
+				onWglMakeCurrent(true); 
 		
 				//prepare/finalize the old, immediate mode keyboard 'actions' interface (inputs.d)
-				actions.beginUpdate;
+				actions.beginUpdate; 
 		
 				//update the local mouse struct
-				onMouseUpdate;
+				onMouseUpdate; 
 		
 				//update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
-				onUpdateViewAnimation;
+				onUpdateViewAnimation; 
 		
 				//UI integration: prepare and finalize the IMGUI for every frame
-				onUpdateUIBeginFrame;
+				onUpdateUIBeginFrame; 
 		
 		
 				//call the user overridden update method for the window
 				try { onUpdate; }catch(Throwable t) { showException(t); }
 		
-				onUpdateUIEndFrame;
+				onUpdateUIEndFrame; 
 		
 				{ if(actions.changed) invalidate;  actions.endUpdate; }
 		
-				onWglMakeCurrent(false);
-	}
+				onWglMakeCurrent(false); 
+	} 
 	
-	MouseCursor mouseCursor;
-	private MouseCursor lastMouseCursor;
+	MouseCursor mouseCursor; 
+	private MouseCursor lastMouseCursor; 
 	private void internalUpdateMouseCursor(Flag!"forced" forced = No.forced)
 	{
-		if(!isMouseInside) return;
+		if(!isMouseInside) return; 
 		if(lastMouseCursor.chkSet(mouseCursor) || forced)
-		SetCursor(mouseCursor);
-	}
+		SetCursor(mouseCursor); 
+	} 
 	
-	private bool inUpdate;
+	private bool inUpdate; 
 	
 	private final void internalUpdate()
 	{
 		//static if(1){ const T0 = QPS; scope(exit) print("IU", (QPS-T0)*1000); }
 		
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
-		inUpdate = true;
-		scope(exit) inUpdate = false;
+		inUpdate = true; 
+		scope(exit) inUpdate = false; 
 		
-		enforce(isMain, "Window.internalUpdate() called from non main window.");
+		enforce(isMain, "Window.internalUpdate() called from non main window."); 
 		
 		//lock
-		if(disableCounter) return;
-		disableUpdate;
+		if(disableCounter) return; 
+		disableUpdate; 
 		scope(exit) {
-			enableUpdate;
+			enableUpdate; 
 			//wasUpdateAfterPaint = true;
 			
 			//forceRedraw; //Bug: ha ez itt van, akkor az ablakot lehetetlen bezarni
-		}
+		} 
 		
 		//handle debug.kill
-		if(dbg.forceExit_check) { dbg.forceExit_clear; this.destroy; } //Todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
+		if(dbg.forceExit_check) { dbg.forceExit_clear; this.destroy; }//Todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
 		
-		const timeTarget = (1.0f/targetUpdateRate)*second;
+		const timeTarget = (1.0f/targetUpdateRate)*second; 
 		
 		//refresh processorId
-		mainThreadProcessorNumber = GetCurrentProcessorNumber;
+		mainThreadProcessorNumber = GetCurrentProcessorNumber; 
 		
 		//initialize timing system
 		if(!time0) { time0 = timeLast = QPS-timeTarget-0.001*second; }
 		
 		const tickNow = now; //this is for application.tickTime. Taken at the same time as timeAct.
-		timeAct = QPS;
-		deltaTime = timeAct-timeLast;
+		timeAct = QPS; 
+		deltaTime = timeAct-timeLast; 
 		if(deltaTime<timeTarget) return; //too small elapsed time
 		
 		if(deltaTime>0.5*second) {
 			 //LAG handling
-			lagCnt++;
-			lagTime += deltaTime;
-			deltaTime = timeTarget;
+			lagCnt++; 
+			lagTime += deltaTime; 
+			deltaTime = timeTarget; 
 		}
 		
 		//int updateCnt = iround(deltaTime.value(second)/timeTarget.value(second)).clamp(0, 1);
 		int updateCnt = 1; //220814: It is better to be stable. This game loop is already way too complicated. This performs best for DIDE2
 		
-		deltaTime /= updateCnt;
+		deltaTime /= updateCnt; 
 		
 		try
 		{
-			bool anyInvalidate;
+			bool anyInvalidate; 
 			foreach(i; 0..updateCnt)
 			{
-				totalTime = timeLast + deltaTime*i;
+				totalTime = timeLast + deltaTime*i; 
 				
 				//ticking. The same timing information as what the windows are receiving
-				application.tick++;
-				application.tickTime	= tickNow - deltaTime*(updateCnt-i);
-				application.deltaTime	= deltaTime;
+				application.tick++; 
+				application.tickTime	= tickNow - deltaTime*(updateCnt-i); 
+				application.deltaTime	= deltaTime; 
 				
 				inputs.update; //Note: it's main window only
-				clipboard.update;
-				updateDragAcceptFilesState;
+				clipboard.update; 
+				updateDragAcceptFilesState; 
 				
 				updateWithActionManager; //update Main
 				foreach(w; windowList)
 				if(!w.isMain)
 				{
 					 //call othyer forms.updates
-					w.totalTime = totalTime;
-					w.deltaTime = deltaTime;
-					w.FPS = FPS;
-					w.UPS = UPS;
+					w.totalTime = totalTime; 
+					w.deltaTime = deltaTime; 
+					w.FPS = FPS; 
+					w.UPS = UPS; 
 					
-					w.updateWithActionManager;//update Others
-					anyInvalidate |= w.pendingInvalidate;
+					w.updateWithActionManager; //update Others
+					anyInvalidate |= w.pendingInvalidate; 
 				}
 				
 				
-				if(i==0) inputs.clearDeltas;
+				if(i==0) inputs.clearDeltas; 
 				//only the first update is used for input processing... Later maybe interpolation can kick in...
 				
-				UPSCnt++;
+				UPSCnt++; 
 				
 				//update FPS, UPS
 				if(chkSet(PSSec,	ltrunc(totalTime.value(second))))
 				{
-					FPS = FPSCnt;	FPSCnt = 0;
-					UPS = UPSCnt;	UPSCnt = 0;
+					FPS = FPSCnt; 	FPSCnt = 0; 
+					UPS = UPSCnt; 	UPSCnt = 0; 
 					if(isMain) {
-						TPS = global_TPSCnt;	 global_TPSCnt = 0; //texture upload/sec
-						VPS = global_VPSCnt;	 global_VPSCnt = 0; //VBO upload/sec
+						TPS = global_TPSCnt; 	 global_TPSCnt = 0; //texture upload/sec
+						VPS = global_VPSCnt; 	 global_VPSCnt = 0; //VBO upload/sec
 					}
 				}
 			}
 			
-			if(updateCnt>0) canSleep = !anyInvalidate;
+			if(updateCnt>0) canSleep = !anyInvalidate; 
 			//if there was an actual update cycle, update the canSleep state. It can only sleep when tere was no invalidate() calls
 			
-			internalUpdateMouseCursor;
+			internalUpdateMouseCursor; 
 		}
 		finally { timeLast = timeAct; }
-	}
+	} 
 	
 	void onUpdate()
 	{
@@ -1314,7 +1314,7 @@ class Window
 			
 			if(autoUpdate) invalidate;
 		*/
-	}
+	} 
 	
 	
-}
+} 

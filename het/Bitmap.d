@@ -1,40 +1,40 @@
-module het.bitmap;/+DIDE+/
+module het.bitmap; /+DIDE+/
 
 version(/+$DIDE_REGION+/all)
 {
 	//This is the new replacement of het.image.d
 	
-	pragma(lib, "gdi32.lib");
+	pragma(lib, "gdi32.lib"); 
 	
 	//Todo: icons have a black background since windows update installed near 22.11.15
 	
-	import het.utils;
+	import het; 
 	
-	enum smallSpace = "\u2008";
+	enum smallSpace = "\u2008"; 
 	
-	__gshared size_t BitmapCacheMaxSizeBytes = 768<<20;
-	__gshared BitmapLoaderUsesTaskPool = true;
+	__gshared size_t BitmapCacheMaxSizeBytes = 768<<20; 
+	__gshared BitmapLoaderUsesTaskPool = true; 
 	
-	import std.uni: isAlphaNum;
+	import std.uni: isAlphaNum; 
 	import core.sys.windows.windows :	HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, 
 		SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, DIB_RGB_COLORS,
 		HRESULT, WCHAR, BOOL, RECT, IID,
-		BITMAP, GetObject;
+		BITMAP, GetObject; 
 	
 	//png, tga, jpg(read_jpeg_info only)
 	import imageformats; //Todo: a jpeg ebbol mar nem kell.
 	
 	//webp
-	import webp.encode, webp.decode;
+	import webp.encode, webp.decode; 
 	
 	//jpeg
-	import turbojpeg.turbojpeg;
+	import turbojpeg.turbojpeg; 
 	
 	//turn Direct2D linkage on/off
-	version = D2D_FONT_RENDERER;
+	version = D2D_FONT_RENDERER; 
 	
 	enum BitmapQueryCommand
-	{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect, set, access_delayed_multi }
+	{ access, access_delayed, finishWork, finishTransformation, remove, stats, details, garbageCollect, set, access_delayed_multi} 
 	
 	/+
 		{ //handle thumbnails
@@ -88,191 +88,191 @@ version(/+$DIDE_REGION+/all)
 	
 	struct BitmapCacheStats
 	{
-		size_t count;
-		size_t allSizeBytes, nonUnloadableSizeBytes, residentSizeBytes;
+		size_t count; 
+		size_t allSizeBytes, nonUnloadableSizeBytes, residentSizeBytes; 
 		Bitmap[] bitmaps; //pnly when detailed stats requested
 		
 		string toString()
 		{
 			auto res = 	format!"BitmapCacheStats: count: %6d  residentSize: %4s allSize: %4s"
-				(count, residentSizeBytes.shortSizeText!1024, allSizeBytes.shortSizeText!1024);
+				(count, residentSizeBytes.shortSizeText!1024, allSizeBytes.shortSizeText!1024); 
 			
 			if(bitmaps.length)
-			res ~= "\n" ~ bitmaps.sort!((a, b) => a.file < b.file).map!text.join("\n");
+			res ~= "\n" ~ bitmaps.sort!((a, b) => a.file < b.file).map!text.join("\n"); 
 			
-			return res;
-		}
-	}
+			return res; 
+		} 
+	} 
 	
 	//Load a bitmap immediately with optional error handling. No caching, no thumbnail/transformations.
 	auto newBitmap(File file, ErrorHandling errorHandling, Flag!"fx" fx = No.fx)
 	{
 		
-		const hasFx = !file.driveIs("font") & file.hasQueryString;
+		const hasFx = !file.driveIs("font") & file.hasQueryString; 
 		
-		if(hasFx && !fx) WARN("newBitmap fileName has fx but fx flag is not set. "~file.text);
+		if(hasFx && !fx) WARN("newBitmap fileName has fx but fx flag is not set. "~file.text); 
 		
 		static Bitmap newBitmap_internal(File file)
 		{
 			enum mustSucceed=true; //This function either must return a non-null bitmap or throw an exception.
-			auto fn = file.fullName;
-			auto prefix = fn.until!(not!isAlphaNum).text;
+			auto fn = file.fullName; 
+			auto prefix = fn.until!(not!isAlphaNum).text; 
 			if(prefix.length>1 && fn[prefix.length..$].startsWith(`:\`))
 			{
 				//strip off prefix:\ and call a loader with the remaining text
-				fn = fn[prefix.length+2..$];
-				auto loader = prefix in bitmapLoaders.functions;
-				if(!loader) raise("Unknown BitmapLoader prefix: "~prefix~`:\`);
-				return (*loader)(fn).enforce("Unable to load bitmap (null returned by loader): "~fn.quoted);
+				fn = fn[prefix.length+2..$]; 
+				auto loader = prefix in bitmapLoaders.functions; 
+				if(!loader) raise("Unknown BitmapLoader prefix: "~prefix~`:\`); 
+				return (*loader)(fn).enforce("Unable to load bitmap (null returned by loader): "~fn.quoted); 
 			}
 			else
 			{
 				//threat it as a normal file
-				auto bmp = File(fn).deserialize!Bitmap(mustSucceed);
-				bmp.modified = File(fn).modified;
-				return bmp;
+				auto bmp = File(fn).deserialize!Bitmap(mustSucceed); 
+				bmp.modified = File(fn).modified; 
+				return bmp; 
 			}
-		}
+		} 
 		
-		Bitmap res;
+		Bitmap res; 
 		final switch(errorHandling)
 		{
-			case ErrorHandling.raise:{
+			case ErrorHandling.raise: {
 				try { res = newBitmap_internal(file); }
 				catch(Exception e) { throw e; }
-			}	break;
-			case ErrorHandling.track:{
+			}	break; 
+			case ErrorHandling.track: {
 				try { res = newBitmap_internal(file); }
 				catch(Exception e) { WARN(e.simpleMsg); res = newErrorBitmap(e.simpleMsg); }
-			}	break;
-			case ErrorHandling.ignore:{
+			}	break; 
+			case ErrorHandling.ignore: {
 				try { res = newBitmap_internal(file); }
 				catch(Exception e) { res = newErrorBitmap(e.simpleMsg); }
-			}	break;
+			}	break; 
 		}
 		
-		if(hasFx && fx) res = applyEffects(res, file);
+		if(hasFx && fx) res = applyEffects(res, file); 
 		
 		//bitmap.name is always the same as the name passed to this loader
-		res.file = file;
+		res.file = file; 
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	auto newBitmap(File file, Flag!"fx" fx = No.fx)
-	{ return newBitmap(file, ErrorHandling.track, fx); }
+	{ return newBitmap(file, ErrorHandling.track, fx); } 
 	
 	Bitmap newBitmap(HBITMAP hBitmap)
 	{
-		Bitmap res;
-		BITMAP bmp;
-		ivec2 size;
-		int bits;
+		Bitmap res; 
+		BITMAP bmp; 
+		ivec2 size; 
+		int bits; 
 		if(GetObject(hBitmap, BITMAP.sizeof, &bmp))
 		{
-			size = ivec2(bmp.bmWidth, bmp.bmHeight);
-			bits = bmp.bmBitsPixel;
+			size = ivec2(bmp.bmWidth, bmp.bmHeight); 
+			bits = bmp.bmBitsPixel; 
 			
-			__gshared HDC hdcMem;
-			if(!hdcMem) hdcMem  = CreateCompatibleDC(GetDC(null));
+			__gshared HDC hdcMem; 
+			if(!hdcMem) hdcMem  = CreateCompatibleDC(GetDC(null)); 
 			
-			BITMAPINFO bmi;
+			BITMAPINFO bmi; 
 			with(bmi.bmiHeader) {
-				biSize	= BITMAPINFOHEADER.sizeof;
-				biWidth	= size.x;
-				biHeight	= -size.y;
-				biPlanes	= 1;
-				biBitCount	= 32;
-				biCompression	= BI_RGB;
-				biSizeImage	= size.x*size.y*4;
+				biSize	= BITMAPINFOHEADER.sizeof; 
+				biWidth	= size.x; 
+				biHeight	= -size.y; 
+				biPlanes	= 1; 
+				biBitCount	= 32; 
+				biCompression	= BI_RGB; 
+				biSizeImage	= size.x*size.y*4; 
 			}
 			
 			auto img = image2D(size, RGBA(0)); //Todo: uninitialized image, or copy manually
 			if(!img.empty)
 			{
 				if(!GetDIBits(hdcMem, hBitmap, 0, size.y, img.asArray.ptr, &bmi, DIB_RGB_COLORS))
-				raiseLastError;
-				img.asArray.rgba_to_bgra_inplace;
+				raiseLastError; 
+				img.asArray.rgba_to_bgra_inplace; 
 			}
 			
-			res = new Bitmap(img);
+			res = new Bitmap(img); 
 		}
-		return res;
-	}
+		return res; 
+	} 
 	
 	//Todo: ezt is bepakolni a Bitmap class-ba... De kell a delayed betoltes lehetosege is talan...
 	auto isFontDeclaration(string s)
-	{ return s.startsWith(`font:\`); }
+	{ return s.startsWith(`font:\`); } 
 	
 	private Bitmap newSpecialBitmap(string error="")
 	{
-		const loading = error=="loading";
-		auto bmp = new Bitmap(image2D(1, 1, loading ? RGBA(0xFFC0C0C0) : RGBA(0xFFFF00FF)));
-		bmp.markChanged;
+		const loading = error=="loading"; 
+		auto bmp = new Bitmap(image2D(1, 1, loading ? RGBA(0xFFC0C0C0) : RGBA(0xFFFF00FF))); 
+		bmp.markChanged; 
 		if(loading) { bmp.loading = true; }else { if(error) bmp.error = error; }
-		return bmp;
-	}
+		return bmp; 
+	} 
 	
 	Bitmap newErrorBitmap(string cause)
-	{ return newSpecialBitmap(cause); }
+	{ return newSpecialBitmap(cause); } 
 	private Bitmap newLoadingBitmap()
-	{ return newSpecialBitmap("loading"); }
+	{ return newSpecialBitmap("loading"); } 
 	
 	/// Gets the modified time of any given filename. Including real/virtual files, fonts, transformed images, thumbnails
 	/// returns null if unknown
 	auto getLatestModifiedTime(in File file, Flag!"virtualOnly" virtualOnly = Yes.virtualOnly/*Todo: preproc*/)
 	{
 		if(file) {
-			auto drive = file.drive;
+			auto drive = file.drive; 
 			if(!virtualOnly || drive!="virtual:") { return file.withoutQueryString.modified; }
 		}
-		return DateTime.init;
-	}
+		return DateTime.init; 
+	} 
 	
 	
 	mixin template PluginTemplate(string name, string postfix, alias Function_, alias UDA)
 	{
-		static:
+		static: 
 		
-		alias Function = Function_;
+		alias Function = Function_; 
 		
-		private __gshared Function[string] functions;
+		private __gshared Function[string] functions; 
 		
 		void register(string prefix, Function fun) //Todo: make it threadsafe
 		{
-			enforce(prefix.length>=2, "Invalid prefix string.");
+			enforce(prefix.length>=2, "Invalid prefix string."); 
 			//Note: prefix names are case sensitive. File drives are NOT.
-			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix);
-			functions[prefix] = fun;
-			static if(0) LOG(name ~ " successfully registered:", prefix);
-		}
+			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix); 
+			functions[prefix] = fun; 
+			static if(0) LOG(name ~ " successfully registered:", prefix); 
+		} 
 		
 		void register(alias fun)()
 		{
-			static assert(__traits(isStaticFunction, fun));
-			enum name = __traits(identifier, fun);static assert(name.endsWith(postfix));
-			enum prefix = name.withoutEnding(postfix);/+static assert(prefix == prefix.lc);+/
-			register(prefix, &fun);
-		}
+			static assert(__traits(isStaticFunction, fun)); 
+			enum name = __traits(identifier, fun); static assert(name.endsWith(postfix)); 
+			enum prefix = name.withoutEnding(postfix); /+static assert(prefix == prefix.lc);+/
+			register(prefix, &fun); 
+		} 
 		
 		void registerMarkedFunctions(alias obj)()
 		{
 			foreach(name; __traits(allMembers, obj))
 			{
-				alias member = __traits(getMember, obj, name);
+				alias member = __traits(getMember, obj, name); 
 				static if(__traits(isStaticFunction, member) && hasUDA!(member, UDA))
-				register!member;
+				register!member; 
 			}
-		}
-	}
+		} 
+	} 
 	
 	struct BITMAPLOADER; //uda
 	struct bitmapLoaders
-	{ mixin PluginTemplate!("BitmapLoader", "Bitmap", Bitmap function(string), BITMAPLOADER); }
+	{ mixin PluginTemplate!("BitmapLoader", "Bitmap", Bitmap function(string), BITMAPLOADER); } 
 	
 	struct BITMAPEFFECT; //uda
 	struct bitmapEffects
-	{ mixin PluginTemplate!("BitmapEffect", "Effect", Bitmap function(Bitmap, in QueryString), BITMAPEFFECT); }
+	{ mixin PluginTemplate!("BitmapEffect", "Effect", Bitmap function(Bitmap, in QueryString), BITMAPEFFECT); } 
 	
 	
 	
@@ -336,61 +336,61 @@ version(/+$DIDE_REGION+/all)
 			//Todo: font and icon should be put in a list that ensures the following: bitmap.resident, no delayed load
 			version(D2D_FONT_RENDERER)
 			{
-				auto res = bitmapFontRenderer.renderDecl(`font:\` ~ name);
-				if(res.valid) res.resident = true;//dont garbagecollect fonts because they are slow to generate
-				return res;
+				auto res = bitmapFontRenderer.renderDecl(`font:\` ~ name); 
+				if(res.valid) res.resident = true; //dont garbagecollect fonts because they are slow to generate
+				return res; 
 			}
 			else {
-				enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!");
-				return null;
+				enforce(0, "No font renderer linked into the exe. Use version D2D_FONT_RENDERER!"); 
+				return null; 
 			}
-		}
+		} 
 		
 		Bitmap tempBitmap(string name)
 		{
-			auto b = new Bitmap;
-			b.resident = true;
-			b.modified = now;
-			return b;
-		}
+			auto b = new Bitmap; 
+			b.resident = true; 
+			b.modified = now; 
+			return b; 
+		} 
 		
 		Bitmap virtualBitmap(string name)
 		{
 			//Just forward it to the fileSystem, that will handle the 'virtual:\' prefix.
-			return File(`virtual:\` ~ name).deserialize!Bitmap(true);
+			return File(`virtual:\` ~ name).deserialize!Bitmap(true); 
 			
 			//Todo: this forwarding should only be don inside the filesystem.
-		}
+		} 
 		
 		Bitmap desktopBitmap(string name)
-		{ return getDesktopSnapshot; }
+		{ return getDesktopSnapshot; } 
 		
 		Bitmap monitorBitmap(string name)
 		{
 			//Todo: monitor indexing
-			return getPrimaryMonitorSnapshot;
-		}
+			return getPrimaryMonitorSnapshot; 
+		} 
 		
 		Bitmap clipboardBitmap(string name)
 		{
 			if(clipboard.hasBitmap)
 			{
-				Bitmap res;
-				clipboard.getBitmapHandle((HBITMAP hBitmap){ res = newBitmap(hBitmap); });
-				if(!res) raise("Clipboard has no bitmap.");
-				return res;
+				Bitmap res; 
+				clipboard.getBitmapHandle((HBITMAP hBitmap){ res = newBitmap(hBitmap); }); 
+				if(!res) raise("Clipboard has no bitmap."); 
+				return res; 
 			}
 			
-			return null;
-		}
+			return null; 
+		} 
 		
 		Bitmap debugBitmap(string name)
 		{
 			//debug images
-			uint color = (name.to!int)>>1;
-			color = color | (255-color)<<8;
-			return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color)));
-		}
+			uint color = (name.to!int)>>1; 
+			color = color | (255-color)<<8; 
+			return new Bitmap(image2D(1600, 1200, RGBA(0xFF000000 | color))); 
+		} 
 		
 		Bitmap iconBitmap(string name)
 		{
@@ -406,23 +406,23 @@ version(/+$DIDE_REGION+/all)
 			auto res = getAssociatedIconBitmap(
 				name.replace('&', '?')
 				/+Todo: This is a nasty and inefficient  hack+/
-			);
-			if(!res) raise("Unable to get associated icon for " ~ name.quoted);
+			); 
+			if(!res) raise("Unable to get associated icon for " ~ name.quoted); 
 			
-			if(res.valid) res.resident = true;
-			return res;
-		}
+			if(res.valid) res.resident = true; 
+			return res; 
+		} 
 		
 		Bitmap colormapBitmap(string name)
 		{
-			enforce(name in colorMaps);
+			enforce(name in colorMaps); 
 			auto 	width = 128,
 				raw = colorMaps[name].toArray!RGBA(width),
 				img = image2D(width, 1, raw),
-				bmp = new Bitmap(img);
-			return bmp;
-		}
-	}
+				bmp = new Bitmap(img); 
+			return bmp; 
+		} 
+	} 
 	
 	
 	
@@ -433,7 +433,7 @@ version(/+$DIDE_REGION+/all)
 	struct BitmapTransformation
 	{
 		//BitmapTransformation (thumb) ////////////////////////////////////
-		enum thumbKeyword = "?thumbOld";
+		enum thumbKeyword = "?thumbOld"; 
 		//?thumb32w		 specifies maximum width
 		//?thumb32h		 specifies maximum height
 		//?thumb32wh	  specifies maximum width and maximum height
@@ -447,48 +447,48 @@ version(/+$DIDE_REGION+/all)
 		//Todo: cache decoded full size image
 		//Todo: turboJpeg small size extract
 		
-		File originalFile, transformedFile;
-		int thumbMaxSize;
-		bool maxWidthSpecified, maxHeightSpecified;
+		File originalFile, transformedFile; 
+		int thumbMaxSize; 
+		bool maxWidthSpecified, maxHeightSpecified; 
 		
 		size_t sizeBytes; //used by bitmapQuery/detailed stats
 		
-		deprecated bool isThumb() const { return thumbMaxSize>0; }
+		deprecated bool isThumb() const { return thumbMaxSize>0; } 
 		
-		bool isHistogram, isGrayHistogram;
+		bool isHistogram, isGrayHistogram; 
 		//Todo: this is lame. This should be solved by registered plugins.
 		
-		bool isEffect;
+		bool isEffect; 
 		
 		this(File file)
 		{
-			transformedFile = file;
+			transformedFile = file; 
 			
 			//try to decode thumbnail params
-			string thumbDef, orig;
+			string thumbDef, orig; 
 			if(file.fullName.split2(thumbKeyword, orig, thumbDef, false/+must not strip!+/))
 			{
-				originalFile = File(orig);
+				originalFile = File(orig); 
 				
 				//get width/height posfixes
 				while(1) {
 					if(thumbDef.endsWith("w")) { maxWidthSpecified	= true; thumbDef.popBack; continue; }
 					if(thumbDef.endsWith("h")) { maxHeightSpecified	= true; thumbDef.popBack; continue; }
-					break;
+					break; 
 				}
-				const maxAllSpecified = maxWidthSpecified == maxHeightSpecified;
+				const maxAllSpecified = maxWidthSpecified == maxHeightSpecified; 
 				if(maxAllSpecified)
-				maxWidthSpecified = maxHeightSpecified = true;
+				maxWidthSpecified = maxHeightSpecified = true; 
 				
-				ignoreExceptions({ thumbMaxSize = thumbDef.to!int; });
+				ignoreExceptions({ thumbMaxSize = thumbDef.to!int; }); 
 			}
 			else if(file.fullName.canFind("?histogramOld"))	{
-				originalFile = File(orig[0..orig.countUntil('?')]);
-				isHistogram = true;
+				originalFile = File(orig[0..orig.countUntil('?')]); 
+				isHistogram = true; 
 			}
 			else if(file.fullName.canFind("?grayHistogramOld"))	{
-				originalFile = File(orig[0..orig.countUntil('?')]);
-				isGrayHistogram = true;
+				originalFile = File(orig[0..orig.countUntil('?')]); 
+				isGrayHistogram = true; 
 			}
 			else {
 				if(
@@ -502,20 +502,20 @@ version(/+$DIDE_REGION+/all)
 				{
 					if(file.hasQueryString)
 					{
-						originalFile = file.withoutQueryString;
-						isEffect = true;
+						originalFile = file.withoutQueryString; 
+						isEffect = true; 
 					}
 				}
 			}
-		}
+		} 
 		
-		alias needTransform this;
+		alias needTransform this; 
 		bool needTransform()
-		{ return isThumb|| isHistogram || isGrayHistogram || isEffect; }
+		{ return isThumb|| isHistogram || isGrayHistogram || isEffect; } 
 		
 		Bitmap transform(Bitmap orig)
 		{
-			if(!orig || !orig.valid) return newErrorBitmap("Invalid source for BitmapTransform.");
+			if(!orig || !orig.valid) return newErrorBitmap("Invalid source for BitmapTransform."); 
 			
 			sizeBytes = orig.sizeBytes; //used by bitmapQuery/detailed stats
 			
@@ -525,82 +525,82 @@ version(/+$DIDE_REGION+/all)
 				{
 					if(isThumb)
 					{
-						float minScale = 1;
-						if(maxWidthSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.x);
-						if(maxHeightSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.y);
+						float minScale = 1; 
+						if(maxWidthSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.x); 
+						if(maxHeightSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.y); 
 						
 						if(minScale < 1) {
-							ivec2 newSize = round(orig.size*minScale);
+							ivec2 newSize = round(orig.size*minScale); 
 							//print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
 							return orig.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
 						}
 					}
 					else if(isHistogram)
 					{
-						auto img = orig.get!RGB;
-						int[3][256] histogram;
-						foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++;
-						int histogramMax = histogram[].map!(h => h[].max).array.max;
-						float sc = 255.0f/histogramMax;
-						return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc))));
+						auto img = orig.get!RGB; 
+						int[3][256] histogram; 
+						foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++; 
+						int histogramMax = histogram[].map!(h => h[].max).array.max; 
+						float sc = 255.0f/histogramMax; 
+						return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc)))); 
 					}
 					else if(isGrayHistogram)
 					{
-						auto img = orig.get!ubyte;
-						int[256] histogram;
-						foreach(p; img.asArray) histogram[p]++;
-						int histogramMax = histogram[].max;
-						float sc = 255.0f/histogramMax;
-						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
+						auto img = orig.get!ubyte; 
+						int[256] histogram; 
+						foreach(p; img.asArray) histogram[p]++; 
+						int histogramMax = histogram[].max; 
+						float sc = 255.0f/histogramMax; 
+						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround)))); 
 					}
 					else if(isEffect)
 					{ return orig.applyEffects(transformedFile); }
 				}
-				catch(Exception e) WARN(e.simpleMsg);
+				catch(Exception e) WARN(e.simpleMsg); 
 				
 				//Todo: handle errors
-				return orig.dup;
-			}
+				return orig.dup; 
+			} 
 			
 			//set filename and copy the modified time
-			auto res = doIt;
-			res.file = transformedFile;
-			res.modified = orig.modified;
-			return res;
-		}
+			auto res = doIt; 
+			res.file = transformedFile; 
+			res.modified = orig.modified; 
+			return res; 
+		} 
 		
-	}
+	} 
 	
 	Bitmap applyEffects(Bitmap bmp, File effects)
-	{ return bmp.applyEffects(effects.queryStringMulti); }
+	{ return bmp.applyEffects(effects.queryStringMulti); } 
 	
 	Bitmap applyEffects(R)(Bitmap bmp, R effects)
 	if(is(ElementType!R==QueryString))
 	{
-		auto file = bmp.file;
+		auto file = bmp.file; 
 		
 		foreach(qs; effects)
 		{
-			const prefix = qs.command;
+			const prefix = qs.command; 
 			if(prefix!="")
 			{
 				if(auto a = prefix in bitmapEffects.functions)
 				{
-					bmp = (*a)(bmp, qs);
+					bmp = (*a)(bmp, qs); 
 					
 					//always update the proper filename of the bitmap. Some effects may use it.
-					file = file ~ ("?" ~qs.text);
-					bmp.file = file;
-					bmp.modified = now;//As the effect just modified it.
+					file = file ~ ("?" ~qs.text); 
+					bmp.file = file; 
+					bmp.modified = now; //As the effect just modified it.
 				}
 				else
-				WARN("Unknown bitmapEffect prefix: "~prefix.quoted~" "~qs.text);
+				WARN("Unknown bitmapEffect prefix: "~prefix.quoted~" "~qs.text); 
 			}
 			else
-			WARN("Missing bitmapEffect prefix: "~qs.text);
+			WARN("Missing bitmapEffect prefix: "~qs.text); 
 		}
-		return bmp;
-	}
+		return bmp; 
+	} 
 	
 	
 	@BITMAPEFFECT
@@ -624,67 +624,67 @@ version(/+$DIDE_REGION+/all)
 		
 		Bitmap thumbEffect(Bitmap original, in QueryString params)
 		{
-			if(original.size.area<=1) return original;
+			if(original.size.area<=1) return original; 
 			
 			//Todo: If the original bitmap is refreshed, this bitmap should be also invalidated.
 			//Todo: Find a way to weekly link this image to the original image to detect changes.
 			
-			ivec2 maxSize;
+			ivec2 maxSize; 
 			
-			float divisor=0;
-			params("d", divisor);
+			float divisor=0; 
+			params("d", divisor); 
 			if(divisor) { maxSize = iround(original.size / divisor); maxSize.LOG("D"); }
 			
-			params("thumb", (int a){ maxSize = ivec2(a); });
-			params("w", maxSize.x);
-			params("h", maxSize.y);
+			params("thumb", (int a){ maxSize = ivec2(a); }); 
+			params("w", maxSize.x); 
+			params("h", maxSize.y); 
 			
-			float scale = 1;
-			if(maxSize.x>0) scale.minimize(float(maxSize.x) / original.size.x);
-			if(maxSize.y>0) scale.minimize(float(maxSize.y) / original.size.y);
+			float scale = 1; 
+			if(maxSize.x>0) scale.minimize(float(maxSize.x) / original.size.x); 
+			if(maxSize.y>0) scale.minimize(float(maxSize.y) / original.size.y); 
 			
 			//print(maxSize, original.size, scale, params);
 			
-			enum rationalScale = false;
+			enum rationalScale = false; 
 			if(rationalScale) scale = 1/floor(1/scale); //divide it to even parts
 			
 			if(scale<=.5f) {
-				ivec2 newSize = iround(original.size*scale);
+				ivec2 newSize = iround(original.size*scale); 
 				return original.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
 			}
 			else
 			{ return original.shallowDup; }
-		}
+		} 
 		
 		Bitmap histogramEffect(Bitmap original, in QueryString params)
 		{
-			const isGray = params.names.canFind("gray");
+			const isGray = params.names.canFind("gray"); 
 			
 			if(!isGray)
 			{
-				auto img = original.accessOrGet!RGB;
-				uint[3][256] histogram;
-				foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++;
-				uint histogramMax = histogram[].map!(h => h[].max).array.max;
-				float sc = 255.0f/histogramMax;
-				return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc))));
+				auto img = original.accessOrGet!RGB; 
+				uint[3][256] histogram; 
+				foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++; 
+				uint histogramMax = histogram[].map!(h => h[].max).array.max; 
+				float sc = 255.0f/histogramMax; 
+				return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc)))); 
 			}
 			else
 			{
-				auto img = original.accessOrGet!ubyte;
-				uint[256] histogram;
-				foreach(p; img.asArray) histogram[p]++;
-				uint histogramMax = histogram[].max;
-				float sc = 255.0f/histogramMax;
-				return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround))));
+				auto img = original.accessOrGet!ubyte; 
+				uint[256] histogram; 
+				foreach(p; img.asArray) histogram[p]++; 
+				uint histogramMax = histogram[].max; 
+				float sc = 255.0f/histogramMax; 
+				return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround)))); 
 			}
-		}
+		} 
 		Bitmap grayscaleEffect(Bitmap original, in QueryString params)
-		{ return new Bitmap(original.accessOrGet!ubyte); }
+		{ return new Bitmap(original.accessOrGet!ubyte); } 
 		
 		Bitmap invertRGBEffect(Bitmap original, in QueryString params)
-		{ return new Bitmap(image2D(original.size, original.accessOrGet!RGBA.asArray.rgba_invert_rgb)); }
-	}
+		{ return new Bitmap(image2D(original.size, original.accessOrGet!RGBA.asArray.rgba_invert_rgb)); } 
+	} 
 	
 	/+
 		Todo: Implement this monitor, clipboard auto updater somehow.
@@ -707,16 +707,16 @@ version(/+$DIDE_REGION+/all)
 	
 	private BitmapCacheStats _bitmapCacheStats; //this is a result
 	
-	private __gshared File[] bitmap_access_delayed_multi_files;
-	private __gshared Bitmap[] bitmap_access_delayed_multi_bitmaps;
+	private __gshared File[] bitmap_access_delayed_multi_files; 
+	private __gshared Bitmap[] bitmap_access_delayed_multi_bitmaps; 
 	
 	Bitmap[] bitmapQuery_accessDelayedMulti(File[] files)
 	{
 		//this must be called from main thread only!!!
-		bitmap_access_delayed_multi_files = files;
-		bitmapQuery(BitmapQueryCommand.access_delayed_multi, File.init, ErrorHandling.ignore);
-		return bitmap_access_delayed_multi_bitmaps;
-	}
+		bitmap_access_delayed_multi_files = files; 
+		bitmapQuery(BitmapQueryCommand.access_delayed_multi, File.init, ErrorHandling.ignore); 
+		return bitmap_access_delayed_multi_bitmaps; 
+	} 
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
@@ -726,29 +726,29 @@ version(/+$DIDE_REGION+/all)
 			//disable delayed
 			//if(cmd==BitmapQueryCommand.access_delayed) cmd = BitmapQueryCommand.access;
 			
-			import std.parallelism;
-			enum log = false;
+			import std.parallelism; 
+			enum log = false; 
 			
-			Bitmap res;
+			Bitmap res; 
 			
-			__gshared Bitmap[File] cache, loading;
-			__gshared  BitmapTransformation[][File] transformationQueue;
-			shared static int activeBackgroundLoaderCount = 0;
+			__gshared Bitmap[File] cache, loading; 
+			__gshared  BitmapTransformation[][File] transformationQueue; 
+			shared static int activeBackgroundLoaderCount = 0; 
 			
 			/// Allocate new file in cache , mark it as "loading"
 			static auto startLoading(File file)
 			{
-				auto b = newLoadingBitmap;
-				b.file = file;
-				cache[file] = b;
-				loading[file] = b;
-				return b;
-			}
+				auto b = newLoadingBitmap; 
+				b.file = file; 
+				cache[file] = b; 
+				loading[file] = b; 
+				return b; 
+			} 
 			
 			/// Allocate new file in cache and launch the loader thread
 			static auto startDelayedLoad(File file)
 			{
-				auto bmp = startLoading(file);
+				auto bmp = startLoading(file); 
 				
 				static void worker_load(shared Bitmap bmp/+"loading" bitmap that is holding filename to load+/)
 				{
@@ -759,10 +759,10 @@ version(/+$DIDE_REGION+/all)
 					//Todo: no need to limit parallelism, taskPool is good. The slow bottleneck is convert and upload to gpu.
 					version(/+$DIDE_REGION limit max number of loader threads+/none)
 					{
-						const maxWorkers = 9999;
+						const maxWorkers = 9999; 
 						while(cast()activeBackgroundLoaderCount >= maxWorkers)
 						{
-							sleep(3);
+							sleep(3); 
 							//Todo: this sleep is not threadsafe
 						}
 						//import core.atomic;
@@ -774,20 +774,20 @@ version(/+$DIDE_REGION+/all)
 					if(bmp.removed)
 					{
 						if(log)
-						LOG("Bitmap has been removed before delayed loader. Cancelling operation.", bmp);
-						return;
+						LOG("Bitmap has been removed before delayed loader. Cancelling operation.", bmp); 
+						return; 
 					}
 					
-					auto newBmp = newBitmap(file, errorHandling);
+					auto newBmp = newBitmap(file, errorHandling); 
 					
-					bitmapQuery(BitmapQueryCommand.finishWork, file, errorHandling, newBmp);
-				}
+					bitmapQuery(BitmapQueryCommand.finishWork, file, errorHandling, newBmp); 
+				} 
 				
-				if(BitmapLoaderUsesTaskPool) taskPool.put(task!worker_load(cast(shared)bmp));
-				else spawn(&worker_load, cast(shared)bmp);
+				if(BitmapLoaderUsesTaskPool) taskPool.put(task!worker_load(cast(shared)bmp)); 
+				else spawn(&worker_load, cast(shared)bmp); 
 				
 				return bmp; //returns a "loading" placeholder bitmap
-			}
+			} 
 			
 			/// Allocate new transformed file in cache and launch the transformer thread
 			static auto startDelayedTransformation(Bitmap originalBmp, Bitmap transformedBmp, BitmapTransformation tr)
@@ -798,60 +798,60 @@ version(/+$DIDE_REGION+/all)
 					if(transformedBmp.removed)
 					{
 						if(log)
-						LOG("Bitmap has been removed before delayed transformation. Canceling operation.", cast()transformedBmp);
-						return;
+						LOG("Bitmap has been removed before delayed transformation. Canceling operation.", cast()transformedBmp); 
+						return; 
 					}
 					
 					ignoreExceptions
 					(
 						{
-							auto newBmp = (cast()tr).transform(cast()originalBmp);
-							bitmapQuery(BitmapQueryCommand.finishTransformation, (cast()tr).transformedFile, ErrorHandling.track, newBmp);
+							auto newBmp = (cast()tr).transform(cast()originalBmp); 
+							bitmapQuery(BitmapQueryCommand.finishTransformation, (cast()tr).transformedFile, ErrorHandling.track, newBmp); 
 						}
-					);
-				}
+					); 
+				} 
 				
-				if(BitmapLoaderUsesTaskPool) taskPool.put(task!worker_transform(cast(shared)originalBmp, cast(shared)transformedBmp, cast(shared)tr));
-				else spawn(&worker_transform, cast(shared)originalBmp, cast(shared)transformedBmp, cast(shared)tr);
-			}
+				if(BitmapLoaderUsesTaskPool) taskPool.put(task!worker_transform(cast(shared)originalBmp, cast(shared)transformedBmp, cast(shared)tr)); 
+				else spawn(&worker_transform, cast(shared)originalBmp, cast(shared)transformedBmp, cast(shared)tr); 
+			} 
 			
 			//Loads and transforms a file, and updates the caches. Works in delayed and immediate mode.
 			//   requiredOriginalTime : optional check for the transformation's original file modified time
 			Bitmap loadAndTransform(File file, bool delayed_, DateTime requiredOriginalTime = DateTime.init)
 			{
-				Bitmap res;
+				Bitmap res; 
 				
 				const delayed = (){
-					if(!delayed_) return false;
-					const fn = file.fullName;
+					if(!delayed_) return false; 
+					const fn = file.fullName; 
 					if(fn.length>=2 && fn[1]==':') return true; //simple drive
-					const drv = file.drive.withoutEnding(':');
-					if(drv.among("virtual")) return true;
+					const drv = file.drive.withoutEnding(':'); 
+					if(drv.among("virtual")) return true; 
 					if(1)
-					if(drv.among("S1", "S2", "S3")) return true;
+					if(drv.among("S1", "S2", "S3")) return true; 
 						/+Todo: plugins should provide delayed flag+/
 					
-					return false;
-				}();
+					return false; 
+				}(); 
 				
-				auto tr = file.BitmapTransformation;
+				auto tr = file.BitmapTransformation; 
 				
 				bool checkRequiredModifiedTime(Bitmap bmp)
 				{
-					if(requiredOriginalTime.isNull) return true;
-					return requiredOriginalTime == bmp.modified;
-				}
+					if(requiredOriginalTime.isNull) return true; 
+					return requiredOriginalTime == bmp.modified; 
+				} 
 				
 				if(delayed) {
 					 //delayed load
 					if(tr) {
-						res = startLoading(tr.transformedFile);
+						res = startLoading(tr.transformedFile); 
 						if(auto originalBmp = tr.originalFile in cache)
 						{
 							if(checkRequiredModifiedTime(*originalBmp) && !(*originalBmp).loading)
 							{
 								//original bmp is up to date
-								startDelayedTransformation(*originalBmp, res, tr);
+								startDelayedTransformation(*originalBmp, res, tr); 
 							}
 							else
 							{
@@ -859,16 +859,16 @@ version(/+$DIDE_REGION+/all)
 								auto lastBmp = *originalBmp; 
 								//preserve it in the cache, so it can be displayed while loading the new
 								
-								transformationQueue[tr.originalFile] ~= tr;
-								startDelayedLoad(tr.originalFile);
+								transformationQueue[tr.originalFile] ~= tr; 
+								startDelayedLoad(tr.originalFile); 
 								
-								cache[tr.originalFile] = lastBmp;
-								lastBmp.loading = true;
+								cache[tr.originalFile] = lastBmp; 
+								lastBmp.loading = true; 
 							}
 						}
 						else {
-							transformationQueue[tr.originalFile] ~= tr;
-							startDelayedLoad(tr.originalFile);
+							transformationQueue[tr.originalFile] ~= tr; 
+							startDelayedLoad(tr.originalFile); 
 						}
 					}
 					else { res = startDelayedLoad(file); }
@@ -881,34 +881,34 @@ version(/+$DIDE_REGION+/all)
 							Note: it doesn't look at delayed caches: loaded[] and transformQueue[]. 
 												Those will complete later if there are any.
 						+/
-						Bitmap orig;
-						auto originalBmp = tr.originalFile in cache;
+						Bitmap orig; 
+						auto originalBmp = tr.originalFile in cache; 
 						if(originalBmp && checkRequiredModifiedTime(*originalBmp))
 						{ orig = *originalBmp; }
 						else
 						{
-							orig = newBitmap(tr.originalFile, errorHandling);
-							cache[tr.originalFile] = orig;
+							orig = newBitmap(tr.originalFile, errorHandling); 
+							cache[tr.originalFile] = orig; 
 						}
 						
 						//and transform it
-						assert(orig !is null);
-						res = tr.transform(orig);
+						assert(orig !is null); 
+						res = tr.transform(orig); 
 						res.file = file; //set the correct name
 					}
 					else { res = newBitmap(file, errorHandling); }
-					cache[file] = res;
+					cache[file] = res; 
 				}
 				
-				return res;
-			}
+				return res; 
+			} 
 			
 			Bitmap access(bool autoRefresh)(File file, bool delayed)
 			{
 				if(auto p = file in cache)
 				{
 					 //already in cache
-					auto res = *p;
+					auto res = *p; 
 					
 					//check for a refreshed version
 					static if(autoRefresh)
@@ -924,10 +924,10 @@ version(/+$DIDE_REGION+/all)
 									//it has a new version, must load...
 									if(delayed)
 									{
-										loadAndTransform(file, delayed, t);
+										loadAndTransform(file, delayed, t); 
 										//put back the original file into the cache and mark that it is loading
-										cache[file] = res;
-										res.loading = true;
+										cache[file] = res; 
+										res.loading = true; 
 									}
 									else
 									{ res = loadAndTransform(file, delayed, t); }
@@ -935,14 +935,14 @@ version(/+$DIDE_REGION+/all)
 							}
 						}
 					}
-					return res;
+					return res; 
 				}
 				else
 				{
 					//new thing, must be loaded
-					return loadAndTransform(file, delayed);
+					return loadAndTransform(file, delayed); 
 				}
-			}
+			} 
 			
 			
 			
@@ -950,94 +950,94 @@ version(/+$DIDE_REGION+/all)
 			final switch(cmd)
 			{
 				
-				case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed:
+				case BitmapQueryCommand.access, BitmapQueryCommand.access_delayed: 
 				{
 					if(bmpIn) {
 						//just put the image into the cache
 						
-						res = bmpIn;
-						cache[file] = res;
+						res = bmpIn; 
+						cache[file] = res; 
 						
 					}
 					else {
 						//try to load the file from the fileSystem
-						res = access!true(file, cmd==BitmapQueryCommand.access_delayed);
+						res = access!true(file, cmd==BitmapQueryCommand.access_delayed); 
 					}
 				}
-				break;
+				break; 
 				
-				case BitmapQueryCommand.access_delayed_multi:
+				case BitmapQueryCommand.access_delayed_multi: 
 				{
 					//batch processing used bny timeview.
 					bitmap_access_delayed_multi_bitmaps = bitmap_access_delayed_multi_files
 					.map!(
 						(file){
-							res = access!false(file, true);
-							if(res) res.accessed_tick = application.tick;
-							return res;
+							res = access!false(file, true); 
+							if(res) res.accessed_tick = application.tick; 
+							return res; 
 						}
-					).array;
+					).array; 
 				}
-				break;
+				break; 
 				
-				case BitmapQueryCommand.finishWork, BitmapQueryCommand.finishTransformation:
+				case BitmapQueryCommand.finishWork, BitmapQueryCommand.finishTransformation: 
 				{
-					loading.remove(file);
+					loading.remove(file); 
 					
 					if(auto p = file in cache)
 					{
-						*p = bmpIn;
+						*p = bmpIn; 
 						//swap in the new bitmap and let the GC free up the previous one. The GC will know if there is no references left.
 						
 						//optionally start a transformation
 						if(cmd==BitmapQueryCommand.finishWork)
 						if(auto tr = file in transformationQueue)
 						{
-							foreach(t; *tr) startDelayedTransformation(bmpIn, cache[t.transformedFile], t);
-							transformationQueue.remove(file);
+							foreach(t; *tr) startDelayedTransformation(bmpIn, cache[t.transformedFile], t); 
+							transformationQueue.remove(file); 
 						}
 					}
 					else
 					{ if(log) LOG("Bitmap was removed after delayed ", cmd.text.withoutStarting("finish").lc, " has started. ", bmpIn); }
 				}
-				break;
+				break; 
 				
-				case BitmapQueryCommand.remove:
+				case BitmapQueryCommand.remove: 
 				{
-					if(auto p = file in cache) (*p).removed = true;
-					loading.remove(file);
-					transformationQueue.remove(file);
-					cache.remove(file);
+					if(auto p = file in cache) (*p).removed = true; 
+					loading.remove(file); 
+					transformationQueue.remove(file); 
+					cache.remove(file); 
 				}
-				break;
+				break; 
 				
-				case BitmapQueryCommand.stats, BitmapQueryCommand.details:
+				case BitmapQueryCommand.stats, BitmapQueryCommand.details: 
 				{
-					_bitmapCacheStats.count = cache.length;
-					_bitmapCacheStats.allSizeBytes	= cache.byValue                       .map!"a.sizeBytes".sum;
-					_bitmapCacheStats.nonUnloadableSizeBytes	= cache.byValue.filter!"!a.unloadable".map!"a.sizeBytes".sum;
-					_bitmapCacheStats.residentSizeBytes	= cache.byValue.filter!"a.resident"   .map!"a.sizeBytes".sum;
+					_bitmapCacheStats.count = cache.length; 
+					_bitmapCacheStats.allSizeBytes	= cache.byValue                       .map!"a.sizeBytes".sum; 
+					_bitmapCacheStats.nonUnloadableSizeBytes	= cache.byValue.filter!"!a.unloadable".map!"a.sizeBytes".sum; 
+					_bitmapCacheStats.residentSizeBytes	= cache.byValue.filter!"a.resident"   .map!"a.sizeBytes".sum; 
 					
-					_bitmapCacheStats.bitmaps = cmd==BitmapQueryCommand.details ? _bitmapCacheStats.bitmaps = cache.values.dup : null;
+					_bitmapCacheStats.bitmaps = cmd==BitmapQueryCommand.details ? _bitmapCacheStats.bitmaps = cache.values.dup : null; 
 				}
-				break;
+				break; 
 				
-				case BitmapQueryCommand.garbageCollect:
+				case BitmapQueryCommand.garbageCollect: 
 				{
 					//T0;
-					auto	list = cache.byValue.filter!"a.unloadable".array;
-					const	sizeBytes = list.map!(b => b.sizeBytes).sum;
+					auto	list = cache.byValue.filter!"a.unloadable".array; 
+					const	sizeBytes = list.map!(b => b.sizeBytes).sum; 
 					
 					
 					static if(0)
 					{
-						LOG("BITMAP GC StATISTICS");
+						LOG("BITMAP GC StATISTICS"); 
 						void printStats(alias f)()
 						{
-							auto filtered = cache.byValue.filter!f;
-							print(format!"%-20s %5d %5sB"(f.stringof, filtered.walkLength, filtered.map!"a.sizeBytes".sum.shortSizeText));
-						}
-						foreach(f; AliasSeq!("a.resident", "!a.resident", "a.loading" , "a.removed", "true")) printStats!f;
+							auto filtered = cache.byValue.filter!f; 
+							print(format!"%-20s %5d %5sB"(f.stringof, filtered.walkLength, filtered.map!"a.sizeBytes".sum.shortSizeText)); 
+						} 
+						foreach(f; AliasSeq!("a.resident", "!a.resident", "a.loading" , "a.removed", "true")) printStats!f; 
 						
 						//dump some statistics
 						print(
@@ -1053,157 +1053,157 @@ version(/+$DIDE_REGION+/all)
 								)
 							)
 								.join('\n')
-						);
+						); 
 					}
 					
 					if(sizeBytes > BitmapCacheMaxSizeBytes)
 					{
-						auto _2 = PROBE("bitmapQuery.GC");
+						auto _2 = PROBE("bitmapQuery.GC"); 
 						
 						//ascending by access time
-						list = list.sort!((a, b)=>a.accessed_tick<b.accessed_tick).array;
+						list = list.sort!((a, b)=>a.accessed_tick<b.accessed_tick).array; 
 						
-						const targetSize = BitmapCacheMaxSizeBytes;
-						size_t remaining = sizeBytes;
+						const targetSize = BitmapCacheMaxSizeBytes; 
+						size_t remaining = sizeBytes; 
 						//LOG("Bitmap cache GC", remaining.shortSizeText, targetSize.shortSizeText);
 						foreach(b; list) {
 							//print("removing", b);
 							
-							remaining -= b.sizeBytes;
-							cache.remove(b.file);
-							b.removed = true;
+							remaining -= b.sizeBytes; 
+							cache.remove(b.file); 
+							b.removed = true; 
 							
-							if(remaining<=targetSize) break;
+							if(remaining<=targetSize) break; 
 						}
 						
 						//LOG(DT);
 					}
 				}
-				break;
-				case BitmapQueryCommand.set:
+				break; 
+				case BitmapQueryCommand.set: 
 				{
 					if(bmpIn)
 					{
-						cache[file] = bmpIn;
+						cache[file] = bmpIn; 
 						
-						bmpIn.loading = false;
-						loading.remove(file);
+						bmpIn.loading = false; 
+						loading.remove(file); 
 						
 						//file removed, -> also the transformations quued for the file
-						transformationQueue.remove(file);
+						transformationQueue.remove(file); 
 					}
 				}
-				break;
+				break; 
 			}
 			
-			if(res) res.accessed_tick = application.tick;
+			if(res) res.accessed_tick = application.tick; 
 			
-			return res;
-		}
-	}
+			return res; 
+		} 
+	} 
 	
 	__gshared struct bitmaps
 	{
-		static:
+		static: 
 		//bitmaps(fn) = delayed access
 		//bitmaps[fn] = immediate access
 		auto opCall(F)(F file, Flag!"delayed" delayed=Yes.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null)
-		{ return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling, bmp); }
+		{ return bitmapQuery(delayed ? BitmapQueryCommand.access_delayed : BitmapQueryCommand.access, File(file), errorHandling, bmp); } 
 		auto opCall(F)(F file, ErrorHandling errorHandling, Flag!"delayed" delayed=Yes.delayed, Bitmap bmp=null)
-		{ return opCall(file, delayed, errorHandling, bmp); }
+		{ return opCall(file, delayed, errorHandling, bmp); } 
 		
 		auto opIndex(F)(F file)
-		{ return opCall(file, No.delayed, ErrorHandling.raise); }
+		{ return opCall(file, No.delayed, ErrorHandling.raise); } 
 		
 		auto opIndexAssign(F)(Bitmap bmp, F file)
-		{ /*enforce(bmp && bmp.valid);*/ return opCall(file, No.delayed, ErrorHandling.raise, bmp); }
+		{ /*enforce(bmp && bmp.valid);*/ return opCall(file, No.delayed, ErrorHandling.raise, bmp); } 
 		
 		auto opIndexAssign(F, I)(I img, F file) if(isImage2D!I)
-		{ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); }
+		{ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); } 
 		
 		void remove (F)(F file)
-		{ bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); }
+		{ bitmapQuery(BitmapQueryCommand.remove, File(file), ErrorHandling.ignore); } 
 		
 		BitmapCacheStats stats()
-		{ bitmapQuery(BitmapQueryCommand.stats  , File(), ErrorHandling.ignore); return _bitmapCacheStats; }
+		{ bitmapQuery(BitmapQueryCommand.stats  , File(), ErrorHandling.ignore); return _bitmapCacheStats; } 
 		BitmapCacheStats details()
-		{ bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); return _bitmapCacheStats; }
+		{ bitmapQuery(BitmapQueryCommand.details, File(), ErrorHandling.ignore); return _bitmapCacheStats; } 
 		
 		void garbageCollect()
-		{ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); }
+		{ bitmapQuery(BitmapQueryCommand.garbageCollect, File(), ErrorHandling.ignore); } 
 		
 		void set(F)(F file, Bitmap bmp)
 		{
-			auto f = File(file);
-			enforce(f);
-			enforce(bmp);
+			auto f = File(file); 
+			enforce(f); 
+			enforce(bmp); 
 			
-			bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp);
-		}
+			bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp); 
+		} 
 		
 		void refresh(F)(F file)
 		{
-			auto f = File(file);
+			auto f = File(file); 
 			auto b = newBitmap(f, ErrorHandling.track); //Todo: this reallocates the buffer, it's a waste of GC
-			b.modified = now;
-			bitmaps.set(f, b);
-		}
+			b.modified = now; 
+			bitmaps.set(f, b); 
+		} 
 		
-	}
+	} 
 	
 	void testBitmaps()
 	{
-		print("\nStarting bitmap() tests.----------------------------------------");
+		print("\nStarting bitmap() tests.----------------------------------------"); 
 		
 		void doIt(string title, Bitmap delegate() fun)
 		{
-			writeln("bitmap() test: \33\16"~title~"\33\7");
-			const t0 = QPS;
-			Bitmap b = fun();
+			writeln("bitmap() test: \33\16"~title~"\33\7"); 
+			const t0 = QPS; 
+			Bitmap b = fun(); 
 			if(b.loading) {
-				print("  first access    :", b);
+				print("  first access    :", b); 
 				while(b.loading) {
-					sleep(10);
-					b = fun();
+					sleep(10); 
+					b = fun(); 
 				}
-				print("  loaded          :", b);
+				print("  loaded          :", b); 
 			}else { print("  immediate access:", b); }
-			print("  time              :\33\12", (QPS-t0)*1e3, "ms\33\7");
-		}
+			print("  time              :\33\12", (QPS-t0)*1e3, "ms\33\7"); 
+		} 
 		
-		auto file	= File(`c:\dl\BaiLing0.jpg`);
-		auto thumb	= File(file.fullName~"?thumb64");
-		enforce(file.exists);
+		auto file	= File(`c:\dl\BaiLing0.jpg`); 
+		auto thumb	= File(file.fullName~"?thumb64"); 
+		enforce(file.exists); 
 		
-		doIt("immediate"                    , ()=>bitmaps(file, No.delayed));	 bitmaps.remove(file);
-		doIt("immediate again, after remove", ()=>bitmaps(file, No.delayed));	 bitmaps.remove(file);
-		doIt("delayed first (cache miss)"	  , ()=>bitmaps(file, Yes.delayed));
-		doIt("delayed again (cache hit)"		 , ()=>bitmaps(file, Yes.delayed));	 bitmaps.remove(file);
-		doIt("delayed again (removed  )"		 , ()=>bitmaps(file, Yes.delayed));	 bitmaps.remove(file);
+		doIt("immediate"                    , ()=>bitmaps(file, No.delayed)); 	 bitmaps.remove(file); 
+		doIt("immediate again, after remove", ()=>bitmaps(file, No.delayed)); 	 bitmaps.remove(file); 
+		doIt("delayed first (cache miss)"	  , ()=>bitmaps(file, Yes.delayed)); 
+		doIt("delayed again (cache hit)"		 , ()=>bitmaps(file, Yes.delayed)); 	 bitmaps.remove(file); 
+		doIt("delayed again (removed  )"		 , ()=>bitmaps(file, Yes.delayed)); 	 bitmaps.remove(file); 
 		
-		print("Thumb immediate tests:");
-		bitmaps.remove(file); bitmaps.remove(thumb);
-		doIt("immediate originalFile (miss)", ()=>bitmaps(file , No.delayed));
-		doIt("immediate thumb"              , ()=>bitmaps(thumb, No.delayed));
+		print("Thumb immediate tests:"); 
+		bitmaps.remove(file); bitmaps.remove(thumb); 
+		doIt("immediate originalFile (miss)", ()=>bitmaps(file , No.delayed)); 
+		doIt("immediate thumb"              , ()=>bitmaps(thumb, No.delayed)); 
 		//bitmaps(thumb).saveTo(`c:\dl\thumb.bmp`);   { auto b = new Bitmap; b.loadFrom(`c:\dl\thumb.bmp`); b.print; }
 		
-		bitmaps.remove(file); bitmaps.remove(thumb);
-		doIt("immediate thumb"	, ()=>bitmaps(thumb, No.delayed));
-		doIt("immediate originalFile (hit)"	, ()=>bitmaps(file , No.delayed));
+		bitmaps.remove(file); bitmaps.remove(thumb); 
+		doIt("immediate thumb"	, ()=>bitmaps(thumb, No.delayed)); 
+		doIt("immediate originalFile (hit)"	, ()=>bitmaps(file , No.delayed)); 
 		
-		print("Thumb delayed tests:");
-		bitmaps.remove(file); bitmaps.remove(thumb);
-		doIt("delayed originalFile (miss)", ()=>bitmaps(file , Yes.delayed));
-		doIt("delayed thumb"              , ()=>bitmaps(thumb, Yes.delayed));
-		bitmaps.remove(file); bitmaps.remove(thumb);
-		doIt("delayed thumb"	, ()=>bitmaps(thumb, Yes.delayed));
-		doIt("delayed originalFile (hit)"	, ()=>bitmaps(file , Yes.delayed));
+		print("Thumb delayed tests:"); 
+		bitmaps.remove(file); bitmaps.remove(thumb); 
+		doIt("delayed originalFile (miss)", ()=>bitmaps(file , Yes.delayed)); 
+		doIt("delayed thumb"              , ()=>bitmaps(thumb, Yes.delayed)); 
+		bitmaps.remove(file); bitmaps.remove(thumb); 
+		doIt("delayed thumb"	, ()=>bitmaps(thumb, Yes.delayed)); 
+		doIt("delayed originalFile (hit)"	, ()=>bitmaps(file , Yes.delayed)); 
 		
-		print("\nBitmap cache statistics");
-		bitmaps.details;
-		print("All bitmap() tests done.----------------------------------------\n");
-		readln;
-	}
+		print("\nBitmap cache statistics"); 
+		bitmaps.details; 
+		print("All bitmap() tests done.----------------------------------------\n"); 
+		readln; 
+	} 
 	
 	
 	
@@ -1216,15 +1216,15 @@ version(/+$DIDE_REGION+/all)
 	float cubicInterpolate(float[4] p, float x)
 	{
 		//http://www.paulinternet.nl/?page=bicubic
-		return p[1] + 0.5f * x*(p[2] - p[0] + x*(2*p[0] - 5*p[1] + 4*p[2] - p[3] + x*(3*(p[1] - p[2]) + p[3] - p[0])));
-	}
+		return p[1] + 0.5f * x*(p[2] - p[0] + x*(2*p[0] - 5*p[1] + 4*p[2] - p[3] + x*(3*(p[1] - p[2]) + p[3] - p[0]))); 
+	} 
 	
 	T cubicInterpolate(T)(T[4] p, float x) if(__traits(isIntegral, T))
 	{
 		//http://www.paulinternet.nl/?page=bicubic
-		float f = (p[1] + 0.5f * x*(p[2] - p[0] + x*(2*p[0] - 5*p[1] + 4*p[2] - p[3] + x*(3*(p[1] - p[2]) + p[3] - p[0]))));
-		return cast(T) f.iround.clamp(T.min, T.max);
-	}
+		float f = (p[1] + 0.5f * x*(p[2] - p[0] + x*(2*p[0] - 5*p[1] + 4*p[2] - p[3] + x*(3*(p[1] - p[2]) + p[3] - p[0])))); 
+		return cast(T) f.iround.clamp(T.min, T.max); 
+	} 
 	
 	T bicubicInterpolate (T)(T[4][4] p, float x, float y)
 	{
@@ -1234,9 +1234,9 @@ version(/+$DIDE_REGION+/all)
 			cubicInterpolate(p[1], x),
 			cubicInterpolate(p[2], x),
 			cubicInterpolate(p[3], x) 
-		];
-		return cubicInterpolate(a, y);
-	}
+		]; 
+		return cubicInterpolate(a, y); 
+	} 
 	
 	//Extract a sub-region of a given image
 	//x,y :	 top, left coordinate of the rect
@@ -1244,45 +1244,45 @@ version(/+$DIDE_REGION+/all)
 	//xs, ys:	 stepSize int x, y directions  <1 means magnification
 	Image!(T, 2) extract_bicubic(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1)
 	{
-		auto res = image2D(w, h, T.init);
-		auto x00 = x0;
+		auto res = image2D(w, h, T.init); 
+		auto x00 = x0; 
 		
 		foreach(int y; 0..h)
 		{
 			auto yt = y0.iFloor,
-					 yf = y0-yt;
+					 yf = y0-yt; 
 			
 			x0 = x00; //advance row
 			foreach(int x; 0..w)
 			{
 				auto xt = x0.iFloor,
-						 xf = x0-xt;
+						 xf = x0-xt; 
 				
 				//get a sample form x0, y0
-				T[4][4] a; foreach(j; 0..4) foreach(i; 0..4) a[j][i] = iSrc[iSrc.ofs_safe(i+xt-1, j+yt-1)];
+				T[4][4] a; foreach(j; 0..4) foreach(i; 0..4) a[j][i] = iSrc[iSrc.ofs_safe(i+xt-1, j+yt-1)]; 
 				
-				res[x, y] = bicubicInterpolate(a, xf, yf);
+				res[x, y] = bicubicInterpolate(a, xf, yf); 
 				
-				x0 += xs;
+				x0 += xs; 
 			}
-			y0 += ys;
+			y0 += ys; 
 		}
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	float linearInterpolate(float[2] p, float x)
 	{
 		//http://www.paulinternet.nl/?page=bicubic
-		return p[1]*x + p[0]*(1-x);
-	}
+		return p[1]*x + p[0]*(1-x); 
+	} 
 	
 	T linearInterpolate(T)(T[2] p, float x) if(__traits(isIntegral, T))
 	{
 		 //http://www.paulinternet.nl/?page=bicubic
-		float f = p[1]*x + p[0]*(1-x);
-		return cast(T) f.iround.clamp(T.min, T.max);
-	}
+		float f = p[1]*x + p[0]*(1-x); 
+		return cast(T) f.iround.clamp(T.min, T.max); 
+	} 
 	
 	T bilinearInterpolate (T)(T[2][2] p, float x, float y)
 	{
@@ -1290,48 +1290,48 @@ version(/+$DIDE_REGION+/all)
 		T[2] a = [
 			linearInterpolate(p[0], x),
 			linearInterpolate(p[1], x) 
-		];
-		return linearInterpolate(a, y);
-	}
+		]; 
+		return linearInterpolate(a, y); 
+	} 
 	
 	Image!(T, 2) extract_bilinear(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1)
 	{
-		auto res = image2D(w, h, T.init);
-		auto x00 = x0;
+		auto res = image2D(w, h, T.init); 
+		auto x00 = x0; 
 		
 		foreach(int y; 0..h)
 		{
 			auto yt = y0.iFloor,
-					 yf = y0-yt;
+					 yf = y0-yt; 
 			
 			x0 = x00; //advance row
 			foreach(int x; 0..w)
 			{
 				auto xt = x0.iFloor,
-						 xf = x0-xt;
+						 xf = x0-xt; 
 				
 				//get a sample form x0, y0
-				T[2][2] a; foreach(j; 0..2) foreach(i; 0..2) a[j][i] = iSrc[iSrc.ofs_safe(i+xt, j+yt)];
+				T[2][2] a; foreach(j; 0..2) foreach(i; 0..2) a[j][i] = iSrc[iSrc.ofs_safe(i+xt, j+yt)]; 
 				
-				res[x, y] = bilinearInterpolate(a, xf, yf);
+				res[x, y] = bilinearInterpolate(a, xf, yf); 
 				
-				x0 += xs;
+				x0 += xs; 
 			}
-			y0 += ys;
+			y0 += ys; 
 		}
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	auto sample_nearest(T)(Image!(T, 2) iSrc, ivec2 p)
 	{
 		  //Todo: unsafe/safe versions, safe with boundary mode and color -> openCV
-		if(p.x<0 || p.y<0 || p.x>=iSrc.width || p.y>=iSrc.height) return T.init;
-		return iSrc[p];
-	}
+		if(p.x<0 || p.y<0 || p.x>=iSrc.width || p.y>=iSrc.height) return T.init; 
+		return iSrc[p]; 
+	} 
 	
 	auto sample_nearest(T)(Image!(T, 2) iSrc, vec2 p)
-	{ return iSrc.sample_nearest(p.ifloor); }
+	{ return iSrc.sample_nearest(p.ifloor); } 
 	
 	auto extract_nearest(T)(Image!(T, 2) iSrc, float x0, float y0, int w, int h, float xs=1, float ys=1)
 	{
@@ -1367,13 +1367,13 @@ version(/+$DIDE_REGION+/all)
 			
 			return res;
 		*/
-	}
+	} 
 	
 	Image!(T, 2) resize_nearest(T)(Image!(T, 2) iSrc, ivec2 newSize)
 	{
 		//Todo: What about pixel center 0.5?  It is now shifting the image.
-		return extract_nearest(iSrc, 0, 0, newSize.x, newSize.y, iSrc.size.x/float(newSize.x), iSrc.size.y/float(newSize.y));
-	}
+		return extract_nearest(iSrc, 0, 0, newSize.x, newSize.y, iSrc.size.x/float(newSize.x), iSrc.size.y/float(newSize.y)); 
+	} 
 	
 	//This is a special one: it only processes the first 2 ubytes of an uint
 	//Todo: should be refactored to an image that handles RGBA types
@@ -1485,133 +1485,133 @@ version(/+$DIDE_REGION+/all)
 	auto convertImage(Dst, T)(Image!(T, 2) src)
 	{
 		//compile time image convert
-		scope auto bmp = new Bitmap;
-		bmp.set(src);
-		return bmp.get!Dst;
-	}
+		scope auto bmp = new Bitmap; 
+		bmp.set(src); 
+		return bmp.get!Dst; 
+	} 
 	
 	/// converts it to ubyte and remaps chn using a chn expression string
 	private auto convertImage_ubyte_chnRemap(int[4] chnRemap, T)(Image!(T, 2) a)
 	{
 		enum chn = VectorLength!T,
-		newChn = chnRemap[chn-1];
-		static assert(newChn.inRange(1,4));
+		newChn = chnRemap[chn-1]; 
+		static assert(newChn.inRange(1,4)); 
 		
-		static if(is(ScalarType!T == ubyte) && chn == newChn) return a;
-		else return a.convertImage!(Vector!(ubyte, newChn));
-	}
+		static if(is(ScalarType!T == ubyte) && chn == newChn) return a; 
+		else return a.convertImage!(Vector!(ubyte, newChn)); 
+	} 
 	
 	auto interpolate_bilinear(A)(in A a00, in A a10, in A a01, in A a11, in vec2 p)
 	{
 		return mix(
 			mix(a00, a10, p.x),
 			mix(a01, a11, p.x), p.y
-		);
-	}
+		); 
+	} 
 	
 	auto interpolate_bilinear_safe(A)(Image!(A, 2) im, in vec2 p)
 	{
-		if(im.empty) return A.init;
+		if(im.empty) return A.init; 
 		auto 	limit 	= im.size-1,
 			p0	= p.ifloor.clamp(ivec2(0), limit),
-			p1	= min(p0+1, limit);
+			p1	= min(p0+1, limit); 
 		return interpolate_bilinear(
 			im[p0      ], im[p1.x, p0.y],
 			im[p0.x, p1.y], im[p1      ], p.fract
-		);
-	}
+		); 
+	} 
 	
 	auto peakDetect(T)(Image!T img, int border=1, T minValue=T.min)
 	{
 		with(img) {
-			ivec2[] peaks;
+			ivec2[] peaks; 
 			foreach(int y; border..height-border)
 			{
-				 int o0 = y*width;
+				 int o0 = y*width; 
 				foreach(int x; border..width-border) {
-					 auto o = o0+x, val = data[o];
+					 auto o = o0+x, val = data[o]; 
 					if(val>minValue && img.isPeak(o))
-					peaks ~= ivec2(x, y);
+					peaks ~= ivec2(x, y); 
 				}
 			}
-			return peaks;
+			return peaks; 
 		}
-	}
+	} 
 	
 	void maskAll(T)(Image!T img, T mask)
-	{ with(img) { data[] &= mask; } }
+	{ with(img) { data[] &= mask; }} 
 	
 	void mask(T)(Image!T img, Bounds2i b, T msk)
 	{
 		with(img) {
 			with(bounds.clamp(b))
 			{
-				if(isNull) return;
+				if(isNull) return; 
 				foreach(int y; bMin.y..bMax.y)
 				{
-					int o0 = y*width_;
+					int o0 = y*width_; 
 					foreach(int o; o0+bMin.x..o0+bMax.x) { data_[o] &= msk; }
 				}
 				
 			}
 		}
-	}
+	} 
 	
 	void maskBorder(T)(Image!T img, int border, T mask)
 	{
 		with(img) {
-			if(border*2>=width || border*2>=height) img.maskAll(mask);
+			if(border*2>=width || border*2>=height) img.maskAll(mask); 
 			
-			data[0..width*border] &= mask;
-			data[$-width*border..$] &= mask;
+			data[0..width*border] &= mask; 
+			data[$-width*border..$] &= mask; 
 			foreach(int y; border..height-border) {
-				int o = y*width;
-				data[o..o+border] &= mask;
-				data[o+width-border..o+width] &= mask;
+				int o = y*width; 
+				data[o..o+border] &= mask; 
+				data[o+width-border..o+width] &= mask; 
 			}
 		}
-	}
+	} 
 	
 	bool isPeak(T)(Image!T img, int o)
 	{
 		with(img) {
-			const center = data[o];
+			const center = data[o]; 
 			bool g(int delta) {
-				const val = data[o+delta];
-				return center>val || (center==val && delta>0);
-			}
+				const val = data[o+delta]; 
+				return center>val || (center==val && delta>0); 
+			} 
 			
 			return g(-1) && g(1) &&
 						 g(-width  ) && g(width  )	&&
 						 g(width-1) && g(width+1)	&&
-						 g(-width-1) && g(-width+1);
+						 g(-width-1) && g(-width+1); 
 		}
-	}
+	} 
 }
 version(/+$DIDE_REGION+/all)
 {
-	immutable supportedBitmapExts = ["webp", "png", "jpg", "jpeg", "bmp", "tga", "gif"];
-	immutable supportedBitmapFilter = supportedBitmapExts.map!(a=>"*."~a).join(';');
+	immutable supportedBitmapExts = ["webp", "png", "jpg", "jpeg", "bmp", "tga", "gif"]; 
+	immutable supportedBitmapFilter = supportedBitmapExts.map!(a=>"*."~a).join(';'); 
 	
 	File[] bitmapFiles(in Path p)
-	{ return p.files(supportedBitmapFilter); }
+	{ return p.files(supportedBitmapFilter); } 
 	
 	struct BitmapInfo
 	{
-			string format;
-			ivec2 size;
-			int chn;
+			string format; 
+			ivec2 size; 
+			int chn; 
 		
 			bool valid() const
-		{ return supportedBitmapExts.canFind(format) && chn.inRange(1, 4); }
+		{ return supportedBitmapExts.canFind(format) && chn.inRange(1, 4); } 
 		
 			int numPixels() const
-		{ return size[].product; }
+		{ return size[].product; } 
 		
 			const ref auto width()
-		{ return size.x; }
+		{ return size.x; } 
 			const ref auto height()
-		{ return size.y; }
+		{ return size.y; } 
 		
 		private static
 		{
@@ -1619,22 +1619,22 @@ version(/+$DIDE_REGION+/all)
 			bool isWebp(in ubyte[] s)
 			{
 				return 	s.length>16 && s[0..4].equal("RIFF") && s[8..15].equal("WEBPVP8") 
-					&& s[15].among(' ', 'L', 'X');
-			}
+					&& s[15].among(' ', 'L', 'X'); 
+			} 
 			bool isJpg (in ubyte[] s)
-			{ return s.startsWith([0xff, 0xd8, 0xff]); }
+			{ return s.startsWith([0xff, 0xd8, 0xff]); } 
 			bool isPng (in ubyte[] s)
-			{ return s.startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); }
+			{ return s.startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]); } 
 			bool isBmp (in ubyte[] s)
 			{
 				return 	s.length>18 && s[0..2].equal("BM") 
-					&& (cast(uint[])s[14..18])[0].among(12, 40, 52, 56, 108, 124);
-			}
+					&& (cast(uint[])s[14..18])[0].among(12, 40, 52, 56, 108, 124); 
+			} 
 			bool isGif (in ubyte[] s)
 			{
 				return 	s.length>=6+7 && s[0..4].equal("GIF8") 
-					&& s[4].among('7', '9') && s[5]=='a';
-			}
+					&& s[4].among('7', '9') && s[5]=='a'; 
+			} 
 			
 			bool isTga (in ubyte[] s)
 			{
@@ -1642,73 +1642,73 @@ version(/+$DIDE_REGION+/all)
 				if(s.length>18)
 				{
 					auto us(int i)
-					{ return (cast(ushort[])s[i..i+2])[0]; }
+					{ return (cast(ushort[])s[i..i+2])[0]; } 
 					const badTga = 
 					(
 						us(12) < 1 || us(14) < 1 || s[1] > 1
 						|| (s[1] == 0 && (us(3) || us(5) || s[7])) //palette is off, but has palette info
 						|| (4 <= s[2] && s[2] <= 8) || 12 <= s[2]
-					);
-					if(!badTga) return true;
+					); 
+					if(!badTga) return true; 
 				}
-				return false;
-			}
+				return false; 
+			} 
 			
 			string detectFormat(in File fileName, in ubyte[] stream)
 			{
-				 alias s = stream;
+				 alias s = stream; 
 				if(!stream.empty)
 				{
-					if(isJpg (s)) return "jpg";
-					if(isPng (s)) return "png";
-					if(isBmp (s)) return "bmp";
-					if(isWebp(s)) return "webp";
-					if(isTga (s)) return "tga";
-					if(isGif (s)) return "gif";
+					if(isJpg (s)) return "jpg"; 
+					if(isPng (s)) return "png"; 
+					if(isBmp (s)) return "bmp"; 
+					if(isWebp(s)) return "webp"; 
+					if(isTga (s)) return "tga"; 
+					if(isGif (s)) return "gif"; 
 				}
 				
 				//unable to detect from stream, try fileExt
 				if(stream.empty)
 				{
-					string e = fileName.ext.lc;
-					if(e.startsWith(".")) e = e[1..$];
+					string e = fileName.ext.lc; 
+					if(e.startsWith(".")) e = e[1..$]; 
 					
 					if(supportedBitmapExts.canFind(e))
 					{
 						if(e=="jpeg") e = "jpg"; //synonim
-						return e;
+						return e; 
 					}
 				}
 				
-				return "";
-			}
+				return ""; 
+			} 
 			
-		}
+		} 
 		
-		private:
+		private: 
 		
 			void detectInfo(in ubyte[] stream)
 		{
-			if(stream.empty) return;
+			if(stream.empty) return; 
 			if(format=="webp")
 			{
 				 //use libWebp
-				import webp.decode;
+				import webp.decode; 
 				
-				WebPBitstreamFeatures features;
+				WebPBitstreamFeatures features; 
 				if(WebPGetFeatures(stream.ptr, stream.length, &features)==VP8StatusCode.VP8_STATUS_OK)
 				{
-					size = ivec2(features.width, features.height);
-					chn = features.has_alpha ? 4 : 3;
+					size = ivec2(features.width, features.height); 
+					chn = features.has_alpha ? 4 : 3; 
 				}
 			}
 			else if(format=="gif")
 			{
 				try {
-					enforce(stream.length>=8);
-					const us = cast(ushort[])stream[0..8];
-					size = ivec2(us[3], us[4]);
-					chn = 4;
+					enforce(stream.length>=8); 
+					const us = cast(ushort[])stream[0..8]; 
+					size = ivec2(us[3], us[4]); 
+					chn = 4; 
 				}catch(Exception) {}
 			}
 			else if(supportedBitmapExts.canFind(format))
@@ -1716,28 +1716,28 @@ version(/+$DIDE_REGION+/all)
 				 //use imageFormats package. It should be good for libjpeg-turbo as well.
 				try { read_image_info_from_mem(stream, size.x, size.y, chn); }catch(Exception) {}
 			}
-		}
+		} 
 		
-		public:
+		public: 
 		
 			this(in File fileName, in ubyte[] stream)
 		{
-			format = detectFormat(fileName, stream);
+			format = detectFormat(fileName, stream); 
 			
-			if(format.empty) return;
-			detectInfo(stream);
-		}
+			if(format.empty) return; 
+			detectInfo(stream); 
+		} 
 		
 			this(in ubyte[] stream)
-		{ this(File(""), stream); }
+		{ this(File(""), stream); } 
 		
 			this(in File fileName)
 		{
-			enum peekSize = 32;
-			this(fileName, fileName.read(false, 0, peekSize));
-		}
+			enum peekSize = 32; 
+			this(fileName, fileName.read(false, 0, peekSize)); 
+		} 
 		
-	}
+	} 
 	
 	
 	class Bitmap
@@ -1746,43 +1746,43 @@ version(/+$DIDE_REGION+/all)
 		
 		private
 		{
-			void[] data_;
-			string type_ = "ubyte";
-			int width_, height_, channels_=4;
-		}
+			void[] data_; 
+			string type_ = "ubyte"; 
+			int width_, height_, channels_=4; 
+		} 
 		
-		deprecated int tag;	//can be an external id
-		deprecated int counter;	//can notify of cnahges
+		deprecated int tag; 	//can be an external id
+		deprecated int counter; 	//can notify of cnahges
 		
-		File file;
-		DateTime modified;
-		string error;
-		bool loading, removed;	//Todo: these are managed by bitmaps(). Should be protected and readonly.
-		bool processed;	//user flag. Can do postprocessing after the image is loaded
-		bool resident;	//if true, garbageCollector will nor free this
+		File file; 
+		DateTime modified; 
+		string error; 
+		bool loading, removed; 	//Todo: these are managed by bitmaps(). Should be protected and readonly.
+		bool processed; 	//user flag. Can do postprocessing after the image is loaded
+		bool resident; 	//if true, garbageCollector will nor free this
 		
 		uint accessed_tick; //garbageCollect using it
 		
-		Object extraData;
+		Object extraData; 
 		
 		@property bool unloadable() const
 		{
-			enum recentlyUsedTicks = 3;
+			enum recentlyUsedTicks = 3; 
 			return 	!resident
 				&& !loading
 				&& !removed
-				&& accessed_tick+recentlyUsedTicks <= application.tick;
-		}
+				&& accessed_tick+recentlyUsedTicks <= application.tick; 
+		} 
 		
 		bool valid()
-		{ return !empty && !loading && error==""; }
+		{ return !empty && !loading && error==""; } 
 		//Todo: this is not the best because first must check for (this !is null) from the outside
 		
 		bool canProcess()
-		{ return valid && !processed; }
+		{ return valid && !processed; } 
 		
 		void markChanged()
-		{ modified.actualize; }
+		{ modified.actualize; } 
 		
 		//Todo: constraints
 		//Todo: fileName
@@ -1792,76 +1792,76 @@ version(/+$DIDE_REGION+/all)
 		
 		//constructors
 		this()
-		{}
+		{} 
 		this(T)(Image!(T, 2) img)
-		{ set(img); }
+		{ set(img); } 
 		//in general: use newBitmap() to create a bitmap
 		
 		bool empty()
-		{ return data_.length==0 || width<=0 || height<=0 || channels<=0; }
+		{ return data_.length==0 || width<=0 || height<=0 || channels<=0; } 
 		size_t sizeBytes() const
-		{ return data_.length; }
+		{ return data_.length; } 
 		
 		void waitFor()
-		{ while(loading) sleep(3); }
+		{ while(loading) sleep(3); } 
 		
 		@property width	 () const
-		{ return width_	; }
+		{ return width_	; } 
 		@property height () const
-		{ return height_	; }
+		{ return height_	; } 
 		@property size () const
-		{ return ivec2(width, height); }
+		{ return ivec2(width, height); } 
 		@property bounds	 () const
-		{ return ibounds2(ivec2(0), size); }
+		{ return ibounds2(ivec2(0), size); } 
 		@property channels() const
-		{ return channels_; }
+		{ return channels_; } 
 		@property type    () const
-		{ return type_; }
+		{ return type_; } 
 		
 		void setRaw(void[] data, int width, int height, int channels, string type)
 		{
 			//check consistency
-			auto chSize = type.predSwitch("ubyte", 1, "float", 4, "int", 4, "ushort", 2, 0);
+			auto chSize = type.predSwitch("ubyte", 1, "float", 4, "int", 4, "ushort", 2, 0); 
 			enforce(
 				chSize>0 ,
 				type.format!`Invalid bitmap component type: "%s"`
-			);
+			); 
 			enforce(
 				channels.inRange(1, 4), 
 				channels.format!`Invalid number of bitmap channels: "%s"`
-			);
+			); 
 			enforce(
 				width>=0, 
 				width.format!`Invalid bitmap width: "%s"`
-			);
+			); 
 			enforce(
 				height>=0, 
 				height.format!`Invalid bitmap height: "%s"`
-			);
+			); 
 			enforce(
 				width*height*channels*chSize == data.length,
 				format!"Inconsistent bitmap size: %s{w} * %s{h} * %s{ch} * %s != %s{bytes}"
 				(width, height, channels, chSize, data.length)
-			);
-			data_ = data;
-			width_ = width;
-			height_ = height;
-			channels_ = channels;
-			type_ = type;
+			); 
+			data_ = data; 
+			width_ = width; 
+			height_ = height; 
+			channels_ = channels; 
+			type_ = type; 
 			
-			counter++;
-		}
+			counter++; 
+		} 
 		
 		void set(E)(Image!(E, 2) im)
 		{
-			const typeStr = (ScalarType!E).stringof;
-			setRaw(im.asArray, im.width, im.height, VectorLength!E, typeStr);
+			const typeStr = (ScalarType!E).stringof; 
+			setRaw(im.asArray, im.width, im.height, VectorLength!E, typeStr); 
 			
-			counter++;
-		}
+			counter++; 
+		} 
 		
 		private auto getImage_unsafe(E)()
-		{ return Image2D!(Unqual!E)(ivec2(width_, height_), cast(Unqual!E[]) data_); }
+		{ return Image2D!(Unqual!E)(ivec2(width_, height_), cast(Unqual!E[]) data_); } 
 		
 		auto access(E)()
 		{
@@ -1869,13 +1869,13 @@ version(/+$DIDE_REGION+/all)
 			enforce(
 				VectorLength!E == channels,
 				format!"channel mismatch (reqd, present): (%s, %s)"(VectorLength!E, channels)
-			);
+			); 
 			enforce(
 				(ScalarType!E).stringof == type,
 				"type mismatch"
-			);
-			return getImage_unsafe!E;
-		}
+			); 
+			return getImage_unsafe!E; 
+		} 
 		
 		auto get(E)() const
 		{
@@ -1885,31 +1885,31 @@ version(/+$DIDE_REGION+/all)
 			{
 				{
 					alias CT = ScalarType   !T,
-					len = VectorLength!T;
+					len = VectorLength!T; 
 					if(CT.stringof == type && len==channels)
 					{
-						auto im = (cast()this).getImage_unsafe!T;
-						static if(is(T==E)) return im.dup;
+						auto im = (cast()this).getImage_unsafe!T; 
+						static if(is(T==E)) return im.dup; 
 						else static if(is(T==RGB) && is(E==RGBA))
 						{
 							//fast path
-							return image2D(size, im.asArray.rgb_to_rgba);
+							return image2D(size, im.asArray.rgb_to_rgba); 
 						}
-						else return im.image2D!(a => a.convertPixel!E);
+						else return im.image2D!(a => a.convertPixel!E); 
 					}
 				}
 			}
 			
-			raise("unsupported bitmap format"); assert(0);
-		}
+			raise("unsupported bitmap format"); assert(0); 
+		} 
 		
 		auto accessOrGet(E)()
 		{
 			//First it tries to access(), and if is not possible uses get() to convert.
 			//It always returns somthing, and when the format matches, it returns the reference of the stored image.
-			if(VectorLength!E == channels && (ScalarType!E).stringof == type) return getImage_unsafe!E;
-			return get!E;
-		}
+			if(VectorLength!E == channels && (ScalarType!E).stringof == type) return getImage_unsafe!E; 
+			return get!E; 
+		} 
 		
 		void resizeInPlace_nearest(ivec2 newSize)
 		{
@@ -1917,16 +1917,16 @@ version(/+$DIDE_REGION+/all)
 			{
 				{
 					alias CT = ScalarType   !T,
-					len = VectorLength!T;
+					len = VectorLength!T; 
 					if(CT.stringof == type && len==channels) {
-						set(access!T.resize_nearest(newSize));
-						return;
+						set(access!T.resize_nearest(newSize)); 
+						return; 
 					}
 				}
 			}
 			
-			raise("unsupported bitmap format"); assert(0);
-		}
+			raise("unsupported bitmap format"); assert(0); 
+		} 
 		
 		auto resize_nearest(ivec2 newSize)
 		{
@@ -1935,18 +1935,18 @@ version(/+$DIDE_REGION+/all)
 				{
 					 //Todo: redundant
 					alias CT = ScalarType!T,
-					len = VectorLength!T;
+					len = VectorLength!T; 
 					if(CT.stringof == type && len==channels) {
-						auto b = new Bitmap(access!T.resize_nearest(newSize));
+						auto b = new Bitmap(access!T.resize_nearest(newSize)); 
 						b.file = file; //Todo: redundant
-						b.modified = modified;
-						b.error = error;
-						return b;
+						b.modified = modified; 
+						b.error = error; 
+						return b; 
 					}
 				}
 			}
-			raise("unsupported bitmap format"); assert(0);
-		}
+			raise("unsupported bitmap format"); assert(0); 
+		} 
 		
 		override string toString() const
 		{
@@ -1956,7 +1956,7 @@ version(/+$DIDE_REGION+/all)
 				"["~ [loading?"loading":"", removed?"removed":""].join(", " ) ~"]",
 				error ? "error: "~error : ""
 			); 
-		}
+		} 
 		
 		string details()
 		{
@@ -1964,49 +1964,49 @@ version(/+$DIDE_REGION+/all)
 			(
 				file.fullName, width.text~"x"~height.text, double(width)*height/1_000_000, channels, file.size.shortSizeText!1024,
 				sizeBytes.shortSizeText!1024, double(file.size)*100/sizeBytes, double(file.size)/width/height*8
-			);
-		}
+			); 
+		} 
 		
 		void assign(Bitmap b)
 		{
-			enforce(b);
-			setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_);
-			error = b.error;
-			markChanged;
-		}
+			enforce(b); 
+			setRaw(b.data_, b.width_, b.height_, b.channels_, b.type_); 
+			error = b.error; 
+			markChanged; 
+		} 
 		
 		Bitmap dup(Flag!"shallow" shallow = No.shallow)
 		{
-			auto b = new Bitmap;
-			b.file = file;
-			b.modified = modified;
-			b.error = error;
-			b.setRaw(shallow ? data_ : data_.dup, width, height, channels, type);
-			return b;
-		}
+			auto b = new Bitmap; 
+			b.file = file; 
+			b.modified = modified; 
+			b.error = error; 
+			b.setRaw(shallow ? data_ : data_.dup, width, height, channels, type); 
+			return b; 
+		} 
 		
 		Bitmap shallowDup()
-		{ return dup(Yes.shallow); }
+		{ return dup(Yes.shallow); } 
 		
 		void saveTo(F)(in F file)
 		{
-			auto f = File(file);
-			this.serialize(f.ext.withoutStarting('.')).saveTo(f);
-		}
+			auto f = File(file); 
+			this.serialize(f.ext.withoutStarting('.')).saveTo(f); 
+		} 
 		
 		void loadFrom(F)(in F file)
 		{
-			auto f = File(file);
-			auto b = f.read.deserialize!Bitmap;
-			copyFrom(b);
-		}
-	}
+			auto f = File(file); 
+			auto b = f.read.deserialize!Bitmap; 
+			copyFrom(b); 
+		} 
+	} 
 	
 	//Bitmap/Image serializer //////////////////////////////////////////
 	
-	immutable serializeImage_supportedFormats = ["webp", "png", "bmp", "tga", "jpg"];
+	immutable serializeImage_supportedFormats = ["webp", "png", "bmp", "tga", "jpg"]; 
 	
-	__gshared serializeImage_defaultFormat = "png";
+	__gshared serializeImage_defaultFormat = "png"; 
 	//png is the best because it knows 1..4 components and it's moderately compressed.
 	
 	private static ubyte[] write_webp_to_mem(int width, int height, ubyte[] data, int quality)
@@ -2014,103 +2014,103 @@ version(/+$DIDE_REGION+/all)
 		  //Reasonable quality = 95,  lossless = 100
 		//Note: the header is in the same syntax like in the imageformats module.
 		
-		ubyte* output;
-		size_t size;
+		ubyte* output; 
+		size_t size; 
 		const lossy = quality<100; //100 means lossless
-		const channels = data.length.to!int/(width*height);
-		enforce(data.length = width*height*channels, "invalid image data");
+		const channels = data.length.to!int/(width*height); 
+		enforce(data.length = width*height*channels, "invalid image data"); 
 		switch(channels)
 		{
-			case 4:	size = lossy 	? WebPEncodeRGBA	(data.ptr, width, height, width*channels, quality, &output)
-				: WebPEncodeLosslessRGBA	(data.ptr, width, height, width*channels, &output);	break;
-			case 3:	size = lossy 	? WebPEncodeRGB	(data.ptr, width, height, width*channels, quality, &output)
-				: WebPEncodeLosslessRGB	(data.ptr, width, height, width*channels, &output);	break;
-			default:	enforce(0, "8/16bit webp not supported"); //Todo: Y, YA plane-kkal megoldani ezeket is
+			case 4: 	size = lossy 	? WebPEncodeRGBA	(data.ptr, width, height, width*channels, quality, &output)
+				: WebPEncodeLosslessRGBA	(data.ptr, width, height, width*channels, &output); 	break; 
+			case 3: 	size = lossy 	? WebPEncodeRGB	(data.ptr, width, height, width*channels, quality, &output)
+				: WebPEncodeLosslessRGB	(data.ptr, width, height, width*channels, &output); 	break; 
+			default: 	enforce(0, "8/16bit webp not supported"); //Todo: Y, YA plane-kkal megoldani ezeket is
 		}
 		
 		//Todo: tovabbi info a webp-rol: az alpha az csak lossless modon van tomoritve. Lehet, hogy azt is egy Y-al kene megoldani...
 		
-		enforce(size, "WebPEncode failed.");
+		enforce(size, "WebPEncode failed."); 
 		
 		ubyte[] res = output[0..size].dup; //unoptimal copy
 		
-		import core.stdc.stdlib : free;
+		import core.stdc.stdlib : free; 
 		free(output); //free the memory that was allocated by LibWebP using malloc()
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	private static ubyte[] write_jpg_to_mem(int width, int height, ubyte[] data, int quality)
 	{
 		const channels = data.length.to!int/(width*height),
-					pitch = width*channels;
-		enforce(data.length = pitch*height, "invalid image data");
+					pitch = width*channels; 
+		enforce(data.length = pitch*height, "invalid image data"); 
 		const pixelFormat = channels.predSwitch(1, TJPF_GRAY, 3, TJPF_RGB); //Todo: alpha
 		const subsamp = TJSAMP_420; //Todo: subsamp-ot kihozni
 		
-		ubyte* jpegBuf;
-		uint jpegSize;
+		ubyte* jpegBuf; 
+		uint jpegSize; 
 		tjChk(
 			tjEncoder, tjCompress2(
 				tjEncoder, data.ptr, width, pitch,
 								height, pixelFormat, &jpegBuf, &jpegSize, subsamp, quality, 0
 			), "tjCompress2"
-		);
+		); 
 		
-		scope(exit) tjFree(jpegBuf);
-		auto res = uninitializedArray!(ubyte[])(jpegSize);
-		res[] = jpegBuf[0..jpegSize];
-		return res;
-	}
+		scope(exit) tjFree(jpegBuf); 
+		auto res = uninitializedArray!(ubyte[])(jpegSize); 
+		res[] = jpegBuf[0..jpegSize]; 
+		return res; 
+	} 
 	
 	private ubyte[] serializeImage(T)(Image!(T, 2) img, string format="")
 	{
 		 //compile time version
-		import imageformats;
+		import imageformats; 
 		
 		enum chn = VectorLength!T,
-				 type = (ScalarType!T).stringof;
-		if(format=="") format = serializeImage_defaultFormat;
-		auto fmt = format.commandLineToMap;
+				 type = (ScalarType!T).stringof; 
+		if(format=="") format = serializeImage_defaultFormat; 
+		auto fmt = format.commandLineToMap; 
 		
 		auto getQuality()
 		{
 			return ("quality" in fmt) 	? fmt["quality"].to!int.clamp(0, 100)
-				: 95 /+Default quality for jpeg and webp+/;
-		}
+				: 95 /+Default quality for jpeg and webp+/; 
+		} 
 		
 		//Todo: validate parameters for each formats
 		
 		switch(fmt["0"])
 		{
-			case "bmp":	return write_bmp_to_mem 
+			case "bmp": 	return write_bmp_to_mem 
 			(
 				img.width, img.height, cast(ubyte[])
 				img.convertImage_ubyte_chnRemap!([3,4,3,4]).asArray
 			); //only 3 and 4 chn supported
-			case "png":	return write_png_to_mem 
+			case "png": 	return write_png_to_mem 
 			(
 				img.width, img.height, cast(ubyte[])
 				img.convertImage_ubyte_chnRemap!([1,2,3,4]).asArray
 			); //all chn supported
-			case "tga":	return write_tga_to_mem  
+			case "tga": 	return write_tga_to_mem  
 			(
 				img.width, img.height, cast(ubyte[])
 				img.convertImage_ubyte_chnRemap!([1,4,3,4]).asArray
 			); //all except 2 chn supported
-			case "webp":	return write_webp_to_mem
+			case "webp": 	return write_webp_to_mem
 			(
 				img.width, img.height, cast(ubyte[])
 				img.convertImage_ubyte_chnRemap!([3,4,3,4]).asArray, getQuality
 			); //only 3 and 4 chn
-			case "jpg":	return write_jpg_to_mem  
+			case "jpg": 	return write_jpg_to_mem  
 			(
 				img.width, img.height, cast(ubyte[])
 				img.convertImage_ubyte_chnRemap!([1,1,3,3]).asArray, getQuality
 			); //losts alpha
-			default:	raise("invalid image serialization format: "~format); return [];
+			default: 	raise("invalid image serialization format: "~format); return []; 
 		}
-	}
+	} 
 	
 	private ubyte[] serializeImage(Bitmap bmp, string format="")
 	{
@@ -2121,28 +2121,28 @@ version(/+$DIDE_REGION+/all)
 		{
 			{
 				alias CT = ScalarType   !T,
-							len = VectorLength!T;
+							len = VectorLength!T; 
 				if(CT.stringof == bmp.type && len==bmp.channels)
-				return mixin("serializeImage(bmp.access!(", T.stringof, "), format)");
+				return mixin("serializeImage(bmp.access!(", T.stringof, "), format)"); 
 			}
 		}
 		
-		raise("invalid bitmap format"); assert(0);
-	}
+		raise("invalid bitmap format"); assert(0); 
+	} 
 	
 	
 	//combined compress function
 	ubyte[] serialize(A)(A a, string format="")
 	{
-		static if(is(A==Bitmap)	) return a.serializeImage(format);
+		static if(is(A==Bitmap)	) return a.serializeImage(format); 
 		else static if(
 			isImage2D!A	//Bitmap
 		)
-		return a.serializeImage(format);
+		return a.serializeImage(format); 
 		else
-		static assert(0, "invalid arg");
+		static assert(0, "invalid arg"); 
 		
-	}
+	} 
 	
 	//Todo: implement PPM image codec /////////////////////////////////
 	/*
@@ -2221,20 +2221,20 @@ version(/+$DIDE_REGION+/all)
 	
 	Bitmap deserialize(T : Bitmap)(in File file, bool mustSucceed=false)
 	{
-		auto b = deserialize!T(file.read(mustSucceed), mustSucceed);
-		if(b) b.modified = file.modified;
-		return b;
-	}
+		auto b = deserialize!T(file.read(mustSucceed), mustSucceed); 
+		if(b) b.modified = file.modified; 
+		return b; 
+	} 
 	
 	Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false)
 	{
-		Bitmap bmp;
+		Bitmap bmp; 
 		try {
-			auto info = BitmapInfo(stream);
-			enforce(info.valid, "Invalid bitmap format");
+			auto info = BitmapInfo(stream); 
+			enforce(info.valid, "Invalid bitmap format"); 
 			
-			bmp = new Bitmap;
-			bmp.modified = now;
+			bmp = new Bitmap; 
+			bmp.modified = now; 
 			
 			void doWebp()
 			{
@@ -2242,45 +2242,45 @@ version(/+$DIDE_REGION+/all)
 				{
 					case 3: {
 						auto data = uninitializedArray!(RGB [])(info.numPixels); 
-						WebPDecodeRGBInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*3, info.size.x*3);
-						bmp.set(image2D(info.size, data));
-					} break;
+						WebPDecodeRGBInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*3, info.size.x*3); 
+						bmp.set(image2D(info.size, data)); 
+					}break; 
 					case 4: {
-						auto data = uninitializedArray!(RGBA[])(info.numPixels);
-						WebPDecodeRGBAInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*4, info.size.x*4);
-						bmp.set(image2D(info.size, data));
-					} break;
+						auto data = uninitializedArray!(RGBA[])(info.numPixels); 
+						WebPDecodeRGBAInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*4, info.size.x*4); 
+						bmp.set(image2D(info.size, data)); 
+					}break; 
 					//Todo: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
-					default: raise("webp 1-2chn not impl");
+					default: raise("webp 1-2chn not impl"); 
 				}
-			}
+			} 
 			
 			void doImageFormats()
 			{
 				 //imageFormats package
-				auto img = read_image_from_mem(stream);
+				auto img = read_image_from_mem(stream); 
 				exit: switch(info.chn)
 				{
 					static foreach(i, T; AliasSeq!(ubyte, RG, RGB, RGBA))
 					{ case i+1: bmp.set(image2D(img.w, img.h, cast(T[])img.pixels)); break exit; }
-					default: raise("imgformat: fatal error: channels out of range");
+					default: raise("imgformat: fatal error: channels out of range"); 
 				}
-			}
+			} 
 			
 			void doWebpConversion()
 			{
-				const s = [QPS].xxh32.to!string(36).text;
-				const tempFileSrc = File(tempPath, `$` ~ s ~ ".src" ); scope(exit) tempFileSrc.remove;
-				const tempFileDst = File(tempPath, `$` ~ s ~ ".webp"); scope(exit) tempFileDst.remove;
+				const s = [QPS].xxh32.to!string(36).text; 
+				const tempFileSrc = File(tempPath, `$` ~ s ~ ".src" ); scope(exit) tempFileSrc.remove; 
+				const tempFileDst = File(tempPath, `$` ~ s ~ ".webp"); scope(exit) tempFileDst.remove; 
 				
-				tempFileSrc.write(stream);
-				auto res = execute(["cwebp", "-preset", "photo", "-q", "85", tempFileSrc.fullName, "-o", tempFileDst.fullName]);
+				tempFileSrc.write(stream); 
+				auto res = execute(["cwebp", "-preset", "photo", "-q", "85", tempFileSrc.fullName, "-o", tempFileDst.fullName]); 
 				if(res.status==0) {
-					LOG("\n"~res.output);
-					bmp = deserialize!Bitmap(tempFileDst);
+					LOG("\n"~res.output); 
+					bmp = deserialize!Bitmap(tempFileDst); 
 				}
 				else { raise("Webp conversion failed:"~ res.output); }
-			}
+			} 
 			
 			void doTurboJpeg()
 			{
@@ -2291,7 +2291,7 @@ version(/+$DIDE_REGION+/all)
 						//turbojpeg/classic release/debug performance: 43, 47, 335, 1941
 						auto 	pixelFormat 	= info.chn.predSwitch(3, TJPF_RGB, 1, TJPF_GRAY),
 							pitch	= tjPixelSize[pixelFormat]*info.width,
-							data	= uninitializedArray!(ubyte[])(info.height*pitch);
+							data	= uninitializedArray!(ubyte[])(info.height*pitch); 
 						try {
 							tjChk(
 								tjDecoder, 
@@ -2300,38 +2300,38 @@ version(/+$DIDE_REGION+/all)
 									info.width, pitch, info.height, pixelFormat, 0
 								),
 								"tjDecompress2"
-							);
-							bmp.setRaw(data, info.width, info.height, info.chn, "ubyte");
+							); 
+							bmp.setRaw(data, info.width, info.height, info.chn, "ubyte"); 
 						}
 						catch(Exception e) {
-							WARN("TurboJpeg decode failed: "~e.simpleMsg);
+							WARN("TurboJpeg decode failed: "~e.simpleMsg); 
 							try {
 								//doImageFormats;
-								doWebpConversion;
+								doWebpConversion; 
 							}catch(Exception e) { throw e; }
 						}
 						
-					} break;
+					}break; 
 					//Todo: Tobb jpeg-bol osszekombinalni a 2-4 channelt.
-					default: raise("jpg 2-4chn not impl");
+					default: raise("jpg 2-4chn not impl"); 
 				}
-			}
+			} 
 			
 			void doGif()
-			{ raise("GIF decoder NOTIMPL"); }
+			{ raise("GIF decoder NOTIMPL"); } 
 			
-			if(info.format=="webp") doWebp;
-			else if(info.format=="jpg") doTurboJpeg;
-			else if(info.format=="gif") doGif;
-			else doImageFormats;
+			if(info.format=="webp") doWebp; 
+			else if(info.format=="jpg") doTurboJpeg; 
+			else if(info.format=="gif") doGif; 
+			else doImageFormats; 
 			
-			return bmp;
+			return bmp; 
 			
 		}
 		catch(Exception e) { if(mustSucceed) throw e; }
 		
-		return null;
-	}
+		return null; 
+	} 
 	
 	
 	//Bitmap convert and serializer tests //////////////////////////////
@@ -2345,46 +2345,46 @@ version(/+$DIDE_REGION+/all)
 					RGBA(clBlue,255), RGBA(clWhite,   0), vec2(p)/tileSize
 				) 
 			)
-		);
-	}
+		); 
+	} 
 	
 	auto makeAlphaTestBackgroundImage(in ivec2 size, int mask=4)
 	{
-		mask = nextPow2(mask-1);
-		return image2D(size, (ivec2 p) { auto b = (p.x^p.y)&mask ? 50 : 200; return RGBA(b,b,b,255); });
-	}
+		mask = nextPow2(mask-1); 
+		return image2D(size, (ivec2 p) { auto b = (p.x^p.y)&mask ? 50 : 200; return RGBA(b,b,b,255); }); 
+	} 
 	
 	auto makeConversionTestImage(int size=32)
 	{
-		const tileSize = ivec2(64, 64);
+		const tileSize = ivec2(64, 64); 
 		
-		auto bmp = makeRgbaTestBitmap(tileSize);
-		auto img = makeAlphaTestBackgroundImage(tileSize*4, 4);
+		auto bmp = makeRgbaTestBitmap(tileSize); 
+		auto img = makeAlphaTestBackgroundImage(tileSize*4, 4); 
 		
-		alias ComponentTypes = AliasSeq!(ubyte, RG, RGB, RGBA);
+		alias ComponentTypes = AliasSeq!(ubyte, RG, RGB, RGBA); 
 		static foreach(i, SrcType; ComponentTypes)
 		{
 			{
-				auto bmp2 = new Bitmap;
-				bmp2.set(bmp.get!SrcType);
+				auto bmp2 = new Bitmap; 
+				bmp2.set(bmp.get!SrcType); 
 				static foreach(j, DstType; ComponentTypes)
 				{
 					{
-						auto bounds = ibounds2(i, j, i+1, j+1)*tileSize;
-						auto dst = img[bounds];
-						auto src = bmp2.get!DstType;
+						auto bounds = ibounds2(i, j, i+1, j+1)*tileSize; 
+						auto dst = img[bounds]; 
+						auto src = bmp2.get!DstType; 
 						
 						//foreach(x, y, ref a; dst){  auto b = src[x, y].convertPixel!RGBA;  a = RGBA(mix(a.rgb, b.rgb, a.a*(1/255.0f)), 255);  }
 						
-						image2D!"a = RGBA(mix(a.rgb, b.rgb, b.a*(1/255.0f)), 255);"(dst, src.convertImage!RGBA);
+						image2D!"a = RGBA(mix(a.rgb, b.rgb, b.a*(1/255.0f)), 255);"(dst, src.convertImage!RGBA); 
 						
 					}
 				}
 			}
 		}
 		
-		return img;
-	}
+		return img; 
+	} 
 	
 	void testImageBilinearAndSerialize()
 	{
@@ -2424,72 +2424,72 @@ version(/+$DIDE_REGION+/all)
 			newBitmap(`font:\Times New Roman\64?Hello World`~"\U0001F4A9").serialize("webp").saveTo(`c:\dl\text.webp`); 
 		*/
 		
-	}
+	} 
 	
 	
 	import core.sys.windows.windows : 	GetDeviceCaps, GetSystemMetrics, ReleaseDC, BitBlt, HORZRES, VERTRES, 
-		SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SRCCOPY;
+		SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN, SRCCOPY; 
 	
 	//Screenshot //////////////////////////
 	
 	auto getPrimaryMonitorSize()
 	{
 		 //Note: it's just the primary monitor area
-		HDC hScreenDC = GetDC(null);//CreateDC("DISPLAY", NULL, NULL, NULL);
+		HDC hScreenDC = GetDC(null); //CreateDC("DISPLAY", NULL, NULL, NULL);
 		scope(exit) ReleaseDC(null, hScreenDC);  //This is needed and returns 1, so it is working.
-		return ivec2(GetDeviceCaps(hScreenDC, HORZRES), GetDeviceCaps(hScreenDC, VERTRES));
-	}
+		return ivec2(GetDeviceCaps(hScreenDC, HORZRES), GetDeviceCaps(hScreenDC, VERTRES)); 
+	} 
 	
 	auto getPrimaryMonitorBounds()
-	{ return ibounds2(ivec2(0), getPrimaryMonitorSize); }
+	{ return ibounds2(ivec2(0), getPrimaryMonitorSize); } 
 	
 	auto getDesktopSize()
-	{ return ivec2(GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN)); }
+	{ return ivec2(GetSystemMetrics(SM_CXVIRTUALSCREEN), GetSystemMetrics(SM_CYVIRTUALSCREEN)); } 
 	
 	auto getDesktopBounds()
 	{
-		auto pos = ivec2(GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN));
-		return ibounds2(pos, pos+getDesktopSize);
-	}
+		auto pos = ivec2(GetSystemMetrics(SM_XVIRTUALSCREEN), GetSystemMetrics(SM_YVIRTUALSCREEN)); 
+		return ibounds2(pos, pos+getDesktopSize); 
+	} 
 	
 	auto getDesktopSnapshot(in ibounds2 bnd)
 	{
-		auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.free;
-		auto dc = GetDC(null); scope(exit) ReleaseDC(null, dc);
-		BitBlt(gBmp.hdcMem, 0, 0, bnd.width, bnd.height, dc, bnd.left, bnd.top, SRCCOPY);
-		auto img = gBmp.toImage;
-		img.asArray.rgba_to_bgra_inplace;
-		auto bmp = new Bitmap(img);
-		bmp.modified = now;
-		return bmp;
-	}
+		auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.free; 
+		auto dc = GetDC(null); scope(exit) ReleaseDC(null, dc); 
+		BitBlt(gBmp.hdcMem, 0, 0, bnd.width, bnd.height, dc, bnd.left, bnd.top, SRCCOPY); 
+		auto img = gBmp.toImage; 
+		img.asArray.rgba_to_bgra_inplace; 
+		auto bmp = new Bitmap(img); 
+		bmp.modified = now; 
+		return bmp; 
+	} 
 	
 	auto getDesktopSnapshot()
-	{ return getDesktopSnapshot(getDesktopBounds); }
+	{ return getDesktopSnapshot(getDesktopBounds); } 
 	auto getPrimaryMonitorSnapshot()
-	{ return getDesktopSnapshot(getPrimaryMonitorBounds); }
+	{ return getDesktopSnapshot(getPrimaryMonitorBounds); } 
 	
 	
 	private HICON getAssociatedIcon(string fn)
 	{
-		import core.sys.windows.shellapi, core.sys.windows.winnt;
-		HICON hIcon;
+		import core.sys.windows.shellapi, core.sys.windows.winnt; 
+		HICON hIcon; 
 		
 		bool opt(string o) {
-			const res = fn.endsWith('?'~o);
-			if(res) fn = fn[0..$-o.length-1];
-			return res;
-		}
+			const res = fn.endsWith('?'~o); 
+			if(res) fn = fn[0..$-o.length-1]; 
+			return res; 
+		} 
 		
-		bool isSmall;
-		if(opt("small")) isSmall = true;
-		if(opt("16"   )) isSmall = true;
-		if(opt("large")) isSmall = false;
-		if(opt("32"   )) isSmall = false;
+		bool isSmall; 
+		if(opt("small")) isSmall = true; 
+		if(opt("16"   )) isSmall = true; 
+		if(opt("large")) isSmall = false; 
+		if(opt("32"   )) isSmall = false; 
 		
 		if(fn.canFind('?')) {
-			raise("Unknown option: `"~fn~"`");
-			return null;
+			raise("Unknown option: `"~fn~"`"); 
+			return null; 
 		}
 		
 		if(
@@ -2499,7 +2499,7 @@ version(/+$DIDE_REGION+/all)
 				|| fn.length>=2 && fn.startsWith(".")
 			)
 		)
-		raise(format!q"<getAssociatedIcon: icon name must be a `c:\` (c is optional) or `folder\` (folder is "folder") or  `.ext` (ext is optional). Instead of `%s`");>"(fn));
+		raise(format!q"<getAssociatedIcon: icon name must be a `c:\` (c is optional) or `folder\` (folder is "folder") or  `.ext` (ext is optional). Instead of `%s`");>"(fn)); 
 		
 		/*
 			ushort dummy;
@@ -2508,12 +2508,12 @@ version(/+$DIDE_REGION+/all)
 		*/
 		
 		//https://stackoverflow.com/questions/524137/get-icons-for-common-file-types
-		SHFILEINFOW fi;
-		uint file_attribute = FILE_ATTRIBUTE_NORMAL;
+		SHFILEINFOW fi; 
+		uint file_attribute = FILE_ATTRIBUTE_NORMAL; 
 		//Todo: specify file attributes too that was accessed in FileEntry -> SHGFI_USEFILEATTRIBUTES
 		
 		if(fn.endsWith(pathDelimiter))
-		file_attribute = FILE_ATTRIBUTE_DIRECTORY;
+		file_attribute = FILE_ATTRIBUTE_DIRECTORY; 
 		
 		//Note: SHGFI_USEFILEATTRIBUTES means: do not access the disk, just the filename
 		
@@ -2526,149 +2526,149 @@ version(/+$DIDE_REGION+/all)
 				) | SHGFI_USEFILEATTRIBUTES
 			)
 		)
-		hIcon = fi.hIcon;
+		hIcon = fi.hIcon; 
 		//must free it with DestroyIcon
 		
 		//Note: this is not the same icon as in TotalCmd
 		//Todo: large 48*48 icon with proper alpha channel.
 		//Note: fi.szTypeName -> when SHGFI_TYPENAME used, it returns the typename
-		return hIcon;
-	}
+		return hIcon; 
+	} 
 	
 	private Bitmap getAssociatedIconBitmap(string fn)
 	{
-		auto hIcon = getAssociatedIcon(fn);
-		if(!hIcon) return null;
+		auto hIcon = getAssociatedIcon(fn); 
+		if(!hIcon) return null; 
 		
-		import core.sys.windows.winuser, core.sys.windows.wingdi;
+		import core.sys.windows.winuser, core.sys.windows.wingdi; 
 		
-		scope(exit) DestroyIcon(hIcon);
+		scope(exit) DestroyIcon(hIcon); 
 		
-		ICONINFO ii;
+		ICONINFO ii; 
 		if(GetIconInfo(hIcon, &ii))
 		{
 			scope(exit) {
-				if(ii.hbmColor) DeleteObject(ii.hbmColor);
-				if(ii.hbmMask) DeleteObject(ii.hbmMask);
-			}
+				if(ii.hbmColor) DeleteObject(ii.hbmColor); 
+				if(ii.hbmMask) DeleteObject(ii.hbmMask); 
+			} 
 			if(ii.hbmColor)
 			{
 				 //Icon has colour plane
-				BITMAPINFOHEADER bi;
+				BITMAPINFOHEADER bi; 
 				if(GetObject(ii.hbmColor, typeof(bi).sizeof.to!int, &bi))
 				{
 					//print("hbmColor", bi.biWidth, bi.biHeight);
 					
-					auto gBmp = scoped!GdiBitmap(bi.biWidth, bi.biHeight);
+					auto gBmp = scoped!GdiBitmap(bi.biWidth, bi.biHeight); 
 					
-					DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_MASK );	 auto imMask	= gBmp.toImage;
-					DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_IMAGE);	 auto imColor	= gBmp.toImage;
+					DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_MASK ); 	 auto imMask	= gBmp.toImage; 
+					DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_IMAGE); 	 auto imColor	= gBmp.toImage; 
 					
 					//swap blue-red, gray if transparent.
-					auto imAlpha = image2D!((i, m) => m.g ? RGBA(127, 127, 127, 0) : RGBA(i.b, i.g, i.r, 255))(imColor, imMask);
+					auto imAlpha = image2D!((i, m) => m.g ? RGBA(127, 127, 127, 0) : RGBA(i.b, i.g, i.r, 255))(imColor, imMask); 
 					
-					auto bmp = new Bitmap(imAlpha);
-					assert(!fn.startsWith(`icon:\`));
-					bmp.file = File(`icon:\`~fn);
-					bmp.modified = now;
-					return bmp;
+					auto bmp = new Bitmap(imAlpha); 
+					assert(!fn.startsWith(`icon:\`)); 
+					bmp.file = File(`icon:\`~fn); 
+					bmp.modified = now; 
+					return bmp; 
 				}
 			}
 		}
 		
-		return null;
-	}
+		return null; 
+	} 
 	class GdiBitmap
 	{
 		//holds a windows gdi bitmap and makes it accessible as a normal RGBA Image or Bitmap object
-		ivec2 size;
-		HBITMAP hBitmap;
+		ivec2 size; 
+		HBITMAP hBitmap; 
 		static HDC hdcMem, hdcScreen; //needs only one of these
-		BITMAPINFO bmi;
+		BITMAPINFO bmi; 
 		
 		this(in ivec2 size)
 		{
 			
-			this.size = size;
+			this.size = size; 
 			
-			if(!hdcScreen) hdcScreen = GetDC(null);
-			if(!hdcMem) hdcMem  = CreateCompatibleDC(hdcScreen);
+			if(!hdcScreen) hdcScreen = GetDC(null); 
+			if(!hdcMem) hdcMem  = CreateCompatibleDC(hdcScreen); 
 			
-			hBitmap = CreateCompatibleBitmap(hdcScreen, size.x, size.y);
+			hBitmap = CreateCompatibleBitmap(hdcScreen, size.x, size.y); 
 			                             //^^^^^^^^^ must be hdcScreen, otherwise 1bit monochrome
 			
-			SelectObject(hdcMem, hBitmap);
+			SelectObject(hdcMem, hBitmap); 
 			
 			with(bmi.bmiHeader) {
-				biSize	= BITMAPINFOHEADER.sizeof;
-				biWidth	= size.x;
-				biHeight	= -size.y;
-				biPlanes	= 1;
-				biBitCount	= 32;
-				biCompression	= BI_RGB;
-				biSizeImage	= size.x*size.y*4;
+				biSize	= BITMAPINFOHEADER.sizeof; 
+				biWidth	= size.x; 
+				biHeight	= -size.y; 
+				biPlanes	= 1; 
+				biBitCount	= 32; 
+				biCompression	= BI_RGB; 
+				biSizeImage	= size.x*size.y*4; 
 			}
-		}
+		} 
 		
 		this(int width, int height)
-		{ this(ivec2(width, height)); }
+		{ this(ivec2(width, height)); } 
 		
 		~this()
 		{
-			DeleteObject(hBitmap);
+			DeleteObject(hBitmap); 
 			//hdcScreen and hdcMem are static
-		}
+		} 
 		
 		auto toImage()
 		{
-			auto img = image2D(size, RGBA(0));
+			auto img = image2D(size, RGBA(0)); 
 			if(!img.empty)
 			{
 				if(!GetDIBits(hdcMem, hBitmap, 0, size.y, img.asArray.ptr, &bmi, DIB_RGB_COLORS))
-				raiseLastError;
+				raiseLastError; 
 			}
 			
-			return img;
-		}
+			return img; 
+		} 
 		
 		Bitmap toBitmap()
-		{ return new Bitmap(toImage); }
-	}
+		{ return new Bitmap(toImage); } 
+	} 
 	
 	
 	//FontDeclaration ///////////////////////////////
 	
 	struct BitmapFontProps
 	{
-		string fontName = "Tahoma";
-		int height = 32;
-		int xScale = 1;
-		bool clearType = false;
-	}
+		string fontName = "Tahoma"; 
+		int height = 32; 
+		int xScale = 1; 
+		bool clearType = false; 
+	} 
 	
 	auto decodeFontDeclaration(string s, out string text)
 	{
-		BitmapFontProps res;
+		BitmapFontProps res; 
 		
-		enforce(s.isFontDeclaration, `Not a font declaration. "%s" `.format(s));
+		enforce(s.isFontDeclaration, `Not a font declaration. "%s" `.format(s)); 
 		//example: `font:\Times New Roman\64\x3\ct?text`
 		//^ fontName
 		//optional size,	x3: width*=3, x2, ct=clearType
 		//last part is the text to write after the '?'
 		
-		s.split2("?", s, text, false/*no strip*/);
+		s.split2("?", s, text, false/*no strip*/); 
 		
-		auto p = s.split('\\').array;
-		enforce(p.length>=2, `Invalid format. "%s"`.format(s));
+		auto p = s.split('\\').array; 
+		enforce(p.length>=2, `Invalid format. "%s"`.format(s)); 
 		
-		res.fontName = p[1];
+		res.fontName = p[1]; 
 		foreach(a; p[2..$])
 		{
-			int i; bool ok;
+			int i; bool ok; 
 			try { i = a.to!int; ok = true; }catch(Throwable) {}
 			if(ok) {
-				enforce(i.inRange(0, 0x10000), `Height out of range %d in "%s"`.format(i, s));
-				res.height = i;
+				enforce(i.inRange(0, 0x10000), `Height out of range %d in "%s"`.format(i, s)); 
+				res.height = i; 
 			}
 			else if(a=="ct") { res.clearType = true; }
 			else if(a=="x3") { res.xScale = 3; }
@@ -2679,289 +2679,289 @@ version(/+$DIDE_REGION+/all)
 			else { enforce(0, `Invalid param "%s" in "%s"`.format(a, s)); }
 		}
 		
-		return res;
-	}
+		return res; 
+	} 
 }
 version(/+$DIDE_REGION+/all)
 {
 	version(D2D_FONT_RENDERER)
 	{
-		 private:
+		 private: 
 			//Direct2D stuff ////////////////////////////////////////////////////////
 		
-			pragma(lib, "D2d1.lib");
-			pragma(lib, "DWrite.lib");
+			pragma(lib, "D2d1.lib"); 
+			pragma(lib, "DWrite.lib"); 
 		
-			alias FLOAT = float, UINT32 = uint, UINT64 = ulong, D2D1_TAG = UINT64;
+			alias FLOAT = float, UINT32 = uint, UINT64 = ulong, D2D1_TAG = UINT64; 
 		
 			struct D2D_RECT_F
-		{ float left=0, top=0, right=0, bottom=0; }
-			alias D2D1_RECT_F = D2D_RECT_F;
+		{ float left=0, top=0, right=0, bottom=0; } 
+			alias D2D1_RECT_F = D2D_RECT_F; 
 			struct D2D1_COLOR_F
-		{ float r=0, g=0, b=0, a=1; }
-			alias DWRITE_COLOR_F = D2D1_COLOR_F;
+		{ float r=0, g=0, b=0, a=1; } 
+			alias DWRITE_COLOR_F = D2D1_COLOR_F; 
 			struct D2D1_POINT_2F
-		{ float x=0, y=0; }
-			alias D2D1_SIZE_F = D2D1_POINT_2F;
+		{ float x=0, y=0; } 
+			alias D2D1_SIZE_F = D2D1_POINT_2F; 
 			struct D2D1_SIZE_U
-		{ uint x=0, y=0; }
+		{ uint x=0, y=0; } 
 			struct D2D1_MATRIX_3X2_F
-		{ float m11=1, m12=0, m21=0, m22=1, dx=0, dy=0; }
+		{ float m11=1, m12=0, m21=0, m22=1, dx=0, dy=0; } 
 			struct DWRITE_TEXT_RANGE
-		{ uint start, length; }
+		{ uint start, length; } 
 		
 			struct D2D1_RENDER_TARGET_PROPERTIES
 		{
-			int type, pixelFormat, alphaMode;
-			float dpiX=0, dpiY=0;
-			int usage, minLevel;
-		}
+			int type, pixelFormat, alphaMode; 
+			float dpiX=0, dpiY=0; 
+			int usage, minLevel; 
+		} 
 			auto DCRenderTargetProps()
 		{
 			return D2D1_RENDER_TARGET_PROPERTIES(
 				0, 
 				87 /*DXGI_FORMAT_B8G8R8A8_UNORM*/, 
 				3 /*3:IGNORE, 2:STRAIGHT(unsupported)*/
-			);
-		}
+			); 
+		} 
 		
-			mixin(uuid!(ID2D1Factory, "06152247-6f50-465a-9245-118bfd3b6007"));
+			mixin(uuid!(ID2D1Factory, "06152247-6f50-465a-9245-118bfd3b6007")); 
 			interface ID2D1Factory : IUnknown
 		{
-			extern(Windows):
-			HRESULT ReloadSystemMetrics();
-			void GetDesktopDpi(/*out*/ FLOAT *dpiX,/*out*/ FLOAT *dpiY);
-			HRESULT CreateRectangleGeometry(/**/);
-			HRESULT CreateRoundedRectangleGeometry(/**/);
-			HRESULT CreateEllipseGeometry(/**/);
-			HRESULT CreateGeometryGroup(/**/);
-			HRESULT CreateTransformedGeometry(/**/);
-			HRESULT CreatePathGeometry(/**/);
-			HRESULT CreateStrokeStyle(/**/);
-			HRESULT CreateDrawingStateBlock(/**/);
-			HRESULT CreateWicBitmapRenderTarget(/**/);
-			HRESULT CreateHwndRenderTarget(/**/);
-			HRESULT CreateDxgiSurfaceRenderTarget(/**/);
+			extern(Windows): 
+			HRESULT ReloadSystemMetrics(); 
+			void GetDesktopDpi(/*out*/ FLOAT *dpiX,/*out*/ FLOAT *dpiY); 
+			HRESULT CreateRectangleGeometry(/**/); 
+			HRESULT CreateRoundedRectangleGeometry(/**/); 
+			HRESULT CreateEllipseGeometry(/**/); 
+			HRESULT CreateGeometryGroup(/**/); 
+			HRESULT CreateTransformedGeometry(/**/); 
+			HRESULT CreatePathGeometry(/**/); 
+			HRESULT CreateStrokeStyle(/**/); 
+			HRESULT CreateDrawingStateBlock(/**/); 
+			HRESULT CreateWicBitmapRenderTarget(/**/); 
+			HRESULT CreateHwndRenderTarget(/**/); 
+			HRESULT CreateDxgiSurfaceRenderTarget(/**/); 
 			HRESULT CreateDCRenderTarget(
 				in D2D1_RENDER_TARGET_PROPERTIES renderTargetProperties, 
 				out ID2D1DCRenderTarget dcRenderTarget
-			);
-		}
+			); 
+		} 
 		
 			enum D2D1_FACTORY_TYPE:uint
-		{ SINGLE_THREADED, MULTI_THREADED, FORCE_DWORD = 0xffffffff }
+		{ SINGLE_THREADED, MULTI_THREADED, FORCE_DWORD = 0xffffffff} 
 		
 			extern(Windows) HRESULT D2D1CreateFactory(
 			D2D1_FACTORY_TYPE factoryType, 
 			REFIID riid, void* pFactoryOptions, out ID2D1Factory
-		);
+		); 
 		
 			enum D2D1_ANTIALIAS_MODE:uint
-		{ PER_PRIMITIVE, ALIASED, FORCE_DWORD = 0xffffffff }
+		{ PER_PRIMITIVE, ALIASED, FORCE_DWORD = 0xffffffff} 
 			enum D2D1_DRAW_TEXT_OPTIONS:uint
-		{ NONE=0, NO_SNAP=1, CLIP=2, ENABLE_COLOR_FONT=4, FORCE_DWORD=0xffffffff }
+		{ NONE=0, NO_SNAP=1, CLIP=2, ENABLE_COLOR_FONT=4, FORCE_DWORD=0xffffffff} 
 			enum D2D1_TEXT_ANTIALIAS_MODE:uint
-		{ DEFAULT, CLEARTYPE, GRAYSCALE, ALIASED, FORCE_DWORD = 0xffffffff }
+		{ DEFAULT, CLEARTYPE, GRAYSCALE, ALIASED, FORCE_DWORD = 0xffffffff} 
 		
 			enum DWRITE_TEXT_ALIGNMENT :int
-		{ LEADING, TRAILING, CENTER, JUSTIFIED }
+		{ LEADING, TRAILING, CENTER, JUSTIFIED} 
 			enum DWRITE_PARAGRAPH_ALIGNMENT :int
-		{ NEAR, FAR, CENTER }
+		{ NEAR, FAR, CENTER} 
 			enum DWRITE_WORD_WRAPPING :int
-		{ WRAP, NO_WRAP, EMERGENCY_BREAK, WHOLE_WORD, CHARACTER }
+		{ WRAP, NO_WRAP, EMERGENCY_BREAK, WHOLE_WORD, CHARACTER} 
 			enum DWRITE_READING_DIRECTION :int
-		{ LEFT_TO_RIGHT, RIGHT_TO_LEFT, TOP_TO_BOTTOM, BOTTOM_TO_TOP }
+		{ LEFT_TO_RIGHT, RIGHT_TO_LEFT, TOP_TO_BOTTOM, BOTTOM_TO_TOP} 
 			enum DWRITE_FLOW_DIRECTION :int
-		{ TOP_TO_BOTTOM, BOTTOM_TO_TOP, LEFT_TO_RIGHT, RIGHT_TO_LEFT }
+		{ TOP_TO_BOTTOM, BOTTOM_TO_TOP, LEFT_TO_RIGHT, RIGHT_TO_LEFT} 
 			enum DWRITE_TRIMMING_GRANULARITY :int
-		{ NONE, CHARACTER, WORD }
+		{ NONE, CHARACTER, WORD} 
 			enum DWRITE_LINE_SPACING_METHOD :int
-		{ DEFAULT, UNIFORM }
+		{ DEFAULT, UNIFORM} 
 			enum DWRITE_FONT_WEIGHT :int
 		{
 			THIN=100, EXTRA_LIGHT=200, ULTRA_LIGHT=200, LIGHT=300, SEMI_LIGHT=350, NORMAL=400, 
 			REGULAR=400, MEDIUM=500, DEMI_BOLD=600, SEMI_BOLD=600, BOLD=700, EXTRA_BOLD=800, 
 			ULTRA_BOLD=800, BLACK=900, HEAVY=900, EXTRA_BLACK=950, ULTRA_BLACK=950
-		}
+		} 
 			enum DWRITE_FONT_STRETCH :int
 		{
 			UNDEFINED=0, ULTRA_CONDENSED=1, EXTRA_CONDENSED=2, CONDENSED=3, SEMI_CONDENSED=4, 
 			NORMAL=5, MEDIUM=5, SEMI_EXPANDED=6, EXPANDED=7, EXTRA_EXPANDED=8, ULTRA_EXPANDED=9
-		}
+		} 
 			enum DWRITE_FONT_STYLE :int
-		{ NORMAL, OBLIQUE, ITALIC }
+		{ NORMAL, OBLIQUE, ITALIC} 
 		
 			struct DWRITE_TEXT_METRICS
 		{
 			float 	left, top,
 				width, widthIncludingTrailingWhitespace,
 				height,
-				layoutWidth, layoutHeight;
-			uint maxBidiReorderingDepth, lineCount;
-		}
+				layoutWidth, layoutHeight; 
+			uint maxBidiReorderingDepth, lineCount; 
+		} 
 		
-			mixin(uuid!(IDWriteTextFormat, "9c906818-31d7-4fd3-a151-7c5e225db55a"));
+			mixin(uuid!(IDWriteTextFormat, "9c906818-31d7-4fd3-a151-7c5e225db55a")); 
 			interface IDWriteTextFormat : IUnknown
 		{
-			extern(Windows):
-			HRESULT SetTextAlignment(DWRITE_TEXT_ALIGNMENT textAlignment);
-			HRESULT SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT paragraphAlignment);
-			HRESULT SetWordWrapping(DWRITE_WORD_WRAPPING wordWrapping);
-			HRESULT SetReadingDirection(DWRITE_READING_DIRECTION readingDirection);
-			HRESULT SetFlowDirection(DWRITE_FLOW_DIRECTION flowDirection);
-			HRESULT SetIncrementalTabStop(FLOAT incrementalTabStop);
-			HRESULT SetTrimming(/**/);
-			HRESULT SetLineSpacing(DWRITE_LINE_SPACING_METHOD lineSpacingMethod, FLOAT lineSpacing, FLOAT baseline);
-			DWRITE_TEXT_ALIGNMENT GetTextAlignment();
-			DWRITE_PARAGRAPH_ALIGNMENT GetParagraphAlignment();
-			DWRITE_WORD_WRAPPING GetWordWrapping();
-			DWRITE_READING_DIRECTION GetReadingDirection();
-			DWRITE_FLOW_DIRECTION GetFlowDirection();
-			FLOAT GetIncrementalTabStop();
-			HRESULT GetTrimming(/**/);
-			HRESULT GetLineSpacing(/*out*/ DWRITE_LINE_SPACING_METHOD* lineSpacingMethod, /*out*/ FLOAT* lineSpacing, /*out*/ FLOAT* baseline);
-			HRESULT GetFontCollection(/**/);
-			UINT32 GetFontFamilyNameLength();
-			HRESULT GetFontFamilyName(/*out*/ WCHAR* fontFamilyName, UINT32 nameSize);
-			DWRITE_FONT_WEIGHT GetFontWeight();
-			DWRITE_FONT_STYLE GetFontStyle();
-			DWRITE_FONT_STRETCH GetFontStretch();
-			FLOAT GetFontSize();
-			UINT32 GetLocaleNameLength();
-			HRESULT GetLocaleName(/*out*/ WCHAR* localeName, UINT32 nameSize);
-		}
+			extern(Windows): 
+			HRESULT SetTextAlignment(DWRITE_TEXT_ALIGNMENT textAlignment); 
+			HRESULT SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT paragraphAlignment); 
+			HRESULT SetWordWrapping(DWRITE_WORD_WRAPPING wordWrapping); 
+			HRESULT SetReadingDirection(DWRITE_READING_DIRECTION readingDirection); 
+			HRESULT SetFlowDirection(DWRITE_FLOW_DIRECTION flowDirection); 
+			HRESULT SetIncrementalTabStop(FLOAT incrementalTabStop); 
+			HRESULT SetTrimming(/**/); 
+			HRESULT SetLineSpacing(DWRITE_LINE_SPACING_METHOD lineSpacingMethod, FLOAT lineSpacing, FLOAT baseline); 
+			DWRITE_TEXT_ALIGNMENT GetTextAlignment(); 
+			DWRITE_PARAGRAPH_ALIGNMENT GetParagraphAlignment(); 
+			DWRITE_WORD_WRAPPING GetWordWrapping(); 
+			DWRITE_READING_DIRECTION GetReadingDirection(); 
+			DWRITE_FLOW_DIRECTION GetFlowDirection(); 
+			FLOAT GetIncrementalTabStop(); 
+			HRESULT GetTrimming(/**/); 
+			HRESULT GetLineSpacing(/*out*/ DWRITE_LINE_SPACING_METHOD* lineSpacingMethod, /*out*/ FLOAT* lineSpacing, /*out*/ FLOAT* baseline); 
+			HRESULT GetFontCollection(/**/); 
+			UINT32 GetFontFamilyNameLength(); 
+			HRESULT GetFontFamilyName(/*out*/ WCHAR* fontFamilyName, UINT32 nameSize); 
+			DWRITE_FONT_WEIGHT GetFontWeight(); 
+			DWRITE_FONT_STYLE GetFontStyle(); 
+			DWRITE_FONT_STRETCH GetFontStretch(); 
+			FLOAT GetFontSize(); 
+			UINT32 GetLocaleNameLength(); 
+			HRESULT GetLocaleName(/*out*/ WCHAR* localeName, UINT32 nameSize); 
+		} 
 		
 			struct D2D1_BRUSH_PROPERTIES
 		{
-			FLOAT opacity = 1;
-			D2D1_MATRIX_3X2_F transform;
-		}
+			FLOAT opacity = 1; 
+			D2D1_MATRIX_3X2_F transform; 
+		} 
 		
-			mixin(uuid!(ID2D1Brush, "2cd906a8-12e2-11dc-9fed-001143a055f9"));
+			mixin(uuid!(ID2D1Brush, "2cd906a8-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1Brush : ID2D1Resource
 		{
-			extern(Windows):
-			void SetOpacity(FLOAT opacity);
-			void SetTransform(in D2D1_MATRIX_3X2_F transform);
-			FLOAT GetOpacity() const;
-			void GetTransform(out D2D1_MATRIX_3X2_F transform) const;
-		}
+			extern(Windows): 
+			void SetOpacity(FLOAT opacity); 
+			void SetTransform(in D2D1_MATRIX_3X2_F transform); 
+			FLOAT GetOpacity() const; 
+			void GetTransform(out D2D1_MATRIX_3X2_F transform) const; 
+		} 
 		
-			mixin(uuid!(ID2D1SolidColorBrush, "2cd906a9-12e2-11dc-9fed-001143a055f9"));
+			mixin(uuid!(ID2D1SolidColorBrush, "2cd906a9-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1SolidColorBrush : ID2D1Brush
 		{
-			extern(Windows):
-			void SetColor(in D2D1_COLOR_F color);
+			extern(Windows): 
+			void SetColor(in D2D1_COLOR_F color); 
 			ref D2D1_COLOR_F GetColor() const; //Bug: got crash? see ID2D1RenderTarget.GetSize()
-		}
+		} 
 		
-			mixin(uuid!(ID2D1Resource, "2cd90691-12e2-11dc-9fed-001143a055f9"));
+			mixin(uuid!(ID2D1Resource, "2cd90691-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1Resource : IUnknown
 		{
-			extern(Windows):
-			void GetFactory(out ID2D1Factory factory) const;
-		}
+			extern(Windows): 
+			void GetFactory(out ID2D1Factory factory) const; 
+		} 
 		
-			mixin(uuid!(ID2D1RenderTarget, "2cd90694-12e2-11dc-9fed-001143a055f9"));
+			mixin(uuid!(ID2D1RenderTarget, "2cd90694-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1RenderTarget : ID2D1Resource
 		{
-			extern(Windows):
-			HRESULT CreateBitmap(/**/);
-			HRESULT CreateBitmapFromWicBitmap(/**/);
-			HRESULT CreateSharedBitmap(/**/);
-			HRESULT CreateBitmapBrush(/**/);
+			extern(Windows): 
+			HRESULT CreateBitmap(/**/); 
+			HRESULT CreateBitmapFromWicBitmap(/**/); 
+			HRESULT CreateSharedBitmap(/**/); 
+			HRESULT CreateBitmapBrush(/**/); 
 			HRESULT CreateSolidColorBrush(
 				in D2D1_COLOR_F color, 
 				in D2D1_BRUSH_PROPERTIES brushProperties, 
 				out ID2D1SolidColorBrush solidColorBrush
-			);
-			HRESULT CreateGradientStopCollection(/**/);
-			HRESULT CreateLinearGradientBrush(/**/);
-			HRESULT CreateRadialGradientBrush(/**/);
-			HRESULT CreateCompatibleRenderTarget(/**/);
-			HRESULT CreateLayer(/**/);
-			HRESULT CreateMesh(/**/);
-			void DrawLine(/**/);
-			void DrawRectangle(/**/);
-			void FillRectangle(in D2D1_RECT_F rect, ID2D1Brush brush);
-			void DrawRoundedRectangle(/**/);
-			void FillRoundedRectangle(/**/);
-			void DrawEllipse(/**/);
-			void FillEllipse(/**/);
-			void DrawGeometry(/**/);
-			void FillGeometry(/**/);
-			void FillMesh(/**/);
-			void FillOpacityMask(/**/);
-			void DrawBitmap(/**/);
-			void DrawText(/**/);
+			); 
+			HRESULT CreateGradientStopCollection(/**/); 
+			HRESULT CreateLinearGradientBrush(/**/); 
+			HRESULT CreateRadialGradientBrush(/**/); 
+			HRESULT CreateCompatibleRenderTarget(/**/); 
+			HRESULT CreateLayer(/**/); 
+			HRESULT CreateMesh(/**/); 
+			void DrawLine(/**/); 
+			void DrawRectangle(/**/); 
+			void FillRectangle(in D2D1_RECT_F rect, ID2D1Brush brush); 
+			void DrawRoundedRectangle(/**/); 
+			void FillRoundedRectangle(/**/); 
+			void DrawEllipse(/**/); 
+			void FillEllipse(/**/); 
+			void DrawGeometry(/**/); 
+			void FillGeometry(/**/); 
+			void FillMesh(/**/); 
+			void FillOpacityMask(/**/); 
+			void DrawBitmap(/**/); 
+			void DrawText(/**/); 
 			
 			void DrawTextLayout(
 				D2D1_POINT_2F origin, IDWriteTextLayout textLayout, ID2D1Brush defaultForegroundBrush,
 							D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS.NONE
-			);
+			); 
 			
-			void DrawGlyphRun(/**/);
+			void DrawGlyphRun(/**/); 
 			
-			void SetTransform(in D2D1_MATRIX_3X2_F transform);
-			void GetTransform(out D2D1_MATRIX_3X2_F transform) const;
-			void SetAntialiasMode(D2D1_ANTIALIAS_MODE antialiasMode);
-			D2D1_ANTIALIAS_MODE GetAntialiasMode() const;
-			void SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE textAntialiasMode);
-			D2D1_TEXT_ANTIALIAS_MODE GetTextAntialiasMode() const;
+			void SetTransform(in D2D1_MATRIX_3X2_F transform); 
+			void GetTransform(out D2D1_MATRIX_3X2_F transform) const; 
+			void SetAntialiasMode(D2D1_ANTIALIAS_MODE antialiasMode); 
+			D2D1_ANTIALIAS_MODE GetAntialiasMode() const; 
+			void SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE textAntialiasMode); 
+			D2D1_TEXT_ANTIALIAS_MODE GetTextAntialiasMode() const; 
 			void SetTextRenderingParams(/**/); /*
 				Todo: SetTextRenderingParams gdi classic-ra allitani, 
 								hogy szebb legyen az ui font, ekkor a 3x 
 								miatt pont cleartype-ra fog illeszkedni.
 			*/
-			void GetTextRenderingParams(/**/) const;
-			void SetTags(D2D1_TAG tag1, D2D1_TAG tag2);
-			void GetTags(/*out*/ D2D1_TAG *tag1 = null, /*out*/ D2D1_TAG *tag2 = null) const;
-			void PushLayer(/**/);
-			void PopLayer();
-			HRESULT Flush(/*out*/ D2D1_TAG *tag1 = null, /*out*/ D2D1_TAG *tag2 = null);
-			void SaveDrawingState(/**/) const;
-			void RestoreDrawingState(/**/);
-			void PushAxisAlignedClip(/**/);
-			void PopAxisAlignedClip();
+			void GetTextRenderingParams(/**/) const; 
+			void SetTags(D2D1_TAG tag1, D2D1_TAG tag2); 
+			void GetTags(/*out*/ D2D1_TAG *tag1 = null, /*out*/ D2D1_TAG *tag2 = null) const; 
+			void PushLayer(/**/); 
+			void PopLayer(); 
+			HRESULT Flush(/*out*/ D2D1_TAG *tag1 = null, /*out*/ D2D1_TAG *tag2 = null); 
+			void SaveDrawingState(/**/) const; 
+			void RestoreDrawingState(/**/); 
+			void PushAxisAlignedClip(/**/); 
+			void PopAxisAlignedClip(); 
 			
-			void Clear(in D2D1_COLOR_F clearColor);
+			void Clear(in D2D1_COLOR_F clearColor); 
 			
-			void BeginDraw();
-			HRESULT EndDraw(/*out*/ D2D1_TAG *tag1 = null,/*out*/ D2D1_TAG *tag2 = null);
+			void BeginDraw(); 
+			HRESULT EndDraw(/*out*/ D2D1_TAG *tag1 = null,/*out*/ D2D1_TAG *tag2 = null); 
 			
-			void GetPixelFormat(/**/) const;
-			void SetDpi(/**/);
-			void GetDpi(/*out*/ FLOAT *dpiX,/*out*/ FLOAT *dpiY) const;
+			void GetPixelFormat(/**/) const; 
+			void SetDpi(/**/); 
+			void GetDpi(/*out*/ FLOAT *dpiX,/*out*/ FLOAT *dpiY) const; 
 			void GetSize(D2D1_SIZE_F* outSize) const; //<-- NOTE: ABI bug workaround, see D2D1_SIZE_F GetSize() below
 			void GetPixelSize(D2D1_SIZE_U* outSize) const; //<-- NOTE: ABI bug workaround, see D2D1_SIZE_U GetPixelSize() below
-			UINT32 GetMaximumBitmapSize() const;
-			BOOL IsSupported(const(D2D1_RENDER_TARGET_PROPERTIES)* renderTargetProperties) const;
-		}
+			UINT32 GetMaximumBitmapSize() const; 
+			BOOL IsSupported(const(D2D1_RENDER_TARGET_PROPERTIES)* renderTargetProperties) const; 
+		} 
 		
 			//------------------------------------------------------------------------------
-			mixin(uuid!(ID2D1DCRenderTarget, "1c51bc64-de61-46fd-9899-63a5d8f03950"));
+			mixin(uuid!(ID2D1DCRenderTarget, "1c51bc64-de61-46fd-9899-63a5d8f03950")); 
 			interface ID2D1DCRenderTarget : ID2D1RenderTarget
 		{
-			 extern(Windows):
-					HRESULT BindDC(const HDC  hDC, const(RECT)* pSubRect);
-		}
+			 extern(Windows): 
+					HRESULT BindDC(const HDC  hDC, const(RECT)* pSubRect); 
+		} 
 		
-			mixin(uuid!(IDWriteFactory, "b859ee5a-d838-4b5b-a2e8-1adc7d93db48"));
+			mixin(uuid!(IDWriteFactory, "b859ee5a-d838-4b5b-a2e8-1adc7d93db48")); 
 			interface IDWriteFactory : IUnknown
 		{
-			extern(Windows):
-			HRESULT GetSystemFontCollection(/**/);
-			HRESULT CreateCustomFontCollection(/**/);
-			HRESULT RegisterFontCollectionLoader(/**/);
-			HRESULT UnregisterFontCollectionLoader(/**/);
-			HRESULT CreateFontFileReference(/**/);
-			HRESULT CreateCustomFontFileReference(/**/);
-			HRESULT CreateFontFace(/**/);
-			HRESULT CreateRenderingParams(/**/);
-			HRESULT CreateMonitorRenderingParams(/**/);
-			HRESULT CreateCustomRenderingParams(/**/);
-			HRESULT RegisterFontFileLoader(/**/);
-			HRESULT UnregisterFontFileLoader(/**/);
+			extern(Windows): 
+			HRESULT GetSystemFontCollection(/**/); 
+			HRESULT CreateCustomFontCollection(/**/); 
+			HRESULT RegisterFontCollectionLoader(/**/); 
+			HRESULT UnregisterFontCollectionLoader(/**/); 
+			HRESULT CreateFontFileReference(/**/); 
+			HRESULT CreateCustomFontFileReference(/**/); 
+			HRESULT CreateFontFace(/**/); 
+			HRESULT CreateRenderingParams(/**/); 
+			HRESULT CreateMonitorRenderingParams(/**/); 
+			HRESULT CreateCustomRenderingParams(/**/); 
+			HRESULT RegisterFontFileLoader(/**/); 
+			HRESULT UnregisterFontFileLoader(/**/); 
 			
 			HRESULT CreateTextFormat(
 				const(WCHAR)* fontFamilyName, void* fontCollection,
@@ -2969,94 +2969,94 @@ version(/+$DIDE_REGION+/all)
 				DWRITE_FONT_STRETCH fontStretch,
 				FLOAT fontSize, const(WCHAR)* localeName, 
 				out IDWriteTextFormat textFormat
-			);
+			); 
 			
-			HRESULT CreateTypography(/**/);
-			HRESULT GetGdiInterop(/**/);
+			HRESULT CreateTypography(/**/); 
+			HRESULT GetGdiInterop(/**/); 
 			
 			HRESULT CreateTextLayout(
 				const(WCHAR)* string, UINT32 stringLength, 
 				IDWriteTextFormat textFormat, FLOAT maxWidth, FLOAT maxHeight, 
 				out IDWriteTextLayout textLayout
-			);
+			); 
 			
-			HRESULT CreateGdiCompatibleTextLayout(/**/);
-			HRESULT CreateEllipsisTrimmingSign(/**/);
-			HRESULT CreateTextAnalyzer(/**/);
-			HRESULT CreateNumberSubstitution(/**/);
-			HRESULT CreateGlyphRunAnalysis(/**/);
-		}
+			HRESULT CreateGdiCompatibleTextLayout(/**/); 
+			HRESULT CreateEllipsisTrimmingSign(/**/); 
+			HRESULT CreateTextAnalyzer(/**/); 
+			HRESULT CreateNumberSubstitution(/**/); 
+			HRESULT CreateGlyphRunAnalysis(/**/); 
+		} 
 		
-			enum DWRITE_FACTORY_TYPE : int { SHARED, ISOLATED }
+			enum DWRITE_FACTORY_TYPE : int { SHARED, ISOLATED} 
 		
-			export extern(C) HRESULT DWriteCreateFactory(DWRITE_FACTORY_TYPE factoryType, REFIID iid, out IDWriteFactory factory);
+			export extern(C) HRESULT DWriteCreateFactory(DWRITE_FACTORY_TYPE factoryType, REFIID iid, out IDWriteFactory factory); 
 		
-			mixin(uuid!(IDWriteTextLayout, "53737037-6d14-410b-9bfe-0b182bb70961"));
+			mixin(uuid!(IDWriteTextLayout, "53737037-6d14-410b-9bfe-0b182bb70961")); 
 			interface IDWriteTextLayout : IDWriteTextFormat
 		{
-			extern(Windows):
-			HRESULT SetMaxWidth(FLOAT maxWidth);
-			HRESULT SetMaxHeight(FLOAT maxHeight);
-			HRESULT SetFontCollection(/**/);
-			HRESULT SetFontFamilyName(const(WCHAR)* fontFamilyName, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetFontWeight(DWRITE_FONT_WEIGHT fontWeight, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetFontStyle(DWRITE_FONT_STYLE fontStyle, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetFontStretch(DWRITE_FONT_STRETCH fontStretch, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetFontSize(FLOAT fontSize, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetUnderline(BOOL hasUnderline, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetStrikethrough(BOOL hasStrikethrough, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetDrawingEffect(IUnknown drawingEffect, DWRITE_TEXT_RANGE textRange);
-			HRESULT SetInlineObject(/**/);
-			HRESULT SetTypography(/**/);
-			HRESULT SetLocaleName(const(WCHAR)* localeName, DWRITE_TEXT_RANGE textRange);
-			FLOAT GetMaxWidth();
-			FLOAT GetMaxHeight();
-			HRESULT GetFontCollection(/**/);
-			HRESULT GetFontFamilyNameLength(UINT32 currentPosition, UINT32* nameLength, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetFontFamilyName(UINT32 currentPosition, /*out*/ WCHAR* fontFamilyName, UINT32 nameSize, DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetFontWeight(UINT32 currentPosition, /*out*/ DWRITE_FONT_WEIGHT* fontWeight, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetFontStyle(UINT32 currentPosition, /*out*/ DWRITE_FONT_STYLE* fontStyle, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetFontStretch(UINT32 currentPosition,/*out*/ DWRITE_FONT_STRETCH* fontStretch, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetFontSize(UINT32 currentPosition, /*out*/ FLOAT* fontSize, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetUnderline(UINT32 currentPosition,/*out*/ BOOL* hasUnderline, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetStrikethrough(UINT32 currentPosition, /*out*/ BOOL* hasStrikethrough, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetDrawingEffect(UINT32 currentPosition, /*out*/ IUnknown* drawingEffect, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetInlineObject(/**/);
-			HRESULT GetTypography(/**/);
-			HRESULT GetLocaleNameLength(UINT32 currentPosition, /*out*/ UINT32* nameLength, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT GetLocaleName(UINT32 currentPosition, /*out*/ WCHAR* localeName, UINT32 nameSize, /*out*/ DWRITE_TEXT_RANGE* textRange = null);
-			HRESULT Draw(/**/);
-			HRESULT GetLineMetrics(/**/);
-			HRESULT GetMetrics(out DWRITE_TEXT_METRICS textMetrics);
-			HRESULT GetOverhangMetrics(/**/);
-			HRESULT GetClusterMetrics(/**/);
-			HRESULT DetermineMinWidth(/*out*/ FLOAT* minWidth);
-			HRESULT HitTestPoint(/**/);
-			HRESULT HitTestTextPosition(/**/);
-			HRESULT HitTestTextRange(/**/);
-		}
+			extern(Windows): 
+			HRESULT SetMaxWidth(FLOAT maxWidth); 
+			HRESULT SetMaxHeight(FLOAT maxHeight); 
+			HRESULT SetFontCollection(/**/); 
+			HRESULT SetFontFamilyName(const(WCHAR)* fontFamilyName, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetFontWeight(DWRITE_FONT_WEIGHT fontWeight, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetFontStyle(DWRITE_FONT_STYLE fontStyle, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetFontStretch(DWRITE_FONT_STRETCH fontStretch, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetFontSize(FLOAT fontSize, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetUnderline(BOOL hasUnderline, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetStrikethrough(BOOL hasStrikethrough, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetDrawingEffect(IUnknown drawingEffect, DWRITE_TEXT_RANGE textRange); 
+			HRESULT SetInlineObject(/**/); 
+			HRESULT SetTypography(/**/); 
+			HRESULT SetLocaleName(const(WCHAR)* localeName, DWRITE_TEXT_RANGE textRange); 
+			FLOAT GetMaxWidth(); 
+			FLOAT GetMaxHeight(); 
+			HRESULT GetFontCollection(/**/); 
+			HRESULT GetFontFamilyNameLength(UINT32 currentPosition, UINT32* nameLength, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetFontFamilyName(UINT32 currentPosition, /*out*/ WCHAR* fontFamilyName, UINT32 nameSize, DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetFontWeight(UINT32 currentPosition, /*out*/ DWRITE_FONT_WEIGHT* fontWeight, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetFontStyle(UINT32 currentPosition, /*out*/ DWRITE_FONT_STYLE* fontStyle, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetFontStretch(UINT32 currentPosition,/*out*/ DWRITE_FONT_STRETCH* fontStretch, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetFontSize(UINT32 currentPosition, /*out*/ FLOAT* fontSize, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetUnderline(UINT32 currentPosition,/*out*/ BOOL* hasUnderline, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetStrikethrough(UINT32 currentPosition, /*out*/ BOOL* hasStrikethrough, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetDrawingEffect(UINT32 currentPosition, /*out*/ IUnknown* drawingEffect, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetInlineObject(/**/); 
+			HRESULT GetTypography(/**/); 
+			HRESULT GetLocaleNameLength(UINT32 currentPosition, /*out*/ UINT32* nameLength, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT GetLocaleName(UINT32 currentPosition, /*out*/ WCHAR* localeName, UINT32 nameSize, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
+			HRESULT Draw(/**/); 
+			HRESULT GetLineMetrics(/**/); 
+			HRESULT GetMetrics(out DWRITE_TEXT_METRICS textMetrics); 
+			HRESULT GetOverhangMetrics(/**/); 
+			HRESULT GetClusterMetrics(/**/); 
+			HRESULT DetermineMinWidth(/*out*/ FLOAT* minWidth); 
+			HRESULT HitTestPoint(/**/); 
+			HRESULT HitTestTextPosition(/**/); 
+			HRESULT HitTestTextRange(/**/); 
+		} 
 		
 		
 			class BitmapFontRenderer
 		{
-			private:
-				BitmapFontProps props;
-				alias props this;
-				bool isSegoeAssets, isLucidaConsole;
+			private: 
+				BitmapFontProps props; 
+				alias props this; 
+				bool isSegoeAssets, isLucidaConsole; 
 			
-				ID2D1Factory d2dFactory;
-				IDWriteFactory dwFactory;
+				ID2D1Factory d2dFactory; 
+				IDWriteFactory dwFactory; 
 			
-				ID2D1DCRenderTarget dcrt;
+				ID2D1DCRenderTarget dcrt; 
 			
-				IDWriteTextFormat textFormat;
-				ID2D1SolidColorBrush brush;
+				IDWriteTextFormat textFormat; 
+				ID2D1SolidColorBrush brush; 
 			
-				bool mustRebuild = true;
+				bool mustRebuild = true; 
 			
 				const 	white	= D2D1_COLOR_F(1, 1, 1),
 				black	= D2D1_COLOR_F(0, 0, 0),
-				heightScale 	= 0.75f;
+				heightScale 	= 0.75f; 
 			
 				void initialize()
 			{
@@ -3064,28 +3064,28 @@ version(/+$DIDE_REGION+/all)
 				D2D1CreateFactory(
 					D2D1_FACTORY_TYPE.SINGLE_THREADED, 
 					&IID_ID2D1Factory, null, d2dFactory
-				).hrChk("D2D1CreateFactory");
+				).hrChk("D2D1CreateFactory"); 
 				DWriteCreateFactory(
 					DWRITE_FACTORY_TYPE.SHARED, 
 					&IID_IDWriteFactory, dwFactory
-				).hrChk("DWriteCreateFactory");
+				).hrChk("DWriteCreateFactory"); 
 				
 				//Create DCRenderTarget
-				d2dFactory.CreateDCRenderTarget(DCRenderTargetProps, dcrt).hrChk("CreateDCRenderTarget");
+				d2dFactory.CreateDCRenderTarget(DCRenderTargetProps, dcrt).hrChk("CreateDCRenderTarget"); 
 				
 				//Create brush
-				dcrt.CreateSolidColorBrush(black, D2D1_BRUSH_PROPERTIES(1), brush).hrChk("CreateSolidColorBrush");
-			}
+				dcrt.CreateSolidColorBrush(black, D2D1_BRUSH_PROPERTIES(1), brush).hrChk("CreateSolidColorBrush"); 
+			} 
 			
 				void rebuild()
 			{
-				if(!chkClear(mustRebuild)) return;
+				if(!chkClear(mustRebuild)) return; 
 				
-				isSegoeAssets = fontName=="Segoe MDL2 Assets";
-				isLucidaConsole = fontName=="Lucida Console";
+				isSegoeAssets = fontName=="Segoe MDL2 Assets"; 
+				isLucidaConsole = fontName=="Lucida Console"; 
 				
 				//Create font
-				SafeRelease(textFormat);
+				SafeRelease(textFormat); 
 				dwFactory.CreateTextFormat(
 					fontName.toPWChar, 
 					null/*fontCollection*/,
@@ -3095,115 +3095,115 @@ version(/+$DIDE_REGION+/all)
 					height*heightScale, 
 					"".toPWChar/*locale*/, 
 					textFormat
-				).hrChk("CreateTextFormat");
+				).hrChk("CreateTextFormat"); 
 				
-				dcrt.SetTransform(D2D1_MATRIX_3X2_F(xScale, 0, 0, 1, 0, 0));
+				dcrt.SetTransform(D2D1_MATRIX_3X2_F(xScale, 0, 0, 1, 0, 0)); 
 				dcrt.SetTextAntialiasMode(
 					clearType 	? D2D1_TEXT_ANTIALIAS_MODE.CLEARTYPE 
 						: D2D1_TEXT_ANTIALIAS_MODE.GRAYSCALE
-				);
-			}
+				); 
+			} 
 			
 				void finalize()
 			{
-				SafeRelease(textFormat);
-				SafeRelease(brush);
-				SafeRelease(dcrt);
-				SafeRelease(d2dFactory);
-				SafeRelease(dwFactory);
-			}
-			public:
+				SafeRelease(textFormat); 
+				SafeRelease(brush); 
+				SafeRelease(dcrt); 
+				SafeRelease(d2dFactory); 
+				SafeRelease(dwFactory); 
+			} 
+			public: 
 				this()
-			{ initialize; }
+			{ initialize; } 
 			
 				~this()
-			{ finalize; }
+			{ finalize; } 
 			
 				void setProps(in BitmapFontProps props_)
 			{
-				if(props==props_) return;
-				props = props_;
-				mustRebuild = true;
-			}
+				if(props==props_) return; 
+				props = props_; 
+				mustRebuild = true; 
+			} 
 			
 				Bitmap render(in BitmapFontProps props_, string text)
 			{
-				setProps(props_);
-				return renderText(text);
-			}
+				setProps(props_); 
+				return renderText(text); 
+			} 
 			
 				Bitmap renderDecl(string fontDecl)
 			{
-				string text;
-				setProps(decodeFontDeclaration(fontDecl, text));
-				return renderText(text);
-			}
+				string text; 
+				setProps(decodeFontDeclaration(fontDecl, text)); 
+				return renderText(text); 
+			} 
 			
 				Bitmap renderText(string text)
 			{
-				enforce(!text.empty, "Nothing to render.");
+				enforce(!text.empty, "Nothing to render."); 
 				
-				if(mustRebuild) rebuild;
+				if(mustRebuild) rebuild; 
 				
 				//a single space character needs special care
-				const spaceIdx = text.among(" ", /*"\u2000", "\u2001", "\u2004",*/ smallSpace);
+				const spaceIdx = text.among(" ", /*"\u2000", "\u2001", "\u2004",*/ smallSpace); 
 				//Todo: measure the width of spaces. For example put 2 well known chars around it.
 				
-				const spaceScale =  [1,	1 , /*2	    , 4	      , 0.666f	 ,*/ 0.4f    ][spaceIdx];
+				const spaceScale =  [1,	1 , /*2	    , 4	      , 0.666f	 ,*/ 0.4f    ][spaceIdx]; 
 								 //1/4em	1/2em	    1em	      1/6em	 1/4em      thin
-				const isSpace = spaceIdx>0;
+				const isSpace = spaceIdx>0; 
 				if(isSpace) text = "j";  //a letter used to emulate the width of a space.
 				//Todo: get space width from DirectWrite
 				
 				//Create text layout
-				IDWriteTextLayout textLayout;
-				auto ws = text.toUTF16;
+				IDWriteTextLayout textLayout; 
+				auto ws = text.toUTF16; 
 				
 				dwFactory.CreateTextLayout(
 					ws.ptr, cast(uint)ws.length, 
 					textFormat, float.max, height, textLayout
-				).hrChk("CreateTextLayout");
-				scope(exit) SafeRelease(textLayout);
+				).hrChk("CreateTextLayout"); 
+				scope(exit) SafeRelease(textLayout); 
 				
 				//get text extents
-				DWRITE_TEXT_METRICS metrics;
-				textLayout.GetMetrics(metrics).hrChk("GetMetrics");
+				DWRITE_TEXT_METRICS metrics; 
+				textLayout.GetMetrics(metrics).hrChk("GetMetrics"); 
 				
 				auto bmpSize()
-				{ return ivec2((metrics.width*props.xScale*spaceScale).iround, props.height).max(ivec2(1)); }
+				{ return ivec2((metrics.width*props.xScale*spaceScale).iround, props.height).max(ivec2(1)); } 
 				
 				if(isSpace) { return new Bitmap(image2D(bmpSize, ubyte(0))); }
 				
 				Bitmap doRender(bool inverse=false)
 				{
-					auto gBmp = new GdiBitmap(bmpSize);
-					scope(exit) gBmp.free;
+					auto gBmp = new GdiBitmap(bmpSize); 
+					scope(exit) gBmp.free; 
 					
 					//draw
 					auto rect = RECT(0, 0, gBmp.size.x, gBmp.size.y); //Todo: this can be null???
-					dcrt.BindDC(gBmp.hdcMem, &rect).hrChk("BindDC");
+					dcrt.BindDC(gBmp.hdcMem, &rect).hrChk("BindDC"); 
 					
-					dcrt.BeginDraw;
-						dcrt.Clear(inverse ? white : black);
-						brush.SetColor(inverse ? black : white);
+					dcrt.BeginDraw; 
+						dcrt.Clear(inverse ? white : black); 
+						brush.SetColor(inverse ? black : white); 
 					
-						float y = 0;
-						if(isLucidaConsole) y = props.height*0.16f;else if(!isSegoeAssets)
-					y = props.height*((-1.425f)/18);
+						float y = 0; 
+						if(isLucidaConsole) y = props.height*0.16f; else if(!isSegoeAssets)
+					y = props.height*((-1.425f)/18); 
 					
 						dcrt.DrawTextLayout(
 						D2D1_POINT_2F(0, y), textLayout, brush, 
 						D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT
-					);
-					dcrt.EndDraw.hrChk("EndDraw");
+					); 
+					dcrt.EndDraw.hrChk("EndDraw"); 
 					
-					return gBmp.toBitmap;
-				}
+					return gBmp.toBitmap; 
+				} 
 				
-				auto res = doRender;
+				auto res = doRender; 
 				
 				static bool isGrayscale(in RGBA color)
-				{ return color.rg==color.gb; }
+				{ return color.rg==color.gb; } 
 				
 				if(res.access!RGBA.asArray.map!isGrayscale.all)
 				{
@@ -3211,18 +3211,18 @@ version(/+$DIDE_REGION+/all)
 				}
 				else
 				{
-					auto res2 = doRender(true);
+					auto res2 = doRender(true); 
 					
 					//ha ide betuk keverednek, akkor aszoknak zajos lesz a konturjuk ugyanis
 					//nem csak a hatterszin valtozik, hanem az eloteszin is. Az mar duplaannyi, mint kene.
 					
 					static RGBA process(RGBA a, RGBA b)
 					{
-						ubyte alpha = cast(ubyte)(~(b.r - a.r));
+						ubyte alpha = cast(ubyte)(~(b.r - a.r)); 
 						return alpha<0xff 	? RGBA(0,0,0, alpha)
-							: RGBA(b.bgr, alpha);
-					}
-					res.set(image2D!process(res.access!RGBA, res2.access!RGBA));
+							: RGBA(b.bgr, alpha); 
+					} 
+					res.set(image2D!process(res.access!RGBA, res2.access!RGBA)); 
 					
 				}
 				
@@ -3231,16 +3231,16 @@ version(/+$DIDE_REGION+/all)
 					 //align the assets font vertically with letters
 					int ysh = iround(res.height*0.125f); //scroll down that many pixels
 					
-					auto img = res.access!ubyte;
-					img = img.extract_nearest(0, -ysh, res.width, res.height);
-					res.set(img);
+					auto img = res.access!ubyte; 
+					img = img.extract_nearest(0, -ysh, res.width, res.height); 
+					res.set(img); 
 				}
 				
-				return res;
-			}
-		}
+				return res; 
+			} 
+		} 
 		
-			alias bitmapFontRenderer = Singleton!BitmapFontRenderer;
+			alias bitmapFontRenderer = Singleton!BitmapFontRenderer; 
 	}
 	
 	//Segoe Symbol database ////////////////////////////////
@@ -3440,23 +3440,23 @@ version(/+$DIDE_REGION+/all)
 			"allForwardingMirrored=60543;MobBluetooth=60481;EndPointSolid=60235;DeviceMonitorNoPic=59387;Dial1=61766;SignalError=60718;Forwar"~
 			"dSm=59820;ContactPresence=59599;BackSpaceQWERTYLg=60310;FavoriteList=59176;Ringer=60047;VerticalBatteryCharging9=62982;RadioBtnO"~
 			"n=60619;Pencil=60771;HWPSplit=62564;Contact2=59604;FullAlpha=59775;DialShape1=61782;InPrivate=59175;StartPoint=59417;Headphone1="~
-			"60721;Phone=59159;WifiWarning1=60256";
+			"60721;Phone=59159;WifiWarning1=60256"; 
 		
-		shared static dchar[string] table;
+		shared static dchar[string] table; 
 		if(table is null) {
 			foreach(s; tableData.split(';')) {
-				auto p = s.split('=');
-				table[p[0]] = (p[1].to!int).to!dchar;
+				auto p = s.split('='); 
+				table[p[0]] = (p[1].to!int).to!dchar; 
 			}
-			table.rehash;
+			table.rehash; 
 		}
 		
 		//get by dec or hex code
-		if(name.length && name[0].inRange('0', '9')) return name.toInt.to!dchar;
+		if(name.length && name[0].inRange('0', '9')) return name.toInt.to!dchar; 
 		
-		auto a = name in table;
-		return a ? *a : '\uFFFD';
-	}
+		auto a = name in table; 
+		return a ? *a : '\uFFFD'; 
+	} 
 	
 	/*
 		void importSegoeSymbols(){
@@ -3480,7 +3480,7 @@ version(/+$DIDE_REGION+/all)
 	
 	shared static this()
 	{
-		bitmapLoaders.registerMarkedFunctions!(mixin(__MODULE__));
-		bitmapEffects.registerMarkedFunctions!(mixin(__MODULE__));
-	}
+		bitmapLoaders.registerMarkedFunctions!(mixin(__MODULE__)); 
+		bitmapEffects.registerMarkedFunctions!(mixin(__MODULE__)); 
+	} 
 }

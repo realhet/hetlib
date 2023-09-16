@@ -1,4 +1,4 @@
-module het.inputs;/+DIDE+/
+module het.inputs; /+DIDE+/
 version(/+$DIDE_REGION+/all)
 {
 	/+
@@ -39,125 +39,125 @@ version(/+$DIDE_REGION+/all)
 	//Todo: tesztelni, hogy 'F5' es 'Shift F5' jol mukodik-e egyutt.
 	//Todo: improve mousewheel precision: it is only giving 1's and 2's on 60FPS.
 	
-	import het.utils,
-	core.sys.windows.windows, core.sys.windows.winuser, std.json;
+	import het,
+	core.sys.windows.windows, core.sys.windows.winuser, std.json; 
 	
-	__gshared int[] virtualKeysDown;
+	__gshared int[] virtualKeysDown; 
 	
 	//Utils /////////////////////////////////////////////////////////////////////
 	
 	//VK_ letter and number constants
 	static foreach(a; chain(iota('A', 'Z'+1), iota('0', '9'+1)))
-	mixin(a.to!char.format!"enum VK_%1$s=%1$d;");
+	mixin(a.to!char.format!"enum VK_%1$s=%1$d;"); 
 	
 	void spiGetKeyboardDelays(ref Time d1, ref Time d2)
 	{
 		//Gets windows keyboard delays in seconds
 		//Note: The query takes 6microsecs only, so it can go into the update loop
-		int val;
+		int val; 
 		
-		SystemParametersInfoW(SPI_GETKEYBOARDDELAY, 0, &val, 0);
+		SystemParametersInfoW(SPI_GETKEYBOARDDELAY, 0, &val, 0); 
 		d1 = remap(val, 0, 3, 0.250f, 1)*second; //0: 250ms .. 3: 1sec
 		
-		SystemParametersInfoW(SPI_GETKEYBOARDSPEED, 0, &val, 0);
+		SystemParametersInfoW(SPI_GETKEYBOARDSPEED, 0, &val, 0); 
 		d2 = (1.0f/remap(val, 0, 31, 2.5f, 37.5f))*second; //0: 2.5hz .. 31: 40Hz
-	}
+	} 
 	
 	int[3] spiGetMouse()
 	{
-		int[3] val;
-		SystemParametersInfoW(SPI_GETMOUSE, 0, &val, 0);
-		return val;
-	}
+		int[3] val; 
+		SystemParametersInfoW(SPI_GETMOUSE, 0, &val, 0); 
+		return val; 
+	} 
 	
 	int spiGetMouseSpeed()
 	{
-		int val;
-		SystemParametersInfoW(SPI_GETMOUSESPEED, 0, &val, 0);
-		return val;
-	}
+		int val; 
+		SystemParametersInfoW(SPI_GETMOUSESPEED, 0, &val, 0); 
+		return val; 
+	} 
 	
 	void _notifyMouseWheel(float delta)
 	//Must be called from outside, from a Window loop in Window.d
-	{ MouseInputHandler.wheelDeltaAccum += delta; }
+	{ MouseInputHandler.wheelDeltaAccum += delta; } 
 	
 	char shiftedKey(char key)
 	{
 		switch(key) {
-			case 'a':..case'z':	return cast(char)(key - 'a' + 'A');
-			case '0':..case'9':	return ")!@#$%^&*("[key-'0'];
+			case 'a': ..case'z': 	return cast(char)(key - 'a' + 'A'); 
+			case '0': ..case'9': 	return ")!@#$%^&*("[key-'0']; 
 				
-			case '`':	return '~';
-			case '-':	return '_';
-			case '=':	return '+';
-			case '[':	return '{';
-			case ']':	return '}';
-			case ';':	return ':';
-			case '\'':	return '"';
-			case '\\':	return '|';
-			case ',':	return '<';
-			case '.':	return '>';
-			case '/':	return '?';
-			default:	return key;
+			case '`': 	return '~'; 
+			case '-': 	return '_'; 
+			case '=': 	return '+'; 
+			case '[': 	return '{'; 
+			case ']': 	return '}'; 
+			case ';': 	return ':'; 
+			case '\'': 	return '"'; 
+			case '\\': 	return '|'; 
+			case ',': 	return '<'; 
+			case '.': 	return '>'; 
+			case '/': 	return '?'; 
+			default: 	return key; 
 		}
-	}
+	} 
 	
 	char unshiftedKey(char key)
 	{
 		switch(key) {
-			case 'A':..case'Z':	return cast(char)(key - 'A' + 'a');
+			case 'A': ..case'Z': 	return cast(char)(key - 'A' + 'a'); 
 				
-			case ')':	return '0';
-			case '!':	return '1';
-			case '@':	return '2';
-			case '#':	return '3';
-			case '$':	return '4';
-			case '%':	return '5';
-			case '^':	return '6';
-			case '&':	return '7';
-			case '*':	return '8';
-			case '(':	return '9';
+			case ')': 	return '0'; 
+			case '!': 	return '1'; 
+			case '@': 	return '2'; 
+			case '#': 	return '3'; 
+			case '$': 	return '4'; 
+			case '%': 	return '5'; 
+			case '^': 	return '6'; 
+			case '&': 	return '7'; 
+			case '*': 	return '8'; 
+			case '(': 	return '9'; 
 				
-			case '~':	return '`';
-			case '_':	return '-';
-			case '+':	return '=';
-			case '{':	return '[';
-			case '}':	return ']';
-			case ':':	return ';';
-			case '"':	return '\'';
-			case '|':	return '\\';
-			case '<':	return ',';
-			case '>':	return '.';
-			case '?':	return '/';
-			default:	return key;
+			case '~': 	return '`'; 
+			case '_': 	return '-'; 
+			case '+': 	return '='; 
+			case '{': 	return '['; 
+			case '}': 	return ']'; 
+			case ':': 	return ';'; 
+			case '"': 	return '\''; 
+			case '|': 	return '\\'; 
+			case '<': 	return ','; 
+			case '>': 	return '.'; 
+			case '?': 	return '/'; 
+			default: 	return key; 
 		}
-	}
+	} 
 	
 	string shiftedKey(string s)
 	{
-		if(s.length==1) return shiftedKey(s[0]).to!string;
-		return s;
-	}
+		if(s.length==1) return shiftedKey(s[0]).to!string; 
+		return s; 
+	} 
 	
 	string unshiftedKey(string s)
 	{
-		if(s.length==1) return unshiftedKey(s[0]).to!string;
-		return s;
-	}
+		if(s.length==1) return unshiftedKey(s[0]).to!string; 
+		return s; 
+	} 
 	
 	struct ClickDetector
 	{
 		 //ClickDetector ///////////////////////////////
 		
 		enum doubleDuration	= .25f	* second,   //Todo: use winuser.GetDoubleClickTime()
-				 longDuration	= .5f	* second;
+				 longDuration	= .5f	* second; 
 		
-		bool pressing, pressed, released;
-		bool clicked, doubleClicked, tripleClicked, nClicked;
-		bool longPressed, longPressing, longClicked;
-		int clickCount;
+		bool pressing, pressed, released; 
+		bool clicked, doubleClicked, tripleClicked, nClicked; 
+		bool longPressed, longPressing, longClicked; 
+		int clickCount; 
 		
-		DateTime tPressed, tPressedPrev;
+		DateTime tPressed, tPressedPrev; 
 		
 		void update(bool state, DateTime t=DateTime.init)
 		{
@@ -165,28 +165,28 @@ version(/+$DIDE_REGION+/all)
 			//getting time.
 			if(!t) {
 					//1st priority is the given time parameter
-				t = application.tickTime;	//2nd priority if there is a running gui app
+				t = application.tickTime; 	//2nd priority if there is a running gui app
 				if(!t)
-				t = now;	//last priority is system time
+				t = now; 	//last priority is system time
 			}
 			
 			//clear all the transitional bits
 			pressed = released = clicked = doubleClicked = tripleClicked
-			= nClicked = longPressed = longClicked = false;
+			= nClicked = longPressed = longClicked = false; 
 			
-			pressed = state && !pressing;
-			released = !state &&  pressing;
-			pressing = state;
+			pressed = state && !pressing; 
+			released = !state &&  pressing; 
+			pressing = state; 
 			
 			if(pressed) {
-				tPressedPrev = tPressed;
-				tPressed = t;
+				tPressedPrev = tPressed; 
+				tPressed = t; 
 				if(tPressed-tPressedPrev <= doubleDuration)
 				{
 					switch(++clickCount) {
-						case 1:doubleClicked = true; break;
-						case 2:tripleClicked = true; break;
-						default: nClicked = true;
+						case 1: doubleClicked = true; break; 
+						case 2: tripleClicked = true; break; 
+						default: nClicked = true; 
 					}
 				}
 				else { clickCount = 0; }
@@ -196,18 +196,18 @@ version(/+$DIDE_REGION+/all)
 				else { if(clickCount==0) clicked = true; }
 			}
 			
-			const pressDuration = pressing ? t-tPressed : 0*second;
-			enum enableDoubleLongPress = true;
+			const pressDuration = pressing ? t-tPressed : 0*second; 
+			enum enableDoubleLongPress = true; 
 			if(pressDuration>longDuration && (enableDoubleLongPress || clickCount==0))
 			{
 				if(longPressing.chkSet) {
-					longPressed = true;
-					clickCount = 0;
+					longPressed = true; 
+					clickCount = 0; 
 				}
 			}
 			
-			if(t-tPressed > doubleDuration) clickCount = 0;
-		}
+			if(t-tPressed > doubleDuration) clickCount = 0; 
+		} 
 		
 		
 		string toString() const
@@ -219,7 +219,7 @@ version(/+$DIDE_REGION+/all)
 				longPressing ? "P":"_",
 				longPressed ? "+" : longClicked?"-": " ",
 				doubleClicked ? "2" : tripleClicked ? "3" : nClicked ? "N" : " "
-			);
+			); 
 			
 			/*
 				bool pressing, pressed, released;
@@ -230,36 +230,36 @@ version(/+$DIDE_REGION+/all)
 				uint tPressed, tPressedPrev;
 			*/
 			
-		}
-	}
+		} 
+	} 
 	
 	/////////////////////////////////////////////////////////////////////////////
 	///  KeyCombo                                                             ///
 	/////////////////////////////////////////////////////////////////////////////
 	
-	immutable keyModifiers = ["Ctrl", "Shift", "Alt", "Win"];
+	immutable keyModifiers = ["Ctrl", "Shift", "Alt", "Win"]; 
 	
 	int keyModifierCode(string key)
 	{
-		if(key.empty) return 0;
+		if(key.empty) return 0; 
 		foreach(i, a; keyModifiers)
 		{
 			if(key==a || key[0].among('L', 'R') && key[1..$]==a)
 			{ return 1<<cast(int)i; }
 		}
-		return 0;
-	}
+		return 0; 
+	} 
 	
 	int keyModifierMask(in string[] keys)
-	{ int res; foreach(k; keys) res |= k.keyModifierCode; return res; }
+	{ int res; foreach(k; keys) res |= k.keyModifierCode; return res; } 
 	
 	auto keyModifierMaskToStrings(int mask)
 	{
-		string[] res;
+		string[] res; 
 		foreach(i, s; keyModifiers)
-		if(mask & (1<<cast(int)i)) res ~= s;
-		return res;
-	}
+		if(mask & (1<<cast(int)i)) res ~= s; 
+		return res; 
+	} 
 	
 	string commonKeyModifier(string key)
 	{
@@ -267,19 +267,19 @@ version(/+$DIDE_REGION+/all)
 		if(
 			!key.empty && keyModifiers.canFind(key[1..$]) &&
 			key[0].among('L', 'R')
-		) return key[1..$];
-		return key;
-	}
+		) return key[1..$]; 
+		return key; 
+	} 
 	
 	string keyWithoutLR(string k)
 	{
 		if(k.length && k[0].among('L', 'R'))
 		{
-			const simple = k[1..$];
-			if(keyModifiers.canFind(simple)) return simple;
+			const simple = k[1..$]; 
+			if(keyModifiers.canFind(simple)) return simple; 
 		}
-		return k;
-	}
+		return k; 
+	} 
 	
 	
 	
@@ -287,51 +287,51 @@ version(/+$DIDE_REGION+/all)
 	{
 		//a single keycombo like F1, LShift+RShift, Ctrl+Alt, Ctrl+Num+, Ctrl+K+U
 		//Todo: Ctrl+KU is sequential!
-		string[] keys;
+		string[] keys; 
 		
 		this(string s)
 		{
-			enum plusMark = "@PLUS@";
+			enum plusMark = "@PLUS@"; 
 			
-			s = s.replace("++", plusMark~"+");//the first plus from ++ is preserved
-			if(s.startsWith("+")) s = plusMark~s[1..$];
-			if(s.endsWith("+")) s = s[0..$-1]~plusMark;
+			s = s.replace("++", plusMark~"+"); //the first plus from ++ is preserved
+			if(s.startsWith("+")) s = plusMark~s[1..$]; 
+			if(s.endsWith("+")) s = s[0..$-1]~plusMark; 
 			
 			keys = s	.split('+')
 				.map!(s => s.strip.replace(plusMark, "+"))
 				.filter!(s => !s.empty)
-				.array;
-		}
+				.array; 
+		} 
 		
 		string toString() const
-		{ return keys.join('+'); }
+		{ return keys.join('+'); } 
 		
 		private bool validIdx(size_t n) const
-		{ return n<keys.length; }
+		{ return n<keys.length; } 
 		InputEntry entries(size_t n)
-		{ return validIdx(n) ? inputs.entries.get(keys[n], null) : null; }
+		{ return validIdx(n) ? inputs.entries.get(keys[n], null) : null; } 
 		bool valid(size_t n)
-		{ return entries(n) !is null; }
+		{ return entries(n) !is null; } 
 		bool valid()
-		{ return !keys.empty && iota(keys.length).map!(i => valid(i)).all; }
+		{ return !keys.empty && iota(keys.length).map!(i => valid(i)).all; } 
 		
 		int keyModifierMask() const
-		{ return keys.keyModifierMask; }
+		{ return keys.keyModifierMask; } 
 		
 		bool pressed()
-		{ return valid &&	inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).pressed; }
+		{ return valid &&	inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).pressed; } 
 		
 		bool active()
-		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).active; }
+		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).active; } 
 		bool released()
-		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).released; }
+		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).released; } 
 		bool typed()
-		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).repeated; }
-	}
+		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).repeated; } 
+	} 
 	
 	struct KeyCombo
 	{
-		KeyComboEntry[] combos;
+		KeyComboEntry[] combos; 
 		
 		this(string s)
 		{
@@ -339,23 +339,23 @@ version(/+$DIDE_REGION+/all)
 				.map!strip
 				.filter!(x => !x.empty)
 				.map!(x => KeyComboEntry(x))
-				.array;
-		}
+				.array; 
+		} 
 		
 		string toString() const
-		{ return combos.map!text.join('+'); }
+		{ return combos.map!text.join('+'); } 
 		
 		bool active()
-		{ return combos.any!"a.active"; } alias hold = active; alias down = active;
+		{ return combos.any!"a.active"; } alias hold = active; alias down = active; 
 		bool pressed()
-		{ return combos.any!"a.pressed"; }
+		{ return combos.any!"a.pressed"; } 
 		bool typed()
-		{ return combos.any!"a.typed"; }
+		{ return combos.any!"a.typed"; } 
 		bool released()
-		{ return combos.any!"a.released"; }
+		{ return combos.any!"a.released"; } 
 		
 		//bool changed () { return combos.map!changed .any; }
-	}
+	} 
 	
 	void callVerbs(T)(T a)
 	{
@@ -364,17 +364,17 @@ version(/+$DIDE_REGION+/all)
 		static foreach(Member; getSymbolsByUDA!(T, VERB))
 		{
 			{
-				enum verb = getUDA!(Member, VERB);
-				//Note: het.utils.getUDA will not fail with @VERB too, which is a type, not a VERB value.
+				enum verb = getUDA!(Member, VERB); 
+				//Note: het.getUDA will not fail with @VERB too, which is a type, not a VERB value.
 				
 				 static if(verb.keyCombo!="")
 				{
 					//LOG("A", __traits(identifier, Member));
-					auto kc = KeyCombo(verb.keyCombo);
+					auto kc = KeyCombo(verb.keyCombo); 
 					
-					bool b = (verb.flags & VerbFlag.hold) ? kc.down : kc.typed;
+					bool b = (verb.flags & VerbFlag.hold) ? kc.down : kc.typed; 
 					
-					if(b) __traits(getMember, a, __traits(identifier, Member))();
+					if(b) __traits(getMember, a, __traits(identifier, Member))(); 
 				}
 			}
 		}
@@ -398,7 +398,7 @@ version(/+$DIDE_REGION+/all)
 					}
 				}}
 		+/
-	}
+	} 
 	
 	
 	/+
@@ -406,7 +406,7 @@ version(/+$DIDE_REGION+/all)
 		ha az update interval rovidebb volt a klikkeles hosszanal. Ezt valahogy javitani.
 	+/
 	
-	alias inputs = Singleton!InputManager;
+	alias inputs = Singleton!InputManager; 
 	
 	enum InputEntryType
 	{
@@ -417,186 +417,186 @@ version(/+$DIDE_REGION+/all)
 		analogButton,	//[0..1]	       normally released. Left/Right trigger, piano note
 		absolute,	//any value	       Mouse ScreenPos, position of a playback time slider
 		delta	//any value	       Mouse Wheel, Jog wheel
-	}
+	} 
 	
 	class InputEntry
 	{
-		bool opCast(T:bool)() const { return active; }
+		bool opCast(T:bool)() const { return active; } 
 		
-		const InputHandlerBase owner;
-		const string name;
-		const InputEntryType type;
+		const InputHandlerBase owner; 
+		const string name; 
+		const InputEntryType type; 
 		float	value=0,
-			lastValue=0;
-		Time pressedTime=0*second;
+			lastValue=0; 
+		Time pressedTime=0*second; 
 		
 		string category() const
-		{ return owner.category; }
+		{ return owner.category; } 
 		
 		this(InputHandlerBase owner, InputEntryType type, string name, float value = 0)
 		{
 			//validate name
-			enforce(!name.empty && name[0]!='+', `InputEntry() invalid name "%s"`.format(name));
+			enforce(!name.empty && name[0]!='+', `InputEntry() invalid name "%s"`.format(name)); 
 			
-			this.owner = owner;
-			this.name = name;
-			this.type = type;
-			this.value = value;
-			lastValue = value;
-		}
+			this.owner = owner; 
+			this.name = name; 
+			this.type = type; 
+			this.value = value; 
+			lastValue = value; 
+		} 
 		
 		bool isButton() const
-		{ return type==InputEntryType.digitalButton || type==InputEntryType.analogButton; }
+		{ return type==InputEntryType.digitalButton || type==InputEntryType.analogButton; } 
 		
 		float delta () const
-		{ return value -lastValue; }
+		{ return value -lastValue; } 
 		bool changed() const
-		{ return value!=lastValue; }
+		{ return value!=lastValue; } 
 		bool active() const
-		{ return value!=0; }
+		{ return value!=0; } 
 		bool lastActive () const
-		{ return lastValue!=0; }
+		{ return lastValue!=0; } 
 		bool pressed() const
-		{ return active && !lastActive; }
+		{ return active && !lastActive; } 
 		bool released()const
-		{ return !active && lastActive; }
+		{ return !active && lastActive; } 
 		
 		Time activeDuration() const
 		{
-			if(active) return inputs.now-pressedTime;
-			else return 0*second;
-		}
+			if(active) return inputs.now-pressedTime; 
+			else return 0*second; 
+		} 
 		
 		bool longPress() const
-		{ return activeDuration >= inputs.longPressDuration; }
+		{ return activeDuration >= inputs.longPressDuration; } 
 		
 		bool down() const
-		{ return	active; }
+		{ return	active; } 
 		bool up()	const
-		{ return !active; }
+		{ return !active; } 
 		
 		
 		private {
-			bool repeated_;
-			Time repeatNextTime = 0*second;
-		}
+			bool repeated_; 
+			Time repeatNextTime = 0*second; 
+		} 
 		
 		bool repeated()const
-		{ return repeated_; }
+		{ return repeated_; } 
 		
 		void _updateRepeated(Time now)
-		{ repeated_ = inputs.repeatLogic(active, pressed, repeatNextTime); }
+		{ repeated_ = inputs.repeatLogic(active, pressed, repeatNextTime); } 
 		
-	}
+	} 
 	
 	class InputHandlerBase
 	{
-		string category;
-		InputEntry[] entries;
+		string category; 
+		InputEntry[] entries; 
 		void update()
-		{}
+		{} 
 		this()
-		{}
-	}
+		{} 
+	} 
 	
 	class InputManager
 	{
 		static
 		{
-			auto longPressDuration = 0.5*second;
+			auto longPressDuration = 0.5*second; 
 			
-			auto repeatDelay1 = 0.5*second;	//updated in every frame
-			auto repeatDelay2 = 0.125*second;	//updated in every frame
+			auto repeatDelay1 = 0.5*second; 	//updated in every frame
+			auto repeatDelay2 = 0.125*second; 	//updated in every frame
 			
 			int mouseSpeed = 10; //updated in every frame
 			int[3] mouseThresholds = [6, 10, 1]; //updated in every frame
-		}
+		} 
 		private
 		{
-			bool initialized = false;
+			bool initialized = false; 
 			
-			InputEntry nullEntry;
+			InputEntry nullEntry; 
 			
 			void rehashAll()
-			{ entries.rehash; handlers.rehash; }
+			{ entries.rehash; handlers.rehash; } 
 			void error(string s)
-			{ throw new Exception("InputManager: "~s); }
+			{ throw new Exception("InputManager: "~s); } 
 			
 			Time now; //local fast time in seconds
 			//Todo: replace this with DateTime and prioper seconds handling.
-		}
+		} 
 		
-		InputHandlerBase[string] handlers;
-		InputEntry[string] entries;
+		InputHandlerBase[string] handlers; 
+		InputEntry[string] entries; 
 		
-		KeyboardInputHandler keyboardInputHandler;
+		KeyboardInputHandler keyboardInputHandler; 
 		
 		this()
 		{
 			//add the nullEntry
-			nullEntry = new InputEntry(null, InputEntryType.digitalState, "null");
-			entries [nullEntry.name] = nullEntry;
+			nullEntry = new InputEntry(null, InputEntryType.digitalState, "null"); 
+			entries [nullEntry.name] = nullEntry; 
 			
 			//register common handlers
-			registerInputHandler(keyboardInputHandler = new KeyboardInputHandler);
-			registerInputHandler(new MouseInputHandler);
-			registerInputHandler(new PotiInputHandler);
-			registerInputHandler(new XInputInputHandler);
-		}
+			registerInputHandler(keyboardInputHandler = new KeyboardInputHandler); 
+			registerInputHandler(new MouseInputHandler); 
+			registerInputHandler(new PotiInputHandler); 
+			registerInputHandler(new XInputInputHandler); 
+		} 
 		
 		void registerInputHandler(InputHandlerBase h)
 		{
 			if(h.category in handlers)
-			error(`Input handler category "`~h.category~`" already registered.`);
+			error(`Input handler category "`~h.category~`" already registered.`); 
 			foreach(e; h.entries)
 			if(e.name in entries)
-			error(`Input entry "`~e.name~`" already registered.`);
+			error(`Input entry "`~e.name~`" already registered.`); 
 			
 			
 			//add the category and the entries to the pool
-			handlers[h.category] = h;
-			foreach(e; h.entries) entries[e.name] = e;
-			rehashAll;
-		}
+			handlers[h.category] = h; 
+			foreach(e; h.entries) entries[e.name] = e; 
+			rehashAll; 
+		} 
 		
 		void unregisterInputHandler(InputHandlerBase h)
 		{
-			handlers.remove(h.category);
-			foreach(e; h.entries) entries.remove(e.name);
-			rehashAll;
-		}
+			handlers.remove(h.category); 
+			foreach(e; h.entries) entries.remove(e.name); 
+			rehashAll; 
+		} 
 		
 		void update()
 		{
-			now = QPS_local;
+			now = QPS_local; 
 			
 			//ensure that inputentry is untouched
 			with(nullEntry) {
 				if(value || lastValue || pressedTime!=0*second)
 				{
-					WARN("nullEntry was disturbed.");
-					value=0; lastValue=0; pressedTime=0*second;
+					WARN("nullEntry was disturbed."); 
+					value=0; lastValue=0; pressedTime=0*second; 
 				}
 			}
 			
-			clearDeltas;
-			foreach(h; handlers) h.update;
+			clearDeltas; 
+			foreach(h; handlers) h.update; 
 			
-			spiGetKeyboardDelays(repeatDelay1, repeatDelay2);
+			spiGetKeyboardDelays(repeatDelay1, repeatDelay2); 
 			//Todo: this is only needed once a sec, dunno how slow it is.
 			
-			mouseSpeed = spiGetMouseSpeed;
-			mouseThresholds = spiGetMouse;
+			mouseSpeed = spiGetMouseSpeed; 
+			mouseThresholds = spiGetMouse; 
 			
 			
 			foreach(e; entries) {
-				if(e.pressed) e.pressedTime = now;
-				e._updateRepeated(now);
+				if(e.pressed) e.pressedTime = now; 
+				e._updateRepeated(now); 
 			}
-		}
+		} 
 		
 		void clearDeltas()
-		{ foreach(e; entries) e.lastValue = e.value; }
+		{ foreach(e; entries) e.lastValue = e.value; } 
 		
 		auto opIndex(string name)
 		{
@@ -608,39 +608,39 @@ version(/+$DIDE_REGION+/all)
 					Note: this wrapper is needed for opCast!(bool) to work properly.
 								For classes, D doesn't call opCast, it checks the pointer.
 				+/
-				alias entry this;
-				InputEntry entry;
-				bool opCast(T:bool)() { return entry ? entry.active : false; }
-			}
+				alias entry this; 
+				InputEntry entry; 
+				bool opCast(T:bool)() { return entry ? entry.active : false; } 
+			} 
 			
 			auto doit()
 			{
-				if(name=="") return nullEntry;
-				auto e = name in entries;
+				if(name=="") return nullEntry; 
+				auto e = name in entries; 
 				if(e is null) e = translateKey(name) in entries; //try to translate
-				return e ? *e : nullEntry;
-			}
+				return e ? *e : nullEntry; 
+			} 
 			
-			return InpitEntryWrapper(doit);
-		}
+			return InpitEntryWrapper(doit); 
+		} 
 		
 		auto opDispatch(string name)()
-		{ return opIndex(name); }
+		{ return opIndex(name); } 
 		
 		/// Tries to interpret a key's name. Searching the closest in inputs.entries.
 		string translateKey(string key)
 		{
 			//empty string is empty
-			if(key=="") return "";
+			if(key=="") return ""; 
 			//can find in inputs
-			if(key in entries) return key;
+			if(key in entries) return key; 
 			
 			//try to find it in a dynamic dictionary
-			static string[string] dict;
-			if(auto p = key in dict) return *p;
+			static string[string] dict; 
+			if(auto p = key in dict) return *p; 
 			
 			//compress words to letters
-			auto words = key.split(' ');
+			auto words = key.split(' '); 
 			foreach(ref word; words)
 			{
 				if(
@@ -649,51 +649,51 @@ version(/+$DIDE_REGION+/all)
 						"Click", "Button", "Btn", "Wheel"
 					)
 				)
-				word = word[0..1].uc;
+				word = word[0..1].uc; 
 				else if(word.sameText("Control"))
-				word = "Ctrl";
+				word = "Ctrl"; 
 			}
 			
 			//join words and try to translate
-			string trans = words.join;
-			static string[string] wdict;
+			string trans = words.join; 
+			static string[string] wdict; 
 			if(wdict is null)
 			wdict = [
 				"LMC": "LMB", 	"MMC": "MMB", 	"RMC": "RMB", 
 				"MB3": "MMB", 	"MWDown": "MWDn"	
-			];
+			]; 
 			
-			if(auto p = trans in wdict) trans = *p;
+			if(auto p = trans in wdict) trans = *p; 
 			
 			//fint the translated result in inputs.entries
-			string found;
+			string found; 
 			if(trans in entries) {
 				 //case sens
-				found = trans;
+				found = trans; 
 			}
 			else {
 				 //case insens
-				auto keys = entries.keys;
-				auto i = keys.map!lc.countUntil(trans.lc);
-				if(i>=0) found = keys[i];
+				auto keys = entries.keys; 
+				auto i = keys.map!lc.countUntil(trans.lc); 
+				if(i>=0) found = keys[i]; 
 			}
 			if(found=="")
 			ERR(
 				format!"Can't find transformed key in inputs.entries: %s -> %s"
 				(key.quoted, trans.quoted)
-			);
+			); 
 			
 			//save the transformed name
-			dict[key] = found;
-			return found;
-		}
+			dict[key] = found; 
+			return found; 
+		} 
 		
 		//query functions for key combo access
 		private
 		{
 			
 			//Todo: use KeyCombo struct!
-			enum QueryMode { Active, Pressed, Typed }
+			enum QueryMode { Active, Pressed, Typed} 
 			bool _query(string keys, QueryMode mode)
 			{
 				//format: Alt+F1 K Ctrl+K
@@ -701,13 +701,13 @@ version(/+$DIDE_REGION+/all)
 				if(keys.canFind(' '))
 				{
 					//call it recursively
-					foreach(k; strip(keys).split(' ')) if(_query(k, mode)) return true;
-					return false;
+					foreach(k; strip(keys).split(' ')) if(_query(k, mode)) return true; 
+					return false; 
 				}
 				
 				//all key must be down
-				bool allDown = true;
-				auto keyList = keys.split('+').map!strip.array;
+				bool allDown = true; 
+				auto keyList = keys.split('+').map!strip.array; 
 				if(keyList.empty) allDown = false; //empty combo
 				
 				foreach(key; keyList) if(!this[key].value) { allDown = false; break; }
@@ -716,79 +716,79 @@ version(/+$DIDE_REGION+/all)
 				
 				final switch(mode)
 				{
-					case QueryMode.Active:	return true;
-					case QueryMode.Pressed:	return this[keyList[$-1]].pressed;	//Todo: wrong
-					case QueryMode.Typed:	return this[keyList[$-1]].repeated;	//Todo: wrong
+					case QueryMode.Active: 	return true; 
+					case QueryMode.Pressed: 	return this[keyList[$-1]].pressed; 	//Todo: wrong
+					case QueryMode.Typed: 	return this[keyList[$-1]].repeated; 	//Todo: wrong
 					//case QueryMode.Released:return this[k[$-1]].released; //todo: wrong
 				}
-			}
+			} 
 			
-		}
+		} 
 		
 		bool active (string keys)
-		{ return _query(keys, QueryMode.Active ); }
+		{ return _query(keys, QueryMode.Active ); } 
 		bool pressed(string keys)
-		{ return _query(keys, QueryMode.Pressed); }
+		{ return _query(keys, QueryMode.Pressed); } 
 		bool typed  (string keys)
-		{ return _query(keys, QueryMode.Typed  ); }
+		{ return _query(keys, QueryMode.Typed  ); } 
 		//bool released(string keys) { return _query(keys, QueryMode.Released ); }
 		
 		
 		auto mouseAct()	const
-		{ return vec2(entries["MX"].value, entries["MY"].value); }
+		{ return vec2(entries["MX"].value, entries["MY"].value); } 
 		auto mouseDelta()	const
-		{ return vec2(entries["MX"].delta, entries["MY"].delta); }
+		{ return vec2(entries["MX"].delta, entries["MY"].delta); } 
 		bool mouseMoved()	const
-		{ return entries["MX"].changed || entries["MY"].changed; }
+		{ return entries["MX"].changed || entries["MY"].changed; } 
 		float mouseWheelDelta() const
-		{ return entries["MW"].delta; }
+		{ return entries["MW"].delta; } 
 		
 		int keyModifierMask()
 		{
-			int res;
-			foreach(i, s; keyModifiers) if(entries[s].active) res += 1<<i;
-			return res;
-		};
-		alias modifiers = keyModifierMask;
+			int res; 
+			foreach(i, s; keyModifiers) if(entries[s].active) res += 1<<i; 
+			return res; 
+		} ; 
+		alias modifiers = keyModifierMask; 
 		
 		//keyboard emulation ///////////////////////////////////
 		
 		bool validKey(string key)
-		{ return strToVk(key)!=0; }
+		{ return strToVk(key)!=0; } 
 		
 		static bool isMouseBtn(int vk)
 		{
 			return vk.among(
 				VK_LBUTTON, VK_RBUTTON, VK_MBUTTON,
 				VK_XBUTTON1, VK_XBUTTON2
-			)>0;
-		}//Todo: these are slow...
+			)>0; 
+		} //Todo: these are slow...
 		static bool isExtendedKey(int vk)
 		{
 			return vk.among(
 				VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, VK_HOME, 
 				VK_END, VK_PRIOR, VK_NEXT, VK_INSERT, VK_DELETE
-			)>0;
-		}
+			)>0; 
+		} 
 		
 		bool isMouseBtn(string key)
 		{ return isMouseBtn(strToVk(key)); } //Todo: these are slow...
 		
 		void pressKey(ubyte vk, bool press=true)
 		{
-			if(!vk) return;
+			if(!vk) return; 
 			if(isMouseBtn(vk))
 			{
 				void a(int d, int u, int x=0)
-				{ mouse_event(press ? d : u , 0, 0, x, 0); }
+				{ mouse_event(press ? d : u , 0, 0, x, 0); } 
 				switch(vk)
 				{
-					case VK_LBUTTON:	a(MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP);	break;
-					case VK_RBUTTON:	a(MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP);	break;
-					case VK_MBUTTON:	a(MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP);	break;
-					case VK_XBUTTON1:	a(MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, XBUTTON1);	break;
-					case VK_XBUTTON2:	a(MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, XBUTTON2);	break;
-					default:	enforce(0, `Unknown mouse button %s`.format(vk));
+					case VK_LBUTTON: 	a(MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP); 	break; 
+					case VK_RBUTTON: 	a(MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP); 	break; 
+					case VK_MBUTTON: 	a(MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP); 	break; 
+					case VK_XBUTTON1: 	a(MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, XBUTTON1); 	break; 
+					case VK_XBUTTON2: 	a(MOUSEEVENTF_XDOWN, MOUSEEVENTF_XUP, XBUTTON2); 	break; 
+					default: 	enforce(0, `Unknown mouse button %s`.format(vk)); 
 				}
 			}
 			else
@@ -798,51 +798,51 @@ version(/+$DIDE_REGION+/all)
 								Sound volume, and play controls are working.
 				+/
 				const flags = 	(press ? 0 : KEYEVENTF_KEYUP) | 
-					(isExtendedKey(vk) ? KEYEVENTF_EXTENDEDKEY : 0);
+					(isExtendedKey(vk) ? KEYEVENTF_EXTENDEDKEY : 0); 
 				
-				enum method = 1;
+				enum method = 1; 
 				
 				static if(method==0)
 				{
 					//const sc = MapVirtualKeyA(vk, MAPVK_VK_TO_VSC).to!ubyte; <--- not needed
-					keybd_event(vk, 0, flags, 0);
+					keybd_event(vk, 0, flags, 0); 
 				}
 				else static if(method==1)
 				{
-					INPUT input;
-					input.type = INPUT_KEYBOARD;
+					INPUT input; 
+					input.type = INPUT_KEYBOARD; 
 					with(input.ki) {
-						wVk = vk;
+						wVk = vk; 
 						//wScan = MapVirtualKey(vk, 0).to!ushort; //<--- not needed
-						dwFlags = flags;
+						dwFlags = flags; 
 					}
-					SendInput(1, &input, INPUT.sizeof);
+					SendInput(1, &input, INPUT.sizeof); 
 				}
 				else
-				static assert(0, "invalid keyboard emulation method index");
+				static assert(0, "invalid keyboard emulation method index"); 
 			}
-		}
+		} 
 		
 		void releaseKey(ubyte vk)
-		{ pressKey(vk, false); }
+		{ pressKey(vk, false); } 
 		
 		void pressKey(string key, bool press=true)
 		{
 			//if(key=="") return; //empty is	valid
 			//auto vk = enforce(strToVk(key),	"Inputs.keyPress: Invalid key "~key.quoted);
-			const vk = strToVk(key);
-			if(!vk) return;
-			pressKey(vk, press);
-		}
+			const vk = strToVk(key); 
+			if(!vk) return; 
+			pressKey(vk, press); 
+		} 
 		
 		void releaseKey(string key)
-		{ pressKey(key, false); }
+		{ pressKey(key, false); } 
 		
 		void clickKey(string key)
 		{
-			pressKey(key);
-			releaseKey(key);
-		}
+			pressKey(key); 
+			releaseKey(key); 
+		} 
 		
 		void pressCombo(string combo)
 		{
@@ -851,12 +851,12 @@ version(/+$DIDE_REGION+/all)
 				//Todo: release already pressed modifiers
 				//Todo: delays between presses
 				if(keys.length) {
-					foreach(mod; keys[0..$-1]) pressKey(mod);
-					clickKey(keys.back);
-					foreach_reverse(mod; keys[0..$-1]) releaseKey(mod);
+					foreach(mod; keys[0..$-1]) pressKey(mod); 
+					clickKey(keys.back); 
+					foreach_reverse(mod; keys[0..$-1]) releaseKey(mod); 
 				}
 			}
-		}
+		} 
 		
 		void typeKey(string key)
 		{
@@ -867,56 +867,56 @@ version(/+$DIDE_REGION+/all)
 				key[0].isLetter && 
 				((key[0].toUpper==key[0]) != inputs["CapsLockState"].active)
 			) &&
-				!inputs["Shift"].down;
+				!inputs["Shift"].down; 
 			
-			if(needShift) pressKey("LShift");
-			pressKey(key);
-			releaseKey(key);
-			if(needShift) releaseKey("LShift");
-		}
+			if(needShift) pressKey("LShift"); 
+			pressKey(key); 
+			releaseKey(key); 
+			if(needShift) releaseKey("LShift"); 
+		} 
 		
 		void typeText(string s)
-		{ foreach(ch; s) typeKey(ch.to!string); }
+		{ foreach(ch; s) typeKey(ch.to!string); } 
 		
 		//keycode conversion //////////////////////////////////////
 		
 		ubyte strToVk(string key)
-		{ return keyboardInputHandler.strToVk(key); }
+		{ return keyboardInputHandler.strToVk(key); } 
 		string vkToStr(ubyte vk)
-		{ return keyboardInputHandler.vkToStr(vk); }
+		{ return keyboardInputHandler.vkToStr(vk); } 
 		
 		string vkToUni(ubyte vk, Flag!"shift" shift, Flag!"altGr" altGr)
 		{
-			if(!vk) return "";
-			static ubyte[256] keymap = ubyte(0).repeat(256).array;
+			if(!vk) return ""; 
+			static ubyte[256] keymap = ubyte(0).repeat(256).array; 
 			
-			keymap[VK_SHIFT  ] = shift ? 0xFF : 0;
-			keymap[VK_CONTROL] = altGr ? 0xff : 0;
-			keymap[VK_MENU   ] = altGr ? 0xff : 0;
+			keymap[VK_SHIFT  ] = shift ? 0xFF : 0; 
+			keymap[VK_CONTROL] = altGr ? 0xff : 0; 
+			keymap[VK_MENU   ] = altGr ? 0xff : 0; 
 			
-			wchar[256] buf;
-			const res = ToUnicode(vk, 0, keymap.ptr, buf.ptr, buf.length, 0);
-			if(res!=1) return "";//"\uFFFD";
-			return buf.toStr;
-		}
+			wchar[256] buf; 
+			const res = ToUnicode(vk, 0, keymap.ptr, buf.ptr, buf.length, 0); 
+			if(res!=1) return ""; //"\uFFFD";
+			return buf.toStr; 
+		} 
 		
 		string vkToUni(ubyte vk, int flags)
-		{ return vkToUni(vk, flags&1 ? Yes.shift : No.shift, flags&2 ? Yes.altGr : No.altGr); }
+		{ return vkToUni(vk, flags&1 ? Yes.shift : No.shift, flags&2 ? Yes.altGr : No.altGr); } 
 		string strToUni(string key, int flags)
-		{ return vkToUni(strToVk(key), flags); }
+		{ return vkToUni(strToVk(key), flags); } 
 		string strToUni(string key, Flag!"shift" shift, Flag!"altGr" altGr)
-		{ return vkToUni(strToVk(key), shift, altGr); }
+		{ return vkToUni(strToVk(key), shift, altGr); } 
 		
 		//this version uses the current keystate
 		string vkToUni(ubyte vk)
 		{
-			wchar[256] buf;
-			const res = ToUnicode(vk, 0, keyboardInputHandler.keys.ptr, buf.ptr, buf.length, 0);
-			if(res!=1) return "";//"\uFFFD";
-			return buf.toStr;
-		}
+			wchar[256] buf; 
+			const res = ToUnicode(vk, 0, keyboardInputHandler.keys.ptr, buf.ptr, buf.length, 0); 
+			if(res!=1) return ""; //"\uFFFD";
+			return buf.toStr; 
+		} 
 		string strToUni(string key)
-		{ return vkToUni(strToVk(key)); }
+		{ return vkToUni(strToVk(key)); } 
 		
 		
 		bool repeatLogic(
@@ -929,21 +929,21 @@ version(/+$DIDE_REGION+/all)
 				 //Todo: at kene terni tick-re...
 				//Note: 'now' is saved in every update cycle. That's why this fucnt is not static.
 				if(pressed) {
-					repeatNextTime = now+repeatDelay1;
-					return true;
+					repeatNextTime = now+repeatDelay1; 
+					return true; 
 				}
 				if(now>=repeatNextTime) {
-					repeatNextTime = now+repeatDelay2;
-					return true;
+					repeatNextTime = now+repeatDelay2; 
+					return true; 
 				}
 			}
-			return false;
-		}
+			return false; 
+		} 
 		
 		bool repeatLogic(in bool active, in bool pressed, ref Time repeatNextTime)
-		{ return repeatLogic(active, pressed, repeatNextTime, repeatDelay1, repeatDelay2); }
+		{ return repeatLogic(active, pressed, repeatNextTime, repeatDelay1, repeatDelay2); } 
 		
-	}
+	} 
 }
 
 version(/+$DIDE_REGION+/all)
@@ -951,49 +951,49 @@ version(/+$DIDE_REGION+/all)
 	class InputEmulator
 	{
 		//redirects keyboard and mouse inputs to windows
-		string[] activeKeys, lastActiveKeys, pressedKeys, releasedKeys;
-		string repeatedKey, lastRepeatedKey;
-		Time repeatState;
-		bool repeatedKeyPressed;
+		string[] activeKeys, lastActiveKeys, pressedKeys, releasedKeys; 
+		string repeatedKey, lastRepeatedKey; 
+		Time repeatState; 
+		bool repeatedKeyPressed; 
 		
 		void updateKeyState(string[] activeKeys_)
 		{
-			lastActiveKeys = activeKeys;
-			activeKeys = activeKeys_.sort.uniq.array;
+			lastActiveKeys = activeKeys; 
+			activeKeys = activeKeys_.sort.uniq.array; 
 			
 			//detect pressed and released keys. Using only the state of activeKeys and lastActiveKeys.
-			pressedKeys	= activeKeys.filter!(k => !lastActiveKeys.canFind(k)).array;
-			releasedKeys	= lastActiveKeys.filter!(k => !activeKeys.canFind(k)).array;
+			pressedKeys	= activeKeys.filter!(k => !lastActiveKeys.canFind(k)).array; 
+			releasedKeys	= lastActiveKeys.filter!(k => !activeKeys.canFind(k)).array; 
 			
-			foreach(k; releasedKeys) inputs.releaseKey(k);
-			foreach(k; pressedKeys) inputs.pressKey(k);
+			foreach(k; releasedKeys) inputs.releaseKey(k); 
+			foreach(k; pressedKeys) inputs.pressKey(k); 
 			
-			if(!releasedKeys.empty) repeatedKey = "";
-			pressedKeys.filter!(k => !inputs.isMouseBtn(k)).each!(k => repeatedKey = k);
+			if(!releasedKeys.empty) repeatedKey = ""; 
+			pressedKeys.filter!(k => !inputs.isMouseBtn(k)).each!(k => repeatedKey = k); 
 			//all keys can be repeated except mouse buttons
 			
 			repeatedKeyPressed = inputs.repeatLogic(
 				repeatedKey!="",
 				lastRepeatedKey != repeatedKey,
 				repeatState
-			);
+			); 
 			if(repeatedKeyPressed && !pressedKeys.canFind(repeatedKey))
-			inputs.pressKey(repeatedKey);
+			inputs.pressKey(repeatedKey); 
 			
 			//update history
-			lastRepeatedKey = repeatedKey;
-			lastActiveKeys = activeKeys;
-		}
+			lastRepeatedKey = repeatedKey; 
+			lastActiveKeys = activeKeys; 
+		} 
 		
-		protected vec2 lastMMoveFraction;
+		protected vec2 lastMMoveFraction; 
 		
 		void mouseMove1(float nx, float ny)
 		{
-			lastMMoveFraction += vec2(nx, ny);
-			ivec2 r = iround(lastMMoveFraction);
-			if(r) mouse_event(MOUSEEVENTF_MOVE, r.x, r.y, 0, 0);
-			lastMMoveFraction -= r;
-		}
+			lastMMoveFraction += vec2(nx, ny); 
+			ivec2 r = iround(lastMMoveFraction); 
+			if(r) mouse_event(MOUSEEVENTF_MOVE, r.x, r.y, 0, 0); 
+			lastMMoveFraction -= r; 
+		} 
 		
 		
 		void mouseMove(float nx, float ny, float fastOrSlow)
@@ -1001,20 +1001,20 @@ version(/+$DIDE_REGION+/all)
 			float f(float x)
 			{
 				return x<0 	? -f(-x)
-					: max(0, x*1.125-0.1)/+deadzone+/;
-			}
+					: max(0, x*1.125-0.1)/+deadzone+/; 
+			} 
 			
-			float len = vec2(nx, ny).length;
+			float len = vec2(nx, ny).length; 
 			float speed = len>0.95 ? 5 : 2;  //turbo speed at the very ends
 			
 			if(fastOrSlow!=0) {
-				float a = fastOrSlow.sqr.remap(0, 1, 1, 4);
-				if(fastOrSlow<0) a = 1/a;
-				speed *= a;
+				float a = fastOrSlow.sqr.remap(0, 1, 1, 4); 
+				if(fastOrSlow<0) a = 1/a; 
+				speed *= a; 
 			}
 			
-			mouseMove1(f(nx)*speed, f(ny)*-speed);
-		}
+			mouseMove1(f(nx)*speed, f(ny)*-speed); 
+		} 
 		
 		void mouseWheel(float speed/+-1..1 range+/, float fastOrSlow)
 		{
@@ -1022,16 +1022,16 @@ version(/+$DIDE_REGION+/all)
 			{
 				speed = signedsqr(speed) * 15; //base wheel speed
 				if(fastOrSlow!=0) {
-					float f = fastOrSlow.sqr.remap(0, 1, 1, 5);
-					if(fastOrSlow<0) f = 1/f;
-					speed *= f;
+					float f = fastOrSlow.sqr.remap(0, 1, 1, 5); 
+					if(fastOrSlow<0) f = 1/f; 
+					speed *= f; 
 				}
-				if(const i = speed.iround) mouse_event(MOUSEEVENTF_WHEEL, 0, 0, i, 0);
+				if(const i = speed.iround) mouse_event(MOUSEEVENTF_WHEEL, 0, 0, i, 0); 
 			}
-		}
+		} 
 		
 		
-	}
+	} 
 	
 	
 	/////////////////////////////////////////////////////////////////////////////
@@ -1040,42 +1040,42 @@ version(/+$DIDE_REGION+/all)
 	
 	class KeyboardInputHandler: InputHandlerBase
 	{
-		ubyte[256] keys;
+		ubyte[256] keys; 
 		private
 		{
-			InputEntry[256] emap;
+			InputEntry[256] emap; 
 			
 			//maps to and from virtual keycodes
-			ubyte[string] _nameToVk;
-			string[ubyte] _vkToName;
+			ubyte[string] _nameToVk; 
+			string[ubyte] _vkToName; 
 			
 			void initMaps()
 			{
 				foreach(idx, e; emap)
 				if(e) {
-					_nameToVk[e.name] = idx.to!ubyte;
-					_vkToName[idx.to!ubyte] = e.name;
+					_nameToVk[e.name] = idx.to!ubyte; 
+					_vkToName[idx.to!ubyte] = e.name; 
 				}
 				
-			}
+			} 
 			
 			InputEntry 	eWin,  //there is no Win = LWin | RWin key on the map, so emulate it.
 				eCapsLockState, eNumLockState, eScrLockState, //toggled states
-				eMWUp, eMWDn /+Mouse Wheel up/down as buttons reacting to movement+/;
+				eMWUp, eMWDn /+Mouse Wheel up/down as buttons reacting to movement+/; 
 			
 			void add(int vk, string name)
 			{
 				if(emap[vk])
-				throw new Exception("KeyboardInputHandler.add("~name~") Duplicated vk: "~text(vk));
-				auto e = new InputEntry(this, InputEntryType.digitalButton, name);
-				emap[vk] = e;
-				entries ~= e;
-			}
-		}
+				throw new Exception("KeyboardInputHandler.add("~name~") Duplicated vk: "~text(vk)); 
+				auto e = new InputEntry(this, InputEntryType.digitalButton, name); 
+				emap[vk] = e; 
+				entries ~= e; 
+			} 
+		} 
 		
 		this()
 		{
-			category = "kbd";
+			category = "kbd"; 
 			
 			void special(ref InputEntry e, string name, bool isState=false)
 			{
@@ -1084,88 +1084,88 @@ version(/+$DIDE_REGION+/all)
 					isState 	? InputEntryType.digitalState 
 						: InputEntryType.digitalButton,
 					name
-				);
-				entries ~= e;
-			}
+				); 
+				entries ~= e; 
+			} 
 			
-			special(eWin, "Win");
-			special(eCapsLockState, "CapsLockState", true);
-			special(eNumLockState	, "NumLockState" , true);
-			special(eScrLockState	, "ScrLockState" , true);
-			special(eMWUp	, "MWUp");
-			special(eMWDn	, "MWDn");
+			special(eWin, "Win"); 
+			special(eCapsLockState, "CapsLockState", true); 
+			special(eNumLockState	, "NumLockState" , true); 
+			special(eScrLockState	, "ScrLockState" , true); 
+			special(eMWUp	, "MWUp"); 
+			special(eMWDn	, "MWDn"); 
 			
 			//Top row
-			add(VK_ESCAPE, "Esc");
-			foreach(i; 0..24) add(VK_F1+i, "F"~text(i+1));
-			add(VK_SNAPSHOT, "PrtScn");
-			add(VK_SCROLL, "ScrLock");
-			add(VK_PAUSE, "Pause");
+			add(VK_ESCAPE, "Esc"); 
+			foreach(i; 0..24) add(VK_F1+i, "F"~text(i+1)); 
+			add(VK_SNAPSHOT, "PrtScn"); 
+			add(VK_SCROLL, "ScrLock"); 
+			add(VK_PAUSE, "Pause"); 
 			
 			//Numpad
-			add(VK_NUMLOCK, "NumLock");	add(VK_DIVIDE  , "Num/");	add(VK_MULTIPLY, "Num*");
-			add(VK_ADD    , "Num+");	add(VK_SUBTRACT, "Num-");	add(VK_DECIMAL , "Num.");
+			add(VK_NUMLOCK, "NumLock"); 	add(VK_DIVIDE  , "Num/"); 	add(VK_MULTIPLY, "Num*"); 
+			add(VK_ADD    , "Num+"); 	add(VK_SUBTRACT, "Num-"); 	add(VK_DECIMAL , "Num."); 
 			
-			foreach(i; 0..10) add(VK_NUMPAD0+i, "Num"~text(i));
+			foreach(i; 0..10) add(VK_NUMPAD0+i, "Num"~text(i)); 
 			//VK_RETURN is the same on NumPad.
 			
 			//Ins, Home...
-			add(VK_INSERT, "Ins");	add(VK_HOME, "Home");	add(VK_PRIOR, "PgUp"  );
-			add(VK_DELETE, "Del");	add(VK_END , "End" );	add(VK_NEXT , "PgDn");
+			add(VK_INSERT, "Ins"); 	add(VK_HOME, "Home"); 	add(VK_PRIOR, "PgUp"  ); 
+			add(VK_DELETE, "Del"); 	add(VK_END , "End" ); 	add(VK_NEXT , "PgDn"); 
 			
 			//Arrows
-			add(VK_UP  , "Up"  );	
-			add(VK_LEFT, "Left");	add(VK_DOWN, "Down");	add(VK_RIGHT, "Right");
+			add(VK_UP  , "Up"  ); 	
+			add(VK_LEFT, "Left"); 	add(VK_DOWN, "Down"); 	add(VK_RIGHT, "Right"); 
 			
 			//Special keys
-			add(VK_OEM_1, ";");	add(VK_OEM_2, "/");	add(VK_OEM_3, "`");
-			add(VK_OEM_4, "[");	add(VK_OEM_5, `\`);	add(VK_OEM_6, "]");
-			add(VK_OEM_7, "'");	add(VK_OEM_8, "OEM_8");	
-			add(VK_OEM_PLUS , "=");	add(VK_OEM_COMMA , ",");	
-			add(VK_OEM_MINUS, "-");	add(VK_OEM_PERIOD, ".");	
-			add(VK_OEM_102, "OEM_102");	//hosszu 'i' a magyaron
+			add(VK_OEM_1, ";"); 	add(VK_OEM_2, "/"); 	add(VK_OEM_3, "`"); 
+			add(VK_OEM_4, "["); 	add(VK_OEM_5, `\`); 	add(VK_OEM_6, "]"); 
+			add(VK_OEM_7, "'"); 	add(VK_OEM_8, "OEM_8"); 	
+			add(VK_OEM_PLUS , "="); 	add(VK_OEM_COMMA , ","); 	
+			add(VK_OEM_MINUS, "-"); 	add(VK_OEM_PERIOD, "."); 	
+			add(VK_OEM_102, "OEM_102"); 	//hosszu 'i' a magyaron
 			add(VK_APPS, "Menu"); 	//windows menu button
 			
 			//enter, bs, tab, caps, space
-			add(VK_RETURN, "Enter");	add(VK_BACK , "Backspace");	add(VK_CAPITAL, "CapsLock");
-			add(VK_TAB   , "Tab"  );	add(VK_SPACE, "Space"    );	
+			add(VK_RETURN, "Enter"); 	add(VK_BACK , "Backspace"); 	add(VK_CAPITAL, "CapsLock"); 
+			add(VK_TAB   , "Tab"  ); 	add(VK_SPACE, "Space"    ); 	
 			
 			//modifiers, win/menus
-			add(VK_SHIFT  , "Shift");	add(VK_LSHIFT  , "LShift");	add(VK_RSHIFT  , "RShift");
-			add(VK_CONTROL, "Ctrl"	);	add(VK_LCONTROL, "LCtrl"	);	add(VK_RCONTROL, "RCtrl"	);
-			add(VK_MENU   , "Alt"	);	add(VK_LMENU	  , "LAlt"	);	add(VK_RMENU		, "RAlt"	);
-			 add(VK_LWIN	  , "LWin"	);	add(VK_RWIN	  , "RWin"	);	//Win is added	manually
+			add(VK_SHIFT  , "Shift"); 	add(VK_LSHIFT  , "LShift"); 	add(VK_RSHIFT  , "RShift"); 
+			add(VK_CONTROL, "Ctrl"	); 	add(VK_LCONTROL, "LCtrl"	); 	add(VK_RCONTROL, "RCtrl"	); 
+			add(VK_MENU   , "Alt"	); 	add(VK_LMENU	  , "LAlt"	); 	add(VK_RMENU		, "RAlt"	); 
+			 add(VK_LWIN	  , "LWin"	); 	add(VK_RWIN	  , "RWin"	); 	//Win is added	manually
 			
 			//AlphaNumerics
 			foreach(i; 0..10) add('0'+i, text(i)); //numbers
 			foreach(char i; 'A'..'Z'+1) { add(i, to!string(i)); }
 			
 			//Mouse
-			add(VK_LBUTTON , "LMB");	add(VK_RBUTTON , "RMB");	add(VK_MBUTTON, "MMB");
-			add(VK_XBUTTON1, "MB4");	add(VK_XBUTTON2, "MB5");	//back, fwd buttons on mouse
+			add(VK_LBUTTON , "LMB"); 	add(VK_RBUTTON , "RMB"); 	add(VK_MBUTTON, "MMB"); 
+			add(VK_XBUTTON1, "MB4"); 	add(VK_XBUTTON2, "MB5"); 	//back, fwd buttons on mouse
 			
 			//Multimedia
-			add(7, "XBox");//Ubdocumented xbox guide bitton
-			add(VK_LAUNCH_MAIL, "Mail");
-			add(VK_LAUNCH_MEDIA_SELECT, "Media");
-			add(VK_LAUNCH_APP1, "App1");
-			add(VK_LAUNCH_APP2, "App2");
+			add(7, "XBox"); //Ubdocumented xbox guide bitton
+			add(VK_LAUNCH_MAIL, "Mail"); 
+			add(VK_LAUNCH_MEDIA_SELECT, "Media"); 
+			add(VK_LAUNCH_APP1, "App1"); 
+			add(VK_LAUNCH_APP2, "App2"); 
 			
-			add(VK_VOLUME_DOWN, "Vol-");
-			add(VK_VOLUME_UP, "Vol+");
-			add(VK_VOLUME_MUTE, "Mute");
-			add(VK_MEDIA_NEXT_TRACK, "Next");
-			add(VK_MEDIA_PREV_TRACK, "Prev");
-			add(VK_MEDIA_STOP, "Stop");
-			add(VK_MEDIA_PLAY_PAUSE, "Play");
+			add(VK_VOLUME_DOWN, "Vol-"); 
+			add(VK_VOLUME_UP, "Vol+"); 
+			add(VK_VOLUME_MUTE, "Mute"); 
+			add(VK_MEDIA_NEXT_TRACK, "Next"); 
+			add(VK_MEDIA_PREV_TRACK, "Prev"); 
+			add(VK_MEDIA_STOP, "Stop"); 
+			add(VK_MEDIA_PLAY_PAUSE, "Play"); 
 			
-			add(VK_BROWSER_BACK, "Back");
-			add(VK_BROWSER_FORWARD, "Forward");
-			add(VK_BROWSER_REFRESH, "Refresh");
-			add(VK_BROWSER_STOP,	"BrStop");
-			add(VK_BROWSER_SEARCH, "Search");
-			add(VK_BROWSER_FAVORITES, "Favorites");
-			add(VK_BROWSER_HOME, "HomePage");
+			add(VK_BROWSER_BACK, "Back"); 
+			add(VK_BROWSER_FORWARD, "Forward"); 
+			add(VK_BROWSER_REFRESH, "Refresh"); 
+			add(VK_BROWSER_STOP,	"BrStop"); 
+			add(VK_BROWSER_SEARCH, "Search"); 
+			add(VK_BROWSER_FAVORITES, "Favorites"); 
+			add(VK_BROWSER_HOME, "HomePage"); 
 			
 			
 			//Todo: add multimedia keys
@@ -1205,52 +1205,52 @@ version(/+$DIDE_REGION+/all)
 				 add(VK_OEM_CLEAR, "VK_OEM_CLEAR");
 			*/
 			
-			initMaps;
-		}
+			initMaps; 
+		} 
 		override void update()
 		{
 			//this sucks when not in focus, or the mouse is not moving over it -> GetKeyboardState(&keys[0]);
 			
-			const t0 = QPS;
+			const t0 = QPS; 
 			foreach(vk; 0..256)
 			if(emap[vk]) {
-				const s = GetAsyncKeyState(vk);
-				keys[vk] = cast(ubyte)(s>>8);
+				const s = GetAsyncKeyState(vk); 
+				keys[vk] = cast(ubyte)(s>>8); 
 			}
 			
 			
-			static ubyte shrink(int a) { return a&1 | (a>>8) & 0x80; }
+			static ubyte shrink(int a) { return a&1 | (a>>8) & 0x80; } 
 			
-			foreach(vk; [VK_CAPITAL, VK_SCROLL, VK_NUMLOCK]) keys[vk] = shrink(GetKeyState(vk));
+			foreach(vk; [VK_CAPITAL, VK_SCROLL, VK_NUMLOCK]) keys[vk] = shrink(GetKeyState(vk)); 
 			
-			int[] ks;
+			int[] ks; 
 			foreach(vk; 0..256) {
-				int down = keys[vk]&0x80 ? 1 : 0;
+				int down = keys[vk]&0x80 ? 1 : 0; 
 				if(emap[vk]) { emap[vk].value = down; }
-				if(down) ks ~= vk;
+				if(down) ks ~= vk; 
 			}
 			
-			virtualKeysDown = ks;
+			virtualKeysDown = ks; 
 			
 			//manual things
 			eWin.value = max(emap[VK_LWIN].value, emap[VK_RWIN].value); //Win = LWin || RWin
 			
-			eCapsLockState.value = keys[VK_CAPITAL]&1;
-			eNumLockState .value = keys[VK_NUMLOCK]&1;
-			eScrLockState .value = keys[VK_SCROLL ]&1;
+			eCapsLockState.value = keys[VK_CAPITAL]&1; 
+			eNumLockState .value = keys[VK_NUMLOCK]&1; 
+			eScrLockState .value = keys[VK_SCROLL ]&1; 
 			
 			//eMWUp and eMWDn is updated from the mouse handler
 			
 			//foreach(int i; 0..256) if(keys[i]&0x80) write(" ", i); writeln;
 			
 			//print(QPS-t0);
-		}
+		} 
 		
 		ubyte strToVk(string key)
-		{ return _nameToVk.get(key, ubyte(0)); }
+		{ return _nameToVk.get(key, ubyte(0)); } 
 		string vkToStr(ubyte vk)
-		{ return _vkToName.get(vk, ""); }
-	}
+		{ return _vkToName.get(vk, ""); } 
+	} 
 	
 	
 	/////////////////////////////////////////////////////////////////////////////
@@ -1259,52 +1259,52 @@ version(/+$DIDE_REGION+/all)
 	
 	class MouseInputHandler: InputHandlerBase
 	{
-		private:
-			InputEntry mx, my, mw, mxr, myr, mwUp, mwDn;
-			static float wheelDeltaAccum = 0;
-		public:
+		private: 
+			InputEntry mx, my, mw, mxr, myr, mwUp, mwDn; 
+			static float wheelDeltaAccum = 0; 
+		public: 
 			this()
 		{
-			category = "mouse";
+			category = "mouse"; 
 			
-			mx = new InputEntry(this, InputEntryType.absolute, "MX");
-			my = new InputEntry(this, InputEntryType.absolute, "MY");
-			mw = new InputEntry(this, InputEntryType.delta   , "MW");
+			mx = new InputEntry(this, InputEntryType.absolute, "MX"); 
+			my = new InputEntry(this, InputEntryType.absolute, "MY"); 
+			mw = new InputEntry(this, InputEntryType.delta   , "MW"); 
 			
-			mxr = new InputEntry(this, InputEntryType.delta, "MXraw");
-			myr = new InputEntry(this, InputEntryType.delta, "MYraw");
+			mxr = new InputEntry(this, InputEntryType.delta, "MXraw"); 
+			myr = new InputEntry(this, InputEntryType.delta, "MYraw"); 
 			
-			entries ~= [mx, my, mw, mxr, myr];
-		}
+			entries ~= [mx, my, mw, mxr, myr]; 
+		} 
 		
 			override void update()
 		{
 			if(application.handle) {
-				auto st = DInput.getMouseState;
-				mxr.value += st.lX;
-				myr.value += st.lY;
+				auto st = DInput.getMouseState; 
+				mxr.value += st.lX; 
+				myr.value += st.lY; 
 			}
 			if(slowMouseEnabled) {
-				slowMouseUpdate;
-				mx.value = slowMousePos.x;
-				my.value = slowMousePos.y;
+				slowMouseUpdate; 
+				mx.value = slowMousePos.x; 
+				my.value = slowMousePos.y; 
 			}
 			else {
-				POINT p;
+				POINT p; 
 				if(GetCursorPos(&p)) {
-					mx.value = p.x;
-					my.value = p.y;
+					mx.value = p.x; 
+					my.value = p.y; 
 				}
 			}
-			mw.value += wheelDeltaAccum;wheelDeltaAccum = 0;
+			mw.value += wheelDeltaAccum; wheelDeltaAccum = 0; 
 			
 			//mouseWheel up/down as buttons
 			if(mwUp is null)
 			{ mwUp = inputs["MWUp"]; mwDn = inputs["MWDn"]; }
-			mwUp.value = mw.delta>0 ? 1 : 0;
-			mwDn.value = mw.delta<0 ? 1 : 0;
-		}
-	}
+			mwUp.value = mw.delta>0 ? 1 : 0; 
+			mwDn.value = mw.delta<0 ? 1 : 0; 
+		} 
+	} 
 	
 	//DirectInput mouse & gamepad ///////////////////////////////////////////////////
 	
@@ -1332,20 +1332,20 @@ version(/+$DIDE_REGION+/all)
 		DIDFT_NODATA	= 0x80,
 		DIDFT_ANYINSTANCE	= 0x00FF_FF00,
 		DIDFT_INSTANCEMASK	= DIDFT_ANYINSTANCE,
-		DIDFT_OPTIONAL	= 0x8000_0000;
+		DIDFT_OPTIONAL	= 0x8000_0000; 
 		
-		struct SysMouse {}	mixin(uuid!(SysMouse, "6F1D2B60-D5A0-11CF-BFC7-444553540000"));
-		struct XAxis	 {}	mixin(uuid!(XAxis , "A36D02E0-C9F3-11CF-BFC7-444553540000"));
-		struct YAxis	 {}	mixin(uuid!(YAxis , "A36D02E1-C9F3-11CF-BFC7-444553540000"));
-		struct ZAxis	 {}	mixin(uuid!(ZAxis , "A36D02E2-C9F3-11CF-BFC7-444553540000"));
-		struct RxAxis	 {}	mixin(uuid!(RxAxis, "A36D02F4-C9F3-11CF-BFC7-444553540000"));
-		struct RyAxis	 {}	mixin(uuid!(RyAxis, "A36D02F5-C9F3-11CF-BFC7-444553540000"));
-		struct RzAxis	 {}	mixin(uuid!(RzAxis, "A36D02E3-C9F3-11CF-BFC7-444553540000"));
-		struct Slider	 {}	mixin(uuid!(Slider, "A36D02E4-C9F3-11CF-BFC7-444553540000"));
-		struct Button	 {}	mixin(uuid!(Button, "A36D02F0-C9F3-11CF-BFC7-444553540000"));
-		struct Key	 {}	mixin(uuid!(Key, "55728220-D33C-11CF-BFC7-444553540000"));
-		struct Pov	 {}	mixin(uuid!(Pov, "A36D02F2-C9F3-11CF-BFC7-444553540000"));
-		struct Unknown {}	mixin(uuid!(Unknown,"A36D02F3-C9F3-11CF-BFC7-444553540000"));
+		struct SysMouse {} 	mixin(uuid!(SysMouse, "6F1D2B60-D5A0-11CF-BFC7-444553540000")); 
+		struct XAxis	 {} 	mixin(uuid!(XAxis , "A36D02E0-C9F3-11CF-BFC7-444553540000")); 
+		struct YAxis	 {} 	mixin(uuid!(YAxis , "A36D02E1-C9F3-11CF-BFC7-444553540000")); 
+		struct ZAxis	 {} 	mixin(uuid!(ZAxis , "A36D02E2-C9F3-11CF-BFC7-444553540000")); 
+		struct RxAxis	 {} 	mixin(uuid!(RxAxis, "A36D02F4-C9F3-11CF-BFC7-444553540000")); 
+		struct RyAxis	 {} 	mixin(uuid!(RyAxis, "A36D02F5-C9F3-11CF-BFC7-444553540000")); 
+		struct RzAxis	 {} 	mixin(uuid!(RzAxis, "A36D02E3-C9F3-11CF-BFC7-444553540000")); 
+		struct Slider	 {} 	mixin(uuid!(Slider, "A36D02E4-C9F3-11CF-BFC7-444553540000")); 
+		struct Button	 {} 	mixin(uuid!(Button, "A36D02F0-C9F3-11CF-BFC7-444553540000")); 
+		struct Key	 {} 	mixin(uuid!(Key, "55728220-D33C-11CF-BFC7-444553540000")); 
+		struct Pov	 {} 	mixin(uuid!(Pov, "A36D02F2-C9F3-11CF-BFC7-444553540000")); 
+		struct Unknown {} 	mixin(uuid!(Unknown,"A36D02F3-C9F3-11CF-BFC7-444553540000")); 
 		
 		enum DI8DEVCLASS:uint {
 			ALL	= 0,
@@ -1353,51 +1353,51 @@ version(/+$DIDE_REGION+/all)
 			POINTER	= 2,
 			KEYBOARD	= 3,
 			GAMECTRL	= 4
-		}
+		} 
 		enum DIEDFL_ALLDEVICES	= 0x00000000,
 		DIEDFL_ATTACHEDONLY	= 0x00000001,
 		DIEDFL_FORCEFEEDBACK	= 0x00000100,
 		DIEDFL_INCLUDEALIASES	= 0x00010000,
 		DIEDFL_INCLUDEPHANTOMS	= 0x00020000,
-		DIEDFL_INCLUDEHIDDEN	= 0x00040000;
+		DIEDFL_INCLUDEHIDDEN	= 0x00040000; 
 		
 		struct DIDeviceInstanceA
 		{
-			align(1):
-			uint dwSize;
-			GUID guidInstance;
-			GUID guidProduct;
-			uint dwDevType;
-			char[MAX_PATH] tszInstanceName;
-			char[MAX_PATH] tszProductName;
-			GUID guidFFDriver;
-			ushort wUsagePage;
-			ushort wUsage;
-		}
+			align(1): 
+			uint dwSize; 
+			GUID guidInstance; 
+			GUID guidProduct; 
+			uint dwDevType; 
+			char[MAX_PATH] tszInstanceName; 
+			char[MAX_PATH] tszProductName; 
+			GUID guidFFDriver; 
+			ushort wUsagePage; 
+			ushort wUsage; 
+		} 
 		
-		alias DIEnumDevicesCallbackA = extern(Windows) bool function(in DIDeviceInstanceA ddi, void* pvRef);
+		alias DIEnumDevicesCallbackA = extern(Windows) bool function(in DIDeviceInstanceA ddi, void* pvRef); 
 		
 		struct DIDeviceObjectInstanceA
 		{
-			align(1):
-			uint dwSize;
-			GUID guidType;
-			uint dwOfs, dwType, dwFlags;
-			char[MAX_PATH] tszName;
-			uint dwFFMaxForce, dwFFForceResolution;
-			ushort wCollectionNumber, wDesignatorIndex, wUsagePage, wUsage;
-			uint dwDimension;
-			ushort wExponent, wReportId;
-		}
+			align(1): 
+			uint dwSize; 
+			GUID guidType; 
+			uint dwOfs, dwType, dwFlags; 
+			char[MAX_PATH] tszName; 
+			uint dwFFMaxForce, dwFFForceResolution; 
+			ushort wCollectionNumber, wDesignatorIndex, wUsagePage, wUsage; 
+			uint dwDimension; 
+			ushort wExponent, wReportId; 
+		} 
 		
-		alias DIEnumDeviceObjectsCallbackA = extern(Windows) bool function(in DIDeviceObjectInstanceA ddoi, void* pvRef);
+		alias DIEnumDeviceObjectsCallbackA = extern(Windows) bool function(in DIDeviceObjectInstanceA ddoi, void* pvRef); 
 		
-		mixin(uuid!(IDirectInput8A, "BF798030-483A-4DA2-AA99-5D64ED369700"));
+		mixin(uuid!(IDirectInput8A, "BF798030-483A-4DA2-AA99-5D64ED369700")); 
 		interface    IDirectInput8A : IUnknown
 		{
-			extern(Windows):
-			HRESULT CreateDevice(REFIID rguid, out IDirectInputDeviceA device, IUnknown pUnkOuter);
-			HRESULT EnumDevices(DI8DEVCLASS dwDevType, DIEnumDevicesCallbackA lpCallback, void* pvRef, uint dwFlags);
+			extern(Windows): 
+			HRESULT CreateDevice(REFIID rguid, out IDirectInputDeviceA device, IUnknown pUnkOuter); 
+			HRESULT EnumDevices(DI8DEVCLASS dwDevType, DIEnumDevicesCallbackA lpCallback, void* pvRef, uint dwFlags); 
 			/*
 				  function GetDeviceStatus(const rguidInstance: TGUID): HResult; stdcall;
 				function RunControlPanel(hwndOwner: HWND; dwFlags: DWORD): HResult; stdcall;
@@ -1408,40 +1408,40 @@ version(/+$DIDE_REGION+/all)
 				function ConfigureDevices(lpdiCallback: TDIConfigureDevicesCallback; const lpdiCDParams: TDIConfigureDevicesParamsA; 
 					dwFlags: DWORD; pvRefData: Pointer): HResult; stdcall;
 			*/
-		}
+		} 
 		
 		struct DIObjectDataFormat
 		{
-			PGUID pguid;
-			uint dwOfs, dwType, dwFlags;
-		}
+			PGUID pguid; 
+			uint dwOfs, dwType, dwFlags; 
+		} 
 		
 		struct DIDataFormat
 		{
-			uint dwSize, dwObjSize, dwFlags, dwDataSize, dwNumObjs;
-			const DIObjectDataFormat* rgodf;
-		}
+			uint dwSize, dwObjSize, dwFlags, dwDataSize, dwNumObjs; 
+			const DIObjectDataFormat* rgodf; 
+		} 
 		
 		const DIObjectDataFormat[11] rgodfDIMouse2 = 
 			[
-			{ &IID_XAxis, 0, DIDFT_AXIS | DIDFT_ANYINSTANCE, 0 },
-			{ &IID_YAxis, 4, DIDFT_AXIS | DIDFT_ANYINSTANCE, 0 },
-			{ &IID_ZAxis, 8, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 12, DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0 },
-			{ null, 13, DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0 },
-			{ null, 14, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 15, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 16, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 17, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 18, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 19, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-		];
+			{ &IID_XAxis, 0, DIDFT_AXIS | DIDFT_ANYINSTANCE, 0},
+			{ &IID_YAxis, 4, DIDFT_AXIS | DIDFT_ANYINSTANCE, 0},
+			{ &IID_ZAxis, 8, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 12, DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0},
+			{ null, 13, DIDFT_BUTTON | DIDFT_ANYINSTANCE, 0},
+			{ null, 14, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 15, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 16, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 17, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 18, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 19, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		]; 
 		
 		struct DIMouseState
 		{
-			int lX, lY, lZ;
-			ubyte[8] rgbButtons;
-		}
+			int lX, lY, lZ; 
+			ubyte[8] rgbButtons; 
+		} 
 		
 		const c_dfDIMouse2 = DIDataFormat(
 			DIDataFormat.sizeof,
@@ -1450,67 +1450,67 @@ version(/+$DIDE_REGION+/all)
 			DIMouseState.sizeof,
 			rgodfDIMouse2.length,
 			rgodfDIMouse2.ptr
-		);
+		); 
 		
 		const DIObjectDataFormat[44] rgodfDIJoystick =
 			[
-			{ &IID_XAxis ,	 0, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
-			{ &IID_YAxis ,	 4, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
-			{ &IID_ZAxis ,	 8, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
-			{ &IID_RxAxis, 12, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
-			{ &IID_RyAxis, 16, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
-			{ &IID_RzAxis, 20, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
+			{ &IID_XAxis ,	 0, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
+			{ &IID_YAxis ,	 4, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
+			{ &IID_ZAxis ,	 8, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
+			{ &IID_RxAxis, 12, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
+			{ &IID_RyAxis, 16, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
+			{ &IID_RzAxis, 20, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
 			//2 Sliders
-			{ &IID_Slider, 24, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
-			{ &IID_Slider, 28, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION },
+			{ &IID_Slider, 24, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
+			{ &IID_Slider, 28, DIDFT_AXIS | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, DIDOI_ASPECTPOSITION},
 			//4 POVs (yes, really)
-			{ &IID_Pov, 32, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ &IID_Pov, 36, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ &IID_Pov, 40, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ &IID_Pov, 44, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
+			{ &IID_Pov, 32, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ &IID_Pov, 36, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ &IID_Pov, 40, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ &IID_Pov, 44, DIDFT_POV | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
 			//Buttons
-			{ null, 48+ 0, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 1, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 2, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 3, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 4, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 5, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 6, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 7, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 8, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+ 9, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+10, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+11, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+12, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+13, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+14, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+15, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+16, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+17, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+18, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+19, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+20, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+21, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+22, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+23, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+24, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+25, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+26, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+27, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+28, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+29, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+30, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-			{ null, 48+31, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0 },
-		];
+			{ null, 48+ 0, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 1, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 2, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 3, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 4, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 5, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 6, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 7, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 8, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+ 9, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+10, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+11, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+12, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+13, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+14, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+15, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+16, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+17, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+18, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+19, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+20, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+21, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+22, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+23, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+24, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+25, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+26, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+27, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+28, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+29, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+30, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+			{ null, 48+31, DIDFT_BUTTON | DIDFT_ANYINSTANCE | DIDFT_OPTIONAL, 0},
+		]; 
 		
 		struct DIJoystickState
 		{
-			align(1):
-			int X=0x7fff, Y=0x7fff, Z=0x7fff, Rx=0x7fff, Ry=0x7fff, Rz=0x7fff;
-			int[2] Slider;
-			int[4] Pov = [-1, -1, -1, -1];
-			ubyte[32] Button;
-		}
+			align(1): 
+			int X=0x7fff, Y=0x7fff, Z=0x7fff, Rx=0x7fff, Ry=0x7fff, Rz=0x7fff; 
+			int[2] Slider; 
+			int[4] Pov = [-1, -1, -1, -1]; 
+			ubyte[32] Button; 
+		} 
 		
 		const c_dfDIJoystick = DIDataFormat(
 			DIDataFormat.sizeof,
@@ -1519,60 +1519,60 @@ version(/+$DIDE_REGION+/all)
 			DIJoystickState.sizeof,
 			rgodfDIJoystick.length,
 			rgodfDIJoystick.ptr
-		);
+		); 
 		
-		mixin(uuid!(IDirectInputDeviceA, "5944E680-C92E-11CF-BFC7-444553540000"));
+		mixin(uuid!(IDirectInputDeviceA, "5944E680-C92E-11CF-BFC7-444553540000")); 
 		interface    IDirectInputDeviceA : IUnknown
 		{
-			extern(Windows):
-			void _dummy0();//function GetCapabilities(var lpDIDevCaps: TDIDevCaps): HResult; stdcall;
-			HRESULT EnumObjects(DIEnumDeviceObjectsCallbackA cb, void* pvRef, uint dwFlags);
-			void _dummy2();//function GetProperty(rguidProp: PGUID; var pdiph: TDIPropHeader): HResult; stdcall;
-			void _dummy3();//function SetProperty(rguidProp: PGUID; const pdiph: TDIPropHeader): HResult; stdcall;
-			HRESULT Acquire();
-			HRESULT Unacquire();
-			HRESULT GetDeviceState(uint cbData, void* lpvData);
-			void _dummy4();/+
+			extern(Windows): 
+			void _dummy0(); //function GetCapabilities(var lpDIDevCaps: TDIDevCaps): HResult; stdcall;
+			HRESULT EnumObjects(DIEnumDeviceObjectsCallbackA cb, void* pvRef, uint dwFlags); 
+			void _dummy2(); //function GetProperty(rguidProp: PGUID; var pdiph: TDIPropHeader): HResult; stdcall;
+			void _dummy3(); //function SetProperty(rguidProp: PGUID; const pdiph: TDIPropHeader): HResult; stdcall;
+			HRESULT Acquire(); 
+			HRESULT Unacquire(); 
+			HRESULT GetDeviceState(uint cbData, void* lpvData); 
+			void _dummy4(); /+
 				function GetDeviceData(cbObjectData: DWORD; rgdod: PDIDeviceObjectData; 
 				out pdwInOut: DWORD; dwFlags: DWORD): HResult; stdcall;
 			+/
-			HRESULT SetDataFormat(in DIDataFormat didf);
-			void _dummy5();//function SetEventNotification(hEvent: THandle): HResult; stdcall;
-			HRESULT SetCooperativeLevel(HWND hwnd, uint dwFlags);
-			void _dummy6();//function GetObjectInfo(var pdidoi: TDIDeviceObjectInstanceA; dwObj, dwHow: DWORD): HResult; stdcall;
-			void _dummy7();//function GetDeviceInfo(var pdidi: TDIDeviceInstanceA): HResult; stdcall;
-			void _dummy8();//function RunControlPanel(hwndOwner: HWND; dwFlags: DWORD): HResult; stdcall;
-			void _dummy9();//function Initialize(hinst: THandle; dwVersion: DWORD; const rguid: TGUID): HResult; stdcall;
-		}
+			HRESULT SetDataFormat(in DIDataFormat didf); 
+			void _dummy5(); //function SetEventNotification(hEvent: THandle): HResult; stdcall;
+			HRESULT SetCooperativeLevel(HWND hwnd, uint dwFlags); 
+			void _dummy6(); //function GetObjectInfo(var pdidoi: TDIDeviceObjectInstanceA; dwObj, dwHow: DWORD): HResult; stdcall;
+			void _dummy7(); //function GetDeviceInfo(var pdidi: TDIDeviceInstanceA): HResult; stdcall;
+			void _dummy8(); //function RunControlPanel(hwndOwner: HWND; dwFlags: DWORD): HResult; stdcall;
+			void _dummy9(); //function Initialize(hinst: THandle; dwVersion: DWORD; const rguid: TGUID): HResult; stdcall;
+		} 
 		
 		
-		alias DInput = Singleton!DInputWrapper;
-	}
+		alias DInput = Singleton!DInputWrapper; 
+	} 
 }
 version(/+$DIDE_REGION+/all)
 {
 	class DInputWrapper
 	{
-		private:
-			const bool loaded;
+		private: 
+			const bool loaded; 
 			extern(Windows)
 		{
 			HRESULT function(
 				HINSTANCE hinst, uint dwVersion, REFIID riidltf, 
 				out IDirectInput8A ppvOut, IUnknown punkOuter
-			) DirectInput8Create;
-		}
+			) DirectInput8Create; 
+		} 
 		
-			IDirectInput8A directInput8;
-			IDirectInputDeviceA directMouse, directJoystick;
+			IDirectInput8A directInput8; 
+			IDirectInputDeviceA directMouse, directJoystick; 
 		
 			static string nameOf(in GUID g)
 		{
 			static foreach(s; "XAxis,YAxis,ZAxis,RxAxis,RyAxis,RzAxis,Slider,Button,Key,Pov".split(','))
 			{ mixin("if(g==IID_%s) return `%s`;".format(s, s)); }
-			import std.uuid;
-			return (cast(UUID)g).toString;
-		}
+			import std.uuid; 
+			return (cast(UUID)g).toString; 
+		} 
 		
 			void enumObjects(IDirectInputDeviceA dev)
 		{
@@ -1584,95 +1584,95 @@ version(/+$DIDE_REGION+/all)
 					doi.dwType>>8, 
 					doi.dwFlags, 
 					doi.tszName.toStr
-				);
-				return true;//continue or not
-			}
+				); 
+				return true; //continue or not
+			} 
 			
 			enforce(
 				S_OK == dev.EnumObjects(&enumCB, null, 0/*DIDFT_ALL*/),
 				"directInputDevice.EnumObjects() fail"
-			);
-			readln;
-		}
+			); 
+			readln; 
+		} 
 		
 			void initMouse()
 		{
 			enforce(
 				S_OK == directInput8.CreateDevice(&IID_SysMouse, directMouse, null), 
 				"directInput8.CreateDevice(SysMouse) fail"
-			);
+			); 
 			enforce(
 				application.handle !is null, 
 				"DXMouse initialization error: no mainForm present."
-			);
+			); 
 			enforce(
 				S_OK == directMouse.SetCooperativeLevel(
 					application.handle,
 					DISCL_BACKGROUND | DISCL_NONEXCLUSIVE
 				), 
 				"directMouse.SetCooperativeLevel() fail"
-			);
+			); 
 			enforce(
 				S_OK == directMouse.SetDataFormat(c_dfDIMouse2), 
 				"directMouse.SetDataFormat() fail"
-			);
+			); 
 			enforce(
 				S_OK == directMouse.Acquire, 
 				"directMouse.acquire() fail"
-			);
-		}
+			); 
+		} 
 		
 			bool initJoystick()
 		{
-			GUID guidJoystick;
+			GUID guidJoystick; 
 			static extern(Windows) bool enumCB(in DIDeviceInstanceA ddi, void* pvRef)
 			{
 				/+
 					writeln(ddi.guidInstance, " : ", ddi.tszInstanceName.toStr, " / ", 
 									ddi.tszProductName.toStr, " ", ddi.wUsagePage, " ", ddi.wUsage);
 				+/
-				*(cast(GUID*)pvRef) = ddi.guidInstance;
-				return false;//continue or not
-			}
+				*(cast(GUID*)pvRef) = ddi.guidInstance; 
+				return false; //continue or not
+			} 
 			enforce(
 				S_OK == directInput8.EnumDevices(DI8DEVCLASS.GAMECTRL, &enumCB, &guidJoystick, DIEDFL_ALLDEVICES), 
 				"directInput8.EnumDevices(Joystick) fail"
-			);
-			if(guidJoystick==GUID.init) return false;
+			); 
+			if(guidJoystick==GUID.init) return false; 
 			
 			//writeln("Joystick GUID: ", guidJoystick);
 			enforce(
 				S_OK == directInput8.CreateDevice(&guidJoystick, directJoystick, null), 
 				"directInput8.CreateDevice(Joystick) fail"
-			);
-			enforce(application.handle !is null, "DXJoystick initialization error: no mainForm present.");
+			); 
+			enforce(application.handle !is null, "DXJoystick initialization error: no mainForm present."); 
 			enforce(
 				S_OK == directJoystick.SetCooperativeLevel(application.handle, DISCL_BACKGROUND | DISCL_NONEXCLUSIVE), 
 				"directJoystick.SetCooperativeLevel() fail"
-			);
+			); 
 			
 			//enumObjects(directJoystick);
 			
 			enforce(
 				S_OK == directJoystick.SetDataFormat(c_dfDIJoystick), 
 				"directJoystick.SetDataFormat() fail"
-			);
+			); 
 			enforce(
 				S_OK == directJoystick.Acquire, 
 				"directJoystick.acquire() fail"
-			);
+			); 
 			
 			//writeln("Joystick Init");
-			return true;
-		}
+			return true; 
+		} 
 		
-		public:
+		public: 
 			this()
 		{
-			enum dllName = "dinput8.dll";
-			auto m = loadLibrary(dllName, false);
+			enum dllName = "dinput8.dll"; 
+			auto m = loadLibrary(dllName, false); 
 			if(m) {
-				m.getProcAddress("DirectInput8Create", DirectInput8Create);
+				m.getProcAddress("DirectInput8Create", DirectInput8Create); 
 				enforce(
 					S_OK == DirectInput8Create(
 						GetModuleHandle(null), 
@@ -1680,834 +1680,834 @@ version(/+$DIDE_REGION+/all)
 						&IID_IDirectInput8A, directInput8, null
 					), 
 					"DirectInput8Create() fail"
-				);
+				); 
 				
-				initMouse;
-				initJoystick;
-				loaded = true;
+				initMouse; 
+				initJoystick; 
+				loaded = true; 
 			}
-		}
+		} 
 		
 			auto getMouseState()
 		{
-			DIMouseState ms;
+			DIMouseState ms; 
 			if(directMouse !is null) {
-				directMouse.Acquire;
-				directMouse.GetDeviceState(ms.sizeof, &ms);
+				directMouse.Acquire; 
+				directMouse.GetDeviceState(ms.sizeof, &ms); 
 			}
-			return ms;
-		}
+			return ms; 
+		} 
 		
 			auto getJoystickState()
 		{
-			DIJoystickState js;
+			DIJoystickState js; 
 			if(directJoystick !is null) {
-				directJoystick.Acquire;
-				directJoystick.GetDeviceState(js.sizeof, &js);
+				directJoystick.Acquire; 
+				directJoystick.GetDeviceState(js.sizeof, &js); 
 			}
-			return js;
-		}
+			return js; 
+		} 
 		
 			~this()
 		{
 			if(loaded) {
-				directMouse.Unacquire;
-				directMouse.SafeRelease;
-				directInput8.SafeRelease;
+				directMouse.Unacquire; 
+				directMouse.SafeRelease; 
+				directInput8.SafeRelease; 
 			}
-		}
-	}
+		} 
+	} 
 	
 	version(/+$DIDE_REGION Slow/Locked Mouse+/all)
 	{
 		auto rawMousePos  ()
-		{ return vec2(inputs.MXraw.value, inputs.MYraw.value); };
+		{ return vec2(inputs.MXraw.value, inputs.MYraw.value); } ; 
 		auto rawMouseDelta()
-		{ return vec2(inputs.MXraw.delta, inputs.MYraw.delta); };
+		{ return vec2(inputs.MXraw.delta, inputs.MYraw.delta); } ; 
 		
 		void mouseLock(ivec2 pos)
 		{
 			with(pos) {
 				//clamp to the screen, otherwise winapi will unlock the mouse
-				RECT r;
-				GetWindowRect(GetDesktopWindow, &r);
-				pos.x = pos.x.clamp(r.left, r.right-1);
-				pos.y = pos.y.clamp(r.top, r.bottom-1);
+				RECT r; 
+				GetWindowRect(GetDesktopWindow, &r); 
+				pos.x = pos.x.clamp(r.left, r.right-1); 
+				pos.y = pos.y.clamp(r.top, r.bottom-1); 
 				
-				r = RECT(x, y, x+1, y+1);
-				ClipCursor(&r);
+				r = RECT(x, y, x+1, y+1); 
+				ClipCursor(&r); 
 			}
-		}
+		} 
 		
 		void mouseLock(in vec2 pos)
-		{ mouseLock(pos.ifloor); }
+		{ mouseLock(pos.ifloor); } 
 		
 		void mouseLock()
-		{ mouseLock(winMousePos); }
+		{ mouseLock(winMousePos); } 
 		
 		void mouseUnlock()
-		{ ClipCursor(null); }
+		{ ClipCursor(null); } 
 		
 		void slowMouse(bool enabled, float speed=0.25f)
 		{
-			slowMouseSpeed = speed;
+			slowMouseSpeed = speed; 
 			
-			if(slowMouseEnabled==enabled) return;
-			slowMouseEnabled = enabled;
-			slowMousePos = winMousePos + vec2(0.5, 0.5);
-			if(enabled) mouseLock(winMousePos);
-			else mouseUnlock;
-		}
+			if(slowMouseEnabled==enabled) return; 
+			slowMouseEnabled = enabled; 
+			slowMousePos = winMousePos + vec2(0.5, 0.5); 
+			if(enabled) mouseLock(winMousePos); 
+			else mouseUnlock; 
+		} 
 		
 		void mouseMoveRel(float dx, float dy)
 		{
-			if(!dx && !dy) return;
+			if(!dx && !dy) return; 
 			
 			if(slowMouseEnabled) { slowMousePos += vec2(dx, dy); }
 			else {
-				POINT p; GetCursorPos(&p);
-				SetCursorPos(p.x+dx.iround, p.y+dy.iround);
+				POINT p; GetCursorPos(&p); 
+				SetCursorPos(p.x+dx.iround, p.y+dy.iround); 
 			}
-		}
+		} 
 		
 		void mouseMoveRel(in vec2 d)
-		{ mouseMoveRel(d.x, d.y); }
+		{ mouseMoveRel(d.x, d.y); } 
 		void mouseMoveRelX(float dx)
-		{ mouseMoveRel(dx, 0); }
+		{ mouseMoveRel(dx, 0); } 
 		void mouseMoveRelY(float dy)
-		{ mouseMoveRel(0, dy); }
+		{ mouseMoveRel(0, dy); } 
 		
 		private __gshared
 		{
-			bool slowMouseEnabled;
-			float slowMouseSpeed;
-			vec2 slowMousePos;
+			bool slowMouseEnabled; 
+			float slowMouseSpeed; 
+			vec2 slowMousePos; 
 			
 			void slowMouseUpdate()
 			{
 				if(slowMouseEnabled)
 				{
-					slowMousePos += rawMouseDelta*slowMouseSpeed;
+					slowMousePos += rawMouseDelta*slowMouseSpeed; 
 					
 					//clamp to screen
-					RECT r;
-					GetWindowRect(GetDesktopWindow, &r);
-					slowMousePos.x = slowMousePos.x.clamp(r.left, r.right-0.01f);
-					slowMousePos.y = slowMousePos.y.clamp(r.top, r.bottom-0.01f);
+					RECT r; 
+					GetWindowRect(GetDesktopWindow, &r); 
+					slowMousePos.x = slowMousePos.x.clamp(r.left, r.right-0.01f); 
+					slowMousePos.y = slowMousePos.y.clamp(r.top, r.bottom-0.01f); 
 					
-					mouseLock(slowMousePos);
+					mouseLock(slowMousePos); 
 				}
 				else
 				{ slowMousePos = winMousePos + vec2(.5, .5); }
-			}
+			} 
 			
 			//winapi mouse get/set
 			public auto winMousePos()
 			{
-				POINT p; GetCursorPos(&p);
-				return ivec2(p.x, p.y);
-			}
-		}
+				POINT p; GetCursorPos(&p); 
+				return ivec2(p.x, p.y); 
+			} 
+		} 
 	}
 	
 	
 	class MouseState
 	{
-		public:
+		public: 
 			struct MSRelative
 		{
-			ivec2 screen;
-			vec2 world;
-			int wheel;
+			ivec2 screen; 
+			vec2 world; 
+			int wheel; 
 			
-			float screenDist=0, worldDist=0;
-		}
+			float screenDist=0, worldDist=0; 
+		} 
 			struct MSAbsolute
 		{
-			bool LMB, RMB, MMB, shift, alt, ctrl;
-			ivec2 screen;
-			vec2 world;
-			int wheel;
-		}
+			bool LMB, RMB, MMB, shift, alt, ctrl; 
+			ivec2 screen; 
+			vec2 world; 
+			int wheel; 
+		} 
 		
-		public:
-			MSAbsolute act, last, pressed;
-			MSRelative delta, hover, hoverMax;
-			bool justPressed, justReleased, LMB, MMB, RMB;
-			ibounds2 screenRect, screenSelectionRect;
-			bounds2 worldRect, worldSelectionRect;
-			bool moving;
+		public: 
+			MSAbsolute act, last, pressed; 
+			MSRelative delta, hover, hoverMax; 
+			bool justPressed, justReleased, LMB, MMB, RMB; 
+			ibounds2 screenRect, screenSelectionRect; 
+			bounds2 worldRect, worldSelectionRect; 
+			bool moving; 
 		
 			void _updateInternal(MSAbsolute next)
 		{
 			//convert wheel to absolute from relative
-			next.wheel += act.wheel;
+			next.wheel += act.wheel; 
 			
 			//process press/release
 			bool anyButton(const MSAbsolute a) const
-			{ return a.LMB || a.RMB || a.MMB; }
+			{ return a.LMB || a.RMB || a.MMB; } 
 			auto 	pressing	= anyButton(next),
-				lastPressing	= anyButton(act);
+				lastPressing	= anyButton(act); 
 			
-			justPressed = pressing && !lastPressing;
-			justReleased = !pressing &&  lastPressing;
+			justPressed = pressing && !lastPressing; 
+			justReleased = !pressing &&  lastPressing; 
 			
-			last = act; act = next;
+			last = act; act = next; 
 			
 			if(justPressed)
 			{
-				hoverMax = MSRelative.init;
-				pressed = act;
+				hoverMax = MSRelative.init; 
+				pressed = act; 
 			}
 			
 			//calc deltas
 			void diff(ref MSRelative res, const MSAbsolute act, const MSAbsolute last)
 			{
-				res.screen	= act.screen-last.screen;
-				res.world	= act.world -last.world;
-				res.wheel	= act.wheel -last.wheel;
-			}
+				res.screen	= act.screen-last.screen; 
+				res.world	= act.world -last.world; 
+				res.wheel	= act.wheel -last.wheel; 
+			} 
 			
-			diff(delta, act, last);
-			diff(hover, act, pressed);
+			diff(delta, act, last); 
+			diff(hover, act, pressed); 
 			
-			maximize(hoverMax.screen, abs(hover.screen));
-			maximize(hoverMax.world , abs(hover.world ));
+			maximize(hoverMax.screen, abs(hover.screen)); 
+			maximize(hoverMax.world , abs(hover.world )); 
 			
 			//calc distances
 			void dist(ref MSRelative res)
 			{
-				res.screenDist	= length(res.screen);
-				res.worldDist	= length(res.world);
-			}
+				res.screenDist	= length(res.screen); 
+				res.worldDist	= length(res.world); 
+			} 
 			
-			dist(delta);
-			dist(hover);
-			dist(hoverMax);
+			dist(delta); 
+			dist(hover); 
+			dist(hoverMax); 
 			
-			LMB = pressed.LMB && act.LMB;
-			MMB = pressed.MMB && act.MMB;
-			RMB = pressed.RMB && act.RMB;
+			LMB = pressed.LMB && act.LMB; 
+			MMB = pressed.MMB && act.MMB; 
+			RMB = pressed.RMB && act.RMB; 
 			
-			screenSelectionRect = ibounds2(pressed.screen, act.screen).sorted;
-			worldSelectionRect = bounds2(pressed.world, act.world).sorted;
+			screenSelectionRect = ibounds2(pressed.screen, act.screen).sorted; 
+			worldSelectionRect = bounds2(pressed.world, act.world).sorted; 
 			
-			moving = !delta.world.isnull;
-		}
+			moving = !delta.world.isnull; 
+		} 
 		
 			bool inWorld () const
-		{ return worldRect .contains!"[)"(act.world ); }
+		{ return worldRect .contains!"[)"(act.world ); } 
 			bool inScreen() const
-		{ return screenRect.contains!"[)"(act.screen); }
-	}
+		{ return screenRect.contains!"[)"(act.screen); } 
+	} 
 	
 	
 	class PotiInputHandler: InputHandlerBase
 	{
 		 //A set of poties from the debugging interface
-		private:
-			alias potiCount = DebugLogClient.potiCount;
-			InputEntry[potiCount] ie;
-		public:
+		private: 
+			alias potiCount = DebugLogClient.potiCount; 
+			InputEntry[potiCount] ie; 
+		public: 
 			this()
 		{
-			category = "DebugPoti";
+			category = "DebugPoti"; 
 			
 			foreach(i; 0..ie.length) {
-				ie[i] = new InputEntry(this, InputEntryType.analogState, "DebugPoti"~to!string(i));
-				entries ~= ie[i];
+				ie[i] = new InputEntry(this, InputEntryType.analogState, "DebugPoti"~to!string(i)); 
+				entries ~= ie[i]; 
 			}
-		}
+		} 
 		
 			override void update()
-		{ foreach(i; 0..ie.length) ie[i].value = dbg.getPotiValue(i); }
-	}
+		{ foreach(i; 0..ie.length) ie[i].value = dbg.getPotiValue(i); } 
+	} 
 	
 	
-	alias XInput = Singleton!XInputFuncts;
+	alias XInput = Singleton!XInputFuncts; 
 	
 	class XInputFuncts
 	{
-		private:
+		private: 
 		
 			struct XINPUT_GAMEPAD
 		{
-			align(1):
-			ushort wButtons;
-			ubyte bLeftTrigger, bRightTrigger;
-			short sThumbLX, sThumbLY, sThumbRX, sThumbRY;
-		}
+			align(1): 
+			ushort wButtons; 
+			ubyte bLeftTrigger, bRightTrigger; 
+			short sThumbLX, sThumbLY, sThumbRX, sThumbRY; 
+		} 
 		
 			struct XINPUT_STATE
 		{
-			align(1):
-			uint dwPacketNumber;
-			XINPUT_GAMEPAD Gamepad;
-		}
+			align(1): 
+			uint dwPacketNumber; 
+			XINPUT_GAMEPAD Gamepad; 
+		} 
 		
-			const bool functsLoaded;
+			const bool functsLoaded; 
 			extern(Windows)
 		{
-			int function (uint dwUserIndex, XINPUT_STATE *pState) _XInputGetState;
-			void function (bool enable) _XInputEnable;
-		}
+			int function (uint dwUserIndex, XINPUT_STATE *pState) _XInputGetState; 
+			void function (bool enable) _XInputEnable; 
+		} 
 		
-		public:
+		public: 
 			this()
 		{
 			const dllName = "Xinput1_4.dll"; //"Xinputuap.dll";
-			auto hXInputModule = loadLibrary(dllName, false);
+			auto hXInputModule = loadLibrary(dllName, false); 
 			if(hXInputModule) {
-				hXInputModule.getProcAddress("XInputGetState", _XInputGetState);
-				hXInputModule.getProcAddress("XInputEnable"  , _XInputEnable  );
-				functsLoaded = true;
+				hXInputModule.getProcAddress("XInputGetState", _XInputGetState); 
+				hXInputModule.getProcAddress("XInputEnable"  , _XInputEnable  ); 
+				functsLoaded = true; 
 			}
-		}
+		} 
 		
 			auto getState(int userIdx=0)
 		{
-			XINPUT_STATE res;
+			XINPUT_STATE res; 
 			if(functsLoaded) {
 				//_XInputEnable(true); //not needed
-				_XInputGetState(userIdx, &res);
+				_XInputGetState(userIdx, &res); 
 			}
-			return res.Gamepad;
-		}
-	}
+			return res.Gamepad; 
+		} 
+	} 
 	
 	
 	class XInputInputHandler: InputHandlerBase
 	{
-		private:
-			InputEntry[16] buttons;
-			InputEntry[7] axes;
-			InputEntry guideButton;
+		private: 
+			InputEntry[16] buttons; 
+			InputEntry[7] axes; 
+			InputEntry guideButton; 
 		
-			InputEntry[15] abxyCombos;
+			InputEntry[15] abxyCombos; 
 			int 	actAbxyState, lastAbxyState,	//current and last state of ABXY buttons
 			processedAbxyState, abxyPhase, 	//latched state after the delay
-			summedAbxyState	/+for small clicks+/;
+			summedAbxyState	/+for small clicks+/; 
 			enum abxyDelay = 10; //Todo: It is 60 FPS based, not time based
 		
 			void addButton(int idx, string name)
 		{
-			enforce(!buttons[idx], "XInputHandler.addButton("~name~") Duplicated idx: "~text(idx));
-			auto e = new InputEntry(this, InputEntryType.digitalButton, name);
-			buttons[idx] = e;  entries ~= e;
-		}
+			enforce(!buttons[idx], "XInputHandler.addButton("~name~") Duplicated idx: "~text(idx)); 
+			auto e = new InputEntry(this, InputEntryType.digitalButton, name); 
+			buttons[idx] = e;  entries ~= e; 
+		} 
 		
 			void addAnalog(int idx, string name, bool isAnalogButton=false)
 		{
-			enforce(!axes[idx], "XInputHandler.addAnalog("~name~") Duplicated idx: "~text(idx));
+			enforce(!axes[idx], "XInputHandler.addAnalog("~name~") Duplicated idx: "~text(idx)); 
 			auto e = new InputEntry(
 				this,
 				isAnalogButton 	? InputEntryType.analogButton
 					: InputEntryType.analogState,
 				name
-			);
-			axes[idx] = e;  entries ~= e;
-		}
+			); 
+			axes[idx] = e;  entries ~= e; 
+		} 
 		
-		public:
+		public: 
 			this()
 		{
-			category = "xinput";
+			category = "xinput"; 
 			
-			guideButton = new InputEntry(this, InputEntryType.digitalButton, "xiGuide"); entries ~= guideButton;
+			guideButton = new InputEntry(this, InputEntryType.digitalButton, "xiGuide"); entries ~= guideButton; 
 			
-			addAnalog	(4, "xiLT", true	);              addAnalog(6, "xiT");	addAnalog	(5, "xiRT", true	);
-			addButton	(8, "xiLB"	);	addButton	(9, "xiRB"	);
-			addButton	(0, "xiUp"	);   addButton(5, "xiBack"); addButton(4, "xiStart"); 	addButton	(12, "xiA"	);
-			addButton	(1, "xiDown"	);	addButton	(13, "xiB"	);
-			addButton	(2, "xiLeft"	);	addButton	(14, "xiX"	);
-			addButton	(3, "xiRight"	);   addButton(6, "xiLS"); addButton(7, "xiRS");	addButton	(15, "xiY"	);
+			addAnalog	(4, "xiLT", true	);              addAnalog(6, "xiT"); 	addAnalog	(5, "xiRT", true	); 
+			addButton	(8, "xiLB"	); 	addButton	(9, "xiRB"	); 
+			addButton	(0, "xiUp"	);   addButton(5, "xiBack"); addButton(4, "xiStart"); 	addButton	(12, "xiA"	); 
+			addButton	(1, "xiDown"	); 	addButton	(13, "xiB"	); 
+			addButton	(2, "xiLeft"	); 	addButton	(14, "xiX"	); 
+			addButton	(3, "xiRight"	);   addButton(6, "xiLS"); addButton(7, "xiRS"); 	addButton	(15, "xiY"	); 
 			
-			addAnalog(0, "xiLX"); addAnalog(1, "xiLY");            addAnalog(2, "xiRX"); addAnalog(3, "xiRY");
+			addAnalog(0, "xiLX"); addAnalog(1, "xiLY");            addAnalog(2, "xiRX"); addAnalog(3, "xiRY"); 
 			
 			//simultaneously pressed combos of ABXY buttons
 			foreach(i; 1..16) {
-				const name = "xic" ~ iota(4).map!(a => (1<<a) & i ? "ABXY"[a..a+1] : "").join;
-				auto e = new InputEntry(this, InputEntryType.digitalButton, name);
-				abxyCombos[i-1] = e;
-				entries ~= e;
+				const name = "xic" ~ iota(4).map!(a => (1<<a) & i ? "ABXY"[a..a+1] : "").join; 
+				auto e = new InputEntry(this, InputEntryType.digitalButton, name); 
+				abxyCombos[i-1] = e; 
+				entries ~= e; 
 			}
-		}
+		} 
 		
 			override void update()
 		{
-			auto st = XInput.getState;
+			auto st = XInput.getState; 
 			
 			//this hack gets the guide button state.
-			bool guideButtonState;
+			bool guideButtonState; 
 			static if(1) {
 				//Todo: guide button poller: https://forums.tigsource.com/index.php?topic=26792.0
 					//LoadLibrary("C:/Windows/System32/xinput1_3.dll");
 					//Get the address of ordinal 100.
 				struct SecretStruct
 				{
-					uint eventCount;
-					ushort	buttons;
+					uint eventCount; 
+					ushort	buttons; 
 					//unsigned short up:1, down:1, left:1, right:1, start:1, back:1, l3:1, r3:1,
 					//lButton:1, rButton:1, guideButton:1, unknown:1, aButton:1,
 					//bButton:1, xButton:1, yButton:1; // button state bitfield
-					ubyte lTrigger;	//Left Trigger
-					ubyte rTrigger;	//Right Trigger
-					short lJoyY;	//Left Joystick Y
-					short lJoyx;	//Left Joystick X
-					short rJoyY;	//Right Joystick Y
-					short rJoyX;	//Right Joystick X
-				}
+					ubyte lTrigger; 	//Left Trigger
+					ubyte rTrigger; 	//Right Trigger
+					short lJoyY; 	//Left Joystick Y
+					short lJoyx; 	//Left Joystick X
+					short rJoyY; 	//Right Joystick Y
+					short rJoyX; 	//Right Joystick X
+				} 
 				
-				static bool guideHackTried;
-				static extern(C) int function(int, ref SecretStruct) guideHackFunct;
+				static bool guideHackTried; 
+				static extern(C) int function(int, ref SecretStruct) guideHackFunct; 
 				if(guideHackTried.chkSet) {
-					auto lib = loadLibrary("xinput1_3.dll", false);
-					if(lib) getProcAddress(lib, 100, guideHackFunct, false);
+					auto lib = loadLibrary("xinput1_3.dll", false); 
+					if(lib) getProcAddress(lib, 100, guideHackFunct, false); 
 				}
 				
 				if(guideHackFunct !is null) {
-					SecretStruct sc;
+					SecretStruct sc; 
 					if(
 						guideHackFunct(0, sc)==0//only 10us
 					)
-					guideButtonState = (sc.buttons & 0x400)!=0;
+					guideButtonState = (sc.buttons & 0x400)!=0; 
 				}
 			}
 			
 			//Todo: get all the states from xinput1_3, not just the guide button
 			
-			guideButton.value = guideButtonState ? 1 : 0;
+			guideButton.value = guideButtonState ? 1 : 0; 
 			
-			foreach(int idx, e; buttons) if(e) e.value = (st.wButtons>>idx)&1;
-			axes[0].value = st.sThumbLX*(1.0f/32768);
-			axes[1].value = st.sThumbLY*(1.0f/32768);
-			axes[2].value = st.sThumbRX*(1.0f/32768);
-			axes[3].value = st.sThumbRY*(1.0f/32768);
-			axes[4].value = st.bLeftTrigger*(1.0f/256);
-			axes[5].value = st.bRightTrigger*(1.0f/256);
-			axes[6].value = axes[5].value-axes[4].value;
+			foreach(int idx, e; buttons) if(e) e.value = (st.wButtons>>idx)&1; 
+			axes[0].value = st.sThumbLX*(1.0f/32768); 
+			axes[1].value = st.sThumbLY*(1.0f/32768); 
+			axes[2].value = st.sThumbRX*(1.0f/32768); 
+			axes[3].value = st.sThumbRY*(1.0f/32768); 
+			axes[4].value = st.bLeftTrigger*(1.0f/256); 
+			axes[5].value = st.bRightTrigger*(1.0f/256); 
+			axes[6].value = axes[5].value-axes[4].value; 
 			
-			abxyUpdate;
-		}
+			abxyUpdate; 
+		} 
 		
 			private void abxyUpdate()
 		{
 			//update abxy combos
-			lastAbxyState = actAbxyState;
-			actAbxyState = iota(4).map!(a => buttons[12+a].down ? (1<<a) : 0).sum;
-			summedAbxyState |= actAbxyState;
+			lastAbxyState = actAbxyState; 
+			actAbxyState = iota(4).map!(a => buttons[12+a].down ? (1<<a) : 0).sum; 
+			summedAbxyState |= actAbxyState; 
 			
 			if(!actAbxyState) {
-				processedAbxyState = processedAbxyState==0 ? summedAbxyState : 0;
+				processedAbxyState = processedAbxyState==0 ? summedAbxyState : 0; 
 				//^^ this ensures that the smallest clicks are recognised too.
 				
-				summedAbxyState = 0;
-				abxyPhase = 0;
+				summedAbxyState = 0; 
+				abxyPhase = 0; 
 			}
 			else {
-				const changed = lastAbxyState!=actAbxyState;
+				const changed = lastAbxyState!=actAbxyState; 
 				
 				if(changed || abxyPhase)
-				abxyPhase++;
+				abxyPhase++; 
 				
 				if(abxyPhase >= abxyDelay) {
-					processedAbxyState = actAbxyState;
-					abxyPhase = 0;
+					processedAbxyState = actAbxyState; 
+					abxyPhase = 0; 
 				}
 			}
 			
-			foreach(i; 1..16) abxyCombos[i-1].value =  i==processedAbxyState ? 1 : 0;
+			foreach(i; 1..16) abxyCombos[i-1].value =  i==processedAbxyState ? 1 : 0; 
 			
 			//print(format("%2x %3d %2x", actAbxyState, abxyPhase, processedAbxyState));
 			//writef!"%X"(processedAbxyState);
-		}
+		} 
 		
-	}
+	} 
 }
 version(/+$DIDE_REGION+/all)
 {
 	struct Action
 	{
 		  //Todo: this is kinda deprecated: the new thing is MenuItem/KeyCombo.
-		private:
+		private: 
 		//these fields are specified from the constructors
-			ActionGroup* group;
+			ActionGroup* group; 
 			char type; //a = active, p = pressed, g = group, m = modifier
-			string name;
-			string key;
-			bool enabled;
-			void delegate() task;
-			void delegate(float) task2;
-			bool* modifier;
+			string name; 
+			string key; 
+			bool enabled; 
+			void delegate() task; 
+			void delegate(float) task2; 
+			bool* modifier; 
 		
 		//these fields are internally used
 			int consistencyCnt; //at the end; all these counters must be equal
 			string defaultKey; //reduntant copy from defaultKeyMap
 		
 		//-----------------------------------------
-			string fullName() const { return group.name~`\`~name; }
+			string fullName() const { return group.name~`\`~name; } 
 			private bool execute()
 		{
-			bool res;
+			bool res; 
 			if(enabled)
 			switch(type)
 			{
-				case 'a':	if(inputs.active (key))
+				case 'a': 	if(inputs.active (key))
 				if(task) {
-					task();
-					res = true;
+					task(); 
+					res = true; 
 				}
-					break;
-				case 'p':	if(inputs.pressed(key))
+					break; 
+				case 'p': 	if(inputs.pressed(key))
 				if(task) {
-					task();
-					res = true;
+					task(); 
+					res = true; 
 				}
-					break;
-				case 't':	if(inputs.typed(key))
+					break; 
+				case 't': 	if(inputs.typed(key))
 				if(task) {
-					task();
-					res = true;
+					task(); 
+					res = true; 
 				}
-					break;
-				case 'm':	if(modifier) { res = chkSet(*modifier, inputs.active(key)); }	break;
-				case 'd':	if(task2 && inputs[key].changed) {
-					task2(inputs[key].delta);
-					res = true;
-				}	break;
-				case 'v':	if(task2 && inputs[key].changed) {
-					task2(inputs[key].value);
-					res = true;
-				}	break;
-				default:
+					break; 
+				case 'm': 	if(modifier) { res = chkSet(*modifier, inputs.active(key)); }	break; 
+				case 'd': 	if(task2 && inputs[key].changed) {
+					task2(inputs[key].delta); 
+					res = true; 
+				}	break; 
+				case 'v': 	if(task2 && inputs[key].changed) {
+					task2(inputs[key].value); 
+					res = true; 
+				}	break; 
+				default: 
 			}
 			
-			return res;
-		}
-	}
+			return res; 
+		} 
+	} 
 	
 	
 	struct ActionGroup
 	{
-		private:
-			string name;
-			Action[] actions;
+		private: 
+			string name; 
+			Action[] actions; 
 		
 			Action* find(string name)
 		{
 			foreach(ref a; actions) { if(a.name==name) return &a; }
-			return null;
-		}
+			return null; 
+		} 
 			Action* add(Action ac)
 		{
-			enforce(find(ac.name)==null, format(`Action "%s" already exists.`, ac.name));
-			actions ~= ac;
-			return &actions[$-1];
-		}
+			enforce(find(ac.name)==null, format(`Action "%s" already exists.`, ac.name)); 
+			actions ~= ac; 
+			return &actions[$-1]; 
+		} 
 			Action* findAdd(Action action)
 		{
-			auto ac = find(action.name);
-			if(!ac) ac = add(action);
-			return ac;
-		}
+			auto ac = find(action.name); 
+			if(!ac) ac = add(action); 
+			return ac; 
+		} 
 		
 			bool enabled() const
-		{ return true; }
-	}
+		{ return true; } 
+	} 
 	
 	
 	
 	struct ActionManager
 	{
-		private:
-			ActionGroup[] groups;
+		private: 
+			ActionGroup[] groups; 
 			ActionGroup* actGroup; //the following controls will use this group
-			bool m_updating, m_changed;
+			bool m_updating, m_changed; 
 			string[string] 	defaultKeyMap, //it is saved on the first update
-			pendingKeyMap /+it will loaded on the next update+/;
+			pendingKeyMap /+it will loaded on the next update+/; 
 		
 			void add(ActionGroup grp)
 		{
 			enforce(
 				findGroup(grp.name)==null, 
 				format(`ActionGroup "%s" already exists.`, grp.name)
-			);
-			groups ~= grp;
-		}
+			); 
+			groups ~= grp; 
+		} 
 		
 			ActionGroup* findGroup(string name)
 		{
-			foreach(ref g; groups) if(g.name==name) return &g;
-			return null;
-		}
+			foreach(ref g; groups) if(g.name==name) return &g; 
+			return null; 
+		} 
 		
 			ActionGroup* findAddGroup(string name)
 		{
-			auto g = findGroup(name);
+			auto g = findGroup(name); 
 			if(!g) {
-				groups ~= ActionGroup(name);
-				g = &groups[$-1];
+				groups ~= ActionGroup(name); 
+				g = &groups[$-1]; 
 			}
-			return g;
-		}
+			return g; 
+		} 
 		
 			Action* findAction(string fullName)
 		{
-			auto name = File(fullName).name;
-			auto groupName = File(fullName).dir;
-			Action* ac;
+			auto name = File(fullName).name; 
+			auto groupName = File(fullName).dir; 
+			Action* ac; 
 			if(groupName!="")
 			{
-				auto grp = findGroup(groupName);
-				enforce(grp, format(`Can't find ActionGroup "%s"`, groupName));
-				ac = grp.find(name);
-				enforce(ac, format(`Can't find Action "%s" in ActionGroup "%s"`, name, groupName));
+				auto grp = findGroup(groupName); 
+				enforce(grp, format(`Can't find ActionGroup "%s"`, groupName)); 
+				ac = grp.find(name); 
+				enforce(ac, format(`Can't find Action "%s" in ActionGroup "%s"`, name, groupName)); 
 			}
 			else
 			{
 				foreach(ref grp; groups)
 				{
-					auto ac2 = grp.find(name);
+					auto ac2 = grp.find(name); 
 					if(ac2) {
-						enforce(!ac, `Ambiguous Action name"`~name~`"`);
-						ac = ac2;
+						enforce(!ac, `Ambiguous Action name"`~name~`"`); 
+						ac = ac2; 
 					}
 				}
 			}
-			enforce(ac, format(`Can't find Action "%s"`, fullName));
-			return ac;
-		}
+			enforce(ac, format(`Can't find Action "%s"`, fullName)); 
+			return ac; 
+		} 
 		
 			bool checkConsistency()
 		{
 			 //all actions must be processed equal times
-			int c;
+			int c; 
 			foreach(ref g; groups)
 			foreach(ref a; g.actions)
 			{
-				auto act = a.consistencyCnt;
+				auto act = a.consistencyCnt; 
 				if(!c) c = act; //first value
-				if(c!=act) return false;
+				if(c!=act) return false; 
 			}
 			
-			return true;
-		}
+			return true; 
+		} 
 		
 			auto exportKeyMap()
 		{
-			string[string] map;
+			string[string] map; 
 			foreach(ref g; groups)
 			foreach(ref a; g.actions)
-			map[a.fullName] = a.key;
+			map[a.fullName] = a.key; 
 			
-			return map;
-		}
+			return map; 
+		} 
 		
 			void importKeyMap(string[string] map)
 		{
-			pendingKeyMap = map.dup;
+			pendingKeyMap = map.dup; 
 			//update actual keys
 			foreach(ref g; groups)
 			foreach(ref a; g.actions)
 			{
-				auto name = a.fullName;
+				auto name = a.fullName; 
 				if(auto k = name in pendingKeyMap) {
-					a.key = *k;
-					pendingKeyMap.remove(a.name);
+					a.key = *k; 
+					pendingKeyMap.remove(a.name); 
 				}
 			}
 			
-		}
+		} 
 		
 			private void processAction(Action action)
 		{
-			enforce(updating, "Can't add action to ActionManager: not in updating state.");
-			enforce(actGroup, "Can't add action to ActionManager: no group is specified.");
+			enforce(updating, "Can't add action to ActionManager: not in updating state."); 
+			enforce(actGroup, "Can't add action to ActionManager: no group is specified."); 
 			
-			auto ac = actGroup.find(action.name);
+			auto ac = actGroup.find(action.name); 
 			if(!ac) {
 				 //create the new action
-				ac = actGroup.add(action);
+				ac = actGroup.add(action); 
 				
 				//save defaults
 				ac.defaultKey = ac.key; //redundant copy
-				defaultKeyMap[ac.fullName] = ac.key;
+				defaultKeyMap[ac.fullName] = ac.key; 
 			}
 			
 			//copy enabledness
-			ac.enabled = action.enabled;
+			ac.enabled = action.enabled; 
 			
 			//load pending config
-			auto name = ac.fullName;
+			auto name = ac.fullName; 
 			if(auto k=name in pendingKeyMap)
 			{
-				ac.key = *k;
-				pendingKeyMap.remove(name);
+				ac.key = *k; 
+				pendingKeyMap.remove(name); 
 			}
 			
-			ac.consistencyCnt++;
+			ac.consistencyCnt++; 
 			
 			if(enabled && actGroup.enabled && ac.enabled)
-			{ if(ac.execute) { m_changed |= true; } }
-		}
+			{ if(ac.execute) { m_changed |= true; }}
+		} 
 		
-		public:
-			@property bool changed () { return m_changed; }
-			@property bool updating() { return m_updating; }
+		public: 
+			@property bool changed () { return m_changed; } 
+			@property bool updating() { return m_updating; } 
 		
 			string toString()
 		{
 			 //dump
-			string s;
-			s ~= "Actions\n";
+			string s; 
+			s ~= "Actions\n"; 
 			foreach(ref grp; groups)
 			{
-				s ~= "  "~grp.name~"\n";
+				s ~= "  "~grp.name~"\n"; 
 				foreach(ref ac; grp.actions)
 				{ s ~= format("    %-28s: %s\n", ac.name, ac.key); }
 			}
-			return s;
-		}
+			return s; 
+		} 
 		
 			//functs used in Window.doUpdate()
 			void beginUpdate()
 		{
-			enforce(!updating, "ActionManager is already in updating state.");
-			actGroup = null;
-			m_updating = true;
-			m_changed = false;
-		}
+			enforce(!updating, "ActionManager is already in updating state."); 
+			actGroup = null; 
+			m_updating = true; 
+			m_changed = false; 
+		} 
 			void endUpdate()
 		{
-			enforce(updating, "ActionManager is not in updating state.");
-			actGroup = null;
-			m_updating = false;
+			enforce(updating, "ActionManager is not in updating state."); 
+			actGroup = null; 
+			m_updating = false; 
 			pendingKeyMap = null; //already processed, remove possible leftovers
 			
-			enforce(checkConsistency, "ActionManager consistency check failed.");
+			enforce(checkConsistency, "ActionManager consistency check failed."); 
 			//can be 2 actions on the same name for example
-		}
+		} 
 		
 			//shortcuts creating new actions (in doUpdate also)
 			void group(string name)
-		{ actGroup = findAddGroup(name); }
+		{ actGroup = findAddGroup(name); } 
 			void onActive	(string name, string key, bool en, void delegate() task)
-		{ processAction(Action(actGroup, 'a', name, key, en, task)); }
+		{ processAction(Action(actGroup, 'a', name, key, en, task)); } 
 			void onPressed	(string name, string key, bool en, void delegate() task)
-		{ processAction(Action(actGroup, 'p', name, key, en, task)); }
+		{ processAction(Action(actGroup, 'p', name, key, en, task)); } 
 			void onTyped	(string name, string key, bool en, void delegate() task)
-		{ processAction(Action(actGroup, 't', name, key, en, task)); }
+		{ processAction(Action(actGroup, 't', name, key, en, task)); } 
 			void onModifier(string name, string key, bool en, ref bool modifier)
-		{ processAction(Action(actGroup, 'm', name, key, en, null, null, &modifier)); }
+		{ processAction(Action(actGroup, 'm', name, key, en, null, null, &modifier)); } 
 			void onDelta		 (string name, string key, bool en, void delegate(float) task2)
-		{ processAction(Action(actGroup, 'd', name, key, en, null, task2)); }
+		{ processAction(Action(actGroup, 'd', name, key, en, null, task2)); } 
 			void onValue		 (string name, string key, bool en, void delegate(float) task2)
-		{ processAction(Action(actGroup, 'v', name, key, en, null, task2)); }
+		{ processAction(Action(actGroup, 'v', name, key, en, null, task2)); } 
 		
 			bool enabled() const
-		{ return true; }
+		{ return true; } 
 		
 			//manage config
 			@property string config()
-		{ return	mapToStr(exportKeyMap); }
+		{ return	mapToStr(exportKeyMap); } 
 			@property void config(string	data)
-		{ importKeyMap(strToMap(data)); }
+		{ importKeyMap(strToMap(data)); } 
 			auto defaultConfig()
-		{ return mapToStr(defaultKeyMap); }
+		{ return mapToStr(defaultKeyMap); } 
 			void loadDefaults()
-		{ config = defaultConfig; }
+		{ config = defaultConfig; } 
 			bool isDefault()
-		{ return config==defaultConfig; }
+		{ return config==defaultConfig; } 
 		
 			string key(string name)
-		{ return findAction(name).key; }
+		{ return findAction(name).key; } 
 			void setKey(string name, string k)
-		{ with(findAction(name)) if(sameText(k, "default")) key = defaultKey;else key = k; }
+		{ with(findAction(name)) if(sameText(k, "default")) key = defaultKey; else key = k; } 
 			@property string defaultKey(string name)
-		{ return findAction(name).defaultKey; }
+		{ return findAction(name).defaultKey; } 
 		
-	}
+	} 
 	
 	version(/+$DIDE_REGION Keyboard/Mouse hooks+/all)
 	{
 		//Todo: which is faster?	import core.sys.windows.windows;  or
-		import core.sys.windows.windef, core.sys.windows.winuser, core.sys.windows.winbase;
+		import core.sys.windows.windef, core.sys.windows.winuser, core.sys.windows.winbase; 
 		
-		bool hookedKeyboardLog = false;
-		bool hookedMouseLog = false;
+		bool hookedKeyboardLog = false; 
+		bool hookedMouseLog = false; 
 		
-		bool[0x100] hookedKeyboardState;
-		ivec2 hookedMousePos;
-		int hookedMouseWheelAbs;
-		private int _hookedMouseWheelDelta;
+		bool[0x100] hookedKeyboardState; 
+		ivec2 hookedMousePos; 
+		int hookedMouseWheelAbs; 
+		private int _hookedMouseWheelDelta; 
 		
-		enum HookedLogAccess { peek, fetch, _update }
+		enum HookedLogAccess { peek, fetch, _update} 
 		
 		struct KBMLogItem
 		{
-			DateTime when;
-			string[] keys;
-			ivec2 mousePos;
-			int wheelDelta;
-		}
+			DateTime when; 
+			string[] keys; 
+			ivec2 mousePos; 
+			int wheelDelta; 
+		} 
 		
 		auto kbmHookLog(HookedLogAccess access = HookedLogAccess.fetch)
 		{
 			synchronized
 			{
-				__gshared KBMLogItem[] items;
-				__gshared bool[0x100] lastState;
+				__gshared KBMLogItem[] items; 
+				__gshared bool[0x100] lastState; 
 				
 				auto encodeVkState(ref bool[0x100] arr)
 				{
 					auto codeToStr(size_t code)
 					{
-						auto s = inputs.vkToStr(cast(ubyte)code);
+						auto s = inputs.vkToStr(cast(ubyte)code); 
 						
 						//try to add localized chars
 						if(s.length==1)
 						{
-							auto s2 = inputs.vkToUni(cast(ubyte)code);
-							if(s2!="" && s2[0]>' ' && s2!=s) s = s~" "~s2;
+							auto s2 = inputs.vkToUni(cast(ubyte)code); 
+							if(s2!="" && s2[0]>' ' && s2!=s) s = s~" "~s2; 
 						}
 						
-						if(s.empty) s = code.format!"code(%d)";
-						return s;
-					}
+						if(s.empty) s = code.format!"code(%d)"; 
+						return s; 
+					} 
 					
 					bool lessThan(string a, string b)
 					{
 						char code(string s)
 						{
-							if(s.endsWith("Ctrl")) return '1';
-							if(s.endsWith("Alt")) return '2';
-							if(s.endsWith("Win")) return '3';
-							if(s.endsWith("Shift")) return '4';
-							if(s.among("LMB", "RMB", "MMB", "MB4", "MB5")) return '6';
-							return '5';
-						}
+							if(s.endsWith("Ctrl")) return '1'; 
+							if(s.endsWith("Alt")) return '2'; 
+							if(s.endsWith("Win")) return '3'; 
+							if(s.endsWith("Shift")) return '4'; 
+							if(s.among("LMB", "RMB", "MMB", "MB4", "MB5")) return '6'; 
+							return '5'; 
+						} 
 						
-						return code(a)~a < code(b)~b;
-					}
+						return code(a)~a < code(b)~b; 
+					} 
 					
 					return arr[]	.enumerate
 						.filter!"a.value"
 						.map!(a=>codeToStr(a.index))
-						.array.sort!((a,b)=>lessThan(a,b)).array;
-				}
+						.array.sort!((a,b)=>lessThan(a,b)).array; 
+				} 
 				
-				auto res = items;
+				auto res = items; 
 				
 				final switch(access)
 				{
-					case HookedLogAccess.peek:
-					break;
+					case HookedLogAccess.peek: 
+					break; 
 					
-					case HookedLogAccess.fetch:
+					case HookedLogAccess.fetch: 
 					{ items = []; }
-					break;
+					break; 
 					
-					case HookedLogAccess._update:
+					case HookedLogAccess._update: 
 					{
 						if(
 							true 
@@ -2515,104 +2515,104 @@ version(/+$DIDE_REGION+/all)
 							/+!equal(lastState[], hookedKeyboardState[])+/
 						)
 						{
-							items ~= KBMLogItem(now, encodeVkState(hookedKeyboardState), hookedMousePos, _hookedMouseWheelDelta);
-							lastState = hookedKeyboardState;
+							items ~= KBMLogItem(now, encodeVkState(hookedKeyboardState), hookedMousePos, _hookedMouseWheelDelta); 
+							lastState = hookedKeyboardState; 
 						}
 					}
-					break;
+					break; 
 				}
 				
-				return res;
-			}
-		}
+				return res; 
+			} 
+		} 
 		
 		void kbmHookLogUpdate()
-		{ kbmHookLog(HookedLogAccess._update); }
+		{ kbmHookLog(HookedLogAccess._update); } 
 		
 		extern(Windows) LRESULT LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) nothrow
 		{
-			const log = hookedKeyboardLog;
+			const log = hookedKeyboardLog; 
 			try {
 				if(wParam.among(WM_KEYDOWN, WM_SYSKEYDOWN))
 				{
-					auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam;
-					hookedKeyboardState[cast(ubyte)(pKeyBoard.vkCode)] = true;
-					kbmHookLogUpdate;
-					if(log) writeln("down", pKeyBoard.vkCode);
+					auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam; 
+					hookedKeyboardState[cast(ubyte)(pKeyBoard.vkCode)] = true; 
+					kbmHookLogUpdate; 
+					if(log) writeln("down", pKeyBoard.vkCode); 
 				}
 				else if(wParam.among(WM_KEYUP, WM_SYSKEYUP))
 				{
-					auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam;
-					hookedKeyboardState[cast(ubyte)(pKeyBoard.vkCode)] = false;
-					kbmHookLogUpdate;
-					if(log) writeln("up", pKeyBoard.vkCode);
+					auto pKeyBoard = cast(KBDLLHOOKSTRUCT*)lParam; 
+					hookedKeyboardState[cast(ubyte)(pKeyBoard.vkCode)] = false; 
+					kbmHookLogUpdate; 
+					if(log) writeln("up", pKeyBoard.vkCode); 
 				}
 				else
 				{ if(log) writeln("wparam", wParam); }
 			}
 			catch(Exception) {}
 			
-			return CallNextHookEx(null, nCode, wParam, lParam);
-		}
+			return CallNextHookEx(null, nCode, wParam, lParam); 
+		} 
 		
 		auto installGlobalKeyboardHook()
 		{
 			return SetWindowsHookEx(WH_KEYBOARD_LL, &LowLevelKeyboardProc, GetModuleHandle(null), 0)
-			.enforce("Unable to install GlobalKeyboardHook");
-		}
+			.enforce("Unable to install GlobalKeyboardHook"); 
+		} 
 		
 		extern(Windows) LRESULT LowLevelMouseProc(int nCode, WPARAM wParam, LPARAM lParam) nothrow
 		{
 			try
 			{
-				const log = hookedMouseLog;
-				const hs = cast(MSLLHOOKSTRUCT*)lParam;
+				const log = hookedMouseLog; 
+				const hs = cast(MSLLHOOKSTRUCT*)lParam; 
 				
 				void press(ubyte vk, bool st)
 				{
-					hookedKeyboardState[vk] = st;
-					kbmHookLogUpdate;
-				}
+					hookedKeyboardState[vk] = st; 
+					kbmHookLogUpdate; 
+				} 
 				
 				ubyte XBUTTON()
-				{ return hs.mouseData>>16 ==XBUTTON2 ? VK_XBUTTON2 : VK_XBUTTON1; }
+				{ return hs.mouseData>>16 ==XBUTTON2 ? VK_XBUTTON2 : VK_XBUTTON1; } 
 				
 				if(hs) {
 					switch(wParam)
 					{
-						case WM_LBUTTONDOWN:	press(VK_LBUTTON, 1);	break;
-						case WM_LBUTTONUP:	press(VK_LBUTTON, 0);	break;
-						case WM_RBUTTONDOWN:	press(VK_RBUTTON, 1);	break;
-						case WM_RBUTTONUP:	press(VK_RBUTTON, 0);	break;
-						case WM_MBUTTONDOWN:	press(VK_MBUTTON, 1);	break;
-						case WM_MBUTTONUP:	press(VK_MBUTTON, 0);	break;
+						case WM_LBUTTONDOWN: 	press(VK_LBUTTON, 1); 	break; 
+						case WM_LBUTTONUP: 	press(VK_LBUTTON, 0); 	break; 
+						case WM_RBUTTONDOWN: 	press(VK_RBUTTON, 1); 	break; 
+						case WM_RBUTTONUP: 	press(VK_RBUTTON, 0); 	break; 
+						case WM_MBUTTONDOWN: 	press(VK_MBUTTON, 1); 	break; 
+						case WM_MBUTTONUP: 	press(VK_MBUTTON, 0); 	break; 
 						case 	WM_XBUTTONDOWN,
-							WM_NCXBUTTONDOWN:	press(XBUTTON, 1);	break;
+							WM_NCXBUTTONDOWN: 	press(XBUTTON, 1); 	break; 
 						case 	WM_XBUTTONUP,
-							WM_NCXBUTTONUP:	press(XBUTTON, 0);	break;
-						case WM_MOUSEWHEEL:	{
-							_hookedMouseWheelDelta = ((cast(int)hs.mouseData)/(WHEEL_DELTA<<16));
-							hookedMouseWheelAbs += _hookedMouseWheelDelta;
-							kbmHookLogUpdate;
-							_hookedMouseWheelDelta = 0;
-						}	break;
-						case WM_MOUSEMOVE:		break;
-						default:		break;
+							WM_NCXBUTTONUP: 	press(XBUTTON, 0); 	break; 
+						case WM_MOUSEWHEEL: 	{
+							_hookedMouseWheelDelta = ((cast(int)hs.mouseData)/(WHEEL_DELTA<<16)); 
+							hookedMouseWheelAbs += _hookedMouseWheelDelta; 
+							kbmHookLogUpdate; 
+							_hookedMouseWheelDelta = 0; 
+						}	break; 
+						case WM_MOUSEMOVE: 		break; 
+						default: 		break; 
 					}
-					with(hs.pt) hookedMousePos = ivec2(x, y);
-					if(log) print("mouse:", nCode, wParam, *hs);
+					with(hs.pt) hookedMousePos = ivec2(x, y); 
+					if(log) print("mouse:", nCode, wParam, *hs); 
 				}
 			}
 			catch(Exception) {}
 			
-			return CallNextHookEx(null, nCode, wParam, lParam);
-		}
+			return CallNextHookEx(null, nCode, wParam, lParam); 
+		} 
 		
 		auto installGlobalMouseHook()
 		{
 			return SetWindowsHookEx(WH_MOUSE_LL, &LowLevelMouseProc, GetModuleHandle(null), 0)
-			.enforce("Unable to install GlobalMouseHook");
-		}
+			.enforce("Unable to install GlobalMouseHook"); 
+		} 
 		
 	}
 }

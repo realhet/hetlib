@@ -1,157 +1,157 @@
-module het.com;
+module het.com; 
 
-import het.utils;
+import het; 
 
 import std.windows.registry,
-			 core.sys.windows.winbase,
-			 core.sys.windows.winnt,
-			 core.sys.windows.basetsd : HANDLE;
+core.sys.windows.winbase,
+core.sys.windows.winnt,
+core.sys.windows.basetsd : HANDLE; 
 
 struct ComPortSettings
 {
 	 //ComPortSettings ////////////////////////////////////////////////
-	@STORED string port = "";
-	@STORED int baud = 9600;
-	@STORED string params = "8N1";
-	bool enabled;
-}
+	@STORED string port = ""; 
+	@STORED int baud = 9600; 
+	@STORED string params = "8N1"; 
+	bool enabled; 
+} 
 
 HANDLE open(in ComPortSettings settings)
 {
 	enforce(settings.params.sameText("8N1"), "Only 8N1 supported"); //Todo: interpret params
 	
-	string s = settings.port;
+	string s = settings.port; 
 	if(s.map!isDigit.all)
-	s = "COM" ~ s;
+	s = "COM" ~ s; 
 	if(s.uc.startsWith("COM") && s.length>4)
-	s = `\\.\`~s;
+	s = `\\.\`~s; 
 	
-	auto h = CreateFile(s.toPWChar, GENERIC_READ | GENERIC_WRITE, 0, null, OPEN_EXISTING, 0, null);
+	auto h = CreateFile(s.toPWChar, GENERIC_READ | GENERIC_WRITE, 0, null, OPEN_EXISTING, 0, null); 
 	if(h == INVALID_HANDLE_VALUE)
-	raise("Can't open serial port "~s.quoted~" "~getLastErrorStr);
+	raise("Can't open serial port "~s.quoted~" "~getLastErrorStr); 
 	
 	try
 	{
-		DCB dcb;
+		DCB dcb; 
 		if(!GetCommState(h, &dcb))
-		raise("GetComState", getLastErrorStr);
+		raise("GetComState", getLastErrorStr); 
 		with(dcb)
 		{
-			BaudRate = settings.baud;
+			BaudRate = settings.baud; 
 			Parity = 0; //One
 			StopBits = 0; //None
-			ByteSize = 8;
-			_bf = 0;
+			ByteSize = 8; 
+			_bf = 0; 
 		}
 		if(!SetCommState(h, &dcb))
-		raise("SetComState", getLastErrorStr);
+		raise("SetComState", getLastErrorStr); 
 		
-		COMMTIMEOUTS ct;
+		COMMTIMEOUTS ct; 
 		with(ct)
 		{
-			ReadIntervalTimeout = 0xFFFFFFFF;
-			ReadTotalTimeoutMultiplier = 0;
-			ReadTotalTimeoutConstant = 0;
-			WriteTotalTimeoutMultiplier = 1;
-			WriteTotalTimeoutConstant = 500;
+			ReadIntervalTimeout = 0xFFFFFFFF; 
+			ReadTotalTimeoutMultiplier = 0; 
+			ReadTotalTimeoutConstant = 0; 
+			WriteTotalTimeoutMultiplier = 1; 
+			WriteTotalTimeoutConstant = 500; 
 		}
 		if(!SetCommTimeouts(h, &ct))
-		raise("SetComTimeouts", getLastErrorStr);
+		raise("SetComTimeouts", getLastErrorStr); 
 	}catch(Exception e)
 	{
-		CloseHandle(h);
-		throw e;
+		CloseHandle(h); 
+		throw e; 
 	}
 	
-	return h;
-}
+	return h; 
+} 
 
 struct ComPortStats
 {
 	 //ComPortStats /////////////////////////////////////////////////////////
-	size_t messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt;
+	size_t messagesOut, bytesOut, messagesIn, bytesIn, errorCnt, dataErrorCnt; 
 	
-	bool opened;
-	string lastError;
-	DateTime lastErrorTime, lastIncomingDataTime, lastIncomingMessageTime;
+	bool opened; 
+	string lastError; 
+	DateTime lastErrorTime, lastIncomingDataTime, lastIncomingMessageTime; 
 	
 	void reset()
-	{ this = typeof(this).init; }
-}
+	{ this = typeof(this).init; } 
+} 
 
 enum ComPortProtocol
-{ raw, textPackets, binaryPackets }
+{ raw, textPackets, binaryPackets} 
 
 struct MsgComPortError
-{ string error; }
+{ string error; } 
 struct MsgComPortClosed
-{}
+{} 
 struct MsgComPortOpened
-{}
+{} 
 struct MsgComPortDestroy
-{}
+{} 
 
 private void comPortWorker(shared ComPort owner_)
 {
 	auto owner = cast()owner_; //nasty hack
 	
-	import core.thread, std.concurrency;
-	Thread.getThis.isDaemon = true;
+	import core.thread, std.concurrency; 
+	Thread.getThis.isDaemon = true; 
 	
 	//local things
-	ComPortSettings settings;
+	ComPortSettings settings; 
 	size_t openedConfig; //change detection hash
-	HANDLE hCom;
-	Time tLastFailedOpen=0*second;
-	string lastError;
+	HANDLE hCom; 
+	Time tLastFailedOpen=0*second; 
+	string lastError; 
 	
 	bool enabled()
-	{ return settings.enabled; }
+	{ return settings.enabled; } 
 	bool active()
-	{ return enabled && hCom; }
+	{ return enabled && hCom; } 
 	
 	void error(string s)
 	{
 		synchronized(owner)
 		{
-			owner.workerHasError = true;
-			owner.workerError = s;
-		}
-	}
+			owner.workerHasError = true; 
+			owner.workerError = s; 
+		} 
+	} 
 	
 	void errorClear()
-	{ error(""); }
+	{ error(""); } 
 	
 	void comClose()
 	{
-		openedConfig = 0;
+		openedConfig = 0; 
 		if(hCom)
 		{
-			CloseHandle(hCom);
-			hCom = null;
-			errorClear;
+			CloseHandle(hCom); 
+			hCom = null; 
+			errorClear; 
 		}
-		owner.stats.opened = false;
-	}
+		owner.stats.opened = false; 
+	} 
 	
 	void comOpen()
 	{
 		if(hCom)
-		comClose;
+		comClose; 
 		
 		try
 		{
-			hCom = settings.open;
+			hCom = settings.open; 
 			
-			openedConfig = settings.hashOf;
-			owner.stats.opened = true;
-			errorClear;
+			openedConfig = settings.hashOf; 
+			owner.stats.opened = true; 
+			errorClear; 
 		}catch(Exception e)
 		{
-			error(e.simpleMsg);
-			tLastFailedOpen = QPS;
+			error(e.simpleMsg); 
+			tLastFailedOpen = QPS; 
 		}
-	}
+	} 
 	
 	while(1)
 	{
@@ -165,22 +165,22 @@ private void comPortWorker(shared ComPort owner_)
 			if(
 				QPS-tLastFailedOpen > .5*second//don't try to reopen at max FPS
 			)
-			comOpen;
+			comOpen; 
 		}
 		
-		ubyte[] inBuf, outBuf;
+		ubyte[] inBuf, outBuf; 
 		
 		if(enabled && hCom)
 		{
 			//read if can
-			ubyte[4096] buf;
-			uint bytesRead;
+			ubyte[4096] buf; 
+			uint bytesRead; 
 			again: if(ReadFile(hCom, buf.ptr, buf.length, &bytesRead, null))
 			{
 				if(bytesRead>0)
 				{
 					inBuf ~= buf[0..bytesRead]; //Todo: appender???
-					goto again;
+					goto again; 
 				}
 				
 			}
@@ -198,83 +198,83 @@ private void comPortWorker(shared ComPort owner_)
 			if(owner.terminated)
 			{
 				owner.terminated = 2; //ack
-				CloseHandle(hCom);
-				break;
+				CloseHandle(hCom); 
+				break; 
 			}
 			
 			//latch outgoing data
-			settings = owner.settings;
-			outBuf = owner.outBuf;
-			owner.outBuf = [];
+			settings = owner.settings; 
+			outBuf = owner.outBuf; 
+			owner.outBuf = []; 
 			
 			//latch incoming data
 			if(inBuf.length)
 			{
-				owner.inBuf ~= inBuf;
-				owner.stats.lastIncomingDataTime = now;
-				owner.stats.bytesIn += inBuf.length;
+				owner.inBuf ~= inBuf; 
+				owner.stats.lastIncomingDataTime = now; 
+				owner.stats.bytesIn += inBuf.length; 
 			}
-		}
+		} 
 		
 		if(enabled && hCom && outBuf.length)
 		{
 			//write if there is something in outBuf
 			
-			uint bytesWritten;
+			uint bytesWritten; 
 			if(WriteFile(hCom, outBuf.ptr, cast(uint)outBuf.length, &bytesWritten, null))
 			{
 				//Todo: verify bytesWritten
 				synchronized(owner)
-				{ owner.stats.bytesOut += bytesWritten; }
+				{ owner.stats.bytesOut += bytesWritten; } 
 			}
 			else
 			{
-				error("WriteFile error: "~getLastErrorStr);
+				error("WriteFile error: "~getLastErrorStr); 
 				comClose; //close it as it will be unable to recover anyways
 			}
 		}
 		
-		sleep(10);
+		sleep(10); 
 	}//endless loop
 	
-}
+} 
 
 
 class ComPort
 {
-	import std.concurrency;
+	import std.concurrency; 
 	
-	@STORED ComPortSettings settings;
+	@STORED ComPortSettings settings; 
 	
-	ComPortProtocol protocol;
+	ComPortProtocol protocol; 
 	string prefix; //messages: Packet protocols, Application dependent prefix. both for incoming and outgoing messages.
-	bool showErrors;
+	bool showErrors; 
 	
 	protected ubyte[] inBuf, outBuf; //must synchronize
 	
 	protected string lineBuf; //messages buffer
 	protected ubyte[] binaryBuf; //used in binary mode
 	
-	uint maxLineBufSize = 4096;
+	uint maxLineBufSize = 4096; 
 	
 	//stats
-	ComPortStats stats;
+	ComPortStats stats; 
 	
-	protected Tid workerTid;
-	protected int terminated;
+	protected Tid workerTid; 
+	protected int terminated; 
 	
 	protected bool workerHasError; //latched string
-	protected string workerError;
+	protected string workerError; 
 	
 	this()
-	{ workerTid = spawn(&comPortWorker, cast(shared)this); }
+	{ workerTid = spawn(&comPortWorker, cast(shared)this); } 
 	
 	~this()
 	{
-		terminated = 1;
+		terminated = 1; 
 		while(terminated != 2)
-		sleep(1);
-	}
+		sleep(1); 
+	} 
 	
 	override string toString() const
 	{
@@ -285,129 +285,129 @@ class ComPort
 			errorCnt, dataErrorCnt,
 			messagesOut, shortSizeText!1024(bytesOut),
 			messagesIn, shortSizeText!1024(bytesIn)
-		);
-	}
+		); 
+	} 
 	
 	private void error(string s)
 	{
 		if(s=="")
 		{
-			stats.lastError = "";
-			stats.lastErrorTime = DateTime.init;
+			stats.lastError = ""; 
+			stats.lastErrorTime = DateTime.init; 
 		}
 		else
 		{
-			stats.errorCnt++;
-			stats.lastError = s;
-			stats.lastErrorTime = now;
+			stats.errorCnt++; 
+			stats.lastError = s; 
+			stats.lastErrorTime = now; 
 			if(showErrors)
-			ERR(s);
+			ERR(s); 
 		}
-	}
+	} 
 	
 	@property inout ref enabled()
-	{ return settings.enabled; }
+	{ return settings.enabled; } 
 	
 	bool opened() const
-	{ return stats.opened; }
+	{ return stats.opened; } 
 	bool active() const
-	{ return enabled && opened; }
+	{ return enabled && opened; } 
 	
 	//ComPort - simple message protocol /////////////////////////
 	
 	static int computeCheckSum(string s)
-	{ return (cast(ubyte[])s).sum &0xFF; }
+	{ return (cast(ubyte[])s).sum &0xFF; } 
 	
 	void send(in void[] msg)
 	{
 		synchronized(this)
 		{
-		final switch(protocol)
-		{
-			case ComPortProtocol.raw:
-				outBuf ~= cast(ubyte[])msg;
-			break;
-			case ComPortProtocol.textPackets:
-				const str = cast(string)msg;
-				outBuf ~= cast(ubyte[])(format!"%s%s~%x\n"(prefix, str, computeCheckSum(str)));
-				stats.messagesOut ++;
-			break;
-			case ComPortProtocol.binaryPackets:
-				outBuf ~= cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n");
-				stats.messagesOut ++;
-			break;
-		}
-		}
-	}
+			final switch(protocol)
+			{
+				case ComPortProtocol.raw: 
+					outBuf ~= cast(ubyte[])msg; 
+				break; 
+				case ComPortProtocol.textPackets: 
+					const str = cast(string)msg; 
+					outBuf ~= cast(ubyte[])(format!"%s%s~%x\n"(prefix, str, computeCheckSum(str))); 
+					stats.messagesOut ++; 
+				break; 
+				case ComPortProtocol.binaryPackets: 
+					outBuf ~= cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n"); 
+					stats.messagesOut ++; 
+				break; 
+			}
+		} 
+	} 
 	
-	private size_t lastSettingsHash;
+	private size_t lastSettingsHash; 
 	
 	void receive(T)(void delegate(T) fun)
 	{
 		//latch inconing data
-		ubyte[] raw;
+		ubyte[] raw; 
 		synchronized(this)
 		{
-			raw = inBuf;
-			inBuf = [];
+			raw = inBuf; 
+			inBuf = []; 
 			
 			if(chkClear(workerHasError))
-			error(workerError);
-		}
+			error(workerError); 
+		} 
 		
 		if(raw.empty)
-		return;
+		return; 
 		
 		void returnPacket(U)(U data)
 		{
-			stats.messagesIn++;
-			stats.lastIncomingMessageTime = now;
+			stats.messagesIn++; 
+			stats.lastIncomingMessageTime = now; 
 			
 			try
 			{
-				static assert(is(T==string) || !isSomeString!T, "Only string (of char) or other nonstring types supported.");
+				static assert(is(T==string) || !isSomeString!T, "Only string (of char) or other nonstring types supported."); 
 				
 				static if(is(T==string) && !is(U==string))
-				fun((cast(string)data).safeUTF8);
+				fun((cast(string)data).safeUTF8); 
 				else
-				fun(cast(T)data);
+				fun(cast(T)data); 
 				
 				
 			}catch(Exception e)
 			{ ERR("Unhandled Exception in receive().", e.simpleMsg); }
-		}
+		} 
 		
 		void processRaw()
-		{ returnPacket(raw); }
+		{ returnPacket(raw); } 
 		
 		void processBinaryPackets()
 		{
-			binaryBuf ~= raw;
+			binaryBuf ~= raw; 
 			while(1)
 			{
-				const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n'));
+				const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n')); 
 				if(idx<0)
-				break;
+				break; 
 				
-				auto actLine = binaryBuf[0..idx];
-				binaryBuf = binaryBuf[idx+prefix.length+1..$];
+				auto actLine = binaryBuf[0..idx]; 
+				binaryBuf = binaryBuf[idx+prefix.length+1..$]; 
 				if(actLine.length<4)
 				{
-					stats.dataErrorCnt++;
-					error("Binary message too small. Can't check crc32.");
+					stats.dataErrorCnt++; 
+					error("Binary message too small. Can't check crc32."); 
 				}
 				else
 				{
-					const crc = (cast(uint[])actLine[$-4..$])[0];
-					actLine = actLine[0..$-4];
-					const crc2 = actLine.crc32;
+					const crc = (cast(uint[])actLine[$-4..$])[0]; 
+					actLine = actLine[0..$-4]; 
+					const crc2 = actLine.crc32; 
 					
 					if(crc==crc2)
 					{ returnPacket(actLine); }
 					else
 					{
-						error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)");
-						stats.dataErrorCnt++;
+						error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)"); 
+						stats.dataErrorCnt++; 
 					}
 				}
 			}
@@ -415,76 +415,76 @@ class ComPort
 			if(binaryBuf.length>maxLineBufSize)
 			{
 				 //Todo: refactor: maxMessageBytes
-				binaryBuf = [];
-				stats.dataErrorCnt++;
-				error("Receiving garbage instead of valid packages: "~prefix.quoted);
+				binaryBuf = []; 
+				stats.dataErrorCnt++; 
+				error("Receiving garbage instead of valid packages: "~prefix.quoted); 
 			}
-		}
+		} 
 		
 		void processTextPackets()
 		{
-			lineBuf = (cast(string)raw).safeUTF8;
+			lineBuf = (cast(string)raw).safeUTF8; 
 			
 			while(1)
 			{
 				const idx = lineBuf.indexOf('\n'); //Todo: variable declaration in while condition. Needs latest LDC.
 				if(idx<0)
 				break; //Todo: if no \n received after a timeout, that's an error too.
-				const actLine = lineBuf[0..idx];
-				lineBuf = lineBuf[idx+1..$];
+				const actLine = lineBuf[0..idx]; 
+				lineBuf = lineBuf[idx+1..$]; 
 				
 				//check msg checkSum
-				const cIdx = actLine.retro.indexOf('~');
+				const cIdx = actLine.retro.indexOf('~'); 
 				
 				if(actLine.startsWith(prefix) && cIdx>0)
 				{
 					const
 						msg = actLine[prefix.length..$-cIdx-1],
 						crc = actLine[$-cIdx..$],
-						crc2 = computeCheckSum(msg).format!"%x";
+						crc2 = computeCheckSum(msg).format!"%x"; 
 					
 					if(crc==crc2)
 					{ returnPacket(msg); }
 					else
 					{
-						error("Crc error: "~msg.quoted);
-						stats.dataErrorCnt++;
+						error("Crc error: "~msg.quoted); 
+						stats.dataErrorCnt++; 
 					}
 				}
 				else
 				{
-					stats.dataErrorCnt++;
-					error("Invalid package format: "~actLine.quoted);
+					stats.dataErrorCnt++; 
+					error("Invalid package format: "~actLine.quoted); 
 				}
 			}
 			
 			if(lineBuf.length>=maxLineBufSize)
 			{
-				lineBuf = [];
-				stats.dataErrorCnt++;
-				error("Receiving garbage instead of valid packages: "~prefix.quoted);
+				lineBuf = []; 
+				stats.dataErrorCnt++; 
+				error("Receiving garbage instead of valid packages: "~prefix.quoted); 
 			}
-		}
+		} 
 		
 		final switch(protocol)
 		{
-			case ComPortProtocol.raw        : processRaw	; break;
-			case ComPortProtocol.binaryPackets: processBinaryPackets	; break;
-			case ComPortProtocol.textPackets: processTextPackets	; break;
-		} //end switch
-	}
+			case ComPortProtocol.raw       : processRaw	; break; 
+			case ComPortProtocol.binaryPackets: processBinaryPackets	; break; 
+			case ComPortProtocol.textPackets: processTextPackets	; break; 
+		}//end switch
+	} 
 	
 	bool thereWasAnError() const
-	{ return stats.lastErrorTime > stats.lastIncomingMessageTime; }
+	{ return stats.lastErrorTime > stats.lastIncomingMessageTime; } 
 	
 	bool thereWasAMessage(in Time since=9999*second, in Time blink=0*second) const
 	{
 		if(thereWasAnError)
-		return false;
+		return false; 
 		const 	t = stats.lastIncomingMessageTime,
-			t0 = now;
-		return t && t>=t0-since && t<t0-blink;;
-	}
+			t0 = now; 
+		return t && t>=t0-since && t<t0-blink; ; 
+	} 
 	
 	void UI(string title = "", void delegate() fun = null)
 	{
@@ -497,73 +497,73 @@ class ComPort
 				{
 					ChkBox(this.enabled, "Enabled");  //Todo: enabled conflicts with im.enable
 					
-					Text("  ");
+					Text("  "); 
 					
-					Row({ Led(opened, clLime); Text("Open"); });
+					Row({ Led(opened, clLime); Text("Open"); }); 
 					
-					Text("  ");
+					Text("  "); 
 					
 					Row(
 						{
 							if(!this.enabled)
-							Led(false, clGray);
-							else if(thereWasAnError) Led(true, clRed);
+							Led(false, clGray); 
+							else if(thereWasAnError) Led(true, clRed); 
 							else
-							Led(thereWasAMessage(1*hour, (1.0f/20)*second), clLime);
+							Led(thereWasAMessage(1*hour, (1.0f/20)*second), clLime); 
 							
-							Text("Comm");
+							Text("Comm"); 
 						}
-					);
+					); 
 					
-					Text("  ");
+					Text("  "); 
 					
 					if(fun)
-					fun();
+					fun(); 
 				}
-			);
+			); 
 			
 			Row(
 				{
-					Text("Port\t");
-					Edit(settings.port, { width = fh*3; });
+					Text("Port\t"); 
+					Edit(settings.port, { width = fh*3; }); 
 					
-					static bool choosePort;
+					static bool choosePort; 
 					if(!choosePort)
 					{
 						if(Btn("..."))
-						choosePort = true;
+						choosePort = true; 
 					}
 					else
 					{
-						Text(" Select ");
+						Text(" Select "); 
 						foreach(p; comPorts.existingPorts)
 						{
 							if(Btn(p.name, selected(sameText(p.name, settings.port)), hint([p.description, p.deviceId].join(' ')), genericId(p.id)))
 							{
-								settings.port = p.name;
-								choosePort = false;
+								settings.port = p.name; 
+								choosePort = false; 
 							}
 						}
 						if(Btn("\u25C0", hint("Cancel Serial Port selection.")))
-						choosePort = false;
+						choosePort = false; 
 					}
 				}
-			);
+			); 
 			
-			Row("Stats\t", { Static(toString.split(" ")[2..$].join(" ")); });
+			Row("Stats\t", { Static(toString.split(" ")[2..$].join(" ")); }); 
 			
 			Row(
 				"Error\t", {
-					Static(stats.lastError=="" ? " " : stats.lastError, { /*flex = 1;*/ });
+					Static(stats.lastError=="" ? " " : stats.lastError, { /*flex = 1;*/}); 
 					if(Btn("Clear"))
-					stats.lastError = "";
+					stats.lastError = ""; 
 				}
-			);
+			); 
 			
 			//Todo: statistics
 		}
-	}
-}
+	} 
+} 
 
 
 class ComPortInfo
@@ -571,59 +571,59 @@ class ComPortInfo
 	 //ComPortInfo //////////////////////////////////////////////////
 	
 	enum Parity
-	{ none, odd, even, mark, space }	 enum ParityLetters = ["N","O","E","M","S"];
+	{ none, odd, even, mark, space} 	 enum ParityLetters = ["N","O","E","M","S"]; 
 	enum StopBits
-	{ one, onePointFive, two }	 enum StopBitStrings = ["1", "1.5", "2"];
+	{ one, onePointFive, two} 	 enum StopBitStrings = ["1", "1.5", "2"]; 
 	enum ComPortState
-	{ offline, online, createError, writeError }
+	{ offline, online, createError, writeError} 
 	
 	mixin template ReadonlyField(T, string name, string _default="$.init")
-	{ mixin("private $ _*=#; @property auto *() const{ return _*; }".replace('#', _default).replace('$', T.stringof).replace('*', name)); }
+	{ mixin("private $ _*=#; @property auto *() const{ return _*; }".replace('#', _default).replace('$', T.stringof).replace('*', name)); } 
 	
-	mixin ReadonlyField!(int	  , "id");
-	mixin ReadonlyField!(bool	  ,	"exists");
-	mixin ReadonlyField!(string		, "description");
-	mixin ReadonlyField!(string		, "deviceId");
+	mixin ReadonlyField!(int	  , "id"); 
+	mixin ReadonlyField!(bool	  ,	"exists"); 
+	mixin ReadonlyField!(string		, "description"); 
+	mixin ReadonlyField!(string		, "deviceId"); 
 	
 	@property string name() const
-	{ return "COM"~id.text; }
+	{ return "COM"~id.text; } 
 	
-	enum defaultBaud = 9600, defaultBits = 8;
+	enum defaultBaud = 9600, defaultBits = 8; 
 	
 	//@SUGGESTIONS([2400u, 4800, 9600, 14400, 19200, 38400, 57600, 115200, 128000, 256000]);
-	uint baud = defaultBaud;
+	uint baud = defaultBaud; 
 	
 	//@SUGGESTIONS([ubyte(5), 6, 7, 8])
-	ubyte bits = defaultBits;
+	ubyte bits = defaultBits; 
 	
-	Parity parity;
-	StopBits stopBits;
-	ComPortState state;
+	Parity parity; 
+	StopBits stopBits; 
+	ComPortState state; 
 	
 	@property
 	{
 		auto config() const
-		{ return format!"%s %s%s%s"(baud, bits, ParityLetters.get(cast(int) parity), StopBitStrings.get(cast(int) stopBits)); }
+		{ return format!"%s %s%s%s"(baud, bits, ParityLetters.get(cast(int) parity), StopBitStrings.get(cast(int) stopBits)); } 
 		
 		void config(string s)
 		{
 			  //Todo: refactor com port config
-			baud = defaultBaud;
-			bits = defaultBits;
-			parity = Parity.none;
-			stopBits = StopBits.one;
+			baud = defaultBaud; 
+			bits = defaultBits; 
+			parity = Parity.none; 
+			stopBits = StopBits.one; 
 			
 			if(s.isWild("?* ?*"))
 			{
 				baud = wild.ints(0, defaultBaud);               //print(baud);
 				
-				s = wild[1].uc;
+				s = wild[1].uc; 
 				
 				//get bits from the start
 				if(s.length>=1 && s[0].inRange('5', '8'))
 				{
 					bits = s[0..1].to!ubyte;                      //print(bits);
-					s = s[1..$];
+					s = s[1..$]; 
 				}
 				
 				//get stopBits.from the end
@@ -631,8 +631,8 @@ class ComPortInfo
 				if(s.endsWith(p))
 				{
 					stopBits = cast(StopBits) idx;                //print(stopBits);
-					s = s[0..$-p.length];
-					break;
+					s = s[0..$-p.length]; 
+					break; 
 				}
 				
 				//get the Parity
@@ -640,105 +640,105 @@ class ComPortInfo
 				if(s.startsWith(p))
 				{
 					parity = cast(Parity) idx;                    //print(parity);
-					s = s[0..$-p.length];
-					break;
+					s = s[0..$-p.length]; 
+					break; 
 				}
 				
 			}
-		}
+		} 
 		
 		this(int id)
 		{
 			 //1based
-			enforce(id.inRange(1, ComPorts.totalPorts));
-			_id = id;
+			enforce(id.inRange(1, ComPorts.totalPorts)); 
+			_id = id; 
 			
-			readConfigFromRegistry;
-		}
+			readConfigFromRegistry; 
+		} 
 		
 		private void readConfigFromRegistry()
 		{
 			try
 			{
-				auto key = ComPorts.regKeyPortConfig;
+				auto key = ComPorts.regKeyPortConfig; 
 				if(key is null)
-				return;
-				string s = key.getValue("COM"~text(id)~":").value_SZ;
+				return; 
+				string s = key.getValue("COM"~text(id)~":").value_SZ; 
 				if(isWild(s, "*,*,*,*"))
 				{
 					 //baud,parity,bits,stopBits
-					string configInRegistry = format!"%s %s%s%s"(wild[0], wild[2], wild[1].uc, wild[3]);
+					string configInRegistry = format!"%s %s%s%s"(wild[0], wild[2], wild[1].uc, wild[3]); 
 					//print("COM"~id.text~":", "Reading portConfig from registry:", s, configInRegistry);
-					config = configInRegistry;
+					config = configInRegistry; 
 				}
 			}catch(Throwable)
 			{}
-		}
+		} 
 		
 		private void writeConfigToRegistry()
 		{
 			try
 			{
-				auto s = format!"%s,%s,%s,%s"(baud, (parity.text)[0], bits, StopBitStrings[cast(int)stopBits]);
-				auto key = ComPorts.regKeyPortConfig_write;
+				auto s = format!"%s,%s,%s,%s"(baud, (parity.text)[0], bits, StopBitStrings[cast(int)stopBits]); 
+				auto key = ComPorts.regKeyPortConfig_write; 
 				if(key is null)
-				return;
-				key.setValue("COM"~text(id)~":", s);
+				return; 
+				key.setValue("COM"~text(id)~":", s); 
 				//print("COM"~id.text~":", "Written portConfig to registry:", s);
 			}catch(Throwable)
 			{}
-		}
+		} 
 		
 		override string toString() const
-		{ return format!`ComPort(COM%s, %s, %s, config="%s", description="%s", deviceId="%s")`(id, exists ? "exists" : "absent", state.text, config, description, deviceId); }
+		{ return format!`ComPort(COM%s, %s, %s, config="%s", description="%s", deviceId="%s")`(id, exists ? "exists" : "absent", state.text, config, description, deviceId); } 
 		
-	}
+	} 
 	
-}
+} 
 
 class ComPorts
 {
 	 //ComPorts //////////////////////////////////////////////////////////
-	enum totalPorts = 32;
+	enum totalPorts = 32; 
 	
-	ComPortInfo[] ports;
+	ComPortInfo[] ports; 
 	
 	auto opIndex(int idx)
-	{ return ports.get(idx-1); }
+	{ return ports.get(idx-1); } 
 	
 	auto existingPorts()
-	{ return ports.filter!("a.exists"); }
+	{ return ports.filter!("a.exists"); } 
 	
 	//cache some registry keys
 	//private __gshared static Key regKeyPortConfig_read, regKeyPortConfig_write;
 	
 	static Key regKeyPortConfig      ()
-	{ return Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion\Ports`); }
+	{ return Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion\Ports`); } 
 	static Key regKeyPortConfig_write()
-	{ return Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion\Ports`, std.windows.registry.REGSAM.KEY_ALL_ACCESS); }
+	{ return Registry.localMachine.getKey(`Software\Microsoft\Windows NT\CurrentVersion\Ports`, std.windows.registry.REGSAM.KEY_ALL_ACCESS); } 
 	
 	this()
 	{
 		//create ports
-		ports = iota(totalPorts).map!(i => new ComPortInfo(i+1)).array;
+		ports = iota(totalPorts).map!(i => new ComPortInfo(i+1)).array; 
 		
-		updateDeviceInfo;
+		updateDeviceInfo; 
 		
-		import std.concurrency : spawn;
-		spawn(&worker);
-	}
+		import std.concurrency : spawn; 
+		spawn(&worker); 
+	} 
 	
 	override string toString() const
-	{ return ports.map!text.join("\n"); }
+	{ return ports.map!text.join("\n"); } 
 	
 	static void worker()
 	{
 		while(1)
 		{
-			sleep(1000);
+			sleep(1000); 
 			comPorts.updateDeviceInfo; //below 1ms
 		}
-	}
+	} 
 	
 	private void updateDeviceInfo()
 	{
@@ -747,52 +747,52 @@ class ComPorts
 		{
 			if(name.isWild("COM?*"))
 			{
-				com = wild.ints(0);
-				return this[com] !is null;
+				com = wild.ints(0); 
+				return this[com] !is null; 
 			}
 			else
 			{ return false; }
-		}
+		} 
 		
 		struct PortDecl
-		{ string name, deviceId; }
+		{ string name, deviceId; } 
 		
-		PortDecl[int] portMap;
+		PortDecl[int] portMap; 
 		
 		void updatePortDecl(int idx, Key key)
 		{
 			try
 			{
-				string devId;
+				string devId; 
 				try
 				{ devId = key.getValue("MatchingDeviceId").value_SZ; }catch(Throwable)
 				{}
-				portMap[idx] = PortDecl(key.getValue("DriverDesc").value_SZ, devId);
+				portMap[idx] = PortDecl(key.getValue("DriverDesc").value_SZ, devId); 
 			}catch(Throwable)
 			{}
-		}
+		} 
 		
 		void findExistingPorts()
 		{
 			try
 			{
-				auto baseKey = Registry.localMachine.getKey(`HARDWARE\DEVICEMAP\SERIALCOMM`);
+				auto baseKey = Registry.localMachine.getKey(`HARDWARE\DEVICEMAP\SERIALCOMM`); 
 				foreach(a; baseKey.values)
 				try
 				{
-					int idx;
+					int idx; 
 					if(decodePortIdx(a.value_SZ, idx))
 					{
-						portMap[idx] = PortDecl(a.name.withoutStarting(`\Device\`));
+						portMap[idx] = PortDecl(a.name.withoutStarting(`\Device\`)); 
 						
 						//try to get comport info
 						if(a.name.isWild(`\Device\Serial?*`))
 						{
-							const serialIdx = wild.ints(0, -1);
+							const serialIdx = wild.ints(0, -1); 
 							if(serialIdx>=0)
 							{
-								auto key = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Control\Class\{4D36E978-E325-11CE-BFC1-08002BE10318}\` ~ format!"%.4d"(serialIdx));
-								updatePortDecl(idx, key);
+								auto key = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Control\Class\{4D36E978-E325-11CE-BFC1-08002BE10318}\` ~ format!"%.4d"(serialIdx)); 
+								updatePortDecl(idx, key); 
 							}
 						}
 						
@@ -803,38 +803,38 @@ class ComPorts
 			}
 			catch(Throwable)
 			{}
-		}
+		} 
 		
 		void findModems()
 		{
 			try
 			{
-				auto baseKey = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Control\Class\{4D36E96D-E325-11CE-BFC1-08002BE10318}`);
+				auto baseKey = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Control\Class\{4D36E96D-E325-11CE-BFC1-08002BE10318}`); 
 				foreach(k; baseKey.keys)
 				try
 				{
-					int idx;
+					int idx; 
 					if(decodePortIdx(k.getValue("AttachedTo").value_SZ, idx))
 					if(idx in portMap)
-					updatePortDecl(idx, k);
+					updatePortDecl(idx, k); 
 				}
 				catch(Throwable)
 				{}
 			}
 			catch(Throwable)
 			{}
-		}
+		} 
 		
 		void findUsbSerials(string vid, string pid)
 		{
 			try
 			{
-				auto baseKey = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Enum\USB\VID_`~vid~`&PID_`~pid);
+				auto baseKey = Registry.localMachine.getKey(`SYSTEM\CurrentControlSet\Enum\USB\VID_`~vid~`&PID_`~pid); 
 				foreach(k; baseKey.keys)
 				try
 				{
-					int idx;
-					auto kdp = k.getKey("Device Parameters");
+					int idx; 
+					auto kdp = k.getKey("Device Parameters"); 
 					if(decodePortIdx(kdp.getValue("PortName").value_SZ, idx))
 					{
 						//print("USBSER found", idx);
@@ -843,7 +843,7 @@ class ComPorts
 						{
 							portMap[idx].deviceId = kdp	.getValue("SymbolicName")
 								.value_SZ.withoutStarting(`\??\`)
-								.withoutEnding(`#{a5dcbf10-6530-11d2-901f-00c04fb951ed}`);
+								.withoutEnding(`#{a5dcbf10-6530-11d2-901f-00c04fb951ed}`); 
 						}
 						catch(Throwable)
 						{}
@@ -854,55 +854,55 @@ class ComPorts
 			}
 			catch(Throwable)
 			{}
-		}
+		} 
 		
 		//print("Finding existing COM ports in Registry...");
 		
 		findExistingPorts; //1.4 msec
-		findModems;
+		findModems; 
 		findUsbSerials("04D8", "000A"); //CraftBot std Microsoft Serial
 		findUsbSerials("1A86", "7523"); //Arduino CH34
 		//14 msec
 		
 		static void set(ComPortInfo p, bool exists, string description="", string deviceId="")
 		{
-			p._exists	= exists   ;
-			p._description	= description;
-			p._deviceId	= deviceId ;
-		}
+			p._exists	= exists  ; 
+			p._description	= description; 
+			p._deviceId	= deviceId; 
+		} 
 		
 		//unplugged ports
-		int[] unplugged;
+		int[] unplugged; 
 		foreach(p; ports)
 		{
 			if(p.id !in portMap)
 			{
-				unplugged ~= p.id;
-				set(p, false);
+				unplugged ~= p.id; 
+				set(p, false); 
 			}
 		}
 		
-		int[] plugged, replugged;
+		int[] plugged, replugged; 
 		foreach(i; portMap.keys)
 		{
-			auto p = ports[i-1];
-			auto pd = portMap[i];
+			auto p = ports[i-1]; 
+			auto pd = portMap[i]; 
 			if(!p.exists)
 			{
-				set(p, true, pd.name, pd.deviceId);
-				plugged ~= i;
+				set(p, true, pd.name, pd.deviceId); 
+				plugged ~= i; 
 			}
 			else if(p.description != pd.name || p.deviceId != pd.deviceId)
 			{
-				set(p, true, pd.name, pd.deviceId);
-				replugged ~= i;
+				set(p, true, pd.name, pd.deviceId); 
+				replugged ~= i; 
 			}
 		}
 		
-		auto changed = plugged.length || unplugged.length || replugged.length;
+		auto changed = plugged.length || unplugged.length || replugged.length; 
 		//Todo: process changes
-	}
+	} 
 	
-}
+} 
 
-alias comPorts = Singleton!ComPorts;
+alias comPorts = Singleton!ComPorts; 

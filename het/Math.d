@@ -53,7 +53,7 @@ version(/+$DIDE_REGION+/all)
 	
 	private enum approxEqualDefaultDiff = 1e-3f; 
 	
-	//todo: use Phobos's isClose instead of my own approxEqual!
+	//Todo: use Phobos's isClose instead of my own approxEqual!
 	
 	//Todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 	
@@ -529,9 +529,9 @@ version(/+$DIDE_REGION+/all)
 	
 	//define aliases for colors
 	
-	alias RG8	= Vector!(ubyte, 2),	 RG	= RG8; 
-	alias RGB8	= Vector!(ubyte, 3),	 RGB	= RGB8; 
-	alias RGBA8	= Vector!(ubyte, 4),	 RGBA	= RGBA8; 
+	alias RG8	= Vector!(ubyte, 2)	, RG	= RG8	,
+	RGB8	= Vector!(ubyte, 3)	, RGB	= RGB8	,
+	RGBA8 	= Vector!(ubyte, 4)	, RGBA 	= RGBA8	; 
 	
 	auto BGR (T...)(in T args)
 	{ return RGB (args).bgr; } 
@@ -2615,7 +2615,7 @@ version(/+$DIDE_REGION+/all)
 					//Todo: must do this with a global function!!! 
 					//The problem is that need to pass the type and elementcount to it.
 					mixin("import het.bitmap : serialize;"); 
-					mixin("import het.utils : File, saveTo, withoutStarting;"); 
+					mixin("import het : File, saveTo, withoutStarting;"); 
 					auto f = File(file); 
 					saveTo(this.serialize(f.ext.withoutStarting('.')), f); 
 				} 

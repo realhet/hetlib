@@ -1,4 +1,4 @@
-module buildsys;/+DIDE+/ 
+module buildsys; /+DIDE+/ 
 
 //20220428
 //[ ] hldc bug: use a fresh hldc daemon or Shift+F9 -> karc2 rebuild -> it wont kill other compilers after the first error in karc2.d
@@ -25,7 +25,7 @@ module buildsys;/+DIDE+/
 	[-] kill program szinten meghiva a DIDE debug service-t, azt majd tiltani kell. Ugyanis kesobb allandoan mukodni fog ez az exe es emiatt nem csatlakozhat ra a dide-re! Ezen agyalni kell!
 */
 
-import het.utils, het.parser, std.file, std.regex, std.path, std.process;
+import het, het.parser, std.file, std.regex, std.path, std.process; 
 
 
 enum LDCVER = 128; //the targeted LDC version by this builder
@@ -43,38 +43,38 @@ auto predecodeLdcOutput(string input)
 	//^ context position indicator
 	
 	static bool isMessageLine(string line)
-	{ return line.isWild(`?:\*.d*(*): *`)==true; }
+	{ return line.isWild(`?:\*.d*(*): *`)==true; } 
 	static bool isContextPositionLine(string line)
-	{ return line.endsWith('^') && line[0..$-1].map!"a==' '".all; }
+	{ return line.endsWith('^') && line[0..$-1].map!"a==' '".all; } 
 	
 	static struct PredecodedLdcOutput
 	{
-		string[][] messages;
-		string[] pragmas;
+		string[][] messages; 
+		string[] pragmas; 
 		
 		void dump()
 		{
 			
 			void box(string capt, string[] m)
 			{
-				print("\u250C\u2500"~capt~"\u2500".replicate(30));
-				m.each!(a => print("\u2502"~a));
-				print("\u2514"~"\u2500".replicate(5));
-			}
+				print("\u250C\u2500"~capt~"\u2500".replicate(30)); 
+				m.each!(a => print("\u2502"~a)); 
+				print("\u2514"~"\u2500".replicate(5)); 
+			} 
 			
-			box("PRAGMAS", pragmas);
-			messages.each!(m => box("MESSAGE", m));
-		}
-	}
+			box("PRAGMAS", pragmas); 
+			messages.each!(m => box("MESSAGE", m)); 
+		} 
+	} 
 	
-	PredecodedLdcOutput res;
+	PredecodedLdcOutput res; 
 	
-	auto lines = input.splitLines;
+	auto lines = input.splitLines; 
 	
 	if(lines.length && lines[$-1]=="")
 	lines = lines[0..$-1]; //last line is always empty. Just remove it.
 	
-	int lastMessageIdx = -1;
+	int lastMessageIdx = -1; 
 	string[] stack; //contains possible pragma messages
 	
 	void fetchLastMessage(int markerIdx = -1)
@@ -83,24 +83,24 @@ auto predecodeLdcOutput(string input)
 		{
 			
 			if(markerIdx<0)
-			res.pragmas ~= stack;
+			res.pragmas ~= stack; 
 			
-			auto r = lines[lastMessageIdx..(markerIdx>=0 ? markerIdx : lastMessageIdx)+1];
-			res.messages ~= r[0..$-(markerIdx>=0?2:0)];
-			lastMessageIdx = -1;
+			auto r = lines[lastMessageIdx..(markerIdx>=0 ? markerIdx : lastMessageIdx)+1]; 
+			res.messages ~= r[0..$-(markerIdx>=0?2:0)]; 
+			lastMessageIdx = -1; 
 			
 		}else
 		{ res.pragmas ~= stack; }
 		
-		stack = [];
-	}
+		stack = []; 
+	} 
 	
 	foreach(i; 0..lines.length.to!int)
 	{
 		if(isMessageLine(lines[i]))
 		{
-			fetchLastMessage;
-			lastMessageIdx = i;
+			fetchLastMessage; 
+			lastMessageIdx = i; 
 		}else if(
 			isContextPositionLine(lines[i]) &&
 									 i>0 && lines[i-1].length>=lines[i].length && //previous line is sameSize or longer?
@@ -108,46 +108,46 @@ auto predecodeLdcOutput(string input)
 									 lines[i].countUntil('^')== (lines[lastMessageIdx].isWild("*(*,*)*") ? wild.ints(2, -1)-1 : -1) //spaces before marker and column in message are correct?
 		)
 		{ fetchLastMessage(i); }else
-		stack ~= lines[i];
+		stack ~= lines[i]; 
 	}
-	fetchLastMessage;
+	fetchLastMessage; 
 	
-	return res;
-}
+	return res; 
+} 
 
 void test_predecodeLdcOutput()
 {
 	
 	immutable testProgram = q{
 		deprecated("cause") void depr1()
-		{ print("a"); }
+		{ print("a"); } 
 		
 		void depr2()
 		{
-			depr1; depr1;
-			depr1;
-		}
+			depr1; depr1; 
+			depr1; 
+		} 
 		
 		void depr3()
 		{
-			depr2;
-			depr1;
-		}
+			depr2; 
+			depr1; 
+		} 
 		
 		void main()
 		{
-			pragma(msg, "this is just a pragma");
-			iota(5).map!"b+5".print;
-			mixin(`"iota(5).map!"b+5".print;"`);
-			pragma(msg, "this is just a pragma\nwith multiple lines");
-			iota(5).countUntil!((a, b)=>c>d)(5);
-			pragma(msg, "also a pragma");
-			depr3;
-			pragma(msg, "fake markes here");
-			pragma(msg, "       ^");
-			pragma(msg, "end of file");
-		}
-	};
+			pragma(msg, "this is just a pragma"); 
+			iota(5).map!"b+5".print; 
+			mixin(`"iota(5).map!"b+5".print;"`); 
+			pragma(msg, "this is just a pragma\nwith multiple lines"); 
+			iota(5).countUntil!((a, b)=>c>d)(5); 
+			pragma(msg, "also a pragma"); 
+			depr3; 
+			pragma(msg, "fake markes here"); 
+			pragma(msg, "       ^"); 
+			pragma(msg, "end of file"); 
+		} 
+	}; 
 	
 	//C:\D>ldc2 --vcolumns --verrors-context -Ic:\d\libs testMixinError.d
 	
@@ -158,191 +158,193 @@ void test_predecodeLdcOutput()
 						
 								
 										
-												the first pragma
-												c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-												    body
-												    ^
-												c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
-												    body
-												    ^
-												c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-												  depr1; depr1;
-												  ^
-												c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
-												  depr1; depr1;
-												         ^
-												c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-												  depr1;
-												  ^
-												c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
-												  depr1;
-												  ^
-												this is just a pragma
-												c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
-												c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
-												        return fun(_input.front);
-												                  ^
-												c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
-												        return MapResult!(_fun, Range)(r);
-												               ^
-												c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
-												  iota(5).map!"b+5".print;
-												         ^
-												c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
-												this is just a pragma
-												with multiple lines
-												c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
-												  iota(5).countUntil!((a, b)=>c>d)(5);
-												                                  ^
-												c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
-												  with `pred = __lambda1,
-												       R = Result,
-												       Rs = (int)`
-												  must satisfy the following constraint:
-												`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
-												ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
-												          ^
-												c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
-												  with `pred = __lambda1,
-												       R = Result,
-												       N = int`
-												  must satisfy the following constraint:
-												`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
-												ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
-												          ^
-												c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
-												ptrdiff_t countUntil(alias pred, R)(R haystack)
-												          ^
-												also a pragma
-												fake markes here
-												       ^
-												end of file
+												
+														the first pragma
+														c:\d\libs\quantities\internal\dimensions.d(101,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+														    body
+														    ^
+														c:\d\libs\quantities\internal\dimensions.d(136,5): Deprecation: Usage of the `body` keyword is deprecated. Use `do` instead.
+														    body
+														    ^
+														c:\d\testMixinError.d(10,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1; depr1;
+														  ^
+														c:\d\testMixinError.d(10,10): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1; depr1;
+														         ^
+														c:\d\testMixinError.d(11,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1;
+														  ^
+														c:\d\testMixinError.d(16,3): Deprecation: function `testMixinError.depr1` is deprecated - cause
+														  depr1;
+														  ^
+														this is just a pragma
+														c:\D\ldc2\bin\..\import\std\functional.d-mixin-124(124,1): Error: undefined identifier `b`
+														c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(627,19): Error: template instance `std.functional.unaryFun!("b+5", "a").unaryFun!int` error instantiating
+														        return fun(_input.front);
+														                  ^
+														c:\D\ldc2\bin\..\import\std\algorithm\iteration.d(524,16):        instantiated from here: `MapResult!(unaryFun, Result)`
+														        return MapResult!(_fun, Range)(r);
+														               ^
+														c:\d\testMixinError.d(21,10):        instantiated from here: `map!(Result)`
+														  iota(5).map!"b+5".print;
+														         ^
+														c:\d\testMixinError.d-mixin-22(22,15): Error: found `b` when expecting `;` following statement
+														this is just a pragma
+														with multiple lines
+														c:\d\testMixinError.d(24,35): Error: template `std.algorithm.searching.countUntil` cannot deduce function from argument types `!((a, b) => c > d)(Result, int)`
+														  iota(5).countUntil!((a, b)=>c>d)(5);
+														                                  ^
+														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(770,11):        Candidates are: `countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)`
+														  with `pred = __lambda1,
+														       R = Result,
+														       Rs = (int)`
+														  must satisfy the following constraint:
+														`       allSatisfy!(canTestStartsWith!(pred, R), Rs)`
+														ptrdiff_t countUntil(alias pred = "a == b", R, Rs...)(R haystack, Rs needles)
+														          ^
+														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(858,11):                        `countUntil(alias pred = "a == b", R, N)(R haystack, N needle)`
+														  with `pred = __lambda1,
+														       R = Result,
+														       N = int`
+														  must satisfy the following constraint:
+														`       is(typeof(binaryFun!pred(haystack.front, needle)) : bool)`
+														ptrdiff_t countUntil(alias pred = "a == b", R, N)(R haystack, N needle)
+														          ^
+														c:\D\ldc2\bin\..\import\std\algorithm\searching.d(917,11):                        `countUntil(alias pred, R)(R haystack)`
+														ptrdiff_t countUntil(alias pred, R)(R haystack)
+														          ^
+														also a pragma
+														fake markes here
+														       ^
+														end of file
+													
 											
 									
 							
 					
 			
-	}";
+	}"; 
 	//Todo: This fucking tokenstring keeps growing on save/reload.
 	
-	inputText.predecodeLdcOutput.dump;
-}
+	inputText.predecodeLdcOutput.dump; 
+} 
 
 
 class Executor
 {
 	 //Executor ///////////////////////////////////////
-	import std.process, std.file : chdir;
+	import std.process, std.file : chdir; 
 	
 	//input data
-	string[] cmd;
-	string[string] env;
-	Path workPath, logPath;
+	string[] cmd; 
+	string[string] env; 
+	Path workPath, logPath; 
 	
 	//temporal	data
-	File	logFile/+,    errFile+/;
-	StdFile stdLogFile/+, stdErrFile+/;
-	Pid pid;
+	File	logFile/+,    errFile+/; 
+	StdFile stdLogFile/+, stdErrFile+/; 
+	Pid pid; 
 	
 	//output data
-	string output;
-	int result;
-	bool ended;
+	string output; 
+	int result; 
+	bool ended; 
 	
 	this()
-	{}
+	{} 
 	
 	this(bool startNow, in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path logPath = Path.init)
 	{
-		this();
-		(startNow ? &start : &setup)(cmd, env, workPath, logPath);
-	}
+		this(); 
+		(startNow ? &start : &setup)(cmd, env, workPath, logPath); 
+	} 
 	
 	
 	enum State
-	{ idle, running, finished }
+	{ idle, running, finished} 
 	@property
 	{
 		auto state() const
 		{
 			if(pid !is null)
-			return State.running;
+			return State.running; 
 			if(!ended)
-			return State.idle;
-			return State.finished;
-		}
+			return State.idle; 
+			return State.finished; 
+		} 
 		auto isIdle	() const
-		{ return state==State.idle	; }
+		{ return state==State.idle	; } 
 		auto isRunning	() const
-		{ return state==State.running	; }
+		{ return state==State.running	; } 
 		auto isFinished() const
-		{ return state==State.finished; }
-	}
+		{ return state==State.finished; } 
+	} 
 	
 	void reset()
 	{
-		kill;
-		this.clearFields;
-	}
+		kill; 
+		this.clearFields; 
+	} 
 	
 	void setup(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path logPath = Path.init)
 	{
 		if(isRunning)
-		ERR("already running");
-		reset;
-		this.cmd = cmd.dup;
-		this.env = cast(string[string])env;
-		this.workPath = workPath;
-		this.logPath = logPath;
-	}
+		ERR("already running"); 
+		reset; 
+		this.cmd = cmd.dup; 
+		this.env = cast(string[string])env; 
+		this.workPath = workPath; 
+		this.logPath = logPath; 
+	} 
 	
 	void start(in string[] cmd, in string[string] env = null, Path workPath = Path.init, Path logPath = Path.init)
 	{
-		setup(cmd, env, workPath, logPath);
-		start;
-	}
+		setup(cmd, env, workPath, logPath); 
+		start; 
+	} 
 	
 	void start()
 	{
 		if(isRunning)
-		ERR("already running");
+		ERR("already running"); 
 		
 		try
 		{
 			//create logFile default logFile path is tempPath
-			Path actualLogPath = logPath ? logPath : het.utils.tempPath;
-			logFile = File(actualLogPath, this.identityStr ~ ".log");
-			logFile.path.make;
-			stdLogFile = StdFile(logFile.fullName, "w");
+			Path actualLogPath = logPath ? logPath : het.tempPath; 
+			logFile = File(actualLogPath, this.identityStr ~ ".log"); 
+			logFile.path.make; 
+			stdLogFile = StdFile(logFile.fullName, "w"); 
 			
 			//errFile = logFile.otherExt("err");
 			//stdErrFile = StdFile(errFile.fullName, "w");
 			
 			//launch the process
-			pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole, workPath.fullPath);
+			pid = spawnProcess(cmd, stdin, stdLogFile, stdLogFile, env, /*Config.retainStdout | Config.retainStderr | */Config.suppressConsole, workPath.fullPath); 
 			//Note: Config.retainStdout makes it impossible to remove the file after.
 		}catch(Exception e)
 		{
-			result = -1;
-			output = "Error: " ~ e.simpleMsg;
-			ended = true;
-			ignoreExceptions({ stdLogFile.close;         });  ignoreExceptions({ logFile.forcedRemove;     });
+			result = -1; 
+			output = "Error: " ~ e.simpleMsg; 
+			ended = true; 
+			ignoreExceptions({ stdLogFile.close;         });  ignoreExceptions({ logFile.forcedRemove;     }); 
 			//ignoreExceptions({ stdErrFile.close;         });  ignoreExceptions({ errFile.forcedRemove;     });
 		}
-	}
+	} 
 	
 	void update()
 	{
 		//checks if the running process ended.
 		if(pid !is null)
 		{
-			auto w = tryWait(pid);
+			auto w = tryWait(pid); 
 			if(w.terminated)
 			{
-				result = w.status;
-				pid = null;
-				ended = true;
-				ignoreExceptions({ output = logFile.readStr; });
+				result = w.status; 
+				pid = null; 
+				ended = true; 
+				ignoreExceptions({ output = logFile.readStr; }); 
 				
 				//string error; ignoreExceptions({ error = errFile.readStr; });
 				//LOG(mainFile, "CMD", cmd);
@@ -351,11 +353,11 @@ class Executor
 				//Todo: this is only specific for compilers!!!
 				//output = output.splitLines.enumerate.map!(a => format!"%s(%d, 1): Message: %s\n"(mainFile.fullName, a.index+1, a.value)).join ~ error;
 				
-				ignoreExceptions({ logFile.forcedRemove; });
+				ignoreExceptions({ logFile.forcedRemove; }); 
 				//ignoreExceptions({ errFile.forcedRemove; });
 			}
 		}
-	}
+	} 
 	
 	void kill()
 	{
@@ -368,64 +370,64 @@ class Executor
 				WARN(e.extendedMsg); //sometimes it gives "Access is denied.", maybe because it's already dead, so just ignore.
 			}
 			
-			result = -1;
-			output = "Error: Process has been killed.";
-			pid = null;
-			ended = true;
-			ignoreExceptions({ logFile.forcedRemove; });
+			result = -1; 
+			output = "Error: Process has been killed."; 
+			pid = null; 
+			ended = true; 
+			ignoreExceptions({ logFile.forcedRemove; }); 
 			//ignoreExceptions({ errFile.forcedRemove; });
 		}
-	}
+	} 
 	
-}
+} 
 
 /// returns true if it must work more
 bool update(Executor[] executors, bool delegate(int idx, int result, string output) onProgress = null)
 {
-	bool doBreak;
+	bool doBreak; 
 	foreach(i, e; executors)
 	{
 		if(!e.isFinished)
 		{
-			e.update;
+			e.update; 
 			if(e.isFinished && (onProgress !is null))
 			{
-				const doContinue = onProgress(i.to!int, e.result, e.output);
+				const doContinue = onProgress(i.to!int, e.result, e.output); 
 				//LOG("-".replicate(80));
 				//LOG(e.result);
 				//LOG(e.output);
 				if(!doContinue)
-				doBreak = true;
+				doBreak = true; 
 			}
 		}
 		if(doBreak)
-		break;
+		break; 
 	}
 	
 	if(doBreak)
 	{ executors.each!(e => e.kill); }
 	
-	return !executors.all!(e => e.isFinished);
-}
+	return !executors.all!(e => e.isFinished); 
+} 
 
 void executorTest()
 {
-	auto e = new Executor;
+	auto e = new Executor; 
 	
-	print("testing...");
+	print("testing..."); 
 	e.start(
 		["cmd", "/c", "echo", "hello world", "%ENVTEST%", "%CD%"], //commandline
 							["ENVTEST" : "EnvTestValue"], //env override
 							Path(`z:\TEMP`), //workPath
 							Path(`z:\TEMP`)
 	); //logPath for the logFile
-	print(currentPath);
+	print(currentPath); 
 	while([e].update)
 	{ print(e.state, e.result, e.output); sleep(3); }
-	print(e.state, e.result, e.output);
+	print(e.state, e.result, e.output); 
 	
-	print("end of test");
-}
+	print("end of test"); 
+} 
 
 int spawnProcessMulti2(
 	File[] mainFiles, in string[][] cmdLines, 
@@ -436,15 +438,15 @@ int spawnProcessMulti2(
 {
 	//it was developed for running multiple compiler instances.
 	
-	Executor[] executors = cmdLines.map!(a => new Executor(false, a, env, workPath, logPath)).array;
+	Executor[] executors = cmdLines.map!(a => new Executor(false, a, env, workPath, logPath)).array; 
 	
-	DateTime lastLaunchTime;
-	bool cancelled;
+	DateTime lastLaunchTime; 
+	bool cancelled; 
 	while(executors.update(onProgress))
 	{
-		const runningCnt = executors.count!(e => e.isRunning).to!int;
+		const runningCnt = executors.count!(e => e.isRunning).to!int; 
 		
-		int justStartedIdx = -1;
+		int justStartedIdx = -1; 
 		if(!cancelled)
 		if(
 			runningCnt==0 || (
@@ -460,35 +462,35 @@ int spawnProcessMulti2(
 			foreach(i, e; executors)
 			if(e.isIdle)
 			{
-				e.start;
-				lastLaunchTime = now;
-				justStartedIdx = i.to!int;
-				break;
+				e.start; 
+				lastLaunchTime = now; 
+				justStartedIdx = i.to!int; 
+				break; 
 			}
 			
 		}
 		
 		
 		if(onIdle)
-		cancelled |= onIdle(runningCnt, justStartedIdx);
+		cancelled |= onIdle(runningCnt, justStartedIdx); 
 		if(cancelled && runningCnt==0)
-		break;
+		break; 
 		
 		sleep(10); //Todo: config
 	}
 	
-	sOutput = [];
-	auto res = 0;
+	sOutput = []; 
+	auto res = 0; 
 	foreach(e; executors)
 	{
 		if(e.result)
 		res = e.result; //aggregate error codes
 		//combine output and error lof
-		sOutput ~= e.output;
+		sOutput ~= e.output; 
 	}
-	return res;
+	return res; 
 	
-}
+} 
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -583,7 +585,7 @@ Experimental:
 \33\17//@SINGLE\33\7
   Single pass compilation without caching. At the moment it's quite broken.
 "
-	/+Todo: Make this with Table based programming+/;
+	/+Todo: Make this with Table based programming+/; 
 
 //////////////////////////////////////////////////////////////////////////////
 //Common structs                                                          //
@@ -594,34 +596,34 @@ Experimental:
 
 struct EditorFile
 {
-	 align(1):	 //Editor sends it's modified files using this struct
-		char* fileName, source;	 //align1 for Delphi compatibility
-		int length;
-		DateTime dateTime;
-}
+	 align(1): 	 //Editor sends it's modified files using this struct
+		char* fileName, source; 	 //align1 for Delphi compatibility
+		int length; 
+		DateTime dateTime; 
+} 
 
 struct BuildSettings
 {
 	 //Todo: mi a faszert irja ki allandoan az 1 betus roviditest mindenhez???
-	@("v|verbose     = Verbose output. Otherwise it will only display the errors.") bool verbose	;
-	@("m|map         = Generate map file.",	   ) bool generateMap		;
-	@("c|compileOnly = Compile and link only, do not run."	   ) bool	compileOnly	;
-	@("e|leaveObj    = Leave behind .obj and .res files after compilation."	   ) bool leaveObjs	;
-	@("r|rebuild     = Rebuilds everything. Clears all caches."	   ) bool rebuild	;
-	@("I|include     = Add include path to search for .d files."	   ) string[]	importPaths	;
-	@("o|compileOpt  = Pass extra compiler option."		) string[] compileArgs		;
-	@("L|linkOpt     = Pass extra linker option."	   )	string[] linkArgs	;
-	@("y|ldcLinkOpt     = Pass extra LDC linker option."	   )	string[] ldcLinkArgs	;
-	@("k|kill        = Kill currently running executable before compile."	   ) bool killExe	;
-	@("t|todo        = Collect //Todo: and //Opt: comments."	   ) bool collectTodos	;
-	@("n|single      = Single step compilation."	   ) bool singleStepCompilation		;
-	@("w|workPath    = Specify path for temp files. Default = Project's path."	   )	string workPath	;
-	@("a|macroHelp   = Show info about the build-macros."	   ) bool macroHelp	;
+	@("v|verbose     = Verbose output. Otherwise it will only display the errors.") bool verbose	; 
+	@("m|map         = Generate map file.",	   ) bool generateMap		; 
+	@("c|compileOnly = Compile and link only, do not run."	   ) bool	compileOnly	; 
+	@("e|leaveObj    = Leave behind .obj and .res files after compilation."	   ) bool leaveObjs	; 
+	@("r|rebuild     = Rebuilds everything. Clears all caches."	   ) bool rebuild	; 
+	@("I|include     = Add include path to search for .d files."	   ) string[]	importPaths	; 
+	@("o|compileOpt  = Pass extra compiler option."		) string[] compileArgs		; 
+	@("L|linkOpt     = Pass extra linker option."	   )	string[] linkArgs	; 
+	@("y|ldcLinkOpt     = Pass extra LDC linker option."	   )	string[] ldcLinkArgs	; 
+	@("k|kill        = Kill currently running executable before compile."	   ) bool killExe	; 
+	@("t|todo        = Collect //Todo: and //Opt: comments."	   ) bool collectTodos	; 
+	@("n|single      = Single step compilation."	   ) bool singleStepCompilation		; 
+	@("w|workPath    = Specify path for temp files. Default = Project's path."	   )	string workPath	; 
+	@("a|macroHelp   = Show info about the build-macros."	   ) bool macroHelp	; 
 	
 	/// This is needed because the main source header can override the string arrays
 	auto dup() const
 	{
-		BuildSettings res;
+		BuildSettings res; 
 		static foreach(fn; AllFieldNames!BuildSettings)
 		{
 			static if(is(typeof(mixin(fn))==const(string[])))
@@ -630,24 +632,24 @@ struct BuildSettings
 			}else
 			{ mixin("res.*=*;".replace("*", fn)); }
 		}
-		return res;
-	}
+		return res; 
+	} 
 	
 	Path getWorkPath(lazy Path defaultPath)
 	{
-		auto p = Path(workPath);
+		auto p = Path(workPath); 
 		if(!p)
-		p = defaultPath;
-		enforce(!p || p.exists, "WorkPath doesn't exist " ~ p.text);
-		return p;
-	}
-}
+		p = defaultPath; 
+		enforce(!p || p.exists, "WorkPath doesn't exist " ~ p.text); 
+		return p; 
+	} 
+} 
 
 Path getWorkPath(string[] args, lazy Path defaultPath)
 {
-	BuildSettings s; parseOptions(args, s, No.handleHelp);
-	return s.getWorkPath(defaultPath);
-}
+	BuildSettings s; parseOptions(args, s, No.handleHelp); 
+	return s.getWorkPath(defaultPath); 
+} 
 
 
 private struct MSVCEnv
@@ -657,25 +659,25 @@ private struct MSVCEnv
 		 //MSVCEnv ///////////////////////////////
 		private
 		{
-			string[string] amd64, x86;
-			string current;
+			string[string] amd64, x86; 
+			string current; 
 			void get(ref string[string] e, string cmd)
 			{
-				import std.process;
-				auto r = executeShell(cmd, null, Config.suppressConsole).output;
+				import std.process; 
+				auto r = executeShell(cmd, null, Config.suppressConsole).output; 
 				if(r.empty)
-				throw new Exception("Unable to run msvcEnv.bat. Please put LDC2/bin into the PATH.");
+				throw new Exception("Unable to run msvcEnv.bat. Please put LDC2/bin into the PATH."); 
 				
 				void add(string s)
 				{
-					auto i = s.indexOf("=");
+					auto i = s.indexOf("="); 
 					if(i<0)
-					return;
-					auto name = s[0..i], value = s[i+1..$];
-					e[name] = value;
-				}
-				r.lineSplitter.each!add;
-			}
+					return; 
+					auto name = s[0..i], value = s[i+1..$]; 
+					e[name] = value; 
+				} 
+				r.lineSplitter.each!add; 
+			} 
 			
 			string[string] acquire(ref string[string] e, string arch)
 			{
@@ -687,25 +689,25 @@ private struct MSVCEnv
 					}else
 					{ get(e, `msvcenv `~arch~` && set`); }
 				}
-				return e;
-			}
-		}
+				return e; 
+			} 
+		} 
 		
 		string[string] getEnv(bool amd64_)
 		{
 			if(amd64_)
-			return acquire(amd64, "amd64");
-			else return acquire(x86  , "x86"  );
-		}
-	}
-}
+			return acquire(amd64, "amd64"); 
+			else return acquire(x86  , "x86"  ); 
+		} 
+	} 
+} 
 
 //////////////////////////////////////////////////////////////////////////////
 //Hash calculation                                                        //
 //////////////////////////////////////////////////////////////////////////////
 
 private string calcHash(string data, string data2 = "")
-{ return [(data~data2).xxh3_64].binToHex; }
+{ return [(data~data2).xxh3_64].binToHex; } 
 
 //////////////////////////////////////////////////////////////////////////////
 //BuildSys Source File Cache                                              //
@@ -713,57 +715,57 @@ private string calcHash(string data, string data2 = "")
 
 private struct BuildCache
 {
-	private:
+	private: 
 		//first look inside this
-		EditorFile[File] editorFiles;
+		EditorFile[File] editorFiles; 
 	
 		//then look into the filesystem
 		struct Content
 	{
-		File file;
-		string source_original;
-		DateTime dateTime;
-		string hash;
+		File file; 
+		string source_original; 
+		DateTime dateTime; 
+		string hash; 
 		
 		//processed things
-		Parser parser;
-		bool processed;
+		Parser parser; 
+		bool processed; 
 		
 		void unProcess()
 		{
-			processed = false;
-			parser = new Parser();
-		}
+			processed = false; 
+			parser = new Parser(); 
+		} 
 		
 		void process()
 		{
 			parser.tokenize(file.fullName, source_original); //it is needed to extract imported modules and such
 			if(parser.wasError)
-			WARN(parser.errorStr);
-		}
-	}
-		Content[File] cache;
+			WARN(parser.errorStr); 
+		} 
+	} 
+		Content[File] cache; 
 	
-	public:
+	public: 
 		void reset()
-	{ cache.clear; }
+	{ cache.clear; } 
 	
 		void dump()
 	{
 		foreach(ref ch; cache)
-		writeln(ch.file);
+		writeln(ch.file); 
 	} //Todo: editor: ha typo-t ejtek, es egy nekifutasra irtam be a szot, akkor magatol korrigaljon!
 	
 		void setEditorFiles(int count, EditorFile* data)
 	{
-		editorFiles.clear;
+		editorFiles.clear; 
 		foreach(i; 0..count)
 		{
-			auto fn = File(to!string(data[i].fileName));
-			editorFiles[fn] = data[i];
+			auto fn = File(to!string(data[i].fileName)); 
+			editorFiles[fn] = data[i]; 
 		}
-		editorFiles.rehash;
-	}
+		editorFiles.rehash; 
+	} 
 	
 		Content* access(File	file)
 	{
@@ -773,49 +775,49 @@ private struct BuildCache
 		//2	 1	0	load from file if fileDate>cacheDate
 		//3	 1	1	load from editor if editorDate>cacheDate
 		
-		auto ef = file in editorFiles;
-		auto ch = file in cache;
+		auto ef = file in editorFiles; 
+		auto ch = file in cache; 
 		
 		void refresh()
 		{
-			ch.unProcess;
+			ch.unProcess; 
 			if(ef)
 			{
 				 //refresh from editor
-				ch.dateTime = ef.dateTime;
-				ch.source_original = to!string(ef.source[0..ef.length]);
+				ch.dateTime = ef.dateTime; 
+				ch.source_original = to!string(ef.source[0..ef.length]); 
 			}else
 			{
 				 //refresh from file
-				ch.dateTime = file.modified;
+				ch.dateTime = file.modified; 
 				ch.source_original = file.readStr(false); //not mustexists because some files are nonexistent due to conditional imports
 			}
-			ch.hash = calcHash(ch.source_original);
-		}
+			ch.hash = calcHash(ch.source_original); 
+		} 
 		
 		if(!ch)
 		{
 			 //not in cache
-			cache[file] = Content(file);
+			cache[file] = Content(file); 
 			ch = file in cache; //Opt: unoptimal
-			refresh;
+			refresh; 
 		}else
 		{
 			//already in cache
 			auto dt = ef 	? ef.dateTime
-				: file.modified;
+				: file.modified; 
 			if(ch.dateTime<dt)
-			refresh;
+			refresh; 
 		}
 		
 		//access now temporarily has automatic processing
 		if(chkSet(ch.processed))
-		ch.process;
+		ch.process; 
 		
-		return ch;
-	}
+		return ch; 
+	} 
 	
-}
+} 
 
 //Todo: editor: ha ilyen bazinagy commentbe irok, akkor a keretet ne csusztassa el a jobbszelen.
 //Todo: editor: ha ratehenkedek a //-re, es FOLYAMATOSAN nyomom, akkor egeszitse ki 80 char-ig! Ugyanez --ra meg =-re
@@ -829,9 +831,9 @@ private struct BuildCache
 class ModuleInfo
 {
 	File file; //Todo: rename it to just 'file'
-	string fileHash;
-	string moduleFullName;
-	File[] importedFiles;
+	string fileHash; 
+	string moduleFullName; 
+	File[] importedFiles; 
 	string[] importedModuleNames; //Todo: it's fucking lame
 	File[] deps; //dependencies
 	string objHash; //calculated by hashing the dependencies and the compiler flags
@@ -840,16 +842,16 @@ class ModuleInfo
 	
 	this(BuildCache.Content* content)
 	{
-		file = content.file;
-		fileHash = content.hash;
-		sourceLines = content.parser.sourceLines;
-		sourceBytes = content.source_original.length.to!int;
+		file = content.file; 
+		fileHash = content.hash; 
+		sourceLines = content.parser.sourceLines; 
+		sourceBytes = content.source_original.length.to!int; 
 		
-		moduleFullName = content.parser.getModuleFullName;
+		moduleFullName = content.parser.getModuleFullName; 
 		if(moduleFullName.empty)
-		moduleFullName = file.nameWithoutExt;
-	}
-}
+		moduleFullName = file.nameWithoutExt; 
+	} 
+} 
 
 //Todo: editor ha egy wordon allok, akkor a tobbi wordot case sensitiven keresse! Ez mar nem pascal!
 
@@ -867,14 +869,14 @@ void resolveModuleImportDependencies(ref ModuleInfo[] modules)
 	//extend module imports to dependency lists
 	foreach(ref m; modules)
 	{
-		m.deps = m.importedFiles.dup;	//it's depending on it's imports...
-		m.deps.addIfCan(m.file);	//...and itself. (In D a module can import itself too)
+		m.deps = m.importedFiles.dup; 	//it's depending on it's imports...
+		m.deps.addIfCan(m.file); 	//...and itself. (In D a module can import itself too)
 	}
 	
-	bool any;
+	bool any; 
 	do
 	{
-		any = false;
+		any = false; 
 		foreach(ref m1; modules)
 		foreach(ref m2; modules)
 		{
@@ -888,32 +890,32 @@ void resolveModuleImportDependencies(ref ModuleInfo[] modules)
 			}
 		}
 		
-	}while(any);
+	}while(any); 
 	
 	//sort it to make it consequent
-	modules.each!q{a.deps.sort};
-}
+	modules.each!q{a.deps.sort}; 
+} 
 
 void calculateObjHashes(ref ModuleInfo[] modules, string salt)
 {
 	foreach(ref m; modules)
 	{
-		string s = salt~"|"~m.file.fullName;
+		string s = salt~"|"~m.file.fullName; 
 		foreach(dep; m.deps)
 		{
 			s ~= modules.filter!(m => m.file==dep).map!"a.file.fullName~a.fileHash".reduce!"a~b"; //Opt: ez 2x olyan gyors lehetne filter nelkul
 		}
-		m.objHash = calcHash(s);
+		m.objHash = calcHash(s); 
 		//contains hash of all the required filenames and fileContents plus a salt (compiler options)
 	}
-}
+} 
 
 struct SourceStats
 {
 	int 	totalModules,
 		totalLines,
-		totalBytes;
-}
+		totalBytes; 
+} 
 
 
 
@@ -921,81 +923,81 @@ struct BuildSystem
 {
 	private: //current build
 		//input data
-		File mainFile;
+		File mainFile; 
 		Path workPath; //mainly for the .obj files. This is optional.
-		BuildSettings settings;
+		BuildSettings settings; 
 	
 		//flags
 		//bool verbose, compileOnly, generateMap, isWindowedApp, collectTodos, useLDC, singleStepCompilation;
 	
 		//derived data
-		bool isExe, isDll, hasCoreModule, isWindowedApp;
-		File targetFile, mapFile, defFile, resFile;
-		File[string] resFiles;
-		string[] runLines, defLines;
-		ModuleInfo[] modules;
-		string[] todos;
+		bool isExe, isDll, hasCoreModule, isWindowedApp; 
+		File targetFile, mapFile, defFile, resFile; 
+		File[string] resFiles; 
+		string[] runLines, defLines; 
+		ModuleInfo[] modules; 
+		string[] todos; 
 	
 		//cached data
-		BuildCache cache;
-		ubyte[][string] objCache, exeCache, mapCache, resCache;
-		string[string] outputCache;
+		BuildCache cache; 
+		ubyte[][string] objCache, exeCache, mapCache, resCache; 
+		string[string] outputCache; 
 	
 		//flags for special operation (daemon mode)
-		public bool disableKillProgram, isDaemon;
+		public bool disableKillProgram, isDaemon; 
 	
 		//logging
-		public string sLog;
+		public string sLog; 
 		void log(T...)(T args)
 	{
 		if(settings.verbose)
 		{ write(args); console.flush; }
 		foreach(const s; args)
-		sLog ~= to!string(s);
-	}
+		sLog ~= to!string(s); 
+	} 
 		void logln	(T...)(T args)
-	{ log(args, '\n'); }
+	{ log(args, '\n'); } 
 		void logf	(T...)(string fmt, T args)
-	{ log(format(fmt, args)); }
+	{ log(format(fmt, args)); } 
 		void logfln(T...)(string fmt, T args)
-	{ log(format(fmt, args), '\n'); }
+	{ log(format(fmt, args), '\n'); } 
 	
 		//Performance monitoring
 		struct Times
 	{
-		float compile=0, res=0, link=0, all=0;
+		float compile=0, res=0, link=0, all=0; 
 		float other()
-		{ return all-compile-res-link; }
+		{ return all-compile-res-link; } 
 		string report()
 		{
-			float pc = 100/all;
+			float pc = 100/all; 
 			return bold("PERFORMANCE:  ")~
 				format(
 				"All:%.3f  =  Compile:%.3f + RC:%.3f + Link:%.3f + other:%.3f    (%.1f %.1f %.1f %.1f)%%",
 				all, compile   , res   , link   , other   ,
 				compile*pc, res*pc, link*pc, other*pc
-			);
-		}
-	}
-		Times times;
+			); 
+		} 
+	} 
+		Times times; 
 	
 		struct Perf
 	{
-		float *t;
-		DateTime T0;
+		float *t; 
+		DateTime T0; 
 		this(ref float f)
-		{ T0 = now; t = &f; }
+		{ T0 = now; t = &f; } 
 		~this()
-		{ *t += (now-T0).value(second); }
-	}
+		{ *t += (now-T0).value(second); } 
+	} 
 		static perf(string f)
-	{ return "auto _perfMeasurerStruct = Perf(times."~f~");"; }
+	{ return "auto _perfMeasurerStruct = Perf(times."~f~");"; } 
 	
 		void prepareMapPdbResDef()
 	{
 		//mapFile
-		File mf = targetFile.otherExt(".map");
-		mf.remove;
+		File mf = targetFile.otherExt(".map"); 
+		mf.remove; 
 		if(settings.generateMap)
 		{ mapFile = mf; }
 		
@@ -1004,147 +1006,147 @@ struct BuildSystem
 		
 		//defFile
 		File df = targetFile.otherExt(".def"); //Todo: redundant
-		df.remove;
+		df.remove; 
 		if(!defLines.empty)
 		{
-			defFile = df;
-			string defContent = defLines.join("\r\n");
-			defFile.write(defContent);
+			defFile = df; 
+			string defContent = defLines.join("\r\n"); 
+			defFile.write(defContent); 
 			foreach(idx, line; defLines)
-			logln(idx ? " ".replicate(5):bold("DEF: "), line);
+			logln(idx ? " ".replicate(5):bold("DEF: "), line); 
 		}
 		
 		//resFile
 		if(resFiles.length>0)
-		resFile = targetFile.otherExt(".res");
-		else resFile = File("");
+		resFile = targetFile.otherExt(".res"); 
+		else resFile = File(""); 
 		
-	}
+	} 
 	
 		void initData(File mainFile_)
 	{
 		 //clears the above
-		mainFile = mainFile_.actualFile;
-		enforce(mainFile.exists, "Can't open main project file: "~mainFile.fullName);
+		mainFile = mainFile_.actualFile; 
+		enforce(mainFile.exists, "Can't open main project file: "~mainFile.fullName); 
 		
-		DPaths.init;
-		DPaths.addImportPath(mainFile.path.fullPath);
-		DPaths.addImportPath(`c:\d\libs\`);
+		DPaths.init; 
+		DPaths.addImportPath(mainFile.path.fullPath); 
+		DPaths.addImportPath(`c:\d\libs\`); 
 		
-		isExe = isDll = hasCoreModule = isWindowedApp = false;
-		targetFile = File("");
-		workPath = Path("");
-		runLines			 .clear;
-		defLines			 .clear;
-		resFiles			 .clear;
-		modules	   .clear;
-		todos	   .clear;
-	}
+		isExe = isDll = hasCoreModule = isWindowedApp = false; 
+		targetFile = File(""); 
+		workPath = Path(""); 
+		runLines			 .clear; 
+		defLines			 .clear; 
+		resFiles			 .clear; 
+		modules	   .clear; 
+		todos	   .clear; 
+	} 
 	
 		static bool removePath(ref File fn, Path path)
 	{
 		 //Todo: belerakni az utils-ba, megcsinalni path-osra a DPath-ot.
-		bool res = fn.fullName.startsWith(path.fullPath);
+		bool res = fn.fullName.startsWith(path.fullPath); 
 		if(res)
-		fn.fullName = fn.fullName[path.fullPath.length..$];
-		return res;
-	}
+		fn.fullName = fn.fullName[path.fullPath.length..$]; 
+		return res; 
+	} 
 		static bool removePath(ref File fn, string path)
-	{ return removePath(fn, Path(path)); }
+	{ return removePath(fn, Path(path)); } 
 	
 		static string bold(string s)
-	{ return "\33\17"~s~"\33\7"; }
+	{ return "\33\17"~s~"\33\7"; } 
 	
 		string smallName(File fn)
 	{
 		 //strips down extension, removes filePath
-		fn.ext = "";
+		fn.ext = ""; 
 		
 		if(!removePath(fn, mainFile.path))
 		foreach(p; DPaths.allPaths)
 		if(removePath(fn, p))
-		break;
+		break; 
 		
-		return fn.fullName.replace(`\`, `.`);
-	}
+		return fn.fullName.replace(`\`, `.`); 
+	} 
 	
 		void processBuildMacro(string buildMacro)
 	{
 		void addCompileArgs(in string[] args)
 		{ settings.compileArgs.addIfCan(args); } void addLinkArgs(in string[] args)
 		{ settings.linkArgs.addIfCan(args); } void addLdcLinkArgs(in string[] args)
-		{ settings.ldcLinkArgs.addIfCan(args); }
+		{ settings.ldcLinkArgs.addIfCan(args); } 
 		
-		version(none) scope(exit) { import het.stream; LOG("buildMacro processed:", buildMacro.quoted, "settings:", settings.toJson); }
+		version(none) scope(exit) { LOG("buildMacro processed:", buildMacro.quoted, "settings:", settings.toJson); } 
 		
 		const 	args	= splitCommandLine(buildMacro),
 			cmd	= lc(args[0]),
-			param1 	= args.length>1 ? args[1] : "";
+			param1 	= args.length>1 ? args[1] : ""; 
 		
-		const isMain = modules.length==1;
+		const isMain = modules.length==1; 
 		
-		const isTarget = ["exe", "dll"].canFind(cmd);
+		const isTarget = ["exe", "dll"].canFind(cmd); 
 		if(!isExe && !isDll)
 		{ enforce(isTarget, "Main project file must start with target declaration (//@EXE or //@DLL) with an optional projectName."); }else
 		{ enforce(!isTarget, "Target declaration (//@EXE or //@DLL) is already specified."); }
 		
-		alias CMD = het.parser.BuildMacroCommand;
+		alias CMD = het.parser.BuildMacroCommand; 
 		final switch(cmd.to!CMD.ifThrown((cmd~'_').to!CMD))
 		{
 			case 	CMD.exe,
-				CMD.dll:{
-				enforce(isMain, "Target declaration (//@EXE or //@DLL) is not in the main file.");
+				CMD.dll: {
+				enforce(isMain, "Target declaration (//@EXE or //@DLL) is not in the main file."); 
 				
-				isExe = cmd=="exe";
-				isDll = cmd=="dll";
+				isExe = cmd=="exe"; 
+				isDll = cmd=="dll"; 
 				
-				auto ext = "."~cmd;
+				auto ext = "."~cmd; 
 				targetFile = param1.empty ? mainFile.otherExt(ext)
 																	: File(mainFile.path, param1~ext); //Todo: pathosra
 				
 				if(isDll)
 				{
 					 //add implicit macros for DLL
-					settings.compileArgs ~= "-shared";
-					defLines ~= "LIBRARY";
-					defLines ~= "EXETYPE NT";
-					defLines ~= "SUBSYSTEM WINDOWS";
-					defLines ~= "CODE SHARED EXECUTE";
-					defLines ~= "DATA WRITE";
+					settings.compileArgs ~= "-shared"; 
+					defLines ~= "LIBRARY"; 
+					defLines ~= "EXETYPE NT"; 
+					defLines ~= "SUBSYSTEM WINDOWS"; 
+					defLines ~= "CODE SHARED EXECUTE"; 
+					defLines ~= "DATA WRITE"; 
 				}
-				break;
+				break; 
 			}
-			case CMD.res:{
-				string id = args.length>2 ? args[2] : "";
-				auto src = File(param1);
+			case CMD.res: {
+				string id = args.length>2 ? args[2] : ""; 
+				auto src = File(param1); 
 				
 				if(!src.isAbsolute)
 				src.path = mainFile.path; //all resources are relative to the project, unless they as absolute.
 				
-				bool any;
+				bool any; 
 				if(src.exists)
 				{
 					 //one file
 					if(id=="")
-					id = src.name;
-					resFiles[id] = src;
-					any = true;
+					id = src.name; 
+					resFiles[id] = src; 
+					any = true; 
 				}else
 				{
-					string pattern = src.name;
+					string pattern = src.name; 
 					if(pattern=="")
-					pattern = "*.*";
+					pattern = "*.*"; 
 					try
 					{
 						//Todo: filekeresest belerakni a filePath-ba.
 						foreach(f; dirEntries(src.path.fullPath, pattern, SpanMode.shallow))
 						{
 							 //many files
-							auto fn = File(f.name);
+							auto fn = File(f.name); 
 							if(fn.exists)
 							{
-								resFiles[id ~ fn.name] = fn;
-								any = true;
+								resFiles[id ~ fn.name] = fn; 
+								any = true; 
 							}
 						}
 					}catch(Throwable)
@@ -1152,34 +1154,34 @@ struct BuildSystem
 				}
 				enforce(any, format(`Can't find any resources at: "%s"`, src)); //Todo: source file/line number visszajelzes
 				
-				break;
+				break; 
 			}
-			case CMD.def:{ defLines ~= buildMacro[3..$].strip;	   break; }
-			case CMD.win:{ isWindowedApp = true;	   break; }
-			case CMD.compile:{ addCompileArgs(args[1..$]);break; }
-			case CMD.link:{ addLinkArgs(args[1..$]);break; }
-			case CMD.ldclink:{ addLdcLinkArgs(args[1..$]);break; }
+			case CMD.def: { defLines ~= buildMacro[3..$].strip; 	   break; }
+			case CMD.win: { isWindowedApp = true; 	   break; }
+			case CMD.compile: { addCompileArgs(args[1..$]); break; }
+			case CMD.link: { addLinkArgs(args[1..$]); break; }
+			case CMD.ldclink: { addLdcLinkArgs(args[1..$]); break; }
 			
-			case CMD.run:{ runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName);	   break; }
+			case CMD.run: { runLines ~= buildMacro[3..$].strip.replace("$", targetFile.fullName); 	   break; }
 			//Todo: Revisit the obj file hash calculation. It should only include the options that are make the obj different. Must exclude RUN commands for example.
 			
-			case CMD.import_:{ DPaths.addImportPathList(buildMacro[6..$]);	   break; }
+			case CMD.import_: { DPaths.addImportPathList(buildMacro[6..$]); 	   break; }
 			
-			case CMD.release:{
-				enum releaseArgs = ["-release", "-O", "-inline", "-boundscheck=off"];
-				addCompileArgs(releaseArgs);
-				break;
+			case CMD.release: {
+				enum releaseArgs = ["-release", "-O", "-inline", "-boundscheck=off"]; 
+				addCompileArgs(releaseArgs); 
+				break; 
 			}
-			case CMD.debug_:{
-				enum debugArgs = ["-g", "--gline-tables-only"];
-				addCompileArgs(debugArgs);
-				addLdcLinkArgs(debugArgs);
-				break;
+			case CMD.debug_: {
+				enum debugArgs = ["-g", "--gline-tables-only"]; 
+				addCompileArgs(debugArgs); 
+				addLdcLinkArgs(debugArgs); 
+				break; 
 			}
 			//Todo: The release and debug macro should be system-wide configurable. Now it seems better to hardwire the most common options
 			
-			case CMD.single:{ settings.singleStepCompilation = true;	   break; }
-			case CMD.ldc:{ logln("Deprecated build macro: //@LDC");	   break; }
+			case CMD.single: { settings.singleStepCompilation = true; 	   break; }
+			case CMD.ldc: { logln("Deprecated build macro: //@LDC"); 	   break; }
 			/+default: enforce(false, "Unknown BuildMacro command: "~cmd);+/
 			
 			/+
@@ -1192,28 +1194,28 @@ struct BuildSystem
 			+/
 			
 		}
-	}
+	} 
 	
 		//process source files recursively
 		void processSourceFile(File file)
 	{
 		if(modules.canFind!(a => a.file==file))
-		return;
+		return; 
 		
-		enforce(file.exists, format(`File not found: "%s"`, file));
+		enforce(file.exists, format(`File not found: "%s"`, file)); 
 		
 		//add this module
-		double dateTime;
-		auto act = cache.access(file);
-		modules ~= new ModuleInfo(act);
-		auto mAct = &modules[$-1];
+		double dateTime; 
+		auto act = cache.access(file); 
+		modules ~= new ModuleInfo(act); 
+		auto mAct = &modules[$-1]; 
 		
 		//process buildMacros
 		foreach(bm; act.parser.buildMacros)
-		processBuildMacro(bm);
+		processBuildMacro(bm); 
 		
 		//collect Todo/Opt list
-		todos ~= act.parser.todos;
+		todos ~= act.parser.todos; 
 		
 		//decide if it has to link with windows libs
 		if(!hasCoreModule)
@@ -1222,8 +1224,8 @@ struct BuildSystem
 			if(imp.isCoreModule)
 			{
 				addIfCan(settings.linkArgs, ["kernel32.lib", "user32.lib"]); //Todo: not needed to add these, they're implicit -> try it out!
-				hasCoreModule = true;
-				break;
+				hasCoreModule = true; 
+				break; 
 			}
 			
 		}
@@ -1232,68 +1234,68 @@ struct BuildSystem
 		foreach(const imp; act.parser.importDecls)
 		if(imp.isUserModule)
 		{
-			const f = File(imp.resolveFile(mainFile.path, file.fullName, true));
+			const f = File(imp.resolveFile(mainFile.path, file.fullName, true)); 
 			if(!mAct.importedFiles.canFind(f))
 			{
-				mAct.importedFiles ~= f;
-				mAct.importedModuleNames ~= imp.name.fullName;
+				mAct.importedFiles ~= f; 
+				mAct.importedModuleNames ~= imp.name.fullName; 
 			}
 		}
 		
 		
 		//reqursive walk on imports
 		foreach(imp; mAct.importedFiles)
-		processSourceFile(imp);
-	}
+		processSourceFile(imp); 
+	} 
 	
 		static string processDMDErrors(string sErr, string path)
 	{
 		 //processes each errorlog individually, making absolute filepaths
-		string[] list;
-		auto rx = ctRegex!`(.+)\(.+\): `;
+		string[] list; 
+		auto rx = ctRegex!`(.+)\(.+\): `; 
 		foreach(s; sErr.splitLines)
 		{
 			
 			//Make absolute paths.
-			auto m = matchFirst(s, rx);
+			auto m = matchFirst(s, rx); 
 			if(!m.empty)
 			{
-				string fn = m[1];
+				string fn = m[1]; 
 				if(!fn.canFind(`:\`))
-				s = path ~ s;
+				s = path ~ s; 
 			}
 			
-			list ~= s~"\r\n";
+			list ~= s~"\r\n"; 
 		}
-		return list.join;
-	}
+		return list.join; 
+	} 
 	
 		static string mergeDMDErrors(ref string sErr)
 	{
 		 //processes the combined log
-		string[] list;
+		string[] list; 
 		foreach(s; sErr.splitLines)
 		{
-			s ~= "\r\n";
+			s ~= "\r\n"; 
 			if(!list.canFind(s))
-			list ~= s;
+			list ~= s; 
 		}
-		return list.join;
-	}
+		return list.join; 
+	} 
 	
 		ModuleInfo* findModule(in File fn)
 	{
 		foreach(ref m; modules)
 		if(m.file==fn)
-		return &m;
-		return null;
-	}
+		return &m; 
+		return null; 
+	} 
 	
 		auto moduleFullNameOf(in File fn)
 	{
-		auto mi = findModule(fn);
-		return mi ? mi.moduleFullName : "";
-	}
+		auto mi = findModule(fn); 
+		return mi ? mi.moduleFullName : ""; 
+	} 
 	
 		auto objFileOf(File srcFile)
 	{
@@ -1307,18 +1309,18 @@ struct BuildSystem
 			return srcFile.otherExt("obj"); //right next to the source file
 		}else
 		{
-			auto s = moduleFullNameOf(srcFile);
-			enforce(s != "", "moduleFullNameOf() fail: "~srcFile.text);
-			return File(workPath, s~".obj");
+			auto s = moduleFullNameOf(srcFile); 
+			enforce(s != "", "moduleFullNameOf() fail: "~srcFile.text); 
+			return File(workPath, s~".obj"); 
 		}
-	}
+	} 
 	
 		bool is64bit()
-	{ return !settings.compileArgs.canFind("-m32"); }
+	{ return !settings.compileArgs.canFind("-m32"); } 
 		bool isOptimized()
-	{ return settings.compileArgs.canFind("-O"); }
+	{ return settings.compileArgs.canFind("-O"); } 
 		bool isIncremental()
-	{ return !settings.singleStepCompilation; }
+	{ return !settings.singleStepCompilation; } 
 	
 		/// converts the compiler args from ldmd2 to ldc2
 		void makeLdc2CompatibleArgs(ref string[] args)
@@ -1328,109 +1330,109 @@ struct BuildSystem
 			if(a=="-inline")
 			a = "-enable-inlining=true";  //Note: this is the default in -O2
 		}
-	}
+	} 
 	
 		string[] makeCommonCompileArgs()
 	{
 		//make commandline args
-		auto args = ["ldc2", "-vcolumns", "-verrors-context"];
+		auto args = ["ldc2", "-vcolumns", "-verrors-context"]; 
 		
 		if(isIncremental)
 		args ~= ["-c", "-allinst"];  //no more "-op", because every output filename is specified explicitly with "-of="
 		
 		//default bitness is 64
 		if(!settings.compileArgs.canFind("-m32") && !settings.compileArgs.canFind("-m64"))
-		args ~= "-m64";
+		args ~= "-m64"; 
 		
 		//defaul mcpu if not present
 		if(!settings.compileArgs.map!(a => a.startsWith("-mcpu=")).any)
-		args ~= ["-mcpu=athlon64-sse3", "-mattr=+ssse3"];
+		args ~= ["-mcpu=athlon64-sse3", "-mattr=+ssse3"]; 
 		
-		args ~= format!`-I=%s`(DPaths.getImportPathList);
+		args ~= format!`-I=%s`(DPaths.getImportPathList); 
 		
-		args ~= settings.compileArgs;
+		args ~= settings.compileArgs; 
 		
-		return args;
-	}
+		return args; 
+	} 
 	
 		string[][] makeCompileCmdLines(File[] srcFiles, string[] commonCompilerArgs)
 	{
 		 //Todo: refact multi
 		//Note: filenames are normalCase, but LDC2 must get lowercase filenames.
 		
-		string[][] cmdLines;
+		string[][] cmdLines; 
 		if(isIncremental)
 		{
 			foreach(fn; srcFiles)
 			{
-				auto c = commonCompilerArgs ~ ["-of="~objFileOf(fn).fullName.lc, fn.fullName.lc];
+				auto c = commonCompilerArgs ~ ["-of="~objFileOf(fn).fullName.lc, fn.fullName.lc]; 
 				//ez nem tudom, mi. if(sameText(fn.ext, `.lib`)) c ~= "-lib";
-				cmdLines ~= c;
+				cmdLines ~= c; 
 			}
 		}else
 		{
 			//single
-			auto c = commonCompilerArgs;
-			c ~= `-of=`~targetFile.fullName;
+			auto c = commonCompilerArgs; 
+			c ~= `-of=`~targetFile.fullName; 
 			foreach(fn; srcFiles)
 			c ~= fn.fullName.lc; //lowercase because LDC2 drops all kinds of errors.
 			if(defFile.fullName!="")
-			c ~= defFile.fullName;
+			c ~= defFile.fullName; 
 			if(resFile.fullName!="")
-			c ~= resFile.fullName;
+			c ~= resFile.fullName; 
 			
-			string[] libFiles;
+			string[] libFiles; 
 			foreach(fn; settings.linkArgs)
 			switch(lc(File(fn).ext))
 			{
 				 //Todo: ezt osszevonni a linkerrel
-				case ".lib": libFiles ~= fn; break;
-				default: break;
+				case ".lib": libFiles ~= fn; break; 
+				default: break; 
 			}
 			
 			
-			cmdLines ~= c;
+			cmdLines ~= c; 
 		}
-		return cmdLines;
-	}
+		return cmdLines; 
+	} 
 	
-		string[] compileCommands;
+		string[] compileCommands; 
 		
-		enum printCommands = false;
+		enum printCommands = false; 
 		
 		void compile(File[] srcFiles, File[] cachedFiles) //Compile ////////////////////////
 	{
 				if(srcFiles.empty)
-		return;
+		return; 
 		
-				mixin(perf("compile"));
+				mixin(perf("compile")); 
 		
-				auto args = makeCommonCompileArgs();
-				auto cmdLines = makeCompileCmdLines(srcFiles, args);
+				auto args = makeCommonCompileArgs(); 
+				auto cmdLines = makeCompileCmdLines(srcFiles, args); 
 		
 				foreach(ref line; cmdLines)
-		makeLdc2CompatibleArgs(line);
+		makeLdc2CompatibleArgs(line); 
 		
-				logln;logln(bold("COMPILE COMMANDS:"));
+				logln; logln(bold("COMPILE COMMANDS:")); 
 				foreach(line; cmdLines)
 		{ logln(joinCommandLine(line)); }
 		
-				logln;
+				logln; 
 		
 		//Todo: it's a big mess.
 		compileCommands = cmdLines.map!joinCommandLine.array; //this is passed to the link() where the $build.bat file will be exported.
 		if(printCommands)
 		{
-			print;
-			compileCommands.each!print;
+			print; 
+			compileCommands.each!print; 
 		}
 		
 		//////////////////////////////////////////////////////////////////////////////////////
 		
-				string[] sOutputs;
-				int res;
+				string[] sOutputs; 
+				int res; 
 		
-				log(bold("Compiling: "));
+				log(bold("Compiling: ")); 
 		
 		
 				string sOutput; //combined error log
@@ -1438,34 +1440,34 @@ struct BuildSystem
 				foreach(srcFile; cachedFiles)
 		{
 			const objHash = findModule(srcFile).objHash,
-						output = outputCache[objHash];
+						output = outputCache[objHash]; 
 			
 			if(onCompileProgress)
-			onCompileProgress(srcFile, 0/+success+/, outputCache[objHash]);
+			onCompileProgress(srcFile, 0/+success+/, outputCache[objHash]); 
 			
-			sOutput ~= processDMDErrors(output, srcFile.path.fullPath);
+			sOutput ~= processDMDErrors(output, srcFile.path.fullPath); 
 		}
 		
-				bool cancelled;
+				bool cancelled; 
 				res = spawnProcessMulti2(
 			srcFiles, cmdLines, null, /*working dir=*/Path.init, /*log path=*/workPath, sOutputs, 
 			(idx, result, output){
 				
 				//logln(bold("COMPILED("~result.text~"): ")~joinCommandLine(cmdLines[idx]));
-				log(" \33#*\33\7 ".replace("#", result ? "\14" : "\12").replace("*", srcFiles[idx].name));
+				log(" \33#*\33\7 ".replace("#", result ? "\14" : "\12").replace("*", srcFiles[idx].name)); 
 				
 				//storing obj into objCache
 				if(isIncremental && result==0)
 				{
 					const 	srcFile	= srcFiles[idx],
 						objFile	= objFileOf(srcFile),
-						objHash 	= findModule(srcFile).objHash;
-					objCache[objHash] = objFile.forcedRead;
-					outputCache[objHash] = output;
+						objHash 	= findModule(srcFile).objHash; 
+					objCache[objHash] = objFile.forcedRead; 
+					outputCache[objHash] = output; 
 				}
 				
 				if(onCompileProgress)
-				onCompileProgress(srcFiles[idx], result, output);
+				onCompileProgress(srcFiles[idx], result, output); 
 				
 				static if(0)
 				{
@@ -1475,129 +1477,129 @@ struct BuildSystem
 				{
 					//soft stop: cancel and keep all results.
 					if(result)
-					cancelled = true;
+					cancelled = true; 
 					return true; //continue
 				}
 			}, 
 			(int inFlight, int justStartedIdx){
-				cancelled |= onIdle ? onIdle(inFlight, justStartedIdx) : false;
-				return cancelled;
+				cancelled |= onIdle ? onIdle(inFlight, justStartedIdx) : false; 
+				return cancelled; 
 			}
-		);
+		); 
 		
-				enforce(!cancelled, "Compillation cancelled.");
+				enforce(!cancelled, "Compillation cancelled."); 
 		
 				//Todo: refactor cancel/kill functionality.. onIdle should be able to kill too.
 		
-				logln;
-				logln;
+				logln; 
+				logln; 
 		
 				//process combined error log
 				foreach(i, ref o; sOutputs)
-		sOutput ~= processDMDErrors(o, srcFiles[i].path.fullPath);
-				sOutput = mergeDMDErrors(sOutput);
+		sOutput ~= processDMDErrors(o, srcFiles[i].path.fullPath); 
+				sOutput = mergeDMDErrors(sOutput); 
 				//add todos
 				if(settings.collectTodos)
-		sOutput ~= todos.map!(s => s~"\r\n").join;
+		sOutput ~= todos.map!(s => s~"\r\n").join; 
 		
 				//check results
-				enforce(res==0, sOutput);
+				enforce(res==0, sOutput); 
 				if(!sOutput.empty)
-		logln(sOutput);
-	}
+		logln(sOutput); 
+	} 
 	
 		void overwriteObjsFromCache(File[] filesInCache)
 	{
-		File[] objWritten;
+		File[] objWritten; 
 		foreach(fn; filesInCache)
 		{
 			 //provide files already in cache
-			auto data = objCache[findModule(fn).objHash];
-			auto objFn = objFileOf(fn);
+			auto data = objCache[findModule(fn).objHash]; 
+			auto objFn = objFileOf(fn); 
 			if(objFn.writeIfNeeded(data))
-			objWritten ~= fn;
+			objWritten ~= fn; 
 		}
 		if(!objWritten.empty)
-		logln(bold("WRITING CACHE -> OBJ: "), objWritten.map!(a=>smallName(a)).join(", "));
-	}
+		logln(bold("WRITING CACHE -> OBJ: "), objWritten.map!(a=>smallName(a)).join(", ")); 
+	} 
 	
 		void resCompile(File resFile, string resHash) //Todo: ez igy csunya, ahogy at van passzolva
 	{
-		mixin(perf("res"));
-		resFile.remove;
+		mixin(perf("res")); 
+		resFile.remove; 
 		if(resFiles.length>0)
 		{
-			auto resInCache = (resHash in resCache) !is null;
+			auto resInCache = (resHash in resCache) !is null; 
 			if(resInCache)
 			{
 				 //found in cache
-				auto data = resCache[resHash];
+				auto data = resCache[resHash]; 
 				if(!equal(resFile.read, data))
 				{
-					logln(bold("WRITING CACHE -> RES: "), resFile);
-					resFile.write(data);
+					logln(bold("WRITING CACHE -> RES: "), resFile); 
+					resFile.write(data); 
 				}
 			}else
 			{
 				 //recompiling
-				auto rcFile = resFile.otherExt(".rc");
+				auto rcFile = resFile.otherExt(".rc"); 
 				
 				string toCString(File s)
-				{ return `"`~s.fullName.replace(`\`, `\\`).replace(`"`, `\"`)~`"`; }
+				{ return `"`~s.fullName.replace(`\`, `\\`).replace(`"`, `\"`)~`"`; } 
 				
 				//create rc content
 				auto rcContent = resFiles.byKeyValue
-					.map!(kv => format("Z%s 999 %s", kv.key.binToHex, toCString(kv.value))).join("\r\n");
-				rcFile.write(rcContent);
+					.map!(kv => format("Z%s 999 %s", kv.key.binToHex, toCString(kv.value))).join("\r\n"); 
+				rcFile.write(rcContent); 
 				
 				//call RC.exe
-				auto rcCmd = ["rc", rcFile.fullName];
-				auto line = joinCommandLine(rcCmd);
-				logln(bold("CALLING RC: "), line);
-				auto rc = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
+				auto rcCmd = ["rc", rcFile.fullName]; 
+				auto line = joinCommandLine(rcCmd); 
+				logln(bold("CALLING RC: "), line); 
+				auto rc = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv); 
 				//Todo: resource compiler totally bugs on 64bit. Workaround: use resource hacker manually
 				
 				//cleanup
-				rcFile.remove;
+				rcFile.remove; 
 				
-				enforce(enforce(rc.status==0, rc.output));
+				enforce(enforce(rc.status==0, rc.output)); 
 				
-				logln(bold("STORING RES -> CACHE: "), resFile);
-				resCache[resHash] = resFile.read;
+				logln(bold("STORING RES -> CACHE: "), resFile); 
+				resCache[resHash] = resFile.read; 
 			}
 		}else
 		{
 			resFile.remove; //no resfile needed
 		}
-	}
+	} 
 	
 		void link(string[] linkArgs, string[] ldcLinkArgs)//Link ////////////////////////
 	{
-		mixin(perf("link"));
+		mixin(perf("link")); 
 		if(modules.empty)
-		return;
+		return; 
 		
 		string[] objFiles = modules.map!(m => objFileOf(m.file).fullName).array,
 						 libFiles,           //user32, kernel32 nem kell, megtalalja magatol
 						 linkOpts; //Todo: kideriteni, hogy ez miert kell a windowsos cuccokhoz
 		
 		if(settings.generateMap)
-		addIfCan(linkOpts, "/MAP"/+Generate map file+/)/+Todo: If there is proper pdb support, no need for the map file.+/;
+		addIfCan(linkOpts, "/MAP"/+Generate map file+/)/+Todo: If there is proper pdb support, no need for the map file.+/; 
 		
 		foreach(fn; linkArgs)
 		switch(lc(File(fn).ext))
 		{
 			 //sort out different link commandline parts
-			case ".obj": objFiles ~= fn; break;
-			case ".lib": libFiles ~= fn; break;
-			case ".map": mapFile = File(fn); break;
+			case ".obj": objFiles ~= fn; break; 
+			case ".lib": libFiles ~= fn; break; 
+			case ".map": mapFile = File(fn); break; 
 			default: linkOpts ~= fn; //treat as an option
 		}
 		
 		
 		//Todo: /ENTRY, /SUBSYSTEM=CONSOLE/WINDOWS  -> VisualD has help.
 		
-		string[] cmd;
+		string[] cmd; 
 		static if(LDCVER>=128)
 		{
 			cmd = 	[
@@ -1607,7 +1609,7 @@ struct BuildSystem
 			] //default = libcmt
 				~ ldcLinkArgs
 				~ linkOpts.map!"`-L=`~a".array
-				~ objFiles;
+				~ objFiles; 
 		}else
 		{
 			cmd = [
@@ -1619,11 +1621,11 @@ struct BuildSystem
 									~libFiles
 									~`legacy_stdio_definitions.lib`
 									~objFiles
-									~["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"];
+									~["druntime-ldc.lib", "phobos2-ldc.lib", /*msvcrt.lib*/ "libcmt.lib"]; 
 		}
 		
 		if(resFile)
-		cmd ~= resFile.fullName;
+		cmd ~= resFile.fullName; 
 		
 		//add libs for LDC
 		/+
@@ -1635,156 +1637,156 @@ struct BuildSystem
 		+/
 		
 		
-		auto line = joinCommandLine(cmd);
-		logln(bold("LINKING: "), line);
-		auto link = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv);
+		auto line = joinCommandLine(cmd); 
+		logln(bold("LINKING: "), line); 
+		auto link = executeShell(line, MSVCEnv.getEnv(is64bit), Config.suppressConsole | Config.newEnv); 
 		//Todo: I think MSVCENV not needed anymore
 		
 		//Todo: Linker error is not processed at all!!!
 		
-		if(printCommands) print(line);
+		if(printCommands) print(line); 
 		
-		File(targetFile.path, "$build.bat").write(chain(compileCommands, line.only).join("\r\n"));
+		File(targetFile.path, "$build.bat").write(chain(compileCommands, line.only).join("\r\n")); 
 		
 		//cleanup
-		defFile.remove;
+		defFile.remove; 
 		if(targetFile.extIs("exe"))
 		{
-			targetFile.otherExt("exp").remove;
-			targetFile.otherExt("lib").remove;
+			targetFile.otherExt("exp").remove; 
+			targetFile.otherExt("lib").remove; 
 		}
 		
 		enforce(link.status==0, "Link Error: "~link.status.text~" "~link.output); //stop the compiling process
-	}
+	} 
 	
 	
-	public:
+	public: 
 		void reset_cache()
 	{
-		cache.reset;
-		objCache.clear;
-		outputCache.clear;
-		exeCache.clear;
-		mapCache.clear;
-		resCache.clear;
-	};
+		cache.reset; 
+		objCache.clear; 
+		outputCache.clear; 
+		exeCache.clear; 
+		mapCache.clear; 
+		resCache.clear; 
+	} ; 
 	
 		//this is only usable from the IDE, not from a standalone build tool
 		bool killDeleteExe(File file)
 	{
 		const killTimeOut	= 1.0*second,//sec
-					deleteTimeOut	= 1.0*second;//sec
+					deleteTimeOut	= 1.0*second; //sec
 		
 		bool doDelete()
 		{
-			auto t0 = now;
+			auto t0 = now; 
 			while((now-t0)<deleteTimeOut)
 			{
-				file.remove(false);
+				file.remove(false); 
 				if(!file.exists)
-				return true;//success
-				sleep(50);
+				return true; //success
+				sleep(50); 
 			}
-			return false;
-		}
+			return false; 
+		} 
 		
 		if(!dbg.forceExit_set)
 		return false; //fail: no DIDE present
-		auto t0 = now;
-		const timeOut = 1.0;//sec
+		auto t0 = now; 
+		const timeOut = 1.0; //sec
 		while(now-t0<killTimeOut)
 		{
 			if(!dbg.forceExit_check)
 			return doDelete; //success, delete it
-			sleep(50);
+			sleep(50); 
 		}
-		dbg.forceExit_clear;
+		dbg.forceExit_clear; 
 		return false; //fail: timeout
-	}
+	} 
 	
 		//Errors returned in exceptions
 		void build(in File mainFile_, in BuildSettings originalSettings) //Build //////////////////////
 	{
 		{
 			//build /////////////////////////////////////////////////
-			times = times.init;
-			mixin(perf("all"));
+			times = times.init; 
+			mixin(perf("all")); 
 			
-			sLog = "";
-			initData(mainFile_);
-			settings = originalSettings.dup;
+			sLog = ""; 
+			initData(mainFile_); 
+			settings = originalSettings.dup; 
 			
 			//Rebuild all?
 			if(settings.rebuild)
-			reset_cache;
+			reset_cache; 
 			
 			//workPath
 			workPath = settings.getWorkPath(Path("")); //"" means obj files are placed next to their sources.
 			
 			//reqursively collect modules
-			processSourceFile(mainFile);
+			processSourceFile(mainFile); 
 			
 			//check if target exists
-			enforce(isExe||isDll, "Must specify project target (//@EXE or //@DLL).");
+			enforce(isExe||isDll, "Must specify project target (//@EXE or //@DLL)."); 
 			
 			//calculate dependency hashed of obj files to lookup in the objCache
-			modules.resolveModuleImportDependencies;
-			const compilerSalt = joinCommandLine(settings.compileArgs);
-			modules.calculateObjHashes(compilerSalt);//Note: Compiler specific hash generation.
+			modules.resolveModuleImportDependencies; 
+			const compilerSalt = joinCommandLine(settings.compileArgs); 
+			modules.calculateObjHashes(compilerSalt); //Note: Compiler specific hash generation.
 			
 			//ensure that no std or core files are going to be recompiled
 			foreach(const m; modules)
-			enforce(!DPaths.isStdFile(m.file), `It is forbidden to recompile an std/etc/core module. `~m.file.text);
+			enforce(!DPaths.isStdFile(m.file), `It is forbidden to recompile an std/etc/core module. `~m.file.text); 
 			
 			//select files for compilation
-			File[] filesToCompile, filesInCache;
+			File[] filesToCompile, filesInCache; 
 			foreach(ref m; modules)
-			((m.objHash !in objCache) ? filesToCompile : filesInCache) ~= m.file;
+			((m.objHash !in objCache) ? filesToCompile : filesInCache) ~= m.file; 
 			
 			//order by age
-			filesToCompile = filesToCompile.sort!((a, b) => a.modified > b.modified).array;
+			filesToCompile = filesToCompile.sort!((a, b) => a.modified > b.modified).array; 
 			
 			SourceStats sourceStats = {
 				totalModules 	: modules.length.to!int,
 				totalLines	: modules.map!"a.sourceLines".sum,
 				totalBytes	: modules.map!"a.sourceBytes".sum
-			};
+			}; 
 			
 			
 			//print out information
 			{
-				logln(bold("BUILDING PROJECT:    "), mainFile);
-				logln(bold("TARGET FILE:         "), targetFile);
-				logln(bold("OPTIONS:             "), "LDC", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR");
-				with(sourceStats) logln(bold("SOURCE STATS:        "), format("Modules: %s   Lines: %s   Bytes: %s", totalModules, totalLines, totalBytes));
+				logln(bold("BUILDING PROJECT:    "), mainFile); 
+				logln(bold("TARGET FILE:         "), targetFile); 
+				logln(bold("OPTIONS:             "), "LDC", " ", is64bit?64:32, "bit ", isOptimized?"REL":"DBG", " ", settings.singleStepCompilation?"SINGLE":"INCR"); 
+				with(sourceStats) logln(bold("SOURCE STATS:        "), format("Modules: %s   Lines: %s   Bytes: %s", totalModules, totalLines, totalBytes)); 
 				
 				if(0)
 				{
 					 //verbose display of the module graph
 					foreach(i, const m; modules)
 					{
-						auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", ");
-						bool comp = filesToCompile.canFind(m.file);
-						logln((comp ? " \33\16*\33\7 " : "  "), bold(smallName(m.file))~" : "~list);
+						auto list = m.deps.filter!(fn => fn!=m.file).map!(a => smallName(a)).join(", "); 
+						bool comp = filesToCompile.canFind(m.file); 
+						logln((comp ? " \33\16*\33\7 " : "  "), bold(smallName(m.file))~" : "~list); 
 					}
 				}
 				
 				if(1)
 				{
 					if(filesToCompile.length)
-					logln(bold("MODULES TO COMPILE:  "), filesToCompile.map!(f => smallName(f)).join(", "));
+					logln(bold("MODULES TO COMPILE:  "), filesToCompile.map!(f => smallName(f)).join(", ")); 
 					if(filesInCache  .length)
-					logln(bold("MODULES FROM CACHE:  "), filesInCache  .map!(f => smallName(f)).join(", "));
+					logln(bold("MODULES FROM CACHE:  "), filesInCache  .map!(f => smallName(f)).join(", ")); 
 				}
 			}
 			
 			//notify the ide, that a compilation has started. So it can mark the modules visually.
 			if(onBuildStarted)
-			onBuildStarted(mainFile, filesToCompile, filesInCache, todos, sourceStats);
+			onBuildStarted(mainFile, filesToCompile, filesInCache, todos, sourceStats); 
 			
 			//delete target file and bat file.
 			//It ensures that nothing uses it, and there will be no previous executable present after a failed compilation.
-			targetFile.remove(false);
+			targetFile.remove(false); 
 			if(targetFile.exists)
 			{
 				if(settings.killExe && !disableKillProgram)
@@ -1794,7 +1796,7 @@ struct BuildSystem
 			
 			/////////////////////////////////////////////////////////////////////////////////////
 			//calculate resource hash
-			string resHash = calcHash(resFiles.byKeyValue.map!(kv => format!"(%s|%s|%s)"(kv.key, kv.value, kv.value.modified)).join);
+			string resHash = calcHash(resFiles.byKeyValue.map!(kv => format!"(%s|%s|%s)"(kv.key, kv.value, kv.value.modified)).join); 
 			
 			
 			/////////////////////////////////////////////////////////////////////////////////////
@@ -1804,39 +1806,39 @@ struct BuildSystem
 				if(!settings.leaveObjs)
 				{
 					 //including res file
-					resFile.remove;
+					resFile.remove; 
 					foreach(fn; chain(filesToCompile, filesInCache))
-					objFileOf(fn).remove;
+					objFileOf(fn).remove; 
 				}
 				if(!settings.generateMap)
 				mapFile.remove; //linker makes it for dlls even not wanted
-			}
+			} 
 			
 			/////////////////////////////////////////////////////////////////////////////////////
 			//compile and link
 			auto exeHash = calcHash(joinCommandLine(settings.linkArgs ~ targetFile.fullName ~ modules[0].objHash ~ resHash)); //depends on main obj and on linker params.  //todo: include resource hash
-			bool exeInCache = (exeHash in exeCache) !is null;
+			bool exeInCache = (exeHash in exeCache) !is null; 
 			if(exeInCache)
 			{
 				 //exe file is already found in cache
-				auto data = exeCache[exeHash];
-				logln(bold("WRITING CACHE -> EXE: "), targetFile);
+				auto data = exeCache[exeHash]; 
+				logln(bold("WRITING CACHE -> EXE: "), targetFile); 
 				targetFile.write(data); //overwrite if needed
 				if(exeHash in mapCache)
-				mapFile.write(mapCache[exeHash]);
+				mapFile.write(mapCache[exeHash]); 
 			}else
 			{
-				prepareMapPdbResDef;
-				resCompile(resFile, resHash);
+				prepareMapPdbResDef; 
+				resCompile(resFile, resHash); 
 				
-				compile(filesToCompile, filesInCache);
-				overwriteObjsFromCache(filesInCache);
-				link(settings.linkArgs, settings.ldcLinkArgs);
+				compile(filesToCompile, filesInCache); 
+				overwriteObjsFromCache(filesInCache); 
+				link(settings.linkArgs, settings.ldcLinkArgs); 
 				
-				logln(bold("STORING EXE -> CACHE: "), targetFile);
-				exeCache[exeHash] = targetFile.read;
+				logln(bold("STORING EXE -> CACHE: "), targetFile); 
+				exeCache[exeHash] = targetFile.read; 
 				if(mapFile.exists)
-				mapCache[exeHash] = mapFile.read;
+				mapCache[exeHash] = mapFile.read; 
 			}
 			
 		}//end of compile
@@ -1844,7 +1846,7 @@ struct BuildSystem
 		
 		/////////////////////////////////////////////////////////////////////////////////////
 		//performance monitoring
-		logln(times.report);
+		logln(times.report); 
 		
 		/////////////////////////////////////////////////////////////////////////////////////
 		//run
@@ -1865,48 +1867,48 @@ struct BuildSystem
 			*/
 			
 			//old version
-			const batFile = File(targetFile.path, "$run.bat");
-			batFile.remove;
+			const batFile = File(targetFile.path, "$run.bat"); 
+			batFile.remove; 
 			
-			auto runCmd = runLines.join("\r\n");
+			auto runCmd = runLines.join("\r\n"); 
 			
 			//make the default runCmd for exe
 			if(runCmd.empty && isExe)
 			{
-				runCmd = targetFile.fullName;
+				runCmd = targetFile.fullName; 
 				//if(!isWindowedApp) runCmd ~= "\r\n@pause";
 			}
 			
 			if(!runCmd.empty)
 			{
-				batFile.write(runCmd);
+				batFile.write(runCmd); 
 				foreach(idx, line; runCmd.split('\n'))
-				logln(idx ? " ".replicate(9):bold("RUNNING: "), line);
-				spawnProcess(["cmd", "/c", "start", batFile.fullName], null, Config.detached, targetFile.path.fullPath);
+				logln(idx ? " ".replicate(9):bold("RUNNING: "), line); 
+				spawnProcess(["cmd", "/c", "start", batFile.fullName], null, Config.detached, targetFile.path.fullPath); 
 			}
 		}
-	}
+	} 
 	
 	
 		auto findDependencies(File mainFile_, BuildSettings originalSettings)
 	{
 		 //findDependencies //////////////////////////////////////
-		sLog = "";
-		initData(mainFile_);
-		settings = originalSettings;
+		sLog = ""; 
+		initData(mainFile_); 
+		settings = originalSettings; 
 		
 		//Rebuild all?
 		if(settings.rebuild)
-		reset_cache;
+		reset_cache; 
 		
 		//workPath
 		workPath = settings.getWorkPath(Path("")); //"" means obj files are placed next to their sources.
 		
 		//reqursively collect modules
-		processSourceFile(mainFile);
+		processSourceFile(mainFile); 
 		
-		return modules;
-	}
+		return modules; 
+	} 
 	
 	
 		//This can be used by commandline or by a dll export.
@@ -1917,38 +1919,38 @@ struct BuildSystem
 	{
 		try
 		{
-						sLog = sError = sOutput = "";
+						sLog = sError = sOutput = ""; 
 			
-						settings = BuildSettings.init;
-						auto opts = parseOptions(args, settings, No.handleHelp);
+						settings = BuildSettings.init; 
+						auto opts = parseOptions(args, settings, No.handleHelp); 
 			
 			//args.each!print; import het.stream;print(settings.toJson);
 			
 						if(opts.helpWanted || args.length<=1)
 			{
-				settings.verbose = true;
-				logln(mainHelpStr.replace(`$$$OPTS$$$`, opts.helpText));
+				settings.verbose = true; 
+				logln(mainHelpStr.replace(`$$$OPTS$$$`, opts.helpText)); 
 			}else if(settings.macroHelp)
 			{
-				settings.verbose = true;
-				logln(macroHelpStr);
+				settings.verbose = true; 
+				logln(macroHelpStr); 
 			}else
 			{
-				auto mainFile = File(args[1]);
-				enforce(mainFile.exists, "Error: File not found: "~mainFile.fullName);
+				auto mainFile = File(args[1]); 
+				enforce(mainFile.exists, "Error: File not found: "~mainFile.fullName); 
 				build(mainFile, settings); //this overwrites the settings.
 			}
 			
-						sOutput = sLog;
-						return 0;
+						sOutput = sLog; 
+						return 0; 
 		}catch(Exception e)
 		{
 			//sError = format("Exception in %s(%s): %s", e.file, e.line, e.msg);
-			sError = e.simpleMsg;
-			sOutput = sLog;
-			return -1;
+			sError = e.simpleMsg; 
+			sOutput = sLog; 
+			return -1; 
 		}
-	}
+	} 
 	
 		void	cacheInfo()
 	{
@@ -1958,65 +1960,65 @@ struct BuildSystem
 				logln(m.moduleFullName.leftJustify(20));
 			}
 		*/
-	}
+	} 
 	
 		//events ///////////////////////////////////////////////////////////////////////////
 	
-		void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos, in SourceStats sourceStats) onBuildStarted;
-		void delegate(File f, int result, string output) onCompileProgress;
+		void delegate(File mainFile, in File[] filesToCompile, in File[] filesInCache, in string[] todos, in SourceStats sourceStats) onBuildStarted; 
+		void delegate(File f, int result, string output) onCompileProgress; 
 		bool delegate(int inFlight, int justStartedIdx) onIdle; //returns true if IDE wants to cancel.
 	
 	
-}
+} 
 
 
 //////////////////////////////////////////////////////////////////////////////
 //MultiThreaded background builder                                        //
 //////////////////////////////////////////////////////////////////////////////
 
-import core.thread, std.concurrency;
+import core.thread, std.concurrency; 
 
 
 //messages sent to buildSystemWorker
 
 enum MsgBuildCommand
-{ cancel, shutDown }
+{ cancel, shutDown} 
 
 struct MsgBuildRequest
 {
-	File mainFile;
-	BuildSettings settings;
-}
+	File mainFile; 
+	BuildSettings settings; 
+} 
 
 
 //messages received from buildSystemWorker
 
 struct MsgBuildStarted
 {
-	File mainFile;
-	immutable File[] filesToCompile, filesInCache;
-	immutable string[] todos;
-	SourceStats sourceStats;
-}
+	File mainFile; 
+	immutable File[] filesToCompile, filesInCache; 
+	immutable string[] todos; 
+	SourceStats sourceStats; 
+} 
 
 struct MsgCompileStarted
 {
 	int fileIdx=-1;    //indexes MsgBuildStarted.filesToCompile
-}
+} 
 
 struct MsgCompileProgress
 {
-	File file;
-	int result;
-	string output;
-}
+	File file; 
+	int result; 
+	string output; 
+} 
 
 struct MsgBuildFinished
 {
-	File mainFile;
-	string error;
-	string output;
-}
+	File mainFile; 
+	string error; 
+	string output; 
+} 
 
 
 
@@ -2024,18 +2026,18 @@ struct BuildSystemWorkerState
 {
 	 //BuildSystemWorkerState /////////////////////////////////
 	//worker state that don't need synching.
-	bool building, cancelling;
-	int totalModules, compiledModules, inFlight;
-}
+	bool building, cancelling; 
+	int totalModules, compiledModules, inFlight; 
+} 
 
-__gshared const BuildSystemWorkerState buildSystemWorkerState;
+__gshared const BuildSystemWorkerState buildSystemWorkerState; 
 
 void buildSystemWorker()
 {
 	 //worker //////////////////////////
-	BuildSystem buildSystem;
-	auto state = &cast()buildSystemWorkerState;
-	bool isDone = false;
+	BuildSystem buildSystem; 
+	auto state = &cast()buildSystemWorkerState; 
+	bool isDone = false; 
 	
 	//register events
 	
@@ -2044,45 +2046,45 @@ void buildSystemWorker()
 		 //Todo: rename to buildStart
 		with(state)
 		{
-			totalModules = (filesToCompile.length + filesInCache.length).to!int;
-			compiledModules = inFlight = 0;
+			totalModules = (filesToCompile.length + filesInCache.length).to!int; 
+			compiledModules = inFlight = 0; 
 		}
 		
 		//LOG(mainFile, filesToCompile, filesInCache);
-		ownerTid.send(MsgBuildStarted(mainFile, filesToCompile.idup, filesInCache.idup, todos.idup, sourceStats));
-	}
-	buildSystem.onBuildStarted = &onBuildStarted;
+		ownerTid.send(MsgBuildStarted(mainFile, filesToCompile.idup, filesInCache.idup, todos.idup, sourceStats)); 
+	} 
+	buildSystem.onBuildStarted = &onBuildStarted; 
 	
 	void onCompileProgress(File file, int result, string output)
 	{
-		state.compiledModules++;
+		state.compiledModules++; 
 		//LOG("######################", file, result, output);
-		ownerTid.send(MsgCompileProgress(file, result, output));
-	}
-	buildSystem.onCompileProgress = &onCompileProgress;
+		ownerTid.send(MsgCompileProgress(file, result, output)); 
+	} 
+	buildSystem.onCompileProgress = &onCompileProgress; 
 	
 	bool onIdle(int inFlight, int justStartedIdx)
 	{
-		state.inFlight = inFlight;
+		state.inFlight = inFlight; 
 		
 		if(justStartedIdx>=0)
-		ownerTid.send(MsgCompileStarted(justStartedIdx));
+		ownerTid.send(MsgCompileStarted(justStartedIdx)); 
 		
 		//receive commands from mainThread
-		bool cancelRequest = false;
+		bool cancelRequest = false; 
 		receiveTimeout(
 			0.msecs,
 			(MsgBuildCommand cmd){
 				if(cmd==MsgBuildCommand.shutDown)
-				{ cancelRequest = true; isDone = true;	state.cancelling = true; }
-				else if(cmd==MsgBuildCommand.cancel) { cancelRequest = true;	state.cancelling = true; }
+				{ cancelRequest = true; isDone = true; 	state.cancelling = true; }
+				else if(cmd==MsgBuildCommand.cancel) { cancelRequest = true; 	state.cancelling = true; }
 			},
 			(immutable MsgBuildRequest req){ WARN("Build request ignored: already building..."); }
-		);
+		); 
 		
-		return cancelRequest;
-	}
-	buildSystem.onIdle = &onIdle;
+		return cancelRequest; 
+	} 
+	buildSystem.onIdle = &onIdle; 
 	
 	//main worker loop
 	while(!isDone)
@@ -2090,38 +2092,38 @@ void buildSystemWorker()
 		receive(
 			(MsgBuildCommand cmd){
 				if(cmd==MsgBuildCommand.shutDown)
-				isDone = true;
+				isDone = true; 
 			},
 			(immutable MsgBuildRequest req){
-				string error;
+				string error; 
 				try
 				{
-					state.building = true;
+					state.building = true; 
 					//Todo: onIdle
-					buildSystem.build(req.mainFile, req.settings);
+					buildSystem.build(req.mainFile, req.settings); 
 				}catch(Exception e)
 				{ error = e.simpleMsg; }
-				ownerTid.send(MsgBuildFinished(req.mainFile, error, buildSystem.sLog));
+				ownerTid.send(MsgBuildFinished(req.mainFile, error, buildSystem.sLog)); 
 			}
-		);
+		); 
 		
 		state.clear; //must be the last thing in loop to clear this.
 	}
 	
-}
+} 
 
 File withoutDMixin(File f)
 {
 	if(f.fullName.isWild("*.d-mixin-*"))
 	{ return File(wild[0]~".d"); }
-	return f;
-}
+	return f; 
+} 
 
 struct CodeLocation
 {
-	File file;
-	int lineIdx, columnIdx, mixinLineIdx;
-	bool isMixin;
+	File file; 
+	int lineIdx, columnIdx, mixinLineIdx; 
+	bool isMixin; 
 	
 	this(string s)
 	{
@@ -2130,69 +2132,69 @@ struct CodeLocation
 		//strip off line/column index
 		if(s.endsWith(')'))
 		{
-			const idx = s.retro.countUntil('(');
+			const idx = s.retro.countUntil('('); 
 			if(idx>0)
 			{
-				const sNew = s[0 .. $-idx-1];
-				const p = s[$-idx .. $-1].split(',');
+				const sNew = s[0 .. $-idx-1]; 
+				const p = s[$-idx .. $-1].split(','); 
 				
 				if(p.empty)
 				{
 					//filename()  <- this is treated as valid
-					s = sNew;
+					s = sNew; 
 				}
 				else if(p.length.among(1, 2) && p.all!"a.to!int.ifThrown(0) > 0")
 				{
-					lineIdx = p[0].to!int;
-					if(p.length==2) columnIdx = p[1].to!int;
-					s = sNew;
+					lineIdx = p[0].to!int; 
+					if(p.length==2) columnIdx = p[1].to!int; 
+					s = sNew; 
 				}
 			}
 		}
 		
 		//strip off "-mixin-#" ending
 		{
-			const idx = s.retro.countUntil('-');
-			enum kw = "-mixin-";
+			const idx = s.retro.countUntil('-'); 
+			enum kw = "-mixin-"; 
 			if(idx>0 && s[$-idx .. $].all!isDigit && s[$-idx-kw.length .. $-idx]==kw)
 			{
-				isMixin = true;
-				mixinLineIdx = s[$-idx .. $].to!int.ifThrown(0);
-				s = s[0 .. $-idx-kw.length];
+				isMixin = true; 
+				mixinLineIdx = s[$-idx .. $].to!int.ifThrown(0); 
+				s = s[0 .. $-idx-kw.length]; 
 			}
 		}
 		
-		file = File(s);
-	}
+		file = File(s); 
+	} 
 	
 	bool opCast(T:bool)() const
-	{ return cast(bool)file; }
+	{ return cast(bool)file; } 
 	int opCmp(in CodeLocation b) const
-	{ return icmp(file.fullName, b.file.fullName).cmpChain(cmp(lineIdx, b.lineIdx)).cmpChain(cmp(columnIdx, b.columnIdx)); }
+	{ return icmp(file.fullName, b.file.fullName).cmpChain(cmp(lineIdx, b.lineIdx)).cmpChain(cmp(columnIdx, b.columnIdx)); } 
 	
 	string lineText() const
-	{ return (lineIdx ? format!"(%d)"(lineIdx) : ""); }
+	{ return (lineIdx ? format!"(%d)"(lineIdx) : ""); } 
 	string lineColText() const
-	{ return (lineIdx && columnIdx ? format!"(%d,%d)"(lineIdx, columnIdx) : lineIdx ? format!"(%d)"(lineIdx) : ""); }
+	{ return (lineIdx && columnIdx ? format!"(%d,%d)"(lineIdx, columnIdx) : lineIdx ? format!"(%d)"(lineIdx) : ""); } 
 	string mixinText() const
-	{ return isMixin ? "-mixin-"~mixinLineIdx.text : ""; }
+	{ return isMixin ? "-mixin-"~mixinLineIdx.text : ""; } 
 	
 	string toString() const
-	{ return file.fullName ~ mixinText ~ lineColText; }
+	{ return file.fullName ~ mixinText ~ lineColText; } 
 	string shortText() const
-	{ return file.name ~ lineText; }
+	{ return file.name ~ lineText; } 
 	
 	
 	
-}
+} 
 
-import het.keywords;
+import het.keywords; 
 
 struct BuildMessageInfo
 {
-	SyntaxKind syntax;
-	string caption;
-}
+	SyntaxKind syntax; 
+	string caption; 
+} 
 
 enum BuildMessageType
 {
@@ -2206,15 +2208,15 @@ enum BuildMessageType
 	bug
 } static immutable BuildMessageInfo[] buildMessageInfo = 
 [
-	{ skFoundAct	, "Find"	 },
-	{ skError	, "Err"	 },
-	{ skWarning	, "Warn"	 },
-	{ skDeprecation	, "Depr"	 },
-	{ skNote	, "Note"	 },
-	{ skTodo	, "Todo"	 },
-	{ skOpt	, "Opt"	 },
-	{ skBug	, "Bug"	 },
-];
+	{ skFoundAct	, "Find"	},
+	{ skError	, "Err"	},
+	{ skWarning	, "Warn"	},
+	{ skDeprecation	, "Depr"	},
+	{ skNote	, "Note"	},
+	{ skTodo	, "Todo"	},
+	{ skOpt	, "Opt"	},
+	{ skBug	, "Bug"	},
+]; 
 
 //Todo: the UDA version of buildMessageInfo is a fucking piece of crap
 /+
@@ -2231,71 +2233,71 @@ struct BuildMessage
 {
 	//Todo: ""BuildMessage" is not a good name, it starts with a verb.
 	
-	CodeLocation location;
-	BuildMessageType type;
-	string message;
+	CodeLocation location; 
+	BuildMessageType type; 
+	string message; 
 	CodeLocation parentLocation;  //multiline message lines are linked together using parentLocation
 	
 	@property bool isMain() const
-	{ return !parentLocation; }
+	{ return !parentLocation; } 
 	
 	@property bool isSupplemental() const
-	{ return !isMain; }
+	{ return !isMain; } 
 	
 	string toString() const
 	{
 		return isSupplemental 	? format!"%s: %s:        %s"	(location, type.text.capitalize, message)
-			: format!"%s: %s: %s"	(location, type.text.capitalize, message);
-	}
-}
+			: format!"%s: %s: %s"	(location, type.text.capitalize, message); 
+	} 
+} 
 
 enum ModuleBuildState
-{ notInProject, queued, compiling, aborted, hasErrors, hasWarnings, hasDeprecations, flawless }
+{ notInProject, queued, compiling, aborted, hasErrors, hasWarnings, hasDeprecations, flawless} 
 
-auto moduleBuildStateColors = [clBlack, clWhite, clWhite, clGray, clRed, RGB(128, 255, 0), RGB(64, 255, 0), clLime];
+auto moduleBuildStateColors = [clBlack, clWhite, clWhite, clGray, clRed, RGB(128, 255, 0), RGB(64, 255, 0), clLime]; 
 
 class BuildResult
 {
-	File mainFile;
-	File[] filesToCompile, filesInCache;
+	File mainFile; 
+	File[] filesToCompile, filesInCache; 
 	int[File] results; //command line console exit codes
 	string[][File] outputs, remainings; //raw output lines, remaining output lines after processing
 	BuildMessage[CodeLocation] messages; //all the things referencing a code location
 	
 	private
 	{
-		CodeLocation _lastAddedLocation;
-		BuildMessageType _lastAddedType;
-	}
+		CodeLocation _lastAddedLocation; 
+		BuildMessageType _lastAddedType; 
+	} 
 	
-	File[] allFiles;
-	bool[File] filesInFlight;
-	bool[File] filesInProject;
+	File[] allFiles; 
+	bool[File] filesInFlight; 
+	bool[File] filesInProject; 
 	
-	string[string] correctFileCase;
+	string[string] correctFileCase; 
 	
-	DateTime lastUpdateTime;
+	DateTime lastUpdateTime; 
 	
-	SourceStats sourceStats;
-	DateTime buildStarted, buildFinished;
+	SourceStats sourceStats; 
+	DateTime buildStarted, buildFinished; 
 	
-	mixin ClassMixin_clear;
+	mixin ClassMixin_clear; 
 	
 	auto getBuildStateOfFile(File f) const
 	{
 		with(ModuleBuildState)
 		{
 			if(f !in filesInProject)
-			return notInProject;
+			return notInProject; 
 			if(auto r = f in results)
 			{
 				if(*r)
-				return hasErrors;
+				return hasErrors; 
 				return hasWarnings; //Todo: detect hasDeprecations, flawless
 			}
-			return f in filesInFlight ? compiling : queued;
+			return f in filesInFlight ? compiling : queued; 
 		}
-	}
+	} 
 	
 	
 	string repairFileCase(string fn)
@@ -2306,10 +2308,10 @@ class BuildResult
 				{ return allFiles[idx-1].fullName; }else
 				{ return File(fn).actualFile.fullName; }
 			}()
-		);
+		); 
 		
 		
-	}
+	} 
 	
 	private bool _processLine(string line)
 	{
@@ -2317,56 +2319,56 @@ class BuildResult
 		{
 			if(line.isWild(`?:\?*.d*(?*,?*):?*`))
 			{
-				string fn = repairFileCase(wild[0]~`:\`~wild[1]~`.d`);
-				string mixinPostfix = wild[2];
+				string fn = repairFileCase(wild[0]~`:\`~wild[1]~`.d`); 
+				string mixinPostfix = wild[2]; 
 				
 				
 				auto	location 	= CodeLocation(format!"%s%s(%s,%s)"(fn, mixinPostfix, wild[3], wild[4])),
-					content 	= wild[5];
+					content 	= wild[5]; 
 				//if(dbg) WARN(location);
 				
 				void add(BuildMessage bm)
 				{
-					messages[bm.location] = bm;
-					_lastAddedLocation = bm.location;
-					_lastAddedType = bm.type;
+					messages[bm.location] = bm; 
+					_lastAddedLocation = bm.location; 
+					_lastAddedType = bm.type; 
 					
 					/+
 						const dbg = fn==`c:\D\dideTestProject.d`;
 						if(dbg) WARN(bm);
 					+/
-				}
+				} 
 				
 				if(auto orig = location in messages)
 				{
 					 //duplicated location: append the contents to the end of the existing message
-					orig.message ~= "\n" ~ content.strip;
+					orig.message ~= "\n" ~ content.strip; 
 				}else if(content.startsWith("  "))
 				{
 					 //supplemental message
-					enforce(_lastAddedLocation);
-					add(BuildMessage(location, _lastAddedType, content.strip, _lastAddedLocation));
-					return true;
+					enforce(_lastAddedLocation); 
+					add(BuildMessage(location, _lastAddedType, content.strip, _lastAddedLocation)); 
+					return true; 
 				}else if(content.isWild(" ?*:?*"))
 				{
 					 //original message
 					const type = wild[0].decapitalize.to!(BuildMessageType); //can throw
-					const msg = wild[1].strip;
+					const msg = wild[1].strip; 
 					
 					//filter out useless meddages
 					if(type == BuildMessageType.warning && msg.isWild("C preprocessor directive `#*` is not supported"))
-					return false;
+					return false; 
 					//Todo: make this filtering accessible from the IDE. Let te used see the dropped messages too.
 					
 					add(BuildMessage(location, type, msg)); //this is a true original message
 					
-					return true;
+					return true; 
 				}
 			}
 		}catch(Exception e)
 		{}
-		return false;
-	}
+		return false; 
+	} 
 	
 	
 	void receiveBuildMessages()
@@ -2375,32 +2377,32 @@ class BuildResult
 			receiveTimeout(
 				0.msecs,
 				(in MsgBuildStarted msg)	{
-					clear;
+					clear; 
 					
-					buildStarted = now;
-					sourceStats = msg.sourceStats;
+					buildStarted = now; 
+					sourceStats = msg.sourceStats; 
 					
-					mainFile	= msg.mainFile;
-					filesToCompile	= msg.filesToCompile.dup;
-					filesInCache	= msg.filesInCache.dup;
+					mainFile	= msg.mainFile; 
+					filesToCompile	= msg.filesToCompile.dup; 
+					filesInCache	= msg.filesInCache.dup; 
 					
-					allFiles = (filesToCompile~filesInCache);
-					allFiles.each!((f){ filesInProject[f] = true; });
+					allFiles = (filesToCompile~filesInCache); 
+					allFiles.each!((f){ filesInProject[f] = true; }); 
 					
-					msg.todos.each!(t => _processLine(t));
+					msg.todos.each!(t => _processLine(t)); 
 				},
 					
 				(in MsgCompileStarted msg)	{
-					auto f = filesToCompile.get(msg.fileIdx);
-					assert(f);
-					filesInFlight[f] = true;
+					auto f = filesToCompile.get(msg.fileIdx); 
+					assert(f); 
+					filesInFlight[f] = true; 
 				},
 					
 				(in MsgCompileProgress msg)	{
 					
-					auto f = msg.file;
-					filesInFlight.remove(f);
-					results[f] = msg.result;
+					auto f = msg.file; 
+					filesInFlight.remove(f); 
+					results[f] = msg.result; 
 					
 					//LOG(f, msg.result);
 					
@@ -2418,32 +2420,32 @@ class BuildResult
 						remainings[f] = remaining;
 					+/
 					
-					auto o = predecodeLdcOutput(msg.output);
+					auto o = predecodeLdcOutput(msg.output); 
 					foreach(m; o.messages)
-					_processLine(m.join('\n'));
+					_processLine(m.join('\n')); 
 					
 					outputs[f] = msg.output.splitLines; //Todo: not used anymore. Everything is in messages[]
 					remainings[f] = o.pragmas;  //Todo: rename remainings to pragmas
 				},
 					
 				(in MsgBuildFinished msg)	{
-					filesInFlight.clear;
+					filesInFlight.clear; 
 					
 					if(msg.error!="")
 					{
 						beep; ERR("BUILDERROR", msg.error); 
-						remainings[mainFile] ~= msg.error.splitLines;
+						remainings[mainFile] ~= msg.error.splitLines; 
 						//Todo: Show this linker error in DIDE properly
 					}
 					
-					buildFinished = now;
+					buildFinished = now; 
 					remainings[mainFile] ~= format!	"BuildStats:  %.3f seconds,  %d modules,  %d source lines,  %d source bytes"
 						(
 						(buildFinished-buildStarted).value(second), 
 						sourceStats.totalModules,
 						sourceStats.totalLines,
 						sourceStats.totalBytes
-					);
+					); 
 					
 					//decide the global success of the build procedure
 					//Todo: there are errors whose source are not specified or not loaded, those must be displayed too. Also the compiler output.
@@ -2455,40 +2457,40 @@ class BuildResult
 		)
 		{ lastUpdateTime = now; }
 		
-	}
+	} 
 	
 	
 	string dumpMessage(in BuildMessage bm, string indent="")
 	{
-		string res = indent ~ bm.text ~"\n";
+		string res = indent ~ bm.text ~"\n"; 
 		
 		foreach(const v; messages.values)
 		if(v.parentLocation == bm.location)
-		res ~= dumpMessage(v, indent~"  ");
+		res ~= dumpMessage(v, indent~"  "); 
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	string dumpMessage(in CodeLocation location, string indent="")
 	{
 		if(!location)
-		return "";
+		return ""; 
 		if(const bm = location in messages)
-		return dumpMessage(*bm, indent);
-		return "";
-	}
+		return dumpMessage(*bm, indent); 
+		return ""; 
+	} 
 	
 	string dump()
 	{
-		string res;
+		string res; 
 		
-		res ~= ("\n");
-		res ~= ("///////////////////////////////////\n");
-		res ~= ("///  Output                     ///\n");
-		res ~= ("///////////////////////////////////\n");
+		res ~= ("\n"); 
+		res ~= ("///////////////////////////////////\n"); 
+		res ~= ("///  Output                     ///\n"); 
+		res ~= ("///////////////////////////////////\n"); 
 		static if(0)
 		{
-			 auto f = mainFile;
+			 auto f = mainFile; 
 			if(f in remainings && remainings[f].length)
 			{ remainings[f].each!(a => res ~= a~"\n"); }
 		}else
@@ -2497,26 +2499,26 @@ class BuildResult
 			{
 				if(f in remainings && remainings[f].length)
 				{
-					res ~= f.fullName~": Output:\n";
-					remainings[f].each!(a => res ~= a~"\n");
+					res ~= f.fullName~": Output:\n"; 
+					remainings[f].each!(a => res ~= a~"\n"); 
 				}
 			}
 		}
-		res ~= "\n";
+		res ~= "\n"; 
 		
-		res ~= ("///////////////////////////////////\n");
-		res ~= ("///  Messages                   ///\n");
-		res ~= ("///////////////////////////////////\n");
+		res ~= ("///////////////////////////////////\n"); 
+		res ~= ("///  Messages                   ///\n"); 
+		res ~= ("///////////////////////////////////\n"); 
 		foreach(loc; messages.keys.sort)
 		{
-			const bm = messages[loc];
+			const bm = messages[loc]; 
 			if(!bm.parentLocation)
-			res ~= dumpMessage(bm, "  ");
+			res ~= dumpMessage(bm, "  "); 
 		}
-		res ~= "\n";
+		res ~= "\n"; 
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 		//find sub-messages recursively
 		auto subMessagesOf(in CodeLocation loc)
@@ -2524,51 +2526,51 @@ class BuildResult
 		BuildMessage[] subMessages;  //Todo: this is an array of struct. It's unoptimal
 		void doit(in CodeLocation parentLocation)
 		{
-			auto sm = messages.byValue.filter!(m => m.parentLocation==parentLocation).array;
-			subMessages ~= sm;
-			sm.each!(m => doit(m.location));
-		}
-		doit(loc);
-		return subMessages;
-	}
+			auto sm = messages.byValue.filter!(m => m.parentLocation==parentLocation).array; 
+			subMessages ~= sm; 
+			sm.each!(m => doit(m.location)); 
+		} 
+		doit(loc); 
+		return subMessages; 
+	} 
 	
 	private
 	{
 		static private string safeText(string s)
 		{
 			//Note: this string can be safely placed into /++/ comments.
-			s = s.replace("/+", "/ +").replace("+/", "+ /");
-			return s;
-		}
+			s = s.replace("/+", "/ +").replace("+/", "+ /"); 
+			return s; 
+		} 
 		
 		private string innerSourceText(in BuildMessage msg)
 		{
 			with(msg) {
-				if(location.text.canFind(' ')) WARN("Space is not allowed in the code location paths.");
+				if(location.text.canFind(' ')) WARN("Space is not allowed in the code location paths."); 
 				//Todo: Handle modern "" filenames with space characters in $ DIDE_LOC
 				
-				const t = type.text.capitalize ~ ':';
-				const s = formatErrorMessage(fixDuplicatedMessages(message, t~" "));
+				const t = type.text.capitalize ~ ':'; 
+				const s = formatErrorMessage(fixDuplicatedMessages(message, t~" ")); 
 				
-				if(isMain)	return format!"%s/+$DIDE_LOC %s+/ %s"(t, location, s);
-				else if(location)	return format!"/+$DIDE_LOC %s+/ %s"(location, s);
-				else	return s;
+				if(isMain)	return format!"%s/+$DIDE_LOC %s+/ %s"(t, location, s); 
+				else if(location)	return format!"/+$DIDE_LOC %s+/ %s"(location, s); 
+				else	return s; 
 			}
-		}
+		} 
 		
 		
 		static private string fixDuplicatedMessages(string msg, string prefix)
 		{
-			auto lines = msg.splitLines;
+			auto lines = msg.splitLines; 
 			if(lines.length>1)
 			{
-				const s = prefix ~ lines[0];
+				const s = prefix ~ lines[0]; 
 				if(lines[1..$].all!(line => line == s))
-				return lines[0] ~ " (x"~lines.length.text~")";
+				return lines[0] ~ " (x"~lines.length.text~")"; 
 			}
 			
-			return msg;
-		}
+			return msg; 
+		} 
 		
 		private string formatErrorMessage(string msg)
 		{
@@ -2579,99 +2581,99 @@ class BuildResult
 					
 					The following is a cheap workaround only:
 				+/
-				msg = safeText(msg);
+				msg = safeText(msg); 
 			}
 			
 			//locate all the code snippets inside `` and surround them with / +Code: ... + /
-			int[] indices;
+			int[] indices; 
 			
-			foreach(i, char ch; msg) if(ch=='`') indices ~= i.to!int;
+			foreach(i, char ch; msg) if(ch=='`') indices ~= i.to!int; 
 			
 			if(indices.length & 1)
 			{
-				indices = indices.remove(max(indices.length.to!int - 2, 0));
+				indices = indices.remove(max(indices.length.to!int - 2, 0)); 
 				//it removes the second rightmost element. The leftmost and the rightmost are always valid.
 			}
 			
-			bool opening = false;
+			bool opening = false; 
 			foreach_reverse(i; indices)
 			{
 				const 	left = msg[0 .. i],
-					right = msg[i+1 .. $];
+					right = msg[i+1 .. $]; 
 				
-				auto separ = opening ? "/+Code: " :"+/";
+				auto separ = opening ? "/+Code: " :"+/"; 
 				if(left.endsWith(separ[1])) separ = ' ' ~ separ; //Not to produce "/+/" or "+/+"
 				
-				msg = left ~ separ ~ right;
-				opening = !opening;
+				msg = left ~ separ ~ right; 
+				opening = !opening; 
 			}
 			
 			if(msg.endsWith('/')) msg ~= ' '; //Not to produce "/+/"
 			
 			//find filenames and transform them into / + $DIDE_LOC ... + /
 			
-			static rxCodeLocation = ctRegex!(`[a-z]:\\[a-z0-9_\.\-\\!#$%^@~]+.d(-mixin-[0-9]+)?\([0-9]+,[0-9]+\)`, `gim`);
+			static rxCodeLocation = ctRegex!(`[a-z]:\\[a-z0-9_\.\-\\!#$%^@~]+.d(-mixin-[0-9]+)?\([0-9]+,[0-9]+\)`, `gim`); 
 			//Todo: this filename parser regex fails with accented chars and with space.
 			
-			auto fileNames = msg.matchAll(rxCodeLocation).map!"a[0]".array;
+			auto fileNames = msg.matchAll(rxCodeLocation).map!"a[0]".array; 
 			foreach(fn; fileNames.sort.uniq)
 			{
-				msg = msg.replace(fn, "/+$DIDE_LOC " ~ repairFileCase(fn) ~ "+/");
+				msg = msg.replace(fn, "/+$DIDE_LOC " ~ repairFileCase(fn) ~ "+/"); 
 				//Opt: maybe repairFileCase is slow. But maybe caching makes it less of a problem...
 			}
 			
-			return msg;
-		}
-	}
+			return msg; 
+		} 
+	} 
 	
 	
 	string[] unprocessedSourceTexts()
 	{
-		string[] res;
+		string[] res; 
 		
 		foreach(f; remainings.keys.sort)
 		{
 			if(f in remainings && remainings[f].length)
 			{
-				auto act = "/+Output:/+$DIDE_LOC "~f.fullName~"+/\n/+";
-				remainings[f].each!(a => act ~= safeText(a)~"\n");
-				act ~= "+/+/";
+				auto act = "/+Output:/+$DIDE_LOC "~f.fullName~"+/\n/+"; 
+				remainings[f].each!(a => act ~= safeText(a)~"\n"); 
+				act ~= "+/+/"; 
 				
-				res ~= act;
+				res ~= act; 
 			}
 		}
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	string[] messageSourceTexts()
 	{
 		//Note: This produces a compiler message list out of advanced DIDE comments.
 		
-		string[] res;
+		string[] res; 
 		
 		foreach(loc; messages.keys.sort)
 		{
-			const bm = messages[loc];
+			const bm = messages[loc]; 
 			
 			if(bm.isMain)
 			{
-				auto act = "/+"~innerSourceText(bm);
+				auto act = "/+"~innerSourceText(bm); 
 				foreach(const sm; subMessagesOf(bm.location))
-				act ~= "\n"~innerSourceText(sm);
-				act ~= "+/";
+				act ~= "\n"~innerSourceText(sm); 
+				act ~= "+/"; 
 				
-				res ~= act;
+				res ~= act; 
 			}
 		}
 		
-		return res;
-	}
+		return res; 
+	} 
 	
 	string sourceText()
-	{ return chain(unprocessedSourceTexts, messageSourceTexts).join('\n'); }
+	{ return chain(unprocessedSourceTexts, messageSourceTexts).join('\n'); } 
 	
-}
+} 
 
 
 /// Error collection ///////////////////////////////////

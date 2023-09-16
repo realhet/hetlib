@@ -1,6 +1,6 @@
 module het.geometry; /+DIDE+/
 
-import het.utils; 
+import het; 
 
 alias seg2 = Segment!vec2; 
 alias dseg2 = Segment!dvec2; 
