@@ -4,14 +4,9 @@
 #included filenames
 !.gitignore
 !*.d
+!*.drawio
 !README.md
 
 #included directories
 !het/
-!het/test/
-!het/hldc/
-!imageformats/
-!webp/
-!turbojpeg/
 !dvulkan/
-!examples/

@@ -3,7 +3,7 @@ version(/+$DIDE_REGION+/all)
 {
 	import het.opengl; 
 	
-	public import het.geometry; 
+	public import het.algorithm; 
 	public import het.opengl : textures, CustomTexture; 
 	
 	import std.bitmanip; 

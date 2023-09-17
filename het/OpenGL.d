@@ -10,7 +10,7 @@ enum LOG_shaderLoadingTimes = false;
 //Todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //Todo: nincs doUpdate formresize kozben
 
-public import het, het.win, het.geometry, het.bitmap, het.draw2d; 
+public import het, het.win, het.algorithm, het.bitmap, het.draw2d; 
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits; 
 
 //Turn on high performance GPUs on some laptops
@@ -2683,7 +2683,7 @@ version(/+$DIDE_REGION+/all)
 		~this()
 		{ if(handle) handle.release; } 
 	} 
-} version(/+$DIDE_REGION Tesselator+/all)
+}version(/+$DIDE_REGION Tesselator+/all)
 {
 	private
 	{

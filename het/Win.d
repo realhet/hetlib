@@ -10,7 +10,7 @@ version(/+$DIDE_REGION+/all)
 	pragma(lib, "winmm.lib"); 
 	pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 	
-	public import het, het.geometry, het.inputs; 
+	public import het, het.algorithm, het.inputs; 
 	
 	//moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
 	__gshared size_t global_TPSCnt, TPS; //texture upload bytes /sec
