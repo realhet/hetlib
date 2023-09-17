@@ -105,7 +105,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.exception : collectException, ifThrown, assertThrown; 
 			public import std.system : endian, os; 
 			
-			public import het.quantities;
+			public import het.quantities; 
 			
 			public import std.concurrency, std.signals; 
 			
@@ -1716,9 +1716,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			return format!"%s(%s)"(T.stringof, parts.join(", ")); 
 		} 
 		
-		void clearFields(T)(T obj)
+		void clearFields_init(T)(T obj)
 		if(isAggregateType!T)
 		{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); } 
+		
+		//note: at stream, there is a clearFields_default version
+		//todo: bad naming:  initFields and initStoredField would be better.
 		
 		//Meta helpers ///////////////////////////
 		
@@ -13198,7 +13201,7 @@ version(/+$DIDE_REGION debug+/all)
 	
 	//! clearFields /////////////////////////////////////////
 	
-	void clearFields(Type)(auto ref Type data)
+	void clearFields_defaults(Type)(auto ref Type data)
 	if(is(Type==class) || __traits(isRef, data)) //only let classes not to be references  (auto ref template parameter)
 	{
 		static if(is(Type==class)) if(data is null) return; //ignore empty null instances
