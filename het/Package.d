@@ -6,12 +6,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		__gshared logFileOps = false; 
 		
 		pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
-		pragma(lib, "comdlg32.lib");  //for the dialogs
+		pragma(lib, "comdlg32.lib"); //for the dialogs
+		pragma(lib, "winmm.lib"); //for playsound
 		
 		//Todo: ref const for opCmp and opEquals
 		
 		//Todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
-				 //https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
+		//https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
 		
 		//Todo: UTILS lots of todes commented out, because of the compile log is small
 		/+
@@ -1720,8 +1721,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		if(isAggregateType!T)
 		{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); } 
 		
-		//note: at stream, there is a clearFields_default version
-		//todo: bad naming:  initFields and initStoredField would be better.
+		//Note: at stream, there is a clearFields_default version
+		//Todo: bad naming:  initFields and initStoredField would be better.
 		
 		//Meta helpers ///////////////////////////
 		
