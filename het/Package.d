@@ -9059,6 +9059,12 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		immutable string[12] MonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; 
 		
+		immutable monthDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; 
+		
+		
+		bool isLeapYear(int year)
+		{ return year%4==0 && (year%100!=0 || year%400==0); } 
+		
 		 //Todo: delete old crap from datetime
 		
 		version(/+$DIDE_REGION Old routines+/all)
@@ -9068,22 +9074,19 @@ version(/+$DIDE_REGION Date Time+/all)
 				enum dateReference = 693594; 
 				enum secsInDay = 24*60*60; 
 				enum msecsInDay = secsInDay*1000; 
-						
-				immutable monthDays = [
+				
+				immutable monthDays2 = [
 					[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31],
-									[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+					[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 				]; 
-						
-				deprecated bool isLeapYear(int year)
-				{ return year%4==0 && (year%100!=0 || year%400==0); } 
-						
+				
 				deprecated double encodeTime(int hour, int min, int sec, double ms)
 				{ return (((ms/1000+sec)/60+min)/60+hour)/24; } 
-						
+				
 				deprecated double encodeDate(int year, int month, int day)
 				{
 					//returns NaN if invalid
-					auto dayTable = monthDays[isLeapYear(year)][]; 
+					auto dayTable = monthDays2[isLeapYear(year)][]; //Opt: It calculates isleap for every month.
 					if(inRange(year,  1, 9999) && inRange(month, 1, 12) && inRange(day, 1, dayTable[month-1]))
 					{
 						foreach(i; 0..month-1) day += dayTable[i]; 
@@ -9128,7 +9131,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					}
 					Y += I; 
 							
-					auto dayTable = monthDays[isLeapYear(Y)][]; 
+					auto dayTable = monthDays2[isLeapYear(Y)][]; 
 					int M = 0; 
 					while(1) {
 						I = dayTable[M]; 
@@ -9255,7 +9258,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{
 					//37ns is the fastest measurable interval. Using Windown 10 QPC
 					_100ns	= 1<<RawShift	, //100ns = Unit of FILETIME.  6 extra bits of precision below 100ns. Useful time based unique id generation.
-					us	= 10 * _100ns	,
+					us	= 10 * _100ns	, μs = us,
 					ms	= 1000 * us 	,
 					sec	= 1000 * ms 	, //1 sec = Unit of quantities.SI
 					min	= 60 * sec 	,
@@ -9264,11 +9267,14 @@ version(/+$DIDE_REGION Date Time+/all)
 					week	= 7 * day	,
 					month	= cast(ulong)(gregorianDaysInMonth * day)	, //Gregorian average
 					year	= cast(ulong)(gregorianDaysInYear * day)	,
-					_913year	= 913 * year	, //max years before overflow.  1601 + 913 = 2516
+					_minYear	= 1601,
+					_maxYear	= _minYear + ulong.max/year - 1,
+					_numYears	= _maxYear - _minYear + 1
 				} 
 				
 				//lock the above calculations
-				static assert(RawUnit._913year == 0xffe78926_3bb40000); 
+				static assert(RawUnit._numYears==913); //these are all the full years covered
+				static assert(RawUnit._numYears * RawUnit.year == 0xffe78926_3bb40000); 
 				static assert(format!"%.16f"(double(DateTime.RawUnit.year) / DateTime.RawUnit.day) == "365.2524000000000228"); 
 				
 				private enum UnixShift_sec = 11644473600; 
@@ -9344,7 +9350,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							static if(is(T==SYSTEMTIME)) return fileTimeToSystemTime(ft); 
 						}
 					} 
-								
+					
 					void _set(bool isLocal, T)(in T src)
 					{
 						static if(isLocal)
@@ -9361,7 +9367,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						}
 					} 
 				} 
-							
+				
 				@property
 				{
 					auto utcFileTime() const
@@ -9376,12 +9382,12 @@ version(/+$DIDE_REGION Date Time+/all)
 					auto localSystemTime() const
 					{ return _get!(true , SYSTEMTIME	)(); } 	void localSystemTime	(in SYSTEMTIME	a)
 					{ _set!true(a); } 
-								
+					
 					double unixTime() const
 					{ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; } 
 					void unixTime(in double a)
 					{ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; } 
-								
+					
 					private enum RawDelphiShift = 109205*RawUnit.day; 
 					double localDelphiTime() const
 					{
@@ -9395,12 +9401,12 @@ version(/+$DIDE_REGION Date Time+/all)
 						else
 						localFileTime = rawToFileTime((d*RawUnit.day).to!ulong + RawDelphiShift); 
 					} 
-								
+					
 					DateTime utcDayStart() const
 					{ if(isNull) return	this; return RawDateTime(raw - raw%RawUnit.day); } 
 					DateTime utcDayEnd	() const
 					{ if(isNull) return	this; return RawDateTime(utcDayStart.raw + RawUnit.day); } 
-								
+					
 					DateTime localDayStart() const
 					{
 						if(isNull) return this; 
@@ -9411,7 +9417,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						st.wMilliseconds	= 0; 
 						return DateTime(st); 
 					} 
-								
+					
 					DateTime localDayEnd() const
 					{
 						if(isNull) return this; 
@@ -9433,22 +9439,22 @@ version(/+$DIDE_REGION Date Time+/all)
 						+/
 									
 					} 
-								
+					
 					Time utcTime  () const
 					{ return this-utcDayStart; } 
 					Time localTime() const
 					{ return this-localDayStart; } 
-								
+					
 					Time time() const
 					{ return localTime; } 
 					DateTime dayStart() const
 					{ return localDayStart; } 
 				} 
-							
+				
 				///calculate the difference between DateTimes
 				Time opBinary(string op : "-")(in DateTime b) const
 				{ return long(raw-b.raw)*(1.0/RawUnit.sec)*het.quantities.second; } 
-							
+				
 				///adjust DateTime by si.Time
 				DateTime opBinary(string op)(in Time b) const if(op.among("+", "-"))
 				{
@@ -9456,14 +9462,14 @@ version(/+$DIDE_REGION Date Time+/all)
 					mixin("res.raw", op, "=(b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
 					return res; 
 				} 
-							
+				
 				///adjust this DateTime by si.Time
 				DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))
 				{
 					mixin("raw", op,"= (b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
 					return this; 
 				} 
-							
+				
 				private long timeZoneOffset_raw() const
 				{
 					//Todo: rename to utcOffset (read aboit it on web first!)
@@ -9471,14 +9477,14 @@ version(/+$DIDE_REGION Date Time+/all)
 					DateTime dt = void; dt.utcFileTime = localFileTime; 
 					return dt.raw-this.raw; 
 				} 
-							
+				
 				Time timeZoneOffset() const
 				{
 					if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL"); 
 					DateTime dt = void; dt.utcFileTime = localFileTime; 
 					return dt-this; 
 				} 
-							
+				
 				@property
 				{
 					//dayOfWeek stuff
@@ -9498,7 +9504,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				/// This is the hash for bitmap objects
 				ulong toId_deprecated() const
 				{ return raw; } 
-							
+				
 				/// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
 				void actualize()
 				{
@@ -9506,21 +9512,21 @@ version(/+$DIDE_REGION Date Time+/all)
 					if(isNull || c>raw) raw = c; 
 					else raw++; //now it's the exact same as the previous one. Just increment.
 				} 
-							
+				
 				string dateText(alias fun = localSystemTime)() const
 				{
 					//Todo: format
 					if(isNull) return "NULL Date"; 
 					with(fun) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay); 
 				} 
-							
+				
 				string timeText(alias fun = localSystemTime)() const
 				{
 					//todo format
 					if(isNull) return "NULL Time"; 
 					with(fun) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds); 
 				} 
-							
+				
 				string toString(alias fun = localSystemTime)()const
 				{
 					if(isNull) return "NULL DateTime"; 
@@ -9535,11 +9541,11 @@ version(/+$DIDE_REGION Date Time+/all)
 					if(isNull) return "null"; 
 					//4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
 					//return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
-								
+					
 					//windows timestamp format (inserts it after duplicate files)
 					string s; 
 					with(fun) s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds); 
-								
+					
 					if(shortened) {
 						 //Todo: not so fast
 						if(s.endsWith(".000")) {
@@ -9550,7 +9556,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							}
 						}
 					}
-								
+					
 					return s; 
 				} 
 				
@@ -9574,20 +9580,20 @@ version(/+$DIDE_REGION Date Time+/all)
 				static
 				{
 					//self diagnostics
-								
+					
 					void selftest()
-					{ enforce(DateTime(2000, 1, 2) - DateTime(1601, 1, 2) == 145731 * day); } 
-								
+					{ enforce(DateTime(2000, 1, 2) - DateTime(RawUnit._minYear, 1, 2) == 145731 * day); } 
+					
 					void benchmark()
 					{
 						print("DateTime RawUnits"); 
 						foreach(a; EnumMembers!(DateTime.RawUnit))
 						format!"%-10s %29d %16x"(a, a, a).replace(' ', '_').print; 
-									
+						
 						print; 
 						print("now() call frequency: "); 
 						20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; }); 
-									
+						
 						void bench(string code, size_t N=1000)()
 						{
 							write(code, "   //"); 
@@ -9595,7 +9601,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							mixin(code); 
 							((now-t0)/N).siFormat!"%8.0f ns".print; 
 						} 
-									
+						
 						print; 
 						bench!q{foreach(i; 0..N) cast(void)now; 	}; 
 						bench!q{N.iota.each!((i){ cast(void)now; }); 	}; 
@@ -9616,22 +9622,21 @@ version(/+$DIDE_REGION Date Time+/all)
 								print("  Local -> Local ", DateTime(21, m,30,12)); 
 							} 
 							doit(0); doit(1); 
-										
+							
 							print; 
 							print("Test local-utc for 12 31*24hour steps."); 
 							foreach(u; [UTC, Local])
 							iota(12)	.map!(i => DateTime(u, 21, 1, 30, 12) + i*31*day)
 								.enumerate.map!(
-								a =>  //A month is not a real month!!!! it's 32*24 hours!!!!
-																	format!"%2s %2s %2s"
-																	(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour)
+								a => //A month is not a real month!!!! it's 32*24 hours!!!!
+								format!"%2s %2s %2s"
+								(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour)
 							)
 								.each!print; 
 						} 
 						dstTest; 
-									
 					} 
-								
+					
 				} 
 			}
 		} 
