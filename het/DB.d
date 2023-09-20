@@ -80,10 +80,10 @@ class Archiver {
 			this.volume = volume; 
 			originalFileName	=	file.fullName; 
 			masterRecordBegin	=	baseOffset; 
-			masterRecordEnd	=	masterRecordBegin +  DefaultMasterRecordMaxSize; 
-			recordPoolBegin		= masterRecordEnd; 
-			recordPoolEnd	= recordPoolBegin     +  recordPoolInitialSize; 
-			blobPoolBegin     =	recordPoolEnd; 
+			masterRecordEnd	=	masterRecordBegin	+  DefaultMasterRecordMaxSize; 
+			recordPoolBegin		= masterRecordEnd; 	
+			recordPoolEnd	= recordPoolBegin	+	recordPoolInitialSize; 
+			blobPoolBegin     =	recordPoolEnd; 	
 			created = modified = now; 
 		} 
 		
@@ -3756,9 +3756,8 @@ class PictureLibrary
 			string calcTimeRangeText(DateTime[2] tr) const
 			{
 				//Note: This only calculates the lowest unit, and the beginning of the time frame.
-				const 	s0 = tr[0].utcSystemTime; 
+				const s0 = tr[0].LocalDateTime.systemTime; 
 				
-				//Todo: it's UTC only. Later it should be localtime. But that's complicated.
 				final switch(unit)
 				{
 					case TimeUnit.year: 	switch(count)	{
@@ -3871,7 +3870,8 @@ class PictureLibrary
 			
 			TimeBlock[] subBlocks; 
 			
-			string timeRangeText; 
+			auto timeRangeText()
+			{ return level.calcTimeRangeText(timeRange); }
 			
 			int levelIdx() const
 			{ return level.levelIdx; } 
@@ -3903,7 +3903,6 @@ class PictureLibrary
 					subBlocks.length = len; 
 				}
 				
-				timeRangeText = level.calcTimeRangeText(timeRange); 
 				//print("TimeBlock created:", levelIdx, idx, blk.timeRange, blk.rect);
 			} 
 		} 

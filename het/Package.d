@@ -142,7 +142,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				MB_ICONQUESTION,MB_ICONEXCLAMATION ,MB_ICONWARNING,MB_ICONASTERISK,MB_ICONINFORMATION,MB_USERICON,MB_ICONMASK,
 				MB_DEFBUTTON1 ,MB_DEFBUTTON2,MB_DEFBUTTON3,MB_DEFBUTTON4,MB_DEFMASK,MB_APPLMODAL,MB_SYSTEMMODAL ,MB_TASKMODAL,MB_MODEMASK,
 				MB_HELP,MB_NOFOCUS,MB_MISCMASK ,MB_SETFOREGROUND,MB_DEFAULT_DESKTOP_ONLY,MB_TOPMOST,MB_SERVICE_NOTIFICATION_NT3X ,
-				MB_RIGHT,MB_RTLREADING,MB_SERVICE_NOTIFICATION; 
+				MB_RIGHT,MB_RTLREADING,MB_SERVICE_NOTIFICATION,
+				
+				TIME_ZONE_INFORMATION, GetTimeZoneInformation; 
 			
 			import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
 				std.json, std.parallelism, core.runtime; 
@@ -299,14 +301,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						}
 					); 
 				} 
-							
+				
 				void stop()
 				{
 					over = true; 
 					while(!finished) .sleep(5); //Have to wait the thread
 				} 
 			} 
-					
+			
 			KillerThread killerThread; 
 			
 		} 
@@ -315,6 +317,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			uint tick; //enough	for 2 years @ 60Hz
 			DateTime tickTime; 	//it is always behind one frame time compared to now(). But it is only accessed once per frame. If there is LAG, it is interpolated.
 			Time deltaTime; 
+			string timeZoneName;
 			
 			import core.runtime : Runtime; 
 			alias args = Runtime.args; 
@@ -331,13 +334,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				ExitProcess(code); 
 			} 
 			
+			///win.main() or runConsole() calls this from the main thread only.
 			void _initialize()
 			{
-				//win.main() or runConsole() calls this.
 				if(chkSet(initialized))
 				{
 					running_ = true; 
 					SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS); 
+					application.timeZoneName = DateTime.currentTimeZoneName;
 					dbg; //start it up
 					killerThread = new KillerThread;  killerThread.start; 
 					console.handleException({ globalInitialize; }); 
@@ -358,6 +362,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				enforce(false, "Application is already finalized"); 
 			} 
 			
+			void _updateTimeZone()
+			{
+				//opt: This query takes 0.75 millisec, I tried WM_TIMECHANGE but that not works.
+				const t0 = now;
+				if(application.timeZoneName.chkSet(DateTime.currentTimeZoneName))
+				{
+					LocalDateTime.resetLocalDateCache;
+					LOG("TimeZone changed to:", application.timeZoneName, now-t0);
+				}
+			}
+			
 			int runConsole(void delegate() dg)
 			{
 				enforce(!initialized, "Application.run(): Already running."); 
@@ -367,10 +382,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//here we wait all threads. In windowed mode we don't
 				return ret; 
 			} 
-					
+			
 			@property HWND handle()
 			{ return _mainWindowHandle; } 
-					
+			
 			bool isForeground()
 			{ return _mainWindowIsForeground(); } 
 		} 
@@ -9180,6 +9195,69 @@ version(/+$DIDE_REGION Date Time+/all)
 			} 
 		}
 		
+		//this one is a new routine: 230920
+		void adjustDate(Y, M, D)(ref Y year, ref M month, ref D day)
+		if(allSatisfy!(isIntegral, Y, M, D))
+		{
+			static void adjustYear(Y)(ref Y year)
+			if(isIntegral!Y)
+			{
+				//it's just an error check because there is no possible overflow from here
+				enforce(
+					DateTime.RawUnit._minYear <= year && 
+					DateTime.RawUnit._maxYear+1/+include the last fraction year too+/ >= year, 
+					year.format!"adjustYear(): Out of range: %s"
+				); 
+			} 
+			
+			static void adjustMonth(Y, M)(ref Y year, ref M month)
+			if(allSatisfy!(isIntegral, Y, M))
+			{
+				if(month.inRange(1, 12)) { /+it's a correct month index.+/}
+				else if(month<=24) { month -= 12; year++; }
+				else if(month >= -11) { month += 12; year--; }
+				else {
+					auto Δy = month>0 ? (month-1)/12 : -((12-month)/12); 
+					month -= Δy*12; 
+					year += Δy; 
+				}
+				adjustYear(year); 
+			} 
+			
+			static void adjustDay(Y, M, D)(ref Y year, ref M month, ref D day)
+			if(allSatisfy!(isIntegral, Y, M, D))
+			{
+				auto adjustMonthAndGetNumDays()
+				{
+					adjustMonth(year, month); 
+					int n = monthDays[month-1]; 
+					if(n==28 && isLeapYear(year)) n++; 
+					return n; 
+				} 
+				
+				if(day.inRange(1, 28)) { adjustMonth(year, month); }
+				else if(day<1) {
+					while(day<1)
+					{
+						month--; 
+						adjustMonth(year, month); 
+						day += adjustMonthAndGetNumDays; 
+					}
+				}
+				else {
+					while(1)
+					{
+						const n = adjustMonthAndGetNumDays; 
+						if(day<=n) break; 
+						day -= n; 
+						month++; 
+					}
+				}
+			} 
+			
+			adjustDay(year, month, day); 
+		} 
+		
 	}version(/+$DIDE_REGION+/all) {
 		
 		struct TimeZone { byte shift; } 
@@ -9485,6 +9563,21 @@ version(/+$DIDE_REGION Date Time+/all)
 					return dt-this; 
 				} 
 				
+				static currentTimeZoneOffset()
+				{
+					return now.timeZoneOffset;
+				}
+				
+				static currentTimeZoneName()
+				{
+					TIME_ZONE_INFORMATION tzi;
+					switch(GetTimeZoneInformation(&tzi))
+					{
+						case 2: return tzi.DaylightName.text;
+						default: return tzi.StandardName.text;
+					}
+				}
+				
 				@property
 				{
 					//dayOfWeek stuff
@@ -9562,7 +9655,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				
 				string timestamp_compact(alias fun = localSystemTime)()const
 				{ return timestamp!fun(Yes.shortened); } 
-							
+				
 				//Todo: utcXXX not good! should ude TimeZone as first param
 				string utcDateText() const
 				{ return dateText!utcSystemTime; } 
@@ -9576,7 +9669,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return timestamp!utcSystemTime(shortened); } 
 				string utcTtimestamp_compact()const
 				{ return utcTimestamp(Yes.shortened); } 
-							
+				
 				static
 				{
 					//self diagnostics
@@ -10099,8 +10192,285 @@ version(/+$DIDE_REGION Date Time+/all)
 				*/
 						
 			} 
-		} 
+		} 
 		
+		struct LocalDateTime
+		{
+			/+
+				Note: This struct can be used to convert raw UTC DateTime to it's local and decoded form.
+				For display purposes.
+				
+				It contains	all the fields of SYSTEMTIME.
+				It has extra	fields to optionaly store DayLightSaving information.
+				
+				The size of the struct is only 8 bytes. (SYSTEMTIME: 16)
+			+/
+			//Todo: periodically chack if the current time zona changed or not
+			mixin(
+				bitfields!(
+					uint, "min"	, 6,
+					uint, "hour"	, 5,
+					uint, "day"	, 5,
+					uint, "month"	, 4,
+					uint, "yearShifted"	, 10, //0=1601
+					int , "dlsHourAdjust"	, 2
+				)
+			); 
+			mixin(
+				bitfields!(
+					uint, "ms"	, 10,
+					uint, "sec"	, 6,
+					uint, "dlsHourOfs"	, 10, //valid hours until DLS transition
+					uint, "dayOfWeek"	, 3, //0=sun
+					bool, "valid"	, 1,
+					uint, "_reserved"	, 2
+				)
+			); 
+			static assert(typeof(this).sizeof==8); 
+			
+			enum _yearBase = cast(int) DateTime.RawUnit._minYear; 
+			
+			@property int year() const
+			{ return yearShifted + _yearBase; } 
+			@property void year(int y) 
+			{
+				yearShifted = (y - _yearBase).clamp(0, 1023); 
+				/+Todo: This covers more than DateTime, but here's no error handling+/
+			} 
+			
+			this(in SYSTEMTIME st)
+			{
+				if(st.wYear)
+				{
+					year	= st.wYear,
+					month	= st.wMonth,
+					day	= st.wDay,
+					hour	= st.wHour,
+					min	= st.wMinute,
+					sec	= st.wSecond,
+					ms	= st.wMilliseconds,
+					dayOfWeek 	= st.wDayOfWeek; 
+					valid = true; 
+				}
+			}  auto systemTime() const
+			{
+				if(!valid) return SYSTEMTIME.init; 
+				return SYSTEMTIME
+				(
+					cast(ushort) year, 
+					cast(ushort) month, 
+					cast(ushort) dayOfWeek,
+					cast(ushort) day,
+					cast(ushort) hour, 
+					cast(ushort) min, 
+					cast(ushort) sec, 
+					cast(ushort) ms
+				); 
+			} 
+			
+			bool isNull() const
+			{ return !valid; } 	bool opCast(b : bool)() const
+			{ return !!valid; } 	
+			
+			string toString() const
+			{
+				return isNull ? "NULL LocalDateTime" : format!"%04d.%02d.%02d %02d:%02d:%02d.%03d"
+				(year, month, day, hour, min, sec, ms); 
+			} 
+			
+			static ulong dlsTransitionSearch(ulong r0, int h0, ulong r1, int h1)
+			{
+				//returns: Inputs raw utc day range, and local hours at that day.
+				//returns: The raw utc hour position of the DLS transition or zero if there is none.
+				//Bug: Not sure if it works good in the USA side of the world. Was tested for Hungary only.
+				const hourAdjust = h1-h0; 
+				if(hourAdjust /+Don't care about minutes, only hours across 28 days.+/)
+				{
+					const dayDiff = (r1-r0)/DateTime.RawUnit.day; 
+					if(dayDiff>=2)
+					{
+						const 	rm	= r0+dayDiff/2*DateTime.RawUnit.day,
+							hm 	= rm.RawDateTime.localSystemTime.wHour; 
+						//recursion
+						if(hm!=h0) return dlsTransitionSearch(r0, h0, rm, hm); 
+						if(hm!=h1) return dlsTransitionSearch(rm, hm, r1, h1); 
+					}
+					else
+					{
+						int localHour(int i)
+						{ return (r0 + i*DateTime.RawUnit.hour).RawDateTime.localSystemTime.wHour; } 
+						auto differentHours = iota(24).map!(i => localHour(i) != (h0+i)%24).assumeSorted; 
+						
+						const hourOfs = differentHours.lowerBound(true).length.to!int; 
+						
+						return r0 + hourOfs*DateTime.RawUnit.hour; 
+					}
+				}
+				
+				return 0; 
+			} 
+			
+			static void test()
+			{
+				print(now.utcText); 
+				print(now); 
+				print(now.LocalDateTime); 
+				
+				const 	rawFourWeeks	= DateTime.RawUnit.day*28,
+					numFourWeeks 	= ulong.max / rawFourWeeks; 
+				ulong cnt; 
+				
+				auto testRange() { return iota(DateTime.RawUnit.day*10, ulong.max, 1*DateTime.RawUnit.day - 19*DateTime.RawUnit.min); } 
+				
+				print("testing"); 
+				foreach(i; testRange)
+				{
+					const dt = RawDateTime(i); 
+					
+					if(dt.text != dt.LocalDateTime.text)
+					{
+						print("Input/UTC    :", dt.utcText); 
+						print("Input/Local  :", dt); 
+						with(dt.LocalDateTime) print("Local result :", toString); 
+						print; 
+					}
+					
+					cnt++; 
+				}
+				
+				T0; 
+				testRange.each!((i){ RawDateTime(i).localSystemTime; }); 
+				DT.print; 
+				testRange.each!((i){ RawDateTime(i).LocalDateTime; }); 
+				DT.print; 
+				
+				print("Total tests:", cnt); 
+			} 
+			
+			private {
+				enum rawFourWeeks	= DateTime.RawUnit.day*28,
+				numFourWeeks 	= ulong.max / rawFourWeeks; 
+				
+				//The global cache of 4 week intervals
+				__gshared LocalDateTime[
+					numFourWeeks 
+					+ 1/+last is a fraction of four weeks+/
+				] fourWeekCache; 
+			}
+			package static void resetLocalDateCache()
+			{
+				fourWeekCache = typeof(fourWeekCache).init;
+			}
+			
+			this(DateTime dt)
+			{
+				if(!dt) return; 
+				
+				const LocalDateTime accessCache(size_t idx, ulong raw)
+				{
+					ref actLdt() { return fourWeekCache[idx]; } 
+					if(!actLdt)
+					{
+						assert(raw == idx*rawFourWeeks, "LocalDateTime.fourWeekCache incosistency."); 
+						
+						static toLocalDateTime(ulong raw)
+						{
+							return raw	.max(1) //because 0 means null
+								.RawDateTime
+								.localSystemTime
+								.LocalDateTime
+								.ifThrown(LocalDateTime.init/+Negative timezones, first index will be null.+/); 
+						} 
+						
+						actLdt = toLocalDateTime(raw); 
+						
+						//Note: Only 1 hour timezone shifts are supported. -> North Korea has 30min shift.
+						if(actLdt.min != 0) actLdt = LocalDateTime.init; 
+						
+						if(actLdt && idx+1<fourWeekCache.length)
+						{
+							const	nextIdx	= idx + 1,
+								nextRaw 	= raw + rawFourWeeks,
+								nextLdt	= ((fourWeekCache[nextIdx])?(fourWeekCache[nextIdx]) :(toLocalDateTime(nextRaw))); 
+							//Note: Must avoid recursion here, it would do all the way to the end polluting the stack.
+							if(actLdt.hour!=nextLdt.hour/+Detect DayLighSavings transition+/)
+							{
+								if(
+									const rawDLSTransition = dlsTransitionSearch(
+										raw	, actLdt.hour, 
+										nextRaw	, nextLdt.hour
+									)
+								)
+								{
+									with(actLdt)
+									{
+										dlsHourAdjust = nextLdt.hour - actLdt.hour; 
+										dlsHourOfs = ((rawDLSTransition - raw)/(DateTime.RawUnit.hour)); 
+									}
+								}
+							}
+						}
+						//print("Cached: ", idx.format!"%5d", actLdt, actLdt.dlsHourAdjust, actLdt.dlsHourOfs); 
+					}
+					
+					return actLdt; 
+				} 
+				
+				const 	idx	= dt.raw / rawFourWeeks,
+					raw	= idx * rawFourWeeks; 
+				LocalDateTime res = accessCache(idx, raw); 
+				
+				if(!res) {
+					/+
+						Note: This can happen with negative timezones at cache index 0.
+						Revert to the slower windows method.
+					+/
+					this = dt	.localSystemTime
+						.LocalDateTime
+						.ifThrown(LocalDateTime.init); 
+					return; 
+				}
+				
+				//split up delta to all time components below 'day'
+				auto Δ = dt.raw - raw; 
+				static foreach(s; ["day", "hour", "min", "sec", "ms"])
+				mixin(
+					q{
+						auto Δ$ = cast(int) (Δ / DateTime.RawUnit.$); 
+						Δ -= Δ$ * DateTime.RawUnit.$; 
+					}.replace("$", s)
+				); 
+				//Opt: first I should div by 1 msec and then do the rest on an integer.
+				alias Δμs = Δ; 
+				//print(Δday, Δhour, Δmin, Δsec, Δms, Δμs); 
+				
+				int 	year	= res.year,
+					month 	= res.month,
+					day	= res.day + Δday,
+					hour	= res.hour + Δhour; 
+				//minutes and below are not handled.
+				
+				//apply optional DayLightSaving shift.
+				if(res.dlsHourAdjust && (Δday*24 + Δhour)>=res.dlsHourOfs)
+				hour += res.dlsHourAdjust; 
+				
+				while(hour<0) { day--; hour -= 24; }
+				while(hour>=24) { day++; hour -= 24; }
+				adjustDate(year, month, day); 
+				
+				res.year	= year,
+				res.month 	= month,
+				res.day	= day,
+				res.hour	= hour,
+				res.min	= Δmin.to!uint,
+				res.sec	= Δsec.to!uint,
+				res.ms	= Δms.to!uint; 
+				
+				this = res; 
+			} 
+			
+			//Todo: Check timeZone change and invalidate cache.
+		} 
 	}
 }version(/+$DIDE_REGION File System+/all)
 {

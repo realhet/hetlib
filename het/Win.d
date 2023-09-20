@@ -896,6 +896,8 @@ class Window
 				/+Todo: get precise drop position with: DragQueryPoint+/
 				return 0; 
 			}
+			//WM_TIMECHANGE: LOG("WM_TIMECHANGE"); return 0;
+			//case WM_SETTINGCHANGE: LOG("WM_SETTINGSCHANGE"); return 0;
 			default: 	if(message.inRange(WM_USER, 0x7FFF))
 			return onWmUser(message-WM_USER, wParam, lParam); 
 		}
@@ -1254,9 +1256,13 @@ class Window
 				
 				//ticking. The same timing information as what the windows are receiving
 				application.tick++; 
-				application.tickTime	= tickNow - deltaTime*(updateCnt-i); 
-				application.deltaTime	= deltaTime; 
+				application.tickTime = tickNow - deltaTime*(updateCnt-i); 
+				application.deltaTime = deltaTime; 
 				
+				if((application.tick & 0x3F)==0)
+				application._updateTimeZone/+Opt: This one is slow: 0.75ms+/; 
+				
+				//Opt: measure the performance of these update events
 				inputs.update; //Note: it's main window only
 				clipboard.update; 
 				updateDragAcceptFilesState; 
