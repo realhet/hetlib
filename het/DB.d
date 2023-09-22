@@ -3047,15 +3047,14 @@ class PictureLibrary
 				
 				auto _rb_access()
 				{
-					if(!_rb) _rb = new typeof(_rb)(_aa.byKey); 
+					if(!_rb) _rb = new typeof(_rb)(_unorderedKeys); 
 					return _rb; 
 				} 
 				
 				auto _orderedKeys()
 				{
-					if(!_rb) _rb = new typeof(_rb)(_unorderedKeys); 
 					return _rb_access[]; 
-				} 
+				}
 				
 				auto _orderedKeyInterval(K key0, K key1)
 				{
@@ -3349,8 +3348,13 @@ class PictureLibrary
 				
 				void load()
 				{
+					const t0 = now; scope(exit) print(now-t0); 
+					
 					aa.clear; 
 					const mask = DataLoggerUtils.extractWildMask(logFile); 
+					
+					K[] keys; V[] values;
+					
 					foreach(f; logFile.path.files(mask).sort)
 					{
 						static struct KV { align(1): K key; V value; } 
@@ -3361,17 +3365,27 @@ class PictureLibrary
 							WARN("DataLogger.mainFile truncated:", f); 
 							//Todo: this minimal integrity check is for the dynamic array cast.
 						}
-						foreach(const a; cast(KV[])f.read(true, 0, loadSize))
-						aa[a.key] = a.value; 
-						aa.rehash; 
+						
+						//load all the key/value pairs
+						auto buf = cast(KV[])f.read(true, 0, loadSize); 
+						
+						//split into key/values and accumulate
+						keys ~= buf.map!(a => a.key).array;
+						values ~= buf.map!(a => a.value).array;
 					}
+					
+					//create the full AA in a single pass.
+					aa = assocArray(keys, values); 
 				} 
 			} 
 			struct DataLoggerBlobAA(K, V)
 			{
-				struct FileRef
-				{ File file; size_t offset, size; } 
-				FileRef[K] aaIdx; 
+				struct FileBlockRef
+				{
+					File file; size_t offset, size; 
+					//Todo: FileBlockRef should have a text form: fn.ext?ofs=123&size=456
+				} 
+				FileBlockRef[K] aaIdx; 
 				File idxFile, dataFile; 
 				auto length() { return aaIdx.length; } 
 				auto byKey() { return aaIdx.byKey; } 
@@ -3393,7 +3407,7 @@ class PictureLibrary
 					
 					//Todo: Use winapi files
 					
-					aaIdx[key] = FileRef(dataFile, offset, size); 
+					aaIdx[key] = FileBlockRef(dataFile, offset, size); 
 					//Bug: try to do atomic operation with proper exception handling
 					//Todo: implement locked file operations.
 					//Opt: also it's fcking slow to open and close all the time.
@@ -3409,16 +3423,19 @@ class PictureLibrary
 							Note: This voldemort struct is required to emulate the AA's pointer access.
 							This result must not be dereferenced.
 						+/
-						const FileRef _fileRef; 
+						const FileBlockRef _fileBlockRef; 
 						@property
 						{
 							auto _file() const
-							{ return _fileRef.file; } auto _offset() const
-							{ return _fileRef.offset; } auto _size() const
-							{ return _fileRef.size; } 
+							{ return _fileBlockRef.file; } auto _offset() const
+							{ return _fileBlockRef.offset; } auto _size() const
+							{ return _fileBlockRef.size; } 
 							
 							auto _data()
-							{ return _file.read(true, _offset, _size); } 
+							{
+								return _file.read(true, _offset, _size); 
+								//it will throw if can't read.
+							} 
 							
 							bool _valid() const
 							{ return !!_file; } bool _exists() const
@@ -3437,33 +3454,37 @@ class PictureLibrary
 				void load()
 				{
 					//Todo: maintenance: delete orphan bidx and blob files.
+					const t0 = now; scope(exit) print(now-t0); 
 					
 					aaIdx.clear; 
 					const mask = DataLoggerUtils.extractWildMask(idxFile); 
-					foreach(f; idxFile.path.files(mask).sort)
+					
+					static struct KF { align(1): K key; size_t offset, size; } 
+					
+					K[] keys; FileBlockRef[] values;
+					
+					foreach(fIdx; idxFile.path.files(mask).sort)
 					{
-						const 	fData = f.otherExt(".blob"),
+						const 	fData = fIdx.otherExt(".blob"),
 							fDataSize = fData.size; 
 						
-						static struct KF { align(1): K key; size_t offset, size; } 
-						size_t loadSize = f.size; 
+						size_t loadSize = fIdx.size; 
 						if(loadSize%KF.sizeof)
 						{
 							loadSize = loadSize/KF.sizeof*KF.sizeof; 
-							WARN("DataLogger.idxFile truncated:", f); 
+							WARN("DataLogger.idxFile truncated:", fIdx); 
 						}
-						foreach(const a; cast(KF[]) f.read(true, 0, loadSize))
-						{
-							if(a.offset + a.size <= fDataSize)
-							aaIdx[a.key] = FileRef(fData, a.offset, a.size); 
-							else
-							WARN("Blob missing: "~FileRef(fData, a.offset, a.size).text); 
-							//Todo: FileRef could be a smart reference to a specific block of a file with verification/loading.
-							//Todo: FileBlock seems like a better name.
-							//Todo: FileBlock should have a text format too.  fileName?offset=432143&length=32143
-						}
-						aaIdx.rehash; 
+						
+						//load the index file
+						auto buf = cast(KF[]) fIdx.read(true, 0, loadSize); 
+						
+						//split into key/values and accumulate
+						keys ~= buf.map!(a => a.key).array;
+						values ~= buf.map!(a => FileBlockRef(fData, a.offset, a.size)).array;
 					}
+					
+					//create the full AA in a single pass.
+					aaIdx = assocArray(	keys, values); 
 				} 
 			} 
 		} 
@@ -3871,7 +3892,7 @@ class PictureLibrary
 			TimeBlock[] subBlocks; 
 			
 			auto timeRangeText()
-			{ return level.calcTimeRangeText(timeRange); }
+			{ return level.calcTimeRangeText(timeRange); } 
 			
 			int levelIdx() const
 			{ return level.levelIdx; } 
