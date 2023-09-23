@@ -317,7 +317,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			uint tick; //enough	for 2 years @ 60Hz
 			DateTime tickTime; 	//it is always behind one frame time compared to now(). But it is only accessed once per frame. If there is LAG, it is interpolated.
 			Time deltaTime; 
-			string timeZoneName;
+			string timeZoneName; 
 			
 			import core.runtime : Runtime; 
 			alias args = Runtime.args; 
@@ -341,7 +341,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{
 					running_ = true; 
 					SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS); 
-					application.timeZoneName = DateTime.currentTimeZoneName;
+					application.timeZoneName = DateTime.currentTimeZoneName; 
 					dbg; //start it up
 					killerThread = new KillerThread;  killerThread.start; 
 					console.handleException({ globalInitialize; }); 
@@ -364,14 +364,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			void _updateTimeZone()
 			{
-				//opt: This query takes 0.75 millisec, I tried WM_TIMECHANGE but that not works.
-				const t0 = now;
+				//Opt: This query takes 0.75 millisec, I tried WM_TIMECHANGE but that not works.
+				const t0 = now; 
 				if(application.timeZoneName.chkSet(DateTime.currentTimeZoneName))
 				{
-					LocalDateTime.resetLocalDateCache;
-					LOG("TimeZone changed to:", application.timeZoneName, now-t0);
+					LocalDateTime.resetLocalDateCache; 
+					LOG("TimeZone changed to:", application.timeZoneName, now-t0); 
 				}
-			}
+			} 
 			
 			int runConsole(void delegate() dg)
 			{
@@ -1770,7 +1770,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		template getUDA(alias a, U)
 		{
 			enum u = q{getUDAs!(a, U)[$-1]}; 
-				static if(
+			static if(
 				hasUDA!(a, U) && !is(mixin(u))//Note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
 			)
 			enum getUDA	= mixin(u); 
@@ -1815,7 +1815,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			enum fields = AllFieldNames!T; 
 			enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U); 
-					
+			
 			static if(allIfNone && !anySatisfy!(hasThisUDA, fields))
 			enum FieldNamesWithUDA = fields; 
 			else
@@ -9564,19 +9564,17 @@ version(/+$DIDE_REGION Date Time+/all)
 				} 
 				
 				static currentTimeZoneOffset()
-				{
-					return now.timeZoneOffset;
-				}
+				{ return now.timeZoneOffset; } 
 				
 				static currentTimeZoneName()
 				{
-					TIME_ZONE_INFORMATION tzi;
+					TIME_ZONE_INFORMATION tzi; 
 					switch(GetTimeZoneInformation(&tzi))
 					{
-						case 2: return tzi.DaylightName.text;
-						default: return tzi.StandardName.text;
+						case 2: return tzi.DaylightName.text; 
+						default: return tzi.StandardName.text; 
 					}
-				}
+				} 
 				
 				@property
 				{
@@ -10356,11 +10354,9 @@ version(/+$DIDE_REGION Date Time+/all)
 					numFourWeeks 
 					+ 1/+last is a fraction of four weeks+/
 				] fourWeekCache; 
-			}
+			} 
 			package static void resetLocalDateCache()
-			{
-				fourWeekCache = typeof(fourWeekCache).init;
-			}
+			{ fourWeekCache = typeof(fourWeekCache).init; } 
 			
 			this(DateTime dt)
 			{
