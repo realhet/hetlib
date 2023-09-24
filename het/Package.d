@@ -7614,156 +7614,164 @@ version(/+$DIDE_REGION Colors+/all)
 	{
 		version(/+$DIDE_REGION classic delphi palette+/all)
 		{
-			immutable RGB
-			clBlack	= 0x000000,
-			clMaroon	= 0x000080,
-			clGreen	= 0x008000,
-			clOlive	= 0x008080,
-			clNavy	= 0x800000,
-			clPurple	= 0x800080,
-			clTeal	= 0x808000,
-			clGray	= 0x808080,
-			clSilver	= 0xC0C0C0,
-			clRed	= 0x0000FF,
-			clLime	= 0x00FF00,
-			clYellow	= 0x00FFFF,
-			clBlue	= 0xFF0000,
-			clFuchsia	= 0xFF00FF,
-			clAqua	= 0xFFFF00,
-			clLtGray	= 0xC0C0C0,
-			clDkGray	= 0x808080,
-			clWhite	= 0xFFFFFF,
+			immutable
+			clBlack	= (RGB(0x000000)),
+			clMaroon	= (RGB(0x000080)),
+			clGreen	= (RGB(0x008000)),
+			clOlive	= (RGB(0x008080)),
+			clNavy	= (RGB(0x800000)),
+			clPurple	= (RGB(0x800080)),
+			clTeal	= (RGB(0x808000)),
+			clGray	= (RGB(0x808080)),
+			clSilver	= (RGB(0xC0C0C0)),
+			clRed	= (RGB(0x0000FF)),
+			clLime	= (RGB(0x00FF00)),
+			clYellow	= (RGB(0x00FFFF)),
+			clBlue	= (RGB(0xFF0000)),
+			clFuchsia	= (RGB(0xFF00FF)),
+			clAqua	= (RGB(0xFFFF00)),
+			clLtGray	= (RGB(0xC0C0C0)),
+			clDkGray	= (RGB(0x808080)),
+			clWhite	= (RGB(0xFFFFFF)),
 				
-			clSkyBlue	= 0xF0CAA6,
-			clMoneyGreen	= 0xC0DCC0; 
+			clSkyBlue	= (RGB(0xF0CAA6)),
+			clMoneyGreen	= (RGB(0xC0DCC0)); 
 		}
+		
 		version(/+$DIDE_REGION standard vga palette+/all)
 		{
-			immutable RGB
-			clVgaBlack	= 0x000000,
-			clVgaDarkGray	= 0x555555,
-			clVgaLowBlue	= 0xAA0000,
-			clVgaHighBlue	= 0xFF5555,
-			clVgaLowGreen	= 0x00AA00,
-			clVgaHighGreen	= 0x55FF55,
-			clVgaLowCyan	= 0xAAAA00,
-			clVgaHighCyan	= 0xFFFF55,
-			clVgaLowRed	= 0x0000AA,
-			clVgaHighRed	= 0x5555FF,
-			clVgaLowMagenta	= 0xAA00AA,
-			clVgaHighMagenta	= 0xFF55FF,
-			clVgaBrown	= 0x0055AA,
-			clVgaYellow	= 0x55FFFF,
-			clVgaLightGray	= 0xAAAAAA,
-			clVgaWhite	= 0xFFFFFF; 
+			immutable
+			clVgaBlack	= (RGB(0x000000)),
+			clVgaDarkGray	= (RGB(0x555555)),
+			clVgaLowBlue	= (RGB(0xAA0000)),
+			clVgaHighBlue	= (RGB(0xFF5555)),
+			clVgaLowGreen	= (RGB(0x00AA00)),
+			clVgaHighGreen	= (RGB(0x55FF55)),
+			clVgaLowCyan	= (RGB(0xAAAA00)),
+			clVgaHighCyan	= (RGB(0xFFFF55)),
+			clVgaLowRed	= (RGB(0x0000AA)),
+			clVgaHighRed	= (RGB(0x5555FF)),
+			clVgaLowMagenta	= (RGB(0xAA00AA)),
+			clVgaHighMagenta	= (RGB(0xFF55FF)),
+			clVgaBrown	= (RGB(0x0055AA)),
+			clVgaYellow	= (RGB(0x55FFFF)),
+			clVgaLightGray	= (RGB(0xAAAAAA)),
+			clVgaWhite	= (RGB(0xFFFFFF)); 
 		}
+		
 		version(/+$DIDE_REGION C64 palette+/all)
 		{
-			immutable RGB
-			clC64Black	= 0x000000,
-			clC64White	= 0xFFFFFF,
-			clC64Red	= 0x354374,
-			clC64Cyan	= 0xBAAC7C,
-			clC64Purple	= 0x90487B,
-			clC64Green	= 0x4F9764,
-			clC64Blue	= 0x853240,
-			clC64Yellow	= 0x7ACDBF,
-			clC64Orange	= 0x2F5B7B,
-			clC64Brown	= 0x00454f,
-			clC64Pink	= 0x6572a3,
-			clC64DGrey	= 0x505050,
-			clC64Grey	= 0x787878,
-			clC64LGreen	= 0x8ed7a4,
-			clC64LBlue	= 0xbd6a78,
-			clC64LGrey	= 0x9f9f9f; 
+			immutable
+			clC64Black	= (RGB(0x000000)),
+			clC64White	= (RGB(0xFFFFFF)),
+			clC64Red	= (RGB(0x354374)),
+			clC64Cyan	= (RGB(0xBAAC7C)),
+			clC64Purple	= (RGB(0x90487B)),
+			clC64Green	= (RGB(0x4F9764)),
+			clC64Blue	= (RGB(0x853240)),
+			clC64Yellow	= (RGB(0x7ACDBF)),
+			clC64Orange	= (RGB(0x2F5B7B)),
+			clC64Brown	= (RGB(0x00454f)),
+			clC64Pink	= (RGB(0x6572a3)),
+			clC64DGrey	= (RGB(0x505050)),
+			clC64Grey	= (RGB(0x787878)),
+			clC64LGreen	= (RGB(0x8ed7a4)),
+			clC64LBlue	= (RGB(0xbd6a78)),
+			clC64LGrey	= (RGB(0x9f9f9f)); 
 		}
+		
 		version(/+$DIDE_REGION WOW palette+/all)
 		{
-			immutable RGB
-			clWowGrey	= 0x9d9d9d,
-			clWowWhite	= 0xffffff,
-			clWowGreen	= 0x00ff1e,
-			clWowBlue	= 0xdd7000,
-			clWowPurple	= 0xee35a3,
-			clWowRed	= 0x0080ff,
-			clWowRed2	= 0x80cce5; 
+			immutable
+			clWowGrey	= (RGB(0x9d9d9d)),
+			clWowWhite	= (RGB(0xffffff)),
+			clWowGreen	= (RGB(0x00ff1e)),
+			clWowBlue	= (RGB(0xdd7000)),
+			clWowPurple	= (RGB(0xee35a3)),
+			clWowRed	= (RGB(0x0080ff)),
+			clWowRed2	= (RGB(0x80cce5)); 
 		}
+		
 		version(/+$DIDE_REGION VIMpalette+/all)
 		{
-			immutable RGB
-			clVimBlack	= 0x141312,
-			clVimBlue	= 0xDAA669,
-			clVimGreen	= 0x4ACAB9,
-			clVimTeal	= 0xB1C070,
-			clVimRed	= 0x534ED5,
-			clVimPurple	= 0xD897C3,
-			clVimYellow	= 0x47C5E7,
-			clVimWhite	= 0xFFFFFF,
-			clVimGray	= 0x9FA19E,
-			clVimOrange	= 0x458CE7; 
+			immutable
+			clVimBlack	= (RGB(0x141312)),
+			clVimBlue	= (RGB(0xDAA669)),
+			clVimGreen	= (RGB(0x4ACAB9)),
+			clVimTeal	= (RGB(0xB1C070)),
+			clVimRed	= (RGB(0x534ED5)),
+			clVimPurple	= (RGB(0xD897C3)),
+			clVimYellow	= (RGB(0x47C5E7)),
+			clVimWhite	= (RGB(0xFFFFFF)),
+			clVimGray	= (RGB(0x9FA19E)),
+			clVimOrange	= (RGB(0x458CE7)); 
 		}
+		
 		version(/+$DIDE_REGION Rainbow palette+/none)
 		{
 			//https://github.com/FastLED/FastLED/wiki/Pixel-reference
-			immutable RGB
-			clRainbowRed	= 0x0000FF,
-			clRainbowOrange	= 0x0055AA,
-			clRainbowYellow	= 0x00AAAA,
-			clRainbowGreen	= 0x00FF00,
-			clRainbowAqua	= 0x55AA00,
-			clRainbowBlue	= 0xFF0000,
-			clRainbowPurple	= 0xAA0055,
-			clRainbowPing	= 0x5500AA; 
-		}
+			immutable
+			clRainbowRed	= (RGB(0x0000FF)),
+			clRainbowOrange	= (RGB(0x0055AA)),
+			clRainbowYellow	= (RGB(0x00AAAA)),
+			clRainbowGreen	= (RGB(0x00FF00)),
+			clRainbowAqua	= (RGB(0x55AA00)),
+			clRainbowBlue	= (RGB(0xFF0000)),
+			clRainbowPurple	= (RGB(0xAA0055)),
+			clRainbowPink	= (RGB(0x5500AA)); 
+		}
+		
 		version(/+$DIDE_REGION Rainbow palette+/all)
 		{
 			//More distinct colors for the human eye.
 			//This is a better version.
-			immutable RGB
-			clRainbowRed	= 0x0000FF,
-			clRainbowOrange	= 0x0088FF,
-			clRainbowYellow	= 0x00EEEE,
-			clRainbowGreen	= 0x00FF00,
-			clRainbowAqua	= 0xCCCC00,
-			clRainbowBlue	= 0xFF0000,
-			clRainbowPurple	= 0xFF0088,
-			clRainbowPink	= 0x8800FF; 
+			immutable
+			clRainbowRed	= (RGB(0x0000FF)),
+			clRainbowOrange	= (RGB(0x0088FF)),
+			clRainbowYellow	= (RGB(0x00EEEE)),
+			clRainbowGreen	= (RGB(0x00FF00)),
+			clRainbowAqua	= (RGB(0xCCCC00)),
+			clRainbowBlue	= (RGB(0xFF0000)),
+			clRainbowPurple	= (RGB(0xFF0088)),
+			clRainbowPink	= (RGB(0x8800FF)); 
 		}
 		
 		version(/+$DIDE_REGION Solarized palette+/all)
 		{
 			//https://ethanschoonover.com/solarized/
-			immutable RGB
-			clSolBase03	= 0x362b00,
-			clSolBase02	= 0x423607,
-			clSolBase01	= 0x756e58,
-			clSolBase00	= 0x837b65,
-			clSolBase0	= 0x969483,
-			clSolBase1	= 0xa1a193,
-			clSolBase2	= 0xd5e8ee,
-			clSolBase3	= 0xe3f6fd,
-			clSolYellow	= 0x0089b5,
-			clSolOrange	= 0x164bcb,
-			clSolRed	= 0x2f32dc,
-			clSolMagenta	= 0x8236d3,
-			clSolViolet	= 0xc4716c,
-			clSolBlue	= 0xd28b26,
-			clSolCyan	= 0x98a12a,
-			clSolGreen	= 0x009985; 
+			immutable
+			clSolBase03	= (RGB(0x362b00)),
+			clSolBase02	= (RGB(0x423607)),
+			clSolBase01	= (RGB(0x756e58)),
+			clSolBase00	= (RGB(0x837b65)),
+			clSolBase0	= (RGB(0x969483)),
+			clSolBase1	= (RGB(0xa1a193)),
+			clSolBase2	= (RGB(0xd5e8ee)),
+			clSolBase3	= (RGB(0xe3f6fd)),
+			clSolYellow	= (RGB(0x0089b5)),
+			clSolOrange	= (RGB(0x164bcb)),
+			clSolRed	= (RGB(0x2f32dc)),
+			clSolMagenta	= (RGB(0x8236d3)),
+			clSolViolet	= (RGB(0xc4716c)),
+			clSolBlue	= (RGB(0xd28b26)),
+			clSolCyan	= (RGB(0x98a12a)),
+			clSolGreen	= (RGB(0x009985)); 
 		}
+		
 		version(/+$DIDE_REGION Other colors+/all)
 		{
-			immutable RGB
-			clAxisX	= RGB(213, 40, 40),
-			clAxisY	= RGB(40, 166, 40),
-			clAxisZ	= RGB(40, 40, 215),
+			immutable
+			clAxisX	= (RGB(213, 40, 40)),
+			clAxisY	= (RGB(40, 166, 40)),
+			clAxisZ	= (RGB(40, 40, 215)),
 				
 			clOrange	= clRainbowOrange,
-			clGold	= 0x00D7FF,
-			clBronze	= 0x327FCD,
-			clPink	= 0xCBC0FF,
-			clPostit	= 0x99FFFF; 
+			clGold	= (RGB(0x00D7FF)),
+			clBronze	= (RGB(0x327FCD)),
+			clPink	= (RGB(0xCBC0FF)),
+			clPostit	= (RGB(0x99FFFF)); 
 		}
+		
 		immutable RGB8[]
 			clDelphi	= [
 			clBlack, clMaroon, clGreen, clOlive, clNavy, clPurple, clTeal, clGray, clSilver, clRed,
@@ -7808,8 +7816,7 @@ version(/+$DIDE_REGION Colors+/all)
 			
 			if(map is null)
 			{
-				 //Todo: user driendly editing of all the colors
-				import std.traits; 
+				//Todo: user driendly editing of all the colors
 				static foreach(member; __traits(allMembers, mixin(__MODULE__)))
 				static if(is(Unqual!(typeof(mixin(member)))==RGB))
 				map[member.withoutStarting("cl").decapitalize] = mixin(member); 
@@ -7826,7 +7833,7 @@ version(/+$DIDE_REGION Colors+/all)
 				return clFuchsia; 
 			}
 			return *a; 
-		} 
+		} 
 		
 		//toRGB //////////////////////////////////
 		
