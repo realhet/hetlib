@@ -642,6 +642,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{} 
 			} 
 			
+			enum isStoredField(alias Field) = hasUDA!(Field, STORED); 
+			
+			template StoredFields(alias Struct)
+			{
+				alias Fields = Struct.tupleof; 
+				static if(allSatisfy!(templateNot!(isStoredField), Fields))
+				alias StoredFields = Fields; 
+				else
+				alias StoredFields = Filter!(isStoredField, Fields); 
+			} 
 		}
 		
 		version(/+$DIDE_REGION DLLs+/all)
@@ -2245,6 +2255,41 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			}
 		*/
+	}version(/+$DIDE_REGION+/all)
+	{
+		template staticSizeSum(A...)
+		{
+			static if(A.length==0) enum staticSizeSum = 0; 
+			else enum staticSizeSum = A[0].sizeof + staticSizeSum!(A[1..$]); 
+		} 
+		
+		/+
+			+ Tells that all the @STORED fields of a type:
+			- has fixed size, statically streamable data (only contains static array and struct)
+			- struct fields are tightly aligned
+			So the whole type can be serialized directly with a single copy/move operation.
+		+/
+		template isFixedSizeOpaqueType(T)
+		{
+			static if(isScalarType!T)
+			{ enum isFixedSizeOpaqueType = true; }
+			else static if(isStaticArray!T)
+			{ enum isFixedSizeOpaqueType = isFixedSizeOpaqueType!(ElementType!T); }
+			else static if(is(T==struct))
+			{
+				alias Fields = T.tupleof; 
+				static if(allSatisfy!(templateNot!(isStoredField), Fields))
+				alias StoredFields = Fields; 
+				else
+				alias StoredFields = Filter!(isStoredField, Fields); 
+				
+				alias getType(alias f) = typeof(f); 
+				enum isFixedSizeOpaqueType 	= allSatisfy!(.isFixedSizeOpaqueType, staticMap!(getType, StoredFields))
+					&& T.sizeof==staticSizeSum!StoredFields; 
+			}
+			else
+			enum isFixedSizeOpaqueType = false; 
+		} 
 	}
 }version(/+$DIDE_REGION ASM+/all)
 {
@@ -7761,9 +7806,9 @@ version(/+$DIDE_REGION Colors+/all)
 		version(/+$DIDE_REGION Other colors+/all)
 		{
 			immutable
-			clAxisX	= (RGB(213, 40, 40)),
-			clAxisY	= (RGB(40, 166, 40)),
-			clAxisZ	= (RGB(40, 40, 215)),
+			clAxisX	= (RGB(213,  40,  40)),
+			clAxisY	= (RGB( 40, 166,  40)),
+			clAxisZ	= (RGB( 40,  40, 215)),
 				
 			clOrange	= clRainbowOrange,
 			clGold	= (RGB(0x00D7FF)),
@@ -13542,6 +13587,37 @@ version(/+$DIDE_REGION debug+/all)
 	} 
 	
 	
+	version(/+$DIDE_REGION jsonPacket+/all)
+	{
+		
+		/+
+			Note: jsonPacket is a dense json object.
+			It starts with: /+Code: "signature":+/
+			It ends with: /+Code: "\n"+/  new line character.
+		+/
+		
+		string jsonPacket(T, string signature=T.stringof)(in T data)
+		{
+			enum hdr = signature.quoted ~ ':'; 
+			return hdr ~ data.toJson(true/+dense+/) ~ '\n'; 
+		} 
+		
+		T fetchJsonPacket(T, string signature=T.stringof)(ref ubyte[] stream)
+		{
+			enum hdr = signature.quoted ~ ':'; 
+			
+			enforce(stream.startsWith(hdr), format!"Can't fetch JsonPacket %s"(signature.quoted)); 
+			
+			const endIdx = stream[hdr.length..$].countUntil('\n'); 
+			enforce(endIdx>=0, format!"Corrupt JsonPacket %s"(signature.quoted)); 
+			
+			T res; res.fromJson(cast(string) stream[hdr.length..hdr.length+endIdx]); 
+			stream = stream[hdr.length+endIdx+1 .. $]; 
+			
+			return res; 
+		} 
+	}
+	
 	//tests /////////////////////////////////////////////////
 	
 	private void unittest_JsonClassInheritance()
@@ -14012,5 +14088,346 @@ version(/+$DIDE_REGION debug+/all)
 	} 
 	
 	
+	
+	version(/+$DIDE_REGION to/from Bin+/all)
+	{
+		/+
+			Note: It doesn't read unaligned padding.
+			It also doesn't reads non-STORED fields.
+			Generally we're not writing unaligned stuff onto the HDD, rather making 
+			the read operation slower.
+			If a struct is opaque, then it is possible to do optimized reads. But that
+			is an optional opportunity for speedup.
+		+/
+		
+		void toBin(T)(ref T data, ref ubyte[] stream)
+		{ ioBin!false(data, stream); } 
+		
+		void fromBin(T)(ref T data, ref ubyte[] stream)
+		{ ioBin!true(data, stream); } 
+		
+		void ioBin(bool read, T)(ref T data, ref ubyte[] stream)
+		{
+			static if(isScalarType!T)
+			{
+				static if(read)
+				{
+					data = *(cast(T*) stream[0..T.sizeof].ptr); 
+					stream = stream[T.sizeof..$]; 
+				}
+				else
+				{ stream ~= (cast(ubyte*)(&data))[0..T.sizeof]; }
+			}
+			else static if(isStaticArray!T)
+			{
+				//Opt: if the element is opaque, read it fast! ->isFixedSizeOpaqueType
+				foreach(ref a; data[])
+				a.ioBin!read(stream); 
+			}
+			else static if(is(T==struct))
+			{
+				alias Fields = T.tupleof; 
+				static if(allSatisfy!(templateNot!(isStoredField), Fields))
+				alias StoredFields = Fields; 
+				else
+				alias StoredFields = Filter!(isStoredField, Fields); 
+				
+				//Opt: if it's an opaque struct, read it fast! ->isFixedSizeOpaqueType
+				static foreach(F; StoredFields)
+				mixin("data.", F.stringof).ioBin!read(stream); 
+			}
+		} 
+		
+		void test_fromBin()
+		{
+			//Todo: this test requires an extra file from outside.
+			
+			struct ModSample
+			{
+				align(1): 
+				char[22] name; 
+				ushort length2; 
+				ubyte tune, volume; 
+				ushort loopStart2, loopLength2; 
+			} 
+			
+			struct ModCell
+			{
+				align(1): 
+				ushort instrPeriod; 
+				ubyte instrEffect, special; 
+			} 
+			
+			struct ModFile
+			{
+				align(1): 
+				@STORED
+				{
+					char[20] title; 
+					ModSample[31] samples; 
+					ubyte songLength, songRestart; 
+					ubyte[128] patternSequence; 
+					char[4] ID; 
+				} 
+				
+				ModCell[][][] patterns; 
+				
+				void ioBin(bool read)(ref ubyte[] stream)
+				{
+					.ioBin!read(this, stream); 
+					
+					LOG(ID.text); 
+				} 
+			} 
+			
+			
+			auto raw = `c:\dl\krakout-chip.mod`.File.read(true); 
+			ModFile mod, mod2; 
+			mod.fromBin(raw); 
+			mod.toJson.print; 
+			
+			ubyte[] raw2; mod.toBin(raw2); 
+			mod2.fromBin(raw2); 
+			mod2.toJson.print; 
+		} 
+	}
+	
+	version(/+$DIDE_REGION Struct Import+/all)
+	{
+		private string injectFQNInitializer(string fqn)
+		{
+			auto parts = fqn.split('.'); 
+			parts[$-1] = "init."~parts[$-1]; 
+			return parts.join('.'); 
+		} 
+		//Todo: This FQN shit only works for global structs.
+		
+		/+
+			Todo: FieldDef.def is not working yet.
+			Because the following mixin can't use symbols from other modules.
+			/+
+				Code: enum 
+				fieldInitText	(alias Field) = Field.init.text,
+				structFieldInitText	(alias Field) = mixin(fullyQualifiedName!Field.injectFQNInitializer).text,
+				nonDefaultStructFieldInitText	(alias Field) = structFieldInitText!Field == fieldInitText!Field ? "" : structFieldInitText!Field; 
+			+/
+		+/
+		
+		struct FieldDef
+		{
+			string name, type/+, def+/; 
+			uint offset, size; 
+		} 
+		
+		enum fieldDefOf(alias Field) = FieldDef(
+			Field.stringof, 
+			typeof(Field).stringof,
+			/+nonDefaultStructFieldInitText!Field,+/
+			Field.offsetof, 
+			Field.sizeof
+		); 
+		
+		struct StructDef
+		{
+			string name; 
+			uint size; 
+			FieldDef[] fieldDefs; 
+			
+			bool valid() const
+			{ return !fieldDefs.empty; } 
+		}  
+		
+		enum structDefOf(alias Struct) = StructDef(
+			Struct.stringof, 
+			Struct.sizeof, 
+			[staticMap!(fieldDefOf, StoredFields!Struct)]
+		); 
+		
+		alias FieldConvertFunct = void function(void* src, void* dst); 
+		
+		struct FieldImportOperation
+		{
+			uint srcOfs, dstOfs, size; 
+			FieldConvertFunct convert; //null -> it's a raw memory copy
+			
+			void execute(void* src, void* dst)
+			{
+				if(convert)	convert(src+srcOfs, dst+dstOfs); 
+				else	dst[srcOfs .. srcOfs+size] = src[dstOfs .. dstOfs+size]; 
+			} 
+		} 
+		
+		void standardFieldConvertFunct(Src, Dst)(void* src, void* dst)
+		{
+			auto 	s = cast(Src*) src,
+				d = cast(Dst*) dst; 
+			
+			*d = (*s).to!Dst; 
+			//it can throw, but then it writes nothing, keeps the default.
+		} 
+		
+		struct StructImporter
+		{
+			StructDef srcStructDef, dstStructDef; 
+			
+			FieldImportOperation[] operations; 
+			
+			this(StructDef srcStructDef, StructDef dstStructDef, FieldConvertFunct[string] fieldConvertFuncts)
+			{
+				this.srcStructDef = srcStructDef; 
+				this.dstStructDef = dstStructDef; 
+				
+				LOG(format!"Generating StructImporter for: %s -> %s"(srcStructDef.name, dstStructDef.name)); 
+				
+				foreach(df; dstStructDef.fieldDefs)
+				foreach(sf; srcStructDef.fieldDefs)
+				if(df.name==sf.name)
+				{
+					if(df.type==sf.type && df.size==sf.size)
+					{ operations ~= FieldImportOperation(sf.offset, df.offset, df.size); }
+					else
+					{ NOTIMPL("Data conversions with fieldConvertFunct"); }
+					break; 
+				}
+			} 
+			
+			void execute(void* src, void* dst)
+			{
+				foreach(ref op; operations)
+				op.execute(src, dst); 
+			} 
+		} 
+		
+		ref structImporter(StructDef srcStructDef, StructDef dstStructDef, FieldConvertFunct[string] fieldConvertFuncts=null)
+		{
+			const hash = hashOf(srcStructDef, hashOf(dstStructDef)); 
+			synchronized
+			{
+				__gshared StructImporter[ulong] cache; 
+				if(auto a = hash in cache) return *a; 
+				
+				cache[hash] = StructImporter(srcStructDef, dstStructDef, fieldConvertFuncts); 
+				return cache[hash]; 
+			} 
+		} 
+		
+		template Structize(T)
+		{
+			static if(is(T==struct))	alias Structize=T; 
+			else	struct Structize { T _; alias _ this; } 
+		} 
+		
+		struct KeyValueDef
+		{
+			StructDef keyDef, valueDef; 
+			
+			bool valid() const
+			{ return keyDef.valid && valueDef.valid; } 
+		} 
+		
+		enum keyValueDefOf(alias K, alias V) = KeyValueDef(
+			structDefOf!(Structize!K),
+			structDefOf!(Structize!V)
+		); 
+		
+		auto importKeyValues(K, V, V_default=void)(ubyte[] stream, ref K[] keys, ref V[] values)
+		{
+			enforce(keys.length==values.length, "Key/Value array size mismatch."); 
+			
+			alias raw = stream; 
+			
+			enum dstDef = keyValueDefOf!(K, V); 
+			
+			static if(is(V_default==void))
+			enum defaultSrcDef = KeyValueDef.init; 
+			else
+			enum defaultSrcDef = keyValueDefOf!(K, V_default); 
+			
+			//try to read srcDef from the stream.
+			auto srcDef = stream.fetchJsonPacket!KeyValueDef.ifThrown(defaultSrcDef); 
+			
+			enforce(srcDef.valid, "Unable to detect key/value stream structure."); 
+			
+			auto 	keyImporter	= structImporter(srcDef.keyDef, dstDef.keyDef),
+				valueImporter 	= structImporter(srcDef.valueDef, dstDef.valueDef); 
+			
+			//note! it only works with fixed size structs!!!
+			//Bug: Check if the structsize is fixed.
+			const recordSize = srcDef.keyDef.size + srcDef.valueDef.size; 
+			
+			for(; raw.length >= recordSize; raw = raw[recordSize .. $])
+			{
+				try {
+					keys.length++; values.length++; 
+					//!!!! Fixed size record fetching from raw!
+					keyImporter.execute(raw.ptr, &keys.back); 
+					valueImporter.execute(raw[srcDef.keyDef.size .. $].ptr, &values.back); 
+				}
+				catch(Exception e)
+				{
+					WARN("Struct import error ignored, record skipped: "~e.simpleMsg); 
+					keys.length--; //most likely the key increment was successful, so undo that first.
+					values.length = keys.length; //then resynchronize the sizes of the arrays.
+				}
+			}
+			
+			if(raw.length)
+			WARN("Extra garbage at end of Key/Value stream"); 
+		} 
+		
+		private {
+			struct _TestImportOldStruct
+			{
+				align(1) {
+					ivec2 size; 
+					RGBA avgColor; 
+				} 
+			} 
+			
+			struct _TestImportNewStruct
+			{
+				align(1) {
+					ivec2 size2 = ivec2(5, 10); 
+					RGBA avgColor; 
+					uint 	encoderPos	= uint.max,
+						snapshotCounter 	= uint.max; 
+				} 
+			} 
+		} 
+		
+		void test_importKeyValue()
+		{
+			//Todo: this test is too specific to karc.
+			enum hasFileHeader	= true,
+			hasDefaultSpecification 	= true; 
+			
+			auto raw = `f:\!KarcDataLogs\Karc_C1.2023-06-07T18-15-13Z.main`.File.read(true); 
+			if(hasFileHeader) raw = (cast(ubyte[]) keyValueDefOf!(DateTime, _TestImportOldStruct).jsonPacket) ~ raw; 
+			
+			DateTime[] keys; 
+			_TestImportNewStruct[] values; 
+			
+			static if(hasDefaultSpecification)
+			raw.importKeyValues
+			!(
+				DateTime, _TestImportNewStruct, /+Note: ← Ez a mindenkori legujabb formatum.+/
+				_TestImportOldStruct /+
+					Note: 	Ez pedig az alapertelmezett formatum, 
+					←	ha nincs a file elejere kiirva, akkor ezt hasznalja.
+						Ha nincs megadva es nincs formatum a fileban, 
+						akkor pedig errort dob.
+				+/
+			)(keys, values); 
+			else
+			raw.importKeyValues!(DateTime, _TestImportNewStruct)(keys, values); 
+			
+			auto aa = assocArray(keys, values); 
+			
+			aa.keys.each!print; 
+			aa.values.each!print; 
+			
+			keyValueDefOf!(DateTime, _TestImportNewStruct).jsonPacket.print; 
+		} 
+	}
 	
 }

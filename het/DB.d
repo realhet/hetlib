@@ -3052,9 +3052,7 @@ class PictureLibrary
 				} 
 				
 				auto _orderedKeys()
-				{
-					return _rb_access[]; 
-				}
+				{ return _rb_access[]; } 
 				
 				auto _orderedKeyInterval(K key0, K key1)
 				{
@@ -3289,7 +3287,7 @@ class PictureLibrary
 }version(/+$DIDE_REGION DataLogger+/all)
 {
 	
-	class DataLogger(K, R)
+	class DataLogger(K, R, R_default=void)
 	{
 		public
 		{
@@ -3328,6 +3326,9 @@ class PictureLibrary
 				} 
 			} struct DataLoggerAA(K, V)
 			{
+				static assert(isFixedSizeOpaqueType!K); 
+				static assert(isFixedSizeOpaqueType!V); 
+				
 				V[K] aa; 
 				File logFile; 
 				auto opBinaryRight(string op : "in")(K key) { return key in aa; } 
@@ -3337,6 +3338,10 @@ class PictureLibrary
 				{
 					if(logFile)
 					{
+						if(!logFile.exists)
+						logFile.append(keyValueDefOf!(K, V).jsonPacket); 
+						
+						//!!!! Fixed size record handling.  Dynamic data is in blobs!
 						logFile.append([key]); 
 						logFile.append([value]); 
 					}
@@ -3353,25 +3358,14 @@ class PictureLibrary
 					aa.clear; 
 					const mask = DataLoggerUtils.extractWildMask(logFile); 
 					
-					K[] keys; V[] values;
+					K[] keys; V[] values; 
 					
 					foreach(f; logFile.path.files(mask).sort)
 					{
-						static struct KV { align(1): K key; V value; } 
-						size_t loadSize = f.size; 
-						if(loadSize%KV.sizeof)
-						{
-							loadSize = loadSize/KV.sizeof*KV.sizeof; 
-							WARN("DataLogger.mainFile truncated:", f); 
-							//Todo: this minimal integrity check is for the dynamic array cast.
-						}
-						
-						//load all the key/value pairs
-						auto buf = cast(KV[])f.read(true, 0, loadSize); 
-						
-						//split into key/values and accumulate
-						keys ~= buf.map!(a => a.key).array;
-						values ~= buf.map!(a => a.value).array;
+						try
+						{ importKeyValues!(K, V, R_default)(f.read(true), keys, values); }
+						catch(Exception e)
+						{ WARN(e.simpleMsg); }
 					}
 					
 					//create the full AA in a single pass.
@@ -3461,7 +3455,7 @@ class PictureLibrary
 					
 					static struct KF { align(1): K key; size_t offset, size; } 
 					
-					K[] keys; FileBlockRef[] values;
+					K[] keys; FileBlockRef[] values; 
 					
 					foreach(fIdx; idxFile.path.files(mask).sort)
 					{
@@ -3479,8 +3473,8 @@ class PictureLibrary
 						auto buf = cast(KF[]) fIdx.read(true, 0, loadSize); 
 						
 						//split into key/values and accumulate
-						keys ~= buf.map!(a => a.key).array;
-						values ~= buf.map!(a => FileBlockRef(fData, a.offset, a.size)).array;
+						keys ~= buf.map!(a => a.key).array; 
+						values ~= buf.map!(a => FileBlockRef(fData, a.offset, a.size)).array; 
 					}
 					
 					//create the full AA in a single pass.

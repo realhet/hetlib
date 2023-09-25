@@ -1360,6 +1360,9 @@ version(/+$DIDE_REGION Geometry+/all)
 		return mx*a.x + my*a.y + A; 
 	} 
 	
+	auto extrapolateCurve(V)(V A, V B)
+	{ return B + (B-A); } 
+	
 	auto extrapolateCurve(V)(V A, V B, V C)
 	{
 		//Continuity: C1
@@ -1389,6 +1392,19 @@ version(/+$DIDE_REGION Geometry+/all)
 			a2 = asin(cross(v2, v3).z),
 			a3 = a2 + (a2-a1); 
 		return D + (D-C).rotate(a3); 
+	} 
+	
+	T extrapolateCurveFront(R, T=ElementType!R)(R r)
+	{
+		if(r.empty) return T.init; 
+		const A = r.front; r.popFront; 
+		if(r.empty) return A; 
+		const B = r.front; r.popFront; 
+		if(r.empty) return extrapolateCurve(B, A); 
+		const C = r.front; r.popFront; 
+		if(r.empty) return extrapolateCurve(C, B, A); 
+		const D = r.front; 
+		return extrapolateCurve(D, C, B, A); 
 	} 
 	
 	T[2] linearBezierWeights(T)(T t)
@@ -1571,7 +1587,7 @@ version(/+$DIDE_REGION Geometry+/all)
 		void arc_length(
 			T length, //negative: goes backwards on the same side
 			T r, //-left, +right
-			float adjust = 0 //clothoidal bending
+			float adjust = 0 //clothoidal bending, (distorts length)
 		)
 		{
 			if(!length) return; 
