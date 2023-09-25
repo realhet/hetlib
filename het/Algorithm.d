@@ -1406,7 +1406,7 @@ version(/+$DIDE_REGION Geometry+/all)
 		const D = r.front; 
 		return extrapolateCurve(D, C, B, A); 
 	} 
-	
+	
 	T[2] linearBezierWeights(T)(T t)
 	{
 		const u = 1-t; 
@@ -1433,7 +1433,7 @@ version(/+$DIDE_REGION Geometry+/all)
 		return res; 
 	} 
 	
-	auto generateBezierPolyline(F, int N)(in Vector!(F, 2)[N] p, F stepSize=1)
+	auto generateBezierPolyline_equalSteps(F, int N)(in Vector!(F, 2)[N] p, F stepSize=1)
 	{
 		
 		auto eval(F t)
@@ -1446,7 +1446,7 @@ version(/+$DIDE_REGION Geometry+/all)
 			totalLen	= lengths.sum,
 			segmentCount	= iround(totalLen/stepSize).max(1),
 			segmentLen	= totalLen/segmentCount; 
-			
+		
 		F writtenLen = 0, prevLen = 0; F[] t; 
 		loop:  //resample the t values using linear interpolation
 		foreach(i, actLen; lengths)
@@ -1474,66 +1474,63 @@ version(/+$DIDE_REGION Geometry+/all)
 	{
 		alias V=Vector!(T, 2); 
 		
+		void delegate(V[]) onPointsCollected;
 		T stepSize=1; 
-		void delegate(V) sink; 
 		
-		//state variables
-		V pos, dir=V(1, 0); 
-		
-		void reset()
-		{ pos = 0; dir = V(1, 0); } 
-		
-		@property state() { return tuple(pos, dir); } 
-		@property state(Tuple!(V, V) a) { pos = a[0]; dir = a[1]; } 
-		
-		Tuple!(V, V)[] stack; 
-		void push()
-		{ stack ~= state; } 
-		void pop()
+		version(/+$DIDE_REGION Turtle state+/all)
 		{
-			enforce(stack.length); 
-			state = stack.back; stack.popBack; 
-		} 
-		
-		struct Path
-		{
-			V[] points; 
-			V dir_start, dir_end; 
-			alias points this; 
-		} 
-		
-		auto capture(void delegate() fun)
-		{
-			Path path; 
-			with(path)
+			//state variables
+			V pos, dir=V(1, 0); 
+			
+			void home()
+			{ pos = 0; dir = V(1, 0); } 
+			
+			@property state()
+			{ return tuple(pos, dir); }  @property state(Tuple!(V, V) a)
+			{ pos = a[0]; dir = a[1]; } 
+			
+			private Tuple!(V, V)[] stack; 
+			void push()
+			{ stack ~= state; }  void pop()
 			{
-				dir_start = dir; 
-				
-				auto originalSink = sink; 
-				sink = (V p){ if(points.empty || points.back!=p) points ~= p; }; 
-				push; 
-				
-				scope(exit)
-				{
-					sink = originalSink; 
-					dir_end = dir; 
-					pop; 
-				} 
-			}
-			
-			fun(); 
-			
-			return path; 
-		} 
+				enforce(stack.length); 
+				state = stack.back; stack.popBack; 
+			} 
+		}
 		
-		void emit(in Path path)
+		bool active = true;  void on()
+		{ active = true; }  void off()
+		{ active = false; } 
+		
+		
+		private V[] _points;
+		
+		private void sink(V p)
 		{
-			if(path.empty) return; 
-			path.each!((a){ sink(a); }); 
-			pos = path.back; 
-			dir = path.dir_end; 
+			if(active)
+		if(_points.empty || _points.back!=p)
+		_points ~= p; 
+		}
+		
+		private void collectPoints(void delegate() fun, bool emit=true)
+		{
+			scope(exit) _points.clear;
+			fun(); 
+			if(emit && _points.length>=2)
+			onPointsCollected(_points);
 		} 
 		
+		private auto captureStartEndPosDir(void delegate() fun)
+		{
+			const p0 = pos; const d0 = dir; //capture first point+dir
+			//simulate draw commands, but don't generate anything
+			collectPoints(fun, false); 
+			auto res = tuple(p0, d0, pos, dir); 
+			pos = p0; dir = d0; //restore pos/dir to initial values
+			return res; 
+		} 
+		
+		
 		void line(
 			in T length //negative goes backwards
 		)
@@ -1547,7 +1544,7 @@ version(/+$DIDE_REGION Geometry+/all)
 			{ pos += step; sink(pos); }
 			pos = endPos; sink(pos); 
 		} 
-		
+		
 		void arc_angle(
 			T θ, //negative: goes backwards on the same side
 			T r, //-left, +right
@@ -1594,30 +1591,6 @@ version(/+$DIDE_REGION Geometry+/all)
 			const θ = ((length)/((magnitude(r)))).degrees; 
 			arc_angle(θ, r, adjust); 
 		} 
-		
-		void bezier4(V pos_end, V dir_end, float adjust=0)
-		{
-			/+
-				Draw a cubic bezier curve from current pos/dir to a given pos/dir.
-				The middle points can be adjusted to move close to each other, so it is 
-				possible to emulate a clothoid using cubic bezier interpolation.
-			+/
-			V[4] cp; //The 4 control points
-			{
-				const len = (magnitude(pos_end - pos)) * 0.33333f * (1 + adjust); 
-				
-				cp[0] = pos; 
-				cp[1]	= pos	+ (normalize(dir    ))*len,
-				cp[2]	= pos_end	- (normalize(dir_end))*len; 
-				cp[3] = pos_end; 
-			}
-			
-			generateBezierPolyline(cp, stepSize).each!((p){ sink(p); }); 
-			
-			pos = pos_end; 
-			dir = (normalize(dir_end)); 
-		} 
-		
 		
 		void clothoid_accel(
 			T ΔΔθ, //angle step increase between steps.
@@ -1661,5 +1634,181 @@ version(/+$DIDE_REGION Geometry+/all)
 			dir = (normalize(dir.rotate(Δθ/2))); //restore dir.length
 		} 
 		
+		void bezier4(V pos_end, V dir_end, float adjust=0)
+		{
+			/+
+				Draw a cubic bezier curve from current pos/dir to a given pos/dir.
+				The middle points can be adjusted to move close to each other, so it is 
+				possible to emulate a clothoid using cubic bezier interpolation.
+			+/
+			V[4] cp; //The 4 control points
+			{
+				const len = (magnitude(pos_end - pos)) * 0.33333f * (1 + adjust); 
+				
+				cp[0] = pos; 
+				cp[1]	= pos	+ (normalize(dir    ))*len,
+				cp[2]	= pos_end	- (normalize(dir_end))*len; 
+				cp[3] = pos_end; 
+			}
+			
+			generateBezierPolyline_equalSteps(cp, stepSize).each!((p){ sink(p); }); 
+			
+			pos = pos_end; 
+			dir = (normalize(dir_end)); 
+		} 
+		
+		
+		///G, M: line, arc, clothioid
+		void G(double lengthOrAngle, double r0=0, double r1=0)
+		{
+			collectPoints
+			(
+				{
+					if(r0==0)
+					{ line(lengthOrAngle); }
+					else if(r1==0)	{ arc_angle(lengthOrAngle, r0); }
+					else	{ clothoid_accel(lengthOrAngle, r0, r1); }
+				}
+			); 
+		} 
+		
+		///R: Adjustable arc
+		
+		void R(double angle, double r, float adjust=0)
+		{ collectPoints({ arc_angle(angle, r, adjust); }); } 
+		
+		///B: cubic Bezier
+		void B(void delegate() fun, float adjust)
+		{
+			const se = captureStartEndPosDir(fun); 
+			collectPoints({ bezier4(se[2], se[3], adjust); }); 
+		} 
+		
+		void build(in TurtleCmd tcmd)
+		{
+			bool bezierState; 
+			void updateBezier(float adjust)
+			{
+				bezierState.toggle; 
+				if(bezierState)
+				{ push; off; }
+				else	{
+					const p = pos, d = dir; pop; on; 
+					collectPoints({ bezier4(p, d, adjust); }); 
+				}
+			} 
+			
+			foreach(const item; tcmd.list)
+			{
+				with(item)
+				{
+					switch(op)
+					{
+						case TurtleOp.G: 	G(a0); 	break; 
+						case TurtleOp.R: 	R(a0, a1, a2); 	break; 
+						case TurtleOp.push: 	push; 	break; 
+						case TurtleOp.pop: 	pop; 	break; 
+						case TurtleOp.on: 	on; 	break; 
+						case TurtleOp.off: 	off; 	break; 
+						
+						case TurtleOp.back: 	dir *= -1; 	break; 
+						case TurtleOp.turn: 	dir = dir.rotate(a0.radians); 	break; 
+						case TurtleOp.slide: 	pos += V(dir.rotate90*a0 + dir*a1); 	break; 
+						case TurtleOp.bezier: 	updateBezier(a0); 	break; 
+						default: 	raise("Unhandled TurtleCmd: "~this.text); 
+					}
+				}
+			}
+		} 
+	} 
+	
+	enum TurtleOp : ubyte
+	{G, R, push, pop, on, off, turn, back, slide, bezier} 
+	
+	struct TurtleCmd
+	{
+		struct Cmd
+		{
+			TurtleOp op; 
+			double a0, a1, a2; 
+		} 
+		Cmd[] list; 
+		TurtleCmd opBinary(string op: "+")(in TurtleCmd b) const
+		{ return TurtleCmd(list.dup~b.list.dup); } 
+		TurtleCmd opUnary(string op: "+")() const
+		{ return TurtleCmd(list.dup); } 
+		TurtleCmd opUnary(string op: "-")() const
+		{ return TurtleCmd(Cmd(TurtleOp.back)~list.dup); } 
+		TurtleCmd opBinary(string op: "-")(in TurtleCmd b) const
+		{ return this+-b; } 
+		TurtleCmd opBinary(string op: "*")(int n) const
+		{ return TurtleCmd((n<0 ? (-this).list : list.dup).replicate(abs(n))); } 
+		TurtleCmd opBinaryRight(string op: "*")(int n) const
+		{ return this*n; } 
+		TurtleCmd opBinary(string op: "/")(int n) const
+		{
+			enforce(list.length==1, "TurtleCmd: Invalid division of multiple commands."); 
+			with(list.front)
+			{
+				enforce(op.among(TurtleOp.G, TurtleOp.R), "TurtleCmd: Invalid division of command: "~cmd.quoted); 
+				return TurtleCmd([TurtleCmd.Cmd(op, a0/n, a1, a2)]); 
+			}
+		} 
+	} 
+	
+	static turtleCmd(TurtleOp op, double a0=0, double a1=0, double a2=0)
+	{ return TurtleCmd([TurtleCmd.Cmd(op, a0, a1, a2)]); } 
+	static turtleCmd(string op)(double a0=0, double a1=0, double a2=0)
+	{
+		enum op_ = op.to!TurtleOp; 
+		return turtleCmd(op_, a0, a1, a2); 
+	} 
+	
+	mixin template TurtleCmdMixin(alias _Scale=1, alias _WAdjust=0.5)
+	{
+		//Inject this mixin into a struct to create a set of commands generating TurtleCmds
+		
+		static G(double len)
+		{ return turtleCmd!"G"(len*_Scale); } 
+		static R(double a, double r, double adjust=0)
+		{ return turtleCmd!"R"(a, r*_Scale, adjust); } 
+		static RW(double a, double r)
+		{ return R(a, r, _WAdjust); } 
+		
+		static slide(double right, double forward=0) //slide: move to the side
+		{ return turtleCmd!"slide"(right*_Scale, forward*_Scale); } 
+		static turn(double angle) //turn: + = right
+		{ return turtleCmd!"turn"(angle); } static back()
+		{ return turtleCmd!"back"; } 
+		static push()
+		{ return turtleCmd!"push"; } static pop()
+		{ return turtleCmd!"pop"; } 
+		static branch(in TurtleCmd tcmd)
+		{ return push + tcmd + pop; } 
+		static on()
+		{ return turtleCmd!"on"; } static off()
+		{ return turtleCmd!"off"; } 
+		
+		static M(in TurtleCmd tcmd)
+		{ return off + tcmd + on; } //move
+		
+		static B(in TurtleCmd tcmd, double adjust=0)
+		{
+			/+
+				the bezier turtleOp is a toggle: thsi first records the starting pos/dir, 
+							the second records the ending pos/dir and draws the curve.
+			+/
+			return turtleCmd!"bezier"(adjust) + tcmd + turtleCmd!"bezier"(adjust); 
+		} 
+		static BW(in TurtleCmd tcmd)
+		{ return B(tcmd, _WAdjust); } //bezier for switches
+		
+		static fork(A...)(in A a)
+		{
+			static if(a.length==1)
+			return a[0]; 
+			else static if(a.length>1) return push + a[0] + pop + fork(a[1..$]); 
+			//it leaves the turtle at the tip of the last branch.
+		} 
 	} 
 }
