@@ -1474,7 +1474,7 @@ version(/+$DIDE_REGION Geometry+/all)
 	{
 		alias V=Vector!(T, 2); 
 		
-		void delegate(V[]) onPointsCollected;
+		void delegate(V[]) onPointsCollected; 
 		T stepSize=1; 
 		
 		version(/+$DIDE_REGION Turtle state+/all)
@@ -1491,9 +1491,13 @@ version(/+$DIDE_REGION Geometry+/all)
 			
 			private Tuple!(V, V)[] stack; 
 			void push()
-			{ stack ~= state; }  void pop()
 			{
-				enforce(stack.length); 
+				enforce(stack.length<32, "Turtle stack oveflow.");
+				stack ~= state; 
+			} 
+			void pop()
+			{
+				enforce(stack.length, "Turtle stack underflow."); 
 				state = stack.back; stack.popBack; 
 			} 
 		}
@@ -1503,21 +1507,21 @@ version(/+$DIDE_REGION Geometry+/all)
 		{ active = false; } 
 		
 		
-		private V[] _points;
+		private V[] _points; 
 		
 		private void sink(V p)
 		{
-			if(active)
-		if(_points.empty || _points.back!=p)
-		_points ~= p; 
-		}
+				if(active)
+			if(_points.empty || _points.back!=p)
+			_points ~= p; 
+		} 
 		
 		private void collectPoints(void delegate() fun, bool emit=true)
 		{
-			scope(exit) _points.clear;
+			scope(exit) _points.clear; 
 			fun(); 
 			if(emit && _points.length>=2)
-			onPointsCollected(_points);
+			onPointsCollected(_points); 
 		} 
 		
 		private auto captureStartEndPosDir(void delegate() fun)
@@ -1531,132 +1535,134 @@ version(/+$DIDE_REGION Geometry+/all)
 		} 
 		
 		
-		void line(
-			in T length //negative goes backwards
-		)
+		private
 		{
-			if(!length) return; 
-			const 	segmentCount 	= ((abs(length))/(stepSize)).iround.max(1),
-				endPos 	= pos + dir*length,
-				step 	= (endPos-pos) * (T(1)/segmentCount); 
-			sink(pos); 
-			foreach(i; 0..segmentCount-1)
-			{ pos += step; sink(pos); }
-			pos = endPos; sink(pos); 
-		} 
-		
-		void arc_angle(
-			T θ, //negative: goes backwards on the same side
-			T r, //-left, +right
-			float adjust = 0 //clothoidal bending
-		)
-		{
-			if(!θ) return; 
-			if(θ<0) {
-				//negative angle: backwards, same side (mirror)
-				θ *= -1; dir *= -1; r *= -1; 
-			}
-			θ = θ.radians * r.sign; //turning direction is defined by radius
-			
-			const 	length	= abs(θ*r),
-				segmentCount	= ((length)/(stepSize)).iround.max(1),
-				segmentLength 	= ((length)/(segmentCount)),
-				center	= pos + dir.rotate90 * r,
-				endPos	= (pos-center).rotate(θ) + center,
-				endDir	= (normalize(dir.rotate(θ))),
-				Δθ 	= ((θ)/(segmentCount)); 
-			if(adjust==0)
+			void line(
+				in T length //negative goes backwards
+			)
 			{
-				dir = (normalize(dir.rotate(Δθ / 2))) * segmentLength; 
+				if(!length) return; 
+				const 	segmentCount 	= ((abs(length))/(stepSize)).iround.max(1),
+					endPos 	= pos + dir*length,
+					step 	= (endPos-pos) * (T(1)/segmentCount); 
 				sink(pos); 
 				foreach(i; 0..segmentCount-1)
+				{ pos += step; sink(pos); }
+				pos = endPos; sink(pos); 
+			} 
+			
+			void arc_angle(
+				T θ, //negative: goes backwards on the same side
+				T r, //-left, +right
+				float adjust = 0 //clothoidal bending
+			)
+			{
+				if(!θ) return; 
+				if(θ<0) {
+					//negative angle: backwards, same side (mirror)
+					θ *= -1; dir *= -1; r *= -1; 
+				}
+				θ = θ.radians * r.sign; //turning direction is defined by radius
+				
+				const 	length	= abs(θ*r),
+					segmentCount	= ((length)/(stepSize)).iround.max(1),
+					segmentLength 	= ((length)/(segmentCount)),
+					center	= pos + dir.rotate90 * r,
+					endPos	= (pos-center).rotate(θ) + center,
+					endDir	= (normalize(dir.rotate(θ))),
+					Δθ 	= ((θ)/(segmentCount)); 
+				if(adjust==0)
+				{
+					dir = (normalize(dir.rotate(Δθ / 2))) * segmentLength; 
+					sink(pos); 
+					foreach(i; 0..segmentCount-1)
+					{
+						pos += dir; sink(pos); 
+						dir = dir.rotate(Δθ); 
+					}
+					pos = endPos; dir = endDir; 
+					sink(pos); 
+				}
+				else
+				{ bezier4(endPos, endDir, adjust); }
+			} 
+			
+			void arc_length(
+				T length, //negative: goes backwards on the same side
+				T r, //-left, +right
+				float adjust = 0 //clothoidal bending, (distorts length)
+			)
+			{
+				if(!length) return; 
+				const θ = ((length)/((magnitude(r)))).degrees; 
+				arc_angle(θ, r, adjust); 
+			} 
+			
+			void clothoid_accel(
+				T ΔΔθ, //angle step increase between steps.
+				T r_start, T r_end //negative = turn left
+			)
+			{
+				if(!ΔΔθ) return; 
+				if(ΔΔθ<0)
+				{
+					//negative angle: backwards, same side (mirror)
+					ΔΔθ *= -1; dir *= -1; 
+				}
+				
+				const 	segmentLength 	= stepSize,
+					Δθ_start 	= segmentLength / r_start,
+					Δθ_end 	= segmentLength / r_end; 
+				
+				//calculate actual angle acceleration
+				ΔΔθ = (magnitude(ΔΔθ.radians)) * sign(Δθ_end - Δθ_start); 
+				if(!ΔΔθ) return; 
+				
+				
+				sink(pos); 
+				T Δθ = Δθ_start + ΔΔθ; //the first point has acceleration too
+				dir = (normalize(dir.rotate(Δθ/2))) * segmentLength; //sets dir.length
+				while(
+					(ΔΔθ>0 && Δθ<Δθ_end) || 
+					(ΔΔθ<0 && Δθ>Δθ_end)
+				)
 				{
 					pos += dir; sink(pos); 
 					dir = dir.rotate(Δθ); 
+					Δθ += ΔΔθ; 
 				}
-				pos = endPos; dir = endDir; 
-				sink(pos); 
-			}
-			else
-			{ bezier4(endPos, endDir, adjust); }
-		} 
-		
-		void arc_length(
-			T length, //negative: goes backwards on the same side
-			T r, //-left, +right
-			float adjust = 0 //clothoidal bending, (distorts length)
-		)
-		{
-			if(!length) return; 
-			const θ = ((length)/((magnitude(r)))).degrees; 
-			arc_angle(θ, r, adjust); 
-		} 
-		
-		void clothoid_accel(
-			T ΔΔθ, //angle step increase between steps.
-			T r_start, T r_end //negative = turn left
-		)
-		{
-			if(!ΔΔθ) return; 
-			if(ΔΔθ<0)
-			{
-				//negative angle: backwards, same side (mirror)
-				ΔΔθ *= -1; dir *= -1; 
-			}
-			
-			const 	segmentLength 	= stepSize,
-				Δθ_start 	= segmentLength / r_start,
-				Δθ_end 	= segmentLength / r_end; 
-			
-			//calculate actual angle acceleration
-			ΔΔθ = (magnitude(ΔΔθ.radians)) * sign(Δθ_end - Δθ_start); 
-			if(!ΔΔθ) return; 
-			
-			
-			sink(pos); 
-			T Δθ = Δθ_start + ΔΔθ; //the first point has acceleration too
-			dir = (normalize(dir.rotate(Δθ/2))) * segmentLength; //sets dir.length
-			while(
-				(ΔΔθ>0 && Δθ<Δθ_end) || 
-				(ΔΔθ<0 && Δθ>Δθ_end)
-			)
-			{
-				pos += dir; sink(pos); 
-				dir = dir.rotate(Δθ); 
-				Δθ += ΔΔθ; 
-			}
-			
-			/+
-				Note: The final pos/dir is distorted by the iterative calculations, 
-				but it's much simpler than FresnelC
-			+/
-			pos += dir; sink(pos); 
-			dir = (normalize(dir.rotate(Δθ/2))); //restore dir.length
-		} 
-		
-		void bezier4(V pos_end, V dir_end, float adjust=0)
-		{
-			/+
-				Draw a cubic bezier curve from current pos/dir to a given pos/dir.
-				The middle points can be adjusted to move close to each other, so it is 
-				possible to emulate a clothoid using cubic bezier interpolation.
-			+/
-			V[4] cp; //The 4 control points
-			{
-				const len = (magnitude(pos_end - pos)) * 0.33333f * (1 + adjust); 
 				
-				cp[0] = pos; 
-				cp[1]	= pos	+ (normalize(dir    ))*len,
-				cp[2]	= pos_end	- (normalize(dir_end))*len; 
-				cp[3] = pos_end; 
-			}
+				/+
+					Note: The final pos/dir is distorted by the iterative calculations, 
+					but it's much simpler than FresnelC
+				+/
+				pos += dir; sink(pos); 
+				dir = (normalize(dir.rotate(Δθ/2))); //restore dir.length
+			} 
 			
-			generateBezierPolyline_equalSteps(cp, stepSize).each!((p){ sink(p); }); 
-			
-			pos = pos_end; 
-			dir = (normalize(dir_end)); 
+			void bezier4(V pos_end, V dir_end, float adjust=0)
+			{
+				/+
+					Draw a cubic bezier curve from current pos/dir to a given pos/dir.
+					The middle points can be adjusted to move close to each other, so it is 
+					possible to emulate a clothoid using cubic bezier interpolation.
+				+/
+				V[4] cp; //The 4 control points
+				{
+					const len = (magnitude(pos_end - pos)) * 0.33333f * (1 + adjust); 
+					
+					cp[0] = pos; 
+					cp[1]	= pos	+ (normalize(dir    ))*len,
+					cp[2]	= pos_end	- (normalize(dir_end))*len; 
+					cp[3] = pos_end; 
+				}
+				
+				generateBezierPolyline_equalSteps(cp, stepSize).each!((p){ sink(p); }); 
+				
+				pos = pos_end; 
+				dir = (normalize(dir_end)); 
+			} 
 		} 
-		
 		
 		///G, M: line, arc, clothioid
 		void G(double lengthOrAngle, double r0=0, double r1=0)
@@ -1750,10 +1756,15 @@ version(/+$DIDE_REGION Geometry+/all)
 			enforce(list.length==1, "TurtleCmd: Invalid division of multiple commands."); 
 			with(list.front)
 			{
-				enforce(op.among(TurtleOp.G, TurtleOp.R), "TurtleCmd: Invalid division of command: "~cmd.quoted); 
-				return TurtleCmd([TurtleCmd.Cmd(op, a0/n, a1, a2)]); 
+				if(op.among(TurtleOp.G, TurtleOp.R)) return TurtleCmd([TurtleCmd.Cmd(op, a0/n, a1, a2)]); 
+				if(op==TurtleOp.slide) return TurtleCmd([TurtleCmd.Cmd(op, a0/n, a1/n, a2)]); 
+				enforce(0, "TurtleCmd: Invalid division of command: "~op.text); 
+				assert(0);
 			}
 		} 
+		
+		void opOpAssign(string op)(TurtleCmd b)
+		{ mixin("this = this "~op~" b;"); }
 	} 
 	
 	static turtleCmd(TurtleOp op, double a0=0, double a1=0, double a2=0)
@@ -1763,7 +1774,7 @@ version(/+$DIDE_REGION Geometry+/all)
 		enum op_ = op.to!TurtleOp; 
 		return turtleCmd(op_, a0, a1, a2); 
 	} 
-	
+	
 	mixin template TurtleCmdMixin(alias _Scale=1, alias _WAdjust=0.5)
 	{
 		//Inject this mixin into a struct to create a set of commands generating TurtleCmds

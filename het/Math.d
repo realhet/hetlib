@@ -3009,6 +3009,28 @@ version(/+$DIDE_REGION+/all)
 			//Todo: magnitude of complex numbers
 		} 
 		
+		auto negateX(V)(in V a)
+		{
+			V res = a; 
+			res.x = -res.x; 
+			return res; 
+		}  auto negateY(V)(in V a)
+		{
+			V res = a; 
+			res.y = -res.y; 
+			return res; 
+		}  auto negateZ(V)(in V a)
+		{
+			V res = a; 
+			res.z = -res.z; 
+			return res; 
+		}  auto negateW(V)(in V a)
+		{
+			V res = a; 
+			res.w = -res.w; 
+			return res; 
+		} 
+		
 		/// Orients a vector to point away from a surface as defined by its normal.
 		auto faceforward(A, B, C)(in A N, in B I, in C Nref)
 		{ return dot(Nref, I) < 0 ? N : -N; } 

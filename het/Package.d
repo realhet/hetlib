@@ -603,7 +603,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//used by stream
 				struct STORED
 				{} 
-							
+				
+				struct OPTIONAL
+				{} 
+				
+				struct NAKED
+				{} 
+				
 				struct VERB
 				{ string keyCombo; int flags; } 
 				auto HOLD(string keyCombo)
@@ -9592,6 +9598,11 @@ version(/+$DIDE_REGION Date Time+/all)
 					mixin("res.raw", op, "=(b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
 					return res; 
 				} 
+				
+				DateTime add_raw(in ulong delta) const
+				{
+					return RawDateTime(raw + delta);
+				}
 				
 				///adjust this DateTime by si.Time
 				DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))

@@ -3888,6 +3888,15 @@ class PictureLibrary
 			auto timeRangeText()
 			{ return level.calcTimeRangeText(timeRange); } 
 			
+			DateTime[2] timeRange_add_raw(ulong delta) const
+			{
+				if(!delta) return timeRange; 
+				return [
+					timeRange[0].add_raw(delta),
+					timeRange[1].add_raw(delta)
+				]; 
+			} 
+			
 			int levelIdx() const
 			{ return level.levelIdx; } 
 			
