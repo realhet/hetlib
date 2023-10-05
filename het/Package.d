@@ -2627,6 +2627,33 @@ version(/+$DIDE_REGION Numeric+/all)
 			return (a*pow(2,-10*t) * sin((t*d-s)*(2*PIf)/p) + c + b); 
 		} 
 		
+		//draws a slope, starts and ends it with sines transitioning to horizontal.
+		auto easeSlope(float x, float slope, float trans, float shift)
+		{
+			const bump = 	x<0 	? 0 :
+				x<trans 	? (x.remap(0, trans, -PIf, 0).cos.remap(-1, 1, 0, 1)) :
+				x<1-trans 	? 1 :
+				x<1	? (x.remap(1, 1-trans, -PIf, 0).cos.remap(-1, 1, 0, 1)) :
+					  0; 
+			const line = ((-.5f-x+1)*slope).remap(-.5f, .5f, 1, 0) + shift; 
+			return mix(x<.5f ? 0 : 1, line, bump); 
+			
+			//Todo: Embedded testing  (graphical unit testing)
+			/+
+				auto slope = 0.1f, trans = 0.2f; 
+				
+				{
+				Text("timeWarpFunction test."); 
+				Text("Slope\t ", { Slider(slope, range(0, 0.9, 0.01), { width = 200; }); }); 
+				Text("Transition\t ", { Slider(trans, range(0, 0.5, 0.01), { width = 200; }); }); 
+				}
+				
+				const s = 11.2;
+				dr.line(iota(0, s, 0.01f).map!(x => vec2(x, -(1-x/s).easeSlope(slope, trans)*s)).array); 
+				
+			+/
+		} 
+		
 		unittest
 		{
 			string s; 
@@ -7412,6 +7439,51 @@ version(/+$DIDE_REGION Colors+/all)
 		} 
 		alias rgb_to_bgra = transformArray!(rgb_to_bgra_scalar, rgb_to_bgra_simd); 
 		
+		
+		
+		void RGBtoRGBA(bool flipRG = false)(const(ubyte16)* src, ubyte16* dst, in size_t srcLen)
+		{
+			//Bug: unaligned ofs and size!!!
+			//https://stackoverflow.com/questions/7194452/fast-vectorized-conversion-from-rgb-to-bgra
+			auto w = srcLen/3; 
+			while(w-- > 0)
+			{
+				enum shuf(int x) = ubyte16(
+					mixin(
+						iota(12)	.map!(i => (x+i)&15)
+							.chunks(3)
+							.map!("a"~(flipRG ? ".retro" : "")~".array~0")
+							.join
+					)
+				); 
+				enum ubyte16 	alpha	 = mixin([0, 0, 0, 0xff].replicate(4)),
+					loHalf	 = mixin([0xff	].replicate(8) ~ [0	].replicate(8)),
+					hiHalf	 = mixin([0	].replicate(8) ~ [0xff	].replicate(8)); 
+				//print(alpha, loHalf, hiHalf);
+				const in0 = src[0];  	dst[0] = pshufb(in0	, shuf!0	) | alpha; 
+				const in1 = src[1]; 	dst[1] = pshufb(in0 & hiHalf | in1 & loHalf	, shuf!12	) | alpha; 
+				const in2 = src[2]; 	dst[2] = pshufb(in1 & hiHalf | in2 & loHalf	, shuf!8	) | alpha; 
+					dst[3] = pshufb(in2	, shuf!4	) | alpha; 
+				src += 3; 	dst += 4; 
+			}
+			//Opt: palignr sucks. Why? Debug it! asm{ int 3; } //ou = palignr!8(in1, in0);
+		} 
+		alias BGRtoRGBA = RGBtoRGBA!true; 
+		alias RGBtoBGRA = BGRtoRGBA; 
+		
+		void LtoRGBA(const(ubyte16)* src, ubyte16* dst, size_t srcLen)
+		{
+			//Bug: unaligned ofs and size!!!
+			while(srcLen-- > 0)
+			{
+				enum ubyte16 	alpha	= mixin([0, 0, 0, 0xff].replicate(4)),
+					spread(int x) 	= mixin(iota(4).map!(i => [x+i].replicate(4)).join); 
+				
+				const tmp = src[0]; 	src += 1; 
+				static foreach(i; 0..4) { dst[i] = pshufb(tmp, spread!(i*4)) | alpha; }	dst += 4; 
+			}
+		} 
+		alias LtoBGRA = LtoRGBA; 
 		
 		//Todo: test suite for all the bitmap stuff
 		
@@ -9600,9 +9672,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				} 
 				
 				DateTime add_raw(in ulong delta) const
-				{
-					return RawDateTime(raw + delta);
-				}
+				{ return RawDateTime(raw + delta); } 
 				
 				///adjust this DateTime by si.Time
 				DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))

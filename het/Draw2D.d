@@ -2391,8 +2391,8 @@ class Drawing
 			int idx = -1; 
 			static if(isSomeString!Img)	idx = textures.accessLater(img); 
 			else static if(is(Img == File))	idx = textures.accessLater(img); 
-			else static if(is(Img == Bitmap))	idx = textures.accessLater(img.file); 
-			else static if(isIntegral!Img) idx =	img; 
+			else static if(is(Img == Bitmap))	{if(img) idx = textures.accessLater(img.file); }
+			else static if(isIntegral!Img) 	idx = img; 
 			else static if(is(Img : CustomTexture))	{ if(img) idx = img.texIdx; }
 			else	static assert(0, "Unsupported Img param: "~Img.stringof); 
 			

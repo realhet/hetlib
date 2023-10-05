@@ -1108,7 +1108,7 @@ version(/+$DIDE_REGION+/all)
 		{ return opCall(file, No.delayed, ErrorHandling.raise); } 
 		
 		auto opIndexAssign(F)(Bitmap bmp, F file)
-		{ /*enforce(bmp && bmp.valid);*/ return opCall(file, No.delayed, ErrorHandling.raise, bmp); } 
+		{/*enforce(bmp && bmp.valid);*/ return opCall(file, No.delayed, ErrorHandling.raise, bmp); } 
 		
 		auto opIndexAssign(F, I)(I img, F file) if(isImage2D!I)
 		{ return opindexAssign(file, No.delayed, ErrorHandling.raise, new Bitmap(img)); } 
@@ -1133,6 +1133,12 @@ version(/+$DIDE_REGION+/all)
 			bitmapQuery(BitmapQueryCommand.set, f, ErrorHandling.ignore, bmp); 
 		} 
 		
+		void set(Bitmap bmp)
+		{
+			enforce(bmp); 
+			set(bmp.file, bmp); 
+		} 
+		
 		void refresh(F)(F file)
 		{
 			auto f = File(file); 
@@ -1141,6 +1147,15 @@ version(/+$DIDE_REGION+/all)
 			bitmaps.set(f, b); 
 		} 
 		
+	} 
+	
+	ivec2 bitmapSize(T)(in T a, in ivec2 invalidSize = ivec2(0))
+	{
+		static if(is(T==Bitmap))	return a ? a.size : invalidSize; 
+		else	{
+			const b = bitmaps(a.File); 
+			return b.valid ? b.size : invalidSize; 
+		}
 	} 
 	
 	void testBitmaps()
@@ -5420,8 +5435,8 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					int dithering_strength; 	   //dithering strength (0=Off, 100=full)
 					
 					//Unused for now:
-					int force_rotation; 												     //forced rotation (to be applied _last_)
-					int no_enhancement; 												     //if true, discard enhancement layer
+					int force_rotation; 																 //forced rotation (to be applied _last_)
+					int no_enhancement; 																 //if true, discard enhancement layer
 					uint[4] pad;                        //padding for later use
 				} 
 				
@@ -6557,6 +6572,38 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		return res; 
+	} 
+	
+	
+	void toBGRA(
+		Bitmap bmp, 
+		RGBA[] delegate(int) onAlloc = (int area) => uninitializedArray!(RGBA[])(area)
+	)
+	{
+		if(!bmp || !bmp.valid || bmp.channels==4) return; 
+		
+		//48 -> 64 byte
+		
+		switch(bmp.channels)
+		{
+			case 1: {
+				auto img = bmp.access!ubyte; 
+				auto src = cast(byte16[])(img.asArray);  //Opt: handle un-strided images too
+				auto dst = cast(byte16[])(onAlloc(img.area)); 
+				LtoBGRA(src.ptr, dst.ptr, src.length); //Bug: unaligned ofs and size!!!
+				bmp.set(Image2D!RGBA(img.size, cast(RGBA[])dst)); 
+				break; 
+			}
+			case 3: {
+				auto img = bmp.access!RGB; 
+				auto src = cast(byte16[])(img.asArray);  //Opt: handle un-strided images too
+				auto dst = cast(byte16[])(onAlloc(img.area)); 
+				RGBtoBGRA(src.ptr, dst.ptr, src.length); //Bug: unaligned ofs and size!!!
+				bmp.set(Image2D!RGBA(img.size, cast(RGBA[])dst)); 
+				break; 
+			}
+			default: NOTIMPL; 
+		}
 	} 
 }
 version(/+$DIDE_REGION+/all)
