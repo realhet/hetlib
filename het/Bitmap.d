@@ -1094,9 +1094,9 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
-	__gshared struct bitmaps
+	struct bitmaps
 	{
-		static: 
+		__gshared static: 
 		//bitmaps(fn) = delayed access
 		//bitmaps[fn] = immediate access
 		auto opCall(F)(F file, Flag!"delayed" delayed=Yes.delayed, ErrorHandling errorHandling=ErrorHandling.track, Bitmap bmp=null)

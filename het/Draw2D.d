@@ -1180,15 +1180,17 @@ version(/+$DIDE_REGION View2D+/all)
 {
 	class View2D
 	{
+		alias F = float, V = Vector!(F, 2), B = Bounds!V;
+		
 		private: 
 		
 		float 	m_logScale	= 0, //base value. all others are derived from it
 			m_scale	= 1,
 			m_invScale	= 1, /+1 -> 1unit = pixel on screen+/
 			m_logScale_anim 	= 0; 
-		vec2	m_origin_anim; 
-		bool	animStarted; 
-		Window 	owner_; 
+		V m_origin_anim; 
+		bool animStarted; 
+		Window owner_; 
 		
 		bounds2 lastWorkArea; //detection change for autoZoom()
 		
@@ -1203,17 +1205,17 @@ version(/+$DIDE_REGION View2D+/all)
 		bool mustScroll; //a new scroll target has been added, so on next update it needs to scroll there
 		
 		public: 
-		vec2 origin; 
+		V origin; 
 		
 		float animSpeed = 0.3; //0=off, 0.3=normal, 0.9=slow
 		
 		//extra information from external source in screen space. All is in world coords
-		vec2 mousePos, mouseLast; 
-		bounds2 screenBounds_anim, screenBounds_dest; 	/+
+		V mousePos, mouseLast; 
+		B screenBounds_anim, screenBounds_dest; 	/+
 			Todo: maybe anim/destination should be 2 identical viewTransform struct.
 			Not a boolean parameter in EVERY member...
 		+/
-		bounds2 workArea, workArea_accum; 	//next workarea is the currently built one being drawn
+		B workArea, workArea_accum; 	//next workarea is the currently built one being drawn
 		auto subScreenArea = bounds2(0, 0, 1, 1); 	/+
 			if there is some things on the screen that is
 			in front of the view, it can be used to set
@@ -1241,9 +1243,9 @@ version(/+$DIDE_REGION View2D+/all)
 		this()
 		{} 
 		
-		this(in vec2 origin, float scale)
+		this(T)(in T origin, float scale)
 		{
-			this.origin = origin; 
+			this.origin = V(origin); 
 			this.scale = scale; 
 		} 
 		
@@ -1280,9 +1282,9 @@ version(/+$DIDE_REGION View2D+/all)
 		
 		auto subScreenOrigin()
 		{
-			vec2 res = origin; 
+			V res = origin; 
 			if(subScreenArea.valid) {
-				auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
+				auto subScreenShift = clientSize * (subScreenArea.center - V(.5)); //in pixels
 				
 				res += subScreenShift * invScale; 
 			}
@@ -1291,9 +1293,9 @@ version(/+$DIDE_REGION View2D+/all)
 		
 		auto subScreenOrigin_anim()
 		{
-			vec2 res = origin_anim; 
+			V res = origin_anim; 
 			if(subScreenArea.valid) {
-				auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
+				auto subScreenShift = clientSize * (subScreenArea.center - V(.5)); //in pixels
 				//Todo: refactor this redundant crap
 				
 				res += subScreenShift * invScale_anim; 
@@ -1326,27 +1328,27 @@ version(/+$DIDE_REGION View2D+/all)
 		} 
 		
 		
-		vec2 clientSize()
-		{ return vec2(owner.clientSize); } 
-		vec2 clientSizeHalf()
-		{ return clientSize*0.5f; } 
+		V clientSize()
+		{ return V(owner.clientSize); } 
+		V clientSizeHalf()
+		{ return clientSize/2; } 
 		//floor because otherwise it would make aliasing in the center of the view
 		
 		bounds2 visibleArea(bool animated = true)
 		{
-			vec2	mi = invTrans(vec2(0)	, animated),
-				ma = invTrans(clientSize,	animated); 
+			V	mi = invTrans(V(0), animated),
+				ma = invTrans(clientSize, animated); 
 			return bounds2(mi, ma).sorted; 
 		} 
 		
 		
 		auto getOrigin(bool animated)
 		{
-			vec2 res = animated ? origin_anim : origin; 
+			V res = animated ? origin_anim : origin; 
 			if(centerCorrection) {
 				with(clientSize) {
-					if(x.iround&1) res.x += 0.5f/getScale(animated); 
-					if(y.iround&1) res.y += 0.5f/getScale(animated); 
+					if(x.iround&1) res.x += 0.5/getScale(animated); 
+					if(y.iround&1) res.y += 0.5/getScale(animated); 
 					//Opt: fucking slow, need to be cached
 				}
 			}
@@ -1367,38 +1369,43 @@ version(/+$DIDE_REGION View2D+/all)
 		{ return (client-clientSizeHalf)/getScale(animated) + getOrigin(animated); } 
 		
 		//Scroll/Zoom User controls
-		float scrollRate() const      { return scrollSlower ? 0.125f : 1; } 
+		float scrollRate() const
+		 { return scrollSlower ? 0.125f : 1; } 
 		
-		void scroll(in vec2 delta)	   { origin -= delta*(scrollRate*invScale); } 
-		void scrollH(float delta)			 { scroll(vec2(delta, 0)); } 
-		void scrollV(float delta)			 { scroll(vec2(0, delta)); } 
+		void scroll(T)(in T delta)
+		 { origin -= delta*(scrollRate*invScale); } 
+		void scrollH(T)(T delta)
+		 { scroll(V(delta, 0)); } 
+		void scrollV(T)(T delta)
+		 { scroll(V(0, delta)); } 
 		
-		void zoom(float amount)       { scale = pow(2, log2(scale)+amount*scrollRate); } 
+		void zoom(float amount)
+		 { scale = pow(2, log2(scale)+amount*scrollRate); } 
 		
 		enum DefaultOverZoomPercent = 8; 
 		
-		vec2 subScreenClientCenter() {
+		V subScreenClientCenter() {
 			return clientSize * subScreenArea.center; //in pixels
 		} 
 		
-		void zoom(in bounds2 bb, float overZoomPercent = DefaultOverZoomPercent)
+		void zoom(T)(in T bb, float overZoomPercent = DefaultOverZoomPercent)
 		{
 			if(!bb.valid || !subScreenArea.valid) return; 
 			//corrigate according to subScreenArea
 			auto realClientSize = clientSize * subScreenArea.size; //in pixels
-			auto subScreenShift = clientSize * (subScreenArea.center - vec2(.5, .5)); //in pixels
+			auto subScreenShift = clientSize * (subScreenArea.center - V(.5)); //in pixels
 			
 			origin = bb.center; 
 			auto s = bb.size; 
 			//maximize(s.x, .001f); maximize(s.y, .001f);
 			auto sc = realClientSize/bb.size; 
-			scale = min(sc.x, sc.y)*(1 - overZoomPercent*.01f); //overzoom a bit
+			scale = min(sc.x, sc.y)*(1 - overZoomPercent*.01); //overzoom a bit
 			
 			//corrigate according to subScreenArea: shift
 			origin -= subScreenShift * invScale; 
 		} 
 		
-		void scrollZoom(in bounds2 target, float overZoomPercent = DefaultOverZoomPercent)
+		void scrollZoom(T)(in T target, float overZoomPercent = DefaultOverZoomPercent)
 		{
 			if(!target.valid || !subScreenArea.valid) return; 
 			
@@ -1410,16 +1417,16 @@ version(/+$DIDE_REGION View2D+/all)
 			}
 			
 			//scale up the screen if the target donesn't fit inside
-			float requiredScale = max(max(1, target.height/sb.height), max(1, target.width/sb.width)); 
+			F requiredScale = max(max(1, target.height/sb.height), max(1, target.width/sb.width)); 
 			if(requiredScale>1) {
 				const c = origin; 
 				sb = (sb-c)*requiredScale+c; 
 			}
 			
 			//calculate offset needed to shift target into screen
-			float calcOfs(float s0, float s1, float t0, float t1)
+			F calcOfs(F s0, F s1, F t0, F t1)
 			{ return s0>t0 ? s0-t0 : s1<t1 ? s1-t1 : 0; } 
-			auto ofs = vec2(
+			auto ofs = V(
 				calcOfs(sb.left, sb.right , target.left, target.right ),
 				calcOfs(sb.top , sb.bottom, target.top , target.bottom)
 			); 
@@ -1441,7 +1448,7 @@ version(/+$DIDE_REGION View2D+/all)
 			skipAnimation; 
 		} 
 		
-		void zoomAround(in vec2 screenPoint, float amount)
+		void zoomAround(T)(in T screenPoint, float amount)
 		{
 			/+
 				Todo: the zoom and the translation amount is not proportional.
@@ -2391,8 +2398,8 @@ class Drawing
 			int idx = -1; 
 			static if(isSomeString!Img)	idx = textures.accessLater(img); 
 			else static if(is(Img == File))	idx = textures.accessLater(img); 
-			else static if(is(Img == Bitmap))	{if(img) idx = textures.accessLater(img.file); }
-			else static if(isIntegral!Img) 	idx = img; 
+			else static if(is(Img == Bitmap))	{ if(img) idx = textures.accessLater(img.file); }
+			else static if(isIntegral!Img)	idx = img; 
 			else static if(is(Img : CustomTexture))	{ if(img) idx = img.texIdx; }
 			else	static assert(0, "Unsupported Img param: "~Img.stringof); 
 			

@@ -2828,8 +2828,30 @@ version(/+$DIDE_REGION+/all)
 		auto degrees(A)(in A a)
 		{ return radians!(180/PI)(a); } 
 		
+		private enum _normalizeAngle = 
+		q{
+			if(x>=-half && x<half) return x;
+			return cast(T)(
+				x>=0 	?    (x + half) % (2*half)   - half
+					: -(-(x + half) % (2*half)) + half
+			);
+		}; 
+		
+		T normalizeAngle_deg(T)(T x)
+		{
+			enum half = 180; mixin(_normalizeAngle); 
+			//Todo: unittest
+		} 
+		
+		T normalizeAngle_rad(T)(T x)
+		{
+			enum half = PI; mixin(_normalizeAngle); 
+			//Todo: unittest
+		} 
+		
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
-		private enum UnaryStdMathFunct(string name) = q{
+		private enum UnaryStdMathFunct(string name) = 
+		q{
 			auto #(A)(in A a){
 				alias CT = CommonScalarType!(A, float);
 				alias fun = a => std.math.#(cast(CT) a);
@@ -3014,17 +3036,17 @@ version(/+$DIDE_REGION+/all)
 			V res = a; 
 			res.x = -res.x; 
 			return res; 
-		}  auto negateY(V)(in V a)
+		} 	 auto negateY(V)(in V a)
 		{
 			V res = a; 
 			res.y = -res.y; 
 			return res; 
-		}  auto negateZ(V)(in V a)
+		} 	 auto negateZ(V)(in V a)
 		{
 			V res = a; 
 			res.z = -res.z; 
 			return res; 
-		}  auto negateW(V)(in V a)
+		} 	 auto negateW(V)(in V a)
 		{
 			V res = a; 
 			res.w = -res.w; 

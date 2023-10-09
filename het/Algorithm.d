@@ -636,6 +636,201 @@ version(/+$DIDE_REGION+/all)
 		
 	} 
 	
+	version(/+$DIDE_REGION Quadtree+/all)
+	{
+		/+
+			+Author: JackStouffer
+			/+Link: https://gist.github.com/JackStouffer/810c68f86af2abaa56be+/
+			
+			Quadtree implementation that allows the collision resolver 
+			to only scan a small subset of the possible colliding objects
+			See Also:
+			/+Link: http://gamedevelopment.tutsplus.com/tutorials/quick-tip-use-quadtrees-to-detect-likely-collisions-in-2d-space--gamedev-374+/
+		+/
+		struct QuadTree(T, uint MAX_OBJECTS = 10, uint MAX_LEVELS = 5)
+		if (hasMember!(T, "x") && hasMember!(T, "y") && hasMember!(T, "width") && hasMember!(T, "height"))
+		{
+			int level; 
+			T bounds; 
+			T[] objects; 
+			QuadTree[] nodes;  //opt -> should be Quadtree[4]*  or manually allocated form a Quadtree[4][]
+			
+			this(int p_level, T p_bounds)
+			{
+				level = p_level; 
+				bounds = p_bounds; 
+				
+				if(p_level == 0)
+				{ split(); }
+			} 
+			
+			
+			/*Clears the quadtree*/
+			void clear()
+			{
+				objects = []; 
+				
+				foreach(ref node; nodes)
+				{ node.clear(); }
+			} 
+			
+			
+			/*Splits the node into 4 subnodes*/
+			void split()
+			{
+				immutable sub_width = bounds.width / 2; 
+				immutable sub_height = bounds.height / 2; 
+				immutable x = bounds.x; 
+				immutable y = bounds.y; 
+				nodes ~= QuadTree(level+1, T(x + sub_width, y, sub_width, sub_height)); 
+				nodes ~= QuadTree(level+1, T(x, y, sub_width, sub_height)); 
+				nodes ~= QuadTree(level+1, T(x, y + sub_height, sub_width, sub_height)); 
+				nodes ~= QuadTree(level+1, T(x + sub_width, y + sub_height, sub_width, sub_height)); 
+			} 
+			
+			
+			/*
+				Determine which node the object belongs to. -1 means
+				object cannot completely fit within a child node and is part
+				of the parent node
+			*/
+			int getIndex(in T p_rect)
+			{
+				int index = -1; 
+				immutable vertical_midpoint = bounds.x + (bounds.width / 2); 
+				immutable horizontal_midpoint = bounds.y + (bounds.height / 2); 
+				
+				// Object can completely fit within the top quadrants
+				immutable top_quadrant = (
+					p_rect.y < horizontal_midpoint && 
+					p_rect.y + p_rect.height < horizontal_midpoint
+				); 
+				// Object can completely fit within the bottom quadrants
+				immutable bottom_quadrant = (p_rect.y > horizontal_midpoint); 
+				
+				// Object can completely fit within the left quadrants
+				if(
+					p_rect.x < vertical_midpoint && 
+					p_rect.x + p_rect.width < vertical_midpoint
+				)
+				{
+					if(top_quadrant)
+					{ index = 1; }
+					else if(bottom_quadrant) { index = 2; }
+				}
+				else if(p_rect.x > vertical_midpoint)
+				{
+					// Object can completely fit within the right quadrants
+					if(top_quadrant)
+					{ index = 0; }
+					else if(bottom_quadrant) { index = 3; }
+				}
+				
+				return index; 
+			} 
+			
+			/*
+				Insert the object into the quadtree. If the node
+				exceeds the capacity, it will split and add all
+				objects to their corresponding nodes.
+			*/
+			void insert(T p_rect)
+			{
+				if(nodes.length != 0)
+				{
+					immutable index = getIndex(p_rect); 
+					
+					if(index != -1)
+					{
+						nodes[index].insert(p_rect); 
+						return; 
+					}
+				}
+				
+				objects ~= p_rect; 
+				
+				if(objects.length > MAX_OBJECTS && level < MAX_LEVELS)
+				{
+					if(nodes.length == 0)
+					{ split; }
+					
+					int i = 0; 
+					while(i < this.objects.length)
+					{
+						immutable index = getIndex(objects[i]); 
+						
+						if(index != -1)
+						{
+							nodes[index].insert(objects[i]); 
+							objects = objects.remove(i); 
+						}else
+						{ i++; }
+					}
+				}
+			} 
+			
+			
+			/*Return all objects that could collide with the given object*/
+			T[] retrieve(in T p_rect)
+			{
+				//bugs: This is bogus!
+				immutable index = getIndex(p_rect); 
+				T[] return_objects; 
+				
+				if(index != -1 && nodes.length != 0)
+				{ return_objects ~= nodes[index].retrieve(p_rect); }
+				
+				return_objects ~= objects; 
+				
+				return return_objects; 
+			} 
+			
+			void visit(in T p_rect, bool delegate(ref T) fun)
+			{
+				if(
+					bounds.x+bounds.width<p_rect.x || bounds.x>p_rect.x+p_rect.width ||
+									bounds.y+bounds.height<p_rect.y || bounds.y>p_rect.y+p_rect.height
+				) return; 
+				
+				foreach(ref o; objects) if(!fun(o)) return; 
+				
+				//Opt: if all inside, no more boundary checks needed.
+				
+				foreach(ref n; nodes) n.visit(p_rect, fun); 
+			} 
+			
+			static _unittest()
+			{
+				/+
+					struct Rect { int x, y, width, height; } 
+									
+									auto a = QuadTree!Rect(0, Rect(0, 0, 100, 100)); 
+									// Did the tree correctly initialize?
+									assert(a.nodes.length == 4); 
+									
+									auto rects = [Rect(10, 10, 10, 10)].replicate(11); 
+									auto rects2 = [Rect(80, 80, 10, 10)].replicate(11); 
+									
+									foreach(rect; rects) { a.insert(rect); }
+									foreach(rect; rects2) { a.insert(rect); }
+									
+									// Did the child node create four new nodes?
+									assert(a.objects.length == 0); 
+									assert(a.nodes[1].nodes.length == 4); 
+									
+									// Does the retrieve method correctly only return those
+									// Rect's in the second node?
+									assert(a.retrieve(Rect(5, 5, 5, 5)) == rects); 
+									
+									a.clear(); 
+									// Were all of the objects actually cleared from the tree?
+									assert(a.objects.length == 0); 
+									assert(a.nodes[1].objects.length == 0); 
+				+/
+			} 
+		} 
+	}
+	
 	struct PositionExtrapolator
 	{
 		private: 
@@ -1492,7 +1687,7 @@ version(/+$DIDE_REGION Geometry+/all)
 			private Tuple!(V, V)[] stack; 
 			void push()
 			{
-				enforce(stack.length<32, "Turtle stack oveflow.");
+				enforce(stack.length<32, "Turtle stack oveflow."); 
 				stack ~= state; 
 			} 
 			void pop()
@@ -1684,7 +1879,7 @@ version(/+$DIDE_REGION Geometry+/all)
 		{ collectPoints({ arc_angle(angle, r, adjust); }); } 
 		
 		///B: cubic Bezier
-		void B(void delegate() fun, float adjust)
+		void B(void delegate() fun, float adjust=0)
 		{
 			const se = captureStartEndPosDir(fun); 
 			collectPoints({ bezier4(se[2], se[3], adjust); }); 
@@ -1759,12 +1954,12 @@ version(/+$DIDE_REGION Geometry+/all)
 				if(op.among(TurtleOp.G, TurtleOp.R)) return TurtleCmd([TurtleCmd.Cmd(op, a0/n, a1, a2)]); 
 				if(op==TurtleOp.slide) return TurtleCmd([TurtleCmd.Cmd(op, a0/n, a1/n, a2)]); 
 				enforce(0, "TurtleCmd: Invalid division of command: "~op.text); 
-				assert(0);
+				assert(0); 
 			}
 		} 
 		
 		void opOpAssign(string op)(TurtleCmd b)
-		{ mixin("this = this "~op~" b;"); }
+		{ mixin("this = this "~op~" b;"); } 
 	} 
 	
 	static turtleCmd(TurtleOp op, double a0=0, double a1=0, double a2=0)
