@@ -5443,8 +5443,8 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		void hexDump(T=ubyte)(in void[] data, int width=16)
 		{
-				enum digits = T.sizeof*2; 
-					
+			enum digits = T.sizeof*2; 
+			
 			string hexLine(in T[] buf)
 			{
 				return buf	.take(width)
@@ -5452,14 +5452,14 @@ version(/+$DIDE_REGION Containers+/all)
 					.padRight(" ".replicate(digits), width)
 					.join(' '); 
 			} 
-					
+			
 			string binaryLine(in void[] buf)
 			{
 				return (cast(ubyte[])buf)	.take(width*T.sizeof)
 					.map!`a>=32 && a<=127 ? char(a) : '.'`
 					.array; 
 			} 
-					
+			
 			foreach(i, a; (cast(T[])data).chunks(width).map!array.enumerate)
 			writefln!"%04X : %s : %s"(i*width, hexLine(a), binaryLine(a)); 
 		} 
@@ -7895,6 +7895,154 @@ version(/+$DIDE_REGION Colors+/all)
 			clPostit	= (RGB(0x99FFFF)); 
 		}
 		
+		version(/+$DIDE_REGION Windows.UI.Colors+/all)
+		{
+			immutable
+			clUiAliceBlue	= (RGB(240, 248, 255)),
+			clUiAntiqueWhite	= (RGB(250, 235, 215)),
+			clUiAqua	= (RGB(  0, 255, 255)),
+			clUiAquamarine	= (RGB(127, 255, 212)),
+			clUiAzure	= (RGB(240, 255, 255)),
+			clUiBeige	= (RGB(245, 245, 220)),
+			clUiBisque	= (RGB(255, 228, 196)),
+			clUiBlack	= (RGB(  0,   0,   0)),
+			clUiBlanchedAlmond	= (RGB(255, 235, 205)),
+			clUiBlue	= (RGB(  0,   0, 255)),
+			clUiBlueViolet	= (RGB(138,  43, 226)),
+			clUiBrown	= (RGB(165,  42,  42)),
+			clUiBurlyWood	= (RGB(222, 184, 135)),
+			clUiCadetBlue	= (RGB( 95, 158, 160)),
+			clUiChartreuse	= (RGB(127, 255,   0)),
+			clUiChocolate	= (RGB(210, 105,  30)),
+			clUiCoral	= (RGB(255, 127,  80)),
+			clUiCornflowerBlue	= (RGB(100, 149, 237)),
+			clUiCornsilk	= (RGB(255, 248, 220)),
+			clUiCrimson	= (RGB(220,  20,  60)),
+			clUiCyan	= (RGB(  0, 255, 255)),
+			clUiDarkBlue	= (RGB(  0,   0, 139)),
+			clUiDarkCyan	= (RGB(  0, 139, 139)),
+			clUiDarkGoldenrod	= (RGB(184, 134,  11)),
+			clUiDarkGray	= (RGB(169, 169, 169)),
+			clUiDarkGreen	= (RGB(  0, 100,   0)),
+			clUiDarkKhaki	= (RGB(189, 183, 107)),
+			clUiDarkMagenta	= (RGB(139,   0, 139)),
+			clUiDarkOliveGreen	= (RGB( 85, 107,  47)),
+			clUiDarkOrange	= (RGB(255, 140,   0)),
+			clUiDarkOrchid	= (RGB(153,  50, 204)),
+			clUiDarkRed	= (RGB(139,   0,   0)),
+			clUiDarkSalmon	= (RGB(233, 150, 122)),
+			clUiDarkSeaGreen	= (RGB(143, 188, 143)),
+			clUiDarkSlateBlue	= (RGB( 72,  61, 139)),
+			clUiDarkSlateGray	= (RGB( 47,  79,  79)),
+			clUiDarkTurquoise	= (RGB(  0, 206, 209)),
+			clUiDarkViolet	= (RGB(148,   0, 211)),
+			clUiDeepPink	= (RGB(255,  20, 147)),
+			clUiDeepSkyBlue	= (RGB(  0, 191, 255)),
+			clUiDimGray	= (RGB(105, 105, 105)),
+			clUiDodgerBlue	= (RGB( 30, 144, 255)),
+			clUiFirebrick	= (RGB(178,  34,  34)),
+			clUiFloralWhite	= (RGB(255, 250, 240)),
+			clUiForestGreen	= (RGB( 34, 139,  34)),
+			clUiFuchsia	= (RGB(255,   0, 255)),
+			clUiGainsboro	= (RGB(220, 220, 220)),
+			clUiGhostWhite	= (RGB(248, 248, 255)),
+			clUiGold	= (RGB(255, 215,   0)),
+			clUiGoldenrod	= (RGB(218, 165,  32)),
+			clUiGray	= (RGB(128, 128, 128)),
+			clUiGreen	= (RGB(  0, 128,   0)),
+			clUiGreenYellow	= (RGB(173, 255,  47)),
+			clUiHoneydew	= (RGB(240, 255, 240)),
+			clUiHotPink	= (RGB(255, 105, 180)),
+			clUiIndianRed	= (RGB(205,  92,  92)),
+			clUiIndigo	= (RGB( 75,   0, 130)),
+			clUiIvory	= (RGB(255, 255, 240)),
+			clUiKhaki	= (RGB(240, 230, 140)),
+			clUiLavender	= (RGB(230, 230, 250)),
+			clUiLavenderBlush	= (RGB(255, 240, 245)),
+			clUiLawnGreen	= (RGB(124, 252,   0)),
+			clUiLemonChiffon	= (RGB(255, 250, 205)),
+			clUiLightBlue	= (RGB(173, 216, 230)),
+			clUiLightCoral	= (RGB(240, 128, 128)),
+			clUiLightCyan	= (RGB(224, 255, 255)),
+			clUiLightGoldenrodYellow	= (RGB(250, 250, 210)),
+			clUiLightGray	= (RGB(211, 211, 211)),
+			clUiLightGreen	= (RGB(144, 238, 144)),
+			clUiLightPink	= (RGB(255, 182, 193)),
+			clUiLightSalmon	= (RGB(255, 160, 122)),
+			
+			
+			clUiLightSeaGreen	= (RGB( 32, 178, 170)),
+			clUiLightSkyBlue	= (RGB(135, 206, 250)),
+			clUiLightSlateGray	= (RGB(119, 136, 153)),
+			clUiLightSteelBlue	= (RGB(176, 196, 222)),
+			clUiLightYellow	= (RGB(255, 255, 224)),
+			clUiLime	= (RGB(  0, 255,   0)),
+			clUiLimeGreen	= (RGB( 50, 205,  50)),
+			clUiLinen	= (RGB(250, 240, 230)),
+			clUiMagenta	= (RGB(255,   0, 255)),
+			clUiMaroon	= (RGB(128,   0,   0)),
+			clUiMediumAquamarine	= (RGB(102, 205, 170)),
+			clUiMediumBlue	= (RGB(  0,   0, 205)),
+			clUiMediumOrchid	= (RGB(186,  85, 211)),
+			clUiMediumPurple	= (RGB(147, 112, 219)),
+			clUiMediumSeaGreen	= (RGB( 60, 179, 113)),
+			clUiMediumSlateBlue	= (RGB(123, 104, 238)),
+			clUiMediumSpringGreen	= (RGB(  0, 250, 154)),
+			clUiMediumTurquoise	= (RGB( 72, 209, 204)),
+			clUiMediumVioletRed	= (RGB(199,  21, 133)),
+			clUiMidnightBlue	= (RGB( 25,  25, 112)),
+			clUiMintCream	= (RGB(245, 255, 250)),
+			clUiMistyRose	= (RGB(255, 228, 225)),
+			clUiMoccasin	= (RGB(255, 228, 181)),
+			clUiNavajoWhite	= (RGB(255, 222, 173)),
+			clUiNavy	= (RGB(  0,   0, 128)),
+			clUiOldLace	= (RGB(253, 245, 230)),
+			clUiOlive	= (RGB(128, 128,   0)),
+			clUiOliveDrab	= (RGB(107, 142,  35)),
+			clUiOrange	= (RGB(255, 165,   0)),
+			clUiOrangeRed	= (RGB(255,  69,   0)),
+			clUiOrchid	= (RGB(218, 112, 214)),
+			clUiPaleGoldenrod	= (RGB(238, 232, 170)),
+			clUiPaleGreen	= (RGB(152, 251, 152)),
+			clUiPaleTurquoise	= (RGB(175, 238, 238)),
+			clUiPaleVioletRed	= (RGB(219, 112, 147)),
+			clUiPapayaWhip	= (RGB(255, 239, 213)),
+			clUiPeachPuff	= (RGB(255, 218, 185)),
+			clUiPeru	= (RGB(205, 133,  63)),
+			clUiPink	= (RGB(255, 192, 203)),
+			clUiPlum	= (RGB(221, 160, 221)),
+			clUiPowderBlue	= (RGB(176, 224, 230)),
+			clUiPurple	= (RGB(128,   0, 128)),
+			clUiRed	= (RGB(255,   0,   0)),
+			clUiRosyBrown	= (RGB(188, 143, 143)),
+			clUiRoyalBlue	= (RGB( 65, 105, 225)),
+			clUiSaddleBrown	= (RGB(139,  69,  19)),
+			clUiSalmon	= (RGB(250, 128, 114)),
+			clUiSandyBrown	= (RGB(244, 164,  96)),
+			clUiSeaGreen	= (RGB( 46, 139,  87)),
+			clUiSeaShell	= (RGB(255, 245, 238)),
+			clUiSienna	= (RGB(160,  82,  45)),
+			clUiSilver	= (RGB(192, 192, 192)),
+			clUiSkyBlue	= (RGB(135, 206, 235)),
+			clUiSlateBlue	= (RGB(106,  90, 205)),
+			clUiSlateGray	= (RGB(112, 128, 144)),
+			clUiSnow	= (RGB(255, 250, 250)),
+			clUiSpringGreen	= (RGB(  0, 255, 127)),
+			clUiSteelBlue	= (RGB( 70, 130, 180)),
+			clUiTan	= (RGB(210, 180, 140)),
+			clUiTeal	= (RGB(  0, 128, 128)),
+			clUiThistle	= (RGB(216, 191, 216)),
+			clUiTomato	= (RGB(255,  99,  71)),
+			clUiTransparent	= (RGB(255, 255, 255)),
+			clUiTurquoise	= (RGB( 64, 224, 208)),
+			clUiViolet	= (RGB(238, 130, 238)),
+			clUiWheat	= (RGB(245, 222, 179)),
+			clUiWhite	= (RGB(255, 255, 255)),
+			clUiWhiteSmoke	= (RGB(245, 245, 245)),
+			clUiYellow	= (RGB(255, 255,   0)),
+			clUiYellowGreen	= (RGB(154, 205,  50)); 
+		}
+		
 		immutable RGB8[]
 			clDelphi	= [
 			clBlack, clMaroon, clGreen, clOlive, clNavy, clPurple, clTeal, clGray, clSilver, clRed,
@@ -7943,7 +8091,6 @@ version(/+$DIDE_REGION Colors+/all)
 				static foreach(member; __traits(allMembers, mixin(__MODULE__)))
 				static if(is(Unqual!(typeof(mixin(member)))==RGB))
 				map[member.withoutStarting("cl").decapitalize] = mixin(member); 
-				//Todo: utils
 				
 				map.rehash; 
 			}

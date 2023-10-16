@@ -1827,7 +1827,7 @@ version(/+$DIDE_REGION+/all)
 		auto viewGUI()
 	{
 		viewGUI_.scale = guiScale; 
-		viewGUI_.origin = clientSizeHalf; 
+		viewGUI_.origin = View2D.V(clientSizeHalf); 
 		viewGUI_.skipAnimation; 
 		return viewGUI_; 
 	} 
@@ -1989,8 +1989,8 @@ version(/+$DIDE_REGION+/all)
 		void updateViewClipBoundsAndMousePos()
 	{
 		//set extra info about mouse and bounds for view and viewGUI
-		vec2 mp = mouse.act.screen; 
-		bounds2 bnd = clientBounds; 
+		const mp = View2D.V(mouse.act.screen); 
+		const bnd = View2D.B(clientBounds); 
 		
 		with(view)
 		{
@@ -1998,14 +1998,14 @@ version(/+$DIDE_REGION+/all)
 			mousePos = invTrans(mp); 
 			screenBounds_anim = invTrans(bnd, true); 
 			screenBounds_dest = invTrans(bnd, false); 
-			workArea_accum = bounds2.init; 
+			workArea_accum = View2D.B.init; 
 		}with(viewGUI)
 		{
 			mouseLast = mousePos; 
 			mousePos = invTrans(mp); 
 			screenBounds_anim = invTrans(bnd, true); 
 			screenBounds_dest = invTrans(bnd, false); 
-			workArea_accum = bounds2.init; 
+			workArea_accum = View2D.B.init; 
 		}
 	} 
 	

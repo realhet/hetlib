@@ -88,6 +88,21 @@ version(/+$DIDE_REGION+/all)
 		segment	= encodeArrowStyle(2,2,0)
 	} 
 	
+	
+	/+
+		Note: Version 2.0 plans
+		
+		Goals:
+		 - compress more characters into one command.
+		 - Optionally enable 64bit positoning.
+		 - Support integer and 16 bit formats too.
+		 - Support syntax colors
+		
+		
+		
+	+/
+	
+	
 	
 	//DrawingBuffers //////////////////////////////////////////////////////////////////
 	
@@ -1180,7 +1195,7 @@ version(/+$DIDE_REGION View2D+/all)
 {
 	class View2D
 	{
-		alias F = float, V = Vector!(F, 2), B = Bounds!V;
+		alias F = double, V = Vector!(F, 2), B = Bounds!V; 
 		
 		private: 
 		
@@ -1192,7 +1207,7 @@ version(/+$DIDE_REGION View2D+/all)
 		bool animStarted; 
 		Window owner_; 
 		
-		bounds2 lastWorkArea; //detection change for autoZoom()
+		B lastWorkArea; //detection change for autoZoom()
 		
 		
 		//smart zooming stuff
@@ -1215,7 +1230,11 @@ version(/+$DIDE_REGION View2D+/all)
 			Todo: maybe anim/destination should be 2 identical viewTransform struct.
 			Not a boolean parameter in EVERY member...
 		+/
-		B workArea, workArea_accum; 	//next workarea is the currently built one being drawn
+		B workArea; 	//The last complete workarea.
+		B workArea_accum; 	/+
+			The current workarea being updated by glDraw() commands.
+			There are only a few glDraw calls, so it can be double.
+		+/
 		auto subScreenArea = bounds2(0, 0, 1, 1); 	/+
 			if there is some things on the screen that is
 			in front of the view, it can be used to set
@@ -1271,16 +1290,16 @@ version(/+$DIDE_REGION View2D+/all)
 		
 		//animated stuff
 		
-		auto origin_anim()const
+		V origin_anim()const
 		{ return m_origin_anim; } 
-		auto logScale_anim()const
+		float logScale_anim()const
 		{ return m_logScale_anim; } 
-		auto scale_anim()const
+		float scale_anim()const
 		{ return pow(2, m_logScale_anim); } 	//zoomFactor
-		auto invScale_anim()const
+		float invScale_anim()const
 		{ return 1.0f/scale_anim; } 	//pixelSize
 		
-		auto subScreenOrigin()
+		V subScreenOrigin()
 		{
 			V res = origin; 
 			if(subScreenArea.valid) {
@@ -1291,7 +1310,7 @@ version(/+$DIDE_REGION View2D+/all)
 			return res; 
 		} 
 		
-		auto subScreenOrigin_anim()
+		V subScreenOrigin_anim()
 		{
 			V res = origin_anim; 
 			if(subScreenArea.valid) {
@@ -1303,34 +1322,34 @@ version(/+$DIDE_REGION View2D+/all)
 			return res; 
 		} 
 		
-		auto subScreenBounds_anim() const
+		B subScreenBounds_anim() const
 		{
 			/+
 				Note: subsceen is the mostly visible area on the view's surface.
 				The portion of the screen that remains visible aster the overlayed GUI.
 			+/
-			return bounds2(
+			return B(
 				mix(screenBounds_anim.topLeft, screenBounds_anim.bottomRight, subScreenArea.topLeft),
 				mix(screenBounds_anim.topLeft, screenBounds_anim.bottomRight, subScreenArea.bottomRight)
 			); 
 		} 
 		
-		auto subScreenBounds_dest() const
+		B subScreenBounds_dest() const
 		{
 			/+
 				Note: subsceen is the mostly visible area on the view's surface.
 				The portion of the screen that remains visible aster the overlayed GUI.
 			+/
-			return bounds2(
+			return B(
 				mix(screenBounds_dest.topLeft, screenBounds_dest.bottomRight, subScreenArea.topLeft),
 				mix(screenBounds_dest.topLeft, screenBounds_dest.bottomRight, subScreenArea.bottomRight)
 			); 
 		} 
 		
 		
-		V clientSize()
-		{ return V(owner.clientSize); } 
-		V clientSizeHalf()
+		vec2 clientSize()
+		{ return vec2(owner.clientSize); } 
+		vec2 clientSizeHalf()
 		{ return clientSize/2; } 
 		//floor because otherwise it would make aliasing in the center of the view
 		
@@ -1366,25 +1385,25 @@ version(/+$DIDE_REGION View2D+/all)
 		//Opt: fucking slow, need to be cached
 		
 		T invTrans(T)(in T client, bool animated=true)
-		{ return (client-clientSizeHalf)/getScale(animated) + getOrigin(animated); } 
+		{ return T((client-clientSizeHalf)/getScale(animated) + getOrigin(animated)); } 
 		
 		//Scroll/Zoom User controls
 		float scrollRate() const
-		 { return scrollSlower ? 0.125f : 1; } 
+		{ return scrollSlower ? 0.125f : 1; } 
 		
 		void scroll(T)(in T delta)
-		 { origin -= delta*(scrollRate*invScale); } 
+		{ origin -= delta*(scrollRate*invScale); } 
 		void scrollH(T)(T delta)
-		 { scroll(V(delta, 0)); } 
+		{ scroll(V(delta, 0)); } 
 		void scrollV(T)(T delta)
-		 { scroll(V(0, delta)); } 
+		{ scroll(V(0, delta)); } 
 		
 		void zoom(float amount)
-		 { scale = pow(2, log2(scale)+amount*scrollRate); } 
+		{ scale = pow(2, log2(scale)+amount*scrollRate); } 
 		
 		enum DefaultOverZoomPercent = 8; 
 		
-		V subScreenClientCenter() {
+		vec2 subScreenClientCenter() {
 			return clientSize * subScreenArea.center; //in pixels
 		} 
 		
@@ -1395,7 +1414,7 @@ version(/+$DIDE_REGION View2D+/all)
 			auto realClientSize = clientSize * subScreenArea.size; //in pixels
 			auto subScreenShift = clientSize * (subScreenArea.center - V(.5)); //in pixels
 			
-			origin = bb.center; 
+			origin = V(bb.center); 
 			auto s = bb.size; 
 			//maximize(s.x, .001f); maximize(s.y, .001f);
 			auto sc = realClientSize/bb.size; 
@@ -1617,20 +1636,23 @@ version(/+$DIDE_REGION View2D+/all)
 	} 
 	
 	/// Clamps worldCoord points into a view's visible subSurface
-	struct RectClamper
+	alias RectClamperF	= RectClamper_!float, 
+	RectClamperD 	= RectClamper_!double; 
+	struct RectClamper_(F)
 	{
+		alias V = Vector!(F, 2), B = Bounds!V; 
 		const {
-			bounds2 outerBnd, innerBnd; 
-			vec2 center, innerHalfSize; 
+			B outerBnd, innerBnd; 
+			V center, innerHalfSize; 
 		} 
 		
 		this(View2D view, float borderSizePixels)
 		{
-			auto ob = view.subScreenBounds_anim; 
+			auto ob = B(view.subScreenBounds_anim); 
 			this(ob, ob.inflated(-view.invScale_anim*borderSizePixels)); 
 		} 
 		
-		this(in bounds2 outerBnd, in bounds2 innerBnd)
+		this(in B outerBnd, in B innerBnd)
 		{
 			this.outerBnd = outerBnd; 
 			this.innerBnd = innerBnd; 
@@ -1638,7 +1660,7 @@ version(/+$DIDE_REGION View2D+/all)
 			innerHalfSize = innerBnd.size/2; 
 		} 
 		
-		private vec2 clamp_noCenter(vec2 p) const
+		private V clamp_noCenter(V p) const
 		{
 			p -= center; 
 			if(p.x > innerHalfSize.x) p *= innerHalfSize.x/p.x; /*else*/
@@ -1649,17 +1671,17 @@ version(/+$DIDE_REGION View2D+/all)
 			return p; 
 		} 
 		
-		vec2 clamp(vec2 p) const
+		V clamp(V p) const
 		{ return clamp_noCenter(p) + center; } 
 		
-		vec2[2] clampArrow(in vec2 p, float scale0=.99f, float scale1=1) const
+		V[2] clampArrow(in V p, float scale0=.99f, float scale1=1) const
 		{
 			//these are the flashing target arrows in DIDE on the edge of the screen
 			auto cc = clamp_noCenter(p); 
 			return [cc*scale0+center, cc*scale1+center]; 
 		} 
 		
-		bool overlaps(in bounds2 b) const { return outerBnd.overlaps(b); } 
+		bool overlaps(in B b) const { return outerBnd.overlaps(b); } 
 	} 
 }
 class Drawing
@@ -1728,7 +1750,7 @@ class Drawing
 			
 			foreach(o; src.exportDrawingObjs) {
 				o.applyTransform(&inputTransform); 
-				myAppend(o); //Todo: this is a terrible slow copy
+				oldAppend(o); //Todo: this is a terrible slow copy
 			}
 		} 
 		
@@ -1932,66 +1954,65 @@ class Drawing
 		struct DrawingObj
 		{
 			 align(1): 
-			float aType; 	           //4
-			vec2 aA, aB, aC; 	           //24
-			uint aColor; 	           //4
+			/+0+/uint aType; 	           //4
+			/+4+/vec2 aA, aB, aC; 	           //24
+			/+28+/uint aColor; 	           //4
 			
 			//drawGlyph only
-			vec2 aD; 	              //8
-			uint aColor2; 	              //4
-			uint dummy; 	              //4
+			/+32+/vec2 aD; 	              //8
+			/+40+/uint aColor2; 	              //4
+			/+44+/uint aDummy; 	              //4
 			
-			vec2 aClipMin, aClipMax;    //16  clipping rect.
+			/+48+/vec2 aClipMin, aClipMax;    //16  clipping rect.
 			
-										//total: 60 bytes: Terribly unoptimal
-			
-			//atype: 4
-			//acolor, acolor2: 8
-			//aclip 16
-			
-			//aPos: 8
-			//aHeight: 4
-			
-			//total: 4+8+16+8+4 = 40
-			//marad: 20
+			/+64+///total: 64 bytes: Terribly unoptimal
 			
 			void expandBounds(ref bounds2 b) const
 			{
-				auto t = aType.iround; 
-				void x(in vec2 v)
-				{ b |= v; } 
-				
-				if(t==1) x(aA); 
-				else if(t.among(68, 69)) {
-					//Point
-					x(aA); x(aB); x(aC); 
-				}
-				else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) {
-					//Tri, Bez2
-					x(aA); x(aB); 
+				if(isOldCmd(aType))
+				{
+					const t = getOldCmd(aType); 
+					void x(in vec2 v)
+					{ b |= v; } 
+					
+					if(t==1) x(aA); 
+					else if(t.among(5, 6)) {
+						//Point
+						x(aA); x(aB); x(aC); 
+					}
+					else if(t.among(2, 3, 4, 7)) {
+						//Tri, Bez2
+						x(aA); x(aB); 
+					}
+					else
+					raise("aType %s not impl".format(aType)); 
 				}
 				else
-				raise("aType %s not impl".format(aType)); 
+				NOTIMPL; 
 				
 			} 
 			
 			void applyTransform(vec2 delegate(in vec2) tr)
 			{
-				auto t = aType.iround; 
-				
-				void x(ref vec2 v)
-				{ v = tr(v); } 
-				
-				if(t==1) x(aA); 
-				else if(t.among(68, 69)) {
-					//Point
-					x(aA); x(aB); x(aC); 
+				if(isOldCmd(aType))
+				{
+					auto t = getOldCmd(aType); 
+					
+					void x(ref vec2 v)
+					{ v = tr(v); } 
+					
+					if(t==1) x(aA); 
+					else if(t.among(5, 6)) {
+						//Point
+						x(aA); x(aB); x(aC); 
+					}
+					else if(t.among(2, 3, 4, 7)) {
+						//Tri
+						x(aA); x(aB); 
+					}
 				}
-				else if(t.inRange(2, 67) || t.inRange(256, 256+0xFFFF)) {
-					//Tri
-					x(aA); x(aB); 
-				}
-				//Point2, Line, rect, glyph
+				else
+				NOTIMPL; 
 			} 
 		} 
 		static assert(DrawingObj.sizeof==64); 
@@ -2001,13 +2022,42 @@ class Drawing
 		bool empty() const
 		{ return buffers.empty && vboList.empty; } 
 		
-		private void myAppend(DrawingObj o)
+		
+		static uint oldCmd(uint cmd, uint param=0) { return 1 | cmd<<1 | param<<4; } 
+		
+		static bool isOldCmd(uint type)
+		{ return !!(type & 1); } 
+		
+		static uint getOldCmd(uint type)
+		{ return type>>1&7; } 
+		
+		
+		private void oldAppend(DrawingObj o)
 		{
+			assert(isOldCmd(o.aType)); 
 			o.aClipMin = clipBounds.low; 
 			o.aClipMax = clipBounds.high; 
 			o.expandBounds(bounds_); 
 			buffers.put(o); 
 		} 
+		
+		void appendNewDrawObj(void[] buf)
+		{
+			enum requiredBufSize = DrawingObj.sizeof;
+			
+			if(buf.length==requiredBufSize)
+			{
+				buffers.put(*(cast(DrawingObj*)buf.ptr));
+			}
+			else if(buf.length<requiredBufSize)
+			{
+				DrawingObj tmp;
+				(cast(void*)&tmp)[0..buf.length] = buf;
+				buffers.put(tmp);
+			}
+			else
+			enforce(0, "NewDrawObj: Buffer too big.");
+		}
 		
 		private auto exportDrawingObjs()
 		{ return buffers.allObjs; } 
@@ -2106,7 +2156,7 @@ class Drawing
 			//Todo: point2 is not working with appender. should use vec2[]
 			
 			//Create a new Point1
-			myAppend(DrawingObj(1, inputTransform(p), vec2(0), vec2(s, 0), c)); 
+			oldAppend(DrawingObj(oldCmd(1), inputTransform(p), vec2(0), vec2(s, 0), c)); 
 		} 
 		
 		void point(in RGB c, in vec2 p)
@@ -2138,7 +2188,7 @@ class Drawing
 			}
 			//from now process 2 points at a time
 			while(idx<p.length) {
-				myAppend(DrawingObj(2, inputTransform(p[idx]), inputTransform(p[idx+1]), vec2(s, s), c)); 
+				oldAppend(DrawingObj(oldCmd(2), inputTransform(p[idx]), inputTransform(p[idx+1]), vec2(s, s), c)); 
 				idx += 2; 
 			}
 		} 
@@ -2153,7 +2203,7 @@ class Drawing
 			vec2 p = inputTransform(p_); 
 			markDirty; 
 			auto c = realDrawColor, w = inputTransformSize(lineWidth); 
-			myAppend(DrawingObj(3+actState.arrowStyle, inputTransform(lineCursor), p, vec2(w, lineStyle), c)); 
+			oldAppend(DrawingObj(oldCmd(3, actState.arrowStyle), inputTransform(lineCursor), p, vec2(w, lineStyle), c)); 
 			lineCursor = p_; 
 		} 
 		void lineTo(in vec2 p, bool isLine)
@@ -2258,7 +2308,7 @@ class Drawing
 		{
 			markDirty; 
 			auto c = realDrawColor, w = inputTransformSize(lineWidth); 
-			myAppend(DrawingObj(69, inputTransform(A), inputTransform(B), inputTransform(C), c,vec2(w, lineStyle))); 
+			oldAppend(DrawingObj(oldCmd(6), inputTransform(A), inputTransform(B), inputTransform(C), c,vec2(w, lineStyle))); 
 		} 
 		
 		protected static auto genRgbGraph(string fv)()
@@ -2335,7 +2385,7 @@ class Drawing
 		void fillRect(float x0, float y0, float x1, float y1)
 		{
 			auto c = realDrawColor; 
-			myAppend(DrawingObj(67, inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c)); 
+			oldAppend(DrawingObj(oldCmd(4), inputTransform(vec2(x0, y0)), inputTransform(vec2(x1,y1)), vec2(0, 0), c)); 
 		} 
 		void fillRect(in vec2 a, in vec2 b)
 		{ fillRect(a.x, a.y, b.x, b.y); } void fillRect(in bounds2 b)
@@ -2380,7 +2430,7 @@ class Drawing
 			
 			auto b2 = rectAlign.apply(bnd, bounds2(0, 0, info.width*drawScale, info.height*drawScale)); 
 			
-			myAppend(DrawingObj(256+idx, inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw)); 
+			oldAppend(DrawingObj(oldCmd(7, idx), inputTransform(b2.low), inputTransform(b2.high), tx0, c, tx1, c2.raw)); 
 		} 
 		
 		void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args)
@@ -2494,9 +2544,9 @@ class Drawing
 			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
 				tx1 = vec2(1, 1); 
 			
-			myAppend(
+			oldAppend(
 				DrawingObj(
-					256+stIdx, inputTransform(bnd.low), inputTransform(bnd.high), 
+					oldCmd(7, stIdx), inputTransform(bnd.low), inputTransform(bnd.high), 
 					tx0, 0xFF000000/+color+/, tx1, 0xFF000000/+bkColor+/
 				)
 			); 
@@ -2520,15 +2570,15 @@ class Drawing
 			
 			//auto b2 = al.apply(b, bounds2(0, 0, info.width, info.height));
 			
-			myAppend(DrawingObj(256+idx, inputTransform(b.low), inputTransform(b.high), tx0, c, tx1, c2.raw)); 
+			oldAppend(DrawingObj(oldCmd(7, idx), inputTransform(b.low), inputTransform(b.high), tx0, c, tx1, c2.raw)); 
 		} 
 		
 		void fillTriangle(float x0, float y0, float x1, float y1, float x2, float y2)
 		{
 			auto c = realDrawColor; 
-			myAppend(
+			oldAppend(
 				DrawingObj(
-					68, 
+					oldCmd(5), 
 					inputTransform(vec2(x0, y0)), 
 					inputTransform(vec2(x1,y1)), 
 					inputTransform(vec2(x2,y2)), 
@@ -2586,16 +2636,16 @@ class Drawing
 			lineWidth = width; 
 			lineStyle = style; 
 			
-			auto vis	= view.visibleArea; 
-			vis.low	= (vis.low /dist-vec2(1,1)).floor*dist; 
-			vis.high	= (vis.high/dist+vec2(1,1)).ceil *dist; 
-			auto cnt	= vis.size/dist,
-					 siz	= view.clientSize/cnt; 
+			auto vis = view.visibleArea; 
+			vis.low = (vis.low/dist-1).floor*dist; 
+			vis.high = (vis.high/dist+1).ceil*dist; 
+			const 	cnt 	= vis.size/dist,
+				siz	= view.clientSize/cnt; 
 			
-			foreach(c; 0..2) {
+			foreach(c; 0..2)
+			{
 				if(c==0 && horz || c==1 && vert)
 				{
-					
 					alpha = remap_clamp(siz[c], 4, 16, 0, 0.20); 
 					if(!alpha) continue; 
 					
@@ -2606,8 +2656,6 @@ class Drawing
 					}
 				}
 			}
-			
-			alpha = 1; //Todo: nem tul jo
 		} 
 		
 		void mmGrid(View2D view)
@@ -2874,14 +2922,14 @@ class Drawing
 		
 			//Draw the objects on GPU  /////////////////////////////
 		
-			void glDraw(View2D view, in vec2 translate = vec2(0))
+			void glDraw(View2D view, in View2D.V translate=0)
 		{
 			glDraw(view.getOrigin(true), view.getScale(true), translate); 
 			
-			view.workArea_accum |= this.bounds; 
+			view.workArea_accum |= View2D.B(this.bounds); 
 		} 
 		
-			void glDraw(in vec2 center, float scale, in vec2 translate=vec2(0))
+			void glDraw(in View2D.V center, float scale, in View2D.V translate=0)
 		{
 			
 			//static if(1){ const T0 = QPS; scope(exit) print("DR", (QPS-T0)*1000); }
@@ -2912,11 +2960,22 @@ class Drawing
 			
 			auto vpSize = gl.getViewport.size;  //Todo: ezek a vbo hivas elott mehetnek kifele
 			
-			auto uScale = vec2(scale, scale),
-							 uShift = -center; 
+			auto 	uScale = vec2(scale),
+				uShift = -center; 
 			
 			shader.uniform("uScale", uScale); 
-			shader.uniform("uShift", uShift+translate); 
+			
+			vec2 extractTileIndex(T)(T vIn)
+			{
+				static if(is(T==dvec2))
+				{
+					NOTIMPL("Double world transformation"); 
+					//Todo: FP64WORLD
+				}
+				return vec2(vIn); 
+			} 
+			
+			shader.uniform("uShift", extractTileIndex(uShift+translate)); 
 			shader.uniform("uViewPortSize", vec2(vpSize)); 
 			
 			//map all megaTextures
@@ -2951,11 +3010,15 @@ class Drawing
 			//Todo: A binaris konstansokat is szemleltethetne az ide!
 			//Todo: az IDE automatikusan irhatna a bezaro } jelek utan, hogy mit zar az be. Csak annak a scopenak, amiben a cursor van.
 		
+		
+		void strip(R)(dvec2 p0)
+		{} 
 	}
 	
 	static immutable shaderCode =
 		format!q{
-		#version 150
+		#version 330
+		// 231013: 150 -> 330
 		
 		#define MegaTexMaxCnt	%s
 		#define SubTexCellBits	%s
@@ -2978,9 +3041,19 @@ class Drawing
 		#define sqr(a)  ((a)*(a))
 		#define PI 3.14159265359
 		
+		vec4 uint_to_vec4(uint a)
+		{
+			return vec4(
+				(a>> 0&0xFF)/255.0,
+				(a>> 8&0xFF)/255.0,
+				(a>>16&0xFF)/255.0,
+				(a>>24&0xFF)/255.0
+			); 
+		} 
+		
 		@vertex: //////////////////////////////////////////////////////////////////////////
-		in float aType; in vec2 aA, aB, aC, aD; in  vec4 aColor, aColor2; in vec2 aClipMin, aClipMax; 
-		out float Type; out vec2 A, B, C, D; out vec4 Color, Color2; out vec2 ClipMin , ClipMax; 
+		in uint aType; in vec2 aA, aB, aC, aD; in  uint aColor, aColor2, aDummy; in vec2 aClipMin, aClipMax; 
+		out uint Type; out vec2 A, B, C, D; out uint Color, Color2, Dummy; out vec2 ClipMin , ClipMax; 
 		void main()
 		{
 			A=aA; B=aB; C=aC; Color=aColor; Type=aType; 
@@ -2988,6 +3061,7 @@ class Drawing
 			//glyph only
 			D=aD; 
 			Color2=aColor2; 
+			Dummy = aDummy; 
 			
 			//all
 			ClipMin = aClipMin; 
@@ -3016,7 +3090,7 @@ class Drawing
 		
 		//inputs ---------------------------------------------------------------------
 		
-		in float Type[]; in vec2 A[], B[], C[], D[]; in vec4 Color[], Color2[]; in vec2 ClipMin[], ClipMax[]; 
+		in uint Type[]; in vec2 A[], B[], C[], D[]; in uint Color[], Color2[], Dummy[]; in vec2 ClipMin[], ClipMax[]; 
 		
 		//outputs ---------------------------------------------------------------------
 		   //4 gl_Position
@@ -3081,7 +3155,7 @@ class Drawing
 			return info; 
 		} 
 		
-		SubTexInfo fetchSubTexInfo(int subTexIdx)
+		SubTexInfo fetchSubTexInfo(uint subTexIdx)
 		{
 			int infoTexWidth = int(textureSize(smpInfo, 0).x); 
 			ivec2 infoTexCoord = ivec2((subTexIdx<<1)%infoTexWidth, (subTexIdx<<1)/infoTexWidth); 
@@ -3261,7 +3335,7 @@ class Drawing
 			EndPrimitive(); 
 			
 			//Draw optional ArrowHeads
-			if(arrowStyle!=0.0 || true)
+			if(arrowStyle!=0)
 			{
 				
 				fStipple.x = 0; //disable line stipple
@@ -3312,16 +3386,19 @@ class Drawing
 			EndPrimitive(); 
 		} 
 		
-		void main()
+		void oldMain()
 		{
-			fColor = Color[0]; 
+			//bit 0 must be 1!!!
+			uint type = Type[0]>>1&7; 
+			uint param = Type[0]>>4; 
+			
+			fColor = uint_to_vec4(Color[0]); 
 			fStipple = vec2(0, 0); 
 			boldTexelOffset = 0; 
 			fontFlags = 0; 
 			fClipMin = trans(ClipMin[0]) + uViewPortSize*0.5; 
 			fClipMax = trans(ClipMax[0]) + uViewPortSize*0.5; 
 			
-			int type = int(Type[0]); 
 			if(type==1)
 			{
 				//Point
@@ -3333,39 +3410,39 @@ class Drawing
 				emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices/2); 
 				emitEllipse(trans(B[0]), calcRadius(C[0].y), MaxCurveVertices/2); 
 			}
-			else if(type>=3 && type<=3+63)
+			else if(type==3/*type>=3 && type<=3+63*/)
 			{
 				//Line
-				emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, MaxCurveVertices, type-3); 
+				emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, MaxCurveVertices, param); 
 			}
-			else if(type==67)
+			else if(type==4/*67*/)
 			{
 				//Filled rect
 				emitRect(trans(A[0]), trans(B[0])); 
 			}
-			else if(type==68)
+			else if(type==5/*68*/)
 			{
 				//Triangle
 				emitTriangle(trans(A[0]), trans(B[0]), trans(C[0])); 
 			}
-			else if(type==69)
+			else if(type==6/*69*/)
 			{
 				//Bezier 2nd order
 				emitBezier2(trans(A[0]), trans(B[0]), trans(C[0]), D[0].x/*lineWidth*/, MaxCurveVertices); 
 			}
-			else if(type>=256 && type<256+0x10000)
+			else if(type==7/*type>=256 && type<256+0x10000*/)
 			{
 				//glyph rect geom shader////////////////////////////////
 				fontFlags = int(floor(C[0].x)); 
 				
-				fColor2 = Color2[0]; 
+				fColor2 = uint_to_vec4(Color2[0]); 
 				
-				SubTexInfo info = fetchSubTexInfo(type-256); 
+				SubTexInfo info = fetchSubTexInfo(param); 
 				emitSubTexInfo(info); 
 				
 				//texture coordinates (non-normalized)  //adjust to the textel centers
-				vec2 t0 = info.pos	             + vec2(.5); 
-				vec2 t1 = info.pos+info.size	             - vec2(.5); 
+				vec2 t0 = info.pos + vec2(.5); 
+				vec2 t1 = info.pos + info.size - vec2(.5); 
 				
 				//enlarge for boldness
 				bool isBold = (fontFlags & 16)==0 && (fontFlags & 1)!=0; 
@@ -3384,6 +3461,172 @@ class Drawing
 				texelPerPixel = (t1-t0)/(tB-tA); 
 				
 				emitGlyph(tA, tB, t0, t1); 
+			}
+		} 
+		
+		uint stream_getDw(uint i)
+		{
+			//in uint Type[]; in vec2 A[], B[], C[], D[]; in uint Color[], Color2[]; in vec2 ClipMin[], ClipMax[]; 
+			if(i<8)	{
+				if(i< 4)	{
+					if(i< 2)	{
+						return i==0 	? Type[0]
+							: floatBitsToUint(A[0].x); 
+					}
+					else	{
+						return i==2 	? floatBitsToUint(A[0].y)
+							: floatBitsToUint(B[0].x); 
+					}
+				}
+				else	{
+					if(i< 6)	{
+						return i==4 	? floatBitsToUint(B[0].y)
+							: floatBitsToUint(C[0].x); 
+					}
+					else	{
+						return i==6 	? floatBitsToUint(C[0].y)
+							: floatBitsToUint(D[0].x); 
+					}
+				}
+			}
+			else	{
+				if(i<12)	{
+					if(i<10)	{
+						return i==8 	? floatBitsToUint(D[0].y)
+							: Color[0]; 
+					}
+					else	{
+						return i==10 	? Color2[0]
+							: Dummy[0]; 
+					}
+				}
+				else	{
+					if(i<14)	{
+						return i==12 	? floatBitsToUint(ClipMin[0].x)
+							: floatBitsToUint(ClipMin[0].y); 
+					}
+					else	{
+						return i==14 	? floatBitsToUint(ClipMax[0].x)
+							: floatBitsToUint(ClipMax[0].y); 
+					}
+				}
+			}
+		} 
+		
+		uint streamDwIdx, streamActDw, streamActBits; 
+		bool streamOverflow; 
+		
+		void stream_init()
+		{
+			streamDwIdx = 0; 
+			streamActBits = 0; 
+			streamOverflow = false; 
+		} 
+		
+		void stream_internalFetchDw()
+		{
+			streamOverflow  = streamDwIdx>=16; 
+			if(streamOverflow) return; 
+			streamActDw = stream_getDw(streamDwIdx); 
+			streamDwIdx ++; 
+		} 
+		
+		uint stream_fetchBits(uint bits)
+		{
+			if(bits==0) return 0; 
+			
+			if(streamActBits==0) stream_internalFetchDw(); 
+			if(streamOverflow) return 0; 
+			
+			if(bits<=streamActBits)
+			{
+				uint res = streamActDw & ((1<<bits)-1); 
+				streamActDw >>= bits; 
+				streamActBits -= bits; 
+				return res; 
+			}
+			
+			uint res = streamActDw; 
+			bits -= streamActBits; 
+			uint sh = streamActBits; 
+			streamActBits = 0; 
+			stream_internalFetchDw(); 
+			if(streamOverflow) return 0; 
+			
+			res |= (streamActDw & ((1<<bits)-1))<<sh; 
+			streamActDw >>= bits; 
+			streamActBits -= bits; 
+			
+			return res; 
+		} 
+		
+		uint stream_fetchUint()
+		{ return stream_fetchBits(32); } 
+		
+		float stream_fetchFloat()
+		{ return uintBitsToFloat(stream_fetchBits(32)); } 
+		
+		vec2 stream_fetchVec2()
+		{ return vec2(stream_fetchFloat(), stream_fetchFloat()); } 
+		
+		
+		void main()
+		{
+			#define T_oldCommand 1
+			//losing this bit to the old format
+			
+			/*
+				
+				# - bytestream size
+				
+				bit 0:	 oldCommand
+				bit 1:	 absolute position format: 
+						0: vec2	#8
+						1: uint_tileIndex + vec2 	#12
+				bit 2..3:	 relative position format:
+						0: vec2	#8
+						1: short2              	#4
+						2: -
+						3: -
+				bit 4..5:	 relative scale format:
+						0: 1x
+						1: 0.625x
+						2: 0.001x
+						3: float               	#4
+				bit 6:	 clipping:
+						0: disabled
+						1: bounds2
+				bit 5..7	 primary color format
+						0: black
+						1: white
+						2: R
+						3: G
+						4: B
+						5: Y
+						6: RGB
+						7: RGBA
+				
+				bit 6..7:	 primitive type
+						0: strip   width is the first relative coord
+			*/
+			
+			uint T = Type[0]; 
+			if(T&T_oldCommand)
+			{ oldMain(); }
+			else
+			{
+				fColor = vec4(1, 1, 1, 1); 
+				fColor2 = vec4(0, 0, 0, 1); 
+				
+				fStipple = vec2(0, 0); 
+				boldTexelOffset = 0; fontFlags = 0; 
+				fClipMin = vec2(-1e30); 
+				fClipMax = vec2(+1e30); 
+				
+				
+				fColor = vec4(1, 0, .5, .5);
+				fColor2 = fColor;
+				emitRect(trans(vec2(0, 0)), trans(vec2(20, 10))); 
 			}
 		} 
 		

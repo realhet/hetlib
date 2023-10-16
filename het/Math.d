@@ -1545,6 +1545,7 @@ version(/+$DIDE_REGION+/all)
 			VT low = 0, high = -1; //A bounds is invalid when high<low. And empty when high<=low. The extend operator '|' handles these cases accordingly.
 			
 			alias BoundsType = typeof(this); 
+			alias VectorType = VT; 
 			alias ComponentType = ScalarType!VT; 
 			enum VectorLength = CommonVectorLength!VT; 
 			enum BoundsTypeName = 	(ComponentTypePrefix!ComponentType.among("UNDEF", "u", "b"))
@@ -2848,6 +2849,12 @@ version(/+$DIDE_REGION+/all)
 			enum half = PI; mixin(_normalizeAngle); 
 			//Todo: unittest
 		} 
+		
+		auto angleAbsDiff_rad(A, B)(A a, B b)
+		{ return normalizeAngle_rad(b-a).abs; };
+		
+		auto angleAbsDiff_deg(A, B)(A a, B b)
+		{ return normalizeAngle_def(b-a).abs; };
 		
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 		private enum UnaryStdMathFunct(string name) = 

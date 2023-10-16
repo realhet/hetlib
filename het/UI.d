@@ -1,7 +1,7 @@
 module het.ui; /+DIDE+/
 version(/+$DIDE_REGION+/all)
 {
-	public import het.opengl;
+	public import het.opengl; 
 	import het.parser: SyntaxKind, SyntaxPreset, syntaxTable, defaultSyntaxPreset; 
 	
 	import std.bitmanip: bitfields; 
@@ -6134,7 +6134,7 @@ struct im
 			comboOpening = false; 
 			
 			//this is needed for PanelPosition
-			clientArea = targetSurfaces[1].view.screenBounds_anim; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
+			clientArea = targetSurfaces[1].view.screenBounds_anim.bounds2; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 			
 			static DeltaTimer dt; 
 			deltaTime = dt.update; 
@@ -6176,7 +6176,7 @@ struct im
 			if(!a.flags._measured)
 			a.measure; //some panels are already have been measured
 			
-			const screenBounds = targetSurfaces[1].view.screenBounds_anim; 
+			const screenBounds = targetSurfaces[1].view.screenBounds_anim.bounds2; 
 			
 			//Todo: remove this: applyScrollers(screenBounds);
 			
@@ -6194,7 +6194,7 @@ struct im
 			{
 				const surf = a.flags.targetSurface; //1: gui, 0:view
 				
-				const uiMousePos = targetSurfaces[surf].view.mousePos; 
+				const uiMousePos = targetSurfaces[surf].view.mousePos.vec2; 
 				if(a.internal_hitTest(uiMousePos))
 				{
 					mouseOverUI[surf] = true; 
@@ -6272,9 +6272,9 @@ struct im
 			{
 				ref view()
 				{ return targetSurfaces[i].view; } 
-					d.zoomFactor	= view.scale; 
-					d.invZoomFactor	= view.invScale; 
-					d.pushClipBounds(view.screenBounds_anim.inflated(-view.screenBounds_anim.size*0)); 
+				d.zoomFactor	= view.scale; 
+				d.invZoomFactor	= view.invScale; 
+				d.pushClipBounds(view.screenBounds_anim.bounds2.inflated(-view.screenBounds_anim.bounds2.size*0)); 
 			}
 			
 			foreach(i; 0..2)
@@ -7097,8 +7097,8 @@ struct im
 					HitInfo hit; 
 					auto actView = targetSurfaces[1].view; //Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, just like the upcoming enabled flag.
 					auto sl = new SliderClass(
-						combine(info.container.id, orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos, tsNormal, hit,
-											orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1, normThumbSize
+						combine(info.container.id, orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos.vec2, tsNormal, hit,
+						orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1, normThumbSize
 					); 
 					
 					info.slider = sl; 
@@ -7642,7 +7642,8 @@ struct im
 		
 		auto Edit(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
 		{
-			 //Edit /////////////////////////////////
+			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text.");
+			
 			static if(is(T0==Path))
 			return EditPath!(srcModule, srcLine)(value, args); //Todo: not good! There will be 2 returns!!!
 			static if(is(T0==File))
@@ -9445,7 +9446,7 @@ struct im
 			bool userModified; 
 			HitInfo hit; 
 			auto sl = new SliderClass(
-				id_, enabled, normValue, _range, userModified, actView.mousePos, 
+				id_, enabled, normValue, _range, userModified, actView.mousePos.vec2, 
 				style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
 				getStaticParamDef(SliderStyle.slider, args), theme=="tool" ? 1 : 1.4f
 			); 

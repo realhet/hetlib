@@ -1743,7 +1743,7 @@ version(/+$DIDE_REGION+/all)
 		{ mouseLock(pos.ifloor); } 
 		
 		void mouseLock()
-		{ mouseLock(winMousePos); } 
+		{ mouseLock(desktopMousePos); } 
 		
 		void mouseUnlock()
 		{ ClipCursor(null); } 
@@ -1754,8 +1754,8 @@ version(/+$DIDE_REGION+/all)
 			
 			if(slowMouseEnabled==enabled) return; 
 			slowMouseEnabled = enabled; 
-			slowMousePos = winMousePos + vec2(0.5, 0.5); 
-			if(enabled) mouseLock(winMousePos); 
+			slowMousePos = desktopMousePos + vec2(0.5, 0.5); 
+			if(enabled) mouseLock(desktopMousePos); 
 			else mouseUnlock; 
 		} 
 		
@@ -1798,11 +1798,11 @@ version(/+$DIDE_REGION+/all)
 					mouseLock(slowMousePos); 
 				}
 				else
-				{ slowMousePos = winMousePos + vec2(.5, .5); }
+				{ slowMousePos = desktopMousePos + vec2(.5, .5); }
 			} 
 			
 			//winapi mouse get/set
-			public auto winMousePos()
+			public auto desktopMousePos()
 			{
 				POINT p; GetCursorPos(&p); 
 				return ivec2(p.x, p.y); 

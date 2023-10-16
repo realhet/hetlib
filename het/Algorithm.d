@@ -646,84 +646,75 @@ version(/+$DIDE_REGION+/all)
 			to only scan a small subset of the possible colliding objects
 			See Also:
 			/+Link: http://gamedevelopment.tutsplus.com/tutorials/quick-tip-use-quadtrees-to-detect-likely-collisions-in-2d-space--gamedev-374+/
+			
+			Modifications:
+			- It uses het.Bounds omstead of itself. (Was a clever idea but it's wasting resouces.)
+			- Added visit() with optional culling.
 		+/
-		struct QuadTree(T, uint MAX_OBJECTS = 10, uint MAX_LEVELS = 5)
-		if (hasMember!(T, "x") && hasMember!(T, "y") && hasMember!(T, "width") && hasMember!(T, "height"))
+		struct QuadTree(B, T, string boundsProp="bounds", uint MAX_OBJECTS = 10, uint MAX_LEVELS = 5)
+		if (hasMember!(T, boundsProp))
 		{
-			int level; 
-			T bounds; 
+			B bounds; 
 			T[] objects; 
-			QuadTree[] nodes;  //opt -> should be Quadtree[4]*  or manually allocated form a Quadtree[4][]
+			QuadTree[] nodes; 
+			//opt:maybe a ptr to a static array is better
 			
-			this(int p_level, T p_bounds)
+			int level; 
+			
+			this(int level, B bounds)
 			{
-				level = p_level; 
-				bounds = p_bounds; 
-				
-				if(p_level == 0)
-				{ split(); }
+				this.level = level; 
+				this.bounds = bounds; 
 			} 
-			
 			
 			/*Clears the quadtree*/
 			void clear()
 			{
+				foreach(ref node; nodes) node.clear; 
+				nodes = [];
 				objects = []; 
-				
-				foreach(ref node; nodes)
-				{ node.clear(); }
 			} 
-			
 			
 			/*Splits the node into 4 subnodes*/
 			void split()
 			{
-				immutable sub_width = bounds.width / 2; 
-				immutable sub_height = bounds.height / 2; 
-				immutable x = bounds.x; 
-				immutable y = bounds.y; 
-				nodes ~= QuadTree(level+1, T(x + sub_width, y, sub_width, sub_height)); 
-				nodes ~= QuadTree(level+1, T(x, y, sub_width, sub_height)); 
-				nodes ~= QuadTree(level+1, T(x, y + sub_height, sub_width, sub_height)); 
-				nodes ~= QuadTree(level+1, T(x + sub_width, y + sub_height, sub_width, sub_height)); 
+				with(bounds)
+				with(bounds.center)
+				nodes = 
+				[
+					QuadTree(level+1, B(x0, y0, x , y )),
+					QuadTree(level+1, B(x , y0, x1, y )),
+					QuadTree(level+1, B(x0, y , x , y1)),
+					QuadTree(level+1, B(x , y , x1, y1))
+				]; 
 			} 
-			
 			
 			/*
 				Determine which node the object belongs to. -1 means
 				object cannot completely fit within a child node and is part
 				of the parent node
 			*/
-			int getIndex(in T p_rect)
+			int getIndex(in B p_rect)
 			{
 				int index = -1; 
-				immutable vertical_midpoint = bounds.x + (bounds.width / 2); 
-				immutable horizontal_midpoint = bounds.y + (bounds.height / 2); 
+				const center = bounds.center; 
 				
 				// Object can completely fit within the top quadrants
-				immutable top_quadrant = (
-					p_rect.y < horizontal_midpoint && 
-					p_rect.y + p_rect.height < horizontal_midpoint
-				); 
+				const top_quadrant = p_rect.y1 <= center.y; 
 				// Object can completely fit within the bottom quadrants
-				immutable bottom_quadrant = (p_rect.y > horizontal_midpoint); 
+				const bottom_quadrant = p_rect.y0 >= center.y; 
 				
-				// Object can completely fit within the left quadrants
-				if(
-					p_rect.x < vertical_midpoint && 
-					p_rect.x + p_rect.width < vertical_midpoint
-				)
+				if(p_rect.x1 <= center.x)
 				{
-					if(top_quadrant)
-					{ index = 1; }
-					else if(bottom_quadrant) { index = 2; }
+					// Object can completely fit within the left quadrants
+					if(top_quadrant)	index = 0; 
+					else if(bottom_quadrant)	index = 2; 
 				}
-				else if(p_rect.x > vertical_midpoint)
+				else if(p_rect.x0 >= center.x)
 				{
 					// Object can completely fit within the right quadrants
-					if(top_quadrant)
-					{ index = 0; }
-					else if(bottom_quadrant) { index = 3; }
+					if(top_quadrant)	index = 1; 
+					else if(bottom_quadrant)	index = 3; 
 				}
 				
 				return index; 
@@ -734,100 +725,69 @@ version(/+$DIDE_REGION+/all)
 				exceeds the capacity, it will split and add all
 				objects to their corresponding nodes.
 			*/
-			void insert(T p_rect)
+			void insert(T obj)
 			{
-				if(nodes.length != 0)
+				const B objBounds = mixin("obj.", boundsProp); 
+				
+				if(nodes.length)
 				{
-					immutable index = getIndex(p_rect); 
+					const qIdx = getIndex(objBounds); 
 					
-					if(index != -1)
+					if(qIdx>=0)
 					{
-						nodes[index].insert(p_rect); 
+						nodes[qIdx].insert(obj); 
 						return; 
 					}
 				}
 				
-				objects ~= p_rect; 
+				objects ~= obj; 
 				
 				if(objects.length > MAX_OBJECTS && level < MAX_LEVELS)
 				{
-					if(nodes.length == 0)
-					{ split; }
+					if(nodes.empty) split; 
 					
 					int i = 0; 
-					while(i < this.objects.length)
+					while(i < objects.length)
 					{
-						immutable index = getIndex(objects[i]); 
-						
-						if(index != -1)
-						{
-							nodes[index].insert(objects[i]); 
+						const qIdx = getIndex(mixin("objects[i].", boundsProp)); 
+						if(qIdx>=0)	{
+							nodes[qIdx].insert(objects[i]); 
 							objects = objects.remove(i); 
-						}else
-						{ i++; }
+						}
+						else	{ i++; }
 					}
 				}
 			} 
 			
-			
-			/*Return all objects that could collide with the given object*/
-			T[] retrieve(in T p_rect)
+			void visit(void delegate(ref T) fun)
 			{
-				//bugs: This is bogus!
-				immutable index = getIndex(p_rect); 
-				T[] return_objects; 
-				
-				if(index != -1 && nodes.length != 0)
-				{ return_objects ~= nodes[index].retrieve(p_rect); }
-				
-				return_objects ~= objects; 
-				
-				return return_objects; 
+				foreach(ref o; objects) fun(o);
+				foreach(ref n; nodes) n.visit(fun); 
 			} 
 			
-			void visit(in T p_rect, bool delegate(ref T) fun)
+			void visit(in B p_rect, void delegate(ref T) fun)
 			{
-				if(
-					bounds.x+bounds.width<p_rect.x || bounds.x>p_rect.x+p_rect.width ||
-									bounds.y+bounds.height<p_rect.y || bounds.y>p_rect.y+p_rect.height
-				) return; 
+				if(!p_rect.overlaps(bounds)) return; 
 				
-				foreach(ref o; objects) if(!fun(o)) return; 
-				
-				//Opt: if all inside, no more boundary checks needed.
-				
-				foreach(ref n; nodes) n.visit(p_rect, fun); 
+				if(p_rect.contains!"[)"(bounds))
+				{
+					//the whole treeNode is inside the rect.
+					visit(fun); 
+				}
+				else
+				{
+					foreach(ref o; objects)
+					{
+						const ob = mixin("o.", boundsProp); 
+						if(p_rect.overlaps(ob))
+						fun(o);
+					}
+					
+					foreach(ref n; nodes) n.visit(p_rect, fun); 
+				}
 			} 
 			
-			static _unittest()
-			{
-				/+
-					struct Rect { int x, y, width, height; } 
-									
-									auto a = QuadTree!Rect(0, Rect(0, 0, 100, 100)); 
-									// Did the tree correctly initialize?
-									assert(a.nodes.length == 4); 
-									
-									auto rects = [Rect(10, 10, 10, 10)].replicate(11); 
-									auto rects2 = [Rect(80, 80, 10, 10)].replicate(11); 
-									
-									foreach(rect; rects) { a.insert(rect); }
-									foreach(rect; rects2) { a.insert(rect); }
-									
-									// Did the child node create four new nodes?
-									assert(a.objects.length == 0); 
-									assert(a.nodes[1].nodes.length == 4); 
-									
-									// Does the retrieve method correctly only return those
-									// Rect's in the second node?
-									assert(a.retrieve(Rect(5, 5, 5, 5)) == rects); 
-									
-									a.clear(); 
-									// Were all of the objects actually cleared from the tree?
-									assert(a.objects.length == 0); 
-									assert(a.nodes[1].objects.length == 0); 
-				+/
-			} 
+			
 		} 
 	}
 	
@@ -1056,26 +1016,12 @@ version(/+$DIDE_REGION Geometry+/all)
 	
 	//Todo: these should be done with CTCG
 	//Todo: put these into het.math
-	bounds2 inflated(in bounds2 b, in vec2 v)
-	{ return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //Todo: support this for all bounds
-	bounds2 inflated(in bounds2 b, in float x, in float y)
-	{ return b.inflated(vec2(x, y)); } 
-	bounds2 inflated(in bounds2 b, float f)
-	{ return b.inflated(f, f); } //Todo: support this for all bounds
-	
-	bounds2 inflated(in ibounds2 b, in vec2 v)
-	{ return b.valid ? bounds2(b.low-v, b.high+v) : bounds2.init; } //Todo: support this for all bounds
-	bounds2 inflated(in ibounds2 b, in float x, in float y)
-	{ return b.inflated(vec2(x, y)); } 
-	bounds2 inflated(in ibounds2 b, float f)
-	{ return b.inflated(f, f); } //Todo: support this for all bounds
-	
-	ibounds2 inflated(in ibounds2 b, in ivec2 v)
-	{ return b.valid ? ibounds2(b.low-v, b.high+v) : ibounds2.init; } //Todo: support this for all bounds
-	ibounds2 inflated(in ibounds2 b, int x, int y)
-	{ return b.inflated(ivec2(x, y)); } //Todo: support this for all bounds
-	ibounds2 inflated(in ibounds2 b, int a)
-	{ return b.inflated(a, a); } //Todo: support this for all bounds
+	auto inflated(B, V)(in B b, in V v)
+	{ return b.valid ? B(b.low-v, b.high+v) : b; } //Todo: support this for all bounds
+	auto inflated(B, F)(in B b, in F x, in F y)
+	{ return b.inflated(B.VectorType(x, y)); } 
+	auto inflated(B, F)(in B b, in F x, in F y, in F z)
+	{ return b.inflated(B.VectorType(x, y, z)); } 
 	
 	auto fittingSquare(in bounds2 b)
 	{
@@ -1661,9 +1607,8 @@ version(/+$DIDE_REGION Geometry+/all)
 	
 	
 	
-	alias FTurtle = Turtle_!float, 
-	DTurtle = Turtle_!double, 
-	Turtle = DTurtle; 
+	alias TurtleF = Turtle_!float, 
+	TurtleD = Turtle_!double; 
 	
 	struct Turtle_(T)
 	{
