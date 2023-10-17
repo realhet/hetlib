@@ -2016,6 +2016,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			alias value this; 
 		} 
 		
+		alias 名 = genericArg; //Todo: This way it can be compressed. Only 3 chars instead of 10.
+		
 		enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T); 
 		
 		/// pass a generic arg to a function
@@ -5923,6 +5925,7 @@ version(/+$DIDE_REGION Containers+/all)
 			string[string] options; //all name/value pairs
 			
 			auto files() const { return names.map!File; } 
+			auto paths() const { return names.map!Path; } 
 			
 			this(string line)
 			{
@@ -10854,14 +10857,14 @@ version(/+$DIDE_REGION Date Time+/all)
 					}
 					return ""; 
 				} 
-							
+				
 				size_t driveIs(in string[] drives...)const
 				{
 					string e0 = drive.lc.withoutEnding(':'); 
 					foreach(i, s; drives) if(s.lc.withoutEnding(':')==e0) return i+1; 
 					return 0; 
 				} 
-							
+				
 				Path parent() const
 				{ string s = dir; while(s!="" && s.back!='\\') s.length--; return Path(s); } 
 				
@@ -10886,7 +10889,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					}
 					return !exists; 
 				} 
-							
+				
 				bool wipe(bool mustSucceed=true)const
 				{
 					if(dir.length==2 && dir.endsWith("\\"))
@@ -10894,7 +10897,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					
 					return remove!rmdirRecurse(mustSucceed); 
 				} 
-							
+				
 				private static void preparePattern(ref string pattern)
 				{
 					//convert multiple filters to globMatch's format
@@ -10904,7 +10907,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					if(pattern.canFind(',') && !pattern.startsWith('{'))
 					pattern = '{'~pattern~'}'; 
 				} 
-							
+				
 				File[] files(string pattern="*", bool recursive=false) const
 				{
 					preparePattern(pattern); 
@@ -10912,7 +10915,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						.filter!isFile
 						.map!(e => File(e.name)).array; 
 				} 
-							
+				
 				Path[] paths(string pattern="*", bool recursive=false) const
 				{
 					preparePattern(pattern); 
@@ -10920,10 +10923,10 @@ version(/+$DIDE_REGION Date Time+/all)
 						.filter!(e => !e.isFile)
 						.map!(e => Path(e.name)).array; 
 				} 
-							
+				
 				Path opBinary(string op:"~")(string p2)
 				{ return Path(this, p2); } 
-							
+				
 				/+Note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
 				int opCmp(in Path b)const
 				{ return cmp(fullPath, b.fullPath); } 

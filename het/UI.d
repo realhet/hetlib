@@ -6529,13 +6529,18 @@ struct im
 		{ hintState = HintState.idle; } 
 		
 			private enum hintHandler = q{
-			static foreach(a; args) static if(is(Unqual!(typeof(a)) == HintRec)){
-				if(a.markup.length && hit.hover){
+			{
+			static foreach(a; args) 
+			static if(is(Unqual!(typeof(a)) == HintRec))
+			{
+				if(a.markup.length && hit.hover)
+				{
 					auto hr = a;
 					hr.owner = actContainer;
 					hr.bounds = hit.hitBounds;
 					addHint(hr);
 				}
+			}
 			}
 		}; 
 		
@@ -6622,8 +6627,8 @@ struct im
 				hintContainer.measure; 
 				
 				//align the hint
-				hintContainer.outerPos = lastHint.bounds.bottomCenter //Bounds.bottomCenter
-															 + vec2(-hintContainer.outerWidth*.5, 5); 
+				hintContainer.outerPos 	= lastHint.bounds.bottomCenter //Bounds.bottomCenter
+					+ vec2(-hintContainer.outerWidth*.5, 5); 
 				
 				//clamp horizontaly
 				hintContainer.outerPos.x = clamp(hintContainer.outerPos.x, 0, max(0, screenBounds.width-hintContainer.outerWidth)); 
@@ -7581,6 +7586,7 @@ struct im
 			if(!enabled)
 			{
 				style.fontColor	= clWinBtnDisabledText; 
+				style.bkColor 	= mix(style.bkColor, clWinBackground, .66f); 
 				border.color	= style.bkColor; 
 			}else if(captured)
 			{
@@ -7642,7 +7648,7 @@ struct im
 		
 		auto Edit(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
 		{
-			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text.");
+			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
 			
 			static if(is(T0==Path))
 			return EditPath!(srcModule, srcLine)(value, args); //Todo: not good! There will be 2 returns!!!
