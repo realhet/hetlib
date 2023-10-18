@@ -657,7 +657,7 @@ version(/+$DIDE_REGION+/all)
 			B bounds; 
 			T[] objects; 
 			QuadTree[] nodes; 
-			//opt:maybe a ptr to a static array is better
+			//Opt: maybe a ptr to a static array is better
 			
 			int level; 
 			
@@ -671,7 +671,7 @@ version(/+$DIDE_REGION+/all)
 			void clear()
 			{
 				foreach(ref node; nodes) node.clear; 
-				nodes = [];
+				nodes = []; 
 				objects = []; 
 			} 
 			
@@ -761,7 +761,7 @@ version(/+$DIDE_REGION+/all)
 			
 			void visit(void delegate(ref T) fun)
 			{
-				foreach(ref o; objects) fun(o);
+				foreach(ref o; objects) fun(o); 
 				foreach(ref n; nodes) n.visit(fun); 
 			} 
 			
@@ -780,13 +780,26 @@ version(/+$DIDE_REGION+/all)
 					{
 						const ob = mixin("o.", boundsProp); 
 						if(p_rect.overlaps(ob))
-						fun(o);
+						fun(o); 
 					}
 					
 					foreach(ref n; nodes) n.visit(p_rect, fun); 
 				}
 			} 
 			
+			bool empty() const 
+			{ return objects.empty && nodes.empty && nodes.map!(n=>n.empty).all/+recursive+/; } 
+			
+			void remove(bool delegate(in T) pred)
+			{
+				foreach(ref n; nodes) n.remove(pred)/+recursive+/; 
+				const wasEmpty = objects.empty; 
+				
+				//todo: If I use an alias for pred, remove!pred fails with a Dual Context not supported error.
+				objects = objects.remove!(a=>pred(a)); 
+				
+				if(objects.empty && !wasEmpty && empty/+recursive+/) clear/+also recursive+/; 
+			} 
 			
 		} 
 	}

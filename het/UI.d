@@ -6530,17 +6530,17 @@ struct im
 		
 			private enum hintHandler = q{
 			{
-			static foreach(a; args) 
-			static if(is(Unqual!(typeof(a)) == HintRec))
-			{
-				if(a.markup.length && hit.hover)
+				static foreach(a; args) 
+				static if(is(Unqual!(typeof(a)) == HintRec))
 				{
-					auto hr = a;
-					hr.owner = actContainer;
-					hr.bounds = hit.hitBounds;
-					addHint(hr);
+					if(a.markup.length && hit.hover)
+					{
+						auto hr = a;
+						hr.owner = actContainer;
+						hr.bounds = hit.hitBounds;
+						addHint(hr);
+					}
 				}
-			}
 			}
 		}; 
 		

@@ -2988,6 +2988,13 @@ version(/+$DIDE_REGION Numeric+/all)
 			if(idx<0) { arr ~= item; return true; }else { arr = arr.remove(idx); return false; }
 		} 
 		
+		bool removeIfCan(T)(ref T[] arr, in T item)
+		{
+			const idx = arr.countUntil(item); 
+			if(idx>=0){ arr = arr.remove(idx); return true; }
+			return false;
+		} 
+		
 		deprecated("fetchFirst, not popFirst!")
 		{
 			//Todo: This is dumb... There is also popFront...
