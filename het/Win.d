@@ -585,6 +585,7 @@ class Window
 	bool 	isMain, //this is the main windows
 		pendingInvalidate, //invalidate() was called. Timer checks it and clears it.
 		canSleep /+In the last update, there was no invalidate() calls, so it can sleep in the main loop.+/; 
+	
 	enum WM_MyStartup = WM_USER+0; 
 	
 	string getClassName()
@@ -801,6 +802,8 @@ class Window
 	
 	protected wchar lastSurrogateHi; 
 	
+	ivec2 minWindowSize; 
+	
 	protected LRESULT WndProc(UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		auto _ = PROBE("WndProc"); 
@@ -898,6 +901,17 @@ class Window
 			}
 			//WM_TIMECHANGE: LOG("WM_TIMECHANGE"); return 0;
 			//case WM_SETTINGCHANGE: LOG("WM_SETTINGSCHANGE"); return 0;
+			
+			case WM_GETMINMAXINFO: {
+				if(!minWindowSize) break; 
+				with(cast(LPMINMAXINFO)lParam)
+				{
+					ptMinTrackSize.x = minWindowSize.x; 
+					ptMinTrackSize.y = minWindowSize.y; 
+				}
+				return 0; 
+			}
+			
 			default: 	if(message.inRange(WM_USER, 0x7FFF))
 			return onWmUser(message-WM_USER, wParam, lParam); 
 		}
@@ -1132,8 +1146,8 @@ class Window
 	ActionManager actions; //every form has this
 	
 	float targetUpdateRate=70; //must be slightly higher than target display freq.
-														 //Or much higher if it is a physical simulation.
-														 //Todo: ezt is meg kell csinalni jobban.
+	//Or much higher if it is a physical simulation.
+	//Todo: ezt is meg kell csinalni jobban.
 	
 	private Time time0=0*second, timeAct=0*second, timeLast=0*second; //internal vars for timing
 	private int FPSCnt, UPSCnt; //internal counters for statistics
@@ -1154,38 +1168,38 @@ class Window
 		
 		//const A = QPS;
 		//scope(exit) print((QPS-A)*1000);
-				//this calls the update on every window. But right now it is only for one window.
+		//this calls the update on every window. But right now it is only for one window.
 		
-				//timing
-				auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS); 
+		//timing
+		auto t0 = QPS; scope(exit) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS); 
 		
-				//flush the keyboard input queue (WM_CHAR event)
-				scope(exit) inputChars = ""; 
+		//flush the keyboard input queue (WM_CHAR event)
+		scope(exit) inputChars = ""; 
 		
-				//make openGL accessible
-				onWglMakeCurrent(true); 
+		//make openGL accessible
+		onWglMakeCurrent(true); 
 		
-				//prepare/finalize the old, immediate mode keyboard 'actions' interface (inputs.d)
-				actions.beginUpdate; 
+		//prepare/finalize the old, immediate mode keyboard 'actions' interface (inputs.d)
+		actions.beginUpdate; 
 		
-				//update the local mouse struct
-				onMouseUpdate; 
+		//update the local mouse struct
+		onMouseUpdate; 
 		
-				//update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
-				onUpdateViewAnimation; 
+		//update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
+		onUpdateViewAnimation; 
 		
-				//UI integration: prepare and finalize the IMGUI for every frame
-				onUpdateUIBeginFrame; 
+		//UI integration: prepare and finalize the IMGUI for every frame
+		onUpdateUIBeginFrame; 
 		
 		
-				//call the user overridden update method for the window
-				try { onUpdate; }catch(Throwable t) { showException(t); }
+		//call the user overridden update method for the window
+		try { onUpdate; }catch(Throwable t) { showException(t); }
 		
-				onUpdateUIEndFrame; 
+		onUpdateUIEndFrame; 
 		
-				{ if(actions.changed) invalidate;  actions.endUpdate; }
+		{ if(actions.changed) invalidate;  actions.endUpdate; }
 		
-				onWglMakeCurrent(false); 
+		onWglMakeCurrent(false); 
 	} 
 	
 	MouseCursor mouseCursor; 

@@ -2019,6 +2019,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		alias 名 = genericArg; //Todo: This way it can be compressed. Only 3 chars instead of 10.
 		
 		enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T); 
+		enum isGenericArg(A, string name) = is(A==GenericArg!(N, T), string N, T) && N==name; 
 		
 		/// pass a generic arg to a function
 		auto genericArg(string N="", T)(in T p)
@@ -2991,8 +2992,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		bool removeIfCan(T)(ref T[] arr, in T item)
 		{
 			const idx = arr.countUntil(item); 
-			if(idx>=0){ arr = arr.remove(idx); return true; }
-			return false;
+			if(idx>=0) { arr = arr.remove(idx); return true; }
+			return false; 
 		} 
 		
 		deprecated("fetchFirst, not popFirst!")

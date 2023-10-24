@@ -6312,8 +6312,8 @@ struct im
 		
 			enum PanelPosition
 		{
-			 none, topLeft, topCenter, topRight,	leftCenter, center, rightCenter,	bottomLeft,	bottomCenter, bottomRight,
-																					 topClient,	leftClient, client, rightClient,	bottomClient	
+			none, topLeft, topCenter, topRight, leftCenter, center, rightCenter, bottomLeft, bottomCenter, bottomRight,
+			topClient, leftClient, client, rightClient, bottomClient	
 		} 
 		
 			private bool isAlignPosition (PanelPosition pp)
@@ -6958,7 +6958,7 @@ struct im
 			auto endlessRange (float min, float max, float step=1)
 		{ return range(min, max, step, RangeType.endless ); } 
 		
-			static auto hitTest(.Container container, bool enabled)
+			static auto hitTest(.Container container, bool enabled=true)
 		{
 			assert(container !is null); 
 			auto res = hitTestManager.check(container.id); 
@@ -6966,9 +6966,8 @@ struct im
 			return res; 
 		} 
 		
-			auto hitTest(bool enabled)
+			auto hitTest(bool enabled=true)
 		{ return hitTest(actContainer, enabled); } 
-		
 		
 			string symbol(string def)
 		{ return tag(`symbol `~def); } 
@@ -7152,22 +7151,30 @@ struct im
 			static foreach(a; args)
 			{
 				{
-					 alias t = typeof(cast()a); 
-							 static if(isFunctionPointer!a)
-					a(); 
-					else static if(isDelegate!a	) a(); 
-					else static if(isSomeString!t	) Text(a); 
-					else static if(is(t == YAlign)	) flags.yAlign = a; 
-					else static if(is(t == HAlign)	) flags.hAlign = a; 
-					else static if(is(t == VAlign)	) flags.vAlign = a; 
-					else static if(is(t == TextStyle)	) textStyle = a; 
-					else static if(is(t == RGB)	) style.bkColor = bkColor = a; 
-					else static if(is(t == Padding)	) padding = a; 
-					else static if(is(t == Border)	) border = a; 
-					else static if(is(t == Margin)	) margin = a; 
-					else static if(is(t == SyntaxKind)) { textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
-					else static if(is(t == GenericArg!(N, T), string N, T) && N=="id") {}
-					else static assert(false, "Unsupported type: "~t.stringof); 
+					alias T = typeof(cast()a); 
+					static if(isFunctionPointer!a)	a(); 
+					else static if(isDelegate!a)	a(); 
+					else static if(isSomeString!T)	Text(a); 
+					else static if(is(T == YAlign))	flags.yAlign = a; 
+					else static if(is(T == HAlign))	flags.hAlign = a; 
+					else static if(is(T == VAlign))	flags.vAlign = a; 
+					else static if(is(T == TextStyle))	textStyle = a; 
+					else static if(is(T == RGB))	style.bkColor = bkColor = a; 
+					else static if(is(T == Padding))	padding = a; 
+					else static if(is(T == Border))	border = a; 
+					else static if(is(T == Margin))	margin = a; 
+					else static if(is(T == SyntaxKind))	{ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
+					else static if(isGenericArg!(T, "id"))	{/+ Already processed by prepareId.srcId +/}
+					else static if(isGenericArg!(T, "theme"))	theme = a; 
+					else static if(isGenericArg!(T, "syntax"))	{ textStyle.applySyntax(a.to!SyntaxKind); bkColor = textStyle.bkColor; }
+					else static if(isGenericArg!(T, "fontColor"))	style.fontColor = a; 
+					else static if(isGenericArg!(T, "bold"))	style.bolt = a; 
+					else static if(isGenericArg!(T, "italic"))	style.italic = a; 
+					else static if(isGenericArg!(T, "bkColor"))	style.bkColor = bkColor = a; 
+					else static if(isGenericArg!(T, "padding"))	padding = a; 
+					else static if(isGenericArg!(T, "border"))	border = a; 
+					else static if(isGenericArg!(T, "margin"))	margin = a; 
+					else	static assert(false, "Unsupported type: "~T.stringof); 
 				}
 			}
 		} 
