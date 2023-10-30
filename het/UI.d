@@ -4544,7 +4544,7 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			//acquire mouse positions
-			auto mouseAct = view.mousePos; 
+			auto mouseAct = view.mousePos.vec2; 
 			auto mouseDelta = mouseAct-mouseLast; 
 			scope(exit) mouseLast = mouseAct; 
 			

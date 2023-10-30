@@ -403,9 +403,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					if(handle is null) { handle = GetConsoleWindow; }
 					return handle; 
 				} 
-							
+				
 				auto outputHandle() { return GetStdHandle(STD_OUTPUT_HANDLE); } 
-							
+				
 				private int _textAttr = 7; 
 				private void setTextAttr() { flush; SetConsoleTextAttribute(outputHandle, cast(ushort)_textAttr); } 
 				@property int	color()	 { return	_textAttr.getBits	(0, 4); } 
@@ -416,7 +416,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				@property void	reversevideo(bool b)	 { _textAttr =	_textAttr.setBits	(14, 1, b); setTextAttr(); } 
 				@property bool	underscore()	 { return	_textAttr.getBits	(15, 1)!=0; } 
 				@property void	underscore(bool b)	 { _textAttr =	_textAttr.setBits	(15, 1, b); setTextAttr(); } 
-							
+				
 				void indentAdjust(int param) {
 					switch(param) {
 						case 0: indent = 0; break; 
@@ -426,7 +426,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 					//stdWrite("[INDENT <- %d]".format(indent));
 				} 
-							
+				
 				struct Recorder
 				{
 					string recordedStr; 
@@ -447,24 +447,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					} 
 				} 
 				__gshared Recorder recorder; 
-							
+				
 				private bool triggerFocusMainWindow; 
-							
+				
 				void myWrite(string s)
 				{
 					if(s.empty) return; 
-								
+					
 					void wr(string s)
 					{
 						if(indent>0) {
 							auto si = "\n" ~ "    ".replicate(indent.min(20)); 
 							s = s.safeUTF8.replace("\n", si);   //Opt: safeUTF8 is fucking slow!!!!
 						}
-									
+						
 						stdWrite(s); //this is safe for UTF8 errors.
 						if(recorder.recording) synchronized recorder.recordedStr ~= s; 
 					} 
-								
+					
 					while(!s.empty)
 					{
 						auto i = (cast(ubyte[])s).countUntil!(a => a.inRange('\33', '\36'));  //works on ubyte[], so it can't raise UTF8 errors
@@ -488,44 +488,43 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						}
 					}
 					flush; //it is needed
-								
+					
 					if(chkSet(triggerFocusMainWindow) && afterFirstPrintFlushed) afterFirstPrintFlushed(); 
 				} 
-							
 			} static public
 			{
 				//Todo: ha ezt a writeln-t hivja a gc.collect-bol egy destructor, akkor crash.
-							
+				
 				//execute program in hetlib console({ program }); (colorful console, debug and exception handling)
 				//args in application.args
 				static void opCall(void delegate() dg) { application.runConsole(dg); } 
 				
 				__gshared int indent = 0; 
-							
+				
 				void delegate() afterFirstPrintFlushed; //MainWindow can regain it's focus
-							
+				
 				void flush() { stdout.flush; } 
-							
+				
 				void setUTF8() {
 					const cp = 65001; 
 					SetConsoleCP(cp); 
 					SetConsoleOutputCP(cp); 
 				} 
-							
+				
 				void show()	 { if(chkSet	(visible_)	) ShowWindow (hwnd, SW_SHOW	); } 
 				void hide(bool forced=false)	 { if(chkClear	(visible_) || forced	) ShowWindow (hwnd, SW_HIDE	); } 
-							
+				
 				void setFocus()	 { SetFocus(hwnd); } //it's only keyboard focus
 				void setForegroundWindow()	 { show; SetForegroundWindow(hwnd); 	} 
 				bool isForeground()	 { return GetForegroundWindow == hwnd; } 	//this 3 funct is the same in Win class too.
-							
+				
 				void setPos(int x, int y, int w, int h) { SetWindowPos(hwnd, null, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER); } 
-							
+				
 				@property bool visible()	 { return visible_; } 
 				@property void visible(bool vis)	 { vis ? show : hide; } 
-							
+				
 				@property bool exceptionHandlerActive() { return exceptionHandlerActive_; } 
-							
+				
 				int handleException(void delegate() dg)
 				{
 					if(exceptionHandlerActive_) { dg(); }else {
@@ -543,7 +542,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 					return 0; 
 				} 
-							
+				
 				int consoleStrLength(string s)
 				{
 					int len; 
@@ -556,9 +555,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 					return len; 
 				} 
-							
+				
 				string leftJustify(string s, int size) { return s ~ " ".replicate(max(size-consoleStrLength(s), 0)); } 
-							
+				
 				string rightJustify(string s, int size) { return " ".replicate(max(size-consoleStrLength(s), 0)) ~ s; } 
 			} 
 		} 
@@ -7896,8 +7895,8 @@ version(/+$DIDE_REGION Colors+/all)
 		{
 			immutable
 			clAxisX	= (RGB(213,  40,  40)),
-			clAxisY	= (RGB( 40, 166,  40)),
-			clAxisZ	= (RGB( 40,  40, 215)),
+			clAxisY	= (RGB(40, 166,  40)),
+			clAxisZ	= (RGB(40,  40, 215)),
 				
 			clOrange	= clRainbowOrange,
 			clGold	= (RGB(0x00D7FF)),
@@ -7911,61 +7910,61 @@ version(/+$DIDE_REGION Colors+/all)
 			immutable
 			clUiAliceBlue	= (RGB(240, 248, 255)),
 			clUiAntiqueWhite	= (RGB(250, 235, 215)),
-			clUiAqua	= (RGB(  0, 255, 255)),
+			clUiAqua	= (RGB(0, 255, 255)),
 			clUiAquamarine	= (RGB(127, 255, 212)),
 			clUiAzure	= (RGB(240, 255, 255)),
 			clUiBeige	= (RGB(245, 245, 220)),
 			clUiBisque	= (RGB(255, 228, 196)),
-			clUiBlack	= (RGB(  0,   0,   0)),
+			clUiBlack	= (RGB(0,   0,   0)),
 			clUiBlanchedAlmond	= (RGB(255, 235, 205)),
-			clUiBlue	= (RGB(  0,   0, 255)),
+			clUiBlue	= (RGB(0,   0, 255)),
 			clUiBlueViolet	= (RGB(138,  43, 226)),
 			clUiBrown	= (RGB(165,  42,  42)),
 			clUiBurlyWood	= (RGB(222, 184, 135)),
-			clUiCadetBlue	= (RGB( 95, 158, 160)),
+			clUiCadetBlue	= (RGB(95, 158, 160)),
 			clUiChartreuse	= (RGB(127, 255,   0)),
 			clUiChocolate	= (RGB(210, 105,  30)),
 			clUiCoral	= (RGB(255, 127,  80)),
 			clUiCornflowerBlue	= (RGB(100, 149, 237)),
 			clUiCornsilk	= (RGB(255, 248, 220)),
 			clUiCrimson	= (RGB(220,  20,  60)),
-			clUiCyan	= (RGB(  0, 255, 255)),
-			clUiDarkBlue	= (RGB(  0,   0, 139)),
-			clUiDarkCyan	= (RGB(  0, 139, 139)),
+			clUiCyan	= (RGB(0, 255, 255)),
+			clUiDarkBlue	= (RGB(0,   0, 139)),
+			clUiDarkCyan	= (RGB(0, 139, 139)),
 			clUiDarkGoldenrod	= (RGB(184, 134,  11)),
 			clUiDarkGray	= (RGB(169, 169, 169)),
-			clUiDarkGreen	= (RGB(  0, 100,   0)),
+			clUiDarkGreen	= (RGB(0, 100,   0)),
 			clUiDarkKhaki	= (RGB(189, 183, 107)),
 			clUiDarkMagenta	= (RGB(139,   0, 139)),
-			clUiDarkOliveGreen	= (RGB( 85, 107,  47)),
+			clUiDarkOliveGreen	= (RGB(85, 107,  47)),
 			clUiDarkOrange	= (RGB(255, 140,   0)),
 			clUiDarkOrchid	= (RGB(153,  50, 204)),
 			clUiDarkRed	= (RGB(139,   0,   0)),
 			clUiDarkSalmon	= (RGB(233, 150, 122)),
 			clUiDarkSeaGreen	= (RGB(143, 188, 143)),
-			clUiDarkSlateBlue	= (RGB( 72,  61, 139)),
-			clUiDarkSlateGray	= (RGB( 47,  79,  79)),
-			clUiDarkTurquoise	= (RGB(  0, 206, 209)),
+			clUiDarkSlateBlue	= (RGB(72,  61, 139)),
+			clUiDarkSlateGray	= (RGB(47,  79,  79)),
+			clUiDarkTurquoise	= (RGB(0, 206, 209)),
 			clUiDarkViolet	= (RGB(148,   0, 211)),
 			clUiDeepPink	= (RGB(255,  20, 147)),
-			clUiDeepSkyBlue	= (RGB(  0, 191, 255)),
+			clUiDeepSkyBlue	= (RGB(0, 191, 255)),
 			clUiDimGray	= (RGB(105, 105, 105)),
-			clUiDodgerBlue	= (RGB( 30, 144, 255)),
+			clUiDodgerBlue	= (RGB(30, 144, 255)),
 			clUiFirebrick	= (RGB(178,  34,  34)),
 			clUiFloralWhite	= (RGB(255, 250, 240)),
-			clUiForestGreen	= (RGB( 34, 139,  34)),
+			clUiForestGreen	= (RGB(34, 139,  34)),
 			clUiFuchsia	= (RGB(255,   0, 255)),
 			clUiGainsboro	= (RGB(220, 220, 220)),
 			clUiGhostWhite	= (RGB(248, 248, 255)),
 			clUiGold	= (RGB(255, 215,   0)),
 			clUiGoldenrod	= (RGB(218, 165,  32)),
 			clUiGray	= (RGB(128, 128, 128)),
-			clUiGreen	= (RGB(  0, 128,   0)),
+			clUiGreen	= (RGB(0, 128,   0)),
 			clUiGreenYellow	= (RGB(173, 255,  47)),
 			clUiHoneydew	= (RGB(240, 255, 240)),
 			clUiHotPink	= (RGB(255, 105, 180)),
 			clUiIndianRed	= (RGB(205,  92,  92)),
-			clUiIndigo	= (RGB( 75,   0, 130)),
+			clUiIndigo	= (RGB(75,   0, 130)),
 			clUiIvory	= (RGB(255, 255, 240)),
 			clUiKhaki	= (RGB(240, 230, 140)),
 			clUiLavender	= (RGB(230, 230, 250)),
@@ -7982,31 +7981,31 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiLightSalmon	= (RGB(255, 160, 122)),
 			
 			
-			clUiLightSeaGreen	= (RGB( 32, 178, 170)),
+			clUiLightSeaGreen	= (RGB(32, 178, 170)),
 			clUiLightSkyBlue	= (RGB(135, 206, 250)),
 			clUiLightSlateGray	= (RGB(119, 136, 153)),
 			clUiLightSteelBlue	= (RGB(176, 196, 222)),
 			clUiLightYellow	= (RGB(255, 255, 224)),
-			clUiLime	= (RGB(  0, 255,   0)),
-			clUiLimeGreen	= (RGB( 50, 205,  50)),
+			clUiLime	= (RGB(0, 255,   0)),
+			clUiLimeGreen	= (RGB(50, 205,  50)),
 			clUiLinen	= (RGB(250, 240, 230)),
 			clUiMagenta	= (RGB(255,   0, 255)),
 			clUiMaroon	= (RGB(128,   0,   0)),
 			clUiMediumAquamarine	= (RGB(102, 205, 170)),
-			clUiMediumBlue	= (RGB(  0,   0, 205)),
+			clUiMediumBlue	= (RGB(0,   0, 205)),
 			clUiMediumOrchid	= (RGB(186,  85, 211)),
 			clUiMediumPurple	= (RGB(147, 112, 219)),
-			clUiMediumSeaGreen	= (RGB( 60, 179, 113)),
+			clUiMediumSeaGreen	= (RGB(60, 179, 113)),
 			clUiMediumSlateBlue	= (RGB(123, 104, 238)),
-			clUiMediumSpringGreen	= (RGB(  0, 250, 154)),
-			clUiMediumTurquoise	= (RGB( 72, 209, 204)),
+			clUiMediumSpringGreen	= (RGB(0, 250, 154)),
+			clUiMediumTurquoise	= (RGB(72, 209, 204)),
 			clUiMediumVioletRed	= (RGB(199,  21, 133)),
-			clUiMidnightBlue	= (RGB( 25,  25, 112)),
+			clUiMidnightBlue	= (RGB(25,  25, 112)),
 			clUiMintCream	= (RGB(245, 255, 250)),
 			clUiMistyRose	= (RGB(255, 228, 225)),
 			clUiMoccasin	= (RGB(255, 228, 181)),
 			clUiNavajoWhite	= (RGB(255, 222, 173)),
-			clUiNavy	= (RGB(  0,   0, 128)),
+			clUiNavy	= (RGB(0,   0, 128)),
 			clUiOldLace	= (RGB(253, 245, 230)),
 			clUiOlive	= (RGB(128, 128,   0)),
 			clUiOliveDrab	= (RGB(107, 142,  35)),
@@ -8026,11 +8025,11 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiPurple	= (RGB(128,   0, 128)),
 			clUiRed	= (RGB(255,   0,   0)),
 			clUiRosyBrown	= (RGB(188, 143, 143)),
-			clUiRoyalBlue	= (RGB( 65, 105, 225)),
+			clUiRoyalBlue	= (RGB(65, 105, 225)),
 			clUiSaddleBrown	= (RGB(139,  69,  19)),
 			clUiSalmon	= (RGB(250, 128, 114)),
 			clUiSandyBrown	= (RGB(244, 164,  96)),
-			clUiSeaGreen	= (RGB( 46, 139,  87)),
+			clUiSeaGreen	= (RGB(46, 139,  87)),
 			clUiSeaShell	= (RGB(255, 245, 238)),
 			clUiSienna	= (RGB(160,  82,  45)),
 			clUiSilver	= (RGB(192, 192, 192)),
@@ -8038,14 +8037,14 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiSlateBlue	= (RGB(106,  90, 205)),
 			clUiSlateGray	= (RGB(112, 128, 144)),
 			clUiSnow	= (RGB(255, 250, 250)),
-			clUiSpringGreen	= (RGB(  0, 255, 127)),
-			clUiSteelBlue	= (RGB( 70, 130, 180)),
+			clUiSpringGreen	= (RGB(0, 255, 127)),
+			clUiSteelBlue	= (RGB(70, 130, 180)),
 			clUiTan	= (RGB(210, 180, 140)),
-			clUiTeal	= (RGB(  0, 128, 128)),
+			clUiTeal	= (RGB(0, 128, 128)),
 			clUiThistle	= (RGB(216, 191, 216)),
 			clUiTomato	= (RGB(255,  99,  71)),
 			clUiTransparent	= (RGB(255, 255, 255)),
-			clUiTurquoise	= (RGB( 64, 224, 208)),
+			clUiTurquoise	= (RGB(64, 224, 208)),
 			clUiViolet	= (RGB(238, 130, 238)),
 			clUiWheat	= (RGB(245, 222, 179)),
 			clUiWhite	= (RGB(255, 255, 255)),
@@ -11556,10 +11555,18 @@ version(/+$DIDE_REGION Date Time+/all)
 	}version(/+$DIDE_REGION Compress+/all)
 	{
 		//Base64 //////////////////////////////////
-			
-		import std.base64; 
-		alias toBase64 = Base64.encode; 
-		alias fromBase64 = Base64.decode; 
+		
+		string toBase64(in void[] src)
+		{
+			import std.base64; 
+			return Base64.encode(cast(ubyte[])src); 
+		} 
+		
+		ubyte[] fromBase64(string src)
+		{
+			import std.base64; 
+			return Base64.decoder(cast(ubyte[])src).array; 
+		} 
 		
 		/// Helps to track a value whick can be updated. Remembers the
 		/// last falue too. Has boolean and autoinc notification options.
@@ -12217,8 +12224,8 @@ version(/+$DIDE_REGION debug+/all)
 		
 		string makeSrcLocation(string file, string funct, int line)
 		{
-			auto fi = file.split(`\`),
-					 fu = funct.split(`.`); 
+			auto 	fi = file.split(`\`),
+				fu = funct.split(`.`); 
 			
 			//ignore extension
 			if(fi.length)
@@ -12344,6 +12351,14 @@ version(/+$DIDE_REGION debug+/all)
 		string _DATABRKMIXIN(string p)
 		{ return `_DATALOGMIXINFUNCT(`~p~`, q{`~p~`})`; } 
 		
+		
+		//Probe / inspection
+		T PR(T, string file = __FILE__, int line = __LINE__)(T what)
+		{
+			dbg.sendLog(format!"LOG:PR(%s:%s):%s"(file, line, what.text.toBase64)); 
+			return what; 
+		} 
+		
 		
 		//DebugLogClient ////////////////////////////////////////////////////////////////////////////////////
 		
@@ -12385,13 +12400,17 @@ version(/+$DIDE_REGION debug+/all)
 				int exe_hwnd; 
 			} 
 			
-			static immutable dataFileName = `Global\DIDE_DebugFileMappingObject`; 
+			string dataFileName; 
 			HANDLE dataFile; 
 			Data* data; 
 			
 			void tryOpen()
 			{
+				//it is illegal to use LOG() here.
 				
+				//get dataFileName from the env. Only open it when it is present.
+				dataFileName = environment.get("DideDbgEnv", ""); 
+				if(dataFileName=="") return; 
 				dataFile = OpenFileMappingW(
 					 FILE_MAP_ALL_ACCESS,	 //read/write access
 					 false,	 //do not inherit the name
@@ -12411,14 +12430,11 @@ version(/+$DIDE_REGION debug+/all)
 			public: 
 			
 			enum potiCount = 8; 
+			
 			this()
 			{
-				version(noDebugClient)
-				{ return; }else
-				{
-					tryOpen; 
-					sendLog("START:"~appFile.toString); 
-				}
+				tryOpen; 
+				sendLog("START:"~appFile.toString); 
 			} 
 			
 			void ping(int index = 0)
@@ -12525,7 +12541,10 @@ version(/+$DIDE_REGION debug+/all)
 		{
 			private: 
 			alias Data = DebugLogClient.Data; 
-			alias dataFileName = DebugLogClient.dataFileName; 
+			
+			string dataFileName;
+			public string getDataFileName() const
+			{ return dataFileName; }
 			
 			HANDLE dataFile; 
 			Data* data; 
@@ -12535,6 +12554,9 @@ version(/+$DIDE_REGION debug+/all)
 			
 			void tryCreate()
 			{
+				//make a unique filename each time dbgsrv starts.
+				dataFileName = format!"DIDEDGB_%08X"([now.raw].crc32);
+				
 				dataFile = CreateFileMappingW(
 					INVALID_HANDLE_VALUE,	 //use paging file
 					null,	 //default security

@@ -2841,6 +2841,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		{ "Bug"	, [SyntaxStyle(clWhite	,clOrange	,2)].replicate(4)},
 		{ "Link"	, [SyntaxStyle(clWowBlue	,clWhite    ,4)].replicate(4)},
 		{ "Code"	, [SyntaxStyle(RGB(0xc7c5c5)	, mix(RGB(0x2f2f2f), RGB(0x442d44), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
+		{ "Console"	, [SyntaxStyle(clWhite ,clBlack,0)].replicate(4)},
 	]; 
 	
 	mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(','))); 
