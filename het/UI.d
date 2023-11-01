@@ -6767,9 +6767,9 @@ struct im
 		
 			.Container removeLastContainer()
 		{
-			 //needed for temporary composable building
-			return actContainer ? actContainer.removeLastContainer
-													: cast(.Container)root.fetchBack; 
+			//needed for temporary composable building
+			return actContainer 	? actContainer.removeLastContainer
+				: cast(.Container)root.fetchBack; 
 		} 
 		
 			//overlay drawing //////////////////////////

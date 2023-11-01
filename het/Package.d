@@ -2317,17 +2317,37 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	//Imported builtins ////////////////////////////////////////////
 	
-	//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
-	
-	
-	//public import ldc.gccbuiltins_x86 : pshufb	= __builtin_ia32_pshufb128; //note: this maps to signed bytes. I wand unsigneds for chars and for color channels.
-	//byte16 pshufb(byte16 a, byte16 b){return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); }
-	T pshufb(T, U)(T a, in U b) { return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); } 
-	
-	T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1", "=x,0,x,i", a, b, im); } 
-	
-	//__builtin_ia32_pcmpestri128
-	T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); } 
+	mixin template asmFunctions()
+	{
+		//must import as a mixin, to enable inlining in each module. Az LTO sucks.
+		
+		//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
+		
+		
+		//public import ldc.gccbuiltins_x86 : pshufb	= __builtin_ia32_pshufb128; //note: this maps to signed bytes. I wand unsigneds for chars and for color channels.
+		//byte16 pshufb(byte16 a, byte16 b){return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); }
+		T pshufb(T, U)(T a, in U b) { return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); } 
+		
+		T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1", "=x,0,x,i", a, b, im); } 
+		
+		//__builtin_ia32_pcmpestri128
+		T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); } 
+		
+		//Todo: In old LDC 1.28   it generates a mask, but it's bad.  So I use this instead.
+		ubyte16 pcmpeqb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pcmpeqb $2, $1", "=x,0,x", a, b); } 
+		ubyte16 pmaxub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pmaxub $2, $1", "=x,0,x", a, b); } 
+		ubyte16 pminub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pminub $2, $1", "=x,0,x", a, b); } 
+		ubyte16 pavgb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pavgb $2, $1", "=x,0,x", a, b); } 
+		
+		ubyte16 punpcklbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklbw $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhbw $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpcklwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklwd $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhwd $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckldq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckldq $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhdq $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpcklqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklqdq $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhqdq $2, $1", "=x,0,x", a, b); } 
+	} 
 }
 version(/+$DIDE_REGION Numeric+/all)
 {
@@ -7390,6 +7410,9 @@ version(/+$DIDE_REGION Colors+/all)
 			} 
 		} 
 		
+		private
+		{ mixin asmFunctions; } 
+		
 		void rgb_to_rgba_scalar(const ref RGB src, ref RGBA dst)
 		{ dst = src.rgb1; } 
 		void rgb_to_rgba_simd(const ref ubyte16[3] src, ref ubyte16[4] dst)
@@ -12355,7 +12378,7 @@ version(/+$DIDE_REGION debug+/all)
 		//Probe / inspection
 		T PR(T, string file = __FILE__, int line = __LINE__)(T what)
 		{
-			dbg.sendLog(format!"LOG:PR(%s:%s):%s"(file, line, what.text.toBase64)); 
+			dbg.sendLog(format!"LOG:PR(%s(%s)):%s"(file, line, what.text.toBase64)); 
 			return what; 
 		} 
 		
@@ -12542,9 +12565,9 @@ version(/+$DIDE_REGION debug+/all)
 			private: 
 			alias Data = DebugLogClient.Data; 
 			
-			string dataFileName;
+			string dataFileName; 
 			public string getDataFileName() const
-			{ return dataFileName; }
+			{ return dataFileName; } 
 			
 			HANDLE dataFile; 
 			Data* data; 
@@ -12555,7 +12578,7 @@ version(/+$DIDE_REGION debug+/all)
 			void tryCreate()
 			{
 				//make a unique filename each time dbgsrv starts.
-				dataFileName = format!"DIDEDGB_%08X"([now.raw].crc32);
+				dataFileName = format!"DIDEDGB_%08X"([now.raw].crc32); 
 				
 				dataFile = CreateFileMappingW(
 					INVALID_HANDLE_VALUE,	 //use paging file

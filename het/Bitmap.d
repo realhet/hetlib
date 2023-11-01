@@ -10,6 +10,8 @@ version(/+$DIDE_REGION+/all)
 	
 	import het; 
 	
+	private mixin asmFunctions; 
+	
 	enum smallSpace = "\u2008"; 
 	
 	__gshared size_t BitmapCacheMaxSizeBytes = 768<<20; 
@@ -1593,6 +1595,52 @@ version(/+$DIDE_REGION+/all)
 						 g(width-1) && g(width+1)	&&
 						 g(-width-1) && g(-width+1); 
 		}
+	} 
+	
+	
+	
+	auto transpose16x16b(ubyte* p, sizediff_t stride)
+	{
+		static punpckZip(string ending, int len)()
+		{
+			return "tuple(" ~ len.iota.map!(
+				i=>	q{
+					punpcklwd(a[0], b[0]),
+					punpckhwd(a[0], b[0]),
+				}
+					.replace("0", i.text)
+					.replace("wd", ending)
+			).join ~ ")"; 
+		} 
+		
+		static fetch8(ubyte* p, sizediff_t stride)
+		{
+			static fetch4(ubyte* p, sizediff_t stride)
+			{
+				static fetch2(ubyte* p, sizediff_t stride)
+				{
+					const a = *(cast(ubyte16*)(p)), b = *(cast(ubyte16*)(p+stride)); 
+					return tuple(punpcklbw(a, b), punpckhbw(a, b)); 
+				} 
+				
+				const a = fetch2(p, stride), b = fetch2(p+2*stride, stride); 
+				return mixin(punpckZip!("wd", 2)); 
+			} 
+			
+			const a = fetch4(p, stride), b = fetch4(p+4*stride, stride); 
+			return mixin(punpckZip!("dq", 4)); 
+		} 
+		
+		const a = fetch8(p, stride), b = fetch8(p+8*stride, stride); 
+		return mixin(punpckZip!("qdq", 8)); 
+		
+		//todo: unittest
+		/+
+		{
+			auto img = bitmaps[`c:\d\16x16gray.png`].get!ubyte; 
+			image2D(16, 16, cast(ubyte[])(transpose16x16b(img.ptr, img.stride).array)).saveTo(`c:\d\16x16gray_flip.png`); 
+		}
+		+/
 	} 
 }
 version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)

@@ -2170,7 +2170,9 @@ version(/+$DIDE_REGION+/all)
 			int stride; 
 			//here 4 bytes extra data can fit: a change-hash for example
 			E[] impl; 
-				
+			
+			auto ptr(){ return impl.ptr; }
+			
 			//size properties
 			static foreach(i, name; ["width", "height", "depth"].take(N))
 			mixin(
@@ -2851,10 +2853,10 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		auto angleAbsDiff_rad(A, B)(A a, B b)
-		{ return normalizeAngle_rad(b-a).abs; };
+		{ return normalizeAngle_rad(b-a).abs; } ; 
 		
 		auto angleAbsDiff_deg(A, B)(A a, B b)
-		{ return normalizeAngle_def(b-a).abs; };
+		{ return normalizeAngle_def(b-a).abs; } ; 
 		
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 		private enum UnaryStdMathFunct(string name) = 
