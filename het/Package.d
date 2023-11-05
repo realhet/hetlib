@@ -7927,6 +7927,24 @@ version(/+$DIDE_REGION Colors+/all)
 			clPink	= (RGB(0xCBC0FF)),
 			clPostit	= (RGB(0x99FFFF)); 
 		}
+		
+		version(/+$DIDE_REGION Sticky Note Colors+/all)
+		{
+			immutable
+			clStickyYellow      = RGB(0xb1f9ff),
+			clStickyWhite       = RGB(0xf8f6f5),
+			clStickyLightOrange = RGB(0x28d1f5),
+			clStickyOlive       = RGB(0x7ae1d0),
+			clStickyGreen       = RGB(0x92f6d5),
+			clStickyPastelBlue  = RGB(0xf5cca6),
+			clStickyAqua        = RGB(0xc0c667),
+			clStickyBlue        = RGB(0xe7bf23),
+			clStickyOrange      = RGB(0x489dff),
+			clStickyPink        = RGB(0xbb94ea),
+			clStickyRed         = RGB(0x7f6cf1),
+			clStickyPurple      = RGB(0xbbb384)
+			/+Todo: NiceExpressions, hex RGB+/; 
+		}
 		
 		version(/+$DIDE_REGION Windows.UI.Colors+/all)
 		{
@@ -8109,8 +8127,12 @@ version(/+$DIDE_REGION Colors+/all)
 			clSolBase2, clSolBase3, clSolYellow, clSolOrange, clSolRed, clSolMagenta,
 			clSolViolet, clSolBlue, clSolCyan, clSolGreen
 		],
+			clSticky	= [
+			clStickyYellow, clStickyWhite, clStickyLightOrange, clStickyOlive, clStickyGreen, clStickyPastelBlue, 
+			clStickyAqua, clStickyBlue, clStickyOrange, clStickyPink, clStickyRed, clStickyPurple
+		],
 			clAxis	= [clAxisX, clAxisY, clAxisZ],
-			clAll	= clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol; 
+			clAll	= clDelphi ~ clVga ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol ~ clAxis ~ clSticky; 
 		
 		
 		private RGB colorByName(string name, bool mustExists=false)

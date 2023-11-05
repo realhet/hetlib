@@ -2985,6 +2985,31 @@ version(/+$DIDE_REGION+/all)
 		); 
 	} 
 	
+	/+
+		https://chat.openai.com/c/8be74a95-293e-405e-806d-f12483c2e8f1
+		
+		const string[] DataTypes = {
+				  "ulong", "bool", "HAlign", "VAlign", "YAlign", "bool", "bool", "bool",
+				  "bool", "bool", "bool", "bool", "bool", "bool", "uint", "bool", "bool",
+				  "bool", "bool", "bool", "bool", "bool", "bool", "bool", "bool", "ScrollState",
+				  "ScrollState", "bool", "bool", "bool", "bool", "bool", "bool", "bool",
+				  "bool", "bool", "bool", "int"
+		}; 
+		
+		const string[] NameFields = {
+			   "_data", "wordWrap", "hAlign", "vAlign", "yAlign", "dontHideSpaces", "canSelect", "focused",
+			   "hovered_deprecated", "clipSubCells", "_saveComboBounds", "_hasOverlayDrawing", "columnElasticTabs",
+			   "rowElasticTabs", "targetSurface", "_debug", "btnRowLines", "autoWidth", "autoHeight", "hasHScrollBar",
+			   "hasVScrollBar", "_measured", "saveVisibleBounds", "_measureOnlyOnce", "acceptEditorKeys",
+			   "hScrollState", "vScrollState", "clickable", "noBackground", "cullSubCells", "_hasDrawCallback",
+			   "selected", "hidden", "dontSearch", "noHitTest", "dontLocate", "oldSelected", "changedCreated",
+			   "changedRemoved", "dontStretchSubCells", "_dummy"
+		};
+		
+		const int[] SizeFields = {1, 2, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 19};
+	+/
+	
+	
 	static assert(ContainerFlags.sizeof==8); 
 	
 	//Effective horizontal and vertical flow configuration of subCells
@@ -3208,11 +3233,11 @@ version(/+$DIDE_REGION+/all)
 			{ return .getEffectiveVScroll(flags.autoHeight,	flags.vScrollState); } 
 		} 
 		
-		float	calcContentWidth ()
+		float calcContentWidth ()
 		{ return subCells.map!(c => c.outerRight ).maxElement(0); } 
-		float	calcContentHeight()
+		float calcContentHeight()
 		{ return subCells.map!(c => c.outerBottom).maxElement(0); } 
-		vec2	calcContentSize  ()
+		vec2 calcContentSize  ()
 		{ return vec2(calcContentWidth, calcContentHeight); } 
 		
 		final void setSubContainerWidths(bool setAll=true)(float targetWidth)
