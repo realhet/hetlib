@@ -2989,21 +2989,21 @@ version(/+$DIDE_REGION+/all)
 		https://chat.openai.com/c/8be74a95-293e-405e-806d-f12483c2e8f1
 		
 		const string[] DataTypes = {
-				  "ulong", "bool", "HAlign", "VAlign", "YAlign", "bool", "bool", "bool",
-				  "bool", "bool", "bool", "bool", "bool", "bool", "uint", "bool", "bool",
-				  "bool", "bool", "bool", "bool", "bool", "bool", "bool", "bool", "ScrollState",
-				  "ScrollState", "bool", "bool", "bool", "bool", "bool", "bool", "bool",
-				  "bool", "bool", "bool", "int"
+					 "ulong", "bool", "HAlign", "VAlign", "YAlign", "bool", "bool", "bool",
+					 "bool", "bool", "bool", "bool", "bool", "bool", "uint", "bool", "bool",
+					 "bool", "bool", "bool", "bool", "bool", "bool", "bool", "bool", "ScrollState",
+					 "ScrollState", "bool", "bool", "bool", "bool", "bool", "bool", "bool",
+					 "bool", "bool", "bool", "int"
 		}; 
 		
 		const string[] NameFields = {
-			   "_data", "wordWrap", "hAlign", "vAlign", "yAlign", "dontHideSpaces", "canSelect", "focused",
-			   "hovered_deprecated", "clipSubCells", "_saveComboBounds", "_hasOverlayDrawing", "columnElasticTabs",
-			   "rowElasticTabs", "targetSurface", "_debug", "btnRowLines", "autoWidth", "autoHeight", "hasHScrollBar",
-			   "hasVScrollBar", "_measured", "saveVisibleBounds", "_measureOnlyOnce", "acceptEditorKeys",
-			   "hScrollState", "vScrollState", "clickable", "noBackground", "cullSubCells", "_hasDrawCallback",
-			   "selected", "hidden", "dontSearch", "noHitTest", "dontLocate", "oldSelected", "changedCreated",
-			   "changedRemoved", "dontStretchSubCells", "_dummy"
+					 "_data", "wordWrap", "hAlign", "vAlign", "yAlign", "dontHideSpaces", "canSelect", "focused",
+					 "hovered_deprecated", "clipSubCells", "_saveComboBounds", "_hasOverlayDrawing", "columnElasticTabs",
+					 "rowElasticTabs", "targetSurface", "_debug", "btnRowLines", "autoWidth", "autoHeight", "hasHScrollBar",
+					 "hasVScrollBar", "_measured", "saveVisibleBounds", "_measureOnlyOnce", "acceptEditorKeys",
+					 "hScrollState", "vScrollState", "clickable", "noBackground", "cullSubCells", "_hasDrawCallback",
+					 "selected", "hidden", "dontSearch", "noHitTest", "dontLocate", "oldSelected", "changedCreated",
+					 "changedRemoved", "dontStretchSubCells", "_dummy"
 		};
 		
 		const int[] SizeFields = {1, 2, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 19};
@@ -3870,6 +3870,12 @@ version(/+$DIDE_REGION+/all)
 		{ mixin(genSetChanged.replace("#", "Created")); } 
 		void setChangedRemoved()
 		{ mixin(genSetChanged.replace("#", "Removed")); } //Ditto
+		
+		void setChanged()
+		{
+			setChangedCreated; 
+			setChangedRemoved; 
+		} 
 		
 		private enum genClearChanged = q{
 			if(flags.changed#){
@@ -7275,10 +7281,13 @@ struct im
 					}
 				*/
 				
-				if(cell && parent)
+				if(cell)
+				{
+				if(parent)
 				{
 					auto bnd = .Container._savedComboBounds; 
 					cell.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
+				}
 				}
 			} 
 		} 
