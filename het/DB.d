@@ -2769,7 +2769,7 @@ class PictureLibrary
 		return (hnt in recordByHashNameTime) !is null; 
 	} 
 	
-	private File originalArchiveFileOf(in PictureRecord rec)
+	File originalArchiveFileOf(in PictureRecord rec)
 	{
 		//Note: DON'T CHANGE THIS!!!!
 		return File(dirFile.otherExt("").fullName~"_"~rec.modified.utcYearMonth.text~".arch"); 
@@ -2801,7 +2801,7 @@ class PictureLibrary
 	} 
 	
 	
-	void internalAddToRecordToCaches(const(PictureRecord)* rec)
+	protected void internalAddToRecordToCaches(const(PictureRecord)* rec)
 	{
 		const hnt = hashNameTimeOf(*rec); 
 		enforce((hnt in recordByHashNameTime) is null, "Fatal Error: PictureRecord Already exists "~rec.text); 
@@ -2911,7 +2911,9 @@ class PictureLibrary
 		}
 	} 
 	
-} version(/+$DIDE_REGION DataSet+/all)
+} 
+
+version(/+$DIDE_REGION DataSet+/all)
 {
 		mixin  template DatasetTemplate(K, R)
 	{
@@ -3287,6 +3289,10 @@ class PictureLibrary
 }version(/+$DIDE_REGION DataLogger+/all)
 {
 	
+	__gshared DataLogger_fastWrite = false; //experimental
+	//Todo: Make the DataLogger file handling faster.  Not it is slow, but reliable.  The experimental fastWrite method fails when a different thread tries to read stuff back.
+	//Bug: when using fastWrite it is not possible to read the file back from a different file.  It should flush first if it reads from the actual file. Also what about multithrading...
+	
 	class DataLogger(K, R, R_default=void)
 	{
 		public
@@ -3330,7 +3336,10 @@ class PictureLibrary
 				static assert(isFixedSizeOpaqueType!V); 
 				
 				V[K] aa; 
-				File logFile; 
+				File logFile; bool headerWritten=false; 
+				StdFile logStdFile; 
+				bool logStdFileCreated; 
+				
 				auto opBinaryRight(string op : "in")(K key) { return key in aa; } 
 				auto length() { return aa.length; } 
 				auto byKey() { return aa.byKey; } 
@@ -3338,12 +3347,27 @@ class PictureLibrary
 				{
 					if(logFile)
 					{
-						if(!logFile.exists)
-						logFile.append(keyValueDefOf!(K, V).jsonPacket); 
-						
-						//!!!! Fixed size record handling.  Dynamic data is in blobs!
-						logFile.append([key]); 
-						logFile.append([value]); 
+						if(DataLogger_fastWrite)
+						{
+							if(logStdFileCreated.chkSet) logStdFile = StdFile(logFile.fullName, "ab"); 
+							
+							if(headerWritten.chkSet)
+							logStdFile.rawWrite(keyValueDefOf!(K, V).jsonPacket); 
+							
+							//!!!! Fixed size record handling.  Dynamic data is in blobs!
+							
+							auto data1 = [key]; 
+							auto data2 = [value]; 
+							
+							logStdFile.rawWrite((cast(ubyte[])data1) ~ (cast(ubyte[])data2)); 
+						}
+						else
+						{
+							if(headerWritten.chkSet)
+							logFile.append(keyValueDefOf!(K, V).jsonPacket); 
+							logFile.append([key]); 
+							logFile.append([value]); 
+						}
 					}
 					else raise("Can't write data: No log file specified."); 
 					
@@ -3353,7 +3377,7 @@ class PictureLibrary
 				
 				void load()
 				{
-					const t0 = now; scope(exit) print(now-t0); 
+					const t0 = now; scope(exit) print("\33\12DB Loaded \33\7", typeof(this).stringof, now-t0); 
 					
 					aa.clear; 
 					const mask = DataLoggerUtils.extractWildMask(logFile); 
@@ -3363,7 +3387,10 @@ class PictureLibrary
 					foreach(f; logFile.path.files(mask).sort)
 					{
 						try
-						{ importKeyValues!(K, V, R_default)(f.read(true), keys, values); }
+						{
+							//print("    ", f); 
+							importKeyValues!(K, V, R_default)(f.read(true), keys, values); 
+						}
 						catch(Exception e)
 						{ WARN(e.simpleMsg); }
 					}
@@ -3379,29 +3406,49 @@ class PictureLibrary
 					File file; size_t offset, size; 
 					//Todo: FileBlockRef should have a text form: fn.ext?ofs=123&size=456
 				} 
+				struct IdxRec { align(1): K key; size_t offset, size; } 
 				FileBlockRef[K] aaIdx; 
 				File idxFile, dataFile; 
+				
+				StdFile idxStdFile, dataStdFile; 
+				bool idxStdFileCreated, dataStdFileCreated; 
+				ulong dataStdFileOffset; 
+				
 				auto length() { return aaIdx.length; } 
 				auto byKey() { return aaIdx.byKey; } 
 				auto opIndexAssign(in V value, in K key)
 				{
 					auto raw = cast(void[]) value; 
-					const 	offset 	= dataFile.size, 
-						size	= raw.length; 
 					
+					auto idxRec = IdxRec(key, size_t.max/+Note: offset must be acquired later!+/, raw.length); 
+					
+					//Files are be created automatically at the first write.
 					//Content must be written first, if HDD is full, this will fail first.
 					if(dataFile && idxFile)
 					{
-						dataFile.append(raw); 
-						
-						idxFile.append([key]); 
-						idxFile.append([offset, size]); 
+						if(DataLogger_fastWrite)
+						{
+							idxRec.offset = dataStdFileOffset; 
+							
+							if(idxStdFileCreated.chkSet) idxStdFile = StdFile(idxFile.fullName, "ab"); 
+							if(dataStdFileCreated.chkSet) dataStdFile = StdFile(dataFile.fullName, "ab"); 
+							
+							dataStdFile.rawWrite(raw);  dataStdFileOffset += raw.length; 
+							idxStdFile.rawWrite((&idxRec)[0..1]); 
+						}
+						else
+						{
+							idxRec.offset = dataFile.size; 
+							
+							dataFile.append(raw); 
+							idxFile.append((&idxRec)[0..1]); 
+						}
 					}
 					else raise("Can't write data: No data and/or idx file specified."); 
 					
 					//Todo: Use winapi files
 					
-					aaIdx[key] = FileBlockRef(dataFile, offset, size); 
+					aaIdx[key] = FileBlockRef(dataFile, idxRec.offset, idxRec.size); 
 					//Bug: try to do atomic operation with proper exception handling
 					//Todo: implement locked file operations.
 					//Opt: also it's fcking slow to open and close all the time.
@@ -3448,29 +3495,29 @@ class PictureLibrary
 				void load()
 				{
 					//Todo: maintenance: delete orphan bidx and blob files.
-					const t0 = now; scope(exit) print(now-t0); 
+					const t0 = now; scope(exit) print("\33\13DB Loaded \33\7", typeof(this).stringof, now-t0); 
 					
 					aaIdx.clear; 
 					const mask = DataLoggerUtils.extractWildMask(idxFile); 
 					
-					static struct KF { align(1): K key; size_t offset, size; } 
-					
 					K[] keys; FileBlockRef[] values; 
 					
-					foreach(fIdx; idxFile.path.files(mask).sort)
+					foreach(fIdx; idxFile.path.files(mask).sort /+Opt: must use file entries, not the simple path.files()+/)
 					{
+						//print("    ", fIdx); 
 						const 	fData = fIdx.otherExt(".blob"),
-							fDataSize = fData.size; 
+							fDataSize = fData.size/+Opt: this must be exponentially SLOW File.size uses directory listing!!!+/; 
 						
 						size_t loadSize = fIdx.size; 
-						if(loadSize%KF.sizeof)
+						if(loadSize%IdxRec.sizeof)
 						{
-							loadSize = loadSize/KF.sizeof*KF.sizeof; 
+							loadSize = loadSize/IdxRec.sizeof*IdxRec.sizeof; 
 							WARN("DataLogger.idxFile truncated:", fIdx); 
 						}
 						
 						//load the index file
-						auto buf = cast(KF[]) fIdx.read(true, 0, loadSize); 
+						auto buf = cast(IdxRec[]) fIdx.read(true, 0, loadSize); 
+						//Opt: This takes ages...
 						
 						//split into key/values and accumulate
 						keys ~= buf.map!(a => a.key).array; 
@@ -3478,7 +3525,7 @@ class PictureLibrary
 					}
 					
 					//create the full AA in a single pass.
-					aaIdx = assocArray(	keys, values); 
+					aaIdx = assocArray(keys, values); 
 				} 
 			} 
 		} 
@@ -3546,8 +3593,7 @@ class PictureLibrary
 			+/
 			//Todo: There should be an incremental index next to the timestamp as well!
 		} 
-	} 
-	version(/+$DIDE_REGION DataLogger tests+/all)
+	} version(/+$DIDE_REGION DataLogger tests+/all)
 	{
 		void dataLoggerTest()
 		{

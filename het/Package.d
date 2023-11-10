@@ -7666,6 +7666,9 @@ version(/+$DIDE_REGION Colors+/all)
 			return charMap[luma.quantize!(charMap.length)]; 
 		} 
 		
+		char toGrayscaleAscii(ubyte luma)
+		{ return toGrayscaleAscii(luma * (1.0f/255)); } 
+		
 		auto textColorFor(RGB c)
 		{ return c.l>=128 ? clBlack : clWhite; } 
 		
@@ -7931,18 +7934,18 @@ version(/+$DIDE_REGION Colors+/all)
 		version(/+$DIDE_REGION Sticky Note Colors+/all)
 		{
 			immutable
-			clStickyYellow      = RGB(0xb1f9ff),
-			clStickyWhite       = RGB(0xf8f6f5),
-			clStickyLightOrange = RGB(0x28d1f5),
-			clStickyOlive       = RGB(0x7ae1d0),
-			clStickyGreen       = RGB(0x92f6d5),
-			clStickyPastelBlue  = RGB(0xf5cca6),
-			clStickyAqua        = RGB(0xc0c667),
-			clStickyBlue        = RGB(0xe7bf23),
-			clStickyOrange      = RGB(0x489dff),
-			clStickyPink        = RGB(0xbb94ea),
-			clStickyRed         = RGB(0x7f6cf1),
-			clStickyPurple      = RGB(0xbbb384)
+			clStickyYellow	= RGB(0xb1f9ff),
+			clStickyWhite	= RGB(0xf8f6f5),
+			clStickyLightOrange	= RGB(0x28d1f5),
+			clStickyOlive	= RGB(0x7ae1d0),
+			clStickyGreen	= RGB(0x92f6d5),
+			clStickyPastelBlue	= RGB(0xf5cca6),
+			clStickyAqua	= RGB(0xc0c667),
+			clStickyBlue	= RGB(0xe7bf23),
+			clStickyOrange	= RGB(0x489dff),
+			clStickyPink	= RGB(0xbb94ea),
+			clStickyRed	= RGB(0x7f6cf1),
+			clStickyPurple	= RGB(0xbbb384)
 			/+Todo: NiceExpressions, hex RGB+/; 
 		}
 		
@@ -11402,7 +11405,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				else write(data, size); 
 				//Todo: compression, automatic uncompression
 				
-				//Todo: this is lame and slow.
+				//Opt: this is lame and slow.
 			} 
 			
 			void truncate(size_t desiredSize)
