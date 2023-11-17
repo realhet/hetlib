@@ -2742,14 +2742,14 @@ class FileHashCache
 	{ return getHash(f); } 
 } 
 
-struct PictureRecord
+deprecated struct PictureRecord
 {
 	string name; //fully qualified name, unique in this library
 	ulong offset, size, hash;     //offset==0: it's a redundant file. Must be searched by hash.
 	DateTime modified, imported; 
 } 
 
-class PictureLibrary
+deprecated class PictureLibrary
 {
 	File dirFile; 
 	PictureRecord[] records; //in import order
@@ -2793,13 +2793,22 @@ class PictureLibrary
 		result.modified 	= rec.modified,
 		result.hash	= rec.hash; 
 		
-		rec = *recordsByHash[result.hash][0]; //lookup agai to find the first one
+		rec = *recordsByHash[result.hash][0]; //lookup again to find the first one
 		result.data	= originalArchiveFileOf(rec).read(true, rec.offset, rec.size); 
 		if(result.hash != myHashOf(result.data)) ERR("CRC error: "~rec.text); 
 		
 		return result; 
 	} 
 	
+	ubyte[] loadData(ulong hash)
+	{
+		auto a = hash in recordsByHash; 
+		enforce(a, "Invalid plib record hash"); 
+		auto rec = *(*a)[0]; //lookup again to find the first one
+		auto data = originalArchiveFileOf(rec).read(true, rec.offset, rec.size); 
+		if(hash != myHashOf(data)) ERR("CRC error: "~rec.text); 
+		return data; 
+	} 
 	
 	protected void internalAddToRecordToCaches(const(PictureRecord)* rec)
 	{
@@ -2830,9 +2839,9 @@ class PictureLibrary
 			internalAddToRecordToCaches(&r); 
 			
 			print("total count:", records.length); 
-			print("total size:", records.map!"a.size".sum.shortSizeText!1024); 
+			print("total size:", records.map!"a.size".sum/+.shortSizeText!1024+/); 
 			print("unique count:", recordsByHash.byValue.walkLength); 
-			print("unique size:", recordsByHash.byValue.map!"a[0].size".sum.shortSizeText!1024); 
+			print("unique size:", recordsByHash.byValue.map!"a[0].size".sum/+.shortSizeText!1024+/); 
 			print; 
 		}
 	} 
@@ -2915,7 +2924,7 @@ class PictureLibrary
 
 version(/+$DIDE_REGION DataSet+/all)
 {
-		mixin  template DatasetTemplate(K, R)
+	mixin  template DatasetTemplate(K, R)
 	{
 		private
 		{
@@ -3104,10 +3113,23 @@ version(/+$DIDE_REGION DataSet+/all)
 			
 			auto opIndex(K[2] k /+[incl..excl) range+/)
 			{ return _orderedKeyInterval(k[0], k[1]).map!(k => _get!(No.raise)(k)); } 
+			
+			//finds a suitable key location where there are no other keys in the given distance.
+			auto allocateKey(T)(K ideal, T dist)
+			{
+				if(empty) return ideal; 
+				
+				foreach(k; _rb_access.upperBound(ideal-dist))
+				{
+					if(k<ideal+dist)	{ ideal = k+dist; continue; }
+					else	break; 
+				}
+				return ideal; 
+			} 
 		}
 		
 	} 
-		version(/+$DIDE_REGION DataSet tests+/all)
+	version(/+$DIDE_REGION DataSet tests+/all)
 	{
 		void testDataset()
 		{
@@ -3194,7 +3216,18 @@ version(/+$DIDE_REGION DataSet+/all)
 			
 			//access to the whole record
 			(*(logger[DateTime(UTC, 2000, 1, 8)]._record)).toJson.print; 
-			
+			
+			//Todo: unittest
+			/+
+				auto base = DateTime(2000, 01, 01, 00, 00, 00);
+				
+				foreach(i; [0, 0, 0, 8, 10, 14, 12, 9, 5])
+				{
+				auto key = pdb.log.allocateKey(base + i*second, 2*second);
+				print(key);
+				pdb.log[key] = PictureLogRec.init;
+				}
+			+/
 		} mixin template _DatasetTemplateDebug(K, R)
 		{
 			/+
@@ -3474,7 +3507,7 @@ version(/+$DIDE_REGION DataSet+/all)
 							
 							auto _data()
 							{
-								return _file.read(true, _offset, _size); 
+								return cast(V)(_file.read(true, _offset, _size)); 
 								//it will throw if can't read.
 							} 
 							
@@ -3604,7 +3637,7 @@ version(/+$DIDE_REGION DataSet+/all)
 					RGBA avgColor; 
 					ivec2 size; 
 				} 
-				struct Blobs	 { const(void)[] lod0, lod3, lod6; } 
+				struct Blobs { const(ubyte)[] lod0, lod3, lod6; } 
 			} 
 			
 			auto logger = new DataLogger!(DateTime, Data)(Path(`c:\!!!!!test`), `DataLog`); 
@@ -3612,8 +3645,8 @@ version(/+$DIDE_REGION DataSet+/all)
 			with(logger[now] = Data("C1", clRed.rgb1, ivec2(1280, 720)))
 			{
 				print(*_record); 
-				lod0 = "-= LOD0 TEST DATA =-"; 
-				lod3 = "-= LOD33333333333333333333 TEST DATA =-"; 
+				lod0 = cast(ubyte[])"-= LOD0 TEST DATA =-"; 
+				lod3 = cast(ubyte[])"-= LOD33333333333333333333 TEST DATA =-"; 
 				print(lod0); 
 				print(lod3); 
 			}

@@ -1634,12 +1634,12 @@ version(/+$DIDE_REGION+/all)
 		const a = fetch8(p, stride), b = fetch8(p+8*stride, stride); 
 		return mixin(punpckZip!("qdq", 8)); 
 		
-		//todo: unittest
+		//Todo: unittest
 		/+
-		{
-			auto img = bitmaps[`c:\d\16x16gray.png`].get!ubyte; 
-			image2D(16, 16, cast(ubyte[])(transpose16x16b(img.ptr, img.stride).array)).saveTo(`c:\d\16x16gray_flip.png`); 
-		}
+			{
+				auto img = bitmaps[`c:\d\16x16gray.png`].get!ubyte; 
+				image2D(16, 16, cast(ubyte[])(transpose16x16b(img.ptr, img.stride).array)).saveTo(`c:\d\16x16gray_flip.png`); 
+			}
 		+/
 	} 
 }
@@ -1742,11 +1742,9 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				try
 				{ return read_png_info(reader, w, h, chans); }catch(Throwable)
 				{ reader.seek(0, SEEK_SET); }
-				/+
-					try
-						{ return read_jpeg_info(reader, w, h, chans); }catch(Throwable)
-						{ reader.seek(0, SEEK_SET); }
-				+/
+				try
+				{ return read_jpeg_info(reader, w, h, chans); }catch(Throwable)
+				{ reader.seek(0, SEEK_SET); }
 				try
 				{ return read_bmp_info(reader, w, h, chans); }catch(Throwable)
 				{ reader.seek(0, SEEK_SET); }
@@ -1764,11 +1762,9 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				try
 				{ return read_png_info(reader, w, h, chans); }catch(Throwable)
 				{ reader.seek(0, SEEK_SET); }
-				/+
-					try
-						{ return read_jpeg_info(reader, w, h, chans); }catch(Throwable)
-						{ reader.seek(0, SEEK_SET); }
-				+/
+				try
+				{ return read_jpeg_info(reader, w, h, chans); }catch(Throwable)
+				{ reader.seek(0, SEEK_SET); }
 				try
 				{ return read_bmp_info(reader, w, h, chans); }catch(Throwable)
 				{ reader.seek(0, SEEK_SET); }
@@ -4097,6 +4093,110 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				}
 				chans = 0; 	//unknown
 			} 
+			
+		}version(/+$DIDE_REGION Jpeg detector+/all)
+		{
+			/// Reads an image from a buffer containing a JPEG image. req_chans defines the
+			/// format of returned image (you can use ColFmt here).
+			
+			/// Returns width, height and color format information via w, h and chans.
+			public void read_jpeg_info(in char[] filename, out int w, out int h, out int chans)
+			{
+				auto reader = scoped!FileReader(filename); 
+				return read_jpeg_info(reader, w, h, chans); 
+			} 
+			
+			/// Returns width, height and color format information via w, h and chans.
+			public void read_jpeg_info_from_mem(in ubyte[] source, out int w, out int h, out int chans)
+			{
+				auto reader = scoped!MemReader(source); 
+				return read_jpeg_info(reader, w, h, chans); 
+			} 
+			
+			// Detects whether a JPEG image is readable from stream.
+			package bool detect_jpeg(Reader stream)
+			{
+				try {
+					int w, h, c; 
+					read_jpeg_info(stream, w, h, c); 
+					return true; 
+				}
+				catch(Throwable)
+				{ return false; }
+				finally
+				{ stream.seek(0, SEEK_SET); }
+			} 
+			
+			package void read_jpeg_info(Reader stream, out int w, out int h, out int chans)
+			{
+				enum Marker : ubyte {
+					 SOI = 0xd8,	   // start of image
+					 SOF0 = 0xc0,	   // start of frame / baseline DCT
+					 //SOF1 = 0xc1,    // start of frame / extended seq.
+					 //SOF2 = 0xc2,    // start of frame / progressive DCT
+					 SOF3 = 0xc3,			 // start of frame / lossless
+					 SOF9 = 0xc9,			 // start of frame / extended seq., arithmetic
+					 SOF11 = 0xcb,    // start of frame / lossless, arithmetic
+					 DHT = 0xc4,			 // define huffman tables
+					 DQT = 0xdb,			 // define quantization tables
+					 DRI = 0xdd,			 // define restart interval
+					 SOS = 0xda,			 // start of scan
+					 DNL = 0xdc,			 // define number of lines
+					 RST0 = 0xd0,	   // restart entropy coded data
+					 // ...
+					 RST7 = 0xd7,			 // restart entropy coded data
+					 APP0 = 0xe0,			 // application 0 segment
+					 // ...
+					 APPf = 0xef,    // application f segment
+					 //DAC = 0xcc,     // define arithmetic conditioning table
+					 COM = 0xfe,				 // comment
+					 EOI = 0xd9,				 // end of image
+				} 
+				
+				ubyte[2] marker = void; 
+				stream.readExact(marker, 2); 
+				
+				// SOI
+				if(marker[0] != 0xff || marker[1] != Marker.SOI)
+				throw new ImageIOException("not JPEG"); 
+				
+				while(true)
+				{
+					stream.readExact(marker, 2); 
+					
+					if(marker[0] != 0xff)
+					throw new ImageIOException("no frame header"); 
+					while(marker[1] == 0xff)
+					stream.readExact(marker[1..$], 1); 
+					
+					switch(marker[1])
+					with(Marker)
+					{
+						case SOF0: .. case SOF3: 
+						case SOF9: .. case SOF11: 
+							ubyte[8] tmp; 
+							stream.readExact(tmp[0..8], 8); 
+							//int len = bigEndianToNative!ushort(tmp[0..2]);
+							w = bigEndianToNative!ushort(tmp[5..7]); 
+							h = bigEndianToNative!ushort(tmp[3..5]); 
+							chans = tmp[7]; 
+							return; 
+						case SOS, EOI: throw new ImageIOException("no frame header"); 
+						case DRI, DHT, DQT, COM: 
+						case APP0: .. case APPf: 
+							ubyte[2] lenbuf = void; 
+							stream.readExact(lenbuf, 2); 
+							int skiplen = bigEndianToNative!ushort(lenbuf) - 2; 
+							stream.seek(skiplen, SEEK_CUR); 
+							break; 
+						default: throw new ImageIOException("unsupported marker"); 
+					}
+				}
+				assert(0); 
+			} 
+			
+			
+			
 		}version(/+$DIDE_REGION turboJPEG+/all)
 		{
 			//module turbojpeg.turbojpeg; 
@@ -4701,8 +4801,8 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				//data/data_size is the segment of data to write, and 'picture' is for
 				//reference (and so one can make use of picture->custom_ptr).
 				alias int function(
-					in ubyte*	data, size_t data_size,
-														in WebPPicture* picture
+					in ubyte* data, size_t data_size,
+					in WebPPicture* picture
 				) WebPWriterFunction; 
 				
 				//WebPMemoryWrite: a special WebPWriterFunction that writes to memory using
@@ -4728,7 +4828,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				//}
 				int WebPMemoryWrite(
 					in ubyte* data, size_t data_size,
-													 in WebPPicture* picture
+					in WebPPicture* picture
 				); 
 				
 				//Progress hook, called from time to time to report progress. It can return
@@ -4872,7 +4972,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				//Warning: this function is rather CPU-intensive.
 				int WebPPictureDistortion(
 					in WebPPicture* src, in WebPPicture* _ref,
-					int metric_type,           //0 = PSNR, 1 = SSIM, 2 = LSIM
+					int metric_type, //0 = PSNR, 1 = SSIM, 2 = LSIM
 					float* result
 				); //[5]
 				
@@ -4886,7 +4986,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				//snapped to even values.
 				int WebPPictureCrop(
 					WebPPicture* picture,
-													 int left, int top, int width, int height
+					int left, int top, int width, int height
 				); 
 				
 				//Extracts a view from 'src' picture into 'dst'. The rectangle for the view
@@ -4902,8 +5002,8 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				//Returns false in case of memory allocation error or invalid parameters.
 				int WebPPictureView(
 					in WebPPicture* src,
-													 int left, int top, int width, int height,
-													 WebPPicture* dst
+					int left, int top, int width, int height,
+					WebPPicture* dst
 				); 
 				
 				//Returns true if the 'picture' is actually a view and therefore does
@@ -4943,7 +5043,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				//Returns false in case of error.
 				int WebPPictureARGBToYUVA(
 					WebPPicture* picture,
-														   WebPEncCSP colorspace
+					WebPEncCSP colorspace
 				); 
 				
 				//Same as WebPPictureARGBToYUVA(), but the conversion is done using
@@ -5542,23 +5642,25 @@ version(/+$DIDE_REGION+/all)
 	
 	struct BitmapInfo
 	{
-			string format; 
-			ivec2 size; 
-			int chn; 
+		string format; 
+		ivec2 size; 
+		int chn; 
 		
-			bool valid() const
-		{ return supportedBitmapExts.canFind(format) && chn.inRange(1, 4); } 
+		bool valid() const
+		{ return supportedBitmapExts.canFind(format) && chn.inRange(1, 4) && size.area>0; } 
 		
-			int numPixels() const
+		int numPixels() const
 		{ return size[].product; } 
 		
-			const ref auto width()
+		const ref auto width()
 		{ return size.x; } 
-			const ref auto height()
+		const ref auto height()
 		{ return size.y; } 
 		
 		private static
 		{
+			
+			//Todo: there should be isWebp() accessible from the outside. And the below stuff should be named detectWebp
 			
 			bool isWebp(in ubyte[] s)
 			{
@@ -5631,7 +5733,7 @@ version(/+$DIDE_REGION+/all)
 		
 		private: 
 		
-			void detectInfo(in ubyte[] stream)
+		void detectInfo(in ubyte[] stream)
 		{
 			if(stream.empty) return; 
 			if(format=="webp")
@@ -5646,8 +5748,8 @@ version(/+$DIDE_REGION+/all)
 			else if(format=="gif")
 			{
 				try {
-					enforce(stream.length>=8); 
-					const us = cast(ushort[])stream[0..8]; 
+					enforce(stream.length>=10); 
+					const us = cast(ushort[])stream[0..10]; 
 					size = ivec2(us[3], us[4]); 
 					chn = 4; 
 				}catch(Exception) {}
@@ -5661,7 +5763,7 @@ version(/+$DIDE_REGION+/all)
 		
 		public: 
 		
-			this(in File fileName, in ubyte[] stream)
+		this(in File fileName, in ubyte[] stream)
 		{
 			format = detectFormat(fileName, stream); 
 			
@@ -5669,15 +5771,16 @@ version(/+$DIDE_REGION+/all)
 			detectInfo(stream); 
 		} 
 		
-			this(in ubyte[] stream)
+		this(in ubyte[] stream)
 		{ this(File(""), stream); } 
-		
+		/+
 			this(in File fileName)
-		{
-			enum peekSize = 32; 
-			this(fileName, fileName.read(false, 0, peekSize)); 
-		} 
-		
+			{
+				enum peekSize = 64; 
+				//todo: it's not enough for jpeg.
+				this(fileName, fileName.read(false, 0, peekSize)); 
+			} 
+		+/
 	} 
 	
 	
@@ -6061,7 +6164,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			{
 				alias CT = ScalarType   !T,
-							len = VectorLength!T; 
+				len = VectorLength!T; 
 				if(CT.stringof == bmp.type && len==bmp.channels)
 				return mixin("serializeImage(bmp.access!(", T.stringof, "), format)"); 
 			}

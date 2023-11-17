@@ -127,7 +127,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				SetFocus, SetForegroundWindow, GetForegroundWindow,
 				SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
 				GetStdHandle, GetTempPathW, GetFileTime, SetFileTime, GetFileAttributesW,
-				FileTimeToLocalFileTime, LocalFileTimeToFileTime, FileTimeToSystemTime, SystemTimeToFileTime, GetLocalTime, GetSystemTimeAsFileTime, Sleep, GetComputerNameW, GetProcAddress,
+				FileTimeToLocalFileTime, LocalFileTimeToFileTime, FileTimeToSystemTime, SystemTimeToFileTime, GetLocalTime, GetSystemTimeAsFileTime, DosDateTimeToFileTime,
+				Sleep, GetComputerNameW, GetProcAddress,
 				SW_SHOW, SW_HIDE, SWP_NOACTIVATE, SWP_NOOWNERZORDER, FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_IGNORE_INSERTS,
 				GetSystemTimes, MEMORYSTATUSEX, GlobalMemoryStatusEx,
 				HICON,
@@ -2914,32 +2915,45 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		//Todo: DIDE fails when opening object.d. It should know that's a system module.
 		
-		/*inout(*/V/*)*/ get(K, V)(/*inout(*/V[K]/*)*/ aa, K key)
+		V get(K, V)(V[K] aa, K key)
 		{
 			return object.get(aa, key, V.init); 
 			/+this is object.get()+/
 		} 
 		
 		//safe array access
-		
 		//Note: inout(V) doesn't work with class[]: it says can't convert const(Class) to inout(Class)
-		/*inout*/V get(V, I)(/*inout*/V[] arr, I idx) if(isIntegral!I)
+		V get(V, I)(V[] arr, I idx)
+			if(isIntegral!I)
 		{
-			static if(isSigned!I)
-			return idx<arr.length && idx>=0 ? arr[idx] : V.init; 
-			else
-			return idx<arr.length	? arr[idx] : V.init; 
+			enum def = V.init; 
+			static if(isSigned!I)	return idx<arr.length && idx>=0 ? arr[idx] : def; 
+			else	return idx<arr.length	? arr[idx] : def; 
 		} 
 		
 		//Default can be a different type. In that case, result	will be converted
-		/*inout*/D get(V, I, D)(/*inout*/V[] arr, I idx, lazy D	def) if(isIntegral!I)
+		D get(V, I, D)(V[] arr, I idx, lazy D	def)
+			if(isIntegral!I)
 		{
-			static if(isSigned!I)
-			return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def; 
-			else
-			return idx<arr.length ? arr[idx].to!D.ifThrown(def) : def; 
+			static if(isSigned!I)	return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def; 
+			else	return idx<arr.length ? arr[idx].to!D.ifThrown(def) : def; 
 		} 
 		
+		//safe randomAccessRange access. The array overloads can not be omitted.  Overloading sometimes a myth.
+		auto get(R, I)(R arr, I idx)
+		if(isIntegral!I && isRandomAccessRange!R && !isArray!R)
+		{
+			enum def = ElementType!R.init; 
+			static if(isSigned!I)	return idx<arr.length && idx>=0 ? arr[idx] : def; 
+			else	return idx<arr.length	? arr[idx] : def; 
+		} 
+		
+		D get(R, I, D)(R arr, I idx, lazy D def) 
+		if(isIntegral!I && isRandomAccessRange!R && !isArray!R)
+		{
+			static if(isSigned!I)	return idx<arr.length && idx>=0 ? arr[idx].to!D.ifThrown(def) : def; 
+			else	return idx<arr.length ? arr[idx].to!D.ifThrown(def) : def; 
+		} 
 		
 		/+
 			Todo: unittest    auto aa = ["cica": 5, "kutya": 10];
@@ -5948,7 +5962,6 @@ version(/+$DIDE_REGION Containers+/all)
 			
 			Item[] items; //all items
 			string[] names; //only names without values
-			//Todo: accelerate with assoc array
 			string[string] options; //all name/value pairs
 			
 			auto files() const { return names.map!File; } 
@@ -6003,13 +6016,14 @@ version(/+$DIDE_REGION Containers+/all)
 				return def; 
 			} 
 			
+			//these opCalls are loaders. They need a reference or a setter.
 			void opCall(T)(string name, void delegate(T) fun) const
 			{ if(auto a = name in options) fun((*a).to!T); } 
 			
 			void opCall(T)(string name, ref T var) const
 			{ if(auto a = name in options) var = (*a).to!T; } 
 			
-			alias items this; 
+			alias items this;  //Todo: items[] can throw, not good.
 			
 			string command() const
 			{
@@ -9604,7 +9618,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		gregorianDaysInMonth 	= gregorianDaysInYear/12; 
 		
 		auto RawDateTime(ulong t) { DateTime a; a.raw = t; return a; } 
-			
+		
 		struct DateTime
 		{
 			version(/+$DIDE_REGION+/all)
@@ -10079,6 +10093,16 @@ version(/+$DIDE_REGION Date Time+/all)
 			GetSystemTimePreciseAsFileTime(&ft); 
 			dt.utcFileTime = ft; 
 			return dt; 
+		} 
+		
+		DateTime UnixDateTime(uint a)
+		{ return RawDateTime(a ? DateTime.UnixShift_unit + a*DateTime.RawUnit.sec : 0); } 
+		
+		DateTime DosDateTime(uint a)
+		{
+			FILETIME ft; 
+			if(DosDateTimeToFileTime(a>>16, a & 0xFFFF, &ft)) return DateTime(ft); 
+			return DateTime.init; 
 		} 
 		
 		DateTime uniqueNow()
@@ -11958,8 +11982,8 @@ version(/+$DIDE_REGION Date Time+/all)
 				Path path; 
 				string name; 
 				
-				string fullName()
-				const { return path.fullPath~name; } 
+				string fullName() const
+				{ return path.fullPath~name; } 
 				File file()const
 				{ return File(fullName); } 
 				
@@ -12012,7 +12036,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return DateTime(UTC, ftLastWriteTime ); } 
 			} FileEntry[] listFiles(
 				Path path, string mask="", string order="name",
-								Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive
+				Flag!"onlyFiles" onlyFiles = Yes.onlyFiles, Flag!"recursive" recursive = No.recursive
 			)
 			{
 				///similar directory listing like the one in totalcommander
@@ -14586,7 +14610,7 @@ version(/+$DIDE_REGION debug+/all)
 				this.srcStructDef = srcStructDef; 
 				this.dstStructDef = dstStructDef; 
 				
-				LOG(format!"Generating StructImporter for: %s -> %s"(srcStructDef.name, dstStructDef.name)); 
+				//LOG(format!"Generating StructImporter for: %s -> %s"(srcStructDef.name, dstStructDef.name)); 
 				
 				foreach(df; dstStructDef.fieldDefs)
 				foreach(sf; srcStructDef.fieldDefs)

@@ -1776,10 +1776,9 @@ class Drawing
 			ubyte alpha = 0xFF; 
 			LineStyle lineStyle; 
 			ArrowStyle arrowStyle; 
-			ubyte fontFlags; 
-			
-			ubyte _dummy1; 
+			ushort fontFlags;  //customShaderIdx can be bigger than a ubyte.
 			//end	of saveable area
+			
 			float	pointSize = -1,
 				lineWidth = -1; 
 			//auto	arrowSize = vec2(8, 2.5);   //this is fixed in the shader
@@ -1800,7 +1799,7 @@ class Drawing
 			{
 				mixin(
 					"@property bool font*() const { return (fontFlags>>#)&1; }
-@property void font*(bool b){ fontFlags = cast(ubyte) (fontFlags & ~(1<<#) | (cast(int)b << #)); }"
+@property void font*(bool b){ fontFlags = cast(ushort) (fontFlags & ~(1<<#) | (cast(int)b << #)); }"
 					.replace('*', s).replace('#', i.text)
 				); 
 			}
@@ -1818,7 +1817,7 @@ class Drawing
 			/// used in advanced drawing functions such as line2()
 			long quickSave()
 			{
-				static assert(drawColor.offsetof + 8 == _dummy1.offsetof + _dummy1.sizeof); 
+				static assert(drawColor.offsetof + 8 == fontFlags.offsetof + fontFlags.sizeof); 
 				return *(cast(long*) &this); 
 			} 
 			
@@ -2043,21 +2042,19 @@ class Drawing
 		
 		void appendNewDrawObj(void[] buf)
 		{
-			enum requiredBufSize = DrawingObj.sizeof;
+			enum requiredBufSize = DrawingObj.sizeof; 
 			
 			if(buf.length==requiredBufSize)
-			{
-				buffers.put(*(cast(DrawingObj*)buf.ptr));
-			}
+			{ buffers.put(*(cast(DrawingObj*)buf.ptr)); }
 			else if(buf.length<requiredBufSize)
 			{
-				DrawingObj tmp;
-				(cast(void*)&tmp)[0..buf.length] = buf;
-				buffers.put(tmp);
+				DrawingObj tmp; 
+				(cast(void*)&tmp)[0..buf.length] = buf; 
+				buffers.put(tmp); 
 			}
 			else
-			enforce(0, "NewDrawObj: Buffer too big.");
-		}
+			enforce(0, "NewDrawObj: Buffer too big."); 
+		} 
 		
 		private auto exportDrawingObjs()
 		{ return buffers.allObjs; } 
@@ -3624,8 +3621,8 @@ class Drawing
 				fClipMax = vec2(+1e30); 
 				
 				
-				fColor = vec4(1, 0, .5, .5);
-				fColor2 = fColor;
+				fColor = vec4(1, 0, .5, .5); 
+				fColor2 = fColor; 
 				emitRect(trans(vec2(0, 0)), trans(vec2(20, 10))); 
 			}
 		} 
@@ -3987,7 +3984,7 @@ class Drawing
 				if(isFont) { isTransparent = (fontFlags&32)!=0; }
 				else {
 					isCustomShader = (fontFlags&32)!=0; 
-					customShaderIdx = (fontFlags/64)&7; 
+					customShaderIdx = (fontFlags/64)/*&7*/; 
 				}
 				
 				if(!isCustomShader) {

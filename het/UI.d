@@ -257,9 +257,9 @@ version(/+$DIDE_REGION+/all)
 		
 		struct HitTestRec
 		{
-			SrcId id; 	  //in the	next frame this must be the isSame
-			bounds2 hitBounds; 		//absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
-			vec2 localPos; 	  //relative to outerPos
+			SrcId id; 	//in the	next frame this must be the isSame
+			bounds2 hitBounds; 	//absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
+			vec2 localPos; 	//relative to outerPos
 			bool clickable; 
 		} 
 		
@@ -1687,19 +1687,19 @@ version(/+$DIDE_REGION+/all)
 	struct TextEditorState
 	{
 		 //TextEditorState /////////////////////////////////////
-		string str; 	     //the string	being edited	Edit() fills it
-		float defaultFontHeight; 		//used when there's no text to display	0	-> uibase.NortmalFontHeight
-		int[] cellStrOfs; 	     //mapping petween glyphs and string ranges	Edit() fills it
-		
-		Row row; 	  //editor container. Must be a row.	             Edit() fills it
-		WrappedLine[] wrappedLines; 	  //formatted glyphs	             Measure fills it when edit is same as wrappedLines
-		
-		bool strModified; 	            //string is modified, and it is needed to reformat.
-		            //cellStrOfs and wrappedLines are invalid.
-		
-		TextPos caret;                //first there is only one caret, no selection   persistent
-		
-		EditCmd[] cmdQueue;           //commands waiting for execution                Edit() fills, it is proecessed after the hittest
+		string str; 	//the string being edited Edit() fills it
+		float defaultFontHeight; 	//used when there's no text to display 0 -> uibase.NortmalFontHeight
+		int[] cellStrOfs; 	//mapping petween glyphs and string ranges Edit() fills it
+			
+		Row row; 	//editor container. Must be a row. Edit() fills it
+		WrappedLine[] wrappedLines; 	//formatted glyphs. Measure fills it when edit is same as wrappedLines
+			
+		bool strModified; 	//string is modified, and it is needed to reformat.
+			//cellStrOfs and wrappedLines are invalid.
+			
+		TextPos caret; 	//first there is only one caret, no selection persistent
+			
+		EditCmd[] cmdQueue; 	//commands waiting for execution. Edit() fills, it is proecessed after the hittest
 		
 		string dbg; 
 		
@@ -1747,16 +1747,16 @@ version(/+$DIDE_REGION+/all)
 		
 		private ivec2 xy2lc(in vec2 point)
 		{
-					if(wrappedLines.empty)
+			if(wrappedLines.empty)
 			return ivec2(0); 
 			
-					float yMin = wrappedLines[0].top,
-								yMax = wrappedLines.back.bottom,
-								y = point.y; 
+			float 	yMin 	= wrappedLines[0].top,
+				yMax 	= wrappedLines.back.bottom,
+				y 	= point.y; 
 			
-					static if(1)
+			static if(1)
 			{
-				 //above or below: snap to first/last line or start/end of the whole text.
+				//above or below: snap to first/last line or start/end of the whole text.
 				if(y<yMin)
 				return ivec2(0); 
 				if(y>yMax)
@@ -1767,23 +1767,23 @@ version(/+$DIDE_REGION+/all)
 				y = tp.point.y.clamp(yMin, yMax); 
 			}
 			
-					//search the line
-					int line; //Opt: binary search? (not important: only 1 screen of information)
-					foreach_reverse(int i; 0..wrappedLineCount)
+			//search the line
+			int line; //Opt: binary search? (not important: only 1 screen of information)
+			foreach_reverse(int i; 0..wrappedLineCount)
 			{
 				if(y >= wrappedLines[i].y0)
 				{ line = i; break; }
 			}
 			
-					auto wl = &wrappedLines[line]; 
+			auto wl = &wrappedLines[line]; 
 			
-					float xMin = wl.left,
-								xMax = wl.right,
-								x = point.x; 
+			float 	xMin 	= wl.left,
+				xMax 	= wl.right,
+				x 	= point.x; 
 			
-					x = x.clamp(xMin, xMax); //always clamp x coordinate
+			x = x.clamp(xMin, xMax); //always clamp x coordinate
 			
-					int column; 
+			int column; 
 			
 			/*
 					 if(x >= xMax){
@@ -1798,9 +1798,9 @@ version(/+$DIDE_REGION+/all)
 				}
 			*/
 			
-					column = wl.selectNearestGap(x); 
+			column = wl.selectNearestGap(x); 
 			
-					return ivec2(column, line); 
+			return ivec2(column, line); 
 		} 
 		
 		private int xy2idx(in vec2 point)
@@ -2156,7 +2156,7 @@ version(/+$DIDE_REGION+/all)
 			{ container.appendStr("["~t.msg~": "~cmdLine~"]", tsError); }
 		}
 	} 
-	
+	
 	int countMarkupLineCells(string markup)
 	{
 		try
@@ -2173,10 +2173,11 @@ version(/+$DIDE_REGION+/all)
 		appendMarkupLine!(false)(cntr, s, ts, dummy); 
 	} 
 	
-	void appendMarkupLine(bool returnSubCellStrOfs=true)(Container cntr, string s, ref TextStyle ts, ref int[] subCellStrOfs)
+	void appendMarkupLine	(bool returnSubCellStrOfs=true)
+		(Container cntr, string s, ref TextStyle ts, ref int[] subCellStrOfs)
 	{
-		enum CommandStartMarker	= '\u00B6',
-				 CommandEndMarker	= '\u00A7'; 
+		enum CommandStartMarker 	= '\u00B6',
+		CommandEndMarker	= '\u00A7'; 
 		
 		int inCommand; 
 		string commandLine; 
@@ -2250,7 +2251,10 @@ version(/+$DIDE_REGION+/all)
 						ts =	  reference to the TextStyle used while appending all the characters
 	*/
 	
-	void appendCode(Container cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
+	void appendCode(
+		Container cntr, string text, in ubyte[] syntax, 
+		void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1
+	)
 	in(text.length == syntax.length)
 	{
 		size_t numCodeUnits, currentOfs; 
@@ -2275,7 +2279,12 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
-	bool updateSyntax(TC:Container)(TC cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, out bool wasWidthChange, int nonStringTabToSpaces=-1)
+	bool updateSyntax(TC:Container)(
+		TC cntr, string text, in ubyte[] syntax, 
+		void delegate(ubyte) applySyntax, 
+		ref TextStyle ts, out bool wasWidthChange, 
+		int nonStringTabToSpaces=-1
+	)
 	in(text.length == syntax.length)
 	{
 		const cntrSubCellsLength = cntr.subCells.length; 
@@ -2308,12 +2317,20 @@ version(/+$DIDE_REGION+/all)
 								wasBoldShift = true; 
 							}
 							
-							wasUpdate = true; //Todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
+							wasUpdate = true; 
+							/+
+								Todo: return this flag somehow... 
+								Maybe it is useful for recalculating cached row stuff. 
+								But currently the successful flag is returned.
+							+/
 						}
 					}
 					else
 					{
-						//not the same char as it was expected. Only the syntax highlight can change, not the text.
+						/+
+							not the same char as it was expected. 
+							Only the syntax highlight can change, not the text.
+						+/
 						wasError = true; 
 					}
 				}
@@ -2351,75 +2368,16 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		
-		wasWidthChange = wasBoldShift;  //Bug: this only works with elastic tabs when the whole line grows, not when shrinks.
+		wasWidthChange = wasBoldShift; /+
+			Bug: this only works with elastic tabs
+			 when the whole line grows, not when shrinks.
+		+/
 		return !wasError && cntrSubCellsLength == dstIdx; 
 	} 
 	
-	//toro: Refactor the whole Row/Glyph/Syntax mystery
+	//todo: Refactor the whole Row/Glyph/Syntax mystery
 	
-	/*
-		enum updateCodeSyntax = appendCode!(Yes.updateSyntax);
-		
-		void appendCode(Flag!updateInplace = No.updateSyntax)(Container cntr, string text, in ubyte[] syntax, void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1)
-		in(text.length == syntax.length)
-		{
-			int resultCode; //0==ok
-		
-			static if(updateInplace){
-				const cntrSubCellsLength = cntr.subCells.length;
-				size_t dstIdx = 0;
-				bool wasError, wasUpdate;
-		
-				void doit(dchar ch, ref TextStyle ts, ubyte actSyntax){
-					if(dstIdx<cntrSubCellsLength){
-						if(auto g = cast(Glyph)cntr.subCells[dstIdx]){
-							if(g.ch==ch){
-								if(g.syntax.chkSet(actSyntax)){
-									g.bkColor	= ts.bkColor  ;
-									g.fontColor	= ts.fontColor;
-									g.fontFlags	= ts.fontFlags;
-									wasUpdate =	true; //todo: return this flag somehow... Maybe it is useful for recalculating cached row stuff. But currently the successful flag is returned.
-								}
-							}else{
-								wasError = true;
-							}
-						}else{
-							//it's not a glyph. Do nothing.
-						}
-					}
-					dstIdx++;
-				}
-		
-				scope(exit) resultCode = !wasError && cntrSubCellsLength == dstIdx;
-			}else{ //appendCode
-		
-				void doit(dchar ch, ubyte actSyntax){
-					cntr.appendSyntaxChar(ch, ts, actSyntax);
-				}
-		
-			}
-		
-			size_t numCodeUnits, currentOfs;
-			ubyte lastSyntax = 255;
-		
-			while(text.length){
-				auto actSyntax = syntax[currentOfs];
-				auto ch = text.decodeFront!(Yes.useReplacementDchar)(numCodeUnits);
-				currentOfs += numCodeUnits;
-		
-				if(chkSet(lastSyntax, actSyntax)) applySyntax(actSyntax);
-		
-				if(ch=='\t' && nonStringTabToSpaces>=0 && actSyntax!=6/+string+/){
-					foreach(i; 0..nonStringTabToSpaces)
-						doit(' ', ts);
-				}else{
-					doit(ch, ts);
-				}
-			}
-		
-			return resultCode;
-		}
-	*/
+	
 	
 	
 	/// Lookup a syntax style and apply it to a TextStyle reference
@@ -3008,7 +2966,7 @@ version(/+$DIDE_REGION+/all)
 		
 		const int[] SizeFields = {1, 2, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 19};
 	+/
-	
+	
 	
 	static assert(ContainerFlags.sizeof==8); 
 	
@@ -7283,11 +7241,11 @@ struct im
 				
 				if(cell)
 				{
-				if(parent)
-				{
-					auto bnd = .Container._savedComboBounds; 
-					cell.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
-				}
+					if(parent)
+					{
+						auto bnd = .Container._savedComboBounds; 
+						cell.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
+					}
 				}
 			} 
 		} 
@@ -9084,6 +9042,13 @@ struct im
 				
 				void delta(float scale)
 				{
+					//modifiers
+					if(scale)
+					{
+					if(inputs.Shift) scale*=10;
+					if(inputs.Ctrl) scale/=10;
+					}
+					
 					auto nStep()
 					{ return range_.step / (range_.max-range_.min); } 
 					set(nPos + nStep *scale); 
@@ -9223,7 +9188,7 @@ struct im
 				focused = im.focusUpdate(
 					this, id,
 					enabled,
-					hit.pressed/*|| manualFocus*/, //when to enter
+					hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
 					inputs["Esc"].pressed,  //when to exit
 					/*onEnter	*/ {},
 					/*onFocus	*/ {},
@@ -9232,7 +9197,7 @@ struct im
 				
 				//res.focused = focused;
 				
-				if(focused)
+				if(focused && mainWindow.isForeground)
 				userModified |= sliderState.handleKeyboard(nPos, range_, 8); 
 				
 				bkColor = ts.bkColor; 
@@ -9244,12 +9209,17 @@ struct im
 						clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
 						clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
 						clRuler =	mix(bkColor, ts.fontColor, 0.5); //disable ruler for now
+						
+						if(focused){ clThumb = clBlack; clLine = clBlack; } //todo: lame logic
+						
 						rulerSides = 3 *0; 
 					break; 
 					case SliderStyle.scrollBar: 
 						clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
 						bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
-					
+						
+						if(focused){ clThumb = clBlack; } //todo: lame logic
+						
 						//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
 						rulerSides = 0; 
 					break; 
@@ -9302,8 +9272,8 @@ struct im
 				dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
 				
 				auto b = innerBounds; 
-				const actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
-							lwThumb = calcLwThumb(actOrientation); 
+				const 	actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
+					lwThumb = calcLwThumb(actOrientation); 
 				
 				if(isLinear(actOrientation))
 				{
