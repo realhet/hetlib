@@ -2375,7 +2375,7 @@ version(/+$DIDE_REGION+/all)
 		return !wasError && cntrSubCellsLength == dstIdx; 
 	} 
 	
-	//todo: Refactor the whole Row/Glyph/Syntax mystery
+	//Todo: Refactor the whole Row/Glyph/Syntax mystery
 	
 	
 	
@@ -8056,9 +8056,9 @@ struct im
 			bool chg; 
 			if(hit.repeated)
 			{
-				auto oldValue = value,
-						 step = abs(_range.step),
-						 newValue = _range.clamp(value+step*sign); 
+				auto 	oldValue 	= value,
+					step 	= abs(_range.step),
+					newValue 	= _range.clamp(value+step*sign); 
 				
 				if(isInt)
 				value = cast(T0)(round(newValue)); 
@@ -9045,8 +9045,8 @@ struct im
 					//modifiers
 					if(scale)
 					{
-					if(inputs.Shift) scale*=10;
-					if(inputs.Ctrl) scale/=10;
+						if(inputs.Shift) scale*=10; 
+						if(inputs.Ctrl) scale/=10; 
 					}
 					
 					auto nStep()
@@ -9210,7 +9210,7 @@ struct im
 						clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
 						clRuler =	mix(bkColor, ts.fontColor, 0.5); //disable ruler for now
 						
-						if(focused){ clThumb = clBlack; clLine = clBlack; } //todo: lame logic
+						if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
 						
 						rulerSides = 3 *0; 
 					break; 
@@ -9218,7 +9218,7 @@ struct im
 						clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
 						bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
 						
-						if(focused){ clThumb = clBlack; } //todo: lame logic
+						if(focused) { clThumb = clBlack; }//Todo: lame logic
 						
 						//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
 						rulerSides = 0; 
