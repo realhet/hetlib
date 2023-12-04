@@ -3536,15 +3536,25 @@ version(/+$DIDE_REGION+/all)
 		{} //can override to draw some custom things.
 		
 		
-		protected void drawSubCells_cull(Drawing dr)
+		protected void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
+		{
+			//this uses linear search. It can be optimized in subClasses.
+			alias b = clipBounds; 
+			if(b)
+			{
+				foreach(c; subCells)
+				if(b.overlaps(c.outerBounds))
+				fun(c); 
+			}
+		} 
+		
+		final void drawSubCells_cull(Drawing dr)
 		{
 			//this uses linear search. It can be optimized in subClasses.
 			if(auto b = dr.clipBounds)
 			{
 				b = dr.inverseInputTransform(b); 
-				foreach(c; subCells)
-				if(b.overlaps(c.outerBounds))
-				c.draw(dr); 
+				visitSubCells_cull(b, (c){ c.draw(dr); }); 
 			}
 		} 
 		
@@ -4253,60 +4263,58 @@ version(/+$DIDE_REGION+/all)
 			innerHeight = calcContentHeight; 
 		} 
 		
-		override void drawSubCells_cull(Drawing dr)
+		override void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
 		{
-			if(auto b = dr.clipBounds)
+			alias b = clipBounds; 
+			
+			void drawPage(Cell[] subCells)
 			{
-				b = dr.inverseInputTransform(b); 
-				
-				void drawPage(Cell[] subCells)
+				const ub = subCells.map!(c => c.outerBottom).assumeSorted.upperBound(b.top).length; 
+				if(ub>0)
 				{
-					const ub = subCells.map!(c => c.outerBottom).assumeSorted.upperBound(b.top).length; 
-					if(ub>0)
+					auto scUpper = subCells[$-ub..$]; 
+					const lb = scUpper.map!(c => c.outerTop).assumeSorted.lowerBound(b.bottom).length; 
+					if(lb>0)
 					{
-						auto scUpper = subCells[$-ub..$]; 
-						const lb = scUpper.map!(c => c.outerTop).assumeSorted.lowerBound(b.bottom).length; 
-						if(lb>0)
-						{
-							foreach(c; scUpper[0..lb])
-							if(
-								b.overlaps(c.outerBounds)
-								/+Opt: There is overlaps() check and binary search too. I think only one is enough.+/
-							)
-							c.draw(dr); 
-						}
+						foreach(c; scUpper[0..lb])
+						if(
+							b.overlaps(c.outerBounds)
+							/+Opt: There is overlaps() check and binary search too. I think only one is enough.+/
+						)
+						fun(c); 
 					}
-				} 
+				}
+			} 
+			
+			void drawPages(Cell[][] pages)
+			{
+				if(flags.dontStretchSubCells)
+				WARN("flags.dontStretchSubCells should be disabled for multiPage Column."); 
 				
-				void drawPages(Cell[][] pages)
+				const ub = pages.map!(c => c.front.outerRight).assumeSorted.upperBound(b.left).length; 
+				//Note: SubRows must be stretched.
+				if(ub>0)
 				{
-					if(flags.dontStretchSubCells)
-					WARN("flags.dontStretchSubCells should be disabled for multiPage Column."); 
-					
-					const ub = pages.map!(c => c.front.outerRight).assumeSorted.upperBound(b.left).length; 
-					//Note: SubRows must be stretched.
-					if(ub>0)
+					auto pgUpper = pages[$-ub..$]; 
+					const lb = pgUpper.map!(c => c.front.outerLeft).assumeSorted.lowerBound(b.right).length; 
+					if(lb>0)
 					{
-						auto pgUpper = pages[$-ub..$]; 
-						const lb = pgUpper.map!(c => c.front.outerLeft).assumeSorted.lowerBound(b.right).length; 
-						if(lb>0)
-						{
-							foreach(p; pgUpper[0..lb])
-							if(
-								b.overlaps(bounds2(p.front.outerTopLeft, p.back.outerBottomRight))
-								/+Opt: There is overlap check and binary search too. I think only one is enough.+/
-							)
-							drawPage(p); 
-						}
+						foreach(p; pgUpper[0..lb])
+						if(
+							b.overlaps(bounds2(p.front.outerTopLeft, p.back.outerBottomRight))
+							/+Opt: There is overlap check and binary search too. I think only one is enough.+/
+						)
+						drawPage(p); 
 					}
-				} 
-				
-				auto pages = getPageRowRanges; 
-				if(pages.length>1)
-				drawPages(cast(Cell[][]) pages); 
-				else drawPage(subCells); 
-			}
-		} 
+				}
+			} 
+			
+			auto pages = getPageRowRanges; 
+			if(pages.length>1)
+			drawPages(cast(Cell[][]) pages); 
+			else drawPage(subCells); 
+		} 
+		
 		
 		override Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
@@ -9775,7 +9783,7 @@ struct im
 			enum Type { info, warning, error} 
 			Type type; 
 			string msg; 
-			int count=1;
+			int count=1; 
 			
 			RGB color()
 			{
@@ -9796,14 +9804,14 @@ struct im
 			if(msg=="") return; 
 			
 			//duplicated item
-			auto count = 1;
+			auto count = 1; 
 			
-			const duplicatedIdx = flashMessages.countUntil!(m=>m.type==type && m.msg==msg);
+			const duplicatedIdx = flashMessages.countUntil!(m=>m.type==type && m.msg==msg); 
 			if(duplicatedIdx>=0)
 			{
-				auto duplicatedItem = flashMessages[duplicatedIdx];
-				count = duplicatedItem.count+1;
-				flashMessages = flashMessages.remove(duplicatedIdx);
+				auto duplicatedItem = flashMessages[duplicatedIdx]; 
+				count = duplicatedItem.count+1; 
+				flashMessages = flashMessages.remove(duplicatedIdx); 
 			}
 			
 			enum maxLen = 10; 
@@ -9815,8 +9823,8 @@ struct im
 			final switch(type)
 			{
 				case error: 	winSnd("Windows Critical Stop"); 	break; 
-				case warning: 	winSnd("Windows Default"); 	break; 
-				case info: 	winSnd("Windows Information Bar"); 	
+				case warning: 	if(count==1) winSnd("Windows Default"); 	break; 
+				case info: 	if(count==1) winSnd("Windows Information Bar"); 	
 			}
 		} 
 		
@@ -9871,7 +9879,7 @@ struct im
 								fh = DefaultFontHeight*2 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
 									* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
 								
-								const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : "");
+								const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : ""); 
 								Text(s); 
 							}
 						); 
