@@ -241,12 +241,12 @@ version(/+$DIDE_REGION+/all)
 			static if(0) LOG(name ~ " successfully registered:", prefix); 
 		} 
 		
-		void register(alias fun)()
+		void registerStaticFunction(alias fun)()
 		{
-			static assert(__traits(isStaticFunction, fun)); 
+			static assert(__traits(isStaticFunction, fun));
 			enum name = __traits(identifier, fun); static assert(name.endsWith(postfix)); 
 			enum prefix = name.withoutEnding(postfix); /+static assert(prefix == prefix.lc);+/
-			register(prefix, &fun); 
+			register(prefix, toDelegate(&fun)); 
 		} 
 		
 		void registerMarkedFunctions(alias obj)()
@@ -255,18 +255,18 @@ version(/+$DIDE_REGION+/all)
 			{
 				alias member = __traits(getMember, obj, name); 
 				static if(__traits(isStaticFunction, member) && hasUDA!(member, UDA))
-				register!member; 
+				registerStaticFunction!member; 
 			}
 		} 
 	} 
 	
 	struct BITMAPLOADER; //uda
 	struct bitmapLoaders
-	{ mixin PluginTemplate!("BitmapLoader", "Bitmap", Bitmap function(string), BITMAPLOADER); } 
+	{ mixin PluginTemplate!("BitmapLoader", "Bitmap", Bitmap delegate(string), BITMAPLOADER); } 
 	
 	struct BITMAPEFFECT; //uda
 	struct bitmapEffects
-	{ mixin PluginTemplate!("BitmapEffect", "Effect", Bitmap function(Bitmap, in QueryString), BITMAPEFFECT); } 
+	{ mixin PluginTemplate!("BitmapEffect", "Effect", Bitmap delegate(Bitmap, in QueryString), BITMAPEFFECT); } 
 	
 	
 	

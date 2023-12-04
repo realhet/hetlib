@@ -1149,6 +1149,13 @@ version(/+$DIDE_REGION+/all)
 			{ return innerSize.y; } 	void innerHeight(float v)
 			{ outerSize.y = v+totalGapSize.y; } 
 			
+			alias innerLeft = innerX; 
+			alias innerTop = innerY; 
+			auto innerRight() const
+			{ return innerX + innerWidth; } 
+			auto innerBottom() const
+			{ return innerY + innerHeight; } 
+			
 			auto outerLeft	() const
 			{ return outerX; } 
 			auto outerRight	() const
@@ -4477,14 +4484,12 @@ version(/+$DIDE_REGION+/all)
 		T hoveredItem; 
 		
 		enum MouseOp
-		{ idle, move, rectSelect} 
-		MouseOp mouseOp; 
+		{ idle, move, rectSelect} MouseOp mouseOp; 
 		
 		vec2 mouseLast; 
 		
 		enum SelectOp
-		{ none, add, sub, toggle, clearAdd} 
-		SelectOp selectOp; 
+		{ none, add, sub, toggle, clearAdd} SelectOp selectOp; 
 		
 		vec2 dragSource; 
 		bounds2 dragBounds; 
@@ -4674,6 +4679,8 @@ version(/+$DIDE_REGION+/all)
 		
 		doit(actItem); 
 	} 
+	
+	
 }
 version(/+$DIDE_REGION+/all)
 {
@@ -6858,7 +6865,7 @@ struct im
 		{ linear, log, circular, endless} 
 			struct range
 		{
-										//endless can go out of range, circular always using modulo.
+			//endless can go out of range, circular always using modulo.
 			float min, max, step=1; RangeType type;  //Todo: this is an 1D bounds
 			
 			//Todo: handle invalid intervals
@@ -6899,8 +6906,8 @@ struct im
 				n = n.clamp(0, 1); 
 				
 				return clamp(
-					isLog ?  2 ^^	n.remap(0, 1, min.log2, max.log2)
-																	 :	n.remap(0, 1, min     , max     )
+					isLog 	? 2 ^^ n.remap(0, 1, min.log2, max.log2)
+						: n.remap(0, 1, min     , max     )
 				); //clamp is needed because of rounding errors
 			} 
 			
@@ -9768,6 +9775,7 @@ struct im
 			enum Type { info, warning, error} 
 			Type type; 
 			string msg; 
+			int count=1;
 			
 			RGB color()
 			{
@@ -9778,7 +9786,6 @@ struct im
 					case warning: 	return clYellow; 
 					case error: 	return clRed; 
 				}
-				
 			} 
 		} 
 		
@@ -9787,11 +9794,22 @@ struct im
 		void flashMessage(FlashMessage.Type type, string msg)
 		{
 			if(msg=="") return; 
-			//Todo: implement flashing error UI
+			
+			//duplicated item
+			auto count = 1;
+			
+			const duplicatedIdx = flashMessages.countUntil!(m=>m.type==type && m.msg==msg);
+			if(duplicatedIdx>=0)
+			{
+				auto duplicatedItem = flashMessages[duplicatedIdx];
+				count = duplicatedItem.count+1;
+				flashMessages = flashMessages.remove(duplicatedIdx);
+			}
+			
 			enum maxLen = 10; 
 			if(flashMessages.length>maxLen)
 			flashMessages = flashMessages[$-maxLen..$]; 
-			flashMessages ~= FlashMessage(now, type, msg); 
+			flashMessages ~= FlashMessage(now, type, msg, count); 
 			
 			with(FlashMessage.Type)
 			final switch(type)
@@ -9852,7 +9870,9 @@ struct im
 								
 								fh = DefaultFontHeight*2 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
 									* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
-								Text(m.msg); 
+								
+								const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : "");
+								Text(s); 
 							}
 						); 
 					}

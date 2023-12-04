@@ -7691,6 +7691,25 @@ version(/+$DIDE_REGION Colors+/all)
 		
 		auto darken(in RGB a, float t) { return mix(a, clBlack, t); } 
 		auto lighten(in RGB a, float t) { return mix(a, clWhite, t); } 
+		
+		struct RGBSum
+		{
+			float totalWeight = 0; 
+			vec3 totalColor; 
+			
+			void add(RGB c, float weight = 1)
+			{
+				totalColor += c*weight; 
+				totalWeight += weight; 
+			}
+			
+			RGB avg()
+			{ return avg(clBlack); } 
+			
+			RGB avg(lazy RGB def)
+			{ return totalWeight ? RGB((totalColor*(1.0f/totalWeight)).iround) : def; } 
+		} 
+		
 		
 		/+
 			
