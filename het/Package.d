@@ -12796,6 +12796,8 @@ version(/+$DIDE_REGION debug+/all)
 			this()
 			{ tryCreate; } 
 			
+			@property active(){ return !!data; }
+			
 			bool update()
 			{
 				if(!data)
@@ -12861,6 +12863,11 @@ version(/+$DIDE_REGION debug+/all)
 			
 			bool isExeWaiting()
 			{ return data && data.exe_waiting!=0; } 
+			
+			void setAck(int val)
+			{
+			if(data) data.dide_ack = val;
+			}
 			
 		} 
 	}
