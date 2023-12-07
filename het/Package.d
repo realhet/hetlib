@@ -187,48 +187,48 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			//Todo: a unittest alatt nem indul ez el.
 			//Todo: functional tests: nem ide kene
 			//functional tests
-					
+			
 			application.tickTime = now; 
-					
+			
 			installExceptionFilter; 
-					
+			
 			DateTime.selftest; 
-					
+			
 			const s1 = "hello", s2 = "Nobody inspects the spammish repetition"; 
 			enforce(xxh32(s1)==0xfb0077f9); 
 			enforce(xxh32(s2, 123456) == 0xc2845cee); 
 			enforce(crc32("Hello")==0xf7d18982); 
 			enforce(crc32(s2) == 0xAD4270ED); 
-					
+			
 			XXH3.selftest; 
-					
+			
 			{ RNG rng; rng.seed = 0; enforce(iota(30).map!(i => rng.random(100).text).join(' ') == "0 3 86 20 27 67 31 16 37 42 8 47 7 84 5 29 91 36 77 32 69 84 71 30 16 32 46 24 82 27"); }
-					
+			
 			enforce(maskLowBits(0)==0); 
 			enforce(maskLowBits(1)==1); 
 			enforce(maskLowBits(2)==3); 
 			enforce(maskLowBits(3)==3); 
 			enforce(maskLowBits(4)==7); 
-					
+			
 			enforce(countHighZeroBits(0)==32); 
 			enforce(countHighZeroBits(1)==31); 
 			enforce(countHighZeroBits(2)==30); 
 			enforce(countHighZeroBits(0x7FFF0000)==1); 
 			enforce(countHighZeroBits(0xFFFF0000)==0); 
-					
+			
 			UpdateInterval()._testRepeater; 
-					
+			
 			enforce([8,9,10,11,12,13].map!(a => alignUp(a, 4)).equal([8,12,12,12,12,16])); 
-					
+			
 			//startup
-					
+			
 			CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
 			//before 220623 it was: CoInitialize(null);
-					
+			
 			ini.loadIni; 
-					
+			
 			console.setUTF8; 
-					
+			
 			test_SrcId; 
 		} 
 		
@@ -7701,7 +7701,7 @@ version(/+$DIDE_REGION Colors+/all)
 			{
 				totalColor += c*weight; 
 				totalWeight += weight; 
-			}
+			} 
 			
 			RGB avg()
 			{ return avg(clBlack); } 
@@ -10871,7 +10871,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		{
 			return sameText(
 				a.excludeTrailingPathDelimiter,
-								b.excludeTrailingPathDelimiter
+				b.excludeTrailingPathDelimiter
 			); 
 		} 
 		
