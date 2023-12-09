@@ -4,7 +4,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 {
 	version(/+$DIDE_REGION+/all) {
 		__gshared logFileOps = false; 
-		
+		 
 		pragma(lib, "ole32.lib"); //COM (OLE Com Object) initialization is in utils.d, not in win.d
 		pragma(lib, "comdlg32.lib"); //for the dialogs
 		pragma(lib, "winmm.lib"); //for playsound
@@ -96,7 +96,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.utf; 
 			public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum; 
 			public import std.uri: urlEncode = encode, urlDecode = decode; 
-			public import std.process : environment, thisThreadID, execute; 
+			public import std.process : environment, thisThreadID, execute, executeShell, ExecuteConfig = Config; 
 			public import std.zlib : compress, uncompress; 
 			public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write; 
 			//public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
@@ -344,6 +344,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS); 
 					application.timeZoneName = DateTime.currentTimeZoneName; 
 					dbg; //start it up
+					if(dbg.data) {
+						 import std.process; 
+						dbg.data.exe_pid = thisProcessID; 
+						dbg.data.console_hwnd = cast(int)(console.hwnd); 
+					}
 					killerThread = new KillerThread;  killerThread.start; 
 					console.handleException({ globalInitialize; }); 
 				}
@@ -4967,7 +4972,7 @@ version(/+$DIDE_REGION Containers+/all)
 				{
 					return format!("%s(count: %s, minAge = %s, maxAge = %s")(
 						name, items.length,
-													application.tick - items.values.map!(a => a.tick).minElement(uint.max),
+						application.tick - items.values.map!(a => a.tick).minElement(uint.max),
 													application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
 					); 
 				} 
@@ -5040,7 +5045,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			return "DynCharMap(charCnt/Max=%d/%d, bankSize=%s, [%s])"	.format(
 				(map[].count!"a!=b"(0)+1)<<bankSh,
-				maxChars,
+				maxChars, 
 				bankSize,
 				map[].enumerate.filter!"a.value".map!(a => "%X:%X".format(a.index<<bankSh, a.value<<bankSh)).join(", ")
 			); 
@@ -10451,7 +10456,7 @@ version(/+$DIDE_REGION Date Time+/all)
 							auto tAct = QPS-t0; 
 							actEvents = seq.getEvents(tLast, tAct); 
 							tLast = tAct; 
-									
+							
 							if(actEvents.empty) {
 								 //wait more or break on EOS
 								if(!seq.anyEventsAfter(tLast)) {
@@ -12476,7 +12481,7 @@ version(/+$DIDE_REGION debug+/all)
 			
 			static struct Data
 			{
-				 //raw shared data. Careful with 64/32bit stuff!!!!!!
+				//raw shared data. Careful with 64/32bit stuff!!!!!!
 				uint ping; 
 				BreakTable breakTable; 
 				CircBuf!(uint, cBufSize) buf; //CircBuf is a struct, not a reference
@@ -12489,6 +12494,8 @@ version(/+$DIDE_REGION debug+/all)
 				+/
 				int dide_hwnd; //to call setforegroundwindow
 				int exe_hwnd; 
+				int exe_pid; 
+				int console_hwnd; 
 			} 
 			
 			string dataFileName; 
@@ -12796,7 +12803,7 @@ version(/+$DIDE_REGION debug+/all)
 			this()
 			{ tryCreate; } 
 			
-			@property active(){ return !!data; }
+			@property active() { return !!data; } 
 			
 			bool update()
 			{
@@ -12842,6 +12849,8 @@ version(/+$DIDE_REGION debug+/all)
 				{
 					dide_hwnd = cast(uint)application.handle; 
 					exe_hwnd = 0; 
+					exe_pid = 0; 
+					console_hwnd = 0; 
 					forceExit = 0; 
 					dide_ack = 0; 
 					exe_waiting = 0; 
@@ -12865,9 +12874,13 @@ version(/+$DIDE_REGION debug+/all)
 			{ return data && data.exe_waiting!=0; } 
 			
 			void setAck(int val)
-			{
-			if(data) data.dide_ack = val;
-			}
+			{ if(data) data.dide_ack = val; } 
+			
+			int exe_pid()
+			{ return data ? data.exe_pid : 0; } 
+			
+			int console_hwnd()
+			{ return data ? data.console_hwnd : 0; } 
 			
 		} 
 	}

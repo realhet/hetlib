@@ -1052,6 +1052,21 @@ version(/+$DIDE_REGION+/all)
 		ref Padding	padding()
 		{ static Padding	nullPadding; return nullPadding; }  //Todo: inout ref
 		
+		version(/+$DIDE_REGION SelectionManager  virtual functs+/all)
+		{
+			bool getSelected()
+			{ return false; } 
+			void setSelected(bool b)
+			{} 
+			bool getOldSelected()
+			{ return false; } 
+			void setOldSelected(bool b)
+			{ } 
+			
+			bounds2 getBounds()
+			{ return outerBounds; } 
+		}
+		
 		float extraMargin()	const
 		{ return (VisualizeContainers && cast(Container)this)? 3:0; } 
 		vec2 topLeftGapSize()	const
@@ -1072,6 +1087,9 @@ version(/+$DIDE_REGION+/all)
 		} 
 		vec2 totalGapSize()	const
 		{ return topLeftGapSize + bottomRightGapSize; } 
+		
+		
+		
 		
 		@property
 		{
@@ -3228,7 +3246,7 @@ version(/+$DIDE_REGION+/all)
 			innerWidth	= calcContentWidth; 
 			if(flags.autoHeight)
 			innerHeight	= calcContentHeight; 
-		} 
+		} 
 		
 		/// Mark the container, so it will be re-measured on the next measure() call.
 		/// Normal behaviour is ALWAYS measure. (It is the normal behaviour for immediate mode UI)
@@ -3258,7 +3276,7 @@ version(/+$DIDE_REGION+/all)
 			
 			return effective; 
 		} 
-		
+		
 		/// this must be called from outside. It calls rearrange and measures subContainers if needed.
 		final void measure()
 		{
@@ -3534,7 +3552,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void onDraw(Drawing dr)
 		{} //can override to draw some custom things.
-		
+		
 		
 		protected void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
 		{
@@ -3557,7 +3575,7 @@ version(/+$DIDE_REGION+/all)
 				visitSubCells_cull(b, (c){ c.draw(dr); }); 
 			}
 		} 
-		
+		
 		static bounds2 _savedComboBounds; //when saveComboBounds flag is active it saves the absolute bounds
 		
 		override void draw(Drawing dr)
@@ -3658,7 +3676,7 @@ version(/+$DIDE_REGION+/all)
 			drawBorder(dr); //border is the last by default
 			
 			drawDebug(dr); 
-		} 
+		} 
 		
 		void drawDebug(Drawing dr)
 		{
@@ -3707,7 +3725,7 @@ version(/+$DIDE_REGION+/all)
 				}
 			} 
 		} ; 
-		
+		
 		
 		struct SearchResult
 		{
@@ -3898,6 +3916,22 @@ version(/+$DIDE_REGION+/all)
 				}
 		+/
 		
+		version(/+$DIDE_REGION SelectionManager  virtual functs+/all)
+		{
+			override bool getSelected()
+			{ return flags.selected; } 
+			override void setSelected(bool b)
+			{ flags.selected = b; } 
+			override bool getOldSelected()
+			{ return flags.oldSelected; } 
+			override void setOldSelected(bool b)
+			{ flags.oldSelected = b; } 
+			
+			/+
+				override bounds2 getBounds()
+						{ return outerBounds; } 
+			+/
+		}
 	} 
 	
 	
