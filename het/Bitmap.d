@@ -243,7 +243,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void registerStaticFunction(alias fun)()
 		{
-			static assert(__traits(isStaticFunction, fun));
+			static assert(__traits(isStaticFunction, fun)); 
 			enum name = __traits(identifier, fun); static assert(name.endsWith(postfix)); 
 			enum prefix = name.withoutEnding(postfix); /+static assert(prefix == prefix.lc);+/
 			register(prefix, toDelegate(&fun)); 
@@ -7280,7 +7280,7 @@ version(/+$DIDE_REGION+/all)
 				static bool isGrayscale(in RGBA color)
 				{ return color.rg==color.gb; } 
 				
-				if(res.access!RGBA.asArray.map!isGrayscale.all)
+				if(res.access!RGBA.asArray.map!isGrayscale.all && !text.among("➕", "➖", "➗", "✖", "⚙")/+Opt: faster lookup with more exceptions+/)
 				{
 					res.set(res.get!ubyte); //convert it to 1 channel
 				}

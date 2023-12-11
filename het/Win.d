@@ -1215,6 +1215,13 @@ class Window
 	
 	private final void internalUpdate()
 	{
+		//handle debug.kill
+		if(dbg.forceExit_check) {
+			import core.sys.windows.windows; 
+			PostMessage(hwnd, WM_CLOSE, 0, 0); 
+			return; 
+		}
+		
 		//static if(1){ const T0 = QPS; scope(exit) print("IU", (QPS-T0)*1000); }
 		
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
@@ -1233,8 +1240,6 @@ class Window
 			//forceRedraw; //Bug: ha ez itt van, akkor az ablakot lehetetlen bezarni
 		} 
 		
-		//handle debug.kill
-		if(dbg.forceExit_check) { dbg.forceExit_clear; this.destroy; }//Todo: ez multiWindow-ra nem tudom, hogy hogy fog menni...
 		
 		const timeTarget = (1.0f/targetUpdateRate)*second; 
 		

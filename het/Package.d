@@ -263,55 +263,54 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			//__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
 			bool initialized, finalized, running_; 
-			
-			//Lets the executable stopped from DIDE when the windows message loop is not responding.
-			class KillerThread: Thread
-			{
-				bool over, finished; 
-				this()
+			/+
+				No need for KillerThread anymore: DIDE can kill.
+				
+				//Lets the executable stopped from DIDE when the windows message loop is not responding.
+				class KillerThread: Thread
 				{
-					super(
-						{
-							auto t0	= 0.0 *second; 
-							const timeOut	= 0.66*second; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
-							while(!over)
+					bool over, finished; 
+					this()
+					{
+						super(
 							{
-								if(t0 == 0*second)
+								auto t0	= 0.0 *second; 
+								const timeOut	= 0.66*second; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
+								while(!over)
 								{
-									if(dbg.forceExit_check) t0 = QPS; //start timer
-								}
-								else
-								{
-									auto elapsed = QPS-t0; 
-									if(!dbg.forceExit_check)
+									if(t0 == 0*second)
 									{
-										t0 = 0*second; //reset timer. exiting out normally.
+										if(dbg.forceExit_check) t0 = QPS; //start timer
 									}
 									else
 									{
-										if(elapsed>timeOut)
+										auto elapsed = QPS-t0; 
+										if(!dbg.forceExit_check)
 										{
-											dbg.forceExit_clear; //timeout reached, exit drastically
-											application.exit; 
+											t0 = 0*second; //reset timer. exiting out normally.
+										}
+										else
+										{
+											if(elapsed>timeOut)
+											{ application.exit; }
 										}
 									}
+									.sleep(15); 
 								}
-								.sleep(15); 
+								finished = true; 
 							}
-							finished = true; 
-						}
-					); 
+						); 
+					} 
+					
+					void stop()
+					{
+						over = true; 
+						while(!finished) .sleep(5); //Have to wait the thread
+					} 
 				} 
 				
-				void stop()
-				{
-					over = true; 
-					while(!finished) .sleep(5); //Have to wait the thread
-				} 
-			} 
-			
-			KillerThread killerThread; 
-			
+				KillerThread killerThread; 
+			+/
 		} 
 		__gshared static public
 		{
@@ -349,7 +348,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						dbg.data.exe_pid = thisProcessID; 
 						dbg.data.console_hwnd = cast(int)(console.hwnd); 
 					}
-					killerThread = new KillerThread;  killerThread.start; 
+					//killerThread = new KillerThread;  killerThread.start; 
 					console.handleException({ globalInitialize; }); 
 				}
 			} 
@@ -361,7 +360,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(chkSet(finalized))
 				{
 					console.handleException({ globalFinalize; }); 
-					killerThread.stop; 
+					//killerThread.stop; 
 					//dont! -> destroy(killerThread); note: Sometimes it is destroyed automatically, and this causes an access viole reading from addr 0
 					running_ = false; 
 				}else
@@ -946,31 +945,31 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				ulong idle, kernel, user; 
 				auto ft(ref ulong a) { return cast(FILETIME*)(&a); } 
 				if(!GetSystemTimes(ft(idle), ft(kernel), ft(user))) return float.nan; 
-							
+				
 				//calculate  1 - (delta(Idle) / delta(kernel+user))
 				__gshared static ulong prevTotal, prevIdle; 
 				auto total = kernel+user; 
 				auto res = 1 - float(idle-prevIdle) / (total-prevTotal); //Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-							
+				
 				return res*100; 
 			} 
 			
 			auto GetCPULoadPercent()
 			{
-				__gshared static double lastTime = 0; 
+				__gshared static double lastTime = 0; //Todo: Use DateTime
 				__gshared static float lastPercent = 0; 
-							
+				
 				const interval = 0.33f; //seconds
-							
+				
 				auto actTime = QPS.value(second); 
 				if(actTime-lastTime > interval) {
 					lastTime = actTime; 
 					auto a = GetCPULoadPercent_internal; 
 					if(!isnan(a)) lastPercent = a; 
 				}
-							
+				
 				return lastPercent; 
 			} 
 			
@@ -12580,22 +12579,20 @@ version(/+$DIDE_REGION debug+/all)
 			bool isActive()
 			{ return data !is null; } 
 			
-			bool forceExit_set()
-			{
-				if(!data)
-				return false; data.forceExit = 1; return true; 
-			} 
-			void forceExit_clear()
-			{
-				if(data)
-				data.forceExit = 0; 
-			} 
+			/+
+				bool forceExit_set()
+					{
+						if(!data)
+						return false; data.forceExit = 1; return true; 
+					} 
+					void forceExit_clear()
+					{
+						if(data)
+						data.forceExit = 0; 
+					} 
+			+/
 			bool forceExit_check()
-			{
-				if(data)
-				return data.forceExit!=0; else
-				return false; 
-			} 
+			{ return data && !!data.forceExit; } 
 			
 			void handleException(string msg)
 			{
@@ -12836,18 +12833,13 @@ version(/+$DIDE_REGION debug+/all)
 				data.poti[idx] = val; 
 			} 
 			
-			void clearExit()
-			{ data.forceExit = 0; } 
-			void forceExit()
-			{ data.forceExit = 1; } 
-			
 			void resetBeforeRun()
 			{
 				if(!data)
 				return; 
 				with(data)
 				{
-					dide_hwnd = cast(uint)application.handle; 
+					dide_hwnd = cast(int)application.handle; 
 					exe_hwnd = 0; 
 					exe_pid = 0; 
 					console_hwnd = 0; 
@@ -12857,7 +12849,7 @@ version(/+$DIDE_REGION debug+/all)
 				}
 			} 
 			
-			void forcedStop()
+			void forceExit()
 			{
 				if(!data)
 				return; 
@@ -12870,17 +12862,26 @@ version(/+$DIDE_REGION debug+/all)
 				}
 			} 
 			
+			bool isForcingExit()
+			{ return data && !!data.forceExit; } 
+			
 			bool isExeWaiting()
 			{ return data && data.exe_waiting!=0; } 
 			
 			void setAck(int val)
 			{ if(data) data.dide_ack = val; } 
 			
-			int exe_pid()
-			{ return data ? data.exe_pid : 0; } 
-			
-			int console_hwnd()
-			{ return data ? data.console_hwnd : 0; } 
+			@property exe_pid()
+			{ return data ? data.exe_pid : 0; } 	@property exe_pid(int val)
+			{ if(data) data.exe_pid = val; } 
+				
+			@property console_hwnd()
+			{ return data ? data.console_hwnd : 0; } 	@property console_hwnd(int val)
+			{ if(data) data.console_hwnd = val; } 
+				
+			@property exe_hwnd()
+			{ return data ? data.exe_hwnd : 0; } 	@property exe_hwnd(int val)
+			{ if(data) data.exe_hwnd = val; } 
 			
 		} 
 	}
