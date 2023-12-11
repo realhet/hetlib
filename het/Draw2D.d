@@ -2527,13 +2527,20 @@ class Drawing
 			
 			auto nearest = No.nearest; 
 			int shaderIdx = -1; 
+			auto 	color 	= (RGBA(0, 0, 0, 255)),
+				bkColor 	= (RGBA(0, 0, 0, 255)); 
 			
 			static foreach(i, A_; T)
 			{
 				{
 					alias A = Unqual!A_; auto a() { return args[i]; } 
 					static if(is(A==Flag!"nearest"	))	nearest = a; 
-					else static if(is(A==GenericArg!(N,	T), string N, T) && N=="shaderIdx")	shaderIdx = a.value; 
+					else static if(is(A==GenericArg!(N,	T), string N, T))
+					{
+						static if(N=="shaderIdx")	shaderIdx = a.value; 
+						else static if(N=="color")	color = a.value; 
+						else static if(N=="bkColor")	bkColor = a.value; 
+					}
 					else static assert(0, "Unhandled parameter "~typeof(a).stringof); 
 				}
 			}
@@ -2544,7 +2551,7 @@ class Drawing
 			oldAppend(
 				DrawingObj(
 					oldCmd(7, stIdx), inputTransform(bnd.low), inputTransform(bnd.high), 
-					tx0, 0xFF000000/+color+/, tx1, 0xFF000000/+bkColor+/
+					tx0, color.raw, tx1, bkColor.raw
 				)
 			); 
 		} 
