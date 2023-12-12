@@ -6803,7 +6803,6 @@ version(/+$DIDE_REGION+/all)
 			mixin(uuid!(ID2D1Factory, "06152247-6f50-465a-9245-118bfd3b6007")); 
 			interface ID2D1Factory : IUnknown
 		{
-			extern(Windows): 
 			HRESULT ReloadSystemMetrics(); 
 			void GetDesktopDpi(/*out*/ FLOAT *dpiX,/*out*/ FLOAT *dpiY); 
 			HRESULT CreateRectangleGeometry(/**/); 
@@ -6878,7 +6877,6 @@ version(/+$DIDE_REGION+/all)
 			mixin(uuid!(IDWriteTextFormat, "9c906818-31d7-4fd3-a151-7c5e225db55a")); 
 			interface IDWriteTextFormat : IUnknown
 		{
-			extern(Windows): 
 			HRESULT SetTextAlignment(DWRITE_TEXT_ALIGNMENT textAlignment); 
 			HRESULT SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT paragraphAlignment); 
 			HRESULT SetWordWrapping(DWRITE_WORD_WRAPPING wordWrapping); 
@@ -6915,7 +6913,7 @@ version(/+$DIDE_REGION+/all)
 			mixin(uuid!(ID2D1Brush, "2cd906a8-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1Brush : ID2D1Resource
 		{
-			extern(Windows): 
+			//extern(Windows): 
 			void SetOpacity(FLOAT opacity); 
 			void SetTransform(in D2D1_MATRIX_3X2_F transform); 
 			FLOAT GetOpacity() const; 
@@ -6925,7 +6923,7 @@ version(/+$DIDE_REGION+/all)
 			mixin(uuid!(ID2D1SolidColorBrush, "2cd906a9-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1SolidColorBrush : ID2D1Brush
 		{
-			extern(Windows): 
+			//extern(Windows): 
 			void SetColor(in D2D1_COLOR_F color); 
 			ref D2D1_COLOR_F GetColor() const; //Bug: got crash? see ID2D1RenderTarget.GetSize()
 		} 
@@ -6933,14 +6931,13 @@ version(/+$DIDE_REGION+/all)
 			mixin(uuid!(ID2D1Resource, "2cd90691-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1Resource : IUnknown
 		{
-			extern(Windows): 
+			//extern(Windows): 
 			void GetFactory(out ID2D1Factory factory) const; 
 		} 
 		
 			mixin(uuid!(ID2D1RenderTarget, "2cd90694-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1RenderTarget : ID2D1Resource
 		{
-			extern(Windows): 
 			HRESULT CreateBitmap(/**/); 
 			HRESULT CreateBitmapFromWicBitmap(/**/); 
 			HRESULT CreateSharedBitmap(/**/); 
@@ -7016,15 +7013,11 @@ version(/+$DIDE_REGION+/all)
 			//------------------------------------------------------------------------------
 			mixin(uuid!(ID2D1DCRenderTarget, "1c51bc64-de61-46fd-9899-63a5d8f03950")); 
 			interface ID2D1DCRenderTarget : ID2D1RenderTarget
-		{
-			 extern(Windows): 
-					HRESULT BindDC(const HDC  hDC, const(RECT)* pSubRect); 
-		} 
+		{ HRESULT BindDC(const HDC  hDC, const(RECT)* pSubRect); } 
 		
 			mixin(uuid!(IDWriteFactory, "b859ee5a-d838-4b5b-a2e8-1adc7d93db48")); 
 			interface IDWriteFactory : IUnknown
 		{
-			extern(Windows): 
 			HRESULT GetSystemFontCollection(/**/); 
 			HRESULT CreateCustomFontCollection(/**/); 
 			HRESULT RegisterFontCollectionLoader(/**/); 
@@ -7069,7 +7062,6 @@ version(/+$DIDE_REGION+/all)
 			mixin(uuid!(IDWriteTextLayout, "53737037-6d14-410b-9bfe-0b182bb70961")); 
 			interface IDWriteTextLayout : IDWriteTextFormat
 		{
-			extern(Windows): 
 			HRESULT SetMaxWidth(FLOAT maxWidth); 
 			HRESULT SetMaxHeight(FLOAT maxHeight); 
 			HRESULT SetFontCollection(/**/); 

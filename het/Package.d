@@ -178,6 +178,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				"template uuidof(T:"~T.stringof~"){ const uuidof = IID_"~T.stringof~";}"; 
 		} 
 		
+		template clsid(T, string g)
+		{
+			const clsid = "const IID CLSID_"~T.stringof~"={ 0x" ~ g[0..8] ~ ",0x" ~ g[9..13] ~ ",0x" ~ g[14..18] ~ ",[0x" ~ g[19..21] ~ ",0x" ~
+				g[21..23] ~ ",0x" ~ g[24..26] ~ ",0x" ~ g[26..28] ~ ",0x" ~ g[28..30] ~ ",0x" ~ g[30..32] ~ ",0x" ~ g[32..34] ~ ",0x" ~ g[34..36] ~ "]};"~
+				"template clsidof(T:"~T.stringof~"){ const clsidof = IID_"~T.stringof~";}"; 
+			
+			//Todo: it's not so good.
+		} 
+		
 		
 		//for main thread only, called from application class //
 		

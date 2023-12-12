@@ -1393,7 +1393,8 @@ version(/+$DIDE_REGION+/all)
 		alias DIEnumDeviceObjectsCallbackA = extern(Windows) bool function(in DIDeviceObjectInstanceA ddoi, void* pvRef); 
 		
 		mixin(uuid!(IDirectInput8A, "BF798030-483A-4DA2-AA99-5D64ED369700")); 
-		interface    IDirectInput8A : IUnknown
+		
+		interface IDirectInput8A : IUnknown
 		{
 			extern(Windows): 
 			HRESULT CreateDevice(REFIID rguid, out IDirectInputDeviceA device, IUnknown pUnkOuter); 

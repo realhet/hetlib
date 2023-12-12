@@ -1340,6 +1340,79 @@ class Window
 			if(autoUpdate) invalidate;
 		*/
 	} 
+	
 	
+	version(/+$DIDE_REGION ProgressBar on taskbar+/all)
+	{
+		enum TBPFLAGS
+		{
+			NOPROGRESS 	= 0,
+			INDETERMINATE 	= 0x1,
+			NORMAL 	= 0x2,
+			ERROR 	= 0x4,
+			PAUSED 	= 0x8
+		} 
+		
+		mixin(clsid!(ITaskbarList, "56FDF344-FD6D-11D0-958A-006097C9A090")); 
+		mixin(uuid!(ITaskbarList, "56FDF342-FD6D-11D0-958A-006097C9A090")); 
+		interface ITaskbarList : IUnknown
+		{
+			HRESULT HrInit(); 
+			HRESULT AddTab(HWND hwnd); 
+			HRESULT DeleteTab(HWND hwnd); 
+			HRESULT ActivateTab(HWND hwnd); 
+			HRESULT SetActiveAlt(HWND hwnd); 
+		} 
+		
+		mixin(uuid!(ITaskbarList2, "602D4995-B13A-429B-A66E-1935E44F4317")); 
+		interface ITaskbarList2 : ITaskbarList
+		{ HRESULT MarkFullscreenWindow(HWND hwnd, BOOL fFullscreen); } 
+		
+		mixin(uuid!(ITaskbarList3, "EA1AFB91-9E28-4B86-90E9-9E9F8A5EEFAF")); 
+		interface ITaskbarList3 : ITaskbarList2
+		{
+			HRESULT SetProgressValue(HWND hwnd, ulong ullCompleted, ulong ullTotal); 
+			HRESULT SetProgressState(HWND hwnd, DWORD tbpFlags); 
+			/+
+				HRESULT RegisterTab(hwndTab: Cardinal; hwndMDI: Cardinal); safecall;
+				HRESULT UnregisterTab(hwndTab: Cardinal); safecall;
+				HRESULT SetTabOrder(hwndTab: Cardinal; hwndInsertBefore: Cardinal); safecall;
+				HRESULT SetTabActive(hwndTab: Cardinal; hwndMDI: Cardinal; tbatFlags: DWORD); safecall;
+				HRESULT ThumbBarAddButtons(hwnd: Cardinal; cButtons: UINT; Button: THUMBBUTTONLIST); safecall;
+				HRESULT ThumbBarUpdateButtons(hwnd: Cardinal; cButtons: UINT; pButton: THUMBBUTTONLIST); safecall;
+				HRESULT ThumbBarSetImageList(hwnd: Cardinal; himl: Cardinal); safecall;
+				HRESULT SetOverlayIcon(hwnd: Cardinal; hIcon: HICON; pszDescription: LPCWSTR); safecall;
+				HRESULT SetThumbnailTooltip(hwnd: Cardinal; pszTip: LPCWSTR); safecall;
+				HRESULT SetThumbnailClip(hwnd: Cardinal; prcClip: PRect); safecall;
+			+/
+		} 
+		
+		ITaskbarList3 taskbarList3; 
+		
+		void setTaskbarProgress(bool active, long pos, long total)
+		{
+			if(!hwnd) return; 
+			
+			if(!taskbarList3)
+			{
+				CoCreateInstance(
+					&CLSID_ITaskbarList, null, 1/+INPROC_SERVER+/, 
+					&IID_ITaskbarList3, cast(void**) &taskbarList3
+				).hrChk; 
+				if(taskbarList3) taskbarList3.HrInit().hrChk; 
+			}
+			
+			if(taskbarList3)
+			{
+				if(active)
+				{
+					taskbarList3.SetProgressState(hwnd, TBPFLAGS.NORMAL).hrChk; 
+					taskbarList3.SetProgressValue(hwnd, pos, total).hrChk; 
+				}
+				else
+				{ taskbarList3.SetProgressState(hwnd, TBPFLAGS.NOPROGRESS).hrChk; }
+			}
+		} 
+	}
 	
 } 
