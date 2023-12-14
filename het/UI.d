@@ -21,7 +21,7 @@ version(/+$DIDE_REGION+/all)
 		VisualizeTabColors	= 0, //Todo: spaces at row ends
 		VisualizeHitStack	= 0,
 		VisualizeSliders	= 0,
-		VisualizeCodeLineIndices 	= 0,
+		VisualizeCodeLineIndices 	= 0, //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
 			
 		addHitRectAsserts	= 0; //Verifies that Cell.Id is non null and unique
 	
@@ -8166,10 +8166,10 @@ struct im
 					
 					bool focused = focusUpdate(
 						actContainer, id_,
-										enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
-										/*onEnter	*/ {},
-										/*onFocus	*/ {},
-										/*onExit	*/ {}
+						enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
+						/*onEnter	*/ {},
+						/*onFocus	*/ {},
+						/*onExit	*/ {}
 					); 
 					
 					//flags.wordWrap = false;
@@ -8179,10 +8179,7 @@ struct im
 					
 					static if(isSomeString!T0)
 					Text(text); 
-					else text(); 
-					 //delegate
-					
-					static foreach(a; args)
+					else text();  static foreach(a; args)
 					static if(__traits(compiles, a()))
 					a(); 
 				}

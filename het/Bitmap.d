@@ -6044,6 +6044,13 @@ version(/+$DIDE_REGION+/all)
 			auto b = f.read.deserialize!Bitmap; 
 			copyFrom(b); 
 		} 
+		
+		void update(E)(Image!(E, 2) im)
+		{
+			set(im); 
+			markChanged; 
+			bitmaps.set(this); 
+		} 
 	} 
 	
 	//Bitmap/Image serializer //////////////////////////////////////////

@@ -2328,6 +2328,7 @@ version(/+$DIDE_REGION Dimensions+/all)
 		enum minute = 60 * second; /// ditto
 		enum hour = 60 * minute; /// ditto
 		enum day = 24 * hour; /// ditto
+		enum bpm = 1 / minute; /// ditto
 		enum degreeOfAngle = PI / 180 * radian; /// ditto
 		enum minuteOfAngle = degreeOfAngle / 60; /// ditto
 		enum secondOfAngle = minuteOfAngle / 60; /// ditto
@@ -2427,6 +2428,7 @@ version(/+$DIDE_REGION Dimensions+/all)
 			.addUnit("°", degreeOfAngle) /+230916 realhet+/
 			.addUnit("sr", steradian)
 			.addUnit("Hz", hertz)
+			.addUnit("bpm", bpm)
 			.addUnit("N", newton)
 			.addUnit("Pa", pascal)
 			.addUnit("J", joule)
