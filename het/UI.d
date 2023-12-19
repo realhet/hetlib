@@ -1536,15 +1536,21 @@ version(/+$DIDE_REGION+/all)
 		{
 			//Note: this is a Container and has the measure() method, so it can be resized by a Column or something. Unlike the Glyph which has constant size.
 			//Todo: do something to prevent a column to resize this. Current workaround: put the Img inside a Row().
-			const stIdx = textures[file]; //Todo: no delayed load support
-			const siz = calcGlyphSize_image(stIdx); 
-			
-			if(flags.autoHeight && flags.autoWidth)
-			{ innerSize = siz; }
-			else if(flags.autoHeight)
-			{ innerHeight = innerWidth/max(siz.x, 1)*siz.y; }
-			else if(flags.autoWidth)
-			{ innerWidth = innerHeight/max(siz.y, 1)*siz.x; }
+			auto bmp = bitmaps(file); 
+			if(bmp.valid)
+			{
+				const stIdx = textures[file]; //Todo: no delayed load support
+				const siz = calcGlyphSize_image(stIdx); 
+				
+				if(flags.autoHeight && flags.autoWidth)
+				{ innerSize = siz; }
+				else if(flags.autoHeight)
+				{ innerHeight = innerWidth/max(siz.x, 1)*siz.y; }
+				else if(flags.autoWidth)
+				{ innerWidth = innerHeight/max(siz.y, 1)*siz.x; }
+			}
+			else
+			{}
 		} 
 		
 		override void draw(Drawing dr)
@@ -1554,10 +1560,16 @@ version(/+$DIDE_REGION+/all)
 			
 			drawBorder(dr); 
 			
-			const stIdx = textures[file]; 
-			if(transparent)
-			dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/); 
-			else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/); 
+			if(auto bmp = bitmaps(file))
+			{
+				if(bmp.valid)
+				{
+					const stIdx = textures[file]; 
+					if(transparent)
+					dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/); 
+					else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/); 
+				}
+			}
 		} 
 	} 
 }

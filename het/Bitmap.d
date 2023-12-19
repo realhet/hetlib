@@ -6031,7 +6031,7 @@ version(/+$DIDE_REGION+/all)
 		
 		Bitmap shallowDup()
 		{ return dup(Yes.shallow); } 
-		
+		
 		void saveTo(F)(in F file)
 		{
 			auto f = File(file); 
@@ -6048,6 +6048,13 @@ version(/+$DIDE_REGION+/all)
 		void update(E)(Image!(E, 2) im)
 		{
 			set(im); 
+			markChanged; 
+			bitmaps.set(this); 
+		} 
+		
+		void update(File f)
+		{
+			file = f; 
 			markChanged; 
 			bitmaps.set(this); 
 		} 

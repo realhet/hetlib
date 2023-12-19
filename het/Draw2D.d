@@ -2394,10 +2394,11 @@ class Drawing
 		{
 			if(idx<0) return; 
 			
-			RGBA8 bkColor = clBlack; 
 			auto rectAlign = RectAlign(HAlign.center, VAlign.center, true, false, true); //shrink, enlarge, aspect
 			auto nearest = No.nearest; 
 			
+			auto 	color 	= realDrawColor,
+				bkColor 	= (RGBA(0, 0, 0, 255)); 
 			int shaderIdx = -1; 
 			float drawScale = 1; 
 			
@@ -2410,14 +2411,18 @@ class Drawing
 					else static if(is(A==Flag!"nearest"	))	nearest = a; 
 					else static if(is(A==RectAlign	))	rectAlign = a; 
 					else static if(is(A==DrawGlyphScale	))	drawScale = a.value; 
-					else static if(is(A==GenericArg!(N, T), string N, T) && N=="shaderIdx")	shaderIdx = a.value; 
-					else
-					{ static assert(0, "Unhandled parameter: " ~ A.stringof); }
+					else static if(is(A==GenericArg!(N, T), string N, T))
+					{
+						static if(N=="shaderIdx")	shaderIdx = a.value; 
+						else static if(N=="color")	color = a.value; 
+						else static if(N=="bkColor")	bkColor = a.value; 
+					}
+					else { static assert(0, "Unhandled parameter: " ~ A.stringof); }
 					
 				}
 			}
 			
-			auto c = realDrawColor; 
+			auto c = color; 
 			auto c2 = bkColor; 
 			
 			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),

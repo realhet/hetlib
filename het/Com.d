@@ -280,7 +280,8 @@ class ComPort
 	{
 		with(stats)
 		with(settings)
-		return format!`port: %s  baud: %s  %s  errors: %s, %s  out: %s, %sB  in: %s, %sB`(
+		return format	!`port: %s  baud: %s  %s  errors: %s, %s  out: %s, %sB  in: %s, %sB`
+			(
 			port, baud, enabled ? active ? "Active" : "Enabled" : "Disabled",
 			errorCnt, dataErrorCnt,
 			messagesOut, shortSizeText!1024(bytesOut),
@@ -329,11 +330,16 @@ class ComPort
 				break; 
 				case ComPortProtocol.textPackets: 
 					const str = cast(string)msg; 
-					outBuf ~= cast(ubyte[])(format!"%s%s~%x\n"(prefix, str, computeCheckSum(str))); 
+					outBuf ~= cast(ubyte[])(
+					format	!"%s%s~%x\n"
+						(prefix, str, computeCheckSum(str))
+				); 
 					stats.messagesOut ++; 
 				break; 
 				case ComPortProtocol.binaryPackets: 
-					outBuf ~= cast(ubyte[])(msg) ~ cast(ubyte[])[crc32(msg)] ~ cast(ubyte[])(prefix~"\n"); 
+					outBuf 	~= cast(ubyte[])(msg) 
+					 ~ cast(ubyte[])[crc32(msg)] 
+					 ~ cast(ubyte[])(prefix~"\n"); 
 					stats.messagesOut ++; 
 				break; 
 			}
@@ -468,7 +474,7 @@ class ComPort
 		
 		final switch(protocol)
 		{
-			case ComPortProtocol.raw       : processRaw	; break; 
+			case ComPortProtocol.raw      : processRaw	; break; 
 			case ComPortProtocol.binaryPackets: processBinaryPackets	; break; 
 			case ComPortProtocol.textPackets: processTextPackets	; break; 
 		}//end switch
@@ -488,7 +494,8 @@ class ComPort
 	
 	void UI(string title = "", void delegate() fun = null)
 	{
-		import het.ui; with(im)
+		import het.ui; 
+		with(im)
 		{
 			 //UI //////////////////////////////////////
 			
@@ -550,7 +557,7 @@ class ComPort
 				}
 			); 
 			
-			Row("Stats\t", { Static(toString.split(" ")[2..$].join(" ")); }); 
+			Row("Stats\t", { Static(toString.splitter("  ").drop(1).join("  ").replace("  out: ", "\nout: ")); }); 
 			
 			Row(
 				"Error\t", {
@@ -866,7 +873,7 @@ class ComPorts
 		
 		static void set(ComPortInfo p, bool exists, string description="", string deviceId="")
 		{
-			p._exists	= exists  ; 
+			p._exists	= exists ; 
 			p._description	= description; 
 			p._deviceId	= deviceId; 
 		} 

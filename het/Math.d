@@ -6,6 +6,8 @@ version(/+$DIDE_REGION+/all)
 	
 	//Todo: vec2 lvalue-be lehessen assignolni ivec2 rvalue-t!
 	//Todo: ldc fast math http://johanengelen.github.io/ldc/2016/10/11/Math-performance-LDC.html
+	//Todo: implicit cast from int to float in function args: vect, bounds, miageci van még...
+	
 	
 	//This module replaces and extends the interface of std.math.
 	//Anything usefull in std.math should wrapped here to support vector/scalar operations.
@@ -2171,7 +2173,7 @@ version(/+$DIDE_REGION+/all)
 			//here 4 bytes extra data can fit: a change-hash for example
 			E[] impl; 
 			
-			auto ptr(){ return impl.ptr; }
+			auto ptr() { return impl.ptr; } 
 			
 			//size properties
 			static foreach(i, name; ["width", "height", "depth"].take(N))
