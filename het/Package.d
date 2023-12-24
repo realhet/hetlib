@@ -445,13 +445,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{
 					string recordedStr; 
 					bool recording; 
-								
+					
 					//recording ------------------
 					void start() {
 						if(recording) WARN("Already recording."); 
 						recording = true; 
 					} 
-								
+					
 					string stop() {
 						if(!recording) WARN("Did not started recording."); 
 						recording = false; 
@@ -512,6 +512,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//execute program in hetlib console({ program }); (colorful console, debug and exception handling)
 				//args in application.args
 				static void opCall(void delegate() dg) { application.runConsole(dg); } 
+				static void opCall(void function() dg) { application.runConsole(dg.toDelegate); } 
 				
 				__gshared int indent = 0; 
 				
@@ -10170,6 +10171,11 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		private __gshared  Time _TLast; 
 		
+		long timeToRaw(Time t)
+		{ return cast(long)(t.value(second) * DateTime.RawUnit.sec); } 
+		Time rawToTime(long raw)
+		{ return raw * (second/DateTime.RawUnit.sec); } 
+		
 		auto T0() { _TLast = QPS; return QPS; } 
 		auto DT()() { const Q = QPS, res = Q-_TLast; _TLast = Q; return res; } 
 		
@@ -11038,7 +11044,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				Path opBinary(string op:"~")(string p2)
 				{ return Path(this, p2); } 
 				
-				/+Note: Equality and hashing of filenames must be CASE SENSITYIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
+				/+Note: Equality and hashing of filenames must be CASE SENSITIVE and WITHOUT NORMALIZATION.  See -> File.opEquals+/
 				int opCmp(in Path b)const
 				{ return cmp(fullPath, b.fullPath); } 
 				bool opEquals(in Path b)const
@@ -11543,6 +11549,7 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		File actualFile(in File f)
 		{
+			if(!f) return File.init; 
 			char[MAX_PATH] buf; 
 			auto len = GetShortPathNameA(f.normalized.fullName.toPChar, buf.ptr, MAX_PATH); 
 			if(len && len<MAX_PATH) {
@@ -11823,6 +11830,20 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		void unzip(ubyte[] zipData, string prefix)
 		{ zipData.unzip("*", prefix); } 
+		
+		//Todo: make a simple zipper function
+		/+
+			ZipArchive zip = new ZipArchive; 
+			
+			ArchiveMember file1 = new ArchiveMember; 
+			file1.name = "output.txt"; 
+			file1.expandedData = cast(ubyte[]) allOutput; 
+			file1.compressionMethod = CompressionMethod.deflate; 
+			
+			zip.addMember(file1); 
+			
+			File(`z:\temp\$output.zip`).write(zip.build); 
+		+/
 	}version(/+$DIDE_REGION Virtual files+/all)
 	{
 		///  Virtual files //////////////////////////////////////////////
