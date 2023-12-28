@@ -11663,6 +11663,16 @@ version(/+$DIDE_REGION Date Time+/all)
 			throw new Exception(p.error); 
 		} 
 		
+		class FileNameFixer
+		{
+			private File[string] nameMap; 
+			File fix(File f)
+			{ return nameMap.require(f.fullName, f.actualFile); }  
+			File opCall(File f)
+			{ return fix(f); } File opCall(string s)
+			{ return fix(s.File); } 
+		} 
+		
 	}version(/+$DIDE_REGION Compress+/all)
 	{
 		//Base64 //////////////////////////////////

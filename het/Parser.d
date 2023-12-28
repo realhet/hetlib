@@ -2881,7 +2881,85 @@ version(/+$DIDE_REGION Keywords+/all)
 	{ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); } 
 }version(/+$DIDE_REGION D Parser+/all)
 {
-	
+	struct CodeLocation
+	{
+		File file /+Note: Case Sensitive.  Must be the correct case.+/; 
+		int lineIdx, columnIdx, mixinLineIdx; 
+		
+		this(string file_, int lineIdx_, int columnIdx_=0, int mixinLineIdx_=0)
+		{
+			file 	= file_,
+			lineIdx 	= lineIdx_,
+			columnIdx 	= columnIdx_,
+			mixinLineIdx 	= mixinLineIdx_; 
+		} 
+		
+		this(string s)
+		{
+			//example: onlineapp.d-mixin-4(4,4)
+			
+			import std.regex; 
+			static rx = ctRegex!(`^([^\-\(]*)(?:\-mixin\-([0-9]+))?(?:\( *([0-9]+) *(?:, *([0-9]+))? *\) *)?$`); 
+			auto m = s.matchFirst(rx); 
+			if(m.length)
+			{
+				file 	= m[1].File,
+				mixinLineIdx 	= m[2].to!int.ifThrown(0),
+				lineIdx 	= m[3].to!int.ifThrown(0),
+				columnIdx 	= m[4].to!int.ifThrown(0); 
+			}
+		} 
+		
+		bool opCast(T:bool)() const
+		{ return cast(bool)file; } 
+		
+		int opCmp(in CodeLocation b) const //case sens!!!
+		{
+			return 	cmp(file.fullName, b.file.fullName)
+				.cmpChain(cmp(lineIdx, b.lineIdx))
+				.cmpChain(cmp(columnIdx, b.columnIdx))
+				.cmpChain(cmp(mixinLineIdx, b.mixinLineIdx)); 
+		} 
+		
+		bool opEquals(in CodeLocation b) const //case sens!!!
+		{
+			return 	file.fullName == b.file.fullName &&
+				lineIdx == b.lineIdx &&
+				columnIdx == b.columnIdx &&
+				mixinLineIdx == b.mixinLineIdx; 
+		} 
+		
+		size_t toHash() const
+		{
+			return file.fullName.hashOf(
+				only(
+					lineIdx, 
+					columnIdx, 
+					mixinLineIdx
+				).hashOf
+			); 
+		} 
+		
+		
+		bool isMixin() const
+		{ return !!mixinLineIdx; } 
+		
+		string lineText() const
+		{ return (lineIdx ? format!"(%d)"(lineIdx) : ""); } 
+		
+		string lineColText() const
+		{
+			if(lineIdx && columnIdx) return format!"(%d,%d)"(lineIdx, columnIdx); 
+			return lineText; 
+		} 
+		
+		string mixinText() const
+		{ return isMixin ? "-mixin-"~mixinLineIdx.text : ""; } 
+		
+		string toString() const
+		{ return file.fullName ~ mixinText ~ lineColText; } 
+		
+	} 
 	
 	//Todo: editor: mouse back/fwd navigalas, mint delphiben
 	//Todo: 8K, 8M, 8G should be valid numbers! Preprocessing job...
