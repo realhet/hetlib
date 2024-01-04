@@ -119,7 +119,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import het.math; 
 			
 			//Windows imports
-			public import core.sys.windows.windows : HANDLE, GetCurrentProcess, SetPriorityClass,
+			public import core.sys.windows.windows : 
+				HANDLE, GetCurrentProcess, SetPriorityClass, GetModuleHandle,
 				HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
 				BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
 				HRESULT, HWND, GUID, SYSTEMTIME, FILETIME, STD_OUTPUT_HANDLE, HMODULE,
@@ -2924,7 +2925,16 @@ version(/+$DIDE_REGION Numeric+/all)
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
-			
+		
+		auto ifz(A, B)(A a, lazy B b)
+		{ return a ? a : b; } 
+		
+		auto ife(A, B, C)(A a, B b, lazy C c)
+		{ return a==b ? c : a; } 
+		
+		auto ifne(A, B, C)(A a, B b, lazy C c)
+		{ return a!=b ? c : a; } 
+		
 		//safe assoc array lookup
 		
 		//Todo: DIDE fails when opening object.d. It should know that's a system module.

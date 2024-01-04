@@ -26,18 +26,20 @@ auto project(in mat4 m, in vec3 v)
 	return p.xyz*w; 
 } 
 
-mat4 lookAt(const vec3 eye, const vec3 target, const vec3 up)
-{
-	auto forward = target - eye; 
-	if(!sqrLength(forward))
-	return mat4.identity; 
-	forward = normalize(forward); 
-	
-	auto side = cross(forward, up).normalize; 
-	auto upVector = cross(side, forward); 
-	
-	return mat4(vec4(side, 0), vec4(upVector, 0), vec4(-forward, 0), vec4(eye, 1)).transpose.inverse; 
-} 
+/+
+	mat4 lookAt(const vec3 eye, const vec3 target, const vec3 up)
+	{
+		auto forward = target - eye; 
+		if(!sqrLength(forward))
+		return mat4.identity; 
+		forward = normalize(forward); 
+		
+		auto side = cross(forward, up).normalize; 
+		auto upVector = cross(side, forward); 
+		
+		return mat4(vec4(side, 0), vec4(upVector, 0), vec4(-forward, 0), vec4(eye, 1)).transpose.inverse; 
+	} 
++/
 
 void repairRotation(ref mat4 m, bool doNormalize)
 {
@@ -1022,19 +1024,19 @@ class Draw3D
 	} 
 	
 		void translate(in vec3 v)
-	{ /*pushMatrix;*/ mModel.translate(v); } 
+	{/*pushMatrix;*/ mModel.translate(v); } 
 		void translate(float x, float y, float z)
-	{ /*pushMatrix;*/ mModel.translate(x, y, z); } 
+	{/*pushMatrix;*/ mModel.translate(x, y, z); } 
 		void scale(float f)
-	{ /*pushMatrix;*/ mModel.scale(f, f, f); } 
+	{/*pushMatrix;*/ mModel.scale(f, f, f); } 
 		void rotatex(float f)
-	{ /*pushMatrix;*/ mModel.rotatex(f); } 
+	{/*pushMatrix;*/ mModel.rotatex(f); } 
 		void rotatey(float f)
-	{ /*pushMatrix;*/ mModel.rotatey(f); } 
+	{/*pushMatrix;*/ mModel.rotatey(f); } 
 		void rotatez(float f)
-	{ /*pushMatrix;*/ mModel.rotatez(f); } 
+	{/*pushMatrix;*/ mModel.rotatez(f); } 
 		void rotate(float f, in vec3 a)
-	{ /*pushMatrix;*/ mModel.rotate(f, a); } 
+	{/*pushMatrix;*/ mModel.rotate(f, a); } 
 	
 		struct VRecord
 	{ vec3 aPosition; } ; 
@@ -1298,8 +1300,8 @@ enum ChunkID : ushort
 	//3DS File Chunk IDs ////////////////////////
 	
 	M3DMAGIC		= 0x4D4D,
-	SMAGIC				      =	0x2D2D,
-	LMAGIC				      =	0x2D3D,
+	SMAGIC						    =	0x2D2D,
+	LMAGIC						    =	0x2D3D,
 	MLIBMAGIC	         = 0x3DAA,
 	MATMAGIC	         = 0x3DFF,
 	M3D_VERSION	         =	0x0002,
@@ -1325,8 +1327,8 @@ enum ChunkID : ushort
 	V_GRADIENT	        = 0x1300,
 	USE_V_GRADIENT	        = 0x1301,
 	
-	LO_SHADOW_BIAS				    = 0x1400,
-	HI_SHADOW_BIAS				    = 0x1410,
+	LO_SHADOW_BIAS						  = 0x1400,
+	HI_SHADOW_BIAS						  = 0x1410,
 	SHADOW_MAP_SIZE	       = 0x1420,
 	SHADOW_SAMPLES		= 0x1430,
 	SHADOW_RANGE	       =	0x1440,
@@ -1350,10 +1352,10 @@ enum ChunkID : ushort
 	VIEW_TOP	          = 0x3010,
 	VIEW_BOTTOM		= 0x3020,
 	VIEW_LEFT	          =	0x3030,
-	VIEW_RIGHT				       = 0x3040,
-	VIEW_FRONT				       = 0x3050,
-	VIEW_BACK				       =	0x3060,
-	VIEW_USER				       =	0x3070,
+	VIEW_RIGHT						     = 0x3040,
+	VIEW_FRONT						     = 0x3050,
+	VIEW_BACK						     =	0x3060,
+	VIEW_USER						     =	0x3070,
 	VIEW_CAMERA		= 0x3080,
 	VIEW_WINDOW		= 0x3090,
 	
@@ -1372,15 +1374,15 @@ enum ChunkID : ushort
 	POINT_ARRAY	     = 0x4110,
 	POINT_FLAG_ARRAY	     = 0x4111,
 	FACE_ARRAY	     = 0x4120,
-	MSH_MAT_GROUP				  = 0x4130,
-	OLD_MAT_GROUP				  = 0x4131,
+	MSH_MAT_GROUP					 = 0x4130,
+	OLD_MAT_GROUP					 = 0x4131,
 	TEX_VERTS	     = 0x4140,
 	SMOOTH_GROUP	     = 0x4150,
 	MESH_MATRIX	     = 0x4160,
 	MESH_COLOR	     = 0x4165,
 	MESH_TEXTURE_INFO	     = 0x4170,
-	PROC_NAME				  = 0x4181,
-	PROC_DATA				  = 0x4182,
+	PROC_NAME					 = 0x4181,
+	PROC_DATA					 = 0x4182,
 	MSH_BOXMAP	     = 0x4190,
 	
 	N_D_L_OLD              = 0x4400,
@@ -1416,10 +1418,10 @@ enum ChunkID : ushort
 	
 	HIERARCHY	         = 0x4F00,
 	PARENT_OBJECT	         = 0x4F10,
-	PIVOT_OBJECT				      = 0x4F20,
-	PIVOT_LIMITS				      = 0x4F30,
-	PIVOT_ORDER				      = 0x4F40,
-	XLATE_RANGE				      = 0x4F50,
+	PIVOT_OBJECT						    = 0x4F20,
+	PIVOT_LIMITS						    = 0x4F30,
+	PIVOT_ORDER						    = 0x4F40,
+	XLATE_RANGE						    = 0x4F50,
 	
 	POLY_2D                = 0x5000,
 	
@@ -1433,22 +1435,22 @@ enum ChunkID : ushort
 	PATH_3D	          = 0x6000,
 	PATH_MATRIX	          = 0x6005,
 	SHAPE_2D	          = 0x6010,
-	M_SCALE				       = 0x6020,
-	M_TWIST				       = 0x6030,
+	M_SCALE						     = 0x6020,
+	M_TWIST						     = 0x6030,
 	M_TEETER	          = 0x6040,
 	M_FIT	          =	0x6050,
 	M_BEVEL		= 0x6060,
-	XZ_CURVE				       = 0x6070,
-	YZ_CURVE				       = 0x6080,
-	INTERPCT				       = 0x6090,
+	XZ_CURVE						     = 0x6070,
+	YZ_CURVE						     = 0x6080,
+	INTERPCT						     = 0x6090,
 	DEFORM_LIMIT	          = 0x60A0,
 	
 	//Flags for Modeler options /////////////////////
 	
 	USE_CONTOUR		= 0x6100,
-	USE_TWEEN				        =	0x6110,
-	USE_SCALE				        =	0x6120,
-	USE_TWIST				        =	0x6130,
+	USE_TWEEN						      =	0x6110,
+	USE_SCALE						      =	0x6120,
+	USE_TWIST						      =	0x6130,
 	USE_TEETER	           = 0x6140,
 	USE_FIT	           =	0x6150,
 	USE_BEVEL		= 0x6160,
@@ -1488,8 +1490,8 @@ enum ChunkID : ushort
 	
 	MAT_ENTRY	         = 0xAFFF,
 	MAT_NAME	         = 0xA000,
-	MAT_AMBIENT				      = 0xA010,
-	MAT_DIFFUSE				      = 0xA020,
+	MAT_AMBIENT						    = 0xA010,
+	MAT_DIFFUSE						    = 0xA020,
 	MAT_SPECULAR	         = 0xA030,
 	MAT_SHININESS	         = 0xA040,
 	MAT_SHIN2PCT        = 0xA041,
@@ -1504,8 +1506,8 @@ enum ChunkID : ushort
 	MAT_ADDITIVE	        = 0xA083,
 	MAT_SELF_ILPCT      = 0xA084,
 	MAT_WIRE      = 0xA085,
-	MAT_SUPERSMP				  = 0xA086,
-	MAT_WIRESIZE				  = 0xA087,
+	MAT_SUPERSMP					 = 0xA086,
+	MAT_WIRESIZE					 = 0xA087,
 	MAT_FACEMAP      = 0xA088,
 	MAT_XPFALLIN      = 0xA08A,
 	MAT_PHONGSOFT	= 0xA08C,
@@ -1514,10 +1516,10 @@ enum ChunkID : ushort
 	MAT_SHADING            = 0xA100,
 	
 	MAT_TEXMAP	      = 0xA200,
-	MAT_OPACMAP				   = 0xA210,
-	MAT_REFLMAP				   = 0xA220,
-	MAT_BUMPMAP				   = 0xA230,
-	MAT_SPECMAP				   = 0xA204,
+	MAT_OPACMAP						 = 0xA210,
+	MAT_REFLMAP						 = 0xA220,
+	MAT_BUMPMAP						 = 0xA230,
+	MAT_SPECMAP						 = 0xA204,
 	MAT_USE_XPFALL	      = 0xA240,
 	MAT_USE_REFBLUR	      = 0xA250,
 	MAT_BUMP_PERCENT	      = 0xA252,
@@ -1525,11 +1527,11 @@ enum ChunkID : ushort
 	MAT_MAPNAME	           = 0xA300,
 	MAT_ACUBIC	           = 0xA310,
 	
-	MAT_SXP_TEXT_DATA	    = 0xA320,
-	MAT_SXP_TEXT2_DATA	    = 0xA321,
-	MAT_SXP_OPAC_DATA				= 0xA322,
-	MAT_SXP_BUMP_DATA				= 0xA324,
-	MAT_SXP_SPEC_DATA				= 0xA325,
+	MAT_SXP_TEXT_DATA		= 0xA320,
+	MAT_SXP_TEXT2_DATA		=	0xA321,
+	MAT_SXP_OPAC_DATA				=	0xA322,
+	MAT_SXP_BUMP_DATA				=	0xA324,
+	MAT_SXP_SPEC_DATA				=	0xA325,
 	MAT_SXP_SHIN_DATA			=	0xA326,
 	MAT_SXP_SELFI_DATA	=	0xA328,
 	MAT_SXP_TEXT_MASKDATA	= 0xA32A,
@@ -1540,8 +1542,8 @@ enum ChunkID : ushort
 	MAT_SXP_SHIN_MASKDATA	= 0xA334,
 	MAT_SXP_SELFI_MASKDATA	= 0xA336,
 	MAT_SXP_REFL_MASKDATA	= 0xA338,
-	MAT_TEX2MAP				   = 0xA33A,
-	MAT_SHINMAP				   = 0xA33C,
+	MAT_TEX2MAP						 = 0xA33A,
+	MAT_SHINMAP						 = 0xA33C,
 	MAT_SELFIMAP     = 0xA33D,
 	MAT_TEXMASK       = 0xA33E,
 	MAT_TEX2MASK				 = 0xA340,
@@ -1586,16 +1588,16 @@ enum ChunkID : ushort
 	PIVOT	       = 0xB013,
 	BOUNDBOX	       = 0xB014,
 	MORPH_SMOOTH	       = 0xB015,
-	POS_TRACK_TAG				    = 0xB020,
-	ROT_TRACK_TAG				    = 0xB021,
-	SCL_TRACK_TAG				    = 0xB022,
-	FOV_TRACK_TAG				    = 0xB023,
+	POS_TRACK_TAG						  = 0xB020,
+	ROT_TRACK_TAG						  = 0xB021,
+	SCL_TRACK_TAG						  = 0xB022,
+	FOV_TRACK_TAG						  = 0xB023,
 	ROLL_TRACK_TAG	       = 0xB024,
 	COL_TRACK_TAG	       =	0xB025,
 	MORPH_TRACK_TAG		= 0xB026,
 	HOT_TRACK_TAG	       =	0xB027,
-	FALL_TRACK_TAG				    = 0xB028,
-	HIDE_TRACK_TAG				    = 0xB029,
+	FALL_TRACK_TAG						  = 0xB028,
+	HIDE_TRACK_TAG						  = 0xB029,
 	NODE_ID	       = 0xB030,
 } 
 
@@ -1850,7 +1852,7 @@ struct Joint
 	{ fixed, linear, rotational} 
 	
 	bool isFixed	   () const
-	{ return type == Type.fixed ; } 
+	{ return type == Type.fixed; } 
 	bool isLinear	   () const
 	{ return type == Type.linear; } 
 	bool isRotational() const
@@ -2252,39 +2254,39 @@ class ModelPrototype
 			case     NAMED_OBJECT	: newObject(fetch!string); if(dump)
 			actObject.name.write; processChunkArray; break; 
 			case       N_TRI_OBJECT	: processChunkArray; break; 
-			case				     POINT_ARRAY	: fetchCnt; actObject.vertices = (cast(vec3[])(chunk.data[0..cnt*12])).map!import3dsVector.array; break; 
-			case				     FACE_ARRAY	: fetchCnt; actObject.faces = (cast(ushort[4][])(chunk.data[0..cnt*8])).map!import3dsFace.array; chunk.data = chunk.data[cnt*8..$]; processChunkArray; break; 
-			case				       MSH_MAT_GROUP	: todo; break; 
-			case				       SMOOTH_GROUP	: todo; break; 
-			case				     TEX_VERTS	: fetchCnt; actObject.texCoords = cast(vec2[])(chunk.data[0..cnt*8]); break; 
-			case				     MESH_MATRIX	: actObject.mTransform_import = fetchMat43; break; 
-			case				     MESH_COLOR	: todo; break; 
+			case						   POINT_ARRAY	: fetchCnt; actObject.vertices = (cast(vec3[])(chunk.data[0..cnt*12])).map!import3dsVector.array; break; 
+			case						   FACE_ARRAY	: fetchCnt; actObject.faces = (cast(ushort[4][])(chunk.data[0..cnt*8])).map!import3dsFace.array; chunk.data = chunk.data[cnt*8..$]; processChunkArray; break; 
+			case						     MSH_MAT_GROUP	: todo; break; 
+			case						     SMOOTH_GROUP	: todo; break; 
+			case						   TEX_VERTS	: fetchCnt; actObject.texCoords = cast(vec2[])(chunk.data[0..cnt*8]); break; 
+			case						   MESH_MATRIX	: actObject.mTransform_import = fetchMat43; break; 
+			case						   MESH_COLOR	: todo; break; 
 			case     MAT_ENTRY	: processChunkArray; break; 
-			case				   MAT_NAME	: newMaterial(fetch!string); break; 
-			case				   MAT_AMBIENT	: actMaterial.ambient	= fetch!RGB; break; 
-			case				   MAT_DIFFUSE	: actMaterial.diffuse	= fetch!RGB; break; 
-			case				   MAT_SPECULAR	: actMaterial.specular	= fetch!RGB; break; 
-			case				   MAT_SHININESS	: lastPercent = 0; processChunk(chunk.data, level+1); actMaterial.shininess = lastPercent; break; 
-			case				   MAT_TEXMAP	: processMap(actMaterial.texMap ); break; 
-			case				   MAT_OPACMAP	: processMap(actMaterial.opacMap); break; 
-			case				   MAT_REFLMAP	: processMap(actMaterial.reflMap); break; 
-			case				   MAT_BUMPMAP	: processMap(actMaterial.bumpMap); break; 
+			case						 MAT_NAME	: newMaterial(fetch!string); break; 
+			case						 MAT_AMBIENT	: actMaterial.ambient	= fetch!RGB; break; 
+			case						 MAT_DIFFUSE	: actMaterial.diffuse	= fetch!RGB; break; 
+			case						 MAT_SPECULAR	: actMaterial.specular	= fetch!RGB; break; 
+			case						 MAT_SHININESS	: lastPercent = 0; processChunk(chunk.data, level+1); actMaterial.shininess = lastPercent; break; 
+			case						 MAT_TEXMAP	: processMap(actMaterial.texMap ); break; 
+			case						 MAT_OPACMAP	: processMap(actMaterial.opacMap); break; 
+			case						 MAT_REFLMAP	: processMap(actMaterial.reflMap); break; 
+			case						 MAT_BUMPMAP	: processMap(actMaterial.bumpMap); break; 
 			case         MAT_BUMP_PERCENT	: actMaterial.bumpAmount = fetch!ushort*.012f; break; 
 			case       MAT_SPECMAP	: processMap(actMaterial.specMap); break; 
 			case         MAT_MAPNAME	: lastMapName = fetch!string; break; 
 			case   KFDATA	: processChunkArray; break; 
 			case				 KFSEG	: todo; break; //int start, int end
 			case				 OBJECT_NODE_TAG	: processChunkArray; addKfNode; break; 
-			case				   NODE_ID	: lastKfId = fetch!ushort; break; 
-			case				   NODE_HDR	: lastKfName = fetch!string; fetch!int; /*ignore*/ lastKfParent = fetch!ushort;  break; 
-			case				   PIVOT	: lastKfPivot = import3dsVector(fetch!vec3); break; 
-			case				   BOUNDBOX	: todo; break; 
-			case				   POS_TRACK_TAG	: todo; break; 
-			case				   ROT_TRACK_TAG	: todo; break; 
-			case				   SCL_TRACK_TAG	: todo; break; 
+			case						 NODE_ID	: lastKfId = fetch!ushort; break; 
+			case						 NODE_HDR	: lastKfName = fetch!string; fetch!int; /*ignore*/ lastKfParent = fetch!ushort;  break; 
+			case						 PIVOT	: lastKfPivot = import3dsVector(fetch!vec3); break; 
+			case						 BOUNDBOX	: todo; break; 
+			case						 POS_TRACK_TAG	: todo; break; 
+			case						 ROT_TRACK_TAG	: todo; break; 
+			case						 SCL_TRACK_TAG	: todo; break; 
 			
-			case COLOR_F	    : lastColor = RGB(cast(float[])(chunk.data[0..12])); break; 
-			case COLOR_24	    : lastColor = (cast(RGB[])(chunk.data[0..3]))[0]; break; 
+			case COLOR_F	  : lastColor = RGB(cast(float[])(chunk.data[0..12])); break; 
+			case COLOR_24	  : lastColor = (cast(RGB[])(chunk.data[0..3]))[0]; break; 
 			case INT_PERCENTAGE		: 	lastPercent = fetch!ushort*.01f; break; 
 			case FLOAT_PERCENTAGE		: 	lastPercent = fetch!float*.01f; break; 
 			default: 
@@ -2363,17 +2365,17 @@ class ModelPrototype
 		string actMaterialName; 
 		
 		xml.onStartTag["Transform"] = (ElementParser xml){
-						   string def = xml.tag.attr["DEF"]; 
-						   wr("Transform ", def); level++; 
-						   auto rot = toV!vec4(xml, "rotation"); 
-						   auto m = mat4.identity
-							   *mat4.translation(toV!vec3(xml, "translation"))
-							   *mat4.rotation(-rot.w, rot.xyz)
-							   *mat4.scaling(toV!vec3(xml, "scale"))
-			  ; 
+								 string def = xml.tag.attr["DEF"]; 
+								 wr("Transform ", def); level++; 
+								 auto rot = toV!vec4(xml, "rotation"); 
+								 auto m = mat4.identity
+									 *mat4.translation(toV!vec3(xml, "translation"))
+									 *mat4.rotation(-rot.w, rot.xyz)
+									 *mat4.scaling(toV!vec3(xml, "scale"))
+			; 
 			
-						   const validTransform = !def.endsWith("_ifs_TRANSFORM") && def!="Light_TRANSFORM" && def!="Camera_TRANSFORM"; 
-						   validTransformStack ~= validTransform; 
+								 const validTransform = !def.endsWith("_ifs_TRANSFORM") && def!="Light_TRANSFORM" && def!="Camera_TRANSFORM"; 
+								 validTransformStack ~= validTransform; 
 			
 			      if(validTransform)
 			{

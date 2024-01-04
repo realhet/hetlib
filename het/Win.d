@@ -1156,6 +1156,11 @@ class Window
 	Time totalTime=0*second, deltaTime=0*second, lagTime=0*second; //
 	int FPS, UPS, lagCnt; //FramesPerSec, UpdatePerSec
 	
+	Time appRunningTime = 0*second; 
+	
+	@property appRunningTime_sec()
+	{ return appRunningTime.value(second); } 
+	
 	protected void onMouseUpdate() {} //forwarded to GLWindow. Must be called right after view.update
 	protected void onUpdateViewAnimation() {} //forwarded to GLWindow
 	
@@ -1250,7 +1255,10 @@ class Window
 		if(!time0) { time0 = timeLast = QPS-timeTarget-0.001*second; }
 		
 		const tickNow = now; //this is for application.tickTime. Taken at the same time as timeAct.
+		
 		timeAct = QPS; 
+		appRunningTime = QPS_local; //Todo: they are not in exact synch
+		
 		deltaTime = timeAct-timeLast; 
 		if(deltaTime<timeTarget) return; //too small elapsed time
 		

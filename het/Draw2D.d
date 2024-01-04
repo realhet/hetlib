@@ -2987,6 +2987,8 @@ class Drawing
 			shader.uniform("uShift", extractTileIndex(uShift+translate)); 
 			shader.uniform("uViewPortSize", vec2(vpSize)); 
 			
+			shader.uniform("appRunningTime_sec", mainWindow.appRunningTime_sec); 
+			
 			//map all megaTextures
 			foreach(i, t; textures.getGLTextures) {
 				t.bind(cast(int)i, i==0 ? GLTextureFilter.Nearest : GLTextureFilter.Linear); 
@@ -3667,6 +3669,8 @@ class Drawing
 		uniform float	GF0, GF1, GF2, GF3, GF4, GF5, GF6, GF7; 
 		uniform bool	GB0, GB1, GB2, GB3, GB4, GB5, GB6, GB7; 
 		
+		uniform float appRunningTime_sec; 
+		
 		vec4 megaSample_nearest_internal(vec2 tc)
 		{
 			//if(stIdx!=0) return vec4(1, 0, 1, 1); //return fuschia for multitexturing
@@ -3960,7 +3964,7 @@ class Drawing
 					float mask = fract(stippleType)*16; 
 					float scale = floor(stippleType); 
 					
-					float phase = fract(fStipple.y/(pow(2,scale+2.6)))*6; 
+					float phase = fract(fStipple.y/(pow(2,scale+2.6)) + fract(appRunningTime_sec*2.1))*6; 
 					
 					//this is crazy and not having the docs for it.
 					mask /= 2; 	 if(fract(mask)>0) { if(phase<1 || phase>=2 && phase<3) a = 1; mask -= 0.5; }

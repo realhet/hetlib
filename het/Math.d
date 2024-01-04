@@ -478,8 +478,9 @@ version(/+$DIDE_REGION+/all)
 				}
 				else static if(op=="*" && isMatrix!T && T.height==length)
 				{
-					 //vector * matrix
+					//vector * matrix
 					return other.transpose * this; 
+					//Opt: this is slow if it is not unrolled.
 				}
 				else static if(op=="in" && isBounds!T && T.VectorLength == length)
 				{ return other.contains(this); }
@@ -847,10 +848,16 @@ version(/+$DIDE_REGION+/all)
 			{ return typeof(this)(1); } 
 			static auto translation(CT)(in Vector!(CT, N-1) v) if(N>2)
 			{ auto res = identity; res[N-1][0..$-1] = v[]; return res; } 
-					
+			
+			void translate(V)(V v)
+			{
+				this = translation(v) * this; 
+				//Opt: this is not so optimal...
+			} 
+			
 			//note : alias this enables inplicit conversion, but fucks up the ~ concat operator
 			//ref auto opIndex(size_t i){ return columns[i]; } const opIndex(size_t i){ return columns[i]; }
-					
+			
 			string toString() const
 			{ return MatrixTypeName ~ "(" ~ columns[].map!text.join(", ") ~ ")"; } 
 					
@@ -1036,10 +1043,10 @@ version(/+$DIDE_REGION+/all)
 			{
 				//only for mat3 and mat4
 				
-				static Matrix rotation(A)(in Vector!(A, N) axis_, CT alpha)
+				static Matrix rotation(V)(in V axis_, CT alpha)
 				{
 					CT cosa = cos(alpha),  sina = sin(alpha); 
-					auto axis = normalize(VectorType(axis_)); 
+					auto axis = normalize(Vector!(CT, 3)(axis_)); 
 					auto temp = (1 - cosa)*axis; 
 					
 					return cast(Matrix) Matrix!(CT, 3, 3)
@@ -1080,18 +1087,60 @@ version(/+$DIDE_REGION+/all)
 					return m; 
 				} 
 				
-				auto rotate(A)(in Vector!(A, N) axis,	CT alpha)
-				{ this = rotation(axis, alpha)*this; 	return this; } 
-				auto rotatex(CT alpha)
-				{ this = rotationx(alpha)*this; 	 return this; } 
-				auto rotatey(CT alpha)
-				{ this = rotationy(alpha)*this; 	 return this; } 
-				auto rotatez(CT alpha)
-				{ this = rotationz(alpha)*this; 	 return this; } 
+				void rotate(V)(in V axis, CT alpha)
+				{ this = rotation(axis, alpha)*this; } 
+				void rotatex(CT alpha)
+				{ this = rotationx(alpha)*this; } 
+				void rotatey(CT alpha)
+				{ this = rotationy(alpha)*this; } 
+				void rotatez(CT alpha)
+				{ this = rotationz(alpha)*this; } 
 			}
 		}version(/+$DIDE_REGION+/all)
 		{
+			static if(M==4 && N==4 && is(CT==float))
+			{
+				//source: https://github.com/Dav1dde/gl3n/blob/master/gl3n/linalg.d
+				
+				static MatrixType lookAt(in vec3 eye, in vec3 target, in vec3 up)
+				{
+					auto forward = target - eye; 
+					if((magnitude(forward))==0) return mat4.identity; 
+					forward = (normalize(forward)); 
 					
+					auto side = (normalize(((forward).cross(up)))); 
+					auto upVector = ((side).cross(forward)); 
+					
+					return MatrixType(
+						vec4(side, 0), 
+						vec4(upVector, 0), 
+						vec4(-forward, 0), 
+						vec4(eye, 1)
+					).inverse; 
+				} 
+				
+				static MatrixType perspective(float left, float right, float bottom, float top, float near, float far)
+				{
+					return MatrixType(
+						((2*near)/(right-left))	, 0	, ((right+left)/(right-left))	, 0,
+						0	, ((2*near)/(top-bottom))	, ((top+bottom)/(top-bottom))	, 0,
+						0	, 0	, -((far+near)/(far-near))	, -((2*far*near)/(far-near)),
+						0	, 0	, -1	, 0
+					).transpose; 
+				} 
+				
+				static MatrixType perspective(float width, float height, float fov, float near, float far)
+				{
+					float 	aspect 	= width/height,
+						top 	= near * tan(fov*(PIf/360.0f)),
+						bottom 	= -top,
+						right 	= top * aspect,
+						left 	= -right; 
+					return perspective(left, right, bottom, top, near, far); 
+				} 
+				
+				//Todo: do this with dmat4
+			}
 			/+
 				
 							unittest {
