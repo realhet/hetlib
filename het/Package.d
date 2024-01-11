@@ -123,7 +123,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				HANDLE, GetCurrentProcess, SetPriorityClass, GetModuleHandle,
 				HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
 				BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
-				HRESULT, HWND, GUID, SYSTEMTIME, FILETIME, STD_OUTPUT_HANDLE, HMODULE,
+				HRESULT, HWND, HINSTANCE, GUID, SYSTEMTIME, FILETIME, STD_OUTPUT_HANDLE, HMODULE,
 				GetCommandLine, ExitProcess, GetConsoleWindow, SetConsoleTextAttribute, SetConsoleCP, SetConsoleOutputCP, ShowWindow,
 				SetFocus, SetForegroundWindow, GetForegroundWindow,
 				SetWindowPos, GetLastError, FormatMessageA, MessageBeep, QueryPerformanceCounter, QueryPerformanceFrequency,
@@ -694,6 +694,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				func = cast(T)GetProcAddress(hModule, toStringz(name)); 
 				if(mustSucceed)
 				enforce(func, "getProcAddress() fail: "~name); 
+			} 
+			
+			void getProcAddress(alias func)(HMODULE hModule, string name="", bool mustSucceed = true)
+			{
+				if(name=="") name = func.stringof; 
+				getProcAddress(hModule, name, func); 
 			} 
 			
 			void getProcAddress(T)(HMODULE hModule, size_t idx, ref T func, bool mustSucceed = true)

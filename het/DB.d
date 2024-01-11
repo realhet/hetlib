@@ -4187,6 +4187,8 @@ version(/+$DIDE_REGION DataSet+/all)
 			} 
 			visitBlocks(root.values.sort); 
 			
+			//Bug: handle the case when dataLogger.file="" but there is a new sample in the DB.  It's undefinied behavior now.
+			
 			/+Opt: Detect horz/vert direction and do binary filtering on clipBounds+/
 		} 
 		

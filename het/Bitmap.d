@@ -19,8 +19,8 @@ version(/+$DIDE_REGION+/all)
 	
 	import std.uni: isAlphaNum; 
 	import core.sys.windows.windows :	HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, 
-		SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, DIB_RGB_COLORS,
-		HRESULT, WCHAR, BOOL, RECT, IID,
+		SelectObject, BITMAPINFOHEADER, BI_RGB, DeleteObject, GetDIBits, SetDIBits,
+		DIB_RGB_COLORS,	HRESULT, WCHAR, BOOL, RECT, IID,
 		BITMAP, GetObject; 
 	
 	//turn Direct2D linkage on/off
@@ -236,7 +236,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			enforce(prefix.length>=2, "Invalid prefix string."); 
 			//Note: prefix names are case sensitive. File drives are NOT.
-			enforce(!(prefix in functions), name ~ " already registered . Prefix: "~prefix); 
+			if(prefix in functions) WARN(name ~ " already registered . Prefix: "~prefix); 
 			functions[prefix] = fun; 
 			static if(0) LOG(name ~ " successfully registered:", prefix); 
 		} 
@@ -6615,14 +6615,33 @@ version(/+$DIDE_REGION+/all)
 				if(GetObject(ii.hbmColor, typeof(bi).sizeof.to!int, &bi))
 				{
 					//print("hbmColor", bi.biWidth, bi.biHeight);
-					
 					auto gBmp = scoped!GdiBitmap(bi.biWidth, bi.biHeight); 
+					auto doit(uint flags) {
+						DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_MASK | DI_IMAGE); 
+						return gBmp.toImage; 
+					} 
 					
-					DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_MASK ); 	 auto imMask	= gBmp.toImage; 
-					DrawIconEx(gBmp.hdcMem, 0, 0, hIcon, bi.biWidth, bi.biHeight, 0, null, DI_IMAGE); 	 auto imColor	= gBmp.toImage; 
+					version(none)
+					{
+						/+Note: This version only works at me.  On karc machine the DI_MASK produces only RGBA(0, 0, 0, 0) everywhere.+/
+						auto imMask = doit(DI_MASK); 
+						auto imColor = doit(DI_IMAGE); 
+						//swap blue-red, gray if transparent.
+						auto imAlpha = image2D!((i, m) => m.g ? RGBA(127, 127, 127, 0) : RGBA(i.b, i.g, i.r, 255))(imColor, imMask); 
+					}
 					
-					//swap blue-red, gray if transparent.
-					auto imAlpha = image2D!((i, m) => m.g ? RGBA(127, 127, 127, 0) : RGBA(i.b, i.g, i.r, 255))(imColor, imMask); 
+					version(all)
+					{
+						//Note: DI_MASK is broken on some computers. To avoid handling bitplaned masks, I just hack the shit out of it.
+						gBmp.fill(clBlack); 	auto imMask0 = doit(DI_IMAGE | DI_MASK); 
+						gBmp.fill(clWhite); 	auto imMask1 = doit(DI_MASK | DI_IMAGE); 
+						gBmp.fill(het.RGB(0x7f7f7f)); 	auto imPlain = doit(DI_MASK | DI_IMAGE); 
+						//Partial RGB information is lost... Could be recovered but I aint got no time for this shieeet...
+						
+						auto imAlpha = image2D!((i, m0, m1) => RGBA(i.b, i.g, i.r, (m1.g-m0.g)^0xFF))(imPlain, imMask0, imMask1); 
+					}
+					
+					//swap blue-red!!!
 					
 					auto bmp = new Bitmap(imAlpha); 
 					assert(!fn.startsWith(`icon:\`)); 
@@ -6690,6 +6709,10 @@ version(/+$DIDE_REGION+/all)
 		
 		Bitmap toBitmap()
 		{ return new Bitmap(toImage); } 
+		
+		void fill(RGB color)
+		{ SetDIBits(hdcMem, hBitmap, 0, size.y, [RGBA(color, 0xFF)].replicate(size.area).ptr, &bmi, DIB_RGB_COLORS); } 
+		
 	} 
 	
 	

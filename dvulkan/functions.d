@@ -356,9 +356,15 @@ extern(System) @nogc nothrow
 			PFN_vkCmdSetEvent vkCmdSetEvent; 
 			alias PFN_vkCmdResetEvent = void function(VkCommandBuffer commandBuffer,VkEvent event,VkPipelineStageFlags stageMask); 
 			PFN_vkCmdResetEvent vkCmdResetEvent; 
-			alias PFN_vkCmdWaitEvents = void function(VkCommandBuffer commandBuffer,uint32_t eventCount,const(VkEvent)* pEvents,VkPipelineStageFlags srcStageMask,VkPipelineStageFlags dstStageMask,uint32_t memoryBarrierCount,const(VkMemoryBarrier)* pMemoryBarriers,uint32_t bufferMemoryBarrierCount,const(VkBufferMemoryBarrier)* pBufferMemoryBarriers,uint32_t imageMemoryBarrierCount,const(VkImageMemoryBarrier)* pImageMemoryBarriers); 
+			alias PFN_vkCmdWaitEvents = void function(
+				VkCommandBuffer commandBuffer,uint32_t eventCount,const(VkEvent)* pEvents,VkPipelineStageFlags srcStageMask,VkPipelineStageFlags dstStageMask,uint32_t memoryBarrierCount,
+				const(VkMemoryBarrier)* pMemoryBarriers,uint32_t bufferMemoryBarrierCount,const(VkBufferMemoryBarrier)* pBufferMemoryBarriers,uint32_t imageMemoryBarrierCount,const(VkImageMemoryBarrier)* pImageMemoryBarriers
+			); 
 			PFN_vkCmdWaitEvents vkCmdWaitEvents; 
-			alias PFN_vkCmdPipelineBarrier = void function(VkCommandBuffer commandBuffer,VkPipelineStageFlags srcStageMask,VkPipelineStageFlags dstStageMask,VkDependencyFlags dependencyFlags,uint32_t memoryBarrierCount,const(VkMemoryBarrier)* pMemoryBarriers,uint32_t bufferMemoryBarrierCount,const(VkBufferMemoryBarrier)* pBufferMemoryBarriers,uint32_t imageMemoryBarrierCount,const(VkImageMemoryBarrier)* pImageMemoryBarriers); 
+			alias PFN_vkCmdPipelineBarrier = void function(
+				VkCommandBuffer commandBuffer,VkPipelineStageFlags srcStageMask,VkPipelineStageFlags dstStageMask,VkDependencyFlags dependencyFlags,uint32_t memoryBarrierCount,
+				const(VkMemoryBarrier)* pMemoryBarriers,uint32_t bufferMemoryBarrierCount,const(VkBufferMemoryBarrier)* pBufferMemoryBarriers,uint32_t imageMemoryBarrierCount,const(VkImageMemoryBarrier)* pImageMemoryBarriers
+			); 
 			PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier; 
 			alias PFN_vkCmdBeginQuery = void function(VkCommandBuffer commandBuffer,VkQueryPool queryPool,uint32_t query,VkQueryControlFlags flags); 
 			PFN_vkCmdBeginQuery vkCmdBeginQuery; 
