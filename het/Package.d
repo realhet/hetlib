@@ -750,15 +750,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				__iob_func = [*stdin, *stdout, *stderr]; 
 			} 
 			
-			//Obj.Destroy is not clearing the reference
-			void free(T)(ref T o)if(is(T==class))
-			{
-				if(o !is null)
-				{
-					o.destroy; 
-					o = null; 
-				}
-			} 
+			//240113: free() is removed. Now it is clearing it, and it's also safe to call on nulls.
 			
 			void SafeRelease(T:IUnknown)(ref T i)
 			{

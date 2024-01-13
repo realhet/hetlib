@@ -1,11 +1,11 @@
 /// Vulkan types.
 module dvulkan.types; 
-import std.traits, std.format; 
+
 version(/+$DIDE_REGION+/all)
 {
 	
 	//het
-	import std.typecons, std.algorithm; 
+	import std.typecons, std.algorithm, std.traits, std.format; 
 	struct VkBitFlags(E, Flag!"unsafe" unsafe=No.unsafe)
 	{
 		BitFlags!(E, unsafe) _bitflags; 
@@ -1030,22 +1030,27 @@ version(/+$DIDE_REGION+/all)
 			uint32_t signalSemaphoreCount; 
 			const(VkSemaphore)* pSignalSemaphores; 
 		} 
-		enum VkFenceCreateFlagBits
-		{ VK_FENCE_CREATE_SIGNALED_BIT = 0x00000001, } 
-		alias VkFenceCreateFlags = VkFlags; 
+		alias VkFenceCreateFlagBits = VK_FENCE_CREATE_; 
+		enum VK_FENCE_CREATE_
+		{SIGNALED_BIT = 0x00000001, } 
+		alias VkFenceCreateFlags = VkBitFlags!VkFenceCreateFlagBits; 
+		
 		struct VkFenceCreateInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.FENCE_CREATE_INFO; 
 			const(void)* pNext; 
 			VkFenceCreateFlags flags; 
 		} 
+		
 		alias VkSemaphoreCreateFlags = VkFlags; 
+		
 		struct VkSemaphoreCreateInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.SEMAPHORE_CREATE_INFO; 
 			const(void)* pNext; 
 			VkSemaphoreCreateFlags flags; 
 		} 
+		
 		alias VkEventCreateFlags = VkFlags; 
 		struct VkEventCreateInfo
 		{
@@ -1053,7 +1058,9 @@ version(/+$DIDE_REGION+/all)
 			const(void)* pNext; 
 			VkEventCreateFlags flags; 
 		} 
+		
 		mixin(VK_DEFINE_NON_DISPATCHABLE_HANDLE!q{VkEvent}); 
+		
 		alias VkQueryPoolCreateFlags = VkFlags; 
 		enum VkQueryType
 		{
