@@ -59,6 +59,44 @@ version(/+$DIDE_REGION+/all)
 	
 	//Todo: std.conv.to is flexible, but can be slow, because it calls functions and it checks value ranges. Must be tested and optimized if needed with own version.
 	
+	/+
+		Todo: anonym structs ans unions
+		/+
+			Code: struct vec2
+			{
+			    float x, y;
+			}
+			
+			struct vec3
+			{
+			    union {
+			        struct { 
+					          float x; 
+					          union { 
+			                struct { 
+			                    float y, z; 
+					              } 
+					              vec2 yz; 
+			            } 
+					      }
+					      struct { 
+			            vec2 xy; 
+			        }
+			    }
+			}
+			
+			void main()
+			{
+					  auto v = vec3(1, 2, 3);
+					  
+					  writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy);
+					  writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy);
+					  writeln(&v.yz);
+					  
+			}
+		+/
+	+/
+	
 	/// myTo: scalar conversion used in smart-constructors
 	private alias myto(T) = stdto!T; 
 	//private auto myto(T)(in T a){ return cast(T) a; }

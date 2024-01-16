@@ -13742,7 +13742,7 @@ version(/+$DIDE_REGION debug+/all)
 						}
 						
 						//free if the class type is different.
-						if(data !is null && classFullName.length && currentClassFullName != classFullName) { data.free; }
+						if(data !is null && classFullName.length && currentClassFullName != classFullName) { data.destroy; }
 						
 						//create only if original is null
 						if(data is null) {

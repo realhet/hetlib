@@ -1226,6 +1226,7 @@ version(/+$DIDE_REGION+/all)
 			VkComponentSwizzle b; 
 			VkComponentSwizzle a; 
 		} 
+		
 		struct VkImageSubresourceRange
 		{
 			VkImageAspectFlags aspectMask; 
@@ -1234,6 +1235,7 @@ version(/+$DIDE_REGION+/all)
 			uint32_t baseArrayLayer; 
 			uint32_t layerCount; 
 		} 
+		
 		struct VkImageViewCreateInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.IMAGE_VIEW_CREATE_INFO; 
@@ -1594,6 +1596,7 @@ version(/+$DIDE_REGION+/all)
 			VkBlendOp alphaBlendOp; 
 			VkColorComponentFlags colorWriteMask; 
 		} 
+		
 		struct VkPipelineColorBlendStateCreateInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; 
@@ -1925,9 +1928,11 @@ version(/+$DIDE_REGION+/all)
 		} 
 		alias VkAccessFlags = VkBitFlags!VkAccessFlagBits; 
 		
-		enum VkDependencyFlagBits
-		{ VK_DEPENDENCY_BY_REGION_BIT = 0x00000001, } 
-		alias VkDependencyFlags = VkFlags; 
+		alias VkDependencyFlagBits = VK_DEPENDENCY_; 
+		enum VK_DEPENDENCY_
+		{BY_REGION_BIT = 0x00000001, } 
+		alias VkDependencyFlags = VkBitFlags!VkDependencyFlagBits; 
+		
 		struct VkSubpassDependency
 		{
 			uint32_t srcSubpass; 
@@ -1967,12 +1972,14 @@ version(/+$DIDE_REGION+/all)
 		enum VkCommandPoolResetFlagBits
 		{ VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT = 0x00000001, } 
 		alias VkCommandPoolResetFlags = VkFlags; 
+		
 		alias VkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_; 
 		enum VK_COMMAND_BUFFER_LEVEL_
 		{
 			PRIMARY = 0,
 			SECONDARY = 1,
 		} 
+		
 		struct VkCommandBufferAllocateInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.COMMAND_BUFFER_ALLOCATE_INFO; 
@@ -1981,6 +1988,7 @@ version(/+$DIDE_REGION+/all)
 			VkCommandBufferLevel level; 
 			uint32_t commandBufferCount; 
 		} 
+		
 		alias VkCommandBufferUsageFlagBits = VK_COMMAND_BUFFER_USAGE_; 
 		enum VK_COMMAND_BUFFER_USAGE_
 		{
@@ -1989,9 +1997,11 @@ version(/+$DIDE_REGION+/all)
 			SIMULTANEOUS_USE_BIT = 0x00000004,
 		} 
 		alias VkCommandBufferUsageFlags = VkBitFlags!VkCommandBufferUsageFlagBits; 
+		
 		enum VkQueryControlFlagBits
 		{ VK_QUERY_CONTROL_PRECISE_BIT = 0x00000001, } 
 		alias VkQueryControlFlags = VkFlags; 
+		
 		struct VkCommandBufferInheritanceInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.COMMAND_BUFFER_INHERITANCE_INFO; 
@@ -2003,6 +2013,7 @@ version(/+$DIDE_REGION+/all)
 			VkQueryControlFlags queryFlags; 
 			VkQueryPipelineStatisticFlags pipelineStatistics; 
 		} 
+		
 		struct VkCommandBufferBeginInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.COMMAND_BUFFER_BEGIN_INFO; 
@@ -2010,6 +2021,7 @@ version(/+$DIDE_REGION+/all)
 			VkCommandBufferUsageFlags flags; 
 			const(VkCommandBufferInheritanceInfo)* pInheritanceInfo; 
 		} 
+		
 		enum VkCommandBufferResetFlagBits
 		{ VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT = 0x00000001, } 
 		alias VkCommandBufferResetFlags = VkFlags; 
@@ -2120,6 +2132,7 @@ version(/+$DIDE_REGION+/all)
 			VkDeviceSize offset; 
 			VkDeviceSize size; 
 		} 
+		
 		struct VkImageMemoryBarrier
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.IMAGE_MEMORY_BARRIER; 
@@ -2133,6 +2146,7 @@ version(/+$DIDE_REGION+/all)
 			VkImage image; 
 			VkImageSubresourceRange subresourceRange; 
 		} 
+		
 		struct VkRenderPassBeginInfo
 		{
 			VkStructureType sType = VK_STRUCTURE_TYPE_.RENDER_PASS_BEGIN_INFO; 

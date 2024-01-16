@@ -6353,7 +6353,7 @@ struct im
 			{
 				drVisualizeHitStack.glDraw(targetSurfaces[1].view); //Todo: problem with hitStack: it is assumed to be on GUI view
 			}
-			drVisualizeHitStack.free; 
+			drVisualizeHitStack.destroy; 
 			
 			//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
 			//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.

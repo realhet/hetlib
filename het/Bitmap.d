@@ -6511,7 +6511,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto getDesktopSnapshot(in ibounds2 bnd)
 	{
-		auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.free; 
+		auto gBmp = new GdiBitmap(bnd.size); scope(exit) gBmp.destroy; 
 		auto dc = GetDC(null); scope(exit) ReleaseDC(null, dc); 
 		BitBlt(gBmp.hdcMem, 0, 0, bnd.width, bnd.height, dc, bnd.left, bnd.top, SRCCOPY); 
 		auto img = gBmp.toImage; 
@@ -7281,7 +7281,7 @@ version(/+$DIDE_REGION+/all)
 				Bitmap doRender(bool inverse=false)
 				{
 					auto gBmp = new GdiBitmap(bmpSize); 
-					scope(exit) gBmp.free; 
+					scope(exit) gBmp.destroy; 
 					
 					//draw
 					auto rect = RECT(0, 0, gBmp.size.x, gBmp.size.y); //Todo: this can be null???

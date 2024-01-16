@@ -3110,8 +3110,8 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 		
 		~this()
 		{
-			glTexture.free; 
-			bin.free; 
+			glTexture.destroy; 
+			bin.destroy; 
 		} 
 		
 		void reinitialize()
@@ -3246,7 +3246,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 		} 
 		
 		~this()
-		{ glTexture.free; } 
+		{ glTexture.destroy; } 
 		
 		//peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
 		//Note: this technique is too dangerous. Must add the info, but not upload.
@@ -3381,7 +3381,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 		{ this.name = name.strip.length ? name : this.identityStr; } 
 		
 		void clear()
-		{ bmp.free; mustUpload = false; } 
+		{ bmp.destroy; mustUpload = false; } 
 		void update()
 		{ mustUpload = true; } 
 		void update(Bitmap bmp)
