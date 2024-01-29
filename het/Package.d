@@ -1711,461 +1711,452 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	}
 }version(/+$DIDE_REGION Meta prg.+/all)
 {
-	version(/+$DIDE_REGION+/all) {
-		
-		static T Singleton(T)() if(is(T == class))
-		{
-			//Singleton ////////////////////////
-			import std.traits : SharedOf; 
-			enum isShared = is(SharedOf!T == T); 
-			enum log = false; 
-					
-			static if(isShared)
-			{
-				static T instance; //Todo: initOnce does this locking too.
-				static bool initialized; 
-				if(!initialized) {
-					synchronized {
-						if(instance is null) {
-							instance = new T; 
-							if(log) LOG(`created.`); 
-						}
-					} 
-					initialized = true; 
-				}
-			}
-			else
-			{
-				__gshared static T instance; 
-				if(instance is null) {
-					instance = new T; 
-					if(log) LOG(`created.`); 
-				}
-			}
-					
-			return instance; 
-		} 
-		
-		//structs to text /////////////////////////////////////
-		
-		string toString2(T)(in T obj)
-		if(isAggregateType!T)
-		{
-			string[] parts; 
-			alias types = FieldTypeTuple!T; 
-			foreach(idx, name; FieldNameTuple!T) {
-				string value = mixin("obj."~name~".text;"); 
-				if(isSomeString!(types[idx])) value = value.quoted; 
-				parts ~= format!"%s : %s"(name, value); 
-			}
-			return format!"%s(%s)"(T.stringof, parts.join(", ")); 
-		} 
-		
-		void clearFields_init(T)(T obj)
-		if(isAggregateType!T)
-		{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); } 
-		
-		//Note: at stream, there is a clearFields_default version
-		//Todo: bad naming:  initFields and initStoredField would be better.
-		
-		//Meta helpers ///////////////////////////
-		
-		auto getSymbolNamesByUDA(T, string uda)()
-		{
-			string[] res; 
-			static foreach(a; getSymbolsByUDA!(T, uda)) res ~= a.stringof; 
-			return res; 
-		} 
-		
-		/*
-			// this is a __traits only version for string UDAs
-			auto getSymbolNamesByUDA(T, string uda)(){
-				string[] res;
-				static foreach(n; __traits(allMembers, T)) {
-					// static, but don't use static foreach so you can break
-					foreach(u; __traits(getAttributes, __traits(getMember, T, n)))
-						static if(is(typeof(u) == string) && u == uda) {
-							res ~= n;
-							break;
-						}
-				 }
-				return res;
-			}
-		*/
-		
-		enum SameType(A, B) = is(Unqual!A == Unqual!B); 
-		
-		/// returns only the last UDA if more than one exists.
-		template getUDA(alias a, U)
-		{
-			enum u = q{getUDAs!(a, U)[$-1]}; 
-			static if(
-				hasUDA!(a, U) && !is(mixin(u))//Note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
-			)
-			enum getUDA	= mixin(u); 
-			else
-			enum getUDA = U.init; 
-		} 
-		
-		///helper templates to get all the inherited class fields, works for structs as well
-		template AllClasses(T)
-		{
-			//Todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
-			static if(is(T == Object))
-			alias AllClasses = AliasSeq!(); 
-			else static if(is(T == class ))
-			alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1])); 
-			else
-			alias AllClasses = T; 
-		} 
-		
-		/// returns the member names of only this child class only, not the ancestor classes.
-		/// Analogous to FieldNameTuple template
-		template ThisClassMemberNameTuple(T)
-		{
-			static if(is(T == class ) && !is(T == Object))
-			{
-				alias AM = __traits(allMembers, T); 
-				alias BM = __traits(allMembers, BaseClassesTuple!T[0]); 
+	
+	static T Singleton(T)() if(is(T == class))
+	{
+		//Singleton ////////////////////////
+		import std.traits : SharedOf; 
+		enum isShared = is(SharedOf!T == T); 
+		enum log = false; 
 				
-				enum validateName(string name) = !name.among("slot_t"); 
-				//Note: This is a bugfix. There is std.signals.Signal in het.win.Window. That causes hasUDA to fail.
+		static if(isShared)
+		{
+			static T instance; //Todo: initOnce does this locking too.
+			static bool initialized; 
+			if(!initialized) {
+				synchronized {
+					if(instance is null) {
+						instance = new T; 
+						if(log) LOG(`created.`); 
+					}
+				} 
+				initialized = true; 
+			}
+		}
+		else
+		{
+			__gshared static T instance; 
+			if(instance is null) {
+				instance = new T; 
+				if(log) LOG(`created.`); 
+			}
+		}
 				
-				enum ThisClassMemberNameTuple = Filter!(validateName, AM[0..AM.length-BM.length]); 
-			}else
-			enum ThisClassMemberNameTuple = AliasSeq!(); 
-		} 
-		
-		alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); //good order, but no member properties
-		alias AllMemberNames(T) = __traits(allMembers, T); //wrong backward inheritance order.
-		
-		/// used by stream. This is the old version, without properties. Fields are in correct order.
-		template FieldNamesWithUDA(T, U, bool allIfNone)
+		return instance; 
+	} 
+	
+	//structs to text /////////////////////////////////////
+	
+	string toString2(T)(in T obj)
+	if(isAggregateType!T)
+	{
+		string[] parts; 
+		alias types = FieldTypeTuple!T; 
+		foreach(idx, name; FieldNameTuple!T) {
+			string value = mixin("obj."~name~".text;"); 
+			if(isSomeString!(types[idx])) value = value.quoted; 
+			parts ~= format!"%s : %s"(name, value); 
+		}
+		return format!"%s(%s)"(T.stringof, parts.join(", ")); 
+	} 
+	
+	void clearFields_init(T)(T obj)
+	if(isAggregateType!T)
+	{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); } 
+	
+	//Note: at stream, there is a clearFields_default version
+	//Todo: bad naming:  initFields and initStoredField would be better.
+	
+	//Meta helpers ///////////////////////////
+	
+	auto getSymbolNamesByUDA(T, string uda)()
+	{
+		string[] res; 
+		static foreach(a; getSymbolsByUDA!(T, uda)) res ~= a.stringof; 
+		return res; 
+	} 
+	
+	/*
+		// this is a __traits only version for string UDAs
+		auto getSymbolNamesByUDA(T, string uda)(){
+			string[] res;
+			static foreach(n; __traits(allMembers, T)) {
+				// static, but don't use static foreach so you can break
+				foreach(u; __traits(getAttributes, __traits(getMember, T, n)))
+					static if(is(typeof(u) == string) && u == uda) {
+						res ~= n;
+						break;
+					}
+			 }
+			return res;
+		}
+	*/
+	
+	enum SameType(A, B) = is(Unqual!A == Unqual!B); 
+	
+	/// returns only the last UDA if more than one exists.
+	template getUDA(alias a, U)
+	{
+		enum u = q{getUDAs!(a, U)[$-1]}; 
+		static if(
+			hasUDA!(a, U) && !is(mixin(u))//Note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
+		)
+		enum getUDA	= mixin(u); 
+		else
+		enum getUDA = U.init; 
+	} 
+	
+	///helper templates to get all the inherited class fields, works for structs as well
+	template AllClasses(T)
+	{
+		//Todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
+		static if(is(T == Object))
+		alias AllClasses = AliasSeq!(); 
+		else static if(is(T == class ))
+		alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1])); 
+		else
+		alias AllClasses = T; 
+	} 
+	
+	/// returns the member names of only this child class only, not the ancestor classes.
+	/// Analogous to FieldNameTuple template
+	template ThisClassMemberNameTuple(T)
+	{
+		static if(is(T == class ) && !is(T == Object))
 		{
-			enum fields = AllFieldNames!T; 
-			enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U); 
+			alias AM = __traits(allMembers, T); 
+			alias BM = __traits(allMembers, BaseClassesTuple!T[0]); 
 			
-			static if(allIfNone && !anySatisfy!(hasThisUDA, fields))
-			enum FieldNamesWithUDA = fields; 
-			else
-			enum FieldNamesWithUDA = Filter!(hasThisUDA, fields); 
-		} 
+			enum validateName(string name) = !name.among("slot_t"); 
+			//Note: This is a bugfix. There is std.signals.Signal in het.win.Window. That causes hasUDA to fail.
+			
+			enum ThisClassMemberNameTuple = Filter!(validateName, AM[0..AM.length-BM.length]); 
+		}else
+		enum ThisClassMemberNameTuple = AliasSeq!(); 
+	} 
+	
+	alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); //good order, but no member properties
+	alias AllMemberNames(T) = __traits(allMembers, T); //wrong backward inheritance order.
+	
+	/// used by stream. This is the old version, without properties. Fields are in correct order.
+	template FieldNamesWithUDA(T, U, bool allIfNone)
+	{
+		enum fields = AllFieldNames!T; 
+		enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U); 
 		
-		//Todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
+		static if(allIfNone && !anySatisfy!(hasThisUDA, fields))
+		enum FieldNamesWithUDA = fields; 
+		else
+		enum FieldNamesWithUDA = Filter!(hasThisUDA, fields); 
+	} 
+	
+	//Todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
+	
+	/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
+	template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
+	{
+		enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA!(__traits(getMember, T, name), U)); 
+		enum bool isUdaFunction(string name) = name!="slot_t" && isUda!name && isFunction!(__traits(getMember, T, name)); 
+		enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T)); 
 		
-		/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
-		template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
+		static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
+		enum FieldAndFunctionNamesWithUDA = AllFieldNames!T; 
+		else
+		enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T); 
+	} 
+	
+	enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false); 
+	
+	static if(0)
+	string[] getEnumMembers(T)()
+	{
+		static if(is(T == enum)) return [__traits(allMembers, T)]; 
+		else return []; 
+	} 
+	
+	
+	enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : []; 
+	
+	
+	alias toAlias(alias T) = T; //Todo: Alias!T alreadyb exists
+	
+	void inspectSymbol(alias T)(string before="", int level=0)
+	{
+		enum maxInspectLevel = 10; 
+		
+		//step 2
+		foreach(memberName; __traits(allMembers, T))
+		static if(__traits(compiles, toAlias!(__traits(getMember, T, memberName))))
 		{
-			enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA!(__traits(getMember, T, name), U)); 
-			enum bool isUdaFunction(string name) = name!="slot_t" && isUda!name && isFunction!(__traits(getMember, T, name)); 
-			enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T)); 
-			
-			static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
-			enum FieldAndFunctionNamesWithUDA = AllFieldNames!T; 
-			else
-			enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T); 
-		} 
-		
-		enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false); 
-			
-	}version(/+$DIDE_REGION+/all) {
-			
-		static if(0)
-		string[] getEnumMembers(T)()
-		{
-			static if(is(T == enum)) return [__traits(allMembers, T)]; 
-			else return []; 
-		} 
-		
-		
-		enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : []; 
-		
-		
-		alias toAlias(alias T) = T; //Todo: Alias!T alreadyb exists
-		
-		void inspectSymbol(alias T)(string before="", int level=0)
-		{
-			enum maxInspectLevel = 10; 
-			
-			//step 2
-			foreach(memberName; __traits(allMembers, T))
-			static if(__traits(compiles, toAlias!(__traits(getMember, T, memberName))))
+			//step 3
+			alias member = toAlias!(__traits(getMember, T, memberName));  //sometimes this alias declaration fails.
+			//step 4 - inspecting types
+			static if(is(member))
 			{
-				//step 3
-				alias member = toAlias!(__traits(getMember, T, memberName));  //sometimes this alias declaration fails.
-				//step 4 - inspecting types
-				static if(is(member))
+				string specifically; 
+				static if(is(member == struct))
+				specifically = "struct"; 
+				else static if(is(member == class))
+				specifically = "class"; 
+				else static if(is(member == enum))
+				specifically = "enum"; 
+				writeln(before, fullyQualifiedName!member, " is a type (", specifically, ")"); 
+				//drill down (step 1 again)
+				static if(is(member == struct) || is(member == class) || is(member == enum))
 				{
-					string specifically; 
-					static if(is(member == struct))
-					specifically = "struct"; 
-					else static if(is(member == class))
-					specifically = "class"; 
-					else static if(is(member == enum))
-					specifically = "enum"; 
-					writeln(before, fullyQualifiedName!member, " is a type (", specifically, ")"); 
-					//drill down (step 1 again)
-					static if(is(member == struct) || is(member == class) || is(member == enum))
+					static if(!is(T) || !is(member == T))
 					{
-						static if(!is(T) || !is(member == T))
-						{
-							 //ignore types that contain an alias for typeof(this)
-							if(level<maxInspectLevel) {
-								 //limit recursion
-								inspectSymbol!member(before ~ "\t", level+1); 
-							}
+						 //ignore types that contain an alias for typeof(this)
+						if(level<maxInspectLevel) {
+							 //limit recursion
+							inspectSymbol!member(before ~ "\t", level+1); 
 						}
 					}
-					else
-					{ writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof); }
 				}
-				else static if(is(typeof(member) == function))
+				else
+				{ writeln(before ~"\t", fullyQualifiedName!member, " : ", member.stringof); }
+			}
+			else static if(is(typeof(member) == function))
+			{
+				//step 5, inspecting functions
+				writeln(before, fullyQualifiedName!member, " is a function typed ", typeof(member).stringof); 
+			}
+			else
+			{
+				//step 6, everything else
+				
+				static if(__traits(compiles, member.stringof)) enum s = member.stringof; else enum s = ""; 
+				
+				static if(s.startsWith("module "))
+				writeln(before, fullyQualifiedName!member, " is a module"); 
+				else static if(s.startsWith("package "))
+				writeln(before, fullyQualifiedName!member, " is a package"); 
+				else static if(is(typeof(member.init)))
 				{
-					//step 5, inspecting functions
-					writeln(before, fullyQualifiedName!member, " is a function typed ", typeof(member).stringof); 
+					static if(__traits(compiles, member.stringof))
+					{
+						static if(member.stringof.endsWith(')'))
+						{ writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof); }
+						else
+						{ writeln(before, fullyQualifiedName!member, " is a non-property typed ", typeof(member).stringof); }
+					}
+					else
+					{ writeln(before, fullyQualifiedName!member, " is a member, but unable access its .stringof ", memberName); }
 				}
 				else
 				{
-					//step 6, everything else
-					
-					static if(__traits(compiles, member.stringof)) enum s = member.stringof; else enum s = ""; 
-					
-					static if(s.startsWith("module "))
-					writeln(before, fullyQualifiedName!member, " is a module"); 
-					else static if(s.startsWith("package "))
-					writeln(before, fullyQualifiedName!member, " is a package"); 
-					else static if(is(typeof(member.init)))
-					{
-						static if(__traits(compiles, member.stringof))
-						{
-							static if(member.stringof.endsWith(')'))
-							{ writeln(before, fullyQualifiedName!member, " is a property typed ", typeof(member).stringof); }
-							else
-							{ writeln(before, fullyQualifiedName!member, " is a non-property typed ", typeof(member).stringof); }
-						}
-						else
-						{ writeln(before, fullyQualifiedName!member, " is a member, but unable access its .stringof ", memberName); }
-					}
-					else
-					{
-						string fn = memberName; 
-						static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member; 
-						writeln(before, fn, " is template ", s); 
-					}
+					string fn = memberName; 
+					static if(__traits(compiles, fullyQualifiedName!member)) fn = fullyQualifiedName!member; 
+					writeln(before, fn, " is template ", s); 
 				}
 			}
-			else
-			{
-				print(
-					"!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", 
-					T.stringof ~ "." ~ memberName
-				); 
-			}
-		} 
-			
-		auto arraySwitch(alias sourceRange, alias targetRangeOrFunction, T = ElementType!(typeof(sourceRange)))(in T input)
-		{
-			static if(isInputRange!(typeof(targetRangeOrFunction))) alias targetRange = targetRangeOrFunction; 
-			else alias targetRange = sourceRange.map!targetRangeOrFunction; 
-			
-			switch(input) {
-				
-				static foreach(a; zip(StoppingPolicy.requireSameLength, sourceRange, targetRange))
-				case a[0]: return a[1]; 
-				
-				//Todo: DIDE: the parser stops at case a[0]: and doesn't include return a[1]; inside this foreach
-				
-				default: 
-					throw new Exception(__FUNCTION__~": Invalid input value: "~input); 
-			}
-		} 
-		
-		auto functionSwitch(alias fun, E)(E e)
-		/+Todo: bad naming.+/
-		/+Todo: DIDE jopinpreposition bug above+/
-		{
-			final switch(e)
-			static foreach(a; EnumMembers!E)
-			case a: return a.unaryFun!fun; 
-		} 
-		
-		
-		//StaticParam ////////////////////
-		
-		auto getStaticParamDef(T, Args...)(in T def, in Args args)
-		{
-			Unqual!T res = def; 
-			static foreach(a; args) static if(__traits(compiles, res = a)) return a; 
-			return res; 
-		} 
-		
-		auto getStaticParam(T, Args...)(in Args args)
-		{
-			Unqual!T res; 
-			static foreach(a; args) static if(__traits(compiles, res = a)) return a; 
-			static assert(0, "Can't find required param: "~T.stringof); 
-		} 
-		
-		enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0; 
-		
-	}version(/+$DIDE_REGION+/all) {
-			
-		//GenericArg /////////////////////////////////////
-		
-		//Todo: rename to NamedParameter
-		
-		//overloadable arguments. args!(fun, param1 => x, param2 => y)   fun must be a struct, not a function. It's not what I want.
-		//Link: https://github.com/CyberShadow/ae/blob/master/utils/meta/args.d
-		
-		//They never made it:
-		//Link: https://wiki.dlang.org/DIP88
-		
-		
-		struct GenericArg(string N="", T)
-		{
-			alias type = T; enum name = N; 
-			
-			T value; 
-			alias value this; 
-		} 
-		
-		alias 名 = genericArg; //Todo: This way it can be compressed. Only 3 chars instead of 10.
-		
-		enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T); 
-		enum isGenericArg(A, string name) = is(A==GenericArg!(N, T), string N, T) && N==name; 
-		
-		/// pass a generic arg to a function
-		auto genericArg(string N="", T)(in T p)
-		{ return GenericArg!(N, T)(p); } 
-		
-		/// cast anything to GenericArg
-		auto asGenericArg(A)(in A a)
-		{ static if(isGenericArg!A) return a; else return genericArg(a); } 
-		
-		auto asGenericArgValue(A)(in A a)
-		{ static if(isGenericArg!A) return a.value; else return a; } 
-		
-		
-		string processGenericArgs(string code)
-		{
-			//generates a static foreach. "code" is a static if chain evaluating N (name) and T (type). Inputs: args:
-			return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}"; 
-		} 
-		
-		string appendGenericIds(string idVariable)
-		{ return processGenericArgs(`static if(N=="id") `~idVariable~`.appendIdx(a.value);`); } 
-		
-		
-		auto genericId(T)(in T a)
-		{
-			static if(is(T==class))
-			return genericArg!"id"(a.identityStr); 
-			else
-			return genericArg!"id"(a); 
-		} 
-		
-		//SrcId ////////////////////////////////////////////////////////////
-		
-		enum srcLocationStr(string srcModule, size_t srcLine) = srcModule ~ `.d(` ~ srcLine.text ~ ')'; 
-		
-		struct SrcId
-		{
-			/// select Id datatype. Default=string if debug, long if release
-			version(stringId	) alias T = string	; 
-			else version(longId	) alias T = ulong	; 
-			else version(intId	) alias T = uint	; 
-			else {
-				alias T = ulong; 
-				//Todo: it could be string in debug mode. Needs a new ide to handle that.
-			}
-			
-			T value; 
-			
-			bool opCast(B : bool)() const { return value != T.init; } 
-			
-			/*
-				  bool opEquals(in SrcId b) const{ return value == b.value; }
-							size_t toHash() const{ return .toHash(value); }
-			*/
-			
-			alias value this; 
-		} 
-		
-		static if(is(SrcId.T==uint) || is(SrcId.T==ulong))
-		{
-			//auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value)); }
-			
-			auto combine(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); } 
-			void appendIdx(T)(ref SrcId id, in T idx) { id = combine(id, idx); } 
-			
-			//Note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
-			auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
-			{
-				auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); 
-				//Note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
-				mixin(appendGenericIds("id")); 
-				return id; 
-			} 
-		}
-		else static if(is(SrcId.T==string))
-		{
-			//auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
-			
-			auto combine(T)(in SrcId i1, in T i2) { return SrcId(i1.value ~ '.' ~ i2.text); } 
-			void appendIdx(T)(ref SrcId id, in T idx) { id ~= '[' ~ idx.text ~ ']'; } 
-			//for clarity string uses the [idx] form, instead of a.b;
-			
-			auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
-			{
-				auto id = SrcId(srcLocationStr!(srcModule, srcLine)); 
-				//.d is included to make sourceModule detection easier
-				mixin(appendGenericIds("id")); 
-				return id; 
-			} 
 		}
 		else
-		static assert(0, "Invalid SrcId.T"); 
-		
-		void test_SrcId()
 		{
-			{
-				//simple id test: id's on same lines are equal, except with extra params
-				
-				auto f1(string srcModule = __MODULE__, size_t srcLine = __LINE__, Args...)(in Args args)
-				{
-					auto id = srcId!(srcModule, srcLine)(args); 
-					return id.value; 
-				} 
-				
-				//newlines in source do matter here!!!!
-				/+1+/ enum i1 = srcId; enum i2 = srcId; 
-				/+2+/ enum i3 = srcId; auto i4 = srcId(genericArg!"id"("Hello"), genericArg!"id"(123)), i5 = srcId(genericArg!"id"("Hello")); 
-				/+3+/ auto i6 = i5.combine("Test"); 
-				/+4+/ auto i7 = i6.combine(0); 
-				enforce(i1==i2 && i2!=i3 && i3!=i4 && i4!=i5 && i5!=i6 && i6!=i7); 
-			}
-		} 
-	}version(/+$DIDE_REGION+/all) {
-		///////////////////////////////////////////////////////////////////////////
-		/// RTTI                                                                ///
-		///////////////////////////////////////////////////////////////////////////
+			print(
+				"!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", 
+				T.stringof ~ "." ~ memberName
+			); 
+		}
+	} 
 		
+	auto arraySwitch(alias sourceRange, alias targetRangeOrFunction, T = ElementType!(typeof(sourceRange)))(in T input)
+	{
+		static if(isInputRange!(typeof(targetRangeOrFunction))) alias targetRange = targetRangeOrFunction; 
+		else alias targetRange = sourceRange.map!targetRangeOrFunction; 
+		
+		switch(input) {
+			
+			static foreach(a; zip(StoppingPolicy.requireSameLength, sourceRange, targetRange))
+			case a[0]: return a[1]; 
+			
+			//Todo: DIDE: the parser stops at case a[0]: and doesn't include return a[1]; inside this foreach
+			
+			default: 
+				throw new Exception(__FUNCTION__~": Invalid input value: "~input); 
+		}
+	} 
+	
+	auto functionSwitch(alias fun, E)(E e)
+	/+Todo: bad naming.+/
+	/+Todo: DIDE jopinpreposition bug above+/
+	{
+		final switch(e)
+		static foreach(a; EnumMembers!E)
+		case a: return a.unaryFun!fun; 
+	} 
+	
+	
+	//StaticParam ////////////////////
+	
+	auto getStaticParamDef(T, Args...)(in T def, in Args args)
+	{
+		Unqual!T res = def; 
+		static foreach(a; args) static if(__traits(compiles, res = a)) return a; 
+		return res; 
+	} 
+	
+	auto getStaticParam(T, Args...)(in Args args)
+	{
+		Unqual!T res; 
+		static foreach(a; args) static if(__traits(compiles, res = a)) return a; 
+		static assert(0, "Can't find required param: "~T.stringof); 
+	} 
+	
+	enum hasStaticParam(T, Args...) = staticIndexOf!(Unqual!T, staticMap!(Unqual, Args))>0; 
+	
+	//GenericArg /////////////////////////////////////
+	
+	//Todo: rename to NamedParameter
+	
+	//overloadable arguments. args!(fun, param1 => x, param2 => y)   fun must be a struct, not a function. It's not what I want.
+	//Link: https://github.com/CyberShadow/ae/blob/master/utils/meta/args.d
+	
+	//They never made it:
+	//Link: https://wiki.dlang.org/DIP88
+	
+	
+	struct GenericArg(string N="", T)
+	{
+		alias type = T; enum name = N; 
+		
+		T value; 
+		alias value this; 
+	} 
+	
+	alias 名 = genericArg; //Todo: This way it can be compressed. Only 3 chars instead of 10.
+	
+	enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T); 
+	enum isGenericArg(A, string name) = is(A==GenericArg!(N, T), string N, T) && N==name; 
+	
+	/// pass a generic arg to a function
+	auto genericArg(string N="", T)(in T p)
+	{ return GenericArg!(N, T)(p); } 
+	
+	/// cast anything to GenericArg
+	auto asGenericArg(A)(in A a)
+	{ static if(isGenericArg!A) return a; else return genericArg(a); } 
+	
+	auto asGenericArgValue(A)(in A a)
+	{ static if(isGenericArg!A) return a.value; else return a; } 
+	
+	
+	string processGenericArgs(string code)
+	{
+		//generates a static foreach. "code" is a static if chain evaluating N (name) and T (type). Inputs: args:
+		return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}"; 
+	} 
+	
+	string appendGenericIds(string idVariable)
+	{ return processGenericArgs(`static if(N=="id") `~idVariable~`.appendIdx(a.value);`); } 
+	
+	
+	auto genericId(T)(in T a)
+	{
+		static if(is(T==class))
+		return genericArg!"id"(a.identityStr); 
+		else
+		return genericArg!"id"(a); 
+	} 
+	
+	//SrcId ////////////////////////////////////////////////////////////
+	
+	enum srcLocationStr(string srcModule, size_t srcLine) = srcModule ~ `.d(` ~ srcLine.text ~ ')'; 
+	
+	struct SrcId
+	{
+		/// select Id datatype. Default=string if debug, long if release
+		version(stringId	) alias T = string	; 
+		else version(longId	) alias T = ulong	; 
+		else version(intId	) alias T = uint	; 
+		else {
+			alias T = ulong; 
+			//Todo: it could be string in debug mode. Needs a new ide to handle that.
+		}
+		
+		T value; 
+		
+		bool opCast(B : bool)() const { return value != T.init; } 
+		
+		/*
+			  bool opEquals(in SrcId b) const{ return value == b.value; }
+						size_t toHash() const{ return .toHash(value); }
+		*/
+		
+		alias value this; 
+	} 
+	
+	static if(is(SrcId.T==uint) || is(SrcId.T==ulong))
+	{
+		//auto srcId(in SrcId i1, in SrcId i2){ return SrcId(cast(SrcId.T)hashOf(i2.value, i1.value)); }
+		
+		auto combine(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); } 
+		void appendIdx(T)(ref SrcId id, in T idx) { id = combine(id, idx); } 
+		
+		//Note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
+		auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		{
+			auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); 
+			//Note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
+			mixin(appendGenericIds("id")); 
+			return id; 
+		} 
+	}
+	else static if(is(SrcId.T==string))
+	{
+		//auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
+		
+		auto combine(T)(in SrcId i1, in T i2) { return SrcId(i1.value ~ '.' ~ i2.text); } 
+		void appendIdx(T)(ref SrcId id, in T idx) { id ~= '[' ~ idx.text ~ ']'; } 
+		//for clarity string uses the [idx] form, instead of a.b;
+		
+		auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		{
+			auto id = SrcId(srcLocationStr!(srcModule, srcLine)); 
+			//.d is included to make sourceModule detection easier
+			mixin(appendGenericIds("id")); 
+			return id; 
+		} 
+	}
+	else
+	static assert(0, "Invalid SrcId.T"); 
+	
+	void test_SrcId()
+	{
+		{
+			//simple id test: id's on same lines are equal, except with extra params
+			
+			auto f1(string srcModule = __MODULE__, size_t srcLine = __LINE__, Args...)(in Args args)
+			{
+				auto id = srcId!(srcModule, srcLine)(args); 
+				return id.value; 
+			} 
+			
+			//newlines in source do matter here!!!!
+			/+1+/ enum i1 = srcId; enum i2 = srcId; 
+			/+2+/ enum i3 = srcId; auto i4 = srcId(genericArg!"id"("Hello"), genericArg!"id"(123)), i5 = srcId(genericArg!"id"("Hello")); 
+			/+3+/ auto i6 = i5.combine("Test"); 
+			/+4+/ auto i7 = i6.combine(0); 
+			enforce(i1==i2 && i2!=i3 && i3!=i4 && i4!=i5 && i5!=i6 && i6!=i7); 
+		}
+	} 
+	version(/+$DIDE_REGION FieldDeclarations+/all)
+	{
 		struct StructInfo
 		{
-					
 			struct FieldInfo
 			{
 				string uda, type, name, default_; 
 				size_t ofs, size; 
-						
+				
 				string toString()const
 				{ return (uda.empty ? `` : `@(`~uda~`) `) ~ "%s %s = %s; // ofs:%d size:%d".format(type, name, default_, ofs, size); } 
-						
+				
 				string getoptLine(string ownerName)const
 				{
-					 //returns a line used by std.getopt()
+					//returns a line used by std.getopt()
 					//example: "w|WFPerCU"     , `Number of WaveFronts on each Compute Units. Default: `~defOptions.WFPerCU.text, &WFPerCU  ,
-							
+					
 					//split at param = descr
 					string param, descr; 
 					if(!split2(uda, "=", param, descr))
@@ -2173,7 +2164,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						descr = param; 
 						param = ""; 
 					}
-							
+					
 					//split at shortParam | longParam
 					string shortParam, longParam; 
 					if(!split2(param, "|", shortParam, longParam))
@@ -2184,29 +2175,29 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							shortParam = ""; 
 						}
 					}
-							
+					
 					//default short and long param
 					if(shortParam=="") shortParam = name[0..1].lc; 
 					if(longParam=="") longParam = name; 
-							
+					
 					descr = descr.replace("$DEFAULT$", default_); 
-							
+					
 					//format the final string that can be used in getopt()
 					return `"%s|%s", "%s", &%s.%s`.format(shortParam, longParam, descr.replace(`"`, `\"`), ownerName, name); 
 				} 
 			} 
-					
+			
 			string name; 
 			size_t size; 
 			FieldInfo[] fields; 
-					
+			
 			string toString()const
 			{
 				return "struct "~name~" {"~
 					fields.map!(f => "\r\n  "~f.text).join
 				~"\n\r} // size:%s \n\r".format(size); 
 			} 
-					
+			
 			string[] getoptLines(string ownerName)const
 			{ return fields.map!(f => f.getoptLine(ownerName)).array; } 
 		} 
@@ -2217,9 +2208,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			StructInfo si; 
 			si.name = T.stringof; 
 			si.size = T.sizeof; 
-					
+			
 			T defStruct; 
-					
+			
 			import std.traits; 
 			foreach(name; FieldNameTuple!T)
 			{
@@ -2237,7 +2228,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				); 
 				si.fields ~= fi; 
 			}
-					
+			
 			return si; 
 		} 
 		
@@ -2277,7 +2268,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			}
 		*/
-	}version(/+$DIDE_REGION+/all)
+	}
+	version(/+$DIDE_REGION+/all)
 	{
 		template staticSizeSum(A...)
 		{
@@ -2313,55 +2305,148 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			enum isFixedSizeOpaqueType = false; 
 		} 
 	}
-}version(/+$DIDE_REGION ASM+/all)
-{
-	public import ldc.llvmasm; 
-	public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
-	loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
 	
-	/+
-		Note: Important note on SSE constants:
-			/+Code: enum          ubyte16 a = [1, 2, 3];+/	⛔ It calculates BAD results!!!
-			/+Code: static immutable ubyte16 a = [1, 2, 3];+/ 	⚠ It works, but the compiler crashes when used in pragma(msg).
-		Possible workarounds:
-			/+Code: mixin([1, 2, 3])+/ 	put the array literal inside mixin().
-			/+Code: [1, 2, 3].dup+/	pass it through the std library. array(), dup() template functions will work.
-		/+Link: https://forum.dlang.org/post/ekicvpjxpjwwsdallwnk@forum.dlang.org+/
-	+/
-	
-	//Imported builtins ////////////////////////////////////////////
-	
-	mixin template asmFunctions()
+	version(/+$DIDE_REGION NiceExpression implementations+/all)
 	{
-		//must import as a mixin, to enable inlining in each module. Az LTO sucks.
+		static auto 體(T, string def)() //struct
+		{ return format!`((){%s _={%s};return _;}())`(T.stringof, def); } 
+		static auto 舉(T, string def)() //enum
+		{ return format!`(%s.%s)`(T.stringof, def); } 
+		static auto 幟(T, string def)() //flags
+		{ return format!`((){with(%s) return %s;}())`(T.stringof, def); } 
+	}
+	
+	version(/+$DIDE_REGION SmartClass+/all)
+	{
+		struct PARENT {} 
 		
-		//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
+		mixin template SmartParentTemplate()
+		{
+			private
+			{
+				bool _ignoreChildDestructionNotifocations; 
+				bool[Object] _childMap; 
+				
+				void _notifyParent_childCreated(Object a)
+				{
+					_childMap[a] = true; 
+					
+					//Note: parent.onChildCreated is called always.
+					static if(__traits(compiles, { this._onChildCreated(a); }))
+					this._onChildCreated(a); 
+				} 
+				
+				void _notifyParent_childDestroying(Object a)
+				{
+					if(!_ignoreChildDestructionNotifocations)
+					{
+						
+						//Note: parent.onChildDestroying is only called when the parent is NOT destroying.
+						static if(__traits(compiles, { this._onChildDestroying(a); }))
+						this._onChildDestroying(a); 
+						
+						_childMap.remove(a);  
+					}
+				} 
+				
+				auto _children()
+				{ return _childMap.byKey; } 
+				
+				void _thisParentDestroying()
+				{
+					//Note: ⚠This must be called frrom a destructor first
+					//LOG("~parent", typeof(this).stringof); 
+					_ignoreChildDestructionNotifocations = true; 
+					_children.each!destroy; 
+					_childMap = null; 
+				} 
+			} 
+		} 
 		
+		mixin template SmartChildTemplate(alias parentField)
+		{
+			private
+			{
+				alias _parent = parentField; 
+				
+				void _thisChildCreated()
+				{
+					//Note: ⚠This must be called right after a successful constructor
+					if(_parent) _parent._notifyParent_childCreated(this); 
+				} 
+				
+				void _thisChildDestroying()
+				{ if(_parent) _parent._notifyParent_childDestroying(this); } 
+			} 
+		} 
 		
-		//public import ldc.gccbuiltins_x86 : pshufb	= __builtin_ia32_pshufb128; //note: this maps to signed bytes. I wand unsigneds for chars and for color channels.
-		//byte16 pshufb(byte16 a, byte16 b){return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); }
-		T pshufb(T, U)(T a, in U b) { return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); } 
+		template FunctionParameterProcessor(alias f /+this must be a function, defining field types, names and defaults+/)
+		{
+			alias types = Parameters!f; 
+			alias names = ParameterIdentifierTuple!f; 
+			alias defaults = ParameterDefaults!f; 
+			
+			enum length = types.length; 
+			
+			enum typeStr	(int i) = types[i].stringof; //it has no UDAs
+			enum typeUdaStr	(int i) = types[i..i+1].stringof[1..$-1];  //It has UDAs -> @(AliasSeq!((PARENT)), AliasSeq!("hello")) type
+			enum defaultEqStr	(int i) = defaults[i].stringof!="void" ? "="~defaults[i].stringof : ""; 
+			enum fieldDeclaration   (int i) = format!"%s %s;"(typeUdaStr!i, names[i]); //udas, but no defaults here
+			enum fieldInitialization(int i) = format!"this.%s = %s;"(names[i], names[i]); 
+			enum paramDeclaration	(int i) = (i ? "," : "") ~ format!"%s %s%s"(typeStr!i, names[i], defaultEqStr!i); //no udas, but has defaults
+			
+			string transform(alias fv)() { string res; 	static foreach(i; 0..length) res ~= fv!i; return res; } 
+			
+			enum fieldDeclarations = transform!fieldDeclaration; 
+			enum paramDeclarations = transform!paramDeclaration; 
+			enum fieldInitializations = transform!fieldInitialization; 
+		} 
 		
-		T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1", "=x,0,x,i", a, b, im); } 
+		string generateSmartClassCode_impl(alias f, Flag!"hasChildren" hasChildren)()
+		{
+			alias P = FunctionParameterProcessor!f; 
+			
+			string res; 
+			enum hasParent = P.typeUdaStr!0.canFind("(PARENT)"); //hasUDA not works...
+			
+			res ~= P.fieldDeclarations ~ "\n"; 
+			if(hasChildren) res ~= format!"mixin SmartParentTemplate; \n"; 
+			if(hasParent) res ~= format!"mixin SmartChildTemplate!%s; \n"(P.names[0]); 
+			res ~= format!"this(%s){ %s _construct; %s }\n"(
+				P.paramDeclarations, P.fieldInitializations, 
+				hasParent ? "_thisChildCreated;" : ""
+			); 
+			res ~= format!"~this(){ %s %s _destruct; }\n"(
+				hasChildren ? "_thisParentDestroying;" : "",
+				hasParent ? "_thisChildDestroying;" : "",
+			); 
+			return res; 
+		} 
 		
-		//__builtin_ia32_pcmpestri128
-		T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); } 
+		mixin template SmartClass(string fieldDefs, Flag!"hasChildren" hasChildren = No.hasChildren)
+		{
+			//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren)); 
+			mixin(generateSmartClassCode!(fieldDefs, hasChildren)); 
+		} 
 		
-		//Todo: In old LDC 1.28   it generates a mask, but it's bad.  So I use this instead.
-		ubyte16 pcmpeqb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pcmpeqb $2, $1", "=x,0,x", a, b); } 
-		ubyte16 pmaxub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pmaxub $2, $1", "=x,0,x", a, b); } 
-		ubyte16 pminub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pminub $2, $1", "=x,0,x", a, b); } 
-		ubyte16 pavgb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pavgb $2, $1", "=x,0,x", a, b); } 
+		mixin template SmartClassParent(string fieldDefs)
+		{ mixin SmartClass!(fieldDefs, Yes.hasChildren); } 
 		
-		ubyte16 punpcklbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklbw $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhbw $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpcklwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklwd $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhwd $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckldq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckldq $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhdq $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpcklqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklqdq $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhqdq $2, $1", "=x,0,x", a, b); } 
-	} 
+		mixin template SmartClassGenerator()
+		{
+			/+
+				Note: This shoud be mixed in into a place to see the imports of the actual fieldDefs.
+				Usage: /+Code: mixin SmartClassGenerator;+/
+				Example: High level Vulkan classes
+			+/
+			
+			private string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren)()
+			{
+				mixin("void f("~fieldDefs~"){};"); 
+				return generateSmartClassCode_impl!(f, hasChildren); 
+			} 
+		} 
+	}
 }
 version(/+$DIDE_REGION Numeric+/all)
 {
@@ -4370,6 +4455,55 @@ version(/+$DIDE_REGION Numeric+/all)
 		} 
 		
 		
+	} 
+}version(/+$DIDE_REGION ASM+/all)
+{
+	public import ldc.llvmasm; 
+	public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
+	loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
+	
+	/+
+		Note: Important note on SSE constants:
+			/+Code: enum          ubyte16 a = [1, 2, 3];+/	⛔ It calculates BAD results!!!
+			/+Code: static immutable ubyte16 a = [1, 2, 3];+/ 	⚠ It works, but the compiler crashes when used in pragma(msg).
+		Possible workarounds:
+			/+Code: mixin([1, 2, 3])+/ 	put the array literal inside mixin().
+			/+Code: [1, 2, 3].dup+/	pass it through the std library. array(), dup() template functions will work.
+		/+Link: https://forum.dlang.org/post/ekicvpjxpjwwsdallwnk@forum.dlang.org+/
+	+/
+	
+	//Imported builtins ////////////////////////////////////////////
+	
+	mixin template asmFunctions()
+	{
+		//must import as a mixin, to enable inlining in each module. Az LTO sucks.
+		
+		//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
+		
+		
+		//public import ldc.gccbuiltins_x86 : pshufb	= __builtin_ia32_pshufb128; //note: this maps to signed bytes. I wand unsigneds for chars and for color channels.
+		//byte16 pshufb(byte16 a, byte16 b){return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); }
+		T pshufb(T, U)(T a, in U b) { return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); } 
+		
+		T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1", "=x,0,x,i", a, b, im); } 
+		
+		//__builtin_ia32_pcmpestri128
+		T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); } 
+		
+		//Todo: In old LDC 1.28   it generates a mask, but it's bad.  So I use this instead.
+		ubyte16 pcmpeqb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pcmpeqb $2, $1", "=x,0,x", a, b); } 
+		ubyte16 pmaxub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pmaxub $2, $1", "=x,0,x", a, b); } 
+		ubyte16 pminub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pminub $2, $1", "=x,0,x", a, b); } 
+		ubyte16 pavgb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pavgb $2, $1", "=x,0,x", a, b); } 
+		
+		ubyte16 punpcklbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklbw $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhbw $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpcklwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklwd $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhwd $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckldq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckldq $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhdq $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpcklqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklqdq $2, $1", "=x,0,x", a, b); } 
+		ubyte16 punpckhqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhqdq $2, $1", "=x,0,x", a, b); } 
 	} 
 }
 

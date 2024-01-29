@@ -778,12 +778,16 @@ class Window
 	
 	private enum showWarnings = false; 
 	
+	bool disableInternalRedraw; 
+	
 	protected void internalRedraw()
 	{
 		if(inRedraw) { if(showWarnings) WARN("Already in internalRedraw()"); return; }
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
 		
 		inRedraw = true; scope(exit) { inRedraw = false; updatesSinceLastDraw = 0; } 
+		
+		if(disableInternalRedraw) return; 
 		
 		auto t0 = QPS; 
 		onBeginPaint; 
