@@ -342,7 +342,7 @@ version(/+$DIDE_REGION+/all)
 		int nMaxFormats, int* piFormats, int* nNumFormats
 	) wglChoosePixelFormatARB; 
 	
-	private bool initWglChoosePixelFormat()
+	deprecated private bool initWglChoosePixelFormat()
 	//gets it with a dummy window, so the first opengl window can use it. Losing 250ms for nothing by this shit.
 	{
 		void error(string err) { throw new Exception("initWglChoosePixelFormat() "~err); } 
@@ -587,13 +587,6 @@ class Window
 		canSleep /+In the last update, there was no invalidate() calls, so it can sleep in the main loop.+/; 
 	
 	enum WM_MyStartup = WM_USER+0; 
-	
-	string getClassName()
-	{
-		char[256] s; 
-		GetClassNameA(hwnd, s.ptr, s.length); 
-		return to!string(fromStringz(s.ptr)); //ez eleg nagy buzisag...
-	} 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  WINDOW CLASS PUBLIC STUFF                                               ///
@@ -1340,7 +1333,7 @@ class Window
 	
 	void onUpdate()
 	{
-		 //this is just an example
+		//this is just an example
 		/*
 			updateView(true, true);
 			

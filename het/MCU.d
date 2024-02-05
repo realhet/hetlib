@@ -313,7 +313,7 @@ struct ConnectorInfo
 			drawDSubBody(1, .25f); 
 			if(numPins==50)
 			{
-				foreach(i; 0..t  )
+				foreach(i; 0..t)
 				drawPin(vec2(i*2+2.5          , 1.5)*unit, (i+1).text); 
 				foreach(i; t..t*2-1)
 				drawPin(vec2((i-t)*2+3.5      , 3.5)*unit, (i+1).text); 
@@ -345,11 +345,11 @@ struct ConnectorInfo
 				 dr.pointSize = size.x; 	 dr.color = clBody; 	 dr.point(tr(center)); 
 				 dr.pointSize = size.x*.15f; 	 dr.color = clOutline; 	 dr.point(tr(center-vec2(0, (size.y-dr.pointSize)/2))); 
 			
-			  void P(float r, float a, string label)
+				void P(float r, float a, string label)
 			{
 					//polar coords
 				drawPin(unit*(vec2(0, -r).rotate(-PIf*a))+center, label); 
-			} 
+			} 	
 			
 			  if(numPins.inRange(3, 5))
 			{
@@ -690,27 +690,26 @@ class ArduinoNanoProject
 	
 	static auto getNanoPinReg(string pin)
 	{
-		 //access port register/bit of an Arduino NANO pin
+		//access port register/bit of an Arduino NANO pin
 		try
 		{
+			enforce(pin.length>=2, "too short"); 
+			const idx = pin[1..$].to!ubyte; 
 			
-				 enforce(pin.length>=2, "too short"); 
-				 const idx = pin[1..$].to!ubyte; 
-			
-				 if(pin[0]=='D')
+			if(pin[0]=='D')
 			{
 				if(idx.inRange(2,  7))
 				return PinReg('D', idx  ); //0, 1 is for serial!!!
 				if(idx.inRange(8, 13))
 				return PinReg('B', cast(ubyte)(idx-8)); 
 			}
-				 if(pin[0]=='A')
+			if(pin[0]=='A')
 			{
 				if(idx.inRange(0,  5))
 				return PinReg('C', idx  ); //6 is reset
 			}
 			
-			  raise("unhandled"); 
+			raise("unhandled"); 
 			
 		}catch(Exception e)
 		{ raise(format!"Invalid arduino pin: %s (%s)"(pin.quoted, e.simpleMsg)); }
@@ -771,8 +770,8 @@ class ArduinoNanoProject
 			)
 			(
 				cables, //items
-							cablesTabsIdx, //index to remember selected item
-							genericArg!"includeAll"(true) //extra options: includeAll -> Shows an "All" option at the end of the items.
+				cablesTabsIdx, //index to remember selected item
+				genericArg!"includeAll"(true) //extra options: includeAll -> Shows an "All" option at the end of the items.
 			); 
 		}
 	} 
@@ -785,7 +784,8 @@ immutable arduinoUtils = q{
 	
 	/// Arduino utils ///////////////////////////////////////////////////////////////////
 	
-	uint32_t CRC32tab[256] = {
+	const PROGMEM uint32_t CRC32tab[256] = 
+	{
 		 0x00000000, 0x77073096, 0xee0e612c, 0x990951ba,	0x076dc419, 0x706af48f,
 		 0xe963a535, 0x9e6495a3, 0x0edb8832, 0x79dcb8a4,	0xe0d5e91e, 0x97d2d988,
 		 0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91,	0x1db71064, 0x6ab020f2,
@@ -834,7 +834,7 @@ immutable arduinoUtils = q{
 	uint32_t calcCrc32(String& s)
 	{
 		uint32_t r = 0xFFFFFFFF; 
-		uint8_t* ptr = s.c_str(); 
+		uint8_t* ptr = (uint8_t*)(s.c_str()); 
 		int len = s.length(); 
 		for(int i=0; i<len; i++)
 		r = CRC32tab[uint8_t(r)^ptr[i]]^(r>>8); 
@@ -848,7 +848,6 @@ immutable arduinoUtils = q{
 		for(byte i=0; i<4; i++, r>>=8)
 		Serial.print(char(r)); 
 	} 
-	
 	
 	void Serial_sendMessage(String id, String& msg)
 	{
