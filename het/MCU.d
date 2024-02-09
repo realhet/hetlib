@@ -188,7 +188,7 @@ struct ConnectorInfo
 		s = vec2(s.y, s.x); 
 		return s*(fh*unitFromFh); 
 	} 
-	
+	
 	void draw(Drawing dr, float fh, in string[string] pinColorMap = null) const
 	{
 		//Draws the schematic aligned to the top left. Use calcSize() to get the size and align.
@@ -777,12 +777,16 @@ class ArduinoNanoProject
 	} 
 	
 } 
+
 
 
-
-immutable arduinoUtils = q{
-	
+immutable arduinoUtils = 
+q{
 	/// Arduino utils ///////////////////////////////////////////////////////////////////
+	
+	/*Must #define msgBufSize 16  //must be 2*N, footer is 8 bytes*/
+	
+	/*Must #include <avr/pgmspace.h>*/
 	
 	const PROGMEM uint32_t CRC32tab[256] = 
 	{
@@ -831,30 +835,158 @@ immutable arduinoUtils = q{
 		 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d	
 	}; 
 	
-	uint32_t calcCrc32(String& s)
-	{
-		uint32_t r = 0xFFFFFFFF; 
-		uint8_t* ptr = (uint8_t*)(s.c_str()); 
-		int len = s.length(); 
-		for(int i=0; i<len; i++)
-		r = CRC32tab[uint8_t(r)^ptr[i]]^(r>>8); 
+	/*
+		uint32_t calcCrc32(String& s)
+		{
+			uint32_t r = 0xFFFFFFFF; 
+			uint8_t* ptr = (uint8_t*)(s.c_str()); 
+			int len = s.length(); 
+			for(int i=0; i<len; i++)
+			r = CRC32tab[uint8_t(r)^ptr[i]]^(r>>8); 
+			
+			return ~r; 
+		} 
 		
-		return ~r; 
+		void Serial_printCrc32(String& s)
+		{
+			uint32_t r = calcCrc32(s); 
+			for(byte i=0; i<4; i++, r>>=8)
+			Serial.print(char(r)); 
+		} 
+		
+		void Serial_sendMessage(String id, String& msg)
+		{
+			Serial.print(msg); 
+			Serial_printCrc32(msg); 
+			Serial.print(id); 
+			Serial.print('\n'); 
+		} 
+	*/
+	
+}~
+`  //This is a normal string because #if is an error in DLang q{} token strings
+  #define msgBufSizeMask (msgBufSize-1)
+  
+  #if msgBufSize<=8
+    #error "msgBufSize too low."
+  #endif
+  #if msgBufSize>=128
+    #error message "msgBufSize too high."
+  #endif
+  #if msgBufSize & msgBufSizeMask
+    #error message "msgBufSize must be 2^N"
+  #endif
+`~
+q{
+	#define msgMaxDataSize ((msgBufSize)-8)
+	#define msgInvMaxDataSize (msgMaxDataSize & 0xFF)
+	//length is encoded as 8bit inverted
+	
+	uint8_t msgIncomingBuf[msgBufSize]; //header is 8 bytes, max 128 bytes
+	
+	//temporary buffer addresses.  They must be masked all the time when used.
+	uint8_t msgIncomingBufPos = 0; 
+	uint8_t msgDataPos  = 0; 
+	uint8_t msgLen  = 0; 
+	
+	uint8_t msgGet8(uint8_t ofs)
+	{ return msgIncomingBuf[(msgDataPos+ofs) & msgBufSizeMask]; } 
+	
+	uint16_t msgGet16(uint8_t ofs) { return (uint16_t)msgGet8 (ofs) | (uint16_t)msgGet8 (ofs+1) <<  8; } 
+	uint32_t msgGet32(uint8_t ofs) { return (uint32_t)msgGet16(ofs) | (uint32_t)msgGet16(ofs+2) << 16; } 
+	
+	bool msgReceive(const char* ext)
+	{
+		while(1)
+		{
+			int i = Serial.read(); 
+			if(i>=0)
+			{
+				//got a byte, insert into buffer
+				msgIncomingBuf[msgIncomingBufPos] = (uint8_t)i; 
+				msgIncomingBufPos = (msgIncomingBufPos+1) & msgBufSizeMask; 
+				
+				//0x00 0x33 0x04 0x06 0xff 0xff 0x4b 0x54 0x48 0xfd
+				msgLen = ~((uint8_t)i);  
+				msgDataPos = msgIncomingBufPos-8; //origin is the header (which is actually a footer)
+				if(msgGet8(4)==ext[0] && msgGet8(5)==ext[1] && msgGet8(6)==ext[2] && msgLen<=msgBufSize-8)
+				{
+					//valid signature and length
+					/*
+						Serial.print("valid len:"); 
+						Serial.print(msgLen); 
+						Serial.print(";"); 
+					*/
+					
+					uint32_t crc = msgGet32(0); 
+					uint32_t r = 0xFFFFFFFF; 
+					msgDataPos -= msgLen; 
+					for(uint8_t j = 0; j<msgLen; j++) r = pgm_read_dword_near(CRC32tab + (uint8_t(r)^msgGet8(j)))^(r>>8); 
+					r = ~r; 
+					/*
+						Serial.print(crc); 
+						Serial.print(","); 
+						Serial.print(r); 
+						Serial.print("."); 
+						Serial.print(crc==r);
+					*/
+					
+					if(crc==r) return true; //msgs can be processed in a while loop.
+				}
+			}
+			else
+			break; 
+		}
+		   return false; 
 	} 
 	
-	void Serial_printCrc32(String& s)
+	// sending binary messages
+	
+	uint32_t msgOutgoingCrc = 0xFFFFFFFF; 
+	uint8_t msgOutgoingLen = 0; 
+	
+	void msgSendInit()
 	{
-		uint32_t r = calcCrc32(s); 
-		for(byte i=0; i<4; i++, r>>=8)
-		Serial.print(char(r)); 
+		msgOutgoingCrc = 0xFFFFFFFF; 
+		msgOutgoingLen = 0; 
 	} 
 	
-	void Serial_sendMessage(String id, String& msg)
+	void msgPut8(uint8_t a)
 	{
-		Serial.print(msg); 
-		Serial_printCrc32(msg); 
-		Serial.print(id); 
-		Serial.print('\n'); 
+		Serial.write(a); 
+		msgOutgoingCrc = pgm_read_dword_near(CRC32tab + (uint8_t(msgOutgoingCrc)^a))^(msgOutgoingCrc>>8); 
+		msgOutgoingLen++; 
+	} 
+	
+	void msgPut16(uint16_t a)
+	{
+		msgPut8((uint8_t)(a>>0)); 
+		msgPut8((uint8_t)(a>>8)); //intel byte order
+	} 
+	
+	void msgPut32(uint32_t a)
+	{
+		msgPut8((uint8_t)(a>> 0)); 
+		msgPut8((uint8_t)(a>> 8)); 
+		msgPut8((uint8_t)(a>>16)); 
+		msgPut8((uint8_t)(a>>24)); //intel byte order
+	} 
+	
+	void msgSend(const char* ext)
+	{
+		msgOutgoingCrc = ~msgOutgoingCrc; 
+		
+		Serial.write((uint8_t)(msgOutgoingCrc>> 0)); 
+		Serial.write((uint8_t)(msgOutgoingCrc>> 8)); 
+		Serial.write((uint8_t)(msgOutgoingCrc>>16)); 
+		Serial.write((uint8_t)(msgOutgoingCrc>>24)); //intel byte order
+		
+		Serial.write(ext, 3); 
+		
+		msgOutgoingLen = ~msgOutgoingLen; 
+		Serial.write(msgOutgoingLen); 
+		
+		msgSendInit(); 
 	} 
 	
 	/////////////////////////////////////////////////////////////////////////////////////

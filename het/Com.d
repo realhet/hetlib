@@ -80,7 +80,12 @@ struct ComPortStats
 } 
 
 enum ComPortProtocol
-{ raw, textPackets, binaryPackets} 
+{
+	raw, 
+	textPackets, 	//used by KarcBox
+	binaryPackets_old, 	//used by MyController
+	binaryPackets_new	/+used by ThresholdController. This is the simplest to decode on the Arduino.+/
+} 
 
 struct MsgComPortError
 { string error; } 
@@ -254,8 +259,10 @@ class ComPort
 	
 	protected string lineBuf; //messages buffer
 	protected ubyte[] binaryBuf; //used in binary mode
-	
 	uint maxLineBufSize = 4096; 
+	
+	protected ubyte[128] msgIncomingBuf; //used in new binary mode
+	uint msgIncomingBufPos; 
 	
 	//stats
 	ComPortStats stats; 
@@ -336,10 +343,18 @@ class ComPort
 				); 
 					stats.messagesOut ++; 
 				break; 
-				case ComPortProtocol.binaryPackets: 
+				case ComPortProtocol.binaryPackets_old: 
 					outBuf 	~= cast(ubyte[])(msg) 
-					 ~ cast(ubyte[])[crc32(msg)] 
+					 ~ cast(ubyte[])[crc32(msg)].dup 
 					 ~ cast(ubyte[])(prefix~"\n"); 
+					stats.messagesOut ++; 
+				break; 
+				case ComPortProtocol.binaryPackets_new: 
+					enforce(msg.length<128-8, "binaryPackets: Message too big."); 
+					outBuf 	~= cast(ubyte[])msg
+					~ cast(ubyte[])([crc32(msg)].dup)
+					~ cast(ubyte[])prefix
+					~ (cast(ubyte)(msg.length^0xFF)); 
 					stats.messagesOut ++; 
 				break; 
 			}
@@ -386,47 +401,6 @@ class ComPort
 		void processRaw()
 		{ returnPacket(raw); } 
 		
-		void processBinaryPackets()
-		{
-			binaryBuf ~= raw; 
-			while(1)
-			{
-				const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n')); 
-				if(idx<0)
-				break; 
-				
-				auto actLine = binaryBuf[0..idx]; 
-				binaryBuf = binaryBuf[idx+prefix.length+1..$]; 
-				if(actLine.length<4)
-				{
-					stats.dataErrorCnt++; 
-					error("Binary message too small. Can't check crc32."); 
-				}
-				else
-				{
-					const crc = (cast(uint[])actLine[$-4..$])[0]; 
-					actLine = actLine[0..$-4]; 
-					const crc2 = actLine.crc32; 
-					
-					if(crc==crc2)
-					{ returnPacket(actLine); }
-					else
-					{
-						error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)"); 
-						stats.dataErrorCnt++; 
-					}
-				}
-			}
-			
-			if(binaryBuf.length>maxLineBufSize)
-			{
-				 //Todo: refactor: maxMessageBytes
-				binaryBuf = []; 
-				stats.dataErrorCnt++; 
-				error("Receiving garbage instead of valid packages: "~prefix.quoted); 
-			}
-		} 
-		
 		void processTextPackets()
 		{
 			lineBuf = (cast(string)raw).safeUTF8; 
@@ -472,12 +446,91 @@ class ComPort
 			}
 		} 
 		
+		void processBinaryPackets_old()
+		{
+			binaryBuf ~= raw; 
+			while(1)
+			{
+				const idx = binaryBuf.countUntil(cast(ubyte[])(prefix~'\n')); 
+				if(idx<0)
+				break; 
+				
+				auto actLine = binaryBuf[0..idx]; 
+				binaryBuf = binaryBuf[idx+prefix.length+1..$]; 
+				if(actLine.length<4)
+				{
+					stats.dataErrorCnt++; 
+					error("Binary message too small. Can't check crc32."); 
+				}
+				else
+				{
+					const crc = (cast(uint[])actLine[$-4..$])[0]; 
+					actLine = actLine[0..$-4]; 
+					const crc2 = actLine.crc32; 
+					
+					if(crc==crc2)
+					{ returnPacket(actLine); }
+					else
+					{
+						error("Crc error: "~prefix.quoted~" "~actLine.format!"%(%02X %)"); 
+						stats.dataErrorCnt++; 
+					}
+				}
+			}
+			
+			if(binaryBuf.length>maxLineBufSize)
+			{
+				 //Todo: refactor: maxMessageBytes
+				binaryBuf = []; 
+				stats.dataErrorCnt++; 
+				error("Receiving garbage instead of valid packages: "~prefix.quoted); 
+			}
+		} 
+		
+		void processBinaryPackets_new()
+		{
+			//this is a similar loop to the arduino program
+			foreach(ubyte act; raw)
+			{
+				binaryBuf ~= act; 
+				
+				ubyte msgLen = ~act;  
+				if(
+					msgLen<=120 && binaryBuf.length>=8+msgLen && 
+					equal(binaryBuf[$-4..$-1], cast(ubyte[])prefix)//valid signature and length
+				)
+				{
+					const crc = *(cast(uint*)&binaryBuf[$-8]); 
+					ubyte[] data = binaryBuf[$-8-msgLen .. $-8]; 
+					//LOG(data, crc.to!string(16), data.crc32.to!string(16)); 
+					if(crc==data.crc32)
+					{
+						binaryBuf.clear; //Todo: can be garbage in it...
+						returnPacket(data); 
+					}
+					else
+					{
+						error("Crc error: "~prefix.quoted); 
+						stats.dataErrorCnt++; 
+					}
+				}
+			}
+			
+			if(binaryBuf.length>128)
+			{
+				binaryBuf = binaryBuf[$-128 .. $]; 
+				stats.dataErrorCnt++; 
+				error("Receiving garbage instead of valid packages: "~prefix.quoted); 
+			}
+		} 
+		
 		final switch(protocol)
 		{
-			case ComPortProtocol.raw      : processRaw	; break; 
-			case ComPortProtocol.binaryPackets: processBinaryPackets	; break; 
-			case ComPortProtocol.textPackets: processTextPackets	; break; 
-		}//end switch
+			case ComPortProtocol.raw: 	processRaw; 	break; 
+			case ComPortProtocol.textPackets: 	processTextPackets; 	break; 
+			case ComPortProtocol.binaryPackets_old: 	processBinaryPackets_old; 	break; 
+			case ComPortProtocol.binaryPackets_new: 	processBinaryPackets_new; 	break; 
+		}
 	} 
 	
 	bool thereWasAnError() const
@@ -873,7 +926,7 @@ class ComPorts
 		
 		static void set(ComPortInfo p, bool exists, string description="", string deviceId="")
 		{
-			p._exists	= exists ; 
+			p._exists	= exists; 
 			p._description	= description; 
 			p._deviceId	= deviceId; 
 		} 
