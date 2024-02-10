@@ -445,7 +445,7 @@ class ComPort
 				error("Receiving garbage instead of valid packages: "~prefix.quoted); 
 			}
 		} 
-		
+		
 		void processBinaryPackets_old()
 		{
 			binaryBuf ~= raw; 
