@@ -9,11 +9,10 @@ core.sys.windows.basetsd : HANDLE;
 
 struct ComPortSettings
 {
-	 //ComPortSettings ////////////////////////////////////////////////
 	@STORED string port = ""; 
 	@STORED int baud = 9600; 
 	@STORED string params = "8N1"; 
-	bool enabled; 
+	@STORED bool enabled=true; 
 } 
 
 HANDLE open(in ComPortSettings settings)
@@ -272,6 +271,8 @@ class ComPort
 	
 	protected bool workerHasError; //latched string
 	protected string workerError; 
+	
+	bool choosePort; //ui interface for choosing port is opened
 	
 	this()
 	{ workerTid = spawn(&comPortWorker, cast(shared)this); } 
@@ -587,7 +588,6 @@ class ComPort
 					Text("Port\t"); 
 					Edit(settings.port, { width = fh*3; }); 
 					
-					static bool choosePort; 
 					if(!choosePort)
 					{
 						if(Btn("..."))
