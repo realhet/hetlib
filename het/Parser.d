@@ -4015,6 +4015,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		enum initialState = State.structuredBlock; 
 		
 		mixin StructureScanner; 
+		
 		enum EOF	= Trans(EOFTokens	, State.unstructured); 
 		enum StructuredEOF	= Trans(EOFTokens /+~ " __EOF__"+/	, State.unstructured); //Todo: __EOF__ is only valid when it is a complete keyword.
 	} 
