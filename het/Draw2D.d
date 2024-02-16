@@ -2859,7 +2859,8 @@ class Drawing
 		
 		//these can be used from the customShaders
 		static {
-			 //Shader management /////////////////////////////
+			//Shader management /////////////////////////////
+			
 			struct GlobalShaderParams {
 				auto floats = [0.0f].replicate(8); 
 				auto bools = [false].replicate(8); 

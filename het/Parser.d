@@ -3979,7 +3979,6 @@ version(/+$DIDE_REGION Keywords+/all)
 			q{
 				enum State : ubyte
 				{
-					 //State graph
 					/+special system tokens+/ ignore, pop, error, eof, @Trans("", eof) unstructured, 
 					
 					@Pop("}") @Error("] )")	$$$		structuredBlock	,

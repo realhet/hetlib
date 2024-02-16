@@ -6922,7 +6922,7 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return crc32(uc(cast(string)source)); } 
 		
 	}version(/+$DIDE_REGION+/all) {
-		@trusted pure nothrow uint xxh32(in void[] source, uint seed = 0)//Todo: it must run at compile time too
+		@trusted nothrow uint xxh32(in void[] source, uint seed = 0)//Todo: it must run at compile time too
 		{
 			//! xxh32 //////////////////////////////////////////////////////
 			//a fast hashing function
@@ -13755,7 +13755,7 @@ version(/+$DIDE_REGION debug+/all)
 				try { data = actToken.data.get!long .to!Type; }
 				catch(Exception)	{ data = actToken.data.get!ulong.to!Type; }
 				
-				if(isNegative) data = -data; 
+				if(isNegative) data = cast(typeof(data))(-data); 
 				
 				//slow workaround: data = ((isNegative ? "-" : "")~actToken.source).to!Type;
 				

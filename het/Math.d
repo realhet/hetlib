@@ -71,15 +71,15 @@ version(/+$DIDE_REGION+/all)
 			{
 			    union {
 			        struct { 
-					          float x; 
-					          union { 
+						         float x; 
+						         union { 
 			                struct { 
 			                    float y, z; 
-					              } 
-					              vec2 yz; 
+						             } 
+						             vec2 yz; 
 			            } 
-					      }
-					      struct { 
+						     }
+						     struct { 
 			            vec2 xy; 
 			        }
 			    }
@@ -87,12 +87,12 @@ version(/+$DIDE_REGION+/all)
 			
 			void main()
 			{
-					  auto v = vec3(1, 2, 3);
-					  
-					  writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy);
-					  writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy);
-					  writeln(&v.yz);
-					  
+						 auto v = vec3(1, 2, 3);
+						 
+						 writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy);
+						 writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy);
+						 writeln(&v.yz);
+						 
 			}
 		+/
 	+/
@@ -305,7 +305,7 @@ version(/+$DIDE_REGION+/all)
 					static assert(false, "Vector constructor: Unable to process argument of type: " ~ T.stringof); 
 				}
 			} 
-					
+			
 			private void construct(int i)()
 			{
 				//handle the rare case of RGB -> RGBA conversion:
@@ -318,7 +318,7 @@ version(/+$DIDE_REGION+/all)
 					//Todo: show the error's place in source: __ctor!(int, int, int)
 				}
 			} 
-					
+			
 			this(A...)(in A args)
 			{
 				void setAll(T)(in T a)
@@ -357,7 +357,10 @@ version(/+$DIDE_REGION+/all)
 					static foreach(i; 0..length) components[i] = args[0].components[i].myto!CT; 
 				}
 				else
-				{ construct!0(args); }
+				{
+					//Todo: OpenD ezt erosen hasznalja.  A swizzling-tol kiakad: template recursion errorral.
+					construct!0(args); 
+				}
 			} 
 					
 			auto opCast(T)() const
@@ -487,7 +490,7 @@ version(/+$DIDE_REGION+/all)
 			auto opUnary(string op)() const
 			{
 				VectorType res; 
-				static foreach(i; 0..length) mixin(format!"res[%s] = %s this[%s];"(i, op, i)); 
+				static foreach(i; 0..length) mixin(format!"res[%s] = cast(CT)(%s this[%s]);"(i, op, i)); 
 				return res; 
 			} 
 					
@@ -495,7 +498,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				//same as above but NOT const
 				VectorType res; 
-				static foreach(i; 0..length) mixin(format!"res[%s] = %s this[%s];"(i, op, i)); 
+				static foreach(i; 0..length) mixin(format!"res[%s] = cast(CT)(%s this[%s]);"(i, op, i)); 
 				return res; 
 			} 
 					

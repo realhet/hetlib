@@ -441,7 +441,11 @@ class Archiver {
 				seedStream.seed = headerCompression.xxh3_32; 
 				auto ss = refRange(&seedStream); 
 				void apply(uint[] a)
-				{ mixin(q{a[] #= ss.take(a.length).array[]; }.replace("#", op)); } 
+				{
+					//opend
+					//mixin(q{a[] #= ss.take(a.length).array[]; }.replace("#", op)); 
+					mixin("a[] #= ss.take(a.length).array[]; ".replace("#", op)); 
+				} 
 				
 				apply(uLeadIn); 
 				apply(uHeader); 
@@ -4008,6 +4012,9 @@ version(/+$DIDE_REGION DataSet+/all)
 				
 				//print("TimeBlock created:", levelIdx, idx, blk.timeRange, blk.rect);
 			} 
+			
+			override string toString() const
+			{ return format!"%s %s sec"(level.levelIdx, level.avgDuration); } 
 		} 
 		
 		TimeStep[] levels; 	/+Note: From largest to lowest time step level.+/

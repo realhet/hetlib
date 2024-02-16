@@ -495,7 +495,7 @@ class ComPort
 			{
 				binaryBuf ~= act; 
 				
-				ubyte msgLen = ~act;  
+				ubyte msgLen = cast(ubyte)~act;  
 				if(
 					msgLen<=120 && binaryBuf.length>=8+msgLen && 
 					equal(binaryBuf[$-4..$-1], cast(ubyte[])prefix)//valid signature and length
