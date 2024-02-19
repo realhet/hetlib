@@ -3205,8 +3205,11 @@ version(/+$DIDE_REGION Keywords+/all)
 				return File(s).actualFile; //it's a module
 			}
 			
-			if(mustExists)
-			throw new Exception("Module not found: "~fn~"  referenced from: "~baseFileName); 
+			
+			const err = "Module not found: "~fn~"  referenced from: "~baseFileName; 
+			if(mustExists)	raise(err); 
+			else	WARN(err); 
+			
 			return File.init; 
 		} 
 	} 

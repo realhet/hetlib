@@ -594,7 +594,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		void print(T...)(auto ref T args) {
 			 //like in python
 			string[] s; 
-			static foreach(a; args) { { s ~= a.text; }}
+			static foreach(a; args) { { s ~= text(a); }}
 			writeln(s.filter!(s => s.length).join(' ')); 
 		} 
 		
