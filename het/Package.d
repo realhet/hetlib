@@ -335,8 +335,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			@property bool running()
 			{ return running_; } 
 			
-			void function() _windowInitFunct; //Todo: should be moved to win.d //Win.d call it from it's own main.
-			
 			void exit(int code=0)
 			{
 				//immediate exit
@@ -11067,7 +11065,14 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ this(path_.fullPath); } 
 							
 				string toString() const
-				{ return "Path("~fullPath.quoted('`')~")"; } 
+				{
+					/+
+						Todo: this is bad naming. It's sourceText, not text.  
+						Text() or toString() should be fullPath.
+						Same for File.
+					+/
+					return "Path("~fullPath.quoted('`')~")"; 
+				} 
 				bool isNull() const
 				{ return fullPath==""; } 
 				bool opCast() const

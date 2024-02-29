@@ -1718,102 +1718,99 @@ version(/+$DIDE_REGION+/all)
 		
 		return loadCachedTextFile!shaderFromText(file); 
 	} 
-	
 	
-	class VBO:GlResource
+	
+	
+}version(/+$DIDE_REGION wglChoosePixelFormat hack+/all)
+{
+	
+	private HWND helperWindow() //Source: GLFW3
 	{
-		public: 
-			override string resName() const
-		{ return elementFields.map!(a=>a.name).array.text; } 
-			override size_t resSize() const
-		{ return count*stride; } 
-			override string resInfo() const
-		{ return format("count:%s stride:%s elements:%s", count, stride, elementFields.map!(a=>a.name).array); } 
-		private: 
-			alias Handle = GLBufferHandle; 
+		__gshared static HWND window; 
+		if(window) return window; 
 		
-			Handle buffer; //Todo: readonly property
-			int stride, count; 
+		string className = "Helper window class"; 
+		registerWindowClass(className); 
+		window = CreateWindowExW(
+			WS_EX_OVERLAPPEDWINDOW,
+			toPWChar(className),
+			"Helper window",
+			WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+			0, 0, 1, 1,
+			HWND_MESSAGE, NULL,
+			GetModuleHandleW(NULL),
+			NULL
+		); 
 		
-			struct Field
-		{ string name, type; int offset; } 
-			Field[] elementFields; 
-			string elementType; 
+		//HACK:	The first call to ShowWindow is ignored if the parent process
+		//passed along a STARTUPINFO, so clear that flag with a no-op call
+		ShowWindow(window, SW_HIDE); 
 		
-		public: 
-			@property auto handle() const
-		{ return buffer.handle; } 
-			@property auto shortName() const
-		{ return format!"VBO(%d)"(handle); } 
-			@property auto logName() const
-		{ return "\33\13"~shortName~"\33\7"; } 
-		
-			const string attrName; //only if VBO is not a struct
-		
-			int getCount() const
-		{ return count; } 
-		
-			this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW)
+		MSG msg; 
+		while(PeekMessageW(&msg, window, 0, 0, PM_REMOVE))
 		{
-			this.stride = recordSize; 
-			this.count = count; 
-			this.attrName = attrName; 
-			buffer = new Handle(resName, resSize); 
-			if(logVBO) LOG(logName, "created", "resSize:", resSize); 
-			
-			bind; 
-			
-			//if(logVBO) LOG("bufferData", "count:", count, "stride:", stride, "fields:", "["~elementFields.map!"a.name".join(", ")~"]");
-			gl.bufferData(GL_ARRAY_BUFFER, count*stride, data, accessType); 
-			
-			global_VPSCnt += resSize; 
-		} 
-		
-			this(T)(const(T)[] data, string attrName="", int accessType = GL_STATIC_DRAW)
-		{
-			elementType = T.stringof; 
-			static if(!isVector!T && !isMatrix!T)
+			try
 			{
-				//search struct fields
-				foreach(i, n; FieldNameTuple!T)
-				{
-					static if(!n.empty)
-					elementFields ~= Field(n, FieldTypeTuple!T[i].stringof, __traits(getMember, T, n).offsetof); 
-				}
+				TranslateMessage(&msg); 
+				DispatchMessageW(&msg); 
 			}
-			
-			this(data.ptr, cast(int)data.length, cast(int)data[0].sizeof, attrName, accessType); 
-		} 
+			catch(Throwable e)
+			{ writeln("Unhandled Exception: "~__traits(identifier, typeof(e))~"\r\n"~e.toString); }
+		}
 		
-			void bind()
-		{
-			//if(logVBO) LOG("bind");
-			gl.bindBuffer(GL_ARRAY_BUFFER, handle); 
-			//Todo: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
-		} 
-		
-			void draw(int primitive, int start = 0, int end = int.max)
-		{
-			if(start>=count) return; 
-			if(start<0) start = 0; 
-			if(end>count) end = count; 
-			if(end<=start) return; 
-			
-			bind; 
-			
-			//if(logVBO) LOG("drawArrays", primitive.to!string(16), "[%d..%d]".format(start, end), "cnt:", end-start);
-			gl.drawArrays(primitive, start, end-start); 
-		} 
-		
-			~this()
-		{
-			//if(logVBO) LOG("release (destroy)");
-			buffer.release; //elvileg nem volna szabad hivatkozni erre a member classra
-		} 
-		
+		return window; 
 	} 
 	
 	
+	private auto createSimplePixelFormatDescriptor()
+	{
+		PIXELFORMATDESCRIPTOR pfd; 
+		with(pfd) {
+			nSize = pfd.sizeof; 
+			
+			nVersion = 1; 
+			dwFlags = 	PFD_SUPPORT_OPENGL | PFD_SWAP_EXCHANGE |
+				PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER; 
+			iPixelType = PFD_TYPE_RGBA; 
+			
+			cColorBits = 32; 
+			cAccumBits = 0; 
+			cDepthBits = 24; 
+			cStencilBits = 8; 
+			iLayerType = PFD_MAIN_PLANE; 
+		}
+		return pfd; 
+	} 
+	
+	private __gshared extern(Windows) bool function(
+		HDC hdc, const(int*) piAttribIList, const(float*) pfAttribFList, 
+		int nMaxFormats, int* piFormats, int* nNumFormats
+	) wglChoosePixelFormatARB; 
+	
+	private bool initWglChoosePixelFormat()
+	//gets it with a dummy window, so the first opengl window can use it. Losing 250ms for nothing by this shit.
+	{
+		if(wglChoosePixelFormatARB !is null) return true; //already got it
+		
+		void error(string err) { throw new Exception("initWglChoosePixelFormat() "~err); } 
+		auto w = helperWindow; 
+		auto dc = GetDC(w); 
+		
+		auto pfd = createSimplePixelFormatDescriptor; 
+		if(!SetPixelFormat(dc, ChoosePixelFormat(dc, &pfd), &pfd)) error("SetPixelFormat failed"); 
+		
+		auto rc = wglCreateContext(dc); 
+		if(!rc) error("createContext failed"); 
+		wglMakeCurrent(dc, rc); 
+		
+		wglChoosePixelFormatARB = cast(typeof(wglChoosePixelFormatARB))wglGetProcAddress("wglChoosePixelFormatARB"); 
+		//when it's null, multisampling will not be used.  But now at the initialization it's not az exception.
+		
+		wglMakeCurrent(null, null); 
+		wglDeleteContext(rc); 
+		
+		return wglChoosePixelFormatARB !is null; 
+	} 
 }class GLWindow: Window
 {
 		View2D view; 
@@ -1899,7 +1896,7 @@ version(/+$DIDE_REGION+/all)
 		const multiSample = 6; 
 		newSetPixelFormat(hdc, multiSample); 
 		
-		frc = wglCreateContext(hdc);  if(!frc) error("GLVindow.CreateRenderingContext failed"); 
+		frc = wglCreateContext(hdc);  if(!frc) raise("GLVindow.CreateRenderingContext failed"); 
 		
 		wglMakeCurrent; 
 		gl.loadFuncts; 
@@ -1917,6 +1914,16 @@ version(/+$DIDE_REGION+/all)
 	protected: 
 		override void onInitializeGLWindow()
 	{
+		{
+			initWglChoosePixelFormat(); 
+			/+
+				Note: This creates another window just to access wglChoosePixelFormat.
+				If wglChoosePixelFormat is not accessible (returns false), it will not exit with an error right now.
+				Later when it fails to setup multisampling, it will just show a warning.
+				And revert to the old choosePixelFormat.
+			+/
+		}
+		
 		createRenderingContext; 
 		
 		//init drawing, view, mouse
@@ -2682,6 +2689,98 @@ version(/+$DIDE_REGION+/all)
 		
 		~this()
 		{ if(handle) handle.release; } 
+	} 
+	class VBO:GlResource
+	{
+		public: 
+			override string resName() const
+		{ return elementFields.map!(a=>a.name).array.text; } 
+			override size_t resSize() const
+		{ return count*stride; } 
+			override string resInfo() const
+		{ return format("count:%s stride:%s elements:%s", count, stride, elementFields.map!(a=>a.name).array); } 
+		private: 
+			alias Handle = GLBufferHandle; 
+		
+			Handle buffer; //Todo: readonly property
+			int stride, count; 
+		
+			struct Field
+		{ string name, type; int offset; } 
+			Field[] elementFields; 
+			string elementType; 
+		
+		public: 
+			@property auto handle() const
+		{ return buffer.handle; } 
+			@property auto shortName() const
+		{ return format!"VBO(%d)"(handle); } 
+			@property auto logName() const
+		{ return "\33\13"~shortName~"\33\7"; } 
+		
+			const string attrName; //only if VBO is not a struct
+		
+			int getCount() const
+		{ return count; } 
+		
+			this(const(void*) data, int count, int recordSize, string attrName="", int accessType = GL_STATIC_DRAW)
+		{
+			this.stride = recordSize; 
+			this.count = count; 
+			this.attrName = attrName; 
+			buffer = new Handle(resName, resSize); 
+			if(logVBO) LOG(logName, "created", "resSize:", resSize); 
+			
+			bind; 
+			
+			//if(logVBO) LOG("bufferData", "count:", count, "stride:", stride, "fields:", "["~elementFields.map!"a.name".join(", ")~"]");
+			gl.bufferData(GL_ARRAY_BUFFER, count*stride, data, accessType); 
+			
+			global_VPSCnt += resSize; 
+		} 
+		
+			this(T)(const(T)[] data, string attrName="", int accessType = GL_STATIC_DRAW)
+		{
+			elementType = T.stringof; 
+			static if(!isVector!T && !isMatrix!T)
+			{
+				//search struct fields
+				foreach(i, n; FieldNameTuple!T)
+				{
+					static if(!n.empty)
+					elementFields ~= Field(n, FieldTypeTuple!T[i].stringof, __traits(getMember, T, n).offsetof); 
+				}
+			}
+			
+			this(data.ptr, cast(int)data.length, cast(int)data[0].sizeof, attrName, accessType); 
+		} 
+		
+			void bind()
+		{
+			//if(logVBO) LOG("bind");
+			gl.bindBuffer(GL_ARRAY_BUFFER, handle); 
+			//Todo: csak akkor bind, ha kell. Ehhez mindig resetelni kell a currentet a rajzolas kezdetekor
+		} 
+		
+			void draw(int primitive, int start = 0, int end = int.max)
+		{
+			if(start>=count) return; 
+			if(start<0) start = 0; 
+			if(end>count) end = count; 
+			if(end<=start) return; 
+			
+			bind; 
+			
+			//if(logVBO) LOG("drawArrays", primitive.to!string(16), "[%d..%d]".format(start, end), "cnt:", end-start);
+			gl.drawArrays(primitive, start, end-start); 
+		} 
+		
+			~this()
+		{
+			//if(logVBO) LOG("release (destroy)");
+			buffer.release; //elvileg nem volna szabad hivatkozni erre a member classra
+		} 
+		
 	} 
 }version(/+$DIDE_REGION Tesselator+/all)
 {

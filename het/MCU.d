@@ -835,34 +835,6 @@ q{
 		 0xb40bbe37, 0xc30c8ea1, 0x5a05df1b, 0x2d02ef8d	
 	}; 
 	
-	/*
-		uint32_t calcCrc32(String& s)
-		{
-			uint32_t r = 0xFFFFFFFF; 
-			uint8_t* ptr = (uint8_t*)(s.c_str()); 
-			int len = s.length(); 
-			for(int i=0; i<len; i++)
-			r = CRC32tab[uint8_t(r)^ptr[i]]^(r>>8); 
-			
-			return ~r; 
-		} 
-		
-		void Serial_printCrc32(String& s)
-		{
-			uint32_t r = calcCrc32(s); 
-			for(byte i=0; i<4; i++, r>>=8)
-			Serial.print(char(r)); 
-		} 
-		
-		void Serial_sendMessage(String id, String& msg)
-		{
-			Serial.print(msg); 
-			Serial_printCrc32(msg); 
-			Serial.print(id); 
-			Serial.print('\n'); 
-		} 
-	*/
-	
 }~
 `  //This is a normal string because #if is an error in DLang q{} token strings
   #define msgBufSizeMask (msgBufSize-1)
@@ -906,30 +878,17 @@ q{
 				msgIncomingBuf[msgIncomingBufPos] = (uint8_t)i; 
 				msgIncomingBufPos = (msgIncomingBufPos+1) & msgBufSizeMask; 
 				
-				//0x00 0x33 0x04 0x06 0xff 0xff 0x4b 0x54 0x48 0xfd
 				msgLen = ~((uint8_t)i);  
 				msgDataPos = msgIncomingBufPos-8; //origin is the header (which is actually a footer)
 				if(msgGet8(4)==ext[0] && msgGet8(5)==ext[1] && msgGet8(6)==ext[2] && msgLen<=msgBufSize-8)
 				{
 					//valid signature and length
-					/*
-						Serial.print("valid len:"); 
-						Serial.print(msgLen); 
-						Serial.print(";"); 
-					*/
 					
 					uint32_t crc = msgGet32(0); 
 					uint32_t r = 0xFFFFFFFF; 
 					msgDataPos -= msgLen; 
 					for(uint8_t j = 0; j<msgLen; j++) r = pgm_read_dword_near(CRC32tab + (uint8_t(r)^msgGet8(j)))^(r>>8); 
 					r = ~r; 
-					/*
-						Serial.print(crc); 
-						Serial.print(","); 
-						Serial.print(r); 
-						Serial.print("."); 
-						Serial.print(crc==r);
-					*/
 					
 					if(crc==r) return true; //msgs can be processed in a while loop.
 				}

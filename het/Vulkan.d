@@ -1959,23 +1959,23 @@ version(/+$DIDE_REGION+/all)
 		alias VkAccessFlagBits = VK_ACCESS_; 
 		enum VK_ACCESS_
 		{
-			INDIRECT_COMMAND_READ_BIT = 0x00000001,
-			INDEX_READ_BIT = 0x00000002,
-			VERTEX_ATTRIBUTE_READ_BIT = 0x00000004,
-			UNIFORM_READ_BIT = 0x00000008,
-			INPUT_ATTACHMENT_READ_BIT = 0x00000010,
-			SHADER_READ_BIT = 0x00000020,
-			SHADER_WRITE_BIT = 0x00000040,
-			COLOR_ATTACHMENT_READ_BIT = 0x00000080,
-			COLOR_ATTACHMENT_WRITE_BIT = 0x00000100,
-			DEPTH_STENCIL_ATTACHMENT_READ_BIT = 0x00000200,
-			DEPTH_STENCIL_ATTACHMENT_WRITE_BIT = 0x00000400,
-			TRANSFER_READ_BIT = 0x00000800,
-			TRANSFER_WRITE_BIT = 0x00001000,
-			HOST_READ_BIT = 0x00002000,
-			HOST_WRITE_BIT = 0x00004000,
-			MEMORY_READ_BIT = 0x00008000,
-			MEMORY_WRITE_BIT = 0x00010000,
+			INDIRECT_COMMAND_READ_BIT 	= 0x00000001,
+			INDEX_READ_BIT 	= 0x00000002,
+			VERTEX_ATTRIBUTE_READ_BIT 	= 0x00000004,
+			UNIFORM_READ_BIT 	= 0x00000008,
+			INPUT_ATTACHMENT_READ_BIT 	= 0x00000010,
+			SHADER_READ_BIT 	= 0x00000020,
+			SHADER_WRITE_BIT 	= 0x00000040,
+			COLOR_ATTACHMENT_READ_BIT 	= 0x00000080,
+			COLOR_ATTACHMENT_WRITE_BIT 	= 0x00000100,
+			DEPTH_STENCIL_ATTACHMENT_READ_BIT 	= 0x00000200,
+			DEPTH_STENCIL_ATTACHMENT_WRITE_BIT 	= 0x00000400,
+			TRANSFER_READ_BIT 	= 0x00000800,
+			TRANSFER_WRITE_BIT 	= 0x00001000,
+			HOST_READ_BIT 	= 0x00002000,
+			HOST_WRITE_BIT 	= 0x00004000,
+			MEMORY_READ_BIT 	= 0x00008000,
+			MEMORY_WRITE_BIT 	= 0x00010000,
 		} 
 		alias VkAccessFlags = VkBitFlags!VkAccessFlagBits; 
 		
@@ -3626,8 +3626,6 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				}
 			); 
 			
-			enum canTripleBuffer = true; 
-			
 			//These lists only discovered once.
 			VkSurfaceCapabilitiesKHR surfaceCapabilities; 
 			VkSurfaceFormatKHR[] availableSurfaceFormats; 
@@ -3705,20 +3703,27 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					static if(canTripleBuffer)
+					enum canTripleBuffer = false; 
+					
+					static if(0)
 					{
-						/+
-							Link: https://www.intel.com/content/www/us/en/developer/articles/training/
-							api-without-secrets-introduction-to-vulkan-part-2.html
-						+/
-						//mailbox is required for triple buffering, but not all devices supporting it.
-						return ((presentModes.canFind((mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR}))))) ?((mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR})))):((mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR}))))); 
+						static if(canTripleBuffer)
+						{
+							/+
+								Link: https://www.intel.com/content/www/us/en/developer/articles/training/
+								api-without-secrets-introduction-to-vulkan-part-2.html
+							+/
+							//mailbox is required for triple buffering, but not all devices supporting it.
+							return ((presentModes.canFind((mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR}))))) ?((mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR})))):((mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR}))))); 
+						}
+						else
+						{
+							//FIFO is always supported
+							return (mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR}))); 
+						}
 					}
 					else
-					{
-						//FIFO is always supported
-						return (mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR}))); 
-					}
+					{ return (mixin(舉!((VK_PRESENT_MODE_),q{IMMEDIATE_KHR}))); }
 				} 
 			} 
 			
@@ -3731,7 +3736,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				{
 					auto pdh = device.physicalDevice.handle, sh = surface.handle; 
-					surfaceCapabilities 	= device.getPhysicalDeviceSurfaceCapabilitiesKHR	(pdh, sh); 
+					surfaceCapabilities = device.getPhysicalDeviceSurfaceCapabilitiesKHR(pdh, sh); 
 					/+
 						/+Code: surfaceCapabilities+/ must be reevaluated every time, not just at the start.
 						Luckily it is very fast.

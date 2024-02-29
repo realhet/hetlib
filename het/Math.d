@@ -71,15 +71,15 @@ version(/+$DIDE_REGION+/all)
 			{
 			    union {
 			        struct { 
-						         float x; 
-						         union { 
+							        float x; 
+							        union { 
 			                struct { 
 			                    float y, z; 
-						             } 
-						             vec2 yz; 
+							            } 
+							            vec2 yz; 
 			            } 
-						     }
-						     struct { 
+							    }
+							    struct { 
 			            vec2 xy; 
 			        }
 			    }
@@ -430,7 +430,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			else
 			{
-				mixin(format!q{auto	%s() const	 { return        Vector!(CT, %s)	(components[%s..%s]); } }(regs[i..i+len], len, i, i+len)); 
+				mixin(format!q{auto	%s() const	 { return Vector!(CT, %s)	(components[%s..%s]); } }(regs[i..i+len], len, i, i+len)); 
 				mixin(format!q{ref	%s()	 { return *(cast(Vector!(CT, %s)*)	(components[%s..%s])); } }(regs[i..i+len], len, i, i+len)); 
 			}
 					
