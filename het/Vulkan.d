@@ -4238,19 +4238,55 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				static viewportState(VkExtent2D size)
 				{ return viewportState(ivec2(size.width, size.height)); } 
+				
+				auto createComputePipeline(Args...)(Args args)
+				{
+					enum N = 3; /+the last 3 parameters are: /+Code: (layout, null, -1)+/+/
+					
+					VkPipelineShaderStageCreateInfo shaderStage; 
+					VkPipelineCreateFlags pcFlags; 
+					static foreach(i, arg; args[0..$-N])
+					{
+						{
+							alias T = Unqual!(Args[i]); 
+							static if(is(T==VkPipelineShaderStageCreateInfo))	shaderStage = arg; 
+							else static if(is(T==VkPipelineCreateFlagBits))	pcFlags |= arg; 
+							else static if(is(T==VkPipelineCreateFlags))	pcFlags |= arg; 
+						}
+					}
+					
+					VkComputePipelineCreateInfo res =
+					{
+						flags	: pcFlags,
+						stage	: shaderStage,
+						layout 	: args[$-3].handle,
+						basePipelineHandle 	: args[$-2],
+						basePipelineIndex 	: args[$-1],
+					}; 
+					
+					VkPipeline pipelineHandle; 
+					
+					//the handle creation is right here, so the pipeline object will not hold any pointers.
+					vkCreateComputePipelines(handle, null/+Todo: PipelineCache+/, 1, &res, null, &pipelineHandle)
+					.vkEnforce("failed to create graphics pipeline"); 
+					
+					return new VulkanPipeline(this, pipelineHandle); //Todo: rename res to ci
+				} 
 				
 				auto createGraphicsPipeline(Args...)(Args args)
 				{
-					enum N = 5; 
-					/+the last 5 parameters are: /+Code: (layout, renderPass, 0, null, -1)+/+/
+					enum N = 5; /+the last 5 parameters are: /+Code: (layout, renderPass, 0, null, -1)+/+/
 					
 					VkPipelineShaderStageCreateInfo[] shaderStages; 
+					VkPipelineCreateFlags pcFlags; 
 					static foreach(i, arg; args[0..$-N])
 					{
 						{
 							alias T = Unqual!(Args[i]); 
 							static if(is(T==VkPipelineShaderStageCreateInfo))	shaderStages ~= arg; 
 							else static if(is(T==VkPipelineShaderStageCreateInfo[]))	shaderStages ~= arg; 
+							else static if(is(T==VkPipelineCreateFlagBits))	pcFlags |= arg; 
+							else static if(is(T==VkPipelineCreateFlags))	pcFlags |= arg; 
 						}
 					}
 					
@@ -4265,6 +4301,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					
 					VkGraphicsPipelineCreateInfo res =
 					{
+						flags	: pcFlags,
 						stageCount 	: shaderStages.length.to!uint,
 						pStages	: shaderStages.ptr,
 							/+Note: optional structs 🠊+/
@@ -4308,10 +4345,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					VkPipeline pipelineHandle; 
 					
 					//the handle creation is right here, so the pipeline object will not hold any pointers.
-					vkCreateGraphicsPipelines(handle, null, 1, &res, null, &pipelineHandle)
+					vkCreateGraphicsPipelines(handle, null/+Todo: PipelineCache+/, 1, &res, null, &pipelineHandle)
 					.vkEnforce("failed to create graphics pipeline"); 
 					
-					return new VulkanPipeline(this, pipelineHandle); 
+					
+					
+					return new VulkanPipeline(this, pipelineHandle); //Todo: rename res to ci
 				} 
 			}
 			
@@ -4548,8 +4587,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			void write(in void* src, size_t size)
 			{
 				memcpy(map(0, size), src, size); 
-				flush; //Todo: what about flushing?!!! Is it required?
-				//Link: https://github.com/KhronosGroup/Vulkan-Docs/wiki/Synchronization-Examples
+				flush; 
+				/+
+					Todo: what about flushing?!!! Is it required?
+					/+
+						Link: https://github.com/KhronosGroup/Vulkan-Docs/wiki/
+						Synchronization-Examples
+					+/
+				+/
+				/+
+					Todo: Also, never unmap memory unless you're about to delete it. 
+					There is no disadvantage to keeping host-visible memory mapped, 
+					and mapping it is not a free operation.
+					/+
+						Link: https://stackoverflow.com/questions/77551915/vulkan-compute-
+						shaders-most-efficient-way-to-tranfer-buffer-to-from-gpu-retrie
+					+/
+				+/
 				unmap; 
 			} 
 			
@@ -4820,6 +4874,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					uint firstIndex, 	int 	vertexOffset, 	uint firstInstance
 				)
 				{ device.vkCmdDrawIndexed(handle, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance); } 
+				
+				void cmdDispatch(uint x, uint y=1, uint z=1)
+				{ device.vkCmdDispatch(handle, x, y, z); } 
 				
 				void cmdEndRenderPass()
 				{ device.vkCmdEndRenderPass(handle); } 
@@ -5132,14 +5189,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				auto writeDescriptorSet = 
 					(mixin(體!((VkWriteDescriptorSet),q{
 					dstSet 	: this.handle,
+					dstBinding	: 0, /+Todo: way too specific!!!+/
 					descriptorCount 	: 1,
 					descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))),
-					pBufferInfo 	: &descriptorBufferInfo,
-					dstBinding 	: 0,
+					pBufferInfo 	: &descriptorBufferInfo
 				}))); 
 				
 				device.vkUpdateDescriptorSets(device.handle, 1, &writeDescriptorSet, 0, null); 
 				//Opt: batch processing
+				//Todo: this is way too specific
 			} 
 		} 
 		
