@@ -3469,6 +3469,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{ return queueFamilies.items.filter!(qf=>qf.queueCount>0 && qf.queueFlags.TRANSFER_BIT); } 
 			auto graphicsAndComputeQueueFamilies()
 			{ return computeQueueFamilies.filter!(qf=>qf.queueFlags.GRAPHICS_BIT); } 
+			
 			auto dedicatedComputeQueueFamilies()
 			{ return computeQueueFamilies.filter!(qf=>!qf.queueFlags.GRAPHICS_BIT); } 
 			auto dedicatedTransferQueueFamilies()
@@ -3749,6 +3750,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					enum canTripleBuffer = false; 
 					
+					/+
+						Todo: V-Sync On: FIFO_RELAXED, if not supported, then FIFO .
+						V-Sync Off: IMMEDIATE.
+					+/
 					static if(1)
 					{
 						static if(canTripleBuffer)
@@ -5628,7 +5633,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 											extent 	: swapchain.extent 
 										},
 										clearValueCount 	: 1,
-										pClearValues 	: &clearColor
+										pClearValues 	: &clearColor //Note: AMD has FastClear if black or white
 									}))), 
 									{
 										cmdBindGraphicsDescriptorSets(pipelineLayout, 0, descriptorSet); 
