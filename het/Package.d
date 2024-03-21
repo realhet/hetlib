@@ -956,7 +956,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//calculate  1 - (delta(Idle) / delta(kernel+user))
 				__gshared static ulong prevTotal, prevIdle; 
 				auto total = kernel+user; 
-				auto res = 1 - float(idle-prevIdle) / (total-prevTotal); //Bug: can divide by zero when called too frequently
+				auto res = 1 - float(idle-prevIdle) / (total-prevTotal); 
+				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
 				
@@ -995,9 +996,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 		}
 		
-		//Todo: process snapshots : https://learn.microsoft.com/en-us/windows/win32/toolhelp/taking-a-snapshot-and-viewing-processes?redirectedfrom=MSDN
+		/+
+			Todo: process snapshots : 
+				https://learn.microsoft.com/en-us/windows/win32/toolhelp
+				/taking-a-snapshot-and-viewing-processes?redirectedfrom=MSDN
+		+/
 		
-		int spawnProcessMulti(const string[][] cmdLines, const string[string] env, out string[] sOutput, void delegate(int i) onProgress = null)
+		int spawnProcessMulti(
+			const string[][] cmdLines, const string[string] env, 
+			out string[] sOutput, void delegate(int i) onProgress = null
+		)
 		{
 			//it was developed for running multiple compiler instances.
 			import std.process; 
@@ -1021,7 +1029,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 					
 			//execute
-			bool[] running; 	//Todo: bugzik az stdOut fileDelete itt, emiatt nem megy az, hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
+			bool[] running; 	/+
+				Todo: bugzik az stdOut fileDelete itt, emiatt nem megy az, 
+				hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
+			+/
 			running.length =	pool.length; 
 			running[] = true; 
 					
@@ -1295,14 +1306,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		string extendedMsg(string lines)
 		{
+			
 			static string processLine(string line)
 			{
 				if(line.isWild("0x????????????????"))
 				{
 					auto addr = cast(void*) line[2..$].to!ulong(16); 
+					
 					auto mi = getModuleInfoByAddr(addr, true); 
 					line ~= " " ~ mi.location; 
-							
+					
 					if(line.isWild(`*"*.d", *`))
 					{
 						 //search src line locations in the parameters
@@ -1346,7 +1359,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			try {
 				string err = s.extendedMsg; 
-						
+				
 				if(dbg.isActive)
 				{ dbg.handleException(err); }else
 				{
@@ -1402,6 +1415,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				bool active=false; 
 				foreach(line; f.readLines(false))
 				{
+					LOG(line); 
+					
 					if(!active) active = line.isWild("*Address*Publics by Value*Rva+Base*Lib:Object"); 
 					auto p = line.split.array; 
 					switch(p.length) {
@@ -1425,7 +1440,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string locate(ulong relAddr)
 			{
 				//Todo: Try core.runtime.defaultTraceHandler
-						
+				
 				foreach(idx; 1..list.length)
 				if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
 				return list[idx-1].name; 
@@ -1482,6 +1497,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					)
 				)
 				{
+					
 					wchar[256] tmp; 
 					if(GetModuleFileNameW(handle, tmp.ptr, 256))
 					fileName = File(tmp.toStr); 
@@ -1496,10 +1512,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						if(location.empty)
 						location = fileName.fullName.quoted; 
 						
-						if(locateInMapFile)
+						enum enableExeMapFile = false; 
+						/+
+							Bug: memory error can happen here, 
+							when the exe map file is loaded.
+							splitLines() needs a lot of dynamic allocations.
+							
+							Now I disable it.  In the IDE it seems ok...
+						+/
+						
+						if(locateInMapFile && enableExeMapFile)
 						{
 							if(fileName==appFile)
-							res.location = exeMapFile.locate(addr-base); 
+							{ res.location = exeMapFile.locate(addr-base); }
 						}
 					}
 				}
@@ -5432,8 +5457,8 @@ version(/+$DIDE_REGION Containers+/all)
 			static if(start)
 			alias fv = startsWith; 
 			else
-			alias fv = endsWith; 
-			const e = end.to!S; 
+			alias fv = endsWith; 	
+			const e = end.to!S; 	//Todo: this is fucking lame.
 			if(e != "" && fv(s, e) == remove)
 			{
 				return remove 	? start 	? s[e.length..$]
@@ -6307,10 +6332,10 @@ version(/+$DIDE_REGION Containers+/all)
 		//Todo: import splitLines from std.string
 		
 		string[] splitLines(string s)
-		{ return s.split('\n').map!(a => a.withoutEnding('\r')).array; } 
+		{ return s.splitter('\n').map!(a => a.withoutEnding('\r')).array; } 
 		
 		dstring[] splitLines(dstring s)
-		{ return s.split('\n').map!(a => a.withoutEnding('\r')).array; } 
+		{ return s.splitter('\n').map!(a => a.withoutEnding('\r')).array; } 
 		
 		bool startsWith_ci(string s, string w) pure
 		{
@@ -11522,10 +11547,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
 				ulong offset = 0, size_t len = size_t.max
 			) const
-			{
-				auto s = readStr(mustExists, offset, len); 
-				return textToUTF8(s, defaultEncoding); //own converter. Handles BOM
-			} 
+			{ return readStr(mustExists, offset, len).textToUTF8(defaultEncoding)/+own converter. Handles BOM+/; } 
 			
 			string[] readLines(
 				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,

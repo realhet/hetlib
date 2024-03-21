@@ -4082,7 +4082,16 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			} 
 			
 			auto createShaderModule(File f)
-			{ return new VulkanShaderModule(this, f.read(true)); } 
+			{
+				return new VulkanShaderModule(
+					this, f.read(true)
+					/+
+						Todo: This throws memory error 
+						when file not found.
+						console app, headless.
+					+/
+				); 
+			} 
 			
 			auto createRenderPass(
 				VkAttachmentDescription[] attachmentDescriptions, 
@@ -5169,7 +5178,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			void _destruct()
 			{
 				device.vkFreeDescriptorSets(device.handle, pool.handle, 1, &handle)
-					.vkEnforce("failed to create descriptor set"); handle = null; 
+					.vkEnforce("failed to create descriptor set"); 
+				handle = null; 
 				
 				/+
 					Note: It seems OK in 1.0, but in VK_VERSION_1_2: 
@@ -5178,6 +5188,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				+/
 			} 
 			
+			deprecated 
 			void updateWriteUniformBuffer(
 				VkBuffer 	uniformBuffer, 
 				VkDeviceSize 	ofs = 0, 
@@ -5203,6 +5214,26 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				device.vkUpdateDescriptorSets(device.handle, 1, &writeDescriptorSet, 0, null); 
 				//Opt: batch processing
 				//Todo: this is way too specific
+			} 
+			
+			void write(int bindingIdx, VulkanMemoryBuffer buf, VK_DESCRIPTOR_TYPE_ dtype)
+			{
+				//Todo: write partial buffer
+				auto descriptorBufferInfo = 
+					(mixin(體!((VkDescriptorBufferInfo),q{
+					buffer 	: buf.buffer.handle,
+					offset 	: 0,
+					range 	: VK_WHOLE_SIZE,
+				}))); 
+				auto writeDescriptorSet = 
+					(mixin(體!((VkWriteDescriptorSet),q{
+					dstSet 	: this.handle,
+					dstBinding	: bindingIdx,
+					descriptorCount 	: 1,
+					descriptorType 	: dtype,
+					pBufferInfo 	: &descriptorBufferInfo
+				}))); 
+				pool.device.vkUpdateDescriptorSets(pool.device.handle, 1, &writeDescriptorSet, 0, null); 
 			} 
 		} 
 		
