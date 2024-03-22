@@ -5336,6 +5336,182 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			}
 			
 		} 
+		class VulkanKernel(UB)
+		{
+			protected /+Note: Vulkan handling+/
+			{
+				VulkanInstance vk; 
+				VulkanPhysicalDevice physicalDevice; 
+				VulkanQueueFamily queueFamily; 
+				VulkanQueue queue; 
+				VulkanDevice device; 
+				VulkanCommandPool commandPool; 
+				
+				void initialize()
+				{
+					assert(!commandPool); 
+					vk = new VulkanInstance([/+extensions+/]); 
+					physicalDevice = vk.physicalDevices.front; 
+					queueFamily = physicalDevice.requireComputeQueueFamily; 
+					device = createVulkanDevice(queueFamily, &queue); 
+					commandPool = queue.createCommandPool; 
+				} 
+				
+				VulkanDescriptorSetLayout descriptorSetLayout; 
+				VulkanPipelineLayout pipelineLayout; 
+				void createLayouts()
+				{
+					descriptorSetLayout = device.createDescriptorSetLayout
+						(
+						(mixin(體!((VkDescriptorSetLayoutBinding),q{
+							binding	: 0, 	descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))),
+							descriptorCount 	: 1, 	stageFlags 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
+						}))), 
+						(mixin(體!((VkDescriptorSetLayoutBinding),q{
+							binding	: 1, 	descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))),
+							descriptorCount 	: 1, 	stageFlags 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
+						})))
+					); 
+					pipelineLayout = device.createPipelineLayout(descriptorSetLayout); 
+				} 
+				
+				VulkanShaderModule shaderModule; 
+				VulkanPipeline pipeline; 
+				void createPipeline(File kernelFile, string kernelFunction="main")
+				{
+					shaderModule = device.createShaderModule(kernelFile); 
+					pipeline = device.createComputePipeline
+						(
+						(mixin(體!((VkPipelineShaderStageCreateInfo),q{
+							stage 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
+							_module 	: shaderModule,
+							pName 	: kernelFunction.toPChar,
+						}))), pipelineLayout, null, -1
+					); 
+				} 
+				
+				VulkanMemoryBuffer 	uniformMemoryBuffer, 
+					dataHostMemoryBuffer,
+					dataDeviceMemoryBuffer; 
+				const uint dwbufSizeBytes; //fixed size specified in constructor
+				void createBuffers()
+				{
+					uniformMemoryBuffer = device.createMemoryBuffer
+						(UB.sizeof, (mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT}))), (mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT})))); 
+					dataHostMemoryBuffer = device.createMemoryBuffer
+						(
+						dwbufSizeBytes, 	(mixin(幟!((VK_MEMORY_PROPERTY_),q{
+							HOST_VISIBLE_BIT |
+							HOST_CACHED_BIT
+						}))), (mixin(幟!((VK_BUFFER_USAGE_),q{
+							TRANSFER_SRC_BIT |
+							TRANSFER_DST_BIT
+						})))
+					); 
+					dwbuf = (cast(uint*)dataHostMemoryBuffer.map)[0..dwbufSizeBytes/uint.sizeof]; 
+					dataDeviceMemoryBuffer = device.createMemoryBuffer
+						(
+						dwbufSizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT}))), (mixin(幟!((VK_BUFFER_USAGE_),q{
+							STORAGE_BUFFER_BIT |
+							TRANSFER_SRC_BIT |
+							TRANSFER_DST_BIT
+						})))
+					); 
+				} 
+				
+				void uploadBuffers()
+				{
+					uniformMemoryBuffer.write(ubuf); //ubuf is easy-peasy
+					
+					//dwbuf is more complicated
+					//Opt: Don't upload all the buffer, only parts that were modified!
+					dataHostMemoryBuffer.flush; 
+					auto cb = new VulkanCommandBuffer(commandPool); 
+					with(cb)
+					record(
+						(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+						{ cmdCopyBuffer(dataHostMemoryBuffer, dataDeviceMemoryBuffer); }
+					); 
+					queue.submit(cb); 
+					queue.waitIdle; //Opt: STALL
+				} 
+				
+				void downloadBuffers()
+				{
+					//Opt: Don't download all the buffer, only parts that are interesting!
+					auto cb = new VulkanCommandBuffer(commandPool); 
+					with(cb)
+					record(
+						(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+						{ cmdCopyBuffer(dataDeviceMemoryBuffer, dataHostMemoryBuffer); }
+					); 
+					queue.submit(cb); 
+					queue.waitIdle; //Opt: STALL
+				} 
+				
+				VulkanDescriptorPool descriptorPool; 
+				VulkanDescriptorSet descriptorSet; 
+				
+				void createDescriptors()
+				{
+					descriptorPool = device.createDescriptorPool
+						(
+						[
+							(mixin(體!((VkDescriptorPoolSize),q{type 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))), 	descriptorCount 	: 1}))),
+							(mixin(體!((VkDescriptorPoolSize),q{type 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))), 	descriptorCount 	: 1})))
+						], 1 /+maxSets+/
+					); 
+					descriptorSet = descriptorPool.allocate(descriptorSetLayout); 
+					descriptorSet.write(0, uniformMemoryBuffer, (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})))); 
+					descriptorSet.write(1, dataDeviceMemoryBuffer, (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})))); 
+				} 
+				
+				void dispatch(uint groupCountX)
+				{
+					auto cb = commandPool.createBuffer; 
+					with(cb)
+					{
+						record
+						(
+							(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+							{
+								cmdBindComputePipeline(pipeline); 
+								cmdBindComputeDescriptorSets(pipelineLayout, 0, descriptorSet); 
+								cmdDispatch(groupCountX); 
+							}
+						); 
+					}
+					queue.submit(cb); 
+					queue.waitIdle; //Opt: STALL
+				} 
+			} 
+			UB ubuf; 	/+Note: Uniform buffer+/
+			uint[] dwbuf; 	/+
+				Note: GPU can only address dwords, 
+				so all the offsets are practically dwOffsets
+			+/
+			
+			this(
+				File kernelFile, string kernelFunction, 
+				ulong bufSizeBytes
+			)
+			{
+				this.dwbufSizeBytes = bufSizeBytes.to!uint; 
+				
+				initialize; 
+				createLayouts; 
+				createPipeline(kernelFile, kernelFunction); 
+				createBuffers; 
+				createDescriptors; 
+			} 
+			
+			~this()
+			{
+				vk.destroy; 
+				/+deterministic destructor+/
+			} 
+		} 
+		
 		static if(VulkanWindowed)
 		{
 			public import het.win;  //From here it uses hetlib.win
@@ -5716,7 +5892,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					device.waitIdle; 
 					vk.destroy; 
-				} 
+				}  
 				
 				void onWindowSizeChanged() 
 				{
