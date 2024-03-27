@@ -2675,10 +2675,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				stream.rawWrite(hdr); 
 				
 				const LineConv!ubyte convert =
-					get_converter!ubyte(
-					src_chans, (tgt_chans == 3) ? _ColFmt.BGR
-																			: _ColFmt.BGRA
-				); 
+					get_converter!ubyte(src_chans, (tgt_chans == 3) ? _ColFmt.BGR : _ColFmt.BGRA); 
 				
 				auto tgt_line = new ubyte[tgt_linesize + pad]; 
 				const size_t src_linesize = cast(size_t) w * src_chans; 
@@ -6137,6 +6134,8 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		//Todo: validate parameters for each formats
+		
+		//Todo: support 8bit bmp
 		
 		switch(fmt["0"])
 		{

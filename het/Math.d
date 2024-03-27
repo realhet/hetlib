@@ -71,15 +71,15 @@ version(/+$DIDE_REGION+/all)
 			{
 			    union {
 			        struct { 
-							        float x; 
-							        union { 
+												   float x; 
+												   union { 
 			                struct { 
 			                    float y, z; 
-							            } 
-							            vec2 yz; 
+												       } 
+												       vec2 yz; 
 			            } 
-							    }
-							    struct { 
+										 }
+										 struct { 
 			            vec2 xy; 
 			        }
 			    }
@@ -96,6 +96,14 @@ version(/+$DIDE_REGION+/all)
 			}
 		+/
 	+/
+	
+	private {
+		//Todo: GenericArg is not visible to math.d because math.d is independent from package(utils).d  Thisi is just here for testing.
+		struct GenericArg(string N="", T)
+		{ alias type = T; enum name = N; T value; alias value this; } 
+		auto genericArg(string N="", T)(in T p)
+		{ return GenericArg!(N, T)(p); } 
+	} 
 	
 	/// myTo: scalar conversion used in smart-constructors
 	private alias myto(T) = stdto!T; 
@@ -220,13 +228,13 @@ version(/+$DIDE_REGION+/all)
 		assert(validRvalueSwizzle("_01yx") && validRvalueSwizzle("bgr1")); 
 		assert(!validRvalueSwizzle("xy")); //false: this is Lvalue swizzle
 		assert(!validRvalueSwizzle("xa")); //false: mixture of divverent swizzle variables
-			
+		
 		assert(!anyVector!(int, float) && anyVector!(float, vec2)); 
 		assert(FirstVectorLength!(float, vec3)==3 && FirstVectorLength!(float, int)==0); 
 		assert(CommonVectorLength!()==0 && CommonVectorLength!(int)==1 && CommonVectorLength!(int, vec3)==3); 
-			
+		
 		assert(is(CommonScalarType!(int, float, dvec3, mat2)==double)); 
-			
+		
 		assert(vectorAccess!2(5)==5 && vectorAccess!2(vec3(1,2,3))==3); 
 	} 
 }version(/+$DIDE_REGION+/all)
@@ -1656,26 +1664,48 @@ version(/+$DIDE_REGION+/all)
 				else static if(A.length==1 && isBounds!(A[0]))
 				{
 					 //another Bounds
-					static assert(VectorLength == A[0].VectorLength, "dimension mismatch "~VectorLength.text~" != "~A[0].VectorLength.text); 
-					low	= a[0].low; 
-					high	= a[0].high; 
+					static assert(
+						VectorLength == A[0].VectorLength, 
+						"dimension mismatch "~VectorLength.text~" != "~A[0].VectorLength.text
+					); 
+					low = a[0].low; 
+					high = a[0].high; 
 				}
 				else static if(A.length==2)
 				{
-					 //2 vectors or scalars
-					low	= a[0]; 
-					high	= a[1]; 
+					//2 vectors or scalars
+					low = a[0]; 
+					high = a[1]; 
+					
+					version(/+$DIDE_REGION handle center: size: radius: namedParams.+/all)
+					{
+						enum a0_is_center 	= __traits(compiles, a[0].name=="center") && a[0].name=="center",
+						a1_is_size 	= __traits(compiles, a[1].name=="size"  ) && a[1].name=="size",
+						a1_is_radius 	= __traits(compiles, a[1].name=="radius") && a[1].name=="radius"; 
+						static if(a0_is_center || a1_is_radius /+centered+/)
+						{
+							static if(a1_is_size)	{ low -= high/2; high = low + high; }
+							else static if(a1_is_radius)	{ low -= high; high = low + high*2; }
+							else	static assert(0, "Must specify size: or radius: after center:"); 
+						}
+						else
+						{
+							//non centered: topleft is the origin of size
+							static if(a1_is_size) high += low; 
+						}
+					}
+					
 				}
 				else static if(A.length==4 && VectorLength==2)
 				{
-					 //4 scalars
+					//4 scalars
 					//cast is needed to be able to pass foreach index variables (long)
 					low [0] = cast(CT)a[0]; low [1] = cast(CT)a[1]; 
 					high[0] = cast(CT)a[2]; high[1] = cast(CT)a[3]; 
 				}
 				else static if(A.length==6 && VectorLength==3)
 				{
-					 //6 scalars
+					//6 scalars
 					low [0] = cast(CT)a[0]; low [1] = cast(CT)a[1]; low [2] = cast(CT)a[2]; 
 					high[0] = cast(CT)a[3]; high[1] = cast(CT)a[4]; high[2] = cast(CT)a[5]; 
 				}
@@ -1971,6 +2001,30 @@ version(/+$DIDE_REGION+/all)
 			int[] a; foreach(x, y; ibounds2(ivec2(1, 5), ivec2(3, 8))) a ~= [x, y]; assert(a.equal([1, 5, 2, 5, 1, 6, 2, 6, 1, 7, 2, 7])); 
 			int[] b; foreach(p		 ; ibounds2(1, 5, 3, 8)) with(p) b ~= [x, y]; assert(b.equal(a)); 
 			int[] c; foreach(i		 ; ibounds1 (2, 6)) c ~= i; assert(c.equal([2, 3, 4, 5])); 
+		}
+		{
+			static assert
+			(
+				[
+					//topLeft is the origin of size
+					bounds2(100, 200, 120, 250),
+					bounds2(vec2(100, 200), vec2(120, 250)),
+					bounds2(vec2(100, 200), ((5).genericArg!q{size})),
+					//center is the origin of size/radius
+					bounds2(vec2(100, 200), ((5).genericArg!q{radius})),
+					bounds2(((vec2(100, 200)).genericArg!q{center}), ((5).genericArg!q{size})),
+					bounds2(((vec2(100, 200)).genericArg!q{center}), ((5).genericArg!q{radius}))
+				]==[
+					bounds2(100, 200, 120, 250), 
+					bounds2(100, 200, 120, 250), 
+					bounds2(100, 200, 105, 205), 
+					
+					
+					bounds2(95, 195, 105, 205),
+					bounds2(97.5, 197.5, 102.5, 202.5), 
+					bounds2(95, 195, 105, 205)
+				]
+			); 
 		}
 	} 
 	

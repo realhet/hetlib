@@ -5393,14 +5393,16 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanMemoryBuffer 	uniformMemoryBuffer, 
 					dataHostMemoryBuffer,
 					dataDeviceMemoryBuffer; 
-				const uint dwbufSizeBytes; //fixed size specified in constructor
+				const size_t bufSizeBytes; //fixed size specified in constructor
 				void createBuffers()
 				{
+					//Todo: concurrent sharing mode: (mixin(舉!((VK_SHARING_MODE_),q{CONCURRENT})))
+					
 					uniformMemoryBuffer = device.createMemoryBuffer
 						(UB.sizeof, (mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT}))), (mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT})))); 
 					dataHostMemoryBuffer = device.createMemoryBuffer
 						(
-						dwbufSizeBytes, 	(mixin(幟!((VK_MEMORY_PROPERTY_),q{
+						bufSizeBytes, 	(mixin(幟!((VK_MEMORY_PROPERTY_),q{
 							HOST_VISIBLE_BIT |
 							HOST_CACHED_BIT
 						}))), (mixin(幟!((VK_BUFFER_USAGE_),q{
@@ -5408,22 +5410,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							TRANSFER_DST_BIT
 						})))
 					); 
-					dwbuf = (cast(uint*)dataHostMemoryBuffer.map)[0..dwbufSizeBytes/uint.sizeof]; 
+					buf = (cast(ubyte*)dataHostMemoryBuffer.map)[0..bufSizeBytes]; 
 					dataDeviceMemoryBuffer = device.createMemoryBuffer
 						(
-						dwbufSizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT}))), (mixin(幟!((VK_BUFFER_USAGE_),q{
+						bufSizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT}))), (mixin(幟!((VK_BUFFER_USAGE_),q{
 							STORAGE_BUFFER_BIT |
 							TRANSFER_SRC_BIT |
 							TRANSFER_DST_BIT
 						})))
-					); 
+					)
+						/+Todo: , (mixin(舉!((VK_SHARING_MODE_),q{CONCURRENT})))+/; 
 				} 
 				
 				void uploadBuffers()
 				{
 					uniformMemoryBuffer.write(ubuf); //ubuf is easy-peasy
 					
-					//dwbuf is more complicated
+					//buf is more complicated
 					//Opt: Don't upload all the buffer, only parts that were modified!
 					dataHostMemoryBuffer.flush; 
 					auto cb = new VulkanCommandBuffer(commandPool); 
@@ -5466,7 +5469,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					descriptorSet.write(1, dataDeviceMemoryBuffer, (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})))); 
 				} 
 				
-				void dispatch(uint groupCountX)
+				void dispatch(uint groupCountX, uint groupCountY=1, uint groupCountZ=1)
 				{
 					auto cb = commandPool.createBuffer; 
 					with(cb)
@@ -5477,7 +5480,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							{
 								cmdBindComputePipeline(pipeline); 
 								cmdBindComputeDescriptorSets(pipelineLayout, 0, descriptorSet); 
-								cmdDispatch(groupCountX); 
+								cmdDispatch(groupCountX, groupCountY, groupCountZ); 
 							}
 						); 
 					}
@@ -5486,17 +5489,19 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				} 
 			} 
 			UB ubuf; 	/+Note: Uniform buffer+/
-			uint[] dwbuf; 	/+
+			ubyte[] buf; 	/+
 				Note: GPU can only address dwords, 
 				so all the offsets are practically dwOffsets
 			+/
 			
+			@property dwbuf() { return cast(uint[])buf; } 
+			
 			this(
 				File kernelFile, string kernelFunction, 
-				ulong bufSizeBytes
+				size_t bufSizeBytes_
 			)
 			{
-				this.dwbufSizeBytes = bufSizeBytes.to!uint; 
+				this.bufSizeBytes = bufSizeBytes_; 
 				
 				initialize; 
 				createLayouts; 
