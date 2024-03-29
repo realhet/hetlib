@@ -203,6 +203,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			installExceptionFilter; 
 			
 			DateTime.selftest; 
+			het.math.unittest_main; //1ms
 			
 			const s1 = "hello", s2 = "Nobody inspects the spammish repetition"; 
 			enforce(xxh32(s1)==0xfb0077f9); 

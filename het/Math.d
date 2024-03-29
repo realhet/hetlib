@@ -31,12 +31,13 @@ version(/+$DIDE_REGION+/all)
 	public import std.algorithm; //extends : cmp, any, all, equal, min, max, sort
 	public import std.functional; //extends: lessThan, greaterThan, not
 	
-	//import locally	used things.     //must not import het.utils to keep het.math simle and standalone
-	import std.format	: format; 
-	import std.conv	: text, stdto = to; 
-	import std.array	: replicate, split, replace, join, array; 
-	import std.range	: iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro; 
-	import std.traits	: Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, stdCommonType = CommonType, ReturnType; 
+	//import locally used things.     //must not import het.utils to keep het.math simle and standalone
+	import std.format : format; 
+	import std.conv : text, stdto = to; 
+	import std.array : replicate, split, replace, join, array; 
+	import std.range : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro; 
+	import std.traits : 	Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, 
+		stdCommonType = CommonType, ReturnType, isPointer; 
 	import std.meta	: AliasSeq; 
 	
 	import std.exception	: enforce; 
@@ -71,12 +72,12 @@ version(/+$DIDE_REGION+/all)
 			{
 			    union {
 			        struct { 
-												   float x; 
-												   union { 
+														 float x; 
+														 union { 
 			                struct { 
 			                    float y, z; 
-												       } 
-												       vec2 yz; 
+																   } 
+																   vec2 yz; 
 			            } 
 										 }
 										 struct { 
@@ -2235,9 +2236,14 @@ version(/+$DIDE_REGION+/all)
 							//return type is something, make an Image out of it.
 						}
 					}
+					else static if(isPointer!(A[1]))
+					{
+						alias E = Unqual!(typeof(*args[1])); 
+						return Image!(E, 2)(size, cast(E[])(args[1][0..size.area])); 
+					}
 					else
 					{
-						 //non-callable
+						//non-callable
 						Unqual!R tmp = args[1]; 
 						return Image!(Unqual!R, 2)(size, [tmp].replicate(size[].product)); 
 						//one pixel stretched all over the size
@@ -2795,7 +2801,7 @@ version(/+$DIDE_REGION+/all)
 			assert(__traits(compiles, image2D(2, 2, [clRed, clGreen, clBlue].dup, clWhite))); 
 		}
 		
-		auto	img	= image2D(
+		auto img = image2D(
 			4, 3, [
 				0,	1,	2,	 3,
 				4,	5,	6,	 7,
@@ -2804,6 +2810,8 @@ version(/+$DIDE_REGION+/all)
 		); 
 		
 		assert(img.width == 4 && img.height == 3); 
+		
+		assert(image2D(img.size, img.asArray.ptr).asArray.equal(img.asArray)); //image as pointer
 		
 		//indexing: img[x, y]
 		assert([img[0,0], img[$-1, 0], img[$-1, $-1]] == [0, 3, 11]); 
@@ -3988,21 +3996,23 @@ version(/+$DIDE_REGION+/all)
 
 //Todo: when the ide supports unit testing, this should be private. Also needs real unittest{} blocks.
 void unittest_main() {
-	version(assert) {}else enforce(0, "Turn on debug build for asserts."); 
-	
-	unittest_utilityStuff; 
-	unittest_Vectors; 
-	unittest_Matrices; 
-	unittest_AngleAndTrigFunctions; 
-	unittest_ExponentialFunctions; 
-	unittest_CommonFunctions; 
-	unittest_GeometricFunctions; 
-	unittest_MatrixFunctions; 
-	unittest_VectorRelationalFunctions; 
-	unittest_Bounds; 
-	unittest_ImageElementType; 
-	unittest_Image; 
-	unittest_Other(); 
+	//version(assert) {}else enforce(0, "Turn on debug build for asserts."); 
+	version(assert)
+	{
+		unittest_utilityStuff; 
+		unittest_Vectors; 
+		unittest_Matrices; 
+		unittest_AngleAndTrigFunctions; 
+		unittest_ExponentialFunctions; 
+		unittest_CommonFunctions; 
+		unittest_GeometricFunctions; 
+		unittest_MatrixFunctions; 
+		unittest_VectorRelationalFunctions; 
+		unittest_Bounds; 
+		unittest_ImageElementType; 
+		unittest_Image; 
+		unittest_Other; 
+	}
 } 
 
 unittest { unittest_main; } 

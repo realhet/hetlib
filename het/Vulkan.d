@@ -5437,6 +5437,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					); 
 					queue.submit(cb); 
 					queue.waitIdle; //Opt: STALL
+					cb.destroy; 
 				} 
 				
 				void downloadBuffers()
@@ -5450,6 +5451,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					); 
 					queue.submit(cb); 
 					queue.waitIdle; //Opt: STALL
+					cb.destroy; 
 				} 
 				
 				VulkanDescriptorPool descriptorPool; 
@@ -5486,6 +5488,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					}
 					queue.submit(cb); 
 					queue.waitIdle; //Opt: STALL
+					cb.destroy; 
 				} 
 			} 
 			UB ubuf; 	/+Note: Uniform buffer+/

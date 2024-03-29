@@ -2784,6 +2784,12 @@ version(/+$DIDE_REGION+/all)
 	
 	void processElasticTabs(Cell[] rows, int level=0)
 	{
+		/+
+			Copyright: Nick Gravgaard
+			licensed under a Creative Commons Attribution 3.0 Licence
+			/+Link: https://nickgravgaard.com/elastic-tabstops+/
+		+/
+		
 		bool tabCntGood(Cell row)
 		{ return row.tabCnt > level; } 
 		
