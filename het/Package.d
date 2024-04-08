@@ -1892,7 +1892,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false); 
 	
 	static if(0)
-	string[] getEnumMembers(T)()
+	deprecated(`use EnumMemberNames`) string[] getEnumMembers(T)()
 	{
 		static if(is(T == enum)) return [__traits(allMembers, T)]; 
 		else return []; 

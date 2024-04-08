@@ -8938,7 +8938,7 @@ struct im
 		auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, T...)(ref E e, T args) if(is(E==enum))
 		{
 			auto s = e.text; 
-			auto res = ComboBox!(srcModule, srcLine)(s, getEnumMembers!E, args); 
+			auto res = ComboBox!(srcModule, srcLine)(s, EnumMemberNames!E, args); 
 			if(res)
 			ignoreExceptions({ e = s.to!E; }); 
 			return res; 

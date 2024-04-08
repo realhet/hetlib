@@ -5411,6 +5411,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						})))
 					); 
 					buf = (cast(ubyte*)dataHostMemoryBuffer.map)[0..bufSizeBytes]; 
+					/+
+						Todo: HOST_CACHED only needed for download buffers
+						For upload buffers there is write compining, 
+						and that's not a cache, must be flushed.
+						/+Link: https://gpuopen.com/learn/vulkan-device-memory+/
+					+/
+					
 					dataDeviceMemoryBuffer = device.createMemoryBuffer
 						(
 						bufSizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT}))), (mixin(幟!((VK_BUFFER_USAGE_),q{

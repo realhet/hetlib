@@ -76,8 +76,8 @@ version(/+$DIDE_REGION+/all)
 														 union { 
 			                struct { 
 			                    float y, z; 
-																   } 
-																   vec2 yz; 
+																	  } 
+																	  vec2 yz; 
 			            } 
 										 }
 										 struct { 
@@ -2356,7 +2356,7 @@ version(/+$DIDE_REGION+/all)
 				impl.length = stride * size.y; 
 			} 
 			
-			bool empty()
+			bool empty() const
 			{ return size.lessThanEqual(0).any; } 
 			bool opCast(B : bool)() const
 			{ return !empty; } 

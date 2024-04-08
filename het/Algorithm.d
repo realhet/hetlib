@@ -61,187 +61,330 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
-	auto findBlobs(alias pred = "a", T1)(Image!(T1, 2) src)
+	version(/+$DIDE_REGION Blob detect+/all)
 	{
-		bool boolSrc(int x, int y)
-		{ return !!(src[x, y].unaryFun!pred); } 
-		
-		struct Res {
-			Image!(int, 2) img; 
-			Blob[int] blobs; 
-			alias blobs this; 
-		} 
-		
-		Res res; 
-		res.img = image2D(src.size, 0); 
-		
-		int[int] map_; 
-		int map(int i) { if(auto a = i in map_) return *a; else return i; } 
-		
-		int actId; 
-		
-		//first pass: find the blobs based on top and left neighbors
-		
-		foreach(y; 0..src.height)
-		foreach(x; 0..src.width)
-		if(boolSrc(x, y))
+		auto findBlobs(alias pred = "a", T1)(Image!(T1, 2) src)
 		{
-			bool leftSet()
-			{ return x ? boolSrc(x-1, y) : false; } 	bool topSet ()
-			{ return y ? boolSrc(x, y-1) : false; } 
-			int leftId()
-			{ return res.img[x-1, y]; } 	int topId ()
-			{ return res.img[x, y-1]; } 
-			int p; 
+			bool boolSrc(int x, int y)
+			{ return !!(src[x, y].unaryFun!pred); } 
 			
-			if(leftSet && topSet)
+			struct Res {
+				Image!(int, 2) img; 
+				Blob[int] blobs; 
+				alias blobs this; 
+			} 
+			
+			Res res; 
+			res.img = image2D(src.size, 0); 
+			
+			int[int] map_; 
+			int map(int i) { if(auto a = i in map_) return *a; else return i; } 
+			
+			int actId; 
+			
+			//first pass: find the blobs based on top and left neighbors
+			
+			foreach(y; 0..src.height)
+			foreach(x; 0..src.width)
+			if(boolSrc(x, y))
 			{
-				p = map(topId); 	//map is important for topId
-				int l = leftId; 	//leftId is alrteady mapped
-				if(p!=l) {
-					sort(p, l); 	//sort is to eliminate cyclic loops im map_[]
-					map_[l] = p; 	//from unmapped to mapped is good
+				bool leftSet()
+				{ return x ? boolSrc(x-1, y) : false; } 	bool topSet ()
+				{ return y ? boolSrc(x, y-1) : false; } 
+				int leftId()
+				{ return res.img[x-1, y]; } 	int topId ()
+				{ return res.img[x, y-1]; } 
+				int p; 
+				
+				if(leftSet && topSet)
+				{
+					p = map(topId); 	//map is important for topId
+					int l = leftId; 	//leftId is alrteady mapped
+					if(p!=l) {
+						sort(p, l); 	//sort is to eliminate cyclic loops im map_[]
+						map_[l] = p; 	//from unmapped to mapped is good
+					}
 				}
+				else if(topSet)
+				{
+					p = map(topId ); 	//map is important for topId
+				}
+				else if(leftSet)
+				{
+					p = leftId; 	//leftId is already mapped
+				}
+				else
+				{ p = ++actId; res.blobs[p] = Blob(ivec2(x, y), p); }
+				
+				res.img[x, y] = p; 
+				res.blobs[p].area++; 
+				
+				static if(is(findBlobsDebug))
+				findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
 			}
-			else if(topSet)
-			{
-				p = map(topId ); 	//map is important for topId
-			}
-			else if(leftSet)
-			{
-				p = leftId; 	//leftId is already mapped
-			}
-			else
-			{ p = ++actId; res.blobs[p] = Blob(ivec2(x, y), p); }
 			
-			res.img[x, y] = p; 
-			res.blobs[p].area++; 
+			
+			
+			{
+				//make the map recursive
+				//print("FUCK"); map_.keys.sort.each!(k => print(k, "->", map_[k]));
+				int map_recursive(int id)
+				{
+					while(1) if(auto a = id in map_) id = *a; else break; 
+					//Todo: install latest LDC
+					return id; 
+				} 
+				foreach(k; map_.keys) map_[k] = map_recursive(k); 
+				//remap the result id image
+				foreach(ref p; res.img) if(p) p = map(p); 
+			}
+			
+			{
+					//remap the result blobs
+				int[] rem; 
+				foreach(k; res.blobs.keys) {
+						//Opt: maybe the .array is not needed
+					int p = map(k); 
+					if(p!=k) {
+						res.blobs[p].area += res.blobs[k].area; 
+						rem ~= k; 
+					}
+				}
+				rem.each!(k => res.blobs.remove(k)); 
+			}
 			
 			static if(is(findBlobsDebug))
-			findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
-		}
-		
-		
-		
+			findBlobsDebug.log(ivec2(-1), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
+			
+			return res; 
+		} 
+		
+		static if(0)
+		struct findBlobsDebug
 		{
-			//make the map recursive
-			//print("FUCK"); map_.keys.sort.each!(k => print(k, "->", map_[k]));
-			int map_recursive(int id)
+			import het.draw2d, het.ui; static: 
+			struct Event
 			{
-				while(1) if(auto a = id in map_) id = *a; else break; 
-				//Todo: install latest LDC
-				return id; 
+				ivec2 actPos; 
+				Image!(ubyte, 2) src; 
+				Image!(int, 2) dst; 
+				int[int] idMap; 
+				Blob[int] blobs; 
+				
+				void draw(Drawing dr)
+				{
+					with(dr) {
+						fontHeight = .8; 
+						
+						void setColor(int i)
+						{ color = hsvToRgb(([i].xxh32&255)/255.0f, 1, 1).floatToRgb; } 
+						
+						foreach(y; 0..src.height)
+						foreach(x; 0..src.width)
+						{
+							translate(x, y); 
+							
+							if(src[x, y]) setColor(dst[x, y]); else color = clBlack; 
+							drawRect(0.05, 0.05, 0.95, 0.95); 
+							
+							if(dst[x, y]) textOut(0.1, 0.1, dst[x, y].to!string(36)); 
+							
+							pop; 
+						}
+						
+						
+						color = clWhite; 
+						foreach(i, k; idMap.keys.sort.array)
+						{
+							translate(src.width+2, i); 
+							textOut(0, 0, k.to!string(36) ~ " -> " ~ idMap[k].to!string(36)); 
+							pop; 
+						}
+						
+						
+						foreach(k, v; blobs)
+						{
+							translate(v.pos); 
+							setColor(k); 
+							fontHeight = 0.8; 
+							textOut(0.1, 0.1, k.to!string(36)); 
+							color = clWhite; 
+							fontHeight = 0.3; 
+							textOut(0.1, 0.7, v.area.text); 
+							circle(vec2(.5), 0.7); 
+							pop; 
+						}
+						
+					}
+				} 
 			} 
-			foreach(k; map_.keys) map_[k] = map_recursive(k); 
-			//remap the result id image
-			foreach(ref p; res.img) if(p) p = map(p); 
-		}
-		
-		{
-				//remap the result blobs
-			int[] rem; 
-			foreach(k; res.blobs.keys) {
-					//Opt: maybe the .array is not needed
-				int p = map(k); 
-				if(p!=k) {
-					res.blobs[p].area += res.blobs[k].area; 
-					rem ~= k; 
-				}
-			}
-			rem.each!(k => res.blobs.remove(k)); 
-		}
-		
-		static if(is(findBlobsDebug))
-		findBlobsDebug.log(ivec2(-1), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
-		
-		return res; 
-	} 
-	
-	static if(0)
-	struct findBlobsDebug
-	{
-		import het.draw2d, het.ui; static: 
-		struct Event
-		{
-			ivec2 actPos; 
-			Image!(ubyte, 2) src; 
-			Image!(int, 2) dst; 
-			int[int] idMap; 
-			Blob[int] blobs; 
+			
+			Event[] events; 
+			
+			void log(A...)(A a)
+			{ events ~= Event(a); } 
+			
+			int actEventIdx; 
+			
+			void UI()
+			{
+				with(im)
+				Row(
+					{
+						Text("FindBlobs debug idx:"); 
+						const r = range(0, events.length.to!int-1); 
+						IncDec(actEventIdx, r); 
+						Slider(actEventIdx, r, { width = fh*32; }); 
+					}
+				); 
+				
+				
+			} 
 			
 			void draw(Drawing dr)
+			{ events.get(actEventIdx).draw(dr); } 
+		} 
+		version(/+$DIDE_REGION Largest Blob + Erode +/all)
+		{
+			auto isolateLargestBlob(Image2D!RGBA img)
 			{
-				with(dr) {
-					fontHeight = .8; 
-					
-					void setColor(int i)
-					{ color = hsvToRgb(([i].xxh32&255)/255.0f, 1, 1).floatToRgb; } 
-					
-					foreach(y; 0..src.height)
-					foreach(x; 0..src.width)
+				auto blobs = findBlobs(img.image2D!(p => p.a>0)); 
+				if(blobs.length)
+				{
+					const largestBlobId = blobs.values.maxElement!(a => a.area).id; 
+					foreach(y; 0..img.height)
+					foreach(x; 0..img.width)
+					if(blobs.img[x, y]!=largestBlobId)
+					img[x, y].a = 0; 
+				}
+				return blobs; 
+			} 
+			
+			void convexizeH(Image2D!RGBA img, int len)
+			{
+				if(len<=0) return; 
+				foreach(y; 0..img.height)
+				{
+					bool lastState; 
+					int lastPos = -1; 
+					foreach(x; 0..img.width)
 					{
-						translate(x, y); 
-						
-						if(src[x, y]) setColor(dst[x, y]); else color = clBlack; 
-						drawRect(0.05, 0.05, 0.95, 0.95); 
-						
-						if(dst[x, y]) textOut(0.1, 0.1, dst[x, y].to!string(36)); 
-						
-						pop; 
+						const actState = img[x, y].a>0; 
+						if(lastState!=actState)
+						{
+							//fill holes
+							if(actState && lastPos>=0 && lastPos+len>=x)
+							foreach(x2; lastPos..x) img[x2, y].a = 160; 
+							
+							lastPos = x; lastState = actState; 
+						}
 					}
-					
-					
-					color = clWhite; 
-					foreach(i, k; idMap.keys.sort.array)
+				}
+			}  void convexizeV(Image2D!RGBA img, int len)
+			{
+				if(len<=0) return; 
+				foreach(x; 0..img.width)
+				{
+					bool lastState; 
+					int lastPos = -1; 
+					foreach(y; 0..img.height)
 					{
-						translate(src.width+2, i); 
-						textOut(0, 0, k.to!string(36) ~ " -> " ~ idMap[k].to!string(36)); 
-						pop; 
+						const actState = !!img[x, y].a>0; 
+						if(lastState!=actState)
+						{
+							//fill holes
+							if(actState && lastPos>=0 && lastPos+len>=y)
+							foreach(y2; lastPos..y) img[x, y2].a = 160; 
+							
+							lastPos = y; lastState = actState; 
+						}
 					}
-					
-					
-					foreach(k, v; blobs)
-					{
-						translate(v.pos); 
-						setColor(k); 
-						fontHeight = 0.8; 
-						textOut(0.1, 0.1, k.to!string(36)); 
-						color = clWhite; 
-						fontHeight = 0.3; 
-						textOut(0.1, 0.7, v.area.text); 
-						circle(vec2(.5), 0.7); 
-						pop; 
-					}
-					
 				}
 			} 
-		} 
-		
-		Event[] events; 
-		
-		void log(A...)(A a)
-		{ events ~= Event(a); } 
-		
-		int actEventIdx; 
-		
-		void UI()
-		{
-			with(im)
-			Row(
+			
+			///Fills large holes on horizontal and vertical scanlines.  Works on alpha channel.
+			void convexize(Image2D!RGBA img, int len)
+			{
+				convexizeH(img, len); 
+				convexizeV(img, len); 
+			} 
+			
+			void inflateH(Image2D!RGBA img, int len1, int len2)
+			{
+				int[3][] indices; 
+				foreach(y; 0..img.height)
 				{
-					Text("FindBlobs debug idx:"); 
-					const r = range(0, events.length.to!int-1); 
-					IncDec(actEventIdx, r); 
-					Slider(actEventIdx, r, { width = fh*32; }); 
+					auto arr() { return img.rows[y].map!"a.a>0"; } 
+					const i0 = arr.countUntil(true).to!int; 
+					if(i0>=0)
+					{
+						const i1 = arr.retro.countUntil(true).to!int; 
+						if(i1>=0)
+						indices ~= [y, i0, img.width - i1]; 
+					}
 				}
-			); 
+				
+				//smooth
+				const indices2 = indices.dup; 
+				foreach(i; 1..indices.length.to!int-1)
+				{
+					foreach(j; 1..3)
+					indices[i][j] = (indices2[i-1][j] + indices2[i+1][j])/2; 
+				}
+				
+				//adjust
+				foreach(ref ind; indices)
+				{
+					ind[1] -= len1; 
+					ind[2] += len2; 
+				}
+				
+				//execute
+				foreach(const ind; indices)
+				foreach(x; 0..img.width)
+				if(!(x>=ind[1] && x<ind[2]))
+				img[x, ind[0]].a = 0; 
+				
+			}  void inflateV(Image2D!RGBA img, int len1, int len2)
+			{
+				int[3][] indices; 
+				foreach(x; 0..img.width)
+				{
+					auto arr() { return img.columns[x].map!"a.a>0"; } 
+					const i0 = arr.countUntil(true).to!int; 
+					if(i0>=0)
+					{
+						const i1 = arr.retro.countUntil(true).to!int; 
+						if(i1>=0)
+						indices ~= [x, i0, img.height - i1]; 
+					}
+				}
+				
+				//smooth
+				const indices2 = indices.dup; 
+				foreach(i; 1..indices.length.to!int-1)
+				{
+					foreach(j; 1..3)
+					indices[i][j] = (indices2[i-1][j] + indices2[i+1][j])/2; 
+				}
+				
+				//adjust
+				foreach(ref ind; indices)
+				{
+					ind[1] -= len1; 
+					ind[2] += len2; 
+				}
+				
+				//execute
+				foreach(const ind; indices)
+				foreach(y; 0..img.height)
+				if(!(y>=ind[1] && y<ind[2]))
+				img[ind[0], y].a = 0; 
+				
+			} 
 			
-			
-		} 
-		
-		void draw(Drawing dr)
-		{ events.get(actEventIdx).draw(dr); } 
-	} 
+		}
+	}
 	
 	//////////////////////////////////////////////////////////////////////
 	///  2D MaxRects Bin Packer                                        ///
@@ -795,7 +938,7 @@ version(/+$DIDE_REGION+/all)
 				foreach(ref n; nodes) n.remove(pred)/+recursive+/; 
 				const wasEmpty = objects.empty; 
 				
-				//todo: If I use an alias for pred, remove!pred fails with a Dual Context not supported error.
+				//Todo: If I use an alias for pred, remove!pred fails with a Dual Context not supported error.
 				objects = objects.remove!(a=>pred(a)); 
 				
 				if(objects.empty && !wasEmpty && empty/+recursive+/) clear/+also recursive+/; 
