@@ -76,8 +76,8 @@ version(/+$DIDE_REGION+/all)
 														 union { 
 			                struct { 
 			                    float y, z; 
-																	  } 
-																	  vec2 yz; 
+																		 } 
+																		 vec2 yz; 
 			            } 
 										 }
 										 struct { 
@@ -1868,7 +1868,11 @@ version(/+$DIDE_REGION+/all)
 				static if(cfg[1]==']') alias f2 = lessThanEqual; else alias f2 = lessThan; 
 				
 				static if(isBounds!T)
-				return contains!cfg(other.low) && contains!cfg(other.high); 
+				{
+					//return contains!cfg(other.low) && contains!cfg(other.high); 
+					return !empty && ((this & other)==other); 
+					//for bounds it always do Windows style rect handling
+				}
 				else
 				return all(f1(other, low) & f2(other, high)); 
 			} 

@@ -149,7 +149,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				TIME_ZONE_INFORMATION, GetTimeZoneInformation; 
 			
 			import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
-				std.json, std.parallelism, core.runtime; 
+			std.json, std.parallelism, core.runtime; 
 			
 			public import core.sys.windows.com : IUnknown; 
 			import core.sys.windows.com : CoInitializeEx, CoUninitialize; 
@@ -4086,7 +4086,7 @@ version(/+$DIDE_REGION Numeric+/all)
 					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241732f +
 					a[i]*0.382928f; 
 			} 
-					
+			
 			float delegate(int) fv; 
 			switch(kernelSize) {
 				case 1: return a.dup; 
@@ -4096,7 +4096,7 @@ version(/+$DIDE_REGION Numeric+/all)
 				case 9: fv = &g9; break; 
 				default: enforce(0, "Unsupported kernel size "~kernelSize.text); 
 			}
-					
+			
 			return iota(a.length.to!int).map!(i => fv(i)).array; 
 		} 
 		
@@ -4225,6 +4225,70 @@ version(/+$DIDE_REGION Numeric+/all)
 				var	= reduce!((a, b) => a + pow(b - avg, 2) / n)(0.0f, a),
 				sd	= sqrt(var); 
 			return sd; 
+		} 
+		
+		T bitReverse(T)(T x, uint log2n)
+		{
+			T n; 
+			foreach(i; 0..log2n)
+			{
+				n <<= 1; 
+				n |= (x & 1); 
+				x >>= 1; 
+			}
+			return n; 
+		} 
+		
+		const double PI = 3.1415926536; 
+		
+		void fft(T)(T[] a, T[] b, int log2n)
+		{
+			/+Link: https://www.sanfoundry.com/cpp-program-compute-discrete-fourier-transform-using-fast-fourier-transform-approach+/
+			import std.complex; 
+			const J = T(0, 1); 
+			int n = 1 << log2n; 
+			for(uint i = 0; i < n; ++i)
+			{ b[bitReverse(i, log2n)] = a[i]; }
+			
+			for(int s = 1; s <= log2n; ++s)
+			{
+				int m = 1 << s; 
+				int m2 = m >> 1; 
+				auto w = T(1, 0); 
+				auto wm = std.complex.exp(-J * (PI / m2)); 
+				for(int j = 0; j < m2; ++j)
+				{
+					for(int k = j; k < n; k += m)
+					{
+						auto t = w * b[k + m2]; 
+						auto u = b[k]; 
+						b[k] = u + t; 
+						b[k + m2] = u - t; 
+					}
+					w *= wm; 
+				}
+			}
+		} 
+		
+		void test_fft()
+		{
+			import std.complex; 
+			
+			alias cx = Complex!float; 
+			cx[] a = [cx(0, 0), cx(1, 1), cx(3, 3), cx(4, 4), cx(4, 4), cx(3, 3), cx(1, 1), cx(0, 0)]; 
+			cx[] b; b.length=8; 
+			fft(a, b, 3); 
+			b.each!writeln; 
+			/+
+				16+16i
+				-4.82843-11.6569i
+				0+0i
+				-0.343146+0.828427i
+				0+0i
+				0.828427-0.343146i
+				0+0i
+				-11.6569-4.82843i
+			+/
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
