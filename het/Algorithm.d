@@ -177,7 +177,7 @@ version(/+$DIDE_REGION+/all)
 						fontHeight = .8; 
 						
 						void setColor(int i)
-						{ color = hsvToRgb(([i].xxh32&255)/255.0f, 1, 1).floatToRgb; } 
+						{ color = hsvToRgb(([i].xxh32&255)/255.0f, 1, 1).to_unorm; } 
 						
 						foreach(y; 0..src.height)
 						foreach(x; 0..src.width)

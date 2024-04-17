@@ -4100,6 +4100,16 @@ version(/+$DIDE_REGION Numeric+/all)
 			return iota(a.length.to!int).map!(i => fv(i)).array; 
 		} 
 		
+		Image2D!float gaussianBlur(Image2D!float img, int kernelSize)
+		{
+			foreach(i; 0..2)
+			{
+				img = img.columns.image2D; 
+				foreach(row; img.rows) row[] = row.gaussianBlur(kernelSize); 
+			}
+			return img; 
+		} 
+		
 		class ResonantFilter
 		{
 			//https://www.music.mcgill.ca/~gary/307/week2/filters.html
@@ -4239,13 +4249,10 @@ version(/+$DIDE_REGION Numeric+/all)
 			return n; 
 		} 
 		
-		const double PI = 3.1415926536; 
-		
-		void fft(T)(T[] a, T[] b, int log2n)
+		void fft(F)(Complex!F[] a, Complex!F[] b, int log2n)
 		{
 			/+Link: https://www.sanfoundry.com/cpp-program-compute-discrete-fourier-transform-using-fast-fourier-transform-approach+/
-			import std.complex; 
-			const J = T(0, 1); 
+			const J = Complex!F(0, 1); 
 			int n = 1 << log2n; 
 			for(uint i = 0; i < n; ++i)
 			{ b[bitReverse(i, log2n)] = a[i]; }
@@ -4254,8 +4261,8 @@ version(/+$DIDE_REGION Numeric+/all)
 			{
 				int m = 1 << s; 
 				int m2 = m >> 1; 
-				auto w = T(1, 0); 
-				auto wm = std.complex.exp(-J * (PI / m2)); 
+				auto w = Complex!F(1, 0); 
+				auto wm = exp(-J * (PI / m2)); 
 				for(int j = 0; j < m2; ++j)
 				{
 					for(int k = j; k < n; k += m)
@@ -4272,9 +4279,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		void test_fft()
 		{
-			import std.complex; 
-			
 			alias cx = Complex!float; 
+			
 			cx[] a = [cx(0, 0), cx(1, 1), cx(3, 3), cx(4, 4), cx(4, 4), cx(3, 3), cx(1, 1), cx(0, 0)]; 
 			cx[] b; b.length=8; 
 			fft(a, b, 3); 
@@ -4289,6 +4295,32 @@ version(/+$DIDE_REGION Numeric+/all)
 				0+0i
 				-11.6569-4.82843i
 			+/
+		} 
+		
+		auto fft(Image2D!(Complex!float) a)
+		{
+			auto 	b = image2D(a.size.x, a.size.y, Complex!float(0)),
+				c = image2D(a.size.y, a.size.x, Complex!float(0)); 
+			
+			const log2size = a.size.log2.ifloor; 
+			foreach(y; 0..a.height) fft(a.rows[y], b.rows[y], log2size.x); b = image2D(b.columns); 
+			foreach(y; 0..b.height) fft(b.rows[y], c.rows[y], log2size.y); c = image2D(c.columns); 
+			
+			return c; 
+		} 
+		
+		auto fft(Image2D!float img)
+		{
+			//only real part is specified
+			return img.image2D!(a=>Complex!float(a)).fft; 
+			//Opt: all imaginary value is 0
+		} 
+		
+		auto ifft(Image2D!(Complex!float) img)
+		{
+			//It's for conjugate symmetric matrices. Only returns the real part.
+			return img.fft.image2D!(a=>a.re); 
+			//Opt: imaginary value is not used
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
@@ -7585,10 +7617,14 @@ version(/+$DIDE_REGION Colors+/all)
 {
 	version(/+$DIDE_REGION Color processing+/all)
 	{
-		auto floatToRgb(T, int N)(in Vector!(T, N) x)	 if(is(T == float))
-		{ return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255)); 	} 
-		auto rgbToFloat(T, int N)(in Vector!(T, N) x)	 if(is(T == ubyte))
-		{ return x * (1.0f/255); 	} 
+		
+		/+
+			use to_unorm, from_unorm
+			auto floatToRgb(T, int N)(in Vector!(T, N) x)	 if(is(T == float))
+			{ return Vector!(ubyte, N)(iround(x.clamp(0, 1)*255)); } 
+			auto rgbToFloat(T, int N)(in Vector!(T, N) x)	 if(is(T == ubyte))
+			{ return x * (1.0f/255); } 
+		+/
 		
 		
 		template transformArray(alias fun, alias sseFun, bool inplace=false)
@@ -8512,7 +8548,7 @@ version(/+$DIDE_REGION Colors+/all)
 			override RGB eval(float x)
 			{
 				x = x.clamp(0, 1); 
-				return vec3(evalPoly(x, polys[0]), evalPoly(x, polys[1]), evalPoly(x, polys[2])).floatToRgb; 
+				return vec3(evalPoly(x, polys[0]), evalPoly(x, polys[1]), evalPoly(x, polys[2])).to_unorm; 
 			} 
 		} 
 		class DistinctColorMap: ColorMap

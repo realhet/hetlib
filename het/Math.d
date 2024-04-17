@@ -26,6 +26,11 @@ version(/+$DIDE_REGION+/all)
 	public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI); 
 	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly; 
 	
+	static import std.complex; 
+	public import std.complex : Complex, norm, arg, fromPolar; 
+	enum isComplex(T) = is(T==Complex!F, F); 
+	alias ℂ = Complex!float; 
+	
 	//publicly import std modules whose functions are gonna be overloaded/extended/hijacked here.
 	public import std.string, std.uni;    //std.string publicly imports std.algorithm, so it MUST be publicly imported from here.
 	public import std.algorithm; //extends : cmp, any, all, equal, min, max, sort
@@ -2231,12 +2236,12 @@ version(/+$DIDE_REGION+/all)
 						static if(is(RT == void))
 						{
 							//return is void, just call the delegate.
-							foreach(pos; size.iota2) args[1](pos); 
+							foreach(pos; size.iota2D) args[1](pos); 
 							return; //the result is void
 						}
 						else
 						{
-							return Image!(RT, 2)(size, cast(RT[])(size.iota2.map!(p => args[1](p)).array)); 
+							return Image!(RT, 2)(size, cast(RT[])(size.iota2D.map!(p => args[1](p)).array)); 
 							//return type is something, make an Image out of it.
 						}
 					}
@@ -2395,7 +2400,7 @@ version(/+$DIDE_REGION+/all)
 			{ return width.iota.map!(x => column(x)); } 
 				
 			void regenerate(E delegate(ivec2) generator)
-			{ impl = size.iota2.map!generator.array; } 
+			{ impl = size.iota2D.map!generator.array; } 
 				
 			@property auto asArray()
 			{
@@ -2733,7 +2738,7 @@ version(/+$DIDE_REGION+/all)
 			bool opEquals(A)(in A a) const
 			{
 				static assert(isImage2D!A); 
-				return (size == a.size) && size.iota2.map!(p => this[p.x, p.y] == a[p.x, p.y]).all; 
+				return (size == a.size) && size.iota2D.map!(p => this[p.x, p.y] == a[p.x, p.y]).all; 
 			} 
 				
 			static if(N==2)
@@ -2983,7 +2988,7 @@ version(/+$DIDE_REGION+/all)
 		auto radians(real scale = PI/180, A)(in A a)
 		{
 			alias CT = CommonScalarType!(A, float); 	//common type is at least float
-			alias fun = a => a * cast(CT) scale;         //degrade the real enum if needed
+			alias fun = a => a * cast(CT) scale; //degrade the real enum if needed
 			return a.generateVector!(CT, fun); 
 		} 
 		auto degrees(A)(in A a)
@@ -3014,15 +3019,20 @@ version(/+$DIDE_REGION+/all)
 		{ return normalizeAngle_rad(b-a).abs; } ; 
 		
 		auto angleAbsDiff_deg(A, B)(A a, B b)
-		{ return normalizeAngle_def(b-a).abs; } ; 
+		{ return normalizeAngle_deg(b-a).abs; } ; 
 		
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 		private enum UnaryStdMathFunct(string name) = 
 		q{
 			auto #(A)(in A a){
-				alias CT = CommonScalarType!(A, float);
-				alias fun = a => std.math.#(cast(CT) a);
-				return a.generateVector!(CT, fun);
+				static if(isComplex!A) 
+				{return std.complex.#(a);}
+				else
+				{
+					alias CT = CommonScalarType!(A, float);
+					alias fun = a => std.math.#(cast(CT) a);
+					return a.generateVector!(CT, fun);
+				}
 			}
 		}.replace('#', name); 
 		
@@ -3187,8 +3197,13 @@ version(/+$DIDE_REGION+/all)
 		
 		auto normalize(A)(in A a)
 		{
-			static assert(isVector!A, "Normalize needs a vector argument."); 
-			return a*(1.0f/length(a)); 
+			static if(isComplex!A)
+			{ return a/abs(a); }
+			else
+			{
+				static assert(isVector!A, "Normalize needs a vector argument."); 
+				return a*(1.0f/length(a)); 
+			}
 		} 
 		
 		auto magnitude(A)(in A a)
@@ -3371,7 +3386,10 @@ version(/+$DIDE_REGION+/all)
 		//Common functions //////////////////////////////////////////
 		
 		auto abs(A)(in A a)
-		{ return max(a, -a); } 
+		{
+			static if(isComplex!A)	return std.complex.abs(a); 
+			else	return max(a, -a); 
+		} 
 		
 		auto sign(A)(in A a)
 		{ alias CT = ScalarType!A; return a.generateVector!(CT, a => a==0 ? 0 : a<0 ? -1 : 1 ); } 
@@ -3737,6 +3755,7 @@ version(/+$DIDE_REGION+/all)
 			return a*(1.0f/(levels-1)); 
 		} 
 		
+		
 		auto product(A)(A a) if(isInputRange!A)
 		{
 			//similar to std.sum()
@@ -3749,7 +3768,7 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		//2D iota()
-		auto iota2(B, E, S)(in B b, in E e, in S s)
+		auto iota2D(B, E, S)(in B b, in E e, in S s)
 		{
 			alias CT = CommonScalarType!(B, E, S); 
 			return cartesianProduct(
@@ -3758,11 +3777,11 @@ version(/+$DIDE_REGION+/all)
 			).map!(a => Vector!(CT, 2)(a[1], a[0])); 
 		} 
 		
-		auto iota2(B, E)(in B b, in E e)
-		{ return iota2(b, e, 1); } 
+		auto iota2D(B, E)(in B b, in E e)
+		{ return iota2D(b, e, 1); } 
 		
-		auto iota2(E)(in E e)
-		{ return iota2(0, e); } 
+		auto iota2D(E)(in E e)
+		{ return iota2D(0, e); } 
 		
 		//Todo: Make better animater following using Euler interpolation
 		
@@ -3805,7 +3824,7 @@ version(/+$DIDE_REGION+/all)
 		bool follow(A)(ref A act, in A target, float t, float snapDistance)
 		{
 			if(act==target) return true; //fast path, nothing to do
-					
+			
 			static if(isFloatingPoint!A)
 			{
 				//scalar
@@ -3829,6 +3848,29 @@ version(/+$DIDE_REGION+/all)
 			else
 			static assert(0, "unhandled type: "~A.stringof); 
 		} 
+		
+		//snorm, unorm confersion.
+		//Link: https://registry.khronos.org/vulkan/specs/1.0/html/vkspec.html#fundamentals-fixedconv
+		
+		auto to_unorm(A)(A a)
+		{ return a.generateVector!(ubyte, a=>cast(ubyte)(iround(a.clamp(0, 1)*0xFF))); } 
+		auto from_unorm(A)(A a)
+		{ return a.generateVector!(float, a=>a*(1.0f/0xFF)); } 
+		
+		auto to_snorm(A)(A a)
+		{ return a.generateVector!(ubyte, a=>cast(ubyte)(iround(a.clamp(-1, 1)*0x7F))); } 
+		auto from_snorm(A)(A a)
+		{ return a.generateVector!(float, a=>max((cast(byte)a)*(1.0f/0x7F), -1)); } 
+		
+		auto to_unorm16(A)(A a)
+		{ return a.generateVector!(ushort, a=>cast(ushort)(iround(a.clamp(0, 1)*0xFFFF))); } 
+		auto from_unorm16(A)(A a)
+		{ return a.generateVector!(float, a=>a*(1.0f/0xFFFF)); } 
+		
+		auto to_snorm16(A)(A a)
+		{ return a.generateVector!(ushort, a=>cast(ushort)(iround(a.clamp(-1, 1)*0x7FFF))); } 
+		auto from_snorm16(A)(A a)
+		{ return a.generateVector!(float, a=>max((cast(short)a)*(1.0f/0x7FFF), -1)); } 
 	}version(/+$DIDE_REGION+/all)
 	{
 		private void unittest_CommonFunctions()
@@ -3989,7 +4031,7 @@ version(/+$DIDE_REGION+/all)
 			assert([2, 3	  ].product == 2*3	 ); 
 			assert([2, 3, 4].product == 2*3*4); 
 					
-			assert(iota2(ivec2(3, 2)).equal([ivec2(0, 0), ivec2(1, 0), ivec2(2, 0), ivec2(0, 1), ivec2(1, 1), ivec2(2, 1)])); 
+			assert(iota2D(ivec2(3, 2)).equal([ivec2(0, 0), ivec2(1, 0), ivec2(2, 0), ivec2(0, 1), ivec2(1, 1), ivec2(2, 1)])); 
 		} 
 	}
 }
