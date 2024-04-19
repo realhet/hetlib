@@ -206,9 +206,11 @@ version(/+$DIDE_REGION+/all)
 		alias A = T.ComponentType; 
 		else static if(isMatrix!T)
 		alias A = T.ComponentType; 
+		else static if(isBounds!T)
+		alias A = T.VT.ComponentType; 
 		else
 		alias A = T; 
-			
+		
 		alias ScalarType = Unqual!A; 
 	} 
 	
@@ -541,8 +543,10 @@ version(/+$DIDE_REGION+/all)
 				{ return other.contains(this); }
 				else static if(op=="in" && isImage!T && T.Dimension == length)
 				{ return other.contains(this); }
+				else static if(op.among("+", "*") && isBounds!T && T.VectorLength == length)
+				{ return other.opBinary!op(this); }
 				else
-				{ static assert(false, "invalid operation"); }
+				{ static assert(false, "Unhandled operation: "~op~" "~T.stringof); }
 			} 
 					
 			auto opBinaryRight(string op, T)(in T other) const
@@ -2264,7 +2268,8 @@ version(/+$DIDE_REGION+/all)
 				//fun is specified
 				enforceImageSize2D(size, args[1..$]); 
 				
-				return image2D(
+				return image2D
+				(
 					size, (ivec2 pos)
 					{
 						//generate all the access functions
@@ -2525,6 +2530,15 @@ version(/+$DIDE_REGION+/all)
 			void safeSet(int x, int y, E val)
 			{ safeSet(ivec2(x, y), val); } 
 			
+			import std.traits : isSomeChar; 
+			static if(!isSomeChar!E/+Bug: Ez a gecifos beszarik ha char az elementtype.  A .array dchar-rá rakja ossze a chart.+/)
+			{
+				auto safeGet(ibounds2 b, E def = E.init)
+				{
+					if((b & bounds)==b) return this[b]; 
+					return image2D(b.size, b.size.iota2D.map!(p=>safeGet(b.topLeft+p, def))); 
+				} 
+			}
 			
 			bool opBinaryRight(string op : "in", A)(A p) const
 			{ return p.x>=0 && p.y>=0 && p.x<width && p.y<height; } 
@@ -3396,8 +3410,17 @@ version(/+$DIDE_REGION+/all)
 		
 		private auto floatReductionOp(alias fun, CT, A)(in A a)
 		{
-			static assert(isFloatingPoint!(ScalarType!A)); 
-			return a.generateVector!(CT, fun); 
+			static if(isBounds!A)
+			{
+				auto 	low 	= a.low	.generateVector!(CT, fun),
+					high 	= a.high	.generateVector!(CT, fun); 
+				return Bounds!(typeof(low))(low, high); 
+			}
+			else
+			{
+				static assert(isFloatingPoint!(ScalarType!A)); 
+				return a.generateVector!(CT, fun); 
+			}
 		} 
 		
 		auto floor(A, CT=ScalarType!A)(in A a)

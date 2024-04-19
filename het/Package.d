@@ -2590,11 +2590,12 @@ version(/+$DIDE_REGION Numeric+/all)
 	}version(/+$DIDE_REGION+/all) {
 		
 		//Todo: remap goes to math
+		
+		T remap(alias srcFrom, alias srcTo, alias dstFrom, alias dstTo, T)(in T src)
+		{ return cast(T)(((srcTo-srcFrom)?((src-srcFrom)*((dstTo-dstFrom)/(srcTo-srcFrom)) + dstFrom):(dstFrom))); } 
+		
 		T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
-		{
-			float s = srcTo-srcFrom; 
-			if(s==0) { return dstFrom; }else { return cast(T)((src-srcFrom)/s*(dstTo-dstFrom)+dstFrom); }
-		} 
+		{ return src.remap!(srcFrom, srcTo, dstFrom, dstTo); } 
 		
 		//Todo: Decide what to return when input is NAN. Result is now NAN.
 		T remap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
@@ -4157,12 +4158,13 @@ version(/+$DIDE_REGION Numeric+/all)
 		} 
 			
 	}version(/+$DIDE_REGION+/all) {
-			
+		
 		T[] derived(T)(in T[] arr)
 		{
+			//Todo: this should be a map function, not something that allocates
 			if(arr.empty) return []; 
-			T[] res; 	res.reserve(arr.length); 
-			T last =	arr[0]; 
+			T[] res; res.reserve(arr.length); 
+			T last = arr[0]; 
 			foreach(a; arr) {
 				res ~= a-last; 
 				last = a; 
@@ -4236,6 +4238,8 @@ version(/+$DIDE_REGION Numeric+/all)
 				sd	= sqrt(var); 
 			return sd; 
 		} 
+		
+		//Todo: FFT for double precision.
 		
 		T bitReverse(T)(T x, uint log2n)
 		{
@@ -4249,7 +4253,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			return n; 
 		} 
 		
-		void fft(F)(Complex!F[] a, Complex!F[] b, int log2n)
+		void fft(F)(in Complex!F[] a, Complex!F[] b, int log2n)
 		{
 			/+Link: https://www.sanfoundry.com/cpp-program-compute-discrete-fourier-transform-using-fast-fourier-transform-approach+/
 			const J = Complex!F(0, 1); 
@@ -4279,6 +4283,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		void test_fft()
 		{
+			//Todo: this must be a selftest at startup
+			
 			alias cx = Complex!float; 
 			
 			cx[] a = [cx(0, 0), cx(1, 1), cx(3, 3), cx(4, 4), cx(4, 4), cx(3, 3), cx(1, 1), cx(0, 0)]; 
@@ -4296,6 +4302,35 @@ version(/+$DIDE_REGION Numeric+/all)
 				-11.6569-4.82843i
 			+/
 		} 
+		
+		auto fft(in ℂ[] a)
+		{
+			auto b = uninitializedArray!(ℂ[])(a.length); 
+			fft(a, b, a.length.log2.itrunc); 
+			return b; 
+		} 
+		
+		auto fft(in float[] a)
+		{
+			//only real part is specified
+			return a.map!ℂ.array.fft; 
+		} 
+		
+		auto ifft(in ℂ[] a)
+		{
+			//Only returns the real part.
+			return a.fft.map!(a=>a.re).array.fftFlip; 
+			//Bug: a != a.fft.ifft  [1,2,1,2]->[4,8,4,8]    4x annyi es torzitva van, ha nem periodikus!!!!  Tukrozve is van!
+		} 
+		
+		auto fftShift(uint sh=1, T)(in T[] a)
+		{
+			const mask = cast(uint)a.length-1>>sh; 
+			return iota(a.length).map!(i=>cast()(a[i^mask])).array; 
+		} 
+		
+		auto fftFlip(T)(in T[] a)
+		{ return a.fftShift!0; } 
 		
 		auto fft(Image2D!(Complex!float) a)
 		{
@@ -4319,9 +4354,21 @@ version(/+$DIDE_REGION Numeric+/all)
 		auto ifft(Image2D!(Complex!float) img)
 		{
 			//It's for conjugate symmetric matrices. Only returns the real part.
-			return img.fft.image2D!(a=>a.re); 
+			return img.fft.image2D!(a=>a.re).fftFlip; 
 			//Opt: imaginary value is not used
+			//Bug: Ez kozeppontosan tukrozve van! -> fftFlip
 		} 
+		
+		auto fftShift(uint sh=1, F)(in Image!(F, 2) a)
+		{
+			const mask = a.size-1>>sh; 
+			return image2D(a.size, iota2D(a.size).map!(p=>cast()(a[p^mask]))); 
+		} 
+		
+		auto fftFlip(F)(in Image!(F, 2) a)
+		{ return a.fftShift!0; } 
+		
+		
 		
 	}version(/+$DIDE_REGION+/all) {
 		

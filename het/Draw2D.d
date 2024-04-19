@@ -2853,6 +2853,15 @@ class Drawing
 			drawRect(-10, -10, 210, 110); 
 		} 
 		
+		
+		void draw(F)(in Image!(F, 2) img, RGB delegate(F) fun, in vec2 pos = vec2(0), in vec2 scale = vec2(1))
+		{
+			foreach(p; img.size.iota2D) {
+				color = fun(img[p]); 
+				fillRect(bounds2(pos + p*scale, ((scale).genericArg!q{size}))); 
+			}
+		} 
+		
 		
 		
 		
