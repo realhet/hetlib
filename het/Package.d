@@ -2718,7 +2718,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		float peakLocation(float a, float b, float c, float* y=null)
 		{
 			NOTIMPL; //Todo: this is possibly buggy. must refactor.
-			//https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
+			//Link: https://ccrma.stanford.edu/~jos/sasp/Quadratic_Interpolation_Spectral_Peaks.html
 			auto 	d = (a-2*b+c),
 				p = abs(d)<1e-4 ? 0 : 0.5f*(a-c)/d; 
 			if(y) *y = b-0.25f*(a-c)*p; 

@@ -24,6 +24,8 @@ version(/+$DIDE_REGION+/all)
 	
 	//important constants from std.math
 	public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI); 
+	enum π = PIf; 
+	
 	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly; 
 	
 	static import std.complex; 
@@ -3212,13 +3214,16 @@ version(/+$DIDE_REGION+/all)
 		auto normalize(A)(in A a)
 		{
 			static if(isComplex!A)
-			{ return a/abs(a); }
+			{ return a*(1.0f/abs(a)); }
 			else
 			{
 				static assert(isVector!A, "Normalize needs a vector argument."); 
 				return a*(1.0f/length(a)); 
 			}
 		} 
+		
+		auto normalize_safe(A)(in A a)
+		{ return a==A(0) ? typeof(a.normalize)(0) : a.normalize; } 
 		
 		auto magnitude(A)(in A a)
 		{
