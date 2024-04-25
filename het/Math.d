@@ -530,6 +530,12 @@ version(/+$DIDE_REGION+/all)
 			{
 				//Todo: associative array for right operand
 				
+				/+
+					Todo: Use different approach: example in std.complex.Complax!T.opAssign
+					It uses ref results.
+					ref Complex opOpAssign(string op, C)(const C z)
+				+/
+				
 				static if(isNumeric!T || isVector!T)
 				{
 					//vector * (vector/scalar)

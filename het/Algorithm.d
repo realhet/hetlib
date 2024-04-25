@@ -1,5 +1,5 @@
 module het.algorithm; 
-import het; 
+import het, het.draw2d; 
 version(/+$DIDE_REGION+/all)
 {
 	
@@ -727,7 +727,6 @@ version(/+$DIDE_REGION+/all)
 			writeln("  freeRects:", freeRects.map!text.join("\n")); 
 		} 
 		
-		import het.draw2d; 
 		static string test(Drawing dr)
 		{
 				//test /////////////////////////////////
@@ -1118,6 +1117,89 @@ version(/+$DIDE_REGION+/all)
 			detectWaveLength!method(samples[1], wlMin, wlMax, wlStep)
 		]; 
 		return res; 
+	} 
+	
+	auto fftDonutHistogram(int count)(
+		Image2D!ℂ shiftedSpectrum, float minRadius, float maxRadius, 
+		bool dbg=false
+	)
+	{
+		static ivec2 to180(ivec2 v)
+		{ return ((v.y>0)?(((v.x<0)?(-v):(v))) :(((v.x<=0)?(-v):(v)))); } 
+		
+		auto hist = [0.0f].replicate(count); 
+		const center = shiftedSpectrum.size/2-1; 
+		foreach(p; shiftedSpectrum.size.iota2D)
+		{
+			const dir = to180(p-center); 
+			if(dir)
+			{
+				const len = length(dir); 
+				if(len.inRange(minRadius, maxRadius))
+				{
+					const 	n = dir*(1.0f/len),
+						α = atan(n.y, n.x),
+						quant = (α.remap!(-π/2, π/2, 0, count).iround+count)%count; 
+					hist[quant] += shiftedSpectrum[p].abs; 
+					if(dbg) shiftedSpectrum[p.x, p.y] = ℂ(0); 
+				}
+			}
+		}
+		
+		return hist; 
+	} 
+	
+	auto angleHistogramPeakAngle(float[] hist, float* y=null)
+	{
+		const roughAngleIdx = hist.maxIndex.to!int; 
+		auto hist2(int i) { return hist[(roughAngleIdx+i+$)%$]; } 
+		return (roughAngleIdx + peakLocation(hist2(-1), hist2(0), hist2(1), y)) * (π/hist.length); 
+	} 
+	
+	auto angleHistogramPeakVector(float[] hist)
+	{
+		float y; 
+		const angle = angleHistogramPeakAngle(hist, &y); 
+		return vec2(0, y).rotate(angle); 
+	} 
+	
+	void drawFftDonutHistogram(Drawing dr, float[] hist)
+	{
+		dr.lineLoop(
+			iota((hist.length*2).to!int).map!(
+				i=>	vec2(0, hist[i%hist.length])
+					.rotate(π * i / hist.length)
+			).array
+		); 
+	} 
+	
+	void drawFftDonutAngle(Drawing dr, float[] hist)
+	{
+		const v = angleHistogramPeakVector(hist); 
+		dr.line(+v, -v); 
+	} 
+	
+	auto fftRadialSum(Image2D!ℂ shiftedSpectrum, vec2 vector, int size)
+	{
+		if(!vector) return 0; 
+		const 	dir 	= vector.normalize,
+			side	= dir.rotate90,
+			center 	= shiftedSpectrum.size/2-1; 
+		return (
+			iota
+			(
+				-size+1,
+				size
+			)
+		).map!(
+			i=>(
+				iota
+				(
+					-1,
+					2
+				)
+			).map!(j=>(magnitude(shiftedSpectrum[iround(center + i*dir + j*side)]))).sum
+		).sum; 
 	} 
 }
 version(/+$DIDE_REGION Geometry+/all)
