@@ -5375,19 +5375,24 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					pipelineLayout = device.createPipelineLayout(descriptorSetLayout); 
 				} 
 				
-				VulkanShaderModule shaderModule; 
-				VulkanPipeline pipeline; 
-				void createPipeline(File kernelFile, string kernelFunction="main")
+				//support multiple shaders/pipelines
+				VulkanShaderModule[File/+file ony+/] shaderModules; 
+				VulkanPipeline[] pipelines; 
+				protected void createPipelines(File[] kernelFiles)
 				{
-					shaderModule = device.createShaderModule(kernelFile); 
-					pipeline = device.createComputePipeline
+					foreach(kf; kernelFiles)
+					{
+						const f = kf.withoutQueryString; 
+						auto sm = shaderModules.require(f, device.createShaderModule(f)); 
+						pipelines ~= device.createComputePipeline
 						(
-						(mixin(體!((VkPipelineShaderStageCreateInfo),q{
-							stage 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
-							_module 	: shaderModule,
-							pName 	: kernelFunction.toPChar,
-						}))), pipelineLayout, null, -1
-					); 
+							(mixin(體!((VkPipelineShaderStageCreateInfo),q{
+								stage 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
+								_module 	: sm,
+								pName 	: kf.queryString.names.get(0).toPChar,
+							}))), pipelineLayout, null, -1
+						); 
+					}
 				} 
 				
 				VulkanMemoryBuffer 	uniformMemoryBuffer, 
@@ -5478,8 +5483,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					descriptorSet.write(1, dataDeviceMemoryBuffer, (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})))); 
 				} 
 				
-				void dispatch(uint groupCountX, uint groupCountY=1, uint groupCountZ=1)
+				void dispatchPipeline(
+					uint pipelineIdx, 
+					uint groupCountX, uint groupCountY=1, uint groupCountZ=1
+				)
 				{
+					enforce(pipelineIdx.inRange(pipelines), "Invalid pipelineIdx"); 
+					
 					auto cb = commandPool.createBuffer; 
 					with(cb)
 					{
@@ -5487,7 +5497,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						(
 							(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
 							{
-								cmdBindComputePipeline(pipeline); 
+								cmdBindComputePipeline(pipelines[pipelineIdx]); 
 								cmdBindComputeDescriptorSets(pipelineLayout, 0, descriptorSet); 
 								cmdDispatch(groupCountX, groupCountY, groupCountZ); 
 							}
@@ -5497,6 +5507,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					queue.waitIdle; //Opt: STALL
 					cb.destroy; 
 				} 
+				
+				void dispatch(uint groupCountX, uint groupCountY=1, uint groupCountZ=1)
+				{ dispatchPipeline(0, groupCountX, groupCountY, groupCountZ); } 
 			} 
 			UB ubuf; 	/+Note: Uniform buffer+/
 			ubyte[] buf; 	/+
@@ -5506,19 +5519,19 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			@property dwbuf() { return cast(uint[])buf; } 
 			
-			this(
-				File kernelFile, string kernelFunction, 
-				size_t bufSizeBytes_
-			)
+			this(File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_)
 			{
 				this.bufSizeBytes = bufSizeBytes_; 
 				
 				initialize; 
 				createLayouts; 
-				createPipeline(kernelFile, kernelFunction); 
+				createPipelines(kernelFiles); 
 				createBuffers; 
 				createDescriptors; 
 			} 
+			
+			this(File kernelFile, size_t bufSizeBytes_)
+			{ this([kernelFile], bufSizeBytes_); } 
 			
 			~this()
 			{

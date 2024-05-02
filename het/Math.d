@@ -24,7 +24,7 @@ version(/+$DIDE_REGION+/all)
 	
 	//important constants from std.math
 	public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI); 
-	enum π = PIf; 
+	enum π = PIf, ℯ = Ef; 
 	
 	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly; 
 	

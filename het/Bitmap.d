@@ -6066,12 +6066,12 @@ version(/+$DIDE_REGION+/all)
 	
 	private static ubyte[] write_webp_to_mem(int width, int height, ubyte[] data, int quality)
 	{
-		  //Reasonable quality = 95,  lossless = 100
+		//Reasonable quality=95,  best=100,  worst=0,  lossless=101 and up
 		//Note: the header is in the same syntax like in the imageformats module.
 		
 		ubyte* output; 
 		size_t size; 
-		const lossy = quality<100; //100 means lossless
+		const lossy = quality<=100; //101 and up means lossless
 		const channels = data.length.to!int/(width*height); 
 		enforce(data.length = width*height*channels, "invalid image data"); 
 		switch(channels)

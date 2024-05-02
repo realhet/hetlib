@@ -602,6 +602,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			synchronized
 				print(args); 
 		} 
+		
+		private string aliasToString(alias a)()
+		{ return fullyQualifiedName!a ~ " / " ~ a.stringof ~ " = " ~ a.text; } 
+		
+		void print(alias x, A...)(A args) { print(aliasToString!x, args); } 
+		void print(alias x, alias y, A...)(A args) { print(aliasToString!x, aliasToString!y,  args); } 
+		void print(alias x, alias y, alias z, A...)(A args) { print(aliasToString!x, aliasToString!y, aliasToString!z, args); } 
 	}version(/+$DIDE_REGION+/all)
 	{
 		version(/+$DIDE_REGION UDAs+/all)
