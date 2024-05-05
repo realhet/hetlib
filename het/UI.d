@@ -3968,6 +3968,15 @@ version(/+$DIDE_REGION+/all)
 		void refreshTabIdx()
 		{ tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array; } 
 		
+		void clearTabIdx()
+		{ tabIdxInternal = []; } 
+		
+		override void clearSubCells()
+		{
+			super.clearSubCells; 
+			clearTabIdx; 
+		} 
+		
 		/// Must be called manually when needed for debugging
 		bool verifyTabIdx()
 		{
@@ -3991,6 +4000,7 @@ version(/+$DIDE_REGION+/all)
 			bkColor = ts.bkColor; 
 			appendMulti(cast(Cell[])cells); 
 		} 
+		
 		
 		override void appendCell(Cell c)
 		{
@@ -4105,7 +4115,11 @@ version(/+$DIDE_REGION+/all)
 					lineEnd(i); 
 				}
 				
-				act.outerPos = cursor; //because of this, newline and wrapped space goes to the next line. This allocates a new wrapped_row for them.
+				act.outerPos = cursor; /+
+					because of this, newline and wrapped space 
+					goes to the next line. 
+					This allocates a new wrapped_row for them.
+				+/
 				cursor.x += actWidth; 
 				maxLineHeight.maximize(act.outerHeight); 
 			}
@@ -4175,7 +4189,7 @@ version(/+$DIDE_REGION+/all)
 			//horizontal text align on every line
 			if(!flags.autoWidth || wrappedLines.length>1)
 			wrappedLines.applyHAlign(flags.hAlign, innerWidth); 
-																				//Note: >1 because autoWidth and 1 line is already aligned
+			//Note: >1 because autoWidth and 1 line is already aligned
 			
 			//vertical alignment, sizing
 			if(flags.autoHeight)
@@ -4211,7 +4225,7 @@ version(/+$DIDE_REGION+/all)
 			
 			//draw the carets and selection of the editor
 			drawTextEditorOverlay(dr, this); 
-		} 
+		} 
 		
 		
 		override Cell[] internal_hitTest_filteredSubCells(vec2 p)

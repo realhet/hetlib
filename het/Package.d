@@ -2478,6 +2478,126 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 		} 
 	}
+	
+	version(/+$DIDE_REGION+/all)
+	{
+		struct MixinTable
+		{
+			static struct Cell
+			{
+				enum Type { nothing, error, dComment, dString, cString, expr, code } 
+				enum typeFormats = ["", "$Error:`%s`", "/+%s+/", "`%s`", "\"%s\"", "(%s)", "q{%s}"]; 
+				
+				Type type; 
+				int endingNewLineCount; 
+				string content; 
+				
+				this(string src)
+				{
+					//strip on both sides, count the newlines.
+					src = src.stripLeft; 
+					while(src.length) {
+						if(const idx = src[$-1].among('\n', ' ', '\t','\r', '\v','\f'))
+						{
+							if(idx==1) endingNewLineCount++; 
+							src = src[0..$-1]; 
+							continue; 
+						}
+						break; 
+					}
+					
+					if(src.empty)
+					{ type = Type.nothing; }
+					else
+					{
+						switch(src[0])
+						{
+							void extract(string st, string en, Type t)
+							{
+								if(src.startsWith(st) && src[st.length..$].endsWith(en))
+								{
+									type = t; 
+									content = src[st.length .. $-en.length]; 
+								}
+								else
+								{
+									type = Type.error; 
+									content = "Bad cell format ("~t.text~")"; 
+								}
+							} 
+							
+							case '(': extract("(", ")", Type.expr); 	break; 
+							case '/': extract("/+", "+/", Type.dComment); 	break; 
+							case '`': extract("`", "`", Type.dString); 	break; 
+							case '"': extract(`"`, `"`, Type.cString); 	break; 
+							case 'q': extract("q{", "}", Type.code); 	break; 
+							default: type = Type.error; content = format!"Unknown cell format. (%s)"(src.take(10).text); 
+						}
+					}
+				} 
+				
+				string outer() const
+				{
+					//this is for debugging:  Take all these strings, prepend each with the special char 0x02B0 and join.
+					const fmt = typeFormats[type]; 
+					return (type==Type.nothing ? fmt : format(fmt, content)); 
+				} 
+				
+				string inner() const
+				{ return content; } 
+				
+				string toString() const
+				{ return inner; } 
+				
+			} 
+			
+			Cell[][] cells; 
+			
+			this(string src)
+			{
+				foreach(c; src.splitter('ʰ').drop(1).map!Cell)
+				{
+					if(cells.empty) cells.length=1; 
+					cells.back ~= c; 
+					cells.length += c.endingNewLineCount; 
+				}
+				
+				if(cells.length && cells.back.empty) cells.length--; 
+			} 
+			
+			string toString() const
+			{ return cells.map!(row => row.map!(cell => `ʰ`~cell.outer).join('\t')).join('\n')~'\n'; } 
+		} 
+		
+		auto 表(string tableStr, string scriptStr)()
+		{
+			enum grid = MixinTable(tableStr); 
+			with(grid) { mixin(scriptStr); }
+		} 
+		
+		private struct MixinTable_TestStruct
+		{
+			mixin(
+				(
+					表 /+Note: This is not in the recognizable format.  (That's the most compact one)+/
+					!(
+						q{
+							ʰ"Field"	ʰ"Type"	ʰ"Default"
+							ʰ(piros)	ʰ(ubyte)
+							ʰ(zold)	ʰ(ubyte)
+							ʰ(kek)	ʰ(ubyte)
+							ʰ(alpha)	ʰ(ubyte)	ʰ(255)
+						},
+						q{return cells[1..$]	.map!(r=>format!"%s %s%s;"(r[1], r[0], r.length>2 ? "="~r[2].inner : "")).join; }
+					)
+				)
+			); 
+		} 
+		
+		static assert(is(typeof(MixinTable_TestStruct.zold)==ubyte)); 
+		static assert(MixinTable_TestStruct.init.alpha==255); 
+	}
+	
 }
 version(/+$DIDE_REGION Numeric+/all)
 {
