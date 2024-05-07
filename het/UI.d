@@ -2808,13 +2808,14 @@ version(/+$DIDE_REGION+/all)
 			
 			foreach(row; range)
 			{
-				auto tIdx = row.tabIdx[level],
-						 tab = row.subGlyph(tIdx),
-						 delta = rightMostTabPos-(tab.outerRight); 
+				auto 	tIdx 	= row.tabIdx[level],
+					tab 	= row.subGlyph(tIdx),
+					delta 	= rightMostTabPos-(tab.outerRight); 
 				
 				if(delta)
 				{
-					tab.innerWidth = tab.innerWidth + delta; //Todo: after this, the flex width are fucked up.
+					tab.innerWidth = tab.innerWidth + delta; 
+					//Todo: after this, the flex width are fucked up.
 					
 					//Todo: itt ha tordeles van, akkor ez szar.
 					float flexRatioSum = 0; 
@@ -2896,23 +2897,24 @@ version(/+$DIDE_REGION+/all)
 			
 			foreach(row; range)
 			{
-				auto tIdx = row.tabIdx(level),
-						 tab = cast(Glyph)(row.cells[tIdx]),
-						 delta = rightMostTabPos-(tab.outerRight); 
+				auto 	tIdx 	= row.tabIdx(level),
+					tab 	= cast(Glyph)(row.cells[tIdx]),
+					delta 	= rightMostTabPos-(tab.outerRight); 
 				
 				if(delta)
 				{
-									tab.innerWidth = tab.innerWidth + delta; 
+					tab.innerWidth = tab.innerWidth + delta; 
 					
-									//Todo: itt ha tordeles van, akkor ez szar.
-									foreach(g; row.cells[tIdx+1..$])
+					//Todo: itt ha tordeles van, akkor ez szar.
+					foreach(g; row.cells[tIdx+1..$])
 					g.outerPos.x += delta; 
 					//row.innerWidth += delta;
 				}
 				
 				if(VisualizeTabColors)
 				{
-					tab.bkColor = avg(clWhite, clRainbow[level%$]); //debug coloring
+					tab.bkColor = avg(clWhite, clRainbow[level%$]); 
+					//debug coloring
 				}
 				
 			}
@@ -2985,7 +2987,8 @@ version(/+$DIDE_REGION+/all)
 						
 				bool	, "dontStretchSubCells"	, 1, //Column: don't stretch the items to the innerWidth of the column.
 						
-				int	, "_dummy"	,19,
+				bool	, "columnIsTable"	, 1, //At the moment it is only used by DIDE
+				int	, "_dummy"	,18,
 			)
 		); 
 	} 
