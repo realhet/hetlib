@@ -358,7 +358,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						dbg.data.console_hwnd = cast(int)(console.hwnd); 
 					}
 					//killerThread = new KillerThread;  killerThread.start; 
-					console.handleException({ globalInitialize; }); 
+					console.handleException({ globalInitialize; } ); 
 				}
 			} 
 			
@@ -368,7 +368,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(!initialized) return; 
 				if(chkSet(finalized))
 				{
-					console.handleException({ globalFinalize; }); 
+					console.handleException({ globalFinalize; } ); 
 					//killerThread.stop; 
 					//dont! -> destroy(killerThread); note: Sometimes it is destroyed automatically, and this causes an access viole reading from addr 0
 					running_ = false; 
@@ -1392,7 +1392,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		void forceAssertions(string file=__FILE__, int line=__LINE__)()
 		{
 				//Todo: this crap drops an ILLEGAL INSTRUCTION exception. At least it works...
-			enforce(ignoreExceptions({ assert(false); }), "Enable DEBUG compiler output! %s(%s)".format(file, line)); 
+			enforce(ignoreExceptions({ assert(false); } ), "Enable DEBUG compiler output! %s(%s)".format(file, line)); 
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
@@ -1733,7 +1733,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					{
 						writefln("\33\x0CFAILED\33\x07 (%d!=%d)", xa, xb); 
 						auto e = new Exception(format("Error: selftest [%s] failed (%d!=%d)", name, xa, xb), file, line); 
-						console.handleException({ throw e; }); 
+						console.handleException({ throw e; } ); 
 						application.exit; //Todo: this is a fatal exception, should the IDE know about this also...
 					}
 				}
@@ -2363,7 +2363,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					_childMap[a] = true; 
 					
 					//Note: parent.onChildCreated is called always.
-					static if(__traits(compiles, { this._onChildCreated(a); }))
+					static if(__traits(compiles, { this._onChildCreated(a); } ))
 					this._onChildCreated(a); 
 				} 
 				
@@ -2373,7 +2373,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					{
 						
 						//Note: parent.onChildDestroying is only called when the parent is NOT destroying.
-						static if(__traits(compiles, { this._onChildDestroying(a); }))
+						static if(__traits(compiles, { this._onChildDestroying(a); } ))
 						this._onChildDestroying(a); 
 						
 						_childMap.remove(a);  
@@ -2481,98 +2481,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	version(/+$DIDE_REGION+/all)
 	{
-		struct MixinTable
-		{
-			static struct Cell
-			{
-				enum Type { nothing, error, dComment, dString, cString, expr, code } 
-				enum typeFormats = ["", "$Error:`%s`", "/+%s+/", "`%s`", "\"%s\"", "(%s)", "q{%s}"]; 
-				
-				Type type; 
-				int endingNewLineCount; 
-				string content; 
-				
-				this(string src)
-				{
-					//strip on both sides, count the newlines.
-					src = src.stripLeft; 
-					while(src.length) {
-						if(const idx = src[$-1].among('\n', ' ', '\t','\r', '\v','\f'))
-						{
-							if(idx==1) endingNewLineCount++; 
-							src = src[0..$-1]; 
-							continue; 
-						}
-						break; 
-					}
-					
-					if(src.empty)
-					{ type = Type.nothing; }
-					else
-					{
-						switch(src[0])
-						{
-							void extract(string st, string en, Type t)
-							{
-								if(src.startsWith(st) && src[st.length..$].endsWith(en))
-								{
-									type = t; 
-									content = src[st.length .. $-en.length]; 
-								}
-								else
-								{
-									type = Type.error; 
-									content = "Bad cell format ("~t.text~")"; 
-								}
-							} 
-							
-							case '(': extract("(", ")", Type.expr); 	break; 
-							case '/': extract("/+", "+/", Type.dComment); 	break; 
-							case '`': extract("`", "`", Type.dString); 	break; 
-							case '"': extract(`"`, `"`, Type.cString); 	break; 
-							case 'q': extract("q{", "}", Type.code); 	break; 
-							default: type = Type.error; content = format!"Unknown cell format. (%s)"(src.take(10).text); 
-						}
-					}
-				} 
-				
-				string outer() const
-				{
-					//this is for debugging:  Take all these strings, prepend each with the special char 0x02B0 and join.
-					const fmt = typeFormats[type]; 
-					return (type==Type.nothing ? fmt : format(fmt, content)); 
-				} 
-				
-				string inner() const
-				{ return content; } 
-				
-				string toString() const
-				{ return inner; } 
-				
-			} 
-			
-			Cell[][] cells; 
-			
-			this(string src)
-			{
-				foreach(c; src.splitter('ʰ').drop(1).map!Cell)
-				{
-					if(cells.empty) cells.length=1; 
-					cells.back ~= c; 
-					cells.length += c.endingNewLineCount; 
-				}
-				
-				if(cells.length && cells.back.empty) cells.length--; 
-			} 
-			
-			string toString() const
-			{ return cells.map!(row => row.map!(cell => `ʰ`~cell.outer).join('\t')).join('\n')~'\n'; } 
-		} 
-		
 		auto 表(string tableStr, string scriptStr)()
 		{
-			enum grid = MixinTable(tableStr); 
-			with(grid) { mixin(scriptStr); }
+			enum cells = mixin(tableStr); 
+			static if(__traits(compiles, { enum res = mixin(scriptStr); }))
+			{ enum res = mixin(scriptStr); return res; }
+			else
+			{ mixin(scriptStr); }
 		} 
 		
 		private struct MixinTable_TestStruct
@@ -2582,13 +2497,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					表 /+Note: This is not in the recognizable format.  (That's the most compact one)+/
 					!(
 						q{
-							ʰ"Field"	ʰ"Type"	ʰ"Default"
-							ʰ(piros)	ʰ(ubyte)
-							ʰ(zold)	ʰ(ubyte)
-							ʰ(kek)	ʰ(ubyte)
-							ʰ(alpha)	ʰ(ubyte)	ʰ(255)
+							[
+								["Field","Type","Default",],
+								[q{piros},q{ubyte},],
+								[q{zold},q{ubyte},],
+								[q{kek},q{ubyte},],
+								[q{alpha},q{ubyte},q{255},],
+							]
 						},
-						q{return cells[1..$]	.map!(r=>format!"%s %s%s;"(r[1], r[0], r.length>2 ? "="~r[2].inner : "")).join; }
+						q{return cells[1..$].map!(r=>format!"%s %s%s;"(r[1], r[0], r.length>2 ? "="~r[2] : "")).join; }
 					)
 				)
 			); 
@@ -8241,7 +8158,7 @@ version(/+$DIDE_REGION Colors+/all)
 						avg(cos(α), cos(β))
 					).normalize; 
 					return ((atan(-v.x, -v.y) + π)/(π*2)); 
-				}
+				} 
 			); 
 			dr.color = clOrange; 	plot!(
 				(α){
@@ -8250,7 +8167,7 @@ version(/+$DIDE_REGION Colors+/all)
 						vec3(β/π/2, 1, 1).hsvToRgb
 					); 
 					return v.rgbToHsv.x; 
-				}
+				} 
 			); 
 			
 			dr.pop; dr.pop; 
@@ -8852,7 +8769,7 @@ version(/+$DIDE_REGION Colors+/all)
 					(ColorMap m){
 						add(m); 
 						categories.add(m); 
-					}
+					} 
 				); 
 			} 
 			
@@ -10035,7 +9952,7 @@ version(/+$DIDE_REGION Date Time+/all)
 			static void adjustMonth(Y, M)(ref Y year, ref M month)
 			if(allSatisfy!(isIntegral, Y, M))
 			{
-				if(month.inRange(1, 12)) { /+it's a correct month index.+/}
+				if(month.inRange(1, 12)) {/+it's a correct month index.+/}
 				else if(month<=24) { month -= 12; year++; }
 				else if(month >= -11) { month += 12; year--; }
 				else {
@@ -10422,11 +10339,13 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return raw; } 
 				
 				/// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
-				void actualize()
+				auto actualize()
 				{
 					auto c = now.raw; 
 					if(isNull || c>raw) raw = c; 
 					else raw++; //now it's the exact same as the previous one. Just increment.
+					
+					return this; 
 				} 
 				
 				string dateText(alias fun = localSystemTime)() const
@@ -10508,7 +10427,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						
 						print; 
 						print("now() call frequency: "); 
-						20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; }); 
+						20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; } ); 
 						
 						void bench(string code, size_t N=1000)()
 						{
@@ -10520,7 +10439,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						
 						print; 
 						bench!q{foreach(i; 0..N) cast(void)now; 	}; 
-						bench!q{N.iota.each!((i){ cast(void)now; }); 	}; 
+						bench!q{N.iota.each!((i){ cast(void)now; } ); 	}; 
 						bench!q{foreach(i; 0..N) cast(void)(now-now); 	}; 
 						bench!q{foreach(i; 0..N) cast(void).today; 	}; 
 						bench!q{foreach(i; 0..N) cast(void).time; 	}; 
@@ -11177,9 +11096,9 @@ version(/+$DIDE_REGION Date Time+/all)
 				}
 				
 				T0; 
-				testRange.each!((i){ RawDateTime(i).localSystemTime; }); 
+				testRange.each!((i){ RawDateTime(i).localSystemTime; } ); 
 				DT.print; 
-				testRange.each!((i){ RawDateTime(i).LocalDateTime; }); 
+				testRange.each!((i){ RawDateTime(i).LocalDateTime; } ); 
 				DT.print; 
 				
 				print("Total tests:", cnt); 
@@ -11435,7 +11354,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				bool make(bool mustSucceed=true)const
 				{
 					if(exists) return true; 
-					ignoreExceptions({ mkdirRecurse(dir); }); 
+					ignoreExceptions({ mkdirRecurse(dir); } ); 
 								
 					const res = exists; 
 					if(mustSucceed && !res) raise(format!`Unable to make directory : %s`(dir.quoted)); 
@@ -12278,7 +12197,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						auto outFile = File(prefix~name); 
 						outFile.write(data); 
 					}
-				}
+				} 
 			); 
 		} 
 		
@@ -12751,7 +12670,7 @@ version(/+$DIDE_REGION Date Time+/all)
 					files = files.sort!((a, b) => a.modified < b.modified).array; 
 					
 					DateTime[string] pathTimes; 
-					files.each!((f){ if(f.file.fullPath !in pathTimes) pathTimes[f.file.fullPath] = f.modified; }); 
+					files.each!((f){ if(f.file.fullPath !in pathTimes) pathTimes[f.file.fullPath] = f.modified; } ); 
 					
 					foreach(k, v; pathTimes)
 					paths ~= DirPath(Path(k), v); 
@@ -12762,7 +12681,7 @@ version(/+$DIDE_REGION Date Time+/all)
 						(f){
 							extCnt[f.file.ext.lc]++; 
 							extSize[f.file.ext.lc]+=f.size; 
-						}
+						} 
 					); 
 					
 					foreach(k; extCnt.keys)
@@ -14213,7 +14132,7 @@ version(/+$DIDE_REGION debug+/all)
 					}
 				}
 				
-				static if(__traits(compiles, { data.afterLoad(); })) data.afterLoad(); 
+				static if(__traits(compiles, { data.afterLoad(); } )) data.afterLoad(); 
 			}
 			else static if(isArray!T)
 			{
@@ -14383,7 +14302,7 @@ version(/+$DIDE_REGION debug+/all)
 			//handle null for class
 			static if(is(T == class)) { if(data is null) { st ~= "null"; return; }}
 			
-			static if(__traits(compiles, { (cast()data).beforeSave(); }))
+			static if(__traits(compiles, { (cast()data).beforeSave(); } ))
 			{
 				(cast()data).beforeSave(); //Todo: this violates constness.
 			}
