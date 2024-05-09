@@ -2991,6 +2991,70 @@ version(/+$DIDE_REGION+/all)
 				int	, "_dummy"	,18,
 			)
 		); 
+	} struct ContainerFlags2
+	{
+		mixin(
+			//Bug: Copy this page and paste it right next to it!
+			//Bug: Select a column of cursors and insert alt+[
+			//Todo: type q{} means new empty field
+			//Todo: unpack q{"str"} to "str",  `` and /++/ too!
+			//Todo: Vertical tab works in the table.  Find a way to save and load it!
+			(表!(q{[
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{bool},q{1},"wordWrap",q{1},q{/++/}],
+				[q{HAlign},q{2},"hAlign",q{},q{/+alignment for all subCells+/}],
+				[q{VAlign},q{2},"vAlign",q{},q{/++/}],
+				[q{YAlign},q{3},"yAlign",q{1},q{/++/}],
+				[],
+				[q{bool},q{1},"dontHideSpaces",q{},q{/+
+					useful for active edit mode
+					/+$DIDE_IMG c:\dl\avatar18.jpg maxHeight=80+/
+				+/}],
+				[q{bool},q{1},"canSelect",q{},q{/++/}],
+				[q{bool},q{1},"focused",q{},q{/+maintained by system, not by user+/}],
+				[q{bool},q{1},"hovered_deprecated",q{},q{/+maintained by system, not by user+/}],
+				[q{bool},q{1},"clipSubCells",q{},q{/++/}],
+				[q{bool},q{1},"_saveComboBounds",q{},q{/+marks the container to save the absolute bounds to align the popup window to.+/}],
+				[q{bool},q{1},"_hasOverlayDrawing",q{},q{/++/}],
+				[q{bool},q{1},"columnElasticTabs",q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
+				[],
+				[q{bool},q{1},"rowElasticTabs",q{},q{/+Row will do elastic tabs inside its own WrappedLines.+/}],
+				[q{uint},q{1},"targetSurface",q{1},q{/+0: zoomable view, 1: GUI screen+/}],
+				[q{bool},q{1},"_debug",q{},q{/+the container can be marked, for debugging+/}],
+				[q{bool},q{1},"btnRowLines",q{},q{/+draw thin, dark lines between the buttons of a btnRow+/}],
+				[q{bool},q{1},"autoWidth",q{},q{/+kinda readonly: It's set by Container in measure to outerSize!=0+/}],
+				[q{bool},q{1},"autoHeight",q{},q{/+later everything else can read it.+/}],
+				[q{bool},q{1},"hasHScrollBar",q{},q{/+system manages this, not the user.+/}],
+				[q{bool},q{1},"hasVScrollBar",q{},q{/++/}],
+				[],
+				[q{bool},q{1},"_measured",q{},q{/+used to tell if a top level container was measured already+/}],
+				[q{bool},q{1},"saveVisibleBounds",q{},q{/+draw() will save the visible innerBounds under the name id.appendIdx("visibleBounds");+/}],
+				[q{bool},q{1},"_measureOnlyOnce",q{},q{/++/}],
+				[q{bool},q{1},"acceptEditorKeys",q{},q{/+accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.+/}],
+				[q{ScrollState},q{2},"hScrollState",q{},q{/++/}],
+				[q{ScrollState},q{2},"vScrollState",q{},q{/++/}],
+				[q{/+-------- 32bits ------------------------------------------------------------------------------------------+/}],
+				[q{bool},q{1},"clickable",q{1},q{/+If false, hittest will not check this as clicked. It checks the parent instead.+/}],
+				[q{bool},q{1},"noBackground",q{},q{/++/}],
+				[q{bool},q{1},"cullSubCells",q{},q{/+clipSubCells must be enabled too+/}],
+				[q{bool},q{1},"_hasDrawCallback",q{},q{/++/}],
+				[q{bool},q{1},"selected",q{},q{/+maintained by system, not by user (in applyBtnStyle)+/}],
+				[q{bool},q{1},"hidden",q{},q{/+only affects draw() calls.+/}],
+				[q{bool},q{1},"dontSearch",q{},q{/+no search() inside this container+/}],
+				[q{bool},q{1},"noHitTest",q{},q{/+don't even bother to add this container and it's subcontainers to the hit list.+/}],
+				[],
+				[q{bool},q{1},"dontLocate",q{},q{/+disables the locate() method for this container and its subcontainers+/}],
+				[q{bool},q{1},"oldSelected",q{},q{/+SelectionManager2 needs this.+/}],
+				[],
+				[q{bool},q{1},"changedCreated",q{},q{/+Dide2.CodeRow: changed by creationg a new cell+/}],
+				[q{bool},q{1},"changedRemoved",q{},q{/+Dide2.CodeRow: changed by removing existing cells+/}],
+				[],
+				[q{bool},q{1},"dontStretchSubCells",q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
+				[q{bool},q{1},"columnIsTable",q{},q{/+At the moment it is only used by DIDE+/}],
+				[],
+				[q{int},q{18},"_dummy",q{},q{/++/}],
+			]},q{""}))
+		); 
 	} 
 	
 	/+
@@ -7820,7 +7884,7 @@ struct im
 							
 							//for keyboard entry: textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
 						},
-						/*onFocus	*/ { /*_EditHandleInput(value, textEditorState.str, chg);*/},
+						/*onFocus	*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
 						/*onExit	*/ {}
 					); 
 					res.focused = focused; 

@@ -507,6 +507,23 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				} 
 			} static public
 			{
+				/+
+					Todo: Faster console IO
+					/+
+						Code: wchar_t PipeName[32];
+						wsprintfW(PipeName, L"\\\\.\\pipe\\fastpipe%x", GetCurrentProcessId());
+						HANDLE FastPipe = CreateFileW(PipeName, GENERIC_READ|GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+						if(FastPipe != INVALID_HANDLE_VALUE)
+						{
+							SetStdHandle(STD_OUTPUT_HANDLE, FastPipe);
+							SetStdHandle(STD_INPUT_HANDLE, FastPipe);
+						}
+					+/
+					/+Link: https://github.com/cmuratori/refterm/blob/main/fast_pipe.h+/
+					/+Link: https://youtu.be/hxM8QmyZXtg?t=2988+/
+					Molly Rocket, Remedybg
+				+/
+				
 				//Todo: ha ezt a writeln-t hivja a gc.collect-bol egy destructor, akkor crash.
 				
 				//execute program in hetlib console({ program }); (colorful console, debug and exception handling)
@@ -2494,7 +2511,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			mixin(
 				(
-					表 /+Note: This is not in the recognizable format.  (That's the most compact one)+/
+					表 /+
+						Note: This is not in the recognizable format.  
+						(That's the most compact one)
+					+/
 					!(
 						q{
 							[
@@ -2505,7 +2525,16 @@ version(/+$DIDE_REGION Global System stuff+/all)
 								[q{alpha},q{ubyte},q{255},],
 							]
 						},
-						q{return cells[1..$].map!(r=>format!"%s %s%s;"(r[1], r[0], r.length>2 ? "="~r[2] : "")).join; }
+						q{
+							return cells[1..$]
+							.map!(
+								r=>	format!"%s %s%s;"
+									(
+									r[1], r[0], 
+									r.length>2 ? "="~r[2] : ""
+								)
+							).join; 
+						}
 					)
 				)
 			); 
