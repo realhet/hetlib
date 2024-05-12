@@ -2498,46 +2498,48 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	version(/+$DIDE_REGION+/all)
 	{
-		auto 表(string tableStr, string scriptStr)()
+		struct 表
 		{
-			enum cells = mixin(tableStr); 
-			static if(__traits(compiles, { enum res = mixin(scriptStr); }))
-			{ enum res = mixin(scriptStr); return res; }
-			else
-			{ mixin(scriptStr); }
+			string[][] allRows; 
+			
+			auto rows()
+			{ return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/+`))); } 
+			
+			string cell(int x, int y)
+			{ return allRows.get(y).get(x); } 
 		} 
+		
+		
+		/+
+			auto 表(string tableStr, string scriptStr)()
+			{
+				enum cells = mixin(tableStr); 
+				static if(__traits(compiles, { enum res = mixin(scriptStr); }))
+				{ enum res = mixin(scriptStr); return res; }
+				else
+				{ mixin(scriptStr); }
+			} 
+		+/
+		
 		
 		private struct MixinTable_TestStruct
 		{
-			mixin(
-				(
-					表 /+
-						Note: This is not in the recognizable format.  
-						(That's the most compact one)
-					+/
-					!(
-						q{
-							[
-								["Field","Type","Default",],
-								[q{piros},q{ubyte},],
-								[q{zold},q{ubyte},],
-								[q{kek},q{ubyte},],
-								[q{alpha},q{ubyte},q{255},],
-							]
-						},
-						q{
-							return cells[1..$]
-							.map!(
-								r=>	format!"%s %s%s;"
-									(
-									r[1], r[0], 
-									r.length>2 ? "="~r[2] : ""
-								)
-							).join; 
-						}
+			mixin((){with(表([
+				["/+note:Field+/","/+note:Type+/","/+note:Default+/"],
+				[q{piros},q{ubyte}],
+				[q{zold},q{ubyte}],
+				[q{kek},q{ubyte}],
+				[q{alpha},q{ubyte},q{255}],
+			])){
+				return rows
+				.map!(
+					r=>	format!"%s %s%s;"
+						(
+						r[1], r[0], 
+						r.length>2 ? "="~r[2] : ""
 					)
-				)
-			); 
+				).join; 
+			}}()); 
 		} 
 		
 		static assert(is(typeof(MixinTable_TestStruct.zold)==ubyte)); 
