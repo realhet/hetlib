@@ -2509,41 +2509,63 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{ return allRows.get(y).get(x); } 
 		} 
 		
+		//multiple variants for DIDE to distinguish.
+		alias 表1 = 表; 
+		alias 表2 = 表; 
 		
-		/+
-			auto 表(string tableStr, string scriptStr)()
-			{
-				enum cells = mixin(tableStr); 
-				static if(__traits(compiles, { enum res = mixin(scriptStr); }))
-				{ enum res = mixin(scriptStr); return res; }
-				else
-				{ mixin(scriptStr); }
-			} 
-		+/
-		
-		
-		private struct MixinTable_TestStruct
+		string GEN_bitfields(R)(R rows)
 		{
-			mixin((){with(表([
-				["/+note:Field+/","/+note:Type+/","/+note:Default+/"],
-				[q{piros},q{ubyte}],
-				[q{zold},q{ubyte}],
-				[q{kek},q{ubyte}],
-				[q{alpha},q{ubyte},q{255}],
-			])){
-				return rows
-				.map!(
-					r=>	format!"%s %s%s;"
-						(
-						r[1], r[0], 
-						r.length>2 ? "="~r[2] : ""
-					)
-				).join; 
-			}}()); 
+			static if(isInputRange!R)
+			{
+				string[] res; ulong totalDef; int totalBits; 
+				foreach(r; rows)
+				{
+					{
+						auto type = r[0], name = r[2], bits = r[1].to!int, def = r[3].to!int.ifThrown(0); 
+						totalDef = totalDef.setBits(totalBits, bits, def); 
+						if(def) totalDef |= (long(def) & ((1<<bits)-1))<<totalBits; 
+						res ~= format!`%s,%s,%s,`(type, name, bits); //Note: Name must evaluate to string literal
+						totalBits += bits; 
+					}
+				}
+				enforce(totalBits.inRange(1, 64), format!"Invalid bitCount: %s"(totalBits)); 
+				const 	roundedBits = max(totalBits.nearest2NSize, 8),
+					defT = roundedBits.predSwitch(8, "ubyte", 16, "ushort", 32, "uint", 64, "ulong"); 
+				if(totalBits < roundedBits) res ~= format!q{uint,"_dummy",%s}(roundedBits - totalBits); 
+				return format!q{
+					union  {
+						%s _default = %s; 
+						mixin(std.bitmanip.bitfields!(%s)); 
+					} 
+				}(
+					defT, totalDef.format!"0x%X", 
+					res.join
+				); 
+			}
+			else
+			{ return GEN_bitfields(rows.rows); }
 		} 
 		
-		static assert(is(typeof(MixinTable_TestStruct.zold)==ubyte)); 
-		static assert(MixinTable_TestStruct.init.alpha==255); 
+		
+		version(none)
+		private /+Note: This will test MixinTable and GEN_bitfields+/
+		{
+			struct MixinTable_TestStruct
+			{
+				mixin
+				((){with(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/}],
+					[q{ubyte},q{2},"red",q{3}],
+					[q{ubyte},q{3},"green",q{}],
+					[q{ubyte},q{2},"blue",q{3}],
+					[q{bool},q{1},q{"al"~"pha"},q{1}],
+					[q{/+Default color: Fuchsia+/}],
+				])){ return rows.GEN_bitfields; }}()); 
+			} 
+			static assert(MixinTable_TestStruct.init._default==227); 
+			static assert(is(typeof(MixinTable_TestStruct.green)==ubyte)); 
+			static assert(is(typeof(MixinTable_TestStruct.alpha)==bool)); 
+		} 
 	}
 	
 }
