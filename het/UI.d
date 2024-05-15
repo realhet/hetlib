@@ -1422,7 +1422,11 @@ version(/+$DIDE_REGION+/all)
 			isTab = ch==9; 
 			isWhite = isTab || ch==32; 
 			isNewLine = ch==10; 
-			isReturn = ch==13;         //Todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. ossz 16byte all rendelkezeser ugyis.
+			isReturn = ch==13; 
+			/+
+				Todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. 
+				ossz 16byte all rendelkezeser ugyis.
+			+/
 			
 			dchar visibleCh = ch; 
 			if(VisualizeGlyphs)
@@ -1460,7 +1464,76 @@ version(/+$DIDE_REGION+/all)
 		{
 			drawBorder(dr); //Todo: csak a containernek kell border elvileg, ez hatha gyorsit.
 			dr.color = fontColor; 
-			dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags); 
+			
+			if(isStretched)
+			{
+				const isr = 1/stretchRatio; //inverse stretch ratio
+				enum center 	= .53f, /+The center of the { symbol measured from the top. 0..1 range.+/
+				side 	= .12f /+The straight part in the { symbol measured from the center.+/; 
+				
+				/+
+					Code: {}()[]
+					⎧⎫⎛⎞⎡⎤⌈⌉⎾⏋⌜⌝
+					⎨⎬⎜⎟⎢⎥⌊⌋⎿⏌⌞⌟
+					⎪⎪⎝⎠⎣⎦
+					⎩⎭
+				+/ void part(float targety0, float targety1, float srcy0, float srcy1)
+				{
+					dr.drawFontGlyph
+					(
+						stIdx, bounds2(
+							0	, targety0*outerSize.y,
+							outerSize.x	, targety1*outerSize.y
+						)+innerPos, 
+						bkColor, fontFlags, vec2(srcy0, srcy1)
+					); 
+				} 
+				
+				switch(ch)
+				{
+					case 	'[', ']', 
+						'(', ')', 
+						'|', '‖',
+						'⎡', '⎤',
+						'⎣', '⎦': {
+						auto 	y0 = 0f,
+							y1 = center*isr, 
+							y2 = 1-(1-center)*isr,
+							y3 = 1f; 
+						
+						if(ch.among('⎡', '⎤')) { y3 -= .05; }
+						if(ch.among('⎣', '⎦')) { y0 += .1; }
+						
+						part(y0, y1, 0, center); 
+						part(y1, y2, center, center); 
+						part(y2, y3, center, 1); 
+					}break; 
+					case 	'{', '}',
+						'⁅', '⁆': {
+						//First draw the { without the center peak.
+						const 	y1 = (center-side)*isr, 
+							y2 = .5f-side*isr,
+							y3 = .5f+side*isr,
+							y4 = 1-(1-(center+side))*isr; 
+						part( 0, y1, 0, center-side); 
+						part(y1, y2, center-side, center-side); 
+						part(y2, y3, center-side, center+side); 
+						part(y3, y4, center+side, center+side); 
+						part(y4,  1, center+side, 1); 
+					}break; 
+					
+					
+					default: {
+						/+simple default stretching+/
+						dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags); 
+					}
+				}
+			}
+			else
+			{
+				//normal height
+				dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags); 
+			}
 			
 			if(VisualizeCodeLineIndices)
 			{
@@ -1487,17 +1560,29 @@ version(/+$DIDE_REGION+/all)
 		
 		override string toString()
 		{ return format!"Glyph(%s, %s, %s)"(ch.text.quoted, stIdx, outerBounds); } 
+		
+		version(/+$DIDE_REGION Vertical Glyph-Stretching+/all)
+		{
+			float stretchRatio=1;  /+stretch the glyph vertically.  This operation depends on the character.  Used for  [] () {} etc...+/
+			bool isStretched; 
+			void stretch(float y0, float y1)
+			{
+				const h0 = outerHeight; 
+				outerPos.y = y0; 
+				outerSize.y = y1-y0; 
+				stretchRatio *= outerHeight/h0; 
+				isStretched = true; 
+			} 
+		}
 	} 
-	
-	
+	
 	enum ShapeType
 	{ led} 
 	
 	class Shape : Cell
 	{
-		 //Shape /////////////////////////////////////
-			ShapeType type; 
-			RGB color; 
+		ShapeType type; 
+		RGB color; 
 		
 		/*
 			 this(T)(ShapeType shapeType, RGB color, T state, float fontHeight){
@@ -1507,21 +1592,21 @@ version(/+$DIDE_REGION+/all)
 			}
 		*/
 		
-			override void draw(Drawing dr)
+		override void draw(Drawing dr)
 		{
 			final switch(type)
 			{
 				case ShapeType.led: {
-						auto r = min(innerWidth, innerHeight)*0.92f; 
+					auto r = min(innerWidth, innerHeight)*0.92f; 
 					
 					
-						auto p = innerCenter; 
+					auto p = innerCenter; 
 					
-						dr.pointSize = r; 	 dr.color = RGB(.3, .3, .3);  dr.point(p); 
-						dr.pointSize = r*.8f; 	 dr.color = color;   dr.point(p); 
-						dr.pointSize = r*0.4f; 	 dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f)); 
-						dr.pointSize = r*0.2f; 	 dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f)); 
-						dr.alpha = 1; 
+					dr.pointSize = r; 	 dr.color = RGB(.3, .3, .3);  dr.point(p); 
+					dr.pointSize = r*.8f; 	 dr.color = color;   dr.point(p); 
+					dr.pointSize = r*0.4f; 	 dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f)); 
+					dr.pointSize = r*0.2f; 	 dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f)); 
+					dr.alpha = 1; 
 					
 					break; 
 				}
@@ -4283,6 +4368,14 @@ version(/+$DIDE_REGION+/all)
 			return snapToNearest ? subCells.back : null; 
 		} 
 		
+		void stretchGlyph(long idx/+index of glyph+/)
+		{
+			if(auto g = (cast(Glyph)(subCells.get(idx>=0 ? idx : subCells.length+idx))))
+			{ g.stretch(0, innerHeight); }
+		} 
+		
+		void stretchGlyphs(long[] idx... /+indices of glyphs+/)
+		{ idx.each!(i=>stretchGlyph(i)); } 
 	} 
 	
 	class Column : Container

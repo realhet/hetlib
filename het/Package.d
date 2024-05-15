@@ -2553,14 +2553,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			struct MixinTable_TestStruct
 			{
 				mixin
-				((){with(表([
-					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/}],
-					[q{ubyte},q{2},"red",q{3}],
-					[q{ubyte},q{3},"green",q{}],
-					[q{ubyte},q{2},"blue",q{3}],
-					[q{bool},q{1},q{"al"~"pha"},q{1}],
-					[q{/+Default color: Fuchsia+/}],
-				])){ return rows.GEN_bitfields; }}()); 
+				(
+					(){
+						with(
+							表 (
+								[
+									[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/}],
+									[q{ubyte},q{2},"red",q{3}],
+									[q{ubyte},q{3},"green",q{}],
+									[q{ubyte},q{2},"blue",q{3}],
+									[q{bool},q{1},q{"al"~"pha"},q{1}],
+									[q{/+Default color: Fuchsia+/}],
+								]
+							)
+						) { return rows.GEN_bitfields; }
+					}()
+				); 
 			} 
 			static assert(MixinTable_TestStruct.init._default==227); 
 			static assert(is(typeof(MixinTable_TestStruct.green)==ubyte)); 
