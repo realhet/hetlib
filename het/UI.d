@@ -3432,14 +3432,20 @@ version(/+$DIDE_REGION+/all)
 				//Opt: cache calcContentSize. It is called too much
 				//Opt: rearrange should optionally return contentSize
 				
-				const scrollThickness = DefaultScrollThickness,
-							e = 1; //minimum area that must remain after the scrollbar.
+				const 	scrollThickness 	= DefaultScrollThickness,
+					e 	= 1/+minimum area that must remain after the scrollbar.+/; 
+				
 				
 				bool alloc(char o)()
 				{
 					const size = innerSize; 
 					static if(o=='H')
-					if(size.x>=e && (size.y>=scrollThickness+e || vFlow==FlowConfig.autoSize) && !flags.hasHScrollBar)
+					if(
+						size.x>=e && (
+							size.y>=scrollThickness+e || 
+							vFlow==FlowConfig.autoSize
+						) && !flags.hasHScrollBar
+					)
 					{
 						flags.hasHScrollBar = true; 
 						if(vFlow!=FlowConfig.autoSize)
@@ -3448,7 +3454,12 @@ version(/+$DIDE_REGION+/all)
 					}
 					
 					static if(o=='V')
-					if(size.y>=e && (size.x>=scrollThickness+e || hFlow==FlowConfig.autoSize) && !flags.hasVScrollBar)
+					if(
+						size.y>=e && (
+							size.x>=scrollThickness+e || 
+							hFlow==FlowConfig.autoSize
+						) && !flags.hasVScrollBar
+					)
 					{
 						flags.hasVScrollBar = true; 
 						if(hFlow!=FlowConfig.autoSize)
@@ -3488,12 +3499,12 @@ version(/+$DIDE_REGION+/all)
 								 //V overflow
 								if(alloc!'V' && cs.x > innerWidth)
 								{
-									 //possivle H overflow because of VScrollBar
+									//possivle H overflow because of VScrollBar
 									if(cast(Column)this)
 									rearrange; 
 									else
 									alloc!'H'; 
-									 //Other things will need a scrollbar
+									//Other things will need a scrollbar
 								}
 							}
 						}
@@ -3501,9 +3512,10 @@ version(/+$DIDE_REGION+/all)
 						{
 							if(cs.x>innerWidth)
 							{
-								 //H overflow
+								//H overflow
 								if(alloc!'H' && cs.y > innerHeight)
-								alloc!'V'; //possivle V overflow because of HScrollBar
+								{ alloc!'V'; }
+								//possivle V overflow because of HScrollBar
 							}
 						}
 					}
@@ -3521,13 +3533,30 @@ version(/+$DIDE_REGION+/all)
 						 //only auto vscroll
 						if(hFlow==FlowConfig.scroll)
 						alloc!'H'; //alloc fixed if needed
-						rearrange;    //Opt: this rearrange can exit early when the wordWrap and contentheight becomes too much.
+						rearrange; 
+						/+
+							Opt: This rearrange can exit early when the wordWrap 
+							and contentheight becomes too much.
+						+/
 						if(calcContentHeight > innerHeight)
 						{
-							if(alloc!'V' && (hFlow==FlowConfig.wrap || cast(Column)this/*column also changes the width!*/))
+							if(
+								alloc!'V' && (
+									hFlow==FlowConfig.wrap || cast(Column)this
+									/*column also changes the width!*/
+								)
+							)
 							{
-								rearrange; //second rearrange
-								//I think this is overkill, not needed: if(!flags.hasHScrollBar && calcContentWidth > innerWidth) alloc!'H';
+								rearrange; 
+								//second rearrange
+								version(none)
+								{
+									/+I think this is overkill, not needed: +/
+									if(
+										!flags.hasHScrollBar && 
+										calcContentWidth > innerWidth
+									) alloc!'H'; 
+								}
 							}
 						}
 					}
@@ -3539,7 +3568,10 @@ version(/+$DIDE_REGION+/all)
 				if(flags.hasVScrollBar)
 				im.vScrollInfo.update(this, calcContentHeight, innerHeight); 
 				
-				//restore size after rearrange. (Autosize wont subtract the scrollbarthickness, so it will be added here as an extra.)
+				/+
+					restore size after rearrange. 
+					(Autosize wont subtract the scrollbarthickness, so it will be added here as an extra.)
+				+/
 				if(flags.hasHScrollBar)
 				outerSize.y += scrollThickness; 
 				if(flags.hasVScrollBar)

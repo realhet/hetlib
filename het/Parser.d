@@ -4055,7 +4055,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		
 		enum State : ubyte
 		{
-			 //State graph
+			//State graph
 			/+special system tokens+/ ignore, pop, error,
 			
 			@Push("$(", element) 	@Push("`", inline) @Trans(NewLineTokens~" \0", line) 	line	,
@@ -4076,12 +4076,10 @@ version(/+$DIDE_REGION Keywords+/all)
 			auto src = f.readText; 
 			auto scanner = DLangScanner(src); 	
 			size_t size, hash; 
-			scanner.each!(
-				(a){
-					size += a.src.length; 
-					hash = a.src.hashOf(hash); 
-				}
-			); 
+			scanner.each!((a){
+				size += a.src.length; 
+				hash = a.src.hashOf(hash); 
+			}); 
 			res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 		}
 		//res.print;
@@ -4145,23 +4143,21 @@ version(/+$DIDE_REGION Keywords+/all)
 		if(1)
 		scanner	.take(80)
 				//.filter!(a => !a.src.isWild(`*:\*`)) //a file neveket nem mutatom
-				.each!(
-			(a){
-				with(ScanOp)
-				with(EgaColor)
-				write(
-					a.op.predSwitch(
-						content	, ltWhite	(a.src),
-									push	, ltBlue	(a.src),
-									pop	, ltGreen	(a.src),
-									trans	, ltCyan	(a.src)
-										, gray	(a.src) 
-					)
-				); 
-					
+				.each!((a){
+			with(ScanOp)
+			with(EgaColor)
+			write(
+				a.op.predSwitch(
+					content	, ltWhite	(a.src),
+								push	, ltBlue	(a.src),
+								pop	, ltGreen	(a.src),
+								trans	, ltCyan	(a.src)
+									, gray	(a.src) 
+				)
+			); 
 				
-			}
-		); 
+			
+		}); 
 		
 		
 		print("\n--------------------------DONE------------------------------"); 
