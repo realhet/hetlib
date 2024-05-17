@@ -4097,7 +4097,7 @@ version(/+$DIDE_REGION+/all)
 		
 		//for Elastic tabs
 		/+private+/ int[] tabIdxInternal; 
-		int rearrangedLineCount; 
+		bool strictLeftToRight; 
 		
 		void refreshTabIdx()
 		{ tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array; } 
@@ -4344,7 +4344,7 @@ version(/+$DIDE_REGION+/all)
 			//remember the contents of the edited row
 			rememberEditedWrappedLines(this, wrappedLines); 
 			
-			rearrangedLineCount = wrappedLines.length.to!int; 
+			strictLeftToRight = wrappedLines.length.to!int<=1; 
 		} 
 		
 		override void draw(Drawing dr)
@@ -4364,14 +4364,13 @@ version(/+$DIDE_REGION+/all)
 		
 		override Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
-			if(rearrangedLineCount!=1)
+			if(strictLeftToRight)
 			{
-				return super.internal_hitTest_filteredSubCells(p); //Todo: wrapped filter support
+				return sortedSubCellsAroundX(subCells, p); 
+				/+Todo: make this work for multiline too+/
 			}
 			else
-			{
-				return sortedSubCellsAroundX(subCells, p); //Bug: it wont work for multiline
-			}
+			{ return super.internal_hitTest_filteredSubCells(p); }
 		} 
 		
 		//fast content size calculations (after measure)
