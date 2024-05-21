@@ -2062,7 +2062,7 @@ class Drawing
 		//private int dirty = -1; //must set to -1 data[] is changed. bit0 = VBO, bit1 = bounds
 		private void markDirty()
 		{/*dirty = -1;*/} 
-		
+		
 		private bounds2 bounds_; 
 		@property bounds2 bounds()const
 		{ return bounds_; } 
@@ -2942,16 +2942,16 @@ class Drawing
 		
 		
 		
-			//Draw the objects on GPU  /////////////////////////////
+		//Draw the objects on GPU  /////////////////////////////
 		
-			void glDraw(View2D view, in View2D.V translate=0)
+		void glDraw(View2D view, in View2D.V translate=0)
 		{
 			glDraw(view.getOrigin(true), view.getScale(true), translate); 
 			
 			view.workArea_accum |= View2D.B(this.bounds); 
 		} 
 		
-			void glDraw(in View2D.V center, float scale, in View2D.V translate=0)
+		void glDraw(in View2D.V center, float scale, in View2D.V translate=0)
 		{
 			
 			//static if(1){ const T0 = QPS; scope(exit) print("DR", (QPS-T0)*1000); }
@@ -2991,8 +2991,7 @@ class Drawing
 			{
 				static if(is(T==dvec2))
 				{
-					NOTIMPL("Double world transformation"); 
-					//Todo: FP64WORLD
+					//Todo: Implement double FP64 WORLD Coordinates
 				}
 				return vec2(vIn); 
 			} 
@@ -3034,7 +3033,7 @@ class Drawing
 			//Todo: A binaris konstansokat is szemleltethetne az ide!
 			//Todo: az IDE automatikusan irhatna a bezaro } jelek utan, hogy mit zar az be. Csak annak a scopenak, amiben a cursor van.
 		
-		
+		
 		void strip(R)(dvec2 p0)
 		{} 
 	}

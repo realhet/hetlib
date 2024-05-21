@@ -3352,6 +3352,27 @@ version(/+$DIDE_REGION Numeric+/all)
 						*length_p += N;
 					}
 		*/
+		
+		auto iota_closed(B, E, S)(B b, E e, S s)
+		{
+			static struct Stepper(T)
+			{
+				T b, e, s; //Bug: What if step<=0 or e<b
+				@property empty() { return b>e; } 
+				auto front() { return b; } 
+				void popFront() { b += s; } 
+				auto save() { return this; } 
+			} 
+			alias T = CommonType!(B, E, S); 
+			return Stepper!T(b, e, s); 
+			
+			
+			/+
+				static if(isFloatingPoint!S) s = s.nextUp; 
+				else s++; 
+				return iota(b, e, s); 
+			+/
+		} 
 	}version(/+$DIDE_REGION st R/W+/all)
 	{
 		//rather use bitmanip stuff!!!
@@ -4621,7 +4642,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			}
 		} 
 		
-		//must call tis periodically from the main thread
+		//must call this periodically from the main thread
 		void update()
 		{
 			synchronized(this)
@@ -5039,7 +5060,58 @@ version(/+$DIDE_REGION Containers+/all)
 				doTest!4; doTest!5; //test bo the & and the % case
 			} 
 		}
-	} version(/+$DIDE_REGION+/all)
+	} 
+	
+	class SafeQueue(T, bool multiSrc, bool multiDst)
+	{
+		struct Node { T data; Node* next; } 
+		Node* head, tail; 
+		
+		this()
+		{ head = tail = new Node; } 
+		
+		void put(T data)
+		{
+			auto node = new Node(data); 
+			void doit()
+			{
+				tail.next = node; 
+				tail = node; 
+			} 
+			static if(multiSrc) synchronized doit; else doit; 
+		} 
+		
+		T* fetch()
+		{
+			T* res; 
+			void doit()
+			{
+				if(auto newHead = head.next)
+				{
+					res = &newHead.data; 
+					head = newHead; 
+				}
+			} 
+			static if(multiDst) synchronized doit; else doit; 
+			return res; 
+		} 
+		
+		auto fetchAll()
+		{
+			//Opt: it could be optimized into a single syncronize block.
+			T[] res; /+Not the fastest but it's synchronous.+/
+			while(1) if(auto a = fetch) res ~= *a; else break; 
+			return res; 
+		} 
+	} 
+	
+	alias SSQueue	(T) = SafeQueue!(T, 0, 0),
+	MSQueue	(T) = SafeQueue!(T, 1, 0),
+	SMQueue	(T) = SafeQueue!(T, 0, 1),
+	MMQueue	(T) = SafeQueue!(T, 1, 1); 
+	
+	
+	version(/+$DIDE_REGION+/all)
 	{
 		class BigArray(T)
 		{
@@ -6019,6 +6091,9 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch=='_' || isUniAlpha(ch); } 
 		bool isDLangIdentifierCont	(T)(T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierStart(ch) || isDLangNumberStart(ch); } 
+		bool isDLangIdentifier(T)(T s)
+		if(isSomeString!T)
+		{ return !s.empty && s.front.isDLangIdentifierStart && s.drop(1).all!isDLangIdentifierCont; } 
 		
 		bool isDLangNumberStart	(T)(T ch)if(isSomeChar!T)
 		{ return ch.inRange('0', '9'); } 
@@ -7050,7 +7125,83 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		uint fourCC(string s)
 		{ return s.take(4).enumerate.map!(a => a.value << cast(uint)a.index*8).sum; } 
+		
+		auto splitDLang(string src, string separ)
+		{
+			auto res = [""]; 
+			string stack; 
+			
+			void skip(size_t n)
+			{
+				foreach(i; 0..n)
+				{
+					if(src.empty) break; 
+					
+					if(/+remove comments+/["\n", "*/", "+/"].any!(a=>stack.startsWith(a)))
+					{ if(!res.back.endsWith(' ')) res.back ~= ' '; }
+					else
+					res.back ~= src.front; 
+					
+					src.popFront; 
+				}
+			} 
+			
+			while(src.length)
+			{
+				if(src.length>=2 && src[0]=='\\')
+				if(stack.length && stack[0].among('"', '\'') && src[1]==stack[0])
+				{ skip(2); continue; /+ignore string escapes+/}
+				
+				auto cp = commonPrefix(stack, src); 
+				if(cp.length && cp.back.among('+','*')) cp.length--; 
+				if(cp.length)
+				{ skip(cp.length); stack = stack[cp.length..$]; continue; /+block closes+/}
+				
+				if(stack.empty || [`}`, `)`, "]"].any!(a => stack.startsWith(a)))
+				{
+					if(const i = src[0].among('{', '[', '(', '"', '\'', '`'))
+					{
+						stack =        ['\0', '}', ']', ')', '"', '\'', '`'][i] ~ stack; 
+						skip(1); continue; /+block begins+/
+					}
+					foreach(i, s; ["//", "/*", "/+"])
+					if(src.startsWith(s))
+					{
+						stack = ["\n", "*/", "+/"][i] ~ stack; 
+						skip(2); continue; /+comment begins+/
+					}
+				}
+				
+				if(stack.startsWith("+/") && src.startsWith("/+"))
+				{ stack = "+/" ~ stack; skip(2); continue; /+nested comment begins+/}
+				
+				if(!separ.empty && stack.empty && src.startsWith(separ))
+				{ src.popFront; res ~= ""; continue; /+separator processed+/}
+				
+				skip(1); 
+			}
+			
+			if(stack=="\n") stack = ""; 
+			enforce(stack.empty, "splitDLang: bad syntax"); 
+			
+			foreach(ref s; res) s = s.strip; 
+			return res; 
+		} 
 		
+		static removeDLangComments(string src)
+		{ return src.splitDLang("")[0].strip; } 
+		
+		void unittest_splitDLang()
+		{
+			//Todo: proper unittest when starting.  It's a critical test...
+			writeln(splitDLang(`i=0,(5,6)"\""/+,/++/+/`, `,`)); 
+			writeln(splitDLang(`i=0,()//5`, `,`)); 
+			writeln(splitDLang(`0>=i>=6, 3`, `,`)); 
+			
+			const s = "int a = 5, b = 10; /* comment, not a split point */ int c = 15, d = 20; // Another comment, still not a split point
+	float e = 3.14, f = 2.71; void func(int x, int y) { int arr[2] = {1, 2}; if (x == y) { x++; } }"; 
+			writeln(splitDLang(s, `,`)); 
+		} 
 	}
 }version(/+$DIDE_REGION Hashing+/all)
 {
@@ -11343,7 +11494,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ this(combinePath(path_.fullPath, name_)); } 
 				this(Path path_)
 				{ this(path_.fullPath); } 
-							
+				
 				string toString() const
 				{
 					/+
@@ -11357,17 +11508,17 @@ version(/+$DIDE_REGION Date Time+/all)
 				{ return fullPath==""; } 
 				bool opCast() const
 				{ return !isNull(); } 
-							
+				
 				bool exists() const
 				{ return fullPath.length && dirExists(dir); } 
-							
+				
 				string name() const
 				{
-					auto a = fullPath.withoutEnding(pathDelimiter),
-							 i = a.retro.countUntil(pathDelimiter); 
+					auto 	a 	= fullPath.withoutEnding(pathDelimiter),
+						i	= a.retro.countUntil(pathDelimiter); 
 					return i<0 ? a : a[$-i..$]; 
 				} 
-							
+				
 				@property string dir() const
 				{ return excludeTrailingPathDelimiter(fullPath); } 
 				@property void dir(string dir_)
@@ -11409,6 +11560,9 @@ version(/+$DIDE_REGION Date Time+/all)
 					return 0; 
 				} 
 				
+				@property bool hasDrive()const
+				{ return drive!=""; } 
+				
 				Path parent() const
 				{ string s = dir; while(s!="" && s.back!='\\') s.length--; return Path(s); } 
 				
@@ -11416,7 +11570,7 @@ version(/+$DIDE_REGION Date Time+/all)
 				{
 					if(exists) return true; 
 					ignoreExceptions({ mkdirRecurse(dir); } ); 
-								
+					
 					const res = exists; 
 					if(mustSucceed && !res) raise(format!`Unable to make directory : %s`(dir.quoted)); 
 					return res; 
@@ -11678,6 +11832,8 @@ version(/+$DIDE_REGION Date Time+/all)
 			{ return Path(fullName).drive; } 
 			size_t driveIs(in string[] drives...) const
 			{ return Path(fullName).driveIs(drives); } 
+			@property bool hasDrive()const
+			{ return drive!=""; } 
 			
 			@property string name()const
 			{ return extractFileName(fullName); } 
@@ -11958,10 +12114,10 @@ version(/+$DIDE_REGION Date Time+/all)
 		{
 			if(!a) return b; 
 			if(!b) return a; 
-					
+			
 			//Note: in buildPath() "c:\a" + "\xyz" equals "c:\syz". This is bad.
 			b = b.withoutStarting(`\`); 
-					
+			
 			return std.path.buildPath(a, b); 
 		} 
 		
@@ -12090,13 +12246,20 @@ version(/+$DIDE_REGION Date Time+/all)
 		class FileNameFixer
 		{
 			private File[string] nameMap; 
+			Path defaultPath; 
 			File fix(File f)
-			{ return nameMap.require(f.fullName, f.actualFile); }  
+			{
+				return nameMap.require(
+					f.fullName, (
+						defaultPath && !f.hasDrive 
+						? File(defaultPath, f) : f
+					).actualFile
+				); 
+			}  
 			File opCall(File f)
 			{ return fix(f); } File opCall(string s)
 			{ return fix(s.File); } 
 		} 
-		
 	}version(/+$DIDE_REGION Compress+/all)
 	{
 		//Base64 //////////////////////////////////
@@ -12779,6 +12942,15 @@ version(/+$DIDE_REGION debug+/all)
 			
 			enum LOGLevelString 	= ["\33\13DBG_", "\33\17LOG_", "\33\16WARN", "\33\14ERR_", "\33\14CRIT"][levelIdx]
 				~ (subLevelDiff ? subLevelDiff.text : ""); 
+			
+			enum Text 	= ["Debug", "Info", "Warning", "Error", "Critical"][levelIdx]; 
+		} 
+		
+		private template LOGLevelText(int level)
+		{
+			enum levelIdx	= ((level+1)/10-1).clamp(0, 4); 
+			enum LOGLevelText 	= ["Debug", "Info", "Warning", "Error", "Critical"][levelIdx]; 
+			//Todo: this shit is overcomplicated
 		} 
 		
 		string makeSrcLocation(string file, string funct, int line)
@@ -12806,10 +12978,25 @@ version(/+$DIDE_REGION debug+/all)
 			return res; 
 		} 
 		
+		__gshared MSQueue!string globalDbgRerouteQueue; 
+		
 		void DBG (int level = 10, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args)
 		{
-			
 			enum location = makeSrcLocation(file, funct, line); 
+			
+			if(globalDbgRerouteQueue)
+			{
+				string s = format!"%s: %s: "(LOGLevelText!level, location); 
+				static foreach(idx, a; args)
+				{
+					if(idx)
+					s ~= " "; s ~= a.text; 
+				}
+				//Todo: refactor this redundant crap
+				globalDbgRerouteQueue.put(s); 
+				return; 
+			}
+			
 			//format colorful message
 			string s = format!"%s\33\10: T%0.4f: C%x: %s:  \33\7"(LOGLevelString!level, QPS_local, GetCurrentProcessorNumber, location); 
 			static foreach(idx, a; args)

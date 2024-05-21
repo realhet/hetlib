@@ -37,6 +37,8 @@ struct Request
 	} 
 } 
 
+//Todo: replace the queues with SafeQueue
+
 synchronized class RequestQueue
 {
 	private Request[] requests; 

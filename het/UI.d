@@ -4097,7 +4097,7 @@ version(/+$DIDE_REGION+/all)
 		
 		//for Elastic tabs
 		/+private+/ int[] tabIdxInternal; 
-		bool strictLeftToRight; 
+		bool strictCellOrder/+Todo: put into containerFlags+/; 
 		
 		void refreshTabIdx()
 		{ tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array; } 
@@ -4344,7 +4344,7 @@ version(/+$DIDE_REGION+/all)
 			//remember the contents of the edited row
 			rememberEditedWrappedLines(this, wrappedLines); 
 			
-			strictLeftToRight = wrappedLines.length.to!int<=1; 
+			strictCellOrder = wrappedLines.length<=1; 
 		} 
 		
 		override void draw(Drawing dr)
@@ -4364,7 +4364,7 @@ version(/+$DIDE_REGION+/all)
 		
 		override Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
-			if(strictLeftToRight)
+			if(strictCellOrder)
 			{
 				return sortedSubCellsAroundX(subCells, p); 
 				/+Todo: make this work for multiline too+/
@@ -8477,12 +8477,10 @@ struct im
 					dr.hLine(bOfs.x, bOfs.y, cntr.innerWidth-bOfs.x); 
 					
 					dr.color = clAccent; 
-					btns.filter!(b => b.flags.selected).each!(
-						(b){
-							with(b.borderBounds)
-							dr.hLine(left, bottom, right); 
-						}
-					); 
+					btns.filter!(b => b.flags.selected).each!((b){
+						with(b.borderBounds)
+						dr.hLine(left, bottom, right); 
+					}); 
 				}
 			} 
 			
