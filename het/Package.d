@@ -2503,7 +2503,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string[][] allRows; 
 			
 			auto rows()
-			{ return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/+`))); } 
+			{
+				/+It skips empty rows and rows starting with a comment.+/
+				return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/+`))); 
+			} 
 			
 			string cell(int x, int y)
 			{ return allRows.get(y).get(x); } 
@@ -2574,6 +2577,150 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			static assert(is(typeof(MixinTable_TestStruct.green)==ubyte)); 
 			static assert(is(typeof(MixinTable_TestStruct.alpha)==bool)); 
 		} 
+		
+		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
+		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
+		{
+			static fetchType(ref string id)
+			{
+				string type; 
+				if(!id.isDLangIdentifier)
+				{
+					auto parts = id.split(" "); 
+					auto id2 = parts.back; 
+					type = id[0..$-id2.length]; 
+					id = id2; 
+				}
+				return type; 
+			} static fetchStep(ref string src)
+			{
+				string step; 
+				auto parts = src.splitDLang(","); 
+				if(parts.length == 2)
+				{
+					step = parts[1]; 
+					src = parts[0]; 
+				}
+				return step; 
+			} 
+			
+			static fetchInclusivity1(ref string src)
+			{
+				if(src.startsWith('='))
+				{ src = src[1..$].stripLeft; return true; }return false; 
+			} 
+			static fetchInclusivity2(ref string src)/+Note: < or <=   default <=+/
+			{
+				if(src.startsWith("<"))
+				{ src = src[1..$]; return fetchInclusivity1(src); }return true; 
+			} 
+			
+			static string formatGeneratorCode(
+				string start, bool includeStart, 
+				string end, bool includeEnd, string step
+			)
+			{
+				if(step=="") step = "1"; 
+				static foreach(a; AliasSeq!(start, end, step)) a = "("~a~")"; 
+				if(!includeStart) start ~= "+"~step; 
+				return format	!"iota%s(%s,%s,%s)"
+					(
+					includeEnd ? "_closed" : "", 
+					start, end, step,
+				); 
+			} 
+			
+			static string formatCode(
+				string generatorCode, string type, string id, 
+				string expr, string fun
+			)
+			{
+				if(fun=="each")
+				{
+					expr = expr.removeDLangComments; 
+					const isCode = expr.length && expr.back.among(';', '}'); 
+					if(!isCode) expr ~= ';'; //make it a valid statement
+					return format	!"(%s.each!((%s){%s}))"
+						(generatorCode, strip(type~' '~id), expr); 
+				}
+				else
+				return format	!"(%s.map!((%s)=>(%s))%s)"
+					(generatorCode, strip(type~' '~id), expr, fun); 
+			} 
+			
+			auto parts = low.splitDLang("<"); 
+			if(parts.length==3 /+Note: min <= var <= max ,step+/)
+			{
+				auto 	start 	= parts[0],
+					id 	= parts[1],
+					end 	= parts[2],
+					includeStart 	= fetchInclusivity1(id),
+					includeEnd 	= fetchInclusivity1(end),
+					step	= fetchStep(end),
+					type	= fetchType(id); 
+				//also include 'high' to generate an error.
+				high = high.removeDLangComments; 
+				if(high!="") step ~= ","~high; 
+				return formatCode(
+					formatGeneratorCode
+					(
+						start, includeStart, 
+						end, includeEnd, step
+					), 
+					type, id, expr, fun
+				); 
+			}
+			
+			parts = low.splitDLang("="); 
+			if(parts.length==2 /+Note: var=min, step  |  <=max+/)
+			{
+				auto 	id	= parts[0],
+					type	= fetchType(id),
+					start	= parts[1],
+					step	= fetchStep(start),
+					end	= removeDLangComments(high),
+					includeStart 	= true,
+					includeEnd	= fetchInclusivity2(end); 
+				return formatCode(
+					formatGeneratorCode
+					(
+						start, includeStart, 
+						end, includeEnd, step
+					), 
+					type, id, expr, fun
+				); 
+			}
+			
+			{
+				/+Note: If non of the above,  ->  it is a .map() on a range.+/
+				auto 	elements 	= removeDLangComments(high),
+					id 	= removeDLangComments(low),
+					type	= fetchType(id); 
+				
+				/+Add optional [] if there is more "," separated items.+/
+				const brackets = ((elements.splitDLang(",").length>=2) ?("[]"):("()")); 
+				elements = brackets[0] ~ elements ~ brackets[1]; 
+				
+				//Todo: a,b..c,d  felsorolas.
+				
+				return formatCode(elements, type, id, expr, fun); 
+			}
+			
+			//throw new Exception("Invalid sigma-operation operands."); 
+		} 
+		
+		string 求map(string low, string high, string expr)
+		{ return 求(low, high, expr, ""); } 
+		
+		string 求each(string low, string high, string expr)
+		{ return 求(low, high, expr, "each"); } 
+		
+		string 求sum(string low, string high, string expr)
+		{ return 求(low, high, expr, ".sum"); } 
+		
+		string 求product(string low, string high, string expr)
+		{ return 求(low, high, expr, ".product"); } 
+		
 	}
 	
 }
@@ -2737,7 +2884,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		bool chkClear(ref bool b)
 		{ if(!b) return false; else { b = false; return true; }} 
 		
-		bool chkSet(T)(ref T a, in T b)
+		bool chkSet(T)(ref T a, T b)
 		{ if(a==b) return false; else { a = b; return true; }} 
 		
 		auto returnThenSet(T, U)(ref T a, in U b)

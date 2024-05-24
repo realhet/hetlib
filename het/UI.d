@@ -1400,6 +1400,8 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
+	bool cellIsNewLine(Cell c) { return cast(Glyph)c && (cast(Glyph)c).isNewLine; } 
+	
 	
 	class Glyph : Cell
 	{

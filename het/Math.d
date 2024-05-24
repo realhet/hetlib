@@ -3722,15 +3722,21 @@ version(/+$DIDE_REGION+/all)
 		{ return a.generateVector!(ScalarType!A, a => isPowerOf2(a) ? a/2 : std.math.truncPow2(a) ); } 
 		
 		auto nextUp(A)(in A a)
-		{ static assert(isFloatingPoint!(ScalarType!A)); return a.generateVector!(A, a => std.math.nextUp(a) ); } 
+		{
+			alias CT = ScalarType!A; static assert(isFloatingPoint!CT); 
+			return a.generateVector!(CT, a => std.math.nextUp(a) ); 
+		} 
 		auto nextDown(A)(in A a)
-		{ static assert(isFloatingPoint!(ScalarType!A)); return a.generateVector!(A, a => std.math.nextDown(a) ); } 
+		{
+			alias CT = ScalarType!A; static assert(isFloatingPoint!CT); 
+			return a.generateVector!(CT, a => std.math.nextDown(a) ); 
+		} 
 		
 		auto nextAfter(A, B)(in A a, in B b)
 		{
 			//a goes towads b
-			static assert(isFloatingPoint!(ScalarType!A)); 
-			return generateVector!(A, (a, b) => std.math.nextafter(a, cast(A) b) )(a, b); 
+			alias CT = CommonScalarType!(A, B); static assert(isFloatingPoint!CT); 
+			return generateVector!(CT, (a, b) => std.math.nextafter(a, cast(A) b) )(a, b); 
 		} 
 		
 		private auto floatBitsTo(T, A)(in A a)
