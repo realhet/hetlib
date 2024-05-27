@@ -646,6 +646,7 @@ version(/+$DIDE_REGION+/all)
 	private bool isSame(T1, T2)()
 	{ return is(immutable(T1)==immutable(T2)); } 
 	
+	//Todo: tag() must be inside im.
 	string tag(string s)
 	{ return "\u00B6"~s~"\u00A7"; } 
 	
