@@ -2721,6 +2721,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		string 求product(string low, string high, string expr)
 		{ return 求(low, high, expr, ".product"); } 
 		
+		
+		auto 檢(T)(T a, ulong location)
+		{
+			if(dbg.isActive)
+			{
+				auto s = "LOG:INSP:"~location.to!string(16)~":"~a.text.toBase64; 
+				print("\33\13"~s~"\33\7"); 
+				dbg.sendLog(s); 
+			}
+			return a; 
+		} 
 	}
 	
 }
