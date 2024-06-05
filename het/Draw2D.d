@@ -409,15 +409,13 @@ version(/+$DIDE_REGION+/all)
 		const N=1000, step = N/100; 
 		if(0)
 		iota(0, N+1, step)	.map!(a => pow(float(a)/N, 1+sin(blinkf(.25)*PIf*2))*N)
-			.each!(
-			(i){
-				dr.color = mix(clYellow, clAqua, float(i)/N); 
-				dr.line(i,	0,	0,	N-i	); 
-				dr.line(i,	0,	0,	-(N-i)	); 
-				dr.line(-i,	0,	0,	N-i	); 
-				dr.line(-i,	0,	0,	-(N-i)	); 
-			}
-		); 
+			.each!((i){
+			dr.color = mix(clYellow, clAqua, float(i)/N); 
+			dr.line(i,	0,	0,	N-i	); 
+			dr.line(i,	0,	0,	-(N-i)	); 
+			dr.line(-i,	0,	0,	N-i	); 
+			dr.line(-i,	0,	0,	-(N-i)	); 
+		}); 
 		
 	} 
 	
@@ -2426,7 +2424,7 @@ class Drawing
 			auto c2 = bkColor; 
 			
 			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
-				tx1 = vec2(1, 1); 
+				tx1 = vec2(0, 1)/+y subRange [0..1]+/; 
 			
 			auto info = textures.accessInfo(idx); //Todo: csunya, kell egy texture wrapper erre
 			
@@ -2437,7 +2435,7 @@ class Drawing
 		
 		void drawGlyph_impl(T...)(int idx, in vec2 topLeft, in T args)
 		{
-			 //autosize version
+			//autosize version
 			if(idx<0) return; 
 			auto info = textures.accessInfo(idx); //Opt: double call to accessInfo
 			drawGlyph_impl(idx, bounds2(topLeft, topLeft+info.size), args); 
@@ -2551,7 +2549,7 @@ class Drawing
 			}
 			
 			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
-				tx1 = vec2(1, 1); 
+				tx1 = vec2(0, 1)/+y subRange [0..1]+/; 
 			
 			oldAppend(
 				DrawingObj(

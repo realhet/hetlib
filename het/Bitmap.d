@@ -964,13 +964,11 @@ version(/+$DIDE_REGION+/all)
 				{
 					//batch processing used bny timeview.
 					bitmap_access_delayed_multi_bitmaps = bitmap_access_delayed_multi_files
-					.map!(
-						(file){
-							res = access!false(file, true); 
-							if(res) res.accessed_tick = application.tick; 
-							return res; 
-						}
-					).array; 
+					.map!((file){
+						res = access!false(file, true); 
+						if(res) res.accessed_tick = application.tick; 
+						return res; 
+					}).array; 
 				}
 				break; 
 				
@@ -6055,6 +6053,11 @@ version(/+$DIDE_REGION+/all)
 			markChanged; 
 			bitmaps.set(this); 
 		} 
+		
+		
+		//advanced image handling
+		
+		
 	} 
 	
 	//Bitmap/Image serializer //////////////////////////////////////////
@@ -6076,10 +6079,8 @@ version(/+$DIDE_REGION+/all)
 		enforce(data.length = width*height*channels, "invalid image data"); 
 		switch(channels)
 		{
-			case 4: 	size = lossy 	? WebPEncodeRGBA	(data.ptr, width, height, width*channels, quality, &output)
-				: WebPEncodeLosslessRGBA	(data.ptr, width, height, width*channels, &output); 	break; 
-			case 3: 	size = lossy 	? WebPEncodeRGB	(data.ptr, width, height, width*channels, quality, &output)
-				: WebPEncodeLosslessRGB	(data.ptr, width, height, width*channels, &output); 	break; 
+			case 4: 	size = ((lossy)?(WebPEncodeRGBA       (data.ptr, width, height, width*channels, quality, &output)) :(WebPEncodeLosslessRGBA(data.ptr, width, height, width*channels,        &output))); 	break; 
+			case 3: 	size = ((lossy)?(WebPEncodeRGB        (data.ptr, width, height, width*channels, quality, &output)) :(WebPEncodeLosslessRGB (data.ptr, width, height, width*channels,        &output))); 	break; 
 			default: 	enforce(0, "8/16bit webp not supported"); //Todo: Y, YA plane-kkal megoldani ezeket is
 		}
 		
@@ -6791,6 +6792,43 @@ version(/+$DIDE_REGION+/all)
 			}
 			default: NOTIMPL; 
 		}
+	} 
+	
+	
+	private enum INSPECT_format = /+"webp quality=101"+/ "bmp"; 
+	
+	
+	private enum INSPECT_ext = '.' ~ INSPECT_format.splitter(' ').take(1).front; 
+	
+	string INSPECT(T)(string name, lazy Image!(T, 2) a)
+	{
+		const f = File(appPath, name~INSPECT_ext); 
+		a.serialize(INSPECT_format).saveTo(f); 
+		return "$DIDE_CODE /+$DIDE_IMG "~f.fullName.quoted~" maxHeight=96+/"; 
+	} 
+	
+	string INSPECT(string name, lazy Bitmap a)
+	{
+		const f = File(appPath, name~INSPECT_ext); 
+		a.serialize(INSPECT_format).saveTo(f); 
+		return "$DIDE_CODE /+$DIDE_IMG "~f.fullName.quoted~" maxHeight=96+/"; 
+	} 
+	
+	Image2D!RGB splitChn(T)(Image!(T, 2) src)
+	{
+		static if(is(T==RGB))	enum chns = ["rgb", "r00", "_0g0", "_00b"]; 
+		else static if(is(T==RGBA))	enum chns = ["rgb", "r00", "_0g0", "_00b", "aaa"]; 
+		
+		auto dst = image2D(src.width*(cast(int)(chns.length)), src.height, clBlack); 
+		static foreach(i, chn; chns)
+		dst[src.width * (cast(int)(i)), 0] = src.image2D!("a."~chn); 
+		return dst; 
+	} 
+	
+	Image2D!RGB splitChn(T)(Bitmap a)
+	{
+		auto src = a.get!T; 
+		return src.splitChn!T; 
 	} 
 }
 version(/+$DIDE_REGION+/all)

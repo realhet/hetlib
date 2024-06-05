@@ -2506,15 +2506,21 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				/+It skips empty rows and rows starting with a comment.+/
 				return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/+`))); 
+				//Todo: full row //comment detection is failing
 			} 
 			
 			string cell(int x, int y)
 			{ return allRows.get(y).get(x); } 
+			
+			string GEN(string src)()
+			{
+				static if(__traits(compiles, { return mixin(src); }))	return mixin(src); 
+				else	mixin(src); 
+			} 
+			
+			string GEN_bitfields()
+			{ return rows.GEN_bitfields; } 
 		} 
-		
-		//multiple variants for DIDE to distinguish.
-		alias 表1 = 表; 
-		alias 表2 = 表; 
 		
 		string GEN_bitfields(R)(R rows)
 		{
@@ -2720,17 +2726,38 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		string 求product(string low, string high, string expr)
 		{ return 求(low, high, expr, ".product"); } 
+		
 		
-		
+		//Inspector
 		auto 檢(T)(T a, ulong location)
 		{
 			if(dbg.isActive)
 			{
 				auto s = "LOG:INSP:"~location.to!string(16)~":"~a.text.toBase64; 
-				print("\33\13"~s~"\33\7"); 
 				dbg.sendLog(s); 
 			}
+			else
+			{/+Normal user can't see debug inspector messages.+/}
 			return a; 
+		} 
+		
+		
+		//StopWatch
+		auto init間()
+		{ return now; } 
+		
+		auto update間(ref DateTime state)
+		{
+			const 	act = now,
+				ΔT = act-state,
+				ms = (float(ΔT.value(milli(second)))),
+				str = 	(
+				ms<1 	? ms.format!"%.2f" :
+				ms<10 	? ms.format!"%.1f"
+					: ms.format!"%.0f"
+			) ~ " ms"; ; 
+			state = act; 
+			return str; 
 		} 
 	}
 	
@@ -8123,14 +8150,20 @@ version(/+$DIDE_REGION Colors+/all)
 				}
 				
 				//do simd until possible
-				const batchLen = i+(len-i)/batchSize*batchSize; 
-				while(i<batchLen)
+				const batchEnd = i + ((len-i)/(batchSize))*batchSize; 
+				while(i<batchEnd)
 				{
-					auto pSrc = cast(SrcElementTypeSSE*)(&src[i]); 
-					auto pDst = cast(DstElementTypeSSE*)(&dst[i]); 
-					sseFun(*pSrc, *pDst); 
-					i += batchSize; 
+					sseFun(
+						*(cast(SrcElementTypeSSE*)(src.ptr + i)),
+						*(cast(DstElementTypeSSE*)(dst.ptr + i))
+					); 
+					i+=batchSize; 
 				}
+				/+
+					Opt: When the compiler is NOT optimizing,
+					this loop could be optimized in ASM 
+				+/
+				/+Opt: The inplace version should use only 1 parameter+/
 				
 				//do the remaining with non-simd
 				while(i<len)
@@ -8695,8 +8728,8 @@ version(/+$DIDE_REGION Colors+/all)
 		{
 			immutable
 			clAxisX	= (RGB(213,  40,  40)),
-			clAxisY	= (RGB(40, 166,  40)),
-			clAxisZ	= (RGB(40,  40, 215)),
+			clAxisY	= (RGB( 40, 166,  40)),
+			clAxisZ	= (RGB( 40,  40, 215)),
 				
 			clOrange	= clRainbowOrange,
 			clGold	= (RGB(0x00D7FF)),
@@ -8708,18 +8741,18 @@ version(/+$DIDE_REGION Colors+/all)
 		version(/+$DIDE_REGION Sticky Note Colors+/all)
 		{
 			immutable
-			clStickyYellow	= RGB(0xb1f9ff),
-			clStickyWhite	= RGB(0xf8f6f5),
-			clStickyLightOrange	= RGB(0x28d1f5),
-			clStickyOlive	= RGB(0x7ae1d0),
-			clStickyGreen	= RGB(0x92f6d5),
-			clStickyPastelBlue	= RGB(0xf5cca6),
-			clStickyAqua	= RGB(0xc0c667),
-			clStickyBlue	= RGB(0xe7bf23),
-			clStickyOrange	= RGB(0x489dff),
-			clStickyPink	= RGB(0xbb94ea),
-			clStickyRed	= RGB(0x7f6cf1),
-			clStickyPurple	= RGB(0xbbb384)
+			clStickyYellow	= (RGB(0xb1f9ff)),
+			clStickyWhite	= (RGB(0xf8f6f5)),
+			clStickyLightOrange	= (RGB(0x28d1f5)),
+			clStickyOlive	= (RGB(0x7ae1d0)),
+			clStickyGreen	= (RGB(0x92f6d5)),
+			clStickyPastelBlue	= (RGB(0xf5cca6)),
+			clStickyAqua	= (RGB(0xc0c667)),
+			clStickyBlue	= (RGB(0xe7bf23)),
+			clStickyOrange	= (RGB(0x489dff)),
+			clStickyPink	= (RGB(0xbb94ea)),
+			clStickyRed	= (RGB(0x7f6cf1)),
+			clStickyPurple	= (RGB(0xbbb384))
 			/+Todo: NiceExpressions, hex RGB+/; 
 		}
 		
@@ -8728,61 +8761,61 @@ version(/+$DIDE_REGION Colors+/all)
 			immutable
 			clUiAliceBlue	= (RGB(240, 248, 255)),
 			clUiAntiqueWhite	= (RGB(250, 235, 215)),
-			clUiAqua	= (RGB(0, 255, 255)),
+			clUiAqua	= (RGB(  0, 255, 255)),
 			clUiAquamarine	= (RGB(127, 255, 212)),
 			clUiAzure	= (RGB(240, 255, 255)),
 			clUiBeige	= (RGB(245, 245, 220)),
 			clUiBisque	= (RGB(255, 228, 196)),
-			clUiBlack	= (RGB(0,   0,   0)),
+			clUiBlack	= (RGB(  0,   0,   0)),
 			clUiBlanchedAlmond	= (RGB(255, 235, 205)),
-			clUiBlue	= (RGB(0,   0, 255)),
+			clUiBlue	= (RGB(  0,   0, 255)),
 			clUiBlueViolet	= (RGB(138,  43, 226)),
 			clUiBrown	= (RGB(165,  42,  42)),
 			clUiBurlyWood	= (RGB(222, 184, 135)),
-			clUiCadetBlue	= (RGB(95, 158, 160)),
+			clUiCadetBlue	= (RGB( 95, 158, 160)),
 			clUiChartreuse	= (RGB(127, 255,   0)),
 			clUiChocolate	= (RGB(210, 105,  30)),
 			clUiCoral	= (RGB(255, 127,  80)),
 			clUiCornflowerBlue	= (RGB(100, 149, 237)),
 			clUiCornsilk	= (RGB(255, 248, 220)),
 			clUiCrimson	= (RGB(220,  20,  60)),
-			clUiCyan	= (RGB(0, 255, 255)),
-			clUiDarkBlue	= (RGB(0,   0, 139)),
-			clUiDarkCyan	= (RGB(0, 139, 139)),
+			clUiCyan	= (RGB(  0, 255, 255)),
+			clUiDarkBlue	= (RGB(  0,   0, 139)),
+			clUiDarkCyan	= (RGB(  0, 139, 139)),
 			clUiDarkGoldenrod	= (RGB(184, 134,  11)),
 			clUiDarkGray	= (RGB(169, 169, 169)),
-			clUiDarkGreen	= (RGB(0, 100,   0)),
+			clUiDarkGreen	= (RGB(  0, 100,   0)),
 			clUiDarkKhaki	= (RGB(189, 183, 107)),
 			clUiDarkMagenta	= (RGB(139,   0, 139)),
-			clUiDarkOliveGreen	= (RGB(85, 107,  47)),
+			clUiDarkOliveGreen	= (RGB( 85, 107,  47)),
 			clUiDarkOrange	= (RGB(255, 140,   0)),
 			clUiDarkOrchid	= (RGB(153,  50, 204)),
 			clUiDarkRed	= (RGB(139,   0,   0)),
 			clUiDarkSalmon	= (RGB(233, 150, 122)),
 			clUiDarkSeaGreen	= (RGB(143, 188, 143)),
-			clUiDarkSlateBlue	= (RGB(72,  61, 139)),
-			clUiDarkSlateGray	= (RGB(47,  79,  79)),
-			clUiDarkTurquoise	= (RGB(0, 206, 209)),
+			clUiDarkSlateBlue	= (RGB( 72,  61, 139)),
+			clUiDarkSlateGray	= (RGB( 47,  79,  79)),
+			clUiDarkTurquoise	= (RGB(  0, 206, 209)),
 			clUiDarkViolet	= (RGB(148,   0, 211)),
 			clUiDeepPink	= (RGB(255,  20, 147)),
-			clUiDeepSkyBlue	= (RGB(0, 191, 255)),
+			clUiDeepSkyBlue	= (RGB(  0, 191, 255)),
 			clUiDimGray	= (RGB(105, 105, 105)),
-			clUiDodgerBlue	= (RGB(30, 144, 255)),
+			clUiDodgerBlue	= (RGB( 30, 144, 255)),
 			clUiFirebrick	= (RGB(178,  34,  34)),
 			clUiFloralWhite	= (RGB(255, 250, 240)),
-			clUiForestGreen	= (RGB(34, 139,  34)),
+			clUiForestGreen	= (RGB( 34, 139,  34)),
 			clUiFuchsia	= (RGB(255,   0, 255)),
 			clUiGainsboro	= (RGB(220, 220, 220)),
 			clUiGhostWhite	= (RGB(248, 248, 255)),
 			clUiGold	= (RGB(255, 215,   0)),
 			clUiGoldenrod	= (RGB(218, 165,  32)),
 			clUiGray	= (RGB(128, 128, 128)),
-			clUiGreen	= (RGB(0, 128,   0)),
+			clUiGreen	= (RGB(  0, 128,   0)),
 			clUiGreenYellow	= (RGB(173, 255,  47)),
 			clUiHoneydew	= (RGB(240, 255, 240)),
 			clUiHotPink	= (RGB(255, 105, 180)),
 			clUiIndianRed	= (RGB(205,  92,  92)),
-			clUiIndigo	= (RGB(75,   0, 130)),
+			clUiIndigo	= (RGB( 75,   0, 130)),
 			clUiIvory	= (RGB(255, 255, 240)),
 			clUiKhaki	= (RGB(240, 230, 140)),
 			clUiLavender	= (RGB(230, 230, 250)),
@@ -8799,31 +8832,31 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiLightSalmon	= (RGB(255, 160, 122)),
 			
 			
-			clUiLightSeaGreen	= (RGB(32, 178, 170)),
+			clUiLightSeaGreen	= (RGB( 32, 178, 170)),
 			clUiLightSkyBlue	= (RGB(135, 206, 250)),
 			clUiLightSlateGray	= (RGB(119, 136, 153)),
 			clUiLightSteelBlue	= (RGB(176, 196, 222)),
 			clUiLightYellow	= (RGB(255, 255, 224)),
-			clUiLime	= (RGB(0, 255,   0)),
-			clUiLimeGreen	= (RGB(50, 205,  50)),
+			clUiLime	= (RGB(  0, 255,   0)),
+			clUiLimeGreen	= (RGB( 50, 205,  50)),
 			clUiLinen	= (RGB(250, 240, 230)),
 			clUiMagenta	= (RGB(255,   0, 255)),
 			clUiMaroon	= (RGB(128,   0,   0)),
 			clUiMediumAquamarine	= (RGB(102, 205, 170)),
-			clUiMediumBlue	= (RGB(0,   0, 205)),
+			clUiMediumBlue	= (RGB(  0,   0, 205)),
 			clUiMediumOrchid	= (RGB(186,  85, 211)),
 			clUiMediumPurple	= (RGB(147, 112, 219)),
-			clUiMediumSeaGreen	= (RGB(60, 179, 113)),
+			clUiMediumSeaGreen	= (RGB( 60, 179, 113)),
 			clUiMediumSlateBlue	= (RGB(123, 104, 238)),
-			clUiMediumSpringGreen	= (RGB(0, 250, 154)),
-			clUiMediumTurquoise	= (RGB(72, 209, 204)),
+			clUiMediumSpringGreen	= (RGB(  0, 250, 154)),
+			clUiMediumTurquoise	= (RGB( 72, 209, 204)),
 			clUiMediumVioletRed	= (RGB(199,  21, 133)),
-			clUiMidnightBlue	= (RGB(25,  25, 112)),
+			clUiMidnightBlue	= (RGB( 25,  25, 112)),
 			clUiMintCream	= (RGB(245, 255, 250)),
 			clUiMistyRose	= (RGB(255, 228, 225)),
 			clUiMoccasin	= (RGB(255, 228, 181)),
 			clUiNavajoWhite	= (RGB(255, 222, 173)),
-			clUiNavy	= (RGB(0,   0, 128)),
+			clUiNavy	= (RGB(  0,   0, 128)),
 			clUiOldLace	= (RGB(253, 245, 230)),
 			clUiOlive	= (RGB(128, 128,   0)),
 			clUiOliveDrab	= (RGB(107, 142,  35)),
@@ -8843,11 +8876,11 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiPurple	= (RGB(128,   0, 128)),
 			clUiRed	= (RGB(255,   0,   0)),
 			clUiRosyBrown	= (RGB(188, 143, 143)),
-			clUiRoyalBlue	= (RGB(65, 105, 225)),
+			clUiRoyalBlue	= (RGB( 65, 105, 225)),
 			clUiSaddleBrown	= (RGB(139,  69,  19)),
 			clUiSalmon	= (RGB(250, 128, 114)),
 			clUiSandyBrown	= (RGB(244, 164,  96)),
-			clUiSeaGreen	= (RGB(46, 139,  87)),
+			clUiSeaGreen	= (RGB( 46, 139,  87)),
 			clUiSeaShell	= (RGB(255, 245, 238)),
 			clUiSienna	= (RGB(160,  82,  45)),
 			clUiSilver	= (RGB(192, 192, 192)),
@@ -8855,14 +8888,14 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiSlateBlue	= (RGB(106,  90, 205)),
 			clUiSlateGray	= (RGB(112, 128, 144)),
 			clUiSnow	= (RGB(255, 250, 250)),
-			clUiSpringGreen	= (RGB(0, 255, 127)),
-			clUiSteelBlue	= (RGB(70, 130, 180)),
+			clUiSpringGreen	= (RGB(  0, 255, 127)),
+			clUiSteelBlue	= (RGB( 70, 130, 180)),
 			clUiTan	= (RGB(210, 180, 140)),
-			clUiTeal	= (RGB(0, 128, 128)),
+			clUiTeal	= (RGB(  0, 128, 128)),
 			clUiThistle	= (RGB(216, 191, 216)),
 			clUiTomato	= (RGB(255,  99,  71)),
 			clUiTransparent	= (RGB(255, 255, 255)),
-			clUiTurquoise	= (RGB(64, 224, 208)),
+			clUiTurquoise	= (RGB( 64, 224, 208)),
 			clUiViolet	= (RGB(238, 130, 238)),
 			clUiWheat	= (RGB(245, 222, 179)),
 			clUiWhite	= (RGB(255, 255, 255)),
@@ -10906,7 +10939,11 @@ version(/+$DIDE_REGION Date Time+/all)
 		{ return raw * (second/DateTime.RawUnit.sec); } 
 		
 		auto T0() { _TLast = QPS; return QPS; } 
-		auto DT()() { const Q = QPS, res = Q-_TLast; _TLast = Q; return res; } 
+		auto DT() { const Q = QPS, res = Q-_TLast; _TLast = Q; return res; } 
+		auto DTms() { const t = DT; const s = siFormat("%.1f ms", t); DT; return s; } 
+		
+		alias ΔT = DT; 
+		alias ΔTms = DTms; 
 		
 		DateTime parseDate(in TimeZone tz, string str)
 		{
@@ -13272,6 +13309,9 @@ version(/+$DIDE_REGION debug+/all)
 		
 		class DebugLogClient
 		{
+			bool F0, F1, F2, F3; //debug flags
+			
+			
 			//Todo: rewrite it with utils.sharedMemClient
 			
 			private: 
@@ -13403,6 +13443,13 @@ version(/+$DIDE_REGION debug+/all)
 			bool forceExit_check()
 			{ return data && !!data.forceExit; } 
 			
+			void focusIde()
+			{
+				if(data && data.dide_hwnd)
+				SetForegroundWindow(cast(void*)data.dide_hwnd); 
+			} 
+			alias focusIDE = focusIde; 
+			
 			void handleException(string msg)
 			{
 				if(!data)
@@ -13411,7 +13458,7 @@ version(/+$DIDE_REGION debug+/all)
 				data.dide_ack = 0; 
 				data.exe_waiting = 1; 
 				
-				SetForegroundWindow(cast(void*)data.dide_hwnd); 
+				focusIde; 
 				
 				//fileWriteStr(`c:\dl\exc.txt`, msg);
 				string s = "EXCEPTION:"~msg; 

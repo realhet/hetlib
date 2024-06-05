@@ -531,6 +531,50 @@ version(/+$DIDE_REGION+/all)
 		{ modify(commandLineToMap(cmdLine)); } 
 	} 
 	
+	mixin((
+		(表([
+			[q{clChapter},q{(RGB(221,   3,  48))}],
+			[q{clAccent},q{(RGB(  0, 120, 215))}],
+			[],
+			[q{clMenuBk},q{(RGB(235, 235, 236))}],
+			[q{clMenuHover},q{(RGB(222, 222, 222))}],
+			[],
+			[q{clLink},q{(RGB(  0, 120, 215))}],
+			[q{clLinkHover},q{(RGB(102, 102, 102))}],
+			[q{clLinkPressed},q{(RGB(153, 153, 153))}],
+			[q{clLinkDisabled},q{
+				(RGB(122, 122, 122))
+				/+clWinBtnHoverBorder+/
+			}],
+			[],
+			[q{clWinRed},q{(RGB(232,  17,  35))}],
+			[q{clWinText},q{clBlack}],
+			[q{clWinBackground},q{clWhite}],
+			[q{clWinFocusBorder},q{clBlack}],
+			[q{clWinBtn},q{(RGB(204, 204, 204))}],
+			[q{clWinBtnHoverBorder},q{(RGB(122, 122, 122))}],
+			[q{clWinBtnPressed},q{clWinBtnHoverBorder}],
+			[q{clWinBtnDisabledText},q{clWinBtnHoverBorder}],
+			[q{clHintText},q{clWinText}],
+			[q{clHintBk},q{(RGB(236, 233, 216))}],
+			[q{clHintDetailsText},q{clWinText}],
+			[q{clHintDetailsBk},q{clWhite}],
+			[],
+			[q{clSliderLine},q{clLinkPressed}],
+			[q{clSliderLineHover},q{clLinkHover}],
+			[q{clSliderLinePressed},q{clLinkPressed}],
+			[q{clSliderThumb},q{clAccent}],
+			[q{clSliderThumbHover},q{(RGB( 23,  23,  23))}],
+			[q{clSliderThumbPressed},q{clWinBtn}],
+			[q{clSliderHintBorder},q{clMenuBk}],
+			[q{clSliderHintBk},q{clWinBtn}],
+			[],
+			[q{clScrollBk},q{clMenuBk}],
+			[q{clScrollThumb},q{clWinBtn}],
+			[q{clScrollThumbPressed},q{clWinBtnPressed}],
+		]))
+	) .GEN!q{(mixin(求map(q{r},q{rows},q{r.join('=')}))).format!q{const %-(%s,%); }}); 
+	
 	//TextStyles ////////////////////////////////////////////
 	
 	TextStyle tsNormal, tsComment, tsError, tsBold, tsBold2, tsCode, tsQuote, tsLink, tsTitle, tsChapter, tsChapter2, tsChapter3,
@@ -547,44 +591,6 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	//https://docs.microsoft.com/en-us/windows/desktop/api/winuser/nf-winuser-getsyscolor
-	const
-				clChapter	              = RGB(221,	3,  48),
-				clAccent														 = RGB(0, 120,	215),
-				clMenuBk														 = RGB(235, 235, 236),
-				clMenuHover	              = RGB(222, 222, 222),
-				clLink	              = RGB(0, 120, 215),
-	
-				clLinkHover	           =	RGB(102, 102, 102),
-				clLinkPressed		= RGB(153,	153, 153),
-				clLinkDisabled		= RGB(122, 122, 122), //clWinBtnHoverBorder
-	
-				clWinRed                  = RGB(232,17,35),
-	
-				clWinText	     = clBlack,
-				clWinBackground	     = clWhite,
-				clWinFocusBorder	     = clBlack,
-				clWinBtn	     = RGB(204,	204, 204),
-				clWinBtnHoverBorder		= RGB(122, 122, 122),
-				clWinBtnPressed	     = clWinBtnHoverBorder,
-				clWinBtnDisabledText	     = clWinBtnHoverBorder,
-	
-				clHintText		= clWinText,
-				clHintBk	        =	RGB(236, 233, 216),
-				clHintDetailsText			= clWinText,
-				clHintDetailsBk	        =	clWhite,
-	
-				clSliderLine	     = clLinkPressed,
-				clSliderLineHover		=	clLinkHover,
-				clSliderLinePressed		=	clLinkPressed,
-				clSliderThumb	     = clAccent,
-				clSliderThumbHover		=	RGB(23, 23, 23),
-				clSliderThumbPressed		=	clWinBtn,
-				clSliderHintBorder		=	clMenuBk,
-				clSliderHintBk	     = clWinBtn,
-	
-				clScrollBk	     = clMenuBk,
-				clScrollThumb	     = clWinBtn,
-				clScrollThumbPressed	     = clWinBtnPressed; 
 	
 	
 	void initTextStyles()
@@ -3035,89 +3041,70 @@ version(/+$DIDE_REGION+/all)
 	bool getEffectiveScroll(ScrollState s) pure
 	{ return s.among(ScrollState.on, ScrollState.autoOn)>0; } 
 	
-	union ContainerFlags
+	struct ContainerFlags
 	{
-		 //------------------------------ ContainerFlags /////////////////////////////////
-		//Todo: do this nicer with a table
-		ulong _data = 0b_000_00000001____00_00_0_0_0_0____0_0_0_0_0_0_1_0____1_0_0_0_0_0_0_0____001_00_00_1; //Todo: ui editor for this
-		mixin(
-			bitfields!(
-				bool	, "wordWrap"	, 1,
-				HAlign	, "hAlign"	, 2, //alignment for all subCells
-				VAlign	, "vAlign"	, 2,
-				YAlign	, "yAlign"	, 3,
-						
-				bool	, "dontHideSpaces"	, 1, //useful for active edit mode
-				bool	, "canSelect"	, 1,
-				bool	, "focused"	, 1, //maintained by system, not by user
-				bool	, "hovered_deprecated"	, 1, //maintained by system, not by user
-				bool	, "clipSubCells"	, 1,
-				bool	, "_saveComboBounds"	, 1, //marks the container to save the absolute bounds to align the popup window to.
-				bool	, "_hasOverlayDrawing"	, 1,
-				bool	, "columnElasticTabs"	, 1, //Column will do ElasticTabs its own Rows.
-						
-				bool	, "rowElasticTabs"	, 1, //Row will do elastic tabs inside its own WrappedLines.
-				uint	, "targetSurface"	, 1, //0: zoomable view, 1: GUI screen
-				bool	, "_debug"	, 1, //the container can be marked, for debugging
-				bool	, "btnRowLines"	, 1, //draw thin, dark lines between the buttons of a btnRow
-				bool	, "autoWidth"	, 1, //kinda readonly: It's set by Container in measure to outerSize!=0
-				bool	, "autoHeight"	, 1, //later everything else can read it.
-				bool	, "hasHScrollBar"	, 1, //system manages this, not the user.
-				bool	, "hasVScrollBar"	, 1,
-						
-				bool	, "_measured"	, 1, //used to tell if a top level container was measured already
-				bool	, "saveVisibleBounds"	, 1, //draw() will save the visible innerBounds under the name id.appendIdx("visibleBounds");
-				bool	, "_measureOnlyOnce"	, 1,
-				bool	, "acceptEditorKeys"	, 1, //accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.
-				ScrollState	, "hScrollState"	, 2,
-				ScrollState	, "vScrollState"	, 2,
-						//------------------------ 32bits ---------------------------------------
-				bool	, "clickable"	, 1, //If false, hittest will not check this as clicked. It checks the parent instead.
-				bool	, "noBackground"	, 1,
-				bool	, "cullSubCells"	, 1, //clipSubCells must be enabled too
-				bool	, "_hasDrawCallback"	, 1,
-				bool	, "selected"	, 1, //maintained by system, not by user (in applyBtnStyle)
-				bool	, "hidden"	, 1, //only affects draw() calls.
-				bool	, "dontSearch"	, 1, //no search() inside this container
-				bool	, "noHitTest"	, 1, //don't even bother to add this container and it's subcontainers to the hit list.
-						
-				bool	, "dontLocate"	, 1, //disables the locate() method for this container and its subcontainers
-				bool	, "oldSelected"	, 1, //SelectionManager2 needs this.
-						
-				bool	, "changedCreated"	, 1, //Dide2.CodeRow: changed by creationg a new cell
-				bool	, "changedRemoved"	, 1, //Dide2.CodeRow: changed by removing existing cells
-						
-				bool	, "dontStretchSubCells"	, 1, //Column: don't stretch the items to the innerWidth of the column.
-						
-				bool	, "columnIsTable"	, 1, //At the moment it is only used by DIDE
-				int	, "_dummy"	,18,
-			)
-		); 
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{bool},q{1},q{"wordWrap"},q{1},q{/++/}],
+				[q{HAlign},q{2},q{"hAlign"},q{},q{/+alignment for all subCells+/}],
+				[q{VAlign},q{2},q{"vAlign"},q{},q{/++/}],
+				[q{YAlign},q{3},q{"yAlign"},q{1},q{/++/}],
+				[],
+				[q{bool},q{1},q{"dontHideSpaces"},q{},q{/+useful for active edit mode+/}],
+				[q{bool},q{1},q{"canSelect"},q{},q{/++/}],
+				[q{bool},q{1},q{"focused"},q{},q{/+maintained by system, not by user+/}],
+				[q{bool},q{1},q{"hovered_deprecated"},q{},q{/+maintained by system, not by user+/}],
+				[q{bool},q{1},q{"clipSubCells"},q{},q{/++/}],
+				[q{bool},q{1},q{"_saveComboBounds"},q{},q{/+marks the container to save the absolute bounds to align the popup window to.+/}],
+				[q{bool},q{1},q{"_hasOverlayDrawing"},q{},q{/++/}],
+				[q{bool},q{1},q{"columnElasticTabs"},q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
+				[],
+				[q{bool},q{1},q{"rowElasticTabs"},q{},q{/+Row will do elastic tabs inside its own WrappedLines.+/}],
+				[q{uint},q{1},q{"targetSurface"},q{1},q{/+0: zoomable view, 1: GUI screen+/}],
+				[q{bool},q{1},q{"_debug"},q{},q{/+the container can be marked, for debugging+/}],
+				[q{bool},q{1},q{"btnRowLines"},q{},q{/+draw thin, dark lines between the buttons of a btnRow+/}],
+				[q{bool},q{1},q{"autoWidth"},q{},q{/+kinda readonly: It's set by Container in measure to outerSize!=0+/}],
+				[q{bool},q{1},q{"autoHeight"},q{},q{/+later everything else can read it.+/}],
+				[q{bool},q{1},q{"hasHScrollBar"},q{},q{/+system manages this, not the user.+/}],
+				[q{bool},q{1},q{"hasVScrollBar"},q{},q{/++/}],
+				[],
+				[q{bool},q{1},q{"_measured"},q{},q{/+used to tell if a top level container was measured already+/}],
+				[q{bool},q{1},q{"saveVisibleBounds"},q{},q{/+
+					draw() will save the visible innerBounds under the name 
+					id.appendIdx("visibleBounds");fewqfew
+				+/}],
+				[q{bool},q{1},q{"_measureOnlyOnce"},q{},q{/++/}],
+				[q{bool},q{1},q{"acceptEditorKeys"},q{},q{/+accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.+/}],
+				[q{ScrollState},q{2},q{"hScrollState"},q{},q{/++/}],
+				[q{ScrollState},q{2},q{"vScrollState"},q{},q{/++/}],
+				[],
+				[q{/+------------------------ 32bits ---------------------------------------+/}],
+				[q{bool},q{1},q{"clickable"},q{1},q{/+
+					If false, hittest will not check this as clicked. 
+					It checks the parent instead.
+				+/}],
+				[q{bool},q{1},q{"noBackground"},q{},q{/++/}],
+				[q{bool},q{1},q{"cullSubCells"},q{},q{/+clipSubCells must be enabled too+/}],
+				[q{bool},q{1},q{"_hasDrawCallback"},q{},q{/++/}],
+				[q{bool},q{1},q{"selected"},q{},q{/+maintained by system, not by user (in applyBtnStyle)+/}],
+				[q{bool},q{1},q{"hidden"},q{},q{/+only affects draw() calls.+/}],
+				[q{bool},q{1},q{"dontSearch"},q{},q{/+no search() inside this container+/}],
+				[q{bool},q{1},q{"noHitTest"},q{},q{/+don't even bother to add this container and it's subcontainers to the hit list.+/}],
+				[],
+				[q{bool},q{1},q{"dontLocate"},q{},q{/+disables the locate() method for this container and its subcontainers+/}],
+				[q{bool},q{1},q{"oldSelected"},q{},q{/+SelectionManager2 needs this.+/}],
+				[],
+				[q{bool},q{1},q{"changedCreated"},q{},q{/+Dide2.CodeRow: changed by creationg a new cell+/}],
+				[q{bool},q{1},q{"changedRemoved"},q{},q{/+Dide2.CodeRow: changed by removing existing cells+/}],
+				[],
+				[q{bool},q{1},q{"dontStretchSubCells"},q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
+				[q{bool},q{1},q{"columnIsTable"},q{},q{/+At the moment it is only used by DIDE+/}],
+			]))
+		) .GEN!q{GEN_bitfields}); 
 	} 
 	
-	/+
-		https://chat.openai.com/c/8be74a95-293e-405e-806d-f12483c2e8f1
-		
-		const string[] DataTypes = {
-					 "ulong", "bool", "HAlign", "VAlign", "YAlign", "bool", "bool", "bool",
-					 "bool", "bool", "bool", "bool", "bool", "bool", "uint", "bool", "bool",
-					 "bool", "bool", "bool", "bool", "bool", "bool", "bool", "bool", "ScrollState",
-					 "ScrollState", "bool", "bool", "bool", "bool", "bool", "bool", "bool",
-					 "bool", "bool", "bool", "int"
-		}; 
-		
-		const string[] NameFields = {
-					 "_data", "wordWrap", "hAlign", "vAlign", "yAlign", "dontHideSpaces", "canSelect", "focused",
-					 "hovered_deprecated", "clipSubCells", "_saveComboBounds", "_hasOverlayDrawing", "columnElasticTabs",
-					 "rowElasticTabs", "targetSurface", "_debug", "btnRowLines", "autoWidth", "autoHeight", "hasHScrollBar",
-					 "hasVScrollBar", "_measured", "saveVisibleBounds", "_measureOnlyOnce", "acceptEditorKeys",
-					 "hScrollState", "vScrollState", "clickable", "noBackground", "cullSubCells", "_hasDrawCallback",
-					 "selected", "hidden", "dontSearch", "noHitTest", "dontLocate", "oldSelected", "changedCreated",
-					 "changedRemoved", "dontStretchSubCells", "_dummy"
-		};
-		
-		const int[] SizeFields = {1, 2, 2, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 19};
-	+/
+	
 	
 	
 	static assert(ContainerFlags.sizeof==8); 
@@ -6186,7 +6173,7 @@ version(/+$DIDE_REGION+/all)
 					}
 				}
 			); 
-		} 
+		} 
 		
 		//scroller state
 		Node actNode; //state

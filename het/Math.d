@@ -2055,11 +2055,10 @@ version(/+$DIDE_REGION+/all)
 	//Image ///////////////////////////////////////////////////////
 	enum isImage(A) = is(A.ImageType); //not nice
 	
-	template ImageDimension(A) {
-		static if(isImage!A)
-		enum ImageDimension = A.Dimension; 
-		else
-		enum ImageDimension = 0; 
+	template ImageDimension(A)
+	{
+		static if(isImage!A)	enum ImageDimension = A.Dimension; 
+		else	enum ImageDimension = 0; 
 	} 
 	
 	enum isImage1D(A) = ImageDimension!A == 1; 
@@ -2069,49 +2068,40 @@ version(/+$DIDE_REGION+/all)
 	alias Image2D(T) = Image!(T, 2); 
 	
 	//tells the elementType of an 1D range.  Returns void if can't.
-	template ElementType1D(R) {
-		static if(!isVector!R)
-		alias ElementType1D = ElementType!R; 
-		else
-		alias ElementType1D = void; 
+	template ElementType1D(R)
+	{
+		static if(!isVector!R)	alias ElementType1D = ElementType!R; 
+		else	alias ElementType1D = void; 
 	} 
 	
-	template ElementType2D(R) {
+	template ElementType2D(R)
+	{
 		alias T = ElementType1D!R; 
-		static if(!is(T==void) && !isVector!T)
-		alias ElementType2D = ElementType!T; 
-		else
-		alias ElementType2D = void; 
+		static if(!is(T==void) && !isVector!T)	alias ElementType2D = ElementType!T; 
+		else	alias ElementType2D = void; 
 	} 
 	
-	template ElementType3D(R) {
+	template ElementType3D(R)
+	{
 		alias T = ElementType2D!R; 
-		static if(!is(T==void) && !isVector!T)
-		alias ElementType3D = ElementType!T; 
-		else
-		alias ElementType3D = void; 
+		static if(!is(T==void) && !isVector!T)	alias ElementType3D = ElementType!T; 
+		else	alias ElementType3D = void; 
 	} 
 	
-	template RangeDimension(R) {
-		static if(!is(ElementType3D!R == void))
-		enum RangeDimension = 3; 
-		else static if(!is(ElementType2D!R == void))
-		enum RangeDimension = 2; 
-		else static if(!is(ElementType1D!R == void))
-		enum RangeDimension = 1; 
-		else
-		enum RangeDimension = 0; 
+	template RangeDimension(R)
+	{
+		static if(!is(ElementType3D!R == void))	enum RangeDimension = 3; 
+		else static if(!is(ElementType2D!R == void))	enum RangeDimension = 2; 
+		else static if(!is(ElementType1D!R == void))	enum RangeDimension = 1; 
+		else	enum RangeDimension = 0; 
 	} 
 	
-	template InnerElementType(R) {
-		static if(RangeDimension!R==3)
-		alias InnerElementType = ElementType3D!R; 
-		else static if(RangeDimension!R==2)
-		alias InnerElementType = ElementType2D!R; 
-		else static if(RangeDimension!R==1)
-		alias InnerElementType = ElementType1D!R; 
-		else
-		alias InnerElementType = R; 
+	template InnerElementType(R)
+	{
+		static if(RangeDimension!R==3)	alias InnerElementType = ElementType3D!R; 
+		else static if(RangeDimension!R==2)	alias InnerElementType = ElementType2D!R; 
+		else static if(RangeDimension!R==1)	alias InnerElementType = ElementType1D!R; 
+		else	alias InnerElementType = R; 
 	} 
 	
 	private void unittest_ImageElementType()
@@ -2288,17 +2278,13 @@ version(/+$DIDE_REGION+/all)
 							return format!"auto ref %s(){ return args[i+1]%s; }"(cast(char)('a'+i), index); 
 						} 
 						static foreach(i, T; A[1..$]) mixin(importArg!T(i)); 
-							
+						
 						static if(funIsStr)
 						{
-							enum isStatement = fun.strip.endsWith(';'); 
-							static if(isStatement)
-							{
-								mixin(fun); 
-								//Note: if the fun has a return statement, it will make an image. Otherwise return void.
-							}
-							else
-							{ return mixin(fun); }
+							//Note: if the fun has a return statement, it will make an image. Otherwise return void.
+							enum isStatement = __traits(compiles, {mixin(fun);}); 
+							static if(isStatement)	{ mixin(fun); }
+							else	{ return mixin(fun); }
 						}
 						else
 						{
