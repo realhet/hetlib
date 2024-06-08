@@ -1760,6 +1760,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 }version(/+$DIDE_REGION Meta prg.+/all)
 {
 	
+	void free(O)(ref O o)
+	if(is(O == class))
+	{ if(o) { o.destroy; o = null; }} 
+	
 	static T Singleton(T)() if(is(T == class))
 	{
 		//Singleton ////////////////////////
@@ -2509,8 +2513,23 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Todo: full row //comment detection is failing
 			} 
 			
-			string cell(int x, int y)
+			string cell(long x, long y)
 			{ return allRows.get(y).get(x); } 
+			
+			string header(long x)
+			{
+				auto s = cell(x, 0); 
+				if(s.length>=4 && s.startsWith("/+") && s.endsWith("+/"))
+				{
+					s = s[2..$-2]; 
+					foreach(prefix; ["note:"].map!"[a, a.capitalize]".joiner)
+					if(s.startsWith(prefix)) {
+						s = s.withoutStarting(prefix).withoutStarting(' '); 
+						break; 
+					}
+				}
+				return s; 
+			} 
 			
 			string GEN(string src)()
 			{
@@ -2520,6 +2539,37 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			string GEN_bitfields()
 			{ return rows.GEN_bitfields; } 
+			
+			string GEN_enumTable()
+			{
+				const 	numCols 	= rows.front.length, 
+					prefix 	= header(0); 
+				
+				string generateColumn(string fmt)(size_t colIdx, string label)
+				{ return format!fmt(label, rows.map!((a)=>(a[colIdx]))); } 
+				
+				string res = generateColumn!"enum %s {%-(%s,%)}"(0, prefix.capitalize); 
+				foreach(i; 1..numCols)
+				res ~= generateColumn!"enum %s = [%-(%s,%)];"(i, prefix.decapitalize ~ header(i).capitalize); 
+				return res; 
+				
+				/+
+					Use this code to verify the generated enums.
+					/+
+						Code: mixin template DumpEnumTable(string prefix)
+						{
+							pragma(msg, prefix~"\t"~EnumMemberNames!Type/+!!!!+/.stringof); 
+							static foreach(name; __traits(allMembers, typeof(this)))
+							static if(name.startsWith(prefix) && name.length>prefix.length)
+							pragma(msg, name~"\t"~mixin(name).text); 
+							pragma(msg, prefix~"\t"~EnumMemberNames!Type/+!!!!+/.stringof.hashOf.to!string(26)); 
+							static foreach(name; __traits(allMembers, typeof(this)))
+							static if(name.startsWith(prefix) && name.length>prefix.length)
+							pragma(msg, name~"\t"~mixin(name).text.hashOf.to!string(26)); 
+						} 
+					+/
+				+/
+			} 
 		} 
 		
 		string GEN_bitfields(R)(R rows)
