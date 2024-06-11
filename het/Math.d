@@ -3431,6 +3431,18 @@ version(/+$DIDE_REGION+/all)
 		auto roundEven(A, CT=ScalarType!A)(in A a)
 		{ return a.floatReductionOp!(std.math.lrint	, CT, A); } //Note: depens on roundingMode: default is even
 		
+		auto vectorCast(CT, A)(A a)
+		{
+			auto fun(A a) { return (cast(T)(a)); } 
+			a.generateVector!(fun, CT); //Todo: unittest
+		} 
+		
+		auto vectorClampCast(CT, CT mi = CT.min, CT ma = CT.max, A)(A a)
+		{
+			auto fun(A a) { return (cast(CT)(a.clamp(mi, ma))); } 
+			return a.generateVector!(CT, fun); //Todo: unittest
+		} 
+		
 		//generate int, and long versions
 		static foreach(T; AliasSeq!(int, long))
 		static foreach(F; AliasSeq!(floor, ceil, trunc, round, roundEven))

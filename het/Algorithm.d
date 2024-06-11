@@ -260,7 +260,7 @@ version(/+$DIDE_REGION+/all)
 				return blobs; 
 			} 
 			
-			void convexizeH(Image2D!RGBA img, int len)
+			void convexizeH(Image2D!RGBA img, int len, ubyte alpha=255)
 			{
 				if(len<=0) return; 
 				foreach(y; 0..img.height)
@@ -274,13 +274,13 @@ version(/+$DIDE_REGION+/all)
 						{
 							//fill holes
 							if(actState && lastPos>=0 && lastPos+len>=x)
-							foreach(x2; lastPos..x) img[x2, y].a = 160; 
+							foreach(x2; lastPos..x) img[x2, y].a = alpha; 
 							
 							lastPos = x; lastState = actState; 
 						}
 					}
 				}
-			}  void convexizeV(Image2D!RGBA img, int len)
+			}  void convexizeV(Image2D!RGBA img, int len, ubyte alpha=255)
 			{
 				if(len<=0) return; 
 				foreach(x; 0..img.width)
@@ -294,7 +294,7 @@ version(/+$DIDE_REGION+/all)
 						{
 							//fill holes
 							if(actState && lastPos>=0 && lastPos+len>=y)
-							foreach(y2; lastPos..y) img[x, y2].a = 160; 
+							foreach(y2; lastPos..y) img[x, y2].a = alpha; 
 							
 							lastPos = y; lastState = actState; 
 						}
@@ -303,10 +303,10 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			///Fills large holes on horizontal and vertical scanlines.  Works on alpha channel.
-			void convexize(Image2D!RGBA img, int len)
+			void convexize(Image2D!RGBA img, int len, ubyte alpha=255)
 			{
-				convexizeH(img, len); 
-				convexizeV(img, len); 
+				convexizeH(img, len, alpha); 
+				convexizeV(img, len, alpha); 
 			} 
 			
 			void inflateH(Image2D!RGBA img, int len1, int len2)
@@ -1002,17 +1002,15 @@ version(/+$DIDE_REGION+/all)
 			PositionExtrapolator pe; 
 			[100, 125, 150, 0, 0, 300, 300, 300, 300, 300, 300, 500, 505]
 				.chain([0].replicate(20))
-				.each!(
-				(a){
-					sleep(100); 
-					if(a) pe.appendPosition(a); 
-					pe.update; 
-					pe.position.print; 
-					
-					if(a==505)
-					iota(-1.5, 1.5, 0.03333).map!(i => pe.position(now + i*second)).print; 
-				}
-			); 
+				.each!((a){
+				sleep(100); 
+				if(a) pe.appendPosition(a); 
+				pe.update; 
+				pe.position.print; 
+				
+				if(a==505)
+				iota(-1.5, 1.5, 0.03333).map!(i => pe.position(now + i*second)).print; 
+			}); 
 		} 
 	} 
 	float waveLengthStrength(float[] arr, int wl)

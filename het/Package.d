@@ -2537,8 +2537,41 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				else	mixin(src); 
 			} 
 			
+			string GEN_bitfields(R)(R rows)
+			{
+				static if(isInputRange!R)
+				{
+					string[] res; ulong totalDef; int totalBits; 
+					foreach(r; rows)
+					{
+						{
+							auto type = r[0], name = r[2], bits = r[1].to!int, def = r[3].to!int.ifThrown(0); 
+							totalDef = totalDef.setBits(totalBits, bits, def); 
+							if(def) totalDef |= (long(def) & ((1<<bits)-1))<<totalBits; 
+							res ~= format!`%s,%s,%s,`(type, name, bits); //Note: Name must evaluate to string literal
+							totalBits += bits; 
+						}
+					}
+					enforce(totalBits.inRange(1, 64), format!"Invalid bitCount: %s"(totalBits)); 
+					const 	roundedBits = max(totalBits.nearest2NSize, 8),
+						defT = roundedBits.predSwitch(8, "ubyte", 16, "ushort", 32, "uint", 64, "ulong"); 
+					if(totalBits < roundedBits) res ~= format!q{uint,"_dummy",%s}(roundedBits - totalBits); 
+					return format!q{
+						union  {
+							%s _default = %s; 
+							mixin(std.bitmanip.bitfields!(%s)); 
+						} 
+					}(
+						defT, totalDef.format!"0x%X", 
+						res.join
+					); 
+				}
+				else
+				{ return GEN_bitfields(rows.rows); }
+			} 
+			
 			string GEN_bitfields()
-			{ return rows.GEN_bitfields; } 
+			{ return GEN_bitfields(rows); } 
 			
 			string GEN_enumTable()
 			{
@@ -2572,68 +2605,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 		} 
 		
-		string GEN_bitfields(R)(R rows)
-		{
-			static if(isInputRange!R)
-			{
-				string[] res; ulong totalDef; int totalBits; 
-				foreach(r; rows)
-				{
-					{
-						auto type = r[0], name = r[2], bits = r[1].to!int, def = r[3].to!int.ifThrown(0); 
-						totalDef = totalDef.setBits(totalBits, bits, def); 
-						if(def) totalDef |= (long(def) & ((1<<bits)-1))<<totalBits; 
-						res ~= format!`%s,%s,%s,`(type, name, bits); //Note: Name must evaluate to string literal
-						totalBits += bits; 
-					}
-				}
-				enforce(totalBits.inRange(1, 64), format!"Invalid bitCount: %s"(totalBits)); 
-				const 	roundedBits = max(totalBits.nearest2NSize, 8),
-					defT = roundedBits.predSwitch(8, "ubyte", 16, "ushort", 32, "uint", 64, "ulong"); 
-				if(totalBits < roundedBits) res ~= format!q{uint,"_dummy",%s}(roundedBits - totalBits); 
-				return format!q{
-					union  {
-						%s _default = %s; 
-						mixin(std.bitmanip.bitfields!(%s)); 
-					} 
-				}(
-					defT, totalDef.format!"0x%X", 
-					res.join
-				); 
-			}
-			else
-			{ return GEN_bitfields(rows.rows); }
-		} 
-		
-		
-		version(none)
-		private /+Note: This will test MixinTable and GEN_bitfields+/
-		{
-			struct MixinTable_TestStruct
-			{
-				mixin
-				(
-					(){
-						with(
-							表 (
-								[
-									[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/}],
-									[q{ubyte},q{2},"red",q{3}],
-									[q{ubyte},q{3},"green",q{}],
-									[q{ubyte},q{2},"blue",q{3}],
-									[q{bool},q{1},q{"al"~"pha"},q{1}],
-									[q{/+Default color: Fuchsia+/}],
-								]
-							)
-						) { return rows.GEN_bitfields; }
-					}()
-				); 
-			} 
-			static assert(MixinTable_TestStruct.init._default==227); 
-			static assert(is(typeof(MixinTable_TestStruct.green)==ubyte)); 
-			static assert(is(typeof(MixinTable_TestStruct.alpha)==bool)); 
-		} 
-		
+		
 		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
 		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
 		{
@@ -2691,17 +2663,21 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				string expr, string fun
 			)
 			{
+				expr = expr.removeDLangComments; 
+				const isCode = expr.length && expr.back.among(';', '}'); 
 				if(fun=="each")
 				{
-					expr = expr.removeDLangComments; 
-					const isCode = expr.length && expr.back.among(';', '}'); 
 					if(!isCode) expr ~= ';'; //make it a valid statement
 					return format	!"(%s.each!((%s){%s}))"
 						(generatorCode, strip(type~' '~id), expr); 
 				}
 				else
-				return format	!"(%s.map!((%s)=>(%s))%s)"
-					(generatorCode, strip(type~' '~id), expr, fun); 
+				{
+					return format(
+						((isCode)?("(%s.map!((%s){%s})%s)") :("(%s.map!((%s)=>(%s))%s)")),
+						generatorCode, strip(type~' '~id), expr, fun
+					); 
+				}
 			} 
 			
 			auto parts = low.splitDLang("<"); 
@@ -2766,17 +2742,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		} 
 		
 		string 求map(string low, string high, string expr)
-		{ return 求(low, high, expr, ""); } 
+		{ return 求(low, high, expr, ""/+Note: map is the default behavior: nothing, just iterate.+/); } 
 		
 		string 求each(string low, string high, string expr)
-		{ return 求(low, high, expr, "each"); } 
+		{ return 求(low, high, expr, "each"/+Note: "each" is a special case+/); } 
 		
 		string 求sum(string low, string high, string expr)
 		{ return 求(low, high, expr, ".sum"); } 
 		
 		string 求product(string low, string high, string expr)
 		{ return 求(low, high, expr, ".product"); } 
-		
+		
 		
 		//Inspector
 		auto 檢(T)(T a, ulong location)
@@ -2805,10 +2781,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				ms<1 	? ms.format!"%.2f" :
 				ms<10 	? ms.format!"%.1f"
 					: ms.format!"%.0f"
-			) ~ " ms"; ; 
+			) ~ " ms"; 
 			state = act; 
 			return str; 
 		} 
+		
+		
+		string ONCE(string scr)
+		{ return scr.format!q{{ static bool running; if(running.chkSet) {%s}}}; } 
 	}
 	
 }
@@ -4418,60 +4398,120 @@ version(/+$DIDE_REGION Numeric+/all)
 {
 	//Signal processing /////////////////////////////
 	version(/+$DIDE_REGION+/all) {
-		float[] gaussianBlur(in float[] a, int kernelSize)
-		{
-			//http://dev.theomader.com/gaussian-kernel-calculator/
-			//Todo: refactor this
+		version(/+$DIDE_REGION+/all) {
+			version(/+$DIDE_REGION+/none) {
+				float[] gaussianBlur(in float[] a, int kernelSize)
+				{
+					//http://dev.theomader.com/gaussian-kernel-calculator/
+					//Todo: refactor this
 					
-			float g3(int i) {
-				 return	(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.27901f +
-					a[i]*0.44198f; 
-			} 
+					float g3(int i) {
+						 return	(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.27901f +
+							a[i]*0.44198f; 
+					} 
 					
-			float g5(int i) {
-				return	(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.06136f +
-					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.24477f +
-					a[i]*0.38774f; 
-			} 
+					float g5(int i) {
+						return	(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.06136f +
+							(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.24477f +
+							a[i]*0.38774f; 
+					} 
 					
-			float g7(int i) {
-				return	(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.00598f +
-					(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060626f +
-					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241843f +
-					a[i]*0.383103f; 
-			} 
+					float g7(int i) {
+						return	(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.00598f +
+							(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060626f +
+							(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241843f +
+							a[i]*0.383103f; 
+					} 
 					
-			float g9(int i) {
-				return	(a[max(i-5, 0)]+a[min(i+5, $-1)])*0.000229f +
-					(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.005977f +
-					(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060598f +
-					(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241732f +
-					a[i]*0.382928f; 
-			} 
+					float g9(int i) {
+						return	(a[max(i-5, 0)]+a[min(i+5, $-1)])*0.000229f +
+							(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.005977f +
+							(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060598f +
+							(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241732f +
+							a[i]*0.382928f; 
+					} 
+					
+					float delegate(int) fv; 
+					switch(kernelSize) {
+						case 1: return a.dup; 
+						case 3: fv = &g3; break; 
+						case 5: fv = &g5; break; 
+						case 7: fv = &g7; break; 
+						case 9: fv = &g9; break; 
+						default: enforce(0, "Unsupported kernel size "~kernelSize.text); 
+					}
+					
+					return iota(a.length.to!int).map!(i => fv(i)).array; 
+				} 
+				
+				Image2D!float gaussianBlur(Image2D!float img, int kernelSize)
+				{
+					foreach(i; 0..2)
+					{
+						img = img.columns.image2D; 
+						foreach(row; img.rows) row[] = row.gaussianBlur(kernelSize); 
+					}
+					return img; 
+				} 
+			}
+			struct SymmetricKernel(T)
+			{ T[] value; alias value this; } 
 			
-			float delegate(int) fv; 
-			switch(kernelSize) {
-				case 1: return a.dup; 
-				case 3: fv = &g3; break; 
-				case 5: fv = &g5; break; 
-				case 7: fv = &g7; break; 
-				case 9: fv = &g9; break; 
-				default: enforce(0, "Unsupported kernel size "~kernelSize.text); 
-			}
-			
-			return iota(a.length.to!int).map!(i => fv(i)).array; 
-		} 
-		
-		Image2D!float gaussianBlur(Image2D!float img, int kernelSize)
-		{
-			foreach(i; 0..2)
+			SymmetricKernel!float gaussKernel(float σ)
 			{
-				img = img.columns.image2D; 
-				foreach(row; img.rows) row[] = row.gaussianBlur(kernelSize); 
-			}
-			return img; 
-		} 
-		
+				const N = (itrunc(σ*3)); if(N<=0) return SymmetricKernel!float([1]); 
+				
+				auto kernel = (mixin(求map(q{0<=x<N},q{},q{(exp(((-((x)^^(2)))/(2*((σ)^^(2))))))}))).array; 
+				kernel[] *= ((1)/(kernel[0] + 2*kernel[1..$].sum)); /+
+					more precise 
+					discrete normalization
+				+/
+				
+				return SymmetricKernel!float(kernel); 
+			} 
+			
+			auto gaussKernel2(float σ)
+			{
+				/+
+					Note: This version is for testing a GPU friendly algorithm, 
+					that works without table lookups.
+					/+
+						Link: https://developer.nvidia.com/gpugems/gpugems3/
+						part-vi-gpu-computing/chapter-40-incremental-computation-gaussian
+					+/
+				+/
+				const N = (itrunc(σ*3)); if(N<=0) return SymmetricKernel!float([1]); 
+				auto g = vec3(((1)/(σ * (float((sqrt(2*π)))))), exp((-1)/(2 * ((σ)^^(2)))), 0); g.z = ((g.y)^^(2)); 
+				auto kernel = (mixin(求map(q{0<=i<N},q{},q{auto tmp = g.x; g.xy *= g.yz; return tmp; }))).array; 
+				return SymmetricKernel!float(kernel); 
+			} 
+			
+			T[] convolve(string chn_="", T)(T[] signal, SymmetricKernel!float kernel)
+			{
+				alias CT = ScalarType!T; 
+				enum chn = chn_!="" ? chn_.withStarting('.') : ""; 
+				const 	N = signal.length.to!int, 
+					M = kernel.length.to!int; 
+				
+				auto read(int i)
+				{ return mixin("signal[i]"~chn); } 
+				
+				auto combine(A)(int i, A a)
+				{
+					static if(isIntegral!CT)	auto b = (round(a)).vectorClampCast!CT; 
+					else	alias b = a; 
+					auto s = signal[i]; 
+					mixin("s"~chn~"=b;"); 
+					return s; 
+				} 
+				
+				return (mixin(求map(q{0<=i<N},q{},q{combine(i, (mixin(求sum(q{-M<j<M},q{},q{kernel[(magnitude(j))] * read((i+j).clamp(0, N-1))}))))}))).array; 
+			} 
+			
+			auto convolve(string chn="", E)(Image!(E, 2) img, SymmetricKernel!float kernel)
+			{ (mixin(求each(q{pass=1},q{2},q{img = (mixin(求map(q{line},q{img.columns},q{line.convolve!chn(kernel)}))).image2D}))); return img; } 
+			
+		}
 		class ResonantFilter
 		{
 			//https://www.music.mcgill.ca/~gary/307/week2/filters.html
