@@ -4399,8 +4399,8 @@ version(/+$DIDE_REGION Numeric+/all)
 	//Signal processing /////////////////////////////
 	version(/+$DIDE_REGION+/all) {
 		version(/+$DIDE_REGION+/all) {
-			version(/+$DIDE_REGION+/none) {
-				float[] gaussianBlur(in float[] a, int kernelSize)
+			version(/+$DIDE_REGION+/all) {
+				deprecated float[] gaussianBlur(in float[] a, int kernelSize)
 				{
 					//http://dev.theomader.com/gaussian-kernel-calculator/
 					//Todo: refactor this
@@ -4444,7 +4444,7 @@ version(/+$DIDE_REGION Numeric+/all)
 					return iota(a.length.to!int).map!(i => fv(i)).array; 
 				} 
 				
-				Image2D!float gaussianBlur(Image2D!float img, int kernelSize)
+				deprecated Image2D!float gaussianBlur(Image2D!float img, int kernelSize)
 				{
 					foreach(i; 0..2)
 					{

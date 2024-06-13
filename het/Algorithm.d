@@ -12,8 +12,8 @@ version(/+$DIDE_REGION+/all)
 	struct Blob
 	{
 		ivec2 pos; 
-		int id; 
-		int area; 
+		uint id; 
+		uint area; 
 		
 		auto calcBounds(T)(T im)
 		{
@@ -83,7 +83,7 @@ version(/+$DIDE_REGION+/all)
 			int actId; 
 			
 			//first pass: find the blobs based on top and left neighbors
-			
+			auto _間=init間; 
 			foreach(y; 0..src.height)
 			foreach(x; 0..src.width)
 			if(boolSrc(x, y))
@@ -122,28 +122,27 @@ version(/+$DIDE_REGION+/all)
 				static if(is(findBlobsDebug))
 				findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
 			}
-			
+			(((update間(_間))).檢(0xC29E871EC65)); //63 ms
 			
 			
 			{
 				//make the map recursive
-				//print("FUCK"); map_.keys.sort.each!(k => print(k, "->", map_[k]));
 				int map_recursive(int id)
 				{
 					while(1) if(auto a = id in map_) id = *a; else break; 
-					//Todo: install latest LDC
 					return id; 
 				} 
 				foreach(k; map_.keys) map_[k] = map_recursive(k); 
 				//remap the result id image
 				foreach(ref p; res.img) if(p) p = map(p); 
 			}
+			(((update間(_間))).檢(0xD99E871EC65)); //22 ms
 			
 			{
-					//remap the result blobs
+				//remap the result blobs
 				int[] rem; 
 				foreach(k; res.blobs.keys) {
-						//Opt: maybe the .array is not needed
+					//Opt: maybe the .array is not needed
 					int p = map(k); 
 					if(p!=k) {
 						res.blobs[p].area += res.blobs[k].area; 
@@ -248,7 +247,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			auto isolateLargestBlob(Image2D!RGBA img)
 			{
-				auto blobs = findBlobs(img.image2D!(p => p.a>0)); 
+				auto blobs = findBlobs!"a.a"(img); 
 				if(blobs.length)
 				{
 					const largestBlobId = blobs.values.maxElement!(a => a.area).id; 
