@@ -6037,7 +6037,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			auto f = File(file); 
 			auto b = f.read.deserialize!Bitmap; 
-			copyFrom(b); 
+			copyFrom(b); //Todo: mi a faszom ez a copyFrom????
 		} 
 		
 		void update(E)(Image!(E, 2) im)
@@ -6077,6 +6077,7 @@ version(/+$DIDE_REGION+/all)
 		const lossy = quality<=100; //101 and up means lossless
 		const channels = data.length.to!int/(width*height); 
 		enforce(data.length = width*height*channels, "invalid image data"); 
+		
 		switch(channels)
 		{
 			case 4: 	size = ((lossy)?(WebPEncodeRGBA       (data.ptr, width, height, width*channels, quality, &output)) :(WebPEncodeLosslessRGBA(data.ptr, width, height, width*channels,        &output))); 	break; 
@@ -6098,6 +6099,8 @@ version(/+$DIDE_REGION+/all)
 	
 	private static ubyte[] write_jpg_to_mem(int width, int height, ubyte[] data, int quality)
 	{
+		enforce(quality<=100, "TJPARAM_LOSSLESS not supported yet."); 
+		
 		const 	channels 	= data.length.to!int/(width*height),
 			pitch 	= width*channels; 
 		enforce(data.length = pitch*height, "invalid image data"); 
@@ -6119,18 +6122,18 @@ version(/+$DIDE_REGION+/all)
 		return res; 
 	} 
 	
-	private ubyte[] serializeImage(T)(Image!(T, 2) img, string format="")
+	ubyte[] serializeImage(T)(Image!(T, 2) img, string format="")
 	{
 		//compile time version
 		
 		enum chn = VectorLength!T,
-				 type = (ScalarType!T).stringof; 
+		type = (ScalarType!T).stringof; 
 		if(format=="") format = serializeImage_defaultFormat; 
 		auto fmt = format.commandLineToMap; 
 		
 		auto getQuality()
 		{
-			return ("quality" in fmt) 	? fmt["quality"].to!int.clamp(0, 100)
+			return ("quality" in fmt) 	? fmt["quality"].to!int.clamp(0, 101)
 				: 95 /+Default quality for jpeg and webp+/; 
 		} 
 		
@@ -6169,7 +6172,7 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
-	private ubyte[] serializeImage(Bitmap bmp, string format="")
+	ubyte[] serializeImage(Bitmap bmp, string format="")
 	{
 		//runtime version
 		
@@ -6388,7 +6391,14 @@ version(/+$DIDE_REGION+/all)
 		catch(Exception e) { if(mustSucceed) throw e; }
 		
 		return null; 
-	} 
+	} 
+	
+	Image2D!T deserializeImage(T)(in ubyte[] stream)
+	{
+		auto bmp = stream.deserialize!Bitmap(true); 
+		return bmp.accessOrGet!T; 
+	} 
+	
 	
 	
 	//Bitmap convert and serializer tests //////////////////////////////

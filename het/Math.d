@@ -3842,6 +3842,7 @@ version(/+$DIDE_REGION+/all)
 			return dt<maxDt 	? 1-pow(speed, dt*30)
 				: 1; 
 			//Todo: Upgrade to https://val-sagrario.github.io/Dynamics%20of%20First%20Order%20Systems%20for%20game%20devs%20-%20Jan%202020.pdf
+			//Todo: also upgrade https://youtu.be/LSNQuFEDOyQ?t=2981 - Freya Holmér - Lerp smoothing is broken -> expDecay
 		} 
 		
 		/*

@@ -4459,8 +4459,7 @@ version(/+$DIDE_REGION Numeric+/all)
 			
 			SymmetricKernel!float gaussKernel(float σ)
 			{
-				const N = (itrunc(σ*3)); if(N<=0) return SymmetricKernel!float([1]); 
-				
+				const N = (iround(σ*3)); if(N<=0) return SymmetricKernel!float([1]); 
 				auto kernel = (mixin(求map(q{0<=x<N},q{},q{(exp(((-((x)^^(2)))/(2*((σ)^^(2))))))}))).array; 
 				kernel[] *= ((1)/(kernel[0] + 2*kernel[1..$].sum)); /+
 					more precise 
@@ -4470,7 +4469,14 @@ version(/+$DIDE_REGION Numeric+/all)
 				return SymmetricKernel!float(kernel); 
 			} 
 			
-			auto gaussKernel2(float σ)
+			vec4 incrementalGaussKernelParams(float σ)
+			{
+				const N = (iround(σ*3)); if(N<=0) return vec4(1, 0, 0, 1); 
+				auto g = vec4(((1)/(σ * (float((sqrt(2*π)))))), exp((-1)/(2 * ((σ)^^(2)))), 0, N); g.z = ((g.y)^^(2)); 
+				return g; //N is stored in g.w
+			} 
+			
+			auto incrementalGaussKernel(float σ)
 			{
 				/+
 					Note: This version is for testing a GPU friendly algorithm, 
@@ -4480,13 +4486,13 @@ version(/+$DIDE_REGION Numeric+/all)
 						part-vi-gpu-computing/chapter-40-incremental-computation-gaussian
 					+/
 				+/
-				const N = (itrunc(σ*3)); if(N<=0) return SymmetricKernel!float([1]); 
-				auto g = vec3(((1)/(σ * (float((sqrt(2*π)))))), exp((-1)/(2 * ((σ)^^(2)))), 0); g.z = ((g.y)^^(2)); 
+				auto g = incrementalGaussKernelParams(σ); 
+				const N = g.w; 
 				auto kernel = (mixin(求map(q{0<=i<N},q{},q{auto tmp = g.x; g.xy *= g.yz; return tmp; }))).array; 
 				return SymmetricKernel!float(kernel); 
 			} 
 			
-			T[] convolve(string chn_="", T)(T[] signal, SymmetricKernel!float kernel)
+			T[] convolve(string chn_="", T)(T[] signal, in SymmetricKernel!float kernel)
 			{
 				alias CT = ScalarType!T; 
 				enum chn = chn_!="" ? chn_.withStarting('.') : ""; 
@@ -4508,7 +4514,7 @@ version(/+$DIDE_REGION Numeric+/all)
 				return (mixin(求map(q{0<=i<N},q{},q{combine(i, (mixin(求sum(q{-M<j<M},q{},q{kernel[(magnitude(j))] * read((i+j).clamp(0, N-1))}))))}))).array; 
 			} 
 			
-			auto convolve(string chn="", E)(Image!(E, 2) img, SymmetricKernel!float kernel)
+			auto convolve(string chn="", E)(Image!(E, 2) img, in SymmetricKernel!float kernel)
 			{ (mixin(求each(q{pass=1},q{2},q{img = (mixin(求map(q{line},q{img.columns},q{line.convolve!chn(kernel)}))).image2D}))); return img; } 
 			
 		}

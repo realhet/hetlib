@@ -3840,13 +3840,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				// Note: these are the images that swap chain image indices refer to
 				// Note: actual number of images may differ from requested number, since it's a lower bound
 				images = device.getSwapchainImagesKHR(device.handle, handle)
-					.map!(
-					(im){
-						auto vulkanImage = new VulkanImage(device, im); 
-						vulkanImage.automaticallyDestroyed = true; 
-						return vulkanImage; 
-					}
-				).array; 
+					.map!((im){
+					auto vulkanImage = new VulkanImage(device, im); 
+					vulkanImage.automaticallyDestroyed = true; 
+					return vulkanImage; 
+				}).array; 
 				
 				// create imageViews
 				imageViews = images.map!
@@ -5578,7 +5576,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				struct Vertex { vec3 pos, color; } 
 				
-				VkClearValue clearColor = { color: { float32: [ 0.98, 0.92, 0.96, 1.0 ]}, }; 
+				VkClearValue clearColor = { color: {float32: [ 0.98, 0.92, 0.96, 1.0 ]}, }; 
 				
 				//must fill these in update
 				//Todo: these must be the already mapped VulkanMemory Staging-Buffers
