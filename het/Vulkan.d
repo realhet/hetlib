@@ -5509,7 +5509,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void dispatch(uint groupCountX, uint groupCountY=1, uint groupCountZ=1)
 				{ dispatchPipeline(0, groupCountX, groupCountY, groupCountZ); } 
 			} 
-			UB ubuf; 	/+Note: Uniform buffer+/
+			protected UB* ubufPtr; 	/+Note: Uniform buffer+/
+			ref ubuf() { return *ubufPtr; } 
+			
 			ubyte[] buf; 	/+
 				Note: GPU can only address dwords, 
 				so all the offsets are practically dwOffsets
@@ -5519,6 +5521,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			this(File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_)
 			{
+				ubufPtr = new UB; /+
+					This fixes possible access violation 
+					when the struct has align(16) fields.
+				+/
+				
 				this.bufSizeBytes = bufSizeBytes_; 
 				
 				initialize; 
@@ -5534,8 +5541,49 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			~this()
 			{
 				vk.destroy; 
+				ubufPtr = null; 
 				/+deterministic destructor+/
 			} 
+			
+			version(none)
+			{
+				/+
+					Bug: When the struct has align(16), and it's placed on the surface of this class, 
+					access violation can happen.
+					/+Link: https://forum.dlang.org/post/cwnzgfzodjdrjyhohlqw@forum.dlang.org+/
+				+/
+				
+				//import het; <- it's needed with LDC 1.28.1
+				
+				struct S
+				{
+					int a; 
+					align(16)//<-this triggers it
+					int[4] b; 
+				} 
+				
+				class A(T)
+				{
+					version(none)
+					{ T u; }
+					else
+					{
+						T* p; //<- this fixes it.  (The struct is not on the class surface)
+						ref u() { return *p; } 
+						this() { p = new T; } 
+					}
+				} 
+				
+				class B: A!S
+				{ void f() { writeln(u.text/+<-The access violation can be here+/); } } 
+				
+				void main()
+				{
+					//writeln("a"); <- this fixes it
+					auto b = new B; //<-scoped! can trigger it too
+					b.f; 
+				} 
+			}
 		} 
 		
 		static if(VulkanWindowed)
