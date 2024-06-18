@@ -5509,9 +5509,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void dispatch(uint groupCountX, uint groupCountY=1, uint groupCountZ=1)
 				{ dispatchPipeline(0, groupCountX, groupCountY, groupCountZ); } 
 			} 
-			protected UB* ubufPtr; 	/+Note: Uniform buffer+/
-			ref ubuf() { return *ubufPtr; } 
+			enum StructAlignBugFix=true; 
 			
+			static if(StructAlignBugFix)
+			{
+				protected UB* ubufPtr; 	/+Note: Uniform buffer+/
+				ref ubuf() { return *ubufPtr; } 
+			}
+			else
+			{ UB ubuf; }
 			ubyte[] buf; 	/+
 				Note: GPU can only address dwords, 
 				so all the offsets are practically dwOffsets
@@ -5521,10 +5527,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			this(File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_)
 			{
-				ubufPtr = new UB; /+
-					This fixes possible access violation 
-					when the struct has align(16) fields.
-				+/
+				static if(StructAlignBugFix)
+				{
+					ubufPtr = new UB; /+
+						This fixes possible access violation 
+						when the struct has align(16) fields.
+					+/
+				}
 				
 				this.bufSizeBytes = bufSizeBytes_; 
 				
@@ -5541,14 +5550,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			~this()
 			{
 				vk.destroy; 
-				ubufPtr = null; 
+				version(StructAlignBugFix) ubufPtr = null; 
 				/+deterministic destructor+/
 			} 
 			
 			version(none)
 			{
 				/+
-					Bug: When the struct has align(16), and it's placed on the surface of this class, 
+					Bug: StructAlignBugFix:
+					When the struct has align(16), and it's placed on the surface of this class, 
 					access violation can happen.
 					/+Link: https://forum.dlang.org/post/cwnzgfzodjdrjyhohlqw@forum.dlang.org+/
 				+/
