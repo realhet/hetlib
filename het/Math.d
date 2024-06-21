@@ -26,10 +26,10 @@ version(/+$DIDE_REGION+/all)
 	public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI); 
 	enum π = PIf, ℯ = Ef; 
 	
-	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly; 
+	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly, isClose; 
 	
 	static import std.complex; 
-	public import std.complex : Complex, norm, arg, fromPolar; 
+	public import std.complex : Complex, norm, arg, fromPolar, expi; 
 	enum isComplex(T) = is(T==Complex!F, F); 
 	alias ℂ = Complex!float; 
 	
