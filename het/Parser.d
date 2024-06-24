@@ -3776,19 +3776,19 @@ version(/+$DIDE_REGION Keywords+/all)
 		auto Trans(string s, State dst, int op=0)
 		{
 			return s.predSwitch(
-				""	, [Transition(""	, dst, op)],  //s=="" means take ALL chars from src
-						" "	, [Transition(" "	, dst, op)]  //space character is special
-							, s.split(' ').map!(t => Transition(t, dst, op)).array
+				""	, [Transition(""	, dst, op)],	 //s=="" means take ALL chars from src
+				" "	, [Transition(" "	, dst, op)],	 //space character is special
+				s.split(' ').map!(t => Transition(t, dst, op)).array
 			); 
 		} 
 		
-		auto Push	(string s, State dst	)
+		auto Push(string s, State dst)
 		{ return Trans(s, dst, 1); } 
-		auto Pop	(string s	)
+		auto Pop(string s)
 		{ return Trans(s, State.pop); } 
-		auto Ignore	(string s	)
+		auto Ignore(string s)
 		{ return Trans(s, State.ignore); } 
-		auto Error	(string s	)
+		auto Error(string s)
 		{ return Trans(s, State.error); } 
 		
 		auto collectStateTransitions(State st)()
@@ -3982,8 +3982,8 @@ version(/+$DIDE_REGION Keywords+/all)
 	{
 		static: 
 		
-		enum NewLineTokens	= "\r\n \r \n \u2028 \u2029"; 
-		enum EOFTokens	= "\0 \x1A"; 
+		enum NewLineTokens = "\r\n \r \n \u2028 \u2029"; 
+		enum EOFTokens = "\0 \x1A"; 
 		
 		string extendCWD(string s)
 		{ return s.split(" ").map!(a => [a~"c", a~"w", a~"d", a]).join.join(" "); } 
@@ -4015,7 +4015,7 @@ version(/+$DIDE_REGION Keywords+/all)
 									
 					@Pop(NewLineTokens)	@Pop(EOFTokens) 		slashComment	,
 						@Pop("*/")	@EOF 	cComment	,
-					@Push("/+", dComment)	@Pop("+/")	@EOF	dComment 	, //Bug: This is broken: /+ //NewLine +/
+					@Push("/+", dComment)	@Pop("+/")	@EOF	dComment 	,
 									
 					@Ignore(`\\ \'`)	@PopCWD(`'`)	@EOF	cChar	,
 					@Ignore(`\\ \"`)	@PopCWD(`"`)	@EOF	cString	,
@@ -4042,8 +4042,8 @@ version(/+$DIDE_REGION Keywords+/all)
 		
 		mixin StructureScanner; 
 		
-		enum EOF	= Trans(EOFTokens	, State.unstructured); 
-		enum StructuredEOF	= Trans(EOFTokens /+~ " __EOF__"+/	, State.unstructured); //Todo: __EOF__ is only valid when it is a complete keyword.
+		enum EOF = Trans(EOFTokens, State.unstructured); 
+		enum StructuredEOF = Trans(EOFTokens /+~ " __EOF__"+/, State.unstructured); //Todo: __EOF__ is only valid when it is a complete keyword.
 	} 
 	
 	alias DDocScanner = StructureScanner_DDoc.scanner; 
