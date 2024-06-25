@@ -2516,6 +2516,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string cell(long x, long y)
 			{ return allRows.get(y).get(x); } 
 			
+			auto column(int x)()
+			{ return rows.map!(r=>r.get(x)); } 
+			
 			string header(long x)
 			{
 				auto s = cell(x, 0); 
@@ -2603,6 +2606,64 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					+/
 				+/
 			} 
+			
+			string GEN_enum(R)(string name, R items)
+			{ return format!q{enum %s {%s} }(name, items.join(", "))~'\n'; } 
+			
+			
+			
+			version(/+$DIDE_REGION GEN_StructureScanner+/all)
+			{
+				
+				string GEN_StructureScanner_State(R)(R items)
+				{ return GEN_enum("State : "~((items.walkLength<0x100)?("ubyte"):("ushort")), items); } 
+				
+				string GEN_StructureScanner_EntryTransitions(R0, R1)(string name, R0 tokens, R1 states)
+				{
+					return format!q{enum %s = chain(%s).array; }
+					(name, zip(tokens, states).filter!q{a[0]!=""}.map!q{format!"Push(%s, State.%s)"(a[0], a[1])}	.join(","))~'\n'; 
+				} 
+				
+				string GEN_StructureScanner_EntryTransitions(R0, R1)(R0 tokens, R1 states)
+				{ return GEN_StructureScanner_EntryTransitions("EntryTransitions", tokens, states); } 
+				
+				string GEN_StructureScanner_StateTransitions(R0, R1, R2)(string name, string enumName, R0 transitionItems, R1 leaveItems, R2 eofItems)
+				{
+					return format!q{static immutable %s = ((){ with(%s) return [%s]; }()); }
+					(
+						name, enumName,
+						zip(transitionItems, leaveItems, eofItems).map!
+						((a){
+							string preprocess(string s)
+							{ s = s.strip; if(s.startsWith("/+")&&s.endsWith("+/")) s = ""; return s; } 
+							auto trans = preprocess(a[0]); 
+							auto leave = preprocess(a[1]); if(leave!="") leave = "Pop("~leave~")"; 
+							auto eof = preprocess(a[2]); 
+							return only(trans, leave, eof).filter!"a!=``".join("~"); 
+						})
+						.join(",")
+					)~'\n'; 
+				} 
+				
+				string GEN_StructureScanner_StateTransitions(R0, R1, R2)(R0 transitionItems, R1 leaveItems, R2 eofItems)
+				{ return GEN_StructureScanner_StateTransitions("StateTransitions", "State", transitionItems, leaveItems, eofItems); } 
+				
+				string GEN_StructureScanner(string initializations)
+				{
+					//Help -> StructureScanner_DLang
+					return [
+						GEN_StructureScanner_State(column!1),
+						q{static: mixin StructureScanner.prologue; },
+						
+						initializations,
+						
+						GEN_StructureScanner_EntryTransitions(column!0, column!1),
+						GEN_StructureScanner_StateTransitions(column!2, column!3, column!4),
+						
+						q{mixin StructureScanner.epilogue; }
+					].join('\n'); 
+				} 
+			}
 		} 
 		
 		
@@ -6430,6 +6491,17 @@ version(/+$DIDE_REGION Containers+/all)
 		bool isDLangSymbol(T)(T ch)if(isSomeChar!T)
 		{
 			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //Todo: optimize this to a lookup
+		} 
+		
+		bool isSingleDString(string src)
+		{
+			return src.length>=2 && src.startsWith('`') && src.endsWith('`') 
+			&& !src[1..$-1].canFind('`'); 
+		} 
+		bool isSingleCString(string src)
+		{
+			return src.length>=2 && src.startsWith('"') && src.endsWith('"') 
+			&& !src[1..$-1].replace(`\"`, `\'`).canFind('"'); 
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {

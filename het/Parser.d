@@ -3961,16 +3961,6 @@ version(/+$DIDE_REGION Keywords+/all)
 		return false; 
 	} 
 	
-	bool isSingleDString(string src)
-	{
-		return src.length>=2 && src.startsWith('`') && src.endsWith('`') 
-		&& !src[1..$-1].canFind('`'); 
-	} 
-	bool isSingleCString(string src)
-	{
-		return src.length>=2 && src.startsWith('"') && src.endsWith('"') 
-		&& !src[1..$-1].replace(`\"`, `\'`).canFind('"'); 
-	} 
 	bool isSingleDComment(string src)
 	{
 		return src.length>=4 && src.startsWith("/+") && src.endsWith("+/") 
