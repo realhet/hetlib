@@ -44,7 +44,7 @@ version(/+$DIDE_REGION+/all)
 	import std.array : replicate, split, replace, join, array, staticArray; 
 	import std.range : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro; 
 	import std.traits : 	Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, 
-		CommonType, ReturnType, isPointer; 
+		CommonType, ReturnType, isPointer, isFunction, isDelegate; 
 	import std.meta	: AliasSeq, allSatisfy, anySatisfy; 
 	
 	import std.exception	: enforce; 
@@ -2271,6 +2271,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto image2D(alias fun="", A...)(A args)
 	{
+		//pragma(msg, "$RECURSIVEBUG:", __PRETTY_FUNCTION__); 
 		//image2D constructor //////////////////////////////////
 		static assert(A.length>0, "invalid args"); 
 		
@@ -2302,7 +2303,13 @@ version(/+$DIDE_REGION+/all)
 				else
 				{
 					static assert(A.length<=2, "too many args"); 
-					static if(__traits(compiles, args[1](size)))
+					static if(isPointer!(A[1]) && __traits(compiles, args[1][0..size.area]))
+					{
+						/+Bug: This fails in libUEye.d -> template recursion error at a random position.+/
+						alias E = Unqual!(typeof(*args[1])); 
+						return Image!(E, 2)(size, cast(E[])(args[1][0..size.area])); 
+					}
+					else static if(__traits(compiles, args[1](size)))
 					{
 						//delegate or function (ivec2)
 						alias RT = Unqual!(typeof(args[1](size))); 
@@ -2318,16 +2325,11 @@ version(/+$DIDE_REGION+/all)
 							//return type is something, make an Image out of it.
 						}
 					}
-					else static if(isPointer!(A[1]))
-					{
-						alias E = Unqual!(typeof(*args[1])); 
-						return Image!(E, 2)(size, cast(E[])(args[1][0..size.area])); 
-					}
 					else
 					{
 						//non-callable
 						Unqual!R tmp = args[1]; 
-						return Image!(Unqual!R, 2)(size, [tmp].replicate(size[].product)); 
+						return Image!(Unqual!R, 2)(size, [tmp].replicate(size.area)); 
 						//one pixel stretched all over the size
 					}
 				}
@@ -2421,7 +2423,7 @@ version(/+$DIDE_REGION+/all)
 			auto volume() const
 			{ return area*depth; } 
 			
-				
+			
 			this(in ivec2 size, E[] initialData = [], int stride=0)
 			{
 				//from array. stride is optional
