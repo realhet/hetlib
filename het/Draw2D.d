@@ -2872,11 +2872,17 @@ class Drawing
 			//Shader management /////////////////////////////
 			
 			struct GlobalShaderParams {
-				auto floats = [0.0f].replicate(8); 
-				auto bools = [false].replicate(8); 
+				float[] floats; 
+				bool[] bools; 
 			} 
 			
 			GlobalShaderParams globalShaderParams; 
+			
+			static this()
+			{
+				globalShaderParams.floats = [0.0f].replicate(8); 
+				globalShaderParams.bools = [false].replicate(8); 
+			} 
 			
 			private string customShader_; 
 			private bool customShaderChanged; 

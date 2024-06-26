@@ -41,11 +41,11 @@ version(/+$DIDE_REGION+/all)
 	//import locally used things.     //must not import het.utils to keep het.math simle and standalone
 	import std.format : format; 
 	import std.conv : text, stdto = to; 
-	import std.array : replicate, split, replace, join, array; 
+	import std.array : replicate, split, replace, join, array, staticArray; 
 	import std.range : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro; 
 	import std.traits : 	Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, 
-		stdCommonType = CommonType, ReturnType, isPointer; 
-	import std.meta	: AliasSeq; 
+		CommonType, ReturnType, isPointer; 
+	import std.meta	: AliasSeq, allSatisfy, anySatisfy; 
 	
 	import std.exception	: enforce; 
 	import std.stdio	: write, writeln; 
@@ -105,17 +105,98 @@ version(/+$DIDE_REGION+/all)
 		+/
 	+/
 	
-	private {
-		//Todo: GenericArg is not visible to math.d because math.d is independent from package(utils).d  Thisi is just here for testing.
-		struct GenericArg(string N="", T)
-		{ alias type = T; enum name = N; T value; alias value this; } 
-		auto genericArg(string N="", T)(in T p)
-		{ return GenericArg!(N, T)(p); } 
+	version(none)
+	{
+		struct vec2
+		{
+			float 	x,
+				y; 
+		} 
+		
+		struct vec3
+		{
+			union 
+			{
+				struct 
+				{
+					float x; 
+					union 
+					{
+						struct 
+						{
+							float 	y,
+								z; 
+						} 
+						vec2 yz; 
+					} 
+				} 
+				struct 
+				{ vec2 xy; } 
+			} 
+		} 
+		
+		
+		
+		struct vec4
+		{
+			union 
+			{
+				struct 
+				{
+					vec3 xyz; 
+					float w; 
+				} 
+				struct 
+				{
+					float _x; 
+					vec3 yzw; 
+				} 
+				struct 
+				{
+					float _xy; 
+					vec2 zw; 
+				} 
+			} 
+		} 
+		
+	}
+	
+	version(/+$DIDE_REGION GenericArg+/all)
+	{
+		public {
+			struct GenericArg(string N="", T)
+			{
+				alias type = T; enum name = N; 
+				
+				T value; 
+				alias value this; 
+			} 
+			
+			alias 名 = genericArg; //Todo: This way it can be compressed. Only 3 chars instead of 10.
+			
+			enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T); 
+			enum isGenericArg(A, string name) = is(A==GenericArg!(N, T), string N, T) && N==name; 
+			
+			/// pass a generic arg to a function
+			auto genericArg(string N="", T)(in T p)
+			{ return GenericArg!(N, T)(p); } 
+			
+			/// cast anything to GenericArg
+			auto asGenericArg(A)(in A a)
+			{ static if(isGenericArg!A) return a; else return genericArg(a); } 
+			
+			auto asGenericArgValue(A)(in A a)
+			{ static if(isGenericArg!A) return a.value; else return a; } 
+		} 
+	}
+	
+	/// myto: scalar conversion used in smart-constructors
+	private Tout myto(Tout, Tin)(in Tin a)
+	{
+		static if(is(Tin==bool))	return Tout(a ? 1 : 0); 
+		else	return a.stdto!Tout; 
 	} 
 	
-	/// myTo: scalar conversion used in smart-constructors
-	private alias myto(T) = stdto!T; 
-	//private auto myto(T)(in T a){ return cast(T) a; }
 	
 	/// converts numbers to text, includes all the digits stored in the original type.
 	string text_precise(T)(in T a)
@@ -146,25 +227,24 @@ version(/+$DIDE_REGION+/all)
 	private bool validRvalueSwizzle(string def)
 	{
 		if(def.startsWith('_')) return validRvalueSwizzle(def[1..$]); //_ is allowed at the start because of the constants 0 and 1
-			
+		
 		if(!def.length.inRange(1, 4)) return false; //too small or too long
-			
+		
 		//LvalueSwizzles are not included. Those are midex in.  (LValue swizzle examples: x, xy, yzw, those that stay on a contiguous memory area)
-		if(swizzleRegs.map!(r => r.canFind(def)).any) return false; 
-			
+		if(def.validLvalueSwizzle) return false; 
+		
 		return swizzleRegs.map!(r => def.map!(ch => "01lL".canFind(ch) || r.canFind(ch.toLower)).all).any; 
 	} 
 	
+	private bool validLvalueSwizzle(string def)
+	{ return def.length.inRange(1, 4) && swizzleRegs.any!((r)=>(r.canFind(def))); } 
+	
 	
 	enum isVector(T) = is(T==Vector!(CT, N), CT, int N); 
+	enum isScalar(T) = is(T==bool) || isNumeric!T; 
 	
-	private bool anyVector(T...)()
-	{
-		bool res; 
-		static foreach(t; T)
-		static if(isVector!t) res = true; 
-		return res; 
-	} 
+	
+	private enum anyVector(T...) = anySatisfy!(isVector, T); 
 	
 	private int FirstVectorLength(T...)() {
 		int res; 
@@ -173,45 +253,32 @@ version(/+$DIDE_REGION+/all)
 		return res; 
 	} 
 	
-	private template CommonType(A...)
-	{
-		//Todo: ubyte + ushort should be ushort, not int
-		alias CommonType = stdCommonType!(A); 
-	} 
-	
 	private template OperationResultType(string op, A, B)
 	{
-		static if(op.among("<<", ">>", ">>>")) alias OperationResultType = A; 
-		else
-		alias OperationResultType = CommonType!(A, B); 
-		
+		static if(op.among("<<", ">>", ">>>"))	alias OperationResultType = A; 
+		else	alias OperationResultType = CommonType!(A, B); 
 	} 
 	
 	/// T is a combination of vector and scalar parameters
 	/// returns the common vector length if there is one, otherwise stops with an assert;
 	int CommonVectorLength(T...)()
 	{
-			static if(!T.length	) return 0; 
-		else static if(!anyVector!T	) return 1; 
-		else {
+		static if(!T.length)	return 0; 
+		else static if(!anyVector!T)	return 1; 
+		else	{
 			enum len = FirstVectorLength!T; 
 			foreach(t; T) static assert(!isVector!t || t.length==len, "vector dimension mismatch"); 
-			//assume all are scalar
-			return len; 
+			return len; //assume all are scalar
 		}
 	} 
 	
 	alias VectorLength = CommonVectorLength; 
 	
 	template ScalarType(T) {
-		static if(isVector!T)
-		alias A = T.ComponentType; 
-		else static if(isMatrix!T)
-		alias A = T.ComponentType; 
-		else static if(isBounds!T)
-		alias A = T.VT.ComponentType; 
-		else
-		alias A = T; 
+		static if(isVector!T)	alias A = T.ComponentType; 
+		else static if(isMatrix!T)	alias A = T.ComponentType; 
+		else static if(isBounds!T)	alias A = T.VT.ComponentType; 
+		else	alias A = T; 
 		
 		alias ScalarType = Unqual!A; 
 	} 
@@ -219,10 +286,8 @@ version(/+$DIDE_REGION+/all)
 	template CommonScalarType(T...)
 	{
 		static assert(T.length>=1); 
-		static if(T.length==1)
-		alias CommonScalarType = ScalarType!(T[0]); 
-		else
-		alias CommonScalarType = CommonType!(ScalarType!(T[0]), CommonScalarType!(T[1..$])); 
+		static if(T.length==1)	alias CommonScalarType = ScalarType!(T[0]); 
+		else	alias CommonScalarType = CommonType!(ScalarType!(T[0]), CommonScalarType!(T[1..$])); 
 	} 
 	
 	private alias CommonVectorType(Types...) = Vector!(CommonScalarType!Types, CommonVectorLength!Types); 
@@ -270,7 +335,7 @@ version(/+$DIDE_REGION+/all)
 					
 			static if(isFloatingPoint!CT)
 			{
-				CT[N] components = [0].replicate(N); //default is 0,0,0, not NaN.  Just like in GLSL.
+				CT[N] components = CT(0); //default is 0,0,0, not NaN.  Just like in GLSL.
 			}
 			else
 			{ CT[N] components; }
@@ -284,101 +349,113 @@ version(/+$DIDE_REGION+/all)
 					
 			string toString() const
 			{ return VectorTypeName ~ "(" ~ components[].map!text.join(", ") ~ ")"; } 
-					
-			private void construct(int i, T, Tail...)(in T head, in Tail tail)
-			{
-				//this is based on the gl3n package
-				static if(i >= length)
-				{ static assert(false, "Vector constructor: Too many arguments"); }
-				else static if(isDynamicArray!T)
-				{
-					static assert((Tail.length == 0), "Vector constructor: Dynamic array can only be the last argument"); 
-					enforce(i+head.length <= components.length, "Vector constructor: Dynamic array too large"); 
-					components[i..i+head.length] = head[].myto!(CT[]); 
-					//further construction stops
-				}
-				else static if(isStaticArray!T)
-				{
-					static foreach(j; 0..head.length) components[i+j] = head[j].myto!CT; 
-					construct!(i + head.length)(tail); 
-				}
-				else static if(isVector!T)
-				{
-					//another vec
-					construct!i(head.components, tail); 
-				}
-				else static if(isNumeric!T)
-				{
-					components[i] = head.myto!CT; 
-					construct!(i+1)(tail); 
-				}
-				else static if(is(T==bool))
-				{
-					components[i] = head ? 1 : 0; 
-					construct!(i+1)(tail); 
-				}
-				else
-				{
-					//Todo: it sometimes give this as false error
-					static assert(false, "Vector constructor: Unable to process argument of type: " ~ T.stringof); 
-				}
-			} 
 			
-			private void construct(int i)()
+			private enum isAcceptableScalar(T) = isNumeric!T || is(T==bool); 
+			
+			version(all)
 			{
-				//handle the rare case of RGB -> RGBA conversion:
-				static if(is(CT==ubyte) && i==3 && length==4)
+				private void construct(int i, T, Tail...)(in T head, in Tail tail)
 				{
-					a = 255; //set default opaque alpha
-				}
-				else {
-					static assert(i == length, "Vector constructor: Not enough arguments"); 
-					//Todo: show the error's place in source: __ctor!(int, int, int)
-				}
-			} 
+					//pragma(msg, "$RECURSIVEBUG:", __PRETTY_FUNCTION__); 
+					//this is based on the gl3n package
+					static if(i >= length)
+					{ static assert(false, "Vector constructor: Too many arguments"); }
+					else static if(isDynamicArray!T)
+					{
+						static assert((Tail.length == 0), "Vector constructor: Dynamic array can only be the last argument"); 
+						enforce(i+head.length <= components.length, "Vector constructor: Dynamic array too large"); 
+						foreach(j; 0..head.length) components[i+j] = head[j].myto!CT; 
+						//further construction stops, the length is unknown in CT
+					}
+					else static if(isStaticArray!T)
+					{
+						static foreach(j; 0..head.length) components[i+j] = head[j].myto!CT; 
+						construct!(i + head.length)(tail); 
+					}
+					else static if(isVector!T /+Same code as static array+/)
+					{
+						static foreach(j; 0..head.length) components[i+j] = head[j].myto!CT; 
+						construct!(i + head.length)(tail); 
+					}
+					else static if(isScalar!T)
+					{
+						components[i] = head.myto!CT; 
+						construct!(i+1)(tail); 
+					}
+					else
+					{
+						//Todo: it sometimes give this as false error
+						static assert(false, "Vector constructor: Unable to process argument of type. "~T.stringof); 
+					}
+				} 
+				
+				private void construct(int i)()
+				{
+					//pragma(msg, "$RECURSIVEBUG:", __PRETTY_FUNCTION__); 
+					static if(
+						/+handle the rare case of RGB -> RGBA conversion:+/
+						is(CT==ubyte) && i==3 && length==4
+					)
+					{
+						a = 255; //set default opaque alpha
+					}
+					else {
+						/+Otherwise, the number of vector elements must match with this vector.+/
+						static assert(i == length, "Vector constructor: Not enough arguments"); 
+						//Todo: show the error's place in source: __ctor!(int, int, int)
+					}
+				} 
+			}
 			
 			this(A...)(in A args)
 			{
-				void setAll(T)(in T a)
-				{ components[] = a.myto!CT; } 
-				
-				static if(is(ComponentType==ubyte) && args.length==1 && (is(A[0]==int) || is(A[0]==uint) || isSomeString!(A[0])))
+				//pragma(msg, "$RECURSIVEBUG:", __PRETTY_FUNCTION__); 
+				static if(args.length==1 && is(ComponentType==ubyte) && (is(A[0]==int) || is(A[0]==uint) || isSomeString!(A[0])))
 				{
 					//special case for RG, RGB and RGBA: decodes it from one value
 					static if(isSomeString!(A[0]))
 					{ static assert(0, "not impl"); }
 					else static if(is(A[0]==int) || is(A[0]==uint))
 					{
-						//raw data copy
+						//Opt: raw data copy
 						//Todo: kulonvalasztani a compile time es a runtime konvertalast. Ha egyaltalan lehet.
 						//runtime: components = *(cast(typeof(components)*) &(args[0]));
-								
-						//CTFE version
-						//Todo: put this in a loop
-						//static foreach(i; 0..length) components[i] == 128;//cast(ubyte)(((args[0]>>(i*8)) & 0xFF));
-						static if(length==2) { components = [args[0]&0xFF, (args[0]>>>8)&0xFF]; }
-						static if(length==3) { components = [args[0]&0xFF, (args[0]>>>8)&0xFF, (args[0]>>>16)&0xFF]; }
-						static if(length==4) { components = [args[0]&0xFF, (args[0]>>>8)&0xFF, (args[0]>>>16)&0xFF, args[0]>>>24]; }
+						
+						static foreach(i; 0..length) components[i] = (args[0]>>>(i*8)) & 0xFF; 
 					}
 					else
 					{ static assert(0, "unhandler type: "~(A[0]).stringof); }
 					//if the above version would be not ok... -> static foreach(i; 0..length) components[i] = cast(ubyte) args[0]>>(i*8);
 				}
-				else static if(args.length==1 && __traits(compiles, setAll(args[0])))
+				else static if(args.length==1 && isScalar!(A[0])/+&& __traits(compiles, setAll(args[0]))+/)
 				{
 					//One can also use one number in the constructor to set all components to the same value
-					setAll(args[0]); 
+					components[] = args[0].myto!CT; 
+				}
+				else static if(args.length>1 && allSatisfy!(isScalar, A))
+				{
+					//Special case: All params are scalar.  Don't call construct() to avoid template recursion.
+					static assert(args.length==length, "Invalid number of scalar arguments."); 
+					static foreach(i; 0..length) components[i] = args[i].myto!CT; 
 				}
 				else static if(args.length==1 && isVector!(A[0]) && A[0].length>=length)
 				{
 					//Casting a higher-dimensional vector to a lower-dimensional vector is also achieved with these constructors:
-					static foreach(i; 0..length) components[i] = args[0].components[i].myto!CT; 
+					//Smaller vectors will go through construct()
+					static foreach(i; 0..length) components[i] = args[0][i].myto!CT; 
+				}
+				else static if(args.length==1 && isDynamicArray!(A[0]))
+				{
+					enforce(args[0].length <= components.length, "Vector constructor: Dynamic array too large"); 
+					foreach(i; 0..args[0].length) components[i] = args[0][i].myto!CT; 
+				}
+				else static if(args.length==1 && isStaticArray!(A[0]))
+				{
+					static assert(args[0].length <= components.length, "Vector constructor: Static array too large"); 
+					static foreach(i; 0..args[0].length) components[i] = args[0][i].myto!CT; 
 				}
 				else
-				{
-					//Todo: OpenD ezt erosen hasznalja.  A swizzling-tol kiakad: template recursion errorral.
-					construct!0(args); 
-				}
+				{ construct!0(args); }
 			} 
 					
 			auto opCast(T)() const
@@ -437,21 +514,15 @@ version(/+$DIDE_REGION+/all)
 			//swizzling ///////////////////////
 			
 			//Todo: syntax highlight the swizzles. Colorize + monospace. Red, Green, Blue, Gray(Luma), White(1), Black(0)
-					
+			
 			static foreach(regs; swizzleRegs)
 			static foreach(len; 1..N+1)
 			static foreach(i; 0..N-len+1)
 			static if(len==1)
-			{
-				mixin(format!q{auto	%s() const	 { return components[%s]; } }(regs[i], i)); 
-				mixin(format!q{ref	%s()	 { return components[%s]; } }(regs[i], i)); 
-			}
+			{ mixin(format!q{inout ref %s() { return components[%s]; } }(regs[i], i)); }
 			else
-			{
-				mixin(format!q{auto	%s() const	 { return Vector!(CT, %s)	(components[%s..%s]); } }(regs[i..i+len], len, i, i+len)); 
-				mixin(format!q{ref	%s()	 { return *(cast(Vector!(CT, %s)*)	(components[%s..%s])); } }(regs[i..i+len], len, i, i+len)); 
-			}
-					
+			{ mixin(format!q{inout ref %s() { return *cast(Vector!(CT, %s)*)(&components[%s]); } }(regs[i..i+len], len, i)); }
+			
 			//lumonosity swizzle
 			@property auto l() const
 			{
@@ -483,8 +554,8 @@ version(/+$DIDE_REGION+/all)
 				{ enum swizzleDecode = (isLower ? "" : "-") ~ cast(string)[lowerCh]; }
 			} 
 					
-			auto opDispatch(string def)() const
-			if(validRvalueSwizzle(def))
+			const opDispatch(string def)()
+			if(def.validRvalueSwizzle)
 			{
 				static if(def.startsWith('_'))
 				{ return opDispatch!(def[1..$]); }
@@ -1681,7 +1752,7 @@ version(/+$DIDE_REGION+/all)
 				}
 				else static if(A.length==1 && isBounds!(A[0]))
 				{
-					 //another Bounds
+					//another Bounds
 					static assert(
 						VectorLength == A[0].VectorLength, 
 						"dimension mismatch "~VectorLength.text~" != "~A[0].VectorLength.text
@@ -1691,9 +1762,9 @@ version(/+$DIDE_REGION+/all)
 				}
 				else static if(A.length==2)
 				{
-					//2 vectors or scalars
-					low = a[0]; 
-					high = a[1]; 
+					//2 vectors or scalars.  GenericArgs are allowed here.
+					low = a[0].asGenericArgValue; 
+					high = a[1].asGenericArgValue; 
 					
 					version(/+$DIDE_REGION handle center: size: radius: namedParams.+/all)
 					{
@@ -3553,7 +3624,7 @@ version(/+$DIDE_REGION+/all)
 			static if(anyVector!(T1, T2, T3))
 			return max(lower, min(upper,val)); 
 			else
-			return std.algorithm.clamp(val, lower, upper); 
+			return std.algorithm.clamp(val, cast(T1)lower, cast(T1)upper); 
 		} 
 		
 		

@@ -2068,29 +2068,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	//Link: https://wiki.dlang.org/DIP88
 	
 	
-	struct GenericArg(string N="", T)
-	{
-		alias type = T; enum name = N; 
-		
-		T value; 
-		alias value this; 
-	} 
-	
-	alias 名 = genericArg; //Todo: This way it can be compressed. Only 3 chars instead of 10.
-	
-	enum isGenericArg(A) = is(A==GenericArg!(N, T), string N, T); 
-	enum isGenericArg(A, string name) = is(A==GenericArg!(N, T), string N, T) && N==name; 
-	
-	/// pass a generic arg to a function
-	auto genericArg(string N="", T)(in T p)
-	{ return GenericArg!(N, T)(p); } 
-	
-	/// cast anything to GenericArg
-	auto asGenericArg(A)(in A a)
-	{ static if(isGenericArg!A) return a; else return genericArg(a); } 
-	
-	auto asGenericArgValue(A)(in A a)
-	{ static if(isGenericArg!A) return a.value; else return a; } 
+	//GenericArg moved into math.
 	
 	
 	string processGenericArgs(string code)
@@ -2494,7 +2472,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			private string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren)()
 			{
-				mixin("void f("~fieldDefs~"){};"); 
+				mixin("void f("~fieldDefs~"){}"); 
 				return generateSmartClassCode_impl!(f, hasChildren); 
 			} 
 		} 
@@ -8076,10 +8054,10 @@ version(/+$DIDE_REGION Containers+/all)
 						
 				void accumulate512_sse(ulong* acc/+presumed aligned+/, in ubyte* input, in ubyte* secret)
 				{
-					enum ver = "opt"; 
-							
+					enum ver = "opt"/+"unroll2"+/; 
+					
 					auto inp = cast(const ulong*) input, sec = cast(const ulong*) secret; 
-							
+					
 					static if(ver=="normal")
 					{
 						//1250ms
@@ -8090,7 +8068,7 @@ version(/+$DIDE_REGION Containers+/all)
 							acc[i^1] += v; 
 						}
 					}
-							
+					
 					static if(ver=="unroll2")
 					{
 						//1150ms
@@ -8105,11 +8083,17 @@ version(/+$DIDE_REGION Containers+/all)
 							acc[i+1] += a1*b1 + v0; 
 						}
 					}
-							
+					
 					static if(ver=="opt")
 					asm {
-						 //860ms
-						//R8 acc, RDX input, RCX secret
+						/+Bug: LDC__ASM__BUG+/
+						//860ms
+						
+						/+R8 acc, RDX input, RCX secret.+/
+						
+						//LDC 1.35: Must load these regs manually. Assumptions aren't work anymore.
+						mov R8, acc; mov RDX, input; mov RCX, secret; 
+						
 						//free: RAX, RCX, RDX, R8, R9, R10, R11, XMM0-XMM5
 						prefetcht0 [R8 + 0x200]; 
 						mov R11, 0;  L0: ; 
