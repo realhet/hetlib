@@ -3089,7 +3089,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 	//packed data struct that
 	private struct SubTexInfo
 	{
-		align(1): import std.bitmanip; 
+		import std.bitmanip; 
 		mixin(
 			bitfields!(
 				uint, "cellX",	 14, uint, "texIdx_lo",	 2,
