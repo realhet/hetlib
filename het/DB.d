@@ -112,8 +112,8 @@ class Archiver {
 			{ s ~= format!"  %s count: %7d  total size: %4sB  avg size: %4sB\n"(name, count, size.shortSizeText!1024, count ? (size/count).shortSizeText!1024 : "- "); } 
 			
 			CTA("Record", totalRecordCount, totalRecordSize); 
-			CTA("Jump  ", totalJumpCount  , totalJumpSize); 
-			CTA("Blob  ", totalBlobCount  , totalBlobSize); 
+			CTA("Jump  ", totalJumpCount	 , totalJumpSize); 
+			CTA("Blob  ", totalBlobCount	 , totalBlobSize); 
 			return s; 
 		} 
 	} 
@@ -1371,8 +1371,8 @@ class AMDBCore {
 				if(isSystemVerb(s))
 				s = EgaColor.ltWhite(s); 
 				else if(isSystemType(s)) s = EgaColor.ltGreen(s); 
-				else if(isVerb  (id)) s = EgaColor.yellow(s); 
-				else if(isEType (id)) s = EgaColor.ltMagenta(s); 
+				else if(isVerb	(id)) s = EgaColor.yellow(s); 
+				else if(isEType	(id)) s = EgaColor.ltMagenta(s); 
 				else if(isEntity(id)) s = EgaColor.ltBlue(s); 
 			}
 			return s; 
@@ -1412,8 +1412,8 @@ class AMDBCore {
 				if(isSystemVerb(s))
 				s = EgaColor.ltWhite(s); 
 				else if(isSystemType(s)) s = EgaColor.ltGreen(s); 
-				else if(isVerb  (id)) s = EgaColor.yellow(s); 
-				else if(isEType (id)) s = EgaColor.ltMagenta(s); 
+				else if(isVerb	(id)) s = EgaColor.yellow(s); 
+				else if(isEType	(id)) s = EgaColor.ltMagenta(s); 
 				else if(isEntity(id)) s = EgaColor.ltBlue(s); 
 			}
 			return console.leftJustify(s, ci.size); 
@@ -2610,8 +2610,8 @@ class AMDBCore {
 				}break; 
 				
 				case "items": printFilteredSortedItems(items.ids, input); break; 
-				case "etypes": printFilteredSortedItems(eTypes   , input); break; 
-				case "verbs"	: printFilteredSortedItems(verbs    , input); break; 
+				case "etypes": printFilteredSortedItems(eTypes	  , input); break; 
+				case "verbs"	: printFilteredSortedItems(verbs	  , input); break; 
 				case "entities": 	printFilteredSortedItems(entities(input=="" ? "*" : input)); break; 
 				
 				case "commit": transaction.commit; break; 
@@ -3032,7 +3032,7 @@ version(/+$DIDE_REGION DataSet+/all)
 					static if(isSimpleField!T)
 					mixin(
 						q{
-							@property auto $()
+							@property auto $ ()
 							{ return _record.$; } 
 						}.replace("$", FieldNameTuple!R[i])
 					); 
@@ -3042,9 +3042,9 @@ version(/+$DIDE_REGION DataSet+/all)
 					{
 						mixin(
 							q{
-								@property auto $()
+								@property auto $ ()
 								{ return _logger._blobGet!`$`(key); } 
-								@property void $(T)(T data)
+								@property void $ (T)(T data)
 								{ _logger._blobSet!`$`(key, data); } 
 							}.replace("$", name)
 						); 
@@ -3198,8 +3198,8 @@ version(/+$DIDE_REGION DataSet+/all)
 			if(DateTime(UTC, 2000, 1, 4) !in logger)
 			print("not found"); 
 			
-			//access range of keys  (uses optionally built rbTree)
-			logger.keys.each!print; 
+			//access range of keys	(uses optionally built rbTree)
+			logger.keys.each!print;	
 			logger.keys(DateTime(UTC, 2000, 1, 7), DateTime(UTC, 2000, 1, 9)).each!print; 
 			
 			//access data of key ranges
@@ -3541,9 +3541,9 @@ version(/+$DIDE_REGION DataSet+/all)
 					
 					foreach(fIdx; idxFile.path.files(mask).sort /+Opt: must use file entries, not the simple path.files()+/)
 					{
-						//print("    ", fIdx); 
-						const 	fData = fIdx.otherExt(".blob"),
-							fDataSize = fData.size/+Opt: this must be exponentially SLOW File.size uses directory listing!!!+/; 
+						//print("	", fIdx); 
+						const 	fData	= fIdx.otherExt(".blob"),
+							fDataSize =	fData.size/+Opt: this must be exponentially SLOW File.size uses directory listing!!!+/; 
 						
 						size_t loadSize = fIdx.size; 
 						if(loadSize%IdxRec.sizeof)

@@ -4099,20 +4099,27 @@ version(/+$DIDE_REGION Keywords+/all)
 				[q{`"`},q{cString},q{Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
 				[q{`r"`},q{rString},q{},q{CWD(`"`)},q{EOF}],
 				[q{"`"},q{dString},q{},q{CWD("`")},q{EOF}],
+				[],
 				[q{`q"/`},q{qStringSlash},q{},q{CWD(`/"`)},q{EOF}],
 				[],
 				[q{`q"{`},q{qStringCurly},q{Push("{", qStringCurlyInner)},q{CWD(`}"`)},q{EOF}],
-				[q{`q"(`},q{qStringRound},q{Push("(", qStringRoundInner)},q{CWD(`)"`)},q{EOF}],
-				[q{`q"[`},q{qStringSquare},q{Push("[", qStringSquareInner)},q{CWD(`]"`)},q{EOF}],
-				[q{`q"<`},q{qStringAngle},q{Push("<", qStringAngleInner)},q{CWD(`>"`)},q{EOF}],
-				[],
 				[q{},q{qStringCurlyInner},q{Push("{", qStringCurlyInner)},q{`}`},q{EOF}],
+				[q{`q"(`},q{qStringRound},q{Push("(", qStringRoundInner)},q{CWD(`)"`)},q{EOF}],
 				[q{},q{qStringRoundInner},q{Push("(", qStringRoundInner)},q{`)`},q{EOF}],
+				[q{`q"[`},q{qStringSquare},q{Push("[", qStringSquareInner)},q{CWD(`]"`)},q{EOF}],
 				[q{},q{qStringSquareInner},q{Push("[", qStringSquareInner)},q{`]`},q{EOF}],
+				[q{`q"<`},q{qStringAngle},q{Push("<", qStringAngleInner)},q{CWD(`>"`)},q{EOF}],
 				[q{},q{qStringAngleInner},q{Push("<", qStringAngleInner)},q{`>`},q{EOF}],
 				[],
 				[q{`q"`},q{qStringBegin},q{Trans(NewLineTokens, qStringMain) },q{},q{EOF}],
 				[q{},q{qStringMain},q{/+Todo: quoted identifier str+/ },q{},q{EOF}],
+				[],
+				[q{`x"`},q{hexString},q{},q{CWD(`"`)},q{EOF}],
+				[],
+				[q{`i"`},q{interpolatedCString},q{Push("$(", interpolationBlock) ~ Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
+				[q{"i`"},q{interpolatedDString},q{Push("$(", interpolationBlock)},q{CWD("`")},q{EOF}],
+				[q{"iq{"},q{interpolatedStructuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}"`)},q{StructuredEOF}],
+				[q{"$("},q{interpolationBlock},q{Error("] }") ~ EntryTransitions},q{")"},q{StructuredEOF}],
 				[],
 				[q{},q{unstructured},q{Trans("", unstructured)},q{},q{}],
 			]))
@@ -4121,8 +4128,8 @@ version(/+$DIDE_REGION Keywords+/all)
 			(
 				q{
 					enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029",
-					EOFTokens 	= "\0 \x1A",
-					EOF 	= Trans(EOFTokens, State.unstructured),
+					EOFTokens 	= "\0" /+"\x1A" not supported because pcmpstri limit.+/
+					,EOF 	= Trans(EOFTokens, State.unstructured),
 					StructuredEOF 	= Trans(EOFTokens /+~ " __EOF__"+/, State.unstructured)
 						/+Todo: __EOF__ is only valid when it is a complete keyword.+/; 
 					
