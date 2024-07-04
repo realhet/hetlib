@@ -4065,18 +4065,22 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			auto createPipelineLayout(Args...)(Args args)
 			{
 				VulkanDescriptorSetLayout[] sets; 
+				VkPushConstantRange[] pcRanges; 
 				
 				static foreach(i, arg; args)
 				{
 					{
 						alias T = Unqual!(Args[i]); 
+						
 						static if(is(T==VulkanDescriptorSetLayout))	sets ~= arg; 
 						else static if(is(T==VulkanDescriptorSetLayout[]))	sets ~= arg; 
+						else static if(is(T==VkPushConstantRange))	pcRanges ~= arg; 
+						else static if(is(T==VkPushConstantRange[]))	pcRanges ~= arg; 
 						else static assert(0, "Unhandled T:"~T.stringof); 
 					}
 				}
 				
-				return new VulkanPipelineLayout(this, sets); 
+				return new VulkanPipelineLayout(this, sets, pcRanges); 
 			} 
 			
 			auto createShaderModule(File f)
@@ -4881,6 +4885,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void cmdBindIndexBuffer(VkBuffer buffer, VkIndexType indexType)
 				{ device.vkCmdBindIndexBuffer(handle, buffer, 0, indexType); } 
 				
+				
+				void cmdPushConstants(T)(VkPipelineLayout layout, VkShaderStageFlags stageFlags, T value)
+				{ device.vkCmdPushConstants(handle, layout, stageFlags, 0, T.sizeof.to!uint, &value); } 
+				
+				
 				void cmdDrawIndexed(
 					uint indexCount, 	uint 	instanceCount,	
 					uint firstIndex, 	int 	vertexOffset, 	uint firstInstance
@@ -4944,7 +4953,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			mixin SmartClass!(
 				q{
 					@PARENT VulkanDevice 	device, 
-					const VulkanDescriptorSetLayout[] 	layouts/+Todo: notify destruction!+/
+					const VulkanDescriptorSetLayout[] 	layouts,/+Todo: notify destruction!+/
+					const VkPushConstantRange[]	pushConstantRanges
 				}
 			); 
 			
@@ -4956,6 +4966,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				auto layoutCreateInfo = (mixin(體!((VkPipelineLayoutCreateInfo),q{
 					setLayoutCount 	: sets.length.to!uint,
 					pSetLayouts 	: sets.ptr,
+					pushConstantRangeCount	: pushConstantRanges.length.to!uint,
+					pPushConstantRanges	: pushConstantRanges.ptr
 				}))); 
 				device.vkCreatePipelineLayout(device.handle, &layoutCreateInfo, null, &handle)
 					.vkEnforce("Failed to create pipeline layout."); 
@@ -5357,7 +5369,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				VulkanDescriptorSetLayout descriptorSetLayout; 
 				VulkanPipelineLayout pipelineLayout; 
-				void createLayouts()
+				void createLayouts(VkPushConstantRange[] pushConstantRanges=null)
 				{
 					descriptorSetLayout = device.createDescriptorSetLayout
 						(
@@ -5370,7 +5382,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							descriptorCount 	: 1, 	stageFlags 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
 						})))
 					); 
-					pipelineLayout = device.createPipelineLayout(descriptorSetLayout); 
+					pipelineLayout = device.createPipelineLayout(descriptorSetLayout, pushConstantRanges); 
 				} 
 				
 				//support multiple shaders/pipelines
@@ -5380,6 +5392,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					foreach(kf; kernelFiles)
 					{
+						kf.writeln; 
+						kf.queryString.names.get(0).writeln; 
 						const f = kf.withoutQueryString; 
 						auto sm = shaderModules.require(f, device.createShaderModule(f)); 
 						pipelines ~= device.createComputePipeline
@@ -5525,12 +5539,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			@property dwbuf() { return cast(uint[])buf; } 
 			
-			this(File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_)
+			this(File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_, VkPushConstantRange[] pushConstantRanges = null)
 			{
 				static if(StructAlignBugFix)
 				{
 					ubufPtr = new UB; /+
-						This fixes possible access violation 
+						This exterbak alloc fixes possible access violation 
 						when the struct has align(16) fields.
 					+/
 				}
@@ -5538,14 +5552,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				this.bufSizeBytes = bufSizeBytes_; 
 				
 				initialize; 
-				createLayouts; 
+				createLayouts(pushConstantRanges); 
 				createPipelines(kernelFiles); 
 				createBuffers; 
 				createDescriptors; 
 			} 
 			
-			this(File kernelFile, size_t bufSizeBytes_)
-			{ this([kernelFile], bufSizeBytes_); } 
+			this(File kernelFile, size_t bufSizeBytes_, VkPushConstantRange[] pushConstantRanges = null)
+			{ this([kernelFile], bufSizeBytes_, pushConstantRanges); } 
 			
 			~this()
 			{
