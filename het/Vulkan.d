@@ -4886,9 +4886,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{ device.vkCmdBindIndexBuffer(handle, buffer, 0, indexType); } 
 				
 				
-				void cmdPushConstants(T)(VkPipelineLayout layout, VkShaderStageFlags stageFlags, T value)
-				{ device.vkCmdPushConstants(handle, layout, stageFlags, 0, T.sizeof.to!uint, &value); } 
+				void cmdPushConstants(SSF)(VulkanPipelineLayout layout, SSF shaderStages, size_t ofs, size_t size, const(void)* values)
+				{ device.vkCmdPushConstants(this.handle, layout.handle, VkShaderStageFlags(shaderStages), ofs.to!uint, size.to!uint, values); } 
 				
+				void cmdPushConstants(SSF, V)(VulkanPipelineLayout layout, SSF shaderStages, const ref V values)
+				{ cmdPushConstants(layout, shaderStages, 0, V.sizeof.to!int, &values); } 
+				
+				void cmdPushConstants(SSF, V)(VulkanPipelineLayout layout, SSF shaderStages, const V values)
+				{ cmdPushConstants(layout, shaderStages, 0, V.sizeof.to!int, &values); } 
 				
 				void cmdDrawIndexed(
 					uint indexCount, 	uint 	instanceCount,	
