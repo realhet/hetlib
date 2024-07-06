@@ -4785,7 +4785,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						else static assert(0, "Unhandled T:"~T.stringof); 
 					}
 				}
-				
+				//print(srcStageMask, dstStageMask, dependencyFlags, memoryBarriers, bufferMemoryBarriers); 
 				device.vkCmdPipelineBarrier
 					(
 					handle, 
@@ -5397,8 +5397,6 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					foreach(kf; kernelFiles)
 					{
-						kf.writeln; 
-						kf.queryString.names.get(0).writeln; 
 						const f = kf.withoutQueryString; 
 						auto sm = shaderModules.require(f, device.createShaderModule(f)); 
 						pipelines ~= device.createComputePipeline
@@ -5544,7 +5542,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			@property dwbuf() { return cast(uint[])buf; } 
 			
-			this(File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_, VkPushConstantRange[] pushConstantRanges = null)
+			this(
+				File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_, 
+				VkPushConstantRange[] pushConstantRanges = null
+			)
 			{
 				static if(StructAlignBugFix)
 				{
