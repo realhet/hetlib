@@ -2794,16 +2794,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		
 		//Inspector
-		auto 檢(T)(T a, ulong location)
+		auto 檢(A...)(A args)
 		{
-			if(dbg.isActive)
-			{
-				auto s = "LOG:INSP:"~location.to!string(16)~":"~a.text.toBase64; 
-				dbg.sendLog(s); 
-			}
+			static if(A.length>2)
+			{ return 檢(text(args[0..$-1]), args[$-1]); /+Note: IES support+/}
 			else
-			{/+Normal user can't see debug inspector messages.+/}
-			return a; 
+			{
+				static assert(A.length==2); 
+				const ulong location = args[1]; 
+				if(dbg.isActive)
+				{
+					auto s = "LOG:INSP:"~location.to!string(16)~":"~args[0].text.toBase64; 
+					dbg.sendLog(s); 
+				}
+				/+Normal user can't see debug inspector messages.+/
+				return args[0]; 
+			}
 		} 
 		
 		
