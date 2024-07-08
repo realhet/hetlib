@@ -2644,6 +2644,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		} 
 		
+		//put popular generators onto the global scope
+		
+		string GEN_bitfields(表 t)
+		{ return t.GEN_bitfields; } 
+		string GEN_enumTable(表 t)
+		{ return t.GEN_enumTable; } 
+		
 		
 		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
 		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
@@ -2834,6 +2841,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		string ONCE(string scr)
 		{ return scr.format!q{{ static bool running; if(running.chkSet) {%s}}}; } 
+		
+		//call a function
+		auto 調(alias fun, Args...)(Args args)
+		{ return fun(args); } 
+		
 	}
 	
 }
