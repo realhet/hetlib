@@ -65,66 +65,90 @@ version(/+$DIDE_REGION+/all)
 	{
 		auto findBlobs(alias pred = "a", T1)(Image!(T1, 2) src)
 		{
-			bool boolSrc(int x, int y)
-			{ return !!(src[x, y].unaryFun!pred); } 
-			
 			struct Res {
 				Image!(int, 2) img; 
 				Blob[int] blobs; 
 				alias blobs this; 
 			} 
 			
-			Res res; 
-			res.img = image2D(src.size, 0); 
+			Res res; 	res.img = image2D(src.size, 0); 
+			int[int] map_; 	int map(int i) { if(auto a = i in map_) return *a; else return i; } 
 			
-			int[int] map_; 
-			int map(int i) { if(auto a = i in map_) return *a; else return i; } 
 			
-			int actId; 
 			
-			//first pass: find the blobs based on top and left neighbors
-			auto _間=init間; 
-			foreach(y; 0..src.height)
-			foreach(x; 0..src.width)
-			if(boolSrc(x, y))
+			version(/+$DIDE_REGION Find the blobs based on top and left neighbors+/all)
 			{
-				bool leftSet()
-				{ return x ? boolSrc(x-1, y) : false; } 	bool topSet ()
-				{ return y ? boolSrc(x, y-1) : false; } 
-				int leftId()
-				{ return res.img[x-1, y]; } 	int topId ()
-				{ return res.img[x, y-1]; } 
-				int p; 
+				auto actId=0, ofs=0, w = src.width, pSrc = src.ptr, pDst = res.img.ptr; 
 				
-				if(leftSet && topSet)
+				//cached stuff:
+				uint* pArea; uint pArea_lastP; 
+				int lastMappedTopId, lastMappedTopId_topId; 
+				void resetLastP() { lastMappedTopId_topId = pArea_lastP = 0; } 
+				foreach(y; 0..src.height)
 				{
-					p = map(topId); 	//map is important for topId
-					int l = leftId; 	//leftId is alrteady mapped
-					if(p!=l) {
-						sort(p, l); 	//sort is to eliminate cyclic loops im map_[]
-						map_[l] = p; 	//from unmapped to mapped is good
+					auto leftSet = false; 
+					foreach(x; 0..src.width)
+					{
+						const centerSet = !!(*(pSrc)).unaryFun!pred; 
+						if(centerSet)
+						{
+							bool topSet ()
+							{ return y ? !!(*(pSrc-w)).unaryFun!pred : false; } 
+							int leftId()
+							{ return *(pDst-1); } int topId ()
+							{ return *(pDst-w); } 
+							
+							int mappedTopId()
+							{
+								const tid = topId; 
+								if(lastMappedTopId_topId.chkSet(tid))
+								lastMappedTopId = map(tid); 
+								return lastMappedTopId; 
+							} 
+							
+							int newBlob()
+							{
+								actId++; 
+								res.blobs[actId] = Blob(ivec2(x, y), actId); 
+								resetLastP; //Because AA can be reorganized.
+								return actId; 
+							} 
+							
+							int joinBlobs(int p, int l)
+							{
+								if(p!=l) {
+									sort(p, l); //sort is to eliminate cyclic loops im map_[]
+									map_[l] = p; 	//from unmapped to mapped is good
+									resetLastP; 
+								}
+								return p; 
+							} 
+							
+							int p; 
+							if(leftSet)	{
+								if(topSet)	{ p = joinBlobs(leftId, mappedTopId); }
+								else	{ p = leftId; /+leftId is already mapped+/}
+							}
+							else	{
+								if(topSet)	{ p = mappedTopId; }
+								else	{ p = newBlob; }
+							}
+							
+							*pDst = p; 
+							if(pArea_lastP.chkSet(p)) { pArea = &res.blobs[p].area; }
+							(*pArea)++; 
+							
+							static if(is(findBlobsDebug))
+							findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
+						}
+						
+						//advance
+						leftSet = centerSet; //left = last
+						pSrc ++; pDst++; 
 					}
 				}
-				else if(topSet)
-				{
-					p = map(topId ); 	//map is important for topId
-				}
-				else if(leftSet)
-				{
-					p = leftId; 	//leftId is already mapped
-				}
-				else
-				{ p = ++actId; res.blobs[p] = Blob(ivec2(x, y), p); }
-				
-				res.img[x, y] = p; 
-				res.blobs[p].area++; 
-				
-				static if(is(findBlobsDebug))
-				findBlobsDebug.log(ivec2(x, y), src.dup, res.img.dup, map_.dup, res.blobs.dup); 
 			}
-			(((update間(_間))).檢(0xC29E871EC65)); //63 ms
-			
-			
+			
 			{
 				//make the map recursive
 				int map_recursive(int id)
@@ -134,22 +158,31 @@ version(/+$DIDE_REGION+/all)
 				} 
 				foreach(k; map_.keys) map_[k] = map_recursive(k); 
 				//remap the result id image
-				foreach(ref p; res.img) if(p) p = map(p); 
+				map_.rehash; 
+				int lastp, mappedp; 
+				(mixin(求each(q{ref p},q{res.img},q{
+					if(p) {
+						if(lastp.chkSet(p))
+						mappedp = map(p); 
+						if(p!=mappedp)
+						p = mappedp; 
+					}
+				}))); 
 			}
-			(((update間(_間))).檢(0xD99E871EC65)); //22 ms
 			
 			{
 				//remap the result blobs
 				int[] rem; 
-				foreach(k; res.blobs.keys) {
-					//Opt: maybe the .array is not needed
-					int p = map(k); 
-					if(p!=k) {
-						res.blobs[p].area += res.blobs[k].area; 
-						rem ~= k; 
+				(mixin(求each(q{k},q{res.blobs.keys},q{
+					{
+						int p = map(k); 
+						if(p!=k) {
+							res.blobs[p].area += res.blobs[k].area; 
+							rem ~= k; 
+						}
 					}
-				}
-				rem.each!(k => res.blobs.remove(k)); 
+				}))); 
+				(mixin(求each(q{k},q{rem},q{res.blobs.remove(k)}))); 
 			}
 			
 			static if(is(findBlobsDebug))
@@ -245,21 +278,24 @@ version(/+$DIDE_REGION+/all)
 		} 
 		version(/+$DIDE_REGION Largest Blob + Erode +/all)
 		{
-			auto isolateLargestBlob(Image2D!RGBA img)
+			auto isolateLargestBlob(char chn)(Image2D!RGBA img)
 			{
-				auto blobs = findBlobs!"a.a"(img); 
+				auto blobs = findBlobs!("a."~chn)(img); 
 				if(blobs.length)
 				{
 					const largestBlobId = blobs.values.maxElement!(a => a.area).id; 
-					foreach(y; 0..img.height)
-					foreach(x; 0..img.width)
-					if(blobs.img[x, y]!=largestBlobId)
-					img[x, y].a = 0; 
+					
+					foreach(ofs, id; blobs.img.asArray)
+					if(
+						id && id!=largestBlobId
+						/+It's a blob, but not the largest.+/
+					)
+					mixin("(*(img.ptr+ofs))."~chn) = 0; 
 				}
 				return blobs; 
 			} 
 			
-			void convexizeH(Image2D!RGBA img, int len, ubyte alpha=255)
+			void convexizeH(char chn)(Image2D!RGBA img, int len, ubyte alpha=255)
 			{
 				if(len<=0) return; 
 				foreach(y; 0..img.height)
@@ -268,18 +304,18 @@ version(/+$DIDE_REGION+/all)
 					int lastPos = -1; 
 					foreach(x; 0..img.width)
 					{
-						const actState = img[x, y].a>0; 
+						const actState = mixin("img[x, y]."~chn)>0; 
 						if(lastState!=actState)
 						{
 							//fill holes
 							if(actState && lastPos>=0 && lastPos+len>=x)
-							foreach(x2; lastPos..x) img[x2, y].a = alpha; 
+							foreach(x2; lastPos..x) mixin("img[x2, y]."~chn) = alpha; 
 							
 							lastPos = x; lastState = actState; 
 						}
 					}
 				}
-			}  void convexizeV(Image2D!RGBA img, int len, ubyte alpha=255)
+			}  void convexizeV(char chn)(Image2D!RGBA img, int len, ubyte alpha=255)
 			{
 				if(len<=0) return; 
 				foreach(x; 0..img.width)
@@ -288,12 +324,12 @@ version(/+$DIDE_REGION+/all)
 					int lastPos = -1; 
 					foreach(y; 0..img.height)
 					{
-						const actState = !!img[x, y].a>0; 
+						const actState = mixin("img[x, y]."~chn)>0; 
 						if(lastState!=actState)
 						{
 							//fill holes
 							if(actState && lastPos>=0 && lastPos+len>=y)
-							foreach(y2; lastPos..y) img[x, y2].a = alpha; 
+							foreach(y2; lastPos..y) mixin("img[x, y2]."~chn) = alpha; 
 							
 							lastPos = y; lastState = actState; 
 						}
@@ -302,18 +338,18 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			///Fills large holes on horizontal and vertical scanlines.  Works on alpha channel.
-			void convexize(Image2D!RGBA img, int len, ubyte alpha=255)
+			void convexize(char chn)(Image2D!RGBA img, int len, ubyte alpha=255)
 			{
-				convexizeH(img, len, alpha); 
-				convexizeV(img, len, alpha); 
+				convexizeH!chn(img, len, alpha); 
+				convexizeV!chn(img, len, alpha); 
 			} 
 			
-			void inflateH(Image2D!RGBA img, int len1, int len2)
+			void deflateBlobH(char chn)(Image2D!RGBA img, int len1, int len2)
 			{
 				int[3][] indices; 
 				foreach(y; 0..img.height)
 				{
-					auto arr() { return img.rows[y].map!"a.a>0"; } 
+					auto arr() { return img.rows[y].map!("a."~chn~"!=0"); } 
 					const i0 = arr.countUntil(true).to!int; 
 					if(i0>=0)
 					{
@@ -334,22 +370,21 @@ version(/+$DIDE_REGION+/all)
 				//adjust
 				foreach(ref ind; indices)
 				{
-					ind[1] -= len1; 
-					ind[2] += len2; 
+					ind[1] += len1; 
+					ind[2] -= len2; 
 				}
 				
 				//execute
 				foreach(const ind; indices)
 				foreach(x; 0..img.width)
 				if(!(x>=ind[1] && x<ind[2]))
-				img[x, ind[0]].a = 0; 
-				
-			}  void inflateV(Image2D!RGBA img, int len1, int len2)
+				mixin("img[x, ind[0]]."~chn) = 0; 
+			}  void deflateBlobV(char chn)(Image2D!RGBA img, int len1, int len2)
 			{
 				int[3][] indices; 
 				foreach(x; 0..img.width)
 				{
-					auto arr() { return img.columns[x].map!"a.a>0"; } 
+					auto arr() { return img.columns[x].map!("a."~chn~"!=0"); } 
 					const i0 = arr.countUntil(true).to!int; 
 					if(i0>=0)
 					{
@@ -370,16 +405,21 @@ version(/+$DIDE_REGION+/all)
 				//adjust
 				foreach(ref ind; indices)
 				{
-					ind[1] -= len1; 
-					ind[2] += len2; 
+					ind[1] += len1; 
+					ind[2] -= len2; 
 				}
 				
 				//execute
 				foreach(const ind; indices)
 				foreach(y; 0..img.height)
 				if(!(y>=ind[1] && y<ind[2]))
-				img[ind[0], y].a = 0; 
-				
+				mixin("img[ind[0], y]."~chn) = 0; 
+			} 
+			
+			void deflateBlob(char chn)(Image2D!RGBA img, int top, int right, int bottom, int left)
+			{
+				deflateBlobH!chn(img, left, right); 
+				deflateBlobV!chn(img, top, bottom); 
 			} 
 			
 		}

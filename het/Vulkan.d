@@ -5614,6 +5614,178 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					b.f; 
 				} 
 			}
+			
+			mixin template KernelAllocationsTemplate()
+			{
+				struct Allocation
+				{ BUF name; uint ofs, length; } 
+				
+				Allocation[BUF.max+1] allocations; 
+				
+				
+				auto forAllocations(BUF[] b)
+				{ return b.map!((a)=>(allocations[a])); } 
+				
+				protected
+				{
+					VulkanCommandBuffer cb; 
+					
+					void uploadBarrier()
+					{
+						with(cb)
+						{
+							cb.cmdPipelineBarrier
+							(
+								
+								(mixin(舉!((VK_PIPELINE_STAGE_),q{TRANSFER_BIT}))),
+								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))),
+								
+								(mixin(體!((VkBufferMemoryBarrier),q{
+									srcAccessMask	: (mixin(舉!((VK_ACCESS_),q{TRANSFER_WRITE_BIT}))),
+									dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_READ_BIT}))),
+									srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									buffer	: dataDeviceMemoryBuffer,
+									offset	: 0,
+									size	: VK_WHOLE_SIZE
+								})))
+							); 
+						}
+					} 
+					void downloadBarrier()
+					{
+						with(cb)
+						{
+							cmdPipelineBarrier
+							(
+								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))), 
+								(mixin(舉!((VK_PIPELINE_STAGE_),q{TRANSFER_BIT}))),
+								
+								(mixin(體!((VkBufferMemoryBarrier),q{
+									srcAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_WRITE_BIT}))),
+									dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{TRANSFER_READ_BIT}))),
+									srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									buffer	: dataDeviceMemoryBuffer,
+									offset	: 0,
+									size	: VK_WHOLE_SIZE
+								})))
+							); 
+						}
+					} 
+					
+					void upload(BUF[] uploads, Flag!"barrier" barrier = Yes.barrier)
+					{
+						with(cb)
+						{
+							if(!uploads.empty)
+							{
+								dataHostMemoryBuffer.flush; 
+								cmdCopyBuffer(
+									dataHostMemoryBuffer, dataDeviceMemoryBuffer, 
+									(mixin(求map(q{a},q{forAllocations(uploads)},q{(mixin(體!((VkBufferCopy),q{a.ofs, a.ofs, a.length})))}))).array
+								); 
+								if(barrier) uploadBarrier; 
+							}
+						}
+					} 
+					void upload(BUF buf, Flag!"barrier" barrier = Yes.barrier)
+					{ upload([buf], barrier); } 
+					
+					void download(BUF[] downloads, Flag!"barrier" barrier = Yes.barrier)
+					{
+						with(cb)
+						{
+							if(!downloads.empty)
+							{
+								if(barrier) downloadBarrier; 
+								{
+									cmdCopyBuffer(
+										dataDeviceMemoryBuffer, dataHostMemoryBuffer,
+										(mixin(求map(q{a},q{forAllocations(downloads)},q{(mixin(體!((VkBufferCopy),q{a.ofs, a.ofs, a.length})))}))).array
+									); 
+								}
+							}
+						}
+					} 
+					void download(BUF buf, Flag!"barrier" barrier = Yes.barrier)
+					{ download([buf], barrier); } 
+					
+					alias dispatch = typeof(super).dispatch; 
+					void dispatch(CMD cmd, uint N)
+					{
+						with(cb)
+						{
+							const workItems = (((N).alignUp(groupSize))/(groupSize)), pipelineIdx = 0; 
+							cmdBindComputePipeline(pipelines[pipelineIdx]); 
+							cmdBindComputeDescriptorSets(pipelineLayout, 0, descriptorSet); 
+							cmdPushConstants(pipelineLayout, (mixin(幟!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))), PushConstants(cmd)); 
+							cmdDispatch(workItems, 1, 1); 
+						}
+					} 
+					
+					void barrier()
+					{
+						with(cb)
+						{
+							cmdPipelineBarrier
+							(
+								
+								
+								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))), 
+								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))),
+								(mixin(體!((VkMemoryBarrier),q{
+									srcAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_WRITE_BIT}))),
+									dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_READ_BIT})))
+								})))
+							); 
+						}
+					} 
+					
+					void execute(void delegate() fun)
+					{
+						enforce(!cb); cb = new VulkanCommandBuffer(commandPool); 
+						with(cb)
+						record(
+							(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))), 
+							{ fun(); }
+						); 
+						queue.submit(cb); 
+						queue.waitIdle; cb.destroy; cb = null; 
+					} 
+					
+					void execute(BUF[] uploads, CMD cmd, uint N, BUF[] downloads)
+					{
+						execute(
+							{
+								upload(uploads); 
+								dispatch(cmd, N); 
+								download(downloads); 
+							}
+						); 
+					} 
+					
+					version(/+$DIDE_REGION+/none) {
+						void execute_old(CMD cmd, uint N)
+						{
+							auto _間=init間; ubuf.cmd = cmd; 
+							uploadBuffers; /+
+								Opt: upload imgSrc only -> 1 command buffer 
+								with a barrier bewteen copy and execute
+							+/	(((update間(_間))).檢(0x326339B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	(((update間(_間))).檢(0x3269B9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	(((update間(_間))).檢(0x327009B0E4249)); 
+						} 
+					}
+				} 
+				
+				static GEN_Dispatch(T)(T table)
+				{
+					const payload =
+					(mixin(求map(q{r},q{table.rows},q{((r[0]!="") ?(iq{dispatch(CMD.$(r[0]), ubuf.$(r[1])); }.text) :(""))~ r[3]}))).join; 
+					return iq{execute({$(payload)}); }.text; 
+				} 
+			} 
 		} 
 		
 		static if(VulkanWindowed)
