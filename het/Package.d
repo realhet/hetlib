@@ -1127,55 +1127,80 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		} 
 	}version(/+$DIDE_REGION+/all)
 	{
-		class SharedMem(SharedDataType, string sharedFileName, bool isServer)
+		class SharedMem(SharedDataType, bool isServer_)
 		{
-			//Todo: Creating a shared memory block that can grow in size
-			//SEC_RESERVE, VirtualAlloc  https://devblogs.microsoft.com/oldnewthing/20150130-00/?p=44793
+			enum isServer = isServer_; 
+			/+
+				Todo: Creating a shared memory block that can grow in size
+				SEC_RESERVE, VirtualAlloc  https://devblogs.microsoft.com/oldnewthing/20150130-00/?p=44793
+				
+				VirtualAlloc(pView, BLOCK_SIZE, MEM_COMMIT, PAGE_READWRITE);
+				
+				void ReportMemoryPresence(void *p)
+				{
+				 MEMORY_BASIC_INFORMATION mbi;
+				 VirtualQuery(p, &mbi, sizeof(mbi));
+				 printf("Memory at %p is %s\n", p,
+					(mbi.State & MEM_COMMIT) ? "committed" : "not committed");
+				}
+			+/
 			
-			private: 
+			protected: 
+			const string sharedFileName; 
 			HANDLE sharedFileHandle; 
 			SharedDataType* sharedData; 
+			uint extraCreationFlags = 0; 
 			
 			void initialize()
 			{
 				if(isActive) return; 
-						
+				
 				import core.sys.windows.windows; 
-				sharedFileHandle = isServer	? CreateFileMappingW(
-					INVALID_HANDLE_VALUE,	//use paging file
-					null,	//default security
-					PAGE_READWRITE,	//read/write access
-					0,	//maximum object size (high)
-					SharedDataType.sizeof.to!uint,	//maximum object size (low)
-					sharedFileName.toPWChar	//name of mapping object
-				)
-					: OpenFileMappingW(
-					FILE_MAP_ALL_ACCESS,	//read/write access
-					false,	//do not inherit the name
-					sharedFileName.toPWChar	//name of mapping object
-				); 
-				
-				sharedData = cast(SharedDataType*) MapViewOfFile(
-					sharedFileHandle,	//handle to map object
-					FILE_MAP_ALL_ACCESS,	//read/write permission
-					0,
-					0,
-					SharedDataType.sizeof
-				); 
-				//ensure(data, "DebugLogClient: Can't open mapFile.");
-				
-				LOG(sharedData); 
+				sharedFileHandle = 
+				((isServer)?(
+					CreateFileMappingW
+					(
+						INVALID_HANDLE_VALUE,	//use paging file
+						null,	//default security
+						PAGE_READWRITE | extraCreationFlags,	//read/write access
+						0,	//maximum object size (high)
+						SharedDataType.sizeof.to!uint,	//maximum object size (low)
+						sharedFileName.toPWChar	//name of mapping object
+					)
+				) :(
+					OpenFileMappingW
+					(
+						FILE_MAP_ALL_ACCESS,	//read/write access
+						false,	//do not inherit the name
+						sharedFileName.toPWChar	//name of mapping object
+					)
+				)); 
+				sharedData = 
+				(cast(SharedDataType*)(
+					MapViewOfFile(
+						sharedFileHandle,	//handle to map object
+						FILE_MAP_ALL_ACCESS,	//read/write permission
+						0,
+						0,
+						SharedDataType.sizeof
+					)
+				)); 
 			} 
 			
 			public: 
-			alias sharedData this; 
-			bool isActive() { return sharedData !is null; } 
+			SharedDataType* data() { return sharedData; } 
+			@property isActive() { return sharedData !is null; } 
 			
-			this() { initialize; } 
+			this(string sharedFileName, Flag!"reserve" reserve = No.reserve)
+			{
+				this.sharedFileName = sharedFileName; 
+				if(reserve) extraCreationFlags |= SEC_RESERVE; 
+				initialize; 
+			} 
 		} 
 		
-		alias SharedMemServer(SharedDataType, string sharedFileName) = SharedMem!(SharedDataType, sharedFileName, true ); 
-		alias SharedMemClient(SharedDataType, string sharedFileName) = SharedMem!(SharedDataType, sharedFileName, false); 
+		alias SharedMemServer(SharedDataType) = SharedMem!(SharedDataType, true); 
+		alias SharedMemClient(SharedDataType) = SharedMem!(SharedDataType, false); 
 		
 		
 		////////////////////////////////////////////////////////////////////////////////////
@@ -2298,7 +2323,28 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			}
 		*/
-	}
+	}
+	
+	///Used for get a hash based on the aggregated content type of a struct
+	///align and nested structs matter.
+	uint getStructHash(S)()
+	{
+		size_t h = hashOf("structHash", S.sizeof); 
+		static foreach(f; FieldNameTuple!S)
+		{
+			{
+				alias m = mixin("S.", f); 
+				alias T = typeof(m); 
+				h = hashOf(f, h); 
+				h = hashOf(m.sizeof, h); 
+				h = hashOf(m.offsetof, h); 
+				h = hashOf(T.stringof, h); 
+				static if(is(T==struct)) h = hashOf(getStructHash!T, h); 
+			}
+		}
+		return h & 0xFFFFFFFF; 
+	} 
+	
 	version(/+$DIDE_REGION+/all)
 	{
 		template staticSizeSum(A...)
@@ -13521,73 +13567,56 @@ version(/+$DIDE_REGION debug+/all)
 		
 		alias dbg = Singleton!DebugLogClient; 
 		
-		//Todo: ha relativ a hibauzenetben a filename, akkor egeszitse ki! hdmd!
-		
 		class DebugLogClient
 		{
-			bool F0, F1, F2, F3; //debug flags
-			
-			
 			//Todo: rewrite it with utils.sharedMemClient
-			
 			private: 
-			enum cBufSize = 1<<16; //the same as in DIDE.exe
 			
-			static struct BreakRec
-			{ uint locationHash, state; } 
 			
-			static struct BreakTable
+			version(/+$DIDE_REGION Shared Debug struct+/all)
 			{
-				BreakRec[64] records; 
+				enum circularBufferSize = 64<<10,
+				memoryPoolSize = 64<<20; 
 				
-				void waitFor(uint locationHash); 
-			} 
+				struct BreakRec
+				{ uint locationHash, state; } 
+				
+				struct BreakTable
+				{
+					BreakRec[64] records; 
+					
+					void waitFor(uint locationHash); 
+				} 
+				
+				struct Data
+				{
+					uint dbgDataStructHash; 
+					uint ping; 
+					BreakTable breakTable; 
+					float[potiCount] poti; 
+					int forceExit; 
+					int exe_waiting; 
+					int dide_ack; /+
+						exception utan exe_waiting = 1 -> dide ekkor F9-re beleir 1-et 
+						az ackba es tovabbmegy az exe. ha -1-et ir az ack-ba, akkor kill.
+					+/
+					int dide_hwnd; //to call setforegroundwindow
+					int exe_hwnd; 
+					int exe_pid; 
+					int console_hwnd; 
+					
+					align(64) CircBuf!(uint, circularBufferSize) circularBuffer; //CircBuf is a struct, not a class
+					
+					align(64) ubyte[memoryPoolSize] memoryPool; //allocator on the client uses this to send big blobs
+				} 
+			}
 			
-			static struct Data
-			{
-				//raw shared data. Careful with 64/32bit stuff!!!!!!
-				uint ping; 
-				BreakTable breakTable; 
-				CircBuf!(uint, cBufSize) buf; //CircBuf is a struct, not a reference
-				float[potiCount] poti; 
-				int forceExit; 
-				int exe_waiting; 
-				int dide_ack; /+
-					exception utan exe_waiting = 1 -> dide ekkor F9-re beleir 1-et 
-					az ackba es tovabbmegy az exe. ha -1-et ir az ack-ba, akkor kill.
-				+/
-				int dide_hwnd; //to call setforegroundwindow
-				int exe_hwnd; 
-				int exe_pid; 
-				int console_hwnd; 
-			} 
 			
-			string dataFileName; 
-			HANDLE dataFile; 
+			private SharedMemClient!Data sharedMem; 
 			Data* data; 
 			
-			void tryOpen()
-			{
-				//it is illegal to use LOG() here.
-				
-				//get dataFileName from the env. Only open it when it is present.
-				dataFileName = environment.get("DideDbgEnv", ""); 
-				if(dataFileName=="") return; 
-				dataFile = OpenFileMappingW(
-					 FILE_MAP_ALL_ACCESS,	 //read/write access
-					 false,	 //do not inherit the name
-					 dataFileName.toPWChar	 /+name of mapping object+/
-				); 
-				
-				data = cast(Data*)MapViewOfFile(
-					dataFile,	//handle to map object
-					FILE_MAP_ALL_ACCESS, 	//read/write permission
-					0,
-					0,
-					Data.sizeof
-				); 
-				//ensure(data, "DebugLogClient: Can't open mapFile.");
-			} 
+			bool isActive()
+			{ return data !is null; } 
 			
 			public: 
 			
@@ -13595,41 +13624,54 @@ version(/+$DIDE_REGION debug+/all)
 			
 			this()
 			{
-				tryOpen; 
+				auto dataFileName = environment.get("DideDbgEnv", ""); 
+				if(dataFileName=="") return; 
+				
+				sharedMem = new SharedMemClient!Data(dataFileName); 
+				data = sharedMem.data; 
+				
+				if(data && data.dbgDataStructHash != getStructHash!Data)
+				{
+					//Todo: show this error on the server side
+					/+
+						writeln(
+						"DebugClient: Incompatible dbgDataStructHash.  "~
+						"Further debug communications are disabled."
+						); 
+					+/
+					data = null; 
+				}
+				
 				sendLog("START:"~appFile.toString); 
 			} 
 			
 			void ping(int index = 0)
 			{
-				if(!data)
-				return; 
+				if(!data) return; 
 				data.ping |= 1<<index; 
 			} 
 			
 			void sendLog(string s)
 			{
-				if(!data)
-				return; 
+				if(!data) return; 
 				ubyte[] packet; 
 				packet.length = 4+s.length; 
 				*cast(uint*)(packet.ptr) = cast(uint)s.length; 
 				memcpy(&packet[4], s.ptr, s.length); 
-				while(!data.buf.store(packet))
+				while(!data.circularBuffer.store(packet))
 				sleep(1); 
 			} 
 			
 			string getLog()
 			{
-				 //not needed on exe side. It's needed on dide side. Only for testing.
-				if(!data)
-				return ""; 
+				//not needed on exe side. It's needed on dide side. Only for testing.
+				if(!data) return ""; 
 				
-				uint siz;  if(!data.buf.get(&siz, 4))
-				return ""; 
+				uint siz; if(!data.circularBuffer.get(&siz, 4)) return ""; 
 				
-				ubyte[] buf;  buf.length = siz; 
+				ubyte[] buf; buf.length = siz; 
 				
-				while(!data.buf.get(buf.ptr, siz))
+				while(!data.circularBuffer.get(buf.ptr, siz))
 				sleep(1); //probably an error+deadlock...
 				return cast(string)buf; 
 			} 
@@ -13640,9 +13682,6 @@ version(/+$DIDE_REGION debug+/all)
 				return data.poti[idx]; 
 				else return 0; 
 			} 
-			
-			bool isActive()
-			{ return data !is null; } 
 			
 			/+
 				bool forceExit_set()
@@ -13668,8 +13707,7 @@ version(/+$DIDE_REGION debug+/all)
 			
 			void handleException(string msg)
 			{
-				if(!data)
-				return; 
+				if(!data) return; 
 				
 				data.dide_ack = 0; 
 				data.exe_waiting = 1; 
@@ -13710,45 +13748,18 @@ version(/+$DIDE_REGION debug+/all)
 			alias Data = DebugLogClient.Data; 
 			
 			string dataFileName; 
-			public string getDataFileName() const
+			public @property getDataFileName() const
 			{ return dataFileName; } 
 			
-			HANDLE dataFile; 
+			SharedMemServer!Data sharedMem; 
 			Data* data; 
 			
 			enum pingLedCount = 8; 
 			int[pingLedCount] pingLedState; 
 			
-			void tryCreate()
-			{
-				//make a unique filename each time dbgsrv starts.
-				dataFileName = format!"DIDEDGB_%08X"([now.raw].crc32); 
-				
-				dataFile = CreateFileMappingW(
-					INVALID_HANDLE_VALUE,	 //use paging file
-					null,	 //default security
-					PAGE_READWRITE,	 //read/write access
-					0,	 //maximum object size (high-order DWORD)
-					Data.sizeof,	 //maximum object size (low-order DWORD)
-					dataFileName.toPWChar	 /+dataFileName.toPWChar+/
-				); 
-				
-				data = cast(Data*)MapViewOfFile(
-					dataFile,	//handle to map object
-					FILE_MAP_ALL_ACCESS,	//read/write permission
-					0,
-					0,
-					Data.sizeof
-				); 
-				
-				if(!dataFile || !data)
-				ERR(`dbgsrv: Could not map create debug fileMapping. Run this as Admin!`); 
-			} 
-			
 			void updatePingLeds()
 			{
-				if(!data)
-				return; 
+				if(!data) return; 
 				
 				auto st = data.ping;  data.ping = 0; //latch
 				
@@ -13758,22 +13769,61 @@ version(/+$DIDE_REGION debug+/all)
 			
 			string[] logEvents; 
 			bool logChanged_; 
+			
+			void processLogMessage(string s)
+			{
+				logEvents ~= s; 
+				logChanged_ = true; 
+				
+				if(s.isWild("LOG:*"))
+				{
+					if(onDebugLog)
+					onDebugLog(wild[0]); 
+				}
+				else if(s.isWild("EXCEPTION:*")) {
+					if(onDebugException)
+					onDebugException(wild[0]); 
+				}
+				else if(s.isWild("START:*")) { clearLog; }
+			} 
+			
+			void updateLog()
+			{
+				if(!data) return; 
+				
+				while(1)
+				{
+					auto d = CircBuf_getLog(
+						data.circularBuffer.tail	, data.circularBuffer.head, 
+						data.circularBuffer.capacity	, data.circularBuffer.buf.ptr
+					); 
+					if(d.empty) break; 
+					
+					//safely interpret it as UTF8. If fails, convert it from Latin1
+					auto s = cast(string)d; 
+					try
+					{ validate(s); }catch(Exception)
+					{
+						import std.encoding; 
+						transcode(cast(Latin1String)d, s); 
+					}
+					
+					processLogMessage(s); 
+				}
+			} 
 			
 			ubyte[] CircBuf_getLog(ref uint tail, ref uint head, in uint cap, ubyte* buf)
 			{
-				 //reads a packet from the circbuff
+				//reads a packet from the circbuff
 				uint capacity()
-				{ return cap; } 
-				uint length()
+				{ return cap; } 	uint length()
 				{ return head-tail; } 
 				uint canGet()
-				{ return length; } 
-				
-				uint truncate(uint x)
+				{ return length; } 	uint truncate(uint x)
 				{ return x % cap; } 
 				
 				void Move(in void *source, void *destination, uint num)
-				{ (cast(ubyte*)destination)[0 .. num][]=(cast(const(ubyte)*)source)[0 .. num]; } 
+				{ (cast(ubyte*)(destination))[0 .. num] = (cast(ubyte*)(source))[0 .. num]; } 
 				
 				bool get(ubyte* dst, uint dstLen)
 				{
@@ -13781,8 +13831,8 @@ version(/+$DIDE_REGION debug+/all)
 					if(dstLen>canGet)
 					return false; 
 					
-					uint o = truncate(tail),
-								 fullLen = dstLen; 
+					uint 	o 	= truncate(tail),
+						fullLen 	= dstLen; 
 					if(o+dstLen >= capacity)
 					{
 						//multipart
@@ -13808,61 +13858,22 @@ version(/+$DIDE_REGION debug+/all)
 				if(!get(cast(ubyte*)(&siz), 4))
 				return []; 
 				//Todo: sanity check for siz
-				auto res = new ubyte[siz]; //Opt: uninitialized
+				if(siz>capacity-4)
+				{
+					WARN(i"Invalid message size. ($(siz))"); 
+					flush; return []; 
+				}
+				
+				auto res = uninitializedArray!(ubyte[])(siz); 
 				auto t0 = now; 
 				while(!get(res.ptr, siz))
 				{
 					sleep(1); //probably an error+deadlock...
 					if(now-t0>0.1*second)
-					{
-						flush; 
-						return []; 
-					}
+					{ flush; return []; }
 				}
 				return res; 
 			} 
-			
-			void processLogMessage(string s)
-			{
-				logEvents ~= s; 
-				logChanged_ = true; 
-				
-				if(s.isWild("LOG:*"))
-				{
-					if(onDebugLog)
-					onDebugLog(wild[0]); 
-				}
-				else if(s.isWild("EXCEPTION:*")) {
-					if(onDebugException)
-					onDebugException(wild[0]); 
-				}
-				else if(s.isWild("START:*")) { clearLog; }
-			} 
-			
-			void updateLog()
-			{
-				if(!data)
-				return; 
-				
-				while(1)
-				{
-					auto d = CircBuf_getLog(data.buf.tail, data.buf.head, data.buf.capacity, data.buf.buf.ptr); 
-					if(d.empty)
-					break; 
-					
-					//safely interpret it as UTF8. If fails, convert it from Latin1
-					auto s = cast(string)d; 
-					try
-					{ validate(s); }catch(Exception)
-					{
-						import std.encoding; 
-						transcode(cast(Latin1String)d, s); 
-					}
-					
-					processLogMessage(s); 
-				}
-			} 
-			
 			public: 
 			immutable het.math.RGB[pingLedCount] pingLedColors = 
 				[0xffffff, 0x00FF00, 0x00FFe0, 0x2020FF, 0xFF2020, 0x00b0FF, 0xb000FF, 0xFFFF00]; 
@@ -13870,14 +13881,29 @@ version(/+$DIDE_REGION debug+/all)
 			void delegate(string) onDebugLog, onDebugException; 
 			
 			this()
-			{ tryCreate; } 
+			{
+				//make a unique filename each time dbgsrv starts.
+				dataFileName = format!"DIDEDGB_%08X"([now.raw].crc32); 
+				sharedMem = new SharedMemServer!Data(dataFileName); 
+				data = sharedMem.data; 
+				
+				if(data)
+				{
+					data.dbgDataStructHash = getStructHash!Data; 
+					//client will compare its structureHash to this one.
+				}
+				
+				
+				
+				if(!data)
+				ERR(`dbgsrv: Could not map create debug fileMapping. Run this as Admin!`); 
+			} 
 			
 			@property active() { return !!data; } 
 			
 			bool update()
 			{
-				if(!data)
-				return false; 
+				if(!data) return false; 
 				updatePingLeds; 
 				updateLog; 
 				return true; //Todo: only when chg...
@@ -13904,11 +13930,10 @@ version(/+$DIDE_REGION debug+/all)
 				if(data && idx.inRange(data.poti))
 				data.poti[idx] = val; 
 			} 
-			
+			
 			void resetBeforeRun()
 			{
-				if(!data)
-				return; 
+				if(!data) return; 
 				with(data)
 				{
 					dide_hwnd = cast(int)application.handle; 
@@ -13923,8 +13948,7 @@ version(/+$DIDE_REGION debug+/all)
 			
 			void forceExit()
 			{
-				if(!data)
-				return; 
+				if(!data) return; 
 				with(data)
 				{
 					dide_ack = -1; 

@@ -5617,6 +5617,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			mixin template KernelAllocationsTemplate()
 			{
+				/+Link: https://registry.khronos.org/vulkan/specs/1.3-khr-extensions/html/chap15.html#interfaces-resources-layout+/
+				
 				struct Allocation
 				{ BUF name; uint ofs, length; } 
 				
@@ -5772,9 +5774,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	(((update間(_間))).檢(0x326339B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	(((update間(_間))).檢(0x3269B9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	(((update間(_間))).檢(0x327009B0E4249)); 
+							+/	(((update間(_間))).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	(((update間(_間))).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	(((update間(_間))).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
