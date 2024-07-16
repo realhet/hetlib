@@ -2855,10 +2855,40 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				static assert(A.length==2); 
 				const ulong location = args[1]; 
+				
+				enum TStr 	= A[0].stringof,
+				isImage 	= isImage2D!(A[0]); 
+				
 				if(dbg.isActive)
 				{
-					auto s = "LOG:INSP:"~location.to!string(16)~":"~args[0].text.toBase64; 
-					dbg.sendLog(s); 
+					
+					
+					if(isImage)
+					{
+						todo; 
+						
+						//Todo: make this work in dide
+						
+						auto data = args[0].asArray; 
+						auto blobAddress = dbg.setBlob(location, args[0].asArray); 
+						dbg.sendLog(
+							"LOG:INSP_IMG_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)
+								~":"~ElementType!(typeof(Data)).stringof
+								~":"~args[0].width.to!string(16)
+								~":"~args[0].height.to!string(16)
+						); 
+					}
+					else
+					{
+						auto txt = args[0].text; 
+						if(txt.length<=1024)
+						{ dbg.sendLog("LOG:INSP_TXT_B64:"~location.to!string(16)~":"~txt.toBase64); }
+						else
+						{
+							auto blobAddress = dbg.setBlob(location, txt); 
+							dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
+						}
+					}
 				}
 				/+Normal user can't see debug inspector messages.+/
 				return args[0]; 
@@ -13615,6 +13645,8 @@ version(/+$DIDE_REGION debug+/all)
 			private SharedMemClient!Data sharedMem; 
 			Data* data; 
 			
+			MyAllocator!(16) allocator; 
+			
 			bool isActive()
 			{ return data !is null; } 
 			
@@ -13641,6 +13673,8 @@ version(/+$DIDE_REGION debug+/all)
 					+/
 					data = null; 
 				}
+				
+				if(data) allocator = new typeof(allocator)(data.memoryPool[]); 
 				
 				sendLog("START:"~appFile.toString); 
 			} 
@@ -13675,7 +13709,7 @@ version(/+$DIDE_REGION debug+/all)
 				sleep(1); //probably an error+deadlock...
 				return cast(string)buf; 
 			} 
-			
+			
 			float getPotiValue(size_t idx)
 			{
 				if(data && idx>=0 && idx<data.poti.length)
@@ -13683,18 +13717,6 @@ version(/+$DIDE_REGION debug+/all)
 				else return 0; 
 			} 
 			
-			/+
-				bool forceExit_set()
-					{
-						if(!data)
-						return false; data.forceExit = 1; return true; 
-					} 
-					void forceExit_clear()
-					{
-						if(data)
-						data.forceExit = 0; 
-					} 
-			+/
 			bool forceExit_check()
 			{ return data && !!data.forceExit; } 
 			
@@ -13704,7 +13726,7 @@ version(/+$DIDE_REGION debug+/all)
 				SetForegroundWindow(cast(void*)data.dide_hwnd); 
 			} 
 			alias focusIDE = focusIde; 
-			
+			
 			void handleException(string msg)
 			{
 				if(!data) return; 
@@ -13737,6 +13759,9 @@ version(/+$DIDE_REGION debug+/all)
 				if(data)
 				data.exe_hwnd = cast(int)hwnd; 
 			} 
+			
+			void sendBlob(string s)
+			{} 
 		} 
 		//Todo: Set a unique name to the dbgserver's Shared Memory, and pass it to the launched program.
 		
@@ -14395,6 +14420,201 @@ version(/+$DIDE_REGION debug+/all)
 			records = (cast(SymbolRecord*)&stream[0])[0..recordCount]; 
 			stream = stream[records.sizeBytes..$]; 
 			nameStream = stream; 
+		} 
+		
+	} class MyAllocator(uint alignment_)
+	{
+		import std.container : RedBlackTree; 
+		
+		enum alignment = alignment_; 
+		static assert(alignment>0 && !(alignment & (alignment-1))); 
+		
+		protected: 
+		
+		alias Chunk = ubyte[alignment]; 
+		Chunk[] memory; 
+		struct Block {
+			uint st, en; 
+			@property length() const
+			{ return en-st; } 
+			@property sizeBytes() const
+			{ return length*Chunk.sizeof; } 
+		} 
+		
+		static bool lessThanBySize(in Block a, in Block b)
+		{
+			if(a.length==b.length) return a.st<b.st; 
+			return a.length<b.length; 
+		} 
+		
+		static bool lessThanByPos(in Block a, in Block b)
+		{ return a.st<b.st; } 
+		
+		Block[uint] usedBlocks; 
+		RedBlackTree!(Block, lessThanBySize, false) freeBlocksBySize; 
+		RedBlackTree!(Block, lessThanByPos, false) freeBlocksByPos; 
+		
+		void addFreeBlock(Block fb)
+		{
+			assert(fb.en>fb.st); 
+			
+			freeBlocksBySize.insert(fb); 
+			freeBlocksByPos.insert(fb); 
+		}  void removeFreeBlock(Block fb)
+		{
+			freeBlocksBySize.removeKey(fb); 
+			freeBlocksByPos.removeKey(fb); 
+		} 
+		
+		void addUsedBlock(Block ub)
+		{
+			assert(ub.en>ub.st); 
+			
+			usedBlocks[ub.st] = ub; 
+		}  void removeUsedBlock(uint st)
+		{ usedBlocks.remove(st); } 
+		
+		public: 
+		
+		this(void[] memory_)
+		{
+			auto 	p0 = (cast(size_t)(memory_.ptr)).alignUp(alignment), 
+				p1 = (p0 + memory_.length).alignDown(alignment); 
+			enforce(p1>p0, "MyAlloc.init: Memory pool is too small."); 
+			enforce(p1-p0<=uint.max, "MyAlloc.init: Memory pool is too big."); 
+			memory = (cast(Chunk[])((cast(void*)(p0))[0 .. p1-p0])); 
+			
+			freeBlocksBySize = new typeof(freeBlocksBySize); 
+			freeBlocksByPos = new typeof(freeBlocksByPos); 
+			
+			addFreeBlock(Block(0, memory.length.to!uint)); //the very first block
+		} 
+		
+		void* alloc(size_t requiredBytes)
+		{
+			const requiredChunksL = ((max(requiredBytes, 1) + Chunk.sizeof - 1)/(Chunk.sizeof)); 
+			if(requiredChunksL>uint.max) return null; //way too big
+			const requiredChunks = (cast(uint)(requiredChunksL)); 
+			if(requiredChunks<=0) return null; //nothing to alloc
+			auto sufficientFreeBlocks = 	freeBlocksBySize.upperBound
+				(
+				Block(
+					uint.max-(requiredChunks-1), 
+					uint.max
+				)
+				/+
+					Note: Special non-inclusive bound value
+					of one less length.
+				+/
+			); 
+			
+			if(sufficientFreeBlocks.empty) return null; //out of memory
+			auto fb = sufficientFreeBlocks.front; 
+			assert(fb.length>=requiredChunks); 
+			removeFreeBlock(fb); 
+			if(fb.length==requiredChunks)
+			{
+				addUsedBlock(fb); 
+				return &memory[fb.st]; 
+			}
+			else
+			{
+				auto nb = Block(fb.st, fb.st + requiredChunks); 
+				fb.st += requiredChunks; 
+				
+				addFreeBlock(fb); 
+				addUsedBlock(nb); 
+				return &memory[nb.st]; 
+			}
+		} 
+		
+		bool free(void* ptr)
+		{
+			if(ptr<memory.ptr) return false; 
+			if(ptr>=memory.ptr+memory.length) return false; 
+			
+			const st = (cast(uint)((((cast(size_t)(ptr))-(cast(size_t)(memory.ptr)))/(Chunk.sizeof)))); 
+			if(auto a = st in usedBlocks)
+			{
+				auto ub = *a; 
+				removeUsedBlock(st); 
+				
+				
+				bool tryExtendLeft()
+				{
+					auto a = freeBlocksByPos.lowerBound(Block(ub.st, ub.st)); 
+					if(!a.empty && a.front.en==ub.st)
+					{ ub.st = a.front.st; removeFreeBlock(a.front); return true; }
+					return false; 
+				} 
+				while(tryExtendLeft) {}
+				bool tryExtendRight()
+				{
+					auto a = freeBlocksByPos.upperBound(Block(ub.st, ub.st)); 
+					if(!a.empty && a.front.st==ub.en)
+					{ ub.en = a.front.en; removeFreeBlock(a.front); return true; }
+					return false; 
+				} 
+				while(tryExtendRight) {}
+				
+				addFreeBlock(ub); 
+				
+				//Todo: join with other free blocks
+				return true; 
+			}
+			return false; 
+		} 
+		
+		@property countUsed()
+		=> usedBlocks.length; 	@property sizeUsed() => (mixin(求sum(q{b},q{usedBlocks.byValue},q{b.sizeBytes}))); 
+		@property countFree()
+		=> freeBlocksByPos[].walkLength; 	@property sizeFree() => (mixin(求sum(q{b},q{freeBlocksByPos[]},q{b.sizeBytes}))); 
+		@property stats() {
+			return i"    	Count	Size
+	Used:	$(countUsed)	$(sizeUsed)
+	Free:	$(countFree)	$(sizeFree)
+	Total:	$(countUsed+
+	countFree)	$(sizeUsed+
+	sizeFree)".text; 
+		} 
+		
+		static void test()
+		{
+			randSeed = 123; 
+			const M = 512<<20; 
+			const N = 16384; 
+			auto memory = new ubyte[M]; 
+			auto ta = new MyAllocator(memory); 
+			ta.stats.print; 
+			
+			size_t totalSize; 
+			
+			auto randomAlloc()
+			{
+				const size = random(max(M/N, 1)); 
+				totalSize += size; 
+				return ta.alloc(random(max(M/N, 1))).enforce("alloc() failed"); 
+			} 
+			
+			auto ptrs = (mixin(求map(q{0<=i<N},q{},q{randomAlloc}))).array; 
+			T0; 
+			(mixin(求each(q{i=1},q{1<<20},q{
+				if(!(i&0xFFFF)) { print(i, totalSize); ta.stats.print; }
+				auto j=random(N); 
+				ta.free(ptrs[j]).enforce("free() failed."); 
+				ptrs[j]=randomAlloc; 
+			}))); 
+			DT.print; 
+			
+			/+
+					Count	  Size
+				Used:	16384	 268572624
+				Free:	12549	 268298288
+				Total:	28933	 536870912
+				2.37975	[T]
+			+/
+			
+			totalSize.print; 
 		} 
 		
 	} 
