@@ -2388,6 +2388,8 @@ class Drawing
 		{ fillRect(bounds2(b)); } 
 		//Todo: ibounds2 automatikusan atalakulhasson bounds2-re
 		struct DrawGlyphScale { float value=1; } 
+		enum SamplerEffect { none, quad, karc } 
+		
 		void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args)
 		{
 			if(idx<0) return; 
@@ -2398,17 +2400,19 @@ class Drawing
 			auto 	color 	= realDrawColor,
 				bkColor 	= (RGBA(0, 0, 0, 255)); 
 			int shaderIdx = -1; 
+			SamplerEffect samplerEffect = SamplerEffect.quad; 
 			float drawScale = 1; 
 			
 			static foreach(i, A_; T)
 			{
 				{
-					 alias A = Unqual!A_; auto a() { return args[i]; } 
+					alias A = Unqual!A_; auto a() { return args[i]; } 
 					static if(is(A==RGB8	))	bkColor = a.to!RGBA8; 
 					else static if(is(A==RGBA8	))	bkColor = a; 
 					else static if(is(A==Flag!"nearest"	))	nearest = a; 
 					else static if(is(A==RectAlign	))	rectAlign = a; 
 					else static if(is(A==DrawGlyphScale	))	drawScale = a.value; 
+					else static if(is(A==SamplerEffect	))	samplerEffect = a; 
 					else static if(is(A==GenericArg!(N, T), string N, T))
 					{
 						static if(N=="shaderIdx")	shaderIdx = a.value; 
@@ -2416,14 +2420,16 @@ class Drawing
 						else static if(N=="bkColor")	bkColor = a.value; 
 					}
 					else { static assert(0, "Unhandled parameter: " ~ A.stringof); }
-					
 				}
 			}
 			
 			auto c = color; 
 			auto c2 = bkColor; 
 			
-			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
+			auto 	tx0 = vec2(
+				(nearest ? 0 : 1) | 16/*fontflag=image*/ | 
+				(shaderIdx>=0 ? 32 + 64*shaderIdx : 0) | ((cast(int)(samplerEffect))<<16), 0
+			),
 				tx1 = vec2(0, 1)/+y subRange [0..1]+/; 
 			
 			auto info = textures.accessInfo(idx); //Todo: csunya, kell egy texture wrapper erre
@@ -2530,6 +2536,7 @@ class Drawing
 			
 			auto nearest = No.nearest; 
 			int shaderIdx = -1; 
+			SamplerEffect samplerEffect = SamplerEffect.quad; 
 			auto 	color 	= (RGBA(0, 0, 0, 255)),
 				bkColor 	= (RGBA(0, 0, 0, 255)); 
 			
@@ -2538,6 +2545,7 @@ class Drawing
 				{
 					alias A = Unqual!A_; auto a() { return args[i]; } 
 					static if(is(A==Flag!"nearest"	))	nearest = a; 
+					else static if(is(A==SamplerEffect)) samplerEffect = a; 
 					else static if(is(A==GenericArg!(N,	T), string N, T))
 					{
 						static if(N=="shaderIdx")	shaderIdx = a.value; 
@@ -2548,7 +2556,11 @@ class Drawing
 				}
 			}
 			
-			auto 	tx0 = vec2((nearest ? 0 : 1) | 16/*fontflag=image*/ | (shaderIdx>=0 ? 32 + 64*shaderIdx : 0), 0),
+			auto 	tx0 = vec2(
+				(nearest ? 0 : 1) | 16/*fontflag=image*/ | 
+				(shaderIdx>=0 ? 32 + 64*shaderIdx : 0) |
+				((cast(int)(samplerEffect))<<16) , 0
+			),
 				tx1 = vec2(0, 1)/+y subRange [0..1]+/; 
 			
 			oldAppend(
@@ -3695,9 +3707,24 @@ class Drawing
 		
 		uniform float appRunningTime_sec; 
 		
+		
+		bool enableQuadEffect; //display the RGBA channels separatedly
+		bool enableKarcEffect; //Karc sample visualization effect
+		
+		
 		vec4 megaSample_nearest_internal(vec2 tc)
 		{
 			//if(stIdx!=0) return vec4(1, 0, 1, 1); //return fuschia for multitexturing
+			
+			int quadIdx; 
+			if(enableQuadEffect)
+			{
+				quadIdx = 0; 
+				tc = (tc-stPos)*2; 
+				if(tc.x>=stSize.x) { tc.x -= stSize.x; quadIdx |= 1; }
+				if(tc.y>=stSize.y) { tc.y -= stSize.y; quadIdx |= 2; }
+				tc += stPos; 
+			}
 			
 			ivec2 itc = ivec2(floor(tc)); 
 			
@@ -3711,6 +3738,19 @@ class Drawing
 			if(outside) t = vec4(0); 
 			
 			if(stConfig==0) t.yzw = t.xxx; //spread 1 channel to 4ch
+			
+			if(enableQuadEffect)
+			{
+				switch(quadIdx)
+				{
+					case 0: t.rgb = t.rrr; break; 
+					case 1: t.rgb = t.ggg; break; 
+					case 2: t.rgb = t.bbb; break; 
+					default: t.rgb = t.aaa; 
+				}
+				t.a = 1; 
+			}
+			
 			
 			return t; 
 			
@@ -4021,6 +4061,10 @@ class Drawing
 				customShaderIdx = 0; 
 				isTransparent = false; 
 				
+				int effectIdx = (fontFlags>>16)&3; 
+				enableQuadEffect = effectIdx==1; 
+				enableKarcEffect = effectIdx==2; 
+				
 				if(isFont) { isTransparent = (fontFlags&32)!=0; }
 				else {
 					isCustomShader = (fontFlags&32)!=0; 
@@ -4028,7 +4072,7 @@ class Drawing
 				}
 				
 				if(!isCustomShader) {
-					 //default shader for images and text
+					//default shader for images and text
 					FragColor = defaultShader(); 
 				}
 				else {

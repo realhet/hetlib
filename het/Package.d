@@ -2856,24 +2856,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				static assert(A.length==2); 
 				const ulong location = args[1]; 
 				
-				enum TStr 	= A[0].stringof,
-				isImage 	= isImage2D!(A[0]); 
-				
 				if(dbg.isActive)
 				{
-					
-					
-					if(isImage)
+					static if(isImage2D!(A[0]))
 					{
-						todo; 
-						
-						//Todo: make this work in dide
-						
 						auto data = args[0].asArray; 
-						auto blobAddress = dbg.setBlob(location, args[0].asArray); 
+						auto blobAddress = dbg.setBlob(location, data); 
 						dbg.sendLog(
 							"LOG:INSP_IMG_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)
-								~":"~ElementType!(typeof(Data)).stringof
+								~":"~typeof(data[0]).stringof
 								~":"~args[0].width.to!string(16)
 								~":"~args[0].height.to!string(16)
 						); 
@@ -2882,10 +2873,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					{
 						auto txt = args[0].text; 
 						if(txt.length<=1024)
-						{ dbg.sendLog("LOG:INSP_TXT_B64:"~location.to!string(16)~":"~txt.toBase64); }
+						{ dbg.sendLog("LOG:INSP_TXT:"~location.to!string(16)~":"~txt); }
 						else
 						{
-							auto blobAddress = dbg.setBlob(location, txt); 
+							auto blobAddress = dbg.setBlob(location, cast(void[])txt); 
 							dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
 						}
 					}
@@ -6867,11 +6858,15 @@ version(/+$DIDE_REGION Containers+/all)
 			assert(0); 
 		} 
 		
-		string optionallyQuotedFileName(string s)
+		string cmdArg(string s)
 		{
 			//Bug: Don't give a fuck about quoting quotes.
+			/+Todo: make proper dos/windows command line argument encoding.+/
 			return s.canFind(' ') ? '"' ~ s ~ '"' : s; 
 		} 
+		
+		string cmdArg(File f)
+		{ return f.fullName.cmdArg; } 
 		
 		auto joinCommandLine(string[] cmd)//Todo: handling quotes
 		{
@@ -8870,6 +8865,7 @@ version(/+$DIDE_REGION Colors+/all)
 		} 
 	}version(/+$DIDE_REGION Color constants+/all)
 	{
+		//Todo: all these should be static immutable
 		version(/+$DIDE_REGION classic delphi palette+/all)
 		{
 			immutable
@@ -13649,6 +13645,41 @@ version(/+$DIDE_REGION debug+/all)
 			
 			bool isActive()
 			{ return data !is null; } 
+			
+			struct BlobRec { void* ptr; uint length; } 
+			BlobRec[ulong] blobs; 
+			//Todo: statistics: number of blobs, size of blobs
+			
+			
+			ulong setBlob(ulong id, void[] buf)
+			{
+				if(!data) return 0; 
+				
+				ulong copyAndCalcBlobAddress(void* ptr)
+				{
+					ptr[0..buf.length] = buf; 
+					return 	(cast(ulong)(buf.length)) |
+						((cast(ulong)(ptr))-(cast(ulong)(data.memoryPool.ptr)))<<32; 
+				} 
+				
+				if(auto a = id in blobs)
+				{
+					if(buf.length==a.length)
+					{ return copyAndCalcBlobAddress(a.ptr); }
+					
+					allocator.free(a.ptr); 
+					blobs.remove(id); 
+				}
+				
+				if(auto p = allocator.alloc(buf.length))
+				{
+					blobs[id] = BlobRec(p, buf.length.to!uint); 
+					return copyAndCalcBlobAddress(p); 
+				}
+				
+				return 0; 
+			} 
+			
 			
 			public: 
 			
@@ -13792,24 +13823,21 @@ version(/+$DIDE_REGION debug+/all)
 				ps = st.getBit(i) ? 255: ps*7 >> 3; 
 			} 
 			
-			string[] logEvents; 
-			bool logChanged_; 
 			
 			void processLogMessage(string s)
 			{
-				logEvents ~= s; 
-				logChanged_ = true; 
-				
-				if(s.isWild("LOG:*"))
-				{
+				if(s.isWild("LOG:*"))	{
 					if(onDebugLog)
 					onDebugLog(wild[0]); 
 				}
-				else if(s.isWild("EXCEPTION:*")) {
+				else if(s.isWild("EXCEPTION:*"))	{
 					if(onDebugException)
 					onDebugException(wild[0]); 
 				}
-				else if(s.isWild("START:*")) { clearLog; }
+				else if(s.isWild("START:*"))	{
+					if(onDebugStart)
+					onDebugStart(wild[0]); 
+				}
 			} 
 			
 			void updateLog()
@@ -13903,7 +13931,7 @@ version(/+$DIDE_REGION debug+/all)
 			immutable het.math.RGB[pingLedCount] pingLedColors = 
 				[0xffffff, 0x00FF00, 0x00FFe0, 0x2020FF, 0xFF2020, 0x00b0FF, 0xb000FF, 0xFFFF00]; 
 			
-			void delegate(string) onDebugLog, onDebugException; 
+			void delegate(string) onDebugStart, onDebugLog, onDebugException; 
 			
 			this()
 			{
@@ -13936,19 +13964,6 @@ version(/+$DIDE_REGION debug+/all)
 			
 			string pingLedStateText()
 			{ return pingLedState[].enumerate.map!(a => a.value ? a.index.text : "_").join; } 
-			
-			void clearLog()
-			{
-				logEvents = []; 
-				logChanged_ = true; 
-			} 
-			
-			int getLogCount()
-			{ return logEvents.length.to!int; } 
-			string getLogStr(int idx)
-			{ return logEvents.get(idx); } 
-			bool logChanged()
-			{ return logChanged_; } //signal to redraw log list
 			
 			void setPotiValue(int idx, float val)
 			{
@@ -14003,6 +14018,15 @@ version(/+$DIDE_REGION debug+/all)
 			@property exe_hwnd()
 			{ return data ? data.exe_hwnd : 0; } 	@property exe_hwnd(int val)
 			{ if(data) data.exe_hwnd = val; } 
+			
+			void[] getBlob(ulong blobAddress)
+			{
+				if(!data) return null; 
+				const 	base = blobAddress>>>32,
+					length = cast(uint)blobAddress; 
+				enforce(base>=0 && base+length<=Data.memoryPool.length, "blobAddress out of range"); 
+				return data.memoryPool[base..base+length]; 
+			} 
 			
 		} 
 	}
