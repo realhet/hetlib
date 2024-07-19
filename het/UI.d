@@ -1628,13 +1628,14 @@ version(/+$DIDE_REGION+/all)
 		File file; 
 		bool transparent; 
 		bool autoRefresh; 
+		SamplerEffect samplerEffect; 
 		
 		int stIdx; 
 		
 		this(File file)
 		{
 			this.file = file; 
-			id = srcId(genericId("Img")); //Todo: this is bad
+			id = srcId(genericId("Img:"~file.fullName)); //Todo: this is not so standard...
 		} 
 		
 		this(File file, RGB bkColor)
@@ -1674,13 +1675,14 @@ version(/+$DIDE_REGION+/all)
 			
 			drawBorder(dr); 
 			
-			if(autoRefresh) ignoreExceptions({ stIdx = textures[file]; }); //Todo: this does not reflect size change.
+			if(autoRefresh) { stIdx = textures[file].ifThrown(0); }//Todo: this does not reflect size change.
+			
+			int baseFontFlags = ((cast(int)(samplerEffect))<<16); 
 			
 			if(stIdx)
 			{
-				if(transparent)
-				dr.drawFontGlyph(stIdx, innerBounds, bkColor, 32/*transparent font*/); 
-				else dr.drawFontGlyph(stIdx, innerBounds, bkColor, 16/*image*/); 
+				if(transparent)	dr.drawFontGlyph(stIdx, innerBounds, bkColor, baseFontFlags | 32/*transparent font*/); 
+				else	dr.drawFontGlyph(stIdx, innerBounds, bkColor, baseFontFlags | 16/*image*/); 
 			}
 		} 
 	} 
@@ -3934,7 +3936,7 @@ version(/+$DIDE_REGION+/all)
 				{
 					context.absInnerPos -= thisC.innerPos; 
 					context.cellPath.popBack; 
-				} 
+				}
 				
 				//print("enter");
 				
@@ -6458,7 +6460,7 @@ struct im
 			static if(doTiming)
 			{
 				const T0 = QPS; scope(exit)
-				{ tDraw = QPS-T0; print(format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)); } 
+				{ tDraw = QPS-T0; print(format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)); }
 			}
 			
 			static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 

@@ -2847,43 +2847,40 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		
 		//Inspector
-		auto 檢(A...)(A args)
+		auto 檢(A...)(ulong location, A args)
 		{
-			static if(A.length>2)
-			{ return 檢(text(args[0..$-1]), args[$-1]); /+Note: IES support+/}
-			else
+			static assert(A.length>=1); 
+			
+			if(dbg.isActive)
 			{
-				static assert(A.length==2); 
-				const ulong location = args[1]; 
-				
-				if(dbg.isActive)
+				static if(isImage2D!(A[0]))
 				{
-					static if(isImage2D!(A[0]))
-					{
-						auto data = args[0].asArray; 
-						auto blobAddress = dbg.setBlob(location, data); 
-						dbg.sendLog(
-							"LOG:INSP_IMG_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)
-								~":"~typeof(data[0]).stringof
-								~":"~args[0].width.to!string(16)
-								~":"~args[0].height.to!string(16)
-						); 
-					}
+					static assert(A.length==1); 
+					auto data = args[0].asArray; 
+					auto blobAddress = dbg.setBlob(location, data); 
+					dbg.sendLog(
+						"LOG:INSP_IMG_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)
+							~":"~typeof(data[0]).stringof
+							~":"~args[0].width.to!string(16)
+							~":"~args[0].height.to!string(16)
+					); 
+				}
+				else
+				{
+					static if(A.length==1)	auto txt = args[0].text; 
+					else	auto txt = text(args[0..$]); 
+					if(txt.length<=1024)
+					{ dbg.sendLog("LOG:INSP_TXT:"~location.to!string(16)~":"~txt); }
 					else
 					{
-						auto txt = args[0].text; 
-						if(txt.length<=1024)
-						{ dbg.sendLog("LOG:INSP_TXT:"~location.to!string(16)~":"~txt); }
-						else
-						{
-							auto blobAddress = dbg.setBlob(location, cast(void[])txt); 
-							dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
-						}
+						auto blobAddress = dbg.setBlob(location, cast(void[])txt); 
+						dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
 					}
 				}
-				/+Normal user can't see debug inspector messages.+/
-				return args[0]; 
 			}
+			
+			static if(A.length==1)	return args[0]; 
+			else	return tuple(args[0..$]); 
 		} 
 		
 		
@@ -6904,6 +6901,9 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		private mixin template ComandLineTemplate(char chDelim, char chQuote , char chEqu)
 		{
+			//Todo: boolean handling
+			//Todo: same option multimple times: the last one is the real one
+			
 			struct Item {
 				bool hasValue; 
 				string name, value; 

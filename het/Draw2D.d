@@ -52,7 +52,7 @@ version(/+$DIDE_REGION+/all)
 	+/
 	
 	//Standard LineStyles
-	enum LineStyle:ubyte
+	enum LineStyle : ubyte
 	{
 		normal	= 0,
 		dot	= 2,
@@ -63,19 +63,19 @@ version(/+$DIDE_REGION+/all)
 	} //Todo: this is a piece of shit. dot is so long that it is already a fucking dash. And what fucking format is this anyways???
 	
 	//these are also used in ui.d
-	enum HAlign
-	{ left, center, right, justify} 	 //when the container width is fixed
-	enum VAlign
-	{ top, center, bottom, justify} 	 //when the container height is fixed
-	enum YAlign
-	{ top, center, bottom, baseline, stretch} 	//this aligns the y position of each cell in a line. baseline is 0.7ish
+	enum HAlign : ubyte
+	{left, center, right, justify} 	 //when the container width is fixed
+	enum VAlign : ubyte
+	{top, center, bottom, justify} 	 //when the container height is fixed
+	enum YAlign : ubyte
+	{top, center, bottom, baseline, stretch} 	//this aligns the y position of each cell in a line. baseline is 0.7ish
 	
 	
 	//Standard arrows
 	private int encodeArrowStyle(int headArrow, int tailArrow, int centerNormal)
 	{ return headArrow<<0 | tailArrow<<2 | centerNormal<<4; } 
 	
-	enum ArrowStyle:ubyte
+	enum ArrowStyle : ubyte
 	{
 		none	= 0,
 		arrow	= encodeArrowStyle(1,0,0),
@@ -87,6 +87,9 @@ version(/+$DIDE_REGION+/all)
 		vector	= encodeArrowStyle(1,2,0),
 		segment	= encodeArrowStyle(2,2,0)
 	} 
+	
+	enum SamplerEffect : ubyte
+	{none, quad, karc} 
 	
 	
 	/+
@@ -2388,7 +2391,6 @@ class Drawing
 		{ fillRect(bounds2(b)); } 
 		//Todo: ibounds2 automatikusan atalakulhasson bounds2-re
 		struct DrawGlyphScale { float value=1; } 
-		enum SamplerEffect { none, quad, karc } 
 		
 		void drawGlyph_impl(T...)(int idx, in bounds2 bnd, in T args)
 		{
@@ -3707,7 +3709,7 @@ class Drawing
 		
 		uniform float appRunningTime_sec; 
 		
-		
+		//Todo: replace these with samplerEffect enum
 		bool enableQuadEffect; //display the RGBA channels separatedly
 		bool enableKarcEffect; //Karc sample visualization effect
 		
@@ -3748,6 +3750,20 @@ class Drawing
 					case 2: t.rgb = t.bbb; break; 
 					default: t.rgb = t.aaa; 
 				}
+				t.a = 1; 
+			}
+			else if(enableKarcEffect)
+			{
+				//Todo: This is way too karc specific
+				float y = t.g,  u = t.r,  v = t.b,  a = t.a; 
+				
+				float 	errorVisibility 	= 1, 
+					maskVisibility 	= 1; u *= errorVisibility,
+				v *= maskVisibility; 
+				
+				t.rgb =	vec3(y)
+					+errorVisibility*vec3(u, -(u+v)/2, v)
+					+maskVisibility*(-y*(1-a))*vec3(1, 0, 1); 
 				t.a = 1; 
 			}
 			
@@ -4061,9 +4077,9 @@ class Drawing
 				customShaderIdx = 0; 
 				isTransparent = false; 
 				
-				int effectIdx = (fontFlags>>16)&3; 
-				enableQuadEffect = effectIdx==1; 
-				enableKarcEffect = effectIdx==2; 
+				int samplerEffect = (fontFlags>>16)&3; 
+				enableQuadEffect = samplerEffect==1; 
+				enableKarcEffect = samplerEffect==2; 
 				
 				if(isFont) { isTransparent = (fontFlags&32)!=0; }
 				else {
