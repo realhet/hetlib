@@ -270,10 +270,7 @@ int main(string[] args)
 				}
 			}
 			
-			if(canSleep) {
-				sleep(1); //sleep 1 does nothing
-				print("SLP", application.tick); 
-			}
+			if(canSleep) { sleep(1); }
 		}
 		
 		done: 
@@ -674,7 +671,7 @@ class Window
 		if(inRedraw) { if(showWarnings) WARN("Already in internalRedraw()"); return; }
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
 		
-		inRedraw = true; scope(exit) { inRedraw = false; updatesSinceLastDraw = 0; } 
+		inRedraw = true; scope(exit) { inRedraw = false; updatesSinceLastDraw = 0; }
 		
 		if(disableInternalRedraw) return; 
 		
@@ -993,7 +990,7 @@ class Window
 	
 	private final void internalPaint()
 	{
-		auto t0 = QPS; scope(exit) { timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); } 
+		auto t0 = QPS; scope(exit) { timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); }
 		
 		paintErrorStr = ""; 
 		try
@@ -1039,7 +1036,7 @@ class Window
 			SelectObject(hdcMem, hbmOld); 
 			DeleteObject(hbmMem); 
 			DeleteDC(hdcMem); 
-		} 
+		}
 		
 		fun(); 
 	} 
@@ -1065,14 +1062,14 @@ class Window
 		
 		if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
 		inUpdate = true; 
-		scope(exit) { inUpdate = false; } 
+		scope(exit) { inUpdate = false; }
 		
 		enforce(isMain, "Window.internalUpdate() called from non main window."); 
 		
 		//lock
 		if(disableCounter) return; 
 		disableUpdate; 
-		scope(exit) { enableUpdate; } 
+		scope(exit) { enableUpdate; }
 		
 		
 		const timeTarget = (1.0f/targetUpdateRate)*second; 

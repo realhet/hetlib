@@ -2464,26 +2464,27 @@ version(/+$DIDE_REGION+/all)
 		
 		void upload(Bitmap bmp, int x=0, int y=0, int sx=int.min, int sy=int.min)
 		{
-			//Opt: bmp.GetForUpload should need a performance monitoring
-			switch(type)
+			try
 			{
-				case GLTextureType.L8: upload(bmp.accessOrGet!ubyte, x, y, sx,sy); break; 
-				case GLTextureType.RGBA8: 
-					//T0;
-					try
+				switch(type)
 				{
-					 //it can be a preview texture too, so don't take errors seriously
-					convertOSExceptionsToNormalExceptions({ upload(bmp.accessOrGet!RGBA , x, y, sx,sy); }); 
+					case GLTextureType.L8: upload(bmp.accessOrGet!ubyte, x, y, sx,sy); break; 
+					case GLTextureType.RGBA8: {
+						if(bmp.channels==1 && bmp.type=="ubyte")
+						{
+							auto _間=init間; static RGBA[] staticBuf; 
+							const requiredLen = bmp.size.area; 
+							if(staticBuf.length<requiredLen)	staticBuf.length = requiredLen; 	((0x11632ACEE6EC7).檢((update間(_間)))); 
+							upload(l_to_rgba(bmp.access!ubyte.asArray, staticBuf[0 .. requiredLen]), x, y, sx, sy); 	((0x116C0ACEE6EC7).檢((update間(_間)))); 
+						}
+						else
+						upload(bmp.accessOrGet!RGBA , x, y, sx, sy); 
+					}break; 
+					default: raise("unhandled texture type: "~type.text); 
 				}
-				catch(Exception e)
-				{
-					//WARN(e.simpleMsg);
-					//Opt: This warning displays an unoptimal conversion through every project. Optimize it!
-				}
-					//LOG(DT);
-				break; 
-				default: raise("unhandled texture type: "~type.text); 
 			}
+			catch(Exception e)
+			{ WARN(e.simpleMsg); }
 		} 
 		
 		//specual uploads for textures holding sequential data. Consider using 1D textures in the future?
@@ -3670,10 +3671,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				if(!dontUploadData)
 				{
 					mt.glTexture.fastBind; 
-					
-					//Todo: this is wasting ram and not work with custom non 4ch bitmaps
-					//Note: temporary solution: there is a nondestructive converter inside
-					//bmp.channels = 4;
 					mt.glTexture.upload(bmp, info.pos.x, info.pos.y, info.size.x, info.size.y); 
 				}
 			} 
@@ -3712,7 +3709,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				+/
 				
 				//new version allowing GC to manipulate subTexInfos.
-				
 				
 				//Todo: DIDE TimeMeasurements
 				static auto tInfoAdd = 0*second; 
@@ -4024,7 +4020,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				foreach(megaIdx, mt; megaTextures)
 				{
 					dr.translate(0, ofs); scope(exit)
-					{ dr.pop; ofs += mt.texSize.y + 16; } 
+					{ dr.pop; ofs += mt.texSize.y + 16; }
 					
 					//draw background
 					dr.color = clFuchsia; 
@@ -4157,7 +4153,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 						); 
 						tCnt = 0; tTotal = tUpdate = tCreate = tRemove = 0*second; 
 					}
-				} 
+				}
 				
 				foreach(bmp; bitmapQuery_accessDelayedMulti(files))
 				accumulateTime!(refreshFile, tUpdate)(bmp.file, bmp); 

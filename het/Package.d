@@ -2910,6 +2910,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		auto 調(alias fun, Args...)(Args args)
 		{ return fun(args); } 
 		
+		//constant literals
+		auto 常(T)(T val)
+		{ return val; } 
+		
 	}
 	
 }
@@ -4074,7 +4078,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		} 
 		
 		RNG defaultRng; //Every thread get's its own, because of different QPC
-		
+		
 		ref uint randSeed()
 		{ return defaultRng.seed; } 
 		void randomize(uint seed)
@@ -4854,7 +4858,7 @@ version(/+$DIDE_REGION Numeric+/all)
 				}
 			}
 		} 
-		
+		
 		void test_fft()
 		{
 			//Todo: this must be a selftest at startup
@@ -8413,16 +8417,20 @@ version(/+$DIDE_REGION Colors+/all)
 			
 			//Todo: Do automatic tests using scalar and simd versions.
 			
-			auto transformArray(in SrcElementType[] src)
+			void classic2(in SrcElementType[] src, DstElementType[] dst)
 			{
-				static if(inplace)
-				{
-					static assert(SrcElementType.sizeof==DstElementType.sizeof); 
-					auto dst = cast(DstElementType[])src; 
-				}
-				else
-				{ auto dst = uninitializedArray!(DstElementType[])(src.length); }; 
-				
+				for(
+					auto 	pSrc	= src.ptr,
+						pEnd 	= pSrc + src.length,
+						pDst	= dst.ptr
+					; pSrc<pEnd 
+					; pDst++, pSrc++
+				)
+				{ fun(*pSrc, *pDst); }
+			} 
+			
+			void transformArray2(in SrcElementType[] src, DstElementType[] dst)
+			{
 				size_t 	i = 0; 
 				const 	len = src.length; 
 				
@@ -8458,11 +8466,9 @@ version(/+$DIDE_REGION Colors+/all)
 					fun(src[i], dst[i]); 
 					i++; 
 				}
-				
-				return dst; 
 			} 
 			
-			auto classic(in SrcElementType[] src)
+			auto classic(in SrcElementType[] src, DstElementType[] optionalDst = null)
 			{
 				static if(inplace)
 				{
@@ -8470,19 +8476,24 @@ version(/+$DIDE_REGION Colors+/all)
 					auto dst = cast(DstElementType[])src; 
 				}
 				else
-				{ auto dst = uninitializedArray!(DstElementType[])(src.length); }
-				//Todo: copy paste suxxx
-				
-				for(
-					auto 	pSrc	= src.ptr,
-						pEnd 	= pSrc + src.length,
-						pDst	= dst.ptr
-					; pSrc<pEnd 
-					; pDst++, pSrc++
-				)
-				{ fun(*pSrc, *pDst); }
+				{ auto dst = optionalDst.length ? optionalDst : uninitializedArray!(DstElementType[])(src.length); }
+				classic2(src, dst); 
 				return dst; 
 			} 
+			
+			auto transformArray(in SrcElementType[] src, DstElementType[] optionalDst = null)
+			{
+				static if(inplace)
+				{
+					static assert(SrcElementType.sizeof==DstElementType.sizeof); 
+					auto dst = cast(DstElementType[])src; 
+				}
+				else
+				{ auto dst = optionalDst.length ? optionalDst : uninitializedArray!(DstElementType[])(src.length); }
+				transformArray2(src, dst); 
+				return dst; 
+			} 
+			
 		} 
 		
 		private
@@ -8546,6 +8557,24 @@ version(/+$DIDE_REGION Colors+/all)
 			dst[3] = pshufb(src[2], mask3) | alpha; 
 		} 
 		alias rgb_to_bgra = transformArray!(rgb_to_bgra_scalar, rgb_to_bgra_simd); 
+		
+		
+		void l_to_rgba_scalar(const ref ubyte src, ref RGBA dst)
+		{ dst = RGBA(src, src, src, 255); } 
+		void l_to_rgba_simd(const ref ubyte16[1] src, ref ubyte16[4] dst)
+		{
+			enum _ = 255; 
+			enum ubyte16 	mask0	= mixin([0, 0, 0, _, 1, 1, 1, _, 2, 2, 2, _, 3, 3, 3, _]),
+				mask1	= mixin([4, 4, 4, _, 5, 5, 5, _, 6, 6, 6, _, 7, 7, 7, _]),
+				mask2	= mixin([8, 8, 8, _, 9, 9, 9, _, 10, 10, 10, _, 11, 11, 11, _]),
+				mask3	= mixin([12, 12, 12, _, 13, 13, 13, _, 14, 14, 14, _, 15, 15, 15, _]),
+				alpha	= mixin([0, 0, 0, 255].replicate(4)); 
+			dst[0] = pshufb(src[0], mask0) | alpha; 
+			dst[1] = pshufb(src[0], mask1) | alpha; 
+			dst[2] = pshufb(src[0], mask2) | alpha; 
+			dst[3] = pshufb(src[0], mask3) | alpha; 
+		} 
+		alias l_to_rgba = transformArray!(l_to_rgba_scalar, l_to_rgba_simd); 
 		
 		
 		

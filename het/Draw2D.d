@@ -2402,7 +2402,7 @@ class Drawing
 			auto 	color 	= realDrawColor,
 				bkColor 	= (RGBA(0, 0, 0, 255)); 
 			int shaderIdx = -1; 
-			SamplerEffect samplerEffect = SamplerEffect.quad; 
+			SamplerEffect samplerEffect = SamplerEffect.none; 
 			float drawScale = 1; 
 			
 			static foreach(i, A_; T)
@@ -2538,7 +2538,7 @@ class Drawing
 			
 			auto nearest = No.nearest; 
 			int shaderIdx = -1; 
-			SamplerEffect samplerEffect = SamplerEffect.quad; 
+			SamplerEffect samplerEffect = SamplerEffect.none; 
 			auto 	color 	= (RGBA(0, 0, 0, 255)),
 				bkColor 	= (RGBA(0, 0, 0, 255)); 
 			
@@ -2654,7 +2654,7 @@ class Drawing
 			scope(exit) {
 				bounds_ = savedBounds; 
 				restoreState; 
-			} 
+			}
 			
 			this.color = color; 
 			lineWidth = width; 

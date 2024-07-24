@@ -6297,7 +6297,10 @@ version(/+$DIDE_REGION+/all)
 		
 		private
 		{
-			void[] data_; 
+			void[] data_; /+
+				Todo: this storage can't handle stride. It should be pitch and in bytes.
+				Also do this in image!
+			+/
 			string type_ = "ubyte"; 
 			int width_, height_, channels_=4; 
 		} 
@@ -6437,16 +6440,18 @@ version(/+$DIDE_REGION+/all)
 				{
 					alias CT = ScalarType   !T,
 					len = VectorLength!T; 
-					if(CT.stringof == type && len==channels)
+					if(type==CT.stringof && len==channels)
 					{
 						auto im = (cast()this).getImage_unsafe!T; 
-						static if(is(T==E)) return im.dup; 
-						else static if(is(T==RGB) && is(E==RGBA))
-						{
-							//fast path
-							return image2D(size, im.asArray.rgb_to_rgba); 
+						static if(is(T==E))	return im.dup; 
+						else static if(is(T==RGB) && is(E==RGBA))	{ return image2D(size, im.asArray.rgb_to_rgba); }
+						else static if(is(T==ubyte) && is(E==RGBA))	{ return image2D(size, im.asArray.l_to_rgba); }
+						else	{
+							return im.image2D!(
+								a => a.convertPixel!E
+								/+the slowest way+/
+							); 
 						}
-						else return im.image2D!(a => a.convertPixel!E); 
 					}
 				}
 			}
@@ -7129,7 +7134,7 @@ version(/+$DIDE_REGION+/all)
 			scope(exit) {
 				if(ii.hbmColor) DeleteObject(ii.hbmColor); 
 				if(ii.hbmMask) DeleteObject(ii.hbmMask); 
-			} 
+			}
 			if(ii.hbmColor)
 			{
 				 //Icon has colour plane

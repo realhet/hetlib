@@ -1490,16 +1490,14 @@ class AMDBCore {
 	string prettyStr(Flag!"color" color = Yes.color)(in IdSequence seq)
 	{
 		//Todo: Use sentenceColumnIndices!
-		return iota(seq.ids.length.to!int).map!(
-			(i){
-				auto id = seq.ids[i]; 
-				auto s = prettyStr!(color)(id); 
-				static if(color)
-				if(i==seq.centerIdx)
-				s = "\34\10" ~ s ~ "\34\0"; 
-				return s; 
-			}
-		).join("  "); 
+		return iota(seq.ids.length.to!int).map!((i){
+			auto id = seq.ids[i]; 
+			auto s = prettyStr!(color)(id); 
+			static if(color)
+			if(i==seq.centerIdx)
+			s = "\34\10" ~ s ~ "\34\0"; 
+			return s; 
+		}).join("  "); 
 	} 
 	
 	void printTable(in IdSequence[] seqs)
@@ -2950,10 +2948,9 @@ version(/+$DIDE_REGION DataSet+/all)
 				auto value = R(value_); 
 				
 				const creating = key !in _aa, modifying = !creating; 
-				
+				_aa[key] = value; //Note: This can throw!
 				static if(__traits(compiles, _rb))
 				if(_rb && creating)	_rb.insert(key); 
-				_aa[key] = value; 
 				
 				static if(__traits(hasMember, This, "afterCreate"))
 				if(creating) afterCreate(key, value); 
@@ -3178,7 +3175,7 @@ version(/+$DIDE_REGION DataSet+/all)
 			auto logger = new TestDataset!(DateTime, TestRecord); 
 			
 			//feed some data
-			TestRecord record = { "HELL", 320, 200, vec3(5)}; 
+			TestRecord record = {"HELL", 320, 200, vec3(5)}; 
 			logger[DateTime(UTC, 2000, 1, 9)] = record; 
 			logger[DateTime(UTC, 2000, 1, 9)] = record; //this one is a modification
 			logger[DateTime(UTC, 2000, 1, 3)] = record; 
@@ -3199,7 +3196,7 @@ version(/+$DIDE_REGION DataSet+/all)
 			print("not found"); 
 			
 			//access range of keys	(uses optionally built rbTree)
-			logger.keys.each!print;	
+			logger.keys.each!print; 	
 			logger.keys(DateTime(UTC, 2000, 1, 7), DateTime(UTC, 2000, 1, 9)).each!print; 
 			
 			//access data of key ranges

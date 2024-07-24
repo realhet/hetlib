@@ -8270,7 +8270,7 @@ struct im
 			auto capt = symbol(`Calculator` ~ (sign>0 ? `Addition` : `Subtract`)); 
 			enum isInt = isIntegral!T0; 
 			
-			auto hit = Btn!(srcModule, srcLine)(capt, args, genericId(sign)); //2 id's can pass because of the static foreach
+			auto hit = Btn!(srcModule, srcLine)(capt, args, genericId(sign), ((true).genericArg!q{focusOnPress})); //2 id's can pass because of the static foreach
 			bool chg; 
 			if(hit.repeated)
 			{
@@ -8318,10 +8318,13 @@ struct im
 		auto WhiteBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
 		{ return Btn!(srcModule, srcLine, true, T0, T)(text, args); } 
 		
-		auto Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  //Btn //////////////////////////////
+		auto Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
 			mixin(prepareId, enable.M, selected.M); 
+			
+			bool focusOnPress = false; 
+			mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
 			
 			const isToolBtn = theme=="tool"; 
 			
@@ -8333,9 +8336,10 @@ struct im
 					hit = hitTest(enabled); 
 					mixin(hintHandler); 
 					
-					bool focused = focusUpdate(
+					bool focused = focusUpdate
+					(
 						actContainer, id_,
-						enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
+						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
 						/*onEnter	*/ {},
 						/*onFocus	*/ {},
 						/*onExit	*/ {}
@@ -8571,7 +8575,7 @@ struct im
 			); 
 		} 
 		
-		auto Link(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)  //Link //////////////////////////////
+		auto Link(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
 			mixin(prepareId, enable.M); 
@@ -8585,12 +8589,13 @@ struct im
 					
 					mixin(hintHandler); 
 					
-					bool focused = focusUpdate(
+					bool focused = focusUpdate
+						(
 						actContainer, id_,
-										enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
-										/*onEnter	*/ {},
-										/*onFocus	*/ {},
-										/*onExit	*/ {}
+						enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
+						/*onEnter	*/ {},
+						/*onFocus	*/ {},
+						/*onExit	*/ {}
 					); 
 					
 					//handle the space key when focused
@@ -8634,7 +8639,7 @@ struct im
 			return Btn!(srcModule, srcLine)(text, args); 
 		} 
 		
-		auto OldListItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)  //OldListItem //////////////////////////////
+		auto OldListItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
 			mixin(prepareId, enable.M, selected.M); 
@@ -8660,7 +8665,8 @@ struct im
 					
 					if(!enabled)
 					{
-						style.fontColor = mix(style.fontColor, clGray, 0.5f); //Todo: rather use an 50% overlay for disabled?
+						style.fontColor = mix(style.fontColor, clGray, 0.5f); 
+						//Todo: rather use an 50% overlay for disabled?
 					}
 					
 					if(_selected)
@@ -8669,7 +8675,8 @@ struct im
 						border.color	= mix(border.color , clAccent, .5f); 
 					}
 					
-					bkColor = style.bkColor; //Todo: update the backgroundColor of the container. Should be automatic, but how?...
+					bkColor = style.bkColor; 
+					//Todo: update the backgroundColor of the container. Should be automatic, but how?...
 					
 					static if(isSomeString!T0)
 					Text(text); 
@@ -8715,11 +8722,14 @@ struct im
 						: tag(`symbol Checkbox`~(state?"CompositeReversed":"")); 
 					
 					//Text(format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor));
-					Text(markColor, bullet~" ", textColor, caption); 
 					
-					foreach(a; args)
-					static if(isDelegate!a || isFunction!a)
-					a(); 
+					static if(__traits(compiles, caption==""))	const captionIsEmpty = caption==""; 
+					else	enum captionIsEmpty = false; 
+					
+					if(captionIsEmpty)	Text(markColor, bullet); 
+					else	Text(markColor, bullet, " ", textColor, caption); 
+					
+					static foreach(a; args) static if(__traits(compiles, a())) a(); 
 				}
 			); 
 			
