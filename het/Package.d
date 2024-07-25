@@ -1592,7 +1592,34 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			scope(exit) gDisableOSExceptionsCouinter--; 
 			if(fun) fun(); 
 		} 
+		
+		version(/+$DIDE_REGION Windows PID queryes+/all)
+		{
+			@property bool PIDIsRunning(int pid)
+			{
+				import core.sys.windows.windows; 
+				if(auto hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, dbgsrv.exe_pid))
+				{ CloseHandle(hProcess); return true; }
+				return false; 
+			} 
 			
+			@property File PIDModuleFile(int pid)
+			{
+				import core.sys.windows.windows, core.sys.windows.psapi; 
+				if(auto hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, dbgsrv.exe_pid))
+				{
+					scope(exit) CloseHandle(hProcess); 
+					wchar[MAX_PATH] fn; 
+					auto len = fn.length.to!uint; 
+					if(GetModuleFileNameExW(hProcess, null, fn.ptr, len))
+					{ return fn.toStr.File; }
+				}
+				return File.init; 
+			} 
+			
+			@property bool PIDModuleFileIsRunning(int pid, File e)
+			{ return e && sameText(PIDModuleFile(pid).fullName, e.fullName); } 
+		}
 	}version(/+$DIDE_REGION+/all) {
 			
 		void installExceptionFilter()

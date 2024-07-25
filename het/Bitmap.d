@@ -1139,6 +1139,13 @@ version(/+$DIDE_REGION+/all)
 			set(bmp.file, bmp); 
 		} 
 		
+		Bitmap set(T)(File f, DateTime m, Image!(T, 2) img)
+		{
+			auto b = new Bitmap(img); b.file = f; b.modified = m; 
+			set(b); 
+			return b; 
+		} 
+		
 		void refresh(F)(F file)
 		{
 			auto f = File(file); 
@@ -2703,13 +2710,13 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 			/// Header of a PNG file.
 			public struct PNG_Header
 			{
-				int		 width; 
-				int		 height; 
-				ubyte		 bit_depth; 
-				ubyte		 color_type; 
-				ubyte		 compression_method; 
-				ubyte		 filter_method; 
-				ubyte		 interlace_method; 
+				int width; 
+				int height; 
+				ubyte bit_depth; 
+				ubyte color_type; 
+				ubyte compression_method; 
+				ubyte filter_method; 
+				ubyte interlace_method; 
 			} 
 			
 			/// Returns the header of a PNG file.
@@ -2810,13 +2817,13 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				ubyte[4] crc = crc32Of(tmp[12..29]); 
 				reverse(crc[]); 
 				if(
-					tmp[0..8] != png_file_header[0..$]              ||
-													tmp[8..16] != png_image_header                  ||
-													crc != tmp[29..33]
+					tmp[0..8] != png_file_header[0..$] ||
+					tmp[8..16] != png_image_header ||
+					crc != tmp[29..33]
 				)
 				throw new ImageIOException("corrupt header"); 
 				
-				PNG_Header header = {
+				return (mixin(體!((PNG_Header),q{
 					width	: bigEndianToNative!int(tmp[16..20]),
 					height	: bigEndianToNative!int(tmp[20..24]),
 					bit_depth	: tmp[24],
@@ -2824,32 +2831,29 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					compression_method	: tmp[26],
 					filter_method	: tmp[27],
 					interlace_method	: tmp[28],
-				}; 
-				return header; 
+				}))); 
 			} 
 			
 			package IFImage read_png(Reader stream, long req_chans = 0)
 			{
 				PNG_Decoder dc = init_png_decoder(stream, req_chans, 8); 
-				IFImage result = {
+				return (mixin(體!((IFImage),q{
 					w	: dc.w,
 					h	: dc.h,
-					c	: cast(ColFmt) dc.tgt_chans,
+					c	: (cast(ColFmt)(dc.tgt_chans)),
 					pixels	: decode_png(dc).bpc8
-				}; 
-				return result; 
+				}))); 
 			} 
 			
 			IFImage16 read_png16(Reader stream, long req_chans = 0)
 			{
 				PNG_Decoder dc = init_png_decoder(stream, req_chans, 16); 
-				IFImage16 result = {
+				return (mixin(體!((IFImage16),q{
 					w	: dc.w,
 					h	: dc.h,
-					c	: cast(ColFmt) dc.tgt_chans,
+					c	: (cast(ColFmt)(dc.tgt_chans)),
 					pixels	: decode_png(dc).bpc16
-				}; 
-				return result; 
+				}))); 
 			} 
 			
 			PNG_Decoder init_png_decoder(Reader stream, long req_chans, int req_bpc)
@@ -2859,37 +2863,43 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				
 				PNG_Header hdr = read_png_header(stream); 
 				
-				if(hdr.width < 1 || hdr.height < 1 || int.max < cast(ulong) hdr.width * hdr.height)
+				if(
+					hdr.width < 1 || hdr.height < 1 || 
+					int.max < (cast(ulong)(hdr.width * hdr.height))
+				)
 				throw new ImageIOException("invalid dimensions"); 
-				if((hdr.bit_depth != 8 && hdr.bit_depth != 16) || (req_bpc != 8 && req_bpc != 16))
+				if(
+					(hdr.bit_depth != 8 && hdr.bit_depth != 16) ||
+					(req_bpc != 8 && req_bpc != 16)
+				)
 				throw new ImageIOException("only 8-bit and 16-bit images supported"); 
 				if(
 					! (
-						hdr.color_type == PNG_ColorType.Y    ||
-										 hdr.color_type == PNG_ColorType.RGB	 ||
-										 hdr.color_type == PNG_ColorType.Idx	 ||
-										 hdr.color_type == PNG_ColorType.YA	 ||
-										 hdr.color_type == PNG_ColorType.RGBA
+						hdr.color_type == PNG_ColorType.Y	||
+						hdr.color_type == PNG_ColorType.RGB 	||
+						hdr.color_type == PNG_ColorType.Idx	||
+						hdr.color_type == PNG_ColorType.YA	||
+						hdr.color_type == PNG_ColorType.RGBA
 					)
 				)
 				throw new ImageIOException("color type not supported"); 
 				if(
 					hdr.compression_method != 0 || hdr.filter_method != 0 ||
-						(hdr.interlace_method != 0 && hdr.interlace_method != 1)
+					(hdr.interlace_method != 0 && hdr.interlace_method != 1)
 				)
 				throw new ImageIOException("not supported"); 
 				
-				PNG_Decoder dc = {
+				auto dc = (mixin(體!((PNG_Decoder),q{
 					stream	: stream,
 					src_indexed	: (hdr.color_type == PNG_ColorType.Idx),
-					src_chans	: channels(cast(PNG_ColorType) hdr.color_type),
+					src_chans	: channels(cast(PNG_ColorType)(hdr.color_type)),
 					bpc	: hdr.bit_depth,
 					req_bpc	: req_bpc,
 					ilace	: hdr.interlace_method,
 					w	: hdr.width,
 					h	: hdr.height,
-				}; 
-				dc.tgt_chans = (req_chans == 0) ? dc.src_chans : cast(int) req_chans; 
+				}))); 
+				dc.tgt_chans = ((req_chans == 0)?(dc.src_chans) :((cast(int)(req_chans)))); 
 				return dc; 
 			} 
 			
@@ -2904,10 +2914,10 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				final switch(ct)
 				with(PNG_ColorType)
 				{
-					case Y: return 1; 
-					case RGB: return 3; 
-					case YA: return 2; 
-					case RGBA, Idx: return 4; 
+					case Y: 	return 1; 
+					case RGB: 	return 3; 
+					case YA: 	return 2; 
+					case RGBA, Idx: 	return 4; 
 				}
 				
 			} 
@@ -2916,11 +2926,11 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 			{
 				switch(channels)
 				{
-					case 1: return PNG_ColorType.Y; 
-					case 2: return PNG_ColorType.YA; 
-					case 3: return PNG_ColorType.RGB; 
-					case 4: return PNG_ColorType.RGBA; 
-					default: assert(0); 
+					case 1: 	return PNG_ColorType.Y; 
+					case 2: 	return PNG_ColorType.YA; 
+					case 3: 	return PNG_ColorType.RGB; 
+					case 4: 	return PNG_ColorType.RGBA; 
+					default: 	assert(0); 
 				}
 			} 
 			
@@ -2976,7 +2986,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 							if(
 							! (
 								stage == Stage.IHDR_parsed ||
-													  (stage == Stage.PLTE_parsed && dc.src_indexed)
+								(stage == Stage.PLTE_parsed && dc.src_indexed)
 							)
 						)
 						throw new ImageIOException("corrupt chunk stream"); 
@@ -3003,7 +3013,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 							if(
 							! (
 								stage == Stage.IHDR_parsed ||
-													  (stage == Stage.PLTE_parsed && dc.src_indexed)
+								(stage == Stage.PLTE_parsed && dc.src_indexed)
 							)
 						)
 						throw new ImageIOException("corrupt chunk stream"); 
@@ -3068,7 +3078,9 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				Average	= 3,
 				Paeth	= 4,
 			} 	 enum InterlaceMethod
-			{ None = 0, Adam7 = 1} 	 union Buffer
+			{ None = 0, Adam7 = 1} 	 
+			
+			union Buffer
 			{
 				ubyte[] bpc8; 
 				ushort[] bpc16; 
@@ -3136,24 +3148,24 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				{
 					//Adam7 interlacing
 					
-					immutable size_t[7] redw = [
+					immutable size_t[7] redw = 
+						[
 						(dc.w + 7) / 8,
-															(dc.w + 3) / 8,
-															(dc.w + 3) / 4,
-															(dc.w + 1) / 4,
-															(dc.w + 1) / 2,
-															(dc.w + 0) / 2,
-															(dc.w + 0) / 1
-					]; 
-					
-					immutable size_t[7] redh = [
+						(dc.w + 3) / 8,
+						(dc.w + 3) / 4,
+						(dc.w + 1) / 4,
+						(dc.w + 1) / 2,
+						(dc.w + 0) / 2,
+						(dc.w + 0) / 1
+					]; immutable size_t[7] redh = 
+						[
 						(dc.h + 7) / 8,
-															(dc.h + 7) / 8,
-															(dc.h + 3) / 8,
-															(dc.h + 3) / 4,
-															(dc.h + 1) / 4,
-															(dc.h + 1) / 2,
-															(dc.h + 0) / 2
+						(dc.h + 7) / 8,
+						(dc.h + 3) / 8,
+						(dc.h + 3) / 4,
+						(dc.h + 1) / 4,
+						(dc.h + 1) / 2,
+						(dc.h + 0) / 2
 					]; 
 					
 					auto redline8 = (dc.req_bpc == 8) ? new ubyte[dc.w * dc.tgt_chans] : null; 
@@ -3210,7 +3222,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 							cln = _swap; 
 						}
 					}
-				}
+				}
 				
 				if(!metaready)
 				{
@@ -3261,7 +3273,10 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				}
 			} 
 			
-			void depalette(in ubyte[] palette, in ubyte[] transparency, in ubyte[] src_line, ubyte[] depaletted) pure
+			void depalette(
+				in ubyte[] palette, in ubyte[] transparency, 
+				in ubyte[] src_line, ubyte[] depaletted
+			) pure
 			{
 				for(size_t s, d;  s < src_line.length;  s+=1, d+=4)
 				{
@@ -3381,7 +3396,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					cline[k] += pline[k] / 2; 
 						foreach(k; fstep .. cline.length)
 					cline[k] += cast(ubyte)
-								((cast(uint) cline[k-fstep] + cast(uint) pline[k]) / 2); 
+					((cast(uint) cline[k-fstep] + cast(uint) pline[k]) / 2); 
 						break; 
 					case Paeth: 
 						foreach(i; 0 .. fstep)
