@@ -2531,6 +2531,19 @@ class Drawing
 				} 
 		+/
 		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		void drawTexture(B, T...)(int stIdx, in B bnd, in T args)
 		{
 			//Note: This simplified version is used in TimeView/KarcLogger
@@ -2539,8 +2552,8 @@ class Drawing
 			auto nearest = No.nearest; 
 			int shaderIdx = -1; 
 			SamplerEffect samplerEffect = SamplerEffect.none; 
-			auto 	color 	= (RGBA(0, 0, 0, 255)),
-				bkColor 	= (RGBA(0, 0, 0, 255)); 
+			auto 	color 	= (RGBA(0xFFFFFFFF)),
+				bkColor 	= (RGBA(0xFF000000)); 
 			
 			static foreach(i, A_; T)
 			{
@@ -2560,8 +2573,7 @@ class Drawing
 			
 			auto 	tx0 = vec2(
 				(nearest ? 0 : 1) | 16/*fontflag=image*/ | 
-				(shaderIdx>=0 ? 32 + 64*shaderIdx : 0) |
-				((cast(int)(samplerEffect))<<16) , 0
+				(shaderIdx>=0 ? 32 + 64*shaderIdx : 0) | ((cast(int)(samplerEffect))<<16) , 0
 			),
 				tx1 = vec2(0, 1)/+y subRange [0..1]+/; 
 			
