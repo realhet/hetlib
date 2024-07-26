@@ -3097,10 +3097,10 @@ class Drawing
 		vec4 uint_to_vec4(uint a)
 		{
 			return vec4(
-				(a>> 0&0xFF)/255.0,
-				(a>> 8&0xFF)/255.0,
-				(a>>16&0xFF)/255.0,
-				(a>>24&0xFF)/255.0
+				(a>> 0&0xFFU)/255.0,
+				(a>> 8&0xFFU)/255.0,
+				(a>>16&0xFFU)/255.0,
+				(a>>24&0xFFU)/255.0
 			); 
 		} 
 		
@@ -3120,7 +3120,6 @@ class Drawing
 			ClipMin = aClipMin; 
 			ClipMax = aClipMax; //Todo: culling in geometry shader
 		} //just shovels the data through
-		
 		
 		@geometry: ////////////////////////////////////////////////////////////////////////
 		#define MaxArrowVertices 12
@@ -3210,7 +3209,7 @@ class Drawing
 		
 		SubTexInfo fetchSubTexInfo(uint subTexIdx)
 		{
-			int infoTexWidth = int(textureSize(smpInfo, 0).x); 
+			uint infoTexWidth = uint(textureSize(smpInfo, 0).x); 
 			ivec2 infoTexCoord = ivec2((subTexIdx<<1)%infoTexWidth, (subTexIdx<<1)/infoTexWidth); 
 			
 			vec4[2] subTexInfoRaw; 
@@ -3442,7 +3441,7 @@ class Drawing
 		void oldMain()
 		{
 			//bit 0 must be 1!!!
-			uint type = Type[0]>>1&7; 
+			uint type = Type[0]>>1&7U; 
 			uint param = Type[0]>>4; 
 			
 			fColor = uint_to_vec4(Color[0]); 
@@ -3452,38 +3451,38 @@ class Drawing
 			fClipMin = trans(ClipMin[0]) + uViewPortSize*0.5; 
 			fClipMax = trans(ClipMax[0]) + uViewPortSize*0.5; 
 			
-			if(type==1)
+			if(type==1U)
 			{
 				//Point
 				emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices); 
 			}
-			else if(type==2)
+			else if(type==2U)
 			{
 				//Point2
 				emitEllipse(trans(A[0]), calcRadius(C[0].x), MaxCurveVertices/2); 
 				emitEllipse(trans(B[0]), calcRadius(C[0].y), MaxCurveVertices/2); 
 			}
-			else if(type==3/*type>=3 && type<=3+63*/)
+			else if(type==3U/*type>=3 && type<=3+63*/)
 			{
 				//Line
 				emitLine(A[0], B[0], C[0].x/*lineWidth*/, C[0].y/*stipple*/, MaxCurveVertices, param); 
 			}
-			else if(type==4/*67*/)
+			else if(type==4U/*67*/)
 			{
 				//Filled rect
 				emitRect(trans(A[0]), trans(B[0])); 
 			}
-			else if(type==5/*68*/)
+			else if(type==5U/*68*/)
 			{
 				//Triangle
 				emitTriangle(trans(A[0]), trans(B[0]), trans(C[0])); 
 			}
-			else if(type==6/*69*/)
+			else if(type==6U/*69*/)
 			{
 				//Bezier 2nd order
 				emitBezier2(trans(A[0]), trans(B[0]), trans(C[0]), D[0].x/*lineWidth*/, MaxCurveVertices); 
 			}
-			else if(type==7/*type>=256 && type<256+0x10000*/)
+			else if(type==7U/*type>=256 && type<256+0x10000*/)
 			{
 				//glyph rect geom shader////////////////////////////////
 				fontFlags = int(floor(C[0].x)); 
@@ -3525,8 +3524,9 @@ class Drawing
 			}
 		} 
 		
-		uint stream_getDw(uint i)
+		uint stream_getDw(uint ui)
 		{
+			int i = int(ui); 
 			//in uint Type[]; in vec2 A[], B[], C[], D[]; in uint Color[], Color2[]; in vec2 ClipMin[], ClipMax[]; 
 			if(i<8)	{
 				if(i< 4)	{
@@ -3579,14 +3579,14 @@ class Drawing
 		
 		void stream_init()
 		{
-			streamDwIdx = 0; 
-			streamActBits = 0; 
+			streamDwIdx = 0u; 
+			streamActBits = 0u; 
 			streamOverflow = false; 
 		} 
 		
 		void stream_internalFetchDw()
 		{
-			streamOverflow  = streamDwIdx>=16; 
+			streamOverflow  = streamDwIdx>=16u; 
 			if(streamOverflow) return; 
 			streamActDw = stream_getDw(streamDwIdx); 
 			streamDwIdx ++; 
@@ -3594,14 +3594,14 @@ class Drawing
 		
 		uint stream_fetchBits(uint bits)
 		{
-			if(bits==0) return 0; 
+			if(bits==0u) return 0u; 
 			
-			if(streamActBits==0) stream_internalFetchDw(); 
-			if(streamOverflow) return 0; 
+			if(streamActBits==0u) stream_internalFetchDw(); 
+			if(streamOverflow) return 0u; 
 			
 			if(bits<=streamActBits)
 			{
-				uint res = streamActDw & ((1<<bits)-1); 
+				uint res = streamActDw & ((1u<<bits)-1u); 
 				streamActDw >>= bits; 
 				streamActBits -= bits; 
 				return res; 
@@ -3610,11 +3610,11 @@ class Drawing
 			uint res = streamActDw; 
 			bits -= streamActBits; 
 			uint sh = streamActBits; 
-			streamActBits = 0; 
+			streamActBits = 0u; 
 			stream_internalFetchDw(); 
-			if(streamOverflow) return 0; 
+			if(streamOverflow) return 0u; 
 			
-			res |= (streamActDw & ((1<<bits)-1))<<sh; 
+			res |= (streamActDw & ((1u<<bits)-1u))<<sh; 
 			streamActDw >>= bits; 
 			streamActBits -= bits; 
 			
@@ -3622,10 +3622,10 @@ class Drawing
 		} 
 		
 		uint stream_fetchUint()
-		{ return stream_fetchBits(32); } 
+		{ return stream_fetchBits(32u); } 
 		
 		float stream_fetchFloat()
-		{ return uintBitsToFloat(stream_fetchBits(32)); } 
+		{ return uintBitsToFloat(stream_fetchBits(32u)); } 
 		
 		vec2 stream_fetchVec2()
 		{ return vec2(stream_fetchFloat(), stream_fetchFloat()); } 
@@ -3633,7 +3633,7 @@ class Drawing
 		
 		void main()
 		{
-			#define T_oldCommand 1
+			#define T_oldCommand 1u
 			//losing this bit to the old format
 			
 			/*
@@ -3672,7 +3672,7 @@ class Drawing
 			*/
 			
 			uint T = Type[0]; 
-			if(T&T_oldCommand)
+			if((T&T_oldCommand)!=0u)
 			{ oldMain(); }
 			else
 			{
