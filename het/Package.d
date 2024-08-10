@@ -6128,62 +6128,62 @@ version(/+$DIDE_REGION Containers+/all)
 {
 	version(/+$DIDE_REGION+/all) {
 		//Strings //////////////////////////////////
-			
-			bool isUpper(A)(in A a)
+		
+		bool isUpper(A)(in A a)
 		{ return a==a.toUpper; } 
-			bool isLower(A)(in A a)
+		bool isLower(A)(in A a)
 		{ return a==a.toLower; } 
-			
-			bool isAsciiLower(char c) pure
+		
+		bool isAsciiLower(char c) pure
 		{ return c.inRange('a', 'z'); } 
-			bool isAsciiUpper(char c) pure
+		bool isAsciiUpper(char c) pure
 		{ return c.inRange('A', 'Z'); } 
-			
-			char asciiUpper(char c) pure
+		
+		char asciiUpper(char c) pure
 		{ return cast(char)(cast(int)c + (c.isAsciiUpper ? 0 : 'A'-'a')); } 
-			char asciiLower(char c) pure
+		char asciiLower(char c) pure
 		{ return cast(char)(cast(int)c + (c.isAsciiLower ? 0 : 'a'-'A')); } 
-			
-			string asciiUpper(string s)
+		
+		string asciiUpper(string s)
 		{
 			//Opt: this is terrible coding from the times when I was so dumb
 			char[] res = s.dup; 
 			foreach(ref char ch; res) ch = ch.asciiUpper; 
 			return cast(string)res; 
 		} 
-			string asciiLower(string s)
+		string asciiLower(string s)
 		{
 			char[] res = s.dup; 
 			foreach(ref char ch; res) ch = ch.asciiLower; 
 			return cast(string)res; 
 		} 
-			
-			//Todo: lc and uc is so redundant... Maybe I should use toUpper everywhere...
-			auto uc(char s) pure
+		
+		//Todo: lc and uc is so redundant... Maybe I should use toUpper everywhere...
+		auto uc(char s) pure
 		{ return s.toUpper; }  
-			auto lc(char s) pure
+		auto lc(char s) pure
 		{ return s.toLower; } 
-			
-			auto uc(wchar s) pure
+		
+		auto uc(wchar s) pure
 		{ return s.toUpper; } 
-			auto lc(wchar s) pure
+		auto lc(wchar s) pure
 		{ return s.toLower; } 
-			
-			auto uc(dchar s) pure
+		
+		auto uc(dchar s) pure
 		{ return s.toUpper; } 
-			auto lc(dchar s) pure
+		auto lc(dchar s) pure
 		{ return s.toLower; } 
-			
-			string uc(string s) pure
+		
+		string uc(string s) pure
 		{ return s.toUpper; } 
-			string lc(string s) pure
+		string lc(string s) pure
 		{ return s.toLower; } 
-			
-			///generates D source string format from values
-			string escape(T)(T s)
+		
+		///generates D source string format from values
+		string escape(T)(T s)
 		{ return format!"%(%s%)"([s]); } 
-			
-			string capitalize(alias fv = toUpper)(string s)
+		
+		string capitalize(alias fv = toUpper)(string s)
 		{
 			//Todo: terrible looking solution, with NO unicode handling.
 			//Todo: use std.string.capitalize or std.uni.asCapitalized
@@ -6194,16 +6194,16 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 			return s; 
 		} 
-			
-			void listAppend(ref string s, string what, string separ)
+		
+		void listAppend(ref string s, string what, string separ)
 		{
 			auto w = what.strip; 
 			if(w.empty) return; 
 			if(!s.strip.empty) s ~= separ; 
 			s ~= w; 
 		} 
-			
-			string truncate(string ellipsis="...")(string s, size_t maxLen)
+		
+		string truncate(string ellipsis="...")(string s, size_t maxLen)
 		{
 			//Todo: string.truncate-t megcsinalni unicodeosra rendesen.
 			/*
@@ -6219,40 +6219,40 @@ version(/+$DIDE_REGION Containers+/all)
 				: maxLen>ellipsisLen 	? s[0..maxLen-ellipsisLen]~ellipsis
 					: s[0..maxLen]; 
 		} 
-			
-			
-			string decapitalize()(string s)
+		
+		
+		string decapitalize()(string s)
 		{ return s.capitalize!toLower; } 
-			
-			bool sameString(string a, string b)
+		
+		bool sameString(string a, string b)
 		{ return a==b; } 
-			bool sameText(string a, string b) 
+		bool sameText(string a, string b) 
 		{ return icmp(a, b)==0; } 
-			bool sameFile(File a, File b) 
+		bool sameFile(File a, File b) 
 		{ return sameText(a.normalized.fullName, b.normalized.fullName); } 
-			
-			auto amongText(Values...)(string value, Values values)
+		
+		auto amongText(Values...)(string value, Values values)
 		{ return value.among!sameText(values); } 
-			
-			/// Show the differences in 2 strings
-			string strDiff(char diffChar='^', char sameChar='_')(string a, string b)
+		
+		/// Show the differences in 2 strings
+		string strDiff(char diffChar='^', char sameChar='_')(string a, string b)
 		{
 			string res; 
 			foreach(i; 0..min(a.length, b.length)) res ~= a[i]==b[i] ? sameChar : diffChar; 
 			res ~= [diffChar].replicate(a.length>b.length ? a.length-b.length : b.length>a.length); 
 			return res; 
 		} 
-			
-			//strips specific strings at both ends.
-			string strip2(string s, string start, string end)
+		
+		//strips specific strings at both ends.
+		string strip2(string s, string start, string end)
 		{
 			if(s.length >= start.length + end.length && s.startsWith(start) && s.endsWith(end))
 			return s[start.length..$-end.length]; 
 			else
 			return s; 
 		} 
-			
-			private S _withoutStarting(bool start, bool remove, S, T)(in S s, in T end)
+		
+		private S _withoutStarting(bool start, bool remove, S, T)(in S s, in T end)
 		{
 			static if(start)
 			alias fv = startsWith; 
@@ -6268,16 +6268,19 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 			else return s; 
 		} 
-			
-			//Todo: inconvenience with includeTrailingPathDelimiter
-			S withoutStarting	(S, T)(in S s, in T end)
+		
+		//Todo: inconvenience with includeTrailingPathDelimiter
+		S withoutStarting	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(1, 1)(s, end); } 
-			S withoutEnding	(S, T)(in S s, in T end)
+		S withoutEnding	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(0, 1)(s, end); } 
-			S withStarting	(S, T)(in S s, in T end)
+		S withStarting	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(1, 0)(s, end); } 
-			S withEnding	(S, T)(in S s, in T end)
+		S withEnding	(S, T)(in S s, in T end)
 		{ return _withoutStarting!(0, 0)(s, end); } 
+		
+		S withoutEndingNewLine(S)(in S s)
+		{ return ((s.endsWith('\n'))?(s[0..$-1].withoutEnding('\r')):(s)); } 
 	}version(/+$DIDE_REGION+/all) {
 		//Todo: unittest
 		/*
@@ -6557,7 +6560,7 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 			return s.to!T; 
 		} 
-		
+		
 		bool isDLangWhitespace	(C)(in C ch)
 		{ return !!ch.among(' ', '\t', '\x0b', '\x0c'); } 
 		
@@ -6593,6 +6596,25 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			return src.length>=2 && src.startsWith('"') && src.endsWith('"') 
 			&& !src[1..$-1].replace(`\"`, `\'`).canFind('"'); 
+		} 
+		
+		string safeDCommentBody(string s)
+		{
+			//check if the nesting is correct or not
+			
+			auto a = s, level = 0, ok = false; 
+			while(a.length>=2)
+			{
+				if(a.startsWith("/+"))	{ level++; a = a[2..$]; }
+				else if(a.startsWith("+/"))	{ level--; a = a[2..$]; if(level<0) ok = false; }
+				else	a = a[1..$]; 
+			}
+			if(!level) ok = false; 
+			
+			//if it's wrong, then defuse all the comment prefixes and postfixes.
+			if(!ok) s = s.replace("/+", "/ +").replace("+/", "+ /"); 
+			
+			return s; 
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
@@ -8922,6 +8944,7 @@ version(/+$DIDE_REGION Colors+/all)
 	}version(/+$DIDE_REGION Color constants+/all)
 	{
 		//Todo: all these should be static immutable
+		/+Todo: LEGO periodic table of colors+/
 		version(/+$DIDE_REGION classic delphi palette+/all)
 		{
 			immutable
