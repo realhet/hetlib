@@ -1026,105 +1026,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				https://learn.microsoft.com/en-us/windows/win32/toolhelp
 				/taking-a-snapshot-and-viewing-processes?redirectedfrom=MSDN
 		+/
-		
-		int spawnProcessMulti(
-			const string[][] cmdLines, const string[string] env, 
-			out string[] sOutput, void delegate(int i) onProgress = null
-		)
-		{
-			//it was developed for running multiple compiler instances.
-			import std.process; 
-					
-			//create log files
-			StdFile[] logFiles; 
-			foreach(i; 0..cmdLines.length)
-			{
-				auto fn = File(tempPath, "spawnProcessMulti.$log"~to!string(i)); 
-				logFiles ~= StdFile(fn.fullName, "w"); 
-			}
-					
-			//create pool of commands
-			Pid[] pool; 
-			foreach(i, cmd; cmdLines)
-			{
-				pool ~= spawnProcess(
-					cmd, stdin, logFiles[i], logFiles[i], env,
-					Config.retainStdout | Config.retainStderr | Config.suppressConsole
-				); 
-			}
-					
-			//execute
-			bool[] running; 	/+
-				Todo: bugzik az stdOut fileDelete itt, emiatt nem megy az, 
-				hogy a leghamarabb keszen levot ki lehessen jelezni. fuck this shit!
-			+/
-			running.length =	pool.length; 
-			running[] = true; 
-					
-			int res = 0; 
-			do
-			{
-				sleep(10); 
-				foreach(i; 0..pool.length)
-				{
-					if(running[i])
-					{
-						auto w = tryWait(pool[i]); 
-						if(w.terminated)
-						{
-							running[i] = false; 
-							if(w.status != 0)
-							{
-								res = w.status; 
-								running[] = false; 
-							}
-							if(onProgress !is null)
-							onProgress(cast(int)i); 
-						}
-					}
-				}
-			}while(running.any); 
-					
-			/*
-				foreach(i, p; pool){
-								int r = wait(p);
-								if(r) res = r;
-								if(onProgress !is null) onProgress(i);
-							}
-			*/
-					
-			//make sure every process is closed (when one of them yielded an error)
-			foreach(p; pool)
-			{
-				try
-				{ kill(p); }catch(Exception e)
-				{}
-			}
-					
-			//read/clear logfiles
-			foreach(i, ref f; logFiles)
-			{
-				File fn = File(f.name); 
-				f.close; 
-				sOutput ~= fn.readStr; 
-						
-				//fucking lame because tryWait doesn't wait the file to be closed;
-				foreach(k; 0..100)
-				{
-					if(fn.exists)
-					{
-						try
-						{ fn.remove; }catch(Exception e)
-						{ sleep(10); }
-					}
-					if(!fn.exists)
-					break; 
-				}
-			}
-			logFiles.clear; 
-					
-			return res; 
-		} 
 	}version(/+$DIDE_REGION+/all)
 	{
 		class SharedMem(SharedDataType, bool isServer_)
@@ -2570,7 +2471,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			auto column(int x)()
 			{ return rows.map!(r=>r.get(x)); } 
 			
-			string header(long x)
+			string headerCell(long x)
 			{
 				auto s = cell(x, 0); 
 				if(s.length>=4 && s.startsWith("/+") && s.endsWith("+/"))
@@ -2583,6 +2484,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					}
 				}
 				return s; 
+			} 
+			
+			string[] headerRow()
+			{
+				//return allRows.get(0).length.iota.map!((i)=>(this.headerCell(i))).array; 
+				const cnt = allRows.get(0).length; 
+				string[] res; foreach(i; 0..cnt) res ~= headerCell(i); return res; 
+				//Todo: weird bug: .iota won't work here...
+				
 			} 
 			
 			string GEN(string src)()
@@ -2627,17 +2537,32 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			string GEN_bitfields()
 			{ return GEN_bitfields(rows); } 
 			
+			string GEN_fields()
+			{
+				const 	hdr 	= headerRow,
+					cType 	= hdr.countUntil("Type"),
+					cName 	= hdr.countUntil("Name"),
+					cDefault 	= hdr.countUntil("Default"),
+					cUDAs	= hdr.enumerate.filter!((a)=>(a.value.startsWith('@'))).map!"a.index".array; 
+				return (mixin(求map(q{r},q{rows},q{
+					string getUDA(long c) => 
+					((r.get(c)=="")?("") : (iq{$(hdr[c])($(r[c])) }.text)); string getDefault() => 
+					((r.get(cDefault)=="")?("") : ("="~r[cDefault])); 
+					return iq{$(cUDAs.map!getUDA.join)$(r[cType]) $(r[cName]) $(getDefault); }.text ~ '\n'; 
+				}))).join; 
+			} 
+			
 			string GEN_enumTable()
 			{
 				const 	numCols 	= rows.front.length, 
-					prefix 	= header(0); 
+					prefix 	= headerCell(0); 
 				
 				string generateColumn(string fmt)(size_t colIdx, string label)
 				{ return format!fmt(label, rows.map!((a)=>(a[colIdx]))); } 
 				
 				string res = generateColumn!"enum %s {%-(%s,%)}"(0, prefix.capitalize); 
 				foreach(i; 1..numCols)
-				res ~= generateColumn!"enum %s = [%-(%s,%)];"(i, prefix.decapitalize ~ header(i).capitalize); 
+				res ~= generateColumn!"enum %s = [%-(%s,%)];"(i, prefix.decapitalize ~ headerCell(i).capitalize); 
 				return res; 
 				
 				/+
@@ -2721,6 +2646,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		string GEN_bitfields(表 t)
 		{ return t.GEN_bitfields; } 
+		string GEN_fields(表 t)
+		{ return t.GEN_fields; } 
 		string GEN_enumTable(表 t)
 		{ return t.GEN_enumTable; } 
 		
@@ -5588,6 +5515,38 @@ version(/+$DIDE_REGION Containers+/all)
 	MSQueue	(T) = SafeQueue!(T, 1, 0),
 	SMQueue	(T) = SafeQueue!(T, 0, 1),
 	MMQueue	(T) = SafeQueue!(T, 1, 1); 
+	
+	
+	struct GroupByTime(T)
+	{
+		T[] queue; 
+		DateTime lastT; 
+		@property empty() const => queue.empty; 
+		
+		void put(T a)
+		{ if(a.empty) return; queue ~= a; lastT = now; } 
+		
+		void put(R)(R a) if(isInputRange!(R, T))
+		{ if(a.empty) return; queue ~= a.array; lastT = now; } 
+		
+		bool canGet(Time minElapsedTime)
+		{
+			if(!queue.empty) {
+				const Δt = now-lastT; 
+				if(Δt>=minElapsedTime)
+				return true; 
+			}
+			return false; 
+		} 
+		
+		T[] get(Time minElapsedTime)
+		{
+			T[] res; 
+			if(canGet(minElapsedTime))
+			{ res = queue; queue = []; }
+			return res; 
+		} 
+	} 
 	
 	
 	version(/+$DIDE_REGION+/all)

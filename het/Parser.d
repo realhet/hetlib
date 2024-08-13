@@ -2891,7 +2891,7 @@ version(/+$DIDE_REGION Keywords+/all)
 			file 	= file_,
 			lineIdx 	= lineIdx_,
 			columnIdx 	= columnIdx_,
-			mixinLineIdx 	= mixinLineIdx_; 
+			mixinLineIdx 	= mixinLineIdx_/+Todo: multiple "-mixin-N" can be after the ".d" extension!!!+/; 
 		} 
 		
 		this(string s)
@@ -3964,7 +3964,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D64BFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D68BFDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
