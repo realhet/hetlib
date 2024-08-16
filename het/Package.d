@@ -1679,6 +1679,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return; 
 				else {
 					import het.inputs; 
+					
+					
 					shared static bool skip; if(inputs["Shift"].active) skip = true; 
 					//Todo: selftest skippelesen gondolkozni... A problema, hogy csak akkor kezelheto belul, ha a selftest lazy parametereben tortenik minden.
 					
@@ -2551,6 +2553,21 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					return iq{$(cUDAs.map!getUDA.join)$(r[cType]) $(r[cName]) $(getDefault); }.text ~ '\n'; 
 				}))).join; 
 			} 
+			
+			string GEN_verbs(Flag!"hold" hold = No.hold)
+			{
+				const 	hdr 	= headerRow,
+				cKey 	= hdr.countUntil("Key"),
+				cName 	= hdr.countUntil("Name"),
+				cScript 	= hdr.countUntil("Script"),
+				cUDAs	= hdr.enumerate.filter!((a)=>(a.value.startsWith('@'))).map!"a.index".array; 
+				return (mixin(求map(q{r},q{rows},q{
+					string getUDA(long c) => ((r.get(c)=="")?(""): (iq{$(hdr[c])($(r[c])) }.text)); 
+					const 	udas = cUDAs.map!getUDA.join ~ iq{@$(((hold)?("HOLD"):("VERB")))($(r[cKey])) }.text,
+						functName = r[cName]~((r[cName].stripRight.endsWith(')'))?(""):("()")); 
+					return iq{$(udas)void $(functName) {$(r[cScript])} }.text ~ '\n'; 
+				}))).join; 
+			} 
 			
 			string GEN_enumTable()
 			{
@@ -3367,6 +3384,13 @@ version(/+$DIDE_REGION Numeric+/all)
 			auto i = min(arr.length, count),
 					 res = arr[0..i]; 
 			arr = arr[i..$]; 
+			return res; 
+		} 
+		
+		auto fetchAll(T)(ref T[] arr)
+		{
+			auto res = arr; 
+			arr = []; 
 			return res; 
 		} 
 		
@@ -5524,7 +5548,7 @@ version(/+$DIDE_REGION Containers+/all)
 		@property empty() const => queue.empty; 
 		
 		void put(T a)
-		{ if(a.empty) return; queue ~= a; lastT = now; } 
+		{ queue ~= a; lastT = now; } 
 		
 		void put(R)(R a) if(isInputRange!(R, T))
 		{ if(a.empty) return; queue ~= a.array; lastT = now; } 

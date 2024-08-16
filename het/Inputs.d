@@ -1,4 +1,4 @@
-module het.inputs; /+DIDE+/
+module het.inputs; 
 version(/+$DIDE_REGION+/all)
 {
 	/+
@@ -346,7 +346,8 @@ version(/+$DIDE_REGION+/all)
 		{ return combos.map!text.join('+'); } 
 		
 		bool active()
-		{ return combos.any!"a.active"; } alias hold = active; alias down = active; 
+		{ return combos.any!"a.active"; } alias hold 	= active,
+		down 	= active; 
 		bool pressed()
 		{ return combos.any!"a.pressed"; } 
 		bool typed()
@@ -357,47 +358,23 @@ version(/+$DIDE_REGION+/all)
 		//bool changed () { return combos.map!changed .any; }
 	} 
 	
-	void callVerbs(T)(T a)
+	void callVerbs(T)(T obj)
 	{
 		///calls all member functions marked with VERB, that has a pressed KeyCombo
-		//Todo: hova a faszba rakjam ezt...
-		static foreach(Member; getSymbolsByUDA!(T, VERB))
+		static foreach(name; __traits(allMembers, T))
+		static if(__traits(compiles, { mixin(iq{obj.$(name)(); }.text); }))
 		{
+			static foreach(oi, ovl; __traits(getOverloads, obj, name))
+			static foreach(verb; __traits(getAttributes, ovl))
+			static if(is(typeof(verb)==VERB) && verb.keyCombo!="")
 			{
-				enum verb = getUDA!(Member, VERB); 
-				//Note: het.getUDA will not fail with @VERB too, which is a type, not a VERB value.
-				
-				 static if(verb.keyCombo!="")
 				{
-					//LOG("A", __traits(identifier, Member));
-					auto kc = KeyCombo(verb.keyCombo); 
-					
-					bool b = (verb.flags & VerbFlag.hold) ? kc.down : kc.typed; 
-					
-					if(b) __traits(getMember, a, __traits(identifier, Member))(); 
+					auto 	kc = KeyCombo(verb.keyCombo),
+						b = ((verb.flags & VerbFlag.hold)?(kc.down):(kc.typed)); 
+					if(b) __traits(getOverloads, obj, name)[oi](); 
 				}
 			}
 		}
-		
-		/+
-			Note: this version fails with overloaded parameters!
-				//class C{
-				//	 void openFile(string fn){ } //<- because of this
-				//	 @VERB("Alt+F4") void closeApp		 (){ }
-				//	 @VERB("Ctrl+O") void openFile		 (){ } //<- can't find this
-				//}
-				static foreach(n; __traits(allMembers, T)){{
-					alias Member = __traits(getMember, T, n);
-					static if(hasUDA!(Member, VERB)){
-						enum verb = getUDAs!(Member, VERB)[0];
-						static if(verb.keyCombo!=""){
-							LOG("B", n);
-							if(KeyCombo(verb.keyCombo).pressed)
-								__traits(getMember, a, n)();
-						}
-					}
-				}}
-		+/
 	} 
 	
 	

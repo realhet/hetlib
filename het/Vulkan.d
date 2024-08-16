@@ -32,6 +32,21 @@ version(/+$DIDE_REGION+/all)
 		/+Link: https://asawicki.info/news_1740_vulkan_memory_types_on_pc_and_how_to_use_them+/
 	+/
 	
+	/+
+		Note: GLSL Interface blocks, alignment requirements of structs
+		/+Link: https://www.khronos.org/opengl/wiki/Interface_Block_(GLSL)+/
+	+/
+	
+	/+
+		Note: Vulkan tutorial
+		/+Link: https://vulkan-tutorial.com/Compute_Shader+/
+	+/
+	
+	/+
+		Todo: vulkan timestamp queries
+		/+Link: https://nikitablack.github.io/post/how_to_use_vulkan_timestamp_queries/ +/
+	+/
+	
 	//Extensions used by hetlib.
 	version = DVulkan_VK_VERSION_1_0; 
 	
@@ -5774,9 +5789,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	(((update間(_間))).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	(((update間(_間))).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	(((update間(_間))).檢(0x3277F9B0E4249)); 
+							+/	((0x3282C9B0E4249).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x328929B0E4249).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x328F59B0E4249).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
