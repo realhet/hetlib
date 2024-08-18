@@ -5370,7 +5370,7 @@ version(/+$DIDE_REGION Containers+/all)
 			//size_type: for debugClient communication, it must be 32bit because it communicates with debugClient
 					
 			size_type tail, head; 
-			ubyte[cap] buf; 
+			ubyte[cap] buf = void; 
 					
 			private auto truncate(size_type x) const
 			{
@@ -13668,6 +13668,7 @@ version(/+$DIDE_REGION debug+/all)
 				
 				struct BreakRec
 				{ uint locationHash, state; } 
+				static assert(BreakRec.sizeof==8); 
 				
 				struct BreakTable
 				{
@@ -13678,10 +13679,23 @@ version(/+$DIDE_REGION debug+/all)
 				
 				struct Data
 				{
+					/+
+						Note: Important note:	All fields must be initialized to ZERO or VOID.	
+						Otherwise a very	large initialization block will be placed on the	data segment.
+						
+						-> dumpbin /SECTION:rdata 
+						SECTION HEADER #37B6
+						 40102C0	size of raw data
+							Initialized Data
+							COMDAT; sym= _D3het14DebugLogClient4Data6__initZ
+							
+						/+Link: https://forum.dlang.org/thread/rdk3m2$725$1@digitalmars.com+/
+					+/
+					
 					uint dbgDataStructHash; 
 					uint ping; 
 					BreakTable breakTable; 
-					float[potiCount] poti; 
+					float[potiCount] poti = 0 /+Note: must be zero!!+/; 
 					int forceExit; 
 					int exe_waiting; 
 					int dide_ack; /+
@@ -13695,7 +13709,7 @@ version(/+$DIDE_REGION debug+/all)
 					
 					align(64) CircBuf!(uint, circularBufferSize) circularBuffer; //CircBuf is a struct, not a class
 					
-					align(64) ubyte[memoryPoolSize] memoryPool; //allocator on the client uses this to send big blobs
+					align(64) ubyte[memoryPoolSize] memoryPool = void; //allocator on the client uses this to send big blobs
 				} 
 			}
 			
@@ -13749,6 +13763,9 @@ version(/+$DIDE_REGION debug+/all)
 			
 			this()
 			{
+				if(typeid(Data).initializer.ptr !is null)
+				throw new Exception("het.DbgClient.Data: Nonzero initializer. Obj file has an enormous waste of zeroes inside."); 
+				
 				auto dataFileName = environment.get("DideDbgEnv", ""); 
 				if(dataFileName=="") return; 
 				
