@@ -3705,11 +3705,10 @@ version(/+$DIDE_REGION+/all)
 		protected void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
 		{
 			//this uses linear search. It can be optimized in subClasses.
-			alias b = clipBounds; 
-			if(b)
+			if(clipBounds)
 			{
 				foreach(c; subCells)
-				if(b.overlaps(c.outerBounds))
+				if(clipBounds.overlaps(c.outerBounds))
 				fun(c); 
 			}
 		} 
@@ -4208,15 +4207,10 @@ version(/+$DIDE_REGION+/all)
 			{
 				
 				auto act()
-				{ return subCells[i]; } 
-				auto actWidth()
+				{ return subCells[i]; } auto actWidth()
 				{ return act.outerWidth; } 
-				auto actIsNewLine()
-				{
-					if(auto g = cast(Glyph)act)
-					return g.isNewLine; else
-					return false; 
-				} 
+				bool actIsNewLine()
+				{ if(auto g = cast(Glyph)act) return g.isNewLine; return false; } 
 				
 				//wrap
 				if(actIsNewLine)

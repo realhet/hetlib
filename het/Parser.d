@@ -2885,6 +2885,7 @@ version(/+$DIDE_REGION Keywords+/all)
 	{
 		File file /+Note: Case Sensitive.  Must be the correct case.+/; 
 		int lineIdx, columnIdx, mixinLineIdx; 
+		uint moduleHash; 
 		
 		this(string file_, int lineIdx_, int columnIdx_=0, int mixinLineIdx_=0)
 		{
@@ -2892,6 +2893,7 @@ version(/+$DIDE_REGION Keywords+/all)
 			lineIdx 	= lineIdx_,
 			columnIdx 	= columnIdx_,
 			mixinLineIdx 	= mixinLineIdx_/+Todo: multiple "-mixin-N" can be after the ".d" extension!!!+/; 
+			recalcModuleHash; 
 		} 
 		
 		this(string s)
@@ -2908,7 +2910,12 @@ version(/+$DIDE_REGION Keywords+/all)
 				lineIdx 	= m[3].to!int.ifThrown(0),
 				columnIdx 	= m[4].to!int.ifThrown(0); 
 			}
+			recalcModuleHash; 
 		} 
+		
+		
+		void recalcModuleHash()
+		{ moduleHash = file.fullName.xxh32; } 
 		
 		bool opCast(T:bool)() const
 		{ return cast(bool)file; } 
@@ -3956,7 +3963,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D65DFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D6EDFDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

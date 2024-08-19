@@ -626,6 +626,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		void print(alias x, A...)(A args) { print(aliasToString!x, args); } 
 		void print(alias x, alias y, A...)(A args) { print(aliasToString!x, aliasToString!y,  args); } 
 		void print(alias x, alias y, alias z, A...)(A args) { print(aliasToString!x, aliasToString!y, aliasToString!z, args); } 
+		
+		//Todo: interpolated string support for print, write*, LOG, ERR, WARN
 	}version(/+$DIDE_REGION+/all)
 	{
 		version(/+$DIDE_REGION UDAs+/all)
@@ -3316,18 +3318,19 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		//?. optional chaining operator
 		
-		auto ifNotNull(alias fun, T)(T p)
-		{
-			if(p !is null) return unaryFun!fun(p); 
-			else return typeof(return).init; 
-		} 
-		
-		auto ifNotNull(alias fun, T, U)(T p, lazy U def)
-		{
-			if(p !is null) return unaryFun!fun(p); 
-			else return def; 
-		} 
-		
+		/+
+			auto ifNotNull(alias fun, T)(T p)
+			{
+				if(p !is null) return unaryFun!fun(p); 
+				else return typeof(return).init; 
+			} 
+			
+			auto ifNotNull(alias fun, T, U)(T p, lazy U def)
+			{
+				if(p !is null) return unaryFun!fun(p); 
+				else return def; 
+			} 
+		+/
 	}
 }version(/+$DIDE_REGION Arrays Ranges+/all)
 {
@@ -3459,6 +3462,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		auto ifz(A, B)(A a, lazy B b)
 		{ return a ? a : b; } 
+		alias ifnull = ifz; 
 		
 		auto ife(A, B, C)(A a, B b, lazy C c)
 		{ return a==b ? c : a; } 
