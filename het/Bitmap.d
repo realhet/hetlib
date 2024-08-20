@@ -4981,7 +4981,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Compute PSNR, SSIM or LSIM distortion metric between two pictures.
 					//Result is in dB, stores in result[] in the Y/U/V/Alpha/All order.
 					//Returns false in case of error (src and ref don't have same dimension, ...)
-					//Warning: this function is rather CPU-intensive.
+					//Warning : this function is rather CPU-intensive.
 					int WebPPictureDistortion(
 						in WebPPicture* src, in WebPPicture* _ref,
 						int metric_type, //0 = PSNR, 1 = SSIM, 2 = LSIM

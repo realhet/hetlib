@@ -15,15 +15,16 @@ version(/+$DIDE_REGION+/all)
 	
 	//adjust the size of the original Tab character
 	enum 
-		VisualizeContainers	= 0,
-		VisualizeContainerIds	= 0,
-		VisualizeGlyphs	= 0,
-		VisualizeTabColors	= 0, //Todo: spaces at row ends
-		VisualizeHitStack	= 0,
-		VisualizeSliders	= 0,
-		VisualizeCodeLineIndices 	= 0, //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
+		VisualizeContainers	= (常!(bool)(0)),
+		VisualizeContainerIds	= (常!(bool)(0)),
+		VisualizeGlyphs	= (常!(bool)(0)),
+		VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
+		VisualizeHitStack	= (常!(bool)(0)),
+		VisualizeSliders	= (常!(bool)(0)),
+		VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
 			
-		addHitRectAsserts	= 0; //Verifies that Cell.Id is non null and unique
+		addHitRectAsserts	= (常!(bool)(0)); //Verifies that Cell.Id is non null and unique
+	//Todo: DIDE, look inside  enum statement  not just  enum block.   enum; enum{}
 	
 	//Todo: bug: NormalFontHeight = 18*4	-> RemoteUVC.d crashes.
 	immutable DefaultFontName = //this is	the cached font
