@@ -4002,8 +4002,7 @@ version(/+$DIDE_REGION+/all)
 		private enum genSetChanged = q{
 			if(!flags.changed#){
 				flags.changed# = true;
-				if(auto p = getParent) if(p)
-					p.setChanged#;
+				if(auto p = getParent) if(p) p.setChanged#;
 			}
 		}; 
 		
