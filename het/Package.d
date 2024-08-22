@@ -5971,7 +5971,11 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		
 		///note: This has been moved here to avoid circular module initialization in uiBase
-		ref auto imstVisibleBounds(in SrcId id) { return ImStorage!bounds2.access(id.combine("visibleBounds")); } ; 
+		ref auto imstVisibleBounds(in SrcId id)
+		{ return ImStorage!bounds2.access(id.combine("VisibleBounds")); } 
+		ref auto imstOuterBounds(in SrcId id)
+		{ return ImStorage!bounds2.access(id.combine("OuterBounds")); } 
+		//Todo: Fix this circular module initialization mess
 		
 	}class DynCharMap
 	{
@@ -6504,25 +6508,25 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		bool isIdentifier(const string s) @safe
 		{
+			//Todo: ezt esszerusiteni!
 			if(isDigit(s.get(0))) return false; //can't be number
 			auto w = s.wordAt(0); 
 			return w.length==s.length; 
 		} 
 		
-		string wordAt(const string s, const ptrdiff_t pos) @safe 
-		//Todo: this is ascii!!!! fails if isWordChar contains uni.isAlpha or uni.isNumber!!!!
+		string wordAt(string s, size_t pos) @safe
 		{
 			if(!isWordChar(s.get(pos))) return ""; 
-					
-			size_t st	= pos; 	while(isWordChar(s.get(st-1	))) st--; 
-			size_t en	= pos+1; 	while(isWordChar(s.get(en	))) en++; 
-					
+			
+			auto st = pos; 	while(isWordChar(s.get(st-1))) st--; 
+			auto en = pos+1; 	while(isWordChar(s.get(en))) en++; 
+			
 			return s[st..en]; 
 		} 
 		
 		ptrdiff_t wordPos(
 			const string s, const string sub, size_t startIdx,
-					in std.string.CaseSensitive cs = Yes.caseSensitive
+			in std.string.CaseSensitive cs = Yes.caseSensitive
 		) @safe
 		{
 			ptrdiff_t res; 
@@ -6585,23 +6589,25 @@ version(/+$DIDE_REGION Containers+/all)
 			&& !src[1..$-1].replace(`\"`, `\'`).canFind('"'); 
 		} 
 		
-		string safeDCommentBody(string s)
+		bool validDCommentBody(string s)
 		{
-			//check if the nesting is correct or not
-			
-			auto a = s, level = 0, ok = false; 
+			//check if the nesting is correct
+			auto a = s, level = 0, ok = true; 
 			while(a.length>=2)
 			{
 				if(a.startsWith("/+"))	{ level++; a = a[2..$]; }
 				else if(a.startsWith("+/"))	{ level--; a = a[2..$]; if(level<0) ok = false; }
 				else	a = a[1..$]; 
 			}
-			if(!level) ok = false; 
+			if(level!=0) ok = false; 
 			
+			return ok; 
+		} 
+		
+		string safeDCommentBody(string s)
+		{
 			//if it's wrong, then defuse all the comment prefixes and postfixes.
-			if(!ok) s = s.replace("/+", "/ +").replace("+/", "+ /"); 
-			
-			return s; 
+			return ((s.validDCommentBody)?(s) :(s.replace("/+", "／+").replace("+/", "+／"))); 
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
@@ -9008,8 +9014,9 @@ version(/+$DIDE_REGION Colors+/all)
 			clWowGreen	= (RGB(0x00ff1e)),
 			clWowBlue	= (RGB(0xdd7000)),
 			clWowPurple	= (RGB(0xee35a3)),
-			clWowRed	= (RGB(0x0080ff)),
-			clWowRed2	= (RGB(0x80cce5)); 
+			clWowOrange	= (RGB(0x0080ff)),
+			clWowPink	= (RGB(0xBA8CF4)),
+			clWowGold	= (RGB(0x80cce5)); 
 		}
 		
 		version(/+$DIDE_REGION VIMpalette+/all)
@@ -9276,7 +9283,7 @@ version(/+$DIDE_REGION Colors+/all)
 		],
 			clWow	= [
 			clBlack, clWowGrey, clWowWhite, clWowGreen, clWowBlue, clWowPurple,
-			clWowRed, clWowRed2
+			clWowOrange, clWowPink, clWowGold
 		],
 			clVim	= [
 			clVimBlack, clVimBlue, clVimGreen, clVimTeal, clVimRed, clVimPurple, clVimYellow,

@@ -72,35 +72,34 @@ version(/+$DIDE_REGION+/all)
 		/+
 			Code: struct vec2
 			{
-			    float x, y;
+			     float x, y;
 			}
 			
 			struct vec3
 			{
-			    union {
-			        struct { 
-														 float x; 
-														 union { 
-			                struct { 
-			                    float y, z; 
-																		 } 
-																		 vec2 yz; 
-			            } 
-										 }
-										 struct { 
-			            vec2 xy; 
-			        }
-			    }
+				union {
+					struct { 
+						float x; 
+						union { 
+							struct { 
+								float y, z; 
+							}
+							vec2 yz; 
+						} 
+					}
+					struct { 
+						vec2 xy; 
+					}
+				}
 			}
 			
 			void main()
 			{
-						 auto v = vec3(1, 2, 3);
-						 
-						 writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy);
-						 writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy);
-						 writeln(&v.yz);
-						 
+				auto v = vec3(1, 2, 3);
+				
+				writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy);
+				writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy);
+				writeln(&v.yz);
 			}
 		+/
 	+/

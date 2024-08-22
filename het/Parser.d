@@ -3333,7 +3333,10 @@ version(/+$DIDE_REGION Keywords+/all)
 		{
 			//Todo: Multiline Todo: is NOT recognized by this preprocessor
 			//Todo: Only slashcomment todos are recognized by this preprocessor
-			//Note: It is better to keep do the detection here, because it collects all the todos for the compiled project, not just the opened structured files in DIDE.
+			/+
+				Note: It is better to keep do the detection here, because 
+				it collects all the todos for the compiled project, not just the opened structured files in DIDE.
+			+/
 			auto rxTodo	= ctRegex!(`\/\/todo:(.*)`, `gi`); 
 			auto rxOpt	= ctRegex!(`\/\/opt:(.*)`, `gi`); 
 			auto rxBug	= ctRegex!(`\/\/bug:(.*)`, `gi`); 
@@ -3342,43 +3345,30 @@ version(/+$DIDE_REGION Keywords+/all)
 			{
 				if(cmt.isComment)
 				{
-					if(cmt.posInLine==0 && cmt.source.startsWith("//@"))
+					if(cmt.source.startsWith("//@"))
 					{
-						  //Todo: ezt berakni a tokenizerbe
-						auto line = cmt.source[3..$]; 
-						
-						//extract command word
-						int i = line.indexOf(' ').to!int; 
-						if(i<0)
-						i = line.length.to!int; 
-						string command = lc(line[0..i]); 
-						
-						//check if command is valid
-						if(validBuildMacroCommands.canFind(command))
-						{
-							cmt.isBuildMacro = true; 
-							macros ~= line; 
-						}
+						auto 	line 	= cmt.source[3..$],
+							command 	= line.wordAt(0).lc; 
+						if(validBuildMacroCommands.canFind(command)/+valid buildmacro command?+/)
+						{ cmt.isBuildMacro = true; macros ~= line; }
 					}else
 					{
-						string s, t; 
-						auto m = cmt.source.matchFirst(rxTodo); 
-						if(!m.empty)
-						{ t = "Todo";  s = m[1]; }else
+						auto s = cmt.source[2..$].stripLeft; 
+						foreach(kw; ["todo:", "bug:", "opt:"])
+						if(s.map!toLower.startsWith(kw))
 						{
-							m = cmt.source.matchFirst(rxOpt); 
-							if(!m.empty)
-							{ t = "Opt";  s = m[1]; }else
+							s = s[kw.length..$]; 
+							if(s.startsWith(' ')) s = s[1..$]; //strip optional space after keyword
+							if(cmt.source[1].among('+', '*')) s = s[0..$-2]; //strip closing comment token
+							
+							foreach(line; s.splitter('\n').map!strip.filter!"a.length".enumerate)
 							{
-								m = cmt.source.matchFirst(rxBug); 
-								if(!m.empty)
-								{ t = "Bug";  s = m[1]; }
+								todos ~= 	i`$(fileName)($(cmt.line+1),$(cmt.posInLine+1)): `.text /+source location+/~
+									((line.index==0)?(i`$(kw.capitalize) $(line.value)`.text/+main comment+/) :(i`       $(line.value)`.text/+supplemental comment+/)); 
 							}
+							
+							break; 
 						}
-						
-						s = s.strip; 
-						if(!s.empty)
-						{ todos ~= format(`%s(%d,%d): %s: %s`, fileName, cmt.line+1, cmt.posInLine+1, t, s); }
 					}
 				}
 			}
@@ -3963,7 +3953,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D6EDFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D6E8FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

@@ -21,7 +21,7 @@ version(/+$DIDE_REGION+/all)
 		VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
 		VisualizeHitStack	= (常!(bool)(0)),
 		VisualizeSliders	= (常!(bool)(0)),
-		VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
+		VisualizeCodeLineIndices 	= (常!(bool)(1)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
 			
 		addHitRectAsserts	= (常!(bool)(0)); //Verifies that Cell.Id is non null and unique
 	//Todo: DIDE, look inside  enum statement  not just  enum block.   enum; enum{}
@@ -3073,16 +3073,13 @@ version(/+$DIDE_REGION+/all)
 				[q{bool},q{1},q{"hasVScrollBar"},q{},q{/++/}],
 				[],
 				[q{bool},q{1},q{"_measured"},q{},q{/+used to tell if a top level container was measured already+/}],
-				[q{bool},q{1},q{"saveVisibleBounds"},q{},q{/+
-					draw() will save the visible innerBounds under the name 
-					id.appendIdx("visibleBounds");fewqfew
-				+/}],
+				[q{bool},q{1},q{"saveVisibleBounds"},q{},q{/+draw() will save the visible innerBounds into imstVisibleBounds+/}],
+				[q{bool},q{1},q{"saveOuterBounds"},q{},q{/+draw() will save the outer world outerBounds into imstOuterBounds +/}],
 				[q{bool},q{1},q{"_measureOnlyOnce"},q{},q{/++/}],
 				[q{bool},q{1},q{"acceptEditorKeys"},q{},q{/+accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.+/}],
 				[q{ScrollState},q{2},q{"hScrollState"},q{},q{/++/}],
 				[q{ScrollState},q{2},q{"vScrollState"},q{},q{/++/}],
 				[],
-				[q{/+------------------------ 32bits ---------------------------------------+/}],
 				[q{bool},q{1},q{"clickable"},q{1},q{/+
 					If false, hittest will not check this as clicked. 
 					It checks the parent instead.
@@ -3142,7 +3139,6 @@ version(/+$DIDE_REGION+/all)
 {
 	class Container : Cell
 	{
-		 //Container ////////////////////////////////////
 		SrcId id; //Scrolling needs it. Also useful for debugging.
 		
 		auto getHScrollBar()
@@ -3751,7 +3747,10 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 			if(flags._saveComboBounds)
-			_savedComboBounds = dr.inputTransform(outerBounds); 
+			{
+				_savedComboBounds = dr.inputTransform(outerBounds); 
+				//Todo: Use saveContainerBounds for this as well!
+			}
 			
 			const 	scrollOffset = getScrollOffset,
 				hasScrollOffset = !isnull(scrollOffset); 
@@ -3760,7 +3759,11 @@ version(/+$DIDE_REGION+/all)
 			{
 				flags.saveVisibleBounds = true; 
 				imstVisibleBounds(id) = bounds2(scrollOffset, scrollOffset+innerSize); 
-				//print("draw", id, imstVisibleBounds(id));
+			}
+			if(flags.saveOuterBounds)
+			{
+				flags.saveOuterBounds = true; 
+				imstOuterBounds(id) = dr.inputTransform(outerBounds); 
 			}
 			
 			dr.translate(innerPos); 
@@ -4085,8 +4088,6 @@ version(/+$DIDE_REGION+/all)
 	
 	class Row : Container
 	{
-		 //Row ////////////////////////////////////
-		
 		//for Elastic tabs
 		/+private+/ int[] tabIdxInternal; 
 		bool strictCellOrder/+Todo: put into containerFlags+/; 
@@ -6293,6 +6294,16 @@ struct im
 		
 			//GUI area that tracks PanelPosition changes
 			bounds2 clientArea; 
+			
+			bounds2 actContainerBounds()
+		{
+			if(actContainer)
+			{
+				actContainer.flags.saveOuterBounds = true; 
+				return imstOuterBounds(actContainer.id); 
+			}
+			return typeof(return).init; 
+		} 
 		
 			enum doTiming = false; 
 		
@@ -6315,9 +6326,9 @@ struct im
 			//inject stuff into het.uibase. So no import het.ui is needed there.
 			//Todo: het.uibase was merged with het.ui. This is no longer needed.
 			static auto getActFontHeight()
-			{ return float(textStyle.fontHeight); 	} 	 .g_actFontHeightFunct	= &getActFontHeight; 
+			{ return float(textStyle.fontHeight); 	} 	.g_actFontHeightFunct	= &getActFontHeight; 
 			static auto getActFontColor ()
-			{ return textStyle.fontColor; 	} 	 .g_actFontColorFunct	= &getActFontColor; 
+			{ return textStyle.fontColor; 	} 	.g_actFontColorFunct	= &getActFontColor; 
 			.g_getOverlayDrawingFunct = &getOverlayDrawing; 
 			.g_getDrawCallbackFunct = &getDrawCallback; 
 			
@@ -6336,7 +6347,8 @@ struct im
 			comboOpening = false; 
 			
 			//this is needed for PanelPosition
-			clientArea = targetSurfaces[1].view.screenBounds_anim.bounds2; //Maybe it is the same as the bounds for clipping rects: flags.clipChildren
+			clientArea = targetSurfaces[1].view.screenBounds_anim.bounds2; 
+			//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 			
 			static DeltaTimer dt; 
 			deltaTime = dt.update; 
