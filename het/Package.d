@@ -7872,21 +7872,21 @@ version(/+$DIDE_REGION Containers+/all)
 					Prime32_5 = 374761393U; 
 				
 				enum UpdateValuesRound = q{
-				v1 += loadUint(srcPtr) * Prime32_2;	 v1 = rol(v1, 13);	 v1 *= Prime32_1;	 srcPtr++;
-				v2 += loadUint(srcPtr) * Prime32_2;	 v2 = rol(v2, 13);	 v2 *= Prime32_1;	 srcPtr++;
-				v3 += loadUint(srcPtr) * Prime32_2;	 v3 = rol(v3, 13);	 v3 *= Prime32_1;	 srcPtr++;
-				v4 += loadUint(srcPtr) * Prime32_2;	 v4 = rol(v4, 13);	 v4 *= Prime32_1;	 srcPtr++;
+				v1 += loadUint(srcPtr) * Prime32_2; 	 v1 = rol(v1, 13); 	 v1 *= Prime32_1; 	 srcPtr++; 
+				v2 += loadUint(srcPtr) * Prime32_2; 	 v2 = rol(v2, 13); 	 v2 *= Prime32_1; 	 srcPtr++; 
+				v3 += loadUint(srcPtr) * Prime32_2; 	 v3 = rol(v3, 13); 	 v3 *= Prime32_1; 	 srcPtr++; 
+				v4 += loadUint(srcPtr) * Prime32_2; 	 v4 = rol(v4, 13); 	 v4 *= Prime32_1; 	 srcPtr++; 
 			}; 
 				
 				enum FinishRound = q{
-				while (ptr < end) {
-					result += *ptr * Prime32_5;
-					result = rol(result, 11) * Prime32_1 ;
-					ptr++;
+				while(ptr < end) {
+					result += *ptr * Prime32_5; 
+					result = rol(result, 11) * Prime32_1; 
+					ptr++; 
 				}
-				result ^= result >> 15;	 result *= Prime32_2;
-				result ^= result >> 13;	 result *= Prime32_3;
-				result ^= result >> 16;
+				result ^= result >> 15; 	 result *= Prime32_2; 
+				result ^= result >> 13; 	 result *= Prime32_3; 
+				result ^= result >> 16; 
 			}; 
 				
 				static void xxh_rounds(ref const(uint)*	src, const(uint)* limit, uint* v) nothrow
