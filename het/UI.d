@@ -21,7 +21,7 @@ version(/+$DIDE_REGION+/all)
 		VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
 		VisualizeHitStack	= (常!(bool)(0)),
 		VisualizeSliders	= (常!(bool)(0)),
-		VisualizeCodeLineIndices 	= (常!(bool)(1)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
+		VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
 			
 		addHitRectAsserts	= (常!(bool)(0)); //Verifies that Cell.Id is non null and unique
 	//Todo: DIDE, look inside  enum statement  not just  enum block.   enum; enum{}
@@ -3878,12 +3878,12 @@ version(/+$DIDE_REGION+/all)
 		} ; 
 		
 		
-		struct SearchResult
+		static struct SearchResult
 		{
 			Container container; 
 			vec2 absInnerPos; 
 			Cell[] cells; //Todo: if this is empty, the whole container should be marked
-			string reference; //user can use it to identify the search result
+			Object reference; //user can use it to identify the search result
 			bool showArrow = true; //The searchresult is amade out of multiple parts. Only one of those should display an arrow.
 			
 			

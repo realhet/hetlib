@@ -2325,14 +2325,16 @@ version(/+$DIDE_REGION Keywords+/all)
 		
 				"File", "Path", "DateTime", "Time",
 		
+				"Object",
+		
 				"Vector",
 				"vec2", "dvec2", "ivec2", "uvec2", "bvec2", "RG",
 				"vec3", "dvec3", "ivec3", "uvec3", "bvec3", "RGB",
 				"vec4", "dvec4", "ivec4", "uvec4", "bvec4", "RGBA",
 		
 				"Matrix",
-				 "mat2" , "mat3" , "mat4" , "mat2x3",  "mat2x4",	"mat3x2",	"mat3x4",  "mat4x2",  "mat4x3",
-				"dmat2", "dmat3", "dmat4", "dmat2x3", "dmat2x4", "dmat3x2", "dmat3x4",	"dmat4x2",	"dmat4x3",
+				"mat2", "mat3", "mat4", "mat2x3", "mat2x4", "mat3x2", "mat3x4", "mat4x2", "mat4x3",
+				"dmat2", "dmat3", "dmat4", "dmat2x3", "dmat2x4", "dmat3x2", "dmat3x4", "dmat4x2", "dmat4x3",
 		
 				"Bounds",
 				"bounds1", "dbounds1", "ibounds1",
@@ -3953,7 +3955,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D6E8FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D6F4FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

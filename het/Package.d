@@ -4028,8 +4028,10 @@ version(/+$DIDE_REGION Numeric+/all)
 					w = x1*x1 + x2*x2; 
 				}while(w>1); 
 				w = sqrt((-2*log(w))/w); 
-						
-				return tuple(x1*w, x2*w); 
+				return tuple(
+					x1*w * ((seedStream.front&1)?-1:1), 
+					x2*w * ((seedStream.front&2)?-1:1)
+				); 
 			} 
 					
 			auto randomGauss()
