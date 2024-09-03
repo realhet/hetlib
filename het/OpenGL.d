@@ -2850,7 +2850,7 @@ version(/+$DIDE_REGION+/all)
 				tessActPrimitive = 0; tessIdx = 0; 
 			} 
 			
-			void cbVertex(in TessVertex v)
+			void cbVertex(const TessVertex v)
 			{
 				//"glVertex %d %s".writefln(v.idx, v.v);
 				
@@ -3086,7 +3086,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 		RGB	, GBA	, unknown1	, unknown2	,
 		RGBA	, unknown3	, unknown4	, RGBA_ClearType	
 	} 
-	
+	
 	//packed data struct that
 	private struct SubTexInfo
 	{
@@ -3373,7 +3373,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 			if(!freeIndices.empty)
 			{
 				//reuse a free slot
-				actIdx = freeIndices.popLast; 
+				actIdx = freeIndices.fetchBack; 
 				infoArray[actIdx] = info; 
 			}
 			else {
@@ -3444,67 +3444,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 	} 
 	
 	//Todo: make the texture class
-	class Texture
-	{
-		//this holds all the info to access a subTexture
-		private
-		{
-			int idx; 
-			File file; 
-			
-			this(int idx)
-			{
-				//this is unnamed and empty
-				this.idx = idx; 
-			} 
-		} 
-		
-		this(int idx, File file, bool delayed = false)
-		{
-			this(idx); 
-			this.file = file; 
-		} 
-		
-		override string toString() const
-		{ return "Texture(#%d, %s)".format(idx, file); } 
-	}    deprecated(`Use bitmaps("name", bitmap)")`) class CustomTexture
-	{
-		 //CustomTexture ///////////////////////////////
-		const string name; 
-		protected
-		{
-			Bitmap bmp; 
-			bool mustUpload; 
-		} 
-		
-		this(string name="")
-		{ this.name = name.strip.length ? name : this.identityStr; } 
-		
-		void clear()
-		{ bmp.destroy; mustUpload = false; } 
-		void update()
-		{ mustUpload = true; } 
-		void update(Bitmap bmp)
-		{ this.bmp = bmp; mustUpload = true; } 
-		
-		int texIdx()
-		{
-			if(bmp is null)
-			return -1; //nothing to draw
-			if(!textures.isCustomExists(name))
-			mustUpload = true; //prepare for megaTexture GC
-			Bitmap b = chkClear(mustUpload) ? bmp : null; 
-			return textures.custom(name, b); 
-		} 
-		
-		ivec2 size()const
-		{ return bmp ? bmp.size : ivec2(0); } 
-		
-		auto getFile()
-		{ return File(`custom:\`~name); } 
-		auto getBmp()
-		{ return bmp; } 
-	} 
 	
 	
 	struct textures
@@ -3516,9 +3455,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 			MegaTexture[] megaTextures; 
 			
 			int[File] byFileName; //texIdx of File
-			
-			bool[int] pendingIndices; //files being loaded by a worker thread
-			bool[int] invalidateAgain; //files that cannot be invalidated yet, because they are loading right now
 			
 			void enforceSize(const ivec2 size)
 			{
@@ -3561,15 +3497,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 			
 			private int garbageCycle; //just an ever increasing index
 			
-			bool isPending(int idx)
-			{ return idx in pendingIndices && pendingIndices[idx]; } 
-			
-			bool isInvalidatingAgain(int idx)
-			{ return idx in invalidateAgain && invalidateAgain[idx]; } 
-			
-			bool isUntouchable(int idx)
-			{ return isPending(idx) || isInvalidatingAgain(idx); } 
-			
 			void garbageCollect()
 			{
 				//auto _ = PROBE("Textures.GC");
@@ -3580,28 +3507,10 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				
 				garbageCycle++; //set the index for the next garbageCollect
 				
-				//LOG("GCycle", garbageCycle);
-				
-				//megaTextures[mtIdx].bin.dump;
-				//infoDump;
-				
-				//auto allInfos = collectSubTexInfo2.filter!(i => i.info.texIdx==mtIdx); //on the current megatexture
-				
-				//auto infosToUnload	= allInfos.filter!(i =>  i.canUnload).array;
-				//auto infosToSave	= allInfos.filter!(i => !i.canUnload).array;
-				
-				//no need to wait pending because they are not allocated yet in the bins and update() only called from main thread, also it can start a GC
-				/+
-					while(allInfos.map!(i => isPending(i.idx)).any){
-						LOG("Waiting for pending textures...");
-						sleep(10);
-					}
-				+/
-				
 				//LOG("MegaTexture.GC   mtIdx:", mtIdx, "  removing:", infosToUnload.length, "  keeping:", infosToSave.length, "   total:", collectSubTexInfo2.count);
 				
 				//Note: There is no fucking glReadSubtexImage. So everything must be dropped. Custom textures must be uploaded on every frame if needed.
-				//raise("notImpl " ~ info.text);
+				
 				
 				foreach(file; byFileName.byKeyValue.array.filter!(a=>infoTexture.infoArray[a.value].texIdx==mtIdx).map!"a.key")
 				{ invalidate(file); }
@@ -3763,100 +3672,33 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				megaTextures[mtIdx].remove(idx); 
 				infoTexture.remove(idx); 
 			} 
-			
-			Bitmap[] bmpQueue; 
 			
 		} 
 		public
 		{
+			
+			//private Bitmap[] bmpQueue; 
+			
 			bool update()
 			{
-				auto _ = PROBE("Textures.Update"); 
-				bool inv; 
+				/+
+					240827: There was a bandwidth limuted uploader that uploaded images taken from bmpQueue.
+					But it seems like not used anymore, so deleted.
+				+/
 				
-				auto t0 = QPS; 
-				
-				enum UploadTextureMaxTime = 1.0*second/60; 
-				size_t uploadedSize; 
-				enum TextureFlushLimit = 8 << 20; 
-				do
-				{
-					
-					Bitmap bmp; 
-					synchronized
-					{
-						if(synchLog)
-						LOG("bmpQueue.popFirst(null) before"); 
-						bmp = bmpQueue.popFirst(null); 
-						if(synchLog)
-						LOG("bmpQueue.popFirst(null) after"); 
-					} 
-					
-					if(!bmp)
-					break; 
-					
-					auto idx = bmp.tag; 
-					
-					pendingIndices.remove(idx); //not pending anymore so it can be reinvalidated
-					
-					if(idx in invalidateAgain)
-					{
-						//WARN("Delayed loaded bmp is in invalidateAgain.", idx);
-						
-						uploadSubTex(idx, bmp, true); 
-						//this is here to finalize the allocation of the texture before the invalidation
-						//Opt: disable the upload of this texture data
-						
-						invalidateAgain.remove(idx); 
-						foreach(f, i; byFileName)
-						if(i == idx)
-						{
-							 //Opt: slow linear search
-							//WARN("Reinvalidating", f, idx);
-							invalidate(f); 
-							break; 
-						}
-						
-					}
-					else {
-						uploadSubTex(idx, bmp); 
-						
-						//flush at every N megabytes so the transfer time of this particular upload can be measured and limited.
-						uploadedSize += bmp.sizeBytes; 
-						if(uploadedSize >= TextureFlushLimit)
-						{
-							uploadedSize -= TextureFlushLimit; 
-							gl.flush; 
-						}
-					}
-					
-					inv = true; 
-					
-				}
-				while(QPS-t0<UploadTextureMaxTime/*sec*/); 
-				
-				return inv; 
-			} 
+				return false; 
+			} 
+			
 			
 			void invalidate(in File fileName)
 			{
+				//it removes the texture, so the next access() will reload it.
 				if(auto idx = (fileName in byFileName))
 				{
-					if(*idx in pendingIndices)
-					{
-						//WARN("Texture loader is pending", fileName, *idx);
-						invalidateAgain[*idx] = true; 
-						return; 
-					}
-					enforce(byFileName.remove(fileName), "Unable to remove "~fileName.fullName); 
 					removeSubTex(*idx); 
-					//LOG("invalidated ", fileName, "  idx:", *idx);
-				}
-				else {
-					//LOG("no need to invalidate, doesn't exists", fileName);
+					byFileName.remove(fileName); 
 				}
 			} 
-			
 			
 			
 			bool isCustomExists(string name)

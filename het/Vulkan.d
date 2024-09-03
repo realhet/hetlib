@@ -5871,7 +5871,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					{
 						static if(is(A==vec3)) emit(args[i]); 
 						else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
-						else static if(is(A==RGB)) actColor = rgbToFloat(args[i]); 
+						else static if(is(A==RGB)) actColor = args[i].from_unorm; 
 					}
 				} 
 				

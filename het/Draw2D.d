@@ -4,7 +4,7 @@ version(/+$DIDE_REGION+/all)
 	import het.opengl; 
 	
 	public import het.algorithm; 
-	public import het.opengl : textures, CustomTexture; 
+	public import het.opengl : textures; 
 	
 	import std.bitmanip; 
 	
@@ -1918,7 +1918,7 @@ class Drawing
 		{
 			foreach(i; 0..count) {
 				enforce(!stack.empty, "Drawing.pop() stack is empty"); 
-				auto a = stack.popLast; 
+				auto a = stack.fetchBack; 
 				origin = a[0]; 
 				scaleFactor = a[1]; 
 			}
@@ -2451,14 +2451,13 @@ class Drawing
 		
 		void drawGlyph(Img, T...)(/+Not const because CustomTexture.texIdx is mutable+/Img img, in T args)
 		{
-			//Img can be int or Bmp File or string or CustomTexture
+			//Img can be int or Bmp File or string
 			//Todo: Bitmap, Image2D
 			int idx = -1; 
 			static if(isSomeString!Img)	idx = textures.accessLater(img); 
 			else static if(is(Img == File))	idx = textures.accessLater(img); 
 			else static if(is(Img == Bitmap))	{ if(img) idx = textures.accessLater(img.file); }
 			else static if(isIntegral!Img)	idx = img; 
-			else static if(is(Img : CustomTexture))	{ if(img) idx = img.texIdx; }
 			else	static assert(0, "Unsupported Img param: "~Img.stringof); 
 			
 			//position can be x,y  vec2,   ivec2      the size is automatic

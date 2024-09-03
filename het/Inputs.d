@@ -1352,7 +1352,7 @@ version(/+$DIDE_REGION+/all)
 			ushort wUsage; 
 		} 
 		
-		alias DIEnumDevicesCallbackA = extern(Windows) bool function(in DIDeviceInstanceA ddi, void* pvRef); 
+		alias DIEnumDevicesCallbackA = extern(Windows) bool function(const DIDeviceInstanceA ddi, void* pvRef); 
 		
 		struct DIDeviceObjectInstanceA
 		{
@@ -1367,7 +1367,7 @@ version(/+$DIDE_REGION+/all)
 			ushort wExponent, wReportId; 
 		} 
 		
-		alias DIEnumDeviceObjectsCallbackA = extern(Windows) bool function(in DIDeviceObjectInstanceA ddoi, void* pvRef); 
+		alias DIEnumDeviceObjectsCallbackA = extern(Windows) bool function(const DIDeviceObjectInstanceA ddoi, void* pvRef); 
 		
 		mixin(uuid!(IDirectInput8A, "BF798030-483A-4DA2-AA99-5D64ED369700")); 
 		
@@ -1514,7 +1514,7 @@ version(/+$DIDE_REGION+/all)
 				function GetDeviceData(cbObjectData: DWORD; rgdod: PDIDeviceObjectData; 
 				out pdwInOut: DWORD; dwFlags: DWORD): HResult; stdcall;
 			+/
-			HRESULT SetDataFormat(in DIDataFormat didf); 
+			HRESULT SetDataFormat(const DIDataFormat didf); 
 			void _dummy5(); //function SetEventNotification(hEvent: THandle): HResult; stdcall;
 			HRESULT SetCooperativeLevel(HWND hwnd, uint dwFlags); 
 			void _dummy6(); //function GetObjectInfo(var pdidoi: TDIDeviceObjectInstanceA; dwObj, dwHow: DWORD): HResult; stdcall;
@@ -1554,7 +1554,7 @@ version(/+$DIDE_REGION+/all)
 		
 			void enumObjects(IDirectInputDeviceA dev)
 		{
-			static extern(Windows) bool enumCB(in DIDeviceObjectInstanceA doi, void* pvRef)
+			static extern(Windows) bool enumCB(const DIDeviceObjectInstanceA doi, void* pvRef)
 			{
 				"%-20s t:%2X #:%2X f:%04X %s".writefln(
 					nameOf(doi.guidType), 
@@ -1603,7 +1603,7 @@ version(/+$DIDE_REGION+/all)
 			bool initJoystick()
 		{
 			GUID guidJoystick; 
-			static extern(Windows) bool enumCB(in DIDeviceInstanceA ddi, void* pvRef)
+			static extern(Windows) bool enumCB(const DIDeviceInstanceA ddi, void* pvRef)
 			{
 				/+
 					writeln(ddi.guidInstance, " : ", ddi.tszInstanceName.toStr, " / ", 

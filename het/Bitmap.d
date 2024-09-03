@@ -210,7 +210,7 @@ version(/+$DIDE_REGION+/all)
 	{ return newSpecialBitmap(cause); } 
 	private Bitmap newLoadingBitmap()
 	{ return newSpecialBitmap("loading"); } 
-	
+	
 	/// Gets the modified time of any given filename. Including real/virtual files, fonts, transformed images, thumbnails
 	/// returns null if unknown
 	//realhet
@@ -426,86 +426,33 @@ version(/+$DIDE_REGION+/all)
 	
 	struct BitmapTransformation
 	{
-		//BitmapTransformation (thumb) ////////////////////////////////////
-		enum thumbKeyword = "?thumbOld"; 
-		//?thumb32w		 specifies maximum width
-		//?thumb32h		 specifies maximum height
-		//?thumb32wh	  specifies maximum width and maximum height
-		//?thumb32	  ditto
-		//Todo: ?thumb32x24  different maxwidth and maxheight
-		//Todo: keep aspect or not
-		/+
-			Todo: ?thumb=32w is not possible because processMarkupCommandLine() 
-				uses the = pro parameters and it can't passed into this filename.
-		+/
-		//Todo: cache decoded full size image
-		//Todo: turboJpeg small size extract
-		
 		File originalFile, transformedFile; 
-		int thumbMaxSize; 
-		bool maxWidthSpecified, maxHeightSpecified; 
-		
 		size_t sizeBytes; //used by bitmapQuery/detailed stats
-		
-		deprecated bool isThumb() const { return thumbMaxSize>0; } 
-		
-		bool isHistogram, isGrayHistogram; 
-		//Todo: this is lame. This should be solved by registered plugins.
-		
 		bool isEffect; 
 		
 		this(File file)
 		{
 			transformedFile = file; 
-			
-			//try to decode thumbnail params
-			string thumbDef, orig; 
-			if(file.fullName.split2(thumbKeyword, orig, thumbDef, false/+must not strip!+/))
+			if(
+				!file.driveIs(`font`)
+				/+
+					Todo: 🛑 Ez igy osszeutkozne.
+					A fontban a kerdojel utan nem effekt van, hanem a karaktersorozat nyersen.
+					Ezt a kivetelt meg kell szuntetni.
+				+/
+			)
 			{
-				originalFile = File(orig); 
-				
-				//get width/height posfixes
-				while(1) {
-					if(thumbDef.endsWith("w")) { maxWidthSpecified	= true; thumbDef.popBack; continue; }
-					if(thumbDef.endsWith("h")) { maxHeightSpecified	= true; thumbDef.popBack; continue; }
-					break; 
-				}
-				const maxAllSpecified = maxWidthSpecified == maxHeightSpecified; 
-				if(maxAllSpecified)
-				maxWidthSpecified = maxHeightSpecified = true; 
-				
-				ignoreExceptions({ thumbMaxSize = thumbDef.to!int; }); 
-			}
-			else if(file.fullName.canFind("?histogramOld"))	{
-				originalFile = File(orig[0..orig.countUntil('?')]); 
-				isHistogram = true; 
-			}
-			else if(file.fullName.canFind("?grayHistogramOld"))	{
-				originalFile = File(orig[0..orig.countUntil('?')]); 
-				isGrayHistogram = true; 
-			}
-			else {
-				if(
-					!file.driveIs(`font`)
-					/+
-						Todo: 🛑 Ez igy osszeutkozne.
-						A fontban a kerdojel utan nem effekt van, hanem a karaktersorozat nyersen.
-						Ezt a kivetelt meg kell szuntetni.
-					+/
-				)
+				if(file.hasQueryString)
 				{
-					if(file.hasQueryString)
-					{
-						originalFile = file.withoutQueryString; 
-						isEffect = true; 
-					}
+					originalFile = file.withoutQueryString; 
+					isEffect = true; 
 				}
 			}
 		} 
 		
 		alias needTransform this; 
 		bool needTransform()
-		{ return isThumb|| isHistogram || isGrayHistogram || isEffect; } 
+		{ return isEffect; } 
 		
 		Bitmap transform(Bitmap orig)
 		{
@@ -517,42 +464,10 @@ version(/+$DIDE_REGION+/all)
 			{
 				try
 				{
-					if(isThumb)
-					{
-						float minScale = 1; 
-						if(maxWidthSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.x); 
-						if(maxHeightSpecified) minScale.minimize(float(thumbMaxSize) / orig.size.y); 
-						
-						if(minScale < 1) {
-							ivec2 newSize = round(orig.size*minScale); 
-							//print("THUMB", fn, thumbDef, "oldSize", orig.size, "newSize", newSize);
-							return orig.resize_nearest(newSize); //Todo: mipmapped bilinear/trilinear
-						}
-					}
-					else if(isHistogram)
-					{
-						auto img = orig.get!RGB; 
-						int[3][256] histogram; 
-						foreach(p; img.asArray) foreach(i; 0..3) histogram[p[i]][i]++; 
-						int histogramMax = histogram[].map!(h => h[].max).array.max; 
-						float sc = 255.0f/histogramMax; 
-						return new Bitmap(image2D(256, 1, histogram[].map!(p => RGB(p[0]*sc, p[1]*sc, p[2]*sc)))); 
-					}
-					else if(isGrayHistogram)
-					{
-						auto img = orig.get!ubyte; 
-						int[256] histogram; 
-						foreach(p; img.asArray) histogram[p]++; 
-						int histogramMax = histogram[].max; 
-						float sc = 255.0f/histogramMax; 
-						return new Bitmap(image2D(256, 1, histogram[].map!(p => cast(ubyte)((p*sc).iround)))); 
-					}
-					else if(isEffect)
+					if(isEffect)
 					{ return orig.applyEffects(transformedFile); }
 				}
 				catch(Exception e) WARN(e.simpleMsg); 
-				
-				//Todo: handle errors
 				return orig.dup; 
 			} 
 			
@@ -4534,7 +4449,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 			int tjGetErrorCode(tjhandle handle); 
 			
 			
-			deprecated: 
+			//deprecated:  //24087 why was it marked deprecated?!!
 			
 			c_ulong TJBUFSIZE(int width, int height); 
 			
@@ -4625,22 +4540,22 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//can go from 0 (smaller output, lower quality) to 100 (best quality,
 					//larger output).
 					size_t WebPEncodeRGB(
-						in ubyte*	rgb,
+						const ubyte*	rgb,
 						int width, int height, int stride,
 						float quality_factor, ubyte** output
 					); 
 					size_t WebPEncodeBGR(
-						in ubyte*	bgr,
+						const ubyte*	bgr,
 						int width, int height, int stride,
 						float quality_factor, ubyte** output
 					); 
 					size_t WebPEncodeRGBA(
-						in ubyte* rgba,
+						const ubyte* rgba,
 						int width, int height, int stride,
 						float quality_factor, ubyte** output
 					); 
 					size_t WebPEncodeBGRA(
-						in ubyte* bgra,
+						const ubyte* bgra,
 						int width, int height, int stride,
 						float quality_factor, ubyte** output
 					); 
@@ -4649,22 +4564,22 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//lossless manner. Files are usually larger than lossy format, but will
 					//not suffer any compression loss.
 					size_t WebPEncodeLosslessRGB(
-						in ubyte* rgb,
+						const ubyte* rgb,
 						int width, int height, int stride,
 						ubyte** output
 					); 
 					size_t WebPEncodeLosslessBGR(
-						in ubyte* bgr,
+						const ubyte* bgr,
 						int width, int height, int stride,
 						ubyte** output
 					); 
 					size_t WebPEncodeLosslessRGBA(
-						in ubyte* rgba,
+						const ubyte* rgba,
 						int width, int height, int stride,
 						ubyte** output
 					); 
 					size_t WebPEncodeLosslessBGRA(
-						in ubyte* bgra,
+						const ubyte* bgra,
 						int width, int height, int stride,
 						ubyte** output
 					); 
@@ -4774,7 +4689,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					
 					//Returns true if 'config' is non-NULL and all configuration parameters are
 					//within their valid ranges.
-					int WebPValidateConfig(in WebPConfig* config); 
+					int WebPValidateConfig(const WebPConfig* config); 
 					
 					//------------------------------------------------------------------------------
 					//Input / Output
@@ -4813,8 +4728,8 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//data/data_size is the segment of data to write, and 'picture' is for
 					//reference (and so one can make use of picture->custom_ptr).
 					alias int function(
-						in ubyte* data, size_t data_size,
-						in WebPPicture* picture
+						const ubyte* data, size_t data_size,
+						const WebPPicture* picture
 					) WebPWriterFunction; 
 					
 					//WebPMemoryWrite: a special WebPWriterFunction that writes to memory using
@@ -4839,14 +4754,14 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//writer.mem must be freed by calling 'free(writer.mem)'.
 					//}
 					int WebPMemoryWrite(
-						in ubyte* data, size_t data_size,
-						in WebPPicture* picture
+						const ubyte* data, size_t data_size,
+						const WebPPicture* picture
 					); 
 					
 					//Progress hook, called from time to time to report progress. It can return
 					//false to request an abort of the encoding process, or true otherwise if
 					//everything is OK.
-					alias int function(int percent, in WebPPicture* picture) WebPProgressHook; 
+					alias int function(int percent, const WebPPicture* picture) WebPProgressHook; 
 					
 					//Color spaces.
 					enum WebPEncCSP
@@ -4976,14 +4891,14 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//will fully own the copied pixels (this is not a view). The 'dst' picture need
 					//not be initialized as its content is overwritten.
 					//Returns false in case of memory allocation error.
-					int WebPPictureCopy(in WebPPicture* src, WebPPicture* dst); 
+					int WebPPictureCopy(const WebPPicture* src, WebPPicture* dst); 
 					
 					//Compute PSNR, SSIM or LSIM distortion metric between two pictures.
 					//Result is in dB, stores in result[] in the Y/U/V/Alpha/All order.
 					//Returns false in case of error (src and ref don't have same dimension, ...)
 					//Warning : this function is rather CPU-intensive.
 					int WebPPictureDistortion(
-						in WebPPicture* src, in WebPPicture* _ref,
+						const WebPPicture* src, const WebPPicture* _ref,
 						int metric_type, //0 = PSNR, 1 = SSIM, 2 = LSIM
 						float* result
 					); //[5]
@@ -5013,14 +4928,14 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//be overwritten.
 					//Returns false in case of memory allocation error or invalid parameters.
 					int WebPPictureView(
-						in WebPPicture* src,
+						const WebPPicture* src,
 						int left, int top, int width, int height,
 						WebPPicture* dst
 					); 
 					
 					//Returns true if the 'picture' is actually a view and therefore does
 					//not own the memory for pixels.
-					int WebPPictureIsView(in WebPPicture* picture); 
+					int WebPPictureIsView(const WebPPicture* picture); 
 					
 					//Rescale a picture to new dimension width x height.
 					//If either 'width' or 'height' (but not both) is 0 the corresponding
@@ -5033,19 +4948,19 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Previous buffer will be free'd, if any.
 					//*rgb buffer should have a size of at least height * rgb_stride.
 					//Returns false in case of memory error.
-					int WebPPictureImportRGB(WebPPicture* picture, in ubyte* rgb, int rgb_stride); 
+					int WebPPictureImportRGB(WebPPicture* picture, const ubyte* rgb, int rgb_stride); 
 					//Same, but for RGBA buffer.
-					int WebPPictureImportRGBA(WebPPicture* picture, in ubyte* rgba, int rgba_stride); 
+					int WebPPictureImportRGBA(WebPPicture* picture, const ubyte* rgba, int rgba_stride); 
 					//Same, but for RGBA buffer. Imports the RGB direct from the 32-bit format
 					//input buffer ignoring the alpha channel. Avoids needing to copy the data
 					//to a temporary 24-bit RGB buffer to import the RGB only.
 					
-					int WebPPictureImportRGBX(WebPPicture* picture, in ubyte* rgbx, int rgbx_stride); 
+					int WebPPictureImportRGBX(WebPPicture* picture, const ubyte* rgbx, int rgbx_stride); 
 					
 					//Variants of the above, but taking BGR(A|X) input.
-					int WebPPictureImportBGR(WebPPicture* picture, in ubyte* bgr, int bgr_stride); 
-					int WebPPictureImportBGRA(WebPPicture* picture, in ubyte* bgra, int bgra_stride); 
-					int WebPPictureImportBGRX(WebPPicture* picture, in ubyte* bgrx, int bgrx_stride); 
+					int WebPPictureImportBGR(WebPPicture* picture, const ubyte* bgr, int bgr_stride); 
+					int WebPPictureImportBGRA(WebPPicture* picture, const ubyte* bgra, int bgra_stride); 
+					int WebPPictureImportBGRX(WebPPicture* picture, const ubyte* bgrx, int bgrx_stride); 
 					
 					//Converts picture->argb data to the YUV420A format. The 'colorspace'
 					//parameter is deprecated and should be equal to WEBP_YUV420.
@@ -5080,7 +4995,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Scan the picture 'picture' for the presence of non fully opaque alpha values.
 					//Returns true in such case. Otherwise returns false (indicating that the
 					//alpha plane can be ignored altogether e.g.).
-					int WebPPictureHasTransparency(in WebPPicture* picture); 
+					int WebPPictureHasTransparency(const WebPPicture* picture); 
 					
 					//Remove the transparency information (if present) by blending the color with
 					//the background color 'background_rgb' (specified as 24bit RGB triplet).
@@ -5100,7 +5015,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//the former for lossy encoding, and the latter for lossless encoding
 					//(when config.lossless is true). Automatic conversion from one format to
 					//another is provided but they both incur some loss.
-					int WebPEncode(in WebPConfig* config, WebPPicture* picture); 
+					int WebPEncode(const WebPConfig* config, WebPPicture* picture); 
 					
 					//------------------------------------------------------------------------------
 					
@@ -5135,45 +5050,27 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//This function will also validate the header and return 0 in
 					//case of formatting error.
 					//Pointers 'width' and 'height' can be passed NULL if deemed irrelevant.
-					int WebPGetInfo(
-						in ubyte* data, size_t data_size,
-										int* width, int* height
-					); 
+					int WebPGetInfo(const ubyte* data, size_t data_size, int* width, int* height); 
 					
 					//Decodes WebP images pointed to by 'data' and returns RGBA samples, along
 					//with the dimensions in *width and *height. The ordering of samples in
 					//memory is R, G, B, A, R, G, B, A... in scan order (endian-independent).
 					//The returned pointer should be deleted calling free().
 					//Returns NULL in case of error.
-					ubyte* WebPDecodeRGBA(
-						in ubyte* data, size_t data_size,
-											  int* width, int* height
-					); 
+					ubyte* WebPDecodeRGBA(const ubyte* data, size_t data_size, int* width, int* height); 
 					
 					//Same as WebPDecodeRGBA, but returning A, R, G, B, A, R, G, B... ordered data.
-					ubyte* WebPDecodeARGB(
-						in ubyte* data, size_t data_size,
-											  int* width, int* height
-					); 
+					ubyte* WebPDecodeARGB(const ubyte* data, size_t data_size, int* width, int* height); 
 					
 					//Same as WebPDecodeRGBA, but returning B, G, R, A, B, G, R, A... ordered data.
-					ubyte* WebPDecodeBGRA(
-						in ubyte* data, size_t data_size,
-											  int* width, int* height
-					); 
+					ubyte* WebPDecodeBGRA(const ubyte* data, size_t data_size, int* width, int* height); 
 					
 					//Same as WebPDecodeRGBA, but returning R, G, B, R, G, B... ordered data.
 					//If the bitstream contains transparency, it is ignored.
-					ubyte* WebPDecodeRGB(
-						in ubyte* data, size_t data_size,
-											 int* width, int* height
-					); 
+					ubyte* WebPDecodeRGB(const ubyte* data, size_t data_size, int* width, int* height); 
 					
 					//Same as WebPDecodeRGB, but returning B, G, R, B, G, R... ordered data.
-					ubyte* WebPDecodeBGR(
-						in ubyte* data, size_t data_size,
-											 int* width, int* height
-					); 
+					ubyte* WebPDecodeBGR(const ubyte* data, size_t data_size, int* width, int* height); 
 					
 					
 					//Decode WebP images pointed to by 'data' to Y'UV format(*). The pointer
@@ -5186,10 +5083,10 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Return NULL in case of error.
 					//(*) Also named Y'CbCr. See: http://en.wikipedia.org/wiki/YCbCr
 					ubyte* WebPDecodeYUV(
-						in ubyte* data, size_t data_size,
-											 int* width, int* height,
-											 ubyte** u, ubyte** v,
-											 int* stride, int* uv_stride
+						const ubyte* data, size_t data_size,
+						int* width, int* height,
+						ubyte** u, ubyte** v,
+						int* stride, int* uv_stride
 					); 
 					
 					//These five functions are variants of the above ones, that decode the image
@@ -5201,26 +5098,26 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//between scanlines. Hence, output_buffer_size is expected to be at least
 					//output_stride x picture-height.
 					ubyte* WebPDecodeRGBAInto(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						ubyte* output_buffer, size_t output_buffer_size, int output_stride
 					); 
 					ubyte* WebPDecodeARGBInto(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						ubyte* output_buffer, size_t output_buffer_size, int output_stride
 					); 
 					ubyte* WebPDecodeBGRAInto(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						ubyte* output_buffer, size_t output_buffer_size, int output_stride
 					); 
 					
 					//RGB and BGR variants. Here too the transparency information, if present,
 					//will be dropped and ignored.
 					ubyte* WebPDecodeRGBInto(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						ubyte* output_buffer, size_t output_buffer_size, int output_stride
 					); 
 					ubyte* WebPDecodeBGRInto(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						ubyte* output_buffer, size_t output_buffer_size, int output_stride
 					); 
 					
@@ -5233,7 +5130,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//during decoding (or because some buffers were found to be too small).
 					
 					ubyte* WebPDecodeYUVInto(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						ubyte* luma, size_t luma_size, int luma_stride,
 						ubyte* u, size_t u_size, int u_stride,
 						ubyte* v, size_t v_size, int v_stride
@@ -5457,14 +5354,14 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Copies and decodes the next available data. Returns VP8_STATUS_OK when
 					//the image is successfully decoded. Returns VP8_STATUS_SUSPENDED when more
 					//data is expected. Returns error in other cases.
-					VP8StatusCode WebPIAppend(WebPIDecoder* idec, in ubyte* data, size_t data_size); 
+					VP8StatusCode WebPIAppend(WebPIDecoder* idec, const ubyte* data, size_t data_size); 
 					
 					//A variant of the above function to be used when data buffer contains
 					//partial data from the beginning. In this case data buffer is not copied
 					//to the internal memory.
 					//Note that the value of the 'data' pointer can change between calls to
 					//WebPIUpdate, for instance when the data buffer is resized to fit larger data.
-					VP8StatusCode WebPIUpdate(WebPIDecoder* idec, in ubyte* data, size_t data_size); 
+					VP8StatusCode WebPIUpdate(WebPIDecoder* idec, const ubyte* data, size_t data_size); 
 					
 					//Returns the RGB/A image decoded so far. Returns NULL if output params
 					//are not initialized yet. The RGB/A output type corresponds to the colorspace
@@ -5473,7 +5370,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//(*last_y, *width etc.) can be NULL if corresponding information is not
 					//needed.
 					ubyte* WebPIDecGetRGB(
-						in WebPIDecoder* idec, int* last_y,
+						const WebPIDecoder* idec, int* last_y,
 						int* width, int* height, int* stride
 					); 
 					
@@ -5481,7 +5378,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//plane or NULL in case of error. If there is no alpha information
 					//the alpha pointer '*a' will be returned NULL.
 					ubyte* WebPIDecGetYUVA(
-						in WebPIDecoder* idec, int* last_y,
+						const WebPIDecoder* idec, int* last_y,
 						ubyte** u, ubyte** v, ubyte** a,
 						int* width, int* height, int* stride, int* uv_stride, int* a_stride
 					); 
@@ -5489,7 +5386,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Deprecated alpha-less version of WebPIDecGetYUVA(): it will ignore the
 					//alpha information (if present). Kept for backward compatibility.
 					static ubyte* WebPIDecGetYUV(
-						in WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v,
+						const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v,
 						int* width, int* height, int* stride, int* uv_stride
 					)
 					{
@@ -5509,7 +5406,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Todo: Review. I don't know, is this correct.
 					//WEBP_EXTERN(const WebPDecBuffer*) WebPIDecodedArea(
 					//const WebPIDecoder* idec, int* left, int* top, int* width, int* height);
-					WebPDecBuffer* WebPIDecodedArea(in WebPIDecoder* idec, int* left, int* top, int* width, int* height); 
+					WebPDecBuffer* WebPIDecodedArea(const WebPIDecoder* idec, int* left, int* top, int* width, int* height); 
 					
 					//------------------------------------------------------------------------------
 					//Advanced decoding parametrization
@@ -5570,7 +5467,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//VP8_STATUS_NOT_ENOUGH_DATA when more data is needed to retrieve the
 					//features from headers. Returns error in other cases.
 					static VP8StatusCode WebPGetFeatures(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						WebPBitstreamFeatures* features
 					)
 					{
@@ -5627,7 +5524,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//Returns NULL in case of error (and config->status will then reflect
 					//the error condition).
 					WebPIDecoder* WebPIDecode(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						WebPDecoderConfig* config
 					); 
 					
@@ -5635,7 +5532,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					//'config' into account. Returns decoding status (which should be VP8_STATUS_OK
 					//if the decoding was successful).
 					VP8StatusCode WebPDecode(
-						in ubyte* data, size_t data_size,
+						const ubyte* data, size_t data_size,
 						WebPDecoderConfig* config
 					); 
 					
@@ -6320,9 +6217,6 @@ version(/+$DIDE_REGION+/all)
 			int width_, height_, channels_=4; 
 		} 
 		
-		deprecated int tag; 	//can be an external id
-		deprecated int counter; 	//can notify of cnahges
-		
 		File file; 
 		DateTime modified; 
 		string error; 
@@ -6417,16 +6311,12 @@ version(/+$DIDE_REGION+/all)
 			height_ = height; 
 			channels_ = channels; 
 			type_ = type; 
-			
-			counter++; 
 		} 
 		
 		void set(E)(Image!(E, 2) im)
 		{
 			const typeStr = (ScalarType!E).stringof; 
 			setRaw(im.asArray, im.width, im.height, VectorLength!E, typeStr); 
-			
-			counter++; 
 		} 
 		
 		private auto getImage_unsafe(E)()
@@ -7433,7 +7323,7 @@ version(/+$DIDE_REGION+/all)
 			HRESULT CreateHwndRenderTarget(/**/); 
 			HRESULT CreateDxgiSurfaceRenderTarget(/**/); 
 			HRESULT CreateDCRenderTarget(
-				in D2D1_RENDER_TARGET_PROPERTIES renderTargetProperties, 
+				const D2D1_RENDER_TARGET_PROPERTIES renderTargetProperties, 
 				out ID2D1DCRenderTarget dcRenderTarget
 			); 
 		} 
@@ -7531,7 +7421,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			//extern(Windows): 
 			void SetOpacity(FLOAT opacity); 
-			void SetTransform(in D2D1_MATRIX_3X2_F transform); 
+			void SetTransform(const D2D1_MATRIX_3X2_F transform); 
 			FLOAT GetOpacity() const; 
 			void GetTransform(out D2D1_MATRIX_3X2_F transform) const; 
 		} 
@@ -7540,7 +7430,7 @@ version(/+$DIDE_REGION+/all)
 			interface ID2D1SolidColorBrush : ID2D1Brush
 		{
 			//extern(Windows): 
-			void SetColor(in D2D1_COLOR_F color); 
+			void SetColor(const D2D1_COLOR_F color); 
 			ref D2D1_COLOR_F GetColor() const; //Bug: got crash? see ID2D1RenderTarget.GetSize()
 		} 
 		
@@ -7559,8 +7449,8 @@ version(/+$DIDE_REGION+/all)
 			HRESULT CreateSharedBitmap(/**/); 
 			HRESULT CreateBitmapBrush(/**/); 
 			HRESULT CreateSolidColorBrush(
-				in D2D1_COLOR_F color, 
-				in D2D1_BRUSH_PROPERTIES brushProperties, 
+				const D2D1_COLOR_F color, 
+				const D2D1_BRUSH_PROPERTIES brushProperties, 
 				out ID2D1SolidColorBrush solidColorBrush
 			); 
 			HRESULT CreateGradientStopCollection(/**/); 
@@ -7571,7 +7461,7 @@ version(/+$DIDE_REGION+/all)
 			HRESULT CreateMesh(/**/); 
 			void DrawLine(/**/); 
 			void DrawRectangle(/**/); 
-			void FillRectangle(in D2D1_RECT_F rect, ID2D1Brush brush); 
+			void FillRectangle(const D2D1_RECT_F rect, ID2D1Brush brush); 
 			void DrawRoundedRectangle(/**/); 
 			void FillRoundedRectangle(/**/); 
 			void DrawEllipse(/**/); 
@@ -7590,7 +7480,7 @@ version(/+$DIDE_REGION+/all)
 			
 			void DrawGlyphRun(/**/); 
 			
-			void SetTransform(in D2D1_MATRIX_3X2_F transform); 
+			void SetTransform(const D2D1_MATRIX_3X2_F transform); 
 			void GetTransform(out D2D1_MATRIX_3X2_F transform) const; 
 			void SetAntialiasMode(D2D1_ANTIALIAS_MODE antialiasMode); 
 			D2D1_ANTIALIAS_MODE GetAntialiasMode() const; 
@@ -7612,7 +7502,7 @@ version(/+$DIDE_REGION+/all)
 			void PushAxisAlignedClip(/**/); 
 			void PopAxisAlignedClip(); 
 			
-			void Clear(in D2D1_COLOR_F clearColor); 
+			void Clear(const D2D1_COLOR_F clearColor); 
 			
 			void BeginDraw(); 
 			HRESULT EndDraw(/*out*/ D2D1_TAG *tag1 = null,/*out*/ D2D1_TAG *tag2 = null); 

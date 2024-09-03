@@ -843,9 +843,9 @@ version(/+$DIDE_REGION Tokenizer+/all)
 	} 
 	
 	
-	deprecated class Tokenizer
+	class Tokenizer
 	{
-		 //Tokenizer ///////////////////////////////
+		//Todo: rewrite this tokenizer using StructureScanner
 		public: 
 			string fileName; 
 			string text; 
@@ -3955,7 +3955,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D6F4FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D6F2FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

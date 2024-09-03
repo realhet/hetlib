@@ -1803,6 +1803,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	enum SameType(A, B) = is(Unqual!A == Unqual!B); 
 	
+	
+	
 	/// returns only the last UDA if more than one exists.
 	template getUDA(alias a, U)
 	{
@@ -1866,6 +1868,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA!(__traits(getMember, T, name), U)); 
 		enum bool isUdaFunction(string name) = name!="slot_t" && isUda!name && isFunction!(__traits(getMember, T, name)); 
+		
+		//Todo: when swapping isUda and isFunction, the compilers run out of memory.  This shit should berewritten by using static foreach.
+		
 		enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T)); 
 		
 		static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
@@ -1873,7 +1878,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		else
 		enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T); 
 	} 
-	
 	enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false); 
 	
 	static if(0)
@@ -6736,14 +6740,14 @@ version(/+$DIDE_REGION Containers+/all)
 					else if(wildStr[0]==chOne) { wildReq++; wildStr = wildStr[1..$]; }
 					else break; 
 				}
-				while(wildStr.length && !wildStr[0].among(chAny, chOne))
-				wildSuffix ~= wildStr.popFirst; //slow
-						
+				while(wildStr.length && !wildStr.front.among(chAny, chOne))
+				wildSuffix ~= wildStr.fetchFront; //slow
+				
 				//get the required minimal amount of chars
-				if(input.length<wildReq) return false; 
-				if(1) actOutput = input[0..wildReq]; 
-				input = input[wildReq..$]; 
-						
+				actOutput = input.take(wildReq).text; 
+				if(actOutput.walkLength<wildReq) return false; 
+				input = input[actOutput.length..$]; 
+				
 				if(wildSuffix.empty)
 				{
 					//search for end of input
@@ -14225,18 +14229,18 @@ version(/+$DIDE_REGION debug+/all)
 			} 
 			
 			alias SYM_ENUMMODULES_CALLBACK64 	= extern(Windows) BOOL function(
-				in PCSTR ModuleName,
-				in ULONG64 BaseOfDll,
-				in PVOID UserContext
+				const PCSTR ModuleName,
+				const ULONG64 BaseOfDll,
+				const PVOID UserContext
 			),
 			SYM_ENUMERATESYMBOLS_CALLBACK 	= extern(Windows) BOOL function(
-				in SYMBOL_INFO* pSymInfo,
-				in ULONG SymbolSize,
-				in PVOID UserContext
+				const SYMBOL_INFO* pSymInfo,
+				const ULONG SymbolSize,
+				const PVOID UserContext
 			),
 			SYM_ENUMLINES_CALLBACK 	= extern(Windows) BOOL function(
-				in SRCCODEINFO* LineInfo,
-				in PVOID UserContext
+				const SRCCODEINFO* LineInfo,
+				const PVOID UserContext
 			); 
 			
 			enum SYMENUM_OPTIONS_DEFAULT 	= 1,
@@ -14247,40 +14251,40 @@ version(/+$DIDE_REGION debug+/all)
 				extern(Windows)
 				{
 					BOOL function(
-						in HANDLE	hProcess,
+						const HANDLE	hProcess,
 						SYM_ENUMMODULES_CALLBACK64 	EnumModulesCallback,
-						in PVOID	UserContext
+						const PVOID	UserContext
 					) SymEnumerateModules64; 
 					BOOL function(
-						in HANDLE	hProcess,
-						in ULONG64	BaseOfDll,
-						in PCSTR	Mask,
-						in SYM_ENUMERATESYMBOLS_CALLBACK 	EnumSymbolsCallback,
-						in PVOID	UserContext
+						const HANDLE	hProcess,
+						const ULONG64	BaseOfDll,
+						const PCSTR	Mask,
+						const SYM_ENUMERATESYMBOLS_CALLBACK 	EnumSymbolsCallback,
+						const PVOID	UserContext
 					) SymEnumSymbols; 
 					BOOL function(
-						in HANDLE	hProcess,
-						in ULONG64	BaseOfDll,
-						in PCSTR	Mask,
-						in SYM_ENUMERATESYMBOLS_CALLBACK 	EnumSymbolsCallback,
-						in PVOID	UserContext,
-						in DWORD	Options
+						const HANDLE	hProcess,
+						const ULONG64	BaseOfDll,
+						const PCSTR	Mask,
+						const SYM_ENUMERATESYMBOLS_CALLBACK 	EnumSymbolsCallback,
+						const PVOID	UserContext,
+						const DWORD	Options
 					) SymEnumSymbolsEx; 
 					BOOL function(
-						in HANDLE	hProcess,
-						in ULONG64	Base,
-						in PCSTR	Obj,
-						in PCSTR	File,
-						in DWORD	Line,
-						in DWORD	Flags,
-						in SYM_ENUMLINES_CALLBACK 	EnumLinesCallback,
-						in PVOID	UserContext
+						const HANDLE	hProcess,
+						const ULONG64	Base,
+						const PCSTR	Obj,
+						const PCSTR	File,
+						const DWORD	Line,
+						const DWORD	Flags,
+						const SYM_ENUMLINES_CALLBACK 	EnumLinesCallback,
+						const PVOID	UserContext
 					) SymEnumSourceLines; 
 					BOOL function(
-						in	HANDLE	hProcess,
-						in	ULONG64	BaseOfDll,
-						in	SYM_ENUMERATESYMBOLS_CALLBACK	EnumSymbolsCallback,
-						in	PVOID	UserContext
+						const HANDLE	hProcess,
+						const ULONG64	BaseOfDll,
+						const SYM_ENUMERATESYMBOLS_CALLBACK	EnumSymbolsCallback,
+						const PVOID	UserContext
 					) SymEnumTypes; 
 				} 
 				static auto get()
@@ -14430,7 +14434,7 @@ version(/+$DIDE_REGION debug+/all)
 			
 			//find modules
 			extern(Windows) 
-			BOOL enumModulesProc(in PCSTR ModuleName, in ULONG64 BaseOfDll, in PVOID UserContext)
+			BOOL enumModulesProc(const PCSTR ModuleName, const ULONG64 BaseOfDll, const PVOID UserContext)
 			{
 				DebugInfo.actInstance.addRecord(SymbolType.Module, BaseOfDll, 0, ModuleName.text); 
 				return true; 
@@ -14442,8 +14446,8 @@ version(/+$DIDE_REGION debug+/all)
 				const mainBase = records[0].addr; 
 				
 				extern(Windows) BOOL enumSymProc(
-					in SYMBOL_INFO* pSymInfo, in ULONG SymbolSize, 
-					in PVOID UserContext
+					const SYMBOL_INFO* pSymInfo, const ULONG SymbolSize, 
+					const PVOID UserContext
 				)
 				{
 					with(pSymInfo)
@@ -14466,7 +14470,7 @@ version(/+$DIDE_REGION debug+/all)
 				
 				dh2.SymEnumSymbols(process, mainBase, null, &enumSymProc, null); 
 				
-				extern(Windows) BOOL enumLineProc(in SRCCODEINFO* LineInfo, in PVOID UserContext)
+				extern(Windows) BOOL enumLineProc(const SRCCODEINFO* LineInfo, const PVOID UserContext)
 				{
 					with(LineInfo)
 					{
@@ -15094,7 +15098,7 @@ version(/+$DIDE_REGION debug+/all)
 				{
 					{
 						//create a new instance with the default creator if needed
-						//TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+						//Todo: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 						//Ezt at kell gondolni es a linkelt classt is meg kell tudni csinalni
 						
 						//peek className   "class" : "name"

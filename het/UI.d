@@ -393,8 +393,8 @@ version(/+$DIDE_REGION+/all)
 		enum isWrapperStruct = __traits(hasMember, Tp, "val") && Fields!Tp.length==1; //is it encapsulated in a wrapper struct?  -> struct{ type val; }
 		
 		enum checkDuplicatedParams = q{
-			static assert(!__traits(compiles, duplicated_parameter), "Duplicated parameter type: %s%s".format(Tp.stringof, fallback ? "("~typeof(Tp.val).stringof~")" : ""));
-			enum duplicated_parameter = 1;
+			static assert(!__traits(compiles, duplicated_parameter), "Duplicated parameter type: %s%s".format(Tp.stringof, fallback ? "("~typeof(Tp.val).stringof~")" : "")); 
+			enum duplicated_parameter = 1; 
 		}; 
 		
 		static foreach_reverse(idx, t; T)
@@ -4000,9 +4000,9 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		private enum genSetChanged = q{
-			if(!flags.changed#){
-				flags.changed# = true;
-				if(auto p = getParent) if(p) p.setChanged#;
+			if(!flags.changed#) {
+				flags.changed# = true; 
+				if(auto p = getParent) if(p) p.setChanged#; 
 			}
 		}; 
 		
@@ -4021,9 +4021,9 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		private enum genClearChanged = q{
-			if(flags.changed#){
-				flags.changed# = false;
-				subContainers.each!"a.clearChanged#";
+			if(flags.changed#) {
+				flags.changed# = false; 
+				subContainers.each!"a.clearChanged#"; 
 			}
 		}; 
 		
@@ -6456,7 +6456,7 @@ struct im
 		
 			int actTargetSurface; //0:world, 1:GUI
 		
-			private enum bool reuseDr = 0; 
+			enum reuseDr = true; //very important option, somehow it was disabled.
 			private Drawing[2] staticDr; 
 		
 			void _drawFrame(string restrict="")()
@@ -6743,15 +6743,15 @@ struct im
 		
 			private enum hintHandler = q{
 			{
-				static foreach(a; args) 
+				static foreach(a; args)
 				static if(is(Unqual!(typeof(a)) == HintRec))
 				{
 					if(a.markup.length && hit.hover)
 					{
-						auto hr = a;
-						hr.owner = actContainer;
-						hr.bounds = hit.hitBounds;
-						addHint(hr);
+						auto hr = a; 
+						hr.owner = actContainer; 
+						hr.bounds = hit.hitBounds; 
+						addHint(hr); 
 					}
 				}
 			}
@@ -7074,9 +7074,9 @@ struct im
 			immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
 		
 			struct enable 
-		{ bool val; 	 private enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled;	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled	= enabled && a.val;	}; } 
+		{ bool val; 	 private enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled	= enabled && a.val; 	}; } 
 			struct selected
-		{ bool val; 	 private enum M = q{auto _selected = false;	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val;	}; } 
+		{ bool val; 	 private enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
 			enum RangeType
 		{ linear, log, circular, endless} 
@@ -7161,7 +7161,7 @@ struct im
 				return f; 
 			} 
 			
-			private enum M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a;}; 
+			private enum M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; 
 		} 
 		
 			auto logRange     (float min, float max, float step=1)
@@ -9001,6 +9001,55 @@ struct im
 			//Todo: what if callee don't handle it????
 		} 
 		
+		void ScrollBox()
+		{
+			NOTIMPL; 
+			version(/+$DIDE_REGION+/none) {
+				Panel(
+					PanelPosition.bottomClient,
+					{
+						margin = "0"; padding = "0"; //border = "1 normal gray";
+						outerHeight = 200; 
+						auto siz = innerSize; 
+						Container
+						(
+							{
+								outerSize = siz; 
+								with(flags) {
+									clipSubCells = true; 
+									vScrollState = ScrollState.auto_; 
+									hScrollState = ScrollState.auto_; 
+								}
+								
+								if(auto mod = errorModule)
+								{
+									if(auto col = mod.content)
+									{
+										//total size placeholder
+										Container({ outerPos = col.outerSize; outerSize = vec2(0); }); 
+										
+										flags.saveVisibleBounds = true; 
+										if(auto visibleBounds = imstVisibleBounds(actId))
+										{
+											CodeRow[] visibleRows = col.rows.filter!(
+												r => r.outerBounds.overlaps(visibleBounds)
+												&& r.subCells.length
+											).array; 
+											//Opt: binary search
+											
+											actContainer.append(cast(Cell[])visibleRows); 
+											//Note: append is important because it already has the spaceHolder Container.
+										}
+									}
+									else
+									WARN("Invalid errorList"); 
+								}
+							}
+						); 
+					}
+				); 
+			}
+		} 
 		
 		auto ComboBox_idx(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
 		{
