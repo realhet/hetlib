@@ -1260,6 +1260,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		string extendedMsg(string lines)
 		{
 			
+			/+
+				examples:
+					Error: OS Exception: ACCESS_VIOLATION at 7FF793EC1A1E info: 0, 0
+					----------------
+					0x00007FF793EC1A1E in onPaint at c:\d\testcleartypemultisampling.d(83)
+				
+				
+			+/
+			
 			static string processLine(string line)
 			{
 				if(line.isWild("0x????????????????"))
@@ -1288,7 +1297,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return line; 
 			} 
 			
-			return lines.split("\n").map!processLine.filter!(not!empty).join("\n"); 
+			return lines.splitLines.map!processLine.cache.filter!(not!empty).join("\n"); 
 		} 
 		
 		string extendedMsg(Throwable t) { return t.msg.extendedMsg; } 
@@ -1308,11 +1317,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		string simpleMsg(Throwable t) { return t.msg.simpleMsg; } 
 		
-		void showException(string s) nothrow
+		void showException(string msg) nothrow
 		{
 			try {
-				string err = s.extendedMsg; 
-				
+				string err = msg.extendedMsg; 
+				/+
+					example msg:
+					Error: OS Exception: ACCESS_VIOLATION at 7FF7D0AE1A1E info: 0, 0
+					----------------
+					0x00007FF7D0AE1A1E in onPaint at c:\d\testapp.d(83)
+					...
+				+/
 				if(dbg.isActive)
 				{ dbg.handleException(err); }else
 				{
@@ -1552,6 +1567,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					
 					//print("\n\33\14OS Exception:\33\17", exceptionCodeToStr(ExceptionCode), "\33\7at", ExceptionAddress, excInfo);
 					msg = format!"Error: OS Exception: %s at %s %s"(exceptionCodeToStr(ExceptionCode), ExceptionAddress, excInfo); 
+					//examplem msg: Error: OS Exception: ACCESS_VIOLATION at 7FF7A62B1A1E info: 0, 0
 					
 					//if(mi.handle){
 						//print("module:", mi.fileName.fullName.quoted, "base:", mi.base, "rel_addr:\33\17", format("%X",ExceptionAddress-mi.base), mi.location, "\33\7");
