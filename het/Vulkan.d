@@ -2682,10 +2682,10 @@ version(/+$DIDE_REGION+/all)
 				 name.startsWith("vk") &&
 				 staticIndexOf!(
 				name,
-								"vkGetInstanceProcAddr",
-								"vkEnumerateInstanceExtensionProperties",
-								"vkEnumerateInstanceLayerProperties",
-								"vkCreateInstance",
+				"vkGetInstanceProcAddr",
+				"vkEnumerateInstanceExtensionProperties",
+				"vkEnumerateInstanceLayerProperties",
+				"vkCreateInstance",
 			) == -1; 
 			alias funcsToLoad = Filter!(shouldLoad, AllFuncs); 
 			
@@ -5789,9 +5789,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x3282C9B0E4249).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x328929B0E4249).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x328F59B0E4249).檢(0x3277F9B0E4249)); 
+							+/	((0x3281C9B0E4249).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x328829B0E4249).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x328E59B0E4249).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

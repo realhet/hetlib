@@ -1563,7 +1563,8 @@ version(/+$DIDE_REGION+/all)
 				{
 					dr.lineWidth = innerHeight*0.04f; 
 					dr.line2(ArrowStyle.vector, innerBounds.leftCenter, innerBounds.rightCenter); 
-				}else if(isWhite)
+				}
+				else if(isWhite)
 				{ dr.drawX(innerBounds); }
 			}
 		} 

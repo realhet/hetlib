@@ -835,7 +835,7 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 		
-		void typeKey(string key)
+		void typeKey(string key, int delay_ms=0)
 		{
 			//Todo: accent handling
 			//Todo: shift symbol handling
@@ -846,14 +846,17 @@ version(/+$DIDE_REGION+/all)
 			) &&
 				!inputs["Shift"].down; 
 			
-			if(needShift) pressKey("LShift"); 
-			pressKey(key); 
-			releaseKey(key); 
-			if(needShift) releaseKey("LShift"); 
+			void d() { if(delay_ms>0) sleep(delay_ms); } 
+			
+			if(needShift) { d; pressKey("LShift"); }
+			d; pressKey(key); 
+			d; releaseKey(key); 
+			if(needShift) { d; releaseKey("LShift"); }
+			d; 
 		} 
 		
-		void typeText(string s)
-		{ foreach(ch; s) typeKey(ch.to!string); } 
+		void typeText(string s, int delay_ms=0)
+		{ foreach(ch; s) typeKey(ch.to!string, delay_ms); } 
 		
 		//keycode conversion //////////////////////////////////////
 		

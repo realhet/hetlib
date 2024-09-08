@@ -70,6 +70,8 @@ struct WindowInfo
 	string title, className; 
 	uint pid; 
 	File file; 
+	
+	bool opCast(B : bool)() const => !!handle; 
 } 
 
 auto getWindowInfo(HWND handle)
@@ -95,6 +97,20 @@ auto getWindowInfo(HWND handle)
 	//print(QPS-t0); // .1 ms
 	
 	return res; 
+} 
+
+auto waitWindow(string classNameWild, string titleWild, Time timeout = 10*second)
+{
+	WindowInfo wi; 
+	auto t0 = now, tMax = t0+timeout; 
+	while(1) {
+		if(now>tMax) raise("Timeout waiting for window "~classNameWild.quoted~" "~titleWild.quoted); 
+		sleep(100); //wait for page loading
+		wi = GetForegroundWindow.getWindowInfo; 
+		if(wi.className.isWild(classNameWild) && wi.title.isWild(titleWild))
+		break; 
+	}
+	return wi; 
 } 
 
 
