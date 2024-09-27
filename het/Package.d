@@ -3284,7 +3284,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		bool getBit(T)(T a, size_t idx)
 		{ return ((a>>idx)&1)!=0; } 
 		T setBit(T)(T a, size_t idx, bool v=true)
-		{ return a&~(cast(T)1<<idx)|(cast(T)v<<idx); } 
+		{ return cast(T)(a&~(cast(T)1<<idx)|(cast(T)v<<idx)); } 
 		T clearBit(T)(T a, size_t idx)
 		{ return setBit(a, idx, false); } 
 		

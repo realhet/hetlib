@@ -546,6 +546,15 @@ class ComPort
 		return t && t>=t0-since && t<t0-blink; ; 
 	} 
 	
+	void UI_CommLed(lazy bool activity)
+	{
+		import het.ui; 
+		with(im)
+		if(!this.enabled)	Led(false, clGray); 
+		else if(thereWasAnError)	Led(true, clRed); 
+		else	Led(activity, clLime); 
+	} 
+	
 	void UI(string title = "", void delegate() fun = null)
 	{
 		import het.ui; 
@@ -566,11 +575,7 @@ class ComPort
 					
 					Row(
 						{
-							if(!this.enabled)
-							Led(false, clGray); 
-							else if(thereWasAnError) Led(true, clRed); 
-							else
-							Led(thereWasAMessage(1*hour, (1.0f/20)*second), clLime); 
+							UI_CommLed(thereWasAMessage(1*hour, (1.0f/20)*second)); 
 							
 							Text("Comm"); 
 						}
@@ -614,7 +619,7 @@ class ComPort
 			
 			Row(
 				"Error\t", {
-					Static(stats.lastError=="" ? " " : stats.lastError, { /*flex = 1;*/}); 
+					Static(stats.lastError=="" ? " " : stats.lastError, {/*flex = 1;*/}); 
 					if(Btn("Clear"))
 					stats.lastError = ""; 
 				}
