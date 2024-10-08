@@ -2485,7 +2485,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			auto rows()
 			{
 				/+It skips empty rows and rows starting with a comment.+/
-				return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/+`))); 
+				return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/*`))); 
 				//Todo: full row //comment detection is failing
 			} 
 			
@@ -2593,15 +2593,18 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			string GEN_enumTable()
 			{
-				const 	numCols 	= rows.front.length, 
-					prefix 	= headerCell(0); 
+				const 	numCols 	= headerRow.length, 
+					prefix 	= headerCell(0).strip; 
+				
+				string withoutType(string s) => ((s.canFind(':'))?(s.splitter(':').front.strip):(s)); 
+				
 				
 				string generateColumn(string fmt)(size_t colIdx, string label)
 				{ return format!fmt(label, rows.map!((a)=>(a[colIdx]))); } 
 				
 				string res = generateColumn!"enum %s {%-(%s,%)}"(0, prefix.capitalize); 
 				foreach(i; 1..numCols)
-				res ~= generateColumn!"enum %s = [%-(%s,%)];"(i, prefix.decapitalize ~ headerCell(i).capitalize); 
+				res ~= generateColumn!"enum %s = [%-(%s,%)];"(i, withoutType(prefix.decapitalize) ~ headerCell(i).capitalize); 
 				return res; 
 				
 				/+
@@ -2663,7 +2666,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				string GEN_StructureScanner_StateTransitions(R0, R1, R2)(R0 transitionItems, R1 leaveItems, R2 eofItems)
 				{ return GEN_StructureScanner_StateTransitions("StateTransitions", "State", transitionItems, leaveItems, eofItems); } 
 				
-				string GEN_StructureScanner(string initializations)
+				string GEN_StructureScanner(string initializations="")
 				{
 					//Help -> StructureScanner_DLang
 					return [
@@ -2682,14 +2685,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		} 
 		
 		//put popular generators onto the global scope
-		
-		string GEN_bitfields(表 t)
-		{ return t.GEN_bitfields; } 
-		string GEN_fields(表 t)
-		{ return t.GEN_fields; } 
-		string GEN_enumTable(表 t)
-		{ return t.GEN_enumTable; } 
-		
+		static foreach(name; "bitfields fields enumTable StructureScanner".split)
+		mixin(iq{string GEN_$(name)(表 t) => t.GEN_$(name); }.text); 
+		/+Todo: Nonstandard casing (sometimes capitalized, sometimes not)  I thing everything capitalized would be better.+/
 		
 		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
 		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
