@@ -3540,6 +3540,13 @@ version(/+$DIDE_REGION Keywords+/all)
 		//startsWithToken_X86
 		startsWithToken_SSE42; 
 		
+		enum utils = /+Note: These can be injected into a function code with a local 'scanner'.+/
+		q{
+			string peek() => ((scanner.empty)?(""):(scanner.front.src)); 
+			void skipWhite() { scanner.find!((a)=>(!a.src.all!isWhite)); } 
+			auto expect(string[] a...) { const r = a.countUntil(peek); enforce(r>=0, a.text~" expected."); scanner.popFront; return r; } 
+		}; 
+		
 		sizediff_t startsWithToken_X86(string[] tokens)(string s)
 		{
 			static foreach(tIdx, token; tokens)
@@ -3955,7 +3962,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D6F2FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D868FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
@@ -4182,6 +4189,20 @@ version(/+$DIDE_REGION Keywords+/all)
 				[q{"`"},q{inline},q{Pop(NewLineTokens~" \0")},q{"`"},q{}],
 			]))
 		) .GEN!q{GEN_StructureScanner(q{enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029"; })}); 
+	} 
+	
+	version(none /+Note: This is just an example. Use het.fromJSON()!+/)
+	struct StructureScanner_JSON
+	{
+		mixin((
+			(表([
+				[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/}],
+				[q{"{"},q{object},q{Error("] )") ~ EntryTransitions ~ Trans(": ,", object)},q{"}"}],
+				[q{"["},q{array},q{Error(") }") ~ EntryTransitions ~ Trans(",", array)},q{"]"}],
+				[q{"'"},q{sqString},q{Ignore(`\\ \'`)},q{`'`}],
+				[q{`"`},q{dqString},q{Ignore(`\\ \"`)},q{`"`}],
+			]))
+		).調!GEN_StructureScanner); 
 	} 
 	
 }

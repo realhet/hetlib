@@ -15163,6 +15163,7 @@ version(/+$DIDE_REGION debug+/all)
 						static if(fieldName=="char_")	enum fn = "char"; 
 						else static if(fieldName=="align_")	enum fn = "align"; 
 						else static if(fieldName=="default_")	enum fn = "default"; 
+						else static if(fieldName=="init_")	enum fn = "init"; 
 						else	enum fn = fieldName; 
 						
 						if(auto p = fn in elementMap)
