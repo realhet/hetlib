@@ -12722,6 +12722,9 @@ version(/+$DIDE_REGION Date Time+/all)
 		
 		
 		//helpers for saving and loading
+		
+		string otherExt(string fn, string ext)
+		{ return fn.File.otherExt(ext).fullName; } 
 		void saveTo(T)(const T[] data, const File file)if(is(T == char))
 		{ file.write(cast(string)data); } 
 		void saveTo(T)(const T[] data, const File file)if(!is(T == char))
