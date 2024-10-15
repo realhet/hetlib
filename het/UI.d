@@ -3101,6 +3101,7 @@ version(/+$DIDE_REGION+/all)
 				[],
 				[q{bool},q{1},q{"dontStretchSubCells"},q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
 				[q{bool},q{1},q{"columnIsTable"},q{},q{/+At the moment it is only used by DIDE+/}],
+				[q{bool},q{1},q{"removed"},q{},q{/+At the moment it is only used by DIDE: SearchResults, BuildMessages can detect validity+/}],
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 
@@ -3998,6 +3999,7 @@ version(/+$DIDE_REGION+/all)
 			cntrSearchImpl(this, context); 
 			return context.results; 
 		} 
+		
 		
 		
 		private enum genSetChanged = q{
@@ -4083,6 +4085,13 @@ version(/+$DIDE_REGION+/all)
 						{ return outerBounds; } 
 			+/
 		}
+		
+		void setRemoved()
+		{
+			if(flags.removed) return; 
+			flags.removed = true; 
+			foreach(sc; subCells) if(auto cntr = cast(Container)(sc)) cntr.setRemoved; 
+		} 
 	} 
 	
 	
