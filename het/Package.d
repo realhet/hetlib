@@ -336,10 +336,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			@property bool running()
 			{ return running_; } 
 			
-			void exit(int code=0)
+			void exit(uint code=0, Flag!"finalize" finalize=No.finalize)
 			{
 				//immediate exit
-				try { _finalize; }catch(Throwable) {}
+				if(finalize) try { _finalize; }catch(Throwable) {}
 				ExitProcess(code); 
 			} 
 			
@@ -1262,7 +1262,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			/+
 				examples:
-					Error: OS Exception: ACCESS_VIOLATION at 7FF793EC1A1E info: 0, 0
+					Exception: ACCESS_VIOLATION at 7FF793EC1A1E info: 0, 0
 					----------------
 					0x00007FF793EC1A1E in onPaint at c:\d\testcleartypemultisampling.d(83)
 				
@@ -1285,14 +1285,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						int srcLine; 
 						try { auto tmp = wild[2]; srcLine = parse!int(tmp); }catch(Throwable) {}
 						if(srcLine>0 && File(fn).exists)
-						line = format!"%s(%s,1): Error: %s"(fn, srcLine, line); 
+						line = format!"%s(%s,1): Exception: %s"(fn, srcLine, line); 
 					}
 					return line; 
 				}
 				if(line.isWild("*@*.d(*): *"))
 				{
 					//exception
-					return format!"%s.d(%s,1): Error: %s: %s"(wild[1], wild[2], wild[0], wild[3]); 
+					return format!"%s.d(%s,1): Exception: %s: %s"(wild[1], wild[2], wild[0], wild[3]); 
 				}
 				return line; 
 			} 
@@ -1566,8 +1566,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					if(NumberParameters) excInfo = "info: " ~ ExceptionInformation[0..NumberParameters].map!(a => a.format!"%X").join(", "); 
 					
 					//print("\n\33\14OS Exception:\33\17", exceptionCodeToStr(ExceptionCode), "\33\7at", ExceptionAddress, excInfo);
-					msg = format!"Error: OS Exception: %s at %s %s"(exceptionCodeToStr(ExceptionCode), ExceptionAddress, excInfo); 
-					//examplem msg: Error: OS Exception: ACCESS_VIOLATION at 7FF7A62B1A1E info: 0, 0
+					msg = format!"Exception: %s at %s %s"(exceptionCodeToStr(ExceptionCode), ExceptionAddress, excInfo); 
+					//examplem msg: Exception: ACCESS_VIOLATION at 7FF7A62B1A1E info: 0, 0
 					
 					//if(mi.handle){
 						//print("module:", mi.fileName.fullName.quoted, "base:", mi.base, "rel_addr:\33\17", format("%X",ExceptionAddress-mi.base), mi.location, "\33\7");
@@ -7126,6 +7126,20 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 	}version(/+$DIDE_REGION+/all) {
 		//std.algorithm.findsplit is similar
+		
+		string firstLine(string s)
+		{
+			print("FIRSTLINE IN", s.quoted); 
+			
+			auto a = s.splitter("\n").map!strip; 
+			if(a.empty) return ""; 
+			auto res = a.front; a.popFront; 
+			
+			if(!a.empty) res ~= "…"; 
+			print("FIRSTLINE out", s.quoted); 
+			return res; 
+		} 
+		
 		bool split2(string s, string delim, out string a, out string b, bool doStrip = true)
 		{
 			//split to 2 parts

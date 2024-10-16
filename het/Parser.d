@@ -2835,6 +2835,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		{"BasicType"	, [{ clTeal	,clWhite	,1}, { clVgaHighCyan	,clVgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { clWhite	,0x2d2d2d ,1}]},
 		{"Binary1"	, [{ clWhite	,clBlue	,0}, { clVgaLowBlue	,clVgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
 		{"Error"	, [SyntaxStyle(clWhite	,clRed     ,0)].replicate(4)},
+		{"Exception"	, [SyntaxStyle(clYellow	,clRed     ,0)].replicate(4)},
 		{"Warning"	, [SyntaxStyle(clBlack	,clYellow     ,0)].replicate(4)},
 		{"Deprecation"	, [SyntaxStyle(clBlack	,clAqua      ,0)].replicate(4)},
 		{"Note"	, [SyntaxStyle(clBlack	,clPostit,2)].replicate(4)},
@@ -3962,7 +3963,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D868FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D8AFFDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

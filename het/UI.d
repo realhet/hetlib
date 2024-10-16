@@ -10053,20 +10053,26 @@ struct im
 		///Brings up an error message on the center of the screen for a short duration
 		struct FlashMessage {
 			DateTime when; 
-			enum Type { info, warning, error} 
+			enum Type { info, warning, error, exception} 
 			Type type; 
 			string msg; 
 			int count=1; 
 			
-			RGB color()
+			RGB color() const
 			{
 				with(Type)
 				final switch(type)
 				{
 					case info: 	return clWhite; 
 					case warning: 	return clYellow; 
-					case error: 	return clRed; 
+					case error, exception: 	return clRed; 
 				}
+			} 
+			
+			RGB fontColor() const
+			{
+				if(type==Type.exception) return clYellow; 
+				return blackOrWhiteFor(color); 
 			} 
 		} 
 		
@@ -10095,7 +10101,7 @@ struct im
 			with(FlashMessage.Type)
 			final switch(type)
 			{
-				case error: 	winSnd("Windows Critical Stop"); 	break; 
+				case error, exception: 	winSnd("Windows Critical Stop"); 	break; 
 				case warning: 	if(count==1) winSnd("Windows Default"); 	break; 
 				case info: 	if(count==1) winSnd("Windows Information Bar"); 	
 			}
@@ -10109,6 +10115,9 @@ struct im
 		
 		void flashError(string msg)
 		{ flashMessage(FlashMessage.Type.error, msg); } 
+		
+		void flashException(string msg)
+		{ flashMessage(FlashMessage.Type.exception, msg); } 
 		
 		enum flashMessageDuration = 4*second; 
 		
@@ -10139,7 +10148,7 @@ struct im
 						Row(
 							{
 								style.bkColor = m.color; 
-								style.fontColor = blackOrWhiteFor(style.bkColor); 
+								style.fontColor = m.fontColor; 
 								
 								if(m.type == FlashMessage.Type.error)
 								style.fontColor = mix(style.fontColor, style.bkColor, blink^^2); 
