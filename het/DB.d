@@ -2674,255 +2674,233 @@ class AMDBCore {
 } 
 
 
-auto myHashOf(in ubyte[] data)
-{ return data.xxh3_64; } 
-
-auto myHashStrOf(in ubyte[] data)
-{ return data.xxh3_64.to!string(36); } 
-
-auto myHashStrOf(in File f)
-{ return f.read(false).xxh3_64.to!string(36); } 
-
-int utcYearMonth(DateTime d)
-{
-	if(!d)
-	return 0; 
-	with(d.utcSystemTime)
-	return wYear*100 + wMonth; 
-} 
-
-int utcYearQuarter(DateTime d)
-{
-	if(!d)
-	return 0; 
-	with(d.utcSystemTime)
-	return wYear*10 + ((wMonth-1)/3)+1; 
-} 
-
-int utcYear(DateTime d)
-{
-	if(!d)
-	return 0; 
-	with(d.utcSystemTime)
-	return wYear; 
-} 
-
-class FileHashCache
-{
-	File file; 
-	@STORED string[string] data; 
-	int changedCnt; 
+version(/+$DIDE_REGION+/none) {
+	auto myHashOf(in ubyte[] data)
+	{ return data.xxh3_64; } 
 	
-	void save() const
-	{ this.toJson.saveTo(file); LOG; } 
+	auto myHashStrOf(in ubyte[] data)
+	{ return data.xxh3_64.to!string(36); } 
 	
-	void load()
-	{ auto a = this; a.fromJson(file.readStr(false)); } 
+	auto myHashStrOf(in File f)
+	{ return f.read(false).xxh3_64.to!string(36); } 
 	
-	this(File file)
+	class FileHashCache
 	{
-		this.file = file; 
-		load; 
-	} 
-	
-	string getHash(File f)
-	{
-		string fn = f.fullName; 
-		if(auto a = fn in data)
-		{ return *a; }else
+		File file; 
+		@STORED string[string] data; 
+		int changedCnt; 
+		
+		void save() const
+		{ this.toJson.saveTo(file); LOG; } 
+		
+		void load()
+		{ auto a = this; a.fromJson(file.readStr(false)); } 
+		
+		this(File file)
 		{
-			if(changedCnt++ > 256)
-			{
-				changedCnt = 0; 
-				save; 
-			}
-			return data[fn] = myHashStrOf(f); 
-		}
-	} 
-	
-	string opIndex(File f)
-	{ return getHash(f); } 
-} 
-
-deprecated struct PictureRecord
-{
-	string name; //fully qualified name, unique in this library
-	ulong offset, size, hash;     //offset==0: it's a redundant file. Must be searched by hash.
-	DateTime modified, imported; 
-} 
-
-deprecated class PictureLibrary
-{
-	File dirFile; 
-	PictureRecord[] records; //in import order
-	
-	const(PictureRecord)*[][ulong] recordsByHash; //allow multiple records
-	const(PictureRecord)*[ulong] recordByHashNameTime; 
-	
-	static ulong hashNameTimeOf(in ulong hash, in string name, in DateTime dt)
-	{ return name.xxh3_64(hash+dt.toId_deprecated); } 
-	
-	static ulong hashNameTimeOf(in PictureRecord r)
-	{ return hashNameTimeOf(r.hash, r.name, r.modified); } 
-	
-	bool exists(in PictureRecord rec)
-	{
-		const hnt = hashNameTimeOf(rec); 
-		return (hnt in recordByHashNameTime) !is null; 
-	} 
-	
-	File originalArchiveFileOf(in PictureRecord rec)
-	{
-		//Note: DON'T CHANGE THIS!!!!
-		return File(dirFile.otherExt("").fullName~"_"~rec.modified.utcYearMonth.text~".arch"); 
-	} 
-	
-	auto exportRecord(size_t idx)
-	{
-		static struct Result
-		{
-			string name; 
-			DateTime modified; 
-			ulong hash; 
-			ubyte[] data; 
+			this.file = file; 
+			load; 
 		} 
 		
-		enforce(idx.inRange(records)); 
-		auto rec = records[idx]; 
-		Result result; 
-		
-		result.name	= rec.name,
-		result.modified 	= rec.modified,
-		result.hash	= rec.hash; 
-		
-		rec = *recordsByHash[result.hash][0]; //lookup again to find the first one
-		result.data	= originalArchiveFileOf(rec).read(true, rec.offset, rec.size); 
-		if(result.hash != myHashOf(result.data)) ERR("CRC error: "~rec.text); 
-		
-		return result; 
-	} 
-	
-	ubyte[] loadData(ulong hash)
-	{
-		auto a = hash in recordsByHash; 
-		enforce(a, "Invalid plib record hash"); 
-		auto rec = *(*a)[0]; //lookup again to find the first one
-		auto data = originalArchiveFileOf(rec).read(true, rec.offset, rec.size); 
-		if(hash != myHashOf(data)) ERR("CRC error: "~rec.text); 
-		return data; 
-	} 
-	
-	protected void internalAddToRecordToCaches(const(PictureRecord)* rec)
-	{
-		const hnt = hashNameTimeOf(*rec); 
-		enforce((hnt in recordByHashNameTime) is null, "Fatal Error: PictureRecord Already exists "~rec.text); 
-		recordByHashNameTime[hnt] = rec; 
-		
-		if(auto a = rec.hash in recordsByHash)
-		{ *a ~= rec; }else
-		recordsByHash[rec.hash] = [rec]; 
-	} 
-	
-	this(File dirFile_, Flag!"create" create = No.create)
-	{
-		dirFile = dirFile_.normalized; 
-		if(create)
+		string getHash(File f)
 		{
-			print("Creating PictureLibrary:", dirFile); 
-			enforce(!dirFile.exists, "Already exists, delete first: "~dirFile.text); 
-			dirFile.write(""); 
-		}else
-		{
-			print("Opening PictureLibrary:", dirFile); 
-			enforce(dirFile.exists, "File not exists: "~dirFile.text); 
-			auto txt = "["~dirFile.readText(true)~"]"; 
-			records.fromJson(txt, "PictureLibrary("~dirFile.text~")", ErrorHandling.raise); //Opt: 5sec for 35 megs... json is slow
-			foreach(ref r; records)
-			internalAddToRecordToCaches(&r); 
-			
-			print("total count:", records.length); 
-			print("total size:", records.map!"a.size".sum/+.shortSizeText!1024+/); 
-			print("unique count:", recordsByHash.byValue.walkLength); 
-			print("unique size:", recordsByHash.byValue.map!"a[0].size".sum/+.shortSizeText!1024+/); 
-			print; 
-		}
-	} 
-	
-	void add(FileEntry[] srcEntries, Path srcPath, FileHashCache hashCache)
-	{
-		PictureRecord[] goodRecords, badRecords; 
-		
-		srcPath = srcPath.normalized; 
-		
-		//process
-		foreach(entry; srcEntries)
-		{
-			PictureRecord rec; 
-			bool good=false; 
-			try
+			string fn = f.fullName; 
+			if(auto a = fn in data)
+			{ return *a; }else
 			{
-				auto f = entry.file; 
-				enforce(f.fullPath.startsWith(srcPath.fullPath), "File is not in srcPath: "~f.text~" "~srcPath.text); 
-				//too slow enforce(f.exists, "File not exists: "~f.fullName.quoted);
-				enforce(f.extIs("jpg", "jpeg", "webp", "gif"), "Unsupported file extension: "~entry.ext.quoted); 
-				
-				//rec.name is just the filename right after srcPath without the starting '\'
-				rec.name = entry.fullName[srcPath.fullPath.length..$]; 
-				rec.modified = entry.modified; 
-				rec.size = entry.size; 
-				
-				enforce(rec.size, "File is empty: "~f.text); 
-				
-				good = true; 
-			}catch(Exception ex)
-			{ rec.name = ex.simpleMsg; }
-			
-			(good ? goodRecords : badRecords) ~= rec; 
-		}
-		
-		//report collected errors
-		if(badRecords.length)
-		throw new Exception("There were errors importing into PictureLibrary\n"~badRecords.map!(r => r.name).join("\n")); 
-		
-		foreach(idx, r; goodRecords)
-		{
-			auto f = File(srcPath, r.name); 
-			r.hash = hashCache[f].to!ulong(36); 
-			r.imported = now; 
-			
-			write(idx.text, " / ", goodRecords.length.text, " ", r.text); 
-			try
-			{
-				if(exists(r))
-				{ print(EgaColor.ltWhite("Exact file occurence already exists.")); }else
+				if(changedCnt++ > 256)
 				{
-					if(auto hr = r.hash in recordsByHash)
-					{ print(EgaColor.ltGreen("File contents exists previously "~hr.length.text~" times.")); }else
-					{
-						print(EgaColor.yellow("Importing new file.")); 
-						
-						//append file data
-						auto fArch = originalArchiveFileOf(r); 
-						{
-							auto sf = StdFile(originalArchiveFileOf(r).fullName, "a+b"); 
-							sf.rawWrite("\nFile:"~r.name~"\nHash:"~r.hash.to!string(36)~"\nModified:"~r.modified.utcTimestamp~"\nImported:"~r.imported.utcTimestamp~"\nSize:"~r.size.text~"\n"); 
-							r.offset = sf.size; 
-							sf.rawWrite(f.read(true)); 
-							sf.close; 
-						}
-					}
-					
-					//append record
-					{ auto df = StdFile(dirFile.fullName, "a+b");  df.rawWrite(r.toJson~",\n");  df.close; }
-					records ~= r; 
-					internalAddToRecordToCaches(&r); 
+					changedCnt = 0; 
+					save; 
 				}
-			}catch(Exception e)
-			{ ERR(e.simpleMsg); }
-		}
+				return data[fn] = myHashStrOf(f); 
+			}
+		} 
+		
+		string opIndex(File f)
+		{ return getHash(f); } 
+	} 
+	
+	deprecated struct PictureRecord
+	{
+		string name; //fully qualified name, unique in this library
+		ulong offset, size, hash;     //offset==0: it's a redundant file. Must be searched by hash.
+		DateTime modified, imported; 
 	} 
 	
-} 
+	deprecated class PictureLibrary
+	{
+		File dirFile; 
+		PictureRecord[] records; //in import order
+		
+		const(PictureRecord)*[][ulong] recordsByHash; //allow multiple records
+		const(PictureRecord)*[ulong] recordByHashNameTime; 
+		
+		static ulong hashNameTimeOf(in ulong hash, in string name, in DateTime dt)
+		{ return name.xxh3_64(hash+dt.toId_deprecated); } 
+		
+		static ulong hashNameTimeOf(in PictureRecord r)
+		{ return hashNameTimeOf(r.hash, r.name, r.modified); } 
+		
+		bool exists(in PictureRecord rec)
+		{
+			const hnt = hashNameTimeOf(rec); 
+			return (hnt in recordByHashNameTime) !is null; 
+		} 
+		
+		File originalArchiveFileOf(in PictureRecord rec)
+		{
+			//Note: DON'T CHANGE THIS!!!!
+			return File(dirFile.otherExt("").fullName~"_"~rec.modified.utcYearMonth.text~".arch"); 
+		} 
+		
+		auto exportRecord(size_t idx)
+		{
+			static struct Result
+			{
+				string name; 
+				DateTime modified; 
+				ulong hash; 
+				ubyte[] data; 
+			} 
+			
+			enforce(idx.inRange(records)); 
+			auto rec = records[idx]; 
+			Result result; 
+			
+			result.name	= rec.name,
+			result.modified 	= rec.modified,
+			result.hash	= rec.hash; 
+			
+			rec = *recordsByHash[result.hash][0]; //lookup again to find the first one
+			result.data	= originalArchiveFileOf(rec).read(true, rec.offset, rec.size); 
+			if(result.hash != myHashOf(result.data)) ERR("CRC error: "~rec.text); 
+			
+			return result; 
+		} 
+		
+		ubyte[] loadData(ulong hash)
+		{
+			auto a = hash in recordsByHash; 
+			enforce(a, "Invalid plib record hash"); 
+			auto rec = *(*a)[0]; //lookup again to find the first one
+			auto data = originalArchiveFileOf(rec).read(true, rec.offset, rec.size); 
+			if(hash != myHashOf(data)) ERR("CRC error: "~rec.text); 
+			return data; 
+		} 
+		
+		protected void internalAddToRecordToCaches(const(PictureRecord)* rec)
+		{
+			const hnt = hashNameTimeOf(*rec); 
+			enforce((hnt in recordByHashNameTime) is null, "Fatal Error: PictureRecord Already exists "~rec.text); 
+			recordByHashNameTime[hnt] = rec; 
+			
+			if(auto a = rec.hash in recordsByHash)
+			{ *a ~= rec; }else
+			recordsByHash[rec.hash] = [rec]; 
+		} 
+		
+		this(File dirFile_, Flag!"create" create = No.create)
+		{
+			dirFile = dirFile_.normalized; 
+			if(create)
+			{
+				print("Creating PictureLibrary:", dirFile); 
+				enforce(!dirFile.exists, "Already exists, delete first: "~dirFile.text); 
+				dirFile.write(""); 
+			}else
+			{
+				print("Opening PictureLibrary:", dirFile); 
+				enforce(dirFile.exists, "File not exists: "~dirFile.text); 
+				auto txt = "["~dirFile.readText(true)~"]"; 
+				records.fromJson(txt, "PictureLibrary("~dirFile.text~")", ErrorHandling.raise); //Opt: 5sec for 35 megs... json is slow
+				foreach(ref r; records)
+				internalAddToRecordToCaches(&r); 
+				
+				print("total count:", records.length); 
+				print("total size:", records.map!"a.size".sum/+.shortSizeText!1024+/); 
+				print("unique count:", recordsByHash.byValue.walkLength); 
+				print("unique size:", recordsByHash.byValue.map!"a[0].size".sum/+.shortSizeText!1024+/); 
+				print; 
+			}
+		} 
+		
+		void add(FileEntry[] srcEntries, Path srcPath, FileHashCache hashCache)
+		{
+			PictureRecord[] goodRecords, badRecords; 
+			
+			srcPath = srcPath.normalized; 
+			
+			//process
+			foreach(entry; srcEntries)
+			{
+				PictureRecord rec; 
+				bool good=false; 
+				try
+				{
+					auto f = entry.file; 
+					enforce(f.fullPath.startsWith(srcPath.fullPath), "File is not in srcPath: "~f.text~" "~srcPath.text); 
+					//too slow enforce(f.exists, "File not exists: "~f.fullName.quoted);
+					enforce(f.extIs("jpg", "jpeg", "webp", "gif"), "Unsupported file extension: "~entry.ext.quoted); 
+					
+					//rec.name is just the filename right after srcPath without the starting '\'
+					rec.name = entry.fullName[srcPath.fullPath.length..$]; 
+					rec.modified = entry.modified; 
+					rec.size = entry.size; 
+					
+					enforce(rec.size, "File is empty: "~f.text); 
+					
+					good = true; 
+				}catch(Exception ex)
+				{ rec.name = ex.simpleMsg; }
+				
+				(good ? goodRecords : badRecords) ~= rec; 
+			}
+			
+			//report collected errors
+			if(badRecords.length)
+			throw new Exception("There were errors importing into PictureLibrary\n"~badRecords.map!(r => r.name).join("\n")); 
+			
+			foreach(idx, r; goodRecords)
+			{
+				auto f = File(srcPath, r.name); 
+				r.hash = hashCache[f].to!ulong(36); 
+				r.imported = now; 
+				
+				write(idx.text, " / ", goodRecords.length.text, " ", r.text); 
+				try
+				{
+					if(exists(r))
+					{ print(EgaColor.ltWhite("Exact file occurence already exists.")); }else
+					{
+						if(auto hr = r.hash in recordsByHash)
+						{ print(EgaColor.ltGreen("File contents exists previously "~hr.length.text~" times.")); }else
+						{
+							print(EgaColor.yellow("Importing new file.")); 
+							
+							//append file data
+							auto fArch = originalArchiveFileOf(r); 
+							{
+								auto sf = StdFile(originalArchiveFileOf(r).fullName, "a+b"); 
+								sf.rawWrite("\nFile:"~r.name~"\nHash:"~r.hash.to!string(36)~"\nModified:"~r.modified.utcTimestamp~"\nImported:"~r.imported.utcTimestamp~"\nSize:"~r.size.text~"\n"); 
+								r.offset = sf.size; 
+								sf.rawWrite(f.read(true)); 
+								sf.close; 
+							}
+						}
+						
+						//append record
+						{ auto df = StdFile(dirFile.fullName, "a+b");  df.rawWrite(r.toJson~",\n");  df.close; }
+						records ~= r; 
+						internalAddToRecordToCaches(&r); 
+					}
+				}catch(Exception e)
+				{ ERR(e.simpleMsg); }
+			}
+		} 
+		
+	} 
+}
 
 version(/+$DIDE_REGION DataSet+/all)
 {

@@ -688,7 +688,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{} 
 			} 
 			
-			enum isStoredField(alias Field) = hasUDA!(Field, STORED); 
+			enum isStoredField(alias Field) = hasUDA2!(Field, STORED); 
 			
 			template StoredFields(alias Struct)
 			{
@@ -1801,37 +1801,77 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		return res; 
 	} 
 	
-	/*
-		// this is a __traits only version for string UDAs
-		auto getSymbolNamesByUDA(T, string uda)(){
-			string[] res;
-			static foreach(n; __traits(allMembers, T)) {
-				// static, but don't use static foreach so you can break
-				foreach(u; __traits(getAttributes, __traits(getMember, T, n)))
-					static if(is(typeof(u) == string) && u == uda) {
-						res ~= n;
-						break;
-					}
-			 }
-			return res;
-		}
-	*/
 	
 	enum SameType(A, B) = is(Unqual!A == Unqual!B); 
 	
-	
-	
-	/// returns only the last UDA if more than one exists.
-	template getUDA(alias a, U)
+	///This is copied from Phobos.
+	private template isDesiredUDA(alias attribute)
 	{
-		enum u = q{getUDAs!(a, U)[$-1]}; 
-		static if(
-			hasUDA!(a, U) && !is(mixin(u))//Note: !is(mixin(u)) meaning: mixin(u) IS NOT A TYPE
-		)
-		enum getUDA	= mixin(u); 
-		else
-		enum getUDA = U.init; 
+		template isDesiredUDA(alias toCheck)
+		{
+			static if(is(typeof(attribute)) && !__traits(isTemplate, attribute))
+			{
+				static if(__traits(compiles, toCheck == attribute))
+				enum isDesiredUDA = toCheck == attribute; 
+				else
+				enum isDesiredUDA = false; 
+			}
+			else static if(is(typeof(toCheck)))
+			{
+				static if(__traits(isTemplate, attribute))
+				enum isDesiredUDA =  isInstanceOf!(attribute, typeof(toCheck)); 
+				else
+				enum isDesiredUDA = is(typeof(toCheck) == attribute); 
+			}
+			else static if(__traits(isTemplate, attribute))
+			enum isDesiredUDA = isInstanceOf!(attribute, toCheck); 
+			else
+			enum isDesiredUDA = is(toCheck == attribute); 
+		} 
 	} 
+	
+	///returns the first overload of the symbol if it has any.  Otherwise returns the symbol itself.
+	template getFirstOverload(alias Sym)
+	{
+		static if(
+			/+
+				__traits(compiles, __traits(parent, Sym))
+				&& !__traits(isSame, Sym, __traits(parent, Sym)) /+this trick is from fullyQualifiedName+/
+				/+Note: these tests are not necessary+/
+			+/ 
+			/+
+				__traits(compiles,  __traits(getOverloads, __traits(parent, Sym), __traits(identifier, Sym)))
+				&&        typeof(__traits(getOverloads, __traits(parent, Sym), __traits(identifier, Sym))).length > 0
+				/+Note: no need for these either...+/
+			+/
+			__traits(compiles,   __traits(getOverloads, __traits(parent, Sym), __traits(identifier, Sym), true)[0])
+		)
+		{ alias getFirstOverload = __traits(getOverloads, __traits(parent, Sym), __traits(identifier, Sym), true)[0]; }
+		else
+		{ alias getFirstOverload = Sym; }
+	} 
+	
+	template getAttributesOfFirstOverload(alias Sym)
+	{ alias getAttributesOfFirstOverload = __traits(getAttributes, getFirstOverload!Sym); } 
+	
+	///This version checks only the first overloads.  Avoids the Deprecation hint.
+	template hasUDA2(alias S, U)
+	{
+		static if(true || isFunction!S)
+		enum hasUDA2 = Filter!(isDesiredUDA!U, getAttributesOfFirstOverload!S).length != 0; 
+		else
+		enum hasUDA2 = hasUDA!(S, U); 
+	} 
+	
+	
+	
+	///Returns only the last UDA if more than one exists.
+	template getUDA(alias S, U, U def = U.init)
+	{
+		static if(hasUDA2!(S, U))	alias getUDA = getUDAs!(S, U)[$-1]; 
+		else	alias getUDA = def; 
+	} 
+	
 	
 	///helper templates to get all the inherited class fields, works for structs as well
 	template AllClasses(T)
@@ -1849,17 +1889,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	/// Analogous to FieldNameTuple template
 	template ThisClassMemberNameTuple(T)
 	{
-		static if(is(T == class ) && !is(T == Object))
+		//Todo: this can be allmembers
+		
+		enum validateName(string name) = !name.among("slot_t"); 
+		//Note: This is a bugfix. There is std.signals.Signal in het.win.Window. That causes hasUDA to fail.
+		
+		static if(is(T == class) && !is(T == Object))
 		{
 			alias AM = __traits(allMembers, T); 
 			alias BM = __traits(allMembers, BaseClassesTuple!T[0]); 
-			
-			enum validateName(string name) = !name.among("slot_t"); 
-			//Note: This is a bugfix. There is std.signals.Signal in het.win.Window. That causes hasUDA to fail.
-			
 			enum ThisClassMemberNameTuple = Filter!(validateName, AM[0..AM.length-BM.length]); 
-		}else
-		enum ThisClassMemberNameTuple = AliasSeq!(); 
+		}
+		else static if(is(T == struct))
+		{
+			alias AM = __traits(allMembers, T); 
+			enum ThisClassMemberNameTuple = Filter!(validateName, AM); 
+		}
+		else
+		{ enum ThisClassMemberNameTuple = AliasSeq!(); }
 	} 
 	
 	alias AllFieldNames(T) = staticMap!(FieldNameTuple, AllClasses!T); //good order, but no member properties
@@ -1869,7 +1916,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	template FieldNamesWithUDA(T, U, bool allIfNone)
 	{
 		enum fields = AllFieldNames!T; 
-		enum bool hasThisUDA(string fieldName) = hasUDA!(__traits(getMember, T, fieldName), U); 
+		enum bool hasThisUDA(string fieldName) = hasUDA2!(__traits(getMember, T, fieldName), U); 
 		
 		static if(allIfNone && !anySatisfy!(hasThisUDA, fields))
 		enum FieldNamesWithUDA = fields; 
@@ -1882,12 +1929,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
 	template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
 	{
-		enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA!(__traits(getMember, T, name), U)); 
+		enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA2!(__traits(getMember, T, name), U)); 
 		enum bool isUdaFunction(string name) = name!="slot_t" && isUda!name && isFunction!(__traits(getMember, T, name)); 
 		
 		//Todo: when swapping isUda and isFunction, the compilers run out of memory.  This shit should berewritten by using static foreach.
 		
-		enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(Filter!(isUda, FieldNameTuple!T), Filter!(isUdaFunction, ThisClassMemberNameTuple!T)); 
+		enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(
+			Filter!(isUda, FieldNameTuple!T), 
+			Filter!(
+				isUdaFunction, /+__traits(allMembers, T)+/
+				ThisClassMemberNameTuple!T
+				/+Todo: use allmembers here after slot_t has been solved.+/
+			)
+		); 
 		
 		static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
 		enum FieldAndFunctionNamesWithUDA = AllFieldNames!T; 
@@ -4526,61 +4580,6 @@ version(/+$DIDE_REGION Numeric+/all)
 	//Signal processing /////////////////////////////
 	version(/+$DIDE_REGION+/all) {
 		version(/+$DIDE_REGION+/all) {
-			version(/+$DIDE_REGION+/all) {
-				deprecated float[] gaussianBlur(in float[] a, int kernelSize)
-				{
-					//http://dev.theomader.com/gaussian-kernel-calculator/
-					//Todo: refactor this
-					
-					float g3(int i) {
-						 return	(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.27901f +
-							a[i]*0.44198f; 
-					} 
-					
-					float g5(int i) {
-						return	(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.06136f +
-							(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.24477f +
-							a[i]*0.38774f; 
-					} 
-					
-					float g7(int i) {
-						return	(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.00598f +
-							(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060626f +
-							(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241843f +
-							a[i]*0.383103f; 
-					} 
-					
-					float g9(int i) {
-						return	(a[max(i-5, 0)]+a[min(i+5, $-1)])*0.000229f +
-							(a[max(i-3, 0)]+a[min(i+3, $-1)])*0.005977f +
-							(a[max(i-2, 0)]+a[min(i+2, $-1)])*0.060598f +
-							(a[max(i-1, 0)]+a[min(i+1, $-1)])*0.241732f +
-							a[i]*0.382928f; 
-					} 
-					
-					float delegate(int) fv; 
-					switch(kernelSize) {
-						case 1: return a.dup; 
-						case 3: fv = &g3; break; 
-						case 5: fv = &g5; break; 
-						case 7: fv = &g7; break; 
-						case 9: fv = &g9; break; 
-						default: enforce(0, "Unsupported kernel size "~kernelSize.text); 
-					}
-					
-					return iota(a.length.to!int).map!(i => fv(i)).array; 
-				} 
-				
-				deprecated Image2D!float gaussianBlur(Image2D!float img, int kernelSize)
-				{
-					foreach(i; 0..2)
-					{
-						img = img.columns.image2D; 
-						foreach(row; img.rows) row[] = row.gaussianBlur(kernelSize); 
-					}
-					return img; 
-				} 
-			}
 			struct SymmetricKernel(T)
 			{ T[] value; alias value this; } 
 			
@@ -4643,6 +4642,12 @@ version(/+$DIDE_REGION Numeric+/all)
 			
 			auto convolve(string chn="", E)(Image!(E, 2) img, in SymmetricKernel!float kernel)
 			{ (mixin(求each(q{pass=1},q{2},q{img = (mixin(求map(q{line},q{img.columns},q{line.convolve!chn(kernel)}))).image2D}))); return img; } 
+			
+			float translateDeprecatedGaussParameter(int i)
+			{
+				//translated from old deprecated window size parameters to the commonly used 'phi' parameter
+				if(i<3) return 0.333f; if(i<5) return 0.906f; if(i<7) return 1.042f; return 1.0565f; 
+			} 
 			
 		}
 		class ResonantFilter
@@ -11210,6 +11215,15 @@ version(/+$DIDE_REGION Date Time+/all)
 				string utcTtimestamp_compact()const
 				{ return utcTimestamp(Yes.shortened); } 
 				
+				@property int utcYearMonth(DateTime d)
+				{ if(!this) return 0; with(utcSystemTime) return wYear*100 + wMonth; } 
+				
+				@property int utcYearQuarter(DateTime d)
+				{ if(!this) return 0; with(utcSystemTime) return wYear*10 + ((wMonth-1)/3)+1; } 
+				
+				@property int utcYear(DateTime d)
+				{ if(!this) return 0; with(utcSystemTime) return wYear; } 
+				
 				static
 				{
 					//self diagnostics
@@ -15386,7 +15400,7 @@ version(/+$DIDE_REGION debug+/all)
 			static foreach(fieldName; FieldAndFunctionNamesWithUDA!(T, STORED, true))
 			{
 				{
-					enum hasHex = hasUDA!(__traits(getMember, T, fieldName), HEX); 
+					enum hasHex = hasUDA2!(__traits(getMember, T, fieldName), HEX); 
 					streamAppend_json(
 						st, __traits(getMember, data, fieldName),
 						dense, hex || hasHex, fieldName, nextIndent
@@ -15930,7 +15944,7 @@ version(/+$DIDE_REGION debug+/all)
 	
 	
 	
-	version(/+$DIDE_REGION to/from Bin+/all)
+	version(/+$DIDE_REGION to/from Bin+/none)
 	{
 		/+
 			Note: It doesn't read unaligned padding.

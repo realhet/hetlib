@@ -4969,7 +4969,7 @@ version(/+$DIDE_REGION+/all)
 		//Todo: readonly
 		p.unit	    = getUDA!(f, UNIT   ).text; 
 		p.range	    = getUDA!(f, RANGE); 
-		p.indent	    = hasUDA!(f, INDENT); 
+		p.indent	    = hasUDA2!(f, INDENT); 
 		p.choices	    = EnumMemberNames!T; 
 		
 		return p; 
@@ -5102,7 +5102,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				 //Struct, Class
 				
-				enum bool notHidden(string fieldName) = !hasUDA!(__traits(getMember, T, fieldName), HIDDEN); 
+				enum bool notHidden(string fieldName) = !hasUDA2!(__traits(getMember, T, fieldName), HIDDEN); 
 				import std.meta; 
 				enum visibleFields = Filter!(notHidden, AllFieldNames!T); 
 				

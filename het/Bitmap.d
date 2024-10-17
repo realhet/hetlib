@@ -254,7 +254,7 @@ version(/+$DIDE_REGION+/all)
 			foreach(name; __traits(allMembers, obj))
 			{
 				alias member = __traits(getMember, obj, name); 
-				static if(__traits(isStaticFunction, member) && hasUDA!(member, UDA))
+				static if(__traits(isStaticFunction, member) && hasUDA2!(member, UDA))
 				registerStaticFunction!member; 
 			}
 		} 

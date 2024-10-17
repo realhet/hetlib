@@ -1121,7 +1121,7 @@ version(/+$DIDE_REGION+/all)
 		}
 		else static assert(0, "Unknown method"); 
 		
-		scores = scores.gaussianBlur(3); 
+		scores = scores.gaussianBlur(3.translateDeprecatedGaussParameter); 
 		const idx = scores.maxIndex.to!int; 
 		
 		return WaveLengthDetectionResult(idx<0 ? 0 : idx*wlStep+wlMin, wlMin, wlMax, wlStep, arr, scores); 
