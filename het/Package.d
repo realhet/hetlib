@@ -1856,19 +1856,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	///This version checks only the first overloads.  Avoids the Deprecation hint.
 	template hasUDA2(alias S, U)
-	{
-		static if(true || isFunction!S)
-		enum hasUDA2 = Filter!(isDesiredUDA!U, getAttributesOfFirstOverload!S).length != 0; 
-		else
-		enum hasUDA2 = hasUDA!(S, U); 
-	} 
+	{ enum hasUDA2 = Filter!(isDesiredUDA!U, getAttributesOfFirstOverload!S).length != 0; } 
 	
 	
 	
 	///Returns only the last UDA if more than one exists.
 	template getUDA(alias S, U, U def = U.init)
 	{
-		static if(hasUDA2!(S, U))	alias getUDA = getUDAs!(S, U)[$-1]; 
+		//Todo: handle overloads
+		static if(hasUDA!(S, U))	alias getUDA = getUDAs!(S, U)[$-1]; 
 		else	alias getUDA = def; 
 	} 
 	
@@ -1876,35 +1872,25 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	///helper templates to get all the inherited class fields, works for structs as well
 	template AllClasses(T)
 	{
-		//Todo: a kisbetu meg nagybetu legyen konzekvens. A staticMap az kisbetu, ennek is annak kene lennie...
-		static if(is(T == Object))
-		alias AllClasses = AliasSeq!(); 
-		else static if(is(T == class ))
-		alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1])); 
-		else
-		alias AllClasses = T; 
+		static if(is(T == Object))	alias AllClasses = AliasSeq!(); 
+		else static if(is(T == class ))	alias AllClasses = Reverse!(AliasSeq!(T, BaseClassesTuple!T[0..$-1])); 
+		else	alias AllClasses = T; 
 	} 
 	
 	/// returns the member names of only this child class only, not the ancestor classes.
 	/// Analogous to FieldNameTuple template
+	/// Works for structs too
 	template ThisClassMemberNameTuple(T)
 	{
-		//Todo: this can be allmembers
-		
-		enum validateName(string name) = !name.among("slot_t"); 
-		//Note: This is a bugfix. There is std.signals.Signal in het.win.Window. That causes hasUDA to fail.
-		
 		static if(is(T == class) && !is(T == Object))
 		{
+			//Todo: this can be allmembers
 			alias AM = __traits(allMembers, T); 
 			alias BM = __traits(allMembers, BaseClassesTuple!T[0]); 
-			enum ThisClassMemberNameTuple = Filter!(validateName, AM[0..AM.length-BM.length]); 
+			enum ThisClassMemberNameTuple = AM[0..AM.length-BM.length]; 
 		}
 		else static if(is(T == struct))
-		{
-			alias AM = __traits(allMembers, T); 
-			enum ThisClassMemberNameTuple = Filter!(validateName, AM); 
-		}
+		{ enum ThisClassMemberNameTuple = __traits(allMembers, T); }
 		else
 		{ enum ThisClassMemberNameTuple = AliasSeq!(); }
 	} 
@@ -1924,30 +1910,32 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		enum FieldNamesWithUDA = Filter!(hasThisUDA, fields); 
 	} 
 	
-	//Todo: FieldAndFunctionNamesWithUDA should be  FieldsAndPropertiesWithUDA. Functions are actions, not values.
-	
-	/// The new version with properties. Sort order: fields followed by functions, grouped by each inherited class.
+	/// The new version with properties. Sort order: fields followed by functions
 	template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
 	{
-		enum bool isUda       (string name) = name!="slot_t" &&(is(U==void) || hasUDA2!(__traits(getMember, T, name), U)); 
-		enum bool isUdaFunction(string name) = name!="slot_t" && isUda!name && isFunction!(__traits(getMember, T, name)); 
-		
-		//Todo: when swapping isUda and isFunction, the compilers run out of memory.  This shit should berewritten by using static foreach.
-		
-		enum UdaFieldAndFunctionNameTuple(T) = AliasSeq!(
-			Filter!(isUda, FieldNameTuple!T), 
-			Filter!(
-				isUdaFunction, /+__traits(allMembers, T)+/
-				ThisClassMemberNameTuple!T
-				/+Todo: use allmembers here after slot_t has been solved.+/
-			)
-		); 
+		enum bool isUda       (string name) = (is(U==void) || hasUDA2!(__traits(getMember, T, name), U)); 
 		
 		static if(allIfNone && !anySatisfy!(isUda, AllMemberNames!T))
-		enum FieldAndFunctionNamesWithUDA = AllFieldNames!T; 
+		{ enum FieldAndFunctionNamesWithUDA = AllFieldNames!T; /+only fields, not properties+/}
 		else
-		enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T); 
+		{
+			enum bool isUdaFunction(string name) = isUda!name && isFunction!(__traits(getMember, T, name)); 
+			enum UdaFieldAndFunctionNameTuple(T) = 	AliasSeq!(
+				Filter!(isUda, FieldNameTuple!T), 
+				Filter!(isUdaFunction, ThisClassMemberNameTuple!T)
+			); 
+			enum FieldAndFunctionNamesWithUDA = staticMap!(UdaFieldAndFunctionNameTuple, AllClasses!T); 
+		}
+		
+		static if((常!(bool)(0))) {
+			enum hdr = i"$(__FILE__)($(__LINE__+1),1): ".text; 
+			pragma(
+				msg, hdr, "Warning: ", fullyQualifiedName!T, 
+					[FieldAndFunctionNamesWithUDA].map!((a)=>("\n"~hdr~"          	• "~a)).join
+			); 
+		}
 	} 
+	
 	enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false); 
 	
 	static if(0)
@@ -5884,7 +5872,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		//Usage:  ImStorage!float.set(srcId!("module", 123)(genericArg!"id"(456)), newValue)  //this is the most complicated one
 		
-				/+
+		/+
 			ImStorageManager.purge(10);
 					
 			struct MyInt{ int value; }
@@ -5905,16 +5893,16 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		struct ImStorageManager
 		{
-			 static: 
-						__gshared ImStorageInfo[string] storages; 
-					
-						void registerStorage(ImStorageInfo info)
+			static: 
+			__gshared ImStorageInfo[string] storages; 
+			
+			void registerStorage(ImStorageInfo info)
 			{ storages[info.name] = info; } 
-					
-						void purge(uint maxAge)
+			
+			void purge(uint maxAge)
 			{ storages.values.each!(s => s.purge(maxAge)); } 
-					
-						string stats(string details="")
+			
+			string stats(string details="")
 			{
 				string res; 
 				foreach(name; storages.keys.sort)
@@ -5925,32 +5913,32 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				return res; 
 			} 
-					
-						string detailedStats() { return stats("*"); } 
+			
+			string detailedStats() { return stats("*"); } 
 		} 
 		
 		struct ImStorage(T)
 		{
 			static: 
-						alias Id = SrcId; 
-					
-						struct Item {
+			alias Id = SrcId; 
+			
+			struct Item {
 				T data; 
 				Id id; 
 				uint tick; 
 			} 
-					
-						Item[Id] items; //by Id
-					
-						void purge(uint maxAge)
+			
+			Item[Id] items; //by Id
+			
+			void purge(uint maxAge)
 			{
 				 //age = 0 purge all
 				uint limit = application.tick-maxAge; 
 				auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array; 
 				toRemove.each!(k => items.remove(k)); 
 			} 
-					
-						class InfoClass : ImStorageInfo
+			
+			class InfoClass : ImStorageInfo
 			{
 				string name()
 				{ return ImStorage!T.stringof; } 
@@ -5959,7 +5947,7 @@ version(/+$DIDE_REGION Containers+/all)
 					return format!("%s(count: %s, minAge = %s, maxAge = %s")(
 						name, items.length,
 						application.tick - items.values.map!(a => a.tick).minElement(uint.max),
-													application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
+						application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
 					); 
 				} 
 				string[] infoDetails()
@@ -5967,8 +5955,8 @@ version(/+$DIDE_REGION Containers+/all)
 				void purge(uint maxAge)
 				{ ImStorage!T.purge(maxAge); } 
 			} 
-					
-						auto ref access(in Id id, lazy T default_ = T.init)
+			
+			auto ref access(in Id id, lazy T default_ = T.init)
 			{
 				auto p = id in items; 
 				if(!p) {
@@ -5980,18 +5968,18 @@ version(/+$DIDE_REGION Containers+/all)
 				p.tick = application.tick; 
 				return p.data; 
 			} 
-					
-						void set(in Id id, T data)
+			
+			void set(in Id id, T data)
 			{ access(id) = data; } 
-					
-						bool exists(in Id id)
+			
+			bool exists(in Id id)
 			{ return (id in items) !is null; } 
-					
-						uint age(in Id id)
+			
+			uint age(in Id id)
 			{ if(auto p = id in items) { return application.tick-p.tick; }else return typeof(return).max; } 
-					
-						//Todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
-						//shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
+			
+			//Todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
+			//shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
 		} 
 		
 		
