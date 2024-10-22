@@ -2943,9 +2943,31 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		auto 調(alias fun, Args...)(Args args)
 		{ return fun(args); } 
 		
-		//constant literals
+		//constant literals (compile time)
 		auto 常(T)(T val)
 		{ return val; } 
+		
+		bool waitForZeroAndSet(T)(T* reference, T newValue, int numTries)
+		{
+			import core.atomic; int cnt=0; 
+			while(!cas(reference, T(0), newValue)) { cnt++; if(cnt>=numTries) return false; }
+			return true; 
+		} 
+		
+		//interactive values (run time)
+		auto 互(T, T def, ulong id)()
+		{
+			static int index=-1; 
+			if(dbg.isActive)
+			{
+				auto iv = &dbg.data.interactiveValues; 
+				if(index<0)
+				{ index = iv.resolveIndex(id, def.to!float); }
+				return iv.floats[index].to!T; 
+			}
+			else
+			return def/+debugger is inactive+/; 
+		} 
 		
 	}
 	
@@ -13727,6 +13749,36 @@ version(/+$DIDE_REGION debug+/all)
 					void waitFor(uint locationHash); 
 				} 
 				
+				struct InteractiveValues
+				{
+					enum maxCount = 64; 
+					ulong[maxCount] ids; 
+					float[maxCount] floats = 0 /+Note: must be zero!!!+/; 
+					ulong synchId; 
+					
+					void reset()
+					{ this = this.init; } 
+					
+					int resolveIndex(ulong id, float def)
+					{
+						version(/+$DIDE_REGION Synchronization with multiple threads and with the debugger (another process).+/all)
+						{
+							waitForZeroAndSet(&synchId, id, 100_000).enforce("InteractiveValues: Timeout."); 
+							scope(exit) synchId = 0; 
+						}
+						
+						//the first time this thread accessed this interactive value
+						auto i = ids[].until(0).countUntil(id).to!int; 
+						if(i<0) {
+							i = ids[].countUntil(0).to!int; 
+							enforce(i>=0, "InteractiveValues: Run out of slots."); 
+							ids[i] = id; /+allocate slot+/
+							floats[i] = def; 
+						}
+						return i; 
+					} 
+				} 
+				
 				struct Data
 				{
 					/+
@@ -13756,13 +13808,14 @@ version(/+$DIDE_REGION debug+/all)
 					int exe_hwnd; 
 					int exe_pid; 
 					int console_hwnd; 
+					InteractiveValues interactiveValues; 
 					
 					align(64) CircBuf!(uint, circularBufferSize) circularBuffer; //CircBuf is a struct, not a class
 					
 					align(64) ubyte[memoryPoolSize] memoryPool = void; //allocator on the client uses this to send big blobs
 				} 
 			}
-			
+			
 			
 			private SharedMemClient!Data sharedMem; 
 			Data* data; 
@@ -14112,6 +14165,7 @@ version(/+$DIDE_REGION debug+/all)
 					forceExit = 0; 
 					dide_ack = 0; 
 					exe_waiting = 0; 
+					interactiveValues.reset; 
 				}
 			} 
 			

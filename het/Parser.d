@@ -2895,7 +2895,10 @@ version(/+$DIDE_REGION Keywords+/all)
 			file 	= file_,
 			lineIdx 	= lineIdx_,
 			columnIdx 	= columnIdx_,
-			mixinLineIdx 	= mixinLineIdx_/+Todo: multiple "-mixin-N" can be after the ".d" extension!!!+/; 
+			mixinLineIdx 	= mixinLineIdx_/+
+				Todo: multiple "-mixin-N" can be after the ".d" extension!!!
+				Example: c:\d\projects\dide\didemodule.d-mixin-11412-mixin-11417(11418,53):
+			+/; 
 			recalcModuleHash; 
 		} 
 		
@@ -3963,7 +3966,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D8AFFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1D90BFDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
