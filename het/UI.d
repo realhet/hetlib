@@ -3701,7 +3701,7 @@ version(/+$DIDE_REGION+/all)
 		{} //can override to draw some custom things.
 		
 		
-		protected void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
+		void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
 		{
 			//this uses linear search. It can be optimized in subClasses.
 			if(clipBounds)

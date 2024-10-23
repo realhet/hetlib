@@ -2845,6 +2845,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		{"Link"	, [SyntaxStyle(clWowBlue	,clWhite    ,4)].replicate(4)},
 		{"Code"	, [SyntaxStyle(RGB(0xc7c5c5)	, mix(RGB(0x2f2f2f), RGB(0x442d44), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
 		{"Console"	, [SyntaxStyle(clWhite ,clBlack,0)].replicate(4)},
+		{"Interact"	, [SyntaxStyle(clBlack ,clWhite,0)].replicate(4)}
 	]; 
 	
 	mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(','))); 
@@ -2895,27 +2896,63 @@ version(/+$DIDE_REGION Keywords+/all)
 			file 	= file_,
 			lineIdx 	= lineIdx_,
 			columnIdx 	= columnIdx_,
-			mixinLineIdx 	= mixinLineIdx_/+
-				Todo: multiple "-mixin-N" can be after the ".d" extension!!!
-				Example: c:\d\projects\dide\didemodule.d-mixin-11412-mixin-11417(11418,53):
-			+/; 
+			mixinLineIdx 	= mixinLineIdx_; 
 			recalcModuleHash; 
 		} 
 		
-		this(string s)
+		this(string s_)
 		{
 			//example: onlineapp.d-mixin-4(4,4)
 			
-			import std.regex; 
-			static rx = ctRegex!(`^([^\-\(]*)(?:\-mixin\-([0-9]+))?(?:\( *([0-9]+) *(?:, *([0-9]+))? *\) *)?$`); 
-			auto m = s.matchFirst(rx); 
-			if(m.length)
-			{
-				file 	= m[1].File,
-				mixinLineIdx 	= m[2].to!int.ifThrown(0),
-				lineIdx 	= m[3].to!int.ifThrown(0),
-				columnIdx 	= m[4].to!int.ifThrown(0); 
+			version(/+$DIDE_REGION+/none) {
+				import std.regex; 
+				static rx = ctRegex!(`^([^\-\(]*)(?:\-mixin\-([0-9]+))?(?:\( *([0-9]+) *(?:, *([0-9]+))? *\) *)?$`); 
+				auto m = s.matchFirst(rx); 
+				if(m.length)
+				{
+					file 	= m[1].File,
+					mixinLineIdx 	= m[2].to!int.ifThrown(0),
+					lineIdx 	= m[3].to!int.ifThrown(0),
+					columnIdx 	= m[4].to!int.ifThrown(0); 
+				}
 			}
+			
+			try
+			{
+				auto s = s_.strip; 
+				if(s.length && s.back==')')
+				{
+					const i = s.countUntil('('); //Opt: count from the back.
+					if(i>=0)
+					{
+						auto lc = s[i+1..$-1].splitter(','); 
+						if(!lc.empty) { lineIdx = lc.front.strip.to!int; lc.popFront; }
+						if(!lc.empty) columnIdx = lc.front.strip.to!int; 
+						s = s[0..i]; 
+					}
+				}
+				
+				auto p = s.split("-mixin-"); 
+				while(p.length>1)
+				{
+					mixinLineIdx = p.back.to!int; 
+					p.popBack; 
+					/+
+						Todo: It only remembers the first mixin line in the chain. 
+						Should handle mixin chains differently.
+						Currently it's not handled, just displayed.
+						It could be a supplemental message like: "mixed in from" ...
+					+/
+				}
+				if(p.length==1)
+				file = File(p.front); 
+			}
+			catch(Exception e)
+			{
+				WARN("Can't decode CodePosition: "~s_.quoted); 
+				this = typeof(this).init; 
+			}
+			
 			recalcModuleHash; 
 		} 
 		
@@ -3966,7 +4003,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1D90BFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1DC94FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
