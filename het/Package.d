@@ -543,8 +543,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					SetConsoleOutputCP(cp); 
 				} 
 				
-				void show()	 { if(chkSet	(visible_)	) ShowWindow (hwnd, SW_SHOW	); } 
-				void hide(bool forced=false)	 { if(chkClear	(visible_) || forced	) ShowWindow (hwnd, SW_HIDE	); } 
+				void show()	 {
+					if(chkSet	(visible_)	) ShowWindow (hwnd, SW_SHOW	); 
+					/+Opt: Measure the speed of ShowWindow when it effectively does nothing!+/
+				} 
+				void hide(bool forced=false)	 {
+					__gshared first=true; 
+					if(chkClear	(visible_) || chkClear	(first) || forced) ShowWindow (hwnd, SW_HIDE	); 
+				} 
 				
 				void setFocus()	 { SetFocus(hwnd); } //it's only keyboard focus
 				void setForegroundWindow()	 { show; SetForegroundWindow(hwnd); 	} 
@@ -13818,7 +13824,7 @@ version(/+$DIDE_REGION debug+/all)
 			
 			
 			private SharedMemClient!Data sharedMem; 
-			Data* data; 
+			public Data* data; 
 			
 			MyAllocator!(16) allocator; 
 			
@@ -13990,7 +13996,7 @@ version(/+$DIDE_REGION debug+/all)
 			{ return dataFileName; } 
 			
 			SharedMemServer!Data sharedMem; 
-			Data* data; 
+			public Data* data; 
 			
 			enum pingLedCount = 8; 
 			int[pingLedCount] pingLedState; 
@@ -14134,7 +14140,7 @@ version(/+$DIDE_REGION debug+/all)
 				ERR(`dbgsrv: Could not map create debug fileMapping. Run this as Admin!`); 
 			} 
 			
-			@property active() { return !!data; } 
+			@property isActive() { return !!data; } 
 			
 			bool update()
 			{

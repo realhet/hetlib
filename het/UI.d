@@ -6287,8 +6287,8 @@ struct im
 		
 			/*private*/ View2D actView; //this is only used for getting mouse position from actview
 		
-			//Todo: this should be the only opportunity to switch between GUI and World. Better that a containerflag that is initialized too late.
-			private void selectTargetSurface(int n)
+			//Todo: this should be the only opportunity to switch between GUI and World. Better than a containerflag that is initialized too late.
+			void selectTargetSurface(int n)
 		{
 			enforce(n.among(0, 1)); 
 			with(targetSurfaces[n])
@@ -9463,7 +9463,7 @@ struct im
 				this.id = id; 
 				this.orientation = orientation; 
 				this.sliderStyle = sliderStyle; 
-				this.nPos = enabled ? nPos_ : float.init; 
+				this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
 				this.normThumbSize = normThumbSize; 
 				
 				if(sliderStyle==SliderStyle.scrollBar)
