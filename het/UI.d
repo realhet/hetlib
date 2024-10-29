@@ -9496,11 +9496,11 @@ struct im
 					case SliderStyle.slider: 
 						clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
 						clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
-						clRuler =	mix(bkColor, ts.fontColor, 0.5); //disable ruler for now
+						clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
 						
 						if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
 						
-						rulerSides = 3 *0; 
+						rulerSides = 3; 
 					break; 
 					case SliderStyle.scrollBar: 
 						clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
@@ -9730,7 +9730,7 @@ struct im
 			static foreach(a; args)
 			{
 				{
-					 alias t = Unqual!(typeof(a)); 
+					alias t = Unqual!(typeof(a)); 
 					static if(isSomeString!t)
 					{
 						//props = a; //todo: ennek is

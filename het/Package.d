@@ -2952,7 +2952,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		//constant literals (compile time)
 		auto 常(T)(T val)
 		{ return val; } 
-		
+		
 		bool waitForZeroAndSet(T)(T* reference, T newValue, int numTries)
 		{
 			import core.atomic; int cnt=0; 
@@ -2973,6 +2973,33 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 			else
 			return def/+debugger is inactive+/; 
+		} 
+		
+		bool 同internal(T, ulong id)(ref T val)
+		{
+			static int index=-1; 
+			if(dbg.isActive)
+			{
+				auto iv = &dbg.data.interactiveValues; 
+				if(index<0)
+				{ index = iv.resolveIndex(id, val.to!float); }
+				if(iv.ticks[index])	{ val = cast(T)iv.floats[index]; return true; }
+				else	{ iv.floats[index] = val; return false; }
+			}
+			else
+			return false; 
+		} 
+		
+		auto 同(string T, string sym, string id)()
+		{
+			return iq{
+				() {
+					$(T) act = $(sym); 
+					if(同internal!($(T), $(id))(act))
+					$(sym) = act; 
+					return act; 
+				} ()
+			}.text; 
 		} 
 		
 	}
@@ -7089,6 +7116,8 @@ version(/+$DIDE_REGION Containers+/all)
 			
 			string toString() const
 			{ return items.map!text.join(chDelim); } 
+			
+			const @property empty() => !!items.length; 
 		} 
 		
 		//Todo: Use this instead of CommandLineToMap
@@ -13759,6 +13788,7 @@ version(/+$DIDE_REGION debug+/all)
 				{
 					enum maxCount = 64; 
 					ulong[maxCount] ids; 
+					uint[maxCount] ticks/+nonzero: the value was modified recently by the server+/; 
 					float[maxCount] floats = 0 /+Note: must be zero!!!+/; 
 					ulong synchId; 
 					
