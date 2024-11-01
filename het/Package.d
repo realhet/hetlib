@@ -146,7 +146,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				MB_HELP,MB_NOFOCUS,MB_MISCMASK ,MB_SETFOREGROUND,MB_DEFAULT_DESKTOP_ONLY,MB_TOPMOST,MB_SERVICE_NOTIFICATION_NT3X ,
 				MB_RIGHT,MB_RTLREADING,MB_SERVICE_NOTIFICATION,
 				
-				TIME_ZONE_INFORMATION, GetTimeZoneInformation; 
+				TIME_ZONE_INFORMATION, GetTimeZoneInformation,
+				
+				HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER; 
 			
 			import std.windows.registry, core.sys.windows.winreg, core.thread, std.file, std.path,
 			std.json, std.parallelism, core.runtime; 
@@ -13786,7 +13788,7 @@ version(/+$DIDE_REGION debug+/all)
 				
 				struct InteractiveValues
 				{
-					enum maxCount = 64; 
+					enum maxCount = 256; 
 					ulong[maxCount] ids; 
 					uint[maxCount] ticks/+nonzero: the value was modified recently by the server+/; 
 					float[maxCount] floats = 0 /+Note: must be zero!!!+/; 

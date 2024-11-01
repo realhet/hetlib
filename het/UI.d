@@ -9500,7 +9500,7 @@ struct im
 						
 						if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
 						
-						rulerSides = 3; 
+						rulerSides = 0; 
 					break; 
 					case SliderStyle.scrollBar: 
 						clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
