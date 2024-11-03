@@ -2917,6 +2917,8 @@ version(/+$DIDE_REGION Keywords+/all)
 				}
 			}
 			
+			/+Opt: examine which is faster: regex or manual+/
+			
 			try
 			{
 				auto s = s_.strip; 
@@ -2938,7 +2940,7 @@ version(/+$DIDE_REGION Keywords+/all)
 					mixinLineIdx = p.back.to!int; 
 					p.popBack; 
 					/+
-						Todo: It only remembers the first mixin line in the chain. 
+						Todo: It only remembers the FIRST mixin line in the chain. 
 						Should handle mixin chains differently.
 						Currently it's not handled, just displayed.
 						It could be a supplemental message like: "mixed in from" ...
@@ -4003,7 +4005,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1DC94FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1DCCFFDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
