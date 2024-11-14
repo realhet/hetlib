@@ -2297,7 +2297,14 @@ class Drawing
 						if(isnan(coord)) coord = a; 
 						else { lineTo(coord, a, first); first = true; coord = float.init; }
 					}
-					else	static assert(0, "invalid type: "~T.stringof); 
+					else static if(is(T==GenericArg!(N, T2), string N, T2))
+					{
+						static if(N=="lineWidth" || N=="lw")	{ lineWidth = a.value; }
+						else static if(N=="pointSize" || N=="ps")	{ pointSize = a.value; }
+						else static if(N=="alpha" || N=="a")	{ alpha = a.value; }
+						else static assert("Invalid genericArg: "~T.stringof); 
+					}
+					else static assert(0, "invalid type: "~T.stringof); 
 				}
 			}
 		} 
@@ -2710,13 +2717,20 @@ class Drawing
 		
 		//Ellipse/circle //////////////////////////////////////////////////////////////
 		
-		void ellipse(float x, float y, float ra, float rb, float arc0=0, float arc1=2*PI)
+		void ellipse(float x, float y, float ra, float rb, float arc0=0, float arc1=2*PI, float incr=0)
 		{
 			while(arc0>arc1) arc1 += 2*PI; //Todo: lame
 			
-			float rounds = (arc1-arc0)*(0.5f/PI); 	
-			int cnt = iround(rounds*64); 	//resolution  //todo: it should be done in the shader
-			float incr = cnt ? (arc1-arc0)/cnt : 0; 
+			int cnt; 
+			if(incr>0)
+			{ cnt = iround((arc1-arc0)/incr); }
+			else
+			{
+				float rounds = (arc1-arc0)*(0.5f/PI); 	
+				cnt = iround(rounds*64); 	//resolution  //todo: it should be done in the shader
+				incr = cnt ? (arc1-arc0)/cnt : 0; 
+			}
+			
 			foreach(i; 0..cnt+1) {
 				float a = arc0+incr*i; 
 				lineTo(x+sin(a)*ra, y+cos(a)*rb, !!i); 
