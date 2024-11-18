@@ -757,6 +757,7 @@ class Window
 				//this is a good time to launch the timer. Called by a delayed PostMessage
 			
 			case WM_TIMER: 	if(wParam==999) { doUpdate; if(chkClear(pendingInvalidate)) forceRedraw; }return 0; 
+				/+Todo: Try Windows Multimedia Timer (timeBeginPeriod)+/
 			case WM_SIZE: 	doUpdate; forceRedraw; return 0; 
 			
 			case WM_MOUSEWHEEL: 	_notifyMouseWheel((cast(int)wParam>>16)*(1.0f/WHEEL_DELTA)); return 0; 

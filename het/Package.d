@@ -3004,6 +3004,37 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}.text; 
 		} 
 		
+		auto tuplify(size_t n, R)(R r) if (isInputRange!R)
+		{
+			/+Link: https://stackoverflow.com/questions/47046850/is-there-any-way-to-assign-multiple-variable-at-once-with-dlang+/
+			Tuple!(Repeat!(n, ElementType!R)) result; 
+			static foreach(i; 0..n) { result[i] = r.front; r.popFront(); }assert(r.empty); 
+			return result; 
+		} 
+		
+		auto tupleOp(string op, A, B)(A a, B b)
+		{
+			static if(a.length==b.length)	return mixin("tuple(",iota(a.length).map!(i=>iq{a[$(i)] $(op) b[$(i)],}.text).join,")"); 
+			else static if(a.length==1)	return mixin("tuple(",iota(b.length).map!(i=>iq{a[0] $(op) b[$(i)],}.text).join,")"); 
+			else static if(b.length==1)	return mixin("tuple(",iota(a.length).map!(i=>iq{a[$(i)] $(op) b[0],}.text).join,")"); 
+			else static	assert(false, "Invalid params."); 
+		} 
+		
+		string 配(string left, string op, string right) /+Note: Tuple operations: (x,y) += (y,x)+/
+		{
+			auto opStr() => '"'~op~'"'; 
+			auto isBinaryOp(string op) => !!op.among("+", "-", "*", "/", "%", "^", "~", "<<", ">>", ">>>", "^^"); 
+			
+			if(op.among("=", "==", "is"))
+			return iq{tuple(AliasSeq!($(left)) $(op) tuple($(right)))}.text; 
+			else if(isBinaryOp(op))
+			return iq{tupleOp!$(opStr)(tuple($(left)),tuple($(right)))}.text; 
+			else if(op.endsWith('=') && isBinaryOp(op[0..$-1]))
+			return iq{tuple(AliasSeq!($(left))=(tupleOp!$(opStr)(tuple($(left)),tuple($(right)))))}.text; 
+			else enforce(false, "Invalid params."); 
+			assert(0); 
+		} 
+		
 	}
 	
 }
