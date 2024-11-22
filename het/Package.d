@@ -6216,6 +6216,35 @@ version(/+$DIDE_REGION Containers+/all)
 			return res; 
 		} 
 	} 
+}version(/+$DIDE_REGION Ranges+/all)
+{
+	auto orderedInterleave(alias keyFun="a", R1, R2)(R1 s1, R2 s2)
+	if(isInputRange!R1 && isInputRange!R1 && is(ElementType!R1==ElementType!R2))
+	{
+		import std.concurrency: Generator, yield; 
+		alias T = ElementType!R1; 
+		return new Generator!(Nullable!T)
+		((){
+			while(!s1.empty || !s2.empty)
+			{
+				void blank() { yield(Nullable!T.init); } 
+				void y1() { yield(s1.front.nullable); s1.popFront; } 
+				void y2() { yield(s2.front.nullable); s2.popFront; } 
+				const k1() => s1.front.unaryFun!keyFun; 
+				const k2() => s2.front.unaryFun!keyFun; 
+				
+				if(s1.empty)	{ blank; y2; }
+				else if(s2.empty)	{ y1; blank; }
+				else	{
+					if(k1<=k2)	{
+						y1; if(s1.empty || k1>=k2)	y2; 
+						else	blank; 
+					}
+					else	{ blank; y2; }
+				}
+			}
+		}); 
+	} 
 }version(/+$DIDE_REGION String ops.+/all)
 {
 	version(/+$DIDE_REGION+/all) {
@@ -8940,6 +8969,7 @@ version(/+$DIDE_REGION Colors+/all)
 		
 		auto darken(in RGB a, float t) { return mix(a, clBlack, t); } 
 		auto lighten(in RGB a, float t) { return mix(a, clWhite, t); } 
+		alias brighten = lighten; 
 		
 		struct RGBSum
 		{
