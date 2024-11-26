@@ -6827,6 +6827,7 @@ struct im
 								padding = "4"; 
 								style.fontColor = clHintText; 
 								style.bkColor = bkColor = clHintBk; 
+								flags.rowElasticTabs = true; 
 								
 								Text(lastHint.markup); 
 							}
@@ -6838,6 +6839,8 @@ struct im
 								padding = "4"; 
 								style.fontColor = clHintDetailsText; 
 								style.bkColor = bkColor = clHintDetailsBk; 
+								flags.rowElasticTabs = true; 
+								//Todo: Why is this redundancy?
 								
 								Text(lastHint.markupDetails); 
 							}
@@ -7667,7 +7670,7 @@ struct im
 			*/
 		} 
 		
-			void Tab()
+			void TAB()
 		{ Text("\t"); } 	void NL()
 		{ Text("\n"); } 
 		
@@ -8082,6 +8085,7 @@ struct im
 			return res; //a hit testet vissza kene adni im.valtozoban
 		} 
 		
+		static EditPath_hasRefreshBtn = true; 
 		auto EditPath(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref Path actPath, in Args args)
 		{
 			 //EditPath ///////////////////////////////////////
@@ -8091,6 +8095,8 @@ struct im
 				bool valid, editing, changed; 
 			} 
 			Res res; 
+			
+			EditPath_hasRefreshBtn = true; 
 			
 			Row!(srcModule, srcLine)(
 				args, {
@@ -8150,7 +8156,7 @@ struct im
 						}
 					}else
 					{
-						if(res.valid && Btn(symbol("Refresh")))
+						if(EditPath_hasRefreshBtn && res.valid && Btn(symbol("Refresh")))
 						{ res.mustRefresh = true; }
 					}
 				}

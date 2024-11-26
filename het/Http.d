@@ -9,8 +9,7 @@ import het;
 auto curlGet(string url)
 {
 	import std.net.curl; 
-	if(url.canFind(" "))
-	url = url.urlEncode; 
+	if(url.canFind(" ")) url = url.urlEncode; 
 	return cast(string)get!(AutoProtocol, ubyte)(url); 
 } 
 
