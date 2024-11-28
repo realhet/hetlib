@@ -2359,6 +2359,25 @@ class Drawing
 			}
 		} 
 		
+		void hBars(R1)(float x0, float y0, R1 data, float xScale=1, float yScale=1, float sideGap = .1f)
+		if(isRandomAccessRange!R1)
+		{
+			if(data.empty) return; 
+			void doit(bool flip)()
+			{
+				foreach(i, val; data)
+				{
+					float v0 = 0, v1 = val; 
+					static if(flip) (mixin(配(q{v0, v1},q{=},q{v1, v0}))); 
+					fillRect(
+						x0+(i+(0+sideGap))*xScale, y0+v0*yScale, 
+						x0+(i+(1-sideGap))*xScale, y0+v1*yScale
+					); 
+				}
+			} 
+			if((xScale>0)==(yScale>0)) doit!false; else doit!true; 
+		} 
+		
 		
 		void vGraph(T)(in vec2 v0, in T[] data, float xScale=1, float yScale=1)
 		{ vGraph(v0.x, v0.y, data, xScale, yScale); } 

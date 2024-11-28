@@ -9341,6 +9341,7 @@ struct im
 					{
 						if(inputs.Shift) scale*=10; 
 						if(inputs.Ctrl) scale/=10; 
+						if(inputs.Alt) scale/=100; 
 					}
 					
 					auto nStep()
@@ -9398,7 +9399,7 @@ struct im
 				if(id==pressed_id)
 				{
 					userModified = true; 
-					const adjustSpeed = inputs.Shift.active ? 0.125f : 1; //Note: this is a scaling factor...
+					const adjustSpeed = inputs.Shift.active ? 10 : inputs.Ctrl.active ? 0.1f : inputs.Alt.active ? 0.01f : 1; //Note: this is a scaling factor...
 					mouseAdjust(nPos, mousePos, range_, wrapCnt, adjustSpeed); 
 				}
 				
