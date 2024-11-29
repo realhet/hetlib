@@ -11588,10 +11588,14 @@ version(/+$DIDE_REGION Date Time+/all)
 			//Todo: result should be an int counting how many updates missed since last time
 		} 
 		
-		auto blinkf(float freq=3)
-		{ return (QPS.value(second)*freq).fract; } 
-		auto blink(float freq=3/*hz*/, float duty=.5f)
+		bool blink(float freq=3/*hz*/, float duty=.5f)
 		{ return blinkf(freq) < duty; } 
+		
+		float blinkf(float freq=3)
+		{ return (QPS.value(second)*freq).fract; } 
+		
+		float blinks(float freq=3)
+		{ return (sin(blinkf(freq) * ((2)*(π)))+1)/2; } 
 		
 		
 		synchronized class Perf
