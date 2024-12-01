@@ -590,7 +590,7 @@ version(/+$DIDE_REGION+/all)
 				return res; 
 			} 
 					
-			private static binaryVectorScalarOp(string op, A, B)(in A a, in B b)
+			private static binaryVectorOp(string op, A, B)(in A a, in B b)
 			{
 				alias CT = OperationResultType!(op, ScalarType!A, ScalarType!B); 
 				return generateVector!(CT, (a, b) => mixin("a", op, "b") )(a, b); 
@@ -608,8 +608,8 @@ version(/+$DIDE_REGION+/all)
 				
 				static if(isNumeric!T || isVector!T)
 				{
-					//vector * (vector/scalar)
-					return binaryVectorScalarOp!op(this, other); 
+					//vector * (scalar or vector)
+					return binaryVectorOp!op(this, other); 
 				}
 				else static if(op=="*" && isMatrix!T && T.height==length)
 				{
@@ -2354,7 +2354,7 @@ version(/+$DIDE_REGION+/all)
 						static if(funIsStr)
 						{
 							//Note: if the fun has a return statement, it will make an image. Otherwise return void.
-							enum isStatement = __traits(compiles, {mixin(fun);}); 
+							enum isStatement = __traits(compiles, { mixin(fun); }); 
 							static if(isStatement)	{ mixin(fun); }
 							else	{ return mixin(fun); }
 						}
@@ -3076,11 +3076,11 @@ version(/+$DIDE_REGION+/all)
 		
 		private enum _normalizeAngle = 
 		q{
-			if(x>=-half && x<half) return x;
+			if(x>=-half && x<half) return x; 
 			return cast(T)(
 				x>=0 	?    (x + half) % (2*half)   - half
 					: -(-(x + half) % (2*half)) + half
-			);
+			); 
 		}; 
 		
 		T normalizeAngle_deg(T)(T x)
@@ -3104,16 +3104,16 @@ version(/+$DIDE_REGION+/all)
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 		private enum UnaryStdMathFunct(string name) = 
 		q{
-			auto #(A)(in A a){
-				static if(isComplex!A) 
-				{return std.complex.#(a);}
+			auto #(A)(in A a) {
+				static if(isComplex!A)
+				{ return std.complex.#(a); }
 				else
 				{
-					alias CT = CommonScalarType!(A, float);
-					alias fun = a => std.math.#(cast(CT) a);
-					return a.generateVector!(CT, fun);
+					alias CT = CommonScalarType!(A, float); 
+					alias fun = a => std.math.#(cast(CT) a); 
+					return a.generateVector!(CT, fun); 
 				}
-			}
+			} 
 		}.replace('#', name); 
 		
 		static foreach(s; "sin cos tan asin acos sinh cosh tanh asinh acosh atan".split(' '))
