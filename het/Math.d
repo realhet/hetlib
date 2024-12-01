@@ -45,7 +45,7 @@ version(/+$DIDE_REGION+/all)
 	import std.range : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro; 
 	import std.traits : 	Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, 
 		CommonType, ReturnType, isPointer, isFunction, isDelegate; 
-	import std.meta	: AliasSeq, allSatisfy, anySatisfy; 
+	import std.meta	: AliasSeq, allSatisfy, anySatisfy, staticMap; 
 	
 	import std.exception	: enforce; 
 	import std.stdio	: write, writeln; 
@@ -221,6 +221,7 @@ version(/+$DIDE_REGION+/all)
 		 is(CT==bool	) ? "b"	:
 		 is(CT==int	) ? "i"	:
 		 is(CT==uint	) ? "u"	:
+		 is(CT==ubyte) ? "ub"	:
 		 "UNDEF"; 
 	
 	private bool validRvalueSwizzle(string def)
@@ -285,8 +286,7 @@ version(/+$DIDE_REGION+/all)
 	template CommonScalarType(T...)
 	{
 		static assert(T.length>=1); 
-		static if(T.length==1)	alias CommonScalarType = ScalarType!(T[0]); 
-		else	alias CommonScalarType = CommonType!(ScalarType!(T[0]), CommonScalarType!(T[1..$])); 
+		alias CommonScalarType = CommonType!(staticMap!(ScalarType, T)); 
 	} 
 	
 	private alias CommonVectorType(Types...) = Vector!(CommonScalarType!Types, CommonVectorLength!Types); 
@@ -326,12 +326,12 @@ version(/+$DIDE_REGION+/all)
 		{
 			alias VectorType	= typeof(this); 
 			alias ComponentType	= CT; 
+			
 			enum VectorTypeName	=	is(VectorType==Vector!(ubyte, 2))	? "RG"	:
 					is(VectorType==Vector!(ubyte, 3))	? "RGB"	:
 					is(VectorType==Vector!(ubyte, 4))	? "RGBA"	:
 					ComponentTypePrefix!CT != "UNDEF" 	? ComponentTypePrefix!CT ~ "vec" ~ N.stringof 	:
 					VectorType.stringof; 
-					
 			static if(isFloatingPoint!CT)
 			{
 				CT[N] components = CT(0); //default is 0,0,0, not NaN.  Just like in GLSL.
@@ -581,19 +581,13 @@ version(/+$DIDE_REGION+/all)
 				static foreach(i; 0..length) mixin(format!"res[%s] = cast(CT)(%s this[%s]);"(i, op, i)); 
 				return res; 
 			} 
-					
+			
 			auto opUnary(string op)() if(op.among("++", "--"))
 			{
 				//same as above but NOT const
 				VectorType res; 
 				static foreach(i; 0..length) mixin(format!"res[%s] = cast(CT)(%s this[%s]);"(i, op, i)); 
 				return res; 
-			} 
-					
-			private static binaryVectorOp(string op, A, B)(in A a, in B b)
-			{
-				alias CT = OperationResultType!(op, ScalarType!A, ScalarType!B); 
-				return generateVector!(CT, (a, b) => mixin("a", op, "b") )(a, b); 
 			} 
 			
 			auto opBinary(string op, T)(in T other) const
@@ -605,12 +599,10 @@ version(/+$DIDE_REGION+/all)
 					It uses ref results.
 					ref Complex opOpAssign(string op, C)(const C z)
 				+/
-				
-				static if(isNumeric!T || isVector!T)
-				{
-					//vector * (scalar or vector)
-					return binaryVectorOp!op(this, other); 
-				}
+				static if(isVector!T)
+				{ return binaryVectorOp!op(this, other); }
+				else static if(isScalar!T)
+				{ return binaryVectorOp!op(this, other); }
 				else static if(op=="*" && isMatrix!T && T.height==length)
 				{
 					//vector * matrix
@@ -629,8 +621,10 @@ version(/+$DIDE_REGION+/all)
 					
 			auto opBinaryRight(string op, T)(in T other) const
 			{
-				static if(isNumeric!T)
-				return generateVector!(CommonScalarType!(VectorType, T), (a, b) => mixin("a", op, "b") )(other, this); 
+				static if(
+					isScalar!T//return generateVector!(CommonScalarType!(VectorType, T), (a, b) => mixin("a", op, "b") )(other, this); 
+				)
+				return binaryVectorOp!op(other, this); 
 				else
 				static assert(0, "invalid operation"); 
 			} 
@@ -660,18 +654,30 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
-	private alias vectorElementTypes = AliasSeq!(float, double, bool, int, uint); 
+	private alias vectorElementTypes = AliasSeq!(float, double, bool, int, uint, ubyte); 
 	private enum vectorElementCounts = [2, 3, 4]; 
 	
 	static foreach(T; vectorElementTypes)
 	static foreach(N; vectorElementCounts)
-	mixin(format!q{alias %s = %s; }(Vector!(T, N).VectorTypeName, Vector!(T, N).stringof)); 
+	{
+		/+voodoo magic ->+/pragma(msg, Vector!(T, N).stringof[0..0]); 
+		/+
+			Note: BugFix: 241201: LDC 1.40: Without 'mentioning' the vector type first, 
+			/+Code: image2D(1, 2, RGB(1, 2, 3))+/ drops a template instance recursion rerror
+			at random places when it tries to resolve the RGB alias.
+			❗ Must be placed in front of the alias declaration!
+			❗ Can't use __traits(compiles, ...) or static assert(...) or mixin(dummy function with variable declaration) 
+				because those fail with various errors like: "forward reference" error.
+			/+Link: https://forum.dlang.org/post/ohstifwncjaudbqrejfq@forum.dlang.org+/
+		+/
+		mixin(iq{alias $(Vector!(T, N).VectorTypeName) = $(Vector!(T, N).stringof); }.text); 
+	}
 	
 	//define aliases for colors
+	alias RG8	= RG,
+	RGB8	= RGB,
+	RGBA8 	= RGBA; 
 	
-	alias RG8	= Vector!(ubyte, 2)	, RG	= RG8	,
-	RGB8	= Vector!(ubyte, 3)	, RGB	= RGB8	,
-	RGBA8 	= Vector!(ubyte, 4)	, RGBA 	= RGBA8	; 
 	
 	auto BGR (T...)(in T args)
 	{ return RGB (args).bgr; } 
@@ -2268,8 +2274,99 @@ version(/+$DIDE_REGION+/all)
 	
 	enum isIntOrUint(T) = is(Unqual!T==int) || is(Unqual!T==uint); 
 	
-	auto image2D(alias fun="", A...)(A args)
+	private auto image2D_impl(alias fun=void, A...)(ivec2 size, A args)
 	{
+		static if(is(fun==void))
+		{
+			static assert(A.length, "not enough args"); 
+			
+			//default behaviour: one bitmap, optional default
+			alias R = Unqual!(A[0]); 
+			static if(RangeDimension!R.among(1, 2))
+			{
+				return image2DfromRanges(size, args[0..$]); //1D, 2D range
+			}
+			else
+			{
+				static assert(A.length==1, "too many args"); 
+				static if(isPointer!(A[0]) && __traits(compiles, args[0][0..size.area]))
+				{
+					/+Bug: This fails in libUEye.d -> template recursion error at a random position.+/
+					alias E = Unqual!(typeof(*args[0])); 
+					return Image!(E, 2)(size, cast(E[])(args[0][0..size.area])); 
+				}
+				else static if(__traits(compiles, args[0](size)))
+				{
+					//delegate or function (ivec2)
+					alias RT = Unqual!(typeof(args[0](size))); 
+					static if(is(RT == void))
+					{
+						//return is void, just call the delegate.
+						foreach(pos; size.iota2D) args[0](pos); 
+						return; //the result is void
+					}
+					else
+					{
+						return Image!(RT, 2)(size, cast(RT[])(size.iota2D.map!(p => args[0](p)).array)); 
+						//return type is something, make an Image out of it.
+					}
+				}
+				else
+				{
+					//non-callable
+					Unqual!R tmp = args[0]; 
+					return Image!(Unqual!R, 2)(size, [tmp].replicate(size.area)); 
+					//one pixel stretched all over the size
+				}
+			}
+		}
+		else
+		{ return image2D_impl_fun!fun(size, args); }
+	} 
+	
+	private auto image2D_impl_fun(alias fun, A...)(ivec2 size, A args)
+	{
+		//fun is specified
+		enum funIsStr = isSomeString!(typeof(fun)); 
+		enforceImageSize2D(size, args[0..$]); 
+		return image2D_impl
+		(
+			size, (ivec2 pos)
+			{
+				//generate all the access functions
+				static auto importArg(T)(int i)
+				{
+					string index; 
+					static if(isImage2D!T) index = "[pos.x, pos.y]"; 
+					return format!"auto ref %s(){ return args[i]%s; }"(cast(char)('a'+i), index); 
+				} 
+				static foreach(i, T; A) mixin(importArg!T(i)); 
+				
+				static if(funIsStr)
+				{
+					//Note: if the fun has a return statement, it will make an image. Otherwise return void.
+					enum isStatement = __traits(compiles, { mixin(fun); }); 
+					static if(isStatement)	{ mixin(fun); }
+					else	{ return mixin(fun); }
+				}
+				else
+				{
+					return mixin(
+						"fun(", (
+							(A.length)	.iota
+							.map!(i => cast(string)[cast(char)('a'+i)])
+							//Todo: use .text
+							.join(",")
+						), ")"
+					); 
+				}
+			}
+		); 
+	} 
+	
+	auto image2D(alias fun=void, A...)(A args)
+	{
+		//pragma(msg, i"$(__FILE__)($(__LINE__),1): Console: $(__PRETTY_FUNCTION__)".text); 
 		//pragma(msg, "$RECURSIVEBUG:", __PRETTY_FUNCTION__); 
 		//image2D constructor //////////////////////////////////
 		static assert(A.length>0, "invalid args"); 
@@ -2280,103 +2377,17 @@ version(/+$DIDE_REGION+/all)
 		static if(A.length>=2 && isIntOrUint!(A[0]) && isIntOrUint!(A[1]))
 		{
 			//Starts with 2 ints: width, height
-			return image2D!fun(ivec2(args[0], args[1]), args[2..$]); 
+			return image2D_impl!fun(ivec2(args[0], args[1]), args[2..$]); 
 		}
 		else static if(is(Unqual!(A[0])==ivec2))
 		{
 			//Starts with known ivec2 size
-			ivec2 size = args[0]; 
-			
-			static assert(A.length>1, "not enough args"); 
-			
-			alias funIsStr = isSomeString!(typeof(fun)); 
-			
-			static if(funIsStr && fun=="")
-			{
-				//default behaviour: one bitmap, optional default
-				alias R = Unqual!(A[1]); 
-				static if(RangeDimension!R.among(1, 2))
-				{
-					return image2DfromRanges(size, args[1..$]); //1D, 2D range
-				}
-				else
-				{
-					static assert(A.length<=2, "too many args"); 
-					static if(isPointer!(A[1]) && __traits(compiles, args[1][0..size.area]))
-					{
-						/+Bug: This fails in libUEye.d -> template recursion error at a random position.+/
-						alias E = Unqual!(typeof(*args[1])); 
-						return Image!(E, 2)(size, cast(E[])(args[1][0..size.area])); 
-					}
-					else static if(__traits(compiles, args[1](size)))
-					{
-						//delegate or function (ivec2)
-						alias RT = Unqual!(typeof(args[1](size))); 
-						static if(is(RT == void))
-						{
-							//return is void, just call the delegate.
-							foreach(pos; size.iota2D) args[1](pos); 
-							return; //the result is void
-						}
-						else
-						{
-							return Image!(RT, 2)(size, cast(RT[])(size.iota2D.map!(p => args[1](p)).array)); 
-							//return type is something, make an Image out of it.
-						}
-					}
-					else
-					{
-						//non-callable
-						Unqual!R tmp = args[1]; 
-						return Image!(Unqual!R, 2)(size, [tmp].replicate(size.area)); 
-						//one pixel stretched all over the size
-					}
-				}
-			}
-			else
-			{
-				//fun is specified
-				enforceImageSize2D(size, args[1..$]); 
-				
-				return image2D
-				(
-					size, (ivec2 pos)
-					{
-						//generate all the access functions
-						static auto importArg(T)(int i)
-						{
-							string index; 
-							static if(isImage2D!T) index = "[pos.x, pos.y]"; 
-							return format!"auto ref %s(){ return args[i+1]%s; }"(cast(char)('a'+i), index); 
-						} 
-						static foreach(i, T; A[1..$]) mixin(importArg!T(i)); 
-						
-						static if(funIsStr)
-						{
-							//Note: if the fun has a return statement, it will make an image. Otherwise return void.
-							enum isStatement = __traits(compiles, { mixin(fun); }); 
-							static if(isStatement)	{ mixin(fun); }
-							else	{ return mixin(fun); }
-						}
-						else
-						{
-							return mixin(
-								"fun(", (
-									(A.length-1)	.iota
-									.map!(i => cast(string)[cast(char)('a'+i)])
-									//Todo: use .text
-									.join(",")
-								), ")"
-							); 
-						}
-					}
-				); 
-			}
+			return image2D_impl!fun(args[0], args[1..$]); 
 		}
 		else
 		{
-			 //automatically calculate size from args
-			return image2D!fun(maxImageSize2D(args), args); 
+			//automatically calculate size from args
+			return image2D_impl!fun(maxImageSize2D(args), args); 
 		}
 	} 
 	
@@ -2870,7 +2881,6 @@ version(/+$DIDE_REGION+/all)
 {
 	private void unittest_Image() //image2D tests /////////////////////////////////
 	{
-		
 		//have some colors to test immutable vectors
 		static immutable RGB clRed = 0x0000FF, clGreen = 0x008000,  clBlue = 0xFF0000, clWhite = 0xFFFFFF; 
 		
@@ -3061,6 +3071,26 @@ version(/+$DIDE_REGION+/all)
 			}
 			else
 			{ return cast(CT) fun(args); }
+		} 
+		
+		private auto binaryVectorOp(string op, A, B)(in A a, in B b)
+		{
+			alias CT = OperationResultType!(op, ScalarType!A, ScalarType!B); 
+			return generateVector!(CT, (a, b) => mixin("a", op, "b") )(a, b); 
+			
+			/+
+				Equivalent:
+				alias fun = binaryFun!("a"~op~"b"); 
+				static if(anyVector!(A, B))
+				{
+					Vector!(CT, CommonVectorLength!(A, B)) res; 
+					static foreach(i; 0..res.length)
+					res[i] = cast(CT) fun(a.vectorAccess!i, b.vectorAccess!i); 
+					return res; 
+				}
+				else
+				{ return cast(CT) fun(a, b); }
+			+/
 		} 
 		
 		//Angle & Trig. functions ///////////////////////////////////

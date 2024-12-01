@@ -9412,7 +9412,7 @@ version(/+$DIDE_REGION Colors+/all)
 			clUiYellowGreen	= (RGB(154, 205,  50)); 
 		}
 		
-		immutable RGB8[]
+		immutable RGB[]
 			clDelphi	= [
 			clBlack, clMaroon, clGreen, clOlive, clNavy, clPurple, clTeal, clGray, clSilver, clRed,
 			clLime, clYellow, clBlue, clFuchsia, clAqua, clLtGray, clDkGray, clWhite, clSkyBlue, clMoneyGreen
@@ -10408,7 +10408,7 @@ version(/+$DIDE_REGION Colors+/all)
 		return filterStr; 
 	} 
 	
-	RGB8 chooseColor(HWND hwnd, RGB8 color, bool fullOpen)
+	RGB chooseColor(HWND hwnd, RGB color, bool fullOpen)
 	{
 		import core.sys.windows.commdlg; 
 		static uint[16] customColors; //Todo: save/load ini
@@ -10419,7 +10419,7 @@ version(/+$DIDE_REGION Colors+/all)
 			Flags: CC_RGBINIT | CC_ANYCOLOR | (fullOpen ? CC_FULLOPEN : 0)
 		}; 
 		RGB8 res = color; 
-		if(ChooseColor(&cc)) res = RGB8(cc.rgbResult); 
+		if(ChooseColor(&cc)) res = RGB(cc.rgbResult); 
 		return res; 
 	} 
 	
