@@ -243,7 +243,6 @@ version(/+$DIDE_REGION+/all)
 	enum isVector(T) = is(T==Vector!(CT, N), CT, int N); 
 	enum isScalar(T) = is(T==bool) || isNumeric!T; 
 	
-	
 	private enum anyVector(T...) = anySatisfy!(isVector, T); 
 	
 	private int FirstVectorLength(T...)() {
@@ -668,6 +667,7 @@ version(/+$DIDE_REGION+/all)
 			❗ Must be placed in front of the alias declaration!
 			❗ Can't use __traits(compiles, ...) or static assert(...) or mixin(dummy function with variable declaration) 
 				because those fail with various errors like: "forward reference" error.
+				/+Code: /+not working -> +/mixin(iq{enum null_$(Vector!(T, N).VectorTypeName) = Vector!(T, N)(0); }.text); +/
 			/+Link: https://forum.dlang.org/post/ohstifwncjaudbqrejfq@forum.dlang.org+/
 		+/
 		mixin(iq{alias $(Vector!(T, N).VectorTypeName) = $(Vector!(T, N).stringof); }.text); 

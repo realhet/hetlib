@@ -9343,6 +9343,7 @@ struct im
 						if(inputs.Ctrl) scale/=10; 
 						if(inputs.Alt) scale/=100; 
 					}
+					/+Todo: this layout is incompatible with the mouse Shift = slow behavior.+/
 					
 					auto nStep()
 					{ return range_.step / (range_.max-range_.min); } 
@@ -9356,14 +9357,22 @@ struct im
 				delta(-1); 
 				if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated)
 				delta(1); 
-				if(inputs.PgDn.repeated)
-				delta(-pageSize); 
-				if(inputs.PgUp.repeated)
-				delta(pageSize); 
-				if(inputs.Home.down)
-				set(0); 
-				if(inputs.End .down)
-				set(1); 
+				version(none)
+				{
+					/+
+						Todo: Make a forking focused control system that only sends these keys to only the focused control.
+						Until that only the arrows will work.
+						A mouse click somewhere else should also loce focus automatically
+					+/
+					if(inputs.PgDn.repeated)
+					delta(-pageSize); 
+					if(inputs.PgUp.repeated)
+					delta(pageSize); 
+					if(inputs.Home.down)
+					set(0); 
+					if(inputs.End .down)
+					set(1); 
+				}
 				
 				return userModified; 
 			} 
