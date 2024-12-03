@@ -3158,10 +3158,26 @@ version(/+$DIDE_REGION Numeric+/all)
 		//Todo: remap goes to math
 		
 		T remap(alias srcFrom, alias srcTo, alias dstFrom, alias dstTo, T)(in T src)
-		{ return cast(T)(((srcTo-srcFrom)?((src-srcFrom)*((dstTo-dstFrom)/(srcTo-srcFrom)) + dstFrom):(dstFrom))); } 
+		=> (cast(T)(((srcTo-srcFrom)?((src-srcFrom)*((dstTo-dstFrom)/(srcTo-srcFrom)) + dstFrom):(dstFrom)))); 
 		
 		T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{ return src.remap!(srcFrom, srcTo, dstFrom, dstTo); } 
+		
+		template CommonFloatType(A...)
+		{
+			alias C = Unqual!(CommonType!A); 
+			static if(__traits(isFloating, C))	alias CommonFloatType = C; 
+			else	alias CommonFloatType = float; 
+		} 
+		
+		T mapTo(alias dstFrom, alias dstTo, T)(in T src)
+		{
+			alias R = CommonFloatType!(typeof(dstFrom), typeof(dstTo), T); 
+			return (cast(T)(dstFrom + (dstTo-dstFrom)*R(src))); 
+		} 
+		
+		auto mapTo(Tfrom, Tto, T)(in T src, in Tfrom dstFrom, in Tto dstTo)
+		=> src.mapTo!(dstFrom, dstTo); 
 		
 		//Todo: Decide what to return when input is NAN. Result is now NAN.
 		T remap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
