@@ -6612,7 +6612,8 @@ struct im
 			
 			.Container cntr; 
 			
-			Document!(srcModule, srcLine)(
+			Document!(srcModule, srcLine)
+			(
 				{
 					 //Todo: why document? It should be a template parameter!
 					cntr = actContainer; 
