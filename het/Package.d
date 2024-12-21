@@ -1738,7 +1738,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 		}
 	}
-}version(/+$DIDE_REGION Meta prg.+/all)
+}version(/+$DIDE_REGION Meta programming       +/all)
 {
 	
 	void free(O)(ref O o)
@@ -2650,7 +2650,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				
 				
 				string generateColumn(string fmt)(size_t colIdx, string label)
-				{ return format!fmt(label, rows.map!((a)=>(a[colIdx]))); } 
+				{
+					if(label.endsWith('$'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx]~"}"))); 
+					else	return format!fmt(label, rows.map!((a)=>(a[colIdx]))); 
+				} 
 				
 				string res = generateColumn!"enum %s {%-(%s,%)}"(0, prefix.capitalize); 
 				foreach(i; 1..numCols)
@@ -4667,7 +4670,7 @@ version(/+$DIDE_REGION Numeric+/all)
 				
 		}
 	} 
-}version(/+$DIDE_REGION Signal p.+/all)
+}version(/+$DIDE_REGION Signal processing+/all)
 {
 	//Signal processing /////////////////////////////
 	version(/+$DIDE_REGION+/all) {
@@ -6261,7 +6264,7 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 		}); 
 	} 
-}version(/+$DIDE_REGION String ops.+/all)
+}version(/+$DIDE_REGION String operations+/all)
 {
 	version(/+$DIDE_REGION+/all) {
 		//Strings //////////////////////////////////
@@ -7885,8 +7888,8 @@ version(/+$DIDE_REGION Containers+/all)
 		/// If a string is passed, the caller must ensure if it's system wide unique.
 		string identityStr(T)(in T a)
 		{
-			 //identityStr /////////////////////////
-				static if(isSomeString!T	) return a; 
+			//identityStr /////////////////////////
+			static if(isSomeString!T	) return a; 
 			else static if(isPointer!T   	) return a is null ? "" : format!"%s(%s)"(PointerTarget!T.stringof, cast(void*)a); 
 			else static if(is(T == class)	) return a is null ? "" : format!"%s(%s)"(T.stringof, cast(void*)a); 
 			else static if(is(T == typeof(null))	) return ""; 
@@ -10729,9 +10732,8 @@ version(/+$DIDE_REGION Colors+/all)
 		} 
 	} 
 }
-version(/+$DIDE_REGION Date Time+/all)
+version(/+$DIDE_REGION Date Time handling+/all)
 {
-	//Date/Time///////////////////////////////
 	version(/+$DIDE_REGION+/all)
 	{
 		void sleep(int ms) { Sleep(ms); } 
@@ -12200,6 +12202,30 @@ version(/+$DIDE_REGION Date Time+/all)
 		bool samePath(in Path a, in Path b)
 		{ return samePath(a.fullPath, b.fullPath); } 
 		
+		struct DriveInfo
+		{
+			this(string drive)
+			{
+				this.drive = drive; 
+				import core.sys.windows.winnt : ULARGE_INTEGER, PULARGE_INTEGER; 
+				import core.sys.windows.winbase : GetDiskFreeSpaceExA; 
+				ULARGE_INTEGER freeBytes, totalBytes; 
+				if(GetDiskFreeSpaceExA(drive.toPChar, &freeBytes, &totalBytes, null))
+				{
+					valid = true; 
+					this.freeBytes = freeBytes.QuadPart; 
+					this.totalBytes = totalBytes.QuadPart; 
+				}
+			} const
+			{
+				string drive; 
+				bool valid; B opCast(B: bool)() => valid; 
+				long totalBytes, freeBytes; 
+				@property totalGB()
+				=> ((totalBytes)/(((2.0f)^^(30)))); 	@property freeGB()
+				=> ((freeBytes)/(((2.0f)^^(30)))); 
+			} 
+		} 
 		
 		struct Path
 		{
@@ -12292,8 +12318,11 @@ version(/+$DIDE_REGION Date Time+/all)
 					return 0; 
 				} 
 				
-				@property bool hasDrive()const
-				{ return drive!=""; } 
+				
+				
+				@property hasDrive()const
+				=> drive!=""; @property driveInfo()const 
+				=> DriveInfo(drive); 
 				
 				Path parent() const
 				{ string s = dir; while(s!="" && s.back!='\\') s.length--; return Path(s); } 
@@ -12566,6 +12595,9 @@ version(/+$DIDE_REGION Date Time+/all)
 			{ return Path(fullName).driveIs(drives); } 
 			@property bool hasDrive()const
 			{ return drive!=""; } 
+			
+			@property driveInfo()const 
+			=> DriveInfo(drive); 
 			
 			@property string name()const
 			{ return extractFileName(fullName); } 
@@ -12875,7 +12907,6 @@ version(/+$DIDE_REGION Date Time+/all)
 			}
 			return f; 
 		} 
-		
 		
 		//helpers for saving and loading
 		
