@@ -15378,6 +15378,12 @@ version(/+$DIDE_REGION debug+/all)
 				}
 				
 				//recursive call for each field
+				enum debugUnusedFields = true; 
+				
+				static if(debugUnusedFields)
+				bool[string] usedFields; 
+				
+				
 				static foreach(fieldName; FieldAndFunctionNamesWithUDA!(T, STORED, true))
 				{
 					{
@@ -15399,8 +15405,17 @@ version(/+$DIDE_REGION debug+/all)
 								mixin("data.", fieldName, "=tmp;"); 
 							}
 							else { streamDecode_json(state, *p, __traits(getMember, data, fieldName)); }
-						}//Todo: error handling
+							
+							static if(debugUnusedFields)
+							usedFields[fn] = true; 
+						}
 					}
+				}
+				
+				static if(debugUnusedFields)
+				{
+					foreach(e; elementMap.keys)
+					if(e !in usedFields) LOG("Unused JSON field:", e); 
 				}
 				
 				static if(__traits(compiles, { data.afterLoad(); } )) data.afterLoad(); 
