@@ -2957,6 +2957,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		//constant literals (compile time)
 		auto 常(T)(T val)
 		{ return val; } 
+		
+		//index operation
+		string 指(string var, string idx)
+		=> var~'['~idx~']'; 
 		
 		bool waitForZeroAndSet(T)(T* reference, T newValue, int numTries)
 		{

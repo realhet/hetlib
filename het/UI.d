@@ -35,15 +35,15 @@ version(/+$DIDE_REGION+/all)
 	
 	immutable
 		DefaultFontHeight	= 18,
-		InvDefaultFontHeight	= 1.0f/DefaultFontHeight,
+		InvDefaultFontHeight 	= 1.0f/DefaultFontHeight,
+			
+		LeadingTabWidth 	= 7.25f*4 	*(DefaultFontHeight/18.0f),	 LeadingTabAspect 	= LeadingTabWidth	/ DefaultFontHeight,
+		InternalTabWidth	= 3.25f	*(DefaultFontHeight/18.0f),	 InternalTabAspect	= InternalTabWidth	/ DefaultFontHeight,
+			
+		MinScrollThumbSize	= 4, 
+		DefaultScrollThickness 	= 15; 
 	
-		MinScrollThumbSize	= 4, //pixels
-		DefaultScrollThickness	= 15, //pixels
-	
-		LeadingTabWidth	=	 7.25f*4,	 LeadingTabAspect	= LeadingTabWidth	/ DefaultFontHeight,
-		InternalTabWidth	=	 3.25f  ,	 InternalTabAspect	= InternalTabWidth	/ DefaultFontHeight; 
-	
-	static assert(DefaultFontHeight==18, "//fucking keep it on 18!!!!"); 
+	//static assert(DefaultFontHeight==18, "//fucking keep it on 18!!!!"); 
 	
 	
 	Glyph newLineGlyph()
@@ -3911,13 +3911,20 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		/// do a recursive visit. Search result and continuation is supplied by alias functions
-		auto search(string searchText, vec2 origin = vec2.init)
+		auto search(
+			string searchText, vec2 origin = vec2.init, 
+			Flag!"caseSensitive" 	caseSensitive 	= No.caseSensitive, 
+			Flag!"wholeWords" 	wholeWords 	= No.wholeWords
+		)
 		{
 			
 			static struct SearchContext
 			{
 				dstring searchText; 
 				vec2 absInnerPos; 
+				Flag!"caseSensitive" caseSensitive; 
+				Flag!"wholeWords" wholeWords; 
+				//---------------------------------------
 				Cell[] cellPath; 
 				
 				SearchResult[] results; 
@@ -3968,17 +3975,35 @@ version(/+$DIDE_REGION+/all)
 						size_t searchBaseIdx = 0; 
 						while(1)
 						{
-							auto idx = chars.indexOf(context.searchText, No.caseSensitive); 
+							auto idx = chars.indexOf(context.searchText, context.caseSensitive); 
 							if(idx<0)
 							break; 
 							
-							context.results ~= SearchResult(
-								thisC, 
-								context.absInnerPos, 
-								cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]
-							); 
-							if(context.canStop)
-							return true; 
+							
+							bool valid = true; 
+							
+							if(context.wholeWords)
+							{
+								if(
+									only(
+										idx-1, 
+										idx+context.searchText.length
+									)
+									.any!((size_t i)=>(isDLangIdentifierCont(((i<chars.length)?(chars[i]):(dchar(0))))))
+								) valid = false; 
+							}
+							
+							
+							if(valid)
+							{
+								context.results ~= SearchResult(
+									thisC, 
+									context.absInnerPos, 
+									cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]
+								); 
+								if(context.canStop)
+								return true; 
+							}
 							
 							const skip = idx + context.searchText.length; 
 							chars.popFrontExactly(skip); 
@@ -3994,7 +4019,7 @@ version(/+$DIDE_REGION+/all)
 				return false; 
 			} 
 			
-			auto context = SearchContext(searchText.to!dstring, origin); 
+			auto context = SearchContext(searchText.to!dstring, origin, caseSensitive, wholeWords); 
 			if(!searchText.empty)
 			cntrSearchImpl(this, context); 
 			return context.results; 

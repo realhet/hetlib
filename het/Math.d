@@ -686,6 +686,10 @@ version(/+$DIDE_REGION+/all)
 	
 	enum isColor(T) = isVector!T && T.length>=3 && (is(T.ComponentType==ubyte) || is(T.ComponentType==float)); 
 	
+	enum CardinalDir : ubyte {
+		N, E, S, W,
+		top=N, right=E, bottom=S, left=W 
+	} 
 	struct CardinalDirs
 	{
 		static immutable ivec2 = [.ivec2(0, 1), .ivec2(1, 0), .ivec2(0, -1), .ivec2(-1, 0)]; 
@@ -697,6 +701,11 @@ version(/+$DIDE_REGION+/all)
 			static immutable vec2 = ivec2.map!(.vec2).array; 
 			alias ivec2 this; 
 		} 
+	} 
+	
+	enum OrdinalDir : ubyte {
+		N, NE, E, SE, S, SW, W, NW,
+		top=N, topRight=NE, right=E, bottomRight=SE, bottom=S, bottomLeft=SW, left=W, topLeft=NW
 	} 
 	
 	struct OrdinalDirs
@@ -3523,15 +3532,15 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		auto floor(A, CT=ScalarType!A)(in A a)
-		{ return a.floatReductionOp!(std.math.floor	, CT, A); } 
+		{ return a.floatReductionOp!(std.math.floor, CT, A); } 
 		auto ceil(A, CT=ScalarType!A)(in A a)
-		{ return a.floatReductionOp!(std.math.ceil	, CT, A); } 
+		{ return a.floatReductionOp!(std.math.ceil, CT, A); } 
 		auto trunc(A, CT=ScalarType!A)(in A a)
-		{ return a.floatReductionOp!(std.math.trunc	, CT, A); } 
+		{ return a.floatReductionOp!(std.math.trunc, CT, A); } 
 		auto round(A, CT=ScalarType!A)(in A a)
-		{ return a.floatReductionOp!(std.math.round	, CT, A); } 
+		{ return a.floatReductionOp!(std.math.round, CT, A); } 
 		auto roundEven(A, CT=ScalarType!A)(in A a)
-		{ return a.floatReductionOp!(std.math.lrint	, CT, A); } //Note: depens on roundingMode: default is even
+		{ return a.floatReductionOp!(std.math.lrint, CT, A); } //Note: depends on roundingMode: default is even
 		
 		auto vectorCast(CT, A)(A a)
 		{
