@@ -27,6 +27,14 @@ version(/+$DIDE_REGION+/all)
 	//Todo: DIDE, look inside  enum statement  not just  enum block.   enum; enum{}
 	
 	//Todo: bug: NormalFontHeight = 18*4	-> RemoteUVC.d crashes.
+	
+	/+
+		Todo: 241231 id generalas
+		- adat pointer alapjan  (ref parameter vagy T*)
+		- elmentett hash alapjan. Ugyanaz a hash, mint a DIDE.Inspector-nal.
+		
+		Ezekkel meg lehetne oldani az 1 soron levo dolgok kulonbozo ID-jét végre.
+	+/
 	immutable DefaultFontName = //this is	the cached font
 		"Segoe UI"
 	//"Lucida Console"
@@ -4073,7 +4081,7 @@ version(/+$DIDE_REGION+/all)
 									}
 								} 
 								
-								const 	idxLast = idx + context.searchText.length /+last character index+/,
+								const 	idxLast = idx + context.searchText.length-1 /+last character index+/,
 									valid = 	checkBoundary(context.options.boundaryTypeStart, idx, idx-1) && 
 										checkBoundary(context.options.boundaryTypeEnd, idxLast, idxLast+1); 
 								
@@ -8511,9 +8519,10 @@ struct im
 		} 
 		
 		//BtnRow //////////////////////////////////
-		auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(void delegate() fun, in T args)
+		
+		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(void delegate() fun, in T args)
 		{
-			Row!(srcModule, srcLine)(
+			Container!(Cntr, srcModule, srcLine)(
 				{
 					flags.btnRowLines = true; 
 					
@@ -8521,25 +8530,34 @@ struct im
 					
 					foreach(i, c; subCells)
 					{
-						const first = i==0, last = i+1==subCells.length; 
-						
+						const 	first = i==0, 
+							last = i+1==subCells.length; 
 						//stick them together with 0 margin
-						if(!first)
-						c.margin.left = 0; 
-						if(!last)
-						c.margin.right= 0; 
+						static if(is(Cntr : .Row))
+						{
+							if(!first)
+							c.margin.left = 0; if(!last)
+							c.margin.right= 0; 
+						}
+						static if(is(Cntr : .Column))
+						{
+							if(!first)
+							c.margin.top = 0; if(!last)
+							c.margin.bottom= 0; 
+						}
+						
 					}
 				}, args
 			); 
 		} 
 		
-		auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref int idx, in string[] captions, in T args)
+		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref int idx, in string[] captions, in T args)
 		{
 			mixin(enable.M); 
 			
 			auto last = idx; 
 			
-			BtnRow!(srcModule, srcLine)(
+			BtnRow!(Cntr, srcModule, srcLine)(
 				{
 					foreach(i0, capt; captions)
 					{
@@ -8553,20 +8571,20 @@ struct im
 			return last != idx; 
 		} 
 		
-		auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, in Args args)
+		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, in Args args)
 		{
 			auto idx = cast(int) items.countUntil(value); //Todo: it's a copy from ListBox. Refactor needed
-			auto res = BtnRow!(srcModule, srcLine)(idx, items, args); 
+			auto res = BtnRow!(Cntr, srcModule, srcLine)(idx, items, args); 
 			if(res)
 			value = items[idx]; 
 			return res; 
 		} 
 		
 		//Todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
-		auto BtnRow(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum))
+		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum))
 		{
 			string s = e.text; 
-			auto res = BtnRow!(srcModule, srcLine)(s, EnumMemberNames!E, args); 
+			auto res = BtnRow!(Cntr, srcModule, srcLine)(s, EnumMemberNames!E, args); 
 			if(res)
 			ignoreExceptions({ e = s.to!E; }); 
 			return res; 

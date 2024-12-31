@@ -2480,7 +2480,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			enum fieldInitializations = transform!fieldInitialization; 
 		} 
 		
-		string generateSmartClassCode_impl(alias f, Flag!"hasChildren" hasChildren)()
+		string generateSmartClassCode_impl(alias f, Flag!"hasChildren" hasChildren, string customConstructor)()
 		{
 			alias P = FunctionParameterProcessor!f; 
 			
@@ -2490,22 +2490,43 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			res ~= P.fieldDeclarations ~ "\n"; 
 			if(hasChildren) res ~= format!"mixin SmartParentTemplate; \n"; 
 			if(hasParent) res ~= format!"mixin SmartChildTemplate!%s; \n"(P.names[0]); 
-			res ~= format!"this(%s){ %s _construct; %s }\n"(
-				P.paramDeclarations, P.fieldInitializations, 
-				hasParent ? "_thisChildCreated;" : ""
-			); 
-			res ~= format!"~this(){ %s %s _destruct; }\n"(
-				hasChildren ? "_thisParentDestroying;" : "",
-				hasParent ? "_thisChildDestroying;" : "",
-			); 
+			version(/+$DIDE_REGION+/none) {
+				res ~= format!"this(%s){ %s static if(__traits(compiles, { _construct; })) _construct; %s%s}\n"
+					(
+					P.paramDeclarations, P.fieldInitializations, 
+					hasParent ? "_thisChildCreated;" : "",
+					customConstructor
+				); 
+				res ~= format!"~this(){ %s %s static if(__traits(compiles, { _destruct; })) _destruct; }\n"
+					(
+					hasChildren ? "_thisParentDestroying;" : "",
+					hasParent ? "_thisChildDestroying;" : "",
+				); 
+			}
+			
+			res ~= iq{
+				this($(P.paramDeclarations))
+				{
+					$(P.fieldInitializations); $(customConstructor); 
+					static if(__traits(compiles, { _construct; })) _construct; 
+					$(((hasParent)?("_thisChildCreated;"):(""))); 
+				} 
+				~this()
+				{
+					$(((hasChildren)?("_thisParentDestroying;"):(""))); 
+					$(((hasParent)?("_thisChildDestroying;"):(""))); 
+					static if(__traits(compiles, { _destruct; })) _destruct; 
+				} 
+			}.text; 
+			
 			return res; 
 		} 
 		
-		mixin template SmartClass(string fieldDefs, Flag!"hasChildren" hasChildren = No.hasChildren)
-		{
-			//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren)); 
-			mixin(generateSmartClassCode!(fieldDefs, hasChildren)); 
-		} 
+		mixin template SmartClass(string fieldDefs, Flag!"hasChildren" hasChildren = No.hasChildren, string customConstructor = "")
+		{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
+		
+		mixin template SmartClass(string fieldDefs, string customConstructor, Flag!"hasChildren" hasChildren = No.hasChildren)
+		{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
 		
 		mixin template SmartClassParent(string fieldDefs)
 		{ mixin SmartClass!(fieldDefs, Yes.hasChildren); } 
@@ -2518,10 +2539,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Example: High level Vulkan classes
 			+/
 			
-			private string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren)()
+			private string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren, string customConstructor)()
 			{
+				//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); 
 				mixin("void f("~fieldDefs~"){}"); 
-				return generateSmartClassCode_impl!(f, hasChildren); 
+				return generateSmartClassCode_impl!(f, hasChildren, customConstructor); 
 			} 
 		} 
 	}
