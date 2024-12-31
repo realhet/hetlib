@@ -3975,6 +3975,8 @@ version(/+$DIDE_REGION+/all)
 				DateTime* timeLimit=null	/+If this is reached, it will call Fiber.yield;+/
 			)
 			{
+				enum MeasureStack = false; /+measured: 24K, level:84+/
+				
 				static struct SearchContext
 				{
 					dstring searchText; 
@@ -3991,6 +3993,8 @@ version(/+$DIDE_REGION+/all)
 					
 					bool canStop() const
 					{ return results.length >= maxResults; } 
+					
+					static if(MeasureStack) ulong baseSP; 
 				} 
 				
 				static bool cntrSearchImpl(Container thisC, ref SearchContext context)
@@ -4005,6 +4009,21 @@ version(/+$DIDE_REGION+/all)
 					
 					scope(exit)
 					{
+						static if(MeasureStack)
+						{
+							{
+								ulong tmp; asm { mov tmp, RSP; } 
+								long actPos = context.baseSP-tmp; 
+								static long maxPos; 
+								if(maxPos < actPos) { maxPos = actPos; print(actPos, context.cellPath.length); }
+								
+								/+
+									Todo: Write a guard for this.  Get the cache size from the outside and 
+									make an Exception when running low.
+								+/
+							}
+						}
+						
 						context.absInnerPos -= thisC.innerPos; 
 						context.cellPath.popBack; 
 						
@@ -4092,6 +4111,9 @@ version(/+$DIDE_REGION+/all)
 				} 
 				
 				auto context = SearchContext(searchText.to!dstring, options, origin, onMatch, timeLimit); 
+				
+				static if(MeasureStack)
+				{ { ulong tmp; asm { mov tmp, RSP; } context.baseSP = tmp; }}
 				
 				if(!searchText.empty)
 				cntrSearchImpl(this, context); 
