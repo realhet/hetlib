@@ -3845,10 +3845,7 @@ version(/+$DIDE_REGION Keywords+/all)
 			import std.concurrency : Generator, yield; //Ali Cehreli Fiber presentation: https://youtu.be/NWIU5wn1F1I?t=1624
 			
 			auto scanner(string src)
-			{
-				return 	new Generator!(StructureScanner.ScanResult)({ scan(src); })
-					.map!"a"/+Todo: This is needed because the 2 specializations std.algorithm.each are ambiguous.+/; 
-			} 
+			{ return new Generator!(StructureScanner.ScanResult)({ scan(src); }); } 
 			
 			auto scan(string src)
 			{
@@ -4005,7 +4002,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1DCCFFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1DC5DFDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

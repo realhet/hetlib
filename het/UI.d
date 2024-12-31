@@ -3879,152 +3879,225 @@ version(/+$DIDE_REGION+/all)
 			} 
 		} ; 
 		
-		
-		static struct SearchResult
+		version(/+$DIDE_REGION Search+/all)
 		{
-			Container container; 
-			vec2 absInnerPos; 
-			Cell[] cells; //Todo: if this is empty, the whole container should be marked
-			Object reference; //user can use it to identify the search result
-			bool showArrow = true; //The searchresult is amade out of multiple parts. Only one of those should display an arrow.
-			
-			
-			bool valid() const
-			{ return !!container; } bool opCast(T : bool)() const
-			{ return valid; } 
-			
-			auto cellBounds() const
-			{ return cells.map!(c => c.outerBounds + absInnerPos); } 
-			auto bounds() const
-			{ return cellBounds.fold!"a|b"(bounds2.init); } 
-			
-			void drawHighlighted(Drawing dr, RGB clHighlight) const
+			static struct SearchOptions
 			{
-				foreach(cell; cells)
-				if(auto glyph = cast(Glyph)cell)
-				with(glyph)
-				{
-					dr.color = bkColor; 
-					dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags); 
-				}
+				enum BoundaryType : byte {none, word, line /+otlet: Tab is lehetne+/} 
+				
+				bool caseSensitive; 
+				BoundaryType 	boundaryTypeStart, 
+					boundaryTypeEnd; 
+				
+				static foreach(
+					name, bt; [
+						"wholeWords"	: BoundaryType.word,
+						"wholeLines"	: BoundaryType.line
+					]
+				)
+				mixin(
+					iq{
+						@property $(name)() const
+						=> boundaryTypeStart 	== $(bt.stringof) &&
+						boundaryTypeEnd	== $(bt.stringof); 
+						@property $(name)(bool a)
+						{
+							const b = ((a)?($(bt.stringof)):(BoundaryType.none)); 
+							boundaryTypeStart = b; 
+							boundaryTypeEnd = b; 
+						} 
+						void $(name)_toggle()
+						{ $(name) = !$(name); } 
+					}.text
+				); 
 			} 
-		} 
-		
-		/// do a recursive visit. Search result and continuation is supplied by alias functions
-		auto search(
-			string searchText, vec2 origin = vec2.init, 
-			Flag!"caseSensitive" 	caseSensitive 	= No.caseSensitive, 
-			Flag!"wholeWords" 	wholeWords 	= No.wholeWords
-		)
-		{
 			
-			static struct SearchContext
+			static struct SearchResult
 			{
-				dstring searchText; 
+				Container container; 
 				vec2 absInnerPos; 
-				Flag!"caseSensitive" caseSensitive; 
-				Flag!"wholeWords" wholeWords; 
-				//---------------------------------------
-				Cell[] cellPath; 
+				Cell[] cells; //Todo: if this is empty, the whole container should be marked
+				Object reference; //user can use it to identify the search result
+				bool showArrow = true; //The searchresult is amade out of multiple parts. Only one of those should display an arrow.
 				
-				SearchResult[] results; 
-				int maxResults = 9999; 
 				
-				bool canStop() const
-				{ return results.length >= maxResults; } 
+				bool valid() const
+				{ return !!container; } bool opCast(T : bool)() const
+				{ return valid; } 
+				
+				auto cellBounds() const
+				{ return cells.map!(c => c.outerBounds + absInnerPos); } 
+				auto bounds() const
+				{ return cellBounds.fold!"a|b"(bounds2.init); } 
+				
+				void drawHighlighted(Drawing dr, RGB clHighlight) const
+				{
+					foreach(cell; cells)
+					if(auto glyph = cast(Glyph)cell)
+					with(glyph)
+					{
+						dr.color = bkColor; 
+						dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags); 
+					}
+				} 
 			} 
 			
-			static bool cntrSearchImpl(Container thisC, ref SearchContext context)
+			auto search(A...)(string searchText, A args)
 			{
-				//returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
-				if(thisC.flags.dontSearch)
-				return false; 
+				SearchOptions o; 
+				vec2 origin = vec2(0); 
+				void delegate(SearchResult) cb; 
+				DateTime* dt; 
 				
-				//recursive entry/leave
-				context.cellPath ~= thisC; 
-				context.absInnerPos += thisC.innerPos; 
-				
-				scope(exit)
+				static foreach(i, a; args)
 				{
-					context.absInnerPos -= thisC.innerPos; 
-					context.cellPath.popBack; 
+					{
+						alias T = A[i]; 
+						static if((is(T : Flag!"caseSensitive"))) o.caseSensitive = !!a; 
+						else static if((is(T : Flag!"wholeWords"))) o.wholeWords = !!a; 
+						else static if((is(T : vec2))) origin = a; 
+						else static if((is(T : void delegate(SearchResult)))) cb = a; 
+						else static if((is(T : DateTime*))) dt = a; 
+						else static assert(0, "Unhandled type"); 
+					}
 				}
 				
-				//print("enter");
-				
-				Cell[] cells = thisC.subCells; 
-				size_t baseIdx; 
-				foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group)
+				return search(searchText, o, origin, cb, dt); 
+			} 
+			/// do a recursive visit. Search result and continuation is supplied by alias functions
+			auto search(
+				string searchText, SearchOptions options = SearchOptions.init, 
+				vec2 origin = vec2.init, 	/+The world position of this container (innerPos=origin).+/
+				void delegate(SearchResult) onMatch = null, 	/+
+					When set, it will return the results using this callback.
+					And not collecting results in an array.
+				+/
+				DateTime* timeLimit=null	/+If this is reached, it will call Fiber.yield;+/
+			)
+			{
+				static struct SearchContext
 				{
-					auto act = cells[baseIdx..baseIdx+len]; 
+					dstring searchText; 
+					SearchOptions options; 
+					vec2 absInnerPos; 
+					void delegate(SearchResult) onMatch; 
+					DateTime* timeLimit; 
+					//---------------------------------------
+					
+					Cell[] cellPath; 
 					
-					if(!isGlyph)
-					{
-						foreach(c; act.map!(c => cast(Container)c).filter!"a")
-						{
-							if(cntrSearchImpl(c, context))
-							return true; //end recursive call
-						}
-					}
-					else
-					{
-						auto chars = act.map!(c => (cast(Glyph)c).ch); 
-						
-						//print("searching in", chars.text);
-						
-						size_t searchBaseIdx = 0; 
-						while(1)
-						{
-							auto idx = chars.indexOf(context.searchText, context.caseSensitive); 
-							if(idx<0)
-							break; 
-							
-							
-							bool valid = true; 
-							
-							if(context.wholeWords)
-							{
-								if(
-									only(
-										idx-1, 
-										idx+context.searchText.length
-									)
-									.any!((size_t i)=>(isDLangIdentifierCont(((i<chars.length)?(chars[i]):(dchar(0))))))
-								) valid = false; 
-							}
-							
-							
-							if(valid)
-							{
-								context.results ~= SearchResult(
-									thisC, 
-									context.absInnerPos, 
-									cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]
-								); 
-								if(context.canStop)
-								return true; 
-							}
-							
-							const skip = idx + context.searchText.length; 
-							chars.popFrontExactly(skip); 
-							searchBaseIdx += skip; 
-						}
-					}
+					SearchResult[] results; 
+					int maxResults = 9999; 
 					
-					//readln;
-					//print("advance", len);
-					baseIdx += len; 
-				}
+					bool canStop() const
+					{ return results.length >= maxResults; } 
+				} 
 				
-				return false; 
+				static bool cntrSearchImpl(Container thisC, ref SearchContext context)
+				{
+					//returns: "you can exit from recursion now"    It is possible to do an optimized exit when context.canStop==true.
+					if(thisC.flags.dontSearch)
+					return false; 
+					
+					//recursive entry/leave
+					context.cellPath ~= thisC; 
+					context.absInnerPos += thisC.innerPos; 
+					
+					scope(exit)
+					{
+						context.absInnerPos -= thisC.innerPos; 
+						context.cellPath.popBack; 
+						
+						if(context.timeLimit && now > *context.timeLimit)
+						{ import core.thread.fiber; Fiber.yield; /+Note: Fiber time limitation.+/}
+					}
+					
+					//print("enter");
+					
+					Cell[] cells = thisC.subCells; 
+					size_t baseIdx; 
+					foreach(isGlyph, len; cells.map!(c => cast(Glyph)c !is null).group)
+					{
+						auto act = cells[baseIdx..baseIdx+len]; 
+						
+						if(!isGlyph)
+						{
+							foreach(c; act.map!(c => cast(Container)c).filter!"a")
+							{
+								if(cntrSearchImpl(c, context))
+								return true; //end recursive call
+							}
+						}
+						else
+						{
+							auto chars = act.map!(c => (cast(Glyph)c).ch); 
+							
+							size_t searchBaseIdx = 0; 
+							while(1)
+							{
+								auto idx = chars.indexOf(context.searchText, (cast(CaseSensitive)(context.options.caseSensitive))); 
+								if(idx<0) break; 
+								
+								alias BT = SearchOptions.BoundaryType; 
+								bool checkBoundary(BT type, sizediff_t inside, sizediff_t outside )
+								{
+									dchar ch(alias i)() => ((i>=0 && i<chars.length)?(chars[i]):('\0')); 
+									final switch(type)
+									{
+										case BT.none: 	return true; 
+										case BT.word: 	return 	!isDLangIdentifierCont(ch!inside) || !isDLangIdentifierCont(ch!outside)
+											/+
+											Note: Only word-word is not OK.
+											Any combination with symbols are OK.
+										+/; 
+										case BT.line: 	return ch!outside=='\0'; 
+									}
+								} 
+								
+								const 	idxLast = idx + context.searchText.length /+last character index+/,
+									valid = 	checkBoundary(context.options.boundaryTypeStart, idx, idx-1) && 
+										checkBoundary(context.options.boundaryTypeEnd, idxLast, idxLast+1); 
+								
+								if(valid)
+								{
+									auto sr = SearchResult(
+										thisC, context.absInnerPos, 
+										cells[baseIdx+searchBaseIdx+idx..$][0..context.searchText.length]
+									); 
+									if(context.onMatch)
+									{
+										/+Note: callback mode: unlimited number of results. The caller can stop it by a Fiber.+/
+										context.onMatch(sr); 
+									}
+									else
+									{
+										/+Note: classic mode: returns limited number of results.+/
+										context.results ~= sr; 
+										if(context.canStop) return true; 
+									}
+								}
+								
+								const skip = idx + context.searchText.length; 
+								chars.popFrontExactly(skip); 
+								searchBaseIdx += skip; 
+							}
+						}
+						
+						//readln;
+						//print("advance", len);
+						baseIdx += len; 
+					}
+					
+					return false; 
+				} 
+				
+				auto context = SearchContext(searchText.to!dstring, options, origin, onMatch, timeLimit); 
+				
+				if(!searchText.empty)
+				cntrSearchImpl(this, context); 
+				return context.results; 
 			} 
-			
-			auto context = SearchContext(searchText.to!dstring, origin, caseSensitive, wholeWords); 
-			if(!searchText.empty)
-			cntrSearchImpl(this, context); 
-			return context.results; 
-		} 
-		
+		}
 		
 		
 		private enum genSetChanged = q{

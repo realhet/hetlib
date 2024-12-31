@@ -3042,6 +3042,29 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			assert(0); 
 		} 
 		
+		/+Note: tenary relationals+/
+		string 界0(string mi, string x, string ma) => iq{($(mi))<($(x)) && ($(x))<($(ma))}.text; 
+		string 界1(string mi, string x, string ma) => iq{($(mi))<=($(x)) && ($(x))<($(ma))}.text; 
+		string 界2(string mi, string x, string ma) => iq{($(mi))<($(x)) && ($(x))<=($(ma))}.text; 
+		string 界3(string mi, string x, string ma) => iq{($(mi))<=($(x)) && ($(x))<=($(ma))}.text; 
+		
+		/+Note: tenary equal+/
+		string 等(string a, string b, string c) => iq{($(a))==($(b)) && ($(b))==($(c))}.text; 
+		
+		/+
+			Todo: UnitTest relational operations.
+			/+
+				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
+				(mixin(求each(q{i=0},q{4},q{
+					((0x5188F6F833B).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+					((0x5708F6F833B).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+					((0x5C88F6F833B).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+					((0x6208F6F833B).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+					((0x6788F6F833B).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+				}))); 
+			+/
+		+/
+		
 	}
 	
 }
