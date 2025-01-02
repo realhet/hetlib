@@ -2640,12 +2640,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					cName 	= hdr.countUntil("Name"),
 					cDefault 	= hdr.countUntil("Default"),
 					cUDAs	= hdr.enumerate.filter!((a)=>(a.value.startsWith('@'))).map!"a.index".array; 
-				return (mixin(求map(q{r},q{rows},q{
-					string getUDA(long c) => 
-					((r.get(c)=="")?("") : (iq{$(hdr[c])($(r[c])) }.text)); string getDefault() => 
-					((r.get(cDefault)=="")?("") : ("="~r[cDefault])); 
-					return iq{$(cUDAs.map!getUDA.join)$(r[cType]) $(r[cName]) $(getDefault); }.text ~ '\n'; 
-				}))).join; 
+				return (
+					mixin(求map(q{r},q{rows},q{
+						string getUDA(long c) => 
+						((r.get(c)=="")?("") : (iq{$(hdr[c])($(r[c])) }.text)); string getDefault() => 
+						((r.get(cDefault)=="")?("") : ("="~r[cDefault])); 
+						return iq{$(cUDAs.map!getUDA.join)$(r[cType]) $(r[cName]) $(getDefault); }.text ~ '\n'; 
+					}))
+				).join; 
 			} 
 			
 			string GEN_verbs(Flag!"hold" hold = No.hold)
@@ -2655,12 +2657,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				cName 	= hdr.countUntil("Name"),
 				cScript 	= hdr.countUntil("Script"),
 				cUDAs	= hdr.enumerate.filter!((a)=>(a.value.startsWith('@'))).map!"a.index".array; 
-				return (mixin(求map(q{r},q{rows},q{
-					string getUDA(long c) => ((r.get(c)=="")?(""): (iq{$(hdr[c])($(r[c])) }.text)); 
-					const 	udas = cUDAs.map!getUDA.join ~ iq{@$(((hold)?("HOLD"):("VERB")))($(r[cKey])) }.text,
-						functName = r[cName]~((r[cName].stripRight.endsWith(')'))?(""):("()")); 
-					return iq{$(udas)void $(functName) {$(r[cScript])} }.text ~ '\n'; 
-				}))).join; 
+				return (
+					mixin(求map(q{r},q{rows},q{
+						string getUDA(long c) => ((r.get(c)=="")?(""): (iq{$(hdr[c])($(r[c])) }.text)); 
+						const 	udas = cUDAs.map!getUDA.join ~ iq{@$(((hold)?("HOLD"):("VERB")))($(r[cKey])) }.text,
+							functName = r[cName]~((r[cName].stripRight.endsWith(')'))?(""):("()")); 
+						return iq{$(udas)void $(functName) {$(r[cScript])} }.text ~ '\n'; 
+					}))
+				).join; 
 			} 
 			
 			string GEN_enumTable()
@@ -2826,7 +2830,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				if(fun=="each")
 				{
 					if(!isCode) expr ~= ';'; //make it a valid statement
-					return format	!"(%s.each!((%s){%s}))"
+					return format	!"%s.each!((%s){%s});"
 						(generatorCode, strip(type~' '~id), expr); 
 				}
 				else
@@ -15004,12 +15008,12 @@ version(/+$DIDE_REGION debug+/all)
 			
 			auto ptrs = (mixin(求map(q{0<=i<N},q{},q{randomAlloc}))).array; 
 			T0; 
-			(mixin(求each(q{i=1},q{1<<20},q{
+			mixin(求each(q{i=1},q{1<<20},q{
 				if(!(i&0xFFFF)) { print(i, totalSize); ta.stats.print; }
 				auto j=random(N); 
 				ta.free(ptrs[j]).enforce("free() failed."); 
 				ptrs[j]=randomAlloc; 
-			}))); 
+			})); 
 			DT.print; 
 			
 			/+

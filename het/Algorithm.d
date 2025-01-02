@@ -160,20 +160,20 @@ version(/+$DIDE_REGION+/all)
 				//remap the result id image
 				map_.rehash; 
 				int lastp, mappedp; 
-				(mixin(求each(q{ref p},q{res.img},q{
+				mixin(求each(q{ref p},q{res.img},q{
 					if(p) {
 						if(lastp.chkSet(p))
 						mappedp = map(p); 
 						if(p!=mappedp)
 						p = mappedp; 
 					}
-				}))); 
+				})); 
 			}
 			
 			{
 				//remap the result blobs
 				int[] rem; 
-				(mixin(求each(q{k},q{res.blobs.keys},q{
+				mixin(求each(q{k},q{res.blobs.keys},q{
 					{
 						int p = map(k); 
 						if(p!=k) {
@@ -181,8 +181,8 @@ version(/+$DIDE_REGION+/all)
 							rem ~= k; 
 						}
 					}
-				}))); 
-				(mixin(求each(q{k},q{rem},q{res.blobs.remove(k)}))); 
+				})); 
+				mixin(求each(q{k},q{rem},q{res.blobs.remove(k)})); 
 			}
 			
 			static if(is(findBlobsDebug))
