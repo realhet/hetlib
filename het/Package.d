@@ -2677,7 +2677,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				
 				string generateColumn(string fmt)(size_t colIdx, string label)
 				{
-					if(label.endsWith('$'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx]~"}"))); 
+					/+Todo: these nasty hacks should be marked with a hidden comment, not a special symbol character.+/
+					if(label.endsWith('#'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx].withoutDComment!"Code"~"}"))); 
+					else if(label.endsWith('$'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx]~"}"))); 
 					else	return format!fmt(label, rows.map!((a)=>(a[colIdx]))); 
 				} 
 				
@@ -6474,6 +6476,22 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		S withoutEndingNewLine(S)(in S s)
 		{ return ((s.endsWith('\n'))?(s[0..$-1].withoutEnding('\r')):(s)); } 
+		
+		auto withoutStartingEnding(S, ST, EN)(in S s, in ST st, in EN en)
+		{
+			if(s.startsWith(st) && s.endsWith(en))
+			return s.withoutStarting(st).withoutEnding(en); 
+			return s; 
+		} 
+		
+		auto withoutDComment(string prefix="")(string s)
+		{
+			static assert(prefix.all!isAlpha); 
+			string p = ((prefix!="")?(prefix~':'):("")); 
+			if(s.length>=2+p.length+2 && s.startsWith("/+") && s.endsWith("+/") && sameText(s[2..2+p.length], p))
+			{ s = s[2+p.length..$-2].withoutStarting(' '); }
+			return s; 
+		} 
 	}version(/+$DIDE_REGION+/all) {
 		//Todo: unittest
 		/*
