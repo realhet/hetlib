@@ -2544,8 +2544,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); 
 				mixin("void f("~fieldDefs~"){}"); 
 				return generateSmartClassCode_impl!(f, hasChildren, customConstructor); 
+				
+				/+Todo: Read the manual and fix this mixin template mess!  Use minimal string mixins!+/
 			} 
 		} 
+		
+		
 	}
 	
 	version(/+$DIDE_REGION+/all)
@@ -2597,7 +2601,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				else	mixin(src); 
 			} 
 			
-			string GEN_bitfields(R)(R rows)
+			deprecated string GEN_bitfields(R)(R rows)
 			{
 				static if(isInputRange!R)
 				{
@@ -2630,7 +2634,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{ return GEN_bitfields(rows.rows); }
 			} 
 			
-			string GEN_bitfields()
+			deprecated string GEN_bitfields()
 			{ return GEN_bitfields(rows); } 
 			
 			string GEN_fields()
@@ -2650,7 +2654,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				).join; 
 			} 
 			
-			string GEN_verbs(Flag!"hold" hold = No.hold)
+			deprecated string GEN_verbs(Flag!"hold" hold = No.hold)
 			{
 				const 	hdr 	= headerRow,
 				cKey 	= hdr.countUntil("Key"),
@@ -2667,7 +2671,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				).join; 
 			} 
 			
-			string GEN_enumTable()
+			deprecated string GEN_enumTable()
 			{
 				const 	numCols 	= headerRow.length, 
 					prefix 	= headerCell(0).strip; 
@@ -2706,7 +2710,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				+/
 			} 
 			
-			string GEN_enum(R)(string name, R items)
+			deprecated string GEN_enum(R)(string name, R items)
 			{ return format!q{enum %s {%s} }(name, items.join(", "))~'\n'; } 
 			
 			
@@ -2769,6 +2773,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		static foreach(name; "bitfields fields enumTable StructureScanner".split)
 		mixin(iq{string GEN_$(name)(表 t) => t.GEN_$(name); }.text); 
 		/+Todo: Nonstandard casing (sometimes capitalized, sometimes not)  I thing everything capitalized would be better.+/
+		
+		
+		mixin template INJECTOR_TEMPLATE(表 table, string script)
+		{ mixin(script); } 
 		
 		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
 		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
@@ -2979,7 +2987,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{ return scr.format!q{{ static bool running; if(running.chkSet) {%s}}}; } 
 		
 		//call a function
-		auto 調(alias fun, Args...)(Args args)
+		deprecated auto 調(alias fun, Args...)(Args args)
 		{ return fun(args); } 
 		
 		//constant literals (compile time)
