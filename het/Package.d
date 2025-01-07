@@ -2775,8 +2775,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		/+Todo: Nonstandard casing (sometimes capitalized, sometimes not)  I thing everything capitalized would be better.+/
 		
 		
-		mixin template INJECTOR_TEMPLATE(表 table, string script)
-		{ mixin(script); } 
+		mixin template INJECTOR_TEMPLATE(alias _data, string _script)
+		{ mixin(_script); } 
+		alias 入 = INJECTOR_TEMPLATE; 
 		
 		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
 		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
