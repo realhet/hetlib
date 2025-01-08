@@ -424,13 +424,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				
 				private int _textAttr = 7; 
 				private void setTextAttr() { flush; SetConsoleTextAttribute(outputHandle, cast(ushort)_textAttr); } 
-				@property int	color()	 { return	_textAttr.getBits	(0, 4); } 
+				@property int	color()	 { return _textAttr.getBits	(0, 4); } 
 				@property void	color(int c)	 { _textAttr =	_textAttr.setBits	(0, 4, c); setTextAttr(); } 
-				@property int	bkColor()	 { return	_textAttr.getBits	(4, 4); } 
+				@property int	bkColor()	 { return _textAttr.getBits	(4, 4); } 
 				@property void	bkColor(int c)	 { _textAttr =	_textAttr.setBits	(4, 4, c); setTextAttr(); } 
-				@property bool	reversevideo()	 { return	_textAttr.getBits	(14, 1)!=0; } 
+				@property bool	reversevideo()	 { return _textAttr.getBits	(14, 1)!=0; } 
 				@property void	reversevideo(bool b)	 { _textAttr =	_textAttr.setBits	(14, 1, b); setTextAttr(); } 
-				@property bool	underscore()	 { return	_textAttr.getBits	(15, 1)!=0; } 
+				@property bool	underscore()	 { return _textAttr.getBits	(15, 1)!=0; } 
 				@property void	underscore(bool b)	 { _textAttr =	_textAttr.setBits	(15, 1, b); setTextAttr(); } 
 				
 				void indentAdjust(int param) {
@@ -1640,7 +1640,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					//1 = disable exception handling
 					showException(msg); 
 					
-					return
+					return 
 						EXCEPTION_EXECUTE_HANDLER;    //exits because D runtime has no registered handler
 						//EXCEPTION_CONTINUE_SEARCH;	//exits, unhandled by this filter.
 						//EXCEPTION_CONTINUE_EXECUTION;	//continues, but it becomes an endless as it retriggers an exception on the same error
@@ -6711,7 +6711,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		bool isHexDigit(dchar ch) @safe
 		{
-			return	  isDigit(ch)
+			return   isDigit(ch)
 				|| inRange(ch, 'a', 'f')
 				|| inRange(ch, 'A', 'F'); 
 		} 
@@ -6725,7 +6725,7 @@ version(/+$DIDE_REGION Containers+/all)
 		bool isLetter(dchar ch) @safe 
 		{
 			//Todo: also there is std.uni.isAlpha
-			return	  inRange(ch, 'a', 'z')
+			return   inRange(ch, 'a', 'z')
 				|| inRange(ch, 'A', 'Z'); 
 		} 
 		
@@ -11118,7 +11118,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					auto fileTimeToRaw(in FILETIME ft)
 					{
 						if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow."); 
-						return	((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
+						return ((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
 							((cast(ulong)ft.dwHighDateTime)<<(RawShift+32)); 
 						//Opt: optimize this. one shift should be enough. High and LowDateTime is in order anyways.
 					} 
@@ -11229,9 +11229,9 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					} 
 					
 					DateTime utcDayStart() const
-					{ if(isNull) return	this; return RawDateTime(raw - raw%RawUnit.day); } 
+					{ if(isNull) return this; return RawDateTime(raw - raw%RawUnit.day); } 
 					DateTime utcDayEnd	() const
-					{ if(isNull) return	this; return RawDateTime(utcDayStart.raw + RawUnit.day); } 
+					{ if(isNull) return this; return RawDateTime(utcDayStart.raw + RawUnit.day); } 
 					
 					DateTime localDayStart() const
 					{
