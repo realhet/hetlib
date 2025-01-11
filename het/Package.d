@@ -1201,7 +1201,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 }version(/+$DIDE_REGION Error hnd.+/all)
 {
 	version(/+$DIDE_REGION+/all) {
-		enum ErrorHandling { ignore, raise, track} 
+		enum ErrorHandling { ignore, warn, raise, track} 
 		
 		alias enforce = stdEnforce; 
 		
@@ -13907,6 +13907,16 @@ version(/+$DIDE_REGION debug+/all)
 			return value; 
 		} 
 		
+		string COUNT(T, string file=__FILE__, int line=__LINE__)(T key)
+		{
+			synchronized
+			{
+				__gshared uint[T] a; a[key]++; 
+				return a.byKeyValue.array.sort!"a.value>b.value"
+					.map!((a)=>(format!"%9d %s"(a.value, a.key))).join('\n'); 
+			} 
+		} 
+		
 		
 		///////////////////////////////////////////////////////////////////////////////////
 		
@@ -15099,15 +15109,34 @@ version(/+$DIDE_REGION debug+/all)
 	private auto quoteIfNeeded(string s)
 	{ return s.canFind(" ") ? quoted(s) : s; } //Todo: this is lame, must make it better in utils/filename routines
 	
-	struct JsonDecoderState
+	private /+Translate some reserved words in D, that is acceptable in Json.+/
 	{
-		 //JsonDecoderState
-		string stream; 
+		static immutable jsonReservedWordMap = 
+			assocArray(["alias", "align", "char", "default", "in", "init", "out", "this"], true.repeat); 
+		
+		string jsonFieldToIdentifier(string js)
+		=> ((js in jsonReservedWordMap)?(js~"_"):(js)); 
+		
+		string identifierToJsonField(string id)
+		=> ((id.endsWith('_') && id[0..$-1] in jsonReservedWordMap)?(id[0..$-1]):(id)); 
+	} 
+	
+	struct JsonDecoderOptions
+	{
 		string moduleName; 
 		ErrorHandling errorHandling; 
-		string srcFile, srcFunct; int srcLine; 
+		bool checkIgnoredFields; 
+	} 
+	
+	struct JsonDecoderState
+	{
+		//JsonDecoderState
+		string stream; 
+		JsonDecoderOptions options; 
 		
-		bool ldcXJsonImport; //if moduleName=="LDCXJSON", then it is set to true
+		
+		string srcFile, srcFunct; int srcLine; //These are for raising errors
+		
 		
 		Token[] tokens; 
 		string[] errors; 
@@ -15119,10 +15148,10 @@ version(/+$DIDE_REGION debug+/all)
 			if(tokenIdx.inRange(tokens))
 			{
 				auto t = &tokens[tokenIdx]; 
-				location = format!`%s(%s:%s): `(quoteIfNeeded(moduleName), t.line+1, t.posInLine+1); 
+				location = format!`%s(%s:%s): `(quoteIfNeeded(options.moduleName), t.line+1, t.posInLine+1); 
 			}
-			else if(moduleName!="")
-			{ location = quoteIfNeeded(moduleName) ~ ": "; }
+			else if(options.moduleName!="")
+			{ location = quoteIfNeeded(options.moduleName) ~ ": "; }
 			
 			return (location ~ " " ~ msg).strip; 
 		} 
@@ -15135,34 +15164,33 @@ version(/+$DIDE_REGION debug+/all)
 			if(msg=="") return; 
 			
 			with(ErrorHandling)
-			final switch(errorHandling) {
-				case ignore: return; 
+			final switch(
+				options.
+				errorHandling
+			) {
+				case ignore: break; 
+				case warn: WARN(errorMsg(msg, tokenIdx)); break; 
 				case raise: this.raise(msg, tokenIdx); break; 
 				case track: errors ~= errorMsg(msg, tokenIdx); 
 			}
-			
 		} 
 		
 	} 
-	
+	
 	//! fromJson ///////////////////////////////////
 	
-	//Default version, errors are ignored.
-	//alias fromJson = fromJson_ignore;
 	string[] fromJson/*_ignore*/(Type)
 	(
-		ref Type data, string st, string moduleName="unnamed_json",
-		ErrorHandling errorHandling=ErrorHandling.ignore,
+		ref Type data, string st, JsonDecoderOptions options,
 		string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__
 	)
 	{
-		auto state = JsonDecoderState(st, moduleName, errorHandling, srcFile, srcFunct, srcLine); 
-		state.ldcXJsonImport = moduleName=="LDCXJSON"; 
+		auto state = JsonDecoderState(st, options, srcFile, srcFunct, srcLine); 
 		
 		try
 		{
 			//1. tokenize
-			auto err = tokenize(state.moduleName, state.stream, state.tokens); //Todo: tokenize throw errors
+			auto err = tokenize(state.options.moduleName, state.stream, state.tokens); //Todo: tokenize throw errors
 			if(err!="") throw new Exception(err); 
 			if(state.tokens.empty) throw new Exception("Empty json document."); 
 			
@@ -15176,6 +15204,16 @@ version(/+$DIDE_REGION debug+/all)
 		
 		return state.errors; 
 	} 
+	
+	//Default version, errors are ignored.
+	//alias fromJson = fromJson_ignore;
+	string[] fromJson/*_ignore*/(Type)
+	(
+		ref Type data, string st, string moduleName="unnamed_json",
+		ErrorHandling errorHandling=ErrorHandling.ignore,
+		string srcFile=__FILE__, string srcFunct=__FUNCTION__, int srcLine=__LINE__
+	)
+	{ return data.fromJson(st, JsonDecoderOptions(moduleName, errorHandling), srcFile, srcFunct, srcLine); } 
 	
 	/+
 		auto fromJson_raise(Type)(ref Type data, string st, string moduleName="", string srcFile=__FILE__, string srcFunct=__FUNCTION__,int srcLine=__LINE__){
@@ -15211,6 +15249,28 @@ version(/+$DIDE_REGION debug+/all)
 	} 
 	
 	//errorHandling: 0: no errors, 1:just collect the errors, 2:raise
+	
+	///Creates a write only property which redirect a json field into an existing field. 
+	///Gives ERR message when the existing field already have data.
+	mixin template RedirectJsonField(alias dst, string src, T=typeof(dst))
+	{
+		mixin(
+			iq{
+				void $(src)($(T.stringof) a)
+				{
+					if(dst!=typeof(dst).init)
+					{
+						ERR(
+							i"Combining values from multiple JSON fields, 
+		already holding a value:  $(dst.stringof)
+		new value: $(src)"
+						); 
+					}
+					$(dst.stringof) = a; 
+				} 
+			}.text
+		); 
+	} 
 	
 	void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data) 
 	{
@@ -15246,17 +15306,15 @@ version(/+$DIDE_REGION debug+/all)
 				return false; 
 			} 
 			
-			if(state.ldcXJsonImport)
-			{
-				if(check("kind")) {
-					res = res.split(' ').map!capitalize.join; 
-					//print("Found class kind:", res);
-				}
-			}
-			else
-			{ if(check("class")) return res; }
+			if(check("class")) return res; 
 			
-			return res; 
+			/+
+				Todo: Special class detection can be implemented here.
+				 - Different `class` keyword
+				 - Modified className in res
+			+/
+			
+			return ""; 
 		} 
 		
 		void expect(char b)()
@@ -15284,7 +15342,7 @@ version(/+$DIDE_REGION debug+/all)
 				if(isOp!'}') break; //"}" right after "," or "{"
 				
 				if(actToken.kind != TokenKind.literalString) throw new Exception("Field name string literal expected."); 
-				auto fieldName = actToken.data.to!string; 
+				auto fieldName = actToken.data.to!string.jsonFieldToIdentifier; 
 				idx++; 
 				
 				expect!':'; 
@@ -15323,7 +15381,10 @@ version(/+$DIDE_REGION debug+/all)
 				if(isNegative) data = -data; 
 			}
 			else static if(is(T == enum))
-			{ data = actToken.data.get!string.to!Type; }
+			{
+				const s = actToken.data.get!string.jsonFieldToIdentifier; 
+				data = ((s=="")?(Type.min):(s.to!Type)); 
+			}
 			else static if(isIntegral!T)
 			{
 				getSign; 
@@ -15469,60 +15530,85 @@ version(/+$DIDE_REGION debug+/all)
 				}
 				
 				//recursive call for each field
-				enum debugUnusedFields = false; 
-				
-				static if(debugUnusedFields)
-				bool[string] usedFields; 
-				
-				
-				static foreach(fieldName; FieldAndFunctionNamesWithUDA!(T, STORED, true))
+				void loadFields(bool checkIgnoredFields)()
 				{
+					static if(checkIgnoredFields) bool[string] usedFields; 
+					
+					static foreach(fieldName; FieldAndFunctionNamesWithUDA!(T, STORED, true))
 					{
-						
-						
-						version(/+$DIDE_REGION Dirty fix for LDCXJSON reading. (not writing)+/all)
 						{
-							/+Todo: Make this for writing json too+/
-							enum reservedWords = ["in", "out", "init", "default", "align", "alias", "char"]; 
-							enum fn = ((fieldName.among(aliasSeqOf!(reservedWords.map!((a)=>(a~'_')))))?(fieldName[0..$-1]) :(fieldName)); 
-						}
-						
-						if(auto p = fn in elementMap)
-						{
-							alias member 	= __traits(getMember, data, fieldName); 
-							/+Note: !!! alias is NOT good for __traits code generation, it can only hold types.+/
 							
-							static if(isFunction!member)
+							
+							version(/+$DIDE_REGION Dirty fix for LDCXJSON reading. (not writing)+/all)
 							{
-								//@property setter
-								//it not modifies the existing property, it cretes new data.
-								alias MT = Parameters!member; 
-								static if(MT.length==1)
+								/+Todo: Make this for writing json too+/
+								/+
+									enum reservedWords = ["in", "out", "init", "default", "align", "alias", "char"]; 
+									enum fn = ((fieldName.among(aliasSeqOf!(reservedWords.map!((a)=>(a~'_')))))?(fieldName[0..$-1]) :(fieldName)); 
+								+/
+								enum fn = fieldName; 
+							}
+							
+							
+							
+							if(auto p = fn in elementMap)
+							{
+								alias member 	= __traits(getMember, data, fieldName); 
+								/+Note: !!! alias is NOT good for __traits code generation, it can only hold types.+/
+								
+								static if(isFunction!member)
 								{
-									Unqual!(MT[0]) tmp; streamDecode_json(state, *p, tmp); 
-									__traits(getMember, data, fieldName) = tmp; 
+									//@property setter
+									//it not modifies the existing property, it cretes new data.
+									version(/+$DIDE_REGION+/none) {
+										/+Note: Old version: This is not working with both setter & getter.+/
+										alias MT = Parameters!member; 
+										static if(MT.length==1)
+										{
+											Unqual!(MT[0]) tmp; streamDecode_json(state, *p, tmp); 
+											//__traits(getMember, data, fieldName) = tmp; 
+											mixin("data.", fieldName.text, " = tmp;"); 
+										}
+									}
+									
+									static foreach(ovl; __traits(getOverloads, data, fieldName))
+									{
+										static if(Parameters!ovl.length==1)
+										{
+											/+
+												Todo: it is possible to found more than one overloads here, 
+												a compiler error should be nice in that case...
+											+/
+											Unqual!(Parameters!ovl[0]) tmp; streamDecode_json(state, *p, tmp); 
+											mixin("data.", fieldName.text, " = tmp;"); 
+										}
+									}
 								}
+								else
+								{
+									//normal field
+									streamDecode_json(state, *p, __traits(getMember, data, fieldName)); 
+								}
+								
+								static if(checkIgnoredFields) usedFields[fn] = true; 
 							}
-							else
-							{
-								//normal field
-								streamDecode_json(state, *p, __traits(getMember, data, fieldName)); 
-							}
-							
-							static if(debugUnusedFields)
-							usedFields[fn] = true; 
 						}
 					}
-				}
+					
+					static if(__traits(compiles, { data.afterLoad(); } )) data.afterLoad(); 
+					
+					static if(checkIgnoredFields)
+					{
+						foreach(e; elementMap.keys)
+						if(e !in usedFields)
+						if(e != "class"/+Todo: It's problematic.  Class detection only works with MY json...+/)
+						WARN(i"Ignored JSON field in module $(state.options.moduleName.quoted): $(e)"); 
+						
+					}
+				} 
 				
-				static if(debugUnusedFields)
-				{
-					foreach(e; elementMap.keys)
-					if(e !in usedFields)
-					LOG(i"Unloaded JSON field in module $(state.moduleName.quoted): $(e)"); 
-				}
-				
-				static if(__traits(compiles, { data.afterLoad(); } )) data.afterLoad(); 
+				if(state.options.checkIgnoredFields)	loadFields!true; 
+				else	loadFields!false; 
 			}
 			else static if(isArray!T)
 			{
@@ -15554,7 +15640,7 @@ version(/+$DIDE_REGION debug+/all)
 							data.length = cnt+1; //make room
 						}
 						else {
-							if(state.errorHandling==ErrorHandling.raise) { throw new Exception("Static array overflow."); }
+							if(state.options.errorHandling==ErrorHandling.raise) { throw new Exception("Static array overflow."); }
 							else {
 								state.onError("Static array overflow."); //track or ignore
 							}
@@ -15618,7 +15704,7 @@ version(/+$DIDE_REGION debug+/all)
 			else static assert(0, "Unhandled type: "~T.stringof); 
 			
 		}
-		catch(Throwable t) { state.onError(t.msg, idx); }
+		catch(Exception t) { state.onError(t.msg, idx); }
 	} 
 	
 	
@@ -15688,7 +15774,7 @@ version(/+$DIDE_REGION debug+/all)
 		 
 		//switch all possible types
 		static if(isFloatingPoint!T)	{ st ~= data.text_precise; }
-		else static if(is(T == enum))	{ st ~= quoted(data.text); }
+		else static if(is(T == enum))	{ st ~= quoted(data.text.identifierToJsonField); }
 		else static if(isIntegral!T)	{ if(hex) st ~= format!"0x%X"(data); else st ~= data.text; }
 		else static if(isSomeString!T)	{ st ~= quoted(data); }
 		else static if(isSomeChar!T)	{ st ~= quoted([data]); }
@@ -15721,12 +15807,13 @@ version(/+$DIDE_REGION debug+/all)
 			{
 				{
 					enum hasHex = hasUDA2!(__traits(getMember, T, fieldName), HEX); 
+					enum jsonField = fieldName.identifierToJsonField; 
 					static if(__traits(compiles, { auto a = __traits(getMember, data, fieldName); }))
 					{
 						static bool chkNonZero(T)(in T a)
 						{
 							static if(isIntegral!T || isFloatingPoint!T || isPointer!T || isVector!T) return !!a; 
-							else static if(isArray!T || isAssociativeArray!T) return !a.empty; 
+							else static if(isDynamicArray!T || isAssociativeArray!T) return !a.empty; 
 							else return true; 
 						} 
 						
@@ -15734,7 +15821,7 @@ version(/+$DIDE_REGION debug+/all)
 						{
 							streamAppend_json(
 								st, __traits(getMember, data, fieldName),
-								dense, hex || hasHex, omitZeroes, fieldName, nextIndent
+								dense, hex || hasHex, omitZeroes, jsonField, nextIndent
 							); 
 						}
 					}

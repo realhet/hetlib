@@ -134,7 +134,8 @@ version(/+$DIDE_REGION+/all)
 				try { res = newBitmap_internal(file); }
 				catch(Exception e) { throw e; }
 			}	break; 
-			case ErrorHandling.track: {
+			case 	ErrorHandling.track,
+				ErrorHandling.warn: {
 				try { res = newBitmap_internal(file); }
 				catch(Exception e) { WARN(e.simpleMsg); res = newErrorBitmap(e.simpleMsg); }
 			}	break; 
@@ -1771,9 +1772,9 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					case combo(BGR, RGB): return &BGR_to_RGB!T; 
 					case combo(BGR, RGBA): 	return &BGR_to_RGBA!T; 
 					case combo(BGRA, Y)	: return &BGRA_to_Y!T; 
-					case combo(BGRA, YA): return	&BGRA_to_YA!T; 
-					case combo(BGRA, RGB): return	&BGRA_to_RGB!T; 
-					case combo(BGRA, RGBA): return	&BGRA_to_RGBA!T; 
+					case combo(BGRA, YA): return &BGRA_to_YA!T; 
+					case combo(BGRA, RGB): return &BGRA_to_RGB!T; 
+					case combo(BGRA, RGBA): return &BGRA_to_RGBA!T; 
 					default	: throw new ImageIOException("internal error"); 
 				}
 				
@@ -2738,37 +2739,43 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				)
 				throw new ImageIOException("corrupt header"); 
 				
-				return (mixin(體!((PNG_Header),q{
-					width	: bigEndianToNative!int(tmp[16..20]),
-					height	: bigEndianToNative!int(tmp[20..24]),
-					bit_depth	: tmp[24],
-					color_type	: tmp[25],
-					compression_method	: tmp[26],
-					filter_method	: tmp[27],
-					interlace_method	: tmp[28],
-				}))); 
+				return (
+					mixin(體!((PNG_Header),q{
+						width	: bigEndianToNative!int(tmp[16..20]),
+						height	: bigEndianToNative!int(tmp[20..24]),
+						bit_depth	: tmp[24],
+						color_type	: tmp[25],
+						compression_method	: tmp[26],
+						filter_method	: tmp[27],
+						interlace_method	: tmp[28],
+					}))
+				); 
 			} 
 			
 			package IFImage read_png(Reader stream, long req_chans = 0)
 			{
 				PNG_Decoder dc = init_png_decoder(stream, req_chans, 8); 
-				return (mixin(體!((IFImage),q{
-					w	: dc.w,
-					h	: dc.h,
-					c	: (cast(ColFmt)(dc.tgt_chans)),
-					pixels	: decode_png(dc).bpc8
-				}))); 
+				return (
+					mixin(體!((IFImage),q{
+						w	: dc.w,
+						h	: dc.h,
+						c	: (cast(ColFmt)(dc.tgt_chans)),
+						pixels	: decode_png(dc).bpc8
+					}))
+				); 
 			} 
 			
 			IFImage16 read_png16(Reader stream, long req_chans = 0)
 			{
 				PNG_Decoder dc = init_png_decoder(stream, req_chans, 16); 
-				return (mixin(體!((IFImage16),q{
-					w	: dc.w,
-					h	: dc.h,
-					c	: (cast(ColFmt)(dc.tgt_chans)),
-					pixels	: decode_png(dc).bpc16
-				}))); 
+				return (
+					mixin(體!((IFImage16),q{
+						w	: dc.w,
+						h	: dc.h,
+						c	: (cast(ColFmt)(dc.tgt_chans)),
+						pixels	: decode_png(dc).bpc16
+					}))
+				); 
 			} 
 			
 			PNG_Decoder init_png_decoder(Reader stream, long req_chans, int req_bpc)
@@ -2804,16 +2811,18 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				)
 				throw new ImageIOException("not supported"); 
 				
-				auto dc = (mixin(體!((PNG_Decoder),q{
-					stream	: stream,
-					src_indexed	: (hdr.color_type == PNG_ColorType.Idx),
-					src_chans	: channels(cast(PNG_ColorType)(hdr.color_type)),
-					bpc	: hdr.bit_depth,
-					req_bpc	: req_bpc,
-					ilace	: hdr.interlace_method,
-					w	: hdr.width,
-					h	: hdr.height,
-				}))); 
+				auto dc = (
+					mixin(體!((PNG_Decoder),q{
+						stream	: stream,
+						src_indexed	: (hdr.color_type == PNG_ColorType.Idx),
+						src_chans	: channels(cast(PNG_ColorType)(hdr.color_type)),
+						bpc	: hdr.bit_depth,
+						req_bpc	: req_bpc,
+						ilace	: hdr.interlace_method,
+						w	: hdr.width,
+						h	: hdr.height,
+					}))
+				); 
 				dc.tgt_chans = ((req_chans == 0)?(dc.src_chans) :((cast(int)(req_chans)))); 
 				return dc; 
 			} 
