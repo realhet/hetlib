@@ -1229,9 +1229,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 		} 
 		
-		void raise(string str="", string file = __FILE__, int line = __LINE__)
+		void raise(string file = __FILE__, int line = __LINE__, T...)(T str)
 		{
-			enforce(0, str, file, line); 
+			enforce(0, str.text, file, line); 
 			
 			//Todo: use noreturn and/or learn about abort.
 			//Link: https://dlang.org/spec/type.html#noreturn
@@ -3061,7 +3061,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			static if(a.length==b.length)	return mixin("tuple(",iota(a.length).map!(i=>iq{a[$(i)] $(op) b[$(i)],}.text).join,")"); 
 			else static if(a.length==1)	return mixin("tuple(",iota(b.length).map!(i=>iq{a[0] $(op) b[$(i)],}.text).join,")"); 
 			else static if(b.length==1)	return mixin("tuple(",iota(a.length).map!(i=>iq{a[$(i)] $(op) b[0],}.text).join,")"); 
-			else static	assert(false, "Invalid params."); 
+			else static assert(false, "Invalid params."); 
 		} 
 		
 		string 配(string left, string op, string right) /+Note: Tuple operations: (x,y) += (y,x)+/
@@ -7120,8 +7120,13 @@ version(/+$DIDE_REGION Containers+/all)
 			return opts; 
 		} 
 		
-		string quoted(string s, char q = '"')
+		string quoted(T)(T src, char q = '"')
 		{
+			string s; 
+			static if(is(T : File))	s = src.fullName; 
+			else static if(is(T : Path))	s = src.fullPath; 
+			else	s = src; 
+			
 			if(q=='"') return format!"%(%s%)"([s]); 
 			else if(q=='`') return s.canFind(q) ? quoted(s, '"') : q ~ s ~ q; 
 			else
@@ -15426,12 +15431,13 @@ version(/+$DIDE_REGION debug+/all)
 						
 						//Todo: error handling when there is no classloader for the class in json
 						
-						/*
-							print("className in Json:", className);
-							print("Trying to load class:", classFullName);
-							print("Currently in Loader:", fullyQualifiedName!Type);
-							print("Current Instance:", currentClassFullName);
-						*/
+						/+
+							print("className in Json:", className); 
+							print("Trying to load class:", classFullName); 
+							print("Currently in Loader:", fullyQualifiedName!Type); 
+							print("Current Instance:", currentClassFullName); 
+							print("data1:", data); 
+						+/
 						
 						//call a different loader if needed
 						if(classFullName.length && fullyQualifiedName!Type != classFullName)
@@ -15449,16 +15455,21 @@ version(/+$DIDE_REGION debug+/all)
 						//free if the class type is different.
 						if(data !is null && classFullName.length && currentClassFullName != classFullName) { data.destroy; }
 						
+						
 						//create only if original is null
 						if(data is null) {
-							static if(__traits(compiles, new Type)) { data = new Type; }
-							else { raise("fromJson: Unable to construct new instance of: "~Type.stringof); }
+							static assert(
+								__traits(compiles, new Type), 
+								i"fromJson(): Class $(Type.stringof) must have this() to be loaded.".text
+							); 
+							data = new Type; 
 						}
+						
 					}
 				}
 				
 				//recursive call for each field
-				enum debugUnusedFields = true; 
+				enum debugUnusedFields = false; 
 				
 				static if(debugUnusedFields)
 				bool[string] usedFields; 
@@ -15468,23 +15479,35 @@ version(/+$DIDE_REGION debug+/all)
 				{
 					{
 						
-						//dirty fix for LDCXJSON reading. (not writing)
-						static if(fieldName=="char_")	enum fn = "char"; 
-						else static if(fieldName=="align_")	enum fn = "align"; 
-						else static if(fieldName=="default_")	enum fn = "default"; 
-						else static if(fieldName=="init_")	enum fn = "init"; 
-						else	enum fn = fieldName; 
+						
+						version(/+$DIDE_REGION Dirty fix for LDCXJSON reading. (not writing)+/all)
+						{
+							/+Todo: Make this for writing json too+/
+							enum reservedWords = ["in", "out", "init", "default", "align", "alias", "char"]; 
+							enum fn = ((fieldName.among(aliasSeqOf!(reservedWords.map!((a)=>(a~'_')))))?(fieldName[0..$-1]) :(fieldName)); 
+						}
 						
 						if(auto p = fn in elementMap)
 						{
-							alias member = __traits(getMember, data, fieldName); 
-							static if(isFunction!member) {
-								 //handle properties
-								typeof(member) tmp; 
-								streamDecode_json(state, *p, tmp); 
-								mixin("data.", fieldName, "=tmp;"); 
+							alias member 	= __traits(getMember, data, fieldName); 
+							/+Note: !!! alias is NOT good for __traits code generation, it can only hold types.+/
+							
+							static if(isFunction!member)
+							{
+								//@property setter
+								//it not modifies the existing property, it cretes new data.
+								alias MT = Parameters!member; 
+								static if(MT.length==1)
+								{
+									Unqual!(MT[0]) tmp; streamDecode_json(state, *p, tmp); 
+									__traits(getMember, data, fieldName) = tmp; 
+								}
 							}
-							else { streamDecode_json(state, *p, __traits(getMember, data, fieldName)); }
+							else
+							{
+								//normal field
+								streamDecode_json(state, *p, __traits(getMember, data, fieldName)); 
+							}
 							
 							static if(debugUnusedFields)
 							usedFields[fn] = true; 
@@ -15495,7 +15518,8 @@ version(/+$DIDE_REGION debug+/all)
 				static if(debugUnusedFields)
 				{
 					foreach(e; elementMap.keys)
-					if(e !in usedFields) LOG("Unused JSON field:", e); 
+					if(e !in usedFields)
+					LOG(i"Unloaded JSON field in module $(state.moduleName.quoted): $(e)"); 
 				}
 				
 				static if(__traits(compiles, { data.afterLoad(); } )) data.afterLoad(); 
@@ -15562,7 +15586,6 @@ version(/+$DIDE_REGION debug+/all)
 			}
 			else static if(isAssociativeArray!T)
 			{
-				
 				//handle null
 				if(actToken.isKeyword(kwnull)) {
 					data = T.init; 
@@ -15581,8 +15604,18 @@ version(/+$DIDE_REGION debug+/all)
 				}
 				
 			}
-			else
-			{ static assert(0, "Unhandled type: "~T.stringof); }
+			else static if(isPointer!T)
+			{
+				//handle null
+				if(actToken.isKeyword(kwnull)) {
+					data = null; 
+					return; //nothing else to expect after null
+				}
+				
+				data = new PointerTarget!T; 
+				streamDecode_json(state, idx, *data); 
+			}
+			else static assert(0, "Unhandled type: "~T.stringof); 
 			
 		}
 		catch(Throwable t) { state.onError(t.msg, idx); }
@@ -15592,17 +15625,17 @@ version(/+$DIDE_REGION debug+/all)
 	//! toJson ///////////////////////////////////
 	string toJson(Type)(
 		in Type data, 
-		bool dense=false, bool hex=false, string thisName=""
+		bool dense=false, bool hex=false, bool omitZeroes=false, string thisName=""
 	) 
 	{
 		string st; 
-		streamAppend_json!(Type)(st, data, dense, hex, thisName); 
+		streamAppend_json!(Type)(st, data, dense, hex, omitZeroes, thisName); 
 		return st; 
 	} 
 	
 	void streamAppend_json(Type)(
 		ref string st, /*!!!!!*/in Type data,
-		bool dense=false, bool hex=false, string thisName="", string indent=""
+		bool dense=false, bool hex=false, bool omitZeroes=false, string thisName="", string indent=""
 	) 
 	{
 		alias T = Unqual!Type; 
@@ -15660,8 +15693,8 @@ version(/+$DIDE_REGION debug+/all)
 		else static if(isSomeString!T)	{ st ~= quoted(data); }
 		else static if(isSomeChar!T)	{ st ~= quoted([data]); }
 		else static if(is(T == bool))	{ st ~= data ? "true" : "false"; }
-		else static if(isVector!T)	{ streamAppend_json(st, data.components, dense || true, hex, "", indent); }
-		else static if(isMatrix!T)	{ streamAppend_json(st, data.columns   , dense || true, hex, "", indent); }
+		else static if(isVector!T)	{ streamAppend_json(st, data.components, dense || true, hex, omitZeroes, "", indent); }
+		else static if(isMatrix!T)	{ streamAppend_json(st, data.columns   , dense || true, hex, omitZeroes, "", indent); }
 		else static if(isAggregateType!T)
 		{
 			//Struct, Class
@@ -15680,7 +15713,7 @@ version(/+$DIDE_REGION debug+/all)
 			{
 				 //write class type name
 				string s = T.stringof; 
-				streamAppend_json(st, s, dense, hex, "class", nextIndent); 
+				streamAppend_json(st, s, dense, hex, omitZeroes, "class", nextIndent); 
 			}
 			
 			//recursive call for each field
@@ -15688,10 +15721,23 @@ version(/+$DIDE_REGION debug+/all)
 			{
 				{
 					enum hasHex = hasUDA2!(__traits(getMember, T, fieldName), HEX); 
-					streamAppend_json(
-						st, __traits(getMember, data, fieldName),
-						dense, hex || hasHex, fieldName, nextIndent
-					); 
+					static if(__traits(compiles, { auto a = __traits(getMember, data, fieldName); }))
+					{
+						static bool chkNonZero(T)(in T a)
+						{
+							static if(isIntegral!T || isFloatingPoint!T || isPointer!T || isVector!T) return !!a; 
+							else static if(isArray!T || isAssociativeArray!T) return !a.empty; 
+							else return true; 
+						} 
+						
+						if(!omitZeroes || chkNonZero(__traits(getMember, data, fieldName)))
+						{
+							streamAppend_json(
+								st, __traits(getMember, data, fieldName),
+								dense, hex || hasHex, omitZeroes, fieldName, nextIndent
+							); 
+						}
+					}
 				}
 			}
 			
@@ -15707,7 +15753,7 @@ version(/+$DIDE_REGION debug+/all)
 			
 			const actHex = hex || hasUDA!(data, HEX); 
 			foreach(const val; data)
-			streamAppend_json(st, val, dense, actHex, "", nextIndent); 
+			streamAppend_json(st, val, dense, actHex, omitZeroes, "", nextIndent); 
 			
 			st ~= dense ? "]" : "\n"~indent~"]";        //closing bracket ]
 		}
@@ -15720,9 +15766,15 @@ version(/+$DIDE_REGION debug+/all)
 			const nextIndent = dense ? "" : indent~"  "; 
 			
 			foreach(k, ref v; data)
-			streamAppend_json(st, v, dense, hex, k.text, nextIndent); 
+			streamAppend_json(st, v, dense, hex, omitZeroes, k.text, nextIndent); 
 			
 			st ~= dense ? "}" : "\n"~indent~"}";        //closing bracket }
+		}
+		else static if(isPointer!T)
+		{
+			/+optional field+/
+			if(data)	streamAppend_json(st, *data, dense, hex, omitZeroes); 
+			else	st ~= "null"; 
 		}
 		else
 		{ static assert(0, "Unhandled type: "~T.stringof); }
