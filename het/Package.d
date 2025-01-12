@@ -15262,8 +15262,8 @@ version(/+$DIDE_REGION debug+/all)
 					{
 						ERR(
 							i"Combining values from multiple JSON fields, 
-		already holding a value:  $(dst.stringof)
-		new value: $(src)"
+	already holding a value:  $(dst.stringof)
+	new value: $(src)"
 						); 
 					}
 					$(dst.stringof) = a; 
