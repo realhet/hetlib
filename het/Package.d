@@ -2560,8 +2560,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			auto rows()
 			{
-				/+It skips empty rows and rows starting with a comment.+/
-				return allRows.filter!(r=>r.length && !(r.front.length>=2 && r.front[0..2].among(`//`,`/+`,`/*`))); 
+				/+It skips empty rows and rows with only one cell starting with a comment.+/
+				static isComment(string s)
+				{
+					if(s.length>=2 && s[0]=='/')
+					{
+						if(s[1]=='+' && s[$-2..$]=="+/") return true; 
+						if(s[1]=='*' && s[$-2..$]=="*/") return true; 
+						if(s[1]=='/') return true; 
+					}
+					return false; 
+				} 
+				
+				return allRows.filter!(r=>r.length>=1 && !r.all!isComment); 
 				//Todo: full row //comment detection is failing
 			} 
 			
@@ -2601,8 +2612,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				else	mixin(src); 
 			} 
 			
-			deprecated string GEN_bitfields(R)(R rows)
+			string GEN_bitfields(R)(R rows)
 			{
+				/+Todo: This must be replaced by a template mixin!+/
 				static if(isInputRange!R)
 				{
 					string[] res; ulong totalDef; int totalBits; 
@@ -2634,11 +2646,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{ return GEN_bitfields(rows.rows); }
 			} 
 			
-			deprecated string GEN_bitfields()
-			{ return GEN_bitfields(rows); } 
+			string GEN_bitfields()
+			{
+				/+Todo: This must be replaced by a template mixin!+/
+				return GEN_bitfields(rows); 
+			} 
 			
 			string GEN_fields()
 			{
+				/+Todo: This must be replaced by a template mixin!+/
 				const 	hdr 	= headerRow,
 					cType 	= hdr.countUntil("Type"),
 					cName 	= hdr.countUntil("Name"),
@@ -2654,8 +2670,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				).join; 
 			} 
 			
-			deprecated string GEN_verbs(Flag!"hold" hold = No.hold)
+			string GEN_verbs(Flag!"hold" hold = No.hold)
 			{
+				/+Todo: This must be replaced by a template mixin!+/
 				const 	hdr 	= headerRow,
 				cKey 	= hdr.countUntil("Key"),
 				cName 	= hdr.countUntil("Name"),
@@ -2671,8 +2688,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				).join; 
 			} 
 			
-			deprecated string GEN_enumTable()
+			string GEN_enumTable()
 			{
+				/+Todo: This must be replaced by a template mixin!+/
 				const 	numCols 	= headerRow.length, 
 					prefix 	= headerCell(0).strip; 
 				
@@ -2682,7 +2700,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				string generateColumn(string fmt)(size_t colIdx, string label)
 				{
 					/+Todo: these nasty hacks should be marked with a hidden comment, not a special symbol character.+/
-					if(label.endsWith('#'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx].withoutDComment!"Code"~"}"))); 
+					if(label.endsWith('#'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx].unpackDComment!"Code"~"}"))); 
 					else if(label.endsWith('$'))	return format!fmt(label[0..$-1], rows.map!((a)=>("q{"~a[colIdx]~"}"))); 
 					else	return format!fmt(label, rows.map!((a)=>(a[colIdx]))); 
 				} 
@@ -2710,8 +2728,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				+/
 			} 
 			
-			deprecated string GEN_enum(R)(string name, R items)
-			{ return format!q{enum %s {%s} }(name, items.join(", "))~'\n'; } 
+			string GEN_enum(R)(string name, R items)
+			{
+				/+Todo: This must be replaced by a template mixin!+/
+				return format!q{enum %s {%s} }(name, items.join(", "))~'\n'; 
+			} 
 			
 			
 			
@@ -2770,11 +2791,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		} 
 		
 		//put popular generators onto the global scope
+		/+Todo: This must be replaced by a template mixin!+/
 		static foreach(name; "bitfields fields enumTable StructureScanner".split)
 		mixin(iq{string GEN_$(name)(表 t) => t.GEN_$(name); }.text); 
 		/+Todo: Nonstandard casing (sometimes capitalized, sometimes not)  I thing everything capitalized would be better.+/
 		
-		
+		//This is the new way: template mixin instead of string mixin.
 		mixin template INJECTOR_TEMPLATE(alias _data, string _script)
 		{ mixin(_script); } 
 		alias 入 = INJECTOR_TEMPLATE; 
@@ -2988,8 +3010,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{ return scr.format!q{{ static bool running; if(running.chkSet) {%s}}}; } 
 		
 		//call a function
-		deprecated auto 調(alias fun, Args...)(Args args)
-		{ return fun(args); } 
+		auto 調(alias fun, Args...)(Args args)
+		{
+			/+Todo: Should deprecate this! Use template mixins!+/
+			return fun(args); 
+		} 
 		
 		//constant literals (compile time)
 		auto 常(T)(T val)
@@ -6493,7 +6518,7 @@ version(/+$DIDE_REGION Containers+/all)
 			return s; 
 		} 
 		
-		auto withoutDComment(string prefix="")(string s)
+		auto unpackDComment(string prefix="")(string s)
 		{
 			static assert(prefix.all!isAlpha); 
 			string p = ((prefix!="")?(prefix~':'):("")); 
@@ -15109,13 +15134,24 @@ version(/+$DIDE_REGION debug+/all)
 	private auto quoteIfNeeded(string s)
 	{ return s.canFind(" ") ? quoted(s) : s; } //Todo: this is lame, must make it better in utils/filename routines
 	
-	private /+Translate some reserved words in D, that is acceptable in Json.+/
+	public /+Translate some reserved words in D, that is acceptable in Json.+/
 	{
-		static immutable jsonReservedWordMap = 
-			assocArray(["alias", "align", "char", "default", "in", "init", "out", "this"], true.repeat); 
+		static immutable jsonReservedWords = [
+			"alias", "align", "char", "default", "in", "init", "out", "this",
+			"public", "private", "package", "protected", "export",
+			"class", "interface", "mixin", "struct", "template", "union",
+			"import", "enum", "function"
+		]; 
+		static immutable jsonReservedWordMap = assocArray(jsonReservedWords, true.repeat); 
 		
 		string jsonFieldToIdentifier(string js)
-		=> ((js in jsonReservedWordMap)?(js~"_"):(js)); 
+		{
+			if(__ctfe /+because no assoc arrays in CT.+/)
+			return ((jsonReservedWords.canFind(js))?(js~"_"):(js)); 
+			else
+			return ((js in jsonReservedWordMap)?(js~"_"):(js)); 
+		} 
+		
 		
 		string identifierToJsonField(string id)
 		=> ((id.endsWith('_') && id[0..$-1] in jsonReservedWordMap)?(id[0..$-1]):(id)); 
@@ -15306,7 +15342,8 @@ version(/+$DIDE_REGION debug+/all)
 				return false; 
 			} 
 			
-			if(check("class")) return res; 
+			/+Note: !!! Use the identifier form, NOT the json form. -> "class_"+/
+			if(check(q{class_})) return res; 
 			
 			/+
 				Todo: Special class detection can be implemented here.
@@ -15799,7 +15836,10 @@ version(/+$DIDE_REGION debug+/all)
 			{
 				 //write class type name
 				string s = T.stringof; 
-				streamAppend_json(st, s, dense, hex, omitZeroes, "class", nextIndent); 
+				streamAppend_json(
+					st, s, dense, hex, omitZeroes, 
+					"class"/+'class' in the json, exactly.+/, nextIndent
+				); 
 			}
 			
 			//recursive call for each field
