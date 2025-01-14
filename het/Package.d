@@ -12756,7 +12756,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			{
 				foreach(k; 0..500)
 				{
-					if(exists) { try { remove; }catch(Exception e) { sleep(10); }}
+					if(exists) { try { remove; }catch(Exception e) { sleep(1); }}
 					if(!exists) return; 
 				}
 				ERR("Failed to forcedRemove file ", this); 
@@ -12769,7 +12769,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					try {
 						auto res = read(true); 
 						return res; 
-					}catch(Exception e) { sleep(10); }
+					}catch(Exception e) { sleep(1); }
 				}
 				ERR("Failed to forcedRead file ", this); 
 				assert(0); 
