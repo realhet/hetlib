@@ -3718,13 +3718,16 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		auto ifz(A, B)(A a, lazy B b)
 		{ return a ? a : b; } 
-		alias ifnull = ifz; 
+		alias ifNull = ifz; 
 		
 		auto ife(A, B, C)(A a, B b, lazy C c)
 		{ return a==b ? c : a; } 
 		
 		auto ifne(A, B, C)(A a, B b, lazy C c)
 		{ return a!=b ? c : a; } 
+		
+		auto ifEmpty(A, B)(A a, lazy B b)
+		=> ((a.empty)?(b):(a)); 
 		
 		//safe assoc array lookup
 		
