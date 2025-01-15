@@ -4013,6 +4013,7 @@ version(/+$DIDE_REGION+/all)
 					
 					//recursive entry/leave
 					context.cellPath ~= thisC; 
+					const previousAbsInnerPos = context.absInnerPos; 
 					context.absInnerPos += thisC.innerPos; 
 					
 					scope(exit)
@@ -4032,7 +4033,7 @@ version(/+$DIDE_REGION+/all)
 							}
 						}
 						
-						context.absInnerPos -= thisC.innerPos; 
+						context.absInnerPos = previousAbsInnerPos; 
 						context.cellPath.popBack; 
 						
 						if(context.timeLimit && now > *context.timeLimit)
