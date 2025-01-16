@@ -15291,25 +15291,82 @@ version(/+$DIDE_REGION debug+/all)
 	
 	///Creates a write only property which redirect a json field into an existing field. 
 	///Gives ERR message when the existing field already have data.
-	mixin template RedirectJsonField(alias dst, string src, T=typeof(dst))
+	mixin template RedirectJsonField(
+		alias 	_dstField	/+The target field of the struct we are in.+/, 
+		string 	_srcField	/+The name of the field in the JSon object.+/, 
+		string 	_unaryFun="a"	/+
+			Optional transformation of the data. Eg:/+Code: a+1+/
+			'a' is the identifier of the incoming value as a parameter.
+		+/
+	)
 	{
 		mixin(
 			iq{
-				void $(src)($(T.stringof) a)
+				void $(_srcField)(typeof(_dstField) a)
 				{
-					if(dst!=typeof(dst).init)
+					if(_dstField!=typeof(_dstField).init)
 					{
 						ERR(
-							i"Combining values from multiple JSON fields, 
-	already holding a value:  $(dst.stringof)
-	new value: $(src)"
+							i"Error combining values from multiple JSON fields, target already HAS a value.
+Target field: $(_dstField.stringof)
+Source field: $(_srcField)"
 						); 
 					}
-					$(dst.stringof) = a; 
+					_dstField = $(_unaryFun); 
 				} 
 			}.text
 		); 
 	} 
+	
+	mixin template RedirectJsonFields(
+		alias 	_dstField	/+single target field+/, 
+		string[] 	_srcFields	/+multiple source JSon fields+/, 
+		string 	_unaryFun="a"
+	)
+	{ static foreach(_srcField; _srcFields) mixin RedirectJsonField!(_dstField, _srcField, _unaryFun); } 
+	
+	version(none)
+	{
+		/+Note: Example usage:+/
+		mixin RedirectJsonField!(base, "baseDeco", q{a.demangleType}); 
+		
+		/+Note: Code injected by string mixin() inside template:+/
+		void baseDeco(typeof(_dstField) a)
+		{
+			if(_dstField!=typeof(_dstField).init)
+			{
+				ERR(
+					i"Error combining values from multiple JSON fields, target already HAS a value.
+Target field: 	$(_dstField.stringof) 	Target value: 	$(_dstField)
+Source field: 	$(_srcField) 	Source field: 	$(a)"
+					/+Note: Only the outermost level of $() is processed, by the string interpolator.+/
+				); 
+			}
+			_dstField = a.demangleType; 
+		} 
+		
+		/+Note: Code transformed by template mixin instantiation+/
+		void baseDeco(typeof(base) a)
+		{
+			if(base!=typeof(base).init)
+			{
+				ERR(
+					i"Error combining values from multiple JSON fields, target already HAS a value.
+Target field: 	$(base.stringof) 	Target value: 	$(base)
+Source field: 	$("baseDeco") 	Source field: 	$(a)"
+				); 
+			}
+			base = a.demangleType; 
+		} 
+		
+		/+
+			Note: What the nested interpolated string looks like in RunTime:
+			/+
+				Code: Target field: 	this.base	Target value: 	_oldValue_from_field
+				Source field: 	baseDeco 	Source value: 	_new_value_in_param_a
+			+/
+		+/
+	}
 	
 	void streamDecode_json(Type)(ref JsonDecoderState state, int idx, ref Type data) 
 	{
@@ -15563,6 +15620,7 @@ version(/+$DIDE_REGION debug+/all)
 								__traits(compiles, new Type), 
 								i"fromJson(): Class $(Type.stringof) must have this() to be loaded.".text
 							); 
+							/+Todo: This can't load nested classes.  Not a big problem, but it can't.+/
 							data = new Type; 
 						}
 						
@@ -15817,7 +15875,7 @@ version(/+$DIDE_REGION debug+/all)
 		else static if(is(T == enum))	{ st ~= quoted(data.text.identifierToJsonField); }
 		else static if(isIntegral!T)	{ if(hex) st ~= format!"0x%X"(data); else st ~= data.text; }
 		else static if(isSomeString!T)	{ st ~= quoted(data); }
-		else static if(isSomeChar!T)	{ st ~= quoted([data]); }
+		else static if(isSomeChar!T)	{ st ~= quoted(data.text); }
 		else static if(is(T == bool))	{ st ~= data ? "true" : "false"; }
 		else static if(isVector!T)	{ streamAppend_json(st, data.components, dense || true, hex, omitZeroes, "", indent); }
 		else static if(isMatrix!T)	{ streamAppend_json(st, data.columns   , dense || true, hex, omitZeroes, "", indent); }
