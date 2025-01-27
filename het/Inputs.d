@@ -358,10 +358,8 @@ version(/+$DIDE_REGION+/all)
 		//bool changed () { return combos.map!changed .any; }
 	} 
 	
-	void callVerbs(T)(T obj)
+	void callVerb(string name, T)(T obj)
 	{
-		///calls all member functions marked with VERB, that has a pressed KeyCombo
-		static foreach(name; __traits(allMembers, T))
 		static if(__traits(compiles, { mixin(iq{obj.$(name)(); }.text); }))
 		{
 			static foreach(oi, ovl; __traits(getOverloads, obj, name))
@@ -375,6 +373,16 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 		}
+	} 
+	
+	void callVerb(alias member, T)(T obj)
+	{ callVerb!(__traits(identifier, member))(obj); } 
+	
+	void callVerbs(T)(T obj)
+	{
+		///calls all member functions marked with VERB, that has a pressed KeyCombo
+		static foreach(name; __traits(allMembers, T))
+		callVerb!(name)(obj); 
 	} 
 	
 	
@@ -448,7 +456,7 @@ version(/+$DIDE_REGION+/all)
 		{ return activeDuration >= inputs.longPressDuration; } 
 		
 		bool down() const
-		{ return	active; } 
+		{ return active; } 
 		bool up()	const
 		{ return !active; } 
 		
@@ -2390,7 +2398,7 @@ version(/+$DIDE_REGION+/all)
 		
 			//manage config
 			@property string config()
-		{ return	mapToStr(exportKeyMap); } 
+		{ return mapToStr(exportKeyMap); } 
 			@property void config(string	data)
 		{ importKeyMap(strToMap(data)); } 
 			auto defaultConfig()
