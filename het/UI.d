@@ -5063,7 +5063,10 @@ version(/+$DIDE_REGION+/all)
 		this()
 		{} 
 		
-		void UI(void delegate() setup/+must set outerSize in setup! Optionally can set fontHeight+/)
+		void UI(
+			void delegate() setup/+must set outerSize in setup! Optionally can set fontHeight+/,
+			void delegate(Item*) onItem=null
+		)
 		{
 			with(im)
 			{
@@ -5142,7 +5145,9 @@ version(/+$DIDE_REGION+/all)
 												{ if(showBullet) Row({ outerSize = vec2(fh); flags.hAlign = HAlign.center; Text("•"); }); }
 											}
 											
-											r.item.UI; //the actual and responsive UI of the item
+											if(onItem)	onItem(r.item); 
+											else	r.item.UI; 
+											
 										}
 									); 
 								}

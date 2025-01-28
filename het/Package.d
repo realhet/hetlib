@@ -15926,6 +15926,7 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 							); 
 						}
 					}
+					else static assert(0, "Unable to read property. (Maybe it's not const!)"); 
 				}
 			}
 			
