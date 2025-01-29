@@ -1425,7 +1425,9 @@ version(/+$DIDE_REGION View2D+/all)
 			origin -= subScreenShift * invScale; 
 		} 
 		
-		void scrollZoom(T)(in T target, float overZoomPercent = DefaultOverZoomPercent)
+		void scrollZoomIn(T)(in T target, float overZoomPercent = DefaultOverZoomPercent)
+		{ scrollZoom!(Yes.zoomIn)(target, overZoomPercent); } 
+		void scrollZoom(Flag!"zoomIn" doZoomIn = No.zoomIn, T)(in T target, float overZoomPercent = DefaultOverZoomPercent)
 		{
 			if(!target.valid || !subScreenArea.valid) return; 
 			
@@ -1437,8 +1439,9 @@ version(/+$DIDE_REGION View2D+/all)
 			}
 			
 			//scale up the screen if the target donesn't fit inside
-			F requiredScale = max(max(1, target.height/sb.height), max(1, target.width/sb.width)); 
-			if(requiredScale>1) {
+			const baseScale = doZoomIn ? 0.0001f : 1; 
+			F requiredScale = max(max(baseScale, target.height/sb.height), max(baseScale, target.width/sb.width)); 
+			if(requiredScale>baseScale) {
 				const c = origin; 
 				sb = (sb-c)*requiredScale+c; 
 			}
@@ -1452,7 +1455,7 @@ version(/+$DIDE_REGION View2D+/all)
 			); 
 			
 			//execute changes
-			if(requiredScale>1) scale = scale/requiredScale; 
+			if(requiredScale>baseScale) scale = scale/requiredScale; 
 			if(ofs) origin -= ofs; 
 		} 
 		
@@ -1807,7 +1810,7 @@ class Drawing
 			
 			private enum fontWeightBold =	1.4f; 
 			@property bool fontBold()
-			{ return	fontWeight> (fontWeightBold+1)*.5f; } 
+			{ return fontWeight> (fontWeightBold+1)*.5f; } 
 			@property void fontBold(bool b)
 			{ fontWeight = b ? fontWeightBold : 1; } 
 			

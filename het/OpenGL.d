@@ -2389,7 +2389,7 @@ version(/+$DIDE_REGION+/all)
 		bool isCompatibleWith(in Bitmap bmp)const
 		{
 			//Note: it is not used. Because everything is placed on a 4chn texture
-			return		bmp.channels==4 && type==GLTextureType.RGBA8
+			return 	bmp.channels==4 && type==GLTextureType.RGBA8
 				||	bmp.channels==1 && type==GLTextureType.L8; 
 		} 
 		
@@ -3902,8 +3902,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				enum log = false; 
 				
 				const delayed = fDelayed && EnableMultiThreadedTextureLoading; 
-				
-				auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore);  
+				auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore); 
 				//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
 				auto modified = bmp.modified.toId_deprecated; //Todo: deprecate toId and use the DateTime itself
 				
@@ -3911,7 +3910,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				LOG(bmp); 
 				if(auto existing = file in byFileName)
 				{
-					
 					//Todo: ennel az egyenlosegjelnel 2 bug van:
 					//1: ha ==, akkor a thumbnailnak 0 a datetime-je
 					/+
@@ -3932,7 +3930,6 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				//upload new texture
 				if(log)
 				LOG("\33\16creating\33\7", modified); 
-				
 				auto idx = createSubTex(bmp); 
 				byFileName[file] = idx; 
 				bitmapModified[file] = modified; 

@@ -630,6 +630,34 @@ version(/+$DIDE_REGION+/all)
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x4DFAF599A70B).檢((update間(_間)))); }
+		/+
+			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
+			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.
+			
+			ChatGPT answer:
+			
+			
+			The issue you’re experiencing—where performance drops significantly while moving the window—suggests that Windows is deprioritizing your thread’s execution when a window is being dragged. This is a known behavior in the Windows GUI system.
+			
+			Possible Causes:
+			Windows GUI Thread Starvation
+			When a window is being dragged, Windows gives higher priority to the thread handling UI events (such as the one processing WM_MOUSEMOVE). This can cause other threads, especially those not explicitly marked as high priority, to experience delays.
+			
+			Synchronization Overhead (synchronized)
+			Your function is wrapped in a synchronized block, which means that while the function is executing, it might be blocking access to shared resources. If the UI thread tries to access any of these resources while dragging, it could cause contention, further slowing down execution.
+			
+			Thread Scheduling Delays
+			Your code spawns worker threads via taskPool.put(task!worker_load(...)) and spawn(...). These threads might be getting scheduled with a lower priority when the window is being dragged.
+			
+			Windows "Input Lag Reduction" Mode
+			When you move a window, Windows sometimes lowers the priority of background threads to ensure smooth UI updates. This is especially noticeable if the program has a single-threaded message loop that isn't processing messages quickly.
+			
+			Increased Message Pump Overhead
+			If your application uses PeekMessage or GetMessage in the main thread, the increased rate of UI messages (like WM_MOUSEMOVE or WM_SETCURSOR) might be consuming more CPU cycles, reducing available time for other threads.
+			
+			
+		+/
 		//auto _ = PROBE("bitmapQuery");
 		synchronized
 		{
