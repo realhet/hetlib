@@ -13021,6 +13021,9 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			return f; 
 		} 
 		
+		Path actualPath(in Path p)
+		=> ((p)?(p.dir.File.actualFile.fullName.Path):(p)); 
+		
 		//helpers for saving and loading
 		
 		string otherExt(string fn, string ext)

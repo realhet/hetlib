@@ -5146,8 +5146,10 @@ version(/+$DIDE_REGION+/all)
 											}
 											
 											if(onItem)	onItem(r.item); 
-											else	r.item.UI; 
-											
+											else	{
+												static if(__traits(compiles, { r.item.UI(); }))	r.item.UI(); 
+												else	Text(r.item.text); 
+											}
 										}
 									); 
 								}
