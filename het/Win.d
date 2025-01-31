@@ -777,7 +777,10 @@ class Window
 						}
 					}
 					else
-					{ inputChars ~= ch; }
+					{
+						const isCtrlSpace = ch==' ' && (GetKeyState(VK_CONTROL)&0x8000); 
+						if(!isCtrlSpace) inputChars ~= ch; 
+					}
 				}
 				catch(Exception e) { WARN(e.simpleMsg); }
 				

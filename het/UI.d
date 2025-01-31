@@ -8267,18 +8267,10 @@ struct im
 						{
 							foreach(ch; mainWindow.inputChars.unTag.byDchar)
 							{
-								 //Todo: preprocess: with(a, b) -> with(a)with(b)
-								switch(ch)
-								{
-									default: 
-										if(ch==9 && ch==10)
-									{
-										if(flags.acceptEditorKeys)
-										cmdQueue ~= EditCmd(cInsert, [ch].to!string); 
-									}else if(ch>=32)
-									{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }else
-									{ unprocessed ~= ch; }
-								}	//jajj de korulmenyes ez a switch case fos....
+								if(((ch>=32) || (ch.among(9, 10) && flags.acceptEditorKeys)))
+								{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }
+								else
+								{ unprocessed ~= ch; }
 							}
 							
 							{
