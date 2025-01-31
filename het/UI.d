@@ -5026,9 +5026,9 @@ version(/+$DIDE_REGION+/all)
 	} 
 	static class VirtualTreeView(Item) if(is(Item==struct))
 	{
-		Item root_; 
-		@property root(Item a) { if(root_.chkSet(a)) changed = now; } 
-		@property ref root() => root_; 
+		Item _root; 
+		@property root(Item a) { if(_root.chkSet(a)) changed = now; } 
+		@property ref root() => _root; 
 		
 		static struct TreeRow
 		{
@@ -5054,7 +5054,7 @@ version(/+$DIDE_REGION+/all)
 			} 
 			{
 				rows = []; maxRowWidth = 0; 
-				if(showRoot)	{ doit(root_, "", true, false); }
+				if(showRoot)	{ doit(_root, "", true, false); }
 				else	{ root.open; foreach(ref a; root.subNodes) doit(a, "", false, false); }
 				rowsUpdated = now; 
 			}
@@ -6072,13 +6072,15 @@ version(/+$DIDE_REGION+/all)
 	
 	class GraphNode(Graph, Label) : Row
 	{
-		 //GraphNode /////////////////////////////
 		mixin CachedDrawing; 
 		
 		Graph parent; 
 		
-		this()
-		{ flags._measureOnlyOnce = true; } 
+		this(Graph parent)
+		{
+			this.parent = parent; 
+			flags._measureOnlyOnce = true; 
+		} 
 		
 		bool isSelected, oldSelected; 
 		bool isHovered()
@@ -6116,9 +6118,9 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		auto absInnerBounds() const
-		{ return innerBounds + parent.innerPos; } ; 
+		{ return innerBounds + parent.innerPos; } 
 		auto absInnerPos   () const
-		{ return innerPos    + parent.innerPos; } ; 
+		{ return innerPos    + parent.innerPos; } 
 	} 
 	
 	class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container
@@ -6156,7 +6158,7 @@ version(/+$DIDE_REGION+/all)
 			enforce(cast(Node)node !is null     , "addNode() param must be an instance of "~Node.stringof       ); 
 			enforce(name.length                 , "Name must be non-empty."                                     ); 
 			enforce(findNode(name) is null      , "Node named "~name.quoted~" already exists"                   ); 
-			enforce(!node.parent                , "Node already has a parent."                                  ); 
+			//enforce(!node.parent                , "Node already has a parent."                                  ); 
 			
 			const bnd = allBounds; 
 			const nextPos = bnd.valid ? bnd.bottomLeft + vec2(0, 32) : vec2(0); 
