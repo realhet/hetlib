@@ -5041,6 +5041,37 @@ version(/+$DIDE_REGION+/all)
 		bool showBullet = true; /+if there is no icon, a bullet mark looks nice in front of the item name+/
 		bool showRoot = true; 
 		
+		Item* getParentItem(Item* child)
+		{
+			/+Opt: this is not so fast.  Items should know their parents...+/
+			//Todo: refactor this crap in functional style
+			foreach(i, ref a; rows)
+			if(a.item is child)
+			{
+				if(i>0) {
+					const desiredPrefixLen = (cast(sizediff_t)(rows[i].prefix.length))-1; 
+					if(desiredPrefixLen>=0)
+					{
+						foreach_reverse(ref b; rows[0..i])
+						if(b.prefix.length==desiredPrefixLen)
+						return b.item; 
+					}
+				}
+			}
+			return null; 
+		} 
+		
+		auto getAllParentItems(Item* child)
+		{
+			Item*[] res; 
+			while(child)
+			{
+				child = getParentItem(child); 
+				if(child) res ~= child; 
+			}
+			return res.retro.array; 
+		} 
+		
 		void makeRows()
 		{
 			void doit(ref Item act, string prefix, bool isLast, bool doPrefix=true)

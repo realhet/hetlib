@@ -280,11 +280,11 @@ version(/+$DIDE_REGION Tokenizer+/all)
 		int isOperator(int op1, int op2) const
 		{ return kind==TokenKind.operator ? cast(int)id.among(op1, op2) : 0; } 
 		bool isKeyword ()		const	
-		{ return	kind==TokenKind.keyword; } 
+		{ return kind==TokenKind.keyword; } 
 		bool isKeyword (int	kw)		const
 		{ return id==kw &&	kind==TokenKind.keyword; } 
 		bool isIdentifier()	  const
-		{ return	kind==TokenKind.identifier; } 
+		{ return kind==TokenKind.identifier; } 
 		bool isIdentifier(string s)		const
 		{ return isIdentifier && source==s; } 
 		bool isIdentifier(string s, int level)   const
@@ -4104,13 +4104,17 @@ version(/+$DIDE_REGION Keywords+/all)
 			format!q{enum stateTransitions = [%s]; }("\n"~transitions.join(",\n")~"\n") ~ "\n"; 
 			else
 			return (members.map!`"/+note:"~a~"+/"`.join("\t"))~"\n"~
-			(mixin(求map(q{i=0},q{<transitions.map!"a.split('\t').length".maxElement},q{
-				(mixin(求map(q{j=0},q{<members.length},q{
-					auto s = transitions[j].split('\t').get(i).withoutStarting(',').strip; 
-					if(s=="") s = " "; 
-					return s; 
-				}))).join('\t')
-			}))).join('\n'); 
+			(
+				mixin(求map(q{i=0},q{<transitions.map!"a.split('\t').length".maxElement},q{
+					(
+						mixin(求map(q{j=0},q{<members.length},q{
+							auto s = transitions[j].split('\t').get(i).withoutStarting(',').strip; 
+							if(s=="") s = " "; 
+							return s; 
+						}))
+					).join('\t')
+				}))
+			).join('\n'); 
 		} 
 		
 	} 
@@ -4234,15 +4238,17 @@ version(/+$DIDE_REGION Keywords+/all)
 	version(none /+Note: This is just an example. Use het.fromJSON()!+/)
 	struct StructureScanner_JSON
 	{
-		mixin((
-			(表([
-				[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/}],
-				[q{"{"},q{object},q{Error("] )") ~ EntryTransitions ~ Trans(": ,", object)},q{"}"}],
-				[q{"["},q{array},q{Error(") }") ~ EntryTransitions ~ Trans(",", array)},q{"]"}],
-				[q{"'"},q{sqString},q{Ignore(`\\ \'`)},q{`'`}],
-				[q{`"`},q{dqString},q{Ignore(`\\ \"`)},q{`"`}],
-			]))
-		).調!GEN_StructureScanner); 
+		mixin(
+			(
+				(表([
+					[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/}],
+					[q{"{"},q{object},q{Error("] )") ~ EntryTransitions ~ Trans(": ,", object)},q{"}"}],
+					[q{"["},q{array},q{Error(") }") ~ EntryTransitions ~ Trans(",", array)},q{"]"}],
+					[q{"'"},q{sqString},q{Ignore(`\\ \'`)},q{`'`}],
+					[q{`"`},q{dqString},q{Ignore(`\\ \"`)},q{`"`}],
+				]))
+			).調!GEN_StructureScanner
+		); 
 	} 
 	
 }
