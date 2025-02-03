@@ -4824,11 +4824,11 @@ version(/+$DIDE_REGION Numeric+/all)
 					return s; 
 				} 
 				
-				return (mixin(求map(q{0<=i<N},q{},q{combine(i, (mixin(求sum(q{-M<j<M},q{},q{kernel[(magnitude(j))] * read((i+j).clamp(0, N-1))}))))}))).array; 
+				return mixin(求map(q{0<=i<N},q{},q{combine(i, mixin(求sum(q{-M<j<M},q{},q{kernel[(magnitude(j))] * read((i+j).clamp(0, N-1))})))})).array; 
 			} 
 			
 			auto convolve(string chn="", E)(Image!(E, 2) img, in SymmetricKernel!float kernel)
-			{ (mixin(求each(q{pass=1},q{2},q{img = (mixin(求map(q{line},q{img.columns},q{line.convolve!chn(kernel)}))).image2D}))); return img; } 
+			{ mixin(求each(q{pass=1},q{2},q{img = mixin(求map(q{line},q{img.columns},q{line.convolve!chn(kernel)})).image2D})); return img; } 
 			
 			float translateDeprecatedGaussParameter(int i)
 			{
