@@ -15265,8 +15265,7 @@ version(/+$DIDE_REGION debug+/all)
 	+/
 	
 	//Todo: this should be a nonDestructive overwrite for not just classes but for assocArrays too.
-	//Todo: New name: addJson or includeJson
-	auto fromJsonProps(Type)
+	string[] propsFromJson(Type)
 	(
 		Type data, string st, string moduleName="unnamed_json",
 		ErrorHandling errorHandling=ErrorHandling.ignore,
@@ -15274,20 +15273,19 @@ version(/+$DIDE_REGION debug+/all)
 	)
 	if(is(Type == class))
 	{
-		auto tmp = data; 
+		auto orig = data; 
 		auto errors = fromJson(data, st, moduleName, errorHandling, srcFile, srcFunct, srcLine); 
-		
-		if(data is null) {
-			auto msg = "fromJsonProps: Object was set to null. Did nothing..."; 
-			//Todo: null should reset all fields
+		if(data !is orig) {
+			auto msg = "propsFromJson: Unable to read object fields."; 
 			with(ErrorHandling)
 			final switch(errorHandling) {
-				case ignore: return; 
-				case raise: .raise(msg); break; 
-				case track: errors ~= msg; 
+				case ignore: 		break; 
+				case warn: 	WARN(msg); 	break; 
+				case raise: 	.raise(msg); 	break; 
+				case track: 	errors ~= msg; 
 			}
-			
 		}
+		return errors; 
 	} 
 	
 	//errorHandling: 0: no errors, 1:just collect the errors, 2:raise
@@ -15626,7 +15624,6 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 							/+Todo: This can't load nested classes.  Not a big problem, but it can't.+/
 							data = new Type; 
 						}
-						
 					}
 				}
 				

@@ -7190,7 +7190,7 @@ struct im
 		
 			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 			.Container actContainer, lastContainer; //top of the containerStack for faster access
-			bool enabled; 
+			bool enabled;  //Todo: bad naming.  It should be in flags, in cascaded style.
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
 			string theme; //for now it's a str, later it will be much more complex
 			//valid valus: "", "tool"
