@@ -1203,7 +1203,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	version(/+$DIDE_REGION+/all) {
 		enum ErrorHandling { ignore, warn, raise, track} 
 		
-		alias enforce = stdEnforce; 
+		alias enforce = stdEnforce/+Todo: should work with interpolated strings!!!+/; 
 		
 		///this version compares 2 values and shows the difference too
 		void enforceDiff(T)(in T expected, in T actual, lazy string caption="", string file = __FILE__, int line = __LINE__)
