@@ -7373,14 +7373,10 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		string firstLine(string s)
 		{
-			print("FIRSTLINE IN", s.quoted); 
-			
 			auto a = s.splitter("\n").map!strip; 
 			if(a.empty) return ""; 
 			auto res = a.front; a.popFront; 
-			
 			if(!a.empty) res ~= "…"; 
-			print("FIRSTLINE out", s.quoted); 
 			return res; 
 		} 
 		
@@ -10599,7 +10595,7 @@ version(/+$DIDE_REGION Colors+/all)
 			{
 				Data data; 
 				string caption; 
-			} ; 
+			}; 
 			
 			bool lastOpWasNew, blockChg; 
 			Data lastData; //saved before chg()
@@ -11836,7 +11832,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				}
 				return res; 
 			} 
-		} ; 
+		}; 
 		
 		struct Sequencer(T)
 		{

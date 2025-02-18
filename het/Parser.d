@@ -31,7 +31,7 @@ version(/+$DIDE_REGION Tokenizer+/all)
 	//Todo: detect 3 spaces exotic indent.
 	
 	enum TokenKind
-	{ unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat} ; 
+	{ unknown, comment, identifier, keyword, special, operator, literalString, literalChar, literalInt, literalFloat}; 
 	
 	@trusted string tokenize(string fileName, string sourceText, out Token[] tokens, WhitespaceStats* whitespaceStats=null) //returns error of any
 	{ auto t = scoped!Tokenizer;  return t.tokenize(fileName, sourceText, tokens, whitespaceStats); } 
@@ -3198,9 +3198,9 @@ version(/+$DIDE_REGION Keywords+/all)
 	{
 		string[] identifiers; 
 		string fullName() const
-		{ return identifiers.join('.'); } ; 
+		{ return identifiers.join('.'); }; 
 		string fileName() const
-		{ return identifiers.length ? identifiers.join('\\')~".d" : ""; } ; 
+		{ return identifiers.length ? identifiers.join('\\')~".d" : ""; }; 
 	} 
 	
 	struct ImportBind
@@ -3851,7 +3851,7 @@ version(/+$DIDE_REGION Keywords+/all)
 			{
 				with(StructureScanner)
 				{
-					enum log = 0; 
+					enum log = (常!(bool)(0)); 
 					
 					static if(__traits(compiles, initialState))	State[] stack = [initialState]; 
 					else	State[] stack = [State.init]; 
@@ -3874,7 +3874,7 @@ version(/+$DIDE_REGION Keywords+/all)
 									static immutable	transitions	 = StateTransitions[caseState],
 										tokens	 = transitions.map!"a.token".array; 
 									//pragma(msg, caseState, "\n", transitions.map!(a => a.format!"  %s").join("\n"));
-									if(log)
+									static if(log)
 									{
 										print("------------------------------------"); 
 										print("SRC:", EgaColor.yellow(src.quoted)); 
@@ -3926,7 +3926,7 @@ version(/+$DIDE_REGION Keywords+/all)
 														yield(ScanResult(ScanOp.error, tokenStr ~ src)); 
 														return; 
 													}
-													if(stack.length)
+													if(stack.length >= ((isPop)?(2):(1)))
 													{
 														if(isPop)
 														{
@@ -4002,7 +4002,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1DC5DFDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1DC84FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
