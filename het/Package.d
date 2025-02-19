@@ -3113,6 +3113,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		/+Note: tenary equal+/
 		string 等(string a, string b, string c) => iq{($(a))==($(b)) && ($(b))==($(c))}.text; 
 		
+		//Todo: 製(T, alias def) manufacture constants from simple definitions.  Eg: RGB(255, 0, 0) RGB(red)  <- both should use color display!
+		
 		/+
 			Todo: UnitTest relational operations.
 			/+

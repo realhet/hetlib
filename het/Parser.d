@@ -2267,6 +2267,83 @@ version(/+$DIDE_REGION Tokenizer+/all)
 
 version(/+$DIDE_REGION Keywords+/all)
 {
+	
+	struct KeywordSearchTree
+	{
+		dchar ch/+root is always 0xff, it is there to hold subNodes.+/; 
+		int code; 
+		KeywordSearchTree[] subNodes; 
+		
+		int search(string s) const
+		{
+			if(s.empty) return 0; 
+			foreach(const sn; subNodes)
+			{
+				if(sn.ch==s.front)
+				{
+					s.popFront; 
+					if(!s.empty) if(const a = sn.search(s)) return a; 
+					return sn.code; 
+				}
+			}
+			return 0; 
+		} 
+		
+		void addSubNode(string s, int scode)
+		{
+			if(s.empty) return; 
+			
+			auto idx = subNodes.map!"a.ch".countUntil(s.front); 
+			if(idx<0) { idx = subNodes.length; subNodes ~= KeywordSearchTree(s.front); }
+			
+			s.popFront; 
+			if(s.empty)	subNodes[idx].code = scode; 
+			else	subNodes[idx].addSubNode(s, scode); 
+		} 
+		
+		static KeywordSearchTree build(string[] keywords)
+		{
+			KeywordSearchTree root; 
+			foreach(i, act; keywords)
+			root.addSubNode(act, (cast(int)(i+1))); 
+			return root; 
+		} 
+	} 
+	
+	int startsWithKeyword(KeywordSearchTree tree, R)(R s)
+	{
+		//pragma(msg, __PRETTY_FUNCTION__); 
+		
+		if(s.empty) return 0; 
+		switch(s.front)
+		{
+			static foreach(sn; tree.subNodes)
+			{
+				case sn.ch: {
+					s.popFront; 
+					
+					if(!s.empty) if(const res = startsWithKeyword!sn(s)) return res; 
+					
+					if(
+						s.empty || !s.front.isDLangIdentifierCont || !sn.ch.isDLangIdentifierCont
+						/+whole words only, except the keyword is not ends with wordChar+/
+					)
+					return sn.code; 
+					
+					return 0; 
+				}
+			}
+			default: return 0; 
+		}
+	} 
+	
+	int startsWithKeyword(string[] keywords, R)(R s)
+	{
+		enum tree = KeywordSearchTree.build(keywords); 
+		return startsWithKeyword!tree(s); 
+	} 
+	
+	
 	////////////////////////////////////////////////////////////////////////////////
 	///  Basic Types                                                             ///
 	////////////////////////////////////////////////////////////////////////////////
@@ -2811,6 +2888,49 @@ version(/+$DIDE_REGION Keywords+/all)
 	
 	//Todo: these should be uploaded to the gpu
 	//Todo: from the program this is NOT extendable
+	//Todo: Get the accent color from WM_DWMCOLORIZATIONCOLORCHANGED 
+	
+	version(none)
+	{
+		enum a =
+		(表([
+			[q{/+Note: SyntaxKind+/},q{/+Note: Default+/}],
+			[q{whitespace}],
+			[q{selected}],
+			[q{foundAct}],
+			[q{foundAlso}],
+			[q{navLink}],
+			[q{number}],
+			[q{string}],
+			[q{keyword}],
+			[q{symbol}],
+			[q{comment}],
+			[q{directive}],
+			[q{identifier1}],
+			[q{identifier2}],
+			[q{identifier3}],
+			[q{identifier4}],
+			[q{identifier5}],
+			[q{identifier6}],
+			[q{label}],
+			[q{attribute}],
+			[q{basicType}],
+			[q{binary1}],
+			[q{error}],
+			[q{exception}],
+			[q{warning}],
+			[q{deprecation}],
+			[q{note}],
+			[q{todo}],
+			[q{opt}],
+			[q{bug}],
+			[q{link}],
+			[q{code}],
+			[q{console}],
+			[q{interact}],
+		])); 
+	}
+	
 	immutable syntaxPresetNames =	             ["Default"             , "Classic"                         , "C64"                   , "Dark"                     ]; 
 	immutable SyntaxStyleRow[] syntaxTable =[
 		{"Whitespace"	, [{ clBlack	,clWhite	,0}, { clVgaYellow	,clVgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { 0xc7c5c5	,0x2f2f2f ,0}]},
@@ -2853,7 +2973,7 @@ version(/+$DIDE_REGION Keywords+/all)
 	
 	static foreach(m; EnumMembers!SyntaxKind)
 	mixin("alias sk* = SyntaxKind.*;".replace('*', m.text)); 
-	
+	
 	__gshared defaultSyntaxPreset = SyntaxPreset.Dark; 
 	
 	//Todo: slow, needs a color theme struct
@@ -4002,7 +4122,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1DC84FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1E642FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
