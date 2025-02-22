@@ -215,6 +215,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			XXH3.selftest; 
 			
+			tea_selftest; 
+			
 			{ RNG rng; rng.seed = 0; enforce(iota(30).map!(i => rng.random(100).text).join(' ') == "0 3 86 20 27 67 31 16 37 42 8 47 7 84 5 29 91 36 77 32 69 84 71 30 16 32 46 24 82 27"); }
 			
 			enforce(maskLowBits(0)==0); 
@@ -3606,18 +3608,18 @@ version(/+$DIDE_REGION Numeric+/all)
 			arr.length = len; 
 		} 
 		
-		@property auto frontOr(R, T)(R r, T e = ElementType!R.init)if(isInputRange!R)
+		auto frontOr(R, T)(R r, T e = ElementType!R.init)if(isInputRange!R)
 		{
 			return r.empty ? e : r.front; //Todo: constness
 		} 
-		@property auto backOr(R, T)(R r, T e = ElementType!R.init)if(isBidirectionalRange!R)
+		auto backOr(R, T)(R r, T e = ElementType!R.init)if(isBidirectionalRange!R)
 		{ return r.empty ? e : r.back; } 
 		
-		@property auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class))
+		auto frontOrNull(R)(R r)if(isInputRange!R && is(ElementType!R==class))
 		{
 			return r.empty ? null : r.front; //Todo: constness
 		} 
-		@property auto backOrNull(R)(R r)if(isBidirectionalRange!R && is(ElementType!R==class))
+		auto backOrNull(R)(R r)if(isBidirectionalRange!R && is(ElementType!R==class))
 		{ return r.empty ? null : r.back; } 
 		
 		auto fetchFront(T)(ref T arr, lazy ElementType!T def = ElementType!T.init)
@@ -4763,7 +4765,62 @@ version(/+$DIDE_REGION Numeric+/all)
 				shared static this() { test; } 
 				
 		}
-	} 
+	} version(/+$DIDE_REGION Tiny Encryption Algorithm+/all)
+	{
+		void tea_enc(ref uint[2] v, const uint[4] k)
+		{
+			uint v0=v[0], v1=v[1], sum=0, i; 	/* set up */
+			uint delta=0x9E3779B9; 	/* a key schedule constant */
+			uint k0=k[0], k1=k[1], k2=k[2], k3=k[3]; 	/* cache key */
+			for(i=0; i<32; i++) {
+				sum += delta; 
+				v0 += ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1); 
+				v1 += ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3); 
+			}
+			v[0]=v0; v[1]=v1; 
+		} 
+		
+		void tea_dec(ref uint[2] v, const uint[4] k)
+		{
+			uint v0=v[0], v1=v[1], sum=0xC6EF3720, i; 	/* set up; sum is (delta << 5) & 0xFFFFFFFF */
+			uint delta=0x9E3779B9; 	/* a key schedule constant */
+			uint k0=k[0], k1=k[1], k2=k[2], k3=k[3]; 	/* cache key */
+			for(i=0; i<32; i++) {
+				v1 -= ((v0<<4) + k2) ^ (v0 + sum) ^ ((v0>>5) + k3); 
+				v0 -= ((v1<<4) + k0) ^ (v1 + sum) ^ ((v1>>5) + k1); 
+				sum -= delta; 
+			}
+			v[0]=v0; v[1]=v1; 
+		} 
+		
+		uint[4] tea_key(string key)
+		{
+			ulong h = key.xxh3_64; ulong[2] k = [h, h^0x93297832_AFCDBABE]; 
+			return (cast(uint[4])(k)); 
+		} 
+		
+		ulong[] tea_enc(string data, string key)
+		{
+			ulong[] tmp = (cast(ulong[])((cast(ubyte[])(data)).padRight(ubyte(255), data.length.alignUp(8)).array)); 
+			foreach(i; 0..tmp.length) tea_enc(*(cast(uint[2]*)(&tmp[i])), tea_key(key)); 
+			return tmp; 
+		} 
+		
+		string tea_dec(in ulong[] data, string key)
+		{
+			ulong[] tmp = data.dup; 
+			foreach(i; 0..tmp.length) tea_dec(*(cast(uint[2]*)(&tmp[i])), tea_key(key)); 
+			string s = cast(string)tmp; 
+			while(s.length && s[$-1]==255) s.length--; 
+			return safeUTF8(s); 
+		} 
+		
+		void tea_selftest()
+		{
+			enum a = "Hello World!", b = [11725383039627143599UL, 9008936852623383586UL], k = "test"; 
+			enforce(tea_enc(a, k).equal(b)); enforce(tea_dec(b, k).equal(a)); 
+		} 
+	}
 }version(/+$DIDE_REGION Signal processing+/all)
 {
 	//Signal processing /////////////////////////////

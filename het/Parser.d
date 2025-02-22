@@ -1128,31 +1128,31 @@ version(/+$DIDE_REGION Tokenizer+/all)
 				{
 					switch(id)
 					{
-											default	: { error("Unhandled keyword specialtoken: "~source); break; }
-											case kw__EOF__	: { seekToEOF; removeLastToken; break; }
-											case kw__TIMESTAMP__	: { kind = TokenKind.literalString; data = now.text; break; }
-											case kw__DATE__		: { kind = TokenKind.literalString; data = now.dateText; break; }
-											case kw__TIME__		: { kind = TokenKind.literalString; data = now.timeText; break; }
-											case kw__VENDOR__	: { kind = TokenKind.literalString; data = "realhet"; break; }
-											case kw__VERSION__		: { kind = TokenKind.literalInt; data = CompilerVersion; break; }
-											case kw__FILE__	: { import 	std.path; kind = TokenKind.literalString; data = baseName(fileName); break; }
-											case kw__FILE_FULL_PATH__		: { kind = TokenKind.literalString; data = fileName; break; }
-						
-						//Todo: Ez kurvara nem igy megy: A function helyen kell ezt meghivni.
-											case kw__LINE__	: { kind = TokenKind.literalInt; data = line+1; break; }
-											case kw__MODULE__	: { kind = TokenKind.literalString; data = "module"; break; }//TODO
-											case kw__FUNCTION__	: { kind = TokenKind.literalString; data = "function"; break; }//TODO
-											case kw__PRETTY_FUNCTION__	: { kind = TokenKind.literalString; data = "pretty_function"; break; }//TODO
+						default	: 	{ error("Unhandled keyword specialtoken: "~source); break; }
+						case kw__EOF__	: 	{ seekToEOF; removeLastToken; break; }
+						case kw__TIMESTAMP__	: 	{ kind = TokenKind.literalString; data = now.text; break; }
+						case kw__DATE__		: 	{ kind = TokenKind.literalString; data = now.dateText; break; }
+						case kw__TIME__		: 	{ kind = TokenKind.literalString; data = now.timeText; break; }
+						case kw__VENDOR__	: 	{ kind = TokenKind.literalString; data = "realhet"; break; }
+						case kw__VERSION__		: 	{ kind = TokenKind.literalInt; data = CompilerVersion; break; }
+						case kw__FILE__	: 	{ import 	std.path; kind = TokenKind.literalString; data = baseName(fileName); break; }
+						case kw__FILE_FULL_PATH__		: 	{ kind = TokenKind.literalString; data = fileName; break; }
+							//Todo: Ez kurvara nem igy megy: A function helyen kell ezt meghivni.
+						case kw__LINE__	: 	{ kind = TokenKind.literalInt; data = line+1; break; }
+						case kw__MODULE__	: 	{ kind = TokenKind.literalString; data = "module"; break; }//TODO
+						case kw__FUNCTION__	: 	{ kind = TokenKind.literalString; data = "function"; break; }//TODO
+						case kw__PRETTY_FUNCTION__	: 	{ kind = TokenKind.literalString; data = "pretty_function"; break; }//TODO
 					}
-				}else if(kwIsOperator(id))
+				}
+				else if(kwIsOperator(id))
 				{
 					switch(id)
 					{
 						default: { error("Unhandled keyword operator: "~source); break; }
-						case kwin: case kwis: case kwnew: /*case kwdelete  deprecated:*/{
-								kind = TokenKind.operator; 
-								id = opParse(source); 
-								if(!id)
+						case kwin, kwis, kwnew: {
+							kind = TokenKind.operator; 
+							id = opParse(source); 
+							if(!id)
 							error("Cannot lookup keyword operator."); 
 							break; 
 						}
@@ -1191,11 +1191,8 @@ version(/+$DIDE_REGION Tokenizer+/all)
 			fetch; 
 			switch(ch)
 			{
-				default: {
-					//named character entries
-					error(format(`Invalid char in escape sequence "%s" hex:%d`, ch, ch)); return ""; 
-				}
-				case '\'': case '\"': case '?': case '\\': { auto res = to!string(ch); fetch; return res; }
+				default: { error(format(`Invalid char in escape sequence "%s" hex:%d`, ch, ch)); return ""; }
+				case 	'\'', '\"', '?', '\\', '/': { auto res = to!string(ch); fetch; return res; }
 				case 'a': { fetch; return "\x07"; }
 				case 'b': { fetch; return "\x08"; }
 				case 'f': { fetch; return "\x0C"; }
@@ -1228,6 +1225,7 @@ version(/+$DIDE_REGION Tokenizer+/all)
 					return to!string(cast(dchar)u); 
 				}
 				case '&': {
+					//named character entries
 					fetch; 
 					auto s = fetchIdentifier; 
 					if(ch!=';')
@@ -1235,7 +1233,8 @@ version(/+$DIDE_REGION Tokenizer+/all)
 					fetch; 
 					auto u = nceLookup(s); 
 					if(!u)
-					error(`Unknown NamedCharacterEntry "`~s~`".`); //Todo: this should be only a warning, not a complete failure
+					error(`Unknown NamedCharacterEntry "`~s~`".`); 
+					//Todo: this should be only a warning, not a complete failure
 					
 					return to!string(u); 
 				}
@@ -1651,7 +1650,8 @@ version(/+$DIDE_REGION Tokenizer+/all)
 					break; //eof reached
 					switch(ch)
 					{
-						case 'a': ..case 'z': case 'A': ..case 'Z': case '_': {
+						case 'a': ..case 'z':   case 'A': ..case 'Z':   case '_': 
+							{
 							dchar nc = peek; 
 							if(nc=='"')
 							{
@@ -1659,7 +1659,8 @@ version(/+$DIDE_REGION Tokenizer+/all)
 								{ parseWysiwygString; break; }
 								if(ch=='q')
 								{ parseDelimitedString; break; }
-								//deprecated if(ch=='x'){ parseHexString; break; }  //todo: x"" hexString can be an addon in the IDE.
+								//deprecated if(ch=='x'){ parseHexString; break; }
+								//Todo: x"" hexString can be an addon in the IDE.
 							}else if(nc=='{')
 							{
 								if(ch=='q')
@@ -1668,6 +1669,7 @@ version(/+$DIDE_REGION Tokenizer+/all)
 							parseIdentifier; 
 							break; 
 						}
+							
 						case '"': { parseDoubleQuotedString; break; }
 						case '`': { parseWysiwygString; break; }
 						case '\'': { parseLiteralChar; break; }
@@ -1678,18 +1680,18 @@ version(/+$DIDE_REGION Tokenizer+/all)
 							goto default; //operator
 						}
 						case '#': {
-							 //Special token sequences
+							//Special token sequences
 							
 							/*
-								 This #line can broke the codeeditor. Rather disable it
-														if(text[pos..$].startsWith("#line")){ //lineNumber/fileName override
-															fetch("#line".length.to!int);  skipSpaces;
-															this.line = to!int(expectInteger(10))-2;  skipSpaces;
-															if(ch=='"'){ this.fileName = parseFilespec;  skipSpaces;  }
-															if(!isNewLine(ch)) error("NewLine character expected after #line SpecialTokenSequence.");
+								This #line can broke the codeeditor. Rather disable it
+								if(text[pos..$].startsWith("#line")){ //lineNumber/fileName override
+									fetch("#line".length.to!int);  skipSpaces;
+									this.line = to!int(expectInteger(10))-2;  skipSpaces;
+									if(ch=='"'){ this.fileName = parseFilespec;  skipSpaces;  }
+									if(!isNewLine(ch)) error("NewLine character expected after #line SpecialTokenSequence.");
 								
-															break;
-														}
+									break;
+								}
 							*/
 							if(text[pos..$].startsWith("#define"))
 							{
@@ -2270,6 +2272,12 @@ version(/+$DIDE_REGION Keywords+/all)
 	
 	struct KeywordSearchTree
 	{
+		/+
+			Opt: Do a benchmark with a char version instead of dchar!  
+			All this is turned into code, the layout of the struct doesn't matter.
+		+/
+		/+Link: https://forum.dlang.org/post/xilyefahtonmvdnuioyx@forum.dlang.org+/
+		
 		dchar ch/+root is always 0xff, it is there to hold subNodes.+/; 
 		int code; 
 		KeywordSearchTree[] subNodes; 
@@ -4122,7 +4130,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E642FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1E6B0FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
