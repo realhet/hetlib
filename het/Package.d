@@ -4799,16 +4799,19 @@ version(/+$DIDE_REGION Numeric+/all)
 			return (cast(uint[4])(k)); 
 		} 
 		
-		ulong[] tea_enc(string data, string key)
+		string tea_enc(string data, string key)
 		{
 			ulong[] tmp = (cast(ulong[])((cast(ubyte[])(data)).padRight(ubyte(255), data.length.alignUp(8)).array)); 
 			foreach(i; 0..tmp.length) tea_enc(*(cast(uint[2]*)(&tmp[i])), tea_key(key)); 
-			return tmp; 
+			return tmp.toBase64; 
 		} 
 		
-		string tea_dec(in ulong[] data, string key)
+		string tea_dec(string data, string key)
 		{
-			ulong[] tmp = data.dup; 
+			ubyte[] tmpb = (cast(ubyte[])(data.fromBase64)); 
+			tmpb.length = tmpb.length.alignUp(8); 
+			ulong[] tmp = (cast(ulong[])(tmpb)); 
+			
 			foreach(i; 0..tmp.length) tea_dec(*(cast(uint[2]*)(&tmp[i])), tea_key(key)); 
 			string s = cast(string)tmp; 
 			while(s.length && s[$-1]==255) s.length--; 
@@ -4817,7 +4820,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		void tea_selftest()
 		{
-			enum a = "Hello World!", b = [11725383039627143599UL, 9008936852623383586UL], k = "test"; 
+			enum a = "Hello World!", b = "r6ldNMDtuKIi3IoIViwGfQ==", k = "test"; 
 			enforce(tea_enc(a, k).equal(b)); enforce(tea_dec(b, k).equal(a)); 
 		} 
 	}
@@ -15577,7 +15580,13 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 				+/
 			}
 			else static if(isSomeString!T)
-			{ data = actToken.data.get!string.to!Type; }
+			{
+				data = ((actToken.data.hasValue)?(actToken.data.get!string.to!Type):("")); 
+				/+
+					null is a keyword, its data variant is uninitialized.  
+					VariantN.get() throws if it's uninitialized.
+				+/
+			}
 			else static if(isSomeChar!T)
 			{
 				dstring s = actToken.data.get!string.to!dstring; 
