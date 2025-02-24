@@ -2973,7 +2973,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		{"Link"	, [SyntaxStyle(clWowBlue	,clWhite    ,4)].replicate(4)},
 		{"Code"	, [SyntaxStyle(RGB(0xc7c5c5)	, mix(RGB(0x2f2f2f), RGB(0x442d44), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
 		{"Console"	, [SyntaxStyle(clWhite ,clBlack,0)].replicate(4)},
-		{"Interact"	, [SyntaxStyle(clBlack ,clWhite,0)].replicate(4)}
+		{"Interact"	, [SyntaxStyle(clBlack ,clWhite,0)].replicate(4)},
 	]; 
 	
 	mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(','))); 
@@ -4130,7 +4130,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E6B0FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1E6B1FDEAC48D).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
