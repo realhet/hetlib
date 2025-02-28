@@ -6883,9 +6883,11 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch=='_' || isUniAlpha(ch); } 
 		bool isDLangIdentifierCont	(T)(T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierStart(ch) || isDLangNumberStart(ch); } 
-		bool isDLangIdentifier(T)(T s)
-		if(isSomeString!T)
-		{ return !s.empty && s.front.isDLangIdentifierStart && s.drop(1).all!isDLangIdentifierCont; } 
+		/+
+			bool isDLangIdentifier(T)(T s)
+			if(isSomeString!T)
+			{ return !s.empty && s.front.isDLangIdentifierStart && s.drop(1).all!isDLangIdentifierCont; } 
+		+/
 		
 		bool isDLangNumberStart	(T)(T ch)if(isSomeChar!T)
 		{ return ch.inRange('0', '9'); } 
@@ -6896,6 +6898,18 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			return "~`!@#$%^&*()_+-=[]{}'\\\"|<>?,./".canFind(ch); //Todo: optimize this to a lookup
 		} 
+		
+		bool isDLangIdentifier(alias fStart=isDLangIdentifierStart, alias fCont=isDLangIdentifierCont, S)(S s)
+		{
+			static if(isInputRange!(S, dchar))	auto a = s; 
+			else	auto a = s.byDchar; 
+			if(a.empty) return false; 
+			if(!a.front.unaryFun!fStart) return false; 
+			a.popFront; 
+			return a.all!(unaryFun!fCont); 
+		} 
+		
+		alias isDLangNumber(S) = isDLangIdentifier!(isDLangNumberStart, isDLangNumberCont, S); 
 		
 		bool isSingleDString(string src)
 		{
