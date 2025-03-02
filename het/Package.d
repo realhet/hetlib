@@ -2482,9 +2482,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			enum fieldInitializations = transform!fieldInitialization; 
 		} 
 		
-		string generateSmartClassCode_impl(alias f, Flag!"hasChildren" hasChildren, string customConstructor)()
+		string generateSmartClassCode_impl(alias P, Flag!"hasChildren" hasChildren, string customConstructor)()
 		{
-			alias P = FunctionParameterProcessor!f; 
+			//alias P = FunctionParameterProcessor!f; 
 			
 			string res; 
 			enum hasParent = P.typeUdaStr!0.canFind("(PARENT)"); //hasUDA not works...
@@ -2541,15 +2541,42 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Example: High level Vulkan classes
 			+/
 			
-			private string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren, string customConstructor)()
+			string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren, string customConstructor)()
 			{
 				//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); 
-				mixin("void f("~fieldDefs~"){}"); 
-				return generateSmartClassCode_impl!(f, hasChildren, customConstructor); 
+				
+				mixin("void f("~fieldDefs~");"); 
+				return generateSmartClassCode_impl!(FunctionParameterProcessor!f, hasChildren, customConstructor); 
 				
 				/+Todo: Read the manual and fix this mixin template mess!  Use minimal string mixins!+/
 			} 
-		} 
+		} 
+		version(/+$DIDE_REGION Experimental thing that uses an anonym class to send parameters+/all)
+		{
+			version(none)
+			{
+				auto getDefaultFieldValue(T, string f)()
+				{ auto a = new T; return __traits(getMember, a, f); } 
+				
+				template DefaultTuple(alias C)
+				{
+					alias DefaultTuple = AliasSeq!(); 
+					static foreach(n; FieldNameTuple!C)
+					DefaultTuple = AliasSeq!(DefaultTuple, getDefaultFieldValue!(C, n)()); 
+				} 
+				
+				mixin template T(string def, C = typeof(mixin("new class{"~def~"}")))
+				{ enum T = "=>"~FieldNameTuple!C.stringof~FieldTypeTuple!C.stringof~DefaultTuple!C.stringof; } 
+				
+				struct LocalStruct { string s="hello"; } 
+				
+				void main()
+				{ pragma(msg, T!"int a=5, b=10; LocalStruct ls=LocalStruct(`world`);"); } 
+			}
+		}
+		
+		
+		
 		
 		
 	}
