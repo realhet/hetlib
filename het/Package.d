@@ -11937,6 +11937,114 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			} 
 		}; 
 		
+		struct SequencerRunner_blocking(T)
+		{
+			////todo: opApply a range helyett!
+			Sequencer!T seq; 
+			void delegate() onIdle = null; 
+			Time t0; 
+			float tLast = -1e30; 
+					
+			private T[] actEvents; 
+			private bool eof; 
+					
+			private void fetch()
+			{
+				if(eof || actEvents.length) return; 
+						
+				do {
+					auto tAct = (QPS-t0).value(second); 
+					actEvents = seq.getEvents(tLast, tAct); 
+					tLast = tAct; 
+					
+					if(actEvents.empty) {
+						 //wait more or break on EOS
+						if(!seq.anyEventsAfter(tLast)) {
+							eof = true; 
+							break; 
+						}
+								
+						if(onIdle !is null) onIdle(); 
+						else sleep(1); 
+					}
+				}while(actEvents.empty); 
+			} 
+					
+					
+			bool empty()
+			{
+				fetch; 
+				return eof && actEvents.empty; 
+			} 
+					
+			T front()
+			{
+				fetch; 
+				return actEvents.empty ? T.init : actEvents[0]; 
+			} 
+					
+			void popFront()
+			{
+				fetch; 
+				if(!actEvents.empty)
+				actEvents.popFront; 
+			} 
+		} 
+		struct SequencerRunner_nonBlocking(T)
+		{
+			//Todo: refactor this copy paste, and do unittests
+			////todo: opApply a range helyett!
+			Sequencer!T seq; 
+			T waitEvent; //void delegate() onIdle = null; 
+			Time t0; 
+			float tLast = -1e30; 
+					
+			private T[] actEvents; 
+			private bool eof; 
+					
+			private void fetch()
+			{
+				if(eof || actEvents.length) return; 
+						
+				do {
+					auto tAct = (QPS-t0).value(second); 
+					actEvents = seq.getEvents(tLast, tAct); 
+					tLast = tAct; 
+					
+					if(actEvents.empty) {
+						 //wait more or break on EOS
+						if(!seq.anyEventsAfter(tLast)) {
+							eof = true; 
+							break; 
+						}
+						
+						actEvents = [waitEvent]; 
+						return; 
+					}
+				}while(actEvents.empty); 
+			} 
+					
+					
+			bool empty()
+			{
+				fetch; 
+				return eof && actEvents.empty; 
+			} 
+					
+			T front()
+			{
+				fetch; 
+				return actEvents.empty ? T.init : actEvents[0]; 
+			} 
+					
+			void popFront()
+			{
+				fetch; 
+				if(!actEvents.empty)
+				actEvents.popFront; 
+			} 
+		} 
+		
 		struct Sequencer(T)
 		{
 			//Sequencer /////////////////////////////
@@ -11958,6 +12066,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			{
 				return events	.keys
 					.filter!(k => tLast<k && k<=tAct)
+					.array.sort
 					.map!(k => events[k]).array;  //Todo: this is slow
 			} 
 					
@@ -11967,63 +12076,10 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			} 
 					
 			auto run(void delegate() onIdle = null)
-			{
-				static struct SequencerRunner(T)
-				{
-					////todo: opApply a range helyett!
-					Sequencer!T seq; 
-					void delegate() onIdle = null; 
-					double t0; 
-					float tLast = -1e30; 
-							
-					private T[] actEvents; 
-					private bool eof; 
-							
-					private void fetch()
-					{
-						if(eof || actEvents.length) return; 
-								
-						do {
-							auto tAct = QPS-t0; 
-							actEvents = seq.getEvents(tLast, tAct); 
-							tLast = tAct; 
-							
-							if(actEvents.empty) {
-								 //wait more or break on EOS
-								if(!seq.anyEventsAfter(tLast)) {
-									eof = true; 
-									break; 
-								}
-										
-								if(onIdle !is null) onIdle(); 
-								else sleep(1); 
-							}
-						}while(actEvents.empty); 
-					} 
-							
-							
-					bool empty()
-					{
-						fetch; 
-						return eof && actEvents.empty; 
-					} 
-							
-					T front()
-					{
-						fetch; 
-						return actEvents.empty ? T.init : actEvents[0]; 
-					} 
-							
-					void popFront()
-					{
-						fetch; 
-						if(!actEvents.empty)
-						actEvents.popFirst; 
-					} 
-				} 
-						
-				return SequencerRunner!T(this, onIdle, QPS); 
-			} 
+			{ return SequencerRunner_blocking!T(this, onIdle, QPS); } 
+			
+			auto start(T waitEvent)
+			{ return SequencerRunner_nonBlocking!T(this, waitEvent, QPS); } 
 		} 
 		
 		struct UpdateInterval
