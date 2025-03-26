@@ -271,6 +271,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			cast()appStartedDay = appStarted.localDayStart; 
 			het.parser.initializeKeywordDictionaries; 
 		} 
+		
+		void hiddenConsole(void delegate() a) { console.hide; console(a); } 
 	}struct application
 	{
 		/// application /////////////////////////
@@ -2396,7 +2398,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{ return format!`((){with(%s) return %s;}())`(T.stringof, def); } 
 	}
 	
-	version(/+$DIDE_REGION SmartClass+/all)
+	version(/+$DIDE_REGION SmartChild+/all)
 	{
 		struct PARENT {} 
 		
@@ -2462,9 +2464,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		template FunctionParameterProcessor(alias f /+this must be a function, defining field types, names and defaults+/)
 		{
-			alias types = Parameters!f; 
-			alias names = ParameterIdentifierTuple!f; 
-			alias defaults = ParameterDefaults!f; 
+			static if(isFunction!f)
+			{
+				alias types = Parameters!f; 
+				alias names = ParameterIdentifierTuple!f; 
+				alias defaults = ParameterDefaults!f; 
+			}
+			else static if(false && is(f==struct))
+			{
+				alias types = TypeTuple!f; 
+				alias names = FieldNameTuple!f; 
+				//structs are not a good choice because it is impossible to detect when a default value is unspecified.
+			}
+			else static assert(0, "Unhandled symbol 'f'"); 
 			
 			enum length = types.length; 
 			
@@ -2524,33 +2536,50 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			return res; 
 		} 
 		
-		mixin template SmartClass(string fieldDefs, Flag!"hasChildren" hasChildren = No.hasChildren, string customConstructor = "")
-		{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
-		
-		mixin template SmartClass(string fieldDefs, string customConstructor, Flag!"hasChildren" hasChildren = No.hasChildren)
-		{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
-		
-		mixin template SmartClassParent(string fieldDefs)
-		{ mixin SmartClass!(fieldDefs, Yes.hasChildren); } 
-		
-		mixin template SmartClassGenerator()
-		{
-			/+
-				Note: This shoud be mixed in into a place to see the imports of the actual fieldDefs.
-				Usage: /+Code: mixin SmartClassGenerator;+/
-				Example: High level Vulkan classes
-			+/
+		version(/+$DIDE_REGION+/none) {
+			version(/+$DIDE_REGION+/none) {
+				mixin template SmartClass(string fieldDefs, Flag!"hasChildren" hasChildren = No.hasChildren, string customConstructor = "")
+				{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
+				
+				mixin template SmartClass(string fieldDefs, string customConstructor, Flag!"hasChildren" hasChildren = No.hasChildren)
+				{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
+				
+				mixin template SmartClassParent(string fieldDefs)
+				{ mixin SmartChild!(fieldDefs, Yes.hasChildren); } 
+			}
 			
-			string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren, string customConstructor)()
+			mixin template SmartClassGenerator()
 			{
-				//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); 
+				/+
+					Note: This shoud be mixed in into a place to see the imports of the actual fieldDefs.
+					Usage: /+Code: mixin SmartClassGenerator;+/
+					Example: High level Vulkan classes
+				+/
 				
-				mixin("void f("~fieldDefs~");"); 
-				return generateSmartClassCode_impl!(FunctionParameterProcessor!f, hasChildren, customConstructor); 
-				
-				/+Todo: Read the manual and fix this mixin template mess!  Use minimal string mixins!+/
+				version(/+$DIDE_REGION+/none) {
+					string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren, string customConstructor)()
+					{
+						//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); 
+						
+						
+						mixin("void f("~fieldDefs~");"); 
+						return generateSmartClassCode_impl!(FunctionParameterProcessor!f, hasChildren, customConstructor); 
+						
+						/+Todo: Read the manual and fix this mixin template mess!  Use minimal string mixins!+/
+					} 
+				}
 			} 
-		} 
+		}
+		
+		mixin template SmartClass(Flag!"hasChildren" hasChildren, string def, string constr = "")
+		{
+			mixin(iq{private static void _proto($(def)) {} }.text); 
+			mixin(generateSmartClassCode_impl!(FunctionParameterProcessor!_proto, hasChildren, constr)); 
+		} 
+		
+		mixin template SmartParent(string def, string constr = "") { mixin SmartClass!(Yes.hasChildren, def, constr); } 
+		mixin template SmartChild (string def, string constr = "") { mixin SmartClass!(No.hasChildren, def, constr); } 
+		
 		version(/+$DIDE_REGION Experimental thing that uses an anonym class to send parameters+/all)
 		{
 			version(none)
@@ -7542,13 +7571,28 @@ version(/+$DIDE_REGION Containers+/all)
 		auto csvToCells(string text)
 		{ return tabTextToCells(text, ";\n"); } 
 		
-		//Todo: import splitLines from std.string
+		/+
+			Bug: //import splitLines from std.string
+			
+			⚠ Can't do it because DIDE editor losts all incoming newlines if the good splitLines is used.
+			
+			The problem is	that they are different:
+			my splitLine:	"\r\n" -> ["", ""]
+			dlang splitLine: "\r\n" -> [""]
+			
+			It's because Unicode  doesn't treat "\r\n" as 'content'.
+			
+			Must use different naming because it will lead to problems in the future!
+		+/
 		
-		string[] splitLines(string s)
-		{ return s.splitter('\n').map!(a => a.withoutEnding('\r')).array; } 
+		//public import std.string : splitLines, lineSplitter; 
 		
-		dstring[] splitLines(dstring s)
-		{ return s.splitter('\n').map!(a => a.withoutEnding('\r')).array; } 
+		auto splitLines(T)(T s)
+		{
+			//This only supports "\n" and "\r\n"
+			//Big difference: The result ot this version can be simply recombined by join("\n");
+			return s.splitter('\n').map!((a)=>(a.withoutEnding('\r'))).array; 
+		} 
 		
 		bool startsWith_ci(string s, string w) pure
 		{
@@ -7593,7 +7637,18 @@ version(/+$DIDE_REGION Containers+/all)
 		string outdent(string s)
 		{
 			//Todo: this is lame
-			return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n'); 
+			//return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n'); 
+			
+			auto lines = s.split('\n'); 
+			
+			auto prefixLines = lines.filter!((a)=>(a.stripLeft!="")).map!((a)=>(a.until!(not!isWhite).text)).array; 
+			
+			if(prefixLines.empty) return s; 
+			
+			auto prefix = prefixLines.front; 
+			foreach(a; prefixLines.drop(1)) prefix = commonPrefix(prefix, a); 
+			
+			return prefix.empty ? s : lines.map!((a)=>(a.withoutStarting(prefix))).join('\n'); 
 		} 
 		
 		/// makes "Hello world" from "helloWorld"
