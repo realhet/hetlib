@@ -212,8 +212,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			enforce(xxh32(s2, 123456) == 0xc2845cee); 
 			enforce(crc32("Hello")==0xf7d18982); 
 			enforce(crc32(s2) == 0xAD4270ED); 
-			
 			XXH3.selftest; 
+			[File("@z.a[").toHash, Path("@Z.A[").hashOf].all!"a==16477785305357802113"; 
 			
 			tea_selftest; 
 			
@@ -12714,8 +12714,9 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				{ return cmp(fullPath, b.fullPath); } 
 				bool opEquals(in Path b)const
 				{ return fullPath==b.fullPath; } 
-				size_t toHash()const
-				{ return fullPath.hashOf; } 
+				
+				ulong toHash()const
+				=> fullPath.calcFileNameHash; 
 			}
 		} 
 		
@@ -13155,8 +13156,9 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			{ return cmp(fullName, b.fullName); } 
 			bool opEquals(in File b) const
 			{ return fullName==b.fullName; } 
-			size_t toHash() const
-			{ return fullName.hashOf; } 
+			
+			ulong toHash() const
+			=> fullName.calcFileNameHash; 
 			
 			@property bool hasQueryString() const
 			{ return fullName.canFind('?'); } 
@@ -13275,6 +13277,21 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		alias workPath = currentPath; 
 		
 		
+		//A very fast case insensitive 64 bit hash dedicated for windows filenames.
+		ulong calcFileNameHash(string s)
+		{
+			char fastLower(char c) => c>='A' && c<='Z' ? (cast(char)(c | ' ')) : c; 
+			//std.ascii.toLower is much slower, it does the full isUpper()...
+			
+			char[256] buf; 
+			const len = s.length; 
+			if(len==0/+empty filename has zero hash+/) return 0; 
+			if(len>buf.length/+too big+/) return s.byChar.map!fastLower.array.xxh3; 
+			
+			foreach(i, ch; (cast(ubyte[])(s))) buf[i] = fastLower(ch); 
+			return buf[0..len].xxh3; 
+		} 
+		
 		auto loadCachedTextFile(alias fun)(File file)
 		if(__traits(isStaticFunction, fun))
 		{
