@@ -105,6 +105,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.path: baseName; 
 			public import std.exception : collectException, ifThrown, assertThrown; 
 			public import std.system : endian, os; 
+			public import core.thread.osthread: Thread; 
 			
 			public import het.quantities; 
 			
