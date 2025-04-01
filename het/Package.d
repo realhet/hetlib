@@ -96,7 +96,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.utf; 
 			public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum; 
 			public import std.uri: urlEncode = encode, urlDecode = decode; 
-			public import std.process : environment, thisThreadID, execute, executeShell, ExecuteConfig = Config; 
+			public import std.process : environment, thisThreadID, execute, executeShell, ExecuteConfig = Config, Pid; 
 			public import std.zlib : compress, uncompress; 
 			public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write; 
 			//public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
@@ -121,6 +121,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			//Windows imports
 			public import core.sys.windows.windows : 
+				VOID, BOOL, BYTE, WORD, DWORD, INT, UINT, UINT64, ULONG,
 				HANDLE, GetCurrentProcess, SetPriorityClass, GetModuleHandle,
 				HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
 				BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
@@ -955,6 +956,47 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 		} 
 		
+		void killAndWaitProcess(T)(T pid, uint timeoutMs = 10_000)
+		{
+			static if(is(T : Pid))	{ const processID = pid ? pid.processID : 0; }
+			else	{ const processID = pid; }
+			
+			if(!processID/+0 is the id of system idle+/) return; 
+			
+			
+			
+			void ERR(string s) { static if((常!(bool)(0))) .ERR(s); } 
+			static if((常!(bool)(0))) { T0; scope(exit) print("killProcess", DT.value(milli(second))); }
+			
+			import core.sys.windows.windows : 	OpenProcess, TerminateProcess, PROCESS_TERMINATE, 
+				SYNCHRONIZE, WAIT_TIMEOUT, WAIT_FAILED; 
+			
+			/+
+				If you need to be sure the process has terminated, call the WaitForSingleObject function with a handle to the process.
+				The handle must have the SYNCHRONIZE access right. For more information, see Standard Access Rights.
+				Killing an LDC2 compiler takes 30-100ms.  It's not fast, but ok.
+			+/
+			// Open the process with necessary access rights
+			HANDLE hProcess = OpenProcess(
+				PROCESS_TERMINATE | SYNCHRONIZE,
+				false,  // Don't inherit handle
+				processID
+			); 
+			
+			if(hProcess == null) { ERR("Failed to open process: " ~ to!string(GetLastError())); }
+			
+			scope(exit) CloseHandle(hProcess); //Ensure handle is always closed
+			
+			// Terminate the process
+			if(TerminateProcess(hProcess, 1) == 0) { ERR("Failed to terminate process: " ~ to!string(GetLastError())); }
+			
+			// Wait for process to actually terminate
+			DWORD result = WaitForSingleObject(hProcess, timeoutMs); 
+			
+			if(result == WAIT_TIMEOUT) { ERR("Process termination timed out"); }
+			else if(result == WAIT_FAILED) { ERR("Wait failed: " ~ to!string(GetLastError())); }
+		} 
+		
 	}version(/+$DIDE_REGION+/all)
 	{
 		version(/+$DIDE_REGION SysInfo+/all)
@@ -1041,7 +1083,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				https://learn.microsoft.com/en-us/windows/win32/toolhelp
 				/taking-a-snapshot-and-viewing-processes?redirectedfrom=MSDN
 		+/
-	}version(/+$DIDE_REGION+/all)
+	}
+	
+	
+	version(/+$DIDE_REGION+/all)
 	{
 		class SharedMem(SharedDataType, bool isServer_)
 		{
