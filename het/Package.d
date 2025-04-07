@@ -166,6 +166,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.array : join;  //het.utils:  blabla.join conflicts with blabla.join
 			//het.ui: LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
 			
+			
+			import std.regex: regex; 
+			public import std.regex: Regex, regex, ctRegex, matchFirst;  //use rtRegex, for one time initialized runtime regex.
 		}
 		
 	}version(/+$DIDE_REGION+/all)
@@ -2436,6 +2439,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	version(/+$DIDE_REGION NiceExpression implementations+/all)
 	{
+		/+Todo: These should be mixin templates to see the target's scope.+/
 		static auto 體(T, string def)() //struct
 		{ return format!`((){%s _={%s};return _;}())`(T.stringof, def); } 
 		static auto 舉(T, string def)() //enum
@@ -8192,6 +8196,10 @@ version(/+$DIDE_REGION Containers+/all)
 	float e = 3.14, f = 2.71; void func(int x, int y) { int arr[2] = {1, 2}; if (x == y) { x++; } }"; 
 			writeln(splitDLang(s, `,`)); 
 		} 
+		
+		///It is similar to ctRegex, it just compiles at runtime
+		auto rtRegex(string s, string flags="")()
+		{ static Regex!char rx; if(rx.empty) rx = regex(s, flags); return rx; } 
 	}
 }version(/+$DIDE_REGION Hashing+/all)
 {
@@ -14079,7 +14087,7 @@ version(/+$DIDE_REGION debug+/all)
 {
 	version(/+$DIDE_REGION+/all)
 	{
-		import std.regex, std.demangle; 
+		import std.demangle; 
 		import core.sys.windows.windows: OpenFileMappingW, MapViewOfFile, CreateFileMappingW, FILE_MAP_ALL_ACCESS; 
 		//Note: LLVM debugging: https://llvm.org/docs/SourceLevelDebugging.html
 		
@@ -15896,12 +15904,11 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 						
 						//create only if original is null
 						if(data is null) {
-							static assert(
-								__traits(compiles, new Type), 
-								i"fromJson(): Class $(Type.stringof) must have this() to be loaded.".text
-							); 
+							static if(__traits(compiles, new Type))
+							{ data = new Type; }
+							else
+							{ WARN(i"fromJson(): Can't create class $(Type.stringof), it has no this()."); }
 							/+Todo: This can't load nested classes.  Not a big problem, but it can't.+/
-							data = new Type; 
 						}
 					}
 				}

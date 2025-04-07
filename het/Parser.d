@@ -1,4 +1,4 @@
-module het.parser;  import het, std.regex, std.variant; 
+module het.parser;  import het, std.variant; 
 version(/+$DIDE_REGION Tokenizer+/all)
 {
 	
@@ -3033,7 +3033,6 @@ version(/+$DIDE_REGION Keywords+/all)
 			//example: onlineapp.d-mixin-4(4,4)
 			
 			version(/+$DIDE_REGION+/none) {
-				import std.regex; 
 				static rx = ctRegex!(`^([^\-\(]*)(?:\-mixin\-([0-9]+))?(?:\( *([0-9]+) *(?:, *([0-9]+))? *\) *)?$`); 
 				auto m = s.matchFirst(rx); 
 				if(m.length)
@@ -3510,9 +3509,9 @@ version(/+$DIDE_REGION Keywords+/all)
 				Note: It is better to keep do the detection here, because 
 				it collects all the todos for the compiled project, not just the opened structured files in DIDE.
 			+/
-			auto rxTodo	= ctRegex!(`\/\/todo:(.*)`, `gi`); 
-			auto rxOpt	= ctRegex!(`\/\/opt:(.*)`, `gi`); 
-			auto rxBug	= ctRegex!(`\/\/bug:(.*)`, `gi`); 
+			auto 	rxTodo 	= rtRegex!(`\/\/todo:(.*)`, `gi`),
+				rxOpt	= rtRegex!(`\/\/opt:(.*)`, `gi`),
+				rxBug	= rtRegex!(`\/\/bug:(.*)`, `gi`); 
 			
 			foreach(ref cmt; tokens)
 			{
@@ -4130,7 +4129,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E6B1FDEAC48D).檢(0x1D64BFDEAC48D)); 
+			((0x1E686899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

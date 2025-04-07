@@ -506,7 +506,7 @@ class Window
 		{
 			auto rect = clientRect; 
 			DrawText(hdc, "Default Window.doPaint()", -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER); 
-		} ; 
+		}; 
 		
 		void onEndPaint()
 		{
@@ -518,7 +518,7 @@ class Window
 				int c = (rect.bottom+rect.top)/2; 
 				DrawText(hdc, toPWChar("Error: "~paintErrorStr), -1, &rect, DT_LEFT | DT_VCENTER); 
 			}
-		} ; 
+		}; 
 		
 		protected void onMouseUpdate()
 		{/+forwarded to GLWindow. Must be called right after view.update+/} 
