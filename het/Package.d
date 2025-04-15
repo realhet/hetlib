@@ -8200,6 +8200,30 @@ version(/+$DIDE_REGION Containers+/all)
 		///It is similar to ctRegex, it just compiles at runtime
 		auto rtRegex(string s, string flags="")()
 		{ static Regex!char rx; if(rx.empty) rx = regex(s, flags); return rx; } 
+		
+		
+		private static immutable fileNameCharMap = 
+		[
+			[`&`, `&amp;`],  //Critical: must be encoded first
+			//Semicolon (;) intentionally excluded
+			
+			//Special symbols
+			[`\`, `&bsl;`], [`/`, `&sl;`], [`:`, `&col;`],
+			[`*`, `&ast;`], [`?`, `&qst;`], [`"`, `&quot;`],
+			[`<`, `&lt;`], [`>`, `&gt;`], [`|`, `&bar;`],
+			
+			//Some system chars
+			["\0", `&null;`], ["\r", `&cr;`], ["\n", `&nl;`], ["\t", `&tab;`], ["\v", `&vtab;`]
+		]; 
+		
+		string encodeFileName(string s)
+		{ foreach(pair; fileNameCharMap) { s = s.replace(pair[0], pair[1]); }return s; } 
+		
+		string decodeFileName(string s)
+		{
+			if(s.canFind('&', ';'))
+			foreach_reverse(pair; fileNameCharMap) { s = s.replace(pair[1], pair[0]); }return s; 
+		} 
 	}
 }version(/+$DIDE_REGION Hashing+/all)
 {
