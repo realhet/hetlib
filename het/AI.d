@@ -332,14 +332,17 @@ class AiModel
 	{ return new AiChat(this); } 
 	
 	///This is the blocking version.  Use newChat.ask() for background version.
-	string ask(T)(T prompt, bool debugPrint=false)
+	string ask(T)(
+		T prompt, bool debugPrint=false, 
+		void delegate(AiChat.Event e, string) userEvent=null
+	)
 	{
 		if(prompt.empty) return ""; 
 		
 		auto c = newChat; c.ask(prompt); 
 		
 		void nullEvent(AiChat.Event e, string s) {} 
-		auto onEvent = debugPrint ? null : &nullEvent; 
+		auto onEvent = ((userEvent)?(userEvent):(((debugPrint)?(null):(&nullEvent)))); 
 		
 		do { c.update(onEvent); sleep(15); }while(c.running); 
 		c.update(onEvent)/+fetch all remaining parts+/; 

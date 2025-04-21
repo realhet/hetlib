@@ -10441,10 +10441,16 @@ struct im
 			if(prefix=="") return; 
 			
 			const duplicatedIdx = flashMessages.countUntil!((m)=>(m.msg.startsWith(prefix))); 
+			DateTime when = now; 
 			if(duplicatedIdx>=0)
-			{ flashMessages = flashMessages.remove(duplicatedIdx); }
+			{
+				when = flashMessages[duplicatedIdx].when; 
+				flashMessages = flashMessages.remove(duplicatedIdx); 
+			}
 			
 			appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
+			
+			if(flashMessages.length) flashMessages.back.when = when; 
 		} 
 		
 		void flashInfo(string msg)
