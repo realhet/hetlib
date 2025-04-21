@@ -3885,7 +3885,7 @@ version(/+$DIDE_REGION+/all)
 					dr.subDraw(cachedDrawing); 
 				}
 			} 
-		} ; 
+		}; 
 		
 		version(/+$DIDE_REGION Search+/all)
 		{
@@ -10402,21 +10402,8 @@ struct im
 		
 		FlashMessage[] flashMessages; 
 		
-		void flashMessage(FlashMessage.Type type, string msg)
+		protected void appendMessage(FlashMessage.Type type, string msg, int count)
 		{
-			if(msg=="") return; 
-			
-			//duplicated item
-			auto count = 1; 
-			
-			const duplicatedIdx = flashMessages.countUntil!(m=>m.type==type && m.msg==msg); 
-			if(duplicatedIdx>=0)
-			{
-				auto duplicatedItem = flashMessages[duplicatedIdx]; 
-				count = duplicatedItem.count+1; 
-				flashMessages = flashMessages.remove(duplicatedIdx); 
-			}
-			
 			enum maxLen = 10; 
 			if(flashMessages.length>maxLen)
 			flashMessages = flashMessages[$-maxLen..$]; 
@@ -10431,14 +10418,44 @@ struct im
 			}
 		} 
 		
+		void flashMessage(FlashMessage.Type type, string msg)
+		{
+			if(msg=="") return; 
+			
+			//duplicated item
+			auto count = 1; 
+			
+			const duplicatedIdx = flashMessages.countUntil!((m)=>(m.type==type && m.msg==msg)); 
+			if(duplicatedIdx>=0)
+			{
+				auto duplicatedItem = flashMessages[duplicatedIdx]; 
+				count = duplicatedItem.count+1; 
+				flashMessages = flashMessages.remove(duplicatedIdx); 
+			}
+			
+			appendMessage(type, msg, count); 
+		} 
+		
+		void flashMessage(FlashMessage.Type type, string prefix, string msg)
+		{
+			if(prefix=="") return; 
+			
+			const duplicatedIdx = flashMessages.countUntil!((m)=>(m.msg.startsWith(prefix))); 
+			if(duplicatedIdx>=0)
+			{ flashMessages = flashMessages.remove(duplicatedIdx); }
+			
+			appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
+		} 
+		
 		void flashInfo(string msg)
-		{ flashMessage(FlashMessage.Type.info, msg); } 
-		
+		{ flashMessage(FlashMessage.Type.info, msg); } 	void flashInfo(string prefix, string msg)
+		{ flashMessage(FlashMessage.Type.info, prefix, msg); } 
 		void flashWarning(string msg)
-		{ flashMessage(FlashMessage.Type.warning, msg); } 
-		
+		{ flashMessage(FlashMessage.Type.warning, msg); } 	void flashWarning(string prefix, string msg)
+		{ flashMessage(FlashMessage.Type.warning, prefix, msg); } 
 		void flashError(string msg)
-		{ flashMessage(FlashMessage.Type.error, msg); } 
+		{ flashMessage(FlashMessage.Type.error, msg); } 	void flashError(string prefix, string msg)
+		{ flashMessage(FlashMessage.Type.error, prefix, msg); } 
 		
 		void flashException(string msg)
 		{ flashMessage(FlashMessage.Type.exception, msg); } 
@@ -10482,7 +10499,7 @@ struct im
 								const 	tIn = (now-m.when).value(.5f*second),
 									tOut = (m.when+flashMessageDuration-now).value(.25f*second); 
 								
-								fh = DefaultFontHeight*2 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
+								fh = DefaultFontHeight*1.68f 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
 									* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
 								
 								const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : ""); 

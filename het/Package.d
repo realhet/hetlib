@@ -6985,9 +6985,9 @@ version(/+$DIDE_REGION Containers+/all)
 		bool isDLangNewLine	(S)(in S str)if(isSomeString!S)
 		{ return !!str.among("\r\n", "\n", "\r", "\u2028", "\u2029"); } 
 		
-		bool isDLangIdentifierStart	(T)(T ch)if(isSomeChar!T)
+		bool isDLangIdentifierStart	(T)(in T ch)if(isSomeChar!T)
 		{ return ch.inRange('a', 'z') || ch.inRange('A', 'Z') || ch=='_' || isUniAlpha(ch); } 
-		bool isDLangIdentifierCont	(T)(T ch)if(isSomeChar!T)
+		bool isDLangIdentifierCont	(T)(in T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierStart(ch) || isDLangNumberStart(ch); } 
 		/+
 			bool isDLangIdentifier(T)(T s)
@@ -6995,9 +6995,9 @@ version(/+$DIDE_REGION Containers+/all)
 			{ return !s.empty && s.front.isDLangIdentifierStart && s.drop(1).all!isDLangIdentifierCont; } 
 		+/
 		
-		bool isDLangNumberStart	(T)(T ch)if(isSomeChar!T)
+		bool isDLangNumberStart	(T)(in T ch)if(isSomeChar!T)
 		{ return ch.inRange('0', '9'); } 
-		bool isDLangNumberCont	(T)(T ch)if(isSomeChar!T)
+		bool isDLangNumberCont	(T)(in T ch)if(isSomeChar!T)
 		{ return isDLangIdentifierCont(ch); } 
 		
 		bool isDLangSymbol(T)(T ch)if(isSomeChar!T)
