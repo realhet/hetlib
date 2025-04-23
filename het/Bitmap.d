@@ -603,14 +603,14 @@ version(/+$DIDE_REGION+/all)
 				{
 					while(1)
 					{
-						static uint cSeq = -1;
+						static uint cSeq = -1; 
 						if(cSeq.chkSet(clipboard.sequenceNumber))
 						{ bitmaps.refresh(`clipboard:\`); }
-						bitmaps.refresh(`monitor:\`);
-						sleep(100);
+						bitmaps.refresh(`monitor:\`); 
+						sleep(100); 
 					}
 				}
-			);
+			); 
 		+/
 		
 	+/
@@ -630,7 +630,7 @@ version(/+$DIDE_REGION+/all)
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x4DFAF599A70B).檢((update間(_間)))); }
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x4DFEB8E2CB5D).檢((update間(_間)))); }
 		/+
 			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
 			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.
@@ -5239,7 +5239,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 						ubyte* rgba;    //pointer to RGBA samples
 						int stride; 	     //stride in bytes from one scanline to the next.
 						size_t size; 	     //total size of the *rgba buffer.
-					} ; 
+					}; 
 					
 					struct WebPYUVABuffer
 					{
@@ -5254,7 +5254,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 						size_t y_size; 				 //luma plane size
 						size_t u_size, v_size; 	    //chroma planes size
 						size_t a_size; 	    //alpha-plane size
-					} ; 
+					}; 
 					
 					//Output buffer
 					struct WebPDecBuffer
@@ -5272,7 +5272,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 						ubyte* private_memory; 	//Internally allocated memory (only when
 							//is_external_memory is false). Should not be used
 							//externally, but accessed via the buffer union.
-					} ; 
+					}; 
 					
 					//Internal, version-checked, entry point
 					int WebPInitDecBufferInternal(WebPDecBuffer*, int); 
@@ -5493,7 +5493,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 						int rotate; 	 //TODO(later)
 						int uv_sampling; 	 //should be 0 for now. TODO(later)
 						uint[2] pad;              //padding for later use
-					} ; 
+					}; 
 					
 					//Internal, version-checked, entry point
 					VP8StatusCode WebPGetFeaturesInternal(const ubyte*, size_t, WebPBitstreamFeatures*, int); 
@@ -5540,7 +5540,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 						WebPBitstreamFeatures input; 	 //Immutable bitstream features (optional)
 						WebPDecBuffer output; 	 //Output buffer (can point to external mem)
 						WebPDecoderOptions options; 	 //Decoding options
-					} ; 
+					}; 
 					
 					//Internal, version-checked, entry point
 					int WebPInitDecoderConfigInternal(WebPDecoderConfig*, int); 

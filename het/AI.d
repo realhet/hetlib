@@ -24,6 +24,9 @@ class AiChat
 		string model; 
 		float temperature = 1.0; 
 		bool stream; 
+		
+		File cacheFile; 
+		ulong cacheHash; 
 	} 
 	
 	protected
@@ -171,7 +174,7 @@ class AiChat
 		Usage usage; 
 	} 
 	
-	void ask(Message[] messages)
+	void ask(Message[] messages, bool refreshCache=false)
 	{
 		if(running) return; 
 		if(messages.empty) return; 
@@ -184,6 +187,16 @@ class AiChat
 		query.temperature = model.temperature; 
 		query.messages = messages; 
 		
+		//cache logic
+		const cacheEnabled = model.cached && model.cachePath; 
+		query.cacheHash 	= ((cacheEnabled)?(query.messages.hashOf):(0)),
+		query.cacheFile 	= ((cacheEnabled) ?(
+			File(
+				model.cachePath, 
+				"ai_"~query.cacheHash.to!string(26)~".chat"
+			)
+		):(File.init)); 
+		
 		//Alloc reply message for "assistant" role
 		incomingMessageIdx = query.messages.length.to!int; 
 		query.messages ~= Message(roleAssistant, ""); 
@@ -192,10 +205,33 @@ class AiChat
 		if(!msgQueue) msgQueue = new typeof(msgQueue); 
 		
 		workerPending = true; buffer = ""; 
+		
+		bool readFromCache()
+		{
+			if(!refreshCache && query.cacheFile && query.cacheHash)
+			{
+				Message[] cachedMessages; 
+				ignoreExceptions({ cachedMessages.fromJson(query.cacheFile.readStr); }); 
+				if(cachedMessages.length && cachedMessages[0..$-1].hashOf==query.cacheHash)
+				{
+					const s = cachedMessages.back.content.toJson; 
+					msgQueue.put
+					(
+						`data: {"choices":[{"index":0,"delta":{"content":`~s~`},"finish_reason":null}]}`~"\n\n\n"~
+						`data: {"choices":[{"index":0,"delta":{"content":""},"finish_reason":"stopCached"}]}`~"\n\n\n"
+					); 
+					workerPending = false; 
+					return true; 
+				}
+			}
+			return false; 
+		} 
+		
+		if(!readFromCache)
 		spawn(&worker, cast(shared)this); 
 	} 
 	
-	void ask(string[][] messages)
+	void ask(string[][] messages, bool refreshCache=false)
 	{
 		auto m = messages.map!((a)=>(Message(a.get(0), a.get(1)))).array; 
 		
@@ -208,11 +244,11 @@ class AiChat
 		const hasSystem = m.any!((a)=>(a.role==roleSystem)); 
 		if(!hasSystem) m = Message(roleSystem, model.system) ~ m; 
 		
-		ask(m); 
+		ask(m, refreshCache); 
 	} 
 	
 	///this is continuing the current chat
-	void ask(string prompt)
+	void ask(string prompt, bool refreshCache=false)
 	{
 		if(running) return; 
 		if(prompt.strip=="") return; 
@@ -224,7 +260,7 @@ class AiChat
 		//Append current message
 		query.messages ~= Message(roleUser, prompt); 
 		
-		ask(query.messages); 
+		ask(query.messages, refreshCache); 
 	} 
 	
 	void stop()
@@ -270,7 +306,16 @@ class AiChat
 						}
 						switch(a.choices[0].finish_reason)
 						{
-							case "stop": 	{ onEvent(Event.done, a.usage.text); }break; 
+							case "stop": 	{
+								onEvent(Event.done, a.usage.text); 
+								
+								if(
+									query.messages.length>=2 &&
+									query.cacheFile && query.cacheHash
+								)
+								{ query.cacheFile.write(query.messages.toJson); }
+							}break; 
+							case "stopCached": 	{ onEvent(Event.done, ""); }break; 
 							case "length": 	{/+Todo:+/}break; 
 							case "function call": 	{/+Todo:+/}break; 
 							case "content filter": 	{/+Todo:+/}break; 
@@ -319,10 +364,13 @@ class AiModel
 			@STORED string 	apiUrl,
 			@STORED string 	model,
 			@STORED string 	system 	= "You are a helpful assistant."	,
-			@STORED float 	temperature 	= .625	,
-			@STORED string 	apiKey 	= ""
+			@STORED float 	temperature 	= .625	
 		}
 	); 
+	
+	string apiKey; 
+	Path cachePath; 
+	bool cached; 
 	
 	void _construct()
 	{}  void _destruct()
@@ -334,12 +382,13 @@ class AiModel
 	///This is the blocking version.  Use newChat.ask() for background version.
 	string ask(T)(
 		T prompt, bool debugPrint=false, 
-		void delegate(AiChat.Event e, string) userEvent=null
+		void delegate(AiChat.Event e, string) userEvent=null,
+		bool refreshCache=false
 	)
 	{
 		if(prompt.empty) return ""; 
 		
-		auto c = newChat; c.ask(prompt); 
+		auto c = newChat; c.ask(prompt, refreshCache); 
 		
 		void nullEvent(AiChat.Event e, string s) {} 
 		auto onEvent = ((userEvent)?(userEvent):(((debugPrint)?(null):(&nullEvent)))); 
