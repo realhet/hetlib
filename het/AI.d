@@ -114,7 +114,7 @@ class AiChat
 		
 		if(!mixin(界3(q{200},q{http.statusLine.code},q{299})))
 		{ chat.msgQueue.put(i"\nerror: $(http.statusLine.code) $(http.statusLine.reason)\n\n".text); }
-	} 
+	} 
 	struct StreamDataEvent
 	{
 		//string id; //a guid.
@@ -354,6 +354,109 @@ class AiChat
 		}
 		
 		return res /+true: messages updated.+/; 
+	} 
+	class MarkdownProcessor
+	{
+		int backtickCount, backtickLevel, asteriskCount, asteriskLevel, codeLineIdx; 
+		
+		void delegate(dchar ch) onChar; 
+		void delegate() onFinalizeCode; 
+		
+		version(/+$DIDE_REGION+/none) {
+			//example events
+			void onChar(dchar ch) 
+			{
+				if(ch=='\n')
+				{ writeln("CR"); }
+				else
+				{
+					write(
+						"\34"~
+						(
+							backtickLevel ? (codeLineIdx>0 ? "\3" : "\2") : 
+							asteriskLevel==1 ? "\5" : 
+							asteriskLevel==2 ? "\6" : 
+							"\10"
+						)
+						~ch.text~"\34\0"
+					); 
+				}
+			} 
+			void onFinalizeCode()
+			{ write("\33\15[CODE]\33\7"); } 
+		}
+		
+		
+		void process(dchar ch /+must call with a \0 at the very end.+/)
+		{
+			
+			bool processEnterExit(in dchar marker, ref int count, ref int level, void delegate() onExit = null)
+			{
+				if(ch==marker) { count++; return true; }
+				if(count)
+				{
+					if(level==0)	{/+enter+/level = count; }
+					else if(level==count)	{/+leave+/if(onExit) onExit(); level = 0; }
+					else	{/+as is+/foreach(i; 0..level) onChar(marker); }
+					count=0; 
+				}
+				return false; 
+			} 
+			
+			if(processEnterExit('`', backtickCount, backtickLevel, { if(codeLineIdx>0) onFinalizeCode(); })) return; 
+			if(!backtickLevel) if(processEnterExit('*', asteriskCount, asteriskLevel)) return; 
+			
+			
+			void finalizeLine()
+			{
+				asteriskCount = 0; asteriskLevel = 0; 
+				backtickCount = 0; 
+				if(backtickLevel.inRange(1, 2)) { onFinalizeCode(); backtickLevel = 0;  }
+				if(backtickLevel) codeLineIdx++; else codeLineIdx = 0; 
+			} 
+			
+			if(ch=='\r') return; 
+			if(ch=='\n') { finalizeLine; onChar('\n'); return; }
+			if(ch=='\0') { finalizeLine; return; }
+			
+			onChar(ch); 
+		} 
+	} 
+	
+	MarkdownProcessor markdownProcessor; 
+	
+	bool update_markDown(
+		void delegate(dchar) onChar/+Called when have to inject a char. State can be examined.+/, 
+		void delegate() onFinalizeCode/+Called at the end of a multiline code block.+/
+	)
+	{
+		void init()
+		{
+			if(!markdownProcessor) markdownProcessor = new MarkdownProcessor; 
+			markdownProcessor.onChar = onChar; 
+			markdownProcessor.onFinalizeCode = onFinalizeCode; 
+		} 
+		void emit(string s)
+		{
+			if(s=="") return; 
+			init; foreach(ch; s.byDchar) markdownProcessor.process(ch); 
+		} 
+		void emitBlock(string b, string s)
+		{ emit("\n/+"~b~": "~s.safeDCommentBody~"+/"); } 
+		
+		scope(exit) if(!running && markdownProcessor) { emit("\0"); markdownProcessor.free; }
+		return update(
+			(Event event, string s)
+			{
+				final switch(event)
+				{
+					case Event.text: 	emit(s); 	break; 
+					case Event.error: 	emitBlock("Error", s); 	break; 
+					case Event.warning: 	emitBlock("Warning", s); 	break; 
+					case Event.done: 	if(s!="") emitBlock("Note", s); 	break; 
+				}
+			}
+		); 
 	} 
 	
 } 
