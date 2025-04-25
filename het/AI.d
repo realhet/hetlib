@@ -360,7 +360,7 @@ class AiChat
 		int backtickCount, backtickLevel, asteriskCount, asteriskLevel, codeLineIdx; 
 		
 		void delegate(dchar ch) onChar; 
-		void delegate() onFinalizeCode; 
+		void delegate() onFinalizeCode, onFinish; 
 		
 		version(/+$DIDE_REGION+/none) {
 			//example events
@@ -417,7 +417,7 @@ class AiChat
 			
 			if(ch=='\r') return; 
 			if(ch=='\n') { finalizeLine; onChar('\n'); return; }
-			if(ch=='\0') { finalizeLine; return; }
+			if(ch=='\0') { finalizeLine; onFinish(); return; }
 			
 			onChar(ch); 
 		} 
@@ -427,14 +427,16 @@ class AiChat
 	
 	bool update_markDown(
 		void delegate(dchar) onChar/+Called when have to inject a char. State can be examined.+/, 
-		void delegate() onFinalizeCode/+Called at the end of a multiline code block.+/
+		void delegate() onFinalizeCode/+Called at the end of a multiline code block.+/,
+		void delegate() onFinish/+The very end of document+/
 	)
 	{
 		void init()
 		{
 			if(!markdownProcessor) markdownProcessor = new MarkdownProcessor; 
-			markdownProcessor.onChar = onChar; 
-			markdownProcessor.onFinalizeCode = onFinalizeCode; 
+			markdownProcessor.onChar 	= onChar,
+			markdownProcessor.onFinalizeCode 	= onFinalizeCode,
+			markdownProcessor.onFinish 	= onFinish; 
 		} 
 		void emit(string s)
 		{
@@ -442,7 +444,7 @@ class AiChat
 			init; foreach(ch; s.byDchar) markdownProcessor.process(ch); 
 		} 
 		void emitBlock(string b, string s)
-		{ emit("\n/+"~b~": "~s.safeDCommentBody~"+/"); } 
+		{ emit("\n\n/+"~b~": "~s.safeDCommentBody~"+/\n"); } 
 		
 		scope(exit) if(!running && markdownProcessor) { emit("\0"); markdownProcessor.free; }
 		return update(
@@ -450,6 +452,7 @@ class AiChat
 			{
 				final switch(event)
 				{
+					/+Todo: These events should be passed forward, so the caller could decide what to do.+/
 					case Event.text: 	emit(s); 	break; 
 					case Event.error: 	emitBlock("Error", s); 	break; 
 					case Event.warning: 	emitBlock("Warning", s); 	break; 
