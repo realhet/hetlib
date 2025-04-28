@@ -521,13 +521,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				/+
 					Todo: Faster console IO
 					/+
-						Code: wchar_t PipeName[32];
-						wsprintfW(PipeName, L"\\\\.\\pipe\\fastpipe%x", GetCurrentProcessId());
-						HANDLE FastPipe = CreateFileW(PipeName, GENERIC_READ|GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+						Code: wchar_t PipeName[32]; 
+						wsprintfW(PipeName, L"\\\\.\\pipe\\fastpipe%x", GetCurrentProcessId()); 
+						HANDLE FastPipe = CreateFileW(PipeName, GENERIC_READ|GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0); 
 						if(FastPipe != INVALID_HANDLE_VALUE)
 						{
-							SetStdHandle(STD_OUTPUT_HANDLE, FastPipe);
-							SetStdHandle(STD_INPUT_HANDLE, FastPipe);
+							SetStdHandle(STD_OUTPUT_HANDLE, FastPipe); 
+							SetStdHandle(STD_INPUT_HANDLE, FastPipe); 
 						}
 					+/
 					/+Link: https://github.com/cmuratori/refterm/blob/main/fast_pipe.h+/
@@ -3227,13 +3227,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			Todo: UnitTest relational operations.
 			/+
 				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
-				(mixin(求each(q{i=0},q{4},q{
-					((0x5188F6F833B).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
-					((0x5708F6F833B).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
-					((0x5C88F6F833B).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
-					((0x6208F6F833B).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
-					((0x6788F6F833B).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
-				}))); 
+				(
+					mixin(求each(q{i=0},q{4},q{
+						((0x1960F59F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+						((0x1966B59F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+						((0x196C759F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+						((0x1972359F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+						((0x1977F59F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+					}))
+				); 
 			+/
 		+/
 		
@@ -5423,21 +5425,21 @@ version(/+$DIDE_REGION Numeric+/all)
 			can only be done in the main thread inside the onPaint event.
 			Implementation details for this example:
 			   /+
-				Code: onPaintJob = new MainThreadJob;
+				Code: onPaintJob = new MainThreadJob; 
 				...
 				onPaint()
 				{
 					...
-					onPaintJob.update;
+					onPaintJob.update; 
 					...
-				}
+				} 
 			+/   /+
 				Code: worker()
 				{
 					...
-					onPaintJob({ process; });
+					onPaintJob({ process; }); 
 					...
-				}
+				} 
 			+/   
 		+/
 		
@@ -7337,7 +7339,7 @@ version(/+$DIDE_REGION Containers+/all)
 			else static if(is(T : Path))	s = src.fullPath; 
 			else	s = src; 
 			
-			if(q=='"') return format!"%(%s%)"([s]); 
+			if(q=='"') return s.only.format!"%(%s%)"; 
 			else if(q=='`') return s.canFind(q) ? quoted(s, '"') : q ~ s ~ q; 
 			else
 			ERR("Unsupported quote char: "~q); 
