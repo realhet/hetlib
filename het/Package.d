@@ -1744,12 +1744,21 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						0x80070006,	"E_HANDLE"	,
 						0x8007000E,	"E_OUTOFMEMORY"	,
 						0x80070057,	"E_INVALIDARG"	,
+						0x800703E5,	"HR_IO_PENDING"	,
+						0x8007007A,	"HR_INSUFFICIENT_BUFFER"	,
+						0x80070002,	"HR_FILE_NOT_FOUND"	,
 							format!"%X"(res)
 					); 
 					
 					enforce(false, "HRESULT=%s %s".format(h, str), file, line); 
 				} 
 				
+				void hrChk(alias fun, string extraStr="", string file = __FILE__, int line = __LINE__, A...)(A a)
+				{
+					string s = __traits(identifier, fun); 
+					if(extraStr!="") s ~= extraStr; 
+					fun(a).hrChk(s, file, line); 
+				} 
 			}
 			
 			void selftest(T)(lazy const T a, uint xb, string name, string notes="", string file=__FILE__, int line=__LINE__)
@@ -3229,11 +3238,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
 				(
 					mixin(求each(q{i=0},q{4},q{
-						((0x1960F59F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
-						((0x1966B59F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
-						((0x196C759F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
-						((0x1972359F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
-						((0x1977F59F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+						((0x1977959F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+						((0x197D559F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+						((0x1983159F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+						((0x1988D59F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+						((0x198E959F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
 					}))
 				); 
 			+/
