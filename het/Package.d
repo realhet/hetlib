@@ -121,7 +121,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			//Windows imports
 			public import core.sys.windows.windows : 
-				VOID, BOOL, BYTE, WORD, DWORD, INT, UINT, UINT64, ULONG,
+				VOID, BOOL, BYTE, WORD, DWORD, INT, UINT, UINT32, UINT64, ULONG,
+				S_OK, CoCreateGuid,
 				HANDLE, GetCurrentProcess, SetPriorityClass, GetModuleHandle,
 				HIGH_PRIORITY_CLASS, REALTIME_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS,
 				BELOW_NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, IDLE_PRIORITY_CLASS, //, PROCESS_MODE_BACKGROUND_BEGIN, PROCESS_MODE_BACKGROUND_END;
@@ -3238,11 +3239,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
 				(
 					mixin(求each(q{i=0},q{4},q{
-						((0x1977959F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
-						((0x197D559F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
-						((0x1983159F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
-						((0x1988D59F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
-						((0x198E959F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+						((0x1979A59F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+						((0x197F659F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+						((0x1985259F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+						((0x198AE59F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+						((0x1990A59F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
 					}))
 				); 
 			+/
