@@ -7124,11 +7124,11 @@ version(/+$DIDE_REGION Containers+/all)
 			} 
 			
 			auto ints	(size_t i, int def = 0)
-			{ try return to!int	(i); catch(Throwable) return def; } 
+			{ try return to!int	(i); catch(Exception) return def; } 
 			auto floats	(size_t i, float def = 0)
-			{ try return to!float	(i); catch(Throwable) return def; } 
+			{ try return to!float	(i); catch(Exception) return def; } 
 			auto doubles	(size_t i, double def = 0)
-			{ try return to!double	(i); catch(Throwable) return def; } 
+			{ try return to!double	(i); catch(Exception) return def; } 
 			
 			void stripAll()
 			{ foreach(ref s; p) s = s.strip; } 
@@ -7698,19 +7698,28 @@ version(/+$DIDE_REGION Containers+/all)
 		/// Because the one in std is bugging
 		string outdent(string s)
 		{
-			//Todo: this is lame
-			//return s.split('\n').map!(a => a.withoutEnding('\r').stripLeft).join('\n'); 
+			auto lines = s.splitLines; 
 			
-			auto lines = s.split('\n'); 
-			
+			if(outdentLines(lines))	return lines.join('\n'); 
+			else	return s; 
+		} 
+		
+		bool outdentLines(string[] lines)
+		{
 			auto prefixLines = lines.filter!((a)=>(a.stripLeft!="")).map!((a)=>(a.until!(not!isWhite).text)).array; 
 			
-			if(prefixLines.empty) return s; 
+			if(prefixLines.empty) return false; 
 			
 			auto prefix = prefixLines.front; 
 			foreach(a; prefixLines.drop(1)) prefix = commonPrefix(prefix, a); 
 			
-			return prefix.empty ? s : lines.map!((a)=>(a.withoutStarting(prefix))).join('\n'); 
+			if(!prefix.empty)
+			{
+				foreach(ref line; lines) line = line.withoutStarting(prefix); 
+				return true; 
+			}
+			else
+			{ return false; }
 		} 
 		
 		/// makes "Hello world" from "helloWorld"

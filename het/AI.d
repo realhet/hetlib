@@ -355,7 +355,7 @@ class AiChat
 		
 		return res /+true: messages updated.+/; 
 	} 
-	class MarkdownProcessor
+	static class MarkdownProcessor
 	{
 		int backtickCount, backtickLevel, asteriskCount, asteriskLevel, codeLineIdx; 
 		
