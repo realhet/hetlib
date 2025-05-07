@@ -244,16 +244,16 @@ version(/+$DIDE_REGION Placeholder and File APIs+/all)
 		const PCWSTR destinationFileName,
 		const PRJ_PLACEHOLDER_INFO* placeholderInfo,
 		const UINT32 placeholderInfoSize,
-		const PRJ_UPDATE_TYPES updateFlags,
-		out PRJ_UPDATE_FAILURE_CAUSES failureReason
+		const PRJ_UPDATE_TYPES updateFlags = PRJ_UPDATE_TYPES.init,
+		PRJ_UPDATE_FAILURE_CAUSES* failureReason = null
 	) PrjUpdateFileIfNeeded; 
 	
 	__gshared extern(Windows) HRESULT function
 		(
 		const PRJ_NAMESPACE_VIRTUALIZATION_CONTEXT namespaceVirtualizationContext,
 		const PCWSTR destinationFileName,
-		const PRJ_UPDATE_TYPES updateFlags,
-		out PRJ_UPDATE_FAILURE_CAUSES failureReason
+		const PRJ_UPDATE_TYPES updateFlags = PRJ_UPDATE_TYPES.init,
+		PRJ_UPDATE_FAILURE_CAUSES* failureReason = null
 	) PrjDeleteFile; 
 	
 	__gshared extern(Windows) HRESULT function
