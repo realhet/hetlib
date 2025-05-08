@@ -3190,18 +3190,15 @@ version(/+$DIDE_REGION+/all)
 		{ return subCells.map!(c => cast(Container)c).filter!"a"; } 
 		
 		void appendCell (Cell c)
-		{
-			if(c)
-			subCells ~= c; 
-		} 
+		{ if(c)	subCells ~= c; } 
 		
-		int cellCount()
-		{ return cast(int)subCells.length; } 
+		int cellCount() const
+		=> (cast(int)(subCells.length)); 
 		
 		int subCellIndex(in Cell c) const
 		{
 			//Note: overflows at 2G items, I don't care because that would be 128GB memory usage.
-			return cast(int)subCells.countUntil(c); 
+			return (cast(int)(subCells.countUntil(c))); 
 		} 
 		
 		void adoptSubCells()

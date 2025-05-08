@@ -2955,7 +2955,7 @@ version(/+$DIDE_REGION Keywords+/all)
 		{"Identifier1"	, [{ clBlack	,clWhite	,0}, { clVgaYellow	,clVgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0xc7c5c5	,0x2d2d2d ,0}]},
 		{"Identifier2"	, [{ clGreen	,clWhite	,0}, { clVgaHighGreen	,clVgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { clGreen	,0x2d2d2d ,0}]},
 		{"Identifier3"	, [{ clTeal	,clWhite	,0}, { clVgaHighCyan	,clVgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { clTeal	,0x2d2d2d ,0}]},
-		{"Identifier4"	, [{ clPurple	,clWhite	,0}, { clVgaHighMagenta	,clVgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { 0xf040e0	,0x2d2d2d ,0}]},
+		{"Identifier4"	, [{ clPurple	,clWhite	,0}, { clVgaHighMagenta	,clVgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { 0x9136AA, 0x2d2d2d ,0}]},
 		{"Identifier5"	, [{ 0x0040b0	,clWhite	,0}, { clVgaBrown	,clVgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { 0x0060f0	,0x2d2d2d ,0}]},
 		{"Identifier6"	, [{ 0xb04000	,clWhite	,0}, { clVgaHighBlue	,clVgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { 0xf06000	,0x2d2d2d ,0}]},
 		{"Label"	, [{ clBlack	,0xDDFFEE	,4}, { clBlack	,clVgaHighCyan	,0}, { clBlack	,clC64Cyan	,0}, { 0xFFA43B	,0x2d2d2d ,2}]},
