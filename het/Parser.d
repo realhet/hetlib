@@ -2438,7 +2438,7 @@ version(/+$DIDE_REGION Keywords+/all)
 			"assert","debug","import","mixin","version",
 		
 		//special functions
-			"cast","pragma","typeid","typeof","__traits","__parameters","__vector",
+			"cast","pragma","typeid","typeof","__traits","__parameters","__vector","__rvalue",
 		
 		//special keywords
 			"__EOF__","__DATE__","__TIME__","__TIMESTAMP__","__DATETIME__"/+//EXTRA+/,"__VENDOR__","__VERSION__",
@@ -4130,7 +4130,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E6CD899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x1E6D8899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

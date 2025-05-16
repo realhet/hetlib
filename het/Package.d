@@ -211,6 +211,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			installExceptionFilter; 
 			
 			DateTime.selftest; 
+			unittest_decodeHumanDateTime; 
+			
 			het.math.unittest_main; //1ms
 			
 			const s1 = "hello", s2 = "Nobody inspects the spammish repetition"; 
@@ -279,6 +281,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		} 
 		
 		void hiddenConsole(void delegate() a) { console.hide; console(a); } 
+		alias noconsole = hiddenConsole; 
 	}struct application
 	{
 		/// application /////////////////////////
@@ -3241,11 +3244,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
 				(
 					mixin(求each(q{i=0},q{4},q{
-						((0x197B359F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
-						((0x1980F59F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
-						((0x1986B59F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
-						((0x198C759F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
-						((0x1992359F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+						((0x1980059F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+						((0x1985C59F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+						((0x198B859F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+						((0x1991459F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+						((0x1997059F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
 					}))
 				); 
 			+/
@@ -12049,6 +12052,213 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		shared PERF = new shared Perf; 
 		
 		//Todo: strToDateTime, creators
+		
+		DateTime decodeHumanDateTime(string s, bool ending=false, lazy SYSTEMTIME getSysTime)
+		{
+			try {
+				s = s.strip; 
+				auto r = strip(s).splitWhen!((a,b)=>(a.isDigit!=b.isDigit)).map!"a.to!string".array; 
+				const pattern = r.map!((string s)=>(((s.get(0, '\0').isDigit)?("0"):(s.strip.ifEmpty(" "))))).join; 
+				
+				SYSTEMTIME t; 
+				void set(int Y=-1, int M=-1, int D=-1, int h=-1, int m=-1, int s=-1)
+				{
+					if(Y.inRange(0, 99)) Y+=2000; 
+					if(Y<0 || M<0 || D<0) t = getSysTime; 
+					with(t)
+					{
+						if(Y>0) wYear = Y.to!ushort; 
+						if(M>0) wMonth = M.to!ushort; 
+						if(D>0) wDay = D.to!ushort; 
+						wHour = (h<0 ? (ending ? 23 : 0) : h).to!ushort; 
+						wMinute = (m<0 ? (ending ? 59 : 0) : m).to!ushort; 
+						wSecond = (s<0 ? (ending ? 59 : 0) : s).to!ushort; 
+					}
+				} 
+				string[] rr = r.filter!((s)=>(s.all!isDigit)).array; int R() => rr.fetchFront.to!int; 
+				
+				switch(pattern)
+				{
+					case "0": 	set(-1, -1, R); 	break; 
+					case "0:": 	set(-1, -1, -1, R); 	break; 
+					case "0 0", "0 0:": 	set(-1, -1, R, R); 	break; 
+					case "0 0:0", "0 0:0:": 	set(-1, -1, R, R, R); 	break; 
+					case "0 0:0:0": 	set(-1, -1, R, R, R, R); 	break; 
+					case "0.0", "0.0.": 	set(-1, R, R); 	break; 
+					case "0.0 0", "0.0 0:": 	set(-1, R, R, R); 	break; 
+					case "0.0 0:0", "0.0 0:0:": 	set(-1, R, R, R, R); 	break; 
+					case "0.0 0:0:0": 	set(-1, R, R, R, R, R); 	break; 
+					case "0.0.0": 	set(R, R, R); 	break; 
+					case "0.0.0 0", "0.0.0 0:": 	set(R, R, R, R); 	break; 
+					case "0.0.0 0:0", "0.0.0 0:0:": 	set(R, R, R, R, R); 	break; 
+					case "0.0.0 0:0:0": 	set(R, R, R, R, R, R); 	break; 
+					case "0:0", "0:0:": 	set(-1, -1, -1, R, R); 	break; 
+					case "0:0:0": 	set(-1, -1, -1, R, R, R); 	break; 
+					default: enforce(0); 
+				}
+				
+				t.wMilliseconds = t.wSecond==59 ? 999 : 0 
+				/+nagy gány, de hát ez van az emberi zárt árt intervallumokkal...+/; 
+				
+				return DateTime(Local, t); 
+			}
+			catch(Exception) return DateTime.init; 
+		} 
+		
+		private void unittest_decodeHumanDateTime()
+		{
+			/+ Helper to create fixed SYSTEMTIME for testing +/
+			SYSTEMTIME fixedSysTime = {
+				wYear: 2020, wMonth: 5, wDay: 15, 
+				wHour: 12, wMinute: 30, wSecond: 45
+			}; 
+			
+			/+ Test basic date patterns +/
+			{
+				auto dt = decodeHumanDateTime("5", false, fixedSysTime).localSystemTime; 
+				assert(dt.wYear == 2020); 
+				assert(dt.wMonth == 5); 
+				assert(dt.wDay == 5); 
+				assert(dt.wHour == 0); 
+				assert(dt.wMinute == 0); 
+				assert(dt.wSecond == 0); 
+			}
+			
+			{
+				auto dt = decodeHumanDateTime("5.10", false, fixedSysTime).localSystemTime; 
+				assert(dt.wYear == 2020); 
+				assert(dt.wMonth == 5); 
+				assert(dt.wDay == 10); 
+			}
+			
+			{
+				auto dt = decodeHumanDateTime("20.5.15", false, fixedSysTime).localSystemTime; 
+				assert(dt.wYear == 2020); 
+				assert(dt.wMonth == 5); 
+				assert(dt.wDay == 15); 
+			}
+			
+			/+ Test time patterns +/
+			{
+				auto dt = decodeHumanDateTime("14", false, fixedSysTime).localSystemTime; 
+				assert(dt.wHour == 0); 
+				assert(dt.wMinute == 0); 
+				assert(dt.wDay == 14); 
+			}
+			
+			{
+				auto dt = decodeHumanDateTime("14:30", false, fixedSysTime).localSystemTime; 
+				assert(dt.wHour == 14); 
+				assert(dt.wMinute == 30); 
+				assert(dt.wDay == 15); // from fixedSysTime
+			}
+			
+			/+ Test ending=true behavior +/
+			{
+				auto dt = decodeHumanDateTime("5", true, fixedSysTime).localSystemTime; 
+				assert(dt.wHour == 23); 
+				assert(dt.wMinute == 59); 
+				assert(dt.wSecond == 59); 
+				assert(dt.wMilliseconds == 999); 
+			}
+			
+			/+ Test combined date+time patterns +/
+			{
+				auto dt = decodeHumanDateTime("5 14:30", false, fixedSysTime).localSystemTime; 
+				assert(dt.wDay == 5); 
+				assert(dt.wHour == 14); 
+				assert(dt.wMinute == 30); 
+			}
+			
+			{
+				auto dt = decodeHumanDateTime("10.5 14:30:45", false, fixedSysTime).localSystemTime; 
+				assert(dt.wMonth == 10); 
+				assert(dt.wDay == 5); 
+				assert(dt.wHour == 14); 
+				assert(dt.wMinute == 30); 
+				assert(dt.wSecond == 45); 
+			}
+			
+			/+ Test invalid inputs return DateTime.init +/
+			{
+				auto dt = decodeHumanDateTime("invalid", false, fixedSysTime); 
+				assert(dt == DateTime.init); 
+			}
+			
+			{
+				auto dt = decodeHumanDateTime("1.2.3.4", false, fixedSysTime); 
+				assert(dt == DateTime.init); 
+			}
+			
+			/+ Test two-digit wYear handling +/
+			{
+				auto dt = decodeHumanDateTime("20.5.15", false, fixedSysTime).localSystemTime; 
+				assert(dt.wYear == 2020); 
+			}
+			
+			/+ Test whitespace handling +/
+			{
+				auto dt1 = decodeHumanDateTime("5.10 14:30", false, fixedSysTime).localSystemTime; 
+				auto dt2 = decodeHumanDateTime(" 5.10  14:30 ", false, fixedSysTime).localSystemTime; 
+				assert(dt1 == dt2); 
+			}
+		} 
+		string toHumanText(DateTime dt)
+		{
+			if(!dt) return ""; 
+			string d2(int a)
+			=> a.format!"%02d"; 	string d3(int a)
+			=> a.format!"%03d"; 	string d4(int a)
+			=> a.format!"%04d"; 
+			with(dt.localSystemTime)
+			return d4(wYear)~"."~d2(wMonth)~"."~d2(wDay)~" "~
+			d2(wHour)~":"~d2(wMinute)~":"~d2(wSecond); 
+		} 
+		
+		struct DateTimeRange
+		{
+			DateTime start, end; 
+			
+			bool valid() const => start && end && start<=end; 
+			bool opCast(B : bool)() const => valid; 
+			
+			string toString() const
+			{
+				if(!valid) return ""; 
+				
+				auto st = toHumanText(start), en = toHumanText(end); 
+				/+
+					//this stripping is not so good. It makes data more unreliable
+					bool tryStripEnd(string s, string e)
+					{
+						if(st.endsWith(s) && en.endsWith(e))
+						{
+							st = st[0..$-s.length], 
+							en = en[0..$-e.length]; return true; 
+						}else return false; 
+					} 
+					//Strip off seconds and hour&minutes if those are full intervals.
+					//tryStripEnd(":00", ":59"); 
+				+/
+				
+				return st~" .. "~en; 
+			} 
+		} 
+		
+		DateTimeRange decodeHumanDateTimeRange(string s)
+		{
+			string[] p = s.split(".."); 
+			if(p.length==1) p = p.replicate(2); 
+			if(p.length==2)
+			{
+				if(auto st = decodeHumanDateTime(p[0], false, now.localSystemTime))
+				if(auto en = decodeHumanDateTime(p[1], true, st.localSystemTime))
+				if(auto res = DateTimeRange(st, en))
+				return res; 
+			}
+			return DateTimeRange.init; 
+		} 
+		
 		
 	}version(/+$DIDE_REGION+/all)
 	{
@@ -15629,22 +15839,20 @@ version(/+$DIDE_REGION debug+/all)
 		+/
 	)
 	{
-		mixin(
-			iq{
-				void $(_srcField)(typeof(_dstField) a)
+		mixin(iq{
+			void $(_srcField)(typeof(_dstField) a)
+			{
+				if(_dstField!=typeof(_dstField).init)
 				{
-					if(_dstField!=typeof(_dstField).init)
-					{
-						ERR(
-							i"Error combining values from multiple JSON fields, target already HAS a value.
+					ERR(
+						i"Error combining values from multiple JSON fields, target already HAS a value.
 Target field: $(_dstField.stringof)
 Source field: $(_srcField)"
-						); 
-					}
-					_dstField = $(_unaryFun); 
-				} 
-			}.text
-		); 
+					); 
+				}
+				_dstField = $(_unaryFun); 
+			} 
+		}.text); 
 	} 
 	
 	mixin template RedirectJsonFields(

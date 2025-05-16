@@ -168,7 +168,7 @@ enum MouseCursor {
 	SIZENWSE, SIZENESW, SIZEWE, SIZENS, SIZEALL, NO, HAND, APPSTARTING, HELP
 } 
 
-private void SetCursor(MouseCursor c)
+void SetCursor(MouseCursor c)
 {
 	immutable _cursorIds = mixin("[", [EnumMembers!MouseCursor].map!`"IDC_"~a.text`.join(','), "]"); 
 	__gshared HCURSOR[MouseCursor.max] _loadedCursors; 
