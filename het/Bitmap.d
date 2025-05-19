@@ -7815,7 +7815,12 @@ version(/+$DIDE_REGION+/all)
 				static bool isGrayscale(in RGBA color)
 				{ return color.rg==color.gb; } 
 				
-				if(res.access!RGBA.asArray.map!isGrayscale.all && !text.among("➕", "➖", "➗", "✖", "⚙")/+Opt: faster lookup with more exceptions+/)
+				if(
+					res.access!RGBA.asArray.map!isGrayscale.all && 
+					!text.among("➕", "➖", "➗", "✖", "⚙", "🧾", "📄")
+					/+Opt: faster lookup with more exceptions+/
+					/+Todo: Get the alpha mask with IDWriteGlyphRunAnalysis+/
+				)
 				{
 					res.set(res.get!ubyte); //convert it to 1 channel
 				}
