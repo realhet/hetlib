@@ -3254,10 +3254,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			+/
 		+/
 		
-		template 碼/+ExternalCode+/(string args, string src, string FILE=__FILE__, int LINE=__LINE__)
+		template 碼1/+ExternalCode+/(string args, string src, string FILE=__FILE__, int LINE=__LINE__)
 		{
-			pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$(args.quoted),$(src.quoted)]".text); 
-			const hash = src.hashOf(args.hashOf).to!string(26); 
+			//pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$(args.quoted),$(src.quoted)]".text); 
+			pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$((cast(ubyte[])(args))),$((cast(ubyte[])(src)))]".text); 
+			enum hash = src.hashOf(args.hashOf).to!string(26); 
 			enum 碼 = (cast(immutable(ubyte)[])(import(hash))); 
 			static if(碼.startsWith(cast(ubyte[])("ERROR:")))
 			{
@@ -3266,6 +3267,32 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		} 
 		
+		immutable(ubyte)[] 碼2(string args, string src, string FILE=__FILE__, int LINE=__LINE__)()
+		{
+			pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$((cast(ubyte[])(args))),$((cast(ubyte[])(src)))]".text); 
+			enum hash = src.hashOf(args.hashOf).to!string(26); 
+			enum res = (cast(immutable(ubyte)[])(import(hash))); 
+			return res; 
+		} 
+		
+		static string 碼3(string args, string src)
+		=> q{
+			(
+				(){
+					enum args=q{__ARGS__},FILE=__FILE__,LINE=__LINE__,src=q{__SRC__}; 
+					pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$((cast(ubyte[])(args))),$((cast(ubyte[])(src[0..$/10])))]".text); 
+					//enum hash=src.hashOf(args.hashOf).to!string(26); 
+					enum res = (cast(immutable(ubyte)[])(/+import(hash)+/"FUCK")); 
+					static if(res.startsWith(cast(ubyte[])("ERROR:")))
+					{
+						pragma(msg, (cast(string)(res)).splitter('\n').drop(1).join('\n')); 
+						static assert(false, "$DIDE_EXTERNAL_COMPILATION_"~(cast(string)(res)).splitter('\n').front); 
+					}
+					return res; 
+				}()
+			)
+		}
+		.replaceFirst("__ARGS__", args).replaceLast("__SRC__", src); ; 
 	}
 	
 }
@@ -6783,8 +6810,9 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 		
 		/// replaces UTF errors with the error character. So the string will be safe for further processing.
-		string safeUTF8(string s)
+		string safeUTF8(immutable(void)[] s_)
 		{
+			auto s = (cast(string)(s_)); 
 			try
 			{
 				std.utf.validate(s); 
@@ -13835,30 +13863,54 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			return res; 
 		} 
 		
-		void unzip(ubyte[] zipData, void delegate(string, lazy ubyte[]) fun)
+		void unzipCB(const(ubyte)[] zipData, void delegate(string, lazy ubyte[]) fun)
 		{
 			import std.zip; 
-			auto zip = scoped!ZipArchive(zipData); 
+			auto zip = scoped!ZipArchive(cast(ubyte[])zipData); 
 			foreach(member; zip.directory)
-			fun(member.name, cast(ubyte[])zip.expand(member)); 
+			fun(member.name, zip.expand(member)); 
 		} 
 		
-		void unzip(ubyte[] zipData, string filter, string prefix)
+		void unzipFiles(const(ubyte)[] zipData, string filter, string prefix)
 		{
-			zipData.unzip(
-				(string name, lazy ubyte[] data)
-				{
-					if(name.isWild(filter))
-					{
-						auto outFile = File(prefix~name); 
-						outFile.write(data); 
-					}
-				} 
-			); 
+			zipData.unzipCB((
+				name,
+				data
+			){
+				if(name.isWild(filter))
+				{ File(prefix~name).write(data); }
+			}); 
 		} 
 		
-		void unzip(ubyte[] zipData, string prefix)
-		{ zipData.unzip("*", prefix); } 
+		void unzipFiles(const(ubyte)[] zipData, string prefix)
+		{ zipData.unzipFiles("*", prefix); } 
+		
+		ubyte[][string] unzipAA(const(ubyte)[] zipData, string filter="*")
+		{
+			string[] names; ubyte[][] contents; 
+			zipData.unzipCB((
+				name,
+				data
+			){
+				if(name.isWild(filter))
+				{ names ~= name; contents ~= data; }
+			}); 
+			return assocArray(names, contents); 
+		} 
+		
+		ubyte[] unzip(const(ubyte)[] zipData, string filter="*")
+		//this version unzips the first matching file
+		{
+			bool found = false; ubyte[] res; 
+			zipData.unzipCB((
+				name,
+				data
+			){
+				if(!found && name.isWild(filter))
+				{ res = data; found=true; }
+			}); 
+			return res; 
+		} 
 		
 		//Todo: make a simple zipper function
 		/+

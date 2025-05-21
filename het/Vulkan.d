@@ -3427,13 +3427,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanPhysicalDevice
 		{
-			mixin SmartParent!(
-				q{
-					@PARENT VulkanInstance 	instance,
-					VkPhysicalDevice 	handle,
-					int 	index
-				}
-			); 
+			mixin SmartParent!q{
+				@PARENT VulkanInstance 	instance,
+				VkPhysicalDevice 	handle,
+				int 	index
+			}; 
 			
 			VkPhysicalDeviceProperties properties; alias properties this; 
 			string name; 
@@ -3510,7 +3508,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanPhysicalDevices
 		{
-			mixin SmartChild!(q{VulkanPhysicalDevice[] items}); alias items this; 
+			mixin SmartChild!q{VulkanPhysicalDevice[] items}; alias items this; 
 			void _construct() {} void _destruct() {} 
 			
 			override string toString() const
@@ -3610,15 +3608,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				auto semaphoreHandles = renderingFinishedSemaphores.map!"a.handle".array; 
 				auto presentInfo = 
-				(
-					mixin(體!((VkPresentInfoKHR),q{
-						waitSemaphoreCount 	: semaphoreHandles.length.to!uint,
-						pWaitSemaphores 	: semaphoreHandles.ptr,
-						swapchainCount 	: 1,
-						pSwapchains 	: &swapchain.handle,
-						pImageIndices 	: &imageIndex,
-					}))
-				); 
+				mixin(體!((VkPresentInfoKHR),q{
+					waitSemaphoreCount 	: semaphoreHandles.length.to!uint,
+					pWaitSemaphores 	: semaphoreHandles.ptr,
+					swapchainCount 	: 1,
+					pSwapchains 	: &swapchain.handle,
+					pImageIndices 	: &imageIndex,
+				})); 
 				return device.vkQueuePresentKHR(handle, &presentInfo); 
 			} 
 			auto present(VulkanSemaphore renderingFinishedSemaphore, VulkanSwapchain swapchain, uint imageIndex)
@@ -3628,13 +3624,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanSurface
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT VulkanInstance 	instance, 
-					HWND 	hwnd, 
-					HINSTANCE 	hinst = null 
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanInstance 	instance, 
+				HWND 	hwnd, 
+				HINSTANCE 	hinst = null 
+			}; 
 			
 			VkSurfaceKHR handle; 
 			
@@ -3678,13 +3672,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanSwapchain
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT VulkanDevice 	device, 
-					VulkanSurface 	surface, 
-					ivec2	requiredSize
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanDevice 	device, 
+				VulkanSurface 	surface, 
+				ivec2	requiredSize
+			}; 
 			
 			//These lists only discovered once.
 			VkSurfaceCapabilitiesKHR surfaceCapabilities; 
@@ -3734,12 +3726,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				auto chooseSurfaceFormat(in VkSurfaceFormatKHR[] availableFormats)
 				{
 					// We can either choose any format
-					if(availableFormats.length==1 && availableFormats[0].format==(mixin(舉!((VK_FORMAT_),q{UNDEFINED}))))
-					return VkSurfaceFormatKHR((mixin(舉!((VK_FORMAT_),q{R8G8B8A8_UNORM}))), (mixin(舉!((VK_COLOR_SPACE_),q{SRGB_NONLINEAR_KHR})))); 
+					if(availableFormats.length==1 && availableFormats[0].format==mixin(舉!((VK_FORMAT_),q{UNDEFINED})))
+					return VkSurfaceFormatKHR(mixin(舉!((VK_FORMAT_),q{R8G8B8A8_UNORM})), mixin(舉!((VK_COLOR_SPACE_),q{SRGB_NONLINEAR_KHR}))); 
 					
 					// Or go with the standard format - if available
 					foreach(const availableSurfaceFormat; availableFormats)
-					if(availableSurfaceFormat.format==(mixin(舉!((VK_FORMAT_),q{R8G8B8A8_UNORM}))))
+					if(availableSurfaceFormat.format==mixin(舉!((VK_FORMAT_),q{R8G8B8A8_UNORM})))
 					return availableSurfaceFormat; 
 					
 					// Or fall back to the first available one
@@ -3778,17 +3770,17 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								api-without-secrets-introduction-to-vulkan-part-2.html
 							+/
 							//mailbox is required for triple buffering, but not all devices supporting it.
-							return ((presentModes.canFind((mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR}))))) ?((mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR})))):((mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR}))))); 
+							return ((presentModes.canFind(mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR})))) ?(mixin(舉!((VK_PRESENT_MODE_),q{MAILBOX_KHR}))):(mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR})))); 
 						}
 						else
 						{
 							//Todo: relaxed fifo
 							//FIFO is always supported
-							return (mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR}))); 
+							return mixin(舉!((VK_PRESENT_MODE_),q{FIFO_KHR})); 
 						}
 					}
 					else
-					{ return (mixin(舉!((VK_PRESENT_MODE_),q{IMMEDIATE_KHR}))); }
+					{ return mixin(舉!((VK_PRESENT_MODE_),q{IMMEDIATE_KHR})); }
 				} 
 			} 
 			
@@ -3820,32 +3812,30 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				extent = chooseSwapExtent(surfaceCapabilities, requiredSize); 
 				
 				// Determine transformation to use (preferring no transform)
-				const surfaceTransform = ((surfaceCapabilities.supportedTransforms.IDENTITY_BIT_KHR) ?((mixin(舉!((VK_SURFACE_TRANSFORM_),q{IDENTITY_BIT_KHR})))):(surfaceCapabilities.currentTransform)); 
+				const surfaceTransform = ((surfaceCapabilities.supportedTransforms.IDENTITY_BIT_KHR) ?(mixin(舉!((VK_SURFACE_TRANSFORM_),q{IDENTITY_BIT_KHR}))):(surfaceCapabilities.currentTransform)); 
 				
 				// Choose presentation mode (preferring MAILBOX ~= triple buffering)
 				presentMode = choosePresentMode(availablePresentModes); 
 				
 				// Finally, create the swap chain
 				const createInfo = 
-				(
-					mixin(體!((VkSwapchainCreateInfoKHR),q{
-						surface	: this.surface.handle,
-						minImageCount	: imageCount,
-						imageFormat	: this.surfaceFormat.format,
-						imageColorSpace	: this.surfaceFormat.colorSpace,
-						imageExtent	: this.extent,
-						imageArrayLayers	: 1,
-						imageUsage	: (mixin(舉!((VK_IMAGE_USAGE_),q{COLOR_ATTACHMENT_BIT}))),
-						imageSharingMode	: (mixin(舉!((VK_SHARING_MODE_),q{EXCLUSIVE}))),
-						queueFamilyIndexCount 	: 0,
-						pQueueFamilyIndices	: null,
-						preTransform	: surfaceTransform,
-						compositeAlpha	: (mixin(舉!((VK_COMPOSITE_ALPHA_),q{OPAQUE_BIT_KHR}))),
-						presentMode	: this.presentMode,
-						clipped	: VK_TRUE,
-						oldSwapchain	: previousHandle,
-					}))
-				); 
+				mixin(體!((VkSwapchainCreateInfoKHR),q{
+					surface	: this.surface.handle,
+					minImageCount	: imageCount,
+					imageFormat	: this.surfaceFormat.format,
+					imageColorSpace	: this.surfaceFormat.colorSpace,
+					imageExtent	: this.extent,
+					imageArrayLayers	: 1,
+					imageUsage	: mixin(舉!((VK_IMAGE_USAGE_),q{COLOR_ATTACHMENT_BIT})),
+					imageSharingMode	: mixin(舉!((VK_SHARING_MODE_),q{EXCLUSIVE})),
+					queueFamilyIndexCount 	: 0,
+					pQueueFamilyIndices	: null,
+					preTransform	: surfaceTransform,
+					compositeAlpha	: mixin(舉!((VK_COMPOSITE_ALPHA_),q{OPAQUE_BIT_KHR})),
+					presentMode	: this.presentMode,
+					clipped	: VK_TRUE,
+					oldSwapchain	: previousHandle,
+				})); 
 				
 				device.vkCreateSwapchainKHR(device.handle, &createInfo, null, &handle)
 					.vkEnforce("Failed to create swapchain."); 
@@ -3868,21 +3858,17 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					(
 					im=>im.createView
 					(
-						(mixin(舉!((VK_IMAGE_VIEW_TYPE),q{_2D}))),
+						mixin(舉!((VK_IMAGE_VIEW_TYPE),q{_2D})),
 						format,
-						(
-							mixin(體!((VkComponentMapping),q{
-								r 	: (mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY}))), g 	: (mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY}))), 
-								b 	: (mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY}))), a 	: (mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY}))),
-							}))
-						),
-						(
-							mixin(體!((VkImageSubresourceRange),q{
-								aspectMask 	: (mixin(舉!((VK_IMAGE_ASPECT_),q{COLOR_BIT}))),
-								baseMipLevel 	: 0, levelCount 	: 1,
-								baseArrayLayer 	: 0, layerCount 	: 1,
-							}))
-						)
+						mixin(體!((VkComponentMapping),q{
+							r 	: mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY})), g 	: mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY})), 
+							b 	: mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY})), a 	: mixin(舉!((VK_COMPONENT_SWIZZLE_),q{IDENTITY})),
+						})),
+						mixin(體!((VkImageSubresourceRange),q{
+							aspectMask 	: mixin(舉!((VK_IMAGE_ASPECT_),q{COLOR_BIT})),
+							baseMipLevel 	: 0, levelCount 	: 1,
+							baseArrayLayer 	: 0, layerCount 	: 1,
+						}))
 					)
 				).array; 
 			} 
@@ -4005,15 +3991,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				//Create the device
 				auto pExtensions = requiredExtensions.map!toPChar.array; 
 				auto deviceCreateInfo = 
-					(
 					mixin(體!((VkDeviceCreateInfo),q{
-						queueCreateInfoCount 	: deviceQueueCreateInfos.length.to!uint,
-						pQueueCreateInfos 	: deviceQueueCreateInfos.ptr,
-						enabledExtensionCount	: pExtensions.length.to!uint,
-						ppEnabledExtensionNames 	: pExtensions.ptr,
-						pEnabledFeatures	: &features
-					}))
-				); 
+					queueCreateInfoCount 	: deviceQueueCreateInfos.length.to!uint,
+					pQueueCreateInfos 	: deviceQueueCreateInfos.ptr,
+					enabledExtensionCount	: pExtensions.length.to!uint,
+					ppEnabledExtensionNames 	: pExtensions.ptr,
+					pEnabledFeatures	: &features
+				})); 
 				
 				auto vk = physicalDevice.instance; 
 				vk.vkCreateDevice(physicalDevice.handle, &deviceCreateInfo, null, &handle)
@@ -4108,17 +4092,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				return new VulkanPipelineLayout(this, sets, pcRanges); 
 			} 
 			
+			auto createShaderModule(const(ubyte)[] data)
+			=> new VulkanShaderModule(this, data); 
+			
 			auto createShaderModule(File f)
-			{
-				return new VulkanShaderModule(
-					this, f.read(true)
-					/+
-						Todo: This throws memory error 
-						when file not found.
-						console app, headless.
-					+/
-				); 
-			} 
+			=> createShaderModule(f.read(true))
+			/+
+				Todo: This throws memory error when file not found.
+				console app, headless.
+			+/; 
 			
 			auto createRenderPass(
 				VkAttachmentDescription[] attachmentDescriptions, 
@@ -4127,14 +4109,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			)
 			{
 				auto vkSubpassDescriptions = subpassDescriptions.map!"a.toVkSubpassDescription".array; 
-				auto createInfo = 	(
-					mixin(體!((VkRenderPassCreateInfo),q{
-						attachmentCount 	: attachmentDescriptions.length.to!uint, 
-						pAttachments 	: attachmentDescriptions.ptr,
-						subpassCount 	: vkSubpassDescriptions.length.to!uint,
-						pSubpasses 	: vkSubpassDescriptions.ptr,
-					}))
-				); 
+				auto createInfo = 	mixin(體!((VkRenderPassCreateInfo),q{
+					attachmentCount 	: attachmentDescriptions.length.to!uint, 
+					pAttachments 	: attachmentDescriptions.ptr,
+					subpassCount 	: vkSubpassDescriptions.length.to!uint,
+					pSubpasses 	: vkSubpassDescriptions.ptr,
+				})); 
 				//Todo: verify subpass attachment indices
 				
 				VkRenderPass renderPassHandle; 
@@ -4270,15 +4250,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					//Simple viewport for an entire windows.
 					//Note: Scissor test is always enabled. Viewport is the transform, scissor is the clipping.
-					return 
-					(
-						mixin(體!((VkPipelineViewportStateCreateInfo),q{
-							viewportCount 	: 1, 
-							pViewports 	: new VkViewport(0, 0, size.x, size.y, 0, 1),
-							scissorCount 	: 1, 
-							pScissors 	: new VkRect2D(VkOffset2D(0, 0), VkExtent2D(size.x, size.y)),
-						}))
-					); 
+					return mixin(體!((VkPipelineViewportStateCreateInfo),q{
+						viewportCount 	: 1, 
+						pViewports 	: new VkViewport(0, 0, size.x, size.y, 0, 1),
+						scissorCount 	: 1, 
+						pScissors 	: new VkRect2D(VkOffset2D(0, 0), VkExtent2D(size.x, size.y)),
+					})); 
 				} 
 				
 				static viewportState(VkExtent2D size)
@@ -4427,7 +4404,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							&queue2, 0.6, 
 						QueueFamily2, 
 							&queue3
-					);
+					); 
 				+/
 			+/
 			
@@ -4945,7 +4922,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanSemaphore
 		{
-			mixin SmartChild!(q{ @PARENT VulkanDevice device }); 
+			mixin SmartChild!q{ @PARENT VulkanDevice device }; 
 			
 			VkSemaphore handle;  alias handle this; 
 			
@@ -4961,23 +4938,19 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanDescriptorSetLayout
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT VulkanDevice 	device, 
-					const VkDescriptorSetLayoutBinding[] 	layoutBindings
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanDevice 	device, 
+				const VkDescriptorSetLayoutBinding[] 	layoutBindings
+			}; 
 			
 			VkDescriptorSetLayout handle; 
 			
 			void _construct()
 			{
-				auto descriptorLayoutCreateInfo = 	(
-					mixin(體!((VkDescriptorSetLayoutCreateInfo),q{
-						bindingCount 	: layoutBindings.length.to!uint,
-						pBindings 	: layoutBindings.ptr,
-					}))
-				); 
+				auto descriptorLayoutCreateInfo = 	mixin(體!((VkDescriptorSetLayoutCreateInfo),q{
+					bindingCount 	: layoutBindings.length.to!uint,
+					pBindings 	: layoutBindings.ptr,
+				})); 
 				device.vkCreateDescriptorSetLayout(device.handle, &descriptorLayoutCreateInfo, null, &handle)
 					.vkEnforce("Failed to create descriptor layout."); 
 			} 
@@ -4988,27 +4961,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanPipelineLayout
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT VulkanDevice 	device, 
-					const VulkanDescriptorSetLayout[] 	layouts,/+Todo: notify destruction!+/
-					const VkPushConstantRange[]	pushConstantRanges
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanDevice 	device, 
+				const VulkanDescriptorSetLayout[] 	layouts,/+Todo: notify destruction!+/
+				const VkPushConstantRange[]	pushConstantRanges
+			}; 
 			
 			VkPipelineLayout handle;  alias handle this; 
 			
 			void _construct()
 			{
 				auto sets = layouts.map!"a.handle".array; 
-				auto layoutCreateInfo = (
-					mixin(體!((VkPipelineLayoutCreateInfo),q{
-						setLayoutCount 	: sets.length.to!uint,
-						pSetLayouts 	: sets.ptr,
-						pushConstantRangeCount	: pushConstantRanges.length.to!uint,
-						pPushConstantRanges	: pushConstantRanges.ptr
-					}))
-				); 
+				auto layoutCreateInfo = mixin(體!((VkPipelineLayoutCreateInfo),q{
+					setLayoutCount 	: sets.length.to!uint,
+					pSetLayouts 	: sets.ptr,
+					pushConstantRangeCount	: pushConstantRanges.length.to!uint,
+					pPushConstantRanges	: pushConstantRanges.ptr
+				})); 
 				device.vkCreatePipelineLayout(device.handle, &layoutCreateInfo, null, &handle)
 					.vkEnforce("Failed to create pipeline layout."); 
 			} 
@@ -5019,12 +4988,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanShaderModule
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT	VulkanDevice 	device, 
-					ubyte[]		rawBytes
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanDevice 	device, 
+				const(ubyte)[] 	rawBytes
+			}; 
 			
 			VkShaderModule handle; alias handle this; 
 			
@@ -5046,12 +5013,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanPipeline
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT	VulkanDevice 	device, 
-					VkPipeline		handle
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT	VulkanDevice 	device, 
+				VkPipeline		handle
+			}; 
 			
 			alias handle this; 
 			
@@ -5078,32 +5043,27 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					resolveAttachments.length.among(0, colorAttachments.length), 
 					`Inconsistent colorAttachments - resolveAttachments.`
 				); 
-				return 
-				(
-					mixin(體!((VkSubpassDescription),q{
-						flags	: this.flags,
-						pipelineBindPoint	: this.pipelineBindPoint,
-						inputAttachmentCount	: inputAttachments.length.to!uint,
-						pInputAttachments	: inputAttachments.ptr,
-						colorAttachmentCount	: colorAttachments.length.to!uint,
-						pColorAttachments	: colorAttachments.ptr,
-						pResolveAttachments 	: resolveAttachments.ptr,
-						pDepthStencilAttachment	: ((depthStencilAttachment.attachment!=VK_ATTACHMENT_UNUSED) ?(&depthStencilAttachment):(null)),
-						preserveAttachmentCount 	: preserveAttachments.length.to!uint,
-						pPreserveAttachments	: preserveAttachments.ptr,
-					}))
-				); 
+				return mixin(體!((VkSubpassDescription),q{
+					flags	: this.flags,
+					pipelineBindPoint	: this.pipelineBindPoint,
+					inputAttachmentCount	: inputAttachments.length.to!uint,
+					pInputAttachments	: inputAttachments.ptr,
+					colorAttachmentCount	: colorAttachments.length.to!uint,
+					pColorAttachments	: colorAttachments.ptr,
+					pResolveAttachments 	: resolveAttachments.ptr,
+					pDepthStencilAttachment	: ((depthStencilAttachment.attachment!=VK_ATTACHMENT_UNUSED) ?(&depthStencilAttachment):(null)),
+					preserveAttachmentCount 	: preserveAttachments.length.to!uint,
+					pPreserveAttachments	: preserveAttachments.ptr,
+				})); 
 			} 
 		} 
 		
 		class VulkanRenderPass
 		{
-			mixin SmartParent!(
-				q{
-					@PARENT VulkanDevice 	device, 
-					VkRenderPass	handle
-				}
-			); 
+			mixin SmartParent!q{
+				@PARENT VulkanDevice 	device, 
+				VkRenderPass	handle
+			}; 
 			
 			alias handle this; 
 			
@@ -5131,16 +5091,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					foreach(imv; swapchain.imageViews)
 					{
-						auto ci = (
-							mixin(體!((VkFramebufferCreateInfo),q{
-								renderPass 	: this.handle,
-								attachmentCount 	: 1,
-								pAttachments 	: &imv.handle,
-								width 	: swapchain.extent.width,
-								height 	: swapchain.extent.height,
-								layers 	: 1,
-							}))
-						); 
+						auto ci = mixin(體!((VkFramebufferCreateInfo),q{
+							renderPass 	: this.handle,
+							attachmentCount 	: 1,
+							pAttachments 	: &imv.handle,
+							width 	: swapchain.extent.width,
+							height 	: swapchain.extent.height,
+							layers 	: 1,
+						})); 
 						VkFramebuffer fbHandle; 
 						device.vkCreateFramebuffer(device.handle, &ci, null, &fbHandle).vkEnforce; 
 						framebuffers ~= new VulkanFramebuffer(this, fbHandle); 
@@ -5156,12 +5114,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanFramebuffer
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT VulkanRenderPass 	renderPass, 
-					VkFramebuffer	handle
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanRenderPass 	renderPass, 
+				VkFramebuffer	handle
+			}; 
 			
 			alias handle this; 
 			
@@ -5179,12 +5135,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanDescriptorPool
 		{
-			mixin SmartParent!(
-				q{
-					@PARENT VulkanDevice 	device, 
-					VkDescriptorPool	handle
-				}
-			); 
+			mixin SmartParent!q{
+				@PARENT VulkanDevice 	device, 
+				VkDescriptorPool	handle
+			}; 
 			
 			alias handle this; 
 			
@@ -5198,13 +5152,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			auto allocateDescriptorSet(VulkanDescriptorSetLayout descriptorSetLayout)
 			{
 				auto allocInfo = 
-					(
 					mixin(體!((VkDescriptorSetAllocateInfo),q{
-						descriptorPool 	: this.handle,
-						descriptorSetCount 	: 1, //Opt: multiple allocation at once
-						pSetLayouts 	: &descriptorSetLayout.handle,
-					}))
-				); 
+					descriptorPool 	: this.handle,
+					descriptorSetCount 	: 1, //Opt: multiple allocation at once
+					pSetLayouts 	: &descriptorSetLayout.handle,
+				})); 
 				
 				VkDescriptorSet descriptorSetHandle; 
 				device.vkAllocateDescriptorSets(device.handle, &allocInfo, &descriptorSetHandle)
@@ -5216,12 +5168,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanDescriptorSet
 		{
-			mixin SmartChild!(
-				q{
-					@PARENT VulkanDescriptorPool 	pool, 
-					VkDescriptorSet	handle
-				}
-			); 
+			mixin SmartChild!q{
+				@PARENT VulkanDescriptorPool 	pool, 
+				VkDescriptorSet	handle
+			}; 
 			
 			alias handle this; 
 			
@@ -5253,23 +5203,19 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				// Update descriptor set with uniform binding
 				auto descriptorBufferInfo = 
-					(
 					mixin(體!((VkDescriptorBufferInfo),q{
-						buffer 	: uniformBuffer,
-						offset 	: ofs,
-						range 	: siz,
-					}))
-				); 
+					buffer 	: uniformBuffer,
+					offset 	: ofs,
+					range 	: siz,
+				})); 
 				auto writeDescriptorSet = 
-					(
 					mixin(體!((VkWriteDescriptorSet),q{
-						dstSet 	: this.handle,
-						dstBinding	: 0, /+Todo: way too specific!!!+/
-						descriptorCount 	: 1,
-						descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))),
-						pBufferInfo 	: &descriptorBufferInfo
-					}))
-				); 
+					dstSet 	: this.handle,
+					dstBinding	: 0, /+Todo: way too specific!!!+/
+					descriptorCount 	: 1,
+					descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+					pBufferInfo 	: &descriptorBufferInfo
+				})); 
 				
 				device.vkUpdateDescriptorSets(device.handle, 1, &writeDescriptorSet, 0, null); 
 				//Opt: batch processing
@@ -5280,23 +5226,19 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				//Todo: write partial buffer
 				auto descriptorBufferInfo = 
-					(
 					mixin(體!((VkDescriptorBufferInfo),q{
-						buffer 	: buf.buffer.handle,
-						offset 	: 0,
-						range 	: VK_WHOLE_SIZE,
-					}))
-				); 
+					buffer 	: buf.buffer.handle,
+					offset 	: 0,
+					range 	: VK_WHOLE_SIZE,
+				})); 
 				auto writeDescriptorSet = 
-					(
 					mixin(體!((VkWriteDescriptorSet),q{
-						dstSet 	: this.handle,
-						dstBinding	: bindingIdx,
-						descriptorCount 	: 1,
-						descriptorType 	: dtype,
-						pBufferInfo 	: &descriptorBufferInfo
-					}))
-				); 
+					dstSet 	: this.handle,
+					dstBinding	: bindingIdx,
+					descriptorCount 	: 1,
+					descriptorType 	: dtype,
+					pBufferInfo 	: &descriptorBufferInfo
+				})); 
 				pool.device.vkUpdateDescriptorSets(pool.device.handle, 1, &writeDescriptorSet, 0, null); 
 			} 
 		} 
@@ -5304,12 +5246,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanInstance
 		{
-			mixin SmartParent!(
-				q{
-					string[] requiredExtensions, 
-					string appName=""
-				}
-			); 
+			mixin SmartParent!q{
+				string[] requiredExtensions, 
+				string appName=""
+			}; 
 			
 			static /+query stuff+/
 			{
@@ -5427,18 +5367,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					descriptorSetLayout = device.createDescriptorSetLayout
 						(
-						(
-							mixin(體!((VkDescriptorSetLayoutBinding),q{
-								binding	: 0, 	descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))),
-								descriptorCount 	: 1, 	stageFlags 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
-							}))
-						), 
-						(
-							mixin(體!((VkDescriptorSetLayoutBinding),q{
-								binding	: 1, 	descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))),
-								descriptorCount 	: 1, 	stageFlags 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
-							}))
-						)
+						mixin(體!((VkDescriptorSetLayoutBinding),q{
+							binding	: 0, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+							descriptorCount 	: 1, 	stageFlags 	: mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT})),
+						})), 
+						mixin(體!((VkDescriptorSetLayoutBinding),q{
+							binding	: 1, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
+							descriptorCount 	: 1, 	stageFlags 	: mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT})),
+						}))
 					); 
 					pipelineLayout = device.createPipelineLayout(descriptorSetLayout, pushConstantRanges); 
 				} 
@@ -5446,21 +5382,38 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				//support multiple shaders/pipelines
 				VulkanShaderModule[File/+file ony+/] shaderModules; 
 				VulkanPipeline[] pipelines; 
-				protected void createPipelines(File[] kernelFiles)
+				
+				protected void createPipelines(T)(T[] kernels)
+				if(is(T==File)||is(T : const(ubyte)[]))
 				{
-					foreach(kf; kernelFiles)
+					foreach(kf; kernels)
 					{
-						const f = kf.withoutQueryString; 
-						auto sm = shaderModules.require(f, device.createShaderModule(f)); 
+						static if(is(T==File))
+						{
+							const 	f 	= kf.withoutQueryString,
+								name 	= kf.queryString.names.get(0).ifEmpty("main"); 
+							auto sm = shaderModules.require(f, device.createShaderModule(f)); 
+						}
+						else static if(is(T : const(ubyte)[]))
+						{
+							const(ubyte)[] bin = kf; 
+							if(bin.startsWith((cast(ubyte[])("PK"))))
+							bin = bin.unzip("comp.spv")/+optional unzip+/; 
+							auto sm = shaderModules.require(
+								bin.hashOf.text.File, 
+								device.createShaderModule(bin)
+							); 
+							const name = "main"; 
+						}
+						
 						pipelines ~= device.createComputePipeline
 						(
-							(
-								mixin(體!((VkPipelineShaderStageCreateInfo),q{
-									stage 	: (mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))),
-									_module 	: sm,
-									pName 	: kf.queryString.names.get(0).toPChar,
-								}))
-							), pipelineLayout, null, -1
+							mixin(體!((VkPipelineShaderStageCreateInfo),q{
+								stage 	: mixin(舉!((VK_SHADER_STAGE_),q{COMPUTE_BIT})),
+								_module 	: sm,
+								pName 	: name.toPChar,
+							})), 
+							pipelineLayout, null, -1
 						); 
 					}
 				} 
@@ -5474,20 +5427,16 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					//Todo: concurrent sharing mode: (mixin(舉!((VK_SHARING_MODE_),q{CONCURRENT})))
 					
 					uniformMemoryBuffer = device.createMemoryBuffer
-						(UB.sizeof, (mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT}))), (mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT})))); 
+						(UB.sizeof, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))); 
 					dataHostMemoryBuffer = device.createMemoryBuffer
 						(
-						bufSizeBytes, 	(
-							mixin(幟!((VK_MEMORY_PROPERTY_),q{
-								HOST_VISIBLE_BIT |
-								HOST_CACHED_BIT
-							}))
-						), (
-							mixin(幟!((VK_BUFFER_USAGE_),q{
-								TRANSFER_SRC_BIT |
-								TRANSFER_DST_BIT
-							}))
-						)
+						bufSizeBytes, 	mixin(幟!((VK_MEMORY_PROPERTY_),q{
+							HOST_VISIBLE_BIT |
+							HOST_CACHED_BIT
+						})), mixin(幟!((VK_BUFFER_USAGE_),q{
+							TRANSFER_SRC_BIT |
+							TRANSFER_DST_BIT
+						}))
 					); 
 					buf = (cast(ubyte*)dataHostMemoryBuffer.map)[0..bufSizeBytes]; 
 					/+
@@ -5499,13 +5448,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					
 					dataDeviceMemoryBuffer = device.createMemoryBuffer
 						(
-						bufSizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT}))), (
-							mixin(幟!((VK_BUFFER_USAGE_),q{
-								STORAGE_BUFFER_BIT |
-								TRANSFER_SRC_BIT |
-								TRANSFER_DST_BIT
-							}))
-						)
+						bufSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
+							STORAGE_BUFFER_BIT |
+							TRANSFER_SRC_BIT |
+							TRANSFER_DST_BIT
+						}))
 					)
 						/+Todo: , (mixin(舉!((VK_SHARING_MODE_),q{CONCURRENT})))+/; 
 				} 
@@ -5520,7 +5467,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					auto cb = new VulkanCommandBuffer(commandPool); 
 					with(cb)
 					record(
-						(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+						mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
 						{ cmdCopyBuffer(dataHostMemoryBuffer, dataDeviceMemoryBuffer); }
 					); 
 					queue.submit(cb); 
@@ -5534,7 +5481,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					auto cb = new VulkanCommandBuffer(commandPool); 
 					with(cb)
 					record(
-						(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+						mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
 						{ cmdCopyBuffer(dataDeviceMemoryBuffer, dataHostMemoryBuffer); }
 					); 
 					queue.submit(cb); 
@@ -5550,13 +5497,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					descriptorPool = device.createDescriptorPool
 						(
 						[
-							(mixin(體!((VkDescriptorPoolSize),q{type 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))), 	descriptorCount 	: 1}))),
-							(mixin(體!((VkDescriptorPoolSize),q{type 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))), 	descriptorCount 	: 1})))
+							mixin(體!((VkDescriptorPoolSize),q{type 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})), 	descriptorCount 	: 1})),
+							mixin(體!((VkDescriptorPoolSize),q{type 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})), 	descriptorCount 	: 1}))
 						], 1 /+maxSets+/
 					); 
 					descriptorSet = descriptorPool.allocate(descriptorSetLayout); 
-					descriptorSet.write(0, uniformMemoryBuffer, (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})))); 
-					descriptorSet.write(1, dataDeviceMemoryBuffer, (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})))); 
+					descriptorSet.write(0, uniformMemoryBuffer, mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))); 
+					descriptorSet.write(1, dataDeviceMemoryBuffer, mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))); 
 				} 
 				
 				void dispatchPipeline(
@@ -5571,7 +5518,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					{
 						record
 						(
-							(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+							mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
 							{
 								cmdBindComputePipeline(pipelines[pipelineIdx]); 
 								cmdBindComputeDescriptorSets(pipelineLayout, 0, descriptorSet); 
@@ -5603,15 +5550,16 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			@property dwbuf() { return cast(uint[])buf; } 
 			
-			this(
-				File[] kernelFiles /+FileName?function+/, size_t bufSizeBytes_, 
+			this(T)(
+				T[] kernels /+FileName?function+/, size_t bufSizeBytes_, 
 				VkPushConstantRange[] pushConstantRanges = null
 			)
+			if(is(T==File)||is(T : const(ubyte)[]))
 			{
 				static if(StructAlignBugFix)
 				{
 					ubufPtr = new UB; /+
-						This exterbak alloc fixes possible access violation 
+						This external alloc fixes possible access violation 
 						when the struct has align(16) fields.
 					+/
 				}
@@ -5620,13 +5568,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				initialize; 
 				createLayouts(pushConstantRanges); 
-				createPipelines(kernelFiles); 
+				createPipelines(kernels); 
 				createBuffers; 
 				createDescriptors; 
 			} 
 			
-			this(File kernelFile, size_t bufSizeBytes_, VkPushConstantRange[] pushConstantRanges = null)
-			{ this([kernelFile], bufSizeBytes_, pushConstantRanges); } 
+			this(T)(T kernel, size_t bufSizeBytes_, VkPushConstantRange[] pushConstantRanges = null)
+			if(is(T==File)||is(T : const(ubyte)[]))
+			{ this([kernel], bufSizeBytes_, pushConstantRanges); } 
 			
 			~this()
 			{
@@ -5700,20 +5649,18 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							cb.cmdPipelineBarrier
 							(
 								
-								(mixin(舉!((VK_PIPELINE_STAGE_),q{TRANSFER_BIT}))),
-								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))),
+								mixin(舉!((VK_PIPELINE_STAGE_),q{TRANSFER_BIT})),
+								mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT})),
 								
-								(
-									mixin(體!((VkBufferMemoryBarrier),q{
-										srcAccessMask	: (mixin(舉!((VK_ACCESS_),q{TRANSFER_WRITE_BIT}))),
-										dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_READ_BIT}))),
-										srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-										dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-										buffer	: dataDeviceMemoryBuffer,
-										offset	: 0,
-										size	: VK_WHOLE_SIZE
-									}))
-								)
+								mixin(體!((VkBufferMemoryBarrier),q{
+									srcAccessMask	: mixin(舉!((VK_ACCESS_),q{TRANSFER_WRITE_BIT})),
+									dstAccessMask 	: mixin(舉!((VK_ACCESS_),q{SHADER_READ_BIT})),
+									srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									buffer	: dataDeviceMemoryBuffer,
+									offset	: 0,
+									size	: VK_WHOLE_SIZE
+								}))
 							); 
 						}
 					} 
@@ -5723,20 +5670,18 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						{
 							cmdPipelineBarrier
 							(
-								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))), 
-								(mixin(舉!((VK_PIPELINE_STAGE_),q{TRANSFER_BIT}))),
+								mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT})), 
+								mixin(舉!((VK_PIPELINE_STAGE_),q{TRANSFER_BIT})),
 								
-								(
-									mixin(體!((VkBufferMemoryBarrier),q{
-										srcAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_WRITE_BIT}))),
-										dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{TRANSFER_READ_BIT}))),
-										srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-										dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-										buffer	: dataDeviceMemoryBuffer,
-										offset	: 0,
-										size	: VK_WHOLE_SIZE
-									}))
-								)
+								mixin(體!((VkBufferMemoryBarrier),q{
+									srcAccessMask 	: mixin(舉!((VK_ACCESS_),q{SHADER_WRITE_BIT})),
+									dstAccessMask 	: mixin(舉!((VK_ACCESS_),q{TRANSFER_READ_BIT})),
+									srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+									buffer	: dataDeviceMemoryBuffer,
+									offset	: 0,
+									size	: VK_WHOLE_SIZE
+								}))
 							); 
 						}
 					} 
@@ -5750,7 +5695,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								dataHostMemoryBuffer.flush; 
 								cmdCopyBuffer(
 									dataHostMemoryBuffer, dataDeviceMemoryBuffer, 
-									(mixin(求map(q{a},q{forAllocations(uploads)},q{(mixin(體!((VkBufferCopy),q{a.ofs, a.ofs, a.length})))}))).array
+									(mixin(求map(q{a},q{forAllocations(uploads)},q{mixin(體!((VkBufferCopy),q{a.ofs, a.ofs, a.length}))}))).array
 								); 
 								if(barrier) uploadBarrier; 
 							}
@@ -5769,7 +5714,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								{
 									cmdCopyBuffer(
 										dataDeviceMemoryBuffer, dataHostMemoryBuffer,
-										(mixin(求map(q{a},q{forAllocations(downloads)},q{(mixin(體!((VkBufferCopy),q{a.ofs, a.ofs, a.length})))}))).array
+										(mixin(求map(q{a},q{forAllocations(downloads)},q{mixin(體!((VkBufferCopy),q{a.ofs, a.ofs, a.length}))}))).array
 									); 
 								}
 							}
@@ -5786,7 +5731,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							const workItems = (((N).alignUp(groupSize))/(groupSize)), pipelineIdx = 0; 
 							cmdBindComputePipeline(pipelines[pipelineIdx]); 
 							cmdBindComputeDescriptorSets(pipelineLayout, 0, descriptorSet); 
-							cmdPushConstants(pipelineLayout, (mixin(幟!((VK_SHADER_STAGE_),q{COMPUTE_BIT}))), PushConstants(cmd)); 
+							cmdPushConstants(pipelineLayout, mixin(幟!((VK_SHADER_STAGE_),q{COMPUTE_BIT})), PushConstants(cmd)); 
 							cmdDispatch(workItems, 1, 1); 
 						}
 					} 
@@ -5799,14 +5744,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							(
 								
 								
-								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))), 
-								(mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT}))),
-								(
-									mixin(體!((VkMemoryBarrier),q{
-										srcAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_WRITE_BIT}))),
-										dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{SHADER_READ_BIT})))
-									}))
-								)
+								mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT})), 
+								mixin(舉!((VK_PIPELINE_STAGE_),q{COMPUTE_SHADER_BIT})),
+								mixin(體!((VkMemoryBarrier),q{
+									srcAccessMask 	: mixin(舉!((VK_ACCESS_),q{SHADER_WRITE_BIT})),
+									dstAccessMask 	: mixin(舉!((VK_ACCESS_),q{SHADER_READ_BIT}))
+								}))
 							); 
 						}
 					} 
@@ -5816,7 +5759,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						enforce(!cb); cb = new VulkanCommandBuffer(commandPool); 
 						with(cb)
 						record(
-							(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))), 
+							mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
 							{ fun(); }
 						); 
 						queue.submit(cb); 
@@ -5841,9 +5784,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x329F44F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x32A5A4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x32ABD4F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x328EF4F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x329554F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x329B84F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
@@ -5931,11 +5874,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					//host accessible buffer
 					auto stagingBuffer = device.createMemoryBuffer
-						(buff, (mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT}))), (mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT})))); 
+						(buff, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
 					
 					//gpu only buffer
 					auto deviceBuffer = device.createMemoryBuffer
-						(buff.sizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT}))), (mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT})))); 
+						(buff.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT}))); 
 					
 					//Allocate command buffer for copy operation
 					auto copyCommandBuffer = new VulkanCommandBuffer(commandPool); 
@@ -5943,7 +5886,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					// Now copy data from host visible buffer to gpu only buffer
 					with(copyCommandBuffer)
 					record(
-						(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+						mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
 						{ cmdCopyBuffer(stagingBuffer, deviceBuffer); }
 					); 
 					
@@ -5960,7 +5903,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void createUniformBuffer()
 				{
 					uniformMemoryBuffer = device.createMemoryBuffer
-						(uniformData.sizeBytes, (mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT}))), (mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT})))); 
+						(uniformData.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))); 
 					updateUniformData; 
 				} 
 				
@@ -5995,29 +5938,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					renderPass = device.createRenderPass
 						(
 						[
-							(
-								mixin(體!((VkAttachmentDescription),q{
-									format 	: swapchain.format, 	samples 	: (mixin(舉!((VK_SAMPLE_COUNT),q{_1_BIT}))),
-									loadOp 	: (mixin(舉!((VK_ATTACHMENT_LOAD_OP_),q{CLEAR}))), 	storeOp 	: (mixin(舉!((VK_ATTACHMENT_STORE_OP_),q{STORE}))),
-									stencilLoadOp 	: (mixin(舉!((VK_ATTACHMENT_LOAD_OP_),q{DONT_CARE}))), 	stencilStoreOp 	: (mixin(舉!((VK_ATTACHMENT_STORE_OP_),q{DONT_CARE}))),
-									initialLayout 	: (mixin(舉!((VK_IMAGE_LAYOUT_),q{PRESENT_SRC_KHR}))), 	finalLayout 	: (mixin(舉!((VK_IMAGE_LAYOUT_),q{PRESENT_SRC_KHR}))),
-								}))
-							)
+							mixin(體!((VkAttachmentDescription),q{
+								format 	: swapchain.format, 	samples 	: mixin(舉!((VK_SAMPLE_COUNT),q{_1_BIT})),
+								loadOp 	: mixin(舉!((VK_ATTACHMENT_LOAD_OP_),q{CLEAR})), 	storeOp 	: mixin(舉!((VK_ATTACHMENT_STORE_OP_),q{STORE})),
+								stencilLoadOp 	: mixin(舉!((VK_ATTACHMENT_LOAD_OP_),q{DONT_CARE})), 	stencilStoreOp 	: mixin(舉!((VK_ATTACHMENT_STORE_OP_),q{DONT_CARE})),
+								initialLayout 	: mixin(舉!((VK_IMAGE_LAYOUT_),q{PRESENT_SRC_KHR})), 	finalLayout 	: mixin(舉!((VK_IMAGE_LAYOUT_),q{PRESENT_SRC_KHR})),
+							}))
 						], 
 						[
-							(
-								mixin(體!((VulkanSubpassDescription),q{
-									pipelineBindPoint	: (mixin(舉!((VK_PIPELINE_BIND_POINT_),q{GRAPHICS}))), 
-									colorAttachments	: [
-										(
-											mixin(體!((VkAttachmentReference),q{
-												attachment 	: 0, //attachment index
-												layout	: (mixin(舉!((VK_IMAGE_LAYOUT_),q{COLOR_ATTACHMENT_OPTIMAL}))),
-											}))
-										)
-									]
-								}))
-							)
+							mixin(體!((VulkanSubpassDescription),q{
+								pipelineBindPoint	: mixin(舉!((VK_PIPELINE_BIND_POINT_),q{GRAPHICS})), 
+								colorAttachments	: [
+									mixin(體!((VkAttachmentReference),q{
+										attachment 	: 0, //attachment index
+										layout	: mixin(舉!((VK_IMAGE_LAYOUT_),q{COLOR_ATTACHMENT_OPTIMAL})),
+									}))
+								]
+							}))
 						]
 					); 
 					renderPass.createFramebuffers(swapchain); 
@@ -6033,13 +5970,11 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					// This is for uniform buffers and samplers
 					descriptorSetLayout = device.createDescriptorSetLayout
 						(
-						(
-							mixin(體!((VkDescriptorSetLayoutBinding),q{
-								descriptorType 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))),
-								descriptorCount 	: 1,
-								stageFlags 	: (mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT}))),
-							}))
-						)
+						mixin(體!((VkDescriptorSetLayoutBinding),q{
+							descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+							descriptorCount 	: 1,
+							stageFlags 	: mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT})),
+						}))
 					); 
 					
 					// Describe pipeline layout
@@ -6050,96 +5985,76 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					graphicsPipeline = device.createGraphicsPipeline
 						(
 						[
-							(
-								mixin(體!((VkPipelineShaderStageCreateInfo),q{
-									stage 	: (mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT}))),
-									_module 	: vertexShaderModule,
-									pName 	: "main",
-								}))
-							), (
-								mixin(體!((VkPipelineShaderStageCreateInfo),q{
-									stage 	: (mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT}))),
-									_module 	: fragmentShaderModule,
-									pName 	: "main",
-								}))
-							)
+							mixin(體!((VkPipelineShaderStageCreateInfo),q{
+								stage 	: mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT})),
+								_module 	: vertexShaderModule,
+								pName 	: "main",
+							})), mixin(體!((VkPipelineShaderStageCreateInfo),q{
+								stage 	: mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT})),
+								_module 	: fragmentShaderModule,
+								pName 	: "main",
+							}))
 						],
 						
 						device.vertexInputState
 						(
-							(
-								mixin(體!((VkVertexInputBindingDescription),q{
+							mixin(體!((VkVertexInputBindingDescription),q{
+								binding	: 0, 
+								stride	: Vertex.sizeof,
+								inputRate 	: mixin(舉!((VK_VERTEX_INPUT_RATE_),q{VERTEX})),
+							})), [
+								mixin(體!((VkVertexInputAttributeDescription),q{
+									//vec3 position (.z is 0)
 									binding	: 0, 
-									stride	: Vertex.sizeof,
-									inputRate 	: (mixin(舉!((VK_VERTEX_INPUT_RATE_),q{VERTEX}))),
-								}))
-							), [
-								(
-									mixin(體!((VkVertexInputAttributeDescription),q{
-										//vec3 position (.z is 0)
-										binding	: 0, 
-										location 	: 0,
-										format	: (mixin(舉!((VK_FORMAT_),q{R32G32B32_SFLOAT}))),
-										offset	: 0
-									}))
-								), (
-									mixin(體!((VkVertexInputAttributeDescription),q{
-										//vec3 color
-										binding	: 0,
-										location 	: 1,
-										format	: (mixin(舉!((VK_FORMAT_),q{R32G32B32_SFLOAT}))), 
-										offset	: float.sizeof * 3,
-									}))
-								),
+									location 	: 0,
+									format	: mixin(舉!((VK_FORMAT_),q{R32G32B32_SFLOAT})),
+									offset	: 0
+								})), mixin(體!((VkVertexInputAttributeDescription),q{
+									//vec3 color
+									binding	: 0,
+									location 	: 1,
+									format	: mixin(舉!((VK_FORMAT_),q{R32G32B32_SFLOAT})), 
+									offset	: float.sizeof * 3,
+								})),
 							]
 						),
 						
-						(
-							mixin(體!((VkPipelineInputAssemblyStateCreateInfo),q{
-								topology 	: (mixin(舉!((VK_PRIMITIVE_TOPOLOGY_),q{TRIANGLE_LIST}))),
-								primitiveRestartEnable 	: false,
-							}))
-						), 
+						mixin(體!((VkPipelineInputAssemblyStateCreateInfo),q{
+							topology 	: mixin(舉!((VK_PRIMITIVE_TOPOLOGY_),q{TRIANGLE_LIST})),
+							primitiveRestartEnable 	: false,
+						})), 
 						
 						device.viewportState(swapchain.extent),
 						
-						(
-							mixin(體!((VkPipelineRasterizationStateCreateInfo),q{
-								depthClampEnable 	: false,
-								rasterizerDiscardEnable 	: false,
-								polygonMode 	: (mixin(舉!((VK_POLYGON_MODE_),q{FILL}))),
-								cullMode 	: (mixin(舉!((VK_CULL_MODE_),q{BACK_BIT}))),
-								frontFace 	: (mixin(舉!((VK_FRONT_FACE_),q{COUNTER_CLOCKWISE}))),
-								depthBiasEnable 	: false,
-								depthBiasConstantFactor 	: 0.0f,
-								depthBiasClamp 	: 0.0f,
-								depthBiasSlopeFactor 	: 0.0f,
-								lineWidth 	: 1.0f,
-							}))
-						), (
-							mixin(體!((VkPipelineMultisampleStateCreateInfo),q{
-								rasterizationSamples 	: (mixin(舉!((VK_SAMPLE_COUNT),q{_1_BIT}))),
-								sampleShadingEnable 	: false,
-								minSampleShading 	: 1.0f,
-								alphaToCoverageEnable 	: false,
-								alphaToOneEnable 	: false,
-							}))
-						), (
-							mixin(體!((VkPipelineColorBlendStateCreateInfo),q{
-								logicOpEnable 	: false,
-								logicOp 	: (mixin(舉!((VK_LOGIC_OP_),q{COPY}))),
-								blendConstants 	: [0, 0, 0, 0]
-							}))
-						),
+						mixin(體!((VkPipelineRasterizationStateCreateInfo),q{
+							depthClampEnable 	: false,
+							rasterizerDiscardEnable 	: false,
+							polygonMode 	: mixin(舉!((VK_POLYGON_MODE_),q{FILL})),
+							cullMode 	: mixin(舉!((VK_CULL_MODE_),q{BACK_BIT})),
+							frontFace 	: mixin(舉!((VK_FRONT_FACE_),q{COUNTER_CLOCKWISE})),
+							depthBiasEnable 	: false,
+							depthBiasConstantFactor 	: 0.0f,
+							depthBiasClamp 	: 0.0f,
+							depthBiasSlopeFactor 	: 0.0f,
+							lineWidth 	: 1.0f,
+						})), mixin(體!((VkPipelineMultisampleStateCreateInfo),q{
+							rasterizationSamples 	: mixin(舉!((VK_SAMPLE_COUNT),q{_1_BIT})),
+							sampleShadingEnable 	: false,
+							minSampleShading 	: 1.0f,
+							alphaToCoverageEnable 	: false,
+							alphaToOneEnable 	: false,
+						})), mixin(體!((VkPipelineColorBlendStateCreateInfo),q{
+							logicOpEnable 	: false,
+							logicOp 	: mixin(舉!((VK_LOGIC_OP_),q{COPY})),
+							blendConstants 	: [0, 0, 0, 0]
+						})),
 						
-						(
-							mixin(體!((VkPipelineColorBlendAttachmentState),q{
-								blendEnable 	: false,
-								srcColorBlendFactor 	: (mixin(舉!((VK_BLEND_FACTOR_),q{ONE}))), 	dstColorBlendFactor 	: (mixin(舉!((VK_BLEND_FACTOR_),q{ZERO}))), 	colorBlendOp 	: (mixin(舉!((VK_BLEND_OP_),q{ADD}))),
-								srcAlphaBlendFactor 	: (mixin(舉!((VK_BLEND_FACTOR_),q{ONE}))), 	dstAlphaBlendFactor 	: (mixin(舉!((VK_BLEND_FACTOR_),q{ZERO}))), 	alphaBlendOp 	: (mixin(舉!((VK_BLEND_OP_),q{ADD}))),
-								colorWriteMask 	: (mixin(幟!((VK_COLOR_COMPONENT_),q{R_BIT | G_BIT | B_BIT | A_BIT})))
-							}))
-						),
+						mixin(體!((VkPipelineColorBlendAttachmentState),q{
+							blendEnable 	: false,
+							srcColorBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ONE})), 	dstColorBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ZERO})), 	colorBlendOp 	: mixin(舉!((VK_BLEND_OP_),q{ADD})),
+							srcAlphaBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ONE})), 	dstAlphaBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ZERO})), 	alphaBlendOp 	: mixin(舉!((VK_BLEND_OP_),q{ADD})),
+							colorWriteMask 	: mixin(幟!((VK_COLOR_COMPONENT_),q{R_BIT | G_BIT | B_BIT | A_BIT}))
+						})),
 						
 						pipelineLayout, renderPass, 0, null, -1
 					); 
@@ -6155,12 +6070,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					descriptorPool = device.createDescriptorPool
 						(
 						[
-							(
-								mixin(體!((VkDescriptorPoolSize),q{
-									type 	: (mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))),
-									descriptorCount 	: 1
-								}))
-							)
+							mixin(體!((VkDescriptorPoolSize),q{
+								type 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+								descriptorCount 	: 1
+							}))
 						],
 						1 /+maxSets+/
 					); 
@@ -6184,48 +6097,44 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					{
 						record
 						(
-							(mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT}))),
+							mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
 							{
 								cmdPipelineBarrier
 									(
-									(mixin(舉!((VK_PIPELINE_STAGE_),q{COLOR_ATTACHMENT_OUTPUT_BIT}))), 
-									(mixin(舉!((VK_PIPELINE_STAGE_),q{COLOR_ATTACHMENT_OUTPUT_BIT}))),
-									(
-										mixin(體!((VkImageMemoryBarrier),q{
-											srcAccessMask 	: (mixin(舉!((VK_ACCESS_),q{init}))),
-											dstAccessMask 	: (mixin(舉!((VK_ACCESS_),q{COLOR_ATTACHMENT_WRITE_BIT}))),
-											oldLayout 	: (mixin(舉!((VK_IMAGE_LAYOUT_),q{UNDEFINED}))),
-											newLayout 	: (mixin(舉!((VK_IMAGE_LAYOUT_),q{PRESENT_SRC_KHR}))),
-											srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-											dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
-											image	: swapchain.images[swapchainIndex],
-											subresourceRange	: {
-												aspectMask 	: (mixin(舉!((VK_IMAGE_ASPECT_),q{COLOR_BIT}))),
-												baseMipLevel 	: 0, levelCount 	: 1,
-												baseArrayLayer 	: 0, layerCount 	: 1,
-											},
-										}))
-									)
+									mixin(舉!((VK_PIPELINE_STAGE_),q{COLOR_ATTACHMENT_OUTPUT_BIT})), 
+									mixin(舉!((VK_PIPELINE_STAGE_),q{COLOR_ATTACHMENT_OUTPUT_BIT})),
+									mixin(體!((VkImageMemoryBarrier),q{
+										srcAccessMask 	: mixin(舉!((VK_ACCESS_),q{init})),
+										dstAccessMask 	: mixin(舉!((VK_ACCESS_),q{COLOR_ATTACHMENT_WRITE_BIT})),
+										oldLayout 	: mixin(舉!((VK_IMAGE_LAYOUT_),q{UNDEFINED})),
+										newLayout 	: mixin(舉!((VK_IMAGE_LAYOUT_),q{PRESENT_SRC_KHR})),
+										srcQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+										dstQueueFamilyIndex	: VK_QUEUE_FAMILY_IGNORED,
+										image	: swapchain.images[swapchainIndex],
+										subresourceRange	: {
+											aspectMask 	: mixin(舉!((VK_IMAGE_ASPECT_),q{COLOR_BIT})),
+											baseMipLevel 	: 0, levelCount 	: 1,
+											baseArrayLayer 	: 0, layerCount 	: 1,
+										},
+									}))
 								); 
 								recordRenderPass
 									(
-									(
-										mixin(體!((VkRenderPassBeginInfo),q{
-											renderPass 	: this.renderPass,
-											framebuffer 	: renderPass.framebuffers[swapchainIndex],
-											renderArea 	: {
-												offset 	: { x: 0, y: 0 }, 
-												extent 	: swapchain.extent 
-											},
-											clearValueCount 	: 1,
-											pClearValues 	: &clearColor //Note: AMD has FastClear if black or white
-										}))
-									), 
+									mixin(體!((VkRenderPassBeginInfo),q{
+										renderPass 	: this.renderPass,
+										framebuffer 	: renderPass.framebuffers[swapchainIndex],
+										renderArea 	: {
+											offset 	: { x: 0, y: 0 }, 
+											extent 	: swapchain.extent 
+										},
+										clearValueCount 	: 1,
+										pClearValues 	: &clearColor //Note: AMD has FastClear if black or white
+									})), 
 									{
 										cmdBindGraphicsDescriptorSets(pipelineLayout, 0, descriptorSet); 
 										cmdBindGraphicsPipeline(graphicsPipeline); 
 										cmdBindVertexBuffers(0, vertexMemoryBuffer); 
-										cmdBindIndexBuffer(indexMemoryBuffer, (mixin(舉!((VK_INDEX_TYPE_),q{UINT32})))); 
+										cmdBindIndexBuffer(indexMemoryBuffer, mixin(舉!((VK_INDEX_TYPE_),q{UINT32}))); 
 										cmdDrawIndexed(indexCount.to!uint, 1, 0, 0, 0); 
 									}
 								); 
@@ -6310,8 +6219,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								
 								updateUniformData; 
 								
-								vertexMemoryBuffer 	= createAndUploadBuffer(vertices, (mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})))),
-								indexMemoryBuffer 	= createAndUploadBuffer(indices, (mixin(幟!((VK_BUFFER_USAGE_),q{INDEX_BUFFER_BIT})))); 
+								vertexMemoryBuffer 	= createAndUploadBuffer(vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))),
+								indexMemoryBuffer 	= createAndUploadBuffer(indices, mixin(幟!((VK_BUFFER_USAGE_),q{INDEX_BUFFER_BIT}))); 
 								
 								device.waitIdle; 
 								//Opt: The waitidle is terribly slow
@@ -6323,7 +6232,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								); 
 								queue.submit
 									(
-									imageAvailableSemaphore, (mixin(舉!((VK_PIPELINE_STAGE_),q{TOP_OF_PIPE_BIT}))),
+									imageAvailableSemaphore, mixin(舉!((VK_PIPELINE_STAGE_),q{TOP_OF_PIPE_BIT})),
 									commandBuffer,
 									renderingFinishedSemaphore
 								); 
