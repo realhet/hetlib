@@ -3254,11 +3254,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			+/
 		+/
 		
-		template 碼1/+ExternalCode+/(string args, string src, string FILE=__FILE__, int LINE=__LINE__)
+		template 碼/+ExternalCode+/(string args, string src, string FILE=__FILE__, int LINE=__LINE__)
 		{
-			//pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$(args.quoted),$(src.quoted)]".text); 
-			pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$((cast(ubyte[])(args))),$((cast(ubyte[])(src)))]".text); 
-			enum hash = src.hashOf(args.hashOf).to!string(26); 
+			pragma(msg, "$DIDE_TEXTBLOCK_BEGIN$"); 
+			pragma(msg, src /+Must not use transformation functions, because the CTFE interpreter is slow.+/); 
+			pragma(msg, "$DIDE_TEXTBLOCK_END$"); 
+			enum hash = src.hashOf(args.hashOf).to!string(26) /+hashOf CTFE performance: 1.2ms / 1KB+/; 
+			pragma(msg, FILE, "(", LINE, ",1): $DIDE_EXTERNAL_COMPILATION_REQUEST: ", args.quoted, ",", hash.quoted); 
+			//The TEXTBLOCK will be attached to the end of the compilation request message as a string literal inside DIDE.
 			enum 碼 = (cast(immutable(ubyte)[])(import(hash))); 
 			static if(碼.startsWith(cast(ubyte[])("ERROR:")))
 			{
@@ -3266,33 +3269,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				static assert(false, "$DIDE_EXTERNAL_COMPILATION_"~(cast(string)(碼)).splitter('\n').front); 
 			}
 		} 
-		
-		immutable(ubyte)[] 碼2(string args, string src, string FILE=__FILE__, int LINE=__LINE__)()
-		{
-			pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$((cast(ubyte[])(args))),$((cast(ubyte[])(src)))]".text); 
-			enum hash = src.hashOf(args.hashOf).to!string(26); 
-			enum res = (cast(immutable(ubyte)[])(import(hash))); 
-			return res; 
-		} 
-		
-		static string 碼3(string args, string src)
-		=> q{
-			(
-				(){
-					enum args=q{__ARGS__},FILE=__FILE__,LINE=__LINE__,src=q{__SRC__}; 
-					pragma(msg, i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: [$((cast(ubyte[])(args))),$((cast(ubyte[])(src[0..$/10])))]".text); 
-					//enum hash=src.hashOf(args.hashOf).to!string(26); 
-					enum res = (cast(immutable(ubyte)[])(/+import(hash)+/"FUCK")); 
-					static if(res.startsWith(cast(ubyte[])("ERROR:")))
-					{
-						pragma(msg, (cast(string)(res)).splitter('\n').drop(1).join('\n')); 
-						static assert(false, "$DIDE_EXTERNAL_COMPILATION_"~(cast(string)(res)).splitter('\n').front); 
-					}
-					return res; 
-				}()
-			)
-		}
-		.replaceFirst("__ARGS__", args).replaceLast("__SRC__", src); ; 
 	}
 	
 }
