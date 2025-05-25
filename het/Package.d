@@ -96,7 +96,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.utf; 
 			public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum; 
 			public import std.uri: urlEncode = encode, urlDecode = decode; 
-			public import std.process : environment, thisThreadID, execute, executeShell, ExecuteConfig = Config, Pid; 
+			public import std.process : environment, thisThreadID, execute, executeShell, ExecuteConfig = Config, Pid, escapeWindowsArgument; 
 			public import std.zlib : compress, uncompress; 
 			public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write; 
 			//public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
@@ -3244,11 +3244,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
 				(
 					mixin(求each(q{i=0},q{4},q{
-						((0x1980059F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
-						((0x1985C59F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
-						((0x198B859F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
-						((0x1991459F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
-						((0x1997059F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+						((0x1981759F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+						((0x1987359F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+						((0x198CF59F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+						((0x1992B59F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+						((0x1998759F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
 					}))
 				); 
 			+/
@@ -3269,6 +3269,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				static assert(false, "$DIDE_EXTERNAL_COMPILATION_"~(cast(string)(碼)).splitter('\n').front); 
 			}
 		} 
+		
+		auto 碼text(Args...)(Args args) => args.text; 
 	}
 	
 }
@@ -6786,7 +6788,7 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 		
 		/// replaces UTF errors with the error character. So the string will be safe for further processing.
-		string safeUTF8(immutable(void)[] s_)
+		string safeUTF8(in void[] s_)
 		{
 			auto s = (cast(string)(s_)); 
 			try
@@ -7379,11 +7381,7 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 		
 		string cmdArg(string s)
-		{
-			//Bug: Don't give a fuck about quoting quotes.
-			/+Todo: make proper dos/windows command line argument encoding.+/
-			return s.canFind(' ') ? '"' ~ s ~ '"' : s; 
-		} 
+		=> escapeWindowsArgument(s); 
 		
 		string cmdArg(File f)
 		{ return f.fullName.cmdArg; } 
@@ -7413,6 +7411,8 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 			}
 			return to!string(wcmd.join(' ')); //join
+			
+			// escapeShellCommand is for linux, I guess.  It uses single `'`
 		} 
 		
 		unittest

@@ -5802,7 +5802,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		static if(VulkanWindowed)
 		{
-			public import het.win;  //From here it uses hetlib.win
+			mixin("public import het.win; "); //From here it uses hetlib.win
 			
 			class VulkanWindow: Window
 			{
