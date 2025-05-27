@@ -3253,7 +3253,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				); 
 			+/
 		+/
-		
+		
 		template 碼/+ExternalCode+/(string args, string src, string FILE=__FILE__, int LINE=__LINE__)
 		{
 			pragma(msg, "$DIDE_TEXTBLOCK_BEGIN$"); 
@@ -3270,7 +3270,186 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		} 
 		
-		auto 碼text(Args...)(Args args) => args.text; 
+		template 碼3(string LOCATION, Args...)
+		{
+			size_t ctfeWriteIES(Args...)(Args args, size_t h)
+			{
+				static size_t doit(A)(A a, size_t h)
+				{
+					import core.interpolation; alias T = typeof(a); 
+					static if(is(T==InterpolationHeader))	{ __ctfeWrite("\1"); }
+					else static if(is(T==InterpolationFooter))	{ __ctfeWrite("\2"); }
+					else static if(is(T==InterpolatedLiteral   !lit , string lit ))	{ __ctfeWrite("\3"); __ctfeWrite(lit   ); h = lit.hashOf(h); }
+					else static if(is(T==InterpolatedExpression!expr, string expr))	{ __ctfeWrite("\4"); __ctfeWrite(expr  ); }
+					else	{ __ctfeWrite("\5"); const s = a.text; __ctfeWrite(s); h = s.hashOf(h); }
+					return h; 
+				} 
+				static foreach(a; args) h = doit(a, h); return h; 
+			} 
+			
+			string ctfeTransmitIES(string LOCATION, Args...)(Args args)
+			{
+				__ctfeWrite("$DIDE_TEXTBLOCK_BEGIN$\n"); 
+				const hash = ctfeWriteIES(args, "DIDE_EXTERNAL_CODE".hashOf).to!string(26); __ctfeWrite("\n"); 
+				__ctfeWrite("$DIDE_TEXTBLOCK_END$\n"); 
+				__ctfeWrite(i"$(LOCATION): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash.quoted)\n".text); 
+				//The TEXTBLOCK will be attached to the end of the compilation request message as a string literal inside DIDE.
+				return hash; 
+			} 
+			
+			enum hash = ctfeTransmitIES!LOCATION(Args); 
+			enum 碼3 = (cast(immutable(ubyte)[])(import(hash))); 
+			static if(碼3.startsWith(cast(ubyte[])("ERROR:")))
+			{
+				pragma(msg, (cast(string)(碼3)).splitter('\n').drop(1).join('\n')); 
+				static assert(false, "$DIDE_EXTERNAL_COMPILATION_"~(cast(string)(碼3)).splitter('\n').front); 
+			}
+		} 
+		
+		string[] deserializeIES(string data, string hash="")
+		{
+			auto src = (cast(immutable(ubyte)[])(data)); const hashEnabled = hash!=""; 
+			size_t h = "DIDE_EXTERNAL_CODE".hashOf; string[] results; string act; 
+			
+			enum MaxMarker = 5; 
+			
+			ubyte fetch() {
+				if(!src.length) return 0; 
+				ubyte x = src.front; src.popFront; return x; 
+			} 
+			
+			string fetchString(bool doHash)
+			{
+				size_t i; while(i<src.length && src[i]>MaxMarker) i++; 
+				const x = (cast(string)(src[0..i])); src = src[i..$]; 
+				if(doHash)
+				{
+					//const h0 = h; 
+					h = x.hashOf(h); 
+					//print("##", h0.to!string(26), "->", h.to!string(26), x.quoted); 
+				}
+				return x; 
+			} 
+			while(src.length)
+			{
+				enforce(fetch==1, "Start marker expected"); 
+				while(1)
+				{
+					const b = fetch; 
+					if(b==0) {/+eof+/enforce(0, "Unexpected end"); }
+					else if(b==1) {/+block start+/enforce(0, "Recursion not supported"); }
+					else if(b==2) {/+block end+/results ~= act; act = ""; break; }
+					else if(b==3) {/+literal+/act ~= fetchString(hashEnabled); }
+					else if(b==4) {/+expression+/fetchString(false); }
+					else if(b==5) {/+value+/act ~= fetchString(hashEnabled); }
+					else enforce(0, "Unhandled char: "~b.text); 
+				}
+			}
+			
+			const calculatedHash = h.to!string(26); 
+			enforce(
+				!hashEnabled || hash==calculatedHash, 
+				i"Hash error: expected: $(hash) != calculated: $(calculatedHash)".text
+			);  return results; 
+		} 
+		
+		
+		
+		
+		template _LOCATION_(string FILE=__FILE__, int LINE=__LINE__)
+		{
+			//note this must be a template instead of enum, alias, function. 
+			//Those will lock onto the very first __FILE__ __LINE__ get.
+			enum _LOCATION_=i"$(FILE)($(LINE),1)".text; 
+			/+Usage: /+Structured: (_LOCATION_!())+/+/
+		} 
+		
+		string 碼2/+ExternalCode+/(Args...)(Args args, string FILE=__FILE__, int LINE=__LINE__)
+		{
+			auto h = "DIDE_EXTERNAL_CODE".hashOf(h); 
+			static foreach(a; args)
+			{
+				{
+					import core.interpolation; alias T = typeof(a); 
+					static if(is(T==InterpolationHeader))	{ __ctfeWrite("\1"); }
+					else static if(is(T==InterpolationFooter))	{ __ctfeWrite("\2"); }
+					else static if(is(T==InterpolatedLiteral!lit, string lit))	{ __ctfeWrite("\3"); __ctfeWrite(lit); h = lit.hashOf(h); }
+					else static if(is(T==InterpolatedExpression!expr, string expr))	{ __ctfeWrite("\4"); __ctfeWrite(expr); }
+					else	{
+						const s = a.text; 
+						__ctfeWrite("\5"); __ctfeWrite(s); h = s.hashOf(h); 
+					}
+				}
+			}
+			const hash = h.to!string(26); 
+			
+			version(/+$DIDE_REGION+/none) {
+				__ctfeWrite(i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)\n".text); 
+				
+				
+				__ctfeWrite(i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)\n".text); 
+				__ctfeWrite(
+					i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+MPILATION_REQUEST: $(hash)\n".text
+				); 
+				
+				__ctfeWrite(i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)\n".text); 
+				__ctfeWrite(q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text); 
+				__ctfeWrite(
+					q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text,q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text
+				); 
+				__ctfeWrite(
+					q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text
+				); 
+				__ctfeWrite(
+					q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text,q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text
+				); 
+				
+				
+				__ctfeWrite(
+					q{
+						$(
+							FI
+							LE
+						)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)
+					}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text
+				); 
+				__ctfeWrite(
+					q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text,q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text
+				); 
+				__ctfeWrite(
+					q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text
+				); 
+				__ctfeWrite(
+					q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text,q{
+						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
+						MPILATION_REQUEST: $(hash)
+					}.text
+				); 
+			}
+			return "str"; 
+		} 
 	}
 	
 }
