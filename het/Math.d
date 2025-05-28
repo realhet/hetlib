@@ -71,36 +71,30 @@ version(/+$DIDE_REGION+/all)
 		Todo: anonym structs ans unions
 		/+
 			Code: struct vec2
-			{
-			     float x, y;
-			}
+			{     float x, y; } 
 			
 			struct vec3
 			{
-				union {
-					struct { 
+				union  {
+					struct 	 {
 						float x; 
-						union { 
-							struct { 
-								float y, z; 
-							}
+						union  {
+							struct  { float y, z; } 
 							vec2 yz; 
 						} 
-					}
-					struct { 
-						vec2 xy; 
-					}
-				}
-			}
+					} 
+					struct 	 { vec2 xy; } 
+				} 
+			} 
 			
 			void main()
 			{
-				auto v = vec3(1, 2, 3);
+				auto v = vec3(1, 2, 3); 
 				
-				writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy);
-				writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy);
-				writeln(&v.yz);
-			}
+				writeln(v); writeln(v.x); writeln(v.y); writeln(v.z); writeln(v.xy); 
+				writeln(&v.yz); writeln(&v.x); writeln(&v.y); writeln(&v.z); writeln(&v.xy); 
+				writeln(&v.yz); 
+			} 
 		+/
 	+/
 	
@@ -3135,10 +3129,10 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		auto angleAbsDiff_rad(A, B)(A a, B b)
-		{ return normalizeAngle_rad(b-a).abs; } ; 
+		{ return normalizeAngle_rad(b-a).abs; }; 
 		
 		auto angleAbsDiff_deg(A, B)(A a, B b)
-		{ return normalizeAngle_deg(b-a).abs; } ; 
+		{ return normalizeAngle_deg(b-a).abs; }; 
 		
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 		private enum UnaryStdMathFunct(string name) = 
@@ -4029,7 +4023,7 @@ version(/+$DIDE_REGION+/all)
 			assert(sign(Vector!(byte, 3)(-5, 0, 5)) == vec3(-1, 0, 1)); 
 					
 			static assert(is(typeof(iceil (5.4 )) == int	)); 
-			static assert(is(typeof(lfloor(5.4 )) == long	)); 
+			static assert(is(typeof((lfloor(5.4 ))) == long	)); 
 			static assert(is(typeof(floor (5.4f)) == float	)); 
 			static assert(is(typeof(floor (5.0 )) == double)); 
 			auto vf = vec4(0.1,	-.5, 1.5, 1.6); 
@@ -4190,7 +4184,7 @@ version(/+$DIDE_REGION+/all)
 ////////////////////////////////////////////////////////////////////////////////
 
 
-//Todo: when the ide supports unit testing, this should be private. Also needs real unittest{} blocks.
+/+Todo: when the ide supports unit testing, this should be private. Also needs real unittest{} blocks.+/
 void unittest_main() {
 	//version(assert) {}else enforce(0, "Turn on debug build for asserts."); 
 	version(assert)

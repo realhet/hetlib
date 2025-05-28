@@ -5424,7 +5424,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				const size_t bufSizeBytes; //fixed size specified in constructor
 				void createBuffers()
 				{
-					//Todo: concurrent sharing mode: (mixin(舉!((VK_SHARING_MODE_),q{CONCURRENT})))
+					/+Todo: concurrent sharing mode: (mixin(舉!((VK_SHARING_MODE_),q{CONCURRENT})))+/
 					
 					uniformMemoryBuffer = device.createMemoryBuffer
 						(UB.sizeof, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))); 
@@ -5784,9 +5784,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x328EF4F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x329554F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x329B84F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x328F14F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x329574F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x329BA4F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

@@ -112,7 +112,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.concurrency, std.signals; 
 			
 			import std.encoding : transcode, Windows1252String; 
-			import std.exception : stdEnforce = enforce; 
+			import std.exception : stdEnforce = enforce, assumeUnique; 
 			import std.getopt; 
 			
 			
@@ -3244,11 +3244,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Code: string[5] x; auto a(bool b) => ((b)?('✅'):('❌')); 
 				(
 					mixin(求each(q{i=0},q{4},q{
-						((0x1981759F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
-						((0x1987359F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
-						((0x198CF59F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
-						((0x1992B59F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
-						((0x1998759F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
+						((0x1982559F156A1).檢((mixin(指(q{x},q{0}))) ~= a(mixin(界0(q{1},q{i},q{4 }))))),
+						((0x1988159F156A1).檢((mixin(指(q{x},q{1}))) ~= a(mixin(界1(q{1},q{i},q{4 }))))),
+						((0x198DD59F156A1).檢((mixin(指(q{x},q{2}))) ~= a(mixin(界2(q{1},q{i},q{4 }))))),
+						((0x1993959F156A1).檢((mixin(指(q{x},q{3}))) ~= a(mixin(界3(q{1},q{i},q{4 }))))),
+						((0x1999559F156A1).檢((mixin(指(q{x},q{4}))) ~= a(mixin(等(q{2},q{i},q{4-i})))))
 					}))
 				); 
 			+/
@@ -3270,7 +3270,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		} 
 		
-		template 碼3(string LOCATION, Args...)
+		struct LOCATION_t {
+			string location; 
+			string toString() const => location; 
+		} 
+		
+		enum _LOCATION_(string FILE=__FILE__, size_t LINE=__LINE__) = LOCATION_t(FILE~'('~LINE.text~",1)"); 
+		enum 位         (string FILE=__FILE__, size_t LINE=__LINE__) = LOCATION_t(FILE~'('~LINE.text~",1)"); 
+		
+		template packAliasSeq(A...) { alias unpack=A; } 
+		
+		template 碼3(LOCATION_t LOCATION, Args...)
 		{
 			size_t ctfeWriteIES(Args...)(Args args, size_t h)
 			{
@@ -3287,7 +3297,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				static foreach(a; args) h = doit(a, h); return h; 
 			} 
 			
-			string ctfeTransmitIES(string LOCATION, Args...)(Args args)
+			string ctfeTransmitIES(LOCATION_t LOCATION, Args...)(Args args)
 			{
 				__ctfeWrite("$DIDE_TEXTBLOCK_BEGIN$\n"); 
 				const hash = ctfeWriteIES(args, "DIDE_EXTERNAL_CODE".hashOf).to!string(26); __ctfeWrite("\n"); 
@@ -3306,6 +3316,118 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}
 		} 
 		
+		struct ExternalCodeIES
+		{
+			struct NewLineBlock
+			{ int literalNewLines, expressionNewLines, valueNewLines; } 
+			struct Part
+			{
+				string sourceText; 
+				NewLineBlock[] newLineBlocks; 
+				int[] lineIdxMap; 
+			} 
+			
+			Part[] parts; 
+			
+			this(string data, string hash="")
+			{
+				auto src = (cast(immutable(ubyte)[])(data)); const hashEnabled = hash!=""; 
+				size_t h = "DIDE_EXTERNAL_CODE".hashOf; Part act; 
+				
+				enum MaxMarker = 5; 
+				
+				ubyte fetch() {
+					if(!src.length) return 0; 
+					ubyte x = src.front; src.popFront; return x; 
+				} 
+				
+				string fetchString(ubyte mode, bool doHash)
+				{
+					int newLineCount, i; while(i<src.length && src[i]>MaxMarker) { if(src[i]=='\n') newLineCount++; i++; }
+					const x = (cast(string)(src[0..i])); src = src[i..$]; 
+					if(doHash) { h = x.hashOf(h); }
+					
+					if(mode==3)	act.newLineBlocks ~= NewLineBlock(newLineCount); 
+					else if(mode==4)	act.newLineBlocks ~= NewLineBlock(0, newLineCount); 
+					else if(mode==5)	{
+						if(act.newLineBlocks.empty || act.newLineBlocks.back.literalNewLines)
+						act.newLineBlocks ~= NewLineBlock(); 
+						act.newLineBlocks.back.valueNewLines += newLineCount; 
+					}
+					
+					return x; 
+				} 
+				
+				void finalize() /+Remives the first and last extra newLines, that are added automaticalli in DIDE+/
+				{
+					void dec(ref int i) { if(i>0) i--; } 
+					if(act.newLineBlocks.length) {
+						dec(act.newLineBlocks.front.literalNewLines); 
+						dec(act.newLineBlocks.back.literalNewLines); 
+					}
+				} 
+				
+				while(src.length)
+				{
+					enforce(fetch==1, "Start marker expected"); 
+					while(1)
+					{
+						const b = fetch; 
+						if(b==0) {/+eof+/enforce(0, "Unexpected end"); }
+						else if(b==1) {/+block start+/enforce(0, "Recursion not supported"); }
+						else if(b==2) {/+block end+/finalize; parts ~= act; act = Part.init; break; }
+						else if(b==3) {/+literal+/act.sourceText ~= fetchString(b, hashEnabled); }
+						else if(b==4) {/+expression+/fetchString(b, false); }
+						else if(b==5) {/+value+/act.sourceText ~= fetchString(b, hashEnabled); }
+						else enforce(0, "Unhandled char: "~b.text); 
+					}
+				}
+				
+				const calculatedHash = h.to!string(26); 
+				enforce(
+					!hashEnabled || hash==calculatedHash, 
+					i"Hash error: expected: $(hash) != calculated: $(calculatedHash)".text
+				); 
+			} 
+			
+			immutable(int)[] getLineIdxMap(int baseIdx, int partIdx)
+			{
+				//result array is indexed by 1 based line index.
+				
+				if(!partIdx.inRange(parts)) return [baseIdx]; 
+				
+				static auto generateLineIdxMap(in NewLineBlock[] input)
+				{
+					enum log = (常!(bool)(1)); auto lineA = 1, lineB = 1, delta = 0; int[] res = [1/+extra 1 at index 0+/]; 
+					void emit() {
+						res ~= lineA; 
+						static if(log) writeln(format!"%3d %3d     (%3d)"(lineA, lineB, lineB-lineA)); 
+					} 
+					emit; 
+					foreach(block; input)
+					{
+						static if(log) writeln(block); 
+						if(block.literalNewLines) foreach(i; 0..block.literalNewLines) { lineA++; lineB++; emit; }
+						if(block.valueNewLines) foreach(i; 0..block.valueNewLines) { lineB ++; emit; }
+						if(block.expressionNewLines) lineA += block.expressionNewLines/+ + 2+/; 
+					}
+					static if(log) writeln; 
+					return res; 
+				} 
+				
+				foreach(ref part; parts[0..partIdx+1])
+				if(part.lineIdxMap.empty)
+				part.lineIdxMap = generateLineIdxMap(part.newLineBlocks); 
+				
+				const offset = baseIdx + parts[0..partIdx].map!((a){
+					auto x = a.lineIdxMap.backOr(1)-1; 
+					if(x>0) x+=2; /+extra DIDE newLines+/
+					return x; 
+				}).sum; 
+				return parts[partIdx].lineIdxMap.map!((a)=>(a+offset)).array.assumeUnique; 
+			} 
+		} 
+		
 		string[] deserializeIES(string data, string hash="")
 		{
 			auto src = (cast(immutable(ubyte)[])(data)); const hashEnabled = hash!=""; 
@@ -3322,14 +3444,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{
 				size_t i; while(i<src.length && src[i]>MaxMarker) i++; 
 				const x = (cast(string)(src[0..i])); src = src[i..$]; 
-				if(doHash)
-				{
-					//const h0 = h; 
-					h = x.hashOf(h); 
-					//print("##", h0.to!string(26), "->", h.to!string(26), x.quoted); 
-				}
-				return x; 
-			} 
+				if(doHash) { h = x.hashOf(h); }return x; 
+			} 
+			
 			while(src.length)
 			{
 				enforce(fetch==1, "Start marker expected"); 
@@ -3351,104 +3468,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				!hashEnabled || hash==calculatedHash, 
 				i"Hash error: expected: $(hash) != calculated: $(calculatedHash)".text
 			);  return results; 
-		} 
-		
-		
-		
-		
-		template _LOCATION_(string FILE=__FILE__, int LINE=__LINE__)
-		{
-			//note this must be a template instead of enum, alias, function. 
-			//Those will lock onto the very first __FILE__ __LINE__ get.
-			enum _LOCATION_=i"$(FILE)($(LINE),1)".text; 
-			/+Usage: /+Structured: (_LOCATION_!())+/+/
-		} 
-		
-		string 碼2/+ExternalCode+/(Args...)(Args args, string FILE=__FILE__, int LINE=__LINE__)
-		{
-			auto h = "DIDE_EXTERNAL_CODE".hashOf(h); 
-			static foreach(a; args)
-			{
-				{
-					import core.interpolation; alias T = typeof(a); 
-					static if(is(T==InterpolationHeader))	{ __ctfeWrite("\1"); }
-					else static if(is(T==InterpolationFooter))	{ __ctfeWrite("\2"); }
-					else static if(is(T==InterpolatedLiteral!lit, string lit))	{ __ctfeWrite("\3"); __ctfeWrite(lit); h = lit.hashOf(h); }
-					else static if(is(T==InterpolatedExpression!expr, string expr))	{ __ctfeWrite("\4"); __ctfeWrite(expr); }
-					else	{
-						const s = a.text; 
-						__ctfeWrite("\5"); __ctfeWrite(s); h = s.hashOf(h); 
-					}
-				}
-			}
-			const hash = h.to!string(26); 
-			
-			version(/+$DIDE_REGION+/none) {
-				__ctfeWrite(i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)\n".text); 
-				
-				
-				__ctfeWrite(i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)\n".text); 
-				__ctfeWrite(
-					i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-MPILATION_REQUEST: $(hash)\n".text
-				); 
-				
-				__ctfeWrite(i"$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)\n".text); 
-				__ctfeWrite(q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text); 
-				__ctfeWrite(
-					q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text,q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text
-				); 
-				__ctfeWrite(
-					q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text
-				); 
-				__ctfeWrite(
-					q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text,q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text
-				); 
-				
-				
-				__ctfeWrite(
-					q{
-						$(
-							FI
-							LE
-						)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)
-					}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text
-				); 
-				__ctfeWrite(
-					q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text,q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text
-				); 
-				__ctfeWrite(
-					q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text,q{$(FILE)($(LINE),1): $DIDE_EXTERNAL_COMPILATION_REQUEST: $(hash)}.text
-				); 
-				__ctfeWrite(
-					q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text,q{
-						$(FILE)($(LINE),1): $DIDE_EXTERNAL_CO
-						MPILATION_REQUEST: $(hash)
-					}.text
-				); 
-			}
-			return "str"; 
 		} 
 	}
 	
