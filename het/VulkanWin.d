@@ -52,29 +52,24 @@ class VulkanWindow: Window
 	
 	struct Vertex { vec3 pos, color; } 
 	
-	VkClearValue clearColor = { color: {float32: [ 0.98, 0.92, 0.96, 1.0 ]}, }; 
+	VkClearValue clearColor = { color: {float32: [ 0, 0, 0, 0 ]}, }; 
 	
 	//must fill these in update
 	//Todo: these must be the already mapped VulkanMemory Staging-Buffers
 	vec3 actColor; 
 	Vertex[] vertices; 
-	uint[] indices; 
 	
 	void reset()
 	{
 		actColor = vec3(0); 
 		vertices.clear; 
-		indices.clear; 
 	} 
 	
 	
 	void tri(Args...)(in Args args)
 	{
 		void emit(in vec3 pos)
-		{
-			indices ~= cast(uint)vertices.length; 
-			vertices ~= Vertex(pos, actColor); 
-		} 
+		{ vertices ~= Vertex(pos, actColor); } 
 		
 		static foreach(i, A; Args)
 		{
@@ -121,22 +116,22 @@ class VulkanWindow: Window
 			(uniformData.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))); 
 		updateUniformData; 
 	} 
-	
+	float rotationAngle = 0; 
 	void updateUniformData()
 	{
 		// Rotate based on time
 		
-		const angle = QPS.value(10*second).fract * PIf*2; 
+		//const angle = QPS.value(10*second).fract * PIf*2; 
 		
 		auto modelMatrix = mat4.identity; 
-		modelMatrix.rotate(vec3(0, 0, 1), angle); 
-		modelMatrix.translate(vec3(0.5f, -0.5f, 0)/3); 
+		modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
+		modelMatrix.translate(vec3(-274, -266, 0)); 
 		
 		// Set up view
-		auto viewMatrix = mat4.lookAt(vec3(0, 0, 2), vec3(0), vec3(0, 1, 0)); 
+		auto viewMatrix = mat4.lookAt(vec3(0, 0, 500), vec3(0), vec3(0, 1, 0)); 
 		
 		// Set up projection
-		auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 45, 0.1, 10); 
+		auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1, 1000); 
 		
 		uniformData.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
 		
@@ -147,32 +142,82 @@ class VulkanWindow: Window
 			/+Link: https://vkguide.dev/docs/chapter-3/push_constants+/
 		+/
 	} 
-	
+	
 	void createShaderModules()
 	{
 		enum shaderBinary = 
+		/+
+			Code: (碼!((位!()),iq{glslc -O},iq{
+				#version 430
+				
+				@vert: 
+				layout(binding = 0) uniform UBO { mat4 mvp; } ubo; 
+				
+				layout(location = 0) in vec3 inPosition; 
+				layout(location = 1) in vec3 inColor; 
+				
+				layout(location = 0) out vec3 fragColor; 
+				
+				void main() {
+					gl_Position = ubo.mvp * vec4(inPosition, 1.0); 
+					fragColor = inColor; 
+				} 
+				
+				@frag: 
+				layout(location = 0) flat in vec3 fragColor; 
+				
+				layout(location = 0) out vec4 outColor; 
+				
+				void main() { outColor = vec4(fragColor, .5); } 
+			}))
+		+/
+		
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
 			
 			@vert: 
-			layout(binding = 0) uniform bi { mat4 mvp; } ubo; 
+			layout(location = 0)
+			in vec3 vertPosition; 	layout(location = 1)
+			in vec3 vertColor; 
+				
+			layout(location = 0)
+			out vec3 geomPosition; 	layout(location = 1)
+			out vec3 geomColor; 
+			@geom: 	
+			layout(location = 0)
+			in vec3 geomPosition[]; 	layout(location = 1)
+			in vec3 geomColor[]; 
 			
-			layout(location = 0) in vec3 inPosition; 
-			layout(location = 1) in vec3 inColor; 
+			layout(location = 0)
+			flat out vec3 fragColor; 
+			@frag: 
+			layout(location = 0)
+			flat in vec3 fragColor; 
 			
-			layout(location = 0) out vec3 fragColor; 
+			layout(location = 0)
+			out vec4 outColor; 
+			
+			@vert: 
+			void main()
+			{ geomPosition = vertPosition, geomColor = vertColor; } 
 			
-			void main() {
-				gl_Position = ubo.mvp * vec4(inPosition, 1.0); 
-				fragColor = inColor; 
+			@geom: 
+			layout(points) in; 
+			layout(points, max_vertices = 32) out; 
+			
+			layout(binding = 0) uniform UBO { mat4 mvp; } ubo; 
+			
+			
+			void main()
+			{
+				gl_Position = ubo.mvp * vec4(geomPosition[0], 1.0); 
+				fragColor = geomColor[0]; 
+				EmitVertex(); 
 			} 
 			
 			@frag: 
-			layout(location = 0) in vec3 fragColor; 
 			
-			layout(location = 0) out vec4 outColor; 
-			
-			void main() { outColor = vec4(fragColor, 1.0); } 
+			void main() { outColor = vec4(fragColor, .5); } 
 		})); 
 		shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
 	} 
@@ -225,20 +270,7 @@ class VulkanWindow: Window
 		// Create the graphics pipeline
 		graphicsPipeline = device.createGraphicsPipeline
 			(
-			shaderModules.pipelineShaderStageCreateInfos/+
-				[
-					mixin(體!((VkPipelineShaderStageCreateInfo),q{
-						stage 	: mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT})),
-						_module 	: vertexShaderModule,
-						pName 	: "main",
-					})), mixin(體!((VkPipelineShaderStageCreateInfo),q{
-						stage 	: mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT})),
-						_module 	: fragmentShaderModule,
-						pName 	: "main",
-					}))
-				]
-			+/,
-			
+			shaderModules.pipelineShaderStageCreateInfos,
 			device.vertexInputState
 			(
 				mixin(體!((VkVertexInputBindingDescription),q{
@@ -263,8 +295,8 @@ class VulkanWindow: Window
 			),
 			
 			mixin(體!((VkPipelineInputAssemblyStateCreateInfo),q{
-				topology 	: mixin(舉!((VK_PRIMITIVE_TOPOLOGY_),q{TRIANGLE_LIST})),
-				primitiveRestartEnable 	: false,
+				topology 	: mixin(舉!((VK_PRIMITIVE_TOPOLOGY_),q{POINT_LIST})),
+				primitiveRestartEnable 	: true,
 			})), 
 			
 			device.viewportState(swapchain.extent),
@@ -293,8 +325,8 @@ class VulkanWindow: Window
 			})),
 			
 			mixin(體!((VkPipelineColorBlendAttachmentState),q{
-				blendEnable 	: false,
-				srcColorBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ONE})), 	dstColorBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ZERO})), 	colorBlendOp 	: mixin(舉!((VK_BLEND_OP_),q{ADD})),
+				blendEnable 	: true,
+				srcColorBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{SRC_ALPHA})), 	dstColorBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ONE_MINUS_SRC_ALPHA})), 	colorBlendOp 	: mixin(舉!((VK_BLEND_OP_),q{ADD})),
 				srcAlphaBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ONE})), 	dstAlphaBlendFactor 	: mixin(舉!((VK_BLEND_FACTOR_),q{ZERO})), 	alphaBlendOp 	: mixin(舉!((VK_BLEND_OP_),q{ADD})),
 				colorWriteMask 	: mixin(幟!((VK_COLOR_COMPONENT_),q{R_BIT | G_BIT | B_BIT | A_BIT}))
 			})),
@@ -326,9 +358,9 @@ class VulkanWindow: Window
 	} 
 	
 	auto createCommandBuffer(
-		size_t swapchainIndex, size_t indexCount,
-		VulkanMemoryBuffer vertexMemoryBuffer, 
-		VulkanMemoryBuffer indexMemoryBuffer
+		size_t swapchainIndex, size_t vertexCount,
+		VulkanMemoryBuffer vertexMemoryBuffer
+		/+VulkanMemoryBuffer indexMemoryBuffer+/
 	)
 	{
 		auto commandBuffer = commandPool.createBuffer; 
@@ -373,8 +405,11 @@ class VulkanWindow: Window
 							cmdBindGraphicsDescriptorSets(pipelineLayout, 0, descriptorSet); 
 							cmdBindGraphicsPipeline(graphicsPipeline); 
 							cmdBindVertexBuffers(0, vertexMemoryBuffer); 
-							cmdBindIndexBuffer(indexMemoryBuffer, mixin(舉!((VK_INDEX_TYPE_),q{UINT32}))); 
-							cmdDrawIndexed(indexCount.to!uint, 1, 0, 0, 0); 
+							/+
+								cmdBindIndexBuffer(indexMemoryBuffer, mixin(舉!((VK_INDEX_TYPE_),q{UINT32}))); 
+								cmdDrawIndexed(indexCount.to!uint, 1, 0, 0, 0); 
+							+/
+							cmdDraw(vertexCount.to!uint, 1, 0, 0); 
 						}
 					); 
 				}
@@ -459,16 +494,16 @@ class VulkanWindow: Window
 					
 					updateUniformData; 
 					
-					vertexMemoryBuffer 	= createAndUploadBuffer(vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))),
-					indexMemoryBuffer 	= createAndUploadBuffer(indices, mixin(幟!((VK_BUFFER_USAGE_),q{INDEX_BUFFER_BIT}))); 
+					vertexMemoryBuffer 	= createAndUploadBuffer(vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
+					/+indexMemoryBuffer 	= createAndUploadBuffer(indices, mixin(幟!((VK_BUFFER_USAGE_),q{INDEX_BUFFER_BIT}))); +/
 					
 					device.waitIdle; 
 					//Opt: The waitidle is terribly slow
 					
 					commandBuffer = createCommandBuffer
 						(
-						swapchain.imageIndex, indices.length.to!uint,
-						vertexMemoryBuffer, indexMemoryBuffer
+						swapchain.imageIndex, vertices.length,
+						vertexMemoryBuffer/+, indexMemoryBuffer+/
 					); 
 					queue.submit
 						(
@@ -488,7 +523,7 @@ class VulkanWindow: Window
 		indexMemoryBuffer.destroy; 
 		//Opt: These reallocations in every frame are bad.
 		
-		invalidate /+It means: no sleep allowed in winMain()+/; 
+		//invalidate /+It means: no sleep allowed in winMain()+/; 
 	} 
 	
 } 

@@ -3711,7 +3711,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				//Note: This implicitly destroys images (in fact, we're not allowed to do that explicitly)
 				device.vkDestroySwapchainKHR(device.handle, handle, null); handle = null; 
 			} 
-			
+			
 			private static
 			{
 				auto chooseSurfaceFormat(in VkSurfaceFormatKHR[] availableFormats)
@@ -3746,13 +3746,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					enum canTripleBuffer = false; 
+					enum canTripleBuffer 	= (常!(bool)(0)),
+					vsynch 	= (常!(bool)(1)); 
 					
 					/+
 						Todo: V-Sync On: FIFO_RELAXED, if not supported, then FIFO .
 						V-Sync Off: IMMEDIATE.
 					+/
-					static if(1)
+					static if(vsynch)
 					{
 						static if(canTripleBuffer)
 						{
@@ -4894,9 +4895,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void cmdPushConstants(SSF, V)(VulkanPipelineLayout layout, SSF shaderStages, const V values)
 				{ cmdPushConstants(layout, shaderStages, 0, V.sizeof.to!int, &values); } 
 				
+				
+				void cmdDraw(uint vertexCount, uint instanceCount, uint firstVertex, uint firstInstance)
+				{ device.vkCmdDraw(handle, vertexCount, instanceCount, firstVertex, firstInstance); } 
+				
 				void cmdDrawIndexed(
 					uint indexCount, 	uint 	instanceCount,	
-					uint firstIndex, 	int 	vertexOffset, 	uint firstInstance
+					uint firstIndex, 	uint 	vertexOffset, 	uint firstInstance
 				)
 				{ device.vkCmdDrawIndexed(handle, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance); } 
 				
@@ -5033,6 +5038,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				(表([
 					[q{/+Note: Stage+/},q{/+Note: Name+/},q{/+Note: Field#+/},q{/+Note: Flag+/}],
 					[q{vert},q{"vert.spv"},q{/+Code: vertexShaderModule+/},q{mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT}))}],
+					[q{geom},q{"geom.spv"},q{/+Code: geometryShadermodule+/},q{mixin(舉!((VK_SHADER_STAGE_),q{GEOMETRY_BIT}))}],
 					[q{frag},q{"frag.spv"},q{/+Code: fragmentShadermodule+/},q{mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT}))}],
 				]))
 			).調!(GEN_enumTable)); 
@@ -5056,9 +5062,13 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						"Invalid Shader Module binary format."
 					); 
 					auto z = binary.unzipAA; 
+					{
+						string[] a; foreach(k; z.keys) if(!stageName.canFind(k)) a ~= k; 
+						enforce(a.empty, "Unsupported files in shader binary: "~a.text); 
+					}
 					foreach(i, ref m; allShaderModules)
 					{
-						const name = 	stageName[i]; 
+						const name = stageName[i]; 
 						if(auto data = name in z)
 						{
 							enforce(
@@ -5843,9 +5853,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x32F484F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x32FAE4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x330114F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x331564F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x331BC4F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x3321F4F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
