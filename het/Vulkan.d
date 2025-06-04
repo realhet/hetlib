@@ -4592,7 +4592,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			} 
 			
 			void* map(VkDeviceSize offset = 0, VkDeviceSize size = VK_WHOLE_SIZE)
-			{ return memory.map(offset, size); } 
+			{
+				/+Todo: minMemoryMapAlignment!!! check! 4K+/
+				return memory.map(offset, size); 
+			} 
 			
 			void unmap()
 			{ memory.unmap; } 
@@ -4600,6 +4603,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			void flush(VkDeviceSize offset = 0, VkDeviceSize size = VK_WHOLE_SIZE)
 			{ memory.flush(offset, size); } 
 			
+			deprecated("Size is not aligned!!!")
 			void write(in void* src, size_t size)
 			{
 				memcpy(map(0, size), src, size); 
@@ -4884,7 +4888,6 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{ device.vkCmdBindIndexBuffer(handle, buffer, offset, indexType); } 
 				void cmdBindIndexBuffer(VkBuffer buffer, VkIndexType indexType)
 				{ device.vkCmdBindIndexBuffer(handle, buffer, 0, indexType); } 
-				
 				
 				void cmdPushConstants(SSF)(VulkanPipelineLayout layout, SSF shaderStages, size_t ofs, size_t size, const(void)* values)
 				{ device.vkCmdPushConstants(this.handle, layout.handle, VkShaderStageFlags(shaderStages), ofs.to!uint, size.to!uint, values); } 
@@ -5263,33 +5266,35 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				+/
 			} 
 			
-			deprecated 
-			void updateWriteUniformBuffer(
-				VkBuffer 	uniformBuffer, 
-				VkDeviceSize 	ofs = 0, 
-				VkDeviceSize 	siz = VK_WHOLE_SIZE
-			)
-			{
-				// Update descriptor set with uniform binding
-				auto descriptorBufferInfo = 
-					mixin(體!((VkDescriptorBufferInfo),q{
-					buffer 	: uniformBuffer,
-					offset 	: ofs,
-					range 	: siz,
-				})); 
-				auto writeDescriptorSet = 
-					mixin(體!((VkWriteDescriptorSet),q{
-					dstSet 	: this.handle,
-					dstBinding	: 0, /+Todo: way too specific!!!+/
-					descriptorCount 	: 1,
-					descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
-					pBufferInfo 	: &descriptorBufferInfo
-				})); 
-				
-				device.vkUpdateDescriptorSets(device.handle, 1, &writeDescriptorSet, 0, null); 
-				//Opt: batch processing
-				//Todo: this is way too specific
-			} 
+			/+
+				deprecated 
+				void updateWriteUniformBuffer(
+					VkBuffer 	uniformBuffer, 
+					VkDeviceSize 	ofs = 0, 
+					VkDeviceSize 	siz = VK_WHOLE_SIZE
+				)
+				{
+					// Update descriptor set with uniform binding
+					auto descriptorBufferInfo = 
+						mixin(體!((VkDescriptorBufferInfo),q{
+						buffer 	: uniformBuffer,
+						offset 	: ofs,
+						range 	: siz,
+					})); 
+					auto writeDescriptorSet = 
+						mixin(體!((VkWriteDescriptorSet),q{
+						dstSet 	: this.handle,
+						dstBinding	: 0, /+Todo: way too specific!!!+/
+						descriptorCount 	: 1,
+						descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+						pBufferInfo 	: &descriptorBufferInfo
+					})); 
+					
+					device.vkUpdateDescriptorSets(device.handle, 1, &writeDescriptorSet, 0, null); 
+					//Opt: batch processing
+					//Todo: this is way too specific
+				} 
+			+/
 			
 			void write(int bindingIdx, VulkanMemoryBuffer buf, VK_DESCRIPTOR_TYPE_ dtype)
 			{
@@ -5853,9 +5858,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x331564F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x331BC4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x3321F4F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x331DE4F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332444F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x332A74F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

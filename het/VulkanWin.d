@@ -48,9 +48,9 @@ class VulkanWindow: Window
 	struct UniformData
 	{ mat4 transformationMatrix; } 
 	UniformData uniformData; 
-	VulkanMemoryBuffer uniformMemoryBuffer; 
+	VulkanMemoryBuffer uniformMemoryBuffer, hostStorageMemoryBuffer, storageMemoryBuffer; 
 	
-	struct Vertex { vec3 pos, color; } 
+	struct Vertex { vec3 pos; vec3 color; } 
 	
 	VkClearValue clearColor = { color: {float32: [ 0, 0, 0, 0 ]}, }; 
 	
@@ -77,6 +77,28 @@ class VulkanWindow: Window
 			else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
 			else static if(is(A==RGB)) actColor = args[i].from_unorm; 
 		}
+	} 
+	
+	struct State
+	{
+		vec3 base; //def=0
+		vec3 scale; //def=1
+		vec3 last, act; //def=0
+	} 
+	
+	struct CoordConfig
+	{
+		bool rel; 
+		bool f32, u32, i32, u16, i16, u8, i8; 
+	} 
+	
+	enum Inst
+	{
+		cfg, //rel, dt
+		cfg_x, //rel, dt
+		cfg_y, //rel, dt
+		cfg_z, //rel, dt
+		move_abs_u8_u8
 	} 
 	
 	
@@ -142,38 +164,47 @@ class VulkanWindow: Window
 			/+Link: https://vkguide.dev/docs/chapter-3/push_constants+/
 		+/
 	} 
+	
+	void createStorageBuffer()
+	{
+		enum storageBufferSizeBytes = 16 << 20; 
+		hostStorageMemoryBuffer = device.createMemoryBuffer
+			(storageBufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
+		storageMemoryBuffer = device.createMemoryBuffer
+			(storageBufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{TRANSFER_DST_BIT | STORAGE_BUFFER_BIT}))); 
+	} 
+	
+	void uploadStorageBuffer(in void[] data)
+	{
+		if(data.empty) return; 
+		
+		hostStorageMemoryBuffer.write(data/+Bug: alignment!!!+/); /+Opt: Should write directly to memory buffer, not copy!+/
+		auto cb = new VulkanCommandBuffer(commandPool); 
+		with(cb)
+		record(
+			mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+			{
+				cmdCopyBuffer(
+					hostStorageMemoryBuffer, storageMemoryBuffer, 
+					VkBufferCopy(0, 0, data.sizeBytes/+Bug: alignment!!!+/)
+				); 
+			}
+		); 
+		queue.submit(cb); 
+		queue.waitIdle; //Opt: STALL
+		
+		cb.destroy; 
+	} 
 	
 	void createShaderModules()
 	{
 		enum shaderBinary = 
-		/+
-			Code: (碼!((位!()),iq{glslc -O},iq{
-				#version 430
-				
-				@vert: 
-				layout(binding = 0) uniform UBO { mat4 mvp; } ubo; 
-				
-				layout(location = 0) in vec3 inPosition; 
-				layout(location = 1) in vec3 inColor; 
-				
-				layout(location = 0) out vec3 fragColor; 
-				
-				void main() {
-					gl_Position = ubo.mvp * vec4(inPosition, 1.0); 
-					fragColor = inColor; 
-				} 
-				
-				@frag: 
-				layout(location = 0) flat in vec3 fragColor; 
-				
-				layout(location = 0) out vec4 outColor; 
-				
-				void main() { outColor = vec4(fragColor, .5); } 
-			}))
-		+/
-		
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
+			
+			layout(binding = 0) uniform UBO { mat4 mvp; } ubo; 
+			
+			layout(binding = 1) buffer SBO { uint sbo[]; }; 
 			
 			@vert: 
 			layout(location = 0)
@@ -189,14 +220,16 @@ class VulkanWindow: Window
 			in vec3 geomColor[]; 
 			
 			layout(location = 0)
-			flat out vec3 fragColor; 
+			flat out vec4 fragColor; 
 			@frag: 
 			layout(location = 0)
-			flat in vec3 fragColor; 
+			flat in vec4 fragColor; 
 			
 			layout(location = 0)
 			out vec4 outColor; 
 			
+			@common: 
+			
 			@vert: 
 			void main()
 			{ geomPosition = vertPosition, geomColor = vertColor; } 
@@ -205,19 +238,18 @@ class VulkanWindow: Window
 			layout(points) in; 
 			layout(points, max_vertices = 32) out; 
 			
-			layout(binding = 0) uniform UBO { mat4 mvp; } ubo; 
-			
 			
 			void main()
 			{
 				gl_Position = ubo.mvp * vec4(geomPosition[0], 1.0); 
-				fragColor = geomColor[0]; 
+				fragColor = vec4(geomColor[0], 1.0); 
+				fragColor = unpackUnorm4x8(sbo[0]); 
 				EmitVertex(); 
 			} 
 			
 			@frag: 
 			
-			void main() { outColor = vec4(fragColor, .5); } 
+			void main() { outColor = fragColor; } 
 		})); 
 		shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
 	} 
@@ -257,9 +289,12 @@ class VulkanWindow: Window
 		descriptorSetLayout = device.createDescriptorSetLayout
 			(
 			mixin(體!((VkDescriptorSetLayoutBinding),q{
-				descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
-				descriptorCount 	: 1,
-				stageFlags 	: shaderModules.shaderStageFlagBits,
+				binding	: 0, descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+				descriptorCount 	: 1, stageFlags 	: shaderModules.shaderStageFlagBits
+			})), 
+			mixin(體!((VkDescriptorSetLayoutBinding),q{
+				binding	: 1, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
+				descriptorCount 	: 1, 	stageFlags 	: shaderModules.shaderStageFlagBits
 			}))
 		); 
 		
@@ -342,11 +377,13 @@ class VulkanWindow: Window
 			(
 			[
 				mixin(體!((VkDescriptorPoolSize),q{
-					type 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
-					descriptorCount 	: 1
+					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+					descriptorCount : 1
+				})), mixin(體!((VkDescriptorPoolSize),q{
+					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
+					descriptorCount : 1
 				}))
-			],
-			1 /+maxSets+/
+			], 1 /+maxSets+/
 		); 
 	} 
 	
@@ -354,13 +391,14 @@ class VulkanWindow: Window
 	{
 		// There needs to be one descriptor set per binding point in the shader
 		descriptorSet = descriptorPool.allocate(descriptorSetLayout); 
-		descriptorSet.updateWriteUniformBuffer(uniformMemoryBuffer.buffer); 
+		descriptorSet.write(0, uniformMemoryBuffer, mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))); 
+		descriptorSet.write(1, storageMemoryBuffer, mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))); 
+		//descriptorSet.updateWriteUniformBuffer(uniformMemoryBuffer.buffer); 
 	} 
 	
 	auto createCommandBuffer(
 		size_t swapchainIndex, size_t vertexCount,
 		VulkanMemoryBuffer vertexMemoryBuffer
-		/+VulkanMemoryBuffer indexMemoryBuffer+/
 	)
 	{
 		auto commandBuffer = commandPool.createBuffer; 
@@ -405,10 +443,6 @@ class VulkanWindow: Window
 							cmdBindGraphicsDescriptorSets(pipelineLayout, 0, descriptorSet); 
 							cmdBindGraphicsPipeline(graphicsPipeline); 
 							cmdBindVertexBuffers(0, vertexMemoryBuffer); 
-							/+
-								cmdBindIndexBuffer(indexMemoryBuffer, mixin(舉!((VK_INDEX_TYPE_),q{UINT32}))); 
-								cmdDrawIndexed(indexCount.to!uint, 1, 0, 0, 0); 
-							+/
 							cmdDraw(vertexCount.to!uint, 1, 0, 0); 
 						}
 					); 
@@ -440,6 +474,7 @@ class VulkanWindow: Window
 		createRenderPass(swapchain); 
 		
 		createUniformBuffer; 
+		createStorageBuffer; 
 		
 		createShaderModules; 
 		createGraphicsPipeline; //also creates descriptorsetLayout and pipelineLayout
@@ -493,9 +528,8 @@ class VulkanWindow: Window
 					internalUpdate; //this will call onUpdate()
 					
 					updateUniformData; 
-					
-					vertexMemoryBuffer 	= createAndUploadBuffer(vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
-					/+indexMemoryBuffer 	= createAndUploadBuffer(indices, mixin(幟!((VK_BUFFER_USAGE_),q{INDEX_BUFFER_BIT}))); +/
+					vertexMemoryBuffer = createAndUploadBuffer(vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
+					uploadStorageBuffer([(RGBA(45, 192, 45, 255)), (RGBA(0xFFFF00FF))]); 
 					
 					device.waitIdle; 
 					//Opt: The waitidle is terribly slow
@@ -503,7 +537,7 @@ class VulkanWindow: Window
 					commandBuffer = createCommandBuffer
 						(
 						swapchain.imageIndex, vertices.length,
-						vertexMemoryBuffer/+, indexMemoryBuffer+/
+						vertexMemoryBuffer
 					); 
 					queue.submit
 						(
@@ -518,12 +552,11 @@ class VulkanWindow: Window
 		catch(Exception e)
 		{ ERR(e.simpleMsg); }
 		
-		commandBuffer.destroy; 
-		vertexMemoryBuffer.destroy; 
-		indexMemoryBuffer.destroy; 
+		commandBuffer.free; 
+		vertexMemoryBuffer.free; 
 		//Opt: These reallocations in every frame are bad.
 		
-		//invalidate /+It means: no sleep allowed in winMain()+/; 
+		//invalidate; no need.+/; 
 	} 
 	
 } 
