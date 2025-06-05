@@ -2,6 +2,8 @@ module vulkanwin;
 
 public import het.win, het.vulkan; 
 
+import core.stdc.string : memset; 
+
 /+
 	Code: (表([
 		[q{/+Note: Limits/Cards+/},q{/+Note: MAX+/},q{/+Note: R9 Fury X+/},q{/+Note: R9 280+/},q{/+Note: GTX 1060+/},q{/+Note: RX 580+/},q{/+Note: RTX 5090+/},q{/+Note: RX 9070+/}],
@@ -45,156 +47,309 @@ class VulkanWindow: Window
 	
 	bool windowResized; 
 	
-	struct UniformData
-	{ mat4 transformationMatrix; } 
-	UniformData uniformData; 
-	VulkanMemoryBuffer uniformMemoryBuffer, hostStorageMemoryBuffer, storageMemoryBuffer; 
-	
-	struct Vertex { vec3 pos; vec3 color; } 
-	
 	VkClearValue clearColor = { color: {float32: [ 0, 0, 0, 0 ]}, }; 
 	
-	//must fill these in update
-	//Todo: these must be the already mapped VulkanMemory Staging-Buffers
-	vec3 actColor; 
-	Vertex[] vertices; 
 	
-	void reset()
-	{
-		actColor = vec3(0); 
-		vertices.clear; 
-	} 
+	/+
+		/+
+			Code: struct State
+			{
+				vec3 base; //def=0
+				vec3 scale; //def=1
+				vec3 last, act; //def=0
+			} 
+			
+			struct CoordConfig
+			{
+				bool rel; 
+				bool f32, u32, i32, u16, i16, u8, i8; 
+			} 
+			
+			enum Inst
+			{
+				cfg, //rel, dt
+				cfg_x, //rel, dt
+				cfg_y, //rel, dt
+				cfg_z, //rel, dt
+				move_abs_u8_u8
+			} 
+			
+			
+			
+			enum Primitive
+			{
+				triangles_2d_f32_constantColor
+				triangles_2d_f32_flatColor
+				triangles_2d_f32_smoothColor
+				triangleStrip_2d_f32_constantColor
+				triangleStrip_2d_f32_flatColor
+				triangleStrip_2d_f32_smoothColor
+			} 
+			
+			struct VertexInput
+			{
+				uint cmd; float x, y, z; 
+				int tile_x, tile_y; RGBA col0, col1; 
+				bounds2 clipBounds; 
+			} 
+		+/
+	+/
 	
-	
-	void tri(Args...)(in Args args)
-	{
-		void emit(in vec3 pos)
-		{ vertices ~= Vertex(pos, actColor); } 
-		
-		static foreach(i, A; Args)
-		{
-			static if(is(A==vec3)) emit(args[i]); 
-			else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
-			else static if(is(A==RGB)) actColor = args[i].from_unorm; 
-		}
-	} 
-	
-	struct State
-	{
-		vec3 base; //def=0
-		vec3 scale; //def=1
-		vec3 last, act; //def=0
-	} 
-	
-	struct CoordConfig
-	{
-		bool rel; 
-		bool f32, u32, i32, u16, i16, u8, i8; 
-	} 
-	
-	enum Inst
-	{
-		cfg, //rel, dt
-		cfg_x, //rel, dt
-		cfg_y, //rel, dt
-		cfg_z, //rel, dt
-		move_abs_u8_u8
-	} 
-	
-	
-	auto createAndUploadBuffer(T)(in T[] buff, in VK_BUFFER_USAGE_ usage)
-	{
-		//host accessible buffer
-		auto stagingBuffer = device.createMemoryBuffer
-			(buff, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
-		
-		//gpu only buffer
-		auto deviceBuffer = device.createMemoryBuffer
-			(buff.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT}))); 
-		
-		//Allocate command buffer for copy operation
-		auto copyCommandBuffer = new VulkanCommandBuffer(commandPool); 
-		
-		// Now copy data from host visible buffer to gpu only buffer
-		with(copyCommandBuffer)
-		record(
-			mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
-			{ cmdCopyBuffer(stagingBuffer, deviceBuffer); }
-		); 
-		
-		// Submit to queue
-		queue.submit(copyCommandBuffer); 
-		queue.waitIdle; //Opt: STALL
-		
-		copyCommandBuffer.destroy; 
-		stagingBuffer.destroy; 
-		
-		return deviceBuffer; 
-	} 
-	
-	void createUniformBuffer()
-	{
-		uniformMemoryBuffer = device.createMemoryBuffer
-			(uniformData.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))); 
-		updateUniformData; 
-	} 
-	float rotationAngle = 0; 
-	void updateUniformData()
-	{
-		// Rotate based on time
-		
-		//const angle = QPS.value(10*second).fract * PIf*2; 
-		
-		auto modelMatrix = mat4.identity; 
-		modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
-		modelMatrix.translate(vec3(-274, -266, 0)); 
-		
-		// Set up view
-		auto viewMatrix = mat4.lookAt(vec3(0, 0, 500), vec3(0), vec3(0, 1, 0)); 
-		
-		// Set up projection
-		auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1, 1000); 
-		
-		uniformData.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
-		
-		uniformMemoryBuffer.write(uniformData); 
+	/+
+		Note: Alignment rules:
 		
 		/+
-			Todo: Use push constants
-			/+Link: https://vkguide.dev/docs/chapter-3/push_constants+/
+			Bullet: /+Bold: minMemoryMapAlignment+/ (Fury=4096, RX580=64, RTX4080=64) s the minimum required alignment, in bytes, 
+			of host visible memory allocations within the host address space. When mapping a memory 
+			allocation with vkMapMemory, subtracting offset bytes from the returned pointer will always 
+			produce an integer multiple of this limit.
+			/+Nem erdekel, mert vele foglaltatom a cpu memoriat es az egesz buffert mappolom.+/
 		+/
-	} 
-	
-	void createStorageBuffer()
-	{
-		enum storageBufferSizeBytes = 16 << 20; 
-		hostStorageMemoryBuffer = device.createMemoryBuffer
-			(storageBufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
-		storageMemoryBuffer = device.createMemoryBuffer
-			(storageBufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{TRANSFER_DST_BIT | STORAGE_BUFFER_BIT}))); 
-	} 
-	
-	void uploadStorageBuffer(in void[] data)
-	{
-		if(data.empty) return; 
 		
-		hostStorageMemoryBuffer.write(data/+Bug: alignment!!!+/); /+Opt: Should write directly to memory buffer, not copy!+/
-		auto cb = new VulkanCommandBuffer(commandPool); 
-		with(cb)
-		record(
-			mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+		/+
+			Bullet: /+Bold: minUniformBufferOffsetAlignment+/ (Fury=4, RX580=64, RTX4080=64) is the minimum required alignment, in 
+			bytes, for the offset member of the VkDescriptorBufferInfo structure for uniform buffers. When 
+			a descriptor of type VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER or 
+			VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC is updated, the offset must be an integer 
+			multiple of this limit. Similarly, dynamic offsets for uniform buffers must be multiples of this limit.
+			/+Nem erdekel, mert a teljes buffert bekuldom.+/
+		+/
+		
+		/+
+			Bullet: /+Bold: minStorageBufferOffsetAlignment+/ (Fury=4, RX580=4, RTX4080=16) is the minimum required alignment, in bytes, 
+			for the offset member of the VkDescriptorBufferInfo structure for storage buffers. When a 
+			descriptor of type VK_DESCRIPTOR_TYPE_STORAGE_BUFFER or 
+			VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC is updated, the offset must be an integer 
+			multiple of this limit. Similarly, dynamic offsets for storage buffers must be multiples of this limit.
+			/+Nem erdekel, mert nalam is 4 a minimum align (4=GPU addressable unit).+/
+		+/
+		
+		// Flush the memory range
+		// If the memory type of stagingMemory includes VK_MEMORY_PROPERTY_HOST_COHERENT, skip this step
+		
+		// Align to the VkPhysicalDeviceProperties::nonCoherentAtomSize
+		uint32_t alignedSize = (vertexDataSize-1) - ((vertexDataSize-1) % nonCoherentAtomSize) + nonCoherentAtomSize;
+	+/
+	
+	
+	
+	
+	
+	version(/+$DIDE_REGION UB    +/all)
+	{
+		struct UniformData
+		{ mat4 transformationMatrix; } 
+		
+		UniformBufferManager UB; 
+		
+		class UniformBufferManager
+		{
+			protected UniformData* uniformDataPtr; 
+			protected VulkanMemoryBuffer uniformMemoryBuffer; 
+			
+			ref access() => *uniformDataPtr; 
+			
+			
+			this()
 			{
-				cmdCopyBuffer(
-					hostStorageMemoryBuffer, storageMemoryBuffer, 
-					VkBufferCopy(0, 0, data.sizeBytes/+Bug: alignment!!!+/)
+				//uniformDataPtr = (cast(UniformData*)(virtualAlloc(UniformData.sizeof))); 
+				uniformMemoryBuffer = device.createMemoryBuffer
+					(
+					UniformData.sizeof/+Bug: alignment!!!+/, 
+					mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))
 				); 
-			}
-		); 
-		queue.submit(cb); 
-		queue.waitIdle; //Opt: STALL
+				uniformDataPtr = (cast(UniformData*)(uniformMemoryBuffer.map)); 
+			} 
+			
+			~this()
+			{
+				uniformMemoryBuffer.free; 
+				virtualFree(uniformDataPtr); 
+			} 
+		} 
+	}
+	
+	version(/+$DIDE_REGION VB    +/all)
+	{
+		struct VertexData { vec3 pos; vec3 color; } 
 		
-		cb.destroy; 
+		VertexBufferManager VB; 
+		
+		class VertexBufferManager
+		{
+			vec3 actColor; 
+			VertexData[] vertices; 
+			
+			void reset()
+			{
+				actColor = vec3(0); 
+				vertices.clear; 
+			} 
+			
+			
+			void tri(Args...)(in Args args)
+			{
+				void emit(in vec3 pos)
+				{ vertices ~= VertexData(pos, actColor); } 
+				
+				static foreach(i, A; Args)
+				{
+					static if(is(A==vec3)) emit(args[i]); 
+					else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
+					else static if(is(A==RGB)) actColor = args[i].from_unorm; 
+				}
+			} 
+			
+			
+			auto createAndUploadBuffer(T)(in T[] buff, in VK_BUFFER_USAGE_ usage)
+			{
+				//host accessible buffer
+				auto stagingBuffer = device.createMemoryBuffer
+					(buff, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
+				
+				//gpu only buffer
+				auto deviceBuffer = device.createMemoryBuffer
+					(buff.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT}))); 
+				
+				//Allocate command buffer for copy operation
+				auto copyCommandBuffer = new VulkanCommandBuffer(commandPool); 
+				
+				// Now copy data from host visible buffer to gpu only buffer
+				with(copyCommandBuffer)
+				record(
+					mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+					{ cmdCopyBuffer(stagingBuffer, deviceBuffer); }
+				); 
+				
+				// Submit to queue
+				queue.submit(copyCommandBuffer); 
+				queue.waitIdle; //Opt: STALL
+				
+				copyCommandBuffer.destroy; 
+				stagingBuffer.destroy; 
+				
+				return deviceBuffer; 
+			} 
+		} 
+	}
+	
+	class StagingStorageBuffer
+	{
+		VulkanMemoryBuffer hostMemoryBuffer, deviceMemoryBuffer; 
+		size_t initialSizeBytes, maxSizeBytes, bufferSizeBytes; 
+		void* hostPtr; 
+		
+		this(size_t initialSizeBytes, size_t maxSizeBytes)
+		{
+			this.initialSizeBytes = initialSizeBytes, this.maxSizeBytes = maxSizeBytes; 
+			
+			bufferSizeBytes = initialSizeBytes; 
+			hostMemoryBuffer = device.createMemoryBuffer
+				(bufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
+			deviceMemoryBuffer = device.createMemoryBuffer
+				(
+				bufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
+					TRANSFER_SRC_BIT | TRANSFER_DST_BIT | 
+					STORAGE_BUFFER_BIT
+				}))
+			); 
+			hostPtr = hostMemoryBuffer.map; 
+		} 
+		
+		~this()
+		{
+			hostMemoryBuffer.free; 
+			deviceMemoryBuffer.free; 
+		} 
+		
+		/+
+			Measurements: 
+				CPU memset: 10 GB/s
+					{ import core.stdc.string; memset(hostStorageMemoryBuffer.map 0xAA, storageBufferSizeBytes); }
+				CPU <-> GPU transfer: 5.8 GB/sec
+		+/
+		
+		void upload(in void[] data)
+		{
+			if(data.empty) return; 
+			
+			hostMemoryBuffer.write(data/+Bug: alignment!!!+/); 
+			/+Opt: Should write directly to memory buffer, not copy!+/
+			
+			auto cb = new VulkanCommandBuffer(commandPool); 
+			with(cb)
+			record(
+				mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+				{
+					cmdCopyBuffer(
+						hostMemoryBuffer, deviceMemoryBuffer,
+						VkBufferCopy(0, 0, bufferSizeBytes/+data.sizeBytes+//+Bug: alignment!!!+/)
+					); 
+				}
+			); 
+			queue.submit(cb); 
+			queue.waitIdle; //Opt: STALL
+			cb.destroy; 
+		} 
 	} 
+	
+	version(/+$DIDE_REGION IB     +/all)
+	{
+		enum TexFormat
+		{
+			l8,
+			la8,
+			rgb8,
+			rgba8,
+			bgr8,
+			bgra8,
+		} 
+		
+		struct TexInfo
+		{ uint addr, type, width, height; } 
+		
+		InfoBufferManager IB; 
+		class InfoBufferManager : StagingStorageBuffer
+		{
+			this()
+			{
+				super(
+					16 << 10, 
+					16 << 20
+				); 
+				
+				upload([TexInfo.init].replicate(bufferSizeBytes/TexInfo.sizeof)); 
+			} 
+			
+			~this()
+			{} 
+		} 
+	}
+	
+	version(/+$DIDE_REGION SB     +/all)
+	{
+		StorageBufferManager SB; 
+		class StorageBufferManager : StagingStorageBuffer
+		{
+			this()
+			{
+				super(
+					initialSizeBytes 	=  64 << 10,
+					maxSizeBytes 	= 512 << 20
+				); 
+			} 
+			
+			~this()
+			{} 
+			
+			/+
+				Measurements: 
+					CPU memset: 10 GB/s
+						{ import core.stdc.string; memset(hostStorageMemoryBuffer.map 0xAA, storageBufferSizeBytes); }
+					CPU <-> GPU transfer: 5.8 GB/sec
+			+/
+		} 
+	}
 	
 	void createShaderModules()
 	{
@@ -281,6 +436,42 @@ class VulkanWindow: Window
 		renderPass.createFramebuffers(swapchain); 
 	} 
 	
+	void createDescriptorPool()
+	{
+		/+
+			 This describes how many descriptor sets we'll 
+			create from this pool for each type
+		+/
+		descriptorPool = device.createDescriptorPool
+			(
+			[
+				mixin(體!((VkDescriptorPoolSize),q{
+					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+					descriptorCount : 1
+				})), 
+				mixin(體!((VkDescriptorPoolSize),q{
+					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
+					descriptorCount : 1
+				}))
+			],1 /+maxSets+/
+		); 
+	}  void createDescriptorSet()
+	{
+		/+
+			 There needs to be one descriptor set per 
+			binding point in the shader
+		+/
+		descriptorSet = descriptorPool.allocate(descriptorSetLayout); 
+		descriptorSet.write(
+			0, UB.uniformMemoryBuffer, 
+				mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))
+		); 
+		descriptorSet.write(
+			1, SB.deviceMemoryBuffer, 
+				mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))
+		); 
+	} 
+	
 	void createGraphicsPipeline()
 	{
 		//Link: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
@@ -310,7 +501,7 @@ class VulkanWindow: Window
 			(
 				mixin(體!((VkVertexInputBindingDescription),q{
 					binding	: 0, 
-					stride	: Vertex.sizeof,
+					stride	: VertexData.sizeof,
 					inputRate 	: mixin(舉!((VK_VERTEX_INPUT_RATE_),q{VERTEX})),
 				})), [
 					mixin(體!((VkVertexInputAttributeDescription),q{
@@ -370,32 +561,6 @@ class VulkanWindow: Window
 		); 
 	} 
 	
-	void createDescriptorPool()
-	{
-		// This describes how many descriptor sets we'll create from this pool for each type
-		descriptorPool = device.createDescriptorPool
-			(
-			[
-				mixin(體!((VkDescriptorPoolSize),q{
-					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
-					descriptorCount : 1
-				})), mixin(體!((VkDescriptorPoolSize),q{
-					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
-					descriptorCount : 1
-				}))
-			], 1 /+maxSets+/
-		); 
-	} 
-	
-	void createDescriptorSet()
-	{
-		// There needs to be one descriptor set per binding point in the shader
-		descriptorSet = descriptorPool.allocate(descriptorSetLayout); 
-		descriptorSet.write(0, uniformMemoryBuffer, mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))); 
-		descriptorSet.write(1, storageMemoryBuffer, mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))); 
-		//descriptorSet.updateWriteUniformBuffer(uniformMemoryBuffer.buffer); 
-	} 
-	
 	auto createCommandBuffer(
 		size_t swapchainIndex, size_t vertexCount,
 		VulkanMemoryBuffer vertexMemoryBuffer
@@ -456,7 +621,7 @@ class VulkanWindow: Window
 		+/
 	} 
 	
-	
+	
 	override void onInitializeGLWindow()
 	{
 		disableInternalRedraw = true /+Do nothing on WM_PAINT+/; 
@@ -470,11 +635,12 @@ class VulkanWindow: Window
 		commandPool	= queue.createCommandPool,
 		imageAvailableSemaphore	= new VulkanSemaphore(device),
 		renderingFinishedSemaphore 	= new VulkanSemaphore(device); 
-		swapchain 	= new VulkanSwapchain(device, surface, clientSize); 
+		swapchain = new VulkanSwapchain(device, surface, clientSize); 
 		createRenderPass(swapchain); 
 		
-		createUniformBuffer; 
-		createStorageBuffer; 
+		UB = new UniformBufferManager; 
+		VB = new VertexBufferManager; 
+		SB = new StorageBufferManager; 
 		
 		createShaderModules; 
 		createGraphicsPipeline; //also creates descriptorsetLayout and pipelineLayout
@@ -483,24 +649,27 @@ class VulkanWindow: Window
 		createDescriptorSet; //needs: descriptorsetLayout, uniformBuffer
 		
 		if(0) VulkanInstance.dumpBasicStuff; 
-		//print("\nGreat Success!"); 
 	} 
 	
 	override void onFinalizeGLWindow()
 	{
 		device.waitIdle; 
-		vk.destroy; 
-	}  
+		SB.free; VB.free; UB.free; 
+		vk.free; 
+	} 
 	
 	void onWindowSizeChanged() 
 	{
-		// Only recreate objects that are affected by framebuffer size changes
+		/+
+			Only recreate objects that are affected 
+				by framebuffer size changes
+		+/
 		device.waitIdle; 
-		graphicsPipeline.destroy; 
-		pipelineLayout.destroy; 
-		descriptorSetLayout.destroy; 
-		renderPass.destroy; 
 		
+		graphicsPipeline.free; 
+		pipelineLayout.free; 
+		descriptorSetLayout.free; 
+		renderPass.free; 
 		swapchain.recreate(clientSize); 
 		createRenderPass(swapchain); 
 		createGraphicsPipeline; 
@@ -523,20 +692,35 @@ class VulkanWindow: Window
 				(
 				queue, imageAvailableSemaphore, renderingFinishedSemaphore, 
 				{
-					reset; 
+					VB.reset; 
 					
 					internalUpdate; //this will call onUpdate()
 					
-					updateUniformData; 
-					vertexMemoryBuffer = createAndUploadBuffer(vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
-					uploadStorageBuffer([(RGBA(45, 192, 45, 255)), (RGBA(0xFFFF00FF))]); 
 					
-					device.waitIdle; 
-					//Opt: The waitidle is terribly slow
+					{
+						auto modelMatrix = mat4.identity; 
+						const rotationAngle = QPS.value(10*second); 
+						modelMatrix.translate(vec3(-274, -266, 0)); 
+						modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
+						
+						// Set up view
+						auto viewMatrix = mat4.lookAt(vec3(0, 0, 500), vec3(0), vec3(0, 1, 0)); 
+						
+						// Set up projection
+						auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1, 1000); 
+						
+						UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
+					}
+					
+					UB.uniformMemoryBuffer.flush; 
+					
+					SB.upload([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
+					vertexMemoryBuffer = VB.createAndUploadBuffer(VB.vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
+					device.waitIdle; //Opt: STALL
 					
 					commandBuffer = createCommandBuffer
 						(
-						swapchain.imageIndex, vertices.length,
+						swapchain.imageIndex, VB.vertices.length,
 						vertexMemoryBuffer
 					); 
 					queue.submit

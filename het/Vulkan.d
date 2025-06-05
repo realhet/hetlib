@@ -5614,6 +5614,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				protected UB* ubufPtr; 	/+Note: Uniform buffer+/
 				ref ubuf() { return *ubufPtr; } 
+				/+Todo: do this with virtualAlloc+/
+				/+Todo: Nem is kell alloc! csak uniformBuffer.map()!!! Meg Flush!+/
 			}
 			else
 			{ UB ubuf; }
@@ -5858,9 +5860,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x331DE4F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332444F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x332A74F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x332504F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332B64F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x333194F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

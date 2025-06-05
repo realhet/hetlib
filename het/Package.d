@@ -1258,6 +1258,23 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 		} 
 	}
+	
+	
+	
+	void* virtualAlloc(size_t size)
+	{
+		if(!size) return null; 
+		import core.sys.windows.windows; 
+		auto ptr = VirtualAlloc(null, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE)
+			.enforce("VirtualAlloc failed"); 
+		return ptr; 
+	} 
+	
+	void virtualFree(T)(ref T* ptr) 
+	{
+		import core.sys.windows.windows; 
+		if(ptr) { VirtualFree(cast(void*)ptr, 0, MEM_RELEASE); ptr = null; }
+	} 
 }version(/+$DIDE_REGION Error hnd.+/all)
 {
 	version(/+$DIDE_REGION+/all) {
@@ -15652,16 +15669,16 @@ version(/+$DIDE_REGION debug+/all)
 		} 
 		
 		@property countUsed()
-		=> usedBlocks.length; 	@property sizeUsed() => (mixin(求sum(q{b},q{usedBlocks.byValue},q{b.sizeBytes}))); 
+		=> usedBlocks.length; 	@property sizeUsed() => mixin(求sum(q{b},q{usedBlocks.byValue},q{b.sizeBytes})); 
 		@property countFree()
-		=> freeBlocksByPos[].walkLength; 	@property sizeFree() => (mixin(求sum(q{b},q{freeBlocksByPos[]},q{b.sizeBytes}))); 
+		=> freeBlocksByPos[].walkLength; 	@property sizeFree() => mixin(求sum(q{b},q{freeBlocksByPos[]},q{b.sizeBytes})); 
 		@property stats() {
 			return i"    	Count	Size
 	Used:	$(countUsed)	$(sizeUsed)
 	Free:	$(countFree)	$(sizeFree)
 	Total:	$(countUsed+
-	countFree)	$(sizeUsed+
-	sizeFree)".text; 
+countFree)	$(sizeUsed+
+sizeFree)".text; 
 		} 
 		
 		static void test()
