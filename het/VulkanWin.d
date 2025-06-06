@@ -149,6 +149,11 @@ class VulkanWindow: Window
 			
 			ref access() => *uniformDataPtr; 
 			
+			void flush()
+			{
+				uniformMemoryBuffer.flush; //only is not coherent!
+			} 
+			
 			
 			this()
 			{
@@ -156,7 +161,7 @@ class VulkanWindow: Window
 				uniformMemoryBuffer = device.createMemoryBuffer
 					(
 					UniformData.sizeof/+Bug: alignment!!!+/, 
-					mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))
+					mixin(幟!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT | HOST_COHERENT_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{UNIFORM_BUFFER_BIT}))
 				); 
 				uniformDataPtr = (cast(UniformData*)(uniformMemoryBuffer.map)); 
 			} 
@@ -205,11 +210,11 @@ class VulkanWindow: Window
 			{
 				//host accessible buffer
 				auto stagingBuffer = device.createMemoryBuffer
-					(buff, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
+					(buff, mixin(幟!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT | HOST_COHERENT_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
 				
 				//gpu only buffer
 				auto deviceBuffer = device.createMemoryBuffer
-					(buff.sizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT}))); 
+					(buff.sizeBytes, 	mixin(幟!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT}))); 
 				
 				//Allocate command buffer for copy operation
 				auto copyCommandBuffer = new VulkanCommandBuffer(commandPool); 
@@ -236,24 +241,17 @@ class VulkanWindow: Window
 	class StagingStorageBuffer
 	{
 		VulkanMemoryBuffer hostMemoryBuffer, deviceMemoryBuffer; 
-		size_t initialSizeBytes, maxSizeBytes, bufferSizeBytes; 
+		size_t minSizeBytes, maxSizeBytes, bufferSizeBytes; 
 		void* hostPtr; 
 		
-		this(size_t initialSizeBytes, size_t maxSizeBytes)
+		enum granularity = 4<<10; 
+		
+		this(size_t minSizeBytes, size_t maxSizeBytes)
 		{
-			this.initialSizeBytes = initialSizeBytes, this.maxSizeBytes = maxSizeBytes; 
+			this.minSizeBytes = minSizeBytes.alignUp(granularity).max(granularity), 
+			this.maxSizeBytes = maxSizeBytes.alignUp(granularity).max(minSizeBytes); 
 			
-			bufferSizeBytes = initialSizeBytes; 
-			hostMemoryBuffer = device.createMemoryBuffer
-				(bufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
-			deviceMemoryBuffer = device.createMemoryBuffer
-				(
-				bufferSizeBytes, mixin(舉!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
-					TRANSFER_SRC_BIT | TRANSFER_DST_BIT | 
-					STORAGE_BUFFER_BIT
-				}))
-			); 
-			hostPtr = hostMemoryBuffer.map; 
+			resize(minSizeBytes, keepContents : true); 
 		} 
 		
 		~this()
@@ -262,12 +260,91 @@ class VulkanWindow: Window
 			deviceMemoryBuffer.free; 
 		} 
 		
-		/+
-			Measurements: 
-				CPU memset: 10 GB/s
-					{ import core.stdc.string; memset(hostStorageMemoryBuffer.map 0xAA, storageBufferSizeBytes); }
-				CPU <-> GPU transfer: 5.8 GB/sec
-		+/
+		bool grow(float rate, bool keepContents)
+		{
+			const newSize = (lround(bufferSizeBytes*rate)); 
+			return resize(((rate>=1)?(newSize.alignUp  (granularity)) :(newSize.alignDown(granularity))), keepContents); 
+		} 
+		
+		bool resize(size_t newBufferSizeBytes, bool keepContents)
+		{
+			T0; 
+			
+			newBufferSizeBytes = newBufferSizeBytes.alignUp(granularity).clamp(minSizeBytes, maxSizeBytes); 
+			if(newBufferSizeBytes==bufferSizeBytes) return false; 
+			
+			VulkanMemoryBuffer newHostMemoryBuffer, newDeviceMemoryBuffer; void* newHostPtr; 
+			try
+			{
+				newHostMemoryBuffer = device.createMemoryBuffer
+					(
+					newBufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{
+						HOST_VISIBLE_BIT | 
+						HOST_COHERENT_BIT
+					})), mixin(幟!((VK_BUFFER_USAGE_),q{
+						TRANSFER_SRC_BIT | 
+						TRANSFER_DST_BIT
+					}))
+				); 
+				newDeviceMemoryBuffer = device.createMemoryBuffer
+					(
+					newBufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
+						TRANSFER_SRC_BIT | 
+						TRANSFER_DST_BIT | 
+						STORAGE_BUFFER_BIT
+					}))
+				); 
+				newHostPtr = newHostMemoryBuffer.map; 
+			}
+			catch(Exception e)
+			{
+				newHostMemoryBuffer.free; newDeviceMemoryBuffer.free; 
+				WARN(e.simpleMsg); return false; 
+			}
+			
+			if(keepContents)
+			{
+				const copySizeBytes = min(bufferSizeBytes, newBufferSizeBytes); 
+				if(copySizeBytes>0)
+				{
+					auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
+					cb.record(
+						mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
+						{
+							cb.cmdCopyBuffer(
+								hostMemoryBuffer, newHostMemoryBuffer, 
+								copySizeBytes
+							); 
+							cb.cmdCopyBuffer(
+								deviceMemoryBuffer, newDeviceMemoryBuffer, 
+								copySizeBytes
+							); 
+						}
+					); 
+					queue.submit(cb); 
+					queue.waitIdle; /+Opt: STALL+/
+				}
+			}
+			
+			print(
+				"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
+				bufferSizeBytes, "-\33\12>", newBufferSizeBytes, "\33\7"
+			); 
+			
+			auto 	oldHostMemoryBuffer 	= hostMemoryBuffer,
+				oldDeviceMemoryBuffer 	= deviceMemoryBuffer; 
+			
+			hostMemoryBuffer 	= newHostMemoryBuffer,
+			deviceMemoryBuffer 	= newDeviceMemoryBuffer,
+			hostPtr	= newHostPtr,
+			bufferSizeBytes	= newBufferSizeBytes; 
+			
+			oldHostMemoryBuffer.free; 
+			oldDeviceMemoryBuffer.free; 
+			
+			return true; 
+		} 
+		
 		
 		void upload(in void[] data)
 		{
@@ -276,6 +353,7 @@ class VulkanWindow: Window
 			hostMemoryBuffer.write(data/+Bug: alignment!!!+/); 
 			/+Opt: Should write directly to memory buffer, not copy!+/
 			
+			hostMemoryBuffer.flush; 
 			auto cb = new VulkanCommandBuffer(commandPool); 
 			with(cb)
 			record(
@@ -283,12 +361,12 @@ class VulkanWindow: Window
 				{
 					cmdCopyBuffer(
 						hostMemoryBuffer, deviceMemoryBuffer,
-						VkBufferCopy(0, 0, bufferSizeBytes/+data.sizeBytes+//+Bug: alignment!!!+/)
+						VkBufferCopy(0, 0, data.sizeBytes/+Bug: alignment!!!+/)
 					); 
 				}
 			); 
 			queue.submit(cb); 
-			queue.waitIdle; //Opt: STALL
+			auto _間=init間; queue.waitIdle; ((0x2A6782886ADB).檢((update間(_間)))); //Opt: STALL
 			cb.destroy; 
 		} 
 	} 
@@ -333,9 +411,16 @@ class VulkanWindow: Window
 		{
 			this()
 			{
+				/+
+					super(
+						initialSizeBytes 	:  64 << 10,
+						maxSizeBytes 	: 512 << 20
+					); 
+				+/
+				
 				super(
-					initialSizeBytes 	=  64 << 10,
-					maxSizeBytes 	= 512 << 20
+					minSizeBytes 	: 4 << 10,
+					maxSizeBytes	: 15689 << 20
 				); 
 			} 
 			
@@ -712,11 +797,20 @@ class VulkanWindow: Window
 						UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
 					}
 					
-					UB.uniformMemoryBuffer.flush; 
-					
 					SB.upload([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
 					vertexMemoryBuffer = VB.createAndUploadBuffer(VB.vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
 					device.waitIdle; //Opt: STALL
+					
+					if(SB.grow(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
+					{
+						{
+							auto _間=init間; 
+							descriptorSet.free; 
+							descriptorPool.free; ((0x5E4F82886ADB).檢((update間(_間)))); 
+							createDescriptorPool; 
+							createDescriptorSet; ((0x5EB782886ADB).檢((update間(_間)))); 
+						}
+					}; 
 					
 					commandBuffer = createCommandBuffer
 						(

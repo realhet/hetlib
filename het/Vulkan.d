@@ -4808,12 +4808,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{ device.vkCmdCopyBuffer(handle, srcBuffer, dstBuffer, 1, &region); } 
 			
 			void cmdCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size_)
-			{ cmdCopyBuffer(srcBuffer, dstBuffer, (mixin(體!((VkBufferCopy),q{size : size_})))); } 
+			{ cmdCopyBuffer(srcBuffer, dstBuffer, mixin(體!((VkBufferCopy),q{size : size_}))); } 
 			
 			void cmdCopyBuffer(VulkanMemoryBuffer src, VulkanMemoryBuffer dst)
 			{
 				enforce(src.size==dst.size, "VukanMemoryBuffer size mismatch."); 
-				cmdCopyBuffer(src.buffer, dst.buffer, (mixin(體!((VkBufferCopy),q{size : src.size })))); 
+				cmdCopyBuffer(src.buffer, dst.buffer, mixin(體!((VkBufferCopy),q{size : src.size }))); 
 			} 
 			
 			void cmdEnd()
@@ -5860,9 +5860,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x332504F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332B64F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x333194F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x3324C4F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332B24F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x333154F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
