@@ -82,7 +82,11 @@ class AiChat
 			"Content-Type"	: "application/json",
 			"Authorization"	: "Bearer "~tea_dec(chat.apiKey, "apiKey")
 		],
-			msg 	= chat.query.toJson(true); 
+			msg 	= chat.query.toJson(true).replace(`\v`, `\u000B`)
+				/+
+			Todo: toJson should generate proper JSON string literals. Currently 
+			C literals are used for simplicity.
+		+/; 
 		string[string] responseHeader; 
 		
 		//prepare curl

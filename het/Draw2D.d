@@ -3744,55 +3744,7 @@ class Drawing
 		flat in float boldTexelOffset; 
 		flat in int fontFlags; 
 		
-		flat in vec2 fClipMin, fClipMax; /+
-			AI: /+
-				User: /+
-					Code: flat in vec4 fColor; 
-					in vec2 fStipple; //type, phase
-					
-					//glyph only
-					in vec2 fTexCoord; 
-					flat in vec4 fColor2; //
-					
-					//subTexture
-					flat in ivec2 stPos, stSize; 
-					flat in int stConfig, stIdx; 
-					
-					flat in vec2 texelPerPixel; 
-					flat in float boldTexelOffset; 
-					flat in int fontFlags; 
-					
-					flat in vec2 fClipMin, fClipMax; 
-				+/
-				Count all the flat and varying components! (vec2 count as 2 components.)
-			+/
-			/+
-				Assistant: Let me count the components for you:
-				
-				/+Bold: Flat inputs:+/
-				1. /+Highlighted: fColor+/ - vec4 (4 components)
-				2. /+Highlighted: fColor2+/ - vec4 (4 components)
-				3. /+Highlighted: stPos+/ - ivec2 (2 components)
-				4. /+Highlighted: stSize+/ - ivec2 (2 components)
-				5. /+Highlighted: stConfig+/ - int (1 component)
-				6. /+Highlighted: stIdx+/ - int (1 component)
-				7. /+Highlighted: texelPerPixel+/ - vec2 (2 components)
-				8. /+Highlighted: boldTexelOffset+/ - float (1 component)
-				9. /+Highlighted: fontFlags+/ - int (1 component)
-				10. /+Highlighted: fClipMin+/ - vec2 (2 components)
-				11. /+Highlighted: fClipMax+/ - vec2 (2 components)
-				
-				/+Bold: Varying inputs:+/
-				1. /+Highlighted: fStipple+/ - vec2 (2 components)
-				2. /+Highlighted: fTexCoord+/ - vec2 (2 components)
-				
-				/+Bold: Total counts:+/
-					/+Bullet: Flat components: 4 + 4 + 2 + 2 + 1 + 1 + 2 + 1 + 1 + 2 + 2 = /+Bold: 22 components+/+/
-					/+Bullet: Varying components: 2 + 2 = /+Bold: 4 components+/+/
-				
-				/+Note: Usage(prompt_hit: 256, prompt_miss: 308, completion: 258, HUF: 0.12, price: 100%)+/
-			+/
-		+/
+		flat in vec2 fClipMin, fClipMax; 
 		
 		out vec4 FragColor; //NV compatibility: gl_FragColor is deprecated
 		
