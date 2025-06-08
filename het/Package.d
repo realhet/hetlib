@@ -15592,9 +15592,42 @@ version(/+$DIDE_REGION debug+/all)
 			
 			addFreeBlock(Block(0, memory.length.to!uint)); //the very first block
 		} 
-		
+		
+		void growPool(void* p, size_t size)
+		{
+			enforce(p, "Null pointer provided"); 
+			enforce(size, "Zero size provided"); 
+			
+			auto newMemory = (cast(Chunk[])((cast(ubyte*)(p))[0..size])); 
+			const 	newLength 	= newMemory.length, 
+				oldLength 	= memory.length; 
+			
+			enforce(
+				newLength >= oldLength, 
+				"Shrinking memory pool not supported."
+			); 
+			
+			
+			memory = newMemory; //Set the new pool.
+			
+			/+
+				Add an extra used block at the end and free it up 
+				to joint with the rest of the pool.
+			+/
+			if(newLength > oldLength)
+			{
+				const extraBlock = Block(
+					(cast(uint)(oldLength)),
+					(cast(uint)(newLength))
+				); 
+				addUsedBlock(extraBlock); 
+				const success = this.free(&memory[extraBlock.st]); 
+				assert(success); 
+			}
+		} 
 		void* alloc(size_t requiredBytes)
 		{
+			/+0 length allocation is valid. It still gives a unique pointer.+/
 			const requiredChunksL = ((max(requiredBytes, 1) + Chunk.sizeof - 1)/(Chunk.sizeof)); 
 			if(requiredChunksL>uint.max) return null; //way too big
 			const requiredChunks = (cast(uint)(requiredChunksL)); 

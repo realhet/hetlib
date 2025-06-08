@@ -45,6 +45,8 @@ class VulkanWindow: Window
 	
 	VulkanGraphicsShaderModules shaderModules; 
 	
+	Object[] buffers; 
+	
 	bool windowResized; 
 	
 	VkClearValue clearColor = { color: {float32: [ 0, 0, 0, 0 ]}, }; 
@@ -182,20 +184,44 @@ class VulkanWindow: Window
 		
 		class VertexBufferManager
 		{
+			protected VulkanStagedBuffer buffer; 
+			uint uploadedVertexCount; 
+			
+			this()
+			{
+				buffer = new VulkanStagedBuffer
+					(
+					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})),
+					minSizeBytes 	: 4 << 10, 
+					maxSizeBytes 	: 1 << 30/+Todo: do it in multiple parts when max was reached+/
+				); 
+			} 
+			
+			~this()
+			{ buffer.free; } 
+			
 			vec3 actColor; 
-			VertexData[] vertices; 
 			
 			void reset()
 			{
+				buffer.reset; 
+				
 				actColor = vec3(0); 
-				vertices.clear; 
 			} 
+			
+			void upload()
+			{
+				buffer.upload_appender; 
+				uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
+			} 
+			
+			auto deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
 			
 			
 			void tri(Args...)(in Args args)
 			{
 				void emit(in vec3 pos)
-				{ vertices ~= VertexData(pos, actColor); } 
+				{ buffer.append(VertexData(pos, actColor)); } 
 				
 				static foreach(i, A; Args)
 				{
@@ -203,37 +229,6 @@ class VulkanWindow: Window
 					else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
 					else static if(is(A==RGB)) actColor = args[i].from_unorm; 
 				}
-			} 
-			
-			
-			auto createAndUploadBuffer(T)(in T[] buff, in VK_BUFFER_USAGE_ usage)
-			{
-				//host accessible buffer
-				auto stagingBuffer = device.createMemoryBuffer
-					(buff, mixin(幟!((VK_MEMORY_PROPERTY_),q{HOST_VISIBLE_BIT | HOST_COHERENT_BIT})), mixin(舉!((VK_BUFFER_USAGE_),q{TRANSFER_SRC_BIT}))); 
-				
-				//gpu only buffer
-				auto deviceBuffer = device.createMemoryBuffer
-					(buff.sizeBytes, 	mixin(幟!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{usage | TRANSFER_DST_BIT}))); 
-				
-				//Allocate command buffer for copy operation
-				auto copyCommandBuffer = new VulkanCommandBuffer(commandPool); 
-				
-				// Now copy data from host visible buffer to gpu only buffer
-				with(copyCommandBuffer)
-				record(
-					mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
-					{ cmdCopyBuffer(stagingBuffer, deviceBuffer); }
-				); 
-				
-				// Submit to queue
-				queue.submit(copyCommandBuffer); 
-				queue.waitIdle; //Opt: STALL
-				
-				copyCommandBuffer.destroy; 
-				stagingBuffer.destroy; 
-				
-				return deviceBuffer; 
 			} 
 		} 
 	}
@@ -267,7 +262,7 @@ class VulkanWindow: Window
 					maxSizeBytes 	: 16 << 20
 				); 
 				
-				buffer.upload([TexInfo.init].replicate(buffer.bufferSizeBytes/TexInfo.sizeof)); 
+				/+buffer.upload_deprecated([TexInfo.init].replicate(buffer.bufferSizeBytes/TexInfo.sizeof)); +/
 			} 
 			
 			~this()
@@ -275,7 +270,7 @@ class VulkanWindow: Window
 		} 
 	}
 	
-	version(/+$DIDE_REGION SB     +/all)
+	version(/+$DIDE_REGION TB     +/all)
 	{
 		TextureBufferManager TB; 
 		class TextureBufferManager
@@ -287,8 +282,8 @@ class VulkanWindow: Window
 				buffer = new VulkanStagedBuffer
 					(
 					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})),
-					minSizeBytes 	:     4 << 10,
-					maxSizeBytes 	: 15689 << 20
+					minSizeBytes 	:   4 << 10,
+					maxSizeBytes 	: 512 << 20
 				); 
 			} 
 			
@@ -506,6 +501,9 @@ class VulkanWindow: Window
 			pipelineLayout, renderPass, 0, null, -1
 		); 
 	} 
+	
+	void recreateDescriptors()
+	{ descriptorSet.free; descriptorPool.free; createDescriptorPool; createDescriptorSet; /+0.03 ms+/} 
 	
 	auto createCommandBuffer(
 		size_t swapchainIndex, size_t vertexCount,
@@ -584,9 +582,12 @@ class VulkanWindow: Window
 		swapchain = new VulkanSwapchain(device, surface, clientSize); 
 		createRenderPass(swapchain); 
 		
-		UB = new UniformBufferManager; 
-		VB = new VertexBufferManager; 
-		TB = new TextureBufferManager; 
+		buffers = 
+		[
+			UB 	= new UniformBufferManager,
+			VB 	= new VertexBufferManager,
+			TB 	= new TextureBufferManager
+		]; 
 		
 		createShaderModules; 
 		createGraphicsPipeline; //also creates descriptorsetLayout and pipelineLayout
@@ -600,7 +601,7 @@ class VulkanWindow: Window
 	override void onFinalizeGLWindow()
 	{
 		device.waitIdle; 
-		TB.free; VB.free; UB.free; 
+		buffers.each!free; buffers = []; 
 		vk.free; 
 	} 
 	
@@ -642,6 +643,7 @@ class VulkanWindow: Window
 					
 					internalUpdate; //this will call onUpdate()
 					
+					VB.upload; 
 					
 					{
 						auto modelMatrix = mat4.identity; 
@@ -658,25 +660,21 @@ class VulkanWindow: Window
 						UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
 					}
 					
-					TB.buffer.upload([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
-					vertexMemoryBuffer = VB.createAndUploadBuffer(VB.vertices, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT}))); 
-					device.waitIdle; //Opt: STALL
+					TB.buffer.reset; 
+					TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
 					
 					if(TB.buffer.grow(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
-					{
-						{
-							auto _間=init間; 
-							descriptorSet.free; 
-							descriptorPool.free; ((0x4FEF82886ADB).檢((update間(_間)))); 
-							createDescriptorPool; 
-							createDescriptorSet; ((0x505782886ADB).檢((update間(_間)))); 
-						}
-					}; 
+					{}; 
 					
-					commandBuffer = createCommandBuffer
-						(
-						swapchain.imageIndex, VB.vertices.length,
-						vertexMemoryBuffer
+					TB.buffer.upload_appender; 
+					
+					//because buffers could grow, descriptors can change.
+					recreateDescriptors; 
+					
+					device.waitIdle/+Wait for everything+/; /+Opt: STALL+/
+					commandBuffer = createCommandBuffer	(
+						swapchain.imageIndex, 
+						VB.uploadedVertexCount, VB.deviceMemoryBuffer
 					); 
 					queue.submit
 						(

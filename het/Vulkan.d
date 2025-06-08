@@ -5886,7 +5886,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				size_t	maxSizeBytes
 			}; 
 			
-			enum granularity = 4<<10; 
+			enum poolGranularity 	= 0x1000,
+			uploadGranularity 	= 0x100,
+			heapGranularity	= 0x10; 
 			
 			VulkanMemoryBuffer hostMemoryBuffer, deviceMemoryBuffer; 
 			size_t bufferSizeBytes; 
@@ -5894,8 +5896,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			void _construct()
 			{
-				this.minSizeBytes = minSizeBytes.alignUp(granularity).max(granularity), 
-				this.maxSizeBytes = maxSizeBytes.alignUp(granularity).max(minSizeBytes); 
+				this.minSizeBytes = minSizeBytes.alignUp(poolGranularity).max(poolGranularity), 
+				this.maxSizeBytes = maxSizeBytes.alignUp(poolGranularity).max(minSizeBytes); 
 				
 				resize(minSizeBytes, keepContents : true); 
 			} 
@@ -5909,19 +5911,31 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			bool grow(float rate, bool keepContents)
 			{
 				const newSize = (lround(bufferSizeBytes*rate)); 
-				return resize(((rate>=1)?(newSize.alignUp  (granularity)) :(newSize.alignDown(granularity))), keepContents); 
+				return resize(((rate>=1)?(newSize.alignUp  (poolGranularity)) :(newSize.alignDown(poolGranularity))), keepContents); 
 			} 
 			
 			bool resize(size_t newBufferSizeBytes, bool keepContents)
 			{
 				T0; 
 				
-				newBufferSizeBytes = newBufferSizeBytes.alignUp(granularity).clamp(minSizeBytes, maxSizeBytes); 
-				if(newBufferSizeBytes==bufferSizeBytes) return false; 
+				newBufferSizeBytes = newBufferSizeBytes.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
+				if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
+				
+				if(allocator)
+				{
+					enforce(
+						newBufferSizeBytes >= bufferSizeBytes, 
+						"Pool Shrinking with allocator not supported yet."
+					); 
+				}
 				
 				VulkanMemoryBuffer newHostMemoryBuffer, newDeviceMemoryBuffer; void* newHostPtr; 
 				try
 				{
+					/+
+						I only use coherent memory, I don't flush/invalidate.
+						On Radeon it's OK.
+					+/
 					newHostMemoryBuffer = device.createMemoryBuffer
 						(
 						newBufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{
@@ -5944,7 +5958,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				catch(Exception e)
 				{
 					newHostMemoryBuffer.free; newDeviceMemoryBuffer.free; 
-					WARN(e.simpleMsg); return false; 
+					WARN(e.simpleMsg); return false/+out of mem, nothing's changed+/; 
 				}
 				
 				if(keepContents)
@@ -5977,7 +5991,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				); 
 				
 				auto 	oldHostMemoryBuffer 	= hostMemoryBuffer,
-					oldDeviceMemoryBuffer 	= deviceMemoryBuffer; 
+					oldDeviceMemoryBuffer 	= deviceMemoryBuffer,
+					oldBufferSizeBytes	= bufferSizeBytes; 
 				
 				hostMemoryBuffer 	= newHostMemoryBuffer,
 				deviceMemoryBuffer 	= newDeviceMemoryBuffer,
@@ -5987,13 +6002,18 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				oldHostMemoryBuffer.free; 
 				oldDeviceMemoryBuffer.free; 
 				
-				return true; 
+				if(allocator) {
+					if(newBufferSizeBytes > oldBufferSizeBytes)
+					allocator.growPool(hostPtr, newBufferSizeBytes); 
+				}
+				
+				return true/+success+/; 
 			} 
 			version(/+$DIDE_REGION Append functionality+/all)
 			{
 				size_t appendPos; 
 				
-				void append(void* data, size_t size)
+				void append(in void* data, size_t size)
 				{
 					if(!size) return; 
 					
@@ -6018,31 +6038,131 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				void reset()
 				{ appendPos = 0; } 
+				
+				void upload_appender()
+				{
+					if(appendPos<=0) return; 
+					//no flush needed because of coherent memory
+					auto cb = new VulkanCommandBuffer(commandPool); 
+					with(cb)
+					record(
+						mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+						{
+							cmdCopyBuffer(
+								hostMemoryBuffer, deviceMemoryBuffer,
+								VkBufferCopy(0, 0, appendPos.alignUp(uploadGranularity))
+							); 
+						}
+					); 
+					queue.submit(cb); 
+					queue.waitIdle; //Opt: STALL
+					cb.free; 
+				} 
 			}
 			
-			void upload(in void[] data)
+			version(/+$DIDE_REGION Invalidation logic+/all)
 			{
-				if(data.empty) return; 
-				
-				hostMemoryBuffer.write(data/+Bug: alignment!!!+/); 
-				/+Opt: Should write directly to memory buffer, not copy!+/
-				
-				hostMemoryBuffer.flush; 
-				auto cb = new VulkanCommandBuffer(commandPool); 
-				with(cb)
-				record(
-					mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+				protected
+				{
+					static struct BlockRange { uint start, end/+non-inclusive+/; } 
+					BlockRange[] modifiedBlocks; 
+					
+					void markModified(void* ptr, size_t size) 
 					{
-						cmdCopyBuffer(
-							hostMemoryBuffer, deviceMemoryBuffer,
-							VkBufferCopy(0, 0, data.sizeBytes/+Bug: alignment!!!+/)
+						if(size<=0) return; 
+						static uint calcBlkIdx(size_t x) => (cast(uint)(x / uploadGranularity)); 
+						sizediff_t ofs = ptr - hostPtr; 
+						modifiedBlocks ~= BlockRange(
+							calcBlkIdx(ofs), 
+							calcBlkIdx(ofs + size - 1) + 1 
 						); 
-					}
-				); 
-				queue.submit(cb); 
-				auto _間=init間; queue.waitIdle; ((0x346794F76D066).檢((update間(_間)))); //Opt: STALL
-				cb.destroy; 
-			} 
+					} 
+					
+					void markModified(void* ptr, void* end) 
+					{ markModified(ptr, end-ptr); } 
+					
+					void markModified(void* ptr) 
+					{ markModified(ptr, 1); } 
+					
+					BlockRange[] combineBlocks(R)(R blocks) 
+					if(isInputRange!(R, BlockRange)) 
+					{
+						BlockRange[] combined; 
+						
+						if(blocks.empty) return combined; 
+						
+						// Sort ranges by their starting offset, do range checking and filtering 
+						const totalBlocks = bufferSizeBytes / uploadGranularity; 
+						auto sorted = blocks	.map!((a)=>(
+							BlockRange(
+								a.start.min(totalBlocks), 
+								a.end.min(totalBlocks) 
+							) 
+						)) 
+							.cache.filter!((a)=>(a.start < a.end)) 
+							.array.sort!((a, b)=>(a.start < b.start)); 
+						combined.reserve(sorted.length); 
+						
+						BlockRange current = sorted.front; //Initialize with first range 
+						
+						foreach(block; sorted[1..$])
+						{
+							if(block.start <= current.end)
+							{
+								// Ranges overlap or are adjacent - merge them 
+								current.end = max(current.end, block.end); 
+							}
+							else
+							{
+								// No overlap - add current and start new 
+								combined ~= current; current = block; 
+							}
+						}
+						combined ~= current; //Add the last accumulated range 
+						
+						return combined; 
+					} 
+				} 
+			}
+			version(/+$DIDE_REGION Heap functionality+/all)
+			{
+				alias Allocator = MyAllocator!heapGranularity; 
+				Allocator allocator; 
+				
+				void heapInit()
+				{
+					allocator = new Allocator((cast(ubyte*)(hostPtr))[0..bufferSizeBytes]); 
+					allocator.alloc(0).enforce; 
+				} 
+				
+				struct HeapRef
+				{
+					void* ptr; 	/++/
+					uint heapAddr; 	/+block index addresses 16 byte blocks.+/
+				} 
+				
+				uint calcHeapAddr(void* p /+p must be null or valid!+/)
+				=> p ? (cast(uint)((p - hostPtr) / heapGranularity)) : 0; 
+				
+				void* calcHeapPtr(uint a /+a must be 0 or valid!+/)
+				=> a ? hostPtr + (size_t(a) * heapGranularity) : null; 
+				
+				auto heapAlloc(size_t size)
+				{
+					HeapRef res; 
+					res.ptr = allocator.alloc(size); 
+					res.heapAddr = calcHeapAddr(res.ptr); 
+					return res; 
+				} 
+				
+				void heapFree(void* p)
+				{ allocator.free(p); }  void heapFree(uint a)
+				{ heapFree(calcHeapPtr(a)); } 
+				
+			}
+			
+			
+			
 		} 
 	}
 }
