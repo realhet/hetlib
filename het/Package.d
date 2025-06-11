@@ -14264,70 +14264,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				return chain(parent, pathIdx.map!(i => paths[i]), fileIdx.map!(i => files[i])).array; 
 			} 
 			
-			FileEntry[] findFiles(Path path, string mask="", string order="name", int level=0)
-			{
-				///this is a recursive search
-				path = path.normalized; 
-							
-				FileEntry[] files, paths; 
-							
-				if(mask=="*") mask = ""; 
-							
-				WIN32_FIND_DATAW data; 
-				HANDLE hFind = FindFirstFileW((path.dir~`\*`).toPWChar, &data); 
-				if(hFind != INVALID_HANDLE_VALUE)
-				{
-					do {
-						auto entry = FileEntry(data, path); 
-						if(entry.isDirectory)
-						{
-							if(entry.name.among(".", "..")) continue; 
-							paths ~= entry; 
-						}
-						else
-						{ if(mask=="" || entry.name.isWild(mask)) files ~= entry; }
-					}
-					while(FindNextFileW(hFind, &data)); 
-					FindClose(hFind); 
-				}
-							
-				//recursion
-				files ~= paths.map!(p => findFiles(Path(p.path, p.name), mask, order, level+1)).join; 
-							
-				//only sort on root level
-				if(level==0)
-				{
-					//PERF("makeIndex");
-					auto fileIdx = new int[files.length]; 
-								
-					auto ascending = 1; 
-					if(order.startsWith("-")) { order = order[1..$]; ascending = -1; }
-					order = order.withoutStarting("+"); 
-								
-					static auto cmpChain(int c1, lazy int c2) { return c1 ? c1 : c2; } 
-					static auto cmpSize(long a, long b) { return a==b?0:a<b?1:-1; } 
-					static auto cmpTime(FILETIME a, FILETIME b) { return cmpSize(*cast(long*)&a, *cast(long*)&b); } 
-								
-					switch(order.lc)
-					{
-						case "name": 	files.makeIndex!((a, b) => ascending*icmp(a.name, b.name)<0)(fileIdx); 	break; 
-						case "ext": 	files.makeIndex!((a, b) => ascending*cmpChain(icmp(File(a.name).ext, File(b.name).ext), cmpChain(icmp(a.path.fullPath, b.path.fullPath), icmp(a.name, b.name)))<0)(fileIdx); 	break; 
-						case "size": 	files.makeIndex!((a, b) => ascending*cmpSize(a.size,b.size)<0)(fileIdx); 	break; 
-						case "date": 	files.makeIndex!((a, b) => ascending*(*cast(long*)&a.ftLastWriteTime-*cast(long*)&b.ftLastWriteTime)>0)(fileIdx); 	break; 
-						default: 	raise("Invalid sort order: " ~ order.quoted); 
-					}
-					//PERF("buildArray");
-								
-					files = fileIdx.map!(i => files[i]).array; 
-								
-					//print(PERF.report);
-								
-					return files; 
-				}
-				else
-				{ return files; }
-							
-			} 			 struct DirResult
+			struct DirResult
 			{
 				static struct DirFile
 				{
@@ -14364,7 +14301,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 						paths	.map!text.join('\n')~'\n'~
 						exts	.map!text.join('\n')~'\n'; 
 				} 
-			} 			 auto dirPerS(in Path path, string pattern = "*")
+			}  auto dirPerS(in Path path, string pattern = "*")
 			{
 				//dirPerS//////////////////////////
 				
@@ -15705,14 +15642,13 @@ version(/+$DIDE_REGION debug+/all)
 		=> usedBlocks.length; 	@property sizeUsed() => mixin(求sum(q{b},q{usedBlocks.byValue},q{b.sizeBytes})); 
 		@property countFree()
 		=> freeBlocksByPos[].walkLength; 	@property sizeFree() => mixin(求sum(q{b},q{freeBlocksByPos[]},q{b.sizeBytes})); 
-		@property stats() {
-			return i"    	Count	Size
-	Used:	$(countUsed)	$(sizeUsed)
-	Free:	$(countFree)	$(sizeFree)
-	Total:	$(countUsed+
+		@property stats()
+		=> i"	Count	Size
+Used:	$(countUsed)	$(sizeUsed)
+Free:	$(countFree)	$(sizeFree)
+Total:	$(countUsed+
 countFree)	$(sizeUsed+
 sizeFree)".text; 
-		} 
 		
 		static void test()
 		{

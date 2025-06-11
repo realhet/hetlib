@@ -1405,7 +1405,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			typeof(this)[int] handles; 
 			auto sizeBytes()
-			{ return handles.values.map!"a.size".sum; } ; 
+			{ return handles.values.map!"a.size".sum; }; 
 			auto stats()
 			{ return format!"%ss:(%s, %sKB)"(resName, handles.values.count, sizeBytes>>10); } 
 			void update()
@@ -2474,8 +2474,8 @@ version(/+$DIDE_REGION+/all)
 						{
 							auto _間=init間; static RGBA[] staticBuf; 
 							const requiredLen = bmp.size.area; 
-							if(staticBuf.length<requiredLen)	staticBuf.length = requiredLen; 	((0x11632ACEE6EC7).檢((update間(_間)))); 
-							upload(l_to_rgba(bmp.access!ubyte.asArray, staticBuf[0 .. requiredLen]), x, y, sx, sy); 	((0x116C0ACEE6EC7).檢((update間(_間)))); 
+							if(staticBuf.length<requiredLen)	staticBuf.length = requiredLen; 	((0x11631964A4CA9).檢((update間(_間)))); 
+							upload(l_to_rgba(bmp.access!ubyte.asArray, staticBuf[0 .. requiredLen]), x, y, sx, sy); 	((0x116BF964A4CA9).檢((update間(_間)))); 
 						}
 						else
 						upload(bmp.accessOrGet!RGBA , x, y, sx, sy); 
@@ -3701,57 +3701,61 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 			} 
 			
 			
-			bool isCustomExists(string name)
-			{ return (File(`custom:\`~name) in byFileName) !is null; } 
+			/+
+				bool isCustomExists(string name)
+				{ return (File(`custom:\`~name) in byFileName) !is null; } 
+			+/
 			
 			bool exists(File f)
 			{ return (f in byFileName) !is null; } 
 			bool exists(string f)
 			{ return (File(f) in byFileName) !is null; } 
 			
-			int custom(string name, Bitmap bmp=null)
-			{
-				 //if bitmap != null then refresh
-				enum log = false; 
-				if(log)
-				"testures.custom(%s, %s)".writefln(name, bmp); 
-				
-				auto fileName = File(`custom:\`~name); 
-				
-				if(auto a = (fileName in byFileName))
+			/+
+				int custom(string name, Bitmap bmp=null)
 				{
-					//already exists?
-					if(bmp)
+					 //if bitmap != null then refresh
+					enum log = false; 
+					if(log)
+					"testures.custom(%s, %s)".writefln(name, bmp); 
+					
+					auto fileName = File(`custom:\`~name); 
+					
+					if(auto a = (fileName in byFileName))
 					{
-						//reupdate existing
-						removeSubTex(*a); 
+						//already exists?
+						if(bmp)
+						{
+							//reupdate existing
+							removeSubTex(*a); 
+							auto idx = createSubTex(bmp); 
+							byFileName[fileName] = idx; 
+							if(log)
+							"Updated subtex %s:".writefln(fileName); 
+							return idx; 
+						}
+						else {
+							 //no change, just return the existing handle
+							if(log)
+							"Found subtex %s:".writefln(fileName); 
+							return *a; 
+						}
+					}
+					else {
+						//this is a new entry
+						if(bmp is null)
+						{
+							bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia))); 
+							//if no bmp, just create a purple placeholder
+						}
 						auto idx = createSubTex(bmp); 
 						byFileName[fileName] = idx; 
 						if(log)
-						"Updated subtex %s:".writefln(fileName); 
+						"Created subtex %s:".writefln(fileName); 
 						return idx; 
 					}
-					else {
-						 //no change, just return the existing handle
-						if(log)
-						"Found subtex %s:".writefln(fileName); 
-						return *a; 
-					}
-				}
-				else {
-					//this is a new entry
-					if(bmp is null)
-					{
-						bmp = new Bitmap(image2D(8, 8, RGBA(clFuchsia))); 
-						//if no bmp, just create a purple placeholder
-					}
-					auto idx = createSubTex(bmp); 
-					byFileName[fileName] = idx; 
-					if(log)
-					"Created subtex %s:".writefln(fileName); 
-					return idx; 
-				}
-			} 
+				} 
+			+/
 			
 			SubTexInfo accessInfo(int idx)
 			{

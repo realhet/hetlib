@@ -3746,7 +3746,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					enum canTripleBuffer 	= (常!(bool)(0)),
+					enum canTripleBuffer 	= (常!(bool)(1)),
 					vsynch 	= (常!(bool)(1)); 
 					
 					/+
@@ -5886,13 +5886,95 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				size_t	maxSizeBytes
 			}; 
 			
-			enum poolGranularity 	= 0x1000,
-			uploadGranularity 	= 0x100,
-			heapGranularity	= 0x10; 
+			enum poolGranularity 	= 0x1000 /+The pool size will be aligned by this.+/,
+			uploadGranularity 	=  0x100 /+Modification tracking will upload this large block.+/,
+			heapGranularity	=   0x10 /+Heap allocation align and min size.+/; 
 			
-			VulkanMemoryBuffer hostMemoryBuffer, deviceMemoryBuffer; 
-			size_t bufferSizeBytes; 
-			void* hostPtr; 
+			static protected
+			{
+				public struct BufferPair
+				{
+					VulkanMemoryBuffer hostMemoryBuffer, deviceMemoryBuffer; 
+					size_t bufferSizeBytes; 
+					void* hostPtr; 
+					
+					bool valid() => bufferSizeBytes && hostMemoryBuffer && deviceMemoryBuffer && !!hostPtr; 
+				} 
+				
+				auto allocateBufferPair(VulkanDevice device, VkBufferUsageFlagBits usage, size_t desiredSizeBytes)
+				{
+					BufferPair res; 
+					with(res)
+					try
+					{
+						/+
+							I only use coherent memory, I don't flush/invalidate.
+							On Radeon it's OK.
+						+/
+						bufferSizeBytes = desiredSizeBytes; 
+						hostMemoryBuffer = device.createMemoryBuffer
+							(
+							bufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{
+								HOST_VISIBLE_BIT | 
+								HOST_COHERENT_BIT
+							})), mixin(幟!((VK_BUFFER_USAGE_),q{
+								TRANSFER_SRC_BIT | 
+								TRANSFER_DST_BIT
+							}))
+						); 
+						deviceMemoryBuffer = device.createMemoryBuffer
+							(
+							bufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
+								TRANSFER_SRC_BIT | 
+								TRANSFER_DST_BIT | usage
+							}))
+						); 
+						hostPtr = hostMemoryBuffer.map; 
+					}
+					catch(Exception e)
+					{
+						hostMemoryBuffer.free; deviceMemoryBuffer.free; 
+						WARN(e.simpleMsg); return BufferPair.init/+out of mem, nothing's changed+/; 
+					}
+					return res; 
+				} 
+				
+				void freeBufferPair(ref BufferPair bp)
+				{
+					with(bp)
+					{
+						hostMemoryBuffer.free; 
+						deviceMemoryBuffer.free; 
+						hostPtr = null; 
+						bufferSizeBytes = 0; 
+					}
+				} 
+				
+				void copyBufferPair(
+					ref BufferPair src, ref BufferPair dst,
+					VulkanCommandPool commandPool, VulkanQueue queue
+				)
+				{
+					const copySizeBytes = min(src.bufferSizeBytes, dst.bufferSizeBytes); 
+					if(copySizeBytes>0)
+					{
+						auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
+						cb.record(
+							mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
+							{
+								cb.cmdCopyBuffer
+								(src.hostMemoryBuffer, dst.hostMemoryBuffer, copySizeBytes); 
+								cb.cmdCopyBuffer
+								(src.deviceMemoryBuffer, dst.deviceMemoryBuffer, copySizeBytes); 
+							}
+						); 
+						queue.submit(cb); 
+						queue.waitIdle; /+Opt: STALL+/
+					}
+				} 
+			} 
+			
+			BufferPair bufferPair; alias this = bufferPair; 
 			
 			void _construct()
 			{
@@ -5903,163 +5985,68 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			} 
 			
 			void _destruct()
+			{ freeBufferPair(bufferPair); } 
+			
+			version(/+$DIDE_REGION Resize functionality+/all)
 			{
-				hostMemoryBuffer.free; 
-				deviceMemoryBuffer.free; 
-			} 
-			
-			bool grow(float rate, bool keepContents)
-			{
-				const newSize = (lround(bufferSizeBytes*rate)); 
-				return resize(((rate>=1)?(newSize.alignUp  (poolGranularity)) :(newSize.alignDown(poolGranularity))), keepContents); 
-			} 
-			
-			bool resize(size_t newBufferSizeBytes, bool keepContents)
-			{
-				T0; 
+				protected size_t prepareBufferSize(size_t s)
+				=> s.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
 				
-				newBufferSizeBytes = newBufferSizeBytes.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
-				if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
-				
-				if(allocator)
+				bool growByRate(float rate, bool keepContents)
 				{
-					enforce(
-						newBufferSizeBytes >= bufferSizeBytes, 
-						"Pool Shrinking with allocator not supported yet."
-					); 
-				}
+					const newSize = (lround(bufferSizeBytes*rate)); 
+					return resize(((rate>=1)?(newSize.alignUp  (poolGranularity)) :(newSize.alignDown(poolGranularity))), keepContents); 
+				} 
 				
-				VulkanMemoryBuffer newHostMemoryBuffer, newDeviceMemoryBuffer; void* newHostPtr; 
-				try
+				void growToAndBeyond(size_t newSize)
 				{
-					/+
-						I only use coherent memory, I don't flush/invalidate.
-						On Radeon it's OK.
-					+/
-					newHostMemoryBuffer = device.createMemoryBuffer
-						(
-						newBufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{
-							HOST_VISIBLE_BIT | 
-							HOST_COHERENT_BIT
-						})), mixin(幟!((VK_BUFFER_USAGE_),q{
-							TRANSFER_SRC_BIT | 
-							TRANSFER_DST_BIT
-						}))
-					); 
-					newDeviceMemoryBuffer = device.createMemoryBuffer
-						(
-						newBufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
-							TRANSFER_SRC_BIT | 
-							TRANSFER_DST_BIT | usage
-						}))
-					); 
-					newHostPtr = newHostMemoryBuffer.map; 
-				}
-				catch(Exception e)
-				{
-					newHostMemoryBuffer.free; newDeviceMemoryBuffer.free; 
-					WARN(e.simpleMsg); return false/+out of mem, nothing's changed+/; 
-				}
-				
-				if(keepContents)
-				{
-					const copySizeBytes = min(bufferSizeBytes, newBufferSizeBytes); 
-					if(copySizeBytes>0)
-					{
-						auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
-						cb.record(
-							mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
-							{
-								cb.cmdCopyBuffer(
-									hostMemoryBuffer, newHostMemoryBuffer, 
-									copySizeBytes
-								); 
-								cb.cmdCopyBuffer(
-									deviceMemoryBuffer, newDeviceMemoryBuffer, 
-									copySizeBytes
-								); 
-							}
-						); 
-						queue.submit(cb); 
-						queue.waitIdle; /+Opt: STALL+/
-					}
-				}
-				
-				print(
-					"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
-					bufferSizeBytes, "-\33\12>", newBufferSizeBytes, "\33\7"
-				); 
-				
-				auto 	oldHostMemoryBuffer 	= hostMemoryBuffer,
-					oldDeviceMemoryBuffer 	= deviceMemoryBuffer,
-					oldBufferSizeBytes	= bufferSizeBytes; 
-				
-				hostMemoryBuffer 	= newHostMemoryBuffer,
-				deviceMemoryBuffer 	= newDeviceMemoryBuffer,
-				hostPtr	= newHostPtr,
-				bufferSizeBytes	= newBufferSizeBytes; 
-				
-				oldHostMemoryBuffer.free; 
-				oldDeviceMemoryBuffer.free; 
-				
-				if(allocator) {
-					if(newBufferSizeBytes > oldBufferSizeBytes)
-					allocator.growPool(hostPtr, newBufferSizeBytes); 
-				}
-				
-				return true/+success+/; 
-			} 
-			version(/+$DIDE_REGION Append functionality+/all)
-			{
-				size_t appendPos; 
-				
-				void append(in void* data, size_t size)
-				{
-					if(!size) return; 
-					
-					const newPos = appendPos + size; 
-					bool hasEnoughSpace() => newPos<=bufferSizeBytes; 
+					bool hasEnoughSpace() => newSize<=bufferSizeBytes; 
 					
 					if(!hasEnoughSpace)
 					{
-						grow(2, keepContents : true); 
-						enforce(hasEnoughSpace, "Unable to grow VulkanStagedBuffer"); 
+						resize(newSize * 2, keepContents : true); 
+						enforce(hasEnoughSpace, "Unable to grow VulkanStorageBuffer."); 
+					}
+				} 
+				
+				bool resize(size_t newBufferSizeBytes, bool keepContents)
+				{
+					T0; 
+					
+					newBufferSizeBytes = prepareBufferSize(newBufferSizeBytes); 
+					if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
+					
+					if(allocator)
+					{
+						if(newBufferSizeBytes < bufferSizeBytes)
+						ERR("Pool Shrinking with allocator not supported yet."); 
 					}
 					
-					memcpy(hostPtr+appendPos, data, size); 
-					appendPos += size; 
-				} 
-				
-				void append(T)(in T a)
-				{
-					static if(isDynamicArray!T)	append(a.ptr, a.sizeBytes); 
-					else	append(&a, T.sizeof); 
-				} 
-				
-				void reset()
-				{ appendPos = 0; } 
-				
-				void upload_appender()
-				{
-					if(appendPos<=0) return; 
-					//no flush needed because of coherent memory
-					auto cb = new VulkanCommandBuffer(commandPool); 
-					with(cb)
-					record(
-						mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
-						{
-							cmdCopyBuffer(
-								hostMemoryBuffer, deviceMemoryBuffer,
-								VkBufferCopy(0, 0, appendPos.alignUp(uploadGranularity))
-							); 
-						}
+					auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes); 
+					if(!newBufferPair.valid) return false/+out of mem, nothing's changed+/; 
+					
+					if(keepContents) { copyBufferPair(bufferPair, newBufferPair, commandPool, queue); }
+					
+					print(
+						"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
+						bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"
 					); 
-					queue.submit(cb); 
-					queue.waitIdle; //Opt: STALL
-					cb.free; 
+					
+					const oldBufferSizeBytes = bufferSizeBytes; 
+					
+					freeBufferPair(bufferPair); 
+					bufferPair = newBufferPair; 
+					
+					if(allocator) {
+						if(bufferSizeBytes > oldBufferSizeBytes)
+						try { allocator.growPool(hostPtr, bufferSizeBytes); }
+						catch(Exception e) ERR(e.simpleMsg); 
+					}
+					
+					return true/+success+/; 
 				} 
 			}
-			
+			
 			version(/+$DIDE_REGION Invalidation logic+/all)
 			{
 				protected
@@ -6084,12 +6071,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					void markModified(void* ptr) 
 					{ markModified(ptr, 1); } 
 					
-					BlockRange[] combineBlocks(R)(R blocks) 
+					void combineBlocks(R)(R blocks, void delegate(BlockRange) onBlock) 
 					if(isInputRange!(R, BlockRange)) 
 					{
-						BlockRange[] combined; 
-						
-						if(blocks.empty) return combined; 
+						if(blocks.empty) return; 
 						
 						// Sort ranges by their starting offset, do range checking and filtering 
 						const totalBlocks = bufferSizeBytes / uploadGranularity; 
@@ -6101,7 +6086,6 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						)) 
 							.cache.filter!((a)=>(a.start < a.end)) 
 							.array.sort!((a, b)=>(a.start < b.start)); 
-						combined.reserve(sorted.length); 
 						
 						BlockRange current = sorted.front; //Initialize with first range 
 						
@@ -6115,12 +6099,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							else
 							{
 								// No overlap - add current and start new 
-								combined ~= current; current = block; 
+								onBlock(current); current = block; 
 							}
 						}
-						combined ~= current; //Add the last accumulated range 
-						
-						return combined; 
+						onBlock(current); //Add the last accumulated range 
 					} 
 				} 
 			}
@@ -6132,7 +6114,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void heapInit()
 				{
 					allocator = new Allocator((cast(ubyte*)(hostPtr))[0..bufferSizeBytes]); 
-					allocator.alloc(0).enforce; 
+					enforce(
+						allocator.alloc(0) is hostPtr, 
+						"Error allocating very first null block in heap."
+					); 
 				} 
 				
 				struct HeapRef
@@ -6163,6 +6148,121 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			
 			
+		} 
+		
+		class VulkanAppenderBuffer : VulkanStagedBuffer
+		{
+			size_t appendPos; 
+			
+			this(
+				VulkanDevice 	device,
+				VulkanQueue	queue,
+				VulkanCommandPool	commandPool,
+				VkBufferUsageFlagBits	usage,
+				size_t	minSizeBytes, 
+				size_t	maxSizeBytes
+			)
+			{ super(__traits(parameters)); } 
+			
+			void append(in void* data, size_t size)
+			{
+				if(!size) return; 
+				
+				growToAndBeyond(appendPos + size); 
+				
+				memcpy(hostPtr+appendPos, data, size); 
+				appendPos += size; 
+			} 
+			
+			void append(T)(in T a)
+			{
+				static if(isDynamicArray!T)	append(a.ptr, a.sizeBytes); 
+				else	append(&a, T.sizeof); 
+			} 
+			
+			void reset()
+			{ appendPos = 0; } 
+			
+			void upload()
+			{
+				if(appendPos<=0) return; 
+				//no flush needed because of coherent memory
+				auto cb = new VulkanCommandBuffer(commandPool); 
+				with(cb)
+				record(
+					mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})),
+					{
+						cmdCopyBuffer(
+							hostMemoryBuffer, deviceMemoryBuffer,
+							mixin(體!((VkBufferCopy),q{0, 0, appendPos.alignUp(uploadGranularity)}))
+						); 
+					}
+				); 
+				queue.submit(cb); 
+				queue.waitIdle; //Opt: STALL
+				cb.free; 
+			} 
+		} 
+		
+		class VulkanArrayBuffer(T) : VulkanStagedBuffer
+		{
+			this(
+				VulkanDevice 	device,
+				VulkanQueue	queue,
+				VulkanCommandPool	commandPool,
+				VkBufferUsageFlagBits	usage,
+				size_t	minSizeBytes, 
+				size_t	maxSizeBytes
+			)
+			{ super(__traits(parameters)); } 
+			
+			enum sizeSh = T.sizeof.isPowerOf2 ? (cast(uint)(T.sizeof.log2)) : 0; 
+			
+			protected T[] _array; 
+			@property length() const
+			=> _array.length; 
+			const ref opIndex(size_t i)()
+			=> _array[i]; 
+			void opIndexAssign(in T value, size_t i)
+			{
+				_array[i] = value; 
+				markModified(&_array[i], T.sizeof); 
+			} 
+			
+			const(T)[] opSlice() const => _array; 
+			
+			uint append(in T value)
+			{
+				growToAndBeyond((length + 1)*T.sizeof); 	//exception when out of mem
+				const idx = _array.length.to!uint; 	//exception after 2^32 index
+				_array = (cast(T*)(hostPtr))[0..idx+1]; 	//uptate the slice
+				this[idx] = value; 	//set the value and mark it as changed
+				return idx; 
+			} 
+			
+			void upload()
+			{
+				if(modifiedBlocks.empty) return; auto _間=init間; 
+				scope(exit) modifiedBlocks = []; 
+				auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
+				cb.record(
+					mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
+					{
+						combineBlocks
+						(
+							modifiedBlocks, 
+							((blk){
+								const 	ofs 	= size_t(blk.start) 	* uploadGranularity,
+									size 	= size_t(blk.end - blk.start) 	* uploadGranularity; 
+								cb.cmdCopyBuffer
+								(hostMemoryBuffer, deviceMemoryBuffer, mixin(體!((VkBufferCopy),q{ofs, ofs, size}))); 
+							})
+						); 
+					}
+				); 
+				queue.submit(cb); 
+				queue.waitIdle; /+Opt: STALL+/((0x35FBB4F76D066).檢((update間(_間)))); 
+			} 
 		} 
 	}
 }

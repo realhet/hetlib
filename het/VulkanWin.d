@@ -135,7 +135,6 @@ class VulkanWindow: Window
 	
 	
 	
-	
 	
 	version(/+$DIDE_REGION UB    +/all)
 	{
@@ -184,12 +183,12 @@ class VulkanWindow: Window
 		
 		class VertexBufferManager
 		{
-			protected VulkanStagedBuffer buffer; 
+			protected VulkanAppenderBuffer buffer; 
 			uint uploadedVertexCount; 
 			
 			this()
 			{
-				buffer = new VulkanStagedBuffer
+				buffer = new VulkanAppenderBuffer
 					(
 					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})),
 					minSizeBytes 	: 4 << 10, 
@@ -211,7 +210,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				buffer.upload_appender; 
+				buffer.upload; 
 				uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
 			
@@ -235,9 +234,10 @@ class VulkanWindow: Window
 	
 	version(/+$DIDE_REGION IB     +/all)
 	{
-		enum TexFormat
+		enum TexFormat : ubyte
 		{
 			l8,
+			wa8 /+all white, alpha8. It's for fonts.+/, 
 			la8,
 			rgb8,
 			rgba8,
@@ -245,17 +245,59 @@ class VulkanWindow: Window
 			bgra8,
 		} 
 		
+		//flags: 1D/2D
+		
+		enum TexType
+		{
+			/+Note: bits↓+/  	/+Note: 1 ch+/	/+Note: 2 ch+/	/+Note: 3 ch+/	/+Note: 4 ch+/	
+			/+Note:   1+/	u1,				
+			/+Note:   2+/	u2,				
+			/+Note:   4+/	u4,				
+			/+Note:   8+/	u8,				
+			/+Note:  16+/	u16,	rg_u8, 	rgb_u565,	rgba_u5551,	
+			/+Note:  24+/			rgb8,		
+			/+Note:  32+/	f32,			rgba_u8,	
+			/+Note:  48+/			rgb_u16,		
+			/+Note:  64+/		rg_f32,		rgba_u16,	
+			/+Note:  96+/			rgb_f32,		
+			/+Note: 128+/				rgba_f32	
+		} 
+		
+		static string GEN_enum_defines(E)()
+		{ return [EnumMembers!TexType].map!((a)=>("#define TexType_"~a.text~" "~a.to!int.text)).join('\n'); } 
+		
+		pragma(msg, i"$(位!()): Warning: $(GEN_enum_defines!TexType)".text); 
+		
+		enum TexEffect
+		{
+			none, 
+			whiteAlpha, 
+			redBlueSwap
+		} 
+		
+		struct TexFormatSize
+		{
+			mixin((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+					[q{TexType},q{4},q{"type"},q{},q{/++/}],
+					[q{TexEffect},q{4},q{"effect"},q{},q{/++/}],
+					[q{YAlign},q{3},q{"yAlign"},q{1},q{/++/}],
+				]))
+			).調!(GEN_bitfields)); 
+		} 
+		
 		struct TexInfo
-		{ uint addr, type, width, height; } 
+		{ uint addr, format, width, height; } 
 		
 		InfoBufferManager IB; 
 		class InfoBufferManager
 		{
-			VulkanStagedBuffer buffer; 
+			VulkanArrayBuffer!TexInfo buffer; 
 			
 			this()
 			{
-				buffer = new VulkanStagedBuffer
+				buffer = new VulkanArrayBuffer!TexInfo
 					(
 					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})),
 					minSizeBytes 	: 16 << 10, 
@@ -267,6 +309,170 @@ class VulkanWindow: Window
 			
 			~this()
 			{ buffer.free; } 
+			
+			/+
+				Code: //these are saved from the old version of info manager:
+				
+				class InfoTexture
+				{
+					private
+					{
+						enum TexelsPerInfo = 2; //for rgba & 8byte subTexInfo
+						enum TexWidth = 512, InfoPerLine = TexWidth/TexelsPerInfo; 
+					} 
+					
+					GLTexture glTexture; 
+					int[int] lastAccessed; //last globalUpdateTick when accessed/updated
+					
+					SubTexInfo[] infoArray; 
+					int[]	freeIndices; 
+					
+					int capacity() const
+					{ return InfoPerLine * glTexture.height; } 
+					int length() const
+					{ return cast(int)infoArray.length; } 
+					
+					void upload(int idx)
+					{
+						 //Opt: ezt megcsinalni kotegelt feldolgozasura
+						glTexture.fastBind; 
+						glTexture.upload(infoArray[idx..idx+1], idx % InfoPerLine * TexelsPerInfo, idx / InfoPerLine, 2, 1); 
+					} 
+					
+					void grow()
+					{
+						glTexture.fastBind; 
+						glTexture.resize(TexWidth, glTexture.height*2); //exponential grow
+					} 
+					
+					bool isValidIdx(int idx) const
+					{ return idx.inRange(infoArray); } 
+					
+					void checkValidIdx(int idx) const
+					{
+						 //Todo: refactor to isValidIdx
+						enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx)); 
+						//ez nem kell, mert a delayed loader null-t allokal eloszor. 
+						//enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
+					} 
+					
+					void accessedNow(int idx)
+					{
+						if(!global_disableSubtextureAging)
+						lastAccessed[idx] = application.tick; 
+					} 
+					
+					this()
+					{
+						enforce(SubTexInfo.sizeof==8, "Only implemented for 8 byte SubTextInfo"); 
+						
+						glTexture = new GLTexture(
+							"InfoTexture", TexWidth, 1/*height*/, 
+							GLTextureType.RGBA8, 
+							false/*no mipmap*/
+						); 
+						glTexture.bind; 
+					} 
+					
+					~this()
+					{ glTexture.destroy; } 
+					
+					//peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
+					//Note: this technique is too dangerous. Must add the info, but not upload.
+					/*
+						int peekNextIdx() const{
+								if(!freeIndices.empty){//reuse a free slot
+									return freeIndices[$-1];
+								}else{ //add an extra slot
+									return cast(int)infoArray.length;
+								}
+							}
+					*/
+					
+					//allocates a new subTexture slot
+					
+					int add(in SubTexInfo info, Flag!"uploadNow" uploadNow= Yes.uploadNow)
+					{
+						//ez nem kell, mert a delayed loader pont null-t allokal eloszor: 
+						//enforce(!info.isNull, "cannot allocate SubTexInfo.null");
+						
+						int actIdx; 
+						
+						//this must be analogous with peekNextIdx
+						if(!freeIndices.empty)
+						{
+							//reuse a free slot
+							actIdx = freeIndices.fetchBack; 
+							infoArray[actIdx] = info; 
+						}
+						else {
+							//add an extra slot
+							actIdx = cast(int)infoArray.length; 
+							infoArray ~= info; 
+							
+							enforce(actIdx<SubTexIdxCnt, "FATAL: SubTexIdxCnt limit reached"); 
+							
+							if(capacity<infoArray.length)
+							grow; 
+						}
+						
+						accessedNow(actIdx); 
+						
+						if(uploadNow)
+						upload(actIdx); 
+						
+						return actIdx; 
+					} 
+					
+					//removes a subTex by idx
+					void remove(int idx)
+					{
+						checkValidIdx(idx); 
+						
+						infoArray[idx] = SubTexInfo.init; 
+						freeIndices ~= idx; 
+						
+						upload(idx); //upload the null for safety
+						//Todo: feltetelesen fordithatova tenni ezeket a felszabaditas utani zero filleket
+					} 
+					
+					//gets a subTexInfo by idx
+					SubTexInfo access(int idx)
+					{
+						checkValidIdx(idx); 
+						accessedNow(idx); 
+						return infoArray[idx]; 
+					} 
+					
+					void modify(int idx, in SubTexInfo info)
+					{
+						checkValidIdx(idx); 
+						accessedNow(idx); 
+						infoArray[idx] = info; 
+						upload(idx); 
+					} 
+					
+					
+					void dump() const
+					{
+						//infoArray.enumerate.each!writeln;
+						//!!! LDC 1.20.0 win64 linker bug when using enumerate here!!!!!
+						
+						//foreach(i, a; infoArray) writeln(tuple(i, a));
+						//!!! linker error as well
+						
+						//foreach(i, a; infoArray) writeln(tuple(i, i+1));
+						//!!! this is bad as well, the problem is not related to own structs, just to tuples
+						
+						foreach(i, a; infoArray)
+						writefln("(%s, %s)", i, a);  //this works
+					} 
+					
+					size_t sizeBytes() const
+					{ return glTexture ? glTexture.sizeBytes : 0; } 
+				} 
+				
+			+/
 		} 
 	}
 	
@@ -275,16 +481,20 @@ class VulkanWindow: Window
 		TextureBufferManager TB; 
 		class TextureBufferManager
 		{
-			VulkanStagedBuffer buffer; 
+			VulkanAppenderBuffer buffer; 
 			
 			this()
 			{
-				buffer = new VulkanStagedBuffer
+				buffer = new VulkanAppenderBuffer
 					(
 					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})),
 					minSizeBytes 	:   4 << 10,
 					maxSizeBytes 	: 512 << 20
 				); 
+				
+				buffer.heapInit; 
+				
+				buffer.allocator.stats.print; 
 			} 
 			
 			~this()
@@ -292,15 +502,58 @@ class VulkanWindow: Window
 		} 
 	}
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	void createShaderModules()
 	{
 		enum shaderBinary = 
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
-			
-			layout(binding = 0) uniform UBO { mat4 mvp; } ubo; 
-			
-			layout(binding = 1) buffer SBO { uint sbo[]; }; 
 			
 			@vert: 
 			layout(location = 0)
@@ -327,23 +580,27 @@ class VulkanWindow: Window
 			@common: 
 			
 			@vert: 
+			
 			void main()
 			{ geomPosition = vertPosition, geomColor = vertColor; } 
 			
 			@geom: 
+			$(ShaderBufferDeclarations); 
+			
 			layout(points) in; 
 			layout(points, max_vertices = 32) out; 
 			
 			
 			void main()
 			{
-				gl_Position = ubo.mvp * vec4(geomPosition[0], 1.0); 
+				gl_Position = UB.mvp * vec4(geomPosition[0], 1.0); 
 				fragColor = vec4(geomColor[0], 1.0); 
-				fragColor = unpackUnorm4x8(sbo[0]); 
+				fragColor = unpackUnorm4x8(TB[IB[0]]); 
 				EmitVertex(); 
 			} 
 			
 			@frag: 
+			$(ShaderBufferDeclarations); 
 			
 			void main() { outColor = fragColor; } 
 		})); 
@@ -377,58 +634,102 @@ class VulkanWindow: Window
 		renderPass.createFramebuffers(swapchain); 
 	} 
 	
+	
+	
+	
+	
+	
 	void createDescriptorPool()
 	{
 		/+
-			 This describes how many descriptor sets we'll 
+			This describes how many descriptor sets we'll 
 			create from this pool for each type
 		+/
 		descriptorPool = device.createDescriptorPool
-			(
+		(
 			[
 				mixin(體!((VkDescriptorPoolSize),q{
-					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
+					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})), 
 					descriptorCount : 1
 				})), 
 				mixin(體!((VkDescriptorPoolSize),q{
-					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
-					descriptorCount : 1
+					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})), 
+					descriptorCount : 2
 				}))
-			],1 /+maxSets+/
+			]
+			,1 /+maxSets+/
 		); 
-	}  void createDescriptorSet()
+	} void createDescriptorSet()
 	{
 		/+
-			 There needs to be one descriptor set per 
+			There needs to be one descriptor set per 
 			binding point in the shader
 		+/
 		descriptorSet = descriptorPool.allocate(descriptorSetLayout); 
 		descriptorSet.write(
 			0, UB.uniformMemoryBuffer, 
-				mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))
+			mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER}))
 		); 
 		descriptorSet.write(
-			1, TB.buffer.deviceMemoryBuffer, 
-				mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))
+			1, IB.buffer.deviceMemoryBuffer, 
+			mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))
+		); 
+		descriptorSet.write(
+			2, TB.buffer.deviceMemoryBuffer, 
+			mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))
 		); 
 	} 
+	
+	void createDescriptorSetLayout()
+	{
+		const stages = mixin(幟!((VK_SHADER_STAGE_),q{GEOMETRY_BIT | FRAGMENT_BIT})); 
+		descriptorSetLayout = device.createDescriptorSetLayout
+		(
+			mixin(體!((VkDescriptorSetLayoutBinding),q{
+				binding	: 0, descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})), 
+				descriptorCount 	: 1, stageFlags 	: stages
+			})), 
+			mixin(體!((VkDescriptorSetLayoutBinding),q{
+				binding	: 1, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})), 
+				descriptorCount 	: 1, 	stageFlags 	: stages
+			})),
+			mixin(體!((VkDescriptorSetLayoutBinding),q{
+				binding	: 2, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
+				descriptorCount 	: 1, 	stageFlags 	: stages
+			})),
+		); 
+	} enum ShaderBufferDeclarations = 
+	iq{
+		//UB: Uniform buffer
+		layout(binding = 0) uniform UB_T { mat4 mvp; } UB; 
+		
+		//IB: Info buffer
+		layout(binding = 1) buffer IB_T { uint IB[]; }; 
+		
+		//TB: Texture buffer
+		layout(binding = 2) buffer TB_T { uint TB[]; }; 
+		
+		void _dummy_declaration()
+	}.text; 
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	void createGraphicsPipeline()
 	{
 		//Link: https://vulkan-tutorial.com/Drawing_a_triangle/Graphics_pipeline_basics/Shader_modules
 		
-		// This is for uniform buffers and samplers
-		descriptorSetLayout = device.createDescriptorSetLayout
-			(
-			mixin(體!((VkDescriptorSetLayoutBinding),q{
-				binding	: 0, descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{UNIFORM_BUFFER})),
-				descriptorCount 	: 1, stageFlags 	: shaderModules.shaderStageFlagBits
-			})), 
-			mixin(體!((VkDescriptorSetLayoutBinding),q{
-				binding	: 1, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
-				descriptorCount 	: 1, 	stageFlags 	: shaderModules.shaderStageFlagBits
-			}))
-		); 
+		createDescriptorSetLayout; 
 		
 		// Describe pipeline layout
 		// Note: this describes the mapping between memory and shader resources (descriptor sets)
@@ -585,8 +886,9 @@ class VulkanWindow: Window
 		buffers = 
 		[
 			UB 	= new UniformBufferManager,
-			VB 	= new VertexBufferManager,
-			TB 	= new TextureBufferManager
+			VB	= new VertexBufferManager,
+			IB	= new InfoBufferManager,
+			TB	= new TextureBufferManager
 		]; 
 		
 		createShaderModules; 
@@ -639,35 +941,41 @@ class VulkanWindow: Window
 				(
 				queue, imageAvailableSemaphore, renderingFinishedSemaphore, 
 				{
-					VB.reset; 
-					
-					internalUpdate; //this will call onUpdate()
-					
-					VB.upload; 
-					
+					try
 					{
-						auto modelMatrix = mat4.identity; 
-						const rotationAngle = QPS.value(10*second); 
-						modelMatrix.translate(vec3(-274, -266, 0)); 
-						modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
+						VB.reset; 
 						
-						// Set up view
-						auto viewMatrix = mat4.lookAt(vec3(0, 0, 500), vec3(0), vec3(0, 1, 0)); 
+						internalUpdate; //this will call onUpdate()
 						
-						// Set up projection
-						auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1, 1000); 
+						VB.upload; 
 						
-						UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
+						{
+							auto modelMatrix = mat4.identity; 
+							const rotationAngle = QPS.value(10*second); 
+							modelMatrix.translate(vec3(-274, -266, 0)); 
+							modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
+							
+							// Set up view
+							auto viewMatrix = mat4.lookAt(vec3(0, 0, 500), vec3(0), vec3(0, 1, 0)); 
+							
+							// Set up projection
+							auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1, 1000); 
+							
+							UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
+						}
+						
+						if(!IB.buffer.length) IB.buffer.append(TexInfo(0)); 
+						
+						TB.buffer.reset; 
+						TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
+						
+						if(TB.buffer.growByRate(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
+						{}
+						
+						IB.buffer.upload; 
+						TB.buffer.upload; 
 					}
-					
-					TB.buffer.reset; 
-					TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
-					
-					if(TB.buffer.grow(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
-					{}; 
-					
-					TB.buffer.upload_appender; 
-					
+					catch(Exception e) { ERR("Scene exception: ", e.simpleMsg); }
 					//because buffers could grow, descriptors can change.
 					recreateDescriptors; 
 					
