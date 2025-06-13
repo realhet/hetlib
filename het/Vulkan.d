@@ -5875,6 +5875,35 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				} 
 			} 
 		} 
+		struct VulkanBufferSizeConfig
+		{
+			size_t 	minSizeBytes 	= 4*KiB, 
+				maxSizeBytes 	= 4*MiB; float growRate = 2.0, 
+			shrinkWhen 	= 0.25, 
+			shrinkRate 	= 0.5; 
+			
+			enum minGranularity = 16, maxReasonableSizeBytes = 1*TiB; 
+			void prepare(size_t granularity=minGranularity)
+			{
+				granularity.maximize(minGranularity); 
+				minSizeBytes = minSizeBytes.max(1).alignUp(granularity).min(maxReasonableSizeBytes); 
+				maxSizeBytes = maxSizeBytes.max(minSizeBytes).alignUp(granularity).min(maxReasonableSizeBytes); 
+				growRate = growRate.clamp(1, 1000); 
+				shrinkRate = shrinkRate.clamp(0, 1); 
+				shrinkWhen = shrinkWhen.clamp(0, shrinkRate); 
+				verify; 
+			} 
+			
+			void verify()
+			{
+				enforce(minSizeBytes > 0, "Minimum size must be greater than zero"); 
+				enforce(maxSizeBytes.inRange(minSizeBytes, 1*TiB), "Maximum size must be between minSizeBytes and 1 TiB"); 
+				enforce(growRate >= 1, "Grow rate must be at least 1"); 
+				enforce(shrinkRate.inRange(0, 1), "Shrink rate must be between 0 and 1"); 
+				enforce(shrinkWhen.inRange(0, shrinkRate), "Shrink threshold must be between 0 and shrinkRate"); 
+			} 
+		} 
+		
 		class VulkanStagedBuffer
 		{
 			mixin SmartChild!q{
@@ -5882,8 +5911,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				size_t	minSizeBytes, 
-				size_t	maxSizeBytes
+				VulkanBufferSizeConfig	bufferSizeConfig
 			}; 
 			
 			enum poolGranularity 	= 0x1000 /+The pool size will be aligned by this.+/,
@@ -5976,11 +6004,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			BufferPair bufferPair; alias this = bufferPair; 
 			
+			@property minSizeBytes() const => bufferSizeConfig.minSizeBytes; 
+			@property maxSizeBytes() const => bufferSizeConfig.maxSizeBytes; 
+			
 			void _construct()
 			{
-				this.minSizeBytes = minSizeBytes.alignUp(poolGranularity).max(poolGranularity), 
-				this.maxSizeBytes = maxSizeBytes.alignUp(poolGranularity).max(minSizeBytes); 
-				
+				bufferSizeConfig.prepare; 
 				resize(minSizeBytes, keepContents : true); 
 			} 
 			
@@ -5989,29 +6018,35 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			version(/+$DIDE_REGION Resize functionality+/all)
 			{
-				protected size_t prepareBufferSize(size_t s)
-				=> s.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
-				
 				bool growByRate(float rate, bool keepContents)
 				{
 					const newSize = (lround(bufferSizeBytes*rate)); 
 					return resize(((rate>=1)?(newSize.alignUp  (poolGranularity)) :(newSize.alignDown(poolGranularity))), keepContents); 
 				} 
 				
-				void growToAndBeyond(size_t newSize)
+				void requireBufferSizeBytes(size_t newSize)
 				{
 					bool hasEnoughSpace() => newSize<=bufferSizeBytes; 
 					
 					if(!hasEnoughSpace)
 					{
-						resize(newSize * 2, keepContents : true); 
-						enforce(hasEnoughSpace, "Unable to grow VulkanStorageBuffer."); 
+						resize(
+							(lceil(max(bufferSizeBytes * (double(bufferSizeConfig.growRate)), newSize))), 
+							keepContents : true
+						); 
+						enforce(
+							hasEnoughSpace, "Unable to grow VulkanStorageBuffer."
+							/+Todo: more info+/
+						); 
 					}
 				} 
 				
 				bool resize(size_t newBufferSizeBytes, bool keepContents)
 				{
 					T0; 
+					
+					size_t prepareBufferSize(size_t s)
+					=> s.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
 					
 					newBufferSizeBytes = prepareBufferSize(newBufferSizeBytes); 
 					if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
@@ -6025,7 +6060,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes); 
 					if(!newBufferPair.valid) return false/+out of mem, nothing's changed+/; 
 					
-					if(keepContents) { copyBufferPair(bufferPair, newBufferPair, commandPool, queue); }
+					if(keepContents) {
+						copyBufferPair(bufferPair, newBufferPair, commandPool, queue); 
+						/+
+							Opt: The copying of GPU buffer is only needed right before 
+							the shader execution. Only the CPU buffer needs to 
+							grow first.
+							Problem: What if GPU becomes out of mem....
+						+/
+					}
 					
 					print(
 						"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
@@ -6039,8 +6082,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					
 					if(allocator) {
 						if(bufferSizeBytes > oldBufferSizeBytes)
-						try { allocator.growPool(hostPtr, bufferSizeBytes); }
-						catch(Exception e) ERR(e.simpleMsg); 
+						allocator.growPool(hostPtr, bufferSizeBytes); 
 					}
 					
 					return true/+success+/; 
@@ -6078,14 +6120,18 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						
 						// Sort ranges by their starting offset, do range checking and filtering 
 						const totalBlocks = bufferSizeBytes / uploadGranularity; 
-						auto sorted = blocks	.map!((a)=>(
+						auto filtered = blocks	.map!((a)=>(
 							BlockRange(
 								a.start.min(totalBlocks), 
 								a.end.min(totalBlocks) 
 							) 
 						)) 
-							.cache.filter!((a)=>(a.start < a.end)) 
-							.array.sort!((a, b)=>(a.start < b.start)); 
+							.cache.filter!((a)=>(a.start < a.end)).array; 
+						auto sorted = filtered.sort!((a, b)=>(a.start < b.start)); 
+						/+
+							Opt: This quicksort is not a good solution when having 400K accesses. 
+							Also way too much allocation for these arrays.
+						+/
 						
 						BlockRange current = sorted.front; //Initialize with first range 
 						
@@ -6113,11 +6159,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				void heapInit()
 				{
-					allocator = new Allocator((cast(ubyte*)(hostPtr))[0..bufferSizeBytes]); 
-					enforce(
-						allocator.alloc(0) is hostPtr, 
-						"Error allocating very first null block in heap."
-					); 
+					synchronized(this)
+					{
+						allocator = new Allocator((cast(ubyte*)(hostPtr))[0..bufferSizeBytes]); 
+						enforce(
+							allocator.alloc(0) is hostPtr, 
+							"Error allocating very first null block in heap."
+						); 
+					} 
 				} 
 				
 				struct HeapRef
@@ -6134,14 +6183,33 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto heapAlloc(size_t size)
 				{
-					HeapRef res; 
-					res.ptr = allocator.alloc(size); 
-					res.heapAddr = calcHeapAddr(res.ptr); 
-					return res; 
+					synchronized(this)
+					{
+						HeapRef res; 
+						res.ptr = allocator.alloc(size); 
+						
+						if(!res.ptr)
+						{
+							ignoreExceptions(
+								{
+									requireBufferSizeBytes(bufferSizeBytes + size); 
+									res.ptr = allocator.alloc(size); 
+								}
+							); 
+							/+Todo: Do garbage collect/defrag on exception+/
+							/+Todo: Exception should be just a boolean success flag.+/
+						}
+						
+						if(res.ptr) res.heapAddr = calcHeapAddr(res.ptr); 
+						return res; 
+					} 
 				} 
 				
 				void heapFree(void* p)
-				{ allocator.free(p); }  void heapFree(uint a)
+				{
+					synchronized(this)
+					{ allocator.free(p); } 
+				}  void heapFree(uint a)
 				{ heapFree(calcHeapPtr(a)); } 
 				
 			}
@@ -6159,8 +6227,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				size_t	minSizeBytes, 
-				size_t	maxSizeBytes
+				VulkanBufferSizeConfig	bufferSizeConfig
 			)
 			{ super(__traits(parameters)); } 
 			
@@ -6168,7 +6235,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				if(!size) return; 
 				
-				growToAndBeyond(appendPos + size); 
+				requireBufferSizeBytes(appendPos + size); 
 				
 				memcpy(hostPtr+appendPos, data, size); 
 				appendPos += size; 
@@ -6211,8 +6278,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				size_t	minSizeBytes, 
-				size_t	maxSizeBytes
+				VulkanBufferSizeConfig	bufferSizeConfig
 			)
 			{ super(__traits(parameters)); } 
 			
@@ -6221,7 +6287,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			protected T[] _array; 
 			@property length() const
 			=> _array.length; 
-			const ref opIndex(size_t i)()
+			const ref opIndex(size_t i)
 			=> _array[i]; 
 			void opIndexAssign(in T value, size_t i)
 			{
@@ -6233,7 +6299,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			uint append(in T value)
 			{
-				growToAndBeyond((length + 1)*T.sizeof); 	//exception when out of mem
+				requireBufferSizeBytes((length + 1)*T.sizeof); 	//exception when out of mem
 				const idx = _array.length.to!uint; 	//exception after 2^32 index
 				_array = (cast(T*)(hostPtr))[0..idx+1]; 	//uptate the slice
 				this[idx] = value; 	//set the value and mark it as changed
@@ -6242,7 +6308,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			void upload()
 			{
-				if(modifiedBlocks.empty) return; auto _間=init間; 
+				if(modifiedBlocks.empty) return; 
 				scope(exit) modifiedBlocks = []; 
 				auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
 				cb.record(
@@ -6261,7 +6327,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					}
 				); 
 				queue.submit(cb); 
-				queue.waitIdle; /+Opt: STALL+/((0x35FBB4F76D066).檢((update間(_間)))); 
+				queue.waitIdle; /+Opt: STALL+/
 			} 
 		} 
 	}

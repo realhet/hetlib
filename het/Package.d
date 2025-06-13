@@ -2475,11 +2475,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	version(/+$DIDE_REGION NiceExpression implementations+/all)
 	{
 		/+Todo: These should be mixin templates to see the target's scope.+/
-		static auto 體(T, string def)() //struct
+		static auto 體(alias T, string def)() //struct
 		{ return format!`((){%s _={%s};return _;}())`(T.stringof, def); } 
-		static auto 舉(T, string def)() //enum
+		static auto 舉(alias T, string def)() //enum
 		{ return format!`(%s.%s)`(T.stringof, def); } 
-		static auto 幟(T, string def)() //flags
+		static auto 幟(alias T, string def)() //flags
 		{ return format!`((){with(%s) return %s;}())`(T.stringof, def); } 
 	}
 	
@@ -2939,6 +2939,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		mixin(iq{string GEN_$(name)(表 t) => t.GEN_$(name); }.text); 
 		/+Todo: Nonstandard casing (sometimes capitalized, sometimes not)  I thing everything capitalized would be better.+/
 		
+		string GEN_enumDefines(E)() if(is(E==enum))
+		{ return [EnumMembers!E].map!((a)=>("#define TexType_"~a.text~" "~a.to!int.text~"\r\n")).join; } 
+		
 		//This is the new way: template mixin instead of string mixin.
 		mixin template INJECTOR_TEMPLATE(alias _data, string _script)
 		{ mixin(_script); } 
@@ -3323,7 +3326,12 @@ version(/+$DIDE_REGION Numeric+/all)
 		alias uint64_t 	= ulong	, int64_t 	= long	,
 		uint32_t	= uint	, int32_t	= int	,
 		uint16_t	= ushort	, int16_t	= short	,
-		uint8_t	= ubyte	, int8_t	= byte	; 
+		uint8_t	= ubyte	, int8_t	= byte	;  enum KiB 	= 1L<<10,
+		MiB 	= 1L<<20,
+		GiB 	= 1L<<30,
+		TiB 	= 1L<<40,
+		PiB 	= 1L<<50,
+		EiB 	= 1L<<60; 
 		
 		//Todo: Table based programming. definition: : rowmajor col=2 "alias %1s = %2s, ...; "
 		

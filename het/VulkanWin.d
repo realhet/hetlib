@@ -20,6 +20,35 @@ import core.stdc.string : memset;
 
 class VulkanWindow: Window
 {
+	struct BufferSizeConfigs
+	{ VulkanBufferSizeConfig VBConfig, IBConfig, TBConfig; } 
+	
+	BufferSizeConfigs bufferSizeConfigs =
+	mixin(體!((BufferSizeConfigs),q{
+		VBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
+			minSizeBytes 	: ((  4)*(KiB)), 
+			maxSizeBytes 	: ((256)*(MiB)),
+			growRate : 2.0,
+			shrinkWhen 	: 0.25, 
+			shrinkRate 	: 0.5
+		})),
+		IBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
+			minSizeBytes 	: ((  4)*(KiB)), 
+			maxSizeBytes 	: (( 16)*(MiB)),
+			growRate : 2.0,
+			shrinkWhen 	: 0.25, 
+			shrinkRate 	: 0.5
+		})),
+		TBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
+			minSizeBytes 	: ((768)*(MiB)), 
+			maxSizeBytes 	: ((768)*(MiB)),
+			growRate : 2.0,
+			shrinkWhen 	: 0.25, 
+			shrinkRate 	: 0.5
+		}))
+	})); 
+	
+	
 	VulkanInstance vk; 
 	VulkanSurface surface; 
 	VulkanPhysicalDevice physicalDevice; 
@@ -189,11 +218,8 @@ class VulkanWindow: Window
 			this()
 			{
 				buffer = new VulkanAppenderBuffer
-					(
-					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})),
-					minSizeBytes 	: 4 << 10, 
-					maxSizeBytes 	: 1 << 30/+Todo: do it in multiple parts when max was reached+/
-				); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})), bufferSizeConfigs.VBConfig); 
+				/+Todo: Do the whole drawing thing it in multiple parts when max was reached+/
 			} 
 			
 			~this()
@@ -234,246 +260,178 @@ class VulkanWindow: Window
 	
 	version(/+$DIDE_REGION IB     +/all)
 	{
-		enum TexFormat : ubyte
+		
+		version(/+$DIDE_REGION TexInfo declarations+/all)
 		{
-			l8,
-			wa8 /+all white, alpha8. It's for fonts.+/, 
-			la8,
-			rgb8,
-			rgba8,
-			bgr8,
-			bgra8,
-		} 
-		
-		//flags: 1D/2D
-		
-		enum TexType
-		{
-			/+Note: bits↓+/  	/+Note: 1 ch+/	/+Note: 2 ch+/	/+Note: 3 ch+/	/+Note: 4 ch+/	
-			/+Note:   1+/	u1,				
-			/+Note:   2+/	u2,				
-			/+Note:   4+/	u4,				
-			/+Note:   8+/	u8,				
-			/+Note:  16+/	u16,	rg_u8, 	rgb_u565,	rgba_u5551,	
-			/+Note:  24+/			rgb8,		
-			/+Note:  32+/	f32,			rgba_u8,	
-			/+Note:  48+/			rgb_u16,		
-			/+Note:  64+/		rg_f32,		rgba_u16,	
-			/+Note:  96+/			rgb_f32,		
-			/+Note: 128+/				rgba_f32	
-		} 
-		
-		static string GEN_enum_defines(E)()
-		{ return [EnumMembers!TexType].map!((a)=>("#define TexType_"~a.text~" "~a.to!int.text)).join('\n'); } 
-		
-		pragma(msg, i"$(位!()): Warning: $(GEN_enum_defines!TexType)".text); 
-		
-		enum TexEffect
-		{
-			none, 
-			whiteAlpha, 
-			redBlueSwap
-		} 
-		
-		struct TexFormatSize
-		{
-			mixin((
-				(表([
-					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-					[q{TexType},q{4},q{"type"},q{},q{/++/}],
-					[q{TexEffect},q{4},q{"effect"},q{},q{/++/}],
-					[q{YAlign},q{3},q{"yAlign"},q{1},q{/++/}],
-				]))
-			).調!(GEN_bitfields)); 
-		} 
-		
-		struct TexInfo
-		{ uint addr, format, width, height; } 
-		
+			alias TexHandle 	= Typedef!(uint, 0, "TexHandle"),
+			TexPtr 	= Typedef!(uint, 0, "TexPtr"); 
+			
+			
+			enum TexType
+			{
+				/+Note: bits↓+/  	/+Note: 1 ch+/	/+Note: 2 ch+/	/+Note: 3 ch+/	/+Note: 4 ch+/	
+				/+Note:   1+/	u1,				
+				/+Note:   2+/	u2,				
+				/+Note:   4+/	u4,				
+				/+Note:   8+/	u8,				
+				/+Note:  16+/	u16,	rg_u8, 	rgb_u565,	rgba_u5551,	
+				/+Note:  24+/			rgb_u8,		
+				/+Note:  32+/	f32,			rgba_u8,	
+				/+Note:  48+/			rgb_u16,		
+				/+Note:  64+/		rg_f32,		rgba_u16,	
+				/+Note:  96+/			rgb_f32,		
+				/+Note: 128+/				rgba_f32	
+			} 
+			static assert(TexType.max < 1<<4); 
+			
+			enum TexEffect
+			{
+				none, 
+				whiteAlpha, 
+				redBlueSwap
+			} 
+			static assert(TexEffect.max < 1<<4); 
+			
+			enum TexDim
+			{
+				_1D, 
+				_2D, 
+				_3D,
+			} 
+			static assert(TexEffect.max < 1<<2); 
+			
+			struct TexSizeFormat
+			{
+				mixin((
+					(表([
+						[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+						[q{TexType},q{4},q{"type"},q{},q{/++/}],
+						[q{TexEffect},q{4},q{"effect"},q{},q{/++/}],
+						[q{TexDim},q{2},q{"dim"},q{},q{/++/}],
+						[q{uint},q{6},q{"_unused"},q{},q{/++/}],
+						[q{uint},q{16},q{"_rawSize0"},q{},q{/++/}],
+						[q{uint},q{32},q{"_rawSize12"},q{},q{/++/}],
+					]))
+				).調!(GEN_bitfields)); 
+				
+				@property ivec3 size()
+				=> dim.predSwitch(
+					TexDim._1D, ivec3(_rawSize12, 1, 1),
+					TexDim._2D, ivec3((_rawSize0 | ((_rawSize12 & 0xFF)<<16)), _rawSize12>>8, 1),
+					TexDim._3D, ivec3(_rawSize0, _rawSize12 & 0xFFFF, _rawSize12>>16),
+				); 
+				@property size(int a)
+				{ dim = TexDim._1D; _rawSize0 = 0; _rawSize12 = a; } 
+				@property size(ivec2 a)
+				{ dim = TexDim._2D; _rawSize0 = a.x & 0xFFFF; _rawSize12 = ((a.x>>16) & 0xFF) | (a.y << 8); } 
+				@property size(ivec3 a)
+				{ dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); } 
+				
+				static void selfTest()
+				{
+					void doit(T)(T v, ivec3 r) { TexSizeFormat t; t.size = v; enforce(t.size==r); } 
+					{
+						const a = [1, 84903, 0x7F12_345F]; 
+						foreach(x; a) doit(x, ivec3(x, 1, 1)); 
+					}
+					{
+						const a = [1, 84903, 0xF1234F]; 
+						foreach(x; a) foreach(y; a) doit(ivec2(x, y), ivec3(x, y, 1)); 
+					}
+					{
+						const a = [1, 14903, 0xF12F]; 
+						foreach(x; a) foreach(y; a) foreach(z; a) doit(ivec3(x, y, z), ivec3(x, y, z)); 
+					}
+				} 
+			} 
+			static assert(TexSizeFormat.sizeof==8); 
+			
+			struct TexInfo
+			{
+				TexPtr addr; uint extra; 
+				TexSizeFormat SizeFormat; 
+			} 
+			static assert(TexInfo.sizeof==16); 
+		}
 		InfoBufferManager IB; 
 		class InfoBufferManager
 		{
 			VulkanArrayBuffer!TexInfo buffer; 
 			
+			const TexHandle nullHandle; 
+			
+			protected
+			{
+				TexHandle[] freeHandles; 
+				uint[] lastAccesTicks /+Must synched with main buffer array.+/
+				/+Opt: Maybe this information should be stored in the record.+/; 
+			} 
+			
+			
 			this()
 			{
 				buffer = new VulkanArrayBuffer!TexInfo
 					(
-					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})),
-					minSizeBytes 	: 16 << 10, 
-					maxSizeBytes 	: 16 << 20
+					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), 
+					bufferSizeConfigs.IBConfig
 				); 
 				
-				/+buffer.upload_deprecated([TexInfo.init].replicate(buffer.bufferSizeBytes/TexInfo.sizeof)); +/
+				//create the very first handle
+				nullHandle = buffer.append(TexInfo.init); enforce(!nullHandle); 
 			} 
 			
 			~this()
 			{ buffer.free; } 
 			
-			/+
-				Code: //these are saved from the old version of info manager:
-				
-				class InfoTexture
-				{
-					private
-					{
-						enum TexelsPerInfo = 2; //for rgba & 8byte subTexInfo
-						enum TexWidth = 512, InfoPerLine = TexWidth/TexelsPerInfo; 
-					} 
-					
-					GLTexture glTexture; 
-					int[int] lastAccessed; //last globalUpdateTick when accessed/updated
-					
-					SubTexInfo[] infoArray; 
-					int[]	freeIndices; 
-					
-					int capacity() const
-					{ return InfoPerLine * glTexture.height; } 
-					int length() const
-					{ return cast(int)infoArray.length; } 
-					
-					void upload(int idx)
-					{
-						 //Opt: ezt megcsinalni kotegelt feldolgozasura
-						glTexture.fastBind; 
-						glTexture.upload(infoArray[idx..idx+1], idx % InfoPerLine * TexelsPerInfo, idx / InfoPerLine, 2, 1); 
-					} 
-					
-					void grow()
-					{
-						glTexture.fastBind; 
-						glTexture.resize(TexWidth, glTexture.height*2); //exponential grow
-					} 
-					
-					bool isValidIdx(int idx) const
-					{ return idx.inRange(infoArray); } 
-					
-					void checkValidIdx(int idx) const
-					{
-						 //Todo: refactor to isValidIdx
-						enforce(isValidIdx(idx), "subTexIdx out of range (%s)".format(idx)); 
-						//ez nem kell, mert a delayed loader null-t allokal eloszor. 
-						//enforce(!infoArray[idx].isNull, "invalid subTexIdx (%s)".format(idx));
-					} 
-					
-					void accessedNow(int idx)
-					{
-						if(!global_disableSubtextureAging)
-						lastAccessed[idx] = application.tick; 
-					} 
-					
-					this()
-					{
-						enforce(SubTexInfo.sizeof==8, "Only implemented for 8 byte SubTextInfo"); 
-						
-						glTexture = new GLTexture(
-							"InfoTexture", TexWidth, 1/*height*/, 
-							GLTextureType.RGBA8, 
-							false/*no mipmap*/
-						); 
-						glTexture.bind; 
-					} 
-					
-					~this()
-					{ glTexture.destroy; } 
-					
-					//peeks the next subTex idx. Doesn't allocate it. Must be analogous with add()
-					//Note: this technique is too dangerous. Must add the info, but not upload.
-					/*
-						int peekNextIdx() const{
-								if(!freeIndices.empty){//reuse a free slot
-									return freeIndices[$-1];
-								}else{ //add an extra slot
-									return cast(int)infoArray.length;
-								}
-							}
-					*/
-					
-					//allocates a new subTexture slot
-					
-					int add(in SubTexInfo info, Flag!"uploadNow" uploadNow= Yes.uploadNow)
-					{
-						//ez nem kell, mert a delayed loader pont null-t allokal eloszor: 
-						//enforce(!info.isNull, "cannot allocate SubTexInfo.null");
-						
-						int actIdx; 
-						
-						//this must be analogous with peekNextIdx
-						if(!freeIndices.empty)
-						{
-							//reuse a free slot
-							actIdx = freeIndices.fetchBack; 
-							infoArray[actIdx] = info; 
-						}
-						else {
-							//add an extra slot
-							actIdx = cast(int)infoArray.length; 
-							infoArray ~= info; 
-							
-							enforce(actIdx<SubTexIdxCnt, "FATAL: SubTexIdxCnt limit reached"); 
-							
-							if(capacity<infoArray.length)
-							grow; 
-						}
-						
-						accessedNow(actIdx); 
-						
-						if(uploadNow)
-						upload(actIdx); 
-						
-						return actIdx; 
-					} 
-					
-					//removes a subTex by idx
-					void remove(int idx)
-					{
-						checkValidIdx(idx); 
-						
-						infoArray[idx] = SubTexInfo.init; 
-						freeIndices ~= idx; 
-						
-						upload(idx); //upload the null for safety
-						//Todo: feltetelesen fordithatova tenni ezeket a felszabaditas utani zero filleket
-					} 
-					
-					//gets a subTexInfo by idx
-					SubTexInfo access(int idx)
-					{
-						checkValidIdx(idx); 
-						accessedNow(idx); 
-						return infoArray[idx]; 
-					} 
-					
-					void modify(int idx, in SubTexInfo info)
-					{
-						checkValidIdx(idx); 
-						accessedNow(idx); 
-						infoArray[idx] = info; 
-						upload(idx); 
-					} 
-					
-					
-					void dump() const
-					{
-						//infoArray.enumerate.each!writeln;
-						//!!! LDC 1.20.0 win64 linker bug when using enumerate here!!!!!
-						
-						//foreach(i, a; infoArray) writeln(tuple(i, a));
-						//!!! linker error as well
-						
-						//foreach(i, a; infoArray) writeln(tuple(i, i+1));
-						//!!! this is bad as well, the problem is not related to own structs, just to tuples
-						
-						foreach(i, a; infoArray)
-						writefln("(%s, %s)", i, a);  //this works
-					} 
-					
-					size_t sizeBytes() const
-					{ return glTexture ? glTexture.sizeBytes : 0; } 
-				} 
-				
-			+/
+			bool isValidHandle(in TexHandle handle) const
+			=> handle.inRange(1, buffer.length); 
+			
+			void markAccessed(in TexHandle handle)
+			{
+				assert(isValidHandle(handle)); 
+				lastAccesTicks[(cast(uint)(handle))] = application.tick; 
+				/+Todo: application.tick can overflow in a month.+/
+			} 
+			
+			TexHandle add(in TexInfo info) /+can throw+/
+			{
+				TexHandle handle; 
+				if(!freeHandles.empty)	{
+					handle = freeHandles.fetchBack; 
+					buffer[(cast(uint)(handle))] = info; 
+				}
+				else	{
+					handle = buffer.append(info); 
+					lastAccesTicks.length = buffer.length; 
+				}
+				markAccessed(handle); 
+				return handle; 
+			} 
+			
+			void remove(in TexHandle handle)
+			{
+				if(!handle) return; 
+				assert(isValidHandle(handle)); 
+				buffer[(cast(uint)(handle))] = TexInfo.init; 
+				freeHandles ~= handle; 
+				lastAccesTicks[(cast(uint)(handle))] = 0; 
+			} 
+			
+			TexInfo access(in TexHandle handle)
+			{
+				assert(isValidHandle(handle)); 
+				markAccessed(handle); 
+				return buffer[(cast(uint)(handle))]; 
+			} 
+			
+			void modify(in TexHandle handle, in TexInfo info)
+			{
+				assert(isValidHandle(handle)); 
+				markAccessed(handle); 
+				buffer[(cast(uint)(handle))] = info; 
+			} 
 		} 
+		
 	}
 	
 	version(/+$DIDE_REGION TB     +/all)
@@ -485,20 +443,31 @@ class VulkanWindow: Window
 			
 			this()
 			{
+					auto _間=init間; 
 				buffer = new VulkanAppenderBuffer
 					(
-					device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})),
-					minSizeBytes 	:   4 << 10,
-					maxSizeBytes 	: 512 << 20
-				); 
+					device, queue, commandPool, 
+					mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))
+				); 	((0x314F82886ADB).檢((update間(_間)))); 
+				buffer.heapInit; 	((0x319282886ADB).檢((update間(_間)))); 
+				buffer.allocator.stats.print; 	((0x31E282886ADB).檢((update間(_間)))); 
+					
+				uint[] sizes = mixin(求map(q{0<i<35000},q{},q{uint(i)})).array; 	((0x325C82886ADB).檢((update間(_間)))); 
+				import std.random; auto rnd = MinstdRand0(42); 	((0x32BD82886ADB).檢((update間(_間)))); 
 				
-				buffer.heapInit; 
-				
-				buffer.allocator.stats.print; 
+				if((常!(bool)(1))) { sizes.randomShuffle(rnd); }	((0x332682886ADB).檢((update間(_間)))); 
+				sizes.take(20).print; 	((0x336E82886ADB).檢((update間(_間)))); 
+				auto addrs = mixin(求map(q{i},q{sizes},q{buffer.heapAlloc(i).heapAddr})).array; 	((0x33F182886ADB).檢((update間(_間)))); 
+				addrs.take(20).print; 	((0x343982886ADB).檢((update間(_間)))); 
+				if((常!(bool)(1))) { addrs.randomShuffle(rnd); }	((0x349C82886ADB).檢((update間(_間)))); 
+				buffer.allocator.stats.print; 	((0x34EC82886ADB).檢((update間(_間)))); 
+				mixin(求each(q{a},q{addrs},q{buffer.heapFree(buffer.calcHeapPtr(a))})); 	((0x356782886ADB).檢((update間(_間)))); 
+				buffer.allocator.stats.print; 	((0x35B782886ADB).檢((update間(_間)))); 
 			} 
 			
 			~this()
 			{ buffer.free; } 
+			
 		} 
 	}
 	
@@ -554,6 +523,8 @@ class VulkanWindow: Window
 		enum shaderBinary = 
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
+			
+			$(GEN_enumDefines!TexType)
 			
 			@vert: 
 			layout(location = 0)
@@ -866,11 +837,16 @@ class VulkanWindow: Window
 		+/
 	} 
 	
+	void selfTest()
+	{ TexSizeFormat.selfTest; } 
+	
 	
 	override void onInitializeGLWindow()
 	{
 		disableInternalRedraw = true /+Do nothing on WM_PAINT+/; 
 		targetUpdateRate = 100000 /+No limit on minimum update interval+/; 
+		
+		selfTest; 
 		
 		vk	= new VulkanInstance(["VK_KHR_surface", "VK_KHR_win32_surface"]),
 		physicalDevice	= vk.physicalDevices.front,
@@ -963,8 +939,6 @@ class VulkanWindow: Window
 							
 							UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
 						}
-						
-						if(!IB.buffer.length) IB.buffer.append(TexInfo(0)); 
 						
 						TB.buffer.reset; 
 						TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 

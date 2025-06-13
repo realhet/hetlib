@@ -1437,10 +1437,10 @@ version(/+$DIDE_REGION+/all)
 			this.ch = ch; 
 			
 			//tab is the isSame as a space
-			isTab = ch==9; 
-			isWhite = isTab || ch==32; 
-			isNewLine = ch==10; 
-			isReturn = ch==13; 
+			isTab = ch=='\t'/+9+/; 
+			isWhite = isTab || ch==' '/+32+/; 
+			isNewLine = ch=='\n'/+10+/; 
+			isReturn = ch=='\r'/+13+/; 
 			/+
 				Todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. 
 				ossz 16byte all rendelkezeser ugyis.
@@ -1449,14 +1449,16 @@ version(/+$DIDE_REGION+/all)
 			dchar visibleCh = ch; 
 			if(VisualizeGlyphs)
 			{
-				if(isReturn)
-				visibleCh = 0x240D; else if(isNewLine)
-				visibleCh = 0x240A; //0x23CE;
-			}else
+				if(isReturn)	visibleCh = 0x240D; 
+				else if(isNewLine)	visibleCh = 0x240A; 
+			}
+			else
 			{
-				if(isReturn || isNewLine)
-				visibleCh = ' '; 
-				else if(ch==0xb) visibleCh = 0x240B; //vertical tab. It is used for multiColumns
+				if(isReturn || isNewLine)	{ visibleCh = ' '; }
+				else if(ch=='\v'/+11+/)	{
+					visibleCh = 0x240B; 
+					//vertical tab. It is used for multiColumns
+				}
 			}
 			
 			stIdx = visibleCh.fontTexture(ts); 
@@ -3900,21 +3902,19 @@ version(/+$DIDE_REGION+/all)
 						"wholeLines"	: BoundaryType.line
 					]
 				)
-				mixin(
-					iq{
-						@property $(name)() const
-						=> boundaryTypeStart 	== $(bt.stringof) &&
-						boundaryTypeEnd	== $(bt.stringof); 
-						@property $(name)(bool a)
-						{
-							const b = ((a)?($(bt.stringof)):(BoundaryType.none)); 
-							boundaryTypeStart = b; 
-							boundaryTypeEnd = b; 
-						} 
-						void $(name)_toggle()
-						{ $(name) = !$(name); } 
-					}.text
-				); 
+				mixin(iq{
+					@property $(name)() const
+					=> boundaryTypeStart 	== $(bt.stringof) &&
+					boundaryTypeEnd	== $(bt.stringof); 
+					@property $(name)(bool a)
+					{
+						const b = ((a)?($(bt.stringof)):(BoundaryType.none)); 
+						boundaryTypeStart = b; 
+						boundaryTypeEnd = b; 
+					} 
+					void $(name)_toggle()
+					{ $(name) = !$(name); } 
+				}.text); 
 			} 
 			
 			static struct SearchResult
