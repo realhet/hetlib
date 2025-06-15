@@ -4800,7 +4800,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					imageMemoryBarriers	.length.to!uint, imageMemoryBarriers	.ptr
 				); 
 			} 
-			
+			
 			void cmdCopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, in VkBufferCopy[] regions)
 			{ device.vkCmdCopyBuffer(handle, srcBuffer, dstBuffer, regions.length.to!uint, regions.ptr); } 
 			
@@ -5860,9 +5860,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x3324C4F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332B24F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x333154F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x3324B4F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x332B14F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x333144F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
@@ -5875,6 +5875,357 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				} 
 			} 
 		} 
+		version(/+$DIDE_REGION MemTrack+/all)
+		{
+			struct MemTrackStats
+			{ size_t usedBytes, capacityBytes; } 
+			
+			/+Interface for tracking memory dirty regions+/ 
+			interface IMemTrack
+			{
+				/+Reset the memory tracker to initial state+/
+				void reset(); 
+				
+				/+
+					Mark a range of memory as dirty
+					Params:
+						start 	= start index (inclusive)
+						end 	= end index (exclusive)
+				+/
+				void markRange(in uint start, in uint end); 
+				
+				/+
+					Explore all dirty ranges
+					Params:
+						onRange = 	callback called for each dirty range
+							(start is inclusive, end is exclusive)
+				+/
+				void visitRanges(void delegate(uint start, uint end) onRange); 
+				
+				/+return memory usage stats+/
+				MemTrackStats stats() const; 
+			} 
+			
+			
+			alias MemTrack = MemTrack_quicksort; 
+			
+			void MemTrack_selfTest()
+			{
+				MemTrack_simpleTest(new MemTrack_bitarray!512); 
+				MemTrack_deepTest(new MemTrack_bitarray!512); 
+				/+Last successful test: 250613 2.87MB, 36.9ms+/
+				
+				MemTrack_simpleTest(new MemTrack_quicksort); 
+				MemTrack_deepTest(new MemTrack_quicksort); 
+				/+Last successful test: 250613 1.00MB, 9.4ms+/
+			} 
+			
+			
+			class MemTrack_quicksort : IMemTrack
+			{
+				static struct BlockRange { uint start, end/+non-inclusive+/; } 
+				protected BlockRange[] modifiedBlocks; 
+				
+				MemTrackStats stats() const
+				=> MemTrackStats(
+					BlockRange.sizeof * modifiedBlocks.length, 
+					BlockRange.sizeof * modifiedBlocks.capacity
+				); 
+				
+				void reset()
+				{ modifiedBlocks = []; } 
+				
+				void markRange(in uint start, in uint end)
+				{
+					if(start>=end) return; 
+					modifiedBlocks ~= BlockRange(start, end); 
+				} 
+				
+				void visitRanges(void delegate(uint start, uint end) onRange)
+				{
+					if(modifiedBlocks.empty) return; 
+					
+					// Sort ranges by their starting offset, do range checking and filtering 
+					auto sorted = modifiedBlocks.sort!((a, b)=>(a.start < b.start)); 
+					
+					BlockRange current = sorted.front; //Initialize with first range 
+					foreach(block; sorted[1..$])
+					{
+						if(block.start <= current.end)
+						{
+							// Ranges overlap or are adjacent - merge them 
+							current.end = max(current.end, block.end); 
+						}
+						else
+						{
+							// No overlap - add current and start new 
+							onRange(current.start, current.end); current = block; 
+						}
+					}
+					onRange(current.start, current.end); //Add the last accumulated range 
+				} 
+			} 
+			
+			
+			
+			
+			
+			class MemTrack_bitarray(uint BlockBits=512) : IMemTrack
+			{
+				static assert(BlockBits/64>0, "BlockBits must be at least 64"); 
+				static assert(BlockBits.isPowerOf2, "BlockBits must be a power of 2"); 
+				
+				alias Block = ulong[BlockBits/64]; //holds dirty bits.
+				
+				protected
+				{
+					Block[] blockPool; //very first block is unused, it is the null block
+					uint[] blockIndices; /+
+						indexing blockPool. Index 0 is special, 
+						it means no block allocated, all dirty bits are 0.
+					+/
+				} 
+				
+				this() { reset; } 
+				
+				
+				MemTrackStats stats() const
+				=> MemTrackStats(
+					Block.sizeof * blockPool.length 	+ uint.sizeof * blockIndices.length, 
+					Block.sizeof * blockPool.capacity 	+ uint.sizeof * blockIndices.capacity
+				); 
+				
+				//Before using the memory tracker, reset must be called.
+				void reset()
+				{
+					blockPool.length = 1; //It contains only the unused null block
+					blockIndices[] = 0; //all indices point to nothing
+				} 
+				
+				void visitRanges(void delegate(uint start, uint end) onRange)
+				{
+					bool inRange = false; 
+					uint rangeStart = 0; 
+					
+					foreach(const uint blockIdx; 0..blockIndices.length.to!uint)
+					{
+						const poolIdx = blockIndices[blockIdx]; 
+						if(poolIdx == 0 /+Note: No block allocated - all bits are 0+/)
+						{
+							if(inRange)
+							{ onRange(rangeStart, blockIdx * BlockBits); inRange = false; }
+						}
+						else if(poolIdx == uint.max /+Note: Entire block is dirty+/)
+						{
+							if(!inRange)
+							{ rangeStart = blockIdx * BlockBits; inRange = true; }
+						}
+						else
+						{
+							auto block = blockPool[poolIdx].ptr; /+Note: Block has dirty bits+/
+							foreach(const uint bit; 0..BlockBits)
+							{
+								const uint 	wordIdx 	= bit / 64, 
+									bitInWord 	= bit % 64; 
+								if(!!(block[wordIdx] & (1UL<<bitInWord)) != inRange)
+								{
+									const uint actPos = blockIdx * BlockBits + bit; 
+									if(inRange)	{ onRange(rangeStart, actPos); inRange = false; }
+									else	{ rangeStart = actPos; inRange = true; }
+								}
+							}
+						}
+					}
+					
+					// Handle final range if needed
+					if(inRange)
+					{ onRange(rangeStart, (cast(uint)(blockIndices.length)) * BlockBits); inRange = false; }
+				} 
+				void markRange(in uint start, in uint end)
+				{
+					if(start>=end) return; 
+					
+					// Calculate required block indices
+					const uint 	startBlock 	= start / BlockBits,
+						endBlock 	= (end + (BlockBits-1))/ BlockBits; 
+					
+					// Extend blockIndices if needed
+					if(blockIndices.length < endBlock)
+					{ blockIndices.length = endBlock; }
+					
+					void processBlock(in uint blockIdx)
+					{
+						if(blockIndices[blockIdx] == uint.max)
+						{ return; /+all dirty, nothing to do+/}
+						
+						// Calculate bit range for this block
+						const uint 	base 	= blockIdx * BlockBits,
+							localStart 	= max(start, base) - base,
+							localEnd 	= min(end , base + BlockBits) - base; 
+						
+						if(localStart==0 && localEnd==BlockBits)
+						{
+							blockIndices[blockIdx] = uint.max; 
+							return; /+The full block is dirty+/
+						}
+						
+						// Allocate block if needed
+						if(blockIndices[blockIdx] == 0)
+						{
+							/+Todo: Overflow handling!+/
+							blockIndices[blockIdx] = (cast(uint)(blockPool.length)); 
+							blockPool.length += 1; 
+						}
+						
+						// Get the actual block
+						auto block = blockPool[blockIndices[blockIdx]].ptr; 
+						
+						// Set bits in the block
+						enum optimized = (常!(bool)(1)); 
+						static if(!optimized)
+						{
+							foreach(const uint bit; localStart..localEnd)
+							{
+								uint 	wordIdx 	= bit / 64, 
+									bitInWord 	= bit % 64; 
+								block[wordIdx] |= 1UL << bitInWord; 
+							}
+						}
+						else
+						{
+							/+
+								Optimized bit-range filler that sets all bits between localStart (inclusive)
+								and localEnd (exclusive) in the ulong[] block using bulk operations.
+							+/
+							
+							// Calculate word and bit positions for start/end
+							uint 	startWord 	= localStart / 64,
+								startBit 	= localStart % 64,
+								endWord 	= (localEnd - 1) / 64,
+								endBit 	= (localEnd - 1) % 64; 
+							
+							// Handle case where all bits are in same word
+							if(startWord == endWord)
+							{ block[startWord] |= (~0UL << startBit) & (~0UL >> (63 - endBit)); }
+							else
+							{
+								// Set partial first word
+								if(startBit != 0)
+								{
+									block[startWord] |= ~0UL << startBit; 
+									startWord++; 
+								}
+								
+								// Set complete words in between
+								foreach(const uint word; startWord..endWord)
+								{ block[word] = ~0UL; }
+								
+								// Set partial last word
+								block[endWord] |= ~0UL >> (63 - endBit); 
+							}
+						}
+					} 
+					
+					// Process each block in range
+					const uint blockCnt = endBlock - startBlock; 
+					if(blockCnt==1)
+					{ processBlock(startBlock); }
+					else if(blockCnt>1)
+					{
+						processBlock(startBlock); 
+						foreach(const uint blockIdx; startBlock+1..endBlock-1) { processBlock(blockIdx); }
+						processBlock(endBlock-1); 
+					}
+				} 
+				
+				
+			} 
+			void MemTrack_simpleTest(IMemTrack mt)
+			{
+				void ins(uint start, uint end)
+				{
+					char[80] x; x[] = '.'; int idx; 
+					void paint(char ch, uint start, uint end) { foreach(i; start..end) x[i] = ch; } 
+					
+					paint('+', start, end); writeln(x); 
+					mt.markRange(start, end); 
+					mt.visitRanges((start, end){ paint('A'+(idx++%26), start, end); }); writeln(x); 
+				} 
+				
+				mt.reset; 
+				version(/+$DIDE_REGION+/all) {
+					print("separated blocks"); 
+					ins(10, 11); 
+					ins(15, 17); 
+					ins(5, 7); 
+					ins(1, 3); 
+					
+					print("touching"); 
+					ins(11, 12); 
+					ins(8, 10); 
+					
+					print("exactly overlapping"); 
+					ins(7, 10); 
+					ins(10, 14); 
+					
+					print("overlapping"); 
+					ins(12, 30); 
+					ins(0, 32); 
+				}
+				
+				const N = 35000*3; 
+				uint[] sizes = mixin(求map(q{0<i<N},q{},q{uint(i)})).array; 
+				import std.random; auto rnd = MinstdRand0(42); 
+				if((常!(bool)(1))) { sizes.randomShuffle(rnd); }
+				uint[2][] ranges; ulong pos; 
+				foreach(siz; sizes)
+				{ ranges ~= [(cast(uint)((pos)/256)), (cast(uint)((pos+siz+255)/256))]; pos+=siz; }
+				if((常!(bool)(1))) { ranges.randomShuffle(rnd); }
+				
+					T0; 
+				foreach(r; ranges)
+				{ mt.markRange(r[0], r[1]); }	const t0 = DT; 
+				mt.visitRanges((a, b){}); 	const t1 = DT; 
+				print("allocated total:", pos, pos.shortSizeText!1024~"B"); 
+				mt.visitRanges((a, b){ print(a, b); }); 
+				mt.stats.toJson.print; 
+				print(t0, "+", t1, "=", t0+t1); print; 
+			} 
+			
+			void MemTrack_deepTest(IMemTrack mt)
+			{
+				int[] positions = [-2, -1, 0, 1, 2, 32]; 
+				positions ~= positions.map!"a+64".array; positions ~= positions.map!"a+512".array; 
+				positions ~= positions.map!"a+2048".array; positions = positions.filter!"a>=0".array; 
+				print(positions.length); 
+				foreach(a; positions)
+				{
+					write(a, " "); 
+					foreach(b; positions)
+					if(a<b)
+					foreach(c; positions)
+					foreach(d; positions)
+					if(c<d)
+					{
+						mt.reset; mt.markRange(a, b); mt.markRange(c, d); 
+						
+						ubyte[2700] arr; 
+						foreach(x; a..b) arr[x] = 1; 
+						foreach(x; c..d) arr[x] = 1; 
+						
+						mt.visitRanges
+							((lo,hi){
+							foreach(x; lo..hi)
+							arr[x] = (cast(ubyte)(arr[x] + 2)); 
+						}); 
+						
+						const success = arr[].all!"a.among(0, 3)"; 
+						if(!success) ERR("Failed MemTrack", a, b, c, d, arr); 
+					}
+				}
+				write("\n\n"); 
+			} 
+		}
 		struct VulkanBufferSizeConfig
 		{
 			size_t 	minSizeBytes 	= 4*KiB, 
@@ -5882,7 +6233,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			shrinkWhen 	= 0.25, 
 			shrinkRate 	= 0.5; 
 			
-			enum minGranularity = 16, maxReasonableSizeBytes = 1*TiB; 
+			enum minGranularity = 16, maxReasonableSizeBytes = 1*TiB; 
+			
 			void prepare(size_t granularity=minGranularity)
 			{
 				granularity.maximize(minGranularity); 
@@ -5893,6 +6245,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				shrinkWhen = shrinkWhen.clamp(0, shrinkRate); 
 				verify; 
 			} 
+			
+			
+			
+			
+			
+			
+			
+			
 			
 			void verify()
 			{
@@ -5915,8 +6275,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			}; 
 			
 			enum poolGranularity 	= 0x1000 /+The pool size will be aligned by this.+/,
-			uploadGranularity 	=  0x100 /+Modification tracking will upload this large block.+/,
-			heapGranularity	=   0x10 /+Heap allocation align and min size.+/; 
+			uploadGranularity 	=  0x100 /+Modification tracking will upload this large block.+/; 
 			
 			static protected
 			{
@@ -6024,7 +6383,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					return resize(((rate>=1)?(newSize.alignUp  (poolGranularity)) :(newSize.alignDown(poolGranularity))), keepContents); 
 				} 
 				
-				void requireBufferSizeBytes(size_t newSize)
+				bool requireBufferSizeBytes(size_t newSize)
 				{
 					bool hasEnoughSpace() => newSize<=bufferSizeBytes; 
 					
@@ -6034,12 +6393,17 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							(lceil(max(bufferSizeBytes * (double(bufferSizeConfig.growRate)), newSize))), 
 							keepContents : true
 						); 
-						enforce(
-							hasEnoughSpace, "Unable to grow VulkanStorageBuffer."
-							/+Todo: more info+/
-						); 
+						const success = hasEnoughSpace; 
+						if(!success) ERR("Unable to grow VulkanStorageBuffer."); 
+						return success; 
 					}
+					return true; 
 				} 
+				
+				protected bool beforeResize(size_t newSizeBytes)
+				{ return true/+resizing operation allowed+/; } 
+				protected void afterResize(size_t oldSizeBytes)
+				{} 
 				
 				bool resize(size_t newBufferSizeBytes, bool keepContents)
 				{
@@ -6051,11 +6415,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					newBufferSizeBytes = prepareBufferSize(newBufferSizeBytes); 
 					if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
 					
-					if(allocator)
-					{
-						if(newBufferSizeBytes < bufferSizeBytes)
-						ERR("Pool Shrinking with allocator not supported yet."); 
-					}
+					if(!beforeResize(newBufferSizeBytes)) return false/+beforeResize() declined+/; 
 					
 					auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes); 
 					if(!newBufferPair.valid) return false/+out of mem, nothing's changed+/; 
@@ -6080,144 +6440,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					freeBufferPair(bufferPair); 
 					bufferPair = newBufferPair; 
 					
-					if(allocator) {
-						if(bufferSizeBytes > oldBufferSizeBytes)
-						allocator.growPool(hostPtr, bufferSizeBytes); 
-					}
+					afterResize(oldBufferSizeBytes); 
 					
 					return true/+success+/; 
 				} 
 			}
-			
-			version(/+$DIDE_REGION Invalidation logic+/all)
-			{
-				protected
-				{
-					static struct BlockRange { uint start, end/+non-inclusive+/; } 
-					BlockRange[] modifiedBlocks; 
-					
-					void markModified(void* ptr, size_t size) 
-					{
-						if(size<=0) return; 
-						static uint calcBlkIdx(size_t x) => (cast(uint)(x / uploadGranularity)); 
-						sizediff_t ofs = ptr - hostPtr; 
-						modifiedBlocks ~= BlockRange(
-							calcBlkIdx(ofs), 
-							calcBlkIdx(ofs + size - 1) + 1 
-						); 
-					} 
-					
-					void markModified(void* ptr, void* end) 
-					{ markModified(ptr, end-ptr); } 
-					
-					void markModified(void* ptr) 
-					{ markModified(ptr, 1); } 
-					
-					void combineBlocks(R)(R blocks, void delegate(BlockRange) onBlock) 
-					if(isInputRange!(R, BlockRange)) 
-					{
-						if(blocks.empty) return; 
-						
-						// Sort ranges by their starting offset, do range checking and filtering 
-						const totalBlocks = bufferSizeBytes / uploadGranularity; 
-						auto filtered = blocks	.map!((a)=>(
-							BlockRange(
-								a.start.min(totalBlocks), 
-								a.end.min(totalBlocks) 
-							) 
-						)) 
-							.cache.filter!((a)=>(a.start < a.end)).array; 
-						auto sorted = filtered.sort!((a, b)=>(a.start < b.start)); 
-						/+
-							Opt: This quicksort is not a good solution when having 400K accesses. 
-							Also way too much allocation for these arrays.
-						+/
-						
-						BlockRange current = sorted.front; //Initialize with first range 
-						
-						foreach(block; sorted[1..$])
-						{
-							if(block.start <= current.end)
-							{
-								// Ranges overlap or are adjacent - merge them 
-								current.end = max(current.end, block.end); 
-							}
-							else
-							{
-								// No overlap - add current and start new 
-								onBlock(current); current = block; 
-							}
-						}
-						onBlock(current); //Add the last accumulated range 
-					} 
-				} 
-			}
-			version(/+$DIDE_REGION Heap functionality+/all)
-			{
-				alias Allocator = MyAllocator!heapGranularity; 
-				Allocator allocator; 
-				
-				void heapInit()
-				{
-					synchronized(this)
-					{
-						allocator = new Allocator((cast(ubyte*)(hostPtr))[0..bufferSizeBytes]); 
-						enforce(
-							allocator.alloc(0) is hostPtr, 
-							"Error allocating very first null block in heap."
-						); 
-					} 
-				} 
-				
-				struct HeapRef
-				{
-					void* ptr; 	/++/
-					uint heapAddr; 	/+block index addresses 16 byte blocks.+/
-				} 
-				
-				uint calcHeapAddr(void* p /+p must be null or valid!+/)
-				=> p ? (cast(uint)((p - hostPtr) / heapGranularity)) : 0; 
-				
-				void* calcHeapPtr(uint a /+a must be 0 or valid!+/)
-				=> a ? hostPtr + (size_t(a) * heapGranularity) : null; 
-				
-				auto heapAlloc(size_t size)
-				{
-					synchronized(this)
-					{
-						HeapRef res; 
-						res.ptr = allocator.alloc(size); 
-						
-						if(!res.ptr)
-						{
-							ignoreExceptions(
-								{
-									requireBufferSizeBytes(bufferSizeBytes + size); 
-									res.ptr = allocator.alloc(size); 
-								}
-							); 
-							/+Todo: Do garbage collect/defrag on exception+/
-							/+Todo: Exception should be just a boolean success flag.+/
-						}
-						
-						if(res.ptr) res.heapAddr = calcHeapAddr(res.ptr); 
-						return res; 
-					} 
-				} 
-				
-				void heapFree(void* p)
-				{
-					synchronized(this)
-					{ allocator.free(p); } 
-				}  void heapFree(uint a)
-				{ heapFree(calcHeapPtr(a)); } 
-				
-			}
 			
 			
 			
-		} 
-		
+		} 
 		class VulkanAppenderBuffer : VulkanStagedBuffer
 		{
 			size_t appendPos; 
@@ -6235,7 +6466,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				if(!size) return; 
 				
-				requireBufferSizeBytes(appendPos + size); 
+				requireBufferSizeBytes(appendPos + size).enforce("Out of GPU mem"); 
 				
 				memcpy(hostPtr+appendPos, data, size); 
 				appendPos += size; 
@@ -6282,29 +6513,86 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			)
 			{ super(__traits(parameters)); } 
 			
-			enum sizeSh = T.sizeof.isPowerOf2 ? (cast(uint)(T.sizeof.log2)) : 0; 
-			
-			protected T[] _array; 
+			protected T[] _array;  const(T)[] opSlice() const => _array; 
 			@property length() const
-			=> _array.length; 
-			const ref opIndex(size_t i)
-			=> _array[i]; 
-			void opIndexAssign(in T value, size_t i)
+			=> _array.length;  const ref opIndex(size_t i)
+			=> _array[i];  void opIndexAssign(in T value, size_t i)
 			{
 				_array[i] = value; 
 				markModified(&_array[i], T.sizeof); 
 			} 
 			
-			const(T)[] opSlice() const => _array; 
-			
 			uint append(in T value)
 			{
-				requireBufferSizeBytes((length + 1)*T.sizeof); 	//exception when out of mem
+				requireBufferSizeBytes((length + 1) * T.sizeof)
+					.enforce("Out of GPU mem"); 	//exception when out of mem
 				const idx = _array.length.to!uint; 	//exception after 2^32 index
-				_array = (cast(T*)(hostPtr))[0..idx+1]; 	//uptate the slice
+				_array = (cast(T*)(hostPtr))[0..idx.to!size_t + 1]; 	//uptate the slice
 				this[idx] = value; 	//set the value and mark it as changed
 				return idx; 
+				/+Opt: Maybe .to!uint is not fast enough+/
 			} 
+			
+			version(/+$DIDE_REGION Invalidation logic+/all)
+			{
+				protected
+				{
+					static struct BlockRange { uint start, end/+non-inclusive+/; } 
+					BlockRange[] modifiedBlocks; 
+					
+					void markModified(void* ptr, size_t size) 
+					{
+						if(size<=0) return; 
+						static uint calcBlkIdx(size_t x) => (cast(uint)(x / uploadGranularity)); 
+						sizediff_t ofs = ptr - hostPtr; 
+						modifiedBlocks ~= BlockRange(
+							calcBlkIdx(ofs), 
+							calcBlkIdx(ofs + size - 1) + 1 
+						); 
+					} 
+					
+					void markModified(void* ptr, void* end)
+					{ markModified(ptr, end-ptr); }  void markModified(void* ptr)
+					{ markModified(ptr, 1); } 
+					
+					void combineBlocks(R)(R blocks, void delegate(BlockRange) onBlock) 
+					if(isInputRange!(R, BlockRange)) 
+					{
+						if(blocks.empty) return; 
+						
+						// Sort ranges by their starting offset, do range checking and filtering 
+						const totalBlocks = bufferSizeBytes / uploadGranularity; 
+						auto filtered = blocks	.map!((a)=>(
+							BlockRange(
+								a.start.min(totalBlocks), 
+								a.end.min(totalBlocks) 
+							) 
+						)) 
+							.cache.filter!((a)=>(a.start < a.end)).array; 
+						auto sorted = filtered.sort!((a, b)=>(a.start < b.start)); 
+						/+
+							Opt: This quicksort is not a good solution when having 400K accesses. 
+							Also way too much allocation for these arrays.
+						+/
+						
+						BlockRange current = sorted.front; //Initialize with first range 
+						foreach(block; sorted[1..$])
+						{
+							if(block.start <= current.end)
+							{
+								// Ranges overlap or are adjacent - merge them 
+								current.end = max(current.end, block.end); 
+							}
+							else
+							{
+								// No overlap - add current and start new 
+								onBlock(current); current = block; 
+							}
+						}
+						onBlock(current); //Add the last accumulated range 
+					} 
+				} 
+			}
 			
 			void upload()
 			{
@@ -6329,6 +6617,112 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				queue.submit(cb); 
 				queue.waitIdle; /+Opt: STALL+/
 			} 
+		} 
+		alias HeapChunkIdx = Typedef!(uint, 0, "HeapChunkIdx"); 
+		
+		struct HeapRef {
+			void* ptr; 
+			HeapChunkIdx heapChunkIdx; 
 		} 
+		
+		class VulkanHeapBuffer(uint heapGranularity_) : VulkanArrayBuffer!(ubyte[heapGranularity_])
+		{
+			static assert(heapGranularity>0 && heapGranularity.isPowerOf2); 
+			enum heapGranularity 	= heapGranularity_,
+			maxAddressableSizeBytes 	= (1UL<<32) * heapGranularity; 
+			alias Allocator = MyAllocator!heapGranularity; 
+			
+			Allocator allocator; 
+			
+			this(
+				VulkanDevice 	device,
+				VulkanQueue	queue,
+				VulkanCommandPool	commandPool,
+				VkBufferUsageFlagBits	usage,
+				VulkanBufferSizeConfig	bufferSizeConfig
+			)
+			{
+				super(__traits(parameters)); 
+				/+
+					At this point the allocator was created in the afterResize event.
+					It allocated the null chunk.
+					(null chunk: chunkIdx==0 && ptr==hostPtr)
+				+/
+			} 
+			
+			HeapChunkIdx calcHeapChunkIdx(void* p /+must be null or valid!+/)
+			=> HeapChunkIdx((p)?((cast(uint)((p - hostPtr) / heapGranularity))):(0)); 
+			
+			void* calcHeapPtr(HeapChunkIdx a /+must be 0 or valid!+/)
+			=> ((a)?(hostPtr + a.to!size_t * heapGranularity):(null)); 
+			
+			auto heapAlloc(size_t size)
+			{
+				HeapRef res; 
+				res.ptr = allocator.alloc(size); 
+				
+				if(!res.ptr)
+				{
+					const requiredBufferSize = bufferSizeBytes + size; 
+					
+					if(requiredBufferSize > maxAddressableSizeBytes)
+					{ ERR("maxAddressableSizeBytes reached."); return res; }
+					
+					const success = requireBufferSizeBytes(requiredBufferSize); 
+					
+					if(success)
+					{ res.ptr = allocator.alloc(size); }
+					else
+					{
+						ERR("Out of GPU mem"); 
+						/+Todo: garbage collect+/
+					}
+				}
+				
+				if(res.ptr) res.heapChunkIdx = calcHeapChunkIdx(res.ptr); 
+				return res; 
+			} 
+			
+			void heapFree(void* p)
+			{
+				assert(p!=hostPtr, "Failed attempt to free nullPtr."); 
+				allocator.free(p); 
+			} 
+			
+			void heapFree(HeapChunkIdx a)
+			{ heapFree(calcHeapPtr(a)); } 
+			
+			
+			protected override bool beforeResize(size_t newBufferSizeBytes)
+			{
+				if(newBufferSizeBytes/heapGranularity > uint.max)
+				{ ERR("Ran out of HeapChunkIdx addressable range."); return false; }
+				if(newBufferSizeBytes < bufferSizeBytes)
+				{ ERR("Shrinking Vulkan Heap Allocator not functioning yet. (1)"); return false; }
+				return true; 
+			} 
+			
+			protected override void afterResize(size_t oldBufferSizeBytes)
+			{
+				if(/+Note: Create a new allocator+/ !allocator)
+				{
+					allocator = new Allocator((cast(ubyte*)(hostPtr))[0..bufferSizeBytes]); 
+					
+					//Allocate null chunk
+					enforce(allocator.alloc(0), "Error allocating very first null block in GPU heap."); 
+				}
+				else
+				{
+					if(/+Note: Grow+/ bufferSizeBytes > oldBufferSizeBytes)
+					allocator.growPool(hostPtr, bufferSizeBytes); 
+					else if(/+Note: Shrink+/ bufferSizeBytes < oldBufferSizeBytes)
+					{ ERR("Shrinking Vulkan Heap Allocator not functioning yet. (2)"); }
+				}
+				allocator.stats.print; 
+			} 
+		} 
+		
+		
+		
 	}
 }

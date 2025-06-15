@@ -611,7 +611,7 @@ version(/+$DIDE_REGION+/all)
 		
 		//it bogs    bool remove(in Rectangle	r){ return remove(find(r)); }
 		bool remove(in RectangleData d)
-		{ return	remove(find(d)); } 
+		{ return remove(find(d)); } 
 		
 		private: 
 		

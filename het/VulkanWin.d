@@ -40,13 +40,14 @@ class VulkanWindow: Window
 			shrinkRate 	: 0.5
 		})),
 		TBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
-			minSizeBytes 	: ((768)*(MiB)), 
+			minSizeBytes 	: ((  1)*(MiB)), 
 			maxSizeBytes 	: ((768)*(MiB)),
 			growRate : 2.0,
 			shrinkWhen 	: 0.25, 
 			shrinkRate 	: 0.5
 		}))
 	})); 
+	enum TB_heapGranularity = 16; 
 	
 	
 	VulkanInstance vk; 
@@ -213,7 +214,8 @@ class VulkanWindow: Window
 		class VertexBufferManager
 		{
 			protected VulkanAppenderBuffer buffer; 
-			uint uploadedVertexCount; 
+			protected uint _uploadedVertexCount; 
+			@property uploadedVertexCount() const => _uploadedVertexCount; 
 			
 			this()
 			{
@@ -237,7 +239,7 @@ class VulkanWindow: Window
 			void upload()
 			{
 				buffer.upload; 
-				uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
+				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
 			
 			auto deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
@@ -263,8 +265,7 @@ class VulkanWindow: Window
 		
 		version(/+$DIDE_REGION TexInfo declarations+/all)
 		{
-			alias TexHandle 	= Typedef!(uint, 0, "TexHandle"),
-			TexPtr 	= Typedef!(uint, 0, "TexPtr"); 
+			alias TexHandle 	= Typedef!(uint, 0, "TexHandle"); 
 			
 			
 			enum TexType
@@ -348,23 +349,19 @@ class VulkanWindow: Window
 			
 			struct TexInfo
 			{
-				TexPtr addr; uint extra; 
+				HeapChunkIdx heapChunkIdx; 
+				uint extra; 
 				TexSizeFormat SizeFormat; 
 			} 
 			static assert(TexInfo.sizeof==16); 
-		}
+		}
 		InfoBufferManager IB; 
 		class InfoBufferManager
 		{
-			VulkanArrayBuffer!TexInfo buffer; 
-			
-			const TexHandle nullHandle; 
-			
 			protected
 			{
+				VulkanArrayBuffer!TexInfo buffer; 
 				TexHandle[] freeHandles; 
-				uint[] lastAccesTicks /+Must synched with main buffer array.+/
-				/+Opt: Maybe this information should be stored in the record.+/; 
 			} 
 			
 			
@@ -377,7 +374,8 @@ class VulkanWindow: Window
 				); 
 				
 				//create the very first handle
-				nullHandle = buffer.append(TexInfo.init); enforce(!nullHandle); 
+				const nullHandle = buffer.append(TexInfo.init); 
+				enforce(!nullHandle); 
 			} 
 			
 			~this()
@@ -386,13 +384,6 @@ class VulkanWindow: Window
 			bool isValidHandle(in TexHandle handle) const
 			=> handle.inRange(1, buffer.length); 
 			
-			void markAccessed(in TexHandle handle)
-			{
-				assert(isValidHandle(handle)); 
-				lastAccesTicks[(cast(uint)(handle))] = application.tick; 
-				/+Todo: application.tick can overflow in a month.+/
-			} 
-			
 			TexHandle add(in TexInfo info) /+can throw+/
 			{
 				TexHandle handle; 
@@ -400,11 +391,7 @@ class VulkanWindow: Window
 					handle = freeHandles.fetchBack; 
 					buffer[(cast(uint)(handle))] = info; 
 				}
-				else	{
-					handle = buffer.append(info); 
-					lastAccesTicks.length = buffer.length; 
-				}
-				markAccessed(handle); 
+				else	{ handle = buffer.append(info); }
 				return handle; 
 			} 
 			
@@ -414,20 +401,17 @@ class VulkanWindow: Window
 				assert(isValidHandle(handle)); 
 				buffer[(cast(uint)(handle))] = TexInfo.init; 
 				freeHandles ~= handle; 
-				lastAccesTicks[(cast(uint)(handle))] = 0; 
 			} 
 			
 			TexInfo access(in TexHandle handle)
 			{
 				assert(isValidHandle(handle)); 
-				markAccessed(handle); 
 				return buffer[(cast(uint)(handle))]; 
 			} 
 			
 			void modify(in TexHandle handle, in TexInfo info)
 			{
 				assert(isValidHandle(handle)); 
-				markAccessed(handle); 
 				buffer[(cast(uint)(handle))] = info; 
 			} 
 		} 
@@ -437,36 +421,90 @@ class VulkanWindow: Window
 	version(/+$DIDE_REGION TB     +/all)
 	{
 		TextureBufferManager TB; 
+		
 		class TextureBufferManager
 		{
-			VulkanAppenderBuffer buffer; 
+			alias HeapBuffer = VulkanHeapBuffer!TB_heapGranularity; 
+			static struct TexRec
+			{
+				TexHandle texHandle; 	//index into IB (InfoBuffer) enties
+				uint lastAccessed; 	//last application.tick value of most recent access
+				DateTime modified; 	//last bitmap.modified value for automatic reload
+			} 
+			static assert(TexRec.sizeof==16); 
+			
+			protected HeapBuffer buffer; 
+			protected TexRec[File] texRecByFileName; 
 			
 			this()
 			{
 					auto _間=init間; 
-				buffer = new VulkanAppenderBuffer
-					(
-					device, queue, commandPool, 
-					mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))
-				); 	((0x314F82886ADB).檢((update間(_間)))); 
-				buffer.heapInit; 	((0x319282886ADB).檢((update間(_間)))); 
-				buffer.allocator.stats.print; 	((0x31E282886ADB).檢((update間(_間)))); 
+				buffer = new HeapBuffer
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x30E282886ADB).檢((update間(_間)))); 
+				/+
+					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
+					buffer.allocator.stats.print; 	((0x31DE82886ADB).檢((update間(_間)))); 
+						
+					uint[] sizes = mixin(求map(q{0<i<35000},q{},q{uint(i)})).array; 	((0x325882886ADB).檢((update間(_間)))); 
+					import std.random; auto rnd = MinstdRand0(42); 	((0x32B982886ADB).檢((update間(_間)))); 
 					
-				uint[] sizes = mixin(求map(q{0<i<35000},q{},q{uint(i)})).array; 	((0x325C82886ADB).檢((update間(_間)))); 
-				import std.random; auto rnd = MinstdRand0(42); 	((0x32BD82886ADB).檢((update間(_間)))); 
-				
-				if((常!(bool)(1))) { sizes.randomShuffle(rnd); }	((0x332682886ADB).檢((update間(_間)))); 
-				sizes.take(20).print; 	((0x336E82886ADB).檢((update間(_間)))); 
-				auto addrs = mixin(求map(q{i},q{sizes},q{buffer.heapAlloc(i).heapAddr})).array; 	((0x33F182886ADB).檢((update間(_間)))); 
-				addrs.take(20).print; 	((0x343982886ADB).檢((update間(_間)))); 
-				if((常!(bool)(1))) { addrs.randomShuffle(rnd); }	((0x349C82886ADB).檢((update間(_間)))); 
-				buffer.allocator.stats.print; 	((0x34EC82886ADB).檢((update間(_間)))); 
-				mixin(求each(q{a},q{addrs},q{buffer.heapFree(buffer.calcHeapPtr(a))})); 	((0x356782886ADB).檢((update間(_間)))); 
-				buffer.allocator.stats.print; 	((0x35B782886ADB).檢((update間(_間)))); 
+					if((常!(bool)(1))) { sizes.randomShuffle(rnd); }	((0x332282886ADB).檢((update間(_間)))); 
+					sizes.take(20).print; 	((0x336A82886ADB).檢((update間(_間)))); 
+					auto addrs = mixin(求map(q{i},q{sizes},q{
+						() {
+							auto a = buffer.heapAlloc(i); 
+							if((常!(bool)(1))) IB.add(TexInfo(TexPtr(a.heapAddr))); 
+							return a.heapAddr; 
+						} ()
+					})).array; 	((0x346F82886ADB).檢((update間(_間)))); 
+					IB.buffer.upload; 	((0x34B382886ADB).檢((update間(_間)))); 
+					addrs.take(20).print; 	((0x34FB82886ADB).檢((update間(_間)))); 
+					if((常!(bool)(1))) { addrs.randomShuffle(rnd); }	((0x355E82886ADB).檢((update間(_間)))); 
+					buffer.allocator.stats.print; 	((0x35AE82886ADB).檢((update間(_間)))); 
+					mixin(求each(q{a},q{addrs},q{buffer.heapFree(buffer.calcHeapPtr(a))})); 	((0x362982886ADB).檢((update間(_間)))); 
+					buffer.allocator.stats.print; 	((0x367982886ADB).檢((update間(_間)))); 
+				+/
 			} 
 			
 			~this()
 			{ buffer.free; } 
+			
+			TexRec* access(File file, in Flag!"delayed" fDelayed)
+			{
+				const delayed = fDelayed && EnableMultiThreadedTextureLoading; 
+				auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore); 
+				//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
+				
+				if(auto existing = file in byFileName)
+				{
+					if(bmp.modified == existing.modified)
+					{
+						return existing; //existing texture and matching modified datetime
+					}
+					
+					const 	texHandle 	= existing.texHandle,
+						texInfo	= IB.access(texHandle); 
+					buffer.heapFree(texInfo.heapChunkIdx); 
+					IB.remove(texHandle); 
+				}
+				
+				
+				itt tartok; 
+				
+				auto idx = createSubTex(bmp); 
+				byFileName[file] = idx; 
+				bitmapModified[file] = modified; 
+				return idx; 
+			} 
+			
+			void remove(File file)
+			{
+				if(auto texRec = file in byFileName)
+				{
+					remove(texRec.texHandle); 
+					
+				}
+			} 
 			
 		} 
 	}
@@ -566,7 +604,8 @@ class VulkanWindow: Window
 			{
 				gl_Position = UB.mvp * vec4(geomPosition[0], 1.0); 
 				fragColor = vec4(geomColor[0], 1.0); 
-				fragColor = unpackUnorm4x8(TB[IB[0]]); 
+				//fragColor = unpackUnorm4x8(TB[IB[0]]); 
+				fragColor = vec4(1, 0, 1, 1); 
 				EmitVertex(); 
 			} 
 			
@@ -940,11 +979,14 @@ class VulkanWindow: Window
 							UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
 						}
 						
-						TB.buffer.reset; 
-						TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
+						/+
+							TB.buffer.reset; 
+							TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
+						+/
 						
 						if(TB.buffer.growByRate(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
 						{}
+						
 						
 						IB.buffer.upload; 
 						TB.buffer.upload; 
