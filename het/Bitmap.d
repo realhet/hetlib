@@ -6249,8 +6249,12 @@ version(/+$DIDE_REGION+/all)
 			void[] data_; /+
 				Todo: this storage can't handle stride. It should be pitch and in bytes.
 				Also do this in image!
+				
+				250616: Image has stride! But this doesn't needs it. 
+				It is simple to upload as a texture if it has no stride.
+				Bitmap is more like a storage and image is like a reference.
 			+/
-			string type_ = "ubyte"; 
+			string type_ = "ubyte"; //Todo: This must be an enum!
 			int width_, height_, channels_=4; 
 		} 
 		
@@ -6318,6 +6322,9 @@ version(/+$DIDE_REGION+/all)
 		@property type    () const
 		{ return type_; } 
 		
+		void[] getRaw()
+		=> data_; 
+		
 		void setRaw(void[] data, int width, int height, int channels, string type)
 		{
 			//check consistency
@@ -6349,6 +6356,7 @@ version(/+$DIDE_REGION+/all)
 			channels_ = channels; 
 			type_ = type; 
 		} 
+		
 		
 		void set(E)(Image!(E, 2) im)
 		{

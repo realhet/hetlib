@@ -6407,42 +6407,46 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				bool resize(size_t newBufferSizeBytes, bool keepContents)
 				{
-					T0; 
-					
-					size_t prepareBufferSize(size_t s)
-					=> s.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
-					
-					newBufferSizeBytes = prepareBufferSize(newBufferSizeBytes); 
-					if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
-					
-					if(!beforeResize(newBufferSizeBytes)) return false/+beforeResize() declined+/; 
-					
-					auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes); 
-					if(!newBufferPair.valid) return false/+out of mem, nothing's changed+/; 
-					
-					if(keepContents) {
-						copyBufferPair(bufferPair, newBufferPair, commandPool, queue); 
-						/+
-							Opt: The copying of GPU buffer is only needed right before 
-							the shader execution. Only the CPU buffer needs to 
-							grow first.
-							Problem: What if GPU becomes out of mem....
-						+/
+					try {
+						T0; 
+						
+						size_t prepareBufferSize(size_t s)
+						=> s.alignUp(poolGranularity).clamp(minSizeBytes, maxSizeBytes); 
+						
+						newBufferSizeBytes = prepareBufferSize(newBufferSizeBytes); 
+						if(newBufferSizeBytes==bufferSizeBytes) return false/+nothing's changed+/; 
+						
+						if(!beforeResize(newBufferSizeBytes)) return false/+beforeResize() declined+/; 
+						
+						auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes); 
+						if(!newBufferPair.valid) return false/+out of mem, nothing's changed+/; 
+						
+						if(keepContents) {
+							copyBufferPair(bufferPair, newBufferPair, commandPool, queue); 
+							/+
+								Opt: The copying of GPU buffer is only needed right before 
+								the shader execution. Only the CPU buffer needs to 
+								grow first.
+								Problem: What if GPU becomes out of mem....
+							+/
+						}
+						
+						print(
+							"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
+							bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"
+						); 
+						
+						const oldBufferSizeBytes = bufferSizeBytes; 
+						
+						freeBufferPair(bufferPair); 
+						bufferPair = newBufferPair; 
+						
+						afterResize(oldBufferSizeBytes); 
+						
+						return true/+success+/; 
 					}
-					
-					print(
-						"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
-						bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"
-					); 
-					
-					const oldBufferSizeBytes = bufferSizeBytes; 
-					
-					freeBufferPair(bufferPair); 
-					bufferPair = newBufferPair; 
-					
-					afterResize(oldBufferSizeBytes); 
-					
-					return true/+success+/; 
+					catch(Exception e)
+					{ ERR(e.simpleMsg); return false; }
 				} 
 			}
 			
@@ -6462,20 +6466,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			)
 			{ super(__traits(parameters)); } 
 			
-			void append(in void* data, size_t size)
+			bool append(in void* data, size_t size)
 			{
-				if(!size) return; 
+				if(!size) return true; 
 				
-				requireBufferSizeBytes(appendPos + size).enforce("Out of GPU mem"); 
-				
-				memcpy(hostPtr+appendPos, data, size); 
-				appendPos += size; 
+				const success = requireBufferSizeBytes(appendPos + size); 
+				if(success)
+				{
+					memcpy(hostPtr+appendPos, data, size); 
+					appendPos += size; 
+				}
+				return success; 
 			} 
 			
-			void append(T)(in T a)
+			bool append(T)(in T a)
 			{
-				static if(isDynamicArray!T)	append(a.ptr, a.sizeBytes); 
-				else	append(&a, T.sizeof); 
+				static if(isDynamicArray!T)	return append(a.ptr, a.sizeBytes); 
+				else	return append(&a, T.sizeof); 
 			} 
 			
 			void reset()
@@ -6522,15 +6529,19 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				markModified(&_array[i], T.sizeof); 
 			} 
 			
-			uint append(in T value)
+			size_t append(in T value)
 			{
-				requireBufferSizeBytes((length + 1) * T.sizeof)
-					.enforce("Out of GPU mem"); 	//exception when out of mem
-				const idx = _array.length.to!uint; 	//exception after 2^32 index
-				_array = (cast(T*)(hostPtr))[0..idx.to!size_t + 1]; 	//uptate the slice
-				this[idx] = value; 	//set the value and mark it as changed
+				/+
+					uint index is returned because it will be used on the GPU
+					null is problematic: It should be allocated at the start.
+				+/
+				const 	idx 	= length, 
+					requiredLength 	= idx+1; 
+				if(!requireBufferSizeBytes(requiredLength * T.sizeof))
+				return 0/+out of gpu mem+/; 
+				_array = (cast(T*)(hostPtr))[0..requiredLength]; //uptate the slice
+				this[idx] = value; //set the value and mark it as changed
 				return idx; 
-				/+Opt: Maybe .to!uint is not fast enough+/
 			} 
 			
 			version(/+$DIDE_REGION Invalidation logic+/all)
@@ -6623,6 +6634,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		struct HeapRef {
 			void* ptr; 
 			HeapChunkIdx heapChunkIdx; 
+			
+			bool opCast(B : bool)() const => !!heapChunkIdx; 
 		} 
 		
 		class VulkanHeapBuffer(uint heapGranularity_) : VulkanArrayBuffer!(ubyte[heapGranularity_])
@@ -6685,12 +6698,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			void heapFree(void* p)
 			{
-				assert(p!=hostPtr, "Failed attempt to free nullPtr."); 
+				assert(p !is hostPtr, "Failed attempt to free nullPtr."); 
 				allocator.free(p); 
 			} 
 			
 			void heapFree(HeapChunkIdx a)
 			{ heapFree(calcHeapPtr(a)); } 
+			
+			void heapFree(HeapRef a)
+			{ heapFree(a.ptr); } 
 			
 			
 			protected override bool beforeResize(size_t newBufferSizeBytes)

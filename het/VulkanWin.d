@@ -1,6 +1,6 @@
 module vulkanwin; 
 
-public import het.win, het.vulkan; 
+public import het.win, het.bitmap, het.vulkan; 
 
 import core.stdc.string : memset; 
 
@@ -47,7 +47,8 @@ class VulkanWindow: Window
 			shrinkRate 	: 0.5
 		}))
 	})); 
-	enum TB_heapGranularity = 16; 
+	enum HeapGranularity 	= 16,
+	DelayedTextureLoading 	= (常!(bool)(1)); 
 	
 	
 	VulkanInstance vk; 
@@ -275,9 +276,9 @@ class VulkanWindow: Window
 				/+Note:   2+/	u2,				
 				/+Note:   4+/	u4,				
 				/+Note:   8+/	u8,				
-				/+Note:  16+/	u16,	rg_u8, 	rgb_u565,	rgba_u5551,	
+				/+Note:  16+/	u16,	rg_u8, 			
 				/+Note:  24+/			rgb_u8,		
-				/+Note:  32+/	f32,			rgba_u8,	
+				/+Note:  32+/	f32,	rg_u16,		rgba_u8,	
 				/+Note:  48+/			rgb_u16,		
 				/+Note:  64+/		rg_f32,		rgba_u16,	
 				/+Note:  96+/			rgb_f32,		
@@ -289,7 +290,9 @@ class VulkanWindow: Window
 			{
 				none, 
 				whiteAlpha, 
-				redBlueSwap
+				redBlueSwap,
+				rgb565,
+				rgba5551
 			} 
 			static assert(TexEffect.max < 1<<4); 
 			
@@ -299,7 +302,7 @@ class VulkanWindow: Window
 				_2D, 
 				_3D,
 			} 
-			static assert(TexEffect.max < 1<<2); 
+			static assert(TexDim.max < 1<<2); 
 			
 			struct TexSizeFormat
 			{
@@ -351,7 +354,7 @@ class VulkanWindow: Window
 			{
 				HeapChunkIdx heapChunkIdx; 
 				uint extra; 
-				TexSizeFormat SizeFormat; 
+				TexSizeFormat sizeFormat; 
 			} 
 			static assert(TexInfo.sizeof==16); 
 		}
@@ -375,7 +378,7 @@ class VulkanWindow: Window
 				
 				//create the very first handle
 				const nullHandle = buffer.append(TexInfo.init); 
-				enforce(!nullHandle); 
+				enforce(!nullHandle && buffer.length==1); 
 			} 
 			
 			~this()
@@ -384,14 +387,21 @@ class VulkanWindow: Window
 			bool isValidHandle(in TexHandle handle) const
 			=> handle.inRange(1, buffer.length); 
 			
-			TexHandle add(in TexInfo info) /+can throw+/
+			TexHandle add(in TexInfo info)
 			{
 				TexHandle handle; 
-				if(!freeHandles.empty)	{
-					handle = freeHandles.fetchBack; 
-					buffer[(cast(uint)(handle))] = info; 
+				if(!freeHandles.empty)
+				{ handle = freeHandles.fetchBack; }
+				else
+				{
+					const h = buffer.append(info); 
+					if(h && h<=uint.max /+overflow check+/)
+					{ handle = (cast(TexHandle)((cast(uint)(h)))); }
 				}
-				else	{ handle = buffer.append(info); }
+				
+				if(handle)
+				buffer[(cast(uint)(handle))] = info; 
+				
 				return handle; 
 			} 
 			
@@ -409,7 +419,7 @@ class VulkanWindow: Window
 				return buffer[(cast(uint)(handle))]; 
 			} 
 			
-			void modify(in TexHandle handle, in TexInfo info)
+			void set(in TexHandle handle, in TexInfo info)
 			{
 				assert(isValidHandle(handle)); 
 				buffer[(cast(uint)(handle))] = info; 
@@ -424,7 +434,7 @@ class VulkanWindow: Window
 		
 		class TextureBufferManager
 		{
-			alias HeapBuffer = VulkanHeapBuffer!TB_heapGranularity; 
+			alias HeapBuffer = VulkanHeapBuffer!HeapGranularity; 
 			static struct TexRec
 			{
 				TexHandle texHandle; 	//index into IB (InfoBuffer) enties
@@ -434,13 +444,14 @@ class VulkanWindow: Window
 			static assert(TexRec.sizeof==16); 
 			
 			protected HeapBuffer buffer; 
-			protected TexRec[File] texRecByFileName; 
+			protected TexRec[File] texRecByFile; 
+			const TexRec nullTexRec = TexRec.init; 
 			
 			this()
 			{
 					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x30E282886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x31D782886ADB).檢((update間(_間)))); 
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
 					buffer.allocator.stats.print; 	((0x31DE82886ADB).檢((update間(_間)))); 
@@ -469,41 +480,160 @@ class VulkanWindow: Window
 			~this()
 			{ buffer.free; } 
 			
-			TexRec* access(File file, in Flag!"delayed" fDelayed)
+			protected TexHandle createHandleAndData(in TexSizeFormat fmt, in void[] data)
 			{
-				const delayed = fDelayed && EnableMultiThreadedTextureLoading; 
-				auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore); 
-				//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
-				
-				if(auto existing = file in byFileName)
+				if(auto heapRef = buffer.heapAlloc(data.length))
 				{
-					if(bmp.modified == existing.modified)
+					TexInfo texInfo = { sizeFormat : fmt }; 
+					if(const texHandle = IB.add(texInfo))
 					{
-						return existing; //existing texture and matching modified datetime
+						memcpy(heapRef.ptr, data.ptr, data.length); /+Note: ⚡ Memory transfer (process → host) +/
+						buffer.markModified(heapRef.ptr, data.length); 
+						return texHandle; /+Note: ✔ Success+/
 					}
-					
-					const 	texHandle 	= existing.texHandle,
-						texInfo	= IB.access(texHandle); 
-					buffer.heapFree(texInfo.heapChunkIdx); 
-					IB.remove(texHandle); 
+					else
+					{ buffer.heapFree(heapRef); /+Note: 🚫 Failed to allocate handle+/}
 				}
-				
-				
-				itt tartok; 
-				
-				auto idx = createSubTex(bmp); 
-				byFileName[file] = idx; 
-				bitmapModified[file] = modified; 
-				return idx; 
+				else
+				{/+Note: 🚫 Failed to allocate memory+/}
+				return TexHandle.init; 
+			} 
+			
+			protected bool updateExistingData(in TexHandle handle, in TexSizeFormat fmt, in void[] data)
+			{
+				auto info = IB.access(handle); 
+				buffer.heapFree(info.heapChunkIdx); 
+				info.heapChunkIdx = HeapChunkIdx(0); 
+				if(auto heapRef = buffer.heapAlloc(data.length))
+				{
+					info.sizeFormat = fmt; 
+					memcpy(heapRef.ptr, data.ptr, data.length); /+Note: ⚡ Memory transfer (process → host) +/
+					buffer.markModified(heapRef.ptr, data.length); 
+					info.heapChunkIdx = heapRef.heapChunkIdx; 
+					IB.set(handle, info); 
+					return true; /+Note: ✔ Success+/
+				}
+				else
+				{
+					IB.set(handle, info); //upload the info with null pointer.
+					return false; /+Note: 🚫 Failed to allocate memory+/
+				}
 			} 
 			
 			void remove(File file)
 			{
-				if(auto texRec = file in byFileName)
+				if(const texRec = file in texRecByFile)
 				{
-					remove(texRec.texHandle); 
+					if(const texHandle = texRec.texHandle)
+					{
+						if(const heapChunkIdx = IB.access(texHandle).heapChunkIdx)
+						{ buffer.heapFree(heapChunkIdx); }
+						IB.remove(texHandle); 
+					}
+					texRecByFile.remove(file); 
+				}
+			} 
+			
+			
+			auto extractBitmapData(Bitmap bmp)
+			{
+				TexSizeFormat fmt; 
+				const void[] data; 
+				fmt.size = ivec2(bmp.size); 
+				
+				void unsupported()
+				{
+					fmt.size = ivec2(1); 
+					fmt.type = TexType.rgba_u8; 
+					data = [0xFFFF00FF]; 
+				} 
+				
+				switch(bmp.type)
+				{
+					case "ubyte": 	switch(bmp.channels)
+					{
+						case 1: 	fmt.type = TexType.u8; 	data = bmp.getRaw; 	break; 
+						case 2: 	fmt.type = TexType.rg_u8; 	data = bmp.getRaw; 	break; 
+						case 3: 	fmt.type = TexType.rgb_u8; 	data = bmp.getRaw; 	break; 
+						case 4: 	fmt.type = TexType.rgba_u8; 	data = bmp.getRaw; 	break; 
+						default: 	unsupported; 
+					}	break; 
+					case "float": 	switch(bmp.channels)
+					{
+						case 1: 	fmt.type = TexType.f32; 	data = bmp.getRaw; 	break; 
+						case 2: 	fmt.type = TexType.rg_f32; 	data = bmp.getRaw; 	break; 
+						case 3: 	fmt.type = TexType.rgb_f32; 	data = bmp.getRaw; 	break; 
+						case 4: 	fmt.type = TexType.rgba_f32; 	data = bmp.getRaw; 	break; 
+						default: 	unsupported; 
+					}	break; 
+					case "ushort": 	switch(bmp.channels)
+					{
+						case 1: 	fmt.type = TexType.u16; 	data = bmp.getRaw; 	break; 
+						case 2: 	fmt.type = TexType.rg_u16; 	data = bmp.getRaw; 	break; 
+						case 3: 	fmt.type = TexType.rgb_u16; 	data = bmp.getRaw; 	break; 
+						case 4: 	fmt.type = TexType.rgba_u16; 	data = bmp.getRaw; 	break; 
+						default: 	unsupported; 
+					}	break; 
+					default: 	unsupported; 
+				}
+				return tuple(fmt, data); 
+			} 
+			
+			TexRec* access(File file, in Flag!"delayed" delayed_)
+			{
+				const delayed = delayed_ && DelayedTextureLoading; 
+				auto bmp = bitmaps(file, delayed ? Yes.delayed : No.delayed, ErrorHandling.ignore); 
+				//Opt: this synchronized call is slow. Should make a very fast cache storing images accessed in the current frame.
+				
+				if(auto texRec = file in texRecByFile)
+				{
+					if(texRec.modified==bmp.modified) return texRec; 
 					
 				}
+				
+				/+
+					TexRec* res; 
+					texRecByFileName.update
+					(
+						((){}),
+						((ref texRec tr){
+							res = &tr /+found existing+/; 
+							if(tr.modified!=bmp.modified /+bmp's changed+/)
+							{
+								auto 	texHandle 	= tr.texHandle,
+									texInfo 	= IB.access(texHandle); 
+								buffer.heapFree(texInfo.heapChunkIdx); 
+								auto bmp.serialize()
+								auto heapRef = texInfo.heapAlloc(bmp); 
+								texInfo.heapChunkIdx = heapRef.texChunkIdx; 
+								if(heapRef.texInfo.heapChunkIdx)
+								{}
+								IB.modify(texHandle, texInfo); 
+							}
+						})
+					); 
+					
+					if(auto texRec = file in byFileName)
+					{
+						if(bmp.modified == texRec.modified)
+						{
+							return texRec; //existing texture and matching modified datetime
+						}
+						
+						const 	texHandle 	= texRec.texHandle,
+							texInfo	= IB.access(texHandle); 
+						buffer.heapFree(texInfo.heapChunkIdx); 
+						IB.remove(texHandle); 
+					}
+					
+					
+					itt tartok; 
+					
+					auto idx = createSubTex(bmp); 
+					byFileName[file] = idx; 
+					bitmapModified[file] = modified; 
+					return idx; 
+				+/
 			} 
 			
 		} 
