@@ -284,6 +284,69 @@ class VulkanWindow: Window
 				/+Note:  96+/			rgb_f32,		
 				/+Note: 128+/				rgba_f32	
 			} 
+			
+			/+
+				Code: enum TexType
+				{
+					/+Note: cnh/bits+/	/+Note: 1+/	/+Note: 2+/	/+Note: 4+/	/+Note: 8+/	/+Note: 16+/	/+Note: 24+/	/+Note: 32+/	/+Note: 48+/	/+Note: 64+/	/+Note: 96+/	/+Note: 128+/
+					/+Note: 1 ch+/	u1,	u2,	u4,	u8, aw8,	u16,		f32,					
+					/+Note: 2 ch+/					rg_u8,		rg_u16,		rg_f32,			
+					/+Note: 3 ch+/					rgb_565,	rgb_u8,		rgb_u16,		rgb_f32,		
+					/+Note: 4 ch+/					rgba_5551,		rgba_u8,		rgba_u16,		rgba_f32	
+				} 
+			+/
+			
+			enum _TexType_matrix = 
+			(表([
+				[q{/+Note: cnh/bits+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
+				[q{/+Note: 1 ch+/},q{u1},q{u2},q{u4},q{u8},q{u16},q{},q{f32},q{},q{},q{},q{},q{6}],
+				[q{/+Note: 2 ch+/},q{},q{},q{},q{wa_u8},q{la_u8},q{},q{la_u16},q{},q{la_f32},q{},q{},q{4}],
+				[q{/+Note: 3 ch+/},q{},q{},q{},q{},q{
+					rgb_565
+					bgr_565
+				},q{
+					rgb_u8
+					bgr_u8
+				},q{},q{
+					rgb_u16
+					bgr_u16
+				},q{},q{
+					rgb_f32
+					bgr_f32
+				},q{},q{8}],
+				[q{/+Note: 4 ch+/},q{},q{},q{},q{},q{
+					rgba_5551
+					bgra_5551
+				},q{},q{
+					rgba_u8
+					bgra_u8
+				},q{},q{
+					rgba_u16
+					bgra_u16
+				},q{},q{
+					rgba_f32
+					bgra_f32
+				},q{8}],
+				[q{/+
+					Special types: 	u8 -> wa_u8: white+alpha for fonts.  
+						u16 -> 565, 5551: 16bit colors.
+				+/}],
+			])); 
+			
+			static string GEN_TexType()
+			{
+				string res; 
+				
+				string[] types; 
+				foreach(x; 1..12) foreach(y; 1..5) types ~= _TexType_matrix.allRows[y][x].split; 
+				
+				
+				
+				return res; 
+			} 
+			
+			pragma(msg, GEN_TexType()); 
+			
 			static assert(TexType.max < 1<<4); 
 			
 			enum TexEffect
@@ -309,10 +372,15 @@ class VulkanWindow: Window
 				mixin((
 					(表([
 						[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+						[q{bool},q{1},q{"error"},q{},q{/+No sampling, 0xFFFF00FF color+/}],
+						[q{bool},q{1},q{"loading"},q{},q{/+No sampling, 0xC0C0C0C0 color+/}],
+						[q{bool},q{1},q{"resident"},q{},q{/+GC will not unload it, just relocate it+/}],
+						[q{uint},q{3},q{"_unused"},q{},q{/++/}],
+						[q{TexDim},q{2},q{"dim"},q{},q{/++/}],
+						[],
 						[q{TexType},q{4},q{"type"},q{},q{/++/}],
 						[q{TexEffect},q{4},q{"effect"},q{},q{/++/}],
-						[q{TexDim},q{2},q{"dim"},q{},q{/++/}],
-						[q{uint},q{6},q{"_unused"},q{},q{/++/}],
+						[],
 						[q{uint},q{16},q{"_rawSize0"},q{},q{/++/}],
 						[q{uint},q{32},q{"_rawSize12"},q{},q{/++/}],
 					]))
@@ -451,7 +519,7 @@ class VulkanWindow: Window
 			{
 					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x31D782886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x39A882886ADB).檢((update間(_間)))); 
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
 					buffer.allocator.stats.print; 	((0x31DE82886ADB).檢((update間(_間)))); 
@@ -479,6 +547,66 @@ class VulkanWindow: Window
 			
 			~this()
 			{ buffer.free; } 
+			
+			auto extractBitmapData(Bitmap bmp)
+			{
+				TexSizeFormat fmt; 
+				const void[] data; 
+				
+				void doUnsupported()
+				{
+					fmt.size = ivec2(1); 
+					fmt.type = TexType.rgba_u8; 
+					data = [0xFFFF00FF]; 
+				} 
+				
+				if(bmp && bmp.valid)
+				{}
+				else
+				{
+					//bmp is null
+				}
+				
+				fmt.size = ivec2(bmp.size); 
+				data = bmp.getRaw; 
+				
+				
+				
+				if(bmp.channels.inRange(1, 4))
+				{
+					switch(bmp.type)
+					{
+						case "ubyte": 	switch(bmp.channels)
+						{
+							case 1: 	fmt.type = TexType.u8; 	data = bmp.getRaw; 	break; 
+							case 2: 	fmt.type = TexType.rg_u8; 	data = bmp.getRaw; 	break; 
+							case 3: 	fmt.type = TexType.rgb_u8; 	data = bmp.getRaw; 	break; 
+							case 4: 	fmt.type = TexType.rgba_u8; 	data = bmp.getRaw; 	break; 
+							default: 	unsupported; 
+						}	break; 
+						case "float": 	switch(bmp.channels)
+						{
+							case 1: 	fmt.type = TexType.f32; 	data = bmp.getRaw; 	break; 
+							case 2: 	fmt.type = TexType.rg_f32; 	data = bmp.getRaw; 	break; 
+							case 3: 	fmt.type = TexType.rgb_f32; 	data = bmp.getRaw; 	break; 
+							case 4: 	fmt.type = TexType.rgba_f32; 	data = bmp.getRaw; 	break; 
+							default: 	unsupported; 
+						}	break; 
+						case "ushort": 	switch(bmp.channels)
+						{
+							case 1: 	fmt.type = TexType.u16; 	data = bmp.getRaw; 	break; 
+							case 2: 	fmt.type = TexType.rg_u16; 	data = bmp.getRaw; 	break; 
+							case 3: 	fmt.type = TexType.rgb_u16; 	data = bmp.getRaw; 	break; 
+							case 4: 	fmt.type = TexType.rgba_u16; 	data = bmp.getRaw; 	break; 
+							default: 	unsupported; 
+						}	break; 
+						default: 	unsupported; 
+					}
+				}
+				
+				
+				return tuple(fmt, data); 
+			} 
 			
 			protected TexHandle createHandleAndData(in TexSizeFormat fmt, in void[] data)
 			{
@@ -532,51 +660,6 @@ class VulkanWindow: Window
 					}
 					texRecByFile.remove(file); 
 				}
-			} 
-			
-			
-			auto extractBitmapData(Bitmap bmp)
-			{
-				TexSizeFormat fmt; 
-				const void[] data; 
-				fmt.size = ivec2(bmp.size); 
-				
-				void unsupported()
-				{
-					fmt.size = ivec2(1); 
-					fmt.type = TexType.rgba_u8; 
-					data = [0xFFFF00FF]; 
-				} 
-				
-				switch(bmp.type)
-				{
-					case "ubyte": 	switch(bmp.channels)
-					{
-						case 1: 	fmt.type = TexType.u8; 	data = bmp.getRaw; 	break; 
-						case 2: 	fmt.type = TexType.rg_u8; 	data = bmp.getRaw; 	break; 
-						case 3: 	fmt.type = TexType.rgb_u8; 	data = bmp.getRaw; 	break; 
-						case 4: 	fmt.type = TexType.rgba_u8; 	data = bmp.getRaw; 	break; 
-						default: 	unsupported; 
-					}	break; 
-					case "float": 	switch(bmp.channels)
-					{
-						case 1: 	fmt.type = TexType.f32; 	data = bmp.getRaw; 	break; 
-						case 2: 	fmt.type = TexType.rg_f32; 	data = bmp.getRaw; 	break; 
-						case 3: 	fmt.type = TexType.rgb_f32; 	data = bmp.getRaw; 	break; 
-						case 4: 	fmt.type = TexType.rgba_f32; 	data = bmp.getRaw; 	break; 
-						default: 	unsupported; 
-					}	break; 
-					case "ushort": 	switch(bmp.channels)
-					{
-						case 1: 	fmt.type = TexType.u16; 	data = bmp.getRaw; 	break; 
-						case 2: 	fmt.type = TexType.rg_u16; 	data = bmp.getRaw; 	break; 
-						case 3: 	fmt.type = TexType.rgb_u16; 	data = bmp.getRaw; 	break; 
-						case 4: 	fmt.type = TexType.rgba_u16; 	data = bmp.getRaw; 	break; 
-						default: 	unsupported; 
-					}	break; 
-					default: 	unsupported; 
-				}
-				return tuple(fmt, data); 
 			} 
 			
 			TexRec* access(File file, in Flag!"delayed" delayed_)
