@@ -6551,7 +6551,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					static struct BlockRange { uint start, end/+non-inclusive+/; } 
 					BlockRange[] modifiedBlocks; 
 					
-					void markModified(void* ptr, size_t size) 
+					public void markModified(void* ptr, size_t size) 
 					{
 						if(size<=0) return; 
 						static uint calcBlkIdx(size_t x) => (cast(uint)(x / uploadGranularity)); 

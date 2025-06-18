@@ -266,42 +266,39 @@ class VulkanWindow: Window
 		
 		version(/+$DIDE_REGION TexInfo declarations+/all)
 		{
-			alias TexHandle 	= Typedef!(uint, 0, "TexHandle"); 
+			alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
+			enum DimBits 	= 2, 
+			ChnBits 	= 2, 
+			BppBits 	= 4, 
+			DimBitOfs	= 6,
+			TypeBitOfs 	= 8 /+inside info_dword[0]+/,
+			TypeBits 	= ChnBits + BppBits + 1 /+alt+/; 
 			
-			
-			enum TexType
-			{
-				/+Note: bits↓+/  	/+Note: 1 ch+/	/+Note: 2 ch+/	/+Note: 3 ch+/	/+Note: 4 ch+/	
-				/+Note:   1+/	u1,				
-				/+Note:   2+/	u2,				
-				/+Note:   4+/	u4,				
-				/+Note:   8+/	u8,				
-				/+Note:  16+/	u16,	rg_u8, 			
-				/+Note:  24+/			rgb_u8,		
-				/+Note:  32+/	f32,	rg_u16,		rgba_u8,	
-				/+Note:  48+/			rgb_u16,		
-				/+Note:  64+/		rg_f32,		rgba_u16,	
-				/+Note:  96+/			rgb_f32,		
-				/+Note: 128+/				rgba_f32	
-			} 
-			
-			/+
-				Code: enum TexType
-				{
-					/+Note: cnh/bits+/	/+Note: 1+/	/+Note: 2+/	/+Note: 4+/	/+Note: 8+/	/+Note: 16+/	/+Note: 24+/	/+Note: 32+/	/+Note: 48+/	/+Note: 64+/	/+Note: 96+/	/+Note: 128+/
-					/+Note: 1 ch+/	u1,	u2,	u4,	u8, aw8,	u16,		f32,					
-					/+Note: 2 ch+/					rg_u8,		rg_u16,		rg_f32,			
-					/+Note: 3 ch+/					rgb_565,	rgb_u8,		rgb_u16,		rgb_f32,		
-					/+Note: 4 ch+/					rgba_5551,		rgba_u8,		rgba_u16,		rgba_f32	
-				} 
-			+/
-			
+			enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<DimBits); 
 			enum _TexType_matrix = 
 			(表([
-				[q{/+Note: cnh/bits+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
-				[q{/+Note: 1 ch+/},q{u1},q{u2},q{u4},q{u8},q{u16},q{},q{f32},q{},q{},q{},q{},q{6}],
-				[q{/+Note: 2 ch+/},q{},q{},q{},q{wa_u8},q{la_u8},q{},q{la_u16},q{},q{la_f32},q{},q{},q{4}],
-				[q{/+Note: 3 ch+/},q{},q{},q{},q{},q{
+				[q{/+Note: chn/bpp+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
+				[q{/+Note: 1+/},q{
+					u1
+					wa_u1
+				},q{
+					u2
+					wa_u2
+				},q{
+					u4
+					wa_u4
+				},q{
+					u8
+					wa_u8
+				},q{
+					u16
+					wa_u16
+				},q{},q{
+					f32
+					wa_f32
+				},q{},q{},q{},q{},q{12}],
+				[q{/+Note: 2+/},q{},q{},q{},q{},q{la_u8},q{},q{la_u16},q{},q{la_f32},q{},q{},q{3}],
+				[q{/+Note: 3+/},q{},q{},q{},q{},q{
 					rgb_565
 					bgr_565
 				},q{
@@ -314,7 +311,7 @@ class VulkanWindow: Window
 					rgb_f32
 					bgr_f32
 				},q{},q{8}],
-				[q{/+Note: 4 ch+/},q{},q{},q{},q{},q{
+				[q{/+Note: 4+/},q{},q{},q{},q{},q{
 					rgba_5551
 					bgra_5551
 				},q{},q{
@@ -328,65 +325,69 @@ class VulkanWindow: Window
 					bgra_f32
 				},q{8}],
 				[q{/+
-					Special types: 	u8 -> wa_u8: white+alpha for fonts.  
-						u16 -> 565, 5551: 16bit colors.
+					Alternate modes: 	1ch 	: wa_* 	: white+alpha for fonts 
+						2ch, 3ch 	: bgr* 	: red blue swap
 				+/}],
 			])); 
+			pragma(msg, GEN_TexType); 
+			mixin(GEN_TexType); 
+			static assert(TexChn.max < 1<<ChnBits); static assert(TexBpp.max < 1<<BppBits); 
+			static assert(TexType.max < 1<<TypeBits); 
 			
 			static string GEN_TexType()
 			{
-				string res; 
+				version(/+$DIDE_REGION Process table cells, generate types+/all)
+				{
+					auto 	table = _TexType_matrix,
+						bppCount = table.width-2,
+						chnCount = table.rowCount; struct Type {
+						string name; 
+						int value, chn, bpp; 
+					} Type[] types; 
+					int chnVal(int chn) => table.headerColumnCell(chn+1).to!int; 
+					int bppVal(int bpp) => table.headerCell(bpp+1).to!int; 
+					void processCell(int bpp, int chn)
+					{
+						foreach(alt, n; table.cell(bpp+1, chn+1).split)
+						types ~= Type(n, chn | (bpp<<2) | (!!alt<<6), chnVal(chn), bppVal(bpp)); 
+					} 
+					foreach(bpp; 0..bppCount) foreach(chn; 0..chnCount) processCell(bpp, chn); 
+				}
 				
-				string[] types; 
-				foreach(x; 1..12) foreach(y; 1..5) types ~= _TexType_matrix.allRows[y][x].split; 
-				
-				
-				
-				return res; 
+				return iq{
+					enum TexType {$(types.map!"a.name~`=`~a.value.text".join(','))} 
+					enum TexChn {$(chnCount.iota.map!((i)=>('_'~chnVal(i).text)).join(','))} 
+					enum TexBpp {$(bppCount.iota.map!((i)=>('_'~bppVal(i).text)).join(','))} 
+					enum texTypeChnVals 	= [$(types.map!q{a.chn.text}.join(','))],
+					texTypeBppVals 	= [$(types.map!q{a.bpp.text}.join(','))]; 
+				}.text; 
 			} 
-			
-			pragma(msg, GEN_TexType()); 
-			
-			static assert(TexType.max < 1<<4); 
-			
-			enum TexEffect
-			{
-				none, 
-				whiteAlpha, 
-				redBlueSwap,
-				rgb565,
-				rgba5551
-			} 
-			static assert(TexEffect.max < 1<<4); 
-			
-			enum TexDim
-			{
-				_1D, 
-				_2D, 
-				_3D,
-			} 
-			static assert(TexDim.max < 1<<2); 
-			
+			
 			struct TexSizeFormat
 			{
 				mixin((
 					(表([
 						[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-						[q{bool},q{1},q{"error"},q{},q{/+No sampling, 0xFFFF00FF color+/}],
+						[q{bool},q{1},q{"error"},q{},q{/+No sampling, 0xFFFF00FF color /+Todo: Error can be marked by chunkIdx=null+/+/}],
 						[q{bool},q{1},q{"loading"},q{},q{/+No sampling, 0xC0C0C0C0 color+/}],
-						[q{bool},q{1},q{"resident"},q{},q{/+GC will not unload it, just relocate it+/}],
-						[q{uint},q{3},q{"_unused"},q{},q{/++/}],
+						[q{bool},q{1},q{"resident"},q{},q{/+GC will not unload it, just relocate it /+Todo: not needed on GPU+/+/}],
+						[q{uint},q{3},q{"_unused1"},q{},q{/++/}],
 						[q{TexDim},q{2},q{"dim"},q{},q{/++/}],
 						[],
-						[q{TexType},q{4},q{"type"},q{},q{/++/}],
-						[q{TexEffect},q{4},q{"effect"},q{},q{/++/}],
+						[q{TexChn},q{2},q{"chn"},q{},q{/+channels (0: 1ch, ..., 3: 4ch)+/}],
+						[q{TexBpp},q{4},q{"bpp"},q{},q{/+bits per pixel (enum)+/}],
+						[q{bool},q{1},q{"alt"},q{},q{/+alternate mode: 1ch: white_alpha, 3ch, 4ch: swapRB+/}],
+						[q{uint},q{1},q{"_unused2"},q{},q{/++/}],
 						[],
 						[q{uint},q{16},q{"_rawSize0"},q{},q{/++/}],
 						[q{uint},q{32},q{"_rawSize12"},q{},q{/++/}],
 					]))
 				).調!(GEN_bitfields)); 
 				
-				@property ivec3 size()
+				@property type() const => (cast(TexType)((*(cast(ulong*)(&this))).getBits(TypeBitOfs, TypeBits))); 
+				@property type(TexType t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(TypeBitOfs, TypeBits, t); } 
+				
+				@property ivec3 size() const
 				=> dim.predSwitch(
 					TexDim._1D, ivec3(_rawSize12, 1, 1),
 					TexDim._2D, ivec3((_rawSize0 | ((_rawSize12 & 0xFF)<<16)), _rawSize12>>8, 1),
@@ -417,12 +418,12 @@ class VulkanWindow: Window
 				} 
 			} 
 			static assert(TexSizeFormat.sizeof==8); 
-			
+			
 			struct TexInfo
 			{
+				TexSizeFormat sizeFormat; 
 				HeapChunkIdx heapChunkIdx; 
 				uint extra; 
-				TexSizeFormat sizeFormat; 
 			} 
 			static assert(TexInfo.sizeof==16); 
 		}
@@ -519,7 +520,7 @@ class VulkanWindow: Window
 			{
 					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x39A882886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x3C5F82886ADB).檢((update間(_間)))); 
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
 					buffer.allocator.stats.print; 	((0x31DE82886ADB).檢((update間(_間)))); 
@@ -551,7 +552,7 @@ class VulkanWindow: Window
 			auto extractBitmapData(Bitmap bmp)
 			{
 				TexSizeFormat fmt; 
-				const void[] data; 
+				const(void)[] data; 
 				
 				void doUnsupported()
 				{
@@ -571,40 +572,40 @@ class VulkanWindow: Window
 				data = bmp.getRaw; 
 				
 				
-				
-				if(bmp.channels.inRange(1, 4))
-				{
-					switch(bmp.type)
+				/+
+					if(bmp.channels.inRange(1, 4))
 					{
-						case "ubyte": 	switch(bmp.channels)
+						switch(bmp.type)
 						{
-							case 1: 	fmt.type = TexType.u8; 	data = bmp.getRaw; 	break; 
-							case 2: 	fmt.type = TexType.rg_u8; 	data = bmp.getRaw; 	break; 
-							case 3: 	fmt.type = TexType.rgb_u8; 	data = bmp.getRaw; 	break; 
-							case 4: 	fmt.type = TexType.rgba_u8; 	data = bmp.getRaw; 	break; 
+							case "ubyte": 	switch(bmp.channels)
+							{
+								case 1: 	fmt.type = TexType.u8; 	data = bmp.getRaw; 	break; 
+								case 2: 	fmt.type = TexType.rg_u8; 	data = bmp.getRaw; 	break; 
+								case 3: 	fmt.type = TexType.rgb_u8; 	data = bmp.getRaw; 	break; 
+								case 4: 	fmt.type = TexType.rgba_u8; 	data = bmp.getRaw; 	break; 
+								default: 	unsupported; 
+							}	break; 
+							case "float": 	switch(bmp.channels)
+							{
+								case 1: 	fmt.type = TexType.f32; 	data = bmp.getRaw; 	break; 
+								case 2: 	fmt.type = TexType.rg_f32; 	data = bmp.getRaw; 	break; 
+								case 3: 	fmt.type = TexType.rgb_f32; 	data = bmp.getRaw; 	break; 
+								case 4: 	fmt.type = TexType.rgba_f32; 	data = bmp.getRaw; 	break; 
+								default: 	unsupported; 
+							}	break; 
+							case "ushort": 	switch(bmp.channels)
+							{
+								case 1: 	fmt.type = TexType.u16; 	data = bmp.getRaw; 	break; 
+								case 2: 	fmt.type = TexType.rg_u16; 	data = bmp.getRaw; 	break; 
+								case 3: 	fmt.type = TexType.rgb_u16; 	data = bmp.getRaw; 	break; 
+								case 4: 	fmt.type = TexType.rgba_u16; 	data = bmp.getRaw; 	break; 
+								default: 	unsupported; 
+							}	break; 
 							default: 	unsupported; 
-						}	break; 
-						case "float": 	switch(bmp.channels)
-						{
-							case 1: 	fmt.type = TexType.f32; 	data = bmp.getRaw; 	break; 
-							case 2: 	fmt.type = TexType.rg_f32; 	data = bmp.getRaw; 	break; 
-							case 3: 	fmt.type = TexType.rgb_f32; 	data = bmp.getRaw; 	break; 
-							case 4: 	fmt.type = TexType.rgba_f32; 	data = bmp.getRaw; 	break; 
-							default: 	unsupported; 
-						}	break; 
-						case "ushort": 	switch(bmp.channels)
-						{
-							case 1: 	fmt.type = TexType.u16; 	data = bmp.getRaw; 	break; 
-							case 2: 	fmt.type = TexType.rg_u16; 	data = bmp.getRaw; 	break; 
-							case 3: 	fmt.type = TexType.rgb_u16; 	data = bmp.getRaw; 	break; 
-							case 4: 	fmt.type = TexType.rgba_u16; 	data = bmp.getRaw; 	break; 
-							default: 	unsupported; 
-						}	break; 
-						default: 	unsupported; 
+						}
 					}
-				}
-				
-				
+					
+				+/
 				return tuple(fmt, data); 
 			} 
 			
@@ -674,6 +675,7 @@ class VulkanWindow: Window
 					
 				}
 				
+				return null; 
 				/+
 					TexRec* res; 
 					texRecByFileName.update
@@ -775,7 +777,11 @@ class VulkanWindow: Window
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
 			
+			$(GEN_enumDefines!TexDim)
 			$(GEN_enumDefines!TexType)
+			$(GEN_enumDefines!TexChn)
+			$(GEN_enumDefines!TexBpp)
+			
 			
 			@vert: 
 			layout(location = 0)
@@ -799,15 +805,13 @@ class VulkanWindow: Window
 			layout(location = 0)
 			out vec4 outColor; 
 			
-			@common: 
-			
 			@vert: 
 			
 			void main()
 			{ geomPosition = vertPosition, geomColor = vertColor; } 
 			
 			@geom: 
-			$(ShaderBufferDeclarations); 
+			$(ShaderBufferDeclarations)
 			
 			layout(points) in; 
 			layout(points, max_vertices = 32) out; 
@@ -821,11 +825,225 @@ class VulkanWindow: Window
 				fragColor = vec4(1, 0, 1, 1); 
 				EmitVertex(); 
 			} 
-			
+			
 			@frag: 
-			$(ShaderBufferDeclarations); 
+			$(ShaderBufferDeclarations)
 			
-			void main() { outColor = fragColor; } 
+			#define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
+			#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
+			
+			#define ErrorColor vec4(1, 0, 1, 1)
+			#define LoadingColor vec4(1, 0, 1, 1)
+			
+			uvec3 decode_1D_size(in uint _rawSize0, in uint _rawSize12)
+			{ return uvec3(_rawSize12, 1, 1); } 
+			uvec3 decode_2D_size(in uint _rawSize0, in uint _rawSize12)
+			{ return uvec3((_rawSize0 | ((_rawSize12 & 0xFF)<<16)), _rawSize12>>8, 1); } 
+			uvec3 decode_3D_size(in uint _rawSize0, in uint _rawSize12)
+			{ return uvec3(_rawSize0, _rawSize12 & 0xFFFF, _rawSize12>>16); } 
+			
+			uvec3 decodeDimSize(in uint dim, in uint _rawSize0, in uint _rawSize12)
+			{
+				switch(dim)
+				{
+					case TexDim_1D: 	return decode_1D_size(_rawSize0, _rawSize12); 
+					case TexDim_2D: 	return decode_2D_size(_rawSize0, _rawSize12); 
+					case TexDim_3D: 	return decode_3D_size(_rawSize0, _rawSize12); 
+					default: 	return uvec3(0); 
+				}
+			} 
+			
+			uint calcFlatIndex(in uvec3 v, in uint dim, in uvec3 size)
+			{
+				switch(dim)
+				{
+					case TexDim_1D: 	return v.x; 
+					case TexDim_2D: 	return v.x + v.y * size.x; 
+					case TexDim_3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
+					default: 	return 0; 
+				}
+			} 
+			
+			vec4 readSample(in uint texIdx, in ivec3 v)
+			{
+				if(texIdx==0) return ErrorColor; 
+				
+				//fetch info dword 0
+				const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+				const uint info_0 = IB[textDwIdx+0]; 
+				
+				//handle 'error' and 'loading' flags
+				if(getBits(info_0, 0, 2)!=0)
+				{
+					if(getBit(info_0, 0))	return ErrorColor; 
+					else	return LoadingColor; 
+				}
+				
+				//decode type (chn, bpp, alt)
+				const uint chn = getBits(info_0, $(TypeBitOfs), $(ChnBits)) + 1; 
+				const uint bpp = getBits(info_0, $(TypeBitOfs + ChnBits), $(BppBits)); 
+				const bool alt = getBit(info_0, $(TypeBitOfs+ChnBits+BppBits)); 
+				
+				//decode dimensions, size
+				const uint dim = getBits(info_0, $(DimBitOfs), $(DimBits)); 
+				const uint info_1 = IB[textDwIdx+1]; 
+				const uint _rawSize0 = getBits(info_0, 16, 16); 
+				const uint _rawSize12 = info_1; 
+				const uvec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
+				
+				//Clamp coordinates. Assume non-empty image.
+				const uvec3 clamped = uvec3(max(min(v, size-1), 0)); 
+				
+				//Calculate flat index
+				const uint i = calcFlatIndex(clamped, dim, size); 
+				
+				//Get chunkIdx from info rec
+				const uint chunkIdx = IB[textDwIdx+2]; 
+				const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
+				
+				//Phase 1: Calculate minimal read range
+				uint startIdx; 
+				uint numDWords; 
+				int shift; // Only used for 24bpp case
+				bool aligned; // Only used for 48bpp case
+				
+				switch(bpp)
+				{
+					case TexBpp_1: 	{ startIdx = dwIdx + i/32; numDWords = 1; }	break; 
+					case TexBpp_2: 	{ startIdx = dwIdx + i/16; numDWords = 1; }	break; 
+					case TexBpp_4: 	{ startIdx = dwIdx + i/8; numDWords = 1; }	break; 
+					case TexBpp_8: 	{ startIdx = dwIdx + i/4; numDWords = 1; }	break; 
+					case TexBpp_16: 	{ startIdx = dwIdx + i/2; numDWords = 1; }	break; 
+					case TexBpp_24: 	{
+						startIdx = dwIdx + (i*3)/4; 
+						shift = int(i%4)*6; 
+						numDWords = (shift <= 8) ? 1 : 2; 
+					}	break; 
+					case TexBpp_32: 	{ startIdx = dwIdx + i; numDWords = 1; }	break; 
+					case TexBpp_48: 	{
+						startIdx = dwIdx + i*3/2; 
+						aligned = (i%2 == 0); numDWords = 2; 
+					}	break; 
+					case TexBpp_64: 	{ startIdx = dwIdx + i*2; numDWords = 2; }	break; 
+					case TexBpp_96: 	{ startIdx = dwIdx + i*3; numDWords = 3; }	break; 
+					case TexBpp_128: 	{ startIdx = dwIdx + i*4; numDWords = 4; }	break; 
+					default: return ErrorColor; 
+				}
+				
+				//Phase 2: Perform minimal TB[] reads
+				uvec4 tmp; // Max 4 dwords needed for 128bpp case
+				tmp.x = TB[startIdx + 0]; 
+				if(numDWords>1) tmp.y = TB[startIdx + 1]; 
+				if(numDWords>2) tmp.z = TB[startIdx + 2]; 
+				if(numDWords>3) tmp.w = TB[startIdx + 3]; 
+				
+				vec4 res; 
+				
+				switch(chn)
+				{
+					case TexChn_1: 
+					switch(bpp)
+					{
+						case TexBpp_1: 	{ res = vec4(vec3(getBits(tmp.x, int(i%32)* 1,  1)         ), 1); }	break; 
+						case TexBpp_2: 	{ res = vec4(vec3(getBits(tmp.x, int(i%16)* 2,  2) /     3.0), 1); }	break; 
+						case TexBpp_4: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 8)* 4,  4) /    15.0), 1); }	break; 
+						case TexBpp_8: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 4)* 8,  8) /   255.0), 1); }	break; 
+						case TexBpp_16: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 2)*16, 16) / 65535.0), 1); }	break; 
+						case TexBpp_32: 	{ res = vec4(vec3(uintBitsToFloat(tmp.x)                 ), 1); }	break; 
+						default: return ErrorColor; 
+					}
+					if(alt) {
+						/*white alpha (used by monochrome fonts)*/
+						res.a = res.r; res.rgb = vec3(1); 
+					}break; 
+					
+					case TexChn_2: 
+					switch(bpp)
+					{
+						case TexBpp_16: 	{ res = unpackUnorm4x8(tmp.x).xxxy; }	break; 
+						case TexBpp_32: 	{ res = unpackUnorm2x16(tmp.x).xxxy; }	break; 
+						case TexBpp_64: 	{
+							res = vec4(
+								vec3(uintBitsToFloat(tmp.x)),
+								      uintBitsToFloat(tmp.y)
+							); 
+						}	break; 
+						default: return ErrorColor; 
+					}
+					if(alt) {/*no alt mode defined for 2ch,*/}break; 
+					case TexChn_3: 
+					switch(bpp)
+					{
+						case TexBpp_16: 	{
+							res = vec4(
+								getBits(tmp.x,  0, 5) / 31.0,
+								getBits(tmp.x,  5, 6) / 63.0,
+								getBits(tmp.x, 11, 5) / 31.0, 1
+							); 
+						}	break; 
+						case TexBpp_24: 	{
+							if(shift <= 8)	{ res = vec4(unpackUnorm4x8(getBits(tmp.x, shift, 24)).xyz, 1); }
+							else	{
+								res = vec4(
+									unpackUnorm4x8(
+										(tmp.x >> shift) | 
+										(tmp.y << (32-shift))
+									).xyz, 1
+								); 
+							}
+						}	break; 
+						case TexBpp_48: 	{
+							if(aligned)	{
+								res = vec4(
+									unpackUnorm2x16(tmp.x).xy, 
+									unpackUnorm2x16(tmp.y).x, 1
+								); 
+							}
+							else	{
+								res = vec4(
+									unpackUnorm2x16(tmp.x>>16).x, 
+									unpackUnorm2x16(tmp.y).xy, 1
+								); 
+							}
+						}	break; 
+						case TexBpp_96: 	{ res = vec4(uintBitsToFloat(tmp.xyz), 1); }	break; 
+						default: return ErrorColor; 
+					}
+					if(alt) {/*swap red-blue*/res.rgba = res.bgra; }break; 
+					
+					case TexChn_4: 
+					switch(bpp)
+					{
+						case TexBpp_16: 	{
+							res = vec4(
+								getBits(tmp.x,  0, 5) / 31.0,
+								getBits(tmp.x,  5, 5) / 31.0,
+								getBits(tmp.x, 10, 5) / 31.0,
+								getBits(tmp.x, 15, 1)
+							); 
+						}	break; 
+						case TexBpp_32: 	{ res = unpackUnorm4x8(tmp.x); }	break; 
+						case TexBpp_64: 	{
+							res = vec4(
+								unpackUnorm2x16(tmp.x),
+								unpackUnorm2x16(tmp.y)
+							); 
+						}	break; 
+						case TexBpp_128: 	{ res = uintBitsToFloat(tmp.xyzw); }	break; 
+						default: return ErrorColor; 
+					}
+					if(alt) {/*swap red-blue*/res.rgba = res.bgra; }break; 
+					
+					default: return ErrorColor; 
+				}
+				return res; 
+			} 
+			
+			void main() {
+				outColor = fragColor; 
+				
+				outColor = readSample(1, ivec3(0)); 
+			} 
 		})); 
 		shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
 	} 
@@ -931,8 +1149,6 @@ class VulkanWindow: Window
 		
 		//TB: Texture buffer
 		layout(binding = 2) buffer TB_T { uint TB[]; }; 
-		
-		void _dummy_declaration()
 	}.text; 
 	
 	

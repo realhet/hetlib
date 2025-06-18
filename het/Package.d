@@ -2715,19 +2715,23 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					return false; 
 				} 
 				
-				return allRows.filter!(r=>r.length>=1 && !r.all!isComment); 
-				//Todo: full row //comment detection is failing
+				return allRows.filter!((r)=>(r.length>=1 && !r.all!isComment)); 
+				/+
+					Note: It takes all non-full-comment rows. 
+					It excludes empty rows, comment rows, and the header row.
+				+/
 			} 
 			
-			string cell(long x, long y)
-			{ return allRows.get(y).get(x); } 
+			int width()
+			=> allRows.get(0).length.to!int;  int rowCount()
+			=> rows.walkLength.to!int; 
 			
-			auto column(int x)()
+			string cell(long x, long y)
+			{ return allRows.get(y).get(x); }  auto column(int x)()
 			{ return rows.map!(r=>r.get(x)); } 
 			
-			string headerCell(long x)
+			static string unpackHeader(string s)
 			{
-				auto s = cell(x, 0); 
 				if(s.length>=4 && s.startsWith("/+") && s.endsWith("+/"))
 				{
 					s = s[2..$-2]; 
@@ -2740,10 +2744,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return s; 
 			} 
 			
+			string headerCell(long x)
+			=> unpackHeader(cell(x, 0));  string headerColumnCell(long y)
+			=> unpackHeader(cell(0, y)); 
+			
 			string[] headerRow()
 			{
 				//return allRows.get(0).length.iota.map!((i)=>(this.headerCell(i))).array; 
-				const cnt = allRows.get(0).length; 
+				const cnt = allRows[0].length; 
 				string[] res; foreach(i; 0..cnt) res ~= headerCell(i); return res; 
 				//Todo: weird bug: .iota won't work here...
 				
@@ -2940,7 +2948,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		/+Todo: Nonstandard casing (sometimes capitalized, sometimes not)  I thing everything capitalized would be better.+/
 		
 		string GEN_enumDefines(E)() if(is(E==enum))
-		{ return [EnumMembers!E].map!((a)=>("#define TexType_"~a.text~" "~a.to!int.text~"\r\n")).join; } 
+		{ return [EnumMembers!E].map!((a)=>("#define "~E.stringof~"_"~a.text.withoutStarting('_')~" "~a.to!int.text~"\r\n")).join; } 
 		
 		//This is the new way: template mixin instead of string mixin.
 		mixin template INJECTOR_TEMPLATE(alias _data, string _script)
