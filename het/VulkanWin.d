@@ -208,7 +208,20 @@ class VulkanWindow: Window
 	
 	version(/+$DIDE_REGION VB    +/all)
 	{
-		struct VertexData { vec3 pos; vec3 color; } 
+		enum VertexCmd
+		{texturedRect} 
+		enum VertexCmdBits = 4; static assert(VertexCmd.max < 1<<VertexCmdBits); 
+		
+		union VertexData {
+			struct 	 { uvec4 VA0, VA1; } 
+			struct 	 {
+				uint cmd; 
+				RGBA color; 
+				uint dummy0, dummy1; 
+				bounds2 bounds; 
+			} 
+		} 
+		static assert(VertexData.sizeof == 32); 
 		
 		VertexBufferManager VB; 
 		
@@ -228,14 +241,8 @@ class VulkanWindow: Window
 			~this()
 			{ buffer.free; } 
 			
-			vec3 actColor; 
-			
 			void reset()
-			{
-				buffer.reset; 
-				
-				actColor = vec3(0); 
-			} 
+			{ buffer.reset; } 
 			
 			void upload()
 			{
@@ -245,19 +252,32 @@ class VulkanWindow: Window
 			
 			auto deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
 			
-			
-			void tri(Args...)(in Args args)
+			void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 			{
-				void emit(in vec3 pos)
-				{ buffer.append(VertexData(pos, actColor)); } 
-				
-				static foreach(i, A; Args)
-				{
-					static if(is(A==vec3)) emit(args[i]); 
-					else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
-					else static if(is(A==RGB)) actColor = args[i].from_unorm; 
-				}
+				buffer.append
+				(
+					mixin(體!((VertexData),q{
+						cmd 	: VertexCmd.texturedRect | texHandle.to!uint<<VertexCmdBits,
+						bounds 	: bounds,
+						color 	: color
+					}))
+				); 
 			} 
+			
+			/+
+				void tri(Args...)(in Args args)
+				{
+					void emit(in vec3 pos)
+					{ buffer.append(VertexData(pos, actColor)); } 
+					
+					static foreach(i, A; Args)
+					{
+						static if(is(A==vec3)) emit(args[i]); 
+						else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
+						else static if(is(A==RGB)) actColor = args[i].from_unorm; 
+					}
+				} 
+			+/
 		} 
 	}
 	
@@ -267,6 +287,7 @@ class VulkanWindow: Window
 		version(/+$DIDE_REGION TexInfo declarations+/all)
 		{
 			alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
+			
 			enum DimBits 	= 2, 
 			ChnBits 	= 2, 
 			BppBits 	= 4, 
@@ -329,7 +350,7 @@ class VulkanWindow: Window
 						2ch, 3ch 	: bgr* 	: red blue swap
 				+/}],
 			])); 
-			pragma(msg, GEN_TexType); 
+			static if((常!(bool)(0))) { pragma(msg, GEN_TexType); }
 			mixin(GEN_TexType); 
 			static assert(TexChn.max < 1<<ChnBits); static assert(TexBpp.max < 1<<BppBits); 
 			static assert(TexType.max < 1<<TypeBits); 
@@ -387,12 +408,43 @@ class VulkanWindow: Window
 				@property type() const => (cast(TexType)((*(cast(ulong*)(&this))).getBits(TypeBitOfs, TypeBits))); 
 				@property type(TexType t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(TypeBitOfs, TypeBits, t); } 
 				
+				enum SharedCode = 
+				q{
+					ivec3 decodeDimSize(in uint dim, in uint raw0, in uint raw12)
+					{
+						switch(dim)
+						{
+							case TexDim._1D: 	return ivec3(raw12, 1, 1); 
+							case TexDim._2D: 	return ivec3((raw0 | ((raw12 & 0xFF)<<16)), raw12>>8, 1); 
+							case TexDim._3D: 	return ivec3(raw0, raw12 & 0xFFFF, raw12>>16); 
+							default: 	return ivec3(0); 
+						}
+					} 
+					
+					uint calcFlatIndex(in ivec3 v, in uint dim, in ivec3 size)
+					{
+						switch(dim)
+						{
+							case TexDim._1D: 	return v.x; 
+							case TexDim._2D: 	return v.x + (v.y * size.x); 
+							case TexDim._3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
+							default: 	return 0; 
+						}
+					} 
+				},
+				
+				GLSLCode = 
+				iq{
+					$(GEN_enumDefines!TexDim)
+					$(GEN_enumDefines!TexType)
+					$(GEN_enumDefines!TexChn)
+					$(GEN_enumDefines!TexBpp)
+					$(SharedCode.replace("TexDim._", "TexDim_"))
+				}.text; 
+				static protected { mixin(SharedCode); } 
+				
 				@property ivec3 size() const
-				=> dim.predSwitch(
-					TexDim._1D, ivec3(_rawSize12, 1, 1),
-					TexDim._2D, ivec3((_rawSize0 | ((_rawSize12 & 0xFF)<<16)), _rawSize12>>8, 1),
-					TexDim._3D, ivec3(_rawSize0, _rawSize12 & 0xFFFF, _rawSize12>>16),
-				); 
+				=> decodeDimSize(dim, _rawSize0, _rawSize12); 
 				@property size(int a)
 				{ dim = TexDim._1D; _rawSize0 = 0; _rawSize12 = a; } 
 				@property size(ivec2 a)
@@ -416,6 +468,9 @@ class VulkanWindow: Window
 						foreach(x; a) foreach(y; a) foreach(z; a) doit(ivec3(x, y, z), ivec3(x, y, z)); 
 					}
 				} 
+				
+				string toString() const
+				=> i"TexSizeFormat($(type), $(size.x) x $(size.y) x $(size.z)$(error?", ERR":"")$(loading?", LD":"")$(resident?", RES":""))".text; 
 			} 
 			static assert(TexSizeFormat.sizeof==8); 
 			
@@ -424,6 +479,10 @@ class VulkanWindow: Window
 				TexSizeFormat sizeFormat; 
 				HeapChunkIdx heapChunkIdx; 
 				uint extra; 
+				
+				string toString() const
+				=> format!"TexInfo(%s, chunk:%d, extra:%d)"
+				(sizeFormat, heapChunkIdx.to!uint, extra); 
 			} 
 			static assert(TexInfo.sizeof==16); 
 		}
@@ -520,7 +579,8 @@ class VulkanWindow: Window
 			{
 					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x3C5F82886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x430582886ADB).檢((update間(_間)))); 
+				
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
 					buffer.allocator.stats.print; 	((0x31DE82886ADB).檢((update間(_間)))); 
@@ -609,11 +669,15 @@ class VulkanWindow: Window
 				return tuple(fmt, data); 
 			} 
 			
-			protected TexHandle createHandleAndData(in TexSizeFormat fmt, in void[] data)
+			protected TexHandle createHandleAndSetData(in TexSizeFormat fmt, in void[] data)
 			{
 				if(auto heapRef = buffer.heapAlloc(data.length))
 				{
-					TexInfo texInfo = { sizeFormat : fmt }; 
+					const texInfo = mixin(體!((TexInfo),q{
+						sizeFormat 	: fmt, 
+						heapChunkIdx 	: heapRef.heapChunkIdx,
+						extra 	: 0
+					})); 
 					if(const texHandle = IB.add(texInfo))
 					{
 						memcpy(heapRef.ptr, data.ptr, data.length); /+Note: ⚡ Memory transfer (process → host) +/
@@ -777,94 +841,118 @@ class VulkanWindow: Window
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
 			
-			$(GEN_enumDefines!TexDim)
-			$(GEN_enumDefines!TexType)
-			$(GEN_enumDefines!TexChn)
-			$(GEN_enumDefines!TexBpp)
-			
-			
-			@vert: 
-			layout(location = 0)
-			in vec3 vertPosition; 	layout(location = 1)
-			in vec3 vertColor; 
-				
-			layout(location = 0)
-			out vec3 geomPosition; 	layout(location = 1)
-			out vec3 geomColor; 
-			@geom: 	
-			layout(location = 0)
-			in vec3 geomPosition[]; 	layout(location = 1)
-			in vec3 geomColor[]; 
-			
-			layout(location = 0)
-			flat out vec4 fragColor; 
-			@frag: 
-			layout(location = 0)
-			flat in vec4 fragColor; 
-			
-			layout(location = 0)
-			out vec4 outColor; 
-			
-			@vert: 
-			
-			void main()
-			{ geomPosition = vertPosition, geomColor = vertColor; } 
-			
-			@geom: 
-			$(ShaderBufferDeclarations)
-			
-			layout(points) in; 
-			layout(points, max_vertices = 32) out; 
-			
-			
-			void main()
-			{
-				gl_Position = UB.mvp * vec4(geomPosition[0], 1.0); 
-				fragColor = vec4(geomColor[0], 1.0); 
-				//fragColor = unpackUnorm4x8(TB[IB[0]]); 
-				fragColor = vec4(1, 0, 1, 1); 
-				EmitVertex(); 
-			} 
-			
-			@frag: 
-			$(ShaderBufferDeclarations)
-			
 			#define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
 			#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
 			
 			#define ErrorColor vec4(1, 0, 1, 1)
 			#define LoadingColor vec4(1, 0, 1, 1)
 			
-			uvec3 decode_1D_size(in uint _rawSize0, in uint _rawSize12)
-			{ return uvec3(_rawSize12, 1, 1); } 
-			uvec3 decode_2D_size(in uint _rawSize0, in uint _rawSize12)
-			{ return uvec3((_rawSize0 | ((_rawSize12 & 0xFF)<<16)), _rawSize12>>8, 1); } 
-			uvec3 decode_3D_size(in uint _rawSize0, in uint _rawSize12)
-			{ return uvec3(_rawSize0, _rawSize12 & 0xFFFF, _rawSize12>>16); } 
 			
-			uvec3 decodeDimSize(in uint dim, in uint _rawSize0, in uint _rawSize12)
+			@vert: 
+			layout(location = 0)
+			in uvec4 vertAttr0; 	layout(location = 1)
+			in uvec4 vertAttr1; 
+				
+			layout(location = 0)
+			out uvec4 geomAttr0; 	layout(location = 1)
+			out uvec4 geomAttr1; 	layout(location = 2)
+			out int geomVertexID; 
+			@geom: 		
+			layout(location = 0)
+			in uvec4 geomAttr0[]; 	layout(location = 1)
+			in uvec4 geomAttr1[]; 	layout(location = 2)
+			in int[] geomVertexID; 
+					
+			layout(location = 0)
+			smooth out vec4 fragColor; 	layout(location = 1)
+			smooth out vec2 fragTexCoord; 	layout(location = 2)
+			flat out uint fragTexHandle; 
+			@frag: 		
+			layout(location = 0)
+			smooth in vec4 fragColor; 	layout(location = 1)
+			smooth in vec2 fragTexCoord; 	layout(location = 2)
+			flat in uint fragTexHandle; 
+			
+			layout(location = 0)
+			out vec4 outColor; 
+			
+			
+			
+			@vert: 
+			
+			void main()
 			{
-				switch(dim)
-				{
-					case TexDim_1D: 	return decode_1D_size(_rawSize0, _rawSize12); 
-					case TexDim_2D: 	return decode_2D_size(_rawSize0, _rawSize12); 
-					case TexDim_3D: 	return decode_3D_size(_rawSize0, _rawSize12); 
-					default: 	return uvec3(0); 
-				}
+				geomAttr0 	= vertAttr0, 
+				geomAttr1 	= vertAttr1,
+				geomVertexID	= gl_VertexIndex; 
+			} 
+			
+			@geom: 
+			$(ShaderBufferDeclarations)
+			
+			layout(points) in; 
+			layout(triangle_strip, max_vertices = 32) out; 
+			
+			void emitVertex2D(vec2 p)
+			{
+				gl_Position = UB.mvp * vec4(p.xy, 0, 1); 
+				EmitVertex(); 
 			} 
 			
-			uint calcFlatIndex(in uvec3 v, in uint dim, in uvec3 size)
+			void emitPointSizeRect2D(in vec2 p, in vec2 size)
 			{
-				switch(dim)
+				emitVertex2D(p); 
+				emitVertex2D(p+vec2(0, size.y)); 
+				emitVertex2D(p+vec2(size.x, 0)); 
+				emitVertex2D(p+size); 
+				EndPrimitive(); 
+			} 
+			
+			void emitTexturedPointSizeRect2D(in vec2 p, in vec2 size)
+			{
+				fragTexCoord = vec2(0,0); emitVertex2D(p); 
+				fragTexCoord = vec2(0,1); emitVertex2D(p+vec2(0, size.y)); 
+				fragTexCoord = vec2(1,0); emitVertex2D(p+vec2(size.x, 0)); 
+				fragTexCoord = vec2(1,1); emitVertex2D(p+size); 
+				EndPrimitive(); 
+			} 
+			
+			void emitTexturedPointPointRect2D(in vec2 p, in vec2 q)
+			{
+				fragTexCoord = vec2(0,0); emitVertex2D(p); 
+				fragTexCoord = vec2(0,1); emitVertex2D(vec2(p.x, q.y)); 
+				fragTexCoord = vec2(1,0); emitVertex2D(vec2(q.x, p.y)); 
+				fragTexCoord = vec2(1,1); emitVertex2D(q); 
+				EndPrimitive(); 
+			} 
+			
+			$(GEN_enumDefines!VertexCmd)
+			
+			void main()
+			{
+				const uint 	vertexCmd = getBits(geomAttr0[0].x, 0, $(VertexCmdBits)); 
+				
+				switch(vertexCmd)
 				{
-					case TexDim_1D: 	return v.x; 
-					case TexDim_2D: 	return v.x + v.y * size.x; 
-					case TexDim_3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
-					default: 	return 0; 
+					case VertexCmd_texturedRect: 
+						{
+						fragTexHandle = geomAttr0[0].x >> $(VertexCmdBits); 
+						fragColor = unpackUnorm4x8(geomAttr0[0].y); 
+						emitTexturedPointPointRect2D(
+							uintBitsToFloat (geomAttr1[0].xy),
+							uintBitsToFloat (geomAttr1[0].zw)
+						); 
+					}
+					break; 
 				}
 			} 
 			
-			vec4 readSample(in uint texIdx, in ivec3 v)
+			@frag: 
+			$(ShaderBufferDeclarations)
+			
+			$(TexSizeFormat.GLSLCode)
+			
+			vec4 readSample(in uint texIdx, in vec3 v, in bool preScale)
 			{
 				if(texIdx==0) return ErrorColor; 
 				
@@ -879,20 +967,16 @@ class VulkanWindow: Window
 					else	return LoadingColor; 
 				}
 				
-				//decode type (chn, bpp, alt)
-				const uint chn = getBits(info_0, $(TypeBitOfs), $(ChnBits)) + 1; 
-				const uint bpp = getBits(info_0, $(TypeBitOfs + ChnBits), $(BppBits)); 
-				const bool alt = getBit(info_0, $(TypeBitOfs+ChnBits+BppBits)); 
-				
 				//decode dimensions, size
 				const uint dim = getBits(info_0, $(DimBitOfs), $(DimBits)); 
 				const uint info_1 = IB[textDwIdx+1]; 
 				const uint _rawSize0 = getBits(info_0, 16, 16); 
 				const uint _rawSize12 = info_1; 
-				const uvec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
+				const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
 				
 				//Clamp coordinates. Assume non-empty image.
-				const uvec3 clamped = uvec3(max(min(v, size-1), 0)); 
+				const ivec3 iv = ivec3 ((preScale)?(v * vec3(size)) :(v)); 
+				const ivec3 clamped = max(min(iv, size-1), 0); 
 				
 				//Calculate flat index
 				const uint i = calcFlatIndex(clamped, dim, size); 
@@ -900,6 +984,11 @@ class VulkanWindow: Window
 				//Get chunkIdx from info rec
 				const uint chunkIdx = IB[textDwIdx+2]; 
 				const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
+				
+				//decode type (chn, bpp, alt)
+				const uint chn = getBits(info_0, $(TypeBitOfs), $(ChnBits)); 
+				const uint bpp = getBits(info_0, $(TypeBitOfs + ChnBits), $(BppBits)); 
+				const bool alt = getBit(info_0, $(TypeBitOfs+ChnBits+BppBits)); 
 				
 				//Phase 1: Calculate minimal read range
 				uint startIdx; 
@@ -1040,9 +1129,25 @@ class VulkanWindow: Window
 			} 
 			
 			void main() {
-				outColor = fragColor; 
+				const vec2[6] rooks6_offsets = 
+					{
+					vec2(-0.417, 0.250), vec2(-0.250, -0.417), vec2(-0.083, -0.083),
+					vec2(0.083, 0.083), vec2(0.250, 0.417), vec2(0.417, -0.250)
+				}; 
 				
-				outColor = readSample(1, ivec3(0)); 
+				vec4 sum = vec4(0); 
+				const vec2 texCoordDx = dFdx(fragTexCoord); 
+				const vec2 texCoordDy = dFdy(fragTexCoord); 
+				for(int i=0; i<6; i++)
+				{
+					vec2 rooks = rooks6_offsets[i]; 
+					vec2 tc = fragTexCoord + 	rooks.x * texCoordDx + 
+						rooks.y * texCoordDy; 
+					vec4 smp = readSample(fragTexHandle, vec3(tc, 0), true); 
+					sum += smp; 
+				}
+				
+				outColor = sum/6 * fragColor; 
 			} 
 		})); 
 		shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
@@ -1186,23 +1291,23 @@ class VulkanWindow: Window
 					inputRate 	: mixin(舉!((VK_VERTEX_INPUT_RATE_),q{VERTEX})),
 				})), [
 					mixin(體!((VkVertexInputAttributeDescription),q{
-						//vec3 position (.z is 0)
+						//uvec4 VertexData0
 						binding	: 0, 
 						location 	: 0,
-						format	: mixin(舉!((VK_FORMAT_),q{R32G32B32_SFLOAT})),
+						format	: mixin(舉!((VK_FORMAT_),q{R32G32B32A32_UINT})),
 						offset	: 0
 					})), mixin(體!((VkVertexInputAttributeDescription),q{
-						//vec3 color
+						//uvec4 VertexData1
 						binding	: 0,
 						location 	: 1,
-						format	: mixin(舉!((VK_FORMAT_),q{R32G32B32_SFLOAT})), 
-						offset	: float.sizeof * 3,
+						format	: mixin(舉!((VK_FORMAT_),q{R32G32B32A32_UINT})), 
+						offset	: uvec4.sizeof,
 					})),
 				]
 			),
 			
 			mixin(體!((VkPipelineInputAssemblyStateCreateInfo),q{
-				topology 	: mixin(舉!((VK_PRIMITIVE_TOPOLOGY_),q{POINT_LIST})),
+				topology 	: mixin(舉!((VK_PRIMITIVE_TOPOLOGY_),q{TRIANGLE_STRIP})),
 				primitiveRestartEnable 	: true,
 			})), 
 			
@@ -1342,6 +1447,114 @@ class VulkanWindow: Window
 		createDescriptorSet; //needs: descriptorsetLayout, uniformBuffer
 		
 		if(0) VulkanInstance.dumpBasicStuff; 
+		
+		if(1)
+		{
+			console.hide; 
+			{
+				TexSizeFormat fmt; 
+				
+				fmt.size = ivec2(24, 21); 
+				fmt.type = TexType.wa_u1; 
+				
+				const ubyte[] data = 
+				[
+					0,127,0,
+					1,255,192,
+					3,255,224,
+					3,231,224,
+					7,217,240,
+					7,223,240,
+					7,217,240,
+					3,231,224,
+					3,255,224,
+					3,255,224,
+					2,255,160,
+					1,127,64,
+					1,62,64,
+					0,156,128,
+					0,156,128,
+					0,73,0,
+					0,73,0,
+					0,62,0,
+					0,62,0,
+					0,62,0,
+					0,28,0
+				]
+				.map!((a)=>((cast(ubyte)(a.bitSwap>>>24)))).array; 
+				
+				const texHandle = TB.createHandleAndSetData(fmt, data); 
+				
+				const texInfo = IB.buffer[texHandle.to!uint]; 
+				((0xACD682886ADB).檢(texInfo)); 
+				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
+				((0xAD6282886ADB).檢 (ptr[0..3*21])); 
+			}
+			
+			{
+				TexSizeFormat fmt; 
+				
+				fmt.size = ivec2(24/2, 21); 
+				fmt.type = TexType.wa_u2; 
+				
+				const ubyte[] data = 
+				[
+					0,170,0,
+					2,170,128,
+					10,170,160,
+					10,170,160,
+					42,170,168,
+					43,170,232,
+					47,235,250,
+					175,235,250,
+					173,235,122,
+					173,235,122,
+					171,170,234,
+					170,170,170,
+					170,170,170,
+					170,170,170,
+					170,170,170,
+					170,170,170,
+					170,170,170,
+					162,138,138,
+					162,138,138,
+					128,130,2,
+					128,130,2,
+				]
+				.map!((a)=>((cast(ubyte)(a.bitSwap>>>24)))).array; 
+				
+				const texHandle = TB.createHandleAndSetData(fmt, data); 
+				
+				const texInfo = IB.buffer[texHandle.to!uint]; 
+				((0xB06782886ADB).檢(texInfo)); 
+				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
+				((0xB0F382886ADB).檢 (ptr[0..3*21])); 
+			}
+			
+			{
+				TexSizeFormat fmt; 
+				
+				fmt.size = ivec2(24/2, 21); 
+				fmt.type = TexType.wa_u2; 
+				
+				const ubyte[] data = (cast(ubyte[])(
+					x"91 3d c8 a5  65 91 3d 4c  26 09 a0 02  b1 3d c5 32
+90 12 85 30  88 b1 3d 85  2f 88 b1 3d  a8 91 2f a9
+ff c8 91 2f  a5 66 c5 32  90 19 a4 64  c8 b1 65 c9
+ff f0 03 20  6b 1d a4 64  a5 3d 91 65"
+				)).map!((a)=>((cast(ubyte)(a.bitSwap>>>24)))).array; 
+				
+				
+				
+				const texHandle = TB.createHandleAndSetData(fmt, data); 
+				
+				const texInfo = IB.buffer[texHandle.to!uint]; 
+				((0xB35282886ADB).檢(texInfo)); 
+				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
+				((0xB3DE82886ADB).檢 (ptr[0..3*21])); 
+			}
+			
+		}
 	} 
 	
 	override void onFinalizeGLWindow()
@@ -1395,7 +1608,7 @@ class VulkanWindow: Window
 						
 						{
 							auto modelMatrix = mat4.identity; 
-							const rotationAngle = QPS.value(10*second); 
+							const rotationAngle = 0 * QPS.value(10*second); 
 							modelMatrix.translate(vec3(-274, -266, 0)); 
 							modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
 							
@@ -1413,6 +1626,7 @@ class VulkanWindow: Window
 							TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
 						+/
 						
+						if(0)
 						if(TB.buffer.growByRate(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
 						{}
 						
