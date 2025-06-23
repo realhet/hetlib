@@ -1345,6 +1345,37 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	//helper function to access a texture of a font character
+	
+	enum EnableFontstats = (常!(bool)(0)); 
+	
+	static if(EnableFontstats)
+	{
+		struct FontStats
+		{
+			static: 
+			uint[uint] rootDirs; 
+			uint[uint] subDirs; 
+			uint[uint] codes; 
+			
+			void doit(dchar ch)
+			{
+				const 	code 	= (cast(uint)(ch)),
+					subDir 	= code >> 7,
+					rootDir 	= subDir >> 7; 
+						
+				if(code !in codes)
+				{
+					codes[code]++; 
+					subDirs[subDir]++; 
+					rootDirs[rootDir]++; 
+					writeln("fontStats"); 
+					rootDirs.keys.sort.writeln; 
+					subDirs.keys.sort.writeln; 
+				}
+			} 
+		} 
+	}
+	
 	int fontTexture(Args...)(in dchar ch, in Args args)
 	if(Args.length==0 || Args.length==1 && (is(Args[0] == TextStyle) || is(Args[0] == string)))
 	{
@@ -1373,16 +1404,19 @@ version(/+$DIDE_REGION+/all)
 		
 		if(isDefault)
 		{
-			 //cached version for the default font
+			//cached version for the default font
 			if(auto p = ch in DefaultFont_subTexIdxMap)
-			{ stIdx = *p; }else
+			{ stIdx = *p; }
+			else
 			{
+				static if(EnableFontstats) FontStats.doit(ch); 
 				lookupSubTexIdx; 
 				DefaultFont_subTexIdxMap[ch] = stIdx; 
 			}
-		}else
+		}
+		else
 		{
-			 //uncached for non-default fonts
+			//uncached for non-default fonts
 			lookupSubTexIdx; 
 		}
 		
@@ -3913,7 +3947,7 @@ version(/+$DIDE_REGION+/all)
 						boundaryTypeEnd = b; 
 					} 
 					void $(name)_toggle()
-					{ $(name) = !$(name); } 
+					{$(name) = !$(name); } 
 				}.text); 
 			} 
 			

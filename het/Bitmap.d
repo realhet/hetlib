@@ -6246,7 +6246,7 @@ version(/+$DIDE_REGION+/all)
 		
 		private
 		{
-			void[] data_; /+
+			ubyte[] data_; /+
 				Todo: this storage can't handle stride. It should be pitch and in bytes.
 				Also do this in image!
 				
@@ -6255,6 +6255,10 @@ version(/+$DIDE_REGION+/all)
 				Bitmap is more like a storage and image is like a reference.
 			+/
 			string type_ = "ubyte"; //Todo: This must be an enum!
+			
+			/+Todo: _data storage type must be ubyte[]  !!! Because void[] is searched by GC!!!!!+/
+			//Todo: 1, 2, 4 bit modes!
+			
 			int width_, height_, channels_=4; 
 		} 
 		
@@ -6350,7 +6354,7 @@ version(/+$DIDE_REGION+/all)
 				format!"Inconsistent bitmap size: %s{w} * %s{h} * %s{ch} * %s != %s{bytes}"
 				(width, height, channels, chSize, data.length)
 			); 
-			data_ = data; 
+			data_ = (cast(ubyte[])(data)); 
 			width_ = width; 
 			height_ = height; 
 			channels_ = channels; 

@@ -2701,7 +2701,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			string[][] allRows; 
 			
-			auto rows()
+			auto rows() const
 			{
 				/+It skips empty rows and rows with only one cell starting with a comment.+/
 				static isComment(string s)
@@ -3704,10 +3704,29 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		public import core.bitop : rol, ror,
 			bitCount	= popcnt	,
-			bitSwap	= bitswap	,
+		//	bitSwap	= bitswap	,
 			byteSwap	= bswap	,
 			bitScan	= bsf	,
 			bitScan_reverse	= bsr	; 
+		
+		T swapBits(T)(in T a) if(isIntegral!T || isSomeChar!T)
+		{
+			import core.bitop : bitswap; 
+			static if(T.sizeof==8)
+			{ return (cast(T)(bitswap((cast(ulong)(a))))); }
+			else static if(T.sizeof==4)
+			{ return (cast(T)(bitswap((cast(uint)(a))))); }
+			else static if(T.sizeof==2)
+			{ return (cast(T)(bitswap((cast(uint)(a)))>>>16)); }
+			else static if(T.sizeof==1)
+			{
+				static immutable table = iota(0x100).map!((a)=>(cast(ubyte)(bitswap(a)>>>24))).array; 
+				return (cast(T)(table[(cast(ubyte)(a))])); 
+			}
+		} 
+		
+		auto swapBits(R)(R input) if(isInputRange!R)
+		=> input.map!swapBits.array; 
 		
 		ushort byteSwap(ushort a)
 		{ return cast(ushort)((a>>>8)|(a<<8)); } 

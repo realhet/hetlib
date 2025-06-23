@@ -848,34 +848,26 @@ class VulkanWindow: Window
 			#define LoadingColor vec4(1, 0, 1, 1)
 			
 			
-			@vert: 
-			layout(location = 0)
-			in uvec4 vertAttr0; 	layout(location = 1)
-			in uvec4 vertAttr1; 
-				
-			layout(location = 0)
-			out uvec4 geomAttr0; 	layout(location = 1)
-			out uvec4 geomAttr1; 	layout(location = 2)
-			out int geomVertexID; 
-			@geom: 		
-			layout(location = 0)
-			in uvec4 geomAttr0[]; 	layout(location = 1)
-			in uvec4 geomAttr1[]; 	layout(location = 2)
-			in int[] geomVertexID; 
-					
-			layout(location = 0)
-			smooth out vec4 fragColor; 	layout(location = 1)
-			smooth out vec2 fragTexCoord; 	layout(location = 2)
-			flat out uint fragTexHandle; 
-			@frag: 		
-			layout(location = 0)
-			smooth in vec4 fragColor; 	layout(location = 1)
-			smooth in vec2 fragTexCoord; 	layout(location = 2)
-			flat in uint fragTexHandle; 
 			
-			layout(location = 0)
-			out vec4 outColor; 
-			
+			$(
+				(表([
+					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/}],
+					[q{},q{vert},q{uvec4 vertAttr0},q{uvec4 vertAttr1}],
+					[q{vert},q{geom},q{uvec4 geomAttr0},q{uvec4 geomAttr1},q{int geomVertexID}],
+					[q{geom},q{frag},q{
+						smooth
+						vec4 fragColor
+					},q{
+						smooth
+						vec2 fragTexCoord
+					},q{
+						flat
+						uint fragTexHandle
+					}],
+					[q{frag},q{},q{vec4 outColor}],
+				]))
+				.GEN_ShaderLayoutDeclarations
+			)
 			
 			
 			@vert: 
@@ -993,7 +985,7 @@ class VulkanWindow: Window
 				//Phase 1: Calculate minimal read range
 				uint startIdx; 
 				uint numDWords; 
-				int shift; // Only used for 24bpp case
+				uint shift; // Only used for 24bpp case
 				bool aligned; // Only used for 48bpp case
 				
 				switch(bpp)
@@ -1005,7 +997,7 @@ class VulkanWindow: Window
 					case TexBpp_16: 	{ startIdx = dwIdx + i/2; numDWords = 1; }	break; 
 					case TexBpp_24: 	{
 						startIdx = dwIdx + (i*3)/4; 
-						shift = int(i%4)*6; 
+						shift = (i*24)&31; /*AI mistake: int(i%4)*6*/
 						numDWords = (shift <= 8) ? 1 : 2; 
 					}	break; 
 					case TexBpp_32: 	{ startIdx = dwIdx + i; numDWords = 1; }	break; 
@@ -1071,7 +1063,7 @@ class VulkanWindow: Window
 							); 
 						}	break; 
 						case TexBpp_24: 	{
-							if(shift <= 8)	{ res = vec4(unpackUnorm4x8(getBits(tmp.x, shift, 24)).xyz, 1); }
+							if(shift <= 8)	{ res = vec4(unpackUnorm4x8(getBits(tmp.x, int(shift), 24)).xyz, 1); }
 							else	{
 								res = vec4(
 									unpackUnorm4x8(
@@ -1250,10 +1242,10 @@ class VulkanWindow: Window
 		layout(binding = 0) uniform UB_T { mat4 mvp; } UB; 
 		
 		//IB: Info buffer
-		layout(binding = 1) buffer IB_T { uint IB[]; }; 
+		layout(binding = 1) buffer IB_T { uint IB[]; } ; 
 		
 		//TB: Texture buffer
-		layout(binding = 2) buffer TB_T { uint TB[]; }; 
+		layout(binding = 2) buffer TB_T { uint TB[]; } ; 
 	}.text; 
 	
 	
@@ -1480,15 +1472,14 @@ class VulkanWindow: Window
 					0,62,0,
 					0,62,0,
 					0,28,0
-				]
-				.map!((a)=>((cast(ubyte)(a.bitSwap>>>24)))).array; 
+				]; 
 				
-				const texHandle = TB.createHandleAndSetData(fmt, data); 
+				const texHandle = TB.createHandleAndSetData(fmt, data.swapBits); 
 				
 				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xACD682886ADB).檢(texInfo)); 
+				((0xABAC82886ADB).檢(texInfo)); 
 				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xAD6282886ADB).檢 (ptr[0..3*21])); 
+				((0xAC3882886ADB).檢 (ptr[0..3*21])); 
 			}
 			
 			{
@@ -1520,15 +1511,14 @@ class VulkanWindow: Window
 					162,138,138,
 					128,130,2,
 					128,130,2,
-				]
-				.map!((a)=>((cast(ubyte)(a.bitSwap>>>24)))).array; 
+				]; 
 				
-				const texHandle = TB.createHandleAndSetData(fmt, data); 
+				const texHandle = TB.createHandleAndSetData(fmt, data.swapBits); 
 				
 				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xB06782886ADB).檢(texInfo)); 
+				((0xAF0F82886ADB).檢(texInfo)); 
 				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xB0F382886ADB).檢 (ptr[0..3*21])); 
+				((0xAF9B82886ADB).檢 (ptr[0..3*21])); 
 			}
 			
 			{
@@ -1542,16 +1532,32 @@ class VulkanWindow: Window
 90 12 85 30  88 b1 3d 85  2f 88 b1 3d  a8 91 2f a9
 ff c8 91 2f  a5 66 c5 32  90 19 a4 64  c8 b1 65 c9
 ff f0 03 20  6b 1d a4 64  a5 3d 91 65"
-				)).map!((a)=>((cast(ubyte)(a.bitSwap>>>24)))).array; 
+				)).swapBits; 
 				
 				
 				
 				const texHandle = TB.createHandleAndSetData(fmt, data); 
 				
 				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xB35282886ADB).檢(texInfo)); 
+				((0xB1D282886ADB).檢(texInfo)); 
 				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xB3DE82886ADB).檢 (ptr[0..3*21])); 
+				((0xB25E82886ADB).檢 (ptr[0..3*21])); 
+			}
+			{
+				TexSizeFormat fmt; 
+				
+				auto bmp = bitmaps[`c:\dl\zafira-is-a-hungarian-porn-actres-1.jpg`.File]; 
+				auto img = bmp.access!RGB[876..$, 1123..$][0..38, 0..26]; 
+				
+				fmt.size = img.size; 
+				fmt.type = TexType.rgb_u8; 
+				
+				const texHandle = TB.createHandleAndSetData(fmt, img.asArray); 
+				
+				const texInfo = IB.buffer[texHandle.to!uint]; 
+				((0xB40D82886ADB).檢(texInfo)); 
+				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
+				((0xB49982886ADB).檢 (ptr[0..img.asArray.length*3][0..50])); 
 			}
 			
 		}
