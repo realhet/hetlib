@@ -3748,9 +3748,9 @@ version(/+$DIDE_REGION Numeric+/all)
 		T getBits(T)(T a, size_t idx, size_t cnt)
 		{ return (a>>idx)&((cast(T)1<<cnt)-1); } 
 		T setBits(T)(T a, size_t idx, size_t cnt, T v) {
-			T msk0 = (cast(T)1<<cnt)-1,
-				msk = msk0<<idx; 
-			return a&~msk|((v&msk0)<<idx); 
+			auto 	msk0 	= (cast(T)1<<cnt)-1,
+				msk 	= msk0<<idx; 
+			return cast(T)(a&~msk|((v&msk0)<<idx)); 
 		} 
 		
 		T maskLowBits(T)(T a)
@@ -13880,6 +13880,84 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		
 		alias DeltaDeltaCompressor(T) = CompressorChain!(DeltaCompressor!T, DeltaCompressor!T); 
 		
+		Unsigned!T interleaveSign(T)(T i) if(isIntegral!T && isSigned!T)
+		=> i<0 ? (-i<<1)-1 : i<<1; 
+		
+		Unsigned!T deinterleaveSign(T)(T u) if(isIntegral!T && isUnsigned!T)
+		=> u&1 ? -((u>>>1)+1) : u>>>1; 
+		
+		int[] decodeDxDS9(in uint[] input, in int threshold=0)
+		{
+			DeltaDeltaCompressor!int ddc; ddc.c1.threshold = threshold; 
+			auto res = appender!(int[]); 
+			foreach(u; input)
+			{
+				enum selectorBits 	= 4, 
+				dataBits 	= 32-selectorBits; 
+				immutable 	nItems 	= [224, 112, 56, 28, 14, 9, 7, 5, 4, 3, 2, 1],
+					nBits 	= nItems.map!(a => dataBits/a).array; 
+				
+				const selector = u.getBits(0, selectorBits); 
+				enforce(selector<nItems.length, "Simple-9: Invalid selector"); 
+				
+				const 	ni 	= nItems	[selector],
+					nb 	= nBits	[selector]; 
+				
+				foreach(i; 0..ni)
+				res ~= 	ddc.uncompress
+					(
+					((nb)?(
+						u.getBits(selectorBits + i*nb, nb)
+						 .deinterleaveSign
+					):(0))
+				); 
+			}
+			
+			return res[]; 
+		} 
+		
+		uint[] encodeDxDS9(R)(R input, in int threshold = 0)
+		if(isInputRange!R)
+		{
+			DeltaDeltaCompressor!int ddc; ddc.c1.threshold = threshold; 
+			
+			uint[] tmp = input.map!((a)=>(ddc.compress(a).interleaveSign)).array; 
+			
+			auto res = appender!(uint[]); 
+			while(!tmp.empty)
+			{
+				enum selectorBits 	= 4, 
+				dataBits 	= 32-selectorBits; 
+				immutable 	nItems 	= [224, 112, 56, 28, 14, 9, 7, 5, 4, 3, 2, 1],
+					nBits 	= nItems.map!(a => dataBits/a).array; 
+				bool success; 
+				foreach(selector; 0..(cast(uint)(nItems.length)))
+				{
+					const 	ni 	= nItems	[selector],
+						nb 	= nBits	[selector], limit = 1u<<nb; 
+					if(tmp.take(min(ni, tmp.length)).all!((a)=>(a<limit)))
+					{
+						uint packet = selector; 
+						if(nb)
+						{
+							int bitIdx = selectorBits; 
+							foreach(i; 0..ni)
+							{
+								packet = packet.setBits(bitIdx, nb, tmp.get(i)); 
+								bitIdx += nb; 
+							}
+						}
+						res ~= packet; 
+						tmp = tmp[min(ni, $)..$]; 
+						success = true; break; 
+					}
+				}
+				enforce(success, "Simple-9: Too high value."); 
+			}
+			
+			return res[]; 
+		} 
+		
 		//zip files ////////////////////////////////
 			
 		/// extrazt a zip stream appended to the end.
@@ -14508,7 +14586,7 @@ version(/+$DIDE_REGION debug+/all)
 				return; 
 				
 				map[h] = true; 
-				ERR!(file, line, funct)("NOT IMPLEMENTED"); 
+				ERR!(file, line, funct)("NOT IMPLEMENTED "); 
 			} 
 		} 
 		

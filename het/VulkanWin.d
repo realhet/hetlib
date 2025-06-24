@@ -4,6 +4,8 @@ public import het.win, het.bitmap, het.vulkan;
 
 import core.stdc.string : memset; 
 
+alias destroyedResidentTexHandles = MSQueue!(VulkanWindow.TexHandle); 
+
 /+
 	Code: (表([
 		[q{/+Note: Limits/Cards+/},q{/+Note: MAX+/},q{/+Note: R9 Fury X+/},q{/+Note: R9 280+/},q{/+Note: GTX 1060+/},q{/+Note: RX 580+/},q{/+Note: RTX 5090+/},q{/+Note: RX 9070+/}],
@@ -49,7 +51,6 @@ class VulkanWindow: Window
 	})); 
 	enum HeapGranularity 	= 16,
 	DelayedTextureLoading 	= (常!(bool)(1)); 
-	
 	
 	VulkanInstance vk; 
 	VulkanSurface surface; 
@@ -288,15 +289,25 @@ class VulkanWindow: Window
 		{
 			alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
 			
-			enum DimBits 	= 2, 
+			enum TexFlag {
+				error 	= 1,
+				loading 	= 2,
+				resident 	= 4
+			}; alias TexFlags = VkBitFlags!TexFlag; 
+			
+			enum FlagBits	= 3,
+			DimBits 	= 2, 
 			ChnBits 	= 2, 
 			BppBits 	= 4, 
+			FlagBitOfs	= 0,
 			DimBitOfs	= 6,
-			TypeBitOfs 	= 8 /+inside info_dword[0]+/,
-			TypeBits 	= ChnBits + BppBits + 1 /+alt+/; 
+			FormatBitOfs 	= 8 /+inside info_dword[0]+/,
+			FormatBits 	= ChnBits + BppBits + 1 /+alt+/; 
+			
+			pragma(msg, "FB:", FlagBits); 
 			
 			enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<DimBits); 
-			enum _TexType_matrix = 
+			enum _TexFormat_matrix = 
 			(表([
 				[q{/+Note: chn/bpp+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
 				[q{/+Note: 1+/},q{
@@ -350,37 +361,37 @@ class VulkanWindow: Window
 						2ch, 3ch 	: bgr* 	: red blue swap
 				+/}],
 			])); 
-			static if((常!(bool)(0))) { pragma(msg, GEN_TexType); }
-			mixin(GEN_TexType); 
+			static if((常!(bool)(0))) { pragma(msg, GEN_TexFormat); }/+Todo: rename Type -> Format+/
+			mixin(GEN_TexFormat); 
 			static assert(TexChn.max < 1<<ChnBits); static assert(TexBpp.max < 1<<BppBits); 
-			static assert(TexType.max < 1<<TypeBits); 
+			static assert(TexFormat.max < 1<<FormatBits); 
 			
-			static string GEN_TexType()
+			static string GEN_TexFormat()
 			{
 				version(/+$DIDE_REGION Process table cells, generate types+/all)
 				{
-					auto 	table = _TexType_matrix,
+					auto 	table = _TexFormat_matrix,
 						bppCount = table.width-2,
-						chnCount = table.rowCount; struct Type {
+						chnCount = table.rowCount; struct Format {
 						string name; 
 						int value, chn, bpp; 
-					} Type[] types; 
+					} Format[] formats; 
 					int chnVal(int chn) => table.headerColumnCell(chn+1).to!int; 
 					int bppVal(int bpp) => table.headerCell(bpp+1).to!int; 
 					void processCell(int bpp, int chn)
 					{
 						foreach(alt, n; table.cell(bpp+1, chn+1).split)
-						types ~= Type(n, chn | (bpp<<2) | (!!alt<<6), chnVal(chn), bppVal(bpp)); 
+						formats ~= Format(n, chn | (bpp<<2) | (!!alt<<6), chnVal(chn), bppVal(bpp)); 
 					} 
 					foreach(bpp; 0..bppCount) foreach(chn; 0..chnCount) processCell(bpp, chn); 
 				}
 				
 				return iq{
-					enum TexType {$(types.map!"a.name~`=`~a.value.text".join(','))} 
+					enum TexFormat {$(formats.map!"a.name~`=`~a.value.text".join(','))} 
 					enum TexChn {$(chnCount.iota.map!((i)=>('_'~chnVal(i).text)).join(','))} 
 					enum TexBpp {$(bppCount.iota.map!((i)=>('_'~bppVal(i).text)).join(','))} 
-					enum texTypeChnVals 	= [$(types.map!q{a.chn.text}.join(','))],
-					texTypeBppVals 	= [$(types.map!q{a.bpp.text}.join(','))]; 
+					enum texFormatChnVals 	= [$(formats.map!q{a.chn.text}.join(','))],
+					texFormatBppVals 	= [$(formats.map!q{a.bpp.text}.join(','))]; 
 				}.text; 
 			} 
 			
@@ -405,8 +416,8 @@ class VulkanWindow: Window
 					]))
 				).調!(GEN_bitfields)); 
 				
-				@property type() const => (cast(TexType)((*(cast(ulong*)(&this))).getBits(TypeBitOfs, TypeBits))); 
-				@property type(TexType t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(TypeBitOfs, TypeBits, t); } 
+				@property format() const => (cast(TexFormat)((*(cast(ulong*)(&this))).getBits(FormatBitOfs, FormatBits))); 
+				@property format(TexFormat t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(FormatBitOfs, FormatBits, t); } 
 				
 				enum SharedCode = 
 				q{
@@ -436,7 +447,7 @@ class VulkanWindow: Window
 				GLSLCode = 
 				iq{
 					$(GEN_enumDefines!TexDim)
-					$(GEN_enumDefines!TexType)
+					$(GEN_enumDefines!TexFormat)
 					$(GEN_enumDefines!TexChn)
 					$(GEN_enumDefines!TexBpp)
 					$(SharedCode.replace("TexDim._", "TexDim_"))
@@ -451,6 +462,12 @@ class VulkanWindow: Window
 				{ dim = TexDim._2D; _rawSize0 = a.x & 0xFFFF; _rawSize12 = ((a.x>>16) & 0xFF) | (a.y << 8); } 
 				@property size(ivec3 a)
 				{ dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); } 
+				
+				@property flags() const
+				=> mixin(幟!((TexFlag),q{getBits(*(cast(ubyte*)(&this)), FlagBitOfs, FlagBits)})); 
+				
+				@property flags(in TexFlags a)
+				{ auto b = (cast(ubyte*)(&this)); *b = setBits(*b, FlagBitOfs, FlagBits, (cast(ubyte)((cast(uint)(a))))); } 
 				
 				static void selfTest()
 				{
@@ -470,7 +487,7 @@ class VulkanWindow: Window
 				} 
 				
 				string toString() const
-				=> i"TexSizeFormat($(type), $(size.x) x $(size.y) x $(size.z)$(error?", ERR":"")$(loading?", LD":"")$(resident?", RES":""))".text; 
+				=> i"TexSizeFormat($(format), $(size.x) x $(size.y) x $(size.z)$(error?", ERR":"")$(loading?", LD":"")$(resident?", RES":""))".text; 
 			} 
 			static assert(TexSizeFormat.sizeof==8); 
 			
@@ -579,7 +596,7 @@ class VulkanWindow: Window
 			{
 					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x430582886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x458A82886ADB).檢((update間(_間)))); 
 				
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
@@ -617,7 +634,7 @@ class VulkanWindow: Window
 				void doUnsupported()
 				{
 					fmt.size = ivec2(1); 
-					fmt.type = TexType.rgba_u8; 
+					fmt.format = TexFormat.rgba_u8; 
 					data = [0xFFFF00FF]; 
 				} 
 				
@@ -635,30 +652,30 @@ class VulkanWindow: Window
 				/+
 					if(bmp.channels.inRange(1, 4))
 					{
-						switch(bmp.type)
+						switch(bmp.format)
 						{
 							case "ubyte": 	switch(bmp.channels)
 							{
-								case 1: 	fmt.type = TexType.u8; 	data = bmp.getRaw; 	break; 
-								case 2: 	fmt.type = TexType.rg_u8; 	data = bmp.getRaw; 	break; 
-								case 3: 	fmt.type = TexType.rgb_u8; 	data = bmp.getRaw; 	break; 
-								case 4: 	fmt.type = TexType.rgba_u8; 	data = bmp.getRaw; 	break; 
+								case 1: 	fmt.format = TexFormat.u8; 	data = bmp.getRaw; 	break; 
+								case 2: 	fmt.format = TexFormat.rg_u8; 	data = bmp.getRaw; 	break; 
+								case 3: 	fmt.format = TexFormat.rgb_u8; 	data = bmp.getRaw; 	break; 
+								case 4: 	fmt.format = TexFormat.rgba_u8; 	data = bmp.getRaw; 	break; 
 								default: 	unsupported; 
 							}	break; 
 							case "float": 	switch(bmp.channels)
 							{
-								case 1: 	fmt.type = TexType.f32; 	data = bmp.getRaw; 	break; 
-								case 2: 	fmt.type = TexType.rg_f32; 	data = bmp.getRaw; 	break; 
-								case 3: 	fmt.type = TexType.rgb_f32; 	data = bmp.getRaw; 	break; 
-								case 4: 	fmt.type = TexType.rgba_f32; 	data = bmp.getRaw; 	break; 
+								case 1: 	fmt.format = TexFormat.f32; 	data = bmp.getRaw; 	break; 
+								case 2: 	fmt.format = TexFormat.rg_f32; 	data = bmp.getRaw; 	break; 
+								case 3: 	fmt.format = TexFormat.rgb_f32; 	data = bmp.getRaw; 	break; 
+								case 4: 	fmt.format = TexFormat.rgba_f32; 	data = bmp.getRaw; 	break; 
 								default: 	unsupported; 
 							}	break; 
 							case "ushort": 	switch(bmp.channels)
 							{
-								case 1: 	fmt.type = TexType.u16; 	data = bmp.getRaw; 	break; 
-								case 2: 	fmt.type = TexType.rg_u16; 	data = bmp.getRaw; 	break; 
-								case 3: 	fmt.type = TexType.rgb_u16; 	data = bmp.getRaw; 	break; 
-								case 4: 	fmt.type = TexType.rgba_u16; 	data = bmp.getRaw; 	break; 
+								case 1: 	fmt.format = TexFormat.u16; 	data = bmp.getRaw; 	break; 
+								case 2: 	fmt.format = TexFormat.rg_u16; 	data = bmp.getRaw; 	break; 
+								case 3: 	fmt.format = TexFormat.rgb_u16; 	data = bmp.getRaw; 	break; 
+								case 4: 	fmt.format = TexFormat.rgba_u16; 	data = bmp.getRaw; 	break; 
 								default: 	unsupported; 
 							}	break; 
 							default: 	unsupported; 
@@ -667,7 +684,7 @@ class VulkanWindow: Window
 					
 				+/
 				return tuple(fmt, data); 
-			} 
+			} 
 			
 			protected TexHandle createHandleAndSetData(in TexSizeFormat fmt, in void[] data)
 			{
@@ -788,52 +805,41 @@ class VulkanWindow: Window
 		} 
 	}
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+	class Texture
+	{
+		const TexHandle handle; 
+		
+		version(/+$DIDE_REGION Tracking released texHandles+/all)
+		{
+			protected __gshared MSQueue!TexHandle destroyedResidentTexHandles; 
+			shared static this()
+			{ destroyedResidentTexHandles = new typeof(destroyedResidentTexHandles); } 
+		}
+		
+		this(S)(in TexFlags flags, in TexFormat format, in S size, in void[] data=null)
+		{
+			TexSizeFormat fmt; 
+			fmt.flags 	= flags,
+			fmt.format 	= format,
+			fmt.size 	= size; 
+			fmt.resident = true; 
+			handle = TB.createHandleAndSetData(fmt, data); 
+		} 
+		
+		this(S)(in TexFormat format, in S size, in void[] data=null, in TexFlags flags=TexFlags.init)
+		{ this(flags, format, size, data); } 
+		
+		~this()
+		{
+			/+
+				Bug: 🛑This shit is freezes in first CG cycle when no class pointer was saved.
+				/+
+					Code: if(handle)
+					{ destroyedResidentTexHandles.put(handle); }
+				+/
+			+/
+		} 
+	} 
 	
 	void createShaderModules()
 	{
@@ -953,9 +959,9 @@ class VulkanWindow: Window
 				const uint info_0 = IB[textDwIdx+0]; 
 				
 				//handle 'error' and 'loading' flags
-				if(getBits(info_0, 0, 2)!=0)
+				if(getBits(info_0, $(FlagBitOfs), 2)!=0)
 				{
-					if(getBit(info_0, 0))	return ErrorColor; 
+					if(getBit(info_0, $(FlagBitOfs)))	return ErrorColor; 
 					else	return LoadingColor; 
 				}
 				
@@ -977,10 +983,10 @@ class VulkanWindow: Window
 				const uint chunkIdx = IB[textDwIdx+2]; 
 				const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
 				
-				//decode type (chn, bpp, alt)
-				const uint chn = getBits(info_0, $(TypeBitOfs), $(ChnBits)); 
-				const uint bpp = getBits(info_0, $(TypeBitOfs + ChnBits), $(BppBits)); 
-				const bool alt = getBit(info_0, $(TypeBitOfs+ChnBits+BppBits)); 
+				//decode format (chn, bpp, alt)
+				const uint chn = getBits(info_0, $(FormatBitOfs), $(ChnBits)); 
+				const uint bpp = getBits(info_0, $(FormatBitOfs + ChnBits), $(BppBits)); 
+				const bool alt = getBit(info_0, $(FormatBitOfs+ChnBits+BppBits)); 
 				
 				//Phase 1: Calculate minimal read range
 				uint startIdx; 
@@ -1439,133 +1445,15 @@ class VulkanWindow: Window
 		createDescriptorSet; //needs: descriptorsetLayout, uniformBuffer
 		
 		if(0) VulkanInstance.dumpBasicStuff; 
-		
-		if(1)
-		{
-			console.hide; 
-			{
-				TexSizeFormat fmt; 
-				
-				fmt.size = ivec2(24, 21); 
-				fmt.type = TexType.wa_u1; 
-				
-				const ubyte[] data = 
-				[
-					0,127,0,
-					1,255,192,
-					3,255,224,
-					3,231,224,
-					7,217,240,
-					7,223,240,
-					7,217,240,
-					3,231,224,
-					3,255,224,
-					3,255,224,
-					2,255,160,
-					1,127,64,
-					1,62,64,
-					0,156,128,
-					0,156,128,
-					0,73,0,
-					0,73,0,
-					0,62,0,
-					0,62,0,
-					0,62,0,
-					0,28,0
-				]; 
-				
-				const texHandle = TB.createHandleAndSetData(fmt, data.swapBits); 
-				
-				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xABAC82886ADB).檢(texInfo)); 
-				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xAC3882886ADB).檢 (ptr[0..3*21])); 
-			}
-			
-			{
-				TexSizeFormat fmt; 
-				
-				fmt.size = ivec2(24/2, 21); 
-				fmt.type = TexType.wa_u2; 
-				
-				const ubyte[] data = 
-				[
-					0,170,0,
-					2,170,128,
-					10,170,160,
-					10,170,160,
-					42,170,168,
-					43,170,232,
-					47,235,250,
-					175,235,250,
-					173,235,122,
-					173,235,122,
-					171,170,234,
-					170,170,170,
-					170,170,170,
-					170,170,170,
-					170,170,170,
-					170,170,170,
-					170,170,170,
-					162,138,138,
-					162,138,138,
-					128,130,2,
-					128,130,2,
-				]; 
-				
-				const texHandle = TB.createHandleAndSetData(fmt, data.swapBits); 
-				
-				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xAF0F82886ADB).檢(texInfo)); 
-				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xAF9B82886ADB).檢 (ptr[0..3*21])); 
-			}
-			
-			{
-				TexSizeFormat fmt; 
-				
-				fmt.size = ivec2(24/2, 21); 
-				fmt.type = TexType.wa_u2; 
-				
-				const ubyte[] data = (cast(ubyte[])(
-					x"91 3d c8 a5  65 91 3d 4c  26 09 a0 02  b1 3d c5 32
-90 12 85 30  88 b1 3d 85  2f 88 b1 3d  a8 91 2f a9
-ff c8 91 2f  a5 66 c5 32  90 19 a4 64  c8 b1 65 c9
-ff f0 03 20  6b 1d a4 64  a5 3d 91 65"
-				)).swapBits; 
-				
-				
-				
-				const texHandle = TB.createHandleAndSetData(fmt, data); 
-				
-				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xB1D282886ADB).檢(texInfo)); 
-				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xB25E82886ADB).檢 (ptr[0..3*21])); 
-			}
-			{
-				TexSizeFormat fmt; 
-				
-				auto bmp = bitmaps[`c:\dl\zafira-is-a-hungarian-porn-actres-1.jpg`.File]; 
-				auto img = bmp.access!RGB[876..$, 1123..$][0..38, 0..26]; 
-				
-				fmt.size = img.size; 
-				fmt.type = TexType.rgb_u8; 
-				
-				const texHandle = TB.createHandleAndSetData(fmt, img.asArray); 
-				
-				const texInfo = IB.buffer[texHandle.to!uint]; 
-				((0xB40D82886ADB).檢(texInfo)); 
-				auto ptr = (cast(ubyte*)(TB.buffer.hostPtr)) + texInfo.heapChunkIdx.to!uint * HeapGranularity; 
-				((0xB49982886ADB).檢 (ptr[0..img.asArray.length*3][0..50])); 
-			}
-			
-		}
 	} 
 	
 	override void onFinalizeGLWindow()
 	{
 		device.waitIdle; 
+		/+
+			import core.memory : GC; GC.collect; 
+			((0xAEFC82886ADB).檢(destroyedResidentTexHandles.fetchAll)); 
+		+/
 		buffers.each!free; buffers = []; 
 		vk.free; 
 	} 
