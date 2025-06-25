@@ -3354,7 +3354,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ try { return src.to!T; }catch(Throwable) { return def; }} 
 		
 		T safeDiv(T)(T a, T b, T def=0)
-		{ return b==0 ? def : a/b; } 
+		=> b==0 ? def : a/b; 
 		
 		/*
 			  it's het.math.mod auto cyclicMod(T, U)(T a, U b) if(__traits(compiles, a%b)){

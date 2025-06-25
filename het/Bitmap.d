@@ -1229,15 +1229,9 @@ version(/+$DIDE_REGION+/all)
 		return res; 
 	} 
 	
-	float linearInterpolate(float[2] p, float x)
-	{
-		//http://www.paulinternet.nl/?page=bicubic
-		return p[1]*x + p[0]*(1-x); 
-	} 
-	
 	T linearInterpolate(T)(T[2] p, float x) if(__traits(isIntegral, T))
 	{
-		 //http://www.paulinternet.nl/?page=bicubic
+		//http://www.paulinternet.nl/?page=bicubic
 		float f = p[1]*x + p[0]*(1-x); 
 		return cast(T) f.iround.clamp(T.min, T.max); 
 	} 
@@ -1279,7 +1273,38 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		return res; 
-	} 
+	} 
+	
+	auto resample_linear(R)(R src, int dstSize, float srcStartPos=0, float srcStep=1) if(isRandomAccessRange!R)
+	{
+		alias T = ElementType!R; 
+		if(dstSize<=0) return (T[]).init; 
+		const srcSize = src.length.to!int; if(!srcSize) return [T.init].replicate(dstSize); 
+		
+		T doSample(int index)
+		{
+			const srcPos = srcStartPos + index * srcStep, t = (ifloor(srcPos)), f = srcPos-t; 
+			if(t>=0 && t+1<srcSize) { return mix(src[t], src[t+1], f); }
+			else {
+				return mix(
+					src[clamp(t+0, 0, srcSize-1)], 
+					src[clamp(t+1, 0, srcSize-1)], f
+				); 
+			}
+		} 
+		
+		return iota(dstSize).map!((i)=>(doSample(i))).array; 
+		/+Note: tested: OK 250625+/
+	} 
+	
+	auto stretch_linear(R)(R src, int dstSize) if(isRandomAccessRange!R)
+	=> src.resample_linear(dstSize, 0, (float(src.length.to!int-1)) / max(dstSize-1, 1)); 
+	
+	auto scale_linear(R)(R src, float ratio) if(isRandomAccessRange!R)
+	=> src.resample_linear(dstSize, 0, (iround(src.length * ratio))); 
+	
+	/+Todo: testcases for all these image extractors!!!+/
+	
 	
 	auto sample_nearest(T)(Image!(T, 2) iSrc, ivec2 p)
 	{
