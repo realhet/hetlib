@@ -798,7 +798,7 @@ version(/+$DIDE_REGION+/all)
 					dr.color = clWhite;  dr.drawRect(0, 0, mrb.width, mrb.height); 
 					
 					foreach(j, r; mrb.rects) {
-						dr.color = clVga[(cast(int)j % ($-1))+1]; 
+						dr.color = clEga[(cast(int)j % ($-1))+1]; 
 						dr.fillRect(r.bounds); 
 					}
 					

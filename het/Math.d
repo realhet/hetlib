@@ -3477,7 +3477,7 @@ version(/+$DIDE_REGION+/all)
 			else static if(isNumeric!T)
 			{
 				import std.range; 
-				return zip(StoppingPolicy.requireSameLength, a, b).map!(a => SE(a[])).sum*(1.0f/float(a.length)); 
+				return zip(StoppingPolicy.requireSameLength, a, b).map!(a => SE(a[])).sum/float(a.length); 
 			}
 			else
 			static assert(0, "Invalid type for MSE()"); 
@@ -3733,7 +3733,9 @@ version(/+$DIDE_REGION+/all)
 			else
 			{
 				alias CT = CommonScalarType!(A, B); //type of result NOT depends on t
-				return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t); 
+				static if(!isFloatingPoint!CT)
+				return generateVector!(CT, (a, b, t) => std.math.round(a*(1-t) + b*t))(a, b, t); 
+				else return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t); 
 			}
 		} 
 		
@@ -3745,18 +3747,22 @@ version(/+$DIDE_REGION+/all)
 			{
 				//an array
 				assert(A.length == 1); 
-				alias RT = Unqual!(ElementType!(A[0])); 
-				return cast(RT) (a[0][].sum * (1.0f / a[0].length)); 
+				alias RT 	= Unqual!(ElementType!(A[0])),
+				isFloat 	= isFloatingPoint!(ScalarType!RT); 
+				static if(isFloat) return cast(RT) (a[0][].sum / a[0].length); 
+				else return cast(RT) round(a[0][].sum / (float(a[0].length))); 
 				//Todo: it's not for ranges, just arrays because []!!! MSE() can't use it.
 			}
 			else
 			{
 				//arguments
-				alias 	RT = Unqual!(CommonVectorType!A); 
-				alias 	T = typeof(RT(0) * 1.0f); 
-				T res	= a[0]; 
+				alias RT 	= Unqual!(CommonVectorType!A),
+				isFloat 	= isFloatingPoint!(ScalarType!RT),
+				T 	= typeof(RT(0) * 1.0f); 
+				T res = a[0]; 
 				static foreach(i; 1..a.length) res += a[i]; 
-				return cast(RT) (res * (1.0f / A.length)); 
+				static if(isFloat) return cast(RT) res/A.length; 
+				else return cast(RT) round(res/A.length); 
 			}
 		} 
 		
@@ -4112,10 +4118,10 @@ version(/+$DIDE_REGION+/all)
 			{
 				//test if avg() and mix() keeps the right types
 				static immutable RGB clRed = 0xFF, clBlue = 0xFF0000; 
-				auto x = RGB(127, 0, 127); 
+				auto x = RGB(128, 0, 128); /+Note: mix uses rounding since 250626+/
 				{ auto a = mix(clRed, clBlue, .5); 	 assert(a==x && is(typeof(a)==RGB)); }
 				{ auto a = avg(clRed, clBlue); 	 assert(a==x && is(typeof(a)==RGB)); }
-				{ auto a = avg([clRed, clBlue]); 	 assert(a==x && is(typeof(a)==RGB)); }
+				{ auto a = avg([clRed, clBlue]); 	 assert(a==x && is(typeof(a)==RGB), i"$(a) $(x)".text); }
 			}
 					
 			assert(step(vec3(1, 2, 3), 2) == vec3(1, 1, 0)); 

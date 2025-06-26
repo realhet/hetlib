@@ -323,7 +323,7 @@ version(/+$DIDE_REGION+/all)
 				* /+Code: &large+/, /+Code: &32+/ (default)
 				* /+Code: &small+/, /+Code: &16+/
 				
-			/+Code: colormap:\+/ Generates a palette from a named Python matplotlib ColorMap. Example: viridis
+			/+Code: cmap:\+/ Generates a palette from a named Python matplotlib ColorMap. Example: viridis
 		+/
 		
 		Bitmap fontBitmap(string name)
@@ -408,15 +408,8 @@ version(/+$DIDE_REGION+/all)
 			return res; 
 		} 
 		
-		Bitmap colormapBitmap(string name)
-		{
-			enforce(name in colorMaps); 
-			auto 	width = 128,
-				raw = colorMaps[name].toArray!RGBA(width),
-				img = image2D(width, 1, raw),
-				bmp = new Bitmap(img); 
-			return bmp; 
-		} 
+		Bitmap cmapBitmap(string name)
+		{ return cmapRawData[name.to!cmap].deserialize!Bitmap(true); } 
 	} 
 	
 	
@@ -630,7 +623,7 @@ version(/+$DIDE_REGION+/all)
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x4DFEB8E2CB5D).檢((update間(_間)))); }
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x4D75B8E2CB5D).檢((update間(_間)))); }
 		/+
 			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
 			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.
@@ -4567,7 +4560,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 		}version(/+$DIDE_REGION WEBP+/all)
 		{
 			pragma(lib, "libwebp.lib"); 
-			version(all)
+			version(none)
 			{
 				extern (C)
 				{
@@ -5600,514 +5593,6 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 					
 				} 
 			}
-			version(none)
-			extern (C)
-			{
-				enum WEBP_DECODER_ABI_VERSION = 0x0209; 
-				enum WEBP_ENCODER_ABI_VERSION = 0x020f; 
-				/+Todo: Switch to New WEBP header.+/
-				/+
-					Note: Extracted with:
-						/+
-						Code: copy types.h + decode.h + encode.h webp_d_header.c
-						ldc2 webp_d_header.c -Hc -o-
-					+/
-					
-					Manual modivications:
-						- remove ImportC header
-						- remove /+Code:  = void+/
-						- fix an union
-						- fix an identifier called /+Code: ref+/
-						- bring all the static functions
-					
-					Maybe better to import it manually?
-				+/
-				/+
-					alias __uint16_t = ushort; 
-					alias __uint32_t = uint; 
-					alias __uint64_t = ulong; 
-					align alias uintptr_t = ulong; 
-					align alias va_list = char*; 
-					align void __va_start(char**, ...); 
-					alias size_t = ulong; 
-					alias ptrdiff_t = long; 
-					alias intptr_t = long; 
-					alias __vcrt_bool = bool; 
-					alias wchar_t = ushort; 
-					void __security_init_cookie(); 
-					void __security_check_cookie(ulong _StackCookie); 
-					void __report_gsfailure(ulong _StackCookie); 
-					extern __gshared ulong __security_cookie; 
-					alias __crt_bool = bool; 
-					void _invalid_parameter_noinfo(); 
-					void _invalid_parameter_noinfo_noreturn(); 
-					void _invoke_watson(
-						const(ushort)* _Expression, const(ushort)* _FunctionName, 
-						const(ushort)* _FileName, uint _LineNo, ulong _Reserved
-					); 
-					alias errno_t = int; 
-					alias wint_t = ushort; 
-					alias wctype_t = ushort; 
-					alias __time32_t = int; 
-					alias __time64_t = long; 
-					struct __crt_locale_data_public
-					{
-						const(ushort)* _locale_pctype; 
-						int _locale_mb_cur_max; 
-						uint _locale_lc_codepage; 
-					} 
-					struct __crt_locale_pointers
-					{
-						__crt_locale_data* locinfo; 
-						__crt_multibyte_data* mbcinfo; 
-					} 
-					alias _locale_t = __crt_locale_pointers*; 
-					struct _Mbstatet
-					{
-						uint _Wchar; 
-						ushort _Byte; 
-						ushort _State; 
-					} 
-					struct _Mbstatet; 
-					alias mbstate_t = _Mbstatet; 
-					alias time_t = long; 
-					alias rsize_t = ulong; 
-					int* _errno(); 
-					int _set_errno(int _Value); 
-					int _get_errno(int* _Value); 
-					extern uint __threadid(); 
-					extern ulong __threadhandle(); 
-					alias int8_t = byte; 
-					alias uint8_t = ubyte; 
-					alias int16_t = short; 
-					alias uint16_t = ushort; 
-					alias int32_t = int; 
-					alias uint32_t = uint; 
-					alias uint64_t = ulong; 
-					alias int64_t = long; 
-				+/
-				extern void* WebPMalloc(ulong size); 
-				extern void WebPFree(void* ptr); 
-				extern int WebPGetDecoderVersion(); 
-				extern int WebPGetInfo(const(ubyte)* data, ulong data_size, int* width, int* height); 
-				extern ubyte* WebPDecodeRGBA(const(ubyte)* data, ulong data_size, int* width, int* height); 
-				extern ubyte* WebPDecodeARGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
-				extern ubyte* WebPDecodeBGRA(const(ubyte)* data, ulong data_size, int* width, int* height); 
-				extern ubyte* WebPDecodeRGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
-				extern ubyte* WebPDecodeBGR(const(ubyte)* data, ulong data_size, int* width, int* height); 
-				extern ubyte* WebPDecodeYUV(
-					const(ubyte)* data, ulong data_size, int* width, int* height, 
-					ubyte** u, ubyte** v, int* stride, int* uv_stride
-				); 
-				extern ubyte* WebPDecodeRGBAInto(
-					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-					ulong output_buffer_size, int output_stride
-				); 
-				extern ubyte* WebPDecodeARGBInto(
-					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-					ulong output_buffer_size, int output_stride
-				); 
-				extern ubyte* WebPDecodeBGRAInto(
-					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-					ulong output_buffer_size, int output_stride
-				); 
-				extern ubyte* WebPDecodeRGBInto(
-					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-					ulong output_buffer_size, int output_stride
-				); 
-				extern ubyte* WebPDecodeBGRInto(
-					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-					ulong output_buffer_size, int output_stride
-				); 
-				extern ubyte* WebPDecodeYUVInto(
-					const(ubyte)* data, ulong data_size, ubyte* luma, 
-					ulong luma_size, int luma_stride, ubyte* u, ulong u_size, 
-					int u_stride, ubyte* v, ulong v_size, int v_stride
-				); 
-				enum WEBP_CSP_MODE
-				{
-					MODE_RGB = 0,
-					MODE_RGBA = 1,
-					MODE_BGR = 2,
-					MODE_BGRA = 3,
-					MODE_ARGB = 4,
-					MODE_RGBA_4444 = 5,
-					MODE_RGB_565 = 6,
-					MODE_rgbA = 7,
-					MODE_bgrA = 8,
-					MODE_Argb = 9,
-					MODE_rgbA_4444 = 10,
-					MODE_YUV = 11,
-					MODE_YUVA = 12,
-					MODE_LAST = 13,
-				} 
-				alias MODE_RGB = WEBP_CSP_MODE.MODE_RGB; 
-				alias MODE_RGBA = WEBP_CSP_MODE.MODE_RGBA; 
-				alias MODE_BGR = WEBP_CSP_MODE.MODE_BGR; 
-				alias MODE_BGRA = WEBP_CSP_MODE.MODE_BGRA; 
-				alias MODE_ARGB = WEBP_CSP_MODE.MODE_ARGB; 
-				alias MODE_RGBA_4444 = WEBP_CSP_MODE.MODE_RGBA_4444; 
-				alias MODE_RGB_565 = WEBP_CSP_MODE.MODE_RGB_565; 
-				alias MODE_rgbA = WEBP_CSP_MODE.MODE_rgbA; 
-				alias MODE_bgrA = WEBP_CSP_MODE.MODE_bgrA; 
-				alias MODE_Argb = WEBP_CSP_MODE.MODE_Argb; 
-				alias MODE_rgbA_4444 = WEBP_CSP_MODE.MODE_rgbA_4444; 
-				alias MODE_YUV = WEBP_CSP_MODE.MODE_YUV; 
-				alias MODE_YUVA = WEBP_CSP_MODE.MODE_YUVA; 
-				alias MODE_LAST = WEBP_CSP_MODE.MODE_LAST; 
-				static int WebPIsPremultipliedMode(WEBP_CSP_MODE mode); 
-				static int WebPIsAlphaMode(WEBP_CSP_MODE mode); 
-				static int WebPIsRGBMode(WEBP_CSP_MODE mode); 
-				struct WebPRGBABuffer
-				{
-					ubyte* rgba; 
-					int stride; 
-					ulong size; 
-				} 
-				struct WebPYUVABuffer
-				{
-					ubyte* y; 
-					ubyte* u; 
-					ubyte* v; 
-					ubyte* a; 
-					int y_stride; 
-					int u_stride; 
-					int v_stride; 
-					int a_stride; 
-					ulong y_size; 
-					ulong u_size; 
-					ulong v_size; 
-					ulong a_size; 
-				} 
-				struct WebPDecBuffer
-				{
-					WEBP_CSP_MODE colorspace; 
-					int width; 
-					int height; 
-					int is_external_memory; 
-					union 
-					{
-						WebPRGBABuffer RGBA; 
-						WebPYUVABuffer YUVA; 
-					} 
-					uint[4] pad; 
-					ubyte* private_memory; 
-				} 
-				extern int WebPInitDecBufferInternal(const WebPDecBuffer*, int); 
-				static int WebPInitDecBuffer(const WebPDecBuffer* buffer); 
-				extern void WebPFreeDecBuffer(const WebPDecBuffer* buffer); 
-				enum VP8StatusCode
-				{
-					VP8_STATUS_OK = 0,
-					VP8_STATUS_OUT_OF_MEMORY,
-					VP8_STATUS_INVALID_PARAM,
-					VP8_STATUS_BITSTREAM_ERROR,
-					VP8_STATUS_UNSUPPORTED_FEATURE,
-					VP8_STATUS_SUSPENDED,
-					VP8_STATUS_USER_ABORT,
-					VP8_STATUS_NOT_ENOUGH_DATA,
-				} 
-				alias VP8_STATUS_OK = VP8StatusCode.VP8_STATUS_OK; 
-				alias VP8_STATUS_OUT_OF_MEMORY = VP8StatusCode.VP8_STATUS_OUT_OF_MEMORY; 
-				alias VP8_STATUS_INVALID_PARAM = VP8StatusCode.VP8_STATUS_INVALID_PARAM; 
-				alias VP8_STATUS_BITSTREAM_ERROR = VP8StatusCode.VP8_STATUS_BITSTREAM_ERROR; 
-				alias VP8_STATUS_UNSUPPORTED_FEATURE = VP8StatusCode.VP8_STATUS_UNSUPPORTED_FEATURE; 
-				alias VP8_STATUS_SUSPENDED = VP8StatusCode.VP8_STATUS_SUSPENDED; 
-				alias VP8_STATUS_USER_ABORT = VP8StatusCode.VP8_STATUS_USER_ABORT; 
-				alias VP8_STATUS_NOT_ENOUGH_DATA = VP8StatusCode.VP8_STATUS_NOT_ENOUGH_DATA; 
-				extern const WebPIDecoder* WebPINewDecoder(const WebPDecBuffer* output_buffer); 
-				extern const WebPIDecoder* WebPINewRGB(
-					WEBP_CSP_MODE csp, ubyte* output_buffer, 
-					ulong output_buffer_size, int output_stride
-				); 
-				extern const WebPIDecoder* WebPINewYUVA(
-					ubyte* luma, ulong luma_size, int luma_stride, 
-					ubyte* u, ulong u_size, int u_stride, ubyte* v, 
-					ulong v_size, int v_stride, 
-					ubyte* a, ulong a_size, int a_stride
-				); 
-				extern const WebPIDecoder* WebPINewYUV(
-					ubyte* luma, ulong luma_size, int luma_stride, 
-					ubyte* u, ulong u_size, int u_stride, ubyte* v, 
-					ulong v_size, int v_stride
-				); 
-				extern void WebPIDelete(const WebPIDecoder* idec); 
-				extern VP8StatusCode WebPIAppend(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
-				extern VP8StatusCode WebPIUpdate(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
-				extern ubyte* WebPIDecGetRGB(const WebPIDecoder* idec, int* last_y, int* width, int* height, int* stride); 
-				extern ubyte* WebPIDecGetYUVA(
-					const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
-					ubyte** a, int* width, int* height, int* stride, int* uv_stride, int* a_stride
-				); 
-				static ubyte* WebPIDecGetYUV(
-					const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
-					int* width, int* height, int* stride, int* uv_stride
-				); 
-				extern const WebPDecBuffer* WebPIDecodedArea(
-					const WebPIDecoder* idec, int* left, int* top, 
-					int* width, int* height
-				); 
-				struct WebPBitstreamFeatures
-				{
-					int width; 
-					int height; 
-					int has_alpha; 
-					int has_animation; 
-					int format; 
-					uint[5] pad; 
-				} 
-				extern VP8StatusCode WebPGetFeaturesInternal(const(ubyte)*, ulong, WebPBitstreamFeatures*, int); 
-				static VP8StatusCode WebPGetFeatures(const(ubyte)* data, ulong data_size, WebPBitstreamFeatures* features); 
-				struct WebPDecoderOptions
-				{
-					int bypass_filtering; 
-					int no_fancy_upsampling; 
-					int use_cropping; 
-					int crop_left; 
-					int crop_top; 
-					int crop_width; 
-					int crop_height; 
-					int use_scaling; 
-					int scaled_width; 
-					int scaled_height; 
-					int use_threads; 
-					int dithering_strength; 
-					int flip; 
-					int alpha_dithering_strength; 
-					uint[5] pad; 
-				} 
-				struct WebPDecoderConfig
-				{
-					WebPBitstreamFeatures input; 
-					const WebPDecBuffer output; 
-					WebPDecoderOptions options; 
-				} 
-				extern int WebPInitDecoderConfigInternal(WebPDecoderConfig*, int); 
-				static int WebPInitDecoderConfig(WebPDecoderConfig* config); 
-				extern const WebPIDecoder* WebPIDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
-				extern VP8StatusCode WebPDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
-				extern int WebPGetEncoderVersion(); 
-				extern ulong WebPEncodeRGB(
-					const(ubyte)* rgb, int width, int height, int stride, 
-					float quality_factor, ubyte** output
-				); 
-				extern ulong WebPEncodeBGR(
-					const(ubyte)* bgr, int width, int height, int stride, 
-					float quality_factor, ubyte** output
-				); 
-				extern ulong WebPEncodeRGBA(
-					const(ubyte)* rgba, int width, int height, int stride, 
-					float quality_factor, ubyte** output
-				); 
-				extern ulong WebPEncodeBGRA(
-					const(ubyte)* bgra, int width, int height, int stride, 
-					float quality_factor, ubyte** output
-				); 
-				extern ulong WebPEncodeLosslessRGB(const(ubyte)* rgb, int width, int height, int stride, ubyte** output); 
-				extern ulong WebPEncodeLosslessBGR(const(ubyte)* bgr, int width, int height, int stride, ubyte** output); 
-				extern ulong WebPEncodeLosslessRGBA(const(ubyte)* rgba, int width, int height, int stride, ubyte** output); 
-				extern ulong WebPEncodeLosslessBGRA(const(ubyte)* bgra, int width, int height, int stride, ubyte** output); 
-				enum WebPImageHint
-				{
-					WEBP_HINT_DEFAULT = 0,
-					WEBP_HINT_PICTURE,
-					WEBP_HINT_PHOTO,
-					WEBP_HINT_GRAPH,
-					WEBP_HINT_LAST,
-				} 
-				alias WEBP_HINT_DEFAULT = WebPImageHint.WEBP_HINT_DEFAULT; 
-				alias WEBP_HINT_PICTURE = WebPImageHint.WEBP_HINT_PICTURE; 
-				alias WEBP_HINT_PHOTO = WebPImageHint.WEBP_HINT_PHOTO; 
-				alias WEBP_HINT_GRAPH = WebPImageHint.WEBP_HINT_GRAPH; 
-				alias WEBP_HINT_LAST = WebPImageHint.WEBP_HINT_LAST; 
-				struct WebPConfig
-				{
-					int lossless; 
-					float quality; 
-					int method; 
-					WebPImageHint image_hint; 
-					int target_size; 
-					float target_PSNR; 
-					int segments; 
-					int sns_strength; 
-					int filter_strength; 
-					int filter_sharpness; 
-					int filter_type; 
-					int autofilter; 
-					int alpha_compression; 
-					int alpha_filtering; 
-					int alpha_quality; 
-					int pass; 
-					int show_compressed; 
-					int preprocessing; 
-					int partitions; 
-					int partition_limit; 
-					int emulate_jpeg_size; 
-					int thread_level; 
-					int low_memory; 
-					int near_lossless; 
-					int exact; 
-					int use_delta_palette; 
-					int use_sharp_yuv; 
-					int qmin; 
-					int qmax; 
-				} 
-				enum WebPPreset
-				{
-					WEBP_PRESET_DEFAULT = 0,
-					WEBP_PRESET_PICTURE,
-					WEBP_PRESET_PHOTO,
-					WEBP_PRESET_DRAWING,
-					WEBP_PRESET_ICON,
-					WEBP_PRESET_TEXT,
-				} 
-				alias WEBP_PRESET_DEFAULT = WebPPreset.WEBP_PRESET_DEFAULT; 
-				alias WEBP_PRESET_PICTURE = WebPPreset.WEBP_PRESET_PICTURE; 
-				alias WEBP_PRESET_PHOTO = WebPPreset.WEBP_PRESET_PHOTO; 
-				alias WEBP_PRESET_DRAWING = WebPPreset.WEBP_PRESET_DRAWING; 
-				alias WEBP_PRESET_ICON = WebPPreset.WEBP_PRESET_ICON; 
-				alias WEBP_PRESET_TEXT = WebPPreset.WEBP_PRESET_TEXT; 
-				
-				extern int WebPConfigInitInternal(const WebPConfig*, WebPPreset, float, int); 
-				static int WebPConfigInit(const WebPConfig* config); 
-				static int WebPConfigPreset(const WebPConfig* config, WebPPreset preset, float quality); 
-				extern int WebPConfigLosslessPreset(const WebPConfig* config, int level); 
-				extern int WebPValidateConfig(const WebPConfig* config); 
-				struct WebPAuxStats
-				{
-					int coded_size; 
-					float[5] PSNR; 
-					int[3] block_count; 
-					int[2] header_bytes; 
-					int[4][3] residual_bytes; 
-					int[4] segment_size; 
-					int[4] segment_quant; 
-					int[4] segment_level; 
-					int alpha_data_size; 
-					int layer_data_size; 
-					uint lossless_features; 
-					int histogram_bits; 
-					int transform_bits; 
-					int cache_bits; 
-					int palette_size; 
-					int lossless_size; 
-					int lossless_hdr_size; 
-					int lossless_data_size; 
-					uint[2] pad; 
-				} 
-				alias WebPWriterFunction = int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
-				struct WebPMemoryWriter
-				{
-					ubyte* mem; 
-					ulong size; 
-					ulong max_size; 
-					uint[1] pad; 
-				} 
-				extern void WebPMemoryWriterInit(WebPMemoryWriter* writer); 
-				extern void WebPMemoryWriterClear(WebPMemoryWriter* writer); 
-				extern int WebPMemoryWrite(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
-				alias WebPProgressHook = int function(int percent, const WebPPicture* picture); 
-				enum WebPEncCSP
-				{
-					WEBP_YUV420 = 0,
-					WEBP_YUV420A = 4,
-					WEBP_CSP_UV_MASK = 3,
-					WEBP_CSP_ALPHA_BIT = 4,
-				} 
-				alias WEBP_YUV420 = WebPEncCSP.WEBP_YUV420; 
-				alias WEBP_YUV420A = WebPEncCSP.WEBP_YUV420A; 
-				alias WEBP_CSP_UV_MASK = WebPEncCSP.WEBP_CSP_UV_MASK; 
-				alias WEBP_CSP_ALPHA_BIT = WebPEncCSP.WEBP_CSP_ALPHA_BIT; 
-				enum WebPEncodingError
-				{
-					VP8_ENC_OK = 0,
-					VP8_ENC_ERROR_OUT_OF_MEMORY,
-					VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY,
-					VP8_ENC_ERROR_NULL_PARAMETER,
-					VP8_ENC_ERROR_INVALID_CONFIGURATION,
-					VP8_ENC_ERROR_BAD_DIMENSION,
-					VP8_ENC_ERROR_PARTITION0_OVERFLOW,
-					VP8_ENC_ERROR_PARTITION_OVERFLOW,
-					VP8_ENC_ERROR_BAD_WRITE,
-					VP8_ENC_ERROR_FILE_TOO_BIG,
-					VP8_ENC_ERROR_USER_ABORT,
-					VP8_ENC_ERROR_LAST,
-				} 
-				alias VP8_ENC_OK = WebPEncodingError.VP8_ENC_OK; 
-				alias VP8_ENC_ERROR_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_OUT_OF_MEMORY; 
-				alias VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY; 
-				alias VP8_ENC_ERROR_NULL_PARAMETER = WebPEncodingError.VP8_ENC_ERROR_NULL_PARAMETER; 
-				alias VP8_ENC_ERROR_INVALID_CONFIGURATION = WebPEncodingError.VP8_ENC_ERROR_INVALID_CONFIGURATION; 
-				alias VP8_ENC_ERROR_BAD_DIMENSION = WebPEncodingError.VP8_ENC_ERROR_BAD_DIMENSION; 
-				alias VP8_ENC_ERROR_PARTITION0_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION0_OVERFLOW; 
-				alias VP8_ENC_ERROR_PARTITION_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION_OVERFLOW; 
-				alias VP8_ENC_ERROR_BAD_WRITE = WebPEncodingError.VP8_ENC_ERROR_BAD_WRITE; 
-				alias VP8_ENC_ERROR_FILE_TOO_BIG = WebPEncodingError.VP8_ENC_ERROR_FILE_TOO_BIG; 
-				alias VP8_ENC_ERROR_USER_ABORT = WebPEncodingError.VP8_ENC_ERROR_USER_ABORT; 
-				alias VP8_ENC_ERROR_LAST = WebPEncodingError.VP8_ENC_ERROR_LAST; 
-				struct WebPPicture
-				{
-					int use_argb; 
-					WebPEncCSP colorspace; 
-					int width; 
-					int height; 
-					ubyte* y; 
-					ubyte* u; 
-					ubyte* v; 
-					int y_stride; 
-					int uv_stride; 
-					ubyte* a; 
-					int a_stride; 
-					uint[2] pad1; 
-					uint* argb; 
-					int argb_stride; 
-					uint[3] pad2; 
-					int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture) writer; 
-					void* custom_ptr; 
-					int extra_info_type; 
-					ubyte* extra_info; 
-					WebPAuxStats* stats; 
-					WebPEncodingError error_code; 
-					int function(int percent, const WebPPicture* picture) progress_hook; 
-					void* user_data; 
-					uint[3] pad3; 
-					ubyte* pad4; 
-					ubyte* pad5; 
-					uint[8] pad6; 
-					void* memory_; 
-					void* memory_argb_; 
-					void*[2] pad7; 
-				} 
-				extern int WebPPictureInitInternal(const WebPPicture*, int); 
-				static int WebPPictureInit(const WebPPicture* picture); 
-				extern int WebPPictureAlloc(const WebPPicture* picture); 
-				extern void WebPPictureFree(const WebPPicture* picture); 
-				extern int WebPPictureCopy(const WebPPicture* src, const WebPPicture* dst); 
-				extern int WebPPlaneDistortion(
-					const(ubyte)* src, ulong src_stride, const(ubyte)* ref_, ulong ref_stride, 
-					int width, int height, ulong x_step, int type, float* distortion, float* result
-				); 
-				extern int WebPPictureDistortion(const WebPPicture* src, const WebPPicture* ref_, int metric_type, float[5] result); 
-				extern int WebPPictureCrop(const WebPPicture* picture, int left, int top, int width, int height); 
-				extern int WebPPictureView(const WebPPicture* src, int left, int top, int width, int height, const WebPPicture* dst); 
-				extern int WebPPictureIsView(const WebPPicture* picture); 
-				extern int WebPPictureRescale(const WebPPicture* picture, int width, int height); 
-				extern int WebPPictureImportRGB(const WebPPicture* picture, const(ubyte)* rgb, int rgb_stride); 
-				extern int WebPPictureImportRGBA(const WebPPicture* picture, const(ubyte)* rgba, int rgba_stride); 
-				extern int WebPPictureImportRGBX(const WebPPicture* picture, const(ubyte)* rgbx, int rgbx_stride); 
-				extern int WebPPictureImportBGR(const WebPPicture* picture, const(ubyte)* bgr, int bgr_stride); 
-				extern int WebPPictureImportBGRA(const WebPPicture* picture, const(ubyte)* bgra, int bgra_stride); 
-				extern int WebPPictureImportBGRX(const WebPPicture* picture, const(ubyte)* bgrx, int bgrx_stride); 
-				extern int WebPPictureARGBToYUVA(const WebPPicture* picture, WebPEncCSP); 
-				extern int WebPPictureARGBToYUVADithered(const WebPPicture* picture, WebPEncCSP colorspace, float dithering); 
-				extern int WebPPictureSharpARGBToYUVA(const WebPPicture* picture); 
-				extern int WebPPictureSmartARGBToYUVA(const WebPPicture* picture); 
-				extern int WebPPictureYUVAToARGB(const WebPPicture* picture); 
-				extern void WebPCleanupTransparentArea(const WebPPicture* picture); 
-				extern int WebPPictureHasTransparency(const WebPPicture* picture); 
-				extern void WebPBlendAlpha(const WebPPicture* picture, uint background_rgb); 
-				extern int WebPEncode(const WebPConfig* config, const WebPPicture* picture); 
-			} 
 			
 		}
 	} 
@@ -7336,6 +6821,507 @@ version(/+$DIDE_REGION+/all)
 		auto src = a.get!T; 
 		return src.splitChn!T; 
 	} 
+	
+	
+	version(/+$DIDE_REGION Color maps+/all)
+	{
+		string _import_matplotlib_cmaps()
+		{
+			/+
+				Note: /+Bold: Step 1:+/ 	Go to /+Link: https://matplotlib.org/stable/gallery/color/colormap_reference.html+/
+					Copy the cmaps listing declarations and update quantized colorbar counts.
+				/+Bold: Step 2:+/ 	Download all the 7 colormap images into DownloadPath.
+				/+Bold: Step 3:+/ 	Fill out Settings, verify pixel locations, execute this function.
+				/+Bold: Step 4:+/ 	Copy and Paste the generated code right after this function.
+			+/
+			enum cmaps_decl = 
+			`[('Perceptually Uniform Sequential', [
+	   'viridis', 'plasma', 'inferno', 'magma', 'cividis']),
+	('Sequential', [
+	   'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+	   'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+	   'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']),
+	('Sequential (2)', [
+	   'binary', 'gist_yarg', 'gist_gray', 'gray', 'bone', 'pink',
+	   'spring', 'summer', 'autumn', 'winter', 'cool', 'Wistia',
+	   'hot', 'afmhot', 'gist_heat', 'copper']),
+	('Diverging', [
+	   'PiYG', 'PRGn', 'BrBG', 'PuOr', 'RdGy', 'RdBu',
+	   'RdYlBu', 'RdYlGn', 'Spectral', 'coolwarm', 'bwr', 'seismic',
+	   'berlin', 'managua', 'vanimo']),
+	('Cyclic', ['twilight', 'twilight_shifted', 'hsv']),
+	('Qualitative', [
+	   'Pastel1', 'Pastel2', 'Paired', 'Accent',
+	   'Dark2', 'Set1', 'Set2', 'Set3',
+	   'tab10', 'tab20', 'tab20b', 'tab20c']),
+	('Miscellaneous', [
+	   'flag', 'prism', 'ocean', 'gist_earth', 'terrain', 'gist_stern',
+	   'gnuplot', 'gnuplot2', 'CMRmap', 'cubehelix', 'brg',
+	   'gist_rainbow', 'rainbow', 'jet', 'turbo', 'nipy_spectral',
+	   'gist_ncar'])]`; 
+			
+			struct Settings
+			{
+				static {
+					Path DownloadPath = `c:\dl`; 
+					string DownloadFileMask = `sphx_glr_colormap_reference_00?.webp`; 
+					
+					int 	x0 = 128, y0 = 34, 	//colorbar topleft on downloadedimage
+						x1 = 634, 	//colorbar ends here at the right. (exclusive)
+						yh = 20, ys = 24 	/+colorbar height and stride+/; 
+					int GradientSadSeparator = 6; 	//Max SAD difference between adjacent pixels.
+					int GradientMinLength = 20; 	//Minimum color gradient group width in pixels.
+					int GradientMaxAdjacentSadReq = 50; 	//Minimum requirement form the max adj. sad.
+					int GradientMaxCount = 40; 	//Max color gradient groups
+					
+					float MaxMSE = 2.0f; 	/+
+						Controls reducement quality. (non quantitative only)
+						The lower, the nicer. The higher, the smaller.
+					+/
+				} 
+			} 
+			
+			static struct CmapCategory { string name; string[] items; } 
+			mixin(
+				"static immutable CmapCategory[] cmapCategories="~
+				cmaps_decl.replace('\'', '"').replace("(", "CmapCategory(")~";"
+			); 
+			mixin("enum cmap{"~cmapCategories.map!((c)=>(c.items.join(", "))).join(", ")~"}"); 
+			print(cmapCategories); 
+			
+			Image2D!RGB[] originalBars; 
+			with(Settings)
+			{
+				foreach(file; listFiles(DownloadPath, DownloadFileMask).map!"a.file")
+				{
+					auto img = bitmaps[file].get!RGB; 
+					for(int j = 0; y0 + ys*j + yh < img.height; j++)
+					{ originalBars ~= img[x0..x1, y0 + ys*j + yh/2]; }
+				}
+			}
+			
+			i"Loaded $(originalBars.length) cmap bitmaps. Expecting $(cmap.max+1).".print; 
+			enforce(originalBars.length==cmap.max+1, "cmap count mismatch"); 
+			with(Settings)
+			{
+				
+				string[] cmapAsHex; int[] cmapNumGradients; 
+				foreach(cmapIdx; 0..originalBars.length.to!int)
+				{
+					auto imSrc = originalBars[cmapIdx]; 
+					
+					Image2D!RGB imDst; 
+					write(i"Importing: $(cmapIdx.format!"%2d") $(cmapIdx.to!cmap.format!"%-18s"): "); 
+					
+					version(/+$DIDE_REGION Detect Quantitative color count+/all)
+					{
+						const maxAdjacentSad = imSrc 	.asArray.slide!(No.withPartial)(2)
+							.map!((a)=>(sad(a[0],a[1]))).maxElement; 
+						/+
+							const groupCnt = imSrc.asArray	.group!((a,b)=>(sad(a,b)<=GradientMaxSad))
+								.filter!((a)=>(a[1]>=GradientMinLength))
+								.walkLength.to!int; 
+						+/
+						const groupCnt = imSrc.asArray	.splitWhen!((a,b)=>(sad(a,b)>GradientSadSeparator))
+							.filter!((a)=>(a.walkLength>=GradientMinLength))
+							.walkLength.to!int; 
+						write(
+							i"MAS:$(maxAdjacentSad
+	.format!"%3d") GrC:$(groupCnt
+	.format!"%3d") "
+						); 
+						const numGradients = ((
+							maxAdjacentSad>=GradientMaxAdjacentSadReq &&
+							groupCnt.inRange(2, GradientMaxCount)
+						)?(groupCnt):(0)); 
+						cmapNumGradients ~= numGradients; 
+					}
+					if(const N = numGradients)
+					{
+						imDst = image2D(N, 1, iota(N).map!((i)=>(imSrc[(ifloor(((i+0.5f)/(N*imSrc.width)))), 0])).array); 
+						write("gradients: ", imDst.width, "  "); 
+					}
+					else
+					{
+						foreach(N; 1..imSrc.width+1)
+						{
+							auto imNew = image2D(N, 1, imSrc.asArray.stretch_linear(N)); 
+							auto imReconstructed = image2D(
+								imSrc.width, 1, 
+								imNew.asArray.stretch_linear(imSrc.width)
+							); 
+							auto mse = MSE(imSrc.asArray, imReconstructed.asArray); 
+							if(mse <= MaxMSE)
+							{
+								imDst = imNew; 
+								write(
+									i"reduced width: $(imDst.width
+	.format!"%-3d")  MSE: $(mse)"
+								); 
+								break; 
+							}
+						}
+					}
+					
+					const success = !imDst.empty; 
+					cmapAsHex ~= success ? imDst.serializeImage("webp quality=101")
+						.map!q{a.format!"%02X"}.join : ""; 
+					writeln(((success)?(""):("\34\4FAIL\34\0"))); 
+				}
+				
+				enforce(
+					cmapAsHex.length==originalBars.length && cmapAsHex.all!q{a!=""}, 
+					"Failed to import all cmap bars."
+				); 
+				enforce(
+					cmapAsHex.length==cmapNumGradients.length, 
+					"Failed to import cmap quantitative info."
+				); 
+				
+				enum wr = 80; 
+				return iq{
+					enum cmap {
+						$(
+							cmapCategories.map!
+							((cat)=>(
+								"//"~cat.name~"\n"~
+								cat.items.map!q{a~", "}.join.wrap(wr)
+							))
+							.join.strip.withoutEnding(',')
+						)
+					} 
+					static immutable int[] cmapNumGradients = 
+					$(cmapNumGradients.text.wrap(wr).strip); 
+					static immutable string[] cmapCategoryNames =
+					[
+						$(
+							cmapCategories.map!((n)=>(n.name.quoted.replace(' ', '\1')))
+							.join(", ").wrap(wr).strip.replace('\1', ' ')
+						)
+					]; 
+					static immutable cmap[2][] cmapCategoryRanges =
+					[
+						$(
+							cmapCategories.map!((n)=>(
+								"[cmap."~n.items.front~",\1"~
+								"cmap."~n.items.back~"]"
+							))
+							.join(", ").wrap(wr).strip.replace('\1', ' ')
+						)
+					]; 
+					static immutable ubyte[][] cmapRawData = 
+					[$(cmapAsHex.map!((data)=>(`x"`~data.chunks(wr).join('\n')~`"`)).join(",\n"))]; 
+				}.text
+				.splitLines.map!strip.join("\n"); 
+			}
+		} 
+		
+		enum cmap {
+			//Perceptually Uniform Sequential
+			viridis, plasma, inferno, magma, cividis,
+			//Sequential
+			Greys, Purples, Blues, Greens, Oranges, Reds, YlOrBr, YlOrRd, OrRd, PuRd, RdPu,
+			BuPu, GnBu, PuBu, YlGnBu, PuBuGn, BuGn, YlGn,
+			//Sequential CmapCategory(2)
+			binary, gist_yarg, gist_gray, gray, bone, pink, spring, summer, autumn, winter,
+			cool, Wistia, hot, afmhot, gist_heat, copper,
+			//Diverging
+			PiYG, PRGn, BrBG, PuOr, RdGy, RdBu, RdYlBu, RdYlGn, Spectral, coolwarm, bwr,
+			seismic, berlin, managua, vanimo,
+			//Cyclic
+			twilight, twilight_shifted, hsv,
+			//Qualitative
+			Pastel1, Pastel2, Paired, Accent, Dark2, Set1, Set2, Set3, tab10, tab20, tab20b,
+			tab20c,
+			//Miscellaneous
+			flag, prism, ocean, gist_earth, terrain, gist_stern, gnuplot, gnuplot2, CMRmap,
+			cubehelix, brg, gist_rainbow, rainbow, jet, turbo, nipy_spectral, gist_ncar
+		} 
+		static immutable int[] cmapNumGradients =
+		[
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 9, 8, 12, 8, 8, 9, 8, 12, 10, 20, 20, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0
+		]; 
+		static immutable string[] cmapCategoryNames =
+		[
+			"Perceptually Uniform Sequential", "Sequential", "Sequential CmapCategory(2)",
+			"Diverging", "Cyclic", "Qualitative", "Miscellaneous"
+		]; 
+		static immutable cmap[2][] cmapCategoryRanges =
+		[
+			[cmap.viridis, cmap.cividis], [cmap.Greys, cmap.YlGn],
+			[cmap.binary, cmap.copper], [cmap.PiYG, cmap.vanimo], [cmap.twilight, cmap.hsv],
+			[cmap.Pastel1, cmap.tab20c], [cmap.flag, cmap.gist_ncar]
+		]; 
+		static immutable ubyte[][] cmapRawData =
+		[
+			x"524946466A000000574542505650384C5D0000002F0D0000006FA0A08D24C5BFD0637A06278ADBB6
+	71D293BBFDC7AADF1BE086A880D2004013249168C4F9FF672DAEBACC7FD02F7F9B5E89D670FA34B9
+	546E11CA3290C7E7F990E8881B781508324C7696586289259658F28BE87F7C8D0500",
+			x"5249464660000000574542505650384C540000002F090000004FA0A8912465C9BF373AC6F7293829
+	6A22C96D10883F240188A52A55D136008F920040908466A7F1FF180BC8F31F7FB70248DFF4D74E96
+	13E37A7BA6989EE00199B46D906AA9966A999645F43FBE04",
+			x"5249464672000000574542505650384C660000002F0E00000077C020008024747783ADFF377A436D
+	2349CD471E4FE4A1FF0AC9501BC956F23FD202B946E4B440FF65B8643E33FF018016DEC2DDF9AFA0
+	17A7D6A7D662D7945AD56B7686E8C1E9FBD2F7BCA5010824201EC8165B6CB1C5165B0C8BE87F504E
+	7700",
+			x"5249464660000000574542505650384C530000002F0B0000005FA0A6912434F6D851F91650410020
+	093980070DFF0FAAD2485218420D0C05E0A2A4FF8E5038C4FC0700376B12434F6533DBE773CA57DB
+	7B15FBCD3E0782001285586299659659268DE87F60BA0300",
+			x"5249464660000000574542505650384C540000002F0C00000067A0A06D1B863FD29EFDA151D0B60D
+	53FE008BE16D633049512349CAF2E18FAC9C7F21278433FF811F63BA52D1C93ACE56ECA0DDE5EEFA
+	7E2772648F0904012431CC32CB2CB3CC326844FFE36B2C00",
+			x"524946464C000000574542505650384C400000002F070000003FA024001A364A07241AF6D4940440
+	C346E98044C39E9A920068D8281D9068D8539BFF007077FDBF24EE8E6D92900481081A6B96596639
+	A2FF7102",
+			x"524946464A000000574542505650384C3E0000002F050000002F40266D9BAC8D6AD83B01638ADAB6
+	81B33CFAACFA3CB62198A2B68D1806FDF6F6E279DCE73FF83FA6EBF4424C0220904D433B4B2C45F4
+	3F0E",
+			x"524946464E000000574542505650384C420000002F070000003FA0A46D0438E6E1D0D1979F9A0040
+	D3240E25ECE59D286923098EF2DDBD9F9D8E7375F31F8F3F3EEB951DFA89276000091088A0B16699
+	659623FA1F27",
+			x"5249464650000000574542505650384C440000002F070000003FA0B4911438AE4F3D80C381A50C14
+	3592A406972CAC04867B9FA2B68DD8148ADE7EEE9BFF78B027B0116642FF54EFD11AD4402082C69A
+	6596598EE87F9C00",
+			x"5249464658000000574542505650384C4B0000002F0800000047A0A89124C5BFC6A53FD39D17C36C
+	24ADBFDB0A2CC101DCBF6ADA466274CF9FD88F9DC08F95C2FCC7D747518EC384804F722F4B7600B2
+	6CE4E07AE3B11CCBB37C44FFC3760000",
+			x"5249464652000000574542505650384C450000002F0800000047A02400103449D6C6018706A10666
+	76E72D8669210FA58DA4C0697B777C1D80C511E63FE05E0758F094F758D6714ACF6820C8B6CD8D61
+	2C6339CB23FA1F5F0200",
+			x"5249464656000000574542505650384C4A0000002F0800000047A0240010E4FF4048DE349168DC20
+	0820C9DFED19265821458D2429D9F5AF695DF01F8ECFC2FCC79B4F3530878001BFD0BE08DA029065
+	2307D71B8FE5589EE523FA1FB603",
+			x"5249464658000000574542505650384C4B0000002F0800000047A0109215EAF9533D80049A00FEA5
+	9006410049FE5C532CB0C5296ADB06529FE54FABCFA92C761398FF78F50C83A9660C3EC99E971000
+	59367270BDF1588EE5593EA2FF613B00",
+			x"5249464654000000574542505650384C470000002F0800000047A0A8912435B70E18251CBFCE301B
+	4929C0FE1760118EEFD8D5B48DC4E60EC38F75EAFFF31FF008076FEE778D90EB35660E0A20C8B6CD
+	8D612C6339CB23FA1F5F0200",
+			x"524946465C000000574542505650384C4F0000002F0800000047A02600D084FEB548C067099C4919
+	250180209107FCDF43E205C9B5AA692405F2EFED0CDC0102DE1ACAF98FFF7FE2B036DB459810C805
+	9616700059367270BDF1588EE5593EA2FF613B00",
+			x"5249464654000000574542505650384C470000002F0800000047A0A86D2336D7A2B8F53F005B211B
+	49707277EF284EE29738358D24A1B1F6A96432F8F31FF88F123C509936D8BB4AB1E011391064DBE6
+	C63096B19CE511FD8F2F0100",
+			x"5249464658000000574542505650384C4C0000002F0800000047A02892D4388B03F85118B8AF444D
+	1B496EF2F2F5B93E0C8FE3D5349202A7EB7BA0BAD0E3001FCC7FC0FFF8CEF795128D4323F84CAED1
+	0208B26D736318CB58CEF288FEC79700",
+			x"5249464656000000574542505650384C4A0000002F0800000047A02600D0A47F44E4E6759806511A
+	0009C3FFE74105FBEA56858C24310677FE620751BE20CC7FFCFFAB639F859F8A840009AE05109065
+	2307D71B8FE5589EE523FA1FB603",
+			x"5249464652000000574542505650384C460000002F0800000047A0A88D14386A61971B5EE002320D
+	C8F4A8E095C0650A50D4460A1C7DEF0578C0026298FF78FEC309AEED980F9B59246C108020DB3637
+	86B18CE52C8FE87F7C09",
+			x"524946465E000000574542505650384C510000002F0800000047A0349214A6FFE2DE92749648146D
+	988D24E3FFD17F3B626518A1580BD404009AE0D23F131DA0C12CC28EF98FFF79D7B689A79B4A361F
+	62213DB30564D9C8C1F5C663399667F988FE87ED0000",
+			x"5249464652000000574542505650384C450000002F0800000047A0A86D233608A1BD3DFE47E58804
+	20B36C502D10194051DB466CEEDFDEC2700CF6FCC7F31F52B0606F1BFCC24362081108B26D736318
+	CB58CEF288FEC7970000",
+			x"5249464656000000574542505650384C4A0000002F0800000047A0349224352AAFCE8364FA405E51
+	DB486E7031ECAFF73B026BC46D5441EAFCE5DC1D20D184F98F0FF501695BF9E37FE416DD40124000
+	41B66D6E0C6319CB591ED1FFF812",
+			x"5249464656000000574542505650384C490000002F0800000047A0349224357AE44EC2B3E2485E49
+	23496CF2E889B86FF86953D348129A33F0F98EA1C7F98F8F3E814681676E7CC943AC898A091F08B2
+	6D736318CB58CEF288FEC7970000",
+			x"524946461E000000574542505650384C120000002F010000000F30FFF33FFFF31F78C888FE07",
+			x"524946461E000000574542505650384C120000002F010000000F30FFF33FFFF31F78C888FE07",
+			x"5249464620000000574542505650384C130000002F010000000F30FFF33FFFF31F78A84044FF0300",
+			x"5249464620000000574542505650384C130000002F010000000F30FFF33FFFF31F78A84044FF0300",
+			x"5249464640000000574542505650384C330000002F040000002740986D1C9BD50670CF23C8B64DCD
+	6A3BC9850464CA2C5937FF01D4AD7CEA8242B611E0D4EE0138968BE87FEC0500",
+			x"5249464658000000574542505650384C4C0000002F130000009988E87F6C0A12D1FF80823692D4D8
+	313C938F57D448921A3CEA7B32A38653DC369292EF42FFA5F241043CFEE71D66A7276AA238AAFF97
+	D836273D6C0FBA3395354C3131AE8822",
+			x"5249464620000000574542505650384C130000002F010000000F30FFF3BFFFF31F1EA84044FF0300",
+			x"5249464620000000574542505650384C130000002F010000000F70C0FFFD1FB3F98F076444FF0300",
+			x"524946461E000000574542505650384C120000002F010000000F30FFF31FF31F0E2A10D1FF00",
+			x"5249464620000000574542505650384C130000002F010000000F30FF71C0FFF90F071588E87F0000",
+			x"5249464620000000574542505650384C130000002F010000000FB0FFF33FFFF31F2DA84044FF0300",
+			x"5249464640000000574542505650384C330000002F0400000027A0A66D03067B40F65E57211148DA
+	B0FE491762BF4080D0E1D4B08EF98FCF623B1C302010A04C158E88E87FEC0500",
+			x"5249464646000000574542505650384C3A0000002F080000004760A66DDB98AFF26B37456DDBC021
+	BF07EE9E81B46DB2FDB67FEDF31F428727C9E3518BC70159367270BDF1588EE5593EA2FF613B",
+			x"5249464634000000574542505650384C280000002F0400000027201048568F7C0D0141D175CB0904
+	08E9949BFF087F8B2540209B867696448AE87F1C",
+			x"524946463E000000574542505650384C310000002F080000004720104861664F906D9B1AC24DB60B
+	088A2C777DFE0312419CE325360359367270BDF1588EE5593EA2FF613B00",
+			x"5249464638000000574542505650384C2B0000002F050000002F201048E136A7206D0336B4E36B9D
+	4020856BF4FC47EA03F8800281401A5288659623FA1F1A00",
+			x"5249464666000000574542505650384C5A0000002F0A00000057A02892A446C4B9C9BECF05D94186
+	2F5A940600D22422FF7FC2111B8C5EB1B52A698008EA1F802A3421009EE1EE91F31FFFEF05AFDEB0
+	335E23C4D7597C540B0BFD0001C8A46DA3F4AC95D99887595A44FF63A117",
+			x"524946466A000000574542505650384C5D0000002F0A00000057A02400D0A60839484A0DEC6FF02C
+	6E3596454900A04D0EFA37C19201F541B1AB9544B24205789AFE797038088043FD1D33F31FFFDF37
+	0976907E28820E249B23C6400AD59A0399B40D7DEB6706666696263DA2FFB1D00B00",
+			x"5249464668000000574542505650384C5C0000002F0A00000057A0A06D1B462A9322187F169FC118
+	ACE3A22892D4A8D0741A813F3611717AC93F6A1A4981AA338084F3EF000F3F94B840C0FC87DE3F30
+	38DA3C0A352EBCC2FCF2B6A860482093B6A157FD4CC67CCCD3A447F43F5E3201",
+			x"524946466A000000574542505650384C5D0000002F0A00000057A0169224285B956538819FF5802E
+	5E876351144952736A72040C61180FB8E089D94832663EFD361E0D08B5AC1295C88D78FEE3DFD73D
+	C071BF652F7219135B6121E9806F82624692E0E05C5403321E8BB111FD8FAF6E0100",
+			x"524946466C000000574542505650384C600000002F0A00000057A02400D046D1E113E325A0BFC623
+	1761399444B242E9D7E1C957820ABF2878BA22E9C1288A24A9B9F43D011990C11FFF06B04251F31F
+	FF7F65BA12E86AB4BC416D9BF71338E0CCEE0532691BFA55CFC44CC94CCD7144FF23F305",
+			x"5249464668000000574542505650384C5B0000002F0A00000057602400921B9C201119C06EABCD23
+	46B6A8892449D17210A28E7B728F42FE5335916C350A7E9903A1C405C2F18193D4CD7FF49D7FBFCA
+	B67F191B084C23784E4810EE2E10C8A46DB3D0B38E266042A66611FD8F875500",
+			x"5249464668000000574542505650384C5B0000002F0A00000057A0260090260A27EF06F7E81FC4DF
+	346ADA3682D4B1003A96C27DFC211C87C3719BA2465298A0A33A2018C0BF0384F4EFFCC7BFFFB6E0
+	071A308C2E95C0005C4EDA522508C8024CDE9D6389259660228FE87FA4F30000",
+			x"5249464664000000574542505650384C570000002F0A00000057A02692144602FE25D145030CE557
+	D44987A2365220056B616D630703F0BCBD809A002018FD3B89A083067B5DCC7FFCE17C420B60AC74
+	B53C5044BB41E150E20764D236F4AB9E999981A99AF288FEC74B2600",
+			x"5249464668000000574542505650384C5C0000002F0A00000057A02400D0A61629A9F4F5F3481C7E
+	7239D40400C1141040FF1A1AB8157089B0879A064C98F4AE83CA432836D68904C24B32FFF1CF3F6B
+	872B3E908F56723E036609301F88804CDA06FAD5CFB4CCC75C4D7244FFA36117",
+			x"5249464668000000574542505650384C5C0000002F0C00000067A0249215AAFB8B450FD41FDC9348
+	9A288924C981E75FCCC9C9F99F3EFF521A499272FEF4E51F19C3A37EF762FEC389FF924BC4001B4F
+	E5E593801F41ED57F68CDE22BE802CC04460572CB1C4114E2C9146F43F627507",
+			x"5249464624000000574542505650384C180000002F020000001730FEF32F2049F0FFE79AFFE07250
+	8C88FE07",
+			x"524946463A000000574542505650384C2D0000002F040000002740906DB3EDFEC8F710901072DC73
+	09488832D05AFB34FF01679C4D51402040992A2C10D1FFE80700",
+			x"5249464670000000574542505650384C630000002F0C00000067C026008034B817B01FC292D075CB
+	A4260090A6065C04D8508016F44F807AF92A8D64ABF9414534430B991AE90F472DD8F90F0312E127
+	890529223789B77F4279D7FC4FDEE37462BDE295814CC0E2DE278B2C5228A294A011FD8F77720000",
+			x"5249464664000000574542505650384C580000002F0A00000057A0269224C5C459B8BA08FD8B8087
+	1055BC15B301506C6D85FF1FB3C90F766A224952249C028C51D6D9BFA7EC83F98FF89E3BA69735CF
+	EBEF1BC01944212A2EE285401660F2EF1A4B2CB1C4127A44FFC37407",
+			x"5249464672000000574542505650384C650000002F0D0000006FA02892D4480AF78FC20926AEA88D
+	96088812C5912425AF93100497C80898BFC682A248929AE7453248B8C212B6939CA36AFEE37E9F36
+	7C00C04E84882A7385D7A9D6F7E6E363916E2299F33610049038A434CB4E3B2CB1C56A11FD8F35C8
+	0700",
+			x"524946467C000000574542505650384C700000002F1200000050535B4BD6013646665A809AC46392
+	FF16EE2630829323D194C4B61545FA1D561AE018E41A810E4440D3010F8E00B8DF444D00204D2C5E
+	0A807EA43086118C6004CFBD13F86B92FE87DBFFF7DE79766F35C51C8306CFDE020A0280436A2443
+	A7A5CB9675CC79EEFDE1F600",
+			x"524946467C000000574542505650384C700000002F1200000050535B4BD601981819A9C1210A51FE
+	6AB81AC1048E8E4653535B4B16890E7F15D8388C1C3250810C8E763080C7C9008E3651134952E4EA
+	2E3C036F0422D081013C2081F08F50800094F43F1010308A66B31ADE32FAAA73C67DE7FDFFEF3BFB
+	96D92956F069DACEC9204400",
+			x"5249464666000000574542505650384C590000002F200000009988E87F6C22A2FF61500849923310
+	A7F1C19FE21E2053FD288D24296A77F212399EFCA3008D260D50144952D36F0A29D1BF8A0C6AA88A
+	E02B741AFEB8D85894137809150DD52926039397189894FAC443C7101300",
+			x"524946461E000000574542505650384C110000002F080000000750DAEAD7B5FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F070000000750F1CEB6B9FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F0B0000000750E79A76BCFF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F0700000007D0E4FEF5AFFF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F070000000750CF6EF4AEFF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F0800000007508D9297A3FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F070000000750E19A95B4FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F0B00000007D0E936F6B8FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F0900000007D0BB7A94B6FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F1300000007D0BB7A94B6FF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F1300000007D09DE634AFFF8188E87F0000",
+			x"524946461E000000574542505650384C110000002F130000000750C1C6B4B7FF8188E87F0000",
+			x"5249464654040000574542505650384C470400002FF9010000901D0B0001472F67DB367BB0CD3662
+	3B5DD84E0F363AB0BFD73BE3AB43726DDBA66D8DF3F6C3B7EEAF3F1B31D80CC26612B683B01983CD
+	B2CD830939B66DD3D67CFCF66FDB8CC16610B693B01984CD186CB66DDE7BDFEA7F10A7E5FD4F19F9
+	CA1E56F7A87AF7B41BD07E567FE9270537B4BDA29156F535292F593FE375CAE8106F38C0267AD186
+	2CA4C0E637E29089267463057BB0B9EB86FCF0924A55D8A7D6490DEF683DA8B3ACFE12D766F450AB
+	B39AED537BB52A73F43E5237BE784E98075C6109E3A8470962E1EBBF43280A508E614CE1947D0FB6
+	E776F86B45D5A9A245350B9A5AD57C543769E7257965C4CFB53CAEC5513596A8BE482F82F5E48F79
+	D83CE216B39842152A10C184FA6B17826294610C93B8E0D895F3B11BF446D10DAA6851ED92A657B4
+	10D76DF2F321F360858FB536A99941B596A9324F6F42F4C4F78F4F9C6311A3A843316298505F1085
+	1CD4A20FF338E4C48DFDB25C5F9454A6FC2EB54E697043EB11EF24E93E676D0576B4BBA2D14E0D34
+	AA205DBFE374FD9760E210DBE84527B291067F068948410BDAB0864DF6BF704AEEBFCAC853D690BA
+	47D4B3ABDD80F633FA49BF2AB0A19D558DB46AA059B9C9FA9DA89301DACF27F6B08D1E7420136970
+	F88904A4A3199D58C30E5C6E2AE8B7528A9437A88E710DEE6A2BA093FF3292375664CFB3BEA0A96E
+	75D6AA34539FA3753940C7FD1E718E158CA011458887379F4318F2508901CCE0989C679ED9E16F15
+	55ADB256D5CE69724D0B115D67DCB7C4A5113FD7F2A49646D554A6FA22BD0AD1A3DFD651F3805BCC
+	611AD5A84024BF10FF1C82518C528C6102171CB9763C75425E29AA41954DAA59D2CCB2E6E3BA4BDA
+	0FE93B2B72AA9509CD0DABB95435057A15AC67BEFF7DD61BAE308F71D4A01451FCC37C4304F25185
+	41CCE28413578E1B9EF7472554AAA8434DB31A59D36AD43B4F3A8FD90F05F6B4BDA8891EF5D5AB38
+	533F623C77FE5830708C2D0CA01DB94841200BF1484513DAB1822D0E3D725A8EDF4ACF53D6803A47
+	D5B3A39DA0F6D3FACC7C28B0A1DD758DB469A845B929FA9BA45341C237F6B0831E742113E970F986
+	44A4A205ED58C3166CAEC8FFAFD20A9433A4CE51F5EF6927A0A3ACACE49DC23BDA5CD244A77A1A54
+	94A66FB13A6F74DC7AC609D6308816E423112EFFEC2291831AF4610E8778E5B11DF64131152A6957
+	FDB4C6D6B518D245C6FB4C5C1AF133AD4C6971582D15AA2FD49B303DF8691D33F7B8C53CA651830A
+	44B182F81C825184528C6202E71CBAB13FB3435F2AB241954DAA5ED4F4B2E662BA4DDA8FA91B337A
+	A695092D8CA8A95475457A19ACE73EE380F5826BCC6112D5284724FF303F6DC250880A0C631A679C
+	B872DCF17CDF29AE56A56D6A58D0F8AA96E2BA4AD80FD9574FF0509B739AEA53778DCA72F425D2F3
+	E09F893F9C621D436845019258C10C629186067462093B1CBDE78C6C3F945AA0AC3E758CA9774B5B
+	211DA4F49EB515D8D2DE9A46DA35D4A2BC54FD4BD4F96FC21FF6B18B1E74210B19F00600",
+			x"52494646A8030000574542505650384C9C0300002FF9010000098020FCAF1B88E87FEA0B456DDB40
+	E68F76AF11B8210CFFE0F73F0122C02A9C01BE094AE1C0B66DB339BF416D5BF31F926D4475530D22
+	7F058224DBAA938EFB97B8EBFE9714DCF9C483C3872049B2692B9FCD6FDBDEFF1E6C9BCFEF9B37D4
+	B66DC3B8ED89BE20059E4689381D927449D0224E8D0879B44FDA96D8E30A5BBEBBC50D676BFFC038
+	75AE92C9C34FFFEC7B7EAB776272AB7322BF652E706B2102C468A11BD045BF4ABFC6E08EFE3D8373
+	BAD7E48EC95DA289D7103A75B234F065862A498AC452F16FFA0FAEB0C30576FCD79E7DE37A0CAF1E
+	3BEDF7DC78B766FE76F52D19CA3DD3867CCF8093491855AF52881EEA98A0F1C3A245F8CAEA82B0CE
+	629F6A9578936C0D87F883287552B449D3427A094AC4C820F602CFC41B6EF18A3BCFC4F381B1757C
+	B13F8C6D76D3EBBFD1D5FFF8C2F0D2E042CF4AF726933C64134468A08B286088162615DA6DA657B4
+	EA8C4E089FB08D27BCE337459836D2972D92D4885324F42F72A07CE2027BAC71201F47C71B97737C
+	FE38627D95C6A73523EDEC5B3C29F64D9E6406BAAFF9C8B5812AFA083046F4C1BC4ADC607E415C61
+	7640E981CA2E99066E050A596AE4A893A74A8E126972C45271C4339EF0C893EEB3FB937B62FF9A30
+	B689E56EEE701E9EA5333BFD63E33BDD23FD07855D2176CE4568A38E218280D93BE1378B6BA226CB
+	23821AFD2DCA15ACA3090A45A27449D221498B38752214D07FE80971C405F6A4BBC795EBC1EE9E7D
+	CECF5F668C9FAEF1E7CA51E7D0EC417AA070141AF12A2342802EE280115A2D264F749E195FD1B963
+	7842EE8ADC1199365A3A414A78653E5BC4CF9223998AFE08FFE2166FB8213D77C3B973DD5B3F7758
+	C7CC74BF627CF70C2D9C74F54D1E9506064C29A31A7A1442F450C3048D3F162DC2775617044D567B
+	D46AC49BE46BD8C717046990E07B98DF244E85083994B3C023B1F325F9DA7ADC72F6764F4EA7BEE5
+	DBE2FEAF7FF637B7D53B31BED531D17FC8243699248D10119A68A3FB4BEF8F7E4532BCA1774FFF8C
+	F6350E71850F7CC78950274B13DF4B5325499E682A7CA27DFA2779BA75394616CFC3D647617C5A33
+	FE3AFB160DE59EC9936C5FCF251BBB04DC32FAA8638AE09B6585A0CDEA8CB0CE628F7285EA26D926
+	AE847F85382DD27CB6C9976491484A8A2D6E91F82C77EE89DB23631BDF2789DD716CB39F5EA5A32B
+	630B5D4B9D7385B5DC31CFCCA189067A8803469FB4BE99DCD1AE333DA5F94C779FFAC3872402419E
+	186D527C1F9DA0469402A13F7A22F08E350E7CF7804B7C01",
+			x"5249464630000000574542505650384C230000002F030000001F20102028976E434050E4FF680212
+	62A593F2D1FCC7DF9040A84D44FF0300",
+			x"5249464682000000574542505650384C750000002F300000009988E87F6C620C08246DF1B6BFFFF1
+	3030682449D16799EECEBFD6271BBB0AD3B6617310833B194592A468B38FF9FEA7ECFCABE088E88B
+	5339162A0A898A4086C3C3D0C28F5C83B97BA607EFA30F3E7830700B3418380526D0F975274F72C7
+	4B872EEC42CEE2AA2EE91EEEE5BEDD8F1B00",
+			x"5249464668000000574542505650384C5C0000002F140000009988E87F6C6A517F02495BBCEDEF7F
+	DCA0A86D24E73F8BA097A370FCB1EC1EAC53D0B60D836265B1CF1F51466192A246529817C9158A5F
+	F480CF88EBDBE8A003E58FFFA903838F050A7B183087050FA4BAAD5BD3EAB206",
+			x"5249464664000000574542505650384C570000002F36000000CD4444FF631311FD0F0399B4CDD3F8
+	B7BF296ADB48329EE1B227FF5F0B445124A9518E9DBC00FF0A61054440C45AF2E9A392F78A2212AE
+	520C01D0000D8E605C1C33A37106D331B37CF2448A223FE24F9D0000",
+			x"5249464668000000574542505650384C5B0000002F160000009988E87F6C22AADFFF30309024C9D0
+	DAB64EFFFFF085A2B68DD8D4BFB73792630D4992AC94588655D8EFD3F90678040FE239BC881F7C07
+	97412668116AC002D347E8A5F470BA0243E2D76089874432E96490236EF60900",
+			x"5249464658000000574542505650384C4C0000002F0C00000067A0A06D1B2652D19C8D3FBB8D8699
+	B66D5C56BD57FE9866206D9B6D6E2EE8D2FBBB19F31F50D4BF9DD01513EFA528C4296C061608324C
+	B6734412472CB184116E44FFE34A6700",
+			x"5249464652000000574542505650384C460000002F0800000047A0260001865F0E3546FF506A1004
+	9044B3C700FB238C91810044EC70C00D6BFC74C3989AFF0078DF947C0A99680F635A814CDA36482D
+	554B05CCCD22FA1FBB01",
+			x"5249464674000000574542505650384C670000002F0F0000007FC0A091244597F36F929919FF6D28
+	8D64ABF9FF93E9BF2C140A89CA3490511C495272F63B2CFF942004CFC0DFCC7F0080FFFF5A9C6245
+	7C32A42F6A9B70929D22E8B3DF3D3D283D02F204158BD9030802201EB468D1A2458B160D7222FA1F
+	5F631100",
+			x"524946462A000000574542505650384C1D0000002F0200000017201048DA1F7A8DF1171014F93FDA
+	FC075F0A8A11D1FF0000",
+			x"5249464666000000574542505650384C5A0000002F230000009988E87F6C22A2FF6160084992A494
+	5883DF5F66EF4EE1807A14B491143541002EEEF16FE6C0031A40D4486A46041AE0FCCB817F5D3489
+	F0C3757F91CDE2D01E87E1322A3461AAC8AF2EC94BBE45D0244D50ECC702",
+			x"5249464660000000574542505650384C540000002F0C00000067A026009086930C342000E74C3EF4
+	34800DCC601402018AF6F07F8AEE60100060D9D86C9BC7FC071C4C3ECA4FFE611FE4865BFE9A6772
+	F54EB51DA6828120802486596699659659068DE87F7C8D05",
+			x"524946465E000000574542505650384C510000002F1A0000009988E87F6C22A2FF6140D3485246C8
+	8796F76F8737408B9A43411B494A9F5CA07F3B2C4751DB488ED9EC758A47B5B2B84F0493CA208A66
+	93B4BFEA3296B9CC1D6399FBCD37C570C8CFFD2C0E00",
+			x"5249464680000000574542505650384C740000002F1300000050130020632520840A4E456613AF18
+	12E8E017C1EB756E72280900A689B100B31BA0AF8310442104298840061AE069F0F4849A00401AC6
+	C54F0612E04E601CAB18C02E46B08319BC3CFA1FD43411A74AC7E717EDCF782BEC4EEB94F15B1F23
+	B415CAA9493C88B9AF720B9FCC3A924A",
+			x"524946465E000000574542505650384C510000002F140000005010D93675DEAFF10BF344A0820854
+	1041056A20886C433B23B20E42C9A0820857C1296824A9199AF36A010BAF0509E0A5FF0164A70E11
+	78E997D7C5B09B3C397C5EBBCF3AF57158316DCF0500",
+			x"52494646CA000000574542505650384CBD0000002F480000009988E87F6C62E807BFFF011B5C47B2
+	6D5AEBDE2FDBBE19F8E69F8B9F6DA6710EA3489214E56BE198D9BF3532718E23DB56A243B9938E4B
+	68C4E9B083A53B331190BBFA50EDEB64C7424817A23FAF418E16195468D05C9CF167F81BFF062859
+	15A340539EB7FBB4705EF98D881129224681AF6CA673D039E85C7407FA19DDF4EEE77B781EB8E34E
+	7810EF24B245E71D7C64EDBFC3017BDC849042863F961E4D7A906F94EF67CF2F752EC91C242D4A7A
+	140955A3644449891200"
+		]; 
+		
+	}
 }
 version(/+$DIDE_REGION+/all)
 {
@@ -8135,4 +8121,566 @@ version(/+$DIDE_REGION+/all)
 		bitmapLoaders.registerMarkedFunctions!(mixin(__MODULE__)); 
 		bitmapEffects.registerMarkedFunctions!(mixin(__MODULE__)); 
 	} 
-}
+}version(all)
+extern (C)
+{
+	
+	
+	enum WEBP_DECODER_ABI_VERSION = 0x0209; 
+	enum WEBP_ENCODER_ABI_VERSION = 0x020f; 
+	
+	/+
+		Note: Extracted with:
+			/+
+			Code: copy types.h + decode.h + encode.h webp_d_header.c
+			ldc2 webp_d_header.c -Hc -o-
+		+/
+		
+		Manual modifications:
+			- remove ImportC header
+			- remove /+Code:  = void+/
+			- fix an union
+			- fix an identifier called /+Code: ref+/
+			- bring all the static functions
+			- bring two initialization functions passing ABI versions
+		
+		250626: it works now. /+Todo: after a longer test period, remove the old headers.+/
+	+/
+	/+
+		alias __uint16_t = ushort; 
+		alias __uint32_t = uint; 
+		alias __uint64_t = ulong; 
+		align alias uintptr_t = ulong; 
+		align alias va_list = char*; 
+		align void __va_start(char**, ...); 
+		alias size_t = ulong; 
+		alias ptrdiff_t = long; 
+		alias intptr_t = long; 
+		alias __vcrt_bool = bool; 
+		alias wchar_t = ushort; 
+		void __security_init_cookie(); 
+		void __security_check_cookie(ulong _StackCookie); 
+		void __report_gsfailure(ulong _StackCookie); 
+		extern __gshared ulong __security_cookie; 
+		alias __crt_bool = bool; 
+		void _invalid_parameter_noinfo(); 
+		void _invalid_parameter_noinfo_noreturn(); 
+		void _invoke_watson(
+			const(ushort)* _Expression, const(ushort)* _FunctionName, 
+			const(ushort)* _FileName, uint _LineNo, ulong _Reserved
+		); 
+		alias errno_t = int; 
+		alias wint_t = ushort; 
+		alias wctype_t = ushort; 
+		alias __time32_t = int; 
+		alias __time64_t = long; 
+		struct __crt_locale_data_public
+		{
+			const(ushort)* _locale_pctype; 
+			int _locale_mb_cur_max; 
+			uint _locale_lc_codepage; 
+		} 
+		struct __crt_locale_pointers
+		{
+			__crt_locale_data* locinfo; 
+			__crt_multibyte_data* mbcinfo; 
+		} 
+		alias _locale_t = __crt_locale_pointers*; 
+		struct _Mbstatet
+		{
+			uint _Wchar; 
+			ushort _Byte; 
+			ushort _State; 
+		} 
+		struct _Mbstatet; 
+		alias mbstate_t = _Mbstatet; 
+		alias time_t = long; 
+		alias rsize_t = ulong; 
+		int* _errno(); 
+		int _set_errno(int _Value); 
+		int _get_errno(int* _Value); 
+		extern uint __threadid(); 
+		extern ulong __threadhandle(); 
+		alias int8_t = byte; 
+		alias uint8_t = ubyte; 
+		alias int16_t = short; 
+		alias uint16_t = ushort; 
+		alias int32_t = int; 
+		alias uint32_t = uint; 
+		alias uint64_t = ulong; 
+		alias int64_t = long; 
+	+/
+	extern void* WebPMalloc(ulong size); 
+	extern void WebPFree(void* ptr); 
+	extern int WebPGetDecoderVersion(); 
+	extern int WebPGetInfo(const(ubyte)* data, ulong data_size, int* width, int* height); 
+	extern ubyte* WebPDecodeRGBA(const(ubyte)* data, ulong data_size, int* width, int* height); 
+	extern ubyte* WebPDecodeARGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
+	extern ubyte* WebPDecodeBGRA(const(ubyte)* data, ulong data_size, int* width, int* height); 
+	extern ubyte* WebPDecodeRGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
+	extern ubyte* WebPDecodeBGR(const(ubyte)* data, ulong data_size, int* width, int* height); 
+	extern ubyte* WebPDecodeYUV(
+		const(ubyte)* data, ulong data_size, int* width, int* height, 
+		ubyte** u, ubyte** v, int* stride, int* uv_stride
+	); 
+	extern ubyte* WebPDecodeRGBAInto(
+		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+		ulong output_buffer_size, int output_stride
+	); 
+	extern ubyte* WebPDecodeARGBInto(
+		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+		ulong output_buffer_size, int output_stride
+	); 
+	extern ubyte* WebPDecodeBGRAInto(
+		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+		ulong output_buffer_size, int output_stride
+	); 
+	extern ubyte* WebPDecodeRGBInto(
+		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+		ulong output_buffer_size, int output_stride
+	); 
+	extern ubyte* WebPDecodeBGRInto(
+		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+		ulong output_buffer_size, int output_stride
+	); 
+	extern ubyte* WebPDecodeYUVInto(
+		const(ubyte)* data, ulong data_size, ubyte* luma, 
+		ulong luma_size, int luma_stride, ubyte* u, ulong u_size, 
+		int u_stride, ubyte* v, ulong v_size, int v_stride
+	); 
+	enum WEBP_CSP_MODE
+	{
+		MODE_RGB = 0,
+		MODE_RGBA = 1,
+		MODE_BGR = 2,
+		MODE_BGRA = 3,
+		MODE_ARGB = 4,
+		MODE_RGBA_4444 = 5,
+		MODE_RGB_565 = 6,
+		MODE_rgbA = 7,
+		MODE_bgrA = 8,
+		MODE_Argb = 9,
+		MODE_rgbA_4444 = 10,
+		MODE_YUV = 11,
+		MODE_YUVA = 12,
+		MODE_LAST = 13,
+	} 
+	alias MODE_RGB = WEBP_CSP_MODE.MODE_RGB; 
+	alias MODE_RGBA = WEBP_CSP_MODE.MODE_RGBA; 
+	alias MODE_BGR = WEBP_CSP_MODE.MODE_BGR; 
+	alias MODE_BGRA = WEBP_CSP_MODE.MODE_BGRA; 
+	alias MODE_ARGB = WEBP_CSP_MODE.MODE_ARGB; 
+	alias MODE_RGBA_4444 = WEBP_CSP_MODE.MODE_RGBA_4444; 
+	alias MODE_RGB_565 = WEBP_CSP_MODE.MODE_RGB_565; 
+	alias MODE_rgbA = WEBP_CSP_MODE.MODE_rgbA; 
+	alias MODE_bgrA = WEBP_CSP_MODE.MODE_bgrA; 
+	alias MODE_Argb = WEBP_CSP_MODE.MODE_Argb; 
+	alias MODE_rgbA_4444 = WEBP_CSP_MODE.MODE_rgbA_4444; 
+	alias MODE_YUV = WEBP_CSP_MODE.MODE_YUV; 
+	alias MODE_YUVA = WEBP_CSP_MODE.MODE_YUVA; 
+	alias MODE_LAST = WEBP_CSP_MODE.MODE_LAST; 
+	//Some useful macros:
+	static int WebPIsPremultipliedMode(WEBP_CSP_MODE mode)
+	{
+		return (
+			mode == WEBP_CSP_MODE.MODE_rgbA || 
+			mode == WEBP_CSP_MODE.MODE_bgrA || 
+			mode == WEBP_CSP_MODE.MODE_Argb ||
+			mode == WEBP_CSP_MODE.MODE_rgbA_4444
+		); 
+	} 
+	
+	static int WebPIsAlphaMode(WEBP_CSP_MODE mode)
+	{
+		return (
+			mode == WEBP_CSP_MODE.MODE_RGBA || 
+			mode == WEBP_CSP_MODE.MODE_BGRA || 
+			mode == WEBP_CSP_MODE.MODE_ARGB ||
+			mode == WEBP_CSP_MODE.MODE_RGBA_4444 || 
+			mode == WEBP_CSP_MODE.MODE_YUVA ||
+			WebPIsPremultipliedMode(mode)
+		); 
+	} 
+	
+	static int WebPIsRGBMode(WEBP_CSP_MODE mode)
+	{ return (mode < WEBP_CSP_MODE.MODE_YUV); } 
+	struct WebPRGBABuffer
+	{
+		ubyte* rgba; 
+		int stride; 
+		ulong size; 
+	} 
+	struct WebPYUVABuffer
+	{
+		ubyte* y; 
+		ubyte* u; 
+		ubyte* v; 
+		ubyte* a; 
+		int y_stride; 
+		int u_stride; 
+		int v_stride; 
+		int a_stride; 
+		ulong y_size; 
+		ulong u_size; 
+		ulong v_size; 
+		ulong a_size; 
+	} 
+	struct WebPDecBuffer
+	{
+		WEBP_CSP_MODE colorspace; 
+		int width; 
+		int height; 
+		int is_external_memory; 
+		union 
+		{
+			WebPRGBABuffer RGBA; 
+			WebPYUVABuffer YUVA; 
+		} 
+		uint[4] pad; 
+		ubyte* private_memory; 
+	} 
+	extern int WebPInitDecBufferInternal(const WebPDecBuffer*, int); 
+	static int WebPInitDecBuffer(WebPDecBuffer* buffer)
+	{ return WebPInitDecBufferInternal(buffer, WEBP_DECODER_ABI_VERSION); } 
+	extern void WebPFreeDecBuffer(const WebPDecBuffer* buffer); 
+	enum VP8StatusCode
+	{
+		VP8_STATUS_OK = 0,
+		VP8_STATUS_OUT_OF_MEMORY,
+		VP8_STATUS_INVALID_PARAM,
+		VP8_STATUS_BITSTREAM_ERROR,
+		VP8_STATUS_UNSUPPORTED_FEATURE,
+		VP8_STATUS_SUSPENDED,
+		VP8_STATUS_USER_ABORT,
+		VP8_STATUS_NOT_ENOUGH_DATA,
+	} 
+	alias VP8_STATUS_OK = VP8StatusCode.VP8_STATUS_OK; 
+	alias VP8_STATUS_OUT_OF_MEMORY = VP8StatusCode.VP8_STATUS_OUT_OF_MEMORY; 
+	alias VP8_STATUS_INVALID_PARAM = VP8StatusCode.VP8_STATUS_INVALID_PARAM; 
+	alias VP8_STATUS_BITSTREAM_ERROR = VP8StatusCode.VP8_STATUS_BITSTREAM_ERROR; 
+	alias VP8_STATUS_UNSUPPORTED_FEATURE = VP8StatusCode.VP8_STATUS_UNSUPPORTED_FEATURE; 
+	alias VP8_STATUS_SUSPENDED = VP8StatusCode.VP8_STATUS_SUSPENDED; 
+	alias VP8_STATUS_USER_ABORT = VP8StatusCode.VP8_STATUS_USER_ABORT; 
+	alias VP8_STATUS_NOT_ENOUGH_DATA = VP8StatusCode.VP8_STATUS_NOT_ENOUGH_DATA; 
+	alias WebPIDecoder = Typedef!(void*); 
+	
+	extern WebPIDecoder* WebPINewDecoder(const WebPDecBuffer* output_buffer); 
+	extern WebPIDecoder* WebPINewRGB(
+		WEBP_CSP_MODE csp, ubyte* output_buffer, 
+		ulong output_buffer_size, int output_stride
+	); 
+	extern WebPIDecoder* WebPINewYUVA(
+		ubyte* luma, ulong luma_size, int luma_stride, 
+		ubyte* u, ulong u_size, int u_stride, ubyte* v, 
+		ulong v_size, int v_stride, 
+		ubyte* a, ulong a_size, int a_stride
+	); 
+	extern WebPIDecoder* WebPINewYUV(
+		ubyte* luma, ulong luma_size, int luma_stride, 
+		ubyte* u, ulong u_size, int u_stride, ubyte* v, 
+		ulong v_size, int v_stride
+	); 
+	extern void WebPIDelete(const WebPIDecoder* idec); 
+	extern VP8StatusCode WebPIAppend(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
+	extern VP8StatusCode WebPIUpdate(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
+	extern ubyte* WebPIDecGetRGB(const WebPIDecoder* idec, int* last_y, int* width, int* height, int* stride); 
+	extern ubyte* WebPIDecGetYUVA(
+		const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
+		ubyte** a, int* width, int* height, int* stride, int* uv_stride, int* a_stride
+	); 
+	static ubyte* WebPIDecGetYUV(
+		const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
+		int* width, int* height, int* stride, int* uv_stride
+	); 
+	extern WebPDecBuffer* WebPIDecodedArea(
+		const WebPIDecoder* idec, int* left, int* top, 
+		int* width, int* height
+	); 
+	struct WebPBitstreamFeatures
+	{
+		int width; 
+		int height; 
+		int has_alpha; 
+		int has_animation; 
+		int format; 
+		uint[5] pad; 
+	} 
+	extern VP8StatusCode WebPGetFeaturesInternal(const(ubyte)*, ulong, WebPBitstreamFeatures*, int); 
+	static VP8StatusCode WebPGetFeatures(
+		const ubyte* data, size_t data_size,
+		WebPBitstreamFeatures* features
+	)
+	=> WebPGetFeaturesInternal(
+		data, data_size, features,
+		WEBP_DECODER_ABI_VERSION
+	); 
+	
+	struct WebPDecoderOptions
+	{
+		int bypass_filtering; 
+		int no_fancy_upsampling; 
+		int use_cropping; 
+		int crop_left; 
+		int crop_top; 
+		int crop_width; 
+		int crop_height; 
+		int use_scaling; 
+		int scaled_width; 
+		int scaled_height; 
+		int use_threads; 
+		int dithering_strength; 
+		int flip; 
+		int alpha_dithering_strength; 
+		uint[5] pad; 
+	} 
+	struct WebPDecoderConfig
+	{
+		WebPBitstreamFeatures input; 
+		const WebPDecBuffer output; 
+		WebPDecoderOptions options; 
+	} 
+	extern int WebPInitDecoderConfigInternal(WebPDecoderConfig*, int); 
+	
+	static int WebPInitDecoderConfig(WebPDecoderConfig* config)
+	=> WebPInitDecoderConfigInternal(config, WEBP_DECODER_ABI_VERSION); 
+	
+	extern WebPIDecoder* WebPIDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
+	extern VP8StatusCode WebPDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
+	extern int WebPGetEncoderVersion(); 
+	extern ulong WebPEncodeRGB(
+		const(ubyte)* rgb, int width, int height, int stride, 
+		float quality_factor, ubyte** output
+	); 
+	extern ulong WebPEncodeBGR(
+		const(ubyte)* bgr, int width, int height, int stride, 
+		float quality_factor, ubyte** output
+	); 
+	extern ulong WebPEncodeRGBA(
+		const(ubyte)* rgba, int width, int height, int stride, 
+		float quality_factor, ubyte** output
+	); 
+	extern ulong WebPEncodeBGRA(
+		const(ubyte)* bgra, int width, int height, int stride, 
+		float quality_factor, ubyte** output
+	); 
+	extern ulong WebPEncodeLosslessRGB(const(ubyte)* rgb, int width, int height, int stride, ubyte** output); 
+	extern ulong WebPEncodeLosslessBGR(const(ubyte)* bgr, int width, int height, int stride, ubyte** output); 
+	extern ulong WebPEncodeLosslessRGBA(const(ubyte)* rgba, int width, int height, int stride, ubyte** output); 
+	extern ulong WebPEncodeLosslessBGRA(const(ubyte)* bgra, int width, int height, int stride, ubyte** output); 
+	enum WebPImageHint
+	{
+		WEBP_HINT_DEFAULT = 0,
+		WEBP_HINT_PICTURE,
+		WEBP_HINT_PHOTO,
+		WEBP_HINT_GRAPH,
+		WEBP_HINT_LAST,
+	} 
+	alias WEBP_HINT_DEFAULT = WebPImageHint.WEBP_HINT_DEFAULT; 
+	alias WEBP_HINT_PICTURE = WebPImageHint.WEBP_HINT_PICTURE; 
+	alias WEBP_HINT_PHOTO = WebPImageHint.WEBP_HINT_PHOTO; 
+	alias WEBP_HINT_GRAPH = WebPImageHint.WEBP_HINT_GRAPH; 
+	alias WEBP_HINT_LAST = WebPImageHint.WEBP_HINT_LAST; 
+	struct WebPConfig
+	{
+		int lossless; 
+		float quality; 
+		int method; 
+		WebPImageHint image_hint; 
+		int target_size; 
+		float target_PSNR; 
+		int segments; 
+		int sns_strength; 
+		int filter_strength; 
+		int filter_sharpness; 
+		int filter_type; 
+		int autofilter; 
+		int alpha_compression; 
+		int alpha_filtering; 
+		int alpha_quality; 
+		int pass; 
+		int show_compressed; 
+		int preprocessing; 
+		int partitions; 
+		int partition_limit; 
+		int emulate_jpeg_size; 
+		int thread_level; 
+		int low_memory; 
+		int near_lossless; 
+		int exact; 
+		int use_delta_palette; 
+		int use_sharp_yuv; 
+		int qmin; 
+		int qmax; 
+	} 
+	enum WebPPreset
+	{
+		WEBP_PRESET_DEFAULT = 0,
+		WEBP_PRESET_PICTURE,
+		WEBP_PRESET_PHOTO,
+		WEBP_PRESET_DRAWING,
+		WEBP_PRESET_ICON,
+		WEBP_PRESET_TEXT,
+	} 
+	alias WEBP_PRESET_DEFAULT = WebPPreset.WEBP_PRESET_DEFAULT; 
+	alias WEBP_PRESET_PICTURE = WebPPreset.WEBP_PRESET_PICTURE; 
+	alias WEBP_PRESET_PHOTO = WebPPreset.WEBP_PRESET_PHOTO; 
+	alias WEBP_PRESET_DRAWING = WebPPreset.WEBP_PRESET_DRAWING; 
+	alias WEBP_PRESET_ICON = WebPPreset.WEBP_PRESET_ICON; 
+	alias WEBP_PRESET_TEXT = WebPPreset.WEBP_PRESET_TEXT; 
+	
+	extern int WebPConfigInitInternal(const WebPConfig*, WebPPreset, float, int); 
+	static int WebPConfigInit(WebPConfig* config)
+	{
+		return WebPConfigInitInternal(
+			config, WebPPreset.WEBP_PRESET_DEFAULT, 75.0f,
+			WEBP_ENCODER_ABI_VERSION
+		); 
+	} 
+	static int WebPConfigPreset(
+		WebPConfig* config,
+		WebPPreset preset, float quality
+	)
+	{
+		return WebPConfigInitInternal(
+			config, preset, quality,
+			WEBP_ENCODER_ABI_VERSION
+		); 
+	} 
+	extern int WebPConfigLosslessPreset(const WebPConfig* config, int level); 
+	extern int WebPValidateConfig(const WebPConfig* config); 
+	struct WebPAuxStats
+	{
+		int coded_size; 
+		float[5] PSNR; 
+		int[3] block_count; 
+		int[2] header_bytes; 
+		int[4][3] residual_bytes; 
+		int[4] segment_size; 
+		int[4] segment_quant; 
+		int[4] segment_level; 
+		int alpha_data_size; 
+		int layer_data_size; 
+		uint lossless_features; 
+		int histogram_bits; 
+		int transform_bits; 
+		int cache_bits; 
+		int palette_size; 
+		int lossless_size; 
+		int lossless_hdr_size; 
+		int lossless_data_size; 
+		uint[2] pad; 
+	} 
+	alias WebPWriterFunction = int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
+	struct WebPMemoryWriter
+	{
+		ubyte* mem; 
+		ulong size; 
+		ulong max_size; 
+		uint[1] pad; 
+	} 
+	extern void WebPMemoryWriterInit(WebPMemoryWriter* writer); 
+	extern void WebPMemoryWriterClear(WebPMemoryWriter* writer); 
+	extern int WebPMemoryWrite(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
+	alias WebPProgressHook = int function(int percent, const WebPPicture* picture); 
+	enum WebPEncCSP
+	{
+		WEBP_YUV420 = 0,
+		WEBP_YUV420A = 4,
+		WEBP_CSP_UV_MASK = 3,
+		WEBP_CSP_ALPHA_BIT = 4,
+	} 
+	alias WEBP_YUV420 = WebPEncCSP.WEBP_YUV420; 
+	alias WEBP_YUV420A = WebPEncCSP.WEBP_YUV420A; 
+	alias WEBP_CSP_UV_MASK = WebPEncCSP.WEBP_CSP_UV_MASK; 
+	alias WEBP_CSP_ALPHA_BIT = WebPEncCSP.WEBP_CSP_ALPHA_BIT; 
+	enum WebPEncodingError
+	{
+		VP8_ENC_OK = 0,
+		VP8_ENC_ERROR_OUT_OF_MEMORY,
+		VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY,
+		VP8_ENC_ERROR_NULL_PARAMETER,
+		VP8_ENC_ERROR_INVALID_CONFIGURATION,
+		VP8_ENC_ERROR_BAD_DIMENSION,
+		VP8_ENC_ERROR_PARTITION0_OVERFLOW,
+		VP8_ENC_ERROR_PARTITION_OVERFLOW,
+		VP8_ENC_ERROR_BAD_WRITE,
+		VP8_ENC_ERROR_FILE_TOO_BIG,
+		VP8_ENC_ERROR_USER_ABORT,
+		VP8_ENC_ERROR_LAST,
+	} 
+	alias VP8_ENC_OK = WebPEncodingError.VP8_ENC_OK; 
+	alias VP8_ENC_ERROR_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_OUT_OF_MEMORY; 
+	alias VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY; 
+	alias VP8_ENC_ERROR_NULL_PARAMETER = WebPEncodingError.VP8_ENC_ERROR_NULL_PARAMETER; 
+	alias VP8_ENC_ERROR_INVALID_CONFIGURATION = WebPEncodingError.VP8_ENC_ERROR_INVALID_CONFIGURATION; 
+	alias VP8_ENC_ERROR_BAD_DIMENSION = WebPEncodingError.VP8_ENC_ERROR_BAD_DIMENSION; 
+	alias VP8_ENC_ERROR_PARTITION0_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION0_OVERFLOW; 
+	alias VP8_ENC_ERROR_PARTITION_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION_OVERFLOW; 
+	alias VP8_ENC_ERROR_BAD_WRITE = WebPEncodingError.VP8_ENC_ERROR_BAD_WRITE; 
+	alias VP8_ENC_ERROR_FILE_TOO_BIG = WebPEncodingError.VP8_ENC_ERROR_FILE_TOO_BIG; 
+	alias VP8_ENC_ERROR_USER_ABORT = WebPEncodingError.VP8_ENC_ERROR_USER_ABORT; 
+	alias VP8_ENC_ERROR_LAST = WebPEncodingError.VP8_ENC_ERROR_LAST; 
+	struct WebPPicture
+	{
+		int use_argb; 
+		WebPEncCSP colorspace; 
+		int width; 
+		int height; 
+		ubyte* y; 
+		ubyte* u; 
+		ubyte* v; 
+		int y_stride; 
+		int uv_stride; 
+		ubyte* a; 
+		int a_stride; 
+		uint[2] pad1; 
+		uint* argb; 
+		int argb_stride; 
+		uint[3] pad2; 
+		int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture) writer; 
+		void* custom_ptr; 
+		int extra_info_type; 
+		ubyte* extra_info; 
+		WebPAuxStats* stats; 
+		WebPEncodingError error_code; 
+		int function(int percent, const WebPPicture* picture) progress_hook; 
+		void* user_data; 
+		uint[3] pad3; 
+		ubyte* pad4; 
+		ubyte* pad5; 
+		uint[8] pad6; 
+		void* memory_; 
+		void* memory_argb_; 
+		void*[2] pad7; 
+	} 
+	extern int WebPPictureInitInternal(const WebPPicture*, int); 
+	static int WebPPictureInit(WebPPicture* picture)
+	{ return WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION); } 
+	extern int WebPPictureAlloc(const WebPPicture* picture); 
+	extern void WebPPictureFree(const WebPPicture* picture); 
+	extern int WebPPictureCopy(const WebPPicture* src, const WebPPicture* dst); 
+	extern int WebPPlaneDistortion(
+		const(ubyte)* src, ulong src_stride, const(ubyte)* ref_, ulong ref_stride, 
+		int width, int height, ulong x_step, int type, float* distortion, float* result
+	); 
+	extern int WebPPictureDistortion(const WebPPicture* src, const WebPPicture* ref_, int metric_type, float[5] result); 
+	extern int WebPPictureCrop(const WebPPicture* picture, int left, int top, int width, int height); 
+	extern int WebPPictureView(const WebPPicture* src, int left, int top, int width, int height, const WebPPicture* dst); 
+	extern int WebPPictureIsView(const WebPPicture* picture); 
+	extern int WebPPictureRescale(const WebPPicture* picture, int width, int height); 
+	extern int WebPPictureImportRGB(const WebPPicture* picture, const(ubyte)* rgb, int rgb_stride); 
+	extern int WebPPictureImportRGBA(const WebPPicture* picture, const(ubyte)* rgba, int rgba_stride); 
+	extern int WebPPictureImportRGBX(const WebPPicture* picture, const(ubyte)* rgbx, int rgbx_stride); 
+	extern int WebPPictureImportBGR(const WebPPicture* picture, const(ubyte)* bgr, int bgr_stride); 
+	extern int WebPPictureImportBGRA(const WebPPicture* picture, const(ubyte)* bgra, int bgra_stride); 
+	extern int WebPPictureImportBGRX(const WebPPicture* picture, const(ubyte)* bgrx, int bgrx_stride); 
+	extern int WebPPictureARGBToYUVA(const WebPPicture* picture, WebPEncCSP); 
+	extern int WebPPictureARGBToYUVADithered(const WebPPicture* picture, WebPEncCSP colorspace, float dithering); 
+	extern int WebPPictureSharpARGBToYUVA(const WebPPicture* picture); 
+	extern int WebPPictureSmartARGBToYUVA(const WebPPicture* picture); 
+	extern int WebPPictureYUVAToARGB(const WebPPicture* picture); 
+	extern void WebPCleanupTransparentArea(const WebPPicture* picture); 
+	extern int WebPPictureHasTransparency(const WebPPicture* picture); 
+	extern void WebPBlendAlpha(const WebPPicture* picture, uint background_rgb); 
+	extern int WebPEncode(const WebPConfig* config, const WebPPicture* picture); 
+} 
