@@ -4021,6 +4021,11 @@ version(/+$DIDE_REGION+/all)
 		{ return a.generateVector!(ushort, a=>cast(ushort)(iround(a.clamp(-1, 1)*0x7FFF))); } 
 		auto from_snorm16(A)(A a)
 		{ return a.generateVector!(float, a=>max((cast(short)a)*(1.0f/0x7FFF), -1)); } 
+		
+		auto to_unorm24(A)(A a)
+		=> a.generateVector!(ushort, a=>cast(uint)(iround(a.clamp(0, 1)*0xFFFFFF))); 
+		auto from_unorm24(A)(A a)
+		=> a.generateVector!(float, a=>a*(1.0f/0xFFFFFF)); 
 	}version(/+$DIDE_REGION+/all)
 	{
 		private void unittest_CommonFunctions()

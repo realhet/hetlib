@@ -4,7 +4,129 @@ public import het.win, het.bitmap, het.vulkan;
 
 import core.stdc.string : memset; 
 
-alias destroyedResidentTexHandles = MSQueue!(VulkanWindow.TexHandle); 
+/+
+	+This variant is sinchronizes put and fetch to itself 
+	and put() can be called in a destructor.
++/
+class SafeQueue_nogc(T)
+{
+	private
+	{
+		static struct Node 
+		{ T data; uint next; } 
+		
+		Node* buffer; 
+		uint bufferSize; 
+		uint head, tail; 
+		uint freeListHead = uint.max; // Using uint.max as null indicator
+		
+		import core.stdc.stdlib : malloc, free; 
+	} 
+	
+	this()
+	{
+		synchronized(this) { asm { nop; } } 
+		/+
+			It is priming the synchronization object,
+			so later put() can be called from a destructor
+			without freezing.
+		+/
+		
+		// Start with capacity for 16 nodes
+		bufferSize = 16; 
+		buffer = cast(Node*)malloc(Node.sizeof * bufferSize); 
+		
+		// Initialize all nodes as free
+		for(uint i = 0; i < bufferSize; ++i)
+		{ buffer[i].next = i + 1; }
+		buffer[bufferSize-1].next = uint.max; 
+		freeListHead = 0; 
+		
+		// Allocate first node for dummy head
+		head = tail = allocNode(); 
+		buffer[head].next = uint.max; 
+	} 
+	
+	~this()
+	{
+		if(buffer)
+		{ free(buffer); buffer = null; }
+	} 
+	
+	private uint allocNode() @nogc
+	{
+		if(freeListHead == uint.max)
+		{
+			// Double the buffer size
+			auto newSize = bufferSize * 2; 
+			auto newBuffer = cast(Node*)malloc(Node.sizeof * newSize); 
+			
+			// Copy old data
+			memcpy(newBuffer, buffer, Node.sizeof * bufferSize); 
+			
+			// Initialize new nodes
+			for(uint i = bufferSize; i < newSize; ++i)
+			{ newBuffer[i].next = i + 1; }
+			newBuffer[newSize-1].next = uint.max; 
+			freeListHead = bufferSize; 
+			
+			// Replace buffer
+			free(buffer); 
+			buffer = newBuffer; 
+			bufferSize = newSize; 
+		}
+		
+		uint nodeIdx = freeListHead; 
+		freeListHead = buffer[nodeIdx].next; 
+		return nodeIdx; 
+	} 
+	
+	private void freeNode(uint idx)
+	{
+		buffer[idx].next = freeListHead; 
+		freeListHead = idx; 
+	} 
+	
+	void put(T data) @nogc
+	{
+		synchronized(this)
+		{
+			auto nodeIdx = allocNode(); 
+			buffer[nodeIdx].data = data; 
+			buffer[nodeIdx].next = uint.max; 
+			
+			buffer[tail].next = nodeIdx; 
+			tail = nodeIdx; 
+		} 
+	} 
+	
+	int opApply(int delegate(T) fun)
+	{
+		synchronized(this)
+		{
+			while(1)
+			{
+				auto nextHead = buffer[head].next; 
+				if(nextHead != uint.max)
+				{
+					T res = buffer[nextHead].data; 
+					freeNode(head); // Free old dummy head
+					head = nextHead; 
+					
+					if(fun(res)) return 1; 
+				}
+				else break; 
+			}
+		} 
+		return 0; 
+	} 
+	
+	
+	string stats() const
+	=> i"bufSize:$(bufferSize) head:$(head) tail:$(tail) freeHead:$(freeListHead)".text; 
+} 
+
+alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 
 /+
 	Code: (表([
@@ -265,6 +387,8 @@ class VulkanWindow: Window
 				); 
 			} 
 			
+			
+			
 			/+
 				void tri(Args...)(in Args args)
 				{
@@ -303,8 +427,6 @@ class VulkanWindow: Window
 			DimBitOfs	= 6,
 			FormatBitOfs 	= 8 /+inside info_dword[0]+/,
 			FormatBits 	= ChnBits + BppBits + 1 /+alt+/; 
-			
-			pragma(msg, "FB:", FlagBits); 
 			
 			enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<DimBits); 
 			enum _TexFormat_matrix = 
@@ -596,7 +718,7 @@ class VulkanWindow: Window
 			{
 					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x458A82886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x4F5E82886ADB).檢((update間(_間)))); 
 				
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
@@ -730,16 +852,21 @@ class VulkanWindow: Window
 				}
 			} 
 			
+			void remove(in TexHandle texHandle)
+			{
+				if(texHandle)
+				{
+					if(const heapChunkIdx = IB.access(texHandle).heapChunkIdx)
+					{ buffer.heapFree(heapChunkIdx); }
+					IB.remove(texHandle); 
+				}
+			} 
+			
 			void remove(File file)
 			{
 				if(const texRec = file in texRecByFile)
 				{
-					if(const texHandle = texRec.texHandle)
-					{
-						if(const heapChunkIdx = IB.access(texHandle).heapChunkIdx)
-						{ buffer.heapFree(heapChunkIdx); }
-						IB.remove(texHandle); 
-					}
+					remove(texRec.texHandle); 
 					texRecByFile.remove(file); 
 				}
 			} 
@@ -811,7 +938,7 @@ class VulkanWindow: Window
 		
 		version(/+$DIDE_REGION Tracking released texHandles+/all)
 		{
-			protected __gshared MSQueue!TexHandle destroyedResidentTexHandles; 
+			protected __gshared MMQueue_nogc!TexHandle destroyedResidentTexHandles; 
 			shared static this()
 			{ destroyedResidentTexHandles = new typeof(destroyedResidentTexHandles); } 
 		}
@@ -831,13 +958,8 @@ class VulkanWindow: Window
 		
 		~this()
 		{
-			/+
-				Bug: 🛑This shit is freezes in first CG cycle when no class pointer was saved.
-				/+
-					Code: if(handle)
-					{ destroyedResidentTexHandles.put(handle); }
-				+/
-			+/
+			if(handle)
+			{ destroyedResidentTexHandles.put(handle); }
 		} 
 	} 
 	
@@ -971,6 +1093,7 @@ class VulkanWindow: Window
 				const uint _rawSize0 = getBits(info_0, 16, 16); 
 				const uint _rawSize12 = info_1; 
 				const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
+				if(size.x==0 || size.y==0 || size.z==0) return ErrorColor; 
 				
 				//Clamp coordinates. Assume non-empty image.
 				const ivec3 iv = ivec3 ((preScale)?(v * vec3(size)) :(v)); 
@@ -1523,6 +1646,22 @@ class VulkanWindow: Window
 						if(0)
 						if(TB.buffer.growByRate(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
 						{}
+						
+						
+						if(KeyCombo("Up").down) {
+							foreach(i; 0..16)
+							{
+								const N = 1<<20; 
+								auto t = new Texture(TexFormat.rgb_u8, 3*N, [clAqua].replicate(N)); 
+								print(t.handle); 
+							}
+						}
+						
+						foreach(th; Texture.destroyedResidentTexHandles)
+						{ TB.remove(th); LOG(th); }
+						
+						if(KeyCombo("Space").down)
+						{ LOG(Texture.destroyedResidentTexHandles.stats); }
 						
 						
 						IB.buffer.upload; 
