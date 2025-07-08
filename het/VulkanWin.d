@@ -126,7 +126,69 @@ class SafeQueue_nogc(T)
 	=> i"bufSize:$(bufferSize) head:$(head) tail:$(tail) freeHead:$(freeListHead)".text; 
 } 
 
-alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
+alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
+
+enum QuadOrientation
+{
+	normal 	= 0, //Default orientation (0,0)-(1,1)
+	mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
+	mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
+	mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
+	mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
+	mirrorXDiag 	= 5, //Mirror X then diagonal
+	mirrorYDiag 	= 6, //Mirror Y then diagonal
+	mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
+	
+	//Additional rotation names
+	rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
+	rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
+	rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
+	
+	//Alternative names
+	flipH 	= mirrorX, 	//Horizontal flip
+	flipV 	= mirrorY, 	//Vertical flip
+	flipHV 	= mirrorXY, 	//Both flips
+	transpose 	= mirrorDiag 	//Swap X and Y coordinates
+} 
+
+void orientQuadTexCoords(
+	in vec2 inTopLeft, in vec2 inBottomRight, QuadOrientation orientation,
+	out vec2 outTopLeft, out vec2 outBottomLeft,
+	out vec2 outTopRight, out vec2 outBottomRight
+)
+{
+	//initialize texCoords on foor corners
+	vec2 tl = inTopLeft, br = inBottomRight, tr = vec2(br.x, tl.y), bl = vec2(tl.x, br.y); 
+	
+	//Apply the transformations
+	if(orientation)
+	{
+		if(
+			(orientation & 1) != 0
+			/*mirrorX*/
+		) {
+			vec2 tmp = tl; tl = tr; tr = tmp; 
+			tmp = bl; bl = br; br = tmp; 
+		}
+		if(
+			(orientation & 2) != 0
+			/*mirrorY*/
+		) {
+			vec2 tmp = tl; tl = bl; bl = tmp; 
+			tmp = tr; tr = br; br = tmp; 
+		}
+		if(
+			(orientation & 4) != 0
+			/*mirrorDiag*/
+		) {
+			tl = vec2(tl.y, tl.x); tr = vec2(bl.y, bl.x); 
+			bl = vec2(tr.y, tr.x); br = vec2(br.y, br.x); 
+		}
+	}
+	
+	//Output final coordinates
+	outTopLeft = tl; outBottomLeft = bl; outTopRight = tr; outBottomRight = br; 
+} 
 
 /+
 	Code: (表([
@@ -140,16 +202,22 @@ alias MMQueue_nogc(T) = SafeQueue_nogc!T;
 		[q{maxGeometryShaderInvocations},q{32},q{127},q{127},q{32},q{32},q{32},q{32}],
 		[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 	]))
-+/
-
++/
 class VulkanWindow: Window
 {
 	struct BufferSizeConfigs
-	{ VulkanBufferSizeConfig VBConfig, IBConfig, TBConfig; } 
+	{ VulkanBufferSizeConfig VBConfig, GBConfig, IBConfig, TBConfig; } 
 	
 	BufferSizeConfigs bufferSizeConfigs =
 	mixin(體!((BufferSizeConfigs),q{
 		VBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
+			minSizeBytes 	: ((  4)*(KiB)), 
+			maxSizeBytes 	: ((256)*(MiB)),
+			growRate : 2.0,
+			shrinkWhen 	: 0.25, 
+			shrinkRate 	: 0.5
+		})),
+		GBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
 			minSizeBytes 	: ((  4)*(KiB)), 
 			maxSizeBytes 	: ((256)*(MiB)),
 			growRate : 2.0,
@@ -336,8 +404,10 @@ class VulkanWindow: Window
 		enum VertexCmdBits = 4; static assert(VertexCmd.max < 1<<VertexCmdBits); 
 		
 		union VertexData {
-			struct 	 { uvec4 VA0, VA1; } 
-			struct 	 {
+			struct 
+			{ uvec4 VA0, VA1; } 
+			struct 
+			{
 				uint cmd; 
 				RGBA color; 
 				uint dummy0, dummy1; 
@@ -373,42 +443,56 @@ class VulkanWindow: Window
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
 			
-			auto deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
+			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
+		} 
+	}
+	
+	version(/+$DIDE_REGION GB    +/all)
+	{
+		GeometryBufferManager GB; 
+		
+		class GeometryBufferManager
+		{
+			protected VulkanAppenderBuffer buffer; 
 			
-			void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
+			this()
 			{
-				buffer.append
-				(
-					mixin(體!((VertexData),q{
-						cmd 	: VertexCmd.texturedRect | texHandle.to!uint<<VertexCmdBits,
-						bounds 	: bounds,
-						color 	: color
-					}))
-				); 
+				buffer = new VulkanAppenderBuffer
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), bufferSizeConfigs.GBConfig); 
 			} 
 			
+			~this()
+			{ buffer.free; } 
 			
+			void reset()
+			{
+				buffer.reset; 
+				append(0)/+The very first uint is reserved for null+/; 
+			} 
 			
-			/+
-				void tri(Args...)(in Args args)
-				{
-					void emit(in vec3 pos)
-					{ buffer.append(VertexData(pos, actColor)); } 
-					
-					static foreach(i, A; Args)
-					{
-						static if(is(A==vec3)) emit(args[i]); 
-						else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
-						else static if(is(A==RGB)) actColor = args[i].from_unorm; 
-					}
-				} 
-			+/
+			uint append(T)(in T data)
+			{
+				//returns dword idx or 0
+				
+				//align up 4 bytes
+				if(const rem = buffer.appendPos & 3)
+				buffer.appendPos += 4-rem; 
+				
+				const ofs = (cast(uint)(buffer.appendPos / 4)); 
+				/+A maximum of 4*4GB geometry data is assumed+/
+				
+				return ((buffer.append(data))?(ofs):(0)); 
+			} 
+			
+			void upload()
+			{ buffer.upload; } 
+			
+			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
 		} 
 	}
 	
 	version(/+$DIDE_REGION IB     +/all)
 	{
-		
 		version(/+$DIDE_REGION TexInfo declarations+/all)
 		{
 			alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
@@ -716,9 +800,8 @@ class VulkanWindow: Window
 			
 			this()
 			{
-					auto _間=init間; 
 				buffer = new HeapBuffer
-					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	((0x4F5E82886ADB).檢((update間(_間)))); 
+					(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	
 				
 				/+
 					buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
@@ -963,6 +1046,117 @@ class VulkanWindow: Window
 		} 
 	} 
 	
+	Drawing dr; 
+	
+	class Drawing
+	{
+		enum WidthAlign { left, center, client, right } 
+		enum Align {
+			topLeft	, topCenter	, topRight	,
+			centerLeft	, center	, centerRight	,
+			bottomLeft	, bottomCenter	, bottomRight	
+		} 
+		enum SizeUnit
+		{
+			world, 	/+one unit in the world+/
+			screen, 	/+one pixel at the screen (similar to fwidth())+/
+			model 	/+Todo: one unit inside scaled model space+/
+		} 
+		enum SizeSpec
+		{
+			scaled, 	/+bitmaps's size is used and scaled by specified size+/
+			exact	/+size is exactly specified+/
+		} 
+		enum Aspect {stretch, keep, crop} 
+		
+		static foreach(field; ["PC", "SC"])
+		mixin(iq{
+			protected RGBA $(field)_; 
+			@property
+			{
+				RGBA $(field)() const => $(field)_; 
+				void $(field)(RGBA a) {$(field)_= a; } 
+				
+				void $(field)(vec4 a) {$(field)_= a.to_unorm; } 
+				void $(field)(RGB a) {$(field)_.rgb = a; } 
+				void $(field)(vec3 a) {$(field)_.rgb = a.to_unorm; } 
+				void $(field)(float f) {$(field)_.rgb = f.to_unorm; } 
+			} 
+		}.text); 
+		
+		static foreach(field; ["PS", "LW"])
+		mixin(iq{
+			//Todo: these must be coded 12bit log2(x)*64 <-> exp2(x/64)
+			protected float $(field)_; 
+			@property
+			{
+				float $(field)() const => $(field)_; 
+				void $(field)(float a) {$(field)_= a; } 
+			} 
+		}.text); 
+		
+		
+		alias primaryColor 	= PC, 
+		secondaryColor 	= SC,
+		pointSize	= PS,
+		lineWidth	= LW; 
+		
+		void reset()
+		{
+			PC = (RGB(0xFFFFFFFF)); 
+			SC = (RGB(0xFF000000)); 
+		} 
+		
+		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
+		{
+			VB.buffer.append
+			(
+				mixin(體!((VertexData),q{
+					cmd 	: VertexCmd.texturedRect | texHandle.to!uint<<VertexCmdBits,
+					bounds 	: bounds,
+					color 	: color
+				}))
+			); 
+		} 
+		
+		void draw(A...)(A args)
+		{
+			TexHandle tex; 
+			RGBA color = (RGBA(0xFFFFFFFF)); 
+			
+			void emitQuad_vec2(); 
+			
+			static foreach(i; 0..A.length)
+			{
+				{
+					alias T = A[i], a = args[i]; 
+					static if(is(T : TexHandle)) { tex = a; }
+					else static if(is(T : RGB)) { color.rgb = a; }
+					else static if(is(T : RGBA)) { color.rgba = a; }
+					else static if(is(T : vec2)) { emitQuad_vec2(a); }
+					else static assert(0, "unhandled type: "~T.stringof); 
+				}
+			}
+		} 
+		
+		
+		
+		/+
+			void tri(Args...)(in Args args)
+			{
+				void emit(in vec3 pos)
+				{ buffer.append(VertexData(pos, actColor)); } 
+				
+				static foreach(i, A; Args)
+				{
+					static if(is(A==vec3)) emit(args[i]); 
+					else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
+					else static if(is(A==RGB)) actColor = args[i].from_unorm; 
+				}
+			} 
+		+/
+	} 
+	
 	void createShaderModules()
 	{
 		enum shaderBinary = 
@@ -1321,7 +1515,7 @@ class VulkanWindow: Window
 				})), 
 				mixin(體!((VkDescriptorPoolSize),q{
 					type : mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})), 
-					descriptorCount : 2
+					descriptorCount : 3
 				}))
 			]
 			,1 /+maxSets+/
@@ -1345,6 +1539,10 @@ class VulkanWindow: Window
 			2, TB.buffer.deviceMemoryBuffer, 
 			mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))
 		); 
+		descriptorSet.write(
+			3, GB.buffer.deviceMemoryBuffer, 
+			mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER}))
+		); 
 	} 
 	
 	void createDescriptorSetLayout()
@@ -1364,17 +1562,24 @@ class VulkanWindow: Window
 				binding	: 2, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
 				descriptorCount 	: 1, 	stageFlags 	: stages
 			})),
+			mixin(體!((VkDescriptorSetLayoutBinding),q{
+				binding	: 3, 	descriptorType 	: mixin(舉!((VK_DESCRIPTOR_TYPE_),q{STORAGE_BUFFER})),
+				descriptorCount 	: 1, 	stageFlags 	: stages
+			})),
 		); 
 	} enum ShaderBufferDeclarations = 
 	iq{
 		//UB: Uniform buffer
 		layout(binding = 0) uniform UB_T { mat4 mvp; } UB; 
 		
-		//IB: Info buffer
+		//IB: Info buffer (texture directory)
 		layout(binding = 1) buffer IB_T { uint IB[]; } ; 
 		
 		//TB: Texture buffer
 		layout(binding = 2) buffer TB_T { uint TB[]; } ; 
+		
+		//GB: Geometry buffer (additional variable lengt vertex data)
+		layout(binding = 3) buffer GB_T { uint GB[]; } ; 
 	}.text; 
 	
 	
@@ -1557,9 +1762,11 @@ class VulkanWindow: Window
 		[
 			UB 	= new UniformBufferManager,
 			VB	= new VertexBufferManager,
+			GB	= new GeometryBufferManager,
 			IB	= new InfoBufferManager,
 			TB	= new TextureBufferManager
 		]; 
+		dr = new Drawing; 
 		
 		createShaderModules; 
 		createGraphicsPipeline; //also creates descriptorsetLayout and pipelineLayout
@@ -1617,11 +1824,12 @@ class VulkanWindow: Window
 				{
 					try
 					{
-						VB.reset; 
+						VB.reset; GB.reset; dr.reset; 
 						
 						internalUpdate; //this will call onUpdate()
 						
-						VB.upload; 
+						
+						VB.upload; GB.upload; 
 						
 						{
 							auto modelMatrix = mat4.identity; 
@@ -1649,16 +1857,16 @@ class VulkanWindow: Window
 						
 						
 						if(KeyCombo("Up").down) {
-							foreach(i; 0..16)
+							foreach(i; 0..6)
 							{
 								const N = 1<<20; 
 								auto t = new Texture(TexFormat.rgb_u8, 3*N, [clAqua].replicate(N)); 
-								print(t.handle); 
+								/+print(t.handle); +/
 							}
 						}
 						
 						foreach(th; Texture.destroyedResidentTexHandles)
-						{ TB.remove(th); LOG(th); }
+						{ TB.remove(th); /+LOG(th); +/}
 						
 						if(KeyCombo("Space").down)
 						{ LOG(Texture.destroyedResidentTexHandles.stats); }
