@@ -2060,8 +2060,11 @@ class Drawing
 			enforce(0, "NewDrawObj: Buffer too big."); 
 		} 
 		
-		private auto exportDrawingObjs()
+		public DrawingObj[] exportDrawingObjs()
 		{ return buffers.allObjs; } 
+		
+		public DrawingObj[] exportDrawingObjs2()
+		{ return buffers.allObjs ~ subDrawings.map!((sd)=>(sd.exportDrawingObjs2)).join; } 
 		
 		//private int dirty = -1; //must set to -1 data[] is changed. bit0 = VBO, bit1 = bounds
 		private void markDirty()
@@ -3026,6 +3029,26 @@ class Drawing
 			
 			if(logDrawing) LOG(shortName, "drawing", stats, "center:", center, "scale:", scale, "translate:", translate); 
 			
+			enum enableLogging = (常!(bool)(1)); 
+			static if(enableLogging)
+			{
+				{
+					static logTick = 0u; 
+					static bool pressed; 
+					const f = File(`c:\dl\hetlib_draw.log`); 
+					if(pressed.chkSet(KeyCombo("Ctrl+Alt+Shift+PrtScn").down) && pressed)
+					{
+						logTick = application.tick+4; 
+						f.remove; 
+					}
+					if(logTick==application.tick)
+					{
+						f.append(exportDrawingObjs); 
+						LOG(this, "saved to", f); 
+					}
+				}
+			}
+			
 			drawCnt++; 
 			vboList ~= buffers.toVBOs; 
 			buffers.clear; 
@@ -3101,6 +3124,7 @@ class Drawing
 		
 		void strip(R)(dvec2 p0)
 		{} 
+		
 	}
 	
 	static immutable shaderCode =

@@ -414,6 +414,7 @@ class VulkanWindow: Window
 				bounds2 bounds; 
 			} 
 		} 
+		
 		static assert(VertexData.sizeof == 32); 
 		
 		VertexBufferManager VB; 
@@ -446,6 +447,8 @@ class VulkanWindow: Window
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
 		} 
 	}
+	
+	
 	
 	version(/+$DIDE_REGION GB    +/all)
 	{
@@ -465,23 +468,13 @@ class VulkanWindow: Window
 			{ buffer.free; } 
 			
 			void reset()
-			{
-				buffer.reset; 
-				append(0)/+The very first uint is reserved for null+/; 
-			} 
+			{ buffer.reset; } 
 			
+			//returns byte idx
 			uint append(T)(in T data)
 			{
-				//returns dword idx or 0
-				
-				//align up 4 bytes
-				if(const rem = buffer.appendPos & 3)
-				buffer.appendPos += 4-rem; 
-				
-				const ofs = (cast(uint)(buffer.appendPos / 4)); 
-				/+A maximum of 4*4GB geometry data is assumed+/
-				
-				return ((buffer.append(data))?(ofs):(0)); 
+				const ofs = (cast(uint)(buffer.appendPos)); /+A maximum of 4GB geometry data is assumed+/
+				buffer.append(data); return ofs; 
 			} 
 			
 			void upload()
@@ -1050,24 +1043,42 @@ class VulkanWindow: Window
 	
 	class Drawing
 	{
-		enum WidthAlign { left, center, client, right } 
-		enum Align {
-			topLeft	, topCenter	, topRight	,
-			centerLeft	, center	, centerRight	,
-			bottomLeft	, bottomCenter	, bottomRight	
-		} 
-		enum SizeUnit
-		{
-			world, 	/+one unit in the world+/
-			screen, 	/+one pixel at the screen (similar to fwidth())+/
-			model 	/+Todo: one unit inside scaled model space+/
-		} 
-		enum SizeSpec
-		{
-			scaled, 	/+bitmaps's size is used and scaled by specified size+/
-			exact	/+size is exactly specified+/
-		} 
-		enum Aspect {stretch, keep, crop} 
+		/+
+			enum WidthAlign { left, center, client, right } 
+			enum Align {
+				topLeft	, topCenter	, topRight	,
+				centerLeft	, center	, centerRight	,
+				bottomLeft	, bottomCenter	, bottomRight	
+			} 
+			enum SizeUnit
+			{
+				world, 	/+one unit in the world+/
+				screen, 	/+one pixel at the screen (similar to fwidth())+/
+				model 	/+Todo: one unit inside scaled model space+/
+			} 
+			enum SizeSpec
+			{
+				scaled, 	/+bitmaps's size is used and scaled by specified size+/
+				exact	/+size is exactly specified+/
+			} 
+			enum Aspect {stretch, keep, crop} 
+			
+			struct VD_texturedRect
+			{
+				mixin((
+					(表([
+						[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+						[q{cmd},q{4},q{"cmd"},q{
+							mixin(舉!((VertexCmd),q{texturedRect}))
+							
+						},q{/++/}],
+						[q{Align},q{4},q{"align_"},q{},q{/++/}],
+						[q{SizeUnit},q{2},q{"sizeUnit"},q{},q{/++/}],
+						[q{SizeSpec},q{1},q{"sizeSpec"},q{},q{/++/}],
+					]))
+				).調!(GEN_bitfields)); 
+			} 
+		+/
 		
 		static foreach(field; ["PC", "SC"])
 		mixin(iq{
@@ -1109,11 +1120,15 @@ class VulkanWindow: Window
 		
 		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 		{
+			const addr = GB.append(bounds); 
+			GB.append(ubyte(1)); 
+			LOG(addr); 
 			VB.buffer.append
 			(
 				mixin(體!((VertexData),q{
 					cmd 	: VertexCmd.texturedRect | texHandle.to!uint<<VertexCmdBits,
-					bounds 	: bounds,
+					dummy0 	: addr,
+					/+bounds 	: bounds,+/
 					color 	: color
 				}))
 			); 
@@ -1242,9 +1257,91 @@ class VulkanWindow: Window
 			
 			$(GEN_enumDefines!VertexCmd)
 			
+			struct BitStream
+			{
+				uint dwOfs; //the dword offset of the NEXT fetched dword.
+				uint currentDw; //the current dword that is fetched
+				int currentDwBits; /*
+					how many of the lower bits are valid in the current dword, 
+					if zero, the next dword must be fetched
+				*/
+			}; 
+			
+			uint fetchBits(inout BitStream bitStream, in uint numBits)
+			{
+				uint result = 0; 
+				int bitsRemaining = int(numBits); 
+				
+				while(bitsRemaining > 0)
+				{
+					// If current dword is exhausted, fetch next one
+					if(bitStream.currentDwBits == 0)
+					{
+						bitStream.currentDw = GB[bitStream.dwOfs]; 
+						bitStream.dwOfs++; 
+						bitStream.currentDwBits = 32; 
+					}
+					
+					// Calculate how many bits we can take this iteration
+					int bitsToTake = min(bitsRemaining, bitStream.currentDwBits); 
+					
+					// Extract the bits we need (using bitfieldExtract)
+					uint extracted = bitfieldExtract(bitStream.currentDw, 0, bitsToTake); 
+					
+					// Insert them into the result (using bitfieldInsert)
+					result = bitfieldInsert(result, extracted, int(numBits) - bitsRemaining, bitsToTake); 
+					
+					// Remove used bits from current dword (using bitfieldExtract for the remaining bits)
+					bitStream.currentDw >>= bitsToTake; 
+					bitStream.currentDwBits -= bitsToTake; 
+					bitsRemaining -= bitsToTake; 
+				}
+				
+				return result; 
+			} 
+			
+			bool fetch_bool(inout BitStream bitStream)
+			{
+				if(bitStream.currentDwBits == 0)
+				{
+					bitStream.currentDw = GB[bitStream.dwOfs]; 
+					bitStream.dwOfs++; 
+					bitStream.currentDwBits = 32; 
+				}
+				
+				bool bit = (bitStream.currentDw & 1u) != 0; 
+				bitStream.currentDw >>= 1; 
+				bitStream.currentDwBits--; 
+				
+				return bit; 
+			} 
+			
+			uint fetch_uint(inout BitStream bitStream)
+			{
+				return fetchBits(bitStream, 32); 
+				/*Opt: this 32bit read should be optimized*/
+			} 
+			
+			float fetch_float(inout BitStream bitStream)
+			{ return uintBitsToFloat(fetch_uint(bitStream)); } 
+			
+			vec2 fetch_vec2(inout BitStream bitStream)
+			{ return vec2(fetch_float(bitStream), fetch_float(bitStream)); } 
+			
+			BitStream initBitStream(uint byteOfs)
+			{
+				BitStream bitStream; 
+				bitStream.dwOfs = byteOfs >> 2; 
+				bitStream.currentDwBits = 0; 
+				uint bitsToSkip = (byteOfs & 3) * 8; 
+				if(bitsToSkip > 0)
+				{ uint dummy = fetchBits(bitStream, bitsToSkip); }
+				return bitStream; 
+			} 
+			
 			void main()
 			{
-				const uint 	vertexCmd = getBits(geomAttr0[0].x, 0, $(VertexCmdBits)); 
+				const uint vertexCmd = getBits(geomAttr0[0].x, 0, $(VertexCmdBits)); 
 				
 				switch(vertexCmd)
 				{
@@ -1252,10 +1349,9 @@ class VulkanWindow: Window
 						{
 						fragTexHandle = geomAttr0[0].x >> $(VertexCmdBits); 
 						fragColor = unpackUnorm4x8(geomAttr0[0].y); 
-						emitTexturedPointPointRect2D(
-							uintBitsToFloat (geomAttr1[0].xy),
-							uintBitsToFloat (geomAttr1[0].zw)
-						); 
+						const uint gAddr = geomAttr0[0].z; 
+						BitStream GS = initBitStream(gAddr); 
+						emitTexturedPointPointRect2D(fetch_vec2(GS), fetch_vec2(GS)); 
 					}
 					break; 
 				}
@@ -1353,7 +1449,7 @@ class VulkanWindow: Window
 						case TexBpp_4: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 8)* 4,  4) /    15.0), 1); }	break; 
 						case TexBpp_8: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 4)* 8,  8) /   255.0), 1); }	break; 
 						case TexBpp_16: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 2)*16, 16) / 65535.0), 1); }	break; 
-						case TexBpp_32: 	{ res = vec4(vec3(uintBitsToFloat(tmp.x)                 ), 1); }	break; 
+						case TexBpp_32: 	{ res = vec4(vec3(uintBitsToFloat(tmp.x)      ), 1); }	break; 
 						default: return ErrorColor; 
 					}
 					if(alt) {

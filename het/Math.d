@@ -3734,7 +3734,10 @@ version(/+$DIDE_REGION+/all)
 			{
 				alias CT = CommonScalarType!(A, B); //type of result NOT depends on t
 				static if(!isFloatingPoint!CT)
-				return generateVector!(CT, (a, b, t) => std.math.round(a*(1-t) + b*t))(a, b, t); 
+				{
+					return generateVector!(CT, (a, b, t) => (a*(1-t) + b*t))(a, b, t)
+					/+Todo: std.math.round() can't handle RGB ubyte!!! It is truncation now...+/; 
+				}
 				else return generateVector!(CT, (a, b, t) => a*(1-t) + b*t)(a, b, t); 
 			}
 		} 
@@ -4123,10 +4126,15 @@ version(/+$DIDE_REGION+/all)
 			{
 				//test if avg() and mix() keeps the right types
 				static immutable RGB clRed = 0xFF, clBlue = 0xFF0000; 
-				auto x = RGB(128, 0, 128); /+Note: mix uses rounding since 250626+/
+				auto x = RGB(127, 0, 127); /+
+					Note: 250626: mix uses rounding
+					250709: it failed in CT inside dide\dideBase.d
+					/+Todo: Fix this rounding crap!+/
+				+/
+				auto y = RGB(128, 0, 128); /+Note: 250709 But it is inconsistent because avg HAS rounding.+/
 				{ auto a = mix(clRed, clBlue, .5); 	 assert(a==x && is(typeof(a)==RGB)); }
-				{ auto a = avg(clRed, clBlue); 	 assert(a==x && is(typeof(a)==RGB)); }
-				{ auto a = avg([clRed, clBlue]); 	 assert(a==x && is(typeof(a)==RGB), i"$(a) $(x)".text); }
+				{ auto a = avg(clRed, clBlue); 	 assert(a==y && is(typeof(a)==RGB)); }
+				{ auto a = avg([clRed, clBlue]); 	 assert(a==y && is(typeof(a)==RGB)); }
 			}
 					
 			assert(step(vec3(1, 2, 3), 2) == vec3(1, 1, 0)); 
@@ -4135,10 +4143,10 @@ version(/+$DIDE_REGION+/all)
 					
 			assert(
 				8.iota.map!(i => (smoothstep(ivec2(0, 2), 9, i)*100).iround )
-								.equal(
+				.equal(
 					[
 						ivec2(0, 0), ivec2(3, 0), ivec2(13, 0), ivec2(26, 6),
-										ivec2(42, 20), ivec2(58, 39), ivec2(74, 61), ivec2(87, 80)
+						ivec2(42, 20), ivec2(58, 39), ivec2(74, 61), ivec2(87, 80)
 					] 
 				)
 			); 

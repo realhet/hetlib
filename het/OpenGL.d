@@ -2472,10 +2472,10 @@ version(/+$DIDE_REGION+/all)
 					case GLTextureType.RGBA8: {
 						if(bmp.channels==1 && bmp.type=="ubyte")
 						{
-							auto _間=init間; static RGBA[] staticBuf; 
+							static RGBA[] staticBuf; 
 							const requiredLen = bmp.size.area; 
-							if(staticBuf.length<requiredLen)	staticBuf.length = requiredLen; 	((0x11631964A4CA9).檢((update間(_間)))); 
-							upload(l_to_rgba(bmp.access!ubyte.asArray, staticBuf[0 .. requiredLen]), x, y, sx, sy); 	((0x116BF964A4CA9).檢((update間(_間)))); 
+							if(staticBuf.length<requiredLen)	staticBuf.length = requiredLen; 
+							upload(l_to_rgba(bmp.access!ubyte.asArray, staticBuf[0 .. requiredLen]), x, y, sx, sy); 
 						}
 						else
 						upload(bmp.accessOrGet!RGBA , x, y, sx, sy); 

@@ -6827,7 +6827,7 @@ struct im
 			{ auto dr = [new Drawing, new Drawing]; }
 			
 			//init clipbounds
-			foreach(i, ref d;	dr)
+			foreach(i, ref d; dr)
 			{
 				ref view()
 				{ return targetSurfaces[i].view; } 
