@@ -202,7 +202,148 @@ void orientQuadTexCoords(
 		[q{maxGeometryShaderInvocations},q{32},q{127},q{127},q{32},q{32},q{32},q{32}],
 		[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 	]))
-+/
++/
+
+/+
+	Geometry Stream Processor specification
+	
+	Registers:
+	/+
+		Code: (表([
+			[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
+			[q{
+				primary color,
+				secondary color
+			},q{
+				PC,
+				SC
+			},q{vec4},q{
+				000: a_u8, 
+				001: la_u8, 
+				010: rgb_u8, 
+				011: rgba_u8,
+				100: u1, 
+				101: u2, 
+				110: u4, 
+				111: u8
+			},q{
+				setPC fmt, col 	set primary color
+				setSC fmt, col 	set secondary color
+				setPCSC fmt, c1, c2	set both colors individually
+				setC fmt, col	set and broadcast both colors
+			}],
+			[q{
+				point size,
+				line width,
+				font height
+			},q{
+				PS,
+				LW,
+				FH
+			},q{float},q{
+				00: f32,
+				01: log12,
+				10: u8
+				11: u4
+			},q{
+				setPS 	fmt, val
+				setLW 	fmt, val
+				setFH 	fmt, val
+			}],
+			[q{
+				fontMap handle,
+				latinFontMap handle,
+				palette handle
+			},q{
+				FMH
+				LFMH
+				PALH
+			},q{uint},q{
+				00: 12 bit, 
+				01: 16 bit,
+				10: 24 bit
+				11: 32 bit
+			},q{
+				setFontMapHandle 	fontType, fmt, handle (main font)
+				setLatinFontMapHandle 	fmt, handle (stylized latin font)
+				setPaletteHandle 	fmt, handle
+			}],
+			[q{fontType},q{FT},q{flags 2},q{
+				00: texture_handles
+				01: ascii_charmap16x16
+				10: unicode_blocks128
+			}],
+			[q{fontFlags},q{FF},q{Flags 11},q{
+				bit0: bold
+				bit1: italic
+				bit2: monospace
+				bit3_4: subscript, superscript
+				bit5_6: width: .66x, 1.5x, 2x
+				bit7_8: underline, strikeout, errorline
+				bit9_10: blink: normal, soft, fast
+			}],
+			[q{xAlign},q{XA},q{flags 2},q{00: left, 01: center, 10: right}],
+			[q{xSizeSpec},q{XS},q{flags 2},q{00: original, 01: scaled, 10: exact}],
+			[q{yAlign},q{YA},q{flags 2},q{00: top, 01: center, 10: bottom}],
+			[q{ySizeSpec},q{YS},q{flags 2},q{00: original, 01: scaled, 10: exact}],
+			[q{aspect},q{ASP},q{flags 2},q{00: stretch, 01:keep, 10:crop}],
+		]))
+	+/
+	
+	Drawing commands:
+	/+
+		Code: (表([
+			[q{/+Note: instr+/},q{/+Note: name+/}],
+			[q{/+
+				Line drawing commands based on SVG. 
+				Every command has a lowercase relative variant tooL first bit is 1.
+			+/}],
+			[q{M p},q{move}],
+			[q{L p},q{line}],
+			[q{H dist},q{horizontal line}],
+			[q{V dist},q{vertical line}],
+			[q{Q p0, p1},q{quadratic bezier}],
+			[q{T p},q{smooth quadratic bezier}],
+			[q{C p0, p1, p2},q{cubic bezier}],
+			[q{S p0, p1},q{smooth cubic bezier}],
+			[q{A rx, ry, rot, lf, sf, p},q{elliptical arc}],
+			[],
+			[q{/+textured axis aligned rectangles+/}],
+			[q{TEX [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{
+				Draws a texture at the current position,
+				aligned by xAlign, yAlign
+				sized by xSizeSpec, ySizeSpec and aspect.
+			}],
+			[q{TEXM [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{Also moves the cursor to the right.}],
+			[q{TYPE length, string},q{
+				Uses fontMap, fontHeight, fontType 
+				and fontFlags to draw a text.
+			}],
+		]))
+	+/
+	
+	/+
+		Code: bool isLatinChar(uint code)
+		{
+			return (
+				(code >= 0x0020u && code <= 0x024Fu) || // Basic Latin + Latin-1 + Ext-A/B
+				(code >= 0x1E00u && code <= 0x1EFFu)   // Latin Extended Additional
+			); 
+		} 
+		bool isLatinChar_blk128(uint code)
+		{
+			uint blk = code >> 7; 
+			return (
+				(blk < (0x0280u>>7)) || // Basic Latin + Latin-1 + Ext-A/B
+				(
+					blk >=	(0x1E00u>>7) && 
+					blk <	(0x1D00Fu>>7)
+				) // Latin Extended Additional
+			); 
+		} 
+	+/
++/
+
 class VulkanWindow: Window
 {
 	struct BufferSizeConfigs
@@ -1105,7 +1246,7 @@ class VulkanWindow: Window
 				void $(field)(float a) {$(field)_= a; } 
 			} 
 		}.text); 
-		
+		
 		
 		alias primaryColor 	= PC, 
 		secondaryColor 	= SC,
@@ -1121,8 +1262,6 @@ class VulkanWindow: Window
 		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 		{
 			const addr = GB.append(bounds); 
-			GB.append(ubyte(1)); 
-			LOG(addr); 
 			VB.buffer.append
 			(
 				mixin(體!((VertexData),q{
@@ -1172,6 +1311,238 @@ class VulkanWindow: Window
 		+/
 	} 
 	
+	/+Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`.+//+
+		Details: /+
+			Hidden: /+
+				AI: /+
+					User: Yesterday we did this cool bitsream reader in GLSL:
+					/+
+						Code: struct BitStream
+						{
+							uint dwOfs; //the dword offset of the NEXT fetched dword.
+							uint currentDw; //the current dword that is fetched
+							int currentDwBits; /*
+								how many of the lower bits are valid in the current dword, 
+								if zero, the next dword must be fetched
+							*/
+						}; 
+						
+						uint fetchBits(inout BitStream bitStream, in uint numBits)
+						{
+							uint result = 0; 
+							int bitsRemaining = int(numBits); 
+							
+							while(bitsRemaining > 0)
+							{
+								// If current dword is exhausted, fetch next one
+								if(bitStream.currentDwBits == 0)
+								{
+									bitStream.currentDw = GB[bitStream.dwOfs]; 
+									bitStream.dwOfs++; 
+									bitStream.currentDwBits = 32; 
+								}
+								
+								// Calculate how many bits we can take this iteration
+								int bitsToTake = min(bitsRemaining, bitStream.currentDwBits); 
+								
+								// Extract the bits we need (using bitfieldExtract)
+								uint extracted = bitfieldExtract(bitStream.currentDw, 0, bitsToTake); 
+								
+								// Insert them into the result (using bitfieldInsert)
+								result = bitfieldInsert(result, extracted, int(numBits) - bitsRemaining, bitsToTake); 
+								
+								// Remove used bits from current dword (using bitfieldExtract for the remaining bits)
+								bitStream.currentDw >>= bitsToTake; 
+								bitStream.currentDwBits -= bitsToTake; 
+								bitsRemaining -= bitsToTake; 
+							}
+							
+							return result; 
+						} 
+						
+						bool fetch_bool(inout BitStream bitStream)
+						{
+							if(bitStream.currentDwBits == 0)
+							{
+								bitStream.currentDw = GB[bitStream.dwOfs]; 
+								bitStream.dwOfs++; 
+								bitStream.currentDwBits = 32; 
+							}
+							
+							bool bit = (bitStream.currentDw & 1u) != 0; 
+							bitStream.currentDw >>= 1; 
+							bitStream.currentDwBits--; 
+							
+							return bit; 
+						} 
+					+/
+					
+					I thought about making it faster and use less gpu regs by storing
+					`currentDwBits` via an extra one bit on top of the last valid bit.
+					So if I have 8x 0 bits of data, the contents of currentDwBits woud be 0x1FF.
+					So reading 8 bits from it means (currentDwBits>>8)!=0 which means it is still valid (0..31 bits can be in it).
+					Reading 8 bits from that would be (currentDwBits>>9)==0 that is an early signal that it has not enough bits.
+					Reading less than 8 bits end up a nonzero value: the closing bits and optional other data.
+					After the closing 1 bit there are always zeroes.
+					
+					New glsl instructions that support these:
+						* bitCount: it tells if it's invalid (0), or valid(1 or higher)
+						* findMSB: it finds the position of the closing 1 bit. -1 if none. It basically tells all info about the current 
+									0..31 bit temporal storage (currentDwBits).
+					
+					Problem:
+						* It is impossible to load 32 bits into currentDwBits, because you cant put the 33th closing 1 bit, 
+									so the maximum allowed 32bit fetches must be done differently and also in an optimized way.
+						* I feel like currentDw==0 and currentDw==1 are weirdly special cases, 1 means that we run temporarily ran out 
+									of bits, 0 means that we are also at 32 a bit boundary. Please think this through.
+					
+					The goal is to solve the above problem with a simplified struct:
+					/+
+						Code: struct BitStream
+						{
+							uint dwOfs; //The dword offset of the NEXT fetched dword.
+							
+							uint currentDw; 
+							/*
+								The current dword that is fetched, and beyond the highest valid data bit there is a 1 bit for closing.
+								1 means there is 0 data bits currently
+								0 means there were not even a fetch into currentDw. This is the initial state.
+								0x8000000 means 31 valid data bits that are all zeroes in this example.
+								Note: The maximal 32bit reads must be handled specially, it can only hold 31 bits!!!
+							*/
+						}; 
+					+/
+				+/
+				/+
+					Assistant: /+
+						Para: I understand you want to optimize the bitstream reader by encoding the bit count information
+						directly in the /+Highlighted: currentDw+/ value using a terminating 1 bit. Let me analyze this and propose
+						a solution:
+					+/
+					
+					1. Key observations:
+								/+Bullet: The terminating 1 bit marks the end of valid bits+/
+								/+Bullet: /+Highlighted: currentDw == 0+/ means uninitialized state+/
+								/+Bullet: /+Highlighted: currentDw == 1+/ means no valid bits (just the terminator)+/
+								/+Bullet: For N valid bits, the pattern is: [N data bits][1][0...0]+/
+					
+					2. Special case handling:
+								/+Bullet: 32-bit reads must be handled separately since we can't represent them+/
+								/+Bullet: Need to detect when we're about to run out of bits+/
+					
+					Here's the optimized implementation:
+					
+					/+
+						Structured: struct BitStream
+						{
+							uint dwOfs; // The dword offset of the NEXT fetched dword.
+							uint currentDw; // [data bits][1][0...0] pattern
+						}; 
+						
+						uint fetchBits(inout BitStream bitStream, in uint numBits)
+						{
+							// Special case: full 32-bit read
+							if(numBits == 32)
+							{
+								// Must have empty current buffer to do this efficiently
+								if(bitStream.currentDw == 0 || bitStream.currentDw == 1)
+								{
+									uint result = GB[bitStream.dwOfs]; 
+									bitStream.dwOfs++; 
+									return result; 
+								}
+								else
+								{
+									// Need to handle partial read then get remaining bits
+									uint bitsAvailable = findMSB(bitStream.currentDw); 
+									uint firstPart = bitfieldExtract(bitStream.currentDw, 0, bitsAvailable); 
+									bitStream.currentDw = GB[bitStream.dwOfs]; 
+									bitStream.dwOfs++; 
+									uint remainingBits = numBits - bitsAvailable; 
+									uint secondPart = bitfieldExtract(bitStream.currentDw, 0, remainingBits); 
+									bitStream.currentDw >>= remainingBits; 
+									bitStream.currentDw |= 1u << remainingBits; // Set new terminator
+									return (secondPart << bitsAvailable) | firstPart; 
+								}
+							}
+								
+							uint result = 0; 
+							uint bitsRemaining = numBits; 
+								
+							while(bitsRemaining > 0)
+							{
+								// Check if we need to refill
+								if(bitStream.currentDw == 0 || bitStream.currentDw == 1)
+								{
+									bitStream.currentDw = GB[bitStream.dwOfs]; 
+									bitStream.dwOfs++; 
+									bitStream.currentDw |= 1u << 31; // Set terminator at bit 31 (31 data bits)
+								}
+									
+								// Calculate available bits
+								int msbPos = findMSB(bitStream.currentDw); 
+								uint bitsAvailable = msbPos; 
+								uint bitsToTake = min(bitsRemaining, bitsAvailable); 
+									
+								// Extract bits
+								uint extracted = bitfieldExtract(bitStream.currentDw, 0, bitsToTake); 
+								result = bitfieldInsert(result, extracted, numBits - bitsRemaining, bitsToTake); 
+									
+								// Update state
+								bitStream.currentDw >>= bitsToTake; 
+								bitsRemaining -= bitsToTake; 
+									
+								// If we consumed all bits, clear the terminator (will be 1 if empty)
+								if(bitsToTake == bitsAvailable)
+								bitStream.currentDw &= ~(1u << (msbPos - bitsToTake)); 
+							}
+								
+							return result; 
+						} 
+						
+						bool fetch_bool(inout BitStream bitStream)
+						{
+							// Check if we need to refill
+							if(bitStream.currentDw == 0 || bitStream.currentDw == 1)
+							{
+								bitStream.currentDw = GB[bitStream.dwOfs]; 
+								bitStream.dwOfs++; 
+								bitStream.currentDw |= 1u << 31; // Set terminator at bit 31
+							}
+								
+							// Extract bit
+							bool bit = (bitStream.currentDw & 1u) != 0; 
+							bitStream.currentDw >>= 1; 
+								
+							// If we just consumed the terminator, clear it
+							if((bitStream.currentDw & 1u) == 0)
+							bitStream.currentDw = 1; 
+								
+							return bit; 
+						} 
+					+/
+					
+					Key optimizations:
+					1. Eliminated /+Highlighted: currentDwBits+/ by using the terminator bit pattern
+					2. Special handling for 32-bit reads when possible
+					3. Uses /+Highlighted: findMSB+/ to quickly determine available bits
+					4. Maintains the invariant that after the last data bit there's exactly one terminator bit
+					
+					The special cases are handled as:
+						/+Bullet: /+Highlighted: currentDw == 0+/: Initial/uninitialized state+/
+						/+Bullet: /+Highlighted: currentDw == 1+/: Empty buffer (just terminator)+/
+						/+Bullet: Otherwise: [data bits][1][0...0] pattern+/
+					
+					This should be more efficient as it:
+						/+Bullet: Uses one less register (no separate bit count)+/
+						/+Bullet: Has faster empty buffer checks (just compare to 0 or 1)+/
+						/+Bullet: Uses hardware-accelerated /+Highlighted: findMSB+/ for bit counting+/
+					
+					/+Note: Usage(prompt_hit: 64, prompt_miss: 1357, completion: 1102, HUF: 0.60, price: 100%)+/
+				+/
+			+/
+		+/
+	+/
 	void createShaderModules()
 	{
 		enum shaderBinary = 
@@ -1254,9 +1625,7 @@ class VulkanWindow: Window
 				fragTexCoord = vec2(1,1); emitVertex2D(q); 
 				EndPrimitive(); 
 			} 
-			
-			$(GEN_enumDefines!VertexCmd)
-			
+			
 			struct BitStream
 			{
 				uint dwOfs; //the dword offset of the NEXT fetched dword.
@@ -1300,6 +1669,8 @@ class VulkanWindow: Window
 				return result; 
 			} 
 			
+			
+			
 			bool fetch_bool(inout BitStream bitStream)
 			{
 				if(bitStream.currentDwBits == 0)
@@ -1338,8 +1709,10 @@ class VulkanWindow: Window
 				{ uint dummy = fetchBits(bitStream, bitsToSkip); }
 				return bitStream; 
 			} 
+			
+			$(GEN_enumDefines!VertexCmd)
 			
-			void main()
+			void main() /*geometry shader*/
 			{
 				const uint vertexCmd = getBits(geomAttr0[0].x, 0, $(VertexCmdBits)); 
 				
