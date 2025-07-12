@@ -287,6 +287,7 @@ void orientQuadTexCoords(
 			[q{yAlign},q{YA},q{flags 2},q{00: top, 01: center, 10: bottom}],
 			[q{ySizeSpec},q{YS},q{flags 2},q{00: original, 01: scaled, 10: exact}],
 			[q{aspect},q{ASP},q{flags 2},q{00: stretch, 01:keep, 10:crop}],
+			[q{/+Todo: line phase, line stipple, arrows, markers+/}],
 		]))
 	+/
 	
