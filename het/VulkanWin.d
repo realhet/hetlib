@@ -127,69 +127,6 @@ class SafeQueue_nogc(T)
 } 
 
 alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
-
-enum QuadOrientation
-{
-	normal 	= 0, //Default orientation (0,0)-(1,1)
-	mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
-	mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
-	mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
-	mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
-	mirrorXDiag 	= 5, //Mirror X then diagonal
-	mirrorYDiag 	= 6, //Mirror Y then diagonal
-	mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
-	
-	//Additional rotation names
-	rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
-	rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
-	rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
-	
-	//Alternative names
-	flipH 	= mirrorX, 	//Horizontal flip
-	flipV 	= mirrorY, 	//Vertical flip
-	flipHV 	= mirrorXY, 	//Both flips
-	transpose 	= mirrorDiag 	//Swap X and Y coordinates
-} 
-
-void orientQuadTexCoords(
-	in vec2 inTopLeft, in vec2 inBottomRight, QuadOrientation orientation,
-	out vec2 outTopLeft, out vec2 outBottomLeft,
-	out vec2 outTopRight, out vec2 outBottomRight
-)
-{
-	//initialize texCoords on foor corners
-	vec2 tl = inTopLeft, br = inBottomRight, tr = vec2(br.x, tl.y), bl = vec2(tl.x, br.y); 
-	
-	//Apply the transformations
-	if(orientation)
-	{
-		if(
-			(orientation & 1) != 0
-			/*mirrorX*/
-		) {
-			vec2 tmp = tl; tl = tr; tr = tmp; 
-			tmp = bl; bl = br; br = tmp; 
-		}
-		if(
-			(orientation & 2) != 0
-			/*mirrorY*/
-		) {
-			vec2 tmp = tl; tl = bl; bl = tmp; 
-			tmp = tr; tr = br; br = tmp; 
-		}
-		if(
-			(orientation & 4) != 0
-			/*mirrorDiag*/
-		) {
-			tl = vec2(tl.y, tl.x); tr = vec2(bl.y, bl.x); 
-			bl = vec2(tr.y, tr.x); br = vec2(br.y, br.x); 
-		}
-	}
-	
-	//Output final coordinates
-	outTopLeft = tl; outBottomLeft = bl; outTopRight = tr; outBottomRight = br; 
-} 
-
 /+
 	Code: (表([
 		[q{/+Note: Limits/Cards+/},q{/+Note: MAX+/},q{/+Note: R9 Fury X+/},q{/+Note: R9 280+/},q{/+Note: GTX 1060+/},q{/+Note: RX 580+/},q{/+Note: RTX 5090+/},q{/+Note: RX 9070+/}],
@@ -203,150 +140,249 @@ void orientQuadTexCoords(
 		[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 	]))
 +/
+
+version(/+$DIDE_REGION Geometry Stream Processor+/all)
+{
+	enum TexXAlign {left, center, right} 
+	enum TexYAlign {top, center, baseline, bottom} 
+	enum TexSizeSpec {original, scaled, exact} 
+	enum TexAspect {stretch, keep, crop} 
+	
+	enum TexOrientation
+	{
+		normal 	= 0, //Default orientation (0,0)-(1,1)
+		mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
+		mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
+		mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
+		mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
+		mirrorXDiag 	= 5, //Mirror X then diagonal
+		mirrorYDiag 	= 6, //Mirror Y then diagonal
+		mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
+		
+		//Additional rotation names
+		rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
+		rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
+		rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
+		
+		//Alternative names
+		flipH 	= mirrorX, 	//Horizontal flip
+		flipV 	= mirrorY, 	//Vertical flip
+		flipHV 	= mirrorXY, 	//Both flips
+		transpose 	= mirrorDiag 	//Swap X and Y coordinates
+	} 
+	
+	enum FontType
+	{
+		textureHandles, 	//no fontMap, just individual texture handles.
+		asciiCharmap16x16, 	//fontMap is a bitmap containing 16x16 monosized characters
+		unicodeBlockMap128 	/+
+			fontMap is a texture of 0x110000>>7 = 8704 uints.
+			block = code>>7; blkTex = texture[fontMap[block]];
+			charTex = blkTex[code & 0x7F];
+			/+Opt: fast 0th block at the very start of the fontMap+/
+		+/
+	} 
+	enum FontLine {none, underline, strikeout, errorline } 
+	enum FontWidth {normal, thin/+.66+/, wide/+1.5+/, wider/+2+/ } 
+	enum FontScript {none, superscript, subscript, small} 
+	enum FontBlink {none, blink, soft, fast } 
+	
+	enum SizeUnit
+	{
+		world, 	/+one unit in the world+/
+		screen, 	/+one pixel at the screen (similar to fwidth())+/
+		model 	/+Todo: one unit inside scaled model space+/
+	} 
+	enum SizeFormat {f32, log12, u8, u4} 
+	enum ColorFormat {a_u8, la_u8, rgb_u8, rgba_u8, u1, u2, u4, u8} 
+	enum HandleFormat {u12, u16, u24, u32} 
+	
+	class GeometryStreamProcessor
+	{
+		protected
+		{
+			enum SharedCode = 
+			q{
+				void orientQuadTexCoords(
+					in vec2 inTopLeft, in vec2 inBottomRight, TexOrientation orientation,
+					out vec2 outTopLeft, out vec2 outBottomLeft,
+					out vec2 outTopRight, out vec2 outBottomRight
+				)
+				{
+					//initialize texCoords on foor corners
+					vec2 tl = inTopLeft, br = inBottomRight, tr = vec2(br.x, tl.y), bl = vec2(tl.x, br.y); 
+					
+					//Apply the transformations
+					if(orientation)
+					{
+						if(
+							(orientation & 1) != 0
+							/*mirrorX*/
+						) {
+							vec2 tmp = tl; tl = tr; tr = tmp; 
+							tmp = bl; bl = br; br = tmp; 
+						}
+						if(
+							(orientation & 2) != 0
+							/*mirrorY*/
+						) {
+							vec2 tmp = tl; tl = bl; bl = tmp; 
+							tmp = tr; tr = br; br = tmp; 
+						}
+						if(
+							(orientation & 4) != 0
+							/*mirrorDiag*/
+						) {
+							tl = vec2(tl.y, tl.x); tr = vec2(bl.y, bl.x); 
+							bl = vec2(tr.y, tr.x); br = vec2(br.y, br.x); 
+						}
+					}
+					
+					//Output final coordinates
+					outTopLeft = tl; outBottomLeft = bl; outTopRight = tr; outBottomRight = br; 
+				} 
+				
+				bool isLatinChar(uint code)
+				{
+					return (
+						(code >= 0x0020u && code <= 0x024Fu) || // Basic Latin + Latin-1 + Ext-A/B
+						(code >= 0x1E00u && code <= 0x1EFFu)   // Latin Extended Additional
+					); 
+				} 
+				
+				bool isLatinChar_blk128(uint code)
+				{
+					uint blk = code >> 7; 
+					return (
+						(blk < (0x0280u>>7)) || // Basic Latin + Latin-1 + Ext-A/B
+						(
+							blk >=(0x1E00u>>7) && 
+							blk < (0x1D00Fu>>7)
+						) // Latin Extended Additional
+					); 
+				} 
+			}; 
+			static { mixin(SharedCode); } 
+		} 
+	} 
+	
+	/+
+		Flags:
+		/+
+			Code: (表([
+				[q{/+Note: bitOfs+/},q{/+Note: bitLen+/},q{/+Note: type+/},q{/+Note: name+/}],
+				[q{0},q{2},q{TexXAlign},q{texXAlign}],
+				[q{2},q{2},q{TexSizeSpec},q{texXSize}],
+				[q{4},q{2},q{TexYAlign},q{texYAlign}],
+				[q{6},q{2},q{TexSizeSpec},q{texYSize}],
+				[q{8},q{2},q{TexAspect},q{texAspect}],
+				[q{10},q{3},q{TexOrientation},q{texOrientation}],
+				[],
+				[q{13},q{2},q{FontType},q{fontType}],
+				[q{15},q{1},q{bool},q{fontBold}],
+				[q{16},q{1},q{bool},q{fontItalic}],
+				[q{17},q{1},q{bool},q{fontMonospace}],
+				[q{18},q{2},q{FontLine},q{fontLine}],
+				[q{20},q{2},q{FontWidth},q{fontWidth}],
+				[q{22},q{2},q{FontScript},q{fontScript}],
+				[q{24},q{2},q{FontBlink},q{fontBlink}],
+			]))
+		+/
+		
+		Registers:
+		/+
+			Code: (表([
+				[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
+				[q{
+					primary color,
+					secondary color
+				},q{
+					PC,
+					SC
+				},q{vec4},q{ColorFormat},q{
+					setPC ColorFormat, col 	set primary color
+					setSC ColorFormat, col 	set secondary color
+					setPCSC ColorFormat, c1, c2	set both colors individually
+					setC ColorFormat, col	set and broadcast both colors
+				}],
+				[q{
+					point size,
+					line width,
+					font height
+				},q{
+					PS,
+					LW,
+					FH
+				},q{float},q{SizeFormat},q{
+					setPS 	SizeFormat, val
+					setLW 	SizeFormat, val
+					setFH 	SizeFormat, val
+				}],
+				[q{
+					fontMap handle,
+					latinFontMap handle,
+					palette handle
+				},q{
+					FMH
+					LFMH
+					PALH
+				},q{uint},q{HandleFormat},q{
+					setFontMap 	FontType, HandleFormat, handle
+					setLatinFontMap 	HandleFormat, handle
+					setPalette 	HandleFormat, handle
+				}],
+				[],
+				[q{/+Todo: line phase, line stipple, arrows, markers+/}],
+			]))
+		+/
+		
+		
+		
+		Drawing commands:
+		/+
+			Code: (表([
+				[q{/+Note: instr+/},q{/+Note: name+/}],
+				[q{/+
+					Line drawing commands based on SVG. 
+					Every command has a lowercase relative variant tooL first bit is 1.
+				+/}],
+				[q{M p},q{move}],
+				[q{L p},q{line}],
+				[q{H dist},q{horizontal line}],
+				[q{V dist},q{vertical line}],
+				[q{Q p0, p1},q{quadratic bezier}],
+				[q{T p},q{smooth quadratic bezier}],
+				[q{C p0, p1, p2},q{cubic bezier}],
+				[q{S p0, p1},q{smooth cubic bezier}],
+				[q{A rx, ry, rot, lf, sf, p},q{elliptical arc}],
+				[],
+				[q{/+textured axis aligned rectangles+/}],
+				[q{TEX [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{
+					Draws a texture at the current position,
+					aligned by xAlign, yAlign
+					sized by xSizeSpec, ySizeSpec and aspect.
+				}],
+				[q{TEXM [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{Also moves the cursor to the right.}],
+				[q{TYPE length, string},q{
+					Uses fontMap, fontHeight, fontType 
+					and fontFlags to draw a text.
+				}],
+			]))
+		+/
+		
+	+/
+}
 
-/+
-	Geometry Stream Processor specification
-	
-	Registers:
-	/+
-		Code: (表([
-			[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
-			[q{
-				primary color,
-				secondary color
-			},q{
-				PC,
-				SC
-			},q{vec4},q{
-				000: a_u8, 
-				001: la_u8, 
-				010: rgb_u8, 
-				011: rgba_u8,
-				100: u1, 
-				101: u2, 
-				110: u4, 
-				111: u8
-			},q{
-				setPC fmt, col 	set primary color
-				setSC fmt, col 	set secondary color
-				setPCSC fmt, c1, c2	set both colors individually
-				setC fmt, col	set and broadcast both colors
-			}],
-			[q{
-				point size,
-				line width,
-				font height
-			},q{
-				PS,
-				LW,
-				FH
-			},q{float},q{
-				00: f32,
-				01: log12,
-				10: u8
-				11: u4
-			},q{
-				setPS 	fmt, val
-				setLW 	fmt, val
-				setFH 	fmt, val
-			}],
-			[q{
-				fontMap handle,
-				latinFontMap handle,
-				palette handle
-			},q{
-				FMH
-				LFMH
-				PALH
-			},q{uint},q{
-				00: 12 bit, 
-				01: 16 bit,
-				10: 24 bit
-				11: 32 bit
-			},q{
-				setFontMapHandle 	fontType, fmt, handle (main font)
-				setLatinFontMapHandle 	fmt, handle (stylized latin font)
-				setPaletteHandle 	fmt, handle
-			}],
-			[q{fontType},q{FT},q{flags 2},q{
-				00: texture_handles
-				01: ascii_charmap16x16
-				10: unicode_blocks128
-			}],
-			[q{fontFlags},q{FF},q{Flags 11},q{
-				bit0: bold
-				bit1: italic
-				bit2: monospace
-				bit3_4: subscript, superscript
-				bit5_6: width: .66x, 1.5x, 2x
-				bit7_8: underline, strikeout, errorline
-				bit9_10: blink: normal, soft, fast
-			}],
-			[q{xAlign},q{XA},q{flags 2},q{00: left, 01: center, 10: right}],
-			[q{xSizeSpec},q{XS},q{flags 2},q{00: original, 01: scaled, 10: exact}],
-			[q{yAlign},q{YA},q{flags 2},q{00: top, 01: center, 10: bottom}],
-			[q{ySizeSpec},q{YS},q{flags 2},q{00: original, 01: scaled, 10: exact}],
-			[q{aspect},q{ASP},q{flags 2},q{00: stretch, 01:keep, 10:crop}],
-			[q{/+Todo: line phase, line stipple, arrows, markers+/}],
-		]))
-	+/
-	
-	Drawing commands:
-	/+
-		Code: (表([
-			[q{/+Note: instr+/},q{/+Note: name+/}],
-			[q{/+
-				Line drawing commands based on SVG. 
-				Every command has a lowercase relative variant tooL first bit is 1.
-			+/}],
-			[q{M p},q{move}],
-			[q{L p},q{line}],
-			[q{H dist},q{horizontal line}],
-			[q{V dist},q{vertical line}],
-			[q{Q p0, p1},q{quadratic bezier}],
-			[q{T p},q{smooth quadratic bezier}],
-			[q{C p0, p1, p2},q{cubic bezier}],
-			[q{S p0, p1},q{smooth cubic bezier}],
-			[q{A rx, ry, rot, lf, sf, p},q{elliptical arc}],
-			[],
-			[q{/+textured axis aligned rectangles+/}],
-			[q{TEX [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{
-				Draws a texture at the current position,
-				aligned by xAlign, yAlign
-				sized by xSizeSpec, ySizeSpec and aspect.
-			}],
-			[q{TEXM [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{Also moves the cursor to the right.}],
-			[q{TYPE length, string},q{
-				Uses fontMap, fontHeight, fontType 
-				and fontFlags to draw a text.
-			}],
-		]))
-	+/
-	
-	/+
-		Code: bool isLatinChar(uint code)
-		{
-			return (
-				(code >= 0x0020u && code <= 0x024Fu) || // Basic Latin + Latin-1 + Ext-A/B
-				(code >= 0x1E00u && code <= 0x1EFFu)   // Latin Extended Additional
-			); 
-		} 
-		bool isLatinChar_blk128(uint code)
-		{
-			uint blk = code >> 7; 
-			return (
-				(blk < (0x0280u>>7)) || // Basic Latin + Latin-1 + Ext-A/B
-				(
-					blk >=	(0x1E00u>>7) && 
-					blk <	(0x1D00Fu>>7)
-				) // Latin Extended Additional
-			); 
-		} 
-	+/
-+/
+
+
 
 class VulkanWindow: Window
 {
+	/+
+		Todo: handle VK_ERROR_DEVICE_LOST.	It can be caused by an external bug 
+		when the GPU freezes because of another app, and then restarts.
+	+/
+	
 	struct BufferSizeConfigs
 	{ VulkanBufferSizeConfig VBConfig, GBConfig, IBConfig, TBConfig; } 
 	
@@ -760,40 +796,43 @@ class VulkanWindow: Window
 				@property format() const => (cast(TexFormat)((*(cast(ulong*)(&this))).getBits(FormatBitOfs, FormatBits))); 
 				@property format(TexFormat t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(FormatBitOfs, FormatBits, t); } 
 				
-				enum SharedCode = 
-				q{
-					ivec3 decodeDimSize(in uint dim, in uint raw0, in uint raw12)
-					{
-						switch(dim)
+				protected
+				{
+					enum SharedCode = 
+					q{
+						ivec3 decodeDimSize(in uint dim, in uint raw0, in uint raw12)
 						{
-							case TexDim._1D: 	return ivec3(raw12, 1, 1); 
-							case TexDim._2D: 	return ivec3((raw0 | ((raw12 & 0xFF)<<16)), raw12>>8, 1); 
-							case TexDim._3D: 	return ivec3(raw0, raw12 & 0xFFFF, raw12>>16); 
-							default: 	return ivec3(0); 
-						}
-					} 
+							switch(dim)
+							{
+								case TexDim._1D: 	return ivec3(raw12, 1, 1); 
+								case TexDim._2D: 	return ivec3((raw0 | ((raw12 & 0xFF)<<16)), raw12>>8, 1); 
+								case TexDim._3D: 	return ivec3(raw0, raw12 & 0xFFFF, raw12>>16); 
+								default: 	return ivec3(0); 
+							}
+						} 
+						
+						uint calcFlatIndex(in ivec3 v, in uint dim, in ivec3 size)
+						{
+							switch(dim)
+							{
+								case TexDim._1D: 	return v.x; 
+								case TexDim._2D: 	return v.x + (v.y * size.x); 
+								case TexDim._3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
+								default: 	return 0; 
+							}
+						} 
+					},
 					
-					uint calcFlatIndex(in ivec3 v, in uint dim, in ivec3 size)
-					{
-						switch(dim)
-						{
-							case TexDim._1D: 	return v.x; 
-							case TexDim._2D: 	return v.x + (v.y * size.x); 
-							case TexDim._3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
-							default: 	return 0; 
-						}
-					} 
-				},
-				
-				GLSLCode = 
-				iq{
-					$(GEN_enumDefines!TexDim)
-					$(GEN_enumDefines!TexFormat)
-					$(GEN_enumDefines!TexChn)
-					$(GEN_enumDefines!TexBpp)
-					$(SharedCode.replace("TexDim._", "TexDim_"))
-				}.text; 
-				static protected { mixin(SharedCode); } 
+					GLSLCode = 
+					iq{
+						$(GEN_enumDefines!TexDim)
+						$(GEN_enumDefines!TexFormat)
+						$(GEN_enumDefines!TexChn)
+						$(GEN_enumDefines!TexBpp)
+						$(SharedCode.replace("TexDim._", "TexDim_"))
+					}.text; 
+					static { mixin(SharedCode); } 
+				} 
 				
 				@property ivec3 size() const
 				=> decodeDimSize(dim, _rawSize0, _rawSize12); 
