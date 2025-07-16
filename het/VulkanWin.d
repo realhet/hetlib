@@ -196,9 +196,165 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum SizeFormat {f32, log12, u8, u4} 
 	enum ColorFormat {a_u8, la_u8, rgb_u8, rgba_u8, u1, u2, u4, u8} 
 	enum HandleFormat {u12, u16, u24, u32} 
+	
+	struct FontTexFlags
+	{
+		/+This is a combination of FontFlags and TexFlags+/
+		
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{TexXAlign},q{2},q{"texXAlign"},q{},q{/++/}],
+				[q{TexSizeSpec},q{2},q{"texXSize"},q{},q{/++/}],
+				[q{TexYAlign},q{2},q{"texYAlign"},q{},q{/++/}],
+				[q{TexSizeSpec},q{2},q{"texYSize"},q{},q{/++/}],
+				[q{TexAspect},q{2},q{"texAspect"},q{},q{/++/}],
+				[q{TexOrientation},q{3},q{"texOrientation"},q{},q{/++/}],
+				[],
+				[q{FontType},q{2},q{"fontType"},q{},q{/++/}],
+				[q{bool},q{1},q{"fontBold"},q{},q{/++/}],
+				[q{bool},q{1},q{"fontItalic"},q{},q{/++/}],
+				[q{bool},q{1},q{"fontMonospace"},q{},q{/++/}],
+				[q{FontLine},q{2},q{"fontLine"},q{},q{/++/}],
+				[q{FontWidth},q{2},q{"fontWidth"},q{},q{/++/}],
+				[q{FontScript},q{2},q{"fontScript"},q{},q{/++/}],
+				[q{FontBlink},q{2},q{"fontBlink"},q{},q{/++/}],
+			]))
+		).調!(GEN_bitfields)); 
+		
+		protected
+		{
+			enum GLSLCode = /+
+				AI: /+
+					Hidden: I need you to generate GLSL functions.  I have this global variable: `uint fontTexFlags;`
+					
+					I only need the getters, so no need the to use 'get' prefixes.
+					You can use my macros to get the bits:
+					/+
+						Code: #define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
+						#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
+					+/
+					
+					For boolean results please use getBit macro.
+					For other enumerated types, the return type will be uint because fontTextFlags is an uint.
+					
+					Here are all the fields:
+				+/
+			+/
+			q{
+				uint texXAlign() { return getBits(fontTexFlags, 0, 2); } 
+				uint texXSize() { return getBits(fontTexFlags, 2, 2); } 
+				uint texYAlign() { return getBits(fontTexFlags, 4, 2); } 
+				uint texYSize() { return getBits(fontTexFlags, 6, 2); } 
+				uint texAspect() { return getBits(fontTexFlags, 8, 2); } 
+				uint texOrientation() { return getBits(fontTexFlags, 10, 3); } 
+				uint fontType() { return getBits(fontTexFlags, 13, 2); } 
+				bool fontBold() { return getBit(fontTexFlags, 15); } 
+				bool fontItalic() { return getBit(fontTexFlags, 16); } 
+				bool fontMonospace() { return getBit(fontTexFlags, 17); } 
+				uint fontLine() { return getBits(fontTexFlags, 18, 2); } 
+				uint fontWidth() { return getBits(fontTexFlags, 20, 2); } 
+				uint fontScript() { return getBits(fontTexFlags, 22, 2); } 
+				uint fontBlink() { return getBits(fontTexFlags, 24, 2); } 
+			}; 
+		} 
+	} 
 	
 	class GeometryStreamProcessor
 	{
+		/+
+			Registers:
+			/+
+				Code: (表([
+					[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
+					[q{
+						primary color,
+						secondary color
+					},q{
+						PC,
+						SC
+					},q{vec4},q{ColorFormat},q{
+						setPC 	ColorFormat, col
+						setSC 	ColorFormat, col
+						setPCSC 	ColorFormat, col, col
+						setC 	ColorFormat, col /+it broadcasts+/
+					}],
+					[q{
+						pointSize 	= 1,
+						lineWidth 	= 1,
+						dashSize 	= 1,
+						fontHeight 	= 18
+						
+					},q{
+						PS,
+						LW,
+						FH,
+						DS
+					},q{float},q{SizeFormat},q{
+						setPS 	SizeFormat, val
+						setLW 	SizeFormat, val
+						setDS 	SizeFormat, val /+scaling factor for LineTex[Ph]+/
+						setFH 	SizeFormat, val
+					}],
+					[q{
+						fontMapHandle,
+						latinFontMapHandle,
+						paletteHandle
+						lineTexHandle
+					},q{
+						FMH
+						LFMH
+						PALH
+						LTH
+					},q{uint},q{HandleFormat},q{
+						setFontMap 	HandleFormat, handle, FontType
+						setLatinFontMap 	HandleFormat, handle
+						setPalette 	HandleFormat, handle
+						setLineTex 	HandleFormat, handle
+					}],
+					[],
+					[q{//vector state:
+					}],
+					[q{position},q{P},q{vec3},q{CoordFormat},q{Various drawing and moving commands.}],
+					[q{phase},q{Ph},q{float},q{CoordFormat},q{setPhase CoordFormat, coord /+used by -> lineTex[Ph]+/}],
+					[],
+					[q{/+Todo: Perpixel effects: arrows, markers, wavy line, multicolor dashed line+/}],
+				]))
+			+/
+			
+			Drawing commands:
+			/+
+				Code: (表([
+					[q{/+Note: instr+/},q{/+Note: name+/}],
+					[q{/+
+						Line drawing commands based on SVG. 
+						Every command has a lowercase relative variant tooL first bit is 1.
+					+/}],
+					[q{M p},q{move}],
+					[q{L p},q{line}],
+					[q{H signed_dist},q{horizontal line}],
+					[q{V signed_dist},q{vertical line}],
+					[q{Q p0, p1},q{quadratic bezier}],
+					[q{T p},q{smooth quadratic bezier}],
+					[q{C p0, p1, p2},q{cubic bezier}],
+					[q{S p0, p1},q{smooth cubic bezier}],
+					[q{A rx, ry, rot, lf, sf, p},q{elliptical arc}],
+					[],
+					[q{/+textured axis aligned rectangles+/}],
+					[q{TEX [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{
+						Draws a texture at the current position,
+						aligned by xAlign, yAlign
+						sized by xSizeSpec, ySizeSpec and aspect.
+					}],
+					[q{TEXM [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{Also moves the cursor to the right.}],
+					[q{TYPE length, string},q{
+						Uses fontMap, fontHeight, fontType 
+						and fontFlags to draw a text.
+					}],
+				]))
+			+/
+			
+		+/
 		protected
 		{
 			enum SharedCode = 
@@ -266,111 +422,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		} 
 	} 
 	
-	/+
-		Flags:
-		/+
-			Code: (表([
-				[q{/+Note: bitOfs+/},q{/+Note: bitLen+/},q{/+Note: type+/},q{/+Note: name+/}],
-				[q{0},q{2},q{TexXAlign},q{texXAlign}],
-				[q{2},q{2},q{TexSizeSpec},q{texXSize}],
-				[q{4},q{2},q{TexYAlign},q{texYAlign}],
-				[q{6},q{2},q{TexSizeSpec},q{texYSize}],
-				[q{8},q{2},q{TexAspect},q{texAspect}],
-				[q{10},q{3},q{TexOrientation},q{texOrientation}],
-				[],
-				[q{13},q{2},q{FontType},q{fontType}],
-				[q{15},q{1},q{bool},q{fontBold}],
-				[q{16},q{1},q{bool},q{fontItalic}],
-				[q{17},q{1},q{bool},q{fontMonospace}],
-				[q{18},q{2},q{FontLine},q{fontLine}],
-				[q{20},q{2},q{FontWidth},q{fontWidth}],
-				[q{22},q{2},q{FontScript},q{fontScript}],
-				[q{24},q{2},q{FontBlink},q{fontBlink}],
-			]))
-		+/
-		
-		Registers:
-		/+
-			Code: (表([
-				[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
-				[q{
-					primary color,
-					secondary color
-				},q{
-					PC,
-					SC
-				},q{vec4},q{ColorFormat},q{
-					setPC ColorFormat, col 	set primary color
-					setSC ColorFormat, col 	set secondary color
-					setPCSC ColorFormat, c1, c2	set both colors individually
-					setC ColorFormat, col	set and broadcast both colors
-				}],
-				[q{
-					point size,
-					line width,
-					font height
-				},q{
-					PS,
-					LW,
-					FH
-				},q{float},q{SizeFormat},q{
-					setPS 	SizeFormat, val
-					setLW 	SizeFormat, val
-					setFH 	SizeFormat, val
-				}],
-				[q{
-					fontMap handle,
-					latinFontMap handle,
-					palette handle
-				},q{
-					FMH
-					LFMH
-					PALH
-				},q{uint},q{HandleFormat},q{
-					setFontMap 	FontType, HandleFormat, handle
-					setLatinFontMap 	HandleFormat, handle
-					setPalette 	HandleFormat, handle
-				}],
-				[],
-				[q{/+Todo: line phase, line stipple, arrows, markers+/}],
-			]))
-		+/
-		
-		
-		
-		Drawing commands:
-		/+
-			Code: (表([
-				[q{/+Note: instr+/},q{/+Note: name+/}],
-				[q{/+
-					Line drawing commands based on SVG. 
-					Every command has a lowercase relative variant tooL first bit is 1.
-				+/}],
-				[q{M p},q{move}],
-				[q{L p},q{line}],
-				[q{H dist},q{horizontal line}],
-				[q{V dist},q{vertical line}],
-				[q{Q p0, p1},q{quadratic bezier}],
-				[q{T p},q{smooth quadratic bezier}],
-				[q{C p0, p1, p2},q{cubic bezier}],
-				[q{S p0, p1},q{smooth cubic bezier}],
-				[q{A rx, ry, rot, lf, sf, p},q{elliptical arc}],
-				[],
-				[q{/+textured axis aligned rectangles+/}],
-				[q{TEX [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{
-					Draws a texture at the current position,
-					aligned by xAlign, yAlign
-					sized by xSizeSpec, ySizeSpec and aspect.
-				}],
-				[q{TEXM [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{Also moves the cursor to the right.}],
-				[q{TYPE length, string},q{
-					Uses fontMap, fontHeight, fontType 
-					and fontFlags to draw a text.
-				}],
-			]))
-		+/
-		
-	+/
+	
 }
 
 
@@ -1351,6 +1403,396 @@ class VulkanWindow: Window
 		+/
 	} 
 	
+	/+
+		AI: /+
+			User: I have some GLSL variables declared:
+			/+
+				Code: /+Vector graphics state registers+/
+				vec4 PC = vec4(0, 0, 0, 1); 	/+ Primary color - default black +/
+				vec4 SC = vec4(1, 1, 1, 1); 	/+ Secondary color - default white +/
+					
+				float PS = 1; 	/+ Point size +/
+				float LW = 1; 	/+ Line width +/
+				float DS = 1; 	/+ Dash size scaling factor +/
+				float FH = 18; 	/+ Font height +/
+					
+				uint FMH = 0; 	/+ Font map handle +/
+				uint LFMH = 0; 	/+ Latin font map handle +/
+				uint PALH = 0; 	/+ Palette handle +/
+				uint LTH = 0; 	/+ Line texture handle +/
+					
+				vec3 P = vec3(0); 	/+ Position +/
+				float Ph = 0; 	/+ Phase coordinate +/
+			+/
+			
+			I also have a bitStream that I can read from by using : 
+			/+Code: uint fetchBits(GS, numBits/*you have to fill it!*/)+/
+			/+Code: bool fetch_bool(GS)+/
+			/+Code: uint fetch_uint(GS)+/
+			/+Code: float fetch_float(GS)+/
+			/+Code: vec2 fetch_vec2(GS)+/
+			/+Code: vec3 fetch_vec3(GS)+/
+			/+Code: vec4 fetch_vec4(GS)+/
+			You can build more convinience functions if you want based on these.
+			
+			Here are the documentation of these variables, they are basically registers in a virtual processor:
+			/+
+				Code: (表([
+					[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
+					[q{
+						primary color,
+						secondary color
+					},q{
+						PC,
+						SC
+					},q{vec4},q{ColorFormat},q{
+						setPC 	ColorFormat, col
+						setSC 	ColorFormat, col
+						setPCSC 	ColorFormat, col, col
+						setC 	ColorFormat, col /+it broadcasts+/
+					}],
+					[q{
+						pointSize 	= 1,
+						lineWidth 	= 1,
+						dashSize 	= 1,
+						fontHeight 	= 18
+						
+					},q{
+						PS,
+						LW,
+						FH,
+						DS
+					},q{float},q{SizeFormat},q{
+						setPS 	SizeFormat, val
+						setLW 	SizeFormat, val
+						setDS 	SizeFormat, val /+scaling factor for LineTex[Ph]+/
+						setFH 	SizeFormat, val
+					}],
+					[q{
+						fontMapHandle,
+						latinFontMapHandle,
+						paletteHandle
+						lineTexHandle
+					},q{
+						FMH
+						LFMH
+						PALH
+						LTH
+					},q{uint},q{HandleFormat},q{
+						setFontMap 	HandleFormat, handle, FontType
+						setLatinFontMap 	HandleFormat, handle
+						setPalette 	HandleFormat, handle
+						setLineTex 	HandleFormat, handle
+					}],
+					[],
+					[q{//vector state:
+					}],
+					[q{position},q{P},q{vec3},q{CoordFormat},q{Various drawing and moving commands.}],
+					[q{phase},q{Ph},q{float},q{CoordFormat},q{setPhase CoordFormat, coord /+used by -> lineTex[Ph]+/}],
+					[],
+					[q{/+Todo: Perpixel effects: arrows, markers, wavy line, multicolor dashed line+/}],
+				]))
+			+/
+			
+			Here are some types you can use: In GLSL they are in the form: TexXAlign_left, etc...
+			/+
+				Code: enum TexXAlign {left, center, right} 
+				enum TexYAlign {top, center, baseline, bottom} 
+				enum TexSizeSpec {original, scaled, exact} 
+				enum TexAspect {stretch, keep, crop} 
+				
+				enum TexOrientation
+				{
+					normal 	= 0, //Default orientation (0,0)-(1,1)
+					mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
+					mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
+					mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
+					mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
+					mirrorXDiag 	= 5, //Mirror X then diagonal
+					mirrorYDiag 	= 6, //Mirror Y then diagonal
+					mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
+					
+					//Additional rotation names
+					rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
+					rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
+					rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
+					
+					//Alternative names
+					flipH 	= mirrorX, 	//Horizontal flip
+					flipV 	= mirrorY, 	//Vertical flip
+					flipHV 	= mirrorXY, 	//Both flips
+					transpose 	= mirrorDiag 	//Swap X and Y coordinates
+				} 
+				
+				enum FontType
+				{
+					textureHandles, 	//no fontMap, just individual texture handles.
+					asciiCharmap16x16, 	//fontMap is a bitmap containing 16x16 monosized characters
+					unicodeBlockMap128 	/+
+						fontMap is a texture of 0x110000>>7 = 8704 uints.
+						block = code>>7; blkTex = texture[fontMap[block]];
+						charTex = blkTex[code & 0x7F];
+						/+Opt: fast 0th block at the very start of the fontMap+/
+					+/
+				} 
+				enum FontLine {none, underline, strikeout, errorline } 
+				enum FontWidth {normal, thin/+.66+/, wide/+1.5+/, wider/+2+/ } 
+				enum FontScript {none, superscript, subscript, small} 
+				enum FontBlink {none, blink, soft, fast } 
+				
+				enum SizeUnit
+				{
+					world, 	/+one unit in the world+/
+					screen, 	/+one pixel at the screen (similar to fwidth())+/
+					model 	/+Todo: one unit inside scaled model space+/
+				} 
+				enum SizeFormat {f32, log12, u8, u4} 
+				enum ColorFormat {a_u8, la_u8, rgb_u8, rgba_u8, u1, u2, u4, u8} 
+				enum HandleFormat {u12, u16, u24, u32} 
+				
+				struct FontTexFlags
+				{
+					/+This is a combination of FontFlags and TexFlags+/
+					
+					mixin((
+						(表([
+							[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+							[q{TexXAlign},q{2},q{"texXAlign"},q{},q{/++/}],
+							[q{TexSizeSpec},q{2},q{"texXSize"},q{},q{/++/}],
+							[q{TexYAlign},q{2},q{"texYAlign"},q{},q{/++/}],
+							[q{TexSizeSpec},q{2},q{"texYSize"},q{},q{/++/}],
+							[q{TexAspect},q{2},q{"texAspect"},q{},q{/++/}],
+							[q{TexOrientation},q{3},q{"texOrientation"},q{},q{/++/}],
+							[],
+							[q{FontType},q{2},q{"fontType"},q{},q{/++/}],
+							[q{bool},q{1},q{"fontBold"},q{},q{/++/}],
+							[q{bool},q{1},q{"fontItalic"},q{},q{/++/}],
+							[q{bool},q{1},q{"fontMonospace"},q{},q{/++/}],
+							[q{FontLine},q{2},q{"fontLine"},q{},q{/++/}],
+							[q{FontWidth},q{2},q{"fontWidth"},q{},q{/++/}],
+							[q{FontScript},q{2},q{"fontScript"},q{},q{/++/}],
+							[q{FontBlink},q{2},q{"fontBlink"},q{},q{/++/}],
+						]))
+					).調!(GEN_bitfields)); 
+					
+					protected
+					{
+						enum GLSLCode = /+
+							AI: /+
+								Hidden: I need you to generate GLSL functions.  I have this global variable: `uint fontTexFlags;`
+								
+								I only need the getters, so no need the to use 'get' prefixes.
+								You can use my macros to get the bits:
+								/+
+									Code: #define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
+									#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
+								+/
+								
+								For boolean results please use getBit macro.
+								For other enumerated types, the return type will be uint because fontTextFlags is an uint.
+								
+								Here are all the fields:
+							+/
+						+/
+						q{
+							uint texXAlign() { return getBits(fontTexFlags, 0, 2); } 
+							uint texXSize() { return getBits(fontTexFlags, 2, 2); } 
+							uint texYAlign() { return getBits(fontTexFlags, 4, 2); } 
+							uint texYSize() { return getBits(fontTexFlags, 6, 2); } 
+							uint texAspect() { return getBits(fontTexFlags, 8, 2); } 
+							uint texOrientation() { return getBits(fontTexFlags, 10, 3); } 
+							uint fontType() { return getBits(fontTexFlags, 13, 2); } 
+							bool fontBold() { return getBit(fontTexFlags, 15); } 
+							bool fontItalic() { return getBit(fontTexFlags, 16); } 
+							bool fontMonospace() { return getBit(fontTexFlags, 17); } 
+							uint fontLine() { return getBits(fontTexFlags, 18, 2); } 
+							uint fontWidth() { return getBits(fontTexFlags, 20, 2); } 
+							uint fontScript() { return getBits(fontTexFlags, 22, 2); } 
+							uint fontBlink() { return getBits(fontTexFlags, 24, 2); } 
+						}; 
+					} 
+				} 
+			+/
+			
+			Your task is to generate code for the register setter functions in GLSL.
+			It is a big case switch statement basically.
+			You are free to assign opcodes to the instructions. Use 4 bits for it, I think it is enough.
+			Good luck ;)
+		+/
+		/+
+			Assistant: /+
+				Para: I'll generate GLSL code for the register setter functions using a switch statement with 4-bit opcodes.
+				Here's the implementation:
+			+/
+			
+			/+
+				Structured: /+
+					Register setter functions 
+					Uses 4-bit opcodes (0x0-0xF)
+					Format: opcode (4 bits) | format (4 bits) | data...
+				+/ 
+				void processRegisterCommand(uint opcode)
+				{
+					uint format = fetchBits(4); 
+					
+					switch(opcode)
+					{
+						/+ Color registers +/
+						case 0x0: // setPC
+							PC = fetchColor(format); 
+							break; 
+							
+						case 0x1: // setSC 
+							SC = fetchColor(format); 
+							break; 
+							
+						case 0x2: // setPCSC
+							PC = fetchColor(format); 
+							SC = fetchColor(format); 
+							break; 
+							
+						case 0x3: // setC (broadcast to both)
+							vec4 color = fetchColor(format); 
+							PC = color; 
+							SC = color; 
+							break; 
+							
+						/+ Size registers +/
+						case 0x4: // setPS
+							PS = fetchSize(format); 
+							break; 
+							
+						case 0x5: // setLW
+							LW = fetchSize(format); 
+							break; 
+							
+						case 0x6: // setDS
+							DS = fetchSize(format); 
+							break; 
+							
+						case 0x7: // setFH
+							FH = fetchSize(format); 
+							break; 
+							
+						/+ Handle registers +/
+						case 0x8: // setFontMap
+							{
+							uint handle = fetchHandle(format); 
+							uint fontType = fetchBits(2); 
+							FMH = handle; 
+							// Additional font type processing if needed
+						}
+							break; 
+							
+						case 0x9: // setLatinFontMap
+							LFMH = fetchHandle(format); 
+							break; 
+							
+						case 0xA: // setPalette
+							PALH = fetchHandle(format); 
+							break; 
+							
+						case 0xB: // setLineTex
+							LTH = fetchHandle(format); 
+							break; 
+							
+						/+ Vector state +/
+						case 0xC: // setPosition
+							P = fetchCoord(format); 
+							break; 
+							
+						case 0xD: // setPhase
+							Ph = fetchCoord(format).x; 
+							break; 
+							
+						default: 
+							/+ Unknown opcode - handle error +/
+							break; 
+					}
+				} 
+				
+				/+ Helper functions for fetching different data formats +/
+				vec4 fetchColor(uint format)
+				{
+					switch(format)
+					{
+						case 0: return vec4(fetch_float()); // a_u8 as float
+						case 1: return vec4(fetch_vec2(), 0, 1); // la_u8
+						case 2: return vec4(fetch_vec3(), 1); // rgb_u8
+						case 3: return fetch_vec4(); // rgba_u8
+						/+Bug: ezek 8 bitesek, nem floatosak!!!+/
+						
+						/+Bug: A formatokat NEV szerint kell csinalni, a szamokkal kovethetetlen!!!+/
+						
+						case 4: return vec4(fetch_bool() ? 1.0 : 0.0); // u1
+						case 5: return vec4(float(fetchBits(2)) / 3.0); // u2
+						case 6: return vec4(float(fetchBits(4)) / 15.0); // u4
+						case 7: return vec4(float(fetchBits(8)) / 255.0); // u8
+						default: return vec4(0); 
+					}
+				} 
+				
+				float fetchSize(uint format)
+				{
+					switch(format)
+					{
+						case 0: return fetch_float(); // f32
+						case 1: return exp2(float(int(fetchBits(12)) - 2048) / 256.0); // log12
+						case 2: return float(fetchBits(8) / 255.0); // u8
+						case 3: return float(fetchBits(4) / 15.0); // u4
+						default: return 1.0; 
+					}
+				} 
+				
+				uint fetchHandle(uint format)
+				{
+					switch(format)
+					{
+						case 0: return fetchBits(12); // u12
+						case 1: return fetchBits(16); // u16
+						case 2: return fetchBits(24); // u24
+						case 3: return fetch_uint(); // u32
+						default: return 0; 
+					}
+				} 
+				
+				vec3 fetchCoord(uint format)
+				{
+					switch(format)
+					{
+						case 0: return fetch_vec3(); // full precision
+						case 1: return vec3(fetch_vec2(), 0); // 2D coords
+						case 2: return vec3(float(fetchBits(16)) / 65535.0); // normalized u16
+						case 3: return vec3(float(fetchBits(8)) / 255.0); // normalized u8
+						default: return vec3(0); 
+					}
+				} 
+			+/
+			
+			This implementation:
+			
+			1. Uses 4-bit opcodes (0x0-0xF) for the instructions
+			2. Each instruction can have a 4-bit format specifier for data decoding
+			3. Includes helper functions for fetching different data formats:
+						/+Bullet: /+Highlighted: fetchColor()+/ for color formats+/
+						/+Bullet: /+Highlighted: fetchSize()+/ for size values+/
+						/+Bullet: /+Highlighted: fetchHandle()+/ for texture handles+/
+						/+Bullet: /+Highlighted: fetchCoord()+/ for position/coordinate values+/
+			4. Handles all the register types mentioned:
+						/+Bullet: Color registers (PC, SC)+/
+						/+Bullet: Size registers (PS, LW, DS, FH)+/
+						/+Bullet: Handle registers (FMH, LFMH, PALH, LTH)+/
+						/+Bullet: Vector state (P, Ph)+/
+			
+			/+
+				Para: The format specifiers allow flexible data encoding while keeping the bitstream compact. The switch
+				statement makes it easy to add new instructions by just adding new cases.
+			+/
+			
+			/+Note: Usage(prompt_hit: 64, prompt_miss: 3264, completion: 1244, HUF: 0.85, price: 100%)+/
+		+/
+	+/
+	
 	/+Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`.+//+
 		Details: /+
 			Hidden: /+
@@ -1739,6 +2181,22 @@ class VulkanWindow: Window
 			vec2 fetch_vec2(inout BitStream bitStream)
 			{ return vec2(fetch_float(bitStream), fetch_float(bitStream)); } 
 			
+			vec3 fetch_vec3(inout BitStream bitStream)
+			{
+				return vec3(
+					fetch_float(bitStream), fetch_float(bitStream),
+					fetch_float(bitStream)
+				); 
+			} 
+			vec4 fetch_vec4(inout BitStream bitStream)
+			{
+				return vec4(
+					fetch_float(bitStream), fetch_float(bitStream),
+					fetch_float(bitStream), fetch_float(bitStream)
+				); 
+			} 
+			
+			
 			BitStream initBitStream(uint byteOfs)
 			{
 				BitStream bitStream; 
@@ -1751,6 +2209,169 @@ class VulkanWindow: Window
 			} 
 			
 			$(GEN_enumDefines!VertexCmd)
+			
+			uint fontTexFlags = 0; 
+			$(FontTexFlags.GLSLCode)
+			
+			/*Vector graphics state registers*/
+			vec4 PC = vec4(0, 0, 0, 1); 	/* Primary color - default black */
+			vec4 SC = vec4(1, 1, 1, 1); 	/* Secondary color - default white */
+				
+			float PS = 1; 	/* Point size */
+			float LW = 1; 	/* Line width */
+			float DS = 1; 	/* Dash size scaling factor */
+			float FH = 18; 	/* Font height */
+				
+			uint FMH = 0; 	/* Font map handle */
+			uint LFMH = 0; 	/* Latin font map handle */
+			uint PALH = 0; 	/* Palette handle */
+			uint LTH = 0; 	/* Line texture handle */
+				
+			vec3 P = vec3(0); 	/* Position */
+			float Ph = 0; 	/* Phase coordinate */
+			
+			/* Helper functions for fetching different data formats */
+			vec4 fetchColor(inout BitStream bitStream, uint format)
+			{
+				switch(format)
+				{
+					case 0: return vec4(fetch_float(bitStream)); // a_u8 as float
+					case 1: return vec4(fetch_vec2(bitStream), 0, 1); // la_u8
+					case 2: return vec4(fetch_vec3(bitStream), 1); // rgb_u8
+					case 3: return fetch_vec4(bitStream); // rgba_u8
+					/*Bug: ezek 8 bitesek, nem floatosak!!!*/
+					
+					/*Bug: A formatokat NEV szerint kell csinalni, a szamokkal kovethetetlen!!!*/
+					
+					case 4: return vec4(fetch_bool(bitStream) ? 1.0 : 0.0); // u1
+					case 5: return vec4(float(fetchBits(bitStream, 2)) / 3.0); // u2
+					case 6: return vec4(float(fetchBits(bitStream, 4)) / 15.0); // u4
+					case 7: return vec4(float(fetchBits(bitStream, 8)) / 255.0); // u8
+					default: return vec4(0); 
+				}
+			} 
+			
+			float fetchSize(inout BitStream bitStream, uint format)
+			{
+				switch(format)
+				{
+					case 0: return fetch_float(bitStream); // f32
+					case 1: return exp2(float(int(fetchBits(bitStream, 12)) - 2048) / 256.0); // log12
+					case 2: return float(fetchBits(bitStream, 8) / 255.0); // u8
+					case 3: return float(fetchBits(bitStream, 4) / 15.0); // u4
+					default: return 1.0; 
+				}
+			} 
+			
+			uint fetchHandle(inout BitStream bitStream, uint format)
+			{
+				switch(format)
+				{
+					case 0: return fetchBits(bitStream, 12); // u12
+					case 1: return fetchBits(bitStream, 16); // u16
+					case 2: return fetchBits(bitStream, 24); // u24
+					case 3: return fetch_uint(bitStream); // u32
+					default: return 0; 
+				}
+			} 
+			
+			vec3 fetchCoord(inout BitStream bitStream, uint format)
+			{
+				switch(format)
+				{
+					case 0: return fetch_vec3(bitStream); // full precision
+					case 1: return vec3(fetch_vec2(bitStream), 0); // 2D coords
+					case 2: return vec3(float(fetchBits(bitStream, 16)) / 65535.0); // normalized u16
+					case 3: return vec3(float(fetchBits(bitStream, 8)) / 255.0); // normalized u8
+					default: return vec3(0); 
+				}
+			} 
+			
+			void processRegisterCommand(inout BitStream bitStream, uint opcode)
+			{
+				/*
+					Register setter opcodes 
+					Uses 4-bit opcodes (0x0-0xF)
+					Format: opcode (4 bits) | format (4 bits) | data...
+				*/
+				
+				uint format = fetchBits(bitStream, 4); 
+				
+				switch(opcode)
+				{
+					/* Color registers */
+					case 0x0: // setPC
+						PC = fetchColor(bitStream, format); 
+						break; 
+						
+					case 0x1: // setSC 
+						SC = fetchColor(bitStream, format); 
+						break; 
+						
+					case 0x2: // setPCSC
+						PC = fetchColor(bitStream, format); 
+						SC = fetchColor(bitStream, format); 
+						break; 
+						
+					case 0x3: // setC (broadcast to both)
+						vec4 color = fetchColor(bitStream, format); 
+						PC = color; 
+						SC = color; 
+						break; 
+					
+					/* Size registers */
+					case 0x4: // setPS
+						PS = fetchSize(bitStream, format); 
+						break; 
+						
+					case 0x5: // setLW
+						LW = fetchSize(bitStream, format); 
+						break; 
+						
+					case 0x6: // setDS
+						DS = fetchSize(bitStream, format); 
+						break; 
+						
+					case 0x7: // setFH
+						FH = fetchSize(bitStream, format); 
+						break; 
+					
+					/* Handle registers */
+					case 0x8: // setFontMap
+						{
+						uint handle = fetchHandle(bitStream, format); 
+						uint fontType = fetchBits(bitStream, 2); 
+						FMH = handle; 
+						// Additional font type processing if needed
+					}
+						break; 
+						
+					case 0x9: // setLatinFontMap
+						LFMH = fetchHandle(bitStream, format); 
+						break; 
+						
+					case 0xA: // setPalette
+						PALH = fetchHandle(bitStream, format); 
+						break; 
+						
+					case 0xB: // setLineTex
+						LTH = fetchHandle(bitStream, format); 
+						break; 
+					
+					/* Vector state */
+					case 0xC: // setPosition
+						P = fetchCoord(bitStream, format); 
+						break; 
+						
+					case 0xD: // setPhase
+						Ph = fetchCoord(bitStream, format).x; 
+						break; 
+						
+					default: 
+						/* Unknown opcode - handle error */
+						break; 
+				}
+			} 
 			
 			void main() /*geometry shader*/
 			{
