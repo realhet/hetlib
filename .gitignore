@@ -9,4 +9,4 @@
 !g.bat
 
 #included directories
-#!subdir/
+!examples/
