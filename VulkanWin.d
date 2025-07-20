@@ -216,11 +216,14 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		//opcat: system
 		end = 0, 
 		
-		//opcat: system
-		setPC=0, setSC=1, setPCSC=2, setC=3/+broadcast single color+/,
+		//opcat: color
+		setPC=0, setSC, setPCSC, setC/+broadcast single color+/,
 		
 		//opcat: size
-		setPS=0, setLW=1, setDS=2, setFH=3,
+		setPS=0, setLW, setDS, setFH,
+		
+		//opcat: handle
+		setFontMap=0, setLatinFontMap, setPalette, setLineTex,
 		
 		
 	} 
@@ -1996,6 +1999,78 @@ class VulkanWindow: Window
 				/+Bullet: Input: [0,255] → Scaled to [0,128] → exp2 range [1.0, 3.4e38]+/
 			
 			/+Note: Usage(prompt_hit: 128, prompt_miss: 154, completion: 409, HUF: 0.18, price: 100%)+/
+		+/
+	+/
+	
+	/+
+		AI: /+
+			User: Microsoft Windows [Version 10.0.19045.6093]
+			(c) Microsoft Corporation. All rights reserved.
+			
+			c:\D\libs\het>g GSP writing
+			
+			c:\D\libs\het>git commit -m "GSP writing"
+			On branch master
+			Your branch is up to date with 'origin/master'.
+			
+			Changes not staged for commit:
+				(use "git add <file>..." to update what will be committed)
+				(use "git restore	<file>..." to discard changes in working directory)
+							modified:	Vulkan.d
+							modified:	VulkanWin.d
+			
+			no changes added to commit (use "git add" and/or "git commit -a")
+			
+			c:\D\libs\het>git push
+			Everything up-to-date
+			
+			c:\D\libs\het>g GSP writing
+			
+			c:\D\libs\het>git commit -m "GSP writing"
+			On branch master
+			Your branch is up to date with 'origin/master'.
+			
+			Changes not staged for commit:
+				(use "git add <file>..." to update what will be committed)
+				(use "git restore	<file>..." to discard changes in working directory)
+							modified:	Vulkan.d
+							modified:	VulkanWin.d
+			
+			no changes added to commit (use "git add" and/or "git commit -a")
+			
+			c:\D\libs\het>git push
+			Everything up-to-date
+			
+			c:\D\libs\het>
+			
+			
+			Please solve this shit!
+		+/
+		/+
+			Assistant: /+
+				Para: It looks like you're trying to commit changes to your Git repository but the changes aren't being
+				staged for commit. Here's how to solve this:
+			+/
+			
+			1. First, stage your changes:
+			/+Highlighted: git add Vulkan.d VulkanWin.d+/
+			
+			2. Then commit them:
+			/+Highlighted: git commit -m "GSP writing"+/
+			
+			3. Finally push to remote:
+			/+Highlighted: git push+/
+			
+			Alternatively, you can combine the add and commit in one command:
+			/+Highlighted: git commit -a -m "GSP writing"+/
+			
+			/+
+				Para: The issue is that you need to explicitly stage your changes before committing them. The message
+				"no changes added to commit" is telling you exactly this - you've modified files but haven't
+				told Git to include them in the next commit.
+			+/
+			
+			/+Note: Usage(prompt_hit: 64, prompt_miss: 539, completion: 160, HUF: 0.12, price: 100%)+/
 		+/
 	+/
 	

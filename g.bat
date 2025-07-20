@@ -1,2 +1,2 @@
-git commit -m "%*"
+git commit -a -m "%*"
 git push
