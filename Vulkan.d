@@ -6531,6 +6531,76 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				cb.free; 
 			} 
 		} 
+		
+		/+
+			AI: /+
+				User: /+
+					Code: struct BitStreamAppender
+					{
+						ulong tempData; //this will be aligned to 16 bytes, so must use it with aligned sse operations.
+						size_t tempBits; //this keeps track of the current bit position
+						void delegate() onFlush; //this event must be called when tempData is full.
+						
+						void appendBits(T)(in T val, uint numBits = T.sizeof*8)
+						{
+							assert(numBits>0 && numBits<=64, "appendBits() invalid param"); 
+							
+							/+
+								please write a very effective bitstream appendere here!
+								you need to collect 64 bits in tempData and when it is full, call the onFlush() event and reset the state.
+								the architecture is 64bit x86, 64bit shifting and masking is fully supported there
+							+/
+						} 
+					} 
+				+/
+			+/
+			/+
+				Assistant: /+
+					Para: Here's an efficient implementation of the BitStreamAppender.appendBits function that handles
+					bit packing and flushing:
+				+/
+				
+				/+
+					Code: /+Efficient bitstream appender implementation+/
+					void appendBits(T)(in T val, uint numBits = T.sizeof*8)
+					{
+						assert(numBits>0 && numBits<=64, "appendBits() invalid param"); 
+						
+						/+Convert input to ulong and mask to requested bits+/
+						ulong input = cast(ulong)val & ((1UL << numBits) - 1); 
+						
+						/+Case 1: All bits fit in tempData without flushing+/
+						if(tempBits + numBits <= 64)
+						{
+							tempData |= input << tempBits; 
+							tempBits += numBits; 
+							return; 
+						}
+						
+						/+Case 2: Need to split across flush boundary+/
+						uint remainingBits = tempBits + numBits - 64; 
+						uint firstChunkBits = numBits - remainingBits; 
+						
+						/+Fill tempData to 64 bits and flush+/
+						tempData |= (input & ((1UL << firstChunkBits) - 1)) << tempBits; 
+						tempBits = 64; 
+						onFlush(); 
+						
+						/+Handle remaining bits+/
+						tempData = input >> firstChunkBits; 
+						tempBits = remainingBits; 
+					} 
+					
+					/+
+						/+
+							Para: Note: The caller must manually flush any remaining bits (tempBits > 0) after final appendBits
+							call
+						+/
+					+/
+				+/
+				/+Note: Usage(prompt_hit: 0, prompt_miss: 345, completion: 396, HUF: 0.20, price: 100%)+/
+			+/
+		+/
 		
 		class VulkanArrayBuffer(T) : VulkanStagedBuffer
 		{

@@ -143,6 +143,13 @@ alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 
 version(/+$DIDE_REGION Geometry Stream Processor+/all)
 {
+	
+	/+
+		General rules of enums:
+		 - enum item Order is important, GLSL sources rely on it.
+		 - Defaults are always 0. The the first enum member is the default.
+	+/
+	
 	enum TexXAlign {left, center, right} 
 	enum TexYAlign {top, center, baseline, bottom} 
 	enum TexSizeSpec {original, scaled, exact} 
@@ -193,9 +200,30 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		screen, 	/+one pixel at the screen (similar to fwidth())+/
 		model 	/+Todo: one unit inside scaled model space+/
 	} 
-	enum SizeFormat {f32, log12, u8, u4} 
-	enum ColorFormat {a_u8, la_u8, rgb_u8, rgba_u8, u1, u2, u4, u8} 
+	
+	enum SizeFormat {u4, u8, ulog12/+4G range+/, f32} 
+	enum ColorFormat {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
 	enum HandleFormat {u12, u16, u24, u32} 
+	
+	
+	enum OpCat
+	{
+		system, color, size, handle,
+		reserved4, reserved5, reserved6, reserved7,
+	} 
+	enum Opcode
+	{
+		//opcat: system
+		end = 0, 
+		
+		//opcat: system
+		setPC=0, setSC=1, setPCSC=2, setC=3/+broadcast single color+/,
+		
+		//opcat: size
+		setPS=0, setLW=1, setDS=2, setFH=3,
+		
+		
+	} 
 	
 	struct FontTexFlags
 	{
@@ -1793,6 +1821,184 @@ class VulkanWindow: Window
 		+/
 	+/
 	
+	/+
+		AI: /+
+			User: GLSL:
+			/+
+				Code: uint fetchHandle(uint format)
+				{
+					switch(format)
+					{
+						case 0: return fetchBits(12); // u12
+						case 1: return fetchBits(16); // u16
+						case 2: return fetchBits(24); // u24
+						case 3: return fetch_uint(); // u32
+						default: return 0; 
+					}
+				} 
+			+/
+			
+			DLang:
+			/+Code: enum HandleFormat {u12, u16, u24, u32} +/
+			
+			From glsl you can access enum ids like `HandleFormat_u12` constants.
+			
+			Please replace the integer caqse constants with them!
+		+/
+		/+
+			Assistant: Here's the updated GLSL code using the DLang enum constants:
+			
+			/+
+				Structured: /+
+					Code: uint fetchHandle(uint format)
+					{
+						switch(format)
+						{
+							case HandleFormat_u12: return fetchBits(12); // u12
+							case HandleFormat_u16: return fetchBits(16); // u16
+							case HandleFormat_u24: return fetchBits(24); // u24
+							case HandleFormat_u32: return fetch_uint(); // u32
+							default: return 0; 
+						}
+					} 
+				+/
+			+/
+			
+			/+Note: Usage(prompt_hit: 64, prompt_miss: 314, completion: 122, HUF: 0.08, price: 100%)+/
+		+/
+	+/
+	/+
+		AI: /+
+			User: /+
+				Code: float fetchSize(inout BitStream bitStream, uint format)
+				{
+					switch(format)
+					{
+						case 0: return fetch_float(bitStream); // f32
+						case 1: return exp2(float(int(fetchBits(bitStream, 12)) - 2048) / 256.0); // log12
+						case 2: return float(fetchBits(bitStream, 8) / 255.0); // u8
+						case 3: return float(fetchBits(bitStream, 4) / 15.0); // u4
+						default: return 1.0; 
+					}
+				} 
+			+/
+			
+			I have enum ID names here:
+			/+Code: enum SizeFormat {f32, log12, u8, u4} +/
+			
+			Please replace the case constants to to be like `SizeFormat_f32`, not an integer literal!
+		+/
+		/+
+			Assistant: Here's the updated code with enum names instead of integer literals:
+			
+			/+
+				Structured: /+
+					Code: float fetchSize(inout BitStream bitStream, uint format)
+					{
+						switch(format)
+						{
+							case SizeFormat.f32: return fetch_float(bitStream); // f32
+							case SizeFormat.log12: return exp2(float(int(fetchBits(bitStream, 12)) - 2048) / 256.0); // log12
+							case SizeFormat.u8: return float(fetchBits(bitStream, 8) / 255.0); // u8
+							case SizeFormat.u4: return float(fetchBits(bitStream, 4) / 15.0); // u4
+							default: return 1.0; 
+						}
+					} 
+				+/
+			+/
+			
+			/+Note: Usage(prompt_hit: 64, prompt_miss: 354, completion: 196, HUF: 0.11, price: 100%)+/
+		+/
+	+/
+	/+
+		AI: /+
+			User: Please estimate high low ranges and gradient step percentage for:
+			/+Code: exp2(float(fetchBits(bitStream, 12)) / 128.0)+/
+		+/
+		/+
+			Assistant: Let me analyze the expression and estimate the ranges:
+			
+			1. /+Highlighted: fetchBits(bitStream, 12)+/ extracts 12 bits:
+						/+Bullet: Minimum value: 0+/
+						/+Bullet: Maximum value: 2^12 - 1 = 4095+/
+			
+			2. /+Highlighted: float(fetchBits(...))+/ converts to floating point:
+						/+Bullet: Minimum: 0.0f+/
+						/+Bullet: Maximum: 4095.0f+/
+			
+			3. Division by 128.0:
+						/+Bullet: Minimum: 0.0f / 128.0 = 0.0f+/
+						/+Bullet: Maximum: 4095.0f / 128.0 ≈ 31.9921875f+/
+			
+			4. /+Highlighted: exp2()+/ (2^x) operation:
+						/+Bullet: Minimum: exp2(0.0f) = 1.0f+/
+						/+Bullet: Maximum: exp2(31.9921875f) ≈ 4.295e9 (very large number)+/
+			
+			Gradient step percentage analysis:
+				/+Bullet: The 12-bit input gives 4096 discrete steps+/
+				/+Bullet: The output range spans many orders of magnitude (1.0 to ~4.3e9)+/
+				/+Bullet: The gradient step percentage varies dramatically across the range:+/
+					/+Bullet: At low values (input near 0): ~0.7% change per step+/
+					/+Bullet: At mid-range (input ~2048): ~100% change per step+/
+					/+Bullet: At high values (input near 4095): extremely large percentage changes+/
+			
+			This creates an exponential encoding that provides:
+				/+Bullet: High precision at low values+/
+				/+Bullet: Very coarse steps at high values+/
+			
+			Would you like me to suggest alternative encodings or normalization approaches?
+			
+			/+Note: Usage(prompt_hit: 128, prompt_miss: 155, completion: 342, HUF: 0.15, price: 100%)+/
+		+/
+	+/
+	/+
+		AI: /+
+			User: Please estimate high low ranges and gradient step percentage for:
+			/+Code: exp2(float(fetchBits(bitStream, 8)) * 15.0+/
+		+/
+		/+
+			Assistant: To estimate the high/low ranges and gradient step percentage for the given expression:
+			
+			/+Structured: exp2(float(fetchBits(bitStream, 8)) * 15.0)+/
+			
+			/+H3: Analysis:+/
+			1. /+Bold: Input Range+/:
+						/+Bullet: /+Highlighted: fetchBits(bitStream, 8)+/ returns an 8-bit unsigned integer → range [0, 255]+/
+						/+Bullet: /+Highlighted: float()+/ conversion → [0.0f, 255.0f]+/
+			
+			2. /+Bold: Scaled Range+/:
+						/+Bullet: Multiplied by 15.0 → [0.0f, 3825.0f]+/
+			
+			3. /+Bold: Final Output Range+/:
+						/+Bullet: /+Highlighted: exp2(x)+/ applied → [exp2(0.0f), exp2(3825.0f)] ≈ [1.0f, Infinity]+/
+			
+			/+H3: Practical Considerations:+/
+				/+Bullet: For real-world use, you likely want to constrain this to finite values+/
+				/+Bullet: Maximum finite float32 value is ~3.4e38 (exp2(128.0) gives 3.4e38)+/
+			
+			/+H3: Suggested Ranges:+/
+			/+
+				Structured: /+ Recommended safe ranges +/
+				const float minValue = 1.0f; 		/+ exp2(0.0) +/
+				const float maxValue = 3.4e38f; 	/+ exp2(128.0) +/
+				
+				/+ Gradient step percentage suggestion +/
+				const float stepPercent = 0.1f; 	/+ 10% steps for smooth interpolation +/
+			+/
+			
+			/+H3: Modified Version with Clamping:+/
+			/+
+				Structured: /+ Safe version with clamping +/
+				exp2(clamp(float(fetchBits(bitStream, 8)) * (15.0 / 255.0 * 128.0), 0.0f, 128.0f))
+			+/
+			
+			This would give you:
+				/+Bullet: Input: [0,255] → Scaled to [0,128] → exp2 range [1.0, 3.4e38]+/
+			
+			/+Note: Usage(prompt_hit: 128, prompt_miss: 154, completion: 409, HUF: 0.18, price: 100%)+/
+		+/
+	+/
+	
 	/+Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`.+//+
 		Details: /+
 			Hidden: /+
@@ -2231,46 +2437,57 @@ class VulkanWindow: Window
 			float Ph = 0; 	/* Phase coordinate */
 			
 			/* Helper functions for fetching different data formats */
-			vec4 fetchColor(inout BitStream bitStream, uint format)
+			$(GEN_enumDefines!ColorFormat)
+			int fetchColor(inout BitStream bitStream, uint format, inout vec4 color)
 			{
-				switch(format)
+				//return code: 1: color changed, 2: alpha changed, 3: both
+				
+				//optimization strategy: extra math, but less divergence
+				if(format<=ColorFormat_a_u8 /*rgba_u8 .. a_u8*/)
 				{
-					case 0: return vec4(fetch_float(bitStream)); // a_u8 as float
-					case 1: return vec4(fetch_vec2(bitStream), 0, 1); // la_u8
-					case 2: return vec4(fetch_vec3(bitStream), 1); // rgb_u8
-					case 3: return fetch_vec4(bitStream); // rgba_u8
-					/*Bug: ezek 8 bitesek, nem floatosak!!!*/
-					
-					/*Bug: A formatokat NEV szerint kell csinalni, a szamokkal kovethetetlen!!!*/
-					
-					case 4: return vec4(fetch_bool(bitStream) ? 1.0 : 0.0); // u1
-					case 5: return vec4(float(fetchBits(bitStream, 2)) / 3.0); // u2
-					case 6: return vec4(float(fetchBits(bitStream, 4)) / 15.0); // u4
-					case 7: return vec4(float(fetchBits(bitStream, 8)) / 255.0); // u8
-					default: return vec4(0); 
+					const int bits = int((ColorFormat_a_u8 + 1 - format)*8); 
+					const vec4 tmp = unpackUnorm4x8(fetchBits(bitStream, bits)); 
+					switch(format)
+					{
+						case ColorFormat_rgba_u8: 	color = tmp; 	return 3; 
+						case ColorFormat_rgb_u8: 	color.rgb = tmp.xyz; 	return 1; 
+						case ColorFormat_la_u8: 	color.rgb = vec3(tmp.x); color.a = tmp.y; 	return 3; 
+						case ColorFormat_a_u8: 	color.a = tmp.x; 	return 2; 
+					}
 				}
+				else if(format<=ColorFormat_u8 /*u1 .. u8*/)
+				{
+					const int idx = int(format - ColorFormat_u1); //0..3
+					const int bits = 1<<idx; //1, 2, 4, 8
+					const float high = float((1<<bits) - 1); //1, 3, 15, 255
+					color.rgb = vec3(float(fetchBits(bitStream, bits)) / high); 
+					return 1; 
+				}
+				return 0; 
 			} 
 			
+			$(GEN_enumDefines!SizeFormat)
 			float fetchSize(inout BitStream bitStream, uint format)
 			{
 				switch(format)
 				{
-					case 0: return fetch_float(bitStream); // f32
-					case 1: return exp2(float(int(fetchBits(bitStream, 12)) - 2048) / 256.0); // log12
-					case 2: return float(fetchBits(bitStream, 8) / 255.0); // u8
-					case 3: return float(fetchBits(bitStream, 4) / 15.0); // u4
+					case SizeFormat_u4: 	return float(fetchBits(bitStream, 4) / 15.0); 
+					case SizeFormat_u8: 	return float(fetchBits(bitStream, 8) / 255.0); 
+					case SizeFormat_ulog12: 	return exp2(float(fetchBits(bitStream, 12)) / 128.0); 
+					case SizeFormat_f32: 	return fetch_float(bitStream); 
 					default: return 1.0; 
 				}
 			} 
 			
+			
+			$(GEN_enumDefines!HandleFormat)
 			uint fetchHandle(inout BitStream bitStream, uint format)
 			{
-				switch(format)
-				{
-					case 0: return fetchBits(bitStream, 12); // u12
-					case 1: return fetchBits(bitStream, 16); // u16
-					case 2: return fetchBits(bitStream, 24); // u24
-					case 3: return fetch_uint(bitStream); // u32
+				switch(format) {
+					case HandleFormat_u12: 	return fetchBits(bitStream, 12); 
+					case HandleFormat_u16: 	return fetchBits(bitStream, 16); 
+					case HandleFormat_u24: 	return fetchBits(bitStream, 24); 
+					case HandleFormat_u32: 	return fetch_uint(bitStream); 
 					default: return 0; 
 				}
 			} 
@@ -2287,6 +2504,9 @@ class VulkanWindow: Window
 				}
 			} 
 			
+			$(GEN_enumDefines!OpCat)
+			$(GEN_enumDefines!OpCode)
+			
 			void processRegisterCommand(inout BitStream bitStream, uint opcode)
 			{
 				/*
@@ -2295,28 +2515,43 @@ class VulkanWindow: Window
 					Format: opcode (4 bits) | format (4 bits) | data...
 				*/
 				
-				uint format = fetchBits(bitStream, 4); 
+				const uint opCat = fetchBits(bitStream, 3); 
+				switch(opCat)
+				{
+					case OpCat_system: 	{}	break; 
+					case OpCat_setColor: 	{}	break; 
+					case OpCat_setSize: 	{}	break; 
+					case OpCat_setHandle: 	{}	break; 
+					case OpCat_reserved4: 	{}	break; 
+					case OpCat_reserved5: 	{}	break; 
+					case OpCat_reserved6: 	{}	break; 
+					case OpCat_reserved7: 	{}	break; 
+				}
 				
+				
+				uint format = fetchBits(bitStream, 4); 
 				switch(opcode)
 				{
 					/* Color registers */
-					case 0x0: // setPC
-						PC = fetchColor(bitStream, format); 
+					case Opcode_setPC: //set promary color
+						fetchColor(bitStream, format, PC); 
 						break; 
 						
-					case 0x1: // setSC 
-						SC = fetchColor(bitStream, format); 
+					case Opcode_setSC: //set secondary color
+						fetchColor(bitStream, format, SC); 
 						break; 
 						
-					case 0x2: // setPCSC
-						PC = fetchColor(bitStream, format); 
-						SC = fetchColor(bitStream, format); 
+					case Opcode_setPCSC: //set both color regs
+						fetchColor(bitStream, format, PC); 
+						fetchColor(bitStream, format, SC); 
 						break; 
 						
-					case 0x3: // setC (broadcast to both)
-						vec4 color = fetchColor(bitStream, format); 
-						PC = color; 
-						SC = color; 
+					case Opcode_setC: //broadcast to both color regis
+						{
+						const int chg = fetchColor(bitStream, format, PC); 
+						if((chg&1)!=0) SC.rgb = PC.rgb; 
+						if((chg&2)!=0) SC.a = PC.a; 
+					}
 						break; 
 					
 					/* Size registers */
