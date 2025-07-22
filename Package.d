@@ -2044,6 +2044,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : []; 
 	
+	enum EnumBits(T) = float(T.max+1).log2.iceil; 
 	
 	alias toAlias(alias T) = T; //Todo: Alias!T alreadyb exists
 	

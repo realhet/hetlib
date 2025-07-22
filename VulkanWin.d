@@ -204,44 +204,586 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum SizeFormat {u4, u8, ulog12/+4G range+/, f32} 
 	enum ColorFormat {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
 	enum HandleFormat {u12, u16, u24, u32} 
+	enum CoordFormat {f32, i16, i12, i8} 
 	
-	
-	enum OpCat
+	enum FlagFormat
 	{
-		system, color, size, handle,
-		reserved4, reserved5, reserved6, reserved7,
+		tex, 	//texture flags
+		font, 	//font flags
+		vec, 	//vector flags
+		all
 	} 
-	enum Opcode
-	{
-		//opcat: system
-		end = 0, 
-		
-		//opcat: color
-		setPC=0, setSC, setPCSC, setC/+broadcast single color+/,
-		
-		//opcat: size
-		setPS=0, setLW, setDS, setFH,
-		
-		//opcat: handle
-		setFontMap=0, setLatinFontMap, setPalette, setLineTex,
-		
-		
-	} 
+	
 	
-	struct FontTexFlags
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	/+
+		AI: /+
+			User: /+
+				Code: q{
+					[0]; //settings
+						[00]; //system
+							[00] end; 	//5 zeroed at end of VBO
+							[01] setPh; 	//phase (position along line)
+							[10] setTF; 	//font flags
+							[11] setFF; 	//texture flags
+						[01]; //colors: op ColorFormat, data
+							[00] setPC; 	//primary color
+							[01] setSC; 	//secondary color
+							[10] setPCSP; 	//load two colors
+							[11] setC; 	//broadcast one color
+						[10]; //sizes: op SizeFormat data
+							[00] setPS; 	//pixel size
+							[01] setLW; 	//line width
+							[10] setDL; 	//dot length
+							[11] setFH; 	//font height
+						[11]; //handles: op HandleFormat data
+							[00] setFMH; 	//FontMap
+							[01] setLFMH; 	//LatinFontMap
+							[10] setPALH; 	//Palette
+							[11] setLTH; 	//LineTexture
+					
+					[1]; //drawing
+						[00]; //SVG linear
+							[00] drawM xy; 	//move
+							[01] drawL xy; 	//line
+							[10] drawH x; 	//horizontal line
+							[11] drawV y; 	//vertical line
+						[01]; //SVG curves
+							[00] drawQ xy xy; 	//quadratic bezier
+							[01] drawT xy; 	//smooth quadratic bezier
+							[10] drawC xy xy xy; 	//cubic bezier
+							[11] drawS xy xy; 	//smooth cubic bezier
+						[10]; //SVG arc, images, text
+							[00] drawA rx ry rot, b, b, p; 	//elliptical arc
+							[01] drawTEX size, handle; 	//Draws a texture
+							[10] drawTYPE string; 	//cubic bezier
+							[11] drawRECT; 
+						[11]; 
+							[00] drawCHART; 	//graphs, rulers, grids
+							[01] drawMESH; 	//all 3D stuff -> maybe a specialized mode
+							[10]; 
+							[11]; 
+				}
+			+/
+			
+			Generate a nested case switch structure from this:
+			This is a hierarchical representation of an instruction set.
+			Every node has a few number of bits associated them, for example [0] means 1 bit and it must be a 0. [10] means 2 bits and has a decimal value of 2.
+			The tab characters in front of the lines represent the nesting level.
+			Sometimes there are lines without [ ] and ; characters, just ignore those.
+			You can fetch 1 bit by using fetchBool(GS) and do an if/else based on that. In an if else block, please start with the false value first, keep the order same as in the input.
+			You can fetch 2 bits by using fetchBits(GS, 2) and doing a case switch on that.
+			You can extract the commands by the first identifiers, example end, setPh, drawM. Call thos by GLSL syntax: end();  
+			Please preserve the comments you find in the input, also preserve the optional parameters and do dense code by putting the instruction calling and the case break and the comment on the same line.
+			Put the { on a new line. Use /* or // comments only, this is GLSL!
+		+/
+		/+
+			Assistant: Here's the generated nested case switch structure:
+			
+			/+Processes the instruction stream based on the hierarchical encoding +/ 
+			/+
+				Code: void processInstructions(ref GraphicsState GS) 
+				{
+					if(
+						!fetchBool(GS)// [0] settings 
+					)
+					{
+						switch(
+							fetchBits(GS, 2)// [00] system, [01] colors, [10] sizes, [11] handles 
+						)
+						{
+							case 0: // [00] system 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: end(); break; 		// [00] end - 5 zeroed at end of VBO 
+								case 1: setPh(); break; 	// [01] setPh - phase (position along line) 
+								case 2: setTF(); break; 	// [10] setTF - font flags 
+								case 3: setFF(); break; 	// [11] setFF - texture flags 
+							}
+								break; 
+								
+							case 1: // [01] colors 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setPC(); break; 	// [00] setPC - primary color 
+								case 1: setSC(); break; 	// [01] setSC - secondary color 
+								case 2: setPCSP(); break; 	// [10] setPCSP - load two colors 
+								case 3: setC(); break; 		// [11] setC - broadcast one color 
+							}
+								break; 
+								
+							case 2: // [10] sizes 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setPS(); break; 	// [00] setPS - pixel size 
+								case 1: setLW(); break; 	// [01] setLW - line width 
+								case 2: setDL(); break; 	// [10] setDL - dot length 
+								case 3: setFH(); break; 	// [11] setFH - font height 
+							}
+								break; 
+								
+							case 3: // [11] handles 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setFMH(); break; 	// [00] setFMH - FontMap 
+								case 1: setLFMH(); break; 	// [01] setLFMH - LatinFontMap 
+								case 2: setPALH(); break; 	// [10] setPALH - Palette 
+								case 3: setLTH(); break; 	// [11] setLTH - LineTexture 
+							}
+								break; 
+						}
+					}
+					else
+					{
+						switch(
+							fetchBits(GS, 2)// [00] SVG linear, [01] SVG curves, [10] SVG arc/images/text,
+						)
+						{
+							case 0: // [00] SVG linear 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawM(xy); break; 	// [00] drawM - move 
+								case 1: drawL(xy); break; 	// [01] drawL - line 
+								case 2: drawH(x); break; 	// [10] drawH - horizontal line 
+								case 3: drawV(y); break; 	// [11] drawV - vertical line 
+							}
+								break; 
+								
+							case 1: // [01] SVG curves 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawQ(xy, xy); break; 	// [00] drawQ - quadratic bezier 
+								case 1: drawT(xy); break; 	// [01] drawT - smooth quadratic bezier 
+								case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier 
+								case 3: drawS(xy, xy); break; 	// [11] drawS - smooth cubic bezier 
+							}
+								break; 
+								
+							case 2: // [10] SVG arc, images, text 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawA(rx, ry, rot, b, b, p); break; // [00] drawA - elliptical arc 
+								case 1: drawTEX(size, handle); break; 	// [01] drawTEX - Draws a texture 
+								case 2: drawTYPE(string); break; 	// [10] drawTYPE - cubic bezier 
+								case 3: drawRECT(); break; 		// [11] drawRECT 
+							}
+								break; 
+								
+							case 3: // [11] 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawCHART(); break; 	// [00] drawCHART - graphs, rulers, grids 
+								case 1: drawMESH(); break; 	// [01] drawMESH - all 3D stuff 
+								case 2: break; 			// [10] 
+								case 3: break; 			// [11] 
+							}
+								break; 
+						}
+					}
+				} 
+			+/
+			/+Note: Usage(prompt_hit: 960, prompt_miss: 1063, completion: 1175, HUF: 0.53, price: 100%)+/
+		+/
+	+/
+	
+	/+
+		AI: /+
+			User: /+
+				Code: void processInstructions(ref GraphicsState GS) 
+				{
+					if(
+						!fetchBool(GS)// [0] settings 
+					)
+					{
+						switch(
+							fetchBits(GS, 2)// [00] system, [01] colors, [10] sizes, [11] handles 
+						)
+						{
+							case 0: // [00] system 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: end(); break; 		// [00] end - 5 zeroed at end of VBO 
+								case 1: setPh(); break; 	// [01] setPh - phase (position along line) 
+								case 2: setTF(); break; 	// [10] setTF - font flags 
+								case 3: setFF(); break; 	// [11] setFF - texture flags 
+							}
+								break; 
+								
+							case 1: // [01] colors 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setPC(); break; 	// [00] setPC - primary color 
+								case 1: setSC(); break; 	// [01] setSC - secondary color 
+								case 2: setPCSP(); break; 	// [10] setPCSP - load two colors 
+								case 3: setC(); break; 		// [11] setC - broadcast one color 
+							}
+								break; 
+								
+							case 2: // [10] sizes 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setPS(); break; 	// [00] setPS - pixel size 
+								case 1: setLW(); break; 	// [01] setLW - line width 
+								case 2: setDL(); break; 	// [10] setDL - dot length 
+								case 3: setFH(); break; 	// [11] setFH - font height 
+							}
+								break; 
+								
+							case 3: // [11] handles 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setFMH(); break; 	// [00] setFMH - FontMap 
+								case 1: setLFMH(); break; 	// [01] setLFMH - LatinFontMap 
+								case 2: setPALH(); break; 	// [10] setPALH - Palette 
+								case 3: setLTH(); break; 	// [11] setLTH - LineTexture 
+							}
+								break; 
+						}
+					}
+					else
+					{
+						switch(
+							fetchBits(GS, 2)// [00] SVG linear, [01] SVG curves, [10] SVG arc/images/text,
+						)
+						{
+							case 0: // [00] SVG linear 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawM(xy); break; 	// [00] drawM - move 
+								case 1: drawL(xy); break; 	// [01] drawL - line 
+								case 2: drawH(x); break; 	// [10] drawH - horizontal line 
+								case 3: drawV(y); break; 	// [11] drawV - vertical line 
+							}
+								break; 
+								
+							case 1: // [01] SVG curves 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawQ(xy, xy); break; 	// [00] drawQ - quadratic bezier 
+								case 1: drawT(xy); break; 	// [01] drawT - smooth quadratic bezier 
+								case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier 
+								case 3: drawS(xy, xy); break; 	// [11] drawS - smooth cubic bezier 
+							}
+								break; 
+								
+							case 2: // [10] SVG arc, images, text 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawA(rx, ry, rot, b, b, p); break; // [00] drawA - elliptical arc 
+								case 1: drawTEX(size, handle); break; 	// [01] drawTEX - Draws a texture 
+								case 2: drawTYPE(string); break; 	// [10] drawTYPE - cubic bezier 
+								case 3: drawRECT(); break; 		// [11] drawRECT 
+							}
+								break; 
+								
+							case 3: // [11] 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawCHART(); break; 	// [00] drawCHART - graphs, rulers, grids 
+								case 1: drawMESH(); break; 	// [01] drawMESH - all 3D stuff 
+								case 2: break; 			// [10] 
+								case 3: break; 			// [11] 
+							}
+								break; 
+						}
+					}
+				} 
+			+/
+			
+			Remove meaningless redundant comments and put parameters into comments!
+			Example:
+			`case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier`
+			->
+			`case 2: drawC(/*xy, xy, xy)*/); break; // cubic bezier`
+		+/
+		/+
+			Assistant: Here's the cleaned up version of your code with improved comments and parameter documentation:
+			
+			/+
+				Structured: void processInstructions(ref GraphicsState GS) 
+				{
+					if(
+						!fetchBool(GS)// settings
+					)
+					{
+						switch(fetchBits(GS, 2))
+						{
+							case 0: // system
+								switch(fetchBits(GS, 2))
+							{
+								case 0: end(); break; 		// end - 5 zeroed at end of VBO
+								case 1: setPh(); break; 		// set phase (position along line)
+								case 2: setTF(); break; 		// set font flags
+								case 3: setFF(); break; 		// set texture flags
+							}
+								break; 
+								
+							case 1: // colors
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setPC(); break; 		// set primary color
+								case 1: setSC(); break; 		// set secondary color
+								case 2: setPCSP(); break; 	// load two colors
+								case 3: setC(); break; 		// broadcast one color
+							}
+								break; 
+								
+							case 2: // sizes
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setPS(); break; 		// set pixel size
+								case 1: setLW(); break; 		// set line width
+								case 2: setDL(); break; 		// set dot length
+								case 3: setFH(); break; 		// set font height
+							}
+								break; 
+								
+							case 3: // handles
+								switch(fetchBits(GS, 2))
+							{
+								case 0: setFMH(); break; 	// set FontMap handle
+								case 1: setLFMH(); break; 	// set LatinFontMap handle
+								case 2: setPALH(); break; 	// set Palette handle
+								case 3: setLTH(); break; 	// set LineTexture handle
+							}
+								break; 
+						}
+					}
+					else
+					{
+						switch(fetchBits(GS, 2))
+						{
+							case 0: // SVG linear
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawM(/*xy*/); break; 	// move
+								case 1: drawL(/*xy*/); break; 	// line
+								case 2: drawH(/*x*/); break; 	// horizontal line
+								case 3: drawV(/*y*/); break; 	// vertical line
+							}
+								break; 
+								
+							case 1: // SVG curves
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawQ(/*xy, xy*/); break; 	// quadratic bezier
+								case 1: drawT(/*xy*/); break; 	// smooth quadratic bezier
+								case 2: drawC(/*xy, xy, xy*/); break; // cubic bezier
+								case 3: drawS(/*xy, xy*/); break; 	// smooth cubic bezier
+							}
+								break; 
+								
+							case 2: // SVG arc, images, text
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawA(/*rx, ry, rot, b, b, p*/); break; // elliptical arc
+								case 1: drawTEX(/*size, handle*/); break; 	// draw texture
+								case 2: drawTYPE(/*string*/); break; 	// draw text
+								case 3: drawRECT(); break; 		// draw rectangle
+							}
+								break; 
+								
+							case 3: 
+								switch(fetchBits(GS, 2))
+							{
+								case 0: drawCHART(); break; 	// draw graphs/rulers/grids
+								case 1: drawMESH(); break; 	// draw 3D objects
+								case 2: break; 
+								case 3: break; 
+							}
+								break; 
+						}
+					}
+				} 
+			+/
+			
+			/+Note: Usage(prompt_hit: 64, prompt_miss: 1571, completion: 926, HUF: 0.54, price: 100%)+/
+		+/
+	+/
+	
+	
+	//GSP Instruction encoding
+	mixin 入 !((
+		q{
+			[0]; //settings
+				[00]; //system
+					[00] end; 	//5 zeroed at end of VBO
+					[01] setPh; 	//phase (position along line)
+					[10] setTF; 	//font flags
+					[11] setFF; 	//texture flags
+				[01]; //colors: op ColorFormat, data
+					[00] setPC; 	//primary color
+					[01] setSC; 	//secondary color
+					[10] setPCSP; 	//load two colors
+					[11] setC; 	//broadcast one color
+				[10]; //sizes: op SizeFormat data
+					[00] setPS; 	//pixel size
+					[01] setLW; 	//line width
+					[10] setDL; 	//dot length
+					[11] setFH; 	//font height
+				[11]; //handles: op HandleFormat data
+					[00] setFMH; 	//FontMap
+					[01] setLFMH; 	//LatinFontMap
+					[10] setPALH; 	//Palette
+					[11] setLTH; 	//LineTexture
+			
+			[1]; //drawing
+				[00]; //SVG linear
+					[00] drawM xy; 	//move
+					[01] drawL xy; 	//line
+					[10] drawH x; 	//horizontal line
+					[11] drawV y; 	//vertical line
+				[01]; //SVG curves
+					[00] drawQ xy xy; 	//quadratic bezier
+					[01] drawT xy; 	//smooth quadratic bezier
+					[10] drawC xy xy xy; 	//cubic bezier
+					[11] drawS xy xy; 	//smooth cubic bezier
+				[10]; //SVG arc, images, text
+					[00] drawA rx ry rot, b, b, p; 	//elliptical arc
+					[01] drawTEX size, handle; 	//Draws a texture
+					[10] drawTYPE string; 	//cubic bezier
+					[11] drawRECT; 
+				[11]; 
+					[00] drawCHART; 	//graphs, rulers, grids
+					[01] drawMESH; 	//all 3D stuff -> maybe a specialized mode
+					[10]; 
+					[11]; 
+		}
+	),q{
+		mixin(
+			((){
+				string[] levels; 
+				return iq{
+					enum OpCode
+					{
+						$(
+							_data.splitLines
+							.map!((line){
+								const level = line.countUntil!"a!=9"; if(level<0) return ""; line = line[level..$]; 
+								if(!line.skipOver('[')) return ""; 
+								const bitCnt = line.countUntil!q{!a.among('0', '1')}; if(bitCnt<=0) return ""; 
+								const bits = line[0..bitCnt]; line = line[bitCnt..$]; 
+								if(!line.skipOver(']')) return ""; line.skipOver(' '); 
+								levels.length = max(levels.length, level+1); levels[level] = bits; 
+								const idLen = line.countUntil!(not!isDLangIdentifierCont); if(idLen<=0) return ""; 
+								const id = line[0..idLen]; if(id=="") return ""; 
+								return "\t" ~ id ~ "\t = 0b_" ~ levels[0..level+1].retro.join('_') ~ ",\n"; 
+							})
+							.join
+						)
+					} 
+				}.text; 
+			})()
+		); 
+	}); 
+	
+	static foreach(op; EnumMembers!OpCode)
+	pragma(msg, op.stringof, op.text, op.to!int); 
+	
+	
+	/+
+		
+		/+
+			Code: [0] settings; 
+				[00] system; 
+					[00] end; 	//5 zeroed at end of VBO
+					[01] setPh; 	//phase (position along line)
+					[10] setTF; 	//font flags
+					[11] setFF; 	//texture flags
+				[01] colors; //op ColorFormat, data
+					[00] setPC; 	//primary color
+					[01] setSC; 	//secondary color
+					[10] setPCSP; 	//load two colors
+					[11] setC; 	//broadcast one color
+				[10] sizes; //op SizeFormat data
+					[00] setPS; 	//pixel size
+					[01] setLW; 	//line width
+					[10] setDL; 	//dot length
+					[11] setFH; 	//font height
+				[11] handles; //op HandleFormat data
+					[00] setFMH; 	//FontMap
+					[01] setLFMH; 	//LatinFontMap
+					[10] setPALH; 	//Palette
+					[11] setLTH; 	//LineTexture
+			
+			[1] drawing; 
+				[00] SVG linear; 
+					[00] M xy; 	//move
+					[01] L xy; 	//line
+					[10] H x; 	//horizontal line
+					[11] V y; 	//vertical line
+				[01] SVG curves; 
+					[00] Q xy xy; 	//quadratic bezier
+					[01] T xy; 	//smooth quadratic bezier
+					[10] C xy xy xy; 	//cubic bezier
+					[11] S xy xy; 	//smooth cubic bezier
+				[10] SVG arc, images, text; 
+					[00] A rx ry rot, b, b, p; 	//elliptical arc
+					[01] TEX size, handle; 	//Draws a texture
+					[10] TYPE string; 	//cubic bezier
+					[11] RECT; 
+				[11]; 
+					[00] CHART; 	//graphs, rulers, grids
+					[01] MESH; 	//all 3D stuff -> maybe a specialized mode
+					[10]; 
+					[11]; 
+		+/
+	+/
+	
+	
+	struct GSPFlags
 	{
 		/+This is a combination of FontFlags and TexFlags+/
 		
 		mixin((
 			(表([
 				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{//0: texture flags
+				}],
 				[q{TexXAlign},q{2},q{"texXAlign"},q{},q{/++/}],
 				[q{TexSizeSpec},q{2},q{"texXSize"},q{},q{/++/}],
 				[q{TexYAlign},q{2},q{"texYAlign"},q{},q{/++/}],
 				[q{TexSizeSpec},q{2},q{"texYSize"},q{},q{/++/}],
 				[q{TexAspect},q{2},q{"texAspect"},q{},q{/++/}],
 				[q{TexOrientation},q{3},q{"texOrientation"},q{},q{/++/}],
-				[],
+				[q{//13 bits
+				}],
+				[],
+				[q{//font flags
+				}],
 				[q{FontType},q{2},q{"fontType"},q{},q{/++/}],
 				[q{bool},q{1},q{"fontBold"},q{},q{/++/}],
 				[q{bool},q{1},q{"fontItalic"},q{},q{/++/}],
@@ -250,6 +792,11 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{FontWidth},q{2},q{"fontWidth"},q{},q{/++/}],
 				[q{FontScript},q{2},q{"fontScript"},q{},q{/++/}],
 				[q{FontBlink},q{2},q{"fontBlink"},q{},q{/++/}],
+				[],
+				[q{//vector flags
+				}],
+				[q{CoordFormat},q{2},q{"vecFormat"},q{},q{/++/}],
+				[q{bool},q{1},q{"vecRelative"},q{},q{/++/}],
 			]))
 		).調!(GEN_bitfields)); 
 		
@@ -273,20 +820,30 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				+/
 			+/
 			q{
-				uint texXAlign() { return getBits(fontTexFlags, 0, 2); } 
-				uint texXSize() { return getBits(fontTexFlags, 2, 2); } 
-				uint texYAlign() { return getBits(fontTexFlags, 4, 2); } 
-				uint texYSize() { return getBits(fontTexFlags, 6, 2); } 
-				uint texAspect() { return getBits(fontTexFlags, 8, 2); } 
-				uint texOrientation() { return getBits(fontTexFlags, 10, 3); } 
-				uint fontType() { return getBits(fontTexFlags, 13, 2); } 
-				bool fontBold() { return getBit(fontTexFlags, 15); } 
-				bool fontItalic() { return getBit(fontTexFlags, 16); } 
-				bool fontMonospace() { return getBit(fontTexFlags, 17); } 
-				uint fontLine() { return getBits(fontTexFlags, 18, 2); } 
-				uint fontWidth() { return getBits(fontTexFlags, 20, 2); } 
-				uint fontScript() { return getBits(fontTexFlags, 22, 2); } 
-				uint fontBlink() { return getBits(fontTexFlags, 24, 2); } 
+				uint texXAlign() { return getBits(FL, 0, 2); } 
+				uint texXSize() { return getBits(FL, 2, 2); } 
+				uint texYAlign() { return getBits(FL, 4, 2); } 
+				uint texYSize() { return getBits(FL, 6, 2); } 
+				uint texAspect() { return getBits(FL, 8, 2); } 
+				uint texOrientation() { return getBits(FL, 10, 3); } 
+				
+				uint fontType() { return getBits(FL, 13, 2); } 
+				bool fontBold() { return getBit(FL, 15); } 
+				bool fontItalic() { return getBit(FL, 16); } 
+				bool fontMonospace() { return getBit(FL, 17); } 
+				uint fontLine() { return getBits(FL, 18, 2); } 
+				uint fontWidth() { return getBits(FL, 20, 2); } 
+				uint fontScript() { return getBits(FL, 22, 2); } 
+				uint fontBlink() { return getBits(FL, 24, 2); } 
+				
+				uint vecFormat() { return getBits(FL, 26, 2); } 
+				bool vecRelative() { return getBit(FL, 28); } 
+			}
+			~
+			q{
+				const int 	FL_texBits = 13,
+					FL_fontBits = 13,
+					FL_vecBits = 3; 
 			}; 
 		} 
 	} 
@@ -313,7 +870,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 					[q{
 						pointSize 	= 1,
 						lineWidth 	= 1,
-						dashSize 	= 1,
+						dotLength 	= 1,
 						fontHeight 	= 18
 						
 					},q{
@@ -324,7 +881,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 					},q{float},q{SizeFormat},q{
 						setPS 	SizeFormat, val
 						setLW 	SizeFormat, val
-						setDS 	SizeFormat, val /+scaling factor for LineTex[Ph]+/
+						setDL 	SizeFormat, val /+scaling factor for LineTex[Ph]+/
 						setFH 	SizeFormat, val
 					}],
 					[q{
@@ -2314,6 +2871,7 @@ class VulkanWindow: Window
 			
 			#define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
 			#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
+			#define setBits(val, ofs, len, data) (val = bitfieldInsert(val, data, ofs, len))
 			
 			#define ErrorColor vec4(1, 0, 1, 1)
 			#define LoadingColor vec4(1, 0, 1, 1)
@@ -2432,7 +2990,8 @@ class VulkanWindow: Window
 				return result; 
 			} 
 			
-			
+			int fetch_int(inout BitStream bitStream, int numBits)
+			{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
 			
 			bool fetch_bool(inout BitStream bitStream)
 			{
@@ -2491,16 +3050,15 @@ class VulkanWindow: Window
 			
 			$(GEN_enumDefines!VertexCmd)
 			
-			uint fontTexFlags = 0; 
-			$(FontTexFlags.GLSLCode)
-			
 			/*Vector graphics state registers*/
+			uint FL = 0; 	//flags
+			uint reserved = 0; 	
 			vec4 PC = vec4(0, 0, 0, 1); 	/* Primary color - default black */
 			vec4 SC = vec4(1, 1, 1, 1); 	/* Secondary color - default white */
 				
 			float PS = 1; 	/* Point size */
 			float LW = 1; 	/* Line width */
-			float DS = 1; 	/* Dash size scaling factor */
+			float DL = 1; 	/* Dot lenthg */
 			float FH = 18; 	/* Font height */
 				
 			uint FMH = 0; 	/* Font map handle */
@@ -2510,6 +3068,8 @@ class VulkanWindow: Window
 				
 			vec3 P = vec3(0); 	/* Position */
 			float Ph = 0; 	/* Phase coordinate */
+			
+			$(GSPFlags.GLSLCode)
 			
 			/* Helper functions for fetching different data formats */
 			$(GEN_enumDefines!ColorFormat)
@@ -2567,121 +3127,150 @@ class VulkanWindow: Window
 				}
 			} 
 			
-			vec3 fetchCoord(inout BitStream bitStream, uint format)
+			$(GEN_enumDefines!CoordFormat)
+			float fetchCoord(inout BitStream bitStream, uint format)
 			{
+				int bits=0; 
 				switch(format)
 				{
-					case 0: return fetch_vec3(bitStream); // full precision
-					case 1: return vec3(fetch_vec2(bitStream), 0); // 2D coords
-					case 2: return vec3(float(fetchBits(bitStream, 16)) / 65535.0); // normalized u16
-					case 3: return vec3(float(fetchBits(bitStream, 8)) / 255.0); // normalized u8
-					default: return vec3(0); 
+					case CoordFormat_f32: 	return fetch_float(bitStream); 
+					case CoordFormat_i16: 	bits = 16; 	break; 
+					case CoordFormat_i12: 	bits = 12; 	break; 
+					case CoordFormat_i8: 	bits = 8; 	break; 
 				}
-			} 
-			
-			$(GEN_enumDefines!OpCat)
-			$(GEN_enumDefines!OpCode)
-			
-			void processRegisterCommand(inout BitStream bitStream, uint opcode)
+				if(bits>0) return float(fetch_int(bitStream, bits)); 
+				return 0; 
+			} 
+			$(GEN_enumDefines!FlagFormat)
+			void setFlags(inout BitStream bitStream)
 			{
-				/*
-					Register setter opcodes 
-					Uses 4-bit opcodes (0x0-0xF)
-					Format: opcode (4 bits) | format (4 bits) | data...
-				*/
-				
-				const uint opCat = fetchBits(bitStream, 3); 
-				switch(opCat)
+				const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); int ofs=0, cnt=0; 
+				switch(fmt)
 				{
-					case OpCat_system: 	{}	break; 
-					case OpCat_setColor: 	{}	break; 
-					case OpCat_setSize: 	{}	break; 
-					case OpCat_setHandle: 	{}	break; 
-					case OpCat_reserved4: 	{}	break; 
-					case OpCat_reserved5: 	{}	break; 
-					case OpCat_reserved6: 	{}	break; 
-					case OpCat_reserved7: 	{}	break; 
+					case FlagFormat_tex: 	ofs = 0; cnt = FL_texBits; 	break; 
+					case FlagFormat_font: 	ofs = FL_texBits; cnt = FL_fontBits; 	break; 
+					case FlagFormat_vec: 	ofs = FL_texBits+FL_fontBits; cnt = FL_vecBits; 	break; 
+					case FlagFormat_all: 	ofs = 0; cnt = FL_texBits+FL_fontBits+FL_vecBits; 	break; 
 				}
+				if(cnt>0) setBits(FL, ofs, cnt, fetchBits(bitStream, cnt)); 
+			} 
+			
+			void processInstruction(inout BitStream bitStream) 
+			{
+				const uint opcode = 
+				fetchBits(bitStream, 5); const bool mainCat = 
+				getBit(opcode, 0); const uint subCat = 
+				getBits(opcode, 1, 2); const uint cmd = 
+				getBits(opcode, 3, 2); 
 				
-				
-				uint format = fetchBits(bitStream, 4); 
-				switch(opcode)
+				if(
+					!mainCat //settings
+				)
 				{
-					/* Color registers */
-					case Opcode_setPC: //set promary color
-						fetchColor(bitStream, format, PC); 
-						break; 
-						
-					case Opcode_setSC: //set secondary color
-						fetchColor(bitStream, format, SC); 
-						break; 
-						
-					case Opcode_setPCSC: //set both color regs
-						fetchColor(bitStream, format, PC); 
-						fetchColor(bitStream, format, SC); 
-						break; 
-						
-					case Opcode_setC: //broadcast to both color regis
+					switch(subCat)
+					{
+						case 0: //system
+							switch(cmd)
 						{
-						const int chg = fetchColor(bitStream, format, PC); 
-						if((chg&1)!=0) SC.rgb = PC.rgb; 
-						if((chg&2)!=0) SC.a = PC.a; 
+							case 0: 	/*end(); */	/*end - 5 zeroed at end of VBO*/	break; 
+							case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
+							case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
+							case 3: 			break; 
+						}
+						break; 
+						case 1: //colors
+							{
+							const uint fmt = fetchBits(bitStream, $(EnumBits!ColorFormat)); 
+							int copyFlags = 0; /*bit0: RGB changed, bit1: Alpha changed*/
+							if(cmd!=1) copyFlags = fetchColor(bitStream, fmt, PC); 
+							if(cmd==1 || cmd==2) fetchColor(bitStream, fmt, SC); 
+							else if(cmd==3) {
+								if((copyFlags & 1)!=0) SC.rgb = PC.rgb; 
+								if((copyFlags & 2)!=0) SC.a = PC.a; 
+							}
+						}
+						break; 
+						case 2: //sizes
+							{
+							const uint fmt = fetchBits(bitStream, $(EnumBits!SizeFormat)); 
+							const float size = fetchSize(bitStream, fmt); 
+							switch(cmd)
+							{
+								case 0: 	PS = size; 	/* set pixel size*/	break; 
+								case 1: 	LW = size; 	/* set line width*/	break; 
+								case 2: 	DL = size; 	/* set dot length*/	break; 
+								case 3: 	FH = size; 	/* set font height*/	break; 
+							}
+						}
+						break; 
+						case 3: //handles
+							{
+							const uint fmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
+							const uint handle = fetchHandle(bitStream, fmt); 
+							switch(cmd)
+							{
+								case 0: 	FMH = handle; 	/* set FontMap handle*/	break; 
+								case 1: 	LFMH = handle; 	/* set LatinFontMap handle*/	break; 
+								case 2: 	PALH = handle; 	/* set Palette handle*/	break; 
+								case 3: 	LTH = handle; 	/* set LineTexture handle*/	break; 
+							}
+						}
+						break; 
 					}
-						break; 
-					
-					/* Size registers */
-					case 0x4: // setPS
-						PS = fetchSize(bitStream, format); 
-						break; 
-						
-					case 0x5: // setLW
-						LW = fetchSize(bitStream, format); 
-						break; 
-						
-					case 0x6: // setDS
-						DS = fetchSize(bitStream, format); 
-						break; 
-						
-					case 0x7: // setFH
-						FH = fetchSize(bitStream, format); 
-						break; 
-					
-					/* Handle registers */
-					case 0x8: // setFontMap
+				}else {
+					switch(subCat)
+					{
+						case 0: //SVG linear
+							switch(cmd)
 						{
-						uint handle = fetchHandle(bitStream, format); 
-						uint fontType = fetchBits(bitStream, 2); 
-						FMH = handle; 
-						// Additional font type processing if needed
+							/*
+								x	update x coord
+								y 	update y coord
+								z 	update z coord
+								xy	update x and y coords
+								xyz	update x, y and z coords
+								x1 	update x coord, move y by relative 1
+								tf 	turn, then move forward
+								tft 	half turn, move forward, another half turn
+							*/
+							
+							case 0: 	/*drawM(); */	/*move (xy)*/	break; 
+							case 1: 	/*drawL(); */	/*line (xy)*/	break; 
+							case 2: 	/*drawH(); */	/*horizontal line (x)*/	break; 
+							case 3: 	/*drawV(); */	/*vertical line (y)*/	break; 
+						}
+						break; 
+						case 1: //SVG curves
+							switch(cmd)
+						{
+							case 0: 	/*drawQ(); */	/*quadratic bezier (xy, xy)*/	break; 
+							case 1: 	/*drawT(); */	/*smooth quadratic bezier (xy)*/	break; 
+							case 2: 	/*drawC(); */	/*cubic bezier (xy, xy, xy)*/	break; 
+							case 3: 	/*drawS(); */	/*smooth cubic bezier (xy, xy)*/	break; 
+						}
+						break; 
+						case 2: //SVG arc, images, text
+							switch(cmd)
+						{
+							case 0: 	/*drawA(); */	/*elliptical arc (rx, ry, rot, b, b, p)*/	break; 
+							case 1: 	/*drawTEX(); */	/*draw texture (size, handle)*/	break; 
+							case 2: 	/*drawTYPE(); */	/*draw text (string)*/	break; 
+							case 3: 	/*drawRECT(); */	/*draw rectangle*/	break; 
+						}
+						break; 
+						case 3: 
+							switch(cmd)
+						{
+							case 0: 	/*drawCHART(); */	/*draw graphs/rulers/grids*/	break; 
+							case 1: 	/*drawMESH(); */	/*draw 3D objects*/	break; 
+							case 2: 			break; 
+							case 3: 			break; 
+						}
+						break; 
 					}
-						break; 
-						
-					case 0x9: // setLatinFontMap
-						LFMH = fetchHandle(bitStream, format); 
-						break; 
-						
-					case 0xA: // setPalette
-						PALH = fetchHandle(bitStream, format); 
-						break; 
-						
-					case 0xB: // setLineTex
-						LTH = fetchHandle(bitStream, format); 
-						break; 
-					
-					/* Vector state */
-					case 0xC: // setPosition
-						P = fetchCoord(bitStream, format); 
-						break; 
-						
-					case 0xD: // setPhase
-						Ph = fetchCoord(bitStream, format).x; 
-						break; 
-						
-					default: 
-						/* Unknown opcode - handle error */
-						break; 
 				}
 			} 
+			
 			
 			void main() /*geometry shader*/
 			{
