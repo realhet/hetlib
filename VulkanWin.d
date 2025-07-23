@@ -215,91 +215,9 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	} 
 	
 	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	/+
-		AI: /+
-			User: /+
-				Code: q{
-					[0]; //settings
-						[00]; //system
-							[00] end; 	//5 zeroed at end of VBO
-							[01] setPh; 	//phase (position along line)
-							[10] setTF; 	//font flags
-							[11] setFF; 	//texture flags
-						[01]; //colors: op ColorFormat, data
-							[00] setPC; 	//primary color
-							[01] setSC; 	//secondary color
-							[10] setPCSP; 	//load two colors
-							[11] setC; 	//broadcast one color
-						[10]; //sizes: op SizeFormat data
-							[00] setPS; 	//pixel size
-							[01] setLW; 	//line width
-							[10] setDL; 	//dot length
-							[11] setFH; 	//font height
-						[11]; //handles: op HandleFormat data
-							[00] setFMH; 	//FontMap
-							[01] setLFMH; 	//LatinFontMap
-							[10] setPALH; 	//Palette
-							[11] setLTH; 	//LineTexture
-					
-					[1]; //drawing
-						[00]; //SVG linear
-							[00] drawM xy; 	//move
-							[01] drawL xy; 	//line
-							[10] drawH x; 	//horizontal line
-							[11] drawV y; 	//vertical line
-						[01]; //SVG curves
-							[00] drawQ xy xy; 	//quadratic bezier
-							[01] drawT xy; 	//smooth quadratic bezier
-							[10] drawC xy xy xy; 	//cubic bezier
-							[11] drawS xy xy; 	//smooth cubic bezier
-						[10]; //SVG arc, images, text
-							[00] drawA rx ry rot, b, b, p; 	//elliptical arc
-							[01] drawTEX size, handle; 	//Draws a texture
-							[10] drawTYPE string; 	//cubic bezier
-							[11] drawRECT; 
-						[11]; 
-							[00] drawCHART; 	//graphs, rulers, grids
-							[01] drawMESH; 	//all 3D stuff -> maybe a specialized mode
-							[10]; 
-							[11]; 
-				}
-			+/
-			
-			Generate a nested case switch structure from this:
+		AI: Generate case switch for instruction set: /+
+			Hidden: Generate a nested case switch structure from this:
 			This is a hierarchical representation of an instruction set.
 			Every node has a few number of bits associated them, for example [0] means 1 bit and it must be a 0. [10] means 2 bits and has a decimal value of 2.
 			The tab characters in front of the lines represent the nesting level.
@@ -309,461 +227,90 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			You can extract the commands by the first identifiers, example end, setPh, drawM. Call thos by GLSL syntax: end();  
 			Please preserve the comments you find in the input, also preserve the optional parameters and do dense code by putting the instruction calling and the case break and the comment on the same line.
 			Put the { on a new line. Use /* or // comments only, this is GLSL!
-		+/
-		/+
-			Assistant: Here's the generated nested case switch structure:
-			
-			/+Processes the instruction stream based on the hierarchical encoding +/ 
-			/+
-				Code: void processInstructions(ref GraphicsState GS) 
-				{
-					if(
-						!fetchBool(GS)// [0] settings 
-					)
-					{
-						switch(
-							fetchBits(GS, 2)// [00] system, [01] colors, [10] sizes, [11] handles 
-						)
-						{
-							case 0: // [00] system 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: end(); break; 		// [00] end - 5 zeroed at end of VBO 
-								case 1: setPh(); break; 	// [01] setPh - phase (position along line) 
-								case 2: setTF(); break; 	// [10] setTF - font flags 
-								case 3: setFF(); break; 	// [11] setFF - texture flags 
-							}
-								break; 
-								
-							case 1: // [01] colors 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setPC(); break; 	// [00] setPC - primary color 
-								case 1: setSC(); break; 	// [01] setSC - secondary color 
-								case 2: setPCSP(); break; 	// [10] setPCSP - load two colors 
-								case 3: setC(); break; 		// [11] setC - broadcast one color 
-							}
-								break; 
-								
-							case 2: // [10] sizes 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setPS(); break; 	// [00] setPS - pixel size 
-								case 1: setLW(); break; 	// [01] setLW - line width 
-								case 2: setDL(); break; 	// [10] setDL - dot length 
-								case 3: setFH(); break; 	// [11] setFH - font height 
-							}
-								break; 
-								
-							case 3: // [11] handles 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setFMH(); break; 	// [00] setFMH - FontMap 
-								case 1: setLFMH(); break; 	// [01] setLFMH - LatinFontMap 
-								case 2: setPALH(); break; 	// [10] setPALH - Palette 
-								case 3: setLTH(); break; 	// [11] setLTH - LineTexture 
-							}
-								break; 
-						}
-					}
-					else
-					{
-						switch(
-							fetchBits(GS, 2)// [00] SVG linear, [01] SVG curves, [10] SVG arc/images/text,
-						)
-						{
-							case 0: // [00] SVG linear 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawM(xy); break; 	// [00] drawM - move 
-								case 1: drawL(xy); break; 	// [01] drawL - line 
-								case 2: drawH(x); break; 	// [10] drawH - horizontal line 
-								case 3: drawV(y); break; 	// [11] drawV - vertical line 
-							}
-								break; 
-								
-							case 1: // [01] SVG curves 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawQ(xy, xy); break; 	// [00] drawQ - quadratic bezier 
-								case 1: drawT(xy); break; 	// [01] drawT - smooth quadratic bezier 
-								case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier 
-								case 3: drawS(xy, xy); break; 	// [11] drawS - smooth cubic bezier 
-							}
-								break; 
-								
-							case 2: // [10] SVG arc, images, text 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawA(rx, ry, rot, b, b, p); break; // [00] drawA - elliptical arc 
-								case 1: drawTEX(size, handle); break; 	// [01] drawTEX - Draws a texture 
-								case 2: drawTYPE(string); break; 	// [10] drawTYPE - cubic bezier 
-								case 3: drawRECT(); break; 		// [11] drawRECT 
-							}
-								break; 
-								
-							case 3: // [11] 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawCHART(); break; 	// [00] drawCHART - graphs, rulers, grids 
-								case 1: drawMESH(); break; 	// [01] drawMESH - all 3D stuff 
-								case 2: break; 			// [10] 
-								case 3: break; 			// [11] 
-							}
-								break; 
-						}
-					}
-				} 
-			+/
-			/+Note: Usage(prompt_hit: 960, prompt_miss: 1063, completion: 1175, HUF: 0.53, price: 100%)+/
-		+/
-	+/
-	
-	/+
-		AI: /+
-			User: /+
-				Code: void processInstructions(ref GraphicsState GS) 
-				{
-					if(
-						!fetchBool(GS)// [0] settings 
-					)
-					{
-						switch(
-							fetchBits(GS, 2)// [00] system, [01] colors, [10] sizes, [11] handles 
-						)
-						{
-							case 0: // [00] system 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: end(); break; 		// [00] end - 5 zeroed at end of VBO 
-								case 1: setPh(); break; 	// [01] setPh - phase (position along line) 
-								case 2: setTF(); break; 	// [10] setTF - font flags 
-								case 3: setFF(); break; 	// [11] setFF - texture flags 
-							}
-								break; 
-								
-							case 1: // [01] colors 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setPC(); break; 	// [00] setPC - primary color 
-								case 1: setSC(); break; 	// [01] setSC - secondary color 
-								case 2: setPCSP(); break; 	// [10] setPCSP - load two colors 
-								case 3: setC(); break; 		// [11] setC - broadcast one color 
-							}
-								break; 
-								
-							case 2: // [10] sizes 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setPS(); break; 	// [00] setPS - pixel size 
-								case 1: setLW(); break; 	// [01] setLW - line width 
-								case 2: setDL(); break; 	// [10] setDL - dot length 
-								case 3: setFH(); break; 	// [11] setFH - font height 
-							}
-								break; 
-								
-							case 3: // [11] handles 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setFMH(); break; 	// [00] setFMH - FontMap 
-								case 1: setLFMH(); break; 	// [01] setLFMH - LatinFontMap 
-								case 2: setPALH(); break; 	// [10] setPALH - Palette 
-								case 3: setLTH(); break; 	// [11] setLTH - LineTexture 
-							}
-								break; 
-						}
-					}
-					else
-					{
-						switch(
-							fetchBits(GS, 2)// [00] SVG linear, [01] SVG curves, [10] SVG arc/images/text,
-						)
-						{
-							case 0: // [00] SVG linear 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawM(xy); break; 	// [00] drawM - move 
-								case 1: drawL(xy); break; 	// [01] drawL - line 
-								case 2: drawH(x); break; 	// [10] drawH - horizontal line 
-								case 3: drawV(y); break; 	// [11] drawV - vertical line 
-							}
-								break; 
-								
-							case 1: // [01] SVG curves 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawQ(xy, xy); break; 	// [00] drawQ - quadratic bezier 
-								case 1: drawT(xy); break; 	// [01] drawT - smooth quadratic bezier 
-								case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier 
-								case 3: drawS(xy, xy); break; 	// [11] drawS - smooth cubic bezier 
-							}
-								break; 
-								
-							case 2: // [10] SVG arc, images, text 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawA(rx, ry, rot, b, b, p); break; // [00] drawA - elliptical arc 
-								case 1: drawTEX(size, handle); break; 	// [01] drawTEX - Draws a texture 
-								case 2: drawTYPE(string); break; 	// [10] drawTYPE - cubic bezier 
-								case 3: drawRECT(); break; 		// [11] drawRECT 
-							}
-								break; 
-								
-							case 3: // [11] 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawCHART(); break; 	// [00] drawCHART - graphs, rulers, grids 
-								case 1: drawMESH(); break; 	// [01] drawMESH - all 3D stuff 
-								case 2: break; 			// [10] 
-								case 3: break; 			// [11] 
-							}
-								break; 
-						}
-					}
-				} 
-			+/
-			
-			Remove meaningless redundant comments and put parameters into comments!
+		+/ refine: /+
+			Hidden: Remove meaningless redundant comments and put parameters into comments!
 			Example:
 			`case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier`
 			->
 			`case 2: drawC(/*xy, xy, xy)*/); break; // cubic bezier`
 		+/
-		/+
-			Assistant: Here's the cleaned up version of your code with improved comments and parameter documentation:
-			
-			/+
-				Structured: void processInstructions(ref GraphicsState GS) 
-				{
-					if(
-						!fetchBool(GS)// settings
-					)
-					{
-						switch(fetchBits(GS, 2))
-						{
-							case 0: // system
-								switch(fetchBits(GS, 2))
-							{
-								case 0: end(); break; 		// end - 5 zeroed at end of VBO
-								case 1: setPh(); break; 		// set phase (position along line)
-								case 2: setTF(); break; 		// set font flags
-								case 3: setFF(); break; 		// set texture flags
-							}
-								break; 
-								
-							case 1: // colors
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setPC(); break; 		// set primary color
-								case 1: setSC(); break; 		// set secondary color
-								case 2: setPCSP(); break; 	// load two colors
-								case 3: setC(); break; 		// broadcast one color
-							}
-								break; 
-								
-							case 2: // sizes
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setPS(); break; 		// set pixel size
-								case 1: setLW(); break; 		// set line width
-								case 2: setDL(); break; 		// set dot length
-								case 3: setFH(); break; 		// set font height
-							}
-								break; 
-								
-							case 3: // handles
-								switch(fetchBits(GS, 2))
-							{
-								case 0: setFMH(); break; 	// set FontMap handle
-								case 1: setLFMH(); break; 	// set LatinFontMap handle
-								case 2: setPALH(); break; 	// set Palette handle
-								case 3: setLTH(); break; 	// set LineTexture handle
-							}
-								break; 
-						}
-					}
-					else
-					{
-						switch(fetchBits(GS, 2))
-						{
-							case 0: // SVG linear
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawM(/*xy*/); break; 	// move
-								case 1: drawL(/*xy*/); break; 	// line
-								case 2: drawH(/*x*/); break; 	// horizontal line
-								case 3: drawV(/*y*/); break; 	// vertical line
-							}
-								break; 
-								
-							case 1: // SVG curves
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawQ(/*xy, xy*/); break; 	// quadratic bezier
-								case 1: drawT(/*xy*/); break; 	// smooth quadratic bezier
-								case 2: drawC(/*xy, xy, xy*/); break; // cubic bezier
-								case 3: drawS(/*xy, xy*/); break; 	// smooth cubic bezier
-							}
-								break; 
-								
-							case 2: // SVG arc, images, text
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawA(/*rx, ry, rot, b, b, p*/); break; // elliptical arc
-								case 1: drawTEX(/*size, handle*/); break; 	// draw texture
-								case 2: drawTYPE(/*string*/); break; 	// draw text
-								case 3: drawRECT(); break; 		// draw rectangle
-							}
-								break; 
-								
-							case 3: 
-								switch(fetchBits(GS, 2))
-							{
-								case 0: drawCHART(); break; 	// draw graphs/rulers/grids
-								case 1: drawMESH(); break; 	// draw 3D objects
-								case 2: break; 
-								case 3: break; 
-							}
-								break; 
-						}
-					}
-				} 
-			+/
-			
-			/+Note: Usage(prompt_hit: 64, prompt_miss: 1571, completion: 926, HUF: 0.54, price: 100%)+/
-		+/
-	+/
-	
-	
-	//GSP Instruction encoding
-	mixin 入 !((
-		q{
-			[0]; //settings
-				[00]; //system
-					[00] end; 	//5 zeroed at end of VBO
-					[01] setPh; 	//phase (position along line)
-					[10] setTF; 	//font flags
-					[11] setFF; 	//texture flags
-				[01]; //colors: op ColorFormat, data
-					[00] setPC; 	//primary color
-					[01] setSC; 	//secondary color
-					[10] setPCSP; 	//load two colors
-					[11] setC; 	//broadcast one color
-				[10]; //sizes: op SizeFormat data
-					[00] setPS; 	//pixel size
-					[01] setLW; 	//line width
-					[10] setDL; 	//dot length
-					[11] setFH; 	//font height
-				[11]; //handles: op HandleFormat data
-					[00] setFMH; 	//FontMap
-					[01] setLFMH; 	//LatinFontMap
-					[10] setPALH; 	//Palette
-					[11] setLTH; 	//LineTexture
-			
-			[1]; //drawing
-				[00]; //SVG linear
-					[00] drawM xy; 	//move
-					[01] drawL xy; 	//line
-					[10] drawH x; 	//horizontal line
-					[11] drawV y; 	//vertical line
-				[01]; //SVG curves
-					[00] drawQ xy xy; 	//quadratic bezier
-					[01] drawT xy; 	//smooth quadratic bezier
-					[10] drawC xy xy xy; 	//cubic bezier
-					[11] drawS xy xy; 	//smooth cubic bezier
-				[10]; //SVG arc, images, text
-					[00] drawA rx ry rot, b, b, p; 	//elliptical arc
-					[01] drawTEX size, handle; 	//Draws a texture
-					[10] drawTYPE string; 	//cubic bezier
-					[11] drawRECT; 
-				[11]; 
-					[00] drawCHART; 	//graphs, rulers, grids
-					[01] drawMESH; 	//all 3D stuff -> maybe a specialized mode
-					[10]; 
-					[11]; 
-		}
-	),q{
-		mixin(
-			((){
-				string[] levels; 
-				return iq{
-					enum OpCode
-					{
-						$(
-							_data.splitLines
-							.map!((line){
-								const level = line.countUntil!"a!=9"; if(level<0) return ""; line = line[level..$]; 
-								if(!line.skipOver('[')) return ""; 
-								const bitCnt = line.countUntil!q{!a.among('0', '1')}; if(bitCnt<=0) return ""; 
-								const bits = line[0..bitCnt]; line = line[bitCnt..$]; 
-								if(!line.skipOver(']')) return ""; line.skipOver(' '); 
-								levels.length = max(levels.length, level+1); levels[level] = bits; 
-								const idLen = line.countUntil!(not!isDLangIdentifierCont); if(idLen<=0) return ""; 
-								const id = line[0..idLen]; if(id=="") return ""; 
-								return "\t" ~ id ~ "\t = 0b_" ~ levels[0..level+1].retro.join('_') ~ ",\n"; 
-							})
-							.join
-						)
-					} 
-				}.text; 
-			})()
-		); 
-	}); 
-	
-	static foreach(op; EnumMembers!OpCode)
-	pragma(msg, op.stringof, op.text, op.to!int); 
-	
-	
-	/+
-		
-		/+
-			Code: [0] settings; 
-				[00] system; 
-					[00] end; 	//5 zeroed at end of VBO
-					[01] setPh; 	//phase (position along line)
-					[10] setTF; 	//font flags
-					[11] setFF; 	//texture flags
-				[01] colors; //op ColorFormat, data
-					[00] setPC; 	//primary color
-					[01] setSC; 	//secondary color
-					[10] setPCSP; 	//load two colors
-					[11] setC; 	//broadcast one color
-				[10] sizes; //op SizeFormat data
-					[00] setPS; 	//pixel size
-					[01] setLW; 	//line width
-					[10] setDL; 	//dot length
-					[11] setFH; 	//font height
-				[11] handles; //op HandleFormat data
-					[00] setFMH; 	//FontMap
-					[01] setLFMH; 	//LatinFontMap
-					[10] setPALH; 	//Palette
-					[11] setLTH; 	//LineTexture
-			
-			[1] drawing; 
-				[00] SVG linear; 
-					[00] M xy; 	//move
-					[01] L xy; 	//line
-					[10] H x; 	//horizontal line
-					[11] V y; 	//vertical line
-				[01] SVG curves; 
-					[00] Q xy xy; 	//quadratic bezier
-					[01] T xy; 	//smooth quadratic bezier
-					[10] C xy xy xy; 	//cubic bezier
-					[11] S xy xy; 	//smooth cubic bezier
-				[10] SVG arc, images, text; 
-					[00] A rx ry rot, b, b, p; 	//elliptical arc
-					[01] TEX size, handle; 	//Draws a texture
-					[10] TYPE string; 	//cubic bezier
-					[11] RECT; 
-				[11]; 
-					[00] CHART; 	//graphs, rulers, grids
-					[01] MESH; 	//all 3D stuff -> maybe a specialized mode
-					[10]; 
-					[11]; 
-		+/
 	+/
 	
 	
+	version(/+$DIDE_REGION Opcode+/all)
+	{
+		mixin 入 !((
+			(表([
+				[q{/+Note: lvl0+/},q{/+Note: lvl1+/},q{/+Note: lvl2+/},q{/+Note: op+/},q{/+Note: comment+/}],
+				[q{/+settings+/}],
+				[q{/+	system+/}],
+				[q{"0"},q{"00"},q{"00"},q{end},q{/+5 zeroed at end of VBO+/}],
+				[q{},q{},q{"01"},q{setPh},q{/+phase (position along line)+/}],
+				[q{},q{},q{"10"},q{setTF},q{/+font flags+/}],
+				[q{},q{},q{"11"},q{setFF},q{/+texture flags+/}],
+				[q{/+	colors: op ColorFormat, data+/}],
+				[q{},q{"01"},q{"00"},q{setPC},q{/+primary color+/}],
+				[q{},q{},q{"01"},q{setSC},q{/+secondary color+/}],
+				[q{},q{},q{"10"},q{setPCSP},q{/+load two colors+/}],
+				[q{},q{},q{"11"},q{setC},q{/+broadcast one color+/}],
+				[q{/+	sizes: op SizeFormat data+/}],
+				[q{},q{"10"},q{"00"},q{setPS},q{/+pixel size+/}],
+				[q{},q{},q{"01"},q{setLW},q{/+line width+/}],
+				[q{},q{},q{"10"},q{setDL},q{/+dot length+/}],
+				[q{},q{},q{"11"},q{setFH},q{/+font height+/}],
+				[q{/+	handles: op HandleFormat data+/}],
+				[q{},q{"11"},q{"00"},q{setFMH},q{/+FontMap+/}],
+				[q{},q{},q{"01"},q{setLFMH},q{/+LatinFontMap+/}],
+				[q{},q{},q{"10"},q{setPALH},q{/+Palette+/}],
+				[q{},q{},q{"11"},q{setLTH},q{/+LineTexture+/}],
+				[],
+				[q{/+Note: lvl0+/},q{/+Note: lvl1+/},q{/+Note: lvl2+/},q{/+Note: op+/},q{/+Note: comment+/}],
+				[q{/+drawing+/}],
+				[q{/+	SVG linear+/}],
+				[q{"1"},q{"00"},q{"00"},q{drawM},q{/+xy+/}],
+				[q{},q{},q{"01"},q{drawL},q{/+xy+/}],
+				[q{},q{},q{"10"},q{drawH},q{/+x+/}],
+				[q{},q{},q{"11"},q{drawV},q{/+y+/}],
+				[q{/+	SVG curves+/}],
+				[q{},q{"01"},q{"00"},q{drawQ},q{/+xy xy+/}],
+				[q{},q{},q{"01"},q{drawT},q{/+xy+/}],
+				[q{},q{},q{"10"},q{drawC},q{/+xy xy xy+/}],
+				[q{},q{},q{"11"},q{drawS},q{/+xy xy+/}],
+				[q{/+	SVG arc, images, text+/}],
+				[q{},q{"10"},q{"00"},q{drawA},q{/+rx ry rot, b, b, p+/}],
+				[q{},q{},q{"01"},q{drawTEX},q{/+size, handle+/}],
+				[q{},q{},q{"10"},q{drawTYPE},q{/+string+/}],
+				[q{},q{},q{"11"},q{drawRECT},q{/++/}],
+				[q{/+	future extensions+/}],
+				[q{},q{"11"},q{"0001111"},q{drawCHART},q{/++/}],
+				[q{},q{},q{"1010101"},q{drawMESH},q{/++/}],
+				[q{},q{},q{"010"},q{},q{/++/}],
+				[q{},q{},q{"011"},q{},q{/++/}],
+				[],
+			]))
+		),q{
+			struct OpcodeInfo { string name; uint bits, bitCnt; } 
+			static immutable opInfo = 
+			(){
+				enum N=3/+no of levels+/; string[N] lvl; 
+				return mixin(求map(q{r},q{_data.rows},q{
+					mixin(求each(q{0<=i<N},q{},q{if(mixin(指(q{r},q{i}))!="") mixin(指(q{lvl},q{i}))=mixin(指(q{r},q{i})).withoutStartingEnding('"'); })); 
+					return OpcodeInfo(
+						mixin(指(q{r},q{N})), 	lvl[].retro.join.to!uint(2), 
+							lvl[].join.length.to!uint
+					); 
+				}))
+				.filter!q{a.name!=""}.array; 
+			}(); 
+			mixin(iq{enum Opcode {$(opInfo.map!q{a.name}.join(','))} }.text); 
+		}); 
+	}
+	
+	static foreach(op; EnumMembers!Opcode)
+	pragma(msg, opInfo[op].bits.to!string(2).padLeft('0', opInfo[op].bitCnt).text, " : ", op.text); 
+	
+	
+	
 	struct GSPFlags
 	{
 		/+This is a combination of FontFlags and TexFlags+/
@@ -771,7 +318,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		mixin((
 			(表([
 				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-				[q{//0: texture flags
+				[q{//texture flags
 				}],
 				[q{TexXAlign},q{2},q{"texXAlign"},q{},q{/++/}],
 				[q{TexSizeSpec},q{2},q{"texXSize"},q{},q{/++/}],
@@ -779,8 +326,6 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{TexSizeSpec},q{2},q{"texYSize"},q{},q{/++/}],
 				[q{TexAspect},q{2},q{"texAspect"},q{},q{/++/}],
 				[q{TexOrientation},q{3},q{"texOrientation"},q{},q{/++/}],
-				[q{//13 bits
-				}],
 				[],
 				[q{//font flags
 				}],
@@ -1214,7 +759,7 @@ class VulkanWindow: Window
 			} 
 		} 
 	}
-	
+	
 	version(/+$DIDE_REGION VB    +/all)
 	{
 		enum VertexCmd
@@ -1266,8 +811,6 @@ class VulkanWindow: Window
 		} 
 	}
 	
-	
-	
 	version(/+$DIDE_REGION GB    +/all)
 	{
 		GeometryBufferManager GB; 
@@ -1990,646 +1533,6 @@ class VulkanWindow: Window
 			} 
 		+/
 	} 
-	
-	/+
-		AI: /+
-			User: I have some GLSL variables declared:
-			/+
-				Code: /+Vector graphics state registers+/
-				vec4 PC = vec4(0, 0, 0, 1); 	/+ Primary color - default black +/
-				vec4 SC = vec4(1, 1, 1, 1); 	/+ Secondary color - default white +/
-					
-				float PS = 1; 	/+ Point size +/
-				float LW = 1; 	/+ Line width +/
-				float DS = 1; 	/+ Dash size scaling factor +/
-				float FH = 18; 	/+ Font height +/
-					
-				uint FMH = 0; 	/+ Font map handle +/
-				uint LFMH = 0; 	/+ Latin font map handle +/
-				uint PALH = 0; 	/+ Palette handle +/
-				uint LTH = 0; 	/+ Line texture handle +/
-					
-				vec3 P = vec3(0); 	/+ Position +/
-				float Ph = 0; 	/+ Phase coordinate +/
-			+/
-			
-			I also have a bitStream that I can read from by using : 
-			/+Code: uint fetchBits(GS, numBits/*you have to fill it!*/)+/
-			/+Code: bool fetch_bool(GS)+/
-			/+Code: uint fetch_uint(GS)+/
-			/+Code: float fetch_float(GS)+/
-			/+Code: vec2 fetch_vec2(GS)+/
-			/+Code: vec3 fetch_vec3(GS)+/
-			/+Code: vec4 fetch_vec4(GS)+/
-			You can build more convinience functions if you want based on these.
-			
-			Here are the documentation of these variables, they are basically registers in a virtual processor:
-			/+
-				Code: (表([
-					[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
-					[q{
-						primary color,
-						secondary color
-					},q{
-						PC,
-						SC
-					},q{vec4},q{ColorFormat},q{
-						setPC 	ColorFormat, col
-						setSC 	ColorFormat, col
-						setPCSC 	ColorFormat, col, col
-						setC 	ColorFormat, col /+it broadcasts+/
-					}],
-					[q{
-						pointSize 	= 1,
-						lineWidth 	= 1,
-						dashSize 	= 1,
-						fontHeight 	= 18
-						
-					},q{
-						PS,
-						LW,
-						FH,
-						DS
-					},q{float},q{SizeFormat},q{
-						setPS 	SizeFormat, val
-						setLW 	SizeFormat, val
-						setDS 	SizeFormat, val /+scaling factor for LineTex[Ph]+/
-						setFH 	SizeFormat, val
-					}],
-					[q{
-						fontMapHandle,
-						latinFontMapHandle,
-						paletteHandle
-						lineTexHandle
-					},q{
-						FMH
-						LFMH
-						PALH
-						LTH
-					},q{uint},q{HandleFormat},q{
-						setFontMap 	HandleFormat, handle, FontType
-						setLatinFontMap 	HandleFormat, handle
-						setPalette 	HandleFormat, handle
-						setLineTex 	HandleFormat, handle
-					}],
-					[],
-					[q{//vector state:
-					}],
-					[q{position},q{P},q{vec3},q{CoordFormat},q{Various drawing and moving commands.}],
-					[q{phase},q{Ph},q{float},q{CoordFormat},q{setPhase CoordFormat, coord /+used by -> lineTex[Ph]+/}],
-					[],
-					[q{/+Todo: Perpixel effects: arrows, markers, wavy line, multicolor dashed line+/}],
-				]))
-			+/
-			
-			Here are some types you can use: In GLSL they are in the form: TexXAlign_left, etc...
-			/+
-				Code: enum TexXAlign {left, center, right} 
-				enum TexYAlign {top, center, baseline, bottom} 
-				enum TexSizeSpec {original, scaled, exact} 
-				enum TexAspect {stretch, keep, crop} 
-				
-				enum TexOrientation
-				{
-					normal 	= 0, //Default orientation (0,0)-(1,1)
-					mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
-					mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
-					mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
-					mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
-					mirrorXDiag 	= 5, //Mirror X then diagonal
-					mirrorYDiag 	= 6, //Mirror Y then diagonal
-					mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
-					
-					//Additional rotation names
-					rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
-					rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
-					rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
-					
-					//Alternative names
-					flipH 	= mirrorX, 	//Horizontal flip
-					flipV 	= mirrorY, 	//Vertical flip
-					flipHV 	= mirrorXY, 	//Both flips
-					transpose 	= mirrorDiag 	//Swap X and Y coordinates
-				} 
-				
-				enum FontType
-				{
-					textureHandles, 	//no fontMap, just individual texture handles.
-					asciiCharmap16x16, 	//fontMap is a bitmap containing 16x16 monosized characters
-					unicodeBlockMap128 	/+
-						fontMap is a texture of 0x110000>>7 = 8704 uints.
-						block = code>>7; blkTex = texture[fontMap[block]];
-						charTex = blkTex[code & 0x7F];
-						/+Opt: fast 0th block at the very start of the fontMap+/
-					+/
-				} 
-				enum FontLine {none, underline, strikeout, errorline } 
-				enum FontWidth {normal, thin/+.66+/, wide/+1.5+/, wider/+2+/ } 
-				enum FontScript {none, superscript, subscript, small} 
-				enum FontBlink {none, blink, soft, fast } 
-				
-				enum SizeUnit
-				{
-					world, 	/+one unit in the world+/
-					screen, 	/+one pixel at the screen (similar to fwidth())+/
-					model 	/+Todo: one unit inside scaled model space+/
-				} 
-				enum SizeFormat {f32, log12, u8, u4} 
-				enum ColorFormat {a_u8, la_u8, rgb_u8, rgba_u8, u1, u2, u4, u8} 
-				enum HandleFormat {u12, u16, u24, u32} 
-				
-				struct FontTexFlags
-				{
-					/+This is a combination of FontFlags and TexFlags+/
-					
-					mixin((
-						(表([
-							[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-							[q{TexXAlign},q{2},q{"texXAlign"},q{},q{/++/}],
-							[q{TexSizeSpec},q{2},q{"texXSize"},q{},q{/++/}],
-							[q{TexYAlign},q{2},q{"texYAlign"},q{},q{/++/}],
-							[q{TexSizeSpec},q{2},q{"texYSize"},q{},q{/++/}],
-							[q{TexAspect},q{2},q{"texAspect"},q{},q{/++/}],
-							[q{TexOrientation},q{3},q{"texOrientation"},q{},q{/++/}],
-							[],
-							[q{FontType},q{2},q{"fontType"},q{},q{/++/}],
-							[q{bool},q{1},q{"fontBold"},q{},q{/++/}],
-							[q{bool},q{1},q{"fontItalic"},q{},q{/++/}],
-							[q{bool},q{1},q{"fontMonospace"},q{},q{/++/}],
-							[q{FontLine},q{2},q{"fontLine"},q{},q{/++/}],
-							[q{FontWidth},q{2},q{"fontWidth"},q{},q{/++/}],
-							[q{FontScript},q{2},q{"fontScript"},q{},q{/++/}],
-							[q{FontBlink},q{2},q{"fontBlink"},q{},q{/++/}],
-						]))
-					).調!(GEN_bitfields)); 
-					
-					protected
-					{
-						enum GLSLCode = /+
-							AI: /+
-								Hidden: I need you to generate GLSL functions.  I have this global variable: `uint fontTexFlags;`
-								
-								I only need the getters, so no need the to use 'get' prefixes.
-								You can use my macros to get the bits:
-								/+
-									Code: #define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
-									#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
-								+/
-								
-								For boolean results please use getBit macro.
-								For other enumerated types, the return type will be uint because fontTextFlags is an uint.
-								
-								Here are all the fields:
-							+/
-						+/
-						q{
-							uint texXAlign() { return getBits(fontTexFlags, 0, 2); } 
-							uint texXSize() { return getBits(fontTexFlags, 2, 2); } 
-							uint texYAlign() { return getBits(fontTexFlags, 4, 2); } 
-							uint texYSize() { return getBits(fontTexFlags, 6, 2); } 
-							uint texAspect() { return getBits(fontTexFlags, 8, 2); } 
-							uint texOrientation() { return getBits(fontTexFlags, 10, 3); } 
-							uint fontType() { return getBits(fontTexFlags, 13, 2); } 
-							bool fontBold() { return getBit(fontTexFlags, 15); } 
-							bool fontItalic() { return getBit(fontTexFlags, 16); } 
-							bool fontMonospace() { return getBit(fontTexFlags, 17); } 
-							uint fontLine() { return getBits(fontTexFlags, 18, 2); } 
-							uint fontWidth() { return getBits(fontTexFlags, 20, 2); } 
-							uint fontScript() { return getBits(fontTexFlags, 22, 2); } 
-							uint fontBlink() { return getBits(fontTexFlags, 24, 2); } 
-						}; 
-					} 
-				} 
-			+/
-			
-			Your task is to generate code for the register setter functions in GLSL.
-			It is a big case switch statement basically.
-			You are free to assign opcodes to the instructions. Use 4 bits for it, I think it is enough.
-			Good luck ;)
-		+/
-		/+
-			Assistant: /+
-				Para: I'll generate GLSL code for the register setter functions using a switch statement with 4-bit opcodes.
-				Here's the implementation:
-			+/
-			
-			/+
-				Structured: /+
-					Register setter functions 
-					Uses 4-bit opcodes (0x0-0xF)
-					Format: opcode (4 bits) | format (4 bits) | data...
-				+/ 
-				void processRegisterCommand(uint opcode)
-				{
-					uint format = fetchBits(4); 
-					
-					switch(opcode)
-					{
-						/+ Color registers +/
-						case 0x0: // setPC
-							PC = fetchColor(format); 
-							break; 
-							
-						case 0x1: // setSC 
-							SC = fetchColor(format); 
-							break; 
-							
-						case 0x2: // setPCSC
-							PC = fetchColor(format); 
-							SC = fetchColor(format); 
-							break; 
-							
-						case 0x3: // setC (broadcast to both)
-							vec4 color = fetchColor(format); 
-							PC = color; 
-							SC = color; 
-							break; 
-							
-						/+ Size registers +/
-						case 0x4: // setPS
-							PS = fetchSize(format); 
-							break; 
-							
-						case 0x5: // setLW
-							LW = fetchSize(format); 
-							break; 
-							
-						case 0x6: // setDS
-							DS = fetchSize(format); 
-							break; 
-							
-						case 0x7: // setFH
-							FH = fetchSize(format); 
-							break; 
-							
-						/+ Handle registers +/
-						case 0x8: // setFontMap
-							{
-							uint handle = fetchHandle(format); 
-							uint fontType = fetchBits(2); 
-							FMH = handle; 
-							// Additional font type processing if needed
-						}
-							break; 
-							
-						case 0x9: // setLatinFontMap
-							LFMH = fetchHandle(format); 
-							break; 
-							
-						case 0xA: // setPalette
-							PALH = fetchHandle(format); 
-							break; 
-							
-						case 0xB: // setLineTex
-							LTH = fetchHandle(format); 
-							break; 
-							
-						/+ Vector state +/
-						case 0xC: // setPosition
-							P = fetchCoord(format); 
-							break; 
-							
-						case 0xD: // setPhase
-							Ph = fetchCoord(format).x; 
-							break; 
-							
-						default: 
-							/+ Unknown opcode - handle error +/
-							break; 
-					}
-				} 
-				
-				/+ Helper functions for fetching different data formats +/
-				vec4 fetchColor(uint format)
-				{
-					switch(format)
-					{
-						case 0: return vec4(fetch_float()); // a_u8 as float
-						case 1: return vec4(fetch_vec2(), 0, 1); // la_u8
-						case 2: return vec4(fetch_vec3(), 1); // rgb_u8
-						case 3: return fetch_vec4(); // rgba_u8
-						/+Bug: ezek 8 bitesek, nem floatosak!!!+/
-						
-						/+Bug: A formatokat NEV szerint kell csinalni, a szamokkal kovethetetlen!!!+/
-						
-						case 4: return vec4(fetch_bool() ? 1.0 : 0.0); // u1
-						case 5: return vec4(float(fetchBits(2)) / 3.0); // u2
-						case 6: return vec4(float(fetchBits(4)) / 15.0); // u4
-						case 7: return vec4(float(fetchBits(8)) / 255.0); // u8
-						default: return vec4(0); 
-					}
-				} 
-				
-				float fetchSize(uint format)
-				{
-					switch(format)
-					{
-						case 0: return fetch_float(); // f32
-						case 1: return exp2(float(int(fetchBits(12)) - 2048) / 256.0); // log12
-						case 2: return float(fetchBits(8) / 255.0); // u8
-						case 3: return float(fetchBits(4) / 15.0); // u4
-						default: return 1.0; 
-					}
-				} 
-				
-				uint fetchHandle(uint format)
-				{
-					switch(format)
-					{
-						case 0: return fetchBits(12); // u12
-						case 1: return fetchBits(16); // u16
-						case 2: return fetchBits(24); // u24
-						case 3: return fetch_uint(); // u32
-						default: return 0; 
-					}
-				} 
-				
-				vec3 fetchCoord(uint format)
-				{
-					switch(format)
-					{
-						case 0: return fetch_vec3(); // full precision
-						case 1: return vec3(fetch_vec2(), 0); // 2D coords
-						case 2: return vec3(float(fetchBits(16)) / 65535.0); // normalized u16
-						case 3: return vec3(float(fetchBits(8)) / 255.0); // normalized u8
-						default: return vec3(0); 
-					}
-				} 
-			+/
-			
-			This implementation:
-			
-			1. Uses 4-bit opcodes (0x0-0xF) for the instructions
-			2. Each instruction can have a 4-bit format specifier for data decoding
-			3. Includes helper functions for fetching different data formats:
-						/+Bullet: /+Highlighted: fetchColor()+/ for color formats+/
-						/+Bullet: /+Highlighted: fetchSize()+/ for size values+/
-						/+Bullet: /+Highlighted: fetchHandle()+/ for texture handles+/
-						/+Bullet: /+Highlighted: fetchCoord()+/ for position/coordinate values+/
-			4. Handles all the register types mentioned:
-						/+Bullet: Color registers (PC, SC)+/
-						/+Bullet: Size registers (PS, LW, DS, FH)+/
-						/+Bullet: Handle registers (FMH, LFMH, PALH, LTH)+/
-						/+Bullet: Vector state (P, Ph)+/
-			
-			/+
-				Para: The format specifiers allow flexible data encoding while keeping the bitstream compact. The switch
-				statement makes it easy to add new instructions by just adding new cases.
-			+/
-			
-			/+Note: Usage(prompt_hit: 64, prompt_miss: 3264, completion: 1244, HUF: 0.85, price: 100%)+/
-		+/
-	+/
-	
-	/+
-		AI: /+
-			User: GLSL:
-			/+
-				Code: uint fetchHandle(uint format)
-				{
-					switch(format)
-					{
-						case 0: return fetchBits(12); // u12
-						case 1: return fetchBits(16); // u16
-						case 2: return fetchBits(24); // u24
-						case 3: return fetch_uint(); // u32
-						default: return 0; 
-					}
-				} 
-			+/
-			
-			DLang:
-			/+Code: enum HandleFormat {u12, u16, u24, u32} +/
-			
-			From glsl you can access enum ids like `HandleFormat_u12` constants.
-			
-			Please replace the integer caqse constants with them!
-		+/
-		/+
-			Assistant: Here's the updated GLSL code using the DLang enum constants:
-			
-			/+
-				Structured: /+
-					Code: uint fetchHandle(uint format)
-					{
-						switch(format)
-						{
-							case HandleFormat_u12: return fetchBits(12); // u12
-							case HandleFormat_u16: return fetchBits(16); // u16
-							case HandleFormat_u24: return fetchBits(24); // u24
-							case HandleFormat_u32: return fetch_uint(); // u32
-							default: return 0; 
-						}
-					} 
-				+/
-			+/
-			
-			/+Note: Usage(prompt_hit: 64, prompt_miss: 314, completion: 122, HUF: 0.08, price: 100%)+/
-		+/
-	+/
-	/+
-		AI: /+
-			User: /+
-				Code: float fetchSize(inout BitStream bitStream, uint format)
-				{
-					switch(format)
-					{
-						case 0: return fetch_float(bitStream); // f32
-						case 1: return exp2(float(int(fetchBits(bitStream, 12)) - 2048) / 256.0); // log12
-						case 2: return float(fetchBits(bitStream, 8) / 255.0); // u8
-						case 3: return float(fetchBits(bitStream, 4) / 15.0); // u4
-						default: return 1.0; 
-					}
-				} 
-			+/
-			
-			I have enum ID names here:
-			/+Code: enum SizeFormat {f32, log12, u8, u4} +/
-			
-			Please replace the case constants to to be like `SizeFormat_f32`, not an integer literal!
-		+/
-		/+
-			Assistant: Here's the updated code with enum names instead of integer literals:
-			
-			/+
-				Structured: /+
-					Code: float fetchSize(inout BitStream bitStream, uint format)
-					{
-						switch(format)
-						{
-							case SizeFormat.f32: return fetch_float(bitStream); // f32
-							case SizeFormat.log12: return exp2(float(int(fetchBits(bitStream, 12)) - 2048) / 256.0); // log12
-							case SizeFormat.u8: return float(fetchBits(bitStream, 8) / 255.0); // u8
-							case SizeFormat.u4: return float(fetchBits(bitStream, 4) / 15.0); // u4
-							default: return 1.0; 
-						}
-					} 
-				+/
-			+/
-			
-			/+Note: Usage(prompt_hit: 64, prompt_miss: 354, completion: 196, HUF: 0.11, price: 100%)+/
-		+/
-	+/
-	/+
-		AI: /+
-			User: Please estimate high low ranges and gradient step percentage for:
-			/+Code: exp2(float(fetchBits(bitStream, 12)) / 128.0)+/
-		+/
-		/+
-			Assistant: Let me analyze the expression and estimate the ranges:
-			
-			1. /+Highlighted: fetchBits(bitStream, 12)+/ extracts 12 bits:
-						/+Bullet: Minimum value: 0+/
-						/+Bullet: Maximum value: 2^12 - 1 = 4095+/
-			
-			2. /+Highlighted: float(fetchBits(...))+/ converts to floating point:
-						/+Bullet: Minimum: 0.0f+/
-						/+Bullet: Maximum: 4095.0f+/
-			
-			3. Division by 128.0:
-						/+Bullet: Minimum: 0.0f / 128.0 = 0.0f+/
-						/+Bullet: Maximum: 4095.0f / 128.0 ≈ 31.9921875f+/
-			
-			4. /+Highlighted: exp2()+/ (2^x) operation:
-						/+Bullet: Minimum: exp2(0.0f) = 1.0f+/
-						/+Bullet: Maximum: exp2(31.9921875f) ≈ 4.295e9 (very large number)+/
-			
-			Gradient step percentage analysis:
-				/+Bullet: The 12-bit input gives 4096 discrete steps+/
-				/+Bullet: The output range spans many orders of magnitude (1.0 to ~4.3e9)+/
-				/+Bullet: The gradient step percentage varies dramatically across the range:+/
-					/+Bullet: At low values (input near 0): ~0.7% change per step+/
-					/+Bullet: At mid-range (input ~2048): ~100% change per step+/
-					/+Bullet: At high values (input near 4095): extremely large percentage changes+/
-			
-			This creates an exponential encoding that provides:
-				/+Bullet: High precision at low values+/
-				/+Bullet: Very coarse steps at high values+/
-			
-			Would you like me to suggest alternative encodings or normalization approaches?
-			
-			/+Note: Usage(prompt_hit: 128, prompt_miss: 155, completion: 342, HUF: 0.15, price: 100%)+/
-		+/
-	+/
-	/+
-		AI: /+
-			User: Please estimate high low ranges and gradient step percentage for:
-			/+Code: exp2(float(fetchBits(bitStream, 8)) * 15.0+/
-		+/
-		/+
-			Assistant: To estimate the high/low ranges and gradient step percentage for the given expression:
-			
-			/+Structured: exp2(float(fetchBits(bitStream, 8)) * 15.0)+/
-			
-			/+H3: Analysis:+/
-			1. /+Bold: Input Range+/:
-						/+Bullet: /+Highlighted: fetchBits(bitStream, 8)+/ returns an 8-bit unsigned integer → range [0, 255]+/
-						/+Bullet: /+Highlighted: float()+/ conversion → [0.0f, 255.0f]+/
-			
-			2. /+Bold: Scaled Range+/:
-						/+Bullet: Multiplied by 15.0 → [0.0f, 3825.0f]+/
-			
-			3. /+Bold: Final Output Range+/:
-						/+Bullet: /+Highlighted: exp2(x)+/ applied → [exp2(0.0f), exp2(3825.0f)] ≈ [1.0f, Infinity]+/
-			
-			/+H3: Practical Considerations:+/
-				/+Bullet: For real-world use, you likely want to constrain this to finite values+/
-				/+Bullet: Maximum finite float32 value is ~3.4e38 (exp2(128.0) gives 3.4e38)+/
-			
-			/+H3: Suggested Ranges:+/
-			/+
-				Structured: /+ Recommended safe ranges +/
-				const float minValue = 1.0f; 		/+ exp2(0.0) +/
-				const float maxValue = 3.4e38f; 	/+ exp2(128.0) +/
-				
-				/+ Gradient step percentage suggestion +/
-				const float stepPercent = 0.1f; 	/+ 10% steps for smooth interpolation +/
-			+/
-			
-			/+H3: Modified Version with Clamping:+/
-			/+
-				Structured: /+ Safe version with clamping +/
-				exp2(clamp(float(fetchBits(bitStream, 8)) * (15.0 / 255.0 * 128.0), 0.0f, 128.0f))
-			+/
-			
-			This would give you:
-				/+Bullet: Input: [0,255] → Scaled to [0,128] → exp2 range [1.0, 3.4e38]+/
-			
-			/+Note: Usage(prompt_hit: 128, prompt_miss: 154, completion: 409, HUF: 0.18, price: 100%)+/
-		+/
-	+/
-	
-	/+
-		AI: /+
-			User: Microsoft Windows [Version 10.0.19045.6093]
-			(c) Microsoft Corporation. All rights reserved.
-			
-			c:\D\libs\het>g GSP writing
-			
-			c:\D\libs\het>git commit -m "GSP writing"
-			On branch master
-			Your branch is up to date with 'origin/master'.
-			
-			Changes not staged for commit:
-				(use "git add <file>..." to update what will be committed)
-				(use "git restore	<file>..." to discard changes in working directory)
-							modified:	Vulkan.d
-							modified:	VulkanWin.d
-			
-			no changes added to commit (use "git add" and/or "git commit -a")
-			
-			c:\D\libs\het>git push
-			Everything up-to-date
-			
-			c:\D\libs\het>g GSP writing
-			
-			c:\D\libs\het>git commit -m "GSP writing"
-			On branch master
-			Your branch is up to date with 'origin/master'.
-			
-			Changes not staged for commit:
-				(use "git add <file>..." to update what will be committed)
-				(use "git restore	<file>..." to discard changes in working directory)
-							modified:	Vulkan.d
-							modified:	VulkanWin.d
-			
-			no changes added to commit (use "git add" and/or "git commit -a")
-			
-			c:\D\libs\het>git push
-			Everything up-to-date
-			
-			c:\D\libs\het>
-			
-			
-			Please solve this shit!
-		+/
-		/+
-			Assistant: /+
-				Para: It looks like you're trying to commit changes to your Git repository but the changes aren't being
-				staged for commit. Here's how to solve this:
-			+/
-			
-			1. First, stage your changes:
-			/+Highlighted: git add Vulkan.d VulkanWin.d+/
-			
-			2. Then commit them:
-			/+Highlighted: git commit -m "GSP writing"+/
-			
-			3. Finally push to remote:
-			/+Highlighted: git push+/
-			
-			Alternatively, you can combine the add and commit in one command:
-			/+Highlighted: git commit -a -m "GSP writing"+/
-			
-			/+
-				Para: The issue is that you need to explicitly stage your changes before committing them. The message
-				"no changes added to commit" is telling you exactly this - you've modified files but haven't
-				told Git to include them in the next commit.
-			+/
-			
-			/+Note: Usage(prompt_hit: 64, prompt_miss: 539, completion: 160, HUF: 0.12, price: 100%)+/
-		+/
-	+/
 	
 	/+Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`.+//+
 		Details: /+
@@ -3610,19 +2513,6 @@ class VulkanWindow: Window
 		//GB: Geometry buffer (additional variable lengt vertex data)
 		layout(binding = 3) buffer GB_T { uint GB[]; } ; 
 	}.text; 
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
 	
 	void createGraphicsPipeline()
 	{

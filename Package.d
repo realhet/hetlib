@@ -6801,6 +6801,13 @@ version(/+$DIDE_REGION Containers+/all)
 			return s; 
 		} 
 		
+		auto withoutStartingEnding(S, STEN)(in S s, in STEN sten)
+		{
+			if(s.startsWith(sten) && s.endsWith(sten))
+			return s.withoutStarting(sten).withoutEnding(sten); 
+			return s; 
+		} 
+		
 		auto unpackDComment(string prefix="")(string s)
 		{
 			static assert(prefix.all!isAlpha); 
