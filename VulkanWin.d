@@ -832,16 +832,36 @@ class VulkanWindow: Window
 			{ buffer.reset; } 
 			
 			//returns byte idx
-			uint append(T)(in T data)
+			
+			@property uint bitPos() => buffer.bitPos.to!uint /+Opt: check the range ocassionally+/; 
+			
+			void appendBits(T)(in T data, in size_t bits = T.sizeof*8)
 			{
-				const ofs = (cast(uint)(buffer.appendPos)); /+A maximum of 4GB geometry data is assumed+/
-				buffer.append(data); return ofs; 
+				//const ofs = (cast(uint)(buffer.appendPos)); /+A maximum of 4GB geometry data is assumed+/
+				//buffer.append(data); return ofs; 
+				buffer.appendBits(data, bits); /+Opt: too much delegate calls. Should use a delegate maybe.+/
 			} 
 			
 			void upload()
 			{ buffer.upload; } 
 			
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
+			
+			/+
+				Todo: Smart Memoty Access a GB-re meg a VB-re, meg az IB-re!
+				
+				Egy fontos adalek ehhez a Smart Access Memory technikahoz:
+				AMD modded driver segitsegevel a regebbi kartyakat fel lehet kesziteni arra, hogy ne csak 
+				256MB SAM memoria legyen, hanem a teljes GPU memoria az legyen.
+				Az en GPU-m is meg a benti is pont 1 verzioval regebbi (GCN3) de lehet, hogy tevedek 
+				es azoknal is tamogatva van. Ha ezt ki tudnam hasznalni az azt jelentene, hogy a kamera 
+				kepeket is meg az ui grafika adatait is 2x olyan gyorsan tudnam felkuldeni, mint a 
+				hagyomanyos modszerrel, amit most hasznalok.
+				
+				Hogy Intellel, NVidiaval mukodik-e ez, azt nem tudom, ez egy opcionalis lehetoseg lesz es 
+				ki akarom hasznalni.  A lenyege a dolognak, hogy kozvetlenul a PCIE buszra tortenik a kiiras. 
+				A CPU hasznalat ugyanaz marad, de nem kell utana egy PCIE DMA transfert is inditani.
+			+/
 		} 
 	}
 	
@@ -1484,7 +1504,23 @@ class VulkanWindow: Window
 		
 		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 		{
-			const addr = GB.append(bounds); 
+			
+			const addr = GB.bitPos; print(addr); 
+			
+			GB.appendBits(bounds.low.bitCast!ulong); 
+			GB.appendBits(bounds.high.bitCast!ulong); 
+			
+			GB.appendBits(opInfo[Opcode.setPC].bits, opInfo[Opcode.setPC].bitCnt); 
+			GB.appendBits(ColorFormat.rgb_u8, EnumBits!ColorFormat); 
+			GB.appendBits((RGBA(0x40F0C0)).raw, 24); 
+			
+			GB.appendBits(-1, 3); 
+			
+			
+			/+
+				const addr = GB.buffer.appendPos.to!uint; print(addr); 
+				GB.buffer.append(bounds); 
+			+/
 			VB.buffer.append
 			(
 				mixin(體!((VertexData),q{
@@ -1940,12 +1976,25 @@ class VulkanWindow: Window
 			} 
 			
 			
-			BitStream initBitStream(uint byteOfs)
+			/*
+				BitStream initBitStream(uint byteOfs)
+						{
+							BitStream bitStream; 
+							bitStream.dwOfs = byteOfs >> 2; 
+							bitStream.currentDwBits = 0; 
+							uint bitsToSkip = (byteOfs & 3) * 8; 
+							if(bitsToSkip > 0)
+							{ uint dummy = fetchBits(bitStream, bitsToSkip); }
+							return bitStream; 
+						} 
+			*/
+			
+			BitStream initBitStream(uint bitOfs)
 			{
 				BitStream bitStream; 
-				bitStream.dwOfs = byteOfs >> 2; 
+				bitStream.dwOfs = bitOfs >> 5; 
 				bitStream.currentDwBits = 0; 
-				uint bitsToSkip = (byteOfs & 3) * 8; 
+				uint bitsToSkip = bitOfs & 0x1F; 
 				if(bitsToSkip > 0)
 				{ uint dummy = fetchBits(bitStream, bitsToSkip); }
 				return bitStream; 
@@ -2184,10 +2233,17 @@ class VulkanWindow: Window
 					case VertexCmd_texturedRect: 
 						{
 						fragTexHandle = geomAttr0[0].x >> $(VertexCmdBits); 
-						fragColor = unpackUnorm4x8(geomAttr0[0].y); 
+						PC = unpackUnorm4x8(geomAttr0[0].y); 
 						const uint gAddr = geomAttr0[0].z; 
+						
 						BitStream GS = initBitStream(gAddr); 
-						emitTexturedPointPointRect2D(fetch_vec2(GS), fetch_vec2(GS)); 
+						
+						vec2 p1 = fetch_vec2(GS); 
+						vec2 p2 = fetch_vec2(GS); 
+						
+						processInstruction(GS); 
+						
+						fragColor = PC; emitTexturedPointPointRect2D(p1, p2); 
 					}
 					break; 
 				}

@@ -3809,6 +3809,11 @@ version(/+$DIDE_REGION Numeric+/all)
 				else return def; 
 			} 
 		+/
+		
+		
+		
+		pragma(inline, true) ref T bitCast(T, S)(ref S value) if (T.sizeof <= S.sizeof)
+		=> *cast(T*) &value; 
 	}
 }version(/+$DIDE_REGION Arrays Ranges+/all)
 {
@@ -6068,6 +6073,56 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 	} 
 	
+	struct BitStreamAppender
+	{
+		
+		ulong tempData; //this will be aligned to 16 bytes, so must use it with aligned sse operations.
+		size_t tempBits; //this keeps track of the current bit position
+		void delegate(ulong) onBuffer; //this event must be called when tempData is full.
+		
+		void reset()
+		{ tempData = 0; tempBits = 0; } 
+		
+		void appendBits(T)(in T val, size_t numBits = T.sizeof*8)
+		{
+			assert(numBits>0 && numBits<=64, "appendBits() invalid param"); 
+			
+			/+Convert input to ulong and mask to requested bits+/
+			ulong input = cast(ulong)val << (64-numBits) >> (64-numBits); 
+			
+			/+Case 1: All bits fit in tempData without flushing+/
+			if(tempBits + numBits <= 64)
+			{
+				tempData |= input << tempBits; 
+				tempBits += numBits; 
+				return; 
+			}
+			
+			/+Case 2: Need to split across flush boundary+/
+			size_t 	remainingBits = tempBits + numBits - 64, 
+				firstChunkBits = numBits - remainingBits; 
+			
+			/+Fill tempData to 64 bits and flush+/
+			tempData |= (input & ((1UL << firstChunkBits) - 1)) << tempBits; 
+			tempBits = 64; 
+			onBuffer(tempData); 
+			
+			/+Handle remaining bits+/
+			tempData = input >> firstChunkBits; 
+			tempBits = remainingBits; 
+		} 
+		
+		void flush()
+		{ if(tempBits) { onBuffer(tempData); reset; }} 
+		
+		/+
+			Opt: Optimize this!
+			/+
+				Link: https://stackoverflow.com/questions/5704597/
+				fastest-way-to-write-a-bitstream-on-modern-x86-hardware
+			+/
+		+/
+	} 
 	
 	version(/+$DIDE_REGION+/all)
 	{
@@ -6341,6 +6396,7 @@ version(/+$DIDE_REGION Containers+/all)
 				rawWrite(cast(ubyte[])src); 
 			} 
 		} 
+		
 		
 		alias BigText = /*shared*/ BigArray!char; 
 		alias BigStream = /*shared*/ BigStream_; 
