@@ -153,7 +153,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum TexXAlign {left, center, right} 
 	enum TexYAlign {top, center, baseline, bottom} 
 	enum TexSizeSpec {original, scaled, exact} 
-	enum TexAspect {keep, crop, stretch} 
+	enum TexAspect {stretch, keep, crop} 
 	
 	enum TexOrientation
 	{
@@ -205,14 +205,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum ColorFormat {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
 	enum HandleFormat {u12, u16, u24, u32} 
 	enum CoordFormat {f32, i16, i12, i8} 
-	
-	enum FlagFormat
-	{
-		tex, 	//texture flags
-		font, 	//font flags
-		vec, 	//vector flags
-		all
-	} 
+	enum FlagFormat {tex, font, vec, all} 
 	
 	
 	/+
@@ -246,8 +239,8 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{/+	system+/}],
 				[q{"0"},q{"00"},q{"00"},q{end},q{/+5 zeroed at end of VBO+/}],
 				[q{},q{},q{"01"},q{setPh},q{/+phase (position along line)+/}],
-				[q{},q{},q{"10"},q{setTF},q{/+font flags+/}],
-				[q{},q{},q{"11"},q{setFF},q{/+texture flags+/}],
+				[q{},q{},q{"10"},q{setFlags},q{/+FlagFormat Flags+/}],
+				[q{},q{},q{"11"},q{},q{/++/}],
 				[q{/+	colors: op ColorFormat, data+/}],
 				[q{},q{"01"},q{"00"},q{setPC},q{/+primary color+/}],
 				[q{},q{},q{"01"},q{setSC},q{/+secondary color+/}],
@@ -282,10 +275,10 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{},q{"10"},q{drawTYPE},q{/+string+/}],
 				[q{},q{},q{"11"},q{drawRECT},q{/++/}],
 				[q{/+	future extensions+/}],
-				[q{},q{"11"},q{"0001111"},q{drawCHART},q{/++/}],
-				[q{},q{},q{"1010101"},q{drawMESH},q{/++/}],
-				[q{},q{},q{"010"},q{},q{/++/}],
-				[q{},q{},q{"011"},q{},q{/++/}],
+				[q{},q{"11"},q{"00"},q{move},q{/+CoordFormat Coords+/}],
+				[q{},q{},q{"01"},q{texRect},q{/+CoordFormat Coords TexFormat HandleFormat Handle+/}],
+				[q{},q{},q{"10"},q{},q{/++/}],
+				[q{},q{},q{"11"},q{},q{/++/}],
 				[],
 			]))
 		),q{
@@ -311,90 +304,96 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	
 	
 	
-	struct GSPFlags
+	version(none)
+	enum test = mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})); 
+	
+	struct TexFlags
 	{
-		/+This is a combination of FontFlags and TexFlags+/
-		
-		version(none)
-		enum test = mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})); 
-		
 		mixin((
 			(表([
 				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-				[q{//texture flags
-				}],
-				[q{TexXAlign},q{2},q{"texXAlign"},q{},q{/++/}],
-				[q{TexSizeSpec},q{2},q{"texXSize"},q{},q{/++/}],
-				[q{TexYAlign},q{2},q{"texYAlign"},q{},q{/++/}],
-				[q{TexSizeSpec},q{2},q{"texYSize"},q{},q{/++/}],
-				[q{TexAspect},q{2},q{"texAspect"},q{},q{/++/}],
-				[q{TexOrientation},q{3},q{"texOrientation"},q{},q{/++/}],
-				[],
-				[q{//font flags
-				}],
-				[q{FontType},q{2},q{"fontType"},q{},q{/++/}],
-				[q{bool},q{1},q{"fontBold"},q{},q{/++/}],
-				[q{bool},q{1},q{"fontItalic"},q{},q{/++/}],
-				[q{bool},q{1},q{"fontMonospace"},q{},q{/++/}],
-				[q{FontLine},q{2},q{"fontLine"},q{},q{/++/}],
-				[q{FontWidth},q{2},q{"fontWidth"},q{},q{/++/}],
-				[q{FontScript},q{2},q{"fontScript"},q{},q{/++/}],
-				[q{FontBlink},q{2},q{"fontBlink"},q{},q{/++/}],
-				[],
-				[q{//vector flags
-				}],
-				[q{CoordFormat},q{2},q{"vecFormat"},q{},q{/++/}],
-				[q{bool},q{1},q{"vecRelative"},q{},q{/++/}],
+				[q{TexXAlign},q{2},q{"xAlign"},q{},q{/++/}],
+				[q{TexSizeSpec},q{2},q{"xSize"},q{},q{/++/}],
+				[q{TexYAlign},q{2},q{"yAlign"},q{},q{/++/}],
+				[q{TexSizeSpec},q{2},q{"ySize"},q{},q{/++/}],
+				[q{TexAspect},q{2},q{"aspect"},q{},q{/++/}],
+				[q{TexOrientation},q{3},q{"orientation"},q{},q{/++/}],
 			]))
 		).調!(GEN_bitfields)); 
-		
+		enum bitCnt = 13; 
 		protected
 		{
-			enum GLSLCode = /+
-				AI: /+
-					Hidden: I need you to generate GLSL functions.  I have this global variable: `uint fontTexFlags;`
-					
-					I only need the getters, so no need the to use 'get' prefixes.
-					You can use my macros to get the bits:
-					/+
-						Code: #define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
-						#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
-					+/
-					
-					For boolean results please use getBit macro.
-					For other enumerated types, the return type will be uint because fontTextFlags is an uint.
-					
-					Here are all the fields:
-				+/
-			+/
-			q{
-				uint texXAlign() { return getBits(FL, 0, 2); } 
-				uint texXSize() { return getBits(FL, 2, 2); } 
-				uint texYAlign() { return getBits(FL, 4, 2); } 
-				uint texYSize() { return getBits(FL, 6, 2); } 
-				uint texAspect() { return getBits(FL, 8, 2); } 
-				uint texOrientation() { return getBits(FL, 10, 3); } 
-				
-				uint fontType() { return getBits(FL, 13, 2); } 
-				bool fontBold() { return getBit(FL, 15); } 
-				bool fontItalic() { return getBit(FL, 16); } 
-				bool fontMonospace() { return getBit(FL, 17); } 
-				uint fontLine() { return getBits(FL, 18, 2); } 
-				uint fontWidth() { return getBits(FL, 20, 2); } 
-				uint fontScript() { return getBits(FL, 22, 2); } 
-				uint fontBlink() { return getBits(FL, 24, 2); } 
-				
-				uint vecFormat() { return getBits(FL, 26, 2); } 
-				bool vecRelative() { return getBit(FL, 28); } 
-			}
-			~
-			q{
-				const int 	FL_texBits = 13,
-					FL_fontBits = 13,
-					FL_vecBits = 3; 
-			}; 
+			enum GLSLCode =
+			iq{
+				uint texXAlign() { return getBits(TF, 0, 2); } 
+				uint texXSize() { return getBits(TF, 2, 2); } 
+				uint texYAlign() { return getBits(TF, 4, 2); } 
+				uint texYSize() { return getBits(TF, 6, 2); } 
+				uint texAspect() { return getBits(TF, 8, 2); } 
+				uint texOrientation() { return getBits(TF, 10, 3); } 
+			}.text; 
 		} 
 	} 
+	
+	
+	struct FontFlags
+	{
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{FontType},q{2},q{"type"},q{},q{/++/}],
+				[q{bool},q{1},q{"bold"},q{},q{/++/}],
+				[q{bool},q{1},q{"italic"},q{},q{/++/}],
+				[q{bool},q{1},q{"monospace"},q{},q{/++/}],
+				[q{FontLine},q{2},q{"line"},q{},q{/++/}],
+				[q{FontWidth},q{2},q{"width"},q{},q{/++/}],
+				[q{FontScript},q{2},q{"script"},q{},q{/++/}],
+				[q{FontBlink},q{2},q{"blink"},q{},q{/++/}],
+			]))
+		).調!(GEN_bitfields)); 
+		enum bitCnt = 13; 
+		protected
+		{
+			enum GLSLCode =
+			iq{
+				uint fontType() { return getBits(FF, 0, 2); } 
+				bool fontBold() { return getBit(FF, 2); } 
+				bool fontItalic() { return getBit(FF, 3); } 
+				bool fontMonospace() { return getBit(FF, 4); } 
+				uint fontLine() { return getBits(FF, 5, 2); } 
+				uint fontWidth() { return getBits(FF, 7, 2); } 
+				uint fontScript() { return getBits(FF, 9, 2); } 
+				uint fontBlink() { return getBits(FF, 11, 2); } 
+			}.text; 
+		} 
+	} 
+	
+	struct VecFlags
+	{
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{CoordFormat},q{2},q{"format"},q{},q{/++/}],
+				[q{bool},q{1},q{"relative"},q{},q{/++/}],
+			]))
+		).調!(GEN_bitfields)); 
+		enum bitCnt = 3; 
+		protected
+		{
+			enum GLSLCode = 
+			iq{
+				uint vecFormat() { return getBits(VF, 0, 2); } 
+				bool vecRelative() { return getBit(VF, 2); } 
+			}.text; 
+		} 
+	} 
+	
+	template FlagBits(T)
+	{
+		static foreach(A; AliasSeq!(TexFlags, FontFlags, VecFlags))
+		static if(is(T : A)) enum FlagBits = A.bitCnt; 
+	} 
+	
 	
 	class GeometryStreamProcessor
 	{
@@ -874,22 +873,22 @@ class VulkanWindow: Window
 		{
 			alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
 			
-			enum TexFlag {
+			enum TexInfoFlag {
 				error 	= 1,
 				loading 	= 2,
 				resident 	= 4
-			}; alias TexFlags = VkBitFlags!TexFlag; 
+			}; alias TexInfoFlags = VkBitFlags!TexInfoFlag; 
 			
-			enum FlagBits	= 3,
-			DimBits 	= 2, 
-			ChnBits 	= 2, 
-			BppBits 	= 4, 
-			FlagBitOfs	= 0,
-			DimBitOfs	= 6,
-			FormatBitOfs 	= 8 /+inside info_dword[0]+/,
-			FormatBits 	= ChnBits + BppBits + 1 /+alt+/; 
+			enum TexInfoBits	= 3,
+			TexDimBits 	= 2, 
+			TexChnBits 	= 2, 
+			TexBppBits 	= 4, 
+			TexInfoBitOfs	= 0,
+			TexDimBitOfs	= 6,
+			TexFormatBitOfs 	= 8 /+inside info_dword[0]+/,
+			TexFormatBits 	= TexChnBits + TexBppBits + 1 /+alt+/; 
 			
-			enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<DimBits); 
+			enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<TexDimBits); 
 			enum _TexFormat_matrix = 
 			(表([
 				[q{/+Note: chn/bpp+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
@@ -946,8 +945,8 @@ class VulkanWindow: Window
 			])); 
 			static if((常!(bool)(0))) { pragma(msg, GEN_TexFormat); }/+Todo: rename Type -> Format+/
 			mixin(GEN_TexFormat); 
-			static assert(TexChn.max < 1<<ChnBits); static assert(TexBpp.max < 1<<BppBits); 
-			static assert(TexFormat.max < 1<<FormatBits); 
+			static assert(TexChn.max < 1<<TexChnBits); static assert(TexBpp.max < 1<<TexBppBits); 
+			static assert(TexFormat.max < 1<<TexFormatBits); 
 			
 			static string GEN_TexFormat()
 			{
@@ -999,8 +998,8 @@ class VulkanWindow: Window
 					]))
 				).調!(GEN_bitfields)); 
 				
-				@property format() const => (cast(TexFormat)((*(cast(ulong*)(&this))).getBits(FormatBitOfs, FormatBits))); 
-				@property format(TexFormat t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(FormatBitOfs, FormatBits, t); } 
+				@property format() const => (cast(TexFormat)((*(cast(ulong*)(&this))).getBits(TexFormatBitOfs, TexFormatBits))); 
+				@property format(TexFormat t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(TexFormatBitOfs, TexFormatBits, t); } 
 				
 				protected
 				{
@@ -1050,10 +1049,10 @@ class VulkanWindow: Window
 				{ dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); } 
 				
 				@property flags() const
-				=> mixin(幟!((TexFlag),q{getBits(*(cast(ubyte*)(&this)), FlagBitOfs, FlagBits)})); 
+				=> mixin(幟!((TexInfoFlag),q{getBits(*(cast(ubyte*)(&this)), TexInfoBitOfs, TexInfoBits)})); 
 				
-				@property flags(in TexFlags a)
-				{ auto b = (cast(ubyte*)(&this)); *b = setBits(*b, FlagBitOfs, FlagBits, (cast(ubyte)((cast(uint)(a))))); } 
+				@property flags(in TexInfoFlags a)
+				{ auto b = (cast(ubyte*)(&this)); *b = setBits(*b, TexInfoBitOfs, TexInfoBits, (cast(ubyte)((cast(uint)(a))))); } 
 				
 				static void selfTest()
 				{
@@ -1406,7 +1405,7 @@ class VulkanWindow: Window
 			{ destroyedResidentTexHandles = new typeof(destroyedResidentTexHandles); } 
 		}
 		
-		this(S)(in TexFlags flags, in TexFormat format, in S size, in void[] data=null)
+		this(S)(in TexInfoFlags flags, in TexFormat format, in S size, in void[] data=null)
 		{
 			TexSizeFormat fmt; 
 			fmt.flags 	= flags,
@@ -1416,7 +1415,7 @@ class VulkanWindow: Window
 			handle = TB.createHandleAndSetData(fmt, data); 
 		} 
 		
-		this(S)(in TexFormat format, in S size, in void[] data=null, in TexFlags flags=TexFlags.init)
+		this(S)(in TexFormat format, in S size, in void[] data=null, in TexInfoFlags flags=TexInfoFlags.init)
 		{ this(flags, format, size, data); } 
 		
 		~this()
@@ -1505,7 +1504,7 @@ class VulkanWindow: Window
 			SC = (RGB(0xFF000000)); 
 		} 
 		
-		struct Bits(T) { T bits; uint bitCnt; } 
+		struct Bits(T) { T bits; uint bitCnt = T.sizeof.to!uint * 8; } 
 		
 		protected
 		{
@@ -1520,7 +1519,10 @@ class VulkanWindow: Window
 						else static if(is(T==enum))	GB.appendBits(a, EnumBits!T); 
 						else static if(is(T : RGBA))	GB.appendBits(a.raw, 32); 
 						else static if(is(T : RGB))	GB.appendBits(a.raw, 24); 
-						else static assert(0, "Unhandled type"); 
+						else static if(is(T : vec2))	GB.appendBits(a.bitCast!ulong); 
+						else static if(is(T : ushort))	GB.appendBits(a.bitCast!ushort); 
+						else static if(is(T : ubyte))	GB.appendBits(a.bitCast!byte); 
+						else static assert(0, "Unhandled type "~T.stringof); 
 					}
 				}
 			} 
@@ -1529,7 +1531,7 @@ class VulkanWindow: Window
 		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 		{
 			
-			const addr = GB.bitPos; print(addr); 
+			const addr = GB.bitPos; 
 			
 			GB.appendBits(bounds.low.bitCast!ulong); 
 			GB.appendBits(bounds.high.bitCast!ulong); 
@@ -1541,7 +1543,15 @@ class VulkanWindow: Window
 				GB.appendBits((RGBA(0x40F0C0)).raw, 24); 
 			}
 			else
-			{ appendBits(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{rgb_u8})), (RGB(0x40F0C0))); }
+			{
+				appendBits(
+					mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{rgb_u8})), (RGB(0x40F0C0)),
+					/+mixin(舉!((Opcode),q{setFlags})), mixin(舉!((FlagFormat),q{tex})), mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})),+/
+					mixin(舉!((Opcode),q{move})), bounds.low,
+					mixin(舉!((Opcode),q{texRect})), bounds.high, mixin(舉!((HandleFormat),q{u16})), texHandle.to!ushort,
+					mixin(舉!((Opcode),q{end}))
+				); 
+			}
 			
 			
 			GB.appendBits(-1, 3); 
@@ -2033,8 +2043,9 @@ class VulkanWindow: Window
 			$(GEN_enumDefines!VertexCmd)
 			
 			/*Vector graphics state registers*/
-			uint FL = 0; 	//flags
-			uint reserved = 0; 	
+			uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
+			
+			
 			vec4 PC = vec4(0, 0, 0, 1); 	/* Primary color - default black */
 			vec4 SC = vec4(1, 1, 1, 1); 	/* Secondary color - default white */
 				
@@ -2051,7 +2062,9 @@ class VulkanWindow: Window
 			vec3 P = vec3(0); 	/* Position */
 			float Ph = 0; 	/* Phase coordinate */
 			
-			$(GSPFlags.GLSLCode)
+			$(TexFlags.GLSLCode)
+			$(FontFlags.GLSLCode)
+			$(VecFlags.GLSLCode)
 			
 			/* Helper functions for fetching different data formats */
 			$(GEN_enumDefines!ColorFormat)
@@ -2122,19 +2135,17 @@ class VulkanWindow: Window
 				}
 				if(bits>0) return float(fetch_int(bitStream, bits)); 
 				return 0; 
+				/*Opt: Do it with single fetch*/
 			} 
 			$(GEN_enumDefines!FlagFormat)
 			void setFlags(inout BitStream bitStream)
 			{
-				const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); int ofs=0, cnt=0; 
-				switch(fmt)
-				{
-					case FlagFormat_tex: 	ofs = 0; cnt = FL_texBits; 	break; 
-					case FlagFormat_font: 	ofs = FL_texBits; cnt = FL_fontBits; 	break; 
-					case FlagFormat_vec: 	ofs = FL_texBits+FL_fontBits; cnt = FL_vecBits; 	break; 
-					case FlagFormat_all: 	ofs = 0; cnt = FL_texBits+FL_fontBits+FL_vecBits; 	break; 
-				}
-				if(cnt>0) setBits(FL, ofs, cnt, fetchBits(bitStream, cnt)); 
+				const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); 
+				
+				if(fmt==FlagFormat_all || fmt==FlagFormat_tex) TF = fetchBits(bitStream, $(FlagBits!TexFlags)); 
+				if(fmt==FlagFormat_all || fmt==FlagFormat_font) FF = fetchBits(bitStream, $(FlagBits!FontFlags)); 
+				if(fmt==FlagFormat_all || fmt==FlagFormat_vec) VF = fetchBits(bitStream, $(FlagBits!VecFlags)); 
+				/*Opt: Do it all with a single fetchBits call*/
 			} 
 			
 			void processInstruction(inout BitStream bitStream) 
@@ -2293,14 +2304,14 @@ class VulkanWindow: Window
 				const uint info_0 = IB[textDwIdx+0]; 
 				
 				//handle 'error' and 'loading' flags
-				if(getBits(info_0, $(FlagBitOfs), 2)!=0)
+				if(getBits(info_0, $(TexInfoBitOfs), 2)!=0)
 				{
-					if(getBit(info_0, $(FlagBitOfs)))	return ErrorColor; 
+					if(getBit(info_0, $(TexInfoBitOfs)))	return ErrorColor; 
 					else	return LoadingColor; 
 				}
 				
 				//decode dimensions, size
-				const uint dim = getBits(info_0, $(DimBitOfs), $(DimBits)); 
+				const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
 				const uint info_1 = IB[textDwIdx+1]; 
 				const uint _rawSize0 = getBits(info_0, 16, 16); 
 				const uint _rawSize12 = info_1; 
@@ -2319,9 +2330,9 @@ class VulkanWindow: Window
 				const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
 				
 				//decode format (chn, bpp, alt)
-				const uint chn = getBits(info_0, $(FormatBitOfs), $(ChnBits)); 
-				const uint bpp = getBits(info_0, $(FormatBitOfs + ChnBits), $(BppBits)); 
-				const bool alt = getBit(info_0, $(FormatBitOfs+ChnBits+BppBits)); 
+				const uint chn = getBits(info_0, $(TexFormatBitOfs), $(TexChnBits)); 
+				const uint bpp = getBits(info_0, $(TexFormatBitOfs + TexChnBits), $(TexBppBits)); 
+				const bool alt = getBit(info_0, $(TexFormatBitOfs + TexChnBits + TexBppBits)); 
 				
 				//Phase 1: Calculate minimal read range
 				uint startIdx; 
