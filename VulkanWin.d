@@ -153,7 +153,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum TexXAlign {left, center, right} 
 	enum TexYAlign {top, center, baseline, bottom} 
 	enum TexSizeSpec {original, scaled, exact} 
-	enum TexAspect {stretch, keep, crop} 
+	enum TexAspect {keep, crop, stretch} 
 	
 	enum TexOrientation
 	{
@@ -314,6 +314,9 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	struct GSPFlags
 	{
 		/+This is a combination of FontFlags and TexFlags+/
+		
+		version(none)
+		enum test = mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})); 
 		
 		mixin((
 			(表([
@@ -1502,6 +1505,27 @@ class VulkanWindow: Window
 			SC = (RGB(0xFF000000)); 
 		} 
 		
+		struct Bits(T) { T bits; uint bitCnt; } 
+		
+		protected
+		{
+			void appendBits(Args...)(in Args args)
+			{
+				static foreach(i, T; Args)
+				{
+					{
+						alias a = args[i]; 
+						static if(is(T : Opcode))	with(opInfo[a]) GB.appendBits(bits, bitCnt); 
+						else static if(is(T : Bits!(B), B))	GB.appendBits(a.bits, a.bitCnt); 
+						else static if(is(T==enum))	GB.appendBits(a, EnumBits!T); 
+						else static if(is(T : RGBA))	GB.appendBits(a.raw, 32); 
+						else static if(is(T : RGB))	GB.appendBits(a.raw, 24); 
+						else static assert(0, "Unhandled type"); 
+					}
+				}
+			} 
+		} 
+		
 		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 		{
 			
@@ -1510,9 +1534,15 @@ class VulkanWindow: Window
 			GB.appendBits(bounds.low.bitCast!ulong); 
 			GB.appendBits(bounds.high.bitCast!ulong); 
 			
-			GB.appendBits(opInfo[Opcode.setPC].bits, opInfo[Opcode.setPC].bitCnt); 
-			GB.appendBits(ColorFormat.rgb_u8, EnumBits!ColorFormat); 
-			GB.appendBits((RGBA(0x40F0C0)).raw, 24); 
+			version(none)
+			{
+				GB.appendBits(opInfo[Opcode.setPC].bits, opInfo[Opcode.setPC].bitCnt); 
+				GB.appendBits(ColorFormat.rgb_u8, EnumBits!ColorFormat); 
+				GB.appendBits((RGBA(0x40F0C0)).raw, 24); 
+			}
+			else
+			{ appendBits(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{rgb_u8})), (RGB(0x40F0C0))); }
+			
 			
 			GB.appendBits(-1, 3); 
 			

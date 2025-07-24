@@ -6497,6 +6497,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			bool append(in void* data, size_t size)
 			{
+				/+Opt: Must optimize this. It's way too OOPish.+/
+				
 				if(!size) return true; 
 				
 				const success = requireBufferSizeBytes(appendPos + size); 
