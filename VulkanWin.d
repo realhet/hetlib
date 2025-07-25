@@ -256,7 +256,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{},q{"01"},q{setLFMH},q{/+LatinFontMap+/}],
 				[q{},q{},q{"10"},q{setPALH},q{/+Palette+/}],
 				[q{},q{},q{"11"},q{setLTH},q{/+LineTexture+/}],
-				[],
+				[],
 				[q{/+Note: lvl0+/},q{/+Note: lvl1+/},q{/+Note: lvl2+/},q{/+Note: op+/},q{/+Note: comment+/}],
 				[q{/+drawing+/}],
 				[q{/+	SVG linear+/}],
@@ -275,8 +275,8 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{},q{"10"},q{drawTYPE},q{/+string+/}],
 				[q{},q{},q{"11"},q{drawRECT},q{/++/}],
 				[q{/+	future extensions+/}],
-				[q{},q{"11"},q{"00"},q{move},q{/+CoordFormat Coords+/}],
-				[q{},q{},q{"01"},q{texRect},q{/+CoordFormat Coords TexFormat HandleFormat Handle+/}],
+				[q{},q{"11"},q{"00"},q{drawMove},q{/+CoordFormat Coords+/}],
+				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords TexFormat HandleFormat Handle+/}],
 				[q{},q{},q{"10"},q{},q{/++/}],
 				[q{},q{},q{"11"},q{},q{/++/}],
 				[],
@@ -1520,6 +1520,7 @@ class VulkanWindow: Window
 						else static if(is(T : RGBA))	GB.appendBits(a.raw, 32); 
 						else static if(is(T : RGB))	GB.appendBits(a.raw, 24); 
 						else static if(is(T : vec2))	GB.appendBits(a.bitCast!ulong); 
+						else static if(is(T : uint))	GB.appendBits(a.bitCast!uint); 
 						else static if(is(T : ushort))	GB.appendBits(a.bitCast!ushort); 
 						else static if(is(T : ubyte))	GB.appendBits(a.bitCast!byte); 
 						else static assert(0, "Unhandled type "~T.stringof); 
@@ -1533,8 +1534,10 @@ class VulkanWindow: Window
 			
 			const addr = GB.bitPos; 
 			
-			GB.appendBits(bounds.low.bitCast!ulong); 
-			GB.appendBits(bounds.high.bitCast!ulong); 
+			/+
+				GB.appendBits(bounds.low.bitCast!ulong); 
+				GB.appendBits(bounds.high.bitCast!ulong); 
+			+/
 			
 			version(none)
 			{
@@ -1545,10 +1548,10 @@ class VulkanWindow: Window
 			else
 			{
 				appendBits(
-					mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{rgb_u8})), (RGB(0x40F0C0)),
 					/+mixin(舉!((Opcode),q{setFlags})), mixin(舉!((FlagFormat),q{tex})), mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})),+/
-					mixin(舉!((Opcode),q{move})), bounds.low,
-					mixin(舉!((Opcode),q{texRect})), bounds.high, mixin(舉!((HandleFormat),q{u16})), texHandle.to!ushort,
+					mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgb_u8})), (RGB(0x20F020)),
+					mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), bounds.low,
+					mixin(舉!((Opcode),q{drawTexRect}))	, mixin(舉!((CoordFormat),q{f32})), bounds.high, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texHandle)),
 					mixin(舉!((Opcode),q{end}))
 				); 
 			}
@@ -2046,8 +2049,8 @@ class VulkanWindow: Window
 			uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
 			
 			
-			vec4 PC = vec4(0, 0, 0, 1); 	/* Primary color - default black */
-			vec4 SC = vec4(1, 1, 1, 1); 	/* Secondary color - default white */
+			vec4 PC = vec4(1); 	/* Primary color - default black */
+			vec4 SC = vec4(0); 	/* Secondary color - default white */
 				
 			float PS = 1; 	/* Point size */
 			float LW = 1; 	/* Line width */
@@ -2059,8 +2062,16 @@ class VulkanWindow: Window
 			uint PALH = 0; 	/* Palette handle */
 			uint LTH = 0; 	/* Line texture handle */
 				
-			vec3 P = vec3(0); 	/* Position */
-			float Ph = 0; 	/* Phase coordinate */
+			vec3 	P	= vec3(0), 
+				P_last 	= vec3(0),
+				P_next 	= vec3(0); 	/* Position */
+			float 	Ph 	= 0, 
+				Ph_next 	= 0; 	/* Phase coordinate */
+				
+			int runningCntr = 256; 	/*
+				Execution is enabled if it's greater than 0
+				After every step it's decremented.
+			*/
 			
 			$(TexFlags.GLSLCode)
 			$(FontFlags.GLSLCode)
@@ -2148,6 +2159,40 @@ class VulkanWindow: Window
 				/*Opt: Do it all with a single fetchBits call*/
 			} 
 			
+			void fetchP(inout BitStream bitStream)
+			{
+				const uint coordFmt = fetchBits(bitStream, $(EnumBits!CoordFormat)); 
+				P_next.xy = vec2(
+					fetchCoord(bitStream, coordFmt), 
+					fetchCoord(bitStream, coordFmt)
+				); 
+			} 
+			
+			void latchP()
+			{ P_last = P; P = P_next; } 
+			
+			void drawMove(inout BitStream bitStream)
+			{
+				fetchP(bitStream); 
+				
+				latchP(); 
+			} 
+			
+			void drawTexRect(inout BitStream bitStream)
+			{
+				fetchP(bitStream); 
+				
+				const uint handleFmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
+				const uint texHandle = fetchHandle(bitStream, handleFmt); 
+				
+				fragColor = PC; 
+				fragTexHandle = texHandle; 
+				emitTexturedPointPointRect2D(P.xy, P_next.xy); 
+				
+				latchP(); 
+			} 
+			
+			
 			void processInstruction(inout BitStream bitStream) 
 			{
 				const uint opcode = 
@@ -2165,7 +2210,7 @@ class VulkanWindow: Window
 						case 0: //system
 							switch(cmd)
 						{
-							case 0: 	/*end(); */	/*end - 5 zeroed at end of VBO*/	break; 
+							case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
 							case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
 							case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
 							case 3: 			break; 
@@ -2254,8 +2299,8 @@ class VulkanWindow: Window
 						case 3: 
 							switch(cmd)
 						{
-							case 0: 	/*drawCHART(); */	/*draw graphs/rulers/grids*/	break; 
-							case 1: 	/*drawMESH(); */	/*draw 3D objects*/	break; 
+							case 0: 	drawMove(bitStream); 		break; 
+							case 1: 	drawTexRect(bitStream); 		break; 
 							case 2: 			break; 
 							case 3: 			break; 
 						}
@@ -2279,12 +2324,15 @@ class VulkanWindow: Window
 						
 						BitStream GS = initBitStream(gAddr); 
 						
-						vec2 p1 = fetch_vec2(GS); 
-						vec2 p2 = fetch_vec2(GS); 
+						/*
+							vec2 p1 = fetch_vec2(GS); 
+							vec2 p2 = fetch_vec2(GS); 
+						*/
 						
-						processInstruction(GS); 
+						while(runningCntr>0)
+						{ processInstruction(GS); runningCntr--; }
 						
-						fragColor = PC; emitTexturedPointPointRect2D(p1, p2); 
+						/*fragColor = PC; emitTexturedPointPointRect2D(P_last.xy, P.xy); */
 					}
 					break; 
 				}
