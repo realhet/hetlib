@@ -6643,6 +6643,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							}
 						}
 						onBlock(current); //Add the last accumulated range 
+						
+						/+Todo: Use MemTrack class!+/
 					} 
 				} 
 			}

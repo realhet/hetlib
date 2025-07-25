@@ -2318,21 +2318,10 @@ class VulkanWindow: Window
 				{
 					case VertexCmd_texturedRect: 
 						{
-						fragTexHandle = geomAttr0[0].x >> $(VertexCmdBits); 
-						PC = unpackUnorm4x8(geomAttr0[0].y); 
 						const uint gAddr = geomAttr0[0].z; 
-						
 						BitStream GS = initBitStream(gAddr); 
-						
-						/*
-							vec2 p1 = fetch_vec2(GS); 
-							vec2 p2 = fetch_vec2(GS); 
-						*/
-						
 						while(runningCntr>0)
 						{ processInstruction(GS); runningCntr--; }
-						
-						/*fragColor = PC; emitTexturedPointPointRect2D(P_last.xy, P.xy); */
 					}
 					break; 
 				}
