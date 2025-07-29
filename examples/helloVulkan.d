@@ -72,10 +72,10 @@ import het.vulkanwin;
 		
 		
 		{
-			auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x967912637E4)))*300); 
+			auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x9675F5C4644)))*300); 
 			
 			int i; 
-			foreach(v; verts.take((0x9C7912637E4).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x9F1912637E4))))).max(1))))
+			foreach(v; verts.take((0x9C75F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x9F15F5C4644))))).max(1))))
 			VB.tri(i++ & 2 ? clWhite : clRed, v); 
 		}
 		

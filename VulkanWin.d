@@ -764,23 +764,9 @@ class VulkanWindow: Window
 	
 	version(/+$DIDE_REGION VB    +/all)
 	{
-		enum VertexCmd
-		{texturedRect} 
-		enum VertexCmdBits = 4; static assert(VertexCmd.max < 1<<VertexCmdBits); 
+		union VertexData { uint geometryStreamBitOfs; } 
 		
-		union VertexData {
-			struct 
-			{ uvec4 VA0, VA1; } 
-			struct 
-			{
-				uint cmd; 
-				RGBA color; 
-				uint dummy0, dummy1; 
-				bounds2 bounds; 
-			} 
-		} 
-		
-		static assert(VertexData.sizeof == 32); 
+		static assert(VertexData.sizeof == 4); 
 		
 		VertexBufferManager VB; 
 		
@@ -1531,48 +1517,14 @@ class VulkanWindow: Window
 		
 		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
 		{
-			
-			const addr = GB.bitPos; 
-			
-			/+
-				GB.appendBits(bounds.low.bitCast!ulong); 
-				GB.appendBits(bounds.high.bitCast!ulong); 
-			+/
-			
-			version(none)
-			{
-				GB.appendBits(opInfo[Opcode.setPC].bits, opInfo[Opcode.setPC].bitCnt); 
-				GB.appendBits(ColorFormat.rgb_u8, EnumBits!ColorFormat); 
-				GB.appendBits((RGBA(0x40F0C0)).raw, 24); 
-			}
-			else
-			{
-				appendBits(
-					/+mixin(舉!((Opcode),q{setFlags})), mixin(舉!((FlagFormat),q{tex})), mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})),+/
-					mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgb_u8})), (RGB(0x20F020)),
-					mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), bounds.low,
-					mixin(舉!((Opcode),q{drawTexRect}))	, mixin(舉!((CoordFormat),q{f32})), bounds.high, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texHandle)),
-					mixin(舉!((Opcode),q{end}))
-				); 
-			}
-			
-			
-			GB.appendBits(-1, 3); 
-			
-			
-			/+
-				const addr = GB.buffer.appendPos.to!uint; print(addr); 
-				GB.buffer.append(bounds); 
-			+/
-			VB.buffer.append
-			(
-				mixin(體!((VertexData),q{
-					cmd 	: VertexCmd.texturedRect | texHandle.to!uint<<VertexCmdBits,
-					dummy0 	: addr,
-					/+bounds 	: bounds,+/
-					color 	: color
-				}))
+			VB.buffer.append(mixin(體!((VertexData),q{GB.bitPos}))); 
+			foreach(i; 0..4)
+			appendBits(
+				mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgba_u8})), mix((RGBA(0xFF40F0E0)), color, i/255.0f),
+				mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), bounds.low+vec2(i*4).rotate(i*.125f),
+				mixin(舉!((Opcode),q{drawTexRect}))	, mixin(舉!((CoordFormat),q{f32})), bounds.high+vec2(i*4).rotate(i*.125f), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texHandle)),
 			); 
+			appendBits(mixin(舉!((Opcode),q{end}))); 
 		} 
 		
 		void draw(A...)(A args)
@@ -1863,8 +1815,8 @@ class VulkanWindow: Window
 			$(
 				(表([
 					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/}],
-					[q{},q{vert},q{uvec4 vertAttr0},q{uvec4 vertAttr1}],
-					[q{vert},q{geom},q{uvec4 geomAttr0},q{uvec4 geomAttr1},q{int geomVertexID}],
+					[q{},q{vert},q{uint vertGSBitOfs}],
+					[q{vert},q{geom},q{uint geomGSBitOfs}],
 					[q{geom},q{frag},q{
 						smooth
 						vec4 fragColor
@@ -1885,9 +1837,8 @@ class VulkanWindow: Window
 			
 			void main()
 			{
-				geomAttr0 	= vertAttr0, 
-				geomAttr1 	= vertAttr1,
-				geomVertexID	= gl_VertexIndex; 
+				geomGSBitOfs 	= vertGSBitOfs 
+				/*geomVertexID	= gl_VertexIndex*/; 
 			} 
 			
 			@geom: 
@@ -2043,8 +1994,6 @@ class VulkanWindow: Window
 				return bitStream; 
 			} 
 			
-			$(GEN_enumDefines!VertexCmd)
-			
 			/*Vector graphics state registers*/
 			uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
 			
@@ -2312,19 +2261,10 @@ class VulkanWindow: Window
 			
 			void main() /*geometry shader*/
 			{
-				const uint vertexCmd = getBits(geomAttr0[0].x, 0, $(VertexCmdBits)); 
-				
-				switch(vertexCmd)
-				{
-					case VertexCmd_texturedRect: 
-						{
-						const uint gAddr = geomAttr0[0].z; 
-						BitStream GS = initBitStream(gAddr); 
-						while(runningCntr>0)
-						{ processInstruction(GS); runningCntr--; }
-					}
-					break; 
-				}
+				BitStream GS = initBitStream(geomGSBitOfs[0]); 
+				//Todo: read and enforce limitm from geomGSBitOfs[0], use line_strip_adjacent
+				while(runningCntr>0)
+				{ processInstruction(GS); runningCntr--; }
 			} 
 			
 			@frag: 
@@ -2670,18 +2610,11 @@ class VulkanWindow: Window
 					inputRate 	: mixin(舉!((VK_VERTEX_INPUT_RATE_),q{VERTEX})),
 				})), [
 					mixin(體!((VkVertexInputAttributeDescription),q{
-						//uvec4 VertexData0
 						binding	: 0, 
 						location 	: 0,
-						format	: mixin(舉!((VK_FORMAT_),q{R32G32B32A32_UINT})),
+						format	: mixin(舉!((VK_FORMAT_),q{R32_UINT})),
 						offset	: 0
-					})), mixin(體!((VkVertexInputAttributeDescription),q{
-						//uvec4 VertexData1
-						binding	: 0,
-						location 	: 1,
-						format	: mixin(舉!((VK_FORMAT_),q{R32G32B32A32_UINT})), 
-						offset	: uvec4.sizeof,
-					})),
+					}))
 				]
 			),
 			

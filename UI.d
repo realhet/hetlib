@@ -6935,7 +6935,7 @@ struct im
 			}
 		} 
 		
-			void Panel(alias string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+			void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			 //Todo: multiple Panels, but not call them frames...
 			enforce(actContainer is null, "Panel() must be on root level"); 

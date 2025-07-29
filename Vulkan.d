@@ -6306,7 +6306,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				{
 					VulkanMemoryBuffer hostMemoryBuffer, deviceMemoryBuffer; 
 					size_t bufferSizeBytes; 
-					void* hostPtr; 
+					void* hostPtr; /+Todo: Must be ubyte*, because of GC+/
 					
 					bool valid() => bufferSizeBytes && hostMemoryBuffer && deviceMemoryBuffer && !!hostPtr; 
 				} 
@@ -6676,7 +6676,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		alias HeapChunkIdx = Typedef!(uint, 0, "HeapChunkIdx"); 
 		
 		struct HeapRef {
-			void* ptr; 
+			void* ptr; /+Todo: Must be ubyte*, because of GC+/
 			HeapChunkIdx heapChunkIdx; 
 			
 			bool opCast(B : bool)() const => !!heapChunkIdx; 

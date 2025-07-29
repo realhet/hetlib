@@ -250,6 +250,16 @@ version(/+$DIDE_REGION+/all)
 	{
 		static if(op.among("<<", ">>", ">>>"))	alias OperationResultType = A; 
 		else	alias OperationResultType = CommonType!(A, B); 
+		
+		/+
+			Bug: Fucking annoying CommonType template recursion bug
+				/+
+				Code: RGB[] importVicePalette(File f)
+				=> f.readLines	.filter!q{a.length && !a.startsWith(`#`)}
+					.map!((a)=>(a.replace(" ", "").to!uint(16).BGR)).takeExactly(16).array
+					/+Remove takeExactly() and bug happens+/; 
+			+/
+		+/
 	} 
 	
 	/// T is a combination of vector and scalar parameters
