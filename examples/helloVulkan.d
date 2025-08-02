@@ -4,259 +4,433 @@
 
 import het.vulkanwin; 
 
-/+
+static immutable EGAPalette = 
+[
+	(RGBA(0, 0, 0, 255)),	//Black
+	(RGBA(0, 0, 170, 255)),	//Blue
+	(RGBA(0, 170, 0, 255)),	//Green
+	(RGBA(0, 170, 170, 255)),	//Cyan
+	(RGBA(170, 0, 0, 255)),	//Red
+	(RGBA(170, 0, 170, 255)),	//Magenta
+	(RGBA(170, 85, 0, 255)),	//Brown
+	(RGBA(170, 170, 170, 255)),	//Light Gray
+	(RGBA(85, 85, 85, 255)),	//Dark Gray
+	(RGBA(85, 85, 255, 255)),	//Bright Blue
+	(RGBA(85, 255, 85, 255)),	//Bright Green
+	(RGBA(85, 255, 255, 255)),	//Bright Cyan
+	(RGBA(255, 85, 85, 255)),	//Bright Red
+	(RGBA(255, 85, 255, 255)),	//Bright Magenta
+	(RGBA(255, 255, 85, 255)),	//Yellow
+	(RGBA(255, 255, 255, 255))	//White
+]; static immutable C64Palette = 
+[
+	(RGBA(0, 0, 0, 255)),	//Black
+	(RGBA(255, 255, 255, 255)),	//White
+	(RGBA(136, 0, 0, 255)),	//Red
+	(RGBA(170, 255, 238, 255)),	//Cyan
+	(RGBA(204, 68, 204, 255)),	//Purple
+	(RGBA(0, 204, 85, 255)),	//Green
+	(RGBA(0, 0, 170, 255)),	//Blue
+	(RGBA(238, 238, 119, 255)),	//Yellow
+	(RGBA(221, 136, 85, 255)),	//Orange
+	(RGBA(102, 68, 0, 255)),	//Brown
+	(RGBA(255, 119, 119, 255)),	//Light Red
+	(RGBA(51, 51, 51, 255)),	//Dark Gray
+	(RGBA(119, 119, 119, 255)),	//Medium Gray
+	(RGBA(170, 255, 102, 255)),	//Light Green
+	(RGBA(0, 136, 255, 255)),	//Light Blue
+	(RGBA(187, 187, 187, 255)) 	//Light Gray
+]; static immutable VGAPalette = 
+[
+	(RGB(0x000000 )),(RGB(0xAA0000 )),(RGB(0x00AA00 )),(RGB(0xAAAA00 )),(RGB(0x0000AA )),(RGB(0xAA00AA )),(RGB(0x0055AA )),(RGB(0xAAAAAA )),(RGB(0x555555 )),(RGB(0xFF5555 )),(RGB(0x55FF55 )),(RGB(0xFFFF55 )),(RGB(0x5555FF )),(RGB(0xFF55FF )),(RGB(0x55FFFF )),(RGB(0xFFFFFF )),
+	(RGB(0x000000 )),(RGB(0x101010 )),(RGB(0x202020 )),(RGB(0x353535 )),(RGB(0x454545 )),(RGB(0x555555 )),(RGB(0x656565 )),(RGB(0x757575 )),(RGB(0x8A8A8A )),(RGB(0x9A9A9A )),(RGB(0xAAAAAA )),(RGB(0xBABABA )),(RGB(0xCACACA )),(RGB(0xDFDFDF )),(RGB(0xEFEFEF )),(RGB(0xFFFFFF )),
+	(RGB(0xFF0000 )),(RGB(0xFF0041 )),(RGB(0xFF0082 )),(RGB(0xFF00BE )),(RGB(0xFF00FF )),(RGB(0xBE00FF )),(RGB(0x8200FF )),(RGB(0x4100FF )),(RGB(0x0000FF )),(RGB(0x0041FF )),(RGB(0x0082FF )),(RGB(0x00BEFF )),(RGB(0x00FFFF )),(RGB(0x00FFBE )),(RGB(0x00FF82 )),(RGB(0x00FF41 )),(RGB(0x00FF00 )),(RGB(0x41FF00 )),(RGB(0x82FF00 )),(RGB(0xBEFF00 )),(RGB(0xFFFF00 )),(RGB(0xFFBE00 )),(RGB(0xFF8200 )),(RGB(0xFF4100 )),
+	(RGB(0xFF8282 )),(RGB(0xFF829E )),(RGB(0xFF82BE )),(RGB(0xFF82DF )),(RGB(0xFF82FF )),(RGB(0xDF82FF )),(RGB(0xBE82FF )),(RGB(0x9E82FF )),(RGB(0x8282FF )),(RGB(0x829EFF )),(RGB(0x82BEFF )),(RGB(0x82DFFF )),(RGB(0x82FFFF )),(RGB(0x82FFDF )),(RGB(0x82FFBE )),(RGB(0x82FF9E )),(RGB(0x82FF82 )),(RGB(0x9EFF82 )),(RGB(0xBEFF82 )),(RGB(0xDFFF82 )),(RGB(0xFFFF82 )),(RGB(0xFFDF82 )),(RGB(0xFFBE82 )),(RGB(0xFF9E82 )),
+	(RGB(0xFFBABA )),(RGB(0xFFBACA )),(RGB(0xFFBADF )),(RGB(0xFFBAEF )),(RGB(0xFFBAFF )),(RGB(0xEFBAFF )),(RGB(0xDFBAFF )),(RGB(0xCABAFF )),(RGB(0xBABAFF )),(RGB(0xBACAFF )),(RGB(0xBADFFF )),(RGB(0xBAEFFF )),(RGB(0xBAFFFF )),(RGB(0xBAFFEF )),(RGB(0xBAFFDF )),(RGB(0xBAFFCA )),(RGB(0xBAFFBA )),(RGB(0xCAFFBA )),(RGB(0xDFFFBA )),(RGB(0xEFFFBA )),(RGB(0xFFFFBA )),(RGB(0xFFEFBA )),(RGB(0xFFDFBA )),(RGB(0xFFCABA )),
+	(RGB(0x710000 )),(RGB(0x71001C )),(RGB(0x710039 )),(RGB(0x710055 )),(RGB(0x710071 )),(RGB(0x550071 )),(RGB(0x390071 )),(RGB(0x1C0071 )),(RGB(0x000071 )),(RGB(0x001C71 )),(RGB(0x003971 )),(RGB(0x005571 )),(RGB(0x007171 )),(RGB(0x007155 )),(RGB(0x007139 )),(RGB(0x00711C )),(RGB(0x007100 )),(RGB(0x1C7100 )),(RGB(0x397100 )),(RGB(0x557100 )),(RGB(0x717100 )),(RGB(0x715500 )),(RGB(0x713900 )),(RGB(0x711C00 )),
+	(RGB(0x713939 )),(RGB(0x713945 )),(RGB(0x713955 )),(RGB(0x713961 )),(RGB(0x713971 )),(RGB(0x613971 )),(RGB(0x553971 )),(RGB(0x453971 )),(RGB(0x393971 )),(RGB(0x394571 )),(RGB(0x395571 )),(RGB(0x396171 )),(RGB(0x397171 )),(RGB(0x397161 )),(RGB(0x397155 )),(RGB(0x397145 )),(RGB(0x397139 )),(RGB(0x457139 )),(RGB(0x557139 )),(RGB(0x617139 )),(RGB(0x717139 )),(RGB(0x716139 )),(RGB(0x715539 )),(RGB(0x714539 )),
+	(RGB(0x715151 )),(RGB(0x715159 )),(RGB(0x715161 )),(RGB(0x715169 )),(RGB(0x715171 )),(RGB(0x695171 )),(RGB(0x615171 )),(RGB(0x595171 )),(RGB(0x515171 )),(RGB(0x515971 )),(RGB(0x516171 )),(RGB(0x516971 )),(RGB(0x517171 )),(RGB(0x517169 )),(RGB(0x517161 )),(RGB(0x517159 )),(RGB(0x517151 )),(RGB(0x597151 )),(RGB(0x617151 )),(RGB(0x697151 )),(RGB(0x717151 )),(RGB(0x716951 )),(RGB(0x716151 )),(RGB(0x715951 )),
+	(RGB(0x410000 )),(RGB(0x410010 )),(RGB(0x410020 )),(RGB(0x410031 )),(RGB(0x410041 )),(RGB(0x310041 )),(RGB(0x200041 )),(RGB(0x100041 )),(RGB(0x000041 )),(RGB(0x001041 )),(RGB(0x002041 )),(RGB(0x003141 )),(RGB(0x004141 )),(RGB(0x004131 )),(RGB(0x004120 )),(RGB(0x004110 )),(RGB(0x004100 )),(RGB(0x104100 )),(RGB(0x204100 )),(RGB(0x314100 )),(RGB(0x414100 )),(RGB(0x413100 )),(RGB(0x412000 )),(RGB(0x411000 )),
+	(RGB(0x412020 )),(RGB(0x412028 )),(RGB(0x412031 )),(RGB(0x412039 )),(RGB(0x412041 )),(RGB(0x392041 )),(RGB(0x312041 )),(RGB(0x282041 )),(RGB(0x202041 )),(RGB(0x202841 )),(RGB(0x203141 )),(RGB(0x203941 )),(RGB(0x204141 )),(RGB(0x204139 )),(RGB(0x204131 )),(RGB(0x204128 )),(RGB(0x204120 )),(RGB(0x284120 )),(RGB(0x314120 )),(RGB(0x394120 )),(RGB(0x414120 )),(RGB(0x413920 )),(RGB(0x413120 )),(RGB(0x412820 )),
+	(RGB(0x412D2D )),(RGB(0x412D31 )),(RGB(0x412D35 )),(RGB(0x412D3D )),(RGB(0x412D41 )),(RGB(0x3D2D41 )),(RGB(0x352D41 )),(RGB(0x312D41 )),(RGB(0x2D2D41 )),(RGB(0x2D3141 )),(RGB(0x2D3541 )),(RGB(0x2D3D41 )),(RGB(0x2D4141 )),(RGB(0x2D413D )),(RGB(0x2D4135 )),(RGB(0x2D4131 )),(RGB(0x2D412D )),(RGB(0x31412D )),(RGB(0x35412D )),(RGB(0x3D412D )),(RGB(0x41412D )),(RGB(0x413D2D )),(RGB(0x41352D )),(RGB(0x41312D )),
+	(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),
+]; 
+
+version(/+$DIDE_REGION+/all) {
 	/+
-		Code: static vec2[] polyLineToTriangleStrip(in vec2[] pts, float radius)
-		{
-			const numPts = pts.length.to!int; 
-			vec2[] vertices; 
-			
-			for(int i = 0; i < numPts; ++i)
+		/+
+			Code: static vec2[] polyLineToTriangleStrip(in vec2[] pts, float radius)
 			{
-				int a = ((i - 1) < 0) ? 0 : (i - 1); 
-				int b = i; 
-				int c = ((i + 1) >= numPts) ? numPts - 1 : (i + 1); 
-				int d = ((i + 2) >= numPts) ? numPts - 1 : (i + 2); 
-				const p0 = pts[a]; 
-				const p1 = pts[b]; 
-				const p2 = pts[c]; 
-				const p3 = pts[d]; 
+				const numPts = pts.length.to!int; 
+				vec2[] vertices; 
 				
-				if(p1 == p2) continue; 
-				
-				// 1) define the line between the two points
-				const line = (p2 - p1).normalize; 
-				
-				// 2) find the normal vector of this line
-				const normal = vec2(-line.y, line.x).normalize; 
-				
-				// 3) find the tangent vector at both the end points:
-				//					 -if there are no segments before or after this one, use the line itself
-				//					 -otherwise, add the two normalized lines and average them by normalizing again
-				const tangent1 = (p0 == p1) ? line : ((p1 - p0).normalize + line).normalize; 
-				const tangent2 = (p2 == p3) ? line : ((p3 - p2).normalize + line).normalize; 
-				
-				// 4) find the miter line, which is the normal of the tangent
-				const miter1 = vec2(-tangent1.y, tangent1.x); 
-				const miter2 = vec2(-tangent2.y, tangent2.x); 
-				
-				// find	length of miter by projecting the miter onto the normal,
-				// take	the length of the projection, invert it and multiply it by the thickness:
-				//	length = thickness * ( 1 / |normal|.|miter| )
-				float length1 = radius / dot(normal, miter1); 
-				float length2 = radius / dot(normal, miter2); 
-				
-				if(i == 0) {
-					vertices ~= p1 - length1 * miter1; 
-					vertices ~= p1 + length1 * miter1; 
+				for(int i = 0; i < numPts; ++i)
+				{
+					int a = ((i - 1) < 0) ? 0 : (i - 1); 
+					int b = i; 
+					int c = ((i + 1) >= numPts) ? numPts - 1 : (i + 1); 
+					int d = ((i + 2) >= numPts) ? numPts - 1 : (i + 2); 
+					const p0 = pts[a]; 
+					const p1 = pts[b]; 
+					const p2 = pts[c]; 
+					const p3 = pts[d]; 
+					
+					if(p1 == p2) continue; 
+					
+					// 1) define the line between the two points
+					const line = (p2 - p1).normalize; 
+					
+					// 2) find the normal vector of this line
+					const normal = vec2(-line.y, line.x).normalize; 
+					
+					// 3) find the tangent vector at both the end points:
+					//					 -if there are no segments before or after this one, use the line itself
+					//					 -otherwise, add the two normalized lines and average them by normalizing again
+					const tangent1 = (p0 == p1) ? line : ((p1 - p0).normalize + line).normalize; 
+					const tangent2 = (p2 == p3) ? line : ((p3 - p2).normalize + line).normalize; 
+					
+					// 4) find the miter line, which is the normal of the tangent
+					const miter1 = vec2(-tangent1.y, tangent1.x); 
+					const miter2 = vec2(-tangent2.y, tangent2.x); 
+					
+					// find	length of miter by projecting the miter onto the normal,
+					// take	the length of the projection, invert it and multiply it by the thickness:
+					//	length = thickness * ( 1 / |normal|.|miter| )
+					float length1 = radius / dot(normal, miter1); 
+					float length2 = radius / dot(normal, miter2); 
+					
+					if(i == 0) {
+						vertices ~= p1 - length1 * miter1; 
+						vertices ~= p1 + length1 * miter1; 
+					}
+					
+					vertices ~= p2 - length2 * miter2; 
+					vertices ~= p2 + length2 * miter2; 
 				}
+				return vertices; 
+			} 
+			
+			const pathPoints = [
+				vec2(58,80),vec2(108,379),vec2(191,228),vec2(159,144),vec2(265,124),
+				vec2(221,388),vec2(337,476),vec2(313,127),vec2(427,63),vec2(365,175),
+				vec2(448,246),vec2(478,130),vec2(483,303),vec2(380,302),vec2(415,470),
+			]; 
+			
+			if(0)
+			VB.tri(
+				clRed, vec2(0,0), 	clBlue, vec2(0, 1), 
+				clLime, vec2(1, 0), 	clYellow, vec2(1, 1), 
+				clAqua, vec2(2, 1), 	clFuchsia, vec2(1, 0)
+			); 
+			
+			
+			{
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x202B5F5C4644)))*300); 
 				
-				vertices ~= p2 - length2 * miter2; 
-				vertices ~= p2 + length2 * miter2; 
+				int i; 
+				foreach(v; verts.take((0x208F5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x20BA5F5C4644))))).max(1))))
+				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
-			return vertices; 
+			
+		+/
+	+/
+	
+	version(/+$DIDE_REGION Color maps, palettes+/all)
+	{
+		
+		/+
+			enum cmap
+			{
+				//Perceptually Uniform Sequential
+					viridis, plasma, inferno, magma, cividis,
+				//Sequential
+					Greys, Purples, Blues, Greens, Oranges, Reds,
+					YlOrBr, YlOrRd, OrRd, PuRd, RdPu, BuPu,
+					GnBu, PuBu, YlGnBu, PuBuGn, BuGn, YlGn,
+				//Sequential (2)
+					binary, gist_yarg, gist_gray, gray, bone, pink,
+					spring, summer, autumn, winter, cool, Wistia,
+					hot, afmhot, gist_heat, copper,
+				//Diverging
+					PiYG, PRGn, BrBG, PuOr, RdGy, RdBu,
+					RdYlBu, RdYlGn, Spectral, coolwarm, bwr, seismic,
+					berlin, managua, vanimo,
+				//Cyclic
+				   twilight, twilight_shifted, hsv,
+				//Qualitative
+					Pastel1, Pastel2, Paired, Accent,
+					Dark2, Set1, Set2, Set3,
+					tab10, tab20, tab20b, tab20c,
+				//Miscellaneous
+					flag, prism, ocean, gist_earth, terrain, gist_stern,
+					gnuplot, gnuplot2, CMRmap, cubehelix, brg,
+					gist_rainbow, rainbow, jet, turbo, nipy_spectral,
+					gist_ncar
+			} static immutable cmapNumGradients
+				= [EnumMembers!cmap].map!
+			((c){
+				with(cmap)
+				switch(c)
+				{
+					case 	Pastel2,
+						Accent,
+						Dark2,
+						Set2: 	return  8; 
+					case 	Pastel1,
+						Set1: 	return  9; 
+					case tab10: 	return 10; 
+					case 	Paired,
+						Set3: 	return 12; 
+					case 	tab20, 
+						tab20b, 
+						tab20c: 	return 20; 
+					default: 	return 0; 
+				}
+			})
+			.array; 
+		+/
+		
+		
+	}
+	class FrmHelloVulkan : VulkanWindow
+	{
+		mixin autoCreate;  
+		
+		version(/+$DIDE_REGION App management+/all)
+		{
+			class App
+			{
+				void onCreate() {} 
+				void onDestroy() {} 
+				void onUpdate() {} 
+				void onDraw() {} 
+			} 
+			
+			string[] appNames; //class names (not titles)
+			App delegate()[] appConstructors; 
+			App[] apps; //all running apps (null if not running)
+			@STORED string actAppName; 
+			App _app; //active app
+			
+			void initApps()
+			{
+				appNames = []; 
+				static foreach(n; __traits(allMembers, typeof(this)))
+				{
+					{
+						alias M = __traits(getMember, typeof(this), n); 
+						static if(is(M : App) && !is(M==App))
+						{
+							appNames ~= M.classinfo.name.split('.').back; 
+							appConstructors ~= ((){ return (cast(App)(new M())); }); 
+						}
+					}
+				}
+				apps = [App.init].replicate(appNames.length); 
+			} 
+			
+			@property app()
+			{
+				if(_app && typeid(_app).name.endsWith(chain(only('.'), actAppName)))
+				{
+					return _app; //fast path
+				}
+				_app = null; const idx = appNames.countUntil(actAppName); 
+				if(idx>=0)
+				{
+					//create new app if needed
+					if(apps[idx] is null) {
+						apps[idx] = appConstructors[idx](); 
+						apps[idx].onCreate; 
+					}
+					_app = apps[idx]; 
+				}
+				return _app; 
+			} 
+		}
+		
+		version(/+$DIDE_REGION Common stuff+/all)
+		{
+			Texture egaPalette, c64Palette, vgaPalette; 
+			
+			void createCommoStuff()
+			{
+				egaPalette = new Texture(TexFormat.rgba_u8, 16, EGAPalette); 
+				c64Palette = new Texture(TexFormat.rgba_u8, 16, C64Palette); 
+				vgaPalette = new Texture(TexFormat.rgb_u8, 256, VGAPalette); 
+			} 
+		}
+		
+		override void onCreate()
+		{
+			windowBounds = ibounds2(1280, 0, 1920, 600); 
+			(clAll.length).print; 
+			//console.hide; 
+			
+			initApps; 
+			createCommoStuff; 
+			
+			actAppName = ["SamplingDemo", "JupiterLander"][1]; 
 		} 
 		
-		const pathPoints = [
-			vec2(58,80),vec2(108,379),vec2(191,228),vec2(159,144),vec2(265,124),
-			vec2(221,388),vec2(337,476),vec2(313,127),vec2(427,63),vec2(365,175),
-			vec2(448,246),vec2(478,130),vec2(483,303),vec2(380,302),vec2(415,470),
-		]; 
+		override void onDestroy() {} 
 		
-		if(0)
-		VB.tri(
-			clRed, vec2(0,0), 	clBlue, vec2(0, 1), 
-			clLime, vec2(1, 0), 	clYellow, vec2(1, 1), 
-			clAqua, vec2(2, 1), 	clFuchsia, vec2(1, 0)
-		); 
-		
-		
+		override void onUpdate()
 		{
-			auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x9675F5C4644)))*300); 
+			if(KeyCombo("Ctrl+F2").pressed) application.exit; 
+			if(PERIODIC(1*second)) caption = FPS.text ~ " " ~ UPS.text; 
 			
-			int i; 
-			foreach(v; verts.take((0x9C75F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x9F15F5C4644))))).max(1))))
-			VB.tri(i++ & 2 ? clWhite : clRed, v); 
-		}
-		
-	+/
-+/
-
-version(/+$DIDE_REGION Color maps, palettes+/all)
-{
-	
-	/+
-		enum cmap
+			if(app) app.onUpdate; 
+		} 
+		
+		class SamplingDemo : App
 		{
-			//Perceptually Uniform Sequential
-				viridis, plasma, inferno, magma, cividis,
-			//Sequential
-				Greys, Purples, Blues, Greens, Oranges, Reds,
-				YlOrBr, YlOrRd, OrRd, PuRd, RdPu, BuPu,
-				GnBu, PuBu, YlGnBu, PuBuGn, BuGn, YlGn,
-			//Sequential (2)
-				binary, gist_yarg, gist_gray, gray, bone, pink,
-				spring, summer, autumn, winter, cool, Wistia,
-				hot, afmhot, gist_heat, copper,
-			//Diverging
-				PiYG, PRGn, BrBG, PuOr, RdGy, RdBu,
-				RdYlBu, RdYlGn, Spectral, coolwarm, bwr, seismic,
-				berlin, managua, vanimo,
-			//Cyclic
-			   twilight, twilight_shifted, hsv,
-			//Qualitative
-				Pastel1, Pastel2, Paired, Accent,
-				Dark2, Set1, Set2, Set3,
-				tab10, tab20, tab20b, tab20c,
-			//Miscellaneous
-				flag, prism, ocean, gist_earth, terrain, gist_stern,
-				gnuplot, gnuplot2, CMRmap, cubehelix, brg,
-				gist_rainbow, rainbow, jet, turbo, nipy_spectral,
-				gist_ncar
-		} static immutable cmapNumGradients
-			= [EnumMembers!cmap].map!
-		((c){
-			with(cmap)
-			switch(c)
+			Texture[] textures; 
+			
+			Texture hiresSprite, multiSprite; 
+			
+			override void onCreate()
 			{
-				case 	Pastel2,
-					Accent,
-					Dark2,
-					Set2: 	return  8; 
-				case 	Pastel1,
-					Set1: 	return  9; 
-				case tab10: 	return 10; 
-				case 	Paired,
-					Set3: 	return 12; 
-				case 	tab20, 
-					tab20b, 
-					tab20c: 	return 20; 
-				default: 	return 0; 
-			}
-		})
-		.array; 
-	+/
-	
-	
-}
-class FrmHelloVulkan : VulkanWindow
-{
-	mixin autoCreate;  
-	
-	static immutable EGAPalette = 
-	[
-		(RGBA(0, 0, 0, 255)),	//Black
-		(RGBA(0, 0, 170, 255)),	//Blue
-		(RGBA(0, 170, 0, 255)),	//Green
-		(RGBA(0, 170, 170, 255)),	//Cyan
-		(RGBA(170, 0, 0, 255)),	//Red
-		(RGBA(170, 0, 170, 255)),	//Magenta
-		(RGBA(170, 85, 0, 255)),	//Brown
-		(RGBA(170, 170, 170, 255)),	//Light Gray
-		(RGBA(85, 85, 85, 255)),	//Dark Gray
-		(RGBA(85, 85, 255, 255)),	//Bright Blue
-		(RGBA(85, 255, 85, 255)),	//Bright Green
-		(RGBA(85, 255, 255, 255)),	//Bright Cyan
-		(RGBA(255, 85, 85, 255)),	//Bright Red
-		(RGBA(255, 85, 255, 255)),	//Bright Magenta
-		(RGBA(255, 255, 85, 255)),	//Yellow
-		(RGBA(255, 255, 255, 255))	//White
-	]; static immutable C64Palette = 
-	[
-		(RGBA(0, 0, 0, 255)),	//Black
-		(RGBA(255, 255, 255, 255)),	//White
-		(RGBA(136, 0, 0, 255)),	//Red
-		(RGBA(170, 255, 238, 255)),	//Cyan
-		(RGBA(204, 68, 204, 255)),	//Purple
-		(RGBA(0, 204, 85, 255)),	//Green
-		(RGBA(0, 0, 170, 255)),	//Blue
-		(RGBA(238, 238, 119, 255)),	//Yellow
-		(RGBA(221, 136, 85, 255)),	//Orange
-		(RGBA(102, 68, 0, 255)),	//Brown
-		(RGBA(255, 119, 119, 255)),	//Light Red
-		(RGBA(51, 51, 51, 255)),	//Dark Gray
-		(RGBA(119, 119, 119, 255)),	//Medium Gray
-		(RGBA(170, 255, 102, 255)),	//Light Green
-		(RGBA(0, 136, 255, 255)),	//Light Blue
-		(RGBA(187, 187, 187, 255)) 	//Light Gray
-	]; static immutable VGAPalette = 
-	[
-		(RGB(0x000000 )),(RGB(0xAA0000 )),(RGB(0x00AA00 )),(RGB(0xAAAA00 )),(RGB(0x0000AA )),(RGB(0xAA00AA )),(RGB(0x0055AA )),(RGB(0xAAAAAA )),(RGB(0x555555 )),(RGB(0xFF5555 )),(RGB(0x55FF55 )),(RGB(0xFFFF55 )),(RGB(0x5555FF )),(RGB(0xFF55FF )),(RGB(0x55FFFF )),(RGB(0xFFFFFF )),
-		(RGB(0x000000 )),(RGB(0x101010 )),(RGB(0x202020 )),(RGB(0x353535 )),(RGB(0x454545 )),(RGB(0x555555 )),(RGB(0x656565 )),(RGB(0x757575 )),(RGB(0x8A8A8A )),(RGB(0x9A9A9A )),(RGB(0xAAAAAA )),(RGB(0xBABABA )),(RGB(0xCACACA )),(RGB(0xDFDFDF )),(RGB(0xEFEFEF )),(RGB(0xFFFFFF )),
-		(RGB(0xFF0000 )),(RGB(0xFF0041 )),(RGB(0xFF0082 )),(RGB(0xFF00BE )),(RGB(0xFF00FF )),(RGB(0xBE00FF )),(RGB(0x8200FF )),(RGB(0x4100FF )),(RGB(0x0000FF )),(RGB(0x0041FF )),(RGB(0x0082FF )),(RGB(0x00BEFF )),(RGB(0x00FFFF )),(RGB(0x00FFBE )),(RGB(0x00FF82 )),(RGB(0x00FF41 )),(RGB(0x00FF00 )),(RGB(0x41FF00 )),(RGB(0x82FF00 )),(RGB(0xBEFF00 )),(RGB(0xFFFF00 )),(RGB(0xFFBE00 )),(RGB(0xFF8200 )),(RGB(0xFF4100 )),
-		(RGB(0xFF8282 )),(RGB(0xFF829E )),(RGB(0xFF82BE )),(RGB(0xFF82DF )),(RGB(0xFF82FF )),(RGB(0xDF82FF )),(RGB(0xBE82FF )),(RGB(0x9E82FF )),(RGB(0x8282FF )),(RGB(0x829EFF )),(RGB(0x82BEFF )),(RGB(0x82DFFF )),(RGB(0x82FFFF )),(RGB(0x82FFDF )),(RGB(0x82FFBE )),(RGB(0x82FF9E )),(RGB(0x82FF82 )),(RGB(0x9EFF82 )),(RGB(0xBEFF82 )),(RGB(0xDFFF82 )),(RGB(0xFFFF82 )),(RGB(0xFFDF82 )),(RGB(0xFFBE82 )),(RGB(0xFF9E82 )),
-		(RGB(0xFFBABA )),(RGB(0xFFBACA )),(RGB(0xFFBADF )),(RGB(0xFFBAEF )),(RGB(0xFFBAFF )),(RGB(0xEFBAFF )),(RGB(0xDFBAFF )),(RGB(0xCABAFF )),(RGB(0xBABAFF )),(RGB(0xBACAFF )),(RGB(0xBADFFF )),(RGB(0xBAEFFF )),(RGB(0xBAFFFF )),(RGB(0xBAFFEF )),(RGB(0xBAFFDF )),(RGB(0xBAFFCA )),(RGB(0xBAFFBA )),(RGB(0xCAFFBA )),(RGB(0xDFFFBA )),(RGB(0xEFFFBA )),(RGB(0xFFFFBA )),(RGB(0xFFEFBA )),(RGB(0xFFDFBA )),(RGB(0xFFCABA )),
-		(RGB(0x710000 )),(RGB(0x71001C )),(RGB(0x710039 )),(RGB(0x710055 )),(RGB(0x710071 )),(RGB(0x550071 )),(RGB(0x390071 )),(RGB(0x1C0071 )),(RGB(0x000071 )),(RGB(0x001C71 )),(RGB(0x003971 )),(RGB(0x005571 )),(RGB(0x007171 )),(RGB(0x007155 )),(RGB(0x007139 )),(RGB(0x00711C )),(RGB(0x007100 )),(RGB(0x1C7100 )),(RGB(0x397100 )),(RGB(0x557100 )),(RGB(0x717100 )),(RGB(0x715500 )),(RGB(0x713900 )),(RGB(0x711C00 )),
-		(RGB(0x713939 )),(RGB(0x713945 )),(RGB(0x713955 )),(RGB(0x713961 )),(RGB(0x713971 )),(RGB(0x613971 )),(RGB(0x553971 )),(RGB(0x453971 )),(RGB(0x393971 )),(RGB(0x394571 )),(RGB(0x395571 )),(RGB(0x396171 )),(RGB(0x397171 )),(RGB(0x397161 )),(RGB(0x397155 )),(RGB(0x397145 )),(RGB(0x397139 )),(RGB(0x457139 )),(RGB(0x557139 )),(RGB(0x617139 )),(RGB(0x717139 )),(RGB(0x716139 )),(RGB(0x715539 )),(RGB(0x714539 )),
-		(RGB(0x715151 )),(RGB(0x715159 )),(RGB(0x715161 )),(RGB(0x715169 )),(RGB(0x715171 )),(RGB(0x695171 )),(RGB(0x615171 )),(RGB(0x595171 )),(RGB(0x515171 )),(RGB(0x515971 )),(RGB(0x516171 )),(RGB(0x516971 )),(RGB(0x517171 )),(RGB(0x517169 )),(RGB(0x517161 )),(RGB(0x517159 )),(RGB(0x517151 )),(RGB(0x597151 )),(RGB(0x617151 )),(RGB(0x697151 )),(RGB(0x717151 )),(RGB(0x716951 )),(RGB(0x716151 )),(RGB(0x715951 )),
-		(RGB(0x410000 )),(RGB(0x410010 )),(RGB(0x410020 )),(RGB(0x410031 )),(RGB(0x410041 )),(RGB(0x310041 )),(RGB(0x200041 )),(RGB(0x100041 )),(RGB(0x000041 )),(RGB(0x001041 )),(RGB(0x002041 )),(RGB(0x003141 )),(RGB(0x004141 )),(RGB(0x004131 )),(RGB(0x004120 )),(RGB(0x004110 )),(RGB(0x004100 )),(RGB(0x104100 )),(RGB(0x204100 )),(RGB(0x314100 )),(RGB(0x414100 )),(RGB(0x413100 )),(RGB(0x412000 )),(RGB(0x411000 )),
-		(RGB(0x412020 )),(RGB(0x412028 )),(RGB(0x412031 )),(RGB(0x412039 )),(RGB(0x412041 )),(RGB(0x392041 )),(RGB(0x312041 )),(RGB(0x282041 )),(RGB(0x202041 )),(RGB(0x202841 )),(RGB(0x203141 )),(RGB(0x203941 )),(RGB(0x204141 )),(RGB(0x204139 )),(RGB(0x204131 )),(RGB(0x204128 )),(RGB(0x204120 )),(RGB(0x284120 )),(RGB(0x314120 )),(RGB(0x394120 )),(RGB(0x414120 )),(RGB(0x413920 )),(RGB(0x413120 )),(RGB(0x412820 )),
-		(RGB(0x412D2D )),(RGB(0x412D31 )),(RGB(0x412D35 )),(RGB(0x412D3D )),(RGB(0x412D41 )),(RGB(0x3D2D41 )),(RGB(0x352D41 )),(RGB(0x312D41 )),(RGB(0x2D2D41 )),(RGB(0x2D3141 )),(RGB(0x2D3541 )),(RGB(0x2D3D41 )),(RGB(0x2D4141 )),(RGB(0x2D413D )),(RGB(0x2D4135 )),(RGB(0x2D4131 )),(RGB(0x2D412D )),(RGB(0x31412D )),(RGB(0x35412D )),(RGB(0x3D412D )),(RGB(0x41412D )),(RGB(0x413D2D )),(RGB(0x41352D )),(RGB(0x41312D )),
-		(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),
-	]; 
-	
-	
-	Texture[] textures; 
-	
-	Texture egaPalette, c64Palette, vgaPalette, hiresSprite, multiSprite; 
-	
-	override void onCreate()
-	{
-		windowBounds = ibounds2(1280, 0, 1920, 600); 
-		(clAll.length).print; 
-		if(1)
-		{
-			console.hide; 
+				hiresSprite = ((){
+					const ubyte[] data = 
+					[
+						0,127,0, 1,255,192, 3,255,224, 3,231,224, 7,217,240, 7,223,240, 7,217,240, 3,231,224, 
+						3,255,224, 3,255,224, 2,255,160, 1,127,64, 1,62,64, 0,156,128, 0,156,128, 0,73,0, 
+						0,73,0, 0,62,0, 0,62,0, 0,62,0, 0,28,0 
+					]; 
+					return new Texture(TexFormat.wa_u1, ivec2(24, 21), data.swapBits); 
+				})(); 
+				multiSprite = ((){
+					const ubyte[] data = 
+					[
+						0,170,0, 2,170,128, 10,170,160, 10,170,160, 42,170,168, 43,170,232, 47,235,250, 
+						175,235,250, 173,235,122, 173,235,122, 171,170,234, 170,170,170, 170,170,170,
+						170,170,170, 170,170,170, 170,170,170, 170,170,170, 162,138,138, 162,138,138,
+						128,130,2, 128,130,2
+					]; 
+					return new Texture(TexFormat.wa_u2, ivec2(12, 21), data.swapBits); 
+				})(); 
+				
+				new Texture(TexFormat.rgba_u8, 16, EGAPalette); 
+			} 
 			
-			egaPalette = new Texture(TexFormat.rgba_u8, 16, EGAPalette); 
-			c64Palette = new Texture(TexFormat.rgba_u8, 16, C64Palette); 
-			vgaPalette = new Texture(TexFormat.rgb_u8, 256, VGAPalette); 
-			hiresSprite = ((){
-				const ubyte[] data = 
-				[
-					0,127,0, 1,255,192, 3,255,224, 3,231,224, 7,217,240, 7,223,240, 7,217,240, 3,231,224, 
-					3,255,224, 3,255,224, 2,255,160, 1,127,64, 1,62,64, 0,156,128, 0,156,128, 0,73,0, 
-					0,73,0, 0,62,0, 0,62,0, 0,62,0, 0,28,0 
-				]; 
-				return new Texture(TexFormat.wa_u1, ivec2(24, 21), data.swapBits); 
-			})(); 
-			multiSprite = ((){
-				const ubyte[] data = 
-				[
-					0,170,0, 2,170,128, 10,170,160, 10,170,160, 42,170,168, 43,170,232, 47,235,250, 
-					175,235,250, 173,235,122, 173,235,122, 171,170,234, 170,170,170, 170,170,170,
-					170,170,170, 170,170,170, 170,170,170, 170,170,170, 162,138,138, 162,138,138,
-					128,130,2, 128,130,2
-				]; 
-				return new Texture(TexFormat.wa_u2, ivec2(12, 21), data.swapBits); 
-			})(); 
-			
-			new Texture(TexFormat.rgba_u8, 16, EGAPalette); 
-			
-			if(1)
+			override void onUpdate()
 			{
+				foreach(y; 0..8)
+				foreach(x; 0..8)
+				{ dr.rect((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, TexHandle((y*8+x)%16+1)), RGBA(0xFFFF8000); }
 				
-				
-				//bitmaps[`c:\dl\catacomb 3D wall.png`.File].get!RGB.; 
-			}
+				if(KeyCombo("F1").pressed) { textures.each!free; textures.clear; }
+			} 
+		} 
+		class JupiterLander : App
+		{
+			static immutable
+			{
+				enum numFontChars = 128; 
+				auto binCharMap = 
+				x"5249464698020000574542505650384C8B0200002F07C0FF000F30FFF33FFFF31F78064AF3FFA9D1
+A27F68487097504F0AF753701B3A381CDD6DAA1A7777E8C1768F5CD7F7E47B749B62B6E605ACDEDC
+5DC22A324FBA8A24ACBD81DF2FA2FF46DBB6311B5AB633A4C495D53FF886A8BB66FDFA5BBFB55F74
+68FFEC93EB1F7DE17EF9E60700975DB3FEE813AFD69BEED9D58423291756F1FDB9C37A77EED861E6
+C27044748F2B582A0894F7694ABA16A02E375D4A7EEAA9C0352FABF6163227255E892A094A7A950C
+2D494A6C89B892FF2DC05301875A3A28325041E1C2C4D2D116B85AE353DCCCE06A0DF25322256FA2
+95C1F52ABDC5590E0DA8BC5E810A14E939CB64287B21FDB4802EC3CD4FD1A8A59F3640B2E632B46E
+22A5CB0A28DA1CDDBBD36809A3104045B4411C0556B4A9CE80D11273CA241B43A898E41D33BAFB89
+81960B260E018836C807D106ACC6912084849082116B572C5B3B4C4A2E8000B0F469606961FF7377
+F7DF4334CDC00292ECA02613A9EC50E48E0A868ED94162A8589F9AB4A5FDBDF2AEB36647454C2117
+52090180722A0626738898C96DBD38D9482F3F67C59CE45E0388D979F0EC5103D1270D705217EEF4
+D94BA2310BB072CC26490C92BC571BA5ABF97F3714EF31055A0C308D11C4007BAD1E2106D3221A88
+017504883571E41B2BD538EC8EB82A0042D017E5770FE92B298608800B04506B7C9ADE6C65CE5341
+AFA18975B418DA2B509ECB5A37D34F1BB5CC29920EE9ADC121782BBDFFF10700F0FE99AEF9666E48
+522DF83AEBE9E74EB9FB2FE7EE7692C48D5EC5CE5E8E170190374A3DD78A3DD7E6D8051E00B4321F
+205A2AF0030A15801A000850E85A3DA093749DF0AC00C83F75EA5C25875382C4910DA1231301F267
+49917FB40DBE00CFBF84699305F865FF2FFB7E14E06CD3B4DD11C0FF6D327C00"; 
+				enum numSprites = 12; 
+				auto binSprites = 
+				x"524946460A020000574542505650384CFD0100002F17C03E000F30FFF33FFFF31F7890B46DDB31B7
+33BABE519C8C62DB49CDAFC7A0B66DAE6CCF7C731C59D5EDCAB66DDB5EDA8D6DBDAB3AA2FF7BE04E
+37BDA3CD0ED17C9CFBD4E21A3F7D7777FD733F7D5F777DA6BEDA19A4513235C47F953A7C55C7570B
+CB09D967C3EDE09534F5A649040B2DD48739E503AEA1FDC85F5BF5DA5D579C7D2E30BB893E5B09CC
+BE90A95B9A58BBAC5FEDE51121F7EC21F5233458BBDD9E32494E1870BBC77A7A469365A1FEB33267
+90E3C001F17AAAFB91F29A35E6EED96675A67969526061BF4555C3B51F8E6A1BF77C5B7AE59B7A6F
+ADB87E46DEB8E9F6F0A3F2D969B7CFBC67891555B8F3CA21D7D041E41B1B5F2C17658F4460EEF9E7
+6533C616DFDD7EC97EB5D66429BD3BA674E8D8DC86BE7745D7E562E2E4C63D03A41EEBE59ED1B7B3
+AED3A016B6BB627F99F0ABB91E596FB3383CE646288B2D148FA5DA8F8F16B223A5E2B1945FA7DAB1
+6E5163BCB3BEC85223B65788E3CFC41C049A77AE3BC2ADE4489F9986903029BD17337DE917C8C700
+14351FBD880A60871FD6745EF8326E9434626EF7962FCCDB3EBFF152844A7BB51F40A4E738977712
+D151CA42887287380EE85074ECD0A0D7808A7E66A2609C06F434692285019C56F311802628B8031A
+002B28FC142B200158550051FC4C83BB9E38D4FC07328A901020F3BF283F24043840E6B7BC410DDE
+FC474DE00634E15F0100"; 
+				enum numScreens = 6; 
+				auto binScreens = 
+				x"52494646D8040000574542505650384CCB0400002F4F40250005B5DBD6D6C6CD73DFB15E87949419
+ED8EC3CC1C831CBBF18C6649726731A5CCCCED8F975F789E5772E05B44FF1D39922435792815B619
+6A1686C64F20FD7CA2D0A4E1CE60E99E99C1CE22CCB0E7879BC195C29787934586A5FB0260666064
+DC130A0594C7D6B98F1D7D7A6CF78F91131A7E4CF5F7BFA60A27BB9EF5B4C75967615A6465C00C73
+2E7C63C9CFE9873B1F33E383DF220F66FF1FFB84DF22672C0479E1EEBF24E7135C7FD77FB2F945FF
+5A097F68D2BF1D25FDA9FE4C7FAEBFD05FEAAFF4D7FA1BFDADFE4E7FAF7FD03FEA9FF4CF41F95BFF
+C5C8F28FFE57FFA7FFD7F4ACA40743A800D449657C8C29563046810459C9045D2C63304B21607E64
+A354C218CBC84BC930451F05C6488D24842D6CCD8DE0A9C3902ED20E0D694C1925C4A54A7D9A3041
+82210AECA06B30C00E328CF110231473256FE9297224250546484A1E21C11A7A48D1458641498ACC
+D84752AC2137EECF3E1E950CAD447DE37E2DB063488614134C8CBBFAA175950C5323F1B673FF21A3
+47CBD67989718121C891344162B0529263ECDA178CF49F2041668E41C9C44A32418ABE9171AD64C9
+ECAD65972C568D5C2343C879A5B5596E23F92A085D64255D73349CE908B9D5D304DB0646222B4F6A
+A4DD3472F7AD1C03E70CA4F6B9AC71DA04198C915B633631C675C598C3C498A91ED69CC99731C512
+7AD64EDEB358C536A824C5D4C01C4132CE1B623A4B37738E59EF1A633635C629418EDC4837B15788
+63DCB66BBAEEA9A48F142B58F3DC771771133770C9FC95BD724A4D313067B7DAE78263E58FD075B4
+D333AED245615C60CD621EF4859295781AE7F128A678231EC617E3AD98E2224E632AD3147137CECA
+F3F87CA868A12EBAA866B46A44C7A0ADEAE3610055978F3A0EEAF1D1470A062881FA40D5C039318D
+3467D3A91F28469B1E6C23EFB5520BCC8CA7BDB80CDBB1F40325C16D984E6CCE7AF199500ECABDBE
+CF3B91A45B5410D2622249775A4C9B8924DD5931A714AF215E3A5BCF0839A938A7BDA9B9E91C2328
+E084E236C4F98CCB11157B9C73070A00EFE4A3EA98339D279B185E8F25E94E0B8167C741103A321C
+3B4E4341A6ECBE92A692AA54A94869051675D239AA238C8A7704C20686B8882D47D599A3306ADA02
+0216EAA4F5E3000EA25E105154370ED50DA06ED0B320412A2F6F15168A80F588C8DC06A2104EA985
+60E60EDE6C06FB45284388582E98E1C270410D0FAF0B6E38785C25C68FC355A61F2A1F127744C541
+6839B90F44DEFAD7572985B774B8A4234B1BC8FA9E83E72BA7ED23CAA37E944659944414DD8A08B6
+5EB01334468D7163A79137FA8DB491359206356EC193CFADCD6173DA4C9A9326356F354943ACAF69
+122A77F4FC6FCFA1DE5D64B4987484CCEA08A8B0F6BC10228A24B42AE19088368B735280E09C158B
+8C53CC1F9FA99093254C23248467355F09272B43D2C29380DB90137AEFB80334ABA0A350C981C8D7
+8C4E4540502722C07D1958C5BCE125C05B785D24589D711F81085867101D2EA9546BFFBFC09CD411
+81F5F5007544D8E7F6F98A3F6E7160D51121698710A2A86E1C0ACA292F8BC1EA88704FC64EC5FBC6
+29CE674CC2BD499C0C46A8378913A5AB02885C38AA738B0A4C42B890CFC3DB90D366BB45411D2146
+E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
+75C4AB9AC2AA0600"; 
+			} 
 			
-		}
-		
-	} 
+			Texture texFont, texSprites; 
+			Image2D!RG[] screens; 
+			
+			Texture hiresSprite; 
+			
+			override void onCreate()
+			{
+				texFont = new Texture(
+					TexFormat.u1, ivec3(8, 8, numFontChars), 
+					(cast(ubyte[])(binCharMap)).deserializeImage!ubyte.asArray.pack8bitTo1bit
+				); 
+				texSprites = new Texture(
+					TexFormat.u1, ivec3(24, 21, numSprites), 
+					(cast(ubyte[])(binSprites)).deserializeImage!ubyte.asArray.pack8bitTo1bit
+				); 
+				auto allScreen = image2D(
+					ivec2(40, 25*numScreens), 
+					(cast(RG[])((cast(ubyte[])(binScreens)).deserializeImage!ubyte.asArray))
+				); 
+				
+				allScreen.print; 
+			} 
+			
+			override void onUpdate()
+			{
+				foreach(y; 0..8)
+				foreach(x; 0..8)
+				{ dr.rect((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, texSprites.handle), RGBA(0xFFFF8000); }
+				//Bug: Ez kettovel kevesebbet rajzol!
+			} 
+			
+			
+		} 
+	} 
 	
-	override void onDestroy() {} 
-	
-	
-	override void onUpdate()
-	{
-		if(KeyCombo("Ctrl+F2").pressed) application.exit; 
-		if(PERIODIC(1*second)) caption = FPS.text ~ " " ~ UPS.text; 
-		
-		foreach(y; 0..8)
-		foreach(x; 0..8)
-		{ dr.rect((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, TexHandle((y*8+x)%16+1)), RGBA(0xFFFF8000); }
-		
-		
-		if(KeyCombo("F1").pressed) { textures.each!free; textures.clear; }
-	} 
-} 
+}

@@ -244,6 +244,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			enforce([8,9,10,11,12,13].map!(a => alignUp(a, 4)).equal([8,12,12,12,12,16])); 
 			
+			_unittest_pack8bitTo1bit; 
+			
 			//startup
 			
 			CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
@@ -2483,6 +2485,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		static auto 幟(alias T, string def)() //flags
 		{ return format!`((){with(%s) return %s;}())`(T.stringof, def); } 
 	}
+	
+	
+	//saves and restores fields in a scope, and optionally executes code at the end.
+	static string scope_remember(string fields)
+	{
+		/+Usage example: /+Structured: scope_remember(q{field1, ..., fieldn, { final_program_block; }})+/+/
+		string[] names = fields.split(',').map!strip.array; 
+		string fun; if(names.back.startsWith('{')) fun = names.fetchBack; 
+		return names.map!((a)=>(iq{const _prev_$(a)=$(a); }.text)).join ~ "scope(exit){" ~
+		names.map!((a)=>(iq{$(a)=_prev_$(a); }.text)).join ~ fun ~ "}" /+same order!+/; 
+	} 
 	
 	version(/+$DIDE_REGION SmartChild+/all)
 	{
@@ -5700,7 +5713,7 @@ version(/+$DIDE_REGION Numeric+/all)
 	
 	mixin template asmFunctions()
 	{
-		//must import as a mixin, to enable inlining in each module. Az LTO sucks.
+		//must import as a mixin, to enable inlining in each module. As LTO sucks.
 		
 		//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
 		
@@ -9537,6 +9550,51 @@ version(/+$DIDE_REGION Colors+/all)
 		} 
 		
 		
+		///output bit = (input >= 128)
+		ubyte[] pack8bitTo1bit(ubyte[] src)
+		{
+			import ldc.gccbuiltins_x86 : __builtin_ia32_pmovmskb128; 
+			
+			if(src.empty) return (ubyte[]).init; 
+			
+			auto dst = uninitializedArray!(ubyte[])(src.length.alignUp(8)/8); 
+			auto pdst = dst.ptr; 
+			const fastLen = src.length/16; 
+			foreach(const x; (cast(byte16[])(src[0..fastLen*16])))
+			{
+				*(cast(ushort*)(pdst)) = (cast(ushort)(__builtin_ia32_pmovmskb128(x))); 
+				pdst += 2; 
+			}
+			
+			src = src[fastLen*16..$]; //the remaining part
+			if(src.length>0)
+			{
+				byte16 tmp; 
+				(cast(ubyte*)(&tmp))[0..src.length] = src[]; 
+				ushort res = cast(ushort)(__builtin_ia32_pmovmskb128(tmp)); 
+				import core.stdc.string : memcpy; 
+				memcpy(pdst, &res, src.length.alignUp(8)/8); 
+			}
+			
+			return dst; 
+		} 
+		
+		void _unittest_pack8bitTo1bit()
+		{
+			ubyte[] a = [255, 0, 0, 255, 0, 0, 255, 255, 128]; 
+			enforce(
+				a.replicate(18).pack8bitTo1bit.equal
+				(
+					[
+						201, 147, 39, 79, 158, 60, 121, 242, 228, 
+						201, 147, 39, 79, 158, 60, 121, 242, 228, 
+						201, 147, 3
+					]
+				)
+			); 
+		} 
+		
+		
 		void drawPhaseAveragingTests(Dr)(Dr dr)
 		{
 			const π = PIf; 
@@ -9549,37 +9607,33 @@ version(/+$DIDE_REGION Colors+/all)
 			} 
 			
 			dr.lineWidth = .1; 
-			dr.color = clAqua; 	plot!(α=>cos(α).remap(-1, 1, 0, 1)); 
-			dr.color = clYellow; 	plot!(α=>sin(α).remap(-1, 1, 0, 1)); 
-			dr.color = clWhite; 	plot!(α=>((atan(-sin(α), -cos(α)) + π)/(π*2))); 
+			dr.color = clAqua; 	plot!((α)=>(cos(α).remap(-1, 1, 0, 1))); 
+			dr.color = clYellow; 	plot!((α)=>(sin(α).remap(-1, 1, 0, 1))); 
+			dr.color = clWhite; 	plot!((α)=>(((atan(-sin(α), -cos(α)) + π)/(π*2)))); 
 			
 			dr.translate(0, 10); 
-			dr.color = clRed; 	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.r); 
-			dr.color = clLime; 	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.g); 
-			dr.color = clBlue; 	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.b); 
-			dr.color = clWhite; 	plot!(α=>vec3(α/π/2, 1, 1).hsvToRgb.rgbToHsv.x); 
+			dr.color = clRed; 	plot!((α)=>(vec3(α/π/2, 1, 1).hsvToRgb.r)); 
+			dr.color = clLime; 	plot!((α)=>(vec3(α/π/2, 1, 1).hsvToRgb.g)); 
+			dr.color = clBlue; 	plot!((α)=>(vec3(α/π/2, 1, 1).hsvToRgb.b)); 
+			dr.color = clWhite; 	plot!((α)=>(vec3(α/π/2, 1, 1).hsvToRgb.rgbToHsv.x)); 
 			dr.translate(0, 10); 
 			
 			const β = time.value(10*second).fract.remap(0, 1, 0, 2*π).sin*π/2; 
-			dr.color = clWhite; 	plot!(α=>((atan(-sin(avg(α, β)), -cos(avg(α, β))) + π)/(π*2))); 
-			dr.color = clFuchsia; 	plot!(
-				(α){
-					auto v = vec2(
-						avg(sin(α), sin(β)), 
-						avg(cos(α), cos(β))
-					).normalize; 
-					return ((atan(-v.x, -v.y) + π)/(π*2)); 
-				} 
-			); 
-			dr.color = clOrange; 	plot!(
-				(α){
-					auto v = avg(
-						vec3(α/π/2, 1, 1).hsvToRgb,
-						vec3(β/π/2, 1, 1).hsvToRgb
-					); 
-					return v.rgbToHsv.x; 
-				} 
-			); 
+			dr.color = clWhite; 	plot!((α)=>(((atan(-sin(avg(α, β)), -cos(avg(α, β))) + π)/(π*2)))); 
+			dr.color = clFuchsia; 	plot!((α){
+				auto v = vec2(
+					avg(sin(α), sin(β)), 
+					avg(cos(α), cos(β))
+				).normalize; 
+				return ((atan(-v.x, -v.y) + π)/(π*2)); 
+			}); 
+			dr.color = clOrange; 	plot!((α){
+				auto v = avg(
+					vec3(α/π/2, 1, 1).hsvToRgb,
+					vec3(β/π/2, 1, 1).hsvToRgb
+				); 
+				return v.rgbToHsv.x; 
+			}); 
 			
 			dr.pop; dr.pop; 
 			//conclusion: 2 phase sin+cos is the best and sin(a+b) = sin(a)+sin(b)
