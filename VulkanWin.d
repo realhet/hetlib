@@ -4,6 +4,12 @@ public import het.win, het.bitmap, het.vulkan;
 
 import core.stdc.string : memset; 
 
+enum bugFix_LastTwoGeometryShaderStreamsMissing = (常!(bool)(1))
+/+
+	Todo: It happens with the Windows default driver.
+	Try this with new drivers! (official and radeon-ID)
++/; 
+
 /+
 	+This variant is sinchronizes put and fetch to itself 
 	and put() can be called in a destructor.
@@ -143,6 +149,12 @@ alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 
 version(/+$DIDE_REGION Geometry Stream Processor+/all)
 {
+	struct Bits(T) {
+		T data; 
+		uint bitCnt; 
+	} 
+	auto bits(T)(T data, uint bitCnt = T.sizeof.to!uint * 8)
+	=> Bits!T(data, bitCnt); 
 	
 	/+
 		General rules of enums:
@@ -244,7 +256,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{/+	colors: op ColorFormat, data+/}],
 				[q{},q{"01"},q{"00"},q{setPC},q{/+primary color+/}],
 				[q{},q{},q{"01"},q{setSC},q{/+secondary color+/}],
-				[q{},q{},q{"10"},q{setPCSP},q{/+load two colors+/}],
+				[q{},q{},q{"10"},q{setPCSC},q{/+load two colors+/}],
 				[q{},q{},q{"11"},q{setC},q{/+broadcast one color+/}],
 				[q{/+	sizes: op SizeFormat data+/}],
 				[q{},q{"10"},q{"00"},q{setPS},q{/+pixel size+/}],
@@ -256,7 +268,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{},q{"01"},q{setLFMH},q{/+LatinFontMap+/}],
 				[q{},q{},q{"10"},q{setPALH},q{/+Palette+/}],
 				[q{},q{},q{"11"},q{setLTH},q{/+LineTexture+/}],
-				[],
+				[],
 				[q{/+Note: lvl0+/},q{/+Note: lvl1+/},q{/+Note: lvl2+/},q{/+Note: op+/},q{/+Note: comment+/}],
 				[q{/+drawing+/}],
 				[q{/+	SVG linear+/}],
@@ -276,8 +288,8 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{},q{"11"},q{drawRECT},q{/++/}],
 				[q{/+	future extensions+/}],
 				[q{},q{"11"},q{"00"},q{drawMove},q{/+CoordFormat Coords+/}],
-				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords TexFormat HandleFormat Handle+/}],
-				[q{},q{},q{"10"},q{},q{/++/}],
+				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords HandleFormat Handle+/}],
+				[q{},q{},q{"10"},q{drawFontASCII},q{/+ubyte+/}],
 				[q{},q{},q{"11"},q{},q{/++/}],
 				[],
 			]))
@@ -636,7 +648,7 @@ class VulkanWindow: Window
 	
 	bool windowResized; 
 	
-	VkClearValue clearColor = { color: {float32: [ 0, 0, 0, 0 ]}, }; 
+	VkClearValue clearColor = { color: {float32: [ 0.1, 0.1, 0.1, 0 ]}, }; 
 	
 	
 	/+
@@ -661,7 +673,7 @@ class VulkanWindow: Window
 				cfg_y, //rel, dt
 				cfg_z, //rel, dt
 				move_abs_u8_u8
-			} 
+			} 
 			
 			
 			
@@ -764,9 +776,8 @@ class VulkanWindow: Window
 	
 	version(/+$DIDE_REGION VB    +/all)
 	{
-		union VertexData { uint geometryStreamBitOfs; } 
-		
-		static assert(VertexData.sizeof == 4); 
+		struct VertexData
+		{ uint geometryStreamBitOfs; } static assert(VertexData.sizeof == 4); 
 		
 		VertexBufferManager VB; 
 		
@@ -789,6 +800,10 @@ class VulkanWindow: Window
 			void reset()
 			{ buffer.reset; } 
 			
+			final void append(VertexData data)
+			{ buffer.append(data); } final void opCall(T...)(in T args)
+			{ append(args); } 
+			
 			void upload()
 			{
 				buffer.upload; 
@@ -798,7 +813,7 @@ class VulkanWindow: Window
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
 		} 
 	}
-	
+	
 	version(/+$DIDE_REGION GB    +/all)
 	{
 		GeometryBufferManager GB; 
@@ -823,12 +838,28 @@ class VulkanWindow: Window
 			
 			@property uint bitPos() => buffer.bitPos.to!uint /+Opt: check the range ocassionally+/; 
 			
-			void appendBits(T)(in T data, in size_t bits = T.sizeof*8)
+			void append(Args...)(in Args args)
 			{
-				//const ofs = (cast(uint)(buffer.appendPos)); /+A maximum of 4GB geometry data is assumed+/
-				//buffer.append(data); return ofs; 
-				buffer.appendBits(data, bits); /+Opt: too much delegate calls. Should use a delegate maybe.+/
+				static foreach(i, T; Args)
+				{
+					{
+						alias a = args[i]; 
+						static if(is(T : Opcode))	with(opInfo[a]) buffer.appendBits(bits, bitCnt); 
+						else static if(is(T : Bits!(B), B))	buffer.appendBits(a.data, a.bitCnt); 
+						else static if(is(T==enum))	buffer.appendBits(a, EnumBits!T); 
+						else static if(is(T : RGBA))	buffer.appendBits(a.raw, 32); 
+						else static if(is(T : RGB))	buffer.appendBits(a.raw, 24); 
+						else static if(is(T : vec2))	buffer.appendBits(a.bitCast!ulong); 
+						else static if(is(T : uint))	buffer.appendBits(a); 
+						else static if(is(T : ushort))	buffer.appendBits(a); 
+						else static if(is(T : ubyte))	buffer.appendBits(a); 
+						else static assert(0, "Unhandled type "~T.stringof); 
+					}
+				}
 			} 
+			
+			final void opCall(T...)(in T args)
+			{ append(args); } 
 			
 			void upload()
 			{ buffer.upload; } 
@@ -1490,41 +1521,30 @@ class VulkanWindow: Window
 			SC = (RGB(0xFF000000)); 
 		} 
 		
-		struct Bits(T) { T bits; uint bitCnt = T.sizeof.to!uint * 8; } 
-		
-		protected
+		void rect(bounds2 bounds, TexHandle texHandle, in RGBA color=(RGBA(0xFFFFFFFF)))
 		{
-			void appendBits(Args...)(in Args args)
-			{
-				static foreach(i, T; Args)
-				{
-					{
-						alias a = args[i]; 
-						static if(is(T : Opcode))	with(opInfo[a]) GB.appendBits(bits, bitCnt); 
-						else static if(is(T : Bits!(B), B))	GB.appendBits(a.bits, a.bitCnt); 
-						else static if(is(T==enum))	GB.appendBits(a, EnumBits!T); 
-						else static if(is(T : RGBA))	GB.appendBits(a.raw, 32); 
-						else static if(is(T : RGB))	GB.appendBits(a.raw, 24); 
-						else static if(is(T : vec2))	GB.appendBits(a.bitCast!ulong); 
-						else static if(is(T : uint))	GB.appendBits(a.bitCast!uint); 
-						else static if(is(T : ushort))	GB.appendBits(a.bitCast!ushort); 
-						else static if(is(T : ubyte))	GB.appendBits(a.bitCast!byte); 
-						else static assert(0, "Unhandled type "~T.stringof); 
-					}
-				}
-			} 
-		} 
-		
-		void rect(bounds2 bounds, TexHandle texHandle, RGBA color=(RGBA(0xFFFFFFFF)))
-		{
-			VB.buffer.append(mixin(體!((VertexData),q{GB.bitPos}))); 
+			VB(mixin(體!((VertexData),q{GB.bitPos}))); 
 			foreach(i; 0..4)
-			appendBits(
-				mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgba_u8})), mix((RGBA(0xFF40F0E0)), color, i/255.0f),
+			GB(
+				mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgba_u8})), color,
 				mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), bounds.low+vec2(i*4).rotate(i*.125f),
 				mixin(舉!((Opcode),q{drawTexRect}))	, mixin(舉!((CoordFormat),q{f32})), bounds.high+vec2(i*4).rotate(i*.125f), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texHandle)),
 			); 
-			appendBits(mixin(舉!((Opcode),q{end}))); 
+			GB(mixin(舉!((Opcode),q{end}))); 
+		} 
+		
+		void finalize()
+		{
+			static if(bugFix_LastTwoGeometryShaderStreamsMissing)
+			{
+				foreach(i; 0..3) { VB(mixin(體!((VertexData),q{GB.bitPos}))); }GB(0u/+many zeroes as end+/); 
+				/+
+					Bug: I don't know why these empty vertexes are needed. Minimum 2 of them.
+					POINTS -> POINT_LIST is good
+					POINTS -> TRIANGLE_STRIP, needs 2 extra points.
+					I add 3 to make sure.
+				+/
+			}
 		} 
 		
 		void draw(A...)(A args)
@@ -1814,7 +1834,7 @@ class VulkanWindow: Window
 			
 			$(
 				(表([
-					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/}],
+					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/}],
 					[q{},q{vert},q{uint vertGSBitOfs}],
 					[q{vert},q{geom},q{uint geomGSBitOfs}],
 					[q{geom},q{frag},q{
@@ -1822,10 +1842,16 @@ class VulkanWindow: Window
 						vec4 fragColor
 					},q{
 						smooth
-						vec2 fragTexCoord
+						vec4 fragBkColor
+					},q{
+						smooth
+						vec2 fragTexCoordXY
 					},q{
 						flat
 						uint fragTexHandle
+					},q{
+						flat
+						uint fragTexCoordZ
 					}],
 					[q{frag},q{},q{vec4 outColor}],
 				]))
@@ -1843,10 +1869,92 @@ class VulkanWindow: Window
 			
 			@geom: 
 			$(ShaderBufferDeclarations)
+			$(TexSizeFormat.GLSLCode)
+			
 			
 			layout(points) in; 
-			layout(triangle_strip, max_vertices = 32) out; 
+			layout(triangle_strip, max_vertices = 64) out; 
+			/*
+				255 is the max on R9 Fury X
+				
+				- must send 2 more vertices to the geometry shader streams, last 2 is ignored.
+					(Windows default driver, 250802)
+			*/
 			
+			
+			ivec3 getTexSize(in uint texIdx)
+			{
+				//This is all copied from the fragment shader.
+				
+				if(texIdx==0) return ivec3(0); 
+				
+				//fetch info dword 0
+				const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+				const uint info_0 = IB[textDwIdx+0]; 
+				
+				//handle 'error' and 'loading' flags
+				if(getBits(info_0, $(TexInfoBitOfs), 2)!=0) { return ivec3(0); }
+				
+				//decode dimensions, size
+				const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
+				const uint info_1 = IB[textDwIdx+1]; 
+				const uint _rawSize0 = getBits(info_0, 16, 16); 
+				const uint _rawSize12 = info_1; 
+				return decodeDimSize(dim, _rawSize0, _rawSize12); 
+			} 
+			
+			vec4 readPaletteSample(in uint texIdx, in float v, in bool prescaleX)
+			{
+				if(texIdx==0) return ErrorColor; 
+				
+				//fetch info dword 0
+				const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+				const uint info_0 = IB[textDwIdx+0]; 
+				
+				//handle 'error' and 'loading' flags
+				if(getBits(info_0, $(TexInfoBitOfs), 2)!=0)
+				{
+					if(getBit(info_0, $(TexInfoBitOfs)))	return ErrorColor; 
+					else	return LoadingColor; 
+				}
+				
+				//decode dimensions, size
+				const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
+				if(dim!=TexDim_1D) return ErrorColor; 
+				const uint size = IB[textDwIdx+1]/*fast access 1D size*/; 
+				if(size==0) return ErrorColor; 
+				
+				
+				//Prescale tex coordinates by size
+				float pv = v; if(prescaleX) pv *= float(size); 
+				
+				//Clamp tex coordinates. Assume non-empty image.
+				const int iv = int(pv); 
+				const int clamped = max(min(iv, int(size)-1), 0); 
+				
+				//Calculate flat index
+				const uint i = clamped; 
+				
+				//Get chunkIdx from info rec
+				const uint chunkIdx = IB[textDwIdx+2]; 
+				const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
+				
+				//decode format (chn, bpp, alt)
+				const uint chn = getBits(info_0, $(TexFormatBitOfs), $(TexChnBits)); 
+				const uint bpp = getBits(info_0, $(TexFormatBitOfs + TexChnBits), $(TexBppBits)); 
+				const bool alt = getBit(info_0, $(TexFormatBitOfs + TexChnBits + TexBppBits)); 
+				
+				if(chn==TexChn_4 && bpp==TexBpp_32)
+				{
+					//Opt: Cache all this palette reading operation!
+					vec4 res = unpackUnorm4x8(TB[dwIdx + i]); 
+					if(alt) {/*swap red-blue*/res.rgba = res.bgra; }
+					return res; 
+				}
+				
+				return ErrorColor; 
+			} 
+			
 			void emitVertex2D(vec2 p)
 			{
 				gl_Position = UB.mvp * vec4(p.xy, 0, 1); 
@@ -1864,19 +1972,19 @@ class VulkanWindow: Window
 			
 			void emitTexturedPointSizeRect2D(in vec2 p, in vec2 size)
 			{
-				fragTexCoord = vec2(0,0); emitVertex2D(p); 
-				fragTexCoord = vec2(0,1); emitVertex2D(p+vec2(0, size.y)); 
-				fragTexCoord = vec2(1,0); emitVertex2D(p+vec2(size.x, 0)); 
-				fragTexCoord = vec2(1,1); emitVertex2D(p+size); 
+				fragTexCoordXY = vec2(0,0); emitVertex2D(p); 
+				fragTexCoordXY = vec2(0,1); emitVertex2D(p+vec2(0, size.y)); 
+				fragTexCoordXY = vec2(1,0); emitVertex2D(p+vec2(size.x, 0)); 
+				fragTexCoordXY = vec2(1,1); emitVertex2D(p+size); 
 				EndPrimitive(); 
 			} 
 			
 			void emitTexturedPointPointRect2D(in vec2 p, in vec2 q)
 			{
-				fragTexCoord = vec2(0,0); emitVertex2D(p); 
-				fragTexCoord = vec2(0,1); emitVertex2D(vec2(p.x, q.y)); 
-				fragTexCoord = vec2(1,0); emitVertex2D(vec2(q.x, p.y)); 
-				fragTexCoord = vec2(1,1); emitVertex2D(q); 
+				fragTexCoordXY = vec2(0,0); emitVertex2D(p); 
+				fragTexCoordXY = vec2(0,1); emitVertex2D(vec2(p.x, q.y)); 
+				fragTexCoordXY = vec2(1,0); emitVertex2D(vec2(q.x, p.y)); 
+				fragTexCoordXY = vec2(1,1); emitVertex2D(q); 
 				EndPrimitive(); 
 			} 
 			
@@ -1888,13 +1996,19 @@ class VulkanWindow: Window
 					how many of the lower bits are valid in the current dword, 
 					if zero, the next dword must be fetched
 				*/
+				/*uint totalBitsRemaining; *//*overflow checking*/
 			}; 
 			
 			uint fetchBits(inout BitStream bitStream, in uint numBits)
 			{
+				/*
+					//overflow checking
+								if(numBits>bitStream.totalBitsRemaining) { bitStream.totalBitsRemaining = 0; return 0; }
+								bitStream.totalBitsRemaining -= numBits; 
+				*/
+				
 				uint result = 0; 
 				int bitsRemaining = int(numBits); 
-				
 				while(bitsRemaining > 0)
 				{
 					// If current dword is exhausted, fetch next one
@@ -1923,11 +2037,14 @@ class VulkanWindow: Window
 				return result; 
 			} 
 			
-			int fetch_int(inout BitStream bitStream, int numBits)
-			{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
-			
 			bool fetch_bool(inout BitStream bitStream)
 			{
+				/*
+					//overflow check
+								if(bitStream.totalBitsRemaining==0) { return false; }
+								bitStream.totalBitsRemaining--; 
+				*/
+				
 				if(bitStream.currentDwBits == 0)
 				{
 					bitStream.currentDw = GB[bitStream.dwOfs]; 
@@ -1941,6 +2058,9 @@ class VulkanWindow: Window
 				
 				return bit; 
 			} 
+			
+			int fetch_int(inout BitStream bitStream, int numBits)
+			{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
 			
 			uint fetch_uint(inout BitStream bitStream)
 			{
@@ -1970,20 +2090,7 @@ class VulkanWindow: Window
 			} 
 			
 			
-			/*
-				BitStream initBitStream(uint byteOfs)
-						{
-							BitStream bitStream; 
-							bitStream.dwOfs = byteOfs >> 2; 
-							bitStream.currentDwBits = 0; 
-							uint bitsToSkip = (byteOfs & 3) * 8; 
-							if(bitsToSkip > 0)
-							{ uint dummy = fetchBits(bitStream, bitsToSkip); }
-							return bitStream; 
-						} 
-			*/
-			
-			BitStream initBitStream(uint bitOfs)
+			BitStream initBitStream(uint bitOfs/*, uint nextBitOfs*/)
 			{
 				BitStream bitStream; 
 				bitStream.dwOfs = bitOfs >> 5; 
@@ -1991,6 +2098,8 @@ class VulkanWindow: Window
 				uint bitsToSkip = bitOfs & 0x1F; 
 				if(bitsToSkip > 0)
 				{ uint dummy = fetchBits(bitStream, bitsToSkip); }
+				
+				/*bitStream.totalBitsRemaining = nextBitOfs - bitOfs; //overflow check*/
 				return bitStream; 
 			} 
 			
@@ -2050,7 +2159,9 @@ class VulkanWindow: Window
 					const int idx = int(format - ColorFormat_u1); //0..3
 					const int bits = 1<<idx; //1, 2, 4, 8
 					const float high = float((1<<bits) - 1); //1, 3, 15, 255
-					color.rgb = vec3(float(fetchBits(bitStream, bits)) / high); 
+					const uint raw = fetchBits(bitStream, bits); 
+					if(PALH!=0)	color = readPaletteSample(PALH, raw, false)/*palette lookup*/; 
+					else	color.rgb = vec3(float(raw) / high)/*grayscale*/; 
 					return 1; 
 				}
 				return 0; 
@@ -2134,10 +2245,22 @@ class VulkanWindow: Window
 				const uint handleFmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
 				const uint texHandle = fetchHandle(bitStream, handleFmt); 
 				
-				fragColor = PC; 
+				fragColor = PC; fragBkColor = SC; 
 				fragTexHandle = texHandle; 
 				emitTexturedPointPointRect2D(P.xy, P_next.xy); 
 				
+				latchP(); 
+			} void drawASCII(inout BitStream bitStream)
+			{
+				vec2 size = vec2(getTexSize(FMH).xy); 
+				
+				fragTexCoordZ = fetchBits(bitStream, 8); 
+				fragColor = PC; fragBkColor = SC; 
+				fragTexHandle = FMH; 
+				emitTexturedPointPointRect2D(P.xy, P.xy+size); 
+				
+				fragTexCoordZ = 0; //restore it
+				P_next.x += size.x; //advance cursor
 				latchP(); 
 			} 
 			
@@ -2248,10 +2371,10 @@ class VulkanWindow: Window
 						case 3: 
 							switch(cmd)
 						{
-							case 0: 	drawMove(bitStream); 		break; 
-							case 1: 	drawTexRect(bitStream); 		break; 
-							case 2: 			break; 
-							case 3: 			break; 
+							case 0: 	drawMove(bitStream); 	break; 
+							case 1: 	drawTexRect(bitStream); 	break; 
+							case 2: 	drawASCII(bitStream); 	break; 
+							case 3: 		break; 
 						}
 						break; 
 					}
@@ -2261,18 +2384,18 @@ class VulkanWindow: Window
 			
 			void main() /*geometry shader*/
 			{
-				BitStream GS = initBitStream(geomGSBitOfs[0]); 
-				//Todo: read and enforce limitm from geomGSBitOfs[0], use line_strip_adjacent
-				while(runningCntr>0)
+				fragTexCoordZ = 0; //this is normally 0. Fonts can temporarily change it.
+				
+				BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
+				while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
 				{ processInstruction(GS); runningCntr--; }
 			} 
 			
 			@frag: 
 			$(ShaderBufferDeclarations)
-			
 			$(TexSizeFormat.GLSLCode)
-			
-			vec4 readSample(in uint texIdx, in vec3 v, in bool preScale)
+			
+			vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 			{
 				if(texIdx==0) return ErrorColor; 
 				
@@ -2295,8 +2418,14 @@ class VulkanWindow: Window
 				const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
 				if(size.x==0 || size.y==0 || size.z==0) return ErrorColor; 
 				
-				//Clamp coordinates. Assume non-empty image.
-				const ivec3 iv = ivec3 ((preScale)?(v * vec3(size)) :(v)); 
+				
+				//Prescale tex coordinates by size
+				vec3 pv = v; 
+				if(prescaleXY) pv.xy *= size.xy; 
+				if(prescaleZ) pv.z *= size.z; 
+				
+				//Clamp tex coordinates. Assume non-empty image.
+				const ivec3 iv = ivec3(pv); 
 				const ivec3 clamped = max(min(iv, size-1), 0); 
 				
 				//Calculate flat index
@@ -2457,18 +2586,19 @@ class VulkanWindow: Window
 				}; 
 				
 				vec4 sum = vec4(0); 
-				const vec2 texCoordDx = dFdx(fragTexCoord); 
-				const vec2 texCoordDy = dFdy(fragTexCoord); 
+				const vec2 texCoordDx = dFdx(fragTexCoordXY); 
+				const vec2 texCoordDy = dFdy(fragTexCoordXY); 
 				for(int i=0; i<6; i++)
 				{
 					vec2 rooks = rooks6_offsets[i]; 
-					vec2 tc = fragTexCoord + 	rooks.x * texCoordDx + 
+					vec2 tc = fragTexCoordXY + 	rooks.x * texCoordDx + 
 						rooks.y * texCoordDy; 
-					vec4 smp = readSample(fragTexHandle, vec3(tc, 0), true); 
+					vec4 smp = readSample(fragTexHandle, vec3(tc, fragTexCoordZ), true, false); 
 					sum += smp; 
 				}
+				sum /= 6; 
 				
-				outColor = sum/6 * fragColor; 
+				outColor = mix(fragBkColor, vec4(sum.rgb, 1)*fragColor, sum.a); 
 			} 
 		})); 
 		shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
@@ -2814,7 +2944,7 @@ class VulkanWindow: Window
 						
 						internalUpdate; //this will call onUpdate()
 						
-						
+						dr.finalize/+It appends nops to the end.+/; 
 						VB.upload; GB.upload; 
 						
 						{
@@ -2865,7 +2995,7 @@ class VulkanWindow: Window
 					//because buffers could grow, descriptors can change.
 					recreateDescriptors; 
 					
-					device.waitIdle/+Wait for everything+/; /+Opt: STALL+/
+					device.waitIdle/+Wait for everything+/; /+Opt: STALL  only wait if something's changed+/
 					commandBuffer = createCommandBuffer	(
 						swapchain.imageIndex, 
 						VB.uploadedVertexCount, VB.deviceMemoryBuffer

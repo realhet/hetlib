@@ -1,6 +1,6 @@
 //@exe
 //@debug
-///@release
+//@release
 
 import het.vulkanwin; 
 
@@ -54,7 +54,9 @@ static immutable EGAPalette =
 	(RGB(0x412020 )),(RGB(0x412028 )),(RGB(0x412031 )),(RGB(0x412039 )),(RGB(0x412041 )),(RGB(0x392041 )),(RGB(0x312041 )),(RGB(0x282041 )),(RGB(0x202041 )),(RGB(0x202841 )),(RGB(0x203141 )),(RGB(0x203941 )),(RGB(0x204141 )),(RGB(0x204139 )),(RGB(0x204131 )),(RGB(0x204128 )),(RGB(0x204120 )),(RGB(0x284120 )),(RGB(0x314120 )),(RGB(0x394120 )),(RGB(0x414120 )),(RGB(0x413920 )),(RGB(0x413120 )),(RGB(0x412820 )),
 	(RGB(0x412D2D )),(RGB(0x412D31 )),(RGB(0x412D35 )),(RGB(0x412D3D )),(RGB(0x412D41 )),(RGB(0x3D2D41 )),(RGB(0x352D41 )),(RGB(0x312D41 )),(RGB(0x2D2D41 )),(RGB(0x2D3141 )),(RGB(0x2D3541 )),(RGB(0x2D3D41 )),(RGB(0x2D4141 )),(RGB(0x2D413D )),(RGB(0x2D4135 )),(RGB(0x2D4131 )),(RGB(0x2D412D )),(RGB(0x31412D )),(RGB(0x35412D )),(RGB(0x3D412D )),(RGB(0x41412D )),(RGB(0x413D2D )),(RGB(0x41352D )),(RGB(0x41312D )),
 	(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),
-]; 
+]; RGB[] importVicePalette(File f)
+=> f.readLines	.filter!q{a.length && !a.startsWith(`#`)}
+	.map!((a)=>(a.replace(" ", "").to!uint(16).BGR)).takeExactly(16).array; 
 
 version(/+$DIDE_REGION+/all) {
 	/+
@@ -125,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x202B5F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20CE5F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x208F5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x20BA5F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21325F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x215D5F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -256,16 +258,18 @@ version(/+$DIDE_REGION+/all) {
 			void createCommoStuff()
 			{
 				egaPalette = new Texture(TexFormat.rgba_u8, 16, EGAPalette); 
-				c64Palette = new Texture(TexFormat.rgba_u8, 16, C64Palette); 
-				vgaPalette = new Texture(TexFormat.rgb_u8, 256, VGAPalette); 
+				c64Palette = new Texture(
+					TexFormat.rgba_u8, 16, /+C64Palette+/
+					File(`c:\C64\VICE\C64\pepto-pal.vpl`).importVicePalette.map!RGBA.array
+				); 
+				vgaPalette = new Texture(TexFormat.rgba_u8, 256, VGAPalette.map!RGBA.array); 
 			} 
 		}
 		
 		override void onCreate()
 		{
 			windowBounds = ibounds2(1280, 0, 1920, 600); 
-			(clAll.length).print; 
-			//console.hide; 
+			console.hide; 
 			
 			initApps; 
 			createCommoStuff; 
@@ -318,7 +322,7 @@ version(/+$DIDE_REGION+/all) {
 			{
 				foreach(y; 0..8)
 				foreach(x; 0..8)
-				{ dr.rect((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, TexHandle((y*8+x)%16+1)), RGBA(0xFFFF8000); }
+				{ dr.rect((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, hiresSprite.handle), RGBA(0xFFFF8000); }
 				
 				if(KeyCombo("F1").pressed) { textures.each!free; textures.clear; }
 			} 
@@ -401,32 +405,69 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 			Texture texFont, texSprites; 
 			Image2D!RG[] screens; 
 			
-			Texture hiresSprite; 
-			
 			override void onCreate()
 			{
 				texFont = new Texture(
-					TexFormat.u1, ivec3(8, 8, numFontChars), 
-					(cast(ubyte[])(binCharMap)).deserializeImage!ubyte.asArray.pack8bitTo1bit
+					TexFormat.wa_u1, ivec3(8, 8, numFontChars), 
+					binCharMap.deserializeImage!ubyte.asArray.pack8bitTo1bit
 				); 
 				texSprites = new Texture(
-					TexFormat.u1, ivec3(24, 21, numSprites), 
-					(cast(ubyte[])(binSprites)).deserializeImage!ubyte.asArray.pack8bitTo1bit
+					TexFormat.wa_u1, ivec3(24, 21, numSprites), 
+					binSprites.deserializeImage!ubyte.asArray.pack8bitTo1bit
 				); 
-				auto allScreen = image2D(
+				auto allScreens = image2D(
 					ivec2(40, 25*numScreens), 
-					(cast(RG[])((cast(ubyte[])(binScreens)).deserializeImage!ubyte.asArray))
+					(cast(RG[])(binScreens.deserializeImage!ubyte.asArray))
 				); 
-				
-				allScreen.print; 
+				screens = numScreens.iota.map!((i)=>(allScreens[0..$, i*25..(i+1)*25])).array; 
 			} 
 			
 			override void onUpdate()
 			{
-				foreach(y; 0..8)
-				foreach(x; 0..8)
-				{ dr.rect((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, texSprites.handle), RGBA(0xFFFF8000); }
-				//Bug: Ez kettovel kevesebbet rajzol!
+				void drawSprite(ivec2 pos, int idx, RGB color)
+				{
+					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
+					GB(
+						mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgb_u8})), color,
+						mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), vec2(pos),
+						mixin(舉!((Opcode),q{setFMH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texSprites.handle)),
+						mixin(舉!((Opcode),q{drawFontASCII}))	, (cast(ubyte)(idx))
+					); 
+					GB(mixin(舉!((Opcode),q{end}))); 
+				} 
+				void drawChr(ivec2 pos, int ch, int fg, int bk)
+				{
+					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
+					GB(
+						mixin(舉!((Opcode),q{setPALH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle)),
+						mixin(舉!((Opcode),q{setFMH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texFont.handle)),
+						//mixin(舉!((Opcode),q{setPCSC}))	, mixin(舉!((ColorFormat),q{rgba_u8})), clPet[fg&0xF], ubyte(0xff), clPet[bk&0xF], ubyte(0xff),
+						mixin(舉!((Opcode),q{setPCSC}))	, mixin(舉!((ColorFormat),q{u4})), bits(fg, 4), bits(bk, 4),
+						mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), vec2(pos),
+						mixin(舉!((Opcode),q{drawFontASCII}))	, (cast(ubyte)(ch))
+					); 
+					GB(mixin(舉!((Opcode),q{end}))); 
+				} 
+				
+				
+				
+				foreach(y; 0..16)
+				foreach(x; 0..16)
+				{
+					if(x+y*16<(ifloor(QPS.value(10*second).fract*257)))
+					{ drawSprite(ivec2(x, y)*ivec2(32), (ifloor((magnitude(vec2(8)-vec2(x, y)))))%12, VGAPalette[x+y*16]); }
+				}
+				
+				
+				//foreach(p; screens[0].bounds
+				foreach(y; 0..25)
+				foreach(x; 0..40)
+				{
+					auto data = screens[2][x, y]; 
+					drawChr(ivec2(x, y)*8, data.x, data.y, 0); 
+				}
+				
+				
 			} 
 			
 			

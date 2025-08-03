@@ -6267,8 +6267,9 @@ version(/+$DIDE_REGION+/all)
 		return b; 
 	} 
 	
-	Bitmap deserialize(T : Bitmap)(in ubyte[] stream, bool mustSucceed=false)
+	Bitmap deserialize(T : Bitmap)(in void[] stream_, bool mustSucceed=false)
 	{
+		const stream = (cast(const(ubyte[]))(stream_)); 
 		Bitmap bmp; 
 		try {
 			auto info = BitmapInfo(stream); 
@@ -6374,7 +6375,7 @@ version(/+$DIDE_REGION+/all)
 		return null; 
 	} 
 	
-	Image2D!T deserializeImage(T)(in ubyte[] stream)
+	Image2D!T deserializeImage(T)(in void[] stream)
 	{
 		auto bmp = stream.deserialize!Bitmap(true); 
 		return bmp.accessOrGet!T; 
