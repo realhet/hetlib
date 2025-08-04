@@ -149,12 +149,48 @@ alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 
 version(/+$DIDE_REGION Geometry Stream Processor+/all)
 {
-	struct Bits(T) {
+	struct Bits(T)
+	{
 		T data; 
-		uint bitCnt; 
+		size_t bitCnt; 
+		
+		auto opBinary(string op : "~", B)(B other) const
+		{
+			static if(is(B==Bits!T2, T2))
+			return Bits!T(data | (other.data<<bitCnt), bitCnt+other.bitCnt); 
+			else
+			return this ~ bits(other); 
+		} 
 	} 
-	auto bits(T)(T data, uint bitCnt = T.sizeof.to!uint * 8)
+	
+	auto bits(T)(T data, size_t bitCnt)
 	=> Bits!T(data, bitCnt); 
+	
+	auto bits(T)(T a)
+	{
+		static if(is(T==enum))
+		{
+			static if(is(T==Opcode))
+			{ return bits(opInfo[a].bits, opInfo[a].bitCnt); }
+			else
+			{ return bits(a, EnumBits!T); }
+		}
+		else
+		{ return bits(a, T.sizeof * 8); }
+	} 
+	
+	auto assemble(A...)(A args)
+	{
+		Bits!ulong res; 
+		static foreach(i, a; args)
+		{
+			{
+				static if(is(A[i] : Bits!B, B))	res = res ~ a; 
+				else	res = res ~ bits(a); 
+			}
+		}
+		return res; 
+	} 
 	
 	/+
 		General rules of enums:
@@ -311,8 +347,10 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		}); 
 	}
 	
+	static if((常!(bool)(0)))
 	static foreach(op; EnumMembers!Opcode)
 	pragma(msg, opInfo[op].bits.to!string(2).padLeft('0', opInfo[op].bitCnt).text, " : ", op.text); 
+	
 	
 	
 	
@@ -806,6 +844,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
+				((0x633F82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -862,7 +901,10 @@ class VulkanWindow: Window
 			{ append(args); } 
 			
 			void upload()
-			{ buffer.upload; } 
+			{
+				((0x69F282886ADB).檢(buffer.appendPos)); 
+				buffer.upload; 
+			} 
 			
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
 			
@@ -1873,12 +1915,14 @@ class VulkanWindow: Window
 			
 			
 			layout(points) in; 
-			layout(triangle_strip, max_vertices = 64) out; 
+			layout(triangle_strip, max_vertices = 170) out; 
 			/*
 				255 is the max on R9 Fury X
 				
-				- must send 2 more vertices to the geometry shader streams, last 2 is ignored.
-					(Windows default driver, 250802)
+				250802 must send 2 more vertices to the geometry shader streams, last 2 is ignored.
+					(Windows default driver, )
+				250804 170 is the max with 12 components. 170*12=2040  (171*12=2052)
+					I have no clue where this 2048 limit comes from o.O
 			*/
 			
 			
@@ -2397,7 +2441,7 @@ class VulkanWindow: Window
 			
 			vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 			{
-				if(texIdx==0) return ErrorColor; 
+				if(texIdx==0) return vec4(1,1,1,1)/*no texture means full white*/; 
 				
 				//fetch info dword 0
 				const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
@@ -2427,6 +2471,9 @@ class VulkanWindow: Window
 				//Clamp tex coordinates. Assume non-empty image.
 				const ivec3 iv = ivec3(pv); 
 				const ivec3 clamped = max(min(iv, size-1), 0); 
+				
+				//if(iv!=clamped) return vec4(0,0,0,0)/*out of texture means transparent*/; 
+				//transparent is not good! triangle edges can go out of texture bounds
 				
 				//Calculate flat index
 				const uint i = calcFlatIndex(clamped, dim, size); 
@@ -2948,16 +2995,19 @@ class VulkanWindow: Window
 						VB.upload; GB.upload; 
 						
 						{
+							enum globalScale=1; 
 							auto modelMatrix = mat4.identity; 
 							const rotationAngle = 0 * QPS.value(10*second); 
-							modelMatrix.translate(vec3(-274, -266, 0)); 
+							modelMatrix.translate(vec3(-160-32, -100-32, 0)*globalScale); 
 							modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
 							
 							// Set up view
-							auto viewMatrix = mat4.lookAt(vec3(0, 0, 500), vec3(0), vec3(0, 1, 0)); 
+							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*0; 
+							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
+							auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 							
 							// Set up projection
-							auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1, 1000); 
+							auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1*globalScale, 1000*globalScale); 
 							
 							UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
 						}

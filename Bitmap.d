@@ -6292,7 +6292,10 @@ version(/+$DIDE_REGION+/all)
 						WebPDecodeRGBAInto(stream.ptr, stream.length, cast(ubyte*)data.ptr, data.length*4, info.size.x*4); 
 						bmp.set(image2D(info.size, data)); 
 					}break; 
-					//Todo: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
+					/+
+						Opt: WebPDecodeYUVInto-val megcsinalni az 1 es 2 channelt.
+						es/vagy  optimizalni specialis functokkal: toFastGrayscale(), toFast1bit()
+					+/
 					default: raise("webp 1-2chn not impl"); 
 				}
 			} 
@@ -6368,7 +6371,6 @@ version(/+$DIDE_REGION+/all)
 			else doImageFormats; 
 			
 			return bmp; 
-			
 		}
 		catch(Exception e) { if(mustSucceed) throw e; }
 		

@@ -6527,6 +6527,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				bitStreamAppender.flush; 
 				if(appendPos<=0) return; 
 				//no flush needed because of coherent memory
+				
 				auto cb = new VulkanCommandBuffer(commandPool); 
 				with(cb)
 				record(

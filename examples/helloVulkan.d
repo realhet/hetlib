@@ -269,7 +269,7 @@ version(/+$DIDE_REGION+/all) {
 		override void onCreate()
 		{
 			windowBounds = ibounds2(1280, 0, 1920, 600); 
-			console.hide; 
+			//console.hide; 
 			
 			initApps; 
 			createCommoStuff; 
@@ -403,7 +403,14 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 			} 
 			
 			Texture texFont, texSprites; 
-			Image2D!RG[] screens; 
+			struct Screen
+			{
+				Image2D!RG img; 
+				int[3] bkCols; 
+				int borderCol; 
+			} 
+			Screen[] screens; 
+			
 			
 			override void onCreate()
 			{
@@ -419,7 +426,12 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					ivec2(40, 25*numScreens), 
 					(cast(RG[])(binScreens.deserializeImage!ubyte.asArray))
 				); 
-				screens = numScreens.iota.map!((i)=>(allScreens[0..$, i*25..(i+1)*25])).array; 
+				screens = numScreens.iota.map!((i)=>(Screen(allScreens[0..$, i*25..(i+1)*25]))).array; 
+				with(screens[0]) { bkCols = [15, 2, 6]; borderCol = 15; }
+				with(screens[1]) { bkCols = [6, 0, 0]; borderCol = 8; }
+				foreach(ref sc; screens[2..$])
+				with(sc) { bkCols = [0, 4, 8]; borderCol = 0; }
+				
 			} 
 			
 			override void onUpdate()
@@ -441,16 +453,72 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					GB(
 						mixin(舉!((Opcode),q{setPALH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle)),
 						mixin(舉!((Opcode),q{setFMH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texFont.handle)),
-						//mixin(舉!((Opcode),q{setPCSC}))	, mixin(舉!((ColorFormat),q{rgba_u8})), clPet[fg&0xF], ubyte(0xff), clPet[bk&0xF], ubyte(0xff),
 						mixin(舉!((Opcode),q{setPCSC}))	, mixin(舉!((ColorFormat),q{u4})), bits(fg, 4), bits(bk, 4),
 						mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), vec2(pos),
 						mixin(舉!((Opcode),q{drawFontASCII}))	, (cast(ubyte)(ch))
 					); 
 					GB(mixin(舉!((Opcode),q{end}))); 
 				} 
+				void drawChrRow(ivec2 pos, RG[] data, int bk)
+				{
+					if(data.empty) return; 
+					int fg=-1; 
+					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
+					GB(
+						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
+						assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texFont.handle))),
+						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
+						assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4))
+					); 
+					foreach(act; data)
+					{
+						if(fg.chkSet(act.y&0xf))
+						{ GB(bits(mixin(舉!((Opcode),q{setPC}))) ~ mixin(舉!((ColorFormat),q{u4})) ~ bits(fg, 4)); }
+						GB(bits(mixin(舉!((Opcode),q{drawFontASCII}))) ~ bits(act.x, 8)); 
+						/+
+							Opt: This is still 5-10% faster:
+							/+
+								Code: if(fg.chkSet(act.y&0xf))
+								{ GB(bits(0b_00_01_0 | (mixin(舉!((ColorFormat),q{u4}))<<5) | (fg<<(5+3)), 5+3+4)); }
+								GB(bits(0b_10_11_1 | (act.x<<5), 5+8)); 
+							+/
+						+/
+					}
+					GB(mixin(舉!((Opcode),q{end}))); 
+				} 
 				
+				void drawBorder(ivec2 pos, int fg)
+				{
+					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
+					GB(
+						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
+						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
+						
+					); 
+					void r(int x0, int y0, int x1, int y1)
+					{
+						vec2 p(int x, int y) => vec2(pos+ivec2(x, y))*8; 
+						GB(
+							assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), p(x0, y0),
+							assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), p(x1, y1), assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12)),
+						); 
+					} 
+					r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
+					r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
+				} 
 				
+				void drawScreen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
+				{
+					foreach(y; 0..img.height)
+					{
+						drawBorder(pos-4, borderCol); 
+						drawChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); 
+					}
+					
+				} 
 				
+				auto _間=init間; 
+				if(0)
 				foreach(y; 0..16)
 				foreach(x; 0..16)
 				{
@@ -459,15 +527,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				}
 				
 				
-				//foreach(p; screens[0].bounds
-				foreach(y; 0..25)
-				foreach(x; 0..40)
-				{
-					auto data = screens[2][x, y]; 
-					drawChr(ivec2(x, y)*8, data.x, data.y, 0); 
-				}
-				
-				
+				foreach(y; 0..1)
+				foreach(x; 0..1)
+				drawScreen(ivec2(40+8, 25+8)*ivec2(x, y)+ivec2(4, 4), screens[1].img, screens[1].bkCols, screens[1].borderCol); 
+				((0x5D8A5F5C4644).檢((update間(_間)))); 
+				//mixin(求each(q{i=0},q{15},q{drawChr(ivec2(0, i*8), 0x70+i, 1, 0)})); 
 			} 
 			
 			

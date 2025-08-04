@@ -9403,11 +9403,11 @@ version(/+$DIDE_REGION Colors+/all)
 			//Src: L              LA        RGB       RGBA Dst:
 			immutable table =
 			[
-				["a          ", "a.r   ", "a.l   ", "a.l  "], //L
+				["a          ", "a.r   ", "a.l   ", "a.l  "],	//L
 				["VT(a,*)    ", "a     ", "a.l1  ", "a.la "],	//LA
 				["VT(a,a,a)  ", "a.rrr ", "a     ", "a.rgb"],	//RGB
-				["VT(a,a,a,*)", "a.rrrg", "a.rgb1", "a    "]
-			]; 	//RGBA
+				["VT(a,a,a,*)", "a.rrrg", "a.rgb1", "a    "]	//RGBA
+			]; 
 			
 			enum one = is(T==ubyte) ? "255" : "1"; 
 			//* : ubyte alpha, and float alpha is different!!!

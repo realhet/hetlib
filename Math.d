@@ -529,7 +529,10 @@ version(/+$DIDE_REGION+/all)
 			@property auto l() const
 			{
 				static if(N>=3)
-				return cast(CT) dot(rgb, grayscaleWeights); 
+				{
+					return cast(CT) dot(rgb, grayscaleWeights); 
+					/+Todo: What's with fast grayscale> (r+(g<<1)+b)>>2, that should rather be an effect... .l is precise grayscale.+/
+				}
 				else
 				return r; 
 			} 
@@ -858,6 +861,13 @@ version(/+$DIDE_REGION+/all)
 			vec3 c = a + b; //= vec3(1.1, 2.2, 3.3)
 			vec3 d = a * b; //= vec3(0.1, 0.4, 0.9)
 			assert(c == vec3(1.1, 2.2, 3.3) && d.approxEqual(vec3(0.1, 0.4, 0.9))); 
+		}
+		{
+			//grayscale transform
+			assert(
+				iota(256).map!(i => RGB(i,i,i).l==i ? -1 : i).all!q{a==-1},
+				"Grayscale weights are bad."
+			); 
 		}
 	} 
 }version(/+$DIDE_REGION Vector relational+/all)
@@ -3066,7 +3076,14 @@ version(/+$DIDE_REGION+/all)
 	{
 		///  Functions /////////////////////////////////////////////////////
 		
-		immutable grayscaleWeights = vec3(0.299, 0.586, 1-(0.299+0.586)); 
+		//immutable grayscaleWeights = vec3(0.299, 0.586, 1-(0.299+0.586)); 
+		
+		immutable grayscaleWeights = 
+			((){
+			//adjust grayscale weights to work with limited precision floats
+			const N = 1<<16, rg = vec2(0.299, 0.586); 
+			with(ivec2(rg * N)) return ((vec3(r, g, N-r-g))/(N)); 
+		})(); 
 		
 		/// this is my approxEqual. The one in std.math is too complicated
 		bool approxEqual(A, B, C)(in A a, in B b, in C maxDiff = approxEqualDefaultDiff)
