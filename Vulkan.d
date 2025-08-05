@@ -3769,7 +3769,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					enum vsynch 	= (常!(bool)(0)),
+					enum vsynch 	= (常!(bool)(1)),
 					canTripleBuffer 	= (常!(bool)(1)); 
 					
 					/+
@@ -6454,6 +6454,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							+/
 						}
 						
+						static if((常!(bool)(0)))
 						print(
 							"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
 							bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"
@@ -6779,7 +6780,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					else if(/+Note: Shrink+/ bufferSizeBytes < oldBufferSizeBytes)
 					{ ERR("Shrinking Vulkan Heap Allocator not functioning yet. (2)"); }
 				}
-				allocator.stats.print; 
+				
+				static if((常!(bool)(0))) allocator.stats.print; 
 			} 
 		} 
 		

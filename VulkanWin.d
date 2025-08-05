@@ -326,7 +326,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{"11"},q{"00"},q{drawMove},q{/+CoordFormat Coords+/}],
 				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords HandleFormat Handle+/}],
 				[q{},q{},q{"10"},q{drawFontASCII},q{/+ubyte+/}],
-				[q{},q{},q{"11"},q{},q{/++/}],
+				[q{},q{},q{"11"},q{drawFontASCII_2x},q{/+ubyte+/}],
 				[],
 			]))
 		),q{
@@ -844,7 +844,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x633F82886ADB).檢(buffer.appendPos)); 
+				((0x635482886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -902,7 +902,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x69F282886ADB).檢(buffer.appendPos)); 
+				((0x6A0782886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -1589,42 +1589,7 @@ class VulkanWindow: Window
 			}
 		} 
 		
-		void draw(A...)(A args)
-		{
-			TexHandle tex; 
-			RGBA color = (RGBA(0xFFFFFFFF)); 
-			
-			void emitQuad_vec2(); 
-			
-			static foreach(i; 0..A.length)
-			{
-				{
-					alias T = A[i], a = args[i]; 
-					static if(is(T : TexHandle)) { tex = a; }
-					else static if(is(T : RGB)) { color.rgb = a; }
-					else static if(is(T : RGBA)) { color.rgba = a; }
-					else static if(is(T : vec2)) { emitQuad_vec2(a); }
-					else static assert(0, "unhandled type: "~T.stringof); 
-				}
-			}
-		} 
 		
-		
-		
-		/+
-			void tri(Args...)(in Args args)
-			{
-				void emit(in vec3 pos)
-				{ buffer.append(VertexData(pos, actColor)); } 
-				
-				static foreach(i, A; Args)
-				{
-					static if(is(A==vec3)) emit(args[i]); 
-					else static if(is(A==vec2)) emit(vec3(args[i], 0)); 
-					else static if(is(A==RGB)) actColor = args[i].from_unorm; 
-				}
-			} 
-		+/
 	} 
 	
 	/+Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`.+//+
@@ -2294,9 +2259,11 @@ class VulkanWindow: Window
 				emitTexturedPointPointRect2D(P.xy, P_next.xy); 
 				
 				latchP(); 
-			} void drawASCII(inout BitStream bitStream)
+			} void drawASCII(inout BitStream bitStream, bool doubleSize)
 			{
 				vec2 size = vec2(getTexSize(FMH).xy); 
+				
+				if(doubleSize) size *= 2; 
 				
 				fragTexCoordZ = fetchBits(bitStream, 8); 
 				fragColor = PC; fragBkColor = SC; 
@@ -2417,8 +2384,8 @@ class VulkanWindow: Window
 						{
 							case 0: 	drawMove(bitStream); 	break; 
 							case 1: 	drawTexRect(bitStream); 	break; 
-							case 2: 	drawASCII(bitStream); 	break; 
-							case 3: 		break; 
+							case 2: 	drawASCII(bitStream, false); 	break; 
+							case 3: 	drawASCII(bitStream, true); 	break; 
 						}
 						break; 
 					}
@@ -3002,7 +2969,7 @@ class VulkanWindow: Window
 							modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
 							
 							// Set up view
-							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*0; 
+							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*1; 
 							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
 							auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 							
@@ -3034,8 +3001,10 @@ class VulkanWindow: Window
 						foreach(th; Texture.destroyedResidentTexHandles)
 						{ TB.remove(th); /+LOG(th); +/}
 						
-						if(KeyCombo("Space").down)
-						{ LOG(Texture.destroyedResidentTexHandles.stats); }
+						/+
+							if(KeyCombo("Space").down)
+							{ LOG(Texture.destroyedResidentTexHandles.stats); }
+						+/
 						
 						
 						IB.buffer.upload; 

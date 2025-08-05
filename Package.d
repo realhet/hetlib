@@ -289,58 +289,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		/// application /////////////////////////
 		__gshared static private
-		{
-			//__gshared is for variables, static is for functions. Doesn't matter what is in front of the 'struct' keyword.
-			bool initialized, finalized, running_; 
-			/+
-				No need for KillerThread anymore: DIDE can kill.
-				
-				//Lets the executable stopped from DIDE when the windows message loop is not responding.
-				class KillerThread: Thread
-				{
-					bool over, finished; 
-					this()
-					{
-						super(
-							{
-								auto t0	= 0.0 *second; 
-								const timeOut	= 0.66*second; //it shut downs after a little less than the DIDE.killExeTimeout (1sec)
-								while(!over)
-								{
-									if(t0 == 0*second)
-									{
-										if(dbg.forceExit_check) t0 = QPS; //start timer
-									}
-									else
-									{
-										auto elapsed = QPS-t0; 
-										if(!dbg.forceExit_check)
-										{
-											t0 = 0*second; //reset timer. exiting out normally.
-										}
-										else
-										{
-											if(elapsed>timeOut)
-											{ application.exit; }
-										}
-									}
-									.sleep(15); 
-								}
-								finished = true; 
-							}
-						); 
-					} 
-					
-					void stop()
-					{
-						over = true; 
-						while(!finished) .sleep(5); //Have to wait the thread
-					} 
-				} 
-				
-				KillerThread killerThread; 
-			+/
-		} 
+		{ bool initialized, finalized, running_; } 
 		__gshared static public
 		{
 			uint tick; //enough	for 2 years @ 60Hz

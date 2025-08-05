@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+///@release
 
 import het.vulkanwin; 
 
@@ -127,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20CE5F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20CF5F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21325F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x215D5F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21335F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x215E5F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -260,7 +260,7 @@ version(/+$DIDE_REGION+/all) {
 				egaPalette = new Texture(TexFormat.rgba_u8, 16, EGAPalette); 
 				c64Palette = new Texture(
 					TexFormat.rgba_u8, 16, /+C64Palette+/
-					File(`c:\C64\VICE\C64\pepto-pal.vpl`).importVicePalette.map!RGBA.array
+					File(`c:\C64\VICE\C64\colodore.vpl`).importVicePalette.map!RGBA.array
 				); 
 				vgaPalette = new Texture(TexFormat.rgba_u8, 256, VGAPalette.map!RGBA.array); 
 			} 
@@ -269,11 +269,8 @@ version(/+$DIDE_REGION+/all) {
 		override void onCreate()
 		{
 			windowBounds = ibounds2(1280, 0, 1920, 600); 
-			//console.hide; 
-			
 			initApps; 
 			createCommoStuff; 
-			
 			actAppName = ["SamplingDemo", "JupiterLander"][1]; 
 		} 
 		
@@ -403,6 +400,8 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 			} 
 			
 			Texture texFont, texSprites; 
+			ubyte[] fontMap; 
+			RG[] collisionPoints; 
 			struct Screen
 			{
 				Image2D!RG img; 
@@ -411,17 +410,46 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 			} 
 			Screen[] screens; 
 			
+			Game game; 
+			
+			RG[] extractSpriteCollisionPoints(Image2D!ubyte img)
+			{
+				RG[] res; 
+				bool p(int x, int y)
+				{
+					if(img[x, y]) {
+						res.addIfCan(RG(x, y));  
+						return true; 
+					}
+					return false; 
+				} 
+				foreach(x; 0..24)
+				{
+					foreach(y; 0..21) if(p(x, y)) break; 
+					foreach_reverse(y; 0..21) if(p(x, y)) break; 
+				}
+				foreach(y; 0..21)
+				{
+					foreach(x; 0..24) if(p(x, y)) break; 
+					foreach_reverse(x; 0..24) if(p(x, y)) break; 
+				}
+				return res.sort.uniq.array; 
+			} 
+			
 			
 			override void onCreate()
 			{
+				fontMap = binCharMap.deserializeImage!ubyte.asArray.pack8bitTo1bit; 
 				texFont = new Texture(
 					TexFormat.wa_u1, ivec3(8, 8, numFontChars), 
-					binCharMap.deserializeImage!ubyte.asArray.pack8bitTo1bit
+					fontMap
 				); 
+				auto imSprites = binSprites.deserializeImage!ubyte; 
 				texSprites = new Texture(
 					TexFormat.wa_u1, ivec3(24, 21, numSprites), 
-					binSprites.deserializeImage!ubyte.asArray.pack8bitTo1bit
+					imSprites.asArray.pack8bitTo1bit
 				); 
+				collisionPoints = extractSpriteCollisionPoints(imSprites[0..24, 0..21]); 
 				auto allScreens = image2D(
 					ivec2(40, 25*numScreens), 
 					(cast(RG[])(binScreens.deserializeImage!ubyte.asArray))
@@ -432,30 +460,190 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				foreach(ref sc; screens[2..$])
 				with(sc) { bkCols = [0, 4, 8]; borderCol = 0; }
 				
+				game = new Game; 
 			} 
-			
+			
+			class Game
+			{
+				Screen screen; 
+				
+				bool shipVisible, shipSimulated, thrustLeft, thrustRight, thrustBottom, thrustFlicker; 
+				vec2 shipPos, shipSpeed; 
+				int shipColor, shipSpriteIdx; bool shipDoubleSize; 
+				float shipExplosionTick=0; 
+				
+				static immutable 
+					explosionColors = [5, 7, 8, 12, 13, 15, 1, 3],
+					explosionMaxSpriteIdx = 7,
+					explosionMaxTick = 100; 
+				
+				@property shipExplosionFinished() => shipExplosionTick>explosionMaxTick; 
+				
+				enum Scene { title, instructions, demo } 
+				Scene _scene; 
+				Time sceneTime = 0*second; 
+				@property scene() const
+				=> _scene; @property void scene(Scene a)
+				{ _scene = a; onSceneStarts(); } 
+				
+				this()
+				{ scene = Scene.demo; } 
+				
+				void fillFgCol(int col, int x, int y, int w=1, int  h=1)
+				{
+					col &= 0xF; 
+					if(screen.img[x, y].y.getBits(0, 4)!=col)
+					foreach(ref a; screen.img[x..x+w, y..y+h]) a.y = (cast(ubyte)(a.y.setBits(0, 4, col))); 
+				} 
+				
+				void onSceneStarts()
+				{
+					sceneTime = 0*second; 
+					
+					void loadScreen(int idx)
+					{ screen = screens[idx]; screen.img = screen.img.dup; } 
+					
+					void initShip()
+					{
+						shipVisible = true; shipSimulated = true; 
+						shipPos = vec2(32+14, 32+2); shipDoubleSize = false; 
+						shipSpeed = vec2(10, -1); 
+						shipColor = 3; shipSpriteIdx = 0; shipExplosionTick = 0; 
+						thrustLeft = thrustRight = thrustBottom = false; 
+					} 
+					
+					
+					final switch(scene)
+					{
+						case Scene.title: 	{ loadScreen(0); shipVisible = false; }	break; 
+						case Scene.instructions: 	{
+							loadScreen(1); initShip; 
+							shipSimulated = false; 
+							shipPos = vec2(151, 71); 
+							shipDoubleSize = true; 
+						}	break; 
+						case Scene.demo: 	{ loadScreen(2); initShip; }break; 
+					}
+				} 
+				
+				void update()
+				{
+					const appDeltaTime = application.deltaTime * 1; 
+					enum tickFreq = 50 /+Hz+/; 
+					const float 	Δt	= appDeltaTime.value(second),
+						t 	= sceneTime.value(second),
+					Δtick 	= Δt * tickFreq,
+					tick 	= t * tickFreq; 
+					sceneTime += appDeltaTime/+advance time+/; 
+					
+					thrustFlicker = (ifloor(tick/3.5f)) & 1; /+update the flickering of the bottom thruster+/; 
+					
+					void flashingBottomText()
+					{ fillFgCol((ifloor(tick/16)), 10, 24, 18); } 
+					
+					void animateInstructions()
+					{
+						const phase = (ifloor(tick/32))%6; 
+						
+						thrustLeft = phase==1; 
+						thrustRight = phase==3; 
+						thrustBottom = phase==5; 
+						
+						fillFgCol(thrustLeft   ?0:1, 11, 11, 6); 
+						fillFgCol(thrustRight  ?0:1, 19, 11, 7); 
+						fillFgCol(thrustBottom?0:1, 23,  7, 7); 
+					} 
+					
+					void updateShip()
+					{
+						if(shipVisible && shipSimulated)
+						{
+							shipPos += shipSpeed * Δt; 
+							shipSpeed.y += 3.5f * Δt; ; //gravity
+							
+							bool detectCollision()
+							{
+								const fromShipToScreen = (iround(shipPos)) - 4*8; 
+								foreach(cp; collisionPoints)
+								{
+									const pScr = ivec2(cp)+fromShipToScreen; 
+									if(pScr in ibounds2(0, 0, 320, 200))
+									{
+										const chPos = pScr>>3; 
+										const ch = screen.img[chPos.x, chPos.y].x; 
+										if(ch.inRange(1, 127))
+										{
+											const remPos = pScr & 7; 
+											if(fontMap[ch*8 + remPos.y].getBit(remPos.x))
+											{ return true; /+drawMark(pScr+4*8);+/}
+										}
+									}
+								}
+								return false; 
+							} 
+							
+							if(detectCollision)
+							{
+								shipSimulated = false; 
+								shipExplosionTick = .001f; 
+							}
+						}
+						
+						if(shipExplosionTick > 0)
+						{
+							shipExplosionTick += Δtick * 0.65f; 
+							
+							const i = (ifloor(shipExplosionTick)); 
+							shipColor = explosionColors[i%explosionColors.length]; 
+							shipSpriteIdx = i/4+1; 
+							if(shipSpriteIdx>explosionMaxSpriteIdx)
+							{ shipSpriteIdx = -1; }
+						}
+					} 
+					
+					final switch(scene)
+					{
+						case Scene.title: 	{ if(t>=4) scene = Scene.instructions; }	break; 
+						case Scene.instructions: 	{
+							flashingBottomText; animateInstructions; 
+							if(tick>=32*(6*3+1)) scene = Scene.demo; 
+						}	break; 
+						case Scene.demo: 	{
+							flashingBottomText; updateShip; 
+							if(t>=20 || shipExplosionFinished) scene = Scene.title; 
+						}	break; 
+					}
+				} 
+			} 
+			
 			override void onUpdate()
 			{
-				void drawSprite(ivec2 pos, int idx, RGB color)
+				game.update; 
+				
+				void drawRect(ibounds2 bnd, int fg)
 				{
 					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
 					GB(
-						mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgb_u8})), color,
-						mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), vec2(pos),
-						mixin(舉!((Opcode),q{setFMH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texSprites.handle)),
-						mixin(舉!((Opcode),q{drawFontASCII}))	, (cast(ubyte)(idx))
+						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
+						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
+						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
+						assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight), assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12)),
+						
 					); 
-					GB(mixin(舉!((Opcode),q{end}))); 
 				} 
-				void drawChr(ivec2 pos, int ch, int fg, int bk)
+				
+				void drawMark(ivec2 p, int fg = 7)
+				{ drawRect(ibounds2(p, ((1).genericArg!q{size})), fg); } 
+				
+				void drawSprite(vec2 pos, int idx, int fg, bool doubleSize)
 				{
 					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
 					GB(
-						mixin(舉!((Opcode),q{setPALH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle)),
-						mixin(舉!((Opcode),q{setFMH}))	, mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texFont.handle)),
-						mixin(舉!((Opcode),q{setPCSC}))	, mixin(舉!((ColorFormat),q{u4})), bits(fg, 4), bits(bk, 4),
-						mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), vec2(pos),
-						mixin(舉!((Opcode),q{drawFontASCII}))	, (cast(ubyte)(ch))
+						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
+						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
+						assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texSprites.handle))),
+						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
+						assemble(((doubleSize)?(mixin(舉!((Opcode),q{drawFontASCII_2x}))) :(mixin(舉!((Opcode),q{drawFontASCII})))), (cast(ubyte)(idx)))
 					); 
 					GB(mixin(舉!((Opcode),q{end}))); 
 				} 
@@ -485,8 +673,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						+/
 					}
 					GB(mixin(舉!((Opcode),q{end}))); 
-				} 
-				
+				} 
 				void drawBorder(ivec2 pos, int fg)
 				{
 					VB(mixin(體!((VertexData),q{GB.bitPos}))); 
@@ -514,24 +701,31 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						drawBorder(pos-4, borderCol); 
 						drawChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); 
 					}
-					
 				} 
 				
 				auto _間=init間; 
-				if(0)
-				foreach(y; 0..16)
-				foreach(x; 0..16)
+				foreach(sy; 0..1)
+				foreach(sx; 0..1)
 				{
-					if(x+y*16<(ifloor(QPS.value(10*second).fract*257)))
-					{ drawSprite(ivec2(x, y)*ivec2(32), (ifloor((magnitude(vec2(8)-vec2(x, y)))))%12, VGAPalette[x+y*16]); }
+					const base = ivec2(40+8, 25+8)*ivec2(sx, sy); 
+					with(game.screen)
+					{ drawScreen(base+4, img, bkCols, borderCol); }
+					with(game)
+					{
+						if(shipVisible) {
+							const p = base*8+shipPos/+(iround(shipPos))+/; 
+							if(!shipExplosionTick)
+							{
+								if(thrustLeft) drawSprite(p, 10, 2, shipDoubleSize); 
+								if(thrustRight) drawSprite(p, 11, 2, shipDoubleSize); 
+								if(thrustBottom) drawSprite(p, 8+thrustFlicker, 2, shipDoubleSize); 
+							}
+							if(shipSpriteIdx>=0)
+							{ drawSprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
+						}
+					}
 				}
-				
-				
-				foreach(y; 0..1)
-				foreach(x; 0..1)
-				drawScreen(ivec2(40+8, 25+8)*ivec2(x, y)+ivec2(4, 4), screens[1].img, screens[1].bkCols, screens[1].borderCol); 
-				((0x5D8A5F5C4644).檢((update間(_間)))); 
-				//mixin(求each(q{i=0},q{15},q{drawChr(ivec2(0, i*8), 0x70+i, 1, 0)})); 
+				((0x74375F5C4644).檢((update間(_間)))); 
 			} 
 			
 			
