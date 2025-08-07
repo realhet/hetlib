@@ -1,6 +1,6 @@
 //@exe
 //@debug
-///@release
+//@release
 
 import het.vulkanwin; 
 
@@ -127,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20CF5F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20CE5F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21335F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x215E5F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21325F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x215D5F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -341,8 +341,9 @@ version(/+$DIDE_REGION+/all) {
 				void textOut(R)(int x, int y, R s, int fgCol=-1)
 				{
 					int xx = x; 
-					foreach(ch; s) { img[xx, y].x = ch.bitCast!ubyte; xx++; }
-					if(fgCol>=0) fillFgCol(fgCol, x, y, s.length.to!int); 
+					int len; 
+					foreach(ch; s) { img[xx, y].x = ch.bitCast!ubyte; xx++; len++; }
+					if(fgCol>=0) fillFgCol(fgCol, x, y, len); 
 				} 
 			} 
 			Screen[] screens; 
@@ -407,7 +408,7 @@ version(/+$DIDE_REGION+/all) {
 				}
 				return 0; 
 			} 
-			
+			
 			
 			class Sprites : BitmapArray
 			{
@@ -460,7 +461,8 @@ version(/+$DIDE_REGION+/all) {
 					return false; 
 				} 
 			} 
-			Sprites sprites; 
+			Sprites sprites; 
+			
 			void drawRect(ibounds2 bnd, int fg)
 			{
 				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
@@ -487,7 +489,7 @@ version(/+$DIDE_REGION+/all) {
 					assemble(((doubleSize)?(mixin(舉!((Opcode),q{drawFontASCII_2x}))) :(mixin(舉!((Opcode),q{drawFontASCII})))), (cast(ubyte)(idx)))
 				); 
 				GB(mixin(舉!((Opcode),q{end}))); 
-			} 
+			} 
 			void drawChrRow(ivec2 pos, RG[] data, int bk)
 			{
 				if(data.empty) return; 
@@ -635,9 +637,9 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 			bool shipVisible, shipSimulated, thrustLeft, thrustRight, thrustBottom, thrustFlicker; 
 			vec2 shipPos, shipSpeed; 
 			int shipColor, shipSpriteIdx; bool shipDoubleSize; 
-			float shipExplosionTick=0; 
+			float shipExplosionTick=0, delayedExplosion=0; ; 
 			
-			int zoomedPlatform = -1; 
+			int zoomedPlatform = -1, landedOnPlatform = -1; 
 			ivec2 shipTranslation; 
 			
 			static immutable 	explosionColors = [5, 7, 8, 12, 13, 15, 1, 3],
@@ -649,9 +651,12 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				ibounds2(ivec2(27, 20), ((ivec2(5, 1)).genericArg!q{size}))
 			],
 				platformZoomedPos = [ivec2(12, 16), ivec2(12, 10), ivec2(16, 18)],
-				platformMultipliers = [5, 2, 10]; ; 
+				platformMultipliers = [5, 2, 10],
+				speedScale = 3.0f; ; 
 			
-			@property shipExplosionFinished() => shipExplosionTick>explosionMaxTick; 
+			
+			static str(R)(R s)
+			=> s.byChar.map!((a)=>(a.predSwitch(' ', '@', '-', '\x5F', a))).text; 
 			
 			enum Scene {title, instructions, demo, game} 
 			Scene _scene; 
@@ -671,10 +676,12 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				{
 					shipVisible = true; shipSimulated = true; 
 					shipPos = vec2(14, 2); shipDoubleSize = false; 
-					shipSpeed = vec2(10, -1); 
-					shipColor = 3; shipSpriteIdx = 0; shipExplosionTick = 0; 
+					shipSpeed = vec2(10, -1) + vec2(randomGaussPair[])*3; 
+					shipColor = 3; shipSpriteIdx = 0; 
+					shipExplosionTick = 0; delayedExplosion = 0; delayedRestart = 0; 
 					thrustLeft = thrustRight = thrustBottom = false; 
-					zoomedPlatform = -1; shipTranslation = ivec2(0); 
+					zoomedPlatform = -1; landedOnPlatform = -1; 
+					shipTranslation = ivec2(0); 
 				} 
 				
 				
@@ -688,30 +695,53 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						shipDoubleSize = true; 
 					}	break; 
 					case Scene.demo: 	{ loadScreen(2); initShip; }	break; 
-					case Scene.game: 	{ loadScreen(2); initShip; }	break; 
+					case Scene.game: 	{
+						loadScreen(2); initShip; 
+						fuel = initialFuel; score = 0; 
+					}	break; 
 				}
 			} 
-			
-			const score = 123456; 
-			const hiscore = 654321; 
-			int fuel() => (iceil(QPS.value(10*second).fract*8*33)); 
+			
+			int score, highScore, pendingScore; 
+			enum initialFuel = 32 * 8, fuelPenalty = 32; 
+			float fuel = 0; 
+			float scoreTimer=0; 
+			float delayedRestart = 0; 
+			float gameOverTimer = 0; 
 			
 			void uiLabelInt(ivec2 p, int col, string label, int value)
 			{
-				with(screen) {
+				with(screen)
+				{
 					textOut(p.x, p.y, label, col); 
-					textOut(p.x + label.length.to!int, p.y, value.format!"%6d", 1); 
+					textOut(
+						p.x + label.length.to!int, p.y, 
+						str(value.format!"%6d"), 1
+					); 
 				}
 			} 
 			
-			void uiFuelGauge(ivec2 p, int barWidth, int col, int barCol, string label, int value)
+			void uiFuelGauge(
+				ivec2 p, int barWidth, int col, int barCol, 
+				string label, int value
+			)
 			{
 				with(screen)
 				{
 					textOut(p.x, p.y, label, 7); 
-					auto barChars = 	only(16+value%8).padLeft(1, value/8+1)
-						.padRight(0, barWidth).take(barWidth); 
-					textOut(p.x + label.length.to!int, p.y, barChars, 6); 
+					if(value>0)
+					{
+						auto barChars = 	only(16+value%8).padLeft(1, value/8+1)
+							.padRight(0, barWidth).take(barWidth); 
+						textOut(p.x + label.length.to!int, p.y, barChars, 6); 
+					}
+					else
+					{
+						textOut(
+							p.x + label.length.to!int, p.y, 
+							str("      OUT OF FUEL".padRight(' ', barWidth)), 2
+						); 
+					}
 				}
 			} 
 			
@@ -723,7 +753,8 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					version(/+$DIDE_REGION Bar+/all)
 					{
 						img[p.x, p.y-1] = RG(10, col1); 
-						foreach(y; p.y..p.y+barHeight) img[p.x, y] = RG(1, col1); 
+						foreach(y; p.y..p.y+barHeight)
+						img[p.x, y] = RG(1, col1); 
 						img[p.x, cy].y = (cast(ubyte)(col2)); 
 						img[p.x, p.y+barHeight] = RG(11, col1); 
 					}
@@ -748,19 +779,28 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 			{
 				with(screen)
 				{
-					uiLabelInt(ivec2(1, 23), 5, "SCORE@:", score); 
-					uiLabelInt(ivec2(18, 23), 4, "HI\x5FSCORE@:", hiscore); 
-					uiFuelGauge(ivec2(1, 24), 32, 7, 6, "FUEL@:@", fuel); 
-					uiAccelGauge(ivec2(39, 4), 16, 5, 7, (ifloor(shipSpeed.y * 3))); 
+					uiLabelInt(ivec2(1, 23), 5, str("SCORE :"), score); 
+					uiLabelInt(ivec2(18, 23), 4, str("HI-SCORE :"), highScore); 
+					uiFuelGauge(ivec2(1, 24), 32, 7, 6, str("FUEL : "), (ifloor(fuel))); 
+					uiAccelGauge(ivec2(39, 4), 16, 5, 7, (ifloor(shipSpeed.y * speedScale))); 
 				}
 			} 
+			
+			void drawMsg(R)(R msg, int y=1)
+			{
+				with(screen)
+				{
+					const w = msg.length.to!int+4, x = (40-w)/2; 
+					
+					textOut(x, y+0, str('@'.repeat.take(w)), 1); 
+					textOut(x, y+1, chain("@@", msg, "@@"), 1); 
+					textOut(x, y+2, '@'.repeat.take(w), 1); 
+				}
+			} 
+			
 			
 			override void onCreate()
-			{
-				loadAssets; 
-				
-				scene = Scene.game; 
-			} 
+			{ loadAssets; scene = Scene.title; } 
 			
 			override void onUpdate()
 			{
@@ -773,7 +813,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				tick 	= t * tickFreq; 
 				sceneTime += appDeltaTime/+advance time+/; 
 				
-				thrustFlicker = (ifloor(tick/3.5f)) & 1; /+update the flickering of the bottom thruster+/; 
+				thrustFlicker = (ifloor(tick/3.5f)) & 1; /+update the flickering of the bottom thruster+/
 				
 				version(/+$DIDE_REGION+/all) {
 					void animateInstructions()
@@ -788,15 +828,15 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						screen.fillFgCol(thrustRight  ?0:1, 19, 11, 7); 
 						screen.fillFgCol(thrustBottom?0:1, 23,  7, 7); 
 					} 
-					
+					
 					void flashingBottomText()
 					{ screen.fillFgCol((ifloor(tick/16)), 10, 24, 18); } 
 					
-					void processInput()
+					void processInput(bool en)
 					{
-						thrustBottom 	= KeyCombo(`F1`).down,
-						thrustLeft 	= KeyCombo(`A`).down,
-						thrustRight 	= KeyCombo(`D`).down; 
+						thrustBottom 	= en && KeyCombo(`F1`).down,
+						thrustLeft 	= en && KeyCombo(`A`).down,
+						thrustRight 	= en && KeyCombo(`D`).down; 
 					} 
 				}
 				
@@ -809,90 +849,238 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					return p; 
 				} 
 				
+				int decideZoomedPlatform()
+				{
+					with(shipPos)
+					{
+						if(y>88) return x>160 ? 2 : 0; 
+						if(mixin(界0(q{110},q{x},q{220})) && y>12) return 1; 
+						return -1; 
+					}
+				} 
+				
 				void updateShip()
 				{
 					if(shipVisible && shipSimulated)
 					{
-						if(thrustLeft) shipSpeed.x += 7.0f * Δt; 
-						if(thrustRight) shipSpeed.x -= 7.0f * Δt; 
-						if(thrustBottom) shipSpeed.y -= 11.0f * Δt; 
-						
-						static if((常!(bool)(0))/+debug+/)
+						version(/+$DIDE_REGION Ship control+/all)
 						{
-							shipSpeed = 0; 
-							if(inputs["Up"].repeated) shipPos += ivec2(0, -1); 
-							if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
-							if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
-							if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-							((0x7EB75F5C4644).檢(shipPos)); 
-							((0x7EE15F5C4644).檢(zoomedPlatform)); 
-						}
-						
-						static if((常!(bool)(1))/+gravity+/)
-						{ shipSpeed.y += 3.5f * Δt; }
-						
-						shipPos += shipSpeed * Δt; 
-						
-						int decideZoomedPlatform()
-						{
-							with(shipPos)
+							if(thrustLeft) shipSpeed.x += 7.0f * Δt; 
+							if(thrustRight) shipSpeed.x -= 7.0f * Δt; 
+							if(thrustBottom) shipSpeed.y -= 11.0f * Δt; 
+							
+							static if((常!(bool)(0))/+debug+/)
 							{
-								if(y>88) return x>160 ? 2 : 0; 
-								if(x>110 && x<220 && y>12) return 1; 
-								return -1; 
+								shipSpeed = 0; 
+								if(inputs["Up"].repeated) shipPos += ivec2(0, -1); 
+								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
+								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
+								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
+								((0x83765F5C4644).檢 (zoomedPlatform)), ((0x839F5F5C4644).檢 (shipPos)); 
 							}
-						} 
-						if(zoomedPlatform.chkSet(decideZoomedPlatform))
-						{
-							const sceneId = [2, 4, 3, 5][zoomedPlatform+1]; 
-							screen.img[0..38, 0..23] = screens[sceneId].img[0..38, 0..23]; 
-							shipDoubleSize = zoomedPlatform>=0; 
 						}
 						
-						if(
-							sprites.detectCollision(
-								shipSpriteIdx, (iround(applyTransformation(shipPos))), 
-								shipDoubleSize, screen.img, font.raw
-							)
-						)
+						version(/+$DIDE_REGION Physics update+/all)
 						{
-							shipSimulated = false; 
-							shipExplosionTick = .001f; 
+							static if((常!(bool)(1))/+gravity+/)
+							{
+								if(
+									landedOnPlatform<0/+Only when not landed+/
+									/+So it will remember the speed at the moment of touch down+/
+								)
+								shipSpeed.y += 3.5f * Δt; 
+							}
+							
+							shipPos += shipSpeed * Δt; 
+						}
+						
+						version(/+$DIDE_REGION Fuel consumption+/all)
+						{ fuel -= (thrustLeft + thrustRight + 4*thrustBottom) * 5 * Δt; fuel.maximize(0); }
+						
+						version(/+$DIDE_REGION Select camera position+/all)
+						{
+							if(zoomedPlatform.chkSet(decideZoomedPlatform))
+							{
+								const sceneId = [2, 4, 3, 5][zoomedPlatform+1]; 
+								screen.img[0..38, 0..23] = screens[sceneId].img[0..38, 0..23]; 
+								shipDoubleSize = zoomedPlatform>=0; 
+							}
+						}
+						
+						version(/+$DIDE_REGION Collisions, exceptions+/all)
+						{
+							if(shipPos.y<-21) {
+								shipSimulated = false; 
+								fuel = max(fuel - fuelPenalty, 0); 
+								drawMsg(str("OUT OF SKY")); 
+								delayedRestart = 2; 
+							}
+							
+							landedOnPlatform = -1; 
+							if(zoomedPlatform>=0)
+							{
+								auto bnd = bounds2(platformBounds[zoomedPlatform]*8); 
+								enum extraPixels = 3; 
+								bnd.left -= extraPixels; 
+								bnd.right += -24 + extraPixels; 
+								bnd.top -= 21; 
+								
+								if(shipPos in bnd)
+								{
+									shipPos.y = bnd.top; 
+									landedOnPlatform = zoomedPlatform; 
+									shipSpeed.x *= .9f; //slow down horizontally
+									if((magnitude(shipSpeed.x))<.1f/+ship stopped on a platform+/)
+									{
+										shipSimulated = false; 
+										
+										version(/+$DIDE_REGION Score calculation+/all)
+										{
+											const 	baseScore 	= 	1000 - (ifloor(((shipSpeed.y * speedScale)/(8)) * 100))*10,
+												multiplier 	= platformMultipliers[zoomedPlatform],
+												totalScore 	= baseScore * multiplier; 
+											if(baseScore>0)
+											{
+												drawMsg(str(i"$(baseScore) X $(multiplier) = $(totalScore)".text)); 
+												pendingScore = totalScore; 
+											}
+											else if(baseScore>-1000)
+											{ delayedExplosion = 2; drawMsg(str("SORRY NO BONUS")); }
+											else
+											{ delayedExplosion = .001f; drawMsg(str("KABOOM")); }
+										}
+									}
+								}
+							}
+							
+							if(
+								sprites.detectCollision(
+									shipSpriteIdx, (iround(applyTransformation(shipPos))), 
+									shipDoubleSize, screen.img, font.raw
+								)
+							)
+							{
+								shipSimulated = false; 
+								delayedExplosion = .001f; 
+							}
 						}
 					}
 					
-					if(shipExplosionTick > 0)
+					version(/+$DIDE_REGION Explosion+/all)
 					{
-						shipExplosionTick += Δtick * 0.65f; 
+						if(delayedExplosion>0)
+						{
+							delayedExplosion -= Δt; 
+							if(delayedExplosion<=0)
+							{
+								delayedExplosion = 0; 
+								shipExplosionTick = .001f; 
+							}
+						}
+						if(shipExplosionTick > 0)
+						{
+							shipExplosionTick += Δtick * 0.65f; 
+							
+							const i = (ifloor(shipExplosionTick)); 
+							shipColor = explosionColors[i%explosionColors.length]; 
+							shipSpriteIdx = i/4+1; 
+							if(shipSpriteIdx>explosionMaxSpriteIdx)
+							{
+								shipExplosionTick = 0; 
+								shipSpriteIdx = -1; 
+								fuel = max(fuel - fuelPenalty, 0); 
+								shipVisible = false; 
+								delayedRestart = 2; 
+							}
+						}
+					}version(/+$DIDE_REGION Score counting, restarting+/all)
+					{
+						if(pendingScore > 0)
+						{
+							scoreTimer += Δt; enum scoringDelay = .02f; 
+							while(scoreTimer >= scoringDelay)
+							{
+								scoreTimer -= scoringDelay; 
+								const amount = pendingScore.min(10); 
+								score 	+= amount,
+								fuel 	+= amount*.025f,
+								pendingScore 	-= amount; 
+								if(!pendingScore) delayedRestart = 1; 
+							}
+						}
+						if(delayedRestart>0)
+						{
+							delayedRestart -= Δt; 
+							delayedRestart.maximize(0); 
+						}
 						
-						const i = (ifloor(shipExplosionTick)); 
-						shipColor = explosionColors[i%explosionColors.length]; 
-						shipSpriteIdx = i/4+1; 
-						if(shipSpriteIdx>explosionMaxSpriteIdx)
-						{ shipSpriteIdx = -1; }
+						if(gameOverTimer>0)
+						{
+							gameOverTimer -= Δt; 
+							if(gameOverTimer<=0)
+							{
+								gameOverTimer=0; 
+								score = 0; 
+								scene = Scene.title; 
+							}
+						}
 					}
 				} 
+				
+				void tryStartGame()
+				{ if(KeyCombo("F1").down) scene = Scene.game; } 
 				
 				final switch(scene)
 				{
-					case Scene.title: 	{ if(t>=4) scene = Scene.instructions; }	break; 
+					case Scene.title: 	{
+						if(t>=4) scene = Scene.instructions; 
+						tryStartGame; 
+					}	break; 
 					case Scene.instructions: 	{
 						flashingBottomText; animateInstructions; 
 						if(tick>=32*(6*3+1)) scene = Scene.demo; 
+						tryStartGame; 
 					}	break; 
 					case Scene.demo: 	{
 						updateShip; flashingBottomText; 
 						if(
-							shipExplosionFinished
-							|| t>=20
+							(!shipVisible && !delayedRestart) 
+							|| t>20
 						) scene = Scene.title; 
+						tryStartGame; 
 					}	break; 
-					case Scene.game: 	{ updateShip; processInput; drawUI; }	break; 
+					case Scene.game: 	{
+						processInput(shipSimulated); updateShip; 
+						if(scene==Scene.game/+because game over timer can switch out+/)
+						{
+							drawUI; 
+							const 	ongoingStuff 	= (
+								delayedExplosion || shipExplosionTick>0
+								|| delayedRestart || pendingScore
+								|| gameOverTimer>0
+							),
+								roundEnded 	= (!shipSimulated || !shipVisible); 
+							if(!ongoingStuff && roundEnded)
+							{
+								if(fuel>0)
+								{
+									mixin(scope_remember(q{fuel, score})); 
+									scene = Scene.game; 
+								}
+								else
+								{
+									highScore.maximize(score); 
+									gameOverTimer = 3; 
+									drawMsg(str("GAME OVER"), 4); 
+								}
+							}
+						}
+					}	break; 
 				}
-				((0x85C95F5C4644).檢((update間(_間)))); 
+				((0x99D65F5C4644).檢((update間(_間)))); 
 				
-				foreach(sy; 0..1)
-				foreach(sx; 0..1)
+				foreach(sy; 0..31)
+				foreach(sx; 0..31)
 				{
 					const base = ivec2(40+8, 25+8)*ivec2(sx, sy); 
 					with(screen) { drawScreen(base+4, img, bkCols, borderCol); }
@@ -909,7 +1097,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						{ drawSprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
 					}
 				}
-				((0x887E5F5C4644).檢((update間(_間)))); 
+				((0x9C8D5F5C4644).檢((update間(_間)))); 
 			} 
 			
 			

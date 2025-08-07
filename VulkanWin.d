@@ -2962,7 +2962,7 @@ class VulkanWindow: Window
 						VB.upload; GB.upload; 
 						
 						{
-							enum globalScale=1; 
+							enum globalScale=31; 
 							auto modelMatrix = mat4.identity; 
 							const rotationAngle = 0 * QPS.value(10*second); 
 							modelMatrix.translate(vec3(-160-32, -100-32, 0)*globalScale); 
@@ -2970,7 +2970,7 @@ class VulkanWindow: Window
 							
 							// Set up view
 							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*1; 
-							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
+							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*1+0; 
 							auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 							
 							// Set up projection
