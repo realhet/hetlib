@@ -2,7 +2,7 @@
 //@debug
 //@release
 
-import het.vulkanwin; 
+import het.vulkanwin;  mixin asmFunctions; 
 
 static immutable EGAPalette = 
 [
@@ -127,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20CE5F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E35F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21325F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x215D5F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21475F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21725F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -192,6 +192,15 @@ version(/+$DIDE_REGION+/all) {
 			.array; 
 		+/
 		
+		/+
+			chars
+				00 one 7 bit char
+				01 1..32 7 bit chars chars
+				10 1..32 7 bit repeated chars
+				11 zero terminated unicode chars
+			
+			
+		+/
 		
 	}
 	class FrmHelloVulkan : VulkanWindow
@@ -471,6 +480,7 @@ version(/+$DIDE_REGION+/all) {
 					assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
 					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
 					assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight), assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12)),
+					mixin(舉!((Opcode),q{end}))
 					
 				); 
 			} 
@@ -485,39 +495,132 @@ version(/+$DIDE_REGION+/all) {
 					assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
 					assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
 					assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(sprites.tex.handle))),
+					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), ubyte(21*((doubleSize)?(2):(1)))),
 					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
-					assemble(((doubleSize)?(mixin(舉!((Opcode),q{drawFontASCII_2x}))) :(mixin(舉!((Opcode),q{drawFontASCII})))), (cast(ubyte)(idx)))
+					assemble(
+						mixin(舉!((Opcode),q{drawFontASCII})), bits(0, 6), (cast(ubyte)(idx)),
+						mixin(舉!((Opcode),q{end}))
+					)
 				); 
-				GB(mixin(舉!((Opcode),q{end}))); 
 			} 
 			void drawChrRow(ivec2 pos, RG[] data, int bk)
 			{
 				if(data.empty) return; 
-				int fg=-1; 
 				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
 				GB(
 					assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
-					assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle))),
-					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
+					assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
+					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
+					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x, 16), bits(pos.y, 16),
 					assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4))
 				); 
-				foreach(act; data)
+				
+				static RG[] fetchSameColor(ref RG[] data)
 				{
-					enum manualOptimization = (常!(bool)(0)); 
-					static if(manualOptimization)
+					if(data.empty) return []; 
+					const fg = data.front.y; 
+					auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
+					auto res = data[0..n]; data = data[n..$]; return res; 
+				} 
+				
+				enum MinRunLength = 2; 
+				
+				void emitSameChars(ref RG[] data)
+				{
+					if(data.empty) return; 
+					const ubyte ch = data[0].x; 
+					auto n = data.countUntil!((a)=>(a.x!=ch)); if(n<0) n = data.length; 
+					if(n>=MinRunLength)
 					{
-						/+Opt: This is still 5-10% faster:+/
-						if(fg.chkSet(act.y&0xf))
-						{ GB(bits(0b_00_01_0 | (mixin(舉!((ColorFormat),q{u4}))<<5) | (fg<<(5+3)), 5+3+4)); }
-						GB(bits(0b_10_11_1 | (act.x<<5), 5+8)); 
+						GB(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII_rep}))), bits(n-1, 6), ch)); 
+						data = data[n..$]; 
 					}
-					else
+				} 
+				
+				sizediff_t countDifferentChars(RG[] data)
+				{
+					if(data.length>=1+MinRunLength)
 					{
-						if(fg.chkSet(act.y&0xf))
-						{ GB(bits(mixin(舉!((Opcode),q{setPC}))) ~ mixin(舉!((ColorFormat),q{u4})) ~ bits(fg, 4)); }
-						GB(bits(mixin(舉!((Opcode),q{drawFontASCII}))) ~ bits(act.x, 8)); 
+						enum SkipAtStart = 1; 
+						const i = 	data[SkipAtStart..$]
+							.slide!(No.withPartial)(MinRunLength)
+							.countUntil!((a)=>(a.all!((b)=>(b.x==a[0].x)))); 
+						if(i>=0) return i+SkipAtStart; 
 					}
+					return data.length; 
+				} 
+				
+				void emitDifferentChars(ref RG[] data)
+				{
+					if(data.empty) return; 
+					
+					auto n = countDifferentChars(data); 
+					GB(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII}))), bits(n-1, 6))); 
+					while(n>=8)
+					{
+						version(/+$DIDE_REGION+/none) {
+							GB(
+								((cast(ulong)(data[0].x))<< 0)|((cast(ulong)(data[1].x))<< 8)|
+								((cast(ulong)(data[2].x))<<16)|((cast(ulong)(data[3].x))<<24)|
+								((cast(ulong)(data[4].x))<<32)|((cast(ulong)(data[5].x))<<40)|
+								((cast(ulong)(data[6].x))<<48)|((cast(ulong)(data[7].x))<<56)
+							); 
+						}
+						
+						static ulong doItFaster(const ref ubyte16 src)
+						{
+							enum ubyte16 	mask	= mixin(
+								[
+									0, 2, 4, 6, 8, 10, 12, 14,
+									0, 0, 0, 0, 0, 0, 0, 0
+								]
+							); 
+							const ubyte16 res = pshufb(loadUnaligned(&src), mask); 
+							return res.bitCast!ulong; 
+						} 
+						
+						GB(doItFaster(*(cast(ubyte16*)(data.ptr)))); 
+						
+						data = data[8..$]; n -= 8; 
+					}
+					if(n>=4)
+					{
+						GB(
+							(data[0].x<< 0u)|(data[1].x<< 8u)|
+							(data[2].x<<16u)|(data[3].x<<24u)
+						); 
+						data = data[4..$];  n -= 4; 
+					}
+					if(n>=2)
+					{
+						GB((cast(ushort)((data[0].x<< 0u)|(data[1].x<< 8u)))); 
+						data = data[2..$];  n -= 2; 
+					}
+					if(n>=1)
+					{
+						GB(data[0].x); 
+						data.popFront; n--; 
+					}
+				} 
+				
+				void emitRun(ref RG[] data)
+				{
+					if(data.empty) return; 
+					
+					while(!data.empty)
+					{
+						emitSameChars(data); 
+						emitDifferentChars(data); 
+					}
+				} 
+				
+				while(data.length)
+				{
+					auto act = fetchSameColor(data); 
+					GB(assemble(bits(mixin(舉!((Opcode),q{setPC}))), mixin(舉!((ColorFormat),q{u4})), bits(act[0].y, 4))); 
+					emitRun(act); 
 				}
+				
 				GB(mixin(舉!((Opcode),q{end}))); 
 			} 
 			void drawBorder(ivec2 pos, int fg)
@@ -876,7 +979,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x83765F5C4644).檢 (zoomedPlatform)), ((0x839F5F5C4644).檢 (shipPos)); 
+								((0x8DE45F5C4644).檢 (zoomedPlatform)), ((0x8E0D5F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1077,7 +1180,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0x99D65F5C4644).檢((update間(_間)))); 
+				((0xA4445F5C4644).檢((update間(_間)))); 
 				
 				foreach(sy; 0..31)
 				foreach(sx; 0..31)
@@ -1097,7 +1200,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						{ drawSprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
 					}
 				}
-				((0x9C8D5F5C4644).檢((update間(_間)))); 
+				((0xA6FB5F5C4644).檢((update間(_間)))); 
 			} 
 			
 			

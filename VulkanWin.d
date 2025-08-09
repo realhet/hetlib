@@ -326,7 +326,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{"11"},q{"00"},q{drawMove},q{/+CoordFormat Coords+/}],
 				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords HandleFormat Handle+/}],
 				[q{},q{},q{"10"},q{drawFontASCII},q{/+ubyte+/}],
-				[q{},q{},q{"11"},q{drawFontASCII_2x},q{/+ubyte+/}],
+				[q{},q{},q{"11"},q{drawFontASCII_rep},q{/+ubyte+/}],
 				[],
 			]))
 		),q{
@@ -844,7 +844,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x635482886ADB).檢(buffer.appendPos)); 
+				((0x635582886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -889,6 +889,7 @@ class VulkanWindow: Window
 						else static if(is(T : RGBA))	buffer.appendBits(a.raw, 32); 
 						else static if(is(T : RGB))	buffer.appendBits(a.raw, 24); 
 						else static if(is(T : vec2))	buffer.appendBits(a.bitCast!ulong); 
+						else static if(is(T : ulong))	buffer.appendBits(a); 
 						else static if(is(T : uint))	buffer.appendBits(a); 
 						else static if(is(T : ushort))	buffer.appendBits(a); 
 						else static if(is(T : ubyte))	buffer.appendBits(a); 
@@ -902,7 +903,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x6A0782886ADB).檢(buffer.appendPos)); 
+				((0x6A4482886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -2181,8 +2182,8 @@ class VulkanWindow: Window
 			{
 				switch(format)
 				{
-					case SizeFormat_u4: 	return float(fetchBits(bitStream, 4) / 15.0); 
-					case SizeFormat_u8: 	return float(fetchBits(bitStream, 8) / 255.0); 
+					case SizeFormat_u4: 	return float(fetchBits(bitStream, 4)); 
+					case SizeFormat_u8: 	return float(fetchBits(bitStream, 8)); 
 					case SizeFormat_ulog12: 	return exp2(float(fetchBits(bitStream, 12)) / 128.0); 
 					case SizeFormat_f32: 	return fetch_float(bitStream); 
 					default: return 1.0; 
@@ -2247,6 +2248,10 @@ class VulkanWindow: Window
 				latchP(); 
 			} 
 			
+			//Internal state for batch operations
+			uint pendingChars = 0; 
+			bool repeated; 
+			uint repeatedChar; 
 			void drawTexRect(inout BitStream bitStream)
 			{
 				fetchP(bitStream); 
@@ -2259,14 +2264,25 @@ class VulkanWindow: Window
 				emitTexturedPointPointRect2D(P.xy, P_next.xy); 
 				
 				latchP(); 
-			} void drawASCII(inout BitStream bitStream, bool doubleSize)
+			} void drawASCII(uint ch)
 			{
 				vec2 size = vec2(getTexSize(FMH).xy); 
 				
-				if(doubleSize) size *= 2; 
+				size *= FH*(1.0/size.y); 
 				
-				fragTexCoordZ = fetchBits(bitStream, 8); 
+				fragTexCoordZ = ch; 
 				fragColor = PC; fragBkColor = SC; 
+				/*
+					if(pendingChars>0)
+								{
+									vec4 c; 
+									if(repeated)	{ c = vec4(1, 0, 0, 1); }
+									else	{ c = vec4(0, 1, 0, 1); }
+									fragColor = mix(fragColor, c, .5); 
+									fragBkColor = mix(fragBkColor, c, .5); 
+								}
+				*/
+				
 				fragTexHandle = FMH; 
 				emitTexturedPointPointRect2D(P.xy, P.xy+size); 
 				
@@ -2278,117 +2294,133 @@ class VulkanWindow: Window
 			
 			void processInstruction(inout BitStream bitStream) 
 			{
-				const uint opcode = 
-				fetchBits(bitStream, 5); const bool mainCat = 
-				getBit(opcode, 0); const uint subCat = 
-				getBits(opcode, 1, 2); const uint cmd = 
-				getBits(opcode, 3, 2); 
-				
-				if(
-					!mainCat //settings
-				)
+				if(pendingChars==0)
 				{
-					switch(subCat)
+					const uint opcode = 
+					fetchBits(bitStream, 5); const bool mainCat = 
+					getBit(opcode, 0); const uint subCat = 
+					getBits(opcode, 1, 2); const uint cmd = 
+					getBits(opcode, 3, 2); 
+					
+					if(
+						!mainCat //settings
+					)
 					{
-						case 0: //system
-							switch(cmd)
+						switch(subCat)
 						{
-							case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
-							case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
-							case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
-							case 3: 			break; 
-						}
-						break; 
-						case 1: //colors
+							case 0: //system
+								switch(cmd)
 							{
-							const uint fmt = fetchBits(bitStream, $(EnumBits!ColorFormat)); 
-							int copyFlags = 0; /*bit0: RGB changed, bit1: Alpha changed*/
-							if(cmd!=1) copyFlags = fetchColor(bitStream, fmt, PC); 
-							if(cmd==1 || cmd==2) fetchColor(bitStream, fmt, SC); 
-							else if(cmd==3) {
-								if((copyFlags & 1)!=0) SC.rgb = PC.rgb; 
-								if((copyFlags & 2)!=0) SC.a = PC.a; 
+								case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
+								case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
+								case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
+								case 3: 			break; 
 							}
-						}
-						break; 
-						case 2: //sizes
-							{
-							const uint fmt = fetchBits(bitStream, $(EnumBits!SizeFormat)); 
-							const float size = fetchSize(bitStream, fmt); 
-							switch(cmd)
-							{
-								case 0: 	PS = size; 	/* set pixel size*/	break; 
-								case 1: 	LW = size; 	/* set line width*/	break; 
-								case 2: 	DL = size; 	/* set dot length*/	break; 
-								case 3: 	FH = size; 	/* set font height*/	break; 
+							break; 
+							case 1: //colors
+								{
+								const uint fmt = fetchBits(bitStream, $(EnumBits!ColorFormat)); 
+								int copyFlags = 0; /*bit0: RGB changed, bit1: Alpha changed*/
+								if(cmd!=1) copyFlags = fetchColor(bitStream, fmt, PC); 
+								if(cmd==1 || cmd==2) fetchColor(bitStream, fmt, SC); 
+								else if(cmd==3) {
+									if((copyFlags & 1)!=0) SC.rgb = PC.rgb; 
+									if((copyFlags & 2)!=0) SC.a = PC.a; 
+								}
 							}
-						}
-						break; 
-						case 3: //handles
-							{
-							const uint fmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
-							const uint handle = fetchHandle(bitStream, fmt); 
-							switch(cmd)
-							{
-								case 0: 	FMH = handle; 	/* set FontMap handle*/	break; 
-								case 1: 	LFMH = handle; 	/* set LatinFontMap handle*/	break; 
-								case 2: 	PALH = handle; 	/* set Palette handle*/	break; 
-								case 3: 	LTH = handle; 	/* set LineTexture handle*/	break; 
+							break; 
+							case 2: //sizes
+								{
+								const uint fmt = fetchBits(bitStream, $(EnumBits!SizeFormat)); 
+								const float size = fetchSize(bitStream, fmt); 
+								switch(cmd)
+								{
+									case 0: 	PS = size; 	/* set pixel size*/	break; 
+									case 1: 	LW = size; 	/* set line width*/	break; 
+									case 2: 	DL = size; 	/* set dot length*/	break; 
+									case 3: 	FH = size; 	/* set font height*/	break; 
+								}
 							}
+							break; 
+							case 3: //handles
+								{
+								const uint fmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
+								const uint handle = fetchHandle(bitStream, fmt); 
+								switch(cmd)
+								{
+									case 0: 	FMH = handle; 	/* set FontMap handle*/	break; 
+									case 1: 	LFMH = handle; 	/* set LatinFontMap handle*/	break; 
+									case 2: 	PALH = handle; 	/* set Palette handle*/	break; 
+									case 3: 	LTH = handle; 	/* set LineTexture handle*/	break; 
+								}
+							}
+							break; 
 						}
-						break; 
+					}else {
+						switch(subCat)
+						{
+							case 0: //SVG linear
+								switch(cmd)
+							{
+								/*
+									x	update x coord
+									y 	update y coord
+									z 	update z coord
+									xy	update x and y coords
+									xyz	update x, y and z coords
+									x1 	update x coord, move y by relative 1
+									tf 	turn, then move forward
+									tft 	half turn, move forward, another half turn
+								*/
+								
+								case 0: 	/*drawM(); */	/*move (xy)*/	break; 
+								case 1: 	/*drawL(); */	/*line (xy)*/	break; 
+								case 2: 	/*drawH(); */	/*horizontal line (x)*/	break; 
+								case 3: 	/*drawV(); */	/*vertical line (y)*/	break; 
+							}
+							break; 
+							case 1: //SVG curves
+								switch(cmd)
+							{
+								case 0: 	/*drawQ(); */	/*quadratic bezier (xy, xy)*/	break; 
+								case 1: 	/*drawT(); */	/*smooth quadratic bezier (xy)*/	break; 
+								case 2: 	/*drawC(); */	/*cubic bezier (xy, xy, xy)*/	break; 
+								case 3: 	/*drawS(); */	/*smooth cubic bezier (xy, xy)*/	break; 
+							}
+							break; 
+							case 2: //SVG arc, images, text
+								switch(cmd)
+							{
+								case 0: 	/*drawA(); */	/*elliptical arc (rx, ry, rot, b, b, p)*/	break; 
+								case 1: 	/*drawTEX(); */	/*draw texture (size, handle)*/	break; 
+								case 2: 	/*drawTYPE(); */	/*draw text (string)*/	break; 
+								case 3: 	/*drawRECT(); */	/*draw rectangle*/	break; 
+							}
+							break; 
+							case 3: 
+								switch(cmd)
+							{
+								case 0: 	drawMove(bitStream); 	break; 
+								case 1: 	drawTexRect(bitStream); 	break; 
+								case 2: 	{
+									pendingChars = fetchBits(bitStream, 6)+1; 
+									repeated = false; 
+								}	break; 
+								case 3: 	{
+									pendingChars = fetchBits(bitStream, 6)+1; 
+									repeated = true; 
+									repeatedChar = fetchBits(bitStream, 8); 
+								}	break; 
+							}
+							break; 
+						}
 					}
-				}else {
-					switch(subCat)
-					{
-						case 0: //SVG linear
-							switch(cmd)
-						{
-							/*
-								x	update x coord
-								y 	update y coord
-								z 	update z coord
-								xy	update x and y coords
-								xyz	update x, y and z coords
-								x1 	update x coord, move y by relative 1
-								tf 	turn, then move forward
-								tft 	half turn, move forward, another half turn
-							*/
-							
-							case 0: 	/*drawM(); */	/*move (xy)*/	break; 
-							case 1: 	/*drawL(); */	/*line (xy)*/	break; 
-							case 2: 	/*drawH(); */	/*horizontal line (x)*/	break; 
-							case 3: 	/*drawV(); */	/*vertical line (y)*/	break; 
-						}
-						break; 
-						case 1: //SVG curves
-							switch(cmd)
-						{
-							case 0: 	/*drawQ(); */	/*quadratic bezier (xy, xy)*/	break; 
-							case 1: 	/*drawT(); */	/*smooth quadratic bezier (xy)*/	break; 
-							case 2: 	/*drawC(); */	/*cubic bezier (xy, xy, xy)*/	break; 
-							case 3: 	/*drawS(); */	/*smooth cubic bezier (xy, xy)*/	break; 
-						}
-						break; 
-						case 2: //SVG arc, images, text
-							switch(cmd)
-						{
-							case 0: 	/*drawA(); */	/*elliptical arc (rx, ry, rot, b, b, p)*/	break; 
-							case 1: 	/*drawTEX(); */	/*draw texture (size, handle)*/	break; 
-							case 2: 	/*drawTYPE(); */	/*draw text (string)*/	break; 
-							case 3: 	/*drawRECT(); */	/*draw rectangle*/	break; 
-						}
-						break; 
-						case 3: 
-							switch(cmd)
-						{
-							case 0: 	drawMove(bitStream); 	break; 
-							case 1: 	drawTexRect(bitStream); 	break; 
-							case 2: 	drawASCII(bitStream, false); 	break; 
-							case 3: 	drawASCII(bitStream, true); 	break; 
-						}
-						break; 
-					}
+				}
+				
+				if(pendingChars>0)
+				{
+					drawASCII(repeated ? repeatedChar : fetchBits(bitStream, 8)); 
+					pendingChars--; 
 				}
 			} 
 			
@@ -2962,15 +2994,15 @@ class VulkanWindow: Window
 						VB.upload; GB.upload; 
 						
 						{
-							enum globalScale=31; 
+							enum globalScale=1; 
 							auto modelMatrix = mat4.identity; 
 							const rotationAngle = 0 * QPS.value(10*second); 
 							modelMatrix.translate(vec3(-160-32, -100-32, 0)*globalScale); 
 							modelMatrix.rotate(vec3(0, 0, 1), rotationAngle); 
 							
 							// Set up view
-							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*1; 
-							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*1+0; 
+							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*0.5f; 
+							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
 							auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 							
 							// Set up projection
