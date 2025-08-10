@@ -3769,7 +3769,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					enum vsynch 	= (常!(bool)(1)),
+					enum vsynch 	= (常!(bool)(0)),
 					canTripleBuffer 	= (常!(bool)(1)); 
 					
 					/+
@@ -6506,6 +6506,41 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				if(success)
 				{
 					memcpy(hostPtr+appendPos, data, size); 
+					appendPos += size; 
+				}
+				return success; 
+			} 
+			
+			void alignTo(in size_t bytes)
+			{
+				enforce(bytes.inRange(1, 16) && !(bytes-1&bytes)); 
+				const bitStreamBytes = bitStreamAppender.tempBits.alignUp(8)/8; 
+				size_t desiredPos = appendPos; 
+				if(bitStreamBytes) {
+					bitStreamAppender.flush; 
+					desiredPos = appendPos - 8 + bitStreamBytes; 
+				}
+				desiredPos = alignUp(desiredPos, bytes); 
+				
+				if(desiredPos<=appendPos) appendPos = desiredPos; 
+				else { ubyte16 tmp; append(&tmp, desiredPos - appendPos); }; 
+			} 
+			
+			bool appendUints(in uint[] data, in uint shift)
+			{
+				const size = data.sizeBytes; 
+				if(!size) return true; 
+				
+				const success = requireBufferSizeBytes(appendPos + size); 
+				if(success)
+				{
+					if(!shift) { memcpy(hostPtr+appendPos, data.ptr, size); }
+					else {
+						//Opt: It's not using SSE!
+						auto dst = (cast(uint*)(hostPtr+appendPos)); 
+						foreach(i; 0..data.length)
+						dst[i] = data[i] + shift; 
+					}
 					appendPos += size; 
 				}
 				return success; 

@@ -166,9 +166,10 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	auto bits(T)(T data, size_t bitCnt)
 	=> Bits!T(data, bitCnt); 
 	
-	auto bits(T)(T a)
+	auto bits(T)(in T a)
 	{
-		static if(is(T==enum))
+		static if(is(T==vec2)) return bits(*(cast(ulong*)(&a))); 
+		else static if(is(T==enum))
 		{
 			static if(is(T==Opcode))
 			{ return bits(opInfo[a].bits, opInfo[a].bitCnt); }
@@ -605,6 +606,71 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			}; 
 			static { mixin(SharedCode); } 
 		} 
+	} 
+	struct GfxContent
+	{
+		alias VertexData = VulkanWindow.VertexData; 
+		VertexData[] vb; 
+		ulong[] gb; 
+		uint gbBits; 
+	} 
+	
+	class GfxBuilder
+	{
+		alias VertexData = VulkanWindow.VertexData; 
+		
+		
+		protected
+		{
+			Appender!(VertexData[]) vbAppender; 
+			Appender!(ulong[]) gbAppender; 
+			BitStreamAppender bitStreamAppender; 
+			final void onBitStreamAppenderFull(ulong data)
+			{ gbAppender ~= data; } 
+		} 
+		
+		this()
+		{ bitStreamAppender.onBuffer = &onBitStreamAppenderFull; } 
+		
+		GfxContent extractGfxContent()
+		{
+			const gbBits = gbBitPos; 
+			bitStreamAppender.flush; 
+			return GfxContent(vbAppender[], gbAppender[], gbBits); 
+		} 
+		
+		void reset()
+		{
+			vbAppender.clear; 
+			gbAppender.clear; 
+			bitStreamAppender.reset; 
+		} 
+		
+		void dealloc()
+		{
+			vbAppender = appender!(VertexData[])(); 
+			gbAppender = appender!(ulong[])(); 
+			bitStreamAppender.reset; 
+		} 
+		
+		final void emit(Args...)(in Args args)
+		{
+			static foreach(i, T; Args)
+			{
+				{
+					alias a = args[i]; 
+					static if(is(T : Bits!(B), B))	bitStreamAppender.appendBits(a.data, a.bitCnt); 
+					else with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
+				}
+			}
+		} 
+		
+		final @property gbBitPos() 
+		=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
+		
+		final void begin()
+		{ vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); } final void end()
+		{ emit(mixin(舉!((Opcode),q{end}))); } 
 	} 
 	
 	
@@ -842,9 +908,12 @@ class VulkanWindow: Window
 			{ buffer.append(data); } final void opCall(T...)(in T args)
 			{ append(args); } 
 			
+			final void append(uint[], uint shift=0)
+			{} 
+			
 			void upload()
 			{
-				((0x635582886ADB).檢(buffer.appendPos)); 
+				((0x69B682886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -903,7 +972,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x6A4482886ADB).檢(buffer.appendPos)); 
+				((0x70A582886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -924,6 +993,16 @@ class VulkanWindow: Window
 				ki akarom hasznalni.  A lenyege a dolognak, hogy kozvetlenul a PCIE buszra tortenik a kiiras. 
 				A CPU hasznalat ugyanaz marad, de nem kell utana egy PCIE DMA transfert is inditani.
 			+/
+		} 
+		
+		void appendGfxContent(in GfxContent content)
+		{
+			if(content.vb.empty) return; 
+			GB.buffer.alignTo(16); 
+			const shift = GB.bitPos; 
+			GB.buffer.append(content.gb); 
+			static assert(VertexData.sizeof==uint.sizeof); 
+			VB.buffer.appendUints((cast(uint[])(content.vb)), shift); 
 		} 
 	}
 	
@@ -2994,7 +3073,8 @@ class VulkanWindow: Window
 						VB.upload; GB.upload; 
 						
 						{
-							enum globalScale=1; 
+							static float globalScale = 1; 
+							globalScale.follow(inputs.Shift.down ? 34.0f : 1, calcAnimationT(deltaTime.value(second), 0.75f), 0.001f); 
 							auto modelMatrix = mat4.identity; 
 							const rotationAngle = 0 * QPS.value(10*second); 
 							modelMatrix.translate(vec3(-160-32, -100-32, 0)*globalScale); 
