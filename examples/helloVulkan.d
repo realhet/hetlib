@@ -280,7 +280,7 @@ version(/+$DIDE_REGION+/all) {
 			windowBounds = ibounds2(1280, 0, 1920, 600); 
 			initApps; 
 			createCommoStuff; 
-			actAppName = ["SamplingDemo", "JupiterLander"][1]; 
+			actAppName = ["SamplingDemo", "JupiterLander"][0]; 
 		} 
 		
 		override void onDestroy() {} 
@@ -470,186 +470,6 @@ version(/+$DIDE_REGION+/all) {
 				} 
 			} 
 			Sprites sprites; 
-			
-			void drawRect(ibounds2 bnd, int fg)
-			{
-				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
-				GB(
-					assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
-					assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
-					assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight), assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12)),
-					mixin(舉!((Opcode),q{end}))
-					
-				); 
-			} 
-			
-			void drawMark(ivec2 p, int fg = 7)
-			{ drawRect(ibounds2(p, ((1).genericArg!q{size})), fg); } 
-			
-			void drawSprite(vec2 pos, int idx, int fg, bool doubleSize)
-			{
-				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
-				GB(
-					assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
-					assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-					assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(sprites.tex.handle))),
-					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), ubyte(21*((doubleSize)?(2):(1)))),
-					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
-					assemble(
-						mixin(舉!((Opcode),q{drawFontASCII})), bits(0, 6), (cast(ubyte)(idx)),
-						mixin(舉!((Opcode),q{end}))
-					)
-				); 
-			} 
-			void drawChrRow(ivec2 pos, RG[] data, int bk)
-			{
-				if(data.empty) return; 
-				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
-				GB(
-					assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
-					assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
-					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
-					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x, 16), bits(pos.y, 16),
-					assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4))
-				); 
-				
-				static RG[] fetchSameColor(ref RG[] data)
-				{
-					if(data.empty) return []; 
-					const fg = data.front.y; 
-					auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
-					auto res = data[0..n]; data = data[n..$]; return res; 
-				} 
-				
-				enum MinRunLength = 2; 
-				
-				void emitSameChars(ref RG[] data)
-				{
-					if(data.empty) return; 
-					const ubyte ch = data[0].x; 
-					auto n = data.countUntil!((a)=>(a.x!=ch)); if(n<0) n = data.length; 
-					if(n>=MinRunLength)
-					{
-						GB(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII_rep}))), bits(n-1, 6), ch)); 
-						data = data[n..$]; 
-					}
-				} 
-				
-				sizediff_t countDifferentChars(RG[] data)
-				{
-					if(data.length>=1+MinRunLength)
-					{
-						enum SkipAtStart = 1; 
-						const i = 	data[SkipAtStart..$]
-							.slide!(No.withPartial)(MinRunLength)
-							.countUntil!((a)=>(a.all!((b)=>(b.x==a[0].x)))); 
-						if(i>=0) return i+SkipAtStart; 
-					}
-					return data.length; 
-				} 
-				
-				void emitDifferentChars(ref RG[] data)
-				{
-					if(data.empty) return; 
-					
-					auto n = countDifferentChars(data); 
-					GB(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII}))), bits(n-1, 6))); 
-					while(n>=8)
-					{
-						version(/+$DIDE_REGION+/none) {
-							GB(
-								((cast(ulong)(data[0].x))<< 0)|((cast(ulong)(data[1].x))<< 8)|
-								((cast(ulong)(data[2].x))<<16)|((cast(ulong)(data[3].x))<<24)|
-								((cast(ulong)(data[4].x))<<32)|((cast(ulong)(data[5].x))<<40)|
-								((cast(ulong)(data[6].x))<<48)|((cast(ulong)(data[7].x))<<56)
-							); 
-						}
-						
-						static ulong doItFaster(const ref ubyte16 src)
-						{
-							enum ubyte16 	mask	= mixin(
-								[
-									0, 2, 4, 6, 8, 10, 12, 14,
-									0, 0, 0, 0, 0, 0, 0, 0
-								]
-							); 
-							const ubyte16 res = pshufb(loadUnaligned(&src), mask); 
-							return res.bitCast!ulong; 
-						} 
-						
-						GB(doItFaster(*(cast(ubyte16*)(data.ptr)))); 
-						
-						data = data[8..$]; n -= 8; 
-					}
-					if(n>=4)
-					{
-						GB(
-							(data[0].x<< 0u)|(data[1].x<< 8u)|
-							(data[2].x<<16u)|(data[3].x<<24u)
-						); 
-						data = data[4..$];  n -= 4; 
-					}
-					if(n>=2)
-					{
-						GB((cast(ushort)((data[0].x<< 0u)|(data[1].x<< 8u)))); 
-						data = data[2..$];  n -= 2; 
-					}
-					if(n>=1)
-					{
-						GB(data[0].x); 
-						data.popFront; n--; 
-					}
-				} 
-				
-				void emitRun(ref RG[] data)
-				{
-					if(data.empty) return; 
-					
-					while(!data.empty)
-					{
-						emitSameChars(data); 
-						emitDifferentChars(data); 
-					}
-				} 
-				
-				while(data.length)
-				{
-					auto act = fetchSameColor(data); 
-					GB(assemble(bits(mixin(舉!((Opcode),q{setPC}))), mixin(舉!((ColorFormat),q{u4})), bits(act[0].y, 4))); 
-					emitRun(act); 
-				}
-				
-				GB(mixin(舉!((Opcode),q{end}))); 
-			} 
-			void drawBorder(ivec2 pos, int fg)
-			{
-				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
-				GB(
-					assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
-					assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-					
-				); 
-				void r(int x0, int y0, int x1, int y1)
-				{
-					vec2 p(int x, int y) => vec2(pos+ivec2(x, y))*8; 
-					GB(
-						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), p(x0, y0),
-						assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), p(x1, y1), assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12)),
-					); 
-				} 
-				r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
-				r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
-			} 
-			
-			void drawScreen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
-			{
-				foreach(y; 0..img.height)
-				{
-					drawBorder(pos-4, borderCol); 
-					drawChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); 
-				}
-			} 
 			
 			class Builder : GfxBuilder
 			{
@@ -1164,7 +984,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xA6A25F5C4644).檢 (zoomedPlatform)), ((0xA6CB5F5C4644).檢 (shipPos)); 
+								((0x8E0D5F5C4644).檢 (zoomedPlatform)), ((0x8E365F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1365,7 +1185,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xBD0C5F5C4644).檢((update間(_間)))); 
+				((0xA4775F5C4644).檢((update間(_間)))); 
 				
 				enum N = 34; 
 				__gshared Builder[N] builders; 
@@ -1394,11 +1214,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xC0E15F5C4644).檢((update間(_間)))); 
+				((0xA84C5F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xC1785F5C4644).檢((update間(_間)))); 
+				((0xA8E35F5C4644).檢((update間(_間)))); 
 			} 
 			
 			

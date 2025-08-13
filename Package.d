@@ -197,6 +197,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			//Todo: it's not so good.
 		} 
 		
+		@property uint mxcsr()
+		{ uint res; asm { stmxcsr res; } return res; } 	 @property void mxcsr(uint val)
+		{ asm { ldmxcsr val; } } 	 void disableSubnormals()
+		{ mxcsr = mxcsr | 0x8040; } 
 		
 		//for main thread only, called from application class //
 		
@@ -268,7 +272,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		//static this for each thread ////////////////////////////
 		
 		static this() {
-			 //for all threads <- bullshit!!! It's not shared!!!
+			disableSubnormals; 
 			randomize; //randomices for every thread using QPC and thisThreadID
 			init__iob_func; 
 		} 
