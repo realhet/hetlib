@@ -1925,13 +1925,13 @@ class VulkanWindow: Window
 					[q{},q{vert},q{uint vertGSBitOfs}],
 					[q{vert},q{geom},q{uint geomGSBitOfs}],
 					[q{geom},q{frag},q{
-						smooth
+						smooth mediump
 						vec4 fragColor
 					},q{
-						smooth
+						smooth mediump
 						vec4 fragBkColor
 					},q{
-						smooth
+						smooth highp
 						vec2 fragTexCoordXY
 					},q{
 						flat

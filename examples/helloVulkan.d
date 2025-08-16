@@ -280,7 +280,7 @@ version(/+$DIDE_REGION+/all) {
 			windowBounds = ibounds2(1280, 0, 1920, 600); 
 			initApps; 
 			createCommoStuff; 
-			actAppName = ["SamplingDemo", "JupiterLander"][0]; 
+			actAppName = ["SamplingDemo", "JupiterLander"][1]; 
 		} 
 		
 		override void onDestroy() {} 
