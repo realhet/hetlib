@@ -1843,7 +1843,12 @@ version(/+$DIDE_REGION Geometry+/all)
 	
 	auto evalBezier(F, int N)(in Vector!(F, 2)[N] p, F t)
 	{
-		const w = cubicBezierWeights(t); 
+		const w = AliasSeq!(
+			linearBezierWeights, 
+			quadraticBezierWeights, 
+			cubicBezierWeights
+		)[N-2](t); 
+		
 		auto res = p[0]*w[0]; 
 		static foreach(i; 1..p.length) res += p[i]*w[i]; 
 		return res; 
