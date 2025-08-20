@@ -600,7 +600,7 @@ version(/+$DIDE_REGION+/all) {
 							
 							static ulong doItFaster(const ref ubyte16 src)
 							{
-								enum ubyte16 	mask	= mixin(
+								enum ubyte16 mask = mixin(
 									[
 										0, 2, 4, 6, 8, 10, 12, 14,
 										0, 0, 0, 0, 0, 0, 0, 0
@@ -654,9 +654,19 @@ version(/+$DIDE_REGION+/all) {
 					
 					end; 
 				} 
-				
+				
+				void drawPath(Args...)(in Args args)
+				{
+					static foreach(i, a; args)
+					{
+						{
+							alias T = Unqual!(typeof(Args[i])); 
+							
+						}
+					}
+				} 
 			} 
-		} 
+		} 
 		
 		class JupiterLander : C64App
 		{
@@ -984,7 +994,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x8E0D5F5C4644).檢 (zoomedPlatform)), ((0x8E365F5C4644).檢 (shipPos)); 
+								((0x8EBE5F5C4644).檢 (zoomedPlatform)), ((0x8EE75F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1185,7 +1195,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xA4775F5C4644).檢((update間(_間)))); 
+				((0xA5285F5C4644).檢((update間(_間)))); 
 				
 				enum N = 34; 
 				__gshared Builder[N] builders; 
@@ -1214,11 +1224,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xA84C5F5C4644).檢((update間(_間)))); 
+				((0xA8FD5F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xA8E35F5C4644).檢((update間(_間)))); 
+				((0xA9945F5C4644).檢((update間(_間)))); 
 			} 
 			
 			
