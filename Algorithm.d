@@ -1897,111 +1897,75 @@ version(/+$DIDE_REGION Geometry+/all)
 	} 
 	version(/+$DIDE_REGION SVG path helpers+/all)
 	{
-		bool approximateArcToCubicBeziers	(
-			float x0, float y0, float rx, float ry, float rotation_deg, 
-			bool large_arc_flag, bool sweep_flag, float x, float y,
+		int approximateArcToCubicBeziers	(
+			in vec2 P0, vec2 R_, in float rotation_deg, 
+			in bool large_arc, in bool sweep, in vec2 P1,
 			void delegate(const ref vec2[4]) onItem
 		)
 		{
-			float PI = π; 
-			float θ = rotation_deg * PI / 180.0; 
+			enum float PI = π; 
 			
-			float midX = (x0 - x) / 2.0; 
-			float midY = (y0 - y) / 2.0; 
+			auto R = abs(R_), R2 = ((R)^^(2)); 
+			if(!R.x || !R.y) return 0; 
 			
-			float x0p = cos(θ)*midX + sin(θ)*midY; 
-			float y0p = -sin(θ)*midX + cos(θ)*midY; 
+			const 	θ 	= rotation_deg.radians,
+				mid 	= (P0-P1)/2,
+				A 	= mid.rotate(-θ), A2 = ((A)^^(2)); 
 			
-			rx = abs(rx); 
-			ry = abs(ry); 
-			if(rx==0 || ry==0) return false; 
+			const λ = (A2/R2).sum; 
+			if(λ>1) R *= (sqrt(λ)),  R2 = ((R)^^(2)); 
 			
-			float rx2 = rx*rx; 
-			float ry2 = ry*ry; 
-			float x0p2 = x0p*x0p; 
-			float y0p2 = y0p*y0p; 
-			
-			float lambda = x0p2/rx2 + y0p2/ry2; 
-			if(lambda > 1.0)
+			float factor = 0; 
+			const 	den 	= ((R2).dot(A2.yx)),
+				num 	= R2.x*R2.y - den; 
+			if(den>0 && num>0)
 			{
-				float lambda_sqrt = sqrt(lambda); 
-				rx *= lambda_sqrt; 
-				ry *= lambda_sqrt; 
-				rx2 = rx*rx; 
-				ry2 = ry*ry; 
+				factor = (sqrt(num/den)); 
+				if(large_arc == sweep) factor *= -1; 
 			}
 			
-			float num = rx2 * ry2 - rx2 * y0p2 - ry2 * x0p2; 
-			float den = rx2 * y0p2 + ry2 * x0p2; 
-			float factor = 0.0; 
-			if(den > 0 && num >= 0)
+			auto CP = factor * vec2(((R.x*A.y)/(R.y)), ((-R.y*A.x)/(R.x))); 
+			const U = ((A-CP)/(R)), V = ((-A-CP)/(R)); 
+			
+			const φ_start = atan(U.y, U.x); 
+			float Δφ = atan(V.y, V.x) - φ_start; 
+			if(!sweep && Δφ > 0)	{ Δφ -= 2*PI; }
+			else if(sweep && Δφ < 0)	{ Δφ += 2*PI; }
+			
+			const n = (iround((((magnitude(Δφ)))/(PI/2)))).clamp(1, 4); 
+			if(onItem !is null)
 			{
-				factor = sqrt(num / den); 
-				if(large_arc_flag == sweep_flag) { factor = -factor; }
+				const mRotθ = mat2.rotation(θ); 
+				CP = mRotθ * CP + avg(P0, P1); 
+				
+				const segment_Δφ = Δφ / n; 
+				const α = (4.0f/3) * tan(segment_Δφ/4); 
+				
+				vec2[4] C = void; C[0] = P0/*exact startPoint*/; 
+				float φ = φ_start; 
+				vec2 Rs = vec2(1, 0).rotate(φ), Re; 
+				int i=0; 
+				while(1)
+				{
+					const isLast = i==n-1; 
+					
+					φ += segment_Δφ; 
+					Re = vec2(1, 0).rotate(φ); 
+					
+					const T0 = mRotθ * (R*Rs.rotate90); 
+					C[1] = C[0] + α*T0; 
+					
+					C[3] = ((isLast)?(P1/*exact endPoint*/) :(CP + mRotθ * (R*Re))); 
+					const T3 = mRotθ * (R*Re.rotate90); 
+					C[2] = C[3] - α*T3; 
+					
+					onItem(C); 
+					
+					if(isLast) break; 
+					/+advance+/C[0] = C[3]; Rs = Re; i++; 
+				}
 			}
-			
-			float cxp = factor * (rx * y0p) / ry; 
-			float cyp = factor * (-ry * x0p) / rx; 
-			
-			float cx = cos(θ)*cxp - sin(θ)*cyp + (x0 + x)/2.0; 
-			float cy = sin(θ)*cxp + cos(θ)*cyp + (y0 + y)/2.0; 
-			
-			float ux = 0.0, uy = 0.0, vx = 0.0, vy = 0.0; 
-			if(rx != 0 && ry != 0)
-			{
-				ux = (x0p - cxp) / rx; 
-				uy = (y0p - cyp) / ry; 
-				vx = (-x0p - cxp) / rx; 
-				vy = (-y0p - cyp) / ry; 
-			}
-			
-			float φ_start = atan(uy, ux); 
-			float Δφ = atan(vy, vx) - φ_start; 
-			
-			if(!sweep_flag && Δφ > 0)	{ Δφ -= 2 * PI; }
-			else if(sweep_flag && Δφ < 0)	{ Δφ += 2 * PI; }
-			
-			int n = iround((abs(Δφ)) / (PI/2)).clamp(1, 4); 
-			float segment_Δφ = Δφ / n; 
-			
-			vec2[4] P = void; P[0] = vec2(x0, y0); 
-			
-			foreach(i; 0..n)
-			{
-				float sa = φ_start + i * segment_Δφ; 
-				float ea = sa + segment_Δφ; 
-				
-				float cos_sa = cos(sa); 
-				float sin_sa = sin(sa); 
-				float cos_ea = cos(ea); 
-				float sin_ea = sin(ea); 
-				
-				float P0x = cx + rx * cos_sa * cos(θ) - ry * sin_sa * sin(θ); 
-				float P0y = cy + rx * cos_sa * sin(θ) + ry * sin_sa * cos(θ); 
-				float P3x = cx + rx * cos_ea * cos(θ) - ry * sin_ea * sin(θ); 
-				float P3y = cy + rx * cos_ea * sin(θ) + ry * sin_ea * cos(θ); 
-				
-				float T0x = -rx * sin_sa * cos(θ) - ry * cos_sa * sin(θ); 
-				float T0y = -rx * sin_sa * sin(θ) + ry * cos_sa * cos(θ); 
-				float T1x = -rx * sin_ea * cos(θ) - ry * cos_ea * sin(θ); 
-				float T1y = -rx * sin_ea * sin(θ) + ry * cos_ea * cos(θ); 
-				
-				float η = segment_Δφ; 
-				float α = (abs(η) < 1e-10) ? 0.0 : (4.0/3.0) * tan(η/4.0); 
-				
-				float P1x = P0x + α * T0x; 
-				float P1y = P0y + α * T0y; 
-				float P2x = P3x - α * T1x; 
-				float P2y = P3y - α * T1y; 
-				
-				
-				P[1] = vec2(P1x, P1y); 
-				P[2] = vec2(P2x, P2y); 
-				P[3] = vec2(P3x, P3y); 
-				onItem(P); 
-				P[0] = P[3]; 
-			}
-			return true; 
+			return n; 
 		} 
 		
 		enum SvgPathCommand
@@ -2014,17 +1978,24 @@ version(/+$DIDE_REGION Geometry+/all)
 			S,	//Smooth Cubic Bezier (x2,y2 x,y)
 			C,	//Cubic Bezier (x1,y1 x2,y2 x,y)
 			A,	//Arc (rx,ry rotation, flags(large, sweep), x,y)
-		}  static struct SvgPathItem
+		} 
+		
+		struct SvgPathItem
 		{
 			SvgPathCommand cmd; 
 			vec2[3] data; 
 		} 
+		
+		void parseSvgPath(string svgPath, void delegate(const ref SvgPathItem item) onPathItem)
+		{
+			auto parser = SvgParser(onPathItem, svgPath); 
+			parser.parse; 
+		} 
 		
 		struct SvgParser
 		{
+			void delegate(const ref SvgPathItem item) onPathItem; 
 			string svgPath; 
-			void delegate(ref SvgPathItem item) onPathItem; 
-			
 			size_t index = 0; 
 			
 			vec2 currentPoint = vec2(0,0); 
@@ -2154,6 +2125,9 @@ version(/+$DIDE_REGION Geometry+/all)
 				else
 				{ currentPoint = numbers[numParams-2..numParams][0..2]; }
 			} 
+			void parse(string s)
+			{ svgPath = s; index = 0; parse; } 
+			
 			void parse()
 			{
 				while(index < svgPath.length)
@@ -2227,209 +2201,6 @@ version(/+$DIDE_REGION Geometry+/all)
 					{ index++; }
 				}
 			} 
-		} 
-		
-		void parseSvgPath(string svgPath, void delegate(ref SvgPathItem item) onPathItem)
-		{
-			static char toUpper(char c)
-			=> ((mixin(界3(q{'a'},q{c},q{'z'})))?((cast(char)(c - 'a' + 'A'))):(c)); 
-			
-			static void skipWhite(string s, ref size_t index)
-			{
-				while(
-					index < s.length && 
-					s[index].among(' ', ',', '\t', '\r', '\n')
-				)
-				{ index++; }
-			} 
-			
-			static float parseNumber(string s, ref size_t index) 
-			{
-				static bool isDigit(char c)
-				=> mixin(界3(q{'0'},q{c},q{'9'})); 
-				
-				skipWhite(s, index); 
-				if(index >= s.length)
-				{ return 0.0; }
-				
-				size_t start = index; 
-				
-				if(s[index].among('+', '-'))
-				{ index++; }
-				
-				while(index < s.length && isDigit(s[index]))
-				{ index++; }
-				
-				if(index < s.length && s[index] == '.')
-				{
-					index++; 
-					while(index < s.length && isDigit(s[index]))
-					{ index++; }
-				}
-				
-				if(index < s.length && s[index].among('e', 'E'))
-				{
-					index++; 
-					if(index < s.length && s[index].among('+', '-'))
-					{ index++; }
-					while(index < s.length && isDigit(s[index]))
-					{ index++; }
-				}
-				
-				if(index == start)
-				{ return 0.0; }
-				
-				string numStr = s[start .. index]; 
-				try { return numStr.parse!float; }
-				catch(ConvException e) { return 0.0; }
-			} 
-			size_t index = 0; 
-			vec2 currentPoint = vec2(0,0); 
-			vec2 subpathStart = vec2(0,0); 
-			char currentCommand = 0; 
-			bool currentIsRelative = false; 
-			
-			uint numParams = 0; 
-			float[7] numbers; 
-			
-			SvgPathItem item; 
-			
-			void parseCommand()
-			{
-				char c = svgPath[index]; 
-				if(mixin(界3(q{'A'},q{c},q{'Z'})) || mixin(界3(q{'a'},q{c},q{'z'})))
-				{
-					index++; 
-					currentCommand = toUpper(c); 
-					currentIsRelative = mixin(界3(q{'a'},q{c},q{'z'})); 
-				}
-			} 
-			
-			bool parseParams()
-			{
-				switch(currentCommand)
-				{
-					case 'H', 'V': 	numParams = 1; 	break; 
-					case 'M', 'L', 'T': 	numParams = 2; 	break; 
-					case 'Q', 'S': 	numParams = 4; 	break; 
-					case 'C': 	numParams = 6; 	break; 
-					case 'A': 	numParams = 7; 	break; 
-					default: 	numParams = 0; 
-				}
-				
-				assert(numParams<=numbers.length); 
-				foreach(i; 0..numParams)
-				numbers[i] = parseNumber(svgPath, index); 
-				
-				return numParams>0; 
-			} 
-			
-			void resolveHVLine()
-			{
-				if(currentCommand == 'H')
-				{
-					numbers[1] = currentIsRelative ? 0 : currentPoint.y; 
-					currentCommand = 'L'; numParams = 2; 
-				}
-				else if(currentCommand == 'V')
-				{
-					numbers[1] = numbers[0]; 
-					numbers[0] = currentIsRelative ? 0 : currentPoint.x; 
-					currentCommand = 'L'; numParams = 2; 
-				}
-			} 
-			
-			void processRelative()
-			{
-				if(currentIsRelative)
-				{
-					void applyRelative(ref float[2] v)
-					{
-						v[0] += currentPoint.x; currentPoint.x = v[0]; 
-						v[1] += currentPoint.y; currentPoint.y = v[1]; 
-					} 
-					if(currentCommand == 'A')
-					{ applyRelative(numbers[numParams-2..numParams][0..2]); }
-					else
-					{
-						for(int i = 0; i < numParams; i += 2)
-						{ applyRelative(numbers[i..i+2][0..2]); }
-					}
-				}
-				else
-				{ currentPoint = numbers[numParams-2..numParams][0..2]; }
-			} 
-			
-			while(index < svgPath.length)
-			{
-				skipWhite(svgPath, index); if(index >= svgPath.length) break; 
-				
-				parseCommand; 
-				if(currentCommand == 'Z')
-				{
-					item.cmd = SvgPathCommand.Z; 
-					item.data[0] = subpathStart; 
-					onPathItem(item); 
-					currentPoint = subpathStart; 
-					currentCommand = 0; 
-				}
-				else if(currentCommand && parseParams)
-				{
-					resolveHVLine; 
-					processRelative; 
-					
-					item.cmd = SvgPathCommand.Z; 
-					
-					switch(currentCommand)
-					{
-						case 'M': 	item.cmd = SvgPathCommand.M, 
-						currentCommand = 'L'; 	break; 
-						case 'L': 	item.cmd = SvgPathCommand.L; 	break; 
-						case 'Q': 	item.cmd = SvgPathCommand.Q; 	break; 
-						case 'T': 	item.cmd = SvgPathCommand.T; 	break; 
-						case 'C': 	item.cmd = SvgPathCommand.C; 	break; 
-						case 'S': 	item.cmd = SvgPathCommand.S; 	break; 
-						case 'A': 	item.cmd = SvgPathCommand.A; 	break; 
-						default: 	assert(false, "Unhandled"); 	break; 
-					}
-					
-					switch(item.cmd)
-					{
-						case SvgPathCommand.M, SvgPathCommand.L, SvgPathCommand.T: 
-							item.data[0] = vec2(numbers[0], numbers[1]); 
-							if(item.cmd == SvgPathCommand.M)
-						{ subpathStart = currentPoint; }
-							break; 
-						case SvgPathCommand.Q, SvgPathCommand.S: 
-							item.data[0] = vec2(numbers[0], numbers[1]); 
-							item.data[1] = vec2(numbers[2], numbers[3]); 
-							break; 
-						case SvgPathCommand.C: 
-							item.data[0] = vec2(numbers[0], numbers[1]); 
-							item.data[1] = vec2(numbers[2], numbers[3]); 
-							item.data[2] = vec2(numbers[4], numbers[5]); 
-							break; 
-						case SvgPathCommand.A: 
-							const 	rx 	= numbers[0], 
-							ry 	= numbers[1],
-							rotation 	= numbers[2], 
-							large_arc 	= numbers[3]!=0, 
-							sweep 	= numbers[4]!=0,
-							flags 	= large_arc | sweep<<1,
-							x 	= numbers[5], 
-							y 	= numbers[6]; 
-							item.data[0] = vec2(rx, ry); 
-							item.data[1] = vec2(rotation, flags); 
-							item.data[2] = vec2(x, y); 
-							break; 
-						default: 
-					}
-					
-					onPathItem(item); 
-				}
-				else
-				{ index++; }
-			}
 		} 
 	}
 	

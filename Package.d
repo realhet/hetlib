@@ -9,6 +9,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		pragma(lib, "comdlg32.lib"); //for the dialogs
 		pragma(lib, "winmm.lib"); //for playsound
 		
+		
+		//Todo: 250820 final classes have special optimizations and the field order is important for packing as well as in structs
 		//Todo: ref const for opCmp and opEquals
 		
 		//Todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library

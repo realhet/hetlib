@@ -254,7 +254,10 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum ColorFormat {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
 	enum HandleFormat {u12, u16, u24, u32} 
 	enum CoordFormat {f32, i16, i12, i8} 
+	enum XYFormat {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
 	enum FlagFormat {tex, font, vec, all} 
+	
+	
 	
 	
 	/+
@@ -424,17 +427,17 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		mixin((
 			(表([
 				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-				[q{CoordFormat},q{2},q{"format"},q{},q{/++/}],
-				[q{bool},q{1},q{"relative"},q{},q{/++/}],
+				[q{CoordFormat},q{2},q{"coordFormat"},q{},q{/++/}],
+				[q{XYFormat},q{3},q{"xyFormat"},q{},q{/++/}],
 			]))
 		).調!(GEN_bitfields)); 
-		enum bitCnt = 3; 
+		enum bitCnt = 5; 
 		protected
 		{
 			enum GLSLCode = 
 			iq{
-				uint vecFormat() { return getBits(VF, 0, 2); } 
-				bool vecRelative() { return getBit(VF, 2); } 
+				uint vecCoordFormat() { return getBits(VF, 0, 2); } 
+				uint vecXYFormat() { return getBits(VF, 2, 3); } 
 			}.text; 
 		} 
 	} 
@@ -913,7 +916,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x69B682886ADB).檢(buffer.appendPos)); 
+				((0x6A1C82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -972,7 +975,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x70A582886ADB).檢(buffer.appendPos)); 
+				((0x710B82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -2296,7 +2299,9 @@ class VulkanWindow: Window
 				if(bits>0) return float(fetch_int(bitStream, bits)); 
 				return 0; 
 				/*Opt: Do it with single fetch*/
-			} 
+			} 
+			
+			
 			$(GEN_enumDefines!FlagFormat)
 			void setFlags(inout BitStream bitStream)
 			{
@@ -2310,11 +2315,34 @@ class VulkanWindow: Window
 			
 			void fetchP(inout BitStream bitStream)
 			{
+				//fetches absolute 2D point
 				const uint coordFmt = fetchBits(bitStream, $(EnumBits!CoordFormat)); 
 				P_next.xy = vec2(
 					fetchCoord(bitStream, coordFmt), 
 					fetchCoord(bitStream, coordFmt)
 				); 
+			} 
+			
+			$(GEN_enumDefines!XYFormat)
+			vec2 fetchXY(inout BitStream bitStream, vec2 p)
+			{
+				//fetches absolute or relative 2D point
+				const uint xyFmt = fetchBits(bitStream, $(EnumBits!XYFormat)); 
+				const uint coordFmt = fetchBits(bitStream, $(EnumBits!CoordFormat)); 
+				const float f0 = ((xyFmt<=XYFormat_relY) ?(fetchCoord(bitStream, coordFmt)):(0)); 
+				const float f1 = ((xyFmt<=XYFormat_relXY) ?(fetchCoord(bitStream, coordFmt)):(0)); 
+				switch(xyFmt)
+				{
+					case XYFormat_absXY: 	return vec2(f0, f1); 
+					case XYFormat_relXY: 	return p+vec2(f0, f1); 
+					case XYFormat_absX: 	return vec2(f0, p.y); 
+					case XYFormat_relX: 	return vec2(p.x+f0, p.y); 
+					case XYFormat_absY: 	return vec2(p.x, f0); 
+					case XYFormat_relY: 	return vec2(p.x, p.y+f0); 
+					case XYFormat_absXrelY1: 	return vec2(f0, p.y+1); 
+					case XYFormat_relX1absY: 	return vec2(p.x+1, f0); 
+					default: 	return vec2(0)/*invalid*/; 
+				}
 			} 
 			
 			void latchP()
@@ -2331,6 +2359,15 @@ class VulkanWindow: Window
 			uint pendingChars = 0; 
 			bool repeated; 
 			uint repeatedChar; 
+			//Opt: put all this information into one uint!
+			
+			void drawChars(inout BitStream bitStream, bool repeated_)
+			{
+				pendingChars = fetchBits(bitStream, 6)+1; 
+				repeated = repeated_; 
+				if(repeated) repeatedChar = fetchBits(bitStream, 8); 
+			} 
+			
 			void drawTexRect(inout BitStream bitStream)
 			{
 				fetchP(bitStream); 
@@ -2343,7 +2380,9 @@ class VulkanWindow: Window
 				emitTexturedPointPointRect2D(P.xy, P_next.xy); 
 				
 				latchP(); 
-			} void drawASCII(uint ch)
+			} 
+			
+			void drawASCII(uint ch)
 			{
 				vec2 size = vec2(getTexSize(FMH).xy); 
 				
@@ -2351,16 +2390,6 @@ class VulkanWindow: Window
 				
 				fragTexCoordZ = ch; 
 				fragColor = PC; fragBkColor = SC; 
-				/*
-					if(pendingChars>0)
-								{
-									vec4 c; 
-									if(repeated)	{ c = vec4(1, 0, 0, 1); }
-									else	{ c = vec4(0, 1, 0, 1); }
-									fragColor = mix(fragColor, c, .5); 
-									fragBkColor = mix(fragBkColor, c, .5); 
-								}
-				*/
 				
 				fragTexHandle = FMH; 
 				emitTexturedPointPointRect2D(P.xy, P.xy+size); 
@@ -2370,7 +2399,7 @@ class VulkanWindow: Window
 				latchP(); 
 			} 
 			
-			
+			
 			void processInstruction(inout BitStream bitStream) 
 			{
 				if(pendingChars==0)
@@ -2481,15 +2510,8 @@ class VulkanWindow: Window
 							{
 								case 0: 	drawMove(bitStream); 	break; 
 								case 1: 	drawTexRect(bitStream); 	break; 
-								case 2: 	{
-									pendingChars = fetchBits(bitStream, 6)+1; 
-									repeated = false; 
-								}	break; 
-								case 3: 	{
-									pendingChars = fetchBits(bitStream, 6)+1; 
-									repeated = true; 
-									repeatedChar = fetchBits(bitStream, 8); 
-								}	break; 
+								case 2: 	drawChars(bitStream, false); 	break; 
+								case 3: 	drawChars(bitStream, /*repeat*/true); 	break; 
 							}
 							break; 
 						}
