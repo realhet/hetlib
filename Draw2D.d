@@ -2928,7 +2928,46 @@ class Drawing
 		} 
 		
 		
+		void drawPath(string svgPath)
+		{ _drawSvgPath_impl(this, svgPath); } 
 		
+		static private void _drawSvgPath_impl(Drawing dr, string svgPath)
+		{
+			
+			void drawCurve(A...)(in A p)
+			{
+				enum res = 64, invRes = 1.0f/res, N = A.length; static assert(N.inRange(1, 4)); 
+				dr.moveTo(p[0]); 
+				static if(N==2) dr.lineTo(p[1]); 
+				else static foreach(n; [3, 4]) static if(N==n) { mixin(求each(q{i=1},q{res},q{dr.lineTo(evalBezier([p], i*invRes))})); }
+			} 
+			
+			vec2 P_start, P_last, P_mirror; //internal state
+			
+			void onItem(const ref SvgPathItem item)
+			{
+				const ref P0()
+				=> item.data[0]; const ref P1()
+				=> item.data[1]; const ref P2()
+				=> item.data[2]; const Pm()
+				=> P_last*2 - P_mirror; 
+				final switch(item.cmd)
+				{
+						/+drawing+/	/+state update+/	
+					case SvgPathCommand.M: 		P_mirror = P_last = P_start = P0; 	break; 
+					case 	SvgPathCommand.L: 	drawCurve(P_last, P0); 	P_mirror = P_last; P_last = P0; 	break; 
+					case SvgPathCommand.Q: 	drawCurve(P_last, P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+					case SvgPathCommand.T: 	drawCurve(P_last, Pm, P0); 	P_mirror = Pm; P_last = P0; 	break; 
+					case SvgPathCommand.C: 	drawCurve(P_last, P0, P1, P2); 	P_mirror = P1; P_last = P2; 	break; 
+					case SvgPathCommand.S: 	drawCurve(P_last, Pm, P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+					/+redirected commands:+/			
+					case SvgPathCommand.A: 	approximateArcToCubicBeziers(P_last, item, &onItem); 		break; 
+					case SvgPathCommand.Z: 	if(P_last!=P_start) drawCurve(P_last, P_start); 	P_mirror = P_last = P_start; 	break; 
+				}
+			} 
+			
+			svgPath.parseSvgPath(&onItem); 
+		} 
 		
 		
 		//these can be used from the customShaders

@@ -661,20 +661,25 @@ version(/+$DIDE_REGION+/all) {
 					
 					void emitVec(vec2 v) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), v); } 
 					
+					vec2 lastPoint, mirrorPoint; 
 					
-					auto parser = SvgPathParser
-						((item){
-						void drawCurve(A...)(in A p)
-						{
-							enum N = A.length, res = 64; 
-							static if(N==2) dr.line(p[0], p[1]); 
-							else static if(N==3) mixin(求each(q{i=1},q{res},q{dr.lineTo(evalBezier([p], i*(1.0f/res)))})); 
-							else static if(N==4) mixin(求each(q{i=1},q{res},q{dr.lineTo(evalBezier([p], i*(1.0f/res)))})); 
+					void emitItem(A...)(in A p)
+					{
+						enum N = A.length; 
+						static if(N==1) {/+move+/}
+						else {
+							static if(N==2)	{/+line+/}
+							else static if(N==3)	{ mixin(求each(q{i=1},q{res},q{dr.lineTo(evalBezier([p], i*(1.0f/res)))})); }
+							else static if(N==4)	{ mixin(求each(q{i=1},q{res},q{dr.lineTo(evalBezier([p], i*(1.0f/res)))})); }
 							else static assert(0); 
 							mirrorPoint = p[$-2]; 
-						} 
-						
-						switch(item.cmd)
+						}
+						lastPoint = p[$-1]; 
+					} 
+					
+					void onItem(const ref SvgPathItem item)
+					{
+						final switch(item.cmd)
 						{
 							case SvgPathCommand.M: 	dr.moveTo(item.data[0]); 	break; 
 							case 	SvgPathCommand.L,
@@ -698,13 +703,20 @@ version(/+$DIDE_REGION+/all) {
 							
 							default: 
 						}
-					}); 
+					} 
+					SvgPathParser parser = void; 
+					bool parserInitialized = false; 
+					void parse(in string s)
+					{
+						if(parserInitialized.chkSet) parser = SvgParser(onItem); 
+						parser.parse(a); 
+					} 
 					
 					static foreach(i, a; args)
 					{
 						{
 							alias T = Unqual!(typeof(Args[i])); 
-							static if(isSomeString!T) { parser.parse(a); }
+							static if(isSomeString!T) { parse(s); }
 						}
 					}
 				} 
@@ -1037,7 +1049,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x95975F5C4644).檢 (zoomedPlatform)), ((0x95C05F5C4644).檢 (shipPos)); 
+								((0x96D05F5C4644).檢 (zoomedPlatform)), ((0x96F95F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1238,7 +1250,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xAC015F5C4644).檢((update間(_間)))); 
+				((0xAD3A5F5C4644).檢((update間(_間)))); 
 				
 				enum N = 1; 
 				__gshared Builder[N] builders; 
@@ -1267,11 +1279,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xAFD55F5C4644).檢((update間(_間)))); 
+				((0xB10E5F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xB06C5F5C4644).檢((update間(_間)))); 
+				((0xB1A55F5C4644).檢((update間(_間)))); 
 			} 
 			
 			

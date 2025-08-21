@@ -1986,15 +1986,46 @@ version(/+$DIDE_REGION Geometry+/all)
 			vec2[3] data; 
 		} 
 		
-		void parseSvgPath(string svgPath, void delegate(const ref SvgPathItem item) onPathItem)
+		alias SvgPathItemEvent = void delegate(const ref SvgPathItem item); 
+		
+		void approximateArcToCubicBeziers(in vec2 P0, in SvgPathItem item, SvgPathItemEvent onPathItem)
 		{
-			auto parser = SvgParser(onPathItem, svgPath); 
+			bool running = false; 
+			if(
+				!approximateArcToCubicBeziers
+				(
+					P0, item.data[0], item.data[1].x, 
+					((itrunc(item.data[1].y))&1)!=0, ((itrunc(item.data[1].y))&2)!=0,
+					item.data[2],
+					((P){
+						SvgPathItem item; 
+						if(!running)	{ item.cmd = SvgPathCommand.C; item.data[0..3] = P[1..4]; }
+						else	{ item.cmd = SvgPathCommand.S; item.data[0..2] = P[2..4]; }
+						onPathItem(item); 
+						running = true; 
+					})
+				)
+			)
+			{
+				if(P0!=item.data[2])
+				{
+					SvgPathItem line; 
+					line.cmd = SvgPathCommand.S; line.data[0] = item.data[2]; 
+					onPathItem(line); 
+					
+				}
+			}
+		} 
+		
+		void parseSvgPath(string svgPath, SvgPathItemEvent onPathItem)
+		{
+			auto parser = SvgPathParser(onPathItem, svgPath); 
 			parser.parse; 
 		} 
 		
-		struct SvgParser
+		struct SvgPathParser
 		{
-			void delegate(const ref SvgPathItem item) onPathItem; 
+			SvgPathItemEvent onPathItem; 
 			string svgPath; 
 			size_t index = 0; 
 			
