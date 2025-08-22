@@ -1944,10 +1944,10 @@ class VulkanWindow: Window
 						uint fragTexCoordZ
 					},q{
 						flat highp
-						vec4 bezier0
+						vec4 fragFloats0
 					},q{
 						flat highp
-						vec4 bezier1
+						vec4 fragFloats1
 					}],
 					[q{frag},q{},q{vec4 outColor}],
 				]))
@@ -1969,7 +1969,7 @@ class VulkanWindow: Window
 			
 			
 			layout(points) in; 
-			layout(triangle_strip, max_vertices = 170) out; 
+			layout(triangle_strip, max_vertices = 127) out; 
 			/*
 				255 is the max on R9 Fury X
 				
@@ -1977,6 +1977,8 @@ class VulkanWindow: Window
 					(Windows default driver, )
 				250804 170 is the max with 12 components. 170*12=2040  (171*12=2052)
 					I have no clue where this 2048 limit comes from o.O
+				250822 127 is the max when I add 2x vec4 (20 components)  127*16 = 2032
+					highp vs medump doesn't change this 127 limit
 			*/
 			
 			
@@ -2220,11 +2222,44 @@ class VulkanWindow: Window
 			uint PALH = 0; 	/* Palette handle */
 			uint LTH = 0; 	/* Line texture handle */
 				
-			vec3 	P0 	= vec3(0),
-				P1 	= vec3(0),
-				P2 	= vec3(0),
-				P3	= vec3(0), 
-				P4 	= vec3(0); 	/*Position queue*/
+			vec2 	P0 	= vec2(0),
+				P1 	= vec2(0),
+				P2 	= vec2(0),
+				P3	= vec2(0), 
+				P4 	= vec2(0); 	/*Position queue*/
+			
+			uint PathCodeQueue = 0; 
+			
+			#define PathCode_M 0
+			#define PathCode_L 1
+			#define PathCode_TG 2
+			#define PathCode_Q 3
+			#define PathCode_C 4
+			#define PathCode_P 5
+			
+			#define PathCode_bits 3
+			
+			#define PathCode(idx) (PathCodeQueue.getBits(idx*PathCode_bits, PathCode_bits))
+			void shiftInPathCode(uint code)
+			{
+				PathCodeQueue <<= PathCode_bits; 
+				setBits(PathCodeQueue, 4*PathCode_bits, PathCode_bits, code); 
+				
+				//debug
+				fragTexHandle = 0; 
+				switch(code)
+				{
+					case PathCode_M: 	fragColor = vec4(1, 0, 0, 1); 	break; 
+					case PathCode_L: 	fragColor = vec4(0, 1, 0, 1); 	break; 
+					case PathCode_Q: 	fragColor = vec4(0, 1, 1, 1); 	break; 
+					case PathCode_C: 	fragColor = vec4(1, 1, 0, 1); 	break; 
+					case PathCode_P: 	fragColor = vec4(1, 1, 1, 1); 	break; 
+					case PathCode_TG: 	fragColor = vec4(1, 0.5, 1, 1); 	break; 
+				}
+				const float siz = 2; 
+				emitTexturedPointPointRect2D(P4-siz, P4+siz); 
+			} 
+			
 			float 	Ph 	= 0, 
 				Ph_next 	= 0; 	/* Phase coordinate */
 				
@@ -2232,7 +2267,7 @@ class VulkanWindow: Window
 				Execution is enabled if it's greater than 0
 				After every step it's decremented.
 			*/
-			
+			
 			$(TexFlags.GLSLCode)
 			$(FontFlags.GLSLCode)
 			$(VecFlags.GLSLCode)
@@ -2334,7 +2369,7 @@ class VulkanWindow: Window
 			} 
 			
 			$(GEN_enumDefines!XYFormat)
-			vec2 fetchXY(inout BitStream bitStream, vec2 p)
+			vec2 fetchXY(inout BitStream bitStream, vec2 p/*prev point*/)
 			{
 				//fetches absolute or relative 2D point
 				const uint xyFmt = fetchBits(bitStream, $(EnumBits!XYFormat)); 
@@ -2358,13 +2393,19 @@ class VulkanWindow: Window
 			void latchP()
 			{ P0=P1, P1=P2, P2=P3, P3=P4; } 
 			
+			vec2 smoothMirror()
+			{
+				/*mirrors P2 over P3, so it can be assigned to P4*/
+				return P3*2 - P2; 
+			} 
+			
 			void drawMove(inout BitStream bitStream)
 			{
 				fetchP(bitStream); 
 				
 				latchP(); 
 			} 
-			
+			
 			//Internal state for batch operations
 			uint pendingChars = 0; 
 			bool repeated; 
@@ -2480,22 +2521,36 @@ class VulkanWindow: Window
 							case 0: //SVG path 1
 								switch(cmd)
 							{
-								case 0: 	/*Z: close path*/	break; 
-								case 1: 	/*M: move*/	break; 
-								case 2: 	/*L: line*/	break; 
-								case 3: 	/*T: smooth quadratic*/	break; 
+								case 0: 	/*Z: close path*/	/*Todo: close path*/break; 
+								case 1: 	/*M: move*/	{ latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_M); }	break; 
+								case 2: 	/*L: line*/	{ latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_L); }	break; 
+								case 3: 	/*T: smooth quadratic*/	{
+									latchP(); P4 = smoothMirror(); shiftInPathCode(PathCode_Q); 
+									latchP(); P4 = fetchXY(bitStream, P2); shiftInPathCode(PathCode_P); 
+								}	break; 
 							}
 							break; 
 							case 1: //SVG path 2
 								switch(cmd)
 							{
-								case 0: 	/*Q: quadratic*/	break; 
-								case 1: 	/*S: smooth cubic*/	break; 
-								case 2: 	/*C: cubic*/	break; 
-								case 3: 	/*A: arc*/	break; 
+								case 0: 	/*Q: quadratic*/	{
+									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_Q); 
+									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
+								}	break; 
+								case 1: 	/*S: smooth cubic*/	{
+									latchP(); P4 = smoothMirror(); shiftInPathCode(PathCode_C); 
+									latchP(); P4 = fetchXY(bitStream, P2); shiftInPathCode(PathCode_P); 
+									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
+								}	break; 
+								case 2: 	/*C: cubic*/	{
+									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_C); 
+									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
+									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
+								}	break; 
+								case 3: 	/*A: arc*/	/*Todo: arc*/break; 
 							}
 							break; 
-							case 2: //SVG arc, images, text
+							case 2: 
 								switch(cmd)
 							{
 								case 0: 	/**/	break; 
@@ -2528,6 +2583,8 @@ class VulkanWindow: Window
 			void main() /*geometry shader*/
 			{
 				fragTexCoordZ = 0; //this is normally 0. Fonts can temporarily change it.
+				fragFloats0 = vec4(1, 2, 3, 4); 
+				fragFloats1 = vec4(5, 6, 7, 8); 
 				
 				BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
 				while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
