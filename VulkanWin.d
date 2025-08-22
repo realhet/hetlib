@@ -311,22 +311,22 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[],
 				[q{/+Note: lvl0+/},q{/+Note: lvl1+/},q{/+Note: lvl2+/},q{/+Note: op+/},q{/+Note: comment+/}],
 				[q{/+drawing+/}],
-				[q{/+	SVG linear+/}],
-				[q{"1"},q{"00"},q{"00"},q{drawM},q{/+xy+/}],
-				[q{},q{},q{"01"},q{drawL},q{/+xy+/}],
-				[q{},q{},q{"10"},q{drawH},q{/+x+/}],
-				[q{},q{},q{"11"},q{drawV},q{/+y+/}],
-				[q{/+	SVG curves+/}],
-				[q{},q{"01"},q{"00"},q{drawQ},q{/+xy xy+/}],
-				[q{},q{},q{"01"},q{drawT},q{/+xy+/}],
-				[q{},q{},q{"10"},q{drawC},q{/+xy xy xy+/}],
-				[q{},q{},q{"11"},q{drawS},q{/+xy xy+/}],
-				[q{/+	SVG arc, images, text+/}],
-				[q{},q{"10"},q{"00"},q{drawA},q{/+rx ry rot, b, b, p+/}],
-				[q{},q{},q{"01"},q{drawTEX},q{/+size, handle+/}],
-				[q{},q{},q{"10"},q{drawTYPE},q{/+string+/}],
-				[q{},q{},q{"11"},q{drawRECT},q{/++/}],
-				[q{/+	future extensions+/}],
+				[q{/+	SVG path1+/}],
+				[q{"1"},q{"00"},q{"00"},q{drawPathZ},q{/++/}],
+				[q{},q{},q{"01"},q{drawPathM},q{/+xy+/}],
+				[q{},q{},q{"10"},q{drawPathL},q{/+xy+/}],
+				[q{},q{},q{"11"},q{drawPathT},q{/+xt+/}],
+				[q{/+	SVG path2+/}],
+				[q{},q{"01"},q{"00"},q{drawPathQ},q{/+xy xy+/}],
+				[q{},q{},q{"01"},q{drawPathS},q{/+xy xy+/}],
+				[q{},q{},q{"10"},q{drawPathC},q{/+xy xy xy+/}],
+				[q{},q{},q{"11"},q{drawPathA},q{/+rr af xy+/}],
+				[q{/+	unused+/}],
+				[q{},q{"10"},q{"00"},q{unused0},q{/++/}],
+				[q{},q{},q{"01"},q{unused1},q{/++/}],
+				[q{},q{},q{"10"},q{unused2},q{/++/}],
+				[q{},q{},q{"11"},q{unused3},q{/++/}],
+				[q{/+	textured rect, chars, text+/}],
 				[q{},q{"11"},q{"00"},q{drawMove},q{/+CoordFormat Coords+/}],
 				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords HandleFormat Handle+/}],
 				[q{},q{},q{"10"},q{drawFontASCII},q{/+ubyte+/}],
@@ -916,7 +916,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x6A1C82886ADB).檢(buffer.appendPos)); 
+				((0x6A1682886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -975,7 +975,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x710B82886ADB).檢(buffer.appendPos)); 
+				((0x710582886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -1924,7 +1924,7 @@ class VulkanWindow: Window
 			
 			$(
 				(表([
-					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/}],
+					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/},q{/+Note: Location 5+/},q{/+Note: Location 6+/}],
 					[q{},q{vert},q{uint vertGSBitOfs}],
 					[q{vert},q{geom},q{uint geomGSBitOfs}],
 					[q{geom},q{frag},q{
@@ -1942,6 +1942,12 @@ class VulkanWindow: Window
 					},q{
 						flat
 						uint fragTexCoordZ
+					},q{
+						flat highp
+						vec4 bezier0
+					},q{
+						flat highp
+						vec4 bezier1
 					}],
 					[q{frag},q{},q{vec4 outColor}],
 				]))
@@ -2079,6 +2085,8 @@ class VulkanWindow: Window
 				fragTexCoordXY = vec2(1,1); emitVertex2D(q); 
 				EndPrimitive(); 
 			} 
+			
+			
 			
 			struct BitStream
 			{
@@ -2212,9 +2220,11 @@ class VulkanWindow: Window
 			uint PALH = 0; 	/* Palette handle */
 			uint LTH = 0; 	/* Line texture handle */
 				
-			vec3 	P	= vec3(0), 
-				P_last 	= vec3(0),
-				P_next 	= vec3(0); 	/* Position */
+			vec3 	P0 	= vec3(0),
+				P1 	= vec3(0),
+				P2 	= vec3(0),
+				P3	= vec3(0), 
+				P4 	= vec3(0); 	/*Position queue*/
 			float 	Ph 	= 0, 
 				Ph_next 	= 0; 	/* Phase coordinate */
 				
@@ -2317,7 +2327,7 @@ class VulkanWindow: Window
 			{
 				//fetches absolute 2D point
 				const uint coordFmt = fetchBits(bitStream, $(EnumBits!CoordFormat)); 
-				P_next.xy = vec2(
+				P4.xy = vec2(
 					fetchCoord(bitStream, coordFmt), 
 					fetchCoord(bitStream, coordFmt)
 				); 
@@ -2346,7 +2356,7 @@ class VulkanWindow: Window
 			} 
 			
 			void latchP()
-			{ P_last = P; P = P_next; } 
+			{ P0=P1, P1=P2, P2=P3, P3=P4; } 
 			
 			void drawMove(inout BitStream bitStream)
 			{
@@ -2377,7 +2387,7 @@ class VulkanWindow: Window
 				
 				fragColor = PC; fragBkColor = SC; 
 				fragTexHandle = texHandle; 
-				emitTexturedPointPointRect2D(P.xy, P_next.xy); 
+				emitTexturedPointPointRect2D(P3.xy, P4.xy); 
 				
 				latchP(); 
 			} 
@@ -2392,10 +2402,10 @@ class VulkanWindow: Window
 				fragColor = PC; fragBkColor = SC; 
 				
 				fragTexHandle = FMH; 
-				emitTexturedPointPointRect2D(P.xy, P.xy+size); 
+				emitTexturedPointPointRect2D(P3.xy, P3.xy+size); 
 				
 				fragTexCoordZ = 0; //restore it
-				P_next.x += size.x; //advance cursor
+				P4.x += size.x; //advance cursor
 				latchP(); 
 			} 
 			
@@ -2467,42 +2477,31 @@ class VulkanWindow: Window
 					}else {
 						switch(subCat)
 						{
-							case 0: //SVG linear
+							case 0: //SVG path 1
 								switch(cmd)
 							{
-								/*
-									x	update x coord
-									y 	update y coord
-									z 	update z coord
-									xy	update x and y coords
-									xyz	update x, y and z coords
-									x1 	update x coord, move y by relative 1
-									tf 	turn, then move forward
-									tft 	half turn, move forward, another half turn
-								*/
-								
-								case 0: 	/*drawM(); */	/*move (xy)*/	break; 
-								case 1: 	/*drawL(); */	/*line (xy)*/	break; 
-								case 2: 	/*drawH(); */	/*horizontal line (x)*/	break; 
-								case 3: 	/*drawV(); */	/*vertical line (y)*/	break; 
+								case 0: 	/*Z: close path*/	break; 
+								case 1: 	/*M: move*/	break; 
+								case 2: 	/*L: line*/	break; 
+								case 3: 	/*T: smooth quadratic*/	break; 
 							}
 							break; 
-							case 1: //SVG curves
+							case 1: //SVG path 2
 								switch(cmd)
 							{
-								case 0: 	/*drawQ(); */	/*quadratic bezier (xy, xy)*/	break; 
-								case 1: 	/*drawT(); */	/*smooth quadratic bezier (xy)*/	break; 
-								case 2: 	/*drawC(); */	/*cubic bezier (xy, xy, xy)*/	break; 
-								case 3: 	/*drawS(); */	/*smooth cubic bezier (xy, xy)*/	break; 
+								case 0: 	/*Q: quadratic*/	break; 
+								case 1: 	/*S: smooth cubic*/	break; 
+								case 2: 	/*C: cubic*/	break; 
+								case 3: 	/*A: arc*/	break; 
 							}
 							break; 
 							case 2: //SVG arc, images, text
 								switch(cmd)
 							{
-								case 0: 	/*drawA(); */	/*elliptical arc (rx, ry, rot, b, b, p)*/	break; 
-								case 1: 	/*drawTEX(); */	/*draw texture (size, handle)*/	break; 
-								case 2: 	/*drawTYPE(); */	/*draw text (string)*/	break; 
-								case 3: 	/*drawRECT(); */	/*draw rectangle*/	break; 
+								case 0: 	/**/	break; 
+								case 1: 	/**/	break; 
+								case 2: 	/**/	break; 
+								case 3: 	/**/	break; 
 							}
 							break; 
 							case 3: 
