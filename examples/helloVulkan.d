@@ -660,20 +660,12 @@ version(/+$DIDE_REGION+/all) {
 					begin; /+Todo: number of vertex limit handling!!! /+Code: bool insideBlock; uint vcnt; +/+/
 					//print("fuck"); 
 					
-					void emitXY(vec2 v) {
-						emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), v); 
-						//print(v); 
+					void emitPathCmd(A...)(in Opcode op, in A args)
+					{
+						emit(op); 
+						static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
 					} 
 					
-					/+
-						void drawCurve(A...)(in A p)
-						{
-							enum res = 4, invRes = 1.0f/res, N = A.length; static assert(N.inRange(1, 4)); 
-							dr.moveTo(p[0]); 
-							static if(N==2) emit(assemble()); 
-							else static foreach(n; [3, 4]) static if(N==n) { mixin(求each(q{i=1},q{res},q{dr.lineTo(evalBezier([p], i*invRes))})); }
-						} 
-					+/
 					
 					vec2 P_start, P_last, P_mirror; //internal state
 					
@@ -687,22 +679,19 @@ version(/+$DIDE_REGION+/all) {
 						final switch(item.cmd)
 						{
 								/+drawing+/	/+state update+/	
-							case SvgPathCommand.M: 	emit(mixin(舉!((Opcode),q{drawPathM}))); emitXY(P0); 	P_mirror = P_last = P_start = P0; 	break; 
-							case SvgPathCommand.L: 	/+drawCurve(P_last, P0); +/emit(mixin(舉!((Opcode),q{drawPathL}))); emitXY(P0); 	P_mirror = P_last; P_last = P0; 	break; 
-							case SvgPathCommand.Q: 	/+drawCurve(P_last, P0, P1); +/emit(mixin(舉!((Opcode),q{drawPathQ}))); emitXY(P0); emitXY(P1); 	P_mirror = P0; P_last = P1; 	break; 
-							case SvgPathCommand.T: 	/+drawCurve(P_last, Pm, P0); +/emit(mixin(舉!((Opcode),q{drawPathT}))); emitXY(P0); 	P_mirror = Pm; P_last = P0; 	break; 
-							case SvgPathCommand.C: 	/+drawCurve(P_last, P0, P1, P2); +/emit(mixin(舉!((Opcode),q{drawPathC}))); emitXY(P0); emitXY(P1); emitXY(P2); 	P_mirror = P1; P_last = P2; 	break; 
-							case SvgPathCommand.S: 	/+drawCurve(P_last, Pm, P0, P1); +/emit(mixin(舉!((Opcode),q{drawPathS}))); emitXY(P0); emitXY(P1); 	P_mirror = P0; P_last = P1; 	break; 
+							case SvgPathCommand.M: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathM})), P0); 	P_mirror = P_last = P_start = P0; 	break; 
+							case SvgPathCommand.L: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathL})), P0); 	P_mirror = P_last; P_last = P0; 	break; 
+							case SvgPathCommand.Q: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+							case SvgPathCommand.T: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathT})), P0); 	P_mirror = Pm; P_last = P0; 	break; 
+							case SvgPathCommand.C: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	P_mirror = P1; P_last = P2; 	break; 
+							case SvgPathCommand.S: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
 							/+redirected commands:+/			
 							case SvgPathCommand.A: 	approximateArcToCubicBeziers(P_last, item, &onItem)
 							/+Todo: move it to GPU+/; 		break; 
-							case SvgPathCommand.Z: 	if(P_last!=P_start) {
-								/+
-									drawCurve(P_last, P_start)
-									/+Todo: move it to GPU+/; 
-								+/
-								emit(mixin(舉!((Opcode),q{drawPathL}))); emitXY(P_start); 
-								//Todo: tangent!
+							case SvgPathCommand.Z: 	if(P_last!=P_start)
+							{
+								emitPathCmd(mixin(舉!((Opcode),q{drawPathL})), P_start); 
+								/+Todo: move it to GPU+//+Todo: tangent!+/
 							}	P_mirror = P_last = P_start; 	break; 
 						}
 					} 
@@ -1054,7 +1043,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x996E5F5C4644).檢 (zoomedPlatform)), ((0x99975F5C4644).檢 (shipPos)); 
+								((0x973B5F5C4644).檢 (zoomedPlatform)), ((0x97645F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1255,7 +1244,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xAFD85F5C4644).檢((update間(_間)))); 
+				((0xADA55F5C4644).檢((update間(_間)))); 
 				
 				enum N = 1; 
 				__gshared Builder[N] builders; 
@@ -1284,11 +1273,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xB3AC5F5C4644).檢((update間(_間)))); 
+				((0xB1795F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xB4435F5C4644).檢((update間(_間)))); 
+				((0xB2105F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1307,7 +1296,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xB6375F5C4644).檢((update間(_間)))); 
+				((0xB4045F5C4644).檢((update間(_間)))); 
 			} 
 			
 			
