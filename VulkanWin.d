@@ -2171,6 +2171,93 @@ class VulkanWindow: Window
 				); 
 			} 
 			
+			// Split at t = 0.33333333
+			void split_bezier_third(
+				vec2 P0, vec2 P1, vec2 P2, vec2 P3, 
+				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
+				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+			)
+			{
+				vec2 a = 0.66666667 * P0 + 0.33333333 * P1; 
+				vec2 b = 0.44444444 * P0 + 0.44444444 * P1 + 0.11111111 * P2; 
+				vec2 c = 0.29629630 * P0 + 0.44444444 * P1 + 0.22222222 * P2 + 0.03703704 * P3; 
+				vec2 d = 0.44444444 * P1 + 0.44444444 * P2 + 0.11111111 * P3; 
+				vec2 e = 0.66666667 * P2 + 0.33333333 * P3; 
+				
+				Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
+				R0 = c; R1 = d; R2 = e; R3 = P3; 
+			} 
+			
+			// Split at t = 0.50000000
+			void split_bezier_half(
+				vec2 P0, vec2 P1, vec2 P2, vec2 P3,
+				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
+				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+			)
+			{
+				vec2 a = 0.50000000 * P0 + 0.50000000 * P1; 
+				vec2 b = 0.25000000 * P0 + 0.50000000 * P1 + 0.25000000 * P2; 
+				vec2 c = 0.12500000 * P0 + 0.37500000 * P1 + 0.37500000 * P2 + 0.12500000 * P3; 
+				vec2 d = 0.25000000 * P1 + 0.50000000 * P2 + 0.25000000 * P3; 
+				vec2 e = 0.50000000 * P2 + 0.50000000 * P3; 
+				
+				Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
+				R0 = c; R1 = d; R2 = e; R3 = P3; 
+			} 
+			
+			// Split at t = 0.25000000
+			void split_bezier_quarter(
+				vec2 P0, vec2 P1, vec2 P2,	vec2 P3,
+				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
+				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+			)
+			{
+				vec2 a = 0.75000000 * P0 + 0.25000000 * P1; 
+				vec2 b = 0.56250000 * P0 + 0.37500000 * P1 + 0.06250000 * P2; 
+				vec2 c = 0.42187500 * P0 + 0.42187500 * P1 + 0.14062500 * P2 + 0.01562500 * P3; 
+				vec2 d = 0.18750000 * P1 + 0.37500000 * P2 + 0.43750000 * P3; 
+				vec2 e = 0.25000000 * P2 + 0.75000000 * P3; 
+				
+				Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
+				R0 = c; R1 = d; R2 = e; R3 = P3; 
+			} 
+			
+			int analyzeBezierCurve(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
+			{
+				const float TOLERANCE = 0.001; 
+				
+				// Calculate cross products for the three segments
+				float cross1 = cross(vec3(P1 - P0, 0), vec3(P2 - P1, 0)).z; 
+				float cross2 = cross(vec3(P2 - P1, 0), vec3(P3 - P2, 0)).z; 
+				
+				// Check for straight line
+				if(abs(cross1) < TOLERANCE && abs(cross2) < TOLERANCE) { return 0; }
+				
+				// Check if both cross products have the same sign (convex curve)
+				if(cross1 * cross2 > TOLERANCE) {
+					return (cross1 > 0) ? -1 : 1; 
+					// Left turn: -1, Right turn: 1
+				}
+				
+				// Check if cross products have opposite signs (inflection point = Z/S shape)
+				if(cross1 * cross2 < -TOLERANCE) { return 2; }
+				
+				// Handle edge cases where one cross product is near zero
+				if(abs(cross1) < TOLERANCE && abs(cross2) > TOLERANCE)
+				{
+					// Check the overall turning direction
+					float overallCross = cross(vec3(P1 - P0, 0), vec3(P3 - P2, 0)).z; 
+					return (overallCross > 0) ? -1 : ((overallCross < 0) ? 1 : 0); 
+				}
+				
+				if(abs(cross2) < TOLERANCE && abs(cross1) > TOLERANCE)
+				{
+					// Check the overall turning direction
+					float overallCross = cross(vec3(P1 - P0, 0), vec3(P3 - P2, 0)).z; 
+					return (overallCross > 0) ? -1 : ((overallCross < 0) ? 1 : 0); 
+				}
+			} 
+			
 			struct BitStream
 			{
 				uint dwOfs; //the dword offset of the NEXT fetched dword.
@@ -2627,6 +2714,7 @@ class VulkanWindow: Window
 									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_C); 
 									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
 									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
+									/+Todo: cubic b-spline a letrehozva a harmadolos modszerrel.+/
 								}	break; 
 								case 3: 	/*A: arc*/	/*Todo: arc*/break; 
 							}
