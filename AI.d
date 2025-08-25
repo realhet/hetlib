@@ -14,17 +14,24 @@ class AiChat
 	
 	struct Message
 	{
-		string role/+system, user, assistant+/; 
-		string content; 
+		@STORED
+		{
+			string role/+system, user, assistant+/; 
+			string content; 
+		} 
 	} 
 	
 	struct Query
 	{
-		Message[] messages; 
-		string model; 
-		float temperature = 1.0; 
-		bool stream; 
+		@STORED
+		{
+			Message[] messages; 
+			string model; 
+			float temperature = 1.0; 
+			bool stream; 
+		} 
 		
+		//these are not stored, so it's not being sent to deepseek.
 		File cacheFile; 
 		ulong cacheHash; 
 	} 
@@ -75,6 +82,23 @@ class AiChat
 		auto chat = cast()_chat; 
 		if(!chat || !chat.incomingMessageIdx) return; 
 		
+		auto getChatQuery()
+		{
+			auto q = chat.query; 
+			ref msgs = q.messages; 
+			if(msgs.length && msgs.back.content=="" && msgs.back.role==roleAssistant)
+			{
+				/+
+					bug fixed: 250825: Deepseek returns random junk if there is 
+					an empty assistant message at the end.
+				+/
+				msgs = msgs[0..$-1]; 
+			}
+			return q; 
+		} 
+		
+		
+		
 		scope(exit) chat.workerPending = false/+This is the idle state+/; 
 		
 		//prepare data
@@ -82,7 +106,7 @@ class AiChat
 			"Content-Type"	: "application/json",
 			"Authorization"	: "Bearer "~tea_dec(chat.apiKey, "apiKey")
 		],
-			msg 	= chat.query.toJson(true).replace(`\v`, `\u000B`)
+			msg 	= getChatQuery.toJson(true).replace(`\v`, `\u000B`)
 				/+
 			Todo: toJson should generate proper JSON string literals. Currently 
 			C literals are used for simplicity.
@@ -92,6 +116,7 @@ class AiChat
 		//prepare curl
 		auto http = HTTP(); 
 		foreach(k, v; header) http.addRequestHeader(k, v); 
+		
 		http.method 	= HTTP.Method.post,
 		http.url 	= chat.apiUrl,
 		http.onSend 	= ((void[] data) {
@@ -118,7 +143,7 @@ class AiChat
 		
 		if(!mixin(界3(q{200},q{http.statusLine.code},q{299})))
 		{ chat.msgQueue.put(i"\nerror: $(http.statusLine.code) $(http.statusLine.reason)\n\n".text); }
-	} 
+	} 
 	struct StreamDataEvent
 	{
 		//string id; //a guid.
