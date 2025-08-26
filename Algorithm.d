@@ -1247,8 +1247,8 @@ version(/+$DIDE_REGION Geometry+/all)
 	
 	struct Segment(Vect)
 	{
-		alias 	V = Vect, 
-			E = V.ComponentType; 
+		alias V = Vect, 
+		E = V.ComponentType; 
 		
 		V[2] p; 
 		
@@ -1257,9 +1257,9 @@ version(/+$DIDE_REGION Geometry+/all)
 		this(A, B)(in A a, in B b) { p[0] = V(a); p[1] = V(b); } 
 		this(E x0, E y0, E x1, E y1) { this(V(x0, y0), V(x1, y1)); } 
 		
-		auto diff() const { return p[1] - p[0]; } 
-		auto length() const { return .length(diff); } //Todo: implement in math.length
-		auto dir() const { return diff*(1/length); } //Todo: implement in math.normalize
+		auto diff() const => p[1] - p[0]; 
+		auto length() const => .length(diff); //Todo: implement in math.length
+		auto dir() const => diff*(1/length); //Todo: implement in math.normalize
 	} 
 	
 	auto toSegs(in vec2[] p, bool circular)
@@ -1387,6 +1387,30 @@ version(/+$DIDE_REGION Geometry+/all)
 			auto detB = crossZ(T, S); 
 			if(inRange_sorted(detB, 0, det)) {
 				auto alpha = detA/det; 
+				return true; 
+			}
+		}
+		return false; 
+	} 
+	
+	bool intersectSegs_falseParallel_prec(S: Segment!E, E)(in S S0, in S S1, ref E P)
+	{
+		auto 	S	= S1.p[0] - S0.p[0],
+			T	= S0.p[1] - S0.p[0],
+			U 	= S1.p[0] - S1.p[1]; 
+		auto det = crossZ(T, U); 
+		
+		if(abs(det)<1e-30) return false;  //Todo: this is lame
+		
+		auto detA = crossZ(S, U); 
+		
+		if(inRange_sorted(detA, 0, det))
+		{
+			//have one intersection
+			auto detB = crossZ(T, S); 
+			if(inRange_sorted(detB, 0, det)) {
+				auto alpha = detA/det; 
+				P = S0.p[0]+T*alpha; 
 				return true; 
 			}
 		}
@@ -1827,20 +1851,26 @@ version(/+$DIDE_REGION Geometry+/all)
 	{
 		const u = 1-t; 
 		return [u, t]; 
-	} 
-	
+	} 	T[2] linearBezierTangentWeights(T)(T t)
+	{ return [-1, 1]; } 
 	T[3] quadraticBezierWeights(T)(T t)
 	{
 		const u = 1-t; 
 		return [((u)^^(2)), 2*u*t, ((t)^^(2))]; 
+	} 	T[3] quadraticBezierTangentWeights(T)(T t)
+	{
+		const u = 1-t; 
+		return [-2*u, 2*(u - t), 2*t]; 
 	} 
-	
 	T[4] cubicBezierWeights(T)(T t)
 	{
 		const u = 1-t; 
 		return [((u)^^(3)), 3*t*((u)^^(2)), 3*u*((t)^^(2)), ((t)^^(3))]; 
+	} 		T[4] cubicBezierTangentWeights(T)(T t)
+	{
+		const u = 1-t; 
+		return [-3*((u)^^(2)), 3*((u)^^(2)) - 6*u*t, 6*u*t - 3*((t)^^(2)), 3*((t)^^(2))]; 
 	} 
-	
 	auto evalBezier(F, int N)(in Vector!(F, 2)[N] p, F t)
 	{
 		const w = AliasSeq!(
@@ -1852,7 +1882,19 @@ version(/+$DIDE_REGION Geometry+/all)
 		auto res = p[0]*w[0]; 
 		static foreach(i; 1..p.length) res += p[i]*w[i]; 
 		return res; 
+	} 	auto evalBezierTangent(F, int N)(in Vector!(F, 2)[N] p, F t)
+	{
+		const w = AliasSeq!(
+			linearBezierTangentWeights,
+			quadraticBezierTangentWeights,
+			cubicBezierTangentWeights
+		)[N-2](t); 
+		
+		auto res = p[0]*w[0]; 
+		static foreach(i; 1..p.length) res += p[i]*w[i]; 
+		return res; 
 	} 
+	
 	
 	T[4][2] splitBezier(T)(T[4] P, float t=.5)
 	{

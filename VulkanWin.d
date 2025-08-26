@@ -1915,13 +1915,21 @@ class VulkanWindow: Window
 			
 			#define nan (uintBitsToFloat(0x7fc00000u))
 			
+			#define ErrorColor vec4(1, 0, 1, 1)
+			#define LoadingColor vec4(1, 0, 1, 1)
+			
 			#define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
 			#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
 			#define setBits(val, ofs, len, data) (val = bitfieldInsert(val, data, ofs, len))
 			
-			#define ErrorColor vec4(1, 0, 1, 1)
-			#define LoadingColor vec4(1, 0, 1, 1)
+			#define inRange(value, mi, ma) (mi<=value && value<=ma)
+			#define inRange_sorted(value, r1, r2) (inRange(value, min(r1, r2), max(r1, r2)))
 			
+			vec2 rotate90(in vec2 v) { return vec2(-v.y, v.x); } 
+			float crossZ(in vec2 a, vec2 b) { return a.x*b.y - b.x*a.y; } 
+			
+			struct seg2
+			{ vec2[2] p; }; 
 			
 			
 			$(
@@ -2222,40 +2230,91 @@ class VulkanWindow: Window
 				R0 = c; R1 = d; R2 = e; R3 = P3; 
 			} 
 			
-			int analyzeBezierCurve(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
+			float calcManhattanLength(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
 			{
-				const float TOLERANCE = 0.001; 
+				const vec2 v = abs(P3-P2) + abs(P2-P1) + abs(P1-P0); 
+				return v.x + v.y; 
+			} 
+			
+			vec2 evalCubicBezier2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in vec4 w)
+			{ return P0*w.x + P1*w.y + P2*w.z + P3*w.w; } 
+			vec4 cubicBezierPointWeights(in float t)
+			{ const float u = 1-t; return vec4(u*u*u, 3*t*u*u, 3*u*t*t, t*t*t); } 
+			vec4 cubicBezierTangentWeights(in float t)
+			{ const float u = 1-t; return vec4(-3*u*u, 3*u*u - 6*u*t, 6*u*t - 3*t*t, 3*t*t); } 
+			vec2 cubicBezierPoint2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
+			{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierPointWeights(t)); } 
+			vec2 cubicBezierTangent2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
+			{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierTangentWeights(t)); } 
+			
+			vec2 cubicBezierNormal2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
+			{ return rotate90(normalize(cubicBezierTangent2D(P0, P1, P2, P3, t))); } 
+			
+			bool intersectSegs2D(in seg2 S0, in seg2 S1, out vec2 P)
+			{
+				vec2 	S	= S1.p[0] - S0.p[0],
+					T	= S0.p[1] - S0.p[0],
+					U 	= S1.p[0] - S1.p[1]; 
+				float det = crossZ(T, U); 
 				
-				// Calculate cross products for the three segments
-				float cross1 = cross(vec3(P1 - P0, 0), vec3(P2 - P1, 0)).z; 
-				float cross2 = cross(vec3(P2 - P1, 0), vec3(P3 - P2, 0)).z; 
+				if(abs(det)<1e-30) return false;  //Todo: this is lame
 				
-				// Check for straight line
-				if(abs(cross1) < TOLERANCE && abs(cross2) < TOLERANCE) { return 0; }
+				float detA = crossZ(S, U); 
 				
-				// Check if both cross products have the same sign (convex curve)
-				if(cross1 * cross2 > TOLERANCE) {
-					return (cross1 > 0) ? -1 : 1; 
-					// Left turn: -1, Right turn: 1
-				}
-				
-				// Check if cross products have opposite signs (inflection point = Z/S shape)
-				if(cross1 * cross2 < -TOLERANCE) { return 2; }
-				
-				// Handle edge cases where one cross product is near zero
-				if(abs(cross1) < TOLERANCE && abs(cross2) > TOLERANCE)
+				if(inRange_sorted(detA, 0, det))
 				{
-					// Check the overall turning direction
-					float overallCross = cross(vec3(P1 - P0, 0), vec3(P3 - P2, 0)).z; 
-					return (overallCross > 0) ? -1 : ((overallCross < 0) ? 1 : 0); 
+					//have one intersection
+					float detB = crossZ(T, S); 
+					if(inRange_sorted(detB, 0, det)) {
+						float alpha = detA/det; 
+						P = S0.p[0]+T*alpha; 
+						return true; 
+					}
+				}
+				return false; 
+			} 
+			
+			const int tesselateCubicBezierTentacle_N = 7; 
+			
+			void tesselateCubicBezierTentacle_updateRay(inout seg2 ray, in int i, in vec2 p, in bool dir, in float rayLen)
+			{
+				if(i==0) ray.p[0] = p; 
+				else if(i==1) ray.p[1] = p; 
+				else {
+					if((crossZ(ray.p[1]-ray.p[0], p-ray.p[0])>=0)==dir) ray.p[1] = p; 
+					if(i==tesselateCubicBezierTentacle_N-3)
+					ray.p[1] = ray.p[0] + normalize(ray.p[1]-ray.p[0])*rayLen; 
+				}
+			} 
+			
+			void tesselateCubicBezierTentacle(
+				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1,
+				out vec2 M0, out vec2 M1
+			)
+			{
+				const int N = tesselateCubicBezierTentacle_N; 
+				const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
+				
+				vec2[N] points, sides; 
+				for(int i=0; i<N; i++)
+				{
+					points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
+					sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
 				}
 				
-				if(abs(cross2) < TOLERANCE && abs(cross1) > TOLERANCE)
+				const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
+				seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
+				for(int i=0; i<N-2; i++)
 				{
-					// Check the overall turning direction
-					float overallCross = cross(vec3(P1 - P0, 0), vec3(P3 - P2, 0)).z; 
-					return (overallCross > 0) ? -1 : ((overallCross < 0) ? 1 : 0); 
+					int k = N-1-i; 
+					tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
+					tesselateCubicBezierTentacle_updateRay(rayRightBack, i, points[k] + sides[k], false, maxRayLen); 
+					tesselateCubicBezierTentacle_updateRay(rayLeftFwd  , i, points[i] - sides[i], false, maxRayLen); 
+					tesselateCubicBezierTentacle_updateRay(rayLeftBack  , i, points[k] - sides[k], true, maxRayLen); 
 				}
+				
+				if(!intersectSegs2D(rayRightFwd, rayRightBack, M0)) M0 = points[N/2] + sides[N/2]; 
+				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M1)) M1 = points[N/2] - sides[N/2]; 
 			} 
 			
 			struct BitStream
@@ -2714,7 +2773,7 @@ class VulkanWindow: Window
 									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_C); 
 									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
 									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
-									/+Todo: cubic b-spline a letrehozva a harmadolos modszerrel.+/
+									/*Todo: cubic b-spline a letrehozva a harmadolos modszerrel.*/
 								}	break; 
 								case 3: 	/*A: arc*/	/*Todo: arc*/break; 
 							}
