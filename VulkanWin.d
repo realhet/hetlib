@@ -845,7 +845,10 @@ class VulkanWindow: Window
 	version(/+$DIDE_REGION UB    +/all)
 	{
 		struct UniformData
-		{ mat4 transformationMatrix; } 
+		{
+			mat4 transformationMatrix, inverseTransformationMatrix; 
+			vec4 viewport; 
+		} 
 		
 		UniformBufferManager UB; 
 		
@@ -916,7 +919,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x6A1682886ADB).檢(buffer.appendPos)); 
+				((0x6A4F82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -975,7 +978,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x710582886ADB).檢(buffer.appendPos)); 
+				((0x713E82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -1913,6 +1916,7 @@ class VulkanWindow: Window
 		(碼!((位!()),iq{glslc -O},iq{
 			#version 430
 			
+			//common stuff
 			#define nan (uintBitsToFloat(0x7fc00000u))
 			
 			#define ErrorColor vec4(1, 0, 1, 1)
@@ -1932,6 +1936,18 @@ class VulkanWindow: Window
 			{ vec2[2] p; }; 
 			
 			
+			//fragment attributes
+			
+			#define FragMode_default 0
+			#define FragMode_cubicBezier 1
+			
+			#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
+			#define setFragMode(a) setBits(fragTexHandleAndMode, 28, 4, a)
+			
+			#define getFragTexHandle getBits(fragTexHandleAndMode, 0, 28)
+			#define setFragTexHandle(a) setBits(fragTexHandleAndMode, 0, 28, a)
+			
+			
 			$(
 				(表([
 					[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/},q{/+Note: Location 5+/},q{/+Note: Location 6+/}],
@@ -1944,19 +1960,19 @@ class VulkanWindow: Window
 						smooth mediump
 						vec4 fragBkColor
 					},q{
-						smooth highp
+						smooth
 						vec2 fragTexCoordXY
 					},q{
 						flat
-						uint fragTexHandle
+						uint fragTexHandleAndMode
 					},q{
 						flat
 						uint fragTexCoordZ
 					},q{
-						flat highp
+						flat
 						vec4 fragFloats0
 					},q{
-						flat highp
+						flat
 						vec4 fragFloats1
 					}],
 					[q{frag},q{},q{vec4 outColor}],
@@ -2509,7 +2525,7 @@ class VulkanWindow: Window
 				setBits(PathCodeQueue, 4*PathCode_bits, PathCode_bits, code); 
 				
 				//debug
-				fragTexHandle = 0; 
+				fragTexHandleAndMode = 0; 
 				switch(code)
 				{
 					case PathCode_M: 	fragColor = vec4(1, 0, 0, 1); 	break; 
@@ -2690,7 +2706,7 @@ class VulkanWindow: Window
 				const uint texHandle = fetchHandle(bitStream, handleFmt); 
 				
 				fragColor = PC; fragBkColor = SC; 
-				fragTexHandle = texHandle; 
+				fragTexHandleAndMode = texHandle; 
 				emitTexturedPointPointRect2D(P3.xy, P4.xy); 
 				
 				latchP(); 
@@ -2705,7 +2721,7 @@ class VulkanWindow: Window
 				fragTexCoordZ = ch; 
 				fragColor = PC; fragBkColor = SC; 
 				
-				fragTexHandle = FMH; 
+				fragTexHandleAndMode = FMH; 
 				emitTexturedPointPointRect2D(P3.xy, P3.xy+size); 
 				
 				fragTexCoordZ = 0; //restore it
@@ -2846,17 +2862,20 @@ class VulkanWindow: Window
 			
 			void main() /*geometry shader*/
 			{
+				fragTexHandleAndMode = 0; 
 				fragTexCoordZ = 0; //this is normally 0. Fonts can temporarily change it.
 				fragFloats0 = vec4(1, 2, 3, 4); 
 				fragFloats1 = vec4(5, 6, 7, 8); 
 				
-				BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
-				while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
-				{ processInstruction(GS); runningCntr--; }
-				
+				if(false)
+				{
+					BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
+					while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
+					{ processInstruction(GS); runningCntr--; }
+				}
 				
 				//debug
-				fragColor = vec4(0.5, 1, 1, .5); fragTexHandle = 0; 
+				fragColor = vec4(0.5, 1, 1, .5); fragBkColor = vec4(0); 
 				if(true)
 				{
 					emitLineJoint(vec2(nan), vec2(10, 10), vec2(320, 200), 5, 5, 15); 
@@ -2865,15 +2884,30 @@ class VulkanWindow: Window
 				}
 				if(true)
 				{
+					setFragMode(FragMode_cubicBezier); 
 					fragColor = vec4(0, 1, 1, 1); 
-					vec2 P0 = vec2(50, 50), P1 = vec2(150, 50), P2 = vec2(200, 50), P3 = vec2(250, 150); 
+					vec2 P0 = vec2(50, 50), P1 = vec2(150, 50), P2 = vec2(200, 60), P3 = vec2(250, 150); 
+					
+					fragFloats0.xy = P0; fragFloats0.zw = P1; fragFloats1.xy = P2; fragFloats1.zw = P3; 
+					
 					testEmitCubicBezierTentacle(P0, P1, P2, P3, 10, 10); 
 				}
 			} 
 			
 			@frag: 
+			
 			$(ShaderBufferDeclarations)
 			$(TexSizeFormat.GLSLCode)
+			
+			layout(location = 8) in vec3 inPosition; 
+			
+			uint fragMode, fragTexHandle; 
+			
+			void initFragmentParams()
+			{
+				fragMode = getFragMode; 
+				fragTexHandle = getFragTexHandle; 
+			} 
 			
 			vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 			{
@@ -3062,6 +3096,16 @@ class VulkanWindow: Window
 			} 
 			
 			void main() {
+				initFragmentParams(); 
+				
+				const vec4 ndcPos = vec4(
+					2*(gl_FragCoord.xy-UB.viewport.xy)/(UB.viewport.zw)-1,
+					gl_FragCoord.z, 1
+				); 
+				const vec4 clipPos = UB.inv_mvp * ndcPos; 
+				const vec3 objPos = clipPos.xyz / clipPos.w; 
+				
+				
 				const vec2[6] rooks6_offsets = 
 					{
 					vec2(-0.417, 0.250), vec2(-0.250, -0.417), vec2(-0.083, -0.083),
@@ -3082,6 +3126,15 @@ class VulkanWindow: Window
 				sum /= 6; 
 				
 				outColor = mix(fragBkColor, vec4(sum.rgb, 1)*fragColor, sum.a); 
+				
+				if(fragMode==FragMode_cubicBezier)
+				{
+					outColor.rgb = vec3(.2); 
+					outColor.rgb += vec3(1, 0, 0)*(2/length(fragFloats0.xy-objPos.xy)); 
+					outColor.rgb += vec3(.25, .75, 0)*(2/length(fragFloats0.zw-objPos.xy)); 
+					outColor.rgb += vec3(0, .75, .25)*(2/length(fragFloats1.xy-objPos.xy)); 
+					outColor.rgb += vec3(0, 0, 1)*(2/length(fragFloats1.zw-objPos.xy)); 
+				}
 			} 
 		})); 
 		shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
@@ -3189,7 +3242,11 @@ class VulkanWindow: Window
 	} enum ShaderBufferDeclarations = 
 	iq{
 		//UB: Uniform buffer
-		layout(binding = 0) uniform UB_T { mat4 mvp; } UB; 
+		layout(binding = 0)
+		uniform UB_T {
+			mat4 mvp, inv_mvp; 
+			vec4 viewport; 
+		} UB; 
 		
 		//IB: Info buffer (texture directory)
 		layout(binding = 1) buffer IB_T { uint IB[]; } ; 
@@ -3446,7 +3503,14 @@ class VulkanWindow: Window
 							// Set up projection
 							auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1*globalScale, 1000*globalScale); 
 							
-							UB.access.transformationMatrix = projMatrix * viewMatrix * modelMatrix; 
+							auto mvp = projMatrix * viewMatrix * modelMatrix; 
+							with(UB.access)
+							{
+								transformationMatrix = mvp; 
+								inverseTransformationMatrix = mvp.inverse; 
+								viewport = vec4(0, 0, swapchain.extent.width, swapchain.extent.height); 
+								//Todo: The UB struct should be automatic in the shader code.
+							}
 						}
 						
 						/+
