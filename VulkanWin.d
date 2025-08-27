@@ -2098,87 +2098,6 @@ class VulkanWindow: Window
 				EndPrimitive(); 
 			} 
 			
-			// Helper function for line intersection
-			vec2 lineIntersection(vec2 p1, vec2 p2, vec2 p3, vec2 p4)
-			{
-				float denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x); 
-				if(abs(denom) < 1e-4)
-				{
-					return (p2+p3)/2; // Fallback to first point if lines are parallel
-				}
-				
-				float t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom; 
-				return p1 + t * (p2 - p1); 
-			} 
-			
-			void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float W0, in float W1, in float W2)
-			{
-				/*
-					P0-P1 and P1-P2 defines 2 line segments.
-					W0, W1, W2 defiles linewidth at P0, P1, P2.
-					The x coordinate of points can be nan, that meant there is no point defined 
-					and P1 is the start or the end of a line.
-					If this is the cast an endcap must be generated, the depth of the cap is 
-					W1/2 in length, so later a pixel shader can paint a nice roundcap there.
-					If P1.x is null it means that there is nothing at this particular line joint.
-					The primitive type is triangle strip, so ideally it should emit 2 vertices.
-					The 2 vertex is the intersection points of the two side boundary lines at 
-					segments P0-P1 and P1-P2. Be careful with the linewidts at the 3 points.
-					Make the intersection calculation safe, they should fallback tho an existing 
-					point at a valid linewidth distance.
-				*/
-				
-				// Handle case where P1 is invalid (no joint to process)
-				if(isnan(P1.x)) return; 
-				
-				bool hasPrev = !isnan(P0.x), hasNext = !isnan(P2.x); 
-				if(!hasPrev && !hasNext) return; 
-				
-				// Calculate direction vectors
-				vec2 dirPrev = hasPrev ? normalize(P1 - P0) : vec2(0); 
-				vec2 dirNext = hasNext ? normalize(P2 - P1) : vec2(0); 
-				
-				// Calculate perpendicular vectors for offset directions
-				vec2 perpPrev = hasPrev ? vec2(-dirPrev.y, dirPrev.x) : vec2(0); 
-				vec2 perpNext = hasNext ? vec2(-dirNext.y, dirNext.x) : vec2(0); 
-				
-				if(!hasPrev)
-				{
-					// Start cap - emit perpendicular offset
-					vec2 P = P1 - dirNext * (W1/2); vec2 capDir = perpNext * (W1/2); 
-					fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir ); 
-					fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
-					return; 
-				}
-				
-				if(!hasNext)
-				{
-					// End cap - emit perpendicular offset
-					vec2 P = P1 + dirPrev * (W1/2); vec2 capDir = perpPrev * (W1/2); 
-					fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir); 
-					fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
-					EndPrimitive(); 
-					return; 
-				}
-				
-				fragTexCoordXY = vec2(0, 0); emitVertex2D(
-					lineIntersection(
-						P0 - perpPrev*(W0/2), 
-						P1 - perpPrev*(W1/2), 
-						P1 - perpNext*(W1/2), 
-						P2 - perpNext*(W2/2)
-					)
-				); 
-				fragTexCoordXY = vec2(0, 1); emitVertex2D(
-					lineIntersection(
-						P0 + perpPrev*(W0/2), 
-						P1 + perpPrev*(W1/2), 
-						P1 + perpNext*(W1/2), 
-						P2 + perpNext*(W2/2)
-					)
-				); 
-			} 
-			
 			// Split at t = 0.33333333
 			void split_bezier_third(
 				vec2 P0, vec2 P1, vec2 P2, vec2 P3, 
@@ -2315,6 +2234,123 @@ class VulkanWindow: Window
 				
 				if(!intersectSegs2D(rayRightFwd, rayRightBack, M0)) M0 = points[N/2] + sides[N/2]; 
 				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M1)) M1 = points[N/2] - sides[N/2]; 
+			} 
+			
+			void testEmitCubicBezierTentacle(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
+			{
+				const int N = tesselateCubicBezierTentacle_N; 
+				const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
+				
+				vec2[N] points, sides; 
+				for(int i=0; i<N; i++)
+				{
+					points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
+					sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
+				}
+				
+				const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
+				seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
+				for(int i=0; i<N-2; i++)
+				{
+					int k = N-1-i; 
+					tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
+					tesselateCubicBezierTentacle_updateRay(rayRightBack, i, points[k] + sides[k], false, maxRayLen); 
+					tesselateCubicBezierTentacle_updateRay(rayLeftFwd  , i, points[i] - sides[i], false, maxRayLen); 
+					tesselateCubicBezierTentacle_updateRay(rayLeftBack  , i, points[k] - sides[k], true, maxRayLen); 
+				}
+				
+				vec2 M0, M1; 
+				if(!intersectSegs2D(rayRightFwd, rayRightBack, M0)) M0 = points[N/2] + sides[N/2]; 
+				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M1)) M1 = points[N/2] - sides[N/2]; 
+				
+				fragTexCoordXY = vec2(0, 1); emitVertex2D(rayLeftFwd.p[0]); 
+				fragTexCoordXY = vec2(0, 0); emitVertex2D(rayRightFwd.p[0]); 
+				fragTexCoordXY = vec2(0, 1); emitVertex2D(M1); 
+				fragTexCoordXY = vec2(0, 0); emitVertex2D(M0); 
+				fragTexCoordXY = vec2(0, 1); emitVertex2D(rayLeftBack.p[0]); 
+				fragTexCoordXY = vec2(0, 0); emitVertex2D(rayRightBack.p[0]); 
+				EndPrimitive(); 
+			} 
+			
+			// Helper function for line intersection
+			vec2 lineIntersection(vec2 p1, vec2 p2, vec2 p3, vec2 p4)
+			{
+				float denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x); 
+				if(abs(denom) < 1e-4)
+				{
+					return (p2+p3)/2; // Fallback to first point if lines are parallel
+				}
+				
+				float t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom; 
+				return p1 + t * (p2 - p1); 
+			} 
+			
+			void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float W0, in float W1, in float W2)
+			{
+				/*
+					P0-P1 and P1-P2 defines 2 line segments.
+					W0, W1, W2 defiles linewidth at P0, P1, P2.
+					The x coordinate of points can be nan, that meant there is no point defined 
+					and P1 is the start or the end of a line.
+					If this is the cast an endcap must be generated, the depth of the cap is 
+					W1/2 in length, so later a pixel shader can paint a nice roundcap there.
+					If P1.x is null it means that there is nothing at this particular line joint.
+					The primitive type is triangle strip, so ideally it should emit 2 vertices.
+					The 2 vertex is the intersection points of the two side boundary lines at 
+					segments P0-P1 and P1-P2. Be careful with the linewidts at the 3 points.
+					Make the intersection calculation safe, they should fallback tho an existing 
+					point at a valid linewidth distance.
+				*/
+				
+				// Handle case where P1 is invalid (no joint to process)
+				if(isnan(P1.x)) return; 
+				
+				bool hasPrev = !isnan(P0.x), hasNext = !isnan(P2.x); 
+				if(!hasPrev && !hasNext) return; 
+				
+				// Calculate direction vectors
+				vec2 dirPrev = hasPrev ? normalize(P1 - P0) : vec2(0); 
+				vec2 dirNext = hasNext ? normalize(P2 - P1) : vec2(0); 
+				
+				// Calculate perpendicular vectors for offset directions
+				vec2 perpPrev = hasPrev ? vec2(-dirPrev.y, dirPrev.x) : vec2(0); 
+				vec2 perpNext = hasNext ? vec2(-dirNext.y, dirNext.x) : vec2(0); 
+				
+				if(!hasPrev)
+				{
+					// Start cap - emit perpendicular offset
+					vec2 P = P1 - dirNext * (W1/2); vec2 capDir = perpNext * (W1/2); 
+					fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir ); 
+					fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
+					return; 
+				}
+				
+				if(!hasNext)
+				{
+					// End cap - emit perpendicular offset
+					vec2 P = P1 + dirPrev * (W1/2); vec2 capDir = perpPrev * (W1/2); 
+					fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir); 
+					fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
+					EndPrimitive(); 
+					return; 
+				}
+				
+				fragTexCoordXY = vec2(0, 0); emitVertex2D(
+					lineIntersection(
+						P0 - perpPrev*(W0/2), 
+						P1 - perpPrev*(W1/2), 
+						P1 - perpNext*(W1/2), 
+						P2 - perpNext*(W2/2)
+					)
+				); 
+				fragTexCoordXY = vec2(0, 1); emitVertex2D(
+					lineIntersection(
+						P0 + perpPrev*(W0/2), 
+						P1 + perpPrev*(W1/2), 
+						P1 + perpNext*(W1/2), 
+						P2 + perpNext*(W2/2)
+					)
+				); 
 			} 
 			
 			struct BitStream
@@ -2821,10 +2857,18 @@ class VulkanWindow: Window
 				
 				//debug
 				fragColor = vec4(0.5, 1, 1, .5); fragTexHandle = 0; 
-				
-				emitLineJoint(vec2(nan), vec2(10, 10), vec2(320, 200), 5, 5, 15); 
-				emitLineJoint(vec2(10, 10), vec2(320, 200), vec2(10, 200), 5, 15, 15); 
-				emitLineJoint(vec2(320, 200), vec2(10, 200), vec2(nan), 15, 15, 15); 
+				if(true)
+				{
+					emitLineJoint(vec2(nan), vec2(10, 10), vec2(320, 200), 5, 5, 15); 
+					emitLineJoint(vec2(10, 10), vec2(320, 200), vec2(10, 200), 5, 15, 15); 
+					emitLineJoint(vec2(320, 200), vec2(10, 200), vec2(nan), 15, 15, 15); 
+				}
+				if(true)
+				{
+					fragColor = vec4(0, 1, 1, 1); 
+					vec2 P0 = vec2(50, 50), P1 = vec2(150, 50), P2 = vec2(200, 50), P3 = vec2(250, 150); 
+					testEmitCubicBezierTentacle(P0, P1, P2, P3, 10, 10); 
+				}
 			} 
 			
 			@frag: 
