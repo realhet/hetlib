@@ -2876,7 +2876,7 @@ class VulkanWindow: Window
 				
 				//debug
 				fragColor = vec4(0.5, 1, 1, .5); fragBkColor = vec4(0); 
-				if(true)
+				if(false)
 				{
 					emitLineJoint(vec2(nan), vec2(10, 10), vec2(320, 200), 5, 5, 15); 
 					emitLineJoint(vec2(10, 10), vec2(320, 200), vec2(10, 200), 5, 15, 15); 
@@ -2888,9 +2888,11 @@ class VulkanWindow: Window
 					fragColor = vec4(0, 1, 1, 1); 
 					vec2 P0 = vec2(50, 50), P1 = vec2(150, 50), P2 = vec2(200, 60), P3 = vec2(250, 150); 
 					
+					P0*=2; P1*=2; P2*=2; P3*=2; 
+					
 					fragFloats0.xy = P0; fragFloats0.zw = P1; fragFloats1.xy = P2; fragFloats1.zw = P3; 
 					
-					testEmitCubicBezierTentacle(P0, P1, P2, P3, 10, 10); 
+					testEmitCubicBezierTentacle(P0, P1, P2, P3, 20, 20); 
 				}
 			} 
 			
@@ -2907,8 +2909,137 @@ class VulkanWindow: Window
 			{
 				fragMode = getFragMode; 
 				fragTexHandle = getFragTexHandle; 
+			} 
+			/*
+				--------------------------------------------------------------
+					Cubic bezier approx distance 2 
+				--------------------------------------------------------------
+					Created by NinjaKoala in 2019-07-17
+					https://www.shadertoy.com/view/3lsSzS
+				--------------------------------------------------------------
+				
+				Copyright (c) <2024> <Felix Potthast>
+				Permission is hereby granted, free of charge, to any person obtaining a 
+				copy of this software and associated documentation files (the "Software"), 
+				to deal in the Software without restriction, including without limitation 
+				the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+				and/or sell copies of the Software, and to permit persons to whom the
+				Software is furnished to do so, subject to the following conditions:
+				
+				The above copyright notice and this permission notice shall be included 
+				in all copies or substantial portions of the Software.
+				
+				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
+				KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+				WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
+				PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
+				OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
+				OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
+				OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+			*/
+			
+			/*
+				See also:
+				
+				Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
+				Exact distance computation: https://www.shadertoy.com/view/4sKyzW
+				Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
+				This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
+			*/
+			
+			const int bezier_num_iterations=3; /*def:3*/
+			const int bezier_num_start_params=3; /*def:3*/
+			
+			const int bezier_method=0; /*valid range: [0..3]*/
+			
+			//factor should be positive
+			//it decreases the step size when lowered.
+			//Lowering the factor and increasing iterations increases the area in which
+			//the iteration converges, but this is quite costly
+			const float bezier_factor=1; /*def:1*/
+			
+			float newton_iteration(vec3 coeffs, float x)
+			{
+				float a2=coeffs[2]+x; 
+				float a1=coeffs[1]+x*a2; 
+				float f=coeffs[0]+x*a1; 
+				float f1=((x+a2)*x)+a1; 
+				
+				return x-f/f1; 
 			} 
 			
+			float halley_iteration(vec3 coeffs, float x)
+			{
+				float a2=coeffs[2]+x; 
+				float a1=coeffs[1]+x*a2; 
+				float f=coeffs[0]+x*a1; 
+				
+				float b2=a2+x; 
+				float f1=a1+x*b2; 
+				float f2=2.*(b2+x); 
+				return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
+			} 
+			
+			float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
+			{
+				if(method<=1)
+				{
+					//horner's method
+					vec2 a_2=a2+t*a3; 
+					vec2 a_1=a1+t*a_2; 
+					vec2 b_2=a_2+t*a3; 
+					
+					vec2 uv_to_p=a0+t*a_1; 
+					vec2 tang=a_1+t*b_2; 
+					float l_tang=dot(tang,tang); 
+					
+					if(method==0/*normal iteration*/)
+					{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
+					else if(method==1/*normal iteration2*/)
+					{
+						vec2 snd_drv=2.*(b_2+t*a3); 
+						
+						float fac=dot(tang,snd_drv)/(2.*l_tang); 
+						float d=-dot(tang,uv_to_p); 
+						float t2=d/(l_tang+fac*d); 
+						return t+bezier_factor*t2; 
+					}
+				}
+				else
+				{
+					vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
+					vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
+					
+					if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
+					else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
+				}
+				return 0; 
+			} 
+			
+			float cubic_bezier_dis_approx(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+			{
+				vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+				vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+				vec2 a1 = (-3. * p0 + 3. * p1); 
+				vec2 a0 = p0 - uv; 
+				
+				float d0 = 1e38, t0=0.; 
+				for(int i=0;i<bezier_num_start_params;i++)
+				{
+					float t=t0; 
+					for(int j=0;j<bezier_num_iterations;j++)
+					{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
+					t=clamp(t,0.,1.); 
+					vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
+					d0=min(d0,dot(uv_to_p,uv_to_p)); 
+					
+					t0+=1./float(bezier_num_start_params-1); 
+				}
+				
+				return sqrt(d0); 
+			} 
+			
 			vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 			{
 				if(texIdx==0) return vec4(1,1,1,1)/*no texture means full white*/; 
@@ -3134,6 +3265,9 @@ class VulkanWindow: Window
 					outColor.rgb += vec3(.25, .75, 0)*(2/length(fragFloats0.zw-objPos.xy)); 
 					outColor.rgb += vec3(0, .75, .25)*(2/length(fragFloats1.xy-objPos.xy)); 
 					outColor.rgb += vec3(0, 0, 1)*(2/length(fragFloats1.zw-objPos.xy)); 
+					
+					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
+					if(dst<20) outColor.rgb += .5; 
 				}
 			} 
 		})); 
