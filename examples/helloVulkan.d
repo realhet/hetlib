@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+///@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -127,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E35F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E45F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21475F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21725F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21485F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21735F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -1043,7 +1043,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x973B5F5C4644).檢 (zoomedPlatform)), ((0x97645F5C4644).檢 (shipPos)); 
+								((0x973C5F5C4644).檢 (zoomedPlatform)), ((0x97655F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1244,7 +1244,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xADA55F5C4644).檢((update間(_間)))); 
+				((0xADA65F5C4644).檢((update間(_間)))); 
 				
 				enum N = 1; 
 				__gshared Builder[N] builders; 
@@ -1273,11 +1273,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xB1795F5C4644).檢((update間(_間)))); 
+				((0xB17A5F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xB2105F5C4644).檢((update間(_間)))); 
+				((0xB2115F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1286,17 +1286,22 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						drawPath(
 							q{
 								M 10, 10 h 20 v 10 h 10 m 20 0 h 20
-								q 20,0 0,-20 q 20,0 0,20 t 20,0 t 0-20
-								s 20,0 0,-20 c 20,0 0,20 20,0 M 0,0 M 0,0
+								M 0,0 M 0,0 M 0,0 M 0,0
 							}
-							
+							/+
+								q{
+									M 10, 10 h 20 v 10 h 10 m 20 0 h 20
+									q 20,0 0,-20 q 20,0 0,20 t 20,0 t 0-20
+									s 20,0 0,-20 c 20,0 0,20 20,0 M 0,0 M 0,0 M 0,0
+								}
+							+/
 						); 
 					}
 					auto content = builder.extractGfxContent; 
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xB4045F5C4644).檢((update間(_間)))); 
+				((0xB4805F5C4644).檢((update間(_間)))); 
 			} 
 			
 			

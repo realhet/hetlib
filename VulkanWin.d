@@ -1962,7 +1962,7 @@ class VulkanWindow: Window
 			
 			//fragment attributes
 			
-			#define FragMode_default 0
+			#define FragMode_fullyFilled 0
 			#define FragMode_cubicBezier 1
 			
 			#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
@@ -2276,6 +2276,14 @@ class VulkanWindow: Window
 				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M1)) M1 = points[N/2] - sides[N/2]; 
 			} 
 			
+			void emitCubicBezierMidJoint(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
+			{
+				vec2 M0, M1; 
+				tesselateCubicBezierTentacle(P0, P1, P2, P3, r0, r1, M0, M1); 
+				fragTexCoordXY = vec2(.5, 0); emitVertex2D(M1); /*Todo: it's flipped... BAD!*/
+				fragTexCoordXY = vec2(.5, 1); emitVertex2D(M0); 
+			} 
+			
 			void testEmitCubicBezierTentacle(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
 			{
 				const int N = tesselateCubicBezierTentacle_N; 
@@ -2516,38 +2524,103 @@ class VulkanWindow: Window
 				P1 	= vec2(0),
 				P2 	= vec2(0),
 				P3	= vec2(0), 
-				P4 	= vec2(0); 	/*Position queue*/
+				P4 	= vec2(0),
+				P5 	= vec2(0); 	/*Position queue*/
 			
 			uint PathCodeQueue = 0; 
 			
-			#define PathCode_M 0
-			#define PathCode_L 1
-			#define PathCode_TG 2
-			#define PathCode_Q 3
-			#define PathCode_C 4
-			#define PathCode_P 5
+			/*nop*/	#define PathCode_none 0
+				
+			/*move to*/	#define PathCode_M 1
+			/*line to*/	#define PathCode_L 2
+			/*
+				tangent 
+				(for interrupted paths)
+			*/	#define PathCode_TG 3
+				
+			/*
+				quadratic bezier smoot point
+				(turns into Q1, no fetch)
+			*/	#define PathCode_T1 4
+			/*quadratic bezier control point*/	#define PathCode_Q1 5
+			/*quadratic bezier endpoint*/	#define PathCode_Q2 6
+				
+			/*
+				cubic bezier smoot point
+				(turns into C1, no fetch)
+			*/	#define PathCode_S1 5
+			/*cubic bezier control point*/	#define PathCode_C1 8
+			/*cubic bezier control point*/	#define PathCode_C2 9
+			/*cubic bezier endpoint*/	#define PathCode_C3 10
 			
-			#define PathCode_bits 3
+			#define PathCode_bits 4
 			
-			#define PathCode(idx) (PathCodeQueue.getBits(idx*PathCode_bits, PathCode_bits))
+			uint PathCode(int idx)
+			{ return getBits(PathCodeQueue, idx*PathCode_bits, PathCode_bits); } 
+			
+			bool PathCode_isSmooth(uint c)
+			{ return c==PathCode_T1 || c==PathCode_S1; } 
+			
+			bool PathCode_isControlPoint(uint c)
+			{
+				return c>=PathCode_T1 && c<=PathCode_Q1 ||
+				c>=PathCode_S1 && c<=PathCode_C2; 
+			} 
+			
+			uint PathCode_next(uint c)
+			{
+				if(PathCode_isSmooth(c)) c++; 
+				if(PathCode_isControlPoint(c)) c++; 
+				else c = PathCode_none; 
+				return c; 
+			} 
+			
+			
 			void shiftInPathCode(uint code)
 			{
-				PathCodeQueue <<= PathCode_bits; 
-				setBits(PathCodeQueue, 4*PathCode_bits, PathCode_bits, code); 
+				PathCodeQueue >>= PathCode_bits; 
+				setBits(PathCodeQueue, 5*PathCode_bits, PathCode_bits, code); 
 				
 				//debug
-				fragTexHandleAndMode = 0; 
-				switch(code)
+				if(false)
 				{
-					case PathCode_M: 	fragColor = vec4(1, 0, 0, 1); 	break; 
-					case PathCode_L: 	fragColor = vec4(0, 1, 0, 1); 	break; 
-					case PathCode_Q: 	fragColor = vec4(0, 1, 1, 1); 	break; 
-					case PathCode_C: 	fragColor = vec4(1, 1, 0, 1); 	break; 
-					case PathCode_P: 	fragColor = vec4(1, 1, 1, 1); 	break; 
-					case PathCode_TG: 	fragColor = vec4(1, 0.5, 1, 1); 	break; 
+					fragTexHandleAndMode = 0; 
+					switch(code)
+					{
+						case PathCode_M: 	fragColor = vec4(1, 0, 0, 1); 	break; 
+						case PathCode_L: 	fragColor = vec4(0, 1, 0, 1); 	break; 
+						case PathCode_TG: 	fragColor = vec4(1, 0.5, 1, 1); 	break; 
+						case PathCode_Q1: 	fragColor = vec4(0, 1, 1, 1); 	break; 
+						case PathCode_Q2: 	fragColor = vec4(0.5, 1, 1, 1); 	break; 
+						case PathCode_C1: 	fragColor = vec4(1, 1, 0, 1); 	break; 
+						case PathCode_C2: 	fragColor = vec4(1, 1, 0.3, 1); 	break; 
+						case PathCode_C3: 	fragColor = vec4(1, 1, 0.6, 1); 	break; 
+						
+					}
+					const float siz = 2; 
+					emitTexturedPointPointRect2D(P5-siz, P5+siz); 
 				}
-				const float siz = 2; 
-				emitTexturedPointPointRect2D(P4-siz, P4+siz); 
+				
+				//check patterns
+				const float r = 5; 
+				if(
+					PathCode(1)==PathCode_L ||
+					PathCode(2)==PathCode_L
+					/*straight line*/
+				)
+				{
+					setFragMode(FragMode_fullyFilled); fragColor = vec4(0, 1, 0, 1); 
+					emitLineJoint(
+						PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
+						P1, 
+						PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
+						r, r, r
+					); 
+				}
+				
+				
+				//Todo: make it continous, without EndPrimitive, just as it was intended.
+				//Todo: closing the final path via appending an empty PathCode_M
 			} 
 			
 			float 	Ph 	= 0, 
@@ -2648,11 +2721,11 @@ class VulkanWindow: Window
 				/*Opt: Do it all with a single fetchBits call*/
 			} 
 			
-			void fetchP(inout BitStream bitStream)
+			vec2 fetchP(inout BitStream bitStream)
 			{
 				//fetches absolute 2D point
 				const uint coordFmt = fetchBits(bitStream, $(EnumBits!CoordFormat)); 
-				P4.xy = vec2(
+				return vec2(
 					fetchCoord(bitStream, coordFmt), 
 					fetchCoord(bitStream, coordFmt)
 				); 
@@ -2680,21 +2753,17 @@ class VulkanWindow: Window
 				}
 			} 
 			
-			void latchP()
-			{ P0=P1, P1=P2, P2=P3, P3=P4; } 
+			void latchP(vec2 newP)
+			{ P0=P1, P1=P2, P2=P3, P3=P4, P4=P5, P5=newP; } 
 			
 			vec2 smoothMirror()
 			{
-				/*mirrors P2 over P3, so it can be assigned to P4*/
-				return P3*2 - P2; 
+				/*mirrors P3 over P4, so it can be assigned to P5*/
+				return P4*2 - P3; 
 			} 
 			
 			void drawMove(inout BitStream bitStream)
-			{
-				fetchP(bitStream); 
-				
-				latchP(); 
-			} 
+			{ latchP(fetchP(bitStream)); } 
 			
 			//Internal state for batch operations
 			uint pendingChars = 0; 
@@ -2711,16 +2780,14 @@ class VulkanWindow: Window
 			
 			void drawTexRect(inout BitStream bitStream)
 			{
-				fetchP(bitStream); 
+				drawMove(bitStream); 
 				
 				const uint handleFmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
 				const uint texHandle = fetchHandle(bitStream, handleFmt); 
 				
 				fragColor = PC; fragBkColor = SC; 
 				fragTexHandleAndMode = texHandle; 
-				emitTexturedPointPointRect2D(P3.xy, P4.xy); 
-				
-				latchP(); 
+				emitTexturedPointPointRect2D(P4.xy, P5.xy); 
 			} 
 			
 			void drawASCII(uint ch)
@@ -2733,17 +2800,19 @@ class VulkanWindow: Window
 				fragColor = PC; fragBkColor = SC; 
 				
 				fragTexHandleAndMode = FMH; 
-				emitTexturedPointPointRect2D(P3.xy, P3.xy+size); 
+				emitTexturedPointPointRect2D(P5.xy, P5.xy+size); 
 				
 				fragTexCoordZ = 0; //restore it
-				P4.x += size.x; //advance cursor
-				latchP(); 
+				latchP(P5 + vec2(size.x, 0)); //advance cursor
 			} 
 			
 			
+			uint pendingPathCode = 0; 
+			
 			void processInstruction(inout BitStream bitStream) 
 			{
-				if(pendingChars==0)
+				const bool canFetchInstr = pendingChars==0 && pendingPathCode==0; 
+				if(canFetchInstr)
 				{
 					const uint opcode = 
 					fetchBits(bitStream, 5); const bool mainCat = 
@@ -2809,36 +2878,23 @@ class VulkanWindow: Window
 						switch(subCat)
 						{
 							case 0: //SVG path 1
+							/*Opt: build a state machine from SVG PatCode stuff, so the it will require less gpu code and hopefully be faster.*/
 								switch(cmd)
 							{
 								case 0: 	/*Z: close path*/	/*Todo: close path*/break; 
-								case 1: 	/*M: move*/	{ latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_M); }	break; 
-								case 2: 	/*L: line*/	{ latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_L); }	break; 
-								case 3: 	/*T: smooth quadratic*/	{
-									latchP(); P4 = smoothMirror(); shiftInPathCode(PathCode_Q); 
-									latchP(); P4 = fetchXY(bitStream, P2); shiftInPathCode(PathCode_P); 
-								}	break; 
+								case 1: 	/*M: move*/	pendingPathCode = PathCode_M; 	break; 
+								case 2: 	/*L: line*/	pendingPathCode = PathCode_L; 	break; 
+								case 3: 	/*T: smooth quadratic*/	pendingPathCode = PathCode_T1; 	break; 
 							}
 							break; 
 							case 1: //SVG path 2
 								switch(cmd)
 							{
-								case 0: 	/*Q: quadratic*/	{
-									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_Q); 
-									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
-								}	break; 
-								case 1: 	/*S: smooth cubic*/	{
-									latchP(); P4 = smoothMirror(); shiftInPathCode(PathCode_C); 
-									latchP(); P4 = fetchXY(bitStream, P2); shiftInPathCode(PathCode_P); 
-									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
-								}	break; 
-								case 2: 	/*C: cubic*/	{
-									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_C); 
-									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
-									latchP(); P4 = fetchXY(bitStream, P3); shiftInPathCode(PathCode_P); 
-									/*Todo: cubic b-spline a letrehozva a harmadolos modszerrel.*/
-								}	break; 
+								case 0: 	/*Q: quadratic*/	pendingPathCode = PathCode_Q1; 	break; 
+								case 1: 	/*S: smooth cubic*/	pendingPathCode = PathCode_S1; 	break; 
+								case 2: 	/*C: cubic*/	pendingPathCode = PathCode_C1; 	break; 
 								case 3: 	/*A: arc*/	/*Todo: arc*/break; 
+								/*Todo: cubic b-spline a letrehozva a harmadolos modszerrel szerkesztett control pointokkal. */
 							}
 							break; 
 							case 2: 
@@ -2861,6 +2917,22 @@ class VulkanWindow: Window
 							break; 
 						}
 					}
+					
+					if(pendingPathCode!=0)
+					{
+						switch(pendingPathCode)
+						{
+							case PathCode_M: case PathCode_L: 	{
+								latchP(fetchXY(bitStream, P5)); 
+								shiftInPathCode(pendingPathCode); 
+								pendingPathCode = 0; 
+							}	break; 
+							
+							default: pendingPathCode = 0; 
+						}
+					}
+					
+					
 				}
 				
 				if(pendingChars>0)
@@ -2878,7 +2950,7 @@ class VulkanWindow: Window
 				fragFloats0 = vec4(1, 2, 3, 4); 
 				fragFloats1 = vec4(5, 6, 7, 8); 
 				
-				if(false)
+				if(true)
 				{
 					BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
 					while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
@@ -3920,6 +3992,33 @@ class VulkanWindow: Window
 				return res; 
 			} 
 			
+			vec4 readFilteredSample(bool enableMultisampling)
+			{
+				if(enableMultisampling)
+				{
+					const vec2[6] rooks6_offsets = 
+						{
+						vec2(-0.417, 0.250), vec2(-0.250, -0.417), vec2(-0.083, -0.083),
+						vec2(0.083, 0.083), vec2(0.250, 0.417), vec2(0.417, -0.250)
+					}; 
+					
+					vec4 sum = vec4(0); 
+					const vec2 texCoordDx = dFdx(fragTexCoordXY); 
+					const vec2 texCoordDy = dFdy(fragTexCoordXY); 
+					for(int i=0; i<6; i++)
+					{
+						vec2 rooks = rooks6_offsets[i]; 
+						vec2 tc = fragTexCoordXY + 	rooks.x * texCoordDx + 
+							rooks.y * texCoordDy; 
+						vec4 smp = readSample(fragTexHandle, vec3(tc, fragTexCoordZ), true, false); 
+						sum += smp; 
+					}
+					return sum/6; 
+				}
+				else
+				{ return readSample(fragTexHandle, vec3(fragTexCoordXY, fragTexCoordZ), true, false); }
+			} 
+			
 			void main() {
 				initFragmentParams(); 
 				
@@ -3930,27 +4029,16 @@ class VulkanWindow: Window
 				const vec4 clipPos = UB.inv_mvp * ndcPos; 
 				const vec3 objPos = clipPos.xyz / clipPos.w; 
 				
-				
-				const vec2[6] rooks6_offsets = 
-					{
-					vec2(-0.417, 0.250), vec2(-0.250, -0.417), vec2(-0.083, -0.083),
-					vec2(0.083, 0.083), vec2(0.250, 0.417), vec2(0.417, -0.250)
-				}; 
-				
-				vec4 sum = vec4(0); 
-				const vec2 texCoordDx = dFdx(fragTexCoordXY); 
-				const vec2 texCoordDy = dFdy(fragTexCoordXY); 
-				for(int i=0; i<6; i++)
+				if(fragMode==FragMode_cubicBezier)
 				{
-					vec2 rooks = rooks6_offsets[i]; 
-					vec2 tc = fragTexCoordXY + 	rooks.x * texCoordDx + 
-						rooks.y * texCoordDy; 
-					vec4 smp = readSample(fragTexHandle, vec3(tc, fragTexCoordZ), true, false); 
-					sum += smp; 
+					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
+					float t = fract(fragTexCoordXY.x); 
+					float r = mix(5, 5, t); //Todo: send radiuses into the pixel shader!
+					if(dst>r) discard; 
 				}
-				sum /= 6; 
 				
-				vec4 resultColor = mix(fragBkColor, vec4(sum.rgb, 1)*fragColor, sum.a); 
+				const vec4 filteredColor = readFilteredSample(true); 
+				vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
 				
 				if(fragMode==FragMode_cubicBezier)
 				{
@@ -4136,7 +4224,7 @@ class VulkanWindow: Window
 			
 			mixin(體!((VkPipelineRasterizationStateCreateInfo),q{
 				depthClampEnable 	: false,
-				rasterizerDiscardEnable 	: false,
+				rasterizerDiscardEnable 	: false/*This discards everything*/,
 				polygonMode 	: mixin(舉!((VK_POLYGON_MODE_),q{FILL})),
 				cullMode 	: mixin(舉!((VK_CULL_MODE_),q{BACK_BIT})),
 				frontFace 	: mixin(舉!((VK_FRONT_FACE_),q{COUNTER_CLOCKWISE})),
