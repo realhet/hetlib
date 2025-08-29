@@ -2139,8 +2139,8 @@ class VulkanWindow: Window
 			} 
 			
 			// Split at t = 0.33333333
-			void split_bezier_third(
-				vec2 P0, vec2 P1, vec2 P2, vec2 P3, 
+			void splitBezier_third(
+				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, 
 				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
 				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
 			)
@@ -2156,8 +2156,8 @@ class VulkanWindow: Window
 			} 
 			
 			// Split at t = 0.50000000
-			void split_bezier_half(
-				vec2 P0, vec2 P1, vec2 P2, vec2 P3,
+			void splitBezier_half(
+				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
 				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
 				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
 			)
@@ -2173,8 +2173,8 @@ class VulkanWindow: Window
 			} 
 			
 			// Split at t = 0.25000000
-			void split_bezier_quarter(
-				vec2 P0, vec2 P1, vec2 P2,	vec2 P3,
+			void splitBezier_quarter(
+				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
 				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
 				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
 			)
@@ -2188,6 +2188,49 @@ class VulkanWindow: Window
 				Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
 				R0 = c; R1 = d; R2 = e; R3 = P3; 
 			} 
+			
+			bool splitBezier_ration(
+				in int i, in int N, 
+				in vec2 Q0, in vec2 Q1, in vec2 Q2, in vec2 Q3,
+				out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+			)
+			{
+				bool valid = true; int requestHalfSplit=-1; 
+				if(N==1)
+				{ R0=Q0, R1=Q1, R2=Q2, R3=Q3; }
+				else if(N==2 || N==4)
+				{
+					vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
+					splitBezier_half(Q0,Q1,Q2,Q3, A0,A1,A2,A3, B0,B1,B2,B3); 
+					if((i&(N/2))==0)	R0=A0, R1=A1, R2=A2, R3=A3; 
+					else	R0=B0, R1=B1, R2=B2, R3=B3; 
+					if(N==4)
+					{ requestHalfSplit = i&1; }
+				}
+				else if(N==3)
+				{
+					vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
+					splitBezier_third(Q0,Q1,Q2,Q3, A0,A1,A2,A3, B0,B1,B2,B3); 
+					if(i==0) R0=A0, R1=A1, R2=A2, R3=A3; 
+					else {
+						R0=B0, R1=B1, R2=B2, R3=B3; 
+						requestHalfSplit = i-1; 
+					}
+				}
+				else { valid = false; }
+				
+				if(valid && requestHalfSplit>=0)
+				{
+					vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
+					splitBezier_half(R0,R1,R2,R3, A0,A1,A2,A3, B0,B1,B2,B3); 
+					if(requestHalfSplit==0)	R0=A0, R1=A1, R2=A2, R3=A3; 
+					else	R0=B0, R1=B1, R2=B2, R3=B3; 
+				}
+				
+				if(!valid) R0=Q0, R1=Q1, R2=Q2, R3=Q3; 
+				return valid; 
+			} 
+			
 			
 			float calcManhattanLength(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
 			{
@@ -2208,6 +2251,27 @@ class VulkanWindow: Window
 			
 			vec2 cubicBezierNormal2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
 			{ return rotate90(normalize(cubicBezierTangent2D(P0, P1, P2, P3, t))); } 
+			
+			void emitCubicBezierAt(
+				in float t, in 
+				vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, 
+				in float r0, in float r1
+			)
+			{
+				const vec2 	p = cubicBezierPoint2D(P0, P1, P2, P3, t),
+					n = cubicBezierNormal2D(P0, P1, P2, P3, t) * mix(r0, r1, t); 
+				fragTexCoordXY = vec2(t, 0); emitVertex2D(p-n); 
+				fragTexCoordXY = vec2(t, 1); emitVertex2D(p+n); 
+			} 
+			
+			void emitBezierAtStart(vec2 P0, in vec2 P1, in float r)
+			{
+				const vec2 	p = P0,
+					n = rotate90(normalize(P1-P0)) * r; 
+				fragTexCoordXY = vec2(0, 0); emitVertex2D(p-n); 
+				fragTexCoordXY = vec2(0, 1); emitVertex2D(p+n); 
+			} 
+			
 			
 			bool intersectSegs2D(in seg2 S0, in seg2 S1, out vec2 P)
 			{
@@ -2284,7 +2348,7 @@ class VulkanWindow: Window
 				fragTexCoordXY = vec2(.5, 1); emitVertex2D(M0); 
 			} 
 			
-			void testEmitCubicBezierTentacle(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
+			void debugEmitCubicBezierTentacle(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
 			{
 				const int N = tesselateCubicBezierTentacle_N; 
 				const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
@@ -2320,7 +2384,7 @@ class VulkanWindow: Window
 				EndPrimitive(); 
 			} 
 			
-			void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float W0, in float W1, in float W2)
+			void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float r0, in float r1, in float r2)
 			{
 				/*
 					P0-P1 and P1-P2 defines 2 line segments.
@@ -2354,7 +2418,7 @@ class VulkanWindow: Window
 				if(!hasPrev)
 				{
 					// Start cap - emit perpendicular offset
-					vec2 P = P1 - dirNext * (W1/2); vec2 capDir = perpNext * (W1/2); 
+					vec2 P = P1 - dirNext * (r1); vec2 capDir = perpNext * (r1); 
 					fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir ); 
 					fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
 					return; 
@@ -2363,7 +2427,7 @@ class VulkanWindow: Window
 				if(!hasNext)
 				{
 					// End cap - emit perpendicular offset
-					vec2 P = P1 + dirPrev * (W1/2); vec2 capDir = perpPrev * (W1/2); 
+					vec2 P = P1 + dirPrev * (r1); vec2 capDir = perpPrev * (r1); 
 					fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir); 
 					fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
 					EndPrimitive(); 
@@ -2372,18 +2436,18 @@ class VulkanWindow: Window
 				
 				fragTexCoordXY = vec2(0, 0); emitVertex2D(
 					lineIntersection(
-						P0 - perpPrev*(W0/2), 
-						P1 - perpPrev*(W1/2), 
-						P1 - perpNext*(W1/2), 
-						P2 - perpNext*(W2/2)
+						P0 - perpPrev*(r0), 
+						P1 - perpPrev*(r1), 
+						P1 - perpNext*(r1), 
+						P2 - perpNext*(r2)
 					)
 				); 
 				fragTexCoordXY = vec2(0, 1); emitVertex2D(
 					lineIntersection(
-						P0 + perpPrev*(W0/2), 
-						P1 + perpPrev*(W1/2), 
-						P1 + perpNext*(W1/2), 
-						P2 + perpNext*(W2/2)
+						P0 + perpPrev*(r0), 
+						P1 + perpPrev*(r1), 
+						P1 + perpNext*(r1), 
+						P2 + perpNext*(r2)
 					)
 				); 
 			} 
@@ -2519,151 +2583,22 @@ class VulkanWindow: Window
 			uint LFMH = 0; 	/* Latin font map handle */
 			uint PALH = 0; 	/* Palette handle */
 			uint LTH = 0; 	/* Line texture handle */
-				
-			vec2 	P0 	= vec2(0),
-				P1 	= vec2(0),
-				P2 	= vec2(0),
-				P3	= vec2(0), 
-				P4 	= vec2(0),
-				P5 	= vec2(0); 	/*Position queue*/
-			#define PathCodeQueue_lastIdx 5
 			
-			uint PathCodeQueue = 0; 
-			
-			
-			/*nop*/	#define PathCode_none 0
-				
-			/*move to*/	#define PathCode_M 1
-			/*
-				tangent 
-				(for interrupted paths)
-			*/	#define PathCode_TG 2
-			/*line to*/	#define PathCode_L 3
-			
-				
-			/*
-				quadratic bezier smoot point
-				(turns into Q1, no fetch)
-			*/	#define PathCode_T1 4
-			/*quadratic bezier control point*/	#define PathCode_Q1 5
-			/*quadratic bezier endpoint*/	#define PathCode_Q2 6
-				
-			/*
-				cubic bezier smoot point
-				(turns into C1, no fetch)
-			*/	#define PathCode_S1 7
-			/*cubic bezier control point*/	#define PathCode_C1 8
-			/*cubic bezier control point*/	#define PathCode_C2 9
-			/*cubic bezier endpoint*/	#define PathCode_C3 10
-			
-			#define PathCode_bits 4
-			
-			uint PathCode(int idx)
-			{ return getBits(PathCodeQueue, idx*PathCode_bits, PathCode_bits); } 
-			
-			/*S or T*/
-			bool PathCode_isSmooth(uint c)
-			{ return c==PathCode_T1 || c==PathCode_S1; } 
-			
-			/*internal bezier points and the last points of the curve*/
-			bool PathCode_isBezier(uint c)
-			{ return c>=PathCode_T1 && c<=PathCode_C3; } 
-			
-			/*only the internal bezier ponts*/
-			bool PathCode_isControlPoint(uint c)
-			{
-				return c>=PathCode_T1 && c<=PathCode_Q1 ||
-				c>=PathCode_S1 && c<=PathCode_C2; 
-			} 
-			
-			uint PathCode_next(uint c)
-			{
-				if(PathCode_isSmooth(c)) c++; 
-				if(PathCode_isControlPoint(c)) c++; 
-				else c = PathCode_none; 
-				return c; 
-			} 
-			
-			
-			void shiftInPathCode(uint code)
-			{
-				PathCodeQueue >>= PathCode_bits; 
-				setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
-				
-				//debug
-				if(false)
-				{
-					fragTexHandleAndMode = 0; fragColor = vec4(1,0,1,1); 
-					switch(code)
-					{
-						case PathCode_M: 	fragColor = vec4(1, 0, 0, 1); 	break; 
-						case PathCode_L: 	fragColor = vec4(0, 1, 0, 1); 	break; 
-						case PathCode_TG: 	fragColor = vec4(1, 0.5, 1, 1); 	break; 
-						case PathCode_Q1: 	fragColor = vec4(0, 1, 1, 1); 	break; 
-						case PathCode_Q2: 	fragColor = vec4(0.5, 1, 1, 1); 	break; 
-						case PathCode_C1: 	fragColor = vec4(1, 1, 0, 1); 	break; 
-						case PathCode_C2: 	fragColor = vec4(1, 1, 0.3, 1); 	break; 
-						case PathCode_C3: 	fragColor = vec4(1, 1, 0.6, 1); 	break; 
-					}
-					const float siz = 2; 
-					emitTexturedPointPointRect2D(P5-siz, P5+siz); 
-				}
-				
-				
-				if(true)
-				{
-					const float r = 5; 
-					if(
-						PathCode(1)>=PathCode_L ||
-						PathCode(2)>=PathCode_L
-						/*straight line*/
-					)
-					{
-						if(PathCode_isBezier(PathCode(2)))
-						{ setFragMode(FragMode_cubicBezier); }
-						else
-						{ setFragMode(FragMode_fullyFilled); }
-						
-						
-						if(true)
-						{
-							fragColor = vec4(0, 1, 0, 1); //lines are green
-							//detect 3 phase of Q
-							if(PathCode(2)==PathCode_Q1) { fragColor = vec4(1,0,0,1); setFragMode(FragMode_cubicBezier); }
-							if(PathCode(2)==PathCode_Q2) { fragColor = vec4(1,1,0,1); setFragMode(FragMode_cubicBezier); }
-							if(PathCode(1)==PathCode_Q2) { fragColor = vec4(1,1,1,1); }
-							
-							//detect 4 phase of C
-							if(PathCode(2)==PathCode_C1) { fragColor = vec4(0,0,1,1); setFragMode(FragMode_cubicBezier); }
-							if(PathCode(2)==PathCode_C2) { fragColor = vec4(0,.5,1,1); setFragMode(FragMode_cubicBezier); }
-							if(PathCode(2)==PathCode_C3) { fragColor = vec4(0,1,1,1); setFragMode(FragMode_cubicBezier); }
-							if(PathCode(1)==PathCode_C3) { fragColor = vec4(1,1,1,1); }
-						}
-						
-						emitLineJoint(
-							PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
-							P1, 
-							PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
-							r, r, r
-						); 
-					}
-				}
-				
-				//Todo: make it continous, without EndPrimitive, just as it was intended.
-				//Todo: closing the final path via appending an empty PathCode_M
-			} 
-			
-			float 	Ph 	= 0, 
-				Ph_next 	= 0; 	/* Phase coordinate */
-				
-			int runningCntr = 256; 	/*
-				Execution is enabled if it's greater than 0
-				After every step it's decremented.
-			*/
-			
 			$(TexFlags.GLSLCode)
 			$(FontFlags.GLSLCode)
 			$(VecFlags.GLSLCode)
+			
+			$(GEN_enumDefines!FlagFormat)
+			void setFlags(inout BitStream bitStream)
+			{
+				const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); 
+				
+				if(fmt==FlagFormat_all || fmt==FlagFormat_tex) TF = fetchBits(bitStream, $(FlagBits!TexFlags)); 
+				if(fmt==FlagFormat_all || fmt==FlagFormat_font) FF = fetchBits(bitStream, $(FlagBits!FontFlags)); 
+				if(fmt==FlagFormat_all || fmt==FlagFormat_vec) VF = fetchBits(bitStream, $(FlagBits!VecFlags)); 
+				/*Opt: Do it all with a single fetchBits call*/
+			} 
+			
 			
 			/* Helper functions for fetching different data formats */
 			$(GEN_enumDefines!ColorFormat)
@@ -2722,7 +2657,7 @@ class VulkanWindow: Window
 					default: return 0; 
 				}
 			} 
-			
+			
 			$(GEN_enumDefines!CoordFormat)
 			float fetchCoord(inout BitStream bitStream, uint format)
 			{
@@ -2737,18 +2672,6 @@ class VulkanWindow: Window
 				if(bits>0) return float(fetch_int(bitStream, bits)); 
 				return 0; 
 				/*Opt: Do it with single fetch*/
-			} 
-			
-			
-			$(GEN_enumDefines!FlagFormat)
-			void setFlags(inout BitStream bitStream)
-			{
-				const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); 
-				
-				if(fmt==FlagFormat_all || fmt==FlagFormat_tex) TF = fetchBits(bitStream, $(FlagBits!TexFlags)); 
-				if(fmt==FlagFormat_all || fmt==FlagFormat_font) FF = fetchBits(bitStream, $(FlagBits!FontFlags)); 
-				if(fmt==FlagFormat_all || fmt==FlagFormat_vec) VF = fetchBits(bitStream, $(FlagBits!VecFlags)); 
-				/*Opt: Do it all with a single fetchBits call*/
 			} 
 			
 			vec2 fetchP(inout BitStream bitStream)
@@ -2783,6 +2706,107 @@ class VulkanWindow: Window
 				}
 			} 
 			
+			
+			/*Position queue*/
+			
+			vec2 	P0 	= vec2(0),
+				P1 	= vec2(0),
+				P2 	= vec2(0),
+				P3	= vec2(0), 
+				P4 	= vec2(0),
+				P5 	= vec2(0); 
+			#define PathCodeQueue_lastIdx 5
+			
+			uint PathCodeQueue = 0; 
+			
+			/*nop*/	#define PathCode_none 0
+				
+			/*move to*/	#define PathCode_M 1
+			/*
+				tangent 
+				(for interrupted paths)
+			*/	#define PathCode_TG 2
+			/*line to*/	#define PathCode_L 3
+			
+				
+			/*
+				quadratic bezier smoot point
+				(turns into Q1, no fetch)
+			*/	#define PathCode_T1 4
+			/*quadratic bezier control point*/	#define PathCode_Q1 5
+			/*quadratic bezier endpoint*/	#define PathCode_Q2 6
+				
+			/*
+				cubic bezier smoot point
+				(turns into C1, no fetch)
+			*/	#define PathCode_S1 7
+			/*cubic bezier control point*/	#define PathCode_C1 8
+			/*cubic bezier control point*/	#define PathCode_C2 9
+			/*cubic bezier endpoint*/	#define PathCode_C3 10
+			
+			#define PathCode_bits 4
+			
+			uint PathCode(int idx)
+			{ return getBits(PathCodeQueue, idx*PathCode_bits, PathCode_bits); } 
+			
+			/*S or T*/
+			bool PathCode_isSmooth(uint c)
+			{ return c==PathCode_T1 || c==PathCode_S1; } 
+			
+			/*internal bezier points and the last points of the curve*/
+			bool PathCode_isBezier(uint c)
+			{ return c>=PathCode_T1 && c<=PathCode_C3; } 
+			
+			/*only the internal bezier ponts*/
+			bool PathCode_isControlPoint(uint c)
+			{
+				return c>=PathCode_T1 && c<=PathCode_Q1 ||
+				c>=PathCode_S1 && c<=PathCode_C2; 
+			} 
+			
+			uint PathCode_next(uint c)
+			{
+				if(PathCode_isSmooth(c)) c++; 
+				if(PathCode_isControlPoint(c)) c++; 
+				else c = PathCode_none; 
+				return c; 
+			} 
+			
+			vec4 PathCodeQueue_debugColor()
+			{
+				vec4 c = vec4(0, 1, 0, 1); //lines are green
+				//detect 3 phase of Q
+				if(PathCode(2)==PathCode_Q1) return vec4(1,0,0,1); 
+				if(PathCode(2)==PathCode_Q2) return vec4(1,1,0,1); 
+				if(PathCode(1)==PathCode_Q2) return vec4(1,1,.5,1); 
+				
+				//detect 4 phase of C
+				if(PathCode(2)==PathCode_C1) return vec4(0,0,1,1); 
+				if(PathCode(2)==PathCode_C2) return vec4(0,.5,1,1); 
+				if(PathCode(2)==PathCode_C3) return vec4(0,1,1,1); 
+				if(PathCode(1)==PathCode_C3) return vec4(.5,1,1,1); 
+				
+				return vec4(0, 1, 0, 1); //lines are green
+			} 
+			
+			void emitPathCodeDebugPoint(uint code)
+			{
+				setFragMode(FragMode_fullyFilled); fragColor = vec4(1,0,1,1); 
+				switch(code)
+				{
+					case PathCode_M: 	fragColor = vec4(.5,.5,.5,1); 	break; 
+					case PathCode_L: 	fragColor = vec4(0,1,0,1); 	break; 
+					case PathCode_TG: 	fragColor = vec4(1,.5,1,1); 	break; 
+					case PathCode_Q1: 	fragColor = vec4(1,0,0,1); 	break; 
+					case PathCode_Q2: 	fragColor = vec4(1,1,0,1); 	break; 
+					case PathCode_C1: 	fragColor = vec4(0,0,1,1); 	break; 
+					case PathCode_C2: 	fragColor = vec4(0,.5,1,1); 	break; 
+					case PathCode_C3: 	fragColor = vec4(0,1,1,1); 	break; 
+				}
+				const float siz = 2; 
+				emitTexturedPointPointRect2D(P5-siz, P5+siz); 
+			} 
+			
 			void latchP(vec2 newP)
 			{ P0=P1, P1=P2, P2=P3, P3=P4, P4=P5, P5=newP; } 
 			
@@ -2792,9 +2816,108 @@ class VulkanWindow: Window
 				return P4*2 - P3; 
 			} 
 			
+			
 			void drawMove(inout BitStream bitStream)
 			{ latchP(fetchP(bitStream)); } 
-			
+			
+			void setFragModeAndFloats(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
+			{
+				setFragMode(mode); 
+				fragFloats0.xy=P0, fragFloats0.zw=P1, fragFloats1.xy=P2, fragFloats1.zw=P3; 
+			} 
+			
+			void setFragMode_L(in uint mode, in vec2 P0, in vec2 P1)
+			{ setFragModeAndFloats(mode, P0, mix(P0, P1, 1/3.0), mix(P0, P1, 2/3.0), P1); } 
+			
+			void setFragMode_Q(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2)
+			{ setFragModeAndFloats(mode, P0, mix(P0, P1, 2/3.0), mix(P1, P2, 1/3.0), P2); } 
+			
+			void setFragMode_C(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
+			{ setFragModeAndFloats(mode, P0, P1, P2, P3); } 
+			
+			void shiftInPathCode(uint code)
+			{
+				PathCodeQueue >>= PathCode_bits; 
+				setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
+				
+				const bool 	debugPointsOnly 	= false
+				,	enableBezierShader 	= false
+				,	enableDebugColors 	= false; 
+				
+				if(debugPointsOnly)
+				{ emitPathCodeDebugPoint(code); }
+				else
+				{
+					const float r = 2.5; 
+					const uint PC1 = PathCode(1), PC2 = PathCode(2); 
+					
+					if(enableDebugColors)	fragColor = PathCodeQueue_debugColor(); 
+					else	fragColor = PC; 
+					
+					if(enableBezierShader)
+					{
+						switch(PC2)
+						{
+							case PathCode_L: 	setFragMode_L(FragMode_cubicBezier, P1, P2); 	break; 
+							case PathCode_Q1: 	setFragMode_Q(FragMode_cubicBezier, P1, P2, P3); 	break; 
+							case PathCode_C1: 	setFragMode_C(FragMode_cubicBezier, P1, P2, P3, P4); 	break; 
+							/*Todo: _line mode for rounded lines*/
+						}
+					}
+					else
+					{ setFragModeAndFloats(FragMode_fullyFilled, vec2(0), vec2(0), vec2(0), vec2(0)); }
+					
+					if(PC1>=PathCode_L || PC2>=PathCode_L /*any line or curve*/)
+					{
+						if(PC2==PathCode_Q2 || PC2==PathCode_C2 || PC2==PathCode_C3 /*any curve*/)
+						{
+							if(PC2!=PathCode_C3)
+							{
+								vec2 Q0,Q1,Q2,Q3; /*Q: cubic bezier params*/
+								if(PC2==PathCode_Q2)
+								Q0=P0, Q1=mix(P0, P1, 2/3.0), Q2=mix(P1, P2, 1/3.0), Q3=P2; 
+								else
+								Q0=P0, Q1=P1, Q2=P2, Q3=P3; 
+								
+								if(enableBezierShader)
+								{
+									int N = PC2==PathCode_Q2 ? 3 : 4; 
+									for(int i=0; i<N; i++)
+									{
+										vec2 R0,R1,R2,R3; 
+										if(splitBezier_ration(i, N, Q0,Q1,Q2,Q3, R0,R1,R2,R3))
+										{
+											//setFragMode_C(FragMode_cubicBezier, R0, R1, R2, R3); 
+											if(i>0) emitBezierAtStart(R0, R1, r); 
+											emitCubicBezierMidJoint(R0, R1, R2, R3, r, r); 
+										}
+									}
+								}
+								else
+								{
+									const int N = PC2==PathCode_Q2 ? 8 : 12; 
+									const float invN = 1.0/N; 
+									for(int i=1; i<N; i++)
+									emitCubicBezierAt(i*invN, Q0, Q1, Q2, Q3, r, r); 
+								}
+							}
+						}
+						else
+						{
+							emitLineJoint(
+								PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
+								P1, 
+								PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
+								r, r, r
+							); 
+						}
+					}
+				}
+				
+				//Todo: automatically close the final path via appending an empty PathCode_M
+			} 
+			
+			
 			//Internal state for batch operations
 			uint pendingChars = 0; 
 			bool repeated; 
@@ -2837,6 +2960,14 @@ class VulkanWindow: Window
 			} 
 			
 			
+			float 	Ph 	= 0, 
+				Ph_next 	= 0; 	/* Phase coordinate */
+				
+			int runningCntr = 256; 	/*
+				Execution is enabled if it's greater than 0
+				After every step it's decremented.
+			*/
+			
 			uint pendingPathCode = 0; 
 			
 			void processInstruction(inout BitStream bitStream) 
@@ -3007,7 +3138,7 @@ class VulkanWindow: Window
 					
 					fragFloats0.xy = P0; fragFloats0.zw = P1; fragFloats1.xy = P2; fragFloats1.zw = P3; 
 					
-					testEmitCubicBezierTentacle(P0, P1, P2, P3, 20, 50); 
+					debugEmitCubicBezierTentacle(P0, P1, P2, P3, 20, 50); 
 				}
 			} 
 			
@@ -3015,8 +3146,6 @@ class VulkanWindow: Window
 			
 			$(ShaderBufferDeclarations)
 			$(TexSizeFormat.GLSLCode)
-			
-			layout(location = 8) in vec3 inPosition; 
 			
 			uint fragMode, fragTexHandle; 
 			
@@ -4060,11 +4189,11 @@ class VulkanWindow: Window
 				const vec4 clipPos = UB.inv_mvp * ndcPos; 
 				const vec3 objPos = clipPos.xyz / clipPos.w; 
 				
-				if(false && (fragMode==FragMode_cubicBezier))
+				if((true && fragMode==FragMode_cubicBezier))
 				{
 					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
 					float t = fract(fragTexCoordXY.x); 
-					float r = mix(5, 5, t); //Todo: send radiuses into the pixel shader!
+					float r = 2.5; //Todo: send radiuses into the pixel shader!
 					if(dst>r) discard; 
 				}
 				
@@ -4457,7 +4586,7 @@ class VulkanWindow: Window
 							
 							// Set up view
 							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*0.5f; 
-							const zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
+							float zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
 							auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 							
 							// Set up projection
