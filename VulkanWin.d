@@ -2526,17 +2526,20 @@ class VulkanWindow: Window
 				P3	= vec2(0), 
 				P4 	= vec2(0),
 				P5 	= vec2(0); 	/*Position queue*/
+			#define PathCodeQueue_lastIdx 5
 			
 			uint PathCodeQueue = 0; 
+			
 			
 			/*nop*/	#define PathCode_none 0
 				
 			/*move to*/	#define PathCode_M 1
-			/*line to*/	#define PathCode_L 2
 			/*
 				tangent 
 				(for interrupted paths)
-			*/	#define PathCode_TG 3
+			*/	#define PathCode_TG 2
+			/*line to*/	#define PathCode_L 3
+			
 				
 			/*
 				quadratic bezier smoot point
@@ -2548,7 +2551,7 @@ class VulkanWindow: Window
 			/*
 				cubic bezier smoot point
 				(turns into C1, no fetch)
-			*/	#define PathCode_S1 5
+			*/	#define PathCode_S1 7
 			/*cubic bezier control point*/	#define PathCode_C1 8
 			/*cubic bezier control point*/	#define PathCode_C2 9
 			/*cubic bezier endpoint*/	#define PathCode_C3 10
@@ -2558,9 +2561,15 @@ class VulkanWindow: Window
 			uint PathCode(int idx)
 			{ return getBits(PathCodeQueue, idx*PathCode_bits, PathCode_bits); } 
 			
+			/*S or T*/
 			bool PathCode_isSmooth(uint c)
 			{ return c==PathCode_T1 || c==PathCode_S1; } 
 			
+			/*internal bezier points and the last points of the curve*/
+			bool PathCode_isBezier(uint c)
+			{ return c>=PathCode_T1 && c<=PathCode_C3; } 
+			
+			/*only the internal bezier ponts*/
 			bool PathCode_isControlPoint(uint c)
 			{
 				return c>=PathCode_T1 && c<=PathCode_Q1 ||
@@ -2579,12 +2588,12 @@ class VulkanWindow: Window
 			void shiftInPathCode(uint code)
 			{
 				PathCodeQueue >>= PathCode_bits; 
-				setBits(PathCodeQueue, 5*PathCode_bits, PathCode_bits, code); 
+				setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
 				
 				//debug
 				if(false)
 				{
-					fragTexHandleAndMode = 0; 
+					fragTexHandleAndMode = 0; fragColor = vec4(1,0,1,1); 
 					switch(code)
 					{
 						case PathCode_M: 	fragColor = vec4(1, 0, 0, 1); 	break; 
@@ -2595,29 +2604,50 @@ class VulkanWindow: Window
 						case PathCode_C1: 	fragColor = vec4(1, 1, 0, 1); 	break; 
 						case PathCode_C2: 	fragColor = vec4(1, 1, 0.3, 1); 	break; 
 						case PathCode_C3: 	fragColor = vec4(1, 1, 0.6, 1); 	break; 
-						
 					}
 					const float siz = 2; 
 					emitTexturedPointPointRect2D(P5-siz, P5+siz); 
 				}
 				
-				//check patterns
-				const float r = 5; 
-				if(
-					PathCode(1)==PathCode_L ||
-					PathCode(2)==PathCode_L
-					/*straight line*/
-				)
-				{
-					setFragMode(FragMode_fullyFilled); fragColor = vec4(0, 1, 0, 1); 
-					emitLineJoint(
-						PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
-						P1, 
-						PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
-						r, r, r
-					); 
-				}
 				
+				if(true)
+				{
+					const float r = 5; 
+					if(
+						PathCode(1)>=PathCode_L ||
+						PathCode(2)>=PathCode_L
+						/*straight line*/
+					)
+					{
+						if(PathCode_isBezier(PathCode(2)))
+						{ setFragMode(FragMode_cubicBezier); }
+						else
+						{ setFragMode(FragMode_fullyFilled); }
+						
+						
+						if(true)
+						{
+							fragColor = vec4(0, 1, 0, 1); //lines are green
+							//detect 3 phase of Q
+							if(PathCode(2)==PathCode_Q1) { fragColor = vec4(1,0,0,1); setFragMode(FragMode_cubicBezier); }
+							if(PathCode(2)==PathCode_Q2) { fragColor = vec4(1,1,0,1); setFragMode(FragMode_cubicBezier); }
+							if(PathCode(1)==PathCode_Q2) { fragColor = vec4(1,1,1,1); }
+							
+							//detect 4 phase of C
+							if(PathCode(2)==PathCode_C1) { fragColor = vec4(0,0,1,1); setFragMode(FragMode_cubicBezier); }
+							if(PathCode(2)==PathCode_C2) { fragColor = vec4(0,.5,1,1); setFragMode(FragMode_cubicBezier); }
+							if(PathCode(2)==PathCode_C3) { fragColor = vec4(0,1,1,1); setFragMode(FragMode_cubicBezier); }
+							if(PathCode(1)==PathCode_C3) { fragColor = vec4(1,1,1,1); }
+						}
+						
+						emitLineJoint(
+							PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
+							P1, 
+							PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
+							r, r, r
+						); 
+					}
+				}
 				
 				//Todo: make it continous, without EndPrimitive, just as it was intended.
 				//Todo: closing the final path via appending an empty PathCode_M
@@ -2812,6 +2842,7 @@ class VulkanWindow: Window
 			void processInstruction(inout BitStream bitStream) 
 			{
 				const bool canFetchInstr = pendingChars==0 && pendingPathCode==0; 
+				
 				if(canFetchInstr)
 				{
 					const uint opcode = 
@@ -2819,7 +2850,6 @@ class VulkanWindow: Window
 					getBit(opcode, 0); const uint subCat = 
 					getBits(opcode, 1, 2); const uint cmd = 
 					getBits(opcode, 3, 2); 
-					
 					if(
 						!mainCat //settings
 					)
@@ -2917,22 +2947,23 @@ class VulkanWindow: Window
 							break; 
 						}
 					}
-					
-					if(pendingPathCode!=0)
+				}
+				
+				if(pendingPathCode>0)
+				{
+					switch(pendingPathCode)
 					{
-						switch(pendingPathCode)
-						{
-							case PathCode_M: case PathCode_L: 	{
-								latchP(fetchXY(bitStream, P5)); 
-								shiftInPathCode(pendingPathCode); 
-								pendingPathCode = 0; 
-							}	break; 
-							
-							default: pendingPathCode = 0; 
-						}
+						case PathCode_M: case PathCode_L: 
+						case PathCode_Q1: case PathCode_Q2: 
+						case PathCode_C1: case PathCode_C2: case PathCode_C3: 
+							{
+							latchP(fetchXY(bitStream, P5)); 
+							shiftInPathCode(pendingPathCode); 
+							pendingPathCode = PathCode_next(pendingPathCode); 
+						}	break; 
+						
+						default: pendingPathCode = 0; 
 					}
-					
-					
 				}
 				
 				if(pendingChars>0)
@@ -2965,7 +2996,7 @@ class VulkanWindow: Window
 					emitLineJoint(vec2(10, 10), vec2(320, 200), vec2(10, 200), 5, 15, 15); 
 					emitLineJoint(vec2(320, 200), vec2(10, 200), vec2(nan), 15, 15, 15); 
 				}
-				if(true)
+				if(false)
 				{
 					setFragMode(FragMode_cubicBezier); 
 					fragColor = vec4(0, 1, 1, 1); 
@@ -4029,7 +4060,7 @@ class VulkanWindow: Window
 				const vec4 clipPos = UB.inv_mvp * ndcPos; 
 				const vec3 objPos = clipPos.xyz / clipPos.w; 
 				
-				if(fragMode==FragMode_cubicBezier)
+				if(false && (fragMode==FragMode_cubicBezier))
 				{
 					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
 					float t = fract(fragTexCoordXY.x); 
@@ -4040,7 +4071,9 @@ class VulkanWindow: Window
 				const vec4 filteredColor = readFilteredSample(true); 
 				vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
 				
-				if(fragMode==FragMode_cubicBezier)
+				if(fragMode==FragMode_cubicBezier) resultColor = vec4(1, 0, 1, 1); 
+				
+				if(false && (fragMode==FragMode_cubicBezier))
 				{
 					resultColor.rgb = vec3(.2); 
 					

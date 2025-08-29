@@ -1255,6 +1255,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					auto builder = builders[sy]; 
 					builder.reset; 
 					
+					if(1)
 					foreach(sx; N.iota)
 					{
 						const base = ivec2(40+8, 25+8)*ivec2(sx, sy); 
@@ -1273,21 +1274,29 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xB17A5F5C4644).檢((update間(_間)))); 
+				((0xB1865F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xB2115F5C4644).檢((update間(_間)))); 
+				((0xB21D5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
 					{
 						//builder.drawSprite(vec2(0), 0, 3, false); 
 						drawPath(
+							
 							q{
-								M 10, 10 h 20 v 10 h 10 m 20 0 h 20
+								M 10,10 h.01 m 10 h 10 m 10 h 10 h 10 m 10 h 10 h 10 h 10
+								M 10,20 h 10 v 10 h-10 v-10 m 10 m 10
+								M 10,40 l10,10 q 30,0 0,30 h 10
+								M 10,80 l10,10 c 20,0 10,10 0, 20 h 10
+								
+								
 								M 0,0 M 0,0 M 0,0 M 0,0
 							}
+							
+							
 							/+
 								q{
 									M 10, 10 h 20 v 10 h 10 m 20 0 h 20
@@ -1301,7 +1310,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xB4805F5C4644).檢((update間(_間)))); 
+				((0xB5595F5C4644).檢((update間(_間)))); 
 			} 
 			
 			
