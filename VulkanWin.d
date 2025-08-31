@@ -154,10 +154,12 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		T data; 
 		size_t bitCnt; 
 		
+		///'other' is casted to T
+		///There is NO bit range/overflow checking!!!
 		auto opBinary(string op : "~", B)(B other) const
 		{
 			static if(is(B==Bits!T2, T2))
-			return Bits!T(data | (other.data<<bitCnt), bitCnt+other.bitCnt); 
+			return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
 			else
 			return this ~ bits(other); 
 		} 
@@ -182,6 +184,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	
 	auto assemble(A...)(A args)
 	{
+		//Todo: overflow check!
 		Bits!ulong res; 
 		static foreach(i, a; args)
 		{
@@ -192,6 +195,25 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		}
 		return res; 
 	} 
+	
+	/+
+		Bug: Without extra assemble() y value is wrapped above 256!!!
+		/+
+			Code: auto aaa = [
+				assemble(
+					mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits(256, 16), 
+						bits(256, 16)
+				),
+				assemble(
+					mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), assemble(
+						bits(256, 16), 
+						bits(256, 16)
+					)
+				)
+			]; 
+			if(aaa[0]!=aaa[1]) LOG(aaa); 
+		+/
+	+/
 	
 	/+
 		General rules of enums:
@@ -919,7 +941,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x6A4F82886ADB).檢(buffer.appendPos)); 
+				((0x6C8782886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -978,7 +1000,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x713E82886ADB).檢(buffer.appendPos)); 
+				((0x737682886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 			} 
 			
@@ -2310,7 +2332,7 @@ class VulkanWindow: Window
 				}
 			} 
 			
-			void tesselateCubicBezierTentacle(
+			void calcCubicBezierMidPoints(
 				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1,
 				out vec2 M0, out vec2 M1
 			)
@@ -2336,53 +2358,18 @@ class VulkanWindow: Window
 					tesselateCubicBezierTentacle_updateRay(rayLeftBack  , i, points[k] - sides[k], true, maxRayLen); 
 				}
 				
-				if(!intersectSegs2D(rayRightFwd, rayRightBack, M0)) M0 = points[N/2] + sides[N/2]; 
-				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M1)) M1 = points[N/2] - sides[N/2]; 
+				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M0)) M0 = points[N/2] - sides[N/2]; 
+				if(!intersectSegs2D(rayRightFwd, rayRightBack, M1)) M1 = points[N/2] + sides[N/2]; 
 			} 
 			
 			void emitCubicBezierMidJoint(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
 			{
 				vec2 M0, M1; 
-				tesselateCubicBezierTentacle(P0, P1, P2, P3, r0, r1, M0, M1); 
-				fragTexCoordXY = vec2(.5, 0); emitVertex2D(M1); /*Todo: it's flipped... BAD!*/
-				fragTexCoordXY = vec2(.5, 1); emitVertex2D(M0); 
+				calcCubicBezierMidPoints(P0, P1, P2, P3, r0, r1, M0, M1); 
+				fragTexCoordXY = vec2(.5, 0); emitVertex2D(M0); 
+				fragTexCoordXY = vec2(.5, 1); emitVertex2D(M1); 
 			} 
 			
-			void debugEmitCubicBezierTentacle(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
-			{
-				const int N = tesselateCubicBezierTentacle_N; 
-				const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
-				
-				vec2[N] points, sides; 
-				for(int i=0; i<N; i++)
-				{
-					points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
-					sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
-				}
-				
-				const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
-				seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
-				for(int i=0; i<N-2; i++)
-				{
-					int k = N-1-i; 
-					tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
-					tesselateCubicBezierTentacle_updateRay(rayRightBack, i, points[k] + sides[k], false, maxRayLen); 
-					tesselateCubicBezierTentacle_updateRay(rayLeftFwd  , i, points[i] - sides[i], false, maxRayLen); 
-					tesselateCubicBezierTentacle_updateRay(rayLeftBack  , i, points[k] - sides[k], true, maxRayLen); 
-				}
-				
-				vec2 M0, M1; 
-				if(!intersectSegs2D(rayRightFwd, rayRightBack, M0)) M0 = points[N/2] + sides[N/2]; 
-				if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M1)) M1 = points[N/2] - sides[N/2]; 
-				
-				fragTexCoordXY = vec2(0, 1); emitVertex2D(rayLeftFwd.p[0]); 
-				fragTexCoordXY = vec2(0, 0); emitVertex2D(rayRightFwd.p[0]); 
-				fragTexCoordXY = vec2(.5, 1); emitVertex2D(M1); 
-				fragTexCoordXY = vec2(.5, 0); emitVertex2D(M0); 
-				fragTexCoordXY = vec2(1, 1); emitVertex2D(rayLeftBack.p[0]); 
-				fragTexCoordXY = vec2(1, 0); emitVertex2D(rayRightBack.p[0]); 
-				EndPrimitive(); 
-			} 
 			
 			void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float r0, in float r1, in float r2)
 			{
@@ -2709,13 +2696,12 @@ class VulkanWindow: Window
 			
 			/*Position queue*/
 			
-			vec2 	P0 	= vec2(0),
-				P1 	= vec2(0),
-				P2 	= vec2(0),
-				P3	= vec2(0), 
-				P4 	= vec2(0),
-				P5 	= vec2(0); 
-			#define PathCodeQueue_lastIdx 5
+			vec2 	P0 	= vec2(0)
+			,	P1 	= vec2(0)
+			,	P2 	= vec2(0)
+			,	P3	= vec2(0)
+			,	P4 	= vec2(0); 
+			#define PathCodeQueue_lastIdx 4
 			
 			uint PathCodeQueue = 0; 
 			
@@ -2804,22 +2790,19 @@ class VulkanWindow: Window
 					case PathCode_C3: 	fragColor = vec4(0,1,1,1); 	break; 
 				}
 				const float siz = 2; 
-				emitTexturedPointPointRect2D(P5-siz, P5+siz); 
+				emitTexturedPointPointRect2D(P4-siz, P4+siz); 
 			} 
 			
 			void latchP(vec2 newP)
-			{ P0=P1, P1=P2, P2=P3, P3=P4, P4=P5, P5=newP; } 
+			{ P0=P1, P1=P2, P2=P3, P3=P4, P4=newP; } 
 			
 			vec2 smoothMirror()
 			{
-				/*mirrors P3 over P4, so it can be assigned to P5*/
-				return P4*2 - P3; 
+				/*mirrors P2 over P3, so it can be assigned to P4*/
+				return P3*2 - P2; 
 			} 
 			
 			
-			void drawMove(inout BitStream bitStream)
-			{ latchP(fetchP(bitStream)); } 
-			
 			void setFragModeAndFloats(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
 			{
 				setFragMode(mode); 
@@ -2841,7 +2824,7 @@ class VulkanWindow: Window
 				setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
 				
 				const bool 	debugPointsOnly 	= false
-				,	enableBezierShader 	= false
+				,	enableBezierShader 	= true
 				,	enableDebugColors 	= false; 
 				
 				if(debugPointsOnly)
@@ -2923,6 +2906,8 @@ class VulkanWindow: Window
 			bool repeated; 
 			uint repeatedChar; 
 			//Opt: put all this information into one uint!
+			void drawMove(inout BitStream bitStream)
+			{ latchP(fetchP(bitStream)); } 
 			
 			void drawChars(inout BitStream bitStream, bool repeated_)
 			{
@@ -2940,7 +2925,7 @@ class VulkanWindow: Window
 				
 				fragColor = PC; fragBkColor = SC; 
 				fragTexHandleAndMode = texHandle; 
-				emitTexturedPointPointRect2D(P4.xy, P5.xy); 
+				emitTexturedPointPointRect2D(P3.xy, P4.xy); 
 			} 
 			
 			void drawASCII(uint ch)
@@ -2953,10 +2938,10 @@ class VulkanWindow: Window
 				fragColor = PC; fragBkColor = SC; 
 				
 				fragTexHandleAndMode = FMH; 
-				emitTexturedPointPointRect2D(P5.xy, P5.xy+size); 
+				emitTexturedPointPointRect2D(P4.xy, P4.xy+size); 
 				
 				fragTexCoordZ = 0; //restore it
-				latchP(P5 + vec2(size.x, 0)); //advance cursor
+				latchP(P4 + vec2(size.x, 0)); //advance cursor
 			} 
 			
 			
@@ -3088,7 +3073,7 @@ class VulkanWindow: Window
 						case PathCode_Q1: case PathCode_Q2: 
 						case PathCode_C1: case PathCode_C2: case PathCode_C3: 
 							{
-							latchP(fetchXY(bitStream, P5)); 
+							latchP(fetchXY(bitStream, P4)); 
 							shiftInPathCode(pendingPathCode); 
 							pendingPathCode = PathCode_next(pendingPathCode); 
 						}	break; 
@@ -3117,28 +3102,6 @@ class VulkanWindow: Window
 					BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
 					while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
 					{ processInstruction(GS); runningCntr--; }
-				}
-				
-				//debug
-				fragColor = vec4(0.5, 1, 1, .5); fragBkColor = vec4(0); 
-				if(false)
-				{
-					emitLineJoint(vec2(nan), vec2(10, 10), vec2(320, 200), 5, 5, 15); 
-					emitLineJoint(vec2(10, 10), vec2(320, 200), vec2(10, 200), 5, 15, 15); 
-					emitLineJoint(vec2(320, 200), vec2(10, 200), vec2(nan), 15, 15, 15); 
-				}
-				if(false)
-				{
-					setFragMode(FragMode_cubicBezier); 
-					fragColor = vec4(0, 1, 1, 1); 
-					vec2 P0 = vec2(50, 50), P1 = vec2(150, 50), P2 = vec2(200, 60), P3 = vec2(250, 150); 
-					
-					float sc = 1.6; 
-					P0*=sc; P1*=sc; P2*=sc; P3*=sc; 
-					
-					fragFloats0.xy = P0; fragFloats0.zw = P1; fragFloats1.xy = P2; fragFloats1.zw = P3; 
-					
-					debugEmitCubicBezierTentacle(P0, P1, P2, P3, 20, 50); 
 				}
 			} 
 			
@@ -4189,7 +4152,7 @@ class VulkanWindow: Window
 				const vec4 clipPos = UB.inv_mvp * ndcPos; 
 				const vec3 objPos = clipPos.xyz / clipPos.w; 
 				
-				if((true && fragMode==FragMode_cubicBezier))
+				if((fragMode==FragMode_cubicBezier))
 				{
 					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
 					float t = fract(fragTexCoordXY.x); 
@@ -4199,29 +4162,6 @@ class VulkanWindow: Window
 				
 				const vec4 filteredColor = readFilteredSample(true); 
 				vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
-				
-				if(fragMode==FragMode_cubicBezier) resultColor = vec4(1, 0, 1, 1); 
-				
-				if(false && (fragMode==FragMode_cubicBezier))
-				{
-					resultColor.rgb = vec3(.2); 
-					
-						resultColor.rgb += vec3(1, 0, 0)*(2/length(fragFloats0.xy-objPos.xy)); 
-						resultColor.rgb += vec3(.25, .75, 0)*(2/length(fragFloats0.zw-objPos.xy)); 
-						resultColor.rgb += vec3(0, .75, .25)*(2/length(fragFloats1.xy-objPos.xy)); 
-						resultColor.rgb += vec3(0, 0, 1)*(2/length(fragFloats1.zw-objPos.xy)); 
-					
-					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
-					//float dst = quadratic_bezier_dis_approx(objPos.xy, fragFloats0.xy, lineIntersection(fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw), fragFloats1.zw); 
-					
-					float r; 
-					{
-						float t = fragTexCoordXY.x; 
-						r = mix(20, 50, t); 
-					}
-					
-					if(dst<r) resultColor.rgb += .5; 
-				}
 				
 				outColor = resultColor; 
 			} 
@@ -4587,6 +4527,7 @@ class VulkanWindow: Window
 							// Set up view
 							const side = vec2(1, 0).rotate(QPS.value(10*second).fract*π*2)*vec2(80, 40)*0.5f; 
 							float zoomanim = (0.71f+0.7f*sin((float(QPS.value(19*second))).fract*π*2))*0+1; 
+							zoomanim *=2; 
 							auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 							
 							// Set up projection

@@ -385,7 +385,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				this(ivec2 size, string bin)
 				{
-					enforce(size.x>0 && size.y>0 && size.x%8==0); 
+					enforce(size.x>0 && size.y>0); 
 					this.size = size; 
 					auto img = bin.deserializeImage!ubyte; 
 					length = img.height/size.y; 
@@ -1043,7 +1043,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x973C5F5C4644).檢 (zoomedPlatform)), ((0x97655F5C4644).檢 (shipPos)); 
+								((0x972D5F5C4644).檢 (zoomedPlatform)), ((0x97565F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1244,7 +1244,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xADA65F5C4644).檢((update間(_間)))); 
+				((0xAD975F5C4644).檢((update間(_間)))); 
 				
 				enum N = 1; 
 				__gshared Builder[N] builders; 
@@ -1274,11 +1274,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xB1865F5C4644).檢((update間(_間)))); 
+				((0xB1775F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xB21D5F5C4644).檢((update間(_間)))); 
+				((0xB20E5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1310,7 +1310,185 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xB5595F5C4644).檢((update間(_間)))); 
+				((0xB54A5F5C4644).檢((update間(_間)))); 
+				
+				__gshared BitmapArray vgaFont; 
+				if(!vgaFont)
+				{
+					const origFile = File(i`c:\dl\vga-rom-fonts-ag869x16.webp`.text); 
+					auto img = origFile.read(true).deserializeImage!ubyte; 
+					const charSize = img.size/16; 
+					const generate9thPixel = !!origFile.name.isWild("*ag869x*"); 
+					const realCharSize = charSize + ivec2(generate9thPixel, 0); 
+					
+					ubyte[] res; 
+					foreach(cy; 0..16)
+					foreach(cx; 0..16)
+					foreach(y; 0..charSize.y)
+					{
+						res ~= img[cx*8..(cx+1)*8, cy*charSize.y+y].asArray; 
+						if(generate9thPixel)
+						res ~= ((cy==0xC || cy==0xD)?(res.back):(0)); 
+					}
+					
+					img = image2D(realCharSize.x, realCharSize.y*256, res); 
+					
+					const modifiedFile = origFile.otherExt(".fontMap.webp"); 
+					img.serializeImage("webp quality=999").saveTo(modifiedFile); 
+					
+					vgaFont = new BitmapArray
+					(realCharSize, (cast(string)(modifiedFile.read(true)))); 
+				}
+				
+				class EgaBuilder
+				{
+					Builder _builder; 
+					
+					int fgbk=7; ivec2 textPos; 
+					
+					this()
+					{ _builder = new Builder; } 
+					
+					auto extractGfxContent()
+					=> _builder.extractGfxContent; 
+					
+					enum Colors
+					{
+						/+Note: 0+/	black,
+						/+Note: 1+/	blue,
+						/+Note: 2+/	green,
+						/+Note: 3+/	cyan,
+						/+Note: 4+/	red,
+						/+Note: 5+/	magenta,
+						/+Note: 6+/	brown,
+						/+Note: 7+/	ltGray,
+						/+Note:  8+/	dkGray,
+						/+Note:  9+/	ltBlue,
+						/+Note: 10+/ /+Note: 0xA+/	ltGreen,
+						/+Note: 11+/ /+Note: 0xB+/	ltCyan,
+						/+Note: 12+/ /+Note: 0xC+/	ltRed,
+						/+Note: 13+/ /+Note: 0xD+/	ltMagenta,
+						/+Note: 14+/ /+Note: 0xE+/	yellow,
+						/+Note: 15+/ /+Note: 0xF+/	white,
+					} 
+					
+					void Text(A)(A r)
+					{
+						alias font = vgaFont; 
+						foreach(ch; r.text)
+						{
+							_builder.begin; 
+							_builder.emit(
+								assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(egaPalette.handle))),
+								assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
+								assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), bits(font.size.y, 8)),
+								assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), bits(fgbk, 8)),
+								assemble(
+									mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits(textPos.x*font.size.x, 16), 
+										bits(textPos.y*font.size.y, 16)
+								),
+								assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(ch)))
+							); 
+							_builder.end; 
+							textPos.x ++; 
+						}
+					} 
+				} 
+				
+				{
+					auto egaBuilder = new EgaBuilder; 
+					with(egaBuilder)
+					{
+						
+						
+						
+						//Link: google image search: borland turbo pascal
+						//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
+						
+						{
+							textPos = ivec2(0, 0); 
+							fgbk = 0x70; Text(" "); 
+							foreach(
+								s; "&File &Edit &Search &Run &Compile &Debug &Tools &Options &Window &Help"
+								.split.map!((a)=>(" "~a~" "))
+							)
+							{
+								const sel = ((s.canFind("Run"))?(0x50):(0)); 
+								int hl=0; 
+								foreach(ch; s)
+								{
+									if(ch=='&') { hl = 4; continue; }
+									fgbk = 0x70^hl^sel; 
+									Text(ch.text); 
+									hl = 0; 
+								}
+							}
+							fgbk = 0x70; while(textPos.x<80) Text(" "); 
+						}
+						
+						{
+							textPos = ivec2(0, 1); 
+							fgbk = 0x1F; Text("\xC9\xCD["); fgbk = 0x1A; Text("\xFE"); 
+							fgbk = 0x1F; Text("]"~"\xCD".replicate(68)~"1\xCD["); 
+							fgbk = 0x1A; Text("\x12"); fgbk = 0x1F; Text("]\xCD\xBB"); 
+						}
+						
+						foreach(i; 0..20)
+						{
+							textPos = ivec2(0, i+2); 
+							fgbk = 0x1F; Text("\xBA"~" ".replicate(78)); 
+							fgbk = 0x31; Text(i.predSwitch(0, "\x1E", 1, "\xFE", 19, "\x1F", "\xB1")); 
+						}
+						
+						{
+							textPos = ivec2(0, textPos.y+1); 
+							fgbk = 0x1F; Text("\xC8"); Text("\xCD".replicate(7)~" 1:1 "~"\xCD".replicate(5)); 
+							fgbk = 0x31;  Text("\x11\xFE"~"\xB1".replicate(57)~"\x10"); fgbk = 0x1A; Text("\xC4\xD9"); 
+						}
+						
+						{
+							textPos = ivec2(0, textPos.y+1); 
+							fgbk = 0x74; Text(" F1 "); fgbk = 0x70; Text("Help \xB3 Run the current program"); 
+							Text(" ".replicate(80-textPos.x)); 
+						}
+						
+						{
+							textPos = ivec2(1, 2); fgbk = 0x1F; Text("Program "); fgbk = 0x1E; Text("Add;"); 
+							void NL() { textPos = ivec2(1, textPos.y+1); } 
+							NL; fgbk = 0x1F; Text("Var"); 
+							NL; fgbk = 0x1E; Text("   Num1, Num2, Sum : integer;"); 
+							NL; fgbk = 0x1F; Text("Begin"); 
+							NL; fgbk = 0x1E; Text("     Write('Input number 1: ');"); 
+							NL; fgbk = 0x1E; Text("     Readln(Num1);"); 
+							NL; fgbk = 0x1E; Text("     Write('Input number 2: ');"); 
+							NL; fgbk = 0x1E; Text("     Readln(Num2);"); 
+							NL; fgbk = 0x4F; Text("     Sum := Num1 + Num2;"); Text(" ".replicate(79-textPos.x)); 
+							NL; fgbk = 0x4F; Text("     Writeln(Sum);"); Text(" ".replicate(79-textPos.x)); 
+							NL; fgbk = 0x1E; Text("     Readln;"); 
+							NL; fgbk = 0x1F; Text("End"); fgbk = 0x1E; Text("."); 
+						}
+						
+						{
+							textPos.y = 0; void NL() { textPos = ivec2(20, textPos.y+1); } 
+							NL; fgbk = 0x70; Text(" \xDA"~"\xC4".replicate(24)~"\xBF "); 
+							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x24; Text(" R"); fgbk ^= 4; Text("un            Ctrl+F9 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
+							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x74; Text(" S"); fgbk ^= 4; Text("tep over           F8 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
+							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x74; Text(" T"); fgbk ^= 4; Text("race into          F7 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
+							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x74; Text(" G"); fgbk ^= 4; Text("o to cursor        F4 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
+							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x78; Text(" Program reset  Ctrl+F2 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
+							NL; fgbk = 0x70; Text(" \xB3 P"); fgbk = 0x74; Text("a"); fgbk ^= 4; Text("rameters...          "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
+							NL; fgbk = 0x70; Text(" \xC1"~"\xC4".replicate(24)~"\xD9 "); fgbk=0; Text("  "); 
+							NL; textPos.x+=2; fgbk=0; Text(" ".replicate(28)); 
+							
+							textPos = ivec2(34, 2); fgbk = 0x55; Text(" "); //mouse cursor
+						}
+					}
+					auto content = egaBuilder.extractGfxContent; 
+					//content.gb.hexDump; 
+					appendGfxContent(content); 
+				}
+				
+				((0xCFFD5F5C4644).檢((update間(_間)))); 
 			} 
 			
 			
