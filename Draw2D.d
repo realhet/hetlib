@@ -1687,6 +1687,319 @@ version(/+$DIDE_REGION View2D+/all)
 		
 		bool overlaps(in B b) const { return outerBnd.overlaps(b); } 
 	} 
+}version(/+$DIDE_REGION+/all)
+{
+	/+
+		Assistant: /+H1: Drawing Graphics API Cheat Sheet+/
+		
+		/+H2: Core Concepts+/
+			/+Bullet: /+Bold: Drawing+/: Main class for 2D graphics operations+/
+			/+Bullet: /+Bold: State-based+/: Maintains drawing state (color, line style, transformations)+/
+			/+Bullet: /+Bold: Immediate mode+/: Commands are buffered and drawn later+/
+			/+Bullet: /+Bold: GPU accelerated+/: Uses OpenGL/VBOs for rendering+/
+		
+		/+H2: Initialization & Management+/
+		/+
+			Structured: auto d = new Drawing(); 	// Create new drawing
+			auto d = new Drawing("name"); 	// Named drawing
+			auto clone = d.clone(); 	// Create clone
+			d.clear(); 	// Clear all content
+			d.clear(RGB.clWhite); 	// Clear with background color
+		+/
+		
+		/+H2: State Management+/
+		/+H3: Colors & Alpha+/
+		/+
+			Structured: d.color = RGB.clRed; 	// Set draw color
+			d.alpha = 0.5; 	// Set alpha (0-1)
+		+/
+		
+		/+H3: Line & Point Properties+/
+		/+
+			Structured: d.lineWidth = 2.0; 	// Absolute line width
+			d.lineWidth = -2.0; 	// Relative line width
+			d.pointSize = 3.0; 	// Point size
+			d.lineStyle = LineStyle.normal; 	// Line style
+			d.arrowStyle = ArrowStyle.none; 	// Arrow style
+		+/
+		
+		/+H3: Font Properties+/
+		/+
+			Structured: d.fontHeight = 18; 	// Font size
+			d.fontWeight = 1.4; 	// Font weight
+			d.fontBold = true; 	// Bold text
+			d.fontItalic = true; 	// Italic text
+			d.fontMonoSpace = true; 	// Monospace font
+			d.fontUnderline = true; 	// Underline
+			d.fontStrikeOut = true; 	// Strikeout
+		+/
+		
+		/+H3: Transformations+/
+		/+
+			Structured: d.translate(x, y); 	// Move origin
+			d.scale(factor); 	// Scale drawing
+			d.push(); 	// Save transformation state
+			d.pop(); 	// Restore transformation state
+		+/
+		
+		/+H3: State Stack+/
+		/+
+			Structured: d.saveState(); 	// Push current state
+			d.restoreState(); 	// Pop state
+			d.pushState(); d.popState(); 	// Aliases
+		+/
+		/+H2: Drawing Primitives+/
+		
+		/+H3: Points+/
+		/+
+			Structured: d.point(x, y); 	// Single point
+			d.point(vec2(x, y)); 	// Vector point
+			d.point(RGB.clRed, x, y); 	// Colored point
+			d.point([vec2(0,0), vec2(1,1)]); 	// Multiple points
+		+/
+		
+		/+H3: Lines+/
+		/+
+			Structured: d.moveTo(x, y); 	// Set starting point
+			d.lineTo(x, y); 	// Draw line to point
+			d.lineRel(dx, dy); 	// Relative line
+			d.line(p0, p1); 	// Line between points
+			d.line([p0, p1, p2]); 	// Polyline
+			d.lineLoop([p0, p1, p2]); 	// Closed polyline
+		+/
+		
+		/+H3: Advanced Line Drawing+/
+		/+
+			Structured: d.line2(
+				// Flexible line command
+				RGB.clRed,	// Color
+				2.0,	// Line width  
+				vec2(0,0), vec2(100,100),	// Points
+				LineStyle.dashed	// Line style
+			); 	
+		+/
+		
+		/+H3: Shapes+/
+		/+
+			Structured: d.drawRect(x0, y0, x1, y1); 	// Rectangle outline
+			d.fillRect(x0, y0, x1, y1); 	// Filled rectangle
+			d.drawX(x0, y0, x1, y1); 	// X mark
+			d.fillTriangle(p0, p1, p2); 	// Filled triangle
+			d.fillConvexPoly([p0, p1, p2, p3]); 	// Convex polygon
+		+/
+		
+		/+H3: Curves & Circles+/
+		/+
+			Structured: d.ellipse(x, y, rx, ry); 	// Ellipse
+			d.circle(x, y, radius); 	// Circle
+			d.bezier2(p0, p1, p2); 	// Quadratic Bezier
+		+/
+		
+		/+H2: Text Rendering+/
+		/+
+			Structured: d.textOut(x, y, "Hello"); 	// Basic text
+			d.textOut(vec2(x,y), "Hello"); 	// Vector position
+			d.textOut(p, "Text", width, HAlign.center); 	// Aligned text
+			d.textOutMulti(x, y, "Line1\nLine2"); 	// Multiline text
+		+/
+		
+		/+H2: Images & Textures+/
+		/+
+			Structured: d.drawGlyph("image.png", x, y); 	// Draw image
+			d.drawGlyph("image.png", bounds); 	// Draw to bounds
+			d.drawGlyph(
+				img,x, y,	// With options
+				Flag.nearest,	// Filtering
+				RectAlign.center,	// Alignment
+				DrawGlyphScale(0.5)	// Scale
+			); 
+		+/
+		
+		/+H2: Advanced Features+/
+		
+		/+H3: Clipping+/
+		/+
+			Structured: d.pushClipBounds(bounds); 	// Set clip region
+			// drawing commands...
+			d.popClipBounds(); 	// Restore clip
+		+/
+		
+		/+H3: Graphs & Charts+/
+		/+
+			Structured: d.vGraph(x0, y0, data); 	// Vertical graph
+			d.hGraph(x0, y0, data); 	// Horizontal graph  
+			d.hBars(x0, y0, data); 	// Bar chart
+		+/
+		
+		/+H3: Custom Shaders+/
+		/+
+			Structured: d.customShader = ```vec4 customShader() {
+				 // GLSL code
+				 return vec4(1.0);
+	}```; 
+		+/
+		
+		/+H3: SVG Paths+/
+		/+
+			Structured: d.drawPath("M 0 0 L 100 100"); // SVG path data
+		+/
+		
+		/+H2: Rendering+/
+		/+
+			Structured: d.glDraw(view); 	// Draw to view
+			d.glDraw(center, scale); 	// Draw with custom transform
+		+/
+		
+		/+H2: Utility Functions+/
+		/+
+			Structured: bool empty = d.empty(); 	// Check if empty
+			bounds2 b = d.bounds; 	// Get bounding box
+			string s = d.stats(); 	// Get statistics
+			auto objs = d.exportDrawingObjs(); 	// Export drawing objects
+		+/
+		
+		/+H2: Coordinate Systems+/
+			/+Bullet: /+Bold: Local coordinates+/: Affected by transformations+/
+			/+Bullet: /+Bold: Screen coordinates+/: Final output coordinates  +/
+			/+Bullet: Use /+Highlighted: inputTransform()+/ and /+Highlighted: inverseInputTransform()+/ for conversions+/
+		
+		/+H2: Performance Notes+/
+			/+Bullet: Uses VBOs for GPU acceleration+/
+			/+Bullet: Batches drawing commands automatically+/
+			/+Bullet: Clones share data with original+/
+			/+Bullet: Sub-drawings allow hierarchical composition+/
+		
+		/+H2: Common Patterns+/
+		/+
+			Structured: // Fluid interface pattern
+			d.push()	.translate(10, 10)
+				.scale(2)
+				.drawRect(0, 0, 50, 50)
+				.pop(); 
+			
+			// State backup pattern  
+			d.saveState(); 
+			d.color = RGB.clBlue; 
+			d.lineWidth = 3; 
+			// drawing...
+			d.restoreState(); 
+		+/
+		
+		/+Note: Usage(prompt_hit: 64, prompt_miss: 18898, completion: 1464, HUF: 2.55, price: 100%)+/
+	+/
+	/+
+		Assistant: /+H1: View2D Graphics API Cheat Sheet+/
+		
+		/+H2: Core Properties+/
+			/+Bullet: /+Highlighted: origin+/: World space center point (Vector2D)+/
+			/+Bullet: /+Highlighted: scale+/: Zoom factor (1.0 = 1 unit = 1 pixel)+/
+			/+Bullet: /+Highlighted: invScale+/: Pixel size in world units+/
+			/+Bullet: /+Highlighted: animSpeed+/: Animation smoothness (0.0-0.9)+/
+		
+		/+H2: Coordinate Transformation+/
+		/+
+			Structured: // World → Screen
+			vec2 screenPos = view.trans(worldPos); 
+			vec2 screenPos = view.trans(worldPos, false); // skip animation
+			
+			// Screen → World  
+			vec2 worldPos = view.invTrans(screenPos); 
+			vec2 worldPos = view.invTrans(screenPos, false); // skip animation
+		+/
+		
+		/+H2: Navigation Controls+/
+		/+
+			Structured: // Scroll
+			view.scroll(vec2(dx, dy)); 	// Relative world units
+			view.scrollH(pixels); 	// Horizontal pixels
+			view.scrollV(pixels); 	// Vertical pixels
+			
+			// Zoom
+			view.zoom(factor); 	// Relative zoom (logarithmic)
+			view.zoomAround(screenPoint, factor); 	// Zoom around specific point
+			view.zoomAroundMouse(factor); 	// Zoom around mouse position
+			
+			// View fitting
+			view.zoom(bounds); 	// Fit bounds to view
+			view.zoomAll(); 	// Fit workArea to view
+			view.zoomAll_immediate(); 	// Instant fit
+			view.autoZoom(); 	// Auto-fit when workArea changes
+		+/
+		
+		/+H2: Viewport Management+/
+		/+
+			Structured: // Sub-screen area (for UI overlays)
+			view.subScreenArea = bounds2(0.1, 0.1, 0.9, 0.9); 
+			
+			// Center correction (anti-aliasing)
+			view.centerCorrection = true; 
+			
+			// Get visible area
+			bounds2 visible = view.visibleArea(); 
+			bounds2 visibleNow = view.visibleArea(false); // no animation
+		+/
+		
+		/+H2: Mouse Interaction+/
+		/+
+			Structured: // Mouse position tracking
+			vec2 worldMousePos = view.mousePos; 
+			bool mouseInside = view.isMouseInside(); 
+			
+			// Screen bounds
+			bounds2 screenBounds = view.subScreenBounds_anim(); 
+		+/
+		
+		/+H2: Animation Control+/
+		/+
+			Structured: view.skipAnimation(); 	// Jump to target immediately
+			view.updateAnimation(deltaTime, true); 	// Manual animation update
+		+/
+		
+		/+H2: Smart Navigation+/
+		/+
+			Structured: view.smartScrollTo(targetBounds); 	// Queue smooth scroll-to
+			view.updateSmartScroll(); 	// Process scroll queue
+		+/
+		
+		/+H2: Configuration+/
+		/+
+			Structured: // Save/load view state
+			string config = view.config; 
+			view.config = savedConfig; 
+		+/
+		
+		/+H2: Input Handling+/
+		/+
+			Structured: // Built-in navigation (keyboard + mouse)
+			view.navigate(true, true); // Enable both input methods
+			
+			// Default controls:
+			// - MMB/RMB: Pan
+			// - Mouse Wheel: Zoom at mouse
+			// - WASD: Keyboard panning  
+			// - PgUp/PgDn: Keyboard zoom
+			// - Shift: Slower movement
+			// - Home: Zoom to fit
+		+/
+		
+		/+H2: Work Area Management+/
+		/+
+			Structured: // Set drawing bounds
+			view.workArea = calculatedBounds; 
+			
+			// Automatic fitting
+			if(view.autoZoom()) {
+				    // View was automatically adjusted
+			}
+		+/
+		
+		/+H2: Performance Notes+/
+			/+Bullet: Transformation functions are computationally expensive+/
+			/+Bullet: Use /+Highlighted: animated = false+/ for performance-critical operations+/
+			/+Bullet: Center correction adds per-frame overhead+/
+		
+		/+Note: Usage(prompt_hit: 64, prompt_miss: 4948, completion: 704, HUF: 0.80, price: 100%)+/
+	+/
 }
 class Drawing
 {

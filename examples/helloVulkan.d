@@ -1,6 +1,6 @@
 //@exe
 //@debug
-///@release
+//@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -127,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E45F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E35F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21485F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21735F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21475F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21725F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -203,7 +203,7 @@ version(/+$DIDE_REGION+/all) {
 		+/
 		
 	}
-	class FrmHelloVulkan : VulkanWindow
+	class FrmHelloVuonUpdatelkan : VulkanWindow
 	{
 		mixin autoCreate;  
 		
@@ -380,13 +380,15 @@ version(/+$DIDE_REGION+/all) {
 				uint length; 
 				ivec2 size; 
 				
+				float aspect; 
+				
 				int getPixel_unsafe(int idx, int x, int y) const
 				=> raw[(idx*size.y+y)*(size.x/8)+(x/8)].getBit(x%8); 
 				
 				this(ivec2 size, string bin)
 				{
 					enforce(size.x>0 && size.y>0); 
-					this.size = size; 
+					this.size = size; aspect = (float(size.x))/size.y; 
 					auto img = bin.deserializeImage!ubyte; 
 					length = img.height/size.y; 
 					enforce(img.width==size.x); 
@@ -416,6 +418,38 @@ version(/+$DIDE_REGION+/all) {
 					}
 				}
 				return 0; 
+			} 
+			
+			auto vgaFont()
+			{
+				__gshared BitmapArray vgaFont; 
+				if(!vgaFont)
+				{
+					const origFile = File(i`c:\dl\vga-rom-fonts-ag869x16.webp`.text); 
+					auto img = origFile.read(true).deserializeImage!ubyte; 
+					const charSize = img.size/16; 
+					const generate9thPixel = !!origFile.name.isWild("*ag869x*"); 
+					const realCharSize = charSize + ivec2(generate9thPixel, 0); 
+					
+					ubyte[] res; 
+					foreach(cy; 0..16)
+					foreach(cx; 0..16)
+					foreach(y; 0..charSize.y)
+					{
+						res ~= img[cx*8..(cx+1)*8, cy*charSize.y+y].asArray; 
+						if(generate9thPixel)
+						res ~= ((cy==0xC || cy==0xD)?(res.back):(0)); 
+					}
+					
+					img = image2D(realCharSize.x, realCharSize.y*256, res); 
+					
+					const modifiedFile = origFile.otherExt(".fontMap.webp"); 
+					img.serializeImage("webp quality=999").saveTo(modifiedFile); 
+					
+					vgaFont = new BitmapArray
+					(realCharSize, (cast(string)(modifiedFile.read(true)))); 
+				}
+				return vgaFont; 
 			} 
 			
 			class Sprites : BitmapArray
@@ -713,6 +747,278 @@ version(/+$DIDE_REGION+/all) {
 					}
 					
 					end; 
+				} 
+			} 
+			class EGABuilder
+			{
+				Builder _builder; 
+				
+				this()
+				{ _builder = new Builder; } 
+				
+				auto extractGfxContent()
+				=> _builder.extractGfxContent; 
+				
+				
+				enum HAlign:ubyte { left, center, right } 
+				enum VAlign:ubyte { top, center, baseline, bottom } 
+				
+				static struct EGAColor {
+					ubyte data; 
+					this(T)(T a)
+					{ data = cast(ubyte)a; } 
+				} 
+				
+				enum FontId: ubyte
+				{
+					default_, 
+					
+					CGA8x8, 
+					VGA9x16, 
+					
+					Arial,
+					Bahnschrift,
+					Calibri,
+					Cambria,
+					Cambria_Math,
+					Candara,
+					Cascadia_Code,
+					Cascadia_Mono,
+					Comic_Sans_MS,
+					Consolas,
+					Constantia,
+					Corbel,
+					Courier_New,
+					Franklin_Gothic,
+					Gabriola,
+					Georgia,
+					HoloLens_MDL2_Assets,
+					Impact,
+					Ink_Free,
+					Lucida_Console,
+					Lucida_Sans_Unicode,
+					Marlett,
+					Microsoft_Sans_Serif,
+					MingLiU_ExtB,
+					Segoe_MDL2_Assets,
+					Segoe_Print,
+					Segoe_Script,
+					Segoe_UI,
+					Segoe_UI_Emoji,
+					Segoe_UI_Historic,
+					Segoe_UI_Symbol,
+					Sitka,
+					Sylfaen,
+					Symbol,
+					Tahoma,
+					Times_New_Roman,
+					Trebuchet_MS,
+					Verdana,
+					Webdings,
+					Wingdings,
+					
+					reserved_
+				} 
+				static foreach(e; EnumMembers!FontId)
+				static if(e>FontId.default_ && e<FontId.reserved_)
+				mixin(iq{enum $(e.text) = FontId.$(e.text); }.text); 
+				
+				enum 
+				{
+					/+Note: 0+/	black	= EGAColor(0),
+					/+Note: 1+/	blue	= EGAColor(1),
+					/+Note: 2+/	green	= EGAColor(2),
+					/+Note: 3+/	cyan	= EGAColor(3),
+					/+Note: 4+/	red	= EGAColor(4),
+					/+Note: 5+/	magenta	= EGAColor(5),
+					/+Note: 6+/	brown	= EGAColor(6),
+					/+Note: 7+/	ltGray	= EGAColor(7),
+					/+Note:  8+/	dkGray	= EGAColor(8+0),
+					/+Note:  9+/	ltBlue	= EGAColor(8+1),
+					/+Note: 10+/ /+Note: 0xA+/	ltGreen	= EGAColor(8+2),
+					/+Note: 11+/ /+Note: 0xB+/	ltCyan	= EGAColor(8+3),
+					/+Note: 12+/ /+Note: 0xC+/	ltRed	= EGAColor(8+4),
+					/+Note: 13+/ /+Note: 0xD+/	ltMagenta	= EGAColor(8+5),
+					/+Note: 14+/ /+Note: 0xE+/	yellow	= EGAColor(8+6),
+					/+Note: 15+/ /+Note: 0xF+/	white	= EGAColor(8+7),
+				} 
+				
+				static struct fg
+				{
+					EGAColor value; alias this = value; 
+					this(A)(in A a) { value = a; } 
+				} 
+				
+				static struct bk
+				{
+					EGAColor value; alias this = value; 
+					this(A)(in A a) { value = a; } 
+				} 
+				
+				static EGAColor color(A)(in A a)
+				=> fg(a); 
+				
+				static struct fgbk
+				{
+					EGAColor[2] value; 
+					this(A, B)(in A a, in B b) { value[0] = a, value[1] = b; } 
+					this(int a) { value[0] = a.getBits(0, 4), a.getBits(4, 4); } 
+				} 
+				
+				static struct opacity {
+					ubyte value = 255; 
+					this(A)(in A a) {
+						static if(isFloatingPoint!A)	value = a.to_unorm; 
+						else	value = (cast(ubyte)(a)); 
+					} 
+				} 
+				
+				// A struct to hold the current graphic state
+				static struct GraphicState
+				{
+					mixin((
+						(表([
+							[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+							[q{ubyte},q{8},q{"fgbkColors"},q{7},q{/++/}],
+							[q{ubyte},q{8},q{"opacity"},q{255},q{/++/}],
+							[q{FontId},q{6},q{"fontId"},q{VGA9x16},q{/++/}],
+							[q{ubyte},q{8},q{"fontHeight"},q{16},q{/++/}],
+							[q{HAlign},q{2},q{"hAlign"},q{},q{/++/}],
+							[q{VAlign},q{2},q{"vAlign"},q{},q{/++/}],
+						]))
+					).調!(GEN_bitfields)); 
+					
+					@property fgColor() const
+					=> (cast(EGAColor)(fgbkColors.getBits(0, 4))); 
+					@property fgColor(int a) 
+					{ fgbkColors = (cast(ubyte)(fgbkColors.setBits(0, 4, a))); } 
+					@property fgColor(EGAColor a) 
+					{ fgColor = a.data; } 
+					@property bkColor() const
+					=> (cast(EGAColor)(fgbkColors.getBits(4, 4))); 
+					@property bkColor(int a) 
+					{ fgbkColors = (cast(ubyte)(fgbkColors.setBits(4, 4, a))); } 
+					@property bkColor(EGAColor a) 
+					{ bkColor = a.data; } 
+					
+					alias font = fontId, fh = fontHeight; 
+					
+					void applyArg(T)(in T a)
+					{
+						static EGAColor asColor(T)(T arg)
+						{
+							static if(is(C : EGAColor)) return arg.value; 
+							else static if(is(C : int)) return EGAColor(arg.value); 
+							else static assert(false, "Unsupported color type: " ~ C.stringof); 
+						} 
+						
+						static if(is(T : HAlign))	{ hAlign = a; }
+						else static if(is(T : VAlign))	{ vAlign = a; }
+						else static if(is(T : GenericArg!(name, C), string name, C))
+						{
+							static if(name == "fg")	{ fgColor = asColor(a.value); }
+							else static if(name == "bk")	{ bkColor = asColor(a.value); }
+							else static assert(false, "Unsupported generic arg: " ~ T.stringof); 
+						}
+						else static if(is(T : fg))	{ fgColor = a.value; }
+						else static if(is(T : bk))	{ bkColor = a.value; }
+						else static if(is(T : fgbk))	{
+							fgColor = a.value[0]; 
+							bkColor = a.value[1]; 
+						}
+						else static if(
+							is(
+								T : EGABuilder.opacity
+								/+Todo: name conflict!+/
+							)
+						)	{ opacity = a.value; }
+						else static assert(false, "Unsupported type: " ~ T.stringof); 
+					} 
+				} 
+				
+				GraphicState graphicState; 
+				vec2 cursorPos; 
+				
+				struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+				struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+				
+				struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
+				struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
+				struct My { float value=0; this(A)(in A a) { value = float(a); } } 
+				struct my { float value=0; this(A)(in A a) { value = float(a); } } 
+				
+				void Style(Args...)(in Args args)
+				{
+					//this alters graphicState
+					static foreach(i, a; args)
+					{
+						{
+							alias T = Args[i]; 
+							static if(__traits(compiles, { graphicState.applyArg(a); })) graphicState.applyArg(a); 
+							else static assert(false, "Unhandled Style() argument: "~T.stringof); 
+						}
+					}
+				} 
+				
+				enum isStyleArg(T) = __traits(compiles, { GraphicState st; st.applyArg(T.init); }); 
+				
+				void Text(Args...)(Args args)
+				{
+					//this work on temporal graphics state
+					/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
+					
+					GraphicState st = graphicState/+only modity temporal state+/; 
+					static foreach(i, a; args)
+					{
+						{
+							alias T = Args[i]; 
+							static if(is(T : M))	cursorPos = a.value; 
+							else static if(is(T : Mx))	cursorPos.x = a.value; 
+							else static if(is(T : My))	cursorPos.y = a.value; 
+							else static if(is(T : m))	cursorPos += a.value; 
+							else static if(is(T : mx))	cursorPos.x += a.value; 
+							else static if(is(T : my))	cursorPos.y += a.value; 
+							else static if(isStyleArg!T)	st.applyArg(a); 
+							else static if(isSomeString!T)	textBackend(st, a); 
+							else static if(isSomeChar!T)	textBackend(st, a); 
+							else static if(
+								isInputRange!T &&
+								isSomeChar
+								!(ElementType!T)
+							)	{ textBackend(st, a); }
+							else static if(isDelegate!T) a(); 
+							else static if(isFunction!T) a(); 
+							else
+							{
+								st.applyArg(opacity(.5)); 
+								static assert(false, "Unhandled Text() argument: "~T.stringof); 
+							}
+						}
+					}
+				} 
+				
+				void textBackend(A)(in GraphicState st, A r)
+				{
+					const scaleX = 9, scaleY = 16; 
+					alias font = vgaFont; 
+					foreach(ch; r.dtext)
+					{
+						_builder.begin; 
+						_builder.emit(
+							assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(egaPalette.handle))),
+							assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
+							assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
+							assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
+							assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity), 
+							assemble(
+								mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
+									bits((iround(cursorPos.y*scaleY)), 16)
+							),
+							assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(((ch<=255)?(ch):(254)))))
+						); 
+						_builder.end; 
+						cursorPos.x += /+st.fontHeight * font.aspect+/1; 
+					}
 				} 
 			} 
 		} 
@@ -1043,7 +1349,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x972D5F5C4644).檢 (zoomedPlatform)), ((0x97565F5C4644).檢 (shipPos)); 
+								((0xBD1D5F5C4644).檢 (zoomedPlatform)), ((0xBD465F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1244,7 +1550,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xAD975F5C4644).檢((update間(_間)))); 
+				((0xD3875F5C4644).檢((update間(_間)))); 
 				
 				enum N = 1; 
 				__gshared Builder[N] builders; 
@@ -1274,11 +1580,11 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 				}
-				((0xB1775F5C4644).檢((update間(_間)))); 
+				((0xD7675F5C4644).檢((update間(_間)))); 
 				foreach(builder; builders[].filter!"a")
 				appendGfxContent(builder.extractGfxContent); 
 				
-				((0xB20E5F5C4644).檢((update間(_間)))); 
+				((0xD7FE5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1310,93 +1616,12 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xB54A5F5C4644).檢((update間(_間)))); 
+				((0xDB3A5F5C4644).檢((update間(_間)))); 
 				
-				__gshared BitmapArray vgaFont; 
-				if(!vgaFont)
-				{
-					const origFile = File(i`c:\dl\vga-rom-fonts-ag869x16.webp`.text); 
-					auto img = origFile.read(true).deserializeImage!ubyte; 
-					const charSize = img.size/16; 
-					const generate9thPixel = !!origFile.name.isWild("*ag869x*"); 
-					const realCharSize = charSize + ivec2(generate9thPixel, 0); 
-					
-					ubyte[] res; 
-					foreach(cy; 0..16)
-					foreach(cx; 0..16)
-					foreach(y; 0..charSize.y)
-					{
-						res ~= img[cx*8..(cx+1)*8, cy*charSize.y+y].asArray; 
-						if(generate9thPixel)
-						res ~= ((cy==0xC || cy==0xD)?(res.back):(0)); 
-					}
-					
-					img = image2D(realCharSize.x, realCharSize.y*256, res); 
-					
-					const modifiedFile = origFile.otherExt(".fontMap.webp"); 
-					img.serializeImage("webp quality=999").saveTo(modifiedFile); 
-					
-					vgaFont = new BitmapArray
-					(realCharSize, (cast(string)(modifiedFile.read(true)))); 
-				}
-				
-				class EgaBuilder
-				{
-					Builder _builder; 
-					
-					int fgbk=7; ivec2 textPos; 
-					
-					this()
-					{ _builder = new Builder; } 
-					
-					auto extractGfxContent()
-					=> _builder.extractGfxContent; 
-					
-					enum Colors
-					{
-						/+Note: 0+/	black,
-						/+Note: 1+/	blue,
-						/+Note: 2+/	green,
-						/+Note: 3+/	cyan,
-						/+Note: 4+/	red,
-						/+Note: 5+/	magenta,
-						/+Note: 6+/	brown,
-						/+Note: 7+/	ltGray,
-						/+Note:  8+/	dkGray,
-						/+Note:  9+/	ltBlue,
-						/+Note: 10+/ /+Note: 0xA+/	ltGreen,
-						/+Note: 11+/ /+Note: 0xB+/	ltCyan,
-						/+Note: 12+/ /+Note: 0xC+/	ltRed,
-						/+Note: 13+/ /+Note: 0xD+/	ltMagenta,
-						/+Note: 14+/ /+Note: 0xE+/	yellow,
-						/+Note: 15+/ /+Note: 0xF+/	white,
-					} 
-					
-					void Text(A)(A r)
-					{
-						alias font = vgaFont; 
-						foreach(ch; r.text)
-						{
-							_builder.begin; 
-							_builder.emit(
-								assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(egaPalette.handle))),
-								assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
-								assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), bits(font.size.y, 8)),
-								assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), bits(fgbk, 8)),
-								assemble(
-									mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits(textPos.x*font.size.x, 16), 
-										bits(textPos.y*font.size.y, 16)
-								),
-								assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(ch)))
-							); 
-							_builder.end; 
-							textPos.x ++; 
-						}
-					} 
-				} 
+				
 				
 				{
-					auto egaBuilder = new EgaBuilder; 
+					auto egaBuilder = new EGABuilder; 
 					with(egaBuilder)
 					{
 						
@@ -1406,81 +1631,183 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
 						
 						{
-							textPos = ivec2(0, 0); 
-							fgbk = 0x70; Text(" "); 
-							foreach(
-								s; "&File &Edit &Search &Run &Compile &Debug &Tools &Options &Window &Help"
-								.split.map!((a)=>(" "~a~" "))
-							)
-							{
-								const sel = ((s.canFind("Run"))?(0x50):(0)); 
-								int hl=0; 
-								foreach(ch; s)
-								{
-									if(ch=='&') { hl = 4; continue; }
-									fgbk = 0x70^hl^sel; 
-									Text(ch.text); 
-									hl = 0; 
-								}
-							}
-							fgbk = 0x70; while(textPos.x<80) Text(" "); 
-						}
-						
-						{
-							textPos = ivec2(0, 1); 
-							fgbk = 0x1F; Text("\xC9\xCD["); fgbk = 0x1A; Text("\xFE"); 
-							fgbk = 0x1F; Text("]"~"\xCD".replicate(68)~"1\xCD["); 
-							fgbk = 0x1A; Text("\x12"); fgbk = 0x1F; Text("]\xCD\xBB"); 
-						}
-						
-						foreach(i; 0..20)
-						{
-							textPos = ivec2(0, i+2); 
-							fgbk = 0x1F; Text("\xBA"~" ".replicate(78)); 
-							fgbk = 0x31; Text(i.predSwitch(0, "\x1E", 1, "\xFE", 19, "\x1F", "\xB1")); 
-						}
-						
-						{
-							textPos = ivec2(0, textPos.y+1); 
-							fgbk = 0x1F; Text("\xC8"); Text("\xCD".replicate(7)~" 1:1 "~"\xCD".replicate(5)); 
-							fgbk = 0x31;  Text("\x11\xFE"~"\xB1".replicate(57)~"\x10"); fgbk = 0x1A; Text("\xC4\xD9"); 
-						}
-						
-						{
-							textPos = ivec2(0, textPos.y+1); 
-							fgbk = 0x74; Text(" F1 "); fgbk = 0x70; Text("Help \xB3 Run the current program"); 
-							Text(" ".replicate(80-textPos.x)); 
-						}
-						
-						{
-							textPos = ivec2(1, 2); fgbk = 0x1F; Text("Program "); fgbk = 0x1E; Text("Add;"); 
-							void NL() { textPos = ivec2(1, textPos.y+1); } 
-							NL; fgbk = 0x1F; Text("Var"); 
-							NL; fgbk = 0x1E; Text("   Num1, Num2, Sum : integer;"); 
-							NL; fgbk = 0x1F; Text("Begin"); 
-							NL; fgbk = 0x1E; Text("     Write('Input number 1: ');"); 
-							NL; fgbk = 0x1E; Text("     Readln(Num1);"); 
-							NL; fgbk = 0x1E; Text("     Write('Input number 2: ');"); 
-							NL; fgbk = 0x1E; Text("     Readln(Num2);"); 
-							NL; fgbk = 0x4F; Text("     Sum := Num1 + Num2;"); Text(" ".replicate(79-textPos.x)); 
-							NL; fgbk = 0x4F; Text("     Writeln(Sum);"); Text(" ".replicate(79-textPos.x)); 
-							NL; fgbk = 0x1E; Text("     Readln;"); 
-							NL; fgbk = 0x1F; Text("End"); fgbk = 0x1E; Text("."); 
-						}
-						
-						{
-							textPos.y = 0; void NL() { textPos = ivec2(20, textPos.y+1); } 
-							NL; fgbk = 0x70; Text(" \xDA"~"\xC4".replicate(24)~"\xBF "); 
-							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x24; Text(" R"); fgbk ^= 4; Text("un            Ctrl+F9 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
-							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x74; Text(" S"); fgbk ^= 4; Text("tep over           F8 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
-							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x74; Text(" T"); fgbk ^= 4; Text("race into          F7 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
-							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x74; Text(" G"); fgbk ^= 4; Text("o to cursor        F4 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
-							NL; fgbk = 0x70; Text(" \xB3"); fgbk = 0x78; Text(" Program reset  Ctrl+F2 "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
-							NL; fgbk = 0x70; Text(" \xB3 P"); fgbk = 0x74; Text("a"); fgbk ^= 4; Text("rameters...          "); fgbk=0x70; Text("\xB3 "); fgbk=0; Text("  "); 
-							NL; fgbk = 0x70; Text(" \xC1"~"\xC4".replicate(24)~"\xD9 "); fgbk=0; Text("  "); 
-							NL; textPos.x+=2; fgbk=0; Text(" ".replicate(28)); 
+							enum clMenuBk 	= bk(ltGray), 
+							clMenuText 	= fg(black), 
+							clMenuKey	= fg(red),
+							clMenuItem 	= fgbk(clMenuText, clMenuBk),
+							clMenuSelected 	= fgbk(clMenuText, green),
+							clMenuDisabled 	= fgbk(dkGray, clMenuBk); 
 							
-							textPos = ivec2(34, 2); fgbk = 0x55; Text(" "); //mouse cursor
+							enum clWindowBk	= bk(blue),
+							clWindowText 	= fg(white),
+							clWindow 	= fgbk(clWindowText, clWindowBk),
+							clWindowClickable 	= fgbk(ltGreen, clWindowBk); 
+							
+							enum clScrollBar = fgbk(blue, cyan); 
+							
+							
+							static struct MenuItem
+							{
+								string title, shortcut, hint; 
+								bool selected, disabled, opened; 
+								MenuItem[] subMenu; 
+							} 
+							
+							void drawMenuTitle(Args...)(in MenuItem item, Args extra)
+							{
+								const clNormal = 	item.disabled 	? clMenuDisabled : 
+									item.selected 	? clMenuSelected 
+										: clMenuItem; 
+								const s = item.title, aidx = s.byDchar.countUntil('&'); 
+								if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
+								else {
+									Text(
+										clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
+										clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
+										clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
+										extra
+									); 
+								}
+							} 
+							
+							void drawSubMenu(R)(R items)
+								if(isForwardRange!(R, MenuItem))
+							{
+								sizediff_t measureItemWidth(in MenuItem item)
+								=> item.title.filter!"a!='&'".walkLength + 2
+								+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
+								
+								const maxWidth = items.save.map!measureItemWidth.maxElement; 
+								vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
+								Style(clMenuItem); 
+								
+								void shadow(size_t n) { Text(bk(black), opacity(.6), " ".replicate(n)); } 
+								
+								Text(chain(" \u00DA", "\u00C4".replicate(maxWidth), "\u00BF ")); NL; 
+								foreach(item; items)
+								{
+									Text(" \u00B3"); 
+									const space = maxWidth - measureItemWidth(item); 
+									if(item.shortcut!="")
+									{ drawMenuTitle(item, chain(" ".replicate(space+1), item.shortcut, " ")); }
+									else
+									{ drawMenuTitle(item, " ".replicate(space)); }
+									Text("\u00B3 "); shadow(2); NL; 
+								}
+								Text(chain(" \u00C0", "\u00C4".replicate(maxWidth), "\u00D9 ")); shadow(2); NL; 
+								Text(mx(2)); shadow(maxWidth+4); 
+								
+								
+								//Text(fg(yellow), bk(red), " Submenu goes here "~maxWidth.text); 
+							} 
+							
+							void drawMainMenu(R)(R items)
+								if(isForwardRange!(R, MenuItem))
+							{
+								foreach(item; items)
+								{
+									const pos = cursorPos; 
+									drawMenuTitle(item); 
+									if(item.opened && !item.subMenu.empty)
+									{
+										mixin(scope_remember(q{cursorPos})); 
+										Text(M(pos), my(1)); //move the cursor
+										drawSubMenu(item.subMenu); 
+									}
+								}
+							} 
+							
+							void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
+							{
+								void Btn(string s)
+								{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
+								
+								Style(clWindow); 
+								Text(
+									M(bnd.topLeft), "\u00C9\u00CD", { Btn("\u00FE"); }, 
+									chain(" ", title, " ").text.center(bnd.width-12, '\u00CD'), "1\u00CD",
+									{ Btn("\u0012"); }, "\u00CD\u00BB"
+								); 
+								const w = bnd.width-2, h = bnd.height-2; 
+								foreach(line; lines.padRight("", h).take(h))
+								{
+									Text(Mx(bnd.left), my(1), '\u00BA'); 
+									string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
+									foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+									{
+										enum keywords = ["program", "var", "begin", "end", "integer"]; 
+										const isKeyword = keywords.canFind(word.text.lc); 
+										Text(fg(((isKeyword)?(white):(yellow))), word); 
+									}
+									Text(
+										clScrollBar, predSwitch(
+											cursorPos.y-bnd.top-1, 
+											0, '\u001E', 1, '\u00FE', h-1, '\u001F', '\u00B1'
+										)
+									); 
+								}
+								Text(
+									M(bnd.bottomLeft), my(-1), "\u00C8\u00CD",
+									chain(" ", "1:1", " ").text.center(17, '\u00CD'),
+									clScrollBar, chain("\u0011", "\u00FE", "\u00B1".replicate(bnd.width-24), "\u0010"),
+									clWindowClickable, "\u00C4\u00D9"
+								); 
+							} 
+							
+							void fillSpace() { while(cursorPos.x<80) Text(' '); } 
+							
+							
+							drawTextWindow
+							(
+								"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).genericArg!q{size})), 
+								"Program Add;
+
+Var
+	Num1, Num2, Sum : integer;
+Begin
+	Write('Input number 1: ');
+	Readln(Num1);
+	Write('Input number 2: ');
+	Readln(Num2);
+	Sum := Num1 + Num2;
+	Writeln(Sum);
+	Readln;
+End.".splitLines
+							); 
+							
+							static MenuItem[] mainMenuItems = 
+							[
+								{"&File"}, 
+								{"&Edit"}, 
+								{"&Search"}, 
+								{
+									"&Run", selected : true, opened : true, subMenu : 
+									[
+										{"&Run", shortcut : "Ctrl+F9", selected : true}, 
+										{"&Step over", shortcut : "F8"}, 
+										{"&Trace into", shortcut : "F7"}, 
+										{"&Go to cursor", shortcut : "F4"}, 
+										{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
+										{"P&rameters..."}
+									]
+								},
+								{"&Compile"}, 
+								{"&Debug"}, 
+								{"&Tools"}, 
+								{"&Options"}, 
+								{"&Window"}, 
+								{"&Help"},
+							]; 
+							
+							Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
+							
+							Text(
+								M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
+									clMenuItem, "Help \u00B3 Run the current program"
+							); fillSpace; 
+							
+							
+							//fgbk = 0x70; while(textPos.x<80) Text(" "); 
 						}
 					}
 					auto content = egaBuilder.extractGfxContent; 
@@ -1488,7 +1815,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					appendGfxContent(content); 
 				}
 				
-				((0xCFFD5F5C4644).檢((update間(_間)))); 
+				((0xF42D5F5C4644).檢((update間(_間)))); 
 			} 
 			
 			
