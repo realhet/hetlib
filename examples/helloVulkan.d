@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+///@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -127,10 +127,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E35F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E45F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21475F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21725F5C4644))))).max(1))))
+				foreach(v; verts.take((0x21485F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21735F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -451,7 +451,7 @@ version(/+$DIDE_REGION+/all) {
 				}
 				return vgaFont; 
 			} 
-			
+			
 			class Sprites : BitmapArray
 			{
 				RG[][] collisionPoints; 
@@ -510,11 +510,11 @@ version(/+$DIDE_REGION+/all) {
 				void drawRect(ibounds2 bnd, int fg)
 				{
 					begin; 
+					emit_setPALH(c64Palette); 
 					emit(
-						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
 						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
 						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
-						assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight), 
+						assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight),
 						assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12))
 					); 
 					end; 
@@ -526,10 +526,10 @@ version(/+$DIDE_REGION+/all) {
 				void drawSprite(vec2 pos, int idx, int fg, bool doubleSize)
 				{
 					begin; 
+					emit_setPALH(c64Palette); 
+					emit_setFMH(sprites.tex); 
 					emit(
-						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
 						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-						assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(sprites.tex.handle))),
 						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), ubyte(21*((doubleSize)?(2):(1)))),
 						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
 						assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(0, 6), (cast(ubyte)(idx)))
@@ -540,8 +540,8 @@ version(/+$DIDE_REGION+/all) {
 				void drawBorder(ivec2 pos, int fg)
 				{
 					begin; 
+					emit_setPALH(c64Palette); 
 					emit(
-						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
 						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
 						
 					); 
@@ -572,9 +572,9 @@ version(/+$DIDE_REGION+/all) {
 				{
 					if(data.empty) return; 
 					begin; 
+					emit_setPALH(c64Palette); 
+					emit_setFMH(font.tex); 
 					emit(
-						assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(c64Palette.handle))),
-						assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
 						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
 						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x, 16), bits(pos.y, 16),
 						assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4))
@@ -613,7 +613,7 @@ version(/+$DIDE_REGION+/all) {
 							if(i>=0) return i+SkipAtStart; 
 						}
 						return data.length; 
-					} 
+					} 
 					
 					void emitDifferentChars(ref RG[] data)
 					{
@@ -621,62 +621,13 @@ version(/+$DIDE_REGION+/all) {
 						
 						auto n = countDifferentChars(data); 
 						emit(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII}))), bits(n-1, 6))); 
-						while(n>=8)
-						{
-							version(/+$DIDE_REGION+/none) {
-								emit(
-									((cast(ulong)(data[0].x))<< 0)|((cast(ulong)(data[1].x))<< 8)|
-									((cast(ulong)(data[2].x))<<16)|((cast(ulong)(data[3].x))<<24)|
-									((cast(ulong)(data[4].x))<<32)|((cast(ulong)(data[5].x))<<40)|
-									((cast(ulong)(data[6].x))<<48)|((cast(ulong)(data[7].x))<<56)
-								); 
-							}
-							
-							static ulong doItFaster(const ref ubyte16 src)
-							{
-								enum ubyte16 mask = mixin(
-									[
-										0, 2, 4, 6, 8, 10, 12, 14,
-										0, 0, 0, 0, 0, 0, 0, 0
-									]
-								); 
-								const ubyte16 res = pshufb(loadUnaligned(&src), mask); 
-								return res.bitCast!ulong; 
-							} 
-							
-							emit(doItFaster(*(cast(ubyte16*)(data.ptr)))); 
-							
-							data = data[8..$]; n -= 8; 
-						}
-						if(n>=4)
-						{
-							emit(
-								(data[0].x<< 0u)|(data[1].x<< 8u)|
-								(data[2].x<<16u)|(data[3].x<<24u)
-							); 
-							data = data[4..$];  n -= 4; 
-						}
-						if(n>=2)
-						{
-							emit((cast(ushort)((data[0].x<< 0u)|(data[1].x<< 8u)))); 
-							data = data[2..$];  n -= 2; 
-						}
-						if(n>=1)
-						{
-							emit(data[0].x); 
-							data.popFront; n--; 
-						}
+						emitEvenBytes(data.fetchFrontN(n)); 
 					} 
 					
 					void emitRun(ref RG[] data)
 					{
-						if(data.empty) return; 
-						
 						while(!data.empty)
-						{
-							emitSameChars(data); 
-							emitDifferentChars(data); 
-						}
+						{ emitSameChars(data); emitDifferentChars(data); }
 					} 
 					
 					while(data.length)
@@ -685,7 +636,6 @@ version(/+$DIDE_REGION+/all) {
 						emit(assemble(bits(mixin(舉!((Opcode),q{setPC}))), mixin(舉!((ColorFormat),q{u4})), bits(act[0].y, 4))); 
 						emitRun(act); 
 					}
-					
 					end; 
 				} 
 				
@@ -758,6 +708,9 @@ version(/+$DIDE_REGION+/all) {
 				
 				auto extractGfxContent()
 				=> _builder.extractGfxContent; 
+				
+				void reset()
+				{ _builder.reset; } 
 				
 				
 				enum HAlign:ubyte { left, center, right } 
@@ -1004,9 +957,9 @@ version(/+$DIDE_REGION+/all) {
 					foreach(ch; r.dtext)
 					{
 						_builder.begin; 
+						_builder.emit_setPALH(egaPalette); 
+						_builder.emit_setFMH(font.tex); 
 						_builder.emit(
-							assemble(mixin(舉!((Opcode),q{setPALH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(egaPalette.handle))),
-							assemble(mixin(舉!((Opcode),q{setFMH})), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(font.tex.handle)),),
 							assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
 							assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
 							assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity), 
@@ -1020,6 +973,133 @@ version(/+$DIDE_REGION+/all) {
 						cursorPos.x += /+st.fontHeight * font.aspect+/1; 
 					}
 				} 
+			} 
+			class TurboVisionBuilder : EGABuilder
+			{
+				enum clMenuBk 	= bk(ltGray), 
+				clMenuText 	= fg(black), 
+				clMenuKey	= fg(red),
+				clMenuItem 	= fgbk(clMenuText, clMenuBk),
+				clMenuSelected 	= fgbk(clMenuText, green),
+				clMenuDisabled 	= fgbk(dkGray, clMenuBk); 
+				
+				enum clWindowBk	= bk(blue),
+				clWindowText 	= fg(white),
+				clWindow 	= fgbk(clWindowText, clWindowBk),
+				clWindowClickable 	= fgbk(ltGreen, clWindowBk); 
+				
+				enum clScrollBar = fgbk(blue, cyan); 
+				
+				static struct MenuItem
+				{
+					string title, shortcut, hint; 
+					bool selected, disabled, opened; 
+					MenuItem[] subMenu; 
+				} 
+				
+				void drawMenuTitle(Args...)(in MenuItem item, Args extra)
+				{
+					const clNormal = 	item.disabled 	? clMenuDisabled : 
+						item.selected 	? clMenuSelected 
+							: clMenuItem; 
+					const s = item.title, aidx = s.byDchar.countUntil('&'); 
+					if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
+					else {
+						Text(
+							clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
+							clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
+							clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
+							extra
+						); 
+					}
+				} 
+				
+				void drawSubMenu(R)(R items)
+					if(isForwardRange!(R, MenuItem))
+				{
+					sizediff_t measureItemWidth(in MenuItem item)
+					=> item.title.filter!"a!='&'".walkLength + 2
+					+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
+					
+					const maxWidth = items.save.map!measureItemWidth.maxElement; 
+					vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
+					Style(clMenuItem); 
+					
+					void shadow(size_t n) { Text(bk(black), opacity(.6), " ".replicate(n)); } 
+					
+					Text(chain(" \u00DA", "\u00C4".replicate(maxWidth), "\u00BF ")); NL; 
+					foreach(item; items)
+					{
+						Text(" \u00B3"); 
+						const space = maxWidth - measureItemWidth(item); 
+						if(item.shortcut!="")
+						{ drawMenuTitle(item, chain(" ".replicate(space+1), item.shortcut, " ")); }
+						else
+						{ drawMenuTitle(item, " ".replicate(space)); }
+						Text("\u00B3 "); shadow(2); NL; 
+					}
+					Text(chain(" \u00C0", "\u00C4".replicate(maxWidth), "\u00D9 ")); shadow(2); NL; 
+					Text(mx(2)); shadow(maxWidth+4); 
+					
+					
+					//Text(fg(yellow), bk(red), " Submenu goes here "~maxWidth.text); 
+				} 
+				
+				void drawMainMenu(R)(R items)
+					if(isForwardRange!(R, MenuItem))
+				{
+					foreach(item; items)
+					{
+						const pos = cursorPos; 
+						drawMenuTitle(item); 
+						if(item.opened && !item.subMenu.empty)
+						{
+							mixin(scope_remember(q{cursorPos})); 
+							Text(M(pos), my(1)); //move the cursor
+							drawSubMenu(item.subMenu); 
+						}
+					}
+				} 
+				
+				void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
+				{
+					void Btn(string s)
+					{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
+					
+					Style(clWindow); 
+					Text(
+						M(bnd.topLeft), "\u00C9\u00CD", { Btn("\u00FE"); }, 
+						chain(" ", title, " ").text.center(bnd.width-12, '\u00CD'), "1\u00CD",
+						{ Btn("\u0012"); }, "\u00CD\u00BB"
+					); 
+					const w = bnd.width-2, h = bnd.height-2; 
+					foreach(line; lines.padRight("", h).take(h))
+					{
+						Text(Mx(bnd.left), my(1), '\u00BA'); 
+						string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
+						foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+						{
+							enum keywords = ["program", "var", "begin", "end", "integer"]; 
+							const isKeyword = keywords.canFind(word.text.lc); 
+							Text(fg(((isKeyword)?(white):(yellow))), word); 
+						}
+						Text(
+							clScrollBar, predSwitch(
+								cursorPos.y-bnd.top-1, 
+								0, '\u001E', 1, '\u00FE', h-1, '\u001F', '\u00B1'
+							)
+						); 
+					}
+					Text(
+						M(bnd.bottomLeft), my(-1), "\u00C8\u00CD",
+						chain(" ", "1:1", " ").text.center(17, '\u00CD'),
+						clScrollBar, chain("\u0011", "\u00FE", "\u00B1".replicate(bnd.width-24), "\u0010"),
+						clWindowClickable, "\u00C4\u00D9"
+					); 
+				} 
+				
+				void fillSpace(int width=80) { while(cursorPos.x<width) Text(' '); } 
+				
 			} 
 		} 
 		
@@ -1349,7 +1429,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xBD1D5F5C4644).檢 (zoomedPlatform)), ((0xBD465F5C4644).檢 (shipPos)); 
+								((0xC62B5F5C4644).檢 (zoomedPlatform)), ((0xC6545F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1550,217 +1630,58 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xD3875F5C4644).檢((update間(_間)))); 
-				
-				enum N = 1; 
-				__gshared Builder[N] builders; 
-				import std.parallelism; 
-				foreach(sy; N.iota.parallel)
+				((0xDC955F5C4644).檢((update間(_間)))); 
+				void drawJupiterLander(ivec2 baseOfs)
 				{
-					if(!builders[sy]) builders[sy] = new Builder; 
-					auto builder = builders[sy]; 
-					builder.reset; 
-					
-					if(1)
-					foreach(sx; N.iota)
+					enum N = 1; 
+					__gshared Builder[N] builders; 
+					import std.parallelism; 
+					foreach(sy; N.iota.parallel)
 					{
-						const base = ivec2(40+8, 25+8)*ivec2(sx, sy); 
-						with(screen) { builder.drawScreen(base+4, img, bkCols, borderCol); }
-						if(shipVisible)
+						if(!builders[sy]) builders[sy] = new Builder; 
+						auto builder = builders[sy]; 
+						builder.reset; 
+						
+						if(1)
+						foreach(sx; N.iota)
 						{
-							const p = base*8+4*8+applyTransformation(shipPos)/+no rounding+/; 
-							if(!shipExplosionTick)
+							const base = baseOfs + ivec2(40+8, 25+8)*ivec2(sx, sy); 
+							with(screen) { builder.drawScreen(base+4, img, bkCols, borderCol); }
+							if(shipVisible)
 							{
-								if(thrustLeft) builder.drawSprite(p, 10, 2, shipDoubleSize); 
-								if(thrustRight) builder.drawSprite(p, 11, 2, shipDoubleSize); 
-								if(thrustBottom) builder.drawSprite(p, 8+thrustFlicker, 2, shipDoubleSize); 
+								const p = base*8+4*8+applyTransformation(shipPos)/+no rounding+/; 
+								if(!shipExplosionTick)
+								{
+									if(thrustLeft) builder.drawSprite(p, 10, 2, shipDoubleSize); 
+									if(thrustRight) builder.drawSprite(p, 11, 2, shipDoubleSize); 
+									if(thrustBottom) builder.drawSprite(p, 8+thrustFlicker, 2, shipDoubleSize); 
+								}
+								if(shipSpriteIdx>=0)
+								{ builder.drawSprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
 							}
-							if(shipSpriteIdx>=0)
-							{ builder.drawSprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
 						}
 					}
-				}
-				((0xD7675F5C4644).檢((update間(_間)))); 
-				foreach(builder; builders[].filter!"a")
-				appendGfxContent(builder.extractGfxContent); 
-				
-				((0xD7FE5F5C4644).檢((update間(_間)))); 
-				{
-					auto builder = new Builder; 
-					with(builder)
-					{
-						//builder.drawSprite(vec2(0), 0, 3, false); 
-						drawPath(
-							
-							q{
-								M 10,10 h.01 m 10 h 10 m 10 h 10 h 10 m 10 h 10 h 10 h 10
-								M 10,20 h 10 v 10 h-10 v-10 m 10 m 10
-								M 10,40 l10,10 q 30,0 0,30 h 10
-								M 10,80 l10,10 c 20,0 10,10 0, 20 h 10
-								
-								
-								M 0,0 M 0,0 M 0,0 M 0,0
-							}
-							
-							
-							/+
-								q{
-									M 10, 10 h 20 v 10 h 10 m 20 0 h 20
-									q 20,0 0,-20 q 20,0 0,20 t 20,0 t 0-20
-									s 20,0 0,-20 c 20,0 0,20 20,0 M 0,0 M 0,0 M 0,0
-								}
-							+/
-						); 
-					}
-					auto content = builder.extractGfxContent; 
-					//content.gb.hexDump; 
-					appendGfxContent(content); 
-				}
-				((0xDB3A5F5C4644).檢((update間(_間)))); 
+					
+					foreach(builder; builders[].filter!"a")
+					appendGfxContent(builder.extractGfxContent); 
+				} 
 				
 				
 				
 				{
-					auto egaBuilder = new EGABuilder; 
-					with(egaBuilder)
+					auto tvBuilder = new TurboVisionBuilder; 
+					with(tvBuilder)
 					{
-						
-						
-						
 						//Link: google image search: borland turbo pascal
 						//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
 						
-						{
-							enum clMenuBk 	= bk(ltGray), 
-							clMenuText 	= fg(black), 
-							clMenuKey	= fg(red),
-							clMenuItem 	= fgbk(clMenuText, clMenuBk),
-							clMenuSelected 	= fgbk(clMenuText, green),
-							clMenuDisabled 	= fgbk(dkGray, clMenuBk); 
-							
-							enum clWindowBk	= bk(blue),
-							clWindowText 	= fg(white),
-							clWindow 	= fgbk(clWindowText, clWindowBk),
-							clWindowClickable 	= fgbk(ltGreen, clWindowBk); 
-							
-							enum clScrollBar = fgbk(blue, cyan); 
-							
-							
-							static struct MenuItem
-							{
-								string title, shortcut, hint; 
-								bool selected, disabled, opened; 
-								MenuItem[] subMenu; 
-							} 
-							
-							void drawMenuTitle(Args...)(in MenuItem item, Args extra)
-							{
-								const clNormal = 	item.disabled 	? clMenuDisabled : 
-									item.selected 	? clMenuSelected 
-										: clMenuItem; 
-								const s = item.title, aidx = s.byDchar.countUntil('&'); 
-								if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
-								else {
-									Text(
-										clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
-										clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
-										clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
-										extra
-									); 
-								}
-							} 
-							
-							void drawSubMenu(R)(R items)
-								if(isForwardRange!(R, MenuItem))
-							{
-								sizediff_t measureItemWidth(in MenuItem item)
-								=> item.title.filter!"a!='&'".walkLength + 2
-								+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
-								
-								const maxWidth = items.save.map!measureItemWidth.maxElement; 
-								vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
-								Style(clMenuItem); 
-								
-								void shadow(size_t n) { Text(bk(black), opacity(.6), " ".replicate(n)); } 
-								
-								Text(chain(" \u00DA", "\u00C4".replicate(maxWidth), "\u00BF ")); NL; 
-								foreach(item; items)
-								{
-									Text(" \u00B3"); 
-									const space = maxWidth - measureItemWidth(item); 
-									if(item.shortcut!="")
-									{ drawMenuTitle(item, chain(" ".replicate(space+1), item.shortcut, " ")); }
-									else
-									{ drawMenuTitle(item, " ".replicate(space)); }
-									Text("\u00B3 "); shadow(2); NL; 
-								}
-								Text(chain(" \u00C0", "\u00C4".replicate(maxWidth), "\u00D9 ")); shadow(2); NL; 
-								Text(mx(2)); shadow(maxWidth+4); 
-								
-								
-								//Text(fg(yellow), bk(red), " Submenu goes here "~maxWidth.text); 
-							} 
-							
-							void drawMainMenu(R)(R items)
-								if(isForwardRange!(R, MenuItem))
-							{
-								foreach(item; items)
-								{
-									const pos = cursorPos; 
-									drawMenuTitle(item); 
-									if(item.opened && !item.subMenu.empty)
-									{
-										mixin(scope_remember(q{cursorPos})); 
-										Text(M(pos), my(1)); //move the cursor
-										drawSubMenu(item.subMenu); 
-									}
-								}
-							} 
-							
-							void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
-							{
-								void Btn(string s)
-								{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
-								
-								Style(clWindow); 
-								Text(
-									M(bnd.topLeft), "\u00C9\u00CD", { Btn("\u00FE"); }, 
-									chain(" ", title, " ").text.center(bnd.width-12, '\u00CD'), "1\u00CD",
-									{ Btn("\u0012"); }, "\u00CD\u00BB"
-								); 
-								const w = bnd.width-2, h = bnd.height-2; 
-								foreach(line; lines.padRight("", h).take(h))
-								{
-									Text(Mx(bnd.left), my(1), '\u00BA'); 
-									string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
-									foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
-									{
-										enum keywords = ["program", "var", "begin", "end", "integer"]; 
-										const isKeyword = keywords.canFind(word.text.lc); 
-										Text(fg(((isKeyword)?(white):(yellow))), word); 
-									}
-									Text(
-										clScrollBar, predSwitch(
-											cursorPos.y-bnd.top-1, 
-											0, '\u001E', 1, '\u00FE', h-1, '\u001F', '\u00B1'
-										)
-									); 
-								}
-								Text(
-									M(bnd.bottomLeft), my(-1), "\u00C8\u00CD",
-									chain(" ", "1:1", " ").text.center(17, '\u00CD'),
-									clScrollBar, chain("\u0011", "\u00FE", "\u00B1".replicate(bnd.width-24), "\u0010"),
-									clWindowClickable, "\u00C4\u00D9"
-								); 
-							} 
-							
-							void fillSpace() { while(cursorPos.x<80) Text(' '); } 
-							
-							
-							drawTextWindow
-							(
-								"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).genericArg!q{size})), 
-								"Program Add;
+						
+						
+						
+						drawTextWindow
+						(
+							"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).genericArg!q{size})), 
+							"Program Add;
 
 Var
 	Num1, Num2, Sum : integer;
@@ -1773,49 +1694,79 @@ Begin
 	Writeln(Sum);
 	Readln;
 End.".splitLines
-							); 
-							
-							static MenuItem[] mainMenuItems = 
-							[
-								{"&File"}, 
-								{"&Edit"}, 
-								{"&Search"}, 
-								{
-									"&Run", selected : true, opened : true, subMenu : 
-									[
-										{"&Run", shortcut : "Ctrl+F9", selected : true}, 
-										{"&Step over", shortcut : "F8"}, 
-										{"&Trace into", shortcut : "F7"}, 
-										{"&Go to cursor", shortcut : "F4"}, 
-										{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
-										{"P&rameters..."}
-									]
-								},
-								{"&Compile"}, 
-								{"&Debug"}, 
-								{"&Tools"}, 
-								{"&Options"}, 
-								{"&Window"}, 
-								{"&Help"},
-							]; 
-							
-							Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
-							
-							Text(
-								M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
-									clMenuItem, "Help \u00B3 Run the current program"
-							); fillSpace; 
-							
-							
-							//fgbk = 0x70; while(textPos.x<80) Text(" "); 
-						}
+						); 
+						
+						drawTextWindow
+						(
+							"JupiterLander.pas", ibounds2(ivec2(29, 5), ((ivec2(45, 19)).genericArg!q{size})), 
+							"".splitLines
+						); 
 					}
-					auto content = egaBuilder.extractGfxContent; 
+					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
+					
+					drawJupiterLander(ivec2(34, 12)); 
+					
+					with(tvBuilder)
+					{
+						static MenuItem[] mainMenuItems = 
+						[
+							{"&File"}, 
+							{"&Edit"}, 
+							{"&Search"}, 
+							{
+								"&Run", selected : true, opened : true, subMenu : 
+								[
+									{"&Run", shortcut : "Ctrl+F9", selected : true}, 
+									{"&Step over", shortcut : "F8"}, 
+									{"&Trace into", shortcut : "F7"}, 
+									{"&Go to cursor", shortcut : "F4"}, 
+									{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
+									{"P&rameters..."}
+								]
+							},
+							{"&Compile"}, 
+							{"&Debug"}, 
+							{"&Tools"}, 
+							{"&Options"}, 
+							{"&Window"}, 
+							{"&Help"},
+						]; 
+						
+						Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
+						
+						Text(
+							M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
+								clMenuItem, "Help \u00B3 Run the current program"
+						); fillSpace; 
+					}
+					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
+				}
+				
+				((0xE8CC5F5C4644).檢((update間(_間)))); 
+				{
+					auto builder = new Builder; 
+					with(builder)
+					{
+						//builder.drawSprite(vec2(0), 0, 3, false); 
+						drawPath(
+							q{
+								M 10,210 h.01 m 10 h 10 m 10 h 10 h 10 m 10 h 10 h 10 h 10
+								M 10,220 h 10 v 10 h-10 v-10 m 10 m 10
+								M 10,240 l10,10 q 30,0 0,30 h 10
+								M 10,280 l10,10 c 20,0 10,10 0, 20 h 10
+								
+								
+								M 0,0 M 0,0 M 0,0 M 0,0
+							}
+						); 
+					}
+					auto content = builder.extractGfxContent; 
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
+				((0xEB2B5F5C4644).檢((update間(_間)))); 
 				
-				((0xF42D5F5C4644).檢((update間(_間)))); 
+				
 			} 
 			
 			

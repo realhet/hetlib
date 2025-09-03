@@ -3835,8 +3835,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		auto fetchFrontN(T)(ref T[] arr, sizediff_t count)
 		{
-			auto i = min(arr.length, count),
-					 res = arr[0..i]; 
+			auto 	i 	= min(arr.length, count),
+				res 	= arr[0..i]; 
 			arr = arr[i..$]; 
 			return res; 
 		} 
@@ -9548,6 +9548,27 @@ version(/+$DIDE_REGION Colors+/all)
 				)
 			); 
 		} 
+		
+		auto packEvenBytes(T, size_t N)(in T[N] a)
+		{
+			const ref b = a.bitCast!(ubyte[T.sizeof*N]); 
+			enum M = b.length; 
+			static if(M==2) return cast(ubyte)b[0]; 
+			else static if(M==4) return cast(ushort)(b[0] | (b[2]<<8)); 
+			else static if(M==8)
+			{ uint res = b[0]; static foreach(i; 1..M/2) res |= cast(uint)(b[i*2])<<(i*8); return res; }
+			else static if(M==16)
+			{
+				//ulong res = b[0]; static foreach(i; 1..M/2) res |= (cast(ulong)(b[i*2]))<<(i*8); return res;
+				enum ubyte16 mask = mixin([0, 2, 4, 6, 8, 10, 12, 14, 0, 0, 0, 0, 0, 0, 0, 0]); 
+				const res = pshufb(loadUnaligned(&(b.bitCast!ubyte16)), mask); 
+				return res.bitCast!ulong; 
+			}
+			else static assert(false, "Invalid arg: "~typeof(a).stringof); 
+			
+			//Todo: unittest this
+		} 
+		
 		
 		
 		void drawPhaseAveragingTests(Dr)(Dr dr)

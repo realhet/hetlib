@@ -10,6 +10,9 @@ enum bugFix_LastTwoGeometryShaderStreamsMissing = (常!(bool)(1))
 	Try this with new drivers! (official and radeon-ID)
 +/; 
 
+alias Texture = VulkanWindow.Texture, 
+TexHandle = VulkanWindow.TexHandle; 
+
 /+
 	+This variant is sinchronizes put and fetch to itself 
 	and put() can be called in a destructor.
@@ -195,6 +198,16 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		}
 		return res; 
 	} 
+	
+	Bits!ulong assembleHandle(T)(in T handle)
+	{
+		const h = (cast(uint)(handle)); 
+		if(h<(1<<12)) return assemble(mixin(舉!((HandleFormat),q{u12})), bits(h, 12)); 
+		if(h<(1<<16)) return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
+		if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
+		return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
+	} 
+	
 	
 	/+
 		Bug: Without extra assemble() y value is wrapped above 256!!!
@@ -642,6 +655,8 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	
 	class GfxBuilder
 	{
+		/+Opt: final functions everywhere if possible!!!+/
+		
 		alias VertexData = VulkanWindow.VertexData; 
 		
 		
@@ -664,6 +679,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			return GfxContent(vbAppender[], gbAppender[], gbBits); 
 		} 
 		
+		///The appenders are keeping their memory ready to use.
 		void reset()
 		{
 			vbAppender.clear; 
@@ -671,6 +687,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			bitStreamAppender.reset; 
 		} 
 		
+		///This resets and frees up the appenders memory
 		void dealloc()
 		{
 			vbAppender = appender!(VertexData[])(); 
@@ -696,6 +713,42 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		final void begin()
 		{ vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); } final void end()
 		{ emit(mixin(舉!((Opcode),q{end}))); } 
+		
+		void emitBytes(void[] data)
+		{
+			auto ba = (cast(ubyte[])(data)); 
+			while(ba.length>=8)
+			{ emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
+			if(ba.length>=4)
+			{ emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
+			if(ba.length>=2)
+			{ emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
+			if(ba.length>=1)
+			{ emit(*(cast(ubyte*)(ba.ptr))); }
+		} 
+		
+		void emitEvenBytes(void[] data)
+		{
+			auto ba = (cast(ubyte[])(data)); 
+			while(ba.length>=16)
+			{ emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
+			if(ba.length>=8)
+			{ emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
+			if(ba.length>=4)
+			{ emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
+			if(ba.length>=2)
+			{ emit(ba[0]); }
+		} 
+		
+		void emit_setPALH(TexHandle handle)
+		{ emit(assemble(mixin(舉!((Opcode),q{setPALH})), assembleHandle(handle))); } 
+		void emit_setPALH(Texture tex)
+		{ emit_setPALH(tex.handle); } 
+		
+		void emit_setFMH(TexHandle handle)
+		{ emit(assemble(mixin(舉!((Opcode),q{setFMH})), assembleHandle(handle))); } 
+		void emit_setFMH(Texture tex)
+		{ emit_setFMH(tex.handle); } 
 	} 
 	
 	
@@ -941,7 +994,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x6C8782886ADB).檢(buffer.appendPos)); 
+				((0x738782886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -1000,7 +1053,14 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x737682886ADB).檢(buffer.appendPos)); 
+				((0x7A7682886ADB).檢(buffer.appendPos)); 
+				/+
+					optimization steps: 
+					77K 	base
+					61K 	assembleHandle (32->12 bits)
+					
+					
+				+/
 				buffer.upload; 
 			} 
 			
