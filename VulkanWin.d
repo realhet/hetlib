@@ -10,8 +10,6 @@ enum bugFix_LastTwoGeometryShaderStreamsMissing = (常!(bool)(1))
 	Try this with new drivers! (official and radeon-ID)
 +/; 
 
-alias Texture = VulkanWindow.Texture, 
-TexHandle = VulkanWindow.TexHandle; 
 
 /+
 	+This variant is sinchronizes put and fetch to itself 
@@ -149,85 +147,63 @@ alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 		[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 	]))
 +/
+
+struct BezierTesselationSettings
+{
+	enum Mode { points, lines, perPixel } 
+	Mode mode; 
+	int quadraticSegments, cubicSegments, arcMaxParts; 
+	
+	int estimateVertexCount(char cmd_) const
+	{
+		const cmd = cmd_.toAsciiUpper; 
+		const order = cmd.predSwitch(
+			'L', 1, 
+			'Q', 2, 'T', 2, 
+			'C', 3, 'S', 3, 'A', 3, 
+			0
+		); 
+		if(!order) return 0; 
+		const arcScale = cmd=='A' ? arcMaxParts : 1; 
+		final switch(mode)
+		{
+			case Mode.points: 	return order*4 /+4 vertices per points+/; 
+			case Mode.lines: 	switch(order) {
+				case 1: return 2; 
+				case 2: return 2 * quadraticSegments * arcScale; 
+				case 3: return 2 * cubicSegments * arcScale; 
+				default: return 0; 
+			}
+			case Mode.perPixel: 	switch(order) {
+				case 1: return 2; 
+				case 2: return 2 * 2 * quadraticSegments * arcScale; 
+				case 3: return 2 * 2 * cubicSegments * arcScale; 
+				default: return 0; 
+			}
+		}
+	} 
+} 
+
+alias BTSM = BezierTesselationSettings.Mode; 
+
+enum bezierTesselationSettings =
+	0.predSwitch
+	(
+	0, mixin(體!((BezierTesselationSettings),q{
+		mode 	: BTSM.perPixel,
+		quadraticSegments 	: 3,
+		cubicSegments	: 4
+	})),
+	1, mixin(體!((BezierTesselationSettings),q{
+		mode 	: BTSM.lines,
+		quadraticSegments 	: 6,
+		cubicSegments	: 8
+	})),
+	2, mixin(體!((BezierTesselationSettings),q{mode : BTSM.points}))
+); 
 
 version(/+$DIDE_REGION Geometry Stream Processor+/all)
 {
-	struct Bits(T)
-	{
-		T data; 
-		size_t bitCnt; 
-		
-		///'other' is casted to T
-		///There is NO bit range/overflow checking!!!
-		auto opBinary(string op : "~", B)(B other) const
-		{
-			static if(is(B==Bits!T2, T2))
-			return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
-			else
-			return this ~ bits(other); 
-		} 
-	} 
-	
-	auto bits(T)(T data, size_t bitCnt)
-	=> Bits!T(data, bitCnt); 
-	
-	auto bits(T)(in T a)
-	{
-		static if(is(T==vec2)) return bits(*(cast(ulong*)(&a))); 
-		else static if(is(T==enum))
-		{
-			static if(is(T==Opcode))
-			{ return bits(opInfo[a].bits, opInfo[a].bitCnt); }
-			else
-			{ return bits(a, EnumBits!T); }
-		}
-		else
-		{ return bits(a, T.sizeof * 8); }
-	} 
-	
-	auto assemble(A...)(A args)
-	{
-		//Todo: overflow check!
-		Bits!ulong res; 
-		static foreach(i, a; args)
-		{
-			{
-				static if(is(A[i] : Bits!B, B))	res = res ~ a; 
-				else	res = res ~ bits(a); 
-			}
-		}
-		return res; 
-	} 
-	
-	Bits!ulong assembleHandle(T)(in T handle)
-	{
-		const h = (cast(uint)(handle)); 
-		if(h<(1<<12)) return assemble(mixin(舉!((HandleFormat),q{u12})), bits(h, 12)); 
-		if(h<(1<<16)) return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
-		if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
-		return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
-	} 
-	
-	
-	/+
-		Bug: Without extra assemble() y value is wrapped above 256!!!
-		/+
-			Code: auto aaa = [
-				assemble(
-					mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits(256, 16), 
-						bits(256, 16)
-				),
-				assemble(
-					mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), assemble(
-						bits(256, 16), 
-						bits(256, 16)
-					)
-				)
-			]; 
-			if(aaa[0]!=aaa[1]) LOG(aaa); 
-		+/
-	+/
-	
 	/+
 		General rules of enums:
 		 - enum item Order is important, GLSL sources rely on it.
@@ -291,6 +267,98 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum CoordFormat {f32, i16, i12, i8} 
 	enum XYFormat {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
 	enum FlagFormat {tex, font, vec, all} 
+	
+	struct Bits(T)
+	{
+		T data; 
+		size_t bitCnt; 
+		
+		///'other' is casted to T
+		///There is NO bit range/overflow checking!!!
+		auto opBinary(string op : "~", B)(B other) const
+		{
+			static if(is(B==Bits!T2, T2))
+			return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
+			else
+			return this ~ bits(other); 
+		} 
+	} 
+	
+	auto bits(T)(T data, size_t bitCnt)
+	=> Bits!T(data, bitCnt); 
+	
+	auto bits(T)(in T a)
+	{
+		static if(is(T==vec2)) return bits(*(cast(ulong*)(&a))); 
+		else static if(is(T==enum))
+		{
+			static if(is(T==Opcode))
+			{ return bits(opInfo[a].bits, opInfo[a].bitCnt); }
+			else
+			{ return bits(a, EnumBits!T); }
+		}
+		else
+		{ return bits(a, T.sizeof * 8); }
+	} 
+	
+	auto assemble(A...)(A args)
+	{
+		//Todo: overflow check!
+		Bits!ulong res; 
+		static foreach(i, a; args)
+		{
+			{
+				static if(is(A[i] : Bits!B, B))	res = res ~ a; 
+				else	res = res ~ bits(a); 
+			}
+		}
+		return res; 
+	} 
+	
+	Bits!ulong assembleHandle(T)(in T handle)
+	{
+		const h = (cast(uint)(handle)); 
+		if(h<(1<<12)) return assemble(mixin(舉!((HandleFormat),q{u12})), bits(h, 12)); 
+		if(h<(1<<16)) return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
+		if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
+		return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
+	} 
+	
+	Bits!ulong assembleSize(T)(in T size)
+	{
+		static if(is(T : int))	{ const i = size.max(0), f = float(i), isInt = true; }
+		else static if(is(T : float))	{ const f = size.max(0), i = (iround(f)), isInt = i==f; }
+		else static assert(false, "Unhandled type: "~T.stringof); 
+		if(isInt)
+		{
+			if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits(i, 4)); 
+			if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits(i, 8)); 
+		}
+		const logf = f.log2*128.0f, logi = (iround(logf)), exact = logf==logi; 
+		if(exact && mixin(界1(q{0},q{logi},q{1<<12})))	return assemble(mixin(舉!((SizeFormat),q{ulog12})), bits(logi, 12)); 
+		else	return assemble(mixin(舉!((SizeFormat),q{f32})), f); 
+	} 
+	
+	void unittest_assembleSize()
+	{
+		// Test integer cases
+		assert(assembleSize(5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(5, 4))); 
+		assert(assembleSize(20) == assemble(mixin(舉!((SizeFormat),q{u8})), bits(20, 8))); 
+		
+		// Test exact log cases
+		float exactSize = exp2(64.0f / 128.0f); // log2(exactSize)*128 = 64
+		assert(assembleSize(exactSize) == assemble(mixin(舉!((SizeFormat),q{ulog12})), bits(64, 12))); 
+		
+		// Test float fallback
+		float nonExactSize = 3.14159f; 
+		assert(assembleSize(nonExactSize) == assemble(mixin(舉!((SizeFormat),q{f32})), nonExactSize)); 
+		
+		// Test negative clamping
+		assert(assembleSize(-5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
+		assert(assembleSize(-1.5f) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
+	} 
+	
+	
 	
 	
 	
@@ -655,46 +723,55 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	
 	class GfxBuilder
 	{
-		/+Opt: final functions everywhere if possible!!!+/
+		/+Opt: final functions everywhere if possible!!! Do timing tests!!!+/
 		
-		alias VertexData = VulkanWindow.VertexData; 
+		alias VertexData 	= VulkanWindow.VertexData,
+		Texture 	= VulkanWindow.Texture, 
+		TexHandle 	= VulkanWindow.TexHandle; 
 		
 		
-		protected
+		version(/+$DIDE_REGION Bitstream management+/all)
 		{
-			Appender!(VertexData[]) vbAppender; 
-			Appender!(ulong[]) gbAppender; 
-			BitStreamAppender bitStreamAppender; 
-			final void onBitStreamAppenderFull(ulong data)
-			{ gbAppender ~= data; } 
-		} 
-		
-		this()
-		{ bitStreamAppender.onBuffer = &onBitStreamAppenderFull; } 
-		
-		GfxContent extractGfxContent()
-		{
-			const gbBits = gbBitPos; 
-			bitStreamAppender.flush; 
-			return GfxContent(vbAppender[], gbAppender[], gbBits); 
-		} 
-		
-		///The appenders are keeping their memory ready to use.
-		void reset()
-		{
-			vbAppender.clear; 
-			gbAppender.clear; 
-			bitStreamAppender.reset; 
-		} 
-		
-		///This resets and frees up the appenders memory
-		void dealloc()
-		{
-			vbAppender = appender!(VertexData[])(); 
-			gbAppender = appender!(ulong[])(); 
-			bitStreamAppender.reset; 
-		} 
-		
+			protected
+			{
+				Appender!(VertexData[]) vbAppender; 
+				Appender!(ulong[]) gbAppender; 
+				BitStreamAppender bitStreamAppender; 
+				final void onBitStreamAppenderFull(ulong data)
+				{ gbAppender ~= data; } 
+			} 
+			
+			this()
+			{ bitStreamAppender.onBuffer = &onBitStreamAppenderFull; } 
+			
+			final @property gbBitPos() 
+			=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
+			
+			GfxContent extractGfxContent()
+			{
+				end; 
+				const gbBits = gbBitPos; 
+				bitStreamAppender.flush; 
+				return GfxContent(vbAppender[], gbAppender[], gbBits); 
+			} 
+			
+			///The appenders are keeping their memory ready to use.
+			void reset()
+			{
+				vbAppender.clear; 
+				gbAppender.clear; 
+				bitStreamAppender.reset; 
+			} 
+			
+			///This resets and frees up the appenders memory
+			void dealloc()
+			{
+				vbAppender = appender!(VertexData[])(); 
+				gbAppender = appender!(ulong[])(); 
+				bitStreamAppender.reset; 
+			} 
+		}
+		
 		final void emit(Args...)(in Args args)
 		{
 			static foreach(i, T; Args)
@@ -706,13 +783,6 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				}
 			}
 		} 
-		
-		final @property gbBitPos() 
-		=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
-		
-		final void begin()
-		{ vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); } final void end()
-		{ emit(mixin(舉!((Opcode),q{end}))); } 
 		
 		void emitBytes(void[] data)
 		{
@@ -739,16 +809,130 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			if(ba.length>=2)
 			{ emit(ba[0]); }
 		} 
+		
+		protected mixin template ChangeDetectedTexHandle(string name)
+		{
+			mixin(iq{
+				void emit_set$(name)(TexHandle handle)
+				{ emit(assemble(Opcode.set$(name), assembleHandle(handle))); } 
+				void emit_set$(name)(Texture tex)
+				{ emit_set$(name)(tex.handle); } 
+				
+				protected TexHandle user_$(name); 
+				@property $(name)() const => user_$(name); 
+				@property $(name)(TexHandle val)
+				{
+					if(user_$(name).chkSet(val))
+					{
+						/*
+							The user changed the internal state. Change detection, 
+							and precompilation can go here.
+						*/
+					}
+				} 
+				@property $(name)(Texture tex)
+				{$(name)= tex ? tex.handle : TexHandle.init; } 
+				
+				protected TexHandle target_$(name); 
+				void synch_$(name)()
+				{
+					if(target_$(name).chkSet(user_$(name)))
+					{
+						/+
+							The internal state was different to the target GPU state.
+							So it have to be emited.
+						+/
+						emit_set$(name)(target_$(name)); 
+					}
+				} 
+			}.text); 
+		} 
 		
-		void emit_setPALH(TexHandle handle)
-		{ emit(assemble(mixin(舉!((Opcode),q{setPALH})), assembleHandle(handle))); } 
-		void emit_setPALH(Texture tex)
-		{ emit_setPALH(tex.handle); } 
+		mixin ChangeDetectedTexHandle!"FMH"; 	/* Font map handle */
+		mixin ChangeDetectedTexHandle!"LFMH"; 	/* Latin font map handle */
+		mixin ChangeDetectedTexHandle!"PALH"; 	/* Palette handle */
+		mixin ChangeDetectedTexHandle!"LTH"; 	/* Line texture handle */
 		
-		void emit_setFMH(TexHandle handle)
-		{ emit(assemble(mixin(舉!((Opcode),q{setFMH})), assembleHandle(handle))); } 
-		void emit_setFMH(Texture tex)
-		{ emit_setFMH(tex.handle); } 
+		protected mixin template ChangeDetectedSize(string name)
+		{
+			mixin(iq{
+				void emit_set$(name)(float size)
+				{ emit(assemble(Opcode.set$(name), assembleSize(size))); } 
+				void emit_set$(name)(floatTexture tex)
+				{ emit_set$(name)(tex.handle); } 
+				
+				protected TexHandle _$(name); 
+				@property $(name)() const => _$(name); 
+				@property $(name)(TexHandle val)
+				{ if(_$(name).chkSet(val)) emit_set$(name)(val); } 
+			}.text); 
+		} 
+		
+		/+
+			mixin ChangeDetectedSize!"PS"; 	/* Point size */
+			mixin ChangeDetectedSize!"LW"; 	/* Line width */
+			mixin ChangeDetectedSize!"DL"; 	/* Dot lenthg */
+			mixin ChangeDetectedSize!"FH"; 	/* Font height */
+		+/
+		
+		protected void synch_reset()
+		{
+			//the target gpu state is reseted, to the initial shader state
+			target_FMH = TexHandle.init; 
+			target_LFMH = TexHandle.init; 
+			target_PALH = TexHandle.init; 
+			target_LTH = TexHandle.init; 
+		} 
+		
+		protected int actVertexCount; 
+		protected bool insideBlock; 
+		
+		///Closes the block with an 'end' opcode. Only if there is an actual block.
+		final void end()
+		{
+			if(insideBlock.chkClear)
+			{ emit(mixin(舉!((Opcode),q{end}))); }
+		} 
+		
+		///It always starts a new block.  Emits 'end' if needed.
+		final void begin()
+		{
+			if(insideBlock) end; 
+			vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
+			synch_reset; 
+			actVertexCount=0; 
+			insideBlock = true; 
+		} 
+		
+		enum maxVertexCount = 127; 
+		
+		@property remainingVertexCount() const
+		=> maxVertexCount - actVertexCount; 
+		
+		///Tries to continue the current block with the required vertices.
+		///If a new block started, it emits setup code.
+		final void begin(int requiredVertexCount, void delegate() onSetup)
+		{
+			if(insideBlock)
+			{
+				const newVertexCount = actVertexCount + requiredVertexCount; 
+				if(newVertexCount <= maxVertexCount)
+				{
+					actVertexCount = newVertexCount; 
+					/+Actual block is continued.+/
+					//print("continuing block", gbBitPos, actVertexCount); 
+				}
+				else
+				{ begin; onSetup(); }
+			}
+			else
+			{ begin; onSetup(); }
+			/+
+				Todo: Handle the case when maxVertexCount > requiredVertexCount.
+				Because that's an automatic fail, but must be handled on the 
+				caller side, not here.
+			+/
+		} 
 	} 
 	
 	
@@ -994,7 +1178,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x738782886ADB).檢(buffer.appendPos)); 
+				((0x89B982886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -1053,12 +1237,12 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x7A7682886ADB).檢(buffer.appendPos)); 
+				((0x90A882886ADB).檢(buffer.appendPos)); 
 				/+
 					optimization steps: 
 					77K 	base
-					61K 	assembleHandle (32->12 bits)
-					
+					61K	assembleHandle (32->12 bits)
+					59K	bug fixed: C64 border was drawn for all rows
 					
 				+/
 				buffer.upload; 
@@ -2046,6 +2230,7 @@ class VulkanWindow: Window
 			
 			#define FragMode_fullyFilled 0
 			#define FragMode_cubicBezier 1
+			#define FragMode_glyphStrip 2
 			
 			#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
 			#define setFragMode(a) setBits(fragTexHandleAndMode, 28, 4, a)
@@ -2835,7 +3020,7 @@ class VulkanWindow: Window
 				return vec4(0, 1, 0, 1); //lines are green
 			} 
 			
-			void emitPathCodeDebugPoint(uint code)
+			void emitPathCodeDebugPoint(uint code, float r)
 			{
 				setFragMode(FragMode_fullyFilled); fragColor = vec4(1,0,1,1); 
 				switch(code)
@@ -2849,8 +3034,7 @@ class VulkanWindow: Window
 					case PathCode_C2: 	fragColor = vec4(0,.5,1,1); 	break; 
 					case PathCode_C3: 	fragColor = vec4(0,1,1,1); 	break; 
 				}
-				const float siz = 2; 
-				emitTexturedPointPointRect2D(P4-siz, P4+siz); 
+				emitTexturedPointPointRect2D(P4-r, P4+r); 
 			} 
 			
 			void latchP(vec2 newP)
@@ -2878,26 +3062,57 @@ class VulkanWindow: Window
 			void setFragMode_C(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
 			{ setFragModeAndFloats(mode, P0, P1, P2, P3); } 
 			
+			void convertQuadtraticBezierControlPointsToCubic(
+				in vec2 P0, in vec2 P1, in vec2 P2,
+				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
+			)
+			{ Q0=P0, Q1=mix(P0, P1, 2/3.0), Q2=mix(P1, P2, 1/3.0), Q3=P2; } 
+			
+			void copyCubicBezierControlPoints(
+				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
+				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
+			)
+			{ Q0=P0, Q1=P1, Q2=P2, Q3=P3; } 
+			
+			void acquireCubicBezierControlPoints(
+				in bool isQuadratic,
+				in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
+				out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
+			)
+			{
+				if(isQuadratic)
+				convertQuadtraticBezierControlPointsToCubic(
+					P0,P1,P2, 
+					Q0,Q1,Q2,Q3
+				); 
+				else
+				copyCubicBezierControlPoints             (
+					P0,P1,P2,P3, 
+					Q0,Q1,Q2,Q3
+				); 
+				
+			} 
+			
 			void shiftInPathCode(uint code)
 			{
 				PathCodeQueue >>= PathCode_bits; 
 				setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
 				
-				const bool 	debugPointsOnly 	= false
-				,	enableBezierShader 	= true
-				,	enableDebugColors 	= false; 
+				const bool 	Mode_Points 	= $(bezierTesselationSettings.mode == BTSM.points)
+				,	Mode_PerPixel 	= $(bezierTesselationSettings.mode == BTSM.perPixel)
+				,	EnableDebugColors 	= false; 
 				
-				if(debugPointsOnly)
-				{ emitPathCodeDebugPoint(code); }
+				const float r = 2.5;  //Todo: radius handling!!!
+				if(Mode_Points)
+				{ emitPathCodeDebugPoint(code, r); }
 				else
 				{
-					const float r = 2.5; 
 					const uint PC1 = PathCode(1), PC2 = PathCode(2); 
 					
-					if(enableDebugColors)	fragColor = PathCodeQueue_debugColor(); 
+					if(EnableDebugColors)	fragColor = PathCodeQueue_debugColor(); 
 					else	fragColor = PC; 
 					
-					if(enableBezierShader)
+					if(Mode_PerPixel)
 					{
 						switch(PC2)
 						{
@@ -2910,6 +3125,10 @@ class VulkanWindow: Window
 					else
 					{ setFragModeAndFloats(FragMode_fullyFilled, vec2(0), vec2(0), vec2(0), vec2(0)); }
 					
+					/*
+						Todo: Remake this in a way that it emits evry primitive as fast as it can.
+						It is maybe impossible because beziers must know their control points BEFORE the first verices.
+					*/
 					if(PC1>=PathCode_L || PC2>=PathCode_L /*any line or curve*/)
 					{
 						if(PC2==PathCode_Q2 || PC2==PathCode_C2 || PC2==PathCode_C3 /*any curve*/)
@@ -2917,20 +3136,20 @@ class VulkanWindow: Window
 							if(PC2!=PathCode_C3)
 							{
 								vec2 Q0,Q1,Q2,Q3; /*Q: cubic bezier params*/
-								if(PC2==PathCode_Q2)
-								Q0=P0, Q1=mix(P0, P1, 2/3.0), Q2=mix(P1, P2, 1/3.0), Q3=P2; 
-								else
-								Q0=P0, Q1=P1, Q2=P2, Q3=P3; 
-								
-								if(enableBezierShader)
+								const bool isQuadratic = PC2==PathCode_Q2; 
+								acquireCubicBezierControlPoints(isQuadratic, P0,P1,P2,P3, Q0,Q1,Q2,Q3); 
+								const int N = ((isQuadratic)?($(bezierTesselationSettings.quadraticSegments)) :($(bezierTesselationSettings.cubicSegments))); 
+								if(Mode_PerPixel)
 								{
-									int N = PC2==PathCode_Q2 ? 3 : 4; 
 									for(int i=0; i<N; i++)
 									{
 										vec2 R0,R1,R2,R3; 
 										if(splitBezier_ration(i, N, Q0,Q1,Q2,Q3, R0,R1,R2,R3))
 										{
-											//setFragMode_C(FragMode_cubicBezier, R0, R1, R2, R3); 
+											/*
+												//local bezier params. This are simpler than the whole curve
+												setFragMode_C(FragMode_cubicBezier, R0, R1, R2, R3); 
+											*/
 											if(i>0) emitBezierAtStart(R0, R1, r); 
 											emitCubicBezierMidJoint(R0, R1, R2, R3, r, r); 
 										}
@@ -2938,7 +3157,6 @@ class VulkanWindow: Window
 								}
 								else
 								{
-									const int N = PC2==PathCode_Q2 ? 8 : 12; 
 									const float invN = 1.0/N; 
 									for(int i=1; i<N; i++)
 									emitCubicBezierAt(i*invN, Q0, Q1, Q2, Q3, r, r); 
@@ -2947,6 +3165,7 @@ class VulkanWindow: Window
 						}
 						else
 						{
+							//Todo: this should be P2, P3, P4.  As fast as it can!
 							emitLineJoint(
 								PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
 								P1, 
@@ -2959,7 +3178,7 @@ class VulkanWindow: Window
 				
 				//Todo: automatically close the final path via appending an empty PathCode_M
 			} 
-			
+			
 			
 			//Internal state for batch operations
 			uint pendingChars = 0; 
@@ -2967,43 +3186,68 @@ class VulkanWindow: Window
 			uint repeatedChar; 
 			//Opt: put all this information into one uint!
 			void drawMove(inout BitStream bitStream)
-			{ latchP(fetchP(bitStream)); } 
+			{ P4 = fetchP(bitStream); } 
+			
+			void drawTexRect(inout BitStream bitStream)
+			{
+				P3 = P4; P4 = fetchP(bitStream); 
+				
+				const uint handleFmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
+				const uint texHandle = fetchHandle(bitStream, handleFmt); 
+				
+				fragColor = PC; fragBkColor = SC; 
+				setFragMode(FragMode_fullyFilled); 
+				setFragTexHandle(texHandle); 
+				fragTexCoordZ = 0; 
+				
+				emitTexturedPointPointRect2D(P3.xy, P4.xy); 
+			} 
+			
+			const bool EnbaleAsciiStrips = true; 
+			
+			void drawASCII_rect(uint ch)
+			{
+				vec2 size = vec2(getTexSize(FMH).xy); 
+				size *= FH*(1.0/size.y); 
+				fragTexCoordZ = ch; 
+				emitTexturedPointPointRect2D(P4.xy, P4.xy+size); 
+				
+				P4.x += size.x; //advance cursor
+			} 
+			
+			void drawASCII_strip(uint ch, bool isLast)
+			{
+				vec2 size = vec2(getTexSize(FMH).xy); 
+				size *= FH*(1.0/size.y); 
+				
+				fragTexCoordZ = ch; 
+				
+				fragTexCoordXY.y = 0; emitVertex2D(P4.xy); 
+				fragTexCoordXY.y = 1; emitVertex2D(vec2(P4.x, P4.y + size.y)); 
+				
+				//advance
+				P4.x += size.x; 
+				fragTexCoordXY.x += 1; 
+				
+				if(isLast)
+				{
+					fragTexCoordXY.y = 0; emitVertex2D(P4.xy); 
+					fragTexCoordXY.y = 1; emitVertex2D(vec2(P4.x, P4.y + size.y)); 
+					EndPrimitive(); 
+				}
+			} 
 			
 			void drawChars(inout BitStream bitStream, bool repeated_)
 			{
 				pendingChars = fetchBits(bitStream, 6)+1; 
 				repeated = repeated_; 
 				if(repeated) repeatedChar = fetchBits(bitStream, 8); 
-			} 
-			
-			void drawTexRect(inout BitStream bitStream)
-			{
-				drawMove(bitStream); 
-				
-				const uint handleFmt = fetchBits(bitStream, $(EnumBits!HandleFormat)); 
-				const uint texHandle = fetchHandle(bitStream, handleFmt); 
 				
 				fragColor = PC; fragBkColor = SC; 
-				fragTexHandleAndMode = texHandle; 
-				emitTexturedPointPointRect2D(P3.xy, P4.xy); 
+				setFragTexHandle(FMH); 
+				setFragMode(EnbaleAsciiStrips ? FragMode_glyphStrip : FragMode_fullyFilled); 
+				fragTexCoordXY.x = 0; 
 			} 
-			
-			void drawASCII(uint ch)
-			{
-				vec2 size = vec2(getTexSize(FMH).xy); 
-				
-				size *= FH*(1.0/size.y); 
-				
-				fragTexCoordZ = ch; 
-				fragColor = PC; fragBkColor = SC; 
-				
-				fragTexHandleAndMode = FMH; 
-				emitTexturedPointPointRect2D(P4.xy, P4.xy+size); 
-				
-				fragTexCoordZ = 0; //restore it
-				latchP(P4 + vec2(size.x, 0)); //advance cursor
-			} 
-			
 			
 			float 	Ph 	= 0, 
 				Ph_next 	= 0; 	/* Phase coordinate */
@@ -3133,6 +3377,9 @@ class VulkanWindow: Window
 						case PathCode_Q1: case PathCode_Q2: 
 						case PathCode_C1: case PathCode_C2: case PathCode_C3: 
 							{
+							//Todo: set these states it less frequently!!!
+							fragColor = PC; fragBkColor = SC; setFragTexHandle(0); 
+							
 							latchP(fetchXY(bitStream, P4)); 
 							shiftInPathCode(pendingPathCode); 
 							pendingPathCode = PathCode_next(pendingPathCode); 
@@ -3144,7 +3391,14 @@ class VulkanWindow: Window
 				
 				if(pendingChars>0)
 				{
-					drawASCII(repeated ? repeatedChar : fetchBits(bitStream, 8)); 
+					if(true)
+					{
+						const bool isLast = pendingChars==1; 
+						drawASCII_strip(repeated ? repeatedChar : fetchBits(bitStream, 8), isLast); 
+					}
+					else
+					{ drawASCII_rect(repeated ? repeatedChar : fetchBits(bitStream, 8)); }
+					
 					pendingChars--; 
 				}
 			} 
@@ -3171,11 +3425,13 @@ class VulkanWindow: Window
 			$(TexSizeFormat.GLSLCode)
 			
 			uint fragMode, fragTexHandle; 
+			vec2 texCoordXY; 
 			
 			void initFragmentParams()
 			{
 				fragMode = getFragMode; 
 				fragTexHandle = getFragTexHandle; 
+				texCoordXY = fragTexCoordXY; 
 			} 
 			/*
 				--------------------------------------------------------------
@@ -4191,7 +4447,7 @@ class VulkanWindow: Window
 					for(int i=0; i<6; i++)
 					{
 						vec2 rooks = rooks6_offsets[i]; 
-						vec2 tc = fragTexCoordXY + 	rooks.x * texCoordDx + 
+						vec2 tc = texCoordXY + 	rooks.x * texCoordDx + 
 							rooks.y * texCoordDy; 
 						vec4 smp = readSample(fragTexHandle, vec3(tc, fragTexCoordZ), true, false); 
 						sum += smp; 
@@ -4199,11 +4455,17 @@ class VulkanWindow: Window
 					return sum/6; 
 				}
 				else
-				{ return readSample(fragTexHandle, vec3(fragTexCoordXY, fragTexCoordZ), true, false); }
+				{ return readSample(fragTexHandle, vec3(texCoordXY, fragTexCoordZ), true, false); }
 			} 
 			
 			void main() {
 				initFragmentParams(); 
+				
+				if(fragMode==FragMode_glyphStrip)
+				{
+					//textCoord.x is interpolated, so the integer part must be removed
+					texCoordXY.x = fract(texCoordXY.x); 
+				}
 				
 				const vec4 ndcPos = vec4(
 					2*(gl_FragCoord.xy-UB.viewport.xy)/(UB.viewport.zw)-1,
@@ -4215,7 +4477,7 @@ class VulkanWindow: Window
 				if((fragMode==FragMode_cubicBezier))
 				{
 					float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
-					float t = fract(fragTexCoordXY.x); 
+					float t = fract(texCoordXY.x); 
 					float r = 2.5; //Todo: send radiuses into the pixel shader!
 					if(dst>r) discard; 
 				}
@@ -4482,7 +4744,10 @@ class VulkanWindow: Window
 	} 
 	
 	void selfTest()
-	{ TexSizeFormat.selfTest; } 
+	{
+		TexSizeFormat.selfTest; 
+		unittest_assembleSize; 
+	} 
 	
 	
 	override void onInitializeGLWindow()

@@ -6675,22 +6675,22 @@ version(/+$DIDE_REGION Containers+/all)
 		bool isAsciiUpper(char c) pure
 		{ return c.inRange('A', 'Z'); } 
 		
-		char asciiUpper(char c) pure
+		char toAsciiUpper(char c) pure
 		{ return cast(char)(cast(int)c + (c.isAsciiUpper ? 0 : 'A'-'a')); } 
-		char asciiLower(char c) pure
+		char toAsciiLower(char c) pure
 		{ return cast(char)(cast(int)c + (c.isAsciiLower ? 0 : 'a'-'A')); } 
 		
-		string asciiUpper(string s)
+		string toAsciiUpper(string s)
 		{
 			//Opt: this is terrible coding from the times when I was so dumb
 			char[] res = s.dup; 
-			foreach(ref char ch; res) ch = ch.asciiUpper; 
+			foreach(ref char ch; res) ch = ch.toAsciiUpper; 
 			return cast(string)res; 
 		} 
-		string asciiLower(string s)
+		string toAsciiLower(string s)
 		{
 			char[] res = s.dup; 
-			foreach(ref char ch; res) ch = ch.asciiLower; 
+			foreach(ref char ch; res) ch = ch.toAsciiLower; 
 			return cast(string)res; 
 		} 
 		

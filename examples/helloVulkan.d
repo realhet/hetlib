@@ -507,26 +507,36 @@ version(/+$DIDE_REGION+/all) {
 			
 			class Builder : GfxBuilder
 			{
-				void drawRect(ibounds2 bnd, int fg)
+				void drawC64Rect(ibounds2 bnd, int fg)
 				{
-					begin; 
-					emit_setPALH(c64Palette); 
+					begin(4, {}); 
+					synch_PALH; 
 					emit(
 						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
 						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
 						assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight),
-						assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12))
+						assembleHandle(0)
 					); 
-					end; 
 				} 
 				
-				void drawMark(ivec2 p, int fg = 7)
-				{ drawRect(ibounds2(p, ((1).genericArg!q{size})), fg); } 
+				void drawC64Mark(ivec2 p, int fg = 7)
+				{ drawC64Rect(ibounds2(p, ((1).genericArg!q{size})), fg); } 
 				
-				void drawSprite(vec2 pos, int idx, int fg, bool doubleSize)
+				void emitC64Border(ivec2 pos, int fg)
 				{
-					begin; 
-					emit_setPALH(c64Palette); 
+					void r(int x0, int y0, int x1, int y1)
+					{
+						auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
+						drawC64Rect(ibounds2(p(x0, y0), p(x1, y1)), fg); 
+					} 
+					r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
+					r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
+				} 
+				
+				void drawC64Sprite(vec2 pos, int idx, int fg, bool doubleSize)
+				{
+					begin(4, {}); 
+					synch_PALH; 
 					emit_setFMH(sprites.tex); 
 					emit(
 						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
@@ -534,61 +544,58 @@ version(/+$DIDE_REGION+/all) {
 						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
 						assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(0, 6), (cast(ubyte)(idx)))
 					); 
-					end; 
 				} 
 				
-				void drawBorder(ivec2 pos, int fg)
+				void emitC64Screen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
 				{
-					begin; 
-					emit_setPALH(c64Palette); 
-					emit(
-						assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-						
-					); 
-					void r(int x0, int y0, int x1, int y1)
-					{
-						vec2 p(int x, int y) => vec2(pos+ivec2(x, y))*8; 
-						emit(
-							assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), p(x0, y0),
-							assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), p(x1, y1), 
-								assemble(mixin(舉!((HandleFormat),q{u12})), bits(0, 12)),
-						); 
-					} 
-					r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
-					r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
-					end; 
-				} 
-				
-				void drawScreen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
-				{
+					emitC64Border(pos-4, borderCol); 
 					foreach(y; 0..img.height)
-					{
-						drawBorder(pos-4, borderCol); 
-						drawChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); 
-					}
+					{ drawChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
 				} 
 				
 				void drawChrRow(ivec2 pos, RG[] data, int bk)
 				{
 					if(data.empty) return; 
-					begin; 
-					emit_setPALH(c64Palette); 
-					emit_setFMH(font.tex); 
-					emit(
-						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
-						assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x, 16), bits(pos.y, 16),
-						assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4))
-					); 
 					
-					static RG[] fetchSameColor(ref RG[] data)
+					int index = 0; 
+					
+					void setup()
+					{
+						emit_setPALH(c64Palette); 
+						emit_setFMH(font.tex); 
+						emit(
+							assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
+							assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4)),
+							assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x+index*8, 16), bits(pos.y, 16)
+						); 
+					} 
+					
+					//begin; setup;
+					
+					static RG[] fetchSameColor(ref RG[] data, size_t maxCount)
 					{
 						if(data.empty) return []; 
 						const fg = data.front.y; 
 						auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
+						n.minimize(maxCount); 
 						auto res = data[0..n]; data = data[n..$]; return res; 
 					} 
 					
-					enum MinRunLength = 2; 
+					enum MinRunLength = 2,
+					MaxRunLength = 64; 
+					
+					static sizediff_t countDifferentChars(RG[] data)
+					{
+						if(data.length>=1+MinRunLength)
+						{
+							enum SkipAtStart = 1; 
+							const i = 	data[SkipAtStart..$]
+								.slide!(No.withPartial)(MinRunLength)
+								.countUntil!((a)=>(a.all!((b)=>(b.x==a[0].x)))); 
+							if(i>=0) return i+SkipAtStart; 
+						}
+						return data.length; 
+					} 
 					
 					void emitSameChars(ref RG[] data)
 					{
@@ -600,19 +607,6 @@ version(/+$DIDE_REGION+/all) {
 							emit(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII_rep}))), bits(n-1, 6), ch)); 
 							data = data[n..$]; 
 						}
-					} 
-					
-					sizediff_t countDifferentChars(RG[] data)
-					{
-						if(data.length>=1+MinRunLength)
-						{
-							enum SkipAtStart = 1; 
-							const i = 	data[SkipAtStart..$]
-								.slide!(No.withPartial)(MinRunLength)
-								.countUntil!((a)=>(a.all!((b)=>(b.x==a[0].x)))); 
-							if(i>=0) return i+SkipAtStart; 
-						}
-						return data.length; 
 					} 
 					
 					void emitDifferentChars(ref RG[] data)
@@ -630,11 +624,20 @@ version(/+$DIDE_REGION+/all) {
 						{ emitSameChars(data); emitDifferentChars(data); }
 					} 
 					
+					index = 0; 
 					while(data.length)
 					{
-						auto act = fetchSameColor(data); 
+						size_t remainingChars = min(maxVertexCount/4, MaxRunLength/+should go next to the opcodes, not here!+/); 
+						begin; setup;  //Todo: chain it to the end of previous
+						
+						auto act = fetchSameColor(data, remainingChars); 
+						const nextIndex = index + act.length.to!int; 
 						emit(assemble(bits(mixin(舉!((Opcode),q{setPC}))), mixin(舉!((ColorFormat),q{u4})), bits(act[0].y, 4))); 
 						emitRun(act); 
+						
+						//Todo: make a whole line of text a triangle strip!
+						
+						index = nextIndex; 
 					}
 					end; 
 				} 
@@ -642,7 +645,8 @@ version(/+$DIDE_REGION+/all) {
 				void drawPath(Args...)(in Args args)
 				{
 					begin; /+Todo: number of vertex limit handling!!! /+Code: bool insideBlock; uint vcnt; +/+/
-					//print("fuck"); 
+					
+					
 					
 					void emitPathCmd(A...)(in Opcode op, in A args)
 					{
@@ -675,7 +679,8 @@ version(/+$DIDE_REGION+/all) {
 							case SvgPathCommand.Z: 	if(P_last!=P_start)
 							{
 								emitPathCmd(mixin(舉!((Opcode),q{drawPathL})), P_start); 
-								/+Todo: move it to GPU+//+Todo: tangent!+/
+								/+Todo: move it to GPU+/
+								/+Todo: only works for line+/
 							}	P_mirror = P_last = P_start; 	break; 
 						}
 					} 
@@ -1429,7 +1434,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xC62B5F5C4644).檢 (zoomedPlatform)), ((0xC6545F5C4644).檢 (shipPos)); 
+								((0xC66D5F5C4644).檢 (zoomedPlatform)), ((0xC6965F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1630,7 +1635,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xDC955F5C4644).檢((update間(_間)))); 
+				((0xDCD75F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1641,25 +1646,28 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						if(!builders[sy]) builders[sy] = new Builder; 
 						auto builder = builders[sy]; 
 						builder.reset; 
+						builder.PALH = c64Palette; 
 						
 						if(1)
 						foreach(sx; N.iota)
 						{
 							const base = baseOfs + ivec2(40+8, 25+8)*ivec2(sx, sy); 
-							with(screen) { builder.drawScreen(base+4, img, bkCols, borderCol); }
+							with(screen) { builder.emitC64Screen(base+4, img, bkCols, borderCol); }
 							if(shipVisible)
 							{
 								const p = base*8+4*8+applyTransformation(shipPos)/+no rounding+/; 
 								if(!shipExplosionTick)
 								{
-									if(thrustLeft) builder.drawSprite(p, 10, 2, shipDoubleSize); 
-									if(thrustRight) builder.drawSprite(p, 11, 2, shipDoubleSize); 
-									if(thrustBottom) builder.drawSprite(p, 8+thrustFlicker, 2, shipDoubleSize); 
+									if(thrustLeft) builder.drawC64Sprite(p, 10, 2, shipDoubleSize); 
+									if(thrustRight) builder.drawC64Sprite(p, 11, 2, shipDoubleSize); 
+									if(thrustBottom) builder.drawC64Sprite(p, 8+thrustFlicker, 2, shipDoubleSize); 
 								}
 								if(shipSpriteIdx>=0)
-								{ builder.drawSprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
+								{ builder.drawC64Sprite(p, shipSpriteIdx, shipColor, shipDoubleSize); }
 							}
 						}
+						
+						((0xE13D5F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1742,7 +1750,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
 				}
 				
-				((0xE8CC5F5C4644).檢((update間(_間)))); 
+				((0xE97C5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1764,7 +1772,8 @@ End.".splitLines
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xEB2B5F5C4644).檢((update間(_間)))); 
+				((0xEBDB5F5C4644).檢((update間(_間)))); 
+				unittest_assembleSize; 
 				
 				
 			} 
