@@ -1,6 +1,6 @@
 //@exe
 //@debug
-///@release
+//@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -56,7 +56,37 @@ static immutable EGAPalette =
 	(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),(RGB(0x000000 )),
 ]; RGB[] importVicePalette(File f)
 => f.readLines	.filter!q{a.length && !a.startsWith(`#`)}
-	.map!((a)=>(a.replace(" ", "").to!uint(16).BGR)).takeExactly(16).array; 
+	.map!((a)=>(a.replace(" ", "").to!uint(16).BGR)).takeExactly(16).array; enum svgFontDemo = `<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="17.044ex" height="2.843ex" style="vertical-align: -0.838ex;" viewBox="0 -863.1 7338.5 1223.9" role="img" focusable="false" xmlns="http://www.w3.org/2000/svg" aria-labelledby="MathJax-SVG-1-Title">
+<title id="MathJax-SVG-1-Title">{\displaystyle g(\nabla f,X)=\partial _{X}f,}</title>
+<defs aria-hidden="true">
+<path stroke-width="1" id="E1-MJMATHI-67" d="M311 43Q296 30 267 15T206 0Q143 0 105 45T66 160Q66 265 143 353T314 442Q361 442 401 394L404 398Q406 401 409 404T418 412T431 419T447 422Q461 422 470 413T480 394Q480 379 423 152T363 -80Q345 -134 286 -169T151 -205Q10 -205 10 -137Q10 -111 28 -91T74 -71Q89 -71 102 -80T116 -111Q116 -121 114 -130T107 -144T99 -154T92 -162L90 -164H91Q101 -167 151 -167Q189 -167 211 -155Q234 -144 254 -122T282 -75Q288 -56 298 -13Q311 35 311 43ZM384 328L380 339Q377 350 375 354T369 368T359 382T346 393T328 402T306 405Q262 405 221 352Q191 313 171 233T151 117Q151 38 213 38Q269 38 323 108L331 118L384 328Z"></path>
+<path stroke-width="1" id="E1-MJMAIN-28" d="M94 250Q94 319 104 381T127 488T164 576T202 643T244 695T277 729T302 750H315H319Q333 750 333 741Q333 738 316 720T275 667T226 581T184 443T167 250T184 58T225 -81T274 -167T316 -220T333 -241Q333 -250 318 -250H315H302L274 -226Q180 -141 137 -14T94 250Z"></path>
+<path stroke-width="1" id="E1-MJMAIN-2207" d="M46 676Q46 679 51 683H781Q786 679 786 676Q786 674 617 326T444 -26Q439 -33 416 -33T388 -26Q385 -22 216 326T46 676ZM697 596Q697 597 445 597T193 596Q195 591 319 336T445 80L697 596Z"></path>
+<path stroke-width="1" id="E1-MJMATHI-66" d="M118 -162Q120 -162 124 -164T135 -167T147 -168Q160 -168 171 -155T187 -126Q197 -99 221 27T267 267T289 382V385H242Q195 385 192 387Q188 390 188 397L195 425Q197 430 203 430T250 431Q298 431 298 432Q298 434 307 482T319 540Q356 705 465 705Q502 703 526 683T550 630Q550 594 529 578T487 561Q443 561 443 603Q443 622 454 636T478 657L487 662Q471 668 457 668Q445 668 434 658T419 630Q412 601 403 552T387 469T380 433Q380 431 435 431Q480 431 487 430T498 424Q499 420 496 407T491 391Q489 386 482 386T428 385H372L349 263Q301 15 282 -47Q255 -132 212 -173Q175 -205 139 -205Q107 -205 81 -186T55 -132Q55 -95 76 -78T118 -61Q162 -61 162 -103Q162 -122 151 -136T127 -157L118 -162Z"></path>
+<path stroke-width="1" id="E1-MJMAIN-2C" d="M78 35T78 60T94 103T137 121Q165 121 187 96T210 8Q210 -27 201 -60T180 -117T154 -158T130 -185T117 -194Q113 -194 104 -185T95 -172Q95 -168 106 -156T131 -126T157 -76T173 -3V9L172 8Q170 7 167 6T161 3T152 1T140 0Q113 0 96 17Z"></path>
+<path stroke-width="1" id="E1-MJMATHI-58" d="M42 0H40Q26 0 26 11Q26 15 29 27Q33 41 36 43T55 46Q141 49 190 98Q200 108 306 224T411 342Q302 620 297 625Q288 636 234 637H206Q200 643 200 645T202 664Q206 677 212 683H226Q260 681 347 681Q380 681 408 681T453 682T473 682Q490 682 490 671Q490 670 488 658Q484 643 481 640T465 637Q434 634 411 620L488 426L541 485Q646 598 646 610Q646 628 622 635Q617 635 609 637Q594 637 594 648Q594 650 596 664Q600 677 606 683H618Q619 683 643 683T697 681T738 680Q828 680 837 683H845Q852 676 852 672Q850 647 840 637H824Q790 636 763 628T722 611T698 593L687 584Q687 585 592 480L505 384Q505 383 536 304T601 142T638 56Q648 47 699 46Q734 46 734 37Q734 35 732 23Q728 7 725 4T711 1Q708 1 678 1T589 2Q528 2 496 2T461 1Q444 1 444 10Q444 11 446 25Q448 35 450 39T455 44T464 46T480 47T506 54Q523 62 523 64Q522 64 476 181L429 299Q241 95 236 84Q232 76 232 72Q232 53 261 47Q262 47 267 47T273 46Q276 46 277 46T280 45T283 42T284 35Q284 26 282 19Q279 6 276 4T261 1Q258 1 243 1T201 2T142 2Q64 2 42 0Z"></path>
+<path stroke-width="1" id="E1-MJMAIN-29" d="M60 749L64 750Q69 750 74 750H86L114 726Q208 641 251 514T294 250Q294 182 284 119T261 12T224 -76T186 -143T145 -194T113 -227T90 -246Q87 -249 86 -250H74Q66 -250 63 -250T58 -247T55 -238Q56 -237 66 -225Q221 -64 221 250T66 725Q56 737 55 738Q55 746 60 749Z"></path>
+<path stroke-width="1" id="E1-MJMAIN-3D" d="M56 347Q56 360 70 367H707Q722 359 722 347Q722 336 708 328L390 327H72Q56 332 56 347ZM56 153Q56 168 72 173H708Q722 163 722 153Q722 140 707 133H70Q56 140 56 153Z"></path>
+<path stroke-width="1" id="E1-MJMAIN-2202" d="M202 508Q179 508 169 520T158 547Q158 557 164 577T185 624T230 675T301 710L333 715H345Q378 715 384 714Q447 703 489 661T549 568T566 457Q566 362 519 240T402 53Q321 -22 223 -22Q123 -22 73 56Q42 102 42 148V159Q42 276 129 370T322 465Q383 465 414 434T455 367L458 378Q478 461 478 515Q478 603 437 639T344 676Q266 676 223 612Q264 606 264 572Q264 547 246 528T202 508ZM430 306Q430 372 401 400T333 428Q270 428 222 382Q197 354 183 323T150 221Q132 149 132 116Q132 21 232 21Q244 21 250 22Q327 35 374 112Q389 137 409 196T430 306Z"></path>
+</defs>
+<g stroke="currentColor" fill="currentColor" stroke-width="0" transform="matrix(1 0 0 -1 0 0)" aria-hidden="true">
+ <use xlink:href="#E1-MJMATHI-67" x="0" y="0"></use>
+ <use xlink:href="#E1-MJMAIN-28" x="480" y="0"></use>
+ <use xlink:href="#E1-MJMAIN-2207" x="870" y="0"></use>
+ <use xlink:href="#E1-MJMATHI-66" x="1703" y="0"></use>
+ <use xlink:href="#E1-MJMAIN-2C" x="2254" y="0"></use>
+ <use xlink:href="#E1-MJMATHI-58" x="2699" y="0"></use>
+ <use xlink:href="#E1-MJMAIN-29" x="3551" y="0"></use>
+ <use xlink:href="#E1-MJMAIN-3D" x="4218" y="0"></use>
+<g transform="translate(5275,0)">
+ <use xlink:href="#E1-MJMAIN-2202" x="0" y="0"></use>
+ <use transform="scale(0.707)" xlink:href="#E1-MJMATHI-58" x="751" y="-213"></use>
+</g>
+ <use xlink:href="#E1-MJMATHI-66" x="6509" y="0"></use>
+ <use xlink:href="#E1-MJMAIN-2C" x="7060" y="0"></use>
+</g>
+</svg>
+`; 
 
 version(/+$DIDE_REGION+/all) {
 	/+
@@ -127,10 +157,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x20E45F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36675F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x21485F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x21735F5C4644))))).max(1))))
+				foreach(v; verts.take((0x36CB5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F65F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -644,18 +674,44 @@ version(/+$DIDE_REGION+/all) {
 				
 				void drawPath(Args...)(in Args args)
 				{
-					begin; /+Todo: number of vertex limit handling!!! /+Code: bool insideBlock; uint vcnt; +/+/
+					void setup() {/+synch_PS, synch_SC...+/} 
 					
+					/+
+						Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
+						The problem could be at start/end of line segments. The tangents are bad there!
+					+/
+					static if(0)	begin(6/+to be safe+/, {}); 
+					else	begin/+full begin. for a fix+/; 
 					
-					
-					void emitPathCmd(A...)(in Opcode op, in A args)
-					{
-						emit(op); 
-						static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
-					} 
-					
+					setup; 
+					const NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
 					
 					vec2 P_start, P_last, P_mirror; //internal state
+					
+					void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
+					{
+						//cmd is for estimationb only.  It should use the SvgPathCommand...
+						
+						const est = bezierTesselationSettings.estimateVertexCount(cmd); 
+						if(est + 4/*to be sure*/ > remainingVertexCount)
+						{
+							emit(
+								assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
+								NOP, NOP
+							); 
+							end; 
+							begin; 
+							setup; 
+							emit(
+								assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
+								assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
+							); 
+							incVertexCount(2); //add extra to be sure
+						}
+						
+						emit(op); incVertexCount(est); 
+						static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+					} 
 					
 					void onItem(const ref SvgPathItem item)
 					{
@@ -667,18 +723,22 @@ version(/+$DIDE_REGION+/all) {
 						final switch(item.cmd)
 						{
 								/+drawing+/	/+state update+/	
-							case SvgPathCommand.M: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathM})), P0); 	P_mirror = P_last = P_start = P0; 	break; 
-							case SvgPathCommand.L: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathL})), P0); 	P_mirror = P_last; P_last = P0; 	break; 
-							case SvgPathCommand.Q: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
-							case SvgPathCommand.T: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathT})), P0); 	P_mirror = Pm; P_last = P0; 	break; 
-							case SvgPathCommand.C: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	P_mirror = P1; P_last = P2; 	break; 
-							case SvgPathCommand.S: 	emitPathCmd(mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+							case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	P_mirror = P_last = P_start = P0; 	break; 
+							case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	P_mirror = P_last; P_last = P0; 	break; 
+							case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+							case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	P_mirror = Pm; P_last = P0; 	break; 
+							case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	P_mirror = P1; P_last = P2; 	break; 
+							case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
 							/+redirected commands:+/			
 							case SvgPathCommand.A: 	approximateArcToCubicBeziers(P_last, item, &onItem)
-							/+Todo: move it to GPU+/; 		break; 
+							/+Todo: move it to GPU+/
+							/+
+								Opt: Should do with a simplified version of cubic bezier!
+								because <90deg and no S curve
+							+/; 		break; 
 							case SvgPathCommand.Z: 	if(P_last!=P_start)
 							{
-								emitPathCmd(mixin(舉!((Opcode),q{drawPathL})), P_start); 
+								emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P_start); 
 								/+Todo: move it to GPU+/
 								/+Todo: only works for line+/
 							}	P_mirror = P_last = P_start; 	break; 
@@ -701,7 +761,7 @@ version(/+$DIDE_REGION+/all) {
 						}
 					}
 					
-					end; 
+					emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
 				} 
 			} 
 			class EGABuilder
@@ -1434,7 +1494,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xC66D5F5C4644).檢 (zoomedPlatform)), ((0xC6965F5C4644).檢 (shipPos)); 
+								((0xE18D5F5C4644).檢 (zoomedPlatform)), ((0xE1B65F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1635,7 +1695,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xDCD75F5C4644).檢((update間(_間)))); 
+				((0xF7F75F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1667,7 +1727,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 							}
 						}
 						
-						((0xE13D5F5C4644).檢(builder.gbBitPos/8)); 
+						((0xFC5D5F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1750,7 +1810,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
 				}
 				
-				((0xE97C5F5C4644).檢((update間(_間)))); 
+				((0x1049C5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1767,12 +1827,32 @@ End.".splitLines
 								M 0,0 M 0,0 M 0,0 M 0,0
 							}
 						); 
+						
+						foreach(j; 0..20)
+						drawPath(
+							iota((iround(2+QPS.value(5*second).fract*(150-j*3))))
+							.map!((i)=>(i"$(i?'L':'M')$(-i*3) $((iround(j*20 + 50 + sin(i*.2f)*30)))".text)).join
+						); 
+						
+						static string svgPath; if(svgPath=="") svgPath = `c:\dl\testSvgPath.txt`.File.readText(true); 
+						//dr.color = clGold; dr.lineWidth = 1; 
+						drawPath(svgPath); 
+						
+						foreach(line; svgFontDemo.splitLines)
+						if(line.strip.isWild(`<use xlink:href="#*" x="*" y="*"></use>`))
+						{
+							//dr.translate(wild[1].to!float, wild[2].to!float); 
+							const id = wild[0]; 
+							if(svgFontDemo.isWild(`*<path stroke-width="1" id="`~id~`" d="*"></path>*`))
+							{ drawPath(wild[1]); }
+							//dr.pop; 
+						}
 					}
 					auto content = builder.extractGfxContent; 
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0xEBDB5F5C4644).檢((update間(_間)))); 
+				((0x109FD5F5C4644).檢((update間(_間)))); 
 				unittest_assembleSize; 
 				
 				

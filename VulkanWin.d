@@ -152,19 +152,23 @@ struct BezierTesselationSettings
 {
 	enum Mode { points, lines, perPixel } 
 	Mode mode; 
-	int quadraticSegments, cubicSegments, arcMaxParts; 
+	int quadraticSegments, cubicSegments; 
 	
 	int estimateVertexCount(char cmd_) const
 	{
 		const cmd = cmd_.toAsciiUpper; 
 		const order = cmd.predSwitch(
+			'M', 1, /+only 0 if there are more adjacent 2 moves+/
 			'L', 1, 
 			'Q', 2, 'T', 2, 
 			'C', 3, 'S', 3, 'A', 3, 
 			0
 		); 
 		if(!order) return 0; 
+		
+		enum arcMaxParts = 4; 
 		const arcScale = cmd=='A' ? arcMaxParts : 1; 
+		
 		final switch(mode)
 		{
 			case Mode.points: 	return order*4 /+4 vertices per points+/; 
@@ -423,7 +427,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				[q{},q{"01"},q{"00"},q{drawPathQ},q{/+xy xy+/}],
 				[q{},q{},q{"01"},q{drawPathS},q{/+xy xy+/}],
 				[q{},q{},q{"10"},q{drawPathC},q{/+xy xy xy+/}],
-				[q{},q{},q{"11"},q{drawPathA},q{/+rr af xy+/}],
+				[q{},q{},q{"11"},q{drawPathTG},q{/+tangents at curve split points+/}],
 				[q{/+	unused+/}],
 				[q{},q{"10"},q{"00"},q{unused0},q{/++/}],
 				[q{},q{},q{"01"},q{unused1},q{/++/}],
@@ -909,6 +913,9 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		@property remainingVertexCount() const
 		=> maxVertexCount - actVertexCount; 
 		
+		void incVertexCount(int inrc)
+		{ actVertexCount += inrc; } 
+		
 		///Tries to continue the current block with the required vertices.
 		///If a new block started, it emits setup code.
 		final void begin(int requiredVertexCount, void delegate() onSetup)
@@ -1178,7 +1185,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x89B982886ADB).檢(buffer.appendPos)); 
+				((0x8A6482886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
 				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
 			} 
@@ -1237,7 +1244,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x90A882886ADB).檢(buffer.appendPos)); 
+				((0x915382886ADB).檢(buffer.appendPos)); 
 				/+
 					optimization steps: 
 					77K 	base
@@ -3343,7 +3350,9 @@ class VulkanWindow: Window
 								case 0: 	/*Q: quadratic*/	pendingPathCode = PathCode_Q1; 	break; 
 								case 1: 	/*S: smooth cubic*/	pendingPathCode = PathCode_S1; 	break; 
 								case 2: 	/*C: cubic*/	pendingPathCode = PathCode_C1; 	break; 
-								case 3: 	/*A: arc*/	/*Todo: arc*/break; 
+								case 3: 	/*TG: tangent move*/	pendingPathCode = PathCode_TG; 	break; 
+								
+								/*Todo: calculate arc on GPU: 1..4x simple cubic beziers*/
 								/*Todo: cubic b-spline a letrehozva a harmadolos modszerrel szerkesztett control pointokkal. */
 							}
 							break; 
@@ -3373,6 +3382,7 @@ class VulkanWindow: Window
 				{
 					switch(pendingPathCode)
 					{
+						case PathCode_TG: 
 						case PathCode_M: case PathCode_L: 
 						case PathCode_Q1: case PathCode_Q2: 
 						case PathCode_C1: case PathCode_C2: case PathCode_C3: 
