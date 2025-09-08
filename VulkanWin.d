@@ -805,13 +805,13 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				{
 					alias a = args[i]; 
 					static if(is(T : Bits!(B), B))	bitStreamAppender.appendBits(a.data, a.bitCnt); 
-					else static if(is(T : const(ubyte)[])) emitBytes(a); 
+					else static if(is(T : ubyte[])) emitBytes(a); 
 					else with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
 				}
 			}
 		} 
 		
-		void emitBytes(void[] data)
+		void emitBytes(in void[] data)
 		{
 			auto ba = (cast(ubyte[])(data)); 
 			while(ba.length>=8)
@@ -934,7 +934,16 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			insideBlock = true; 
 		} 
 		
-		enum maxVertexCount = 16; 
+		enum ShaderMaxVertexCount = 127; 
+		
+		static @property int maxVertexCount()
+		{
+			__gshared int val = ShaderMaxVertexCount; 
+			__gshared uint lastTick; 
+			if(lastTick.chkSet(application.tick))
+			{ val = ((0x708C82886ADB).檢 ((互!((float/+w=6+/),(1.000),(0x70A382886ADB))).iremap(0, 1, 7, 127))); }
+			return val; 
+		} 
 		
 		@property remainingVertexCount() const
 		=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
@@ -1211,9 +1220,9 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x8DAF82886ADB).檢(buffer.appendPos)); 
+				((0x8EDF82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
-				_uploadedVertexCount = ((0x8E0B82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
+				_uploadedVertexCount = ((0x8F3B82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
 			} 
 			
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
@@ -1270,7 +1279,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x94B682886ADB).檢(buffer.appendPos)); 
+				((0x95E682886ADB).檢(buffer.appendPos)); 
 				/+
 					optimization steps: 
 					77K 	base
@@ -2319,7 +2328,7 @@ class VulkanWindow: Window
 			
 			
 			layout(points) in; 
-			layout(triangle_strip, max_vertices = /*127*/$(GfxBuilder.maxVertexCount)) out; 
+			layout(triangle_strip, max_vertices = /*127*/$(GfxBuilder.ShaderMaxVertexCount)) out; 
 			/*
 				255 is the max on R9 Fury X
 				

@@ -3426,6 +3426,9 @@ version(/+$DIDE_REGION Numeric+/all)
 		T remap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{ return src.remap!(srcFrom, srcTo, dstFrom, dstTo); } 
 		
+		int iremap(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
+		{ return (iround(src.remap!(srcFrom, srcTo, dstFrom, dstTo))); } 
+		
 		template CommonFloatType(A...)
 		{
 			alias C = Unqual!(CommonType!A); 
@@ -3446,8 +3449,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		T remap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
 		{ return clamp(remap(src, srcFrom, srcTo, dstFrom, dstTo), dstFrom, dstTo); } 
 		
-		int iRemap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
-		{ return cast(int)remap_clamp(src, srcFrom, srcTo, dstFrom, dstTo); } 
+		int iremap_clamp(T)(in T src, in T srcFrom, in T srcTo, in T dstFrom, in T dstTo)
+		{ return (iround(remap_clamp(src, srcFrom, srcTo, dstFrom, dstTo))); } 
 		
 		//Todo: rewrite to greaterThan, lessThan
 		bool isAscending	(T0, T1)(in T0 a, in T1 b)

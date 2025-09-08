@@ -1042,8 +1042,10 @@ version(/+$DIDE_REGION+/all) {
 					}
 				} 
 				
+				
 				void textBackend(A)(in GraphicState st, A r)
 				{
+					//Todo: this should go to buffer
 					static if(isInputRange!A) if(r.empty) return; 
 					
 					const scaleX = 9, scaleY = 16; 
@@ -1072,50 +1074,45 @@ version(/+$DIDE_REGION+/all) {
 					//convert UTF-8 to 8bit ASCII, reuse allocated memory.
 					static Appender!(ubyte[]) app; 
 					app.clear, app.put(r.byDchar.map!((ch)=>((cast(ubyte)(((ch<=255)?(ch):(254))))))); 
-					
-					enum maxChars = (1<<6/+bits+/) +1/+base1+/; 
-					if((互!((bool),(0),(0xA42A5F5C4644))))
+					
+					uint decideCharCount(int len)
+					{
+						enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
+						const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
+							n	= len.min(min(space, maxChars)); 
+						if(n) _builder.incVertexCount(n*2+2); return n; 
+					} 
 					encodeRLE
 					(
 						app[], 3,
 						((ubyte[] part) {
 							while(1)
 							{
-								const uint 	space 	= max(_builder.remainingVertexCount-3, 0)/4,
-									n 	= (cast(int)(part.length)).min(min(space, maxChars)); 
-								if(n) {
-									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6))); 
-									_builder.emitBytes(part[0..n]); 
-									cursorPos.x += n; 
+								if(const n = decideCharCount((cast(int)(part.length))))
+								{
+									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
+									cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
 								}
-								/+advance+/part = part[n..$]; if(part.empty) break; 
-								/+continue+/_builder.begin; setup; 
+								/+start next geometry item+/_builder.begin; setup; 
 							}
 						}),
 						((ubyte ch, uint len) {
 							while(1)
 							{
-								const uint 	space 	= max(_builder.remainingVertexCount-3, 0)/4,
-									n 	= len.min(min(space, maxChars)); 
-								if(n) {
-									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6), ch)); 
-									cursorPos.x += n; 
+								if(const n = decideCharCount(len))
+								{
+									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
+									cursorPos.x += n; len -= n; if(!len) break; 
 								}
-								/+advance+/len -= n; if(!n) break; 
-								/+continue+/_builder.begin; setup; 
+								/+start next geometry item+/_builder.begin; setup; 
 							}
 						})
 					); 
-					else
-					foreach(ch; app[])
-					{
-						_builder.begin(5, &setup); 
-						_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), ch)); 
-						cursorPos.x += /+st.fontHeight * font.aspect+/1; 
-					}
 					
-					if(app.length>1024) { app.shrinkTo(1024); /+Don't waste memory for exceptionally large lines+/}
+					enum tooLargeBuf = 0x1000; /+Don't waste memory for exceptionally large texts+/
+					if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
 				} 
+				
 			} 
 			class TurboVisionBuilder : EGABuilder
 			{
@@ -1572,7 +1569,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xEBCD5F5C4644).檢 (zoomedPlatform)), ((0xEBF65F5C4644).檢 (shipPos)); 
+								((0xEB3F5F5C4644).檢 (zoomedPlatform)), ((0xEB685F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1773,7 +1770,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0x102375F5C4644).檢((update間(_間)))); 
+				((0x101A95F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1805,7 +1802,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 							}
 						}
 						
-						((0x1069E5F5C4644).檢(builder.gbBitPos/8)); 
+						((0x106105F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1893,7 +1890,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
 				}
 				
-				((0x10F5E5F5C4644).檢((update間(_間)))); 
+				((0x10ED05F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1941,7 +1938,7 @@ End.".splitLines
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0x115375F5C4644).檢((update間(_間)))); 
+				((0x114A95F5C4644).檢((update間(_間)))); 
 				unittest_assembleSize; 
 				
 				
