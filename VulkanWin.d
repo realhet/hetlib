@@ -941,8 +941,17 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			__gshared int val = ShaderMaxVertexCount; 
 			__gshared uint lastTick; 
 			if(lastTick.chkSet(application.tick))
-			{ val = ((0x708C82886ADB).檢 ((互!((float/+w=6+/),(1.000),(0x70A382886ADB))).iremap(0, 1, 7, 127))); }
+			{ val = ((0x708C82886ADB).檢 ((互!((float/+w=6+/),(1.000),(0x70A382886ADB))).iremap(0, 1, 4, 127))); }
 			return val; 
+			
+			/+
+				4, 79+17
+				8, 35+6
+				16, 19+3
+				32, 12.2+1.5
+				64, 9200+880
+				127, 7760+552
+			+/
 		} 
 		
 		@property remainingVertexCount() const
@@ -1220,9 +1229,9 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x8EDF82886ADB).檢(buffer.appendPos)); 
+				((0x8F5282886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
-				_uploadedVertexCount = ((0x8F3B82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
+				_uploadedVertexCount = ((0x8FAE82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
 			} 
 			
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
@@ -1279,7 +1288,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x95E682886ADB).檢(buffer.appendPos)); 
+				((0x965982886ADB).檢(buffer.appendPos)); 
 				/+
 					optimization steps: 
 					77K 	base
@@ -1287,6 +1296,9 @@ class VulkanWindow: Window
 					59K	bug fixed: C64 border was drawn for all rows
 					
 				+/
+				
+				//if(inputs.Shift.down) (cast(ubyte*)(buffer.hostPtr))[0..buffer.appendPos].saveTo(`c:\dl\a.a`); 
+				
 				buffer.upload; 
 			} 
 			
