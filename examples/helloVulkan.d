@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+///@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -157,10 +157,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36675F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36685F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x36CB5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F65F5C4644))))).max(1))))
+				foreach(v; verts.take((0x36CC5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F75F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -658,6 +658,9 @@ version(/+$DIDE_REGION+/all) {
 					while(data.length)
 					{
 						size_t remainingChars = min(maxVertexCount/4, MaxRunLength/+should go next to the opcodes, not here!+/); 
+						
+						//todo_this_not_works_at_alll; 
+						
 						begin; setup;  //Todo: chain it to the end of previous
 						
 						auto act = fetchSameColor(data, remainingChars); 
@@ -998,7 +1001,7 @@ version(/+$DIDE_REGION+/all) {
 							else static if(is(T : my))	cursorPos.y += a.value; 
 							else static if(isStyleArg!T)	st.applyArg(a); 
 							else static if(isSomeString!T)	textBackend(st, a); 
-							else static if(isSomeChar!T)	textBackend(st, a); 
+							else static if(isSomeChar!T)	textBackend(st, only(a)); 
 							else static if(
 								isInputRange!T &&
 								isSomeChar
@@ -1015,7 +1018,7 @@ version(/+$DIDE_REGION+/all) {
 					}
 				} 
 				
-				void textBackend(A)(in GraphicState st, A r)
+				void textBackend_old(A)(in GraphicState st, A r)
 				{
 					const scaleX = 9, scaleY = 16; 
 					alias font = vgaFont; 
@@ -1037,6 +1040,81 @@ version(/+$DIDE_REGION+/all) {
 						_builder.end; 
 						cursorPos.x += /+st.fontHeight * font.aspect+/1; 
 					}
+				} 
+				
+				void textBackend(A)(in GraphicState st, A r)
+				{
+					static if(isInputRange!A) if(r.empty) return; 
+					
+					const scaleX = 9, scaleY = 16; 
+					alias font = vgaFont; 
+					
+					void setup()
+					{
+						with(_builder)
+						{
+							synch_PALH; 
+							synch_FMH; 
+							emit(
+								assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
+								assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
+								assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity),
+								assemble(
+									mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
+										bits((iround(cursorPos.y*scaleY)), 16)
+								)
+							); 
+						}
+					} 
+					_builder.begin(0, {}); 
+					setup; 
+					
+					//convert UTF-8 to 8bit ASCII, reuse allocated memory.
+					static Appender!(ubyte[]) app; 
+					app.clear, app.put(r.byDchar.map!((ch)=>((cast(ubyte)(((ch<=255)?(ch):(254))))))); 
+					
+					enum maxChars = (1<<6/+bits+/) +1/+base1+/; 
+					if((互!((bool),(0),(0xA42A5F5C4644))))
+					encodeRLE
+					(
+						app[], 3,
+						((ubyte[] part) {
+							while(1)
+							{
+								const uint 	space 	= max(_builder.remainingVertexCount-3, 0)/4,
+									n 	= (cast(int)(part.length)).min(min(space, maxChars)); 
+								if(n) {
+									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6))); 
+									_builder.emitBytes(part[0..n]); 
+									cursorPos.x += n; 
+								}
+								/+advance+/part = part[n..$]; if(part.empty) break; 
+								/+continue+/_builder.begin; setup; 
+							}
+						}),
+						((ubyte ch, uint len) {
+							while(1)
+							{
+								const uint 	space 	= max(_builder.remainingVertexCount-3, 0)/4,
+									n 	= len.min(min(space, maxChars)); 
+								if(n) {
+									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6), ch)); 
+									cursorPos.x += n; 
+								}
+								/+advance+/len -= n; if(!n) break; 
+								/+continue+/_builder.begin; setup; 
+							}
+						})
+					); 
+					else
+					foreach(ch; app[])
+					{
+						_builder.begin(5, &setup); 
+						_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), ch)); 
+						cursorPos.x += /+st.fontHeight * font.aspect+/1; 
+					}
+					
+					if(app.length>1024) { app.shrinkTo(1024); /+Don't waste memory for exceptionally large lines+/}
 				} 
 			} 
 			class TurboVisionBuilder : EGABuilder
@@ -1494,7 +1572,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xE18D5F5C4644).檢 (zoomedPlatform)), ((0xE1B65F5C4644).檢 (shipPos)); 
+								((0xEBCD5F5C4644).檢 (zoomedPlatform)), ((0xEBF65F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1695,7 +1773,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xF7F75F5C4644).檢((update間(_間)))); 
+				((0x102375F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1727,7 +1805,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 							}
 						}
 						
-						((0xFC5D5F5C4644).檢(builder.gbBitPos/8)); 
+						((0x1069E5F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1738,6 +1816,10 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				
 				{
 					auto tvBuilder = new TurboVisionBuilder; 
+					tvBuilder._builder.PALH = egaPalette; 
+					tvBuilder._builder.FMH = vgaFont.tex; 
+					
+					
 					with(tvBuilder)
 					{
 						//Link: google image search: borland turbo pascal
@@ -1774,6 +1856,7 @@ End.".splitLines
 					
 					drawJupiterLander(ivec2(34, 12)); 
 					
+					tvBuilder.reset; 
 					with(tvBuilder)
 					{
 						static MenuItem[] mainMenuItems = 
@@ -1810,7 +1893,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
 				}
 				
-				((0x1049C5F5C4644).檢((update間(_間)))); 
+				((0x10F5E5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1822,37 +1905,43 @@ End.".splitLines
 								M 10,220 h 10 v 10 h-10 v-10 m 10 m 10
 								M 10,240 l10,10 q 30,0 0,30 h 10
 								M 10,280 l10,10 c 20,0 10,10 0, 20 h 10
-								
-								
-								M 0,0 M 0,0 M 0,0 M 0,0
 							}
 						); 
 						
-						foreach(j; 0..20)
-						drawPath(
-							iota((iround(2+QPS.value(5*second).fract*(150-j*3))))
-							.map!((i)=>(i"$(i?'L':'M')$(-i*3) $((iround(j*20 + 50 + sin(i*.2f)*30)))".text)).join
-						); 
-						
-						static string svgPath; if(svgPath=="") svgPath = `c:\dl\testSvgPath.txt`.File.readText(true); 
-						//dr.color = clGold; dr.lineWidth = 1; 
-						drawPath(svgPath); 
-						
-						foreach(line; svgFontDemo.splitLines)
-						if(line.strip.isWild(`<use xlink:href="#*" x="*" y="*"></use>`))
+						static if((常!(bool)(0)))
 						{
-							//dr.translate(wild[1].to!float, wild[2].to!float); 
-							const id = wild[0]; 
-							if(svgFontDemo.isWild(`*<path stroke-width="1" id="`~id~`" d="*"></path>*`))
-							{ drawPath(wild[1]); }
-							//dr.pop; 
+							foreach(j; 0..20)
+							drawPath(
+								iota((iround(2+QPS.value(5*second).fract*(150-j*3))))
+								.map!((i)=>(i"$(i?'L':'M')$(-i*3) $((iround(j*20 + 50 + sin(i*.2f)*30)))".text)).join
+							); 
+						}
+						
+						static if((常!(bool)(0)))
+						{
+							static string svgPath; if(svgPath=="") svgPath = `c:\dl\testSvgPath.txt`.File.readText(true); 
+							//dr.color = clGold; dr.lineWidth = 1; 
+							drawPath(svgPath); 
+						}
+						
+						static if((常!(bool)(0)))
+						{
+							foreach(line; svgFontDemo.splitLines)
+							if(line.strip.isWild(`<use xlink:href="#*" x="*" y="*"></use>`))
+							{
+								//dr.translate(wild[1].to!float, wild[2].to!float); 
+								const id = wild[0]; 
+								if(svgFontDemo.isWild(`*<path stroke-width="1" id="`~id~`" d="*"></path>*`))
+								{ drawPath(wild[1]); }
+								//dr.pop; 
+							}
 						}
 					}
 					auto content = builder.extractGfxContent; 
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0x109FD5F5C4644).檢((update間(_間)))); 
+				((0x115375F5C4644).檢((update間(_間)))); 
 				unittest_assembleSize; 
 				
 				

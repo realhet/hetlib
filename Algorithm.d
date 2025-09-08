@@ -1238,6 +1238,108 @@ version(/+$DIDE_REGION+/all)
 			).map!(j=>(magnitude(shiftedSpectrum[iround(center + i*dir + j*side)]))).sum
 		).sum; 
 	} 
+	
+	version(/+$DIDE_REGION RLE+/all)
+	{
+		auto encodeRLE(R)(
+			R[] src, uint minRep, 	void delegate(R[]) onBulk, 
+				void delegate(R, uint n) onRep
+		)
+		{
+			assert(minRep>1, "invalid param"); 
+			
+			//simple case: shorter than minRep -> bulk
+			if(src.length<minRep) { if(src.length) onBulk(src); return; }
+			
+			auto act = src.front; src.popFront; 
+			uint repCnt=1, allCnt=1; 
+			while(!src.empty)
+			{
+				auto next = src.front; src.popFront; 
+				
+				if(act==next)
+				{ repCnt++; }
+				else
+				{
+					if(repCnt>=minRep)
+					{
+						const bulkCnt = allCnt-repCnt; 
+						if(bulkCnt) onBulk((src.ptr - R.sizeof*(allCnt+1))[0..bulkCnt]); 
+						onRep(act, repCnt); 
+						allCnt = 0;  
+					}
+					repCnt = 1; 
+				}
+				
+				//writeln(">", char(act), " ", char(next), " ", allCnt, " ", repCnt);
+				act = next; allCnt++; 
+			}
+			
+			if(repCnt>=minRep)
+			{
+				const bulkCnt = allCnt-repCnt; 
+				if(bulkCnt) onBulk((src.ptr - R.sizeof*(allCnt))[0..bulkCnt]); 
+				onRep(act, repCnt); 
+			}
+			else
+			{ onBulk((src.ptr-R.sizeof*(allCnt))[0..allCnt]); }
+		} 
+		
+		auto encodeRLE_styled(R, S)(
+			R[] stream, S[] style, uint minRep,
+				void delegate(S) onStyle, 
+				void delegate(R[]) onBulk, void 
+				delegate(R, uint n) onRep
+		)
+		{
+			enforce(
+				stream.length <= style.length, "Inconsistent lengths."
+				/+style must cover all src!+/
+			); 
+			
+			foreach(grp; style.takeExactly(stream.length).group)
+			{
+				auto len = grp[1], st = grp[0]; 	onStyle(st); 
+				auto src = stream[0..len]; 	encodeRLE(src, minRep, onBulk, onRep); 
+				stream = stream[len..$]; 
+			}
+		} 
+		
+		void test_encodeRLE()
+		{
+			//Todo: unittest
+			encodeRLE_styled
+			(
+				cast(ubyte[])"Hello Worrrrrld!!! aaxxaxaaaxxx", 
+				cast(ubyte[])"111111122333___________________________________", 3, 
+				((ubyte s){ writeln("             STYLE: ", char(s)); }),
+				((ubyte[] a){ writeln("             BULK : [", cast(string)a, "]"); }),
+				((ubyte a, uint n){ writeln("             REP  : [", char(a).text, "] x ", n); })
+			); 
+			if(1)
+			{
+				int allCnt, goodCnt; 
+				foreach(i; 0..long(3^^10))
+				{
+					const src = i.to!string(3).leftJustify(10, '0'); 
+					string dst; 
+					encodeRLE(
+						(cast(ubyte[])src), 3,
+						((ubyte[] a){ dst ~= cast(string)(a); }), 
+						((ubyte a, n){ dst ~= char(a).text.replicate(n); })
+					); 
+					
+					if(dst!=src)
+					{ writeln("BAD ", src, " != ", dst); }
+					
+					allCnt++; 
+					if(dst==src) goodCnt++; 
+				}
+				writeln(goodCnt, " / ", allCnt, " ", allCnt==goodCnt); 
+				enforce(allCnt==goodCnt); 
+			}
+		} 
+	}
 }
 version(/+$DIDE_REGION Geometry+/all)
 {

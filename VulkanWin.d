@@ -271,6 +271,23 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 	enum CoordFormat {f32, i16, i12, i8} 
 	enum XYFormat {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
 	enum FlagFormat {tex, font, vec, all} 
+	
+	
+	/+
+		Todo: size	transformations	comment
+		0	unity	
+		4	tr_XY_i16	//xy translation, 16bit int components
+		8	tr_XY_f32	//... 32bit float components
+		12	tr_XY_sc_f32	//... scaling
+		16	tr_XY_sc_ro_f32	//... scaling, rotation 
+		20	tr_tileXY_i32_XYZ_f32	//... global 3d world coordinates, the highest precision
+		48	tr_mat43_f32	// 3d matrix, with any orientation
+		56	tr_tileXY_mat43_f32	// 3d matrix, with any orientation, global tile pos
+		64	tr_mat4_f32	// 3d homogenous matrix with perspective transform
+		
+		cliprect
+		+ AABB size XY, XYZ, i16, f32
+	+/
 	
 	struct Bits(T)
 	{
@@ -760,20 +777,25 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			} 
 			
 			///The appenders are keeping their memory ready to use.
-			void reset()
+			void reset(bool doDealloc=false)
 			{
-				vbAppender.clear; 
-				gbAppender.clear; 
+				if(doDealloc)
+				{
+					vbAppender = appender!(VertexData[])(); 
+					gbAppender = appender!(ulong[])(); 
+				}
+				else
+				{
+					vbAppender.clear; 
+					gbAppender.clear; 
+				}
 				bitStreamAppender.reset; 
+				resetBlockState; 
 			} 
 			
 			///This resets and frees up the appenders memory
 			void dealloc()
-			{
-				vbAppender = appender!(VertexData[])(); 
-				gbAppender = appender!(ulong[])(); 
-				bitStreamAppender.reset; 
-			} 
+			{ reset(doDealloc : true); } 
 		}
 		
 		final void emit(Args...)(in Args args)
@@ -783,6 +805,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 				{
 					alias a = args[i]; 
 					static if(is(T : Bits!(B), B))	bitStreamAppender.appendBits(a.data, a.bitCnt); 
+					else static if(is(T : const(ubyte)[])) emitBytes(a); 
 					else with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
 				}
 			}
@@ -891,6 +914,9 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 		protected int actVertexCount; 
 		protected bool insideBlock; 
 		
+		protected void resetBlockState()
+		{ insideBlock = false; actVertexCount = 0; } 
+		
 		///Closes the block with an 'end' opcode. Only if there is an actual block.
 		final void end()
 		{
@@ -908,10 +934,10 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			insideBlock = true; 
 		} 
 		
-		enum maxVertexCount = 127; 
+		enum maxVertexCount = 16; 
 		
 		@property remainingVertexCount() const
-		=> maxVertexCount - actVertexCount; 
+		=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
 		
 		void incVertexCount(int inrc)
 		{ actVertexCount += inrc; } 
@@ -1185,9 +1211,9 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x8A6482886ADB).檢(buffer.appendPos)); 
+				((0x8DAF82886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
-				_uploadedVertexCount = (buffer.appendPos / VertexData.sizeof).to!uint; 
+				_uploadedVertexCount = ((0x8E0B82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
 			} 
 			
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
@@ -1244,7 +1270,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x915382886ADB).檢(buffer.appendPos)); 
+				((0x94B682886ADB).檢(buffer.appendPos)); 
 				/+
 					optimization steps: 
 					77K 	base
@@ -2293,7 +2319,7 @@ class VulkanWindow: Window
 			
 			
 			layout(points) in; 
-			layout(triangle_strip, max_vertices = 127) out; 
+			layout(triangle_strip, max_vertices = /*127*/$(GfxBuilder.maxVertexCount)) out; 
 			/*
 				255 is the max on R9 Fury X
 				
@@ -3401,7 +3427,7 @@ class VulkanWindow: Window
 				
 				if(pendingChars>0)
 				{
-					if(true)
+					if(EnbaleAsciiStrips)
 					{
 						const bool isLast = pendingChars==1; 
 						drawASCII_strip(repeated ? repeatedChar : fetchBits(bitStream, 8), isLast); 
