@@ -142,7 +142,13 @@ alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 		[q{maxGeometryInputComponents},q{64},q{64},q{128},q{128},q{64},q{128},q{128}],
 		[q{maxGeometryOutputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 		[q{maxGeometryOutputVertices},q{256},q{1024},q{1024},q{1024},q{256},q{1024},q{256}],
-		[q{maxGeometryTotalOutputComponents},q{1024},q{16384},q{16384},q{1024},q{1024},q{1024},q{1024}],
+		[q{maxGeometryTotalOutputComponents},q{1024},q{
+			16384
+			/*bug?!!*/
+		},q{
+			16384
+			/*bug?!!*/
+		},q{1024},q{1024},q{1024},q{1024}],
 		[q{maxGeometryShaderInvocations},q{32},q{127},q{127},q{32},q{32},q{32},q{32}],
 		[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 	]))
@@ -941,7 +947,7 @@ version(/+$DIDE_REGION Geometry Stream Processor+/all)
 			__gshared int val = ShaderMaxVertexCount; 
 			__gshared uint lastTick; 
 			if(lastTick.chkSet(application.tick))
-			{ val = ((0x708C82886ADB).檢 ((互!((float/+w=6+/),(1.000),(0x70A382886ADB))).iremap(0, 1, 4, 127))); }
+			{ val = ((0x70BC82886ADB).檢 ((互!((float/+w=6+/),(1.000),(0x70D382886ADB))).iremap(0, 1, 4, 127))); }
 			return val; 
 			
 			/+
@@ -1229,9 +1235,9 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x8F5282886ADB).檢(buffer.appendPos)); 
+				((0x8F8282886ADB).檢(buffer.appendPos)); 
 				buffer.upload; 
-				_uploadedVertexCount = ((0x8FAE82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
+				_uploadedVertexCount = ((0x8FDE82886ADB).檢((buffer.appendPos / VertexData.sizeof).to!uint)); 
 			} 
 			
 			@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
@@ -1288,7 +1294,7 @@ class VulkanWindow: Window
 			
 			void upload()
 			{
-				((0x965982886ADB).檢(buffer.appendPos)); 
+				((0x968982886ADB).檢(buffer.appendPos)); 
 				/+
 					optimization steps: 
 					77K 	base
@@ -2340,7 +2346,7 @@ class VulkanWindow: Window
 			
 			
 			layout(points) in; 
-			layout(triangle_strip, max_vertices = /*127*/$(GfxBuilder.ShaderMaxVertexCount)) out; 
+			layout(triangle_strip, max_vertices = $(GfxBuilder.ShaderMaxVertexCount)) out; 
 			/*
 				255 is the max on R9 Fury X
 				
@@ -2350,6 +2356,27 @@ class VulkanWindow: Window
 					I have no clue where this 2048 limit comes from o.O
 				250822 127 is the max when I add 2x vec4 (20 components)  127*16 = 2032
 					highp vs medump doesn't change this 127 limit
+				250908 D constant is used, 127 still works.  Have 24 components with gl_Position, 
+					but still, the math fails... 16384/24 = 682.6
+			*/
+			
+			/*
+				Todo: There is no line_strip or line_strip_adjacency.  No overlapping vertex input is possible.
+				
+				So if I want to know the size of each stream, 
+				I have to read it from a buffer, indexed by InputPrimitiveID
+			*/
+			
+			//Todo: Geom Shader User Clip Distances could be useful for UI rect clipping !!!
+			
+			/*Link: https://docs.vulkan.org/spec/latest/chapters/geometry.html*/
+			/*Link: https://www.khronos.org/opengl/wiki/Geometry_Shader*/
+			/*
+				Note: From: OpenGL Geometry Shader docs:
+					Note: You must write to each output variable before every EmitVertex() call (for all 
+					outputs for a stream for each EmitStreamVertex() call).
+				
+				I don't follow this rule and it works so far on Vulkan + R9 Fury X
 			*/
 			
 			

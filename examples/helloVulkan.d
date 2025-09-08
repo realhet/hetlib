@@ -1869,7 +1869,7 @@ End.".splitLines
 									{"&Trace into", shortcut : "F7"}, 
 									{"&Go to cursor", shortcut : "F4"}, 
 									{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
-									{"P&rameters..."}
+									{"P&arameters..."}
 								]
 							},
 							{"&Compile"}, 
@@ -1890,7 +1890,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.reset; 
 				}
 				
-				((0x10ED05F5C4644).檢((update間(_間)))); 
+				((0x10ED15F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1938,7 +1938,7 @@ End.".splitLines
 					//content.gb.hexDump; 
 					appendGfxContent(content); 
 				}
-				((0x114A95F5C4644).檢((update間(_間)))); 
+				((0x114AA5F5C4644).檢((update間(_間)))); 
 				unittest_assembleSize; 
 				
 				
