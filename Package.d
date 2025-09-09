@@ -6047,7 +6047,10 @@ version(/+$DIDE_REGION Containers+/all)
 	struct BitStreamAppender
 	{
 		
-		ulong tempData; //this will be aligned to 16 bytes, so must use it with aligned sse operations.
+		ulong tempData; /+
+			this will be aligned to 16 bytes, 
+			so must use it with aligned sse operations.
+		+/
 		size_t tempBits; //this keeps track of the current bit position
 		void delegate(ulong) onBuffer; //this event must be called when tempData is full.
 		
@@ -6056,7 +6059,10 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		void appendBits(T)(in T val, size_t numBits = T.sizeof*8)
 		{
-			assert(numBits>0 && numBits<=64, "appendBits() numBits: "~numBits.text); 
+			assert(
+				numBits>0 && numBits<=64, 
+				i"appendBits!($(T.stringof)) Invalid numBits: $(numBits)".text
+			); 
 			
 			/+Convert input to ulong and mask to requested bits+/
 			ulong input = cast(ulong)val << (64-numBits) >> (64-numBits); 

@@ -330,7 +330,6 @@ version(/+$DIDE_REGION+/all)
 	
 	auto assemble(A...)(A args)
 	{
-		//Todo: overflow check!
 		Bits!ulong res; 
 		static foreach(i, a; args)
 		{
@@ -339,6 +338,8 @@ version(/+$DIDE_REGION+/all)
 				else	res = res ~ bits(a); 
 			}
 		}
+		
+		assert(res.bitCnt <= 64, i"assemble($(A.stringof)): overflow $(res.bitCnt)".text); 
 		return res; 
 	} 
 	
@@ -2430,23 +2431,23 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x12A8982886ADB).檢(
+					((0x12AC982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x12AFB82886ADB))))
+				if((互!((bool),(0),(0x12B3B82886ADB))))
 				{
 					GfxBuilder.desiredMaxVertexCount = 
-					((0x12B5882886ADB).檢((互!((float/+w=12+/),(1.000),(0x12B6F82886ADB))).iremap(0, 1, 4, 127))); 
+					((0x12B9882886ADB).檢((互!((float/+w=12+/),(1.000),(0x12BAF82886ADB))).iremap(0, 1, 4, 127))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilder.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x12C7482886ADB).檢 (im)); 
+					((0x12CB482886ADB).檢 (im)); 
 				}
 			}
 			
