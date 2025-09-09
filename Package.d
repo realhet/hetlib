@@ -6056,7 +6056,7 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		void appendBits(T)(in T val, size_t numBits = T.sizeof*8)
 		{
-			assert(numBits>0 && numBits<=64, "appendBits() invalid param"); 
+			assert(numBits>0 && numBits<=64, "appendBits() numBits: "~numBits.text); 
 			
 			/+Convert input to ulong and mask to requested bits+/
 			ulong input = cast(ulong)val << (64-numBits) >> (64-numBits); 
