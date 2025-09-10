@@ -282,19 +282,30 @@ version(/+$DIDE_REGION+/all)
 	enum FlagFormat {tex, font, vec, all} 
 	
 	enum AngleFormat {u9, f32} 
-	enum TransFormat {unity, transXY, scale, scaleXY, rotZ/+, tileXY, transXYZ, axisXY+/} 
+	enum TransFormat {unity, transXY, scale, scaleXY, skewX, rotZ/+, tileXY, transXYZ, axisXY+/} 
 	
 	struct Bits(T)
 	{
+		static assert(isIntegral!T); 
+		
+		/+
+			Todo: lock the type for ulong here. Not just in assemble()! 
+			So cast everything to raw ulong here.
+			assemble() does this ulong casting by starting with an empty Bits!ulong.
+		+/
+		
 		T data; 
 		size_t bitCnt; 
 		
 		///'other' is casted to T
-		///There is NO bit range/overflow checking!!!
+		
 		auto opBinary(string op : "~", B)(B other) const
 		{
 			static if(is(B==Bits!T2, T2))
-			return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
+			{
+				static if(isSigned!T) data = data << (64-bitCnt) >>> (64-bitCnt); 
+				return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
+			}
 			else
 			return this ~ bits(other); 
 		} 
@@ -310,9 +321,9 @@ version(/+$DIDE_REGION+/all)
 			is(T==ivec2)
 		)	return bits(a.bitCast!ulong); 
 		else static if(
+			is(T==float)||is(T==RGBA)||
 			is(T==Vector!(short, 2))||
-			is(T==Vector!(ushort, 2))||
-			is(T==RGBA)
+			is(T==Vector!(ushort, 2))
 		)	return bits(a.bitCast!uint); 
 		else static if(is(T==RGB))	return Bits!uint(a.raw, 24); 
 		else static if(
@@ -359,8 +370,8 @@ version(/+$DIDE_REGION+/all)
 		else static assert(false, "Unhandled type: "~T.stringof); 
 		if(isInt)
 		{
-			if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits(i, 4)); 
-			if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits(i, 8)); 
+			if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits(uint(i), 4)); 
+			if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits(uint(i), 8)); 
 		}
 		const logf = f.log2*128.0f, logi = (iround(logf)), exact = logf==logi; 
 		if(exact && mixin(界1(q{0},q{logi},q{1<<12})))	return assemble(mixin(舉!((SizeFormat),q{ulog12})), bits(logi, 12)); 
@@ -386,7 +397,7 @@ version(/+$DIDE_REGION+/all)
 		assert(assembleSize(-1.5f) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
 	} 
 	
-	Bits!ulong assembleAngle(T)(in T angle)
+	Bits!ulong assembleAngle_deg(T)(in T angle)
 	{
 		static if(is(T : int))
 		{ const i = angle; const isInt = true; }
@@ -394,55 +405,81 @@ version(/+$DIDE_REGION+/all)
 		{ const i = (itrunc(angle)); const isInt = i == angle; }
 		else static assert(false, "Unhandled type: "~T.stringof); 
 		
-		if(isInt && mixin(界1(q{0},q{i},q{1<<9})))	{ return assemble(mixin(舉!((AngleFormat),q{u9})), bits(i, 9)); }
-		else	{ return assemble(mixin(舉!((AngleFormat),q{f32})), angle); }
+		if(isInt && mixin(界1(q{0},q{i},q{1<<9})))	{ return assemble(mixin(舉!((AngleFormat),q{u9})), bits((cast(uint)(i)), 9)); }
+		else	{ return assemble(mixin(舉!((AngleFormat),q{f32})), float(angle)); }
 	} 
 	
 	void unittest_assembleAngle()
 	{
 		// Test integer cases within range
-		assert(assembleAngle(0) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(0, 9))); 
-		assert(assembleAngle(256) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(256, 9))); 
-		assert(assembleAngle(511) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(511, 9))); 
+		assert(assembleAngle_deg(0) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(0, 9))); 
+		assert(assembleAngle_deg(256) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(256, 9))); 
+		assert(assembleAngle_deg(511) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(511, 9))); 
 		
 		// Test float cases that are exact integers within range
-		assert(assembleAngle(128.0f) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(128, 9))); 
+		assert(assembleAngle_deg(128.0f) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(128, 9))); 
 		
 		// Test float fallback for non-integer values
-		assert(assembleAngle(128.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), 128.5f)); 
+		assert(assembleAngle_deg(128.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), 128.5f)); 
 		
 		// Test out-of-range values use float32 (no clamping)
-		assert(assembleAngle(-5) == assemble(mixin(舉!((AngleFormat),q{f32})), -5)); 
-		assert(assembleAngle(600) == assemble(mixin(舉!((AngleFormat),q{f32})), 600)); 
-		assert(assembleAngle(-1.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -1.5f)); 
-		assert(assembleAngle(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
+		assert(assembleAngle_deg(-5) == assemble(mixin(舉!((AngleFormat),q{f32})), -5.0f)); 
+		assert(assembleAngle_deg(600) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
+		assert(assembleAngle_deg(-1.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -1.5f)); 
+		assert(assembleAngle_deg(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
 	} 
 	
 	Bits!ulong assemblePoint(in Vector!(byte, 2) p)
-	{ return assemble(mixin(舉!((CoordFormat),q{i8})), p.bitCast!ushort); } 
+	{ return assemble(mixin(舉!((CoordFormat),q{i8})), p); } 
 	
 	Bits!ulong assemblePoint(in Vector!(short, 2) p)
 	{
 		if(mixin(界1(q{-128},q{p.x},q{128})) && mixin(界1(q{-128},q{p.y},q{128})))
-		return assemble(mixin(舉!((CoordFormat),q{i8})), bits(p.x, 8), bits(p.y, 8)); 
+		return assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p.x)), (cast(ubyte)(p.y))); 
 		else return assemble(mixin(舉!((CoordFormat),q{i16})), p); 
 	} 
 	
-	Bits!ulong assemblePoint(in ivec2 p)
+	Bits!(ulong)[2] assemblePoint(in ivec2 p)
 	{
 		if(mixin(界1(q{-128},q{p.x},q{128})) && mixin(界1(q{-128},q{p.y},q{128})))
-		return assemble(mixin(舉!((CoordFormat),q{i8})), bits(p.x, 8), bits(p.y, 8)); 
+		return [assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p.x)), (cast(ubyte)(p.y))), bits(0UL,0)]; 
 		else if(mixin(界1(q{-32768},q{p.x},q{32768})) && mixin(界1(q{-32768},q{p.y},q{32768})))
-		return assemble(mixin(舉!((CoordFormat),q{i16})), bits(p.x, 16), bits(p.y, 16)); 
-		else return assemble(mixin(舉!((CoordFormat),q{i32})), p); 
+		return [assemble(mixin(舉!((CoordFormat),q{i16})), (cast(ushort)(p.x)), (cast(ushort)(p.y))), bits(0UL,0)]; 
+		else return[assemble(mixin(舉!((CoordFormat),q{i32}))), assemble(p)]; 
 	} 
 	
-	Bits!ulong assemblePoint(in vec2 p)
+	Bits!(ulong)[2] assemblePoint(in vec2 p)
 	{
 		const i = (itrunc(p)); 
 		if(p==i) return assemblePoint(i); 
-		else return assemble(mixin(舉!((CoordFormat),q{f32})), p); 
+		else return [assemble(mixin(舉!((CoordFormat),q{f32}))), assemble(p)]; 
 	} 
+	
+	void unittest_assemblePoint()
+	{
+		void test(alias vec, alias fmt, int len)()
+		{
+			const p = assemblePoint(vec); enum fmtBitCnt = EnumBits!(typeof(fmt)); 
+			static if(isStaticArray!(typeof(p)))
+			{ const p0 = p[0],  actualLen = p[0].bitCnt + p[1].bitCnt; }
+			else
+			{ const p0 = p,  actualLen = p.bitCnt; }
+			assert(p0.data.getBits(0, fmtBitCnt) == fmt, "bad fmtCode"); 
+			assert(actualLen - fmtBitCnt == len, "bad len"); 
+		} 
+		
+		test!(vec2(0), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+		test!(ivec2(-128, 27), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+		test!(ivec2(129, 129), mixin(舉!((CoordFormat),q{i16})), 16*2); 
+		test!(ivec2(-32768, 32767), mixin(舉!((CoordFormat),q{i16})), 16*2); 
+		test!(vec2(40000, -40000), mixin(舉!((CoordFormat),q{i32})), 32*2); 
+		test!(vec2(1.0f, 2.0f), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+		test!(vec2(1.5f, 2.5f), mixin(舉!((CoordFormat),q{f32})), 32*2); 
+		test!(Vector!(byte, 2)(0, 0), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+		test!(Vector!(short, 2)(-128, 127), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+		test!(Vector!(short, 2)(129, 129), mixin(舉!((CoordFormat),q{i16})), 16*2); 
+	} 
+	
 	
 	
 	
@@ -839,7 +876,7 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			///The appenders are keeping their memory ready to use.
-			void reset(bool doDealloc=false)
+			void resetStream(bool doDealloc=false)
 			{
 				if(doDealloc)
 				{
@@ -856,8 +893,8 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			///This resets and frees up the appenders memory
-			void dealloc()
-			{ reset(doDealloc : true); } 
+			void deallocStream()
+			{ resetStream(doDealloc : true); } 
 		}
 		
 		final void emit(Args...)(in Args args)
@@ -867,6 +904,7 @@ version(/+$DIDE_REGION+/all)
 				{
 					alias a = args[i]; 
 					static if(is(T : Bits!(B), B))	bitStreamAppender.appendBits(a.data, a.bitCnt); 
+					else static if(is(T : Bits!(B)[N], B, int N))	{ static foreach(i; 0..N) emit(a[i]); }
 					else static if(is(T : ubyte[])) emitBytes(a); 
 					else with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
 				}
@@ -902,9 +940,11 @@ version(/+$DIDE_REGION+/all)
 		static struct Transformation
 		{
 			vec2 scaleXY = vec2(1); 
-			float rotZ_deg=0; 
+			float skewX_deg, rotZ_deg = 0; 
 			vec2 transXY = vec2(0); 
 			//applied in this order
+			
+			alias teljesen_érdektelen_effekt = skewX_deg; 
 		} 
 		
 		Transformation user_TR, target_TR; 
@@ -918,17 +958,24 @@ version(/+$DIDE_REGION+/all)
 				{
 					if(scaleXY.x!=scaleXY.y)
 					{
+						print("DUAL"); 
 						emit(
 							assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
 								assembleSize(scaleXY.y)
 						); 
 					}
 					else
-					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
+					{
+						print("SINGLE"); 
+						emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); 
+					}
 				}
 				
 				if(rotZ_deg.chkSet(user_TR.rotZ_deg))
-				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ})), assembleAngle(rotZ_deg)); }
+				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ})), assembleAngle_deg(rotZ_deg)); }
+				
+				if(skewX_deg.chkSet(user_TR.skewX_deg))
+				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX})), assembleAngle_deg(skewX_deg)); }
 				
 				if(transXY.chkSet(user_TR.transXY))
 				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY})), assemblePoint(transXY)); }
@@ -1004,13 +1051,28 @@ version(/+$DIDE_REGION+/all)
 		
 		protected void synch_reset()
 		{
-			//the target gpu state is reseted, to the initial shader state
+			/+
+				The target gpu state is reseted, 
+				to the initial shader state
+			+/
 			target_FMH = TexHandle.init; 
 			target_LFMH = TexHandle.init; 
 			target_PALH = TexHandle.init; 
 			target_LTH = TexHandle.init; 
 			
 			target_TR = Transformation.init; 
+		} void resetStyle()
+		{
+			/+
+				The local style state
+				is reseted.
+			+/
+			FMH = TexHandle.init; 
+			LFMH = TexHandle.init; 
+			PALH = TexHandle.init; 
+			LTH = TexHandle.init; 
+			
+			TR = Transformation.init; 
 		} 
 		
 		protected int actVertexCount; 
@@ -2357,6 +2419,7 @@ class VulkanWindow: Window
 			TexSizeFormat.selfTest; 
 			unittest_assembleSize; 
 			unittest_assembleAngle; 
+			unittest_assemblePoint; 
 		} 
 		
 		
@@ -2431,23 +2494,23 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x12AC982886ADB).檢(
+					((0x133E782886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x12B3B82886ADB))))
+				if((互!((bool),(0),(0x1345982886ADB))))
 				{
 					GfxBuilder.desiredMaxVertexCount = 
-					((0x12B9882886ADB).檢((互!((float/+w=12+/),(1.000),(0x12BAF82886ADB))).iremap(0, 1, 4, 127))); 
+					((0x134B682886ADB).檢((互!((float/+w=12+/),(1.000),(0x134CD82886ADB))).iremap(0, 1, 4, 127))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilder.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x12CB482886ADB).檢 (im)); 
+					((0x135D282886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3021,12 +3084,14 @@ $(V_size+G_size)".text
 				//mat4x3 matOutputTransform; 
 				
 				vec2 TR_scaleXY = vec2(1); 
+				float TR_skewX_rad = 0; 
 				float TR_rotZ_rad = 0; 
 				vec2 TR_transXY = vec2(0); 
 				
 				void TR_reset()
 				{
 					TR_scaleXY = vec2(1); 
+					TR_skewX_rad = 0; 
 					TR_rotZ_rad = 0; 
 					TR_transXY = vec2(0); 
 				} 
@@ -3050,6 +3115,14 @@ $(V_size+G_size)".text
 					p *= TR_scaleXY; 
 					if(TR_rotZ_rad!=0) p = rotation2D(TR_rotZ_rad) * p; //Opt: cache this matrix
 					p += TR_transXY; 
+					
+					if(TR_skewX_rad>0)
+					{
+						vec2 q = rotation2D(UB.iTime/20) * (p + rotation2D(UB.iTime)*vec2(100, 0)); 
+						vec2 d = q-vec2(320, 240); 
+						q += normalize(d)*sin(length(d)/40)*30*TR_skewX_rad*(sin(fract(UB.iTime)*(2*PI))+1.5); 
+						return q; 
+					}
 					
 					return p; 
 				} 
@@ -3570,10 +3643,10 @@ $(V_size+G_size)".text
 					{
 						//case AngleFormat_u2: 	return float(fetchBits(bitStream, 2))*(PI/2.0); 
 						//case AngleFormat_u4: 	return float(fetchBits(bitStream, 4))*(PI/8.0); 
-						case AngleFormat_u9: 	return radians(float(fetchBits(bitStream, 8))); 
+						case AngleFormat_u9: 	return radians(float(fetchBits(bitStream, 9))); 
 						case AngleFormat_f32: 	return radians(fetch_float(bitStream)); 
-						default: return 0.0; 
 					}
+					return 0.0; 
 				} 
 				
 				float fetchFormattedAngle_rad(inout BitStream bitStream)
@@ -3676,6 +3749,10 @@ $(V_size+G_size)".text
 							//can use outputTransformPoint2D(fetchP) for relative transform
 							TR_transXY = fetchFormattedPoint2D(bitStream); 
 						}
+						break; 
+						
+						case TransFormat_skewX: 
+							{ TR_skewX_rad = fetchFormattedAngle_rad(bitStream); }
 						break; 
 						
 						case TransFormat_rotZ: 

@@ -6059,13 +6059,14 @@ version(/+$DIDE_REGION Containers+/all)
 		
 		void appendBits(T)(in T val, size_t numBits = T.sizeof*8)
 		{
-			assert(
-				numBits>0 && numBits<=64, 
-				i"appendBits!($(T.stringof)) Invalid numBits: $(numBits)".text
-			); 
+			if(numBits==0) return; 
+			
+			assert(numBits<=64, i"appendBits!($(T.stringof)) Invalid numBits: $(numBits)".text); 
+			
+			static assert(isIntegral!T, "Only integers supported!"); 
 			
 			/+Convert input to ulong and mask to requested bits+/
-			ulong input = cast(ulong)val << (64-numBits) >> (64-numBits); 
+			ulong input = cast(ulong)val << (64-numBits) >>> (64-numBits); 
 			
 			/+Case 1: All bits fit in tempData without flushing+/
 			if(tempBits + numBits <= 64)
@@ -7035,7 +7036,7 @@ version(/+$DIDE_REGION Containers+/all)
 					}
 		+/
 		
-		void hexDump(T=ubyte)(in void[] data, int width=16)
+		string hexDump(T=ubyte)(in void[] data, int width=16)
 		{
 			enum digits = T.sizeof*2; 
 			
@@ -7054,8 +7055,10 @@ version(/+$DIDE_REGION Containers+/all)
 					.array; 
 			} 
 			
+			string[] res; 
 			foreach(i, a; (cast(T[])data).chunks(width).map!array.enumerate)
-			writefln!"%04X : %s : %s"(i*width, hexLine(a), binaryLine(a)); 
+			res ~= format!"%04X : %s : %s"(i*width, hexLine(a), binaryLine(a)); 
+			return res.join('\n'); 
 		} 
 		
 		bool isHexDigit(dchar ch) @safe
