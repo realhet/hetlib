@@ -1100,7 +1100,28 @@ version(/+$DIDE_REGION+/all)
 		
 		version(/+$DIDE_REGION Messy ShaderMaxVertexCount logic+/all)
 		{
-			enum ShaderMaxVertexCount = 127; 
+			enum ShaderMaxVertexCount = 
+			
+			//127
+			/+
+				127:
+				4 vec4 gl_Position
+				4 smooth mediump vec4 fragColor
+				4 smooth mediump vec4 fragBkColor
+				2 smooth vec2 fragTexCoordXY
+				1 flat uint fragTexHandleAndMode
+				1 flat uint fragTexCoordZ
+				4 flat vec4 fragFloats0
+				4 flat vec4 fragFloats1
+				-----
+				24 total
+			+/
+			113
+			/+
+				113:
+				24 total + gl_ClipDistance[4] = 28
+			+/
+			; 
 			__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 			
 			static @property int maxVertexCount()
@@ -2494,23 +2515,23 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x133E782886ADB).檢(
+					((0x1357682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1345982886ADB))))
+				if((互!((bool),(0),(0x135E882886ADB))))
 				{
 					GfxBuilder.desiredMaxVertexCount = 
-					((0x134B682886ADB).檢((互!((float/+w=12+/),(1.000),(0x134CD82886ADB))).iremap(0, 1, 4, 127))); 
+					((0x1364582886ADB).檢((互!((float/+w=12+/),(1.000),(0x1365C82886ADB))).iremap(0, 1, 4, 127))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilder.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x135D282886ADB).檢 (im)); 
+					((0x1376182886ADB).檢 (im)); 
 				}
 			}
 			
@@ -2972,6 +2993,11 @@ $(V_size+G_size)".text
 				$(ShaderBufferDeclarations)
 				$(TexSizeFormat.GLSLCode)
 				
+				out gl_PerVertex 
+				{
+					vec4 gl_Position; 
+					float gl_ClipDistance[4]; 
+				}; 
 				
 				layout(points) in; 
 				layout(triangle_strip, max_vertices = $(GfxBuilder.ShaderMaxVertexCount)) out; 
@@ -3129,7 +3155,14 @@ $(V_size+G_size)".text
 				
 				void emitVertex2D(vec2 p)
 				{
-					gl_Position = UB.mvp * vec4(outputTransformPoint2D(p), 0, 1); 
+					vec2 p_trans = outputTransformPoint2D(p); 
+					gl_Position = UB.mvp * vec4(p_trans, 0, 1); 
+					
+					gl_ClipDistance[0] = sin(length(p_trans-vec2(sin(UB.iTime*.6)*100, cos(UB.iTime*.7)*100)-vec2(320, 200))*.1); 
+					gl_ClipDistance[1] = 0; 
+					gl_ClipDistance[2] = 0; 
+					gl_ClipDistance[3] = sin(length(p_trans-vec2(sin(UB.iTime*0.4)*100, cos(UB.iTime*.3)*100)-vec2(320, 200))*.1); 
+					
 					EmitVertex(); 
 				} 
 				

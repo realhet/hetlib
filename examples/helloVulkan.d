@@ -1855,8 +1855,6 @@ $(scaleXY)".text
 						}
 					}
 					
-					
-					
 					with(tvBuilder)
 					{
 						//Link: google image search: borland turbo pascal
@@ -1930,7 +1928,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 				}
 				
-				((0x114485F5C4644).檢((update間(_間)))); 
+				((0x1143A5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1978,7 +1976,7 @@ End.".splitLines
 					//content.gb.hexDump.writeln; 
 					appendGfxContent(content); 
 				}
-				((0x11A295F5C4644).檢((update間(_間)))); 
+				((0x11A1B5F5C4644).檢((update間(_間)))); 
 				
 				
 			} 
