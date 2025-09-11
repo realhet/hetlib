@@ -463,9 +463,9 @@ version(/+$DIDE_REGION+/all) {
 					vgaFont = new BitmapArray
 					//(ivec2(8), File(`fontmap:\C64_upper`))
 					//(ivec2(8), File(`fontmap:\C64_lower`))
-					(ivec2(5, 8), File(`fontmap:\EverexME_5x8`))
+					//(ivec2(5, 8), File(`fontmap:\EverexME_5x8`))
 					//(ivec2(8), File(`fontmap:\CGA_8x8`))
-					//(ivec2(9, 16), File(`fontmap:\VGA_9x16`))
+					(ivec2(9, 16), File(`fontmap:\VGA_9x16`))
 					; 
 				}
 				return vgaFont; 
@@ -1815,30 +1815,46 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					{
 						with(tvBuilder._builder.TR)
 						{
-							if((互!((bool),(0),(0x106855F5C4644))))
-							transXY = (
-								vec2(
-									(互!((float/+w=6+/),(0.000),(0x106D85F5C4644))),
-									(互!((float/+w=6+/),(0.000),(0x107145F5C4644)))
-								)-.5f
-							)*300; 
-							if((互!((bool),(0),(0x1076F5F5C4644)))) rotZ_deg = round((互!((float/+w=3 h=3 endless=1+/),(0.111),(0x107A65F5C4644)))*360) + .1f; 
-							if((互!((bool),(0),(0x107FD5F5C4644)))) rotZ_deg = round((互!((float/+w=3 h=3 endless=1+/),(0.111),(0x108345F5C4644)))*360); 
-							if((互!((bool),(0),(0x108855F5C4644)))) { teljesen_érdektelen_effekt = (互!((float/+w=6+/),(0.000),(0x108CB5F5C4644)))*90; }
-							if((互!((bool),(0),(0x1090D5F5C4644)))) {
+							if((互!((bool),(0),(0x106855F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0x109665F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0x109A45F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0x106DE5F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0x1071C5F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0x10A025F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0x1077A5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							((0x10A615F5C4644).檢(
+							if((互!((bool),(0),(0x107DC5F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0x108105F5C4644))); }
+							if((互!((bool),(0),(0x108635F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0x108945F5C4644)))*360; 
+							if((互!((bool),(0),(0x108E45F5C4644)))) {
+								transXY = (
+									vec2(
+										(互!((float/+w=6+/),(0.000),(0x1093C5F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0x109795F5C4644)))
+									)-.5f
+								)*300; 
+							}
+							if((互!((bool),(0),(0x109E05F5C4644)))) {
+								clipBounds =
+								bounds2(
+									vec2(
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0x10A4B5F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0x10A9D5F5C4644)))
+									),
+									((
+										vec2(
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0x10B1A5F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0x10B6D5F5C4644)))
+										)
+									).genericArg!q{size})
+								); 
+							}
+							((0x10BFB5F5C4644).檢(
 								i"$(transXY)
+$(skewX_deg)
 $(rotZ_deg)
-$(teljesen_érdektelen_effekt)
-$(scaleXY)".text
+$(scaleXY)
+$(clipBounds)".text
 							)); 
 						}
 					}
@@ -1916,7 +1932,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 				}
 				
-				((0x1126E5F5C4644).檢((update間(_間)))); 
+				((0x114055F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1964,7 +1980,7 @@ End.".splitLines
 					//content.gb.hexDump.writeln; 
 					appendGfxContent(content); 
 				}
-				((0x1184F5F5C4644).檢((update間(_間)))); 
+				((0x119E65F5C4644).檢((update間(_間)))); 
 				
 				
 			} 

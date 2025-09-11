@@ -281,12 +281,19 @@ version(/+$DIDE_REGION+/all)
 	enum XYFormat {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
 	enum FlagFormat {tex, font, vec, all} 
 	
-	enum AngleFormat {u9, f32} 
-	enum TransFormat {unity, transXY, scale, scaleXY, skewX, rotZ/+, tileXY, transXYZ, axisXY+/} 
+	enum AngleFormat {i10, f32} 
+	enum TransFormat {
+		unity, transXY, scale, scaleXY, 
+		skewX, rotZ, clipBounds
+		/+, tileXY, transXYZ, axisXY+/
+	} 
 	
 	struct Bits(T)
 	{
 		static assert(isIntegral!T); 
+		//static assert(!isSigned!T); 
+		
+		
 		
 		/+
 			Todo: lock the type for ulong here. Not just in assemble()! 
@@ -304,6 +311,8 @@ version(/+$DIDE_REGION+/all)
 			static if(is(B==Bits!T2, T2))
 			{
 				static if(isSigned!T) data = data << (64-bitCnt) >>> (64-bitCnt); 
+				//Opt: dont allow signed types here, to be able to avoid negative masking
+				
 				return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
 			}
 			else
@@ -316,10 +325,7 @@ version(/+$DIDE_REGION+/all)
 	
 	auto bits(T)(in T a)
 	{
-		static if(
-			is(T==vec2)||
-			is(T==ivec2)
-		)	return bits(a.bitCast!ulong); 
+		static if(is(T==vec2)||is(T==ivec2))	return bits(a.bitCast!ulong); 
 		else static if(
 			is(T==float)||is(T==RGBA)||
 			is(T==Vector!(short, 2))||
@@ -333,7 +339,7 @@ version(/+$DIDE_REGION+/all)
 		else static if(is(T==enum))
 		{
 			static if(is(T==Opcode))	return bits(opInfo[a].bits, opInfo[a].bitCnt); 
-			else	return bits(a, EnumBits!T); 
+			else	return bits((cast(uint)(a)), EnumBits!T); 
 		}
 		else
 		{ return bits(a, T.sizeof * 8); }
@@ -370,11 +376,11 @@ version(/+$DIDE_REGION+/all)
 		else static assert(false, "Unhandled type: "~T.stringof); 
 		if(isInt)
 		{
-			if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits(uint(i), 4)); 
-			if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits(uint(i), 8)); 
+			if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits((cast(uint)(i)), 4)); 
+			if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits((cast(uint)(i)), 8)); 
 		}
 		const logf = f.log2*128.0f, logi = (iround(logf)), exact = logf==logi; 
-		if(exact && mixin(界1(q{0},q{logi},q{1<<12})))	return assemble(mixin(舉!((SizeFormat),q{ulog12})), bits(logi, 12)); 
+		if(exact && mixin(界1(q{0},q{logi},q{1<<12})))	return assemble(mixin(舉!((SizeFormat),q{ulog12})), bits((cast(uint)(logi)), 12)); 
 		else	return assemble(mixin(舉!((SizeFormat),q{f32})), f); 
 	} 
 	
@@ -405,27 +411,31 @@ version(/+$DIDE_REGION+/all)
 		{ const i = (itrunc(angle)); const isInt = i == angle; }
 		else static assert(false, "Unhandled type: "~T.stringof); 
 		
-		if(isInt && mixin(界1(q{0},q{i},q{1<<9})))	{ return assemble(mixin(舉!((AngleFormat),q{u9})), bits((cast(uint)(i)), 9)); }
+		if(
+			isInt && 
+			mixin(界1(q{-1<<9},q{i},q{1<<9}))
+		)	{ return assemble(mixin(舉!((AngleFormat),q{i10})), bits((cast(uint)(i)), 10)); }
 		else	{ return assemble(mixin(舉!((AngleFormat),q{f32})), float(angle)); }
 	} 
 	
 	void unittest_assembleAngle()
 	{
 		// Test integer cases within range
-		assert(assembleAngle_deg(0) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(0, 9))); 
-		assert(assembleAngle_deg(256) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(256, 9))); 
-		assert(assembleAngle_deg(511) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(511, 9))); 
+		assert(assembleAngle_deg(0) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(0, 10))); 
+		assert(assembleAngle_deg(256) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(256, 10))); 
+		assert(assembleAngle_deg(511) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(511, 10))); 
+		assert(assembleAngle_deg(-512) == assemble(mixin(舉!((AngleFormat),q{i10})), bits((cast(uint)(-512)), 10))); 
 		
 		// Test float cases that are exact integers within range
-		assert(assembleAngle_deg(128.0f) == assemble(mixin(舉!((AngleFormat),q{u9})), bits(128, 9))); 
+		assert(assembleAngle_deg(128.0f) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(128, 10))); 
 		
 		// Test float fallback for non-integer values
 		assert(assembleAngle_deg(128.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), 128.5f)); 
 		
 		// Test out-of-range values use float32 (no clamping)
-		assert(assembleAngle_deg(-5) == assemble(mixin(舉!((AngleFormat),q{f32})), -5.0f)); 
+		assert(assembleAngle_deg(-513) == assemble(mixin(舉!((AngleFormat),q{f32})), -513.0f)); 
 		assert(assembleAngle_deg(600) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
-		assert(assembleAngle_deg(-1.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -1.5f)); 
+		assert(assembleAngle_deg(-512.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -512.5f)); 
 		assert(assembleAngle_deg(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
 	} 
 	
@@ -939,12 +949,16 @@ version(/+$DIDE_REGION+/all)
 		
 		static struct Transformation
 		{
+			enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
+			
 			vec2 scaleXY = vec2(1); 
-			float skewX_deg, rotZ_deg = 0; 
-			vec2 transXY = vec2(0); 
+			float skewX_deg = 0; 
+			float rotZ_deg = 0; 
+			vec2 transXY = vec2(0); //in world space
+			bounds2 clipBounds = initialClipBounds; //in world space
 			//applied in this order
 			
-			alias teljesen_érdektelen_effekt = skewX_deg; 
+			void clipBounds_reset() { clipBounds = initialClipBounds; } 
 		} 
 		
 		Transformation user_TR, target_TR; 
@@ -952,33 +966,37 @@ version(/+$DIDE_REGION+/all)
 		
 		void synch_TR()
 		{
-			with(target_TR)
+			with(target_TR /+it updates target and emits if changed+/)
 			{
 				if(scaleXY.chkSet(user_TR.scaleXY))
 				{
 					if(scaleXY.x!=scaleXY.y)
 					{
-						print("DUAL"); 
 						emit(
 							assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
 								assembleSize(scaleXY.y)
 						); 
 					}
 					else
-					{
-						print("SINGLE"); 
-						emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); 
-					}
+					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
 				}
 				
-				if(rotZ_deg.chkSet(user_TR.rotZ_deg))
-				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ})), assembleAngle_deg(rotZ_deg)); }
-				
 				if(skewX_deg.chkSet(user_TR.skewX_deg))
-				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX})), assembleAngle_deg(skewX_deg)); }
+				{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
+				
+				if(rotZ_deg.chkSet(user_TR.rotZ_deg))
+				{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
 				
 				if(transXY.chkSet(user_TR.transXY))
-				{ emit(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY})), assemblePoint(transXY)); }
+				{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
+				
+				if(clipBounds.chkSet(user_TR.clipBounds))
+				{
+					emit(
+						assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
+							assemblePoint(clipBounds.size)
+					); 
+				}
 			}
 		} 
 		
@@ -2515,23 +2533,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1357682886ADB).檢(
+					((0x1388182886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x135E882886ADB))))
+				if((互!((bool),(0),(0x138F382886ADB))))
 				{
+					const ma = GfxBuilder.ShaderMaxVertexCount; 
 					GfxBuilder.desiredMaxVertexCount = 
-					((0x1364582886ADB).檢((互!((float/+w=12+/),(1.000),(0x1365C82886ADB))).iremap(0, 1, 4, 127))); 
+					((0x1398382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1399A82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilder.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1376182886ADB).檢 (im)); 
+					((0x13A9E82886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3107,12 +3126,14 @@ $(V_size+G_size)".text
 					return ErrorColor; 
 				} 
 				
-				//mat4x3 matOutputTransform; 
+				//Model - World coordinate transformation
+				const vec4 initialClipBounds = vec4(-1e30, -1e30, 1e30, 1e30); 
 				
 				vec2 TR_scaleXY = vec2(1); 
 				float TR_skewX_rad = 0; 
 				float TR_rotZ_rad = 0; 
 				vec2 TR_transXY = vec2(0); 
+				vec4 TR_clipBounds = initialClipBounds; 
 				
 				void TR_reset()
 				{
@@ -3120,6 +3141,7 @@ $(V_size+G_size)".text
 					TR_skewX_rad = 0; 
 					TR_rotZ_rad = 0; 
 					TR_transXY = vec2(0); 
+					TR_clipBounds = initialClipBounds; 
 				} 
 				
 				mat2 rotation2D(float angle)
@@ -3130,58 +3152,32 @@ $(V_size+G_size)".text
 				
 				vec2 outputTransformPoint2D(vec2 p)
 				{
-					/*
-						Todo: Do this crazy effect around the mouse!
-						
-						vec2 q = rotation2D(UB.iTime/20) * (p + rotation2D(UB.iTime)*vec2(100, 0)); 
-						vec2 d = q-vec2(320, 240); 
-						q += normalize(d)*sin(length(d)/40)*30; 
-					*/
-					
 					p *= TR_scaleXY; 
-					if(TR_rotZ_rad!=0) p = rotation2D(TR_rotZ_rad) * p; //Opt: cache this matrix
-					p += TR_transXY; 
-					
-					if(TR_skewX_rad>0)
-					{
-						vec2 q = rotation2D(UB.iTime/20) * (p + rotation2D(UB.iTime)*vec2(100, 0)); 
-						vec2 d = q-vec2(320, 240); 
-						q += normalize(d)*sin(length(d)/40)*30*TR_skewX_rad*(sin(fract(UB.iTime)*(2*PI))+1.5); 
-						return q; 
+					if(TR_skewX_rad!=0) {
+						p.x -= p.y * tan(TR_skewX_rad); 
+						//Opt: cache this constant
 					}
+					if(TR_rotZ_rad!=0) {
+						p = rotation2D(-TR_rotZ_rad) * p; 
+						//Opt: cache this matrix
+					}
+					p += TR_transXY; 
 					
 					return p; 
 				} 
 				
 				void emitVertex2D(vec2 p)
 				{
-					vec2 p_trans = outputTransformPoint2D(p); 
-					gl_Position = UB.mvp * vec4(p_trans, 0, 1); 
+					vec2 w = outputTransformPoint2D(p); //model to world transform
 					
-					gl_ClipDistance[0] = sin(length(p_trans-vec2(sin(UB.iTime*.6)*100, cos(UB.iTime*.7)*100)-vec2(320, 200))*.1); 
-					gl_ClipDistance[1] = 0; 
-					gl_ClipDistance[2] = 0; 
-					gl_ClipDistance[3] = sin(length(p_trans-vec2(sin(UB.iTime*0.4)*100, cos(UB.iTime*.3)*100)-vec2(320, 200))*.1); 
+					gl_ClipDistance[0] = w.x-TR_clipBounds.x; 
+					gl_ClipDistance[1] = w.y-TR_clipBounds.y; 
+					gl_ClipDistance[2] = TR_clipBounds.z-w.x; 
+					gl_ClipDistance[3] = TR_clipBounds.w-w.y; 
+					
+					gl_Position = UB.mvp * vec4(w, 0, 1); //world to screen transform
 					
 					EmitVertex(); 
-				} 
-				
-				void emitPointSizeRect2D(in vec2 p, in vec2 size)
-				{
-					emitVertex2D(p); 
-					emitVertex2D(p+vec2(0, size.y)); 
-					emitVertex2D(p+vec2(size.x, 0)); 
-					emitVertex2D(p+size); 
-					EndPrimitive(); 
-				} 
-				
-				void emitTexturedPointSizeRect2D(in vec2 p, in vec2 size)
-				{
-					fragTexCoordXY = vec2(0,0); emitVertex2D(p); 
-					fragTexCoordXY = vec2(0,1); emitVertex2D(p+vec2(0, size.y)); 
-					fragTexCoordXY = vec2(1,0); emitVertex2D(p+vec2(size.x, 0)); 
-					fragTexCoordXY = vec2(1,1); emitVertex2D(p+size); 
-					EndPrimitive(); 
 				} 
 				
 				void emitTexturedPointPointRect2D(in vec2 p, in vec2 q)
@@ -3543,17 +3539,17 @@ $(V_size+G_size)".text
 					return bit; 
 				} 
 				
-				int fetch_int(inout BitStream bitStream, int numBits)
+				int fetch_int(inout BitStream bitStream, in int numBits)
 				{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
 				
-				uint fetch_uint(inout BitStream bitStream)
+				uint fetch_uint(inout BitStream bitStream, in int numBits)
 				{
-					return fetchBits(bitStream, 32); 
+					return fetchBits(bitStream, numBits); 
 					/*Opt: this 32bit read should be optimized*/
 				} 
 				
 				float fetch_float(inout BitStream bitStream)
-				{ return uintBitsToFloat(fetch_uint(bitStream)); } 
+				{ return uintBitsToFloat(fetch_uint(bitStream, 32)); } 
 				
 				vec2 fetch_vec2(inout BitStream bitStream)
 				{ return vec2(fetch_float(bitStream), fetch_float(bitStream)); } 
@@ -3676,7 +3672,7 @@ $(V_size+G_size)".text
 					{
 						//case AngleFormat_u2: 	return float(fetchBits(bitStream, 2))*(PI/2.0); 
 						//case AngleFormat_u4: 	return float(fetchBits(bitStream, 4))*(PI/8.0); 
-						case AngleFormat_u9: 	return radians(float(fetchBits(bitStream, 9))); 
+						case AngleFormat_i10: 	return radians(float(fetch_int(bitStream, 10))); 
 						case AngleFormat_f32: 	return radians(fetch_float(bitStream)); 
 					}
 					return 0.0; 
@@ -3696,7 +3692,7 @@ $(V_size+G_size)".text
 						case HandleFormat_u12: 	return fetchBits(bitStream, 12); 
 						case HandleFormat_u16: 	return fetchBits(bitStream, 16); 
 						case HandleFormat_u24: 	return fetchBits(bitStream, 24); 
-						case HandleFormat_u32: 	return fetch_uint(bitStream); 
+						case HandleFormat_u32: 	return fetch_uint(bitStream, 32); 
 						default: return 0; 
 					}
 				} 
@@ -3797,6 +3793,15 @@ $(V_size+G_size)".text
 							const float 	sx = fetchFormattedSize(bitStream),
 								sy = ((fmt==TransFormat_scaleXY) ?(fetchFormattedSize(bitStream)):(sx)); 
 							TR_scaleXY = vec2(sx, sy); 
+						}
+						break; 
+						
+						case TransFormat_clipBounds: 
+							{
+							//absolute coords: topLeft, widthHeight
+							TR_clipBounds.xy = fetchFormattedPoint2D(bitStream); 
+							TR_clipBounds.zw = 	TR_clipBounds.xy +
+								fetchFormattedPoint2D(bitStream); 
 						}
 						break; 
 					}
