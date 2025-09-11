@@ -415,17 +415,22 @@ version(/+$DIDE_REGION+/all) {
 				int getPixel_unsafe(int idx, int x, int y) const
 				=> raw[(idx*size.y+y)*(size.x/8)+(x/8)].getBit(x%8); 
 				
-				this(ivec2 size, string bin)
+				this(ivec2 size, Image2D!ubyte img)
 				{
 					enforce(size.x>0 && size.y>0); 
 					this.size = size; aspect = (float(size.x))/size.y; 
-					auto img = bin.deserializeImage!ubyte; 
 					length = img.height/size.y; 
 					enforce(img.width==size.x); 
 					enforce(img.height==length*size.y); 
 					raw = img.asArray.pack8bitTo1bit; 
 					tex = new Texture(TexFormat.wa_u1, ivec3(size.xy, length), raw); 
 				} 
+				
+				this(ivec2 size, string bin)
+				{ this(size, bin.deserializeImage!ubyte); } 
+				
+				this(ivec2 size, File file)
+				{ this(size, bitmaps[file].accessOrGet!ubyte); } 
 			} 
 			
 			class Font : BitmapArray
@@ -450,34 +455,18 @@ version(/+$DIDE_REGION+/all) {
 				return 0; 
 			} 
 			
-			auto vgaFont()
+			auto vgaFont2()
 			{
 				__gshared BitmapArray vgaFont; 
 				if(!vgaFont)
 				{
-					const origFile = File(i`c:\dl\vga-rom-fonts-ag869x16.webp`.text); 
-					auto img = origFile.read(true).deserializeImage!ubyte; 
-					const charSize = img.size/16; 
-					const generate9thPixel = !!origFile.name.isWild("*ag869x*"); 
-					const realCharSize = charSize + ivec2(generate9thPixel, 0); 
-					
-					ubyte[] res; 
-					foreach(cy; 0..16)
-					foreach(cx; 0..16)
-					foreach(y; 0..charSize.y)
-					{
-						res ~= img[cx*8..(cx+1)*8, cy*charSize.y+y].asArray; 
-						if(generate9thPixel)
-						res ~= ((cy==0xC || cy==0xD)?(res.back):(0)); 
-					}
-					
-					img = image2D(realCharSize.x, realCharSize.y*256, res); 
-					
-					const modifiedFile = origFile.otherExt(".fontMap.webp"); 
-					img.serializeImage("webp quality=999").saveTo(modifiedFile); 
-					
 					vgaFont = new BitmapArray
-					(realCharSize, (cast(string)(modifiedFile.read(true)))); 
+					//(ivec2(8), File(`fontmap:\C64_upper`))
+					//(ivec2(8), File(`fontmap:\C64_lower`))
+					(ivec2(5, 8), File(`fontmap:\EverexME_5x8`))
+					//(ivec2(8), File(`fontmap:\CGA_8x8`))
+					//(ivec2(9, 16), File(`fontmap:\VGA_9x16`))
+					; 
 				}
 				return vgaFont; 
 			} 
@@ -1021,7 +1010,7 @@ version(/+$DIDE_REGION+/all) {
 				void textBackend_old(A)(in GraphicState st, A r)
 				{
 					const scaleX = 9, scaleY = 16; 
-					alias font = vgaFont; 
+					alias font = vgaFont2; 
 					foreach(ch; r.dtext)
 					{
 						_builder.begin; 
@@ -1041,15 +1030,14 @@ version(/+$DIDE_REGION+/all) {
 						cursorPos.x += /+st.fontHeight * font.aspect+/1; 
 					}
 				} 
-				
-				
+				
 				void textBackend(A)(in GraphicState st, A r)
 				{
 					//Todo: this should go to buffer
 					static if(isInputRange!A) if(r.empty) return; 
 					
 					const scaleX = 9, scaleY = 16; 
-					alias font = vgaFont; 
+					alias font = vgaFont2; 
 					
 					void setup()
 					{
@@ -1576,7 +1564,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xEBBB5F5C4644).檢 (zoomedPlatform)), ((0xEBE45F5C4644).檢 (shipPos)); 
+								((0xE9EC5F5C4644).檢 (zoomedPlatform)), ((0xEA155F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1777,7 +1765,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0x102255F5C4644).檢((update間(_間)))); 
+				((0x100565F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1809,7 +1797,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 							}
 						}
 						
-						((0x106925F5C4644).檢(builder.gbBitPos/8)); 
+						((0x104C35F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1821,32 +1809,32 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				{
 					auto tvBuilder = new TurboVisionBuilder; 
 					tvBuilder._builder.PALH = egaPalette; 
-					tvBuilder._builder.FMH = vgaFont.tex; 
+					tvBuilder._builder.FMH = vgaFont2.tex; 
 					
-					if((互!((bool),(1),(0x107EE5F5C4644))))
+					if((互!((bool),(1),(0x106205F5C4644))))
 					{
 						with(tvBuilder._builder.TR)
 						{
-							if((互!((bool),(0),(0x108535F5C4644))))
+							if((互!((bool),(0),(0x106855F5C4644))))
 							transXY = (
 								vec2(
-									(互!((float/+w=6+/),(0.000),(0x108A65F5C4644))),
-									(互!((float/+w=6+/),(0.000),(0x108E25F5C4644)))
+									(互!((float/+w=6+/),(0.000),(0x106D85F5C4644))),
+									(互!((float/+w=6+/),(0.000),(0x107145F5C4644)))
 								)-.5f
 							)*300; 
-							if((互!((bool),(0),(0x1093D5F5C4644)))) rotZ_deg = round((互!((float/+w=3 h=3 endless=1+/),(0.111),(0x109745F5C4644)))*360) + .1f; 
-							if((互!((bool),(0),(0x109CB5F5C4644)))) rotZ_deg = round((互!((float/+w=3 h=3 endless=1+/),(0.111),(0x10A025F5C4644)))*360); 
-							if((互!((bool),(0),(0x10A535F5C4644)))) { teljesen_érdektelen_effekt = (互!((float/+w=6+/),(0.000),(0x10A995F5C4644)))*90; }
-							if((互!((bool),(0),(0x10ADB5F5C4644)))) {
+							if((互!((bool),(0),(0x1076F5F5C4644)))) rotZ_deg = round((互!((float/+w=3 h=3 endless=1+/),(0.111),(0x107A65F5C4644)))*360) + .1f; 
+							if((互!((bool),(0),(0x107FD5F5C4644)))) rotZ_deg = round((互!((float/+w=3 h=3 endless=1+/),(0.111),(0x108345F5C4644)))*360); 
+							if((互!((bool),(0),(0x108855F5C4644)))) { teljesen_érdektelen_effekt = (互!((float/+w=6+/),(0.000),(0x108CB5F5C4644)))*90; }
+							if((互!((bool),(0),(0x1090D5F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0x10B345F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0x10B725F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0x109665F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0x109A45F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0x10BD05F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0x10A025F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							((0x10C2F5F5C4644).檢(
+							((0x10A615F5C4644).檢(
 								i"$(transXY)
 $(rotZ_deg)
 $(teljesen_érdektelen_effekt)
@@ -1854,7 +1842,7 @@ $(scaleXY)".text
 							)); 
 						}
 					}
-					
+					
 					with(tvBuilder)
 					{
 						//Link: google image search: borland turbo pascal
@@ -1927,8 +1915,8 @@ End.".splitLines
 					}
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 				}
-				
-				((0x1143A5F5C4644).檢((update間(_間)))); 
+				
+				((0x1126E5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1976,7 +1964,7 @@ End.".splitLines
 					//content.gb.hexDump.writeln; 
 					appendGfxContent(content); 
 				}
-				((0x11A1B5F5C4644).檢((update間(_間)))); 
+				((0x1184F5F5C4644).檢((update間(_間)))); 
 				
 				
 			} 

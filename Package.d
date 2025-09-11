@@ -7548,7 +7548,8 @@ version(/+$DIDE_REGION Containers+/all)
 			//Todo: boolean handling
 			//Todo: same option multimple times: the last one is the real one
 			
-			struct Item {
+			struct Item
+			{
 				bool hasValue; 
 				string name, value; 
 				//Todo: toString() with proper quotes and error checking
@@ -7659,7 +7660,8 @@ version(/+$DIDE_REGION Containers+/all)
 		//Todo: make unittest for CommandLine and QueryString
 		void testCommandLineQueryString()
 		{
-			const a = CommandLine(`dir "C:\Program Files" > C:\lists.txt param=" abc def " float=5.4 "c:\a.b?thumb&h=64"`); 
+			const a = CommandLine
+			(`dir "C:\Program Files" > C:\lists.txt param=" abc def " float=5.4 "c:\a.b?thumb&h=64"`); 
 			
 			static if(1)
 			{
