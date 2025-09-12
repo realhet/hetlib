@@ -3187,14 +3187,72 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		auto 同(string T, string sym, string id)()
 		{
+			/+
+				Old version:
+				/+
+					Code: return iq{
+						((){
+							$(T) act = $(sym); 
+							if(同internal!($(T), $(id))(act))
+							$(sym) = act; 
+							return act; 
+						})()
+					}.text; 
+				+/
+				
+				/+
+					Todo: Since 1.41 this shit is broken:
+					/+
+						Error: found /+Code: End of File+/ when expecting /+Code: ;+/ following expression /+Hidden: /+$DIDE_LOC c:\D\projects\DIDE\dideNode.d-mixin-1460(1467,4)+/+/
+						expression: /+
+							Code: ()
+							{
+								int act = padding.left; 
+								if(同internal!(int, 171357661260354L)(act))
+								padding.left = act; 
+								return act; 
+							} 
+							()
+						+/
+					+/
+				+/
+				
+				Forum: /+Link: https://forum.dlang.org/post/yvhqilyyntsryshfkiyx@forum.dlang.org+/
+			+/
+			
+			/+
+				temporal fix: DON'T return the value because if it is uncaptured, it raises the above error.
+				the problem: The new compiler expecting an expression or a statement based 
+					on the place of insertion.
+				Now it is a statement always.
+			+/
 			return iq{
-				() {
+				{
 					$(T) act = $(sym); 
 					if(同internal!($(T), $(id))(act))
 					$(sym) = act; 
-					return act; 
-				} ()
+				}
 			}.text; 
+			
+			/+
+				TestPad:
+				/+
+					Code: static float val=0; 
+					mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x195DB59F156A1})); 
+					padding.right = padding.left = val; 
+					
+					/+
+						Changes after 1.40:
+						/+
+							Code: //These in invalid usage from now:
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x196EA59F156A1})); 
+							//Grouping by comma expressions also broken:
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1979459F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1980959F156A1})); 
+						+/
+					+/
+				+/
+			+/
 		} 
 		
 		auto tuplify(size_t n, R)(R r) if (isInputRange!R)

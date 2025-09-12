@@ -569,10 +569,10 @@ version(/+$DIDE_REGION+/all) {
 				{
 					emitC64Border(pos-4, borderCol); 
 					foreach(y; 0..img.height)
-					{ drawChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
+					{ drawC64ChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
 				} 
 				
-				void drawChrRow(ivec2 pos, RG[] data, int bk)
+				void drawC64ChrRow(ivec2 pos, RG[] data, int bk)
 				{
 					if(data.empty) return; 
 					
@@ -755,20 +755,9 @@ version(/+$DIDE_REGION+/all) {
 					
 					emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
 				} 
-			} 
-			class EGABuilder
-			{
-				Builder _builder; 
-				
-				this()
-				{ _builder = new Builder; } 
-				
-				auto extractGfxContent()
-				=> _builder.extractGfxContent; 
-				
-				void resetStream()
-				{ _builder.resetStream; } 
-				
+				
+				alias _builder = this; 
+				//auto _builder() => this; 
 				
 				enum HAlign:ubyte { left, center, right } 
 				enum VAlign:ubyte { top, center, baseline, bottom } 
@@ -938,7 +927,7 @@ version(/+$DIDE_REGION+/all) {
 						}
 						else static if(
 							is(
-								T : EGABuilder.opacity
+								T : Builder.opacity
 								/+Todo: name conflict!+/
 							)
 						)	{ opacity = a.value; }
@@ -1109,7 +1098,8 @@ version(/+$DIDE_REGION+/all) {
 				} 
 				
 			} 
-			class TurboVisionBuilder : EGABuilder
+			
+			class TurboVisionBuilder : /+EGA+/Builder
 			{
 				enum clMenuBk 	= bk(ltGray), 
 				clMenuText 	= fg(black), 
@@ -1564,7 +1554,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0xE9EC5F5C4644).檢 (zoomedPlatform)), ((0xEA155F5C4644).檢 (shipPos)); 
+								((0xE9425F5C4644).檢 (zoomedPlatform)), ((0xE96B5F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1765,7 +1755,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0x100565F5C4644).檢((update間(_間)))); 
+				((0xFFAC5F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1797,7 +1787,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 							}
 						}
 						
-						((0x104C35F5C4644).檢(builder.gbBitPos/8)); 
+						((0x104185F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1811,45 +1801,45 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					tvBuilder._builder.PALH = egaPalette; 
 					tvBuilder._builder.FMH = vgaFont2.tex; 
 					
-					if((互!((bool),(1),(0x106205F5C4644))))
+					if((互!((bool),(1),(0x105755F5C4644))))
 					{
 						with(tvBuilder._builder.TR)
 						{
-							if((互!((bool),(0),(0x106855F5C4644)))) {
+							if((互!((bool),(0),(0x105DA5F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0x106DE5F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0x1071C5F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0x106335F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0x106715F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0x1077A5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0x106CF5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0x107DC5F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0x108105F5C4644))); }
-							if((互!((bool),(0),(0x108635F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0x108945F5C4644)))*360; 
-							if((互!((bool),(0),(0x108E45F5C4644)))) {
+							if((互!((bool),(0),(0x107315F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0x107655F5C4644))); }
+							if((互!((bool),(0),(0x107B85F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0x107E95F5C4644)))*360; 
+							if((互!((bool),(0),(0x108395F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0x1093C5F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0x109795F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0x108915F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0x108CE5F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0x109E05F5C4644)))) {
+							if((互!((bool),(0),(0x109355F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0x10A4B5F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0x10A9D5F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0x109A05F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0x109F25F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0x10B1A5F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0x10B6D5F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0x10A6F5F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0x10AC25F5C4644)))
 										)
 									).genericArg!q{size})
 								); 
 							}
-							((0x10BFB5F5C4644).檢(
+							((0x10B505F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1932,7 +1922,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 				}
 				
-				((0x114055F5C4644).檢((update間(_間)))); 
+				((0x1135A5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new Builder; 
 					with(builder)
@@ -1980,7 +1970,7 @@ End.".splitLines
 					//content.gb.hexDump.writeln; 
 					appendGfxContent(content); 
 				}
-				((0x119E65F5C4644).檢((update間(_間)))); 
+				((0x1193B5F5C4644).檢((update間(_間)))); 
 				
 				
 			} 
