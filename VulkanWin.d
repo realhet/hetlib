@@ -7,6 +7,8 @@ version(/+$DIDE_REGION+/all)
 	
 	import core.stdc.string : memset; 
 	
+	alias Texture = VulkanWindow.Texture; 
+	
 	enum bugFix_LastTwoGeometryShaderStreamsMissing = (常!(bool)(1))
 	/+
 		Todo: It happens with the Windows default driver.
@@ -590,7 +592,7 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	
-	
+	
 	version(none)
 	enum test = mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})); 
 	
@@ -851,7 +853,7 @@ version(/+$DIDE_REGION+/all)
 		uint gbBits; 
 	} 
 	
-	class GfxBuilder
+	class GfxBuilderBase
 	{
 		/+Opt: final functions everywhere if possible!!! Do timing tests!!!+/
 		
@@ -1176,6 +1178,721 @@ version(/+$DIDE_REGION+/all)
 				caller side, not here.
 			+/
 		} 
+	} 
+	
+	class GfxBuilder : GfxBuilderBase
+	{
+		void drawC64Rect(ibounds2 bnd, int fg)
+		{
+			begin(4, {}); 
+			synch_PALH; 
+			emit(
+				assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
+				assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
+				assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight),
+				assembleHandle(0)
+			); 
+		} 
+		
+		void drawC64Mark(ivec2 p, int fg = 7)
+		{ drawC64Rect(ibounds2(p, ((1).genericArg!q{size})), fg); } 
+		
+		void emitC64Border(ivec2 pos, int fg)
+		{
+			void r(int x0, int y0, int x1, int y1)
+			{
+				auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
+				drawC64Rect(ibounds2(p(x0, y0), p(x1, y1)), fg); 
+			} 
+			r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
+			r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
+		} 
+		
+		void drawC64Sprite(
+			Texture tex/+Todo: eliminate with state!+/, 
+			vec2 pos, int idx, int fg, bool doubleSize
+		)
+		{
+			begin(4, {}); 
+			synch_PALH; 
+			emit_setFMH(tex); 
+			emit(
+				assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
+				assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(tex.height*((doubleSize)?(2):(1))))/+Todo: assembleSize for ints!+/),
+				assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
+				assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
+			); 
+		} 
+		
+		void emitC64Screen(
+			Texture palette, Texture fontTex, /+Todo: -> state+/
+			ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol
+		)
+		{
+			emitC64Border(pos-4, borderCol); 
+			foreach(y; 0..img.height)
+			{ drawC64ChrRow(palette, fontTex, (pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
+		} 
+		
+		void drawC64ChrRow(
+			Texture palette, Texture fontTex, /+Todo: put these into state+/
+			ivec2 pos, RG[] data, int bk
+		)
+		{
+			if(data.empty) return; 
+			
+			int index = 0; 
+			
+			void setup()
+			{
+				emit_setPALH(palette); 
+				emit_setFMH(fontTex); 
+				emit(
+					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
+					assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4)),
+					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x+index*8, 16), bits(pos.y, 16)
+				); 
+			} 
+			
+			//begin; setup;
+			
+			static RG[] fetchSameColor(ref RG[] data, size_t maxCount)
+			{
+				if(data.empty) return []; 
+				const fg = data.front.y; 
+				auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
+				n.minimize(maxCount); 
+				auto res = data[0..n]; data = data[n..$]; return res; 
+			} 
+			
+			enum MinRunLength = 2,
+			MaxRunLength = 64; 
+			
+			static sizediff_t countDifferentChars(RG[] data)
+			{
+				if(data.length>=1+MinRunLength)
+				{
+					enum SkipAtStart = 1; 
+					const i = 	data[SkipAtStart..$]
+						.slide!(No.withPartial)(MinRunLength)
+						.countUntil!((a)=>(a.all!((b)=>(b.x==a[0].x)))); 
+					if(i>=0) return i+SkipAtStart; 
+				}
+				return data.length; 
+			} 
+			
+			void emitSameChars(ref RG[] data)
+			{
+				if(data.empty) return; 
+				const ubyte ch = data[0].x; 
+				auto n = data.countUntil!((a)=>(a.x!=ch)); if(n<0) n = data.length; 
+				if(n>=MinRunLength)
+				{
+					emit(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII_rep}))), bits(n-1, 6), ch)); 
+					data = data[n..$]; 
+				}
+			} 
+			
+			void emitDifferentChars(ref RG[] data)
+			{
+				if(data.empty) return; 
+				
+				auto n = countDifferentChars(data); 
+				emit(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII}))), bits(n-1, 6))); 
+				emitEvenBytes(data.fetchFrontN(n)); 
+			} 
+			
+			void emitRun(ref RG[] data)
+			{
+				while(!data.empty)
+				{ emitSameChars(data); emitDifferentChars(data); }
+			} 
+			
+			index = 0; 
+			while(data.length)
+			{
+				size_t remainingChars = min(maxVertexCount/4, MaxRunLength/+should go next to the opcodes, not here!+/); 
+				
+				//todo_this_not_works_at_alll; 
+				
+				begin; setup;  //Todo: chain it to the end of previous
+				
+				auto act = fetchSameColor(data, remainingChars); 
+				const nextIndex = index + act.length.to!int; 
+				emit(assemble(bits(mixin(舉!((Opcode),q{setPC}))), mixin(舉!((ColorFormat),q{u4})), bits(act[0].y, 4))); 
+				emitRun(act); 
+				
+				//Todo: make a whole line of text a triangle strip!
+				
+				index = nextIndex; 
+			}
+			end; 
+		} 
+		
+		void drawPath(Args...)(in Args args)
+		{
+			void setup() {/+synch_PS, synch_SC...+/} 
+			
+			/+
+				Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
+				The problem could be at start/end of line segments. The tangents are bad there!
+			+/
+			static if(0)	begin(6/+to be safe+/, {}); 
+			else	begin/+full begin. for a fix+/; 
+			
+			setup; 
+			const NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
+			
+			vec2 P_start, P_last, P_mirror; //internal state
+			
+			void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
+			{
+				//cmd is for estimationb only.  It should use the SvgPathCommand...
+				
+				const est = bezierTesselationSettings.estimateVertexCount(cmd); 
+				if(est + 4/*to be sure*/ > remainingVertexCount)
+				{
+					emit(
+						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
+						NOP, NOP
+					); 
+					end; 
+					begin; 
+					setup; 
+					emit(
+						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
+						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
+					); 
+					incVertexCount(2); //add extra to be sure
+				}
+				
+				emit(op); incVertexCount(est); 
+				static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+			} 
+			
+			void onItem(const ref SvgPathItem item)
+			{
+				const ref P0()
+				=> item.data[0]; const ref P1()
+				=> item.data[1]; const ref P2()
+				=> item.data[2]; const Pm()
+				=> P_last*2 - P_mirror; 
+				final switch(item.cmd)
+				{
+						/+drawing+/	/+state update+/	
+					case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	P_mirror = P_last = P_start = P0; 	break; 
+					case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	P_mirror = P_last; P_last = P0; 	break; 
+					case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+					case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	P_mirror = Pm; P_last = P0; 	break; 
+					case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	P_mirror = P1; P_last = P2; 	break; 
+					case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+					/+redirected commands:+/			
+					case SvgPathCommand.A: 	approximateArcToCubicBeziers(P_last, item, &onItem)
+					/+Todo: move it to GPU+/
+					/+
+						Opt: Should do with a simplified version of cubic bezier!
+						because <90deg and no S curve
+					+/; 		break; 
+					case SvgPathCommand.Z: 	if(P_last!=P_start)
+					{
+						emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P_start); 
+						/+Todo: move it to GPU+/
+						/+Todo: only works for line+/
+					}	P_mirror = P_last = P_start; 	break; 
+				}
+			} 
+			
+			
+			SvgPathParser parser = void; bool parserInitialized = false; 
+			void parse(in string s)
+			{
+				if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
+				parser.parse(s); 
+			} 
+			
+			static foreach(i, a; args)
+			{
+				{
+					alias T = Unqual!(Args[i]); 
+					static if(isSomeString!T) { parse(a); }
+				}
+			}
+			
+			emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
+		} 
+		
+		auto _builder() => this; 
+		
+		enum HAlign:ubyte { left, center, right } 
+		enum VAlign:ubyte { top, center, baseline, bottom } 
+		
+		static struct EGAColor {
+			ubyte data; 
+			this(T)(T a)
+			{ data = cast(ubyte)a; } 
+		} 
+		
+		enum FontId: ubyte
+		{
+			default_, 
+			
+			CGA8x8, 
+			VGA9x16, 
+			
+			Arial,
+			Bahnschrift,
+			Calibri,
+			Cambria,
+			Cambria_Math,
+			Candara,
+			Cascadia_Code,
+			Cascadia_Mono,
+			Comic_Sans_MS,
+			Consolas,
+			Constantia,
+			Corbel,
+			Courier_New,
+			Franklin_Gothic,
+			Gabriola,
+			Georgia,
+			HoloLens_MDL2_Assets,
+			Impact,
+			Ink_Free,
+			Lucida_Console,
+			Lucida_Sans_Unicode,
+			Marlett,
+			Microsoft_Sans_Serif,
+			MingLiU_ExtB,
+			Segoe_MDL2_Assets,
+			Segoe_Print,
+			Segoe_Script,
+			Segoe_UI,
+			Segoe_UI_Emoji,
+			Segoe_UI_Historic,
+			Segoe_UI_Symbol,
+			Sitka,
+			Sylfaen,
+			Symbol,
+			Tahoma,
+			Times_New_Roman,
+			Trebuchet_MS,
+			Verdana,
+			Webdings,
+			Wingdings,
+			
+			reserved_
+		} 
+		static foreach(e; EnumMembers!FontId)
+		static if(e>FontId.default_ && e<FontId.reserved_)
+		mixin(iq{enum $(e.text) = FontId.$(e.text); }.text); 
+		
+		enum 
+		{
+			/+Note: 0+/	black	= EGAColor(0),
+			/+Note: 1+/	blue	= EGAColor(1),
+			/+Note: 2+/	green	= EGAColor(2),
+			/+Note: 3+/	cyan	= EGAColor(3),
+			/+Note: 4+/	red	= EGAColor(4),
+			/+Note: 5+/	magenta	= EGAColor(5),
+			/+Note: 6+/	brown	= EGAColor(6),
+			/+Note: 7+/	ltGray	= EGAColor(7),
+			/+Note:  8+/	dkGray	= EGAColor(8+0),
+			/+Note:  9+/	ltBlue	= EGAColor(8+1),
+			/+Note: 10+/ /+Note: 0xA+/	ltGreen	= EGAColor(8+2),
+			/+Note: 11+/ /+Note: 0xB+/	ltCyan	= EGAColor(8+3),
+			/+Note: 12+/ /+Note: 0xC+/	ltRed	= EGAColor(8+4),
+			/+Note: 13+/ /+Note: 0xD+/	ltMagenta	= EGAColor(8+5),
+			/+Note: 14+/ /+Note: 0xE+/	yellow	= EGAColor(8+6),
+			/+Note: 15+/ /+Note: 0xF+/	white	= EGAColor(8+7),
+		} 
+		
+		static struct fg
+		{
+			EGAColor value; alias this = value; 
+			this(A)(in A a) { value = a; } 
+		} 
+		
+		static struct bk
+		{
+			EGAColor value; alias this = value; 
+			this(A)(in A a) { value = a; } 
+		} 
+		
+		static EGAColor color(A)(in A a)
+		=> fg(a); 
+		
+		static struct fgbk
+		{
+			EGAColor[2] value; 
+			this(A, B)(in A a, in B b) { value[0] = a, value[1] = b; } 
+			this(int a) { value[0] = a.getBits(0, 4), a.getBits(4, 4); } 
+		} 
+		
+		static struct opacity {
+			ubyte value = 255; 
+			this(A)(in A a) {
+				static if(isFloatingPoint!A)	value = a.to_unorm; 
+				else	value = (cast(ubyte)(a)); 
+			} 
+		} 
+		
+		// A struct to hold the current graphic state
+		static struct GraphicState
+		{
+			mixin((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+					[q{ubyte},q{8},q{"fgbkColors"},q{7},q{/++/}],
+					[q{ubyte},q{8},q{"opacity"},q{255},q{/++/}],
+					[q{FontId},q{6},q{"fontId"},q{VGA9x16},q{/++/}],
+					[q{ubyte},q{8},q{"fontHeight"},q{16},q{/++/}],
+					[q{HAlign},q{2},q{"hAlign"},q{},q{/++/}],
+					[q{VAlign},q{2},q{"vAlign"},q{},q{/++/}],
+				]))
+			).調!(GEN_bitfields)); 
+			
+			@property fgColor() const
+			=> (cast(EGAColor)(fgbkColors.getBits(0, 4))); 
+			@property fgColor(int a) 
+			{ fgbkColors = (cast(ubyte)(fgbkColors.setBits(0, 4, a))); } 
+			@property fgColor(EGAColor a) 
+			{ fgColor = a.data; } 
+			@property bkColor() const
+			=> (cast(EGAColor)(fgbkColors.getBits(4, 4))); 
+			@property bkColor(int a) 
+			{ fgbkColors = (cast(ubyte)(fgbkColors.setBits(4, 4, a))); } 
+			@property bkColor(EGAColor a) 
+			{ bkColor = a.data; } 
+			
+			alias font = fontId, fh = fontHeight; 
+			
+			void applyArg(T)(in T a)
+			{
+				static EGAColor asColor(T)(T arg)
+				{
+					static if(is(C : EGAColor)) return arg.value; 
+					else static if(is(C : int)) return EGAColor(arg.value); 
+					else static assert(false, "Unsupported color type: " ~ C.stringof); 
+				} 
+				
+				static if(is(T : HAlign))	{ hAlign = a; }
+				else static if(is(T : VAlign))	{ vAlign = a; }
+				else static if(is(T : GenericArg!(name, C), string name, C))
+				{
+					static if(name == "fg")	{ fgColor = asColor(a.value); }
+					else static if(name == "bk")	{ bkColor = asColor(a.value); }
+					else static assert(false, "Unsupported generic arg: " ~ T.stringof); 
+				}
+				else static if(is(T : fg))	{ fgColor = a.value; }
+				else static if(is(T : bk))	{ bkColor = a.value; }
+				else static if(is(T : fgbk))	{
+					fgColor = a.value[0]; 
+					bkColor = a.value[1]; 
+				}
+				else static if(
+					is(
+						T : GfxBuilder.opacity
+						/+Todo: name conflict!+/
+					)
+				)	{ opacity = a.value; }
+				else static assert(false, "Unsupported type: " ~ T.stringof); 
+			} 
+		} 
+		
+		GraphicState graphicState; 
+		vec2 cursorPos; 
+		
+		struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+		struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+		
+		struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
+		struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
+		struct My { float value=0; this(A)(in A a) { value = float(a); } } 
+		struct my { float value=0; this(A)(in A a) { value = float(a); } } 
+		
+		void Style(Args...)(in Args args)
+		{
+			//this alters graphicState
+			static foreach(i, a; args)
+			{
+				{
+					alias T = Args[i]; 
+					static if(__traits(compiles, { graphicState.applyArg(a); })) graphicState.applyArg(a); 
+					else static assert(false, "Unhandled Style() argument: "~T.stringof); 
+				}
+			}
+		} 
+		
+		enum isStyleArg(T) = __traits(compiles, { GraphicState st; st.applyArg(T.init); }); 
+		
+		void Text(Args...)(Args args)
+		{
+			//this work on temporal graphics state
+			/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
+			
+			GraphicState st = graphicState/+only modity temporal state+/; 
+			static foreach(i, a; args)
+			{
+				{
+					alias T = Args[i]; 
+					static if(is(T : M))	cursorPos = a.value; 
+					else static if(is(T : Mx))	cursorPos.x = a.value; 
+					else static if(is(T : My))	cursorPos.y = a.value; 
+					else static if(is(T : m))	cursorPos += a.value; 
+					else static if(is(T : mx))	cursorPos.x += a.value; 
+					else static if(is(T : my))	cursorPos.y += a.value; 
+					else static if(isStyleArg!T)	st.applyArg(a); 
+					else static if(isSomeString!T)	textBackend(st, a); 
+					else static if(isSomeChar!T)	textBackend(st, only(a)); 
+					else static if(
+						isInputRange!T &&
+						isSomeChar
+						!(ElementType!T)
+					)	{ textBackend(st, a); }
+					else static if(isDelegate!T) a(); 
+					else static if(isFunction!T) a(); 
+					else
+					{
+						st.applyArg(opacity(.5)); 
+						static assert(false, "Unhandled Text() argument: "~T.stringof); 
+					}
+				}
+			}
+		} 
+		
+		Texture externalFontTexture; 
+		
+		void textBackend_old(A)(in GraphicState st, A r)
+		{
+			const scaleX = 9, scaleY = 16; 
+			//alias font = vgaFont2; 
+			
+			foreach(ch; r.dtext)
+			{
+				_builder.begin; 
+				_builder.emit_setPALH(egaPalette); 
+				_builder.emit_setFMH(externalFontTexture); 
+				_builder.emit(
+					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
+					assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
+					assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity), 
+					assemble(
+						mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
+							bits((iround(cursorPos.y*scaleY)), 16)
+					),
+					assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(((ch<=255)?(ch):(254)))))
+				); 
+				_builder.end; 
+				cursorPos.x += /+st.fontHeight * font.aspect+/1; 
+			}
+		} 
+		
+		
+		void textBackend(A)(in GraphicState st, A r)
+		{
+			//Todo: this should go to buffer
+			static if(isInputRange!A) if(r.empty) return; 
+			
+			const scaleX = 9, scaleY = 16; 
+			//alias font = getVgaFont2; 
+			
+			void setup()
+			{
+				with(_builder)
+				{
+					synch_TR; 
+					synch_PALH; 
+					synch_FMH; 
+					emit(
+						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
+						assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
+						assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity),
+						assemble(
+							mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
+								bits((iround(cursorPos.y*scaleY)), 16)
+						)
+					); 
+				}
+			} 
+			_builder.begin(0, {}); 
+			setup; 
+			
+			version(/+$DIDE_REGION Convert UTF-8 to 8bit ASCII, reuse allocated memory.+/all)
+			{
+				static Appender!(ubyte[]) app; 
+				app.clear, app.put(r.byDchar.map!((ch)=>((cast(ubyte)(((ch<=255)?(ch):(254))))))); 
+			}
+			
+			uint decideCharCount(int len)
+			{
+				enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
+				const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
+					n	= len.min(min(space, maxChars)); 
+				if(n) _builder.incVertexCount(n*2+2); return n; 
+			} 
+			
+			encodeRLE
+			(
+				app[], 3,
+				((ubyte[] part) {
+					while(1)
+					{
+						if(const n = decideCharCount((cast(int)(part.length))))
+						{
+							_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
+							cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
+						}
+						/+start next geometry item+/_builder.begin; setup; 
+					}
+				}),
+				((ubyte ch, uint len) {
+					while(1)
+					{
+						if(const n = decideCharCount(len))
+						{
+							_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
+							cursorPos.x += n; len -= n; if(!len) break; 
+						}
+						/+start next geometry item+/_builder.begin; setup; 
+					}
+				})
+			); 
+			
+			version(/+$DIDE_REGION Don't waste memory for exceptionally large texts+/all)
+			{
+				enum tooLargeBuf = 0x1000; 
+				if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
+			}
+		} 
+		
+	} 
+	
+	class TurboVisionBuilder : GfxBuilder
+	{
+		enum clMenuBk 	= bk(ltGray), 
+		clMenuText 	= fg(black), 
+		clMenuKey	= fg(red),
+		clMenuItem 	= fgbk(clMenuText, clMenuBk),
+		clMenuSelected 	= fgbk(clMenuText, green),
+		clMenuDisabled 	= fgbk(dkGray, clMenuBk); 
+		
+		enum clWindowBk	= bk(blue),
+		clWindowText 	= fg(white),
+		clWindow 	= fgbk(clWindowText, clWindowBk),
+		clWindowClickable 	= fgbk(ltGreen, clWindowBk); 
+		
+		enum clScrollBar = fgbk(blue, cyan); 
+		
+		static struct MenuItem
+		{
+			string title, shortcut, hint; 
+			bool selected, disabled, opened; 
+			MenuItem[] subMenu; 
+		} 
+		
+		void drawMenuTitle(Args...)(in MenuItem item, Args extra)
+		{
+			const clNormal = 	item.disabled 	? clMenuDisabled : 
+				item.selected 	? clMenuSelected 
+					: clMenuItem; 
+			const s = item.title, aidx = s.byDchar.countUntil('&'); 
+			if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
+			else {
+				Text(
+					clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
+					clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
+					clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
+					extra
+				); 
+			}
+		} 
+		
+		void drawSubMenu(R)(R items)
+			if(isForwardRange!(R, MenuItem))
+		{
+			sizediff_t measureItemWidth(in MenuItem item)
+			=> item.title.filter!"a!='&'".walkLength + 2
+			+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
+			
+			const maxWidth = items.save.map!measureItemWidth.maxElement; 
+			vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
+			Style(clMenuItem); 
+			
+			void shadow(size_t n) { Text(bk(black), opacity(.6), " ".replicate(n)); } 
+			
+			Text(chain(" \u00DA", "\u00C4".replicate(maxWidth), "\u00BF ")); NL; 
+			foreach(item; items)
+			{
+				Text(" \u00B3"); 
+				const space = maxWidth - measureItemWidth(item); 
+				if(item.shortcut!="")
+				{ drawMenuTitle(item, chain(" ".replicate(space+1), item.shortcut, " ")); }
+				else
+				{ drawMenuTitle(item, " ".replicate(space)); }
+				Text("\u00B3 "); shadow(2); NL; 
+			}
+			Text(chain(" \u00C0", "\u00C4".replicate(maxWidth), "\u00D9 ")); shadow(2); NL; 
+			Text(mx(2)); shadow(maxWidth+4); 
+			
+			
+			//Text(fg(yellow), bk(red), " Submenu goes here "~maxWidth.text); 
+		} 
+		
+		void drawMainMenu(R)(R items)
+			if(isForwardRange!(R, MenuItem))
+		{
+			foreach(item; items)
+			{
+				const pos = cursorPos; 
+				drawMenuTitle(item); 
+				if(item.opened && !item.subMenu.empty)
+				{
+					mixin(scope_remember(q{cursorPos})); 
+					Text(M(pos), my(1)); //move the cursor
+					drawSubMenu(item.subMenu); 
+				}
+			}
+		} 
+		
+		void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
+		{
+			void Btn(string s)
+			{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
+			
+			Style(clWindow); 
+			Text(
+				M(bnd.topLeft), "\u00C9\u00CD", { Btn("\u00FE"); }, 
+				chain(" ", title, " ").text.center(bnd.width-12, '\u00CD'), "1\u00CD",
+				{ Btn("\u0012"); }, "\u00CD\u00BB"
+			); 
+			const w = bnd.width-2, h = bnd.height-2; 
+			foreach(line; lines.padRight("", h).take(h))
+			{
+				Text(Mx(bnd.left), my(1), '\u00BA'); 
+				string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
+				foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+				{
+					enum keywords = ["program", "var", "begin", "end", "integer"]; 
+					const isKeyword = keywords.canFind(word.text.lc); 
+					Text(fg(((isKeyword)?(white):(yellow))), word); 
+				}
+				Text(
+					clScrollBar, predSwitch(
+						cursorPos.y-bnd.top-1, 
+						0, '\u001E', 1, '\u00FE', h-1, '\u001F', '\u00B1'
+					)
+				); 
+			}
+			Text(
+				M(bnd.bottomLeft), my(-1), "\u00C8\u00CD",
+				chain(" ", "1:1", " ").text.center(17, '\u00CD'),
+				clScrollBar, chain("\u0011", "\u00FE", "\u00B1".replicate(bnd.width-24), "\u0010"),
+				clWindowClickable, "\u00C4\u00D9"
+			); 
+		} 
+		
+		void fillSpace(int width=80) { while(cursorPos.x<width) Text(' '); } 
+		
 	} 
 	
 	
@@ -2088,6 +2805,19 @@ class VulkanWindow: Window
 				if(handle)
 				{ destroyedResidentTexHandles.put(handle); }
 			} 
+			
+			@property TexInfo texInfo()
+			=> ((handle)?(IB.access(handle)):(TexInfo.init));  @property texSizeFormat()
+			=> texInfo.sizeFormat; 
+			
+			@property size()
+			=> texSizeFormat.size.xy; 	@property size3D()
+			=> texSizeFormat.size.xyz; 
+			
+			@property width()
+			=> size.x; 	 @property height()
+			=> size.y; 	 @property depth()
+			=> size3D.z; 
 		} 
 		
 		Drawing dr; 
@@ -2533,24 +3263,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1388182886ADB).檢(
+					((0x191E982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x138F382886ADB))))
+				if((互!((bool),(0),(0x1925B82886ADB))))
 				{
-					const ma = GfxBuilder.ShaderMaxVertexCount; 
-					GfxBuilder.desiredMaxVertexCount = 
-					((0x1398382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1399A82886ADB))).iremap(0, 1, 4, ma))); 
+					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
+					GfxBuilderBase.desiredMaxVertexCount = 
+					((0x192F382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1930A82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
-						GfxBuilder.desiredMaxVertexCount, 
+						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x13A9E82886ADB).檢 (im)); 
+					((0x1941282886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3019,7 +3749,7 @@ $(V_size+G_size)".text
 				}; 
 				
 				layout(points) in; 
-				layout(triangle_strip, max_vertices = $(GfxBuilder.ShaderMaxVertexCount)) out; 
+				layout(triangle_strip, max_vertices = $(GfxBuilderBase.ShaderMaxVertexCount)) out; 
 				/*
 					255 is the max on R9 Fury X
 					

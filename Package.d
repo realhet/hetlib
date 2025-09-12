@@ -3188,6 +3188,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		auto 同(string T, string sym, string id)()
 		{
 			/+
+				Todo: this is problematic because can't called like this:
+				/+Structured: mixin(同...); +/ The mixin expects a statement.
+				It is only works if there is a () around like this:
+				/+Structured: (mixin(同...)); +/ The mixin expects an expression now.
+				/+Link: https://forum.dlang.org/post/yvhqilyyntsryshfkiyx@forum.dlang.org+/
 				Old version:
 				/+
 					Code: return iq{
@@ -3199,33 +3204,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						})()
 					}.text; 
 				+/
-				
-				/+
-					Todo: Since 1.41 this shit is broken:
-					/+
-						Error: found /+Code: End of File+/ when expecting /+Code: ;+/ following expression /+Hidden: /+$DIDE_LOC c:\D\projects\DIDE\dideNode.d-mixin-1460(1467,4)+/+/
-						expression: /+
-							Code: ()
-							{
-								int act = padding.left; 
-								if(同internal!(int, 171357661260354L)(act))
-								padding.left = act; 
-								return act; 
-							} 
-							()
-						+/
-					+/
-				+/
-				
-				Forum: /+Link: https://forum.dlang.org/post/yvhqilyyntsryshfkiyx@forum.dlang.org+/
 			+/
 			
-			/+
-				temporal fix: DON'T return the value because if it is uncaptured, it raises the above error.
-				the problem: The new compiler expecting an expression or a statement based 
-					on the place of insertion.
-				Now it is a statement always.
-			+/
 			return iq{
 				{
 					$(T) act = $(sym); 
@@ -3237,18 +3217,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: static float val=0; 
-					mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x195DB59F156A1})); 
-					padding.right = padding.left = val; 
-					
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x193E059F156A1})); 
 					/+
-						Changes after 1.40:
+						Changes after the fix:
 						/+
-							Code: //These in invalid usage from now:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x196EA59F156A1})); 
+							Code: //Invalid:
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x194A859F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1979459F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1980959F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1955259F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x195C759F156A1})); 
 						+/
 					+/
 				+/
