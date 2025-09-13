@@ -387,6 +387,21 @@ version(/+$DIDE_REGION+/all) {
 			} 
 			Screen[] screens; 
 			
+			int getPixel_c64_8x8Std(in Image2D!RG img, in ubyte[] fontMap, in ivec2 pScr) const
+			{
+				if(pScr in ibounds2(ivec2(0), img.size*8))
+				{
+					const chPos = pScr>>3; 
+					const ch = img[chPos.x, chPos.y].x; 
+					if(ch < fontMap.length/8)
+					{
+						const remPos = pScr & 7; 
+						return fontMap[ch*8 + remPos.y].getBit(remPos.x); 
+					}
+				}
+				return 0; 
+			} 
+			
 			void loadScreens(string bin)
 			{
 				auto img = bin.deserializeImage!ubyte; 
@@ -440,20 +455,6 @@ version(/+$DIDE_REGION+/all) {
 			} 
 			Font font; 
 			
-			int getPixel_8x8Std(in Image2D!RG screen, in ubyte[] fontMap, in ivec2 pScr)
-			{
-				if(pScr in ibounds2(ivec2(0), screen.size*8))
-				{
-					const chPos = pScr>>3; 
-					const ch = screen[chPos.x, chPos.y].x; 
-					if(ch < fontMap.length/8)
-					{
-						const remPos = pScr & 7; 
-						return fontMap[ch*8 + remPos.y].getBit(remPos.x); 
-					}
-				}
-				return 0; 
-			} 
 			
 			auto vgaFont2()
 			{
@@ -517,7 +518,7 @@ version(/+$DIDE_REGION+/all) {
 					{
 						const pScr = 	fromSpriteToScreen +
 							(ivec2(cp)<<int(doubleSize)); 
-						if(getPixel_8x8Std(screen, fontMap, pScr)) return true; 
+						if(getPixel_c64_8x8Std(screen, fontMap, pScr)) return true; 
 					}
 					return false; 
 				} 
@@ -853,7 +854,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x8D325F5C4644).檢 (zoomedPlatform)), ((0x8D5B5F5C4644).檢 (shipPos)); 
+								((0x8D3C5F5C4644).檢 (zoomedPlatform)), ((0x8D655F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1054,7 +1055,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}	break; 
 				}
-				((0xA39C5F5C4644).檢((update間(_間)))); 
+				((0xA3A65F5C4644).檢((update間(_間)))); 
 				void drawJupiterLander(ivec2 baseOfs)
 				{
 					enum N = 1; 
@@ -1086,7 +1087,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 							}
 						}
 						
-						((0xA8585F5C4644).檢(builder.gbBitPos/8)); 
+						((0xA8625F5C4644).檢(builder.gbBitPos/8)); 
 					}
 					
 					foreach(builder; builders[].filter!"a")
@@ -1101,45 +1102,45 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					tvBuilder._builder.FMH = vgaFont2.tex; 
 					tvBuilder.externalFontTexture = vgaFont2.tex; 
 					
-					if((互!((bool),(1),(0xA9E95F5C4644))))
+					if((互!((bool),(1),(0xA9F35F5C4644))))
 					{
 						with(tvBuilder._builder.TR)
 						{
-							if((互!((bool),(0),(0xAA4D5F5C4644)))) {
+							if((互!((bool),(0),(0xAA575F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xAAA55F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xAAE25F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xAAAF5F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xAAEC5F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xAB3F5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xAB495F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xABA05F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xABD35F5C4644))); }
-							if((互!((bool),(0),(0xAC255F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xAC555F5C4644)))*360; 
-							if((互!((bool),(0),(0xACA45F5C4644)))) {
+							if((互!((bool),(0),(0xABAA5F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xABDD5F5C4644))); }
+							if((互!((bool),(0),(0xAC2F5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xAC5F5F5C4644)))*360; 
+							if((互!((bool),(0),(0xACAE5F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xACFB5F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xAD375F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xAD055F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xAD415F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xAD9D5F5C4644)))) {
+							if((互!((bool),(0),(0xADA75F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xAE075F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xAE585F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xAE115F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xAE625F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xAED45F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xAF265F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xAEDE5F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xAF305F5C4644)))
 										)
 									).genericArg!q{size})
 								); 
 							}
-							((0xAFB35F5C4644).檢(
+							((0xAFBD5F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1222,7 +1223,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 				}
 				
-				((0xB7BC5F5C4644).檢((update間(_間)))); 
+				((0xB7C65F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1270,7 +1271,7 @@ End.".splitLines
 					//content.gb.hexDump.writeln; 
 					appendGfxContent(content); 
 				}
-				((0xBD9F5F5C4644).檢((update間(_間)))); 
+				((0xBDA95F5C4644).檢((update間(_間)))); 
 				
 				
 			} 

@@ -216,308 +216,449 @@ version(/+$DIDE_REGION+/all)
 		})),
 		2, mixin(體!((BezierTesselationSettings),q{mode : BTSM.points}))
 	); 
+	
+	
+	
 	
+	alias TexFormat 	= TexSizeFormat.TexFormat; 
+	
+	enum TexInfoFlag {
+		error 	= 1,
+		loading 	= 2,
+		resident 	= 4
+	}; alias TexInfoFlags = VkBitFlags!TexInfoFlag; 
+	
+	static struct TexSizeFormat
+	{
+		enum TexInfoBits	= 3,
+		TexDimBits 	= 2, 
+		TexChnBits 	= 2, 
+		TexBppBits 	= 4, 
+		TexInfoBitOfs	= 0,
+		TexDimBitOfs	= 6,
+		TexFormatBitOfs 	= 8 /+inside info_dword[0]+/,
+		TexFormatBits 	= TexChnBits + TexBppBits + 1 /+alt+/; 
+		
+		enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<TexDimBits); 
+		
+		mixin 入 !((
+			(表([
+				[q{/+Note: chn/bpp+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
+				[q{/+Note: 1+/},q{
+					u1
+					wa_u1
+				},q{
+					u2
+					wa_u2
+				},q{
+					u4
+					wa_u4
+				},q{
+					u8
+					wa_u8
+				},q{
+					u16
+					wa_u16
+				},q{},q{
+					f32
+					wa_f32
+				},q{},q{},q{},q{},q{12}],
+				[q{/+Note: 2+/},q{},q{},q{},q{},q{la_u8},q{},q{la_u16},q{},q{la_f32},q{},q{},q{3}],
+				[q{/+Note: 3+/},q{},q{},q{},q{},q{
+					rgb_565
+					bgr_565
+				},q{
+					rgb_u8
+					bgr_u8
+				},q{},q{
+					rgb_u16
+					bgr_u16
+				},q{},q{
+					rgb_f32
+					bgr_f32
+				},q{},q{8}],
+				[q{/+Note: 4+/},q{},q{},q{},q{},q{
+					rgba_5551
+					bgra_5551
+				},q{},q{
+					rgba_u8
+					bgra_u8
+				},q{},q{
+					rgba_u16
+					bgra_u16
+				},q{},q{
+					rgba_f32
+					bgra_f32
+				},q{8}],
+				[q{/+
+					Alternate modes: 	1ch 	: wa_* 	: white+alpha for fonts 
+						2ch, 3ch 	: bgr* 	: red blue swap
+				+/}],
+			]))
+		),q{
+			static string GEN_TexFormat()
+			{
+				version(/+$DIDE_REGION Process table cells, generate types+/all)
+				{
+					auto 	table = _data,
+						bppCount = table.width-2,
+						chnCount = table.rowCount; struct Format {
+						string name; 
+						int value, chn, bpp; 
+					} Format[] formats; 
+					int chnVal(int chn) => table.headerColumnCell(chn+1).to!int; 
+					int bppVal(int bpp) => table.headerCell(bpp+1).to!int; 
+					void processCell(int bpp, int chn)
+					{
+						foreach(alt, n; table.cell(bpp+1, chn+1).split)
+						formats ~= Format(n, chn | (bpp<<2) | (!!alt<<6), chnVal(chn), bppVal(bpp)); 
+					} 
+					foreach(bpp; 0..bppCount) foreach(chn; 0..chnCount) processCell(bpp, chn); 
+				}
+				
+				return iq{
+					enum TexFormat {$(formats.map!"a.name~`=`~a.value.text".join(','))} 
+					enum TexChn {$(chnCount.iota.map!((i)=>('_'~chnVal(i).text)).join(','))} 
+					enum TexBpp {$(bppCount.iota.map!((i)=>('_'~bppVal(i).text)).join(','))} 
+					enum texFormatChnVals 	= [$(formats.map!q{a.chn.text}.join(','))],
+					texFormatBppVals 	= [$(formats.map!q{a.bpp.text}.join(','))]; 
+				}.text; 
+			} 
+			
+			mixin(GEN_TexFormat); 
+			
+			static assert(TexChn.max < 1<<TexChnBits); 
+			static assert(TexBpp.max < 1<<TexBppBits); 
+			static assert(TexFormat.max < 1<<TexFormatBits); 
+		}); 
+		
+		
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{bool},q{1},q{"error"},q{},q{/+No sampling, 0xFFFF00FF color /+Todo: Error can be marked by chunkIdx=null+/+/}],
+				[q{bool},q{1},q{"loading"},q{},q{/+No sampling, 0xC0C0C0C0 color+/}],
+				[q{bool},q{1},q{"resident"},q{},q{/+GC will not unload it, just relocate it /+Todo: not needed on GPU+/+/}],
+				[q{uint},q{3},q{"_unused1"},q{},q{/++/}],
+				[q{TexDim},q{2},q{"dim"},q{},q{/++/}],
+				[],
+				[q{TexChn},q{2},q{"chn"},q{},q{/+channels (0: 1ch, ..., 3: 4ch)+/}],
+				[q{TexBpp},q{4},q{"bpp"},q{},q{/+bits per pixel (enum)+/}],
+				[q{bool},q{1},q{"alt"},q{},q{/+alternate mode: 1ch: white_alpha, 3ch, 4ch: swapRB+/}],
+				[q{uint},q{1},q{"_unused2"},q{},q{/++/}],
+				[],
+				[q{uint},q{16},q{"_rawSize0"},q{},q{/++/}],
+				[q{uint},q{32},q{"_rawSize12"},q{},q{/++/}],
+			]))
+		).調!(GEN_bitfields)); 
+		
+		@property format() const => (cast(TexFormat)((*(cast(ulong*)(&this))).getBits(TexFormatBitOfs, TexFormatBits))); 
+		@property format(TexFormat t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(TexFormatBitOfs, TexFormatBits, t); } 
+		
+		protected
+		{
+			static string SharedCode()
+			=> q{
+				ivec3 decodeDimSize(in uint dim, in uint raw0, in uint raw12)
+				{
+					switch(dim)
+					{
+						case TexDim._1D: 	return ivec3(raw12, 1, 1); 
+						case TexDim._2D: 	return ivec3((raw0 | ((raw12 & 0xFF)<<16)), raw12>>8, 1); 
+						case TexDim._3D: 	return ivec3(raw0, raw12 & 0xFFFF, raw12>>16); 
+						default: 	return ivec3(0); 
+					}
+				} 
+				
+				uint calcFlatIndex(in ivec3 v, in uint dim, in ivec3 size)
+				{
+					switch(dim)
+					{
+						case TexDim._1D: 	return v.x; 
+						case TexDim._2D: 	return v.x + (v.y * size.x); 
+						case TexDim._3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
+						default: 	return 0; 
+					}
+				} 
+			}; 
+			
+			static string GLSLCode()
+			=> iq{
+				$(GEN_enumDefines!TexDim)
+				$(GEN_enumDefines!TexFormat)
+				$(GEN_enumDefines!TexChn)
+				$(GEN_enumDefines!TexBpp)
+				$(SharedCode.replace("TexDim._", "TexDim_"))
+			}.text; 
+			static { mixin(SharedCode); } 
+		} 
+		
+		@property ivec3 size() const
+		=> decodeDimSize(dim, _rawSize0, _rawSize12); 
+		@property size(int a)
+		{ dim = TexDim._1D; _rawSize0 = 0; _rawSize12 = a; } 
+		@property size(ivec2 a)
+		{ dim = TexDim._2D; _rawSize0 = a.x & 0xFFFF; _rawSize12 = ((a.x>>16) & 0xFF) | (a.y << 8); } 
+		@property size(ivec3 a)
+		{ dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); } 
+		
+		@property flags() const
+		=> mixin(幟!((TexInfoFlag),q{getBits(*(cast(ubyte*)(&this)), TexInfoBitOfs, TexInfoBits)})); 
+		
+		@property flags(in TexInfoFlags a)
+		{ auto b = (cast(ubyte*)(&this)); *b = setBits(*b, TexInfoBitOfs, TexInfoBits, (cast(ubyte)((cast(uint)(a))))); } 
+		
+		static void selfTest()
+		{
+			void doit(T)(T v, ivec3 r) { TexSizeFormat t; t.size = v; enforce(t.size==r); } 
+			{
+				const a = [1, 84903, 0x7F12_345F]; 
+				foreach(x; a) doit(x, ivec3(x, 1, 1)); 
+			}
+			{
+				const a = [1, 84903, 0xF1234F]; 
+				foreach(x; a) foreach(y; a) doit(ivec2(x, y), ivec3(x, y, 1)); 
+			}
+			{
+				const a = [1, 14903, 0xF12F]; 
+				foreach(x; a) foreach(y; a) foreach(z; a) doit(ivec3(x, y, z), ivec3(x, y, z)); 
+			}
+		} 
+		
+		string toString() const
+		=> i"TexSizeFormat($(format), $(size.x) x $(size.y) x $(size.z)$(error?", ERR":"")$(loading?", LD":"")$(resident?", RES":""))".text; 
+		
+		static assert(TexSizeFormat.sizeof==8); 
+	} 
 	
+	
 	/+
 		General rules of enums:
-		 - enum item Order is important, GLSL sources rely on it.
+		 - enum item Order is important, GLSL sources rely on it by using < > ops.
 		 - Defaults are always 0. The the first enum member is the default.
 	+/
 	
-	enum TexXAlign {left, center, right} 
-	enum TexYAlign {top, center, baseline, bottom} 
-	enum TexSizeSpec {original, scaled, exact} 
-	enum TexAspect {stretch, keep, crop} 
-	
-	enum TexOrientation
+	version(/+$DIDE_REGION Texturing enums+/all)
 	{
-		normal 	= 0, //Default orientation (0,0)-(1,1)
-		mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
-		mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
-		mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
-		mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
-		mirrorXDiag 	= 5, //Mirror X then diagonal
-		mirrorYDiag 	= 6, //Mirror Y then diagonal
-		mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
+		alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
 		
-		//Additional rotation names
-		rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
-		rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
-		rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
+		enum TexXAlign : ubyte {left, center, right} 
+		enum TexYAlign : ubyte {top, center, baseline, bottom} 
+		enum TexSizeSpec : ubyte {original, scaled, exact} 
+		enum TexAspect : ubyte {stretch, keep, crop} 
 		
-		//Alternative names
-		flipH 	= mirrorX, 	//Horizontal flip
-		flipV 	= mirrorY, 	//Vertical flip
-		flipHV 	= mirrorXY, 	//Both flips
-		transpose 	= mirrorDiag 	//Swap X and Y coordinates
-	} 
-	
-	enum FontType
+		enum TexOrientation : ubyte
+		{
+			normal 	= 0, //Default orientation (0,0)-(1,1)
+			mirrorX 	= 1, //Flip horizontally (1,0)-(0,1)
+			mirrorY 	= 2, //Flip vertically (0,1)-(1,0)
+			mirrorXY 	= 3, //Flip both X and Y (1,1)-(0,0) (same as rot180)
+			mirrorDiag 	= 4, //Mirror across main diagonal (0,0)-(1,1)
+			mirrorXDiag 	= 5, //Mirror X then diagonal
+			mirrorYDiag 	= 6, //Mirror Y then diagonal
+			mirrorXYDiag 	= 7, //Mirror X and Y then diagonal
+			
+			//Additional rotation names
+			rot90 	= mirrorYDiag,	//90° counter-clockwise rotation
+			rot180 	= mirrorXY,	//180° rotation (same as mirrorXY)
+			rot270 	= mirrorXDiag,	//270° counter-clockwise rotation
+			
+			//Alternative names
+			flipH 	= mirrorX, 	//Horizontal flip
+			flipV 	= mirrorY, 	//Vertical flip
+			flipHV 	= mirrorXY, 	//Both flips
+			transpose 	= mirrorDiag 	//Swap X and Y coordinates
+		} 
+		
+		struct TexFlags
+		{
+			mixin((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+					[q{TexXAlign},q{2},q{"xAlign"},q{},q{/++/}],
+					[q{TexSizeSpec},q{2},q{"xSize"},q{},q{/++/}],
+					[q{TexYAlign},q{2},q{"yAlign"},q{},q{/++/}],
+					[q{TexSizeSpec},q{2},q{"ySize"},q{},q{/++/}],
+					[q{TexAspect},q{2},q{"aspect"},q{},q{/++/}],
+					[q{TexOrientation},q{3},q{"orientation"},q{},q{/++/}],
+				]))
+			).調!(GEN_bitfields)); 
+			enum bitCnt = 13; 
+			protected
+			{
+				enum GLSLCode = /+Todo: autogenerate this, not with AI+/
+				iq{
+					uint texXAlign() { return getBits(TF, 0, 2); } 
+					uint texXSize() { return getBits(TF, 2, 2); } 
+					uint texYAlign() { return getBits(TF, 4, 2); } 
+					uint texYSize() { return getBits(TF, 6, 2); } 
+					uint texAspect() { return getBits(TF, 8, 2); } 
+					uint texOrientation() { return getBits(TF, 10, 3); } 
+				}.text; 
+			} 
+		} 
+	}
+	version(/+$DIDE_REGION Font enums+/all)
 	{
-		monospace3D,	//fontmap is a 3D texture of same sized glyphs.
-		textureHandles, 	//no fontMap, just individual texture handles.
-		asciiCharmap16x16, 	//fontMap is a bitmap containing 16x16 monosized characters
-		unicodeBlockMap128 	/+
-			fontMap is a texture of 0x110000>>7 = 8704 uints.
-			block = code>>7; blkTex = texture[fontMap[block]];
-			charTex = blkTex[code & 0x7F];
-			/+Opt: fast 0th block at the very start of the fontMap+/
-		+/
-	} 
-	enum FontLine {none, underline, strikeout, errorline } 
-	enum FontWidth {normal, thin/+.66+/, wide/+1.5+/, wider/+2+/ } 
-	enum FontScript {none, superscript, subscript, small} 
-	enum FontBlink {none, blink, soft, fast } 
-	
-	enum SizeUnit
-	{
-		world, 	/+one unit in the world+/
-		screen, 	/+one pixel at the screen (similar to fwidth())+/
-		model 	/+Todo: one unit inside scaled model space+/
-	} 
-	
-	enum SizeFormat {u4, u8, ulog12/+4G range+/, f32} 
-	enum ColorFormat {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
-	enum HandleFormat {u12, u16, u24, u32} 
-	enum CoordFormat {f32, i32, i16, i8} 
-	enum XYFormat {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
-	enum FlagFormat {tex, font, vec, all} 
-	
-	enum AngleFormat {i10, f32} 
-	enum TransFormat {
-		unity, transXY, scale, scaleXY, 
-		skewX, rotZ, clipBounds
-		/+, tileXY, transXYZ, axisXY+/
-	} 
-	
-	struct Bits(T)
-	{
-		static assert(isIntegral!T); 
-		//static assert(!isSigned!T); 
-		
-		
-		
+		enum FontId: ubyte
+		{
+			default_, 
+			
+			CGA8x8, 
+			VGA9x16, 
+			
+			Arial,
+			Bahnschrift,
+			Calibri,
+			Cambria,
+			Cambria_Math,
+			Candara,
+			Cascadia_Code,
+			Cascadia_Mono,
+			Comic_Sans_MS,
+			Consolas,
+			Constantia,
+			Corbel,
+			Courier_New,
+			Franklin_Gothic,
+			Gabriola,
+			Georgia,
+			HoloLens_MDL2_Assets,
+			Impact,
+			Ink_Free,
+			Lucida_Console,
+			Lucida_Sans_Unicode,
+			Marlett,
+			Microsoft_Sans_Serif,
+			MingLiU_ExtB,
+			Segoe_MDL2_Assets,
+			Segoe_Print,
+			Segoe_Script,
+			Segoe_UI,
+			Segoe_UI_Emoji,
+			Segoe_UI_Historic,
+			Segoe_UI_Symbol,
+			Sitka,
+			Sylfaen,
+			Symbol,
+			Tahoma,
+			Times_New_Roman,
+			Trebuchet_MS,
+			Verdana,
+			Webdings,
+			Wingdings,
+			
+			reserved_
+		} 
 		/+
-			Todo: lock the type for ulong here. Not just in assemble()! 
-			So cast everything to raw ulong here.
-			assemble() does this ulong casting by starting with an empty Bits!ulong.
+			static foreach(e; EnumMembers!FontId)
+			static if(e>FontId.default_ && e<FontId.reserved_)
+			mixin(iq{enum $(e.text) = FontId.$(e.text); }.text); 
 		+/
 		
-		T data; 
-		size_t bitCnt; 
-		
-		///'other' is casted to T
-		
-		auto opBinary(string op : "~", B)(B other) const
+		enum FontType : ubyte
 		{
-			static if(is(B==Bits!T2, T2))
-			{
-				static if(isSigned!T) data = data << (64-bitCnt) >>> (64-bitCnt); 
-				//Opt: dont allow signed types here, to be able to avoid negative masking
-				
-				return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
-			}
-			else
-			return this ~ bits(other); 
-		} 
-	} 
-	
-	auto bits(T)(T data, size_t bitCnt)
-	=> Bits!T(data, bitCnt); 
-	
-	auto bits(T)(in T a)
-	{
-		static if(is(T==vec2)||is(T==ivec2))	return bits(a.bitCast!ulong); 
-		else static if(
-			is(T==float)||is(T==RGBA)||
-			is(T==Vector!(short, 2))||
-			is(T==Vector!(ushort, 2))
-		)	return bits(a.bitCast!uint); 
-		else static if(is(T==RGB))	return Bits!uint(a.raw, 24); 
-		else static if(
-			is(T==Vector!(byte, 2))||
-			is(T==Vector!(ubyte, 2))
-		)	return bits(a.bitCast!ushort); 
-		else static if(is(T==enum))
-		{
-			static if(is(T==Opcode))	return bits(opInfo[a].bits, opInfo[a].bitCnt); 
-			else	return bits((cast(uint)(a)), EnumBits!T); 
-		}
-		else
-		{ return bits(a, T.sizeof * 8); }
-	} 
-	
-	auto assemble(A...)(A args)
-	{
-		Bits!ulong res; 
-		static foreach(i, a; args)
-		{
-			{
-				static if(is(A[i] : Bits!B, B))	res = res ~ a; 
-				else	res = res ~ bits(a); 
-			}
-		}
-		
-		assert(res.bitCnt <= 64, i"assemble($(A.stringof)): overflow $(res.bitCnt)".text); 
-		return res; 
-	} 
-	
-	Bits!ulong assembleHandle(T)(in T handle)
-	{
-		const h = (cast(uint)(handle)); 
-		if(h<(1<<12)) return assemble(mixin(舉!((HandleFormat),q{u12})), bits(h, 12)); 
-		if(h<(1<<16)) return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
-		if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
-		return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
-	} 
-	
-	Bits!ulong assembleSize(T)(in T size)
-	{
-		static if(is(T : int))	{ const i = size.max(0), f = float(i), isInt = true; }
-		else static if(is(T : float))	{ const f = size.max(0), i = (iround(f)), isInt = i==f; }
-		else static assert(false, "Unhandled type: "~T.stringof); 
-		if(isInt)
-		{
-			if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits((cast(uint)(i)), 4)); 
-			if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits((cast(uint)(i)), 8)); 
-		}
-		const logf = f.log2*128.0f, logi = (iround(logf)), exact = logf==logi; 
-		if(exact && mixin(界1(q{0},q{logi},q{1<<12})))	return assemble(mixin(舉!((SizeFormat),q{ulog12})), bits((cast(uint)(logi)), 12)); 
-		else	return assemble(mixin(舉!((SizeFormat),q{f32})), f); 
-	} 
-	
-	void unittest_assembleSize()
-	{
-		// Test integer cases
-		assert(assembleSize(5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(5, 4))); 
-		assert(assembleSize(20) == assemble(mixin(舉!((SizeFormat),q{u8})), bits(20, 8))); 
-		
-		// Test exact log cases
-		float exactSize = exp2(64.0f / 128.0f); // log2(exactSize)*128 = 64
-		assert(assembleSize(exactSize) == assemble(mixin(舉!((SizeFormat),q{ulog12})), bits(64, 12))); 
-		
-		// Test float fallback
-		float nonExactSize = 3.14159f; 
-		assert(assembleSize(nonExactSize) == assemble(mixin(舉!((SizeFormat),q{f32})), nonExactSize)); 
-		
-		// Test negative clamping
-		assert(assembleSize(-5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
-		assert(assembleSize(-1.5f) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
-	} 
-	
-	Bits!ulong assembleAngle_deg(T)(in T angle)
-	{
-		static if(is(T : int))
-		{ const i = angle; const isInt = true; }
-		else static if(is(T : float))
-		{ const i = (itrunc(angle)); const isInt = i == angle; }
-		else static assert(false, "Unhandled type: "~T.stringof); 
-		
-		if(
-			isInt && 
-			mixin(界1(q{-1<<9},q{i},q{1<<9}))
-		)	{ return assemble(mixin(舉!((AngleFormat),q{i10})), bits((cast(uint)(i)), 10)); }
-		else	{ return assemble(mixin(舉!((AngleFormat),q{f32})), float(angle)); }
-	} 
-	
-	void unittest_assembleAngle()
-	{
-		// Test integer cases within range
-		assert(assembleAngle_deg(0) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(0, 10))); 
-		assert(assembleAngle_deg(256) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(256, 10))); 
-		assert(assembleAngle_deg(511) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(511, 10))); 
-		assert(assembleAngle_deg(-512) == assemble(mixin(舉!((AngleFormat),q{i10})), bits((cast(uint)(-512)), 10))); 
-		
-		// Test float cases that are exact integers within range
-		assert(assembleAngle_deg(128.0f) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(128, 10))); 
-		
-		// Test float fallback for non-integer values
-		assert(assembleAngle_deg(128.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), 128.5f)); 
-		
-		// Test out-of-range values use float32 (no clamping)
-		assert(assembleAngle_deg(-513) == assemble(mixin(舉!((AngleFormat),q{f32})), -513.0f)); 
-		assert(assembleAngle_deg(600) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
-		assert(assembleAngle_deg(-512.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -512.5f)); 
-		assert(assembleAngle_deg(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
-	} 
-	
-	Bits!ulong assemblePoint(in Vector!(byte, 2) p)
-	{ return assemble(mixin(舉!((CoordFormat),q{i8})), p); } 
-	
-	Bits!ulong assemblePoint(in Vector!(short, 2) p)
-	{
-		if(mixin(界1(q{-128},q{p.x},q{128})) && mixin(界1(q{-128},q{p.y},q{128})))
-		return assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p.x)), (cast(ubyte)(p.y))); 
-		else return assemble(mixin(舉!((CoordFormat),q{i16})), p); 
-	} 
-	
-	Bits!(ulong)[2] assemblePoint(in ivec2 p)
-	{
-		if(mixin(界1(q{-128},q{p.x},q{128})) && mixin(界1(q{-128},q{p.y},q{128})))
-		return [assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p.x)), (cast(ubyte)(p.y))), bits(0UL,0)]; 
-		else if(mixin(界1(q{-32768},q{p.x},q{32768})) && mixin(界1(q{-32768},q{p.y},q{32768})))
-		return [assemble(mixin(舉!((CoordFormat),q{i16})), (cast(ushort)(p.x)), (cast(ushort)(p.y))), bits(0UL,0)]; 
-		else return[assemble(mixin(舉!((CoordFormat),q{i32}))), assemble(p)]; 
-	} 
-	
-	Bits!(ulong)[2] assemblePoint(in vec2 p)
-	{
-		const i = (itrunc(p)); 
-		if(p==i) return assemblePoint(i); 
-		else return [assemble(mixin(舉!((CoordFormat),q{f32}))), assemble(p)]; 
-	} 
-	
-	void unittest_assemblePoint()
-	{
-		void test(alias vec, alias fmt, int len)()
-		{
-			const p = assemblePoint(vec); enum fmtBitCnt = EnumBits!(typeof(fmt)); 
-			static if(isStaticArray!(typeof(p)))
-			{ const p0 = p[0],  actualLen = p[0].bitCnt + p[1].bitCnt; }
-			else
-			{ const p0 = p,  actualLen = p.bitCnt; }
-			assert(p0.data.getBits(0, fmtBitCnt) == fmt, "bad fmtCode"); 
-			assert(actualLen - fmtBitCnt == len, "bad len"); 
+			monospace3D,	//fontmap is a 3D texture of same sized glyphs.
+			textureHandles, 	//no fontMap, just individual texture handles.
+			asciiCharmap16x16, 	//fontMap is a bitmap containing 16x16 monosized characters
+			unicodeBlockMap128 	/+
+				fontMap is a texture of 0x110000>>7 = 8704 uints.
+				block = code>>7; blkTex = texture[fontMap[block]];
+				charTex = blkTex[code & 0x7F];
+				/+Opt: fast 0th block at the very start of the fontMap+/
+			+/
 		} 
 		
-		test!(vec2(0), mixin(舉!((CoordFormat),q{i8})), 8*2); 
-		test!(ivec2(-128, 27), mixin(舉!((CoordFormat),q{i8})), 8*2); 
-		test!(ivec2(129, 129), mixin(舉!((CoordFormat),q{i16})), 16*2); 
-		test!(ivec2(-32768, 32767), mixin(舉!((CoordFormat),q{i16})), 16*2); 
-		test!(vec2(40000, -40000), mixin(舉!((CoordFormat),q{i32})), 32*2); 
-		test!(vec2(1.0f, 2.0f), mixin(舉!((CoordFormat),q{i8})), 8*2); 
-		test!(vec2(1.5f, 2.5f), mixin(舉!((CoordFormat),q{f32})), 32*2); 
-		test!(Vector!(byte, 2)(0, 0), mixin(舉!((CoordFormat),q{i8})), 8*2); 
-		test!(Vector!(short, 2)(-128, 127), mixin(舉!((CoordFormat),q{i8})), 8*2); 
-		test!(Vector!(short, 2)(129, 129), mixin(舉!((CoordFormat),q{i16})), 16*2); 
-	} 
-	
-	
+		enum FontLine : ubyte {none, underline, strikeout, errorline } 
+		enum FontWidth : ubyte {normal, thin/+.66+/, wide/+1.5+/, wider/+2+/ } 
+		enum FontScript : ubyte {none, superscript, subscript, small} 
+		enum FontBlink : ubyte {none, blink, soft, fast } 
+		
+		struct FontFlags
+		{
+			mixin((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+					[q{FontType},q{2},q{"type"},q{},q{/++/}],
+					[q{bool},q{1},q{"bold"},q{},q{/++/}],
+					[q{bool},q{1},q{"italic"},q{},q{/++/}],
+					[q{bool},q{1},q{"monospace"},q{},q{/++/}],
+					[q{FontLine},q{2},q{"line"},q{},q{/++/}],
+					[q{FontWidth},q{2},q{"width"},q{},q{/++/}],
+					[q{FontScript},q{2},q{"script"},q{},q{/++/}],
+					[q{FontBlink},q{2},q{"blink"},q{},q{/++/}],
+				]))
+			).調!(GEN_bitfields)); 
+			enum bitCnt = 13; 
+			protected
+			{
+				enum GLSLCode = /+Todo: autogenerate this, not with AI+/
+				iq{
+					uint fontType() { return getBits(FF, 0, 2); } 
+					bool fontBold() { return getBit(FF, 2); } 
+					bool fontItalic() { return getBit(FF, 3); } 
+					bool fontMonospace() { return getBit(FF, 4); } 
+					uint fontLine() { return getBits(FF, 5, 2); } 
+					uint fontWidth() { return getBits(FF, 7, 2); } 
+					uint fontScript() { return getBits(FF, 9, 2); } 
+					uint fontBlink() { return getBits(FF, 11, 2); } 
+				}.text; 
+			} 
+		} 
+	}
 	
+	version(/+$DIDE_REGION Common enums+/all)
+	{
+		enum SizeUnit : ubyte
+		{
+			world, 	/+one unit in the world+/
+			screen, 	/+one pixel at the screen (similar to fwidth())+/
+			model 	/+Todo: one unit inside scaled model space+/
+		} 
+		
+		enum ColorFormat : ubyte {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
+			enum colorFormatBitCnt = [32,  24,     16,    8,    1,   2,  4,  8]; 
+		
+		enum HandleFormat : ubyte {u12, u16, u24, u32} 
+		enum CoordFormat : ubyte {f32, i32, i16, i8} 
+		enum SizeFormat : ubyte {u4, u8, ulog12/+4G range+/, f32} 
+		enum XYFormat : ubyte {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
+		enum FlagFormat : ubyte {tex, font, vec, all} 
+		enum AngleFormat : ubyte {i10, f32} 
+		enum TransFormat : ubyte {
+			unity, transXY, scale, scaleXY, 
+			skewX, rotZ, clipBounds
+			/+, tileXY, transXYZ, axisXY+/
+		} 
+		
+		struct VecFlags
+		{
+			mixin((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+					[q{CoordFormat},q{2},q{"coordFormat"},q{},q{/++/}],
+					[q{XYFormat},q{3},q{"xyFormat"},q{},q{/++/}],
+				]))
+			).調!(GEN_bitfields)); 
+			enum bitCnt = 5; 
+			protected
+			{
+				enum GLSLCode = 
+				iq{
+					uint vecCoordFormat() { return getBits(VF, 0, 2); } 
+					uint vecXYFormat() { return getBits(VF, 2, 3); } 
+				}.text; 
+			} 
+		} 
+		
+		template FlagBits(T)
+		{
+			static foreach(A; AliasSeq!(TexFlags, FontFlags, VecFlags))
+			static if(is(T : A)) enum FlagBits = A.bitCnt; 
+		} 
+	}
 	
-	/+
-		AI: Generate case switch for instruction set: /+
-			Hidden: Generate a nested case switch structure from this:
-			This is a hierarchical representation of an instruction set.
-			Every node has a few number of bits associated them, for example [0] means 1 bit and it must be a 0. [10] means 2 bits and has a decimal value of 2.
-			The tab characters in front of the lines represent the nesting level.
-			Sometimes there are lines without [ ] and ; characters, just ignore those.
-			You can fetch 1 bit by using fetchBool(GS) and do an if/else based on that. In an if else block, please start with the false value first, keep the order same as in the input.
-			You can fetch 2 bits by using fetchBits(GS, 2) and doing a case switch on that.
-			You can extract the commands by the first identifiers, example end, setPh, drawM. Call thos by GLSL syntax: end();  
-			Please preserve the comments you find in the input, also preserve the optional parameters and do dense code by putting the instruction calling and the case break and the comment on the same line.
-			Put the { on a new line. Use /* or // comments only, this is GLSL!
-		+/ refine: /+
-			Hidden: Remove meaningless redundant comments and put parameters into comments!
-			Example:
-			`case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier`
-			->
-			`case 2: drawC(/*xy, xy, xy)*/); break; // cubic bezier`
-		+/
-	+/
-	
-	
-	version(/+$DIDE_REGION Opcode+/all)
+	version(/+$DIDE_REGION GSP Opcodes+/all)
 	{
 		mixin 入 !((
 			(表([
@@ -584,105 +725,284 @@ version(/+$DIDE_REGION+/all)
 			}(); 
 			mixin(iq{enum Opcode {$(opInfo.map!q{a.name}.join(','))} }.text); 
 		}); 
+		/+
+			AI: Generate case switch for instruction set: /+
+				Hidden: Generate a nested case switch structure from this:
+				This is a hierarchical representation of an instruction set.
+				Every node has a few number of bits associated them, for example [0] means 1 bit and it must be a 0. [10] means 2 bits and has a decimal value of 2.
+				The tab characters in front of the lines represent the nesting level.
+				Sometimes there are lines without [ ] and ; characters, just ignore those.
+				You can fetch 1 bit by using fetchBool(GS) and do an if/else based on that. In an if else block, please start with the false value first, keep the order same as in the input.
+				You can fetch 2 bits by using fetchBits(GS, 2) and doing a case switch on that.
+				You can extract the commands by the first identifiers, example end, setPh, drawM. Call thos by GLSL syntax: end();  
+				Please preserve the comments you find in the input, also preserve the optional parameters and do dense code by putting the instruction calling and the case break and the comment on the same line.
+				Put the { on a new line. Use /* or // comments only, this is GLSL!
+			+/ refine: /+
+				Hidden: Remove meaningless redundant comments and put parameters into comments!
+				Example:
+				`case 2: drawC(xy, xy, xy); break; // [10] drawC - cubic bezier`
+				->
+				`case 2: drawC(/*xy, xy, xy)*/); break; // cubic bezier`
+			+/
+		+/
+		
+		
+		static if((常!(bool)(0)))
+		static foreach(op; EnumMembers!Opcode)
+		pragma(msg, opInfo[op].bits.to!string(2).padLeft('0', opInfo[op].bitCnt).text, " : ", op.text); 
 	}
-	
-	static if((常!(bool)(0)))
-	static foreach(op; EnumMembers!Opcode)
-	pragma(msg, opInfo[op].bits.to!string(2).padLeft('0', opInfo[op].bitCnt).text, " : ", op.text); 
-	
-	
-	
-	
-	version(none)
-	enum test = mixin(體!((TexFlags),q{mixin(舉!((TexXAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexYAlign),q{center})), mixin(舉!((TexSizeSpec),q{original})), mixin(舉!((TexAspect),q{keep})), mixin(舉!((TexOrientation),q{normal}))})); 
-	
-	struct TexFlags
+	
+	version(/+$DIDE_REGION GSP assembler+/all)
 	{
-		mixin((
-			(表([
-				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-				[q{TexXAlign},q{2},q{"xAlign"},q{},q{/++/}],
-				[q{TexSizeSpec},q{2},q{"xSize"},q{},q{/++/}],
-				[q{TexYAlign},q{2},q{"yAlign"},q{},q{/++/}],
-				[q{TexSizeSpec},q{2},q{"ySize"},q{},q{/++/}],
-				[q{TexAspect},q{2},q{"aspect"},q{},q{/++/}],
-				[q{TexOrientation},q{3},q{"orientation"},q{},q{/++/}],
-			]))
-		).調!(GEN_bitfields)); 
-		enum bitCnt = 13; 
-		protected
+		struct Bits(T)
 		{
-			enum GLSLCode =
-			iq{
-				uint texXAlign() { return getBits(TF, 0, 2); } 
-				uint texXSize() { return getBits(TF, 2, 2); } 
-				uint texYAlign() { return getBits(TF, 4, 2); } 
-				uint texYSize() { return getBits(TF, 6, 2); } 
-				uint texAspect() { return getBits(TF, 8, 2); } 
-				uint texOrientation() { return getBits(TF, 10, 3); } 
-			}.text; 
+			static assert(isIntegral!T); 
+			//static assert(!isSigned!T); 
+			
+			
+			
+			/+
+				Todo: lock the type for ulong here. Not just in assemble()! 
+				So cast everything to raw ulong here.
+				assemble() does this ulong casting by starting with an empty Bits!ulong.
+			+/
+			
+			T data; 
+			size_t bitCnt; 
+			
+			///'other' is casted to T
+			
+			auto opBinary(string op : "~", B)(B other) const
+			{
+				static if(is(B==Bits!T2, T2))
+				{
+					static if(isSigned!T) data = data << (64-bitCnt) >>> (64-bitCnt); 
+					//Opt: dont allow signed types here, to be able to avoid negative masking
+					
+					return Bits!T(data | ((cast(T)(other.data))<<bitCnt), bitCnt+other.bitCnt); 
+				}
+				else
+				return this ~ bits(other); 
+			} 
 		} 
-	} 
-	
-	
-	struct FontFlags
-	{
-		mixin((
-			(表([
-				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-				[q{FontType},q{2},q{"type"},q{},q{/++/}],
-				[q{bool},q{1},q{"bold"},q{},q{/++/}],
-				[q{bool},q{1},q{"italic"},q{},q{/++/}],
-				[q{bool},q{1},q{"monospace"},q{},q{/++/}],
-				[q{FontLine},q{2},q{"line"},q{},q{/++/}],
-				[q{FontWidth},q{2},q{"width"},q{},q{/++/}],
-				[q{FontScript},q{2},q{"script"},q{},q{/++/}],
-				[q{FontBlink},q{2},q{"blink"},q{},q{/++/}],
-			]))
-		).調!(GEN_bitfields)); 
-		enum bitCnt = 13; 
-		protected
+		
+		auto bits(T)(T data, size_t bitCnt)
+		=> Bits!T(data, bitCnt); 
+		
+		auto bits(T)(in T a)
 		{
-			enum GLSLCode =
-			iq{
-				uint fontType() { return getBits(FF, 0, 2); } 
-				bool fontBold() { return getBit(FF, 2); } 
-				bool fontItalic() { return getBit(FF, 3); } 
-				bool fontMonospace() { return getBit(FF, 4); } 
-				uint fontLine() { return getBits(FF, 5, 2); } 
-				uint fontWidth() { return getBits(FF, 7, 2); } 
-				uint fontScript() { return getBits(FF, 9, 2); } 
-				uint fontBlink() { return getBits(FF, 11, 2); } 
-			}.text; 
+			static if(is(T==vec2)||is(T==ivec2))	return bits(a.bitCast!ulong); 
+			else static if(
+				is(T==float)||is(T==RGBA)||
+				is(T==Vector!(short, 2))||
+				is(T==Vector!(ushort, 2))
+			)	return bits(a.bitCast!uint); 
+			else static if(is(T==RGB))	return Bits!uint(a.raw, 24); 
+			else static if(
+				is(T==Vector!(byte, 2))||
+				is(T==Vector!(ubyte, 2))
+			)	return bits(a.bitCast!ushort); 
+			else static if(is(T==enum))
+			{
+				static if(is(T==Opcode))	return bits(opInfo[a].bits, opInfo[a].bitCnt); 
+				else	return bits((cast(uint)(a)), EnumBits!T); 
+			}
+			else
+			{ return bits(a, T.sizeof * 8); }
 		} 
-	} 
-	
-	struct VecFlags
-	{
-		mixin((
-			(表([
-				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-				[q{CoordFormat},q{2},q{"coordFormat"},q{},q{/++/}],
-				[q{XYFormat},q{3},q{"xyFormat"},q{},q{/++/}],
-			]))
-		).調!(GEN_bitfields)); 
-		enum bitCnt = 5; 
-		protected
+		
+		auto assemble(A...)(A args)
 		{
-			enum GLSLCode = 
-			iq{
-				uint vecCoordFormat() { return getBits(VF, 0, 2); } 
-				uint vecXYFormat() { return getBits(VF, 2, 3); } 
-			}.text; 
+			Bits!ulong res; 
+			static foreach(i, a; args)
+			{
+				{
+					static if(is(A[i] : Bits!B, B))	res = res ~ a; 
+					else	res = res ~ bits(a); 
+				}
+			}
+			
+			assert(res.bitCnt <= 64, i"assemble($(A.stringof)): overflow $(res.bitCnt)".text); 
+			return res; 
 		} 
-	} 
-	
-	template FlagBits(T)
-	{
-		static foreach(A; AliasSeq!(TexFlags, FontFlags, VecFlags))
-		static if(is(T : A)) enum FlagBits = A.bitCnt; 
-	} 
-	
+		
+		Bits!ulong assembleHandle(T)(in T handle)
+		{
+			const h = (cast(uint)(handle)); 
+			if(h<(1<<12)) return assemble(mixin(舉!((HandleFormat),q{u12})), bits(h, 12)); 
+			if(h<(1<<16)) return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
+			if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
+			return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
+		} 
+		
+		Bits!ulong assembleSize(T)(in T size)
+		{
+			static if(is(T : int))	{ const i = size.max(0), f = float(i), isInt = true; }
+			else static if(is(T : float))	{ const f = size.max(0), i = (iround(f)), isInt = i==f; }
+			else static assert(false, "Unhandled type: "~T.stringof); 
+			if(isInt)
+			{
+				if(i<(1<<4)) return assemble(mixin(舉!((SizeFormat),q{u4})), bits((cast(uint)(i)), 4)); 
+				if(i<(1<<8)) return assemble(mixin(舉!((SizeFormat),q{u8})), bits((cast(uint)(i)), 8)); 
+			}
+			const logf = f.log2*128.0f, logi = (iround(logf)), exact = logf==logi; 
+			if(exact && mixin(界1(q{0},q{logi},q{1<<12})))	return assemble(mixin(舉!((SizeFormat),q{ulog12})), bits((cast(uint)(logi)), 12)); 
+			else	return assemble(mixin(舉!((SizeFormat),q{f32})), f); 
+		} 
+		
+		void unittest_assembleSize()
+		{
+			// Test integer cases
+			assert(assembleSize(5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(5, 4))); 
+			assert(assembleSize(20) == assemble(mixin(舉!((SizeFormat),q{u8})), bits(20, 8))); 
+			
+			// Test exact log cases
+			float exactSize = exp2(64.0f / 128.0f); // log2(exactSize)*128 = 64
+			assert(assembleSize(exactSize) == assemble(mixin(舉!((SizeFormat),q{ulog12})), bits(64, 12))); 
+			
+			// Test float fallback
+			float nonExactSize = 3.14159f; 
+			assert(assembleSize(nonExactSize) == assemble(mixin(舉!((SizeFormat),q{f32})), nonExactSize)); 
+			
+			// Test negative clamping
+			assert(assembleSize(-5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
+			assert(assembleSize(-1.5f) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
+		} 
+		Bits!ulong assembleAngle_deg(T)(in T angle)
+		{
+			static if(is(T : int))
+			{ const i = angle; const isInt = true; }
+			else static if(is(T : float))
+			{ const i = (itrunc(angle)); const isInt = i == angle; }
+			else static assert(false, "Unhandled type: "~T.stringof); 
+			
+			if(
+				isInt && 
+				mixin(界1(q{-1<<9},q{i},q{1<<9}))
+			)	{ return assemble(mixin(舉!((AngleFormat),q{i10})), bits((cast(uint)(i)), 10)); }
+			else	{ return assemble(mixin(舉!((AngleFormat),q{f32})), float(angle)); }
+		} 
+		
+		void unittest_assembleAngle()
+		{
+			// Test integer cases within range
+			assert(assembleAngle_deg(0) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(0, 10))); 
+			assert(assembleAngle_deg(256) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(256, 10))); 
+			assert(assembleAngle_deg(511) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(511, 10))); 
+			assert(assembleAngle_deg(-512) == assemble(mixin(舉!((AngleFormat),q{i10})), bits((cast(uint)(-512)), 10))); 
+			
+			// Test float cases that are exact integers within range
+			assert(assembleAngle_deg(128.0f) == assemble(mixin(舉!((AngleFormat),q{i10})), bits(128, 10))); 
+			
+			// Test float fallback for non-integer values
+			assert(assembleAngle_deg(128.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), 128.5f)); 
+			
+			// Test out-of-range values use float32 (no clamping)
+			assert(assembleAngle_deg(-513) == assemble(mixin(舉!((AngleFormat),q{f32})), -513.0f)); 
+			assert(assembleAngle_deg(600) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
+			assert(assembleAngle_deg(-512.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -512.5f)); 
+			assert(assembleAngle_deg(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
+		} 
+		
+		Bits!ulong assemblePoint(in Vector!(byte, 2) p)
+		{ return assemble(mixin(舉!((CoordFormat),q{i8})), p); } 
+		
+		Bits!ulong assemblePoint(in Vector!(short, 2) p)
+		{
+			if(mixin(界1(q{-128},q{p.x},q{128})) && mixin(界1(q{-128},q{p.y},q{128})))
+			return assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p.x)), (cast(ubyte)(p.y))); 
+			else return assemble(mixin(舉!((CoordFormat),q{i16})), p); 
+		} 
+		
+		Bits!(ulong)[2] assemblePoint(in ivec2 p)
+		{
+			if(mixin(界1(q{-128},q{p.x},q{128})) && mixin(界1(q{-128},q{p.y},q{128})))
+			return [assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p.x)), (cast(ubyte)(p.y))), bits(0UL,0)]; 
+			else if(mixin(界1(q{-32768},q{p.x},q{32768})) && mixin(界1(q{-32768},q{p.y},q{32768})))
+			return [assemble(mixin(舉!((CoordFormat),q{i16})), (cast(ushort)(p.x)), (cast(ushort)(p.y))), bits(0UL,0)]; 
+			else return[assemble(mixin(舉!((CoordFormat),q{i32}))), assemble(p)]; 
+		} 
+		
+		Bits!(ulong)[2] assemblePoint(in vec2 p)
+		{
+			const i = (itrunc(p)); 
+			if(p==i) return assemblePoint(i); 
+			else return [assemble(mixin(舉!((CoordFormat),q{f32}))), assemble(p)]; 
+		} 
+		
+		void unittest_assemblePoint()
+		{
+			void test(alias vec, alias fmt, int len)()
+			{
+				const p = assemblePoint(vec); enum fmtBitCnt = EnumBits!(typeof(fmt)); 
+				static if(isStaticArray!(typeof(p)))
+				{ const p0 = p[0],  actualLen = p[0].bitCnt + p[1].bitCnt; }
+				else
+				{ const p0 = p,  actualLen = p.bitCnt; }
+				assert(p0.data.getBits(0, fmtBitCnt) == fmt, "bad fmtCode"); 
+				assert(actualLen - fmtBitCnt == len, "bad len"); 
+			} 
+			
+			test!(vec2(0), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+			test!(ivec2(-128, 27), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+			test!(ivec2(129, 129), mixin(舉!((CoordFormat),q{i16})), 16*2); 
+			test!(ivec2(-32768, 32767), mixin(舉!((CoordFormat),q{i16})), 16*2); 
+			test!(vec2(40000, -40000), mixin(舉!((CoordFormat),q{i32})), 32*2); 
+			test!(vec2(1.0f, 2.0f), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+			test!(vec2(1.5f, 2.5f), mixin(舉!((CoordFormat),q{f32})), 32*2); 
+			test!(Vector!(byte, 2)(0, 0), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+			test!(Vector!(short, 2)(-128, 127), mixin(舉!((CoordFormat),q{i8})), 8*2); 
+			test!(Vector!(short, 2)(129, 129), mixin(舉!((CoordFormat),q{i16})), 16*2); 
+		} 
+		
+		static struct FormattedColor
+		{
+			uint value; 
+			ColorFormat format; 
+			
+			//constructors
+			this(uint a, ColorFormat fmt)
+			{ value = a; format = fmt; } 
+			this(in FormattedColor a)
+			{ value = a.value; format = a.format; } 
+			
+			//1 component scalars
+			this(uint a, uint bitCnt=8)
+			{
+				switch(bitCnt)
+				{
+					case 1: 	{ format = mixin(舉!((ColorFormat),q{u1})); value = a; }	break; 
+					case 2: 	{ format = mixin(舉!((ColorFormat),q{u2})); value = a; }	break; 
+					case 4: 	{ format = mixin(舉!((ColorFormat),q{u4})); value = a; }	break; 
+					case 8: 	{ format = mixin(舉!((ColorFormat),q{u8})); value = a; }	break; 
+					default: 
+				}
+			} 
+			this(float a) { this(a.to_unorm, 8); } 
+			
+			//2 component vectors
+			this(RG a) { format = mixin(舉!((ColorFormat),q{la_u8})); value = a.raw; } 
+			this(vec2 a) { this(a.to_unorm); value = a.to_unorm.raw; } 
+			
+			//3 component vectors
+			this(RGB a) { format = mixin(舉!((ColorFormat),q{rgb_u8})); value = a.raw; } 
+			this(vec3 a) { this(a.to_unorm); } 
+			
+			//4 component vectors
+			this(RGBA a) { format = mixin(舉!((ColorFormat),q{rgba_u8})); value = a.raw; } 
+			this(vec4 a) { this(a.to_unorm); } 
+			
+			
+			static assert(FormattedColor.sizeof==8); 
+		} 
+		
+		
+		auto assembleColor(A...)(in A args)
+		{
+			const fc = FormattedColor(args); 
+			return assemble(fc.format, bits(fc.value, colorFormatBitCnt[fc.format])); 
+		} 
+	}
 	
 	class GeometryStreamProcessor
 	{
@@ -858,8 +1178,7 @@ version(/+$DIDE_REGION+/all)
 		/+Opt: final functions everywhere if possible!!! Do timing tests!!!+/
 		
 		alias VertexData 	= VulkanWindow.VertexData,
-		Texture 	= VulkanWindow.Texture, 
-		TexHandle 	= VulkanWindow.TexHandle; 
+		Texture 	= VulkanWindow.Texture; 
 		
 		
 		version(/+$DIDE_REGION Bitstream management+/all)
@@ -1249,7 +1568,8 @@ version(/+$DIDE_REGION+/all)
 				emit_setFMH(fontTex); 
 				emit(
 					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
-					assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4)),
+					/*assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4)),*/
+					assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(bk, 4)),
 					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x+index*8, 16), bits(pos.y, 16)
 				); 
 			} 
@@ -1432,60 +1752,6 @@ version(/+$DIDE_REGION+/all)
 			{ data = cast(ubyte)a; } 
 		} 
 		
-		enum FontId: ubyte
-		{
-			default_, 
-			
-			CGA8x8, 
-			VGA9x16, 
-			
-			Arial,
-			Bahnschrift,
-			Calibri,
-			Cambria,
-			Cambria_Math,
-			Candara,
-			Cascadia_Code,
-			Cascadia_Mono,
-			Comic_Sans_MS,
-			Consolas,
-			Constantia,
-			Corbel,
-			Courier_New,
-			Franklin_Gothic,
-			Gabriola,
-			Georgia,
-			HoloLens_MDL2_Assets,
-			Impact,
-			Ink_Free,
-			Lucida_Console,
-			Lucida_Sans_Unicode,
-			Marlett,
-			Microsoft_Sans_Serif,
-			MingLiU_ExtB,
-			Segoe_MDL2_Assets,
-			Segoe_Print,
-			Segoe_Script,
-			Segoe_UI,
-			Segoe_UI_Emoji,
-			Segoe_UI_Historic,
-			Segoe_UI_Symbol,
-			Sitka,
-			Sylfaen,
-			Symbol,
-			Tahoma,
-			Times_New_Roman,
-			Trebuchet_MS,
-			Verdana,
-			Webdings,
-			Wingdings,
-			
-			reserved_
-		} 
-		static foreach(e; EnumMembers!FontId)
-		static if(e>FontId.default_ && e<FontId.reserved_)
-		mixin(iq{enum $(e.text) = FontId.$(e.text); }.text); 
-		
 		enum 
 		{
 			/+Note: 0+/	black	= EGAColor(0),
@@ -1504,6 +1770,82 @@ version(/+$DIDE_REGION+/all)
 			/+Note: 13+/ /+Note: 0xD+/	ltMagenta	= EGAColor(8+5),
 			/+Note: 14+/ /+Note: 0xE+/	yellow	= EGAColor(8+6),
 			/+Note: 15+/ /+Note: 0xF+/	white	= EGAColor(8+7),
+		} 
+		
+		enum EGAColor : ubyte
+		{
+			/+Note: 0+/ black	= 0,
+			/+Note: 1+/ blue	= 1,
+			/+Note: 2+/ green	= 2,
+			/+Note: 3+/ cyan	= 3,
+			/+Note: 4+/ red	= 4,
+			/+Note: 5+/ magenta	= 5,
+			/+Note: 6+/ brown	= 6,
+			/+Note: 7+/ ltGray	= 7,
+			/+Note:  8+/ /+Note: 0x8+/	dkGray	= 8+0,
+			/+Note:  9+/ /+Note: 0x9+/	ltBlue	= 8+1,
+			/+Note: 10+/ /+Note: 0xA+/	ltGreen	= 8+2,
+			/+Note: 11+/ /+Note: 0xB+/	ltCyan	= 8+3,
+			/+Note: 12+/ /+Note: 0xC+/	ltRed	= 8+4,
+			/+Note: 13+/ /+Note: 0xD+/	ltMagenta	= 8+5,
+			/+Note: 14+/ /+Note: 0xE+/	yellow	= 8+6,
+			/+Note: 15+/ /+Note: 0xF+/	white	= 8+7,
+		} 
+		
+		enum EGAColorTable = 
+		(表([
+			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
+			[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
+			[q{1},q{"\1"},q{0x1},q{blue},q{(RGB(0xAA0000))}],
+			[q{2},q{"\2"},q{0x2},q{green},q{(RGB(0x00AA00))}],
+			[q{3},q{"\3"},q{0x3},q{cyan},q{(RGB(0xAAAA00))}],
+			[q{4},q{"\4"},q{0x4},q{red},q{(RGB(0x0000AA))}],
+			[q{5},q{"\5"},q{0x5},q{magenta},q{(RGB(0xAA00AA))}],
+			[q{6},q{"\6"},q{0x6},q{brown},q{(RGB(0x0055AA))}],
+			[q{7},q{"\7"},q{0x7},q{ltGray},q{(RGB(0xAAAAAA))}],
+			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
+			[q{8},q{"\10"},q{0x8},q{dkGray},q{(RGB(0x555555))}],
+			[q{9},q{"\11"},q{0x9},q{ltBlue},q{(RGB(0xFF5555))}],
+			[q{10},q{"\12"},q{0xA},q{ltGreen},q{(RGB(0x55FF55))}],
+			[q{11},q{"\13"},q{0xB},q{ltCyan},q{(RGB(0xFFFF55))}],
+			[q{12},q{"\14"},q{0xC},q{ltRed},q{(RGB(0x5555FF))}],
+			[q{13},q{"\15"},q{0xD},q{ltMagenta},q{(RGB(0xFF55FF))}],
+			[q{14},q{"\16"},q{0xE},q{yellow},q{(RGB(0x55FFFF))}],
+			[q{15},q{"\17"},q{0xF},q{white},q{(RGB(0xFFFFFF))}],
+		])); 
+		enum C64ColorTable = 
+		(表([
+			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
+			[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
+			[q{1},q{"\1"},q{0x1},q{white},q{(RGB(0xFFFFFF))}],
+			[q{2},q{"\2"},q{0x2},q{red},q{(RGB(0x2E2896))}],
+			[q{3},q{"\3"},q{0x3},q{cyan},q{(RGB(0xCED65B))}],
+			[q{4},q{"\4"},q{0x4},q{purple},q{(RGB(0xAD2D9F))}],
+			[q{5},q{"\5"},q{0x5},q{green},q{(RGB(0x36B941))}],
+			[q{6},q{"\6"},q{0x6},q{blue},q{(RGB(0xC42427))}],
+			[q{7},q{"\7"},q{0x7},q{yellow},q{(RGB(0x47F3EF))}],
+			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
+			[q{8},q{"\10"},q{0x8},q{orange},q{(RGB(0x15489F))}],
+			[q{9},q{"\11"},q{0x9},q{brown},q{(RGB(0x00355E))}],
+			[q{10},q{"\12"},q{0xA},q{pink},q{(RGB(0x665FDA))}],
+			[q{11},q{"\13"},q{0xB},q{dkGray},q{(RGB(0x474747))}],
+			[q{12},q{"\14"},q{0xC},q{gray},q{(RGB(0x787878))}],
+			[q{13},q{"\15"},q{0xD},q{ltGreen},q{(RGB(0x84FF91))}],
+			[q{14},q{"\16"},q{0xE},q{ltBlue},q{(RGB(0xFF6468))}],
+			[q{15},q{"\17"},q{0xF},q{ltGray},q{(RGB(0xAEAEAE))}],
+		])); 
+		
+		itt tartok; 
+		
+		mixin((src) .GEN!q{GEN_ColorEnum("EGA")}); 
+		mixin((src) .GEN!q{GEN_ColorEnum("C64")}); 
+		
+		static struct ColorState
+		{
+			FormattedColor user_color; /+CPU side+/
+			RGBA target_color; /+GPU side+/
+			
+			
 		} 
 		
 		static struct fg
@@ -2251,225 +2593,19 @@ class VulkanWindow: Window
 		
 		version(/+$DIDE_REGION IB     +/all)
 		{
-			version(/+$DIDE_REGION TexInfo declarations+/all)
+			static struct TexInfo
 			{
-				alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
+				TexSizeFormat sizeFormat; 
+				HeapChunkIdx heapChunkIdx; 
+				uint extra; 
 				
-				enum TexInfoFlag {
-					error 	= 1,
-					loading 	= 2,
-					resident 	= 4
-				}; alias TexInfoFlags = VkBitFlags!TexInfoFlag; 
+				string toString() const
+				=> format!"TexInfo(%s, chunk:%d, extra:%d)"
+				(sizeFormat, heapChunkIdx.to!uint, extra); 
 				
-				enum TexInfoBits	= 3,
-				TexDimBits 	= 2, 
-				TexChnBits 	= 2, 
-				TexBppBits 	= 4, 
-				TexInfoBitOfs	= 0,
-				TexDimBitOfs	= 6,
-				TexFormatBitOfs 	= 8 /+inside info_dword[0]+/,
-				TexFormatBits 	= TexChnBits + TexBppBits + 1 /+alt+/; 
-				
-				enum TexDim {_1D, _2D, _3D} 	static assert(TexDim.max < 1<<TexDimBits); 
-				enum _TexFormat_matrix = 
-				(表([
-					[q{/+Note: chn/bpp+/},q{/+Note: 1+/},q{/+Note: 2+/},q{/+Note: 4+/},q{/+Note: 8+/},q{/+Note: 16+/},q{/+Note: 24+/},q{/+Note: 32+/},q{/+Note: 48+/},q{/+Note: 64+/},q{/+Note: 96+/},q{/+Note: 128+/},q{/+Note: Count+/}],
-					[q{/+Note: 1+/},q{
-						u1
-						wa_u1
-					},q{
-						u2
-						wa_u2
-					},q{
-						u4
-						wa_u4
-					},q{
-						u8
-						wa_u8
-					},q{
-						u16
-						wa_u16
-					},q{},q{
-						f32
-						wa_f32
-					},q{},q{},q{},q{},q{12}],
-					[q{/+Note: 2+/},q{},q{},q{},q{},q{la_u8},q{},q{la_u16},q{},q{la_f32},q{},q{},q{3}],
-					[q{/+Note: 3+/},q{},q{},q{},q{},q{
-						rgb_565
-						bgr_565
-					},q{
-						rgb_u8
-						bgr_u8
-					},q{},q{
-						rgb_u16
-						bgr_u16
-					},q{},q{
-						rgb_f32
-						bgr_f32
-					},q{},q{8}],
-					[q{/+Note: 4+/},q{},q{},q{},q{},q{
-						rgba_5551
-						bgra_5551
-					},q{},q{
-						rgba_u8
-						bgra_u8
-					},q{},q{
-						rgba_u16
-						bgra_u16
-					},q{},q{
-						rgba_f32
-						bgra_f32
-					},q{8}],
-					[q{/+
-						Alternate modes: 	1ch 	: wa_* 	: white+alpha for fonts 
-							2ch, 3ch 	: bgr* 	: red blue swap
-					+/}],
-				])); 
-				static if((常!(bool)(0))) { pragma(msg, GEN_TexFormat); }/+Todo: rename Type -> Format+/
-				mixin(GEN_TexFormat); 
-				static assert(TexChn.max < 1<<TexChnBits); static assert(TexBpp.max < 1<<TexBppBits); 
-				static assert(TexFormat.max < 1<<TexFormatBits); 
-				
-				static string GEN_TexFormat()
-				{
-					version(/+$DIDE_REGION Process table cells, generate types+/all)
-					{
-						auto 	table = _TexFormat_matrix,
-							bppCount = table.width-2,
-							chnCount = table.rowCount; struct Format {
-							string name; 
-							int value, chn, bpp; 
-						} Format[] formats; 
-						int chnVal(int chn) => table.headerColumnCell(chn+1).to!int; 
-						int bppVal(int bpp) => table.headerCell(bpp+1).to!int; 
-						void processCell(int bpp, int chn)
-						{
-							foreach(alt, n; table.cell(bpp+1, chn+1).split)
-							formats ~= Format(n, chn | (bpp<<2) | (!!alt<<6), chnVal(chn), bppVal(bpp)); 
-						} 
-						foreach(bpp; 0..bppCount) foreach(chn; 0..chnCount) processCell(bpp, chn); 
-					}
-					
-					return iq{
-						enum TexFormat {$(formats.map!"a.name~`=`~a.value.text".join(','))} 
-						enum TexChn {$(chnCount.iota.map!((i)=>('_'~chnVal(i).text)).join(','))} 
-						enum TexBpp {$(bppCount.iota.map!((i)=>('_'~bppVal(i).text)).join(','))} 
-						enum texFormatChnVals 	= [$(formats.map!q{a.chn.text}.join(','))],
-						texFormatBppVals 	= [$(formats.map!q{a.bpp.text}.join(','))]; 
-					}.text; 
-				} 
-				
-				struct TexSizeFormat
-				{
-					mixin((
-						(表([
-							[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-							[q{bool},q{1},q{"error"},q{},q{/+No sampling, 0xFFFF00FF color /+Todo: Error can be marked by chunkIdx=null+/+/}],
-							[q{bool},q{1},q{"loading"},q{},q{/+No sampling, 0xC0C0C0C0 color+/}],
-							[q{bool},q{1},q{"resident"},q{},q{/+GC will not unload it, just relocate it /+Todo: not needed on GPU+/+/}],
-							[q{uint},q{3},q{"_unused1"},q{},q{/++/}],
-							[q{TexDim},q{2},q{"dim"},q{},q{/++/}],
-							[],
-							[q{TexChn},q{2},q{"chn"},q{},q{/+channels (0: 1ch, ..., 3: 4ch)+/}],
-							[q{TexBpp},q{4},q{"bpp"},q{},q{/+bits per pixel (enum)+/}],
-							[q{bool},q{1},q{"alt"},q{},q{/+alternate mode: 1ch: white_alpha, 3ch, 4ch: swapRB+/}],
-							[q{uint},q{1},q{"_unused2"},q{},q{/++/}],
-							[],
-							[q{uint},q{16},q{"_rawSize0"},q{},q{/++/}],
-							[q{uint},q{32},q{"_rawSize12"},q{},q{/++/}],
-						]))
-					).調!(GEN_bitfields)); 
-					
-					@property format() const => (cast(TexFormat)((*(cast(ulong*)(&this))).getBits(TexFormatBitOfs, TexFormatBits))); 
-					@property format(TexFormat t) { auto p = (cast(ulong*)(&this)); *p = (*p).setBits(TexFormatBitOfs, TexFormatBits, t); } 
-					
-					protected
-					{
-						enum SharedCode = 
-						q{
-							ivec3 decodeDimSize(in uint dim, in uint raw0, in uint raw12)
-							{
-								switch(dim)
-								{
-									case TexDim._1D: 	return ivec3(raw12, 1, 1); 
-									case TexDim._2D: 	return ivec3((raw0 | ((raw12 & 0xFF)<<16)), raw12>>8, 1); 
-									case TexDim._3D: 	return ivec3(raw0, raw12 & 0xFFFF, raw12>>16); 
-									default: 	return ivec3(0); 
-								}
-							} 
-							
-							uint calcFlatIndex(in ivec3 v, in uint dim, in ivec3 size)
-							{
-								switch(dim)
-								{
-									case TexDim._1D: 	return v.x; 
-									case TexDim._2D: 	return v.x + (v.y * size.x); 
-									case TexDim._3D: 	return v.x + (v.y + v.z * size.y) * size.x; 
-									default: 	return 0; 
-								}
-							} 
-						},
-						
-						GLSLCode = 
-						iq{
-							$(GEN_enumDefines!TexDim)
-							$(GEN_enumDefines!TexFormat)
-							$(GEN_enumDefines!TexChn)
-							$(GEN_enumDefines!TexBpp)
-							$(SharedCode.replace("TexDim._", "TexDim_"))
-						}.text; 
-						static { mixin(SharedCode); } 
-					} 
-					
-					@property ivec3 size() const
-					=> decodeDimSize(dim, _rawSize0, _rawSize12); 
-					@property size(int a)
-					{ dim = TexDim._1D; _rawSize0 = 0; _rawSize12 = a; } 
-					@property size(ivec2 a)
-					{ dim = TexDim._2D; _rawSize0 = a.x & 0xFFFF; _rawSize12 = ((a.x>>16) & 0xFF) | (a.y << 8); } 
-					@property size(ivec3 a)
-					{ dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); } 
-					
-					@property flags() const
-					=> mixin(幟!((TexInfoFlag),q{getBits(*(cast(ubyte*)(&this)), TexInfoBitOfs, TexInfoBits)})); 
-					
-					@property flags(in TexInfoFlags a)
-					{ auto b = (cast(ubyte*)(&this)); *b = setBits(*b, TexInfoBitOfs, TexInfoBits, (cast(ubyte)((cast(uint)(a))))); } 
-					
-					static void selfTest()
-					{
-						void doit(T)(T v, ivec3 r) { TexSizeFormat t; t.size = v; enforce(t.size==r); } 
-						{
-							const a = [1, 84903, 0x7F12_345F]; 
-							foreach(x; a) doit(x, ivec3(x, 1, 1)); 
-						}
-						{
-							const a = [1, 84903, 0xF1234F]; 
-							foreach(x; a) foreach(y; a) doit(ivec2(x, y), ivec3(x, y, 1)); 
-						}
-						{
-							const a = [1, 14903, 0xF12F]; 
-							foreach(x; a) foreach(y; a) foreach(z; a) doit(ivec3(x, y, z), ivec3(x, y, z)); 
-						}
-					} 
-					
-					string toString() const
-					=> i"TexSizeFormat($(format), $(size.x) x $(size.y) x $(size.z)$(error?", ERR":"")$(loading?", LD":"")$(resident?", RES":""))".text; 
-				} 
-				static assert(TexSizeFormat.sizeof==8); 
-				
-				struct TexInfo
-				{
-					TexSizeFormat sizeFormat; 
-					HeapChunkIdx heapChunkIdx; 
-					uint extra; 
-					
-					string toString() const
-					=> format!"TexInfo(%s, chunk:%d, extra:%d)"
-					(sizeFormat, heapChunkIdx.to!uint, extra); 
-				} 
 				static assert(TexInfo.sizeof==16); 
-			}
+			} 
+			
 			InfoBufferManager IB; 
 			class InfoBufferManager
 			{
@@ -3263,24 +3399,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x191E982886ADB).檢(
+					((0x1A48C82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1925B82886ADB))))
+				if((互!((bool),(0),(0x1A4FE82886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x192F382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1930A82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1A59682886ADB).檢((互!((float/+w=12+/),(1.000),(0x1A5AD82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1941282886ADB).檢 (im)); 
+					((0x1A6B582886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3634,594 +3770,629 @@ $(V_size+G_size)".text
 		+/
 		void createShaderModules()
 		{
-			enum shaderBinary = 
-			(碼!((位!()),iq{glslc -O},iq{
-				#version 430
-				
-				//Todo: check the warnings!
-				
-				//common stuff
-				#define nan (uintBitsToFloat(0x7fc00000u))
-				
-				#define ErrorColor vec4(1, 0, 1, 1)
-				#define LoadingColor vec4(1, 0, 1, 1)
-				
-				#define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
-				#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
-				#define setBits(val, ofs, len, data) (val = bitfieldInsert(val, data, ofs, len))
-				
-				#define inRange(value, mi, ma) (mi<=value && value<=ma)
-				#define inRange_sorted(value, r1, r2) (inRange(value, min(r1, r2), max(r1, r2)))
-				
-				#define PI 3.14159265359
-				
-				vec2 rotate90(in vec2 v) { return vec2(-v.y, v.x); } 
-				float crossZ(in vec2 a, vec2 b) { return a.x*b.y - b.x*a.y; } 
-				
-				struct seg2
-				{ vec2[2] p; }; 
-				
-				vec2 lineSegmentNearestPoint2D(in vec2 p0, in vec2 p1, in vec2 point)
-				{
-					vec2 line_dir = p1 - p0; 
-					vec2 to_point = point - p0; 
-					float t = dot(to_point, line_dir) / dot(line_dir, line_dir); 
-					t = clamp(t, 0.0, 1.0); 
-					return p0 + t * line_dir; 
-				} 
-				
-				// Helper function for line intersection
-				vec2 lineIntersection(vec2 p1, vec2 p2, vec2 p3, vec2 p4)
-				{
-					float denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x); 
-					if(abs(denom) < 1e-4)
+			with(TexSizeFormat /+share bitSize/bitOffset constants for texturing+/)
+			{
+				enum shaderBinary = 
+				(碼!((位!()),iq{glslc -O},iq{
+					#version 430
+					
+					//Todo: check the warnings!
+					
+					//common stuff
+					#define nan (uintBitsToFloat(0x7fc00000u))
+					
+					#define ErrorColor vec4(1, 0, 1, 1)
+					#define LoadingColor vec4(1, 0, 1, 1)
+					
+					#define getBits(val, ofs, len) (bitfieldExtract(val, ofs, len))
+					#define getBit(val, ofs) (bitfieldExtract(val, ofs, 1)!=0)
+					#define setBits(val, ofs, len, data) (val = bitfieldInsert(val, data, ofs, len))
+					
+					#define inRange(value, mi, ma) (mi<=value && value<=ma)
+					#define inRange_sorted(value, r1, r2) (inRange(value, min(r1, r2), max(r1, r2)))
+					
+					#define PI 3.14159265359
+					
+					vec2 rotate90(in vec2 v) { return vec2(-v.y, v.x); } 
+					float crossZ(in vec2 a, vec2 b) { return a.x*b.y - b.x*a.y; } 
+					
+					struct seg2
+					{ vec2[2] p; }; 
+					
+					vec2 lineSegmentNearestPoint2D(in vec2 p0, in vec2 p1, in vec2 point)
 					{
-						return (p2+p3)/2; // Fallback to first point if lines are parallel
-					}
+						vec2 line_dir = p1 - p0; 
+						vec2 to_point = point - p0; 
+						float t = dot(to_point, line_dir) / dot(line_dir, line_dir); 
+						t = clamp(t, 0.0, 1.0); 
+						return p0 + t * line_dir; 
+					} 
 					
-					float t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom; 
-					return p1 + t * (p2 - p1); 
-				} 
-				
-				
-				//fragment attributes
-				
-				#define FragMode_fullyFilled 0
-				#define FragMode_cubicBezier 1
-				#define FragMode_glyphStrip 2
-				
-				#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
-				#define setFragMode(a) setBits(fragTexHandleAndMode, 28, 4, a)
-				
-				#define getFragTexHandle getBits(fragTexHandleAndMode, 0, 28)
-				#define setFragTexHandle(a) setBits(fragTexHandleAndMode, 0, 28, a)
-				
-				
-				$(
-					(表([
-						[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/},q{/+Note: Location 5+/},q{/+Note: Location 6+/}],
-						[q{},q{vert},q{uint vertGSBitOfs}],
-						[q{vert},q{geom},q{uint geomGSBitOfs}],
-						[q{geom},q{frag},q{
-							smooth mediump
-							vec4 fragColor
-						},q{
-							smooth mediump
-							vec4 fragBkColor
-						},q{
-							smooth
-							vec2 fragTexCoordXY
-						},q{
-							flat
-							uint fragTexHandleAndMode
-						},q{
-							flat
-							uint fragTexCoordZ
-						},q{
-							flat
-							vec4 fragFloats0
-						},q{
-							flat
-							vec4 fragFloats1
-						}],
-						[q{frag},q{},q{vec4 outColor}],
-					]))
-					.GEN_ShaderLayoutDeclarations
-				)
-				
-				
-				@vert: 
-				
-				void main()
-				{
-					geomGSBitOfs 	= vertGSBitOfs 
-					/*geomVertexID	= gl_VertexIndex*/; 
-				} 
-				
-				@geom: 
-				$(ShaderBufferDeclarations)
-				$(TexSizeFormat.GLSLCode)
-				
-				out gl_PerVertex 
-				{
-					vec4 gl_Position; 
-					float gl_ClipDistance[4]; 
-				}; 
-				
-				layout(points) in; 
-				layout(triangle_strip, max_vertices = $(GfxBuilderBase.ShaderMaxVertexCount)) out; 
-				/*
-					255 is the max on R9 Fury X
-					
-					250802 must send 2 more vertices to the geometry shader streams, last 2 is ignored.
-						(Windows default driver, )
-					250804 170 is the max with 12 components. 170*12=2040  (171*12=2052)
-						I have no clue where this 2048 limit comes from o.O
-					250822 127 is the max when I add 2x vec4 (20 components)  127*16 = 2032
-						highp vs medump doesn't change this 127 limit
-					250908 D constant is used, 127 still works.  Have 24 components with gl_Position, 
-						but still, the math fails... 16384/24 = 682.6
-				*/
-				
-				/*
-					Todo: There is no line_strip or line_strip_adjacency.  No overlapping vertex input is possible.
-					
-					So if I want to know the size of each stream, 
-					I have to read it from a buffer, indexed by InputPrimitiveID
-				*/
-				
-				//Todo: Geom Shader User Clip Distances could be useful for UI rect clipping !!!
-				
-				/*Link: https://docs.vulkan.org/spec/latest/chapters/geometry.html*/
-				/*Link: https://www.khronos.org/opengl/wiki/Geometry_Shader*/
-				/*
-					Note: From: OpenGL Geometry Shader docs:
-						Note: You must write to each output variable before every EmitVertex() call (for all 
-						outputs for a stream for each EmitStreamVertex() call).
-					
-					I don't follow this rule and it works so far on Vulkan + R9 Fury X
-				*/
-				
-				
-				ivec3 getTexSize(in uint texIdx)
-				{
-					//This is all copied from the fragment shader.
-					
-					if(texIdx==0) return ivec3(0); 
-					
-					//fetch info dword 0
-					const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
-					const uint info_0 = IB[textDwIdx+0]; 
-					
-					//handle 'error' and 'loading' flags
-					if(getBits(info_0, $(TexInfoBitOfs), 2)!=0) { return ivec3(0); }
-					
-					//decode dimensions, size
-					const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
-					const uint info_1 = IB[textDwIdx+1]; 
-					const uint _rawSize0 = getBits(info_0, 16, 16); 
-					const uint _rawSize12 = info_1; 
-					return decodeDimSize(dim, _rawSize0, _rawSize12); 
-				} 
-				
-				vec4 readPaletteSample(in uint texIdx, in float v, in bool prescaleX)
-				{
-					if(texIdx==0) return ErrorColor; 
-					
-					//fetch info dword 0
-					const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
-					const uint info_0 = IB[textDwIdx+0]; 
-					
-					//handle 'error' and 'loading' flags
-					if(getBits(info_0, $(TexInfoBitOfs), 2)!=0)
+					// Helper function for line intersection
+					vec2 lineIntersection(vec2 p1, vec2 p2, vec2 p3, vec2 p4)
 					{
-						if(getBit(info_0, $(TexInfoBitOfs)))	return ErrorColor; 
-						else	return LoadingColor; 
-					}
-					
-					//decode dimensions, size
-					const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
-					if(dim!=TexDim_1D) return ErrorColor; 
-					const uint size = IB[textDwIdx+1]/*fast access 1D size*/; 
-					if(size==0) return ErrorColor; 
-					
-					
-					//Prescale tex coordinates by size
-					float pv = v; if(prescaleX) pv *= float(size); 
-					
-					//Clamp tex coordinates. Assume non-empty image.
-					const int iv = int(pv); 
-					const int clamped = max(min(iv, int(size)-1), 0); 
-					
-					//Calculate flat index
-					const uint i = clamped; 
-					
-					//Get chunkIdx from info rec
-					const uint chunkIdx = IB[textDwIdx+2]; 
-					const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
-					
-					//decode format (chn, bpp, alt)
-					const uint chn = getBits(info_0, $(TexFormatBitOfs), $(TexChnBits)); 
-					const uint bpp = getBits(info_0, $(TexFormatBitOfs + TexChnBits), $(TexBppBits)); 
-					const bool alt = getBit(info_0, $(TexFormatBitOfs + TexChnBits + TexBppBits)); 
-					
-					if(chn==TexChn_4 && bpp==TexBpp_32)
-					{
-						//Opt: Cache all this palette reading operation!
-						vec4 res = unpackUnorm4x8(TB[dwIdx + i]); 
-						if(alt) {/*swap red-blue*/res.rgba = res.bgra; }
-						return res; 
-					}
-					
-					return ErrorColor; 
-				} 
-				
-				//Model - World coordinate transformation
-				const vec4 initialClipBounds = vec4(-1e30, -1e30, 1e30, 1e30); 
-				
-				vec2 TR_scaleXY = vec2(1); 
-				float TR_skewX_rad = 0; 
-				float TR_rotZ_rad = 0; 
-				vec2 TR_transXY = vec2(0); 
-				vec4 TR_clipBounds = initialClipBounds; 
-				
-				void TR_reset()
-				{
-					TR_scaleXY = vec2(1); 
-					TR_skewX_rad = 0; 
-					TR_rotZ_rad = 0; 
-					TR_transXY = vec2(0); 
-					TR_clipBounds = initialClipBounds; 
-				} 
-				
-				mat2 rotation2D(float angle)
-				{
-					float s = sin(angle), c = cos(angle); 
-					return mat2(c, -s, s, c); 
-				} 
-				
-				vec2 outputTransformPoint2D(vec2 p)
-				{
-					p *= TR_scaleXY; 
-					if(TR_skewX_rad!=0) {
-						p.x -= p.y * tan(TR_skewX_rad); 
-						//Opt: cache this constant
-					}
-					if(TR_rotZ_rad!=0) {
-						p = rotation2D(-TR_rotZ_rad) * p; 
-						//Opt: cache this matrix
-					}
-					p += TR_transXY; 
-					
-					return p; 
-				} 
-				
-				void emitVertex2D(vec2 p)
-				{
-					vec2 w = outputTransformPoint2D(p); //model to world transform
-					
-					gl_ClipDistance[0] = w.x-TR_clipBounds.x; 
-					gl_ClipDistance[1] = w.y-TR_clipBounds.y; 
-					gl_ClipDistance[2] = TR_clipBounds.z-w.x; 
-					gl_ClipDistance[3] = TR_clipBounds.w-w.y; 
-					
-					gl_Position = UB.mvp * vec4(w, 0, 1); //world to screen transform
-					
-					EmitVertex(); 
-				} 
-				
-				void emitTexturedPointPointRect2D(in vec2 p, in vec2 q)
-				{
-					fragTexCoordXY = vec2(0,0); emitVertex2D(p); 
-					fragTexCoordXY = vec2(0,1); emitVertex2D(vec2(p.x, q.y)); 
-					fragTexCoordXY = vec2(1,0); emitVertex2D(vec2(q.x, p.y)); 
-					fragTexCoordXY = vec2(1,1); emitVertex2D(q); 
-					EndPrimitive(); 
-				} 
-				
-				// Split at t = 0.33333333
-				void splitBezier_third(
-					in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, 
-					out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
-					out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
-				)
-				{
-					vec2 a = 0.66666667 * P0 + 0.33333333 * P1; 
-					vec2 b = 0.44444444 * P0 + 0.44444444 * P1 + 0.11111111 * P2; 
-					vec2 c = 0.29629630 * P0 + 0.44444444 * P1 + 0.22222222 * P2 + 0.03703704 * P3; 
-					vec2 d = 0.44444444 * P1 + 0.44444444 * P2 + 0.11111111 * P3; 
-					vec2 e = 0.66666667 * P2 + 0.33333333 * P3; 
-					
-					Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
-					R0 = c; R1 = d; R2 = e; R3 = P3; 
-				} 
-				
-				// Split at t = 0.50000000
-				void splitBezier_half(
-					in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
-					out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
-					out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
-				)
-				{
-					vec2 a = 0.50000000 * P0 + 0.50000000 * P1; 
-					vec2 b = 0.25000000 * P0 + 0.50000000 * P1 + 0.25000000 * P2; 
-					vec2 c = 0.12500000 * P0 + 0.37500000 * P1 + 0.37500000 * P2 + 0.12500000 * P3; 
-					vec2 d = 0.25000000 * P1 + 0.50000000 * P2 + 0.25000000 * P3; 
-					vec2 e = 0.50000000 * P2 + 0.50000000 * P3; 
-					
-					Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
-					R0 = c; R1 = d; R2 = e; R3 = P3; 
-				} 
-				
-				// Split at t = 0.25000000
-				void splitBezier_quarter(
-					in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
-					out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
-					out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
-				)
-				{
-					vec2 a = 0.75000000 * P0 + 0.25000000 * P1; 
-					vec2 b = 0.56250000 * P0 + 0.37500000 * P1 + 0.06250000 * P2; 
-					vec2 c = 0.42187500 * P0 + 0.42187500 * P1 + 0.14062500 * P2 + 0.01562500 * P3; 
-					vec2 d = 0.18750000 * P1 + 0.37500000 * P2 + 0.43750000 * P3; 
-					vec2 e = 0.25000000 * P2 + 0.75000000 * P3; 
-					
-					Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
-					R0 = c; R1 = d; R2 = e; R3 = P3; 
-				} 
-				
-				bool splitBezier_ration(
-					in int i, in int N, 
-					in vec2 Q0, in vec2 Q1, in vec2 Q2, in vec2 Q3,
-					out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
-				)
-				{
-					bool valid = true; int requestHalfSplit=-1; 
-					if(N==1)
-					{ R0=Q0, R1=Q1, R2=Q2, R3=Q3; }
-					else if(N==2 || N==4)
-					{
-						vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
-						splitBezier_half(Q0,Q1,Q2,Q3, A0,A1,A2,A3, B0,B1,B2,B3); 
-						if((i&(N/2))==0)	R0=A0, R1=A1, R2=A2, R3=A3; 
-						else	R0=B0, R1=B1, R2=B2, R3=B3; 
-						if(N==4)
-						{ requestHalfSplit = i&1; }
-					}
-					else if(N==3)
-					{
-						vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
-						splitBezier_third(Q0,Q1,Q2,Q3, A0,A1,A2,A3, B0,B1,B2,B3); 
-						if(i==0) R0=A0, R1=A1, R2=A2, R3=A3; 
-						else {
-							R0=B0, R1=B1, R2=B2, R3=B3; 
-							requestHalfSplit = i-1; 
+						float denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x); 
+						if(abs(denom) < 1e-4)
+						{
+							return (p2+p3)/2; // Fallback to first point if lines are parallel
 						}
-					}
-					else { valid = false; }
+						
+						float t = ((p1.x - p3.x) * (p3.y - p4.y) - (p1.y - p3.y) * (p3.x - p4.x)) / denom; 
+						return p1 + t * (p2 - p1); 
+					} 
 					
-					if(valid && requestHalfSplit>=0)
+					
+					//fragment attributes
+					
+					#define FragMode_fullyFilled 0
+					#define FragMode_cubicBezier 1
+					#define FragMode_glyphStrip 2
+					
+					#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
+					#define setFragMode(a) setBits(fragTexHandleAndMode, 28, 4, a)
+					
+					#define getFragTexHandle getBits(fragTexHandleAndMode, 0, 28)
+					#define setFragTexHandle(a) setBits(fragTexHandleAndMode, 0, 28, a)
+					
+					
+					$(
+						(表([
+							[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/},q{/+Note: Location 5+/},q{/+Note: Location 6+/}],
+							[q{},q{vert},q{uint vertGSBitOfs}],
+							[q{vert},q{geom},q{uint geomGSBitOfs}],
+							[q{geom},q{frag},q{
+								smooth mediump
+								vec4 fragColor
+							},q{
+								smooth mediump
+								vec4 fragBkColor
+							},q{
+								smooth
+								vec2 fragTexCoordXY
+							},q{
+								flat
+								uint fragTexHandleAndMode
+							},q{
+								flat
+								uint fragTexCoordZ
+							},q{
+								flat
+								vec4 fragFloats0
+							},q{
+								flat
+								vec4 fragFloats1
+							}],
+							[q{frag},q{},q{vec4 outColor}],
+						]))
+						.GEN_ShaderLayoutDeclarations
+					)
+					
+					
+					@vert: 
+					
+					void main()
 					{
-						vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
-						splitBezier_half(R0,R1,R2,R3, A0,A1,A2,A3, B0,B1,B2,B3); 
-						if(requestHalfSplit==0)	R0=A0, R1=A1, R2=A2, R3=A3; 
-						else	R0=B0, R1=B1, R2=B2, R3=B3; 
-					}
+						geomGSBitOfs 	= vertGSBitOfs 
+						/*geomVertexID	= gl_VertexIndex*/; 
+					} 
+					
+					@geom: 
+					$(ShaderBufferDeclarations)
+					$(TexSizeFormat.GLSLCode)
 					
-					if(!valid) R0=Q0, R1=Q1, R2=Q2, R3=Q3; 
-					return valid; 
-				} 
-				
-				
-				float calcManhattanLength(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
-				{
-					const vec2 v = abs(P3-P2) + abs(P2-P1) + abs(P1-P0); 
-					return v.x + v.y; 
-				} 
-				
-				vec2 evalCubicBezier2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in vec4 w)
-				{ return P0*w.x + P1*w.y + P2*w.z + P3*w.w; } 
-				vec4 cubicBezierPointWeights(in float t)
-				{ const float u = 1-t; return vec4(u*u*u, 3*t*u*u, 3*u*t*t, t*t*t); } 
-				vec4 cubicBezierTangentWeights(in float t)
-				{ const float u = 1-t; return vec4(-3*u*u, 3*u*u - 6*u*t, 6*u*t - 3*t*t, 3*t*t); } 
-				vec2 cubicBezierPoint2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
-				{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierPointWeights(t)); } 
-				vec2 cubicBezierTangent2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
-				{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierTangentWeights(t)); } 
-				
-				vec2 cubicBezierNormal2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
-				{ return rotate90(normalize(cubicBezierTangent2D(P0, P1, P2, P3, t))); } 
-				
-				void emitCubicBezierAt(
-					in float t, in 
-					vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, 
-					in float r0, in float r1
-				)
-				{
-					const vec2 	p = cubicBezierPoint2D(P0, P1, P2, P3, t),
-						n = cubicBezierNormal2D(P0, P1, P2, P3, t) * mix(r0, r1, t); 
-					fragTexCoordXY = vec2(t, 0); emitVertex2D(p-n); 
-					fragTexCoordXY = vec2(t, 1); emitVertex2D(p+n); 
-				} 
-				
-				void emitBezierAtStart(vec2 P0, in vec2 P1, in float r)
-				{
-					const vec2 	p = P0,
-						n = rotate90(normalize(P1-P0)) * r; 
-					fragTexCoordXY = vec2(0, 0); emitVertex2D(p-n); 
-					fragTexCoordXY = vec2(0, 1); emitVertex2D(p+n); 
-				} 
-				
-				
-				bool intersectSegs2D(in seg2 S0, in seg2 S1, out vec2 P)
-				{
-					vec2 	S	= S1.p[0] - S0.p[0],
-						T	= S0.p[1] - S0.p[0],
-						U 	= S1.p[0] - S1.p[1]; 
-					float det = crossZ(T, U); 
-					
-					if(abs(det)<1e-30) return false;  //Todo: this is lame
-					
-					float detA = crossZ(S, U); 
-					
-					if(inRange_sorted(detA, 0, det))
+					out gl_PerVertex 
 					{
-						//have one intersection
-						float detB = crossZ(T, S); 
-						if(inRange_sorted(detB, 0, det)) {
-							float alpha = detA/det; 
-							P = S0.p[0]+T*alpha; 
-							return true; 
-						}
-					}
-					return false; 
-				} 
-				
-				const int tesselateCubicBezierTentacle_N = 7; 
-				
-				void tesselateCubicBezierTentacle_updateRay(inout seg2 ray, in int i, in vec2 p, in bool dir, in float rayLen)
-				{
-					if(i==0) ray.p[0] = p; 
-					else if(i==1) ray.p[1] = p; 
-					else {
-						if((crossZ(ray.p[1]-ray.p[0], p-ray.p[0])>=0)==dir) ray.p[1] = p; 
-						if(i==tesselateCubicBezierTentacle_N-3)
-						ray.p[1] = ray.p[0] + normalize(ray.p[1]-ray.p[0])*rayLen; 
-					}
-				} 
-				
-				void calcCubicBezierMidPoints(
-					in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1,
-					out vec2 M0, out vec2 M1
-				)
-				{
-					const int N = tesselateCubicBezierTentacle_N; 
-					const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
+						vec4 gl_Position; 
+						float gl_ClipDistance[4]; 
+					}; 
 					
-					vec2[N] points, sides; 
-					for(int i=0; i<N; i++)
-					{
-						points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
-						sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
-					}
-					
-					const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
-					seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
-					for(int i=0; i<N-2; i++)
-					{
-						int k = N-1-i; 
-						tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
-						tesselateCubicBezierTentacle_updateRay(rayRightBack, i, points[k] + sides[k], false, maxRayLen); 
-						tesselateCubicBezierTentacle_updateRay(rayLeftFwd  , i, points[i] - sides[i], false, maxRayLen); 
-						tesselateCubicBezierTentacle_updateRay(rayLeftBack  , i, points[k] - sides[k], true, maxRayLen); 
-					}
-					
-					if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M0)) M0 = points[N/2] - sides[N/2]; 
-					if(!intersectSegs2D(rayRightFwd, rayRightBack, M1)) M1 = points[N/2] + sides[N/2]; 
-				} 
-				
-				void emitCubicBezierMidJoint(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
-				{
-					vec2 M0, M1; 
-					calcCubicBezierMidPoints(P0, P1, P2, P3, r0, r1, M0, M1); 
-					fragTexCoordXY = vec2(.5, 0); emitVertex2D(M0); 
-					fragTexCoordXY = vec2(.5, 1); emitVertex2D(M1); 
-				} 
-				
-				
-				void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float r0, in float r1, in float r2)
-				{
+					layout(points) in; 
+					layout(triangle_strip, max_vertices = $(GfxBuilderBase.ShaderMaxVertexCount)) out; 
 					/*
-						P0-P1 and P1-P2 defines 2 line segments.
-						W0, W1, W2 defiles linewidth at P0, P1, P2.
-						The x coordinate of points can be nan, that meant there is no point defined 
-						and P1 is the start or the end of a line.
-						If this is the cast an endcap must be generated, the depth of the cap is 
-						W1/2 in length, so later a pixel shader can paint a nice roundcap there.
-						If P1.x is null it means that there is nothing at this particular line joint.
-						The primitive type is triangle strip, so ideally it should emit 2 vertices.
-						The 2 vertex is the intersection points of the two side boundary lines at 
-						segments P0-P1 and P1-P2. Be careful with the linewidts at the 3 points.
-						Make the intersection calculation safe, they should fallback tho an existing 
-						point at a valid linewidth distance.
+						255 is the max on R9 Fury X
+						
+						250802 must send 2 more vertices to the geometry shader streams, last 2 is ignored.
+							(Windows default driver, )
+						250804 170 is the max with 12 components. 170*12=2040  (171*12=2052)
+							I have no clue where this 2048 limit comes from o.O
+						250822 127 is the max when I add 2x vec4 (20 components)  127*16 = 2032
+							highp vs medump doesn't change this 127 limit
+						250908 D constant is used, 127 still works.  Have 24 components with gl_Position, 
+							but still, the math fails... 16384/24 = 682.6
 					*/
 					
-					// Handle case where P1 is invalid (no joint to process)
-					if(isnan(P1.x)) return; 
+					/*
+						Todo: There is no line_strip or line_strip_adjacency.  No overlapping vertex input is possible.
+						
+						So if I want to know the size of each stream, 
+						I have to read it from a buffer, indexed by InputPrimitiveID
+					*/
 					
-					bool hasPrev = !isnan(P0.x), hasNext = !isnan(P2.x); 
-					if(!hasPrev && !hasNext) return; 
+					//Todo: Geom Shader User Clip Distances could be useful for UI rect clipping !!!
 					
-					// Calculate direction vectors
-					vec2 dirPrev = hasPrev ? normalize(P1 - P0) : vec2(0); 
-					vec2 dirNext = hasNext ? normalize(P2 - P1) : vec2(0); 
+					/*Link: https://docs.vulkan.org/spec/latest/chapters/geometry.html*/
+					/*Link: https://www.khronos.org/opengl/wiki/Geometry_Shader*/
+					/*
+						Note: From: OpenGL Geometry Shader docs:
+							Note: You must write to each output variable before every EmitVertex() call (for all 
+							outputs for a stream for each EmitStreamVertex() call).
+						
+						I don't follow this rule and it works so far on Vulkan + R9 Fury X
+					*/
 					
-					// Calculate perpendicular vectors for offset directions
-					vec2 perpPrev = hasPrev ? vec2(-dirPrev.y, dirPrev.x) : vec2(0); 
-					vec2 perpNext = hasNext ? vec2(-dirNext.y, dirNext.x) : vec2(0); 
 					
-					if(!hasPrev)
+					ivec3 getTexSize(in uint texIdx)
 					{
-						// Start cap - emit perpendicular offset
-						vec2 P = P1 - dirNext * (r1); vec2 capDir = perpNext * (r1); 
-						fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir ); 
-						fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
-						return; 
-					}
+						//This is all copied from the fragment shader.
+						
+						if(texIdx==0) return ivec3(0); 
+						
+						//fetch info dword 0
+						const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+						const uint info_0 = IB[textDwIdx+0]; 
+						
+						//handle 'error' and 'loading' flags
+						if(getBits(info_0, $(TexInfoBitOfs), 2)!=0) { return ivec3(0); }
+						
+						//decode dimensions, size
+						const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
+						const uint info_1 = IB[textDwIdx+1]; 
+						const uint _rawSize0 = getBits(info_0, 16, 16); 
+						const uint _rawSize12 = info_1; 
+						return decodeDimSize(dim, _rawSize0, _rawSize12); 
+					} 
 					
-					if(!hasNext)
+					vec4 readPaletteSample(in uint texIdx, in float v, in bool prescaleX)
 					{
-						// End cap - emit perpendicular offset
-						vec2 P = P1 + dirPrev * (r1); vec2 capDir = perpPrev * (r1); 
-						fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir); 
-						fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
+						if(texIdx==0) return ErrorColor; 
+						
+						//fetch info dword 0
+						const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+						const uint info_0 = IB[textDwIdx+0]; 
+						
+						//handle 'error' and 'loading' flags
+						if(getBits(info_0, $(TexInfoBitOfs), 2)!=0)
+						{
+							if(getBit(info_0, $(TexInfoBitOfs)))	return ErrorColor; 
+							else	return LoadingColor; 
+						}
+						
+						//decode dimensions, size
+						const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
+						if(dim!=TexDim_1D) return ErrorColor; 
+						const uint size = IB[textDwIdx+1]/*fast access 1D size*/; 
+						if(size==0) return ErrorColor; 
+						
+						
+						//Prescale tex coordinates by size
+						float pv = v; if(prescaleX) pv *= float(size); 
+						
+						//Clamp tex coordinates. Assume non-empty image.
+						const int iv = int(pv); 
+						const int clamped = max(min(iv, int(size)-1), 0); 
+						
+						//Calculate flat index
+						const uint i = clamped; 
+						
+						//Get chunkIdx from info rec
+						const uint chunkIdx = IB[textDwIdx+2]; 
+						const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
+						
+						//decode format (chn, bpp, alt)
+						const uint chn = getBits(info_0, $(TexFormatBitOfs), $(TexChnBits)); 
+						const uint bpp = getBits(info_0, $(TexFormatBitOfs + TexChnBits), $(TexBppBits)); 
+						const bool alt = getBit(info_0, $(TexFormatBitOfs + TexChnBits + TexBppBits)); 
+						
+						if(chn==TexChn_4 && bpp==TexBpp_32)
+						{
+							//Opt: Cache all this palette reading operation!
+							vec4 res = unpackUnorm4x8(TB[dwIdx + i]); 
+							if(alt) {/*swap red-blue*/res.rgba = res.bgra; }
+							return res; 
+						}
+						
+						return ErrorColor; 
+					} 
+					
+					//Model - World coordinate transformation
+					const vec4 initialClipBounds = vec4(-1e30, -1e30, 1e30, 1e30); 
+					
+					vec2 TR_scaleXY = vec2(1); 
+					float TR_skewX_rad = 0; 
+					float TR_rotZ_rad = 0; 
+					vec2 TR_transXY = vec2(0); 
+					vec4 TR_clipBounds = initialClipBounds; 
+					
+					void TR_reset()
+					{
+						TR_scaleXY = vec2(1); 
+						TR_skewX_rad = 0; 
+						TR_rotZ_rad = 0; 
+						TR_transXY = vec2(0); 
+						TR_clipBounds = initialClipBounds; 
+					} 
+					
+					mat2 rotation2D(float angle)
+					{
+						float s = sin(angle), c = cos(angle); 
+						return mat2(c, -s, s, c); 
+					} 
+					
+					vec2 outputTransformPoint2D(vec2 p)
+					{
+						p *= TR_scaleXY; 
+						if(TR_skewX_rad!=0) {
+							p.x -= p.y * tan(TR_skewX_rad); 
+							//Opt: cache this constant
+						}
+						if(TR_rotZ_rad!=0) {
+							p = rotation2D(-TR_rotZ_rad) * p; 
+							//Opt: cache this matrix
+						}
+						p += TR_transXY; 
+						
+						return p; 
+					} 
+					
+					void emitVertex2D(vec2 p)
+					{
+						vec2 w = outputTransformPoint2D(p); //model to world transform
+						
+						gl_ClipDistance[0] = w.x-TR_clipBounds.x; 
+						gl_ClipDistance[1] = w.y-TR_clipBounds.y; 
+						gl_ClipDistance[2] = TR_clipBounds.z-w.x; 
+						gl_ClipDistance[3] = TR_clipBounds.w-w.y; 
+						
+						gl_Position = UB.mvp * vec4(w, 0, 1); //world to screen transform
+						
+						EmitVertex(); 
+					} 
+					
+					void emitTexturedPointPointRect2D(in vec2 p, in vec2 q)
+					{
+						fragTexCoordXY = vec2(0,0); emitVertex2D(p); 
+						fragTexCoordXY = vec2(0,1); emitVertex2D(vec2(p.x, q.y)); 
+						fragTexCoordXY = vec2(1,0); emitVertex2D(vec2(q.x, p.y)); 
+						fragTexCoordXY = vec2(1,1); emitVertex2D(q); 
 						EndPrimitive(); 
-						return; 
-					}
-					
-					fragTexCoordXY = vec2(0, 0); emitVertex2D(
-						lineIntersection(
-							P0 - perpPrev*(r0), 
-							P1 - perpPrev*(r1), 
-							P1 - perpNext*(r1), 
-							P2 - perpNext*(r2)
-						)
-					); 
-					fragTexCoordXY = vec2(0, 1); emitVertex2D(
-						lineIntersection(
-							P0 + perpPrev*(r0), 
-							P1 + perpPrev*(r1), 
-							P1 + perpNext*(r1), 
-							P2 + perpNext*(r2)
-						)
-					); 
-				} 
-				
-				struct BitStream
-				{
-					uint dwOfs; //the dword offset of the NEXT fetched dword.
-					uint currentDw; //the current dword that is fetched
-					int currentDwBits; /*
-						how many of the lower bits are valid in the current dword, 
-						if zero, the next dword must be fetched
-					*/
-					/*uint totalBitsRemaining; *//*overflow checking*/
-				}; 
-				
-				uint fetchBits(inout BitStream bitStream, in uint numBits)
-				{
-					/*
-						//overflow checking
-						if(numBits>bitStream.totalBitsRemaining) { bitStream.totalBitsRemaining = 0; return 0; }
-						bitStream.totalBitsRemaining -= numBits; 
-					*/
-					
-					uint result = 0; 
-					int bitsRemaining = int(numBits); 
-					while(bitsRemaining > 0)
+					} 
+					
+					// Split at t = 0.33333333
+					void splitBezier_third(
+						in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, 
+						out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
+						out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+					)
 					{
-						// If current dword is exhausted, fetch next one
+						vec2 a = 0.66666667 * P0 + 0.33333333 * P1; 
+						vec2 b = 0.44444444 * P0 + 0.44444444 * P1 + 0.11111111 * P2; 
+						vec2 c = 0.29629630 * P0 + 0.44444444 * P1 + 0.22222222 * P2 + 0.03703704 * P3; 
+						vec2 d = 0.44444444 * P1 + 0.44444444 * P2 + 0.11111111 * P3; 
+						vec2 e = 0.66666667 * P2 + 0.33333333 * P3; 
+						
+						Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
+						R0 = c; R1 = d; R2 = e; R3 = P3; 
+					} 
+					
+					// Split at t = 0.50000000
+					void splitBezier_half(
+						in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
+						out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
+						out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+					)
+					{
+						vec2 a = 0.50000000 * P0 + 0.50000000 * P1; 
+						vec2 b = 0.25000000 * P0 + 0.50000000 * P1 + 0.25000000 * P2; 
+						vec2 c = 0.12500000 * P0 + 0.37500000 * P1 + 0.37500000 * P2 + 0.12500000 * P3; 
+						vec2 d = 0.25000000 * P1 + 0.50000000 * P2 + 0.25000000 * P3; 
+						vec2 e = 0.50000000 * P2 + 0.50000000 * P3; 
+						
+						Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
+						R0 = c; R1 = d; R2 = e; R3 = P3; 
+					} 
+					
+					// Split at t = 0.25000000
+					void splitBezier_quarter(
+						in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
+						out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3,
+						out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+					)
+					{
+						vec2 a = 0.75000000 * P0 + 0.25000000 * P1; 
+						vec2 b = 0.56250000 * P0 + 0.37500000 * P1 + 0.06250000 * P2; 
+						vec2 c = 0.42187500 * P0 + 0.42187500 * P1 + 0.14062500 * P2 + 0.01562500 * P3; 
+						vec2 d = 0.18750000 * P1 + 0.37500000 * P2 + 0.43750000 * P3; 
+						vec2 e = 0.25000000 * P2 + 0.75000000 * P3; 
+						
+						Q0 = P0; Q1 = a; Q2 = b; Q3 = c; 
+						R0 = c; R1 = d; R2 = e; R3 = P3; 
+					} 
+					
+					bool splitBezier_ration(
+						in int i, in int N, 
+						in vec2 Q0, in vec2 Q1, in vec2 Q2, in vec2 Q3,
+						out vec2 R0, out vec2 R1, out vec2 R2, out vec2 R3
+					)
+					{
+						bool valid = true; int requestHalfSplit=-1; 
+						if(N==1)
+						{ R0=Q0, R1=Q1, R2=Q2, R3=Q3; }
+						else if(N==2 || N==4)
+						{
+							vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
+							splitBezier_half(Q0,Q1,Q2,Q3, A0,A1,A2,A3, B0,B1,B2,B3); 
+							if((i&(N/2))==0)	R0=A0, R1=A1, R2=A2, R3=A3; 
+							else	R0=B0, R1=B1, R2=B2, R3=B3; 
+							if(N==4)
+							{ requestHalfSplit = i&1; }
+						}
+						else if(N==3)
+						{
+							vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
+							splitBezier_third(Q0,Q1,Q2,Q3, A0,A1,A2,A3, B0,B1,B2,B3); 
+							if(i==0) R0=A0, R1=A1, R2=A2, R3=A3; 
+							else {
+								R0=B0, R1=B1, R2=B2, R3=B3; 
+								requestHalfSplit = i-1; 
+							}
+						}
+						else { valid = false; }
+						
+						if(valid && requestHalfSplit>=0)
+						{
+							vec2 A0,A1,A2,A3, B0,B1,B2,B3; 
+							splitBezier_half(R0,R1,R2,R3, A0,A1,A2,A3, B0,B1,B2,B3); 
+							if(requestHalfSplit==0)	R0=A0, R1=A1, R2=A2, R3=A3; 
+							else	R0=B0, R1=B1, R2=B2, R3=B3; 
+						}
+						
+						if(!valid) R0=Q0, R1=Q1, R2=Q2, R3=Q3; 
+						return valid; 
+					} 
+					
+					
+					float calcManhattanLength(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
+					{
+						const vec2 v = abs(P3-P2) + abs(P2-P1) + abs(P1-P0); 
+						return v.x + v.y; 
+					} 
+					
+					vec2 evalCubicBezier2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in vec4 w)
+					{ return P0*w.x + P1*w.y + P2*w.z + P3*w.w; } 
+					vec4 cubicBezierPointWeights(in float t)
+					{ const float u = 1-t; return vec4(u*u*u, 3*t*u*u, 3*u*t*t, t*t*t); } 
+					vec4 cubicBezierTangentWeights(in float t)
+					{ const float u = 1-t; return vec4(-3*u*u, 3*u*u - 6*u*t, 6*u*t - 3*t*t, 3*t*t); } 
+					vec2 cubicBezierPoint2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
+					{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierPointWeights(t)); } 
+					vec2 cubicBezierTangent2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
+					{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierTangentWeights(t)); } 
+					
+					vec2 cubicBezierNormal2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
+					{ return rotate90(normalize(cubicBezierTangent2D(P0, P1, P2, P3, t))); } 
+					
+					void emitCubicBezierAt(
+						in float t, in 
+						vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, 
+						in float r0, in float r1
+					)
+					{
+						const vec2 	p = cubicBezierPoint2D(P0, P1, P2, P3, t),
+							n = cubicBezierNormal2D(P0, P1, P2, P3, t) * mix(r0, r1, t); 
+						fragTexCoordXY = vec2(t, 0); emitVertex2D(p-n); 
+						fragTexCoordXY = vec2(t, 1); emitVertex2D(p+n); 
+					} 
+					
+					void emitBezierAtStart(vec2 P0, in vec2 P1, in float r)
+					{
+						const vec2 	p = P0,
+							n = rotate90(normalize(P1-P0)) * r; 
+						fragTexCoordXY = vec2(0, 0); emitVertex2D(p-n); 
+						fragTexCoordXY = vec2(0, 1); emitVertex2D(p+n); 
+					} 
+					
+					
+					bool intersectSegs2D(in seg2 S0, in seg2 S1, out vec2 P)
+					{
+						vec2 	S	= S1.p[0] - S0.p[0],
+							T	= S0.p[1] - S0.p[0],
+							U 	= S1.p[0] - S1.p[1]; 
+						float det = crossZ(T, U); 
+						
+						if(abs(det)<1e-30) return false;  //Todo: this is lame
+						
+						float detA = crossZ(S, U); 
+						
+						if(inRange_sorted(detA, 0, det))
+						{
+							//have one intersection
+							float detB = crossZ(T, S); 
+							if(inRange_sorted(detB, 0, det)) {
+								float alpha = detA/det; 
+								P = S0.p[0]+T*alpha; 
+								return true; 
+							}
+						}
+						return false; 
+					} 
+					
+					const int tesselateCubicBezierTentacle_N = 7; 
+					
+					void tesselateCubicBezierTentacle_updateRay(inout seg2 ray, in int i, in vec2 p, in bool dir, in float rayLen)
+					{
+						if(i==0) ray.p[0] = p; 
+						else if(i==1) ray.p[1] = p; 
+						else {
+							if((crossZ(ray.p[1]-ray.p[0], p-ray.p[0])>=0)==dir) ray.p[1] = p; 
+							if(i==tesselateCubicBezierTentacle_N-3)
+							ray.p[1] = ray.p[0] + normalize(ray.p[1]-ray.p[0])*rayLen; 
+						}
+					} 
+					
+					void calcCubicBezierMidPoints(
+						in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1,
+						out vec2 M0, out vec2 M1
+					)
+					{
+						const int N = tesselateCubicBezierTentacle_N; 
+						const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
+						
+						vec2[N] points, sides; 
+						for(int i=0; i<N; i++)
+						{
+							points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
+							sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
+						}
+						
+						const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
+						seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
+						for(int i=0; i<N-2; i++)
+						{
+							int k = N-1-i; 
+							tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
+							tesselateCubicBezierTentacle_updateRay(rayRightBack, i, points[k] + sides[k], false, maxRayLen); 
+							tesselateCubicBezierTentacle_updateRay(rayLeftFwd  , i, points[i] - sides[i], false, maxRayLen); 
+							tesselateCubicBezierTentacle_updateRay(rayLeftBack  , i, points[k] - sides[k], true, maxRayLen); 
+						}
+						
+						if(!intersectSegs2D(rayLeftFwd , rayLeftBack , M0)) M0 = points[N/2] - sides[N/2]; 
+						if(!intersectSegs2D(rayRightFwd, rayRightBack, M1)) M1 = points[N/2] + sides[N/2]; 
+					} 
+					
+					void emitCubicBezierMidJoint(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float r0, in float r1)
+					{
+						vec2 M0, M1; 
+						calcCubicBezierMidPoints(P0, P1, P2, P3, r0, r1, M0, M1); 
+						fragTexCoordXY = vec2(.5, 0); emitVertex2D(M0); 
+						fragTexCoordXY = vec2(.5, 1); emitVertex2D(M1); 
+					} 
+					
+					
+					void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float r0, in float r1, in float r2)
+					{
+						/*
+							P0-P1 and P1-P2 defines 2 line segments.
+							W0, W1, W2 defiles linewidth at P0, P1, P2.
+							The x coordinate of points can be nan, that meant there is no point defined 
+							and P1 is the start or the end of a line.
+							If this is the cast an endcap must be generated, the depth of the cap is 
+							W1/2 in length, so later a pixel shader can paint a nice roundcap there.
+							If P1.x is null it means that there is nothing at this particular line joint.
+							The primitive type is triangle strip, so ideally it should emit 2 vertices.
+							The 2 vertex is the intersection points of the two side boundary lines at 
+							segments P0-P1 and P1-P2. Be careful with the linewidts at the 3 points.
+							Make the intersection calculation safe, they should fallback tho an existing 
+							point at a valid linewidth distance.
+						*/
+						
+						// Handle case where P1 is invalid (no joint to process)
+						if(isnan(P1.x)) return; 
+						
+						bool hasPrev = !isnan(P0.x), hasNext = !isnan(P2.x); 
+						if(!hasPrev && !hasNext) return; 
+						
+						// Calculate direction vectors
+						vec2 dirPrev = hasPrev ? normalize(P1 - P0) : vec2(0); 
+						vec2 dirNext = hasNext ? normalize(P2 - P1) : vec2(0); 
+						
+						// Calculate perpendicular vectors for offset directions
+						vec2 perpPrev = hasPrev ? vec2(-dirPrev.y, dirPrev.x) : vec2(0); 
+						vec2 perpNext = hasNext ? vec2(-dirNext.y, dirNext.x) : vec2(0); 
+						
+						if(!hasPrev)
+						{
+							// Start cap - emit perpendicular offset
+							vec2 P = P1 - dirNext * (r1); vec2 capDir = perpNext * (r1); 
+							fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir ); 
+							fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
+							return; 
+						}
+						
+						if(!hasNext)
+						{
+							// End cap - emit perpendicular offset
+							vec2 P = P1 + dirPrev * (r1); vec2 capDir = perpPrev * (r1); 
+							fragTexCoordXY = vec2(0, 0); emitVertex2D(P - capDir); 
+							fragTexCoordXY = vec2(0, 1); emitVertex2D(P + capDir); 
+							EndPrimitive(); 
+							return; 
+						}
+						
+						fragTexCoordXY = vec2(0, 0); emitVertex2D(
+							lineIntersection(
+								P0 - perpPrev*(r0), 
+								P1 - perpPrev*(r1), 
+								P1 - perpNext*(r1), 
+								P2 - perpNext*(r2)
+							)
+						); 
+						fragTexCoordXY = vec2(0, 1); emitVertex2D(
+							lineIntersection(
+								P0 + perpPrev*(r0), 
+								P1 + perpPrev*(r1), 
+								P1 + perpNext*(r1), 
+								P2 + perpNext*(r2)
+							)
+						); 
+					} 
+					
+					struct BitStream
+					{
+						uint dwOfs; //the dword offset of the NEXT fetched dword.
+						uint currentDw; //the current dword that is fetched
+						int currentDwBits; /*
+							how many of the lower bits are valid in the current dword, 
+							if zero, the next dword must be fetched
+						*/
+						/*uint totalBitsRemaining; *//*overflow checking*/
+					}; 
+					
+					uint fetchBits(inout BitStream bitStream, in uint numBits)
+					{
+						/*
+							//overflow checking
+							if(numBits>bitStream.totalBitsRemaining) { bitStream.totalBitsRemaining = 0; return 0; }
+							bitStream.totalBitsRemaining -= numBits; 
+						*/
+						
+						uint result = 0; 
+						int bitsRemaining = int(numBits); 
+						while(bitsRemaining > 0)
+						{
+							// If current dword is exhausted, fetch next one
+							if(bitStream.currentDwBits == 0)
+							{
+								bitStream.currentDw = GB[bitStream.dwOfs]; 
+								bitStream.dwOfs++; 
+								bitStream.currentDwBits = 32; 
+							}
+							
+							// Calculate how many bits we can take this iteration
+							int bitsToTake = min(bitsRemaining, bitStream.currentDwBits); 
+							
+							// Extract the bits we need (using bitfieldExtract)
+							uint extracted = bitfieldExtract(bitStream.currentDw, 0, bitsToTake); 
+							
+							// Insert them into the result (using bitfieldInsert)
+							result = bitfieldInsert(result, extracted, int(numBits) - bitsRemaining, bitsToTake); 
+							
+							// Remove used bits from current dword (using bitfieldExtract for the remaining bits)
+							bitStream.currentDw >>= bitsToTake; 
+							bitStream.currentDwBits -= bitsToTake; 
+							bitsRemaining -= bitsToTake; 
+						}
+						
+						return result; 
+					} 
+					
+					bool fetch_bool(inout BitStream bitStream)
+					{
+						/*
+							//overflow check
+										if(bitStream.totalBitsRemaining==0) { return false; }
+										bitStream.totalBitsRemaining--; 
+						*/
+						
 						if(bitStream.currentDwBits == 0)
 						{
 							bitStream.currentDw = GB[bitStream.dwOfs]; 
@@ -4229,1877 +4400,1844 @@ $(V_size+G_size)".text
 							bitStream.currentDwBits = 32; 
 						}
 						
-						// Calculate how many bits we can take this iteration
-						int bitsToTake = min(bitsRemaining, bitStream.currentDwBits); 
+						bool bit = (bitStream.currentDw & 1u) != 0; 
+						bitStream.currentDw >>= 1; 
+						bitStream.currentDwBits--; 
 						
-						// Extract the bits we need (using bitfieldExtract)
-						uint extracted = bitfieldExtract(bitStream.currentDw, 0, bitsToTake); 
-						
-						// Insert them into the result (using bitfieldInsert)
-						result = bitfieldInsert(result, extracted, int(numBits) - bitsRemaining, bitsToTake); 
-						
-						// Remove used bits from current dword (using bitfieldExtract for the remaining bits)
-						bitStream.currentDw >>= bitsToTake; 
-						bitStream.currentDwBits -= bitsToTake; 
-						bitsRemaining -= bitsToTake; 
-					}
+						return bit; 
+					} 
 					
-					return result; 
-				} 
-				
-				bool fetch_bool(inout BitStream bitStream)
-				{
-					/*
-						//overflow check
-									if(bitStream.totalBitsRemaining==0) { return false; }
-									bitStream.totalBitsRemaining--; 
-					*/
+					int fetch_int(inout BitStream bitStream, in int numBits)
+					{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
 					
-					if(bitStream.currentDwBits == 0)
+					uint fetch_uint(inout BitStream bitStream, in int numBits)
 					{
-						bitStream.currentDw = GB[bitStream.dwOfs]; 
-						bitStream.dwOfs++; 
-						bitStream.currentDwBits = 32; 
-					}
+						return fetchBits(bitStream, numBits); 
+						/*Opt: this 32bit read should be optimized*/
+					} 
 					
-					bool bit = (bitStream.currentDw & 1u) != 0; 
-					bitStream.currentDw >>= 1; 
-					bitStream.currentDwBits--; 
+					float fetch_float(inout BitStream bitStream)
+					{ return uintBitsToFloat(fetch_uint(bitStream, 32)); } 
 					
-					return bit; 
-				} 
-				
-				int fetch_int(inout BitStream bitStream, in int numBits)
-				{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
-				
-				uint fetch_uint(inout BitStream bitStream, in int numBits)
-				{
-					return fetchBits(bitStream, numBits); 
-					/*Opt: this 32bit read should be optimized*/
-				} 
-				
-				float fetch_float(inout BitStream bitStream)
-				{ return uintBitsToFloat(fetch_uint(bitStream, 32)); } 
-				
-				vec2 fetch_vec2(inout BitStream bitStream)
-				{ return vec2(fetch_float(bitStream), fetch_float(bitStream)); } 
-				
-				vec3 fetch_vec3(inout BitStream bitStream)
-				{
-					return vec3(
-						fetch_float(bitStream), fetch_float(bitStream),
-						fetch_float(bitStream)
-					); 
-				} 
-				vec4 fetch_vec4(inout BitStream bitStream)
-				{
-					return vec4(
-						fetch_float(bitStream), fetch_float(bitStream),
-						fetch_float(bitStream), fetch_float(bitStream)
-					); 
-				} 
-				
-				
-				BitStream initBitStream(uint bitOfs/*, uint nextBitOfs*/)
-				{
-					BitStream bitStream; 
-					bitStream.dwOfs = bitOfs >> 5; 
-					bitStream.currentDwBits = 0; 
-					uint bitsToSkip = bitOfs & 0x1F; 
-					if(bitsToSkip > 0)
-					{ uint dummy = fetchBits(bitStream, bitsToSkip); }
+					vec2 fetch_vec2(inout BitStream bitStream)
+					{ return vec2(fetch_float(bitStream), fetch_float(bitStream)); } 
 					
-					/*bitStream.totalBitsRemaining = nextBitOfs - bitOfs; //overflow check*/
-					return bitStream; 
-				} 
-				
-				/*Vector graphics state registers*/
-				uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
-				
-				
-				vec4 PC = vec4(1); 	/* Primary color - default black */
-				vec4 SC = vec4(0); 	/* Secondary color - default white */
-				
-				float PS = 1; 	/* Point size */
-				float LW = 1; 	/* Line width */
-				float DL = 1; 	/* Dot lenthg */
-				float FH = 18; 	/* Font height */
-					
-				uint FMH = 0; 	/* Font map handle */
-				uint LFMH = 0; 	/* Latin font map handle */
-				uint PALH = 0; 	/* Palette handle */
-				uint LTH = 0; 	/* Line texture handle */
-				
-				//Note: transformation state is at the start of GS code
-				
-				
-				$(TexFlags.GLSLCode)
-				$(FontFlags.GLSLCode)
-				$(VecFlags.GLSLCode)
-				
-				/* Helper functions for fetching different data formats */
-				$(GEN_enumDefines!ColorFormat)
-				uint fetchColorFormat(inout BitStream bitStream)
-				{ return fetchBits(bitStream, $(EnumBits!ColorFormat)); } 
-				
-				
-				int fetchColor(inout BitStream bitStream, uint format, inout vec4 color)
-				{
-					//return code: 1: color changed, 2: alpha changed, 3: both
-					
-					//optimization strategy: extra math, but less divergence
-					if(format<=ColorFormat_a_u8 /*rgba_u8 .. a_u8*/)
+					vec3 fetch_vec3(inout BitStream bitStream)
 					{
-						const int bits = int((ColorFormat_a_u8 + 1 - format)*8); 
-						const vec4 tmp = unpackUnorm4x8(fetchBits(bitStream, bits)); 
+						return vec3(
+							fetch_float(bitStream), fetch_float(bitStream),
+							fetch_float(bitStream)
+						); 
+					} 
+					vec4 fetch_vec4(inout BitStream bitStream)
+					{
+						return vec4(
+							fetch_float(bitStream), fetch_float(bitStream),
+							fetch_float(bitStream), fetch_float(bitStream)
+						); 
+					} 
+					
+					
+					BitStream initBitStream(uint bitOfs/*, uint nextBitOfs*/)
+					{
+						BitStream bitStream; 
+						bitStream.dwOfs = bitOfs >> 5; 
+						bitStream.currentDwBits = 0; 
+						uint bitsToSkip = bitOfs & 0x1F; 
+						if(bitsToSkip > 0)
+						{ uint dummy = fetchBits(bitStream, bitsToSkip); }
+						
+						/*bitStream.totalBitsRemaining = nextBitOfs - bitOfs; //overflow check*/
+						return bitStream; 
+					} 
+					
+					/*Vector graphics state registers*/
+					uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
+					
+					
+					vec4 PC = vec4(1); 	/* Primary color - default black */
+					vec4 SC = vec4(0); 	/* Secondary color - default white */
+					
+					float PS = 1; 	/* Point size */
+					float LW = 1; 	/* Line width */
+					float DL = 1; 	/* Dot lenthg */
+					float FH = 18; 	/* Font height */
+						
+					uint FMH = 0; 	/* Font map handle */
+					uint LFMH = 0; 	/* Latin font map handle */
+					uint PALH = 0; 	/* Palette handle */
+					uint LTH = 0; 	/* Line texture handle */
+					
+					//Note: transformation state is at the start of GS code
+					
+					
+					$(TexFlags.GLSLCode)
+					$(FontFlags.GLSLCode)
+					$(VecFlags.GLSLCode)
+					
+					/* Helper functions for fetching different data formats */
+					$(GEN_enumDefines!ColorFormat)
+					uint fetchColorFormat(inout BitStream bitStream)
+					{ return fetchBits(bitStream, $(EnumBits!ColorFormat)); } 
+					
+					
+					int fetchColor(inout BitStream bitStream, uint format, inout vec4 color)
+					{
+						//return code: 1: color changed, 2: alpha changed, 3: both
+						
+						//optimization strategy: extra math, but less divergence
+						if(format<=ColorFormat_a_u8 /*rgba_u8 .. a_u8*/)
+						{
+							const int bits = int((ColorFormat_a_u8 + 1 - format)*8); 
+							const vec4 tmp = unpackUnorm4x8(fetchBits(bitStream, bits)); 
+							switch(format)
+							{
+								case ColorFormat_rgba_u8: 	color = tmp; 	return 3; 
+								case ColorFormat_rgb_u8: 	color.rgb = tmp.xyz; 	return 1; 
+								case ColorFormat_la_u8: 	color.rgb = vec3(tmp.x), color.a = tmp.y; 	return 3; 
+								case ColorFormat_a_u8: 	color.a = tmp.x; 	return 2; 
+							}
+						}
+						else if(format<=ColorFormat_u8 /*u1, u2, u4, u8*/)
+						{
+							const int idx = int(format - ColorFormat_u1); //0..3
+							const int bits = 1<<idx; //1, 2, 4, 8
+							const float high = float((1<<bits) - 1); //1, 3, 15, 255
+							const uint raw = fetchBits(bitStream, bits); 
+							if(PALH!=0)	{ color = readPaletteSample(PALH, raw, false)/*palette lookup*/; return 3; }
+							else	{ color.rgb = vec3(float(raw) / high)/*grayscale*/; return 1; }
+						}
+						return 0; 
+					} 
+					
+					$(GEN_enumDefines!SizeFormat)
+					uint fetchSizeFormat(inout BitStream bitStream)
+					{ return fetchBits(bitStream, $(EnumBits!SizeFormat)); } 
+					
+					float fetchSize(inout BitStream bitStream, uint format)
+					{
 						switch(format)
 						{
-							case ColorFormat_rgba_u8: 	color = tmp; 	return 3; 
-							case ColorFormat_rgb_u8: 	color.rgb = tmp.xyz; 	return 1; 
-							case ColorFormat_la_u8: 	color.rgb = vec3(tmp.x); color.a = tmp.y; 	return 3; 
-							case ColorFormat_a_u8: 	color.a = tmp.x; 	return 2; 
+							case SizeFormat_u4: 	return float(fetchBits(bitStream, 4)); 
+							case SizeFormat_u8: 	return float(fetchBits(bitStream, 8)); 
+							case SizeFormat_ulog12: 	return exp2(float(fetchBits(bitStream, 12)) / 128.0); 
+							case SizeFormat_f32: 	return fetch_float(bitStream); 
+							default: return 1.0; 
 						}
-					}
-					else if(format<=ColorFormat_u8 /*u1 .. u8*/)
+					} 
+					
+					float fetchFormattedSize(inout BitStream bitStream)
+					{ return fetchSize(bitStream, fetchSizeFormat(bitStream)); } 
+					
+					$(GEN_enumDefines!AngleFormat)
+					uint fetchAngleFormat(inout BitStream bitStream)
+					{ return fetchBits(bitStream, $(EnumBits!AngleFormat)); } 
+					
+					float fetchAngle_rad(inout BitStream bitStream, uint format)
 					{
-						const int idx = int(format - ColorFormat_u1); //0..3
-						const int bits = 1<<idx; //1, 2, 4, 8
-						const float high = float((1<<bits) - 1); //1, 3, 15, 255
-						const uint raw = fetchBits(bitStream, bits); 
-						if(PALH!=0)	color = readPaletteSample(PALH, raw, false)/*palette lookup*/; 
-						else	color.rgb = vec3(float(raw) / high)/*grayscale*/; 
-						return 1; 
-					}
-					return 0; 
-				} 
-				
-				$(GEN_enumDefines!SizeFormat)
-				uint fetchSizeFormat(inout BitStream bitStream)
-				{ return fetchBits(bitStream, $(EnumBits!SizeFormat)); } 
-				
-				float fetchSize(inout BitStream bitStream, uint format)
-				{
-					switch(format)
-					{
-						case SizeFormat_u4: 	return float(fetchBits(bitStream, 4)); 
-						case SizeFormat_u8: 	return float(fetchBits(bitStream, 8)); 
-						case SizeFormat_ulog12: 	return exp2(float(fetchBits(bitStream, 12)) / 128.0); 
-						case SizeFormat_f32: 	return fetch_float(bitStream); 
-						default: return 1.0; 
-					}
-				} 
-				
-				float fetchFormattedSize(inout BitStream bitStream)
-				{ return fetchSize(bitStream, fetchSizeFormat(bitStream)); } 
-				
-				$(GEN_enumDefines!AngleFormat)
-				uint fetchAngleFormat(inout BitStream bitStream)
-				{ return fetchBits(bitStream, $(EnumBits!AngleFormat)); } 
-				
-				float fetchAngle_rad(inout BitStream bitStream, uint format)
-				{
-					switch(format)
-					{
-						//case AngleFormat_u2: 	return float(fetchBits(bitStream, 2))*(PI/2.0); 
-						//case AngleFormat_u4: 	return float(fetchBits(bitStream, 4))*(PI/8.0); 
-						case AngleFormat_i10: 	return radians(float(fetch_int(bitStream, 10))); 
-						case AngleFormat_f32: 	return radians(fetch_float(bitStream)); 
-					}
-					return 0.0; 
-				} 
-				
-				float fetchFormattedAngle_rad(inout BitStream bitStream)
-				{ return fetchAngle_rad(bitStream, fetchAngleFormat(bitStream)); } 
-				
-				
-				$(GEN_enumDefines!HandleFormat)
-				uint fetchHandleFormat(inout BitStream bitStream)
-				{ return fetchBits(bitStream, $(EnumBits!HandleFormat)); } 
-				
-				uint fetchHandle(inout BitStream bitStream, uint format)
-				{
-					switch(format) {
-						case HandleFormat_u12: 	return fetchBits(bitStream, 12); 
-						case HandleFormat_u16: 	return fetchBits(bitStream, 16); 
-						case HandleFormat_u24: 	return fetchBits(bitStream, 24); 
-						case HandleFormat_u32: 	return fetch_uint(bitStream, 32); 
-						default: return 0; 
-					}
-				} 
-				
-				$(GEN_enumDefines!CoordFormat)
-				uint fetchCoordFormat(inout BitStream bitStream)
-				{ return fetchBits(bitStream, $(EnumBits!CoordFormat)); } 
-				
-				float fetchCoord(inout BitStream bitStream, uint format)
-				{
-					int bits=0; 
-					switch(format)
-					{
-						case CoordFormat_f32: 	return fetch_float(bitStream); 
-						case CoordFormat_i32: 	bits = 32; 	break; 
-						case CoordFormat_i16: 	bits = 16; 	break; 
-						case CoordFormat_i8: 	bits = 8; 	break; 
-					}
-					if(bits>0) return float(fetch_int(bitStream, bits)); 
-					return 0; 
-					/*Opt: Do it with single fetch*/
-				} 
-				
-				vec2 fetchFormattedPoint2D(inout BitStream bitStream)
-				{
-					//fetches absolute 2D point
-					const uint coordFmt = fetchCoordFormat(bitStream); 
-					return vec2(
-						fetchCoord(bitStream, coordFmt), 
-						fetchCoord(bitStream, coordFmt)
-					); 
-				} 
-				
-				$(GEN_enumDefines!XYFormat)
-				uint fetchXYFormat(inout BitStream bitStream)
-				{ return fetchBits(bitStream, $(EnumBits!XYFormat)); } 
-				
-				vec2 fetchXY(inout BitStream bitStream, vec2 p/*prev point*/)
-				{
-					//fetches absolute or relative 2D point
-					const uint xyFmt = fetchXYFormat(bitStream); 
-					const uint coordFmt = fetchCoordFormat(bitStream); 
-					const float f0 = ((xyFmt<=XYFormat_relY) ?(fetchCoord(bitStream, coordFmt)):(0)); 
-					const float f1 = ((xyFmt<=XYFormat_relXY) ?(fetchCoord(bitStream, coordFmt)):(0)); 
-					switch(xyFmt)
-					{
-						case XYFormat_absXY: 	return vec2(f0, f1); 
-						case XYFormat_relXY: 	return p+vec2(f0, f1); 
-						case XYFormat_absX: 	return vec2(f0, p.y); 
-						case XYFormat_relX: 	return vec2(p.x+f0, p.y); 
-						case XYFormat_absY: 	return vec2(p.x, f0); 
-						case XYFormat_relY: 	return vec2(p.x, p.y+f0); 
-						case XYFormat_absXrelY1: 	return vec2(f0, p.y+1); 
-						case XYFormat_relX1absY: 	return vec2(p.x+1, f0); 
-						default: 	return vec2(0)/*invalid*/; 
-					}
-				} 
-				
-				$(GEN_enumDefines!FlagFormat)
-				void setFlags(inout BitStream bitStream)
-				{
-					const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); 
-					
-					if(fmt==FlagFormat_all || fmt==FlagFormat_tex) TF = fetchBits(bitStream, $(FlagBits!TexFlags)); 
-					if(fmt==FlagFormat_all || fmt==FlagFormat_font) FF = fetchBits(bitStream, $(FlagBits!FontFlags)); 
-					if(fmt==FlagFormat_all || fmt==FlagFormat_vec) VF = fetchBits(bitStream, $(FlagBits!VecFlags)); 
-					/*Opt: Do it all with a single fetchBits call*/
-				} 
-				
-				$(GEN_enumDefines!TransFormat)
-				void setTrans(inout BitStream bitStream)
-				{
-					const uint fmt = fetchBits(bitStream, $(EnumBits!TransFormat)); 
-					
-					switch(fmt)
-					{
-						case TransFormat_unity: 
-							{ TR_reset(); }
-						break; 
-						
-						case TransFormat_transXY: 
-							{
-							//can use outputTransformPoint2D(fetchP) for relative transform
-							TR_transXY = fetchFormattedPoint2D(bitStream); 
-						}
-						break; 
-						
-						case TransFormat_skewX: 
-							{ TR_skewX_rad = fetchFormattedAngle_rad(bitStream); }
-						break; 
-						
-						case TransFormat_rotZ: 
-							{ TR_rotZ_rad = fetchFormattedAngle_rad(bitStream); }
-						break; 
-						
-						case TransFormat_scale: case TransFormat_scaleXY: 
-							{
-							const float 	sx = fetchFormattedSize(bitStream),
-								sy = ((fmt==TransFormat_scaleXY) ?(fetchFormattedSize(bitStream)):(sx)); 
-							TR_scaleXY = vec2(sx, sy); 
-						}
-						break; 
-						
-						case TransFormat_clipBounds: 
-							{
-							//absolute coords: topLeft, widthHeight
-							TR_clipBounds.xy = fetchFormattedPoint2D(bitStream); 
-							TR_clipBounds.zw = 	TR_clipBounds.xy +
-								fetchFormattedPoint2D(bitStream); 
-						}
-						break; 
-					}
-				} 
-				
-				
-				/*Position queue*/
-				
-				vec2 	P0 	= vec2(0)
-				,	P1 	= vec2(0)
-				,	P2 	= vec2(0)
-				,	P3	= vec2(0)
-				,	P4 	= vec2(0); 
-				#define PathCodeQueue_lastIdx 4
-				
-				uint PathCodeQueue = 0; 
-				
-				/*nop*/	#define PathCode_none 0
-					
-				/*move to*/	#define PathCode_M 1
-				/*
-					tangent 
-					(for interrupted paths)
-				*/	#define PathCode_TG 2
-				/*line to*/	#define PathCode_L 3
-				
-					
-				/*
-					quadratic bezier smoot point
-					(turns into Q1, no fetch)
-				*/	#define PathCode_T1 4
-				/*quadratic bezier control point*/	#define PathCode_Q1 5
-				/*quadratic bezier endpoint*/	#define PathCode_Q2 6
-					
-				/*
-					cubic bezier smoot point
-					(turns into C1, no fetch)
-				*/	#define PathCode_S1 7
-				/*cubic bezier control point*/	#define PathCode_C1 8
-				/*cubic bezier control point*/	#define PathCode_C2 9
-				/*cubic bezier endpoint*/	#define PathCode_C3 10
-				
-				#define PathCode_bits 4
-				
-				uint PathCode(int idx)
-				{ return getBits(PathCodeQueue, idx*PathCode_bits, PathCode_bits); } 
-				
-				/*S or T*/
-				bool PathCode_isSmooth(uint c)
-				{ return c==PathCode_T1 || c==PathCode_S1; } 
-				
-				/*internal bezier points and the last points of the curve*/
-				bool PathCode_isBezier(uint c)
-				{ return c>=PathCode_T1 && c<=PathCode_C3; } 
-				
-				/*only the internal bezier ponts*/
-				bool PathCode_isControlPoint(uint c)
-				{
-					return c>=PathCode_T1 && c<=PathCode_Q1 ||
-					c>=PathCode_S1 && c<=PathCode_C2; 
-				} 
-				
-				uint PathCode_next(uint c)
-				{
-					if(PathCode_isSmooth(c)) c++; 
-					if(PathCode_isControlPoint(c)) c++; 
-					else c = PathCode_none; 
-					return c; 
-				} 
-				
-				vec4 PathCodeQueue_debugColor()
-				{
-					vec4 c = vec4(0, 1, 0, 1); //lines are green
-					//detect 3 phase of Q
-					if(PathCode(2)==PathCode_Q1) return vec4(1,0,0,1); 
-					if(PathCode(2)==PathCode_Q2) return vec4(1,1,0,1); 
-					if(PathCode(1)==PathCode_Q2) return vec4(1,1,.5,1); 
-					
-					//detect 4 phase of C
-					if(PathCode(2)==PathCode_C1) return vec4(0,0,1,1); 
-					if(PathCode(2)==PathCode_C2) return vec4(0,.5,1,1); 
-					if(PathCode(2)==PathCode_C3) return vec4(0,1,1,1); 
-					if(PathCode(1)==PathCode_C3) return vec4(.5,1,1,1); 
-					
-					return vec4(0, 1, 0, 1); //lines are green
-				} 
-				
-				void emitPathCodeDebugPoint(uint code, float r)
-				{
-					setFragMode(FragMode_fullyFilled); fragColor = vec4(1,0,1,1); 
-					switch(code)
-					{
-						case PathCode_M: 	fragColor = vec4(.5,.5,.5,1); 	break; 
-						case PathCode_L: 	fragColor = vec4(0,1,0,1); 	break; 
-						case PathCode_TG: 	fragColor = vec4(1,.5,1,1); 	break; 
-						case PathCode_Q1: 	fragColor = vec4(1,0,0,1); 	break; 
-						case PathCode_Q2: 	fragColor = vec4(1,1,0,1); 	break; 
-						case PathCode_C1: 	fragColor = vec4(0,0,1,1); 	break; 
-						case PathCode_C2: 	fragColor = vec4(0,.5,1,1); 	break; 
-						case PathCode_C3: 	fragColor = vec4(0,1,1,1); 	break; 
-					}
-					emitTexturedPointPointRect2D(P4-r, P4+r); 
-				} 
-				
-				void latchP(vec2 newP)
-				{ P0=P1, P1=P2, P2=P3, P3=P4, P4=newP; } 
-				
-				vec2 smoothMirror()
-				{
-					/*mirrors P2 over P3, so it can be assigned to P4*/
-					return P3*2 - P2; 
-				} 
-				
-				
-				void setFragModeAndFloats(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, bool trans)
-				{
-					setFragMode(mode); 
-					if(trans) {
-						fragFloats0.xy 	= outputTransformPoint2D(P0), 
-						fragFloats0.zw 	= outputTransformPoint2D(P1), 
-						fragFloats1.xy 	= outputTransformPoint2D(P2), 
-						fragFloats1.zw 	= outputTransformPoint2D(P3); 
-					}else {
-						fragFloats0.xy 	= P0, 
-						fragFloats0.zw 	= P1, 
-						fragFloats1.xy 	= P2, 
-						fragFloats1.zw 	= P3; 
-					}
-				} 
-				
-				void setFragMode_L(in uint mode, in vec2 P0, in vec2 P1)
-				{ setFragModeAndFloats(mode, P0, mix(P0, P1, 1/3.0), mix(P0, P1, 2/3.0), P1, true); } 
-				
-				void setFragMode_Q(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2)
-				{ setFragModeAndFloats(mode, P0, mix(P0, P1, 2/3.0), mix(P1, P2, 1/3.0), P2, true); } 
-				
-				void setFragMode_C(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
-				{ setFragModeAndFloats(mode, P0, P1, P2, P3, true); } 
-				
-				void convertQuadtraticBezierControlPointsToCubic(
-					in vec2 P0, in vec2 P1, in vec2 P2,
-					out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
-				)
-				{ Q0=P0, Q1=mix(P0, P1, 2/3.0), Q2=mix(P1, P2, 1/3.0), Q3=P2; } 
-				
-				void copyCubicBezierControlPoints(
-					in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
-					out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
-				)
-				{ Q0=P0, Q1=P1, Q2=P2, Q3=P3; } 
-				
-				void acquireCubicBezierControlPoints(
-					in bool isQuadratic,
-					in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
-					out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
-				)
-				{
-					if(isQuadratic)
-					convertQuadtraticBezierControlPointsToCubic(
-						P0,P1,P2, 
-						Q0,Q1,Q2,Q3
-					); 
-					else
-					copyCubicBezierControlPoints             (
-						P0,P1,P2,P3, 
-						Q0,Q1,Q2,Q3
-					); 
-					
-				} 
-				
-				void shiftInPathCode(uint code)
-				{
-					PathCodeQueue >>= PathCode_bits; 
-					setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
-					
-					const bool 	Mode_Points 	= $(bezierTesselationSettings.mode == BTSM.points)
-					,	Mode_PerPixel 	= $(bezierTesselationSettings.mode == BTSM.perPixel)
-					,	EnableDebugColors 	= false; 
-					
-					const float r = 2.5;  //Todo: radius handling!!!
-					if(Mode_Points)
-					{ emitPathCodeDebugPoint(code, r); }
-					else
-					{
-						const uint PC1 = PathCode(1), PC2 = PathCode(2); 
-						
-						if(EnableDebugColors)	fragColor = PathCodeQueue_debugColor(); 
-						else	fragColor = PC; 
-						
-						if(Mode_PerPixel)
+						switch(format)
 						{
-							switch(PC2)
+							//case AngleFormat_u2: 	return float(fetchBits(bitStream, 2))*(PI/2.0); 
+							//case AngleFormat_u4: 	return float(fetchBits(bitStream, 4))*(PI/8.0); 
+							case AngleFormat_i10: 	return radians(float(fetch_int(bitStream, 10))); 
+							case AngleFormat_f32: 	return radians(fetch_float(bitStream)); 
+						}
+						return 0.0; 
+					} 
+					
+					float fetchFormattedAngle_rad(inout BitStream bitStream)
+					{ return fetchAngle_rad(bitStream, fetchAngleFormat(bitStream)); } 
+					
+					
+					$(GEN_enumDefines!HandleFormat)
+					uint fetchHandleFormat(inout BitStream bitStream)
+					{ return fetchBits(bitStream, $(EnumBits!HandleFormat)); } 
+					
+					uint fetchHandle(inout BitStream bitStream, uint format)
+					{
+						switch(format) {
+							case HandleFormat_u12: 	return fetchBits(bitStream, 12); 
+							case HandleFormat_u16: 	return fetchBits(bitStream, 16); 
+							case HandleFormat_u24: 	return fetchBits(bitStream, 24); 
+							case HandleFormat_u32: 	return fetch_uint(bitStream, 32); 
+							default: return 0; 
+						}
+					} 
+					
+					$(GEN_enumDefines!CoordFormat)
+					uint fetchCoordFormat(inout BitStream bitStream)
+					{ return fetchBits(bitStream, $(EnumBits!CoordFormat)); } 
+					
+					float fetchCoord(inout BitStream bitStream, uint format)
+					{
+						int bits=0; 
+						switch(format)
+						{
+							case CoordFormat_f32: 	return fetch_float(bitStream); 
+							case CoordFormat_i32: 	bits = 32; 	break; 
+							case CoordFormat_i16: 	bits = 16; 	break; 
+							case CoordFormat_i8: 	bits = 8; 	break; 
+						}
+						if(bits>0) return float(fetch_int(bitStream, bits)); 
+						return 0; 
+						/*Opt: Do it with single fetch*/
+					} 
+					
+					vec2 fetchFormattedPoint2D(inout BitStream bitStream)
+					{
+						//fetches absolute 2D point
+						const uint coordFmt = fetchCoordFormat(bitStream); 
+						return vec2(
+							fetchCoord(bitStream, coordFmt), 
+							fetchCoord(bitStream, coordFmt)
+						); 
+					} 
+					
+					$(GEN_enumDefines!XYFormat)
+					uint fetchXYFormat(inout BitStream bitStream)
+					{ return fetchBits(bitStream, $(EnumBits!XYFormat)); } 
+					
+					vec2 fetchXY(inout BitStream bitStream, vec2 p/*prev point*/)
+					{
+						//fetches absolute or relative 2D point
+						const uint xyFmt = fetchXYFormat(bitStream); 
+						const uint coordFmt = fetchCoordFormat(bitStream); 
+						const float f0 = ((xyFmt<=XYFormat_relY) ?(fetchCoord(bitStream, coordFmt)):(0)); 
+						const float f1 = ((xyFmt<=XYFormat_relXY) ?(fetchCoord(bitStream, coordFmt)):(0)); 
+						switch(xyFmt)
+						{
+							case XYFormat_absXY: 	return vec2(f0, f1); 
+							case XYFormat_relXY: 	return p+vec2(f0, f1); 
+							case XYFormat_absX: 	return vec2(f0, p.y); 
+							case XYFormat_relX: 	return vec2(p.x+f0, p.y); 
+							case XYFormat_absY: 	return vec2(p.x, f0); 
+							case XYFormat_relY: 	return vec2(p.x, p.y+f0); 
+							case XYFormat_absXrelY1: 	return vec2(f0, p.y+1); 
+							case XYFormat_relX1absY: 	return vec2(p.x+1, f0); 
+							default: 	return vec2(0)/*invalid*/; 
+						}
+					} 
+					
+					$(GEN_enumDefines!FlagFormat)
+					void setFlags(inout BitStream bitStream)
+					{
+						const uint fmt = fetchBits(bitStream, $(EnumBits!FlagFormat)); 
+						
+						if(fmt==FlagFormat_all || fmt==FlagFormat_tex) TF = fetchBits(bitStream, $(FlagBits!TexFlags)); 
+						if(fmt==FlagFormat_all || fmt==FlagFormat_font) FF = fetchBits(bitStream, $(FlagBits!FontFlags)); 
+						if(fmt==FlagFormat_all || fmt==FlagFormat_vec) VF = fetchBits(bitStream, $(FlagBits!VecFlags)); 
+						/*Opt: Do it all with a single fetchBits call*/
+					} 
+					
+					$(GEN_enumDefines!TransFormat)
+					void setTrans(inout BitStream bitStream)
+					{
+						const uint fmt = fetchBits(bitStream, $(EnumBits!TransFormat)); 
+						
+						switch(fmt)
+						{
+							case TransFormat_unity: 
+								{ TR_reset(); }
+							break; 
+							
+							case TransFormat_transXY: 
+								{
+								//can use outputTransformPoint2D(fetchP) for relative transform
+								TR_transXY = fetchFormattedPoint2D(bitStream); 
+							}
+							break; 
+							
+							case TransFormat_skewX: 
+								{ TR_skewX_rad = fetchFormattedAngle_rad(bitStream); }
+							break; 
+							
+							case TransFormat_rotZ: 
+								{ TR_rotZ_rad = fetchFormattedAngle_rad(bitStream); }
+							break; 
+							
+							case TransFormat_scale: case TransFormat_scaleXY: 
+								{
+								const float 	sx = fetchFormattedSize(bitStream),
+									sy = ((fmt==TransFormat_scaleXY) ?(fetchFormattedSize(bitStream)):(sx)); 
+								TR_scaleXY = vec2(sx, sy); 
+							}
+							break; 
+							
+							case TransFormat_clipBounds: 
+								{
+								//absolute coords: topLeft, widthHeight
+								TR_clipBounds.xy = fetchFormattedPoint2D(bitStream); 
+								TR_clipBounds.zw = 	TR_clipBounds.xy +
+									fetchFormattedPoint2D(bitStream); 
+							}
+							break; 
+						}
+					} 
+					
+					
+					/*Position queue*/
+					
+					vec2 	P0 	= vec2(0)
+					,	P1 	= vec2(0)
+					,	P2 	= vec2(0)
+					,	P3	= vec2(0)
+					,	P4 	= vec2(0); 
+					#define PathCodeQueue_lastIdx 4
+					
+					uint PathCodeQueue = 0; 
+					
+					/*nop*/	#define PathCode_none 0
+						
+					/*move to*/	#define PathCode_M 1
+					/*
+						tangent 
+						(for interrupted paths)
+					*/	#define PathCode_TG 2
+					/*line to*/	#define PathCode_L 3
+					
+						
+					/*
+						quadratic bezier smoot point
+						(turns into Q1, no fetch)
+					*/	#define PathCode_T1 4
+					/*quadratic bezier control point*/	#define PathCode_Q1 5
+					/*quadratic bezier endpoint*/	#define PathCode_Q2 6
+						
+					/*
+						cubic bezier smoot point
+						(turns into C1, no fetch)
+					*/	#define PathCode_S1 7
+					/*cubic bezier control point*/	#define PathCode_C1 8
+					/*cubic bezier control point*/	#define PathCode_C2 9
+					/*cubic bezier endpoint*/	#define PathCode_C3 10
+					
+					#define PathCode_bits 4
+					
+					uint PathCode(int idx)
+					{ return getBits(PathCodeQueue, idx*PathCode_bits, PathCode_bits); } 
+					
+					/*S or T*/
+					bool PathCode_isSmooth(uint c)
+					{ return c==PathCode_T1 || c==PathCode_S1; } 
+					
+					/*internal bezier points and the last points of the curve*/
+					bool PathCode_isBezier(uint c)
+					{ return c>=PathCode_T1 && c<=PathCode_C3; } 
+					
+					/*only the internal bezier ponts*/
+					bool PathCode_isControlPoint(uint c)
+					{
+						return c>=PathCode_T1 && c<=PathCode_Q1 ||
+						c>=PathCode_S1 && c<=PathCode_C2; 
+					} 
+					
+					uint PathCode_next(uint c)
+					{
+						if(PathCode_isSmooth(c)) c++; 
+						if(PathCode_isControlPoint(c)) c++; 
+						else c = PathCode_none; 
+						return c; 
+					} 
+					
+					vec4 PathCodeQueue_debugColor()
+					{
+						vec4 c = vec4(0, 1, 0, 1); //lines are green
+						//detect 3 phase of Q
+						if(PathCode(2)==PathCode_Q1) return vec4(1,0,0,1); 
+						if(PathCode(2)==PathCode_Q2) return vec4(1,1,0,1); 
+						if(PathCode(1)==PathCode_Q2) return vec4(1,1,.5,1); 
+						
+						//detect 4 phase of C
+						if(PathCode(2)==PathCode_C1) return vec4(0,0,1,1); 
+						if(PathCode(2)==PathCode_C2) return vec4(0,.5,1,1); 
+						if(PathCode(2)==PathCode_C3) return vec4(0,1,1,1); 
+						if(PathCode(1)==PathCode_C3) return vec4(.5,1,1,1); 
+						
+						return vec4(0, 1, 0, 1); //lines are green
+					} 
+					
+					void emitPathCodeDebugPoint(uint code, float r)
+					{
+						setFragMode(FragMode_fullyFilled); fragColor = vec4(1,0,1,1); 
+						switch(code)
+						{
+							case PathCode_M: 	fragColor = vec4(.5,.5,.5,1); 	break; 
+							case PathCode_L: 	fragColor = vec4(0,1,0,1); 	break; 
+							case PathCode_TG: 	fragColor = vec4(1,.5,1,1); 	break; 
+							case PathCode_Q1: 	fragColor = vec4(1,0,0,1); 	break; 
+							case PathCode_Q2: 	fragColor = vec4(1,1,0,1); 	break; 
+							case PathCode_C1: 	fragColor = vec4(0,0,1,1); 	break; 
+							case PathCode_C2: 	fragColor = vec4(0,.5,1,1); 	break; 
+							case PathCode_C3: 	fragColor = vec4(0,1,1,1); 	break; 
+						}
+						emitTexturedPointPointRect2D(P4-r, P4+r); 
+					} 
+					
+					void latchP(vec2 newP)
+					{ P0=P1, P1=P2, P2=P3, P3=P4, P4=newP; } 
+					
+					vec2 smoothMirror()
+					{
+						/*mirrors P2 over P3, so it can be assigned to P4*/
+						return P3*2 - P2; 
+					} 
+					
+					
+					void setFragModeAndFloats(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, bool trans)
+					{
+						setFragMode(mode); 
+						if(trans) {
+							fragFloats0.xy 	= outputTransformPoint2D(P0), 
+							fragFloats0.zw 	= outputTransformPoint2D(P1), 
+							fragFloats1.xy 	= outputTransformPoint2D(P2), 
+							fragFloats1.zw 	= outputTransformPoint2D(P3); 
+						}else {
+							fragFloats0.xy 	= P0, 
+							fragFloats0.zw 	= P1, 
+							fragFloats1.xy 	= P2, 
+							fragFloats1.zw 	= P3; 
+						}
+					} 
+					
+					void setFragMode_L(in uint mode, in vec2 P0, in vec2 P1)
+					{ setFragModeAndFloats(mode, P0, mix(P0, P1, 1/3.0), mix(P0, P1, 2/3.0), P1, true); } 
+					
+					void setFragMode_Q(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2)
+					{ setFragModeAndFloats(mode, P0, mix(P0, P1, 2/3.0), mix(P1, P2, 1/3.0), P2, true); } 
+					
+					void setFragMode_C(in uint mode, in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3)
+					{ setFragModeAndFloats(mode, P0, P1, P2, P3, true); } 
+					
+					void convertQuadtraticBezierControlPointsToCubic(
+						in vec2 P0, in vec2 P1, in vec2 P2,
+						out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
+					)
+					{ Q0=P0, Q1=mix(P0, P1, 2/3.0), Q2=mix(P1, P2, 1/3.0), Q3=P2; } 
+					
+					void copyCubicBezierControlPoints(
+						in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
+						out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
+					)
+					{ Q0=P0, Q1=P1, Q2=P2, Q3=P3; } 
+					
+					void acquireCubicBezierControlPoints(
+						in bool isQuadratic,
+						in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3,
+						out vec2 Q0, out vec2 Q1, out vec2 Q2, out vec2 Q3
+					)
+					{
+						if(isQuadratic)
+						convertQuadtraticBezierControlPointsToCubic(
+							P0,P1,P2, 
+							Q0,Q1,Q2,Q3
+						); 
+						else
+						copyCubicBezierControlPoints             (
+							P0,P1,P2,P3, 
+							Q0,Q1,Q2,Q3
+						); 
+						
+					} 
+					
+					void shiftInPathCode(uint code)
+					{
+						PathCodeQueue >>= PathCode_bits; 
+						setBits(PathCodeQueue, PathCodeQueue_lastIdx*PathCode_bits, PathCode_bits, code); 
+						
+						const bool 	Mode_Points 	= $(bezierTesselationSettings.mode == BTSM.points)
+						,	Mode_PerPixel 	= $(bezierTesselationSettings.mode == BTSM.perPixel)
+						,	EnableDebugColors 	= false; 
+						
+						const float r = 2.5;  //Todo: radius handling!!!
+						if(Mode_Points)
+						{ emitPathCodeDebugPoint(code, r); }
+						else
+						{
+							const uint PC1 = PathCode(1), PC2 = PathCode(2); 
+							
+							if(EnableDebugColors)	fragColor = PathCodeQueue_debugColor(); 
+							else	fragColor = PC; 
+							
+							if(Mode_PerPixel)
 							{
-								case PathCode_L: 	setFragMode_L(FragMode_cubicBezier, P1, P2); 	break; 
-								case PathCode_Q1: 	setFragMode_Q(FragMode_cubicBezier, P1, P2, P3); 	break; 
-								case PathCode_C1: 	setFragMode_C(FragMode_cubicBezier, P1, P2, P3, P4); 	break; 
-								/*Todo: _line mode for rounded lines*/
+								switch(PC2)
+								{
+									case PathCode_L: 	setFragMode_L(FragMode_cubicBezier, P1, P2); 	break; 
+									case PathCode_Q1: 	setFragMode_Q(FragMode_cubicBezier, P1, P2, P3); 	break; 
+									case PathCode_C1: 	setFragMode_C(FragMode_cubicBezier, P1, P2, P3, P4); 	break; 
+									/*Todo: _line mode for rounded lines*/
+								}
+							}
+							else
+							{ setFragModeAndFloats(FragMode_fullyFilled, vec2(0), vec2(0), vec2(0), vec2(0), false); }
+							
+							/*
+								Todo: Remake this in a way that it emits evry primitive as fast as it can.
+								It is maybe impossible because beziers must know their control points BEFORE the first verices.
+							*/
+							if(PC1>=PathCode_L || PC2>=PathCode_L /*any line or curve*/)
+							{
+								if(PC2==PathCode_Q2 || PC2==PathCode_C2 || PC2==PathCode_C3 /*any curve*/)
+								{
+									if(PC2!=PathCode_C3)
+									{
+										vec2 Q0,Q1,Q2,Q3; /*Q: cubic bezier params*/
+										const bool isQuadratic = PC2==PathCode_Q2; 
+										acquireCubicBezierControlPoints(isQuadratic, P0,P1,P2,P3, Q0,Q1,Q2,Q3); 
+										const int N = ((isQuadratic)?($(bezierTesselationSettings.quadraticSegments)) :($(bezierTesselationSettings.cubicSegments))); 
+										if(Mode_PerPixel)
+										{
+											for(int i=0; i<N; i++)
+											{
+												vec2 R0,R1,R2,R3; 
+												if(splitBezier_ration(i, N, Q0,Q1,Q2,Q3, R0,R1,R2,R3))
+												{
+													/*
+														//local bezier params. This are simpler than the whole curve
+														setFragMode_C(FragMode_cubicBezier, R0, R1, R2, R3); 
+													*/
+													if(i>0) emitBezierAtStart(R0, R1, r); 
+													emitCubicBezierMidJoint(R0, R1, R2, R3, r, r); 
+												}
+											}
+										}
+										else
+										{
+											const float invN = 1.0/N; 
+											for(int i=1; i<N; i++)
+											emitCubicBezierAt(i*invN, Q0, Q1, Q2, Q3, r, r); 
+										}
+									}
+								}
+								else
+								{
+									//Todo: this should be P2, P3, P4.  As fast as it can!
+									emitLineJoint(
+										PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
+										P1, 
+										PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
+										r, r, r
+									); 
+								}
+							}
+						}
+						
+						//Todo: automatically close the final path via appending an empty PathCode_M
+					} 
+					
+					
+					//Internal state for batch operations
+					uint pendingChars = 0; 
+					bool repeated; 
+					uint repeatedChar; 
+					//Opt: put all this information into one uint!
+					void drawMove(inout BitStream bitStream)
+					{ P4 = fetchFormattedPoint2D(bitStream); } 
+					
+					void drawTexturedRect(inout BitStream bitStream)
+					{
+						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
+						
+						const uint handleFmt = fetchHandleFormat(bitStream); ; 
+						const uint texHandle = fetchHandle(bitStream, handleFmt); 
+						
+						fragColor = PC; fragBkColor = SC; 
+						setFragMode(FragMode_fullyFilled); 
+						setFragTexHandle(texHandle); 
+						fragTexCoordZ = 0; 
+						
+						emitTexturedPointPointRect2D(P3.xy, P4.xy); 
+					} 
+					
+					const bool EnbaleAsciiStrips = true; 
+					
+					void drawASCII_rect(uint ch)
+					{
+						vec2 size = vec2(getTexSize(FMH).xy); 
+						size *= FH*(1.0/size.y); 
+						fragTexCoordZ = ch; 
+						emitTexturedPointPointRect2D(P4.xy, P4.xy+size); 
+						
+						P4.x += size.x; //advance cursor
+					} 
+					
+					void drawASCII_strip(uint ch, bool isLast)
+					{
+						vec2 size = vec2(getTexSize(FMH).xy); //Opt: cache these size calculations
+						size *= FH*(1.0/size.y); 
+						
+						fragTexCoordZ = ch; 
+						
+						fragTexCoordXY.y = 0; emitVertex2D(P4.xy); 
+						fragTexCoordXY.y = 1; emitVertex2D(vec2(P4.x, P4.y + size.y)); 
+						
+						//advance
+						P4.x += size.x; 
+						fragTexCoordXY.x += 1; //only the .fract is used
+						
+						if(isLast)
+						{
+							fragTexCoordXY.y = 0; emitVertex2D(P4.xy); 
+							fragTexCoordXY.y = 1; emitVertex2D(vec2(P4.x, P4.y + size.y)); 
+							EndPrimitive(); 
+						}
+					} 
+					
+					void drawChars(inout BitStream bitStream, bool repeated_)
+					{
+						pendingChars = fetchBits(bitStream, 6)+1; 
+						repeated = repeated_; 
+						if(repeated) repeatedChar = fetchBits(bitStream, 8); 
+						
+						fragColor = PC; fragBkColor = SC; 
+						setFragTexHandle(FMH); 
+						setFragMode(EnbaleAsciiStrips ? FragMode_glyphStrip : FragMode_fullyFilled); 
+						fragTexCoordXY.x = 0; 
+					} 
+					
+					float 	Ph 	= 0, 
+						Ph_next 	= 0; 	/* Phase coordinate */
+						
+					int runningCntr = 256; 	/*
+						Execution is enabled if it's greater than 0
+						After every step it's decremented.
+					*/
+					
+					uint pendingPathCode = 0; 
+					
+					void processInstruction(inout BitStream bitStream) 
+					{
+						const bool canFetchInstr = pendingChars==0 && pendingPathCode==0; 
+						
+						if(canFetchInstr)
+						{
+							const uint opcode = 
+							fetchBits(bitStream, 5); const bool mainCat = 
+							getBit(opcode, 0); const uint subCat = 
+							getBits(opcode, 1, 2); const uint cmd = 
+							getBits(opcode, 3, 2); 
+							if(
+								!mainCat //settings
+							)
+							{
+								switch(subCat)
+								{
+									case 0: //system
+										switch(cmd)
+									{
+										case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
+										case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
+										case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
+										case 3: 	setTrans(bitStream); 	/*set output transformation*/	break; 
+									}
+									break; 
+									case 1: //colors
+										{
+										const uint fmt = fetchColorFormat(bitStream); 
+										int copyFlags = 0; /*bit0: RGB changed, bit1: Alpha changed*/
+										if(cmd!=1) copyFlags = fetchColor(bitStream, fmt, PC); 
+										if(cmd==1 || cmd==2) fetchColor(bitStream, fmt, SC); 
+										else if(cmd==3) {
+											if((copyFlags & 1)!=0) SC.rgb = PC.rgb; 
+											if((copyFlags & 2)!=0) SC.a = PC.a; 
+										}
+									}
+									break; 
+									case 2: //sizes
+										{
+										const uint fmt = fetchSizeFormat(bitStream); 
+										const float size = fetchSize(bitStream, fmt); 
+										switch(cmd)
+										{
+											case 0: 	PS = size; 	/* set pixel size*/	break; 
+											case 1: 	LW = size; 	/* set line width*/	break; 
+											case 2: 	DL = size; 	/* set dot length*/	break; 
+											case 3: 	FH = size; 	/* set font height*/	break; 
+										}
+									}
+									break; 
+									case 3: //handles
+										{
+										const uint handle = fetchHandle(bitStream, fetchHandleFormat(bitStream)); 
+										switch(cmd)
+										{
+											case 0: 	FMH = handle; 	/* set FontMap handle*/	break; 
+											case 1: 	LFMH = handle; 	/* set LatinFontMap handle*/	break; 
+											case 2: 	PALH = handle; 	/* set Palette handle*/	break; 
+											case 3: 	LTH = handle; 	/* set LineTexture handle*/	break; 
+										}
+									}
+									break; 
+								}
+							}else {
+								switch(subCat)
+								{
+									case 0: //SVG path 1
+									/*Opt: build a state machine from SVG PatCode stuff, so the it will require less gpu code and hopefully be faster.*/
+										switch(cmd)
+									{
+										case 0: 	/*Z: close path*/	/*Todo: close path*/break; 
+										case 1: 	/*M: move*/	pendingPathCode = PathCode_M; 	break; 
+										case 2: 	/*L: line*/	pendingPathCode = PathCode_L; 	break; 
+										case 3: 	/*T: smooth quadratic*/	pendingPathCode = PathCode_T1; 	break; 
+									}
+									break; 
+									case 1: //SVG path 2
+										switch(cmd)
+									{
+										case 0: 	/*Q: quadratic*/	pendingPathCode = PathCode_Q1; 	break; 
+										case 1: 	/*S: smooth cubic*/	pendingPathCode = PathCode_S1; 	break; 
+										case 2: 	/*C: cubic*/	pendingPathCode = PathCode_C1; 	break; 
+										case 3: 	/*TG: tangent move*/	pendingPathCode = PathCode_TG; 	break; 
+										
+										/*Todo: calculate arc on GPU: 1..4x simple cubic beziers*/
+										/*Todo: cubic b-spline a letrehozva a harmadolos modszerrel szerkesztett control pointokkal. */
+									}
+									break; 
+									case 2: 
+										switch(cmd)
+									{
+										case 0: 	/**/	break; 
+										case 1: 	/**/	break; 
+										case 2: 	/**/	break; 
+										case 3: 	/**/	break; 
+									}
+									break; 
+									case 3: 
+										switch(cmd)
+									{
+										case 0: 	drawMove(bitStream); 	break; 
+										case 1: 	drawTexturedRect(bitStream); 	break; 
+										case 2: 	drawChars(bitStream, false); 	break; 
+										case 3: 	drawChars(bitStream, /*repeat*/true); 	break; 
+									}
+									break; 
+								}
+							}
+						}
+						
+						if(pendingPathCode>0)
+						{
+							switch(pendingPathCode)
+							{
+								case PathCode_TG: 
+								case PathCode_M: case PathCode_L: 
+								case PathCode_Q1: case PathCode_Q2: 
+								case PathCode_C1: case PathCode_C2: case PathCode_C3: 
+									{
+									//Todo: set these states it less frequently!!!
+									fragColor = PC; fragBkColor = SC; setFragTexHandle(0); 
+									
+									latchP(fetchXY(bitStream, P4)); 
+									shiftInPathCode(pendingPathCode); 
+									pendingPathCode = PathCode_next(pendingPathCode); 
+								}	break; 
+								
+								default: pendingPathCode = 0; 
+							}
+						}
+						
+						if(pendingChars>0)
+						{
+							if(EnbaleAsciiStrips)
+							{
+								const bool isLast = pendingChars==1; 
+								drawASCII_strip(repeated ? repeatedChar : fetchBits(bitStream, 8), isLast); 
+							}
+							else
+							{ drawASCII_rect(repeated ? repeatedChar : fetchBits(bitStream, 8)); }
+							
+							pendingChars--; 
+						}
+					} 
+					
+					
+					void main() /*geometry shader*/
+					{
+						fragTexHandleAndMode = 0; 
+						fragTexCoordZ = 0; //this is normally 0. Fonts can temporarily change it.
+						fragFloats0 = vec4(1, 2, 3, 4); 
+						fragFloats1 = vec4(5, 6, 7, 8); 
+						
+						if(true)
+						{
+							BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
+							while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
+							{ processInstruction(GS); runningCntr--; }
+						}
+					} 
+					
+					@frag: 
+					
+					$(ShaderBufferDeclarations)
+					$(TexSizeFormat.GLSLCode)
+					
+					uint fragMode, fragTexHandle; 
+					vec2 texCoordXY; 
+					
+					void initFragmentParams()
+					{
+						fragMode = getFragMode; 
+						fragTexHandle = getFragTexHandle; 
+						texCoordXY = fragTexCoordXY; 
+					} 
+					/*
+						--------------------------------------------------------------
+							Cubic bezier approx distance 2 
+						--------------------------------------------------------------
+							Created by NinjaKoala in 2019-07-17
+							https://www.shadertoy.com/view/3lsSzS
+						--------------------------------------------------------------
+						
+						Copyright (c) <2024> <Felix Potthast>
+						Permission is hereby granted, free of charge, to any person obtaining a 
+						copy of this software and associated documentation files (the "Software"), 
+						to deal in the Software without restriction, including without limitation 
+						the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+						and/or sell copies of the Software, and to permit persons to whom the
+						Software is furnished to do so, subject to the following conditions:
+						
+						The above copyright notice and this permission notice shall be included 
+						in all copies or substantial portions of the Software.
+						
+						THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
+						KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+						WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
+						PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
+						OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
+						OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
+						OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+						SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+					*/
+					
+					/*
+						See also:
+						
+						Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
+						Exact distance computation: https://www.shadertoy.com/view/4sKyzW
+						Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
+						This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
+					*/
+					
+					const int bezier_num_iterations=3; /*def:3*/
+					const int bezier_num_start_params=3; /*def:3*/
+					
+					const int bezier_method=0; /*valid range: [0..3]*/
+					
+					//factor should be positive
+					//it decreases the step size when lowered.
+					//Lowering the factor and increasing iterations increases the area in which
+					//the iteration converges, but this is quite costly
+					const float bezier_factor=1; /*def:1*/
+					
+					float newton_iteration(vec3 coeffs, float x)
+					{
+						float a2=coeffs[2]+x; 
+						float a1=coeffs[1]+x*a2; 
+						float f=coeffs[0]+x*a1; 
+						float f1=((x+a2)*x)+a1; 
+						
+						return x-f/f1; 
+					} 
+					
+					float halley_iteration(vec3 coeffs, float x)
+					{
+						float a2=coeffs[2]+x; 
+						float a1=coeffs[1]+x*a2; 
+						float f=coeffs[0]+x*a1; 
+						
+						float b2=a2+x; 
+						float f1=a1+x*b2; 
+						float f2=2.*(b2+x); 
+						return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
+					} 
+					
+					float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
+					{
+						if(method<=1)
+						{
+							//horner's method
+							vec2 a_2=a2+t*a3; 
+							vec2 a_1=a1+t*a_2; 
+							vec2 b_2=a_2+t*a3; 
+							
+							vec2 uv_to_p=a0+t*a_1; 
+							vec2 tang=a_1+t*b_2; 
+							float l_tang=dot(tang,tang); 
+							
+							if(method==0/*normal iteration*/)
+							{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
+							else if(method==1/*normal iteration2*/)
+							{
+								vec2 snd_drv=2.*(b_2+t*a3); 
+								
+								float fac=dot(tang,snd_drv)/(2.*l_tang); 
+								float d=-dot(tang,uv_to_p); 
+								float t2=d/(l_tang+fac*d); 
+								return t+bezier_factor*t2; 
 							}
 						}
 						else
-						{ setFragModeAndFloats(FragMode_fullyFilled, vec2(0), vec2(0), vec2(0), vec2(0), false); }
+						{
+							vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
+							vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
+							
+							if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
+							else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
+						}
+						return 0; 
+					} 
+					
+					float cubic_bezier_dis_approx(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					{
+						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+						vec2 a1 = (-3. * p0 + 3. * p1); 
+						vec2 a0 = p0 - uv; 
+						
+						float d0 = 1e38, t0=0.; 
+						for(int i=0;i<bezier_num_start_params;i++)
+						{
+							float t=t0; 
+							for(int j=0;j<bezier_num_iterations;j++)
+							{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
+							t=clamp(t,0.,1.); 
+							vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
+							d0=min(d0,dot(uv_to_p,uv_to_p)); 
+							
+							t0+=1./float(bezier_num_start_params-1); 
+						}
+						
+						return sqrt(d0); 
+					} 
+					
+					/*
+						Exact distance to cubic bezier curve by computing roots of the derivative(s)
+						to isolate roots of a fifth degree polynomial and Halley's Method to compute them.
+						Inspired by https://www.shadertoy.com/view/4sXyDr and https://www.shadertoy.com/view/ldXXWH
+						See also my approximate version:
+						https://www.shadertoy.com/view/lsByRG
+					*/
+					const float bezier_eps = .000005; 
+					const int halley_iterations = 8; 
+					
+					//lagrange positive real root upper bound
+					//see for example: https://doi.org/10.1016/j.jsc.2014.09.038
+					float upper_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
+					{
+						vec4 coeffs1 = vec4(a0,a1,a2,a3); 
+						
+						vec4 neg1 = max(-coeffs1,vec4(0)); 
+						float neg2 = max(-a4,0.); 
+						
+						const vec4 indizes1 = vec4(0,1,2,3); 
+						const float indizes2 = 4.; 
+						
+						vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
+						float bounds2 = pow(neg2,1./(5.-indizes2)); 
+						
+						vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
+						vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
+						
+						float maxmin = max(min1_2.x,min1_2.y); 
+						float minmax = min(max1_2.x,max1_2.y); 
+						
+						float max3 = max(max1_2.x,max1_2.y); 
+						
+						float max_max = max(max3,bounds2); 
+						float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
+						
+						return max_max + max_max2; 
+					} 
+					
+					//lagrange upper bound applied to f(-x) to get lower bound
+					float lower_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
+					{
+						vec4 coeffs1 = vec4(-a0,a1,-a2,a3); 
+						
+						vec4 neg1 = max(-coeffs1,vec4(0)); 
+						float neg2 = max(-a4,0.); 
+						
+						const vec4 indizes1 = vec4(0,1,2,3); 
+						const float indizes2 = 4.; 
+						
+						vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
+						float bounds2 = pow(neg2,1./(5.-indizes2)); 
+						
+						vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
+						vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
+						
+						float maxmin = max(min1_2.x,min1_2.y); 
+						float minmax = min(max1_2.x,max1_2.y); 
+						
+						float max3 = max(max1_2.x,max1_2.y); 
+						
+						float max_max = max(max3,bounds2); 
+						float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
+						
+						return -max_max - max_max2; 
+					} 
+					
+					vec2 parametric_cub_bezier(float t, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					{
+						vec2 a0 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+						vec2 a1 = (3. * p0  -6. * p1 + 3. * p2); 
+						vec2 a2 = (-3. * p0 + 3. * p1); 
+						vec2 a3 = p0; 
+						
+						return (((a0 * t) + a1) * t + a2) * t + a3; 
+					} 
+					
+					void sort_roots3(inout vec3 roots)
+					{
+						vec3 tmp; 
+						
+						tmp[0] = min(roots[0],min(roots[1],roots[2])); 
+						tmp[1] = max(roots[0],min(roots[1],roots[2])); 
+						tmp[2] = max(roots[0],max(roots[1],roots[2])); 
+						
+						roots=tmp; 
+					} 
+					
+					void sort_roots4(inout vec4 roots)
+					{
+						vec4 tmp; 
+						
+						vec2 min1_2 = min(roots.xz,roots.yw); 
+						vec2 max1_2 = max(roots.xz,roots.yw); 
+						
+						float maxmin = max(min1_2.x,min1_2.y); 
+						float minmax = min(max1_2.x,max1_2.y); 
+						
+						tmp[0] = min(min1_2.x,min1_2.y); 
+						tmp[1] = min(maxmin,minmax); 
+						tmp[2] = max(minmax,maxmin); 
+						tmp[3] = max(max1_2.x,max1_2.y); 
+						
+						roots = tmp; 
+					} 
+					
+					float eval_poly5(float a0, float a1, float a2, float a3, float a4, float x)
+					{
+						float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
+						return f; 
+					} 
+					
+					//halley's method
+					//basically a variant of newton raphson which converges quicker and has bigger basins of convergence
+					//see http://mathworld.wolfram.com/HalleysMethod.html
+					//or https://en.wikipedia.org/wiki/Halley%27s_method
+					float halley_iteration5(float a0, float a1, float a2, float a3, float a4, float x)
+					{
+						float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
+						float f1 = (((5. * x + 4. * a4) * x + 3. * a3) * x + 2. * a2) * x + a1; 
+						float f2 = ((20. * x + 12. * a4) * x + 6. * a3) * x + 2. * a2; 
+						
+						return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
+					} 
+					
+					float halley_iteration4(vec4 coeffs, float x)
+					{
+						float f = (((x + coeffs[3]) * x + coeffs[2]) * x + coeffs[1]) * x + coeffs[0]; 
+						float f1 = ((4. * x + 3. * coeffs[3]) * x + 2. * coeffs[2]) * x + coeffs[1]; 
+						float f2 = (12. * x + 6. * coeffs[3]) * x + 2. * coeffs[2]; 
+						
+						return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
+					} 
+					
+					// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+					// Credits to Doublefresh for hinting there
+					int solve_quadric(vec2 coeffs, inout vec2 roots)
+					{
+						// normal form: x^2 + px + q = 0
+						float p = coeffs[1] / 2.; 
+						float q = coeffs[0]; 
+						
+						float D = p * p - q; 
+						
+						if(D < 0.) { return 0; }
+						else if(D > 0.) {
+							roots[0] = -sqrt(D) - p; 
+							roots[1] = sqrt(D) - p; 
+							
+							return 2; 
+						}
+					} 
+					
+					//From Trisomie21
+					//But instead of his cancellation fix i'm using a newton iteration
+					int solve_cubic(vec3 coeffs, inout vec3 r)
+					{
+						
+						float a = coeffs[2]; 
+						float b = coeffs[1]; 
+						float c = coeffs[0]; 
+						
+						float p = b - a*a / 3.0; 
+						float q = a * (2.0*a*a - 9.0*b) / 27.0 + c; 
+						float p3 = p*p*p; 
+						float d = q*q + 4.0*p3 / 27.0; 
+						float offset = -a / 3.0; 
+						if(d >= 0.0) {
+							 // Single solution
+							float z = sqrt(d); 
+							float u = (-q + z) / 2.0; 
+							float v = (-q - z) / 2.0; 
+							u = sign(u)*pow(abs(u),1.0/3.0); 
+							v = sign(v)*pow(abs(v),1.0/3.0); 
+							r[0] = offset + u + v; 	
+									
+							//Single newton iteration to account for cancellation
+							float f = ((r[0] + a) * r[0] + b) * r[0] + c; 
+							float f1 = (3. * r[0] + 2. * a) * r[0] + b; 
+									
+							r[0] -= f / f1; 
+									
+							return 1; 
+						}
+						float u = sqrt(-p / 3.0); 
+						float v = acos(-sqrt( -27.0 / p3) * q / 2.0) / 3.0; 
+						float m = cos(v), n = sin(v)*1.732050808; 
+						
+						//Single newton iteration to account for cancellation
+						//(once for every root)
+						r[0]	= offset + u * (m + m); 
+						r[1] = offset - u * (n + m); 
+						r[2] = offset + u * (n - m); 
+						
+						vec3 f = ((r + a) * r + b) * r + c; 
+						vec3 f1 = (3. * r + 2. * a) * r + b; 
+						
+						r -= f / f1; 
+						
+						return 3; 
+					} 
+					
+					// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+					// Credits to Doublefresh for hinting there
+					int solve_quartic(vec4 coeffs, inout vec4 s)
+					{
+						float a = coeffs[3]; 
+						float b = coeffs[2]; 
+						float c = coeffs[1]; 
+						float d = coeffs[0]; 
 						
 						/*
-							Todo: Remake this in a way that it emits evry primitive as fast as it can.
-							It is maybe impossible because beziers must know their control points BEFORE the first verices.
+							  substitute x = y - A/4 to eliminate cubic term:
+										x^4 + px^2 + qx + r = 0 
 						*/
-						if(PC1>=PathCode_L || PC2>=PathCode_L /*any line or curve*/)
+						
+						float sq_a = a * a; 
+						float p = - 3./8. * sq_a + b; 
+						float q = 1./8. * sq_a * a - 1./2. * a * b + c; 
+						float r = - 3./256.*sq_a*sq_a + 1./16.*sq_a*b - 1./4.*a*c + d; 
+						
+						int num; 
+						
+						/* doesn't seem to happen for me */
+						//if(abs(r)<eps){
+						//	/* no absolute term: y(y^3 + py + q) = 0 */
+						
+						//	vec3 cubic_coeffs;
+						
+						//	cubic_coeffs[0] = q;
+						//	cubic_coeffs[1] = p;
+						//	cubic_coeffs[2] = 0.;
+						
+						//	num = solve_cubic(cubic_coeffs, s.xyz);
+						
+						//	s[num] = 0.;
+						//	num++;
+						//}
 						{
-							if(PC2==PathCode_Q2 || PC2==PathCode_C2 || PC2==PathCode_C3 /*any curve*/)
+							/* solve the resolvent cubic ... */
+							
+							vec3 cubic_coeffs; 
+							
+							cubic_coeffs[0] = 1.0/2. * r * p - 1.0/8. * q * q; 
+							cubic_coeffs[1] = - r; 
+							cubic_coeffs[2] = - 1.0/2. * p; 
+							
+							solve_cubic(cubic_coeffs, s.xyz); 
+							
+							/* ... and take the one real solution ... */
+							
+							float z = s[0]; 
+							
+							/* ... to build two quadric equations */
+							
+							float u = z * z - r; 
+							float v = 2. * z - p; 
+							
+							if(u > -bezier_eps) { u = sqrt(abs(u)); }
+							else	{ return 0; }
+							
+							if(v > -bezier_eps) { v = sqrt(abs(v)); }
+							else	{ return 0; }
+							
+							vec2 quad_coeffs; 
+							
+							quad_coeffs[0] = z - u; 
+							quad_coeffs[1] = q < 0. ? -v : v; 
+							
+							num = solve_quadric(quad_coeffs, s.xy); 
+							
+							quad_coeffs[0]= z + u; 
+							quad_coeffs[1] = q < 0. ? v : -v; 
+							
+							vec2 tmp=vec2(1e38); 
+							int old_num=num; 
+							
+							num += solve_quadric(quad_coeffs, tmp); 
+							if(old_num!=num) {
+								if(old_num == 0) {
+									 s[0] = tmp[0]; 
+									 s[1] = tmp[1]; 
+								}
+								else {
+									//old_num == 2
+									s[2] = tmp[0]; 
+									s[3] = tmp[1]; 
+								}
+							}
+						}
+						
+						/* resubstitute */
+						
+						float sub = 1./4. * a; 
+						
+						/* single halley iteration to fix cancellation */
+						for(int i=0;i<4;i+=2) {
+							if(i < num) {
+								s[i] -= sub; 
+								s[i] = halley_iteration4(coeffs,s[i]); 
+								
+								s[i+1] -= sub; 
+								s[i+1] = halley_iteration4(coeffs,s[i+1]); 
+							}
+						}
+						
+						return num; 
+					} 
+					float cubic_bezier_dis_exact(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					{
+						//switch points when near to end point to minimize numerical error
+						//only needed when control point(s) very far away
+						if(false)
+						{
+							vec2 mid_curve = parametric_cub_bezier(.5,p0,p1,p2,p3); 
+							vec2 mid_points = (p0 + p3)/2.; 
+							
+							vec2 tang = mid_curve-mid_points; 
+							vec2 nor = vec2(tang.y,-tang.x); 
+							
+							if(sign(dot(nor,uv-mid_curve)) != sign(dot(nor,p0-mid_curve)))
 							{
-								if(PC2!=PathCode_C3)
+								vec2 tmp = p0; 
+								p0 = p3; 
+								p3 = tmp; 
+								
+								tmp = p2; 
+								p2 = p1; 
+								p1 = tmp; 
+							}
+						}
+						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+						vec2 a1 = (-3. * p0 + 3. * p1); 
+						vec2 a0 = p0 - uv; 
+						
+						//compute polynomial describing distance to current pixel dependent on a parameter t
+						float bc6 = dot(a3,a3); 
+						float bc5 = 2.*dot(a3,a2); 
+						float bc4 = dot(a2,a2) + 2.*dot(a1,a3); 
+						float bc3 = 2.*(dot(a1,a2) + dot(a0,a3)); 
+						float bc2 = dot(a1,a1) + 2.*dot(a0,a2); 
+						float bc1 = 2.*dot(a0,a1); 
+						float bc0 = dot(a0,a0); 
+						
+						bc5 /= bc6; 
+						bc4 /= bc6; 
+						bc3 /= bc6; 
+						bc2 /= bc6; 
+						bc1 /= bc6; 
+						bc0 /= bc6; 
+						
+						//compute derivatives of this polynomial
+						
+						float b0 = bc1 / 6.; 
+						float b1 = 2. * bc2 / 6.; 
+						float b2 = 3. * bc3 / 6.; 
+						float b3 = 4. * bc4 / 6.; 
+						float b4 = 5. * bc5 / 6.; 
+						
+						vec4 c1 = vec4(b1,2.*b2,3.*b3,4.*b4)/5.; 
+						vec3 c2 = vec3(c1[1],2.*c1[2],3.*c1[3])/4.; 
+						vec2 c3 = vec2(c2[1],2.*c2[2])/3.; 
+						float c4 = c3[1]/2.; 
+						
+						vec4 roots_drv = vec4(1e38); 
+						
+						int num_roots_drv = solve_quartic(c1,roots_drv); 
+						sort_roots4(roots_drv); 
+						
+						float ub = upper_bound_lagrange5(b0,b1,b2,b3,b4); 
+						float lb = lower_bound_lagrange5(b0,b1,b2,b3,b4); 
+						
+						vec3 a = vec3(1e38); 
+						vec3 b = vec3(1e38); 
+						
+						vec3 roots = vec3(1e38); 
+						
+						int num_roots = 0; 
+						
+						//compute root isolating intervals by roots of derivative and outer root bounds
+						//only roots going form - to + considered, because only those result in a minimum
+						if(num_roots_drv==4)
+						{
+							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) > 0.)
+							{
+								a[0]=lb; 
+								b[0]=roots_drv[0]; 
+								num_roots=1; 
+							}
+							
+							if(
+								sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1])) != 
+								sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[2]))
+							)
+							{
+								if(num_roots == 0)
 								{
-									vec2 Q0,Q1,Q2,Q3; /*Q: cubic bezier params*/
-									const bool isQuadratic = PC2==PathCode_Q2; 
-									acquireCubicBezierControlPoints(isQuadratic, P0,P1,P2,P3, Q0,Q1,Q2,Q3); 
-									const int N = ((isQuadratic)?($(bezierTesselationSettings.quadraticSegments)) :($(bezierTesselationSettings.cubicSegments))); 
-									if(Mode_PerPixel)
+									a[0]=roots_drv[1]; 
+									b[0]=roots_drv[2]; 
+									num_roots=1; 
+								}
+								else
+								{
+									a[1]=roots_drv[1]; 
+									b[1]=roots_drv[2]; 
+									num_roots=2; 
+								}
+							}
+							
+							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[3]) < 0.)
+							{
+								if(num_roots == 0)
+								{
+									a[0]=roots_drv[3]; 
+									b[0]=ub; 
+									num_roots=1; 
+								}
+								else if(num_roots == 1)
+								{
+									a[1]=roots_drv[3]; 
+									b[1]=ub; 
+									num_roots=2; 
+								}
+								else
+								{
+									a[2]=roots_drv[3]; 
+									b[2]=ub; 
+									num_roots=3; 
+								}
+							}
+						}else {
+							if(num_roots_drv==2)
+							{
+								if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) < 0.)
+								{
+									num_roots=1; 
+									a[0]=roots_drv[1]; 
+									b[0]=ub; 
+								}
+								else if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1]) > 0.)
+								{
+									num_roots=1; 
+									a[0]=lb; 
+									b[0]=roots_drv[0]; 
+								}
+								else
+								{
+									num_roots=2; 
+									
+									a[0]=lb; 
+									b[0]=roots_drv[0]; 
+									
+									a[1]=roots_drv[1]; 
+									b[1]=ub; 
+								}
+							}
+							else {
+								//num_roots_drv==0
+								vec3 roots_snd_drv=vec3(1e38); 
+								int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
+								
+								vec2 roots_trd_drv=vec2(1e38); 
+								int num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); 
+								num_roots=1; 
+								
+								a[0]=lb; 
+								b[0]=ub; 
+							}
+							
+							//further subdivide intervals to guarantee convergence of halley's method
+							//by using roots of further derivatives
+							vec3 roots_snd_drv=vec3(1e38); 
+							int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
+							sort_roots3(roots_snd_drv); 
+							
+							int num_roots_trd_drv=0; 
+							vec2 roots_trd_drv=vec2(1e38); 
+							
+							if(num_roots_snd_drv!=3) { num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); }
+							
+							for(int i=0;i<3;i++)
+							{
+								if(i < num_roots)
+								{
+									for(int j=0;j<3;j+=2)
 									{
-										for(int i=0; i<N; i++)
+										if(j < num_roots_snd_drv)
 										{
-											vec2 R0,R1,R2,R3; 
-											if(splitBezier_ration(i, N, Q0,Q1,Q2,Q3, R0,R1,R2,R3))
+											if(a[i] < roots_snd_drv[j] && b[i] > roots_snd_drv[j])
 											{
-												/*
-													//local bezier params. This are simpler than the whole curve
-													setFragMode_C(FragMode_cubicBezier, R0, R1, R2, R3); 
-												*/
-												if(i>0) emitBezierAtStart(R0, R1, r); 
-												emitCubicBezierMidJoint(R0, R1, R2, R3, r, r); 
+												if(eval_poly5(b0,b1,b2,b3,b4,roots_snd_drv[j]) > 0.)
+												{ b[i]=roots_snd_drv[j]; }
+												else { a[i]=roots_snd_drv[j]; }
 											}
 										}
 									}
-									else
+									for(int j=0;j<2;j++)
 									{
-										const float invN = 1.0/N; 
-										for(int i=1; i<N; i++)
-										emitCubicBezierAt(i*invN, Q0, Q1, Q2, Q3, r, r); 
+										if(j < num_roots_trd_drv)
+										{
+											if(a[i] < roots_trd_drv[j] && b[i] > roots_trd_drv[j])
+											{
+												if(eval_poly5(b0,b1,b2,b3,b4,roots_trd_drv[j]) > 0.)
+												{ b[i]=roots_trd_drv[j]; }
+												else { a[i]=roots_trd_drv[j]; }
+											}
+										}
 									}
 								}
 							}
-							else
-							{
-								//Todo: this should be P2, P3, P4.  As fast as it can!
-								emitLineJoint(
-									PathCode(1)<=PathCode_M ? vec2(nan) : P0, 
-									P1, 
-									PathCode(2)<=PathCode_M ? vec2(nan) : P2, 
-									r, r, r
-								); 
-							}
-						}
-					}
-					
-					//Todo: automatically close the final path via appending an empty PathCode_M
-				} 
-				
-				
-				//Internal state for batch operations
-				uint pendingChars = 0; 
-				bool repeated; 
-				uint repeatedChar; 
-				//Opt: put all this information into one uint!
-				void drawMove(inout BitStream bitStream)
-				{ P4 = fetchFormattedPoint2D(bitStream); } 
-				
-				void drawTexturedRect(inout BitStream bitStream)
-				{
-					P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
-					
-					const uint handleFmt = fetchHandleFormat(bitStream); ; 
-					const uint texHandle = fetchHandle(bitStream, handleFmt); 
-					
-					fragColor = PC; fragBkColor = SC; 
-					setFragMode(FragMode_fullyFilled); 
-					setFragTexHandle(texHandle); 
-					fragTexCoordZ = 0; 
-					
-					emitTexturedPointPointRect2D(P3.xy, P4.xy); 
-				} 
-				
-				const bool EnbaleAsciiStrips = true; 
-				
-				void drawASCII_rect(uint ch)
-				{
-					vec2 size = vec2(getTexSize(FMH).xy); 
-					size *= FH*(1.0/size.y); 
-					fragTexCoordZ = ch; 
-					emitTexturedPointPointRect2D(P4.xy, P4.xy+size); 
-					
-					P4.x += size.x; //advance cursor
-				} 
-				
-				void drawASCII_strip(uint ch, bool isLast)
-				{
-					vec2 size = vec2(getTexSize(FMH).xy); //Opt: cache these size calculations
-					size *= FH*(1.0/size.y); 
-					
-					fragTexCoordZ = ch; 
-					
-					fragTexCoordXY.y = 0; emitVertex2D(P4.xy); 
-					fragTexCoordXY.y = 1; emitVertex2D(vec2(P4.x, P4.y + size.y)); 
-					
-					//advance
-					P4.x += size.x; 
-					fragTexCoordXY.x += 1; //only the .fract is used
-					
-					if(isLast)
-					{
-						fragTexCoordXY.y = 0; emitVertex2D(P4.xy); 
-						fragTexCoordXY.y = 1; emitVertex2D(vec2(P4.x, P4.y + size.y)); 
-						EndPrimitive(); 
-					}
-				} 
-				
-				void drawChars(inout BitStream bitStream, bool repeated_)
-				{
-					pendingChars = fetchBits(bitStream, 6)+1; 
-					repeated = repeated_; 
-					if(repeated) repeatedChar = fetchBits(bitStream, 8); 
-					
-					fragColor = PC; fragBkColor = SC; 
-					setFragTexHandle(FMH); 
-					setFragMode(EnbaleAsciiStrips ? FragMode_glyphStrip : FragMode_fullyFilled); 
-					fragTexCoordXY.x = 0; 
-				} 
-				
-				float 	Ph 	= 0, 
-					Ph_next 	= 0; 	/* Phase coordinate */
-					
-				int runningCntr = 256; 	/*
-					Execution is enabled if it's greater than 0
-					After every step it's decremented.
-				*/
-				
-				uint pendingPathCode = 0; 
-				
-				void processInstruction(inout BitStream bitStream) 
-				{
-					const bool canFetchInstr = pendingChars==0 && pendingPathCode==0; 
-					
-					if(canFetchInstr)
-					{
-						const uint opcode = 
-						fetchBits(bitStream, 5); const bool mainCat = 
-						getBit(opcode, 0); const uint subCat = 
-						getBits(opcode, 1, 2); const uint cmd = 
-						getBits(opcode, 3, 2); 
-						if(
-							!mainCat //settings
-						)
-						{
-							switch(subCat)
-							{
-								case 0: //system
-									switch(cmd)
-								{
-									case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
-									case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
-									case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
-									case 3: 	setTrans(bitStream); 	/*set output transformation*/	break; 
-								}
-								break; 
-								case 1: //colors
-									{
-									const uint fmt = fetchColorFormat(bitStream); 
-									int copyFlags = 0; /*bit0: RGB changed, bit1: Alpha changed*/
-									if(cmd!=1) copyFlags = fetchColor(bitStream, fmt, PC); 
-									if(cmd==1 || cmd==2) fetchColor(bitStream, fmt, SC); 
-									else if(cmd==3) {
-										if((copyFlags & 1)!=0) SC.rgb = PC.rgb; 
-										if((copyFlags & 2)!=0) SC.a = PC.a; 
-									}
-								}
-								break; 
-								case 2: //sizes
-									{
-									const uint fmt = fetchSizeFormat(bitStream); 
-									const float size = fetchSize(bitStream, fmt); 
-									switch(cmd)
-									{
-										case 0: 	PS = size; 	/* set pixel size*/	break; 
-										case 1: 	LW = size; 	/* set line width*/	break; 
-										case 2: 	DL = size; 	/* set dot length*/	break; 
-										case 3: 	FH = size; 	/* set font height*/	break; 
-									}
-								}
-								break; 
-								case 3: //handles
-									{
-									const uint handle = fetchHandle(bitStream, fetchHandleFormat(bitStream)); 
-									switch(cmd)
-									{
-										case 0: 	FMH = handle; 	/* set FontMap handle*/	break; 
-										case 1: 	LFMH = handle; 	/* set LatinFontMap handle*/	break; 
-										case 2: 	PALH = handle; 	/* set Palette handle*/	break; 
-										case 3: 	LTH = handle; 	/* set LineTexture handle*/	break; 
-									}
-								}
-								break; 
-							}
-						}else {
-							switch(subCat)
-							{
-								case 0: //SVG path 1
-								/*Opt: build a state machine from SVG PatCode stuff, so the it will require less gpu code and hopefully be faster.*/
-									switch(cmd)
-								{
-									case 0: 	/*Z: close path*/	/*Todo: close path*/break; 
-									case 1: 	/*M: move*/	pendingPathCode = PathCode_M; 	break; 
-									case 2: 	/*L: line*/	pendingPathCode = PathCode_L; 	break; 
-									case 3: 	/*T: smooth quadratic*/	pendingPathCode = PathCode_T1; 	break; 
-								}
-								break; 
-								case 1: //SVG path 2
-									switch(cmd)
-								{
-									case 0: 	/*Q: quadratic*/	pendingPathCode = PathCode_Q1; 	break; 
-									case 1: 	/*S: smooth cubic*/	pendingPathCode = PathCode_S1; 	break; 
-									case 2: 	/*C: cubic*/	pendingPathCode = PathCode_C1; 	break; 
-									case 3: 	/*TG: tangent move*/	pendingPathCode = PathCode_TG; 	break; 
-									
-									/*Todo: calculate arc on GPU: 1..4x simple cubic beziers*/
-									/*Todo: cubic b-spline a letrehozva a harmadolos modszerrel szerkesztett control pointokkal. */
-								}
-								break; 
-								case 2: 
-									switch(cmd)
-								{
-									case 0: 	/**/	break; 
-									case 1: 	/**/	break; 
-									case 2: 	/**/	break; 
-									case 3: 	/**/	break; 
-								}
-								break; 
-								case 3: 
-									switch(cmd)
-								{
-									case 0: 	drawMove(bitStream); 	break; 
-									case 1: 	drawTexturedRect(bitStream); 	break; 
-									case 2: 	drawChars(bitStream, false); 	break; 
-									case 3: 	drawChars(bitStream, /*repeat*/true); 	break; 
-								}
-								break; 
-							}
-						}
-					}
-					
-					if(pendingPathCode>0)
-					{
-						switch(pendingPathCode)
-						{
-							case PathCode_TG: 
-							case PathCode_M: case PathCode_L: 
-							case PathCode_Q1: case PathCode_Q2: 
-							case PathCode_C1: case PathCode_C2: case PathCode_C3: 
-								{
-								//Todo: set these states it less frequently!!!
-								fragColor = PC; fragBkColor = SC; setFragTexHandle(0); 
-								
-								latchP(fetchXY(bitStream, P4)); 
-								shiftInPathCode(pendingPathCode); 
-								pendingPathCode = PathCode_next(pendingPathCode); 
-							}	break; 
-							
-							default: pendingPathCode = 0; 
-						}
-					}
-					
-					if(pendingChars>0)
-					{
-						if(EnbaleAsciiStrips)
-						{
-							const bool isLast = pendingChars==1; 
-							drawASCII_strip(repeated ? repeatedChar : fetchBits(bitStream, 8), isLast); 
-						}
-						else
-						{ drawASCII_rect(repeated ? repeatedChar : fetchBits(bitStream, 8)); }
-						
-						pendingChars--; 
-					}
-				} 
-				
-				
-				void main() /*geometry shader*/
-				{
-					fragTexHandleAndMode = 0; 
-					fragTexCoordZ = 0; //this is normally 0. Fonts can temporarily change it.
-					fragFloats0 = vec4(1, 2, 3, 4); 
-					fragFloats1 = vec4(5, 6, 7, 8); 
-					
-					if(true)
-					{
-						BitStream GS = initBitStream(geomGSBitOfs[0]/*, geomGSBitOfs[0]+10000*/); 
-						while(runningCntr>0/* && GS.totalBitsRemaining>0*//*overflow check*/)
-						{ processInstruction(GS); runningCntr--; }
-					}
-				} 
-				
-				@frag: 
-				
-				$(ShaderBufferDeclarations)
-				$(TexSizeFormat.GLSLCode)
-				
-				uint fragMode, fragTexHandle; 
-				vec2 texCoordXY; 
-				
-				void initFragmentParams()
-				{
-					fragMode = getFragMode; 
-					fragTexHandle = getFragTexHandle; 
-					texCoordXY = fragTexCoordXY; 
-				} 
-				/*
-					--------------------------------------------------------------
-						Cubic bezier approx distance 2 
-					--------------------------------------------------------------
-						Created by NinjaKoala in 2019-07-17
-						https://www.shadertoy.com/view/3lsSzS
-					--------------------------------------------------------------
-					
-					Copyright (c) <2024> <Felix Potthast>
-					Permission is hereby granted, free of charge, to any person obtaining a 
-					copy of this software and associated documentation files (the "Software"), 
-					to deal in the Software without restriction, including without limitation 
-					the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-					and/or sell copies of the Software, and to permit persons to whom the
-					Software is furnished to do so, subject to the following conditions:
-					
-					The above copyright notice and this permission notice shall be included 
-					in all copies or substantial portions of the Software.
-					
-					THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
-					KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-					WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
-					PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
-					OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
-					OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-					OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-					SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-				*/
-				
-				/*
-					See also:
-					
-					Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
-					Exact distance computation: https://www.shadertoy.com/view/4sKyzW
-					Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
-					This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
-				*/
-				
-				const int bezier_num_iterations=3; /*def:3*/
-				const int bezier_num_start_params=3; /*def:3*/
-				
-				const int bezier_method=0; /*valid range: [0..3]*/
-				
-				//factor should be positive
-				//it decreases the step size when lowered.
-				//Lowering the factor and increasing iterations increases the area in which
-				//the iteration converges, but this is quite costly
-				const float bezier_factor=1; /*def:1*/
-				
-				float newton_iteration(vec3 coeffs, float x)
-				{
-					float a2=coeffs[2]+x; 
-					float a1=coeffs[1]+x*a2; 
-					float f=coeffs[0]+x*a1; 
-					float f1=((x+a2)*x)+a1; 
-					
-					return x-f/f1; 
-				} 
-				
-				float halley_iteration(vec3 coeffs, float x)
-				{
-					float a2=coeffs[2]+x; 
-					float a1=coeffs[1]+x*a2; 
-					float f=coeffs[0]+x*a1; 
-					
-					float b2=a2+x; 
-					float f1=a1+x*b2; 
-					float f2=2.*(b2+x); 
-					return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
-				} 
-				
-				float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
-				{
-					if(method<=1)
-					{
-						//horner's method
-						vec2 a_2=a2+t*a3; 
-						vec2 a_1=a1+t*a_2; 
-						vec2 b_2=a_2+t*a3; 
-						
-						vec2 uv_to_p=a0+t*a_1; 
-						vec2 tang=a_1+t*b_2; 
-						float l_tang=dot(tang,tang); 
-						
-						if(method==0/*normal iteration*/)
-						{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
-						else if(method==1/*normal iteration2*/)
-						{
-							vec2 snd_drv=2.*(b_2+t*a3); 
-							
-							float fac=dot(tang,snd_drv)/(2.*l_tang); 
-							float d=-dot(tang,uv_to_p); 
-							float t2=d/(l_tang+fac*d); 
-							return t+bezier_factor*t2; 
-						}
-					}
-					else
-					{
-						vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
-						vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
-						
-						if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
-						else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
-					}
-					return 0; 
-				} 
-				
-				float cubic_bezier_dis_approx(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-				{
-					vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-					vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-					vec2 a1 = (-3. * p0 + 3. * p1); 
-					vec2 a0 = p0 - uv; 
-					
-					float d0 = 1e38, t0=0.; 
-					for(int i=0;i<bezier_num_start_params;i++)
-					{
-						float t=t0; 
-						for(int j=0;j<bezier_num_iterations;j++)
-						{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
-						t=clamp(t,0.,1.); 
-						vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
-						d0=min(d0,dot(uv_to_p,uv_to_p)); 
-						
-						t0+=1./float(bezier_num_start_params-1); 
-					}
-					
-					return sqrt(d0); 
-				} 
-				
-				/*
-					Exact distance to cubic bezier curve by computing roots of the derivative(s)
-					to isolate roots of a fifth degree polynomial and Halley's Method to compute them.
-					Inspired by https://www.shadertoy.com/view/4sXyDr and https://www.shadertoy.com/view/ldXXWH
-					See also my approximate version:
-					https://www.shadertoy.com/view/lsByRG
-				*/
-				const float bezier_eps = .000005; 
-				const int halley_iterations = 8; 
-				
-				//lagrange positive real root upper bound
-				//see for example: https://doi.org/10.1016/j.jsc.2014.09.038
-				float upper_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
-				{
-					vec4 coeffs1 = vec4(a0,a1,a2,a3); 
-					
-					vec4 neg1 = max(-coeffs1,vec4(0)); 
-					float neg2 = max(-a4,0.); 
-					
-					const vec4 indizes1 = vec4(0,1,2,3); 
-					const float indizes2 = 4.; 
-					
-					vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
-					float bounds2 = pow(neg2,1./(5.-indizes2)); 
-					
-					vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
-					vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
-					
-					float maxmin = max(min1_2.x,min1_2.y); 
-					float minmax = min(max1_2.x,max1_2.y); 
-					
-					float max3 = max(max1_2.x,max1_2.y); 
-					
-					float max_max = max(max3,bounds2); 
-					float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
-					
-					return max_max + max_max2; 
-				} 
-				
-				//lagrange upper bound applied to f(-x) to get lower bound
-				float lower_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
-				{
-					vec4 coeffs1 = vec4(-a0,a1,-a2,a3); 
-					
-					vec4 neg1 = max(-coeffs1,vec4(0)); 
-					float neg2 = max(-a4,0.); 
-					
-					const vec4 indizes1 = vec4(0,1,2,3); 
-					const float indizes2 = 4.; 
-					
-					vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
-					float bounds2 = pow(neg2,1./(5.-indizes2)); 
-					
-					vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
-					vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
-					
-					float maxmin = max(min1_2.x,min1_2.y); 
-					float minmax = min(max1_2.x,max1_2.y); 
-					
-					float max3 = max(max1_2.x,max1_2.y); 
-					
-					float max_max = max(max3,bounds2); 
-					float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
-					
-					return -max_max - max_max2; 
-				} 
-				
-				vec2 parametric_cub_bezier(float t, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-				{
-					vec2 a0 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-					vec2 a1 = (3. * p0  -6. * p1 + 3. * p2); 
-					vec2 a2 = (-3. * p0 + 3. * p1); 
-					vec2 a3 = p0; 
-					
-					return (((a0 * t) + a1) * t + a2) * t + a3; 
-				} 
-				
-				void sort_roots3(inout vec3 roots)
-				{
-					vec3 tmp; 
-					
-					tmp[0] = min(roots[0],min(roots[1],roots[2])); 
-					tmp[1] = max(roots[0],min(roots[1],roots[2])); 
-					tmp[2] = max(roots[0],max(roots[1],roots[2])); 
-					
-					roots=tmp; 
-				} 
-				
-				void sort_roots4(inout vec4 roots)
-				{
-					vec4 tmp; 
-					
-					vec2 min1_2 = min(roots.xz,roots.yw); 
-					vec2 max1_2 = max(roots.xz,roots.yw); 
-					
-					float maxmin = max(min1_2.x,min1_2.y); 
-					float minmax = min(max1_2.x,max1_2.y); 
-					
-					tmp[0] = min(min1_2.x,min1_2.y); 
-					tmp[1] = min(maxmin,minmax); 
-					tmp[2] = max(minmax,maxmin); 
-					tmp[3] = max(max1_2.x,max1_2.y); 
-					
-					roots = tmp; 
-				} 
-				
-				float eval_poly5(float a0, float a1, float a2, float a3, float a4, float x)
-				{
-					float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
-					return f; 
-				} 
-				
-				//halley's method
-				//basically a variant of newton raphson which converges quicker and has bigger basins of convergence
-				//see http://mathworld.wolfram.com/HalleysMethod.html
-				//or https://en.wikipedia.org/wiki/Halley%27s_method
-				float halley_iteration5(float a0, float a1, float a2, float a3, float a4, float x)
-				{
-					float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
-					float f1 = (((5. * x + 4. * a4) * x + 3. * a3) * x + 2. * a2) * x + a1; 
-					float f2 = ((20. * x + 12. * a4) * x + 6. * a3) * x + 2. * a2; 
-					
-					return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
-				} 
-				
-				float halley_iteration4(vec4 coeffs, float x)
-				{
-					float f = (((x + coeffs[3]) * x + coeffs[2]) * x + coeffs[1]) * x + coeffs[0]; 
-					float f1 = ((4. * x + 3. * coeffs[3]) * x + 2. * coeffs[2]) * x + coeffs[1]; 
-					float f2 = (12. * x + 6. * coeffs[3]) * x + 2. * coeffs[2]; 
-					
-					return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
-				} 
-				
-				// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-				// Credits to Doublefresh for hinting there
-				int solve_quadric(vec2 coeffs, inout vec2 roots)
-				{
-					// normal form: x^2 + px + q = 0
-					float p = coeffs[1] / 2.; 
-					float q = coeffs[0]; 
-					
-					float D = p * p - q; 
-					
-					if(D < 0.) { return 0; }
-					else if(D > 0.) {
-						roots[0] = -sqrt(D) - p; 
-						roots[1] = sqrt(D) - p; 
-						
-						return 2; 
-					}
-				} 
-				
-				//From Trisomie21
-				//But instead of his cancellation fix i'm using a newton iteration
-				int solve_cubic(vec3 coeffs, inout vec3 r)
-				{
-					
-					float a = coeffs[2]; 
-					float b = coeffs[1]; 
-					float c = coeffs[0]; 
-					
-					float p = b - a*a / 3.0; 
-					float q = a * (2.0*a*a - 9.0*b) / 27.0 + c; 
-					float p3 = p*p*p; 
-					float d = q*q + 4.0*p3 / 27.0; 
-					float offset = -a / 3.0; 
-					if(d >= 0.0) {
-						 // Single solution
-						float z = sqrt(d); 
-						float u = (-q + z) / 2.0; 
-						float v = (-q - z) / 2.0; 
-						u = sign(u)*pow(abs(u),1.0/3.0); 
-						v = sign(v)*pow(abs(v),1.0/3.0); 
-						r[0] = offset + u + v; 	
-								
-						//Single newton iteration to account for cancellation
-						float f = ((r[0] + a) * r[0] + b) * r[0] + c; 
-						float f1 = (3. * r[0] + 2. * a) * r[0] + b; 
-								
-						r[0] -= f / f1; 
-								
-						return 1; 
-					}
-					float u = sqrt(-p / 3.0); 
-					float v = acos(-sqrt( -27.0 / p3) * q / 2.0) / 3.0; 
-					float m = cos(v), n = sin(v)*1.732050808; 
-					
-					//Single newton iteration to account for cancellation
-					//(once for every root)
-					r[0]	= offset + u * (m + m); 
-					r[1] = offset - u * (n + m); 
-					r[2] = offset + u * (n - m); 
-					
-					vec3 f = ((r + a) * r + b) * r + c; 
-					vec3 f1 = (3. * r + 2. * a) * r + b; 
-					
-					r -= f / f1; 
-					
-					return 3; 
-				} 
-				
-				// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-				// Credits to Doublefresh for hinting there
-				int solve_quartic(vec4 coeffs, inout vec4 s)
-				{
-					float a = coeffs[3]; 
-					float b = coeffs[2]; 
-					float c = coeffs[1]; 
-					float d = coeffs[0]; 
-					
-					/*
-						  substitute x = y - A/4 to eliminate cubic term:
-									x^4 + px^2 + qx + r = 0 
-					*/
-					
-					float sq_a = a * a; 
-					float p = - 3./8. * sq_a + b; 
-					float q = 1./8. * sq_a * a - 1./2. * a * b + c; 
-					float r = - 3./256.*sq_a*sq_a + 1./16.*sq_a*b - 1./4.*a*c + d; 
-					
-					int num; 
-					
-					/* doesn't seem to happen for me */
-					//if(abs(r)<eps){
-					//	/* no absolute term: y(y^3 + py + q) = 0 */
-					
-					//	vec3 cubic_coeffs;
-					
-					//	cubic_coeffs[0] = q;
-					//	cubic_coeffs[1] = p;
-					//	cubic_coeffs[2] = 0.;
-					
-					//	num = solve_cubic(cubic_coeffs, s.xyz);
-					
-					//	s[num] = 0.;
-					//	num++;
-					//}
-					{
-						/* solve the resolvent cubic ... */
-						
-						vec3 cubic_coeffs; 
-						
-						cubic_coeffs[0] = 1.0/2. * r * p - 1.0/8. * q * q; 
-						cubic_coeffs[1] = - r; 
-						cubic_coeffs[2] = - 1.0/2. * p; 
-						
-						solve_cubic(cubic_coeffs, s.xyz); 
-						
-						/* ... and take the one real solution ... */
-						
-						float z = s[0]; 
-						
-						/* ... to build two quadric equations */
-						
-						float u = z * z - r; 
-						float v = 2. * z - p; 
-						
-						if(u > -bezier_eps) { u = sqrt(abs(u)); }
-						else	{ return 0; }
-						
-						if(v > -bezier_eps) { v = sqrt(abs(v)); }
-						else	{ return 0; }
-						
-						vec2 quad_coeffs; 
-						
-						quad_coeffs[0] = z - u; 
-						quad_coeffs[1] = q < 0. ? -v : v; 
-						
-						num = solve_quadric(quad_coeffs, s.xy); 
-						
-						quad_coeffs[0]= z + u; 
-						quad_coeffs[1] = q < 0. ? v : -v; 
-						
-						vec2 tmp=vec2(1e38); 
-						int old_num=num; 
-						
-						num += solve_quadric(quad_coeffs, tmp); 
-						if(old_num!=num) {
-							if(old_num == 0) {
-								 s[0] = tmp[0]; 
-								 s[1] = tmp[1]; 
-							}
-							else {
-								//old_num == 2
-								s[2] = tmp[0]; 
-								s[3] = tmp[1]; 
-							}
-						}
-					}
-					
-					/* resubstitute */
-					
-					float sub = 1./4. * a; 
-					
-					/* single halley iteration to fix cancellation */
-					for(int i=0;i<4;i+=2) {
-						if(i < num) {
-							s[i] -= sub; 
-							s[i] = halley_iteration4(coeffs,s[i]); 
-							
-							s[i+1] -= sub; 
-							s[i+1] = halley_iteration4(coeffs,s[i+1]); 
-						}
-					}
-					
-					return num; 
-				} 
-				float cubic_bezier_dis_exact(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-				{
-					//switch points when near to end point to minimize numerical error
-					//only needed when control point(s) very far away
-					if(false)
-					{
-						vec2 mid_curve = parametric_cub_bezier(.5,p0,p1,p2,p3); 
-						vec2 mid_points = (p0 + p3)/2.; 
-						
-						vec2 tang = mid_curve-mid_points; 
-						vec2 nor = vec2(tang.y,-tang.x); 
-						
-						if(sign(dot(nor,uv-mid_curve)) != sign(dot(nor,p0-mid_curve)))
-						{
-							vec2 tmp = p0; 
-							p0 = p3; 
-							p3 = tmp; 
-							
-							tmp = p2; 
-							p2 = p1; 
-							p1 = tmp; 
-						}
-					}
-					vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-					vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-					vec2 a1 = (-3. * p0 + 3. * p1); 
-					vec2 a0 = p0 - uv; 
-					
-					//compute polynomial describing distance to current pixel dependent on a parameter t
-					float bc6 = dot(a3,a3); 
-					float bc5 = 2.*dot(a3,a2); 
-					float bc4 = dot(a2,a2) + 2.*dot(a1,a3); 
-					float bc3 = 2.*(dot(a1,a2) + dot(a0,a3)); 
-					float bc2 = dot(a1,a1) + 2.*dot(a0,a2); 
-					float bc1 = 2.*dot(a0,a1); 
-					float bc0 = dot(a0,a0); 
-					
-					bc5 /= bc6; 
-					bc4 /= bc6; 
-					bc3 /= bc6; 
-					bc2 /= bc6; 
-					bc1 /= bc6; 
-					bc0 /= bc6; 
-					
-					//compute derivatives of this polynomial
-					
-					float b0 = bc1 / 6.; 
-					float b1 = 2. * bc2 / 6.; 
-					float b2 = 3. * bc3 / 6.; 
-					float b3 = 4. * bc4 / 6.; 
-					float b4 = 5. * bc5 / 6.; 
-					
-					vec4 c1 = vec4(b1,2.*b2,3.*b3,4.*b4)/5.; 
-					vec3 c2 = vec3(c1[1],2.*c1[2],3.*c1[3])/4.; 
-					vec2 c3 = vec2(c2[1],2.*c2[2])/3.; 
-					float c4 = c3[1]/2.; 
-					
-					vec4 roots_drv = vec4(1e38); 
-					
-					int num_roots_drv = solve_quartic(c1,roots_drv); 
-					sort_roots4(roots_drv); 
-					
-					float ub = upper_bound_lagrange5(b0,b1,b2,b3,b4); 
-					float lb = lower_bound_lagrange5(b0,b1,b2,b3,b4); 
-					
-					vec3 a = vec3(1e38); 
-					vec3 b = vec3(1e38); 
-					
-					vec3 roots = vec3(1e38); 
-					
-					int num_roots = 0; 
-					
-					//compute root isolating intervals by roots of derivative and outer root bounds
-					//only roots going form - to + considered, because only those result in a minimum
-					if(num_roots_drv==4)
-					{
-						if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) > 0.)
-						{
-							a[0]=lb; 
-							b[0]=roots_drv[0]; 
-							num_roots=1; 
 						}
 						
-						if(
-							sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1])) != 
-							sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[2]))
-						)
-						{
-							if(num_roots == 0)
-							{
-								a[0]=roots_drv[1]; 
-								b[0]=roots_drv[2]; 
-								num_roots=1; 
-							}
-							else
-							{
-								a[1]=roots_drv[1]; 
-								b[1]=roots_drv[2]; 
-								num_roots=2; 
-							}
-						}
+						float d0 = 1e38; 
 						
-						if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[3]) < 0.)
-						{
-							if(num_roots == 0)
-							{
-								a[0]=roots_drv[3]; 
-								b[0]=ub; 
-								num_roots=1; 
-							}
-							else if(num_roots == 1)
-							{
-								a[1]=roots_drv[3]; 
-								b[1]=ub; 
-								num_roots=2; 
-							}
-							else
-							{
-								a[2]=roots_drv[3]; 
-								b[2]=ub; 
-								num_roots=3; 
-							}
-						}
-					}else {
-						if(num_roots_drv==2)
-						{
-							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) < 0.)
-							{
-								num_roots=1; 
-								a[0]=roots_drv[1]; 
-								b[0]=ub; 
-							}
-							else if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1]) > 0.)
-							{
-								num_roots=1; 
-								a[0]=lb; 
-								b[0]=roots_drv[0]; 
-							}
-							else
-							{
-								num_roots=2; 
-								
-								a[0]=lb; 
-								b[0]=roots_drv[0]; 
-								
-								a[1]=roots_drv[1]; 
-								b[1]=ub; 
-							}
-						}
-						else {
-							//num_roots_drv==0
-							vec3 roots_snd_drv=vec3(1e38); 
-							int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
-							
-							vec2 roots_trd_drv=vec2(1e38); 
-							int num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); 
-							num_roots=1; 
-							
-							a[0]=lb; 
-							b[0]=ub; 
-						}
-						
-						//further subdivide intervals to guarantee convergence of halley's method
-						//by using roots of further derivatives
-						vec3 roots_snd_drv=vec3(1e38); 
-						int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
-						sort_roots3(roots_snd_drv); 
-						
-						int num_roots_trd_drv=0; 
-						vec2 roots_trd_drv=vec2(1e38); 
-						
-						if(num_roots_snd_drv!=3) { num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); }
+						//compute roots with halley's method
 						
 						for(int i=0;i<3;i++)
 						{
 							if(i < num_roots)
 							{
-								for(int j=0;j<3;j+=2)
-								{
-									if(j < num_roots_snd_drv)
-									{
-										if(a[i] < roots_snd_drv[j] && b[i] > roots_snd_drv[j])
-										{
-											if(eval_poly5(b0,b1,b2,b3,b4,roots_snd_drv[j]) > 0.)
-											{ b[i]=roots_snd_drv[j]; }
-											else { a[i]=roots_snd_drv[j]; }
-										}
-									}
-								}
-								for(int j=0;j<2;j++)
-								{
-									if(j < num_roots_trd_drv)
-									{
-										if(a[i] < roots_trd_drv[j] && b[i] > roots_trd_drv[j])
-										{
-											if(eval_poly5(b0,b1,b2,b3,b4,roots_trd_drv[j]) > 0.)
-											{ b[i]=roots_trd_drv[j]; }
-											else { a[i]=roots_trd_drv[j]; }
-										}
-									}
-								}
+								roots[i] = .5 * (a[i] + b[i]); 
+								
+								for(int j=0;j<halley_iterations;j++) { roots[i] = halley_iteration5(b0,b1,b2,b3,b4,roots[i]); }
+								
+								//compute squared distance to nearest point on curve
+								roots[i] =	clamp(roots[i],0.,1.); 
+								vec2 to_curve = uv - parametric_cub_bezier(roots[i],p0,p1,p2,p3); 
+								d0 = min(d0,dot(to_curve,to_curve)); 
 							}
 						}
-					}
-					
-					float d0 = 1e38; 
-					
-					//compute roots with halley's method
-					
-					for(int i=0;i<3;i++)
-					{
-						if(i < num_roots)
-						{
-							roots[i] = .5 * (a[i] + b[i]); 
-							
-							for(int j=0;j<halley_iterations;j++) { roots[i] = halley_iteration5(b0,b1,b2,b3,b4,roots[i]); }
-							
-							//compute squared distance to nearest point on curve
-							roots[i] =	clamp(roots[i],0.,1.); 
-							vec2 to_curve = uv - parametric_cub_bezier(roots[i],p0,p1,p2,p3); 
-							d0 = min(d0,dot(to_curve,to_curve)); 
-						}
-					}
-					
-					return sqrt(d0); 
-				} 
-				
-				//Quadratic Bezier - distance 2D 
-				
-				// The MIT License
-				// Copyright © 2018 Inigo Quilez
-				/*
-					 Permission is hereby granted, free of charge, to any person obtaining a copy of 
-					this software and associated documentation files (the "Software"), to deal in the 
-					Software without restriction, including without limitation the rights to use, copy, 
-					modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
-					and to permit persons to whom the Software is furnished to do so, subject to 
-					the following conditions: The above copyright notice and this permission notice 
-					shall be included in all copies or substantial portions of the Software. 
-					THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-					EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
-					MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-					IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
-					CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
-					TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-					SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-				*/
-				
-				
-				// Distance to a quadratic bezier segment
-				
-				// SDF(x) = argmin{t} |x-b(t)|²  
-				//           
-				// where b(t) is the curve. So we have
-				//
-				// |x-b(t)|² = |x|² - 2x·b(t) + |b(t)|²
-				//
-				// ∂|x-b(t)|²/∂t = 2(b(t)-x)·b'(t) = 0
-				//
-				// (b(t)-x)·b'(t) = 0
-				//
-				// But b(t) is degree 2, so b'(t) is degree 1, so (b(t)-x)·b'(t)=0 is a cubic.
-				// I solved the cubic using the trigonometric solution of the depressed as 
-				// shown here: https://en.wikipedia.org/wiki/Cubic_equation
-				
-				
-				// List of some other 2D distances: https://www.shadertoy.com/playlist/MXdSRf
-				//
-				// and iquilezles.org/articles/distfunctions2d
-				
-				
-				
-				float dot2( vec2 v ) { return dot(v,v); } 
-				float cro( vec2 a, vec2 b ) { return a.x*b.y-a.y*b.x; } 
-				float cos_acos_3( float x )
-				{
-					x=sqrt(0.5+0.5*x); 
-					return x*(x*(x*(x*-0.008972+0.039071)-0.107074)+0.576975)+0.5; 
-				} 
-				// https://www.shadertoy.com/view/WltSD7
-				
-				
-				// This method provides just an approximation, and is only usable in
-				// the very close neighborhood of the curve. Taken and adapted from
-				// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
-				float quadratic_bezier_dis_approx(
-					 vec2 p, vec2 v0, vec2 v1, vec2 v2
-					/*out vec2 outQ */
-				)
-				{
-					vec2 i = v0 - v2; 
-					vec2 j = v2 - v1; 
-					vec2 k = v1 - v0; 
-					vec2 w = j-k; 
-					
-					v0-= p; v1-= p; v2-= p; 
-					
-					float x = cro(v0, v2); 
-					float y = cro(v1, v0); 
-					float z = cro(v2, v1); 
-					
-					vec2 s = 2.0*(y*j+z*k)-x*i; 
-					
-					float r =  (y*z-x*x*0.25)/dot2(s); 
-					float t = clamp( (0.5*x+y+r*dot(s,w))/(x+y+z),0.0,1.0); 
-					
-					vec2 d = v0+t*(k+k+t*w); 
-					//outQ = d + p; 
-					return length(d); 
-				} 
-				
-				// signed distance to a quadratic bezier
-				float quadratic_bezier_dis_exact(
-					 in vec2 pos, in vec2 A, in vec2 B, in vec2 C
-					/*out vec2 outQ*/
-				)
-				{
-					vec2 a = B - A; 
-					vec2 b = A - 2.0*B + C; 
-					vec2 c = a * 2.0; 
-					vec2 d = A - pos; 
-					
-					// cubic to be solved (kx*=3 and ky*=3)
-					float kk = 1.0/dot(b,b); 
-					float kx = kk * dot(a,b); 
-					float ky = kk * (2.0*dot(a,a)+dot(d,b))/3.0; 
-					float kz = kk * dot(d,a); 
-					
-					float res = 0.0; 
-					float sgn = 0.0; 
-					
-					float p = ky - kx*kx; 
-					float q = kx*(2.0*kx*kx - 3.0*ky) + kz; 
-					float p3 = p*p*p; 
-					float q2 = q*q; 
-					float h = q2 + 4.0*p3; 
-					
-					if(h>=0.0)
-					{
-						// 1 root
-						h = sqrt(h); 
 						
-						h = (q<0.0) ? h : -h; // copysign()
-						float x = (h-q)/2.0; 
-						float v = sign(x)*pow(abs(x),1.0/3.0); 
-						float t = v - p/v; 
-						
-						// from NinjaKoala - single newton iteration to account for cancellation
-						t -= (t*(t*t+3.0*p)+q)/(3.0*t*t+3.0*p); 
-						
-						t = clamp( t-kx, 0.0, 1.0 ); 
-						vec2  w = d+(c+b*t)*t; 
-						//outQ = w + pos; 
-						res = dot2(w); 
-						sgn = cro(c+2.0*b*t,w); 
-					}
-					else
-					{
-						// 3 roots
-						float z = sqrt(-p); 
-						float m = cos_acos_3(q/(p*z*2.0)); 
-						float n = sqrt(1.0-m*m); 
-						n *= sqrt(3.0); 
-						vec3	t = clamp( vec3(m+m,-n-m,n-m)*z-kx, 0.0, 1.0 ); 
-						vec2	qx=d+(c+b*t.x)*t.x; float dx=dot2(qx), sx=cro(a+b*t.x,qx); 
-						vec2	qy=d+(c+b*t.y)*t.y; float dy=dot2(qy), sy=cro(a+b*t.y,qy); 
-						if(dx<dy)	{ res=dx; sgn=sx; /*outQ=qx+pos; */}
-						else	{ res=dy; sgn=sy; /*outQ=qy+pos; */}
-					}
-					
-					return sqrt( res )/*sign(sgn)*/; 
-				} 
-				
-				
-				vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
-				{
-					if(texIdx==0) return vec4(1,1,1,1)/*no texture means full white*/; 
-					
-					//fetch info dword 0
-					const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
-					const uint info_0 = IB[textDwIdx+0]; 
-					
-					//handle 'error' and 'loading' flags
-					if(getBits(info_0, $(TexInfoBitOfs), 2)!=0)
-					{
-						if(getBit(info_0, $(TexInfoBitOfs)))	return ErrorColor; 
-						else	return LoadingColor; 
-					}
-					
-					//decode dimensions, size
-					const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
-					const uint info_1 = IB[textDwIdx+1]; 
-					const uint _rawSize0 = getBits(info_0, 16, 16); 
-					const uint _rawSize12 = info_1; 
-					const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
-					if(size.x==0 || size.y==0 || size.z==0) return ErrorColor; 
-					
-					
-					//Prescale tex coordinates by size
-					vec3 pv = v; 
-					if(prescaleXY) pv.xy *= size.xy; 
-					if(prescaleZ) pv.z *= size.z; 
-					
-					//Clamp tex coordinates. Assume non-empty image.
-					const ivec3 iv = ivec3(pv); 
-					const ivec3 clamped = max(min(iv, size-1), 0); 
-					
-					//if(iv!=clamped) return vec4(0,0,0,0)/*out of texture means transparent*/; 
-					//transparent is not good! triangle edges can go out of texture bounds
-					
-					//Calculate flat index
-					const uint i = calcFlatIndex(clamped, dim, size); 
-					
-					//Get chunkIdx from info rec
-					const uint chunkIdx = IB[textDwIdx+2]; 
-					const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
-					
-					//decode format (chn, bpp, alt)
-					const uint chn = getBits(info_0, $(TexFormatBitOfs), $(TexChnBits)); 
-					const uint bpp = getBits(info_0, $(TexFormatBitOfs + TexChnBits), $(TexBppBits)); 
-					const bool alt = getBit(info_0, $(TexFormatBitOfs + TexChnBits + TexBppBits)); 
+						return sqrt(d0); 
+					} 
 					
-					//Phase 1: Calculate minimal read range
-					uint startIdx; 
-					uint numDWords; 
-					uint shift; // Only used for 24bpp case
-					bool aligned; // Only used for 48bpp case
+					//Quadratic Bezier - distance 2D 
 					
-					switch(bpp)
+					// The MIT License
+					// Copyright © 2018 Inigo Quilez
+					/*
+						 Permission is hereby granted, free of charge, to any person obtaining a copy of 
+						this software and associated documentation files (the "Software"), to deal in the 
+						Software without restriction, including without limitation the rights to use, copy, 
+						modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+						and to permit persons to whom the Software is furnished to do so, subject to 
+						the following conditions: The above copyright notice and this permission notice 
+						shall be included in all copies or substantial portions of the Software. 
+						THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+						EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+						MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+						IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+						CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+						TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+						SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+					*/
+					
+					
+					// Distance to a quadratic bezier segment
+					
+					// SDF(x) = argmin{t} |x-b(t)|²  
+					//           
+					// where b(t) is the curve. So we have
+					//
+					// |x-b(t)|² = |x|² - 2x·b(t) + |b(t)|²
+					//
+					// ∂|x-b(t)|²/∂t = 2(b(t)-x)·b'(t) = 0
+					//
+					// (b(t)-x)·b'(t) = 0
+					//
+					// But b(t) is degree 2, so b'(t) is degree 1, so (b(t)-x)·b'(t)=0 is a cubic.
+					// I solved the cubic using the trigonometric solution of the depressed as 
+					// shown here: https://en.wikipedia.org/wiki/Cubic_equation
+					
+					
+					// List of some other 2D distances: https://www.shadertoy.com/playlist/MXdSRf
+					//
+					// and iquilezles.org/articles/distfunctions2d
+					
+					
+					
+					float dot2( vec2 v ) { return dot(v,v); } 
+					float cro( vec2 a, vec2 b ) { return a.x*b.y-a.y*b.x; } 
+					float cos_acos_3( float x )
 					{
-						case TexBpp_1: 	{ startIdx = dwIdx + i/32; numDWords = 1; }	break; 
-						case TexBpp_2: 	{ startIdx = dwIdx + i/16; numDWords = 1; }	break; 
-						case TexBpp_4: 	{ startIdx = dwIdx + i/8; numDWords = 1; }	break; 
-						case TexBpp_8: 	{ startIdx = dwIdx + i/4; numDWords = 1; }	break; 
-						case TexBpp_16: 	{ startIdx = dwIdx + i/2; numDWords = 1; }	break; 
-						case TexBpp_24: 	{
-							startIdx = dwIdx + (i*3)/4; 
-							shift = (i*24)&31; /*AI mistake: int(i%4)*6*/
-							numDWords = (shift <= 8) ? 1 : 2; 
-						}	break; 
-						case TexBpp_32: 	{ startIdx = dwIdx + i; numDWords = 1; }	break; 
-						case TexBpp_48: 	{
-							startIdx = dwIdx + i*3/2; 
-							aligned = (i%2 == 0); numDWords = 2; 
-						}	break; 
-						case TexBpp_64: 	{ startIdx = dwIdx + i*2; numDWords = 2; }	break; 
-						case TexBpp_96: 	{ startIdx = dwIdx + i*3; numDWords = 3; }	break; 
-						case TexBpp_128: 	{ startIdx = dwIdx + i*4; numDWords = 4; }	break; 
-						default: return ErrorColor; 
-					}
+						x=sqrt(0.5+0.5*x); 
+						return x*(x*(x*(x*-0.008972+0.039071)-0.107074)+0.576975)+0.5; 
+					} 
+					// https://www.shadertoy.com/view/WltSD7
 					
-					//Phase 2: Perform minimal TB[] reads
-					uvec4 tmp; // Max 4 dwords needed for 128bpp case
-					tmp.x = TB[startIdx + 0]; 
-					if(numDWords>1) tmp.y = TB[startIdx + 1]; 
-					if(numDWords>2) tmp.z = TB[startIdx + 2]; 
-					if(numDWords>3) tmp.w = TB[startIdx + 3]; 
 					
-					vec4 res; 
-					
-					switch(chn)
+					// This method provides just an approximation, and is only usable in
+					// the very close neighborhood of the curve. Taken and adapted from
+					// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
+					float quadratic_bezier_dis_approx(
+						 vec2 p, vec2 v0, vec2 v1, vec2 v2
+						/*out vec2 outQ */
+					)
 					{
-						case TexChn_1: 
-						switch(bpp)
-						{
-							case TexBpp_1: 	{ res = vec4(vec3(getBits(tmp.x, int(i%32)* 1,  1)         ), 1); }	break; 
-							case TexBpp_2: 	{ res = vec4(vec3(getBits(tmp.x, int(i%16)* 2,  2) /     3.0), 1); }	break; 
-							case TexBpp_4: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 8)* 4,  4) /    15.0), 1); }	break; 
-							case TexBpp_8: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 4)* 8,  8) /   255.0), 1); }	break; 
-							case TexBpp_16: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 2)*16, 16) / 65535.0), 1); }	break; 
-							case TexBpp_32: 	{ res = vec4(vec3(uintBitsToFloat(tmp.x)      ), 1); }	break; 
-							default: return ErrorColor; 
-						}
-						if(alt) {
-							/*white alpha (used by monochrome fonts)*/
-							res.a = res.r; res.rgb = vec3(1); 
-						}break; 
+						vec2 i = v0 - v2; 
+						vec2 j = v2 - v1; 
+						vec2 k = v1 - v0; 
+						vec2 w = j-k; 
 						
-						case TexChn_2: 
-						switch(bpp)
+						v0-= p; v1-= p; v2-= p; 
+						
+						float x = cro(v0, v2); 
+						float y = cro(v1, v0); 
+						float z = cro(v2, v1); 
+						
+						vec2 s = 2.0*(y*j+z*k)-x*i; 
+						
+						float r =  (y*z-x*x*0.25)/dot2(s); 
+						float t = clamp( (0.5*x+y+r*dot(s,w))/(x+y+z),0.0,1.0); 
+						
+						vec2 d = v0+t*(k+k+t*w); 
+						//outQ = d + p; 
+						return length(d); 
+					} 
+					
+					// signed distance to a quadratic bezier
+					float quadratic_bezier_dis_exact(
+						 in vec2 pos, in vec2 A, in vec2 B, in vec2 C
+						/*out vec2 outQ*/
+					)
+					{
+						vec2 a = B - A; 
+						vec2 b = A - 2.0*B + C; 
+						vec2 c = a * 2.0; 
+						vec2 d = A - pos; 
+						
+						// cubic to be solved (kx*=3 and ky*=3)
+						float kk = 1.0/dot(b,b); 
+						float kx = kk * dot(a,b); 
+						float ky = kk * (2.0*dot(a,a)+dot(d,b))/3.0; 
+						float kz = kk * dot(d,a); 
+						
+						float res = 0.0; 
+						float sgn = 0.0; 
+						
+						float p = ky - kx*kx; 
+						float q = kx*(2.0*kx*kx - 3.0*ky) + kz; 
+						float p3 = p*p*p; 
+						float q2 = q*q; 
+						float h = q2 + 4.0*p3; 
+						
+						if(h>=0.0)
 						{
-							case TexBpp_16: 	{ res = unpackUnorm4x8(tmp.x).xxxy; }	break; 
-							case TexBpp_32: 	{ res = unpackUnorm2x16(tmp.x).xxxy; }	break; 
-							case TexBpp_64: 	{
-								res = vec4(
-									vec3(uintBitsToFloat(tmp.x)),
-									      uintBitsToFloat(tmp.y)
-								); 
-							}	break; 
-							default: return ErrorColor; 
+							// 1 root
+							h = sqrt(h); 
+							
+							h = (q<0.0) ? h : -h; // copysign()
+							float x = (h-q)/2.0; 
+							float v = sign(x)*pow(abs(x),1.0/3.0); 
+							float t = v - p/v; 
+							
+							// from NinjaKoala - single newton iteration to account for cancellation
+							t -= (t*(t*t+3.0*p)+q)/(3.0*t*t+3.0*p); 
+							
+							t = clamp( t-kx, 0.0, 1.0 ); 
+							vec2  w = d+(c+b*t)*t; 
+							//outQ = w + pos; 
+							res = dot2(w); 
+							sgn = cro(c+2.0*b*t,w); 
 						}
-						if(alt) {/*no alt mode defined for 2ch,*/}break; 
-						case TexChn_3: 
+						else
+						{
+							// 3 roots
+							float z = sqrt(-p); 
+							float m = cos_acos_3(q/(p*z*2.0)); 
+							float n = sqrt(1.0-m*m); 
+							n *= sqrt(3.0); 
+							vec3	t = clamp( vec3(m+m,-n-m,n-m)*z-kx, 0.0, 1.0 ); 
+							vec2	qx=d+(c+b*t.x)*t.x; float dx=dot2(qx), sx=cro(a+b*t.x,qx); 
+							vec2	qy=d+(c+b*t.y)*t.y; float dy=dot2(qy), sy=cro(a+b*t.y,qy); 
+							if(dx<dy)	{ res=dx; sgn=sx; /*outQ=qx+pos; */}
+							else	{ res=dy; sgn=sy; /*outQ=qy+pos; */}
+						}
+						
+						return sqrt( res )/*sign(sgn)*/; 
+					} 
+					
+					
+					vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
+					{
+						if(texIdx==0) return vec4(1,1,1,1)/*no texture means full white*/; 
+						
+						//fetch info dword 0
+						const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+						const uint info_0 = IB[textDwIdx+0]; 
+						
+						//handle 'error' and 'loading' flags
+						if(getBits(info_0, $(TexInfoBitOfs), 2)!=0)
+						{
+							if(getBit(info_0, $(TexInfoBitOfs)))	return ErrorColor; 
+							else	return LoadingColor; 
+						}
+						
+						//decode dimensions, size
+						const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
+						const uint info_1 = IB[textDwIdx+1]; 
+						const uint _rawSize0 = getBits(info_0, 16, 16); 
+						const uint _rawSize12 = info_1; 
+						const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
+						if(size.x==0 || size.y==0 || size.z==0) return ErrorColor; 
+						
+						
+						//Prescale tex coordinates by size
+						vec3 pv = v; 
+						if(prescaleXY) pv.xy *= size.xy; 
+						if(prescaleZ) pv.z *= size.z; 
+						
+						//Clamp tex coordinates. Assume non-empty image.
+						const ivec3 iv = ivec3(pv); 
+						const ivec3 clamped = max(min(iv, size-1), 0); 
+						
+						//if(iv!=clamped) return vec4(0,0,0,0)/*out of texture means transparent*/; 
+						//transparent is not good! triangle edges can go out of texture bounds
+						
+						//Calculate flat index
+						const uint i = calcFlatIndex(clamped, dim, size); 
+						
+						//Get chunkIdx from info rec
+						const uint chunkIdx = IB[textDwIdx+2]; 
+						const uint dwIdx = chunkIdx * $(HeapGranularity/4); 
+						
+						//decode format (chn, bpp, alt)
+						const uint chn = getBits(info_0, $(TexFormatBitOfs), $(TexChnBits)); 
+						const uint bpp = getBits(info_0, $(TexFormatBitOfs + TexChnBits), $(TexBppBits)); 
+						const bool alt = getBit(info_0, $(TexFormatBitOfs + TexChnBits + TexBppBits)); 
+						
+						//Phase 1: Calculate minimal read range
+						uint startIdx; 
+						uint numDWords; 
+						uint shift; // Only used for 24bpp case
+						bool aligned; // Only used for 48bpp case
+						
 						switch(bpp)
 						{
-							case TexBpp_16: 	{
-								res = vec4(
-									getBits(tmp.x,  0, 5) / 31.0,
-									getBits(tmp.x,  5, 6) / 63.0,
-									getBits(tmp.x, 11, 5) / 31.0, 1
-								); 
-							}	break; 
+							case TexBpp_1: 	{ startIdx = dwIdx + i/32; numDWords = 1; }	break; 
+							case TexBpp_2: 	{ startIdx = dwIdx + i/16; numDWords = 1; }	break; 
+							case TexBpp_4: 	{ startIdx = dwIdx + i/8; numDWords = 1; }	break; 
+							case TexBpp_8: 	{ startIdx = dwIdx + i/4; numDWords = 1; }	break; 
+							case TexBpp_16: 	{ startIdx = dwIdx + i/2; numDWords = 1; }	break; 
 							case TexBpp_24: 	{
-								if(shift <= 8)	{ res = vec4(unpackUnorm4x8(getBits(tmp.x, int(shift), 24)).xyz, 1); }
-								else	{
-									res = vec4(
-										unpackUnorm4x8(
-											(tmp.x >> shift) | 
-											(tmp.y << (32-shift))
-										).xyz, 1
-									); 
-								}
+								startIdx = dwIdx + (i*3)/4; 
+								shift = (i*24)&31; /*AI mistake: int(i%4)*6*/
+								numDWords = (shift <= 8) ? 1 : 2; 
 							}	break; 
+							case TexBpp_32: 	{ startIdx = dwIdx + i; numDWords = 1; }	break; 
 							case TexBpp_48: 	{
-								if(aligned)	{
-									res = vec4(
-										unpackUnorm2x16(tmp.x).xy, 
-										unpackUnorm2x16(tmp.y).x, 1
-									); 
-								}
-								else	{
-									res = vec4(
-										unpackUnorm2x16(tmp.x>>16).x, 
-										unpackUnorm2x16(tmp.y).xy, 1
-									); 
-								}
+								startIdx = dwIdx + i*3/2; 
+								aligned = (i%2 == 0); numDWords = 2; 
 							}	break; 
-							case TexBpp_96: 	{ res = vec4(uintBitsToFloat(tmp.xyz), 1); }	break; 
+							case TexBpp_64: 	{ startIdx = dwIdx + i*2; numDWords = 2; }	break; 
+							case TexBpp_96: 	{ startIdx = dwIdx + i*3; numDWords = 3; }	break; 
+							case TexBpp_128: 	{ startIdx = dwIdx + i*4; numDWords = 4; }	break; 
 							default: return ErrorColor; 
 						}
-						if(alt) {/*swap red-blue*/res.rgba = res.bgra; }break; 
 						
-						case TexChn_4: 
-						switch(bpp)
+						//Phase 2: Perform minimal TB[] reads
+						uvec4 tmp; // Max 4 dwords needed for 128bpp case
+						tmp.x = TB[startIdx + 0]; 
+						if(numDWords>1) tmp.y = TB[startIdx + 1]; 
+						if(numDWords>2) tmp.z = TB[startIdx + 2]; 
+						if(numDWords>3) tmp.w = TB[startIdx + 3]; 
+						
+						vec4 res; 
+						
+						switch(chn)
 						{
-							case TexBpp_16: 	{
-								res = vec4(
-									getBits(tmp.x,  0, 5) / 31.0,
-									getBits(tmp.x,  5, 5) / 31.0,
-									getBits(tmp.x, 10, 5) / 31.0,
-									getBits(tmp.x, 15, 1)
-								); 
-							}	break; 
-							case TexBpp_32: 	{ res = unpackUnorm4x8(tmp.x); }	break; 
-							case TexBpp_64: 	{
-								res = vec4(
-									unpackUnorm2x16(tmp.x),
-									unpackUnorm2x16(tmp.y)
-								); 
-							}	break; 
-							case TexBpp_128: 	{ res = uintBitsToFloat(tmp.xyzw); }	break; 
-							default: return ErrorColor; 
-						}
-						if(alt) {/*swap red-blue*/res.rgba = res.bgra; }break; 
-						
-						default: return ErrorColor; 
-					}
-					return res; 
-				} 
-				
-				vec4 readFilteredSample(bool enableMultisampling)
-				{
-					if(enableMultisampling)
-					{
-						const vec2[6] rooks6_offsets = 
+							case TexChn_1: 
+							switch(bpp)
 							{
-							vec2(-0.417, 0.250), vec2(-0.250, -0.417), vec2(-0.083, -0.083),
-							vec2(0.083, 0.083), vec2(0.250, 0.417), vec2(0.417, -0.250)
-						}; 
-						
-						vec4 sum = vec4(0); 
-						const vec2 texCoordDx = dFdx(fragTexCoordXY); 
-						const vec2 texCoordDy = dFdy(fragTexCoordXY); 
-						for(int i=0; i<6; i++)
-						{
-							vec2 rooks = rooks6_offsets[i]; 
-							vec2 tc = texCoordXY + 	rooks.x * texCoordDx + 
-								rooks.y * texCoordDy; 
-							vec4 smp = readSample(fragTexHandle, vec3(tc, fragTexCoordZ), true, false); 
-							sum += smp; 
+								case TexBpp_1: 	{ res = vec4(vec3(getBits(tmp.x, int(i%32)* 1,  1)         ), 1); }	break; 
+								case TexBpp_2: 	{ res = vec4(vec3(getBits(tmp.x, int(i%16)* 2,  2) /     3.0), 1); }	break; 
+								case TexBpp_4: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 8)* 4,  4) /    15.0), 1); }	break; 
+								case TexBpp_8: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 4)* 8,  8) /   255.0), 1); }	break; 
+								case TexBpp_16: 	{ res = vec4(vec3(getBits(tmp.x, int(i% 2)*16, 16) / 65535.0), 1); }	break; 
+								case TexBpp_32: 	{ res = vec4(vec3(uintBitsToFloat(tmp.x)      ), 1); }	break; 
+								default: return ErrorColor; 
+							}
+							if(alt) {
+								/*white alpha (used by monochrome fonts)*/
+								res.a = res.r; res.rgb = vec3(1); 
+							}break; 
+							
+							case TexChn_2: 
+							switch(bpp)
+							{
+								case TexBpp_16: 	{ res = unpackUnorm4x8(tmp.x).xxxy; }	break; 
+								case TexBpp_32: 	{ res = unpackUnorm2x16(tmp.x).xxxy; }	break; 
+								case TexBpp_64: 	{
+									res = vec4(
+										vec3(uintBitsToFloat(tmp.x)),
+										      uintBitsToFloat(tmp.y)
+									); 
+								}	break; 
+								default: return ErrorColor; 
+							}
+							if(alt) {/*no alt mode defined for 2ch,*/}break; 
+							case TexChn_3: 
+							switch(bpp)
+							{
+								case TexBpp_16: 	{
+									res = vec4(
+										getBits(tmp.x,  0, 5) / 31.0,
+										getBits(tmp.x,  5, 6) / 63.0,
+										getBits(tmp.x, 11, 5) / 31.0, 1
+									); 
+								}	break; 
+								case TexBpp_24: 	{
+									if(shift <= 8)	{ res = vec4(unpackUnorm4x8(getBits(tmp.x, int(shift), 24)).xyz, 1); }
+									else	{
+										res = vec4(
+											unpackUnorm4x8(
+												(tmp.x >> shift) | 
+												(tmp.y << (32-shift))
+											).xyz, 1
+										); 
+									}
+								}	break; 
+								case TexBpp_48: 	{
+									if(aligned)	{
+										res = vec4(
+											unpackUnorm2x16(tmp.x).xy, 
+											unpackUnorm2x16(tmp.y).x, 1
+										); 
+									}
+									else	{
+										res = vec4(
+											unpackUnorm2x16(tmp.x>>16).x, 
+											unpackUnorm2x16(tmp.y).xy, 1
+										); 
+									}
+								}	break; 
+								case TexBpp_96: 	{ res = vec4(uintBitsToFloat(tmp.xyz), 1); }	break; 
+								default: return ErrorColor; 
+							}
+							if(alt) {/*swap red-blue*/res.rgba = res.bgra; }break; 
+							
+							case TexChn_4: 
+							switch(bpp)
+							{
+								case TexBpp_16: 	{
+									res = vec4(
+										getBits(tmp.x,  0, 5) / 31.0,
+										getBits(tmp.x,  5, 5) / 31.0,
+										getBits(tmp.x, 10, 5) / 31.0,
+										getBits(tmp.x, 15, 1)
+									); 
+								}	break; 
+								case TexBpp_32: 	{ res = unpackUnorm4x8(tmp.x); }	break; 
+								case TexBpp_64: 	{
+									res = vec4(
+										unpackUnorm2x16(tmp.x),
+										unpackUnorm2x16(tmp.y)
+									); 
+								}	break; 
+								case TexBpp_128: 	{ res = uintBitsToFloat(tmp.xyzw); }	break; 
+								default: return ErrorColor; 
+							}
+							if(alt) {/*swap red-blue*/res.rgba = res.bgra; }break; 
+							
+							default: return ErrorColor; 
 						}
-						return sum/6; 
-					}
-					else
-					{ return readSample(fragTexHandle, vec3(texCoordXY, fragTexCoordZ), true, false); }
-				} 
-				
-				void main() {
-					initFragmentParams(); 
+						return res; 
+					} 
 					
-					if(fragMode==FragMode_glyphStrip)
+					vec4 readFilteredSample(bool enableMultisampling)
 					{
-						//textCoord.x is interpolated, so the integer part must be removed
-						texCoordXY.x = fract(texCoordXY.x); 
-					}
+						if(enableMultisampling)
+						{
+							const vec2[6] rooks6_offsets = 
+								{
+								vec2(-0.417, 0.250), vec2(-0.250, -0.417), vec2(-0.083, -0.083),
+								vec2(0.083, 0.083), vec2(0.250, 0.417), vec2(0.417, -0.250)
+							}; 
+							
+							vec4 sum = vec4(0); 
+							const vec2 texCoordDx = dFdx(fragTexCoordXY); 
+							const vec2 texCoordDy = dFdy(fragTexCoordXY); 
+							for(int i=0; i<6; i++)
+							{
+								vec2 rooks = rooks6_offsets[i]; 
+								vec2 tc = texCoordXY + 	rooks.x * texCoordDx + 
+									rooks.y * texCoordDy; 
+								vec4 smp = readSample(fragTexHandle, vec3(tc, fragTexCoordZ), true, false); 
+								sum += smp; 
+							}
+							return sum/6; 
+						}
+						else
+						{ return readSample(fragTexHandle, vec3(texCoordXY, fragTexCoordZ), true, false); }
+					} 
 					
-					const vec4 ndcPos = vec4(
-						2*(gl_FragCoord.xy-UB.viewport.xy)/(UB.viewport.zw)-1,
-						gl_FragCoord.z, 1
-					); 
-					const vec4 clipPos = UB.inv_mvp * ndcPos; 
-					const vec3 objPos = clipPos.xyz / clipPos.w; 
-					
-					if((fragMode==FragMode_cubicBezier))
-					{
-						float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
-						float t = fract(texCoordXY.x); 
-						float r = 2.5; //Todo: send radiuses into the pixel shader!
-						if(dst>r) discard; 
-					}
-					
-					const vec4 filteredColor = readFilteredSample(true); 
-					vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
-					
-					outColor = resultColor; 
-				} 
-			})); 
-			shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
+					void main() {
+						initFragmentParams(); 
+						
+						if(fragMode==FragMode_glyphStrip)
+						{
+							//textCoord.x is interpolated, so the integer part must be removed
+							texCoordXY.x = fract(texCoordXY.x); 
+						}
+						
+						const vec4 ndcPos = vec4(
+							2*(gl_FragCoord.xy-UB.viewport.xy)/(UB.viewport.zw)-1,
+							gl_FragCoord.z, 1
+						); 
+						const vec4 clipPos = UB.inv_mvp * ndcPos; 
+						const vec3 objPos = clipPos.xyz / clipPos.w; 
+						
+						if((fragMode==FragMode_cubicBezier))
+						{
+							float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
+							float t = fract(texCoordXY.x); 
+							float r = 2.5; //Todo: send radiuses into the pixel shader!
+							if(dst>r) discard; 
+						}
+						
+						const vec4 filteredColor = readFilteredSample(true); 
+						vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
+						
+						outColor = resultColor; 
+					} 
+				})); 
+				shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
+			}
 		} 
 	}
 	
