@@ -214,7 +214,7 @@ version(/+$DIDE_REGION+/all)
 			quadraticSegments 	: 6,
 			cubicSegments	: 8
 		})),
-		2, mixin(體!((BezierTesselationSettings),q{mode : BTSM.points}))
+		2, mixin(體!((BezierTesselationSettings),q{mode : BTSM.points/+debug only+/}))
 	); 
 	
 	
@@ -609,6 +609,8 @@ version(/+$DIDE_REGION+/all)
 	
 	version(/+$DIDE_REGION Common enums+/all)
 	{
+		enum HandleFormat : ubyte {u12, u16, u24, u32} 
+		
 		enum SizeUnit : ubyte
 		{
 			world, 	/+one unit in the world+/
@@ -619,7 +621,6 @@ version(/+$DIDE_REGION+/all)
 		enum ColorFormat : ubyte {rgba_u8, rgb_u8, la_u8, a_u8, u1, u2, u4, u8} 
 			enum colorFormatBitCnt = [32,  24,     16,    8,    1,   2,  4,  8]; 
 		
-		enum HandleFormat : ubyte {u12, u16, u24, u32} 
 		enum CoordFormat : ubyte {f32, i32, i16, i8} 
 		enum SizeFormat : ubyte {u4, u8, ulog12/+4G range+/, f32} 
 		enum XYFormat : ubyte {absXY, relXY, absX, relX, absY, relY, absXrelY1, relX1absY} 
@@ -666,7 +667,7 @@ version(/+$DIDE_REGION+/all)
 				[q{/+settings+/}],
 				[q{/+	system+/}],
 				[q{"0"},q{"00"},q{"00"},q{end},q{/+5 zeroed at end of VBO+/}],
-				[q{},q{},q{"01"},q{setPh},q{/+phase (position along line)+/}],
+				[q{},q{},q{"01"},q{setOP},q{/+opacity, affects both colors+/}],
 				[q{},q{},q{"10"},q{setFlags},q{/+FlagFormat Flags+/}],
 				[q{},q{},q{"11"},q{setTrans},q{/+TransformFormat data+/}],
 				[q{/+	colors: op ColorFormat, data+/}],
@@ -1323,48 +1324,120 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		
-		protected mixin template ChangeDetectedTexHandle(string name)
+		static if((常!(bool)(0)))
+		{
+			protected mixin template ChangeDetectedTexHandle(string name)
+			{
+				mixin(iq{
+					void emit_set$(name)(TexHandle handle)
+					{ emit(assemble(Opcode.set$(name), assembleHandle(handle))); } 
+					void emit_set$(name)(Texture tex)
+					{ emit_set$(name)(tex.handle); } 
+					
+					protected TexHandle user_$(name); 
+					@property $(name)() const => user_$(name); 
+					@property $(name)(TexHandle val)
+					{
+						if(user_$(name).chkSet(val))
+						{
+							/*
+								The user changed the internal state. Change detection, 
+								and precompilation can go here.
+							*/
+						}
+					} 
+					@property $(name)(Texture tex)
+					{$(name)= tex ? tex.handle : TexHandle.init; } 
+					
+					protected TexHandle target_$(name); 
+					void synch_$(name)()
+					{
+						if(target_$(name).chkSet(user_$(name)))
+						{
+							/+
+								The internal state was different to the target GPU state.
+								So it have to be emited.
+							+/
+							emit_set$(name)(target_$(name)); 
+						}
+					} 
+				}.text); 
+			} 
+			
+			mixin ChangeDetectedTexHandle!"FMH"; 	/* Font map handle */
+			mixin ChangeDetectedTexHandle!"LFMH"; 	/* Latin font map handle */
+			mixin ChangeDetectedTexHandle!"PALH"; 	/* Palette handle */
+			mixin ChangeDetectedTexHandle!"LTH"; 	/* Line texture handle */
+		}
+		
+		enum StateSide { user, target, both } 
+		
+		struct TexHandleState(Opcode opcode)
+		{
+			private: 
+			enum TexHandle initialState = TexHandle.init; 
+			TexHandle userState; //this is where the user writes
+			TexHandle targetState; //this remembers what's uploaded to the target
+			
+			public: 
+			@property TexHandle get()
+			{ return userState; } 
+			
+			@property void set(TexHandle val)
+			{
+				if(userState.chkSet(val))
+				{
+					/+
+						The user changed the internal state. Change detection, 
+						and precompilation can go here.
+					+/
+				}
+			} 
+			
+			@property void set(Texture tex)
+			{ set(tex ? tex.handle : TexHandle.init); } 
+			
+			/+
+				void opCall(T)(T arg)
+				{ set(arg); } auto opCall()
+				=> get(); 
+			+/
+			
+			void resetState(StateSide side)
+			{
+				if(side & StateSide.user) userState = initialState; 
+				if(side & StateSide.target) targetState = initialState; 
+			} 
+			
+			void synch(GfxBuilderBase builder)
+			{
+				if(targetState.chkSet(userState))
+				{
+					/+
+						The internal state was different to the target GPU state.
+						So it have to be emited.
+					+/
+					builder.emit(assemble(opcode, assembleHandle(targetState))); 
+				}
+			} 
+		} 
+		
+		protected mixin template TexHandleTemplate(string name)
 		{
 			mixin(iq{
-				void emit_set$(name)(TexHandle handle)
-				{ emit(assemble(Opcode.set$(name), assembleHandle(handle))); } 
-				void emit_set$(name)(Texture tex)
-				{ emit_set$(name)(tex.handle); } 
-				
-				protected TexHandle user_$(name); 
-				@property $(name)() const => user_$(name); 
-				@property $(name)(TexHandle val)
-				{
-					if(user_$(name).chkSet(val))
-					{
-						/*
-							The user changed the internal state. Change detection, 
-							and precompilation can go here.
-						*/
-					}
-				} 
-				@property $(name)(Texture tex)
-				{$(name)= tex ? tex.handle : TexHandle.init; } 
-				
-				protected TexHandle target_$(name); 
-				void synch_$(name)()
-				{
-					if(target_$(name).chkSet(user_$(name)))
-					{
-						/+
-							The internal state was different to the target GPU state.
-							So it have to be emited.
-						+/
-						emit_set$(name)(target_$(name)); 
-					}
-				} 
+				TexHandleState!(Opcode.set$(name)) _$(name); 
+				void $(name)(T)(T arg) { _$(name).set(arg); } 
+				auto $(name)() => _$(name).get; 
+				void synch_$(name)() { _$(name).synch(this); } 
 			}.text); 
 		} 
 		
-		mixin ChangeDetectedTexHandle!"FMH"; 	/* Font map handle */
-		mixin ChangeDetectedTexHandle!"LFMH"; 	/* Latin font map handle */
-		mixin ChangeDetectedTexHandle!"PALH"; 	/* Palette handle */
-		mixin ChangeDetectedTexHandle!"LTH"; 	/* Line texture handle */
+		mixin TexHandleTemplate!"FMH"; //Fontmap
+		mixin TexHandleTemplate!"LFMH"; //Latin fontmap
+		mixin TexHandleTemplate!"PALH"; //Palette
+		mixin TexHandleTemplate!"LTH"; //Line texture
+		
+		
 		
 		protected mixin template ChangeDetectedSize(string name)
 		{
@@ -1388,34 +1461,22 @@ version(/+$DIDE_REGION+/all)
 			mixin ChangeDetectedSize!"FH"; 	/* Font height */
 		+/
 		
-		protected void synch_reset()
+		protected void resetState(StateSide side)
 		{
-			/+
-				The target gpu state is reseted, 
-				to the initial shader state
-			+/
-			target_FMH = TexHandle.init; 
-			target_LFMH = TexHandle.init; 
-			target_PALH = TexHandle.init; 
-			target_LTH = TexHandle.init; 
+			_FMH	.resetState(side),
+			_LFMH	.resetState(side),
+			_PALH	.resetState(side),
+			_LTH	.resetState(side); 
 			
-			target_TR = Transformation.init; 
-		} void resetStyle()
-		{
-			/+
-				The local style state
-				is reseted.
-			+/
-			FMH = TexHandle.init; 
-			LFMH = TexHandle.init; 
-			PALH = TexHandle.init; 
-			LTH = TexHandle.init; 
-			
-			TR = Transformation.init; 
+			if(side & StateSide.user) TR = Transformation.init; 
+			if(side & StateSide.target) target_TR = Transformation.init; 
 		} 
 		
 		protected int actVertexCount; 
 		protected bool insideBlock; 
+		
+		void resetStyle()
+		{ resetState(StateSide.user); } 
 		
 		protected void resetBlockState()
 		{ insideBlock = false; actVertexCount = 0; } 
@@ -1432,7 +1493,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(insideBlock) end; 
 			vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
-			synch_reset; 
+			resetState(StateSide.target); 
 			actVertexCount=0; 
 			insideBlock = true; 
 		} 
@@ -1501,6 +1562,34 @@ version(/+$DIDE_REGION+/all)
 	
 	class GfxBuilder : GfxBuilderBase
 	{
+		void drawC64Sprite(
+			int texHeight,/+Todo: move it outside!+/
+			vec2 pos, int idx, int fg, bool doubleSize
+		)
+		{
+			begin(4, {}); 
+			synch_PALH; 
+			synch_FMH; 
+			emit(
+				assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
+				assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(texHeight*((doubleSize)?(2):(1))))/+Todo: assembleSize for ints!+/),
+				assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
+				assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
+			); 
+		} 
+		
+		void emitC64Screen(
+			//Texture palette, Texture fontTex, /+Todo: -> state+/
+			ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol
+		)
+		{
+			synch_PALH; 
+			synch_FMH; 
+			emitC64Border(pos-4, borderCol); 
+			foreach(y; 0..img.height)
+			{ drawC64ChrRow(/+palette, fontTex,+/ (pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
+		} 
+		
 		void drawC64Rect(ibounds2 bnd, int fg)
 		{
 			begin(4, {}); 
@@ -1513,9 +1602,6 @@ version(/+$DIDE_REGION+/all)
 			); 
 		} 
 		
-		void drawC64Mark(ivec2 p, int fg = 7)
-		{ drawC64Rect(ibounds2(p, ((1).genericArg!q{size})), fg); } 
-		
 		void emitC64Border(ivec2 pos, int fg)
 		{
 			void r(int x0, int y0, int x1, int y1)
@@ -1526,35 +1612,9 @@ version(/+$DIDE_REGION+/all)
 			r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
 			r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
 		} 
-		
-		void drawC64Sprite(
-			Texture tex/+Todo: eliminate with state!+/, 
-			vec2 pos, int idx, int fg, bool doubleSize
-		)
-		{
-			begin(4, {}); 
-			synch_PALH; 
-			emit_setFMH(tex); 
-			emit(
-				assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-				assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(tex.height*((doubleSize)?(2):(1))))/+Todo: assembleSize for ints!+/),
-				assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
-				assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
-			); 
-		} 
-		
-		void emitC64Screen(
-			Texture palette, Texture fontTex, /+Todo: -> state+/
-			ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol
-		)
-		{
-			emitC64Border(pos-4, borderCol); 
-			foreach(y; 0..img.height)
-			{ drawC64ChrRow(palette, fontTex, (pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
-		} 
 		
 		void drawC64ChrRow(
-			Texture palette, Texture fontTex, /+Todo: put these into state+/
+			//Texture palette, Texture fontTex, /+Todo: put these into state+/
 			ivec2 pos, RG[] data, int bk
 		)
 		{
@@ -1564,8 +1624,8 @@ version(/+$DIDE_REGION+/all)
 			
 			void setup()
 			{
-				emit_setPALH(palette); 
-				emit_setFMH(fontTex); 
+				synch_PALH; 
+				synch_FMH; 
 				emit(
 					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
 					/*assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4)),*/
@@ -1772,25 +1832,6 @@ version(/+$DIDE_REGION+/all)
 			/+Note: 15+/ /+Note: 0xF+/	white	= EGAColor(8+7),
 		} 
 		
-		enum EGAColor : ubyte
-		{
-			/+Note: 0+/ black	= 0,
-			/+Note: 1+/ blue	= 1,
-			/+Note: 2+/ green	= 2,
-			/+Note: 3+/ cyan	= 3,
-			/+Note: 4+/ red	= 4,
-			/+Note: 5+/ magenta	= 5,
-			/+Note: 6+/ brown	= 6,
-			/+Note: 7+/ ltGray	= 7,
-			/+Note:  8+/ /+Note: 0x8+/	dkGray	= 8+0,
-			/+Note:  9+/ /+Note: 0x9+/	ltBlue	= 8+1,
-			/+Note: 10+/ /+Note: 0xA+/	ltGreen	= 8+2,
-			/+Note: 11+/ /+Note: 0xB+/	ltCyan	= 8+3,
-			/+Note: 12+/ /+Note: 0xC+/	ltRed	= 8+4,
-			/+Note: 13+/ /+Note: 0xD+/	ltMagenta	= 8+5,
-			/+Note: 14+/ /+Note: 0xE+/	yellow	= 8+6,
-			/+Note: 15+/ /+Note: 0xF+/	white	= 8+7,
-		} 
 		
 		enum EGAColorTable = 
 		(表([
@@ -1835,10 +1876,10 @@ version(/+$DIDE_REGION+/all)
 			[q{15},q{"\17"},q{0xF},q{ltGray},q{(RGB(0xAEAEAE))}],
 		])); 
 		
-		itt tartok; 
-		
-		mixin((src) .GEN!q{GEN_ColorEnum("EGA")}); 
-		mixin((src) .GEN!q{GEN_ColorEnum("C64")}); 
+		/+
+			mixin((src) .GEN!q{GEN_ColorEnum("EGA")}); 
+			mixin((src) .GEN!q{GEN_ColorEnum("C64")}); 
+		+/
 		
 		static struct ColorState
 		{
@@ -2048,7 +2089,8 @@ version(/+$DIDE_REGION+/all)
 					emit(
 						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
 						assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
-						assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity),
+						/+assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity),+/
+						assemble(mixin(舉!((Opcode),q{setOP})), ubyte(st.opacity)),
 						assemble(
 							mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
 								bits((iround(cursorPos.y*scaleY)), 16)
@@ -3399,24 +3441,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1A48C82886ADB).檢(
+					((0x1A89082886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1A4FE82886ADB))))
+				if((互!((bool),(0),(0x1A90282886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1A59682886ADB).檢((互!((float/+w=12+/),(1.000),(0x1A5AD82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1A99A82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1A9B182886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1A6B582886ADB).檢 (im)); 
+					((0x1AAB982886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3994,6 +4036,26 @@ $(V_size+G_size)".text
 						return ErrorColor; 
 					} 
 					
+					/*Vector graphics state registers*/
+					uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
+					
+					
+					vec4 PC = vec4(1); 	/* Primary color - default black */
+					vec4 SC = vec4(0); 	/* Secondary color - default white */
+					float OP = 1; 	/* opacity*/
+					
+					//Todo: compress PC and SC to RGBA32
+					
+					float PS = 1; 	/* Point size */
+					float LW = 1; 	/* Line width */
+					float DL = 1; 	/* Dot lenthg */
+					float FH = 18; 	/* Font height */
+						
+					uint FMH = 0; 	/* Font map handle */
+					uint LFMH = 0; 	/* Latin font map handle */
+					uint PALH = 0; 	/* Palette handle */
+					uint LTH = 0; 	/* Line texture handle */
+					
 					//Model - World coordinate transformation
 					const vec4 initialClipBounds = vec4(-1e30, -1e30, 1e30, 1e30); 
 					
@@ -4036,6 +4098,9 @@ $(V_size+G_size)".text
 					
 					void emitVertex2D(vec2 p)
 					{
+						fragColor 	= vec4(PC.rgb, PC.a*OP),
+						fragBkColor 	= vec4(SC.rgb, SC.a*OP); 
+						
 						vec2 w = outputTransformPoint2D(p); //model to world transform
 						
 						gl_ClipDistance[0] = w.x-TR_clipBounds.x; 
@@ -4267,7 +4332,7 @@ $(V_size+G_size)".text
 						fragTexCoordXY = vec2(.5, 1); emitVertex2D(M1); 
 					} 
 					
-					
+					
 					void emitLineJoint(in vec2 P0, in vec2 P1, in vec2 P2, in float r0, in float r1, in float r2)
 					{
 						/*
@@ -4451,26 +4516,6 @@ $(V_size+G_size)".text
 						return bitStream; 
 					} 
 					
-					/*Vector graphics state registers*/
-					uint TF = 0, FF = 0, VF = 0; 	//flags: texFlags, fontFlags, vecFlags
-					
-					
-					vec4 PC = vec4(1); 	/* Primary color - default black */
-					vec4 SC = vec4(0); 	/* Secondary color - default white */
-					
-					float PS = 1; 	/* Point size */
-					float LW = 1; 	/* Line width */
-					float DL = 1; 	/* Dot lenthg */
-					float FH = 18; 	/* Font height */
-						
-					uint FMH = 0; 	/* Font map handle */
-					uint LFMH = 0; 	/* Latin font map handle */
-					uint PALH = 0; 	/* Palette handle */
-					uint LTH = 0; 	/* Line texture handle */
-					
-					//Note: transformation state is at the start of GS code
-					
-					
 					$(TexFlags.GLSLCode)
 					$(FontFlags.GLSLCode)
 					$(VecFlags.GLSLCode)
@@ -4508,6 +4553,14 @@ $(V_size+G_size)".text
 							else	{ color.rgb = vec3(float(raw) / high)/*grayscale*/; return 1; }
 						}
 						return 0; 
+					} 
+					
+					//setting RGB automatically sets alpha to 1
+					int fetchColor2(inout BitStream bitStream, uint format, inout vec4 color)
+					{
+						int res = fetchColor(bitStream, format, color); 
+						if(res == 1) { color.a = 1; res = 3; }
+						return res; 
 					} 
 					
 					$(GEN_enumDefines!SizeFormat)
@@ -4618,6 +4671,9 @@ $(V_size+G_size)".text
 						}
 					} 
 					
+					void setOpacity(inout BitStream bitStream)
+					{ OP = float(fetch_uint(bitStream, 8))/255; } 
+					
 					$(GEN_enumDefines!FlagFormat)
 					void setFlags(inout BitStream bitStream)
 					{
@@ -4694,7 +4750,6 @@ $(V_size+G_size)".text
 						(for interrupted paths)
 					*/	#define PathCode_TG 2
 					/*line to*/	#define PathCode_L 3
-					
 						
 					/*
 						quadratic bezier smoot point
@@ -4758,17 +4813,17 @@ $(V_size+G_size)".text
 					
 					void emitPathCodeDebugPoint(uint code, float r)
 					{
-						setFragMode(FragMode_fullyFilled); fragColor = vec4(1,0,1,1); 
+						setFragMode(FragMode_fullyFilled); PC = vec4(1,0,1,1); 
 						switch(code)
 						{
-							case PathCode_M: 	fragColor = vec4(.5,.5,.5,1); 	break; 
-							case PathCode_L: 	fragColor = vec4(0,1,0,1); 	break; 
-							case PathCode_TG: 	fragColor = vec4(1,.5,1,1); 	break; 
-							case PathCode_Q1: 	fragColor = vec4(1,0,0,1); 	break; 
-							case PathCode_Q2: 	fragColor = vec4(1,1,0,1); 	break; 
-							case PathCode_C1: 	fragColor = vec4(0,0,1,1); 	break; 
-							case PathCode_C2: 	fragColor = vec4(0,.5,1,1); 	break; 
-							case PathCode_C3: 	fragColor = vec4(0,1,1,1); 	break; 
+							case PathCode_M: 	PC = vec4(.5,.5,.5,1); 	break; 
+							case PathCode_L: 	PC = vec4(0,1,0,1); 	break; 
+							case PathCode_TG: 	PC = vec4(1,.5,1,1); 	break; 
+							case PathCode_Q1: 	PC = vec4(1,0,0,1); 	break; 
+							case PathCode_Q2: 	PC = vec4(1,1,0,1); 	break; 
+							case PathCode_C1: 	PC = vec4(0,0,1,1); 	break; 
+							case PathCode_C2: 	PC = vec4(0,.5,1,1); 	break; 
+							case PathCode_C3: 	PC = vec4(0,1,1,1); 	break; 
 						}
 						emitTexturedPointPointRect2D(P4-r, P4+r); 
 					} 
@@ -4846,7 +4901,7 @@ $(V_size+G_size)".text
 						
 						const bool 	Mode_Points 	= $(bezierTesselationSettings.mode == BTSM.points)
 						,	Mode_PerPixel 	= $(bezierTesselationSettings.mode == BTSM.perPixel)
-						,	EnableDebugColors 	= false; 
+						,	EnableDebugColors 	= false /*debug only, ruins normal colors*/; 
 						
 						const float r = 2.5;  //Todo: radius handling!!!
 						if(Mode_Points)
@@ -4855,8 +4910,7 @@ $(V_size+G_size)".text
 						{
 							const uint PC1 = PathCode(1), PC2 = PathCode(2); 
 							
-							if(EnableDebugColors)	fragColor = PathCodeQueue_debugColor(); 
-							else	fragColor = PC; 
+							if(EnableDebugColors) { PC = PathCodeQueue_debugColor(); }
 							
 							if(Mode_PerPixel)
 							{
@@ -4941,7 +4995,6 @@ $(V_size+G_size)".text
 						const uint handleFmt = fetchHandleFormat(bitStream); ; 
 						const uint texHandle = fetchHandle(bitStream, handleFmt); 
 						
-						fragColor = PC; fragBkColor = SC; 
 						setFragMode(FragMode_fullyFilled); 
 						setFragTexHandle(texHandle); 
 						fragTexCoordZ = 0; 
@@ -4989,7 +5042,6 @@ $(V_size+G_size)".text
 						repeated = repeated_; 
 						if(repeated) repeatedChar = fetchBits(bitStream, 8); 
 						
-						fragColor = PC; fragBkColor = SC; 
 						setFragTexHandle(FMH); 
 						setFragMode(EnbaleAsciiStrips ? FragMode_glyphStrip : FragMode_fullyFilled); 
 						fragTexCoordXY.x = 0; 
@@ -5020,13 +5072,14 @@ $(V_size+G_size)".text
 								!mainCat //settings
 							)
 							{
+								bool colorsChanged = false; 
 								switch(subCat)
 								{
 									case 0: //system
 										switch(cmd)
 									{
 										case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
-										case 1: 	/*setPh(); */	/*set phase (position along line)*/	break; 
+										case 1: 	setOpacity(bitStream); 	/*set phase (position along line)*/	break; 
 										case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
 										case 3: 	setTrans(bitStream); 	/*set output transformation*/	break; 
 									}
@@ -5035,12 +5088,13 @@ $(V_size+G_size)".text
 										{
 										const uint fmt = fetchColorFormat(bitStream); 
 										int copyFlags = 0; /*bit0: RGB changed, bit1: Alpha changed*/
-										if(cmd!=1) copyFlags = fetchColor(bitStream, fmt, PC); 
-										if(cmd==1 || cmd==2) fetchColor(bitStream, fmt, SC); 
+										if(cmd!=1) copyFlags = fetchColor2(bitStream, fmt, PC); 
+										if(cmd==1 || cmd==2) fetchColor2(bitStream, fmt, SC); 
 										else if(cmd==3) {
 											if((copyFlags & 1)!=0) SC.rgb = PC.rgb; 
 											if((copyFlags & 2)!=0) SC.a = PC.a; 
 										}
+										colorsChanged = true; 
 									}
 									break; 
 									case 2: //sizes
@@ -5068,6 +5122,12 @@ $(V_size+G_size)".text
 										}
 									}
 									break; 
+								}
+								
+								if(colorsChanged)
+								{
+									fragColor 	= vec4(PC.rgb, PC.a*OP),
+									fragBkColor 	= vec4(SC.rgb, SC.a*OP); 
 								}
 							}else {
 								switch(subCat)
