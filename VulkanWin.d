@@ -1004,6 +1004,12 @@ version(/+$DIDE_REGION+/all)
 			const fc = FormattedColor(args); 
 			return assemble(fc.format, bits(fc.value, colorFormatBitCnt[fc.format])); 
 		} 
+		
+		auto assembleColor_noFormat(A...)(in A args)
+		{
+			const fc = FormattedColor(args); 
+			return assemble(bits(fc.value, colorFormatBitCnt[fc.format])); 
+		} 
 	}
 	
 	class GeometryStreamProcessor
@@ -1424,22 +1430,20 @@ version(/+$DIDE_REGION+/all)
 					const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
 						SC_changed = doSC && SC.chkSet(user_colorState.SC); 
 					
-					if(PC_changed || SC_changed)
+					if(PC_changed && SC_changed && PC.format==SC.format)
 					{
-						if(PC_changed && SC_changed)
-						{
-							if(PC==SC)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
-							else	{
-								emit(
-									mixin(舉!((Opcode),q{setPCSC})), assemble(
-										assembleColor(PC),
-										assembleColor(SC)
-									)
-								); 
-							}
+						if(PC.value==SC.value)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
+						else {
+							emit(
+								assemble(mixin(舉!((Opcode),q{setPCSC})), assembleColor(PC)),
+								           assembleColor_noFormat(SC)
+							); 
 						}
-						else if(PC_changed)	emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
-						else if(SC_changed)	emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
+					}
+					else
+					{
+						if(PC_changed) emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
+						if(SC_changed) emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
 					}
 					
 					if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
@@ -1610,57 +1614,46 @@ version(/+$DIDE_REGION+/all)
 	
 	class GfxBuilder : GfxBuilderBase
 	{
-		void drawC64Sprite(
-			int texHeight,/+Todo: move it outside!+/
-			vec2 pos, int idx, int fg, bool doubleSize
-		)
+		void drawC64Sprite(V)(in V pos, in int idx)
 		{
-			begin(4, {}); 
-			synch_PALH; 
-			synch_FMH; 
+			if(idx.inRange(0, 255))
+			{
+				begin(4, {}); synch_PALH, synch_FMH, synch_FH, synch_colors; 
+				emit(
+					mixin(舉!((Opcode),q{drawMove})), assemblePoint(pos),
+					assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
+				); 
+			}
+		} 
+		
+		void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
+		{
+			begin(4, {}); synch_PALH; synch_colors; 
 			emit(
-				assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-				assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(texHeight*((doubleSize)?(2):(1))))/+Todo: assembleSize for ints!+/),
-				assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(pos),
-				assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
+				mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
+				mixin(舉!((Opcode),q{drawTexRect}))	, assemblePoint(bnd.bottomRight),
+				assembleHandle(texHandle)
 			); 
 		} 
 		
-		void emitC64Screen(
-			//Texture palette, Texture fontTex, /+Todo: -> state+/
-			ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol
-		)
-		{
-			synch_PALH; 
-			synch_FMH; 
-			emitC64Border(pos-4, borderCol); 
-			foreach(y; 0..img.height)
-			{ drawC64ChrRow(/+palette, fontTex,+/ (pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
-		} 
-		
-		void drawC64Rect(ibounds2 bnd, int fg)
-		{
-			begin(4, {}); 
-			synch_PALH; 
-			emit(
-				assemble(mixin(舉!((Opcode),q{setPC})), mixin(舉!((ColorFormat),q{u4})), bits(fg, 4)),
-				assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.topLeft),
-				assemble(mixin(舉!((Opcode),q{drawTexRect})), mixin(舉!((CoordFormat),q{f32}))), vec2(bnd.bottomRight),
-				assembleHandle(0)
-			); 
-		} 
-		
-		void emitC64Border(ivec2 pos, int fg)
+		void drawC64Border(ivec2 pos)
 		{
 			void r(int x0, int y0, int x1, int y1)
 			{
 				auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
-				drawC64Rect(ibounds2(p(x0, y0), p(x1, y1)), fg); 
+				drawC64Rect(ibounds2(p(x0, y0), p(x1, y1))); 
 			} 
 			r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
 			r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
 		} 
-		
+		
+		void drawC64Screen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
+		{
+			PC(borderCol, 4); drawC64Border(pos-4); 
+			foreach(y; 0..img.height)
+			{ drawC64ChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
+		} 
+		
 		void drawC64ChrRow(
 			//Texture palette, Texture fontTex, /+Todo: put these into state+/
 			ivec2 pos, RG[] data, int bk
@@ -1670,88 +1663,23 @@ version(/+$DIDE_REGION+/all)
 			
 			int index = 0; 
 			
-			void setup()
-			{
-				synch_PALH; 
-				synch_FMH; 
-				emit(
-					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u4})), bits(8, 4)),
-					/*assemble(mixin(舉!((Opcode),q{setSC})), mixin(舉!((ColorFormat),q{u4})), bits(bk, 4)),*/
-					assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(bk, 4)),
-					assemble(mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16}))), bits(pos.x+index*8, 16), bits(pos.y, 16)
-				); 
-			} 
-			
-			//begin; setup;
-			
-			static RG[] fetchSameColor(ref RG[] data, size_t maxCount)
+			static RG[] fetchSameColor(ref RG[] data)
 			{
 				if(data.empty) return []; 
 				const fg = data.front.y; 
 				auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
-				n.minimize(maxCount); 
 				auto res = data[0..n]; data = data[n..$]; return res; 
 			} 
 			
-			enum MinRunLength = 2,
-			MaxRunLength = 64; 
-			
-			static sizediff_t countDifferentChars(RG[] data)
-			{
-				if(data.length>=1+MinRunLength)
-				{
-					enum SkipAtStart = 1; 
-					const i = 	data[SkipAtStart..$]
-						.slide!(No.withPartial)(MinRunLength)
-						.countUntil!((a)=>(a.all!((b)=>(b.x==a[0].x)))); 
-					if(i>=0) return i+SkipAtStart; 
-				}
-				return data.length; 
-			} 
-			
-			void emitSameChars(ref RG[] data)
-			{
-				if(data.empty) return; 
-				const ubyte ch = data[0].x; 
-				auto n = data.countUntil!((a)=>(a.x!=ch)); if(n<0) n = data.length; 
-				if(n>=MinRunLength)
-				{
-					emit(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII_rep}))), bits(n-1, 6), ch)); 
-					data = data[n..$]; 
-				}
-			} 
-			
-			void emitDifferentChars(ref RG[] data)
-			{
-				if(data.empty) return; 
-				
-				auto n = countDifferentChars(data); 
-				emit(assemble(bits(mixin(舉!((Opcode),q{drawFontASCII}))), bits(n-1, 6))); 
-				emitEvenBytes(data.fetchFrontN(n)); 
-			} 
-			
-			void emitRun(ref RG[] data)
-			{
-				while(!data.empty)
-				{ emitSameChars(data); emitDifferentChars(data); }
-			} 
-			
 			index = 0; 
+			Style(this.bk(EGAColor(bk))); 
 			while(data.length)
 			{
-				size_t remainingChars = min(maxVertexCount/4, MaxRunLength/+should go next to the opcodes, not here!+/); 
-				
-				//todo_this_not_works_at_alll; 
-				
-				begin; setup;  //Todo: chain it to the end of previous
-				
-				auto act = fetchSameColor(data, remainingChars); 
+				auto act = fetchSameColor(data/+, remainingChars+/); 
 				const nextIndex = index + act.length.to!int; 
-				emit(assemble(bits(mixin(舉!((Opcode),q{setPC}))), mixin(舉!((ColorFormat),q{u4})), bits(act[0].y, 4))); 
-				emitRun(act); 
-				
-				//Todo: make a whole line of text a triangle strip!
-				
+				Style(this.fg(EGAColor(act[0].y))); 
+				cursorPos = vec2(pos/8+ivec2(index, 0)); 
+				textBackend(graphicState, act.map!((a)=>(char(a.x)))); 
 				index = nextIndex; 
 			}
 			end; 
@@ -2031,7 +1959,7 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		GraphicState graphicState; 
-		vec2 cursorPos; 
+		vec2 cursorPos, fontSize; 
 		
 		struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
 		struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
@@ -2091,59 +2019,50 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 		
-		Texture externalFontTexture; 
-		
-		void textBackend_old(A)(in GraphicState st, A r)
-		{
-			const scaleX = 9, scaleY = 16; 
-			//alias font = vgaFont2; 
+		/+
+			Texture externalFontTexture; 
 			
-			foreach(ch; r.dtext)
+			void textBackend_old(A)(in GraphicState st, A r)
 			{
-				_builder.begin; 
-				_builder.emit_setPALH(egaPalette); 
-				_builder.emit_setFMH(externalFontTexture); 
-				_builder.emit(
-					assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
-					assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
-					assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity), 
-					assemble(
-						mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
-							bits((iround(cursorPos.y*scaleY)), 16)
-					),
-					assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(((ch<=255)?(ch):(254)))))
-				); 
-				_builder.end; 
-				cursorPos.x += /+st.fontHeight * font.aspect+/1; 
-			}
-		} 
-		
+				const scaleX = 9, scaleY = 16; 
+				//alias font = vgaFont2; 
+				
+				foreach(ch; r.dtext)
+				{
+					_builder.begin; 
+					_builder.emit_setPALH(egaPalette); 
+					_builder.emit_setFMH(externalFontTexture); 
+					_builder.emit(
+						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
+						assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
+						assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity), 
+						assemble(
+							mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
+								bits((iround(cursorPos.y*scaleY)), 16)
+						),
+						assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(((ch<=255)?(ch):(254)))))
+					); 
+					_builder.end; 
+					cursorPos.x += /+st.fontHeight * font.aspect+/1; 
+				}
+			} 
+		+/
 		
 		void textBackend(A)(in GraphicState st, A r)
 		{
 			//Todo: this should go to buffer
 			static if(isInputRange!A) if(r.empty) return; 
 			
-			const scaleX = 9, scaleY = 16; 
-			//alias font = getVgaFont2; 
+			PC(st.fgbkColors.getBits(0, 4), 4), 
+			SC(st.fgbkColors.getBits(4, 4), 4),
+			OP = st.opacity.from_unorm; 
 			
 			void setup()
 			{
 				with(_builder)
 				{
-					synch_colors; 
-					synch_PALH; 
-					synch_FMH; 
-					emit(
-						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
-						assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
-						/+assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity),+/
-						assemble(mixin(舉!((Opcode),q{setOP})), ubyte(st.opacity)),
-						assemble(
-							mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
-								bits((iround(cursorPos.y*scaleY)), 16)
-						)
-					); 
+					synch_PALH, synch_FMH, synch_FH, synch_colors; 
+					emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
 				}
 			} 
 			_builder.begin(0, {}); 
@@ -3489,24 +3408,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1AF6A82886ADB).檢(
+					((0x1A4A482886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1AFDC82886ADB))))
+				if((互!((bool),(0),(0x1A51682886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1B07482886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B08B82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1A5AE82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1A5C582886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1B19382886ADB).檢 (im)); 
+					((0x1A6CD82886ADB).檢 (im)); 
 				}
 			}
 			
