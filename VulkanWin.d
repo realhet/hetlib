@@ -202,7 +202,7 @@ version(/+$DIDE_REGION+/all)
 	alias BTSM = BezierTesselationSettings.Mode; 
 	
 	enum bezierTesselationSettings =
-		0.predSwitch
+		1.predSwitch
 		(
 		0, mixin(體!((BezierTesselationSettings),q{
 			mode 	: BTSM.perPixel,
@@ -215,7 +215,8 @@ version(/+$DIDE_REGION+/all)
 			cubicSegments	: 8
 		})),
 		2, mixin(體!((BezierTesselationSettings),q{mode : BTSM.points/+debug only+/}))
-	); 
+	)
+		/+Todo: It is a line style property, not a system-wide constant setting+/; 
 	
 	
 	
@@ -753,7 +754,7 @@ version(/+$DIDE_REGION+/all)
 		pragma(msg, opInfo[op].bits.to!string(2).padLeft('0', opInfo[op].bitCnt).text, " : ", op.text); 
 	}
 	
-	version(/+$DIDE_REGION GSP assembler+/all)
+	version(/+$DIDE_REGION GSP assembler functs+/all)
 	{
 		struct Bits(T)
 		{
@@ -1174,13 +1175,14 @@ version(/+$DIDE_REGION+/all)
 		uint gbBits; 
 	} 
 	
-	class GfxBuilderBase
+	class GfxBuilderBase /+Todo: this is basically an assembler, not a builder: It maintains a state and emits it on request.+/
 	{
 		/+Opt: final functions everywhere if possible!!! Do timing tests!!!+/
 		
 		alias VertexData 	= VulkanWindow.VertexData,
 		Texture 	= VulkanWindow.Texture; 
 		
+		protected enum StateSide { user, target, both } 
 		
 		version(/+$DIDE_REGION Bitstream management+/all)
 		{
@@ -1228,7 +1230,7 @@ version(/+$DIDE_REGION+/all)
 			void deallocStream()
 			{ resetStream(doDealloc : true); } 
 		}
-		
+		
 		final void emit(Args...)(in Args args)
 		{
 			static foreach(i, T; Args)
@@ -1246,230 +1248,276 @@ version(/+$DIDE_REGION+/all)
 		void emitBytes(in void[] data)
 		{
 			auto ba = (cast(ubyte[])(data)); 
-			while(ba.length>=8)
-			{ emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
-			if(ba.length>=4)
-			{ emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
-			if(ba.length>=2)
-			{ emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
-			if(ba.length>=1)
-			{ emit(*(cast(ubyte*)(ba.ptr))); }
+			while(ba.length>=8) { emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
+			if(ba.length>=4) { emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
+			if(ba.length>=2) { emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
+			if(ba.length>=1) { emit(*(cast(ubyte*)(ba.ptr))); }
 		} 
 		
 		void emitEvenBytes(void[] data)
 		{
 			auto ba = (cast(ubyte[])(data)); 
-			while(ba.length>=16)
-			{ emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
-			if(ba.length>=8)
-			{ emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
-			if(ba.length>=4)
-			{ emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
-			if(ba.length>=2)
-			{ emit(ba[0]); }
+			while(ba.length>=16) { emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
+			if(ba.length>=8) { emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
+			if(ba.length>=4) { emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
+			if(ba.length>=2) { emit(ba[0]); }
 		} 
-		
-		static struct Transformation
-		{
-			enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
-			
-			vec2 scaleXY = vec2(1); 
-			float skewX_deg = 0; 
-			float rotZ_deg = 0; 
-			vec2 transXY = vec2(0); //in world space
-			bounds2 clipBounds = initialClipBounds; //in world space
-			//applied in this order
-			
-			void clipBounds_reset() { clipBounds = initialClipBounds; } 
-		} 
-		
-		Transformation user_TR, target_TR; 
-		alias TR = user_TR; 
-		
-		void synch_TR()
-		{
-			with(target_TR /+it updates target and emits if changed+/)
-			{
-				if(scaleXY.chkSet(user_TR.scaleXY))
-				{
-					if(scaleXY.x!=scaleXY.y)
-					{
-						emit(
-							assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
-								assembleSize(scaleXY.y)
-						); 
-					}
-					else
-					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
-				}
-				
-				if(skewX_deg.chkSet(user_TR.skewX_deg))
-				{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
-				
-				if(rotZ_deg.chkSet(user_TR.rotZ_deg))
-				{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
-				
-				if(transXY.chkSet(user_TR.transXY))
-				{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
-				
-				if(clipBounds.chkSet(user_TR.clipBounds))
-				{
-					emit(
-						assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
-							assemblePoint(clipBounds.size)
-					); 
-				}
-			}
-		} 
-		
 		
 		
-		static if((常!(bool)(0)))
+		version(/+$DIDE_REGION Handles+/all)
 		{
-			protected mixin template ChangeDetectedTexHandle(string name)
+			struct TexHandleState(Opcode opcode)
+			{
+				private: 
+				enum TexHandle initialState = TexHandle.init; 
+				TexHandle 	userState 	= initialState, 
+					targetState 	= initialState; 
+				
+				public: 
+				@property TexHandle get()
+				=> userState; 
+				
+				@property void set(TexHandle val)
+				{
+					if(userState.chkSet(val))
+					{
+						/+
+							The user changed the internal state. Change detection, 
+							and precompilation can go here.
+						+/
+					}
+				} 
+				
+				@property void set(Texture tex)
+				{ set(tex ? tex.handle : TexHandle.init); } 
+				
+				void resetState(StateSide side)
+				{
+					if(side & StateSide.user) userState = initialState; 
+					if(side & StateSide.target) targetState = initialState; 
+				} 
+				
+				void synch(GfxBuilderBase builder)
+				{
+					if(targetState.chkSet(userState))
+					{
+						/+
+							The internal state was different to the target GPU state.
+							So it have to be emited.
+						+/
+						builder.emit(assemble(opcode, assembleHandle(targetState))); 
+					}
+				} 
+			} 
+			
+			protected mixin template TexHandleTemplate(string name)
 			{
 				mixin(iq{
-					void emit_set$(name)(TexHandle handle)
-					{ emit(assemble(Opcode.set$(name), assembleHandle(handle))); } 
-					void emit_set$(name)(Texture tex)
-					{ emit_set$(name)(tex.handle); } 
-					
-					protected TexHandle user_$(name); 
-					@property $(name)() const => user_$(name); 
-					@property $(name)(TexHandle val)
-					{
-						if(user_$(name).chkSet(val))
-						{
-							/*
-								The user changed the internal state. Change detection, 
-								and precompilation can go here.
-							*/
-						}
-					} 
-					@property $(name)(Texture tex)
-					{$(name)= tex ? tex.handle : TexHandle.init; } 
-					
-					protected TexHandle target_$(name); 
-					void synch_$(name)()
-					{
-						if(target_$(name).chkSet(user_$(name)))
-						{
-							/+
-								The internal state was different to the target GPU state.
-								So it have to be emited.
-							+/
-							emit_set$(name)(target_$(name)); 
-						}
-					} 
+					TexHandleState!(Opcode.set$(name)) state_$(name); 
+					void $(name)(T)(T arg) { state_$(name).set(arg); } 
+					auto $(name)() => state_$(name).get; 
+					void synch_$(name)() { state_$(name).synch(this); } 
 				}.text); 
 			} 
 			
-			mixin ChangeDetectedTexHandle!"FMH"; 	/* Font map handle */
-			mixin ChangeDetectedTexHandle!"LFMH"; 	/* Latin font map handle */
-			mixin ChangeDetectedTexHandle!"PALH"; 	/* Palette handle */
-			mixin ChangeDetectedTexHandle!"LTH"; 	/* Line texture handle */
+			version(/+$DIDE_REGION+/all) {
+				mixin TexHandleTemplate!"FMH"; 	//Fontmap
+				mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
+				mixin TexHandleTemplate!"PALH"; 	//Palette
+				mixin TexHandleTemplate!"LTH"; 	//Line texture
+				
+				void reset_handles(StateSide side)
+				{
+					state_FMH	.resetState(side),
+					state_LFMH	.resetState(side),
+					state_PALH	.resetState(side),
+					state_LTH	.resetState(side); 
+				} 
+			}
 		}
 		
-		enum StateSide { user, target, both } 
-		
-		struct TexHandleState(Opcode opcode)
+		version(/+$DIDE_REGION Sizes+/all)
 		{
-			private: 
-			enum TexHandle initialState = TexHandle.init; 
-			TexHandle userState; //this is where the user writes
-			TexHandle targetState; //this remembers what's uploaded to the target
-			
-			public: 
-			@property TexHandle get()
-			{ return userState; } 
-			
-			@property void set(TexHandle val)
+			struct SizeState(Opcode opcode, float initialState)
 			{
-				if(userState.chkSet(val))
-				{
-					/+
-						The user changed the internal state. Change detection, 
-						and precompilation can go here.
-					+/
-				}
-			} 
-			
-			@property void set(Texture tex)
-			{ set(tex ? tex.handle : TexHandle.init); } 
-			
-			/+
-				void opCall(T)(T arg)
-				{ set(arg); } auto opCall()
-				=> get(); 
-			+/
-			
-			void resetState(StateSide side)
-			{
-				if(side & StateSide.user) userState = initialState; 
-				if(side & StateSide.target) targetState = initialState; 
-			} 
-			
-			void synch(GfxBuilderBase builder)
-			{
-				if(targetState.chkSet(userState))
-				{
-					/+
-						The internal state was different to the target GPU state.
-						So it have to be emited.
-					+/
-					builder.emit(assemble(opcode, assembleHandle(targetState))); 
-				}
-			} 
-		} 
-		
-		protected mixin template TexHandleTemplate(string name)
-		{
-			mixin(iq{
-				TexHandleState!(Opcode.set$(name)) _$(name); 
-				void $(name)(T)(T arg) { _$(name).set(arg); } 
-				auto $(name)() => _$(name).get; 
-				void synch_$(name)() { _$(name).synch(this); } 
-			}.text); 
-		} 
-		
-		mixin TexHandleTemplate!"FMH"; //Fontmap
-		mixin TexHandleTemplate!"LFMH"; //Latin fontmap
-		mixin TexHandleTemplate!"PALH"; //Palette
-		mixin TexHandleTemplate!"LTH"; //Line texture
-		
-		
-		
-		protected mixin template ChangeDetectedSize(string name)
-		{
-			mixin(iq{
-				void emit_set$(name)(float size)
-				{ emit(assemble(Opcode.set$(name), assembleSize(size))); } 
-				void emit_set$(name)(floatTexture tex)
-				{ emit_set$(name)(tex.handle); } 
+				private: 
+				float 	userState 	= initialState, 
+					targetState 	= initialState; 
 				
-				protected TexHandle _$(name); 
-				@property $(name)() const => _$(name); 
-				@property $(name)(TexHandle val)
-				{ if(_$(name).chkSet(val)) emit_set$(name)(val); } 
-			}.text); 
-		} 
+				public: 
+				ref access() => userState; 
+				
+				void resetState(StateSide side)
+				{
+					if(side & StateSide.user) userState = initialState; 
+					if(side & StateSide.target) targetState = initialState; 
+				} 
+				
+				void synch(GfxBuilderBase builder)
+				{
+					if(targetState.chkSet(userState))
+					{
+						/+
+							The internal state was different to the target GPU state.
+							So it have to be emited.
+						+/
+						builder.emit(assemble(opcode, assembleSize(targetState))); 
+					}
+				} 
+			} 
+			
+			protected mixin template SizeTemplate(string name, float initialValue)
+			{
+				mixin(iq{
+					SizeState!(Opcode.set$(name), initialValue) state_$(name); 
+					ref $(name)() => state_$(name).access; 
+					void synch_$(name)() { state_$(name).synch(this); } 
+				}.text); 
+			} 
+			
+			version(/+$DIDE_REGION+/all) {
+				mixin SizeTemplate!("PS", 1); 	//Point size
+				mixin SizeTemplate!("LW", 1); 	//Line width
+				mixin SizeTemplate!("DL", 1); 	//Dot length
+				mixin SizeTemplate!("FH", 18); 	//Font height
+				
+				void reset_sizes(StateSide side)
+				{
+					state_PS	.resetState(side),
+					state_LW	.resetState(side),
+					state_DL	.resetState(side),
+					state_FH	.resetState(side); 
+				} 
+			}
+		}
+		
+		version(/+$DIDE_REGION C: Colors+/all)
+		{
+			struct ColorState
+			{
+				FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u8}))), 
+					SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
+				float OP = 1; 
+			} 
+			
+			ColorState 	user_colorState, 
+				target_colorState; 
+			
+			auto PC()
+			=> user_colorState.PC; void PC(A...)(in A a)
+			{ user_colorState.PC = FormattedColor(a); } 
+			auto SC()
+			=> user_colorState.SC; void SC(A...)(in A a)
+			{ user_colorState.SC = FormattedColor(a); } 
+			ref OP() => user_colorState.OP; 
+			
+			void reset_colors(StateSide side)
+			{
+				if(side & StateSide.user) user_colorState = ColorState.init; 
+				if(side & StateSide.target) target_colorState = ColorState.init; 
+			} 
+			
+			void synch_colors(bool doPC=true, bool doSC=true)()
+			{
+				with(target_colorState)
+				{
+					const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
+						SC_changed = doSC && SC.chkSet(user_colorState.SC); 
+					
+					if(PC_changed || SC_changed)
+					{
+						if(PC_changed && SC_changed)
+						{
+							if(PC==SC)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
+							else	{
+								emit(
+									mixin(舉!((Opcode),q{setPCSC})), assemble(
+										assembleColor(PC),
+										assembleColor(SC)
+									)
+								); 
+							}
+						}
+						else if(PC_changed)	emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
+						else if(SC_changed)	emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
+					}
+					
+					if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
+				}
+			} 
+			
+			alias synch_PC = synch_colors!(true, false),
+			synch_SC = synch_colors!(false, true); 
+		}
 		
-		/+
-			mixin ChangeDetectedSize!"PS"; 	/* Point size */
-			mixin ChangeDetectedSize!"LW"; 	/* Line width */
-			mixin ChangeDetectedSize!"DL"; 	/* Dot lenthg */
-			mixin ChangeDetectedSize!"FH"; 	/* Font height */
-		+/
+		version(/+$DIDE_REGION TR: Transform+/all)
+		{
+			static struct TransformationState
+			{
+				enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
+				
+				vec2 scaleXY = vec2(1); 
+				float skewX_deg = 0; 
+				float rotZ_deg = 0; 
+				vec2 transXY = vec2(0); //in world space
+				bounds2 clipBounds = initialClipBounds; //in world space
+				//applied in this order
+				
+				void clipBounds_reset() { clipBounds = initialClipBounds; } 
+			} 
+			
+			TransformationState user_TR, target_TR; 
+			alias TR = user_TR; 
+			
+			void reset_transform(StateSide side)
+			{
+				if(side & StateSide.user) user_TR = TransformationState.init; 
+				if(side & StateSide.target) target_TR = TransformationState.init; 
+			} 
+			
+			void synch_transform()
+			{
+				with(target_TR)
+				{
+					if(scaleXY.chkSet(user_TR.scaleXY))
+					{
+						if(scaleXY.x!=scaleXY.y)
+						{
+							emit(
+								assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
+									assembleSize(scaleXY.y)
+							); 
+						}
+						else
+						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
+					}
+					
+					if(skewX_deg.chkSet(user_TR.skewX_deg))
+					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
+					
+					if(rotZ_deg.chkSet(user_TR.rotZ_deg))
+					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
+					
+					if(transXY.chkSet(user_TR.transXY))
+					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
+					
+					if(clipBounds.chkSet(user_TR.clipBounds))
+					{
+						emit(
+							assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
+								assemblePoint(clipBounds.size)
+						); 
+					}
+				}
+			} 
+		}
 		
 		protected void resetState(StateSide side)
 		{
-			_FMH	.resetState(side),
-			_LFMH	.resetState(side),
-			_PALH	.resetState(side),
-			_LTH	.resetState(side); 
-			
-			if(side & StateSide.user) TR = Transformation.init; 
-			if(side & StateSide.target) target_TR = Transformation.init; 
+			reset_handles(side); 
+			reset_sizes(side); 
+			reset_transform(side); 
+			reset_colors(side); 
 		} 
 		
 		protected int actVertexCount; 
@@ -1711,7 +1759,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void drawPath(Args...)(in Args args)
 		{
-			void setup() {/+synch_PS, synch_SC...+/} 
+			void setup() { synch_transform; synch_colors; synch_LW; } 
 			
 			/+
 				Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
@@ -2083,7 +2131,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				with(_builder)
 				{
-					synch_TR; 
+					synch_colors; 
 					synch_PALH; 
 					synch_FMH; 
 					emit(
@@ -3077,7 +3125,7 @@ class VulkanWindow: Window
 				SC = (RGB(0xFF000000)); 
 			} 
 			
-			void rect(bounds2 bounds, TexHandle texHandle, in RGBA color=(RGBA(0xFFFFFFFF)))
+			void rect_old(bounds2 bounds, TexHandle texHandle, in RGBA color=(RGBA(0xFFFFFFFF)))
 			{
 				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
 				foreach(i; 0..4)
@@ -3441,24 +3489,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1A89082886ADB).檢(
+					((0x1AF6A82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1A90282886ADB))))
+				if((互!((bool),(0),(0x1AFDC82886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1A99A82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1A9B182886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1B07482886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B08B82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1AAB982886ADB).檢 (im)); 
+					((0x1B19382886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3909,6 +3957,12 @@ $(V_size+G_size)".text
 						.GEN_ShaderLayoutDeclarations
 					)
 					
+					/*
+						Anomalies:
+							* Lines:
+								* fragTexCoordZ: is used for lineWidth/2
+								* fragFloats0..1 contain 2D cubic bezier control points
+					*/
 					
 					@vert: 
 					
@@ -4903,7 +4957,7 @@ $(V_size+G_size)".text
 						,	Mode_PerPixel 	= $(bezierTesselationSettings.mode == BTSM.perPixel)
 						,	EnableDebugColors 	= false /*debug only, ruins normal colors*/; 
 						
-						const float r = 2.5;  //Todo: radius handling!!!
+						const float r = LW/2;  //Todo: properly delayed and linearly changing radius handling!!!
 						if(Mode_Points)
 						{ emitPathCodeDebugPoint(code, r); }
 						else
@@ -4997,7 +5051,7 @@ $(V_size+G_size)".text
 						
 						setFragMode(FragMode_fullyFilled); 
 						setFragTexHandle(texHandle); 
-						fragTexCoordZ = 0; 
+						fragTexCoordZ = 0; //Todo: should optionally come from the outside
 						
 						emitTexturedPointPointRect2D(P3.xy, P4.xy); 
 					} 
@@ -5079,7 +5133,7 @@ $(V_size+G_size)".text
 										switch(cmd)
 									{
 										case 0: 	runningCntr = 0; 	/*end - 5 zeroes at end of VBO*/	break; 
-										case 1: 	setOpacity(bitStream); 	/*set phase (position along line)*/	break; 
+										case 1: 	setOpacity(bitStream); 	/*opacity for both PS and SC*/	break; 
 										case 2: 	setFlags(bitStream); 	/*set flags*/	break; 
 										case 3: 	setTrans(bitStream); 	/*set output transformation*/	break; 
 									}
@@ -5187,6 +5241,7 @@ $(V_size+G_size)".text
 									{
 									//Todo: set these states it less frequently!!!
 									fragColor = PC; fragBkColor = SC; setFragTexHandle(0); 
+									fragTexCoordZ = floatBitsToUint(LW/2); 
 									
 									latchP(fetchXY(bitStream, P4)); 
 									shiftInPathCode(pendingPathCode); 
@@ -5215,7 +5270,7 @@ $(V_size+G_size)".text
 					void main() /*geometry shader*/
 					{
 						fragTexHandleAndMode = 0; 
-						fragTexCoordZ = 0; //this is normally 0. Fonts can temporarily change it.
+						fragTexCoordZ = 0; //This is normally 0. Fonts and lines can temporarily change it.
 						fragFloats0 = vec4(1, 2, 3, 4); 
 						fragFloats1 = vec4(5, 6, 7, 8); 
 						
@@ -6286,7 +6341,7 @@ $(V_size+G_size)".text
 						{
 							float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
 							float t = fract(texCoordXY.x); 
-							float r = 2.5; //Todo: send radiuses into the pixel shader!
+							float r = uintBitsToFloat(fragTexCoordZ); 
 							if(dst>r) discard; 
 						}
 						

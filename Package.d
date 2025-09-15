@@ -9466,6 +9466,9 @@ version(/+$DIDE_REGION Colors+/all)
 				else return val.rgbToFloat.hsvToRgb.floatToRgb; 
 			}
 		} 
+		
+		alias to_hsv 	= rgbToHsv, 
+		from_hsv 	= hsvToRgb; //similar to to_unorm
 		
 		auto hsvToRgb_prev(float H, float S, float V)
 		{
