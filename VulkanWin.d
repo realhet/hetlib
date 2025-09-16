@@ -1834,18 +1834,6 @@ version(/+$DIDE_REGION+/all)
 			emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
 		} 
 		
-		auto _builder() => this; 
-		
-		vec2 cursorPos, fontSize; 
-		
-		struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
-		struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
-		
-		struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
-		struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
-		struct My { float value=0; this(A)(in A a) { value = float(a); } } 
-		struct my { float value=0; this(A)(in A a) { value = float(a); } } 
-		
 		protected void applyStyleArg(T)(in T arg)
 		{
 			//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
@@ -1900,6 +1888,19 @@ version(/+$DIDE_REGION+/all)
 		void Style(Args...)(Args args)
 		{ static foreach(i, a; args) applyStyleArg(a); } 
 		
+		
+		auto _builder() => this; 
+		
+		vec2 cursorPos, fontSize; 
+		
+		struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+		struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+		
+		struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
+		struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
+		struct My { float value=0; this(A)(in A a) { value = float(a); } } 
+		struct my { float value=0; this(A)(in A a) { value = float(a); } } 
+		
 		void Text(Args...)(Args args)
 		{
 			//this work on temporal graphics state
@@ -1946,7 +1947,6 @@ version(/+$DIDE_REGION+/all)
 			{ processArg!(Unqual!(Args[i]))(a); }
 		} 
 		
-		
 		void textBackend(A)(A r)
 		{
 			static if(isInputRange!A) if(r.empty) return; 
@@ -2009,6 +2009,7 @@ version(/+$DIDE_REGION+/all)
 				if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
 			}
 		} 
+		
 		
 	} 
 	
@@ -3626,24 +3627,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1B68582886ADB).檢(
+					((0x1B68982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1B6F782886ADB))))
+				if((互!((bool),(0),(0x1B6FB82886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1B78F82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B7A682886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1B79382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B7AA82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1B8AE82886ADB).檢 (im)); 
+					((0x1B8B282886ADB).檢 (im)); 
 				}
 			}
 			
