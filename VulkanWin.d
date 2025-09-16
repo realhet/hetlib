@@ -1830,6 +1830,28 @@ version(/+$DIDE_REGION+/all)
 			[q{14},q{"\16"},q{0xE},q{yellow},q{(RGB(0x55FFFF))}],
 			[q{15},q{"\17"},q{0xF},q{white},q{(RGB(0xFFFFFF))}],
 		])); 
+		
+		static string GEN_ColorEnum(T)(T table, string title)
+		=> iq{
+			enum $(title)Color : ubyte
+			{$(table.rows.map!((r)=>("@"~r[4]~r[3]~"="~r[0])).join(","))} 
+		}.text; 
+		
+		template ColorEnum(alias E)
+		{
+			alias getRGBUDA(alias T) = getUDA!(T, RGB); 
+			static immutable RGB[] rgbArray = 
+				[staticMap!(getRGBUDA, EnumMembers!E)]; 
+		} 
+		
+		mixin(GEN_ColorEnum(EGAColorTable, "EGA2")); 
+		
+		
+		
+		
+		pragma(msg, ColorEnum!EGA2Color.rgbArray.text); 
+		
+		
 		enum C64ColorTable = 
 		(表([
 			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
@@ -3224,6 +3246,68 @@ class VulkanWindow: Window
 			=> size3D.z; 
 		} 
 		
+		class BitmapArrayTexture : Texture
+		{
+			ubyte[] raw/+Todo: use the staging buffer!+/; 
+			float aspect; 
+			@property length() => depth; 
+			
+			int getPixel_unsafe(int idx, int x, int y)
+			=> /+Opt: the size quiries are so slow, this must be moved outside+/
+			raw[(idx*size.y+y)*(size.x/8)+(x/8)].getBit(x%8); 
+			
+			this(T)(T src, ivec2 cellSize = ivec2(0), ivec2 gridSize = ivec2(0))
+			{
+				static if(is(T : Image2D!ubyte)) auto img = src; 
+				else static if(is(T : File)) auto img = bitmaps[src].accessOrGet!ubyte; 
+				else static if(
+					is(T : ubyte[])||
+					is(T : string)
+				) auto img = src.deserializeImage!ubyte; 
+				else static assert(false, "unhandled type: "~T.stringof); 
+				
+				const origCellSize = cellSize, origGridSize = gridSize; 
+				
+				string makeErrorMsg(string s)
+				=> i"$(s) (img:$(img.size), cell:$(origCellSize), grid:$(origGridSize)".text; 
+				
+				enforce(!img.empty, makeErrorMsg("empty image")); 
+				
+				static foreach(c; "xy")
+				mixin(iq{
+					if(cellSize.$(c)==0 && gridSize.$(c)>0)
+					{ cellSize.$(c) = img.size.$(c)/gridSize.$(c); }
+					if(cellSize.$(c)>0 && gridSize.$(c)==0)
+					{ gridSize.$(c) = img.size.$(c)/cellSize.$(c); }
+					
+					enforce(
+						cellSize.$(c).inRange(1, img.size.$(c)), 
+							makeErrorMsg("cell size out of range")
+					); 
+					enforce(
+						gridSize.$(c).inRange(1, img.size.$(c)), 
+							makeErrorMsg("grid size out of range")
+					); 
+					enforce(
+						cellSize.$(c)*gridSize.$(c)==img.size.$(c), 
+							makeErrorMsg("image size mismatch")
+					); 
+				}.text); 
+				
+				enforce(gridSize.x==1, makeErrorMsg("only gridSize.x=1 supported")); 
+				
+				raw = img.asArray.pack8bitTo1bit; 
+				super(TexFormat.wa_u1, ivec3(cellSize.xy, gridSize.y), raw); 
+				aspect = (float(size.x))/size.y; 
+				
+				if(cellSize.y==0 && gridSize.y>0) { cellSize.y = img.size.y/gridSize.y; }
+				
+				enforce(size.x>0 && size.y>0); 
+				aspect = (float(size.x))/size.y; 
+			} 
+		} 
+		
+		
 		Drawing dr; 
 		
 		class Drawing
@@ -3667,24 +3751,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1B94A82886ADB).檢(
+					((0x1C32782886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1B9BC82886ADB))))
+				if((互!((bool),(0),(0x1C39982886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1BA5482886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BA6B82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1C43182886ADB).檢((互!((float/+w=12+/),(1.000),(0x1C44882886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1BB7382886ADB).檢 (im)); 
+					((0x1C55082886ADB).檢 (im)); 
 				}
 			}
 			
