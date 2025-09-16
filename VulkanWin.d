@@ -1010,13 +1010,11 @@ version(/+$DIDE_REGION+/all)
 			ColorFormat format; 
 			
 			//constructors
-			this(uint a, ColorFormat fmt)
+			this(in uint a, in ColorFormat fmt)
 			{ value = a; format = fmt; } 
-			this(in FormattedColor a)
-			{ value = a.value; format = a.format; } 
 			
-			//1 component scalars
-			this(uint a, uint bitCnt=8)
+			//1 component palette indices
+			this(in uint a, in uint bitCnt=8)
 			{
 				switch(bitCnt)
 				{
@@ -1027,20 +1025,20 @@ version(/+$DIDE_REGION+/all)
 					default: 
 				}
 			} 
-			this(float a) { this(a.to_unorm, 8); } 
 			
-			//2 component vectors
-			this(RG a) { format = mixin(舉!((ColorFormat),q{la_u8})); value = a.raw; } 
-			this(vec2 a) { this(a.to_unorm); value = a.to_unorm.raw; } 
-			
-			//3 component vectors
-			this(RGB a) { format = mixin(舉!((ColorFormat),q{rgb_u8})); value = a.raw; } 
-			this(vec3 a) { this(a.to_unorm); } 
-			
-			//4 component vectors
-			this(RGBA a) { format = mixin(舉!((ColorFormat),q{rgba_u8})); value = a.raw; } 
-			this(vec4 a) { this(a.to_unorm); } 
-			
+			this(T)(in T a)
+			{
+				static if(is(T == FormattedColor)) { this(a.value, a.format); }
+				else static if(isColorEnum!T)	{ this((cast(uint)(a)), 4/+Todo: !!!!+/); }
+				else static if(isFloatingPoint!T)	{ this(a.to_unorm, 8); }
+				else static if(is(T == RG))	{ format = mixin(舉!((ColorFormat),q{la_u8})); value = a.raw; }
+				else static if(is(T == vec2))	{ this(a.to_unorm); }
+				else static if(is(T == RGB))	{ format = mixin(舉!((ColorFormat),q{rgb_u8})); value = a.raw; }
+				else static if(is(T == vec3))	{ this(a.to_unorm); }
+				else static if(is(T == RGBA))	{ format = mixin(舉!((ColorFormat),q{rgba_u8})); value = a.raw; }
+				else static if(is(T == vec4))	{ this(a.to_unorm); }
+				else static assert(false, "unhandled type: "~T.stringof); 
+			} 
 			
 			static assert(FormattedColor.sizeof==8); 
 		} 
@@ -1448,7 +1446,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			struct ColorState
 			{
-				FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u8}))), 
+				FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u1}))), 
 					SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
 				float OP = 1; 
 			} 
@@ -1719,14 +1717,14 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			index = 0; 
-			Style(this.bk(EGAColor(bk))); 
+			Style((((cast(EGA2Color)(bk))).genericArg!q{bk})); 
 			while(data.length)
 			{
 				auto act = fetchSameColor(data/+, remainingChars+/); 
 				const nextIndex = index + act.length.to!int; 
-				Style(this.fg(EGAColor(act[0].y))); 
+				Style((((cast(EGA2Color)(act[0].y))).genericArg!q{fg})); 
 				cursorPos = vec2(pos/8+ivec2(index, 0)); 
-				textBackend(graphicState, act.map!((a)=>(char(a.x)))); 
+				textBackend(act.map!((a)=>(char(a.x)))); 
 				index = nextIndex; 
 			}
 			end; 
@@ -1781,29 +1779,39 @@ version(/+$DIDE_REGION+/all)
 				=> item.data[0]; const ref P1()
 				=> item.data[1]; const ref P2()
 				=> item.data[2]; const Pm()
-				=> P_last*2 - P_mirror; 
+				=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
+				{ P_mirror = M, P_last = L; } 
 				final switch(item.cmd)
 				{
 						/+drawing+/	/+state update+/	
-					case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	P_mirror = P_last = P_start = P0; 	break; 
-					case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	P_mirror = P_last; P_last = P0; 	break; 
-					case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
-					case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	P_mirror = Pm; P_last = P0; 	break; 
-					case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	P_mirror = P1; P_last = P2; 	break; 
-					case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	P_mirror = P0; P_last = P1; 	break; 
+					case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
+					P_start = P0; 	break; 
+					case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
+					case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
+					case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
+					case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
+					case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
 					/+redirected commands:+/			
-					case SvgPathCommand.A: 	approximateArcToCubicBeziers(P_last, item, &onItem)
+					case SvgPathCommand.A: 	approximateArcToCubicBeziers
+						(P_last, item, &onItem)
 					/+Todo: move it to GPU+/
 					/+
-						Opt: Should do with a simplified version of cubic bezier!
+						Opt: Should do with a simplified 
+						version of cubic bezier!
 						because <90deg and no S curve
 					+/; 		break; 
 					case SvgPathCommand.Z: 	if(P_last!=P_start)
 					{
-						emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P_start); 
-						/+Todo: move it to GPU+/
-						/+Todo: only works for line+/
-					}	P_mirror = P_last = P_start; 	break; 
+						emitPathCmd(
+							'L', mixin(舉!((Opcode),q{drawPathL})), 
+							P_start
+						); 
+						/+
+							Todo: move it	to GPU
+							...bad	idea because vertexLimit
+						+/
+						/+Todo: only works for line, not curves+/
+					}	step(P_start, P_start); 	break; 
 				}
 			} 
 			
@@ -1828,131 +1836,6 @@ version(/+$DIDE_REGION+/all)
 		
 		auto _builder() => this; 
 		
-		enum HAlign:ubyte { left, center, right } 
-		enum VAlign:ubyte { top, center, baseline, bottom } 
-		
-		static struct EGAColor {
-			ubyte data; 
-			this(T)(T a)
-			{ data = cast(ubyte)a; } 
-		} 
-		
-		enum 
-		{
-			/+Note: 0+/	black	= EGAColor(0),
-			/+Note: 1+/	blue	= EGAColor(1),
-			/+Note: 2+/	green	= EGAColor(2),
-			/+Note: 3+/	cyan	= EGAColor(3),
-			/+Note: 4+/	red	= EGAColor(4),
-			/+Note: 5+/	magenta	= EGAColor(5),
-			/+Note: 6+/	brown	= EGAColor(6),
-			/+Note: 7+/	ltGray	= EGAColor(7),
-			/+Note:  8+/	dkGray	= EGAColor(8+0),
-			/+Note:  9+/	ltBlue	= EGAColor(8+1),
-			/+Note: 10+/ /+Note: 0xA+/	ltGreen	= EGAColor(8+2),
-			/+Note: 11+/ /+Note: 0xB+/	ltCyan	= EGAColor(8+3),
-			/+Note: 12+/ /+Note: 0xC+/	ltRed	= EGAColor(8+4),
-			/+Note: 13+/ /+Note: 0xD+/	ltMagenta	= EGAColor(8+5),
-			/+Note: 14+/ /+Note: 0xE+/	yellow	= EGAColor(8+6),
-			/+Note: 15+/ /+Note: 0xF+/	white	= EGAColor(8+7),
-		} 
-		
-		
-		
-		static struct fg
-		{
-			EGAColor value; alias this = value; 
-			this(A)(in A a) { value = a; } 
-		} 
-		
-		static struct bk
-		{
-			EGAColor value; alias this = value; 
-			this(A)(in A a) { value = a; } 
-		} 
-		
-		static EGAColor color(A)(in A a)
-		=> fg(a); 
-		
-		static struct fgbk
-		{
-			EGAColor[2] value; 
-			this(A, B)(in A a, in B b) { value[0] = a, value[1] = b; } 
-			this(int a) { value[0] = a.getBits(0, 4), a.getBits(4, 4); } 
-		} 
-		
-		static struct opacity {
-			ubyte value = 255; 
-			this(A)(in A a) {
-				static if(isFloatingPoint!A)	value = a.to_unorm; 
-				else	value = (cast(ubyte)(a)); 
-			} 
-		} 
-		
-		// A struct to hold the current graphic state
-		static struct GraphicState
-		{
-			mixin((
-				(表([
-					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-					[q{ubyte},q{8},q{"fgbkColors"},q{7},q{/++/}],
-					[q{ubyte},q{8},q{"opacity"},q{255},q{/++/}],
-					[q{FontId},q{6},q{"fontId"},q{VGA9x16},q{/++/}],
-					[q{ubyte},q{8},q{"fontHeight"},q{16},q{/++/}],
-					[q{HAlign},q{2},q{"hAlign"},q{},q{/++/}],
-					[q{VAlign},q{2},q{"vAlign"},q{},q{/++/}],
-				]))
-			).調!(GEN_bitfields)); 
-			
-			@property fgColor() const
-			=> (cast(EGAColor)(fgbkColors.getBits(0, 4))); 
-			@property fgColor(int a) 
-			{ fgbkColors = (cast(ubyte)(fgbkColors.setBits(0, 4, a))); } 
-			@property fgColor(EGAColor a) 
-			{ fgColor = a.data; } 
-			@property bkColor() const
-			=> (cast(EGAColor)(fgbkColors.getBits(4, 4))); 
-			@property bkColor(int a) 
-			{ fgbkColors = (cast(ubyte)(fgbkColors.setBits(4, 4, a))); } 
-			@property bkColor(EGAColor a) 
-			{ bkColor = a.data; } 
-			
-			alias font = fontId, fh = fontHeight; 
-			
-			void applyArg(T)(in T a)
-			{
-				static EGAColor asColor(T)(T arg)
-				{
-					static if(is(C : EGAColor)) return arg.value; 
-					else static if(is(C : int)) return EGAColor(arg.value); 
-					else static assert(false, "Unsupported color type: " ~ C.stringof); 
-				} 
-				
-				static if(is(T : HAlign))	{ hAlign = a; }
-				else static if(is(T : VAlign))	{ vAlign = a; }
-				else static if(is(T : GenericArg!(name, C), string name, C))
-				{
-					static if(name == "fg")	{ fgColor = asColor(a.value); }
-					else static if(name == "bk")	{ bkColor = asColor(a.value); }
-					else static assert(false, "Unsupported generic arg: " ~ T.stringof); 
-				}
-				else static if(is(T : fg))	{ fgColor = a.value; }
-				else static if(is(T : bk))	{ bkColor = a.value; }
-				else static if(is(T : fgbk))	{
-					fgColor = a.value[0]; 
-					bkColor = a.value[1]; 
-				}
-				else static if(
-					is(
-						T : GfxBuilder.opacity
-						/+Todo: name conflict!+/
-					)
-				)	{ opacity = a.value; }
-				else static assert(false, "Unsupported type: " ~ T.stringof); 
-			} 
-		} 
-		
-		GraphicState graphicState; 
 		vec2 cursorPos, fontSize; 
 		
 		struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
@@ -1963,93 +1846,110 @@ version(/+$DIDE_REGION+/all)
 		struct My { float value=0; this(A)(in A a) { value = float(a); } } 
 		struct my { float value=0; this(A)(in A a) { value = float(a); } } 
 		
-		void Style(Args...)(in Args args)
+		protected void applyStyleArg(T)(in T arg)
 		{
-			//this alters graphicState
-			static foreach(i, a; args)
+			//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
+			static if(isTuple!T)
+			{ static foreach(i; 0..T.length) applyStyleArg(arg[i]); }
+			else static if(is(T : GenericArg!(name, C), string name, C))
 			{
-				{
-					alias T = Args[i]; 
-					static if(__traits(compiles, { graphicState.applyArg(a); })) graphicState.applyArg(a); 
-					else static assert(false, "Unhandled Style() argument: "~T.stringof); 
-				}
+				static if(name == "opacity") { OP = arg.value; }
+				else static if(name == "fg")	{ PC = arg.value; }
+				else static if(name == "bk")	{ SC = arg.value; }
+				else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
+			}
+			else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
+		} 
+		
+		template AffectedStyleRegsOfType(T)
+		{
+			static if(is(T : GenericArg!(name, C), string name, C))
+			{
+				static if(name == "opacity")	alias AffectedStyleRegsOfType = AliasSeq!(q{OP}); 
+				else static if(name == "fg")	alias AffectedStyleRegsOfType = AliasSeq!(q{PC}); 
+				else static if(name == "bk")	alias AffectedStyleRegsOfType = AliasSeq!(q{SC}); 
 			}
 		} 
 		
-		enum isStyleArg(T) = __traits(compiles, { GraphicState st; st.applyArg(T.init); }); 
+		enum isStyleArg(T) = __traits(
+			compiles, {
+				auto b = new GfxBuilder; 
+				b.applyStyleArg(T.init); 
+			}
+		); 
+		
+		template AffectedStyleRegs(Args...)
+		{
+			template CollectTypes(alias Pred, Args...)
+			{
+				template ProcessArg(A)
+				{
+					static if(isTuple!A)	alias ProcessArg = Filter!(Pred, A.Types); 
+					else static if(Pred!A)	alias ProcessArg = A; 
+					else	alias ProcessArg = AliasSeq!(); 
+				} 
+				alias CollectTypes = NoDuplicates!(staticMap!(ProcessArg, Args)); 
+			} 
+			
+			enum regs = staticMap!(AffectedStyleRegsOfType, CollectTypes!(isStyleArg, Args)); 
+			static if(regs.length)	enum AffectedStyleRegs = [NoDuplicates!regs]; 
+			else	enum AffectedStyleRegs = string[].init; 	
+		} 
+		
+		
+		void Style(Args...)(Args args)
+		{ static foreach(i, a; args) applyStyleArg(a); } 
 		
 		void Text(Args...)(Args args)
 		{
 			//this work on temporal graphics state
 			/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
 			
-			GraphicState st = graphicState/+only modity temporal state+/; 
-			static foreach(i, a; args)
-			{
-				{
-					alias T = Args[i]; 
-					static if(is(T : M))	cursorPos = a.value; 
-					else static if(is(T : Mx))	cursorPos.x = a.value; 
-					else static if(is(T : My))	cursorPos.y = a.value; 
-					else static if(is(T : m))	cursorPos += a.value; 
-					else static if(is(T : mx))	cursorPos.x += a.value; 
-					else static if(is(T : my))	cursorPos.y += a.value; 
-					else static if(isStyleArg!T)	st.applyArg(a); 
-					else static if(isSomeString!T)	textBackend(st, a); 
-					else static if(isSomeChar!T)	textBackend(st, only(a)); 
-					else static if(
-						isInputRange!T &&
-						isSomeChar
-						!(ElementType!T)
-					)	{ textBackend(st, a); }
-					else static if(isDelegate!T) a(); 
-					else static if(isFunction!T) a(); 
-					else
-					{
-						st.applyArg(opacity(.5)); 
-						static assert(false, "Unhandled Text() argument: "~T.stringof); 
-					}
-				}
-			}
-		} 
-		
-		/+
-			Texture externalFontTexture; 
+			static if((常!(bool)(0)))
+			pragma(
+				msg, i"$(__FILE__)($(__LINE__),1): Warning: ".text,
+				AffectedStyleRegs!Args
+			); 
 			
-			void textBackend_old(A)(in GraphicState st, A r)
+			
+			mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{auto saved_$(reg)=$(reg); }.text)).join); 
+			scope(exit)
+			{ mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{$(reg)=saved_$(reg); }.text)).join); }
+			
+			
+			void processArg(T)(T a)
 			{
-				const scaleX = 9, scaleY = 16; 
-				//alias font = vgaFont2; 
-				
-				foreach(ch; r.dtext)
+				static if(is(T : M))	cursorPos = a.value; 
+				else static if(is(T : Mx))	cursorPos.x = a.value; 
+				else static if(is(T : My))	cursorPos.y = a.value; 
+				else static if(is(T : m))	cursorPos += a.value; 
+				else static if(is(T : mx))	cursorPos.x += a.value; 
+				else static if(is(T : my))	cursorPos.y += a.value; 
+				else static if(isStyleArg!T)	applyStyleArg(a); 
+				else static if(isSomeString!T)	textBackend(a); 
+				else static if(isSomeChar!T)	textBackend(only(a)); 
+				else static if(
+					isInputRange!T &&
+					isSomeChar
+					!(ElementType!T)
+				)	{ textBackend(a); }
+				else static if(isDelegate!T) a(); 
+				else static if(isFunction!T) a(); 
+				else
 				{
-					_builder.begin; 
-					_builder.emit_setPALH(egaPalette); 
-					_builder.emit_setFMH(externalFontTexture); 
-					_builder.emit(
-						assemble(mixin(舉!((Opcode),q{setFH})), mixin(舉!((SizeFormat),q{u8})), (cast(ubyte)(st.fontHeight))),
-						assemble(mixin(舉!((Opcode),q{setPCSC})), mixin(舉!((ColorFormat),q{u4})), st.fgbkColors),
-						assemble(mixin(舉!((Opcode),q{setC})), mixin(舉!((ColorFormat),q{a_u8})), st.opacity), 
-						assemble(
-							mixin(舉!((Opcode),q{drawMove})), mixin(舉!((CoordFormat),q{i16})), 	bits((iround(cursorPos.x*scaleX)), 16), 
-								bits((iround(cursorPos.y*scaleY)), 16)
-						),
-						assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(((ch<=255)?(ch):(254)))))
-					); 
-					_builder.end; 
-					cursorPos.x += /+st.fontHeight * font.aspect+/1; 
+					//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
+					static assert(false, "Unhandled Text() argument: "~T.stringof); 
 				}
 			} 
-		+/
-		
-		void textBackend(A)(in GraphicState st, A r)
-		{
-			//Todo: this should go to buffer
-			static if(isInputRange!A) if(r.empty) return; 
 			
-			PC(st.fgbkColors.getBits(0, 4), 4), 
-			SC(st.fgbkColors.getBits(4, 4), 4),
-			OP = st.opacity.from_unorm; 
+			static foreach(i, a; args)
+			{ processArg!(Unqual!(Args[i]))(a); }
+		} 
+		
+		
+		void textBackend(A)(A r)
+		{
+			static if(isInputRange!A) if(r.empty) return; 
 			
 			void setup()
 			{
@@ -2114,19 +2014,22 @@ version(/+$DIDE_REGION+/all)
 	
 	class TurboVisionBuilder : GfxBuilder
 	{
-		enum clMenuBk 	= bk(ltGray), 
-		clMenuText 	= fg(black), 
-		clMenuKey	= fg(red),
-		clMenuItem 	= fgbk(clMenuText, clMenuBk),
-		clMenuSelected 	= fgbk(clMenuText, green),
-		clMenuDisabled 	= fgbk(dkGray, clMenuBk); 
+		static foreach(e; EnumMembers!EGA2Color)
+		mixin(iq{enum $(e.text) = EGA2Color.$(e.text); }.text); 
 		
-		enum clWindowBk	= bk(blue),
-		clWindowText 	= fg(white),
-		clWindow 	= fgbk(clWindowText, clWindowBk),
-		clWindowClickable 	= fgbk(ltGreen, clWindowBk); 
+		enum clMenuBk 	= ((ltGray).genericArg!q{bk}), 
+		clMenuText 	= ((black).genericArg!q{fg}), 
+		clMenuKey	= ((red).genericArg!q{fg}),
+		clMenuItem 	= tuple(clMenuText, clMenuBk),
+		clMenuSelected 	= tuple(clMenuText, ((green).genericArg!q{bk})),
+		clMenuDisabled 	= tuple(((dkGray).genericArg!q{fg}), clMenuBk); 
 		
-		enum clScrollBar = fgbk(blue, cyan); 
+		enum clWindowBk	= ((blue).genericArg!q{bk}),
+		clWindowText 	= ((white).genericArg!q{fg}),
+		clWindow 	= tuple(clWindowText, clWindowBk),
+		clWindowClickable 	= tuple(((ltGreen).genericArg!q{fg}), clWindowBk); 
+		
+		enum clScrollBar = tuple(((blue).genericArg!q{fg}), ((cyan).genericArg!q{bk})); 
 		
 		static struct MenuItem
 		{
@@ -2163,7 +2066,7 @@ version(/+$DIDE_REGION+/all)
 			vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
 			Style(clMenuItem); 
 			
-			void shadow(size_t n) { Text(bk(black), opacity(.6), " ".replicate(n)); } 
+			void shadow(size_t n) { Text(((black).genericArg!q{bk}), ((.6).genericArg!q{opacity}), " ".replicate(n)); } 
 			
 			Text(chain(" \u00DA", "\u00C4".replicate(maxWidth), "\u00BF ")); NL; 
 			foreach(item; items)
@@ -2219,7 +2122,7 @@ version(/+$DIDE_REGION+/all)
 				{
 					enum keywords = ["program", "var", "begin", "end", "integer"]; 
 					const isKeyword = keywords.canFind(word.text.lc); 
-					Text(fg(((isKeyword)?(white):(yellow))), word); 
+					Text(((((isKeyword)?(white):(yellow))).genericArg!q{fg}), word); 
 				}
 				Text(
 					clScrollBar, predSwitch(
@@ -3723,24 +3626,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1C0C782886ADB).檢(
+					((0x1B68582886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1C13982886ADB))))
+				if((互!((bool),(0),(0x1B6F782886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1C1D182886ADB).檢((互!((float/+w=12+/),(1.000),(0x1C1E882886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1B78F82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B7A682886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1C2F082886ADB).檢 (im)); 
+					((0x1B8AE82886ADB).檢 (im)); 
 				}
 			}
 			
