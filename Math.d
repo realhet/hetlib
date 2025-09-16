@@ -44,8 +44,8 @@ version(/+$DIDE_REGION+/all)
 	import std.array : replicate, split, replace, join, array, staticArray; 
 	import std.range : iota, isInputRange, ElementType, empty, front, popFront, take, padRight, join, retro; 
 	import std.traits : 	Unqual, isDynamicArray, isStaticArray, isNumeric, isSomeString, isIntegral, isUnsigned, isFloatingPoint, 
-		CommonType, ReturnType, isPointer, isFunction, isDelegate; 
-	import std.meta	: AliasSeq, allSatisfy, anySatisfy, staticMap; 
+		CommonType, ReturnType, isPointer, isFunction, isDelegate, hasUDA, getUDAs, EnumMembers; 
+	import std.meta: AliasSeq, allSatisfy, anySatisfy, staticMap; 
 	
 	import std.exception	: enforce; 
 	import std.stdio	: write, writeln; 
@@ -412,10 +412,20 @@ version(/+$DIDE_REGION+/all)
 			this(A...)(in A args)
 			{
 				//pragma(msg, "$RECURSIVEBUG:", __PRETTY_FUNCTION__); 
-				static if(args.length==1 && is(ComponentType==ubyte) && (is(A[0]==int) || is(A[0]==uint) || isSomeString!(A[0])))
+				static if(
+					args.length==1 && is(ComponentType==ubyte) && 
+					(is(A[0]==int) || is(A[0]==uint) || isSomeString!(A[0]) || isColorEnum!(A[0]))
+				)
 				{
 					//special case for RG, RGB and RGBA: decodes it from one value
-					static if(isSomeString!(A[0]))
+					static if(isColorEnum!(A[0]))
+					{
+						static assert(length.among(3, 4), "ColorEnum only works with rgb or rgba."); 
+						alias pal = ColorEnum!(A[0]).rgbaArray; 
+						const col = pal[int(args[0]).clamp(0, $-1)]; 
+						static foreach(i; 0..length) components[i] = col.components[i]; 
+					}
+					else static if(isSomeString!(A[0]))
 					{ static assert(0, "not impl"); }
 					else static if(is(A[0]==int) || is(A[0]==uint))
 					{
@@ -663,6 +673,7 @@ version(/+$DIDE_REGION+/all)
 	private alias vectorElementTypes = AliasSeq!(float, double, bool, int, uint, ubyte); 
 	private enum vectorElementCounts = [2, 3, 4]; 
 	
+	version(all)
 	static foreach(T; vectorElementTypes)
 	static foreach(N; vectorElementCounts)
 	{
@@ -727,6 +738,31 @@ version(/+$DIDE_REGION+/all)
 			static immutable vec2 = [.vec2(0, -1), .vec2(q, -q), .vec2(1, 0), .vec2(q, q), .vec2(0, 1), .vec2(-q, q), .vec2(-1, 0), .vec2(-q, -q)]; 
 			alias ivec2 this; 
 		} 
+	} 
+	
+	//enum isColorEnum(T) = is(T == enum) && (hasUDA!(T.init, RGB) || hasUDA!(T.init, RGBA)); 
+	struct COLORENUM; 
+	enum isColorEnum(T) = is(T == enum) && hasUDA!(T, COLORENUM); 
+	
+	template ColorEnum(E)
+	{
+		static assert(isColorEnum!E); 
+		static assert(equal([EnumMembers!E].map!(stdto!int), iota(E.max.stdto!int+1)), "bad indices"); 
+		
+		
+		//Todo: it's redundant, already defined in utils...
+		template getUDA(alias S, U, U def = U.init)
+		{
+			static if(hasUDA!(S, U))	alias getUDA = getUDAs!(S, U)[$-1]; 
+			else	alias getUDA = def; 
+		} 
+		
+		
+		enum getRGBA(alias e) = getUDA!(e, RGBA, getUDA!(e, RGB, RGB(255, 0, 255)).RGBA); 
+		static immutable RGBA[] rgbaArray = [staticMap!(getRGBA, EnumMembers!E)]; 
+		
+		enum getRGB(alias e) = getRGBA!e.RGB; 
+		static immutable RGB[] rgbArray = [staticMap!(getRGB, EnumMembers!E)]; 
 	} 
 	
 }version(/+$DIDE_REGION+/all)

@@ -2782,8 +2782,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					cUDAs	= hdr.enumerate.filter!((a)=>(a.value.startsWith('@'))).map!"a.index".array; 
 				return (
 					mixin(求map(q{r},q{rows},q{
-						string getUDA(long c) => 
-						((r.get(c)=="")?("") : (iq{$(hdr[c])($(r[c])) }.text)); string getDefault() => 
+						string getUDA(long c) => ((r.get(c)=="")?("") : (iq{$(hdr[c])($(r[c])) }.text)); 
+						string getDefault() => 
 						((r.get(cDefault)=="")?("") : ("="~r[cDefault])); 
 						return iq{$(cUDAs.map!getUDA.join)$(r[cType]) $(r[cName]) $(getDefault); }.text ~ '\n'; 
 					}))
@@ -3147,6 +3147,31 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		//index operation
 		string 指(string var, string idx)
 		=> var~'['~idx~']'; 
+		
+		
+		
+		string GEN_ColorEnum(string title)(表 table)
+		{
+			/+
+				Example usage: /+
+					Code: mixin((
+						(表([
+							[q{/+Note: Idx+/},q{/+Note: Oct+/},q{/+Note: Hex+/},q{/+Note: Name+/},q{/+Note: Color+/}],
+							[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
+						]))
+					).調!(GEN_ColorEnum!q{EnumName})); 
+				+/
+			+/
+			const 	hdr 	= table.headerRow,
+				cIdx 	= hdr.countUntil("Idx"),
+				cName 	= hdr.countUntil("Name"),
+				cColor 	= hdr.countUntil("Color"); 
+			
+			return iq{
+				@COLORENUM enum $(title) : ubyte
+				{$(table.rows.map!((r)=>("@"~r[cColor]~r[cName]~"="~r[cIdx])).join(","))} 
+			}.text; 
+		} 
 		
 		bool waitForZeroAndSet(T)(T* reference, T newValue, int numTries)
 		{
@@ -3217,15 +3242,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x193E059F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1967859F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x194A859F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1974059F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1955259F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x195C759F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x197EA59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1985F59F156A1})); 
 						+/
 					+/
 				+/

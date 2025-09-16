@@ -219,6 +219,53 @@ version(/+$DIDE_REGION+/all)
 		/+Todo: It is a line style property, not a system-wide constant setting+/; 
 	
 	
+	mixin((
+		(表([
+			[q{/+Note: Idx+/},q{/+Note: Oct+/},q{/+Note: Hex+/},q{/+Note: Name+/},q{/+Note: Color+/}],
+			[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
+			[q{1},q{"\1"},q{0x1},q{blue},q{(RGB(0xAA0000))}],
+			[q{2},q{"\2"},q{0x2},q{green},q{(RGB(0x00AA00))}],
+			[q{3},q{"\3"},q{0x3},q{cyan},q{(RGB(0xAAAA00))}],
+			[q{4},q{"\4"},q{0x4},q{red},q{(RGB(0x0000AA))}],
+			[q{5},q{"\5"},q{0x5},q{magenta},q{(RGB(0xAA00AA))}],
+			[q{6},q{"\6"},q{0x6},q{brown},q{(RGB(0x0055AA))}],
+			[q{7},q{"\7"},q{0x7},q{ltGray},q{(RGB(0xAAAAAA))}],
+			[q{/+Note: Idx+/},q{/+Note: Oct+/},q{/+Note: Hex+/},q{/+Note: Name+/},q{/+Note: Color+/}],
+			[q{8},q{"\10"},q{0x8},q{dkGray},q{(RGB(0x555555))}],
+			[q{9},q{"\11"},q{0x9},q{ltBlue},q{(RGB(0xFF5555))}],
+			[q{10},q{"\12"},q{0xA},q{ltGreen},q{(RGB(0x55FF55))}],
+			[q{11},q{"\13"},q{0xB},q{ltCyan},q{(RGB(0xFFFF55))}],
+			[q{12},q{"\14"},q{0xC},q{ltRed},q{(RGB(0x5555FF))}],
+			[q{13},q{"\15"},q{0xD},q{ltMagenta},q{(RGB(0xFF55FF))}],
+			[q{14},q{"\16"},q{0xE},q{yellow},q{(RGB(0x55FFFF))}],
+			[q{15},q{"\17"},q{0xF},q{white},q{(RGB(0xFFFFFF))}],
+		]))
+	).調!(GEN_ColorEnum!q{EGA2Color})); 
+	
+	mixin((
+		(表([
+			[q{/+Note: Idx+/},q{/+Note: Oct+/},q{/+Note: Hex+/},q{/+Note: Name+/},q{/+Note: Color+/}],
+			[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
+			[q{1},q{"\1"},q{0x1},q{white},q{(RGB(0xFFFFFF))}],
+			[q{2},q{"\2"},q{0x2},q{red},q{(RGB(0x2E2896))}],
+			[q{3},q{"\3"},q{0x3},q{cyan},q{(RGB(0xCED65B))}],
+			[q{4},q{"\4"},q{0x4},q{purple},q{(RGB(0xAD2D9F))}],
+			[q{5},q{"\5"},q{0x5},q{green},q{(RGB(0x36B941))}],
+			[q{6},q{"\6"},q{0x6},q{blue},q{(RGB(0xC42427))}],
+			[q{7},q{"\7"},q{0x7},q{yellow},q{(RGB(0x47F3EF))}],
+			[q{/+Note: Idx+/},q{/+Note: Oct+/},q{/+Note: Hex+/},q{/+Note: Name+/},q{/+Note: Color+/}],
+			[q{8},q{"\10"},q{0x8},q{orange},q{(RGB(0x15489F))}],
+			[q{9},q{"\11"},q{0x9},q{brown},q{(RGB(0x00355E))}],
+			[q{10},q{"\12"},q{0xA},q{pink},q{(RGB(0x665FDA))}],
+			[q{11},q{"\13"},q{0xB},q{dkGray},q{(RGB(0x474747))}],
+			[q{12},q{"\14"},q{0xC},q{gray},q{(RGB(0x787878))}],
+			[q{13},q{"\15"},q{0xD},q{ltGreen},q{(RGB(0x84FF91))}],
+			[q{14},q{"\16"},q{0xE},q{ltBlue},q{(RGB(0xFF6468))}],
+			[q{15},q{"\17"},q{0xF},q{ltGray},q{(RGB(0xAEAEAE))}],
+		]))
+	).調!(GEN_ColorEnum!q{C642Color})); 
+	
+	
 	
 	
 	alias TexFormat 	= TexSizeFormat.TexFormat; 
@@ -1697,13 +1744,15 @@ version(/+$DIDE_REGION+/all)
 			else	begin/+full begin. for a fix+/; 
 			
 			setup; 
-			const NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
+			static immutable NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
 			
 			vec2 P_start, P_last, P_mirror; //internal state
 			
 			void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
 			{
 				//cmd is for estimationb only.  It should use the SvgPathCommand...
+				
+				//Todo: compress XYFormat -> assembleXY()
 				
 				const est = bezierTesselationSettings.estimateVertexCount(cmd); 
 				if(est + 4/*to be sure*/ > remainingVertexCount)
@@ -1809,83 +1858,6 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		
-		enum EGAColorTable = 
-		(表([
-			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
-			[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
-			[q{1},q{"\1"},q{0x1},q{blue},q{(RGB(0xAA0000))}],
-			[q{2},q{"\2"},q{0x2},q{green},q{(RGB(0x00AA00))}],
-			[q{3},q{"\3"},q{0x3},q{cyan},q{(RGB(0xAAAA00))}],
-			[q{4},q{"\4"},q{0x4},q{red},q{(RGB(0x0000AA))}],
-			[q{5},q{"\5"},q{0x5},q{magenta},q{(RGB(0xAA00AA))}],
-			[q{6},q{"\6"},q{0x6},q{brown},q{(RGB(0x0055AA))}],
-			[q{7},q{"\7"},q{0x7},q{ltGray},q{(RGB(0xAAAAAA))}],
-			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
-			[q{8},q{"\10"},q{0x8},q{dkGray},q{(RGB(0x555555))}],
-			[q{9},q{"\11"},q{0x9},q{ltBlue},q{(RGB(0xFF5555))}],
-			[q{10},q{"\12"},q{0xA},q{ltGreen},q{(RGB(0x55FF55))}],
-			[q{11},q{"\13"},q{0xB},q{ltCyan},q{(RGB(0xFFFF55))}],
-			[q{12},q{"\14"},q{0xC},q{ltRed},q{(RGB(0x5555FF))}],
-			[q{13},q{"\15"},q{0xD},q{ltMagenta},q{(RGB(0xFF55FF))}],
-			[q{14},q{"\16"},q{0xE},q{yellow},q{(RGB(0x55FFFF))}],
-			[q{15},q{"\17"},q{0xF},q{white},q{(RGB(0xFFFFFF))}],
-		])); 
-		
-		static string GEN_ColorEnum(T)(T table, string title)
-		=> iq{
-			enum $(title)Color : ubyte
-			{$(table.rows.map!((r)=>("@"~r[4]~r[3]~"="~r[0])).join(","))} 
-		}.text; 
-		
-		template ColorEnum(alias E)
-		{
-			alias getRGBUDA(alias T) = getUDA!(T, RGB); 
-			static immutable RGB[] rgbArray = 
-				[staticMap!(getRGBUDA, EnumMembers!E)]; 
-		} 
-		
-		mixin(GEN_ColorEnum(EGAColorTable, "EGA2")); 
-		
-		
-		
-		
-		pragma(msg, ColorEnum!EGA2Color.rgbArray.text); 
-		
-		
-		enum C64ColorTable = 
-		(表([
-			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
-			[q{0},q{"\0"},q{0x0},q{black},q{(RGB(0x000000))}],
-			[q{1},q{"\1"},q{0x1},q{white},q{(RGB(0xFFFFFF))}],
-			[q{2},q{"\2"},q{0x2},q{red},q{(RGB(0x2E2896))}],
-			[q{3},q{"\3"},q{0x3},q{cyan},q{(RGB(0xCED65B))}],
-			[q{4},q{"\4"},q{0x4},q{purple},q{(RGB(0xAD2D9F))}],
-			[q{5},q{"\5"},q{0x5},q{green},q{(RGB(0x36B941))}],
-			[q{6},q{"\6"},q{0x6},q{blue},q{(RGB(0xC42427))}],
-			[q{7},q{"\7"},q{0x7},q{yellow},q{(RGB(0x47F3EF))}],
-			[q{/+Note: dec+/},q{/+Note: oct+/},q{/+Note: hex+/},q{/+Note: name+/},q{/+Note: col+/}],
-			[q{8},q{"\10"},q{0x8},q{orange},q{(RGB(0x15489F))}],
-			[q{9},q{"\11"},q{0x9},q{brown},q{(RGB(0x00355E))}],
-			[q{10},q{"\12"},q{0xA},q{pink},q{(RGB(0x665FDA))}],
-			[q{11},q{"\13"},q{0xB},q{dkGray},q{(RGB(0x474747))}],
-			[q{12},q{"\14"},q{0xC},q{gray},q{(RGB(0x787878))}],
-			[q{13},q{"\15"},q{0xD},q{ltGreen},q{(RGB(0x84FF91))}],
-			[q{14},q{"\16"},q{0xE},q{ltBlue},q{(RGB(0xFF6468))}],
-			[q{15},q{"\17"},q{0xF},q{ltGray},q{(RGB(0xAEAEAE))}],
-		])); 
-		
-		/+
-			mixin((src) .GEN!q{GEN_ColorEnum("EGA")}); 
-			mixin((src) .GEN!q{GEN_ColorEnum("C64")}); 
-		+/
-		
-		static struct ColorState
-		{
-			FormattedColor user_color; /+CPU side+/
-			RGBA target_color; /+GPU side+/
-			
-			
-		} 
 		
 		static struct fg
 		{
@@ -3751,24 +3723,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1C32782886ADB).檢(
+					((0x1C0C782886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1C39982886ADB))))
+				if((互!((bool),(0),(0x1C13982886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1C43182886ADB).檢((互!((float/+w=12+/),(1.000),(0x1C44882886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1C1D182886ADB).檢((互!((float/+w=12+/),(1.000),(0x1C1E882886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1C55082886ADB).檢 (im)); 
+					((0x1C2F082886ADB).檢 (im)); 
 				}
 			}
 			
