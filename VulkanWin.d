@@ -1659,11 +1659,28 @@ version(/+$DIDE_REGION+/all)
 	
 	class GfxBuilder : GfxBuilderBase
 	{
+		alias This = typeof(this); 
+		
+		
+		enum isCallable(alias fun, T) = 
+			__traits(
+			compiles, {
+				auto b = new This; 
+				
+				pragma(msg,i"TEST $(T.stringof)".text.注); 
+				
+				pragma(msg,i"TEST $(T.stringof
+~"\nmultiline expr and string")".text.注); 
+				
+				mixin(iq{b.$(__traits(identifier, fun))(T.init); }.text); 
+			}
+		); 
+		
 		void drawC64Sprite(V)(in V pos, in int idx)
 		{
 			if(idx.inRange(0, 255))
 			{
-				begin(4, {}); synch_PALH, synch_FMH, synch_FH, synch_colors; 
+				begin(4, {}); synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
 				emit(
 					mixin(舉!((Opcode),q{drawMove})), assemblePoint(pos),
 					assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
@@ -1673,7 +1690,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
 		{
-			begin(4, {}); synch_PALH; synch_colors; 
+			begin(4, {}); synch_transform, synch_PALH, synch_colors; 
 			emit(
 				mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
 				mixin(舉!((Opcode),q{drawTexRect}))	, assemblePoint(bnd.bottomRight),
@@ -1732,7 +1749,7 @@ version(/+$DIDE_REGION+/all)
 		
 		void drawPath(Args...)(in Args args)
 		{
-			void setup() { synch_transform; synch_colors; synch_LW; } 
+			void setup() { synch_transform, synch_colors, synch_LW; } 
 			
 			/+
 				Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
@@ -1834,91 +1851,72 @@ version(/+$DIDE_REGION+/all)
 			emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
 		} 
 		
-		protected void applyStyleArg(T)(in T arg)
+		version(/+$DIDE_REGION Style+/all)
 		{
-			//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
-			static if(isTuple!T)
-			{ static foreach(i; 0..T.length) applyStyleArg(arg[i]); }
-			else static if(is(T : GenericArg!(name, C), string name, C))
+			protected void applyStyleArg(T)(in T a)
 			{
-				static if(name == "opacity") { OP = arg.value; }
-				else static if(name == "fg")	{ PC = arg.value; }
-				else static if(name == "bk")	{ SC = arg.value; }
-				else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
-			}
-			else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
-		} 
-		
-		template AffectedStyleRegsOfType(T)
-		{
-			static if(is(T : GenericArg!(name, C), string name, C))
-			{
-				static if(name == "opacity")	alias AffectedStyleRegsOfType = AliasSeq!(q{OP}); 
-				else static if(name == "fg")	alias AffectedStyleRegsOfType = AliasSeq!(q{PC}); 
-				else static if(name == "bk")	alias AffectedStyleRegsOfType = AliasSeq!(q{SC}); 
-			}
-		} 
-		
-		enum isStyleArg(T) = __traits(
-			compiles, {
-				auto b = new GfxBuilder; 
-				b.applyStyleArg(T.init); 
-			}
-		); 
-		
-		template AffectedStyleRegs(Args...)
-		{
-			template CollectTypes(alias Pred, Args...)
-			{
-				template ProcessArg(A)
+				//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
+				static if(isTuple!T)
+				{ static foreach(i; 0..T.length) applyStyleArg(a[i]); }
+				else static if(is(T : GenericArg!(name, C), string name, C))
 				{
-					static if(isTuple!A)	alias ProcessArg = Filter!(Pred, A.Types); 
-					else static if(Pred!A)	alias ProcessArg = A; 
-					else	alias ProcessArg = AliasSeq!(); 
-				} 
-				alias CollectTypes = NoDuplicates!(staticMap!(ProcessArg, Args)); 
+					static if(name == "opacity") { OP = a.value; }
+					else static if(name == "fg")	{ PC = a.value; }
+					else static if(name == "bk")	{ SC = a.value; }
+					else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
+				}
+				else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
 			} 
 			
-			enum regs = staticMap!(AffectedStyleRegsOfType, CollectTypes!(isStyleArg, Args)); 
-			static if(regs.length)	enum AffectedStyleRegs = [NoDuplicates!regs]; 
-			else	enum AffectedStyleRegs = string[].init; 	
-		} 
+			enum isStyleArg(T) = isCallable!(applyStyleArg, T); ; 
+			
+			template AffectedStyleRegsOfType(T)
+			{
+				static if(is(T : GenericArg!(name, C), string name, C))
+				{
+					static if(name == "opacity")	alias AffectedStyleRegsOfType = AliasSeq!(q{OP}); 
+					else static if(name == "fg")	alias AffectedStyleRegsOfType = AliasSeq!(q{PC}); 
+					else static if(name == "bk")	alias AffectedStyleRegsOfType = AliasSeq!(q{SC}); 
+				}
+			} 
+			
+			template AffectedStyleRegs(Args...)
+			{
+				template CollectTypes(alias Pred, Args...)
+				{
+					template ProcessArg(A)
+					{
+						static if(isTuple!A)	alias ProcessArg = Filter!(Pred, A.Types); 
+						else static if(Pred!A)	alias ProcessArg = A; 
+						else	alias ProcessArg = AliasSeq!(); 
+					} 
+					alias CollectTypes = NoDuplicates!(staticMap!(ProcessArg, Args)); 
+				} 
+				
+				enum regs = staticMap!(AffectedStyleRegsOfType, CollectTypes!(isStyleArg, Args)); 
+				static if(regs.length)	enum AffectedStyleRegs = [NoDuplicates!regs]; 
+				else	enum AffectedStyleRegs = string[].init; 	
+			} 
+			
+			
+			void Style(Args...)(Args args)
+			{ static foreach(i, a; args) applyStyleArg(a); } 
+		}
 		
 		
-		void Style(Args...)(Args args)
-		{ static foreach(i, a; args) applyStyleArg(a); } 
-		
-		
-		auto _builder() => this; 
-		
-		vec2 cursorPos, fontSize; 
-		
-		struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
-		struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
-		
-		struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
-		struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
-		struct My { float value=0; this(A)(in A a) { value = float(a); } } 
-		struct my { float value=0; this(A)(in A a) { value = float(a); } } 
-		
-		void Text(Args...)(Args args)
+		version(/+$DIDE_REGION Cursor+/all)
 		{
-			//this work on temporal graphics state
-			/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
+			vec2 cursorPos, fontSize; 
 			
-			static if((常!(bool)(0)))
-			pragma(
-				msg, i"$(__FILE__)($(__LINE__),1): Warning: ".text,
-				AffectedStyleRegs!Args
-			); 
+			struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+			struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
 			
+			struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
+			struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
+			struct My { float value=0; this(A)(in A a) { value = float(a); } } 
+			struct my { float value=0; this(A)(in A a) { value = float(a); } } 
 			
-			mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{auto saved_$(reg)=$(reg); }.text)).join); 
-			scope(exit)
-			{ mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{$(reg)=saved_$(reg); }.text)).join); }
-			
-			
-			void processArg(T)(T a)
+			protected void applyCursorArg(T)(in T a)
 			{
 				static if(is(T : M))	cursorPos = a.value; 
 				else static if(is(T : Mx))	cursorPos.x = a.value; 
@@ -1926,89 +1924,125 @@ version(/+$DIDE_REGION+/all)
 				else static if(is(T : m))	cursorPos += a.value; 
 				else static if(is(T : mx))	cursorPos.x += a.value; 
 				else static if(is(T : my))	cursorPos.y += a.value; 
-				else static if(isStyleArg!T)	applyStyleArg(a); 
-				else static if(isSomeString!T)	textBackend(a); 
-				else static if(isSomeChar!T)	textBackend(only(a)); 
-				else static if(
-					isInputRange!T &&
-					isSomeChar
-					!(ElementType!T)
-				)	{ textBackend(a); }
-				else static if(isDelegate!T) a(); 
-				else static if(isFunction!T) a(); 
-				else
-				{
-					//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
-					static assert(false, "Unhandled Text() argument: "~T.stringof); 
+				else { static assert(false, "Unhandled Cursor() argument: "~T.stringof); }
+			} 
+			
+			enum isCursorArg(T) = __traits(
+				compiles, {
+					auto b = new GfxBuilder; 
+					with(b) b.applyCursorArg(T.init); 
 				}
-			} 
-			
-			static foreach(i, a; args)
-			{ processArg!(Unqual!(Args[i]))(a); }
-		} 
-		
-		void textBackend(A)(A r)
-		{
-			static if(isInputRange!A) if(r.empty) return; 
-			
-			void setup()
-			{
-				with(_builder)
-				{
-					synch_PALH, synch_FMH, synch_FH, synch_colors; 
-					emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
-				}
-			} 
-			_builder.begin(0, {}); 
-			setup; 
-			
-			version(/+$DIDE_REGION Convert UTF-8 to 8bit ASCII, reuse allocated memory.+/all)
-			{
-				static Appender!(ubyte[]) app; 
-				app.clear, app.put(r.byDchar.map!((ch)=>((cast(ubyte)(((ch<=255)?(ch):(254))))))); 
-			}
-			
-			uint decideCharCount(int len)
-			{
-				enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
-				const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
-					n	= len.min(min(space, maxChars)); 
-				if(n) _builder.incVertexCount(n*2+2); return n; 
-			} 
-			
-			encodeRLE
-			(
-				app[], 3,
-				((ubyte[] part) {
-					while(1)
-					{
-						if(const n = decideCharCount((cast(int)(part.length))))
-						{
-							_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
-							cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
-						}
-						/+start next geometry item+/_builder.begin; setup; 
-					}
-				}),
-				((ubyte ch, uint len) {
-					while(1)
-					{
-						if(const n = decideCharCount(len))
-						{
-							_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
-							cursorPos.x += n; len -= n; if(!len) break; 
-						}
-						/+start next geometry item+/_builder.begin; setup; 
-					}
-				})
 			); 
-			
-			version(/+$DIDE_REGION Don't waste memory for exceptionally large texts+/all)
+		}
+		
+		version(/+$DIDE_REGION+/all) {
+			void Text(Args...)(Args args)
 			{
-				enum tooLargeBuf = 0x1000; 
-				if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
-			}
-		} 
+				//this work on temporal graphics state
+				/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
+				
+				static if((常!(bool)(0)))
+				pragma(
+					msg, i"$(__FILE__)($(__LINE__),1): Warning: ".text,
+					AffectedStyleRegs!Args
+				); 
+				
+				
+				mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{auto saved_$(reg)=$(reg); }.text)).join); 
+				scope(exit)
+				{ mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{$(reg)=saved_$(reg); }.text)).join); }
+				
+				
+				void processArg(T)(T a)
+				{
+					static if(isStyleArg!T)	{ applyStyleArg(a); /+must be first because of Tuple!+/}
+					else static if(isCursorArg!T)	applyCursorArg(a); 
+					else static if(isSomeString!T)	textBackend(a); 
+					else static if(isSomeChar!T)	textBackend(only(a)); 
+					else static if(
+						isInputRange!T &&
+						isSomeChar
+						!(ElementType!T)
+					)	{ textBackend(a); }
+					else static if(isDelegate!T) a(); 
+					else static if(isFunction!T) a(); 
+					else
+					{
+						pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof) $(isCallable!(applyStyleArg, T))".text); 
+						
+						static assert(false, "Unhandled Text() argument: "~T.stringof); 
+					}
+				} 
+				
+				static foreach(i, a; args)
+				{ processArg!(Unqual!(Args[i]))(a); }
+			} 
+			
+			void textBackend(A)(A r)
+			{
+				static if(isInputRange!A) if(r.empty) return; 
+				
+				alias _builder = this; 
+				
+				void setup()
+				{
+					with(_builder)
+					{
+						synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
+						emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
+					}
+				} 
+				_builder.begin(0, {}); 
+				setup; 
+				
+				version(/+$DIDE_REGION Convert UTF-8 to 8bit ASCII, reuse allocated memory.+/all)
+				{
+					static Appender!(ubyte[]) app; 
+					app.clear, app.put(r.byDchar.map!((ch)=>((cast(ubyte)(((ch<=255)?(ch):(254))))))); 
+				}
+				
+				uint decideCharCount(int len)
+				{
+					enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
+					const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
+						n	= len.min(min(space, maxChars)); 
+					if(n) _builder.incVertexCount(n*2+2); return n; 
+				} 
+				
+				encodeRLE
+				(
+					app[], 3,
+					((ubyte[] part) {
+						while(1)
+						{
+							if(const n = decideCharCount((cast(int)(part.length))))
+							{
+								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
+								cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
+							}
+							/+start next geometry item+/_builder.begin; setup; 
+						}
+					}),
+					((ubyte ch, uint len) {
+						while(1)
+						{
+							if(const n = decideCharCount(len))
+							{
+								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
+								cursorPos.x += n; len -= n; if(!len) break; 
+							}
+							/+start next geometry item+/_builder.begin; setup; 
+						}
+					})
+				); 
+				
+				version(/+$DIDE_REGION Don't waste memory for exceptionally large texts+/all)
+				{
+					enum tooLargeBuf = 0x1000; 
+					if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
+				}
+			} 
+		}
 		
 		
 	} 
@@ -3627,24 +3661,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1B68982886ADB).檢(
+					((0x1BAA282886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1B6FB82886ADB))))
+				if((互!((bool),(0),(0x1BB1482886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1B79382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B7AA82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1BBAC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BBC382886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1B8B282886ADB).檢 (im)); 
+					((0x1BCCB82886ADB).檢 (im)); 
 				}
 			}
 			

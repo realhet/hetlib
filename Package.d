@@ -2924,6 +2924,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{ mixin(_script); } 
 		alias 入 = INJECTOR_TEMPLATE; 
 		
+		string PRAGMA_MSG(string file=__FILE__, int line=__LINE__, Args...)(Args args)
+		{
+			const hdr = file~"("~line.text~",1): Console: "; 
+			return args.text.splitLines.map!((a)=>(hdr~a)).join('\n'); 
+		} 
+		alias 注 = PRAGMA_MSG; 
+		/+
+			Usage: 	/+Highlighted: pragma(msg,i"test=$(1+2)".text.注);+/
+				/+Structured: pragma(msg,i"test=$(1+2)".text.注); +/
+		+/
+		
 		
 		string 求(string low, string high, string expr, string fun /+the final function: including "."   eg: ".sum"+/)
 		/+Note: Code generator for sigma operations.  Used in DIDE NiceExpressions.+/
@@ -3242,15 +3253,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1967859F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x197F459F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1974059F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198BC59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x197EA59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1985F59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1996659F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x199DB59F156A1})); 
 						+/
 					+/
 				+/

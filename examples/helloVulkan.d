@@ -1080,50 +1080,50 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				
 				{
 					auto tvBuilder = new TurboVisionBuilder; 
-					tvBuilder._builder.PALH = egaPalette; 
-					tvBuilder._builder.FMH 	= vgaFont2,
-					tvBuilder._builder.FH 	= vgaFont2.height,
+					tvBuilder.PALH = egaPalette; 
+					tvBuilder.FMH 	= vgaFont2,
+					tvBuilder.FH 	= vgaFont2.height,
 					tvBuilder.fontSize 	= vgaFont2.size.vec2; 
 					
-					if((互!((bool),(1),(0xA7CC5F5C4644))))
+					if((互!((bool),(1),(0xA7B15F5C4644))))
 					{
-						with(tvBuilder._builder.TR)
+						with(tvBuilder.TR)
 						{
-							if((互!((bool),(0),(0xA8305F5C4644)))) {
+							if((互!((bool),(0),(0xA80C5F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xA8885F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xA8C55F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xA8645F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xA8A15F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xA9225F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xA8FE5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xA9835F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xA9B65F5C4644))); }
-							if((互!((bool),(0),(0xAA085F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xAA385F5C4644)))*360; 
-							if((互!((bool),(0),(0xAA875F5C4644)))) {
+							if((互!((bool),(0),(0xA95F5F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xA9925F5C4644))); }
+							if((互!((bool),(0),(0xA9E45F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xAA145F5C4644)))*360; 
+							if((互!((bool),(0),(0xAA635F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xAADE5F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xAB1A5F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xAABA5F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xAAF65F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xAB805F5C4644)))) {
+							if((互!((bool),(0),(0xAB5C5F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xABEA5F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xAC3B5F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xABC65F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xAC175F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xACB75F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xAD095F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xAC935F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xACE55F5C4644)))
 										)
 									).genericArg!q{size})
 								); 
 							}
-							((0xAD965F5C4644).檢(
+							((0xAD725F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1206,7 +1206,7 @@ End.".splitLines
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 				}
 				
-				((0xB59F5F5C4644).檢((update間(_間)))); 
+				((0xB57B5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1248,7 +1248,7 @@ End.".splitLines
 							foreach(line; svgFontDemo.splitLines)
 							if(line.strip.isWild(`<use xlink:href="#*" x="*" y="*"></use>`))
 							{
-								//dr.translate(wild[1].to!float, wild[2].to!float); 
+								TR.transXY = vec2(wild[1].to!float, wild[2].to!float); 
 								const id = wild[0]; 
 								if(svgFontDemo.isWild(`*<path stroke-width="1" id="`~id~`" d="*"></path>*`))
 								{ drawPath(wild[1]); }
@@ -1260,7 +1260,7 @@ End.".splitLines
 					//content.gb.hexDump.writeln; 
 					appendGfxContent(content); 
 				}
-				((0xBC515F5C4644).檢((update間(_間)))); 
+				((0xBC305F5C4644).檢((update間(_間)))); 
 				
 				
 			} 
