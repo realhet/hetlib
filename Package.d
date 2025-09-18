@@ -4563,6 +4563,7 @@ version(/+$DIDE_REGION Numeric+/all)
 					x2*w * ((seedStream.front&2)?-1:1)
 				); 
 			} 
+			
 					
 			auto randomGauss()
 			{ return randomGaussPair[0]; } 

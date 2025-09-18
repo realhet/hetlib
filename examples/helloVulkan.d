@@ -1,6 +1,6 @@
 //@exe
 //@debug
-///@release
+//@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -157,10 +157,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36685F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36675F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x36CC5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F75F5C4644))))).max(1))))
+				foreach(v; verts.take((0x36CB5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F65F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -826,7 +826,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x8A595F5C4644).檢 (zoomedPlatform)), ((0x8A825F5C4644).檢 (shipPos)); 
+								((0x8A585F5C4644).檢 (zoomedPlatform)), ((0x8A815F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1078,7 +1078,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					foreach(builder; builders[].filter!"a")
 					appendGfxContent(builder.extractGfxContent); 
 				} 
-				((0xA6E55F5C4644).檢((update間(_間)))); 
+				((0xA6E45F5C4644).檢((update間(_間)))); 
 				
 				
 				
@@ -1089,45 +1089,45 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					tvBuilder.FH 	= vgaFont2.height,
 					tvBuilder.fontSize 	= vgaFont2.size.vec2; 
 					
-					if((互!((bool),(1),(0xA8095F5C4644))))
+					if((互!((bool),(1),(0xA8085F5C4644))))
 					{
 						with(tvBuilder.TR)
 						{
-							if((互!((bool),(0),(0xA8645F5C4644)))) {
+							if((互!((bool),(0),(0xA8635F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xA8BC5F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xA8F95F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xA8BB5F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xA8F85F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xA9565F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xA9555F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xA9B75F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xA9EA5F5C4644))); }
-							if((互!((bool),(0),(0xAA3C5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xAA6C5F5C4644)))*360; 
-							if((互!((bool),(0),(0xAABB5F5C4644)))) {
+							if((互!((bool),(0),(0xA9B65F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xA9E95F5C4644))); }
+							if((互!((bool),(0),(0xAA3B5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xAA6B5F5C4644)))*360; 
+							if((互!((bool),(0),(0xAABA5F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xAB125F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xAB4E5F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xAB115F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xAB4D5F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xABB45F5C4644)))) {
+							if((互!((bool),(0),(0xABB35F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xAC1E5F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xAC6F5F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xAC1D5F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xAC6E5F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xACEB5F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xAD3D5F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xACEA5F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xAD3C5F5C4644)))
 										)
 									).genericArg!q{size})
 								); 
 							}
-							((0xADCA5F5C4644).檢(
+							((0xADC95F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1237,34 +1237,53 @@ $(clipBounds)".text
 						} 
 					} 
 					
-					static SpringSimulation spring = SpringSimulation(50.0f, 50+8*(25+8) + 10, 8*(25+8)); 
 					
-					
+					static struct BouncingBounds
 					{
-						float deltaTime = deltaTime.value(second); 
-						// Simulation parameters
-						float mass = .18f; 
-						float damping = 0.02f; 
-						float gravity = .1 * 9.8f; 
-						float minRange = 16*1; 
-						float maxRange = 16*24; 
+						SpringSimulation horz, vert; 
 						
-						spring.update(0.016f, mass, damping, gravity, minRange, maxRange); 
-					}
-					
-					static SpringSimulation spring2 = SpringSimulation(50.0f, 50+8*(40+8) + 5, 8*(40+8), 10); 
-					{
-						float deltaTime = deltaTime.value(second); 
-						// Simulation parameters
-						float mass = .24f; 
-						float damping = 0.00f; 
-						float gravity = 0; 
-						float minRange = 9*1; 
-						float maxRange = 9*79; 
+						this(uint seed)
+						{
+							RNG rng; rng.seed = seed; 
+							auto 	vel 	= vec2(rng.randomGaussPair[])*10, 
+								pos0 	= vec2(rng.randomGaussPair[])*15, 
+								pos1 	= vec2(rng.randomGaussPair[])*15; 
+							
+							horz = SpringSimulation(50.0f+pos0.x, 50+8*(40+8) + 5+pos1.x, 8*(40+8), 10 + vel.x); 
+							vert = SpringSimulation(50.0f+pos0.y, 50+8*(25+8) + 10+pos1.y, 8*(25+8), 0 + vel.y); 
+						} 
 						
-						spring2.update(0.016f, mass, damping, gravity, minRange, maxRange); 
-					}
+						void update(float deltaTime)
+						{
+							{
+								float mass = .18f; 
+								float damping = 0.02f; 
+								float gravity = .1 * 9.8f; 
+								float minRange = 16*1; 
+								float maxRange = 16*24; 
+								vert.update(
+									deltaTime, mass, damping, 
+									gravity, minRange, maxRange
+								); 
+							}
+							{
+								float mass = .24f; 
+								float damping = 0.00f; 
+								float gravity = 0; 
+								float minRange = 9*1; 
+								float maxRange = 9*79; 
+								horz.update(
+									deltaTime, mass, damping, 
+									gravity, minRange, maxRange
+								); 
+							}
+						} 
+						
+						@property bounds() => bounds2(horz.P0, vert.P0, horz.P1, vert.P1); 
+					} 
 					
+					static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
+					mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); 
 					
 					with(tvBuilder)
 					{
@@ -1289,11 +1308,13 @@ Begin
 End.".splitLines
 						); 
 						
+						Style(((.66).genericArg!q{opacity})); 
+						foreach(bb; bouncingBounds)
 						{
 							mixin(scope_remember(q{PALH, FMH, FH, fontSize, TR.transXY, TR.scaleXY})); 
 							const windowSize = ivec2(45, 19); 
-							TR.transXY = vec2(spring2.P0, spring.P0); 
-							TR.scaleXY = ((vec2(spring2.P1, spring.P1) - TR.transXY)/(windowSize*fontSize)); 
+							TR.transXY = bb.bounds.topLeft; 
+							TR.scaleXY = ((bb.bounds.size)/(windowSize*fontSize)); 
 							drawTextWindow
 								(
 								"JupiterLander.pas", ibounds2(ivec2(0), ((windowSize).genericArg!q{size})), 
@@ -1303,7 +1324,7 @@ End.".splitLines
 							TR.scaleXY.y *= ((19-2)*fontSize.y) / (float((25+8)*8)); 
 							drawJupiterLanderOnBuilder(tvBuilder, ivec2(0)); 
 						}
-						
+						Style(((1).genericArg!q{opacity})); 
 						static MenuItem[] mainMenuItems = 
 						[
 							{"&File"}, 
@@ -1335,12 +1356,20 @@ End.".splitLines
 								clMenuItem, "Help │ Run the current program"
 						); fillSpace; 
 					}
+					auto content = tvBuilder.extractGfxContent; 
+					
+					{
+						static bool last; 
+						const act = inputs.F5.down; 
+						if(last.chkSet(act)) ((cast(ubyte[])(content.vb))~(cast(ubyte[])(content.gb))).saveTo(`c:\dl\gsp.dump`); 
+					}
+					
 					appendGfxContent(tvBuilder.extractGfxContent); tvBuilder.resetStream; 
 					
 					
 				}
 				
-				((0xC7F75F5C4644).檢((update間(_間)))); 
+				((0xCB825F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1393,7 +1422,7 @@ End.".splitLines
 					auto content = builder.extractGfxContent; 
 					appendGfxContent(content); 
 				}
-				((0xCE875F5C4644).檢((update間(_間)))); 
+				((0xD2125F5C4644).檢((update間(_間)))); 
 				
 				
 				

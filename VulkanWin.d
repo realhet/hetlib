@@ -1738,7 +1738,6 @@ version(/+$DIDE_REGION+/all)
 				textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
 				index = nextIndex; 
 			}
-			end; 
 		} 
 		
 		void drawPath(Args...)(in Args args)
@@ -1770,9 +1769,7 @@ version(/+$DIDE_REGION+/all)
 						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
 						NOP, NOP
 					); 
-					end; 
-					begin; 
-					setup; 
+					end; begin; setup;  //Todo: this is bad and bogus.
 					emit(
 						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
 						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
@@ -1936,10 +1933,7 @@ version(/+$DIDE_REGION+/all)
 				/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
 				
 				static if((常!(bool)(0)))
-				pragma(
-					msg, i"$(__FILE__)($(__LINE__),1): Warning: ".text,
-					AffectedStyleRegs!Args
-				); 
+				pragma(msg,i"$(AffectedStyleRegs!Args)".text.注); 
 				
 				
 				mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{auto saved_$(reg)=$(reg); }.text)).join); 
@@ -2125,7 +2119,6 @@ version(/+$DIDE_REGION+/all)
 		void drawMainMenu(R)(R items)
 			if(isForwardRange!(R, MenuItem))
 		{
-			if((互!((bool),(0),(0x10BF982886ADB)))) end; /+Todo: if it's off, there is a bug!!!!+/
 			foreach(item; items)
 			{
 				const pos = cursorPos; 
@@ -3669,24 +3662,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1BC8282886ADB).檢(
+					((0x1BBF982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1BCF482886ADB))))
+				if((互!((bool),(0),(0x1BC6B82886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1BD8C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BDA382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1BD0382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BD1A82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1BEAB82886ADB).檢 (im)); 
+					((0x1BE2282886ADB).檢 (im)); 
 				}
 			}
 			
