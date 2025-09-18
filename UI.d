@@ -56,8 +56,7 @@ version(/+$DIDE_REGION+/all)
 	
 	Glyph newLineGlyph()
 	{
-		 //newLineGlyph /////////////////////////////////////////////
-		import std.concurrency; 
+		//newLineGlyph /////////////////////////////////////////////
 		__gshared Glyph g; 
 		return initOnce!g((){ auto a = new Glyph("\u240A\u2936\u23CE"d[1], tsNormal); a.innerSize = DefaultFontNewLineSize; return a; }()); 
 	} 

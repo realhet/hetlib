@@ -1666,12 +1666,6 @@ version(/+$DIDE_REGION+/all)
 			__traits(
 			compiles, {
 				auto b = new This; 
-				
-				pragma(msg,i"TEST $(T.stringof)".text.注); 
-				
-				pragma(msg,i"TEST $(T.stringof
-~"\nmultiline expr and string")".text.注); 
-				
 				mixin(iq{b.$(__traits(identifier, fun))(T.init); }.text); 
 			}
 		); 
@@ -1741,7 +1735,7 @@ version(/+$DIDE_REGION+/all)
 				const nextIndex = index + act.length.to!int; 
 				Style((((cast(EGA2Color)(act[0].y))).genericArg!q{fg})); 
 				cursorPos = vec2(pos/8+ivec2(index, 0)); 
-				textBackend(act.map!((a)=>(char(a.x)))); 
+				textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
 				index = nextIndex; 
 			}
 			end; 
@@ -1961,8 +1955,10 @@ version(/+$DIDE_REGION+/all)
 					else static if(isSomeChar!T)	textBackend(only(a)); 
 					else static if(
 						isInputRange!T &&
-						isSomeChar
-						!(ElementType!T)
+						(
+							isSomeChar!(ElementType!T)
+							||is(ElementType!T : AnsiChar)
+						)
 					)	{ textBackend(a); }
 					else static if(isDelegate!T) a(); 
 					else static if(isFunction!T) a(); 
@@ -1978,9 +1974,9 @@ version(/+$DIDE_REGION+/all)
 				{ processArg!(Unqual!(Args[i]))(a); }
 			} 
 			
-			void textBackend(A)(A r)
+			void textBackend(R)(R input)
 			{
-				static if(isInputRange!A) if(r.empty) return; 
+				if(input.empty) return; 
 				
 				alias _builder = this; 
 				
@@ -1995,10 +1991,18 @@ version(/+$DIDE_REGION+/all)
 				_builder.begin(0, {}); 
 				setup; 
 				
-				version(/+$DIDE_REGION Convert UTF-8 to 8bit ASCII, reuse allocated memory.+/all)
+				version(/+$DIDE_REGION Convert various types to 8bit ASCII, reuse allocated temp memory.+/all)
 				{
-					static Appender!(ubyte[]) app; 
-					app.clear, app.put(r.byDchar.map!((ch)=>((cast(ubyte)(((ch<=255)?(ch):(254))))))); 
+					static Appender!(ubyte[]) app; app.clear; 
+					ubyte[] rawSrc; 
+					alias E = ElementType!R; 
+					static if(isDynamicArray!R && is(E : AnsiChar) /+fastest way+/)
+					{ rawSrc = (cast(ubyte[])(input)); }
+					else static if(isInputRange!R && is(E : AnsiChar) /+buffer the inputRange+/)
+					{ app.put(input); rawSrc = (cast(ubyte[])(app[])); }
+					else static if(isInputRange!R && isSomeChar!E /+convert fron normal string+/)
+					{ app.put(input.map!toAnsiChar); rawSrc = (cast(ubyte[])(app[])); }
+					else static assert(false, "unhandled element type: "~E.stringof); 
 				}
 				
 				uint decideCharCount(int len)
@@ -2011,7 +2015,7 @@ version(/+$DIDE_REGION+/all)
 				
 				encodeRLE
 				(
-					app[], 3,
+					rawSrc, 3,
 					((ubyte[] part) {
 						while(1)
 						{
@@ -2089,12 +2093,12 @@ version(/+$DIDE_REGION+/all)
 				); 
 			}
 		} 
-		
+		
 		void drawSubMenu(R)(R items)
 			if(isForwardRange!(R, MenuItem))
 		{
 			sizediff_t measureItemWidth(in MenuItem item)
-			=> item.title.filter!"a!='&'".walkLength + 2
+			=> item.title.filter!q{a!='&'}.walkLength + 2
 			+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
 			
 			const maxWidth = items.save.map!measureItemWidth.maxElement; 
@@ -2103,27 +2107,25 @@ version(/+$DIDE_REGION+/all)
 			
 			void shadow(size_t n) { Text(((black).genericArg!q{bk}), ((.6).genericArg!q{opacity}), " ".replicate(n)); } 
 			
-			Text(chain(" \u00DA", "\u00C4".replicate(maxWidth), "\u00BF ")); NL; 
+			Text(chain(" ┌", "─".replicate(maxWidth), "┐ ")); NL; 
 			foreach(item; items)
 			{
-				Text(" \u00B3"); 
+				Text(" │"); 
 				const space = maxWidth - measureItemWidth(item); 
 				if(item.shortcut!="")
-				{ drawMenuTitle(item, chain(" ".replicate(space+1), item.shortcut, " ")); }
+				{ drawMenuTitle(item, chain(' '.repeat.take(space+1), item.shortcut, " ")); }
 				else
-				{ drawMenuTitle(item, " ".replicate(space)); }
-				Text("\u00B3 "); shadow(2); NL; 
+				{ drawMenuTitle(item, ' '.repeat.take(space)); }
+				Text("│ "); shadow(2); NL; 
 			}
-			Text(chain(" \u00C0", "\u00C4".replicate(maxWidth), "\u00D9 ")); shadow(2); NL; 
+			Text(chain(" └", '─'.repeat.take(maxWidth), "┘ ")); shadow(2); NL; 
 			Text(mx(2)); shadow(maxWidth+4); 
-			
-			
-			//Text(fg(yellow), bk(red), " Submenu goes here "~maxWidth.text); 
 		} 
 		
 		void drawMainMenu(R)(R items)
 			if(isForwardRange!(R, MenuItem))
 		{
+			if((互!((bool),(0),(0x10BF982886ADB)))) end; /+Todo: if it's off, there is a bug!!!!+/
 			foreach(item; items)
 			{
 				const pos = cursorPos; 
@@ -2144,33 +2146,39 @@ version(/+$DIDE_REGION+/all)
 			
 			Style(clWindow); 
 			Text(
-				M(bnd.topLeft), "\u00C9\u00CD", { Btn("\u00FE"); }, 
-				chain(" ", title, " ").text.center(bnd.width-12, '\u00CD'), "1\u00CD",
-				{ Btn("\u0012"); }, "\u00CD\u00BB"
+				M(bnd.topLeft), "╔═", { Btn("■"); }, 
+				chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
+				{ Btn("↕"); }, "═╗"
 			); 
 			const w = bnd.width-2, h = bnd.height-2; 
 			foreach(line; lines.padRight("", h).take(h))
 			{
-				Text(Mx(bnd.left), my(1), '\u00BA'); 
+				Text(Mx(bnd.left), my(1), '║'); 
 				string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
-				foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+				enum enableSyntaxHighlight = true/+note, it's extremely slow!+/; 
+				static if(enableSyntaxHighlight)
 				{
-					enum keywords = ["program", "var", "begin", "end", "integer"]; 
-					const isKeyword = keywords.canFind(word.text.lc); 
-					Text(((((isKeyword)?(white):(yellow))).genericArg!q{fg}), word); 
+					foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+					{
+						enum keywords = ["program", "var", "begin", "end", "integer"]; 
+						const isKeyword = keywords.canFind(word.text.lc); 
+						Text(((isKeyword)?(((white).genericArg!q{fg})):(((yellow).genericArg!q{fg}))) , word); 
+					}
 				}
+				else
+				{ Text(s); }
 				Text(
 					clScrollBar, predSwitch(
 						cursorPos.y-bnd.top-1, 
-						0, '\u001E', 1, '\u00FE', h-1, '\u001F', '\u00B1'
+						0, '▲', 1, '■', h-1, '▼', '▒'
 					)
 				); 
 			}
 			Text(
-				M(bnd.bottomLeft), my(-1), "\u00C8\u00CD",
-				chain(" ", "1:1", " ").text.center(17, '\u00CD'),
-				clScrollBar, chain("\u0011", "\u00FE", "\u00B1".replicate(bnd.width-24), "\u0010"),
-				clWindowClickable, "\u00C4\u00D9"
+				M(bnd.bottomLeft), my(-1), "╚═",
+				chain(" ", "1:1", " ").text.center(17, '═'),
+				clScrollBar, chain("◄", "■", '▒'.repeat.take(bnd.width-24), "►"),
+				clWindowClickable, "─┘"
 			); 
 		} 
 		
@@ -3661,24 +3669,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1BAA282886ADB).檢(
+					((0x1BC8282886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1BB1482886ADB))))
+				if((互!((bool),(0),(0x1BCF482886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1BBAC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BBC382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1BD8C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BDA382886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1BCCB82886ADB).檢 (im)); 
+					((0x1BEAB82886ADB).檢 (im)); 
 				}
 			}
 			

@@ -262,6 +262,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			console.setUTF8; 
 			
 			test_SrcId; 
+			
+			AnsiEncoding.initialize; 
 		} 
 		
 		private void globalFinalize() {
@@ -2448,8 +2450,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		/+Usage example: /+Structured: scope_remember(q{field1, ..., fieldn, { final_program_block; }})+/+/
 		string[] names = fields.split(',').map!strip.array; 
 		string fun; if(names.back.startsWith('{')) fun = names.fetchBack; 
-		return names.map!((a)=>(iq{const _prev_$(a)=$(a); }.text)).join ~ "scope(exit){" ~
-		names.map!((a)=>(iq{$(a)=_prev_$(a); }.text)).join ~ fun ~ "}" /+same order!+/; 
+		return names.map!((a)=>(iq{const _prev_$(a.replace('.', '_'))=$(a); }.text)).join ~ "scope(exit){" ~
+		names.map!((a)=>(iq{$(a)=_prev_$(a.replace('.', '_')); }.text)).join ~ fun ~ "}" /+same order!+/; 
 	} 
 	
 	version(/+$DIDE_REGION SmartChild+/all)
@@ -3253,15 +3255,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x197F459F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1983B59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198BC59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1990359F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1996659F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x199DB59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x199AD59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19A2259F156A1})); 
 						+/
 					+/
 				+/
@@ -8460,6 +8462,304 @@ version(/+$DIDE_REGION Containers+/all)
 			if(s.canFind('&', ';'))
 			foreach_reverse(pair; fileNameCharMap) { s = s.replace(pair[1], pair[0]); }return s; 
 		} 
+	}
+	version(/+$DIDE_REGION ANSI CP437+/all)
+	{
+		enum AnsiChar : ubyte {_init} 
+		alias AnsiString = immutable(AnsiChar)[]; 
+		enum replacementAnsiChar = (cast(AnsiChar)('\xFE')); 
+		
+		struct AnsiEncoding
+		{
+			static immutable wchar[256] decTable = 
+			mixin((
+				(表([
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{0},q{0x00},q{'�'},q{'\u0000'}],
+					[q{1},q{0x01},q{'☺'},q{'\u263A'}],
+					[q{2},q{0x02},q{'☻'},q{'\u263B'}],
+					[q{3},q{0x03},q{'♥'},q{'\u2665'}],
+					[q{4},q{0x04},q{'♦'},q{'\u2666'}],
+					[q{5},q{0x05},q{'♣'},q{'\u2663'}],
+					[q{6},q{0x06},q{'♠'},q{'\u2660'}],
+					[q{7},q{0x07},q{'•'},q{'\u2022'}],
+					[q{8},q{0x08},q{'◘'},q{'\u25D8'}],
+					[q{9},q{0x09},q{'○'},q{'\u25CB'}],
+					[q{10},q{0x0A},q{'◙'},q{'\u25D9'}],
+					[q{11},q{0x0B},q{'♂'},q{'\u2642'}],
+					[q{12},q{0x0C},q{'♀'},q{'\u2640'}],
+					[q{13},q{0x0D},q{'♪'},q{'\u266A'}],
+					[q{14},q{0x0E},q{'♫'},q{'\u266B'}],
+					[q{15},q{0x0F},q{'☼'},q{'\u263C'}],
+					[q{16},q{0x10},q{'►'},q{'\u25BA'}],
+					[q{17},q{0x11},q{'◄'},q{'\u25C4'}],
+					[q{18},q{0x12},q{'↕'},q{'\u2195'}],
+					[q{19},q{0x13},q{'‼'},q{'\u203C'}],
+					[q{20},q{0x14},q{'¶'},q{'\u00B6'}],
+					[q{21},q{0x15},q{'§'},q{'\u00A7'}],
+					[q{22},q{0x16},q{'▬'},q{'\u25AC'}],
+					[q{23},q{0x17},q{'↨'},q{'\u21A8'}],
+					[q{24},q{0x18},q{'↑'},q{'\u2191'}],
+					[q{25},q{0x19},q{'↓'},q{'\u2193'}],
+					[q{26},q{0x1A},q{'→'},q{'\u2192'}],
+					[q{27},q{0x1B},q{'←'},q{'\u2190'}],
+					[q{28},q{0x1C},q{'∟'},q{'\u221F'}],
+					[q{29},q{0x1D},q{'↔'},q{'\u2194'}],
+					[q{30},q{0x1E},q{'▲'},q{'\u25B2'}],
+					[q{31},q{0x1F},q{'▼'},q{'\u25BC'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{32},q{0x20},q{' '},q{'\u0020'}],
+					[q{33},q{0x21},q{'!'},q{'\u0021'}],
+					[q{34},q{0x22},q{'"'},q{'\u0022'}],
+					[q{35},q{0x23},q{'#'},q{'\u0023'}],
+					[q{36},q{0x24},q{'$'},q{'\u0024'}],
+					[q{37},q{0x25},q{'%'},q{'\u0025'}],
+					[q{38},q{0x26},q{'&'},q{'\u0026'}],
+					[q{39},q{0x27},q{'\''},q{'\u0027'}],
+					[q{40},q{0x28},q{'('},q{'\u0028'}],
+					[q{41},q{0x29},q{')'},q{'\u0029'}],
+					[q{42},q{0x2A},q{'*'},q{'\u002A'}],
+					[q{43},q{0x2B},q{'+'},q{'\u002B'}],
+					[q{44},q{0x2C},q{','},q{'\u002C'}],
+					[q{45},q{0x2D},q{'-'},q{'\u002D'}],
+					[q{46},q{0x2E},q{'.'},q{'\u002E'}],
+					[q{47},q{0x2F},q{'/'},q{'\u002F'}],
+					[q{48},q{0x30},q{'0'},q{'\u0030'}],
+					[q{49},q{0x31},q{'1'},q{'\u0031'}],
+					[q{50},q{0x32},q{'2'},q{'\u0032'}],
+					[q{51},q{0x33},q{'3'},q{'\u0033'}],
+					[q{52},q{0x34},q{'4'},q{'\u0034'}],
+					[q{53},q{0x35},q{'5'},q{'\u0035'}],
+					[q{54},q{0x36},q{'6'},q{'\u0036'}],
+					[q{55},q{0x37},q{'7'},q{'\u0037'}],
+					[q{56},q{0x38},q{'8'},q{'\u0038'}],
+					[q{57},q{0x39},q{'9'},q{'\u0039'}],
+					[q{58},q{0x3A},q{':'},q{'\u003A'}],
+					[q{59},q{0x3B},q{';'},q{'\u003B'}],
+					[q{60},q{0x3C},q{'<'},q{'\u003C'}],
+					[q{61},q{0x3D},q{'='},q{'\u003D'}],
+					[q{62},q{0x3E},q{'>'},q{'\u003E'}],
+					[q{63},q{0x3F},q{'?'},q{'\u003F'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{64},q{0x40},q{'@'},q{'\u0040'}],
+					[q{65},q{0x41},q{'A'},q{'\u0041'}],
+					[q{66},q{0x42},q{'B'},q{'\u0042'}],
+					[q{67},q{0x43},q{'C'},q{'\u0043'}],
+					[q{68},q{0x44},q{'D'},q{'\u0044'}],
+					[q{69},q{0x45},q{'E'},q{'\u0045'}],
+					[q{70},q{0x46},q{'F'},q{'\u0046'}],
+					[q{71},q{0x47},q{'G'},q{'\u0047'}],
+					[q{72},q{0x48},q{'H'},q{'\u0048'}],
+					[q{73},q{0x49},q{'I'},q{'\u0049'}],
+					[q{74},q{0x4A},q{'J'},q{'\u004A'}],
+					[q{75},q{0x4B},q{'K'},q{'\u004B'}],
+					[q{76},q{0x4C},q{'L'},q{'\u004C'}],
+					[q{77},q{0x4D},q{'M'},q{'\u004D'}],
+					[q{78},q{0x4E},q{'N'},q{'\u004E'}],
+					[q{79},q{0x4F},q{'O'},q{'\u004F'}],
+					[q{80},q{0x50},q{'P'},q{'\u0050'}],
+					[q{81},q{0x51},q{'Q'},q{'\u0051'}],
+					[q{82},q{0x52},q{'R'},q{'\u0052'}],
+					[q{83},q{0x53},q{'S'},q{'\u0053'}],
+					[q{84},q{0x54},q{'T'},q{'\u0054'}],
+					[q{85},q{0x55},q{'U'},q{'\u0055'}],
+					[q{86},q{0x56},q{'V'},q{'\u0056'}],
+					[q{87},q{0x57},q{'W'},q{'\u0057'}],
+					[q{88},q{0x58},q{'X'},q{'\u0058'}],
+					[q{89},q{0x59},q{'Y'},q{'\u0059'}],
+					[q{90},q{0x5A},q{'Z'},q{'\u005A'}],
+					[q{91},q{0x5B},q{'['},q{'\u005B'}],
+					[q{92},q{0x5C},q{'\\'},q{'\u005C'}],
+					[q{93},q{0x5D},q{']'},q{'\u005D'}],
+					[q{94},q{0x5E},q{'^'},q{'\u005E'}],
+					[q{95},q{0x5F},q{'_'},q{'\u005F'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{96},q{0x60},q{'`'},q{'\u0060'}],
+					[q{97},q{0x61},q{'a'},q{'\u0061'}],
+					[q{98},q{0x62},q{'b'},q{'\u0062'}],
+					[q{99},q{0x63},q{'c'},q{'\u0063'}],
+					[q{100},q{0x64},q{'d'},q{'\u0064'}],
+					[q{101},q{0x65},q{'e'},q{'\u0065'}],
+					[q{102},q{0x66},q{'f'},q{'\u0066'}],
+					[q{103},q{0x67},q{'g'},q{'\u0067'}],
+					[q{104},q{0x68},q{'h'},q{'\u0068'}],
+					[q{105},q{0x69},q{'i'},q{'\u0069'}],
+					[q{106},q{0x6A},q{'j'},q{'\u006A'}],
+					[q{107},q{0x6B},q{'k'},q{'\u006B'}],
+					[q{108},q{0x6C},q{'l'},q{'\u006C'}],
+					[q{109},q{0x6D},q{'m'},q{'\u006D'}],
+					[q{110},q{0x6E},q{'n'},q{'\u006E'}],
+					[q{111},q{0x6F},q{'o'},q{'\u006F'}],
+					[q{112},q{0x70},q{'p'},q{'\u0070'}],
+					[q{113},q{0x71},q{'q'},q{'\u0071'}],
+					[q{114},q{0x72},q{'r'},q{'\u0072'}],
+					[q{115},q{0x73},q{'s'},q{'\u0073'}],
+					[q{116},q{0x74},q{'t'},q{'\u0074'}],
+					[q{117},q{0x75},q{'u'},q{'\u0075'}],
+					[q{118},q{0x76},q{'v'},q{'\u0076'}],
+					[q{119},q{0x77},q{'w'},q{'\u0077'}],
+					[q{120},q{0x78},q{'x'},q{'\u0078'}],
+					[q{121},q{0x79},q{'y'},q{'\u0079'}],
+					[q{122},q{0x7A},q{'z'},q{'\u007A'}],
+					[q{123},q{0x7B},q{'{'},q{'\u007B'}],
+					[q{124},q{0x7C},q{'|'},q{'\u007C'}],
+					[q{125},q{0x7D},q{'}'},q{'\u007D'}],
+					[q{126},q{0x7E},q{'~'},q{'\u007E'}],
+					[q{127},q{0x7F},q{'⌂'},q{'\u2302'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{128},q{0x80},q{'Ç'},q{'\u00C7'}],
+					[q{129},q{0x81},q{'ü'},q{'\u00FC'}],
+					[q{130},q{0x82},q{'é'},q{'\u00E9'}],
+					[q{131},q{0x83},q{'â'},q{'\u00E2'}],
+					[q{132},q{0x84},q{'ä'},q{'\u00E4'}],
+					[q{133},q{0x85},q{'à'},q{'\u00E0'}],
+					[q{134},q{0x86},q{'å'},q{'\u00E5'}],
+					[q{135},q{0x87},q{'ç'},q{'\u00E7'}],
+					[q{136},q{0x88},q{'ê'},q{'\u00EA'}],
+					[q{137},q{0x89},q{'ë'},q{'\u00EB'}],
+					[q{138},q{0x8A},q{'è'},q{'\u00E8'}],
+					[q{139},q{0x8B},q{'ï'},q{'\u00EF'}],
+					[q{140},q{0x8C},q{'î'},q{'\u00EE'}],
+					[q{141},q{0x8D},q{'ì'},q{'\u00EC'}],
+					[q{142},q{0x8E},q{'Ä'},q{'\u00C4'}],
+					[q{143},q{0x8F},q{'Å'},q{'\u00C5'}],
+					[q{144},q{0x90},q{'É'},q{'\u00C9'}],
+					[q{145},q{0x91},q{'æ'},q{'\u00E6'}],
+					[q{146},q{0x92},q{'Æ'},q{'\u00C6'}],
+					[q{147},q{0x93},q{'ô'},q{'\u00F4'}],
+					[q{148},q{0x94},q{'ö'},q{'\u00F6'}],
+					[q{149},q{0x95},q{'ò'},q{'\u00F2'}],
+					[q{150},q{0x96},q{'û'},q{'\u00FB'}],
+					[q{151},q{0x97},q{'ù'},q{'\u00F9'}],
+					[q{152},q{0x98},q{'ÿ'},q{'\u00FF'}],
+					[q{153},q{0x99},q{'Ö'},q{'\u00D6'}],
+					[q{154},q{0x9A},q{'Ü'},q{'\u00DC'}],
+					[q{155},q{0x9B},q{'¢'},q{'\u00A2'}],
+					[q{156},q{0x9C},q{'£'},q{'\u00A3'}],
+					[q{157},q{0x9D},q{'¥'},q{'\u00A5'}],
+					[q{158},q{0x9E},q{'₧'},q{'\u20A7'}],
+					[q{159},q{0x9F},q{'ƒ'},q{'\u0192'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{160},q{0xA0},q{'á'},q{'\u00E1'}],
+					[q{161},q{0xA1},q{'í'},q{'\u00ED'}],
+					[q{162},q{0xA2},q{'ó'},q{'\u00F3'}],
+					[q{163},q{0xA3},q{'ú'},q{'\u00FA'}],
+					[q{164},q{0xA4},q{'ñ'},q{'\u00F1'}],
+					[q{165},q{0xA5},q{'Ñ'},q{'\u00D1'}],
+					[q{166},q{0xA6},q{'ª'},q{'\u00AA'}],
+					[q{167},q{0xA7},q{'º'},q{'\u00BA'}],
+					[q{168},q{0xA8},q{'¿'},q{'\u00BF'}],
+					[q{169},q{0xA9},q{'⌐'},q{'\u2310'}],
+					[q{170},q{0xAA},q{'¬'},q{'\u00AC'}],
+					[q{171},q{0xAB},q{'½'},q{'\u00BD'}],
+					[q{172},q{0xAC},q{'¼'},q{'\u00BC'}],
+					[q{173},q{0xAD},q{'¡'},q{'\u00A1'}],
+					[q{174},q{0xAE},q{'«'},q{'\u00AB'}],
+					[q{175},q{0xAF},q{'»'},q{'\u00BB'}],
+					[q{176},q{0xB0},q{'░'},q{'\u2591'}],
+					[q{177},q{0xB1},q{'▒'},q{'\u2592'}],
+					[q{178},q{0xB2},q{'▓'},q{'\u2593'}],
+					[q{179},q{0xB3},q{'│'},q{'\u2502'}],
+					[q{180},q{0xB4},q{'┤'},q{'\u2524'}],
+					[q{181},q{0xB5},q{'╡'},q{'\u2561'}],
+					[q{182},q{0xB6},q{'╢'},q{'\u2562'}],
+					[q{183},q{0xB7},q{'╖'},q{'\u2556'}],
+					[q{184},q{0xB8},q{'╕'},q{'\u2555'}],
+					[q{185},q{0xB9},q{'╣'},q{'\u2563'}],
+					[q{186},q{0xBA},q{'║'},q{'\u2551'}],
+					[q{187},q{0xBB},q{'╗'},q{'\u2557'}],
+					[q{188},q{0xBC},q{'╝'},q{'\u255D'}],
+					[q{189},q{0xBD},q{'╜'},q{'\u255C'}],
+					[q{190},q{0xBE},q{'╛'},q{'\u255B'}],
+					[q{191},q{0xBF},q{'┐'},q{'\u2510'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{192},q{0xC0},q{'└'},q{'\u2514'}],
+					[q{193},q{0xC1},q{'┴'},q{'\u2534'}],
+					[q{194},q{0xC2},q{'┬'},q{'\u252C'}],
+					[q{195},q{0xC3},q{'├'},q{'\u251C'}],
+					[q{196},q{0xC4},q{'─'},q{'\u2500'}],
+					[q{197},q{0xC5},q{'┼'},q{'\u253C'}],
+					[q{198},q{0xC6},q{'╞'},q{'\u255E'}],
+					[q{199},q{0xC7},q{'╟'},q{'\u255F'}],
+					[q{200},q{0xC8},q{'╚'},q{'\u255A'}],
+					[q{201},q{0xC9},q{'╔'},q{'\u2554'}],
+					[q{202},q{0xCA},q{'╩'},q{'\u2569'}],
+					[q{203},q{0xCB},q{'╦'},q{'\u2566'}],
+					[q{204},q{0xCC},q{'╠'},q{'\u2560'}],
+					[q{205},q{0xCD},q{'═'},q{'\u2550'}],
+					[q{206},q{0xCE},q{'╬'},q{'\u256C'}],
+					[q{207},q{0xCF},q{'╧'},q{'\u2567'}],
+					[q{208},q{0xD0},q{'╨'},q{'\u2568'}],
+					[q{209},q{0xD1},q{'╤'},q{'\u2564'}],
+					[q{210},q{0xD2},q{'╥'},q{'\u2565'}],
+					[q{211},q{0xD3},q{'╙'},q{'\u2559'}],
+					[q{212},q{0xD4},q{'╘'},q{'\u2558'}],
+					[q{213},q{0xD5},q{'╒'},q{'\u2552'}],
+					[q{214},q{0xD6},q{'╓'},q{'\u2553'}],
+					[q{215},q{0xD7},q{'╫'},q{'\u256B'}],
+					[q{216},q{0xD8},q{'╪'},q{'\u256A'}],
+					[q{217},q{0xD9},q{'┘'},q{'\u2518'}],
+					[q{218},q{0xDA},q{'┌'},q{'\u250C'}],
+					[q{219},q{0xDB},q{'█'},q{'\u2588'}],
+					[q{220},q{0xDC},q{'▄'},q{'\u2584'}],
+					[q{221},q{0xDD},q{'▌'},q{'\u258C'}],
+					[q{222},q{0xDE},q{'▐'},q{'\u2590'}],
+					[q{223},q{0xDF},q{'▀'},q{'\u2580'}],
+					[],
+					[q{/+Note: Idx+/},q{/+Note: Hex+/},q{/+Note: Chr+/},q{/+Note: Uni+/}],
+					[q{224},q{0xE0},q{'α'},q{'\u03B1'}],
+					[q{225},q{0xE1},q{'ß'},q{'\u00DF'}],
+					[q{226},q{0xE2},q{'Γ'},q{'\u0393'}],
+					[q{227},q{0xE3},q{'π'},q{'\u03C0'}],
+					[q{228},q{0xE4},q{'Σ'},q{'\u03A3'}],
+					[q{229},q{0xE5},q{'σ'},q{'\u03C3'}],
+					[q{230},q{0xE6},q{'µ'},q{'\u00B5'}],
+					[q{231},q{0xE7},q{'τ'},q{'\u03C4'}],
+					[q{232},q{0xE8},q{'Φ'},q{'\u03A6'}],
+					[q{233},q{0xE9},q{'Θ'},q{'\u0398'}],
+					[q{234},q{0xEA},q{'Ω'},q{'\u03A9'}],
+					[q{235},q{0xEB},q{'δ'},q{'\u03B4'}],
+					[q{236},q{0xEC},q{'∞'},q{'\u221E'}],
+					[q{237},q{0xED},q{'φ'},q{'\u03C6'}],
+					[q{238},q{0xEE},q{'ε'},q{'\u03B5'}],
+					[q{239},q{0xEF},q{'∩'},q{'\u2229'}],
+					[q{240},q{0xF0},q{'≡'},q{'\u2261'}],
+					[q{241},q{0xF1},q{'±'},q{'\u00B1'}],
+					[q{242},q{0xF2},q{'≥'},q{'\u2265'}],
+					[q{243},q{0xF3},q{'≤'},q{'\u2264'}],
+					[q{244},q{0xF4},q{'⌠'},q{'\u2320'}],
+					[q{245},q{0xF5},q{'⌡'},q{'\u2321'}],
+					[q{246},q{0xF6},q{'÷'},q{'\u00F7'}],
+					[q{247},q{0xF7},q{'≈'},q{'\u2248'}],
+					[q{248},q{0xF8},q{'°'},q{'\u00B0'}],
+					[q{249},q{0xF9},q{'∙'},q{'\u2219'}],
+					[q{250},q{0xFA},q{'·'},q{'\u00B7'}],
+					[q{251},q{0xFB},q{'√'},q{'\u221A'}],
+					[q{252},q{0xFC},q{'ⁿ'},q{'\u207F'}],
+					[q{253},q{0xFD},q{'²'},q{'\u00B2'}],
+					[q{254},q{0xFE},q{'■'},q{'\u25A0'}],
+					[q{255},q{0xFF},q{' '},q{'\u00A0'}],
+				]))
+			) .GEN!q{'['~rows.map!((r)=>("0x"~r[3][3..$][0..4])).join(',')~']'}); 
+			__gshared private ubyte[dchar] encMap; private static initialize() {
+				static assert(decTable.length==256); foreach(i, const ch; decTable) { encMap[ch] = i.to!ubyte; }encMap.rehash; 
+				enum testStr = "╦ß☺ABCüúóéáí123"; enforce(testStr.toAnsi.fromAnsi.equal(testStr)); 
+			} 
+		} 
+		
+		AnsiChar toAnsiChar(dchar ch) {
+			if(auto a = ch in AnsiEncoding.encMap)	return (cast(AnsiChar)(*a)); 
+			else	return replacementAnsiChar; 
+		} 	 dchar fromAnsiChar(AnsiChar ch)
+		=> AnsiEncoding.decTable[ch];  auto toAnsi(R)(R src)
+		=> src.byDchar.map!toAnsiChar;  auto fromAnsi(R)(R src)
+		=> src.map!fromAnsiChar; 
 	}
 }version(/+$DIDE_REGION Hashing+/all)
 {
