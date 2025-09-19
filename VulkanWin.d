@@ -1108,7 +1108,7 @@ version(/+$DIDE_REGION+/all)
 	}  interface IGfxContentDestination
 	{ void appendGfxContent(in GfxContent content); } 
 	
-	class GfxBuilderBase /+Todo: this is basically an assembler, not a builder: It maintains a state and emits it on request.+/
+	class GfxAssembler /+Todo: this is basically an assembler, not a builder: It maintains a state and emits it on request.+/
 	{
 		IGfxContentDestination gfxContentDestination/+optional: the target handler of commitGfxContent()+/; 
 		
@@ -1116,6 +1116,8 @@ version(/+$DIDE_REGION+/all)
 			Opt: final functions everywhere if possible!!! Do timing tests!!!
 			250919: No luck. Used `final:` in every classes, but same FPS. Should check in ASM.
 		+/
+		
+		/+Opt: Pull all the state into a central, well packed struct! It will make state copy operations faster.  Currently the user and target states are interleaved.+/
 		
 		alias VertexData 	= VulkanWindow.VertexData,
 		Texture 	= VulkanWindow.Texture; 
@@ -1376,7 +1378,7 @@ version(/+$DIDE_REGION+/all)
 						if(side & StateSide.target) targetState = initialState; 
 					} 
 					
-					void synch(GfxBuilderBase builder)
+					void synch(GfxAssembler builder)
 					{
 						if(targetState.chkSet(userState))
 						{
@@ -1417,7 +1419,7 @@ version(/+$DIDE_REGION+/all)
 						if(side & StateSide.target) targetState = initialState; 
 					} 
 					
-					void synch(GfxBuilderBase builder)
+					void synch(GfxAssembler builder)
 					{
 						if(targetState.chkSet(userState))
 						{
@@ -1651,7 +1653,7 @@ version(/+$DIDE_REGION+/all)
 		
 	} 
 	
-	class GfxBuilder : GfxBuilderBase
+	class GfxBuilder : GfxAssembler
 	{
 		alias This = typeof(this); 
 		
@@ -2987,6 +2989,25 @@ class VulkanWindow: Window, IGfxContentDestination
 				aspect = (float(size.x))/size.y; 
 			} 
 		} 
+		
+		class FontFace
+		{
+			enum Type { monospace, proportional } 
+			const string name; 
+			Type type; 
+			Texture texture; 
+			Vector!(ushort, 2) charSize; 
+			
+			this(string name, BitmapArrayTexture monoTexture)
+			{
+				this.name = name; 
+				type = Type.monospace; 
+				texture = monoTexture.enforce; 
+				charSize = texture.size.Vector!(ushort, 2); 
+			} 
+		} 
+		
+		
 		
 		
 		Drawing dr; 
@@ -3432,24 +3453,24 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1AF6C82886ADB).檢(
+					((0x1B19582886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1AFDE82886ADB))))
+				if((互!((bool),(0),(0x1B20782886ADB))))
 				{
-					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
-					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1B07682886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B08D82886ADB))).iremap(0, 1, 4, ma))); 
+					const ma = GfxAssembler.ShaderMaxVertexCount; 
+					GfxAssembler.desiredMaxVertexCount = 
+					((0x1B29B82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B2B282886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
-						GfxBuilderBase.desiredMaxVertexCount, 
+						GfxAssembler.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1B19582886ADB).檢 (im)); 
+					((0x1B3B882886ADB).檢 (im)); 
 				}
 			}
 			
@@ -3926,7 +3947,7 @@ $(V_size+G_size)".text
 					}; 
 					
 					layout(points) in; 
-					layout(triangle_strip, max_vertices = $(GfxBuilderBase.ShaderMaxVertexCount)) out; 
+					layout(triangle_strip, max_vertices = $(GfxAssembler.ShaderMaxVertexCount)) out; 
 					/*
 						255 is the max on R9 Fury X
 						
