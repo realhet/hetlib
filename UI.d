@@ -7,7 +7,7 @@ version(/+$DIDE_REGION+/all)
 	import std.bitmanip: bitfields; 
 	import std.traits, std.meta; 
 	
-	
+	/+Todo: implement layouting as seen in /+Link: https://libfluid.org/docs/main+/+/
 	//Todo: rename "hovered" -> "hot"
 	//Todo: multiple 2D view controls in hetlib
 	
