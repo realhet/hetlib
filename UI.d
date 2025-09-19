@@ -42,7 +42,7 @@ version(/+$DIDE_REGION+/all)
 	; 
 	
 	immutable
-		DefaultFontHeight	= 18,
+		DefaultFontHeight	= 18, /+Todo: This must be the same in Geometry Stream Processor too!+/
 		InvDefaultFontHeight 	= 1.0f/DefaultFontHeight,
 			
 		LeadingTabWidth 	= 7.25f*4 	*(DefaultFontHeight/18.0f),	 LeadingTabAspect 	= LeadingTabWidth	/ DefaultFontHeight,

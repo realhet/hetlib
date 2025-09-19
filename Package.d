@@ -1993,19 +1993,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	enum FieldAndFunctionNames(T) = FieldAndFunctionNamesWithUDA!(T, void, false); 
 	
-	static if(0)
-	deprecated(`use EnumMemberNames`) string[] getEnumMembers(T)()
-	{
-		static if(is(T == enum)) return [__traits(allMembers, T)]; 
-		else return []; 
-	} 
-	
-	
 	enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : []; 
-	
 	enum EnumBits(T) = float(T.max+1).log2.iceil; 
 	
-	alias toAlias(alias T) = T; //Todo: Alias!T alreadyb exists
+	mixin template InjectEnumMembers(E)
+	{
+		static foreach(e; EnumMembers!E)
+		{ mixin(iq{enum $(e.text) = $(E.stringof).$(e.text); }.text); }
+	} 
 	
 	void inspectSymbol(alias T)(string before="", int level=0)
 	{
@@ -2013,10 +2008,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		//step 2
 		foreach(memberName; __traits(allMembers, T))
-		static if(__traits(compiles, toAlias!(__traits(getMember, T, memberName))))
+		static if(__traits(compiles, Alias!(__traits(getMember, T, memberName))))
 		{
 			//step 3
-			alias member = toAlias!(__traits(getMember, T, memberName));  //sometimes this alias declaration fails.
+			alias member = Alias!(__traits(getMember, T, memberName));  //sometimes this alias declaration fails.
 			//step 4 - inspecting types
 			static if(is(member))
 			{
@@ -2081,7 +2076,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		else
 		{
 			print(
-				"!!!!!!!!!!!!!!!!!!!!!!! unable to compile toAlias!(__traits(getMember, T, memberName) on symbol:", 
+				"!!!!!!!!!!!!!!!!!!!!!!! unable to compile Alias!(__traits(getMember, T, memberName) on symbol:", 
 				T.stringof ~ "." ~ memberName
 			); 
 		}
@@ -2449,9 +2444,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		/+Usage example: /+Structured: scope_remember(q{field1, ..., fieldn, { final_program_block; }})+/+/
 		string[] names = fields.split(',').map!strip.array; 
+		if(names.empty) return ""; 
+		string id(string s) => s.replace('.', '_'); 
 		string fun; if(names.back.startsWith('{')) fun = names.fetchBack; 
-		return names.map!((a)=>(iq{const _prev_$(a.replace('.', '_'))=$(a); }.text)).join ~ "scope(exit){" ~
-		names.map!((a)=>(iq{$(a)=_prev_$(a.replace('.', '_')); }.text)).join ~ fun ~ "}" /+same order!+/; 
+		return names.map!((a)=>(iq{const _prev_$(id(a))=$(a); }.text)).join ~ "scope(exit){" ~
+		names.map!((a)=>(iq{$(a)=_prev_$(id(a)); }.text)).join ~ fun ~ "}" /+same order!+/; 
 	} 
 	
 	version(/+$DIDE_REGION SmartChild+/all)
@@ -3255,15 +3252,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1983B59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1980B59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1990359F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198D359F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x199AD59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19A2259F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1997D59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x199F259F156A1})); 
 						+/
 					+/
 				+/
@@ -6038,6 +6035,129 @@ version(/+$DIDE_REGION Containers+/all)
 		}
 	} 
 	
+	/+
+		+This variant is sinchronizes put and fetch to itself 
+		and put() can be called in a destructor.
+	+/
+	class SafeQueue_nogc(T)
+	{
+		private
+		{
+			static struct Node 
+			{ T data; uint next; } 
+			
+			Node* buffer; 
+			uint bufferSize; 
+			uint head, tail; 
+			uint freeListHead = uint.max; // Using uint.max as null indicator
+			
+			import core.stdc.stdlib : malloc, free; 
+		} 
+		
+		this()
+		{
+			synchronized(this) { asm { nop; } } 
+			/+
+				It is priming the synchronization object,
+				so later put() can be called from a destructor
+				without freezing.
+			+/
+			
+			// Start with capacity for 16 nodes
+			bufferSize = 16; 
+			buffer = cast(Node*)malloc(Node.sizeof * bufferSize); 
+			
+			// Initialize all nodes as free
+			for(uint i = 0; i < bufferSize; ++i)
+			{ buffer[i].next = i + 1; }
+			buffer[bufferSize-1].next = uint.max; 
+			freeListHead = 0; 
+			
+			// Allocate first node for dummy head
+			head = tail = allocNode(); 
+			buffer[head].next = uint.max; 
+		} 
+		
+		~this()
+		{
+			if(buffer)
+			{ free(buffer); buffer = null; }
+		} 
+		
+		private uint allocNode() @nogc
+		{
+			if(freeListHead == uint.max)
+			{
+				// Double the buffer size
+				auto newSize = bufferSize * 2; 
+				auto newBuffer = cast(Node*)malloc(Node.sizeof * newSize); 
+				
+				// Copy old data
+				memcpy(newBuffer, buffer, Node.sizeof * bufferSize); 
+				
+				// Initialize new nodes
+				for(uint i = bufferSize; i < newSize; ++i)
+				{ newBuffer[i].next = i + 1; }
+				newBuffer[newSize-1].next = uint.max; 
+				freeListHead = bufferSize; 
+				
+				// Replace buffer
+				free(buffer); 
+				buffer = newBuffer; 
+				bufferSize = newSize; 
+			}
+			
+			uint nodeIdx = freeListHead; 
+			freeListHead = buffer[nodeIdx].next; 
+			return nodeIdx; 
+		} 
+		
+		private void freeNode(uint idx)
+		{
+			buffer[idx].next = freeListHead; 
+			freeListHead = idx; 
+		} 
+		
+		void put(T data) @nogc
+		{
+			synchronized(this)
+			{
+				auto nodeIdx = allocNode(); 
+				buffer[nodeIdx].data = data; 
+				buffer[nodeIdx].next = uint.max; 
+				
+				buffer[tail].next = nodeIdx; 
+				tail = nodeIdx; 
+			} 
+		} 
+		
+		int opApply(int delegate(T) fun)
+		{
+			synchronized(this)
+			{
+				while(1)
+				{
+					auto nextHead = buffer[head].next; 
+					if(nextHead != uint.max)
+					{
+						T res = buffer[nextHead].data; 
+						freeNode(head); // Free old dummy head
+						head = nextHead; 
+						
+						if(fun(res)) return 1; 
+					}
+					else break; 
+				}
+			} 
+			return 0; 
+		} 
+		
+		
+		string stats() const
+		=> i"bufSize:$(bufferSize) head:$(head) tail:$(tail) freeHead:$(freeListHead)".text; 
+	} 
+	
+	alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 	class SafeQueue(T, bool multiSrc, bool multiDst)
 	{
 		struct Node { T data; Node* next; } 

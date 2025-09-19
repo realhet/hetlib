@@ -7,7 +7,9 @@ version(/+$DIDE_REGION+/all)
 	
 	import core.stdc.string : memset; 
 	
-	alias Texture = VulkanWindow.Texture; 
+	enum GSP_DefaultFontHeight = 18; 
+	
+	//alias Texture = VulkanWindow.Texture; 
 	
 	enum bugFix_LastTwoGeometryShaderStreamsMissing = (常!(bool)(1))
 	/+
@@ -15,130 +17,6 @@ version(/+$DIDE_REGION+/all)
 		Try this with new drivers! (official and radeon-ID)
 	+/; 
 	
-	
-	/+
-		+This variant is sinchronizes put and fetch to itself 
-		and put() can be called in a destructor.
-	+/
-	class SafeQueue_nogc(T)
-	{
-		private
-		{
-			static struct Node 
-			{ T data; uint next; } 
-			
-			Node* buffer; 
-			uint bufferSize; 
-			uint head, tail; 
-			uint freeListHead = uint.max; // Using uint.max as null indicator
-			
-			import core.stdc.stdlib : malloc, free; 
-		} 
-		
-		this()
-		{
-			synchronized(this) { asm { nop; } } 
-			/+
-				It is priming the synchronization object,
-				so later put() can be called from a destructor
-				without freezing.
-			+/
-			
-			// Start with capacity for 16 nodes
-			bufferSize = 16; 
-			buffer = cast(Node*)malloc(Node.sizeof * bufferSize); 
-			
-			// Initialize all nodes as free
-			for(uint i = 0; i < bufferSize; ++i)
-			{ buffer[i].next = i + 1; }
-			buffer[bufferSize-1].next = uint.max; 
-			freeListHead = 0; 
-			
-			// Allocate first node for dummy head
-			head = tail = allocNode(); 
-			buffer[head].next = uint.max; 
-		} 
-		
-		~this()
-		{
-			if(buffer)
-			{ free(buffer); buffer = null; }
-		} 
-		
-		private uint allocNode() @nogc
-		{
-			if(freeListHead == uint.max)
-			{
-				// Double the buffer size
-				auto newSize = bufferSize * 2; 
-				auto newBuffer = cast(Node*)malloc(Node.sizeof * newSize); 
-				
-				// Copy old data
-				memcpy(newBuffer, buffer, Node.sizeof * bufferSize); 
-				
-				// Initialize new nodes
-				for(uint i = bufferSize; i < newSize; ++i)
-				{ newBuffer[i].next = i + 1; }
-				newBuffer[newSize-1].next = uint.max; 
-				freeListHead = bufferSize; 
-				
-				// Replace buffer
-				free(buffer); 
-				buffer = newBuffer; 
-				bufferSize = newSize; 
-			}
-			
-			uint nodeIdx = freeListHead; 
-			freeListHead = buffer[nodeIdx].next; 
-			return nodeIdx; 
-		} 
-		
-		private void freeNode(uint idx)
-		{
-			buffer[idx].next = freeListHead; 
-			freeListHead = idx; 
-		} 
-		
-		void put(T data) @nogc
-		{
-			synchronized(this)
-			{
-				auto nodeIdx = allocNode(); 
-				buffer[nodeIdx].data = data; 
-				buffer[nodeIdx].next = uint.max; 
-				
-				buffer[tail].next = nodeIdx; 
-				tail = nodeIdx; 
-			} 
-		} 
-		
-		int opApply(int delegate(T) fun)
-		{
-			synchronized(this)
-			{
-				while(1)
-				{
-					auto nextHead = buffer[head].next; 
-					if(nextHead != uint.max)
-					{
-						T res = buffer[nextHead].data; 
-						freeNode(head); // Free old dummy head
-						head = nextHead; 
-						
-						if(fun(res)) return 1; 
-					}
-					else break; 
-				}
-			} 
-			return 0; 
-		} 
-		
-		
-		string stats() const
-		=> i"bufSize:$(bufferSize) head:$(head) tail:$(tail) freeHead:$(freeListHead)".text; 
-	} 
-	
-	alias MMQueue_nogc(T) = SafeQueue_nogc!T; 
 	/+
 		Code: (表([
 			[q{/+Note: Limits/Cards+/},q{/+Note: MAX+/},q{/+Note: R9 Fury X+/},q{/+Note: R9 280+/},q{/+Note: GTX 1060+/},q{/+Note: RX 580+/},q{/+Note: RTX 5090+/},q{/+Note: RX 9070+/}],
@@ -240,7 +118,7 @@ version(/+$DIDE_REGION+/all)
 			[q{14},q{"\16"},q{0xE},q{yellow},q{(RGB(0x55FFFF))}],
 			[q{15},q{"\17"},q{0xF},q{white},q{(RGB(0xFFFFFF))}],
 		]))
-	).調!(GEN_ColorEnum!q{EGA2Color})); 
+	).調!(GEN_ColorEnum!q{EGAColor})); 
 	
 	mixin((
 		(表([
@@ -263,7 +141,7 @@ version(/+$DIDE_REGION+/all)
 			[q{14},q{"\16"},q{0xE},q{ltBlue},q{(RGB(0xFF6468))}],
 			[q{15},q{"\17"},q{0xF},q{ltGray},q{(RGB(0xAEAEAE))}],
 		]))
-	).調!(GEN_ColorEnum!q{C642Color})); 
+	).調!(GEN_ColorEnum!q{C64Color})); 
 	
 	
 	
@@ -1009,34 +887,35 @@ version(/+$DIDE_REGION+/all)
 			uint value; 
 			ColorFormat format; 
 			
-			//constructors
-			this(in uint a, in ColorFormat fmt)
-			{ value = a; format = fmt; } 
-			
-			//1 component palette indices
-			this(in uint a, in uint bitCnt=8)
+			this(FT)(in uint a, in FT fmt)
 			{
-				switch(bitCnt)
+				static if(is(FT : ColorFormat))
+				{ value = a, format = fmt; }
+				else
 				{
-					case 1: 	{ format = mixin(舉!((ColorFormat),q{u1})); value = a; }	break; 
-					case 2: 	{ format = mixin(舉!((ColorFormat),q{u2})); value = a; }	break; 
-					case 4: 	{ format = mixin(舉!((ColorFormat),q{u4})); value = a; }	break; 
-					case 8: 	{ format = mixin(舉!((ColorFormat),q{u8})); value = a; }	break; 
-					default: 
+					switch(fmt/+bitCnt+/)
+					{
+						case 1: 	{ format = mixin(舉!((ColorFormat),q{u1})); value = a; }	break; 
+						case 2: 	{ format = mixin(舉!((ColorFormat),q{u2})); value = a; }	break; 
+						case 4: 	{ format = mixin(舉!((ColorFormat),q{u4})); value = a; }	break; 
+						case 8: 	{ format = mixin(舉!((ColorFormat),q{u8})); value = a; }	break; 
+						default: 
+					}
 				}
 			} 
 			
 			this(T)(in T a)
 			{
-				static if(is(T == FormattedColor)) { this(a.value, a.format); }
-				else static if(isColorEnum!T)	{ this((cast(uint)(a)), 4/+Todo: !!!!+/); }
+				static if(is(T : FormattedColor)) { this = a; }
+				else static if(is(T : Bits!U, U)) { this((cast(uint)(a.data)), a.bitCnt); }
+				else static if(isColorEnum!T)	{ this((cast(uint)(a)), 4/+Todo: !!!! Calculate BitCount!!!+/); }
 				else static if(isFloatingPoint!T)	{ this(a.to_unorm, 8); }
-				else static if(is(T == RG))	{ format = mixin(舉!((ColorFormat),q{la_u8})); value = a.raw; }
-				else static if(is(T == vec2))	{ this(a.to_unorm); }
-				else static if(is(T == RGB))	{ format = mixin(舉!((ColorFormat),q{rgb_u8})); value = a.raw; }
-				else static if(is(T == vec3))	{ this(a.to_unorm); }
-				else static if(is(T == RGBA))	{ format = mixin(舉!((ColorFormat),q{rgba_u8})); value = a.raw; }
-				else static if(is(T == vec4))	{ this(a.to_unorm); }
+				else static if(is(T : RG))	{ format = mixin(舉!((ColorFormat),q{la_u8})); value = a.raw; }
+				else static if(is(T : vec2))	{ this(a.to_unorm); }
+				else static if(is(T : RGB))	{ format = mixin(舉!((ColorFormat),q{rgb_u8})); value = a.raw; }
+				else static if(is(T : vec3))	{ this(a.to_unorm); }
+				else static if(is(T : RGBA))	{ format = mixin(舉!((ColorFormat),q{rgba_u8})); value = a.raw; }
+				else static if(is(T : vec4))	{ this(a.to_unorm); }
 				else static assert(false, "unhandled type: "~T.stringof); 
 			} 
 			
@@ -1223,19 +1102,25 @@ version(/+$DIDE_REGION+/all)
 		alias VertexData = VulkanWindow.VertexData; 
 		VertexData[] vb; 
 		ulong[] gb; 
-		uint gbBits; 
-	} 
+		uint gbBits; 
+		@property empty() const
+		=> vb.empty; 
+	}  interface IGfxContentDestination
+	{ void appendGfxContent(in GfxContent content); } 
 	
 	class GfxBuilderBase /+Todo: this is basically an assembler, not a builder: It maintains a state and emits it on request.+/
 	{
-		/+Opt: final functions everywhere if possible!!! Do timing tests!!!+/
+		IGfxContentDestination gfxContentDestination/+optional: the target handler of commitGfxContent()+/; 
+		
+		/+
+			Opt: final functions everywhere if possible!!! Do timing tests!!!
+			250919: No luck. Used `final:` in every classes, but same FPS. Should check in ASM.
+		+/
 		
 		alias VertexData 	= VulkanWindow.VertexData,
 		Texture 	= VulkanWindow.Texture; 
 		
-		protected enum StateSide { user, target, both } 
-		
-		version(/+$DIDE_REGION Bitstream management+/all)
+		version(/+$DIDE_REGION Bitstream+/all)
 		{
 			protected
 			{
@@ -1246,19 +1131,14 @@ version(/+$DIDE_REGION+/all)
 				{ gbAppender ~= data; } 
 			} 
 			
-			this()
-			{ bitStreamAppender.onBuffer = &onBitStreamAppenderFull; } 
-			
-			final @property gbBitPos() 
-			=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
-			
-			GfxContent extractGfxContent()
+			this(IGfxContentDestination gfxContentDestination = null)
 			{
-				end; 
-				const gbBits = gbBitPos; 
-				bitStreamAppender.flush; 
-				return GfxContent(vbAppender[], gbAppender[], gbBits); 
+				this.gfxContentDestination = gfxContentDestination; 
+				bitStreamAppender.onBuffer = &onBitStreamAppenderFull; 
 			} 
+			
+			@property gbBitPos() 
+			=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
 			
 			///The appenders are keeping their memory ready to use.
 			void resetStream(bool doDealloc=false)
@@ -1280,381 +1160,495 @@ version(/+$DIDE_REGION+/all)
 			///This resets and frees up the appenders memory
 			void deallocStream()
 			{ resetStream(doDealloc : true); } 
-		}
-		
-		final void emit(Args...)(in Args args)
-		{
-			static foreach(i, T; Args)
+			
+			@property empty()
 			{
-				{
-					alias a = args[i]; 
-					static if(is(T : Bits!(B), B))	bitStreamAppender.appendBits(a.data, a.bitCnt); 
-					else static if(is(T : Bits!(B)[N], B, int N))	{ static foreach(i; 0..N) emit(a[i]); }
-					else static if(is(T : ubyte[])) emitBytes(a); 
-					else with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
-				}
-			}
-		} 
-		
-		void emitBytes(in void[] data)
-		{
-			auto ba = (cast(ubyte[])(data)); 
-			while(ba.length>=8) { emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
-			if(ba.length>=4) { emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
-			if(ba.length>=2) { emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
-			if(ba.length>=1) { emit(*(cast(ubyte*)(ba.ptr))); }
-		} 
-		
-		void emitEvenBytes(void[] data)
-		{
-			auto ba = (cast(ubyte[])(data)); 
-			while(ba.length>=16) { emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
-			if(ba.length>=8) { emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
-			if(ba.length>=4) { emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
-			if(ba.length>=2) { emit(ba[0]); }
-		} 
-		
-		
-		version(/+$DIDE_REGION Handles+/all)
-		{
-			struct TexHandleState(Opcode opcode)
-			{
-				private: 
-				enum TexHandle initialState = TexHandle.init; 
-				TexHandle 	userState 	= initialState, 
-					targetState 	= initialState; 
-				
-				public: 
-				@property TexHandle get()
-				=> userState; 
-				
-				@property void set(TexHandle val)
-				{
-					if(userState.chkSet(val))
-					{
-						/+
-							The user changed the internal state. Change detection, 
-							and precompilation can go here.
-						+/
-					}
-				} 
-				
-				@property void set(Texture tex)
-				{ set(tex ? tex.handle : TexHandle.init); } 
-				
-				void resetState(StateSide side)
-				{
-					if(side & StateSide.user) userState = initialState; 
-					if(side & StateSide.target) targetState = initialState; 
-				} 
-				
-				void synch(GfxBuilderBase builder)
-				{
-					if(targetState.chkSet(userState))
-					{
-						/+
-							The internal state was different to the target GPU state.
-							So it have to be emited.
-						+/
-						builder.emit(assemble(opcode, assembleHandle(targetState))); 
-					}
-				} 
+				return vbAppender.empty; 
+				/+
+					After the first begin(), there will be an index in VB.
+					Emitting data into GB without calling begin() is treated as empty.
+				+/
 			} 
 			
-			protected mixin template TexHandleTemplate(string name)
+			GfxContent toGfxContent()
 			{
-				mixin(iq{
-					TexHandleState!(Opcode.set$(name)) state_$(name); 
-					void $(name)(T)(T arg) { state_$(name).set(arg); } 
-					auto $(name)() => state_$(name).get; 
-					void synch_$(name)() { state_$(name).synch(this); } 
-				}.text); 
+				if(empty) return GfxContent.init; 
+				end; 
+				const actual_gbBitsPos = gbBitPos; 
+				bitStreamAppender.flush; 
+				return GfxContent(vbAppender[], gbAppender[], actual_gbBitsPos); 
 			} 
 			
-			version(/+$DIDE_REGION+/all) {
-				mixin TexHandleTemplate!"FMH"; 	//Fontmap
-				mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
-				mixin TexHandleTemplate!"PALH"; 	//Palette
-				mixin TexHandleTemplate!"LTH"; 	//Line texture
-				
-				void reset_handles(StateSide side)
-				{
-					state_FMH	.resetState(side),
-					state_LFMH	.resetState(side),
-					state_PALH	.resetState(side),
-					state_LTH	.resetState(side); 
-				} 
-			}
-		}
-		
-		version(/+$DIDE_REGION Sizes+/all)
-		{
-			struct SizeState(Opcode opcode, float initialState)
+			protected void appendToDestination(in GfxContent content)
 			{
-				private: 
-				float 	userState 	= initialState, 
-					targetState 	= initialState; 
-				
-				public: 
-				ref access() => userState; 
-				
-				void resetState(StateSide side)
-				{
-					if(side & StateSide.user) userState = initialState; 
-					if(side & StateSide.target) targetState = initialState; 
-				} 
-				
-				void synch(GfxBuilderBase builder)
-				{
-					if(targetState.chkSet(userState))
-					{
-						/+
-							The internal state was different to the target GPU state.
-							So it have to be emited.
-						+/
-						builder.emit(assemble(opcode, assembleSize(targetState))); 
-					}
-				} 
+				enforce(gfxContentDestination, "Unablem to commit GfxContent."); 
+				gfxContentDestination.appendGfxContent(content); 
 			} 
 			
-			protected mixin template SizeTemplate(string name, float initialValue)
+			void commit()
 			{
-				mixin(iq{
-					SizeState!(Opcode.set$(name), initialValue) state_$(name); 
-					ref $(name)() => state_$(name).access; 
-					void synch_$(name)() { state_$(name).synch(this); } 
-				}.text); 
+				const content = toGfxContent; 
+				appendToDestination(content); 
+				resetStream; 
 			} 
 			
-			version(/+$DIDE_REGION+/all) {
-				mixin SizeTemplate!("PS", 1); 	//Point size
-				mixin SizeTemplate!("LW", 1); 	//Line width
-				mixin SizeTemplate!("DL", 1); 	//Dot length
-				mixin SizeTemplate!("FH", 18); 	//Font height
-				
-				void reset_sizes(StateSide side)
+			void commit(in GfxContent externalContent)
+			{
+				if(!externalContent.empty)
 				{
-					state_PS	.resetState(side),
-					state_LW	.resetState(side),
-					state_DL	.resetState(side),
-					state_FH	.resetState(side); 
-				} 
-			}
-		}
-		
-		version(/+$DIDE_REGION C: Colors+/all)
-		{
-			struct ColorState
-			{
-				FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u1}))), 
-					SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
-				float OP = 1; 
-			} 
-			
-			ColorState 	user_colorState, 
-				target_colorState; 
-			
-			auto PC()
-			=> user_colorState.PC; void PC(A...)(in A a)
-			{ user_colorState.PC = FormattedColor(a); } 
-			auto SC()
-			=> user_colorState.SC; void SC(A...)(in A a)
-			{ user_colorState.SC = FormattedColor(a); } 
-			ref OP() => user_colorState.OP; 
-			
-			void reset_colors(StateSide side)
-			{
-				if(side & StateSide.user) user_colorState = ColorState.init; 
-				if(side & StateSide.target) target_colorState = ColorState.init; 
-			} 
-			
-			void synch_colors(bool doPC=true, bool doSC=true)()
-			{
-				with(target_colorState)
-				{
-					const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
-						SC_changed = doSC && SC.chkSet(user_colorState.SC); 
+					if(!this.empty) { commit; /+first it must commit the self+/}
 					
-					if(PC_changed && SC_changed && PC.format==SC.format)
+					//Normally this is a costy synchronized operation:
+					appendToDestination(externalContent); 
+				}
+			} 
+			
+			void consume(GfxBuilder externalBuilder)
+			{
+				if(externalBuilder && !externalBuilder.empty)
+				{
+					commit(externalBuilder.toGfxContent); 
+					externalBuilder.resetStream; //important to reser AFTER the commit!
+				}
+			} 
+			
+			void emit(Args...)(in Args args)
+			{
+				static foreach(i, T; Args)
+				{
 					{
-						if(PC.value==SC.value)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
-						else {
-							emit(
-								assemble(mixin(舉!((Opcode),q{setPCSC})), assembleColor(PC)),
-								           assembleColor_noFormat(SC)
-							); 
-						}
+						alias a = args[i]; 
+						static if(is(T : Bits!(B), B))
+						bitStreamAppender.appendBits(a.data, a.bitCnt); 
+						else static if(is(T : Bits!(B)[N], B, int N))
+						{ static foreach(i; 0..N) emit(a[i]); }
+						else static if(is(T : ubyte[]))
+						emitBytes(a); 
+						else
+						with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
+					}
+				}
+			} 
+			
+			void emitBytes(in void[] data)
+			{
+				auto ba = (cast(ubyte[])(data)); 
+				while(ba.length>=8) { emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
+				if(ba.length>=4) { emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
+				if(ba.length>=2) { emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
+				if(ba.length>=1) { emit(*(cast(ubyte*)(ba.ptr))); }
+			} 
+			
+			void emitEvenBytes(void[] data)
+			{
+				auto ba = (cast(ubyte[])(data)); 
+				while(ba.length>=16) { emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
+				if(ba.length>=8) { emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
+				if(ba.length>=4) { emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
+				if(ba.length>=2) { emit(ba[0]); }
+			} 
+			
+		}
+		
+		
+		version(/+$DIDE_REGION Block handling+/all)
+		{
+			protected int actVertexCount; 
+			protected bool insideBlock; 
+			
+			protected void resetBlockState()
+			{ insideBlock = false; actVertexCount = 0; } 
+			
+			///Closes the block with an 'end' opcode. Only if there is an actual block.
+			void end()
+			{
+				if(insideBlock.chkClear)
+				{ emit(mixin(舉!((Opcode),q{end}))); }
+			} 
+			
+			///It always starts a new block.  Emits 'end' if needed.
+			void begin()
+			{
+				if(insideBlock) end; 
+				vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
+				resetState!(StateSide.target); 
+				actVertexCount=0; 
+				insideBlock = true; 
+			} 
+			
+			version(/+$DIDE_REGION Messy ShaderMaxVertexCount logic+/all)
+			{
+				enum ShaderMaxVertexCount = 
+				
+				//127
+				/+
+					127:
+					4 vec4 gl_Position
+					4 smooth mediump vec4 fragColor
+					4 smooth mediump vec4 fragBkColor
+					2 smooth vec2 fragTexCoordXY
+					1 flat uint fragTexHandleAndMode
+					1 flat uint fragTexCoordZ
+					4 flat vec4 fragFloats0
+					4 flat vec4 fragFloats1
+					-----
+					24 total
+				+/
+				113
+				/+
+					113:
+					24 total + gl_ClipDistance[4] = 28
+				+/
+				; 
+				__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
+				
+				static @property int maxVertexCount()
+				{ return desiredMaxVertexCount; } 
+			}
+			
+			@property remainingVertexCount() const
+			=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
+			
+			void incVertexCount(int inrc)
+			{ actVertexCount += inrc; } 
+			
+			///Tries to continue the current block with the required vertices.
+			///If a new block started, it emits setup code.
+			void begin(int requiredVertexCount, void delegate() onSetup)
+			{
+				if(insideBlock)
+				{
+					const newVertexCount = actVertexCount + requiredVertexCount; 
+					if(newVertexCount <= maxVertexCount)
+					{
+						actVertexCount = newVertexCount; 
+						/+Actual block is continued.+/
+						//print("continuing block", gbBitPos, actVertexCount); 
 					}
 					else
-					{
-						if(PC_changed) emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
-						if(SC_changed) emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
-					}
-					
-					if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
-				}
-			} 
-			
-			alias synch_PC = synch_colors!(true, false),
-			synch_SC = synch_colors!(false, true); 
-		}
-		
-		version(/+$DIDE_REGION TR: Transform+/all)
-		{
-			static struct TransformationState
-			{
-				enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
-				
-				vec2 scaleXY = vec2(1); 
-				float skewX_deg = 0; 
-				float rotZ_deg = 0; 
-				vec2 transXY = vec2(0); //in world space
-				bounds2 clipBounds = initialClipBounds; //in world space
-				//applied in this order
-				
-				void clipBounds_reset() { clipBounds = initialClipBounds; } 
-			} 
-			
-			TransformationState user_TR, target_TR; 
-			alias TR = user_TR; 
-			
-			void reset_transform(StateSide side)
-			{
-				if(side & StateSide.user) user_TR = TransformationState.init; 
-				if(side & StateSide.target) target_TR = TransformationState.init; 
-			} 
-			
-			void synch_transform()
-			{
-				with(target_TR)
-				{
-					if(scaleXY.chkSet(user_TR.scaleXY))
-					{
-						if(scaleXY.x!=scaleXY.y)
-						{
-							emit(
-								assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
-									assembleSize(scaleXY.y)
-							); 
-						}
-						else
-						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
-					}
-					
-					if(skewX_deg.chkSet(user_TR.skewX_deg))
-					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
-					
-					if(rotZ_deg.chkSet(user_TR.rotZ_deg))
-					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
-					
-					if(transXY.chkSet(user_TR.transXY))
-					{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
-					
-					if(clipBounds.chkSet(user_TR.clipBounds))
-					{
-						emit(
-							assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
-								assemblePoint(clipBounds.size)
-						); 
-					}
-				}
-			} 
-		}
-		
-		protected void resetState(StateSide side)
-		{
-			reset_handles(side); 
-			reset_sizes(side); 
-			reset_transform(side); 
-			reset_colors(side); 
-		} 
-		
-		protected int actVertexCount; 
-		protected bool insideBlock; 
-		
-		void resetStyle()
-		{ resetState(StateSide.user); } 
-		
-		protected void resetBlockState()
-		{ insideBlock = false; actVertexCount = 0; } 
-		
-		///Closes the block with an 'end' opcode. Only if there is an actual block.
-		final void end()
-		{
-			if(insideBlock.chkClear)
-			{ emit(mixin(舉!((Opcode),q{end}))); }
-		} 
-		
-		///It always starts a new block.  Emits 'end' if needed.
-		final void begin()
-		{
-			if(insideBlock) end; 
-			vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
-			resetState(StateSide.target); 
-			actVertexCount=0; 
-			insideBlock = true; 
-		} 
-		
-		version(/+$DIDE_REGION Messy ShaderMaxVertexCount logic+/all)
-		{
-			enum ShaderMaxVertexCount = 
-			
-			//127
-			/+
-				127:
-				4 vec4 gl_Position
-				4 smooth mediump vec4 fragColor
-				4 smooth mediump vec4 fragBkColor
-				2 smooth vec2 fragTexCoordXY
-				1 flat uint fragTexHandleAndMode
-				1 flat uint fragTexCoordZ
-				4 flat vec4 fragFloats0
-				4 flat vec4 fragFloats1
-				-----
-				24 total
-			+/
-			113
-			/+
-				113:
-				24 total + gl_ClipDistance[4] = 28
-			+/
-			; 
-			__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
-			
-			static @property int maxVertexCount()
-			{ return desiredMaxVertexCount; } 
-		}
-		
-		@property remainingVertexCount() const
-		=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
-		
-		void incVertexCount(int inrc)
-		{ actVertexCount += inrc; } 
-		
-		///Tries to continue the current block with the required vertices.
-		///If a new block started, it emits setup code.
-		final void begin(int requiredVertexCount, void delegate() onSetup)
-		{
-			if(insideBlock)
-			{
-				const newVertexCount = actVertexCount + requiredVertexCount; 
-				if(newVertexCount <= maxVertexCount)
-				{
-					actVertexCount = newVertexCount; 
-					/+Actual block is continued.+/
-					//print("continuing block", gbBitPos, actVertexCount); 
+					{ begin; onSetup(); }
 				}
 				else
 				{ begin; onSetup(); }
+				/+
+					Todo: Handle the case when maxVertexCount > requiredVertexCount.
+					Because that's an automatic fail, but must be handled on the 
+					caller side, not here.
+				+/
+			} 
+		}
+		
+		version(/+$DIDE_REGION Internal state+/all)
+		{
+			protected enum StateSide
+			{ user, target, both } 
+			
+			version(/+$DIDE_REGION Handles+/all)
+			{
+				struct TexHandleState(Opcode opcode)
+				{
+					private: 
+					enum TexHandle initialState = TexHandle.init; 
+					TexHandle 	userState 	= initialState, 
+						targetState 	= initialState; 
+					
+					public: 
+					@property TexHandle get()
+					=> userState; 
+					
+					@property void set(TexHandle val)
+					{
+						if(userState.chkSet(val))
+						{
+							/+
+								The user changed the internal state. Change detection, 
+								and precompilation can go here.
+							+/
+						}
+					} 
+					
+					@property void set(Texture tex)
+					{ set(tex ? tex.handle : TexHandle.init); } 
+					
+					void resetState(StateSide side)()
+					{
+						if(side & StateSide.user) userState = initialState; 
+						if(side & StateSide.target) targetState = initialState; 
+					} 
+					
+					void synch(GfxBuilderBase builder)
+					{
+						if(targetState.chkSet(userState))
+						{
+							/+
+								The internal state was different to the target GPU state.
+								So it have to be emited.
+							+/
+							builder.emit(assemble(opcode, assembleHandle(targetState))); 
+						}
+					} 
+				} 
+				
+				protected mixin template TexHandleTemplate(string name)
+				{
+					mixin(iq{
+						TexHandleState!(Opcode.set$(name)) state_$(name); 
+						void $(name)(T)(T arg) { state_$(name).set(arg); } 
+						auto $(name)() => state_$(name).get; 
+						void synch_$(name)() { state_$(name).synch(this); } 
+					}.text); 
+				} 
 			}
-			else
-			{ begin; onSetup(); }
-			/+
-				Todo: Handle the case when maxVertexCount > requiredVertexCount.
-				Because that's an automatic fail, but must be handled on the 
-				caller side, not here.
-			+/
-		} 
+			
+			version(/+$DIDE_REGION Sizes+/all)
+			{
+				struct SizeState(Opcode opcode, float initialState)
+				{
+					private: 
+					float 	userState 	= initialState, 
+						targetState 	= initialState; 
+					
+					public: 
+					ref access() => userState; 
+					
+					void resetState(StateSide side)()
+					{
+						if(side & StateSide.user) userState = initialState; 
+						if(side & StateSide.target) targetState = initialState; 
+					} 
+					
+					void synch(GfxBuilderBase builder)
+					{
+						if(targetState.chkSet(userState))
+						{
+							/+
+								The internal state was different to the target GPU state.
+								So it have to be emited.
+							+/
+							builder.emit(assemble(opcode, assembleSize(targetState))); 
+						}
+					} 
+				} 
+				
+				protected mixin template SizeTemplate(string name, float initialValue)
+				{
+					mixin(iq{
+						SizeState!(Opcode.set$(name), initialValue) state_$(name); 
+						ref $(name)() => state_$(name).access; 
+						void synch_$(name)() { state_$(name).synch(this); } 
+					}.text); 
+				} 
+			}
+			
+			version(/+$DIDE_REGION Color+/all)
+			{
+				@property colorState() => tuple(((PALH).genericArg!q{PALH}), ((PC).genericArg!q{PC}), ((SC).genericArg!q{SC}), ((OP).genericArg!q{OP})); 
+				
+				struct ColorState
+				{
+					FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u1}))), 
+						SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
+					float OP = 1; 
+				} 
+				
+				ColorState 	user_colorState, 
+					target_colorState; 
+				
+				version(/+$DIDE_REGION+/all) {
+					mixin TexHandleTemplate!"PALH"; 
+					auto PC()
+					=> user_colorState.PC; void PC(A...)(in A a)
+					{ user_colorState.PC = FormattedColor(a); } 
+					auto SC()
+					=> user_colorState.SC; void SC(A...)(in A a)
+					{ user_colorState.SC = FormattedColor(a); } 
+					ref OP() => user_colorState.OP; 
+				}
+				
+				void reset_colors(StateSide side)()
+				{
+					state_PALH.resetState!side; 
+					if(side & StateSide.user) user_colorState = ColorState.init; 
+					if(side & StateSide.target) target_colorState = ColorState.init; 
+				} 
+				
+				void synch_colors(bool doPC=true, bool doSC=true)()
+				{
+					synch_PALH; 
+					with(target_colorState)
+					{
+						const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
+							SC_changed = doSC && SC.chkSet(user_colorState.SC); 
+						
+						if(PC_changed && SC_changed && PC.format==SC.format)
+						{
+							if(PC.value==SC.value)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
+							else {
+								emit(
+									assemble(mixin(舉!((Opcode),q{setPCSC})), assembleColor(PC)),
+									           assembleColor_noFormat(SC)
+								); 
+							}
+						}
+						else
+						{
+							if(PC_changed) emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
+							if(SC_changed) emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
+						}
+						
+						if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
+					}
+				} 
+				
+				alias synch_PC = synch_colors!(true, false),
+				synch_SC = synch_colors!(false, true); 
+			}
+			
+			version(/+$DIDE_REGION Font+/all)
+			{
+				@property fontState() => tuple(((FMH).genericArg!q{FMH}), ((LFMH).genericArg!q{LFMH}), ((FH).genericArg!q{FH}), ((fontSize).genericArg!q{fontSize})); 
+				
+				mixin TexHandleTemplate!"FMH"; 	//Fontmap
+				mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
+				mixin SizeTemplate!("FH", GSP_DefaultFontHeight); 	//Font height
+				Vector!(ushort, 2) fontSize; /+cursor can use it to move around+/
+				
+				void reset_font(StateSide side)()
+				{
+					state_FMH	.resetState!(side),
+					state_LFMH	.resetState!(side),
+					state_FH	.resetState!(side); 
+					if(side & StateSide.user) fontSize = 0; 
+				} void synch_font()
+				{
+					synch_FMH, 
+					synch_LFMH, 
+					synch_FH; 
+				} 
+			}
+			
+			version(/+$DIDE_REGION Line+/all)
+			{
+				@property lineState() => tuple(((LTH).genericArg!q{LTH}), ((LW).genericArg!q{LW}), ((DL).genericArg!q{DL})); 
+				
+				mixin TexHandleTemplate!"LTH"; 	//Line tex handle
+				mixin SizeTemplate!("LW", 1); 	//Line width
+				mixin SizeTemplate!("DL", 1); 	//Dot length
+				void reset_line(StateSide side)()
+				{
+					state_LTH	.resetState!(side),
+					state_LW	.resetState!(side),
+					state_DL	.resetState!(side); 
+				} void synch_line()
+				{
+					synch_LTH, 
+					synch_LW, 
+					synch_DL; 
+				} 
+			}
+			
+			version(/+$DIDE_REGION Point+/all)
+			{
+				@property pointState() => tuple(((PS).genericArg!q{PS})); 
+				
+				mixin SizeTemplate!("PS", 1); //Point size
+				void reset_point(StateSide side)()
+				{ state_PS	.resetState!(side); } void synch_point()
+				{ synch_PS; } 
+			}
+			
+			version(/+$DIDE_REGION Transform+/all)
+			{
+				@property transformState() => tuple(((TR).genericArg!q{TR})); 
+				
+				static struct TransformationState
+				{
+					enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
+					vec2 scaleXY = vec2(1); 
+					float skewX_deg = 0; 
+					float rotZ_deg = 0; 
+					vec2 transXY = vec2(0); //in world space
+					bounds2 clipBounds = initialClipBounds; //in world space
+					//applied in this order
+					
+					void clipBounds_reset() { clipBounds = initialClipBounds; } 
+				} 
+				
+				TransformationState user_TR, target_TR; 
+				alias TR = user_TR; 
+				
+				void reset_transform(StateSide side)()
+				{
+					if(side & StateSide.user) user_TR = TransformationState.init; 
+					if(side & StateSide.target) target_TR = TransformationState.init; 
+				} 
+				
+				void synch_transform()
+				{
+					with(target_TR)
+					{
+						if(scaleXY.chkSet(user_TR.scaleXY))
+						{
+							if(scaleXY.x!=scaleXY.y)
+							{
+								emit(
+									assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
+										assembleSize(scaleXY.y)
+								); 
+							}
+							else
+							{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
+						}
+						
+						if(skewX_deg.chkSet(user_TR.skewX_deg))
+						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
+						
+						if(rotZ_deg.chkSet(user_TR.rotZ_deg))
+						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
+						
+						if(transXY.chkSet(user_TR.transXY))
+						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
+						
+						if(clipBounds.chkSet(user_TR.clipBounds))
+						{
+							emit(
+								assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
+									assemblePoint(clipBounds.size)
+							); 
+						}
+					}
+				} 
+			}
+			
+			
+			@property allState()
+			=> tuple(
+				colorState.expand, fontState.expand, lineState.expand, 
+				pointState.expand, transformState.expand
+			); 
+			
+			protected void resetState(StateSide side)()
+			{
+				reset_colors!(side), reset_font!(side), reset_line!(side), 
+				reset_point!(side), reset_transform!(side); 
+			} 
+			
+			void resetStyle()
+			{ resetState!(StateSide.user); } 
+			
+			void setState(Args...)(in Args args)
+			{
+				void processArg(T)(in T a)
+				{
+					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+					else static if(is(T : GenericArg!(name, C), string name, C))
+					{ mixin(iq{$(name) = a; }.text); }
+				} 
+				static foreach(a; args) processArg(a); 
+			} 
+		}
+		
+		
 	} 
 	
 	class GfxBuilder : GfxBuilderBase
@@ -1728,12 +1722,12 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			index = 0; 
-			Style((((cast(EGA2Color)(bk))).genericArg!q{bk})); 
+			Style((((cast(EGAColor)(bk))).genericArg!q{bk})); 
 			while(data.length)
 			{
 				auto act = fetchSameColor(data/+, remainingChars+/); 
 				const nextIndex = index + act.length.to!int; 
-				Style((((cast(EGA2Color)(act[0].y))).genericArg!q{fg})); 
+				Style((((cast(EGAColor)(act[0].y))).genericArg!q{fg})); 
 				cursorPos = vec2(pos/8+ivec2(index, 0)); 
 				textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
 				index = nextIndex; 
@@ -1846,10 +1840,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			protected void applyStyleArg(T)(in T a)
 			{
-				//pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof)".text); 
-				static if(isTuple!T)
-				{ static foreach(i; 0..T.length) applyStyleArg(a[i]); }
-				else static if(is(T : GenericArg!(name, C), string name, C))
+				static if(is(T : GenericArg!(name, C), string name, C))
 				{
 					static if(name == "opacity") { OP = a.value; }
 					else static if(name == "fg")	{ PC = a.value; }
@@ -1890,14 +1881,22 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			
-			void Style(Args...)(Args args)
-			{ static foreach(i, a; args) applyStyleArg(a); } 
+			void Style(Args...)(in Args args)
+			{
+				void processArg(T)(T a)
+				{
+					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+					else applyStyleArg(a); 
+				} 
+				
+				static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
+			} 
 		}
 		
 		
 		version(/+$DIDE_REGION Cursor+/all)
 		{
-			vec2 cursorPos, fontSize; 
+			vec2 cursorPos; 
 			
 			struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
 			struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
@@ -1932,18 +1931,12 @@ version(/+$DIDE_REGION+/all)
 				//this work on temporal graphics state
 				/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
 				
-				static if((常!(bool)(0)))
-				pragma(msg,i"$(AffectedStyleRegs!Args)".text.注); 
-				
-				
-				mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{auto saved_$(reg)=$(reg); }.text)).join); 
-				scope(exit)
-				{ mixin(AffectedStyleRegs!Args.map!((reg)=>(iq{$(reg)=saved_$(reg); }.text)).join); }
-				
+				mixin(scope_remember(AffectedStyleRegs!Args.join(','))); 
 				
 				void processArg(T)(T a)
 				{
-					static if(isStyleArg!T)	{ applyStyleArg(a); /+must be first because of Tuple!+/}
+					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+					else static if(isStyleArg!T)	{ applyStyleArg(a); }
 					else static if(isCursorArg!T)	applyCursorArg(a); 
 					else static if(isSomeString!T)	textBackend(a); 
 					else static if(isSomeChar!T)	textBackend(only(a)); 
@@ -1958,14 +1951,12 @@ version(/+$DIDE_REGION+/all)
 					else static if(isFunction!T) a(); 
 					else
 					{
-						pragma(msg, i"$(__FILE__)($(__LINE__),1): Warning: $(T.stringof) $(isCallable!(applyStyleArg, T))".text); 
-						
+						pragma(msg,i"$(T.stringof) $(isCallable!(applyStyleArg, T))".text.注); 
 						static assert(false, "Unhandled Text() argument: "~T.stringof); 
 					}
 				} 
 				
-				static foreach(i, a; args)
-				{ processArg!(Unqual!(Args[i]))(a); }
+				static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
 			} 
 			
 			void textBackend(R)(R input)
@@ -2047,8 +2038,7 @@ version(/+$DIDE_REGION+/all)
 	
 	class TurboVisionBuilder : GfxBuilder
 	{
-		static foreach(e; EnumMembers!EGA2Color)
-		mixin(iq{enum $(e.text) = EGA2Color.$(e.text); }.text); 
+		mixin InjectEnumMembers!EGAColor; 
 		
 		enum clMenuBk 	= ((ltGray).genericArg!q{bk}), 
 		clMenuText 	= ((black).genericArg!q{fg}), 
@@ -2087,7 +2077,7 @@ version(/+$DIDE_REGION+/all)
 				); 
 			}
 		} 
-		
+		
 		void drawSubMenu(R)(R items)
 			if(isForwardRange!(R, MenuItem))
 		{
@@ -2177,264 +2167,27 @@ version(/+$DIDE_REGION+/all)
 		
 		void fillSpace(int width=80) { while(cursorPos.x<width) Text(' '); } 
 		
-		
+		
 		/+
-			0	0x00	�	0000
-			1	0x01	☺	263A
-			2	0x02	☻	263B
-			3	0x03	♥	2665
-			4	0x04	♦	2666
-			5	0x05	♣	2663
-			6	0x06	♠	2660
-			7	0x07	•	2022
-			8	0x08	◘	25D8
-			9	0x09	○	25CB
-			10	0x0A	◙	25D9
-			11	0x0B	♂	2642
-			12	0x0C	♀	2640
-			13	0x0D	♪	266A
-			14	0x0E	♫	266B
-			15	0x0F	☼	263C
-			16	0x10	►	25BA
-			17	0x11	◄	25C4
-			18	0x12	↕	2195
-			19	0x13	‼	203C
-			20	0x14	¶	00B6
-			21	0x15	§	00A7
-			22	0x16	▬	25AC
-			23	0x17	↨	21A8
-			24	0x18	↑	2191
-			25	0x19	↓	2193
-			26	0x1A	→	2192
-			27	0x1B	←	2190
-			28	0x1C	∟	221F
-			29	0x1D	↔	2194
-			30	0x1E	▲	25B2
-			31	0x1F	▼	25BC
-			32	0x20		0020
-			33	0x21	!	0021
-			34	0x22	"	0022
-			35	0x23	#	0023
-			36	0x24	$	0024
-			37	0x25	%	0025
-			38	0x26	&	0026
-			39	0x27	'	0027
-			40	0x28	(	0028
-			41	0x29	)	0029
-			42	0x2A	*	002A
-			43	0x2B	+	002B
-			44	0x2C	,	002C
-			45	0x2D	-	002D
-			46	0x2E	.	002E
-			47	0x2F	/	002F
-			48	0x30	0	0030
-			49	0x31	1	0031
-			50	0x32	2	0032
-			51	0x33	3	0033
-			52	0x34	4	0034
-			53	0x35	5	0035
-			54	0x36	6	0036
-			55	0x37	7	0037
-			56	0x38	8	0038
-			57	0x39	9	0039
-			58	0x3A	:	003A
-			59	0x3B	;	003B
-			60	0x3C	<	003C
-			61	0x3D	=	003D
-			62	0x3E	>	003E
-			63	0x3F	?	003F
-			64	0x40	@	0040
-			65	0x41	A	0041
-			66	0x42	B	0042
-			67	0x43	C	0043
-			68	0x44	D	0044
-			69	0x45	E	0045
-			70	0x46	F	0046
-			71	0x47	G	0047
-			72	0x48	H	0048
-			73	0x49	I	0049
-			74	0x4A	J	004A
-			75	0x4B	K	004B
-			76	0x4C	L	004C
-			77	0x4D	M	004D
-			78	0x4E	N	004E
-			79	0x4F	O	004F
-			80	0x50	P	0050
-			81	0x51	Q	0051
-			82	0x52	R	0052
-			83	0x53	S	0053
-			84	0x54	T	0054
-			85	0x55	U	0055
-			86	0x56	V	0056
-			87	0x57	W	0057
-			88	0x58	X	0058
-			89	0x59	Y	0059
-			90	0x5A	Z	005A
-			91	0x5B	[	005B
-			92	0x5C	\	005C
-			93	0x5D	]	005D
-			94	0x5E	^	005E
-			95	0x5F	_	005F
-			96	0x60	`	0060
-			97	0x61	a	0061
-			98	0x62	b	0062
-			99	0x63	c	0063
-			100	0x64	d	0064
-			101	0x65	e	0065
-			102	0x66	f	0066
-			103	0x67	g	0067
-			104	0x68	h	0068
-			105	0x69	i	0069
-			106	0x6A	j	006A
-			107	0x6B	k	006B
-			108	0x6C	l	006C
-			109	0x6D	m	006D
-			110	0x6E	n	006E
-			111	0x6F	o	006F
-			112	0x70	p	0070
-			113	0x71	q	0071
-			114	0x72	r	0072
-			115	0x73	s	0073
-			116	0x74	t	0074
-			117	0x75	u	0075
-			118	0x76	v	0076
-			119	0x77	w	0077
-			120	0x78	x	0078
-			121	0x79	y	0079
-			122	0x7A	z	007A
-			123	0x7B	{	007B
-			124	0x7C	|	007C
-			125	0x7D	}	007D
-			126	0x7E	~	007E
-			127	0x7F	⌂	2302
-			128	0x80	Ç	00C7
-			129	0x81	ü	00FC
-			130	0x82	é	00E9
-			131	0x83	â	00E2
-			132	0x84	ä	00E4
-			133	0x85	à	00E0
-			134	0x86	å	00E5
-			135	0x87	ç	00E7
-			136	0x88	ê	00EA
-			137	0x89	ë	00EB
-			138	0x8A	è	00E8
-			139	0x8B	ï	00EF
-			140	0x8C	î	00EE
-			141	0x8D	ì	00EC
-			142	0x8E	Ä	00C4
-			143	0x8F	Å	00C5
-			144	0x90	É	00C9
-			145	0x91	æ	00E6
-			146	0x92	Æ	00C6
-			147	0x93	ô	00F4
-			148	0x94	ö	00F6
-			149	0x95	ò	00F2
-			150	0x96	û	00FB
-			151	0x97	ù	00F9
-			152	0x98	ÿ	00FF
-			153	0x99	Ö	00D6
-			154	0x9A	Ü	00DC
-			155	0x9B	¢	00A2
-			156	0x9C	£	00A3
-			157	0x9D	¥	00A5
-			158	0x9E	₧	20A7
-			159	0x9F	ƒ	0192
-			160	0xA0	á	00E1
-			161	0xA1	í	00ED
-			162	0xA2	ó	00F3
-			163	0xA3	ú	00FA
-			164	0xA4	ñ	00F1
-			165	0xA5	Ñ	00D1
-			166	0xA6	ª	00AA
-			167	0xA7	º	00BA
-			168	0xA8	¿	00BF
-			169	0xA9	⌐	2310
-			170	0xAA	¬	00AC
-			171	0xAB	½	00BD
-			172	0xAC	¼	00BC
-			173	0xAD	¡	00A1
-			174	0xAE	«	00AB
-			175	0xAF	»	00BB
-			176	0xB0	░	2591
-			177	0xB1	▒	2592
-			178	0xB2	▓	2593
-			179	0xB3	│	2502
-			180	0xB4	┤	2524
-			181	0xB5	╡	2561
-			182	0xB6	╢	2562
-			183	0xB7	╖	2556
-			184	0xB8	╕	2555
-			185	0xB9	╣	2563
-			186	0xBA	║	2551
-			187	0xBB	╗	2557
-			188	0xBC	╝	255D
-			189	0xBD	╜	255C
-			190	0xBE	╛	255B
-			191	0xBF	┐	2510
-			192	0xC0	└	2514
-			193	0xC1	┴	2534
-			194	0xC2	┬	252C
-			195	0xC3	├	251C
-			196	0xC4	─	2500
-			197	0xC5	┼	253C
-			198	0xC6	╞	255E
-			199	0xC7	╟	255F
-			200	0xC8	╚	255A
-			201	0xC9	╔	2554
-			202	0xCA	╩	2569
-			203	0xCB	╦	2566
-			204	0xCC	╠	2560
-			205	0xCD	═	2550
-			206	0xCE	╬	256C
-			207	0xCF	╧	2567
-			208	0xD0	╨	2568
-			209	0xD1	╤	2564
-			210	0xD2	╥	2565
-			211	0xD3	╙	2559
-			212	0xD4	╘	2558
-			213	0xD5	╒	2552
-			214	0xD6	╓	2553
-			215	0xD7	╫	256B
-			216	0xD8	╪	256A
-			217	0xD9	┘	2518
-			218	0xDA	┌	250C
-			219	0xDB	█	2588
-			220	0xDC	▄	2584
-			221	0xDD	▌	258C
-			222	0xDE	▐	2590
-			223	0xDF	▀	2580
-			224	0xE0	α	03B1
-			225	0xE1	ß	00DF
-			226	0xE2	Γ	0393
-			227	0xE3	π	03C0
-			228	0xE4	Σ	03A3
-			229	0xE5	σ	03C3
-			230	0xE6	µ	00B5
-			231	0xE7	τ	03C4
-			232	0xE8	Φ	03A6
-			233	0xE9	Θ	0398
-			234	0xEA	Ω	03A9
-			235	0xEB	δ	03B4
-			236	0xEC	∞	221E
-			237	0xED	φ	03C6
-			238	0xEE	ε	03B5
-			239	0xEF	∩	2229
-			240	0xF0	≡	2261
-			241	0xF1	±	00B1
-			242	0xF2	≥	2265
-			243	0xF3	≤	2264
-			244	0xF4	⌠	2320
-			245	0xF5	⌡	2321
-			246	0xF6	÷	00F7
-			247	0xF7	≈	2248
-			248	0xF8	°	00B0
-			249	0xF9	∙	2219
-			250	0xFA	·	00B7
-			251	0xFB	√	221A
-			252	0xFC	ⁿ	207F
-			253	0xFD	²	00B2
-			254	0xFE	■	25A0
-			255	0xFF	 	00A0
+			/+
+				Para: 	00	01	02	03	04	05	06	07	08	09	0A	0B	0C	0D	0E	0F
+				00	�	☺	☻	♥	♦	♣	♠	•	◘	○	◙	♂	♀	♪	♫	☼
+				10	►	◄	↕	‼	¶	§	▬	↨	↑	↓	→	←	∟	↔	▲	▼
+				20	 	!	"	#	$	%	&	'	(	)	*	+	,	-	.	/
+				30	0	1	2	3	4	5	6	7	8	9	:	;	<	=	>	?
+				40	@	A	B	C	D	E	F	G	H	I	J	K	L	M	N	O
+				50	P	Q	R	S	T	U	V	W	X	Y	Z	[	\	]	^	_
+				60	`	a	b	c	d	e	f	g	h	i	j	k	l	m	n	o
+				70	p	q	r	s	t	u	v	w	x	y	z	{	|	}	~	⌂
+				80	Ç	ü	é	â	ä	à	å	ç	ê	ë	è	ï	î	ì	Ä	Å
+				90	É	æ	Æ	ô	ö	ò	û	ù	ÿ	Ö	Ü	¢	£	¥	₧	ƒ
+				A0	á	í	ó	ú	ñ	Ñ	ª	º	¿	⌐	¬	½	¼	¡	«	»
+				B0	░	▒	▓	│	┤	╡	╢	╖	╕	╣	║	╗	╝	╜	╛	┐
+				C0	└	┴	┬	├	─	┼	╞	╟	╚	╔	╩	╦	╠	═	╬	╧
+				D0	╨	╤	╥	╙	╘	╒	╓	╫	╪	┘	┌	█	▄	▌	▐	▀
+				E0	α	ß	Γ	π	Σ	σ	µ	τ	Φ	Θ	Ω	δ	∞	φ	ε	∩
+				F0	≡	±	≥	≤	⌠	⌡	÷	≈	°	∙	·	√	ⁿ	²	■	 
+			+/
 		+/
 	} 
 	
@@ -2448,9 +2201,11 @@ version(/+$DIDE_REGION+/all)
 
 
 
-class VulkanWindow: Window
+class VulkanWindow: Window, IGfxContentDestination
 {
 	version(/+$DIDE_REGION+/all) {
+		auto getGfxContentDestination() => (cast(IGfxContentDestination)(this)); 
+		
 		/+
 			Todo: handle VK_ERROR_DEVICE_LOST.	It can be caused by an external bug 
 			when the GPU freezes because of another app, and then restarts.
@@ -2783,12 +2538,27 @@ class VulkanWindow: Window
 			
 			void appendGfxContent(in GfxContent content)
 			{
-				if(content.vb.empty) return; 
-				GB.buffer.alignTo(16); 
-				const shift = GB.bitPos; 
-				GB.buffer.append(content.gb); 
-				static assert(VertexData.sizeof==uint.sizeof); 
-				VB.buffer.appendUints((cast(uint[])(content.vb)), shift); 
+				if(content.empty) return; 
+				
+				void doit()
+				{
+					GB.buffer.alignTo(16); 
+					const shift = GB.bitPos; 
+					GB.buffer.append(content.gb); 
+					static assert(VertexData.sizeof==uint.sizeof); 
+					VB.buffer.appendUints((cast(uint[])(content.vb)), shift); 
+				} 
+				
+				synchronized doit; 
+			} 
+			
+			void consumeGfxContent(GfxBuilder builder)
+			{
+				if(builder && !builder.empty)
+				{
+					appendGfxContent(builder.toGfxContent); 
+					builder.resetStream; 
+				}
 			} 
 		}
 		
@@ -3662,24 +3432,24 @@ class VulkanWindow: Window
 			{
 				with(lastFrameStats)
 				{
-					((0x1BBF982886ADB).檢(
+					((0x1AF6C82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1BC6B82886ADB))))
+				if((互!((bool),(0),(0x1AFDE82886ADB))))
 				{
 					const ma = GfxBuilderBase.ShaderMaxVertexCount; 
 					GfxBuilderBase.desiredMaxVertexCount = 
-					((0x1BD0382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BD1A82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1B07682886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B08D82886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxBuilderBase.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1BE2282886ADB).檢 (im)); 
+					((0x1B19582886ADB).檢 (im)); 
 				}
 			}
 			
@@ -4276,8 +4046,8 @@ $(V_size+G_size)".text
 					float PS = 1; 	/* Point size */
 					float LW = 1; 	/* Line width */
 					float DL = 1; 	/* Dot lenthg */
-					float FH = 18; 	/* Font height */
-						
+					float FH = $(GSP_DefaultFontHeight); /* Font height */
+					
 					uint FMH = 0; 	/* Font map handle */
 					uint LFMH = 0; 	/* Latin font map handle */
 					uint PALH = 0; 	/* Palette handle */
