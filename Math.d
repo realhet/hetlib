@@ -172,7 +172,13 @@ version(/+$DIDE_REGION+/all)
 			
 			/// pass a generic arg to a function
 			auto genericArg(string N="", T)(in T p)
-			{ return GenericArg!(N, T)(p); } 
+			=> GenericArg!(N, T)(p); 
+			auto genericArg(string N="", X, Y)(in X x, in Y y)
+			=> GenericArg!(N, T)(Vector!(CommonType!(X, Y), 2)(x, y)); 
+			auto genericArg(string N="", X, Y, Z)(in X x, in Y y, in Z z)
+			=> GenericArg!(N, T)(Vector!(CommonType!(X, Y, Z), 3)(x, y, z)); 
+			auto genericArg(string N="", X, Y, Z, W)(in X x, in Y y, in Z z, in W w)
+			=> GenericArg!(N, T)(Vector!(CommonType!(X, Y, Z, W), 4)(x, y, z, w)); 
 			
 			/// cast anything to GenericArg
 			auto asGenericArg(A)(in A a)

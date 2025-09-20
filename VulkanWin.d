@@ -938,99 +938,6 @@ version(/+$DIDE_REGION+/all)
 	
 	class GeometryStreamProcessor
 	{
-		/+
-			Registers:
-			/+
-				Code: (表([
-					[q{/+Note: name+/},q{/+Note: reg+/},q{/+Note: internal type+/},q{/+Note: stream formats+/},q{/+Note: instructions+/}],
-					[q{
-						primary color,
-						secondary color
-					},q{
-						PC,
-						SC
-					},q{vec4},q{ColorFormat},q{
-						setPC 	ColorFormat, col
-						setSC 	ColorFormat, col
-						setPCSC 	ColorFormat, col, col
-						setC 	ColorFormat, col /+it broadcasts+/
-					}],
-					[q{
-						pointSize 	= 1,
-						lineWidth 	= 1,
-						dotLength 	= 1,
-						fontHeight 	= 18
-						
-					},q{
-						PS,
-						LW,
-						FH,
-						DS
-					},q{float},q{SizeFormat},q{
-						setPS 	SizeFormat, val
-						setLW 	SizeFormat, val
-						setDL 	SizeFormat, val /+scaling factor for LineTex[Ph]+/
-						setFH 	SizeFormat, val
-					}],
-					[q{
-						fontMapHandle,
-						latinFontMapHandle,
-						paletteHandle
-						lineTexHandle
-					},q{
-						FMH
-						LFMH
-						PALH
-						LTH
-					},q{uint},q{HandleFormat},q{
-						setFontMap 	HandleFormat, handle, FontType
-						setLatinFontMap 	HandleFormat, handle
-						setPalette 	HandleFormat, handle
-						setLineTex 	HandleFormat, handle
-					}],
-					[],
-					[q{//vector state:
-					}],
-					[q{position},q{P},q{vec3},q{CoordFormat},q{Various drawing and moving commands.}],
-					[q{phase},q{Ph},q{float},q{CoordFormat},q{setPhase CoordFormat, coord /+used by -> lineTex[Ph]+/}],
-					[],
-					[q{/+Todo: Perpixel effects: arrows, markers, wavy line, multicolor dashed line+/}],
-				]))
-			+/
-			
-			Drawing commands:
-			/+
-				Code: (表([
-					[q{/+Note: instr+/},q{/+Note: name+/}],
-					[q{/+
-						Line drawing commands based on SVG. 
-						Every command has a lowercase relative variant tooL first bit is 1.
-					+/}],
-					[q{M p},q{move}],
-					[q{L p},q{line}],
-					[q{H signed_dist},q{horizontal line}],
-					[q{V signed_dist},q{vertical line}],
-					[q{Q p0, p1},q{quadratic bezier}],
-					[q{T p},q{smooth quadratic bezier}],
-					[q{C p0, p1, p2},q{cubic bezier}],
-					[q{S p0, p1},q{smooth cubic bezier}],
-					[q{A rx, ry, rot, lf, sf, p},q{elliptical arc}],
-					[],
-					[q{/+textured axis aligned rectangles+/}],
-					[q{TEX [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{
-						Draws a texture at the current position,
-						aligned by xAlign, yAlign
-						sized by xSizeSpec, ySizeSpec and aspect.
-					}],
-					[q{TEXM [xSizeFmt, xSize], [ySizeFmt, ySize], hFmt, th},q{Also moves the cursor to the right.}],
-					[q{TYPE length, string},q{
-						Uses fontMap, fontHeight, fontType 
-						and fontFlags to draw a text.
-					}],
-				]))
-			+/
-			
-		+/
 		protected
 		{
 			enum SharedCode = 
@@ -1644,7 +1551,10 @@ version(/+$DIDE_REGION+/all)
 				{
 					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
 					else static if(is(T : GenericArg!(name, C), string name, C))
-					{ mixin(iq{$(name) = a; }.text); }
+					{
+						alias mixedInArg = a; 
+						mixin(name~"=mixedInArg;"); 
+					}
 				} 
 				static foreach(a; args) processArg(a); 
 			} 
@@ -1900,6 +1810,8 @@ version(/+$DIDE_REGION+/all)
 		{
 			vec2 cursorPos; 
 			
+			alias cr = cursorPos; 
+			
 			struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
 			struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
 			
@@ -1916,6 +1828,14 @@ version(/+$DIDE_REGION+/all)
 				else static if(is(T : m))	cursorPos += a.value; 
 				else static if(is(T : mx))	cursorPos.x += a.value; 
 				else static if(is(T : my))	cursorPos.y += a.value; 
+				else static if(
+					is(T : GenericArg!(name, E), string name, E) 
+					&& name.startsWith("cr")
+				)
+				{
+					alias mixedInArg = a; 
+					mixin(name~"=mixedInArg.value;"); 
+				}
 				else { static assert(false, "Unhandled Cursor() argument: "~T.stringof); }
 			} 
 			
@@ -1924,6 +1844,9 @@ version(/+$DIDE_REGION+/all)
 					auto b = new GfxBuilder; 
 					with(b) b.applyCursorArg(T.init); 
 				}
+			) || (
+				is(T : GenericArg!(name, E), string name, E) 
+					&& name.startsWith("cr")
 			); 
 		}
 		
@@ -2131,7 +2054,7 @@ version(/+$DIDE_REGION+/all)
 			
 			Style(clWindow); 
 			Text(
-				M(bnd.topLeft), "╔═", { Btn("■"); }, 
+				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1083182886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 				chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 				{ Btn("↕"); }, "═╗"
 			); 
@@ -3453,24 +3376,24 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1B19582886ADB).檢(
+					((0x1A8E682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1B20782886ADB))))
+				if((互!((bool),(0),(0x1A95882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1B29B82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1B2B282886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1A9EC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1AA0382886ADB))).iremap(0, 1, 4, ma))); 
 					static im = image2D(128, 128, ubyte(0)); 
 					im.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
 						im.height-1 - lastFrameStats.VG_size.to!int/1024, 255
 					); 
-					((0x1B3B882886ADB).檢 (im)); 
+					((0x1AB0982886ADB).檢 (im)); 
 				}
 			}
 			
