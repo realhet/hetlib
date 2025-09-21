@@ -730,7 +730,10 @@ version(/+$DIDE_REGION Dimensions+/all)
 			N get() const
 			{ return _value; } 
 			
-			alias get this; 
+			alias this = get; 
+			
+			N value() const
+			{ return _value; } //het
 		}
 		
 			/+
@@ -1289,6 +1292,8 @@ version(/+$DIDE_REGION Dimensions+/all)
 		} 
 		
 			alias get this; 
+			
+			N value() => get; //het
 		
 			/+
 			+
