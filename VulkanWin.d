@@ -430,7 +430,7 @@ version(/+$DIDE_REGION+/all)
 	{
 		enum FontId: ubyte
 		{
-			default_, 
+			_default_, 
 			
 			CGA8x8, 
 			VGA9x16, 
@@ -476,7 +476,7 @@ version(/+$DIDE_REGION+/all)
 			Webdings,
 			Wingdings,
 			
-			reserved_
+			_reserved_
 		} 
 		/+
 			static foreach(e; EnumMembers!FontId)
@@ -1121,7 +1121,133 @@ version(/+$DIDE_REGION+/all)
 					return null; 
 			}
 		} 
+		
+		private struct NamedFontSource
+		{
+			string name; 
+			FontSource src; 
+		} 
 		
+		FontId fontFaceQuery(T)(T a)
+		{
+			enum TotalFonts = 128; 
+			enum DefaultFontId = FontId.VGA_9x16; 
+			
+			__gshared FontSource[string] fontSourceByName; 
+			
+			__gshared FontFace[string] fontFaceByName; 
+			__gshared FontId[string] fontIdByName; 
+			__gshared FontFace[0..TotalFonts] fontFaceById; 
+			
+			
+			FontFace res; 
+			synchronized
+			{
+				bool getByName(string name)
+				{
+					if(auto f = fontFaceByName)
+					{ res = *f; return true; }return false; 
+				} 
+				bool getById(FontId id)
+				{
+					if(id<TotalFonts && fontFaceById[id])
+					{ res = fontFaceById[id]; return true; }return false; 
+				} 
+				void create(string name)
+				{
+					assert(name !in fontFaceByName); 
+					assert(name !in fontIdByName); 
+					
+					const idOfName = name.replace(' ', '_').to!FontId.ifThrown(FontId.init); 
+					FontFace fontFace; 
+					Font fontId; 
+					if(
+						auto src = fontSourceByName 
+						/+font was registered by user+/
+					)
+					{
+						fontFace = createFontFace(name, *src); 
+						fontId = getNewId; 
+					}
+					else if(
+						idOfName && idOfName<FontId._reserved_
+						/+standard fonts+/
+					)
+					{
+						switch(idOfName)
+						{
+							case FontId.CGA_8x8: 
+								fontFace = createFontFace
+							(
+								name, fontSource_mono_1bit
+								(
+									`fontmap:\CGA_8x8`.File, 
+									cellSize: ivec2(9, 16)
+								)
+							); 	break; 
+							case FontId.VGA_9x16: 
+								fontFace = createFontFace
+							(
+								name, fontSource_mono_1bit
+								(
+									`fontmap:\VGA_9x16`.File, 
+									cellSize: ivec2(9, 16)
+								)
+							); 	break; 
+							default: fontFace = createFontFace(name, FontSource(name)); 
+						}
+						fontId = ifOfName; 
+					}
+					enforce(
+						fontFace && fontId, 
+						i"Font registration error: $(name
+.quoted) $(idOfName) $(fontFace)".text
+					); 
+					
+					
+					fontFaceById	[fontId] 	= fontFace	,
+					fontFaceByName	[name] 	= fontFace	,
+					fontIdByName	[name] 	= fontId	; 
+					
+					res = fontFace; 
+				} 
+				
+				static if(is(T : NamedFontSource))
+				{
+					enforce(a.name.trip!="", "Invalid font name"); 
+					if(a.name in fontSourceByName)
+					WARN(i"FontSource $(a.name.quoted) already registered.".text); 
+					else {
+						fontSourceByName[a.name] = a.src; 
+						LOG("Registered fontFace: "~a.name.quoted); 
+					}
+				}
+				else static if(is(T : string))
+				{
+					const name = a; 
+					if(!getByName(name)) create(name); 
+				}
+				else static if(is(T : FontId))
+				{
+					const FontId id = ((a==FontId._default_)?(DefaultFontId):(a)); 
+					if(!getById(id))
+					{
+						if(id>FontId._default_ && id<FontId._reserved_)
+						create(id.text); 
+					}
+				}
+			} 
+			return res; 
+		} 
+		
+		FontId registerFontFace(string name, FontSource src)
+		=> fontFaceQuery(NamedFontFace(name, src)); 
+		
+		FontId fontFace(FontId id)
+		=> fontFaceQuery(id); 
+		
+		FontId fontFace(string name)
+		=> fontFaceQuery(name); 
 		
 	}
 	
@@ -1473,7 +1599,7 @@ version(/+$DIDE_REGION+/all)
 			
 			version(/+$DIDE_REGION Color+/all)
 			{
-				@property colorState() => tuple(((PALH).genericArg!q{PALH}), ((PC).genericArg!q{PC}), ((SC).genericArg!q{SC}), ((OP).genericArg!q{OP})); 
+				@property colorState() => tuple(((PALH).名!q{PALH}), ((PC).名!q{PC}), ((SC).名!q{SC}), ((OP).名!q{OP})); 
 				
 				struct ColorState
 				{
@@ -1537,7 +1663,7 @@ version(/+$DIDE_REGION+/all)
 			
 			version(/+$DIDE_REGION Font+/all)
 			{
-				@property fontState() => tuple(((FMH).genericArg!q{FMH}), ((LFMH).genericArg!q{LFMH}), ((FH).genericArg!q{FH}), ((fontSize).genericArg!q{fontSize})); 
+				@property fontState() => tuple(((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), ((fontSize).名!q{fontSize})); 
 				
 				mixin TexHandleTemplate!"FMH"; 	//Fontmap
 				mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
@@ -1571,7 +1697,7 @@ version(/+$DIDE_REGION+/all)
 			
 			version(/+$DIDE_REGION Line+/all)
 			{
-				@property lineState() => tuple(((LTH).genericArg!q{LTH}), ((LW).genericArg!q{LW}), ((DL).genericArg!q{DL})); 
+				@property lineState() => tuple(((LTH).名!q{LTH}), ((LW).名!q{LW}), ((DL).名!q{DL})); 
 				
 				mixin TexHandleTemplate!"LTH"; 	//Line tex handle
 				mixin SizeTemplate!("LW", 1); 	//Line width
@@ -1591,7 +1717,7 @@ version(/+$DIDE_REGION+/all)
 			
 			version(/+$DIDE_REGION Point+/all)
 			{
-				@property pointState() => tuple(((PS).genericArg!q{PS})); 
+				@property pointState() => tuple(((PS).名!q{PS})); 
 				
 				mixin SizeTemplate!("PS", 1); //Point size
 				void reset_point(StateSide side)()
@@ -1601,7 +1727,7 @@ version(/+$DIDE_REGION+/all)
 			
 			version(/+$DIDE_REGION Transform+/all)
 			{
-				@property transformState() => tuple(((TR).genericArg!q{TR})); 
+				@property transformState() => tuple(((TR).名!q{TR})); 
 				
 				static struct TransformationState
 				{
@@ -1767,12 +1893,12 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			index = 0; 
-			Style((((cast(EGAColor)(bk))).genericArg!q{bk})); 
+			Style((((cast(EGAColor)(bk))).名!q{bk})); 
 			while(data.length)
 			{
 				auto act = fetchSameColor(data/+, remainingChars+/); 
 				const nextIndex = index + act.length.to!int; 
-				Style((((cast(EGAColor)(act[0].y))).genericArg!q{fg})); 
+				Style((((cast(EGAColor)(act[0].y))).名!q{fg})); 
 				cursorPos = vec2(pos/8+ivec2(index, 0)); 
 				textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
 				index = nextIndex; 
@@ -2098,19 +2224,19 @@ version(/+$DIDE_REGION+/all)
 	{
 		mixin InjectEnumMembers!EGAColor; 
 		
-		enum clMenuBk 	= ((ltGray).genericArg!q{bk}), 
-		clMenuText 	= ((black).genericArg!q{fg}), 
-		clMenuKey	= ((red).genericArg!q{fg}),
+		enum clMenuBk 	= ((ltGray).名!q{bk}), 
+		clMenuText 	= ((black).名!q{fg}), 
+		clMenuKey	= ((red).名!q{fg}),
 		clMenuItem 	= tuple(clMenuText, clMenuBk),
-		clMenuSelected 	= tuple(clMenuText, ((green).genericArg!q{bk})),
-		clMenuDisabled 	= tuple(((dkGray).genericArg!q{fg}), clMenuBk); 
+		clMenuSelected 	= tuple(clMenuText, ((green).名!q{bk})),
+		clMenuDisabled 	= tuple(((dkGray).名!q{fg}), clMenuBk); 
 		
-		enum clWindowBk	= ((blue).genericArg!q{bk}),
-		clWindowText 	= ((white).genericArg!q{fg}),
+		enum clWindowBk	= ((blue).名!q{bk}),
+		clWindowText 	= ((white).名!q{fg}),
 		clWindow 	= tuple(clWindowText, clWindowBk),
-		clWindowClickable 	= tuple(((ltGreen).genericArg!q{fg}), clWindowBk); 
+		clWindowClickable 	= tuple(((ltGreen).名!q{fg}), clWindowBk); 
 		
-		enum clScrollBar = tuple(((blue).genericArg!q{fg}), ((cyan).genericArg!q{bk})); 
+		enum clScrollBar = tuple(((blue).名!q{fg}), ((cyan).名!q{bk})); 
 		
 		static struct MenuItem
 		{
@@ -2147,7 +2273,7 @@ version(/+$DIDE_REGION+/all)
 			vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
 			Style(clMenuItem); 
 			
-			void shadow(size_t n) { Text(((black).genericArg!q{bk}), ((.6).genericArg!q{opacity}), " ".replicate(n)); } 
+			void shadow(size_t n) { Text(((black).名!q{bk}), ((.6).名!q{opacity}), " ".replicate(n)); } 
 			
 			Text(chain(" ┌", "─".replicate(maxWidth), "┐ ")); NL; 
 			foreach(item; items)
@@ -2187,7 +2313,7 @@ version(/+$DIDE_REGION+/all)
 			
 			Style(clWindow); 
 			Text(
-				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x116ED82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1226382886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 				chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 				{ Btn("↕"); }, "═╗"
 			); 
@@ -2203,7 +2329,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						enum keywords = ["program", "var", "begin", "end", "integer"]; 
 						const isKeyword = keywords.canFind(word.text.lc); 
-						Text(((isKeyword)?(((white).genericArg!q{fg})):(((yellow).genericArg!q{fg}))) , word); 
+						Text(((isKeyword)?(((white).名!q{fg})):(((yellow).名!q{fg}))) , word); 
 					}
 				}
 				else
@@ -3518,18 +3644,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1B92582886ADB).檢(
+					((0x1C48D82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1B99782886ADB))))
+				if((互!((bool),(0),(0x1C4FF82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1BA2B82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1BA4282886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1C59382886ADB).檢((互!((float/+w=12+/),(1.000),(0x1C5AA82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -3542,8 +3668,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1BC1782886ADB).檢 (imVG)),
-					((0x1BC3D82886ADB).檢 (imFPS)); 
+					((0x1C77F82886ADB).檢 (imVG)),
+					((0x1C7A582886ADB).檢 (imFPS)); 
 				}
 			}
 			

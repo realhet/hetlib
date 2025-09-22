@@ -1833,10 +1833,10 @@ version(/+$DIDE_REGION View2D+/all)
 		
 		/+H3: Custom Shaders+/
 		/+
-			Structured: d.customShader = ```vec4 customShader() {
-				 // GLSL code
-				 return vec4(1.0);
-	}```; 
+			Structured: d.customShader = `vec4 customShader() {
+		// GLSL code
+		return vec4(1.0);
+	}`; 
 		+/
 		
 		/+H3: SVG Paths+/
