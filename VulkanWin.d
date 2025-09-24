@@ -152,6 +152,63 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	
+	version(/+$DIDE_REGION Meta+/all)
+	{
+		mixin template GEN_GLSLBitfields(表 table, string GLSLPrefix, string GLSLReg)
+		{
+			struct FieldInfo { string type, name; uint bitOfs, bitCnt; bool isBool() => type=="bool"; } 
+			enum _fields = std.range.zip(
+				table.column!0,
+				table.column!(2, unpackCString),
+				0 ~ table.column!(1, "a.to!uint").cumulativeFold!"a+b".array,
+				table.column!(1, "a.to!uint")
+			)
+			.map!((Tuple!(string, string, uint, uint) a)=>(FieldInfo(a.expand))).array; 
+			
+			//total bitCount
+			enum bitCnt = _fields.back.bitOfs + _fields.back.bitCnt; 
+			static assert(_raw.sizeof*8 >= bitCnt, i"_raw is too small for $(bitCnt) bits.".text); 
+			
+			//getters, setters
+			static foreach(f; _fields)
+			{
+				mixin(iq{
+					@property $(f.type) $(f.name)() const
+					=> (cast($(f.type))(_raw.getBits($(f.bitOfs), $(f.bitCnt)))); 
+					@property $(f.name)($(f.type) _value)
+					{ _raw = _raw.setBits($(f.bitOfs), $(f.bitCnt), _value); } 
+				}.text); 
+				
+				//_builder_ functions for Builder Pattern
+				static if(f.isBool)
+				{
+					mixin(iq{
+						@property _builder_$(f.name)(bool _value = true) const
+						{ auto tmp = cast()this; tmp.$(f.name) = _value; return tmp; } 
+					}.text); 
+				}
+				else static if(is(mixin(f.type)==enum))
+				{
+					static foreach(i, e; EnumMembers!(mixin(f.type)))
+					static if(e)
+					mixin(iq{
+						@property _builder_$(EnumMemberNames!(mixin(f.type))[i])() const
+						{ auto tmp = cast()this; tmp.$(f.name) = e; return tmp; } 
+					}.text); 
+				}
+			}
+			
+			enum GLSLCode = _fields.map!
+			((FieldInfo f) =>(((f.isBool) ?(iq{bool $(GLSLPrefix)_$(f.name)() { return getBit($(GLSLReg), $(f.bitOfs)); } }.text) :(iq{uint $(GLSLPrefix)_$(f.name)() { return getBits($(GLSLReg), $(f.bitOfs), $(f.bitCnt)); } }.text))))
+			.join("\r\n"); 
+		} 
+		
+		enum GetBuilderMethodNames(T) = [__traits(allMembers, T)]
+			.filter!((a)=>(a.startsWith    ("_builder_")))
+			.map!((a)=>(a.withoutStarting("_builder_"))).array; 
+	}
+	
+	
 	alias TexFormat 	= TexSizeFormat.TexFormat; 
 	
 	enum TexInfoFlag {
@@ -374,8 +431,8 @@ version(/+$DIDE_REGION+/all)
 	{
 		alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
 		
-		enum TexXAlign : ubyte {left, center, right} 
-		enum TexYAlign : ubyte {top, center, baseline, bottom} 
+		enum TexXAlign : ubyte {left, xcenter, hcenter = xcenter, right} 
+		enum TexYAlign : ubyte {top, ycenter, vcenter = ycenter, baseline, bottom} 
 		enum TexSizeSpec : ubyte {original, scaled, exact} 
 		enum TexAspect : ubyte {stretch, keep, crop} 
 		
@@ -402,7 +459,7 @@ version(/+$DIDE_REGION+/all)
 			transpose 	= mirrorDiag 	//Swap X and Y coordinates
 		} 
 		
-		struct TexFlags
+		struct TexFlags_old
 		{
 			mixin((
 				(表([
@@ -429,57 +486,56 @@ version(/+$DIDE_REGION+/all)
 				}.text; 
 			} 
 		} 
+		struct TexFlags
+		{
+			ushort _raw; 
+			mixin 入 !((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Comment+/}],
+					[q{TexXAlign},q{2},q{"xAlign"},q{/++/}],
+					[q{TexYAlign},q{2},q{"yAlign"},q{/++/}],
+					[q{TexSizeSpec},q{2},q{"sizeSpec"},q{/++/}],
+					[q{TexAspect},q{2},q{"aspect"},q{/++/}],
+					[q{TexOrientation},q{3},q{"orientation"},q{/++/}],
+				]))
+			),q{mixin GEN_GLSLBitfields!(_data, "tex", "TF"); }); 
+		} 
 	}
 	version(/+$DIDE_REGION Font enums+/all)
 	{
 		enum FontType : ubyte
 		{
 			monospace3D,	//fontmap is a 3D texture of same sized glyphs.
-			textureHandles, 	//no fontMap, just individual texture handles.
-			asciiCharmap16x16, 	//fontMap is a bitmap containing 16x16 monosized characters
-			unicodeBlockMap128 	/+
+			unicodeBlockMap128, 	/+
 				fontMap is a texture of 0x110000>>7 = 8704 uints.
 				block = code>>7; blkTex = texture[fontMap[block]];
 				charTex = blkTex[code & 0x7F];
 				/+Opt: fast 0th block at the very start of the fontMap+/
 			+/
+			texture2DHandles	//individual uint texture handles
 		} 
 		
-		enum FontLine : ubyte {none, underline, strikeout, errorline } 
+		enum FontLine : ubyte {none, underline, strikethrough, errorline } 
 		enum FontWidth : ubyte {normal, thin/+.66+/, wide/+1.5+/, wider/+2+/ } 
-		enum FontScript : ubyte {none, superscript, subscript, small} 
-		enum FontBlink : ubyte {none, blink, soft, fast } 
+		enum FontScript : ubyte {none, superscript, subscript, smallscript} 
+		enum FontBlink : ubyte {none, blink, slowblink, fastblink } 
 		
 		struct FontFlags
 		{
-			mixin((
+			ushort _raw; 
+			mixin 入 !((
 				(表([
-					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-					[q{FontType},q{2},q{"type"},q{},q{/++/}],
-					[q{bool},q{1},q{"bold"},q{},q{/++/}],
-					[q{bool},q{1},q{"italic"},q{},q{/++/}],
-					[q{bool},q{1},q{"monospace"},q{},q{/++/}],
-					[q{FontLine},q{2},q{"line"},q{},q{/++/}],
-					[q{FontWidth},q{2},q{"width"},q{},q{/++/}],
-					[q{FontScript},q{2},q{"script"},q{},q{/++/}],
-					[q{FontBlink},q{2},q{"blink"},q{},q{/++/}],
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Comment+/}],
+					[q{FontType},q{2},q{"type"},q{/+initialized externally from FontFace+/}],
+					[q{bool},q{1},q{"bold"},q{/++/}],
+					[q{bool},q{1},q{"italic"},q{/++/}],
+					[q{bool},q{1},q{"monospace"},q{/+for coding and terminals+/}],
+					[q{FontLine},q{2},q{"line"},q{/+underline, errorline, strikethrough+/}],
+					[q{FontWidth},q{2},q{"width"},q{/+66%, 150%, 200%+/}],
+					[q{FontScript},q{2},q{"script"},q{/+subscript, superscript, smallscript+/}],
+					[q{FontBlink},q{2},q{"blink"},q{/+normal, fast, slow+/}],
 				]))
-			).調!(GEN_bitfields)); 
-			enum bitCnt = 13; 
-			protected
-			{
-				enum GLSLCode = /+Todo: autogenerate this, not with AI+/
-				iq{
-					uint fontType() { return getBits(FF, 0, 2); } 
-					bool fontBold() { return getBit(FF, 2); } 
-					bool fontItalic() { return getBit(FF, 3); } 
-					bool fontMonospace() { return getBit(FF, 4); } 
-					uint fontLine() { return getBits(FF, 5, 2); } 
-					uint fontWidth() { return getBits(FF, 7, 2); } 
-					uint fontScript() { return getBits(FF, 9, 2); } 
-					uint fontBlink() { return getBits(FF, 11, 2); } 
-				}.text; 
-			} 
+			),q{mixin GEN_GLSLBitfields!(_data, "font", "FF"); }); 
 		} 
 	}
 	
@@ -508,7 +564,7 @@ version(/+$DIDE_REGION+/all)
 			/+, tileXY, transXYZ, axisXY+/
 		} 
 		
-		struct VecFlags
+		struct VecFlags_old
 		{
 			mixin((
 				(表([
@@ -526,6 +582,18 @@ version(/+$DIDE_REGION+/all)
 					uint vecXYFormat() { return getBits(VF, 2, 3); } 
 				}.text; 
 			} 
+		} 
+		
+		struct VecFlags
+		{
+			ubyte _raw; 
+			mixin 入 !((
+				(表([
+					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Comment+/}],
+					[q{CoordFormat},q{2},q{"coordFormat"},q{/++/}],
+					[q{XYFormat},q{3},q{"xyFormat"},q{/++/}],
+				]))
+			),q{mixin GEN_GLSLBitfields!(_data, "vec", "VF"); }); 
 		} 
 		
 		template FlagBits(T)
@@ -1166,10 +1234,30 @@ version(/+$DIDE_REGION+/all)
 			
 			FontFace fontFace(string name)
 			=> g_fontFaceManager.accessFontFace(name); 
-			
 			FontFace fontFace(FontId id)
 			=> g_fontFaceManager.accessFontFace(id); 
+			FontFace fontFace(FontFace f)
+			=> f; 
 		}
+		
+		struct FontSpec(T)
+		{
+			T fontSpec; 
+			FontFlags fontFlags; 
+			
+			static foreach(name; GetBuilderMethodNames!FontFlags)
+			mixin(iq{
+				auto $(name)()
+				{
+					auto tmp = this; 
+					tmp.fontFlags = tmp.fontFlags._builder_$(name)(); 
+					return tmp; 
+				} 
+			}.text); 
+		} 
+		
+		pragma(msg,i"size:	$(FontSpec!FontId.sizeof)
+test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text.注); 
 		
 		final class FontFaceManager
 		{
@@ -1273,8 +1361,7 @@ version(/+$DIDE_REGION+/all)
 						}
 						enforce(
 							fontFace && fontId, 
-							i"Font registration error: $(name
-		.quoted) $(idOfName) $(fontFace)".text
+							i"Font registration error: $(name.quoted) $(idOfName) $(fontFace)".text
 						); 
 						
 						
@@ -1718,7 +1805,7 @@ version(/+$DIDE_REGION+/all)
 				alias synch_PC = synch_colors!(true, false),
 				synch_SC = synch_colors!(false, true); 
 			}
-			
+			
 			version(/+$DIDE_REGION Font+/all)
 			{
 				@property fontState() => tuple(((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), ((fontSize).名!q{fontSize})); 
@@ -2375,7 +2462,7 @@ version(/+$DIDE_REGION+/all)
 			
 			Style(clWindow); 
 			Text(
-				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1297682886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x134E382886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 				chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 				{ Btn("↕"); }, "═╗"
 			); 
@@ -3709,18 +3796,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1CBF182886ADB).檢(
+					((0x1D75E82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1CC6382886ADB))))
+				if((互!((bool),(0),(0x1D7D082886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1CCF782886ADB).檢((互!((float/+w=12+/),(1.000),(0x1CD0E82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1D86482886ADB).檢((互!((float/+w=12+/),(1.000),(0x1D87B82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -3733,8 +3820,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1CEE382886ADB).檢 (imVG)),
-					((0x1CF0982886ADB).檢 (imFPS)); 
+					((0x1DA5082886ADB).檢 (imVG)),
+					((0x1DA7682886ADB).檢 (imFPS)); 
 				}
 			}
 			

@@ -2695,8 +2695,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			=> rows.walkLength.to!int; 
 			
 			string cell(long x, long y)
-			{ return allRows.get(y).get(x); }  auto column(int x)()
-			{ return rows.map!(r=>r.get(x)); } 
+			{ return allRows.get(y).get(x); }  auto column(int x, alias pred="a")()
+			{ return rows.map!(r=>r.get(x).unaryFun!pred).array; } 
 			
 			static string unpackHeader(string s)
 			{
@@ -3252,15 +3252,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1980B59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1982F59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198D359F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198F759F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1997D59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x199F259F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x199A159F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19A1659F156A1})); 
 						+/
 					+/
 				+/
@@ -7377,6 +7377,7 @@ version(/+$DIDE_REGION Containers+/all)
 			return src.length>=2 && src.startsWith('"') && src.endsWith('"') 
 			&& !src[1..$-1].replace(`\"`, `\'`).canFind('"'); 
 		} 
+		string unpackCString(string s) => s.isSingleCString ? s[1..$-1] : s; 
 		
 		bool validDCommentBody(string s)
 		{
