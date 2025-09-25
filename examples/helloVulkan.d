@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//release
+//@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -157,10 +157,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36665F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36675F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x36CA5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F55F5C4644))))).max(1))))
+				foreach(v; verts.take((0x36CB5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F65F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -571,7 +571,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 				
 				registerFontFace(
 					"custom C64 font", fontSource_mono_1bit
-					(binCharMap, cellSize:ivec2(8, 8))
+					((cast(ubyte[])(binCharMap)), cellSize:ivec2(8, 8))
 				); 
 				font = fontFace("custom C64 font"); 
 				
@@ -822,7 +822,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x89C45F5C4644).檢 (zoomedPlatform)), ((0x89ED5F5C4644).檢 (shipPos)); 
+								((0x89D65F5C4644).檢 (zoomedPlatform)), ((0x89FF5F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1075,7 +1075,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					foreach(builder; builders[].filter!"a")
 					appendGfxContent(builder.extractGfxContent); 
 				} 
-				((0xA6635F5C4644).檢((update間(_間)))); 
+				((0xA6755F5C4644).檢((update間(_間)))); 
 				
 				
 				
@@ -1083,47 +1083,94 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					auto tvBuilder = new TurboVisionBuilder; 
 					tvBuilder.gfxContentDestination = getGfxContentDestination/+enables commit()/consume()+/; 
 					tvBuilder.PALH = egaPalette; 
-					tvBuilder.setFont(vgaFont2); 
 					
-					if((互!((bool),(1),(0xA7935F5C4644))))
+					static FontSpec!FontFace customFont222; 
+					{
+						static bool initialized; 
+						if(initialized.chkSet)
+						{
+							registerFontFace(
+								"C64_lower", fontSource_mono_1bit
+								(File(`fontmap:\C64_upper`), cellSize: ivec2(8, 8))
+							); 
+							customFont222 = Font(fontFace("C64_lower")); 
+						}
+					}
+					
+					if((互!((bool),(0),(0xA8DC5F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
+					if((互!((bool),(0),(0xA9315F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
+					if((互!((bool),(0),(0xA9835F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
+					if((互!((bool),(0),(0xA9D45F5C4644)))) {
+						static FontSpec!FontFace customFont; 
+						static bool initialized; 
+						if(initialized.chkSet)
+						{
+							registerFontFace(
+								"EverexME_5x8", fontSource_mono_1bit
+								(File(`fontmap:\EverexME_5x8`), cellSize: ivec2(5, 8))
+							); 
+							customFont = Font(fontFace("EverexME_5x8")).bold; 
+						}
+						tvBuilder.Style(customFont.italic); 
+					}
+					if((互!((bool),(0),(0xAB855F5C4644)))) { tvBuilder.Style(Font("C64_lower")); }
+					
+					
+					((0xABE65F5C4644).檢(tvBuilder.fontSpec)); 
+					if(tvBuilder.fontSpec.fontSpec) ((0xAC395F5C4644).檢(tvBuilder.fontSpec.fontSpec.id)); 
+					if(tvBuilder.fontSpec.fontSpec) ((0xAC985F5C4644).檢(tvBuilder.fontSpec.fontSpec.identityStr)); 
+					
+					((0xACE75F5C4644).檢((update間(_間)))); 
+					//Opt: ✅ tvBuilder.Style(Font.VGA_9x16) is the slowest of all.  Something's fucked up with that generator...
+					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xADC55F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xAE365F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAEA25F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(fontFace("C64_lower"))); 	((0xAF195F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAF985F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xB0015F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font("C64_lower")); 	((0xB06E5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(fontFace("C64_lower"))); 	((0xB0E55F5C4644).檢((update間(_間)))); 
+					
+					
+					if((互!((bool),(1),(0xB1285F5C4644))))
 					{
 						with(tvBuilder.TR)
 						{
-							if((互!((bool),(0),(0xA7EE5F5C4644)))) {
+							if((互!((bool),(0),(0xB1835F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xA8465F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xA8835F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xB1DB5F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xB2185F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xA8E05F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xB2755F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xA9415F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xA9745F5C4644))); }
-							if((互!((bool),(0),(0xA9C65F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xA9F65F5C4644)))*360; 
-							if((互!((bool),(0),(0xAA455F5C4644)))) {
+							if((互!((bool),(0),(0xB2D65F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB3095F5C4644))); }
+							if((互!((bool),(0),(0xB35B5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB38B5F5C4644)))*360; 
+							if((互!((bool),(0),(0xB3DA5F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xAA9C5F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xAAD85F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xB4315F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xB46D5F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xAB3E5F5C4644)))) {
+							if((互!((bool),(0),(0xB4D35F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xABA85F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xABF95F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB53D5F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB58E5F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xAC755F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xACC75F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB60A5F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB65C5F5C4644)))
 										)
 									).名!q{size})
 								); 
 							}
-							((0xAD4D5F5C4644).檢(
+							((0xB6E25F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1279,7 +1326,7 @@ $(clipBounds)".text
 					} 
 					
 					static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
-					((0xC0DF5F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xC15D5F5C4644).檢((update間(_間)))); 
+					((0xCA745F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCAF25F5C4644).檢((update間(_間)))); 
 					
 					with(tvBuilder)
 					{
@@ -1363,7 +1410,7 @@ End.".splitLines
 					
 				}
 				
-				((0xCABE5F5C4644).檢((update間(_間)))); 
+				((0xD4535F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1415,7 +1462,7 @@ End.".splitLines
 					}
 					consumeGfxContent(builder); 
 				}
-				((0xD11E5F5C4644).檢((update間(_間)))); 
+				((0xDAB35F5C4644).檢((update間(_間)))); 
 				
 				
 				

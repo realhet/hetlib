@@ -3855,6 +3855,11 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		pragma(inline, true) ref T bitCast(T, S)(ref S value) if (T.sizeof <= S.sizeof)
 		=> *cast(T*) &value; 
+		
+		auto inc(T, V)(in T a, in V b=1) { return (cast(T)(a+b)); } 
+		auto dec(T, V)(in T a, in V b=1) { return inc(a, -b); } 
+		auto succ(T)(in T a) { return inc(a); } 
+		auto pred(T)(in T a) { return dec(a); } 
 	}
 }version(/+$DIDE_REGION Arrays Ranges+/all)
 {

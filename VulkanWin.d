@@ -420,7 +420,6 @@ version(/+$DIDE_REGION+/all)
 		static assert(TexSizeFormat.sizeof==8); 
 	} 
 	
-	
 	/+
 		General rules of enums:
 		 - enum item Order is important, GLSL sources rely on it by using < > ops.
@@ -459,33 +458,6 @@ version(/+$DIDE_REGION+/all)
 			transpose 	= mirrorDiag 	//Swap X and Y coordinates
 		} 
 		
-		struct TexFlags_old
-		{
-			mixin((
-				(表([
-					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-					[q{TexXAlign},q{2},q{"xAlign"},q{},q{/++/}],
-					[q{TexSizeSpec},q{2},q{"xSize"},q{},q{/++/}],
-					[q{TexYAlign},q{2},q{"yAlign"},q{},q{/++/}],
-					[q{TexSizeSpec},q{2},q{"ySize"},q{},q{/++/}],
-					[q{TexAspect},q{2},q{"aspect"},q{},q{/++/}],
-					[q{TexOrientation},q{3},q{"orientation"},q{},q{/++/}],
-				]))
-			).調!(GEN_bitfields)); 
-			enum bitCnt = 13; 
-			protected
-			{
-				enum GLSLCode = /+Todo: autogenerate this, not with AI+/
-				iq{
-					uint texXAlign() { return getBits(TF, 0, 2); } 
-					uint texXSize() { return getBits(TF, 2, 2); } 
-					uint texYAlign() { return getBits(TF, 4, 2); } 
-					uint texYSize() { return getBits(TF, 6, 2); } 
-					uint texAspect() { return getBits(TF, 8, 2); } 
-					uint texOrientation() { return getBits(TF, 10, 3); } 
-				}.text; 
-			} 
-		} 
 		struct TexFlags
 		{
 			ushort _raw; 
@@ -564,26 +536,6 @@ version(/+$DIDE_REGION+/all)
 			/+, tileXY, transXYZ, axisXY+/
 		} 
 		
-		struct VecFlags_old
-		{
-			mixin((
-				(表([
-					[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-					[q{CoordFormat},q{2},q{"coordFormat"},q{},q{/++/}],
-					[q{XYFormat},q{3},q{"xyFormat"},q{},q{/++/}],
-				]))
-			).調!(GEN_bitfields)); 
-			enum bitCnt = 5; 
-			protected
-			{
-				enum GLSLCode = 
-				iq{
-					uint vecCoordFormat() { return getBits(VF, 0, 2); } 
-					uint vecXYFormat() { return getBits(VF, 2, 3); } 
-				}.text; 
-			} 
-		} 
-		
 		struct VecFlags
 		{
 			ubyte _raw; 
@@ -601,7 +553,7 @@ version(/+$DIDE_REGION+/all)
 			static foreach(A; AliasSeq!(TexFlags, FontFlags, VecFlags))
 			static if(is(T : A)) enum FlagBits = A.bitCnt; 
 		} 
-	}
+	}
 	
 	version(/+$DIDE_REGION GSP Opcodes+/all)
 	{
@@ -696,7 +648,7 @@ version(/+$DIDE_REGION+/all)
 		static foreach(op; EnumMembers!Opcode)
 		pragma(msg, opInfo[op].bits.to!string(2).padLeft('0', opInfo[op].bitCnt).text, " : ", op.text); 
 	}
-	
+	
 	class GeometryStreamProcessor
 	{
 		protected
@@ -848,7 +800,7 @@ version(/+$DIDE_REGION+/all)
 			if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
 			return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
 		} 
-		
+		
 		Bits!ulong assembleSize(T)(in T size)
 		{
 			static if(is(T : int))	{ const i = size.max(0), f = float(i), isInt = true; }
@@ -881,7 +833,8 @@ version(/+$DIDE_REGION+/all)
 			// Test negative clamping
 			assert(assembleSize(-5) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
 			assert(assembleSize(-1.5f) == assemble(mixin(舉!((SizeFormat),q{u4})), bits(0, 4))); 
-		} 
+		} 
+		
 		Bits!ulong assembleAngle_deg(T)(in T angle)
 		{
 			static if(is(T : int))
@@ -916,7 +869,7 @@ version(/+$DIDE_REGION+/all)
 			assert(assembleAngle_deg(600) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
 			assert(assembleAngle_deg(-512.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -512.5f)); 
 			assert(assembleAngle_deg(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
-		} 
+		} 
 		
 		Bits!ulong assemblePoint(in Vector!(byte, 2) p)
 		{ return assemble(mixin(舉!((CoordFormat),q{i8})), p); } 
@@ -1074,12 +1027,9 @@ version(/+$DIDE_REGION+/all)
 			
 			_reserved_
 		} 
-		mixin template InjectFontIds()
-		{
-			static foreach(e; EnumMembers!FontId)
-			static if(e>FontId.default_ && e<FontId.reserved_)
-			mixin(iq{enum $(e.text) = FontId.$(e.text); }.text); 
-		} 
+		
+		enum TotalFontIds = 128; 
+		enum DefaultFontId = FontId.VGA_9x16; 
 		
 		enum FontSourceType: ubyte
 		{
@@ -1151,7 +1101,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			static if(is(T : File))
 			return FontSource(mixin(舉!((FontSourceType),q{mono_1bit_file})), null, a.fullName, cellSize: cellSize, gridSize: gridSize); 
-			else static if(is(T : immutable(ubyte)[]) || is(T : string))
+			else static if(is(T : ubyte[])/+ || is(T : string)+/)
 			return FontSource(mixin(舉!((FontSourceType),q{mono_1bit_raw})), null, (cast(string)(a)), cellSize: cellSize, gridSize: gridSize); 
 			else static assert(false, "unhandled type: "~T.stringof); 
 		} 
@@ -1180,7 +1130,7 @@ version(/+$DIDE_REGION+/all)
 				
 				defaultAspect_inv = 1.0f/defaultAspect; 
 				
-				LOG(i"FontFace created: $(id.to!int) $(id.text) $(name.quoted)".text); 
+				//LOG(i"FontFace created: $(id.to!int) $(id.text) $(name.quoted)".text); 
 			} 
 			
 			abstract @property float charWidth(dchar ch); 
@@ -1212,23 +1162,21 @@ version(/+$DIDE_REGION+/all)
 			} 
 		} 
 		
-		FontFace createFontFace(FontId id, string name, FontSource src)
+		version(/+$DIDE_REGION FontFace stuff+/all)
 		{
-			with(src)
-			switch(type)
+			FontFace createFontFace(FontId id, string name, FontSource src)
 			{
-				case mixin(舉!((FontSourceType),q{monoTexture})), mixin(舉!((FontSourceType),q{mono_1bit_raw})), mixin(舉!((FontSourceType),q{mono_1bit_file})): 
-					return new MonoFont(id, name, asMonoTexture); 
-				case mixin(舉!((FontSourceType),q{directWrite})): 
-					return new DirectWriteFont(id, name, src.asName); 
-				default: 
-					return null; 
-			}
-		} 
-		
-		
-		version(/+$DIDE_REGION FontFace access+/all)
-		{
+				with(src)
+				switch(type) {
+					case mixin(舉!((FontSourceType),q{monoTexture})), mixin(舉!((FontSourceType),q{mono_1bit_raw})), mixin(舉!((FontSourceType),q{mono_1bit_file})): 
+						return new MonoFont(id, name, asMonoTexture); 
+					case mixin(舉!((FontSourceType),q{directWrite})): 
+						return new DirectWriteFont(id, name, src.asName); 
+					default: 
+						return null; 
+				}
+			} 
+			
 			void registerFontFace(string name, FontSource src)
 			{ g_fontFaceManager.registerFontFace(name, src); } 
 			
@@ -1239,12 +1187,13 @@ version(/+$DIDE_REGION+/all)
 			FontFace fontFace(FontFace f)
 			=> f; 
 		}
-		
+		
 		struct FontSpec(T)
 		{
 			T fontSpec; 
 			FontFlags fontFlags; 
 			
+			//FontFlag options by name
 			static foreach(name; GetBuilderMethodNames!FontFlags)
 			mixin(iq{
 				auto $(name)()
@@ -1254,23 +1203,107 @@ version(/+$DIDE_REGION+/all)
 					return tmp; 
 				} 
 			}.text); 
+			
+			version(/+$DIDE_REGION Standard font access by name+/all)
+			{
+				static foreach(id; FontId.init.succ .. FontId._reserved_)
+				{
+					static if(is(T : string))
+					{ mixin(iq{auto $(id)() { auto tmp = this; tmp.fontSpec = id.text; return tmp; } }.text); }
+					static if(is(T : FontId))
+					{ mixin(iq{auto $(id)() { auto tmp = this; tmp.fontSpec = id; return tmp; } }.text); }
+					static if(is(T : FontFace))
+					{ mixin(iq{auto $(id)() { auto tmp = this; tmp.fontSpec = fontFace(id); return tmp; } }.text); }
+				}
+			}
 		} 
 		
-		pragma(msg,i"size:	$(FontSpec!FontId.sizeof)
-test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text.注); 
+		auto Font() => FontSpec!FontId(FontId._default_); 
+		auto Font(FontId id) => FontSpec!FontId(id); 
+		auto Font(string name) => FontSpec!string(name); 
+		auto Font(FontFace ff) => FontSpec!FontFace(ff); 
+		auto Font(Texture t) => FontSpec!Texture(t); 
+		
+		static assert(__traits(compiles, { enum test2 = Font.Times_New_Roman.bold.italic.errorline.fastblink; })); 
+		
+		/+
+			Assistant: /+H3: System Fonts:+/
+			Monospace 1bit: /+Code: CGA_8x8+/, /+Code: VGA_9x16+/
+			DirectWrite: 
+			/+
+				Para: /+Code: Arial+/
+				/+Code: Bahnschrift+/
+				/+Code: Calibri+/
+				/+Code: Cambria+/
+				/+Code: Cambria_Math+/
+				/+Code: Candara+/
+				/+Code: Cascadia_Code+/
+				/+Code: Cascadia_Mono+/
+				/+Code: Comic_Sans_MS+/
+				/+Code: Consolas+/
+				/+Code: Constantia+/
+				/+Code: Corbel+/
+				/+Code: Courier_New+/
+				/+Code: Franklin_Gothic+/
+				/+Code: Gabriola+/
+				/+Code: Georgia+/
+				/+Code: HoloLens_MDL2_Assets+/
+				/+Code: Impact+/
+				/+Code: Ink_Free+/
+				/+Code: Lucida_Console+/
+				/+Code: Lucida_Sans_Unicode+/
+				/+Code: Marlett+/
+				/+Code: Microsoft_Sans_Serif+/
+				/+Code: MingLiU_ExtB+/
+				/+Code: Segoe_MDL2_Assets+/
+				/+Code: Segoe_Print+/
+				/+Code: Segoe_Script+/
+				/+Code: Segoe_UI+/
+				/+Code: Segoe_UI_Emoji+/
+				/+Code: Segoe_UI_Historic+/
+				/+Code: Segoe_UI_Symbol+/
+				/+Code: Sitka+/
+				/+Code: Sylfaen+/
+				/+Code: Symbol+/
+				/+Code: Tahoma+/
+				/+Code: Times_New_Roman+/
+				/+Code: Trebuchet_MS+/
+				/+Code: Verdana+/
+				/+Code: Webdings+/
+				/+Code: Wingdings+/
+			+/
+			/+
+				Para: /+H3: FontLine+/:
+				/+Code: underline+/
+				/+Code: strikethrough+/
+				/+Code: errorline+/
+			+/   /+
+				Para: /+H3: FontWidth+/:
+				/+Code: thin+/ 	 66%
+				/+Code: wide+/ 	150%
+				/+Code: wider+/ 	200%
+			+/   /+
+				Para: /+H3: FontScript+/:
+				/+Code: superscript+/
+				/+Code: subscript+/
+				/+Code: smallscript+/
+			+/   /+
+				Para: /+H3: FontBlink+/:
+				/+Code: blink+/
+				/+Code: slowblink+/
+				/+Code: fastblink+/
+			+/
+		+/
 		
 		final class FontFaceManager
 		{
-			enum TotalFonts = 128; 
-			enum DefaultFontId = FontId.VGA_9x16; 
-			
 			protected
 			{
 				FontSource[string] fontSourceByName; 
 				
 				FontFace[string] fontFaceByName; 
 				FontId[string] fontIdByName; 
-				FontFace[TotalFonts] fontFaceById; 
+				FontFace[TotalFontIds] fontFaceById; 
 			} 
 			
 			void registerFontFace(string name, FontSource src)
@@ -1282,7 +1315,7 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 					WARN(i"FontSource $(name.quoted) already registered.".text); 
 					else {
 						fontSourceByName[name] = src; 
-						LOG("Registered fontFace: "~name.quoted ~ fontSourceByName.text); 
+						//LOG("Registered fontFace: "~name.quoted ~ fontSourceByName.text); 
 					}
 				} 
 			} 
@@ -1299,12 +1332,12 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 					} 
 					bool getById(FontId id)
 					{
-						if(id<TotalFonts && fontFaceById[id])
+						if(id<TotalFontIds && fontFaceById[id])
 						{ res = fontFaceById[id]; return true; }return false; 
 					} 
 					FontId getNewId()
 					{
-						foreach(i; FontId._reserved_+1 .. TotalFonts)
+						foreach(i; FontId._reserved_+1 .. TotalFontIds)
 						if(fontFaceById[i] is null) return (cast(FontId)(i)); 
 						throw new Exception("Fatal error: Out of FontId's."); 
 					} 
@@ -1315,60 +1348,47 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 						assert(name !in fontIdByName); 
 						
 						const idOfName = name.replace(' ', '_').to!FontId.ifThrown(FontId.init); 
-						FontFace fontFace; 
-						FontId fontId; 
+						FontFace fontFace; FontId fontId; 
 						
-						LOG("CREATE", fontSourceByName.text); 
+						void doit(FontSource src)
+						{ fontFace =.createFontFace(fontId, name, src); } 
 						
-						if(
-							auto src = name in fontSourceByName 
-							/+font was registered by user+/
-						)
+						if(auto src = name in fontSourceByName /+font was registered by user+/)
 						{
 							fontId = getNewId; 
-							fontFace = createFontFace(fontId, name, *src); 
-							
-							LOG("CREATED", fontId, fontFace); 
+							doit(*src); 
 						}
-						else if(
-							idOfName && idOfName<FontId._reserved_
-							/+standard fonts+/
-						)
+						else if(idOfName && idOfName<FontId._reserved_/+standard fonts+/)
 						{
 							fontId = idOfName; 
 							switch(idOfName)
 							{
 								case FontId.CGA_8x8: 
-									fontFace = createFontFace
-								(
-									fontId, name, fontSource_mono_1bit
-									(
+								doit(
+									fontSource_mono_1bit(
 										`fontmap:\CGA_8x8`.File, 
-										cellSize: ivec2(9, 16)
+										cellSize: ivec2(8, 8)
 									)
 								); 	break; 
 								case FontId.VGA_9x16: 
-									fontFace = createFontFace
-								(
-									fontId, name, fontSource_mono_1bit
-									(
+								doit(
+									fontSource_mono_1bit(
 										`fontmap:\VGA_9x16`.File, 
 										cellSize: ivec2(9, 16)
 									)
 								); 	break; 
-								default: fontFace = createFontFace(fontId, name, fontSource(name)); 
+								default: doit(fontSource(name)); 
 							}
 						}
+						else enforce(false, iq{Font registration, unknown name: $(name.quoted)}.text); 
 						enforce(
 							fontFace && fontId, 
 							i"Font registration error: $(name.quoted) $(idOfName) $(fontFace)".text
 						); 
 						
-						
 						fontFaceById	[fontId] 	= fontFace,
 						fontFaceByName	[name] 	= fontFace,
 						fontIdByName	[name] 	= fontId; 
-						
 						res = fontFace; 
 					} 
 					
@@ -1379,7 +1399,7 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 					}
 					else static if(is(T : FontId))
 					{
-						const FontId id = ((a==FontId._default_)?(DefaultFontId):(a)); 
+						const FontId id = ((a)?(a):(DefaultFontId)); 
 						if(!getById(id))
 						{
 							if(id>FontId._default_ && id<FontId._reserved_)
@@ -1645,6 +1665,21 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 			protected enum StateSide
 			{ user, target, both } 
 			
+			version(none)
+			{
+				struct ExperimentalState
+				{
+					/+16+/TexHandle PALH, FMH, LFMH, LTH; 
+					/+16+/float FH=GSP_DefaultFontHeight, LW=1, DL=1; Vector!(ushort, 2) fontSize; 
+					/+16+/FormattedColor PC, SC; 	//can save 6
+					/+16+/FontFace fontFace; float	OP=1;  ushort fontFlags, texFlags; 
+					/+40+/TR a; 
+				} 
+				
+				pragma(msg,i"$(ExperimentalState.sizeof)".text.注); 
+				ExperimentalState experimentalUserState, experimentalTargetState; 
+			}
+			
 			version(/+$DIDE_REGION Handles+/all)
 			{
 				struct TexHandleState(Opcode opcode)
@@ -1813,14 +1848,20 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 				mixin TexHandleTemplate!"FMH"; 	//Fontmap
 				mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
 				mixin SizeTemplate!("FH", GSP_DefaultFontHeight); 	//Font height
+				
+				FontSpec!FontFace fontSpec; 
 				Vector!(ushort, 2) fontSize; /+cursor can use it to move around+/
+				
 				
 				void reset_font(StateSide side)()
 				{
 					state_FMH	.resetState!(side),
 					state_LFMH	.resetState!(side),
 					state_FH	.resetState!(side); 
-					if(side & StateSide.user) fontSize = 0; 
+					if(side & StateSide.user) {
+						fontSize = 0;  
+						fontSpec = fontSpec.init; 
+					}
 				} void synch_font()
 				{
 					synch_FMH, 
@@ -1842,6 +1883,13 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 				void setFont(FontId id)
 				{ setFont(fontFace(id)); }  void setFont(string name)
 				{ setFont(fontFace(name)); } 
+				
+				void setFont(T)(FontSpec!T a)
+				{
+					fontSpec.fontSpec = .fontFace(a.fontSpec); 
+					fontSpec.fontFlags = a.fontFlags; 
+					setFont(fontSpec.fontSpec); 
+				} 
 			}
 			
 			version(/+$DIDE_REGION Line+/all)
@@ -2158,7 +2206,7 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 		
 		version(/+$DIDE_REGION Style+/all)
 		{
-			protected void applyStyleArg(T)(in T a)
+			protected void applyStyleArg(T)(T a)
 			{
 				static if(is(T : GenericArg!(name, C), string name, C))
 				{
@@ -2167,6 +2215,7 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 					else static if(name == "bk")	{ SC = a.value; }
 					else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
 				}
+				else static if(is(T : FontSpec!F, F))	{ setFont(a); }
 				else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
 			} 
 			
@@ -2201,7 +2250,7 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 			} 
 			
 			
-			void Style(Args...)(in Args args)
+			void Style(Args...)(Args args)
 			{
 				void processArg(T)(T a)
 				{
@@ -2462,7 +2511,7 @@ test:	$((FontSpec!(FontId)(FontId.Arial)).bold.italic.errorline.fastblink)".text
 			
 			Style(clWindow); 
 			Text(
-				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x134E382886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x13A8782886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 				chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 				{ Btn("↕"); }, "═╗"
 			); 
@@ -3323,23 +3372,6 @@ class VulkanWindow: Window, IGfxContentDestination
 			} 
 		}
 		
-		version(/+$DIDE_REGION+/all) {
-			FontManager fonts; 
-			class FontManager
-			{
-				FontFace[255] fontFaceById; //this is the main source of font info
-				FontFace[string] fontFacesByName; 
-				
-				FontId registerFont(T)(string name, T data)
-				{} 
-			} 
-		}
-		
-		
-		
-		
-		
-		
 		Drawing dr; 
 		
 		class Drawing
@@ -3796,18 +3828,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1D75E82886ADB).檢(
+					((0x1DBD782886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1D7D082886ADB))))
+				if((互!((bool),(0),(0x1DC4982886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1D86482886ADB).檢((互!((float/+w=12+/),(1.000),(0x1D87B82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1DCDD82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1DCF482886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -3820,8 +3852,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1DA5082886ADB).檢 (imVG)),
-					((0x1DA7682886ADB).檢 (imFPS)); 
+					((0x1DEC982886ADB).檢 (imVG)),
+					((0x1DEEF82886ADB).檢 (imFPS)); 
 				}
 			}
 			
