@@ -171,13 +171,13 @@ version(/+$DIDE_REGION+/all)
 			enum isGenericArg(A, string name) = is(A==GenericArg!(N, T), string N, T) && N==name; 
 			
 			/// pass a generic arg to a function
-			auto genericArg(string N="", T)(in T p)
+			auto genericArg(string N="", T)(T p)
 			=> GenericArg!(N, T)(p); 
-			auto genericArg(string N="", X, Y)(in X x, in Y y)
+			auto genericArg(string N="", X, Y)(X x, Y y)
 			=> GenericArg!(N, T)(Vector!(CommonType!(X, Y), 2)(x, y)); 
-			auto genericArg(string N="", X, Y, Z)(in X x, in Y y, in Z z)
+			auto genericArg(string N="", X, Y, Z)(X x, Y y, Z z)
 			=> GenericArg!(N, T)(Vector!(CommonType!(X, Y, Z), 3)(x, y, z)); 
-			auto genericArg(string N="", X, Y, Z, W)(in X x, in Y y, in Z z, in W w)
+			auto genericArg(string N="", X, Y, Z, W)(X x, Y y, Z z, W w)
 			=> GenericArg!(N, T)(Vector!(CommonType!(X, Y, Z, W), 4)(x, y, z, w)); 
 			
 			/// cast anything to GenericArg
