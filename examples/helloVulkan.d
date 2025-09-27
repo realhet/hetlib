@@ -1163,6 +1163,29 @@ $(clipBounds)".text
 						}
 					}
 					
+					if((互!((bool),(0),(0xB6755F5C4644))))
+					{
+						with(tvBuilder) {
+							void benchmarkStateSaving(int N=10000, void delegate() fun)
+							{
+								/+
+									Todo: 250927 conclusion: the state is fragmented: 
+									should be placed into to a contiguous struct.
+								+/
+								void doit(int i)
+								{
+									auto savedState = allState; 
+									fun(); 
+									if(i<10) doit(i+1)/+recursion+/; 
+									setState(savedState); 
+								} 
+								foreach(i; 0..N) doit((i&7)+3); 
+							} 
+							
+							((0xB8935F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB8FE5F5C4644).檢((update間(_間)))); 
+						}
+					}
+					
 					
 					static struct SpringSimulation
 					{
@@ -1309,7 +1332,7 @@ $(clipBounds)".text
 					} 
 					
 					static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
-					((0xC9705F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xC9EE5F5C4644).檢((update間(_間)))); 
+					((0xCC465F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCCC45F5C4644).檢((update間(_間)))); 
 					
 					with(tvBuilder)
 					{
@@ -1393,7 +1416,7 @@ End.".splitLines
 					
 				}
 				
-				((0xD34F5F5C4644).檢((update間(_間)))); 
+				((0xD6255F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1445,7 +1468,7 @@ End.".splitLines
 					}
 					consumeGfxContent(builder); 
 				}
-				((0xD9AF5F5C4644).檢((update間(_間)))); 
+				((0xDC855F5C4644).檢((update間(_間)))); 
 				
 				
 				

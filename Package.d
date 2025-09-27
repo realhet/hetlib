@@ -6582,14 +6582,14 @@ version(/+$DIDE_REGION Containers+/all)
 	{
 		//ImStorage ///////////////////////////////////////////////
 		
-		//Usage:  ImStorage!float.set(srcId!("module", 123)(genericArg!"id"(456)), newValue)  //this is the most complicated one
+		//Usage:  ImStorage!float.set(srcId!("module", 123)(名!"id"(456)), newValue)  //this is the most complicated one
 		
 		/+
 			ImStorageManager.purge(10);
 					
 			struct MyInt{ int value; }
-			auto a = ImStorage!MyInt.access(srcId(genericArg!"id"("fuck"))).value++;
-			if(inputs.Shift.down) ImStorage!int.access(srcId(genericArg!"id"("shit"))) += 10;
+			auto a = ImStorage!MyInt.access(srcId(名!"id"("fuck"))).value++;
+			if(inputs.Shift.down) ImStorage!int.access(srcId(名!"id"("shit"))) += 10;
 					
 			print(ImStorageManager.detailedStats);
 		+/

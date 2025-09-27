@@ -1497,6 +1497,9 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	
+	
+}
+version(/+$DIDE_REGION+/all) {
 	struct GfxContent
 	{
 		alias VertexData = VulkanWindow.VertexData; 
@@ -1508,1218 +1511,1231 @@ version(/+$DIDE_REGION+/all)
 	}  interface IGfxContentDestination
 	{ void appendGfxContent(in GfxContent content); } 
 	
-	class GfxAssembler /+Todo: this is basically an assembler, not a builder: It maintains a state and emits it on request.+/
+	class GfxAssembler
 	{
-		IGfxContentDestination gfxContentDestination/+optional: the target handler of commitGfxContent()+/; 
-		
-		/+
-			Opt: final functions everywhere if possible!!! Do timing tests!!!
-			250919: No luck. Used `final:` in every classes, but same FPS. Should check in ASM.
-		+/
-		
-		/+Opt: Pull all the state into a central, well packed struct! It will make state copy operations faster.  Currently the user and target states are interleaved.+/
-		
-		alias VertexData 	= VulkanWindow.VertexData,
-		Texture 	= VulkanWindow.Texture; 
-		
-		version(/+$DIDE_REGION Bitstream+/all)
+		final
 		{
-			protected
-			{
-				Appender!(VertexData[]) vbAppender; 
-				Appender!(ulong[]) gbAppender; 
-				BitStreamAppender bitStreamAppender; 
-				final void onBitStreamAppenderFull(ulong data)
-				{ gbAppender ~= data; } 
-			} 
+			/+
+				Opt: final functions everywhere if possible!!! Do timing tests!!!
+				250919: No luck. Used `final:` in every classes, but same FPS. Should check in ASM.
+				250927:  benchmarkStateSaving() has a 2x speedup if this is final.
+				Conclusion: /+Code: final+/ is  important, and state must be tightly packed.
+			+/
+			/+Opt: Pull all the state into a central, well packed struct! It will make state copy operations faster.  Currently the user and target states are interleaved.+/
 			
-			this(IGfxContentDestination gfxContentDestination = null)
-			{
-				this.gfxContentDestination = gfxContentDestination; 
-				bitStreamAppender.onBuffer = &onBitStreamAppenderFull; 
-			} 
+			IGfxContentDestination gfxContentDestination/+optional: the target handler of commitGfxContent()+/; 
 			
-			@property gbBitPos() 
-			=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
 			
-			///The appenders are keeping their memory ready to use.
-			void resetStream(bool doDealloc=false)
+			
+			alias VertexData 	= VulkanWindow.VertexData,
+			Texture 	= VulkanWindow.Texture; 
+			
+			version(/+$DIDE_REGION Bitstream+/all)
 			{
-				if(doDealloc)
+				protected
 				{
-					vbAppender = appender!(VertexData[])(); 
-					gbAppender = appender!(ulong[])(); 
-				}
-				else
+					Appender!(VertexData[]) vbAppender; 
+					Appender!(ulong[]) gbAppender; 
+					BitStreamAppender bitStreamAppender; 
+					final void onBitStreamAppenderFull(ulong data)
+					{ gbAppender ~= data; } 
+				} 
+				
+				this(IGfxContentDestination gfxContentDestination = null)
 				{
-					vbAppender.clear; 
-					gbAppender.clear; 
-				}
-				bitStreamAppender.reset; 
-				resetBlockState; 
-			} 
-			
-			///This resets and frees up the appenders memory
-			void deallocStream()
-			{ resetStream(doDealloc : true); } 
-			
-			@property empty()
-			{
-				return vbAppender.empty; 
-				/+
-					After the first begin(), there will be an index in VB.
-					Emitting data into GB without calling begin() is treated as empty.
-				+/
-			} 
-			
-			GfxContent toGfxContent()
-			{
-				if(empty) return GfxContent.init; 
-				end; 
-				const actual_gbBitsPos = gbBitPos; 
-				bitStreamAppender.flush; 
-				return GfxContent(vbAppender[], gbAppender[], actual_gbBitsPos); 
-			} 
-			
-			protected void appendToDestination(in GfxContent content)
-			{
-				enforce(gfxContentDestination, "Unablem to commit GfxContent."); 
-				gfxContentDestination.appendGfxContent(content); 
-			} 
-			
-			void commit()
-			{
-				const content = toGfxContent; 
-				appendToDestination(content); 
-				resetStream; 
-			} 
-			
-			void commit(in GfxContent externalContent)
-			{
-				if(!externalContent.empty)
+					this.gfxContentDestination = gfxContentDestination; 
+					bitStreamAppender.onBuffer = &onBitStreamAppenderFull; 
+				} 
+				
+				@property gbBitPos() 
+				=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
+				
+				///The appenders are keeping their memory ready to use.
+				void resetStream(bool doDealloc=false)
 				{
-					if(!this.empty) { commit; /+first it must commit the self+/}
-					
-					//Normally this is a costy synchronized operation:
-					appendToDestination(externalContent); 
-				}
-			} 
-			
-			void consume(GfxBuilder externalBuilder)
-			{
-				if(externalBuilder && !externalBuilder.empty)
-				{
-					commit(externalBuilder.toGfxContent); 
-					externalBuilder.resetStream; //important to reser AFTER the commit!
-				}
-			} 
-			
-			void emit(Args...)(in Args args)
-			{
-				static foreach(i, T; Args)
-				{
+					if(doDealloc)
 					{
-						alias a = args[i]; 
-						static if(is(T : Bits!(B), B))
-						bitStreamAppender.appendBits(a.data, a.bitCnt); 
-						else static if(is(T : Bits!(B)[N], B, int N))
-						{ static foreach(i; 0..N) emit(a[i]); }
-						else static if(is(T : ubyte[]))
-						emitBytes(a); 
-						else
-						with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
+						vbAppender = appender!(VertexData[])(); 
+						gbAppender = appender!(ulong[])(); 
 					}
-				}
-			} 
-			
-			void emitBytes(in void[] data)
-			{
-				auto ba = (cast(ubyte[])(data)); 
-				while(ba.length>=8) { emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
-				if(ba.length>=4) { emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
-				if(ba.length>=2) { emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
-				if(ba.length>=1) { emit(*(cast(ubyte*)(ba.ptr))); }
-			} 
-			
-			void emitEvenBytes(void[] data)
-			{
-				auto ba = (cast(ubyte[])(data)); 
-				while(ba.length>=16) { emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
-				if(ba.length>=8) { emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
-				if(ba.length>=4) { emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
-				if(ba.length>=2) { emit(ba[0]); }
-			} 
-			
-		}
-		
-		
-		version(/+$DIDE_REGION Block handling+/all)
-		{
-			protected int actVertexCount; 
-			protected bool insideBlock; 
-			
-			protected void resetBlockState()
-			{ insideBlock = false; actVertexCount = 0; } 
-			
-			///Closes the block with an 'end' opcode. Only if there is an actual block.
-			void end()
-			{
-				if(insideBlock.chkClear)
-				{ emit(mixin(舉!((Opcode),q{end}))); }
-			} 
-			
-			///It always starts a new block.  Emits 'end' if needed.
-			void begin()
-			{
-				if(insideBlock) end; 
-				vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
-				resetState!(StateSide.target); 
-				actVertexCount=0; 
-				insideBlock = true; 
-			} 
-			
-			version(/+$DIDE_REGION Messy ShaderMaxVertexCount logic+/all)
-			{
-				enum ShaderMaxVertexCount = 
+					else
+					{
+						vbAppender.clear; 
+						gbAppender.clear; 
+					}
+					bitStreamAppender.reset; 
+					resetBlockState; 
+				} 
 				
-				//127
-				/+
-					127:
-					4 vec4 gl_Position
-					4 smooth mediump vec4 fragColor
-					4 smooth mediump vec4 fragBkColor
-					2 smooth vec2 fragTexCoordXY
-					1 flat uint fragTexHandleAndMode
-					1 flat uint fragTexCoordZ
-					4 flat vec4 fragFloats0
-					4 flat vec4 fragFloats1
-					-----
-					24 total
-				+/
-				113
-				/+
-					113:
-					24 total + gl_ClipDistance[4] = 28
-				+/
-				; 
-				__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
+				///This resets and frees up the appenders memory
+				void deallocStream()
+				{ resetStream(doDealloc : true); } 
 				
-				static @property int maxVertexCount()
-				{ return desiredMaxVertexCount; } 
+				@property empty()
+				{
+					return vbAppender.empty; 
+					/+
+						After the first begin(), there will be an index in VB.
+						Emitting data into GB without calling begin() is treated as empty.
+					+/
+				} 
+				
+				GfxContent toGfxContent()
+				{
+					if(empty) return GfxContent.init; 
+					end; 
+					const actual_gbBitsPos = gbBitPos; 
+					bitStreamAppender.flush; 
+					return GfxContent(vbAppender[], gbAppender[], actual_gbBitsPos); 
+				} 
+				
+				protected void appendToDestination(in GfxContent content)
+				{
+					enforce(gfxContentDestination, "Unablem to commit GfxContent."); 
+					gfxContentDestination.appendGfxContent(content); 
+				} 
+				
+				void commit()
+				{
+					const content = toGfxContent; 
+					appendToDestination(content); 
+					resetStream; 
+				} 
+				
+				void commit(in GfxContent externalContent)
+				{
+					if(!externalContent.empty)
+					{
+						if(!this.empty) { commit; /+first it must commit the self+/}
+						
+						//Normally this is a costy synchronized operation:
+						appendToDestination(externalContent); 
+					}
+				} 
+				
+				void consume(GfxBuilder externalBuilder)
+				{
+					if(externalBuilder && !externalBuilder.empty)
+					{
+						commit(externalBuilder.toGfxContent); 
+						externalBuilder.resetStream; //important to reser AFTER the commit!
+					}
+				} 
+				
+				void emit(Args...)(in Args args)
+				{
+					static foreach(i, T; Args)
+					{
+						{
+							alias a = args[i]; 
+							static if(is(T : Bits!(B), B))
+							bitStreamAppender.appendBits(a.data, a.bitCnt); 
+							else static if(is(T : Bits!(B)[N], B, int N))
+							{ static foreach(i; 0..N) emit(a[i]); }
+							else static if(is(T : ubyte[]))
+							emitBytes(a); 
+							else
+							with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
+						}
+					}
+				} 
+				
+				void emitBytes(in void[] data)
+				{
+					auto ba = (cast(ubyte[])(data)); 
+					while(ba.length>=8) { emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
+					if(ba.length>=4) { emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
+					if(ba.length>=2) { emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
+					if(ba.length>=1) { emit(*(cast(ubyte*)(ba.ptr))); }
+				} 
+				
+				void emitEvenBytes(void[] data)
+				{
+					auto ba = (cast(ubyte[])(data)); 
+					while(ba.length>=16) { emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
+					if(ba.length>=8) { emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
+					if(ba.length>=4) { emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
+					if(ba.length>=2) { emit(ba[0]); }
+				} 
+				
 			}
 			
-			@property remainingVertexCount() const
-			=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
-			
-			void incVertexCount(int inrc)
-			{ actVertexCount += inrc; } 
-			
-			///Tries to continue the current block with the required vertices.
-			///If a new block started, it emits setup code.
-			void begin(int requiredVertexCount, void delegate() onSetup)
+			
+			version(/+$DIDE_REGION Block handling+/all)
 			{
-				if(insideBlock)
+				protected int actVertexCount; 
+				protected bool insideBlock; 
+				
+				protected void resetBlockState()
+				{ insideBlock = false; actVertexCount = 0; } 
+				
+				///Closes the block with an 'end' opcode. Only if there is an actual block.
+				void end()
 				{
-					const newVertexCount = actVertexCount + requiredVertexCount; 
-					if(newVertexCount <= maxVertexCount)
+					if(insideBlock.chkClear)
+					{ emit(mixin(舉!((Opcode),q{end}))); }
+				} 
+				
+				///It always starts a new block.  Emits 'end' if needed.
+				void begin()
+				{
+					if(insideBlock) end; 
+					vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
+					resetState!(StateSide.target); 
+					actVertexCount=0; 
+					insideBlock = true; 
+				} 
+				
+				version(/+$DIDE_REGION Messy ShaderMaxVertexCount logic+/all)
+				{
+					enum ShaderMaxVertexCount = 
+					
+					//127
+					/+
+						127:
+						4 vec4 gl_Position
+						4 smooth mediump vec4 fragColor
+						4 smooth mediump vec4 fragBkColor
+						2 smooth vec2 fragTexCoordXY
+						1 flat uint fragTexHandleAndMode
+						1 flat uint fragTexCoordZ
+						4 flat vec4 fragFloats0
+						4 flat vec4 fragFloats1
+						-----
+						24 total
+					+/
+					113
+					/+
+						113:
+						24 total + gl_ClipDistance[4] = 28
+					+/
+					; 
+					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
+					
+					static @property int maxVertexCount()
+					{ return desiredMaxVertexCount; } 
+				}
+				
+				@property remainingVertexCount() const
+				=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
+				
+				void incVertexCount(int inrc)
+				{ actVertexCount += inrc; } 
+				
+				///Tries to continue the current block with the required vertices.
+				///If a new block started, it emits setup code.
+				void begin(int requiredVertexCount, void delegate() onSetup)
+				{
+					if(insideBlock)
 					{
-						actVertexCount = newVertexCount; 
-						/+Actual block is continued.+/
-						//print("continuing block", gbBitPos, actVertexCount); 
+						const newVertexCount = actVertexCount + requiredVertexCount; 
+						if(newVertexCount <= maxVertexCount)
+						{
+							actVertexCount = newVertexCount; 
+							/+Actual block is continued.+/
+							//print("continuing block", gbBitPos, actVertexCount); 
+						}
+						else
+						{ begin; onSetup(); }
 					}
 					else
 					{ begin; onSetup(); }
-				}
-				else
-				{ begin; onSetup(); }
-				/+
-					Todo: Handle the case when maxVertexCount > requiredVertexCount.
-					Because that's an automatic fail, but must be handled on the 
-					caller side, not here.
-				+/
-			} 
-		}
-		
-		version(/+$DIDE_REGION Internal state+/all)
-		{
-			protected enum StateSide
-			{ user, target, both } 
-			
-			version(none)
-			{
-				struct ExperimentalState
-				{
-					/+16+/TexHandle PALH, FMH, LFMH, LTH; 
-					/+16+/float FH=GSP_DefaultFontHeight, LW=1, DL=1; Vector!(ushort, 2) fontSize; 
-					/+16+/FormattedColor PC, SC; 	//can save 6
-					/+16+/FontFace fontFace; float	OP=1;  ushort fontFlags, texFlags; 
-					/+40+/TR a; 
-				} 
-				
-				pragma(msg,i"$(ExperimentalState.sizeof)".text.注); 
-				ExperimentalState experimentalUserState, experimentalTargetState; 
-			}
-			
-			version(/+$DIDE_REGION Handles+/all)
-			{
-				struct TexHandleState(Opcode opcode)
-				{
-					private: 
-					enum TexHandle initialState = TexHandle.init; 
-					TexHandle 	userState 	= initialState, 
-						targetState 	= initialState; 
-					
-					public: 
-					@property TexHandle get()
-					=> userState; 
-					
-					@property void set(TexHandle val)
-					{
-						if(userState.chkSet(val))
-						{
-							/+
-								The user changed the internal state. Change detection, 
-								and precompilation can go here.
-							+/
-						}
-					} 
-					
-					@property void set(Texture tex)
-					{ set(tex ? tex.handle : TexHandle.init); } 
-					
-					void resetState(StateSide side)()
-					{
-						if(side & StateSide.user) userState = initialState; 
-						if(side & StateSide.target) targetState = initialState; 
-					} 
-					
-					void synch(GfxAssembler builder)
-					{
-						if(targetState.chkSet(userState))
-						{
-							/+
-								The internal state was different to the target GPU state.
-								So it have to be emited.
-							+/
-							builder.emit(assemble(opcode, assembleHandle(targetState))); 
-						}
-					} 
-				} 
-				
-				protected mixin template TexHandleTemplate(string name)
-				{
-					mixin(iq{
-						TexHandleState!(Opcode.set$(name)) state_$(name); 
-						void $(name)(T)(T arg) { state_$(name).set(arg); } 
-						auto $(name)() => state_$(name).get; 
-						void synch_$(name)() { state_$(name).synch(this); } 
-					}.text); 
+					/+
+						Todo: Handle the case when maxVertexCount > requiredVertexCount.
+						Because that's an automatic fail, but must be handled on the 
+						caller side, not here.
+					+/
 				} 
 			}
-			
-			version(/+$DIDE_REGION Sizes+/all)
+			
+			version(/+$DIDE_REGION Internal state+/all)
 			{
-				struct SizeState(Opcode opcode, float initialState)
+				protected enum StateSide
+				{ user, target, both } 
+				
+				version(none)
 				{
-					private: 
-					float 	userState 	= initialState, 
-						targetState 	= initialState; 
-					
-					public: 
-					ref access() => userState; 
-					
-					void resetState(StateSide side)()
+					struct ExperimentalState
 					{
-						if(side & StateSide.user) userState = initialState; 
-						if(side & StateSide.target) targetState = initialState; 
+						/+16+/TexHandle PALH, FMH, LFMH, LTH; 
+						/+16+/float FH=GSP_DefaultFontHeight, LW=1, DL=1; Vector!(ushort, 2) fontSize; 
+						/+16+/FormattedColor PC, SC; 	//can save 6
+						/+16+/FontFace fontFace; float	OP=1;  ushort fontFlags, texFlags; 
+						/+40+/TR a; 
 					} 
 					
-					void synch(GfxAssembler builder)
-					{
-						if(targetState.chkSet(userState))
-						{
-							/+
-								The internal state was different to the target GPU state.
-								So it have to be emited.
-							+/
-							builder.emit(assemble(opcode, assembleSize(targetState))); 
-						}
-					} 
-				} 
-				
-				protected mixin template SizeTemplate(string name, float initialValue)
-				{
-					mixin(iq{
-						SizeState!(Opcode.set$(name), initialValue) state_$(name); 
-						ref $(name)() => state_$(name).access; 
-						void synch_$(name)() { state_$(name).synch(this); } 
-					}.text); 
-				} 
-			}
-			version(/+$DIDE_REGION Flags+/all)
-			{
-				struct FlagsState(T, FlagFormat flagFormat)
-				{
-					private: 
-					enum initialState = T.init; 
-					T 	userState 	= initialState, 
-						targetState 	= initialState; 
-					
-					public: 
-					ref access() => userState; 
-					
-					void resetState(StateSide side)()
-					{
-						if(side & StateSide.user) userState = initialState; 
-						if(side & StateSide.target) targetState = initialState; 
-					} 
-					
-					void synch(GfxAssembler builder)
-					{
-						if(targetState.chkSet(userState))
-						{
-							builder.emit(
-								assemble(
-									mixin(舉!((Opcode),q{setFlags})), flagFormat, bits(
-										targetState._raw, 
-										targetState.bitCnt
-									)
-								)
-							); 
-						}
-					} 
-				} 
-				
-				protected mixin template FlagsTemplate(string name, T, FlagFormat flagFormat)
-				{
-					mixin(iq{
-						FlagsState!(T, flagFormat) state_$(name); 
-						ref $(name)() => state_$(name).access; 
-						void synch_$(name)() { state_$(name).synch(this); } 
-					}.text); 
-				} 
-			}
-			
-			version(/+$DIDE_REGION Color+/all)
-			{
-				@property colorState() => tuple(((PALH).名!q{PALH}), ((PC).名!q{PC}), ((SC).名!q{SC}), ((OP).名!q{OP})); 
-				
-				struct ColorState
-				{
-					FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u1}))), 
-						SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
-					float OP = 1; 
-				} 
-				
-				ColorState 	user_colorState, 
-					target_colorState; 
-				
-				version(/+$DIDE_REGION+/all) {
-					mixin TexHandleTemplate!"PALH"; 
-					auto PC()
-					=> user_colorState.PC; void PC(A...)(in A a)
-					{ user_colorState.PC = FormattedColor(a); } 
-					auto SC()
-					=> user_colorState.SC; void SC(A...)(in A a)
-					{ user_colorState.SC = FormattedColor(a); } 
-					ref OP() => user_colorState.OP; 
+					pragma(msg,i"$(ExperimentalState.sizeof)".text.注); 
+					ExperimentalState experimentalUserState, experimentalTargetState; 
 				}
 				
-				void reset_colors(StateSide side)()
+				version(/+$DIDE_REGION Handles+/all)
 				{
-					state_PALH.resetState!side; 
-					if(side & StateSide.user) user_colorState = ColorState.init; 
-					if(side & StateSide.target) target_colorState = ColorState.init; 
-				} 
-				
-				void synch_colors(bool doPC=true, bool doSC=true)()
-				{
-					synch_PALH; 
-					with(target_colorState)
+					struct TexHandleState(Opcode opcode)
 					{
-						const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
-							SC_changed = doSC && SC.chkSet(user_colorState.SC); 
+						private: 
+						enum TexHandle initialState = TexHandle.init; 
+						TexHandle 	userState 	= initialState, 
+							targetState 	= initialState; 
 						
-						if(PC_changed && SC_changed && PC.format==SC.format)
+						public: 
+						@property TexHandle get()
+						=> userState; 
+						
+						@property void set(TexHandle val)
 						{
-							if(PC.value==SC.value)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
-							else {
-								emit(
-									assemble(mixin(舉!((Opcode),q{setPCSC})), assembleColor(PC)),
-									           assembleColor_noFormat(SC)
+							if(userState.chkSet(val))
+							{
+								/+
+									The user changed the internal state. Change detection, 
+									and precompilation can go here.
+								+/
+							}
+						} 
+						
+						@property void set(Texture tex)
+						{ set(tex ? tex.handle : TexHandle.init); } 
+						
+						void resetState(StateSide side)()
+						{
+							if(side & StateSide.user) userState = initialState; 
+							if(side & StateSide.target) targetState = initialState; 
+						} 
+						
+						void synch(GfxAssembler builder)
+						{
+							if(targetState.chkSet(userState))
+							{
+								/+
+									The internal state was different to the target GPU state.
+									So it have to be emited.
+								+/
+								builder.emit(assemble(opcode, assembleHandle(targetState))); 
+							}
+						} 
+					} 
+					
+					protected mixin template TexHandleTemplate(string name)
+					{
+						mixin(iq{
+							TexHandleState!(Opcode.set$(name)) state_$(name); 
+							void $(name)(T)(T arg) { state_$(name).set(arg); } 
+							auto $(name)() => state_$(name).get; 
+							void synch_$(name)() { state_$(name).synch(this); } 
+						}.text); 
+					} 
+				}
+				
+				version(/+$DIDE_REGION Sizes+/all)
+				{
+					struct SizeState(Opcode opcode, float initialState)
+					{
+						private: 
+						float 	userState 	= initialState, 
+							targetState 	= initialState; 
+						
+						public: 
+						ref access() => userState; 
+						
+						void resetState(StateSide side)()
+						{
+							if(side & StateSide.user) userState = initialState; 
+							if(side & StateSide.target) targetState = initialState; 
+						} 
+						
+						void synch(GfxAssembler builder)
+						{
+							if(targetState.chkSet(userState))
+							{
+								/+
+									The internal state was different to the target GPU state.
+									So it have to be emited.
+								+/
+								builder.emit(assemble(opcode, assembleSize(targetState))); 
+							}
+						} 
+					} 
+					
+					protected mixin template SizeTemplate(string name, float initialValue)
+					{
+						mixin(iq{
+							SizeState!(Opcode.set$(name), initialValue) state_$(name); 
+							ref $(name)() => state_$(name).access; 
+							void synch_$(name)() { state_$(name).synch(this); } 
+						}.text); 
+					} 
+				}
+				version(/+$DIDE_REGION Flags+/all)
+				{
+					struct FlagsState(T, FlagFormat flagFormat)
+					{
+						private: 
+						enum initialState = T.init; 
+						T 	userState 	= initialState, 
+							targetState 	= initialState; 
+						
+						public: 
+						ref access() => userState; 
+						
+						void resetState(StateSide side)()
+						{
+							if(side & StateSide.user) userState = initialState; 
+							if(side & StateSide.target) targetState = initialState; 
+						} 
+						
+						void synch(GfxAssembler builder)
+						{
+							if(targetState.chkSet(userState))
+							{
+								builder.emit(
+									assemble(
+										mixin(舉!((Opcode),q{setFlags})), flagFormat, bits(
+											targetState._raw, 
+											targetState.bitCnt
+										)
+									)
 								); 
 							}
-						}
-						else
-						{
-							if(PC_changed) emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
-							if(SC_changed) emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
-						}
-						
-						if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
-					}
-				} 
-				
-				alias synch_PC = synch_colors!(true, false),
-				synch_SC = synch_colors!(false, true); 
-			}
-			
-			version(/+$DIDE_REGION Font+/all)
-			{
-				@property fontState() => tuple(
-					((FF).名!q{FF}), ((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), 
-					((fontFace).名!q{fontFace}), ((fontSize).名!q{fontSize})
-				); 
-				
-				mixin FlagsTemplate!("FF", FontFlags, FlagFormat.font); 	//FontFlags
-				mixin TexHandleTemplate!"FMH"; 	//Fontmap
-				mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
-				mixin SizeTemplate!("FH", GSP_DefaultFontHeight); 	//Font height
-				
-				FontFace fontFace; 
-				Vector!(ushort, 2) fontSize; /+cursor can use it to move around+/
-				
-				
-				void reset_font(StateSide side)()
-				{
-					state_FF	.resetState!(side),
-					state_FMH	.resetState!(side),
-					state_LFMH	.resetState!(side),
-					state_FH	.resetState!(side); 
-					if(side & StateSide.user) {
-						fontSize = 0;  
-						fontFace = null; 
-					}
-				} void synch_font()
-				{
-					synch_FF,
-					synch_FMH, 
-					synch_LFMH, 
-					synch_FH; 
-				} 
-				
-				/+
-					void setFont(FontId id)
-					{ setFont(accessFontFace(id)); }  void setFont(string name)
-					{ setFont(accessFontFace(name)); } 
-				+/
-				
-				void setFont(T)(FontSpec!T a)
-				{
-					void doit()
-					{
-						if(auto mf = (cast(MonoFont)(fontFace)))
-						{
-							FMH = mf.monoTexture, 
-							FH = mf.defaultSize.y, 
-							fontSize = Vector!(ushort, 2)(mf.defaultSize); 
-						}
-						else raise("Unsupported FontFace type: "~fontFace.text); 
+						} 
 					} 
 					
-					fontFace = accessFontFace(a.fontSpec); 
-					FF = a.fontFlags; //Todo: update the fontType!
-					doit; 
-				} 
-			}
-			
-			version(/+$DIDE_REGION Line+/all)
-			{
-				@property lineState() => tuple(((LTH).名!q{LTH}), ((LW).名!q{LW}), ((DL).名!q{DL})); 
-				
-				mixin TexHandleTemplate!"LTH"; 	//Line tex handle
-				mixin SizeTemplate!("LW", 1); 	//Line width
-				mixin SizeTemplate!("DL", 1); 	//Dot length
-				void reset_line(StateSide side)()
-				{
-					state_LTH	.resetState!(side),
-					state_LW	.resetState!(side),
-					state_DL	.resetState!(side); 
-				} void synch_line()
-				{
-					synch_LTH, 
-					synch_LW, 
-					synch_DL; 
-				} 
-			}
-			
-			version(/+$DIDE_REGION Point+/all)
-			{
-				@property pointState() => tuple(((PS).名!q{PS})); 
-				
-				mixin SizeTemplate!("PS", 1); //Point size
-				void reset_point(StateSide side)()
-				{ state_PS	.resetState!(side); } void synch_point()
-				{ synch_PS; } 
-			}
-			
-			version(/+$DIDE_REGION Transform+/all)
-			{
-				@property transformState() => tuple(((TR).名!q{TR})); 
-				
-				static struct TransformationState
-				{
-					enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
-					vec2 scaleXY = vec2(1); 
-					float skewX_deg = 0; 
-					float rotZ_deg = 0; 
-					vec2 transXY = vec2(0); //in world space
-					bounds2 clipBounds = initialClipBounds; //in world space
-					//applied in this order
-					
-					void clipBounds_reset() { clipBounds = initialClipBounds; } 
-				} 
-				
-				TransformationState user_TR, target_TR; 
-				alias TR = user_TR; 
-				
-				void reset_transform(StateSide side)()
-				{
-					if(side & StateSide.user) user_TR = TransformationState.init; 
-					if(side & StateSide.target) target_TR = TransformationState.init; 
-				} 
-				
-				void synch_transform()
-				{
-					with(target_TR)
+					protected mixin template FlagsTemplate(string name, T, FlagFormat flagFormat)
 					{
-						if(scaleXY.chkSet(user_TR.scaleXY))
+						mixin(iq{
+							FlagsState!(T, flagFormat) state_$(name); 
+							ref $(name)() => state_$(name).access; 
+							void synch_$(name)() { state_$(name).synch(this); } 
+						}.text); 
+					} 
+				}
+				
+				version(/+$DIDE_REGION Color+/all)
+				{
+					@property colorState() => tuple(((PALH).名!q{PALH}), ((PC).名!q{PC}), ((SC).名!q{SC}), ((OP).名!q{OP})); 
+					
+					struct ColorState
+					{
+						FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u1}))), 
+							SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
+						float OP = 1; 
+					} 
+					
+					ColorState 	user_colorState, 
+						target_colorState; 
+					
+					version(/+$DIDE_REGION+/all) {
+						mixin TexHandleTemplate!"PALH"; 
+						auto PC()
+						=> user_colorState.PC; void PC(A...)(in A a)
+						{ user_colorState.PC = FormattedColor(a); } 
+						auto SC()
+						=> user_colorState.SC; void SC(A...)(in A a)
+						{ user_colorState.SC = FormattedColor(a); } 
+						ref OP() => user_colorState.OP; 
+					}
+					
+					void reset_colors(StateSide side)()
+					{
+						state_PALH.resetState!side; 
+						if(side & StateSide.user) user_colorState = ColorState.init; 
+						if(side & StateSide.target) target_colorState = ColorState.init; 
+					} 
+					
+					void synch_colors(bool doPC=true, bool doSC=true)()
+					{
+						synch_PALH; 
+						with(target_colorState)
 						{
-							if(scaleXY.x!=scaleXY.y)
+							const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
+								SC_changed = doSC && SC.chkSet(user_colorState.SC); 
+							
+							if(PC_changed && SC_changed && PC.format==SC.format)
 							{
-								emit(
-									assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
-										assembleSize(scaleXY.y)
-								); 
+								if(PC.value==SC.value)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
+								else {
+									emit(
+										assemble(mixin(舉!((Opcode),q{setPCSC})), assembleColor(PC)),
+										           assembleColor_noFormat(SC)
+									); 
+								}
 							}
 							else
-							{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
+							{
+								if(PC_changed) emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
+								if(SC_changed) emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
+							}
+							
+							if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
 						}
-						
-						if(skewX_deg.chkSet(user_TR.skewX_deg))
-						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
-						
-						if(rotZ_deg.chkSet(user_TR.rotZ_deg))
-						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
-						
-						if(transXY.chkSet(user_TR.transXY))
-						{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
-						
-						if(clipBounds.chkSet(user_TR.clipBounds))
+					} 
+					
+					alias synch_PC = synch_colors!(true, false),
+					synch_SC = synch_colors!(false, true); 
+				}
+				
+				version(/+$DIDE_REGION Font+/all)
+				{
+					@property fontState() => tuple(
+						((FF).名!q{FF}), ((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), 
+						((fontFace).名!q{fontFace}), ((fontSize).名!q{fontSize})
+					); 
+					
+					mixin FlagsTemplate!("FF", FontFlags, FlagFormat.font); 	//FontFlags
+					mixin TexHandleTemplate!"FMH"; 	//Fontmap
+					mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
+					mixin SizeTemplate!("FH", GSP_DefaultFontHeight); 	//Font height
+					
+					FontFace fontFace; 
+					Vector!(ushort, 2) fontSize; /+cursor can use it to move around+/
+					
+					
+					void reset_font(StateSide side)()
+					{
+						state_FF	.resetState!(side),
+						state_FMH	.resetState!(side),
+						state_LFMH	.resetState!(side),
+						state_FH	.resetState!(side); 
+						if(side & StateSide.user) {
+							fontSize = 0;  
+							fontFace = null; 
+						}
+					} void synch_font()
+					{
+						synch_FF,
+						synch_FMH, 
+						synch_LFMH, 
+						synch_FH; 
+					} 
+					
+					/+
+						void setFont(FontId id)
+						{ setFont(accessFontFace(id)); }  void setFont(string name)
+						{ setFont(accessFontFace(name)); } 
+					+/
+					
+					void setFont(T)(FontSpec!T a)
+					{
+						void doit()
 						{
-							emit(
-								assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
-									assemblePoint(clipBounds.size)
-							); 
+							if(auto mf = (cast(MonoFont)(fontFace)))
+							{
+								FMH = mf.monoTexture, 
+								FH = mf.defaultSize.y, 
+								fontSize = Vector!(ushort, 2)(mf.defaultSize); 
+							}
+							else raise("Unsupported FontFace type: "~fontFace.text); 
+						} 
+						
+						fontFace = accessFontFace(a.fontSpec); 
+						FF = a.fontFlags; //Todo: update the fontType!
+						doit; 
+					} 
+				}
+				
+				version(/+$DIDE_REGION Line+/all)
+				{
+					@property lineState() => tuple(((LTH).名!q{LTH}), ((LW).名!q{LW}), ((DL).名!q{DL})); 
+					
+					mixin TexHandleTemplate!"LTH"; 	//Line tex handle
+					mixin SizeTemplate!("LW", 1); 	//Line width
+					mixin SizeTemplate!("DL", 1); 	//Dot length
+					void reset_line(StateSide side)()
+					{
+						state_LTH	.resetState!(side),
+						state_LW	.resetState!(side),
+						state_DL	.resetState!(side); 
+					} void synch_line()
+					{
+						synch_LTH, 
+						synch_LW, 
+						synch_DL; 
+					} 
+				}
+				
+				version(/+$DIDE_REGION Point+/all)
+				{
+					@property pointState() => tuple(((PS).名!q{PS})); 
+					
+					mixin SizeTemplate!("PS", 1); //Point size
+					void reset_point(StateSide side)()
+					{ state_PS	.resetState!(side); } void synch_point()
+					{ synch_PS; } 
+				}
+				
+				version(/+$DIDE_REGION Transform+/all)
+				{
+					@property transformState() => tuple(((TR).名!q{TR})); 
+					
+					static struct TransformationState
+					{
+						enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
+						vec2 scaleXY = vec2(1); 
+						float skewX_deg = 0; 
+						float rotZ_deg = 0; 
+						vec2 transXY = vec2(0); //in world space
+						bounds2 clipBounds = initialClipBounds; //in world space
+						//applied in this order
+						
+						void clipBounds_reset() { clipBounds = initialClipBounds; } 
+						void reset() { this = typeof(this).init; } 
+					} 
+					
+					TransformationState user_TR, target_TR; 
+					alias TR = user_TR; 
+					
+					void reset_transform(StateSide side)()
+					{
+						if(side & StateSide.user) user_TR = TransformationState.init; 
+						if(side & StateSide.target) target_TR = TransformationState.init; 
+					} 
+					
+					void synch_transform()
+					{
+						with(target_TR)
+						{
+							if(scaleXY.chkSet(user_TR.scaleXY))
+							{
+								if(scaleXY.x!=scaleXY.y)
+								{
+									emit(
+										assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
+											assembleSize(scaleXY.y)
+									); 
+								}
+								else
+								{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
+							}
+							
+							if(skewX_deg.chkSet(user_TR.skewX_deg))
+							{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
+							
+							if(rotZ_deg.chkSet(user_TR.rotZ_deg))
+							{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
+							
+							if(transXY.chkSet(user_TR.transXY))
+							{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
+							
+							if(clipBounds.chkSet(user_TR.clipBounds))
+							{
+								emit(
+									assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
+										assemblePoint(clipBounds.size)
+								); 
+							}
 						}
-					}
+					} 
+				}
+				
+				@property allState()
+				=> tuple(
+					colorState.expand, fontState.expand, lineState.expand, 
+					pointState.expand, transformState.expand
+				); 
+				
+				protected void resetState(StateSide side)()
+				{
+					reset_colors!(side), reset_font!(side), reset_line!(side), 
+					reset_point!(side), reset_transform!(side); 
+				} 
+				
+				void resetStyle()
+				{ resetState!(StateSide.user); } 
+				
+				void setState(Args...)(Args args)
+				{
+					void processArg(T)(T a)
+					{
+						static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+						else static if(is(T : GenericArg!(name, C), string name, C))
+						{ mixin(name~"=a;"); }
+					} 
+					static foreach(a; args) processArg(a); 
 				} 
 			}
-			
-			
-			@property allState()
-			=> tuple(
-				colorState.expand, fontState.expand, lineState.expand, 
-				pointState.expand, transformState.expand
-			); 
-			
-			protected void resetState(StateSide side)()
-			{
-				reset_colors!(side), reset_font!(side), reset_line!(side), 
-				reset_point!(side), reset_transform!(side); 
-			} 
-			
-			void resetStyle()
-			{ resetState!(StateSide.user); } 
-			
-			void setState(Args...)(Args args)
-			{
-				void processArg(T)(T a)
-				{
-					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
-					else static if(is(T : GenericArg!(name, C), string name, C))
-					{
-						alias mixedInArg = a; 
-						mixin(name~"=mixedInArg;"); 
-					}
-				} 
-				static foreach(a; args) processArg(a); 
-			} 
-		}
-		
-		
+			
+		} 
 	} 
 	
 	class GfxBuilder : GfxAssembler
 	{
-		alias This = typeof(this); 
-		
-		
-		enum isCallable(alias fun, T) = 
-			__traits(
-			compiles, {
-				auto b = new This; 
-				mixin(iq{b.$(__traits(identifier, fun))(T.init); }.text); 
-			}
-		); 
-		
-		void drawC64Sprite(V)(in V pos, in int idx)
+		final
 		{
-			if(idx.inRange(0, 255))
-			{
-				begin(4, {}); synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
-				emit(
-					mixin(舉!((Opcode),q{drawMove})), assemblePoint(pos),
-					assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
-				); 
-			}
-		} 
-		
-		void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
-		{
-			begin(4, {}); synch_transform, synch_PALH, synch_colors; 
-			emit(
-				mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
-				mixin(舉!((Opcode),q{drawTexRect}))	, assemblePoint(bnd.bottomRight),
-				assembleHandle(texHandle)
-			); 
-		} 
-		
-		void drawC64Border(ivec2 pos)
-		{
-			void r(int x0, int y0, int x1, int y1)
-			{
-				auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
-				drawC64Rect(ibounds2(p(x0, y0), p(x1, y1))); 
-			} 
-			r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
-			r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
-		} 
-		
-		void drawC64Screen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
-		{
-			PC(borderCol, 4); drawC64Border(pos-4); 
-			foreach(y; 0..img.height)
-			{ drawC64ChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
-		} 
-		
-		void drawC64ChrRow(
-			//Texture palette, Texture fontTex, /+Todo: put these into state+/
-			ivec2 pos, RG[] data, int bk
-		)
-		{
-			if(data.empty) return; 
-			
-			int index = 0; 
-			
-			static RG[] fetchSameColor(ref RG[] data)
-			{
-				if(data.empty) return []; 
-				const fg = data.front.y; 
-				auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
-				auto res = data[0..n]; data = data[n..$]; return res; 
-			} 
-			
-			index = 0; 
-			Style((((cast(EGAColor)(bk))).名!q{bk})); 
-			while(data.length)
-			{
-				auto act = fetchSameColor(data/+, remainingChars+/); 
-				const nextIndex = index + act.length.to!int; 
-				Style((((cast(EGAColor)(act[0].y))).名!q{fg})); 
-				cursorPos = vec2(pos/8+ivec2(index, 0)); 
-				textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
-				index = nextIndex; 
-			}
-		} 
-		
-		void drawPath(Args...)(in Args args)
-		{
-			void setup() { synch_transform, synch_colors, synch_LW; } 
-			
-			/+
-				Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
-				The problem could be at start/end of line segments. The tangents are bad there!
-			+/
-			static if(0)	begin(6/+to be safe+/, {}); 
-			else	begin/+full begin. for a fix+/; 
-			
-			setup; 
-			static immutable NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
-			
-			vec2 P_start, P_last, P_mirror; //internal state
-			
-			void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
-			{
-				//cmd is for estimationb only.  It should use the SvgPathCommand...
-				
-				//Todo: compress XYFormat -> assembleXY()
-				
-				const est = bezierTesselationSettings.estimateVertexCount(cmd); 
-				if(est + 4/*to be sure*/ > remainingVertexCount)
-				{
-					emit(
-						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
-						NOP, NOP
-					); 
-					end; begin; setup;  //Todo: this is bad and bogus.
-					emit(
-						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
-						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
-					); 
-					incVertexCount(2); //add extra to be sure
-				}
-				
-				emit(op); incVertexCount(est); 
-				static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
-			} 
-			
-			void onItem(const ref SvgPathItem item)
-			{
-				const ref P0()
-				=> item.data[0]; const ref P1()
-				=> item.data[1]; const ref P2()
-				=> item.data[2]; const Pm()
-				=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
-				{ P_mirror = M, P_last = L; } 
-				final switch(item.cmd)
-				{
-						/+drawing+/	/+state update+/	
-					case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
-					P_start = P0; 	break; 
-					case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
-					case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
-					case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
-					case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
-					case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
-					/+redirected commands:+/			
-					case SvgPathCommand.A: 	approximateArcToCubicBeziers
-						(P_last, item, &onItem)
-					/+Todo: move it to GPU+/
-					/+
-						Opt: Should do with a simplified 
-						version of cubic bezier!
-						because <90deg and no S curve
-					+/; 		break; 
-					case SvgPathCommand.Z: 	if(P_last!=P_start)
-					{
-						emitPathCmd(
-							'L', mixin(舉!((Opcode),q{drawPathL})), 
-							P_start
-						); 
-						/+
-							Todo: move it	to GPU
-							...bad	idea because vertexLimit
-						+/
-						/+Todo: only works for line, not curves+/
-					}	step(P_start, P_start); 	break; 
-				}
-			} 
+			alias This = typeof(this); 
 			
 			
-			SvgPathParser parser = void; bool parserInitialized = false; 
-			void parse(in string s)
-			{
-				if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
-				parser.parse(s); 
-			} 
-			
-			static foreach(i, a; args)
-			{
-				{
-					alias T = Unqual!(Args[i]); 
-					static if(isSomeString!T) { parse(a); }
-				}
-			}
-			
-			emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
-		} 
-		
-		version(/+$DIDE_REGION Style+/all)
-		{
-			private static chkPrefix(string name, string prefix1, string prefix2="")
-			{
-				return name.startsWith(prefix1) || 
-				prefix2!="" && name.startsWith(prefix2); 
-			} 
-			
-			protected void applyStyleArg(T)(T a)
-			{
-				static if(is(T : FontBlink))	FF.blink = a; 
-				else static if(is(T : GenericArg!(name, C), string name, C))
-				{
-					static if(name == "opacity") { OP = a.value; }
-					else static if(name == "fg")	{ PC = a.value; }
-					else static if(name == "bk")	{ SC = a.value; }
-					else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
-				}
-				else static if(is(T : FontSpec!F, F))	{ setFont(a); }
-				else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
-			} 
-			
-			enum isStyleArg(T) = isCallable!(applyStyleArg, T); ; 
-			
-			template AffectedStyleRegsOfType(T)
-			{
-				static if(is(T : FontBlink))	alias AffectedStyleRegsOfType = AliasSeq!(q{FF}); 
-				else static if(is(T : GenericArg!(name, C), string name, C))
-				{
-					static if(name == "opacity")	alias AffectedStyleRegsOfType = AliasSeq!(q{OP}); 
-					else static if(name == "fg")	alias AffectedStyleRegsOfType = AliasSeq!(q{PC}); 
-					else static if(name == "bk")	alias AffectedStyleRegsOfType = AliasSeq!(q{SC}); 
-				}
-			} 
-			
-			template AffectedStyleRegs(Args...)
-			{
-				template CollectTypes(alias Pred, Args...)
-				{
-					template ProcessArg(A)
-					{
-						static if(isTuple!A)	alias ProcessArg = Filter!(Pred, A.Types); 
-						else static if(Pred!A)	alias ProcessArg = A; 
-						else	alias ProcessArg = AliasSeq!(); 
-					} 
-					alias CollectTypes = NoDuplicates!(staticMap!(ProcessArg, Args)); 
-				} 
-				
-				enum regs = staticMap!(AffectedStyleRegsOfType, CollectTypes!(isStyleArg, Args)); 
-				static if(regs.length)	enum AffectedStyleRegs = [NoDuplicates!regs]; 
-				else	enum AffectedStyleRegs = string[].init; 	
-			} 
-			
-			
-			void Style(Args...)(Args args)
-			{
-				void processArg(T)(T a)
-				{
-					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
-					else applyStyleArg(a); 
-				} 
-				
-				static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
-			} 
-		}
-		
-		
-		version(/+$DIDE_REGION Cursor+/all)
-		{
-			vec2 cursorPos; 
-			
-			alias cr = cursorPos; 
-			
-			struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
-			struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
-			
-			struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
-			struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
-			struct My { float value=0; this(A)(in A a) { value = float(a); } } 
-			struct my { float value=0; this(A)(in A a) { value = float(a); } } 
-			
-			protected void applyCursorArg(T)(in T a)
-			{
-				static if(is(T : M))	cursorPos = a.value; 
-				else static if(is(T : Mx))	cursorPos.x = a.value; 
-				else static if(is(T : My))	cursorPos.y = a.value; 
-				else static if(is(T : m))	cursorPos += a.value; 
-				else static if(is(T : mx))	cursorPos.x += a.value; 
-				else static if(is(T : my))	cursorPos.y += a.value; 
-				else static if(
-					is(T : GenericArg!(name, E), string name, E) 
-					&& name.startsWith("cr")
-				)
-				{
-					alias mixedInArg = a; 
-					mixin(name~"=mixedInArg.value;"); 
-				}
-				else { static assert(false, "Unhandled Cursor() argument: "~T.stringof); }
-			} 
-			
-			enum isCursorArg(T) = 	__traits(
+			enum isCallable(alias fun, T) = 
+				__traits(
 				compiles, {
-					auto b = new GfxBuilder; 
-					with(b) b.applyCursorArg(T.init); 
+					auto b = new This; 
+					mixin(iq{b.$(__traits(identifier, fun))(T.init); }.text); 
 				}
-			)
-				/+
-				 || (
-					is(T : GenericArg!(name, E), string name, E) 
-						&& name.startsWith("cr")
-				)
-			+/; 
-		}
-		
-		version(/+$DIDE_REGION+/all) {
-			void Text(Args...)(Args args)
+			); 
+			
+			void drawC64Sprite(V)(in V pos, in int idx)
 			{
-				//this work on temporal graphics state
-				/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
-				
-				mixin(scope_remember(AffectedStyleRegs!Args.join(','))); 
-				
-				void processArg(T)(T a)
+				if(idx.inRange(0, 255))
 				{
-					static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
-					else static if(isStyleArg!T)	{ applyStyleArg(a); }
-					else static if(isCursorArg!T)	applyCursorArg(a); 
-					else static if(isSomeString!T)	textBackend(a); 
-					else static if(isSomeChar!T)	textBackend(only(a)); 
-					else static if(
-						isInputRange!T &&
-						(
-							isSomeChar!(ElementType!T)
-							||is(ElementType!T : AnsiChar)
-						)
-					)	{ textBackend(a); }
-					else static if(isDelegate!T) a(); 
-					else static if(isFunction!T) a(); 
-					else
-					{
-						pragma(msg,i"$(T.stringof) $(isCallable!(applyStyleArg, T))".text.注); 
-						static assert(false, "Unhandled Text() argument: "~T.stringof); 
-					}
-				} 
-				
-				static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
+					begin(4, {}); synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
+					emit(
+						mixin(舉!((Opcode),q{drawMove})), assemblePoint(pos),
+						assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
+					); 
+				}
 			} 
 			
-			void textBackend(R)(R input)
+			void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
 			{
-				if(input.empty) return; 
-				
-				alias _builder = this; 
-				
-				void setup()
-				{
-					with(_builder)
-					{
-						synch_transform, synch_PALH, synch_font, synch_colors; 
-						emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
-					}
-				} 
-				_builder.begin(0, {}); 
-				setup; 
-				
-				version(/+$DIDE_REGION Convert various types to 8bit ASCII, reuse allocated temp memory.+/all)
-				{
-					static Appender!(ubyte[]) app; app.clear; 
-					ubyte[] rawSrc; 
-					alias E = ElementType!R; 
-					static if(isDynamicArray!R && is(E : AnsiChar) /+fastest way+/)
-					{ rawSrc = (cast(ubyte[])(input)); }
-					else static if(isInputRange!R && is(E : AnsiChar) /+buffer the inputRange+/)
-					{ app.put(input); rawSrc = (cast(ubyte[])(app[])); }
-					else static if(isInputRange!R && isSomeChar!E /+convert fron normal string+/)
-					{ app.put(input.map!toAnsiChar); rawSrc = (cast(ubyte[])(app[])); }
-					else static assert(false, "unhandled element type: "~E.stringof); 
-				}
-				
-				uint decideCharCount(int len)
-				{
-					enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
-					const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
-						n	= len.min(min(space, maxChars)); 
-					if(n) _builder.incVertexCount(n*2+2); return n; 
-				} 
-				
-				encodeRLE
-				(
-					rawSrc, 3,
-					((ubyte[] part) {
-						while(1)
-						{
-							if(const n = decideCharCount((cast(int)(part.length))))
-							{
-								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
-								cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
-							}
-							/+start next geometry item+/_builder.begin; setup; 
-						}
-					}),
-					((ubyte ch, uint len) {
-						while(1)
-						{
-							if(const n = decideCharCount(len))
-							{
-								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
-								cursorPos.x += n; len -= n; if(!len) break; 
-							}
-							/+start next geometry item+/_builder.begin; setup; 
-						}
-					})
+				begin(4, {}); synch_transform, synch_PALH, synch_colors; 
+				emit(
+					mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
+					mixin(舉!((Opcode),q{drawTexRect}))	, assemblePoint(bnd.bottomRight),
+					assembleHandle(texHandle)
 				); 
-				
-				version(/+$DIDE_REGION Don't waste memory for exceptionally large texts+/all)
+			} 
+			
+			void drawC64Border(ivec2 pos)
+			{
+				void r(int x0, int y0, int x1, int y1)
 				{
-					enum tooLargeBuf = 0x1000; 
-					if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
+					auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
+					drawC64Rect(ibounds2(p(x0, y0), p(x1, y1))); 
+				} 
+				r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
+				r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
+			} 
+			
+			void drawC64Screen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
+			{
+				PC(borderCol, 4); drawC64Border(pos-4); 
+				foreach(y; 0..img.height)
+				{ drawC64ChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
+			} 
+			
+			void drawC64ChrRow(
+				//Texture palette, Texture fontTex, /+Todo: put these into state+/
+				ivec2 pos, RG[] data, int bk
+			)
+			{
+				if(data.empty) return; 
+				
+				int index = 0; 
+				
+				static RG[] fetchSameColor(ref RG[] data)
+				{
+					if(data.empty) return []; 
+					const fg = data.front.y; 
+					auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
+					auto res = data[0..n]; data = data[n..$]; return res; 
+				} 
+				
+				index = 0; 
+				Style((((cast(EGAColor)(bk))).名!q{bk})); 
+				while(data.length)
+				{
+					auto act = fetchSameColor(data/+, remainingChars+/); 
+					const nextIndex = index + act.length.to!int; 
+					Style((((cast(EGAColor)(act[0].y))).名!q{fg})); 
+					cursorPos = vec2(pos/8+ivec2(index, 0)); 
+					textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
+					index = nextIndex; 
 				}
 			} 
-		}
-		
-		
+			
+			void drawPath(Args...)(in Args args)
+			{
+				void setup() { synch_transform, synch_colors, synch_LW; } 
+				
+				/+
+					Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
+					The problem could be at start/end of line segments. The tangents are bad there!
+				+/
+				static if(0)	begin(6/+to be safe+/, {}); 
+				else	begin/+full begin. for a fix+/; 
+				
+				setup; 
+				static immutable NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
+				
+				vec2 P_start, P_last, P_mirror; //internal state
+				
+				void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
+				{
+					//cmd is for estimationb only.  It should use the SvgPathCommand...
+					
+					//Todo: compress XYFormat -> assembleXY()
+					
+					const est = bezierTesselationSettings.estimateVertexCount(cmd); 
+					if(est + 4/*to be sure*/ > remainingVertexCount)
+					{
+						emit(
+							assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
+							NOP, NOP
+						); 
+						end; begin; setup;  //Todo: this is bad and bogus.
+						emit(
+							assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
+							assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
+						); 
+						incVertexCount(2); //add extra to be sure
+					}
+					
+					emit(op); incVertexCount(est); 
+					static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+				} 
+				
+				void onItem(const ref SvgPathItem item)
+				{
+					const ref P0()
+					=> item.data[0]; const ref P1()
+					=> item.data[1]; const ref P2()
+					=> item.data[2]; const Pm()
+					=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
+					{ P_mirror = M, P_last = L; } 
+					final switch(item.cmd)
+					{
+							/+drawing+/	/+state update+/	
+						case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
+						P_start = P0; 	break; 
+						case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
+						case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
+						case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
+						case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
+						case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
+						/+redirected commands:+/			
+						case SvgPathCommand.A: 	approximateArcToCubicBeziers
+							(P_last, item, &onItem)
+						/+Todo: move it to GPU+/
+						/+
+							Opt: Should do with a simplified 
+							version of cubic bezier!
+							because <90deg and no S curve
+						+/; 		break; 
+						case SvgPathCommand.Z: 	if(P_last!=P_start)
+						{
+							emitPathCmd(
+								'L', mixin(舉!((Opcode),q{drawPathL})), 
+								P_start
+							); 
+							/+
+								Todo: move it	to GPU
+								...bad	idea because vertexLimit
+							+/
+							/+Todo: only works for line, not curves+/
+						}	step(P_start, P_start); 	break; 
+					}
+				} 
+				
+				
+				SvgPathParser parser = void; bool parserInitialized = false; 
+				void parse(in string s)
+				{
+					if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
+					parser.parse(s); 
+				} 
+				
+				static foreach(i, a; args)
+				{
+					{
+						alias T = Unqual!(Args[i]); 
+						static if(isSomeString!T) { parse(a); }
+					}
+				}
+				
+				emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
+			} 
+			
+			version(/+$DIDE_REGION Style+/all)
+			{
+				private static chkPrefix(string name, string prefix1, string prefix2="")
+				{
+					return name.startsWith(prefix1) || 
+					prefix2!="" && name.startsWith(prefix2); 
+				} 
+				
+				version(/+$DIDE_REGION Synonyms+/all)
+				{
+					alias opacity 	= OP, 
+					fg 	= PC, 
+					bk 	= SC,
+					fontFlags	= FF
+					/+
+						texFlags	= TF,
+						vecFlags	= VF
+					+/; 
+				}
+				
+				protected void applyStyleArg(T)(T a)
+				{
+					static if(is(T : FontBlink))	FF.blink = a; 
+					else static if(is(T : GenericArg!(name, C), string name, C))
+					{
+						enum e = ""; 
+						static if(name.among("OP", "opacity")) { OP = a.value; }
+						else static if(name.among("PC", "fg"))	{ PC = a.value; }
+						else static if(name.among("SC", "bk"))	{ SC = a.value; }
+						else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
+					}
+					else static if(is(T : FontSpec!F, F))	{ setFont(a); }
+					else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
+				} 
+				
+				enum isStyleArg(T) = isCallable!(applyStyleArg, T); ; 
+				
+				template AffectedStyleRegsOfType(T)
+				{
+					static if(is(T : FontBlink))	alias AffectedStyleRegsOfType = AliasSeq!(q{FF}); 
+					else static if(is(T : GenericArg!(name, C), string name, C))
+					{
+						static if(name.among("OP", "opacity"))	alias AffectedStyleRegsOfType = AliasSeq!(q{OP}); 
+						else static if(name.among("PC", "fg"))	alias AffectedStyleRegsOfType = AliasSeq!(q{PC}); 
+						else static if(name.among("SC", "bk"))	alias AffectedStyleRegsOfType = AliasSeq!(q{SC}); 
+					}
+				} 
+				
+				template AffectedStyleRegs(Args...)
+				{
+					template CollectTypes(alias Pred, Args...)
+					{
+						template ProcessArg(A)
+						{
+							static if(isTuple!A)	alias ProcessArg = Filter!(Pred, A.Types); 
+							else static if(Pred!A)	alias ProcessArg = A; 
+							else	alias ProcessArg = AliasSeq!(); 
+						} 
+						alias CollectTypes = NoDuplicates!(staticMap!(ProcessArg, Args)); 
+					} 
+					
+					enum regs = staticMap!(AffectedStyleRegsOfType, CollectTypes!(isStyleArg, Args)); 
+					static if(regs.length)	enum AffectedStyleRegs = [NoDuplicates!regs]; 
+					else	enum AffectedStyleRegs = string[].init; 	
+				} 
+				
+				
+				void Style(Args...)(Args args)
+				{
+					void processArg(T)(T a)
+					{
+						static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+						else applyStyleArg(a); 
+					} 
+					
+					static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
+				} 
+			}
+			
+			
+			version(/+$DIDE_REGION Cursor+/all)
+			{
+				vec2 cursorPos; 
+				
+				alias cr = cursorPos; 
+				
+				struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+				struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+				
+				struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
+				struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
+				struct My { float value=0; this(A)(in A a) { value = float(a); } } 
+				struct my { float value=0; this(A)(in A a) { value = float(a); } } 
+				
+				protected void applyCursorArg(T)(in T a)
+				{
+					static if(is(T : M))	cursorPos = a.value; 
+					else static if(is(T : Mx))	cursorPos.x = a.value; 
+					else static if(is(T : My))	cursorPos.y = a.value; 
+					else static if(is(T : m))	cursorPos += a.value; 
+					else static if(is(T : mx))	cursorPos.x += a.value; 
+					else static if(is(T : my))	cursorPos.y += a.value; 
+					else static if(
+						is(T : GenericArg!(name, E), string name, E) 
+						&& name.startsWith("cr")
+					)
+					{
+						alias mixedInArg = a; 
+						mixin(name~"=mixedInArg.value;"); 
+					}
+					else { static assert(false, "Unhandled Cursor() argument: "~T.stringof); }
+				} 
+				
+				enum isCursorArg(T) = 	__traits(
+					compiles, {
+						auto b = new GfxBuilder; 
+						with(b) b.applyCursorArg(T.init); 
+					}
+				); 
+			}
+			
+			version(/+$DIDE_REGION+/all) {
+				void Text(Args...)(Args args)
+				{
+					//this work on temporal graphics state
+					/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
+					
+					mixin(scope_remember(AffectedStyleRegs!Args.join(','))); 
+					
+					void processArg(T)(T a)
+					{
+						static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+						else static if(isStyleArg!T)	{ applyStyleArg(a); }
+						else static if(isCursorArg!T)	applyCursorArg(a); 
+						else static if(isSomeString!T)	textBackend(a); 
+						else static if(isSomeChar!T)	textBackend(only(a)); 
+						else static if(
+							isInputRange!T &&
+							(
+								isSomeChar!(ElementType!T)
+								||is(ElementType!T : AnsiChar)
+							)
+						)	{ textBackend(a); }
+						else static if(isDelegate!T) a(); 
+						else static if(isFunction!T) a(); 
+						else
+						{
+							pragma(msg,i"$(T.stringof) $(isCallable!(applyStyleArg, T))".text.注); 
+							static assert(false, "Unhandled Text() argument: "~T.stringof); 
+						}
+					} 
+					
+					static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
+				} 
+				
+				void textBackend(R)(R input)
+				{
+					if(input.empty) return; 
+					
+					alias _builder = this; 
+					
+					void setup()
+					{
+						with(_builder)
+						{
+							synch_transform, synch_PALH, synch_font, synch_colors; 
+							emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
+						}
+					} 
+					_builder.begin(0, {}); 
+					setup; 
+					
+					version(/+$DIDE_REGION Convert various types to 8bit ASCII, reuse allocated temp memory.+/all)
+					{
+						static Appender!(ubyte[]) app; app.clear; 
+						ubyte[] rawSrc; 
+						alias E = ElementType!R; 
+						static if(isDynamicArray!R && is(E : AnsiChar) /+fastest way+/)
+						{ rawSrc = (cast(ubyte[])(input)); }
+						else static if(isInputRange!R && is(E : AnsiChar) /+buffer the inputRange+/)
+						{ app.put(input); rawSrc = (cast(ubyte[])(app[])); }
+						else static if(isInputRange!R && isSomeChar!E /+convert fron normal string+/)
+						{ app.put(input.map!toAnsiChar); rawSrc = (cast(ubyte[])(app[])); }
+						else static assert(false, "unhandled element type: "~E.stringof); 
+					}
+					
+					uint decideCharCount(int len)
+					{
+						enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
+						const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
+							n	= len.min(min(space, maxChars)); 
+						if(n) _builder.incVertexCount(n*2+2); return n; 
+					} 
+					
+					encodeRLE
+					(
+						rawSrc, 3,
+						((ubyte[] part) {
+							while(1)
+							{
+								if(const n = decideCharCount((cast(int)(part.length))))
+								{
+									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
+									cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
+								}
+								/+start next geometry item+/_builder.begin; setup; 
+							}
+						}),
+						((ubyte ch, uint len) {
+							while(1)
+							{
+								if(const n = decideCharCount(len))
+								{
+									_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
+									cursorPos.x += n; len -= n; if(!len) break; 
+								}
+								/+start next geometry item+/_builder.begin; setup; 
+							}
+						})
+					); 
+					
+					version(/+$DIDE_REGION Don't waste memory for exceptionally large texts+/all)
+					{
+						enum tooLargeBuf = 0x1000; 
+						if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
+					}
+				} 
+			}
+			
+		} 
 	} 
 	
 	class TurboVisionBuilder : GfxBuilder
 	{
-		mixin InjectEnumMembers!EGAColor; 
-		
-		enum clMenuBk 	= ((ltGray).名!q{bk}), 
-		clMenuText 	= ((black).名!q{fg}), 
-		clMenuKey	= ((red).名!q{fg}),
-		clMenuItem 	= tuple(clMenuText, clMenuBk),
-		clMenuSelected 	= tuple(clMenuText, ((green).名!q{bk})),
-		clMenuDisabled 	= tuple(((dkGray).名!q{fg}), clMenuBk); 
-		
-		enum clWindowBk	= ((blue).名!q{bk}),
-		clWindowText 	= ((white).名!q{fg}),
-		clWindow 	= tuple(clWindowText, clWindowBk),
-		clWindowClickable 	= tuple(((ltGreen).名!q{fg}), clWindowBk); 
-		
-		enum clScrollBar = tuple(((blue).名!q{fg}), ((cyan).名!q{bk})); 
-		
-		static struct MenuItem
+		final
 		{
-			string title, shortcut, hint; 
-			bool selected, disabled, opened; 
-			MenuItem[] subMenu; 
-		} 
-		
-		void drawMenuTitle(Args...)(in MenuItem item, Args extra)
-		{
-			const clNormal = 	item.disabled 	? clMenuDisabled : 
-				item.selected 	? clMenuSelected 
-					: clMenuItem; 
-			const s = item.title, aidx = s.byDchar.countUntil('&'); 
-			mixin(scope_remember(q{FF})); 
-			if(item.selected) FF.blink = FontBlink.blink; 
-			if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
-			else {
-				Text(
-					clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
-					clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
-					clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
-					extra
-				); 
-			}
-		} 
-		
-		void drawSubMenu(R)(R items)
-			if(isForwardRange!(R, MenuItem))
-		{
-			sizediff_t measureItemWidth(in MenuItem item)
-			=> item.title.filter!q{a!='&'}.walkLength + 2
-			+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
+			mixin InjectEnumMembers!EGAColor; 
 			
-			const maxWidth = items.save.map!measureItemWidth.maxElement; 
-			vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
-			Style(clMenuItem); 
+			enum clMenuBk 	= ((ltGray).名!q{bk}), 
+			clMenuText 	= ((black).名!q{fg}), 
+			clMenuKey	= ((red).名!q{fg}),
+			clMenuItem 	= tuple(clMenuText, clMenuBk),
+			clMenuSelected 	= tuple(clMenuText, ((green).名!q{bk})),
+			clMenuDisabled 	= tuple(((dkGray).名!q{fg}), clMenuBk); 
 			
-			void shadow(size_t n) { Text(((black).名!q{bk}), ((.6).名!q{opacity}), " ".replicate(n)); } 
+			enum clWindowBk	= ((blue).名!q{bk}),
+			clWindowText 	= ((white).名!q{fg}),
+			clWindow 	= tuple(clWindowText, clWindowBk),
+			clWindowClickable 	= tuple(((ltGreen).名!q{fg}), clWindowBk); 
 			
-			Text(chain(" ┌", "─".replicate(maxWidth), "┐ ")); NL; 
-			foreach(item; items)
+			enum clScrollBar = tuple(((blue).名!q{fg}), ((cyan).名!q{bk})); 
+			
+			static struct MenuItem
 			{
-				Text(" │"); 
-				const space = maxWidth - measureItemWidth(item); 
-				if(item.shortcut!="")
-				{ drawMenuTitle(item, chain(' '.repeat.take(space+1), item.shortcut, " ")); }
-				else
-				{ drawMenuTitle(item, ' '.repeat.take(space)); }
-				Text("│ "); shadow(2); NL; 
-			}
-			Text(chain(" └", '─'.repeat.take(maxWidth), "┘ ")); shadow(2); NL; 
-			Text(mx(2)); shadow(maxWidth+4); 
-		} 
-		
-		void drawMainMenu(R)(R items)
-			if(isForwardRange!(R, MenuItem))
-		{
-			foreach(item; items)
+				string title, shortcut, hint; 
+				bool selected, disabled, opened; 
+				MenuItem[] subMenu; 
+			} 
+			
+			void drawMenuTitle(Args...)(in MenuItem item, Args extra)
 			{
-				const pos = cursorPos; 
-				drawMenuTitle(item); 
-				if(item.opened && !item.subMenu.empty)
-				{
-					mixin(scope_remember(q{cursorPos})); 
-					Text(M(pos), my(1)); //move the cursor
-					drawSubMenu(item.subMenu); 
+				const clNormal = 	item.disabled 	? clMenuDisabled : 
+					item.selected 	? clMenuSelected 
+						: clMenuItem; 
+				const s = item.title, aidx = s.byDchar.countUntil('&'); 
+				mixin(scope_remember(q{FF})); 
+				if(item.selected) FF.blink = FontBlink.blink; 
+				if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
+				else {
+					Text(
+						clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
+						clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
+						clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
+						extra
+					); 
 				}
-			}
-		} 
-		
-		void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
-		{
-			void Btn(string s)
-			{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
+			} 
 			
-			Style(clWindow); 
-			Text(
-				M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x149A282886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
-				chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
-				{ Btn("↕"); }, "═╗"
-			); 
-			const w = bnd.width-2, h = bnd.height-2; 
-			foreach(line; lines.padRight("", h).take(h))
+			void drawSubMenu(R)(R items)
+				if(isForwardRange!(R, MenuItem))
 			{
-				Text(Mx(bnd.left), my(1), '║'); 
-				string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
-				enum enableSyntaxHighlight = true/+note, it's extremely slow!+/; 
-				static if(enableSyntaxHighlight)
+				sizediff_t measureItemWidth(in MenuItem item)
+				=> item.title.filter!q{a!='&'}.walkLength + 2
+				+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
+				
+				const maxWidth = items.save.map!measureItemWidth.maxElement; 
+				vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
+				Style(clMenuItem); 
+				
+				void shadow(size_t n) { Text(((black).名!q{bk}), ((.6).名!q{opacity}), " ".replicate(n)); } 
+				
+				Text(chain(" ┌", "─".replicate(maxWidth), "┐ ")); NL; 
+				foreach(item; items)
 				{
-					foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+					Text(" │"); 
+					const space = maxWidth - measureItemWidth(item); 
+					if(item.shortcut!="")
+					{ drawMenuTitle(item, chain(' '.repeat.take(space+1), item.shortcut, " ")); }
+					else
+					{ drawMenuTitle(item, ' '.repeat.take(space)); }
+					Text("│ "); shadow(2); NL; 
+				}
+				Text(chain(" └", '─'.repeat.take(maxWidth), "┘ ")); shadow(2); NL; 
+				Text(mx(2)); shadow(maxWidth+4); 
+			} 
+			
+			void drawMainMenu(R)(R items)
+				if(isForwardRange!(R, MenuItem))
+			{
+				foreach(item; items)
+				{
+					const pos = cursorPos; 
+					drawMenuTitle(item); 
+					if(item.opened && !item.subMenu.empty)
 					{
-						enum keywords = ["program", "var", "begin", "end", "integer"]; 
-						const isKeyword = keywords.canFind(word.text.lc); 
-						Text(((isKeyword)?(((white).名!q{fg})):(((yellow).名!q{fg}))) , word); 
+						mixin(scope_remember(q{cursorPos})); 
+						Text(M(pos), my(1)); //move the cursor
+						drawSubMenu(item.subMenu); 
 					}
 				}
-				else
-				{ Text(s); }
+			} 
+			
+			void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
+			{
+				void Btn(string s)
+				{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
+				
+				Style(clWindow); 
 				Text(
-					clScrollBar, predSwitch(
-						cursorPos.y-bnd.top-1, 
-						0, '▲', 1, '■', h-1, '▼', '▒'
-					)
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x14F3A82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
+					{ Btn("↕"); }, "═╗"
 				); 
-			}
-			Text(
-				M(bnd.bottomLeft), my(-1), "╚═",
-				chain(" ", "1:1", " ").text.center(17, '═'),
-				clScrollBar, chain("◄", "■", '▒'.repeat.take(bnd.width-24), "►"),
-				clWindowClickable, "─┘"
-			); 
-		} 
-		
-		void fillSpace(int width=80) { while(cursorPos.x<width) Text(' '); } 
-		
-		
-		/+
+				const w = bnd.width-2, h = bnd.height-2; 
+				foreach(line; lines.padRight("", h).take(h))
+				{
+					Text(Mx(bnd.left), my(1), '║'); 
+					string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
+					enum enableSyntaxHighlight = true/+note, it's extremely slow!+/; 
+					static if(enableSyntaxHighlight)
+					{
+						foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+						{
+							enum keywords = ["program", "var", "begin", "end", "integer"]; 
+							const isKeyword = keywords.canFind(word.text.lc); 
+							Text(((isKeyword)?(((white).名!q{fg})):(((yellow).名!q{fg}))) , word); 
+						}
+					}
+					else
+					{ Text(s); }
+					Text(
+						clScrollBar, predSwitch(
+							cursorPos.y-bnd.top-1, 
+							0, '▲', 1, '■', h-1, '▼', '▒'
+						)
+					); 
+				}
+				Text(
+					M(bnd.bottomLeft), my(-1), "╚═",
+					chain(" ", "1:1", " ").text.center(17, '═'),
+					clScrollBar, chain("◄", "■", '▒'.repeat.take(bnd.width-24), "►"),
+					clWindowClickable, "─┘"
+				); 
+			} 
+			
+			void fillSpace(int width=80) { while(cursorPos.x<width) Text(' '); } 
+			
+			
 			/+
-				Para: 	00	01	02	03	04	05	06	07	08	09	0A	0B	0C	0D	0E	0F
-				00	�	☺	☻	♥	♦	♣	♠	•	◘	○	◙	♂	♀	♪	♫	☼
-				10	►	◄	↕	‼	¶	§	▬	↨	↑	↓	→	←	∟	↔	▲	▼
-				20	 	!	"	#	$	%	&	'	(	)	*	+	,	-	.	/
-				30	0	1	2	3	4	5	6	7	8	9	:	;	<	=	>	?
-				40	@	A	B	C	D	E	F	G	H	I	J	K	L	M	N	O
-				50	P	Q	R	S	T	U	V	W	X	Y	Z	[	\	]	^	_
-				60	`	a	b	c	d	e	f	g	h	i	j	k	l	m	n	o
-				70	p	q	r	s	t	u	v	w	x	y	z	{	|	}	~	⌂
-				80	Ç	ü	é	â	ä	à	å	ç	ê	ë	è	ï	î	ì	Ä	Å
-				90	É	æ	Æ	ô	ö	ò	û	ù	ÿ	Ö	Ü	¢	£	¥	₧	ƒ
-				A0	á	í	ó	ú	ñ	Ñ	ª	º	¿	⌐	¬	½	¼	¡	«	»
-				B0	░	▒	▓	│	┤	╡	╢	╖	╕	╣	║	╗	╝	╜	╛	┐
-				C0	└	┴	┬	├	─	┼	╞	╟	╚	╔	╩	╦	╠	═	╬	╧
-				D0	╨	╤	╥	╙	╘	╒	╓	╫	╪	┘	┌	█	▄	▌	▐	▀
-				E0	α	ß	Γ	π	Σ	σ	µ	τ	Φ	Θ	Ω	δ	∞	φ	ε	∩
-				F0	≡	±	≥	≤	⌠	⌡	÷	≈	°	∙	·	√	ⁿ	²	■	 
+				/+
+					Para: 	00	01	02	03	04	05	06	07	08	09	0A	0B	0C	0D	0E	0F
+					00	�	☺	☻	♥	♦	♣	♠	•	◘	○	◙	♂	♀	♪	♫	☼
+					10	►	◄	↕	‼	¶	§	▬	↨	↑	↓	→	←	∟	↔	▲	▼
+					20	 	!	"	#	$	%	&	'	(	)	*	+	,	-	.	/
+					30	0	1	2	3	4	5	6	7	8	9	:	;	<	=	>	?
+					40	@	A	B	C	D	E	F	G	H	I	J	K	L	M	N	O
+					50	P	Q	R	S	T	U	V	W	X	Y	Z	[	\	]	^	_
+					60	`	a	b	c	d	e	f	g	h	i	j	k	l	m	n	o
+					70	p	q	r	s	t	u	v	w	x	y	z	{	|	}	~	⌂
+					80	Ç	ü	é	â	ä	à	å	ç	ê	ë	è	ï	î	ì	Ä	Å
+					90	É	æ	Æ	ô	ö	ò	û	ù	ÿ	Ö	Ü	¢	£	¥	₧	ƒ
+					A0	á	í	ó	ú	ñ	Ñ	ª	º	¿	⌐	¬	½	¼	¡	«	»
+					B0	░	▒	▓	│	┤	╡	╢	╖	╕	╣	║	╗	╝	╜	╛	┐
+					C0	└	┴	┬	├	─	┼	╞	╟	╚	╔	╩	╦	╠	═	╬	╧
+					D0	╨	╤	╥	╙	╘	╒	╓	╫	╪	┘	┌	█	▄	▌	▐	▀
+					E0	α	ß	Γ	π	Σ	σ	µ	τ	Φ	Θ	Ω	δ	∞	φ	ε	∩
+					F0	≡	±	≥	≤	⌠	⌡	÷	≈	°	∙	·	√	ⁿ	²	■	 
+				+/
 			+/
-		+/
+		} 
 	} 
 	
 	
 }
-
 
 
 
@@ -3582,7 +3598,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					void $(field)(float a) {$(field)_= a; } 
 				} 
 			}.text); 
-			
+			
 			
 			alias primaryColor 	= PC, 
 			secondaryColor 	= SC,
@@ -3972,18 +3988,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1EAF282886ADB).檢(
+					((0x1F0C882886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1EB6482886ADB))))
+				if((互!((bool),(0),(0x1F13A82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1EBF882886ADB).檢((互!((float/+w=12+/),(1.000),(0x1EC0F82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1F1CE82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F1E582886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -3996,8 +4012,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1EDE482886ADB).檢 (imVG)),
-					((0x1EE0A82886ADB).檢 (imFPS)); 
+					((0x1F3BA82886ADB).檢 (imVG)),
+					((0x1F3E082886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4113,7 +4129,832 @@ $(V_size+G_size)".text
 			
 			//invalidate; no need.+/; 
 		} 
-	}
+	}static struct BezierImplementations
+	{
+		static: 
+		enum cubic_approx = 
+		q{
+			/*
+				--------------------------------------------------------------
+					Cubic bezier approx distance 2 
+				--------------------------------------------------------------
+					Created by NinjaKoala in 2019-07-17
+					https://www.shadertoy.com/view/3lsSzS
+				--------------------------------------------------------------
+				
+				Copyright (c) <2024> <Felix Potthast>
+				Permission is hereby granted, free of charge, to any person obtaining a 
+				copy of this software and associated documentation files (the "Software"), 
+				to deal in the Software without restriction, including without limitation 
+				the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+				and/or sell copies of the Software, and to permit persons to whom the
+				Software is furnished to do so, subject to the following conditions:
+				
+				The above copyright notice and this permission notice shall be included 
+				in all copies or substantial portions of the Software.
+				
+				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
+				KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+				WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
+				PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
+				OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
+				OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
+				OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+			*/
+			
+			/*
+				See also:
+				
+				Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
+				Exact distance computation: https://www.shadertoy.com/view/4sKyzW
+				Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
+				This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
+			*/
+			
+			const int bezier_num_iterations=3; /*def:3*/
+			const int bezier_num_start_params=3; /*def:3*/
+			
+			const int bezier_method=0; /*valid range: [0..3]*/
+			
+			//factor should be positive
+			//it decreases the step size when lowered.
+			//Lowering the factor and increasing iterations increases the area in which
+			//the iteration converges, but this is quite costly
+			const float bezier_factor=1; /*def:1*/
+			
+			float newton_iteration(vec3 coeffs, float x)
+			{
+				float a2=coeffs[2]+x; 
+				float a1=coeffs[1]+x*a2; 
+				float f=coeffs[0]+x*a1; 
+				float f1=((x+a2)*x)+a1; 
+				
+				return x-f/f1; 
+			} 
+			
+			float halley_iteration(vec3 coeffs, float x)
+			{
+				float a2=coeffs[2]+x; 
+				float a1=coeffs[1]+x*a2; 
+				float f=coeffs[0]+x*a1; 
+				
+				float b2=a2+x; 
+				float f1=a1+x*b2; 
+				float f2=2.*(b2+x); 
+				return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
+			} 
+			
+			float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
+			{
+				if(method<=1)
+				{
+					//horner's method
+					vec2 a_2=a2+t*a3; 
+					vec2 a_1=a1+t*a_2; 
+					vec2 b_2=a_2+t*a3; 
+					
+					vec2 uv_to_p=a0+t*a_1; 
+					vec2 tang=a_1+t*b_2; 
+					float l_tang=dot(tang,tang); 
+					
+					if(method==0/*normal iteration*/)
+					{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
+					else if(method==1/*normal iteration2*/)
+					{
+						vec2 snd_drv=2.*(b_2+t*a3); 
+						
+						float fac=dot(tang,snd_drv)/(2.*l_tang); 
+						float d=-dot(tang,uv_to_p); 
+						float t2=d/(l_tang+fac*d); 
+						return t+bezier_factor*t2; 
+					}
+				}
+				else
+				{
+					vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
+					vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
+					
+					if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
+					else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
+				}
+				return 0; 
+			} 
+			
+			float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+			{
+				vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+				vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+				vec2 a1 = (-3. * p0 + 3. * p1); 
+				vec2 a0 = p0 - uv; 
+				
+				float d0 = 1e38, t0=0.; 
+				for(int i=0;i<bezier_num_start_params;i++)
+				{
+					float t=t0; 
+					for(int j=0;j<bezier_num_iterations;j++)
+					{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
+					t=clamp(t,0.,1.); 
+					vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
+					d0=min(d0,dot(uv_to_p,uv_to_p)); 
+					
+					t0+=1./float(bezier_num_start_params-1); 
+				}
+				
+				return sqrt(d0); 
+			} 
+		}
+		,
+		cubic_exact =
+		q{
+			/*
+				Exact distance to cubic bezier curve by computing roots of the derivative(s)
+				to isolate roots of a fifth degree polynomial and Halley's Method to compute them.
+				Inspired by https://www.shadertoy.com/view/4sXyDr and https://www.shadertoy.com/view/ldXXWH
+				See also my approximate version:
+				https://www.shadertoy.com/view/lsByRG
+			*/
+			const float bezier_eps = .000005; 
+			const int halley_iterations = 8; 
+			
+			//lagrange positive real root upper bound
+			//see for example: https://doi.org/10.1016/j.jsc.2014.09.038
+			float upper_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
+			{
+				vec4 coeffs1 = vec4(a0,a1,a2,a3); 
+				
+				vec4 neg1 = max(-coeffs1,vec4(0)); 
+				float neg2 = max(-a4,0.); 
+				
+				const vec4 indizes1 = vec4(0,1,2,3); 
+				const float indizes2 = 4.; 
+				
+				vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
+				float bounds2 = pow(neg2,1./(5.-indizes2)); 
+				
+				vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
+				vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
+				
+				float maxmin = max(min1_2.x,min1_2.y); 
+				float minmax = min(max1_2.x,max1_2.y); 
+				
+				float max3 = max(max1_2.x,max1_2.y); 
+				
+				float max_max = max(max3,bounds2); 
+				float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
+				
+				return max_max + max_max2; 
+			} 
+			
+			//lagrange upper bound applied to f(-x) to get lower bound
+			float lower_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
+			{
+				vec4 coeffs1 = vec4(-a0,a1,-a2,a3); 
+				
+				vec4 neg1 = max(-coeffs1,vec4(0)); 
+				float neg2 = max(-a4,0.); 
+				
+				const vec4 indizes1 = vec4(0,1,2,3); 
+				const float indizes2 = 4.; 
+				
+				vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
+				float bounds2 = pow(neg2,1./(5.-indizes2)); 
+				
+				vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
+				vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
+				
+				float maxmin = max(min1_2.x,min1_2.y); 
+				float minmax = min(max1_2.x,max1_2.y); 
+				
+				float max3 = max(max1_2.x,max1_2.y); 
+				
+				float max_max = max(max3,bounds2); 
+				float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
+				
+				return -max_max - max_max2; 
+			} 
+			
+			vec2 parametric_cub_bezier(float t, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+			{
+				vec2 a0 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+				vec2 a1 = (3. * p0  -6. * p1 + 3. * p2); 
+				vec2 a2 = (-3. * p0 + 3. * p1); 
+				vec2 a3 = p0; 
+				
+				return (((a0 * t) + a1) * t + a2) * t + a3; 
+			} 
+			
+			void sort_roots3(inout vec3 roots)
+			{
+				vec3 tmp; 
+				
+				tmp[0] = min(roots[0],min(roots[1],roots[2])); 
+				tmp[1] = max(roots[0],min(roots[1],roots[2])); 
+				tmp[2] = max(roots[0],max(roots[1],roots[2])); 
+				
+				roots=tmp; 
+			} 
+			
+			void sort_roots4(inout vec4 roots)
+			{
+				vec4 tmp; 
+				
+				vec2 min1_2 = min(roots.xz,roots.yw); 
+				vec2 max1_2 = max(roots.xz,roots.yw); 
+				
+				float maxmin = max(min1_2.x,min1_2.y); 
+				float minmax = min(max1_2.x,max1_2.y); 
+				
+				tmp[0] = min(min1_2.x,min1_2.y); 
+				tmp[1] = min(maxmin,minmax); 
+				tmp[2] = max(minmax,maxmin); 
+				tmp[3] = max(max1_2.x,max1_2.y); 
+				
+				roots = tmp; 
+			} 
+			
+			float eval_poly5(float a0, float a1, float a2, float a3, float a4, float x)
+			{
+				float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
+				return f; 
+			} 
+			
+			//halley's method
+			//basically a variant of newton raphson which converges quicker and has bigger basins of convergence
+			//see http://mathworld.wolfram.com/HalleysMethod.html
+			//or https://en.wikipedia.org/wiki/Halley%27s_method
+			float halley_iteration5(float a0, float a1, float a2, float a3, float a4, float x)
+			{
+				float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
+				float f1 = (((5. * x + 4. * a4) * x + 3. * a3) * x + 2. * a2) * x + a1; 
+				float f2 = ((20. * x + 12. * a4) * x + 6. * a3) * x + 2. * a2; 
+				
+				return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
+			} 
+			
+			float halley_iteration4(vec4 coeffs, float x)
+			{
+				float f = (((x + coeffs[3]) * x + coeffs[2]) * x + coeffs[1]) * x + coeffs[0]; 
+				float f1 = ((4. * x + 3. * coeffs[3]) * x + 2. * coeffs[2]) * x + coeffs[1]; 
+				float f2 = (12. * x + 6. * coeffs[3]) * x + 2. * coeffs[2]; 
+				
+				return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
+			} 
+			
+			// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+			// Credits to Doublefresh for hinting there
+			int solve_quadric(vec2 coeffs, inout vec2 roots)
+			{
+				// normal form: x^2 + px + q = 0
+				float p = coeffs[1] / 2.; 
+				float q = coeffs[0]; 
+				
+				float D = p * p - q; 
+				
+				if(D < 0.) { return 0; }
+				else if(D > 0.) {
+					roots[0] = -sqrt(D) - p; 
+					roots[1] = sqrt(D) - p; 
+					
+					return 2; 
+				}
+			} 
+			
+			//From Trisomie21
+			//But instead of his cancellation fix i'm using a newton iteration
+			int solve_cubic(vec3 coeffs, inout vec3 r)
+			{
+				
+				float a = coeffs[2]; 
+				float b = coeffs[1]; 
+				float c = coeffs[0]; 
+				
+				float p = b - a*a / 3.0; 
+				float q = a * (2.0*a*a - 9.0*b) / 27.0 + c; 
+				float p3 = p*p*p; 
+				float d = q*q + 4.0*p3 / 27.0; 
+				float offset = -a / 3.0; 
+				if(d >= 0.0) {
+					 // Single solution
+					float z = sqrt(d); 
+					float u = (-q + z) / 2.0; 
+					float v = (-q - z) / 2.0; 
+					u = sign(u)*pow(abs(u),1.0/3.0); 
+					v = sign(v)*pow(abs(v),1.0/3.0); 
+					r[0] = offset + u + v; 	
+							
+					//Single newton iteration to account for cancellation
+					float f = ((r[0] + a) * r[0] + b) * r[0] + c; 
+					float f1 = (3. * r[0] + 2. * a) * r[0] + b; 
+							
+					r[0] -= f / f1; 
+							
+					return 1; 
+				}
+				float u = sqrt(-p / 3.0); 
+				float v = acos(-sqrt( -27.0 / p3) * q / 2.0) / 3.0; 
+				float m = cos(v), n = sin(v)*1.732050808; 
+				
+				//Single newton iteration to account for cancellation
+				//(once for every root)
+				r[0]	= offset + u * (m + m); 
+				r[1] = offset - u * (n + m); 
+				r[2] = offset + u * (n - m); 
+				
+				vec3 f = ((r + a) * r + b) * r + c; 
+				vec3 f1 = (3. * r + 2. * a) * r + b; 
+				
+				r -= f / f1; 
+				
+				return 3; 
+			} 
+			
+			// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+			// Credits to Doublefresh for hinting there
+			int solve_quartic(vec4 coeffs, inout vec4 s)
+			{
+				float a = coeffs[3]; 
+				float b = coeffs[2]; 
+				float c = coeffs[1]; 
+				float d = coeffs[0]; 
+				
+				/*
+					  substitute x = y - A/4 to eliminate cubic term:
+								x^4 + px^2 + qx + r = 0 
+				*/
+				
+				float sq_a = a * a; 
+				float p = - 3./8. * sq_a + b; 
+				float q = 1./8. * sq_a * a - 1./2. * a * b + c; 
+				float r = - 3./256.*sq_a*sq_a + 1./16.*sq_a*b - 1./4.*a*c + d; 
+				
+				int num; 
+				
+				/* doesn't seem to happen for me */
+				//if(abs(r)<eps){
+				//	/* no absolute term: y(y^3 + py + q) = 0 */
+				
+				//	vec3 cubic_coeffs;
+				
+				//	cubic_coeffs[0] = q;
+				//	cubic_coeffs[1] = p;
+				//	cubic_coeffs[2] = 0.;
+				
+				//	num = solve_cubic(cubic_coeffs, s.xyz);
+				
+				//	s[num] = 0.;
+				//	num++;
+				//}
+				{
+					/* solve the resolvent cubic ... */
+					
+					vec3 cubic_coeffs; 
+					
+					cubic_coeffs[0] = 1.0/2. * r * p - 1.0/8. * q * q; 
+					cubic_coeffs[1] = - r; 
+					cubic_coeffs[2] = - 1.0/2. * p; 
+					
+					solve_cubic(cubic_coeffs, s.xyz); 
+					
+					/* ... and take the one real solution ... */
+					
+					float z = s[0]; 
+					
+					/* ... to build two quadric equations */
+					
+					float u = z * z - r; 
+					float v = 2. * z - p; 
+					
+					if(u > -bezier_eps) { u = sqrt(abs(u)); }
+					else	{ return 0; }
+					
+					if(v > -bezier_eps) { v = sqrt(abs(v)); }
+					else	{ return 0; }
+					
+					vec2 quad_coeffs; 
+					
+					quad_coeffs[0] = z - u; 
+					quad_coeffs[1] = q < 0. ? -v : v; 
+					
+					num = solve_quadric(quad_coeffs, s.xy); 
+					
+					quad_coeffs[0]= z + u; 
+					quad_coeffs[1] = q < 0. ? v : -v; 
+					
+					vec2 tmp=vec2(1e38); 
+					int old_num=num; 
+					
+					num += solve_quadric(quad_coeffs, tmp); 
+					if(old_num!=num) {
+						if(old_num == 0) {
+							 s[0] = tmp[0]; 
+							 s[1] = tmp[1]; 
+						}
+						else {
+							//old_num == 2
+							s[2] = tmp[0]; 
+							s[3] = tmp[1]; 
+						}
+					}
+				}
+				
+				/* resubstitute */
+				
+				float sub = 1./4. * a; 
+				
+				/* single halley iteration to fix cancellation */
+				for(int i=0;i<4;i+=2) {
+					if(i < num) {
+						s[i] -= sub; 
+						s[i] = halley_iteration4(coeffs,s[i]); 
+						
+						s[i+1] -= sub; 
+						s[i+1] = halley_iteration4(coeffs,s[i+1]); 
+					}
+				}
+				
+				return num; 
+			} 
+			float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+			{
+				//switch points when near to end point to minimize numerical error
+				//only needed when control point(s) very far away
+				if(false)
+				{
+					vec2 mid_curve = parametric_cub_bezier(.5,p0,p1,p2,p3); 
+					vec2 mid_points = (p0 + p3)/2.; 
+					
+					vec2 tang = mid_curve-mid_points; 
+					vec2 nor = vec2(tang.y,-tang.x); 
+					
+					if(sign(dot(nor,uv-mid_curve)) != sign(dot(nor,p0-mid_curve)))
+					{
+						vec2 tmp = p0; 
+						p0 = p3; 
+						p3 = tmp; 
+						
+						tmp = p2; 
+						p2 = p1; 
+						p1 = tmp; 
+					}
+				}
+				vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+				vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+				vec2 a1 = (-3. * p0 + 3. * p1); 
+				vec2 a0 = p0 - uv; 
+				
+				//compute polynomial describing distance to current pixel dependent on a parameter t
+				float bc6 = dot(a3,a3); 
+				float bc5 = 2.*dot(a3,a2); 
+				float bc4 = dot(a2,a2) + 2.*dot(a1,a3); 
+				float bc3 = 2.*(dot(a1,a2) + dot(a0,a3)); 
+				float bc2 = dot(a1,a1) + 2.*dot(a0,a2); 
+				float bc1 = 2.*dot(a0,a1); 
+				float bc0 = dot(a0,a0); 
+				
+				bc5 /= bc6; 
+				bc4 /= bc6; 
+				bc3 /= bc6; 
+				bc2 /= bc6; 
+				bc1 /= bc6; 
+				bc0 /= bc6; 
+				
+				//compute derivatives of this polynomial
+				
+				float b0 = bc1 / 6.; 
+				float b1 = 2. * bc2 / 6.; 
+				float b2 = 3. * bc3 / 6.; 
+				float b3 = 4. * bc4 / 6.; 
+				float b4 = 5. * bc5 / 6.; 
+				
+				vec4 c1 = vec4(b1,2.*b2,3.*b3,4.*b4)/5.; 
+				vec3 c2 = vec3(c1[1],2.*c1[2],3.*c1[3])/4.; 
+				vec2 c3 = vec2(c2[1],2.*c2[2])/3.; 
+				float c4 = c3[1]/2.; 
+				
+				vec4 roots_drv = vec4(1e38); 
+				
+				int num_roots_drv = solve_quartic(c1,roots_drv); 
+				sort_roots4(roots_drv); 
+				
+				float ub = upper_bound_lagrange5(b0,b1,b2,b3,b4); 
+				float lb = lower_bound_lagrange5(b0,b1,b2,b3,b4); 
+				
+				vec3 a = vec3(1e38); 
+				vec3 b = vec3(1e38); 
+				
+				vec3 roots = vec3(1e38); 
+				
+				int num_roots = 0; 
+				
+				//compute root isolating intervals by roots of derivative and outer root bounds
+				//only roots going form - to + considered, because only those result in a minimum
+				if(num_roots_drv==4)
+				{
+					if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) > 0.)
+					{
+						a[0]=lb; 
+						b[0]=roots_drv[0]; 
+						num_roots=1; 
+					}
+					
+					if(
+						sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1])) != 
+						sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[2]))
+					)
+					{
+						if(num_roots == 0)
+						{
+							a[0]=roots_drv[1]; 
+							b[0]=roots_drv[2]; 
+							num_roots=1; 
+						}
+						else
+						{
+							a[1]=roots_drv[1]; 
+							b[1]=roots_drv[2]; 
+							num_roots=2; 
+						}
+					}
+					
+					if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[3]) < 0.)
+					{
+						if(num_roots == 0)
+						{
+							a[0]=roots_drv[3]; 
+							b[0]=ub; 
+							num_roots=1; 
+						}
+						else if(num_roots == 1)
+						{
+							a[1]=roots_drv[3]; 
+							b[1]=ub; 
+							num_roots=2; 
+						}
+						else
+						{
+							a[2]=roots_drv[3]; 
+							b[2]=ub; 
+							num_roots=3; 
+						}
+					}
+				}else {
+					if(num_roots_drv==2)
+					{
+						if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) < 0.)
+						{
+							num_roots=1; 
+							a[0]=roots_drv[1]; 
+							b[0]=ub; 
+						}
+						else if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1]) > 0.)
+						{
+							num_roots=1; 
+							a[0]=lb; 
+							b[0]=roots_drv[0]; 
+						}
+						else
+						{
+							num_roots=2; 
+							
+							a[0]=lb; 
+							b[0]=roots_drv[0]; 
+							
+							a[1]=roots_drv[1]; 
+							b[1]=ub; 
+						}
+					}
+					else {
+						//num_roots_drv==0
+						vec3 roots_snd_drv=vec3(1e38); 
+						int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
+						
+						vec2 roots_trd_drv=vec2(1e38); 
+						int num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); 
+						num_roots=1; 
+						
+						a[0]=lb; 
+						b[0]=ub; 
+					}
+					
+					//further subdivide intervals to guarantee convergence of halley's method
+					//by using roots of further derivatives
+					vec3 roots_snd_drv=vec3(1e38); 
+					int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
+					sort_roots3(roots_snd_drv); 
+					
+					int num_roots_trd_drv=0; 
+					vec2 roots_trd_drv=vec2(1e38); 
+					
+					if(num_roots_snd_drv!=3) { num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); }
+					
+					for(int i=0;i<3;i++)
+					{
+						if(i < num_roots)
+						{
+							for(int j=0;j<3;j+=2)
+							{
+								if(j < num_roots_snd_drv)
+								{
+									if(a[i] < roots_snd_drv[j] && b[i] > roots_snd_drv[j])
+									{
+										if(eval_poly5(b0,b1,b2,b3,b4,roots_snd_drv[j]) > 0.)
+										{ b[i]=roots_snd_drv[j]; }
+										else { a[i]=roots_snd_drv[j]; }
+									}
+								}
+							}
+							for(int j=0;j<2;j++)
+							{
+								if(j < num_roots_trd_drv)
+								{
+									if(a[i] < roots_trd_drv[j] && b[i] > roots_trd_drv[j])
+									{
+										if(eval_poly5(b0,b1,b2,b3,b4,roots_trd_drv[j]) > 0.)
+										{ b[i]=roots_trd_drv[j]; }
+										else { a[i]=roots_trd_drv[j]; }
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				float d0 = 1e38; 
+				
+				//compute roots with halley's method
+				
+				for(int i=0;i<3;i++)
+				{
+					if(i < num_roots)
+					{
+						roots[i] = .5 * (a[i] + b[i]); 
+						
+						for(int j=0;j<halley_iterations;j++) { roots[i] = halley_iteration5(b0,b1,b2,b3,b4,roots[i]); }
+						
+						//compute squared distance to nearest point on curve
+						roots[i] =	clamp(roots[i],0.,1.); 
+						vec2 to_curve = uv - parametric_cub_bezier(roots[i],p0,p1,p2,p3); 
+						d0 = min(d0,dot(to_curve,to_curve)); 
+					}
+				}
+				
+				return sqrt(d0); 
+			} 
+		}
+		,
+		quadratic_approx = 
+		q{
+			//Quadratic Bezier - distance 2D 
+			
+			// The MIT License
+			// Copyright © 2018 Inigo Quilez
+			/*
+				 Permission is hereby granted, free of charge, to any person obtaining a copy of 
+				this software and associated documentation files (the "Software"), to deal in the 
+				Software without restriction, including without limitation the rights to use, copy, 
+				modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+				and to permit persons to whom the Software is furnished to do so, subject to 
+				the following conditions: The above copyright notice and this permission notice 
+				shall be included in all copies or substantial portions of the Software. 
+				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+				EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+				MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+				IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+				CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+				TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+			*/
+			
+			
+			// Distance to a quadratic bezier segment
+			
+			// SDF(x) = argmin{t} |x-b(t)|²  
+			//           
+			// where b(t) is the curve. So we have
+			//
+			// |x-b(t)|² = |x|² - 2x·b(t) + |b(t)|²
+			//
+			// ∂|x-b(t)|²/∂t = 2(b(t)-x)·b'(t) = 0
+			//
+			// (b(t)-x)·b'(t) = 0
+			//
+			// But b(t) is degree 2, so b'(t) is degree 1, so (b(t)-x)·b'(t)=0 is a cubic.
+			// I solved the cubic using the trigonometric solution of the depressed as 
+			// shown here: https://en.wikipedia.org/wiki/Cubic_equation
+			
+			
+			// List of some other 2D distances: https://www.shadertoy.com/playlist/MXdSRf
+			//
+			// and iquilezles.org/articles/distfunctions2d
+			
+			
+			
+			float dot2( vec2 v ) { return dot(v,v); } 
+			float cro( vec2 a, vec2 b ) { return a.x*b.y-a.y*b.x; } 
+			float cos_acos_3( float x )
+			{
+				x=sqrt(0.5+0.5*x); 
+				return x*(x*(x*(x*-0.008972+0.039071)-0.107074)+0.576975)+0.5; 
+			} 
+			// https://www.shadertoy.com/view/WltSD7
+			
+			
+			// This method provides just an approximation, and is only usable in
+			// the very close neighborhood of the curve. Taken and adapted from
+			// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
+			float quadraticBezierDist(
+				 vec2 p, vec2 v0, vec2 v1, vec2 v2
+				/*out vec2 outQ */
+			)
+			{
+				vec2 i = v0 - v2; 
+				vec2 j = v2 - v1; 
+				vec2 k = v1 - v0; 
+				vec2 w = j-k; 
+				
+				v0-= p; v1-= p; v2-= p; 
+				
+				float x = cro(v0, v2); 
+				float y = cro(v1, v0); 
+				float z = cro(v2, v1); 
+				
+				vec2 s = 2.0*(y*j+z*k)-x*i; 
+				
+				float r =  (y*z-x*x*0.25)/dot2(s); 
+				float t = clamp( (0.5*x+y+r*dot(s,w))/(x+y+z),0.0,1.0); 
+				
+				vec2 d = v0+t*(k+k+t*w); 
+				//outQ = d + p; 
+				return length(d); 
+			} 
+		}
+		,
+		quadratic_exact = 
+		q{
+			// signed distance to a quadratic bezier
+			float quadraticBezierDist(
+				 in vec2 pos, in vec2 A, in vec2 B, in vec2 C
+				/*out vec2 outQ*/
+			)
+			{
+				vec2 a = B - A; 
+				vec2 b = A - 2.0*B + C; 
+				vec2 c = a * 2.0; 
+				vec2 d = A - pos; 
+				
+				// cubic to be solved (kx*=3 and ky*=3)
+				float kk = 1.0/dot(b,b); 
+				float kx = kk * dot(a,b); 
+				float ky = kk * (2.0*dot(a,a)+dot(d,b))/3.0; 
+				float kz = kk * dot(d,a); 
+				
+				float res = 0.0; 
+				float sgn = 0.0; 
+				
+				float p = ky - kx*kx; 
+				float q = kx*(2.0*kx*kx - 3.0*ky) + kz; 
+				float p3 = p*p*p; 
+				float q2 = q*q; 
+				float h = q2 + 4.0*p3; 
+				
+				if(h>=0.0)
+				{
+					// 1 root
+					h = sqrt(h); 
+					
+					h = (q<0.0) ? h : -h; // copysign()
+					float x = (h-q)/2.0; 
+					float v = sign(x)*pow(abs(x),1.0/3.0); 
+					float t = v - p/v; 
+					
+					// from NinjaKoala - single newton iteration to account for cancellation
+					t -= (t*(t*t+3.0*p)+q)/(3.0*t*t+3.0*p); 
+					
+					t = clamp( t-kx, 0.0, 1.0 ); 
+					vec2  w = d+(c+b*t)*t; 
+					//outQ = w + pos; 
+					res = dot2(w); 
+					sgn = cro(c+2.0*b*t,w); 
+				}
+				else
+				{
+					// 3 roots
+					float z = sqrt(-p); 
+					float m = cos_acos_3(q/(p*z*2.0)); 
+					float n = sqrt(1.0-m*m); 
+					n *= sqrt(3.0); 
+					vec3	t = clamp( vec3(m+m,-n-m,n-m)*z-kx, 0.0, 1.0 ); 
+					vec2	qx=d+(c+b*t.x)*t.x; float dx=dot2(qx), sx=cro(a+b*t.x,qx); 
+					vec2	qy=d+(c+b*t.y)*t.y; float dy=dot2(qy), sy=cro(a+b*t.y,qy); 
+					if(dx<dy)	{ res=dx; sgn=sx; /*outQ=qx+pos; */}
+					else	{ res=dy; sgn=sy; /*outQ=qy+pos; */}
+				}
+				
+				return sqrt( res )/*sign(sgn)*/; 
+			} 
+		}; 
+	} 
 	version(/+$DIDE_REGION+/all) {
 		/+
 			Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`./+
@@ -5795,818 +6636,9 @@ $(V_size+G_size)".text
 						fragMode = getFragMode; 
 						fragTexHandle = getFragTexHandle; 
 						texCoordXY = fragTexCoordXY; 
-					} 
-					/*
-						--------------------------------------------------------------
-							Cubic bezier approx distance 2 
-						--------------------------------------------------------------
-							Created by NinjaKoala in 2019-07-17
-							https://www.shadertoy.com/view/3lsSzS
-						--------------------------------------------------------------
-						
-						Copyright (c) <2024> <Felix Potthast>
-						Permission is hereby granted, free of charge, to any person obtaining a 
-						copy of this software and associated documentation files (the "Software"), 
-						to deal in the Software without restriction, including without limitation 
-						the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-						and/or sell copies of the Software, and to permit persons to whom the
-						Software is furnished to do so, subject to the following conditions:
-						
-						The above copyright notice and this permission notice shall be included 
-						in all copies or substantial portions of the Software.
-						
-						THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
-						KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-						WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
-						PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
-						OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
-						OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-						OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-						SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-					*/
-					
-					/*
-						See also:
-						
-						Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
-						Exact distance computation: https://www.shadertoy.com/view/4sKyzW
-						Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
-						This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
-					*/
-					
-					const int bezier_num_iterations=3; /*def:3*/
-					const int bezier_num_start_params=3; /*def:3*/
-					
-					const int bezier_method=0; /*valid range: [0..3]*/
-					
-					//factor should be positive
-					//it decreases the step size when lowered.
-					//Lowering the factor and increasing iterations increases the area in which
-					//the iteration converges, but this is quite costly
-					const float bezier_factor=1; /*def:1*/
-					
-					float newton_iteration(vec3 coeffs, float x)
-					{
-						float a2=coeffs[2]+x; 
-						float a1=coeffs[1]+x*a2; 
-						float f=coeffs[0]+x*a1; 
-						float f1=((x+a2)*x)+a1; 
-						
-						return x-f/f1; 
 					} 
 					
-					float halley_iteration(vec3 coeffs, float x)
-					{
-						float a2=coeffs[2]+x; 
-						float a1=coeffs[1]+x*a2; 
-						float f=coeffs[0]+x*a1; 
-						
-						float b2=a2+x; 
-						float f1=a1+x*b2; 
-						float f2=2.*(b2+x); 
-						return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
-					} 
-					
-					float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
-					{
-						if(method<=1)
-						{
-							//horner's method
-							vec2 a_2=a2+t*a3; 
-							vec2 a_1=a1+t*a_2; 
-							vec2 b_2=a_2+t*a3; 
-							
-							vec2 uv_to_p=a0+t*a_1; 
-							vec2 tang=a_1+t*b_2; 
-							float l_tang=dot(tang,tang); 
-							
-							if(method==0/*normal iteration*/)
-							{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
-							else if(method==1/*normal iteration2*/)
-							{
-								vec2 snd_drv=2.*(b_2+t*a3); 
-								
-								float fac=dot(tang,snd_drv)/(2.*l_tang); 
-								float d=-dot(tang,uv_to_p); 
-								float t2=d/(l_tang+fac*d); 
-								return t+bezier_factor*t2; 
-							}
-						}
-						else
-						{
-							vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
-							vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
-							
-							if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
-							else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
-						}
-						return 0; 
-					} 
-					
-					float cubic_bezier_dis_approx(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-					{
-						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-						vec2 a1 = (-3. * p0 + 3. * p1); 
-						vec2 a0 = p0 - uv; 
-						
-						float d0 = 1e38, t0=0.; 
-						for(int i=0;i<bezier_num_start_params;i++)
-						{
-							float t=t0; 
-							for(int j=0;j<bezier_num_iterations;j++)
-							{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
-							t=clamp(t,0.,1.); 
-							vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
-							d0=min(d0,dot(uv_to_p,uv_to_p)); 
-							
-							t0+=1./float(bezier_num_start_params-1); 
-						}
-						
-						return sqrt(d0); 
-					} 
-					
-					/*
-						Exact distance to cubic bezier curve by computing roots of the derivative(s)
-						to isolate roots of a fifth degree polynomial and Halley's Method to compute them.
-						Inspired by https://www.shadertoy.com/view/4sXyDr and https://www.shadertoy.com/view/ldXXWH
-						See also my approximate version:
-						https://www.shadertoy.com/view/lsByRG
-					*/
-					const float bezier_eps = .000005; 
-					const int halley_iterations = 8; 
-					
-					//lagrange positive real root upper bound
-					//see for example: https://doi.org/10.1016/j.jsc.2014.09.038
-					float upper_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
-					{
-						vec4 coeffs1 = vec4(a0,a1,a2,a3); 
-						
-						vec4 neg1 = max(-coeffs1,vec4(0)); 
-						float neg2 = max(-a4,0.); 
-						
-						const vec4 indizes1 = vec4(0,1,2,3); 
-						const float indizes2 = 4.; 
-						
-						vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
-						float bounds2 = pow(neg2,1./(5.-indizes2)); 
-						
-						vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
-						vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
-						
-						float maxmin = max(min1_2.x,min1_2.y); 
-						float minmax = min(max1_2.x,max1_2.y); 
-						
-						float max3 = max(max1_2.x,max1_2.y); 
-						
-						float max_max = max(max3,bounds2); 
-						float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
-						
-						return max_max + max_max2; 
-					} 
-					
-					//lagrange upper bound applied to f(-x) to get lower bound
-					float lower_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
-					{
-						vec4 coeffs1 = vec4(-a0,a1,-a2,a3); 
-						
-						vec4 neg1 = max(-coeffs1,vec4(0)); 
-						float neg2 = max(-a4,0.); 
-						
-						const vec4 indizes1 = vec4(0,1,2,3); 
-						const float indizes2 = 4.; 
-						
-						vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
-						float bounds2 = pow(neg2,1./(5.-indizes2)); 
-						
-						vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
-						vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
-						
-						float maxmin = max(min1_2.x,min1_2.y); 
-						float minmax = min(max1_2.x,max1_2.y); 
-						
-						float max3 = max(max1_2.x,max1_2.y); 
-						
-						float max_max = max(max3,bounds2); 
-						float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
-						
-						return -max_max - max_max2; 
-					} 
-					
-					vec2 parametric_cub_bezier(float t, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-					{
-						vec2 a0 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-						vec2 a1 = (3. * p0  -6. * p1 + 3. * p2); 
-						vec2 a2 = (-3. * p0 + 3. * p1); 
-						vec2 a3 = p0; 
-						
-						return (((a0 * t) + a1) * t + a2) * t + a3; 
-					} 
-					
-					void sort_roots3(inout vec3 roots)
-					{
-						vec3 tmp; 
-						
-						tmp[0] = min(roots[0],min(roots[1],roots[2])); 
-						tmp[1] = max(roots[0],min(roots[1],roots[2])); 
-						tmp[2] = max(roots[0],max(roots[1],roots[2])); 
-						
-						roots=tmp; 
-					} 
-					
-					void sort_roots4(inout vec4 roots)
-					{
-						vec4 tmp; 
-						
-						vec2 min1_2 = min(roots.xz,roots.yw); 
-						vec2 max1_2 = max(roots.xz,roots.yw); 
-						
-						float maxmin = max(min1_2.x,min1_2.y); 
-						float minmax = min(max1_2.x,max1_2.y); 
-						
-						tmp[0] = min(min1_2.x,min1_2.y); 
-						tmp[1] = min(maxmin,minmax); 
-						tmp[2] = max(minmax,maxmin); 
-						tmp[3] = max(max1_2.x,max1_2.y); 
-						
-						roots = tmp; 
-					} 
-					
-					float eval_poly5(float a0, float a1, float a2, float a3, float a4, float x)
-					{
-						float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
-						return f; 
-					} 
-					
-					//halley's method
-					//basically a variant of newton raphson which converges quicker and has bigger basins of convergence
-					//see http://mathworld.wolfram.com/HalleysMethod.html
-					//or https://en.wikipedia.org/wiki/Halley%27s_method
-					float halley_iteration5(float a0, float a1, float a2, float a3, float a4, float x)
-					{
-						float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
-						float f1 = (((5. * x + 4. * a4) * x + 3. * a3) * x + 2. * a2) * x + a1; 
-						float f2 = ((20. * x + 12. * a4) * x + 6. * a3) * x + 2. * a2; 
-						
-						return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
-					} 
-					
-					float halley_iteration4(vec4 coeffs, float x)
-					{
-						float f = (((x + coeffs[3]) * x + coeffs[2]) * x + coeffs[1]) * x + coeffs[0]; 
-						float f1 = ((4. * x + 3. * coeffs[3]) * x + 2. * coeffs[2]) * x + coeffs[1]; 
-						float f2 = (12. * x + 6. * coeffs[3]) * x + 2. * coeffs[2]; 
-						
-						return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
-					} 
-					
-					// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-					// Credits to Doublefresh for hinting there
-					int solve_quadric(vec2 coeffs, inout vec2 roots)
-					{
-						// normal form: x^2 + px + q = 0
-						float p = coeffs[1] / 2.; 
-						float q = coeffs[0]; 
-						
-						float D = p * p - q; 
-						
-						if(D < 0.) { return 0; }
-						else if(D > 0.) {
-							roots[0] = -sqrt(D) - p; 
-							roots[1] = sqrt(D) - p; 
-							
-							return 2; 
-						}
-					} 
-					
-					//From Trisomie21
-					//But instead of his cancellation fix i'm using a newton iteration
-					int solve_cubic(vec3 coeffs, inout vec3 r)
-					{
-						
-						float a = coeffs[2]; 
-						float b = coeffs[1]; 
-						float c = coeffs[0]; 
-						
-						float p = b - a*a / 3.0; 
-						float q = a * (2.0*a*a - 9.0*b) / 27.0 + c; 
-						float p3 = p*p*p; 
-						float d = q*q + 4.0*p3 / 27.0; 
-						float offset = -a / 3.0; 
-						if(d >= 0.0) {
-							 // Single solution
-							float z = sqrt(d); 
-							float u = (-q + z) / 2.0; 
-							float v = (-q - z) / 2.0; 
-							u = sign(u)*pow(abs(u),1.0/3.0); 
-							v = sign(v)*pow(abs(v),1.0/3.0); 
-							r[0] = offset + u + v; 	
-									
-							//Single newton iteration to account for cancellation
-							float f = ((r[0] + a) * r[0] + b) * r[0] + c; 
-							float f1 = (3. * r[0] + 2. * a) * r[0] + b; 
-									
-							r[0] -= f / f1; 
-									
-							return 1; 
-						}
-						float u = sqrt(-p / 3.0); 
-						float v = acos(-sqrt( -27.0 / p3) * q / 2.0) / 3.0; 
-						float m = cos(v), n = sin(v)*1.732050808; 
-						
-						//Single newton iteration to account for cancellation
-						//(once for every root)
-						r[0]	= offset + u * (m + m); 
-						r[1] = offset - u * (n + m); 
-						r[2] = offset + u * (n - m); 
-						
-						vec3 f = ((r + a) * r + b) * r + c; 
-						vec3 f1 = (3. * r + 2. * a) * r + b; 
-						
-						r -= f / f1; 
-						
-						return 3; 
-					} 
-					
-					// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-					// Credits to Doublefresh for hinting there
-					int solve_quartic(vec4 coeffs, inout vec4 s)
-					{
-						float a = coeffs[3]; 
-						float b = coeffs[2]; 
-						float c = coeffs[1]; 
-						float d = coeffs[0]; 
-						
-						/*
-							  substitute x = y - A/4 to eliminate cubic term:
-										x^4 + px^2 + qx + r = 0 
-						*/
-						
-						float sq_a = a * a; 
-						float p = - 3./8. * sq_a + b; 
-						float q = 1./8. * sq_a * a - 1./2. * a * b + c; 
-						float r = - 3./256.*sq_a*sq_a + 1./16.*sq_a*b - 1./4.*a*c + d; 
-						
-						int num; 
-						
-						/* doesn't seem to happen for me */
-						//if(abs(r)<eps){
-						//	/* no absolute term: y(y^3 + py + q) = 0 */
-						
-						//	vec3 cubic_coeffs;
-						
-						//	cubic_coeffs[0] = q;
-						//	cubic_coeffs[1] = p;
-						//	cubic_coeffs[2] = 0.;
-						
-						//	num = solve_cubic(cubic_coeffs, s.xyz);
-						
-						//	s[num] = 0.;
-						//	num++;
-						//}
-						{
-							/* solve the resolvent cubic ... */
-							
-							vec3 cubic_coeffs; 
-							
-							cubic_coeffs[0] = 1.0/2. * r * p - 1.0/8. * q * q; 
-							cubic_coeffs[1] = - r; 
-							cubic_coeffs[2] = - 1.0/2. * p; 
-							
-							solve_cubic(cubic_coeffs, s.xyz); 
-							
-							/* ... and take the one real solution ... */
-							
-							float z = s[0]; 
-							
-							/* ... to build two quadric equations */
-							
-							float u = z * z - r; 
-							float v = 2. * z - p; 
-							
-							if(u > -bezier_eps) { u = sqrt(abs(u)); }
-							else	{ return 0; }
-							
-							if(v > -bezier_eps) { v = sqrt(abs(v)); }
-							else	{ return 0; }
-							
-							vec2 quad_coeffs; 
-							
-							quad_coeffs[0] = z - u; 
-							quad_coeffs[1] = q < 0. ? -v : v; 
-							
-							num = solve_quadric(quad_coeffs, s.xy); 
-							
-							quad_coeffs[0]= z + u; 
-							quad_coeffs[1] = q < 0. ? v : -v; 
-							
-							vec2 tmp=vec2(1e38); 
-							int old_num=num; 
-							
-							num += solve_quadric(quad_coeffs, tmp); 
-							if(old_num!=num) {
-								if(old_num == 0) {
-									 s[0] = tmp[0]; 
-									 s[1] = tmp[1]; 
-								}
-								else {
-									//old_num == 2
-									s[2] = tmp[0]; 
-									s[3] = tmp[1]; 
-								}
-							}
-						}
-						
-						/* resubstitute */
-						
-						float sub = 1./4. * a; 
-						
-						/* single halley iteration to fix cancellation */
-						for(int i=0;i<4;i+=2) {
-							if(i < num) {
-								s[i] -= sub; 
-								s[i] = halley_iteration4(coeffs,s[i]); 
-								
-								s[i+1] -= sub; 
-								s[i+1] = halley_iteration4(coeffs,s[i+1]); 
-							}
-						}
-						
-						return num; 
-					} 
-					float cubic_bezier_dis_exact(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-					{
-						//switch points when near to end point to minimize numerical error
-						//only needed when control point(s) very far away
-						if(false)
-						{
-							vec2 mid_curve = parametric_cub_bezier(.5,p0,p1,p2,p3); 
-							vec2 mid_points = (p0 + p3)/2.; 
-							
-							vec2 tang = mid_curve-mid_points; 
-							vec2 nor = vec2(tang.y,-tang.x); 
-							
-							if(sign(dot(nor,uv-mid_curve)) != sign(dot(nor,p0-mid_curve)))
-							{
-								vec2 tmp = p0; 
-								p0 = p3; 
-								p3 = tmp; 
-								
-								tmp = p2; 
-								p2 = p1; 
-								p1 = tmp; 
-							}
-						}
-						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-						vec2 a1 = (-3. * p0 + 3. * p1); 
-						vec2 a0 = p0 - uv; 
-						
-						//compute polynomial describing distance to current pixel dependent on a parameter t
-						float bc6 = dot(a3,a3); 
-						float bc5 = 2.*dot(a3,a2); 
-						float bc4 = dot(a2,a2) + 2.*dot(a1,a3); 
-						float bc3 = 2.*(dot(a1,a2) + dot(a0,a3)); 
-						float bc2 = dot(a1,a1) + 2.*dot(a0,a2); 
-						float bc1 = 2.*dot(a0,a1); 
-						float bc0 = dot(a0,a0); 
-						
-						bc5 /= bc6; 
-						bc4 /= bc6; 
-						bc3 /= bc6; 
-						bc2 /= bc6; 
-						bc1 /= bc6; 
-						bc0 /= bc6; 
-						
-						//compute derivatives of this polynomial
-						
-						float b0 = bc1 / 6.; 
-						float b1 = 2. * bc2 / 6.; 
-						float b2 = 3. * bc3 / 6.; 
-						float b3 = 4. * bc4 / 6.; 
-						float b4 = 5. * bc5 / 6.; 
-						
-						vec4 c1 = vec4(b1,2.*b2,3.*b3,4.*b4)/5.; 
-						vec3 c2 = vec3(c1[1],2.*c1[2],3.*c1[3])/4.; 
-						vec2 c3 = vec2(c2[1],2.*c2[2])/3.; 
-						float c4 = c3[1]/2.; 
-						
-						vec4 roots_drv = vec4(1e38); 
-						
-						int num_roots_drv = solve_quartic(c1,roots_drv); 
-						sort_roots4(roots_drv); 
-						
-						float ub = upper_bound_lagrange5(b0,b1,b2,b3,b4); 
-						float lb = lower_bound_lagrange5(b0,b1,b2,b3,b4); 
-						
-						vec3 a = vec3(1e38); 
-						vec3 b = vec3(1e38); 
-						
-						vec3 roots = vec3(1e38); 
-						
-						int num_roots = 0; 
-						
-						//compute root isolating intervals by roots of derivative and outer root bounds
-						//only roots going form - to + considered, because only those result in a minimum
-						if(num_roots_drv==4)
-						{
-							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) > 0.)
-							{
-								a[0]=lb; 
-								b[0]=roots_drv[0]; 
-								num_roots=1; 
-							}
-							
-							if(
-								sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1])) != 
-								sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[2]))
-							)
-							{
-								if(num_roots == 0)
-								{
-									a[0]=roots_drv[1]; 
-									b[0]=roots_drv[2]; 
-									num_roots=1; 
-								}
-								else
-								{
-									a[1]=roots_drv[1]; 
-									b[1]=roots_drv[2]; 
-									num_roots=2; 
-								}
-							}
-							
-							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[3]) < 0.)
-							{
-								if(num_roots == 0)
-								{
-									a[0]=roots_drv[3]; 
-									b[0]=ub; 
-									num_roots=1; 
-								}
-								else if(num_roots == 1)
-								{
-									a[1]=roots_drv[3]; 
-									b[1]=ub; 
-									num_roots=2; 
-								}
-								else
-								{
-									a[2]=roots_drv[3]; 
-									b[2]=ub; 
-									num_roots=3; 
-								}
-							}
-						}else {
-							if(num_roots_drv==2)
-							{
-								if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) < 0.)
-								{
-									num_roots=1; 
-									a[0]=roots_drv[1]; 
-									b[0]=ub; 
-								}
-								else if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1]) > 0.)
-								{
-									num_roots=1; 
-									a[0]=lb; 
-									b[0]=roots_drv[0]; 
-								}
-								else
-								{
-									num_roots=2; 
-									
-									a[0]=lb; 
-									b[0]=roots_drv[0]; 
-									
-									a[1]=roots_drv[1]; 
-									b[1]=ub; 
-								}
-							}
-							else {
-								//num_roots_drv==0
-								vec3 roots_snd_drv=vec3(1e38); 
-								int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
-								
-								vec2 roots_trd_drv=vec2(1e38); 
-								int num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); 
-								num_roots=1; 
-								
-								a[0]=lb; 
-								b[0]=ub; 
-							}
-							
-							//further subdivide intervals to guarantee convergence of halley's method
-							//by using roots of further derivatives
-							vec3 roots_snd_drv=vec3(1e38); 
-							int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
-							sort_roots3(roots_snd_drv); 
-							
-							int num_roots_trd_drv=0; 
-							vec2 roots_trd_drv=vec2(1e38); 
-							
-							if(num_roots_snd_drv!=3) { num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); }
-							
-							for(int i=0;i<3;i++)
-							{
-								if(i < num_roots)
-								{
-									for(int j=0;j<3;j+=2)
-									{
-										if(j < num_roots_snd_drv)
-										{
-											if(a[i] < roots_snd_drv[j] && b[i] > roots_snd_drv[j])
-											{
-												if(eval_poly5(b0,b1,b2,b3,b4,roots_snd_drv[j]) > 0.)
-												{ b[i]=roots_snd_drv[j]; }
-												else { a[i]=roots_snd_drv[j]; }
-											}
-										}
-									}
-									for(int j=0;j<2;j++)
-									{
-										if(j < num_roots_trd_drv)
-										{
-											if(a[i] < roots_trd_drv[j] && b[i] > roots_trd_drv[j])
-											{
-												if(eval_poly5(b0,b1,b2,b3,b4,roots_trd_drv[j]) > 0.)
-												{ b[i]=roots_trd_drv[j]; }
-												else { a[i]=roots_trd_drv[j]; }
-											}
-										}
-									}
-								}
-							}
-						}
-						
-						float d0 = 1e38; 
-						
-						//compute roots with halley's method
-						
-						for(int i=0;i<3;i++)
-						{
-							if(i < num_roots)
-							{
-								roots[i] = .5 * (a[i] + b[i]); 
-								
-								for(int j=0;j<halley_iterations;j++) { roots[i] = halley_iteration5(b0,b1,b2,b3,b4,roots[i]); }
-								
-								//compute squared distance to nearest point on curve
-								roots[i] =	clamp(roots[i],0.,1.); 
-								vec2 to_curve = uv - parametric_cub_bezier(roots[i],p0,p1,p2,p3); 
-								d0 = min(d0,dot(to_curve,to_curve)); 
-							}
-						}
-						
-						return sqrt(d0); 
-					} 
-					
-					//Quadratic Bezier - distance 2D 
-					
-					// The MIT License
-					// Copyright © 2018 Inigo Quilez
-					/*
-						 Permission is hereby granted, free of charge, to any person obtaining a copy of 
-						this software and associated documentation files (the "Software"), to deal in the 
-						Software without restriction, including without limitation the rights to use, copy, 
-						modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
-						and to permit persons to whom the Software is furnished to do so, subject to 
-						the following conditions: The above copyright notice and this permission notice 
-						shall be included in all copies or substantial portions of the Software. 
-						THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-						EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
-						MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-						IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
-						CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
-						TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-						SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-					*/
-					
-					
-					// Distance to a quadratic bezier segment
-					
-					// SDF(x) = argmin{t} |x-b(t)|²  
-					//           
-					// where b(t) is the curve. So we have
-					//
-					// |x-b(t)|² = |x|² - 2x·b(t) + |b(t)|²
-					//
-					// ∂|x-b(t)|²/∂t = 2(b(t)-x)·b'(t) = 0
-					//
-					// (b(t)-x)·b'(t) = 0
-					//
-					// But b(t) is degree 2, so b'(t) is degree 1, so (b(t)-x)·b'(t)=0 is a cubic.
-					// I solved the cubic using the trigonometric solution of the depressed as 
-					// shown here: https://en.wikipedia.org/wiki/Cubic_equation
-					
-					
-					// List of some other 2D distances: https://www.shadertoy.com/playlist/MXdSRf
-					//
-					// and iquilezles.org/articles/distfunctions2d
-					
-					
-					
-					float dot2( vec2 v ) { return dot(v,v); } 
-					float cro( vec2 a, vec2 b ) { return a.x*b.y-a.y*b.x; } 
-					float cos_acos_3( float x )
-					{
-						x=sqrt(0.5+0.5*x); 
-						return x*(x*(x*(x*-0.008972+0.039071)-0.107074)+0.576975)+0.5; 
-					} 
-					// https://www.shadertoy.com/view/WltSD7
-					
-					
-					// This method provides just an approximation, and is only usable in
-					// the very close neighborhood of the curve. Taken and adapted from
-					// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
-					float quadratic_bezier_dis_approx(
-						 vec2 p, vec2 v0, vec2 v1, vec2 v2
-						/*out vec2 outQ */
-					)
-					{
-						vec2 i = v0 - v2; 
-						vec2 j = v2 - v1; 
-						vec2 k = v1 - v0; 
-						vec2 w = j-k; 
-						
-						v0-= p; v1-= p; v2-= p; 
-						
-						float x = cro(v0, v2); 
-						float y = cro(v1, v0); 
-						float z = cro(v2, v1); 
-						
-						vec2 s = 2.0*(y*j+z*k)-x*i; 
-						
-						float r =  (y*z-x*x*0.25)/dot2(s); 
-						float t = clamp( (0.5*x+y+r*dot(s,w))/(x+y+z),0.0,1.0); 
-						
-						vec2 d = v0+t*(k+k+t*w); 
-						//outQ = d + p; 
-						return length(d); 
-					} 
-					
-					// signed distance to a quadratic bezier
-					float quadratic_bezier_dis_exact(
-						 in vec2 pos, in vec2 A, in vec2 B, in vec2 C
-						/*out vec2 outQ*/
-					)
-					{
-						vec2 a = B - A; 
-						vec2 b = A - 2.0*B + C; 
-						vec2 c = a * 2.0; 
-						vec2 d = A - pos; 
-						
-						// cubic to be solved (kx*=3 and ky*=3)
-						float kk = 1.0/dot(b,b); 
-						float kx = kk * dot(a,b); 
-						float ky = kk * (2.0*dot(a,a)+dot(d,b))/3.0; 
-						float kz = kk * dot(d,a); 
-						
-						float res = 0.0; 
-						float sgn = 0.0; 
-						
-						float p = ky - kx*kx; 
-						float q = kx*(2.0*kx*kx - 3.0*ky) + kz; 
-						float p3 = p*p*p; 
-						float q2 = q*q; 
-						float h = q2 + 4.0*p3; 
-						
-						if(h>=0.0)
-						{
-							// 1 root
-							h = sqrt(h); 
-							
-							h = (q<0.0) ? h : -h; // copysign()
-							float x = (h-q)/2.0; 
-							float v = sign(x)*pow(abs(x),1.0/3.0); 
-							float t = v - p/v; 
-							
-							// from NinjaKoala - single newton iteration to account for cancellation
-							t -= (t*(t*t+3.0*p)+q)/(3.0*t*t+3.0*p); 
-							
-							t = clamp( t-kx, 0.0, 1.0 ); 
-							vec2  w = d+(c+b*t)*t; 
-							//outQ = w + pos; 
-							res = dot2(w); 
-							sgn = cro(c+2.0*b*t,w); 
-						}
-						else
-						{
-							// 3 roots
-							float z = sqrt(-p); 
-							float m = cos_acos_3(q/(p*z*2.0)); 
-							float n = sqrt(1.0-m*m); 
-							n *= sqrt(3.0); 
-							vec3	t = clamp( vec3(m+m,-n-m,n-m)*z-kx, 0.0, 1.0 ); 
-							vec2	qx=d+(c+b*t.x)*t.x; float dx=dot2(qx), sx=cro(a+b*t.x,qx); 
-							vec2	qy=d+(c+b*t.y)*t.y; float dy=dot2(qy), sy=cro(a+b*t.y,qy); 
-							if(dx<dy)	{ res=dx; sgn=sx; /*outQ=qx+pos; */}
-							else	{ res=dy; sgn=sy; /*outQ=qy+pos; */}
-						}
-						
-						return sqrt( res )/*sign(sgn)*/; 
-					} 
-					
+					$(BezierImplementations.cubic_approx)
 					
 					vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 					{
@@ -6840,7 +6872,7 @@ $(V_size+G_size)".text
 						
 						if((fragMode==FragMode_cubicBezier))
 						{
-							float dst = cubic_bezier_dis_approx(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
+							float dst = cubicBezierDist(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
 							float t = fract(texCoordXY.x); 
 							float r = uintBitsToFloat(fragTexCoordZ); 
 							if(dst>r) discard; 
