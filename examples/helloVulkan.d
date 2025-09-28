@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+///@release
 
 import het.vulkanwin;  mixin asmFunctions; 
 
@@ -157,10 +157,10 @@ version(/+$DIDE_REGION+/all) {
 			
 			
 			{
-				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36675F5C4644)))*300); 
+				auto verts = polyLineToTriangleStrip(pathPoints, (互!((float/+w=6+/),(0.128),(0x36685F5C4644)))*300); 
 				
 				int i; 
-				foreach(v; verts.take((0x36CB5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F65F5C4644))))).max(1))))
+				foreach(v; verts.take((0x36CC5F5C4644).檢((iround(verts.length*(互!((float/+w=6+/),(1.000),(0x36F75F5C4644))))).max(1))))
 				VB.tri(i++ & 2 ? clWhite : clRed, v); 
 			}
 			
@@ -808,7 +808,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x88AB5F5C4644).檢 (zoomedPlatform)), ((0x88D45F5C4644).檢 (shipPos)); 
+								((0x88AC5F5C4644).檢 (zoomedPlatform)), ((0x88D55F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1063,7 +1063,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					foreach(builder; builders[].filter!"a")
 					appendGfxContent(builder.extractGfxContent); 
 				} 
-				((0xA5B75F5C4644).檢((update間(_間)))); 
+				((0xA5B85F5C4644).檢((update間(_間)))); 
 				
 				
 				
@@ -1077,29 +1077,29 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						static bool initialized; 
 						if(initialized.chkSet)
 						{
-							registerFont_mono_1bit("CGA_8x8", File(`fontmap:\C64_lower`), cellSize: ivec2(8, 8)); 
+							//registerFont_mono_1bit("CGA_8x8", File(`fontmap:\C64_lower`), cellSize: ivec2(8, 8)); 
 							
 							registerFont_mono_1bit(File(`fontmap:\C64_upper`), cellSize: ivec2(8, 8)); 
 							customFont222 = Font(accessFontFace("C64_upper")); 
 						}
 					}
 					
-					((0xA84F5F5C4644).檢((update間(_間)))); 
+					((0xA8525F5C4644).檢((update間(_間)))); 
 					//Opt: ✅ tvBuilder.Style(Font.VGA_9x16) is the slowest of all.  Something's fucked up with that generator...
-					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xA92D5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xA99E5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAA0A5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAA875F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAB065F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xAB6F5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font("C64_upper")); 	((0xABDC5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAC595F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xA9305F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xA9A15F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAA0D5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAA8A5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAB095F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xAB725F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font("C64_upper")); 	((0xABDF5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAC5C5F5C4644).檢((update間(_間)))); 
 					
 					
-					if((互!((bool),(0),(0xAC9C5F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
-					if((互!((bool),(0),(0xACF15F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
-					if((互!((bool),(0),(0xAD435F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
-					if((互!((bool),(0),(0xAD945F5C4644)))) {
+					if((互!((bool),(0),(0xAC9F5F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
+					if((互!((bool),(0),(0xACF45F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
+					if((互!((bool),(0),(0xAD465F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
+					if((互!((bool),(0),(0xAD975F5C4644)))) {
 						static FontSpec!FontFace customFont; 
 						static bool initialized; 
 						if(initialized.chkSet)
@@ -1109,51 +1109,51 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 						tvBuilder.Style(customFont.italic); 
 					}
-					if((互!((bool),(0),(0xAF165F5C4644)))) { tvBuilder.Style(Font("C64_upper")); }
+					if((互!((bool),(0),(0xAF195F5C4644)))) { tvBuilder.Style(Font("C64_upper")); }
 					
 					
-					if(tvBuilder.fontFace) ((0xAF8E5F5C4644).檢(tvBuilder.fontFace.id)); 
-					if(tvBuilder.fontFace) ((0xAFDB5F5C4644).檢(tvBuilder.fontFace.identityStr)); 
+					if(tvBuilder.fontFace) ((0xAF915F5C4644).檢(tvBuilder.fontFace.id)); 
+					if(tvBuilder.fontFace) ((0xAFDE5F5C4644).檢(tvBuilder.fontFace.identityStr)); 
 					
-					if((互!((bool),(1),(0xB0245F5C4644))))
+					if((互!((bool),(1),(0xB0275F5C4644))))
 					{
 						with(tvBuilder.TR)
 						{
-							if((互!((bool),(0),(0xB07F5F5C4644)))) {
+							if((互!((bool),(0),(0xB0825F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xB0D75F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xB1145F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xB0DA5F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xB1175F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xB1715F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xB1745F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xB1D25F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB2055F5C4644))); }
-							if((互!((bool),(0),(0xB2575F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB2875F5C4644)))*360; 
-							if((互!((bool),(0),(0xB2D65F5C4644)))) {
+							if((互!((bool),(0),(0xB1D55F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB2085F5C4644))); }
+							if((互!((bool),(0),(0xB25A5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB28A5F5C4644)))*360; 
+							if((互!((bool),(0),(0xB2D95F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xB32D5F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xB3695F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xB3305F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xB36C5F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xB3CF5F5C4644)))) {
+							if((互!((bool),(0),(0xB3D25F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB4395F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB48A5F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB43C5F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB48D5F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB5065F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB5585F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB5095F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB55B5F5C4644)))
 										)
 									).名!q{size})
 								); 
 							}
-							((0xB5DE5F5C4644).檢(
+							((0xB5E15F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1163,7 +1163,7 @@ $(clipBounds)".text
 						}
 					}
 					
-					if((互!((bool),(0),(0xB6755F5C4644))))
+					if((互!((bool),(0),(0xB6785F5C4644))))
 					{
 						with(tvBuilder) {
 							void benchmarkStateSaving(int N=10000, void delegate() fun)
@@ -1182,167 +1182,178 @@ $(clipBounds)".text
 								foreach(i; 0..N) doit((i&7)+3); 
 							} 
 							
-							((0xB8935F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB8FE5F5C4644).檢((update間(_間)))); 
+							((0xB8965F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB9015F5C4644).檢((update間(_間)))); 
 						}
 					}
 					
+					if((互!((bool),(1),(0xB94E5F5C4644))))
+					{
+						with(tvBuilder) {
+							Style(((white).名!q{fg}), ((black).名!q{bk}), ((5).名!q{TR.scaleXY})); 
+							Text(mixin(舉!((FontId),q{CGA_8x8})), ((ltRed).名!q{fg}), "aa", M(0, 1), "bb"); 
+							
+							Text("aa"); 
+							commit; return; 
+						}
+					}
 					
-					static struct SpringSimulation
-					{
-						// Spring endpoints
-						float P0; 
-						float P1; 
-						
-						// Spring state
-						float springLength; 	// normal/rest length
-						float velocity0, velocity1; 	// current velocity of the moving end
-						
-						// Constructor
-						this(float p0, float p1, float length, float initialVelocity = 0.0f) 
+					version(/+$DIDE_REGION+/none) {
+						static struct SpringSimulation
 						{
-							P0 = p0; 
-							P1 = p1; 
-							springLength = length; 
-							velocity0 = initialVelocity; 
-							velocity1 = initialVelocity; 
-						} 
-						
-						void update(
-							float deltaTime_sec, float mass, float damping, float gravity, 
-							float minRange, float maxRange
-						) 
-						{
+							// Spring endpoints
+							float P0; 
+							float P1; 
 							
-							// Calculate spring force (Hooke's Law: F = -k * x)
-							float displacement = (P1 - P0) - springLength; 
-							float springForce0 = +displacement; 	 // k = 1 for simplicity
-							float springForce1 = -displacement; 	 // k = 1 for simplicity
+							// Spring state
+							float springLength; 	// normal/rest length
+							float velocity0, velocity1; 	// current velocity of the moving end
 							
-							// Calculate damping force (F = -c * v)
-							float dampingForce0 = +damping * velocity0; 
-							float dampingForce1 = -damping * velocity1; 
-							
-							// Calculate gravitational force
-							float gravityForce = mass * gravity; 
-							
-							// Total force acting on the mass
-							float totalForce0 = springForce0 + dampingForce0 + gravityForce; 
-							float totalForce1 = springForce1 + dampingForce1 + gravityForce; 
-							
-							// Update velocity using Newton's second law (F = ma)
-							float acceleration0 = totalForce0 / mass; 
-							float acceleration1 = totalForce1 / mass; 
-							
-							velocity0 += acceleration0 * deltaTime_sec; 
-							velocity1 += acceleration1 * deltaTime_sec; 
-							
-							// Update position
-							P0 += velocity0 * deltaTime_sec; 
-							P1 += velocity1 * deltaTime_sec; 
-							
-							// Apply boundary constraints with elastic bounce
-							applyBoundaryConstraints(minRange, maxRange); 
-						} 
-						
-						void applyBoundaryConstraints(float minRange, float maxRange) 
-						{
-							// Check if P1 exceeds the maximum range
-							if(P1 > maxRange) {
-								float overshoot = P1 - maxRange; 
-								P1 = maxRange - overshoot;  // Reflect position
-								velocity1 = -abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
-							}
-							
-							// Check if P1 goes below the minimum range
-							if(P1 < minRange) {
-								float overshoot = minRange - P1; 
-								P1 = minRange + overshoot;  // Reflect position
-								velocity1 = +abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
-							}
-							
-							// Check if P0 exceeds the maximum range
-							if(P0 > maxRange) {
-								float overshoot = P0 - maxRange; 
-								P0 = maxRange - overshoot;  // Reflect position
-								velocity0 = -abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
-							}
-							
-							// Check if P0 goes below the minimum range
-							if(P0 < minRange) {
-								float overshoot = minRange - P0; 
-								P0 = minRange + overshoot;  // Reflect position
-								velocity0 = +abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
-							}
-							
-						} 
-						
-						// Helper function to visualize the spring
-						void draw() const 
-						{
-							writefln(
-								"Spring: P0=%.2f, P1=%.2f, Length=%.2f, Velocity=%.2f", 
-								P0, P1, (P1 - P0), velocity0
-							); 
-						} 
-					} 
-					
-					
-					static struct BouncingBounds
-					{
-						SpringSimulation horz, vert; 
-						
-						this(uint seed)
-						{
-							RNG rng; rng.seed = seed; 
-							auto 	vel 	= vec2(rng.randomGaussPair[])*10, 
-								pos0 	= vec2(rng.randomGaussPair[])*15, 
-								pos1 	= vec2(rng.randomGaussPair[])*15; 
-							
-							horz = SpringSimulation(50.0f+pos0.x, 50+8*(40+8) + 5+pos1.x, 8*(40+8), 10 + vel.x); 
-							vert = SpringSimulation(50.0f+pos0.y, 50+8*(25+8) + 10+pos1.y, 8*(25+8), 0 + vel.y); 
-						} 
-						
-						void update(float deltaTime)
-						{
+							// Constructor
+							this(float p0, float p1, float length, float initialVelocity = 0.0f) 
 							{
-								float mass = .18f; 
-								float damping = 0.02f; 
-								float gravity = .1 * 9.8f; 
-								float minRange = 16*1; 
-								float maxRange = 16*24; 
-								vert.update(
-									deltaTime, mass, damping, 
-									gravity, minRange, maxRange
-								); 
-							}
+								P0 = p0; 
+								P1 = p1; 
+								springLength = length; 
+								velocity0 = initialVelocity; 
+								velocity1 = initialVelocity; 
+							} 
+							
+							void update(
+								float deltaTime_sec, float mass, float damping, float gravity, 
+								float minRange, float maxRange
+							) 
 							{
-								float mass = .24f; 
-								float damping = 0.00f; 
-								float gravity = 0; 
-								float minRange = 9*1; 
-								float maxRange = 9*79; 
-								horz.update(
-									deltaTime, mass, damping, 
-									gravity, minRange, maxRange
+								
+								// Calculate spring force (Hooke's Law: F = -k * x)
+								float displacement = (P1 - P0) - springLength; 
+								float springForce0 = +displacement; 	 // k = 1 for simplicity
+								float springForce1 = -displacement; 	 // k = 1 for simplicity
+								
+								// Calculate damping force (F = -c * v)
+								float dampingForce0 = +damping * velocity0; 
+								float dampingForce1 = -damping * velocity1; 
+								
+								// Calculate gravitational force
+								float gravityForce = mass * gravity; 
+								
+								// Total force acting on the mass
+								float totalForce0 = springForce0 + dampingForce0 + gravityForce; 
+								float totalForce1 = springForce1 + dampingForce1 + gravityForce; 
+								
+								// Update velocity using Newton's second law (F = ma)
+								float acceleration0 = totalForce0 / mass; 
+								float acceleration1 = totalForce1 / mass; 
+								
+								velocity0 += acceleration0 * deltaTime_sec; 
+								velocity1 += acceleration1 * deltaTime_sec; 
+								
+								// Update position
+								P0 += velocity0 * deltaTime_sec; 
+								P1 += velocity1 * deltaTime_sec; 
+								
+								// Apply boundary constraints with elastic bounce
+								applyBoundaryConstraints(minRange, maxRange); 
+							} 
+							
+							void applyBoundaryConstraints(float minRange, float maxRange) 
+							{
+								// Check if P1 exceeds the maximum range
+								if(P1 > maxRange) {
+									float overshoot = P1 - maxRange; 
+									P1 = maxRange - overshoot;  // Reflect position
+									velocity1 = -abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
+								}
+								
+								// Check if P1 goes below the minimum range
+								if(P1 < minRange) {
+									float overshoot = minRange - P1; 
+									P1 = minRange + overshoot;  // Reflect position
+									velocity1 = +abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
+								}
+								
+								// Check if P0 exceeds the maximum range
+								if(P0 > maxRange) {
+									float overshoot = P0 - maxRange; 
+									P0 = maxRange - overshoot;  // Reflect position
+									velocity0 = -abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
+								}
+								
+								// Check if P0 goes below the minimum range
+								if(P0 < minRange) {
+									float overshoot = minRange - P0; 
+									P0 = minRange + overshoot;  // Reflect position
+									velocity0 = +abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
+								}
+								
+							} 
+							
+							// Helper function to visualize the spring
+							void draw() const 
+							{
+								writefln(
+									"Spring: P0=%.2f, P1=%.2f, Length=%.2f, Velocity=%.2f", 
+									P0, P1, (P1 - P0), velocity0
 								); 
-							}
+							} 
 						} 
 						
-						@property bounds() const => bounds2(horz.P0, vert.P0, horz.P1, vert.P1); 
-					} 
-					
-					static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
-					((0xCC465F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCCC45F5C4644).檢((update間(_間)))); 
-					
-					with(tvBuilder)
-					{
-						//Link: google image search: borland turbo pascal
-						//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
 						
-						drawTextWindow
-						(
-							"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).名!q{size})), 
-							"Program Add;
+						static struct BouncingBounds
+						{
+							SpringSimulation horz, vert; 
+							
+							this(uint seed)
+							{
+								RNG rng; rng.seed = seed; 
+								auto 	vel 	= vec2(rng.randomGaussPair[])*10, 
+									pos0 	= vec2(rng.randomGaussPair[])*15, 
+									pos1 	= vec2(rng.randomGaussPair[])*15; 
+								
+								horz = SpringSimulation(50.0f+pos0.x, 50+8*(40+8) + 5+pos1.x, 8*(40+8), 10 + vel.x); 
+								vert = SpringSimulation(50.0f+pos0.y, 50+8*(25+8) + 10+pos1.y, 8*(25+8), 0 + vel.y); 
+							} 
+							
+							void update(float deltaTime)
+							{
+								{
+									float mass = .18f; 
+									float damping = 0.02f; 
+									float gravity = .1 * 9.8f; 
+									float minRange = 16*1; 
+									float maxRange = 16*24; 
+									vert.update(
+										deltaTime, mass, damping, 
+										gravity, minRange, maxRange
+									); 
+								}
+								{
+									float mass = .24f; 
+									float damping = 0.00f; 
+									float gravity = 0; 
+									float minRange = 9*1; 
+									float maxRange = 9*79; 
+									horz.update(
+										deltaTime, mass, damping, 
+										gravity, minRange, maxRange
+									); 
+								}
+							} 
+							
+							@property bounds() const => bounds2(horz.P0, vert.P0, horz.P1, vert.P1); 
+						} 
+						
+						static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
+						((0xCE465F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCEC45F5C4644).檢((update間(_間)))); 
+						
+						with(tvBuilder)
+						{
+							//Link: google image search: borland turbo pascal
+							//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
+							
+							drawTextWindow
+							(
+								"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).名!q{size})), 
+								"Program Add;
 
 Var
 	Num1, Num2, Sum : integer;
@@ -1355,68 +1366,68 @@ Begin
 	Writeln(Sum);
 	Readln;
 End.".splitLines
-						); 
-						
-						Style(((.66).名!q{opacity})); 
-						static TurboVisionBuilder jlBuilder; if(!jlBuilder) jlBuilder = new TurboVisionBuilder; 
-						foreach(const bb; bouncingBounds)
-						{
-							jlBuilder.setState(colorState, fontState); 
-							with(jlBuilder)
+							); 
+							
+							Style(((.66).名!q{opacity})); 
+							static TurboVisionBuilder jlBuilder; if(!jlBuilder) jlBuilder = new TurboVisionBuilder; 
+							foreach(const bb; bouncingBounds)
 							{
-								const windowSize = ivec2(45, 19); 
-								TR.transXY = bb.bounds.topLeft; 
-								TR.scaleXY = ((bb.bounds.size)/(windowSize*fontSize)); 
-								drawTextWindow
-									(
-									"JupiterLander.pas", ibounds2(ivec2(0), ((windowSize).名!q{size})), 
-									"".splitLines
-								); 
-								TR.transXY = TR.transXY + fontSize * TR.scaleXY; 
-								TR.scaleXY.y *= ((windowSize.y-2)*fontSize.y) / (float((25+8)*8)); 
-								drawJupiterLanderOnBuilder(jlBuilder, ivec2(0)); 
+								jlBuilder.setState(colorState, fontState); 
+								with(jlBuilder)
+								{
+									const windowSize = ivec2(45, 19); 
+									TR.transXY = bb.bounds.topLeft; 
+									TR.scaleXY = ((bb.bounds.size)/(windowSize*fontSize)); 
+									drawTextWindow
+										(
+										"JupiterLander.pas", ibounds2(ivec2(0), ((windowSize).名!q{size})), 
+										"".splitLines
+									); 
+									TR.transXY = TR.transXY + fontSize * TR.scaleXY; 
+									TR.scaleXY.y *= ((windowSize.y-2)*fontSize.y) / (float((25+8)*8)); 
+									drawJupiterLanderOnBuilder(jlBuilder, ivec2(0)); 
+								}
+								consume(jlBuilder); 
 							}
-							consume(jlBuilder); 
+							
+							Style(((1).名!q{opacity})); 
+							static MenuItem[] mainMenuItems = 
+							[
+								{"&File"}, 
+								{"&Edit"}, 
+								{"&Search"}, 
+								{
+									"&Run", selected : true, opened : true, subMenu : 
+									[
+										{"&Run", shortcut : "Ctrl+F9", selected : true}, 
+										{"&Step over", shortcut : "F8"}, 
+										{"&Trace into", shortcut : "F7"}, 
+										{"&Go to cursor", shortcut : "F4"}, 
+										{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
+										{"P&arameters..."}
+									]
+								},
+								{"&Compile"}, 
+								{"&Debug"}, 
+								{"&Tools"}, 
+								{"&Options"}, 
+								{"&Window"}, 
+								{"&Help"},
+							]; 
+							
+							Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
+							
+							Text(
+								M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
+									clMenuItem, "Help │ Run the current program"
+							); fillSpace; 
 						}
 						
-						Style(((1).名!q{opacity})); 
-						static MenuItem[] mainMenuItems = 
-						[
-							{"&File"}, 
-							{"&Edit"}, 
-							{"&Search"}, 
-							{
-								"&Run", selected : true, opened : true, subMenu : 
-								[
-									{"&Run", shortcut : "Ctrl+F9", selected : true}, 
-									{"&Step over", shortcut : "F8"}, 
-									{"&Trace into", shortcut : "F7"}, 
-									{"&Go to cursor", shortcut : "F4"}, 
-									{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
-									{"P&arameters..."}
-								]
-							},
-							{"&Compile"}, 
-							{"&Debug"}, 
-							{"&Tools"}, 
-							{"&Options"}, 
-							{"&Window"}, 
-							{"&Help"},
-						]; 
-						
-						Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
-						
-						Text(
-							M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
-								clMenuItem, "Help │ Run the current program"
-						); fillSpace; 
+						tvBuilder.commit; 
 					}
-					
-					tvBuilder.commit; 
-					
 				}
 				
-				((0xD6255F5C4644).檢((update間(_間)))); 
+				((0xD86A5F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1468,7 +1479,7 @@ End.".splitLines
 					}
 					consumeGfxContent(builder); 
 				}
-				((0xDC855F5C4644).檢((update間(_間)))); 
+				((0xDECA5F5C4644).檢((update間(_間)))); 
 				
 				
 				

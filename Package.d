@@ -2447,7 +2447,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		if(names.empty) return ""; 
 		string id(string s) => s.replace('.', '_'); 
 		string fun; if(names.back.startsWith('{')) fun = names.fetchBack; 
-		return names.map!((a)=>(iq{const _prev_$(id(a))=$(a); }.text)).join ~ "scope(exit){" ~
+		//note : 'const' is not works here because of classes. So it's 'auto'.
+		return names.map!((a)=>(iq{auto _prev_$(id(a))=$(a); }.text)).join ~ "scope(exit){" ~
 		names.map!((a)=>(iq{$(a)=_prev_$(id(a)); }.text)).join ~ fun ~ "}" /+same order!+/; 
 	} 
 	
@@ -3252,15 +3253,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1982F59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1987859F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198F759F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1994059F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x199A159F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19A1659F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x199EA59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19A5F59F156A1})); 
 						+/
 					+/
 				+/
@@ -7304,6 +7305,9 @@ version(/+$DIDE_REGION Containers+/all)
 			return s[st..en]; 
 		} 
 		
+		string firstWord(string s) @safe
+		=> s.until!(not!(isWordChar)).text; 
+		
 		ptrdiff_t wordPos(
 			const string s, const string sub, size_t startIdx,
 			in std.string.CaseSensitive cs = Yes.caseSensitive
@@ -8071,26 +8075,26 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			import std.uni; 
 			if(s=="") return s; //empty
-			if(s[0].isUpper) return s; //starts with uppercase
-					
+			if(s.front.isUpper) return s; //starts with uppercase
+			
 			//fetch a word
 			auto popWord()
 			{
 				string word; 
 				while(s.length) {
-					char ch = s[0]; //no unicode support
+					dchar ch = s.front; 
 					if(!word.empty && ch.isUpper) break; 
-					s = s[1..$]; 
-					word ~= ch; 
+					const l0 = word.length; word ~= ch; const l1 = word.length; 
+					s = s[l1-l0..$]; 
 				}
 				return word; 
 			} 
-					
+			
 			string[] res; 
 			while(s.length) { res ~= popWord; }
-					
+			
 			foreach(idx, ref w; res) w = idx ? w.toLower : w.capitalize; 
-					
+			
 			return res.join(' '); 
 		} 
 		
