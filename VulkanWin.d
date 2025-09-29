@@ -1976,12 +1976,12 @@ version(/+$DIDE_REGION+/all) {
 				version(/+$DIDE_REGION Font+/all)
 				{
 					@property fontState() => tuple(
-						((FF).名!q{FF}), ((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), 
-						((fontFace).名!q{fontFace}), ((fontSize).名!q{fontSize})
+						((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), 
+						fontFace, ((FF).名!q{FF}), ((fontSize).名!q{fontSize}), 
 					); 
 					protected alias FontStateRegs = AliasSeq!(
-						"FF", "FMH", "LFMH", "FH", 
-						"fontFace", "fontSize"
+						"FMH", "LFMH", "FH", 
+						"fontFace", "FF", "fontSize"
 					); 
 					
 					mixin FlagsTemplate!("FF", FontFlags, FlagFormat.font); 	//FontFlags
@@ -2209,6 +2209,10 @@ version(/+$DIDE_REGION+/all) {
 					{
 						static if(is(T : FontSpec!F, F))	{ setFont(a); }
 						else static if(is(T : FontId))	{ setFont(Font(a)); }
+						else static if(
+							is(T : FontFace)
+							/+for restore only+/
+						)	{ fontFace = a; /+keeps regs and fontSize unchanged+/}
 						else static if(is(T : FontBlink))	FF.blink = a; 
 						else static if(is(T : FontLine))	FF.line = a; 
 						else static if(is(T : FontWidth))	FF.width = a; 
@@ -2221,8 +2225,10 @@ version(/+$DIDE_REGION+/all) {
 							else static if(fw.among("SC", "bk"))	mixin(name~q{=a.value; }); 
 							else static if(fw.among("FF", "fontFlags"))	mixin(name~q{=a.value; }); 
 							else static if(fw=="TR")	mixin(name~q{=a.value; }); 
-							else static if(fw=="fontFace"/+for restore only+/)	fontFace = a.value; 
-							else static if(fw=="fontSize"/+for restore only+/)	fontSize = a.value; 
+							else static if(
+								fw=="fontSize"
+								/+for restore only+/
+							)	fontSize = a.value; 
 							else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
 						}
 						else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
@@ -2385,8 +2391,10 @@ version(/+$DIDE_REGION+/all) {
 				//this work on temporal graphics state
 				/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
 				
-				pragma(msg,i"fun: $(__PRETTY_FUNCTION__)
-saved regs:$(AffectedStyleRegs!Args.join(','))".text.注); 
+				/+
+					pragma(msg,i"fun: $(__PRETTY_FUNCTION__)
+					saved regs:$(AffectedStyleRegs!Args.join(','))".text.注); 
+				+/
 				
 				mixin(scope_remember(AffectedStyleRegs!Args.join(','))); 
 				
@@ -2692,7 +2700,7 @@ saved regs:$(AffectedStyleRegs!Args.join(','))".text.注);
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1538682886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x153E482886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4009,18 +4017,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1F51482886ADB).檢(
+					((0x1F57282886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1F58682886ADB))))
+				if((互!((bool),(0),(0x1F5E482886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1F61A82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F63182886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1F67882886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F68F82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4033,8 +4041,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1F80682886ADB).檢 (imVG)),
-					((0x1F82C82886ADB).檢 (imFPS)); 
+					((0x1F86482886ADB).檢 (imVG)),
+					((0x1F88A82886ADB).檢 (imFPS)); 
 				}
 			}
 			

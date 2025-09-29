@@ -643,15 +643,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				struct BASE64
 				{} 
 							
-				//het.ui
+				//het_ui
 				//struct UI{}    // similar to @Composable.  It alters the UI's state
 				//Note: UI is ised for the default UI function. Conflicts with this UDA
 							
-				//het.opengl
+				//het_opengl
 				struct UNIFORM
 				{ string name=""; } //marks a variable as gl.Shader attribute
 							
-				//het.ui
+				//het_ui
 				struct CAPTION
 				{ string text; } 
 				struct HINT

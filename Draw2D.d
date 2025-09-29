@@ -3,10 +3,14 @@ version(/+$DIDE_REGION+/all)
 {
 	import het.opengl; 
 	
-	public import het.algorithm; 
-	public import het.opengl : textures; 
+	import het.algorithm; 
+	import het.inputs: inputs, KeyCombo; 
+	import het.win: Window, mainWindow; 
+	import het.bitmap: Bitmap; 
 	
 	import std.bitmanip; 
+	
+	import het.opengl : textures; 
 	
 	__gshared bool logDrawing = 0; 
 	
@@ -1356,8 +1360,8 @@ version(/+$DIDE_REGION View2D+/all)
 		
 		bounds2 visibleArea(bool animated = true)
 		{
-			V	mi = invTrans(V(0), animated),
-				ma = invTrans(clientSize, animated); 
+			V	mi = screenToWorld(V(0), animated),
+				ma = screenToWorld(clientSize, animated); 
 			return bounds2(mi, ma).sorted; 
 		} 
 		
@@ -1381,12 +1385,12 @@ version(/+$DIDE_REGION View2D+/all)
 		} 
 		
 		//Todo: make this transformation cached and fast!
-		T trans(T)(in T world, bool animated=true)
+		T worldToScreen(T)(in T world, bool animated=true)
 		{ return ((world-getOrigin(animated))*getScale(animated)+clientSizeHalf); } 
 		//Opt: fucking slow, need to be cached
 		
-		T invTrans(T)(in T client, bool animated=true)
-		{ return T((client-clientSizeHalf)/getScale(animated) + getOrigin(animated)); } 
+		T screenToWorld(T)(in T screen, bool animated=true)
+		{ return T((screen-clientSizeHalf)/getScale(animated) + getOrigin(animated)); } 
 		
 		//Scroll/Zoom User controls
 		float scrollRate() const
@@ -1484,7 +1488,7 @@ version(/+$DIDE_REGION View2D+/all)
 			origin -= sh*invScale; 
 		} 
 		void zoomAroundMouse(float amount)
-		{ zoomAround(trans(mousePos), amount); } 
+		{ zoomAround(worldToScreen(mousePos), amount); } 
 		
 		///Automatically call zoomAll() when workArea changes
 		bool autoZoom()
@@ -1690,6 +1694,119 @@ version(/+$DIDE_REGION View2D+/all)
 }version(/+$DIDE_REGION+/all)
 {
 	/+
+		Assistant: /+H1: View2D Graphics API Cheat Sheet+/
+		
+		/+H2: Core Properties+/
+			/+Bullet: /+Highlighted: origin+/: World space center point (Vector2D)+/
+			/+Bullet: /+Highlighted: scale+/: Zoom factor (1.0 = 1 unit = 1 pixel)+/
+			/+Bullet: /+Highlighted: invScale+/: Pixel size in world units+/
+			/+Bullet: /+Highlighted: animSpeed+/: Animation smoothness (0.0-0.9)+/
+		
+		/+H2: Coordinate Transformation+/
+		/+
+			Structured: // World → Screen
+			vec2 screenPos = view.trans(worldPos); 
+			vec2 screenPos = view.trans(worldPos, false); // skip animation
+			
+			// Screen → World  
+			vec2 worldPos = view.screenToWorld(screenPos); 
+			vec2 worldPos = view.screenToWorld(screenPos, false); // skip animation
+		+/
+		
+		/+H2: Navigation Controls+/
+		/+
+			Structured: // Scroll
+			view.scroll(vec2(dx, dy)); 	// Relative world units
+			view.scrollH(pixels); 	// Horizontal pixels
+			view.scrollV(pixels); 	// Vertical pixels
+			
+			// Zoom
+			view.zoom(factor); 	// Relative zoom (logarithmic)
+			view.zoomAround(screenPoint, factor); 	// Zoom around specific point
+			view.zoomAroundMouse(factor); 	// Zoom around mouse position
+			
+			// View fitting
+			view.zoom(bounds); 	// Fit bounds to view
+			view.zoomAll(); 	// Fit workArea to view
+			view.zoomAll_immediate(); 	// Instant fit
+			view.autoZoom(); 	// Auto-fit when workArea changes
+		+/
+		
+		/+H2: Viewport Management+/
+		/+
+			Structured: // Sub-screen area (for UI overlays)
+			view.subScreenArea = bounds2(0.1, 0.1, 0.9, 0.9); 
+			
+			// Center correction (anti-aliasing)
+			view.centerCorrection = true; 
+			
+			// Get visible area
+			bounds2 visible = view.visibleArea(); 
+			bounds2 visibleNow = view.visibleArea(false); // no animation
+		+/
+		
+		/+H2: Mouse Interaction+/
+		/+
+			Structured: // Mouse position tracking
+			vec2 worldMousePos = view.mousePos; 
+			bool mouseInside = view.isMouseInside(); 
+			
+			// Screen bounds
+			bounds2 screenBounds = view.subScreenBounds_anim(); 
+		+/
+		
+		/+H2: Animation Control+/
+		/+
+			Structured: view.skipAnimation(); 	// Jump to target immediately
+			view.updateAnimation(deltaTime, true); 	// Manual animation update
+		+/
+		
+		/+H2: Smart Navigation+/
+		/+
+			Structured: view.smartScrollTo(targetBounds); 	// Queue smooth scroll-to
+			view.updateSmartScroll(); 	// Process scroll queue
+		+/
+		
+		/+H2: Configuration+/
+		/+
+			Structured: // Save/load view state
+			string config = view.config; 
+			view.config = savedConfig; 
+		+/
+		
+		/+H2: Input Handling+/
+		/+
+			Structured: // Built-in navigation (keyboard + mouse)
+			view.navigate(true, true); // Enable both input methods
+			
+			// Default controls:
+			// - MMB/RMB: Pan
+			// - Mouse Wheel: Zoom at mouse
+			// - WASD: Keyboard panning  
+			// - PgUp/PgDn: Keyboard zoom
+			// - Shift: Slower movement
+			// - Home: Zoom to fit
+		+/
+		
+		/+H2: Work Area Management+/
+		/+
+			Structured: // Set drawing bounds
+			view.workArea = calculatedBounds; 
+			
+			// Automatic fitting
+			if(view.autoZoom()) {
+				    // View was automatically adjusted
+			}
+		+/
+		
+		/+H2: Performance Notes+/
+			/+Bullet: Transformation functions are computationally expensive+/
+			/+Bullet: Use /+Highlighted: animated = false+/ for performance-critical operations+/
+			/+Bullet: Center correction adds per-frame overhead+/
+		
+		/+Note: Usage(prompt_hit: 64, prompt_miss: 4948, completion: 704, HUF: 0.80, price: 100%)+/
+	+/
+	/+
 		Assistant: /+H1: Drawing Graphics API Cheat Sheet+/
 		
 		/+H2: Core Concepts+/
@@ -1886,119 +2003,6 @@ version(/+$DIDE_REGION View2D+/all)
 		+/
 		
 		/+Note: Usage(prompt_hit: 64, prompt_miss: 18898, completion: 1464, HUF: 2.55, price: 100%)+/
-	+/
-	/+
-		Assistant: /+H1: View2D Graphics API Cheat Sheet+/
-		
-		/+H2: Core Properties+/
-			/+Bullet: /+Highlighted: origin+/: World space center point (Vector2D)+/
-			/+Bullet: /+Highlighted: scale+/: Zoom factor (1.0 = 1 unit = 1 pixel)+/
-			/+Bullet: /+Highlighted: invScale+/: Pixel size in world units+/
-			/+Bullet: /+Highlighted: animSpeed+/: Animation smoothness (0.0-0.9)+/
-		
-		/+H2: Coordinate Transformation+/
-		/+
-			Structured: // World → Screen
-			vec2 screenPos = view.trans(worldPos); 
-			vec2 screenPos = view.trans(worldPos, false); // skip animation
-			
-			// Screen → World  
-			vec2 worldPos = view.invTrans(screenPos); 
-			vec2 worldPos = view.invTrans(screenPos, false); // skip animation
-		+/
-		
-		/+H2: Navigation Controls+/
-		/+
-			Structured: // Scroll
-			view.scroll(vec2(dx, dy)); 	// Relative world units
-			view.scrollH(pixels); 	// Horizontal pixels
-			view.scrollV(pixels); 	// Vertical pixels
-			
-			// Zoom
-			view.zoom(factor); 	// Relative zoom (logarithmic)
-			view.zoomAround(screenPoint, factor); 	// Zoom around specific point
-			view.zoomAroundMouse(factor); 	// Zoom around mouse position
-			
-			// View fitting
-			view.zoom(bounds); 	// Fit bounds to view
-			view.zoomAll(); 	// Fit workArea to view
-			view.zoomAll_immediate(); 	// Instant fit
-			view.autoZoom(); 	// Auto-fit when workArea changes
-		+/
-		
-		/+H2: Viewport Management+/
-		/+
-			Structured: // Sub-screen area (for UI overlays)
-			view.subScreenArea = bounds2(0.1, 0.1, 0.9, 0.9); 
-			
-			// Center correction (anti-aliasing)
-			view.centerCorrection = true; 
-			
-			// Get visible area
-			bounds2 visible = view.visibleArea(); 
-			bounds2 visibleNow = view.visibleArea(false); // no animation
-		+/
-		
-		/+H2: Mouse Interaction+/
-		/+
-			Structured: // Mouse position tracking
-			vec2 worldMousePos = view.mousePos; 
-			bool mouseInside = view.isMouseInside(); 
-			
-			// Screen bounds
-			bounds2 screenBounds = view.subScreenBounds_anim(); 
-		+/
-		
-		/+H2: Animation Control+/
-		/+
-			Structured: view.skipAnimation(); 	// Jump to target immediately
-			view.updateAnimation(deltaTime, true); 	// Manual animation update
-		+/
-		
-		/+H2: Smart Navigation+/
-		/+
-			Structured: view.smartScrollTo(targetBounds); 	// Queue smooth scroll-to
-			view.updateSmartScroll(); 	// Process scroll queue
-		+/
-		
-		/+H2: Configuration+/
-		/+
-			Structured: // Save/load view state
-			string config = view.config; 
-			view.config = savedConfig; 
-		+/
-		
-		/+H2: Input Handling+/
-		/+
-			Structured: // Built-in navigation (keyboard + mouse)
-			view.navigate(true, true); // Enable both input methods
-			
-			// Default controls:
-			// - MMB/RMB: Pan
-			// - Mouse Wheel: Zoom at mouse
-			// - WASD: Keyboard panning  
-			// - PgUp/PgDn: Keyboard zoom
-			// - Shift: Slower movement
-			// - Home: Zoom to fit
-		+/
-		
-		/+H2: Work Area Management+/
-		/+
-			Structured: // Set drawing bounds
-			view.workArea = calculatedBounds; 
-			
-			// Automatic fitting
-			if(view.autoZoom()) {
-				    // View was automatically adjusted
-			}
-		+/
-		
-		/+H2: Performance Notes+/
-			/+Bullet: Transformation functions are computationally expensive+/
-			/+Bullet: Use /+Highlighted: animated = false+/ for performance-critical operations+/
-			/+Bullet: Center correction adds per-frame overhead+/
-		
-		/+Note: Usage(prompt_hit: 64, prompt_miss: 4948, completion: 704, HUF: 0.80, price: 100%)+/
 	+/
 }
 class Drawing
@@ -3656,7 +3660,7 @@ class Drawing
 		//Transforms into screenSpace. uScale means the pixelsize.
 		vec2 trans(vec2 p)
 		{ return (p+uShift)*uScale; } 
-		vec2 invTrans(vec2 p)
+		vec2 screenToWorld(vec2 p)
 		{ return (p/uScale)-uShift; } 
 		//Transforms into normalized view coordinates for opengl.
 		vec2 finalTrans(vec2 p)
@@ -3792,8 +3796,8 @@ class Drawing
 					sdir	= hdir*xa,
 					q0	= p0-sdir+sside,
 					q1	= p1+sdir+sside; 
-				fStipple.y = dot(lineWidth<0 ? q0-uScale*uShift : invTrans(q0), stippleDir); emit(q0); 
-				fStipple.y = dot(lineWidth<0 ? q1-uScale*uShift : invTrans(q1), stippleDir); emit(q1); 
+				fStipple.y = dot(lineWidth<0 ? q0-uScale*uShift : screenToWorld(q0), stippleDir); emit(q0); 
+				fStipple.y = dot(lineWidth<0 ? q1-uScale*uShift : screenToWorld(q1), stippleDir); emit(q1); 
 			}
 			EndPrimitive(); 
 			

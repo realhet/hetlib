@@ -1,8 +1,20 @@
 module het.ui; /+DIDE+/
 version(/+$DIDE_REGION+/all)
 {
-	public import het.opengl; 
+	//originally it was public import het.opengl
+	public import het; 
+	public import het.win; 
+	
+	public import het.bitmap: Bitmap, bitmaps, segoeSymbolByName; 
+	public import het.inputs: 	inputs, KeyCombo, ClickDetector, rawMousePos, 
+		/+for slider:+/slowMouse, mouseMoveRelX, mouseMoveRelY, mouseLock, mouseUnlock; 
+	
 	import het.parser: SyntaxKind, SyntaxPreset, syntaxTable, defaultSyntaxPreset; 
+	
+	public import het.opengl: 	GLWindow, textures,
+		DefaultFont_subTexIdxMap/+fontExtents service... baaaad!!!+/; 
+	public import het.draw2d: 	View2D, Drawing, HAlign, VAlign, YAlign, SamplerEffect, BoldOffset, LineStyle, ArrowStyle; 
+	
 	
 	import std.bitmanip: bitfields; 
 	import std.traits, std.meta; 
@@ -5622,8 +5634,8 @@ version(/+$DIDE_REGION+/all)
 					UPS.act[0] = mainWindow.UPS; 
 					FPS.act[0] = mainWindow.FPS; 
 					
-					TPS.act[0] = het.win.TPS; 
-					VPS.act[0] = het.win.VPS; 
+					TPS.act[0] = het_win_TPS; 
+					VPS.act[0] = het_win_VPS; 
 					
 					import core.memory : GC; 
 					with(GC.stats)
@@ -10547,5 +10559,4 @@ struct im
 			}
 		} 
 	}
-	
-} 
+} 

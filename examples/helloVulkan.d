@@ -355,7 +355,7 @@ version(/+$DIDE_REGION+/all) {
 			{
 				foreach(y; 0..8)
 				foreach(x; 0..8)
-				{ dr.rect_old((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, hiresSprite.handle), RGBA(0xFFFF8000); }
+				{ ; dr.rect_old((bounds2(0, 0, 1-0.125, 1-0.125)+vec2(x, y))*64, hiresSprite.handle), RGBA(0xFFFF8000); }
 				
 				if(KeyCombo("F1").pressed) { textures.each!free; textures.clear; }
 			} 
@@ -808,7 +808,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x88AC5F5C4644).檢 (zoomedPlatform)), ((0x88D55F5C4644).檢 (shipPos)); 
+								((0x88AE5F5C4644).檢 (zoomedPlatform)), ((0x88D75F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1063,7 +1063,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					foreach(builder; builders[].filter!"a")
 					appendGfxContent(builder.extractGfxContent); 
 				} 
-				((0xA5B85F5C4644).檢((update間(_間)))); 
+				((0xA5BA5F5C4644).檢((update間(_間)))); 
 				
 				
 				
@@ -1084,22 +1084,22 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 					
-					((0xA8525F5C4644).檢((update間(_間)))); 
+					((0xA8545F5C4644).檢((update間(_間)))); 
 					//Opt: ✅ tvBuilder.Style(Font.VGA_9x16) is the slowest of all.  Something's fucked up with that generator...
-					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xA9305F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xA9A15F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAA0D5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAA8A5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAB095F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xAB725F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font("C64_upper")); 	((0xABDF5F5C4644).檢((update間(_間)))); 
-					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAC5C5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xA9325F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xA9A35F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAA0F5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAA8C5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAB0B5F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xAB745F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font("C64_upper")); 	((0xABE15F5C4644).檢((update間(_間)))); 
+					foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAC5E5F5C4644).檢((update間(_間)))); 
 					
 					
-					if((互!((bool),(0),(0xAC9F5F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
-					if((互!((bool),(0),(0xACF45F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
-					if((互!((bool),(0),(0xAD465F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
-					if((互!((bool),(0),(0xAD975F5C4644)))) {
+					if((互!((bool),(0),(0xACA15F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
+					if((互!((bool),(0),(0xACF65F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
+					if((互!((bool),(0),(0xAD485F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
+					if((互!((bool),(0),(0xAD995F5C4644)))) {
 						static FontSpec!FontFace customFont; 
 						static bool initialized; 
 						if(initialized.chkSet)
@@ -1109,51 +1109,51 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 						tvBuilder.Style(customFont.italic); 
 					}
-					if((互!((bool),(0),(0xAF195F5C4644)))) { tvBuilder.Style(Font("C64_upper")); }
+					if((互!((bool),(0),(0xAF1B5F5C4644)))) { tvBuilder.Style(Font("C64_upper")); }
 					
 					
-					if(tvBuilder.fontFace) ((0xAF915F5C4644).檢(tvBuilder.fontFace.id)); 
-					if(tvBuilder.fontFace) ((0xAFDE5F5C4644).檢(tvBuilder.fontFace.identityStr)); 
+					if(tvBuilder.fontFace) ((0xAF935F5C4644).檢(tvBuilder.fontFace.id)); 
+					if(tvBuilder.fontFace) ((0xAFE05F5C4644).檢(tvBuilder.fontFace.identityStr)); 
 					
-					if((互!((bool),(1),(0xB0275F5C4644))))
+					if((互!((bool),(1),(0xB0295F5C4644))))
 					{
 						with(tvBuilder.TR)
 						{
-							if((互!((bool),(0),(0xB0825F5C4644)))) {
+							if((互!((bool),(0),(0xB0845F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xB0DA5F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xB1175F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xB0DC5F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xB1195F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xB1745F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xB1765F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xB1D55F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB2085F5C4644))); }
-							if((互!((bool),(0),(0xB25A5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB28A5F5C4644)))*360; 
-							if((互!((bool),(0),(0xB2D95F5C4644)))) {
+							if((互!((bool),(0),(0xB1D75F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB20A5F5C4644))); }
+							if((互!((bool),(0),(0xB25C5F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB28C5F5C4644)))*360; 
+							if((互!((bool),(0),(0xB2DB5F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xB3305F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xB36C5F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xB3325F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xB36E5F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xB3D25F5C4644)))) {
+							if((互!((bool),(0),(0xB3D45F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB43C5F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB48D5F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB43E5F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB48F5F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB5095F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB55B5F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB50B5F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB55D5F5C4644)))
 										)
 									).名!q{size})
 								); 
 							}
-							((0xB5E15F5C4644).檢(
+							((0xB5E35F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1163,7 +1163,7 @@ $(clipBounds)".text
 						}
 					}
 					
-					if((互!((bool),(0),(0xB6785F5C4644))))
+					if((互!((bool),(0),(0xB67A5F5C4644))))
 					{
 						with(tvBuilder) {
 							void benchmarkStateSaving(int N=10000, void delegate() fun)
@@ -1182,11 +1182,11 @@ $(clipBounds)".text
 								foreach(i; 0..N) doit((i&7)+3); 
 							} 
 							
-							((0xB8965F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB9015F5C4644).檢((update間(_間)))); 
+							((0xB8985F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB9035F5C4644).檢((update間(_間)))); 
 						}
 					}
 					
-					if((互!((bool),(1),(0xB94E5F5C4644))))
+					if((互!((bool),(0),(0xB9505F5C4644))))
 					{
 						with(tvBuilder) {
 							Style(((white).名!q{fg}), ((black).名!q{bk}), ((5).名!q{TR.scaleXY})); 
@@ -1197,237 +1197,235 @@ $(clipBounds)".text
 						}
 					}
 					
-					version(/+$DIDE_REGION+/none) {
-						static struct SpringSimulation
+					static struct SpringSimulation
+					{
+						// Spring endpoints
+						float P0; 
+						float P1; 
+						
+						// Spring state
+						float springLength; 	// normal/rest length
+						float velocity0, velocity1; 	// current velocity of the moving end
+						
+						// Constructor
+						this(float p0, float p1, float length, float initialVelocity = 0.0f) 
 						{
-							// Spring endpoints
-							float P0; 
-							float P1; 
-							
-							// Spring state
-							float springLength; 	// normal/rest length
-							float velocity0, velocity1; 	// current velocity of the moving end
-							
-							// Constructor
-							this(float p0, float p1, float length, float initialVelocity = 0.0f) 
-							{
-								P0 = p0; 
-								P1 = p1; 
-								springLength = length; 
-								velocity0 = initialVelocity; 
-								velocity1 = initialVelocity; 
-							} 
-							
-							void update(
-								float deltaTime_sec, float mass, float damping, float gravity, 
-								float minRange, float maxRange
-							) 
-							{
-								
-								// Calculate spring force (Hooke's Law: F = -k * x)
-								float displacement = (P1 - P0) - springLength; 
-								float springForce0 = +displacement; 	 // k = 1 for simplicity
-								float springForce1 = -displacement; 	 // k = 1 for simplicity
-								
-								// Calculate damping force (F = -c * v)
-								float dampingForce0 = +damping * velocity0; 
-								float dampingForce1 = -damping * velocity1; 
-								
-								// Calculate gravitational force
-								float gravityForce = mass * gravity; 
-								
-								// Total force acting on the mass
-								float totalForce0 = springForce0 + dampingForce0 + gravityForce; 
-								float totalForce1 = springForce1 + dampingForce1 + gravityForce; 
-								
-								// Update velocity using Newton's second law (F = ma)
-								float acceleration0 = totalForce0 / mass; 
-								float acceleration1 = totalForce1 / mass; 
-								
-								velocity0 += acceleration0 * deltaTime_sec; 
-								velocity1 += acceleration1 * deltaTime_sec; 
-								
-								// Update position
-								P0 += velocity0 * deltaTime_sec; 
-								P1 += velocity1 * deltaTime_sec; 
-								
-								// Apply boundary constraints with elastic bounce
-								applyBoundaryConstraints(minRange, maxRange); 
-							} 
-							
-							void applyBoundaryConstraints(float minRange, float maxRange) 
-							{
-								// Check if P1 exceeds the maximum range
-								if(P1 > maxRange) {
-									float overshoot = P1 - maxRange; 
-									P1 = maxRange - overshoot;  // Reflect position
-									velocity1 = -abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
-								}
-								
-								// Check if P1 goes below the minimum range
-								if(P1 < minRange) {
-									float overshoot = minRange - P1; 
-									P1 = minRange + overshoot;  // Reflect position
-									velocity1 = +abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
-								}
-								
-								// Check if P0 exceeds the maximum range
-								if(P0 > maxRange) {
-									float overshoot = P0 - maxRange; 
-									P0 = maxRange - overshoot;  // Reflect position
-									velocity0 = -abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
-								}
-								
-								// Check if P0 goes below the minimum range
-								if(P0 < minRange) {
-									float overshoot = minRange - P0; 
-									P0 = minRange + overshoot;  // Reflect position
-									velocity0 = +abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
-								}
-								
-							} 
-							
-							// Helper function to visualize the spring
-							void draw() const 
-							{
-								writefln(
-									"Spring: P0=%.2f, P1=%.2f, Length=%.2f, Velocity=%.2f", 
-									P0, P1, (P1 - P0), velocity0
-								); 
-							} 
+							P0 = p0; 
+							P1 = p1; 
+							springLength = length; 
+							velocity0 = initialVelocity; 
+							velocity1 = initialVelocity; 
 						} 
 						
-						
-						static struct BouncingBounds
+						void update(
+							float deltaTime_sec, float mass, float damping, float gravity, 
+							float minRange, float maxRange
+						) 
 						{
-							SpringSimulation horz, vert; 
 							
-							this(uint seed)
-							{
-								RNG rng; rng.seed = seed; 
-								auto 	vel 	= vec2(rng.randomGaussPair[])*10, 
-									pos0 	= vec2(rng.randomGaussPair[])*15, 
-									pos1 	= vec2(rng.randomGaussPair[])*15; 
-								
-								horz = SpringSimulation(50.0f+pos0.x, 50+8*(40+8) + 5+pos1.x, 8*(40+8), 10 + vel.x); 
-								vert = SpringSimulation(50.0f+pos0.y, 50+8*(25+8) + 10+pos1.y, 8*(25+8), 0 + vel.y); 
-							} 
+							// Calculate spring force (Hooke's Law: F = -k * x)
+							float displacement = (P1 - P0) - springLength; 
+							float springForce0 = +displacement; 	 // k = 1 for simplicity
+							float springForce1 = -displacement; 	 // k = 1 for simplicity
 							
-							void update(float deltaTime)
-							{
-								{
-									float mass = .18f; 
-									float damping = 0.02f; 
-									float gravity = .1 * 9.8f; 
-									float minRange = 16*1; 
-									float maxRange = 16*24; 
-									vert.update(
-										deltaTime, mass, damping, 
-										gravity, minRange, maxRange
-									); 
-								}
-								{
-									float mass = .24f; 
-									float damping = 0.00f; 
-									float gravity = 0; 
-									float minRange = 9*1; 
-									float maxRange = 9*79; 
-									horz.update(
-										deltaTime, mass, damping, 
-										gravity, minRange, maxRange
-									); 
-								}
-							} 
+							// Calculate damping force (F = -c * v)
+							float dampingForce0 = +damping * velocity0; 
+							float dampingForce1 = -damping * velocity1; 
 							
-							@property bounds() const => bounds2(horz.P0, vert.P0, horz.P1, vert.P1); 
+							// Calculate gravitational force
+							float gravityForce = mass * gravity; 
+							
+							// Total force acting on the mass
+							float totalForce0 = springForce0 + dampingForce0 + gravityForce; 
+							float totalForce1 = springForce1 + dampingForce1 + gravityForce; 
+							
+							// Update velocity using Newton's second law (F = ma)
+							float acceleration0 = totalForce0 / mass; 
+							float acceleration1 = totalForce1 / mass; 
+							
+							velocity0 += acceleration0 * deltaTime_sec; 
+							velocity1 += acceleration1 * deltaTime_sec; 
+							
+							// Update position
+							P0 += velocity0 * deltaTime_sec; 
+							P1 += velocity1 * deltaTime_sec; 
+							
+							// Apply boundary constraints with elastic bounce
+							applyBoundaryConstraints(minRange, maxRange); 
 						} 
 						
-						static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
-						((0xCE465F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCEC45F5C4644).檢((update間(_間)))); 
-						
-						with(tvBuilder)
+						void applyBoundaryConstraints(float minRange, float maxRange) 
 						{
-							//Link: google image search: borland turbo pascal
-							//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
-							
-							drawTextWindow
-							(
-								"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).名!q{size})), 
-								"Program Add;
-
-Var
-	Num1, Num2, Sum : integer;
-Begin
-	Write('Input number 1: ');
-	Readln(Num1);
-	Write('Input number 2: ');
-	Readln(Num2);
-	Sum := Num1 + Num2;
-	Writeln(Sum);
-	Readln;
-End.".splitLines
-							); 
-							
-							Style(((.66).名!q{opacity})); 
-							static TurboVisionBuilder jlBuilder; if(!jlBuilder) jlBuilder = new TurboVisionBuilder; 
-							foreach(const bb; bouncingBounds)
-							{
-								jlBuilder.setState(colorState, fontState); 
-								with(jlBuilder)
-								{
-									const windowSize = ivec2(45, 19); 
-									TR.transXY = bb.bounds.topLeft; 
-									TR.scaleXY = ((bb.bounds.size)/(windowSize*fontSize)); 
-									drawTextWindow
-										(
-										"JupiterLander.pas", ibounds2(ivec2(0), ((windowSize).名!q{size})), 
-										"".splitLines
-									); 
-									TR.transXY = TR.transXY + fontSize * TR.scaleXY; 
-									TR.scaleXY.y *= ((windowSize.y-2)*fontSize.y) / (float((25+8)*8)); 
-									drawJupiterLanderOnBuilder(jlBuilder, ivec2(0)); 
-								}
-								consume(jlBuilder); 
+							// Check if P1 exceeds the maximum range
+							if(P1 > maxRange) {
+								float overshoot = P1 - maxRange; 
+								P1 = maxRange - overshoot;  // Reflect position
+								velocity1 = -abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
 							}
 							
-							Style(((1).名!q{opacity})); 
-							static MenuItem[] mainMenuItems = 
-							[
-								{"&File"}, 
-								{"&Edit"}, 
-								{"&Search"}, 
-								{
-									"&Run", selected : true, opened : true, subMenu : 
-									[
-										{"&Run", shortcut : "Ctrl+F9", selected : true}, 
-										{"&Step over", shortcut : "F8"}, 
-										{"&Trace into", shortcut : "F7"}, 
-										{"&Go to cursor", shortcut : "F4"}, 
-										{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
-										{"P&arameters..."}
-									]
-								},
-								{"&Compile"}, 
-								{"&Debug"}, 
-								{"&Tools"}, 
-								{"&Options"}, 
-								{"&Window"}, 
-								{"&Help"},
-							]; 
+							// Check if P1 goes below the minimum range
+							if(P1 < minRange) {
+								float overshoot = minRange - P1; 
+								P1 = minRange + overshoot;  // Reflect position
+								velocity1 = +abs(velocity1) * 1;  // Reverse velocity with energy loss (bounce damping)
+							}
 							
-							Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
+							// Check if P0 exceeds the maximum range
+							if(P0 > maxRange) {
+								float overshoot = P0 - maxRange; 
+								P0 = maxRange - overshoot;  // Reflect position
+								velocity0 = -abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
+							}
 							
-							Text(
-								M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
-									clMenuItem, "Help │ Run the current program"
-							); fillSpace; 
+							// Check if P0 goes below the minimum range
+							if(P0 < minRange) {
+								float overshoot = minRange - P0; 
+								P0 = minRange + overshoot;  // Reflect position
+								velocity0 = +abs(velocity0) * 1;  // Reverse velocity with energy loss (bounce damping)
+							}
+							
+						} 
+						
+						// Helper function to visualize the spring
+						void draw() const 
+						{
+							writefln(
+								"Spring: P0=%.2f, P1=%.2f, Length=%.2f, Velocity=%.2f", 
+								P0, P1, (P1 - P0), velocity0
+							); 
+						} 
+					} 
+					
+					
+					static struct BouncingBounds
+					{
+						SpringSimulation horz, vert; 
+						
+						this(uint seed)
+						{
+							RNG rng; rng.seed = seed; 
+							auto 	vel 	= vec2(rng.randomGaussPair[])*10, 
+								pos0 	= vec2(rng.randomGaussPair[])*15, 
+								pos1 	= vec2(rng.randomGaussPair[])*15; 
+							
+							horz = SpringSimulation(50.0f+pos0.x, 50+8*(40+8) + 5+pos1.x, 8*(40+8), 10 + vel.x); 
+							vert = SpringSimulation(50.0f+pos0.y, 50+8*(25+8) + 10+pos1.y, 8*(25+8), 0 + vel.y); 
+						} 
+						
+						void update(float deltaTime)
+						{
+							{
+								float mass = .18f; 
+								float damping = 0.02f; 
+								float gravity = .1 * 9.8f; 
+								float minRange = 16*1; 
+								float maxRange = 16*24; 
+								vert.update(
+									deltaTime, mass, damping, 
+									gravity, minRange, maxRange
+								); 
+							}
+							{
+								float mass = .24f; 
+								float damping = 0.00f; 
+								float gravity = 0; 
+								float minRange = 9*1; 
+								float maxRange = 9*79; 
+								horz.update(
+									deltaTime, mass, damping, 
+									gravity, minRange, maxRange
+								); 
+							}
+						} 
+						
+						@property bounds() const => bounds2(horz.P0, vert.P0, horz.P1, vert.P1); 
+					} 
+					
+					static bouncingBounds = mixin(求map(q{seed},q{iota(80)},q{BouncingBounds(seed)})).array; 
+					((0xCD905F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCE0E5F5C4644).檢((update間(_間)))); 
+					
+					with(tvBuilder)
+					{
+						//Link: google image search: borland turbo pascal
+						//Link: https://psychocod3r.wordpress.com/2021/05/23/exploring-borland-turbo-pascal-for-dos/
+						
+						drawTextWindow
+						(
+							"noname00.pas", ibounds2(ivec2(0, 1), ((ivec2(80, 23)).名!q{size})), 
+							"Program Add;
+		
+		Var
+			Num1, Num2, Sum : integer;
+		Begin
+			Write('Input number 1: ');
+			Readln(Num1);
+			Write('Input number 2: ');
+			Readln(Num2);
+			Sum := Num1 + Num2;
+			Writeln(Sum);
+			Readln;
+		End.".splitLines
+						); 
+						
+						Style(((.66).名!q{opacity})); 
+						static TurboVisionBuilder jlBuilder; if(!jlBuilder) jlBuilder = new TurboVisionBuilder; 
+						foreach(const bb; bouncingBounds)
+						{
+							jlBuilder.setState(colorState, fontState); 
+							with(jlBuilder)
+							{
+								const windowSize = ivec2(45, 19); 
+								TR.transXY = bb.bounds.topLeft; 
+								TR.scaleXY = ((bb.bounds.size)/(windowSize*fontSize)); 
+								drawTextWindow
+									(
+									"JupiterLander.pas", ibounds2(ivec2(0), ((windowSize).名!q{size})), 
+									"".splitLines
+								); 
+								TR.transXY = TR.transXY + fontSize * TR.scaleXY; 
+								TR.scaleXY.y *= ((windowSize.y-2)*fontSize.y) / (float((25+8)*8)); 
+								drawJupiterLanderOnBuilder(jlBuilder, ivec2(0)); 
+							}
+							consume(jlBuilder); 
 						}
 						
-						tvBuilder.commit; 
+						Style(((1).名!q{opacity})); 
+						static MenuItem[] mainMenuItems = 
+						[
+							{"&File"}, 
+							{"&Edit"}, 
+							{"&Search"}, 
+							{
+								"&Run", selected : true, opened : true, subMenu : 
+								[
+									{"&Run", shortcut : "Ctrl+F9", selected : true}, 
+									{"&Step over", shortcut : "F8"}, 
+									{"&Trace into", shortcut : "F7"}, 
+									{"&Go to cursor", shortcut : "F4"}, 
+									{"&Program reset", shortcut : "Ctrl+F2", disabled : true}, 
+									{"P&arameters..."}
+								]
+							},
+							{"&Compile"}, 
+							{"&Debug"}, 
+							{"&Tools"}, 
+							{"&Options"}, 
+							{"&Window"}, 
+							{"&Help"},
+						]; 
+						
+						Text(M(0, 0)); drawMainMenu(mainMenuItems); fillSpace; 
+						
+						Text(
+							M(0, 24), 	clMenuKey, chain(" ", "F1", " "), 
+								clMenuItem, "Help │ Run the current program"
+						); fillSpace; 
 					}
+					
+					tvBuilder.commit; 
 				}
 				
-				((0xD86A5F5C4644).檢((update間(_間)))); 
+				((0xD7805F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1479,7 +1477,7 @@ End.".splitLines
 					}
 					consumeGfxContent(builder); 
 				}
-				((0xDECA5F5C4644).檢((update間(_間)))); 
+				((0xDDE05F5C4644).檢((update間(_間)))); 
 				
 				
 				
@@ -1489,4 +1487,599 @@ End.".splitLines
 		} 
 	} 
 	
+}
+
+
+version(/+$DIDE_REGION+/all)
+{
+	/+
+		Assistant: /+H1: Drawing Graphics API Cheat Sheet+/
+		
+		/+H2: Core Concepts+/
+			/+Bullet: /+Bold: Drawing+/: Main class for 2D graphics operations+/
+			/+Bullet: /+Bold: State-based+/: Maintains drawing state (color, line style, transformations)+/
+			/+Bullet: /+Bold: Immediate mode+/: Commands are buffered and drawn later+/
+			/+Bullet: /+Bold: GPU accelerated+/: Uses OpenGL/VBOs for rendering+/
+		
+		/+H2: Initialization & Management+/
+		/+
+			Structured: auto d = new Drawing(); 	// Create new drawing
+			auto d = new Drawing("name"); 	// Named drawing
+			auto clone = d.clone(); 	// Create clone
+			d.clear(); 	// Clear all content
+			d.clear(RGB.clWhite); 	// Clear with background color
+		+/
+		
+		/+H2: State Management+/
+		/+H3: Colors & Alpha+/
+		/+
+			Structured: d.color = RGB.clRed; 	// Set draw color
+			d.alpha = 0.5; 	// Set alpha (0-1)
+		+/
+		
+		/+H3: Line & Point Properties+/
+		/+
+			Structured: d.lineWidth = 2.0; 	// Absolute line width
+			d.lineWidth = -2.0; 	// Relative line width
+			d.pointSize = 3.0; 	// Point size
+			d.lineStyle = LineStyle.normal; 	// Line style
+			d.arrowStyle = ArrowStyle.none; 	// Arrow style
+		+/
+		
+		/+H3: Font Properties+/
+		/+
+			Structured: d.fontHeight = 18; 	// Font size
+			d.fontWeight = 1.4; 	// Font weight
+			d.fontBold = true; 	// Bold text
+			d.fontItalic = true; 	// Italic text
+			d.fontMonoSpace = true; 	// Monospace font
+			d.fontUnderline = true; 	// Underline
+			d.fontStrikeOut = true; 	// Strikeout
+		+/
+		
+		/+H3: Transformations+/
+		/+
+			Structured: d.translate(x, y); 	// Move origin
+			d.scale(factor); 	// Scale drawing
+			d.push(); 	// Save transformation state
+			d.pop(); 	// Restore transformation state
+		+/
+		
+		/+H3: State Stack+/
+		/+
+			Structured: d.saveState(); 	// Push current state
+			d.restoreState(); 	// Pop state
+			d.pushState(); d.popState(); 	// Aliases
+		+/
+		/+H2: Drawing Primitives+/
+		
+		/+H3: Points+/
+		/+
+			Structured: d.point(x, y); 	// Single point
+			d.point(vec2(x, y)); 	// Vector point
+			d.point(RGB.clRed, x, y); 	// Colored point
+			d.point([vec2(0,0), vec2(1,1)]); 	// Multiple points
+		+/
+		
+		/+H3: Lines+/
+		/+
+			Structured: d.moveTo(x, y); 	// Set starting point
+			d.lineTo(x, y); 	// Draw line to point
+			d.lineRel(dx, dy); 	// Relative line
+			d.line(p0, p1); 	// Line between points
+			d.line([p0, p1, p2]); 	// Polyline
+			d.lineLoop([p0, p1, p2]); 	// Closed polyline
+		+/
+		
+		/+H3: Advanced Line Drawing+/
+		/+
+			Structured: d.line2(
+				// Flexible line command
+				RGB.clRed,	// Color
+				2.0,	// Line width  
+				vec2(0,0), vec2(100,100),	// Points
+				LineStyle.dashed	// Line style
+			); 	
+		+/
+		
+		/+H3: Shapes+/
+		/+
+			Structured: d.drawRect(x0, y0, x1, y1); 	// Rectangle outline
+			d.fillRect(x0, y0, x1, y1); 	// Filled rectangle
+			d.drawX(x0, y0, x1, y1); 	// X mark
+			d.fillTriangle(p0, p1, p2); 	// Filled triangle
+			d.fillConvexPoly([p0, p1, p2, p3]); 	// Convex polygon
+		+/
+		
+		/+H3: Curves & Circles+/
+		/+
+			Structured: d.ellipse(x, y, rx, ry); 	// Ellipse
+			d.circle(x, y, radius); 	// Circle
+			d.bezier2(p0, p1, p2); 	// Quadratic Bezier
+		+/
+		
+		/+H2: Text Rendering+/
+		/+
+			Structured: d.textOut(x, y, "Hello"); 	// Basic text
+			d.textOut(vec2(x,y), "Hello"); 	// Vector position
+			d.textOut(p, "Text", width, HAlign.center); 	// Aligned text
+			d.textOutMulti(x, y, "Line1\nLine2"); 	// Multiline text
+		+/
+		
+		/+H2: Images & Textures+/
+		/+
+			Structured: d.drawGlyph("image.png", x, y); 	// Draw image
+			d.drawGlyph("image.png", bounds); 	// Draw to bounds
+			d.drawGlyph(
+				img,x, y,	// With options
+				Flag.nearest,	// Filtering
+				RectAlign.center,	// Alignment
+				DrawGlyphScale(0.5)	// Scale
+			); 
+		+/
+		
+		/+H2: Advanced Features+/
+		
+		/+H3: Clipping+/
+		/+
+			Structured: d.pushClipBounds(bounds); 	// Set clip region
+			// drawing commands...
+			d.popClipBounds(); 	// Restore clip
+		+/
+		
+		/+H3: Graphs & Charts+/
+		/+
+			Structured: d.vGraph(x0, y0, data); 	// Vertical graph
+			d.hGraph(x0, y0, data); 	// Horizontal graph  
+			d.hBars(x0, y0, data); 	// Bar chart
+		+/
+		
+		/+H3: Custom Shaders+/
+		/+
+			Structured: d.customShader = `vec4 customShader() {
+		// GLSL code
+		return vec4(1.0);
+	}`; 
+		+/
+		
+		/+H3: SVG Paths+/
+		/+
+			Structured: d.drawPath("M 0 0 L 100 100"); // SVG path data
+		+/
+		
+		/+H2: Rendering+/
+		/+
+			Structured: d.glDraw(view); 	// Draw to view
+			d.glDraw(center, scale); 	// Draw with custom transform
+		+/
+		
+		/+H2: Utility Functions+/
+		/+
+			Structured: bool empty = d.empty(); 	// Check if empty
+			bounds2 b = d.bounds; 	// Get bounding box
+			string s = d.stats(); 	// Get statistics
+			auto objs = d.exportDrawingObjs(); 	// Export drawing objects
+		+/
+		
+		/+H2: Coordinate Systems+/
+			/+Bullet: /+Bold: Local coordinates+/: Affected by transformations+/
+			/+Bullet: /+Bold: Screen coordinates+/: Final output coordinates  +/
+			/+Bullet: Use /+Highlighted: inputTransform()+/ and /+Highlighted: inverseInputTransform()+/ for conversions+/
+		
+		/+H2: Performance Notes+/
+			/+Bullet: Uses VBOs for GPU acceleration+/
+			/+Bullet: Batches drawing commands automatically+/
+			/+Bullet: Clones share data with original+/
+			/+Bullet: Sub-drawings allow hierarchical composition+/
+		
+		/+H2: Common Patterns+/
+		/+
+			Structured: // Fluid interface pattern
+			d.push()	.translate(10, 10)
+				.scale(2)
+				.drawRect(0, 0, 50, 50)
+				.pop(); 
+			
+			// State backup pattern  
+			d.saveState(); 
+			d.color = RGB.clBlue; 
+			d.lineWidth = 3; 
+			// drawing...
+			d.restoreState(); 
+		+/
+		
+		/+Note: Usage(prompt_hit: 64, prompt_miss: 18898, completion: 1464, HUF: 2.55, price: 100%)+/
+	+/
+	
+	/+
+		Assistant: /+
+			Para: I'll analyze the Drawing class usage patterns from the provided examples and categorize them
+			with statistics.
+		+/
+		
+		/+H2: Drawing Usage Pattern Analysis+/
+		
+		/+H3: Categories of Usage Patterns:+/
+		
+		1. /+Bold: COLOR & STYLING+/ (Most Frequent - 115 occurrences)
+				/+Bullet: /+Highlighted: dr.color = colorValue+/ (85 occurrences)+/
+				/+Bullet: /+Highlighted: dr.alpha = value+/ (4 occurrences)+/
+				/+Bullet: /+Highlighted: dr.lineWidth = value+/ (6 occurrences)+/
+				/+Bullet: /+Highlighted: dr.lineStyle = LineStyle.normal/dash+/ (8 occurrences)+/
+				/+Bullet: /+Highlighted: dr.fontHeight = value+/ (8 occurrences)+/
+				/+Bullet: /+Highlighted: dr.fontMonoSpace = bool+/ (4 occurrences)+/
+		
+		2. /+Bold: TRANSFORMATIONS+/ (45 occurrences)
+				/+Bullet: /+Highlighted: dr.translate(x, y) / dr.translate(vec2)+/ (25 occurrences)+/
+				/+Bullet: /+Highlighted: dr.pop+/ (15 occurrences)+/
+				/+Bullet: /+Highlighted: dr.scale(factor)+/ (3 occurrences)+/
+				/+Bullet: /+Highlighted: dr.pushClipBounds(bounds)+/ (2 occurrences)+/
+		
+		3. /+Bold: RECTANGLE OPERATIONS+/ (40 occurrences)
+				/+Bullet: /+Highlighted: dr.drawRect(bounds) / dr.drawRect(x, y, w, h)+/ (15 occurrences)+/
+				/+Bullet: /+Highlighted: dr.fillRect(bounds) / dr.fillRect(x, y, w, h)+/ (15 occurrences)+/
+				/+Bullet: /+Highlighted: bounds2() creation and manipulation+/ (10 occurrences)+/
+		
+		4. /+Bold: LINE DRAWING+/ (35 occurrences)
+				/+Bullet: /+Highlighted: dr.line/line2(points...)+/ (20 occurrences)+/
+				/+Bullet: /+Highlighted: dr.vLine/hLine+/ (10 occurrences)+/
+				/+Bullet: /+Highlighted: lineWidth changes+/ (5 occurrences)+/
+		
+		5. /+Bold: TEXT OPERATIONS+/ (25 occurrences)
+				/+Bullet: /+Highlighted: dr.drawFontGlyph(stIdx, bounds, bkColor, fontFlags)+/ (15 occurrences)+/
+				/+Bullet: /+Highlighted: dr.textOut(position, text)+/ (10 occurrences)+/
+		
+		6. /+Bold: POINT DRAWING+/ (20 occurrences)
+				/+Bullet: /+Highlighted: dr.point(position)+/ (15 occurrences)+/
+				/+Bullet: /+Highlighted: dr.pointSize changes+/ (5 occurrences)+/
+		
+		7. /+Bold: BEZIER OPERATIONS+/ (15 occurrences)
+				/+Bullet: /+Highlighted: dr.drawCubicBezierDebug(P0, P1, P2, P3, r0, r1)+/ (5 occurrences)+/
+				/+Bullet: /+Highlighted: dr.lineTo with evalBezier+/ (10 occurrences)+/
+		
+		8. /+Bold: CLIPPING+/ (8 occurrences)
+				/+Bullet: /+Highlighted: dr.pushClipBounds+/ (4 occurrences)+/
+				/+Bullet: /+Highlighted: dr.popClipBounds+/ (4 occurrences)+/
+		
+		9. /+Bold: STATE MANAGEMENT+/ (7 occurrences)
+				/+Bullet: /+Highlighted: dr.push/dr.pop+/ (transform stack)+/
+				/+Bullet: /+Highlighted: dr.clone/dr.subDraw+/ (drawing reuse)+/
+				/+Bullet: /+Highlighted: dr.reset/dr.finalize+/+/
+		
+		10. /+Bold: ADVANCED OPERATIONS+/ (6 occurrences)
+			/+Bullet: /+Highlighted: dr.lineLoop(points)+/ (closed polyline)+/
+			/+Bullet: /+Highlighted: dr.copyFrom(otherDrawing)+/+/
+			/+Bullet: /+Highlighted: dr.glDraw(view)+/ (OpenGL rendering)+/
+			/+Bullet: /+Highlighted: dr.isClone property+/+/
+		
+		/+H3: Usage Statistics:+/
+		
+		/+
+			Structured: (表([
+				[q{/+Note: Category+/},q{/+Note: Count+/},q{/+Note: Percentage+/}],
+				[q{Color & Styling},q{115},q{37.1%}],
+				[q{Transformations},q{45},q{14.5%}],
+				[q{Rectangle Operations},q{40},q{12.9%}],
+				[q{Line Drawing},q{35},q{11.3%}],
+				[q{Text Operations},q{25},q{8.1%}],
+				[q{Point Drawing},q{20},q{6.5%}],
+				[q{Bezier Operations},q{15},q{4.8%}],
+				[q{Clipping},q{8},q{2.6%}],
+				[q{State Management},q{7},q{2.3%}],
+				[q{Advanced Operations},q{6},q{1.9%}],
+				[q{/+Bold: Total+/},q{/+Bold: 310+/},q{/+Bold: 100%+/}],
+			]))
+		+/
+		
+		/+H3: Most Popular Specific Usages:+/
+		
+		1. /+Highlighted: dr.color = colorValue+/ - 85 occurrences (27.4% of total)
+		2. /+Highlighted: dr.translate+/ - 25 occurrences (8.1% of total)
+		3. /+Highlighted: dr.drawRect/fillRect+/ - 30 occurrences (9.7% of total)
+		4. /+Highlighted: dr.line/line2+/ - 20 occurrences (6.5% of total)
+		5. /+Highlighted: dr.pop+/ - 15 occurrences (4.8% of total)
+		
+		/+H3: Most Common Color Constants:+/
+		
+		1. /+Highlighted: clWhite+/ - 15+ occurrences
+		2. /+Highlighted: clGray/Silver+/ - 10+ occurrences
+		3. /+Highlighted: clFuchsia+/ - 8+ occurrences
+		4. /+Highlighted: clRed/Blue/Lime+/ - 6+ occurrences each
+		5. /+Highlighted: clYellow/Orange/Aqua+/ - 5+ occurrences each
+		
+		/+H3: Key Observations:+/
+		
+			/+
+			Bullet: /+Bold: Color setting is overwhelmingly dominant+/ (37.1%), indicating Drawing is heavily used for
+			stylized rendering with frequent color changes
+		+/
+			/+Bullet: /+Bold: Transform stack operations+/ are very common, showing hierarchical coordinate system usage+/
+			/+Bullet: /+Bold: Rectangle and line primitives+/ form the core drawing functionality+/
+			/+Bullet: /+Bold: Text and font operations+/ are significant, indicating UI/text rendering is a primary use case+/
+			/+Bullet: /+Bold: Bezier curve support+/ shows advanced path drawing capabilities+/
+			/+Bullet: /+Bold: Heavy use of color-state-change-draw sequences+/ suggests immediate mode drawing patterns+/
+			/+Bullet: /+Bold: Frequent transform push/pop+/ indicates complex hierarchical drawing structures+/
+		
+		/+
+			Para: The Drawing class provides a comprehensive 2D drawing API with strong emphasis on immediate mode drawing,
+			hierarchical coordinate systems, rich styling options, and both simple primitives and complex path operations,
+			particularly focused on UI element rendering with text and bezier curve support.
+		+/
+		
+	+/
+	/+
+		Assistant: /+H1: View2D Graphics API Cheat Sheet+/
+		
+		/+H2: Core Properties+/
+			/+Bullet: /+Highlighted: origin+/: World space center point (Vector2D)+/
+			/+Bullet: /+Highlighted: scale+/: Zoom factor (1.0 = 1 unit = 1 pixel)+/
+			/+Bullet: /+Highlighted: invScale+/: Pixel size in world units+/
+			/+Bullet: /+Highlighted: animSpeed+/: Animation smoothness (0.0-0.9)+/
+		
+		/+H2: Coordinate Transformation+/
+		/+
+			Structured: // World → Screen
+			vec2 screenPos = view.trans(worldPos); 
+			vec2 screenPos = view.trans(worldPos, false); // skip animation
+			
+			// Screen → World  
+			vec2 worldPos = view.invTrans(screenPos); 
+			vec2 worldPos = view.invTrans(screenPos, false); // skip animation
+		+/
+		
+		/+H2: Navigation Controls+/
+		/+
+			Structured: // Scroll
+			view.scroll(vec2(dx, dy)); 	// Relative world units
+			view.scrollH(pixels); 	// Horizontal pixels
+			view.scrollV(pixels); 	// Vertical pixels
+			
+			// Zoom
+			view.zoom(factor); 	// Relative zoom (logarithmic)
+			view.zoomAround(screenPoint, factor); 	// Zoom around specific point
+			view.zoomAroundMouse(factor); 	// Zoom around mouse position
+			
+			// View fitting
+			view.zoom(bounds); 	// Fit bounds to view
+			view.zoomAll(); 	// Fit workArea to view
+			view.zoomAll_immediate(); 	// Instant fit
+			view.autoZoom(); 	// Auto-fit when workArea changes
+		+/
+		
+		/+H2: Viewport Management+/
+		/+
+			Structured: // Sub-screen area (for UI overlays)
+			view.subScreenArea = bounds2(0.1, 0.1, 0.9, 0.9); 
+			
+			// Center correction (anti-aliasing)
+			view.centerCorrection = true; 
+			
+			// Get visible area
+			bounds2 visible = view.visibleArea(); 
+			bounds2 visibleNow = view.visibleArea(false); // no animation
+		+/
+		
+		/+H2: Mouse Interaction+/
+		/+
+			Structured: // Mouse position tracking
+			vec2 worldMousePos = view.mousePos; 
+			bool mouseInside = view.isMouseInside(); 
+			
+			// Screen bounds
+			bounds2 screenBounds = view.subScreenBounds_anim(); 
+		+/
+		
+		/+H2: Animation Control+/
+		/+
+			Structured: view.skipAnimation(); 	// Jump to target immediately
+			view.updateAnimation(deltaTime, true); 	// Manual animation update
+		+/
+		
+		/+H2: Smart Navigation+/
+		/+
+			Structured: view.smartScrollTo(targetBounds); 	// Queue smooth scroll-to
+			view.updateSmartScroll(); 	// Process scroll queue
+		+/
+		
+		/+H2: Configuration+/
+		/+
+			Structured: // Save/load view state
+			string config = view.config; 
+			view.config = savedConfig; 
+		+/
+		
+		/+H2: Input Handling+/
+		/+
+			Structured: // Built-in navigation (keyboard + mouse)
+			view.navigate(true, true); // Enable both input methods
+			
+			// Default controls:
+			// - MMB/RMB: Pan
+			// - Mouse Wheel: Zoom at mouse
+			// - WASD: Keyboard panning  
+			// - PgUp/PgDn: Keyboard zoom
+			// - Shift: Slower movement
+			// - Home: Zoom to fit
+		+/
+		
+		/+H2: Work Area Management+/
+		/+
+			Structured: // Set drawing bounds
+			view.workArea = calculatedBounds; 
+			
+			// Automatic fitting
+			if(view.autoZoom()) {
+				    // View was automatically adjusted
+			}
+		+/
+		
+		/+H2: Performance Notes+/
+			/+Bullet: Transformation functions are computationally expensive+/
+			/+Bullet: Use /+Highlighted: animated = false+/ for performance-critical operations+/
+			/+Bullet: Center correction adds per-frame overhead+/
+	+/
+	
+	/+
+		Assistant: /+
+			Para: I'll analyze the View2D class usage patterns from the provided examples and categorize them
+			with statistics.
+		+/
+		
+		/+H2: View2D Usage Pattern Analysis+/
+		
+		/+H3: Categories of Usage Patterns:+/
+		
+		1. /+Bold: Property Access+/ (Most Frequent - 16 occurrences)
+					/+Bullet: /+Highlighted: view.scale+/ (4 occurrences)+/
+					/+Bullet: /+Highlighted: view.mousePos.vec2+/ (2 occurrences)+/
+					/+Bullet: /+Highlighted: view.screenBounds_anim.bounds2+/ (3 occurrences)+/
+					/+Bullet: /+Highlighted: view.invScale+/ (1 occurrence)+/
+					/+Bullet: /+Highlighted: view.screenBounds_anim.bounds2.size*0+/ (1 occurrence)+/
+					/+Bullet: Other general /+Highlighted: view+/ property access (5 occurrences)+/
+		
+		2. /+Bold: Assignment Operations+/ (4 occurrences)
+					/+Bullet: /+Highlighted: view = viewWorld+/+/
+					/+Bullet: /+Highlighted: view = viewGUI+/+/
+					/+Bullet: /+Highlighted: view.scale = min(view.scale, maxScale)+/+/
+					/+Bullet: /+Highlighted: view = items.drop(topIndex).take(pageSize).array+/+/
+		
+		3. /+Bold: Method Calls+/ (3 occurrences)
+					/+Bullet: /+Highlighted: view.zoom(searchResults.map!(r => r.bounds).fold!"a|b", 12)+/+/
+					/+Bullet: /+Highlighted: view()+/ (function call operator)+/
+					/+Bullet: /+Highlighted: view to zoom home+/+/
+		
+		4. /+Bold: Context/Description References+/ (8 occurrences)
+					/+Bullet: /+Highlighted: view, 1: GUI screen+/+/
+					/+Bullet: /+Highlighted: view, T[] items+/+/
+					/+Bullet: /+Highlighted: view, vec2[2] searchBezierStart+/+/
+					/+Bullet: /+Highlighted: view, subCells.map!(a => cast(Node)a).array+/+/
+					/+Bullet: /+Highlighted: view and a drawing+/+/
+					/+Bullet: /+Highlighted: view, surface1: GUI view+/+/
+					/+Bullet: /+Highlighted: view, cellFun+/+/
+					/+Bullet: /+Highlighted: view space.+/+/
+		
+		5. /+Bold: Standalone References+/ (6 occurrences)
+					/+Bullet: Simple /+Highlighted: view+/ mentions without specific operations+/
+		
+		/+H3: Usage Statistics:+/
+		
+		/+
+			Structured: (表([
+				[q{/+Note: Category+/},q{/+Note: Count+/},q{/+Note: Percentage+/}],
+				[q{Property Access},q{16},q{43.2%}],
+				[q{Context References},q{8},q{21.6%}],
+				[q{Standalone References},q{6},q{16.2%}],
+				[q{Assignment Operations},q{4},q{10.8%}],
+				[q{Method Calls},q{3},q{8.1%}],
+				[q{/+Bold: Total+/},q{/+Bold: 37+/},q{/+Bold: 100%+/}],
+			]))
+		+/
+		
+		/+H3: Most Popular Specific Usages:+/
+		
+		1. /+Highlighted: view.scale+/ - 4 occurrences (10.8% of total)
+		2. /+Bold: General property access+/ - 5 occurrences (13.5% of total)
+		3. /+Highlighted: view.screenBounds_anim.bounds2+/ - 3 occurrences (8.1% of total)
+		4. /+Highlighted: view.mousePos.vec2+/ - 2 occurrences (5.4% of total)
+		
+		/+H3: Key Observations:+/
+		
+			/+
+			Bullet: /+Bold: Property access is dominant+/ (43.2%), indicating View2D is primarily used for reading/viewing
+			state
+		+/
+			/+Bullet: /+Bold: Scale manipulation+/ is the most common specific operation+/
+			/+Bullet: /+Bold: Screen bounds and mouse position+/ are frequently accessed properties+/
+			/+
+			Bullet: /+Bold: Assignment operations+/ suggest View2D objects are used in different contexts (world vs GUI
+			views)
+		+/
+			/+
+			Bullet: /+Bold: Method usage is relatively rare+/, suggesting View2D is more of a data container than an
+			active controller
+		+/
+		
+		/+
+			Para: The View2D class appears to be a viewport/camera abstraction primarily used for coordinate transformations,
+			mouse interaction, and display state management in a graphical interface context.
+		+/
+		
+		/+Note: Usage(prompt_hit: 64, prompt_miss: 569, completion: 696, HUF: 0.34, price: 100%)+/
+	+/
+	
+	/+
+		Assistant: /+H1: Draw3D API Cheat Sheet+/
+		
+		/+H2: Initialization+/
+			/+Bullet: /+Highlighted: Draw3D d3d = new Draw3D();+/ - Create instance+/
+			/+Bullet: /+Highlighted: d3d.beginFrame(screenMousePos);+/ - Start frame rendering+/
+			/+Bullet: /+Highlighted: d3d.endFrame();+/ - End frame rendering+/
+		
+		/+H2: Camera & Navigation+/
+			/+Bullet: /+Highlighted: d3d.navigate(keysEnabled, mouseEnabled)+/ - Camera control+/
+			/+Bullet: /+Highlighted: d3d.cam+/ - Access camera properties+/
+			/+Bullet: /+Highlighted: d3d.getCursor()+/ - Get 3D cursor position+/
+		
+		/+H2: Transformations+/
+			/+Bullet: /+Highlighted: pushMatrix()/popMatrix()+/ - Matrix stack operations+/
+			/+Bullet: /+Highlighted: translate(x, y, z)+/ - Move object+/
+			/+Bullet: /+Highlighted: scale(factor)+/ - Uniform scaling+/
+			/+Bullet: /+Highlighted: rotatex/rotatey/rotatez(angle)+/ - Rotation around axes+/
+			/+Bullet: /+Highlighted: rotate(angle, axis)+/ - Arbitrary axis rotation+/
+		
+		/+H2: Rendering Primitives+/
+			/+Bullet: /+Highlighted: draw(VBO vbo, color)+/ - Draw vertex buffer object+/
+			/+Bullet: /+Highlighted: draw(MeshObject mesh, color)+/ - Draw mesh object+/
+			/+Bullet: /+Highlighted: draw(MeshNode node, color)+/ - Draw node hierarchy+/
+			/+Bullet: /+Highlighted: draw(Model model, color)+/ - Draw complete model+/
+			/+Bullet: /+Highlighted: draw(LineDrawing ld)+/ - Draw lines/wireframes+/
+		
+		
+		/+H2: Debug Features+/
+		/+
+			Structured: d3d.options.showWorldAxes = true; 	  // Show world coordinate axes
+			d3d.options.showCameraPivot = true; 	  // Show camera pivot point
+			d3d.options.showObjectAxes = true; 	  // Show object local axes
+			d3d.options.showObjectBounds = true; 		// Show object bounding boxes
+			d3d.options.axisLength = 250; 	  // Set	axis display length
+		+/
+		
+		/+H2: Properties+/
+			/+Bullet: /+Highlighted: d3d.viewport+/ - Current viewport dimensions+/
+			/+Bullet: /+Highlighted: d3d.cursor+/ - 3D cursor information+/
+			/+Bullet: /+Highlighted: d3d.pickedNode+/ - Last picked/selected node+/
+			/+Bullet: /+Highlighted: d3d.screenMousePos+/ - Current mouse position+/
+		
+		/+H2: Shader Features+/
+			/+Bullet: Built-in Phong lighting with ambient/diffuse+/
+			/+Bullet: Central lighting from camera direction+/
+			/+Bullet: Automatic MVP matrix calculation+/
+			/+Bullet: Color blending support+/
+			/+Bullet: Normal calculation for lighting+/
+		
+		/+H2: OpenGL State+/
+			/+Bullet: Depth testing enabled+/
+			/+Bullet: Face culling (CCW front faces)+/
+			/+Bullet: Proper depth buffer management+/
+			/+Bullet: Line width control for debug drawing+/
+		
+		/+H2: Usage Pattern+/
+		/+
+			Structured: d3d.beginFrame(mousePos); 
+			d3d.navigate(true, true); 
+			
+			// Draw your scene
+			d3d.translate(1, 2, 3); 
+			d3d.draw(myModel, clWhite); 
+			
+			d3d.endFrame(); 
+		+/
+		
+		/+
+			Italic: Note: All coordinates are in world space. Automatic matrix management handles 
+			view/projection transformations.
+		+/
+		
+		/+Note: Usage(prompt_hit: 64, prompt_miss: 4191, completion: 585, HUF: 0.67, price: 100%)+/
+	+/
 }

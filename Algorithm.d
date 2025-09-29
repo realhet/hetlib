@@ -1,5 +1,5 @@
 module het.algorithm; 
-import het, het.draw2d; 
+import het; 
 version(/+$DIDE_REGION+/all)
 {
 	
@@ -194,7 +194,7 @@ version(/+$DIDE_REGION+/all)
 		static if(0)
 		struct findBlobsDebug
 		{
-			import het.draw2d, het.ui; static: 
+			static: 
 			struct Event
 			{
 				ivec2 actPos; 
@@ -203,7 +203,7 @@ version(/+$DIDE_REGION+/all)
 				int[int] idMap; 
 				Blob[int] blobs; 
 				
-				void draw(Drawing dr)
+				void draw(Drawing)(Drawing dr)
 				{
 					with(dr) {
 						fontHeight = .8; 
@@ -273,7 +273,7 @@ version(/+$DIDE_REGION+/all)
 				
 			} 
 			
-			void draw(Drawing dr)
+			void draw(Drawing)(Drawing dr)
 			{ events.get(actEventIdx).draw(dr); } 
 		} 
 		version(/+$DIDE_REGION Largest Blob + Erode +/all)
@@ -766,10 +766,9 @@ version(/+$DIDE_REGION+/all)
 			writeln("  freeRects:", freeRects.map!text.join("\n")); 
 		} 
 		
-		static string test(Drawing dr)
+		static string test(Drawing)(Drawing dr)
 		{
-				//test /////////////////////////////////
-			import het.draw2d; 
+			//test /////////////////////////////////
 			
 			auto mrb = new MaxRectsBin(0, 0, 1024, 1024); 
 			ivec2[] adds = [ivec2(1,1), ivec2(2,2), ivec2(7,3), ivec2(3,7), ivec2(1,1), ivec2(1,1)]; 
@@ -1200,7 +1199,7 @@ version(/+$DIDE_REGION+/all)
 		return vec2(0, y).rotate(angle); 
 	} 
 	
-	void drawFftDonutHistogram(Drawing dr, float[] hist)
+	void drawFftDonutHistogram(Drawing)(Drawing dr, float[] hist)
 	{
 		dr.lineLoop(
 			iota((hist.length*2).to!int).map!(
@@ -1210,7 +1209,7 @@ version(/+$DIDE_REGION+/all)
 		); 
 	} 
 	
-	void drawFftDonutAngle(Drawing dr, float[] hist)
+	void drawFftDonutAngle(Drawing)(Drawing dr, float[] hist)
 	{
 		const v = angleHistogramPeakVector(hist); 
 		dr.line(+v, -v); 
@@ -1390,24 +1389,6 @@ version(/+$DIDE_REGION Geometry+/all)
 	auto toSegs(in bounds2 bnd, bool clockwise=true)
 	{ return bnd.toPoints(clockwise).toSegs(true); } 
 	
-	
-	//Todo: these should be done with CTCG
-	//Todo: put these into het.math
-	auto inflated(B, V)(in B b, in V v)
-	{ return b.valid ? B(b.low-v, b.high+v) : b; } //Todo: support this for all bounds
-	auto inflated(B, F)(in B b, in F x, in F y)
-	{ return b.inflated(B.VectorType(x, y)); } 
-	auto inflated(B, F)(in B b, in F x, in F y, in F z)
-	{ return b.inflated(B.VectorType(x, y, z)); } 
-	
-	auto fittingSquare(in bounds2 b)
-	{
-		auto diff = (b.size.x-b.size.y)*0.5f; 
-		if(diff<0) return b.inflated(0    , diff); 
-		else return b.inflated(-diff,    0); 
-	} 
-	
-	//float - int combinations ///////////////////////////////////////
 	
 	////////////////////////////////////////////////////////////////////////////////////////////
 	///  Graphics algorithms                                                                 ///

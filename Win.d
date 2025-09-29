@@ -13,8 +13,6 @@ public import het, het.algorithm, het.inputs;
 __gshared size_t global_TPSCnt, TPS; //texture upload bytes /sec
 __gshared size_t global_VPSCnt, VPS; //VBO upload bytes /sec
 
-//het.draw2d
-
 import core.runtime,
 core.sys.windows.windows,
 core.sys.windows.windef,

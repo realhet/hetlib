@@ -10,7 +10,15 @@ enum LOG_shaderLoadingTimes = false;
 //Todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //Todo: nincs doUpdate formresize kozben
 
-public import het, het.win, het.algorithm, het.bitmap, het.draw2d; 
+//public import het, het.win, het.algorithm, het.bitmap, het.draw2d; 
+public import het; 
+
+public import het.win; 
+import het.inputs: inputs, MouseState; 
+import het.bitmap: Bitmap, bitmaps, bitmapQuery_accessDelayedMulti; 
+
+import het.draw2d: View2D, Drawing, LineStyle; 
+
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits; 
 
 //Turn on high performance GPUs on some laptops
@@ -1978,15 +1986,15 @@ version(/+$DIDE_REGION+/all)
 			alt	= k("Alt"	); 
 			ctrl	= k("Ctrl"	); 
 			screen	= screenToClient(inputs.mouseAct).iround; 
-			world	= view.invTrans(vec2(screen)); 
+			world	= view.screenToWorld(vec2(screen)); 
 			wheel	= inputs["MW"].delta.iround; 
 		}
 		mouse._updateInternal(a); 
 		
 		mouse.screenRect = clientBounds; 
 		mouse.worldRect = bounds2(
-			view.invTrans(vec2(mouse.screenRect.topLeft)),
-			view.invTrans(vec2(mouse.screenRect.bottomRight))
+			view.screenToWorld(vec2(mouse.screenRect.topLeft)),
+			view.screenToWorld(vec2(mouse.screenRect.bottomRight))
 		); 
 		
 		//Todo: bad names: worldRect is "screenBounds in world coords"
@@ -2002,16 +2010,16 @@ version(/+$DIDE_REGION+/all)
 		with(view)
 		{
 			mouseLast = mousePos; 
-			mousePos = invTrans(mp); 
-			screenBounds_anim = invTrans(bnd, true); 
-			screenBounds_dest = invTrans(bnd, false); 
+			mousePos = screenToWorld(mp); 
+			screenBounds_anim = screenToWorld(bnd, true); 
+			screenBounds_dest = screenToWorld(bnd, false); 
 			workArea_accum = View2D.B.init; 
 		}with(viewGUI)
 		{
 			mouseLast = mousePos; 
-			mousePos = invTrans(mp); 
-			screenBounds_anim = invTrans(bnd, true); 
-			screenBounds_dest = invTrans(bnd, false); 
+			mousePos = screenToWorld(mp); 
+			screenBounds_anim = screenToWorld(bnd, true); 
+			screenBounds_dest = screenToWorld(bnd, false); 
 			workArea_accum = View2D.B.init; 
 		}
 	} 
@@ -3012,9 +3020,6 @@ version(/+$DIDE_REGION+/all)
 version(/+$DIDE_REGION MegaTexturing+/all)
 {
 	import het.algorithm; 
-	
-	//imports for debug
-	import het.draw2d; 
 	
 	//Global access ///////////////////////////////
 	

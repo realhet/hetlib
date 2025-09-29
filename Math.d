@@ -2115,6 +2115,19 @@ version(/+$DIDE_REGION+/all)
 	auto lfloorceil(VT)(in Bounds!VT b)
 	{ return Bounds!(Vector!(long, VT.length))(b.low.lfloor, b.high.lceil); } 
 	
+	auto inflated(B, V)(in B b, in V v)
+	{ return b.valid ? B(b.low-v, b.high+v) : b; } 
+	auto inflated(B, F)(in B b, in F x, in F y)
+	{ return b.inflated(B.VectorType(x, y)); } 
+	auto inflated(B, F)(in B b, in F x, in F y, in F z)
+	{ return b.inflated(B.VectorType(x, y, z)); } 
+	
+	auto fittingSquare(B)(in B b)
+	{
+		auto diff = (b.size.x-b.size.y)*0.5f; 
+		if(diff<0) return b.inflated(0    , diff); 
+		else return b.inflated(-diff,    0); 
+	} 
 	
 	private void unittest_Bounds()
 	{
