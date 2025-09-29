@@ -17,7 +17,7 @@ version(/+$DIDE_REGION+/all)
 	
 	public import het.opengl: 	GLWindow, textures,
 		DefaultFont_subTexIdxMap/+fontExtents service... baaaad!!!+/; 
-	public import het.draw2d: 	View2D, Drawing, HAlign, VAlign, YAlign, SamplerEffect, BoldOffset, LineStyle, ArrowStyle; 
+	public import het.draw2d: 	Drawing, HAlign, VAlign, YAlign, SamplerEffect, BoldOffset, LineStyle, ArrowStyle; 
 	
 	
 	import std.bitmanip: bitfields; 

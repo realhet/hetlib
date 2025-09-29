@@ -17,7 +17,7 @@ public import het.win;
 import het.inputs: inputs, MouseState; 
 import het.bitmap: Bitmap, bitmaps, bitmapQuery_accessDelayedMulti; 
 
-import het.draw2d: View2D, Drawing, LineStyle; 
+import het.draw2d: Drawing, LineStyle; 
 
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits; 
 
