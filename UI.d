@@ -3,10 +3,14 @@ version(/+$DIDE_REGION+/all)
 {
 	//originally it was public import het.opengl
 	public import het; 
+	
 	public import het.win; 
 	
-	public import het.bitmap: Bitmap, bitmaps, segoeSymbolByName; 
-	public import het.inputs: 	inputs, KeyCombo, ClickDetector, rawMousePos, 
+	public import het.bitmap: Bitmap, bitmaps; 
+	import het.bitmap: segoeSymbolByName; 
+	
+	public import het.inputs: 	inputs, KeyCombo; 
+	import het.inputs: 	ClickDetector, rawMousePos, 
 		/+for slider:+/slowMouse, mouseMoveRelX, mouseMoveRelY, mouseLock, mouseUnlock; 
 	
 	import het.parser: SyntaxKind, SyntaxPreset, syntaxTable, defaultSyntaxPreset; 
@@ -206,6 +210,8 @@ version(/+$DIDE_REGION+/all)
 	
 	private
 	{
+		//Todo: These should be templates
+		
 		bool is2(A, B)()
 		{ return is(immutable(A)==immutable(B)); } 
 		
@@ -5634,8 +5640,8 @@ version(/+$DIDE_REGION+/all)
 					UPS.act[0] = mainWindow.UPS; 
 					FPS.act[0] = mainWindow.FPS; 
 					
-					TPS.act[0] = het_win_TPS; 
-					VPS.act[0] = het_win_VPS; 
+					TPS.act[0] = global_TPS; 
+					VPS.act[0] = global_VPS; 
 					
 					import core.memory : GC; 
 					with(GC.stats)

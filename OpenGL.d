@@ -12,8 +12,8 @@ enum LOG_shaderLoadingTimes = false;
 
 //public import het, het.win, het.algorithm, het.bitmap, het.draw2d; 
 public import het; 
-
 public import het.win; 
+
 import het.inputs: inputs, MouseState; 
 import het.bitmap: Bitmap, bitmaps, bitmapQuery_accessDelayedMulti; 
 
@@ -1920,6 +1920,9 @@ version(/+$DIDE_REGION+/all)
 	} 
 	
 	protected: 
+	
+		ivec2 getClientSize() => clientSize; 
+	
 		override void onInitializeGLWindow()
 	{
 		{
@@ -1934,9 +1937,9 @@ version(/+$DIDE_REGION+/all)
 		
 		createRenderingContext; 
 		
-		//init drawing, view, mouse
-		/*dr	= new Drawing;*/	 view	= new View2D; 	 view    .owner = this; 	view.centerCorrection = true; 
-		/*drGUI	= new Drawing;*/	 viewGUI_	= new View2D; 	 viewGUI_.owner =	this; 
+		//init views and mouse
+		view = new View2D(&getClientSize); view.centerCorrection = true; 
+		viewGUI_ = new View2D(&getClientSize); 
 		
 		mouse = new MouseState; 
 	} 
@@ -2026,7 +2029,7 @@ version(/+$DIDE_REGION+/all)
 	
 		override void onUpdateViewAnimation()
 	{
-		view.updateAnimation(deltaTime.value(second), true/*invalidate*/); 
+		if(view.updateAnimation(deltaTime.value(second))) invalidate; 
 		updateViewClipBoundsAndMousePos; 
 	} 
 	
@@ -2216,7 +2219,79 @@ version(/+$DIDE_REGION+/all)
 		textures.debugDraw(dr); 
 		dr.pop; 
 		dr.glDraw(view); 
+	} 
+	//navigate 2D view with the keyboard and the mouse
+	//it optionally calls invalidate
+	bool navigateView(bool keyboardEnabled, bool mouseEnabled)
+	{
+		bool res; 
+		with(view)
+		with(this.actions)
+		{
+			const oldOrigin = origin, oldScale = scale; 
+			
+			const 	scrollSpeed	= this.deltaTime.value(second)*800*4,
+				zoomSpeed	= this.deltaTime.value(second)*6,
+				wheelSpeed	= 0.375f; 
+			
+			group("View controls"); //Todo: ctrl+s es s (mint move osszeakad!)
+			
+			const enm = mouseEnabled; 
+			/+
+				Todo: actions are deprecated. This view.navigate function 
+				should be replaced with an IMGUI enable flag and a hidden window.
+			+/
+			
+			onActive	(
+				"Scroll", "MMB RMB", enm,
+				{ scroll(inputs.mouseDelta); }
+			); 
+			onDelta	(
+				"Zoom", "MW", enm ,
+				(x){ zoomAroundMouse(x*wheelSpeed); }
+			); 
+			
+			const enk = keyboardEnabled; 
+			onActive(
+				"Scroll left", "A", enk,
+				{ scrollH(scrollSpeed); }
+			); 
+			onActive	(
+				"Scroll right", "D", enk,
+				{ scrollH(-scrollSpeed); }
+			); 
+			onActive(
+				"Scroll up", "W", enk,
+				{ scrollV(scrollSpeed); }
+			); 
+			onActive(
+				"Scroll down", "S", enk,
+				{ scrollV(-scrollSpeed); }
+			); 
+			
+			onActive	(
+				"Zoom in", "PgUp", enk ,
+				{ zoom(zoomSpeed); }
+			); 
+			onActive	(
+				"Zoom out", "PgDn", enk ,
+				{ zoom(-zoomSpeed); }
+			); 
+			onModifier(
+				"Scroll/Zoom slower", "Shift", enk || enm,
+				scrollSlower
+			); 
+			onPressed (
+				"Zoom all", "Home", enk ,
+				{ zoomAll; }
+			); 
+			
+			res = origin!=oldOrigin || scale!=oldScale; 
+		}
+		if(res) invalidate; 
+		return res; 
 	} 
+	
 	
 	
 } 

@@ -5,7 +5,6 @@ version(/+$DIDE_REGION+/all)
 	
 	import het.algorithm; 
 	import het.inputs: inputs, KeyCombo; 
-	import het.win: Window, mainWindow; 
 	import het.bitmap: Bitmap; 
 	
 	import std.bitmanip; 
@@ -1210,10 +1209,11 @@ version(/+$DIDE_REGION View2D+/all)
 			m_logScale_anim 	= 0; 
 		V m_origin_anim; 
 		bool animStarted; 
-		Window owner_; 
 		
 		B lastWorkArea; //detection change for autoZoom()
 		
+		//Todo: This is ugly. Tthe window should update the clientSize only when it is changing...
+		ivec2 delegate() m_onGetClientSize; 
 		
 		//smart zooming stuff
 		static struct ScrollTarget {
@@ -1253,25 +1253,12 @@ version(/+$DIDE_REGION View2D+/all)
 		bool _mustZoomAll; 	//schedule zoom all on the next draw
 		
 		public: 
-		@property auto owner()
-		{
-			enforce(owner_ !is null, "Forgot to set View2D.owner"); 
-			return owner_; 
-		} 
-		@property void owner(Window w)
-		{ owner_ = w; } 
 		
 		@property bool isMouseInside() const
 		{ return mousePos in subScreenBounds_anim; } 
 		
-		this()
-		{} 
-		
-		this(T)(in T origin, float scale)
-		{
-			this.origin = V(origin); 
-			this.scale = scale; 
-		} 
+		this(ivec2 delegate() onGetClientSize)
+		{ this.m_onGetClientSize = onGetClientSize; } 
 		
 		override string toString() const
 		{ return format!"View2D(%s, %s)"(origin, scale); } 
@@ -1351,12 +1338,9 @@ version(/+$DIDE_REGION View2D+/all)
 			); 
 		} 
 		
-		
 		vec2 clientSize()
-		{ return vec2(owner.clientSize); } 
-		vec2 clientSizeHalf()
-		{ return clientSize/2; } 
-		//floor because otherwise it would make aliasing in the center of the view
+		=> m_onGetClientSize().vec2;  vec2 clientSizeHalf()
+		=> clientSize/2; 
 		
 		bounds2 visibleArea(bool animated = true)
 		{
@@ -1500,78 +1484,7 @@ version(/+$DIDE_REGION View2D+/all)
 			return false; 
 		} 
 		
-		//navigate 2D view with the keyboard and the mouse
-		//it optionally calls invalidate
-		bool navigate(bool keyboardEnabled, bool mouseEnabled)
-		{
-			auto oldOrigin = origin; 
-			auto oldScale = scale; 
-			
-			with(owner.actions)
-			{
-				const 	scrollSpeed	= owner.deltaTime.value(second)*800*4,
-					zoomSpeed	= owner.deltaTime.value(second)*6,
-					wheelSpeed	= 0.375f; 
-				
-				group("View controls"); ////todo: ctrl+s es s (mint move osszeakad!)
-				
-				const enm = mouseEnabled; 
-				/+
-					Todo: actions are deprecated. This view.navigate function 
-					should be replaced with az IMGUI enable flag and a hidden window.
-				+/
-				
-				onActive	(
-					"Scroll", "MMB RMB", enm,
-					{ scroll(inputs.mouseDelta); }
-				); 
-				onDelta	(
-					"Zoom", "MW", enm ,
-					(x){ zoomAroundMouse(x*wheelSpeed); }
-				); 
-				
-				const enk = keyboardEnabled; 
-				onActive(
-					"Scroll left", "A", enk,
-					{ scrollH(scrollSpeed); }
-				); 
-				onActive	(
-					"Scroll right", "D", enk,
-					{ scrollH(-scrollSpeed); }
-				); 
-				onActive(
-					"Scroll up", "W", enk,
-					{ scrollV(scrollSpeed); }
-				); 
-				onActive(
-					"Scroll down", "S", enk,
-					{ scrollV(-scrollSpeed); }
-				); 
-				
-				onActive	(
-					"Zoom in", "PgUp", enk ,
-					{ zoom(zoomSpeed); }
-				); 
-				onActive	(
-					"Zoom out", "PgDn", enk ,
-					{ zoom(-zoomSpeed); }
-				); 
-				onModifier(
-					"Scroll/Zoom slower", "Shift", enk || enm,
-					scrollSlower
-				); 
-				onPressed (
-					"Zoom all", "Home", enk ,
-					{ zoomAll; }
-				); 
-			}
-			
-			bool res = origin!=oldOrigin || scale!=oldScale; 
-			if(res) owner.invalidate; 
-			return res; 
-		} 
-		
-		bool updateAnimation(float deltaTime, bool callInvalidate)
+		bool updateAnimation(float deltaTime)
 		{
 			  //Todo: use quantities.time
 			float at = calcAnimationT(deltaTime, animSpeed); 
@@ -1581,12 +1494,11 @@ version(/+$DIDE_REGION View2D+/all)
 			res |= follow(m_origin_anim, origin, at, invScale*1e-2f); 
 			res |= follow(m_logScale_anim, logScale, at, 1e-2f); 
 			
-			if(res && callInvalidate) owner.invalidate; 
 			return res; 
 		} 
 		
 		//skips the animated moves to their destination immediately
-		void skipAnimation() { updateAnimation(9999, false); } 
+		void skipAnimation() { updateAnimation(9999); } 
 		
 		//update smooth navigation. invalidates automatically
 		/*
@@ -3443,7 +3355,7 @@ class Drawing
 			shader.uniform("uShift", extractTileIndex(uShift+translate)); 
 			shader.uniform("uViewPortSize", vec2(vpSize)); 
 			
-			shader.uniform("appRunningTime_sec", mainWindow.appRunningTime_sec); 
+			shader.uniform("appRunningTime_sec", application.appTime.value(second)); 
 			
 			//map all megaTextures
 			foreach(i, t; textures.getGLTextures) {

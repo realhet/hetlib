@@ -5,13 +5,15 @@ module het.win; /+DIDE+/
 
 pragma(lib, "gdi32.lib"); 
 pragma(lib, "winmm.lib"); 
-pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
+//pragma(lib, "opengl32.lib"); //needed for initWglChoosePixelFormat()
 
-public import het, het.algorithm, het.inputs; 
+public import het; 
+
+import het.inputs: inputs, ActionManager, _notifyMouseWheel; 
 
 //moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
-__gshared size_t global_TPSCnt, TPS; //texture upload bytes /sec
-__gshared size_t global_VPSCnt, VPS; //VBO upload bytes /sec
+__gshared size_t global_TPSCnt, global_TPS; //texture upload bytes /sec
+__gshared size_t global_VPSCnt, global_VPS; //VBO upload bytes /sec
 
 import core.runtime,
 core.sys.windows.windows,
@@ -961,11 +963,6 @@ class Window
 	Time totalTime=0*second, deltaTime=0*second, lagTime=0*second; //
 	int FPS, UPS, lagCnt; //FramesPerSec, UpdatePerSec
 	
-	Time appRunningTime = 0*second; 
-	
-	@property appRunningTime_sec()
-	{ return appRunningTime.value(second); } 
-	
 	private void updateWithActionManager()
 	{
 		auto _ = PROBE("updateWAM"); 
@@ -1100,7 +1097,6 @@ class Window
 		
 		const tickNow = now; //this is for application.tickTime. Taken at the same time as timeAct.
 		timeAct = QPS; 
-		appRunningTime = QPS_local; //Todo: they are not in exact synch
 		
 		deltaTime = timeAct-timeLast; 
 		if(deltaTime>=timeTarget)
@@ -1121,7 +1117,8 @@ class Window
 			
 			//ticking. The same timing information as what the windows are receiving
 			application.tick++; 
-			application.tickTime = tickNow - deltaTime;  //Todo: This timing is unclear. It's a mess...
+			application.tickTime = tickNow - deltaTime; 	//Todo: This timing is unclear. It's a mess...
+			application.appTime = application.tickTime -	appStarted; 
 			application.deltaTime = deltaTime; 
 			
 			if((application.tick & 0x3F)==0)
@@ -1158,8 +1155,8 @@ class Window
 				FPS = FPSCnt; 	FPSCnt = 0; 
 				UPS = UPSCnt; 	UPSCnt = 0; 
 				if(isMain) {
-					TPS = global_TPSCnt; 	 global_TPSCnt = 0; //texture upload/sec
-					VPS = global_VPSCnt; 	 global_VPSCnt = 0; //VBO upload/sec
+					global_TPS = global_TPSCnt; 	 global_TPSCnt = 0; //texture upload/sec
+					global_VPS = global_VPSCnt; 	 global_VPSCnt = 0; //VBO upload/sec
 				}
 			}
 			
