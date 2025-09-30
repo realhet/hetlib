@@ -12,7 +12,7 @@ version(/+$DIDE_REGION+/all) {
 	
 	import het.inputs: ActionManager, _notifyMouseWheel; 
 	
-	public import het.inputs: inputs, KeyCombo; 
+	public import het.inputs: inputs, KeyCombo, MouseState; 
 	
 	//moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
 	__gshared size_t global_TPSCnt, global_TPS; //texture upload bytes /sec

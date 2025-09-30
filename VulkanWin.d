@@ -2776,6 +2776,89 @@ version(/+$DIDE_REGION+/all) {
 class VulkanWindow: Window, IGfxContentDestination
 {
 	version(/+$DIDE_REGION+/all) {
+		version(/+$DIDE_REGION Old Stuff from GLWindow+/all)
+		{
+			/+Todo: Old crap, just workin'!!! Must refactor!!!+/
+			
+			//views and mouseState
+			MouseState mouse; 
+			View2D view; 
+			private View2D viewGUI_; 
+			
+			float guiScale = 1; 
+			
+			auto viewGUI()
+			{
+				//Opt: cache this, and update at the right moment
+				viewGUI_.scale = guiScale; 
+				viewGUI_.origin = View2D.V(clientSizeHalf); 
+				viewGUI_.skipAnimation; return viewGUI_; 
+			} 
+			
+			protected ivec2 getClientSize() => clientSize; 
+			
+			void initializeViewsAndMouseState()
+			{
+				view = new View2D(&getClientSize); view.centerCorrection = true; 
+				viewGUI_ = new View2D(&getClientSize); 
+				
+				mouse = new MouseState; 
+			} 
+			
+			override void onInitialZoomAll()
+			{ if(!view.workArea.empty) { view.zoomAll_immediate; }} 
+			
+			override void onMouseUpdate()
+			{
+				bool k(const string n) { return inputs[n].value!=0; } 
+				
+				MouseState.MSAbsolute a; 
+				with(a) {
+					LMB	= k("LMB"	 ); 
+					RMB	= k("RMB"	 ); 
+					MMB	= k("MMB"	 ); 
+					shift	= k("Shift"); 
+					alt	= k("Alt"	); 
+					ctrl	= k("Ctrl"	); 
+					screen	= screenToClient(inputs.mouseAct).iround; 
+					world	= view.screenToWorld(vec2(screen)); 
+					wheel	= inputs["MW"].delta.iround; 
+				}
+				mouse._updateInternal(a); 
+				
+				mouse.screenRect = clientBounds; 
+				mouse.worldRect = bounds2(
+					view.screenToWorld(vec2(mouse.screenRect.topLeft)),
+					view.screenToWorld(vec2(mouse.screenRect.bottomRight))
+				); 
+				
+				//Todo: bad names: worldRect is "screenBounds in world coords"
+				//Todo: bad names: screenRect is "screenBounds in client coords"
+			} 
+			
+			void updateViewClipBoundsAndMousePos()
+			{
+				//set extra info about mouse and bounds for view and viewGUI
+				const mp = View2D.V(mouse.act.screen); 
+				const bnd = View2D.B(clientBounds); 
+				
+				static foreach(v; AliasSeq!(view, viewGUI))
+				with(v)
+				{
+					mouseLast = mousePos; 
+					mousePos = screenToWorld(mp); 
+					screenBounds_anim = screenToWorld(bnd, true); 
+					screenBounds_dest = screenToWorld(bnd, false); 
+					workArea_accum = View2D.B.init; 
+				}
+			} 
+			
+			override void onUpdateViewAnimation()
+			{
+				if(view.updateAnimation(deltaTime.value(second))) invalidate; 
+				updateViewClipBoundsAndMousePos; 
+			} 
+		}
 		auto getGfxContentDestination() => (cast(IGfxContentDestination)(this)); 
 		
 		/+
@@ -2857,52 +2940,6 @@ class VulkanWindow: Window, IGfxContentDestination
 		bool windowResized; 
 		
 		VkClearValue clearColor = { color: {float32: [ 0.1, 0.1, 0.1, 0 ]}, }; 
-		
-		
-		/+
-			/+
-				Code: struct State
-				{
-					vec3 base; //def=0
-					vec3 scale; //def=1
-					vec3 last, act; //def=0
-				} 
-				
-				struct CoordConfig
-				{
-					bool rel; 
-					bool f32, u32, i32, u16, i16, u8, i8; 
-				} 
-				
-				enum Inst
-				{
-					cfg, //rel, dt
-					cfg_x, //rel, dt
-					cfg_y, //rel, dt
-					cfg_z, //rel, dt
-					move_abs_u8_u8
-				} 
-				
-				
-				
-				enum Primitive
-				{
-					triangles_2d_f32_constantColor
-					triangles_2d_f32_flatColor
-					triangles_2d_f32_smoothColor
-					triangleStrip_2d_f32_constantColor
-					triangleStrip_2d_f32_flatColor
-					triangleStrip_2d_f32_smoothColor
-				} 
-				
-				struct VertexInput
-				{
-					uint cmd; float x, y, z; 
-					int tile_x, tile_y; RGBA col0, col1; 
-					bounds2 clipBounds; 
-				} 
-			+/
-		+/
 		
 		/+
 			Note: Alignment rules:
@@ -3562,116 +3599,6 @@ class VulkanWindow: Window, IGfxContentDestination
 			} 
 		}
 		
-		Drawing dr; 
-		
-		class Drawing
-		{
-			/+
-				enum WidthAlign { left, center, client, right } 
-				enum Align {
-					topLeft	, topCenter	, topRight	,
-					centerLeft	, center	, centerRight	,
-					bottomLeft	, bottomCenter	, bottomRight	
-				} 
-				enum SizeUnit
-				{
-					world, 	/+one unit in the world+/
-					screen, 	/+one pixel at the screen (similar to fwidth())+/
-					model 	/+Todo: one unit inside scaled model space+/
-				} 
-				enum SizeSpec
-				{
-					scaled, 	/+bitmaps's size is used and scaled by specified size+/
-					exact	/+size is exactly specified+/
-				} 
-				enum Aspect {stretch, keep, crop} 
-				
-				struct VD_texturedRect
-				{
-					mixin((
-						(表([
-							[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
-							[q{cmd},q{4},q{"cmd"},q{
-								mixin(舉!((VertexCmd),q{texturedRect}))
-								
-							},q{/++/}],
-							[q{Align},q{4},q{"align_"},q{},q{/++/}],
-							[q{SizeUnit},q{2},q{"sizeUnit"},q{},q{/++/}],
-							[q{SizeSpec},q{1},q{"sizeSpec"},q{},q{/++/}],
-						]))
-					).調!(GEN_bitfields)); 
-				} 
-			+/
-			
-			static foreach(field; ["PC", "SC"])
-			mixin(iq{
-				protected RGBA $(field)_; 
-				@property
-				{
-					RGBA $(field)() const => $(field)_; 
-					void $(field)(RGBA a) {$(field)_= a; } 
-					
-					void $(field)(vec4 a) {$(field)_= a.to_unorm; } 
-					void $(field)(RGB a) {$(field)_.rgb = a; } 
-					void $(field)(vec3 a) {$(field)_.rgb = a.to_unorm; } 
-					void $(field)(float f) {$(field)_.rgb = f.to_unorm; } 
-				} 
-			}.text); 
-			
-			static foreach(field; ["PS", "LW"])
-			mixin(iq{
-				//Todo: these must be coded 12bit log2(x)*64 <-> exp2(x/64)
-				protected float $(field)_; 
-				@property
-				{
-					float $(field)() const => $(field)_; 
-					void $(field)(float a) {$(field)_= a; } 
-				} 
-			}.text); 
-			
-			
-			alias primaryColor 	= PC, 
-			secondaryColor 	= SC,
-			pointSize	= PS,
-			lineWidth	= LW; 
-			
-			void reset()
-			{
-				PC = (RGB(0xFFFFFFFF)); 
-				SC = (RGB(0xFF000000)); 
-			} 
-			
-			void rect_old(bounds2 bounds, TexHandle texHandle, in RGBA color=(RGBA(0xFFFFFFFF)))
-			{
-				VB(mixin(體!((VertexData),q{GB.bitPos}))); 
-				foreach(i; 0..4)
-				GB(
-					mixin(舉!((Opcode),q{setPC}))	, mixin(舉!((ColorFormat),q{rgba_u8})), color,
-					mixin(舉!((Opcode),q{drawMove}))	, mixin(舉!((CoordFormat),q{f32})), bounds.low+vec2(i*4).rotate(i*.125f),
-					mixin(舉!((Opcode),q{drawTexRect}))	, mixin(舉!((CoordFormat),q{f32})), bounds.high+vec2(i*4).rotate(i*.125f), mixin(舉!((HandleFormat),q{u32})), (cast(uint)(texHandle)),
-				); 
-				GB(mixin(舉!((Opcode),q{end}))); 
-			} 
-			
-			void finalize()
-			{
-				static if(bugFix_LastTwoGeometryShaderStreamsMissing)
-				{
-					foreach(i; 0..3) { VB(mixin(體!((VertexData),q{GB.bitPos}))); }GB(0u/+many zeroes as end+/); 
-					/+
-						Bug: I don't know why these empty vertexes are needed. Minimum 2 of them.
-						POINTS -> POINT_LIST is good
-						POINTS -> TRIANGLE_STRIP, needs 2 extra points.
-						I add 3 to make sure.
-					+/
-				}
-			} 
-			
-			
-		} 
-		
-		
-		
 		void createRenderPass(VulkanSwapchain swapchain)
 		{
 			renderPass = device.createRenderPass
@@ -3949,6 +3876,8 @@ class VulkanWindow: Window, IGfxContentDestination
 				g_fontFaceManager = new FontFaceManager; 
 			}
 			
+			initializeViewsAndMouseState; 
+			
 			disableInternalRedraw = true /+Do nothing on WM_PAINT+/; 
 			targetUpdateRate = 100000 /+No limit on minimum update interval+/; 
 			
@@ -3973,7 +3902,6 @@ class VulkanWindow: Window, IGfxContentDestination
 				IB	= new InfoBufferManager,
 				TB	= new TextureBufferManager
 			]; 
-			dr = new Drawing; 
 			
 			createShaderModules; 
 			createGraphicsPipeline; //also creates descriptorsetLayout and pipelineLayout
@@ -4018,18 +3946,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1F5E082886ADB).檢(
+					((0x1EF9682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1F65282886ADB))))
+				if((互!((bool),(0),(0x1F00882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1F6E682886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F6FD82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1F09C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F0B382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4042,8 +3970,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1F8D282886ADB).檢 (imVG)),
-					((0x1F8F882886ADB).檢 (imFPS)); 
+					((0x1F28882886ADB).檢 (imVG)),
+					((0x1F2AE82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4065,11 +3993,10 @@ $(V_size+G_size)".text
 					{
 						try
 						{
-							VB.reset; GB.reset; dr.reset; 
+							VB.reset; GB.reset; 
 							
 							internalUpdate; //this will call onUpdate()
 							
-							dr.finalize/+It appends nops to the end.+/; 
 							VB.upload; GB.upload; 
 							
 							{
@@ -4086,10 +4013,39 @@ $(V_size+G_size)".text
 								zoomanim *=2; 
 								auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 								
+								((0x1F88982886ADB).檢(modelMatrix)); 
+								
+								((0x1F8C382886ADB).檢(viewMatrix)); 
+								
 								// Set up projection
 								auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1*globalScale, 1000*globalScale); 
 								
+								((0x1F9AA82886ADB).檢(projMatrix)); 
+								
+								
 								auto mvp = projMatrix * viewMatrix * modelMatrix; 
+								
+								((0x1FA3382886ADB).檢(mvp)); 
+								
+								
+								viewMatrix = mat4.lookAt(vec3(clientSizeHalf, 500), vec3(clientSizeHalf, 0), vec3(0, 1, 0)); 
+								mvp = projMatrix * viewMatrix; 
+								
+								
+								const globalScale2 = 1.0f; 
+								const fovY_deg = ((0x1FB4982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x1FB6082886ADB))))); 
+								const fovY_rad = radians(fovY_deg); 
+								const N = 1.0/2; 
+								const extent = vec2(swapchain.extent.width, swapchain.extent.height); 
+								
+								const requiredDistance = double(extent.y*N) / 2 / tan(fovY_rad / 2); 
+								
+								projMatrix = mat4.perspective(extent.x*N, extent.y*N, fovY_deg, globalScale2*0.01, requiredDistance*100); 
+								viewMatrix = mat4.lookAt(vec3(extent/2*N, requiredDistance) + vec3(vec2(1, 0).rotate(QPS.value(second/60*138).fract*π*2)*.1*requiredDistance, 0), vec3(extent/2*N, 0), vec3(0, 1, 0)); 
+								
+								mvp = projMatrix * viewMatrix; 
+								
+								
 								with(UB.access)
 								{
 									transformationMatrix = mvp; 
@@ -4159,832 +4115,7 @@ $(V_size+G_size)".text
 			
 			//invalidate; no need.+/; 
 		} 
-	}static struct BezierImplementations
-	{
-		static: 
-		enum cubic_approx = 
-		q{
-			/*
-				--------------------------------------------------------------
-					Cubic bezier approx distance 2 
-				--------------------------------------------------------------
-					Created by NinjaKoala in 2019-07-17
-					https://www.shadertoy.com/view/3lsSzS
-				--------------------------------------------------------------
-				
-				Copyright (c) <2024> <Felix Potthast>
-				Permission is hereby granted, free of charge, to any person obtaining a 
-				copy of this software and associated documentation files (the "Software"), 
-				to deal in the Software without restriction, including without limitation 
-				the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-				and/or sell copies of the Software, and to permit persons to whom the
-				Software is furnished to do so, subject to the following conditions:
-				
-				The above copyright notice and this permission notice shall be included 
-				in all copies or substantial portions of the Software.
-				
-				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
-				KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-				WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
-				PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
-				OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
-				OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-				OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-			*/
-			
-			/*
-				See also:
-				
-				Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
-				Exact distance computation: https://www.shadertoy.com/view/4sKyzW
-				Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
-				This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
-			*/
-			
-			const int bezier_num_iterations=3; /*def:3*/
-			const int bezier_num_start_params=3; /*def:3*/
-			
-			const int bezier_method=0; /*valid range: [0..3]*/
-			
-			//factor should be positive
-			//it decreases the step size when lowered.
-			//Lowering the factor and increasing iterations increases the area in which
-			//the iteration converges, but this is quite costly
-			const float bezier_factor=1; /*def:1*/
-			
-			float newton_iteration(vec3 coeffs, float x)
-			{
-				float a2=coeffs[2]+x; 
-				float a1=coeffs[1]+x*a2; 
-				float f=coeffs[0]+x*a1; 
-				float f1=((x+a2)*x)+a1; 
-				
-				return x-f/f1; 
-			} 
-			
-			float halley_iteration(vec3 coeffs, float x)
-			{
-				float a2=coeffs[2]+x; 
-				float a1=coeffs[1]+x*a2; 
-				float f=coeffs[0]+x*a1; 
-				
-				float b2=a2+x; 
-				float f1=a1+x*b2; 
-				float f2=2.*(b2+x); 
-				return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
-			} 
-			
-			float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
-			{
-				if(method<=1)
-				{
-					//horner's method
-					vec2 a_2=a2+t*a3; 
-					vec2 a_1=a1+t*a_2; 
-					vec2 b_2=a_2+t*a3; 
-					
-					vec2 uv_to_p=a0+t*a_1; 
-					vec2 tang=a_1+t*b_2; 
-					float l_tang=dot(tang,tang); 
-					
-					if(method==0/*normal iteration*/)
-					{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
-					else if(method==1/*normal iteration2*/)
-					{
-						vec2 snd_drv=2.*(b_2+t*a3); 
-						
-						float fac=dot(tang,snd_drv)/(2.*l_tang); 
-						float d=-dot(tang,uv_to_p); 
-						float t2=d/(l_tang+fac*d); 
-						return t+bezier_factor*t2; 
-					}
-				}
-				else
-				{
-					vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
-					vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
-					
-					if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
-					else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
-				}
-				return 0; 
-			} 
-			
-			float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-			{
-				vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-				vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-				vec2 a1 = (-3. * p0 + 3. * p1); 
-				vec2 a0 = p0 - uv; 
-				
-				float d0 = 1e38, t0=0.; 
-				for(int i=0;i<bezier_num_start_params;i++)
-				{
-					float t=t0; 
-					for(int j=0;j<bezier_num_iterations;j++)
-					{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
-					t=clamp(t,0.,1.); 
-					vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
-					d0=min(d0,dot(uv_to_p,uv_to_p)); 
-					
-					t0+=1./float(bezier_num_start_params-1); 
-				}
-				
-				return sqrt(d0); 
-			} 
-		}
-		,
-		cubic_exact =
-		q{
-			/*
-				Exact distance to cubic bezier curve by computing roots of the derivative(s)
-				to isolate roots of a fifth degree polynomial and Halley's Method to compute them.
-				Inspired by https://www.shadertoy.com/view/4sXyDr and https://www.shadertoy.com/view/ldXXWH
-				See also my approximate version:
-				https://www.shadertoy.com/view/lsByRG
-			*/
-			const float bezier_eps = .000005; 
-			const int halley_iterations = 8; 
-			
-			//lagrange positive real root upper bound
-			//see for example: https://doi.org/10.1016/j.jsc.2014.09.038
-			float upper_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
-			{
-				vec4 coeffs1 = vec4(a0,a1,a2,a3); 
-				
-				vec4 neg1 = max(-coeffs1,vec4(0)); 
-				float neg2 = max(-a4,0.); 
-				
-				const vec4 indizes1 = vec4(0,1,2,3); 
-				const float indizes2 = 4.; 
-				
-				vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
-				float bounds2 = pow(neg2,1./(5.-indizes2)); 
-				
-				vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
-				vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
-				
-				float maxmin = max(min1_2.x,min1_2.y); 
-				float minmax = min(max1_2.x,max1_2.y); 
-				
-				float max3 = max(max1_2.x,max1_2.y); 
-				
-				float max_max = max(max3,bounds2); 
-				float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
-				
-				return max_max + max_max2; 
-			} 
-			
-			//lagrange upper bound applied to f(-x) to get lower bound
-			float lower_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
-			{
-				vec4 coeffs1 = vec4(-a0,a1,-a2,a3); 
-				
-				vec4 neg1 = max(-coeffs1,vec4(0)); 
-				float neg2 = max(-a4,0.); 
-				
-				const vec4 indizes1 = vec4(0,1,2,3); 
-				const float indizes2 = 4.; 
-				
-				vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
-				float bounds2 = pow(neg2,1./(5.-indizes2)); 
-				
-				vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
-				vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
-				
-				float maxmin = max(min1_2.x,min1_2.y); 
-				float minmax = min(max1_2.x,max1_2.y); 
-				
-				float max3 = max(max1_2.x,max1_2.y); 
-				
-				float max_max = max(max3,bounds2); 
-				float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
-				
-				return -max_max - max_max2; 
-			} 
-			
-			vec2 parametric_cub_bezier(float t, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-			{
-				vec2 a0 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-				vec2 a1 = (3. * p0  -6. * p1 + 3. * p2); 
-				vec2 a2 = (-3. * p0 + 3. * p1); 
-				vec2 a3 = p0; 
-				
-				return (((a0 * t) + a1) * t + a2) * t + a3; 
-			} 
-			
-			void sort_roots3(inout vec3 roots)
-			{
-				vec3 tmp; 
-				
-				tmp[0] = min(roots[0],min(roots[1],roots[2])); 
-				tmp[1] = max(roots[0],min(roots[1],roots[2])); 
-				tmp[2] = max(roots[0],max(roots[1],roots[2])); 
-				
-				roots=tmp; 
-			} 
-			
-			void sort_roots4(inout vec4 roots)
-			{
-				vec4 tmp; 
-				
-				vec2 min1_2 = min(roots.xz,roots.yw); 
-				vec2 max1_2 = max(roots.xz,roots.yw); 
-				
-				float maxmin = max(min1_2.x,min1_2.y); 
-				float minmax = min(max1_2.x,max1_2.y); 
-				
-				tmp[0] = min(min1_2.x,min1_2.y); 
-				tmp[1] = min(maxmin,minmax); 
-				tmp[2] = max(minmax,maxmin); 
-				tmp[3] = max(max1_2.x,max1_2.y); 
-				
-				roots = tmp; 
-			} 
-			
-			float eval_poly5(float a0, float a1, float a2, float a3, float a4, float x)
-			{
-				float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
-				return f; 
-			} 
-			
-			//halley's method
-			//basically a variant of newton raphson which converges quicker and has bigger basins of convergence
-			//see http://mathworld.wolfram.com/HalleysMethod.html
-			//or https://en.wikipedia.org/wiki/Halley%27s_method
-			float halley_iteration5(float a0, float a1, float a2, float a3, float a4, float x)
-			{
-				float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
-				float f1 = (((5. * x + 4. * a4) * x + 3. * a3) * x + 2. * a2) * x + a1; 
-				float f2 = ((20. * x + 12. * a4) * x + 6. * a3) * x + 2. * a2; 
-				
-				return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
-			} 
-			
-			float halley_iteration4(vec4 coeffs, float x)
-			{
-				float f = (((x + coeffs[3]) * x + coeffs[2]) * x + coeffs[1]) * x + coeffs[0]; 
-				float f1 = ((4. * x + 3. * coeffs[3]) * x + 2. * coeffs[2]) * x + coeffs[1]; 
-				float f2 = (12. * x + 6. * coeffs[3]) * x + 2. * coeffs[2]; 
-				
-				return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
-			} 
-			
-			// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-			// Credits to Doublefresh for hinting there
-			int solve_quadric(vec2 coeffs, inout vec2 roots)
-			{
-				// normal form: x^2 + px + q = 0
-				float p = coeffs[1] / 2.; 
-				float q = coeffs[0]; 
-				
-				float D = p * p - q; 
-				
-				if(D < 0.) { return 0; }
-				else if(D > 0.) {
-					roots[0] = -sqrt(D) - p; 
-					roots[1] = sqrt(D) - p; 
-					
-					return 2; 
-				}
-			} 
-			
-			//From Trisomie21
-			//But instead of his cancellation fix i'm using a newton iteration
-			int solve_cubic(vec3 coeffs, inout vec3 r)
-			{
-				
-				float a = coeffs[2]; 
-				float b = coeffs[1]; 
-				float c = coeffs[0]; 
-				
-				float p = b - a*a / 3.0; 
-				float q = a * (2.0*a*a - 9.0*b) / 27.0 + c; 
-				float p3 = p*p*p; 
-				float d = q*q + 4.0*p3 / 27.0; 
-				float offset = -a / 3.0; 
-				if(d >= 0.0) {
-					 // Single solution
-					float z = sqrt(d); 
-					float u = (-q + z) / 2.0; 
-					float v = (-q - z) / 2.0; 
-					u = sign(u)*pow(abs(u),1.0/3.0); 
-					v = sign(v)*pow(abs(v),1.0/3.0); 
-					r[0] = offset + u + v; 	
-							
-					//Single newton iteration to account for cancellation
-					float f = ((r[0] + a) * r[0] + b) * r[0] + c; 
-					float f1 = (3. * r[0] + 2. * a) * r[0] + b; 
-							
-					r[0] -= f / f1; 
-							
-					return 1; 
-				}
-				float u = sqrt(-p / 3.0); 
-				float v = acos(-sqrt( -27.0 / p3) * q / 2.0) / 3.0; 
-				float m = cos(v), n = sin(v)*1.732050808; 
-				
-				//Single newton iteration to account for cancellation
-				//(once for every root)
-				r[0]	= offset + u * (m + m); 
-				r[1] = offset - u * (n + m); 
-				r[2] = offset + u * (n - m); 
-				
-				vec3 f = ((r + a) * r + b) * r + c; 
-				vec3 f1 = (3. * r + 2. * a) * r + b; 
-				
-				r -= f / f1; 
-				
-				return 3; 
-			} 
-			
-			// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
-			// Credits to Doublefresh for hinting there
-			int solve_quartic(vec4 coeffs, inout vec4 s)
-			{
-				float a = coeffs[3]; 
-				float b = coeffs[2]; 
-				float c = coeffs[1]; 
-				float d = coeffs[0]; 
-				
-				/*
-					  substitute x = y - A/4 to eliminate cubic term:
-								x^4 + px^2 + qx + r = 0 
-				*/
-				
-				float sq_a = a * a; 
-				float p = - 3./8. * sq_a + b; 
-				float q = 1./8. * sq_a * a - 1./2. * a * b + c; 
-				float r = - 3./256.*sq_a*sq_a + 1./16.*sq_a*b - 1./4.*a*c + d; 
-				
-				int num; 
-				
-				/* doesn't seem to happen for me */
-				//if(abs(r)<eps){
-				//	/* no absolute term: y(y^3 + py + q) = 0 */
-				
-				//	vec3 cubic_coeffs;
-				
-				//	cubic_coeffs[0] = q;
-				//	cubic_coeffs[1] = p;
-				//	cubic_coeffs[2] = 0.;
-				
-				//	num = solve_cubic(cubic_coeffs, s.xyz);
-				
-				//	s[num] = 0.;
-				//	num++;
-				//}
-				{
-					/* solve the resolvent cubic ... */
-					
-					vec3 cubic_coeffs; 
-					
-					cubic_coeffs[0] = 1.0/2. * r * p - 1.0/8. * q * q; 
-					cubic_coeffs[1] = - r; 
-					cubic_coeffs[2] = - 1.0/2. * p; 
-					
-					solve_cubic(cubic_coeffs, s.xyz); 
-					
-					/* ... and take the one real solution ... */
-					
-					float z = s[0]; 
-					
-					/* ... to build two quadric equations */
-					
-					float u = z * z - r; 
-					float v = 2. * z - p; 
-					
-					if(u > -bezier_eps) { u = sqrt(abs(u)); }
-					else	{ return 0; }
-					
-					if(v > -bezier_eps) { v = sqrt(abs(v)); }
-					else	{ return 0; }
-					
-					vec2 quad_coeffs; 
-					
-					quad_coeffs[0] = z - u; 
-					quad_coeffs[1] = q < 0. ? -v : v; 
-					
-					num = solve_quadric(quad_coeffs, s.xy); 
-					
-					quad_coeffs[0]= z + u; 
-					quad_coeffs[1] = q < 0. ? v : -v; 
-					
-					vec2 tmp=vec2(1e38); 
-					int old_num=num; 
-					
-					num += solve_quadric(quad_coeffs, tmp); 
-					if(old_num!=num) {
-						if(old_num == 0) {
-							 s[0] = tmp[0]; 
-							 s[1] = tmp[1]; 
-						}
-						else {
-							//old_num == 2
-							s[2] = tmp[0]; 
-							s[3] = tmp[1]; 
-						}
-					}
-				}
-				
-				/* resubstitute */
-				
-				float sub = 1./4. * a; 
-				
-				/* single halley iteration to fix cancellation */
-				for(int i=0;i<4;i+=2) {
-					if(i < num) {
-						s[i] -= sub; 
-						s[i] = halley_iteration4(coeffs,s[i]); 
-						
-						s[i+1] -= sub; 
-						s[i+1] = halley_iteration4(coeffs,s[i+1]); 
-					}
-				}
-				
-				return num; 
-			} 
-			float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
-			{
-				//switch points when near to end point to minimize numerical error
-				//only needed when control point(s) very far away
-				if(false)
-				{
-					vec2 mid_curve = parametric_cub_bezier(.5,p0,p1,p2,p3); 
-					vec2 mid_points = (p0 + p3)/2.; 
-					
-					vec2 tang = mid_curve-mid_points; 
-					vec2 nor = vec2(tang.y,-tang.x); 
-					
-					if(sign(dot(nor,uv-mid_curve)) != sign(dot(nor,p0-mid_curve)))
-					{
-						vec2 tmp = p0; 
-						p0 = p3; 
-						p3 = tmp; 
-						
-						tmp = p2; 
-						p2 = p1; 
-						p1 = tmp; 
-					}
-				}
-				vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-				vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-				vec2 a1 = (-3. * p0 + 3. * p1); 
-				vec2 a0 = p0 - uv; 
-				
-				//compute polynomial describing distance to current pixel dependent on a parameter t
-				float bc6 = dot(a3,a3); 
-				float bc5 = 2.*dot(a3,a2); 
-				float bc4 = dot(a2,a2) + 2.*dot(a1,a3); 
-				float bc3 = 2.*(dot(a1,a2) + dot(a0,a3)); 
-				float bc2 = dot(a1,a1) + 2.*dot(a0,a2); 
-				float bc1 = 2.*dot(a0,a1); 
-				float bc0 = dot(a0,a0); 
-				
-				bc5 /= bc6; 
-				bc4 /= bc6; 
-				bc3 /= bc6; 
-				bc2 /= bc6; 
-				bc1 /= bc6; 
-				bc0 /= bc6; 
-				
-				//compute derivatives of this polynomial
-				
-				float b0 = bc1 / 6.; 
-				float b1 = 2. * bc2 / 6.; 
-				float b2 = 3. * bc3 / 6.; 
-				float b3 = 4. * bc4 / 6.; 
-				float b4 = 5. * bc5 / 6.; 
-				
-				vec4 c1 = vec4(b1,2.*b2,3.*b3,4.*b4)/5.; 
-				vec3 c2 = vec3(c1[1],2.*c1[2],3.*c1[3])/4.; 
-				vec2 c3 = vec2(c2[1],2.*c2[2])/3.; 
-				float c4 = c3[1]/2.; 
-				
-				vec4 roots_drv = vec4(1e38); 
-				
-				int num_roots_drv = solve_quartic(c1,roots_drv); 
-				sort_roots4(roots_drv); 
-				
-				float ub = upper_bound_lagrange5(b0,b1,b2,b3,b4); 
-				float lb = lower_bound_lagrange5(b0,b1,b2,b3,b4); 
-				
-				vec3 a = vec3(1e38); 
-				vec3 b = vec3(1e38); 
-				
-				vec3 roots = vec3(1e38); 
-				
-				int num_roots = 0; 
-				
-				//compute root isolating intervals by roots of derivative and outer root bounds
-				//only roots going form - to + considered, because only those result in a minimum
-				if(num_roots_drv==4)
-				{
-					if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) > 0.)
-					{
-						a[0]=lb; 
-						b[0]=roots_drv[0]; 
-						num_roots=1; 
-					}
-					
-					if(
-						sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1])) != 
-						sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[2]))
-					)
-					{
-						if(num_roots == 0)
-						{
-							a[0]=roots_drv[1]; 
-							b[0]=roots_drv[2]; 
-							num_roots=1; 
-						}
-						else
-						{
-							a[1]=roots_drv[1]; 
-							b[1]=roots_drv[2]; 
-							num_roots=2; 
-						}
-					}
-					
-					if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[3]) < 0.)
-					{
-						if(num_roots == 0)
-						{
-							a[0]=roots_drv[3]; 
-							b[0]=ub; 
-							num_roots=1; 
-						}
-						else if(num_roots == 1)
-						{
-							a[1]=roots_drv[3]; 
-							b[1]=ub; 
-							num_roots=2; 
-						}
-						else
-						{
-							a[2]=roots_drv[3]; 
-							b[2]=ub; 
-							num_roots=3; 
-						}
-					}
-				}else {
-					if(num_roots_drv==2)
-					{
-						if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) < 0.)
-						{
-							num_roots=1; 
-							a[0]=roots_drv[1]; 
-							b[0]=ub; 
-						}
-						else if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1]) > 0.)
-						{
-							num_roots=1; 
-							a[0]=lb; 
-							b[0]=roots_drv[0]; 
-						}
-						else
-						{
-							num_roots=2; 
-							
-							a[0]=lb; 
-							b[0]=roots_drv[0]; 
-							
-							a[1]=roots_drv[1]; 
-							b[1]=ub; 
-						}
-					}
-					else {
-						//num_roots_drv==0
-						vec3 roots_snd_drv=vec3(1e38); 
-						int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
-						
-						vec2 roots_trd_drv=vec2(1e38); 
-						int num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); 
-						num_roots=1; 
-						
-						a[0]=lb; 
-						b[0]=ub; 
-					}
-					
-					//further subdivide intervals to guarantee convergence of halley's method
-					//by using roots of further derivatives
-					vec3 roots_snd_drv=vec3(1e38); 
-					int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
-					sort_roots3(roots_snd_drv); 
-					
-					int num_roots_trd_drv=0; 
-					vec2 roots_trd_drv=vec2(1e38); 
-					
-					if(num_roots_snd_drv!=3) { num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); }
-					
-					for(int i=0;i<3;i++)
-					{
-						if(i < num_roots)
-						{
-							for(int j=0;j<3;j+=2)
-							{
-								if(j < num_roots_snd_drv)
-								{
-									if(a[i] < roots_snd_drv[j] && b[i] > roots_snd_drv[j])
-									{
-										if(eval_poly5(b0,b1,b2,b3,b4,roots_snd_drv[j]) > 0.)
-										{ b[i]=roots_snd_drv[j]; }
-										else { a[i]=roots_snd_drv[j]; }
-									}
-								}
-							}
-							for(int j=0;j<2;j++)
-							{
-								if(j < num_roots_trd_drv)
-								{
-									if(a[i] < roots_trd_drv[j] && b[i] > roots_trd_drv[j])
-									{
-										if(eval_poly5(b0,b1,b2,b3,b4,roots_trd_drv[j]) > 0.)
-										{ b[i]=roots_trd_drv[j]; }
-										else { a[i]=roots_trd_drv[j]; }
-									}
-								}
-							}
-						}
-					}
-				}
-				
-				float d0 = 1e38; 
-				
-				//compute roots with halley's method
-				
-				for(int i=0;i<3;i++)
-				{
-					if(i < num_roots)
-					{
-						roots[i] = .5 * (a[i] + b[i]); 
-						
-						for(int j=0;j<halley_iterations;j++) { roots[i] = halley_iteration5(b0,b1,b2,b3,b4,roots[i]); }
-						
-						//compute squared distance to nearest point on curve
-						roots[i] =	clamp(roots[i],0.,1.); 
-						vec2 to_curve = uv - parametric_cub_bezier(roots[i],p0,p1,p2,p3); 
-						d0 = min(d0,dot(to_curve,to_curve)); 
-					}
-				}
-				
-				return sqrt(d0); 
-			} 
-		}
-		,
-		quadratic_approx = 
-		q{
-			//Quadratic Bezier - distance 2D 
-			
-			// The MIT License
-			// Copyright © 2018 Inigo Quilez
-			/*
-				 Permission is hereby granted, free of charge, to any person obtaining a copy of 
-				this software and associated documentation files (the "Software"), to deal in the 
-				Software without restriction, including without limitation the rights to use, copy, 
-				modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
-				and to permit persons to whom the Software is furnished to do so, subject to 
-				the following conditions: The above copyright notice and this permission notice 
-				shall be included in all copies or substantial portions of the Software. 
-				THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
-				EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
-				MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-				IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
-				CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
-				TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
-				SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-			*/
-			
-			
-			// Distance to a quadratic bezier segment
-			
-			// SDF(x) = argmin{t} |x-b(t)|²  
-			//           
-			// where b(t) is the curve. So we have
-			//
-			// |x-b(t)|² = |x|² - 2x·b(t) + |b(t)|²
-			//
-			// ∂|x-b(t)|²/∂t = 2(b(t)-x)·b'(t) = 0
-			//
-			// (b(t)-x)·b'(t) = 0
-			//
-			// But b(t) is degree 2, so b'(t) is degree 1, so (b(t)-x)·b'(t)=0 is a cubic.
-			// I solved the cubic using the trigonometric solution of the depressed as 
-			// shown here: https://en.wikipedia.org/wiki/Cubic_equation
-			
-			
-			// List of some other 2D distances: https://www.shadertoy.com/playlist/MXdSRf
-			//
-			// and iquilezles.org/articles/distfunctions2d
-			
-			
-			
-			float dot2( vec2 v ) { return dot(v,v); } 
-			float cro( vec2 a, vec2 b ) { return a.x*b.y-a.y*b.x; } 
-			float cos_acos_3( float x )
-			{
-				x=sqrt(0.5+0.5*x); 
-				return x*(x*(x*(x*-0.008972+0.039071)-0.107074)+0.576975)+0.5; 
-			} 
-			// https://www.shadertoy.com/view/WltSD7
-			
-			
-			// This method provides just an approximation, and is only usable in
-			// the very close neighborhood of the curve. Taken and adapted from
-			// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
-			float quadraticBezierDist(
-				 vec2 p, vec2 v0, vec2 v1, vec2 v2
-				/*out vec2 outQ */
-			)
-			{
-				vec2 i = v0 - v2; 
-				vec2 j = v2 - v1; 
-				vec2 k = v1 - v0; 
-				vec2 w = j-k; 
-				
-				v0-= p; v1-= p; v2-= p; 
-				
-				float x = cro(v0, v2); 
-				float y = cro(v1, v0); 
-				float z = cro(v2, v1); 
-				
-				vec2 s = 2.0*(y*j+z*k)-x*i; 
-				
-				float r =  (y*z-x*x*0.25)/dot2(s); 
-				float t = clamp( (0.5*x+y+r*dot(s,w))/(x+y+z),0.0,1.0); 
-				
-				vec2 d = v0+t*(k+k+t*w); 
-				//outQ = d + p; 
-				return length(d); 
-			} 
-		}
-		,
-		quadratic_exact = 
-		q{
-			// signed distance to a quadratic bezier
-			float quadraticBezierDist(
-				 in vec2 pos, in vec2 A, in vec2 B, in vec2 C
-				/*out vec2 outQ*/
-			)
-			{
-				vec2 a = B - A; 
-				vec2 b = A - 2.0*B + C; 
-				vec2 c = a * 2.0; 
-				vec2 d = A - pos; 
-				
-				// cubic to be solved (kx*=3 and ky*=3)
-				float kk = 1.0/dot(b,b); 
-				float kx = kk * dot(a,b); 
-				float ky = kk * (2.0*dot(a,a)+dot(d,b))/3.0; 
-				float kz = kk * dot(d,a); 
-				
-				float res = 0.0; 
-				float sgn = 0.0; 
-				
-				float p = ky - kx*kx; 
-				float q = kx*(2.0*kx*kx - 3.0*ky) + kz; 
-				float p3 = p*p*p; 
-				float q2 = q*q; 
-				float h = q2 + 4.0*p3; 
-				
-				if(h>=0.0)
-				{
-					// 1 root
-					h = sqrt(h); 
-					
-					h = (q<0.0) ? h : -h; // copysign()
-					float x = (h-q)/2.0; 
-					float v = sign(x)*pow(abs(x),1.0/3.0); 
-					float t = v - p/v; 
-					
-					// from NinjaKoala - single newton iteration to account for cancellation
-					t -= (t*(t*t+3.0*p)+q)/(3.0*t*t+3.0*p); 
-					
-					t = clamp( t-kx, 0.0, 1.0 ); 
-					vec2  w = d+(c+b*t)*t; 
-					//outQ = w + pos; 
-					res = dot2(w); 
-					sgn = cro(c+2.0*b*t,w); 
-				}
-				else
-				{
-					// 3 roots
-					float z = sqrt(-p); 
-					float m = cos_acos_3(q/(p*z*2.0)); 
-					float n = sqrt(1.0-m*m); 
-					n *= sqrt(3.0); 
-					vec3	t = clamp( vec3(m+m,-n-m,n-m)*z-kx, 0.0, 1.0 ); 
-					vec2	qx=d+(c+b*t.x)*t.x; float dx=dot2(qx), sx=cro(a+b*t.x,qx); 
-					vec2	qy=d+(c+b*t.y)*t.y; float dy=dot2(qy), sy=cro(a+b*t.y,qy); 
-					if(dx<dy)	{ res=dx; sgn=sx; /*outQ=qx+pos; */}
-					else	{ res=dy; sgn=sy; /*outQ=qy+pos; */}
-				}
-				
-				return sqrt( res )/*sign(sgn)*/; 
-			} 
-		}; 
-	} 
+	}
 	version(/+$DIDE_REGION+/all) {
 		/+
 			Opt: Make a faster bitStream fetcher with a closing MSB 1 bit instead of `currentDwBits`./+
@@ -5222,6 +4353,832 @@ $(V_size+G_size)".text
 		+/
 		void createShaderModules()
 		{
+			static struct BezierImplementations
+			{
+				static: 
+				enum cubic_approx = 
+				q{
+					/*
+						--------------------------------------------------------------
+							Cubic bezier approx distance 2 
+						--------------------------------------------------------------
+							Created by NinjaKoala in 2019-07-17
+							https://www.shadertoy.com/view/3lsSzS
+						--------------------------------------------------------------
+						
+						Copyright (c) <2024> <Felix Potthast>
+						Permission is hereby granted, free of charge, to any person obtaining a 
+						copy of this software and associated documentation files (the "Software"), 
+						to deal in the Software without restriction, including without limitation 
+						the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+						and/or sell copies of the Software, and to permit persons to whom the
+						Software is furnished to do so, subject to the following conditions:
+						
+						The above copyright notice and this permission notice shall be included 
+						in all copies or substantial portions of the Software.
+						
+						THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY 
+						KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+						WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR 
+						PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS 
+						OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR 
+						OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
+						OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+						SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+					*/
+					
+					/*
+						See also:
+						
+						Old distance approximation (which is inferior): https://www.shadertoy.com/view/lsByRG
+						Exact distance computation: https://www.shadertoy.com/view/4sKyzW
+						Maximum norm distance: https://www.shadertoy.com/view/4sKyRm
+						This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
+					*/
+					
+					const int bezier_num_iterations=3; /*def:3*/
+					const int bezier_num_start_params=3; /*def:3*/
+					
+					const int bezier_method=0; /*valid range: [0..3]*/
+					
+					//factor should be positive
+					//it decreases the step size when lowered.
+					//Lowering the factor and increasing iterations increases the area in which
+					//the iteration converges, but this is quite costly
+					const float bezier_factor=1; /*def:1*/
+					
+					float newton_iteration(vec3 coeffs, float x)
+					{
+						float a2=coeffs[2]+x; 
+						float a1=coeffs[1]+x*a2; 
+						float f=coeffs[0]+x*a1; 
+						float f1=((x+a2)*x)+a1; 
+						
+						return x-f/f1; 
+					} 
+					
+					float halley_iteration(vec3 coeffs, float x)
+					{
+						float a2=coeffs[2]+x; 
+						float a1=coeffs[1]+x*a2; 
+						float f=coeffs[0]+x*a1; 
+						
+						float b2=a2+x; 
+						float f1=a1+x*b2; 
+						float f2=2.*(b2+x); 
+						return x-(2.*f*f1)/(2.*f1*f1-f*f2); 
+					} 
+					
+					float cubic_bezier_normal_iteration(int method, float t, vec2 a0, vec2 a1, vec2 a2, vec2 a3)
+					{
+						if(method<=1)
+						{
+							//horner's method
+							vec2 a_2=a2+t*a3; 
+							vec2 a_1=a1+t*a_2; 
+							vec2 b_2=a_2+t*a3; 
+							
+							vec2 uv_to_p=a0+t*a_1; 
+							vec2 tang=a_1+t*b_2; 
+							float l_tang=dot(tang,tang); 
+							
+							if(method==0/*normal iteration*/)
+							{ return t-bezier_factor*dot(tang,uv_to_p)/l_tang; }
+							else if(method==1/*normal iteration2*/)
+							{
+								vec2 snd_drv=2.*(b_2+t*a3); 
+								
+								float fac=dot(tang,snd_drv)/(2.*l_tang); 
+								float d=-dot(tang,uv_to_p); 
+								float t2=d/(l_tang+fac*d); 
+								return t+bezier_factor*t2; 
+							}
+						}
+						else
+						{
+							vec2 tang=(3.*a3*t+2.*a2)*t+a1; 
+							vec3 poly=vec3(dot(a0,tang),dot(a1,tang),dot(a2,tang))/dot(a3,tang); 
+							
+							if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
+							else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
+						}
+						return 0; 
+					} 
+					
+					float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					{
+						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+						vec2 a1 = (-3. * p0 + 3. * p1); 
+						vec2 a0 = p0 - uv; 
+						
+						float d0 = 1e38, t0=0.; 
+						for(int i=0;i<bezier_num_start_params;i++)
+						{
+							float t=t0; 
+							for(int j=0;j<bezier_num_iterations;j++)
+							{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
+							t=clamp(t,0.,1.); 
+							vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
+							d0=min(d0,dot(uv_to_p,uv_to_p)); 
+							
+							t0+=1./float(bezier_num_start_params-1); 
+						}
+						
+						return sqrt(d0); 
+					} 
+				}
+				,
+				cubic_exact =
+				q{
+					/*
+						Exact distance to cubic bezier curve by computing roots of the derivative(s)
+						to isolate roots of a fifth degree polynomial and Halley's Method to compute them.
+						Inspired by https://www.shadertoy.com/view/4sXyDr and https://www.shadertoy.com/view/ldXXWH
+						See also my approximate version:
+						https://www.shadertoy.com/view/lsByRG
+					*/
+					const float bezier_eps = .000005; 
+					const int halley_iterations = 8; 
+					
+					//lagrange positive real root upper bound
+					//see for example: https://doi.org/10.1016/j.jsc.2014.09.038
+					float upper_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
+					{
+						vec4 coeffs1 = vec4(a0,a1,a2,a3); 
+						
+						vec4 neg1 = max(-coeffs1,vec4(0)); 
+						float neg2 = max(-a4,0.); 
+						
+						const vec4 indizes1 = vec4(0,1,2,3); 
+						const float indizes2 = 4.; 
+						
+						vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
+						float bounds2 = pow(neg2,1./(5.-indizes2)); 
+						
+						vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
+						vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
+						
+						float maxmin = max(min1_2.x,min1_2.y); 
+						float minmax = min(max1_2.x,max1_2.y); 
+						
+						float max3 = max(max1_2.x,max1_2.y); 
+						
+						float max_max = max(max3,bounds2); 
+						float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
+						
+						return max_max + max_max2; 
+					} 
+					
+					//lagrange upper bound applied to f(-x) to get lower bound
+					float lower_bound_lagrange5(float a0, float a1, float a2, float a3, float a4)
+					{
+						vec4 coeffs1 = vec4(-a0,a1,-a2,a3); 
+						
+						vec4 neg1 = max(-coeffs1,vec4(0)); 
+						float neg2 = max(-a4,0.); 
+						
+						const vec4 indizes1 = vec4(0,1,2,3); 
+						const float indizes2 = 4.; 
+						
+						vec4 bounds1 = pow(neg1,1./(5.-indizes1)); 
+						float bounds2 = pow(neg2,1./(5.-indizes2)); 
+						
+						vec2 min1_2 = min(bounds1.xz,bounds1.yw); 
+						vec2 max1_2 = max(bounds1.xz,bounds1.yw); 
+						
+						float maxmin = max(min1_2.x,min1_2.y); 
+						float minmax = min(max1_2.x,max1_2.y); 
+						
+						float max3 = max(max1_2.x,max1_2.y); 
+						
+						float max_max = max(max3,bounds2); 
+						float max_max2 = max(min(max3,bounds2),max(minmax,maxmin)); 
+						
+						return -max_max - max_max2; 
+					} 
+					
+					vec2 parametric_cub_bezier(float t, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					{
+						vec2 a0 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+						vec2 a1 = (3. * p0  -6. * p1 + 3. * p2); 
+						vec2 a2 = (-3. * p0 + 3. * p1); 
+						vec2 a3 = p0; 
+						
+						return (((a0 * t) + a1) * t + a2) * t + a3; 
+					} 
+					
+					void sort_roots3(inout vec3 roots)
+					{
+						vec3 tmp; 
+						
+						tmp[0] = min(roots[0],min(roots[1],roots[2])); 
+						tmp[1] = max(roots[0],min(roots[1],roots[2])); 
+						tmp[2] = max(roots[0],max(roots[1],roots[2])); 
+						
+						roots=tmp; 
+					} 
+					
+					void sort_roots4(inout vec4 roots)
+					{
+						vec4 tmp; 
+						
+						vec2 min1_2 = min(roots.xz,roots.yw); 
+						vec2 max1_2 = max(roots.xz,roots.yw); 
+						
+						float maxmin = max(min1_2.x,min1_2.y); 
+						float minmax = min(max1_2.x,max1_2.y); 
+						
+						tmp[0] = min(min1_2.x,min1_2.y); 
+						tmp[1] = min(maxmin,minmax); 
+						tmp[2] = max(minmax,maxmin); 
+						tmp[3] = max(max1_2.x,max1_2.y); 
+						
+						roots = tmp; 
+					} 
+					
+					float eval_poly5(float a0, float a1, float a2, float a3, float a4, float x)
+					{
+						float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
+						return f; 
+					} 
+					
+					//halley's method
+					//basically a variant of newton raphson which converges quicker and has bigger basins of convergence
+					//see http://mathworld.wolfram.com/HalleysMethod.html
+					//or https://en.wikipedia.org/wiki/Halley%27s_method
+					float halley_iteration5(float a0, float a1, float a2, float a3, float a4, float x)
+					{
+						float f = ((((x + a4) * x + a3) * x + a2) * x + a1) * x + a0; 
+						float f1 = (((5. * x + 4. * a4) * x + 3. * a3) * x + 2. * a2) * x + a1; 
+						float f2 = ((20. * x + 12. * a4) * x + 6. * a3) * x + 2. * a2; 
+						
+						return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
+					} 
+					
+					float halley_iteration4(vec4 coeffs, float x)
+					{
+						float f = (((x + coeffs[3]) * x + coeffs[2]) * x + coeffs[1]) * x + coeffs[0]; 
+						float f1 = ((4. * x + 3. * coeffs[3]) * x + 2. * coeffs[2]) * x + coeffs[1]; 
+						float f2 = (12. * x + 6. * coeffs[3]) * x + 2. * coeffs[2]; 
+						
+						return x - (2. * f * f1) / (2. * f1 * f1 - f * f2); 
+					} 
+					
+					// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+					// Credits to Doublefresh for hinting there
+					int solve_quadric(vec2 coeffs, inout vec2 roots)
+					{
+						// normal form: x^2 + px + q = 0
+						float p = coeffs[1] / 2.; 
+						float q = coeffs[0]; 
+						
+						float D = p * p - q; 
+						
+						if(D < 0.) { return 0; }
+						else if(D > 0.) {
+							roots[0] = -sqrt(D) - p; 
+							roots[1] = sqrt(D) - p; 
+							
+							return 2; 
+						}
+					} 
+					
+					//From Trisomie21
+					//But instead of his cancellation fix i'm using a newton iteration
+					int solve_cubic(vec3 coeffs, inout vec3 r)
+					{
+						
+						float a = coeffs[2]; 
+						float b = coeffs[1]; 
+						float c = coeffs[0]; 
+						
+						float p = b - a*a / 3.0; 
+						float q = a * (2.0*a*a - 9.0*b) / 27.0 + c; 
+						float p3 = p*p*p; 
+						float d = q*q + 4.0*p3 / 27.0; 
+						float offset = -a / 3.0; 
+						if(d >= 0.0) {
+							 // Single solution
+							float z = sqrt(d); 
+							float u = (-q + z) / 2.0; 
+							float v = (-q - z) / 2.0; 
+							u = sign(u)*pow(abs(u),1.0/3.0); 
+							v = sign(v)*pow(abs(v),1.0/3.0); 
+							r[0] = offset + u + v; 	
+									
+							//Single newton iteration to account for cancellation
+							float f = ((r[0] + a) * r[0] + b) * r[0] + c; 
+							float f1 = (3. * r[0] + 2. * a) * r[0] + b; 
+									
+							r[0] -= f / f1; 
+									
+							return 1; 
+						}
+						float u = sqrt(-p / 3.0); 
+						float v = acos(-sqrt( -27.0 / p3) * q / 2.0) / 3.0; 
+						float m = cos(v), n = sin(v)*1.732050808; 
+						
+						//Single newton iteration to account for cancellation
+						//(once for every root)
+						r[0]	= offset + u * (m + m); 
+						r[1] = offset - u * (n + m); 
+						r[2] = offset + u * (n - m); 
+						
+						vec3 f = ((r + a) * r + b) * r + c; 
+						vec3 f1 = (3. * r + 2. * a) * r + b; 
+						
+						r -= f / f1; 
+						
+						return 3; 
+					} 
+					
+					// Modified from http://tog.acm.org/resources/GraphicsGems/gems/Roots3And4.c
+					// Credits to Doublefresh for hinting there
+					int solve_quartic(vec4 coeffs, inout vec4 s)
+					{
+						float a = coeffs[3]; 
+						float b = coeffs[2]; 
+						float c = coeffs[1]; 
+						float d = coeffs[0]; 
+						
+						/*
+							  substitute x = y - A/4 to eliminate cubic term:
+										x^4 + px^2 + qx + r = 0 
+						*/
+						
+						float sq_a = a * a; 
+						float p = - 3./8. * sq_a + b; 
+						float q = 1./8. * sq_a * a - 1./2. * a * b + c; 
+						float r = - 3./256.*sq_a*sq_a + 1./16.*sq_a*b - 1./4.*a*c + d; 
+						
+						int num; 
+						
+						/* doesn't seem to happen for me */
+						//if(abs(r)<eps){
+						//	/* no absolute term: y(y^3 + py + q) = 0 */
+						
+						//	vec3 cubic_coeffs;
+						
+						//	cubic_coeffs[0] = q;
+						//	cubic_coeffs[1] = p;
+						//	cubic_coeffs[2] = 0.;
+						
+						//	num = solve_cubic(cubic_coeffs, s.xyz);
+						
+						//	s[num] = 0.;
+						//	num++;
+						//}
+						{
+							/* solve the resolvent cubic ... */
+							
+							vec3 cubic_coeffs; 
+							
+							cubic_coeffs[0] = 1.0/2. * r * p - 1.0/8. * q * q; 
+							cubic_coeffs[1] = - r; 
+							cubic_coeffs[2] = - 1.0/2. * p; 
+							
+							solve_cubic(cubic_coeffs, s.xyz); 
+							
+							/* ... and take the one real solution ... */
+							
+							float z = s[0]; 
+							
+							/* ... to build two quadric equations */
+							
+							float u = z * z - r; 
+							float v = 2. * z - p; 
+							
+							if(u > -bezier_eps) { u = sqrt(abs(u)); }
+							else	{ return 0; }
+							
+							if(v > -bezier_eps) { v = sqrt(abs(v)); }
+							else	{ return 0; }
+							
+							vec2 quad_coeffs; 
+							
+							quad_coeffs[0] = z - u; 
+							quad_coeffs[1] = q < 0. ? -v : v; 
+							
+							num = solve_quadric(quad_coeffs, s.xy); 
+							
+							quad_coeffs[0]= z + u; 
+							quad_coeffs[1] = q < 0. ? v : -v; 
+							
+							vec2 tmp=vec2(1e38); 
+							int old_num=num; 
+							
+							num += solve_quadric(quad_coeffs, tmp); 
+							if(old_num!=num) {
+								if(old_num == 0) {
+									 s[0] = tmp[0]; 
+									 s[1] = tmp[1]; 
+								}
+								else {
+									//old_num == 2
+									s[2] = tmp[0]; 
+									s[3] = tmp[1]; 
+								}
+							}
+						}
+						
+						/* resubstitute */
+						
+						float sub = 1./4. * a; 
+						
+						/* single halley iteration to fix cancellation */
+						for(int i=0;i<4;i+=2) {
+							if(i < num) {
+								s[i] -= sub; 
+								s[i] = halley_iteration4(coeffs,s[i]); 
+								
+								s[i+1] -= sub; 
+								s[i+1] = halley_iteration4(coeffs,s[i+1]); 
+							}
+						}
+						
+						return num; 
+					} 
+					float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					{
+						//switch points when near to end point to minimize numerical error
+						//only needed when control point(s) very far away
+						if(false)
+						{
+							vec2 mid_curve = parametric_cub_bezier(.5,p0,p1,p2,p3); 
+							vec2 mid_points = (p0 + p3)/2.; 
+							
+							vec2 tang = mid_curve-mid_points; 
+							vec2 nor = vec2(tang.y,-tang.x); 
+							
+							if(sign(dot(nor,uv-mid_curve)) != sign(dot(nor,p0-mid_curve)))
+							{
+								vec2 tmp = p0; 
+								p0 = p3; 
+								p3 = tmp; 
+								
+								tmp = p2; 
+								p2 = p1; 
+								p1 = tmp; 
+							}
+						}
+						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+						vec2 a1 = (-3. * p0 + 3. * p1); 
+						vec2 a0 = p0 - uv; 
+						
+						//compute polynomial describing distance to current pixel dependent on a parameter t
+						float bc6 = dot(a3,a3); 
+						float bc5 = 2.*dot(a3,a2); 
+						float bc4 = dot(a2,a2) + 2.*dot(a1,a3); 
+						float bc3 = 2.*(dot(a1,a2) + dot(a0,a3)); 
+						float bc2 = dot(a1,a1) + 2.*dot(a0,a2); 
+						float bc1 = 2.*dot(a0,a1); 
+						float bc0 = dot(a0,a0); 
+						
+						bc5 /= bc6; 
+						bc4 /= bc6; 
+						bc3 /= bc6; 
+						bc2 /= bc6; 
+						bc1 /= bc6; 
+						bc0 /= bc6; 
+						
+						//compute derivatives of this polynomial
+						
+						float b0 = bc1 / 6.; 
+						float b1 = 2. * bc2 / 6.; 
+						float b2 = 3. * bc3 / 6.; 
+						float b3 = 4. * bc4 / 6.; 
+						float b4 = 5. * bc5 / 6.; 
+						
+						vec4 c1 = vec4(b1,2.*b2,3.*b3,4.*b4)/5.; 
+						vec3 c2 = vec3(c1[1],2.*c1[2],3.*c1[3])/4.; 
+						vec2 c3 = vec2(c2[1],2.*c2[2])/3.; 
+						float c4 = c3[1]/2.; 
+						
+						vec4 roots_drv = vec4(1e38); 
+						
+						int num_roots_drv = solve_quartic(c1,roots_drv); 
+						sort_roots4(roots_drv); 
+						
+						float ub = upper_bound_lagrange5(b0,b1,b2,b3,b4); 
+						float lb = lower_bound_lagrange5(b0,b1,b2,b3,b4); 
+						
+						vec3 a = vec3(1e38); 
+						vec3 b = vec3(1e38); 
+						
+						vec3 roots = vec3(1e38); 
+						
+						int num_roots = 0; 
+						
+						//compute root isolating intervals by roots of derivative and outer root bounds
+						//only roots going form - to + considered, because only those result in a minimum
+						if(num_roots_drv==4)
+						{
+							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) > 0.)
+							{
+								a[0]=lb; 
+								b[0]=roots_drv[0]; 
+								num_roots=1; 
+							}
+							
+							if(
+								sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1])) != 
+								sign(eval_poly5(b0,b1,b2,b3,b4,roots_drv[2]))
+							)
+							{
+								if(num_roots == 0)
+								{
+									a[0]=roots_drv[1]; 
+									b[0]=roots_drv[2]; 
+									num_roots=1; 
+								}
+								else
+								{
+									a[1]=roots_drv[1]; 
+									b[1]=roots_drv[2]; 
+									num_roots=2; 
+								}
+							}
+							
+							if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[3]) < 0.)
+							{
+								if(num_roots == 0)
+								{
+									a[0]=roots_drv[3]; 
+									b[0]=ub; 
+									num_roots=1; 
+								}
+								else if(num_roots == 1)
+								{
+									a[1]=roots_drv[3]; 
+									b[1]=ub; 
+									num_roots=2; 
+								}
+								else
+								{
+									a[2]=roots_drv[3]; 
+									b[2]=ub; 
+									num_roots=3; 
+								}
+							}
+						}else {
+							if(num_roots_drv==2)
+							{
+								if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[0]) < 0.)
+								{
+									num_roots=1; 
+									a[0]=roots_drv[1]; 
+									b[0]=ub; 
+								}
+								else if(eval_poly5(b0,b1,b2,b3,b4,roots_drv[1]) > 0.)
+								{
+									num_roots=1; 
+									a[0]=lb; 
+									b[0]=roots_drv[0]; 
+								}
+								else
+								{
+									num_roots=2; 
+									
+									a[0]=lb; 
+									b[0]=roots_drv[0]; 
+									
+									a[1]=roots_drv[1]; 
+									b[1]=ub; 
+								}
+							}
+							else {
+								//num_roots_drv==0
+								vec3 roots_snd_drv=vec3(1e38); 
+								int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
+								
+								vec2 roots_trd_drv=vec2(1e38); 
+								int num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); 
+								num_roots=1; 
+								
+								a[0]=lb; 
+								b[0]=ub; 
+							}
+							
+							//further subdivide intervals to guarantee convergence of halley's method
+							//by using roots of further derivatives
+							vec3 roots_snd_drv=vec3(1e38); 
+							int num_roots_snd_drv=solve_cubic(c2,roots_snd_drv); 
+							sort_roots3(roots_snd_drv); 
+							
+							int num_roots_trd_drv=0; 
+							vec2 roots_trd_drv=vec2(1e38); 
+							
+							if(num_roots_snd_drv!=3) { num_roots_trd_drv=solve_quadric(c3,roots_trd_drv); }
+							
+							for(int i=0;i<3;i++)
+							{
+								if(i < num_roots)
+								{
+									for(int j=0;j<3;j+=2)
+									{
+										if(j < num_roots_snd_drv)
+										{
+											if(a[i] < roots_snd_drv[j] && b[i] > roots_snd_drv[j])
+											{
+												if(eval_poly5(b0,b1,b2,b3,b4,roots_snd_drv[j]) > 0.)
+												{ b[i]=roots_snd_drv[j]; }
+												else { a[i]=roots_snd_drv[j]; }
+											}
+										}
+									}
+									for(int j=0;j<2;j++)
+									{
+										if(j < num_roots_trd_drv)
+										{
+											if(a[i] < roots_trd_drv[j] && b[i] > roots_trd_drv[j])
+											{
+												if(eval_poly5(b0,b1,b2,b3,b4,roots_trd_drv[j]) > 0.)
+												{ b[i]=roots_trd_drv[j]; }
+												else { a[i]=roots_trd_drv[j]; }
+											}
+										}
+									}
+								}
+							}
+						}
+						
+						float d0 = 1e38; 
+						
+						//compute roots with halley's method
+						
+						for(int i=0;i<3;i++)
+						{
+							if(i < num_roots)
+							{
+								roots[i] = .5 * (a[i] + b[i]); 
+								
+								for(int j=0;j<halley_iterations;j++) { roots[i] = halley_iteration5(b0,b1,b2,b3,b4,roots[i]); }
+								
+								//compute squared distance to nearest point on curve
+								roots[i] =	clamp(roots[i],0.,1.); 
+								vec2 to_curve = uv - parametric_cub_bezier(roots[i],p0,p1,p2,p3); 
+								d0 = min(d0,dot(to_curve,to_curve)); 
+							}
+						}
+						
+						return sqrt(d0); 
+					} 
+				}
+				,
+				quadratic_approx = 
+				q{
+					//Quadratic Bezier - distance 2D 
+					
+					// The MIT License
+					// Copyright © 2018 Inigo Quilez
+					/*
+						 Permission is hereby granted, free of charge, to any person obtaining a copy of 
+						this software and associated documentation files (the "Software"), to deal in the 
+						Software without restriction, including without limitation the rights to use, copy, 
+						modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+						and to permit persons to whom the Software is furnished to do so, subject to 
+						the following conditions: The above copyright notice and this permission notice 
+						shall be included in all copies or substantial portions of the Software. 
+						THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, 
+						EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF 
+						MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+						IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY 
+						CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, 
+						TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
+						SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+					*/
+					
+					
+					// Distance to a quadratic bezier segment
+					
+					// SDF(x) = argmin{t} |x-b(t)|²  
+					//           
+					// where b(t) is the curve. So we have
+					//
+					// |x-b(t)|² = |x|² - 2x·b(t) + |b(t)|²
+					//
+					// ∂|x-b(t)|²/∂t = 2(b(t)-x)·b'(t) = 0
+					//
+					// (b(t)-x)·b'(t) = 0
+					//
+					// But b(t) is degree 2, so b'(t) is degree 1, so (b(t)-x)·b'(t)=0 is a cubic.
+					// I solved the cubic using the trigonometric solution of the depressed as 
+					// shown here: https://en.wikipedia.org/wiki/Cubic_equation
+					
+					
+					// List of some other 2D distances: https://www.shadertoy.com/playlist/MXdSRf
+					//
+					// and iquilezles.org/articles/distfunctions2d
+					
+					
+					
+					float dot2( vec2 v ) { return dot(v,v); } 
+					float cro( vec2 a, vec2 b ) { return a.x*b.y-a.y*b.x; } 
+					float cos_acos_3( float x )
+					{
+						x=sqrt(0.5+0.5*x); 
+						return x*(x*(x*(x*-0.008972+0.039071)-0.107074)+0.576975)+0.5; 
+					} 
+					// https://www.shadertoy.com/view/WltSD7
+					
+					
+					// This method provides just an approximation, and is only usable in
+					// the very close neighborhood of the curve. Taken and adapted from
+					// http://research.microsoft.com/en-us/um/people/hoppe/ravg.pdf
+					float quadraticBezierDist(
+						 vec2 p, vec2 v0, vec2 v1, vec2 v2
+						/*out vec2 outQ */
+					)
+					{
+						vec2 i = v0 - v2; 
+						vec2 j = v2 - v1; 
+						vec2 k = v1 - v0; 
+						vec2 w = j-k; 
+						
+						v0-= p; v1-= p; v2-= p; 
+						
+						float x = cro(v0, v2); 
+						float y = cro(v1, v0); 
+						float z = cro(v2, v1); 
+						
+						vec2 s = 2.0*(y*j+z*k)-x*i; 
+						
+						float r =  (y*z-x*x*0.25)/dot2(s); 
+						float t = clamp( (0.5*x+y+r*dot(s,w))/(x+y+z),0.0,1.0); 
+						
+						vec2 d = v0+t*(k+k+t*w); 
+						//outQ = d + p; 
+						return length(d); 
+					} 
+				}
+				,
+				quadratic_exact = 
+				q{
+					// signed distance to a quadratic bezier
+					float quadraticBezierDist(
+						 in vec2 pos, in vec2 A, in vec2 B, in vec2 C
+						/*out vec2 outQ*/
+					)
+					{
+						vec2 a = B - A; 
+						vec2 b = A - 2.0*B + C; 
+						vec2 c = a * 2.0; 
+						vec2 d = A - pos; 
+						
+						// cubic to be solved (kx*=3 and ky*=3)
+						float kk = 1.0/dot(b,b); 
+						float kx = kk * dot(a,b); 
+						float ky = kk * (2.0*dot(a,a)+dot(d,b))/3.0; 
+						float kz = kk * dot(d,a); 
+						
+						float res = 0.0; 
+						float sgn = 0.0; 
+						
+						float p = ky - kx*kx; 
+						float q = kx*(2.0*kx*kx - 3.0*ky) + kz; 
+						float p3 = p*p*p; 
+						float q2 = q*q; 
+						float h = q2 + 4.0*p3; 
+						
+						if(h>=0.0)
+						{
+							// 1 root
+							h = sqrt(h); 
+							
+							h = (q<0.0) ? h : -h; // copysign()
+							float x = (h-q)/2.0; 
+							float v = sign(x)*pow(abs(x),1.0/3.0); 
+							float t = v - p/v; 
+							
+							// from NinjaKoala - single newton iteration to account for cancellation
+							t -= (t*(t*t+3.0*p)+q)/(3.0*t*t+3.0*p); 
+							
+							t = clamp( t-kx, 0.0, 1.0 ); 
+							vec2  w = d+(c+b*t)*t; 
+							//outQ = w + pos; 
+							res = dot2(w); 
+							sgn = cro(c+2.0*b*t,w); 
+						}
+						else
+						{
+							// 3 roots
+							float z = sqrt(-p); 
+							float m = cos_acos_3(q/(p*z*2.0)); 
+							float n = sqrt(1.0-m*m); 
+							n *= sqrt(3.0); 
+							vec3	t = clamp( vec3(m+m,-n-m,n-m)*z-kx, 0.0, 1.0 ); 
+							vec2	qx=d+(c+b*t.x)*t.x; float dx=dot2(qx), sx=cro(a+b*t.x,qx); 
+							vec2	qy=d+(c+b*t.y)*t.y; float dy=dot2(qy), sy=cro(a+b*t.y,qy); 
+							if(dx<dy)	{ res=dx; sgn=sx; /*outQ=qx+pos; */}
+							else	{ res=dy; sgn=sy; /*outQ=qy+pos; */}
+						}
+						
+						return sqrt( res )/*sign(sgn)*/; 
+					} 
+				}; 
+			} 
 			with(TexSizeFormat /+share bitSize/bitOffset constants for texturing+/)
 			{
 				enum shaderBinary = 
