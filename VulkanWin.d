@@ -4,6 +4,7 @@ version(/+$DIDE_REGION+/all)
 {
 	
 	public import het.win, het.bitmap, het.vulkan; 
+	import het.algorithm: encodeRLE, SvgPathItem, SvgPathCommand, approximateArcToCubicBeziers, SvgPathParser; 
 	
 	import core.stdc.string : memset; 
 	
@@ -2700,7 +2701,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x153E482886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1545282886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4017,18 +4018,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1F57282886ADB).檢(
+					((0x1F5E082886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1F5E482886ADB))))
+				if((互!((bool),(0),(0x1F65282886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1F67882886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F68F82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x1F6E682886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F6FD82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4041,8 +4042,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1F86482886ADB).檢 (imVG)),
-					((0x1F88A82886ADB).檢 (imFPS)); 
+					((0x1F8D282886ADB).檢 (imVG)),
+					((0x1F8F882886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5226,7 +5227,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					
+					 
 					//Todo: check the warnings!
 					
 					//common stuff

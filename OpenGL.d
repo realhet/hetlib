@@ -17,7 +17,7 @@ public import het.win;
 import het.inputs: inputs, MouseState; 
 import het.bitmap: Bitmap, bitmaps, bitmapQuery_accessDelayedMulti; 
 
-import het.draw2d: Drawing, LineStyle; 
+import het.draw2d: Drawing; 
 
 import core.runtime, core.sys.windows.windows, core.sys.windows.wingdi, std.traits; 
 
@@ -3329,7 +3329,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 		void dump() const
 		{ bin.dump; } 
 		
-		void debugDraw(Drawing dr)
+		void debugDraw(Drawing)(Drawing dr)
 		{
 			dr.scale(SubTexCellSize); scope(exit) dr.pop; 
 			
@@ -3933,7 +3933,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				return res; 
 			} 
 			
-			void debugDraw(Drawing dr)
+			void debugDraw(Drawing)(Drawing dr)
 			{
 				//megatexture debugging will not affect texture last-accessed statistics
 				global_disableSubtextureAging = true; 

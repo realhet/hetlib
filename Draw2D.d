@@ -54,45 +54,6 @@ version(/+$DIDE_REGION+/all)
 		/+Todo: Shadow/Outline for everything+/
 	+/
 	
-	//Standard LineStyles
-	enum LineStyle : ubyte
-	{
-		normal	= 0,
-		dot	= 2,
-		dash	= 19,
-		dashDot	= 29,
-		dash2	= 35,
-		dashDot2	= 44
-	} //Todo: this is a piece of shit. dot is so long that it is already a fucking dash. And what fucking format is this anyways???
-	
-	//these are also used in ui.d
-	enum HAlign : ubyte
-	{left, center, right, justify} 	 //when the container width is fixed
-	enum VAlign : ubyte
-	{top, center, bottom, justify} 	 //when the container height is fixed
-	enum YAlign : ubyte
-	{top, center, bottom, baseline, stretch} 	//this aligns the y position of each cell in a line. baseline is 0.7ish
-	
-	
-	//Standard arrows
-	private int encodeArrowStyle(int headArrow, int tailArrow, int centerNormal)
-	{ return headArrow<<0 | tailArrow<<2 | centerNormal<<4; } 
-	
-	enum ArrowStyle : ubyte
-	{
-		none	= 0,
-		arrow	= encodeArrowStyle(1,0,0),
-		doubleArrow	= encodeArrowStyle(1,1,0),
-		normalLeft	= encodeArrowStyle(0,0,1),
-		normalRight	= encodeArrowStyle(0,0,2),
-		arrowNormalLeft	= encodeArrowStyle(1,0,1),
-		arrowNormalRight 	= encodeArrowStyle(1,0,2),
-		vector	= encodeArrowStyle(1,2,0),
-		segment	= encodeArrowStyle(2,2,0)
-	} 
-	
-	enum SamplerEffect : ubyte
-	{none, quad, karc} 
 	
 	
 	/+
@@ -213,97 +174,6 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	
-	
-	struct RectAlign
-	{
-		align(1): import std.bitmanip; 
-		mixin(
-			bitfields!(
-				HAlign,	"hAlign",	2,
-				VAlign,	"vAlign",	2,
-				bool,	"canShrink",	1,
-				bool,	"canEnlarge",	1,
-				bool,	"keepAspect",	1,
-				bool,	"_dummy0",	1
-			)
-		); 
-		
-		this(HAlign hAlign, VAlign vAlign, bool canShrink, bool canEnlarge, bool keepAspect)
-		{
-			//Todo: dumb stupid copy paste constructor
-			this.hAlign = hAlign; 
-			this.vAlign = vAlign; 
-			this.canShrink = canShrink; 
-			this.canEnlarge = canEnlarge; 
-			this.keepAspect = keepAspect; 
-		} 
-		
-		bounds2 apply(in bounds2 rCanvas, in bounds2 rImage)
-		{
-			
-			void alignOne(ref float dst1, ref float dst2,ref float src1, ref float src2, bool shrink, bool enlarge, int align_)
-			{
-				if(shrink && enlarge) return; 
-				if(!shrink && (dst2-dst1<src2-src1))
-				{
-					//a bmp nagyobb es nincs kicsinyites
-					final switch(align_)
-					{
-						case 0: 	src2 = src1+dst2-dst1; 	break; 
-						case 1, 3: 	src1 = ((src1+src2)-(dst2-dst1))*.5; src2 = src1+dst2-dst1; 	break; 
-						case 2: 	src1 = src2-(dst2-dst1); 	break; 
-					}
-				}
-				if(!enlarge && (dst2-dst1>src2-src1))
-				{
-					//a bmp kisebb es nincs nagyitas
-					final switch(align_)
-					{
-						case 0: 	dst2 = dst1+src2-src1; 	break; 
-						case 1, 3: 	dst1 = ((dst1+dst2)-(src2-src1))*.5; dst2 = dst1+src2-src1; 	break; 
-						case 2: 	dst1 = dst2-(src2-src1); 	break; 
-					}
-				}
-			} 
-			
-			bounds2 rdst = rCanvas, rdst2 = rdst, rsrc = rImage; 
-			alignOne(rdst2.left, rdst2.right, rsrc.left, rsrc.right, canShrink, canEnlarge, cast(int)hAlign); 
-			alignOne(rdst2.top, rdst2.bottom, rsrc.top, rsrc.bottom, canShrink, canEnlarge, cast(int)vAlign); 
-			if(keepAspect)
-			{
-				float 	a1 = rdst2.right-rdst2.left,	b1 = rdst2.bottom-rdst2.top,
-					a2 = rImage.right-rImage.left,	b2 = rImage.bottom-rImage.top,
-					r1 = a1/max(1, b1),	r2 = a2/max(1, b2); 
-				if(r1<r2)
-				{
-					b1 = a1/max(0.000001f,r2); 
-					final switch(cast(int)vAlign)
-					{
-						case 0: 	rdst2.top = rdst.top; 	break; 
-						case 1, 3: 	rdst2.top = (rdst.top+rdst.bottom-b1)*.5; 	break; 
-						case 2: 	rdst2.top = rdst.bottom-b1; 	break; 
-					}
-					rdst2.bottom = rdst2.top+b1; 
-					rsrc.top = 0; rsrc.bottom = rImage.bottom-rImage.top; 
-				}
-				else if(r1>r2)
-				{
-					a1 = b1*r2; 
-					final switch(cast(int)hAlign)
-					{
-						case 0: 	rdst2.left = rdst.left; 	break; 
-						case 1, 3: 	rdst2.left = (rdst.left+rdst.right-a1)*.5; 	break; 
-						case 2: 	rdst2.left = rdst.right-a1; 	break; 
-					}
-					rdst2.right = rdst2.left+a1; 
-					rsrc.left = 0; rsrc.right = rImage.right-rImage.left; 
-				}
-			}
-			
-			return rdst2; 
-		} 
-		
-	} 
 	
 	////////////////////////////////////////////////////////////////////////////////
 	//Logger                                                                    //
