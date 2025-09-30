@@ -70,6 +70,8 @@ version(/+$DIDE_REGION+/all)
 	+/
 	
 	
+	
+	
 	
 	//DrawingBuffers //////////////////////////////////////////////////////////////////
 	
@@ -1265,7 +1267,7 @@ version(/+$DIDE_REGION+/all)
 		/+Note: Usage(prompt_hit: 64, prompt_miss: 18898, completion: 1464, HUF: 2.55, price: 100%)+/
 	+/
 }
-class Drawing
+class Drawing : IDrawing
 {
 	version(/+$DIDE_REGION+/all)
 	{
@@ -1431,10 +1433,10 @@ class Drawing
 		{ return actState.pointSize; } 
 		ref float lineWidth()
 		{ return actState.lineWidth; } 
-		ref lineStyle()
+		ref LineStyle lineStyle()
 		{ return actState.lineStyle; } 
 		
-		ref arrowStyle()
+		ref ArrowStyle arrowStyle()
 		{ return actState.arrowStyle; } 
 		
 		ref scaleFactor()
@@ -1442,7 +1444,7 @@ class Drawing
 		ref origin()
 		{ return actState.drawOrigin; } 
 		
-		ref fontHeight()
+		ref float fontHeight()
 		{ return actState.fontHeight					; } 
 		ref fontWeight()
 		{ return actState.fontWeight					; } 
@@ -1494,37 +1496,32 @@ class Drawing
 			stack ~= [origin, scaleFactor]; 
 		} 
 		
-		auto pop(int count=1)
+		void pop()
 		{
-			foreach(i; 0..count) {
-				enforce(!stack.empty, "Drawing.pop() stack is empty"); 
-				auto a = stack.fetchBack; 
-				origin = a[0]; 
-				scaleFactor = a[1]; 
-			}
-			return this; //fluid interface
+			enforce(!stack.empty, "Drawing.pop() stack is empty"); 
+			auto a = stack.fetchBack; 
+			origin = a[0]; 
+			scaleFactor = a[1]; 
 		} 
 		
-		auto translate(float	dx, float dy)
+		void translate(float	dx, float dy)
 		{
 			push; 	//seems like origin is in scale units, not in screen units.
 			origin.x = origin.x + dx; //*scaleFactor.x;
 			origin.y = origin.y + dy; //*scaleFactor.y;
-			return this; //fluid interface
 		} 
-		auto translate(in vec2 d)
-		{ return translate(d.x, d.y); } 
-		auto translate(in ivec2 d)
-		{ return translate(d.x, d.y); } 
+		void translate(in vec2 d)
+		{ translate(d.x, d.y); } 
+		void translate(in ivec2 d)
+		{ translate(d.x, d.y); } 
 		
-		auto scale(float s)
+		void scale(float s)
 		{
 			 //Todo: ezt meg kell csinalni matrixosra.
 			push; 
 			origin *= scaleFactor; 
 			scaleFactor *= s; 
 			origin /= scaleFactor; 
-			return this; //fluid interface
 		} 
 		
 		////////////////////////////////////////////////////////////////////////////////
@@ -1671,14 +1668,17 @@ class Drawing
 		bounds2 inverseInputTransform(in bounds2 b)
 		{ return bounds2(inverseInputTransform(b.low), inverseInputTransform(b.high)); } 
 		
-		float zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
-		float invZoomFactor = 1; //comes from outside view
+		float _zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
+		ref float zoomFactor() => _zoomFactor; 
+		float _invZoomFactor = 1; //comes from outside view
+		ref float invZoomFactor() => _invZoomFactor; 
 		//Todo: rename invScale and invZoomFactor to pixelSize, scale and zoomFactor to scaleFactor.
 		
 		//Todo: zoomFactor naming is incompatible with view.scale
 		
 		private enum clipBounds_init = bounds2(-1e30, -1e30, 1e30, 1e30); 
-		bounds2 clipBounds = clipBounds_init; 
+		bounds2 _clipBounds = clipBounds_init; 
+		ref bounds2 clipBounds() => _clipBounds; 
 		private bounds2[] clipBoundsStack; 
 		
 		void pushClipBounds(bounds2 bnd)
@@ -1941,6 +1941,9 @@ class Drawing
 				}
 			}
 		} 
+		
+		void hGraph_f(float x0, float y0, in float[] data, float xScale=1, float yScale=1)
+		{ hGraph(x0, y0, data, xScale, yScale); } 
 		
 		void hBars(R1)(float x0, float y0, R1 data, float xScale=1, float yScale=1, float sideGap = .1f)
 		if(isRandomAccessRange!R1)
@@ -2551,19 +2554,6 @@ class Drawing
 		static {
 			//Shader management /////////////////////////////
 			
-			struct GlobalShaderParams {
-				float[] floats; 
-				bool[] bools; 
-			} 
-			
-			GlobalShaderParams globalShaderParams; 
-			
-			static this()
-			{
-				globalShaderParams.floats = [0.0f].replicate(8); 
-				globalShaderParams.bools = [false].replicate(8); 
-			} 
-			
 			private string customShader_; 
 			private bool customShaderChanged; 
 			
@@ -2628,7 +2618,10 @@ class Drawing
 		
 		//Draw the objects on GPU  /////////////////////////////
 		
-		void glDraw(View2D view, in View2D.V translate=0)
+		void glDraw(View2D view)
+		{ glDraw(view, View2D.V(0)); } 
+		
+		void glDraw(View2D view, in View2D.V translate)
 		{
 			glDraw(view.getOrigin(true), view.getScale(true), translate); 
 			

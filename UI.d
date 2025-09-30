@@ -3,7 +3,6 @@ version(/+$DIDE_REGION+/all)
 {
 	//originally it was public import het.opengl
 	public import het; 
-	
 	public import het.win; 
 	
 	public import het.bitmap: Bitmap, bitmaps; 
@@ -15,14 +14,38 @@ version(/+$DIDE_REGION+/all)
 	
 	import het.parser: SyntaxKind, SyntaxPreset, syntaxTable, defaultSyntaxPreset; 
 	
-	public import het.opengl: 	GLWindow, textures,
-		DefaultFont_subTexIdxMap/+fontExtents service... baaaad!!!+/; 
-	public import het.draw2d: 	Drawing, BoldOffset; 
-	
-	
 	import std.bitmanip: bitfields; 
 	import std.traits, std.meta; 
 	
+	
+	
+	version(/+$DIDE_REGION OpenGL -> Vulkan transition+/all)
+	{
+		public import het.opengl: 	GLWindow, textures,
+			DefaultFont_subTexIdxMap/+fontExtents service... baaaad!!!+/; 
+		public import het.draw2d: 	OldDrawing = Drawing, BoldOffset; 
+		alias Drawing = IDrawing; 
+		
+		/+
+			250930: Removed things:	Contaniner.CachedDrawing, GraphLabel, GraphNode, 
+				ContainerGraph, MegaTexturing.debugDraw, GLWindow.drawMegaTextures,
+				VisualizeHitStack
+			/+Todo: Revive Graph thing with grammar example+/
+			
+			Replaced addOverlayDrawing with addDrawCallback, because it ain't need to creat a drawing instance.
+			/+Todo: VirtualTreeView treeview graphics is broken. It can't capture a foreach loop.+/
+			
+			No more /+Code: new Drawing+/ remains, I can write a DrawingProxy now.
+			
+			/+Todo: Rewrite DIDE / bloodScreenEffect+/
+		+/
+		
+		
+		
+	}
+	
+	
+	
 	/+Todo: implement layouting as seen in /+Link: https://libfluid.org/docs/main+/+/
 	//Todo: rename "hovered" -> "hot"
 	//Todo: multiple 2D view controls in hetlib
@@ -35,7 +58,7 @@ version(/+$DIDE_REGION+/all)
 		VisualizeContainerIds	= (常!(bool)(0)),
 		VisualizeGlyphs	= (常!(bool)(0)),
 		VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
-		VisualizeHitStack	= (常!(bool)(0)),
+		//VisualizeHitStack	= (常!(bool)(0)),
 		VisualizeSliders	= (常!(bool)(0)),
 		VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
 			
@@ -123,7 +146,7 @@ version(/+$DIDE_REGION+/all)
 	
 	//Todo: Eliminate this dependency injection: addDrawCallback() should be maintained by het.uibase and not het.ui!!
 	//Todo: uibase is merged with ui. This is no longer needed.
-	__gshared void function(Drawing, Container) function(Container) g_getDrawCallbackFunct; 
+	__gshared void delegate(Drawing, Container) function(Container) g_getDrawCallbackFunct; 
 	
 	auto g_getDrawCallback(Container cntr)
 	{
@@ -387,19 +410,21 @@ version(/+$DIDE_REGION+/all)
 			return h; 
 		} 
 		
-		void draw(Drawing dr)
-		{
-			if(VisualizeHitStack)
+		version(/+$DIDE_REGION+/none) {
+			void draw(DrawingOld dr)
 			{
-				dr.lineWidth = (QPS.value(second)*3).fract; 
-				dr.color = clFuchsia; 
-				
-				hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b)); 
-				
-				dr.lineWidth = 1; 
-				dr.lineStyle = LineStyle.normal; 
-			}
-		} 
+				if(VisualizeHitStack)
+				{
+					dr.lineWidth = (QPS.value(second)*3).fract; 
+					dr.color = clFuchsia; 
+					
+					hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b)); 
+					
+					dr.lineWidth = 1; 
+					dr.lineStyle = LineStyle.normal; 
+				}
+			} 
+		}
 		
 		auto stats()
 		{ return format("HitTest lengths: hitStack:%s, lastHitStack::%s, smoothHover::%s", hitStack.length, lastHitStack.length, smoothHover.length); } 
@@ -1008,24 +1033,6 @@ version(/+$DIDE_REGION+/all)
 	
 	class Cell
 	{
-		 //Cell ////////////////////////////////////
-		
-		/+
-			  static shared int[string] objCnt;  //todo: ha ez nem shared, akkor beszarik a hatterben betolto jpeg. Miert?
-				this(){
-			//			 auto n = this.classinfo.name;
-			//			 if(n !in objCnt) objCnt[n]=0;
-			//			 objCnt[n]++;
-				}
-			
-				~this(){
-			//			 auto n = this.classinfo.name;
-			//			 objCnt[n]--;
-					//ennek qrvara sharednek kell lennie, mert a gc akarmelyik threadbol mehet.
-					//egy atomic lenne a legjobb
-				} 
-		+/
-		
 		///Optionally the container can have a parent.
 		inout(Container) getParent() inout
 		{ return null; } 
@@ -1618,12 +1625,13 @@ version(/+$DIDE_REGION+/all)
 				dr.color = clGray; 
 				dr.lineStyle = LineStyle.normal; 
 				dr.lineWidth = 0.16f*2; 
-				dr.line2(innerBounds); 
+				dr.drawRect(innerBounds); 
 				
 				if(isTab)
 				{
-					dr.lineWidth = innerHeight*0.04f; 
-					dr.line2(ArrowStyle.vector, innerBounds.leftCenter, innerBounds.rightCenter); 
+					dr.lineWidth = innerHeight*0.04f; dr.arrowStyle = ArrowStyle.vector; 
+					dr.line(innerBounds.leftCenter, innerBounds.rightCenter); 
+					dr.arrowStyle = ArrowStyle.none; 
 				}
 				else if(isWhite)
 				{ dr.drawX(innerBounds); }
@@ -3122,7 +3130,7 @@ version(/+$DIDE_REGION+/all)
 				[q{bool},q{1},q{"hovered_deprecated"},q{},q{/+maintained by system, not by user+/}],
 				[q{bool},q{1},q{"clipSubCells"},q{},q{/++/}],
 				[q{bool},q{1},q{"_saveComboBounds"},q{},q{/+marks the container to save the absolute bounds to align the popup window to.+/}],
-				[q{bool},q{1},q{"_hasOverlayDrawing"},q{},q{/++/}],
+				[q{bool},q{1},q{"_unused00_"},q{},q{/++/}],
 				[q{bool},q{1},q{"columnElasticTabs"},q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
 				[],
 				[q{bool},q{1},q{"rowElasticTabs"},q{},q{/+Row will do elastic tabs inside its own WrappedLines.+/}],
@@ -3842,8 +3850,10 @@ version(/+$DIDE_REGION+/all)
 			else
 			{ subCells.each!(c => c.draw(dr)); }
 			
-			if(flags._hasOverlayDrawing)
-			dr.copyFrom(g_getOverlayDrawing(this)); 
+			version(/+$DIDE_REGION+/none) {
+				if(flags._hasOverlayDrawing)
+				dr.copyFrom(g_getOverlayDrawing(this)); 
+			}
 			
 			if(flags._hasDrawCallback)
 			g_getDrawCallback(this)(dr, this); 
@@ -3912,31 +3922,31 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		
-		//these can mixed in
-		
-		mixin template CachedDrawing()
-		{
-			Drawing cachedDrawing; 
-			
-			override void draw(Drawing dr)
+		version(/+$DIDE_REGION+/none) {
+			//these can mixed in
+			mixin template CachedDrawing()
 			{
-				if(dr.isClone)
+				Drawing cachedDrawing; 
+				
+				override void draw(Drawing dr)
 				{
-					super.draw(dr); //prevent recursion
-					print("Drawing recursion prevented"); 
-				}
-				else
-				{
-					if(!cachedDrawing)
+					if(dr.isClone)
 					{
-						cachedDrawing = dr.clone; 
-						super.draw(cachedDrawing); 
+						super.draw(dr); //prevent recursion
+						print("Drawing recursion prevented"); 
 					}
-					dr.subDraw(cachedDrawing); 
-				}
-			} 
-		}; 
-		
+					else
+					{
+						if(!cachedDrawing)
+						{
+							cachedDrawing = dr.clone; 
+							super.draw(cachedDrawing); 
+						}
+						dr.subDraw(cachedDrawing); 
+					}
+				} 
+			}; 
+		}
 		version(/+$DIDE_REGION Search+/all)
 		{
 			static struct SearchOptions
@@ -4224,27 +4234,6 @@ version(/+$DIDE_REGION+/all)
 			clearChangedCreated; 
 			clearChangedRemoved; 
 		} 
-		
-		//changed tracking for syntax highlight /////////////////////////////
-		
-		///Override these to implement changedTime tracking.
-		/+
-			int getThisChangedTime(){ return 0; }
-				void setThisChangedTime(int i){ } ///Ditto
-			
-				@property int changedTime(){
-						return getThisChangedTime;
-				}
-			
-				@property void changedTime(int	i){
-						//no optimization: Because	there can be non channgedTime aware classes in the parent chain.
-						if(i>getThisChangedTime){	//only proceed when previous changedTime time is lower than current.
-							setThisChangedTime(i);
-							if(auto p = getParent())
-									p.changedTime = i;
-						}
-				}
-		+/
 		
 		version(/+$DIDE_REGION SelectionManager  virtual functs+/all)
 		{
@@ -5188,18 +5177,19 @@ version(/+$DIDE_REGION+/all)
 												Row(
 													{
 														outerSize = vec2(r.prefix.length, 1)*fh; 
+														
+														void customDraw(Drawing dr, .Container cntr)
 														{
-															auto dr = new Drawing; 
 															dr.color = clGray; dr.lineWidth = 1; 
 															float x = fh*.5f; 
 															foreach(ch; r.prefix.byChar)
 															{
 																if(ch.among('+', 'I')) dr.vLine(x, 0, fh); 
-																if(ch.among('+', 'L')) dr.circle(x+.5*fh, 0, fh*.5f, -π/2, 0); 
+																if(ch.among('+', 'L')) dr.circle(vec2(x+.5*fh, 0), fh*.5f, -π/2, 0); 
 																x += fh; 
 															}
-															addOverlayDrawing(dr); 
-														}
+														} 
+														addDrawCallback(&customDraw); 
 													}
 												); 
 											}
@@ -5721,27 +5711,29 @@ version(/+$DIDE_REGION+/all)
 							const w = innerWidth; 
 							const h = innerHeight; 
 							
-							auto dr = new Drawing; 
-							with(dr)
+							void customDraw(Drawing dr, .Container cntr)
 							{
-								const
-									dataWidth	= data.map!(d => d.values.length).maxElement(1),
-									dataHeight 	= data.map!(d => d.values.maxElement(1)).maxElement(1),
-									sx	=  (w+1) / dataWidth,
-									sy	= -(h) / dataHeight; 
-								
-								dr.color = RGB(70, 70, 70); 
-								dr.lineWidth = 1; 
-								if(gridXStepSize)
-								iota(0, dataWidth+1, gridXStepSize).each!(i => vLine(round(sx*i)-.5f, 0, h)); 
-								if(gridYDivisions)
-								iota(gridYDivisions+1).each!(i => hLine(0, (h*i/gridYDivisions).round-.5f, w)); 
-								
-								dr.lineWidth = 2; 
-								foreach(d; data)
-								{ color = d.color;  hGraph(0, h, d.values, sx, sy); }
-							}
-							addOverlayDrawing(dr); 
+								with(dr)
+								{
+									const
+										dataWidth	= data.map!(d => d.values.length).maxElement(1),
+										dataHeight 	= data.map!(d => d.values.maxElement(1)).maxElement(1),
+										sx	=  (w+1) / dataWidth,
+										sy	= -(h) / dataHeight; 
+									
+									dr.color = RGB(70, 70, 70); 
+									dr.lineWidth = 1; 
+									if(gridXStepSize)
+									iota(0, dataWidth+1, gridXStepSize).each!(i => vLine(round(sx*i)-.5f, 0, h)); 
+									if(gridYDivisions)
+									iota(gridYDivisions+1).each!(i => hLine(0, (h*i/gridYDivisions).round-.5f, w)); 
+									
+									dr.lineWidth = 2; 
+									foreach(d; data)
+									{ color = d.color;  hGraph_f(0, h, d.values, sx, sy); }
+								}
+							} 
+							addDrawCallback(&customDraw); 
 						},
 						genericId(name)
 					); 
@@ -5943,14 +5935,14 @@ version(/+$DIDE_REGION+/all)
 					padding = "4"; 
 					Column(
 						{
-							foreach(idx, ref b; Drawing.globalShaderParams.bools)
+							foreach(idx, ref b; globalShaderParams.bools)
 							ChkBox(b, idx.format!"bool%d", genericId(idx)); 
 						}
 					); 
 					Spacer; 
 					Column(
 						{
-							foreach(idx, ref f; Drawing.globalShaderParams.floats)
+							foreach(idx, ref f; globalShaderParams.floats)
 							Row(
 								{
 									theme = "tool"; 
@@ -5966,639 +5958,7 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
-	////////////////////////////////////////////////////////
-	///  Dead code                                       ///
-	////////////////////////////////////////////////////////
 	
-	
-	//PropertySet tests ///////////////////////////////
-	
-	/+
-		// PropertySet test -----------------------------------------------------------
-		Row({ toolHeader;
-			Text(bold("PropertySet test:  "));
-		});
-		
-		{// test a single property
-			auto ip = new IntProperty;
-			ip.name = "intProp";
-			ip.caption = "Integer property";
-			ip.min = 1;
-			ip.max = 10;
-			stdUI(ip);
-		}
-		
-		{// test a property loaded from json
-			auto str = q{
-				{
-					"class": "PropertySet",
-					"name": "Test property set",
-					"properties": [
-						{
-							"class": "StringProperty",
-							"name": "cap.type",
-							"caption": "",
-							"hint": "Type of capture source.",
-							"act": "file",
-							"def": "auto",
-							"choices": [ "auto", "file", "dshow", "gstreamer", "v4l2", "ueye", "any" ]
-						},
-						{
-							"class": "IntProperty",
-							"name": "cap.width",
-							"caption": "",
-							"hint": "Desired image width",
-							"act": 640,
-							"def": 640,
-							"min": 0,
-							"max": 8192,
-							"step": 0
-						}
-					]
-				}
-			};
-	+/
-	
-	//ListItem ////////////////////////////////
-	/+
-		Row newListItem(string s, TextStyle ts = tsNormal){
-			auto left  = new Row("\u2022", ts);
-			left.outerWidth = ts.fontHeight*2;
-			left.subCells = new FlexRow("", ts) ~ left.subCells ~ new FlexRow("", ts);
-		
-			auto right	= new Row(s, ts); right.flex_=1;
-			auto act	= new Row([left, right], ts);
-		
-			act.bkColor = ts.bkColor;
-			return act;
-		}
-		
-		class FlexRow : Row{ //FlexRow///////////////////////////////
-			this(string markup, TextStyle ts=tsNormal){
-				super(markup, ts);
-				flex_ = 1;
-			}
-		}
-		
-		class Link : Row{ //Link ///////////////////////////////
-		
-			this(string cmdLine, in SrcId hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
-				this.id = hash;
-				auto hit = im.hitTest(this, enabled);
-		
-				if(enabled && onClick !is null && hit.clicked){
-					onClick();
-				}
-		
-				if(!enabled){
-					ts.fontColor = clLinkDisabled;
-					ts.underline = false;
-				}else if(hit.captured){
-					ts.fontColor = clLinkPressed;
-				}else{
-					ts.fontColor = mix(ts.fontColor, clLinkHover, hit.hover_smooth);
-					ts.underline = hit.hover;
-				}
-		
-				flags.wordWrap = false;
-		
-				auto params = cmdLine.commandLineToMap;
-				super(params["0"], ts);
-				setProps(params);
-			}
-		}
-		
-		
-		class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
-		
-			this(string markup, TextStyle ts = tsKey){
-				auto allKeys = inputs.entries.values.filter!(e => e.isButton && e.value).array.sort!((a,b)=>a.pressedTime<b.pressedTime, SwapStrategy.stable).map!"a.name".array;
-		
-				if(allKeys.canFind(markup)) ts.bkColor = clLime;
-		
-				margin_ = Margin(1, 1, 0.75, 0.75);
-				padding_ = Padding(2, 2, 0, 0);
-				border_.width = 1;
-				border_.color = clGray;
-				flags.wordWrap = false;
-		
-				super(markup, ts);
-			}
-		
-		}
-		
-		
-		class WinRow : Row{ //WinRow ///////////////////////////////
-		
-			this(string markup, TextStyle ts = tsNormal){
-				padding_ = Padding(4, 16, 4, 16);
-		
-				super(markup, ts);
-			}
-		
-			this(Cell[] cells, TextStyle ts = tsNormal){
-				padding_ = Padding(4, 16, 4, 16);
-		
-				super(cells, ts);
-			}
-		
-			override{
-			}
-		}
-		
-	+/
-}version(/+$DIDE_REGION Graph+/all)
-{
-	
-	class GraphLabel(Node) : Row
-	{
-		 //GraphLabel /////////////////////////////
-		Node parent; 
-		bool isReference; //a non reference is the caption of the definition
-		string name; 
-		
-		this()
-		{} 
-		
-		this(Node parent, bool isReference, string name, string caption, in TextStyle ts)
-		{
-			this.name = name; 
-			this.parent = parent; 
-			this.isReference = isReference; 
-			appendStr(caption, ts); 
-		} 
-		
-		this(Node parent, bool isReference, string name, in TextStyle ts)
-		{ this(parent, isReference, name, name, ts); } 
-		
-		this(Node parent, bool isReference, string name)
-		{
-				//Todo: this is for languageGraph only
-			auto ts = tsNormal; 
-			ts.applySyntax(isReference ? SyntaxKind.Whitespace : SyntaxKind.BasicType); 
-			ts.underline = isReference; 
-			ts.italic = true; 
-			this(parent, isReference, name, ts); 
-		} 
-		
-		auto absOuterBounds() const
-		{ return innerBounds + parent.absInnerPos; } 
-		auto absOutputPos	 () const
-		{ return absOuterBounds.rightCenter; } 
-		auto absInputPos	 () const
-		{ return absOuterBounds.leftCenter; } 
-	} 
-	
-	class GraphNode(Graph, Label) : Row
-	{
-		mixin CachedDrawing; 
-		
-		Graph parent; 
-		
-		this(Graph parent)
-		{
-			this.parent = parent; 
-			flags._measureOnlyOnce = true; 
-		} 
-		
-		bool isSelected, oldSelected; 
-		bool isHovered()
-		{ return this is parent.hoveredNode; } 
-		
-		string groupName_original; 
-		string groupName_override; 
-		string groupName() const
-		{ return groupName_override.length ? groupName_override : groupName_original; } 
-		
-		string fullName() const
-		{ return groupName ~ "/" ~ name; } 
-		
-		auto labels	  ()
-		{ return subCells.map!(a => cast(Label)a).filter!"a"; } 
-		auto targets	  ()
-		{ return labels.filter!(a => !a.isReference); } 
-		auto references()
-		{ return labels.filter!(a =>  a.isReference); } 
-		
-		Label nameLabel()
-		{
-			pragma(msg, Label, typeof(this)); 
-			foreach(t; targets)
-			return t; return null; 
-		} 
-		
-		string name() const
-		{
-				//default implementation
-			foreach(t; (cast()this).targets)
-			return t.name; 
-			ERR("Unable to get default name. Should override GraphNode.name()."); 
-			return ""; 
-		} 
-		
-		auto absInnerBounds() const
-		{ return innerBounds + parent.innerPos; } 
-		auto absInnerPos   () const
-		{ return innerPos    + parent.innerPos; } 
-	} 
-	
-	class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container
-	{
-		 //ContainerGraph ///////////////////////////////////////////
-		bool showSelection = true; 
-		
-		static assert(
-			__traits(
-				compiles, {
-					Node n; string s = n.groupName; //this could be optional.
-				}
-			), "Field requirements not met."
-		); 
-		
-		SelectionManager!Node selection; 
-		
-		bool invertEdgeDirection; 
-		float groupMargin = 30; 
-		
-		auto nodes        ()
-		{ return cast(Node[])subCells; } //Note: all subcells' type must be Node
-		auto selectedNodes()
-		{ return nodes.filter!(a => a.isSelected); } 
-		auto hoveredNode  ()
-		{ return selection.hoveredItem; } 
-		
-		private Node[string] nodeByName; 
-		
-		auto findNode(string name)
-		{ auto a = name in nodeByName; return a ? *a : null; } 
-		
-		Node addNode(string name, Node node)
-		{
-			enforce(cast(Node)node !is null     , "addNode() param must be an instance of "~Node.stringof       ); 
-			enforce(name.length                 , "Name must be non-empty."                                     ); 
-			enforce(findNode(name) is null      , "Node named "~name.quoted~" already exists"                   ); 
-			//enforce(!node.parent                , "Node already has a parent."                                  ); 
-			
-			const bnd = allBounds; 
-			const nextPos = bnd.valid ? bnd.bottomLeft + vec2(0, 32) : vec2(0); 
-			node.outerPos = nextPos; 
-			
-			nodeByName[name] = node; 
-			append(node); //this is Container.append()
-			return node; 
-		} 
-		
-		Node findAddNode(string name, lazy Node node)
-		{
-			if(auto n = findNode(name))
-			return n; 
-			return addNode(name, node/+lazy!!!+/); 
-		} 
-		
-		bool removeNode(Node node)
-		{
-			const oldLen = subCells.length; 
-			subCells = subCells.filter!(c => c !is node).array; //Todo: use remove()
-			if(subCells.length < oldLen)
-			{
-				nodeByName.remove(node.name); 
-				selection.notifyRemove(node); 
-				return true; 
-			}else
-			return false; 
-		} 
-		
-		bool removeNode(string name)
-		{
-			if(auto node = findNode(name))
-			{
-				removeNode(node); 
-				return true; 
-			}else
-			return false; 
-		} 
-		
-		auto removeNodes(R)(R nodes) if(isInputRange!R && is(ElementType!R == Node))
-		{ return nodes.count!(n => removeNode(n)).to!int; } 
-		
-		auto removeNodes(string nameFilter)
-		{ return nodes.filter!(n => n.name.isWild(nameFilter)); } 
-		
-		Node toggleNode(string name, lazy Node node)
-		{
-			if(removeNode(name))
-			return null; 
-			else	return addNode(name, node/+lazy!!!+/); 
-		} 
-		
-		void removeAll()
-		{
-			subCells = []; 
-			nodeByName.clear; 
-			selection.notifyRemoveAll; 
-		} 
-		
-		auto nodeGroups()
-		{ return nodes.dup.sort!((a, b) => a.groupName < b.groupName).groupBy; } //note .dup is important because .sort works in-place.
-		
-		auto groupBounds()
-		{
-			return nodeGroups.filter!(g => g.front.groupName!="")          //exclude unnamed groups
-							 .map!(
-				grp => grp.map!(a => a.outerBounds)
-													 .fold!"a|b"
-			); 
-		} 
-		
-		auto allBounds()
-		{
-			return nodes.map!(n => n.outerBounds)
-						.fold!"a|b"(bounds2.init); 
-		} 
-		
-		
-		Container.SearchResult[] searchResults; 
-		bool searchBoxVisible; 
-		string searchText; 
-		
-		//inputs from outside
-		private
-		{
-			float viewScale = 1; //used for automatic screenspace linewidth
-			vec2[2] searchBezierStart; //first 2 point of search bezier lines. Starting from the GUI matchCount display.
-		} 
-		
-		this()
-		{
-			bkColor = clBlack; 
-			selection = new typeof(selection); 
-		} 
-		
-		struct Link
-		{ Label from; Node to; } 
-		Link[] _links; 
-		
-		auto links()
-		{
-			if(_links.empty)
-			foreach(d; nodes)
-			foreach(from; d.labels)
-			if(from.isReference)
-			if(auto to = findNode(from.name))
-			_links ~= Link(from, to); 
-			return _links; 
-		} 
-		
-		void update(View2D view, vec2[2] searchBezierStart)
-		{
-			this.viewScale = view.scale; 
-			this.searchBezierStart = searchBezierStart; 
-			
-			selection.update(!im.wantMouse, view, subCells.map!(a => cast(Node)a).array); 
-		} 
-		
-		//drawing routines ////////////////////////////////////////////
-		
-		protected void drawSearchResults(Drawing dr, RGB clSearchHighLight)
-		{
-			with(dr)
-			{
-				 //this is copied to dide2
-				foreach(sr; searchResults)
-				sr.drawHighlighted(dr, clSearchHighLight); 
-				
-				lineWidth = -2 * sqr(sin(QPS.value(second).fract*PIf*2)); 
-				alpha = 0.66; 
-				color = clSearchHighLight; 
-				foreach(sr; searchResults)
-				bezier2(searchBezierStart[0], searchBezierStart[1], sr.absInnerPos + sr.cells.back.outerBounds.rightCenter); 
-				
-				alpha = 1; 
-			}
-		} 
-		
-		protected void drawSelectedItems(Drawing dr, RGB clSelected, float selectedAlpha, RGB clHovered, float hoveredAlpha)
-		{
-			with(dr)
-			{
-				color = clSelected; alpha = selectedAlpha; 	 foreach(a; selectedNodes)
-				dr.fillRect(a.outerBounds); 
-				color = clHovered; alpha = hoveredAlpha; 	 if(hoveredNode !is null)
-				dr.fillRect(hoveredNode.outerBounds); 
-				alpha = 1; 
-			}
-		} 
-		
-		protected void drawSelectionRect(Drawing dr, RGB clRect)
-		{
-			if(auto bnd = selection.selectionBounds)
-			with(dr)
-			{
-				lineWidth = -1; 
-				color = clRect; 
-				drawRect(bnd); 
-			}
-		} 
-		
-		protected void drawGroupBounds(Drawing dr, RGB clGroupFrame)
-		{
-			with(dr)
-			{
-				color = clGroupFrame; 
-				lineWidth = -1; 
-				foreach(bnd; groupBounds)
-				drawRect(bnd.inflated(groupMargin)); 
-			}
-		} 
-		
-		protected void drawLinks(Drawing dr)
-		{
-			with(dr)
-			{
-				/+
-						alpha = 0.66;
-						foreach(link; links){
-							const h1 = link.from.parent.isHovered, h2 = link.to.isHovered;
-					
-							//hide interGroup links
-							if(!h1 && !h2 && link.from.parent.groupName != link.to.groupName) continue;
-					
-							color	 = h1 && !h2 ? clAqua
-					 : h2 && !h1 ? clLime
-																 : clSilver;
-					
-							lineWidth = viewScale>1 ? 1 : -1; //line can't be thinner than 1 pixel, but can be thicker
-					
-							//OutputPos = rightCenter, InputPos = leftCenter
-					
-							vec2 P0, P1, P2, P3, P4, ofs;
-							if(!invertEdgeDirection){ //arrows go the the right. It's good for a grammar graph
-								P0 = link.from.absOutputPos; P4 = link.to.nameLabel.absInputPos;
-								float a = min(50, distance(P0, P4)/3);
-								ofs = P0.x<P4.x ? vec2(a, 0) : vec2(a, -a);
-							}else{ //arrows go to the left. Good for module hierarchy. Rightmost module is the main project.
-								P0 = link.from.absInputPos; P4 = link.to.nameLabel.absOutputPos;
-								float a = min(50, distance(P0, P4)/3);
-								ofs = P0.x>P4.x ? vec2(-a, 0) : vec2(-a, -a);
-							}
-							P1 = P0 + ofs,
-							P3 = P4 + ofs*vec2(-1, 1),
-							P2 = avg(P1, P3);
-							bezier2(P0, P1, P2);
-							bezier2(P2, P3, P4);
-					
-						}
-						alpha = 1; 
-				+/
-			}
-		} 
-		
-		protected void drawOverlay(Drawing dr)
-		{
-			with(dr)
-			{
-				drawLinks(dr); 
-				if(showSelection)
-				drawSelectedItems(dr, clAccent, 0.25, clWhite, 0.2); 
-				drawSelectionRect(dr, clWhite); 
-				drawGroupBounds(dr, clSilver); 
-				drawSearchResults(dr, clYellow); 
-			}
-		} 
-		
-		override void draw(Drawing dr)
-		{
-			super.draw(dr); //draw cached stuff
-			
-			auto dr2 = dr.clone; 
-			drawOverlay(dr2); //draw uncached stuff on top
-			dr.subDraw(dr2); 
-		} 
-		
-		void UI_SearchBox(View2D view)
-		{
-				//UI SearchBox ////////////////////////////////
-			with(im)
-			Row(
-				{
-					//Keyboard shortcuts
-					auto kcFind	= KeyCombo("Ctrl+F"),
-							 kcFindZoom	= KeyCombo("Enter"), //only when edit is focused
-							 kcFindClose	= KeyCombo("Esc"); //always
-					
-					if(kcFind.pressed)
-					searchBoxVisible = true; //this is needed for 1 frame latency of the Edit
-					//Todo: focus on the edit when turned on
-					if(searchBoxVisible)
-					{
-						width = fh*12; 
-						
-						Text("Find "); 
-						.Container editContainer; 
-						if(Edit(searchText, kcFind, { flex = 1; editContainer = actContainer; }))
-						{
-							//refresh search results
-							searchResults = search(searchText); 
-						}
-						
-						//display the number of matches. Also save the location of that number on the screen.
-						const matchCnt = searchResults.length; 
-						Row(
-							{
-								if(matchCnt)
-								Text(" ", clGray, matchCnt.text, " "); 
-							}
-						); 
-						
-						if(Btn(symbol("Zoom"), isFocused(editContainer) ? kcFindZoom : KeyCombo(""), enable(matchCnt>0), hint("Zoom screen on search results.")))
-						{
-							const maxScale = max(view.scale, 1); 
-							view.zoom(searchResults.map!(r => r.bounds).fold!"a|b", 12); 
-							view.scale = min(view.scale, maxScale); 
-						}
-						
-						if(Btn(symbol("ChromeClose"), kcFindClose, hint("Close search box.")))
-						{
-							searchBoxVisible = false; 
-							searchText = ""; 
-							searchResults = []; 
-						}
-					}else
-					{
-						
-						if(Btn(symbol("Zoom"       ), kcFind, hint("Start searching.")))
-						{
-							searchBoxVisible = true; //Todo: Focus the Edit control
-						}
-					}
-				}
-			); 
-		} 
-		
-		//scroller state
-		Node actNode; //state
-		auto topIndex = 0; //state
-		enum pageSize = 10; 
-		
-		void UI_Editor()
-		{
-			alias GraphNode = Node; /*Todo: fucking name collision with im.Node */   with(im)
-			{
-				 //UI_Editor ///////////////////////////////////
-				//WildCard filter
-				static hideUI = true; 
-				static filterStr = ""; 
-				Row({ ChkBox(hideUI, "Hide Graph UI "); }); 
-				
-				if(!hideUI)
-				{
-					
-					  Row({ Text("Filter "); Edit(filterStr, { flex = 1; }); }); 
-					
-						 //filtered data source
-						 auto filteredNodes = nodes.filter!(a => a.name.isWild(filterStr~"*")).array; 
-						 ScrollListBox(actNode, filteredNodes, (in GraphNode n){ Text(n.name); width = 260; }, pageSize, topIndex); 
-					
-						 Spacer; 
-						 Row(
-						{
-							auto selected = selectedNodes.array; 
-							Row({ Text("Selected items: "), Static(selected.length), Text("  Total: "), Static(nodes.length); }); 
-							
-							const selectedGroupNames = selected.map!(a => a.groupName).array.sort.uniq.array; 
-							static string editedGroupName; 
-							Row(
-								{
-									Text("Selected groups: "); 
-									foreach(i, name; selectedGroupNames)
-									if(Btn(name, genericId(i)))
-									editedGroupName = name; 
-								}
-							); 
-							
-							Spacer; 
-							Row(
-								{
-									Text("Group name os felected items: \n"); 
-									Edit(editedGroupName, { width = 200; }); 
-									if(Btn("Set", enable(selected.length>0)))
-									foreach(a; selected)
-									a.groupName_override = editedGroupName; 
-								}
-							); 
-							
-						}
-					); 
-					
-						 Spacer; 
-						 if(Btn("test"))
-					{}
-					
-				}
-			}
-		} 
-		
-	} 
 }
 struct im
 {
@@ -6691,7 +6051,7 @@ struct im
 			{ return float(textStyle.fontHeight); 	} 	.g_actFontHeightFunct	= &getActFontHeight; 
 			static auto getActFontColor ()
 			{ return textStyle.fontColor; 	} 	.g_actFontColorFunct	= &getActFontColor; 
-			.g_getOverlayDrawingFunct = &getOverlayDrawing; 
+			version(/+$DIDE_REGION+/none) { .g_getOverlayDrawingFunct = &getOverlayDrawing; }
 			.g_getDrawCallbackFunct = &getDrawCallback; 
 			
 			//update building/measuring/drawing state
@@ -6782,10 +6142,12 @@ struct im
 				}
 			}
 			
-			if(VisualizeHitStack)
-			{
-				drVisualizeHitStack = new Drawing; 
-				hitTestManager.draw(drVisualizeHitStack); 
+			version(/+$DIDE_REGION+/none) {
+				if(VisualizeHitStack)
+				{
+					drVisualizeHitStack = new_Drawing; 
+					hitTestManager.draw(drVisualizeHitStack); 
+				}
 			}
 			
 			//all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
@@ -6815,17 +6177,12 @@ struct im
 		
 			bounds2[2] surfaceBounds; 
 		
-			Drawing drVisualizeHitStack; 
+			version(/+$DIDE_REGION+/none) { DrawingOld drVisualizeHitStack; }
 		
 			int actTargetSurface; //0:world, 1:GUI
 		
-			enum reuseDr = true; //very important option, somehow it was disabled.
-			private Drawing[2] staticDr; 
-		
-			void _drawFrame(string restrict="")()
+			void _drawFrame(string restrict="")(Drawing[2] staticDr)
 		{
-			
-			//PING(7);
 			static if(doTiming)
 			{
 				const T0 = QPS; scope(exit)
@@ -6835,13 +6192,7 @@ struct im
 			static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 
 			enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now."); 
 			
-			static if(reuseDr)
-			{
-				if(!staticDr[0])
-				staticDr = [new Drawing("im0"), new Drawing("im1")]; 
-				auto dr = staticDr; 
-			}else
-			{ auto dr = [new Drawing, new Drawing]; }
+			Drawing[2] dr = staticDr; 
 			
 			//init clipbounds
 			foreach(i, ref d; dr)
@@ -6871,11 +6222,13 @@ struct im
 				d.clear; 
 			}
 			
-			if(VisualizeHitStack && drVisualizeHitStack)
-			{
-				drVisualizeHitStack.glDraw(targetSurfaces[1].view); //Todo: problem with hitStack: it is assumed to be on GUI view
+			version(/+$DIDE_REGION+/none) {
+				if(VisualizeHitStack && drVisualizeHitStack)
+				{
+					drVisualizeHitStack.glDraw(targetSurfaces[1].view); //Todo: problem with hitStack: it is assumed to be on GUI view
+				}
+				drVisualizeHitStack.destroy; 
 			}
-			drVisualizeHitStack.destroy; 
 			
 			//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
 			//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
@@ -7289,7 +6642,7 @@ struct im
 			stack = [StackEntry(null, enabled, textStyle, theme)]; 
 			actContainer = null; 
 			
-			overlayDrawings.clear; 
+			version(/+$DIDE_REGION+/none) { overlayDrawings.clear; }
 			drawCallbacks.clear; 
 		} 
 		
@@ -7352,27 +6705,29 @@ struct im
 				: cast(.Container)root.fetchBack; 
 		} 
 		
-			//overlay drawing //////////////////////////
-			private Drawing[.Container] overlayDrawings; 
-		
-			void addOverlayDrawing(Drawing dr)
-		{
-			enforce(actContainer !is null); 
-			enforce(!actContainer.flags._hasOverlayDrawing, "Container already has an OverlayDrawing."); 
+		version(/+$DIDE_REGION+/none) {
+				//overlay drawing //////////////////////////
+				private Drawing[.Container] overlayDrawings; 
 			
-			actContainer.flags._hasOverlayDrawing = true; 
-			overlayDrawings[actContainer] = dr; 
-		} 
-		
-			private Drawing getOverlayDrawing(.Container cntr)
-		{
-			if(auto drOverlay = cntr in overlayDrawings)
-			return *drOverlay; 
-			else return null; 
-		} 
+				void addOverlayDrawing(Drawing dr)
+			{
+				enforce(actContainer !is null); 
+				enforce(!actContainer.flags._hasOverlayDrawing, "Container already has an OverlayDrawing."); 
+				
+				actContainer.flags._hasOverlayDrawing = true; 
+				overlayDrawings[actContainer] = dr; 
+			} 
+			
+				private Drawing getOverlayDrawing(.Container cntr)
+			{
+				if(auto drOverlay = cntr in overlayDrawings)
+				return *drOverlay; 
+				else return null; 
+			} 
+		}
 		
 			//DrawCallback ////////////////////////
-			alias DrawCallback = void function(Drawing, .Container); 
+			alias DrawCallback = void delegate(Drawing, .Container); 
 		
 			private DrawCallback[.Container] drawCallbacks; 
 		
@@ -9310,46 +8665,7 @@ struct im
 			); 
 		} 
 		
-		
-		/+
-			  auto Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)  // Btn //////////////////////////////
-				if(isSomeString!T0 || __traits(compiles, text()) )
-				{
-					mixin(id.M ~ enable.M ~ selected.M);
-			
-					const isToolBtn = theme=="tool";
-			
-					HitInfo hit;
-			
-					Row({
-						hit = hitTest(id_, enabled_);
-			
-						mixin(hintHandler);
-			
-						bool focused = focusUpdate(actContainer, id_,
-							enabled, hit.pressed, false,  //enabled, enter, exit
-							/* onEnter	*/ { },
-							/* onFocus	*/ { },
-							/* onExit	*/ { }
-						);
-			
-						//flags.wordWrap = false;
-						flags.hAlign = HAlign.center;
-			
-						applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth);
-			
-						static if(isSomeString!T0) Text(text); //centered text
-																	else text(); //delegate
-			
-						static foreach(a; args) static if(__traits(compiles, a())) a();
-					});
-			
-					return hit;
-				}         
-		+/
-		
-		
-		auto PopupBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, Args...)(T0 text, Args args) //PopupBtn ////////////////////////////////
+		auto PopupBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, Args...)(T0 text, Args args)
 			if((isSomeString!T0 || __traits(compiles, text())) && Args.length>=1 && __traits(compiles, args[$-1]()) )
 		{
 			Cell btn; 
@@ -9433,7 +8749,8 @@ struct im
 			enum translated = anySatisfy!(isTranslator, Args); 
 			
 			Cell btn; 
-			auto hit = WhiteBtn!(srcModule, srcLine)(
+			auto hit = WhiteBtn!(srcModule, srcLine)
+				(
 				{
 					btn = actContainer; 
 					flags.hAlign = HAlign.left; 
@@ -10395,27 +9712,28 @@ struct im
 					bkColor = oldBkColor; 
 					//Todo: make mouse clicks fall throug this to the parent container
 					
-					auto dr = new Drawing; 
 					
-					auto p = vec2(f*.5), r = f*.45; 
-					
-					dr.color = c2; 
-					dr.pointSize = r*2;  dr.point(p); 
-					
-					r -= f/12; 
-					
-					void pie(double angle)
+					void customDraw(Drawing dr, .Container cntr)
 					{
-						enum N=8; 
-						dr.color = c1; 
-						iota(N+1).map!(i => p + vec2(r, 0).rotate(i*(PI/2/N)+angle))
-										 .slide(2)
-										 .each!((a){ dr.fillTriangle(p, a[1], a[0]); }); 
+						auto p = vec2(f*.5), r = f*.45; 
+						
+						dr.color = c2; 
+						dr.pointSize = r*2;  dr.point(p); 
+						
+						r -= f/12; 
+						
+						void pie(double angle)
+						{
+							enum N=8; 
+							dr.color = c1; 
+							iota(N+1).map!(i => p + vec2(r, 0).rotate(i*(PI/2/N)+angle))
+											 .slide(2)
+											 .each!((a){ dr.fillTriangle(p, a[1], a[0]); }); 
+						} 
+						
+						pie(angle); pie(angle+PI); 
 					} 
-					
-					pie(angle); pie(angle+PI); 
-					
-					addOverlayDrawing(dr); 
+					addDrawCallback(&customDraw); 
 				}
 			); 
 		} 
@@ -10566,3 +9884,640 @@ struct im
 		} 
 	}
 } 
+version(/+$DIDE_REGION Dead code+/none)
+{
+	////////////////////////////////////////////////////////
+	///  Dead code                                       ///
+	////////////////////////////////////////////////////////
+	
+	
+	//PropertySet tests ///////////////////////////////
+	
+	/+
+		// PropertySet test -----------------------------------------------------------
+		Row({ toolHeader;
+			Text(bold("PropertySet test:  "));
+		});
+		
+		{// test a single property
+			auto ip = new IntProperty;
+			ip.name = "intProp";
+			ip.caption = "Integer property";
+			ip.min = 1;
+			ip.max = 10;
+			stdUI(ip);
+		}
+		
+		{// test a property loaded from json
+			auto str = q{
+				{
+					"class": "PropertySet",
+					"name": "Test property set",
+					"properties": [
+						{
+							"class": "StringProperty",
+							"name": "cap.type",
+							"caption": "",
+							"hint": "Type of capture source.",
+							"act": "file",
+							"def": "auto",
+							"choices": [ "auto", "file", "dshow", "gstreamer", "v4l2", "ueye", "any" ]
+						},
+						{
+							"class": "IntProperty",
+							"name": "cap.width",
+							"caption": "",
+							"hint": "Desired image width",
+							"act": 640,
+							"def": 640,
+							"min": 0,
+							"max": 8192,
+							"step": 0
+						}
+					]
+				}
+			};
+	+/
+	
+	//ListItem ////////////////////////////////
+	/+
+		Row newListItem(string s, TextStyle ts = tsNormal){
+			auto left  = new Row("\u2022", ts);
+			left.outerWidth = ts.fontHeight*2;
+			left.subCells = new FlexRow("", ts) ~ left.subCells ~ new FlexRow("", ts);
+		
+			auto right	= new Row(s, ts); right.flex_=1;
+			auto act	= new Row([left, right], ts);
+		
+			act.bkColor = ts.bkColor;
+			return act;
+		}
+		
+		class FlexRow : Row{ //FlexRow///////////////////////////////
+			this(string markup, TextStyle ts=tsNormal){
+				super(markup, ts);
+				flex_ = 1;
+			}
+		}
+		
+		class Link : Row{ //Link ///////////////////////////////
+		
+			this(string cmdLine, in SrcId hash, bool enabled, void delegate() onClick, TextStyle ts = tsLink){
+				this.id = hash;
+				auto hit = im.hitTest(this, enabled);
+		
+				if(enabled && onClick !is null && hit.clicked){
+					onClick();
+				}
+		
+				if(!enabled){
+					ts.fontColor = clLinkDisabled;
+					ts.underline = false;
+				}else if(hit.captured){
+					ts.fontColor = clLinkPressed;
+				}else{
+					ts.fontColor = mix(ts.fontColor, clLinkHover, hit.hover_smooth);
+					ts.underline = hit.hover;
+				}
+		
+				flags.wordWrap = false;
+		
+				auto params = cmdLine.commandLineToMap;
+				super(params["0"], ts);
+				setProps(params);
+			}
+		}
+		
+		
+		class KeyComboOld : Row{ //KeyCombo ///////////////////////////////
+		
+			this(string markup, TextStyle ts = tsKey){
+				auto allKeys = inputs.entries.values.filter!(e => e.isButton && e.value).array.sort!((a,b)=>a.pressedTime<b.pressedTime, SwapStrategy.stable).map!"a.name".array;
+		
+				if(allKeys.canFind(markup)) ts.bkColor = clLime;
+		
+				margin_ = Margin(1, 1, 0.75, 0.75);
+				padding_ = Padding(2, 2, 0, 0);
+				border_.width = 1;
+				border_.color = clGray;
+				flags.wordWrap = false;
+		
+				super(markup, ts);
+			}
+		
+		}
+		
+		
+		class WinRow : Row{ //WinRow ///////////////////////////////
+		
+			this(string markup, TextStyle ts = tsNormal){
+				padding_ = Padding(4, 16, 4, 16);
+		
+				super(markup, ts);
+			}
+		
+			this(Cell[] cells, TextStyle ts = tsNormal){
+				padding_ = Padding(4, 16, 4, 16);
+		
+				super(cells, ts);
+			}
+		
+			override{
+			}
+		}
+		
+	+/
+	version(/+$DIDE_REGION Graph+/all)
+	{
+		class GraphLabel(Node) : Row
+		{
+			 //GraphLabel /////////////////////////////
+			Node parent; 
+			bool isReference; //a non reference is the caption of the definition
+			string name; 
+			
+			this()
+			{} 
+			
+			this(Node parent, bool isReference, string name, string caption, in TextStyle ts)
+			{
+				this.name = name; 
+				this.parent = parent; 
+				this.isReference = isReference; 
+				appendStr(caption, ts); 
+			} 
+			
+			this(Node parent, bool isReference, string name, in TextStyle ts)
+			{ this(parent, isReference, name, name, ts); } 
+			
+			this(Node parent, bool isReference, string name)
+			{
+					//Todo: this is for languageGraph only
+				auto ts = tsNormal; 
+				ts.applySyntax(isReference ? SyntaxKind.Whitespace : SyntaxKind.BasicType); 
+				ts.underline = isReference; 
+				ts.italic = true; 
+				this(parent, isReference, name, ts); 
+			} 
+			
+			auto absOuterBounds() const
+			{ return innerBounds + parent.absInnerPos; } 
+			auto absOutputPos	 () const
+			{ return absOuterBounds.rightCenter; } 
+			auto absInputPos	 () const
+			{ return absOuterBounds.leftCenter; } 
+		} 
+		
+		class GraphNode(Graph, Label) : Row
+		{
+			mixin CachedDrawing; 
+			
+			Graph parent; 
+			
+			this(Graph parent)
+			{
+				this.parent = parent; 
+				flags._measureOnlyOnce = true; 
+			} 
+			
+			bool isSelected, oldSelected; 
+			bool isHovered()
+			{ return this is parent.hoveredNode; } 
+			
+			string groupName_original; 
+			string groupName_override; 
+			string groupName() const
+			{ return groupName_override.length ? groupName_override : groupName_original; } 
+			
+			string fullName() const
+			{ return groupName ~ "/" ~ name; } 
+			
+			auto labels	  ()
+			{ return subCells.map!(a => cast(Label)a).filter!"a"; } 
+			auto targets	  ()
+			{ return labels.filter!(a => !a.isReference); } 
+			auto references()
+			{ return labels.filter!(a =>  a.isReference); } 
+			
+			Label nameLabel()
+			{
+				pragma(msg, Label, typeof(this)); 
+				foreach(t; targets)
+				return t; return null; 
+			} 
+			
+			string name() const
+			{
+					//default implementation
+				foreach(t; (cast()this).targets)
+				return t.name; 
+				ERR("Unable to get default name. Should override GraphNode.name()."); 
+				return ""; 
+			} 
+			
+			auto absInnerBounds() const
+			{ return innerBounds + parent.innerPos; } 
+			auto absInnerPos   () const
+			{ return innerPos    + parent.innerPos; } 
+		} 
+		
+		class ContainerGraph(Node : Cell, Label : GraphLabel!Node) : Container
+		{
+			 //ContainerGraph ///////////////////////////////////////////
+			bool showSelection = true; 
+			
+			static assert(
+				__traits(
+					compiles, {
+						Node n; string s = n.groupName; //this could be optional.
+					}
+				), "Field requirements not met."
+			); 
+			
+			SelectionManager!Node selection; 
+			
+			bool invertEdgeDirection; 
+			float groupMargin = 30; 
+			
+			auto nodes        ()
+			{ return cast(Node[])subCells; } //Note: all subcells' type must be Node
+			auto selectedNodes()
+			{ return nodes.filter!(a => a.isSelected); } 
+			auto hoveredNode  ()
+			{ return selection.hoveredItem; } 
+			
+			private Node[string] nodeByName; 
+			
+			auto findNode(string name)
+			{ auto a = name in nodeByName; return a ? *a : null; } 
+			
+			Node addNode(string name, Node node)
+			{
+				enforce(cast(Node)node !is null     , "addNode() param must be an instance of "~Node.stringof       ); 
+				enforce(name.length                 , "Name must be non-empty."                                     ); 
+				enforce(findNode(name) is null      , "Node named "~name.quoted~" already exists"                   ); 
+				//enforce(!node.parent                , "Node already has a parent."                                  ); 
+				
+				const bnd = allBounds; 
+				const nextPos = bnd.valid ? bnd.bottomLeft + vec2(0, 32) : vec2(0); 
+				node.outerPos = nextPos; 
+				
+				nodeByName[name] = node; 
+				append(node); //this is Container.append()
+				return node; 
+			} 
+			
+			Node findAddNode(string name, lazy Node node)
+			{
+				if(auto n = findNode(name))
+				return n; 
+				return addNode(name, node/+lazy!!!+/); 
+			} 
+			
+			bool removeNode(Node node)
+			{
+				const oldLen = subCells.length; 
+				subCells = subCells.filter!(c => c !is node).array; //Todo: use remove()
+				if(subCells.length < oldLen)
+				{
+					nodeByName.remove(node.name); 
+					selection.notifyRemove(node); 
+					return true; 
+				}else
+				return false; 
+			} 
+			
+			bool removeNode(string name)
+			{
+				if(auto node = findNode(name))
+				{
+					removeNode(node); 
+					return true; 
+				}else
+				return false; 
+			} 
+			
+			auto removeNodes(R)(R nodes) if(isInputRange!R && is(ElementType!R == Node))
+			{ return nodes.count!(n => removeNode(n)).to!int; } 
+			
+			auto removeNodes(string nameFilter)
+			{ return nodes.filter!(n => n.name.isWild(nameFilter)); } 
+			
+			Node toggleNode(string name, lazy Node node)
+			{
+				if(removeNode(name))
+				return null; 
+				else	return addNode(name, node/+lazy!!!+/); 
+			} 
+			
+			void removeAll()
+			{
+				subCells = []; 
+				nodeByName.clear; 
+				selection.notifyRemoveAll; 
+			} 
+			
+			auto nodeGroups()
+			{ return nodes.dup.sort!((a, b) => a.groupName < b.groupName).groupBy; } //note .dup is important because .sort works in-place.
+			
+			auto groupBounds()
+			{
+				return nodeGroups.filter!(g => g.front.groupName!="")          //exclude unnamed groups
+								 .map!(
+					grp => grp.map!(a => a.outerBounds)
+														 .fold!"a|b"
+				); 
+			} 
+			
+			auto allBounds()
+			{
+				return nodes.map!(n => n.outerBounds)
+							.fold!"a|b"(bounds2.init); 
+			} 
+			
+			
+			Container.SearchResult[] searchResults; 
+			bool searchBoxVisible; 
+			string searchText; 
+			
+			//inputs from outside
+			private
+			{
+				float viewScale = 1; //used for automatic screenspace linewidth
+				vec2[2] searchBezierStart; //first 2 point of search bezier lines. Starting from the GUI matchCount display.
+			} 
+			
+			this()
+			{
+				bkColor = clBlack; 
+				selection = new typeof(selection); 
+			} 
+			
+			struct Link
+			{ Label from; Node to; } 
+			Link[] _links; 
+			
+			auto links()
+			{
+				if(_links.empty)
+				foreach(d; nodes)
+				foreach(from; d.labels)
+				if(from.isReference)
+				if(auto to = findNode(from.name))
+				_links ~= Link(from, to); 
+				return _links; 
+			} 
+			
+			void update(View2D view, vec2[2] searchBezierStart)
+			{
+				this.viewScale = view.scale; 
+				this.searchBezierStart = searchBezierStart; 
+				
+				selection.update(!im.wantMouse, view, subCells.map!(a => cast(Node)a).array); 
+			} 
+			
+			//drawing routines ////////////////////////////////////////////
+			
+			protected void drawSearchResults(Drawing dr, RGB clSearchHighLight)
+			{
+				with(dr)
+				{
+					 //this is copied to dide2
+					foreach(sr; searchResults)
+					sr.drawHighlighted(dr, clSearchHighLight); 
+					
+					lineWidth = -2 * sqr(sin(QPS.value(second).fract*PIf*2)); 
+					alpha = 0.66; 
+					color = clSearchHighLight; 
+					foreach(sr; searchResults)
+					bezier2(searchBezierStart[0], searchBezierStart[1], sr.absInnerPos + sr.cells.back.outerBounds.rightCenter); 
+					
+					alpha = 1; 
+				}
+			} 
+			
+			protected void drawSelectedItems(Drawing dr, RGB clSelected, float selectedAlpha, RGB clHovered, float hoveredAlpha)
+			{
+				with(dr)
+				{
+					color = clSelected; alpha = selectedAlpha; 	 foreach(a; selectedNodes)
+					dr.fillRect(a.outerBounds); 
+					color = clHovered; alpha = hoveredAlpha; 	 if(hoveredNode !is null)
+					dr.fillRect(hoveredNode.outerBounds); 
+					alpha = 1; 
+				}
+			} 
+			
+			protected void drawSelectionRect(Drawing dr, RGB clRect)
+			{
+				if(auto bnd = selection.selectionBounds)
+				with(dr)
+				{
+					lineWidth = -1; 
+					color = clRect; 
+					drawRect(bnd); 
+				}
+			} 
+			
+			protected void drawGroupBounds(Drawing dr, RGB clGroupFrame)
+			{
+				with(dr)
+				{
+					color = clGroupFrame; 
+					lineWidth = -1; 
+					foreach(bnd; groupBounds)
+					drawRect(bnd.inflated(groupMargin)); 
+				}
+			} 
+			
+			protected void drawLinks(Drawing dr)
+			{
+				with(dr)
+				{
+					/+
+							alpha = 0.66;
+							foreach(link; links){
+								const h1 = link.from.parent.isHovered, h2 = link.to.isHovered;
+						
+								//hide interGroup links
+								if(!h1 && !h2 && link.from.parent.groupName != link.to.groupName) continue;
+						
+								color	 = h1 && !h2 ? clAqua
+						 : h2 && !h1 ? clLime
+																	 : clSilver;
+						
+								lineWidth = viewScale>1 ? 1 : -1; //line can't be thinner than 1 pixel, but can be thicker
+						
+								//OutputPos = rightCenter, InputPos = leftCenter
+						
+								vec2 P0, P1, P2, P3, P4, ofs;
+								if(!invertEdgeDirection){ //arrows go the the right. It's good for a grammar graph
+									P0 = link.from.absOutputPos; P4 = link.to.nameLabel.absInputPos;
+									float a = min(50, distance(P0, P4)/3);
+									ofs = P0.x<P4.x ? vec2(a, 0) : vec2(a, -a);
+								}else{ //arrows go to the left. Good for module hierarchy. Rightmost module is the main project.
+									P0 = link.from.absInputPos; P4 = link.to.nameLabel.absOutputPos;
+									float a = min(50, distance(P0, P4)/3);
+									ofs = P0.x>P4.x ? vec2(-a, 0) : vec2(-a, -a);
+								}
+								P1 = P0 + ofs,
+								P3 = P4 + ofs*vec2(-1, 1),
+								P2 = avg(P1, P3);
+								bezier2(P0, P1, P2);
+								bezier2(P2, P3, P4);
+						
+							}
+							alpha = 1; 
+					+/
+				}
+			} 
+			
+			protected void drawOverlay(Drawing dr)
+			{
+				with(dr)
+				{
+					drawLinks(dr); 
+					if(showSelection)
+					drawSelectedItems(dr, clAccent, 0.25, clWhite, 0.2); 
+					drawSelectionRect(dr, clWhite); 
+					drawGroupBounds(dr, clSilver); 
+					drawSearchResults(dr, clYellow); 
+				}
+			} 
+			
+			override void draw(Drawing dr)
+			{
+				super.draw(dr); //draw cached stuff
+				
+				auto dr2 = dr.clone; 
+				drawOverlay(dr2); //draw uncached stuff on top
+				dr.subDraw(dr2); 
+			} 
+			
+			void UI_SearchBox(View2D view)
+			{
+					//UI SearchBox ////////////////////////////////
+				with(im)
+				Row(
+					{
+						//Keyboard shortcuts
+						auto kcFind	= KeyCombo("Ctrl+F"),
+								 kcFindZoom	= KeyCombo("Enter"), //only when edit is focused
+								 kcFindClose	= KeyCombo("Esc"); //always
+						
+						if(kcFind.pressed)
+						searchBoxVisible = true; //this is needed for 1 frame latency of the Edit
+						//Todo: focus on the edit when turned on
+						if(searchBoxVisible)
+						{
+							width = fh*12; 
+							
+							Text("Find "); 
+							.Container editContainer; 
+							if(Edit(searchText, kcFind, { flex = 1; editContainer = actContainer; }))
+							{
+								//refresh search results
+								searchResults = search(searchText); 
+							}
+							
+							//display the number of matches. Also save the location of that number on the screen.
+							const matchCnt = searchResults.length; 
+							Row(
+								{
+									if(matchCnt)
+									Text(" ", clGray, matchCnt.text, " "); 
+								}
+							); 
+							
+							if(Btn(symbol("Zoom"), isFocused(editContainer) ? kcFindZoom : KeyCombo(""), enable(matchCnt>0), hint("Zoom screen on search results.")))
+							{
+								const maxScale = max(view.scale, 1); 
+								view.zoom(searchResults.map!(r => r.bounds).fold!"a|b", 12); 
+								view.scale = min(view.scale, maxScale); 
+							}
+							
+							if(Btn(symbol("ChromeClose"), kcFindClose, hint("Close search box.")))
+							{
+								searchBoxVisible = false; 
+								searchText = ""; 
+								searchResults = []; 
+							}
+						}else
+						{
+							
+							if(Btn(symbol("Zoom"       ), kcFind, hint("Start searching.")))
+							{
+								searchBoxVisible = true; //Todo: Focus the Edit control
+							}
+						}
+					}
+				); 
+			} 
+			
+			//scroller state
+			Node actNode; //state
+			auto topIndex = 0; //state
+			enum pageSize = 10; 
+			
+			void UI_Editor()
+			{
+				alias GraphNode = Node; /*Todo: fucking name collision with im.Node */   
+				with(im)
+				{
+					 //UI_Editor ///////////////////////////////////
+					//WildCard filter
+					static hideUI = true; 
+					static filterStr = ""; 
+					Row({ ChkBox(hideUI, "Hide Graph UI "); }); 
+					
+					if(!hideUI)
+					{
+						
+						  Row({ Text("Filter "); Edit(filterStr, { flex = 1; }); }); 
+						
+							 //filtered data source
+							 auto filteredNodes = nodes.filter!(a => a.name.isWild(filterStr~"*")).array; 
+							 ScrollListBox(actNode, filteredNodes, (in GraphNode n){ Text(n.name); width = 260; }, pageSize, topIndex); 
+						
+							 Spacer; 
+							 Row(
+							{
+								auto selected = selectedNodes.array; 
+								Row({ Text("Selected items: "), Static(selected.length), Text("  Total: "), Static(nodes.length); }); 
+								
+								const selectedGroupNames = selected.map!(a => a.groupName).array.sort.uniq.array; 
+								static string editedGroupName; 
+								Row(
+									{
+										Text("Selected groups: "); 
+										foreach(i, name; selectedGroupNames)
+										if(Btn(name, genericId(i)))
+										editedGroupName = name; 
+									}
+								); 
+								
+								Spacer; 
+								Row(
+									{
+										Text("Group name os felected items: \n"); 
+										Edit(editedGroupName, { width = 200; }); 
+										if(Btn("Set", enable(selected.length>0)))
+										foreach(a; selected)
+										a.groupName_override = editedGroupName; 
+									}
+								); 
+								
+							}
+						); 
+						
+							 Spacer; 
+							 if(Btn("test"))
+						{}
+						
+					}
+				}
+			} 
+			
+		} 
+	}
+}

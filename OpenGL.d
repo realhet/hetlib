@@ -10,7 +10,6 @@ enum LOG_shaderLoadingTimes = false;
 //Todo: Ha a glWindow.dr-t hasznalom, akkor a glDraw view es viewGui: tokmindegy a kirajzolasi sorrend, a view van mindig felul, pedig forditva kene.
 //Todo: nincs doUpdate formresize kozben
 
-//public import het, het.win, het.algorithm, het.bitmap, het.draw2d; 
 public import het; 
 public import het.win; 
 
@@ -1825,7 +1824,7 @@ version(/+$DIDE_REGION+/all)
 		MouseState mouse; 
 	
 		//diagnostic stuff
-		bool showFPS, showMegaTextures; 
+		bool showFPS /+showMegaTextures+/; 
 		float guiScale = 1; 
 	
 		private View2D viewGUI_; 
@@ -2086,12 +2085,22 @@ version(/+$DIDE_REGION+/all)
 	
 		private bool firstPaint; 
 	
+		private Drawing[2] staticDr; 
+	
 		override void onEndPaint()
 	{
-		if(showMegaTextures) drawMegaTextures; 
+		version(/+$DIDE_REGION+/none) { if(showMegaTextures) drawMegaTextures; }
 		
 		import het.ui: im; //this is a nasty entry point to imgui
-		im._drawFrame!"system call only"; 
+		
+		if(!staticDr[0])
+		staticDr = [new Drawing("im0"), new Drawing("im1")]; 
+		im._drawFrame!"system call only"(
+			[
+				(cast(IDrawing)(staticDr[0])),
+				(cast(IDrawing)(staticDr[1]))
+			]
+		); 
 		
 		if(!view.workArea_accum.empty) view.workArea = view.workArea_accum; 
 		
@@ -2212,14 +2221,16 @@ version(/+$DIDE_REGION+/all)
 		drGUI.glDraw(viewGUI); 
 	} 
 	
+		version(/+$DIDE_REGION+/none) {
 		void drawMegaTextures()
-	{
-		auto dr = scoped!Drawing; 
-		dr.translate(0, view.workArea.bottom+100); 
-		textures.debugDraw(dr); 
-		dr.pop; 
-		dr.glDraw(view); 
-	} 
+		{
+			auto dr = scoped!Drawing; 
+			dr.translate(0, view.workArea.bottom+100); 
+			textures.debugDraw(dr); 
+			dr.pop; 
+			dr.glDraw(view); 
+		} 
+	}
 	//navigate 2D view with the keyboard and the mouse
 	//it optionally calls invalidate
 	bool navigateView(bool keyboardEnabled, bool mouseEnabled)
@@ -3933,47 +3944,49 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				return res; 
 			} 
 			
-			void debugDraw(Drawing)(Drawing dr)
-			{
-				//megatexture debugging will not affect texture last-accessed statistics
-				global_disableSubtextureAging = true; 
-				scope(exit) global_disableSubtextureAging = false; 
-				
-				//collect all subtextures
-				auto subTexInfos = collectSubTexInfo2; 
-				
-				int ofs; 
-				foreach(megaIdx, mt; megaTextures)
+			version(/+$DIDE_REGION+/none) {
+				void debugDraw(Drawing)(Drawing dr)
 				{
-					dr.translate(0, ofs); scope(exit)
-					{ dr.pop; ofs += mt.texSize.y + 16; }
+					//megatexture debugging will not affect texture last-accessed statistics
+					global_disableSubtextureAging = true; 
+					scope(exit) global_disableSubtextureAging = false; 
 					
-					//draw background
-					dr.color = clFuchsia; 
-					dr.alpha = 1; 
-					dr.fillRect(bounds2(vec2(0), mt.texSize)); 
+					//collect all subtextures
+					auto subTexInfos = collectSubTexInfo2; 
 					
-					//draw subtextures
-					foreach(const si; subTexInfos)
-					if(si.info.texIdx==megaIdx)
+					int ofs; 
+					foreach(megaIdx, mt; megaTextures)
 					{
-						dr.color = clWhite; 
-						dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); 
-						//Todo: drawRect support for ibounds2
+						dr.translate(0, ofs); scope(exit)
+						{ dr.pop; ofs += mt.texSize.y + 16; }
 						
-						if(!si.canUnload)
+						//draw background
+						dr.color = clFuchsia; 
+						dr.alpha = 1; 
+						dr.fillRect(bounds2(vec2(0), mt.texSize)); 
+						
+						//draw subtextures
+						foreach(const si; subTexInfos)
+						if(si.info.texIdx==megaIdx)
 						{
-							dr.lineWidth=-3; dr.color = clYellow; 
-							dr.drawX(bounds2(si.info.bounds)); 
+							dr.color = clWhite; 
+							dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); 
+							//Todo: drawRect support for ibounds2
+							
+							if(!si.canUnload)
+							{
+								dr.lineWidth=-3; dr.color = clYellow; 
+								dr.drawX(bounds2(si.info.bounds)); 
+							}
 						}
+						
+						
+						//draw free and used rects and frame
+						mt.debugDraw(dr); 
 					}
 					
-					
-					//draw free and used rects and frame
-					mt.debugDraw(dr); 
-				}
-				
-			} 
+				} 
+			}
 			
 			
 			ulong[File] bitmapModified; 

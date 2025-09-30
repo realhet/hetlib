@@ -1306,7 +1306,83 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 	
 	enum SamplerEffect : ubyte
 	{none, quad, karc} 
+	
+	struct GlobalShaderParams {
+		float[] floats; 
+		bool[] bools; 
+	} 
+	
+	__gshared GlobalShaderParams globalShaderParams; 
+	
+	shared static this()
+	{
+		globalShaderParams.floats = [0.0f].replicate(8); 
+		globalShaderParams.bools = [false].replicate(8); 
+	} 
 	
+	interface IDrawing
+	{
+		void clear(); //ez a reset
+		void glDraw(View2D); //ez meg a commit
+		
+		ref float zoomFactor(); //for LOD
+		ref float invZoomFactor(); 
+		
+		void translate(vec2); 
+		void pop(); 
+		
+		bounds2 inputTransform(in bounds2); 
+		vec2 inputTransform(in vec2); 
+		bounds2 inverseInputTransform(in bounds2); 
+		
+		ref bounds2 clipBounds(); 
+		void pushClipBounds(bounds2); 
+		void popClipBounds(); 
+		
+		ref float fontHeight();  //ez a stickfont csak!!!
+		ref float lineWidth(); 
+		ref float pointSize(); 
+		
+		ref LineStyle lineStyle(); 
+		ref ArrowStyle arrowStyle(); 
+		
+		@property het.math.RGB color(); 
+		@property void color(het.math.RGB); 
+		@property float alpha(); 
+		@property void alpha(float a); 
+		
+		void point(in vec2); 
+		
+		void moveTo(float, float); void lineTo(float, float); 
+		void moveTo(in vec2); void lineTo(in vec2); 
+		void moveRel(float, float); void lineRel(float, float); 
+		
+		void line(in vec2 p0, in vec2 p1); 
+		void hLine(float x0, float y, float x1); 
+		void vLine(float x, float y0, float y1); 
+		void drawRect(in bounds2); 
+		void drawX(in bounds2); 
+		void fillRect(in bounds2); 
+		void fillRect(float x0, float y0, float x1, float y1); 
+		void circle(in vec2 p, float r, float arc0=0, float arc1=2*PI); 
+		void drawFontGlyph(
+			int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
+			in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
+		); 
+		float textWidth(string text); //stickFont
+		void textOut(
+			vec2 p, string text, float width = 0, 
+			HAlign align_ = HAlign.left, bool vertFlip = false
+		); //stickFont
+		void hGraph_f(
+			float x0, float y0, in float[] data, float 
+			xScale=1, float yScale=1
+		); //resMon
+		void bezier2(in vec2 A, in vec2 B, in vec2 C); //DIDE/message arrows
+		void fillTriangle(in vec2 a, in vec2 b, in vec2 c); //not important
+		
+		
+	} 
 	struct RectAlign
 	{
 		align(1): import std.bitmanip; 
