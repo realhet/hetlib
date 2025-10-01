@@ -2116,11 +2116,11 @@ version(/+$DIDE_REGION+/all)
 	{ return Bounds!(Vector!(long, VT.length))(b.low.lfloor, b.high.lceil); } 
 	
 	auto inflated(B, V)(in B b, in V v)
-	{ return b.valid ? B(b.low-v, b.high+v) : b; } 
+	=> b.valid ? B(b.low-v, b.high+v) : b; 
 	auto inflated(B, F)(in B b, in F x, in F y)
-	{ return b.inflated(B.VectorType(x, y)); } 
+	=> b.inflated(Vector!(CommonType!(B.ComponentType, F), 2)(x, y)); 
 	auto inflated(B, F)(in B b, in F x, in F y, in F z)
-	{ return b.inflated(B.VectorType(x, y, z)); } 
+	=> b.inflated(Vector!(CommonType!(B.ComponentType, F), 3)(x, y, z)); 
 	
 	auto fittingSquare(B)(in B b)
 	{

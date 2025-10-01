@@ -74,6 +74,9 @@ version(/+$DIDE_REGION+/all)
 		
 		Ezekkel meg lehetne oldani az 1 soron levo dolgok kulonbozo ID-jét végre.
 	+/
+	
+	enum TargetSurface { world = 0, gui = 1 } 
+	
 	immutable DefaultFontName = //this is	the cached font
 		"Segoe UI"
 	//"Lucida Console"
@@ -110,8 +113,7 @@ version(/+$DIDE_REGION+/all)
 		EmptyCellHeight	= 0,
 		EmptyCellSize	= vec2(EmptyCellWidth, EmptyCellHeight); 
 	
-	private enum 
-		AlignEpsilon = .001f; //avoids float errors that come from float sums of subCell widths/heights
+	private enum AlignEpsilon = .001f; //avoids float errors that come from float sums of subCell widths/heights
 	
 	
 	//Global dependency injection shit //////////////////////////////
@@ -3134,7 +3136,7 @@ version(/+$DIDE_REGION+/all)
 				[q{bool},q{1},q{"columnElasticTabs"},q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
 				[],
 				[q{bool},q{1},q{"rowElasticTabs"},q{},q{/+Row will do elastic tabs inside its own WrappedLines.+/}],
-				[q{uint},q{1},q{"targetSurface"},q{1},q{/+0: zoomable view, 1: GUI screen+/}],
+				[q{TargetSurface},q{1},q{"targetSurface"},q{1},q{/+0: zoomable view, 1: GUI screen+/}],
 				[q{bool},q{1},q{"_debug"},q{},q{/+the container can be marked, for debugging+/}],
 				[q{bool},q{1},q{"btnRowLines"},q{},q{/+draw thin, dark lines between the buttons of a btnRow+/}],
 				[q{bool},q{1},q{"autoWidth"},q{},q{/+kinda readonly: It's set by Container in measure to outerSize!=0+/}],
@@ -4512,12 +4514,6 @@ version(/+$DIDE_REGION+/all)
 		
 		override void draw(Drawing dr)
 		{
-			if(/*flags.targetSurface==0*/1)
-			{
-				//dr.clipBounds.print;
-				//dump;
-			}
-			
 			super.draw(dr); //draw frame, bkgnd and subCells
 			
 			//draw the carets and selection of the editor
@@ -5965,7 +5961,7 @@ struct im
 	static: 
 	version(/+$DIDE_REGION+/all)
 	{
-			/+
+		/+
 			Note: This is also a way to create a 'namespace' in D, with a template.
 			template Algo_ns()
 			{
@@ -5976,48 +5972,46 @@ struct im
 			alias Algo = Algo_ns!();
 		+/
 		
-			alias Id = het.SrcId; 
+		alias Id = het.SrcId; 
 		
-			//Frame handling
-			bool mouseOverUI, wantMouse, wantKeys; 
-			private bool inFrame, canDraw; //synchronization for internal methods
+		//Frame handling
+		bool mouseOverUI, wantMouse, wantKeys; 
+		private bool inFrame, canDraw; //synchronization for internal methods
 		
-			//target surface is a view and a drawing
-			struct TargetSurface
-		{ View2D view; } 
-			private TargetSurface[2] targetSurfaces;  //surface0: zoomable view, surface1: GUI view
-		
-			void setTargetSurfaceViews(View2D viewWorld, View2D viewGUI)
+		version(/+$DIDE_REGION Views+/all)
 		{
-			targetSurfaces[0].view = viewWorld; 
-			targetSurfaces[1].view = viewGUI; 
-		} 
-		
-			auto getView()
-		{ return targetSurfaces[0].view; } 
-			auto getViewGUI()
-		{ return targetSurfaces[1].view; } 
-		
-			/*private*/ View2D actView; //this is only used for getting mouse position from actview
-		
-			//Todo: this should be the only opportunity to switch between GUI and World. Better than a containerflag that is initialized too late.
-			void selectTargetSurface(int n)
-		{
-			enforce(n.among(0, 1)); 
-			with(targetSurfaces[n])
-			{ actView = view; }
-		} 
-		
-			float deltaTime=0; 
-		
-			bool comboState; //automatically cleared on focus.change
-			bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
-			Id comboId;    //when the focus of this is lost, comboState goes false
-		
-			//GUI area that tracks PanelPosition changes
-			bounds2 clientArea; 
+			private View2D[2] targetSurfaceViews; 
+			private TargetSurface selectedTargetSurface; 
 			
-			bounds2 actContainerBounds()
+			@property view_world()
+			=> targetSurfaceViews[0]; 	@property view_gui()
+			=> targetSurfaceViews[1]; @property targetView()
+			=> targetSurfaceViews[selectedTargetSurface]; 
+			
+			void setTargetSurfaces(View2D view_world, View2D view_gui)
+			{ targetSurfaceViews = [view_world, view_gui]; } 
+			
+			/+
+				Todo: this should be the only opportunity to switch between 
+				GUI and World. Better than a containerflag that is initialized too late.
+			+/
+			void selectTargetSurface(TargetSurface n)
+			{ selectedTargetSurface = n; } 
+			
+			private TargetSurface _targetSurfaceBeingDrawn; 
+			@property targetSurfaceBeingDrawn()
+			=> _targetSurfaceBeingDrawn; 
+		}
+		float deltaTime=0; 
+		
+		bool comboState; //automatically cleared on focus.change
+		bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
+		Id comboId;    //when the focus of this is lost, comboState goes false
+		
+		//GUI area that tracks PanelPosition changes
+		bounds2 clientArea; 
+		
+		bounds2 actContainerBounds()
 		{
 			if(actContainer)
 			{
@@ -6027,13 +6021,13 @@ struct im
 			return typeof(return).init; 
 		} 
 		
-			enum doTiming = false; 
+		enum doTiming = false; 
 		
-			static if(doTiming)
+		static if(doTiming)
 		{ double tBeginFrame, tEndFrame, tDraw; }
 		
-			//Todo: package visibility is not working as it should -> remains public
-			void _beginFrame(TargetSurface[2] targetSurfaces)
+		//Todo: package visibility is not working as it should -> remains public
+		void _beginFrame(View2D viewWorld, View2D viewGUI)
 		{
 			//called from mainform.update
 			//PING(5);
@@ -6042,8 +6036,8 @@ struct im
 			{ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
 			enforce(!inFrame, "im.beginFrame() already called."); 
 			
-			this.targetSurfaces = targetSurfaces; 
-			selectTargetSurface(1); //default is the GUI surface
+			setTargetSurfaces(viewWorld, viewGUI); 
+			selectTargetSurface(TargetSurface.gui); //default is the GUI surface
 			
 			//inject stuff into het.uibase. So no import het.ui is needed there.
 			//Todo: het.uibase was merged with het.ui. This is no longer needed.
@@ -6069,7 +6063,7 @@ struct im
 			comboOpening = false; 
 			
 			//this is needed for PanelPosition
-			clientArea = targetSurfaces[1].view.screenBounds_anim.bounds2; 
+			clientArea = view_gui.screenBounds_anim.bounds2; 
 			//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 			
 			static DeltaTimer dt; 
@@ -6089,7 +6083,7 @@ struct im
 			resourceMonitor.update; 
 		} 
 		
-			void _endFrame()
+		void _endFrame()
 		{
 			//called from end of update
 			//PING(6);
@@ -6102,17 +6096,19 @@ struct im
 			enforce(inFrame, "im.endFrame(): must call beginFrame() first."); 
 			enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text); 
 			
-			selectTargetSurface(1); //GUI surface by default
+			selectTargetSurface(TargetSurface.gui); //GUI surface by default
 			
 			auto rc = rootContainers(true); 
-			rc = rc.sort!((a, b) => a.flags.targetSurface < b.flags.targetSurface, SwapStrategy.stable).array; 
+			
+			//it's not sorted in DIDE... It's a problem...
+			//LOG("ISSORTED", rc.isSorted!((a, b)=>(a.flags.targetSurface < b.flags.targetSurface))); 
+			
+			rc = rc.sort!(((a, b)=>(a.flags.targetSurface < b.flags.targetSurface)), SwapStrategy.stable).array; 
 			
 			//measure
 			foreach(a; rc)
 			if(!a.flags._measured)
 			a.measure; //some panels are already have been measured
-			
-			const screenBounds = targetSurfaces[1].view.screenBounds_anim.bounds2; 
 			
 			//Todo: remove this: applyScrollers(screenBounds);
 			
@@ -6130,7 +6126,7 @@ struct im
 			{
 				const surf = a.flags.targetSurface; //1: gui, 0:view
 				
-				const uiMousePos = targetSurfaces[surf].view.mousePos.vec2; 
+				const uiMousePos = targetSurfaceViews[surf].mousePos.vec2; 
 				if(a.internal_hitTest(uiMousePos))
 				{
 					mouseOverUI[surf] = true; 
@@ -6168,20 +6164,19 @@ struct im
 			}
 			wantKeys = textEditorState.active; 
 			
-			generateHints(screenBounds); 
+			const guiBounds = view_gui.screenBounds_anim.bounds2; 
+			generateHints(guiBounds); 
 			
 			//update building/measuring/drawing state
 			canDraw = true; 
 			inFrame = false; 
 		} 
 		
-			bounds2[2] surfaceBounds; 
+		bounds2[2] surfaceBounds; 
 		
-			version(/+$DIDE_REGION+/none) { DrawingOld drVisualizeHitStack; }
+		version(/+$DIDE_REGION+/none) { DrawingOld drVisualizeHitStack; }
 		
-			int actTargetSurface; //0:world, 1:GUI
-		
-			void _drawFrame(string restrict="")(Drawing[2] staticDr)
+		void _drawFrame(string restrict="")(Drawing drWorld, Drawing drGUI)
 		{
 			static if(doTiming)
 			{
@@ -6192,15 +6187,14 @@ struct im
 			static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 
 			enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now."); 
 			
-			Drawing[2] dr = staticDr; 
+			Drawing[2] dr = [drWorld, drGUI]; 
 			
 			//init clipbounds
 			foreach(i, ref d; dr)
 			{
-				ref view()
-				{ return targetSurfaces[i].view; } 
-				d.zoomFactor	= view.scale; 
-				d.invZoomFactor	= view.invScale; 
+				auto view = targetSurfaceViews[i].enforce; 
+				d.zoomFactor = view.scale; 
+				d.invZoomFactor = view.invScale; 
 				d.pushClipBounds(view.screenBounds_anim.bounds2.inflated(-view.screenBounds_anim.bounds2.size*0)); 
 			}
 			
@@ -6210,17 +6204,31 @@ struct im
 			{
 				const s = a.flags.targetSurface; 
 				surfaceBounds[s] |= a.outerBounds; 
-				actTargetSurface = s; 
+				_targetSurfaceBeingDrawn = s; 
 				a.draw(dr[s]); //draw in zOrder
 			}
 			
-			foreach(i, d; dr)
 			{
-				//it's not good because of invisible scrollable elements. -> surfaceBounds[i] |= dr[i].bounds;
-				d.popClipBounds; 
-				d.glDraw(targetSurfaces[i].view); 
-				d.clear; 
+				auto tr = View2D.fromViewToView(view_world, view_gui); 
+				auto shift = tr.origin/tr.scale; 
+				((0x2A4EBEB16D5C4).檢(tr.scale)); 
+				((0x2A514EB16D5C4).檢(tr.origin)); 
+				((0x2A53EEB16D5C4).檢(shift)); 
+				
+				auto p = view_world.mousePos; 
+				((0x2A58EEB16D5C4).檢(p)); 
+				((0x2A5B0EB16D5C4).檢(shift)); 
+				
+				((0x2A5DCEB16D5C4).檢(p+shift)); 
+				((0x2A604EB16D5C4).檢((p+shift)*tr.scale)); 
+				
+				((0x2A63DEB16D5C4).檢(tr.origin)); 
+				((0x2A667EB16D5C4).檢(p*tr.scale)); 
+				((0x2A692EB16D5C4).檢(p*tr.scale+tr.origin)); 
+				
 			}
+			foreach(i, d; dr)
+			{ d.popClipBounds; }
 			
 			version(/+$DIDE_REGION+/none) {
 				if(VisualizeHitStack && drVisualizeHitStack)
@@ -6236,27 +6244,27 @@ struct im
 			//Todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
 		} 
 		
-			//PanelPosition ///////////////////////////////////////////
-			//aligns the container on the screen
+		//PanelPosition ///////////////////////////////////////////
+		//aligns the container on the screen
 		
-			enum PanelPosition
+		enum PanelPosition
 		{
 			none, topLeft, topCenter, topRight, leftCenter, center, rightCenter, bottomLeft, bottomCenter, bottomRight,
 			topClient, leftClient, client, rightClient, bottomClient	
 		} 
 		
-			private bool isAlignPosition (PanelPosition pp)
+		private bool isAlignPosition (PanelPosition pp)
 		{
 			with(PanelPosition)
 			return pp.inRange(topLeft  , bottomRight ); 
 		} //it will only position the container
-			private bool isClientPosition(PanelPosition pp)
+		private bool isClientPosition(PanelPosition pp)
 		{
 			with(PanelPosition)
 			return pp.inRange(topClient, bottomClient); 
 		} //it will change the client rect too
 		
-			private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area)
+		private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area)
 		{
 			with(PanelPosition)
 			{
@@ -6267,7 +6275,7 @@ struct im
 			}
 		} 
 		
-			private void finalizePanelPosition(.Container cntr, PanelPosition pp, ref bounds2 area)
+		private void finalizePanelPosition(.Container cntr, PanelPosition pp, ref bounds2 area)
 		{
 			with(PanelPosition)
 			{
@@ -6305,7 +6313,7 @@ struct im
 			}
 		} 
 		
-			void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			 //Todo: multiple Panels, but not call them frames...
 			enforce(actContainer is null, "Panel() must be on root level"); 
@@ -6343,8 +6351,8 @@ struct im
 			finalizePanelPosition(cntr, pp, clientArea); 
 		} 
 		
-			//Focus handling /////////////////////////////////
-			struct FocusedState
+		//Focus handling /////////////////////////////////
+		struct FocusedState
 		{
 			Id id;              //globally store the current hash
 			.Container container;  //this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
@@ -6352,11 +6360,11 @@ struct im
 			void reset()
 			{ this = typeof(this).init; } 
 		} 
-			FocusedState focusedState; 
+		FocusedState focusedState; 
 		
-			TextEditorState textEditorState; //maintained by edit control
+		TextEditorState textEditorState; //maintained by edit control
 		
-			void onFocusLost(in Id oldId)
+		void onFocusLost(in Id oldId)
 		{
 			if(comboId && oldId==comboId)
 			{
@@ -6365,8 +6373,8 @@ struct im
 			}
 		} 
 		
-			/// internal use only
-			bool focusUpdate(
+		/// internal use only
+		bool focusUpdate(
 			.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, 
 			void delegate() onEnter, void delegate() onFocused, void delegate() onExit
 		)
@@ -6408,12 +6416,12 @@ struct im
 			return res; 
 		} 
 		
-			bool isFocused(in Id id)	
+		bool isFocused(in Id id)	
 		{ return focusedState.id!=Id.init	&& focusedState.id == id; } 
-			bool isFocused(.Container container)	
+		bool isFocused(.Container container)	
 		{ return focusedState.container !is null	&& focusedState.container is container; } 
 		
-			void focusNothing()
+		void focusNothing()
 		{
 			if(focusedState.id)
 			{
@@ -6427,38 +6435,38 @@ struct im
 		//void focusExit(Container container)	  { if(isFocused(container)) focusedState.reset; }
 		//void focusExit()	  { focusedState.reset; }
 		
-			//hints /////////////////////////////////////////////////////////////////
+		//hints /////////////////////////////////////////////////////////////////
 		
-			const float HintActivate_sec	 = 0.5,
+		const float HintActivate_sec	 = 0.5,
 									HintDetails_sec	 = 2.5,
 									HintRelease_sec	 = 1; 
 		
-			struct HintRec
+		struct HintRec
 		{
 			.Container owner; 
 			bounds2 bounds; 
 			string markup, markupDetails; //Todo: support delegates too
 		} 
-			private HintRec[] hints; 
+		private HintRec[] hints; 
 		
-			enum HintState
+		enum HintState
 		{ idle, active, details} 
-			static hintState = HintState.idle; 
+		static hintState = HintState.idle; 
 		
-			/// This can be used to inject a hint into the parameters of a Control
-			auto hint(string markup, string markupDetails="")
+		/// This can be used to inject a hint into the parameters of a Control
+		auto hint(string markup, string markupDetails="")
 		{
 			 //Todo: delegate too
 			return HintRec(null, bounds2.Null, markup, markupDetails); //Todo: lazyness
 		} 
 		
-			void addHint(HintRec hr)
+		void addHint(HintRec hr)
 		{ hints ~= hr; } 
 		
-			void hideHints()
+		void hideHints()
 		{ hintState = HintState.idle; } 
 		
-			private enum hintHandler = q{
+		private enum hintHandler = q{
 			{
 				static foreach(a; args)
 				static if(is(Unqual!(typeof(a)) == HintRec))
@@ -6474,7 +6482,7 @@ struct im
 			}
 		}; 
 		
-			private void generateHints(in bounds2 screenBounds)
+		private void generateHints(in bounds2 screenBounds)
 		{
 			 //called on the end of the frame
 			static float mouseStopped_secs = 0; 
@@ -6572,34 +6580,32 @@ struct im
 			hints = []; 
 		} 
 		
-			//! im internal state ////////////////////////////////////////////////////////////////
+		//! im internal state ////////////////////////////////////////////////////////////////
 		
-			Cell[] root; //when containerStack is empty, this is the container
+		Cell[] root; //when containerStack is empty, this is the container
 		
-			auto rootContainers(bool forceAll)
+		auto rootContainers(bool forceAll)
 		{
-			auto res = root.map!(c => cast(.Container)c)
-										 .filter!"a"
-										 .array; 
+			auto res = root.map!((c)=>((cast(.Container)(c)))).filter!"a".array; 
 			if(forceAll)
 			enforce(root.length == res.length, "FATAL ERROR: All of root[] must be non null and a descendant of Container."); 
 			return res; 
 		} 
 		
-			//double QPS=0, lastQPS=0, dt=0;
-			//Todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
+		//double QPS=0, lastQPS=0, dt=0;
+		//Todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
 		
-			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
-			.Container actContainer, lastContainer; //top of the containerStack for faster access
-			bool enabled;  //Todo: bad naming.  It should be in flags, in cascaded style.
-			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
-			string theme; //for now it's a str, later it will be much more complex
-			//valid valus: "", "tool"
+		//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
+		.Container actContainer, lastContainer; //top of the containerStack for faster access
+		bool enabled;  //Todo: bad naming.  It should be in flags, in cascaded style.
+		TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
+		string theme; //for now it's a str, later it will be much more complex
+		//valid valus: "", "tool"
 		
-			Id actId()
+		Id actId()
 		{ return actContainer ? actContainer.id : Id.init; } 
 		
-			auto lastCell(T:Cell=Cell)()
+		auto lastCell(T:Cell=Cell)()
 		{
 			Cell cell; 
 			if(actContainer && actContainer.subCells.length)
@@ -6607,31 +6613,31 @@ struct im
 			return cast(T)cell; 
 		} 
 		
-			private struct StackEntry
+		private struct StackEntry
 		{ .Container container; bool enabled; TextStyle textStyle; string theme; } 
-			private StackEntry[] stack; 
+		private StackEntry[] stack; 
 		
-			//Note: build* functions are only callable from update()
+		//Note: build* functions are only callable from update()
 		
-			//Build an array of cells using a temporary container
-			Cell[] build(string srcModule=__MODULE__, size_t srcLine=__LINE__,A...)(in A args)
+		//Build an array of cells using a temporary container
+		Cell[] build(string srcModule=__MODULE__, size_t srcLine=__LINE__,A...)(in A args)
 		{
 			Container!(.Container, srcModule, srcLine)(args); 
 			return removeLastContainer.subCells; 
 		} 
 		
-			auto buildContainer(T : .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
+		auto buildContainer(T : .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
 		{
 			Container!(T, srcModule, srcLine)(args); 
 			return cast(T)removeLastContainer; 
 		} 
 		
-			auto buildRow   (string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
+		auto buildRow   (string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
 		{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
-			auto buildColumn(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
+		auto buildColumn(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
 		{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
 		
-			void reset()
+		void reset()
 		{
 			//statck reset
 			enabled = true; 
@@ -6646,7 +6652,7 @@ struct im
 			drawCallbacks.clear; 
 		} 
 		
-			private void push(T : .Container)(T c, in Id newId)
+		private void push(T : .Container)(T c, in Id newId)
 		{
 			 //Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
 			c.id = newId; 
@@ -6656,7 +6662,7 @@ struct im
 			actContainer = c; 
 		} 
 		
-			private void pop()
+		private void pop()
 		{
 			enforce(stack.length>1); //stack[0] is always null and it is never popped.
 			
@@ -6675,7 +6681,7 @@ struct im
 			//Todo: the first stack container is always 0.
 		} 
 		
-			void dump()
+		void dump()
 		{
 			writeln("---- IM dump --------------------------------"); 
 			foreach(cell; root)
@@ -6683,7 +6689,7 @@ struct im
 			writeln("---- End of IM dump -------------------------"); 
 		} 
 		
-			private auto find(C:.Container)()
+		private auto find(C:.Container)()
 		{
 			foreach_reverse(ref s;stack)
 			if(auto r = cast(C)(s.container))
@@ -6691,14 +6697,14 @@ struct im
 			return null; 
 		} 
 		
-			private void append(Cell c)
+		private void append(Cell c)
 		{
 			if(actContainer !is null)
 			actContainer.appendCell(c); 
 			else root ~= c; 
 		} 
 		
-			.Container removeLastContainer()
+		.Container removeLastContainer()
 		{
 			//needed for temporary composable building
 			return actContainer 	? actContainer.removeLastContainer
@@ -6726,12 +6732,12 @@ struct im
 			} 
 		}
 		
-			//DrawCallback ////////////////////////
-			alias DrawCallback = void delegate(Drawing, .Container); 
+		//DrawCallback ////////////////////////
+		alias DrawCallback = void delegate(Drawing, .Container); 
 		
-			private DrawCallback[.Container] drawCallbacks; 
+		private DrawCallback[.Container] drawCallbacks; 
 		
-			void addDrawCallback(DrawCallback fun)
+		void addDrawCallback(DrawCallback fun)
 		{
 			enforce(actContainer !is null); 
 			enforce(!actContainer.flags._hasDrawCallback, "Container already has a DrawCallback."); 
@@ -6740,16 +6746,16 @@ struct im
 			drawCallbacks[actContainer] = fun; 
 		} 
 		
-			private auto getDrawCallback(.Container cntr)
+		private auto getDrawCallback(.Container cntr)
 		{
 			if(auto cb = cntr in drawCallbacks)
 			return *cb; 
 			else return null; 
 		} 
 		
-			//easy access
+		//easy access
 		
-			@property
+		@property
 		{
 			float fh()
 			{ return textStyle.fontHeight; } 
@@ -6757,17 +6763,17 @@ struct im
 			{ textStyle.fontHeight = cast(ubyte)(v.iround); } 
 		} 
 		
-			auto subCells()
+		auto subCells()
 		{ return actContainer.subCells; } 
-			auto subCells(T : .Cell)()
+		auto subCells(T : .Cell)()
 		{ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); } 
-			auto subContainers()
+		auto subContainers()
 		{ return actContainer.subContainers; } 
 		
-			//container delegates
-			//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
+		//container delegates
+		//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
 		
-			auto ContainerProp(string name)
+		auto ContainerProp(string name)
 		{
 			 //Todo: assignment operation sucks with this: width = height = fh
 			return q{
@@ -6778,7 +6784,7 @@ struct im
 			}.replace("#", name); 
 		} 
 		
-			auto ContainerRef(string name)
+		auto ContainerRef(string name)
 		{
 			return q{
 				ref auto #()
@@ -6786,23 +6792,23 @@ struct im
 			}.replace("#", name); 
 		} 
 		
-			mixin(
+		mixin(
 			["innerWidth", "outerWidth", "innerHeight", "outerHeight", "innerSize", "outerSize", "innerPos", "outerPos", "pos", "width", "height"].map!ContainerProp.join ~
 			["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
 		); 
 		
-			//Parameter structs ///////////////////////////////////
-			//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-			immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
+		//Parameter structs ///////////////////////////////////
+		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+		immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
 		
-			struct enable 
+		struct enable 
 		{ bool val; 	 private enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled	= enabled && a.val; 	}; } 
-			struct selected
+		struct selected
 		{ bool val; 	 private enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
-			enum RangeType
+		enum RangeType
 		{ linear, log, circular, endless} 
-			struct range
+		struct range
 		{
 			//endless can go out of range, circular always using modulo.
 			float min, max, step=1; RangeType type;  //Todo: this is an 1D bounds
@@ -6886,14 +6892,14 @@ struct im
 			private enum M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; 
 		} 
 		
-			auto logRange     (float min, float max, float step=1)
+		auto logRange     (float min, float max, float step=1)
 		{ return range(min, max, step, RangeType.log     ); } 
-			auto circularRange(float min, float max, float step=1)
+		auto circularRange(float min, float max, float step=1)
 		{ return range(min, max, step, RangeType.circular); } 
-			auto endlessRange (float min, float max, float step=1)
+		auto endlessRange (float min, float max, float step=1)
 		{ return range(min, max, step, RangeType.endless ); } 
 		
-			static auto hitTest(.Container container, bool enabled=true)
+		static auto hitTest(.Container container, bool enabled=true)
 		{
 			assert(container !is null); 
 			auto res = hitTestManager.check(container.id); 
@@ -6901,18 +6907,18 @@ struct im
 			return res; 
 		} 
 		
-			auto hitTest(bool enabled=true)
+		auto hitTest(bool enabled=true)
 		{ return hitTest(actContainer, enabled); } 
 		
-			string symbol(string def)
+		string symbol(string def)
 		{ return tag(`symbol `~def); } 
-			void Symbol(string def)
+		void Symbol(string def)
 		{ Text(symbol(def)); } 
-			
-			void Img(string def)
+		
+		void Img(string def)
 		{ Img(File(def)); } 
-			
-			void Img(File f)
+		
+		void Img(File f)
 		{
 			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
 			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
@@ -6921,7 +6927,7 @@ struct im
 			append(new .Img(f)); 
 		} 
 		
-			struct ScrollInfo
+		struct ScrollInfo
 		{
 			 //------------------------------- ScrollInfo //////////////////////////////
 			char orientation; 
@@ -7034,9 +7040,9 @@ struct im
 					
 					bool userModified; 
 					HitInfo hit; 
-					auto actView = targetSurfaces[1].view; //Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, just like the upcoming enabled flag.
+					//Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, just like the upcoming enabled flag.
 					auto sl = new SliderClass(
-						combine(info.container.id, orientation), enabled, normValue, range(0, 1), userModified, actView.mousePos.vec2, tsNormal, hit,
+						combine(info.container.id, orientation), enabled, normValue, range(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
 						orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1, normThumbSize
 					); 
 					
@@ -7078,10 +7084,10 @@ struct im
 			} 
 		} 
 		
-			auto hScrollInfo = ScrollInfo('H'); 
-			auto vScrollInfo = ScrollInfo('V'); 
+		auto hScrollInfo = ScrollInfo('H'); 
+		auto vScrollInfo = ScrollInfo('V'); 
 		
-			private void processContainerArgs(Args...)(in Args args)
+		private void processContainerArgs(Args...)(in Args args)
 		{
 			static foreach(a; args)
 			{
@@ -7114,7 +7120,7 @@ struct im
 			}
 		} 
 		
-			void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			  //Container //////////////////////////////
 			mixin(prepareId, enable.M); 
@@ -7134,26 +7140,26 @@ struct im
 			processContainerArgs(args); 
 		} 
 		
-			void Row   (string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		void Row   (string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{ Container!(.Row	, srcModule, srcLine)(args); } 
-			void Column(string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		void Column(string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{ Container!(.Column, srcModule, srcLine)(args); } 
 		
-			/// It is used to put cached cells or subcells into the imgui.
-			void CellRef(Cell cell)
+		/// It is used to put cached cells or subcells into the imgui.
+		void CellRef(Cell cell)
 		{
 			if(cell)
 			Container({ actContainer.append(cell); }); 
 		} 
 		
-			void CellRef(Cell[] cells)
+		void CellRef(Cell[] cells)
 		{
 			if(cells.length)
 			Container({ actContainer.append(cells); }); 
 		} 
 		
-			//popup state
-			struct PopupState
+		//popup state
+		struct PopupState
 		{
 			Cell cell; //the popup itself
 			Cell parent; //the initiator of the popup
@@ -7195,9 +7201,9 @@ struct im
 				}
 			} 
 		} 
-			PopupState popupState; 
+		PopupState popupState; 
 		
-			private void Popup(Cell parent, void delegate() contents)
+		private void Popup(Cell parent, void delegate() contents)
 		{
 			 //Popup for combobox only ////////////////////////////////////
 			//Todo: this check is not working because of the IM gui. When ComboBox1 is pulled down and the user clicks on ComboBox2
@@ -7220,7 +7226,7 @@ struct im
 		} 
 		
 		
-			deprecated void Code_old(string src)
+		deprecated void Code_old(string src)
 		{
 			 //Code /////////////////////////////
 			//Todo: syntax highlight
@@ -7248,22 +7254,22 @@ struct im
 			//Spacer(0.5*fh);
 		} 
 		
-			void Flex(float value = 1)
+		void Flex(float value = 1)
 		{
 			 //Flex //////////////////////////////////
 			Row({ flex = value; }); 
 		} 
 		
-			string bold	  (string s)	
+		string bold	  (string s)	
 		{ return tag("style bold=1"	  )~s~tag("style bold=0"	  ); } 
-			string italic		(string s)
+		string italic		(string s)
 		{ return tag("style italic=1"	  )~s~tag("style italic=0"	  ); } 
-			string underline(string s)
+		string underline(string s)
 		{ return tag("style underline=1")~s~tag("style underline=0"); } 
-			string strikeout(string s)
+		string strikeout(string s)
 		{ return tag("style strikeout=1")~s~tag("style strikeout=0"); } 
 		
-			string progressSpinner(int style=1)
+		string progressSpinner(int style=1)
 		{
 			int t(int n)
 			{ return ((QPS.value(second)*n*1.5).ifloor)%n; } 
@@ -7279,7 +7285,7 @@ struct im
 			}
 		} 
 		
-			void ProgressSpinner(int progressStyle = 0)
+		void ProgressSpinner(int progressStyle = 0)
 		{
 			Row(
 				{
@@ -7294,8 +7300,8 @@ struct im
 		//string flex(string markup){ return tag(["flex", markup].join(" ")); }
 		//string flex(float value){ return flex(value.text); } //kinda lame to do it with texts
 		
-			//Text /////////////////////////////////
-			void Text(/*string srcModule=__MODULE__, size_t srcLine=__LINE__,*/ T...)(T args)
+		//Text /////////////////////////////////
+		void Text(/*string srcModule=__MODULE__, size_t srcLine=__LINE__,*/ T...)(T args)
 		{
 			//Todo: not multiline yet
 			
@@ -7379,23 +7385,23 @@ struct im
 			*/
 		} 
 		
-			void TAB()
+		void TAB()
 		{ Text("\t"); } 	void NL()
 		{ Text("\n"); } 
 		
-			void Comment(/*string srcModule=__MODULE__, size_t srcLine=__LINE__, */T...)(T args)
+		void Comment(/*string srcModule=__MODULE__, size_t srcLine=__LINE__, */T...)(T args)
 		{
 			//It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...
 			Text/*!(file, line)*/(tsComment, args); 
 		} 
 		
-			//Bullet ///////////////////////////////////
-			void Bullet()
+		//Bullet ///////////////////////////////////
+		void Bullet()
 		{
 			Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); //Todo: no flex needed, -> center aligned. Constant width is needed however, for different bullet styles.
 		} 
 		
-			void Bullet(void delegate() contents)
+		void Bullet(void delegate() contents)
 		{
 			Row(
 				{
@@ -7407,8 +7413,8 @@ struct im
 		} 	void Bullet(string text)
 		{ Bullet({ Text(text); }); } 
 		
-			//Spacer //////////////////////////
-			private void SpacerRow(Args...)(float size, in Args args)
+		//Spacer //////////////////////////
+		private void SpacerRow(Args...)(float size, in Args args)
 		{
 			const vert = cast(.Row)actContainer !is null; 
 			Row(
@@ -7420,7 +7426,7 @@ struct im
 			); 
 		} 
 		
-			void Spacer(Args...)(in Args args)
+		void Spacer(Args...)(in Args args)
 		{
 			float size; 
 			static if(args.length && isNumeric!(Args[0]))
@@ -7435,7 +7441,7 @@ struct im
 			SpacerRow(size, args[argStart..$]); 
 		} 
 		
-			void HR()
+		void HR()
 		{
 			SpacerRow(
 				fh*InvDefaultFontHeight, {
@@ -7445,10 +7451,10 @@ struct im
 			); 
 		} 
 		
-			void HLine()
+		void HLine()
 		{ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); } 
 		
-			void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(void delegate() fun, A args)
+		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(void delegate() fun, A args)
 		{
 			 //Grp /////////////////////////////
 			Cntr(
@@ -7459,7 +7465,7 @@ struct im
 			); 
 		} 
 		
-			void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)(T title, void delegate() fun, A args)
+		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)(T title, void delegate() fun, A args)
 		{
 			Container(
 				{
@@ -7481,9 +7487,9 @@ struct im
 			swap(lastContainer.subCells[0], lastContainer.subCells[1]); //nasty trick to measure the caption first
 		} 
 		
-			//apply Btn and Edit style////////////////////////////////////
+		//apply Btn and Edit style////////////////////////////////////
 		
-			void applyBtnBorder(in RGB bColor = clWinBtn)
+		void applyBtnBorder(in RGB bColor = clWinBtn)
 		{
 			 //Todo: use it for edit as well
 			margin	= Margin(2, 2, 2, 2); 
@@ -7498,7 +7504,7 @@ struct im
 			}
 		} 
 		
-			void applyLinkStyle(bool enabled, bool focused, bool captured, float hover)
+		void applyLinkStyle(bool enabled, bool focused, bool captured, float hover)
 		{
 			style = tsNormal; 
 			
@@ -7515,7 +7521,7 @@ struct im
 			//Todo: handle focused
 		} 
 		
-			void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover)
+		void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover)
 		{
 			const oldFh = style.fontHeight; 
 			style = tsBtn; 
@@ -7565,7 +7571,7 @@ struct im
 			//Todo: handle focused
 		} 
 		
-			void applyEditStyle(bool enabled, bool focused, float hover)
+		void applyEditStyle(bool enabled, bool focused, float hover)
 		{
 				style   = tsNormal; 
 			
@@ -7643,7 +7649,7 @@ struct im
 					auto row = cast(.Row)actContainer; 
 					
 					hit = hitTest(enabled); 
-					auto localMouse = actView.mousePos - hit.hitBounds.topLeft - row.topLeftGapSize; 
+					auto localMouse = targetView.mousePos - hit.hitBounds.topLeft - row.topLeftGapSize; 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
 					mixin(hintHandler); 
@@ -9440,7 +9446,7 @@ struct im
 			bool userModified; 
 			HitInfo hit; 
 			auto sl = new SliderClass(
-				id_, enabled, normValue, _range, userModified, actView.mousePos.vec2, 
+				id_, enabled, normValue, _range, userModified, targetView.mousePos.vec2, 
 				style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
 				getStaticParamDef(SliderStyle.slider, args), theme=="tool" ? 1 : 1.4f
 			); 

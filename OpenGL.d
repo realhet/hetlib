@@ -1824,7 +1824,7 @@ version(/+$DIDE_REGION+/all)
 		MouseState mouse; 
 	
 		//diagnostic stuff
-		bool showFPS /+showMegaTextures+/; 
+		bool showFPS, showMegaTextures; 
 		float guiScale = 1; 
 	
 		private View2D viewGUI_; 
@@ -2035,7 +2035,7 @@ version(/+$DIDE_REGION+/all)
 		override void onUpdateUIBeginFrame()
 	{
 		import het.ui:im; 
-		im._beginFrame([im.TargetSurface(view), im.TargetSurface(viewGUI)]); 
+		im._beginFrame(view, viewGUI); 
 	} 
 	
 		override void onUpdateUIEndFrame()
@@ -2068,8 +2068,10 @@ version(/+$DIDE_REGION+/all)
 							Must rethink the update() draw() thing completely.
 			+/
 			updateViewClipBoundsAndMousePos; 
-			import het.ui: im; 
-			im.setTargetSurfaceViews(view, viewGUI); 
+			/+
+				import het.ui: im; 
+				im.setTargetSurfaces(view, viewGUI); 
+			+/
 		}
 	} 
 	
@@ -2083,45 +2085,38 @@ version(/+$DIDE_REGION+/all)
 		void afterPaint()
 	{} 
 	
-		private bool firstPaint; 
-	
-		private Drawing[2] staticDr; 
+		private Drawing staticDr, staticDrGUI; 
 	
 		override void onEndPaint()
 	{
-		version(/+$DIDE_REGION+/none) { if(showMegaTextures) drawMegaTextures; }
+		if(!staticDr)
+		staticDr = new Drawing("im0"), staticDrGUI = new Drawing("im1"); 
 		
 		import het.ui: im; //this is a nasty entry point to imgui
+		im._drawFrame!"system call only"(staticDr, staticDrGUI); 
 		
-		if(!staticDr[0])
-		staticDr = [new Drawing("im0"), new Drawing("im1")]; 
-		im._drawFrame!"system call only"(
-			[
-				(cast(IDrawing)(staticDr[0])),
-				(cast(IDrawing)(staticDr[1]))
-			]
-		); 
+		version(/+$DIDE_REGION Draw optional overlay stuff+/all)
+		{
+			//Todo: here should be an on OverlayPaint wich is paints on top of the UI
+			if(showMegaTextures) drawMegaTextures(staticDr); 
+			if(showFPS) drawFPSGraph(staticDrGUI); 
+		}
+		
+		version(/+$DIDE_REGION RGNFraw main ang GUI surfaces+/all)
+		{
+			staticDr	.glDraw(view),
+			staticDrGUI	.glDraw(viewGUI); 
+		}
+		
+		version(/+$DIDE_REGION Make buffers ready for the next frame.+/all)
+		{
+			staticDr	.clear,
+			staticDrGUI	.clear; 
+		}
 		
 		if(!view.workArea_accum.empty) view.workArea = view.workArea_accum; 
 		
-		//Todo: here should be an on OverlayPaint wich is paints on top of the UI
-		
-		if(showFPS) drawFPS(); 
-		
 		if(chkClear(view._mustZoomAll)) view.zoomAll; 
-		
-		/*
-			if(!dr.drawCnt){
-				if(!firstPaint) onInitialZoomAll; //if dr has a painting
-				dr.glDraw(view   );
-			}
-			if(!drGUI.drawCnt) drGUI.glDraw(viewGUI);
-			
-			lastFrameStats ~= "dr: %s * %d; ".format(dr.drawCnt, dr.totalDrawObj);
-			lastFrameStats ~= "drGUI: %s * %d; ".format(drGUI.drawCnt, drGUI.totalDrawObj);
-		*/
-		
-		firstPaint = true; 
 		
 		afterPaint; 
 	} 
@@ -2154,11 +2149,11 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
-		void drawFPS(Drawing dr)
+		void drawFPSGraph(IDrawing dr)
 	{
-		with(dr) {
-			//FPS graph
-			translate(vec2(0, 64+4)); 
+		with(dr)
+		{
+			translate(vec2(0, 64+4)); scope(exit) pop; 
 			
 			fontHeight = 7; 
 			
@@ -2208,29 +2203,21 @@ version(/+$DIDE_REGION+/all)
 				
 				mark(60); mark(30); 
 			}
-			
-			pop; 
-			
 		}
 	} 
 	
-		void drawFPS()
+		void drawMegaTextures(IDrawing dr)
 	{
-		auto drGUI = scoped!Drawing; 
-		drawFPS(drGUI); 
-		drGUI.glDraw(viewGUI); 
-	} 
-	
-		version(/+$DIDE_REGION+/none) {
-		void drawMegaTextures()
-		{
-			auto dr = scoped!Drawing; 
-			dr.translate(0, view.workArea.bottom+100); 
-			textures.debugDraw(dr); 
-			dr.pop; 
-			dr.glDraw(view); 
-		} 
-	}
+		dr.translate(
+			vec2(
+				0, 0 /+
+					inhibit measure thing is broken too: 
+					view.workArea.bottom+100
+				+/
+			)
+		); scope(exit) dr.pop; 
+		textures.debugDraw(dr); 
+	} 
 	//navigate 2D view with the keyboard and the mouse
 	//it optionally calls invalidate
 	bool navigateView(bool keyboardEnabled, bool mouseEnabled)
@@ -3340,7 +3327,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 		void dump() const
 		{ bin.dump; } 
 		
-		void debugDraw(Drawing)(Drawing dr)
+		void debugDraw(IDrawing dr)
 		{
 			dr.scale(SubTexCellSize); scope(exit) dr.pop; 
 			
@@ -3350,7 +3337,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 			foreach(r; bin.freeRects)
 			{
 				dr.color = clWhite; 
-				dr.drawRect(r.bounds.inflated(-0.25f)); 
+				dr.drawRect(r.bounds.bounds2.inflated(-0.25f)); 
 			}
 			
 			dr.lineStyle = LineStyle.dash; 
@@ -3358,16 +3345,16 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 			{
 				dr.color = clBlack; //clVga[(cast(int)j % ($-1))+1];
 				dr.alpha = 0.25; 
-				dr.fillRect(r.bounds); 
+				dr.fillRect(r.bounds.bounds2); 
 				dr.alpha = 1; 
 				
 				dr.color = clWhite; 
-				dr.drawRect(r.bounds.inflated(-0.25f)); 
+				dr.drawRect(r.bounds.bounds2.inflated(-0.25f)); 
 			}
 			
 			dr.lineStyle = LineStyle.normal; 
 			
-			dr.color = clWhite;  dr.drawRect(0, 0, bin.width, bin.height); 
+			dr.color = clWhite;  dr.drawRect(bounds2(0, 0, bin.width, bin.height)); 
 		} 
 		
 		size_t sizeBytes() const
@@ -3944,49 +3931,46 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 				return res; 
 			} 
 			
-			version(/+$DIDE_REGION+/none) {
-				void debugDraw(Drawing)(Drawing dr)
+			void debugDraw(IDrawing dr)
+			{
+				//megatexture debugging will not affect texture last-accessed statistics
+				global_disableSubtextureAging = true; 
+				scope(exit) global_disableSubtextureAging = false; 
+				
+				//collect all subtextures
+				auto subTexInfos = collectSubTexInfo2; 
+				
+				int ofs; 
+				foreach(megaIdx, mt; megaTextures)
 				{
-					//megatexture debugging will not affect texture last-accessed statistics
-					global_disableSubtextureAging = true; 
-					scope(exit) global_disableSubtextureAging = false; 
+					dr.translate(vec2(0, ofs)); scope(exit)
+					{ dr.pop; ofs += mt.texSize.y + 16; }
 					
-					//collect all subtextures
-					auto subTexInfos = collectSubTexInfo2; 
+					//draw background
+					dr.color = clFuchsia; 
+					dr.alpha = 1; 
+					dr.fillRect(bounds2(vec2(0), mt.texSize)); 
 					
-					int ofs; 
-					foreach(megaIdx, mt; megaTextures)
+					//draw subtextures
+					foreach(const si; subTexInfos)
+					if(si.info.texIdx==megaIdx)
 					{
-						dr.translate(0, ofs); scope(exit)
-						{ dr.pop; ofs += mt.texSize.y + 16; }
+						dr.color = clWhite; 
+						/+discontinued!!! -> dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); +/
+						//Todo: drawRect support for ibounds2
 						
-						//draw background
-						dr.color = clFuchsia; 
-						dr.alpha = 1; 
-						dr.fillRect(bounds2(vec2(0), mt.texSize)); 
-						
-						//draw subtextures
-						foreach(const si; subTexInfos)
-						if(si.info.texIdx==megaIdx)
+						if(!si.canUnload)
 						{
-							dr.color = clWhite; 
-							dr.drawGlyph(si.idx, bounds2(si.info.bounds), clGray); 
-							//Todo: drawRect support for ibounds2
-							
-							if(!si.canUnload)
-							{
-								dr.lineWidth=-3; dr.color = clYellow; 
-								dr.drawX(bounds2(si.info.bounds)); 
-							}
+							dr.lineWidth=-3; dr.color = clYellow; 
+							dr.drawX(bounds2(si.info.bounds)); 
 						}
-						
-						
-						//draw free and used rects and frame
-						mt.debugDraw(dr); 
 					}
 					
-				} 
-			}
+					
+					//draw free and used rects and frame
+					mt.debugDraw(dr); 
+				}
+			} 
 			
 			
 			ulong[File] bitmapModified; 

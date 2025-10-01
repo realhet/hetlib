@@ -1322,13 +1322,10 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 	
 	interface IDrawing
 	{
-		void clear(); //ez a reset
-		void glDraw(View2D); //ez meg a commit
-		
 		ref float zoomFactor(); //for LOD
 		ref float invZoomFactor(); 
 		
-		void translate(vec2); 
+		void translate(vec2); void scale(float); 
 		void pop(); 
 		
 		bounds2 inputTransform(in bounds2); 
@@ -1349,8 +1346,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		@property het.math.RGB color(); 
 		@property void color(het.math.RGB); 
 		@property float alpha(); 
-		@property void alpha(float a); 
-		
+		@property void alpha(float a); 
 		void point(in vec2); 
 		
 		void moveTo(float, float); void lineTo(float, float); 
@@ -1527,6 +1523,38 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		+/
 		bool scrollSlower; 	//It's the current 'shift' modifier state. also affects zoom
 		bool _mustZoomAll; 	//schedule zoom all on the next draw
+		
+		
+		
+		
+		
+		static auto fromViewToView(View2D viewMain, View2D viewGui, bool animated=true)
+		{
+			/+ Use origin point for translation +/ 
+			V worldOrigin = V(0, 0); 
+			V screenOrigin = viewMain.worldToScreen(worldOrigin, animated); 
+			V guiWorldOrigin = viewGui.screenToWorld(screenOrigin, animated); 
+			
+			/+ Use unit point for scale calculation +/
+			V worldUnit = V(1, 0); 
+			V screenUnit = viewMain.worldToScreen(worldUnit); 
+			V guiWorldUnit = viewGui.screenToWorld(screenUnit); 
+			
+			float scale = guiWorldUnit.x - guiWorldOrigin.x; 
+			V origin = guiWorldOrigin; 
+			
+			static struct Res
+			{
+				V origin; float scale; 
+				V transform(V p) => p*scale + origin; 
+				
+				/+
+					alternate way: /+Code: shift = origin/scale; => (p+shift)*scale;+/
+					But the addition is at the same magnitude in both ways.
+				+/
+			} 
+			return Res(origin, scale); 
+		} 
 		
 		public: 
 		
