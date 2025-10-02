@@ -5184,7 +5184,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					 
+					
 					//Todo: check the warnings!
 					
 					//common stuff

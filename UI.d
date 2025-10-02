@@ -21,12 +21,47 @@ version(/+$DIDE_REGION+/all)
 	
 	version(/+$DIDE_REGION OpenGL -> Vulkan transition+/all)
 	{
-		public import het.opengl: 	GLWindow, textures,
-			DefaultFont_subTexIdxMap/+fontExtents service... baaaad!!!+/; 
-		public import het.draw2d: 	OldDrawing = Drawing, BoldOffset; 
-		alias Drawing = IDrawing; 
+		version(VulkanUI) {}else version = OpenGLUI; 
+		
+		
+		version(OpenGLUI)
+		{
+			public import het.opengl: 	GLWindow; 
+			public import het.draw2d: 	OldDrawing = Drawing, BoldOffset; 
+			alias Drawing = IDrawing; 
+			
+			
+			alias TexHandle = Typedef!(uint, 0, "TexHandle"); //The aame in Vulkan.
+			
+			//texture access
+			import het.opengl: oldTextures = textures, 
+			DefaultFont_subTexIdxMap/+
+				It's a map of default chars to textures.
+				It is cleared when the texture GC happens.
+				Totally bad concept.
+			+/; 
+			TexHandle textures_getNow(File f) => TexHandle(oldTextures[f]); 
+			void textures_invalidate(File f) { oldTextures.invalidate(f); } 
+			auto textures_accessInfo(TexHandle stIdx)
+			{
+				auto info = oldTextures.accessInfo((cast(int)(stIdx))); 
+				static struct Res { int width, height; } 
+				with(info) return Res(width, height); 
+			} 
+			
+			//texture statistics
+			size_t textures_length() => oldTextures.length; 
+			size_t textures_poolSizeBytes() => oldTextures.poolSizeBytes; 
+			size_t textures_usedSizeBytes() => oldTextures.usedSizeBytes; 
+			
+		}
+		
+		version(VulkanUI)
+		{}
+		
 		
 		/+
+			History:
 			250930: Removed things:	Contaniner.CachedDrawing, GraphLabel, GraphNode, 
 				ContainerGraph, MegaTexturing.debugDraw, GLWindow.drawMegaTextures,
 				VisualizeHitStack
@@ -38,10 +73,10 @@ version(/+$DIDE_REGION+/all)
 			No more /+Code: new Drawing+/ remains, I can write a DrawingProxy now.
 			
 			/+Todo: Rewrite DIDE / bloodScreenEffect+/
+			
+			251001: View2D understood, refactored. Preparing for single view vulkan rendering.
+			251002: Isolating texture and font handling stuff.
 		+/
-		
-		
-		
 	}
 	
 	
@@ -185,7 +220,7 @@ version(/+$DIDE_REGION+/all)
 		s = s.strip; 
 		if(s.endsWith('x'))
 		{
-			 //12x
+			//12x
 			return baseHeight*s[0..$-1].to!float; 
 		}else
 		{ return s.to!float; }
@@ -195,7 +230,7 @@ version(/+$DIDE_REGION+/all)
 	///Also used by CodeColumnBuilder
 	float adjustBoldWidth(Glyph g, int prevFontFlags)
 	{
-		   //Todo: also check monospaceness
+		//Todo: also check monospaceness
 		enum boldMask = 1; 
 		if((prevFontFlags&boldMask) == (g.fontFlags&boldMask))
 		return 0; 
@@ -206,9 +241,9 @@ version(/+$DIDE_REGION+/all)
 		return delta; 
 	} 
 	
-	private vec2 calcGlyphSize_clearType(in TextStyle ts, int stIdx)
+	private vec2 calcGlyphSize_clearType(in TextStyle ts, TexHandle stIdx)
 	{
-		auto info = textures.accessInfo(stIdx); 
+		auto info = textures_accessInfo(stIdx); 
 		
 		float	aspect	= float(info.width)/(info.height*3/*clearType x3*/); //Opt: rcp_fast
 		auto	size	= vec2(ts.fontHeight*aspect, ts.fontHeight); 
@@ -219,16 +254,15 @@ version(/+$DIDE_REGION+/all)
 		return size; 
 	} 
 	
-	private vec2 calcGlyphSize_image(/*in TextStyle ts,*/ int stIdx)
+	private vec2 calcGlyphSize_image(/*in TextStyle ts,*/ TexHandle stIdx)
 	{
-			auto info = textures.accessInfo(stIdx); 
+		auto info = textures_accessInfo(stIdx); 
 		
 		//float aspect = float(info.width)/(info.height); //opt: rcp_fast
-			auto size =  vec2(info.width, info.height); 
+		auto size =  vec2(info.width, info.height); 
 		
-			//image frame goes here
-		
-			return size; 
+		//image frame goes here
+		return size; 
 	} 
 	
 	//Template Parameter Processing /////////////////////////////////
@@ -1402,10 +1436,10 @@ version(/+$DIDE_REGION+/all)
 		} 
 	}
 	
-	int fontTexture(Args...)(in dchar ch, in Args args)
+	TexHandle fontTexture(Args...)(in dchar ch, in Args args)
 	if(Args.length==0 || Args.length==1 && (is(Args[0] == TextStyle) || is(Args[0] == string)))
 	{
-		int stIdx; //the result texture index
+		TexHandle stIdx; //the result texture index
 		
 		static if(Args.length==0)
 		{
@@ -1425,19 +1459,19 @@ version(/+$DIDE_REGION+/all)
 		void lookupSubTexIdx()
 		{
 			string glyphSpec = `font:\`~fontName~`\72\x3\?`~[ch].toUTF8; 
-			stIdx = textures[File(glyphSpec)]; //fonts are loaded immediatelly
+			stIdx = textures_getNow(File(glyphSpec)); //fonts are loaded immediatelly
 		} 
 		
 		if(isDefault)
 		{
 			//cached version for the default font
 			if(auto p = ch in DefaultFont_subTexIdxMap)
-			{ stIdx = *p; }
+			{ stIdx = TexHandle(*p); }
 			else
 			{
 				static if(EnableFontstats) FontStats.doit(ch); 
 				lookupSubTexIdx; 
-				DefaultFont_subTexIdxMap[ch] = stIdx; 
+				DefaultFont_subTexIdxMap[ch] = (cast(int)(stIdx)); 
 			}
 		}
 		else
@@ -1481,7 +1515,7 @@ version(/+$DIDE_REGION+/all)
 	
 	class Glyph : Cell
 	{
-		int stIdx; 
+		TexHandle stIdx; 
 		dchar ch; 
 		
 		RGB fontColor, bkColor; 
@@ -1521,7 +1555,7 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 			
-			stIdx = visibleCh.fontTexture(ts); 
+			stIdx = fontTexture(visibleCh, ts); 
 			
 			fontFlags = ts.fontFlags; 
 			fontColor = ts.fontColor; 
@@ -1561,7 +1595,7 @@ version(/+$DIDE_REGION+/all)
 				{
 					dr.drawFontGlyph
 					(
-						stIdx, bounds2(
+						(cast(int)(stIdx)), bounds2(
 							0	, targety0*outerSize.y,
 							outerSize.x	, targety1*outerSize.y
 						)+innerPos, 
@@ -1605,14 +1639,14 @@ version(/+$DIDE_REGION+/all)
 					
 					default: {
 						/+simple default stretching+/
-						dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags); 
+						dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, fontFlags); 
 					}
 				}
 			}
 			else
 			{
 				//normal height
-				dr.drawFontGlyph(stIdx, innerBounds, bkColor, fontFlags); 
+				dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, fontFlags); 
 			}
 			
 			if(VisualizeCodeLineIndices)
@@ -1659,7 +1693,7 @@ version(/+$DIDE_REGION+/all)
 	} 
 	
 	enum ShapeType
-	{ led} 
+	{led} 
 	
 	class Shape : Cell
 	{
@@ -1703,7 +1737,7 @@ version(/+$DIDE_REGION+/all)
 		bool autoRefresh; 
 		SamplerEffect samplerEffect; 
 		
-		int stIdx; 
+		TexHandle stIdx; 
 		
 		this(File file)
 		{
@@ -1724,7 +1758,7 @@ version(/+$DIDE_REGION+/all)
 			
 			try
 			{
-				stIdx = textures[file]; //Todo: no delayed load support
+				stIdx = textures_getNow(file); //Todo: no delayed load support
 				const siz = calcGlyphSize_image(stIdx); 
 				
 				if(flags.autoHeight && flags.autoWidth)
@@ -1748,14 +1782,14 @@ version(/+$DIDE_REGION+/all)
 			
 			drawBorder(dr); 
 			
-			if(autoRefresh) { stIdx = textures[file].ifThrown(0); }//Todo: this does not reflect size change.
+			if(autoRefresh) { stIdx = textures_getNow(file).ifThrown(TexHandle.init); }//Todo: this does not reflect size change.
 			
 			int baseFontFlags = ((cast(int)(samplerEffect))<<16); 
 			
 			if(stIdx)
 			{
-				if(transparent)	dr.drawFontGlyph(stIdx, innerBounds, bkColor, baseFontFlags | 32/*transparent font*/); 
-				else	dr.drawFontGlyph(stIdx, innerBounds, bkColor, baseFontFlags | 16/*image*/); 
+				if(transparent)	dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, baseFontFlags | 32/*transparent font*/); 
+				else	dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, baseFontFlags | 16/*image*/); 
 			}
 		} 
 	} 
@@ -4005,7 +4039,7 @@ version(/+$DIDE_REGION+/all)
 					with(glyph)
 					{
 						dr.color = bkColor; 
-						dr.drawFontGlyph(stIdx, innerBounds + absInnerPos, clHighlight, fontFlags); 
+						dr.drawFontGlyph((cast(int)(stIdx)), innerBounds + absInnerPos, clHighlight, fontFlags); 
 					}
 				} 
 			} 
@@ -5608,9 +5642,9 @@ version(/+$DIDE_REGION+/all)
 			updateInternal(
 				{
 					//collect and actualize data
-					textureCount.act[0] = textures.length; 
-					texturePoolSize.act[0] = textures.poolSizeBytes; 
-					textureUsedSize.act[0] = textures.usedSizeBytes; 
+					textureCount.act[0] = textures_length; 
+					texturePoolSize.act[0] = textures_poolSizeBytes; 
+					textureUsedSize.act[0] = textures_usedSizeBytes; 
 					
 					const bs = bitmaps.stats; 
 					bitmapCount	    .act[0] = bs.count; 
@@ -5780,7 +5814,6 @@ version(/+$DIDE_REGION+/all)
 							Legend("Pool", texturePoolSize.val, clTexturePool, "B"); 
 						}
 					); 
-					//Text("Config: "~textures.megaTextureConfig);
 					Graph(
 						"TextureCache", [
 							Data(texturePoolSize.history[timeIdx][], clTexturePool),
@@ -6211,20 +6244,20 @@ struct im
 			{
 				auto tr = View2D.fromViewToView(view_world, view_gui); 
 				auto shift = tr.origin/tr.scale; 
-				((0x2A4EBEB16D5C4).檢(tr.scale)); 
-				((0x2A514EB16D5C4).檢(tr.origin)); 
-				((0x2A53EEB16D5C4).檢(shift)); 
+				((0x2A998EB16D5C4).檢(tr.scale)); 
+				((0x2A9C1EB16D5C4).檢(tr.origin)); 
+				((0x2A9EBEB16D5C4).檢(shift)); 
 				
 				auto p = view_world.mousePos; 
-				((0x2A58EEB16D5C4).檢(p)); 
-				((0x2A5B0EB16D5C4).檢(shift)); 
+				((0x2AA3BEB16D5C4).檢(p)); 
+				((0x2AA5DEB16D5C4).檢(shift)); 
 				
-				((0x2A5DCEB16D5C4).檢(p+shift)); 
-				((0x2A604EB16D5C4).檢((p+shift)*tr.scale)); 
+				((0x2AA89EB16D5C4).檢(p+shift)); 
+				((0x2AAB1EB16D5C4).檢((p+shift)*tr.scale)); 
 				
-				((0x2A63DEB16D5C4).檢(tr.origin)); 
-				((0x2A667EB16D5C4).檢(p*tr.scale)); 
-				((0x2A692EB16D5C4).檢(p*tr.scale+tr.origin)); 
+				((0x2AAEAEB16D5C4).檢(tr.origin)); 
+				((0x2AB14EB16D5C4).檢(p*tr.scale)); 
+				((0x2AB3FEB16D5C4).檢(p*tr.scale+tr.origin)); 
 				
 			}
 			foreach(i, d; dr)

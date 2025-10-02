@@ -1655,7 +1655,13 @@ class Drawing : IDrawing
 		{ return p*actState.drawScale; } //for relative movements
 		
 		vec2 inputTransform(in vec2 p)
-		{ return (p+actState.drawOrigin)*actState.drawScale; } 
+		{
+			return (p+actState.drawOrigin)*actState.drawScale; 
+			/+
+				note : In vulkan it is: (p*scale + shift)
+				shift = origin*scale
+			+/
+		} 
 		vec2 inputTransform(in ivec2 p)
 		{ return (p+actState.drawOrigin)*actState.drawScale; } 
 		bounds2 inputTransform(in bounds2 b)
