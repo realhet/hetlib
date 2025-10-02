@@ -441,6 +441,10 @@ version(/+$DIDE_REGION+/all) {
 		string inputChars; //aaccumulated WM_CHAR input flushed in update()
 		string lastFrameStats; 
 		
+		//Fields accessed from het.ui
+		bool showFPS; //shows FPS graph overlay, UI switching it on and off.
+		MouseState mouse; //it is updated in descendant classes where views are maintained.
+		
 		HWND hwnd()
 		{ return fhwnd; }  HDC hdc()
 		{ return fhdc; } 
@@ -558,7 +562,6 @@ version(/+$DIDE_REGION+/all) {
 			}
 			
 			dbg.setExeHwnd(hwnd); 
-			
 			fhdc = GetDC(hwnd); 
 			
 			onInitializeGLWindow; 
@@ -1346,7 +1349,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		@property het.math.RGB color(); 
 		@property void color(het.math.RGB); 
 		@property float alpha(); 
-		@property void alpha(float a); 
+		@property void alpha(float a); 
 		void point(in vec2); 
 		
 		void moveTo(float, float); void lineTo(float, float); 

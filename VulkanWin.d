@@ -1,4 +1,4 @@
-module vulkanwin; 
+module het.vulkanwin; 
 
 version(/+$DIDE_REGION+/all)
 {
@@ -2701,7 +2701,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1545282886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1545682886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -2762,9 +2762,1896 @@ version(/+$DIDE_REGION+/all) {
 				+/
 			+/
 		} 
-	} 
+	} 
+	class DrawingProxy : IDrawing
+	{
+		GfxBuilder gfx; 
+		this(GfxBuilder gfxBuilder)
+		{ this.gfx = gfxBuilder; } 
+		
+		float _zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
+		ref float zoomFactor() => _zoomFactor; 
+		float _invZoomFactor = 1; //comes from outside view
+		ref float invZoomFactor() => _invZoomFactor; 
+		
+		struct TRStackItem { vec2 origin; float scale; } 
+		private TRStackItem[] trStack; 
+		
+		void push()
+		{
+			enforce(trStack.length<1024); 
+			trStack ~= TRStackItem(gfx.TR.transXY, gfx.TR.scaleXY.x); 
+		} 
+		
+		void translate(vec2 offset)
+		{ push; gfx.TR.transXY += offset*gfx.TR.scaleXY; } 
+		
+		void scale(float factor)
+		{ push; gfx.TR.scaleXY *= factor; } 
+		
+		void pop()
+		{
+			enforce(trStack.length); 
+			auto a = trStack.fetchBack; 
+			gfx.TR.scaleXY = vec2(a.scale); 
+			gfx.TR.transXY = a.origin; 
+		} 
+		
+		
+		bounds2 inputTransform(in bounds2 b)
+		=> bounds2(
+			inputTransform(b.topLeft),
+			inputTransform(b.bottomRight)
+		); 
+		
+		vec2 inputTransform(in vec2 p)
+		=> (p * gfx.TR.scaleXY) + gfx.TR.transXY; 
+		
+		bounds2 inverseInputTransform(in bounds2 b)
+		=> bounds2(
+			inverseInputTransform(b.topLeft),
+			inverseInputTransform(b.bottomRight)
+		); 
+		
+		vec2 inverseInputTransform(in vec2 p)
+		=> (p - gfx.TR.transXY) / gfx.TR.scaleXY; 
+		
+		
+		ref bounds2 clipBounds() => gfx.TR.clipBounds; 
+		private bounds2[] clipBoundsStack; 
+		
+		void pushClipBounds(bounds2 bnd)
+		{
+			enforce(clipBoundsStack.length<1024); 
+			//bnd is in local coords
+			clipBoundsStack ~= clipBounds; 
+			clipBounds = inputTransform(bnd) & clipBounds; 
+		} 
+		
+		void popClipBounds()
+		{
+			enforce(clipBoundsStack.length); 
+			clipBounds = clipBoundsStack[$-1]; 
+			clipBoundsStack = clipBoundsStack[0..$-1]; 
+		} 
+		
+		
+		ref float fontHeight()
+		=> gfx.state_FH.userState; 
+		
+		ref float lineWidth()
+		=> gfx.state_LW.userState; 
+		
+		private float _pointSize = 1; //Todo:
+		ref float pointSize()
+		=> _pointSize; 
+		
+		private LineStyle _lineStyle; //Todo:
+		ref LineStyle lineStyle()
+		=> _lineStyle; 
+		
+		private ArrowStyle _arrowStyle; //Todo:
+		ref ArrowStyle arrowStyle()
+		=> _arrowStyle; 
+		
+		@property RGB color()
+		=> ((gfx.PC.format==ColorFormat.rgb_u8)?(RGB(gfx.PC.value)):(RGB(0))); 
+		
+		@property void color(RGB c)
+		{ gfx.PC = c; } 
+		
+		@property float alpha()
+		=> gfx.OP; 
+		
+		@property void alpha(float a)
+		{ gfx.OP = a; } 
+		
+		//Todo: I'm here !!!-----------------------------------------------------------------
+		
+		void point(in vec2 p)
+		{
+			gfx.begin(1, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.synch_point(); 
+			gfx.emit(
+				assemble(舉!((Opcode), "drawMove")), assemblePoint(p),
+				assemble(舉!((Opcode), "drawPoint"))
+			); 
+			gfx.incVertexCount(1); 
+		} 
+		
+		void moveTo(float x, float y)
+		{ gfx.cursorPos = vec2(x, y); } 
+		
+		void lineTo(float x, float y)
+		{ lineTo(vec2(x, y)); } 
+		
+		void moveTo(in vec2 p)
+		{ gfx.cursorPos = p; } 
+		
+		void lineTo(in vec2 p)
+		{
+			gfx.begin(2, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.synch_line(); 
+			gfx.emit(
+				assemble(舉!((Opcode), "drawMove")), assemblePoint(gfx.cursorPos),
+				assemble(舉!((Opcode), "drawLine")), assemblePoint(p)
+			); 
+			gfx.incVertexCount(2); 
+			gfx.cursorPos = p; 
+		} 
+		
+		void moveRel(float dx, float dy)
+		{ gfx.cursorPos += vec2(dx, dy); } 
+		
+		void lineRel(float dx, float dy)
+		{ lineTo(gfx.cursorPos + vec2(dx, dy)); } 
+		
+		void line(in vec2 p0, in vec2 p1)
+		{
+			moveTo(p0); 
+			lineTo(p1); 
+		} 
+		
+		void hLine(float x0, float y, float x1)
+		{ line(vec2(x0, y), vec2(x1, y)); } 
+		
+		void vLine(float x, float y0, float y1)
+		{ line(vec2(x, y0), vec2(x, y1)); } 
+		
+		void drawRect(in bounds2 b)
+		{
+			gfx.begin(8, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.synch_line(); 
+			gfx.emit(
+				assemble(舉!((Opcode), "drawMove")), assemblePoint(b.topLeft),
+				assemble(舉!((Opcode), "drawLine")), assemblePoint(vec2(b.right, b.top)),
+				assemble(舉!((Opcode), "drawLine")), assemblePoint(b.bottomRight),
+				assemble(舉!((Opcode), "drawLine")), assemblePoint(vec2(b.left, b.bottom)),
+				assemble(舉!((Opcode), "drawLine")), assemblePoint(b.topLeft)
+			); 
+			gfx.incVertexCount(8); 
+		} 
+		
+		void drawX(in bounds2 b)
+		{
+			line(b.topLeft, b.bottomRight); 
+			line(vec2(b.right, b.top), vec2(b.left, b.bottom)); 
+		} 
+		
+		void fillRect(in bounds2 b)
+		{ fillRect(b.left, b.top, b.right, b.bottom); } 
+		
+		void fillRect(float x0, float y0, float x1, float y1)
+		{
+			gfx.begin(4, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.emit(
+				assemble(舉!((Opcode), "drawMove")), assemblePoint(vec2(x0, y0)),
+				assemble(舉!((Opcode), "drawFillRect")), assemblePoint(vec2(x1, y1))
+			); 
+			gfx.incVertexCount(4); 
+		} 
+		
+		void circle(in vec2 p, float r, float arc0 = 0, float arc1 = 2 * PI)
+		{
+			const int segments = max(cast(int)(r * 8), 8); 
+			const float arcStep = (arc1 - arc0) / segments; 
+			
+			gfx.begin(segments + 1, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.synch_line(); 
+			
+			gfx.emit(assemble(舉!((Opcode), "drawMove")), assemblePoint(p + vec2(r * cos(arc0), r * sin(arc0)))); 
+			
+			foreach(i; 1 .. segments + 1)
+			{
+				const float angle = arc0 + i * arcStep; 
+				gfx.emit(assemble(舉!((Opcode), "drawLine")), assemblePoint(p + vec2(r * cos(angle), r * sin(angle)))); 
+			}
+			
+			gfx.incVertexCount(segments + 1); 
+		} 
+		
+		void drawFontGlyph(
+			int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
+			in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
+		)
+		{
+			gfx.begin(4, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_PALH(); 
+			gfx.synch_FMH(); 
+			gfx.synch_FH(); 
+			gfx.synch_colors(); 
+			gfx.FF = fontFlags; 
+			gfx.synch_FF(); 
+			
+			gfx.emit(
+				assemble(舉!((Opcode), "drawMove")), assemblePoint(b.topLeft),
+				assemble(舉!((Opcode), "drawFontGlyph")), bits(idx, 16),
+				assemblePoint(b.size),
+				assembleColor(FormattedColor(bkColor)),
+				assemblePoint(ySubRange)
+			); 
+			gfx.incVertexCount(4); 
+		} 
+		
+		float textWidth(string text)
+		{ return text.length * gfx.FH() * 0.6f; } 
+		
+		void textOut(
+			vec2 p, string text, float width = 0, 
+			HAlign align_ = HAlign.left, bool vertFlip = false
+		)
+		{ gfx.Text(M(p), text); } 
+		
+		void hGraph_f(
+			float x0, float y0, in float[] data, float 
+			xScale = 1, float yScale = 1
+		)
+		{
+			if(data.empty) return; 
+			
+			gfx.begin(data.length * 2, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.synch_line(); 
+			
+			gfx.emit(assemble(舉!((Opcode), "drawMove")), assemblePoint(vec2(x0, y0 + data[0] * yScale))); 
+			
+			foreach(i; 1 .. data.length)
+			{
+				gfx.emit(
+					assemble(舉!((Opcode), "drawLine")), 
+					assemblePoint(vec2(x0 + i * xScale, y0 + data[i] * yScale))
+				); 
+			}
+			
+			gfx.incVertexCount(data.length * 2); 
+		} 
+		
+		void bezier2(in vec2 A, in vec2 B, in vec2 C)
+		{ gfx.drawPath("M " ~ A.toPathString ~ " Q " ~ B.toPathString ~ " " ~ C.toPathString); } 
+		
+		void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
+		{
+			gfx.begin(3, {}); 
+			gfx.synch_transform(); 
+			gfx.synch_colors(); 
+			gfx.emit(
+				assemble(舉!((Opcode), "drawMove")), assemblePoint(a),
+				assemble(舉!((Opcode), "drawFillTriangle")), assemblePoint(b),
+				assemblePoint(c)
+			); 
+			gfx.incVertexCount(3); 
+		} 
+	} 
 	
-	
+	/+
+		AI: /+
+			User: I have an interface:
+			/+
+				Code: interface IDrawing
+				{
+					ref float zoomFactor(); //for LOD
+					ref float invZoomFactor(); 
+					
+					void translate(vec2); void scale(float); 
+					void pop(); 
+					
+					bounds2 inputTransform(in bounds2); 
+					vec2 inputTransform(in vec2); 
+					bounds2 inverseInputTransform(in bounds2); 
+					
+					ref bounds2 clipBounds(); 
+					void pushClipBounds(bounds2); 
+					void popClipBounds(); 
+					
+					ref float fontHeight();  //ez a stickfont csak!!!
+					ref float lineWidth(); 
+					ref float pointSize(); 
+					
+					ref LineStyle lineStyle(); 
+					ref ArrowStyle arrowStyle(); 
+					
+					@property het.math.RGB color(); 
+					@property void color(het.math.RGB); 
+					@property float alpha(); 
+					@property void alpha(float a); 
+					void point(in vec2); 
+					
+					void moveTo(float, float); void lineTo(float, float); 
+					void moveTo(in vec2); void lineTo(in vec2); 
+					void moveRel(float, float); void lineRel(float, float); 
+					
+					void line(in vec2 p0, in vec2 p1); 
+					void hLine(float x0, float y, float x1); 
+					void vLine(float x, float y0, float y1); 
+					void drawRect(in bounds2); 
+					void drawX(in bounds2); 
+					void fillRect(in bounds2); 
+					void fillRect(float x0, float y0, float x1, float y1); 
+					void circle(in vec2 p, float r, float arc0=0, float arc1=2*PI); 
+					void drawFontGlyph(
+						int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
+						in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
+					); 
+					float textWidth(string text); //stickFont
+					void textOut(
+						vec2 p, string text, float width = 0, 
+						HAlign align_ = HAlign.left, bool vertFlip = false
+					); //stickFont
+					void hGraph_f(
+						float x0, float y0, in float[] data, float 
+						xScale=1, float yScale=1
+					); //resMon
+					void bezier2(in vec2 A, in vec2 B, in vec2 C); //DIDE/message arrows
+					void fillTriangle(in vec2 a, in vec2 b, in vec2 c); //not important
+					
+					
+				} 
+			+/
+			
+			And I have a clasees and it's ancestor:
+			/+
+				Code: class GfxAssembler
+				{
+					final
+					{
+						/+
+							Opt: final functions everywhere if possible!!! Do timing tests!!!
+							250919: No luck. Used `final:` in every classes, but same FPS. Should check in ASM.
+							250927:  benchmarkStateSaving() has a 2x speedup if this is final.
+							Conclusion: /+Code: final+/ is  important, and state must be tightly packed.
+						+/
+						/+Opt: Pull all the state into a central, well packed struct! It will make state copy operations faster.  Currently the user and target states are interleaved.+/
+						
+						IGfxContentDestination gfxContentDestination/+optional: the target handler of commitGfxContent()+/; 
+						
+						
+						
+						alias VertexData 	= VulkanWindow.VertexData,
+						Texture 	= VulkanWindow.Texture; 
+						
+						version(/+$DIDE_REGION Bitstream+/all)
+						{
+							protected
+							{
+								Appender!(VertexData[]) vbAppender; 
+								Appender!(ulong[]) gbAppender; 
+								BitStreamAppender bitStreamAppender; 
+								final void onBitStreamAppenderFull(ulong data)
+								{ gbAppender ~= data; } 
+							} 
+							
+							this(IGfxContentDestination gfxContentDestination = null)
+							{
+								this.gfxContentDestination = gfxContentDestination; 
+								bitStreamAppender.onBuffer = &onBitStreamAppenderFull; 
+							} 
+							
+							@property gbBitPos() 
+							=> (cast(uint)(gbAppender.length))*64 + (cast(uint)(bitStreamAppender.tempBits)); 
+							
+							///The appenders are keeping their memory ready to use.
+							void resetStream(bool doDealloc=false)
+							{
+								if(doDealloc)
+								{
+									vbAppender = appender!(VertexData[])(); 
+									gbAppender = appender!(ulong[])(); 
+								}
+								else
+								{
+									vbAppender.clear; 
+									gbAppender.clear; 
+								}
+								bitStreamAppender.reset; 
+								resetBlockState; 
+							} 
+							
+							///This resets and frees up the appenders memory
+							void deallocStream()
+							{ resetStream(doDealloc : true); } 
+							
+							@property empty()
+							{
+								return vbAppender.empty; 
+								/+
+									After the first begin(), there will be an index in VB.
+									Emitting data into GB without calling begin() is treated as empty.
+								+/
+							} 
+							
+							GfxContent toGfxContent()
+							{
+								if(empty) return GfxContent.init; 
+								end; 
+								const actual_gbBitsPos = gbBitPos; 
+								bitStreamAppender.flush; 
+								return GfxContent(vbAppender[], gbAppender[], actual_gbBitsPos); 
+							} 
+							
+							protected void appendToDestination(in GfxContent content)
+							{
+								enforce(gfxContentDestination, "Unablem to commit GfxContent."); 
+								gfxContentDestination.appendGfxContent(content); 
+							} 
+							
+							void commit()
+							{
+								const content = toGfxContent; 
+								appendToDestination(content); 
+								resetStream; 
+							} 
+							
+							void commit(in GfxContent externalContent)
+							{
+								if(!externalContent.empty)
+								{
+									if(!this.empty) { commit; /+first it must commit the self+/}
+									
+									//Normally this is a costy synchronized operation:
+									appendToDestination(externalContent); 
+								}
+							} 
+							
+							void consume(GfxBuilder externalBuilder)
+							{
+								if(externalBuilder && !externalBuilder.empty)
+								{
+									commit(externalBuilder.toGfxContent); 
+									externalBuilder.resetStream; //important to reser AFTER the commit!
+								}
+							} 
+							
+							void emit(Args...)(in Args args)
+							{
+								static foreach(i, T; Args)
+								{
+									{
+										alias a = args[i]; 
+										static if(is(T : Bits!(B), B))
+										bitStreamAppender.appendBits(a.data, a.bitCnt); 
+										else static if(is(T : Bits!(B)[N], B, int N))
+										{ static foreach(i; 0..N) emit(a[i]); }
+										else static if(is(T : ubyte[]))
+										emitBytes(a); 
+										else
+										with(bits(a)) bitStreamAppender.appendBits(data, bitCnt); 
+									}
+								}
+							} 
+							
+							void emitBytes(in void[] data)
+							{
+								auto ba = (cast(ubyte[])(data)); 
+								while(ba.length>=8) { emit(*(cast(ulong*)(ba.ptr))); ba = ba[8..$]; }
+								if(ba.length>=4) { emit(*(cast(uint*)(ba.ptr))); ba = ba[4..$]; }
+								if(ba.length>=2) { emit(*(cast(ushort*)(ba.ptr))); ba = ba[2..$]; }
+								if(ba.length>=1) { emit(*(cast(ubyte*)(ba.ptr))); }
+							} 
+							
+							void emitEvenBytes(void[] data)
+							{
+								auto ba = (cast(ubyte[])(data)); 
+								while(ba.length>=16) { emit(ba.staticArray!16.packEvenBytes); ba = ba[16..$]; }
+								if(ba.length>=8) { emit(ba.staticArray!8.packEvenBytes); ba = ba[8..$]; }
+								if(ba.length>=4) { emit(ba.staticArray!4.packEvenBytes); ba = ba[4..$]; }
+								if(ba.length>=2) { emit(ba[0]); }
+							} 
+							
+						}
+						
+						
+						version(/+$DIDE_REGION Block handling+/all)
+						{
+							protected int actVertexCount; 
+							protected bool insideBlock; 
+							
+							protected void resetBlockState()
+							{ insideBlock = false; actVertexCount = 0; } 
+							
+							///Closes the block with an 'end' opcode. Only if there is an actual block.
+							void end()
+							{
+								if(insideBlock.chkClear)
+								{ emit(mixin(舉!((Opcode),q{end}))); }
+							} 
+							
+							///It always starts a new block.  Emits 'end' if needed.
+							void begin()
+							{
+								if(insideBlock) end; 
+								vbAppender ~= mixin(體!((VertexData),q{gbBitPos})); 
+								resetState!(StateSide.target); 
+								actVertexCount=0; 
+								insideBlock = true; 
+							} 
+							
+							version(/+$DIDE_REGION Messy ShaderMaxVertexCount logic+/all)
+							{
+								enum ShaderMaxVertexCount = 
+								
+								//127
+								/+
+									127:
+									4 vec4 gl_Position
+									4 smooth mediump vec4 fragColor
+									4 smooth mediump vec4 fragBkColor
+									2 smooth vec2 fragTexCoordXY
+									1 flat uint fragTexHandleAndMode
+									1 flat uint fragTexCoordZ
+									4 flat vec4 fragFloats0
+									4 flat vec4 fragFloats1
+									-----
+									24 total
+								+/
+								113
+								/+
+									113:
+									24 total + gl_ClipDistance[4] = 28
+								+/
+								; 
+								__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
+								
+								static @property int maxVertexCount()
+								{ return desiredMaxVertexCount; } 
+							}
+							
+							@property remainingVertexCount() const
+							=> ((insideBlock)?(maxVertexCount - actVertexCount):(0)); 
+							
+							void incVertexCount(int inrc)
+							{ actVertexCount += inrc; } 
+							
+							///Tries to continue the current block with the required vertices.
+							///If a new block started, it emits setup code.
+							void begin(int requiredVertexCount, void delegate() onSetup)
+							{
+								if(insideBlock)
+								{
+									const newVertexCount = actVertexCount + requiredVertexCount; 
+									if(newVertexCount <= maxVertexCount)
+									{
+										actVertexCount = newVertexCount; 
+										/+Actual block is continued.+/
+										//print("continuing block", gbBitPos, actVertexCount); 
+									}
+									else
+									{ begin; onSetup(); }
+								}
+								else
+								{ begin; onSetup(); }
+								/+
+									Todo: Handle the case when maxVertexCount > requiredVertexCount.
+									Because that's an automatic fail, but must be handled on the 
+									caller side, not here.
+								+/
+							} 
+						}
+						
+						version(/+$DIDE_REGION Internal state+/all)
+						{
+							protected enum StateSide
+							{ user, target, both } 
+							
+							version(none)
+							{
+								struct ExperimentalState
+								{
+									/+16+/TexHandle PALH, FMH, LFMH, LTH; 
+									/+16+/float FH=GSP_DefaultFontHeight, LW=1, DL=1; Vector!(ushort, 2) fontSize; 
+									/+16+/FormattedColor PC, SC; 	//can save 6
+									/+16+/FontFace fontFace; float	OP=1;  ushort fontFlags, texFlags; 
+									/+40+/TR a; 
+								} 
+								
+								pragma(msg,i"$(ExperimentalState.sizeof)".text.注); 
+								ExperimentalState experimentalUserState, experimentalTargetState; 
+							}
+							
+							version(/+$DIDE_REGION Handles+/all)
+							{
+								struct TexHandleState(Opcode opcode)
+								{
+									private: 
+									enum TexHandle initialState = TexHandle.init; 
+									TexHandle 	userState 	= initialState, 
+										targetState 	= initialState; 
+									
+									public: 
+									@property TexHandle get()
+									=> userState; 
+									
+									@property void set(TexHandle val)
+									{
+										if(userState.chkSet(val))
+										{
+											/+
+												The user changed the internal state. Change detection, 
+												and precompilation can go here.
+											+/
+										}
+									} 
+									
+									@property void set(Texture tex)
+									{ set(tex ? tex.handle : TexHandle.init); } 
+									
+									void resetState(StateSide side)()
+									{
+										if(side & StateSide.user) userState = initialState; 
+										if(side & StateSide.target) targetState = initialState; 
+									} 
+									
+									void synch(GfxAssembler builder)
+									{
+										if(targetState.chkSet(userState))
+										{
+											/+
+												The internal state was different to the target GPU state.
+												So it have to be emited.
+											+/
+											builder.emit(assemble(opcode, assembleHandle(targetState))); 
+										}
+									} 
+								} 
+								
+								protected mixin template TexHandleTemplate(string name)
+								{
+									mixin(iq{
+										TexHandleState!(Opcode.set$(name)) state_$(name); 
+										void $(name)(T)(T arg) { state_$(name).set(arg); } 
+										auto $(name)() => state_$(name).get; 
+										void synch_$(name)() { state_$(name).synch(this); } 
+									}.text); 
+								} 
+							}
+							
+							version(/+$DIDE_REGION Sizes+/all)
+							{
+								struct SizeState(Opcode opcode, float initialState)
+								{
+									private: 
+									float 	userState 	= initialState, 
+										targetState 	= initialState; 
+									
+									public: 
+									ref access() => userState; 
+									
+									void resetState(StateSide side)()
+									{
+										if(side & StateSide.user) userState = initialState; 
+										if(side & StateSide.target) targetState = initialState; 
+									} 
+									
+									void synch(GfxAssembler builder)
+									{
+										if(targetState.chkSet(userState))
+										{
+											/+
+												The internal state was different to the target GPU state.
+												So it have to be emited.
+											+/
+											builder.emit(assemble(opcode, assembleSize(targetState))); 
+										}
+									} 
+								} 
+								
+								protected mixin template SizeTemplate(string name, float initialValue)
+								{
+									mixin(iq{
+										SizeState!(Opcode.set$(name), initialValue) state_$(name); 
+										ref $(name)() => state_$(name).access; 
+										void synch_$(name)() { state_$(name).synch(this); } 
+									}.text); 
+								} 
+							}
+							version(/+$DIDE_REGION Flags+/all)
+							{
+								struct FlagsState(T, FlagFormat flagFormat)
+								{
+									private: 
+									enum initialState = T.init; 
+									T 	userState 	= initialState, 
+										targetState 	= initialState; 
+									
+									public: 
+									ref access() => userState; 
+									
+									void resetState(StateSide side)()
+									{
+										if(side & StateSide.user) userState = initialState; 
+										if(side & StateSide.target) targetState = initialState; 
+									} 
+									
+									void synch(GfxAssembler builder)
+									{
+										if(targetState.chkSet(userState))
+										{
+											builder.emit(
+												assemble(
+													mixin(舉!((Opcode),q{setFlags})), flagFormat, bits(
+														targetState._raw, 
+														targetState.bitCnt
+													)
+												)
+											); 
+										}
+									} 
+								} 
+								
+								protected mixin template FlagsTemplate(string name, T, FlagFormat flagFormat)
+								{
+									mixin(iq{
+										FlagsState!(T, flagFormat) state_$(name); 
+										ref $(name)() => state_$(name).access; 
+										void synch_$(name)() { state_$(name).synch(this); } 
+									}.text); 
+								} 
+							}
+							
+							version(/+$DIDE_REGION Color+/all)
+							{
+								@property colorState() => tuple(((PALH).名!q{PALH}), ((PC).名!q{PC}), ((SC).名!q{SC}), ((OP).名!q{OP})); 
+								
+								struct ColorState
+								{
+									FormattedColor 	PC = FormattedColor(1, mixin(舉!((ColorFormat),q{u1}))), 
+										SC = FormattedColor(0, mixin(舉!((ColorFormat),q{la_u8}))); 
+									float OP = 1; 
+								} 
+								
+								ColorState 	user_colorState, 
+									target_colorState; 
+								
+								version(/+$DIDE_REGION+/all) {
+									mixin TexHandleTemplate!"PALH"; 
+									auto PC()
+									=> user_colorState.PC; void PC(A...)(in A a)
+									{ user_colorState.PC = FormattedColor(a); } 
+									auto SC()
+									=> user_colorState.SC; void SC(A...)(in A a)
+									{ user_colorState.SC = FormattedColor(a); } 
+									ref OP() => user_colorState.OP; 
+								}
+								
+								void reset_colors(StateSide side)()
+								{
+									state_PALH.resetState!side; 
+									if(side & StateSide.user) user_colorState = ColorState.init; 
+									if(side & StateSide.target) target_colorState = ColorState.init; 
+								} 
+								
+								void synch_colors(bool doPC=true, bool doSC=true)()
+								{
+									synch_PALH; 
+									with(target_colorState)
+									{
+										const 	PC_changed = doPC && PC.chkSet(user_colorState.PC),
+											SC_changed = doSC && SC.chkSet(user_colorState.SC); 
+										
+										if(PC_changed && SC_changed && PC.format==SC.format)
+										{
+											if(PC.value==SC.value)	{ emit(assemble(mixin(舉!((Opcode),q{setC})), assembleColor(PC))); }
+											else {
+												emit(
+													assemble(mixin(舉!((Opcode),q{setPCSC})), assembleColor(PC)),
+													           assembleColor_noFormat(SC)
+												); 
+											}
+										}
+										else
+										{
+											if(PC_changed) emit(assemble(mixin(舉!((Opcode),q{setPC})), assembleColor(PC))); 
+											if(SC_changed) emit(assemble(mixin(舉!((Opcode),q{setSC})), assembleColor(SC))); 
+										}
+										
+										if(OP.chkSet(user_colorState.OP)) emit(assemble(mixin(舉!((Opcode),q{setOP}))), OP.to_unorm); 
+									}
+								} 
+								
+								alias synch_PC = synch_colors!(true, false),
+								synch_SC = synch_colors!(false, true); 
+							}
+							
+							version(/+$DIDE_REGION Font+/all)
+							{
+								@property fontState() => tuple(
+									((FMH).名!q{FMH}), ((LFMH).名!q{LFMH}), ((FH).名!q{FH}), 
+									fontFace, ((FF).名!q{FF}), ((fontSize).名!q{fontSize}), 
+								); 
+								protected alias FontStateRegs = AliasSeq!(
+									"FMH", "LFMH", "FH", 
+									"fontFace", "FF", "fontSize"
+								); 
+								
+								mixin FlagsTemplate!("FF", FontFlags, FlagFormat.font); 	//FontFlags
+								mixin TexHandleTemplate!"FMH"; 	//Fontmap
+								mixin TexHandleTemplate!"LFMH"; 	//Latin fontmap
+								mixin SizeTemplate!("FH", GSP_DefaultFontHeight); 	//Font height
+								
+								FontFace fontFace; 
+								Vector!(ushort, 2) fontSize; /+cursor can use it to move around+/
+								
+								
+								void reset_font(StateSide side)()
+								{
+									state_FF	.resetState!(side),
+									state_FMH	.resetState!(side),
+									state_LFMH	.resetState!(side),
+									state_FH	.resetState!(side); 
+									if(side & StateSide.user) {
+										fontSize = 0;  
+										fontFace = null; 
+									}
+								} void synch_font()
+								{
+									synch_FF,
+									synch_FMH, 
+									synch_LFMH, 
+									synch_FH; 
+								} 
+								
+								/+
+									void setFont(FontId id)
+									{ setFont(accessFontFace(id)); }  void setFont(string name)
+									{ setFont(accessFontFace(name)); } 
+								+/
+								
+								void setFont(T)(FontSpec!T a)
+								{
+									void doit()
+									{
+										if(auto mf = (cast(MonoFont)(fontFace)))
+										{
+											FMH = mf.monoTexture, 
+											FH = mf.defaultSize.y, 
+											fontSize = Vector!(ushort, 2)(mf.defaultSize); 
+										}
+										else raise("Unsupported FontFace type: "~fontFace.text); 
+									} 
+									
+									fontFace = accessFontFace(a.fontSpec); 
+									FF = a.fontFlags; //Todo: update the fontType!
+									doit; 
+								} 
+							}
+							
+							version(/+$DIDE_REGION Line+/all)
+							{
+								@property lineState() => tuple(((LTH).名!q{LTH}), ((LW).名!q{LW}), ((DL).名!q{DL})); 
+								
+								mixin TexHandleTemplate!"LTH"; 	//Line tex handle
+								mixin SizeTemplate!("LW", 1); 	//Line width
+								mixin SizeTemplate!("DL", 1); 	//Dot length
+								void reset_line(StateSide side)()
+								{
+									state_LTH	.resetState!(side),
+									state_LW	.resetState!(side),
+									state_DL	.resetState!(side); 
+								} void synch_line()
+								{
+									synch_LTH, 
+									synch_LW, 
+									synch_DL; 
+								} 
+							}
+							
+							version(/+$DIDE_REGION Point+/all)
+							{
+								@property pointState() => tuple(((PS).名!q{PS})); 
+								
+								mixin SizeTemplate!("PS", 1); //Point size
+								void reset_point(StateSide side)()
+								{ state_PS	.resetState!(side); } void synch_point()
+								{ synch_PS; } 
+							}
+							
+							version(/+$DIDE_REGION Transform+/all)
+							{
+								@property transformState() => tuple(((TR).名!q{TR})); 
+								
+								static struct TransformationState
+								{
+									enum initialClipBounds = bounds2(-1e30, -1e30, 1e30, 1e30); 
+									vec2 scaleXY = vec2(1); 
+									float skewX_deg = 0; 
+									float rotZ_deg = 0; 
+									vec2 transXY = vec2(0); //in world space
+									bounds2 clipBounds = initialClipBounds; //in world space
+									//applied in this order
+									
+									void clipBounds_reset() { clipBounds = initialClipBounds; } 
+									void reset() { this = typeof(this).init; } 
+								} 
+								
+								TransformationState user_TR, target_TR; 
+								alias TR = user_TR; 
+								
+								void reset_transform(StateSide side)()
+								{
+									if(side & StateSide.user) user_TR = TransformationState.init; 
+									if(side & StateSide.target) target_TR = TransformationState.init; 
+								} 
+								
+								void synch_transform()
+								{
+									with(target_TR)
+									{
+										if(scaleXY.chkSet(user_TR.scaleXY))
+										{
+											if(scaleXY.x!=scaleXY.y)
+											{
+												emit(
+													assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scaleXY}))), 	assembleSize(scaleXY.x), 
+														assembleSize(scaleXY.y)
+												); 
+											}
+											else
+											{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{scale}))), assembleSize(scaleXY.x)); }
+										}
+										
+										if(skewX_deg.chkSet(user_TR.skewX_deg))
+										{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{skewX}))), assembleAngle_deg(skewX_deg)); }
+										
+										if(rotZ_deg.chkSet(user_TR.rotZ_deg))
+										{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{rotZ}))), assembleAngle_deg(rotZ_deg)); }
+										
+										if(transXY.chkSet(user_TR.transXY))
+										{ emit(assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{transXY}))), assemblePoint(transXY)); }
+										
+										if(clipBounds.chkSet(user_TR.clipBounds))
+										{
+											emit(
+												assemble(mixin(舉!((Opcode),q{setTrans})), mixin(舉!((TransFormat),q{clipBounds}))), 	assemblePoint(clipBounds.topLeft),
+													assemblePoint(clipBounds.size)
+											); 
+										}
+									}
+								} 
+							}
+							
+							@property allState()
+							=> tuple(
+								colorState.expand, fontState.expand, lineState.expand, 
+								pointState.expand, transformState.expand
+							); 
+							
+							protected void resetState(StateSide side)()
+							{
+								reset_colors!(side), reset_font!(side), reset_line!(side), 
+								reset_point!(side), reset_transform!(side); 
+							} 
+							
+							void resetStyle()
+							{ resetState!(StateSide.user); } 
+							
+							void setState(Args...)(Args args)
+							{
+								void processArg(T)(T a)
+								{
+									static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+									else static if(is(T : GenericArg!(name, C), string name, C))
+									{ mixin(name~"=a;"); }
+								} 
+								static foreach(a; args) processArg(a); 
+							} 
+						}
+						
+					} 
+				} 
+				
+				class GfxBuilder : GfxAssembler
+				{
+					final
+					{
+						protected
+						{
+							alias This = typeof(this); 
+							
+							
+							enum isCallable(alias fun, T) = 
+								__traits(
+								compiles, {
+									auto b = new This; 
+									mixin(iq{b.$(__traits(identifier, fun))(T.init); }.text); 
+								}
+							); 
+							
+							template CollectTypes(alias Pred, Args...)
+							{
+								template ProcessArg(A)
+								{
+									static if(isTuple!A)	alias ProcessArg = Filter!(Pred, A.Types); 
+									else static if(Pred!A)	alias ProcessArg = A; 
+									else	alias ProcessArg = AliasSeq!(); 
+								} 
+								alias CollectTypes = NoDuplicates!(staticMap!(ProcessArg, Args)); 
+							} 
+						} 
+						
+						version(/+$DIDE_REGION Style+/all)
+						{
+							version(/+$DIDE_REGION Synonyms+/all)
+							{
+								alias opacity 	= OP, 
+								fg 	= PC, 
+								bk 	= SC,
+								fontFlags	= FF
+								/+
+									texFlags	= TF,
+									vecFlags	= VF
+								+/; 
+							}
+							
+							protected
+							{
+								void applyStyleArg(T)(T a)
+								{
+									static if(is(T : FontSpec!F, F))	{ setFont(a); }
+									else static if(is(T : FontId))	{ setFont(Font(a)); }
+									else static if(
+										is(T : FontFace)
+										/+for restore only+/
+									)	{ fontFace = a; /+keeps regs and fontSize unchanged+/}
+									else static if(is(T : FontBlink))	FF.blink = a; 
+									else static if(is(T : FontLine))	FF.line = a; 
+									else static if(is(T : FontWidth))	FF.width = a; 
+									else static if(is(T : FontScript))	FF.script = a; 
+									else static if(is(T : GenericArg!(name, C), string name, C))
+									{
+										enum fw = name.firstWord; 
+										static if(fw.among("OP", "opacity"))	mixin(name~q{=a.value; }); 
+										else static if(fw.among("PC", "fg"))	mixin(name~q{=a.value; }); 
+										else static if(fw.among("SC", "bk"))	mixin(name~q{=a.value; }); 
+										else static if(fw.among("FF", "fontFlags"))	mixin(name~q{=a.value; }); 
+										else static if(fw=="TR")	mixin(name~q{=a.value; }); 
+										else static if(
+											fw=="fontSize"
+											/+for restore only+/
+										)	fontSize = a.value; 
+										else static assert(false, "Unsupported Style() named argument: " ~ T.stringof); 
+									}
+									else static assert(false, "Unsupported Style() argument: " ~ T.stringof); 
+								} 
+								
+								enum isStyleArg(T) = isCallable!(applyStyleArg, T); 
+								
+								template AffectedStyleRegsOfType(T)
+								{
+									static if(
+										is(T : FontSpec!F, F)||
+										is(T : FontId)
+									)	alias AffectedStyleRegsOfType = FontStateRegs; 
+									else static if(
+										is(T : FontBlink)	||
+										is(T : FontLine)	||
+										is(T : FontWidth)	||
+										is(T : FontScript)
+									)	alias AffectedStyleRegsOfType = AliasSeq!(q{FF}); 
+									else static if(is(T : GenericArg!(name, C), string name, C))
+									{
+										enum fw = name.firstWord; 
+										static if(fw.among("OP", "opacity"))	alias AffectedStyleRegsOfType = AliasSeq!(q{OP}); 
+										else static if(fw.among("PC", "fg"))	alias AffectedStyleRegsOfType = AliasSeq!(q{PC}); 
+										else static if(fw.among("SC", "bk"))	alias AffectedStyleRegsOfType = AliasSeq!(q{SC}); 
+										else static if(fw.among("FF", "fontFlags"))	alias AffectedStyleRegsOfType = AliasSeq!(q{FF}); 
+										else static if(fw=="TR")	alias AffectedStyleRegsOfType = AliasSeq!(q{TR}); 
+										else alias AffectedStyleRegsOfType = AliasSeq!(); 
+									}
+									else alias AffectedStyleRegsOfType = AliasSeq!(); 
+								} 
+								
+								template AffectedStyleRegs(Args...)
+								{
+									enum regs = staticMap!(AffectedStyleRegsOfType, CollectTypes!(isStyleArg, Args)); 
+									static if(regs.length)	enum AffectedStyleRegs = [NoDuplicates!regs]; 
+									else	enum AffectedStyleRegs = string[].init; 	
+								} 
+							} 
+							
+							void Style(Args...)(Args args)
+							{
+								void processArg(T)(T a)
+								{
+									static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+									else applyStyleArg(a); 
+								} 
+								
+								static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
+							} 
+						}
+						
+						version(/+$DIDE_REGION Cursor+/all)
+						{
+							vec2 cursorPos; 
+							
+							alias cr = cursorPos; 
+							
+							struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+							struct m { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
+							
+							struct Mx { float value=0; this(A)(in A a) { value = float(a); } } 
+							struct mx { float value=0; this(A)(in A a) { value = float(a); } } 
+							struct My { float value=0; this(A)(in A a) { value = float(a); } } 
+							struct my { float value=0; this(A)(in A a) { value = float(a); } } 
+							
+							protected void applyCursorArg(T)(in T a)
+							{
+								static if(is(T : M))	cursorPos = a.value; 
+								else static if(is(T : Mx))	cursorPos.x = a.value; 
+								else static if(is(T : My))	cursorPos.y = a.value; 
+								else static if(is(T : m))	cursorPos += a.value; 
+								else static if(is(T : mx))	cursorPos.x += a.value; 
+								else static if(is(T : my))	cursorPos.y += a.value; 
+								else static if(
+									is(T : GenericArg!(name, E), string name, E) 
+									&& name.startsWith("cr")
+								)
+								{ mixin(name~"=a.value;"); }
+								else { static assert(false, "Unhandled Cursor() argument: "~T.stringof); }
+							} 
+							
+							enum isCursorArg(T) = isCallable!(applyCursorArg, T); 
+						}
+						protected void textBackend(R)(R input)
+						{
+							if(input.empty) return; 
+							
+							alias _builder = this; 
+							
+							void setup()
+							{
+								with(_builder)
+								{
+									synch_transform, synch_PALH, synch_font, synch_colors; 
+									emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
+								}
+							} 
+							_builder.begin(0, {}); 
+							setup; 
+							
+							version(/+$DIDE_REGION Convert various types to 8bit ASCII, reuse allocated temp memory.+/all)
+							{
+								static Appender!(ubyte[]) app; app.clear; 
+								ubyte[] rawSrc; 
+								alias E = ElementType!R; 
+								static if(isDynamicArray!R && is(E : AnsiChar) /+fastest way+/)
+								{ rawSrc = (cast(ubyte[])(input)); }
+								else static if(isInputRange!R && is(E : AnsiChar) /+buffer the inputRange+/)
+								{ app.put(input); rawSrc = (cast(ubyte[])(app[])); }
+								else static if(isInputRange!R && isSomeChar!E /+convert fron normal string+/)
+								{ app.put(input.map!toAnsiChar); rawSrc = (cast(ubyte[])(app[])); }
+								else static assert(false, "unhandled element type: "~E.stringof); 
+							}
+							
+							uint decideCharCount(int len)
+							{
+								enum maxChars = 1<<6/+bits, base1 (0 means 1, 63 means 64)+/; 
+								const uint 	space 	= max(_builder.remainingVertexCount-2, 0)/2,
+									n	= len.min(min(space, maxChars)); 
+								if(n) _builder.incVertexCount(n*2+2); return n; 
+							} 
+							
+							encodeRLE
+							(
+								rawSrc, 3,
+								((ubyte[] part) {
+									while(1)
+									{
+										if(const n = decideCharCount((cast(int)(part.length))))
+										{
+											_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
+											cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
+										}
+										/+start next geometry item+/_builder.begin; setup; 
+									}
+								}),
+								((ubyte ch, uint len) {
+									while(1)
+									{
+										if(const n = decideCharCount(len))
+										{
+											_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
+											cursorPos.x += n; len -= n; if(!len) break; 
+										}
+										/+start next geometry item+/_builder.begin; setup; 
+									}
+								})
+							); 
+							
+							version(/+$DIDE_REGION Don't waste memory for exceptionally large texts+/all)
+							{
+								enum tooLargeBuf = 0x1000; 
+								if(app.length>tooLargeBuf) { app.shrinkTo(tooLargeBuf); }
+							}
+						} 
+						
+						void Text(Args...)(Args args)
+						{
+							//this work on temporal graphics state
+							/+Must not use const args!!!! because /+Code: chain(" ", str)+/ fails.+/
+							
+							/+
+								pragma(msg,i"fun: $(__PRETTY_FUNCTION__)
+								saved regs:$(AffectedStyleRegs!Args.join(','))".text.注); 
+							+/
+							
+							mixin(scope_remember(AffectedStyleRegs!Args.join(','))); 
+							
+							void processArg(T)(T a)
+							{
+								static if(isTuple!T) { static foreach(i; 0..T.length) processArg(a[i]); }
+								else static if(isStyleArg!T)	{ applyStyleArg(a); }
+								else static if(isCursorArg!T)	applyCursorArg(a); 
+								else static if(isSomeString!T)	textBackend(a); 
+								else static if(isSomeChar!T)	textBackend(only(a)); 
+								else static if(
+									isInputRange!T &&
+									(
+										isSomeChar!(ElementType!T)
+										||is(ElementType!T : AnsiChar)
+									)
+								)	{ textBackend(a); }
+								else static if(isDelegate!T) a(); 
+								else static if(isFunction!T) a(); 
+								else
+								{
+									pragma(msg,i"$(T.stringof) $(isCallable!(applyStyleArg, T))".text.注); 
+									static assert(false, "Unhandled Text() argument: "~T.stringof); 
+								}
+							} 
+							
+							static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
+						} 
+						
+						void drawPath(Args...)(in Args args)
+						{
+							void setup() { synch_transform, synch_colors, synch_LW; } 
+							
+							/+
+								Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
+								The problem could be at start/end of line segments. The tangents are bad there!
+							+/
+							static if(0)	begin(6/+to be safe+/, {}); 
+							else	begin/+full begin. for a fix+/; 
+							
+							setup; 
+							static immutable NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
+							
+							vec2 P_start, P_last, P_mirror; //internal state
+							
+							void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
+							{
+								//cmd is for estimationb only.  It should use the SvgPathCommand...
+								
+								//Todo: compress XYFormat -> assembleXY()
+								
+								const est = bezierTesselationSettings.estimateVertexCount(cmd); 
+								if(est + 4/*to be sure*/ > remainingVertexCount)
+								{
+									emit(
+										assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
+										NOP, NOP
+									); 
+									end; begin; setup;  //Todo: this is bad and bogus.
+									emit(
+										assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
+										assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
+									); 
+									incVertexCount(2); //add extra to be sure
+								}
+								
+								emit(op); incVertexCount(est); 
+								static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+							} 
+							
+							void onItem(const ref SvgPathItem item)
+							{
+								const ref P0()
+								=> item.data[0]; const ref P1()
+								=> item.data[1]; const ref P2()
+								=> item.data[2]; const Pm()
+								=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
+								{ P_mirror = M, P_last = L; } 
+								final switch(item.cmd)
+								{
+										/+drawing+/	/+state update+/	
+									case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
+									P_start = P0; 	break; 
+									case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
+									case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
+									case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
+									case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
+									case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
+									/+redirected commands:+/			
+									case SvgPathCommand.A: 	approximateArcToCubicBeziers
+										(P_last, item, &onItem)
+									/+Todo: move it to GPU+/
+									/+
+										Opt: Should do with a simplified 
+										version of cubic bezier!
+										because <90deg and no S curve
+									+/; 		break; 
+									case SvgPathCommand.Z: 	if(P_last!=P_start)
+									{
+										emitPathCmd(
+											'L', mixin(舉!((Opcode),q{drawPathL})), 
+											P_start
+										); 
+										/+
+											Todo: move it	to GPU
+											...bad	idea because vertexLimit
+										+/
+										/+Todo: only works for line, not curves+/
+									}	step(P_start, P_start); 	break; 
+								}
+							} 
+							
+							
+							SvgPathParser parser = void; bool parserInitialized = false; 
+							void parse(in string s)
+							{
+								if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
+								parser.parse(s); 
+							} 
+							
+							static foreach(i, a; args)
+							{
+								{
+									alias T = Unqual!(Args[i]); 
+									static if(isSomeString!T) { parse(a); }
+								}
+							}
+							
+							emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
+						} 
+						
+						void drawC64Sprite(V)(in V pos, in int idx)
+						{
+							if(idx.inRange(0, 255))
+							{
+								begin(4, {}); synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
+								emit(
+									mixin(舉!((Opcode),q{drawMove})), assemblePoint(pos),
+									assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
+								); 
+							}
+						} 
+						
+						void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
+						{
+							begin(4, {}); synch_transform, synch_PALH, synch_colors; 
+							emit(
+								mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
+								mixin(舉!((Opcode),q{drawTexRect}))	, assemblePoint(bnd.bottomRight),
+								assembleHandle(texHandle)
+							); 
+						} 
+						
+						void drawC64Border(ivec2 pos)
+						{
+							void r(int x0, int y0, int x1, int y1)
+							{
+								auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
+								drawC64Rect(ibounds2(p(x0, y0), p(x1, y1))); 
+							} 
+							r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
+							r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
+						} 
+						
+						void drawC64Screen(ivec2 pos, Image2D!RG img, int[3] bkCols, int borderCol)
+						{
+							PC(borderCol, 4); drawC64Border(pos-4); 
+							foreach(y; 0..img.height)
+							{ drawC64ChrRow((pos+ivec2(0, y))*8, img.row(y), bkCols[0]); }
+						} 
+						
+						void drawC64ChrRow(
+							//Texture palette, Texture fontTex, /+Todo: put these into state+/
+							ivec2 pos, RG[] data, int bk
+						)
+						{
+							if(data.empty) return; 
+							
+							int index = 0; 
+							
+							static RG[] fetchSameColor(ref RG[] data)
+							{
+								if(data.empty) return []; 
+								const fg = data.front.y; 
+								auto n = data.countUntil!((a)=>(a.y!=fg)); if(n<0) n = data.length; 
+								auto res = data[0..n]; data = data[n..$]; return res; 
+							} 
+							
+							index = 0; 
+							Style((((cast(EGAColor)(bk))).名!q{bk})); 
+							while(data.length)
+							{
+								auto act = fetchSameColor(data/+, remainingChars+/); 
+								const nextIndex = index + act.length.to!int; 
+								Style((((cast(EGAColor)(act[0].y))).名!q{fg})); 
+								cursorPos = vec2(pos/8+ivec2(index, 0)); 
+								textBackend(act.map!((a)=>((cast(AnsiChar)(a.x))))); 
+								index = nextIndex; 
+							}
+						} 
+						
+						
+						
+						
+						
+					} 
+				} 
+			+/
+			
+			Also a higher level inherited class for some usage example:
+			/+
+				Code: class TurboVisionBuilder : GfxBuilder
+				{
+					final
+					{
+						mixin InjectEnumMembers!EGAColor; 
+						
+						enum clMenuBk 	= ((ltGray).名!q{bk}), 
+						clMenuText 	= ((black).名!q{fg}), 
+						clMenuKey	= ((red).名!q{fg}),
+						clMenuItem 	= tuple(clMenuText, clMenuBk),
+						clMenuSelected 	= tuple(clMenuText, ((green).名!q{bk})),
+						clMenuDisabled 	= tuple(((dkGray).名!q{fg}), clMenuBk); 
+						
+						enum clWindowBk	= ((blue).名!q{bk}),
+						clWindowText 	= ((white).名!q{fg}),
+						clWindow 	= tuple(clWindowText, clWindowBk),
+						clWindowClickable 	= tuple(((ltGreen).名!q{fg}), clWindowBk); 
+						
+						enum clScrollBar = tuple(((blue).名!q{fg}), ((cyan).名!q{bk})); 
+						
+						static struct MenuItem
+						{
+							string title, shortcut, hint; 
+							bool selected, disabled, opened; 
+							MenuItem[] subMenu; 
+						} 
+						
+						void drawMenuTitle(Args...)(in MenuItem item, Args extra)
+						{
+							const clNormal = 	item.disabled 	? clMenuDisabled : 
+								item.selected 	? clMenuSelected 
+									: clMenuItem; 
+							const s = item.title, aidx = s.byDchar.countUntil('&'); 
+							mixin(scope_remember(q{FF})); 
+							if(item.selected) FF.blink = FontBlink.blink; 
+							if(aidx < 0) { Text(clNormal, chain(" ", s , " ")); }
+							else {
+								Text(
+									clNormal, 	chain(" ", mixin(指(q{s},q{0..aidx}))), 
+									clMenuKey, 	mixin(指(q{s},q{aidx+1})), 
+									clNormal, 	chain(mixin(指(q{s},q{aidx+2..$})), " "),
+									extra
+								); 
+							}
+						} 
+						
+						void drawSubMenu(R)(R items)
+							if(isForwardRange!(R, MenuItem))
+						{
+							sizediff_t measureItemWidth(in MenuItem item)
+							=> item.title.filter!q{a!='&'}.walkLength + 2
+							+ ((item.shortcut.empty)?(0):(item.shortcut.walkLength + 2)); 
+							
+							const maxWidth = items.save.map!measureItemWidth.maxElement; 
+							vec2 pos = cursorPos; void NL() { pos += vec2(0, 1); Text(M(pos)); } 
+							Style(clMenuItem); 
+							
+							void shadow(size_t n) { Text(((black).名!q{bk}), ((.6).名!q{opacity}), " ".replicate(n)); } 
+							
+							Text(chain(" ┌", "─".replicate(maxWidth), "┐ ")); NL; 
+							foreach(item; items)
+							{
+								Text(" │"); 
+								const space = maxWidth - measureItemWidth(item); 
+								if(item.shortcut!="")
+								{ drawMenuTitle(item, chain(' '.repeat.take(space+1), item.shortcut, " ")); }
+								else
+								{ drawMenuTitle(item, ' '.repeat.take(space)); }
+								Text("│ "); shadow(2); NL; 
+							}
+							Text(chain(" └", '─'.repeat.take(maxWidth), "┘ ")); shadow(2); NL; 
+							Text(mx(2)); shadow(maxWidth+4); 
+						} 
+						
+						void drawMainMenu(R)(R items)
+							if(isForwardRange!(R, MenuItem))
+						{
+							foreach(item; items)
+							{
+								const pos = cursorPos; 
+								drawMenuTitle(item); 
+								if(item.opened && !item.subMenu.empty)
+								{
+									mixin(scope_remember(q{cursorPos})); 
+									Text(M(pos), my(1)); //move the cursor
+									drawSubMenu(item.subMenu); 
+								}
+							}
+						} 
+						
+						void drawTextWindow(R)(string title, ibounds2 bnd, R lines)
+						{
+							void Btn(string s)
+							{ Text(clWindow, "[", clWindowClickable, s, clWindow, "]"); } 
+							
+							Style(clWindow); 
+							Text(
+								M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x2247182886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+								chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
+								{ Btn("↕"); }, "═╗"
+							); 
+							const w = bnd.width-2, h = bnd.height-2; 
+							foreach(line; lines.padRight("", h).take(h))
+							{
+								Text(Mx(bnd.left), my(1), '║'); 
+								string s = line.replace('\t', "    ").padRight(' ', w).takeExactly(w).text; 
+								enum enableSyntaxHighlight = true/+note, it's extremely slow!+/; 
+								static if(enableSyntaxHighlight)
+								{
+									foreach(word; s.splitWhen!((a,b)=>(a.isAlphaNum!=b.isAlphaNum)))
+									{
+										enum keywords = ["program", "var", "begin", "end", "integer"]; 
+										const isKeyword = keywords.canFind(word.text.lc); 
+										Text(((isKeyword)?(((white).名!q{fg})):(((yellow).名!q{fg}))) , word); 
+									}
+								}
+								else
+								{ Text(s); }
+								Text(
+									clScrollBar, predSwitch(
+										cursorPos.y-bnd.top-1, 
+										0, '▲', 1, '■', h-1, '▼', '▒'
+									)
+								); 
+							}
+							Text(
+								M(bnd.bottomLeft), my(-1), "╚═",
+								chain(" ", "1:1", " ").text.center(17, '═'),
+								clScrollBar, chain("◄", "■", '▒'.repeat.take(bnd.width-24), "►"),
+								clWindowClickable, "─┘"
+							); 
+						} 
+						
+						void fillSpace(int width=80) { while(cursorPos.x<width) Text(' '); } 
+						
+						
+						
+					} 
+				} 
+			+/
+			
+			I ask you to implement the IDrawing interface methods in this class:
+			/+
+				Code: class DrawingProxy : IDrawing
+				{
+					GfxBuilder gfx; 
+					this(GfxBuilder gfxBuilder)
+					{ this.gfx = gfxBuilder; } 
+					
+				} 
+			+/
+		+/
+		/+
+			Assistant: /+
+				Structured: class DrawingProxy : IDrawing
+				{
+					GfxBuilder gfx; 
+					this(GfxBuilder gfxBuilder)
+					{ this.gfx = gfxBuilder; } 
+					
+					ref float zoomFactor()
+					{ return gfx.TR.scaleXY.x; } 
+					
+					ref float invZoomFactor()
+					{
+						static float invZoom = 1.0f; 
+						invZoom = 1.0f / gfx.TR.scaleXY.x; 
+						return 1/invZoom; 
+					} 
+					
+					void translate(vec2 offset)
+					{ gfx.TR.transXY += offset; } 
+					
+					void scale(float factor)
+					{ gfx.TR.scaleXY *= factor; } 
+					
+					void pop()
+					{ gfx.end(); } 
+					
+					bounds2 inputTransform(in bounds2 b)
+					{
+						return bounds2(
+							inputTransform(b.topLeft),
+							inputTransform(b.bottomRight)
+						); 
+					} 
+					
+					vec2 inputTransform(in vec2 p)
+					{ return (p - gfx.TR.transXY) / gfx.TR.scaleXY; } 
+					
+					bounds2 inverseInputTransform(in bounds2 b)
+					{
+						return bounds2(
+							inverseInputTransform(b.topLeft),
+							inverseInputTransform(b.bottomRight)
+						); 
+					} 
+					
+					vec2 inverseInputTransform(in vec2 p)
+					{ return p * gfx.TR.scaleXY + gfx.TR.transXY; } 
+					
+					ref bounds2 clipBounds()
+					{ return gfx.TR.clipBounds; } 
+					
+					void pushClipBounds(bounds2 newBounds)
+					{ gfx.TR.clipBounds = newBounds.intersect(gfx.TR.clipBounds); } 
+					
+					void popClipBounds()
+					{ gfx.TR.clipBounds_reset(); } 
+					
+					ref float fontHeight()
+					{ return gfx.FH(); } 
+					
+					ref float lineWidth()
+					{ return gfx.LW(); } 
+					
+					ref float pointSize()
+					{ return gfx.PS(); } 
+					
+					ref LineStyle lineStyle()
+					{
+						static LineStyle style; 
+						style.width = gfx.LW(); 
+						style.texture = gfx.LTH(); 
+						return style; 
+					} 
+					
+					ref ArrowStyle arrowStyle()
+					{
+						static ArrowStyle style; 
+						return style; 
+					} 
+					
+					@property het.math.RGB color()
+					{ return gfx.PC().toRGB; } 
+					
+					@property void color(het.math.RGB c)
+					{ gfx.PC(c); } 
+					
+					@property float alpha()
+					{ return gfx.OP(); } 
+					
+					@property void alpha(float a)
+					{ gfx.OP = a; } 
+					
+					void point(in vec2 p)
+					{
+						gfx.begin(1, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.synch_point(); 
+						gfx.emit(
+							assemble(舉!((Opcode), "drawMove")), assemblePoint(p),
+							assemble(舉!((Opcode), "drawPoint"))
+						); 
+						gfx.incVertexCount(1); 
+					} 
+					
+					void moveTo(float x, float y)
+					{ gfx.cursorPos = vec2(x, y); } 
+					
+					void lineTo(float x, float y)
+					{ lineTo(vec2(x, y)); } 
+					
+					void moveTo(in vec2 p)
+					{ gfx.cursorPos = p; } 
+					
+					void lineTo(in vec2 p)
+					{
+						gfx.begin(2, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.synch_line(); 
+						gfx.emit(
+							assemble(舉!((Opcode), "drawMove")), assemblePoint(gfx.cursorPos),
+							assemble(舉!((Opcode), "drawLine")), assemblePoint(p)
+						); 
+						gfx.incVertexCount(2); 
+						gfx.cursorPos = p; 
+					} 
+					
+					void moveRel(float dx, float dy)
+					{ gfx.cursorPos += vec2(dx, dy); } 
+					
+					void lineRel(float dx, float dy)
+					{ lineTo(gfx.cursorPos + vec2(dx, dy)); } 
+					
+					void line(in vec2 p0, in vec2 p1)
+					{
+						moveTo(p0); 
+						lineTo(p1); 
+					} 
+					
+					void hLine(float x0, float y, float x1)
+					{ line(vec2(x0, y), vec2(x1, y)); } 
+					
+					void vLine(float x, float y0, float y1)
+					{ line(vec2(x, y0), vec2(x, y1)); } 
+					
+					void drawRect(in bounds2 b)
+					{
+						gfx.begin(8, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.synch_line(); 
+						gfx.emit(
+							assemble(舉!((Opcode), "drawMove")), assemblePoint(b.topLeft),
+							assemble(舉!((Opcode), "drawLine")), assemblePoint(vec2(b.right, b.top)),
+							assemble(舉!((Opcode), "drawLine")), assemblePoint(b.bottomRight),
+							assemble(舉!((Opcode), "drawLine")), assemblePoint(vec2(b.left, b.bottom)),
+							assemble(舉!((Opcode), "drawLine")), assemblePoint(b.topLeft)
+						); 
+						gfx.incVertexCount(8); 
+					} 
+					
+					void drawX(in bounds2 b)
+					{
+						line(b.topLeft, b.bottomRight); 
+						line(vec2(b.right, b.top), vec2(b.left, b.bottom)); 
+					} 
+					
+					void fillRect(in bounds2 b)
+					{ fillRect(b.left, b.top, b.right, b.bottom); } 
+					
+					void fillRect(float x0, float y0, float x1, float y1)
+					{
+						gfx.begin(4, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.emit(
+							assemble(舉!((Opcode), "drawMove")), assemblePoint(vec2(x0, y0)),
+							assemble(舉!((Opcode), "drawFillRect")), assemblePoint(vec2(x1, y1))
+						); 
+						gfx.incVertexCount(4); 
+					} 
+					
+					void circle(in vec2 p, float r, float arc0 = 0, float arc1 = 2 * PI)
+					{
+						const int segments = max(cast(int)(r * 8), 8); 
+						const float arcStep = (arc1 - arc0) / segments; 
+						
+						gfx.begin(segments + 1, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.synch_line(); 
+						
+						gfx.emit(assemble(舉!((Opcode), "drawMove")), assemblePoint(p + vec2(r * cos(arc0), r * sin(arc0)))); 
+						
+						foreach(i; 1 .. segments + 1)
+						{
+							const float angle = arc0 + i * arcStep; 
+							gfx.emit(assemble(舉!((Opcode), "drawLine")), assemblePoint(p + vec2(r * cos(angle), r * sin(angle)))); 
+						}
+						
+						gfx.incVertexCount(segments + 1); 
+					} 
+					
+					void drawFontGlyph(
+						int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
+						in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
+					)
+					{
+						gfx.begin(4, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_PALH(); 
+						gfx.synch_FMH(); 
+						gfx.synch_FH(); 
+						gfx.synch_colors(); 
+						gfx.FF = fontFlags; 
+						gfx.synch_FF(); 
+						
+						gfx.emit(
+							assemble(舉!((Opcode), "drawMove")), assemblePoint(b.topLeft),
+							assemble(舉!((Opcode), "drawFontGlyph")), bits(idx, 16),
+							assemblePoint(b.size),
+							assembleColor(FormattedColor(bkColor)),
+							assemblePoint(ySubRange)
+						); 
+						gfx.incVertexCount(4); 
+					} 
+					
+					float textWidth(string text)
+					{ return text.length * gfx.FH() * 0.6f; } 
+					
+					void textOut(
+						vec2 p, string text, float width = 0, 
+						HAlign align_ = HAlign.left, bool vertFlip = false
+					)
+					{ gfx.Text(M(p), text); } 
+					
+					void hGraph_f(
+						float x0, float y0, in float[] data, float 
+						xScale = 1, float yScale = 1
+					)
+					{
+						if(data.empty) return; 
+						
+						gfx.begin(data.length * 2, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.synch_line(); 
+						
+						gfx.emit(assemble(舉!((Opcode), "drawMove")), assemblePoint(vec2(x0, y0 + data[0] * yScale))); 
+						
+						foreach(i; 1 .. data.length)
+						{
+							gfx.emit(
+								assemble(舉!((Opcode), "drawLine")), 
+								assemblePoint(vec2(x0 + i * xScale, y0 + data[i] * yScale))
+							); 
+						}
+						
+						gfx.incVertexCount(data.length * 2); 
+					} 
+					
+					void bezier2(in vec2 A, in vec2 B, in vec2 C)
+					{ gfx.drawPath("M " ~ A.toPathString ~ " Q " ~ B.toPathString ~ " " ~ C.toPathString); } 
+					
+					void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
+					{
+						gfx.begin(3, {}); 
+						gfx.synch_transform(); 
+						gfx.synch_colors(); 
+						gfx.emit(
+							assemble(舉!((Opcode), "drawMove")), assemblePoint(a),
+							assemble(舉!((Opcode), "drawFillTriangle")), assemblePoint(b),
+							assemblePoint(c)
+						); 
+						gfx.incVertexCount(3); 
+					} 
+				} 
+			+/
+			
+			/+Note: Usage(prompt_hit: 64, prompt_miss: 15822, completion: 2986, HUF: 1.43, price:  50%)+/
+		+/
+	+/
 }
 
 
@@ -2780,8 +4667,7 @@ class VulkanWindow: Window, IGfxContentDestination
 		{
 			/+Todo: Old crap, just workin'!!! Must refactor!!!+/
 			
-			//views and mouseState
-			MouseState mouse; 
+			//views
 			View2D view; 
 			private View2D viewGUI_; 
 			
@@ -2857,6 +4743,71 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				if(view.updateAnimation(deltaTime.value(second))) invalidate; 
 				updateViewClipBoundsAndMousePos; 
+			} 
+			
+			version(/+$DIDE_REGION gányolás texture access provided for het.ui+/all)
+			{
+				Texture[File] gányolás_texturesByFile; 
+				TexHandle gányolás_textures_getNow(File f)
+				{
+					synchronized(this)
+					{
+						if(!f) return TexHandle.init; 
+						if(auto tex = f in gányolás_texturesByFile)
+						{ return tex.handle; }
+						else
+						{
+							auto bmp = bitmaps[f]; 
+							enforce(bmp.type=="ubyte"); 
+							auto tex = new Texture(
+								bmp.channels.predSwitch
+								(
+									1, TexFormat.wa_u8, 
+									2, TexFormat.la_u8,
+									3, TexFormat.bgr_u8,
+									4, TexFormat.bgra_u8
+								), 
+								bmp.size, bmp.getRaw
+							); 
+							gányolás_texturesByFile[f] = tex; 
+							return tex.handle; 
+						}
+					} 
+				} 
+				void gányolás_textures_invalidate(File f)
+				{
+					synchronized(this)
+					{ gányolás_texturesByFile.remove(f); } 
+				} 
+				ivec2 gányolás_textures_getSize(TexHandle h)
+				{
+					synchronized(this)
+					{ return IB.access(h).sizeFormat.size.xy; } 
+				} 
+				protected void initialize_uiSystem()
+				{
+					synchronized(this)
+					{
+						static import het.ui; 
+						het.ui.gányolás_textures_getNow 	= &this.gányolás_textures_getNow,
+						het.ui.gányolás_textures_invalidate 	= &this.gányolás_textures_invalidate,
+						het.ui.gányolás_textures_getSize 	= &this.gányolás_textures_getSize; 
+						het.ui.initTextStyles; 
+					} 
+				} 
+			}
+			
+			//UI integration
+			override void onUpdateUIBeginFrame()
+			{
+				import het.ui:im; 
+				im._beginFrame(view, viewGUI); 
+			} 
+			
+			override void onUpdateUIEndFrame()
+			{
+				import het.ui:im; 
+				im._endFrame; 
 			} 
 		}
 		auto getGfxContentDestination() => (cast(IGfxContentDestination)(this)); 
@@ -3876,7 +5827,11 @@ class VulkanWindow: Window, IGfxContentDestination
 				g_fontFaceManager = new FontFaceManager; 
 			}
 			
-			initializeViewsAndMouseState; 
+			version(/+$DIDE_REGION het.ui initialization+/all)
+			{
+				initializeViewsAndMouseState; 
+				initialize_uiSystem; 
+			}
 			
 			disableInternalRedraw = true /+Do nothing on WM_PAINT+/; 
 			targetUpdateRate = 100000 /+No limit on minimum update interval+/; 
@@ -3946,18 +5901,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x1EF9682886ADB).檢(
+					((0x2E33982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x1F00882886ADB))))
+				if((互!((bool),(0),(0x2E3AB82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x1F09C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x1F0B382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2E43F82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2E45682886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -3970,8 +5925,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x1F28882886ADB).檢 (imVG)),
-					((0x1F2AE82886ADB).檢 (imFPS)); 
+					((0x2E62B82886ADB).檢 (imVG)),
+					((0x2E65182886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4013,19 +5968,19 @@ $(V_size+G_size)".text
 								zoomanim *=2; 
 								auto viewMatrix = mat4.lookAt(vec3(side.xy, 500)/1.65f*globalScale*(zoomanim), vec3(0), vec3(0, 1, 0)); 
 								
-								((0x1F88982886ADB).檢(modelMatrix)); 
+								((0x2EC2C82886ADB).檢(modelMatrix)); 
 								
-								((0x1F8C382886ADB).檢(viewMatrix)); 
+								((0x2EC6682886ADB).檢(viewMatrix)); 
 								
 								// Set up projection
 								auto projMatrix = mat4.perspective(swapchain.extent.width, swapchain.extent.height, 60, 0.1*globalScale, 1000*globalScale); 
 								
-								((0x1F9AA82886ADB).檢(projMatrix)); 
+								((0x2ED4D82886ADB).檢(projMatrix)); 
 								
 								
 								auto mvp = projMatrix * viewMatrix * modelMatrix; 
 								
-								((0x1FA3382886ADB).檢(mvp)); 
+								((0x2EDD682886ADB).檢(mvp)); 
 								
 								
 								viewMatrix = mat4.lookAt(vec3(clientSizeHalf, 500), vec3(clientSizeHalf, 0), vec3(0, 1, 0)); 
@@ -4033,7 +5988,7 @@ $(V_size+G_size)".text
 								
 								
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x1FB4982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x1FB6082886ADB))))); 
+								const fovY_deg = ((0x2EEEC82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2EF0382886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								const N = 1.0/2; 
 								const extent = vec2(swapchain.extent.width, swapchain.extent.height); 

@@ -1821,10 +1821,9 @@ version(/+$DIDE_REGION+/all)
 }class GLWindow: Window
 {
 		View2D view; 
-		MouseState mouse; 
 	
 		//diagnostic stuff
-		bool showFPS, showMegaTextures; 
+		bool showMegaTextures; 
 		float guiScale = 1; 
 	
 		private View2D viewGUI_; 

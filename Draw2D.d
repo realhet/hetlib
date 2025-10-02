@@ -1670,7 +1670,7 @@ class Drawing : IDrawing
 		{ return bounds2(inputTransform(b.low), inputTransform(b.high)); } 
 		
 		vec2 inverseInputTransform(in vec2 v)
-		{ return v/actState.drawScale-actState.drawOrigin; } //Todo: slow divide
+		{ return v/actState.drawScale-actState.drawOrigin; } //Opt: slow divide
 		bounds2 inverseInputTransform(in bounds2 b)
 		{ return bounds2(inverseInputTransform(b.low), inverseInputTransform(b.high)); } 
 		

@@ -23,23 +23,35 @@ version(/+$DIDE_REGION+/all)
 	{
 		version(VulkanUI) {}else version = OpenGLUI; 
 		
-		
 		version(OpenGLUI)
 		{
-			public import het.opengl: 	GLWindow; 
-			public import het.draw2d: 	OldDrawing = Drawing, BoldOffset; 
-			alias Drawing = IDrawing; 
+			mixin(
+				"public import het.opengl: GLWindow; 
+import het.opengl: oldTextures = textures, 
+DefaultFont_subTexIdxMap
+/+
+	It's a map of default chars to textures.
+	It is cleared when the texture GC happens.
+	Totally bad concept.
++/; "
+			); 
 			
+			shared static this()
+			{
+				//static init///////////////////////////////
+				initTextStyles; 
+			} 
+			
+			alias Drawing = IDrawing; 
+			enum BoldOffset = 1.0f/40 /+
+				This is a deprecated constant for resizing bold text.
+				Used in the old font shader.
+			+/; 
 			
 			alias TexHandle = Typedef!(uint, 0, "TexHandle"); //The aame in Vulkan.
 			
 			//texture access
-			import het.opengl: oldTextures = textures, 
-			DefaultFont_subTexIdxMap/+
-				It's a map of default chars to textures.
-				It is cleared when the texture GC happens.
-				Totally bad concept.
-			+/; 
+			
 			TexHandle textures_getNow(File f) => TexHandle(oldTextures[f]); 
 			void textures_invalidate(File f) { oldTextures.invalidate(f); } 
 			auto textures_accessInfo(TexHandle stIdx)
@@ -57,7 +69,45 @@ version(/+$DIDE_REGION+/all)
 		}
 		
 		version(VulkanUI)
-		{}
+		{
+			public import het.vulkanwin; 
+			
+			//must call initTextStyles from outside
+			
+			alias Drawing = IDrawing; 
+			
+			enum BoldOffset = 1.0f/40 /+
+				This is a deprecated constant for resizing bold text.
+				Used in the old font shader.
+			+/; 
+			
+			__gshared int[dchar] DefaultFont_subTexIdxMap; 
+			//Used by UI, must be cleared after every megatexture GC
+			
+			__gshared Texture[File] g_tempLoadedTextures; 
+			
+			__gshared TexHandle delegate(File) gányolás_textures_getNow; 
+			TexHandle textures_getNow(File f)
+			=> gányolás_textures_getNow(f); 
+			
+			__gshared void delegate(File) gányolás_textures_invalidate; 
+			void textures_invalidate(File f) 
+			=> gányolás_textures_invalidate(f); 
+			
+			__gshared ivec2 delegate(TexHandle) gányolás_textures_getSize; 
+			auto textures_accessInfo(TexHandle stIdx)
+			{
+				auto v = gányolás_textures_getSize(stIdx); 
+				static struct Res { int width, height; } 
+				return Res(v.x, v.y); 
+			} 
+			
+			//texture statistics
+			size_t textures_length() => 0; 
+			size_t textures_poolSizeBytes() => 0; 
+			size_t textures_usedSizeBytes() => 0; 
+			
+		}
 		
 		
 		/+
@@ -388,9 +438,9 @@ version(/+$DIDE_REGION+/all)
 			
 			clickedId = pressedId = releasedId = SrcId.init; //normally it's 0 all the time, except that one frame it's clicked.
 			
-			with(cast(GLWindow)mainWindow)
+			with(mainWindow)
 			{
-				 //Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
+				//Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
 				if(topId && mouse.LMB && mouse.justPressed && isForeground)
 				{
 					 //Note: isForeground will not work with a toolwindow
@@ -571,12 +621,6 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	
-	shared static this()
-	{
-		//static init///////////////////////////////
-		initTextStyles; 
-	} 
-	
 	//TextStyle ////////////////////////////////////
 	struct TextStyle
 	{
@@ -664,10 +708,10 @@ version(/+$DIDE_REGION+/all)
 	
 	//TextStyles ////////////////////////////////////////////
 	
-	TextStyle tsNormal, tsComment, tsError, tsBold, tsBold2, tsCode, tsQuote, tsLink, tsTitle, tsChapter, tsChapter2, tsChapter3,
+	__gshared TextStyle tsNormal, tsComment, tsError, tsBold, tsBold2, tsCode, tsQuote, tsLink, tsTitle, tsChapter, tsChapter2, tsChapter3,
 		tsBtn, tsKey, tsLarger, tsSmaller, tsHalf; 
 	
-	TextStyle*[string] textStyles; 
+	__gshared TextStyle*[string] textStyles; 
 	
 	TextStyle newTextStyle(string name)(in TextStyle base, string props)
 	{
@@ -682,6 +726,9 @@ version(/+$DIDE_REGION+/all)
 	
 	void initTextStyles()
 	{
+		__gshared bool initialized; if(initialized) return; scope(exit) initialized = true; 
+		
+		
 		
 		void a(string n, ref TextStyle r, in TextStyle s, void delegate() setup = null)
 		{
@@ -5928,9 +5975,8 @@ version(/+$DIDE_REGION+/all)
 				YAlign.top, "Diagnostics\t", {
 					Column(
 						{
-							if(auto w = cast(GLWindow)mainWindow)
-							ChkBox(w.showFPS	, "Show FPS Graph"       ); 
-							ChkBox(showResMonitor,	"Show Resource Monitor"); 
+							ChkBox(mainWindow.showFPS, "Show FPS Graph"); 
+							ChkBox(showResMonitor, "Show Resource Monitor"); 
 						}
 					); 
 				}
@@ -6244,20 +6290,20 @@ struct im
 			{
 				auto tr = View2D.fromViewToView(view_world, view_gui); 
 				auto shift = tr.origin/tr.scale; 
-				((0x2A998EB16D5C4).檢(tr.scale)); 
-				((0x2A9C1EB16D5C4).檢(tr.origin)); 
-				((0x2A9EBEB16D5C4).檢(shift)); 
+				((0x2AEACEB16D5C4).檢(tr.scale)); 
+				((0x2AED5EB16D5C4).檢(tr.origin)); 
+				((0x2AEFFEB16D5C4).檢(shift)); 
 				
 				auto p = view_world.mousePos; 
-				((0x2AA3BEB16D5C4).檢(p)); 
-				((0x2AA5DEB16D5C4).檢(shift)); 
+				((0x2AF4FEB16D5C4).檢(p)); 
+				((0x2AF71EB16D5C4).檢(shift)); 
 				
-				((0x2AA89EB16D5C4).檢(p+shift)); 
-				((0x2AAB1EB16D5C4).檢((p+shift)*tr.scale)); 
+				((0x2AF9DEB16D5C4).檢(p+shift)); 
+				((0x2AFC5EB16D5C4).檢((p+shift)*tr.scale)); 
 				
-				((0x2AAEAEB16D5C4).檢(tr.origin)); 
-				((0x2AB14EB16D5C4).檢(p*tr.scale)); 
-				((0x2AB3FEB16D5C4).檢(p*tr.scale+tr.origin)); 
+				((0x2AFFEEB16D5C4).檢(tr.origin)); 
+				((0x2B028EB16D5C4).檢(p*tr.scale)); 
+				((0x2B053EB16D5C4).檢(p*tr.scale+tr.origin)); 
 				
 			}
 			foreach(i, d; dr)
