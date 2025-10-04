@@ -3769,7 +3769,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					enum vsynch 	= (常!(bool)(0)),
+					enum vsynch 	= (常!(bool)(1)),
 					canTripleBuffer 	= (常!(bool)(1)); 
 					
 					/+
@@ -6454,7 +6454,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							+/
 						}
 						
-						static if((常!(bool)(0)))
+						static if((常!(bool)(1)))
 						print(
 							"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
 							bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"

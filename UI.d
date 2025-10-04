@@ -25,16 +25,7 @@ version(/+$DIDE_REGION+/all)
 		
 		version(OpenGLUI)
 		{
-			mixin(
-				"public import het.opengl: GLWindow; 
-		import het.opengl: oldTextures = textures, 
-		DefaultFont_subTexIdxMap
-		/+
-			It's a map of default chars to textures.
-			It is cleared when the texture GC happens.
-			Totally bad concept.
-		+/; "
-			); 
+			//public import het.opengl: GLWindow, gl, GL_COLOR_BUFFER_BIT; import het.opengl: oldTextures = textures, DefaultFont_subTexIdxMap; 
 			
 			alias UIWindow = GLWindow; 
 			
@@ -5241,13 +5232,10 @@ version(/+$DIDE_REGION+/all)
 						flags.saveVisibleBounds = true; 
 						if(const visibleBounds = imstVisibleBounds(actId))
 						{
+							void doit(int i, TreeRow r)
 							{
-								foreach(
-									i; 	(ifloor(visibleBounds.top    * invRowHeight    )).max(0) ..
-										(iceil(visibleBounds.bottom * invRowHeight + 1)).min(rows.length.to!int)
-								)
+								with(im)
 								{
-									auto r = &rows[i]; 
 									Row(
 										((identityStr(r.item)).genericArg!q{id}),
 										{
@@ -5258,15 +5246,15 @@ version(/+$DIDE_REGION+/all)
 												Row(
 													{
 														outerSize = vec2(r.prefix.length, 1)*fh; 
-														
+														const float siz = fh; 
 														void customDraw(Drawing dr, .Container cntr)
 														{
 															dr.color = clGray; dr.lineWidth = 1; 
-															float x = fh*.5f; 
+															float x = siz*.5f; 
 															foreach(ch; r.prefix.byChar)
 															{
-																if(ch.among('+', 'I')) dr.vLine(x, 0, fh); 
-																if(ch.among('+', 'L')) dr.circle(vec2(x+.5*fh, 0), fh*.5f, -π/2, 0); 
+																if(ch.among('+', 'I')) dr.vLine(x, 0, siz); 
+																if(ch.among('+', 'L')) dr.circle(vec2(x+.5*siz, 0), siz*.5f, -π/2, 0); 
 																x += fh; 
 															}
 														} 
@@ -5303,6 +5291,14 @@ version(/+$DIDE_REGION+/all)
 										}
 									); 
 								}
+							} 
+							foreach(
+								i; 	(ifloor(visibleBounds.top    * invRowHeight    )).max(0) ..
+									(iceil(visibleBounds.bottom * invRowHeight + 1)).min(rows.length.to!int)
+							)
+							{
+								doit(i, rows[i]); /+must put inside a function, so the customDraw can capture its stack.+/
+								/+Todo: Do it with a better way that dr.addDrawCallback()+/
 							}
 						}
 						
@@ -6294,20 +6290,20 @@ struct im
 			{
 				auto tr = View2D.fromViewToView(view_world, view_gui); 
 				auto shift = tr.origin/tr.scale; 
-				((0x2AF29EB16D5C4).檢(tr.scale)); 
-				((0x2AF52EB16D5C4).檢(tr.origin)); 
-				((0x2AF7CEB16D5C4).檢(shift)); 
+				((0x2AF91EB16D5C4).檢(tr.scale)); 
+				((0x2AFBAEB16D5C4).檢(tr.origin)); 
+				((0x2AFE4EB16D5C4).檢(shift)); 
 				
 				auto p = view_world.mousePos; 
-				((0x2AFCCEB16D5C4).檢(p)); 
-				((0x2AFEEEB16D5C4).檢(shift)); 
+				((0x2B034EB16D5C4).檢(p)); 
+				((0x2B056EB16D5C4).檢(shift)); 
 				
-				((0x2B01AEB16D5C4).檢(p+shift)); 
-				((0x2B042EB16D5C4).檢((p+shift)*tr.scale)); 
+				((0x2B082EB16D5C4).檢(p+shift)); 
+				((0x2B0AAEB16D5C4).檢((p+shift)*tr.scale)); 
 				
-				((0x2B07BEB16D5C4).檢(tr.origin)); 
-				((0x2B0A5EB16D5C4).檢(p*tr.scale)); 
-				((0x2B0D0EB16D5C4).檢(p*tr.scale+tr.origin)); 
+				((0x2B0E3EB16D5C4).檢(tr.origin)); 
+				((0x2B10DEB16D5C4).檢(p*tr.scale)); 
+				((0x2B138EB16D5C4).檢(p*tr.scale+tr.origin)); 
 				
 			}
 			foreach(i, d; dr)

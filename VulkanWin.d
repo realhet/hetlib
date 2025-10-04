@@ -2898,11 +2898,13 @@ version(/+$DIDE_REGION+/all) {
 		{
 			private void setupLine()
 			{ gfx.LW = inputTransformSize(lineWidth); gfx.PC = color; } 
+			private void setupPoint()
+			{ gfx.LW = inputTransformSize(pointSize); gfx.PC = color; } 
 		}
 		
 		
 		void point(in vec2 p)
-		{ setupLine; gfx.drawPath(i"M$(p.x) $(p.y) h 1e-5".text); } 
+		{ setupPoint; gfx.drawPath(i"M$(p.x) $(p.y) h 1e-5".text); } 
 		
 		void moveTo(in vec2 p)
 		{ gfx.cr = p; } 
@@ -3249,7 +3251,79 @@ class VulkanWindow: Window, IGfxContentDestination
 				if(chkClear(view._mustZoomAll)) view.zoomAll; 
 				
 				//afterPaint; 
+			} 
+			//navigate 2D view with the keyboard and the mouse
+			//it optionally calls invalidate
+			bool navigateView(bool keyboardEnabled, bool mouseEnabled)
+			{
+				bool res; 
+				with(view)
+				with(this.actions)
+				{
+					const oldOrigin = origin, oldScale = scale; 
+					
+					const 	scrollSpeed	= this.deltaTime.value(second)*800*4,
+						zoomSpeed	= this.deltaTime.value(second)*6,
+						wheelSpeed	= 0.375f; 
+					
+					group("View controls"); //Todo: ctrl+s es s (mint move osszeakad!)
+					
+					const enm = mouseEnabled; 
+					/+
+						Todo: actions are deprecated. This view.navigate function 
+						should be replaced with an IMGUI enable flag and a hidden window.
+					+/
+					
+					onActive	(
+						"Scroll", "MMB RMB", enm,
+						{ scroll(inputs.mouseDelta); }
+					); 
+					onDelta	(
+						"Zoom", "MW", enm ,
+						(x){ zoomAroundMouse(x*wheelSpeed); }
+					); 
+					
+					const enk = keyboardEnabled; 
+					onActive(
+						"Scroll left", "A", enk,
+						{ scrollH(scrollSpeed); }
+					); 
+					onActive	(
+						"Scroll right", "D", enk,
+						{ scrollH(-scrollSpeed); }
+					); 
+					onActive(
+						"Scroll up", "W", enk,
+						{ scrollV(scrollSpeed); }
+					); 
+					onActive(
+						"Scroll down", "S", enk,
+						{ scrollV(-scrollSpeed); }
+					); 
+					
+					onActive	(
+						"Zoom in", "PgUp", enk ,
+						{ zoom(zoomSpeed); }
+					); 
+					onActive	(
+						"Zoom out", "PgDn", enk ,
+						{ zoom(-zoomSpeed); }
+					); 
+					onModifier(
+						"Scroll/Zoom slower", "Shift", enk || enm,
+						scrollSlower
+					); 
+					onPressed (
+						"Zoom all", "Home", enk ,
+						{ zoomAll; }
+					); 
+					
+					res = origin!=oldOrigin || scale!=oldScale; 
+				}
+				if(res) invalidate; 
+				return res; 
 			} 
+			
 		}
 		auto getGfxContentDestination() => (cast(IGfxContentDestination)(this)); 
 		
@@ -3285,7 +3359,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				shrinkRate 	: 0.5
 			})),
 			TBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
-				minSizeBytes 	: ((  1)*(MiB)), 
+				minSizeBytes 	: ((  4)*(KiB)), 
 				maxSizeBytes 	: ((768)*(MiB)),
 				growRate : 2.0,
 				shrinkWhen 	: 0.25, 
@@ -4350,18 +4424,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x21B0482886ADB).檢(
+					((0x2226A82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x21B7682886ADB))))
+				if((互!((bool),(0),(0x222DC82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x21C0A82886ADB).檢((互!((float/+w=12+/),(1.000),(0x21C2182886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2237082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2238782886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4374,8 +4448,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x21DF682886ADB).檢 (imVG)),
-					((0x21E1C82886ADB).檢 (imFPS)); 
+					((0x2255C82886ADB).檢 (imVG)),
+					((0x2258282886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4406,7 +4480,7 @@ $(V_size+G_size)".text
 							
 							{
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x2216F82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2218682886ADB))))); 
+								const fovY_deg = ((0x228D582886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x228EC82886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								
 								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5555,7 +5629,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					 
+					
 					//Todo: check the warnings!
 					
 					//common stuff
@@ -6970,8 +7044,8 @@ $(V_size+G_size)".text
 					{
 						fragTexHandleAndMode = 0; 
 						fragTexCoordZ = 0; //This is normally 0. Fonts and lines can temporarily change it.
-						fragFloats0 = vec4(1, 2, 3, 4); 
-						fragFloats1 = vec4(5, 6, 7, 8); 
+						fragFloats0 = vec4(0); 
+						fragFloats1 = vec4(0); 
 						
 						if(true)
 						{
