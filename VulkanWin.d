@@ -3234,6 +3234,18 @@ class VulkanWindow: Window, IGfxContentDestination
 					}
 				}
 				
+				//Todo: afterPaint can come here!
+				
+				
+				staticDrGUI.gfx.begin; 
+				/+
+					Todo: /+H1: BUG!!!! 🐞+/
+					This is a bugfix because the 
+					very last item is sometimes deterministically lost.
+				+/
+				
+				
+				
 				version(/+$DIDE_REGION RGNFraw main ang GUI surfaces+/all)
 				{
 					staticDr	.gfx.commit,
@@ -4424,18 +4436,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2226A82886ADB).檢(
+					((0x2235C82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x222DC82886ADB))))
+				if((互!((bool),(0),(0x223CE82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2237082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2238782886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2246282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2247982886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4448,8 +4460,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2255C82886ADB).檢 (imVG)),
-					((0x2258282886ADB).檢 (imFPS)); 
+					((0x2264E82886ADB).檢 (imVG)),
+					((0x2267482886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4476,11 +4488,13 @@ $(V_size+G_size)".text
 							internalUpdate; //This will call: im.beginFrame(), onUpdate(), im.endFrame()
 							imDrawFrame; 
 							
+							
+							
 							VB.upload; GB.upload; 
 							
 							{
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x228D582886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x228EC82886ADB))))); 
+								const fovY_deg = ((0x229D982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x229F082886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								
 								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 

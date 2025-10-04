@@ -1429,7 +1429,7 @@ $(clipBounds)".text
 						); 
 						
 						fillSpace(20+((0xD7EB5F5C4644).檢((ifloor((互!((float/+w=12+/),(1.000),(0xD8095F5C4644)))*80))))); 
-						if((互!((bool),(1),(0xD84E5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
+						if((互!((bool),(0),(0xD84E5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
 						/+Todo: /+H1: BUG!!!! 🐞+/+/
 					}
 					
@@ -1457,7 +1457,7 @@ $(clipBounds)".text
 							}
 						); 
 						
-						static if((常!(bool)(1)))
+						static if((常!(bool)(0)))
 						{
 							foreach(j; 0..20)
 							drawPath(
@@ -1466,14 +1466,14 @@ $(clipBounds)".text
 							); 
 						}
 						
-						static if((常!(bool)(1)))
+						static if((常!(bool)(0)))
 						{
 							static string svgPath; if(svgPath=="") svgPath = `c:\dl\testSvgPath.txt`.File.readText(true); 
 							//dr.color = clGold; dr.lineWidth = 1; 
 							drawPath(svgPath); 
 						}
 						
-						static if((常!(bool)(1)))
+						static if((常!(bool)(0)))
 						{
 							foreach(line; svgFontDemo.splitLines)
 							if(line.strip.isWild(`<use xlink:href="#*" x="*" y="*"></use>`))
@@ -1486,12 +1486,14 @@ $(clipBounds)".text
 							}
 						}
 						
-						if((互!((bool),(1),(0xDF565F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
+						((0xDF535F5C4644).檢(builder.empty)); 
+						
+						if((互!((bool),(0),(0xDF8D5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
 						/+Todo: /+H1: BUG!!!! 🐞+/+/
 					}
 					consumeGfxContent(builder); 
 				}
-				((0xE01F5F5C4644).檢((update間(_間)))); 
+				((0xE0565F5C4644).檢((update間(_間)))); 
 				
 				
 				
