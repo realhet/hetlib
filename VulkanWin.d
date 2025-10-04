@@ -1720,8 +1720,13 @@ version(/+$DIDE_REGION+/all) {
 						24 total + gl_ClipDistance[4] = 28
 					+/
 					
-					112
-					/+20251004: HelloVulkanGui test, a letter disappeared bug.+/; 
+					113
+					/+
+						20251004: testVulkanUI.d 
+							When I hold the first button, 
+							a letter disappears in Edit box. 
+							-> drawC64Rect now requires 4+1 vertices.
+					+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
 					static @property int maxVertexCount()
@@ -2544,7 +2549,7 @@ version(/+$DIDE_REGION+/all) {
 			{
 				if(idx.inRange(0, 255))
 				{
-					begin(4, {}); synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
+					begin(4+1, {}); synch_transform, synch_PALH, synch_FMH, synch_FH, synch_colors; 
 					emit(
 						mixin(舉!((Opcode),q{drawMove})), assemblePoint(pos),
 						assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(1-1, 6), (cast(ubyte)(idx)))
@@ -2554,7 +2559,7 @@ version(/+$DIDE_REGION+/all) {
 			
 			void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
 			{
-				begin(4, {}); synch_transform, synch_PALH, synch_colors; 
+				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
 				emit(
 					mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
 					mixin(舉!((Opcode),q{drawTexRect}))	, assemblePoint(bnd.bottomRight),
@@ -2714,7 +2719,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x155EE82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1566582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -2998,7 +3003,9 @@ version(/+$DIDE_REGION+/all) {
 		)
 		{
 			if(data.empty) return; 
-			setupLine; NOTIMPL; 
+			moveTo(x0, y0 + yScale*data[0]); 
+			foreach(i; 1..data.length.to!int-1)
+			lineTo(x0 + xScale*i, y0 + yScale*data[i]); 
 		} 
 		
 		void bezier2(in vec2 A, in vec2 B, in vec2 C)
@@ -4294,18 +4301,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x214BF82886ADB).檢(
+					((0x2159C82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2153182886ADB))))
+				if((互!((bool),(0),(0x2160E82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x215C582886ADB).檢((互!((float/+w=12+/),(1.000),(0x215DC82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x216A282886ADB).檢((互!((float/+w=12+/),(1.000),(0x216B982886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4318,8 +4325,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x217B182886ADB).檢 (imVG)),
-					((0x217D782886ADB).檢 (imFPS)); 
+					((0x2188E82886ADB).檢 (imVG)),
+					((0x218B482886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4350,7 +4357,7 @@ $(V_size+G_size)".text
 							
 							{
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x21B2A82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x21B4182886ADB))))); 
+								const fovY_deg = ((0x21C0782886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x21C1E82886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								
 								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 
