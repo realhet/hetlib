@@ -27,14 +27,16 @@ version(/+$DIDE_REGION+/all)
 		{
 			mixin(
 				"public import het.opengl: GLWindow; 
-import het.opengl: oldTextures = textures, 
-DefaultFont_subTexIdxMap
-/+
-	It's a map of default chars to textures.
-	It is cleared when the texture GC happens.
-	Totally bad concept.
-+/; "
+		import het.opengl: oldTextures = textures, 
+		DefaultFont_subTexIdxMap
+		/+
+			It's a map of default chars to textures.
+			It is cleared when the texture GC happens.
+			Totally bad concept.
+		+/; "
 			); 
+			
+			alias UIWindow = GLWindow; 
 			
 			shared static this()
 			{
@@ -72,6 +74,8 @@ DefaultFont_subTexIdxMap
 		{
 			public import het.vulkanwin; 
 			
+			alias UIWindow = VulkanWindow; 
+			
 			//must call initTextStyles from outside
 			
 			alias Drawing = IDrawing; 
@@ -103,10 +107,10 @@ DefaultFont_subTexIdxMap
 			} 
 			
 			//texture statistics
+			//Todo: implement these with a global system info collector object.
 			size_t textures_length() => 0; 
 			size_t textures_poolSizeBytes() => 0; 
 			size_t textures_usedSizeBytes() => 0; 
-			
 		}
 		
 		
@@ -5689,26 +5693,26 @@ version(/+$DIDE_REGION+/all)
 			updateInternal(
 				{
 					//collect and actualize data
-					textureCount.act[0] = textures_length; 
-					texturePoolSize.act[0] = textures_poolSizeBytes; 
-					textureUsedSize.act[0] = textures_usedSizeBytes; 
+					textureCount	.act[0] = textures_length,
+					texturePoolSize	.act[0] = textures_poolSizeBytes,
+					textureUsedSize	.act[0] = textures_usedSizeBytes; 
 					
 					const bs = bitmaps.stats; 
-					bitmapCount	    .act[0] = bs.count; 
-					residentBitmapSize	    .act[0] = bs.residentSizeBytes; 
-					nonUnloadableBitmapSize.act[0] = bs.nonUnloadableSizeBytes; 
-					allBitmapSize          .act[0] = bs.allSizeBytes; 
+					bitmapCount	.act[0] = bs.count,
+					residentBitmapSize	.act[0] = bs.residentSizeBytes,
+					nonUnloadableBitmapSize	.act[0] = bs.nonUnloadableSizeBytes,
+					allBitmapSize	.act[0] = bs.allSizeBytes; 
 					
 					const vs = virtualFiles.stats; 
-					virtualFileCount.act[0]	= vs.count; 
-					residentVirtualFileSize	.act[0] = vs.residentSizeBytes; 
+					virtualFileCount	.act[0] = vs.count,
+					residentVirtualFileSize	.act[0] = vs.residentSizeBytes,
 					allVirtualFileSize	.act[0] = vs.allSizeBytes; 
 					
-					UPS.act[0] = mainWindow.UPS; 
-					FPS.act[0] = mainWindow.FPS; 
+					UPS	.act[0] = mainWindow.UPS, 
+					FPS	.act[0] = mainWindow.FPS; 
 					
-					TPS.act[0] = global_TPS; 
-					VPS.act[0] = global_VPS; 
+					TPS	.act[0] = global_TPS,
+					VPS	.act[0] = global_VPS; 
 					
 					import core.memory : GC; 
 					with(GC.stats)
@@ -5828,7 +5832,7 @@ version(/+$DIDE_REGION+/all)
 					Graph(
 						"VirtualFiles", [
 							Data(residentVirtualFileSize.history[timeIdx][], clResidentVirtualFile),
-							Data(allVirtualFileSize     .history[timeIdx][], clVirtualFile        )
+							Data(allVirtualFileSize     .history[timeIdx][], clVirtualFile       )
 						], gridXStepSize
 					); 
 				} 
@@ -5838,16 +5842,16 @@ version(/+$DIDE_REGION+/all)
 					Row(
 						{
 							Text(format!"Bitmaps (%s)"(bitmapCount.val)); 	Flex; 
-							Legend("Res" , residentBitmapSize.val	, clResidentBitmap	, "B"); 	Spacer; 
-							Legend("Hot" , nonUnloadableBitmapSize.val	, clHotBitmap	, "B"); 	Spacer; 
-							Legend("All" , allBitmapSize.val	, clBitmap	, "B"); 
+							Legend("Res", residentBitmapSize.val, clResidentBitmap, "B"); 	Spacer; 
+							Legend("Hot", nonUnloadableBitmapSize.val, clHotBitmap, "B"); 	Spacer; 
+							Legend("All" , allBitmapSize.val, clBitmap, "B"); 
 						}
 					); 
 					Graph(
 						"BitmapCache", [
-							Data(residentBitmapSize     .history[timeIdx][], clResidentBitmap),
-							Data(nonUnloadableBitmapSize.history[timeIdx][], clHotBitmap	    ),
-							Data(allBitmapSize          .history[timeIdx][], clBitmap	    )
+							Data(residentBitmapSize      .history[timeIdx][], clResidentBitmap),
+							Data(nonUnloadableBitmapSize.history[timeIdx][], clHotBitmap),
+							Data(allBitmapSize           .history[timeIdx][], clBitmap)
 						], gridXStepSize
 					); 
 				} 
@@ -5856,8 +5860,8 @@ version(/+$DIDE_REGION+/all)
 				{
 					Row(
 						{
-							Text(format!"Textures (%s)"(textureCount.val));  Flex; 
-							Legend("Used", textureUsedSize.val, clTextureUsed, "B");   Text("   "); 
+							Text(format!"Textures (%s)"(textureCount.val)); 	Flex; 
+							Legend("Used", textureUsedSize.val, clTextureUsed, "B"); 	Text("   "); 
 							Legend("Pool", texturePoolSize.val, clTexturePool, "B"); 
 						}
 					); 
@@ -6290,20 +6294,20 @@ struct im
 			{
 				auto tr = View2D.fromViewToView(view_world, view_gui); 
 				auto shift = tr.origin/tr.scale; 
-				((0x2AEACEB16D5C4).檢(tr.scale)); 
-				((0x2AED5EB16D5C4).檢(tr.origin)); 
-				((0x2AEFFEB16D5C4).檢(shift)); 
+				((0x2AF29EB16D5C4).檢(tr.scale)); 
+				((0x2AF52EB16D5C4).檢(tr.origin)); 
+				((0x2AF7CEB16D5C4).檢(shift)); 
 				
 				auto p = view_world.mousePos; 
-				((0x2AF4FEB16D5C4).檢(p)); 
-				((0x2AF71EB16D5C4).檢(shift)); 
+				((0x2AFCCEB16D5C4).檢(p)); 
+				((0x2AFEEEB16D5C4).檢(shift)); 
 				
-				((0x2AF9DEB16D5C4).檢(p+shift)); 
-				((0x2AFC5EB16D5C4).檢((p+shift)*tr.scale)); 
+				((0x2B01AEB16D5C4).檢(p+shift)); 
+				((0x2B042EB16D5C4).檢((p+shift)*tr.scale)); 
 				
-				((0x2AFFEEB16D5C4).檢(tr.origin)); 
-				((0x2B028EB16D5C4).檢(p*tr.scale)); 
-				((0x2B053EB16D5C4).檢(p*tr.scale+tr.origin)); 
+				((0x2B07BEB16D5C4).檢(tr.origin)); 
+				((0x2B0A5EB16D5C4).檢(p*tr.scale)); 
+				((0x2B0D0EB16D5C4).檢(p*tr.scale+tr.origin)); 
 				
 			}
 			foreach(i, d; dr)

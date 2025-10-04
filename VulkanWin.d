@@ -2008,7 +2008,6 @@ version(/+$DIDE_REGION+/all) {
 					FontFace fontFace; 
 					Vector!(ushort, 2) fontSize; /+cursor can use it to move around+/
 					
-					
 					void reset_font(StateSide side)()
 					{
 						state_FF	.resetState!(side),
@@ -2303,7 +2302,7 @@ version(/+$DIDE_REGION+/all) {
 			version(/+$DIDE_REGION Cursor+/all)
 			{
 				vec2 cursorPos; 
-				
+				//Todo: this must be rafactored!!!
 				alias cr = cursorPos; 
 				
 				struct M { vec2 value; this(A...)(in A a) { value = vec2(a); } } 
@@ -2719,7 +2718,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1566582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1568082886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -2794,7 +2793,10 @@ version(/+$DIDE_REGION+/all) {
 		} 
 		
 		this(GfxBuilder gfxBuilder)
-		{ this.gfx = gfxBuilder; } 
+		{
+			this.gfx = gfxBuilder; 
+			stickFont = Font(accessFontFace(FontId.VGA_9x16)); 
+		} 
 		
 		float _zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
 		ref float zoomFactor() => _zoomFactor; 
@@ -2889,7 +2891,7 @@ version(/+$DIDE_REGION+/all) {
 			{ gfx.OP = a; } 
 			
 			float inputTransformSize(float s)
-			=> ((s<=0)?(s):(s * gfx.TR.scaleXY.x)); 
+			=> ((s<=0)?(-s):(s * gfx.TR.scaleXY.x)); 
 		}
 		
 		version(/+$DIDE_REGION Setup+/all)
@@ -2946,9 +2948,31 @@ version(/+$DIDE_REGION+/all) {
 		
 		void fillRect(float x0, float y0, float x1, float y1)
 		{ fillRect(bounds2(x0, y0, x1, y1)); } 
-		
+		
 		void circle(in vec2 p, float r, float arc0 = 0, float arc1 = 2 * PI)
-		{ setupLine; NOTIMPL; } 
+		{
+			void ellipse(float x, float y, float ra, float rb, float arc0=0, float arc1=2*PI, float incr=0)
+			{
+				while(arc0>arc1) arc1 += 2*PI; //Todo: lame
+				
+				int cnt; 
+				if(incr>0)	{ cnt = iround((arc1-arc0)/incr); }
+				else	{
+					float rounds = (arc1-arc0)*(0.5f/PI); 
+					cnt = iround(rounds*64); 
+					//resolution  //todo: it should be done in the shader
+					incr = cnt ? (arc1-arc0)/cnt : 0; 
+				}
+				
+				foreach(i; 0..cnt+1) {
+					float a = arc0+incr*i; 
+					const p = vec2(x+sin(a)*ra, y+cos(a)*rb); 
+					if(!i) moveTo(p); else lineTo(p); 
+				}
+			} 
+			
+			ellipse(p.x, p.y, r, r, arc0, arc1); 
+		} 
 		
 		void drawFontGlyph(
 			int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
@@ -2988,14 +3012,31 @@ version(/+$DIDE_REGION+/all) {
 			gfx.drawC64Rect(b, h); 
 		} 
 		
+		FontSpec!FontFace stickFont; 
+		
 		float textWidth(string text)
-		{ NOTIMPL; return 1; } 
+		{ return (9*.0f/16) * fontHeight * text.walkLength; } 
 		
 		void textOut(
 			vec2 p, string text, float width = 0, 
 			HAlign align_ = HAlign.left, bool vertFlip = false
 		)
-		{ NOTIMPL; } 
+		{
+			if(text.empty) return; 
+			
+			with(HAlign)
+			if(align_!=left) {
+				const tw = textWidth(text); 
+				p.x += (width-tw)*(align_==center ? 0.5f : 1.0f); 
+			}
+			
+			with(gfx)
+			Text(
+				stickFont, ((color).名!q{fg}), ((FormattedColor(ColorFormat.la_u8, 0)).名!q{bk}), 
+				M(p)/+Todo: this is in charSize!!!! not in pixels!!!+/, text
+			); 
+			
+		} 
 		
 		void hGraph_f(
 			float x0, float y0, in float[] data, float 
@@ -3415,6 +3456,8 @@ class VulkanWindow: Window, IGfxContentDestination
 						V_size 	= buffer.appendPos,
 						V_cnt 	= _uploadedVertexCount; 
 					}
+					
+					global_VPSCnt += buffer.appendPos; /+Todo: better stats for ResourceMonitor+/
 				} 
 				
 				@property deviceMemoryBuffer() => buffer.deviceMemoryBuffer; 
@@ -3472,7 +3515,9 @@ class VulkanWindow: Window, IGfxContentDestination
 				void upload()
 				{
 					buffer.upload; 
-					with(lastFrameStats) { G_size 	= buffer.appendPos; }
+					with(lastFrameStats) { G_size = buffer.appendPos; }
+					
+					global_VPSCnt += buffer.appendPos; 
 					
 					//if(inputs.Shift.down) (cast(ubyte*)(buffer.hostPtr))[0..buffer.appendPos].saveTo(`c:\dl\a.a`); 
 				} 
@@ -3732,6 +3777,8 @@ class VulkanWindow: Window, IGfxContentDestination
 						{
 							memcpy(heapRef.ptr, data.ptr, data.length); /+Note: ⚡ Memory transfer (process → host) +/
 							buffer.markModified(heapRef.ptr, data.length); 
+							
+							global_TPSCnt += data.sizeBytes; 
 							return texHandle; /+Note: ✔ Success+/
 						}
 						else
@@ -3754,6 +3801,8 @@ class VulkanWindow: Window, IGfxContentDestination
 						buffer.markModified(heapRef.ptr, data.length); 
 						info.heapChunkIdx = heapRef.heapChunkIdx; 
 						IB.set(handle, info); 
+						
+						global_TPSCnt += data.sizeBytes; 
 						return true; /+Note: ✔ Success+/
 					}
 					else
@@ -4301,18 +4350,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2159C82886ADB).檢(
+					((0x21B0482886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2160E82886ADB))))
+				if((互!((bool),(0),(0x21B7682886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x216A282886ADB).檢((互!((float/+w=12+/),(1.000),(0x216B982886ADB))).iremap(0, 1, 4, ma))); 
+					((0x21C0A82886ADB).檢((互!((float/+w=12+/),(1.000),(0x21C2182886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4325,8 +4374,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2188E82886ADB).檢 (imVG)),
-					((0x218B482886ADB).檢 (imFPS)); 
+					((0x21DF682886ADB).檢 (imVG)),
+					((0x21E1C82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4357,7 +4406,7 @@ $(V_size+G_size)".text
 							
 							{
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x21C0782886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x21C1E82886ADB))))); 
+								const fovY_deg = ((0x2216F82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2218682886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								
 								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 

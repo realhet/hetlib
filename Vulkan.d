@@ -6479,7 +6479,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		} 
 		class VulkanAppenderBuffer : VulkanStagedBuffer
 		{
-			size_t appendPos; 
+			size_t appendPos; //in bytes
 			
 			BitStreamAppender bitStreamAppender; 
 			@property bitPos() => appendPos*8 + bitStreamAppender.tempBits; 
