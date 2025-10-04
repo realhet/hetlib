@@ -1713,12 +1713,15 @@ version(/+$DIDE_REGION+/all) {
 						-----
 						24 total
 					+/
-					113
+					
+					//113
 					/+
 						113:
 						24 total + gl_ClipDistance[4] = 28
 					+/
-					; 
+					
+					112
+					/+20251004: HelloVulkanGui test, a letter disappeared bug.+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
 					static @property int maxVertexCount()
@@ -2711,7 +2714,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1559882886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x155EE82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4291,18 +4294,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2146982886ADB).檢(
+					((0x214BF82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x214DB82886ADB))))
+				if((互!((bool),(0),(0x2153182886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2156F82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2158682886ADB))).iremap(0, 1, 4, ma))); 
+					((0x215C582886ADB).檢((互!((float/+w=12+/),(1.000),(0x215DC82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4315,8 +4318,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2175B82886ADB).檢 (imVG)),
-					((0x2178182886ADB).檢 (imFPS)); 
+					((0x217B182886ADB).檢 (imVG)),
+					((0x217D782886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4347,11 +4350,11 @@ $(V_size+G_size)".text
 							
 							{
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x21AD482886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x21AEB82886ADB))))); 
+								const fovY_deg = ((0x21B2A82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x21B4182886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								
 								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 
-								const requiredDistance = double(extents.y) / 2 / tan(fovY_rad / 2); 
+								const requiredDistance = double(extents.y) / 2 / tan(double(fovY_rad) / 2); 
 								const projMatrix = mat4.perspective(extents.x, extents.y, fovY_deg, requiredDistance*0.001, requiredDistance*1000); 
 								const org = viewGUI.getOrigin(true).vec2; 
 								const viewMatrix = mat4.lookAt(vec3(org, requiredDistance), vec3(org, 0), vec3(0, 1, 0)); 
@@ -5496,7 +5499,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					
+					 
 					//Todo: check the warnings!
 					
 					//common stuff
