@@ -444,6 +444,7 @@ version(/+$DIDE_REGION+/all) {
 		//Fields accessed from het.ui
 		bool showFPS; //shows FPS graph overlay, UI switching it on and off.
 		MouseState mouse; //it is updated in descendant classes where views are maintained.
+		het.math.RGB backgroundColor = clBlack; 
 		
 		HWND hwnd()
 		{ return fhwnd; }  HDC hdc()

@@ -733,7 +733,7 @@ version(/+$DIDE_REGION+/all)
 			int res; 
 			foreach(i, s; keyModifiers) if(entries[s].active) res += 1<<i; 
 			return res; 
-		} ; 
+		}; 
 		alias modifiers = keyModifierMask; 
 		
 		//keyboard emulation ///////////////////////////////////
@@ -1710,9 +1710,9 @@ version(/+$DIDE_REGION+/all)
 	version(/+$DIDE_REGION Slow/Locked Mouse+/all)
 	{
 		auto rawMousePos  ()
-		{ return vec2(inputs.MXraw.value, inputs.MYraw.value); } ; 
+		{ return vec2(inputs.MXraw.value, inputs.MYraw.value); }; 
 		auto rawMouseDelta()
-		{ return vec2(inputs.MXraw.delta, inputs.MYraw.delta); } ; 
+		{ return vec2(inputs.MXraw.delta, inputs.MYraw.delta); }; 
 		
 		void mouseLock(ivec2 pos)
 		{

@@ -3218,9 +3218,23 @@ class VulkanWindow: Window, IGfxContentDestination
 			protected DrawingProxy staticDr, staticDrGUI; 
 			protected void imDrawFrame()
 			{
-				if(!staticDr)
-				staticDr 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))), 
-				staticDrGUI 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))); 
+				void resetBuilders()
+				{
+					if(!staticDr)
+					staticDr 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))), 
+					staticDrGUI 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))); 
+					
+					staticDr.reset; 
+					staticDrGUI.reset; 
+					
+					{
+						auto vv = View2D.fromViewToView(view, viewGUI); 
+						staticDr.gfx.TR.transXY = vv.origin.vec2; 
+						staticDr.gfx.TR.scaleXY = vv.scale; 
+					}
+				} 
+				
+				resetBuilders; 
 				
 				import het.ui: im; //this is a nasty entry point to imgui
 				im._drawFrame!"system call only"(staticDr, staticDrGUI); 
@@ -3242,6 +3256,8 @@ class VulkanWindow: Window, IGfxContentDestination
 					Todo: /+H1: BUG!!!! 🐞+/
 					This is a bugfix because the 
 					very last item is sometimes deterministically lost.
+					
+					Fiddling with MaxVertexLimit changes this behavior.
 				+/
 				
 				
@@ -3252,11 +3268,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					staticDrGUI	.gfx.commit; 
 				}
 				
-				version(/+$DIDE_REGION Make buffers ready for the next frame.+/all)
-				{
-					staticDr	.reset,
-					staticDrGUI	.reset; 
-				}
+				resetBuilders; 
 				
 				if(!view.workArea_accum.empty) view.workArea = view.workArea_accum; 
 				
@@ -3416,8 +3428,6 @@ class VulkanWindow: Window, IGfxContentDestination
 		Object[] buffers; 
 		
 		bool windowResized; 
-		
-		VkClearValue clearColor = { color: {float32: [ 0.1, 0.1, 0.1, 0 ]}, }; 
 		
 		/+
 			Note: Alignment rules:
@@ -4284,6 +4294,7 @@ class VulkanWindow: Window, IGfxContentDestination
 		)
 		{
 			auto commandBuffer = commandPool.createBuffer; 
+			auto clearColor = mixin(體!((VkClearValue),q{color: mixin(體!((VkClearColorValue),q{float32: vec4(backgroundColor.from_unorm, 0)}))})); 
 			with(commandBuffer)
 			{
 				record
@@ -4436,18 +4447,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2235C82886ADB).檢(
+					((0x2249582886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x223CE82886ADB))))
+				if((互!((bool),(0),(0x2250782886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2246282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2247982886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2259B82886ADB).檢((互!((float/+w=12+/),(1.000),(0x225B282886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4460,8 +4471,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2264E82886ADB).檢 (imVG)),
-					((0x2267482886ADB).檢 (imFPS)); 
+					((0x2278782886ADB).檢 (imVG)),
+					((0x227AD82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4494,7 +4505,7 @@ $(V_size+G_size)".text
 							
 							{
 								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x229D982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x229F082886ADB))))); 
+								const fovY_deg = ((0x22B1282886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x22B2982886ADB))))); 
 								const fovY_rad = radians(fovY_deg); 
 								
 								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 

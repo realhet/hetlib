@@ -5,7 +5,7 @@ version(/+$DIDE_REGION+/all)
 	public import het; 
 	public import het.win; 
 	
-	public import het.bitmap: Bitmap, bitmaps; 
+	public import het.bitmap: Bitmap, bitmaps, BITMAPEFFECT, bitmapEffects; 
 	import het.bitmap: segoeSymbolByName; 
 	
 	public import het.inputs: 	inputs, KeyCombo; 
@@ -6290,20 +6290,20 @@ struct im
 			{
 				auto tr = View2D.fromViewToView(view_world, view_gui); 
 				auto shift = tr.origin/tr.scale; 
-				((0x2AF91EB16D5C4).檢(tr.scale)); 
-				((0x2AFBAEB16D5C4).檢(tr.origin)); 
-				((0x2AFE4EB16D5C4).檢(shift)); 
+				((0x2AFAEEB16D5C4).檢(tr.scale)); 
+				((0x2AFD7EB16D5C4).檢(tr.origin)); 
+				((0x2B001EB16D5C4).檢(shift)); 
 				
 				auto p = view_world.mousePos; 
-				((0x2B034EB16D5C4).檢(p)); 
-				((0x2B056EB16D5C4).檢(shift)); 
+				((0x2B051EB16D5C4).檢(p)); 
+				((0x2B073EB16D5C4).檢(shift)); 
 				
-				((0x2B082EB16D5C4).檢(p+shift)); 
-				((0x2B0AAEB16D5C4).檢((p+shift)*tr.scale)); 
+				((0x2B09FEB16D5C4).檢(p+shift)); 
+				((0x2B0C7EB16D5C4).檢((p+shift)*tr.scale)); 
 				
-				((0x2B0E3EB16D5C4).檢(tr.origin)); 
-				((0x2B10DEB16D5C4).檢(p*tr.scale)); 
-				((0x2B138EB16D5C4).檢(p*tr.scale+tr.origin)); 
+				((0x2B100EB16D5C4).檢(tr.origin)); 
+				((0x2B12AEB16D5C4).檢(p*tr.scale)); 
+				((0x2B155EB16D5C4).檢(p*tr.scale+tr.origin)); 
 				
 			}
 			foreach(i, d; dr)

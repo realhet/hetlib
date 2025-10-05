@@ -15,7 +15,7 @@ version(/+$DIDE_REGION+/all)
 	enum smallSpace = "\u2008"; 
 	
 	__gshared size_t BitmapCacheMaxSizeBytes = 768<<20; 
-	__gshared BitmapLoaderUsesTaskPool = true; 
+	__gshared BitmapLoaderUsesTaskPool = true /+251005: default: true+/; 
 	
 	import std.uni: isAlphaNum; 
 	import core.sys.windows.windows :	HBITMAP, HDC, BITMAPINFO, GetDC, CreateCompatibleDC, CreateCompatibleBitmap, 
@@ -852,7 +852,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x8084B8E2CB5D).檢((update間(_間)))); }
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x809EB8E2CB5D).檢((update間(_間)))); }
 		/+
 			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
 			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.
