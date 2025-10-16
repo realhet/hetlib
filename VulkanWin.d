@@ -1587,6 +1587,13 @@ version(/+$DIDE_REGION+/all)
 						break; /+success+/
 					}
 					catch(Exception e) { deallocateOldest; }
+					//Todo: kimarad a legutolso create!!! Ujra kell irni ezt a loopot!
+					
+					itt tartok; 
+					
+					
+					//Todo: az utolso probalkozasnak teljes uritest kell csinalnia!
+					//Todo: ha az sem sikerul, akkor valami stabil hiba legyen! Pl Error texture, aminek van merete!
 					
 					if(!newEntry.handle)
 					{
@@ -2831,7 +2838,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1612C82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1624A82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4606,18 +4613,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x234EE82886ADB).檢(
+					((0x2360C82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2356082886ADB))))
+				if((互!((bool),(0),(0x2367E82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x235F482886ADB).檢((互!((float/+w=12+/),(1.000),(0x2360B82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2371282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2372982886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4630,8 +4637,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x237E082886ADB).檢 (imVG)),
-					((0x2380682886ADB).檢 (imFPS)); 
+					((0x238FE82886ADB).檢 (imVG)),
+					((0x2392482886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4664,7 +4671,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x23B7682886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x23B8D82886ADB))))); 
+								const double fovY_deg = ((0x23C9482886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x23CAB82886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
