@@ -2157,7 +2157,8 @@ class Drawing : IDrawing
 		
 		
 		
-		
+		void drawTexture(int idx, in bounds2 bnd, Flag!"nearest" nearest = Yes.nearest)
+		{ drawTexture!(bounds2, Flag!"nearest")(idx, bnd, nearest); } 
 		
 		
 		

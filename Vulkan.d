@@ -6780,7 +6780,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			void heapFree(void* p)
 			{
 				assert(p !is hostPtr, "Failed attempt to free nullPtr."); 
-				allocator.free(p); 
+				const success = allocator.free(p); 
+				if(!success) ERR("failed to deallicate heapChunkIdx:"~calcHeapChunkIdx(p).text); 
 			} 
 			
 			void heapFree(HeapChunkIdx a)
@@ -6816,7 +6817,12 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					{ ERR("Shrinking Vulkan Heap Allocator not functioning yet. (2)"); }
 				}
 				
-				static if((常!(bool)(0))) allocator.stats.print; 
+				static if((常!(bool)(1)))
+				{
+					print("heap grown"); 
+					allocator.stats.print; 
+				}
+				
 			} 
 		} 
 		

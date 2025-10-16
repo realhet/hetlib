@@ -15781,7 +15781,7 @@ version(/+$DIDE_REGION debug+/all)
 					{ ub.st = a.front.st; removeFreeBlock(a.front); return true; }
 					return false; 
 				} 
-				while(tryExtendLeft) {}
+				while(tryExtendLeft) {/+print("CUPP left", ub); +/}
 				bool tryExtendRight()
 				{
 					auto a = freeBlocksByPos.upperBound(Block(ub.st, ub.st)); 
@@ -15789,7 +15789,7 @@ version(/+$DIDE_REGION debug+/all)
 					{ ub.en = a.front.en; removeFreeBlock(a.front); return true; }
 					return false; 
 				} 
-				while(tryExtendRight) {}
+				while(tryExtendRight) {/+print("CUPP right", ub); +/}
 				
 				addFreeBlock(ub); 
 				
@@ -15809,9 +15809,10 @@ Used:	$(countUsed)	$(sizeUsed)
 Free:	$(countFree)	$(sizeFree)
 Total:	$(countUsed+
 countFree)	$(sizeUsed+
-sizeFree)".text; 
+sizeFree)
+freeBySize: $(freeBlocksBySize[].map!((b)=>b.sizeBytes))".text; 
 		
-		static void test()
+		static void selfTest()
 		{
 			randSeed = 123; 
 			const M = 512<<20; 
@@ -15826,18 +15827,28 @@ sizeFree)".text;
 			{
 				const size = random(max(M/N, 1)); 
 				totalSize += size; 
-				return ta.alloc(random(max(M/N, 1))).enforce("alloc() failed"); 
+				return ta.alloc(size).enforce("alloc() failed"); 
 			} 
 			
 			auto ptrs = (mixin(求map(q{0<=i<N},q{},q{randomAlloc}))).array; 
+			
+			"allocation kesz".print; 
+			ta.stats.print; 
+			
 			T0; 
+			if(1)
 			mixin(求each(q{i=1},q{1<<20},q{
 				if(!(i&0xFFFF)) { print(i, totalSize); ta.stats.print; }
 				auto j=random(N); 
 				ta.free(ptrs[j]).enforce("free() failed."); 
 				ptrs[j]=randomAlloc; 
 			})); 
+			
+			ptrs.retro.each!((p){ ta.free(p).enforce("last free() failed."); }); 
+			enforce(ta.sizeUsed==0); 
 			DT.print; 
+			"teszt vege".print; 
+			ta.stats.print; 
 			
 			/+
 					Count	  Size

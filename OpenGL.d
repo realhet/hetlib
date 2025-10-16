@@ -1936,8 +1936,8 @@ version(/+$DIDE_REGION+/all)
 		createRenderingContext; 
 		
 		//init views and mouse
-		view = new View2D(&getClientSize); view.centerCorrection = true; 
-		viewGUI_ = new View2D(&getClientSize); 
+		view = new View2D; view.centerCorrection = true; 
+		viewGUI_ = new View2D; 
 		
 		mouse = new MouseState; 
 	} 
@@ -2010,6 +2010,7 @@ version(/+$DIDE_REGION+/all)
 		
 		with(view)
 		{
+			view.clientSize = bnd.size.vec2; 
 			mouseLast = mousePos; 
 			mousePos = screenToWorld(mp); 
 			screenBounds_anim = screenToWorld(bnd, true); 
@@ -2017,6 +2018,7 @@ version(/+$DIDE_REGION+/all)
 			workArea_accum = View2D.B.init; 
 		}with(viewGUI)
 		{
+			viewGUI.clientSize = bnd.size.vec2; 
 			mouseLast = mousePos; 
 			mousePos = screenToWorld(mp); 
 			screenBounds_anim = screenToWorld(bnd, true); 
@@ -2090,6 +2092,11 @@ version(/+$DIDE_REGION+/all)
 	{
 		if(!staticDr)
 		staticDr = new Drawing("im0"), staticDrGUI = new Drawing("im1"); 
+		
+		staticDr.zoomFactor 	= view.scale_anim, 
+		staticDr.invZoomFactor 	= view.invScale_anim; 
+		staticDrGUI.zoomFactor 	= viewGUI.scale_anim, 
+		staticDrGUI.invZoomFactor 	= viewGUI.invScale_anim; 
 		
 		import het.ui: im; //this is a nasty entry point to imgui
 		im._drawFrame!"system call only"(staticDr, staticDrGUI); 
@@ -4025,6 +4032,7 @@ version(/+$DIDE_REGION MegaTexturing+/all)
 					This causes a bug in GC, because there could be two 0 subTextIndices.
 				+/
 				if(!bmp || bmp.loading) return; 
+				assert(bmp.file==file); 
 				if(auto idx = file in byFileName)
 				{
 					//Opt: try to refresh the image inplace, instead of remove+create

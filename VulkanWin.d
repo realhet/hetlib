@@ -1496,10 +1496,122 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		
+	}
+	version(/+$DIDE_REGION+/all) {
+		class TexturePool
+		{
+			struct Entry { TexHandle handle; uint accessed; } 
+			
+			protected
+			{
+				VulkanWindow.InfoBufferManager IB; 
+				VulkanWindow.TextureBufferManager TB; 
+				
+				Entry[File] byFile; 
+			} 
+			
+			this(VulkanWindow ownerWin)
+			{
+				IB 	= ownerWin.IB,
+				TB	= ownerWin.TB; 
+			} 
+			
+			TexHandle tryAccess(File file)
+			{
+				if(auto a = file in byFile)
+				{
+					a.accessed = application.tick; 
+					return a.handle; 
+					/+
+						Note: Don't need to check isLoading here 
+						because only loaded images are in the list.
+					+/
+				}
+				return TexHandle(0); 
+			} 
+			
+			void deallocateOldest()
+			{
+				/+
+					print("$$$$$$$$$$$$ removing", byFile.length); 
+					print("BEFORE"); 
+					TB.stats.print; 
+					byFile.byValue.each!((e){ TB.remove(e.handle); }); 
+					byFile.clear; 
+					print("AFTER"); 
+					TB.stats.print; 
+					beep; 
+					return; 
+				+/
+				
+				
+				auto ticks = byFile.byValue.map!"a.accessed".array.sort; 
+				if(ticks.empty) return; 
+				
+				enum N = 4 /+Will remove 1/N of textures+/; 
+				const 	lengthLimit 	= ticks.length / N,
+					tickLimit 	= ticks[lengthLimit]; 
+				
+				LOG(
+					i"Deallocating
+  lengthLimit: $(lengthLimit)
+  tickLimit: $(tickLimit)"
+				); beep; 
+				
+				File[] toRemove; 
+				foreach(const file, const entry; byFile)
+				if(entry.accessed<=tickLimit)
+				{
+					TB.remove(entry.handle); 
+					toRemove ~= file; 
+					if(toRemove.length>=lengthLimit) break; 
+				}
+				
+				foreach(const file; toRemove) byFile.remove(file); 
+				
+				TB.stats.print; 
+			} 
+			
+			void initiateLoad(R)(R files)
+			if(isInputRange!(R, File))
+			{
+				void doit(File file, Bitmap bmp)
+				{
+					if(!bmp || bmp.loading) return; 
+					assert(bmp.file==file); 
+					
+					Entry newEntry; 
+					foreach(tries; 0..3)
+					try {
+						newEntry.handle = TB.create(bmp); 
+						break; /+success+/
+					}
+					catch(Exception e) { deallocateOldest; }
+					
+					if(!newEntry.handle)
+					{
+						WARN(i"Unable to allocate/upload texture $(file)"); 
+						return; 
+					}
+					
+					newEntry.accessed = application.tick; 
+					
+					if(auto a = file in byFile)
+					{
+						//Opt: try to refresh the image inplace, instead of remove+create
+						TB.remove(a.handle); 
+						*a = newEntry; 
+					}
+					else
+					{ byFile[file] = newEntry; }
+				} 
+				
+				if(!files.empty)
+				foreach(bmp; bitmapQuery_accessDelayedMulti(files))
+				doit(bmp.file, bmp); 
+			} 
+		} 
 	}
-	
-	
-	
 }
 version(/+$DIDE_REGION+/all) {
 	struct GfxContent
@@ -2242,6 +2354,7 @@ version(/+$DIDE_REGION+/all) {
 							else static if(fw.among("PC", "fg"))	mixin(name~q{=a.value; }); 
 							else static if(fw.among("SC", "bk"))	mixin(name~q{=a.value; }); 
 							else static if(fw.among("FF", "fontFlags"))	mixin(name~q{=a.value; }); 
+							else static if(fw.among("FH"))	mixin(name~q{=a.value; }); 
 							else static if(fw=="TR")	mixin(name~q{=a.value; }); 
 							else static if(
 								fw=="fontSize"
@@ -2342,7 +2455,7 @@ version(/+$DIDE_REGION+/all) {
 					with(_builder)
 					{
 						synch_transform, synch_PALH, synch_font, synch_colors; 
-						emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos*fontSize)); 
+						emit(mixin(舉!((Opcode),q{drawMove})), assemblePoint(cursorPos /+no more premultiply. *fontSize+/)); 
 					}
 				} 
 				_builder.begin(0, {}); 
@@ -2379,7 +2492,7 @@ version(/+$DIDE_REGION+/all) {
 							if(const n = decideCharCount((cast(int)(part.length))))
 							{
 								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
-								cursorPos.x += n; part = part[n..$]; if(part.empty) break; 
+								cursorPos.x += n*fontSize.x/+Todo: textWidth!+/; part = part[n..$]; if(part.empty) break; 
 							}
 							/+start next geometry item+/_builder.begin; setup; 
 						}
@@ -2390,7 +2503,7 @@ version(/+$DIDE_REGION+/all) {
 							if(const n = decideCharCount(len))
 							{
 								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
-								cursorPos.x += n; len -= n; if(!len) break; 
+								cursorPos.x += n*fontSize.x/+Todo: textWidth!+/; len -= n; if(!len) break; 
 							}
 							/+start next geometry item+/_builder.begin; setup; 
 						}
@@ -2718,7 +2831,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1568082886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1612C82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -2798,6 +2911,7 @@ version(/+$DIDE_REGION+/all) {
 			stickFont = Font(accessFontFace(FontId.VGA_9x16)); 
 		} 
 		
+		//Todo: nothing's setting these!!!!
 		float _zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
 		ref float zoomFactor() => _zoomFactor; 
 		float _invZoomFactor = 1; //comes from outside view
@@ -2871,7 +2985,7 @@ version(/+$DIDE_REGION+/all) {
 		
 		version(/+$DIDE_REGION DrawState+/all)
 		{
-			private float _fontHeight=1, _lineWidth=1, _pointSize=1; 
+			private float _fontHeight=16, _lineWidth=1, _pointSize=1; 
 			ref float fontHeight() 
 			=> _fontHeight; ref float lineWidth()
 			=> _lineWidth; ref float pointSize()
@@ -2891,7 +3005,7 @@ version(/+$DIDE_REGION+/all) {
 			{ gfx.OP = a; } 
 			
 			float inputTransformSize(float s)
-			=> ((s<=0)?(-s):(s * gfx.TR.scaleXY.x)); 
+			=> ((s<=0)?(-s * invZoomFactor):(s)); 
 		}
 		
 		version(/+$DIDE_REGION Setup+/all)
@@ -3014,10 +3128,13 @@ version(/+$DIDE_REGION+/all) {
 			gfx.drawC64Rect(b, h); 
 		} 
 		
+		void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest)
+		{ drawFontGlyph(idx, b, clBlack, 16/+isImage+/); } 
+		
 		FontSpec!FontFace stickFont; 
 		
 		float textWidth(string text)
-		{ return (9*.0f/16) * fontHeight * text.walkLength; } 
+		{ return (9.0f/16/+Todo: only stickfont!+/) * fontHeight * text.walkLength; } 
 		
 		void textOut(
 			vec2 p, string text, float width = 0, 
@@ -3033,11 +3150,13 @@ version(/+$DIDE_REGION+/all) {
 			}
 			
 			with(gfx)
-			Text(
-				stickFont, ((color).名!q{fg}), ((FormattedColor(ColorFormat.la_u8, 0)).名!q{bk}), 
-				M(p)/+Todo: this is in charSize!!!! not in pixels!!!+/, text
-			); 
-			
+			{
+				Text(
+					stickFont, ((inputTransformSize(fontHeight)).名!q{FH}), 
+					((color).名!q{fg}), ((FormattedColor(ColorFormat.la_u8, 0)).名!q{bk}), 
+					M(p)/+Todo: this is in charSize!!!! not in pixels!!!+/, text
+				); 
+			}
 		} 
 		
 		void hGraph_f(
@@ -3073,26 +3192,16 @@ class VulkanWindow: Window, IGfxContentDestination
 			/+Todo: Old crap, just workin'!!! Must refactor!!!+/
 			
 			//views
-			View2D view; 
-			private View2D viewGUI_; 
+			View2D view, viewGUI; 
 			
-			float guiScale = 1; 
-			
-			auto viewGUI()
-			{
-				//Opt: cache this, and update at the right moment
-				viewGUI_.scale = guiScale; 
-				viewGUI_.origin = View2D.V(clientSizeHalf); 
-				viewGUI_.skipAnimation; return viewGUI_; 
-			} 
-			
-			protected ivec2 getClientSize() => clientSize; 
+			//this is the latest swapchain size, not the actual window size.
+			protected ivec2 swapchainClientSize()
+			=> ivec2(swapchain.extent.width, swapchain.extent.height); 
 			
 			void initializeViewsAndMouseState()
 			{
-				view = new View2D(&getClientSize); view.centerCorrection = true; 
-				viewGUI_ = new View2D(&getClientSize); 
-				
+				view = new View2D; view.centerCorrection = true; 
+				viewGUI = new View2D; 
 				mouse = new MouseState; 
 			} 
 			
@@ -3117,7 +3226,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				}
 				mouse._updateInternal(a); 
 				
-				mouse.screenRect = clientBounds; 
+				mouse.screenRect = ibounds2(ivec2(0), swapchainClientSize); 
 				mouse.worldRect = bounds2(
 					view.screenToWorld(vec2(mouse.screenRect.topLeft)),
 					view.screenToWorld(vec2(mouse.screenRect.bottomRight))
@@ -3127,27 +3236,33 @@ class VulkanWindow: Window, IGfxContentDestination
 				//Todo: bad names: screenRect is "screenBounds in client coords"
 			} 
 			
-			void updateViewClipBoundsAndMousePos()
-			{
-				//set extra info about mouse and bounds for view and viewGUI
-				const mp = View2D.V(mouse.act.screen); 
-				const bnd = View2D.B(clientBounds); 
-				
-				static foreach(v; AliasSeq!(view, viewGUI))
-				with(v)
-				{
-					mouseLast = mousePos; 
-					mousePos = screenToWorld(mp); 
-					screenBounds_anim = screenToWorld(bnd, true); 
-					screenBounds_dest = screenToWorld(bnd, false); 
-					workArea_accum = View2D.B.init; 
-				}
-			} 
-			
 			override void onUpdateViewAnimation()
 			{
 				if(view.updateAnimation(deltaTime.value(second))) invalidate; 
-				updateViewClipBoundsAndMousePos; 
+				
+				version(/+$DIDE_REGION+/all) {
+					//viewGUI.scale = (互!((float/+w=6+/),(0.000),(0x18F0C82886ADB)))*7+.5; 
+					viewGUI.origin = View2D.V(swapchainClientSize*.5); 
+					viewGUI.skipAnimation; 
+				}
+				
+				version(/+$DIDE_REGION+/all)
+				{
+					//set extra info about mouse and bounds for view and viewGUI
+					const mp = View2D.V(mouse.act.screen); 
+					const bnd = View2D.B(ibounds2(ivec2(0), swapchainClientSize)); 
+					
+					static foreach(v; AliasSeq!(view, viewGUI))
+					with(v)
+					{
+						v.clientSize = bnd.size.vec2; 
+						mouseLast = mousePos; 
+						mousePos = screenToWorld(mp); 
+						screenBounds_anim = screenToWorld(bnd, true); 
+						screenBounds_dest = screenToWorld(bnd, false); 
+						workArea_accum = View2D.B.init; 
+					}
+				}
 			} 
 			
 			version(/+$DIDE_REGION gányolás texture access provided for het.ui+/all)
@@ -3215,6 +3330,12 @@ class VulkanWindow: Window, IGfxContentDestination
 				im._endFrame; 
 			} 
 			
+			void beforeImDraw()
+			{} 
+			
+			void afterImDraw()
+			{} 
+			
 			protected DrawingProxy staticDr, staticDrGUI; 
 			protected void imDrawFrame()
 			{
@@ -3232,12 +3353,21 @@ class VulkanWindow: Window, IGfxContentDestination
 						staticDr.gfx.TR.transXY = vv.origin.vec2; 
 						staticDr.gfx.TR.scaleXY = vv.scale; 
 					}
+					
+					staticDr.zoomFactor 	= view.scale_anim, 
+					staticDr.invZoomFactor 	= view.invScale_anim; 
+					staticDrGUI.zoomFactor 	= viewGUI.scale_anim, 
+					staticDrGUI.invZoomFactor 	= viewGUI.invScale_anim; 
 				} 
 				
 				resetBuilders; 
 				
 				import het.ui: im; //this is a nasty entry point to imgui
-				im._drawFrame!"system call only"(staticDr, staticDrGUI); 
+				im._drawFrame!"system call only"(
+					staticDr, staticDrGUI,
+					{ beforeImDraw(); }, 
+					{ afterImDraw(); }
+				); 
 				
 				version(/+$DIDE_REGION Draw optional overlay stuff+/all)
 				{
@@ -3384,7 +3514,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			})),
 			TBConfig : 	mixin(體!((VulkanBufferSizeConfig),q{
 				minSizeBytes 	: ((  4)*(KiB)), 
-				maxSizeBytes 	: ((768)*(MiB)),
+				maxSizeBytes 	: ((512)*(MiB)),
 				growRate : 2.0,
 				shrinkWhen 	: 0.25, 
 				shrinkRate 	: 0.5
@@ -3767,6 +3897,9 @@ class VulkanWindow: Window, IGfxContentDestination
 				protected TexRec[File] texRecByFile; 
 				const TexRec nullTexRec = TexRec.init; 
 				
+				string stats() 
+				=> buffer.allocator.stats; 
+				
 				this()
 				{
 					buffer = new HeapBuffer
@@ -3885,28 +4018,51 @@ class VulkanWindow: Window, IGfxContentDestination
 					return TexHandle.init; 
 				} 
 				
-				protected bool updateExistingData(in TexHandle handle, in TexSizeFormat fmt, in void[] data)
+				/+
+					protected bool updateExistingData(in TexHandle handle, in TexSizeFormat fmt, in void[] data)
+					{
+						auto info = IB.access(handle); 
+						buffer.heapFree(info.heapChunkIdx); 
+						info.heapChunkIdx = HeapChunkIdx(0); 
+						if(auto heapRef = buffer.heapAlloc(data.length))
+						{
+							info.sizeFormat = fmt; 
+							memcpy(heapRef.ptr, data.ptr, data.length); /+Note: ⚡ Memory transfer (process → host) +/
+							buffer.markModified(heapRef.ptr, data.length); 
+							info.heapChunkIdx = heapRef.heapChunkIdx; 
+							IB.set(handle, info); 
+							
+							global_TPSCnt += data.sizeBytes; 
+							return true; /+Note: ✔ Success+/
+						}
+						else
+						{
+							IB.set(handle, info); //upload the info with null pointer.
+							return false; /+Note: 🚫 Failed to allocate memory+/
+						}
+					} 
+				+/
+				
+				TexHandle create(Bitmap bmp)
 				{
-					auto info = IB.access(handle); 
-					buffer.heapFree(info.heapChunkIdx); 
-					info.heapChunkIdx = HeapChunkIdx(0); 
-					if(auto heapRef = buffer.heapAlloc(data.length))
-					{
-						info.sizeFormat = fmt; 
-						memcpy(heapRef.ptr, data.ptr, data.length); /+Note: ⚡ Memory transfer (process → host) +/
-						buffer.markModified(heapRef.ptr, data.length); 
-						info.heapChunkIdx = heapRef.heapChunkIdx; 
-						IB.set(handle, info); 
-						
-						global_TPSCnt += data.sizeBytes; 
-						return true; /+Note: ✔ Success+/
-					}
-					else
-					{
-						IB.set(handle, info); //upload the info with null pointer.
-						return false; /+Note: 🚫 Failed to allocate memory+/
-					}
+					enforce(bmp); enforce(bmp.type=="ubyte"); 
+					TexSizeFormat fmt; 
+					fmt.size = bmp.size; 
+					fmt.format = bmp.channels.predSwitch(
+						1, TexFormat.u8, /+grayscale+/
+						2, TexFormat.la_u8,
+						3, TexFormat.rgb_u8,
+						4, TexFormat.rgba_u8
+					); 
+					fmt.resident = false; 
+					fmt.loading = false; 
+					fmt.error = false; 
+					
+					auto th = createHandleAndSetData(fmt, bmp.getRaw); 
+					enforce(th, "th is null.  Probably out of texture mem."); 
+					return th; 
 				} 
+				
 				
 				void remove(in TexHandle texHandle)
 				{
@@ -3914,6 +4070,8 @@ class VulkanWindow: Window, IGfxContentDestination
 					{
 						if(const heapChunkIdx = IB.access(texHandle).heapChunkIdx)
 						{ buffer.heapFree(heapChunkIdx); }
+						else
+						{ WARN("Null heapChunkIdx for"~texHandle.text); }
 						IB.remove(texHandle); 
 					}
 				} 
@@ -4392,6 +4550,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			commandPool	= queue.createCommandPool,
 			imageAvailableSemaphore	= new VulkanSemaphore(device),
 			renderingFinishedSemaphore 	= new VulkanSemaphore(device); 
+			
 			swapchain = new VulkanSwapchain(device, surface, clientSize); 
 			createRenderPass(swapchain); 
 			
@@ -4447,18 +4606,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2249582886ADB).檢(
+					((0x234EE82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2250782886ADB))))
+				if((互!((bool),(0),(0x2356082886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2259B82886ADB).檢((互!((float/+w=12+/),(1.000),(0x225B282886ADB))).iremap(0, 1, 4, ma))); 
+					((0x235F482886ADB).檢((互!((float/+w=12+/),(1.000),(0x2360B82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4471,8 +4630,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2278782886ADB).檢 (imVG)),
-					((0x227AD82886ADB).檢 (imFPS)); 
+					((0x237E082886ADB).檢 (imVG)),
+					((0x2380682886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4504,17 +4663,17 @@ $(V_size+G_size)".text
 							VB.upload; GB.upload; 
 							
 							{
-								const globalScale2 = 1.0f; 
-								const fovY_deg = ((0x22B1282886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x22B2982886ADB))))); 
-								const fovY_rad = radians(fovY_deg); 
+								const double globalScale2 = 1; 
+								const double fovY_deg = ((0x23B7682886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x23B8D82886ADB))))); 
+								const double fovY_rad = radians(fovY_deg); 
 								
-								const extents = vec2(viewGUI.clientSize * viewGUI.invScale_anim); 
-								const requiredDistance = double(extents.y) / 2 / tan(double(fovY_rad) / 2); 
-								const projMatrix = mat4.perspective(extents.x, extents.y, fovY_deg, requiredDistance*0.001, requiredDistance*1000); 
-								const org = viewGUI.getOrigin(true).vec2; 
-								const viewMatrix = mat4.lookAt(vec3(org, requiredDistance), vec3(org, 0), vec3(0, 1, 0)); 
-								const mvp = projMatrix * viewMatrix; 
-								
+								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
+								const double requiredDistance = double(extents.y) / 2 / tan(double(fovY_rad) / 2); 
+								alias dmat4 = Matrix!(double, 4, 4); 
+								const projMatrix = dmat4.perspective(extents.x, extents.y, fovY_deg, requiredDistance*0.001, requiredDistance*1000); 
+								const org = viewGUI.getOrigin(true).dvec2; 
+								const viewMatrix = dmat4.lookAt(dvec3(org, requiredDistance), dvec3(org, 0), dvec3(0, 1, 0)); 
+								const mvp = mat4(projMatrix * viewMatrix); 
 								
 								with(UB.access)
 								{
@@ -5654,7 +5813,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					
+					 
 					//Todo: check the warnings!
 					
 					//common stuff
@@ -5691,7 +5850,7 @@ $(V_size+G_size)".text
 					vec2 lineIntersection(vec2 p1, vec2 p2, vec2 p3, vec2 p4)
 					{
 						float denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x); 
-						if(abs(denom) < 1e-4)
+						if(abs(denom) < 1e-30)
 						{
 							return (p2+p3)/2; // Fallback to first point if lines are parallel
 						}
@@ -5943,6 +6102,16 @@ $(V_size+G_size)".text
 						return p; 
 					} 
 					
+					float outputTransformSize(float s)
+					{
+						return (
+							(
+								abs(TR_scaleXY.x)+
+								abs(TR_scaleXY.y)
+							)/2
+						) * s; 
+					} 
+					
 					void emitVertex2D(vec2 p)
 					{
 						fragColor 	= vec4(PC.rgb, PC.a*OP),
@@ -5977,6 +6146,9 @@ $(V_size+G_size)".text
 						fragTexCoordXY = vec2(1,1); emitVertex2D(q); 
 						EndPrimitive(); 
 					} 
+					
+					void emitHalfLineWidth(float r)
+					{ fragTexCoordZ = floatBitsToUint(outputTransformSize(LW/2)); } 
 					
 					// Split at t = 0.33333333
 					void splitBezier_third(
@@ -6844,7 +7016,7 @@ $(V_size+G_size)".text
 					{
 						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
 						
-						const uint handleFmt = fetchHandleFormat(bitStream); ; 
+						const uint handleFmt = fetchHandleFormat(bitStream); 
 						const uint texHandle = fetchHandle(bitStream, handleFmt); 
 						
 						setFragMode(FragMode_fullyFilled); 
@@ -7039,7 +7211,7 @@ $(V_size+G_size)".text
 									{
 									//Todo: set these states it less frequently!!!
 									fragColor = PC; fragBkColor = SC; setFragTexHandle(0); 
-									fragTexCoordZ = floatBitsToUint(LW/2); 
+									emitHalfLineWidth(LW/2); 
 									
 									latchP(fetchXY(bitStream, P4)); 
 									shiftInPathCode(pendingPathCode); 

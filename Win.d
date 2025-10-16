@@ -1369,6 +1369,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
 			in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
 		); 
+		void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest); 
 		float textWidth(string text); //stickFont
 		void textOut(
 			vec2 p, string text, float width = 0, 
@@ -1488,9 +1489,6 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		
 		B lastWorkArea; //detection change for autoZoom()
 		
-		//Todo: This is ugly. Tthe window should update the clientSize only when it is changing...
-		ivec2 delegate() m_onGetClientSize; 
-		
 		//smart zooming stuff
 		static struct ScrollTarget {
 			bounds2 rect; 
@@ -1506,7 +1504,9 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		float animSpeed = 0.3; //0=off, 0.3=normal, 0.9=slow
 		
 		//extra information from external source in screen space. All is in world coords
+		vec2 clientSize; 
 		V mousePos, mouseLast; 
+		
 		B screenBounds_anim, screenBounds_dest; 	/+
 			Todo: maybe anim/destination should be 2 identical viewTransform struct.
 			Not a boolean parameter in EVERY member...
@@ -1527,8 +1527,6 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		+/
 		bool scrollSlower; 	//It's the current 'shift' modifier state. also affects zoom
 		bool _mustZoomAll; 	//schedule zoom all on the next draw
-		
-		
 		
 		
 		
@@ -1565,8 +1563,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		@property bool isMouseInside() const
 		{ return mousePos in subScreenBounds_anim; } 
 		
-		this(ivec2 delegate() onGetClientSize)
-		{ this.m_onGetClientSize = onGetClientSize; } 
+		this()
+		{} 
 		
 		override string toString() const
 		{ return format!"View2D(%s, %s)"(origin, scale); } 
@@ -1646,8 +1644,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			); 
 		} 
 		
-		vec2 clientSize()
-		=> m_onGetClientSize().vec2;  vec2 clientSizeHalf()
+		vec2 clientSizeHalf()
 		=> clientSize/2; 
 		
 		bounds2 visibleArea(bool animated = true)

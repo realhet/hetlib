@@ -6255,7 +6255,7 @@ struct im
 		
 		version(/+$DIDE_REGION+/none) { DrawingOld drVisualizeHitStack; }
 		
-		void _drawFrame(string restrict="")(Drawing drWorld, Drawing drGUI)
+		void _drawFrame(string restrict="")(Drawing drWorld, Drawing drGUI, void delegate() funBefore=null, void delegate() funAfter=null)
 		{
 			static if(doTiming)
 			{
@@ -6272,13 +6272,14 @@ struct im
 			foreach(i, ref d; dr)
 			{
 				auto view = targetSurfaceViews[i].enforce; 
-				d.zoomFactor = view.scale; 
-				d.invZoomFactor = view.invScale; 
 				d.pushClipBounds(view.screenBounds_anim.bounds2.inflated(-view.screenBounds_anim.bounds2.size*0)); 
 			}
 			
 			foreach(i; 0..2)
 			surfaceBounds[i] = bounds2.init; 
+			
+			if(funBefore) funBefore(); 
+			
 			foreach(a; rootContainers(true))
 			{
 				const s = a.flags.targetSurface; 
@@ -6287,25 +6288,8 @@ struct im
 				a.draw(dr[s]); //draw in zOrder
 			}
 			
-			{
-				auto tr = View2D.fromViewToView(view_world, view_gui); 
-				auto shift = tr.origin/tr.scale; 
-				((0x2AFAEEB16D5C4).檢(tr.scale)); 
-				((0x2AFD7EB16D5C4).檢(tr.origin)); 
-				((0x2B001EB16D5C4).檢(shift)); 
-				
-				auto p = view_world.mousePos; 
-				((0x2B051EB16D5C4).檢(p)); 
-				((0x2B073EB16D5C4).檢(shift)); 
-				
-				((0x2B09FEB16D5C4).檢(p+shift)); 
-				((0x2B0C7EB16D5C4).檢((p+shift)*tr.scale)); 
-				
-				((0x2B100EB16D5C4).檢(tr.origin)); 
-				((0x2B12AEB16D5C4).檢(p*tr.scale)); 
-				((0x2B155EB16D5C4).檢(p*tr.scale+tr.origin)); 
-				
-			}
+			if(funAfter) funAfter(); 
+			
 			foreach(i, d; dr)
 			{ d.popClipBounds; }
 			

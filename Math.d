@@ -1340,7 +1340,53 @@ version(/+$DIDE_REGION+/all)
 				static MatrixType perspective(float width, float height, float fov, float near, float far)
 				{
 					float 	aspect 	= width/height,
-						top 	= near * tan(fov*(PIf/360.0f)),
+						top 	= near * tan(fov*(PIf/360)),
+						bottom 	= -top,
+						right 	= top * aspect,
+						left 	= -right; 
+					return perspective(left, right, bottom, top, near, far); 
+				} 
+				
+				//Todo: do this with dmat4
+			}
+			
+			static if(M==4 && N==4 && is(CT==double))
+			{
+				//Todo: Make a common double/float version!
+				
+				//source: https://github.com/Dav1dde/gl3n/blob/master/gl3n/linalg.d
+				
+				static MatrixType lookAt(in dvec3 eye, in dvec3 target, in dvec3 up)
+				{
+					auto forward = target - eye; 
+					if((magnitude(forward))==0) return dmat4.identity; 
+					forward = (normalize(forward)); 
+					
+					auto side = (normalize(((forward).cross(up)))); 
+					auto upVector = ((side).cross(forward)); 
+					
+					return MatrixType(
+						dvec4(side, 0), 
+						dvec4(upVector, 0), 
+						dvec4(-forward, 0), 
+						dvec4(eye, 1)
+					).inverse; 
+				} 
+				
+				static MatrixType perspective(double left, double right, double bottom, double top, double near, double far)
+				{
+					return MatrixType(
+						((2*near)/(right-left))	, 0	, ((right+left)/(right-left))	, 0,
+						0	, ((2*near)/(top-bottom))	, ((top+bottom)/(top-bottom))	, 0,
+						0	, 0	, -((far+near)/(far-near))	, -((2*far*near)/(far-near)),
+						0	, 0	, -1	, 0
+					).transpose; 
+				} 
+				
+				static MatrixType perspective(double width, double height, double fov, double near, double far)
+				{
+					double 	aspect 	= width/height,
+						top 	= near * tan(fov*(PI/360)),
 						bottom 	= -top,
 						right 	= top * aspect,
 						left 	= -right; 
