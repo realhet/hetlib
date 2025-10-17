@@ -8,14 +8,19 @@ version(/+$DIDE_REGION+/all)
 	
 	import core.stdc.string : memset; 
 	
+	enum logDeallocationStats = (常!(bool)(1)); 
+	
 	enum GSP_DefaultFontHeight = 18; 
 	
 	
 	//global references initialized by main Vulkan Window
 	__gshared VulkanWindow mainVulkanWindow; //this is how textures can be created outside mainWindow
 	private __gshared FontFaceManager g_fontFaceManager; 
+	private __gshared TexturePool g_texturePool; 
 	
-	alias Texture = VulkanWindow.Texture; 
+	alias Texture 	= VulkanWindow.Texture,
+	TextureManagerStats 	= VulkanWindow.TextureManagerStats,
+	RawTextureData 	= VulkanWindow.TextureBufferManager.RawTextureData; 
 	
 	
 	enum bugFix_LastTwoGeometryShaderStreamsMissing = (常!(bool)(1))
@@ -1498,6 +1503,9 @@ version(/+$DIDE_REGION+/all)
 		
 	}
 	version(/+$DIDE_REGION+/all) {
+		TexturePool texturePool()
+		=> g_texturePool; 
+		
 		class TexturePool
 		{
 			struct Entry { TexHandle handle; uint accessed; } 
@@ -1508,6 +1516,9 @@ version(/+$DIDE_REGION+/all)
 				VulkanWindow.TextureBufferManager TB; 
 				
 				Entry[File] byFile; 
+				
+				bool requestDeallocationStats = true; //triggered by reading deallocationStats property
+				string _deallocationStats; 
 			} 
 			
 			this(VulkanWindow ownerWin)
@@ -1515,6 +1526,9 @@ version(/+$DIDE_REGION+/all)
 				IB 	= ownerWin.IB,
 				TB	= ownerWin.TB; 
 			} 
+			
+			@property length() const
+			=> byFile.length; 
 			
 			TexHandle tryAccess(File file)
 			{
@@ -1530,33 +1544,23 @@ version(/+$DIDE_REGION+/all)
 				return TexHandle(0); 
 			} 
 			
-			void deallocateOldest()
+			
+			@property string deallocationStats()
+			{ requestDeallocationStats = true; return _deallocationStats; } 
+			
+			protected void deallocateOldest(float amount)
 			{
-				/+
-					print("$$$$$$$$$$$$ removing", byFile.length); 
-					print("BEFORE"); 
-					TB.stats.print; 
-					byFile.byValue.each!((e){ TB.remove(e.handle); }); 
-					byFile.clear; 
-					print("AFTER"); 
-					TB.stats.print; 
-					beep; 
-					return; 
-				+/
-				
-				
 				auto ticks = byFile.byValue.map!"a.accessed".array.sort; 
 				if(ticks.empty) return; 
 				
-				enum N = 4 /+Will remove 1/N of textures+/; 
-				const 	lengthLimit 	= ticks.length / N,
+				const 	lengthLimit 	= (lfloor(ticks.length * amount)),
 					tickLimit 	= ticks[lengthLimit]; 
 				
-				LOG(
-					i"Deallocating
-  lengthLimit: $(lengthLimit)
-  tickLimit: $(tickLimit)"
-				); beep; 
+				/+
+					Todo: Different strategy: deallocate until it is possible to allocate X bytes.
+					- Need access to the largest block size in the allocator
+					- Need access to the required bytes
+				+/
 				
 				File[] toRemove; 
 				foreach(const file, const entry; byFile)
@@ -1569,40 +1573,81 @@ version(/+$DIDE_REGION+/all)
 				
 				foreach(const file; toRemove) byFile.remove(file); 
 				
-				TB.stats.print; 
+				if(requestDeallocationStats)
+				_deallocationStats ~= 
+				i"Deallocated: $((iround(amount*100)))%\n$(TB.stats)".text; 
 			} 
-			
-			void initiateLoad(R)(R files)
-			if(isInputRange!(R, File))
+			
+			void initiateLoad(Bitmap bmp)
 			{
-				void doit(File file, Bitmap bmp)
+				if(!bmp || bmp.loading) return; 
+				const file = bmp.file; 
+				
+				enum EnableErrorPlaceholder = false 
+				/+
+					Uploads a 0 byte texture when an error happens.
+					Prevents oscillation.
+					note: It also oscillates, so I turn this off.
+				+/; 
+				
+				Entry newEntry; 
+				auto raw = TB.prepare(bmp); 
+				bool TRY()
 				{
-					if(!bmp || bmp.loading) return; 
-					assert(bmp.file==file); 
-					
-					Entry newEntry; 
-					foreach(tries; 0..3)
-					try {
-						newEntry.handle = TB.create(bmp); 
-						break; /+success+/
-					}
-					catch(Exception e) { deallocateOldest; }
-					//Todo: kimarad a legutolso create!!! Ujra kell irni ezt a loopot!
-					
-					itt tartok; 
-					
-					
-					//Todo: az utolso probalkozasnak teljes uritest kell csinalnia!
-					//Todo: ha az sem sikerul, akkor valami stabil hiba legyen! Pl Error texture, aminek van merete!
-					
-					if(!newEntry.handle)
+					try { newEntry.handle = TB.create(raw); }
+					catch(Exception) {}
+					return !!newEntry.handle; 
+				} 
+				
+				if(!TRY)
+				{
 					{
-						WARN(i"Unable to allocate/upload texture $(file)"); 
-						return; 
+						static if(logDeallocationStats) requestDeallocationStats = true; 
+						if(requestDeallocationStats)
+						_deallocationStats = "TexturePool deallocation:\n"~TB.stats~"\n"; 
+						else _deallocationStats = ""; 
 					}
 					
-					newEntry.accessed = application.tick; 
+					deallocateOldest(0.25); //deallocate some old textures
+					if(!TRY)
+					{
+						deallocateOldest(0.33); //deallocate more
+						if(!TRY)
+						{
+							deallocateOldest(1.0); //deallocate all
+							if(!TRY)
+							{
+								WARN(i"Can't allocate/upload texture $(file)"); 
+								static if(EnableErrorPlaceholder)
+								{
+									raw.fmt.error = true, raw.data = []; 
+									/+upload a fuchsia error texture+/
+									if(!TRY)
+									{ ERR(i"Can't even create texture handle $(file)"); }
+								}
+							}
+						}
+					}
 					
+					if(logDeallocationStats) print(_deallocationStats); 
+				}
+				
+				/+
+					Todo: Fuchsia Oscillation bug:
+					It happens when there are more texture request on 
+					the screen than the whole texture pool.
+					The deallocator can remove, and REASSIGN textures 
+					that are already placed in the geometry stream earlier.
+					Find a solution to that.
+					
+					Idea: 	Do the initiateLoad() batch operation at the 
+						beginning of the NEXT frame!
+				+/
+				
+				if(newEntry.handle)
+				{
+					//successful allocation
+					newEntry.accessed = application.tick; 
 					if(auto a = file in byFile)
 					{
 						//Opt: try to refresh the image inplace, instead of remove+create
@@ -1611,11 +1656,24 @@ version(/+$DIDE_REGION+/all)
 					}
 					else
 					{ byFile[file] = newEntry; }
-				} 
-				
+				}
+				else
+				{
+					//was unable to allocate.  Just remove it from everywhere
+					if(auto a = file in byFile)
+					{
+						TB.remove(a.handle); 
+						byFile.remove(file); 
+					}
+				}
+			} 
+			
+			void initiateLoad(R)(R files)
+			if(isInputRange!(R, File))
+			{
 				if(!files.empty)
 				foreach(bmp; bitmapQuery_accessDelayedMulti(files))
-				doit(bmp.file, bmp); 
+				initiateLoad(bmp); 
 			} 
 		} 
 	}
@@ -2838,7 +2896,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1624A82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1699282886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3421,10 +3479,14 @@ class VulkanWindow: Window, IGfxContentDestination
 				with(view)
 				with(this.actions)
 				{
+					enum MULTIPLIER = 8 /+Bug: sometimes the scroll speed is extremely slow.+/; 
+					
 					const oldOrigin = origin, oldScale = scale; 
 					
-					const 	scrollSpeed	= this.deltaTime.value(second)*800*4,
-						zoomSpeed	= this.deltaTime.value(second)*6,
+					const dt = this.deltaTime.value(second) * MULTIPLIER; 
+					
+					const 	scrollSpeed	= dt*800*4,
+						zoomSpeed	= dt*6,
 						wheelSpeed	= 0.375f; 
 					
 					group("View controls"); //Todo: ctrl+s es s (mint move osszeakad!)
@@ -3530,13 +3592,6 @@ class VulkanWindow: Window, IGfxContentDestination
 		enum HeapGranularity 	= 16,
 		DelayedTextureLoading 	= (常!(bool)(1)); 
 		
-		struct Stats
-		{
-			size_t V_cnt, V_size, G_size; 
-			@property VG_size() => V_size + G_size; 
-		} 
-		Stats lastFrameStats; 
-		
 		VulkanInstance vk; 
 		VulkanSurface surface; 
 		VulkanPhysicalDevice physicalDevice; 
@@ -3565,6 +3620,41 @@ class VulkanWindow: Window, IGfxContentDestination
 		Object[] buffers; 
 		
 		bool windowResized; 
+		
+		version(/+$DIDE_REGION Stats+/all)
+		{
+			struct Stats
+			{
+				size_t V_cnt, V_size, G_size; 
+				@property VG_size() => V_size + G_size; 
+			} 
+			Stats lastFrameStats; 
+			
+			static struct TextureManagerStats
+			{
+				size_t 	length_resident, length_volatile, length_all,
+					totalBytes, freeBytes, usedBytes; 
+			} 
+			
+			TextureManagerStats textureManagerStats()
+			{
+				TextureManagerStats res; 
+				with(res)
+				{
+					length_all	= IB.buffer.length,
+					length_volatile	= texturePool.length /+Todo: only one pool can exist!+/,
+					length_resident 	= length_all - length_volatile; 
+					totalBytes 	= TB.buffer.sizeBytes /++ IB.buffer.sizeBytes+/,
+					freeBytes 	= TB.buffer.allocator.sizeFree /+
+						Opt: This takes time, 
+						should be tracked
+					+/,
+					usedBytes 	= totalBytes - freeBytes; 
+				}
+				return res; 
+			} 
+			
+		}
 		
 		/+
 			Note: Alignment rules:
@@ -4050,26 +4140,39 @@ class VulkanWindow: Window, IGfxContentDestination
 					} 
 				+/
 				
-				TexHandle create(Bitmap bmp)
+				static struct RawTextureData { TexSizeFormat fmt; ubyte[] data; } 
+				
+				RawTextureData prepare(Bitmap bmp)
 				{
 					enforce(bmp); enforce(bmp.type=="ubyte"); 
-					TexSizeFormat fmt; 
-					fmt.size = bmp.size; 
-					fmt.format = bmp.channels.predSwitch(
-						1, TexFormat.u8, /+grayscale+/
-						2, TexFormat.la_u8,
-						3, TexFormat.rgb_u8,
-						4, TexFormat.rgba_u8
-					); 
-					fmt.resident = false; 
-					fmt.loading = false; 
-					fmt.error = false; 
-					
-					auto th = createHandleAndSetData(fmt, bmp.getRaw); 
+					RawTextureData res; 
+					with(res)
+					{
+						fmt.size = bmp.size; 
+						fmt.format = bmp.channels.predSwitch(
+							1, TexFormat.u8, /+grayscale+/
+							2, TexFormat.la_u8,
+							3, TexFormat.rgb_u8,
+							4, TexFormat.rgba_u8
+						); 
+						fmt.resident = false; 
+						fmt.loading = false; 
+						fmt.error = false; 
+						
+						data = bmp.getRaw; 
+					}
+					return res; 
+				} 
+				
+				TexHandle create(RawTextureData data)
+				{
+					auto th = createHandleAndSetData(data.fmt, data.data); 
 					enforce(th, "th is null.  Probably out of texture mem."); 
 					return th; 
 				} 
 				
+				TexHandle create(Bitmap bmp)
+				{ return create(prepare(bmp)); } 
 				
 				void remove(in TexHandle texHandle)
 				{
@@ -4090,8 +4193,7 @@ class VulkanWindow: Window, IGfxContentDestination
 						remove(texRec.texHandle); 
 						texRecByFile.remove(file); 
 					}
-				} 
-				
+				} 
 				TexRec* access(File file, in Flag!"delayed" delayed_)
 				{
 					const delayed = delayed_ && DelayedTextureLoading; 
@@ -4149,13 +4251,14 @@ class VulkanWindow: Window, IGfxContentDestination
 						return idx; 
 					+/
 				} 
-				
 			} 
 		}
 		
 		version(/+$DIDE_REGION+/all) {
 			class Texture
 			{
+				//This is a resident texture. It never gets deallocated when space is required.
+				
 				const TexHandle handle; 
 				
 				version(/+$DIDE_REGION Tracking released texHandles+/all)
@@ -4165,6 +4268,15 @@ class VulkanWindow: Window, IGfxContentDestination
 					{ destroyedResidentTexHandles = new typeof(destroyedResidentTexHandles); } 
 				}
 				
+				this(TexSizeFormat fmt, in void[] data=null)
+				{
+					fmt.resident = true; 
+					handle = TB.createHandleAndSetData(fmt, data); 
+				} 
+				
+				this(RawTextureData rawTextureData)
+				{ this(rawTextureData.fmt, rawTextureData.data); } 
+				
 				this(S)(in TexInfoFlags flags, in TexFormat format, in S size, in void[] data=null)
 				{
 					TexSizeFormat fmt; 
@@ -4172,11 +4284,14 @@ class VulkanWindow: Window, IGfxContentDestination
 					fmt.format 	= format,
 					fmt.size 	= size; 
 					fmt.resident = true; 
-					handle = TB.createHandleAndSetData(fmt, data); 
+					this(fmt, data); 
 				} 
 				
 				this(S)(in TexFormat format, in S size, in void[] data=null, in TexInfoFlags flags=TexInfoFlags.init)
 				{ this(flags, format, size, data); } 
+				
+				this(Bitmap bmp)
+				{ this(TB.prepare(bmp)); } 
 				
 				~this()
 				{
@@ -4534,8 +4649,6 @@ class VulkanWindow: Window, IGfxContentDestination
 				); 
 				
 				mainVulkanWindow = this; 
-				if(!g_fontFaceManager)
-				g_fontFaceManager = new FontFaceManager; 
 			}
 			
 			version(/+$DIDE_REGION het.ui initialization+/all)
@@ -4576,6 +4689,12 @@ class VulkanWindow: Window, IGfxContentDestination
 			createDescriptorPool; 
 			createDescriptorSet; //needs: descriptorsetLayout, uniformBuffer
 			
+			{
+				//now that the buffers are ready, create global managers that depend on them.
+				enforce(!g_fontFaceManager); 	g_fontFaceManager = new FontFaceManager; 
+				enforce(!g_texturePool); 	g_texturePool = new TexturePool(this); 
+			}
+			
 			if(0) VulkanInstance.dumpBasicStuff; 
 		} 
 		
@@ -4613,18 +4732,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2360C82886ADB).檢(
+					((0x2440A82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2367E82886ADB))))
+				if((互!((bool),(0),(0x2447C82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2371282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2372982886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2451082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2452782886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4637,8 +4756,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x238FE82886ADB).檢 (imVG)),
-					((0x2392482886ADB).檢 (imFPS)); 
+					((0x246FC82886ADB).檢 (imVG)),
+					((0x2472282886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4671,7 +4790,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x23C9482886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x23CAB82886ADB))))); 
+								const double fovY_deg = ((0x24A9282886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x24AA982886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 

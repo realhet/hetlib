@@ -99,9 +99,19 @@ version(/+$DIDE_REGION+/all)
 			
 			//texture statistics
 			//Todo: implement these with a global system info collector object.
-			size_t textures_length() => 0; 
-			size_t textures_poolSizeBytes() => 0; 
-			size_t textures_usedSizeBytes() => 0; 
+			
+			private TextureManagerStats cachedTextureManagerStats; 
+			private uint cachedTextureManagerStats_tick; 
+			private ref const(TextureManagerStats) getTextureManagerStats()
+			{
+				if(cachedTextureManagerStats_tick.chkSet(application.tick))
+				cachedTextureManagerStats = mainVulkanWindow.textureManagerStats; 
+				return cachedTextureManagerStats; 
+			} 
+			
+			size_t textures_length() => getTextureManagerStats.length_all; 
+			size_t textures_poolSizeBytes() => getTextureManagerStats.totalBytes; 
+			size_t textures_usedSizeBytes() => getTextureManagerStats.usedBytes; 
 		}
 		
 		
@@ -5686,7 +5696,8 @@ version(/+$DIDE_REGION+/all)
 		
 		void update()
 		{
-			updateInternal(
+			updateInternal
+			(
 				{
 					//collect and actualize data
 					textureCount	.act[0] = textures_length,

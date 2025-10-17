@@ -15804,13 +15804,17 @@ version(/+$DIDE_REGION debug+/all)
 		@property countFree()
 		=> freeBlocksByPos[].walkLength; 	@property sizeFree() => mixin(求sum(q{b},q{freeBlocksByPos[]},q{b.sizeBytes})); 
 		@property stats()
-		=> i"	Count	Size
+		{
+			const frag = calculateFragmentationIndicator
+				(freeBlocksBySize[].map!((b)=>(b.sizeBytes)).array); 
+			return i"	Count	Size
 Used:	$(countUsed)	$(sizeUsed)
 Free:	$(countFree)	$(sizeFree)
 Total:	$(countUsed+
 countFree)	$(sizeUsed+
 sizeFree)
-freeBySize: $(freeBlocksBySize[].map!((b)=>b.sizeBytes))".text; 
+Fragmentation: $(frag.format!"%5.1f")%".text; 
+		} 
 		
 		static void selfTest()
 		{
@@ -15859,6 +15863,58 @@ freeBySize: $(freeBlocksBySize[].map!((b)=>b.sizeBytes))".text;
 			+/
 			
 			totalSize.print; 
+		} 
+		static float calculateFragmentationIndicator(in ulong[] freeBySize)
+		{
+			/+
+				Fragmentation indicator based on:
+				1. Size distribution entropy (more uniform = more fragmented)
+				2. Presence of very large blocks (reduces fragmentation)
+				3. Number of small blocks (increases fragmentation)
+			+/
+			if(freeBySize.empty) return 0; // No free blocks = no fragmentation
+			const N = freeBySize.length; 
+			const totalFreeMemory = freeBySize.sum; 
+			
+			if(totalFreeMemory == 0) return 0; 
+			
+			// Group blocks by size and count occurrences
+			const sizeCounts = freeBySize.group.map!"a[1]".array; 
+			
+			// Calculate size distribution entropy
+			float entropy = 0; 
+			foreach(sizeCount; sizeCounts)
+			{
+				const probability = (((float(sizeCount)))/(N)); 
+				entropy -= probability * log2(probability); 
+			}
+			
+			// Normalize entropy (max entropy = log2(n) where n is number of unique sizes)
+			const maxEntropy = log2((float(sizeCounts.length))); 
+			const normalizedEntropy = ((maxEntropy > 0)?(entropy / maxEntropy):(0.0f)); 
+			
+			// Calculate large block ratio (blocks > 1% of total free memory)
+			const largeBlockThreshold = (ifloor(totalFreeMemory * 0.01)); 
+			const largeBlocksRatio = (((float(freeBySize.count!((size)=>(size >= largeBlockThreshold)))))/(N)); 
+			
+			// Calculate small block ratio (blocks < 256 bytes)
+			const smallBlocksRatio = (((float(freeBySize.count!((size)=>(size < 256)))))/(N)); 
+			
+			// Calculate size variance (higher variance = more fragmentation)
+			const meanSize = (((float(totalFreeMemory)))/(N)); 
+			const variance = ((freeBySize.map!((size)=>((((float(size - meanSize)))^^(2)))).sum)/(N)); 
+			const normalizedVariance = ((variance)/(((meanSize)^^(2)))) / 30
+				/+/6 because the data is widely spread already+/; 
+			
+			// Weighted combination of factors
+			const float fragmentation = 
+				normalizedEntropy 	* 0.4f +	/+ Entropy (distribution evenness) +/
+				normalizedVariance 	* 0.3f +	/+ Size variance +/
+				smallBlocksRatio 	* 0.2f +	/+ Small blocks +/
+				(1 - largeBlocksRatio) 	* 0.1f 	/+ Lack of large blocks +/; 
+			
+			// Convert to percentage and clamp
+			return fragmentation.clamp(0, 1)*100; 
 		} 
 		
 	} 

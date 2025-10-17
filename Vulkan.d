@@ -6496,60 +6496,63 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				bitStreamAppender.onBuffer = &onBitStreamAppenderFull; 
 			} 
 			
-			bool append(in void* data, size_t size)
+			final
 			{
-				/+Opt: Must optimize this. It's way too OOPish.+/
-				
-				if(!size) return true; 
-				
-				const success = requireBufferSizeBytes(appendPos + size); 
-				if(success)
+				bool append(in void* data, size_t size)
 				{
-					memcpy(hostPtr+appendPos, data, size); 
-					appendPos += size; 
-				}
-				return success; 
-			} 
-			
-			void alignTo(in size_t bytes)
-			{
-				enforce(bytes.inRange(1, 16) && !(bytes-1&bytes)); 
-				const bitStreamBytes = bitStreamAppender.tempBits.alignUp(8)/8; 
-				size_t desiredPos = appendPos; 
-				if(bitStreamBytes) {
-					bitStreamAppender.flush; 
-					desiredPos = appendPos - 8 + bitStreamBytes; 
-				}
-				desiredPos = alignUp(desiredPos, bytes); 
-				
-				if(desiredPos<=appendPos) appendPos = desiredPos; 
-				else { ubyte16 tmp; append(&tmp, desiredPos - appendPos); }; 
-			} 
-			
-			bool appendUints(in uint[] data, in uint shift)
-			{
-				const size = data.sizeBytes; 
-				if(!size) return true; 
-				
-				const success = requireBufferSizeBytes(appendPos + size); 
-				if(success)
-				{
-					if(!shift) { memcpy(hostPtr+appendPos, data.ptr, size); }
-					else {
-						//Opt: It's not using SSE!
-						auto dst = (cast(uint*)(hostPtr+appendPos)); 
-						foreach(i; 0..data.length)
-						dst[i] = data[i] + shift; 
+					/+Opt: Must optimize this. It's way too OOPish.+/
+					
+					if(!size) return true; 
+					
+					const success = requireBufferSizeBytes(appendPos + size); 
+					if(success)
+					{
+						memcpy(hostPtr+appendPos, data, size); 
+						appendPos += size; 
 					}
-					appendPos += size; 
-				}
-				return success; 
-			} 
-			
-			bool append(T)(in T a)
-			{
-				static if(isDynamicArray!T)	return append(a.ptr, a.sizeBytes); 
-				else	return append(&a, T.sizeof); 
+					return success; 
+				} 
+				
+				void alignTo(in size_t bytes)
+				{
+					enforce(bytes.inRange(1, 16) && !(bytes-1&bytes)); 
+					const bitStreamBytes = bitStreamAppender.tempBits.alignUp(8)/8; 
+					size_t desiredPos = appendPos; 
+					if(bitStreamBytes) {
+						bitStreamAppender.flush; 
+						desiredPos = appendPos - 8 + bitStreamBytes; 
+					}
+					desiredPos = alignUp(desiredPos, bytes); 
+					
+					if(desiredPos<=appendPos) appendPos = desiredPos; 
+					else { ubyte16 tmp; append(&tmp, desiredPos - appendPos); }; 
+				} 
+				
+				bool appendUints(in uint[] data, in uint shift)
+				{
+					const size = data.sizeBytes; 
+					if(!size) return true; 
+					
+					const success = requireBufferSizeBytes(appendPos + size); 
+					if(success)
+					{
+						if(!shift) { memcpy(hostPtr+appendPos, data.ptr, size); }
+						else {
+							//Opt: It's not using SSE!
+							auto dst = (cast(uint*)(hostPtr+appendPos)); 
+							foreach(i; 0..data.length)
+							dst[i] = data[i] + shift; 
+						}
+						appendPos += size; 
+					}
+					return success; 
+				} 
+				
+				bool append(T)(in T a)
+				{
+					static if(isDynamicArray!T)	return append(a.ptr, a.sizeBytes); 
+					else	return append(&a, T.sizeof); 
+				} 
 			} 
 			
 			void reset()
@@ -6599,28 +6602,40 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			)
 			{ super(__traits(parameters)); } 
 			
-			protected T[] _array;  const(T)[] opSlice() const => _array; 
-			@property length() const
-			=> _array.length;  const ref opIndex(size_t i)
-			=> _array[i];  void opIndexAssign(in T value, size_t i)
-			{
-				_array[i] = value; 
-				markModified(&_array[i], T.sizeof); 
-			} 
+			protected T[] _array; 
 			
-			size_t append(in T value)
+			final
 			{
-				/+
-					uint index is returned because it will be used on the GPU
-					null is problematic: It should be allocated at the start.
-				+/
-				const 	idx 	= length, 
-					requiredLength 	= idx+1; 
-				if(!requireBufferSizeBytes(requiredLength * T.sizeof))
-				return 0/+out of gpu mem+/; 
-				_array = (cast(T*)(hostPtr))[0..requiredLength]; //uptate the slice
-				this[idx] = value; //set the value and mark it as changed
-				return idx; 
+				const(T)[] opSlice() const => _array; 
+				@property length() const
+				=> _array.length;  const ref opIndex(size_t i)
+				=> _array[i];  
+				
+				void opIndexAssign(in T value, size_t i)
+				{
+					_array[i] = value; 
+					markModified(&_array[i], T.sizeof); 
+				} 
+				
+				@property sizeBytes() const
+				=> _array.sizeBytes; 
+				
+				size_t append(in T value)
+				{
+					/+
+						uint index is returned because it will be used on the GPU
+						null is problematic: It should be allocated at the start.
+					+/
+					const 	idx 	= length, 
+						requiredLength 	= idx+1; 
+					if(!requireBufferSizeBytes(requiredLength * T.sizeof))
+					return 0/+out of gpu mem+/; 
+					
+					_array = (cast(T*)(hostPtr))[0..requiredLength]; //uptate the slice
+					
+					this[idx] = value; //set the value and mark it as changed
+					return idx; 
+				} 
 			} 
 			
 			version(/+$DIDE_REGION Invalidation logic+/all)
@@ -6691,7 +6706,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				if(modifiedBlocks.empty) return; 
 				scope(exit) modifiedBlocks = []; 
 				auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
-				cb.record(
+				cb.record
+				(
 					mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
 					{
 						combineBlocks
@@ -6744,52 +6760,54 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				+/
 			} 
 			
-			HeapChunkIdx calcHeapChunkIdx(void* p /+must be null or valid!+/)
-			=> HeapChunkIdx((p)?((cast(uint)((p - hostPtr) / heapGranularity))):(0)); 
-			
-			void* calcHeapPtr(HeapChunkIdx a /+must be 0 or valid!+/)
-			=> ((a)?(hostPtr + a.to!size_t * heapGranularity):(null)); 
-			
-			auto heapAlloc(size_t size)
+			final
 			{
-				HeapRef res; 
-				res.ptr = allocator.alloc(size); 
+				HeapChunkIdx calcHeapChunkIdx(void* p /+must be null or valid!+/)
+				=> HeapChunkIdx((p)?((cast(uint)((p - hostPtr) / heapGranularity))):(0)); 
 				
-				if(!res.ptr)
+				void* calcHeapPtr(HeapChunkIdx a /+must be 0 or valid!+/)
+				=> ((a)?(hostPtr + a.to!size_t * heapGranularity):(null)); 
+				
+				auto heapAlloc(size_t size)
 				{
-					const requiredBufferSize = bufferSizeBytes + size; 
+					HeapRef res; 
+					res.ptr = allocator.alloc(size); 
 					
-					if(requiredBufferSize > maxAddressableSizeBytes)
-					{ ERR("maxAddressableSizeBytes reached."); return res; }
-					
-					const success = requireBufferSizeBytes(requiredBufferSize); 
-					
-					if(success)
-					{ res.ptr = allocator.alloc(size); }
-					else
+					if(!res.ptr)
 					{
-						ERR("Out of GPU mem"); 
-						/+Todo: garbage collect+/
+						const requiredBufferSize = bufferSizeBytes + size; 
+						
+						if(requiredBufferSize > maxAddressableSizeBytes)
+						{ ERR("maxAddressableSizeBytes reached."); return res; }
+						
+						const success = requireBufferSizeBytes(requiredBufferSize); 
+						
+						if(success)
+						{ res.ptr = allocator.alloc(size); }
+						else
+						{
+							ERR("Out of GPU mem"); 
+							/+Todo: garbage collect+/
+						}
 					}
-				}
+					
+					if(res.ptr) res.heapChunkIdx = calcHeapChunkIdx(res.ptr); 
+					return res; 
+				} 
 				
-				if(res.ptr) res.heapChunkIdx = calcHeapChunkIdx(res.ptr); 
-				return res; 
+				void heapFree(void* p)
+				{
+					assert(p !is hostPtr, "Failed attempt to free nullPtr."); 
+					const success = allocator.free(p); 
+					if(!success) ERR("failed to deallicate heapChunkIdx:"~calcHeapChunkIdx(p).text); 
+				} 
+				
+				void heapFree(HeapChunkIdx a)
+				{ heapFree(calcHeapPtr(a)); } 
+				
+				void heapFree(HeapRef a)
+				{ heapFree(a.ptr); } 
 			} 
-			
-			void heapFree(void* p)
-			{
-				assert(p !is hostPtr, "Failed attempt to free nullPtr."); 
-				const success = allocator.free(p); 
-				if(!success) ERR("failed to deallicate heapChunkIdx:"~calcHeapChunkIdx(p).text); 
-			} 
-			
-			void heapFree(HeapChunkIdx a)
-			{ heapFree(calcHeapPtr(a)); } 
-			
-			void heapFree(HeapRef a)
-			{ heapFree(a.ptr); } 
-			
 			
 			protected override bool beforeResize(size_t newBufferSizeBytes)
 			{
@@ -6817,12 +6835,15 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					{ ERR("Shrinking Vulkan Heap Allocator not functioning yet. (2)"); }
 				}
 				
+				//update the array slice.
+				_array = (cast(typeof(_array))((cast(ubyte*)(hostPtr))[0..bufferSizeBytes])); 
+				//It is used only to get sizeBytes. No real use to access the heap linearly.
+				
 				static if((常!(bool)(1)))
 				{
-					print("heap grown"); 
+					print("Heap buffer has grown"); 
 					allocator.stats.print; 
 				}
-				
 			} 
 		} 
 		
