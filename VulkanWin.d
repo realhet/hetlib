@@ -61,6 +61,7 @@ version(/+$DIDE_REGION+/all)
 			const order = cmd.predSwitch(
 				'M', 1, /+only 0 if there are more adjacent 2 moves+/
 				'L', 1, 
+				'Z', 1, 
 				'Q', 2, 'T', 2, 
 				'C', 3, 'S', 3, 'A', 3, 
 				0
@@ -2620,107 +2621,391 @@ version(/+$DIDE_REGION+/all) {
 				static foreach(i, a; args) { processArg/+!(Unqual!(Args[i]))+/(a); }
 			} 
 			
-			void drawPath(Args...)(in Args args)
-			{
-				void setup() { synch_transform, synch_colors, synch_LW; } 
-				
-				/+
-					Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
-					The problem could be at start/end of line segments. The tangents are bad there!
-				+/
-				static if(0)	begin(6/+to be safe+/, {}); 
-				else	begin/+full begin. for a fix+/; 
-				
-				setup; 
-				static immutable NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
-				
-				vec2 P_start, P_last, P_mirror; //internal state
-				
-				void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
+			version(/+$DIDE_REGION+/none) {
+				void drawPathOldest(Args...)(in Args args)
 				{
-					//cmd is for estimationb only.  It should use the SvgPathCommand...
+					void setup() { synch_transform, synch_colors, synch_LW; } 
 					
-					//Todo: compress XYFormat -> assembleXY()
+					/+
+						Bug: The splitter is WRONG, for a temporal fix, it gets a full begin() at each path
+						The problem could be at start/end of line segments. The tangents are bad there!
+					+/
+					static if(0)	begin(6/+to be safe+/, {}); 
+					else	begin/+full begin. for a fix+/; 
 					
-					const est = bezierTesselationSettings.estimateVertexCount(cmd); 
-					if(est + 4/*to be sure*/ > remainingVertexCount)
+					setup; 
+					static immutable NOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
+					
+					vec2 P_start, P_last, P_mirror; //internal state
+					
+					void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
 					{
-						emit(
-							assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
-							NOP, NOP
-						); 
-						end; begin; setup;  //Todo: this is bad and bogus.
-						emit(
-							assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
-							assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
-						); 
-						incVertexCount(2); //add extra to be sure
-					}
-					
-					emit(op); incVertexCount(est); 
-					static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
-				} 
-				
-				void onItem(const ref SvgPathItem item)
-				{
-					const ref P0()
-					=> item.data[0]; const ref P1()
-					=> item.data[1]; const ref P2()
-					=> item.data[2]; const Pm()
-					=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
-					{ P_mirror = M, P_last = L; } 
-					final switch(item.cmd)
-					{
-							/+drawing+/	/+state update+/	
-						case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
-						P_start = P0; 	break; 
-						case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
-						case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
-						case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
-						case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
-						case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
-						/+redirected commands:+/			
-						case SvgPathCommand.A: 	approximateArcToCubicBeziers
-							(P_last, item, &onItem)
-						/+Todo: move it to GPU+/
-						/+
-							Opt: Should do with a simplified 
-							version of cubic bezier!
-							because <90deg and no S curve
-						+/; 		break; 
-						case SvgPathCommand.Z: 	if(P_last!=P_start)
+						//cmd is for estimationb only.  It should use the SvgPathCommand...
+						
+						//Todo: compress XYFormat -> assembleXY()
+						
+						const est = bezierTesselationSettings.estimateVertexCount(cmd); 
+						if(est + 4/*to be sure*/ > remainingVertexCount)
 						{
-							emitPathCmd(
-								'L', mixin(舉!((Opcode),q{drawPathL})), 
-								P_start
+							emit(
+								assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), args[0], 
+								NOP, NOP
 							); 
-							/+
-								Todo: move it	to GPU
-								...bad	idea because vertexLimit
-							+/
-							/+Todo: only works for line, not curves+/
-						}	step(P_start, P_start); 	break; 
-					}
-				} 
-				
-				
-				SvgPathParser parser = void; bool parserInitialized = false; 
-				void parse(in string s)
-				{
-					if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
-					parser.parse(s); 
-				} 
-				
-				static foreach(i, a; args)
-				{
+							end; begin; setup;  //Todo: this is bad and bogus.
+							emit(
+								assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
+								assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
+							); 
+							incVertexCount(2); //add extra to be sure
+						}
+						
+						emit(op); incVertexCount(est); 
+						static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+					} 
+					
+					void onItem(const ref SvgPathItem item)
 					{
-						alias T = Unqual!(Args[i]); 
-						static if(isSomeString!T) { parse(a); }
+						const ref P0()
+						=> item.data[0]; const ref P1()
+						=> item.data[1]; const ref P2()
+						=> item.data[2]; const Pm()
+						=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
+						{ P_mirror = M, P_last = L; } 
+						final switch(item.cmd)
+						{
+								/+drawing+/	/+state update+/	
+							case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
+							P_start = P0; 	break; 
+							case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
+							case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
+							case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
+							case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
+							case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
+							/+redirected commands:+/			
+							case SvgPathCommand.A: 	approximateArcToCubicBeziers
+								(P_last, item, &onItem)
+							/+Todo: move it to GPU+/
+							/+
+								Opt: Should do with a simplified 
+								version of cubic bezier!
+								because <90deg and no S curve
+							+/; 		break; 
+							case SvgPathCommand.Z: 	if(P_last!=P_start)
+							{
+								emitPathCmd(
+									'L', mixin(舉!((Opcode),q{drawPathL})), 
+									P_start
+								); 
+								/+
+									Todo: move it	to GPU
+									...bad	idea because vertexLimit
+								+/
+								/+Todo: only works for line, not curves+/
+							}	step(P_start, P_start); 	break; 
+						}
+					} 
+					
+					
+					SvgPathParser parser = void; bool parserInitialized = false; 
+					void parse(in string s)
+					{
+						if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
+						parser.parse(s); 
+					} 
+					
+					static foreach(i, a; args)
+					{
+						{
+							alias T = Unqual!(Args[i]); 
+							static if(isSomeString!T) { parse(a); }
+						}
+					}
+					
+					emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
+				} 
+			}
+			struct SvgState
+			{
+				bool active; 
+				vec2 P_start, P_last, P_mirror; //internal state
+			} 
+			protected SvgState svgState; 
+			
+			protected void svgSetup() { synch_transform, synch_colors, synch_LW; } 
+			
+			protected void svgBegin()
+			{
+				with(svgState)
+				{
+					if(active.chkSet)
+					{
+						static if((常!(bool)(0)))	begin(6/+to be safe+/, {}); 
+						else	begin/+full begin. for a fix+/; 
+						/+
+							Bug: The splitter is WRONG, for a temporal fix, it gets a full 
+							begin() at each path
+							The problem could be at start/end of line segments. 
+							The tangents are bad there!
+							251018: using begin(6), it works for lines.
+							251018b: mégsem lehet!, Elbaszodnak a betuk!!!
+						+/
+						
+						svgSetup; 
 					}
 				}
-				
-				emit(NOP, NOP, NOP); incVertexCount(2); /+to be sure+/
 			} 
+			
+			protected enum svgNOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
+			
+			protected void svgEnd()
+			{
+				with(svgState)
+				{
+					if(active.chkClear)
+					{
+						emit(svgNOP, svgNOP, svgNOP); incVertexCount(2); /+to be sure+/
+						//Todo: svg queue flushing should be automatic on the GPU
+					}
+				}
+			} 
+			
+			protected void svgSplitStream(A)(in A P_next)
+			{
+				with(svgState)
+				{
+					emit(
+						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_next.vec2, 
+						svgNOP, svgNOP
+					); 
+					end; begin; svgSetup;  //Todo: this is bad and bogus.
+					emit(
+						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_mirror,
+						assemble(mixin(舉!((Opcode),q{drawPathTG})), mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), P_last
+					); 
+					incVertexCount(2); //add extra to be sure
+				}
+			} 
+			
+			version(/+$DIDE_REGION+/none) {
+				protected void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
+				{
+					with(svgState)
+					{
+						//cmd is for estimationb only.  It should use the SvgPathCommand...
+						
+						//Todo: compress XYFormat -> assembleXY()
+						
+						const est = bezierTesselationSettings.estimateVertexCount(cmd); 
+						if(est + 4/*to be sure*/ > remainingVertexCount)
+						{
+							const P_next = args[0].vec2; 
+							svgBeginNextStream(P_next); 
+						}
+						
+						emit(op); incVertexCount(est); 
+						static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+					}
+				} 
+				
+				void drawPath2(Args...)(in Args args)
+				{
+					with(svgState)
+					{
+						svgBegin; scope(exit) svgEnd; 
+						
+						void onItem(const ref SvgPathItem item)
+						{
+							const ref P0()
+							=> item.data[0]; const ref P1()
+							=> item.data[1]; const ref P2()
+							=> item.data[2]; const Pm()
+							=> P_last*2 - P_mirror; void step(vec2 M, vec2 L)
+							{ P_mirror = M, P_last = L; } 
+							final switch(item.cmd)
+							{
+									/+drawing+/	/+state update+/	
+								case SvgPathCommand.M: 	emitPathCmd('M', mixin(舉!((Opcode),q{drawPathM})), P0); 	step(P_last, P0),
+								P_start = P0; 	break; 
+								case SvgPathCommand.L: 	emitPathCmd('L', mixin(舉!((Opcode),q{drawPathL})), P0); 	step(P_last, P0); 	break; 
+								case SvgPathCommand.Q: 	emitPathCmd('Q', mixin(舉!((Opcode),q{drawPathQ})), P0, P1); 	step(P0, P1); 	break; 
+								case SvgPathCommand.T: 	emitPathCmd('T', mixin(舉!((Opcode),q{drawPathT})), P0); 	step(Pm, P0); 	break; 
+								case SvgPathCommand.C: 	emitPathCmd('C', mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); 	step(P1, P2); 	break; 
+								case SvgPathCommand.S: 	emitPathCmd('S', mixin(舉!((Opcode),q{drawPathS})), P0, P1); 	step(P0, P1); 	break; 
+								/+redirected commands:+/			
+								case SvgPathCommand.A: 	approximateArcToCubicBeziers
+									(P_last, item, &onItem)
+								/+Todo: move it to GPU+/
+								/+
+									Opt: Should do with a simplified 
+									version of cubic bezier!
+									because <90deg and no S curve
+								+/; 		break; 
+								case SvgPathCommand.Z: 	if(P_last!=P_start)
+								{
+									emitPathCmd(
+										'L', mixin(舉!((Opcode),q{drawPathL})), 
+										P_start
+									); 
+									/+
+										Todo: move it	to GPU
+										...bad	idea because vertexLimit
+									+/
+									/+Todo: only works for line, not curves+/
+								}	step(P_start, P_start); 	break; 
+							}
+						} 
+						
+						
+						SvgPathParser parser = void; bool parserInitialized = false; 
+						void parseStr(in string s)
+						{
+							if(parserInitialized.chkSet) parser = SvgPathParser(&onItem); 
+							parser.parse(s); 
+						} 
+						
+						static foreach(i, a; args)
+						{
+							{
+								alias T = Unqual!(Args[i]); 
+								static if(isSomeString!T) { parseStr(a); }
+							}
+						}
+					}
+				} 
+			}
+			
+			void svg(char cmd, T...)(in T args)
+			{
+				enum isAbs 	= cmd.isAsciiUpper,  isRel = !isAbs,
+				ucCmd 	= cmd.toAsciiUpper; 
+				static assert(
+					isAbs, "Relative mode not implemented. 
+Use SvgParser to prepare absolute SVG command stream!"
+				); 
+				
+				enum cmdIdx 	= ucCmd.among	('M', 'L', 'Q', 'T', 'C', 'S', 'A', 'Z').to!int-1,
+				expectedArgs 	= 	[  1,    1,    2,    1,    3,    2,    3,    0]; 
+				static assert(cmdIdx>=0, "Invalid cmd: "~ucCmd); 
+				static assert(
+					expectedArgs[cmdIdx]==args.length, 
+					i"Unexpected args: $(args.length). Expected: $(expectedArgs)".text
+				); 
+				
+				with(svgState)
+				{
+					static if(args.length > 0) const P0() => args[0].vec2; 
+					static if(args.length > 1) const P1() => args[1].vec2; 
+					static if(args.length > 2) const P2() => args[2].vec2; 
+					const Pm()
+					=> P_last*2 - P_mirror; void STEP(vec2 M, vec2 L)
+					{ P_mirror = M, P_last = L; } 
+					
+					void EMIT(A...)(in Opcode op, in A args)
+					{
+						assert(svgState.active); 
+						const 	estimatedVertexCount = bezierTesselationSettings.estimateVertexCount(ucCmd),
+							haveSpace = estimatedVertexCount + 4/*to be sure*/ <= remainingVertexCount; 
+						if(!haveSpace)
+						{
+							const P_next = args[0].vec2; 
+							svgSplitStream(P_next); 
+						}
+						
+						emit(op); incVertexCount(estimatedVertexCount); 
+						static foreach(a; args) { emit(assemble(mixin(舉!((XYFormat),q{absXY})), mixin(舉!((CoordFormat),q{f32}))), a); }
+					} 
+					
+					mixin((
+						(表([
+							[q{/+Note: cmd+/},q{/+Note: operation+/},q{/+Note: advance+/}],
+							[q{'M'},q{EMIT(mixin(舉!((Opcode),q{drawPathM})), P0); },q{
+								STEP(P_last, P0),
+								P_start = P0; 
+							}],
+							[q{'L'},q{EMIT(mixin(舉!((Opcode),q{drawPathL})), P0); },q{STEP(P_last, P0); }],
+							[q{'Z'},q{EMIT(mixin(舉!((Opcode),q{drawPathL})), P_start); },q{STEP(P_start, P_start); }],
+							[q{'Q'},q{EMIT(mixin(舉!((Opcode),q{drawPathQ})), P0, P1); },q{STEP(P0, P1); }],
+							[q{'T'},q{EMIT(mixin(舉!((Opcode),q{drawPathT})), P0); },q{STEP(Pm, P0); }],
+							[q{'C'},q{EMIT(mixin(舉!((Opcode),q{drawPathC})), P0, P1, P2); },q{STEP(P1, P2); }],
+							[q{'S'},q{EMIT(mixin(舉!((Opcode),q{drawPathS})), P0, P1); },q{STEP(P0, P1); }],
+							[q{'A'},q{
+								approximateArcToCubicBeziers
+								(
+									P_last, SvgPathItem
+										(
+										SvgPathCommand.A, 
+										[P0, P1, P2]
+									),
+									&emitSvgPathItem
+								); 
+							},q{
+								/+Todo: move it to GPU+/
+								/+
+									Opt: Should do with a 
+									simplified version of 
+									cubic bezier! 
+									because <90deg 
+									and no S curve
+								+/ 
+							}],
+						]))
+					) .GEN!q{
+						rows.map!
+						((r)=>(iq{static if(cmd==$(r[0])) {$(r[1]~r[2])}else }.text))
+						.join~q{static assert(0, "Unhandled cmd: "~cmd.text.quoted); }
+					}); 
+				}
+			} 
+			
+			void emitSvgPathItem(const ref SvgPathItem item)
+			{
+				//this is a dumb interpeter to emitSvgCmd from SvgPathItem
+				const ref P0()
+				=> item.data[0]; const ref P1()
+				=> item.data[1]; const ref P2()
+				=> item.data[2]; 
+				final switch(item.cmd)
+				{
+					case SvgPathCommand.M: 	svg!'M'(P0); 	break; 
+					case SvgPathCommand.L: 	svg!'L'(P0); 	break; 
+					case SvgPathCommand.Q: 	svg!'Q'(P0, P1); 	break; 
+					case SvgPathCommand.T: 	svg!'T'(P0); 	break; 
+					case SvgPathCommand.C: 	svg!'C'(P0, P1, P2); 	break; 
+					case SvgPathCommand.S: 	svg!'S'(P0, P1); 	break; 
+					case SvgPathCommand.A: 	svg!'A'(P0, P1, P2); 	break; 
+					case SvgPathCommand.Z: 	svg!'Z'(); 	break; 
+				}
+			} 
+			
+			protected void drawPath_impl(Args...)(in Args args)
+			{
+				static if(Args.length>=1)
+				{
+					alias T = Args[0]; 
+					static if(is(T==char))
+					{ itt tartok; }
+					else static if(is(T : SvgPathItem))
+					{
+						emitSvgPathItem(args[0]); 
+						drawPath_impl(args[1..$]); 
+					}
+					else static if(isSomeString!T)
+					{
+						SvgPathParser(&emitSvgPathItem).parse(args[0]); 
+						drawPath_impl(args[1..$]); 
+					}
+					else static assert(0, "Unhandled type: "~T.stringof); 
+				}
+			} 
+			
+			void drawPathNew(Args...)(in Args args)
+			{
+				svgBegin; scope(exit) svgEnd; 
+				
+				drawPath_impl(args); 
+			} 
+			
+			alias drawPath = drawPathNew; 
 			
 			void drawC64Sprite(V)(in V pos, in int idx)
 			{
@@ -2896,7 +3181,7 @@ version(/+$DIDE_REGION+/all) {
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1699282886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x18EDB82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4732,18 +5017,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2440A82886ADB).檢(
+					((0x2695382886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2447C82886ADB))))
+				if((互!((bool),(0),(0x269C582886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2451082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2452782886ADB))).iremap(0, 1, 4, ma))); 
+					((0x26A5982886ADB).檢((互!((float/+w=12+/),(1.000),(0x26A7082886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -4756,8 +5041,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x246FC82886ADB).檢 (imVG)),
-					((0x2472282886ADB).檢 (imFPS)); 
+					((0x26C4582886ADB).檢 (imVG)),
+					((0x26C6B82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -4790,7 +5075,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x24A9282886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x24AA982886ADB))))); 
+								const double fovY_deg = ((0x26FDB82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x26FF282886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5939,7 +6224,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					 
+					
 					//Todo: check the warnings!
 					
 					//common stuff

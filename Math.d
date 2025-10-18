@@ -1829,8 +1829,7 @@ version(/+$DIDE_REGION+/all)
 		assert(mat4(-3,-3,-2,1, -1,1,3,-2, 2,2,0,-3, -3,-2,1,1).inverse.approxEqual(mat4(-1.571, -2.142, 2, 3.285,  2,3,-3,-5, -1,-1,1,2, 0.285,0.571,-1,-1.142))); 
 	} 
 	
-}
-version(/+$DIDE_REGION+/all)
+}version(/+$DIDE_REGION+/all)
 {
 	/// Bounds /////////////////////////////////////////////
 	enum isBounds(T) = is(T.BoundsType); 

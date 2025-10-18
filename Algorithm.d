@@ -2718,4 +2718,232 @@ version(/+$DIDE_REGION Geometry+/all)
 			//it leaves the turtle at the tip of the last branch.
 		} 
 	} 
+	version(none)
+	version(/+$DIDE_REGION Tesselator+/all)
+	{
+		private
+		{
+			/+Todo: Revive the tesselator. Use dynamic linking. Check other libraries too!+/
+			struct TessVertex
+			{
+				int idx; 
+				vec2 v; 
+			} 
+			
+			TessVertex*[] tessVertices; 
+			
+			auto addVertex(in vec2 v)
+			{
+				auto r = new TessVertex(cast(int)tessVertices.length, v); 
+				tessVertices ~= r; 
+				return r; 
+			} 
+			
+			auto findAddVertex(in vec2 v)
+			{
+				foreach(i; tessBaseVertexCount..tessVertices.length)
+				if(tessVertices[i].v==v)
+				return tessVertices[i]; 
+				
+				return addVertex(v); 
+			} 
+			
+			public struct TessResult
+			{
+				vec2[] vertices; 
+				int[3][] triangles; 
+				int[2][] lines; 
+				string error; 
+			} 
+			
+			TessResult tessResult; 
+			
+			bool tessBoundaryPass; 
+			size_t tessBaseVertexCount; 
+			int tessActPrimitive; 
+			int tessIdx; 
+			int tessLast0; 
+			int tessLast1; 
+			
+			
+			void* tess; 
+			int tessError; 
+			
+			void tessInit()
+			{
+				tessResult = TessResult.init; 
+				tessVertices = []; 
+				
+				if(tess) return; 
+				with(gl) {
+					tess = gluNewTess(); 
+					gluTessCallback(tess, GLU_TESS_BEGIN	, cast(void*)&cbBegin	); 
+					gluTessCallback(tess, GLU_TESS_VERTEX	, cast(void*)&cbVertex	); 
+					gluTessCallback(tess, GLU_TESS_END	, cast(void*)&cbEnd	); 
+					gluTessCallback(tess, GLU_TESS_COMBINE, cast(void*)&cbCombine); 
+					gluTessCallback(tess, GLU_TESS_ERROR  , cast(void*)&cbError  ); 
+					gluTessNormal(tess, 0, 0, 1); 
+				}
+				//"tess created".writeln;
+			} 
+			
+			extern(Windows)
+			{
+				void cbBegin(int type)
+				{
+					//GLU_TRIANGLE_FAN, GLU_TRIANGLE_STRIP, or GLU_TRIANGLES
+					//if(GLU_TESS_BOUNDARY_ONLY == 1) -> GLU_LINE_LOOP
+					//"glBegin(%d)".writefln(type);
+					
+					tessActPrimitive = type; tessIdx = 0; 
+				} 
+				
+				void cbEnd()
+				{
+					//"glEnd".writeln;
+					
+					if(tessActPrimitive==GL_LINE_LOOP && tessIdx>0) {
+						tessResult.lines ~= [tessLast1, tessLast0]; //last looped segment
+					}
+					tessActPrimitive = 0; tessIdx = 0; 
+				} 
+				
+				void cbVertex(const TessVertex v)
+				{
+					//"glVertex %d %s".writefln(v.idx, v.v);
+					
+					switch(tessActPrimitive)
+					{
+						//Todo: egybeagyazott switch()-ek. Ezeket lehetne grafikusan optolni...
+						case GL_TRIANGLE_FAN: 
+							{
+							switch(tessIdx)
+							{
+								case 0: 	tessLast0 = v.idx; 	break; 
+									//Todo: case 0, case 1 mindegyiknel kozos, ha mar tesztelve van, akkor ki kell pakolni.
+								case 1: 	tessLast1 = v.idx; 	break; 
+								default: 	{
+									tessResult. triangles ~= [tessLast0, tessLast1, v.idx]; 
+									tessLast1 = v.idx; 
+								}
+							}
+							break; 
+						}
+						case GL_TRIANGLE_STRIP: 
+							{
+							switch(tessIdx)
+							{
+								case 0: 	tessLast0 = v.idx; 	break; 
+								case 1: 	tessLast1 = v.idx; 	break; 
+								default: 	{
+									tessResult.triangles ~= tessIdx&1 	? [tessLast1, tessLast0, v.idx]
+										: [tessLast0, tessLast1, v.idx]; 
+									tessLast0 = tessLast1; 
+									tessLast1 = v.idx; 
+								}
+							}
+							break; 
+						}
+						case GL_TRIANGLES: 
+							{
+							switch(tessIdx%3)
+							{
+								case 0: 	tessLast0 = v.idx; 	break; 
+								case 1: 	tessLast1 = v.idx; 	break; 
+								default: 	tessResult.triangles ~= [tessLast0, tessLast1, v.idx]; 
+							}
+							break; 
+						}
+						case GL_LINE_LOOP: 
+							{
+							switch(tessIdx)
+							{
+								case 0: 	tessLast0 = v.idx; 	break; 
+								case 1: 	tessLast1 = v.idx; tessResult.lines ~= [tessLast0, tessLast1]; 	break; 
+								default: 	tessResult.lines ~= [tessLast1, v.idx]; tessLast1 = v.idx; 
+							}
+							break; 
+						}
+						default: 
+							enforce(0, "tess: invalid primitive %s".format(tessActPrimitive)); 
+					}
+					
+					tessIdx++; 
+				} 
+				
+				void cbCombine(double* coords, double* orig, float* weight, out TessVertex* dataOut)
+				{
+					auto v = vec2(coords[0], coords[1]); 
+					if(tessBoundaryPass) dataOut = findAddVertex(v); 
+					else dataOut = addVertex    (v); 
+					
+					//"combine %d %s".writefln(dataOut.idx, dataOut.v);
+				} 
+				
+				void cbError(int err)
+				{
+					tessResult.error = GLFuncts.glErrorStr(err); 
+					//throw new Exception("GLTesselator.Error: "~GLFuncts.glErrorStr(err));
+				} 
+				
+			} 
+		} 
+		TessResult tesselate(in vec2[][] contours, TessWinding winding = TessWinding.nonZero, bool boundary = true)
+		{
+			with(gl) {
+				tessInit; 
+				double[3] dv = [0, 0, 0]; 
+				
+				gluTessProperty(tess, GLU_TESS_WINDING_RULE, winding); 
+				
+				//surface pass
+				tessBoundaryPass = false; 
+				gluTessProperty(tess, GLU_TESS_BOUNDARY_ONLY, tessBoundaryPass); 
+				gluTessBeginPolygon(tess, null); 
+				foreach(const contour; contours)
+				{
+					gluTessBeginContour(tess); //Note: gluTessNextContour is for more control
+					foreach(const vIn; contour)
+					{
+						dv[0] = vIn.x; dv[1] = vIn.y; 
+						gluTessVertex(tess, dv.ptr, cast(void*)addVertex(vIn)); 
+					}
+					gluTessEndContour(tess); 
+				}
+				tessBaseVertexCount = tessVertices.length; //save the base size here, the base vertices will be the same
+				gluTessEndPolygon(tess); 
+				
+				//boundary pass
+				if(boundary)
+				{
+					tessBoundaryPass = true; 
+					gluTessProperty(tess, GLU_TESS_BOUNDARY_ONLY, tessBoundaryPass); 
+					gluTessBeginPolygon(tess, null); 
+					int n = 0; 
+					foreach(const contour; contours)
+					{
+						gluTessBeginContour(tess); //Note: gluTessNextContour is for more control
+						foreach(const vIn; contour)
+						{
+							dv[0] = vIn.x; dv[1] = vIn.y; 
+							gluTessVertex(tess, dv.ptr, cast(void*)(tessVertices[n++])); 
+						}
+						gluTessEndContour(tess); 
+					}
+					gluTessEndPolygon(tess); 
+				}
+				
+				//enforce(dv[2]==0, "tess fatal error: dv[2]!=0");
+				
+				//transfer the vertices
+				tessResult.vertices = tessVertices.map!"a.v".array; 
+				tessVertices = []; 
+				
+				return tessResult; 
+			}
+		} 
+		
+		TessResult tesselate(in vec2[] contour, TessWinding winding = TessWinding.nonZero, bool boundary = true)
+		{ return tesselate([contour], winding, boundary); } 
+	}
 }
