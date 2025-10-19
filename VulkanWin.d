@@ -2883,8 +2883,8 @@ version(/+$DIDE_REGION+/all) {
 Use SvgParser to prepare absolute SVG command stream!"
 				); 
 				
-				enum cmdIdx 	= ucCmd.among	('M', 'L', 'Q', 'T', 'C', 'S', 'A', 'Z').to!int-1,
-				expectedArgs 	= 	[  1,    1,    2,    1,    3,    2,    3,    0]; 
+				enum cmdIdx 	= ucCmd.among	('M', 'L', 'H', 'V', 'Q', 'T', 'C', 'S', 'A', 'Z').to!int-1,
+				expectedArgs 	= 	[  1,    1,    1,    1,    2,    1,    3,    2,    3,    0]; 
 				static assert(cmdIdx>=0, "Invalid cmd: "~ucCmd); 
 				static assert(
 					expectedArgs[cmdIdx]==args.length, 
@@ -2923,6 +2923,14 @@ Use SvgParser to prepare absolute SVG command stream!"
 								P_start = P0; 
 							}],
 							[q{'L'},q{EMIT(mixin(舉!((Opcode),q{drawPathL})), P0); },q{STEP(P_last, P0); }],
+							[q{'H'},q{
+								const PP0 = vec2(args[0], P_last.y); 
+								EMIT(mixin(舉!((Opcode),q{drawPathL})), PP0); 
+							},q{STEP(P_last, PP0); }],
+							[q{'V'},q{
+								const PP0 = vec2(P_last.x, args[0]); 
+								EMIT(mixin(舉!((Opcode),q{drawPathL})), PP0); 
+							},q{STEP(P_last, PP0); }],
 							[q{'Z'},q{EMIT(mixin(舉!((Opcode),q{drawPathL})), P_start); },q{STEP(P_start, P_start); }],
 							[q{'Q'},q{EMIT(mixin(舉!((Opcode),q{drawPathQ})), P0, P1); },q{STEP(P0, P1); }],
 							[q{'T'},q{EMIT(mixin(舉!((Opcode),q{drawPathT})), P0); },q{STEP(Pm, P0); }],
@@ -2977,28 +2985,35 @@ Use SvgParser to prepare absolute SVG command stream!"
 				}
 			} 
 			
-			protected void drawPath_impl(Args...)(in Args args)
+			void emitSvgGenericArg(string name, E)(in GenericArg!(name, E) arg)
+			{
+				static if(name.among("M", "L", "H", "V"))	{ svg!(name[0])(arg.value); }
+				else static if(name=="Z")	{ svg!(name[0])(); }
+				else static assert(0, "Unknown generid arg name: "~T.stringof); 
+			} 
+			
+			protected void drawPath_impl(Args...)(Args args)
 			{
 				static if(Args.length>=1)
 				{
 					alias T = Args[0]; 
-					static if(is(T==char))
-					{ itt tartok; }
+					static if(is(T : GenericArg!(name, E), string name, E))
+					{ enum usedArgs=1; emitSvgGenericArg(args[0]); }
+					else static if(isInputRange!T && isGenericArg!(ElementType!T))
+					{ enum usedArgs=1; foreach(a; args[0]) emitSvgGenericArg(a); }
 					else static if(is(T : SvgPathItem))
-					{
-						emitSvgPathItem(args[0]); 
-						drawPath_impl(args[1..$]); 
-					}
+					{ enum usedArgs=1; emitSvgPathItem(args[0]); }
 					else static if(isSomeString!T)
-					{
-						SvgPathParser(&emitSvgPathItem).parse(args[0]); 
-						drawPath_impl(args[1..$]); 
-					}
+					{ enum usedArgs=1; SvgPathParser(&emitSvgPathItem).parse(args[0]); }
 					else static assert(0, "Unhandled type: "~T.stringof); 
+					
+					
+					static if(usedArgs>args.length) static assert(0, "usedArgs > args.length"); 
+					static if(usedArgs<args.length) drawPath_impl(args[usedArgs..$]); 
 				}
 			} 
 			
-			void drawPathNew(Args...)(in Args args)
+			void drawPathNew(Args...)(Args args)
 			{
 				svgBegin; scope(exit) svgEnd; 
 				
@@ -3181,7 +3196,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x18EDB82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1927E82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3376,7 +3391,9 @@ Use SvgParser to prepare absolute SVG command stream!"
 		void lineTo(in vec2 p)
 		{
 			const p0 = gfx.cr; moveTo(p); const p1 = gfx.cr; 
-			setupLine; gfx.drawPath(i"M$(p0.x) $(p0.y) L$(p1.x) $(p1.y)".text); 
+			setupLine; 
+			static if((常!(bool)(1)))	gfx.drawPath(((p0).名!q{M}), ((p1).名!q{L})); 
+			else	gfx.drawPath(i"M$(p0.x) $(p0.y) L$(p1.x) $(p1.y)".text); 
 		} 
 		
 		void moveTo(float x, float y)
@@ -3402,15 +3419,23 @@ Use SvgParser to prepare absolute SVG command stream!"
 		
 		void drawRect(in bounds2 b)
 		{
-			moveTo(b.topLeft); 	lineTo(b.topRight); lineTo(b.bottomRight); 
-				lineTo(b.bottomLeft); lineTo(b.topLeft); 
+			static if((常!(bool)(1)))	{
+				setupLine; gfx.drawPath(
+					((b.topLeft).名!q{M}), 	((b.right).名!q{H}), 	((b.bottom).名!q{V}), 
+						((b.left).名!q{H}), 	((b.top).名!q{V})
+				); 
+			}
+			else	{
+				moveTo(b.topLeft); 	lineTo(b.topRight); lineTo(b.bottomRight); 
+					lineTo(b.bottomLeft); lineTo(b.topLeft); 
+			}
 		} 
 		
 		void drawX(in bounds2 b)
 		{ line(b.topLeft, b.bottomRight); line(b.topRight, b.bottomLeft); } 
 		
 		void fillRect(in bounds2 b)
-		{ setupLine; gfx.drawC64Rect(b, TexHandle(0)); } 
+		{ gfx.PC = color; gfx.drawC64Rect(b, TexHandle(0)); } 
 		
 		void fillRect(float x0, float y0, float x1, float y1)
 		{ fillRect(bounds2(x0, y0, x1, y1)); } 
@@ -3514,10 +3539,26 @@ Use SvgParser to prepare absolute SVG command stream!"
 			xScale = 1, float yScale = 1
 		)
 		{
-			if(data.empty) return; 
-			moveTo(x0, y0 + yScale*data[0]); 
-			foreach(i; 1..data.length.to!int-1)
-			lineTo(x0 + xScale*i, y0 + yScale*data[i]); 
+			if(data.length<2) return; 
+			static if((常!(bool)(1)))
+			{
+				mixin(scope_remember(q{gfx.TR})); 
+				with(gfx.TR) {
+					transXY += scaleXY*vec2(x0, y0); 
+					/+scaleXY *= vec2(xScale, yScale); +/
+				}
+				setupLine; float x = 0; 
+				gfx.drawPath(
+					((vec2(0, data[0]*yScale)).名!q{M}), 
+					data[1..$].map!((y)=>(((vec2(x++, y) * vec2(xScale, yScale)).名!q{L})))
+				); 
+			}
+			else
+			{
+				moveTo(x0, y0 + yScale*data[0]); 
+				foreach(i; 1..data.length.to!int-1)
+				lineTo(x0 + xScale*i, y0 + yScale*data[i]); 
+			}
 		} 
 		
 		void bezier2(in vec2 A, in vec2 B, in vec2 C)
@@ -5017,18 +5058,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2695382886ADB).檢(
+					((0x26FC782886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x269C582886ADB))))
+				if((互!((bool),(0),(0x2703982886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x26A5982886ADB).檢((互!((float/+w=12+/),(1.000),(0x26A7082886ADB))).iremap(0, 1, 4, ma))); 
+					((0x270CD82886ADB).檢((互!((float/+w=12+/),(1.000),(0x270E482886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5041,8 +5082,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x26C4582886ADB).檢 (imVG)),
-					((0x26C6B82886ADB).檢 (imFPS)); 
+					((0x272B982886ADB).檢 (imVG)),
+					((0x272DF82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5075,7 +5116,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x26FDB82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x26FF282886ADB))))); 
+								const double fovY_deg = ((0x2764F82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2766682886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
