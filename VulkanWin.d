@@ -3258,314 +3258,342 @@ Use SvgParser to prepare absolute SVG command stream!"
 			+/
 		} 
 	} 
+	/+Todo: This is nasty!!! It's there because the new Dr/View is always screen space based.+/
+	__gshared 
+	{
+		vec2 inputTransformFix_invOrigin; 
+		float inputTransformFix_invScale=1; 
+	} 
+	
+	vec2 inputTransformFix(in vec2 p)
+	{
+		auto res = cast()p; 
+		{
+			//res is in screen space. Transform back into world space!
+			res += inputTransformFix_invOrigin; 
+			res *= inputTransformFix_invScale; 
+		}
+		return res; 
+	} 
+	bounds2 inputTransformFix(in bounds2 b)
+	{
+		return bounds2(
+			b.low.inputTransformFix, 
+			b.high.inputTransformFix
+		); 
+	} 
+	
 	class DrawingProxy : IDrawing
 	{
-		GfxBuilder gfx; 
-		
-		void reset()
+		final
 		{
-			if(trStack.length) WARN("trStack was not empty"); 	trStack = []; 
-			if(clipBoundsStack.length) WARN("clipBoundsStack was not empty"); 	clipBoundsStack = []; 
+			GfxBuilder gfx; 
 			
-			gfx.reset; 
-		} 
-		
-		this(GfxBuilder gfxBuilder)
-		{
-			this.gfx = gfxBuilder; 
-			stickFont = Font(accessFontFace(FontId.VGA_9x16)); 
-		} 
-		
-		//Todo: nothing's setting these!!!!
-		float _zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
-		ref float zoomFactor() => _zoomFactor; 
-		float _invZoomFactor = 1; //comes from outside view
-		ref float invZoomFactor() => _invZoomFactor; 
-		
-		version(/+$DIDE_REGION Trans+/all)
-		{
-			struct TRStackItem { vec2 origin; float scale; } 
-			private TRStackItem[] trStack; 
-			
-			void push()
+			void reset()
 			{
-				enforce(trStack.length<1024); 
-				trStack ~= TRStackItem(gfx.TR.transXY, gfx.TR.scaleXY.x); 
-			} 
-			
-			void translate(vec2 offset)
-			{ push; gfx.TR.transXY += offset*gfx.TR.scaleXY; } 
-			
-			void scale(float factor)
-			{ push; gfx.TR.scaleXY *= factor; } 
-			
-			void pop()
-			{
-				enforce(trStack.length); 
-				auto a = trStack.fetchBack; 
-				gfx.TR.scaleXY = vec2(a.scale); 
-				gfx.TR.transXY = a.origin; 
-			} 
-			
-			
-			bounds2 inputTransform(in bounds2 b)
-			=> bounds2(
-				inputTransform(b.topLeft),
-				inputTransform(b.bottomRight)
-			); 
-			
-			vec2 inputTransform(in vec2 p)
-			=> (p * gfx.TR.scaleXY) + gfx.TR.transXY; 
-			
-			bounds2 inverseInputTransform(in bounds2 b)
-			=> bounds2(
-				inverseInputTransform(b.topLeft),
-				inverseInputTransform(b.bottomRight)
-			); 
-			
-			vec2 inverseInputTransform(in vec2 p)
-			=> (p - gfx.TR.transXY) / gfx.TR.scaleXY; 
-		}
-		
-		version(/+$DIDE_REGION ClipBnd+/all)
-		{
-			ref bounds2 clipBounds() => gfx.TR.clipBounds; 
-			private bounds2[] clipBoundsStack; 
-			
-			void pushClipBounds(bounds2 bnd)
-			{
-				enforce(clipBoundsStack.length<1024); 
-				//bnd is in local coords
-				clipBoundsStack ~= clipBounds; 
-				clipBounds = inputTransform(bnd) & clipBounds; 
-			} 
-			
-			void popClipBounds()
-			{
-				enforce(clipBoundsStack.length); 
-				clipBounds = clipBoundsStack[$-1]; 
-				clipBoundsStack = clipBoundsStack[0..$-1]; 
-			} 
-		}
-		
-		version(/+$DIDE_REGION DrawState+/all)
-		{
-			private float _fontHeight=16, _lineWidth=1, _pointSize=1; 
-			ref float fontHeight() 
-			=> _fontHeight; ref float lineWidth()
-			=> _lineWidth; ref float pointSize()
-			=> _pointSize; 
-			
-			private LineStyle _lineStyle; private ArrowStyle _arrowStyle; 
-			ref LineStyle lineStyle()
-			=> _lineStyle; ref ArrowStyle arrowStyle()
-			=> _arrowStyle; 
-			
-			private RGB _color; 
-			@property RGB color()
-			=> _color; @property void color(RGB c)
-			{ _color = c; } 
-			@property float alpha()
-			=> gfx.OP; @property void alpha(float a)
-			{ gfx.OP = a; } 
-			
-			float inputTransformSize(float s)
-			=> ((s<=0)?(-s * invZoomFactor):(s)); 
-		}
-		
-		version(/+$DIDE_REGION Setup+/all)
-		{
-			private void setupLine()
-			{ gfx.LW = inputTransformSize(lineWidth); gfx.PC = color; } 
-			private void setupPoint()
-			{ gfx.LW = inputTransformSize(pointSize); gfx.PC = color; } 
-		}
-		
-		
-		void point(in vec2 p)
-		{ setupPoint; gfx.drawPath(i"M$(p.x) $(p.y) h 1e-5".text); } 
-		
-		void moveTo(in vec2 p)
-		{ gfx.cr = p; } 
-		
-		void lineTo(in vec2 p)
-		{
-			const p0 = gfx.cr; moveTo(p); const p1 = gfx.cr; 
-			setupLine; 
-			static if((常!(bool)(1)))	gfx.drawPath(((p0).名!q{M}), ((p1).名!q{L})); 
-			else	gfx.drawPath(i"M$(p0.x) $(p0.y) L$(p1.x) $(p1.y)".text); 
-		} 
-		
-		void moveTo(float x, float y)
-		{ moveTo(vec2(x, y)); } 
-		
-		void lineTo(float x, float y)
-		{ lineTo(vec2(x, y)); } 
-		
-		void line(in vec2 p0, in vec2 p1)
-		{ moveTo(p0); lineTo(p1); } 
-		
-		void moveRel(float dx, float dy)
-		{ gfx.cr += vec2(dx, dy); } 
-		
-		void lineRel(float dx, float dy)
-		{ lineTo(gfx.cr + vec2(dx, dy)); } 
-		
-		void hLine(float x0, float y, float x1)
-		{ line(vec2(x0, y), vec2(x1, y)); } 
-		
-		void vLine(float x, float y0, float y1)
-		{ line(vec2(x, y0), vec2(x, y1)); } 
-		
-		void drawRect(in bounds2 b)
-		{
-			static if((常!(bool)(1)))	{
-				setupLine; gfx.drawPath(
-					((b.topLeft).名!q{M}), 	((b.right).名!q{H}), 	((b.bottom).名!q{V}), 
-						((b.left).名!q{H}), 	((b.top).名!q{V})
-				); 
-			}
-			else	{
-				moveTo(b.topLeft); 	lineTo(b.topRight); lineTo(b.bottomRight); 
-					lineTo(b.bottomLeft); lineTo(b.topLeft); 
-			}
-		} 
-		
-		void drawX(in bounds2 b)
-		{ line(b.topLeft, b.bottomRight); line(b.topRight, b.bottomLeft); } 
-		
-		void fillRect(in bounds2 b)
-		{ gfx.PC = color; gfx.drawC64Rect(b, TexHandle(0)); } 
-		
-		void fillRect(float x0, float y0, float x1, float y1)
-		{ fillRect(bounds2(x0, y0, x1, y1)); } 
-		
-		void circle(in vec2 p, float r, float arc0 = 0, float arc1 = 2 * PI)
-		{
-			void ellipse(float x, float y, float ra, float rb, float arc0=0, float arc1=2*PI, float incr=0)
-			{
-				while(arc0>arc1) arc1 += 2*PI; //Todo: lame
+				if(trStack.length) WARN("trStack was not empty"); 	trStack = []; 
+				if(clipBoundsStack.length) WARN("clipBoundsStack was not empty"); 	clipBoundsStack = []; 
 				
-				int cnt; 
-				if(incr>0)	{ cnt = iround((arc1-arc0)/incr); }
-				else	{
-					float rounds = (arc1-arc0)*(0.5f/PI); 
-					cnt = iround(rounds*64); 
-					//resolution  //todo: it should be done in the shader
-					incr = cnt ? (arc1-arc0)/cnt : 0; 
-				}
-				
-				foreach(i; 0..cnt+1) {
-					float a = arc0+incr*i; 
-					const p = vec2(x+sin(a)*ra, y+cos(a)*rb); 
-					if(!i) moveTo(p); else lineTo(p); 
-				}
+				gfx.reset; 
 			} 
 			
-			ellipse(p.x, p.y, r, r, arc0, arc1); 
-		} 
-		
-		void drawFontGlyph(
-			int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
-			in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
-		)
-		{
-			if(idx <= 0) return; const h = TexHandle(idx); 
-			if(const isImage = fontFlags.getBit(4))
+			this(GfxBuilder gfxBuilder)
 			{
-				if(const isCustomShader = fontFlags.getBit(5))
+				this.gfx = gfxBuilder; 
+				stickFont = Font(accessFontFace(FontId.VGA_9x16)); 
+			} 
+			
+			//Todo: nothing's setting these!!!!
+			float _zoomFactor = 1; //comes from outside view: units * zoomFactor == unit size in pixels
+			ref float zoomFactor() => _zoomFactor; 
+			float _invZoomFactor = 1; //comes from outside view
+			ref float invZoomFactor() => _invZoomFactor; 
+			
+			version(/+$DIDE_REGION Trans+/all)
+			{
+				struct TRStackItem { vec2 origin; float scale; } 
+				private TRStackItem[] trStack; 
+				
+				void push()
 				{
-					const customShaderIdx = fontFlags/64; 
-					gfx.PC = clFuchsia; gfx.SC = clFuchsia; 
+					enforce(trStack.length<1024); 
+					trStack ~= TRStackItem(gfx.TR.transXY, gfx.TR.scaleXY.x); 
+				} 
+				
+				void translate(vec2 offset)
+				{ push; gfx.TR.transXY += offset*gfx.TR.scaleXY; } 
+				
+				void scale(float factor)
+				{ push; gfx.TR.scaleXY *= factor; } 
+				
+				void pop()
+				{
+					enforce(trStack.length); 
+					auto a = trStack.fetchBack; 
+					gfx.TR.scaleXY = vec2(a.scale); 
+					gfx.TR.transXY = a.origin; 
+				} 
+				
+				
+				bounds2 inputTransform(in bounds2 b)
+				=> bounds2(
+					inputTransform(b.topLeft),
+					inputTransform(b.bottomRight)
+				); 
+				
+				vec2 inputTransform(in vec2 p)
+				{ return (p * gfx.TR.scaleXY) + gfx.TR.transXY; } 
+				
+				bounds2 inverseInputTransform(in bounds2 b)
+				=> bounds2(
+					inverseInputTransform(b.topLeft),
+					inverseInputTransform(b.bottomRight)
+				); 
+				
+				vec2 inverseInputTransform(in vec2 p)
+				{ return (p - gfx.TR.transXY) / gfx.TR.scaleXY; } 
+			}
+			
+			version(/+$DIDE_REGION ClipBnd+/all)
+			{
+				ref bounds2 clipBounds() => gfx.TR.clipBounds; 
+				private bounds2[] clipBoundsStack; 
+				
+				void pushClipBounds(bounds2 bnd)
+				{
+					enforce(clipBoundsStack.length<1024); 
+					//bnd is in local coords
+					clipBoundsStack ~= clipBounds; 
+					clipBounds = inputTransform(bnd) & clipBounds; 
+				} 
+				
+				void popClipBounds()
+				{
+					enforce(clipBoundsStack.length); 
+					clipBounds = clipBoundsStack[$-1]; 
+					clipBoundsStack = clipBoundsStack[0..$-1]; 
+				} 
+			}
+			
+			version(/+$DIDE_REGION DrawState+/all)
+			{
+				private float _fontHeight=16, _lineWidth=1, _pointSize=1; 
+				ref float fontHeight() 
+				=> _fontHeight; ref float lineWidth()
+				=> _lineWidth; ref float pointSize()
+				=> _pointSize; 
+				
+				private LineStyle _lineStyle; private ArrowStyle _arrowStyle; 
+				ref LineStyle lineStyle()
+				=> _lineStyle; ref ArrowStyle arrowStyle()
+				=> _arrowStyle; 
+				
+				private RGB _color; 
+				@property RGB color()
+				=> _color; @property void color(RGB c)
+				{ _color = c; } 
+				@property float alpha()
+				=> gfx.OP; @property void alpha(float a)
+				{ gfx.OP = a; } 
+				
+				float inputTransformSize(float s)
+				=> ((s<=0)?(-s * invZoomFactor):(s)); 
+			}
+			
+			version(/+$DIDE_REGION Setup+/all)
+			{
+				private void setupLine()
+				{ gfx.LW = inputTransformSize(lineWidth); gfx.PC = color; } 
+				private void setupPoint()
+				{ gfx.LW = inputTransformSize(pointSize); gfx.PC = color; } 
+			}
+			
+			
+			void point(in vec2 p)
+			{ setupPoint; gfx.drawPath(i"M$(p.x) $(p.y) h 1e-5".text); } 
+			
+			void moveTo(in vec2 p)
+			{ gfx.cr = p; } 
+			
+			void lineTo(in vec2 p)
+			{
+				const p0 = gfx.cr; moveTo(p); const p1 = gfx.cr; 
+				setupLine; 
+				static if((常!(bool)(1)))	gfx.drawPath(((p0).名!q{M}), ((p1).名!q{L})); 
+				else	gfx.drawPath(i"M$(p0.x) $(p0.y) L$(p1.x) $(p1.y)".text); 
+			} 
+			
+			void moveTo(float x, float y)
+			{ moveTo(vec2(x, y)); } 
+			
+			void lineTo(float x, float y)
+			{ lineTo(vec2(x, y)); } 
+			
+			void line(in vec2 p0, in vec2 p1)
+			{ moveTo(p0); lineTo(p1); } 
+			
+			void moveRel(float dx, float dy)
+			{ gfx.cr += vec2(dx, dy); } 
+			
+			void lineRel(float dx, float dy)
+			{ lineTo(gfx.cr + vec2(dx, dy)); } 
+			
+			void hLine(float x0, float y, float x1)
+			{ line(vec2(x0, y), vec2(x1, y)); } 
+			
+			void vLine(float x, float y0, float y1)
+			{ line(vec2(x, y0), vec2(x, y1)); } 
+			
+			void drawRect(in bounds2 b)
+			{
+				static if((常!(bool)(1)))	{
+					setupLine; gfx.drawPath(
+						((b.topLeft).名!q{M}), 	((b.right).名!q{H}), 	((b.bottom).名!q{V}), 
+							((b.left).名!q{H}), 	((b.top).名!q{V})
+					); 
+				}
+				else	{
+					moveTo(b.topLeft); 	lineTo(b.topRight); lineTo(b.bottomRight); 
+						lineTo(b.bottomLeft); lineTo(b.topLeft); 
+				}
+			} 
+			
+			void drawX(in bounds2 b)
+			{ line(b.topLeft, b.bottomRight); line(b.topRight, b.bottomLeft); } 
+			
+			void fillRect(in bounds2 b)
+			{ gfx.PC = color; gfx.drawC64Rect(b, TexHandle(0)); } 
+			
+			void fillRect(float x0, float y0, float x1, float y1)
+			{ fillRect(bounds2(x0, y0, x1, y1)); } 
+			
+			void circle(in vec2 p, float r, float arc0 = 0, float arc1 = 2 * PI)
+			{
+				void ellipse(float x, float y, float ra, float rb, float arc0=0, float arc1=2*PI, float incr=0)
+				{
+					while(arc0>arc1) arc1 += 2*PI; //Todo: lame
+					
+					int cnt; 
+					if(incr>0)	{ cnt = iround((arc1-arc0)/incr); }
+					else	{
+						float rounds = (arc1-arc0)*(0.5f/PI); 
+						cnt = iround(rounds*64); 
+						//resolution  //todo: it should be done in the shader
+						incr = cnt ? (arc1-arc0)/cnt : 0; 
+					}
+					
+					foreach(i; 0..cnt+1) {
+						float a = arc0+incr*i; 
+						const p = vec2(x+sin(a)*ra, y+cos(a)*rb); 
+						if(!i) moveTo(p); else lineTo(p); 
+					}
+				} 
+				
+				ellipse(p.x, p.y, r, r, arc0, arc1); 
+			} 
+			
+			void drawFontGlyph(
+				int idx, in bounds2 b, in RGB8 bkColor = clBlack, 
+				in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
+			)
+			{
+				if(idx <= 0) return; const h = TexHandle(idx); 
+				if(const isImage = fontFlags.getBit(4))
+				{
+					if(const isCustomShader = fontFlags.getBit(5))
+					{
+						const customShaderIdx = fontFlags/64; 
+						gfx.PC = clFuchsia; gfx.SC = clFuchsia; 
+					}
+					else
+					{ gfx.PC = clWhite; gfx.SC = bkColor; }
 				}
 				else
-				{ gfx.PC = clWhite; gfx.SC = bkColor; }
-			}
-			else
-			{
-				const 	isMonospace 	= fontFlags.getBit(0),
-					isItalic	= fontFlags.getBit(1),
-					isUnderline	= fontFlags.getBit(2),
-					isStrikeout	= fontFlags.getBit(3),
-					/+isImage 	 = bit 4+/
-					isTransparent 	= fontFlags.getBit(5); 
-				const hasAlpha = !!(
-					mainVulkanWindow.IB.access(h).sizeFormat.
-					chn.among(
-						TexSizeFormat.TexChn._4, 
-						TexSizeFormat.TexChn._2
-					)
-				); 
-				if(isTransparent)	gfx.SC = FormattedColor(ColorFormat.la_u8, 0); 
-				else	gfx.SC = bkColor; 
-				gfx.PC = ((hasAlpha)?(clWhite):(color)); 
-			}
-			gfx.drawC64Rect(b, h); 
-		} 
-		
-		void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest)
-		{ drawFontGlyph(idx, b, clBlack, 16/+isImage+/); } 
-		
-		FontSpec!FontFace stickFont; 
-		
-		float textWidth(string text)
-		{ return (9.0f/16/+Todo: only stickfont!+/) * fontHeight * text.walkLength; } 
-		
-		void textOut(
-			vec2 p, string text, float width = 0, 
-			HAlign align_ = HAlign.left, bool vertFlip = false
-		)
-		{
-			if(text.empty) return; 
-			
-			with(HAlign)
-			if(align_!=left) {
-				const tw = textWidth(text); 
-				p.x += (width-tw)*(align_==center ? 0.5f : 1.0f); 
-			}
-			
-			with(gfx)
-			{
-				Text(
-					stickFont, ((inputTransformSize(fontHeight)).名!q{FH}), 
-					((color).名!q{fg}), ((FormattedColor(ColorFormat.la_u8, 0)).名!q{bk}), 
-					M(p)/+Todo: this is in charSize!!!! not in pixels!!!+/, text
-				); 
-			}
-		} 
-		
-		void hGraph_f(
-			float x0, float y0, in float[] data, float 
-			xScale = 1, float yScale = 1
-		)
-		{
-			if(data.length<2) return; 
-			static if((常!(bool)(1)))
-			{
-				mixin(scope_remember(q{gfx.TR})); 
-				with(gfx.TR) {
-					transXY += scaleXY*vec2(x0, y0); 
-					/+scaleXY *= vec2(xScale, yScale); +/
+				{
+					const 	isMonospace 	= fontFlags.getBit(0),
+						isItalic	= fontFlags.getBit(1),
+						isUnderline	= fontFlags.getBit(2),
+						isStrikeout	= fontFlags.getBit(3),
+						/+isImage 	 = bit 4+/
+						isTransparent 	= fontFlags.getBit(5); 
+					const hasAlpha = !!(
+						mainVulkanWindow.IB.access(h).sizeFormat.
+						chn.among(
+							TexSizeFormat.TexChn._4, 
+							TexSizeFormat.TexChn._2
+						)
+					); 
+					if(isTransparent)	gfx.SC = FormattedColor(ColorFormat.la_u8, 0); 
+					else	gfx.SC = bkColor; 
+					gfx.PC = ((hasAlpha)?(clWhite):(color)); 
 				}
-				setupLine; float x = 0; 
-				gfx.drawPath(
-					((vec2(0, data[0]*yScale)).名!q{M}), 
-					data[1..$].map!((y)=>(((vec2(x++, y) * vec2(xScale, yScale)).名!q{L})))
-				); 
-			}
-			else
+				gfx.drawC64Rect(b, h); 
+			} 
+			
+			void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest)
+			{ drawFontGlyph(idx, b, clBlack, 16/+isImage+/); } 
+			
+			FontSpec!FontFace stickFont; 
+			
+			float textWidth(string text)
+			{ return (9.0f/16/+Todo: only stickfont!+/) * fontHeight * text.walkLength; } 
+			
+			void textOut(
+				vec2 p, string text, float width = 0, 
+				HAlign align_ = HAlign.left, bool vertFlip = false
+			)
 			{
-				moveTo(x0, y0 + yScale*data[0]); 
-				foreach(i; 1..data.length.to!int-1)
-				lineTo(x0 + xScale*i, y0 + yScale*data[i]); 
-			}
+				if(text.empty) return; 
+				
+				with(HAlign)
+				if(align_!=left) {
+					const tw = textWidth(text); 
+					p.x += (width-tw)*(align_==center ? 0.5f : 1.0f); 
+				}
+				
+				with(gfx)
+				{
+					Text(
+						stickFont, ((inputTransformSize(fontHeight)).名!q{FH}), 
+						((color).名!q{fg}), ((FormattedColor(ColorFormat.la_u8, 0)).名!q{bk}), 
+						M(p)/+Todo: this is in charSize!!!! not in pixels!!!+/, text
+					); 
+				}
+			} 
+			
+			void hGraph_f(
+				float x0, float y0, in float[] data, float 
+				xScale = 1, float yScale = 1
+			)
+			{
+				if(data.length<2) return; 
+				static if((常!(bool)(1)))
+				{
+					mixin(scope_remember(q{gfx.TR})); 
+					with(gfx.TR) {
+						transXY += scaleXY*vec2(x0, y0); 
+						/+scaleXY *= vec2(xScale, yScale); +/
+					}
+					setupLine; float x = 0; 
+					gfx.drawPath(
+						((vec2(0, data[0]*yScale)).名!q{M}), 
+						data[1..$].map!((y)=>(((vec2(x++, y) * vec2(xScale, yScale)).名!q{L})))
+					); 
+				}
+				else
+				{
+					moveTo(x0, y0 + yScale*data[0]); 
+					foreach(i; 1..data.length.to!int-1)
+					lineTo(x0 + xScale*i, y0 + yScale*data[i]); 
+				}
+			} 
+			
+			void bezier2(in vec2 A, in vec2 B, in vec2 C)
+			{ setupLine; gfx.drawPath(i"M$(A.x) $(A.y)Q$(B.x) $(B.y),$(C.x) $(C.y)".text); } 
+			
+			void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
+			{ NOTIMPL; } 
 		} 
-		
-		void bezier2(in vec2 A, in vec2 B, in vec2 C)
-		{ setupLine; gfx.drawPath(i"M$(A.x) $(A.y)Q$(B.x) $(B.y),$(C.x) $(C.y)".text); } 
-		
-		void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
-		{ NOTIMPL; } 
 	} 
 }
 
@@ -3743,6 +3771,9 @@ class VulkanWindow: Window, IGfxContentDestination
 						auto vv = View2D.fromViewToView(view, viewGUI); 
 						staticDr.gfx.TR.transXY = vv.origin.vec2; 
 						staticDr.gfx.TR.scaleXY = vv.scale; 
+						
+						inputTransformFix_invOrigin = -staticDr.gfx.TR.transXY; 
+						inputTransformFix_invScale = 1/staticDr.gfx.TR.scaleXY.x; 
 					}
 					
 					staticDr.zoomFactor 	= view.scale_anim, 
@@ -5058,18 +5089,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x26FC782886ADB).檢(
+					((0x273E682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2703982886ADB))))
+				if((互!((bool),(0),(0x2745882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x270CD82886ADB).檢((互!((float/+w=12+/),(1.000),(0x270E482886ADB))).iremap(0, 1, 4, ma))); 
+					((0x274EC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2750382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5082,8 +5113,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x272B982886ADB).檢 (imVG)),
-					((0x272DF82886ADB).檢 (imFPS)); 
+					((0x276D882886ADB).檢 (imVG)),
+					((0x276FE82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5116,7 +5147,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x2764F82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2766682886ADB))))); 
+								const double fovY_deg = ((0x27A6E82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x27A8582886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
