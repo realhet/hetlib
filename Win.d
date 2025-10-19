@@ -1501,7 +1501,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		public: 
 		V origin; 
 		
-		float animSpeed = 0.3; //0=off, 0.3=normal, 0.9=slow
+		float animSpeed = 0.5; //0=off, 0.3=normal, 0.9=slow
 		
 		//extra information from external source in screen space. All is in world coords
 		vec2 clientSize; 
@@ -1791,15 +1791,22 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		
 		bool updateAnimation(float deltaTime)
 		{
-			  //Todo: use quantities.time
 			float at = calcAnimationT(deltaTime, animSpeed); 
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= follow(m_origin_anim, origin, at, invScale*1e-2f); 
-			res |= follow(m_logScale_anim, logScale, at, 1e-2f); 
-			
+			res |= ((0xD923285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xD97A285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
+			
+			/+
+				Todo: Make better animation when zooming with mouse!
+				Use not just a single large 'impulse' but a series of tiny zoomAround commands!
+				The mouse wheel is a button anyways, so it is needed to stretch in time.
+				A bell curve can be better maybe.
+				But I don't wanna store a pivot point. There are multiple zoom/pan sources, 
+				a single pivot point is unclear with lerp.
+			+/
 		} 
 		
 		//skips the animated moves to their destination immediately

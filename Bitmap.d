@@ -290,7 +290,7 @@ version(/+$DIDE_REGION+/all)
 				alias member = __traits(getMember, obj, name); 
 				static if(
 					__traits(isStaticFunction, member) && hasUDA2!(member, UDA)
-					&& __traits(compiles, mixin(iq{{ Bitmap b = .$(name)("a"); }}.text))
+					&& is(Bitmap : ReturnType!member)
 				)
 				registerStaticFunction!member; 
 			}
@@ -854,7 +854,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x80E7B8E2CB5D).檢((update間(_間)))); }
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x80C4B8E2CB5D).檢((update間(_間)))); }
 		/+
 			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
 			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.

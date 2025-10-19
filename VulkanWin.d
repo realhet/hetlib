@@ -3805,7 +3805,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				with(view)
 				with(this.actions)
 				{
-					enum MULTIPLIER = 8 /+Bug: sometimes the scroll speed is extremely slow.+/; 
+					enum MULTIPLIER = 4 /+Bug: sometimes the scroll speed is extremely slow.+/; 
 					
 					const oldOrigin = origin, oldScale = scale; 
 					
