@@ -147,8 +147,6 @@ version(/+$DIDE_REGION+/all)
 	
 	struct ClickDetector
 	{
-		 //ClickDetector ///////////////////////////////
-		
 		enum doubleDuration	= .25f	* second,   //Todo: use winuser.GetDoubleClickTime()
 				 longDuration	= .5f	* second; 
 		

@@ -489,9 +489,11 @@ void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isW
 									ci.rot180 = (imData.rotation&2)!=0; 
 									
 									innerSize = ci.transformedSize(fh).ceil; 
-									auto dr = new Drawing; 
-									ci.draw(dr, fh, pinColorMap); 
-									addOverlayDrawing(dr); 
+									
+									void cb(Drawing dr, float fh)
+									{ ci.draw(dr, fh, pinColorMap); } 
+									
+									addDrawCallback(((Drawing dr, .Container cntr) { cb(dr, fh); })); 
 								}
 							); 
 						}else

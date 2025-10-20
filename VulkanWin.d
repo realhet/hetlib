@@ -4,7 +4,7 @@ version(/+$DIDE_REGION+/all)
 {
 	
 	public import het.win, het.bitmap, het.vulkan; 
-	import het.algorithm: encodeRLE, SvgPathItem, SvgPathCommand, approximateArcToCubicBeziers, SvgPathParser; 
+	import het.algorithm: 	encodeRLE, SvgPathItem, SvgPathCommand, approximateArcToCubicBeziers, SvgPathParser; 
 	
 	import core.stdc.string : memset; 
 	
@@ -3196,7 +3196,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1927E82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1927F82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3281,6 +3281,20 @@ Use SvgParser to prepare absolute SVG command stream!"
 			b.low.inputTransformFix, 
 			b.high.inputTransformFix
 		); 
+	} 
+	
+	deprecated("This is a fake shader object.")
+	{
+		class Shader
+		{
+			void uniform(A...)(A)
+			{
+				NOTIMPL("Shader uniform parameter settings"); //Todo: 251020 Shader uniform parameter settings
+			} 
+		} 
+		
+		void delegate(Shader) Drawing_onCustomShaderSetup; //entry point to setup custom variables for the customShader
+		string Drawing_customShader; 
 	} 
 	
 	class DrawingProxy : IDrawing
@@ -3561,6 +3575,27 @@ Use SvgParser to prepare absolute SVG command stream!"
 				}
 			} 
 			
+			void autoSizeText(vec2 p, string s, float aspect=1.0f)
+			{
+				auto fh = fontHeight; 
+				const baseSize = vec2(textWidth(s), fh); 
+				
+				const target = fh*aspect; 
+				vec2 size = baseSize; 
+				while(size.x > target) {
+					enum step = .75f; 
+					fh *= step; 
+					size *= step; 
+				}
+				
+				const oldFh = fontHeight; 
+				fontHeight = fh; 
+				
+				textOut(p-size/2, s); 
+				
+				fontHeight = oldFh; 
+			} 
+			
 			void hGraph_f(
 				float x0, float y0, in float[] data, float 
 				xScale = 1, float yScale = 1
@@ -3594,7 +3629,8 @@ Use SvgParser to prepare absolute SVG command stream!"
 			void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
 			{ NOTIMPL; } 
 		} 
-	} 
+	} 
+	
 }
 
 
@@ -5089,18 +5125,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x273E682886ADB).檢(
+					((0x2772182886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2745882886ADB))))
+				if((互!((bool),(0),(0x2779382886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x274EC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2750382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2782782886ADB).檢((互!((float/+w=12+/),(1.000),(0x2783E82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5113,8 +5149,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x276D882886ADB).檢 (imVG)),
-					((0x276FE82886ADB).檢 (imFPS)); 
+					((0x27A1382886ADB).檢 (imVG)),
+					((0x27A3982886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5147,7 +5183,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x27A6E82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x27A8582886ADB))))); 
+								const double fovY_deg = ((0x27DA982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x27DC082886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 

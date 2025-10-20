@@ -12,7 +12,7 @@ version(/+$DIDE_REGION+/all) {
 	
 	import het.inputs: ActionManager, _notifyMouseWheel; 
 	
-	public import het.inputs: inputs, KeyCombo, MouseState; 
+	public import het.inputs: inputs, KeyCombo, MouseState, ClickDetector; 
 	
 	//moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
 	__gshared size_t global_TPSCnt, global_TPS; //texture upload bytes /sec
@@ -1375,6 +1375,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			vec2 p, string text, float width = 0, 
 			HAlign align_ = HAlign.left, bool vertFlip = false
 		); //stickFont
+		void autoSizeText(vec2 p, string s, float aspect=1.0f); 
 		void hGraph_f(
 			float x0, float y0, in float[] data, float 
 			xScale=1, float yScale=1
@@ -1795,8 +1796,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xD923285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xD97A285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= ((0xD96E285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xD9C5285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
 			
 			/+

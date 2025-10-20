@@ -1,4 +1,4 @@
-module het.ui; /+DIDE+/
+module het.ui; 
 version(/+$DIDE_REGION+/all)
 {
 	//originally it was public import het.opengl
@@ -8,8 +8,8 @@ version(/+$DIDE_REGION+/all)
 	public import het.bitmap: Bitmap, bitmaps, BITMAPEFFECT, bitmapEffects; 
 	import het.bitmap: segoeSymbolByName; 
 	
-	public import het.inputs: 	inputs, KeyCombo; 
-	import het.inputs: 	ClickDetector, rawMousePos, 
+	//public import het.inputs: 	inputs, KeyCombo, ClickDetector; 
+	import het.inputs: 	rawMousePos, 
 		/+for slider:+/slowMouse, mouseMoveRelX, mouseMoveRelY, mouseLock, mouseUnlock; 
 	
 	import het.parser: SyntaxKind, SyntaxPreset, syntaxTable, defaultSyntaxPreset; 
@@ -8268,7 +8268,8 @@ struct im
 						bOfs = bnd.bottomLeft; 
 						
 						dr.color = clWinBtn; 
-						dr.lineTo(bnd.bottomLeft, first); first = false; 
+						if(first)	dr.lineTo(bnd.bottomLeft); 
+						else	dr.moveTo(bnd.bottomLeft); first = false; 
 						if(sel)
 						{
 							dr.lineTo(bnd.topLeft); 
@@ -8315,7 +8316,7 @@ struct im
 						{ idx = i.to!I; clicked = true; }
 					}
 					
-					addDrawCallback(&customDraw); 
+					addDrawCallback(toDelegate(&customDraw)); 
 					
 					
 				}, args
