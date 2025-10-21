@@ -1504,11 +1504,39 @@ version(/+$DIDE_REGION+/all)
 		
 	}
 	version(/+$DIDE_REGION+/all) {
-		TexturePool texturePool()
-		=> g_texturePool; 
+		struct texturePool
+		{
+			__gshared static: 
+			
+			private static _getFile(Bitmap b) => ((b)?(b.file):(File.init)); 
+			
+			TexturePool pool()
+			=> g_texturePool; 
+			
+			void initiateLoad(R)(R files)
+			if(isInputRange!(R, File))
+			{ g_texturePool.initiateLoad(files); } 
+			
+			version(/+$DIDE_REGION+/all) {
+				TexHandle get(File f) 
+				=> g_texturePool.tryAccess(f); 
+				TexHandle opCall(File f) 
+				=> g_texturePool.tryAccessRefresh(f, Yes.delayed); 
+				TexHandle opIndex(File f) 
+				=> g_texturePool.tryAccessRefresh(f, No.delayed); 
+				TexHandle get(Bitmap b) 
+				=> get(_getFile(b)); 
+				TexHandle opCall(Bitmap b) 
+				=> opCall(_getFile(b)); 
+				TexHandle opIndex(Bitmap b) 
+				=> opIndex(_getFile(b)); 
+			}
+		} 
 		
 		class TexturePool
 		{
+			final: 
+			
 			struct Entry { TexHandle handle; uint accessed; } 
 			
 			protected
@@ -1545,6 +1573,29 @@ version(/+$DIDE_REGION+/all)
 				return TexHandle(0); 
 			} 
 			
+			DateTime[File] bitmapModifiedCache; 
+			
+			TexHandle tryAccessRefresh(File file, Flag!"delayed" delayed)
+			{
+				auto bmp = bitmaps(file, Yes.delayed, ErrorHandling.ignore); 
+				if(!bmp || bmp.loading) { return tryAccess(file)/+return the last one if any+/; }
+				//----- bmp exists and loaded into bitmap cache. ----
+				const modified = bmp.modified; 
+				
+				if(auto a = file in byFile)
+				{
+					if(bitmapModifiedCache.get(file) == modified)
+					{
+						a.accessed = application.tick; 
+						return a.handle; 
+					}
+				}
+				
+				//refresh it now
+				initiateLoad(bmp); 
+				bitmapModifiedCache[file] = modified; 
+				return tryAccess(file); 
+			} 
 			
 			@property string deallocationStats()
 			{ requestDeallocationStats = true; return _deallocationStats; } 
@@ -1567,7 +1618,7 @@ version(/+$DIDE_REGION+/all)
 				foreach(const file, const entry; byFile)
 				if(entry.accessed<=tickLimit)
 				{
-					TB.remove(entry.handle); 
+					TB.remove(entry.handle); //immediate remove, because space is needed
 					toRemove ~= file; 
 					if(toRemove.length>=lengthLimit) break; 
 				}
@@ -1643,6 +1694,9 @@ version(/+$DIDE_REGION+/all)
 					
 					Idea: 	Do the initiateLoad() batch operation at the 
 						beginning of the NEXT frame!
+					
+					251021: 	I collect the freed handles in every frame in a queue.
+						It dont swaps the images at least.
 				+/
 				
 				if(newEntry.handle)
@@ -1652,7 +1706,7 @@ version(/+$DIDE_REGION+/all)
 					if(auto a = file in byFile)
 					{
 						//Opt: try to refresh the image inplace, instead of remove+create
-						TB.remove(a.handle); 
+						TB.removeLater(a.handle); //later because it can be mid-drawing
 						*a = newEntry; 
 					}
 					else
@@ -1663,7 +1717,7 @@ version(/+$DIDE_REGION+/all)
 					//was unable to allocate.  Just remove it from everywhere
 					if(auto a = file in byFile)
 					{
-						TB.remove(a.handle); 
+						TB.removeLater(a.handle); //later because it can be mid-drawing
 						byFile.remove(file); 
 					}
 				}
@@ -1898,12 +1952,18 @@ version(/+$DIDE_REGION+/all) {
 						24 total + gl_ClipDistance[4] = 28
 					+/
 					
-					113
+					//113
 					/+
 						20251004: testVulkanUI.d 
 							When I hold the first button, 
 							a letter disappears in Edit box. 
 							-> drawC64Rect now requires 4+1 vertices.
+					+/
+					
+					88
+					/+
+						20251021: Karc sample text kirasok miatt lejjebb 
+							kellett vinni.
 					+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
@@ -3196,7 +3256,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1927F82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1997782886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3289,13 +3349,16 @@ Use SvgParser to prepare absolute SVG command stream!"
 		{
 			void uniform(A...)(A)
 			{
-				NOTIMPL("Shader uniform parameter settings"); //Todo: 251020 Shader uniform parameter settings
+				NOTIMPL("Shader uniform parameter settings"); 
+				//Todo: 251020 Shader uniform parameter settings
 			} 
 		} 
 		
-		void delegate(Shader) Drawing_onCustomShaderSetup; //entry point to setup custom variables for the customShader
+		void delegate(Shader) Drawing_onCustomShaderSetup; 
+		//entry point to setup custom variables for the customShader
+		
 		string Drawing_customShader; 
-	} 
+	} 
 	
 	class DrawingProxy : IDrawing
 	{
@@ -3723,6 +3786,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			version(/+$DIDE_REGION gányolás texture access provided for het.ui+/all)
 			{
 				Texture[File] gányolás_texturesByFile; 
+				
 				TexHandle gányolás_textures_getNow(File f)
 				{
 					synchronized(this)
@@ -3749,6 +3813,7 @@ class VulkanWindow: Window, IGfxContentDestination
 						}
 					} 
 				} 
+				
 				void gányolás_textures_invalidate(File f)
 				{
 					synchronized(this)
@@ -3872,7 +3937,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				with(view)
 				with(this.actions)
 				{
-					enum MULTIPLIER = 4 /+Bug: sometimes the scroll speed is extremely slow.+/; 
+					enum MULTIPLIER = 1 /+Bug: sometimes the scroll speed is extremely slow.+/; 
 					
 					const oldOrigin = origin, oldScale = scale; 
 					
@@ -4035,7 +4100,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				with(res)
 				{
 					length_all	= IB.buffer.length,
-					length_volatile	= texturePool.length /+Todo: only one pool can exist!+/,
+					length_volatile	= texturePool.pool.length /+Todo: only one pool can exist!+/,
 					length_resident 	= length_all - length_volatile; 
 					totalBytes 	= TB.buffer.sizeBytes /++ IB.buffer.sizeBytes+/,
 					freeBytes 	= TB.buffer.allocator.sizeFree /+
@@ -4305,6 +4370,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				{
 					VulkanArrayBuffer!TexInfo buffer; 
 					TexHandle[] freeHandles; 
+					TexHandle[] freeHandles_actFrame; 
 				} 
 				
 				
@@ -4340,7 +4406,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					}
 					
 					if(handle)
-					buffer[(cast(uint)(handle))] = info; 
+					{ buffer[(cast(uint)(handle))] = info; }
 					
 					return handle; 
 				} 
@@ -4350,8 +4416,11 @@ class VulkanWindow: Window, IGfxContentDestination
 					if(!handle) return; 
 					assert(isValidHandle(handle)); 
 					buffer[(cast(uint)(handle))] = TexInfo.init; 
-					freeHandles ~= handle; 
+					freeHandles_actFrame ~= handle; 
 				} 
+				
+				protected void updateFreeHandles()
+				{ freeHandles ~= freeHandles_actFrame.fetchAll; } 
 				
 				TexInfo access(in TexHandle handle)
 				{
@@ -4364,6 +4433,8 @@ class VulkanWindow: Window, IGfxContentDestination
 					assert(isValidHandle(handle)); 
 					buffer[(cast(uint)(handle))] = info; 
 				} 
+				
+				
 			} 
 			
 		}
@@ -4579,6 +4650,9 @@ class VulkanWindow: Window, IGfxContentDestination
 					}
 				} 
 				
+				void removeLater(in TexHandle texHandle)
+				{ if(texHandle) Texture.destroyedResidentTexHandles.put(texHandle); } 
+				
 				void remove(File file)
 				{
 					if(const texRec = file in texRecByFile)
@@ -4586,7 +4660,8 @@ class VulkanWindow: Window, IGfxContentDestination
 						remove(texRec.texHandle); 
 						texRecByFile.remove(file); 
 					}
-				} 
+				} 
+				
 				TexRec* access(File file, in Flag!"delayed" delayed_)
 				{
 					const delayed = delayed_ && DelayedTextureLoading; 
@@ -5125,18 +5200,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2772182886ADB).檢(
+					((0x27F6682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2779382886ADB))))
+				if((互!((bool),(0),(0x27FD882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2782782886ADB).檢((互!((float/+w=12+/),(1.000),(0x2783E82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2806C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2808382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5149,15 +5224,14 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x27A1382886ADB).檢 (imVG)),
-					((0x27A3982886ADB).檢 (imFPS)); 
+					((0x2825882886ADB).檢 (imVG)),
+					((0x2827E82886ADB).檢 (imFPS)); 
 				}
 			}
 			
 			
 			VulkanCommandBuffer commandBuffer; 
-			VulkanMemoryBuffer 	vertexMemoryBuffer,
-				indexMemoryBuffer; 
+			VulkanMemoryBuffer 	vertexMemoryBuffer; 
 			
 			try
 			{
@@ -5172,18 +5246,19 @@ $(V_size+G_size)".text
 					{
 						try
 						{
+							//remove textures right BEFORE drawing anything.
+							foreach(th; Texture.destroyedResidentTexHandles) { TB.remove(th); }
+							
 							VB.reset; GB.reset; 
 							
 							internalUpdate; //This will call: im.beginFrame(), onUpdate(), im.endFrame()
 							imDrawFrame; 
 							
-							
-							
 							VB.upload; GB.upload; 
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x27DA982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x27DC082886ADB))))); 
+								const double fovY_deg = ((0x2865282886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2866982886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5204,51 +5279,20 @@ $(V_size+G_size)".text
 								}
 							}
 							
-							/+
-								TB.buffer.reset; 
-								TB.buffer.append([(RGBA(255, 245, 70, 255)), (RGBA(0xFFFF00FF))]); 
-							+/
-							
-							if(0)
-							if(TB.buffer.growByRate(((KeyCombo("Shift").down)?(2):(((KeyCombo("Ctrl").down)?(.5):(1)))), true))
-							{}
-							
-							
-							if(KeyCombo("Up").down) {
-								foreach(i; 0..6)
-								{
-									const N = 1<<20; 
-									auto t = new Texture(TexFormat.rgb_u8, 3*N, [clAqua].replicate(N)); 
-									/+print(t.handle); +/
-								}
-							}
-							
-							foreach(th; Texture.destroyedResidentTexHandles)
-							{ TB.remove(th); /+LOG(th); +/}
-							
-							/+
-								if(KeyCombo("Space").down)
-								{ LOG(Texture.destroyedResidentTexHandles.stats); }
-							+/
-							
-							
+							IB.updateFreeHandles; //reclaim freed up handles from previous frame
 							IB.buffer.upload; 
 							TB.buffer.upload; 
 						}
 						catch(Exception e) { ERR("Scene exception: ", e.simpleMsg); }
-						//because buffers could grow, descriptors can change.
-						recreateDescriptors; 
-						
 						device.waitIdle/+Wait for everything+/; /+Opt: STALL  only wait if something's changed+/
+						recreateDescriptors; //because buffers could grow, descriptors can change.
 						commandBuffer = createCommandBuffer	(
 							swapchain.imageIndex, 
 							VB.uploadedVertexCount, VB.deviceMemoryBuffer
 						); 
-						queue.submit
-							(
+						queue.submit	(
 							imageAvailableSemaphore, mixin(舉!((VK_PIPELINE_STAGE_),q{TOP_OF_PIPE_BIT})),
-							commandBuffer,
-							renderingFinishedSemaphore
+							commandBuffer, renderingFinishedSemaphore
 						); 
 					},
 					&onWindowSizeChanged
