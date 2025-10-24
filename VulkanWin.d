@@ -436,6 +436,7 @@ version(/+$DIDE_REGION+/all)
 	version(/+$DIDE_REGION Texturing enums+/all)
 	{
 		alias TexHandle = Typedef!(uint, 0, "TexHandle"); 
+		enum TexHandleBits = HandleFormat.max.text[1..$].to!uint; 
 		
 		enum TexXAlign : ubyte {left, xcenter, hcenter = xcenter, right} 
 		enum TexYAlign : ubyte {top, ycenter, vcenter = ycenter, baseline, bottom} 
@@ -520,7 +521,7 @@ version(/+$DIDE_REGION+/all)
 	
 	version(/+$DIDE_REGION Common enums+/all)
 	{
-		enum HandleFormat : ubyte {u12, u16, u24, u32} 
+		enum HandleFormat : ubyte {u0, u8, u16, u24} 
 		
 		enum SizeUnit : ubyte
 		{
@@ -802,10 +803,10 @@ version(/+$DIDE_REGION+/all)
 		Bits!ulong assembleHandle(T)(in T handle)
 		{
 			const h = (cast(uint)(handle)); 
-			if(h<(1<<12)) return assemble(mixin(舉!((HandleFormat),q{u12})), bits(h, 12)); 
-			if(h<(1<<16)) return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
-			if(h<(1<<24)) return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
-			return assemble(mixin(舉!((HandleFormat),q{u32})), h); 
+			if(h==0)	return assemble(mixin(舉!((HandleFormat),q{u0}))); 
+			else if(h<(1<<8))	return assemble(mixin(舉!((HandleFormat),q{u8})), bits(h, 8)); 
+			else if(h<(1<<16))	return assemble(mixin(舉!((HandleFormat),q{u16})), bits(h, 16)); 
+			else	return assemble(mixin(舉!((HandleFormat),q{u24})), bits(h, 24)); 
 		} 
 		
 		Bits!ulong assembleSize(T)(in T size)
@@ -1963,7 +1964,21 @@ version(/+$DIDE_REGION+/all) {
 					88
 					/+
 						20251021: Karc sample text kirasok miatt lejjebb 
-							kellett vinni.
+							kellett vinni 88-ra.
+					+/
+					
+					/+
+						20251022: glslc --show-limits
+							Display available limit names and their default values.
+							
+							//R9 Fury X
+							MaxGeometryTextureImageUnits 16
+							MaxGeometryOutputVertices 256
+							MaxGeometryTotalOutputComponents 1024
+							MaxGeometryUniformComponents 512
+							MaxGeometryVaryingComponents 60
+							
+							1028/28=36 En meg 88-at hasznalok.
 					+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
@@ -3256,7 +3271,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1997782886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19B5882886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4047,6 +4062,19 @@ class VulkanWindow: Window, IGfxContentDestination
 				shrinkRate 	: 0.5
 			}))
 		})); 
+		
+		void verifyBufferSizeConfigs()
+		{
+			with(bufferSizeConfigs)
+			{
+				//1 bit granularity dword address
+				enforce(GBConfig.maxSizeBytes <= 1UL<<(32-3)); 
+				
+				//less than a dword because of textureFlags
+				enforce(IBConfig.maxSizeBytes <= 1UL<<TexHandleBits); 
+			}
+		} 
+		
 		enum HeapGranularity 	= 16,
 		DelayedTextureLoading 	= (常!(bool)(1)); 
 		
@@ -5099,6 +5127,7 @@ class VulkanWindow: Window, IGfxContentDestination
 		
 		void selfTest()
 		{
+			verifyBufferSizeConfigs; 
 			TexSizeFormat.selfTest; 
 			unittest_assembleSize; 
 			unittest_assembleAngle; 
@@ -5200,18 +5229,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x27F6682886ADB).檢(
+					((0x2829182886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x27FD882886ADB))))
+				if((互!((bool),(0),(0x2830382886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2806C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2808382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2839782886ADB).檢((互!((float/+w=12+/),(1.000),(0x283AE82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5224,8 +5253,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2825882886ADB).檢 (imVG)),
-					((0x2827E82886ADB).檢 (imFPS)); 
+					((0x2858382886ADB).檢 (imVG)),
+					((0x285A982886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5258,7 +5287,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x2865282886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2866982886ADB))))); 
+								const double fovY_deg = ((0x2897D82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2899482886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5543,7 +5572,7 @@ $(V_size+G_size)".text
 				+/
 			+/
 		+/
-		void createShaderModules()
+		static auto CompileShaderBinary(string CustomShaderCode)()
 		{
 			static struct BezierImplementations
 			{
@@ -7067,10 +7096,7 @@ $(V_size+G_size)".text
 					{ return bitfieldExtract(int(fetchBits(bitStream, numBits)), 0, numBits); } 
 					
 					uint fetch_uint(inout BitStream bitStream, in int numBits)
-					{
-						return fetchBits(bitStream, numBits); 
-						/*Opt: this 32bit read should be optimized*/
-					} 
+					{ return fetchBits(bitStream, numBits); } 
 					
 					float fetch_float(inout BitStream bitStream)
 					{ return uintBitsToFloat(fetch_uint(bitStream, 32)); } 
@@ -7196,10 +7222,10 @@ $(V_size+G_size)".text
 					uint fetchHandle(inout BitStream bitStream, uint format)
 					{
 						switch(format) {
-							case HandleFormat_u12: 	return fetchBits(bitStream, 12); 
-							case HandleFormat_u16: 	return fetchBits(bitStream, 16); 
-							case HandleFormat_u24: 	return fetchBits(bitStream, 24); 
-							case HandleFormat_u32: 	return fetch_uint(bitStream, 32); 
+							case HandleFormat_u0: 	return 0; 
+							case HandleFormat_u8: 	return fetch_uint(bitStream, 8); 
+							case HandleFormat_u16: 	return fetch_uint(bitStream, 16); 
+							case HandleFormat_u24: 	return fetch_uint(bitStream, 24); 
 							default: return 0; 
 						}
 					} 
@@ -8045,6 +8071,8 @@ $(V_size+G_size)".text
 						{ return readSample(fragTexHandle, vec3(texCoordXY, fragTexCoordZ), true, false); }
 					} 
 					
+					vec4 customShader(in vec4 inColor); 
+					
 					void main()
 					{
 						initFragmentParams(); 
@@ -8062,7 +8090,7 @@ $(V_size+G_size)".text
 						const vec4 clipPos = UB.inv_mvp * ndcPos; 
 						const vec3 objPos = clipPos.xyz / clipPos.w; 
 						
-						if((fragMode==FragMode_cubicBezier))
+						if(fragMode==FragMode_cubicBezier)
 						{
 							float dst = cubicBezierDist(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
 							float t = fract(texCoordXY.x); 
@@ -8070,15 +8098,30 @@ $(V_size+G_size)".text
 							if(dst>r) discard; 
 						}
 						
-						const vec4 filteredColor = readFilteredSample(true); 
+						const bool enableMultisampling = true; 
+						
+						const vec4 filteredColor = readFilteredSample(enableMultisampling); 
 						vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
 						
-						outColor = resultColor; 
+						outColor = customShader(resultColor); 
 					} 
+					
+					$(CustomShaderCode)
 				})); 
-				shaderModules = new VulkanGraphicsShaderModules(device, shaderBinary); 
+				return shaderBinary; 
 			}
 		} 
+		
+		abstract immutable(ubyte)[] compileShaderBinary(); 
+		
+		mixin template SetupMegaShader(string code)
+		{
+			override immutable(ubyte)[] compileShaderBinary()
+			=> CompileShaderBinary!code; 
+		} 
+		
+		protected final void createShaderModules()
+		{ shaderModules = new VulkanGraphicsShaderModules(device, compileShaderBinary); } 
 	}
 	
 } 
