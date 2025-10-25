@@ -1370,6 +1370,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			in int fontFlags = 0, in vec2 ySubRange = vec2(0, 1)
 		); 
 		void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest); 
+		void drawTexture_custom(int idx, in bounds2 bnd, uint customShaderIdx); 
 		float textWidth(string text); //stickFont
 		void textOut(
 			vec2 p, string text, float width = 0, 
@@ -1796,8 +1797,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xD96E285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xD9C5285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= ((0xD9BA285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xDA11285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
 			
 			/+

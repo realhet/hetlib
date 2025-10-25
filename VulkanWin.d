@@ -523,6 +523,8 @@ version(/+$DIDE_REGION+/all)
 	{
 		enum HandleFormat : ubyte {u0, u8, u16, u24} 
 		
+		enum CustomShaderIdxBits = 4; 
+		
 		enum SizeUnit : ubyte
 		{
 			world, 	/+one unit in the world+/
@@ -603,10 +605,13 @@ version(/+$DIDE_REGION+/all)
 				[q{},q{},q{"10"},q{drawPathC},q{/+xy xy xy+/}],
 				[q{},q{},q{"11"},q{drawPathTG},q{/+tangents at curve split points+/}],
 				[q{/+	unused+/}],
-				[q{},q{"10"},q{"00"},q{unused0},q{/+TransformFormat+/}],
+				[q{},q{"10"},q{"00"},q{unused0},q{/++/}],
 				[q{},q{},q{"01"},q{unused1},q{/++/}],
 				[q{},q{},q{"10"},q{unused2},q{/++/}],
-				[q{},q{},q{"11"},q{unused3},q{/++/}],
+				[q{},q{},q{"11"},q{drawTexRectCustom},q{/+
+					CoordFormat Coords HandleFormat Handle
+					 CustomBits CustomData
+				+/}],
 				[q{/+	textured rect, chars, text+/}],
 				[q{},q{"11"},q{"00"},q{drawMove},q{/+CoordFormat Coords+/}],
 				[q{},q{},q{"01"},q{drawTexRect},q{/+CoordFormat Coords HandleFormat Handle+/}],
@@ -3271,7 +3276,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19B5882886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19BC982886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3502,7 +3507,10 @@ Use SvgParser to prepare absolute SVG command stream!"
 			
 			
 			void point(in vec2 p)
-			{ setupPoint; gfx.drawPath(i"M$(p.x) $(p.y) h 1e-5".text); } 
+			{
+				setupPoint; gfx.drawPath(i"M$(p.x) $(p.y) h 1e-3".text); 
+				/+Todo: this quickly runs out of precision. Must do the point shape properly!+/
+			} 
 			
 			void moveTo(in vec2 p)
 			{ gfx.cr = p; } 
@@ -3624,6 +3632,22 @@ Use SvgParser to prepare absolute SVG command stream!"
 			
 			void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest)
 			{ drawFontGlyph(idx, b, clBlack, 16/+isImage+/); } 
+			
+			void drawTexture_custom(int idx, in bounds2 bnd, uint customShaderIdx)
+			{
+				with(gfx)
+				{
+					begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
+					emit(
+						mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
+						mixin(舉!((Opcode),q{drawTexRectCustom}))	, assemblePoint(bnd.bottomRight),
+						assemble(
+							assembleHandle(TexHandle(idx)), 
+							bits(customShaderIdx, CustomShaderIdxBits)
+						)
+					); 
+				}
+			} 
 			
 			FontSpec!FontFace stickFont; 
 			
@@ -4183,14 +4207,34 @@ class VulkanWindow: Window, IGfxContentDestination
 		
 		version(/+$DIDE_REGION UB    +/all)
 		{
-			struct UniformData
-			{
-				mat4 transformationMatrix, inverseTransformationMatrix; 
+			enum UniformFieldDeclarations = 
+			q{
+				mat4 mvp, inv_mvp; 
 				vec4 viewport; 
-				float iTime=0; 
-			} 
+				float iTime, _dummy0, _dummy1, _dummy2; /*std430 align rules!!!!*/
+				uint customShaderParams0; /*
+					<-fucking LAME!  Because
+					uint[16] has complicated alignlemt rules!
+				*/
+				uint customShaderParams1; 
+				uint customShaderParams2; 
+				uint customShaderParams3; 
+				uint customShaderParams4; 
+				uint customShaderParams5; 
+				uint customShaderParams6; 
+				uint customShaderParams7; 
+			}; 
+			
+			struct UniformData
+			{ mixin(UniformFieldDeclarations); } 
 			
 			UniformBufferManager UB; 
+			
+			void setCustomShaderParams(T)(const ref T data)
+			{
+				assert(T.sizeof<=8*4); 
+				memcpy(&UB.access.customShaderParams0, &data, T.sizeof); 
+			} 
 			
 			class UniformBufferManager
 			{
@@ -4974,11 +5018,7 @@ class VulkanWindow: Window, IGfxContentDestination
 		iq{
 			//UB: Uniform buffer
 			layout(binding = 0)
-			uniform UB_T {
-				mat4 mvp, inv_mvp; 
-				vec4 viewport; 
-				float iTime; 
-			} UB; 
+			uniform UB_T {$(UniformFieldDeclarations)} UB; 
 			
 			//IB: Info buffer (texture directory)
 			layout(binding = 1) buffer IB_T { uint IB[]; } ; 
@@ -5229,18 +5269,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2829182886ADB).檢(
+					((0x2877C82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2830382886ADB))))
+				if((互!((bool),(0),(0x287EE82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2839782886ADB).檢((互!((float/+w=12+/),(1.000),(0x283AE82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2888282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2889982886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5253,8 +5293,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2858382886ADB).檢 (imVG)),
-					((0x285A982886ADB).檢 (imFPS)); 
+					((0x28A6E82886ADB).檢 (imVG)),
+					((0x28A9482886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5287,7 +5327,7 @@ $(V_size+G_size)".text
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x2897D82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2899482886ADB))))); 
+								const double fovY_deg = ((0x28E6882886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x28E7F82886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5296,15 +5336,13 @@ $(V_size+G_size)".text
 								const projMatrix = dmat4.perspective(extents.x, extents.y, fovY_deg, requiredDistance*0.001, requiredDistance*1000); 
 								const org = viewGUI.getOrigin(true).dvec2; 
 								const viewMatrix = dmat4.lookAt(dvec3(org, requiredDistance), dvec3(org, 0), dvec3(0, 1, 0)); 
-								const mvp = mat4(projMatrix * viewMatrix); 
 								
+								const mvp_ = projMatrix * viewMatrix, inv_mvp_ = mvp_.inverse; 
 								with(UB.access)
 								{
-									transformationMatrix = mvp; 
-									inverseTransformationMatrix = mvp.inverse; 
+									mvp = mat4(mvp_); inv_mvp = mat4(inv_mvp_); 
 									viewport = vec4(0, 0, swapchain.extent.width, swapchain.extent.height); 
 									iTime = QPS_local.value(second); 
-									//Todo: The UB struct should be automatic in the shader code.
 								}
 							}
 							
@@ -6457,12 +6495,18 @@ $(V_size+G_size)".text
 					#define FragMode_fullyFilled 0
 					#define FragMode_cubicBezier 1
 					#define FragMode_glyphStrip 2
+					#define FragMode_customRect 3
+					
+					/*Todo: This dword struct must be automated...*/
+					
+					#define getFragTexHandle getBits(fragTexHandleAndMode, 0, 24)
+					#define setFragTexHandle(a) setBits(fragTexHandleAndMode, 0, 24, a)
+					
+					#define getFragCustomShaderIdx getBits(fragTexHandleAndMode, 24, 4)
+					#define setFragCustomShaderIdx(a) setBits(fragTexHandleAndMode, 24, 4, a)
 					
 					#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
 					#define setFragMode(a) setBits(fragTexHandleAndMode, 28, 4, a)
-					
-					#define getFragTexHandle getBits(fragTexHandleAndMode, 0, 28)
-					#define setFragTexHandle(a) setBits(fragTexHandleAndMode, 0, 28, a)
 					
 					
 					$(
@@ -6696,12 +6740,16 @@ $(V_size+G_size)".text
 					
 					float outputTransformSize(float s)
 					{
+						/*
+							⚠ Normally this must be 1 * s !!!
+							So it's an average of the non-uniform scaling.
+							Not the length of it becase TR_scaleXY 
+							in NOT a vector!!!!!!!!
+						*/
 						return (
-							(
-								abs(TR_scaleXY.x)+
-								abs(TR_scaleXY.y)
-							)/2
-						) * s; 
+							abs(TR_scaleXY.x)+
+							abs(TR_scaleXY.y)
+						)/2 * s; 
 					} 
 					
 					void emitVertex2D(vec2 p)
@@ -7601,14 +7649,22 @@ $(V_size+G_size)".text
 					void drawMove(inout BitStream bitStream)
 					{ P4 = fetchFormattedPoint2D(bitStream); } 
 					
-					void drawTexturedRect(inout BitStream bitStream)
+					void drawTexturedRect(inout BitStream bitStream, in bool isCustom)
 					{
 						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
 						
 						const uint handleFmt = fetchHandleFormat(bitStream); 
 						const uint texHandle = fetchHandle(bitStream, handleFmt); 
 						
-						setFragMode(FragMode_fullyFilled); 
+						if(isCustom)
+						{
+							const uint customShaderIdx = fetch_uint(bitStream, $(CustomShaderIdxBits)); 
+							setFragMode(FragMode_customRect); 
+							setFragCustomShaderIdx(customShaderIdx); 
+						}
+						else
+						{ setFragMode(FragMode_fullyFilled); }
+						
 						setFragTexHandle(texHandle); 
 						fragTexCoordZ = 0; //Todo: should optionally come from the outside
 						
@@ -7773,14 +7829,14 @@ $(V_size+G_size)".text
 										case 0: 	/**/	break; 
 										case 1: 	/**/	break; 
 										case 2: 	/**/	break; 
-										case 3: 	/**/	break; 
+										case 3: 	drawTexturedRect(bitStream, /*custom*/true); 	break; 
 									}
 									break; 
 									case 3: 
 										switch(cmd)
 									{
 										case 0: 	drawMove(bitStream); 	break; 
-										case 1: 	drawTexturedRect(bitStream); 	break; 
+										case 1: 	drawTexturedRect(bitStream, false); 	break; 
 										case 2: 	drawChars(bitStream, false); 	break; 
 										case 3: 	drawChars(bitStream, /*repeat*/true); 	break; 
 									}
@@ -7857,6 +7913,26 @@ $(V_size+G_size)".text
 					} 
 					
 					$(BezierImplementations.cubic_approx)
+					
+					ivec3 getTexSize(in uint texIdx)
+					{
+						if(texIdx==0) return ivec3(0); 
+						
+						//fetch info dword 0
+						const uint textDwIdx = texIdx * $(TexInfo.sizeof/4); 
+						const uint info_0 = IB[textDwIdx+0]; 
+						
+						//handle 'error' and 'loading' flags
+						if(getBits(info_0, $(TexInfoBitOfs), 2)!=0) { return ivec3(0); }
+						
+						//decode dimensions, size
+						const uint dim = getBits(info_0, $(TexDimBitOfs), $(TexDimBits)); 
+						const uint info_1 = IB[textDwIdx+1]; 
+						const uint _rawSize0 = getBits(info_0, 16, 16); 
+						const uint _rawSize12 = info_1; 
+						const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
+						return size; 
+					} 
 					
 					vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 					{
@@ -8071,7 +8147,15 @@ $(V_size+G_size)".text
 						{ return readSample(fragTexHandle, vec3(texCoordXY, fragTexCoordZ), true, false); }
 					} 
 					
-					vec4 customShader(in vec4 inColor); 
+					vec4 defaultShader()
+					{
+						const bool enableMultisampling = true; 
+						const vec4 filteredColor = readFilteredSample(enableMultisampling); 
+						vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
+						return resultColor; 
+					} 
+					
+					vec4 customShader(); 
 					
 					void main()
 					{
@@ -8098,12 +8182,10 @@ $(V_size+G_size)".text
 							if(dst>r) discard; 
 						}
 						
-						const bool enableMultisampling = true; 
-						
-						const vec4 filteredColor = readFilteredSample(enableMultisampling); 
-						vec4 resultColor = mix(fragBkColor, vec4(filteredColor.rgb, 1)*fragColor, filteredColor.a); 
-						
-						outColor = customShader(resultColor); 
+						if(fragMode==FragMode_customRect)
+						{ outColor = customShader(); }
+						else
+						{ outColor = defaultShader(); }
 					} 
 					
 					$(CustomShaderCode)
@@ -8117,7 +8199,7 @@ $(V_size+G_size)".text
 		mixin template SetupMegaShader(string code)
 		{
 			override immutable(ubyte)[] compileShaderBinary()
-			=> CompileShaderBinary!code; 
+			=> CompileShaderBinary!((code!="")?(code):(q{vec4 customShader() { return defaultShader(); } })); 
 		} 
 		
 		protected final void createShaderModules()
