@@ -13555,7 +13555,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					}
 				}
 				catch(Exception)
-				{ enforce(false, format(`Can't write file: "%s"`, fullName)); }
+				{ enforce(false, format(`Can't write file: "%s" size:%d bytes`, fullName, data.sizeBytes)); }
 			} 
 			
 			void write(const void[] data, Flag!"preserveTimes" preserveTimes=No.preserveTimes)const
