@@ -605,7 +605,7 @@ version(/+$DIDE_REGION+/all)
 				[q{},q{},q{"10"},q{drawPathC},q{/+xy xy xy+/}],
 				[q{},q{},q{"11"},q{drawPathTG},q{/+tangents at curve split points+/}],
 				[q{/+	unused+/}],
-				[q{},q{"10"},q{"00"},q{unused0},q{/++/}],
+				[q{},q{"10"},q{"00"},q{drawFilledTri},q{/+a, b, c+/}],
 				[q{},q{},q{"01"},q{unused1},q{/++/}],
 				[q{},q{},q{"10"},q{unused2},q{/++/}],
 				[q{},q{},q{"11"},q{drawTexRectCustom},q{/+
@@ -1966,7 +1966,7 @@ version(/+$DIDE_REGION+/all) {
 							-> drawC64Rect now requires 4+1 vertices.
 					+/
 					
-					88
+					/+88+/
 					/+
 						20251021: Karc sample text kirasok miatt lejjebb 
 							kellett vinni 88-ra.
@@ -1984,7 +1984,10 @@ version(/+$DIDE_REGION+/all) {
 							MaxGeometryVaryingComponents 60
 							
 							1028/28=36 En meg 88-at hasznalok.
-					+/; 
+					+/
+					
+					113
+					/+20251026: TextOut bug fixed, now 113 seems OK again.+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
 					static @property int maxVertexCount()
@@ -3171,6 +3174,13 @@ Use SvgParser to prepare absolute SVG command stream!"
 					index = nextIndex; 
 				}
 			} 
+			
+			
+			void drawFilledTriangle(A, B, C)(in A a, in B b, in C c)
+			{
+				begin(3+1, {}); synch_transform, synch_PALH, synch_colors; 
+				emit(mixin(舉!((Opcode),q{drawFilledTri})), assemblePoint(a), assemblePoint(b), assemblePoint(c)); 
+			} 
 			
 			
 			
@@ -3276,7 +3286,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19BC982886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D2982886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3734,7 +3744,10 @@ Use SvgParser to prepare absolute SVG command stream!"
 			{ setupLine; gfx.drawPath(i"M$(A.x) $(A.y)Q$(B.x) $(B.y),$(C.x) $(C.y)".text); } 
 			
 			void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
-			{ NOTIMPL; } 
+			{
+				gfx.PC = color; 
+				gfx.drawFilledTriangle(a, b, c); 
+			} 
 		} 
 	} 
 	
@@ -3930,20 +3943,20 @@ class VulkanWindow: Window, IGfxContentDestination
 				resetBuilders; 
 				
 				import het.ui: im; //this is a nasty entry point to imgui
-				im._drawFrame!"system call only"(
+				im._drawFrame!"system call only"
+				(
 					staticDr, staticDrGUI,
 					{ beforeImDraw(); }, 
-					{ afterImDraw(); }
-				); 
-				
-				version(/+$DIDE_REGION Draw optional overlay stuff+/all)
-				{
-					//Todo: implement these later
-					version(/+$DIDE_REGION+/none) {
-						if(showMegaTextures) drawMegaTextures(staticDr); 
-						if(showFPS) drawFPSGraph(staticDrGUI); 
+					{
+						afterImDraw(); 
+						version(/+$DIDE_REGION Draw optional overlay stuff+/all)
+						{
+							//Todo: implement these later
+							version(/+$DIDE_REGION+/none) { if(showMegaTextures) drawMegaTextures(staticDr); }
+							if(showFPS) drawFPSGraph(staticDrGUI); 
+						}
 					}
-				}
+				); 
 				
 				//Todo: afterPaint can come here!
 				
@@ -4047,6 +4060,63 @@ class VulkanWindow: Window, IGfxContentDestination
 				}
 				if(res) invalidate; 
 				return res; 
+			} 
+			
+			void drawFPSGraph(IDrawing dr)
+			{
+				with(dr)
+				{
+					translate(vec2(0, 152)); scope(exit) pop; 
+					
+					fontHeight = 7; 
+					
+					lineWidth = 1.01; 
+					lineStyle = LineStyle.normal; 
+					auto groups = timeLine.getGroups; 
+					foreach(int idx; 1..groups.length.to!int)
+					{
+						auto group = groups[idx], prevGroup = groups[idx-1]; 
+						const scale = vec2(5000.0f, 4); 
+						const origin = vec2(clientWidth-2, 2); 
+						
+						auto rect(double t0, double t1)
+						{
+							bounds2 b; 
+							float base = prevGroup[$-1].t1.value(second); 
+							float len = group[$-1].t1.value(second) - base; 
+							b.low.x	= origin.x + (t0-base-len)*scale.x; 
+							b.high.x	= origin.x + (t1-base-len)*scale.x; 
+							b.low.y	= origin.y + scale.y*(idx-1); 
+							b.high.y	= b.low.y + scale.y*.9; 
+							return b; 
+						} 
+						
+						auto rAll = rect(prevGroup[$-1].t1.value(second), group[$-1].t1.value(second)); 
+						color = clBlack; 
+						fillRect(rAll); 
+						
+						foreach(pass; 0..2)
+						foreach(g; group)
+						{
+							color = g.color; 
+							auto r = rect(g.t0.value(second), g.t1.value(second)); 
+							if(pass==0) { fillRect(r); }else {
+								color = mix(color, clWhite, 0.5f); 
+								line(r.topLeft, r.bottomLeft); 
+							}
+						}
+						
+						
+						void mark(float f)
+						{
+							auto r = rect(group[$-1].t1.value(second)-(1/f), group[$-1].t1.value(second)); 
+							color = clWhite; 
+							line(r.topLeft, r.bottomLeft); 
+						} 
+						
+						mark(60); mark(30); 
+					}
+				}
 			} 
 			
 		}
@@ -4235,12 +4305,6 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			UniformBufferManager UB; 
 			
-			void setCustomShaderParams(T)(const ref T data)
-			{
-				assert(T.sizeof<=8*4); 
-				memcpy(&UB.access.customShaderParams0, &data, T.sizeof); 
-			} 
-			
 			class UniformBufferManager
 			{
 				protected UniformData* uniformDataPtr; 
@@ -4253,6 +4317,11 @@ class VulkanWindow: Window, IGfxContentDestination
 					uniformMemoryBuffer.flush; //only is not coherent!
 				} 
 				
+				void setCustomShaderParams(T)(const ref T data)
+				{
+					assert(T.sizeof<=8*4); 
+					memcpy(&access.customShaderParams0, &data, T.sizeof); 
+				} 
 				
 				this()
 				{
@@ -5270,22 +5339,24 @@ class VulkanWindow: Window, IGfxContentDestination
 		
 		override void doUpdate()
 		{
+			Time t0, t1, t2, t3, t4; t0=QPS; 
+			
 			static if((常!(bool)(1)))
 			{
 				with(lastFrameStats)
 				{
-					((0x2880D82886ADB).檢(
+					((0x2901682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2887F82886ADB))))
+				if((互!((bool),(0),(0x2908882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2891382886ADB).檢((互!((float/+w=12+/),(1.000),(0x2892A82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2911C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2913382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5298,11 +5369,10 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x28AFF82886ADB).檢 (imVG)),
-					((0x28B2582886ADB).檢 (imFPS)); 
+					((0x2930882886ADB).檢 (imVG)),
+					((0x2932E82886ADB).檢 (imFPS)); 
 				}
 			}
-			
 			
 			VulkanCommandBuffer commandBuffer; 
 			VulkanMemoryBuffer 	vertexMemoryBuffer; 
@@ -5324,15 +5394,15 @@ $(V_size+G_size)".text
 							foreach(th; Texture.destroyedResidentTexHandles) { TB.remove(th); }
 							
 							VB.reset; GB.reset; 
-							
 							internalUpdate; //This will call: im.beginFrame(), onUpdate(), im.endFrame()
+							t1=QPS; 
 							imDrawFrame; 
-							
+							t2=QPS; 
 							VB.upload; GB.upload; 
 							
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x28EF982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x28F1082886ADB))))); 
+								const double fovY_deg = ((0x2970D82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2972482886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5351,13 +5421,14 @@ $(V_size+G_size)".text
 									zero = 0; 
 								}
 							}
-							
+							t3=QPS; 
 							IB.updateFreeHandles; //reclaim freed up handles from previous frame
 							IB.buffer.upload; 
 							TB.buffer.upload; 
 						}
 						catch(Exception e) { ERR("Scene exception: ", e.simpleMsg); }
 						device.waitIdle/+Wait for everything+/; /+Opt: STALL  only wait if something's changed+/
+						t4=QPS; 
 						recreateDescriptors; //because buffers could grow, descriptors can change.
 						commandBuffer = createCommandBuffer	(
 							swapchain.imageIndex, 
@@ -5379,6 +5450,13 @@ $(V_size+G_size)".text
 			//Opt: These reallocations in every frame are bad.
 			
 			//invalidate; no need.+/; 
+			const t5 = QPS; 
+			timeLine.addEvent(TimeLine.Event.Type.update    , t0, t1); 
+			timeLine.addEvent(TimeLine.Event.Type.beginPaint , t1, t2); 
+			timeLine.addEvent(TimeLine.Event.Type.paint      , t2, t3); 
+			timeLine.addEvent(TimeLine.Event.Type.endPaint   , t3, t4); 
+			timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t4, t5); 
+			timeLine.restrictSize(174); 
 		} 
 	}
 	version(/+$DIDE_REGION+/all) {
@@ -6449,7 +6527,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					
+					 
 					//Todo: check the warnings!
 					
 					//common stuff
@@ -6977,7 +7055,7 @@ $(V_size+G_size)".text
 						const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
 						
 						vec2[N] points, sides; 
-						for(int i=0+UB.zero; i<N; i++)
+						for(int i=UB.zero; i<N; i++)
 						{
 							points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
 							sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
@@ -6985,7 +7063,7 @@ $(V_size+G_size)".text
 						
 						const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
 						seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
-						for(int i=0+UB.zero; i<N-2; i++)
+						for(int i=UB.zero; i<N-2; i++)
 						{
 							int k = N-1-i; 
 							tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
@@ -7677,6 +7755,21 @@ $(V_size+G_size)".text
 						emitTexturedPointPointRect2D(P3.xy, P4.xy); 
 					} 
 					
+					void drawFilledTri(inout BitStream bitStream)
+					{
+						setFragMode(FragMode_fullyFilled); 
+						setFragTexHandle(0); 
+						for(int i=UB.zero; i<3; i++)
+						{
+							fragTexCoordXY = vec2(
+								(((i&1)!=0)?(1.0):(0.0)),
+								(((i&2)!=0)?(1.0):(0.0))
+							); 
+							emitVertex2D(fetchFormattedPoint2D(bitStream)); 
+						}
+						EndPrimitive(); 
+					} 
+					
 					const bool EnbaleAsciiStrips = true; 
 					
 					void drawASCII_rect(uint ch)
@@ -7832,7 +7925,7 @@ $(V_size+G_size)".text
 									case 2: 
 										switch(cmd)
 									{
-										case 0: 	/**/	break; 
+										case 0: 	drawFilledTri(bitStream); 	break; 
 										case 1: 	/**/	break; 
 										case 2: 	/**/	break; 
 										case 3: 	drawTexturedRect(bitStream, /*custom*/true); 	break; 
@@ -8195,458 +8288,12 @@ $(V_size+G_size)".text
 						{ outColor = customShader(); }
 						else
 						{ outColor = defaultShader(); }
+						
+						//outColor = mix(outColor, vec4(1,0,1,1), .25); 
 					} 
 					
+					//⚠$(CustomShaderCode) must be at the very bottom, without newLine after it.
 					$(CustomShaderCode)
-					
-					
-					#define CSI getFragCustomShaderIdx
-					
-					#define maskStepSize (int(UB.customShaderParams0))
-					#define maskLevel (uintBitsToFloat(UB.customShaderParams1))
-					#define maskDeviance (uintBitsToFloat(UB.customShaderParams2))
-					#define maskSlope (uintBitsToFloat(UB.customShaderParams3))
-					#define inspectionBias (uintBitsToFloat(UB.customShaderParams4))
-					#define inspectionGain (uintBitsToFloat(UB.customShaderParams5))
-					#define inspectionPointGain (uintBitsToFloat(UB.customShaderParams6))
-					#define inspectionLineGain (uintBitsToFloat(UB.customShaderParams7))
-					
-					float applyInspection(float x) { return (x-.5+inspectionBias*(1-1/inspectionGain))*inspectionGain+.5; } 
-					
-					vec2 tc; 
-					void init_tc()
-					{ tc = floor(texCoordXY * getTexSize(fragTexHandle).xy) + vec2(.5); } 
-					vec4 megaSample_nearest(in vec2 v)
-					{
-						return readSample(
-							fragTexHandle, vec3(v, 0), 
-							false, false /*expects prescaled coords*/
-						); 
-					} 
-					
-					#define SQR(a) ((a)*(a))
-					
-					#define SGNSQR(a) (a<0?-SQR(a):SQR(a))
-					
-					#define SMP(x, y, n) (megaSample_nearest(tc+vec2(x, y))*n)
-					#define SMPG(x, y, n) (SMP(x, y, n).g)
-					
-					//#define SMPG5(x, y, n) ((SMPG(x, y, 1)+SMPG(x-n, y, 1)+SMPG(x+n, y, 1)+SMPG(x, y-n, 1)+SMPG(x, y+n, 1))*(1.0/5))
-					float SMPG5(in float x, in float y, in float n)
-					{
-						vec2 P[5] = {vec2(x, y), vec2(x-n, y), vec2(x+n, y), vec2(x, y-n), vec2(x, y+n)}; 
-						float res = 0; 
-						for(int i=UB.zero; i<5; i++)
-						res += SMPG(P[i].x, P[i].y, 1); 
-						return res/5; 
-					} 
-					
-					#define MEDSORT(a, b) if(a>b){t=a; a=b; b=t;}
-					
-					float median3(float a0, float a1, float a2)
-					{
-						float t; 
-						MEDSORT(a0, a1)	MEDSORT(a0, a2)
-							MEDSORT(a1, a2)
-						return a1; 
-					} 
-					
-					float median5(float a0, float a1, float a2, float a3, float a4)
-					{
-						float t; 
-						MEDSORT(a0, a1)	MEDSORT(a0, a2)	MEDSORT(a0, a3)	MEDSORT(a0, a4)
-							MEDSORT(a1, a2)	MEDSORT(a1, a3)	MEDSORT(a1, a4)
-								MEDSORT(a2, a3)	MEDSORT(a2, a4)
-									MEDSORT(a3, a4)
-						return a2; 
-					} 
-					
-					
-					/*
-						GLSL parser differences:
-						
-						1)  struct {}  ; semicolon at the end!
-						
-						2)  #define  will be parsed until the next ; or {}
-						2.5) when there are no ; after the macro issuations, that's nasty too.
-						
-						3)  keywords.   uiniform, etc... Look at the glsl language documentation.
-					*/
-					
-					
-					float componentSum(vec3 a)
-					{ return a.r + a.g + a.b; } 
-					
-					float sqrDiff(vec3 a, vec3 b)
-					{
-						vec3 c = a-b; 
-						return componentSum(c * c); 
-					} 
-					
-					float absDiff(vec3 a, vec3 b)
-					{
-						vec3 c = a-b; 
-						return componentSum(abs(c)); 
-					} 
-					
-					//All components are in the range [0�1], including hue.
-					vec3 hsv2rgb(vec3 c)
-					{
-						vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0); 
-						vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www); 
-						return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y); 
-					} 
-					
-					vec4 sampleRelative(vec2 ofs)
-					{ return SMP(ofs.x, ofs.y, 1); } 
-					
-					vec4 sampleRelativeSide(vec2 ofs, vec2 side)
-					{ return sampleRelative(ofs) + sampleRelative(ofs+side) + sampleRelative(ofs-side); } 
-					
-					struct Slope
-					{ float y0, m; }; 
-					
-					Slope makeSlope(vec2 p0, vec2 p1)
-					{
-						float m = (p1-p0).y / (p1-p0).x; 
-						return Slope(p0.y-p0.x*m, m); 
-					} 
-					
-					Slope avgSlope(in Slope s0, in Slope s1, in Slope s2)
-					{
-						return Slope(
-							(s0.y0 + s1.y0 + s2.y0)/3.0,
-							(s0.m + s1.m + s2.m )/3.0
-						); 
-					} 
-					
-					float yat(in Slope slope, float x)
-					{ return slope.m * x + slope.y0; } 
-					float xat(in Slope slope, float y)
-					{ return (y - slope.y0) / slope.m; } 
-					vec2 eval(in Slope slope, float x)
-					{ return vec2(x, yat(slope, x)); } 
-					
-					float absDiff(float a, float b)
-					{ return abs(a-b); } 
-					
-					void findBestSlope_impl(
-						inout float bestError, 
-						inout Slope bestSlope,
-						in vec2 p0, in vec2 p1, in vec2 p2, 
-						float adjust
-					)
-					{
-						Slope 	s0 = makeSlope(p0, p1),
-							s1 = makeSlope(p1, p2),
-							s2 = makeSlope(p2, p0); 
-						float v0 = 	absDiff(yat(s0, 0), yat(s1, 0))+
-							absDiff(yat(s1, 0), yat(s2, 0))+
-							absDiff(yat(s2, 0), yat(s0, 0)); 
-						float 	a = 1; //aspect;
-						float v1 = 	absDiff(yat(s0, a), yat(s1, a))+
-							absDiff(yat(s1, a), yat(s2, a))+
-							absDiff(yat(s2, a), yat(s0, a)); 
-						
-						float error = max(v0, v1) * adjust; 
-						
-						if(error < bestError) {
-							bestError = error; 
-							bestSlope = avgSlope(s0, s1, s2); 
-						}
-					} 
-					
-					struct SlopeWithError {
-						Slope slope; 
-						float error; 
-					}; 
-					
-					SlopeWithError findBestSlope(
-						in vec2 p0, in vec2 p1, in vec2 p2, 
-						in vec2 p3, in vec2 p4
-					)
-					{
-						
-						Slope bestSlope; 
-						float bestError = 1e30; 
-						
-						/*
-							findBestSlope_impl(bestError, bestSlope, p0, p1, p2, 1); //...XX
-							findBestSlope_impl(bestError, bestSlope, p0, p1, p3, 2); //..X.X
-							findBestSlope_impl(bestError, bestSlope, p0, p1, p4, 1); //..XX.
-							findBestSlope_impl(bestError, bestSlope, p0, p2, p3, 2); //.X..X
-							findBestSlope_impl(bestError, bestSlope, p0, p2, p4, 2); //.X.X.
-							findBestSlope_impl(bestError, bestSlope, p0, p3, p4, 1); //.XX..
-							findBestSlope_impl(bestError, bestSlope, p1, p2, p3, 2); //X...X
-							findBestSlope_impl(bestError, bestSlope, p1, p2, p4, 2); //X..X.
-							findBestSlope_impl(bestError, bestSlope, p1, p3, p4, 2); //X.X..
-							findBestSlope_impl(bestError, bestSlope, p2, p3, p4, 1); //XX...
-						*/
-						
-						vec2[10] A = {p0, p0, p0, p0, p0, p0, p1, p1, p1, p2}; 
-						vec2[10] B = {p1, p1, p1, p2, p2, p3, p2, p2, p3, p3}; 
-						vec2[10] C = {p2, p3, p4, p3, p4, p4, p3, p4, p4, p4}; 
-						int  [10] N = {1,  2,  1,  2,  2,  1,  2,  2,  2,  1}; 
-						
-						for(int i=UB.zero; i<10; i++)
-						findBestSlope_impl(bestError, bestSlope, A[i], B[i], C[i], N[i]); 
-						
-						return SlopeWithError(bestSlope, bestError); 
-					} 
-					
-					struct MaskProcessResult {
-						Slope slope; 
-						float bestError, avgError, minLevel; 
-					}; 
-					
-					//Does the mask slope detection in a specific direction
-					MaskProcessResult maskProcess(float stepSize, float angleDeg)
-					{
-						float angleRad = radians(angleDeg); 
-						vec2 stepVec = vec2(
-							cos(angleRad), 
-							sin(angleRad)
-						)*stepSize; 
-						
-						vec2[5] p; 
-						for(int i = -2+UB.zero; i<=2; i++)
-						{
-							vec2 a = stepVec*i; 
-							p[i+2] = vec2(i*stepSize, SMPG5(a.x, a.y, 3)); 
-						}
-						
-						MaskProcessResult res; 
-						
-						SlopeWithError s = findBestSlope(
-							p[0], p[1], p[2], 
-							p[3], p[4]
-						); 
-						
-						res.slope = s.slope; 
-						res.bestError = s.error; 
-						
-						res.avgError =	  absDiff(p[0].y, yat(s.slope, p[0].x))
-							+ absDiff(p[1].y, yat(s.slope, p[1].x))
-							+ absDiff(p[2].y, yat(s.slope, p[2].x))
-							+ absDiff(p[3].y, yat(s.slope, p[3].x))
-							+ absDiff(p[4].y, yat(s.slope, p[4].x)); 
-						
-						res.minLevel = min(
-							min(
-								min(p[0].y, p[1].y), 
-								min(p[2].y, p[3].y)
-							), p[4].y
-						); 
-						
-						return res; 
-					} 
-					
-					vec3 maskDecideError(in MaskProcessResult a)
-					{
-						return vec3(
-							a.minLevel < maskLevel 	?1:0,
-							a.avgError > (1-maskDeviance) 	?1:0,
-							abs(a.slope.m)*100 > (1-maskSlope) 	?1:0
-						); 
-					} 
-					
-					struct MaskResult
-					{
-						vec3 errVec; //contains 3 categories of mask errors
-						bool masked; //the current pixel is masked
-						float 	smoothed,	//intensity according to the slope detector
-							normalized,	//normalized intensity, scaled around 0.5
-							visible	/*normalized, and 0.5 at masked aread*/; 
-					}; 
-					
-					
-					MaskResult maskDetect()
-					{
-						MaskResult res; 
-						
-						MaskProcessResult 	dir0 = maskProcess(maskStepSize, 0),
-							dir1 = maskProcess(maskStepSize, 60),
-							dir2 = maskProcess(maskStepSize, 120); 
-						res.smoothed = median3(dir0.slope.y0, dir1.slope.y0, dir2.slope.y0); 
-						res.errVec = max(
-							max(
-								maskDecideError(dir0), 
-								maskDecideError(dir1)
-							), 
-							maskDecideError(dir2)
-						); 
-						
-						res.normalized = (SMPG(0, 0, 1) - res.smoothed) + 0.5; 
-						res.masked = res.errVec.x + res.errVec.y + res.errVec.z > 0; 
-						
-						res.visible = res.masked ? .5 : res.normalized; 
-						//this is the signal seen by the machine
-						
-						return res; 
-					} 
-					
-					
-					vec3 karcEffect(vec4 t, float maskVisibility, float errorVisibility)
-					{
-						float 	y = t.g,  
-							u = t.r*inspectionPointGain,
-							v = t.b*inspectionLineGain,
-							a = t.a; 
-						
-						u *= errorVisibility, v *= maskVisibility; 
-						
-						t.rgb =	vec3(y)
-							+errorVisibility*vec3(u, -(u+v)/2, v)
-							+maskVisibility*(-y*(1-a))*vec3(1, 0, 1); 
-						
-						return t.rgb; 
-					} 
-					
-					vec3 ringEffect(vec3 color)
-					{
-						const vec4 fColor = fragColor; 
-						const vec4 fColor2 = fragBkColor; 
-						
-						vec3 errorAmounts; 
-						{
-							ivec4 iColor2 = ivec4(round(fColor2*255)); 
-							
-							ivec3 ROuter = clamp(iColor2.rgb, 0, 16); 
-							ivec3 RInner = ROuter - clamp(iColor2.a, 0, 16); 
-							
-							int N = max(max(ROuter.r, ROuter.g), ROuter.b); 
-							
-							vec3 closestDist = vec3(1e30); 
-							for(int i=-N; i<=N; i++)
-							for(int j=-N; j<=N; j++)
-							{
-								float dist = length(vec2(i, j)); 
-								if(dist<=N)
-								{
-									vec3 smp = SMP(i, j, 1).rgb; 
-									if(smp.r>fColor.r)
-									closestDist.r = min(closestDist.r, dist); 
-									//g is ignored.
-									if(smp.b>fColor.b)
-									closestDist.b = min(closestDist.b, dist); 
-								}
-							}
-							
-							errorAmounts 	= smoothstep(RInner-1, RInner, closestDist)
-								* smoothstep(ROuter, ROuter-1, closestDist); 
-						}
-						
-						float maxErrorAmount = max(
-							max(
-								errorAmounts.r, 
-								errorAmounts.g
-							), 
-							errorAmounts.b
-						); 
-						return color*(1-maxErrorAmount) + errorAmounts; 
-					} 
-					
-					vec4 tuningImage_MaskCombined(in MaskResult mask)
-					{
-						return vec4(
-							vec3(
-								mask.masked 	? mask.errVec 
-									: vec3(mask.smoothed)
-							), 1
-						); 
-					} 
-					vec4 tuningImage_MaskLevel(in MaskResult mask)
-					{
-						return vec4(
-							vec3(
-								mask.masked	? mask.errVec.r*vec3(1, 0, 0) 
-									: vec3(mask.smoothed)
-							), 1
-						); 
-					} 
-					vec4 tuningImage_MaskDeviance(in MaskResult mask)
-					{
-						return vec4(
-							vec3(
-								mask.masked 	? mask.errVec.g*vec3(0, 0.5, 0) 
-									: vec3(mask.smoothed)
-							), 1
-						); 
-					} 
-					vec4 tuningImage_MaskSlope(in MaskResult mask)
-					{
-						return vec4(
-							vec3(
-								mask.masked 	? mask.errVec.b*vec3(0, 0, 1) 
-									: vec3(mask.smoothed)
-							), 1
-						); 
-					} 
-					
-					vec4 tuningImage_MaskFinal(in vec4 s)
-					{
-						//Note: R:mask, G:masked, A:original
-						float a = s.r,  gray = s.a; 
-						if(
-							(.01<a && a<.02)||
-							(.97<a && a<.98)
-							/*
-								slightly lower because 
-								gauss float errors
-							*/
-						)
-						return vec4(1); 
-						return vec4(gray*a, gray, gray*a, 1); 
-					} 
-					
-					vec4 tuningImage_LinearErrors(in vec4 s)
-					{
-						/*Note: R: point error, G: orig, B: line error, A:mask*/
-						return vec4(mix(s.ggg, vec3(0,0,1),s.b), 1); 
-					} 
-					
-					vec4 tuningImage_FinalGauss(in vec4 s)
-					{
-						/*Note: R: point error, G: orig, B: line error, A:mask*/
-						return vec4(karcEffect(s, 1, 1), 1); 
-					} 
-					
-					vec4 customShader()
-					{
-						const vec4 clError = vec4(1, 0, 1, 1); 
-						init_tc(); 
-						
-						if(CSI>=0 && CSI<=3)
-						{
-							MaskResult mask = maskDetect(); 
-							switch(CSI)
-							{
-								case 0: 	return tuningImage_MaskCombined(mask); 
-								case 1: 	return tuningImage_MaskLevel(mask); 
-								case 2: 	return tuningImage_MaskDeviance(mask); 
-								case 3: 	return tuningImage_MaskSlope(mask); 
-								default:  return clError; 
-							}
-						}
-						
-						if(CSI>=4 && CSI<=10)
-						{
-							const vec4 s = SMP(0, 0, 1); 
-							switch(CSI)
-							{
-								case 4: 	return tuningImage_MaskFinal(s); 
-								case 5: 	return tuningImage_LinearErrors(s); 
-								case 6: 	return tuningImage_FinalGauss(s); 
-								case 7: 	return vec4(         vec3(applyInspection(s.g)), 1); 
-								case 8: 	return vec4(ringEffect(vec3(applyInspection(s.g))), 1); 
-								case 9: 	return vec4(          karcEffect(s, 1, 1), 1); 
-								case 10: 	return vec4(ringEffect(karcEffect(s, 1, 1)), 1); 
-								default: 	return clError; 
-							}
-						}
-						
-						return clError; 
-					} 
 				})); 
 				return shaderBinary; 
 			}
