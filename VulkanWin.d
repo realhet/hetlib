@@ -2632,6 +2632,8 @@ version(/+$DIDE_REGION+/all) {
 					if(n) _builder.incVertexCount(n*2+2); return n; 
 				} 
 				
+				const float monoCharWidth = (fontSize.x*(FH/fontSize.y)); 
+				
 				encodeRLE
 				(
 					rawSrc, 3,
@@ -2641,7 +2643,7 @@ version(/+$DIDE_REGION+/all) {
 							if(const n = decideCharCount((cast(int)(part.length))))
 							{
 								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII})), bits(n-1, 6)), part[0..n]); 
-								cursorPos.x += n*fontSize.x/+Todo: textWidth!+/; part = part[n..$]; if(part.empty) break; 
+								cursorPos.x += n*monoCharWidth/+Todo: textWidth!+/; part = part[n..$]; if(part.empty) break; 
 							}
 							/+start next geometry item+/_builder.begin; setup; 
 						}
@@ -2652,7 +2654,7 @@ version(/+$DIDE_REGION+/all) {
 							if(const n = decideCharCount(len))
 							{
 								_builder.emit(assemble(mixin(舉!((Opcode),q{drawFontASCII_rep})), bits(n-1, 6)), ch); 
-								cursorPos.x += n*fontSize.x/+Todo: textWidth!+/; len -= n; if(!len) break; 
+								cursorPos.x += n*monoCharWidth/+Todo: textWidth!+/; len -= n; if(!len) break; 
 							}
 							/+start next geometry item+/_builder.begin; setup; 
 						}
@@ -3286,7 +3288,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D2982886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D7582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3994,7 +3996,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				with(view)
 				with(this.actions)
 				{
-					enum MULTIPLIER = 1 /+Bug: sometimes the scroll speed is extremely slow.+/; 
+					enum MULTIPLIER = 6 /+Bug: sometimes the scroll speed is extremely slow.+/; 
 					
 					const oldOrigin = origin, oldScale = scale; 
 					
@@ -5339,24 +5341,24 @@ class VulkanWindow: Window, IGfxContentDestination
 		
 		override void doUpdate()
 		{
-			Time t0, t1, t2, t3, t4; t0=QPS; 
+			Time t0, t1, t2, t3, t4, t5; t0=QPS; 
 			
 			static if((常!(bool)(1)))
 			{
 				with(lastFrameStats)
 				{
-					((0x2901682886ADB).檢(
+					((0x2906682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2908882886ADB))))
+				if((互!((bool),(0),(0x290D882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2911C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2913382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2916C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2918382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5369,8 +5371,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2930882886ADB).檢 (imVG)),
-					((0x2932E82886ADB).檢 (imFPS)); 
+					((0x2935882886ADB).檢 (imVG)),
+					((0x2937E82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5390,19 +5392,21 @@ $(V_size+G_size)".text
 					{
 						try
 						{
+							t1=QPS; 
+							
 							//remove textures right BEFORE drawing anything.
 							foreach(th; Texture.destroyedResidentTexHandles) { TB.remove(th); }
 							
 							VB.reset; GB.reset; 
 							internalUpdate; //This will call: im.beginFrame(), onUpdate(), im.endFrame()
-							t1=QPS; 
-							imDrawFrame; 
 							t2=QPS; 
+							imDrawFrame; 
+							t3=QPS; 
 							VB.upload; GB.upload; 
-							
+							t4=QPS; 
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x2970D82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2972482886ADB))))); 
+								const double fovY_deg = ((0x2977F82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2979682886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5421,14 +5425,14 @@ $(V_size+G_size)".text
 									zero = 0; 
 								}
 							}
-							t3=QPS; 
+							
 							IB.updateFreeHandles; //reclaim freed up handles from previous frame
 							IB.buffer.upload; 
 							TB.buffer.upload; 
 						}
 						catch(Exception e) { ERR("Scene exception: ", e.simpleMsg); }
 						device.waitIdle/+Wait for everything+/; /+Opt: STALL  only wait if something's changed+/
-						t4=QPS; 
+						t5=QPS; 
 						recreateDescriptors; //because buffers could grow, descriptors can change.
 						commandBuffer = createCommandBuffer	(
 							swapchain.imageIndex, 
@@ -5450,12 +5454,13 @@ $(V_size+G_size)".text
 			//Opt: These reallocations in every frame are bad.
 			
 			//invalidate; no need.+/; 
-			const t5 = QPS; 
-			timeLine.addEvent(TimeLine.Event.Type.update    , t0, t1); 
-			timeLine.addEvent(TimeLine.Event.Type.beginPaint , t1, t2); 
-			timeLine.addEvent(TimeLine.Event.Type.paint      , t2, t3); 
-			timeLine.addEvent(TimeLine.Event.Type.endPaint   , t3, t4); 
-			timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t4, t5); 
+			const t6 = QPS; 
+			timeLine.addEvent(TimeLine.Event.Type.wait      , t0, t1); //gray: wait for swapChain
+			timeLine.addEvent(TimeLine.Event.Type.update    , t1, t2); //blue: update
+			timeLine.addEvent(TimeLine.Event.Type.draw      , t2, t3); //lime: drawFrame
+			timeLine.addEvent(TimeLine.Event.Type.uploadGV  , t3, t4); //yellow: uploag VB+GB
+			timeLine.addEvent(TimeLine.Event.Type.uploadIT   , t4, t5); //orange: upload IB+TB
+			timeLine.addEvent(TimeLine.Event.Type.queue    , t5, t6); //aqua: queue
 			timeLine.restrictSize(174); 
 		} 
 	}

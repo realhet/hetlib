@@ -644,13 +644,13 @@ version(/+$DIDE_REGION+/all) {
 			static struct Event
 			{
 				enum Type
-				{ update, beginPaint, paint, endPaint, swapBuffers} 
+				{ wait, update, draw, uploadGV, uploadIT, queue} 
 				Type type; 
 				Time t0, t1; 
 				
 				auto color()
 				{
-					enum typeColors = [clBlue, clLime, clYellow, clRed, clGray]; 
+					enum typeColors = [clGray, clBlue, clLime, clYellow, clOrange, clAqua]; 
 					return typeColors[cast(int)type]; 
 				} 
 			} 
@@ -698,12 +698,14 @@ version(/+$DIDE_REGION+/all) {
 			
 			if(disableInternalRedraw) return; 
 			
-			auto t0 = QPS; 
-			onBeginPaint; 	timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0); 	t0 = QPS; 
-			internalPaint; 	timeLine.addEvent(TimeLine.Event.Type.paint      , t0); 	t0 = QPS; 
-			onEndPaint; 	timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0); 	t0 = QPS; 
-			onSwapBuffers; 	timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0); 	//t0 = QPS;
-			timeLine.restrictSize(60); 
+			version(/+$DIDE_REGION+/none) {
+				auto t0 = QPS; 
+				onBeginPaint; 	timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0); 	t0 = QPS; 
+				internalPaint; 	timeLine.addEvent(TimeLine.Event.Type.paint      , t0); 	t0 = QPS; 
+				onEndPaint; 	timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0); 	t0 = QPS; 
+				onSwapBuffers; 	timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0); 	//t0 = QPS;
+				timeLine.restrictSize(60); 
+			}
 		} 
 		
 		protected void forceRedraw()
@@ -979,7 +981,7 @@ version(/+$DIDE_REGION+/all) {
 			//this calls the update on every window. But right now it is only for one window.
 			
 			//timing
-			auto t0 = QPS; scope(exit) if(!disableInternalRedraw) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS); 
+			version(/+$DIDE_REGION+/none) { auto t0 = QPS; scope(exit) if(!disableInternalRedraw) timeLine.addEvent(TimeLine.Event.Type.update, t0, QPS); }
 			
 			//flush the keyboard input queue (WM_CHAR event)
 			scope(exit) inputChars = ""; 
@@ -1012,7 +1014,7 @@ version(/+$DIDE_REGION+/all) {
 		
 		private final void internalPaint()
 		{
-			auto t0 = QPS; scope(exit) { if(!disableInternalRedraw) timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); }
+			version(/+$DIDE_REGION+/none) { auto t0 = QPS; scope(exit) { if(!disableInternalRedraw) timeLine.addEvent(TimeLine.Event.Type.paint, t0, QPS); }}
 			
 			paintErrorStr = ""; 
 			try
@@ -1797,8 +1799,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xDA02285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xDA59285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= ((0xDA7C285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xDAD3285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
 			
 			/+
