@@ -1,9 +1,9 @@
-# hetlib
+# DIDE & hetlib
 
 ## Install steps:
 
 ### Download hetlib:
-__Copy modules into__	: c:\d\libs\het\
+__Copy modules into__	: c:\D\libs\het\
 
 ### Download DIDE:
 __Copy modules into__	: c:\D\projects\DIDE\
@@ -15,7 +15,7 @@ __Notes__	:
 ### LDC compiler:
 * __Go to__	: https://github.com/ldc-developers/ldc/releases/tag/v1.41.0	
 * __Download__	: ldc2-1.41.0-windows-x64.7z
-* __Unpack into__	: c:\d\ldc\
+* __Unpack into__	: c:\D\ldc\
 * __Add to PATH__	: c:\D\ldc\bin\
 * __Verify__	: ldc2 --version
 
@@ -23,7 +23,7 @@ __Notes__	:
 * __Go to__	: https://visualstudio.microsoft.com/downloads/
 * __Download__	: Visual Studio Build Tools 2022  (scroll down, open a pulldown thing, download the file "vs_BuildTools.exe".)
 * __Install__	: vs_BuildTools.exe
-* __Verify__	: Find file "user32.lib" -> "c:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64\User32.Lib"
+* __Verify__	: Find file "user32.lib" -> "c:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64\User32.Lib" (something like this)
 
 ### Install a ramdrive
 * __Search for__	: Radeon Ramdisk
