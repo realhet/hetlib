@@ -8,7 +8,7 @@ __Copy modules into__	: c:\D\libs\het\
 ### Download DIDE:
 __Copy modules into__	: c:\D\projects\DIDE\
 __Notes__	: 
-* If you rename "dide.exe" to "dide_x.exe" it will save the registry under that different name. This is how to create multiple workspaces. Registry key location: Computer\HKEY_CURRENT_USER\SOFTWARE\realhet\[exe_path]
+* If you rename "dide.exe" to "dide_x.exe" it will save the workspace config .ini file under that different name next to the exe. This is how to create multiple workspaces atm.
 * It will require a Z: drive for temp files (use a ramdrive!). And it will need Projected FileSystem to be able to handle external compilers, like glslc.exe.
 * It will create an "WebCache" directory next to the exe whenever the online help function downloads something.
 
