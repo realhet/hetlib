@@ -3770,6 +3770,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			//views
 			View2D view, viewGUI; 
+			float guiScale = 1; 
 			
 			//this is the latest swapchain size, not the actual window size.
 			protected ivec2 swapchainClientSize()
@@ -3820,6 +3821,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				version(/+$DIDE_REGION+/all) {
 					//viewGUI.scale = (互!((float/+w=6+/),(0.000),(0x18F0C82886ADB)))*7+.5; 
 					viewGUI.origin = View2D.V(swapchainClientSize*.5); 
+					viewGUI.scale = guiScale; 
 					viewGUI.skipAnimation; 
 				}
 				
@@ -5347,18 +5349,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2906682886ADB).檢(
+					((0x290A082886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x290D882886ADB))))
+				if((互!((bool),(0),(0x2911282886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2916C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2918382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x291A682886ADB).檢((互!((float/+w=12+/),(1.000),(0x291BD82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5371,8 +5373,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2935882886ADB).檢 (imVG)),
-					((0x2937E82886ADB).檢 (imFPS)); 
+					((0x2939282886ADB).檢 (imVG)),
+					((0x293B882886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5406,7 +5408,7 @@ $(V_size+G_size)".text
 							t4=QPS; 
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x2977F82886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2979682886ADB))))); 
+								const double fovY_deg = ((0x297B982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x297D082886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 

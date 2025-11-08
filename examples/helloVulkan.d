@@ -240,7 +240,7 @@ version(/+$DIDE_REGION+/all) {
 	class FrmHelloVulkan : UIWindow
 	{
 		mixin autoCreate; 
-		mixin SetupMegaShader!"/**/"; 
+		mixin SetupMegaShader!""; 
 		
 		version(/+$DIDE_REGION App management+/all)
 		{
@@ -811,7 +811,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 								if(inputs["Down"].repeated) shipPos += ivec2(0, 1); 
 								if(inputs["Left"].repeated) shipPos += ivec2(-1, 0); 
 								if(inputs["Right"].repeated) shipPos += ivec2(1, 0); 
-								((0x88CA5F5C4644).檢 (zoomedPlatform)), ((0x88F35F5C4644).檢 (shipPos)); 
+								((0x88C65F5C4644).檢 (zoomedPlatform)), ((0x88EF5F5C4644).檢 (shipPos)); 
 							}
 						}
 						
@@ -1066,7 +1066,7 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 					foreach(builder; builders[].filter!"a")
 					appendGfxContent(builder.extractGfxContent); 
 				} 
-				((0xA5D65F5C4644).檢((update間(_間)))); 
+				((0xA5D25F5C4644).檢((update間(_間)))); 
 				
 				
 				
@@ -1087,26 +1087,26 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 					}
 					
-					((0xA8705F5C4644).檢((update間(_間)))); 
+					((0xA86C5F5C4644).檢((update間(_間)))); 
 					//Opt: ✅ tvBuilder.Style(Font.VGA_9x16) is the slowest of all.  Something's fucked up with that generator...
-					if((互!((bool),(0),(0xA91A5F5C4644))))
+					if((互!((bool),(0),(0xA9165F5C4644))))
 					{
-						foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xA9855F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xA9F75F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAA645F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAAE25F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAB625F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xABCC5F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(Font("C64_upper")); 	((0xAC3A5F5C4644).檢((update間(_間)))); 
-						foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xACB85F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16); 	((0xA9815F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font(FontId.VGA_9x16)); 	((0xA9F35F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font("VGA_9x16")); 	((0xAA605F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xAADE5F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font.VGA_9x16.bold.italic.errorline); 	((0xAB5E5F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(customFont222); 	((0xABC85F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font("C64_upper")); 	((0xAC365F5C4644).檢((update間(_間)))); 
+						foreach(i; 0..10_000) tvBuilder.Style(Font(accessFontFace("C64_upper"))); 	((0xACB45F5C4644).檢((update間(_間)))); 
 					}
 					
 					tvBuilder.Style(Font.VGA_9x16); 
 					
-					if((互!((bool),(0),(0xAD2A5F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
-					if((互!((bool),(0),(0xAD7F5F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
-					if((互!((bool),(0),(0xADD15F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
-					if((互!((bool),(0),(0xAE225F5C4644)))) {
+					if((互!((bool),(0),(0xAD265F5C4644)))) { tvBuilder.Style(Font.bold.italic); }
+					if((互!((bool),(0),(0xAD7B5F5C4644)))) { tvBuilder.Style(Font.VGA_9x16); }
+					if((互!((bool),(0),(0xADCD5F5C4644)))) { tvBuilder.Style(Font.CGA_8x8); }
+					if((互!((bool),(0),(0xAE1E5F5C4644)))) {
 						static FontSpec!FontFace customFont; 
 						static bool initialized; 
 						if(initialized.chkSet)
@@ -1116,51 +1116,51 @@ E2D90755719ECD7BB50372F82DD68C4E85805BEB08A993DE47385449A4B49FA7461D7119D770A1B6
 						}
 						tvBuilder.Style(customFont.italic); 
 					}
-					if((互!((bool),(0),(0xAFA45F5C4644)))) { tvBuilder.Style(Font("C64_upper")); }
+					if((互!((bool),(0),(0xAFA05F5C4644)))) { tvBuilder.Style(Font("C64_upper")); }
 					
 					
-					if(tvBuilder.fontFace) ((0xB01C5F5C4644).檢(tvBuilder.fontFace.id)); 
-					if(tvBuilder.fontFace) ((0xB0695F5C4644).檢(tvBuilder.fontFace.identityStr)); 
+					if(tvBuilder.fontFace) ((0xB0185F5C4644).檢(tvBuilder.fontFace.id)); 
+					if(tvBuilder.fontFace) ((0xB0655F5C4644).檢(tvBuilder.fontFace.identityStr)); 
 					
-					if((互!((bool),(1),(0xB0B25F5C4644))))
+					if((互!((bool),(1),(0xB0AE5F5C4644))))
 					{
 						with(tvBuilder.TR)
 						{
-							if((互!((bool),(0),(0xB10D5F5C4644)))) {
+							if((互!((bool),(0),(0xB1095F5C4644)))) {
 								scaleXY = ((
 									vec2(
-										(互!((float/+w=6+/),(0.496),(0xB1655F5C4644))), 
-										(互!((float/+w=6+/),(0.496),(0xB1A25F5C4644)))
+										(互!((float/+w=6+/),(0.496),(0xB1615F5C4644))), 
+										(互!((float/+w=6+/),(0.496),(0xB19E5F5C4644)))
 									)*2
 								)^^(2)); 
-								if((互!((bool),(0),(0xB1FF5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
+								if((互!((bool),(0),(0xB1FB5F5C4644)))/+Note: uniform+/) with(scaleXY) y = x; 
 							}
-							if((互!((bool),(0),(0xB2605F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB2935F5C4644))); }
-							if((互!((bool),(0),(0xB2E55F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB3155F5C4644)))*360; 
-							if((互!((bool),(0),(0xB3645F5C4644)))) {
+							if((互!((bool),(0),(0xB25C5F5C4644)))) { skewX_deg = (互!((float/+min=-90 max=90 w=3 h=3+/),(-1.000),(0xB28F5F5C4644))); }
+							if((互!((bool),(0),(0xB2E15F5C4644)))) rotZ_deg = (互!((float/+w=3 h=3 endless=1+/),(0.111),(0xB3115F5C4644)))*360; 
+							if((互!((bool),(0),(0xB3605F5C4644)))) {
 								transXY = (
 									vec2(
-										(互!((float/+w=6+/),(0.000),(0xB3BB5F5C4644))),
-										(互!((float/+w=6+/),(0.000),(0xB3F75F5C4644)))
+										(互!((float/+w=6+/),(0.000),(0xB3B75F5C4644))),
+										(互!((float/+w=6+/),(0.000),(0xB3F35F5C4644)))
 									)-.5f
 								)*300; 
 							}
-							if((互!((bool),(0),(0xB45D5F5C4644)))) {
+							if((互!((bool),(0),(0xB4595F5C4644)))) {
 								clipBounds =
 								bounds2(
 									vec2(
-										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB4C75F5C4644))),
-										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB5185F5C4644)))
+										(互!((float/+min=-200 max=2200 w=6+/),(-200.000),(0xB4C35F5C4644))),
+										(互!((float/+min=-200 max=1200 w=6+/),(-200.000),(0xB5145F5C4644)))
 									),
 									((
 										vec2(
-											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB5945F5C4644))),
-											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB5E65F5C4644)))
+											(互!((float/+min=-100 max=2000 w=6+/),(2000.000),(0xB5905F5C4644))),
+											(互!((float/+min=0 max=2000 w=6+/),(614.932),(0xB5E25F5C4644)))
 										)
 									).名!q{size})
 								); 
 							}
-							((0xB66C5F5C4644).檢(
+							((0xB6685F5C4644).檢(
 								i"$(transXY)
 $(skewX_deg)
 $(rotZ_deg)
@@ -1173,7 +1173,7 @@ $(clipBounds)".text
 					tvBuilder.TR.scaleXY *= tvBuilder.fontSize; 
 					tvBuilder.FH = 1; 
 					
-					if((互!((bool),(0),(0xB7565F5C4644))))
+					if((互!((bool),(0),(0xB7525F5C4644))))
 					{
 						with(tvBuilder) {
 							void benchmarkStateSaving(int N=10000, void delegate() fun)
@@ -1192,11 +1192,11 @@ $(clipBounds)".text
 								foreach(i; 0..N) doit((i&7)+3); 
 							} 
 							
-							((0xB9745F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB9DF5F5C4644).檢((update間(_間)))); 
+							((0xB9705F5C4644).檢((update間(_間)))); /+asm { int 3; } +/benchmarkStateSaving(0xBEEF, { TR.reset; }); ((0xB9DB5F5C4644).檢((update間(_間)))); 
 						}
 					}
 					
-					if((互!((bool),(0),(0xBA2C5F5C4644))))
+					if((互!((bool),(0),(0xBA285F5C4644))))
 					{
 						with(tvBuilder) {
 							Style(((white).名!q{fg}), ((black).名!q{bk}), ((5).名!q{TR.scaleXY})); 
@@ -1352,7 +1352,7 @@ $(clipBounds)".text
 					} 
 					
 					static bouncingBounds = mixin(求map(q{seed},q{iota(80/80)},q{BouncingBounds(seed)})).array; 
-					((0xCE6F5F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCEED5F5C4644).檢((update間(_間)))); 
+					((0xCE6B5F5C4644).檢((update間(_間)))); mixin(求each(q{ref bb},q{bouncingBounds},q{bb.update(deltaTime.value(second))})); ((0xCEE95F5C4644).檢((update間(_間)))); 
 					
 					with(tvBuilder)
 					{
@@ -1379,7 +1379,7 @@ End.".splitLines
 						
 						Style(((.66).名!q{opacity})); 
 						static TurboVisionBuilder jlBuilder; if(!jlBuilder) jlBuilder = new TurboVisionBuilder; 
-						if((互!((bool),(1),(0xD1D35F5C4644))))
+						if((互!((bool),(1),(0xD1CF5F5C4644))))
 						foreach(const bb; bouncingBounds)
 						{
 							jlBuilder.setState(colorState, fontState); 
@@ -1432,15 +1432,15 @@ End.".splitLines
 								clMenuItem, "Help │ Run the current program"
 						); 
 						
-						fillSpace(20+((0xD84C5F5C4644).檢((ifloor((互!((float/+w=12+/),(1.000),(0xD86A5F5C4644)))*80))))); 
-						if((互!((bool),(0),(0xD8AF5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
+						fillSpace(20+((0xD8485F5C4644).檢((ifloor((互!((float/+w=12+/),(1.000),(0xD8665F5C4644)))*80))))); 
+						if((互!((bool),(0),(0xD8AB5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
 						/+Todo: /+H1: BUG!!!! 🐞+/+/
 					}
 					
 					tvBuilder.commit; 
 				}
 				
-				((0xD97C5F5C4644).檢((update間(_間)))); 
+				((0xD9785F5C4644).檢((update間(_間)))); 
 				{
 					auto builder = new GfxBuilder; 
 					with(builder)
@@ -1490,14 +1490,14 @@ End.".splitLines
 							}
 						}
 						
-						((0xDFB45F5C4644).檢(builder.empty)); 
+						((0xDFB05F5C4644).檢(builder.empty)); 
 						
-						if((互!((bool),(0),(0xDFEE5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
+						if((互!((bool),(0),(0xDFEA5F5C4644)))) begin; //<-- must put this here, or else the last 9 spaces are LOST!!!
 						/+Todo: /+H1: BUG!!!! 🐞+/+/
 					}
 					consumeGfxContent(builder); 
 				}
-				((0xE0B75F5C4644).檢((update間(_間)))); 
+				((0xE0B35F5C4644).檢((update間(_間)))); 
 				
 				
 				

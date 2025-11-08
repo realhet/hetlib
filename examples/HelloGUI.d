@@ -1,36 +1,32 @@
-
 //@exe
+//@compile --d-version=VulkanUI
 //@debug
 ///@release
 
 import het.ui; 
 
-class FrmHelloGUI: GLWindow
+class FrmHelloGUI: UIWindow
 {
-	mixin autoCreate; 
+	mixin autoCreate; mixin SetupMegaShader!q{}; 
 	
 	override void onCreate()
-	{} 
+	{ backgroundColor = (RGB(0x2d2d2d)); } 
 	
 	override void onUpdate()
 	{
-		view.navigate(!im.wantKeys, !im.wantMouse); 
+		if(canProcessUserInput) navigateView(!im.wantKeys, !im.wantMouse); 
 		invalidate; 
 		
-		with(im)
-		{ Panel(PanelPosition.topLeft, { Text("Hello"); }); }
-		
+		with(im) { Panel(PanelPosition.topLeft, { Text("Hello"); }); }
 	} 
 	
-	override void onPaint()
+	override void beforeImDraw()
 	{
-		gl.clearColor(RGB(0x2d2d2d)); gl.clear(GL_COLOR_BUFFER_BIT); 
-		
+		with(staticDr)
 		{
-			auto dr = new Drawing; scope(exit) dr.glDraw(view); 
-			
-			//draw something
-			dr.textOut(0, 0, "Hello"); 
+			color = clWhite; 
+			fontHeight = 100; 
+			textOut(vec2(0), "Hello"); 
 		}
 	} 
 } 

@@ -8,15 +8,10 @@ import het.ui;
 
 class FrmTestVulkanUI : UIWindow
 {
-	mixin autoCreate; 
-	
-	//Texture egaPalette; 
+	mixin autoCreate; mixin SetupMegaShader!q{}; 
 	
 	override void onCreate()
-	{
-		windowBounds = ibounds2(1280, 0, 1920, 600); 
-		//egaPalette = new Texture(TexFormat.rgba_u8, 16, ColorEnum!EGAColor.rgbaArray); 
-	} 
+	{ windowBounds = ibounds2(1280, 0, 1920, 600); } 
 	
 	override void onDestroy() {} 
 	
@@ -25,7 +20,7 @@ class FrmTestVulkanUI : UIWindow
 		if(KeyCombo("Ctrl+F2").pressed) application.exit; 
 		if(PERIODIC(1*second)) caption = FPS.text ~ " " ~ UPS.text; 
 		
-		mixin(同!(q{float/+w=2.5 h=2.5 min=0.125 max=16 newLine=1 sameBk=1 rulerSides=1 rulerDiv0=11+/},q{guiScale},q{0x21F49493B0B})); 
+		mixin(同!(q{float/+w=2.5 h=2.5 min=0.125 max=16 newLine=1 sameBk=1 rulerSides=1 rulerDiv0=11+/},q{guiScale},q{0x1C349493B0B})); 
 		with(im)
 		{
 			Panel(
@@ -49,7 +44,7 @@ class FrmTestVulkanUI : UIWindow
 										{
 											addDrawCallback(
 												((IDrawing dr, .Container cntr) {
-													dr.color = clRed; dr.fontHeight = 16; 
+													dr.color = clBlue; dr.fontHeight = 16; 
 													dr.textOut(vec2(40, 0), "Hello"~i.text); 
 												})
 											); 
