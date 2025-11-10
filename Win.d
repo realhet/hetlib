@@ -657,6 +657,8 @@ version(/+$DIDE_REGION+/all) {
 			
 			private Event[][] groups; 
 			
+			Time[] gcTimes; 
+			
 			bool isComplete(in Event[] group)
 			{
 				 //Group Completeness: there must be a paint event at the end.
@@ -672,15 +674,32 @@ version(/+$DIDE_REGION+/all) {
 				else groups[$-1] ~= ev; 
 			} 
 			
+			void addGcTime()
+			{
+				import core.memory; 
+				static Time tLast = 0*second; 
+				const tAct = ((GC.profileStats.totalCollectionTime.total!"hnsecs")/(10_000_000.0)) * second; 
+				const tDiff = tAct - tLast; 
+				tLast = tAct; 
+				gcTimes ~= tDiff; 
+			} 
+			
 			void restrictSize(int maxGroups)
 			{
 				const n = maxGroups+1; 
-				if(n<groups.length) groups = groups[groups.length-n..$]; 
+				if(n<groups.length) groups = groups[$-n..$]; 
+				if(n<gcTimes.length) gcTimes = gcTimes[$-n..$]; 
 			} 
 			
 			Event[][] getGroups()
 			{
 				if(groups.length>1) return groups[0..$-1]; 
+				else return []; 
+			} 
+			
+			Time[] getGcTimes()
+			{
+				if(gcTimes.length>1) return gcTimes[0..$-1]; 
 				else return []; 
 			} 
 			
@@ -1799,8 +1818,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xDA7C285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xDAD3285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= ((0xDC49285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xDCA0285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
 			
 			/+

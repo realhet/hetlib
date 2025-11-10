@@ -4077,6 +4077,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					lineWidth = 1.01; 
 					lineStyle = LineStyle.normal; 
 					auto groups = timeLine.getGroups; 
+					auto gcTimes = timeLine.getGcTimes; 
 					foreach(int idx; 1..groups.length.to!int)
 					{
 						auto group = groups[idx], prevGroup = groups[idx-1]; 
@@ -4099,16 +4100,22 @@ class VulkanWindow: Window, IGfxContentDestination
 						color = clBlack; 
 						fillRect(rAll); 
 						
-						foreach(pass; 0..2)
 						foreach(g; group)
 						{
 							color = g.color; 
 							auto r = rect(g.t0.value(second), g.t1.value(second)); 
-							if(pass==0) { fillRect(r); }else {
-								color = mix(color, clWhite, 0.5f); 
-								line(r.topLeft, r.bottomLeft); 
-							}
+							fillRect(r); 
 						}
+						
+						const gcTime = gcTimes.get(idx, 0*second); 
+						if(gcTime>0*second)
+						{
+							const st = max(group.back.t1 - gcTime, 0*second); 
+							const en = st + gcTime; 
+							color = clFuchsia; 
+							fillRect(rect(st.value(second), en.value(second))); 
+						}
+						
 						
 						
 						void mark(float f)
@@ -5349,18 +5356,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x290A082886ADB).檢(
+					((0x2916082886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2911282886ADB))))
+				if((互!((bool),(0),(0x291D282886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x291A682886ADB).檢((互!((float/+w=12+/),(1.000),(0x291BD82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2926682886ADB).檢((互!((float/+w=12+/),(1.000),(0x2927D82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5373,8 +5380,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2939282886ADB).檢 (imVG)),
-					((0x293B882886ADB).檢 (imFPS)); 
+					((0x2945282886ADB).檢 (imVG)),
+					((0x2947882886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5408,7 +5415,7 @@ $(V_size+G_size)".text
 							t4=QPS; 
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x297B982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x297D082886ADB))))); 
+								const double fovY_deg = ((0x2987982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2989082886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -5463,6 +5470,7 @@ $(V_size+G_size)".text
 			timeLine.addEvent(TimeLine.Event.Type.uploadGV  , t3, t4); //yellow: uploag VB+GB
 			timeLine.addEvent(TimeLine.Event.Type.uploadIT   , t4, t5); //orange: upload IB+TB
 			timeLine.addEvent(TimeLine.Event.Type.queue    , t5, t6); //aqua: queue
+			timeLine.addGcTime; //fuchsia
 			timeLine.restrictSize(174); 
 		} 
 	}
