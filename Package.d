@@ -1001,6 +1001,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			private auto GetCPULoadPercent_internal()
 			{
 				//get tick counters
+				auto _間=init間; 
 				ulong idle, kernel, user; 
 				auto ft(ref ulong a) { return cast(FILETIME*)(&a); } 
 				if(!GetSystemTimes(ft(idle), ft(kernel), ft(user))) return float.nan; 
@@ -1012,7 +1013,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				
+				((0x8AAA59F156A1).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -3254,15 +3255,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198BA59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198FE59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1998259F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x199C659F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19A2C59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19AA159F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19A7059F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19AE559F156A1})); 
 						+/
 					+/
 				+/

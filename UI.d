@@ -69,49 +69,54 @@ version(/+$DIDE_REGION+/all)
 			
 			//must call initTextStyles from outside
 			
-			alias Drawing = IDrawing; 
-			
-			enum BoldOffset = 1.0f/40 /+
-				This is a deprecated constant for resizing bold text.
-				Used in the old font shader.
-			+/; 
-			
-			__gshared int[dchar] DefaultFont_subTexIdxMap; 
-			//Used by UI, must be cleared after every megatexture GC
-			
-			__gshared Texture[File] g_tempLoadedTextures; 
-			
-			__gshared TexHandle delegate(File) gányolás_textures_getNow; 
-			TexHandle textures_getNow(File f)
-			=> gányolás_textures_getNow(f); 
-			
-			__gshared void delegate(File) gányolás_textures_invalidate; 
-			void textures_invalidate(File f) 
-			=> gányolás_textures_invalidate(f); 
-			
-			__gshared ivec2 delegate(TexHandle) gányolás_textures_getSize; 
-			auto textures_accessInfo(TexHandle stIdx)
+			deprecated
 			{
-				auto v = gányolás_textures_getSize(stIdx); 
-				static struct Res { int width, height; } 
-				return Res(v.x, v.y); 
+				
+				alias Drawing = IDrawing; 
+				
+				enum BoldOffset = 1.0f/40 /+
+					This is a deprecated constant for resizing bold text.
+					Used in the old font shader.
+				+/; 
+				
+				__gshared int[dchar] DefaultFont_subTexIdxMap; 
+				//Used by UI, must be cleared after every megatexture GC
+				
+				__gshared Texture[File] g_tempLoadedTextures; 
+				
+				__gshared TexHandle delegate(File) gányolás_textures_getNow; 
+				TexHandle textures_getNow(File f)
+				=> gányolás_textures_getNow(f); 
+				
+				__gshared void delegate(File) gányolás_textures_invalidate; 
+				void textures_invalidate(File f) 
+				=> gányolás_textures_invalidate(f); 
+				
+				__gshared ivec2 delegate(TexHandle) gányolás_textures_getSize; 
+				auto textures_accessInfo(TexHandle stIdx)
+				{
+					auto v = gányolás_textures_getSize(stIdx); 
+					static struct Res { int width, height; } 
+					return Res(v.x, v.y); 
+				} 
+				
+				//texture statistics
+				//Todo: implement these with a global system info collector object.
+				
+				private TextureManagerStats cachedTextureManagerStats; 
+				private uint cachedTextureManagerStats_tick; 
+				private ref const(TextureManagerStats) getTextureManagerStats()
+				{
+					if(cachedTextureManagerStats_tick.chkSet(application.tick))
+					cachedTextureManagerStats = mainVulkanWindow.textureManagerStats; 
+					return cachedTextureManagerStats; 
+				} 
+				
+				size_t textures_length() => getTextureManagerStats.length_all; 
+				size_t textures_poolSizeBytes() => getTextureManagerStats.totalBytes; 
+				size_t textures_usedSizeBytes() => getTextureManagerStats.usedBytes; 
+				
 			} 
-			
-			//texture statistics
-			//Todo: implement these with a global system info collector object.
-			
-			private TextureManagerStats cachedTextureManagerStats; 
-			private uint cachedTextureManagerStats_tick; 
-			private ref const(TextureManagerStats) getTextureManagerStats()
-			{
-				if(cachedTextureManagerStats_tick.chkSet(application.tick))
-				cachedTextureManagerStats = mainVulkanWindow.textureManagerStats; 
-				return cachedTextureManagerStats; 
-			} 
-			
-			size_t textures_length() => getTextureManagerStats.length_all; 
-			size_t textures_poolSizeBytes() => getTextureManagerStats.totalBytes; 
-			size_t textures_usedSizeBytes() => getTextureManagerStats.usedBytes; 
 		}
 		
 		

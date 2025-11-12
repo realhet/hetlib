@@ -3392,12 +3392,12 @@ Use SvgParser to prepare absolute SVG command stream!"
 		string Drawing_customShader; 
 	} 
 	
-	class DrawingProxy : IDrawing
+	deprecated class DrawingProxy : IDrawing
 	{
 		final
 		{
 			GfxBuilder gfx; 
-			
+			deprecated: 
 			void reset()
 			{
 				if(trStack.length) WARN("trStack was not empty"); 	trStack = []; 
@@ -4078,34 +4078,37 @@ class VulkanWindow: Window, IGfxContentDestination
 					lineStyle = LineStyle.normal; 
 					auto groups = timeLine.getGroups; 
 					auto gcTimes = timeLine.getGcTimes; 
+					const origin = vec2(clientWidth-2, 2); 
 					foreach(int idx; 1..groups.length.to!int)
 					{
 						auto group = groups[idx], prevGroup = groups[idx-1]; 
 						const scale = vec2(5000.0f, 4); 
-						const origin = vec2(clientWidth-2, 2); 
 						
 						auto rect(double t0, double t1)
 						{
+							float 	base 	= prevGroup[$-1].t1.value(second),
+								len 	= group[$-1].t1.value(second) - base; 
 							bounds2 b; 
-							float base = prevGroup[$-1].t1.value(second); 
-							float len = group[$-1].t1.value(second) - base; 
-							b.low.x	= origin.x + (t0-base-len)*scale.x; 
-							b.high.x	= origin.x + (t1-base-len)*scale.x; 
-							b.low.y	= origin.y + scale.y*(idx-1); 
+							b.low.x	= origin.x + (t0-base-len)*scale.x,
+							b.high.x	= origin.x + (t1-base-len)*scale.x,
+							b.low.y	= origin.y + scale.y*(idx-1),
 							b.high.y	= b.low.y + scale.y*.9; 
 							return b; 
 						} 
 						
 						auto rAll = rect(prevGroup[$-1].t1.value(second), group[$-1].t1.value(second)); 
 						color = clBlack; 
-						fillRect(rAll); 
+						alpha = .25; fillRect(rAll); alpha = 1; 
 						
 						foreach(g; group)
 						{
 							color = g.color; 
 							auto r = rect(g.t0.value(second), g.t1.value(second)); 
+							
+							alpha = ((g.type)?(1):(0.33)); 
 							fillRect(r); 
 						}
+						alpha = 1.0f; 
 						
 						const gcTime = gcTimes.get(idx, 0*second); 
 						if(gcTime>0*second)
@@ -4116,8 +4119,6 @@ class VulkanWindow: Window, IGfxContentDestination
 							fillRect(rect(st.value(second), en.value(second))); 
 						}
 						
-						
-						
 						void mark(float f)
 						{
 							auto r = rect(group[$-1].t1.value(second)-(1/f), group[$-1].t1.value(second)); 
@@ -4126,7 +4127,25 @@ class VulkanWindow: Window, IGfxContentDestination
 						} 
 						
 						mark(60); mark(30); 
+						if(idx==32 /+Bug: ha ezt kiszedem ebbol a loopbol nem latszik a kibaszott text+/)
+						{
+							textOut(vec2(origin.x-20, origin.y), "FPS"); 
+							float x2 = origin.x-40, x1 = x2-128, y = 16; 
+							color = clYellow; 
+							fontHeight = 16; 	textOut(vec2(x2, y+32-12), "FPS"); 
+							fontHeight = 80; 	textOut(vec2(x1-64, y), FPS.format!"%4d"); 
+							y+= 80; 
+							
+							const CPU = (iround(GetCPULoadPercent)); 
+							color = clAqua; 
+							fontHeight = 16; 	textOut(vec2(x2, y+32-12), "CPU"); 
+							fontHeight = 40; 	textOut(vec2(x1, y), CPU.format!"%3d%%"); 
+						}
+						
 					}
+					
+					
+					
 				}
 			} 
 			
@@ -5356,18 +5375,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2916082886ADB).檢(
+					((0x2943A82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x291D282886ADB))))
+				if((互!((bool),(0),(0x294AC82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2926682886ADB).檢((互!((float/+w=12+/),(1.000),(0x2927D82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2954082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2955782886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5380,8 +5399,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2945282886ADB).檢 (imVG)),
-					((0x2947882886ADB).檢 (imFPS)); 
+					((0x2972C82886ADB).檢 (imVG)),
+					((0x2975282886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5415,7 +5434,7 @@ $(V_size+G_size)".text
 							t4=QPS; 
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x2987982886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x2989082886ADB))))); 
+								const double fovY_deg = ((0x29B5382886ADB).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x29B6A82886ADB))))); 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 
@@ -6542,7 +6561,7 @@ $(V_size+G_size)".text
 				enum shaderBinary = 
 				(碼!((位!()),iq{glslc -O},iq{
 					#version 430
-					 
+					
 					//Todo: check the warnings!
 					
 					//common stuff
@@ -6840,7 +6859,7 @@ $(V_size+G_size)".text
 					float outputTransformSize(float s)
 					{
 						/*
-							⚠ Normally this must be 1 * s !!!
+							⚠ Normally this must return 1 * s !!!
 							So it's an average of the non-uniform scaling.
 							Not the length of it becase TR_scaleXY 
 							in NOT a vector!!!!!!!!
@@ -6856,21 +6875,17 @@ $(V_size+G_size)".text
 						fragColor 	= vec4(PC.rgb, PC.a*OP),
 						fragBkColor 	= vec4(SC.rgb, SC.a*OP); 
 						if(font_blink()!=0)
-						if(
-							fract(
-								UB.iTime 
-								* ((font_blink()==3) ?(.5) :(font_blink()))
-								* 1.875/*Hz*/
-							)>.5
-						) fragColor = fragBkColor; 
+						if(fract(UB.iTime * ((font_blink()==3) ?(.5) :(font_blink())) * 1.875/*Hz*/)>.5)
+						fragColor = fragBkColor; 
+						
 						
 						
 						vec2 w = outputTransformPoint2D(p); //model to world transform
 						
-						gl_ClipDistance[0] = w.x-TR_clipBounds.x; 
-						gl_ClipDistance[1] = w.y-TR_clipBounds.y; 
-						gl_ClipDistance[2] = TR_clipBounds.z-w.x; 
-						gl_ClipDistance[3] = TR_clipBounds.w-w.y; 
+						gl_ClipDistance[0] 	= w.x - TR_clipBounds.x,
+						gl_ClipDistance[1] 	= w.y - TR_clipBounds.y,
+						gl_ClipDistance[2] 	= TR_clipBounds.z - w.x,
+						gl_ClipDistance[3] 	= TR_clipBounds.w - w.y; 
 						
 						gl_Position = UB.mvp * vec4(w, 0, 1); //world to screen transform
 						
@@ -7432,7 +7447,7 @@ $(V_size+G_size)".text
 					} 
 					
 					void setOpacity(inout BitStream bitStream)
-					{ OP = float(fetch_uint(bitStream, 8))/255; } 
+					{ OP = float(fetch_uint(bitStream, 8))/255.0; } 
 					
 					$(GEN_enumDefines!FlagFormat)
 					void setFlags(inout BitStream bitStream)
@@ -7907,11 +7922,14 @@ $(V_size+G_size)".text
 									break; 
 								}
 								
-								if(colorsChanged)
-								{
-									fragColor 	= vec4(PC.rgb, PC.a*OP),
-									fragBkColor 	= vec4(SC.rgb, SC.a*OP); 
-								}
+								/*
+									Note : Color is always set before emitvertex()
+									if(colorsChanged)
+									{
+										fragColor 	= vec4(PC.rgb, PC.a*OP),
+										fragBkColor 	= vec4(SC.rgb, SC.a*OP); 
+									}
+								*/
 							}else {
 								switch(subCat)
 								{
@@ -7968,8 +7986,7 @@ $(V_size+G_size)".text
 								case PathCode_Q1: case PathCode_Q2: 
 								case PathCode_C1: case PathCode_C2: case PathCode_C3: 
 									{
-									//Todo: set these states it less frequently!!!
-									fragColor = PC; fragBkColor = SC; setFragTexHandle(0); 
+									setFragTexHandle(0); 
 									emitHalfLineWidth(LW/2); 
 									
 									latchP(fetchXY(bitStream, P4)); 

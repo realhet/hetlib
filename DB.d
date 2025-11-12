@@ -2900,109 +2900,116 @@ version(/+$DIDE_REGION+/all) {
 			
 		} 
 	}
-	version(/+$DIDE_REGION Building blocks+/all)
+	version(/+$DIDE_REGION Data Building Blocks+/all)
 	{
 		private
 		{
-			enum UseReplacement_RedBlackTree 	= (常!(bool)(1)),
-			UseReplacement_AssocArray 	= (常!(bool)(1)); 
-			
 			/+
-				Todo: Rendes neveket kell adni!
-				Az en RedBlackTreem az valojaban egy SortedKeyArray.
-				A ReplacementAA meg egy SortedKeyAA.
-				A sima AA meg HashTableAA.
-			+/
-			
-			/+
-				Todo: Valahogy tesztelni kene ezt, mert nem akarom elhinni, 
-				hogy elsore latszolag jo lett...
-			+/
-			
-			
-			static if(!UseReplacement_RedBlackTree)
-			{ import std.container.rbtree : RedBlackTree; }
-			else
-			{
-				static class RedBlackTree(T, alias pred, bool allowDuplicates)
-				{
-					static assert(!allowDuplicates); 
-					T[] items; 
-					
-					this(R)(R r) { items = r.array.sort!pred.array; } 
-					
-					auto opIndex() => items.assumeSorted!pred; 
-					auto upperBound(T a) => this[].upperBound(a); 
-					auto lowerBound(T a) => this[].lowerBound(a); 
-					void insert(T a) {
-						/*
-							Opt: Eloszor a vegere kell megprobalni, 
-							mert lehet, hogy a lowerBound
-							kozeprol indul el.
-						*/
-						items.insertInPlace(lowerBound(a).length, a); 
-					} 
-				} 
-			}
-			
-			
-			static if(!UseReplacement_AssocArray)
-			{
-				static struct ReplacementAA(K, V)
-				{
-					V[K] aa; alias this = aa; 
-					void clear() { aa = null; } 
-				} 
-			}
-			else
-			{
-				version(/+$DIDE_REGION+/none) {
-					static struct ReplacementAA(K, V)
-					{
-						V[K] aa; //alias this = aa;
-						void clear() { aa = null; } 
-						auto opBinaryRight(string op : "in")(K key) => key in aa; 
-						auto length() => aa.length; 
-						auto byKey() => aa.byKey; 
-						void opAssign(V[K] src) { aa = src; } 
-						void opIndexAssign(V v, K k) { aa[k] = v; } 
-					} 
-				}
+				Note: 251111: Karc fix: 300ms lag spikes, because of GC micro-allocations
 				
-				static struct ReplacementAA(K, V)
-				{
-					K[] keys/+sorted+/; V[] values; 
-					void clear() { keys = null, values = null; } 
-					V* opBinaryRight(string op : "in")(K k)
-					{
-						auto x = keys.assumeSorted.trisect(k); 
-						if(x[1].empty) { return null; }
-						else { return &values[x[0].length]; }
-					} 
-					auto length() => keys.length; 
-					auto byKey() => keys.assumeSorted; 
-					
-					void opAssign(V[K] src)
-					{
-						keys 	= src.keys,
-						values 	= src.values; 
-						auto index = new uint[keys.length]; 
-						makeIndex(keys, index); 
-						keys 	= index.map!((i)=>(keys[i])).array,
-						values 	= index.map!((i)=>(values[i])).array; 
-					} 
-					void opIndexAssign(V v, K k)
-					{
-						auto x = keys.assumeSorted.trisect(k); 
-						const idx = x[0].length; 
-						if(x[1].empty) {
-							keys.insertInPlace(idx, k); 
-							values.insertInPlace(idx, v); 
-						}
-						else { values[idx] = v; }
-					} 
-				} 
+				/+
+					Todo: Must redesign all the loggers with the new sorted arrays.
+					RedBlack tree and HashTables are BAD for the GC, must do it manually!
+				+/
+			+/
+			
+			enum UseMy_RedBlackTree 	= (常!(bool)(1)),
+			UseMy_AssocArray 	= (常!(bool)(1)); 
+			
+			static if(!UseMy_RedBlackTree)
+			{
+				import std.container.rbtree : RedBlackTree; 
+				alias DataKeyArray(T, alias pred="a<b") =
+					RedBlackTree!(T, pred, false/+no duplicates+/); 
 			}
+			else
+			{ alias DataKeyArray(T, alias pred="a<b") = SortedKeyArray!(T, pred); }
+			
+			static if(!UseMy_AssocArray)
+			{ alias DataAssocArray(K, V) = V[K]; }
+			else
+			{ alias DataAssocArray(K, V) = SortedAssocArray!(K, V); }
+			
+			
+			class SortedKeyArray(T, alias pred="a<b")
+			{
+				T[] items; 
+				
+				this(R)(R r) { items = r.array.sort!pred.array; } 
+				
+				auto opIndex() => items.assumeSorted!pred; 
+				auto upperBound(T a) => this[].upperBound(a); 
+				auto lowerBound(T a) => this[].lowerBound(a); 
+				void insert(T a) {
+					/*
+						Opt: Eloszor a vegere kell megprobalni, 
+						mert lehet, hogy a lowerBound
+						kozeprol indul el.
+					*/
+					//Todo: Duplicates are NOT handled
+					items.insertInPlace(lowerBound(a).length, a); 
+				} 
+			} 
+			
+			static assert(
+				(){
+					auto a = new SortedKeyArray!int([8,1,3]); 
+					[0,2,6,5,4,7,9].each!((x)=>(a.insert(x))); 
+					enforce(a[].equal(iota(10))); 
+					enforce(a.lowerBound(5).equal(iota(5))); 
+					enforce(a.upperBound(5).equal([6,7,8,9])); 
+					return true; 
+				}()
+			); 
+			
+			struct SortedAssocArray(K, V)
+			{
+				K[] keys/+sorted+/; V[] values; 
+				void clear() { keys = null, values = null; } 
+				V* opBinaryRight(string op : "in")(K k)
+				{
+					auto x = keys.assumeSorted.trisect(k); 
+					if(x[1].empty) { return null; }
+					else { return &values[x[0].length]; }
+				} 
+				auto length() => keys.length; 
+				auto byKey() => keys.assumeSorted; 
+				
+				void opAssign(V[K] src)
+				{
+					keys 	= src.keys,
+					values 	= src.values; 
+					auto index = new uint[keys.length]; 
+					makeIndex(keys, index); 
+					keys 	= index.map!((i)=>(keys[i])).array,
+					values 	= index.map!((i)=>(values[i])).array; 
+				} 
+				void opIndexAssign(V v, K k)
+				{
+					auto x = keys.assumeSorted.trisect(k); 
+					const idx = x[0].length; 
+					if(x[1].empty) {
+						keys.insertInPlace(idx, k); 
+						values.insertInPlace(idx, v); 
+					}
+					else { values[idx] = v; }
+				} 
+			} 
+			
+			void testSortedAssocArray()
+			{
+				enforce(
+					(){
+						SortedAssocArray!(int, string) a; 
+						a = [8:"8", 1:"1", 3:"3"]; 
+						[0,2,6,5,4,7,9].each!((x)=>(a[x] = x.text)); 
+						enforce(a.byKey.equal(iota(10))); 
+						enforce(a.byKey.all!((k)=>(k.text==*(k in a)))); 
+						return true; 
+					}()
+				); 
+			} 
+			
 		} 
 	}
 	version(/+$DIDE_REGION DataSet+/all)
@@ -3135,7 +3142,7 @@ version(/+$DIDE_REGION+/all) {
 				enum OrderedKeysEnabled = __traits(hasMember, This, "OrderedKeys") && OrderedKeys; 
 				static if(OrderedKeysEnabled)
 				{
-					RedBlackTree!(K, "a<b", false/+no duplicates+/) _rb; 
+					DataKeyArray!K _rb; 
 					
 					auto _rb_access()
 					{
@@ -3451,7 +3458,7 @@ version(/+$DIDE_REGION+/all) {
 					static assert(isFixedSizeOpaqueType!V); 
 					
 					//V[K] aa; 
-					ReplacementAA!(K, V) aa; 
+					DataAssocArray!(K, V) aa; 
 					
 					File logFile; bool headerWritten=false; 
 					StdFile logStdFile; 
@@ -3529,7 +3536,7 @@ version(/+$DIDE_REGION+/all) {
 					struct IdxRec { align(1): K key; size_t offset, size; } 
 					
 					//FileBlockRef[K] aaIdx; 
-					ReplacementAA!(K, FileBlockRef) aaIdx; 
+					DataAssocArray!(K, FileBlockRef) aaIdx; 
 					File idxFile, dataFile; 
 					
 					StdFile idxStdFile, dataStdFile; 
@@ -3668,6 +3675,8 @@ version(/+$DIDE_REGION+/all) {
 			
 			void _initialize()
 			{
+				testSortedAssocArray; 
+				
 				string encodeFn(string timestamp, string field, string ext)
 				{
 					return only(
