@@ -3215,7 +3215,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		auto vkEnforce(string file = __FILE__, int line = __LINE__)(VkResult r, string s="")
 		{ if(r!=VK_SUCCESS) throw new Exception(only(r.text, s).filter!"a!=``".join(": "), file, line); } 
 		
-		static GEN_ShaderLayoutDeclarations(in 表 table)
+		static GEN_ShaderLayoutDeclarations(/+in+/ 表 table)
 		{
 			string[] res; 
 			foreach(row; table.rows)
@@ -5883,9 +5883,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x334A44F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3350A4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x3356D4F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x334A84F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3350E4F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x335714F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

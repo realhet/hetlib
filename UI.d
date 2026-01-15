@@ -59,6 +59,9 @@ version(/+$DIDE_REGION+/all)
 			size_t textures_poolSizeBytes() => oldTextures.poolSizeBytes; 
 			size_t textures_usedSizeBytes() => oldTextures.usedSizeBytes; 
 			
+			vec2 inputTransformFix(in vec2 p) => p; 
+			bounds2 inputTransformFix(in bounds2 b) => b; 
+			
 		}
 		
 		version(VulkanUI)
@@ -5264,7 +5267,7 @@ version(/+$DIDE_REGION+/all)
 														const float siz = fh; 
 														void customDraw(Drawing dr, .Container cntr)
 														{
-															dr.color = clGray; dr.lineWidth = 1; 
+															dr.color = clGray; dr.lineWidth = 1.0625f; 
 															float x = siz*.5f; 
 															foreach(ch; r.prefix.byChar)
 															{
@@ -5295,8 +5298,10 @@ version(/+$DIDE_REGION+/all)
 													}
 												}
 												else
-												{ if(showBullet) Row({ outerSize = vec2(fh); flags.hAlign = HAlign.center; Text("•"); }); }
+												{ if(showBullet) { Spacer(fh*.25f); Text("•"); }}
 											}
+											
+											Spacer(fh*.25f); 
 											
 											if(onItem)	onItem(r.item); 
 											else	{

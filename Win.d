@@ -717,12 +717,15 @@ version(/+$DIDE_REGION+/all) {
 			
 			if(disableInternalRedraw) return; 
 			
-			version(/+$DIDE_REGION+/none) {
+			version(VulkanUI)
+			{}
+			else
+			{
 				auto t0 = QPS; 
-				onBeginPaint; 	timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0); 	t0 = QPS; 
-				internalPaint; 	timeLine.addEvent(TimeLine.Event.Type.paint      , t0); 	t0 = QPS; 
-				onEndPaint; 	timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0); 	t0 = QPS; 
-				onSwapBuffers; 	timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0); 	//t0 = QPS;
+				onBeginPaint; 	/+timeLine.addEvent(TimeLine.Event.Type.beginPaint , t0); 	t0 = QPS; +/
+				internalPaint; 	/+timeLine.addEvent(TimeLine.Event.Type.paint      , t0); 	t0 = QPS; +/
+				onEndPaint; 	/+timeLine.addEvent(TimeLine.Event.Type.endPaint   , t0); 	t0 = QPS; +/
+				onSwapBuffers; 	/+timeLine.addEvent(TimeLine.Event.Type.swapBuffers, t0); 	//t0 = QPS;+/
 				timeLine.restrictSize(60); 
 			}
 		} 
@@ -1818,8 +1821,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xDC49285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xDCA0285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= ((0xDC61285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xDCB8285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
 			
 			/+

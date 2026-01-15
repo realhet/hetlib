@@ -16,7 +16,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		//Todo: msvcrt.lib(initializers.obj): warning LNK4098: defaultlib 'libcmt.lib' conflicts with use of other libs; use /NODEFAULTLIB:library
 		//https://stackoverflow.com/questions/3007312/resolving-lnk4098-defaultlib-msvcrt-conflicts-with
 		
+		//Todo: Replace `can't` with `cannot` in error message strings. Implement the syntax selective buttons in DIDE/find search results panel.
+		
 		//Todo: UTILS lots of todes commented out, because of the compile log is small
+		
 		/+
 			//todo: IDE: % as postFix operator: 25% -> (25)*.01
 			//todo: IDE: visszajatszo debugger/logger
@@ -1013,7 +1016,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8AAA59F156A1).檢((update間(_間)))); 
+				((0x8B3F59F156A1).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -2672,7 +2675,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			string[][] allRows; 
 			
-			auto rows() const
+			auto rows() /+const+/
 			{
 				/+It skips empty rows and rows with only one cell starting with a comment.+/
 				static isComment(string s)
@@ -3255,15 +3258,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x198FE59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1999759F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x199C659F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19A5F59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19A7059F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19AE559F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19B0959F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19B7E59F156A1})); 
 						+/
 					+/
 				+/
@@ -11449,6 +11452,17 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		enum gregorianDaysInYear 	= 365.2524, 
 		gregorianDaysInMonth 	= gregorianDaysInYear/12; 
 		
+		struct Date
+		{
+			ubyte[3] raw; /+Todo: implement a proper UTC date without the hours...+//+Note: If the DateTime divisor is DateTime.RawUnits.day, then it needs 19 bits to cover the full range. Nut not sure about converting it back, because it is UTC0 and no daylight savings.+/
+			
+			this(DateTime dt)
+			{
+				auto a = dt.raw / DateTime.RawUnit.day; 
+				memcpy(&raw, &a, typeof(raw).sizeof); 
+			} 
+		} 
+		
 		auto RawDateTime(ulong t) { DateTime a; a.raw = t; return a; } 
 		
 		struct DateTime
@@ -11708,8 +11722,11 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					{ return localTime; } 
 					DateTime dayStart() const
 					{ return localDayStart; } 
+					
+					Date date() const
+					=> Date(this); 
 				} 
-				
+				
 				///calculate the difference between DateTimes
 				Time opBinary(string op : "-")(in DateTime b) const
 				{ return long(raw-b.raw)*(1.0/RawUnit.sec)*het.quantities.second; } 
@@ -11861,7 +11878,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				{ if(!this) return 0; with(utcSystemTime) return wYear*10 + ((wMonth-1)/3)+1; } 
 				
 				@property int utcYear(DateTime d)
-				{ if(!this) return 0; with(utcSystemTime) return wYear; } 
+				{ if(!this) return 0; with(utcSystemTime) return wYear; } 
 				
 				static
 				{
@@ -11969,9 +11986,9 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			} 
 		} 
 		
-		DateTime	today()
+		DateTime today()
 		{ return now.localDayStart; } 
-		Time	time ()
+		Time time ()
 		{ return now.localTime; } 
 		
 		Time QPS()

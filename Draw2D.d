@@ -2741,6 +2741,9 @@ class Drawing : IDrawing
 		void strip(R)(dvec2 p0)
 		{} 
 		
+		void drawTexture_custom(int idx, in Bounds!(Vector!(float, 2)) bnd, uint customShaderIdx, Vector!(ubyte, 4) fg, Vector!(ubyte, 4) bk)
+		{ NOTIMPL; } 
+		
 	}
 	
 	static immutable shaderCode =

@@ -2408,7 +2408,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				"string", "wstring", "dstring",
 				"size_t", "sizediff_t", "ptrdiff_t", "noreturn",
 		
-				"File", "Path", "DateTime", "Time",
+				"File", "Path", "DateTime", "Date", "Time",
 		
 				"Object",
 		
@@ -3160,7 +3160,7 @@ version(/+$DIDE_REGION Keywords+/all)
 			string corePath()	   
 		{ return stdImportPath~`core\`; } 
 			string ldcPath()				
-		{ return stdImportPath~`ldc\`; } 
+		{ return stdImportPath~`ldc\`/+it's only the ldc specific lib!!!+/; } 
 			string libPath()				
 		{ return installPath~`lib64\`; } 
 		
@@ -3655,7 +3655,7 @@ version(/+$DIDE_REGION Keywords+/all)
 					{
 						 //alias
 						if(sl.length>1)
-						error(`Alias can't contain multiple identifiers.`); 
+						error(`Alias cannot contain multiple identifiers.`); 
 						decl.alias_ = sl[0]; 
 						decl.name.identifiers = expectIdentifierList(opdot); 
 					}else
@@ -4130,7 +4130,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E6D8899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x1E706899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
