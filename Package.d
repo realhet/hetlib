@@ -11868,7 +11868,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				{ return utcToString; } 
 				string utcTimestamp(in Flag!"shortened" shortened = No.shortened)const
 				{ return timestamp!utcSystemTime(shortened); } 
-				string utcTtimestamp_compact()const
+				string utcTimestamp_compact()const
 				{ return utcTimestamp(Yes.shortened); } 
 				
 				@property int utcYearMonth(DateTime d)
