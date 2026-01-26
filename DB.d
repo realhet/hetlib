@@ -910,8 +910,8 @@ version(/+$DIDE_REGION+/all) {
 					cancel				 // Rollback changes
 					
 					/+ Query Syntax +/
-					query "Person"							  // Find anything matching "Person"
-					query "Person	 works at"							  // Find Person-work_at associations  
+					query "Person"								 // Find anything matching "Person"
+					query "Person	 works at"								 // Find Person-work_at associations  
 					query "Person	 works at  Company" // Find specific triplets
 					query "...  works at  Company"		 // Extend from current context
 					query "Person:Manager"		 // Typed search (entity of type Manager)
@@ -934,17 +934,17 @@ version(/+$DIDE_REGION+/all) {
 					etypes [mask]	                // List entity types  
 					verbs [mask]	                //	List verbs
 					entities [mask]		// List entity instances
-					info												     // Database statistics
-					exit												     // Exit (must commit/cancel first)
+					info														   // Database statistics
+					exit														   // Exit (must commit/cancel first)
 					
 					/+ Query Options +/
 					query "Person"                  // Default: data only
 					query "is"			          // Search all categories
-					query "s:Person"												  // Schema only
-					query "e:Person"												  // Entities only  
-					query "d:Person"												  // Data only
-					query "...Person"												  // Extend left
-					query "Person..."												  // Extend right
+					query "s:Person"													 // Schema only
+					query "e:Person"													 // Entities only  
+					query "d:Person"													 // Data only
+					query "...Person"													 // Extend left
+					query "Person..."													 // Extend right
 					
 					/+ File Operations +/
 					auto db = new AMDBCore("file.amdb");  // Load from file
@@ -958,8 +958,8 @@ version(/+$DIDE_REGION+/all) {
 					/+ Wildcard Patterns +/
 					"*"		                    // Match anything
 					"Person*"			// Prefix match  
-					"*son"							               //	Suffix match
-					"P?rson"							               // Single char wildcard
+					"*son"								              //	Suffix match
+					"P?rson"								              // Single char wildcard
 				+/
 				
 				/+Note: Usage(prompt_hit: 19584, prompt_miss: 21556, completion: 526, HUF: 0.94, price: 100%)+/
@@ -3872,7 +3872,8 @@ version(/+$DIDE_REGION+/all) {
 				+/
 				//Todo: There should be an incremental index next to the timestamp as well!
 			} 
-		} version(/+$DIDE_REGION DataLogger tests+/all)
+		} 
+		version(/+$DIDE_REGION DataLogger tests+/all)
 		{
 			void dataLoggerTest()
 			{
@@ -4037,7 +4038,223 @@ version(/+$DIDE_REGION+/all) {
 				oldDelphiTest_recreated; 
 				karcDataLoggerTest; 
 			} 
-		}
+		}
+		struct LoggerManager
+		{
+			//static helper infrastructure to assist freeing up HDD space.
+			static: 
+			
+			struct StreamInfo
+			{
+				string name /+"Karc_C1", "Karc_C1.lod0"+/; 
+				bool isMain() => !name.canFind('.'); 
+				string lastName() => isMain ? name : name[name.byChar.countUntil('.')..$]; 
+				
+				struct Session
+				{
+					DateTime timestamp; 
+					Time duration = 0*second; 
+					File dataFile, idxFile; 
+					size_t dataSize, idxSize; 
+					
+					auto size() const => dataSize + idxSize; 
+				} 
+				Session[DateTime] sessionMap; 
+				Session[] sessions; //sort by time
+				size_t totalSize; 
+				DateTime[2] timeRange; 
+				void prepare()
+				{
+					sessions = sessionMap.values.sort!((a,b)=>(a.timestamp<b.timestamp)).array; 
+					totalSize = sessions.map!"a.size".sum; 
+					
+					if(sessions.length)
+					{
+						timeRange[0] = sessions.front.timestamp; 
+						timeRange[1] = sessions.back.timestamp; 
+					}
+				} 
+				
+				void addFile(DateTime timestamp, File file, size_t size, Time duration)
+				{
+					if(timestamp !in sessionMap) sessionMap[timestamp] = Session(timestamp); 
+					ref session = sessionMap[timestamp]; 
+					if(
+						file.extIs("main") || 
+						file.extIs("blob")
+					)	{
+						enforce(!session.dataFile, "already exists: "~file.text); 
+						session.dataFile = file; 
+						session.dataSize = size; 
+						session.duration = duration; 
+					}
+					else if(file.extIs("bidx"))	{
+						enforce(!session.idxFile, "already exists: "~file.text); 
+						session.idxFile = file; 
+						session.idxSize = size; 
+					}
+					else enforce(0, "Unknown extension: "~file.text); 
+				} 
+			} 
+			
+			
+			StreamInfo[] discoverStreams(Path path, string prefixSpec)
+			{
+				StreamInfo[string] streamMap; 
+				const prefixMask = prefixSpec ~ ((prefixSpec.isWildMask)?(""):("*")); 
+				
+				foreach(e; listFiles(path))
+				{
+					enum mask = "*.????-??-??T??-??-??Z.*"; 
+					if(e.name.isWild(mask))
+					{
+						try {
+							int w(int i) => wild[i].to!int; 
+							const 	prefix 	= wild[0],
+								timestamp 	= DateTime(
+								UTC, 	w(1), w(2), w(3), 
+									w(4), w(5), w(6)
+							),
+								postfix	= e.name[prefix.length..$][22..$]; 
+							if(prefix.isWild(prefixMask))
+							{
+								string streamName; 
+								if(postfix.lc=="main") streamName = prefix; 
+								else if(
+									postfix.lc.endsWith(".bidx")||
+									postfix.lc.endsWith(".blob")
+								)
+								streamName = prefix~'.'~postfix[0..$-5]; 
+								
+								if(streamName!="")
+								{
+									if(streamName.lc !in streamMap)
+									streamMap[streamName.lc] = StreamInfo(streamName); 
+									streamMap[streamName.lc].addFile(
+										timestamp, e.file, e.size, 
+										(magnitude(e.modified-e.created))
+									); 
+								}
+							}
+						}
+						catch(Exception) {}
+					}
+				}
+				
+				auto res = streamMap.keys.sort.map!((k)=>(streamMap[k])).array; 
+				foreach(ref stream; res) stream.prepare; 
+				return res; 
+			} 
+			
+			void executeCommands(R)(R commands_, Path logPath)
+			{
+				const 	commands 	= commands_.array,
+					N 	= commands.length; 
+				console.setForegroundWindow; print("\n\nExecuting task:"); 
+				int errorCnt; 
+				string log = "\n\nTask started: "~now.text~"\n"; 
+				foreach(i, cmd; commands)
+				{
+					{
+						const str = i"[$((i+1)
+	.format!"%4d")/$(N
+	.format!"%4d")]: $(cmd)".text; 
+						print(str); log ~= str~"\n"; 
+					}
+					import std.process: executeShell; 
+					const res = executeShell(cmd); 
+					if(res.status!=0)
+					{
+						errorCnt++; 
+						{
+							const str = i"Error($(res.status)): $(res.output.strip)".text; 
+							print("\33\14"~str~"\33\7"); log ~= str~"\n"; 
+						}
+					}
+				}
+				{
+					const str = i"Task completed with $(errorCnt) errors.".text; 
+					print(str); log ~= str~"\n"; 
+				}
+				File(logPath, "LogManager.log").append(log~"\n"); 
+			} 
+			
+			auto selectLoggerTimestampOfSize(StreamInfo[] streams, size_t desiredSize)
+			{
+				const allSessions = streams.map!((st)=>(st.sessions)).join.array.sort!"a.timestamp<b.timestamp".array; 
+				size_t actSize; DateTime actTimestamp; 
+				foreach(const ref s; allSessions)
+				{
+					if(actSize>=desiredSize) break; 
+					actSize += s.size; 
+					actTimestamp = s.timestamp; 
+				}
+				return actTimestamp; 
+			} 
+			
+			auto selectLoggerTimestampForFreeSizeOnDrive(Path path, StreamInfo[] streams, long requiredFreeBytes)
+			{
+				const 	freeBytes 	= path.driveInfo.freeBytes,
+					deletionAmount 	= (requiredFreeBytes-freeBytes).max(0),
+					timestamp 	= selectLoggerTimestampOfSize(streams, deletionAmount); 
+				return timestamp; 
+			} 
+			
+			void deleteLoggerFiles(File[] files, Path logPath)
+			{
+				executeCommands
+				(
+					files.map!((f)=>(
+						((f.extIs("main"))?(
+							[
+								"ren", 	f.fullName, 
+									f.fullName~".bak"
+							]
+						) :(["del", f.fullName])).joinCommandLine
+					)), logPath
+				); 
+			} 
+			
+			void deleteLogToHaveFreeSpaceOnLogDrive(Path path, string prefix, long requiredFreeBytes)
+			{
+				/+example params: (Path(`f:\!KarcDataLogs240724`), `Karc_C?`, 20 * 1_000_000_000L);+/
+				
+				// Discover all log streams in the specified path with the given prefix
+				auto streams = discoverStreams(path, prefix); 
+				
+				// Calculate the timestamp threshold for deletion based on required free space
+				auto timestamp = selectLoggerTimestampForFreeSizeOnDrive(path, streams, requiredFreeBytes); 
+				
+				// If no timestamp is returned (no deletion needed or no files), return early
+				if(!timestamp) return; 
+				
+				// Collect all files from sessions older than or equal to the timestamp
+				File[] filesToDelete = streams.map!
+					((st)=>(
+					st.sessions	.filter!((sess)=>(sess.timestamp<=timestamp))
+						.map!((sess)=>(only(sess.dataFile, sess.idxFile).filter!"a"))
+				))
+					.join.join.array.sort.array; 
+				
+				// Delete the collected files
+				if(!filesToDelete.empty)
+				{
+					//Log the operation
+					auto log = "\n\nFree space operation: " ~ now.text ~ "\n"; 
+					log ~= "Path: " ~ path.fullPath ~ "\n"; 
+					log ~= "Prefix: " ~ prefix ~ "\n"; 
+					log ~= "Required free bytes: " ~ requiredFreeBytes.to!string ~ "\n"; 
+					log ~= "Deletion timestamp threshold: " ~ timestamp.text ~ "\n"; 
+					log ~= "Files to be deleted: " ~ filesToDelete.length.to!string ~ "\n"; 
+					log ~= "Total size to be freed: " ~ filesToDelete.map!"a.size".sum.text ~ "\n"; 
+					
+					File(path, "LogManager.log").append(log ~ "\n"); 
+					
+					//call the actual deletion
+					deleteLoggerFiles(filesToDelete, path); 
+				}
+			} 
+		} 
 	}
 	version(/+$DIDE_REGION TimeView+/all)
 	{
