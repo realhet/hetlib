@@ -754,6 +754,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 			/+Code: ?histogram&gray+/	 Calculate lumonocity histogram og the image.
 			/+Code: ?grayscale+/	 Calculate grayscale image.
 			/+Code: ?invertRGB+/	 Inverts RGB, leaves alpha as is.
+			/+Code: ?shiftHUE=360.0+/	 Shifts HUE
 		+/
 		
 		Bitmap thumbEffect(Bitmap original, in QueryString params)
@@ -818,6 +819,30 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 		
 		Bitmap invertRGBEffect(Bitmap original, in QueryString params)
 		{ return new Bitmap(image2D(original.size, original.accessOrGet!RGBA.asArray.rgba_invert_rgb)); } 
+		
+		Bitmap shiftHUEEffect(Bitmap original, in QueryString params)
+		{
+			float shift = 0; params("shiftHUE", shift); // shift in degrees (0-360)
+			const normalizedShift = (shift*(1.0f/360)).mod(1); //cyclic modulo fine for negative values too
+			
+			Bitmap doit(T)()
+			=> 
+			new Bitmap(
+				image2D(
+					original.size, original.access!T.asArray.map!
+					((p){
+						auto hsv = p.rgb.from_unorm.rgbToHsv; 
+						hsv.x = (hsv.x + normalizedShift) % 1; 
+						p.rgb = hsv.hsvToRgb.to_unorm; 
+						return p; 
+					})
+				)
+			); 
+			
+			if(original.channels==4) return doit!RGBA; 
+			if(original.channels==3) return doit!RGB; 
+			return original.dup; 
+		} 
 	} 
 	
 	/+
@@ -838,6 +863,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 		+/
 		
 	+/
+	
 	
 	private BitmapCacheStats _bitmapCacheStats; //this is a result
 	
@@ -854,7 +880,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x80C4B8E2CB5D).檢((update間(_間)))); }
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x839DB8E2CB5D).檢((update間(_間)))); }
 		/+
 			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
 			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.
