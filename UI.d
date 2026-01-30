@@ -5165,7 +5165,7 @@ version(/+$DIDE_REGION+/all)
 		TreeRow[] rows; 
 		float maxRowWidth = 0; 
 		DateTime rowsUpdated, changed; 
-		bool showBullet = true; /+if there is no icon, a bullet mark looks nice in front of the item name+/
+		bool showBullet = true; /+if there is no open/close icon, a bullet mark looks nice in front of the item name+/
 		bool showRoot = true; 
 		
 		Item* getParentItem(Item* child)
@@ -5272,7 +5272,10 @@ version(/+$DIDE_REGION+/all)
 															foreach(ch; r.prefix.byChar)
 															{
 																if(ch.among('+', 'I')) dr.vLine(x, 0, siz); 
-																if(ch.among('+', 'L')) dr.circle(vec2(x+.5*siz, 0), siz*.5f, -π/2, 0); 
+																if(ch.among('+', 'L')) {
+																	dr.circle(vec2(x+.5*siz, 0), siz*.5f, -π/2, 0); 
+																	if(showBullet) dr.hLine(x+.5f*siz, siz*.5f, x+.75f*siz); 
+																}
 																x += fh; 
 															}
 														} 
@@ -5298,7 +5301,7 @@ version(/+$DIDE_REGION+/all)
 													}
 												}
 												else
-												{ if(showBullet) { Spacer(fh*.25f); Text("•"); }}
+												{ if(showBullet) { Spacer(fh*0.275f); Text("●"); Spacer(fh*0.275f); }}
 											}
 											
 											Spacer(fh*.25f); 
