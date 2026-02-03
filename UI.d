@@ -5292,7 +5292,8 @@ version(/+$DIDE_REGION+/all)
 														Btn(
 															{
 																margin = Margin.init; outerSize = vec2(fh); 
-																Text(((r.item.opened)?("▼"):("▷"))); 
+																//Text(((r.item.opened)?("▼"):("▷"))); 
+																Text(((r.item.opened)?("▷"):("▼"))); 
 															}
 														)
 													) {
@@ -7010,7 +7011,14 @@ struct im
 			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
 			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
 			
-			bitmaps(f); //need to pull this crap
+			version(OpenGLUI) { bitmaps(f); /+need to pull this crap+/}
+			version(VulkanUI) {
+				bitmaps[f]; /+
+					Todo: In vulkan there is no delayed refresh of images.
+					All this have to be solved! 
+					26.02.03 It is temporarily fixed.
+				+/
+			}
 			append(new .Img(f)); 
 		} 
 		
