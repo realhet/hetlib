@@ -6454,7 +6454,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							+/
 						}
 						
-						static if((常!(bool)(1)))
+						static if((常!(bool)(0)))
 						print(
 							"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
 							bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"
@@ -6839,7 +6839,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				_array = (cast(typeof(_array))((cast(ubyte*)(hostPtr))[0..bufferSizeBytes])); 
 				//It is used only to get sizeBytes. No real use to access the heap linearly.
 				
-				static if((常!(bool)(1)))
+				static if((常!(bool)(0)))
 				{
 					print("Heap buffer has grown"); 
 					allocator.stats.print; 
