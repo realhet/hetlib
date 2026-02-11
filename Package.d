@@ -1915,7 +1915,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{ alias getAttributesOfFirstOverload = __traits(getAttributes, getFirstOverload!Sym); } 
 	
 	///This version checks only the first overloads.  Avoids the Deprecation hint.
-	template hasUDA2(alias S, U)
+	template hasUDA2(alias S, alias U)
 	{ enum hasUDA2 = Filter!(isDesiredUDA!U, getAttributesOfFirstOverload!S).length != 0; } 
 	
 	
@@ -1959,7 +1959,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	alias AllMemberNames(T) = __traits(allMembers, T); //wrong backward inheritance order.
 	
 	/// used by stream. This is the old version, without properties. Fields are in correct order.
-	template FieldNamesWithUDA(T, U, bool allIfNone)
+	template FieldNamesWithUDA(T, alias U, bool allIfNone)
 	{
 		enum fields = AllFieldNames!T; 
 		enum bool hasThisUDA(string fieldName) = hasUDA2!(__traits(getMember, T, fieldName), U); 
@@ -1971,7 +1971,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	} 
 	
 	/// The new version with properties. Sort order: fields followed by functions
-	template FieldAndFunctionNamesWithUDA(T, U, bool allIfNone)
+	template FieldAndFunctionNamesWithUDA(T, alias U, bool allIfNone)
 	{
 		enum bool isUda       (string name) = (is(U==void) || hasUDA2!(__traits(getMember, T, name), U)); 
 		
@@ -2000,6 +2000,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : []; 
 	enum EnumBits(T) = float(T.max+1).log2.iceil; 
+	enum EnumAssocArray(alias T) = /+keys = enumMember.text, values = enumMember+/
+	((){ T[string] o; static foreach(t; EnumMemberNames!T) o[t]=mixin("T."~t); return o; })(); 
 	
 	mixin template InjectEnumMembers(E)
 	{
@@ -3258,15 +3260,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1999759F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19A5859F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19A5F59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19B2059F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19B0959F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19B7E59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19BCA59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19C3F59F156A1})); 
 						+/
 					+/
 				+/
