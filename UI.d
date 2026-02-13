@@ -5154,8 +5154,11 @@ version(/+$DIDE_REGION+/all)
 	static class VirtualTreeView(Item) if(is(Item==struct))
 	{
 		Item _root; 
-		@property root(Item a) { if(_root.chkSet(a)) changed = now; } 
+		@property root(Item a) { if(_root.chkSet(a)) refresh; } 
 		@property ref root() => _root; 
+		
+		void refresh()
+		{ changed = now; } 
 		
 		static struct TreeRow
 		{
