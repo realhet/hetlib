@@ -1,13 +1,25 @@
 module het.arsd.core; 
 
+//Author: Adam D. Ruppe
+//Link: https://github.com/adamdruppe/arsd
+//Note: Here I collect a small subset of [arsd] modules which is maintained to be compatible with [hetlib].
+
 import core.attribute : standalone; 
 import core.time : MonoTime, Duration, hnsecs; 
 import std.string; 
 
 
 //OpenD has a new, optional synchronization.
-alias SynchronizableObject = Object; 
-mixin template EnableSynchronization() {} 
+static if(!__traits(hasMember, object, "SynchronizableObject"))
+{
+	alias SynchronizableObject = Object; 
+	mixin template EnableSynchronization()
+	{} 
+}else
+{
+	alias SynchronizableObject = object.SynchronizableObject; 
+	alias EnableSynchronization = Object.EnableSynchronization; 
+}
 
 /+
 	======================
