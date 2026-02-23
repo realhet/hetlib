@@ -3190,6 +3190,33 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{$(table.rows.map!((r)=>("@"~r[cColor]~r[cName]~"="~r[cIdx])).join(","))} 
 			}.text; 
 		} 
+		
+		string GEN_Selection(表 table)
+		{
+			/+Example usage: /+Structured: mixin(((表([[q{(常!(bool)(1))},q{value}],]))).調!(GEN_Select)); +/+/
+			return iq{
+				only(
+					$(
+						table.rows	.filter!((r)=>(r.get(0)==q{(常!(bool)(1))}))
+							.map!((r)=>(r.get(1))).join(",")
+					)
+				)
+			}.text; 
+		} 
+		string GEN_Selection(alias aggr)(表 table)
+		{
+			const prefix = aggr.stringof ~ "."; 
+			return iq{
+				only(
+					$(
+						table.rows	.filter!((r)=>(r.get(0)==q{(常!(bool)(1))}))
+							.map!((r)=>(prefix ~ r.get(1))).join(",")
+					)
+				)
+			}.text; 
+		} 
+		
+		
 		
 		bool waitForZeroAndSet(T)(T* reference, T newValue, int numTries)
 		{
@@ -3260,15 +3287,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19A5859F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19CB959F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19B2059F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D8159F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19BCA59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19C3F59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19E2B59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19EA059F156A1})); 
 						+/
 					+/
 				+/
@@ -4634,6 +4661,8 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ defaultRng.randomFill(values, customSeed); } 
 		T[] randomShuffle(T)(T[] arr)
 		{ return defaultRng.randomShuffle(arr); } 
+		string randomPass(uint N=16)
+		=> (()=>((cast(char)(random('~'-'!'+1)+'!')))).generate.take(N).text; 
 		
 		
 		/+
