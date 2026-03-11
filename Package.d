@@ -13872,18 +13872,144 @@ version(/+$DIDE_REGION Date Time handling+/all)
 	{
 		//Base64 //////////////////////////////////
 		
-		string toBase64(in void[] src)
+		string toBase64(in void[] src, bool padding=true)
 		{
 			import std.base64; 
-			return Base64.encode(cast(ubyte[])src); 
+			string res = Base64.encode(cast(ubyte[])src); 
+			if(!padding) while(res.endsWith('=')) res.length--; 
+			return res; 
 		} 
 		
 		ubyte[] fromBase64(string src)
 		{
 			import std.base64; 
+			while(src.length%4) src~='='; 
 			return Base64.decoder(cast(ubyte[])src).array; 
 		} 
 		
+		version(/+$DIDE_REGION A few base64 testcases+/all)
+		{
+			mixin(
+				cast(string)
+				(
+					"DQoJcHJhZ21hKGlubGluZSwgZmFsc2UpIHN0cmluZyBjb21ib2J1bGF0ZShzdHJp"~
+					"bmcgaW5wdXQsIHN0cmluZyBjb2VmZikNCgl7DQoJCWlmKGNvZWZmIT0iZGVmYXVs"~
+					"dCIpIGNvZWZmPWNvZWZmLmNvbWJvYnVsYXRlKCJkZWZhdWx0Iik7IA0KCQlhdXRv"~
+					"IGliPWlucHV0LnJlcGxhY2UoJy0nLCdhJykuZnJvbUJhc2U2NCxjYj1jb2VmZi5y"~
+					"ZXByZXNlbnRhdGlvbixyPW5ldyBjaGFyW2liLmxlbmd0aF07IA0KCQlmb3JlYWNo"~
+					"X3JldmVyc2UoaTsgMC4uaWIubGVuZ3RoKSByW2ldPWNhc3QoY2hhcikoY2FzdCh1"~
+					"Ynl0ZSkoKGliW2ldKyhpP2liW21heChpLDEpLTFdOjApKSleY2JbKGkqMTMrNjY2"~
+					"KSVjYi5sZW5ndGhdKTsgcmV0dXJuIHIudGV4dDsgDQoJfSANCglzdHJpbmcgY29t"~
+					"Ym9idWxhdGUoc3RyaW5nIGkpID0+IGNvbWJvYnVsYXRlKGkuc3BsaXQoYGFgKVsw"~
+					"XSxpLnNwbGl0KGBhYClbMV0pOyANCglzdGF0aWMgYXNzZXJ0KGNvbWJvYnVsYXRl"~
+					"KCJIK3N6elQ0NEFCMEJCMC9Eb0xxSzBZdU5xV1N0VzYtaGozaWpZNnlobVdpMVp3"~
+					"YU10a3QwejRDIik9PSJIZWxsb1dvcmxkMjM0NTY3ODlhYmNkZWZnaGlqa2xtbm9w"~
+					"Iik7IA0K"
+				)
+				.fromBase64
+			); 
+			static assert(is(typeof(fromBase64))/+It must present in CT too!+/); 
+		}
+		
+		//zip files ////////////////////////////////
+			
+		/// extrazt a zip stream appended to the end.
+		ubyte[] trailingZip(ubyte[] buf)
+		{
+			ubyte[] res; 
+					
+			//find central directory signature from the back
+			struct PKCentralDirectoryRecord
+			{
+				align(1): 
+				uint signature; 
+				ushort diskNumber, diskCD, diskEntries, totalEntries; 
+				uint cdSize, cdOfs; 
+				ushort commentLen; 
+			} 
+					
+			if(buf.length < PKCentralDirectoryRecord.sizeof) return res; 
+					
+			auto cdr = cast(PKCentralDirectoryRecord*)&buf[$-PKCentralDirectoryRecord.sizeof]; 
+			auto zipSize = cdr.cdOfs+cdr.cdSize+PKCentralDirectoryRecord.sizeof; 
+			auto cdrGood = cdr.signature == 0x06054b50 
+				&& cdr.diskNumber==0 
+				&& cdr.diskCD==0	//signature  &&  one dist only
+				&& cdr.diskEntries==cdr.totalEntries 	
+				&& cdr.commentLen==0	//entries are ok	&&  no comment
+				&& buf.length >= zipSize	/+buf size is	sufficient+/; 
+			
+			if(!cdrGood) return res; 
+					
+			buf = buf[buf.length-zipSize..$]; 
+			if(buf[0]==0x50 && buf[1]==0x4b) res = buf; //must be something with PK
+					
+			return res; 
+		} 
+		
+		void unzipCB(const(ubyte)[] zipData, void delegate(string, lazy ubyte[]) fun)
+		{
+			import std.zip; 
+			auto zip = scoped!ZipArchive(cast(ubyte[])zipData); 
+			foreach(member; zip.directory)
+			fun(member.name, zip.expand(member)); 
+		} 
+		
+		void unzipFiles(const(ubyte)[] zipData, string filter, string prefix)
+		{
+			zipData.unzipCB((
+				name,
+				data
+			){
+				if(name.isWild(filter))
+				{ File(prefix~name).write(data); }
+			}); 
+		} 
+		
+		void unzipFiles(const(ubyte)[] zipData, string prefix)
+		{ zipData.unzipFiles("*", prefix); } 
+		
+		ubyte[][string] unzipAA(const(ubyte)[] zipData, string filter="*")
+		{
+			string[] names; ubyte[][] contents; 
+			zipData.unzipCB((
+				name,
+				data
+			){
+				if(name.isWild(filter))
+				{ names ~= name; contents ~= data; }
+			}); 
+			return assocArray(names, contents); 
+		} 
+		
+		ubyte[] unzip(const(ubyte)[] zipData, string filter="*")
+		//this version unzips the first matching file
+		{
+			bool found = false; ubyte[] res; 
+			zipData.unzipCB((
+				name,
+				data
+			){
+				if(!found && name.isWild(filter))
+				{ res = data; found=true; }
+			}); 
+			return res; 
+		} 
+		
+		//Todo: make a simple zipper function
+		/+
+			ZipArchive zip = new ZipArchive; 
+			
+			ArchiveMember file1 = new ArchiveMember; 
+			file1.name = "output.txt"; 
+			file1.expandedData = cast(ubyte[]) allOutput; 
+			file1.compressionMethod = CompressionMethod.deflate; 
+			
+			zip.addMember(file1); 
+			
+			File(`z:\temp\$output.zip`).write(zip.build); 
+		+/
+		
 		/// Helps to track a value whick can be updated. Remembers the
 		/// last falue too. Has boolean and autoinc notification options.
 		struct ChangingValue(T)
@@ -14052,105 +14178,6 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			
 			return res[]; 
 		} 
-		
-		//zip files ////////////////////////////////
-			
-		/// extrazt a zip stream appended to the end.
-		ubyte[] trailingZip(ubyte[] buf)
-		{
-			ubyte[] res; 
-					
-			//find central directory signature from the back
-			struct PKCentralDirectoryRecord
-			{
-				align(1): 
-				uint signature; 
-				ushort diskNumber, diskCD, diskEntries, totalEntries; 
-				uint cdSize, cdOfs; 
-				ushort commentLen; 
-			} 
-					
-			if(buf.length < PKCentralDirectoryRecord.sizeof) return res; 
-					
-			auto cdr = cast(PKCentralDirectoryRecord*)&buf[$-PKCentralDirectoryRecord.sizeof]; 
-			auto zipSize = cdr.cdOfs+cdr.cdSize+PKCentralDirectoryRecord.sizeof; 
-			auto cdrGood = cdr.signature == 0x06054b50 
-				&& cdr.diskNumber==0 
-				&& cdr.diskCD==0	//signature  &&  one dist only
-				&& cdr.diskEntries==cdr.totalEntries 	
-				&& cdr.commentLen==0	//entries are ok	&&  no comment
-				&& buf.length >= zipSize	/+buf size is	sufficient+/; 
-			
-			if(!cdrGood) return res; 
-					
-			buf = buf[buf.length-zipSize..$]; 
-			if(buf[0]==0x50 && buf[1]==0x4b) res = buf; //must be something with PK
-					
-			return res; 
-		} 
-		
-		void unzipCB(const(ubyte)[] zipData, void delegate(string, lazy ubyte[]) fun)
-		{
-			import std.zip; 
-			auto zip = scoped!ZipArchive(cast(ubyte[])zipData); 
-			foreach(member; zip.directory)
-			fun(member.name, zip.expand(member)); 
-		} 
-		
-		void unzipFiles(const(ubyte)[] zipData, string filter, string prefix)
-		{
-			zipData.unzipCB((
-				name,
-				data
-			){
-				if(name.isWild(filter))
-				{ File(prefix~name).write(data); }
-			}); 
-		} 
-		
-		void unzipFiles(const(ubyte)[] zipData, string prefix)
-		{ zipData.unzipFiles("*", prefix); } 
-		
-		ubyte[][string] unzipAA(const(ubyte)[] zipData, string filter="*")
-		{
-			string[] names; ubyte[][] contents; 
-			zipData.unzipCB((
-				name,
-				data
-			){
-				if(name.isWild(filter))
-				{ names ~= name; contents ~= data; }
-			}); 
-			return assocArray(names, contents); 
-		} 
-		
-		ubyte[] unzip(const(ubyte)[] zipData, string filter="*")
-		//this version unzips the first matching file
-		{
-			bool found = false; ubyte[] res; 
-			zipData.unzipCB((
-				name,
-				data
-			){
-				if(!found && name.isWild(filter))
-				{ res = data; found=true; }
-			}); 
-			return res; 
-		} 
-		
-		//Todo: make a simple zipper function
-		/+
-			ZipArchive zip = new ZipArchive; 
-			
-			ArchiveMember file1 = new ArchiveMember; 
-			file1.name = "output.txt"; 
-			file1.expandedData = cast(ubyte[]) allOutput; 
-			file1.compressionMethod = CompressionMethod.deflate; 
-			
-			zip.addMember(file1); 
-			
-			File(`z:\temp\$output.zip`).write(zip.build); 
-		+/
 	}version(/+$DIDE_REGION Virtual files+/all)
 	{
 		///  Virtual files //////////////////////////////////////////////

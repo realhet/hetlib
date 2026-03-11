@@ -324,6 +324,10 @@ struct Row
 		return row[idx]; 
 	} 
 	
+	//realhet: needed to access length instantly
+	auto items() => row; 
+	size_t length() const => row.length; 
+	
 	/+
 		+
 				Provides a string representation of the row, for quick eyeball debugging. You probably 

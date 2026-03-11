@@ -90,9 +90,14 @@ class MsSql : Database
 	
 	string escape(string sqlData)
 	{
-		 // FIXME
-		return ""; //FIX ME
-		//return ret.replace("'", "''");
+		/+
+				// FIXME
+			return ""; //FIX ME
+			//return ret.replace("'", "''");
+		+/
+		
+		//realhet: So I have something at least. Dunno what to do with newlines and utf8...
+		return sqlData.replace("'", "''"); 
 	} 
 	
 	string escapeBinaryString(const(ubyte)[] data)
@@ -195,16 +200,23 @@ class MsSqlResult : ResultSet
 					SQLLEN ptr; 
 				
 					more: 
-				        SQLCHAR[1024] buf; 
-					if(SQLGetData(statement, cast(ushort)(i+1), SQL_CHAR, buf.ptr, 1024, &ptr) != SQL_SUCCESS)
-				throw new DatabaseException("get data: " ~ getSQLError(SQL_HANDLE_STMT, statement)); 
+					enum N = 1024 
+				/+
+					Bug: realhet - This FAILS for data larger than 1024 chars.
+					SQL_SUCCESS only returned when finished transfering all data, not when partial data 
+					for fucking fuck's sake!
+				+/; 
+					SQLCHAR[N] buf; 
+					if(SQLGetData(statement, cast(ushort)(i+1), SQL_CHAR, buf.ptr, N, &ptr) != SQL_SUCCESS)
+				{ throw new DatabaseException("get data: " ~ getSQLError(SQL_HANDLE_STMT, statement)); }
+				
 				
 					assert(ptr != SQL_NO_TOTAL); 
 					if(ptr == SQL_NULL_DATA)
 				a = null; 
 				else {
-					a ~= cast(string) buf[0 .. ptr > 1024 ? 1024 : ptr].idup; 
-					ptr -= ptr > 1024 ? 1024 : ptr; 
+					a ~= cast(string) buf[0 .. ptr > N ? N : ptr].idup; 
+					ptr -= ptr > N ? N : ptr; 
 					if(ptr)
 					goto more; 
 				}
@@ -216,6 +228,8 @@ class MsSqlResult : ResultSet
 		}else
 		{ isEmpty = true; }
 	} 
+	
+	
 	
 		void makeFieldMapping()
 	{
