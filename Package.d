@@ -8933,6 +8933,14 @@ version(/+$DIDE_REGION Containers+/all)
 {
 	//Hashing//////////////////////////////////////////
 	version(/+$DIDE_REGION+/all) {
+		ulong mix64(ulong h, ulong v)
+		{
+			enum C = 0x9e3779b97f4a7c15UL; 
+			h ^= v; 	h *= C; 
+			h ^= h >> 32; 	h *= C; 
+			h ^= h >> 29; 	return h; 
+		} 
+		
 		/// Returns a string that represents the identity of the parameter: and object or a pointer or a string
 		/// If a string is passed, the caller must ensure if it's system wide unique.
 		string identityStr(T)(in T a)
