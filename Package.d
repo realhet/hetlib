@@ -7196,29 +7196,19 @@ version(/+$DIDE_REGION Containers+/all)
 		{ return s.to!string; } 
 		string toStr(T)(const(T)* s, size_t maxLen)
 		{ return toStr(s[0..maxLen]); } 
-		string toStr(const char[] s)
+		string toStr(T)(const T[] s)
 		{
-			//safe version, handles well without zero too
-			auto e = (cast(ubyte[])s).countUntil(0); 
-			if(e<0) e = s.length; 
-			return s[0..e].to!string; 
+			static if(T.sizeof==1)	alias B = ubyte; 
+			else static if(T.sizeof==2)	alias B = ushort; 
+			else static if(T.sizeof==4)	alias B = uint; 
+			else static assert(0, "unhandled"); 
 			
-			//Todo: use proper string api
-		} 
-		string toStr(const wchar[] s)
-		{
 			//safe version, handles well without zero too
-			auto e = (cast(ushort[])s).countUntil(0); 
-			if(e<0) e = s.length; 
-			return s[0..e].to!string; 
+			auto n = (cast(B[])(s)).countUntil(0); 
+			if(n<0) n = s.length; 
+			return s[0..n].to!string; 
 		} 
-		string toStr(const dchar[] s)
-		{
-			//safe version, handles well without zero too
-			auto e = (cast(uint[])s).countUntil(0); 
-			if(e<0) e = s.length; 
-			return s[0..e].to!string; 
-		} 
+		
 	}version(/+$DIDE_REGION+/all) {
 		string binToHex(in void[] input)
 		{ return toHexString!(LetterCase.upper)(cast(ubyte[])input); } 
