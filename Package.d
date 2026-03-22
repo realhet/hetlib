@@ -535,7 +535,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				} 
 				
 				void setFocus()	 { SetFocus(hwnd); } //it's only keyboard focus
-				void setForegroundWindow()	 { show; SetForegroundWindow(hwnd); 	} 
+				void setForegroundWindow() { show; SetForegroundWindow(hwnd); } 
 				bool isForeground()	 { return GetForegroundWindow == hwnd; } 	//this 3 funct is the same in Win class too.
 				
 				void setPos(int x, int y, int w, int h) { SetWindowPos(hwnd, null, x, y, w, h, SWP_NOACTIVATE | SWP_NOOWNERZORDER); } 
@@ -1017,7 +1017,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8BBD0C876135).檢((update間(_間)))); 
+				((0x8BBB0C876135).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -3288,15 +3288,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D370C876135})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D350C876135})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19DFF0C876135})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19DFD0C876135})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19EA90C876135})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F1E0C876135})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19EA70C876135})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F1C0C876135})); 
 						+/
 					+/
 				+/

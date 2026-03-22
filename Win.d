@@ -574,7 +574,25 @@ version(/+$DIDE_REGION+/all) {
 			{
 				onWglMakeCurrent(true); scope(exit) onWglMakeCurrent(false); 
 				
-				onCreate; 
+				try
+				{ onCreate; }
+				catch(Exception e) {
+					/+
+						Bug: If this error printing is not here, the first exception can't reach DIDE.
+						The exe stops, the error info seems to start on its wat to DIDE, but maybe
+						because the exe stops fast, it never displayed in DIDE.
+						
+						If there is this error display function, it reaches dide correctly.
+						
+						I think the exe marks the process as stopped, and then DIDE will not check 
+						the last error message.
+						
+						Anyways, it's a temporary fix now and it also produces more info on the console.
+					+/
+					console.setForegroundWindow; 
+					ERR("Fatal Exception in window.onCreate()\n", e.text); 
+					throw e; 
+				}
 				onInitialZoomAll; 
 				//it zooms if there is a drawing that was made in the onCreate... From now it is handled by GlWindow
 			}
@@ -1821,8 +1839,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xDC61285F33B4).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xDCB8285F33B4).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= ((0xDF264577F489).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
+			res |= ((0xDF7D4577F489).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
 			return res; 
 			
 			/+
