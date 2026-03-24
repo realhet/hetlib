@@ -2511,6 +2511,9 @@ version(/+$DIDE_REGION Keywords+/all)
 	string kwStr(int kw)
 	{ return tdKeywords.keyOf(kw); } 
 	
+	bool isImportantDlangKeyword(string s)
+	=> !!s.kwLookup; 
+	
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  Operators                                                               ///
@@ -4130,7 +4133,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E706899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x1E746287CC3DD).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

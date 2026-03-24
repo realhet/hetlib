@@ -7436,6 +7436,15 @@ version(/+$DIDE_REGION Containers+/all)
 			return ((s.validDCommentBody)?(s) :(s.replace("/+", "／+").replace("+/", "+／"))); 
 		} 
 		
+		//Makes an identifier that can come from an external language, compatible with the D environment.
+		string sanitizeDLangIdentifier(string s, string defaultName = "field", sizediff_t idx=-1)
+		{
+			if(s.empty) return defaultName~((idx>=0)?(idx.text):("")); 
+			if(s[0].isDigit) s = "_" ~ s; 
+			if(s.isImportantDlangKeyword) s ~= "_"; 
+			return s; 
+		} 
+		
 	}version(/+$DIDE_REGION+/all) {
 		string replaceWords(alias fun = isWordChar)(string str, string from, string to)
 		{
