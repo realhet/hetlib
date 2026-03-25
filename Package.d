@@ -97,7 +97,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		{
 			//std imports
 			public import std.array, std.conv, std.typecons, std.range, std.format, std.traits, std.meta; //het.math also imports std.string, std.uni, std.algorithm, std.functional
-			public import core.stdc.string : memcpy; 
+			public import core.stdc.string : memcpy, memset; 
 			public import std.utf; 
 			public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum; 
 			public import std.uri: urlEncode = encode, urlDecode = decode; 
@@ -1017,7 +1017,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8BBB0C876135).檢((update間(_間)))); 
+				((0x8BC30C876135).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -3288,15 +3288,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D350C876135})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D3D0C876135})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19DFD0C876135})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19E050C876135})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19EA70C876135})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F1C0C876135})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19EAF0C876135})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F240C876135})); 
 						+/
 					+/
 				+/
@@ -11480,7 +11480,6 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		} 
 		
 	}version(/+$DIDE_REGION+/all) {
-		
 		struct TimeZone { byte shift; } 
 		
 		enum UTC = TimeZone(0); 
@@ -11489,496 +11488,695 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		enum gregorianDaysInYear 	= 365.2524, 
 		gregorianDaysInMonth 	= gregorianDaysInYear/12; 
 		
-		struct Date
-		{
-			ubyte[3] raw; /+Todo: implement a proper UTC date without the hours...+//+Note: If the DateTime divisor is DateTime.RawUnits.day, then it needs 19 bits to cover the full range. Nut not sure about converting it back, because it is UTC0 and no daylight savings.+/
-			
-			this(DateTime dt)
-			{
-				auto a = dt.raw / DateTime.RawUnit.day; 
-				memcpy(&raw, &a, typeof(raw).sizeof); 
-			} 
-		} 
-		
 		auto RawDateTime(ulong t) { DateTime a; a.raw = t; return a; } 
 		
+		
+		version(/+$DIDE_REGION ISC/Firebird+/all)
+		{
+			alias ISC_DATE 	= Typedef!(uint, 0, "ISC_DATE"), 
+			ISC_TIME 	= Typedef!(uint, 0, "ISC_TIME"); 
+			struct ISC_TIMESTAMP { ISC_DATE date; ISC_TIME time; } 
+			
+			Time iscTimeToTime(ISC_TIME t)
+			=> t * (100*micro(second)); 
+			
+			auto decodeIscTime(ISC_TIME t_)
+			{
+				static struct IscTime { int iscHour, iscMin; double iscSec; } 
+				uint t = (cast(uint)(t_)); IscTime res; 
+				res.iscSec = (t % 60_0000)*1e-4; 	t /= 60_0000; 
+				res.iscMin = t % 60; 	t /= 60; 
+				res.iscHour = t; 	return res; 
+			} 
+			
+			auto decodeIscDate(ISC_DATE d)
+			{
+				static struct IscDate { short iscYear, iscMonth, iscDay; } 
+				const st = Date(d).utcDateTime.utcSystemTime; 
+				return IscDate(st.wYear, st.wMonth, st.wDay); 
+			} 
+			
+			string iscTimeToStr(ISC_TIME t_, int minPrecision=6, int maxPrecision=6)
+			{
+				version(/+$DIDE_REGION+/all) {
+					uint t = (cast(uint)(t_)); 
+					const sec = t % 60_0000; 	t /= 60_0000; 
+					const min = t % 60; 	t /= 60; 
+					const hr = t; 
+				}/+
+					precision: 	0 -> hh:mm 
+						2 -> hh:mm:ss
+						...
+						6 -> hh:mm:ss.zzzz
+				+/
+				
+				string res = i"$(hr.format
+	!"%02d"):$(min.format
+	!"%02d")".text; 
+				
+				minPrecision = minPrecision.clamp(0, 6); 
+				maxPrecision = maxPrecision.clamp(minPrecision, 6); 
+				if(maxPrecision>0)
+				{
+					auto secStr = sec.format!"%06d"[0..maxPrecision]; 
+					while(secStr.length>minPrecision && secStr.back=='0')
+					secStr = secStr[0..$-1]; 
+					if(secStr.length==1) secStr ~= '0'; 
+					res ~= ':' ~ secStr[0..2]; 
+					if(secStr.length>2) res ~= '.' ~ secStr[2..$]; 
+				}
+				
+				return res; 
+			} 
+			
+			
+			private auto testIscTimeToStr()
+			{
+				string s; 
+				foreach(src; [456789, 450000])
+				foreach(mi; [3,7])
+				{
+					foreach(ma; [3,7])
+					{
+						s~=iscTimeToStr(
+							ISC_TIME(src+60_0000*(32+60*1)),
+							mi, ma
+						)~' '; 
+					}
+				}
+				return s; 
+			} 
+			
+			static assert(
+				testIscTimeToStr==	`01:32:45.6 01:32:45.6789 01:32:45.6789 01:32:45.6789 `~
+					`01:32:45.0 01:32:45.0 01:32:45.0000 01:32:45.0000 `
+			); 
+			
+			ISC_TIME toIscTime(Time t)
+			=> ISC_TIME(cast(uint)(t.value((100)*(micro(second))).round)); 
+			
+			ISC_TIMESTAMP toIscTimestamp(in FILETIME ft)
+			{
+				const ulong ticks = ft.bitCast!ulong; //100‑ns ticks since 1601‑01‑01
+				enum ulong TICKS_PER_DAY = 24UL * 60 * 60 * 10_000_000; //864000000000
+				enum long DAY_OFFSET = 94187; //days between 1601‑01‑01 and 1858‑11‑17
+				
+				const ulong daysSince1601 = ticks / TICKS_PER_DAY; 
+				const ulong ticksInDay = ticks % TICKS_PER_DAY; 
+				
+				return ISC_TIMESTAMP(
+					ISC_DATE((daysSince1601 - DAY_OFFSET).to!uint),
+					ISC_TIME(ticksInDay / 1000) /+100‑ns -> 100‑µs+/
+				); 
+			} 
+			
+			struct Date
+			{
+				ubyte[3] raw; /+Note: This is a local Date, it's similar to ISC_DATE+/
+				
+				enum _ftTicksPerDay 	= 864000000000,
+				iscShift 	= 94187; 
+				
+				@property bool isNull() const
+				=> !raw[0] && !raw[1] && !raw[2]; 
+				
+				bool opCast(B:bool)() const => !isNull; 
+				
+				void set(DateTime dt)
+				{
+					auto ft = dt.localFileTime; 
+					const days = (ft.bitCast!ulong / _ftTicksPerDay); 
+					memcpy(&raw, &days, 3); 
+				} 
+				
+				void set(ISC_DATE a)
+				{
+					ulong days = ((a)?((cast(ulong)((cast(uint)(a))))):(0UL)) + iscShift; 
+					enforce(days<=0xFFFFFF, "ISC_DATE -> Date overflow"); 
+					memcpy(&raw, &days, 3); 
+				} 
+				
+				this(DateTime dt)
+				{ set(dt); }  this(ISC_DATE d)
+				{ set(d); } 
+				
+				this(int y, int m, int d)
+				{ this(DateTime(Local, y, m, d)); } 
+				
+				@property DateTime toDateTime(TimeZone tz)const
+				{
+					if(isNull) return DateTime.init; 
+					ulong ft; memcpy(&ft, &raw, 3); 
+					enum maxDays = ulong.max/_ftTicksPerDay; 
+					enforce(ft<maxDays, "Date -> DateTime overflow."); 
+					ft *= _ftTicksPerDay; 
+					return DateTime(tz, ft.bitCast!FILETIME); 
+				} 
+				
+				@property DateTime dateTime()const
+				=> toDateTime(Local); 
+				
+				@property DateTime utcDateTime()const
+				=> toDateTime(UTC); 
+				
+				string toString() const
+				=> utcDateTime.dateText; 
+				
+				
+				@property ISC_DATE toIscDate()const
+				{
+					if(isNull) return ISC_DATE(0); 
+					ulong ft; memcpy(&ft, &raw, 3); 
+					return ISC_DATE(cast(uint)((ft - iscShift).max(0))); 
+				} 
+			} 
+		}
+		
+		Time toTime(string s)
+		{
+			try {
+				auto p = s.split(':'); 
+				enforce(p.length.inRange(2, 3)); 
+				return p[0].to!double*hour + p[1].to!double*minute + 
+				p.get(2,'0').to!double*second; 
+			}
+			catch(Exception e) raise("Invalid Time format "~s.quoted); 
+			assert(0); 
+		} 
+		
+		Time toTime(H, M)(H h, M m)
+		=> h*hour + m*minute; 
+		
+		Time toTime(H, M, S)(H h, M m, S s)
+		=> toTime(h, m) + s*second; 
 		struct DateTime
 		{
-			version(/+$DIDE_REGION+/all)
+			///a 64-bit value representing the number of 100/64 nanosecond(!!!not 100ns!!!) intervals since January 1, 1601 (UTC).
+			ulong raw;      //0 = null
+			
+			void set(in TimeZone tz, in SYSTEMTIME a)
 			{
-				///a 64-bit value representing the number of 100/64 nanosecond(!!!not 100ns!!!) intervals since January 1, 1601 (UTC).
-				ulong raw;      //0 = null
-				
-				void set(in TimeZone tz, in SYSTEMTIME a)
-				{
-					switch(tz.shift) {
-						case 0: utcSystemTime = a; break; 
-						case 127: localSystemTime = a; break; 
-						default: throw new Exception("Invalid "~tz.text); 
-					}
-				} 
-				
-				void set(in TimeZone tz, in FILETIME a)
-				{
-					switch(tz.shift) {
-						case 0: utcFileTime = a; break; 
-						case 127: localFileTime = a; break; 
-						default: throw new Exception("Invalid "~tz.text); 
-					}
-				} 
-				
-				void set(in TimeZone tz, in string s)
-				{ this = parseDateTime(tz, s); } 
-				
-				this(T)(in T a)
-				{ this(Local, a); } this(T)(in TimeZone tz, in T a)
-				{ set(tz, a); } 
-				
-				this(in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
-				{ this(Local, y, m, d, h, mi, s, ms); } 
-				this(in TimeZone tz,	in int y, in int m, in int d, in int h, in int mi=0, in int s=0, in int ms=0)
-				{
-					//Todo: adjust carry overflow
-					this(tz, SYSTEMTIME(year2k(y).to!ushort, m.to!ushort, 0, d.to!ushort, h.to!ushort, mi.to!ushort, s.to!ushort, ms.to!ushort)); 
-				} 
-				
-				this(in int y, in int m, in int d)
-				{ this(Local, y, m, d); } this(in TimeZone tz, in int y, in int m, in int d)
-				{ this(tz   , y, m, d, 0); } 
-				
-				this(in int y, in int m, in int d, in Time t)
-				{ this(Local, y, m, d, t); } this(in TimeZone tz, in int y, in int m, in int d, in Time t)
-				{ this(tz, y, m, d); this += t; } 
-				
-				bool isNull() const
-				{ return raw==0; } 
-				bool opCast() const
-				{ return !isNull(); } 
-				nothrow @safe {
-					int opCmp(in DateTime b) const
-					{ return cmp(raw, b.raw); } 
-					bool opEquals(in DateTime b) const
-					{ return raw==b.raw; } 
-					size_t toHash() const
-					{ return raw; } 
-				} 
-				
-				enum RawShift = 6; 
-				enum RawUnit : ulong 
-				{
-					//37ns is the fastest measurable interval. Using Windown 10 QPC
-					_100ns	= 1<<RawShift	, //100ns = Unit of FILETIME.  6 extra bits of precision below 100ns. Useful time based unique id generation.
-					us	= 10 * _100ns	, μs = us,
-					ms	= 1000 * us 	,
-					sec	= 1000 * ms 	, //1 sec = Unit of quantities.SI
-					min	= 60 * sec 	,
-					hour	= 60 * min 	,
-					day	= 24 * hour	,
-					week	= 7 * day	,
-					month	= cast(ulong)(gregorianDaysInMonth * day)	, //Gregorian average
-					year	= cast(ulong)(gregorianDaysInYear * day)	,
-					_minYear	= 1601,
-					_maxYear	= _minYear + ulong.max/year - 1,
-					_numYears	= _maxYear - _minYear + 1
-				} 
-				
-				//lock the above calculations
-				static assert(RawUnit._numYears==913); //these are all the full years covered
-				static assert(RawUnit._numYears * RawUnit.year == 0xffe78926_3bb40000); 
-				static assert(format!"%.16f"(double(DateTime.RawUnit.year) / DateTime.RawUnit.day) == "365.2524000000000228"); 
-				
-				private enum UnixShift_sec = 11644473600; 
-				private enum UnixShift_unit = UnixShift_sec*RawUnit.sec; 
-				
-				static private
-				{
-					//Conversions between windows local/utc/filetime/systemtime/raw. Also throw exceptions.
-					
-					double rawToSeconds(in ulong a)
-					{ return a*(1.0/RawUnit.sec); } 
-					ulong secondsToRaw(in double a)
-					{ return (a*RawUnit.sec).to!ulong; } 
-					
-					auto fileTimeToRaw(in FILETIME ft)
-					{
-						if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow."); 
-						return ((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
-							((cast(ulong)ft.dwHighDateTime)<<(RawShift+32)); 
-						//Opt: optimize this. one shift should be enough. High and LowDateTime is in order anyways.
-					} 
-					
-					auto rawToFileTime(in ulong raw)
-					{
-						return FILETIME(
-							cast(uint)(raw>>>(RawShift   )),
-							cast(uint)(raw>>>(RawShift+32))
-						); 
-					} 
-					
-					import core.sys.windows.windows :
-						FileTimeToSystemTime, SystemTimeToFileTime, 
-						SystemTimeToTzSpecificLocalTime, TzSpecificLocalTimeToSystemTime; 
-					
-					//unify 2 parameter form by adding a default null parameter in front
-					int MySystemTimeToTzSpecificLocalTime(in SYSTEMTIME* a, SYSTEMTIME* b)
-					{ return SystemTimeToTzSpecificLocalTime(null, cast(SYSTEMTIME*)a, b); } 
-					int MyTzSpecificLocalTimeToSystemTime(in SYSTEMTIME* a, SYSTEMTIME* b)
-					{ return TzSpecificLocalTimeToSystemTime(null, cast(SYSTEMTIME*)a, b); } 
-					
-					template tmpl(SRC, alias fun, DST)
-					{
-						auto tmpl()(in SRC src)
-						{
-							DST dst = void; 
-							if(!fun(&src, &dst)) throw new ConvException(__traits(identifier, fun)~"() error.  src: "~src.text); 
-							return dst; 
-						} 
-					} 
-					
-					alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME); 
-					alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME); 
-					alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime, SYSTEMTIME); 
-					alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime, FILETIME  ); 
-				} 
-			}version(/+$DIDE_REGION+/all)
+				switch(tz.shift) {
+					case 0: utcSystemTime = a; break; 
+					case 127: localSystemTime = a; break; 
+					default: throw new Exception("Invalid "~tz.text); 
+				}
+			} 
+			
+			void set(in TimeZone tz, in FILETIME a)
 			{
-				private
-				{
-					///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
-					T _get(bool isLocal, T)() const
-					{
-						const ft = rawToFileTime(raw); 
-						static if(isLocal)
-						{
-							const st = systemTimeToLocalTzSystemTime(fileTimeToSystemTime(ft)); 
-							static if(is(T==FILETIME  )) return systemTimeToFileTime(st); 
-							static if(is(T==SYSTEMTIME)) return st; 
-						}
-						else
-						{
-							static if(is(T==FILETIME  )) return ft; 
-							static if(is(T==SYSTEMTIME)) return fileTimeToSystemTime(ft); 
-						}
-					} 
-					
-					void _set(bool isLocal, T)(in T src)
-					{
-						static if(isLocal)
-						{
-							static if(is(T==FILETIME  )) const st = fileTimeToSystemTime(src); 
-							static if(is(T==SYSTEMTIME)) const st = src; 
-							_set!false(localTzSystemTimeToSystemTime(st)); //recursion
-						}
-						else
-						{
-							static if(is(T==FILETIME  )) const ft = src; 
-							static if(is(T==SYSTEMTIME)) const ft = systemTimeToFileTime(src); 
-							raw = fileTimeToRaw(ft); 
-						}
-					} 
-				} 
-				
-				@property
-				{
-					auto utcFileTime() const
-					{ return _get!(false, FILETIME)(); } 	void utcFileTime	(in FILETIME	a)
-					{ _set!false(a); } 
-					auto utcSystemTime() const
-					{ return _get!(false, SYSTEMTIME	)(); } 	void utcSystemTime	(in SYSTEMTIME	a)
-					{ _set!false(a); } 
-					auto localFileTime() const
-					{ return _get!(true , FILETIME	)(); } 	void localFileTime	(in FILETIME	a)
-					{ _set!true(a); } 
-					auto localSystemTime() const
-					{ return _get!(true , SYSTEMTIME	)(); } 	void localSystemTime	(in SYSTEMTIME	a)
-					{ _set!true(a); } 
-					
-					double unixTime() const
-					{ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; } 
-					void unixTime(in double a)
-					{ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; } 
-					
-					private enum RawDelphiShift = 109205*RawUnit.day; 
-					double localDelphiTime() const
-					{
-						return isNull	? 0
-							: double(fileTimeToRaw(localFileTime)-RawDelphiShift)/RawUnit.day; 
-					} 
-					void localDelphiTime(double d)
-					{
-						if(d.isnan || d==0)
-						raw = 0; 
-						else
-						localFileTime = rawToFileTime((d*RawUnit.day).to!ulong + RawDelphiShift); 
-					} 
-					
-					DateTime utcDayStart() const
-					{ if(isNull) return this; return RawDateTime(raw - raw%RawUnit.day); } 
-					DateTime utcDayEnd	() const
-					{ if(isNull) return this; return RawDateTime(utcDayStart.raw + RawUnit.day); } 
-					
-					DateTime localDayStart() const
-					{
-						if(isNull) return this; 
-						auto st = localSystemTime; 
-						st.wHour	= 0; 
-						st.wMinute	= 0; 
-						st.wSecond	= 0; 
-						st.wMilliseconds	= 0; 
-						return DateTime(st); 
-					} 
-					
-					DateTime localDayEnd() const
-					{
-						if(isNull) return this; 
-						
-						auto	res	= localDayStart + day	,
-							st	= res.localSystemTime	,
-							diff_ms	= ((st.wHour*60L + st.wMinute)*60 + st.wSecond)*1000L + st.wMilliseconds	; 
-						
-						if(diff_ms<12L*60*60*1000) res -= 	diff_ms*milli(second); 
-						else res += day - 	diff_ms*milli(second); 
-						
-						return res; 
-						
-						/+
-							Todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
-								.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
-								.uniq
-								.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); 
-						+/
-									
-					} 
-					
-					Time utcTime  () const
-					{ return this-utcDayStart; } 
-					Time localTime() const
-					{ return this-localDayStart; } 
-					
-					Time time() const
-					{ return localTime; } 
-					DateTime dayStart() const
-					{ return localDayStart; } 
-					
-					Date date() const
-					=> Date(this); 
-				} 
-				
-				///calculate the difference between DateTimes
-				Time opBinary(string op : "-")(in DateTime b) const
-				{ return long(raw-b.raw)*(1.0/RawUnit.sec)*het.quantities.second; } 
-				
-				///adjust DateTime by si.Time
-				DateTime opBinary(string op)(in Time b) const if(op.among("+", "-"))
-				{
-					DateTime res = this; 
-					mixin("res.raw", op, "=(b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
-					return res; 
-				} 
-				
-				DateTime add_raw(in ulong delta) const
-				{ return RawDateTime(raw + delta); } 
-				
-				///adjust this DateTime by si.Time
-				DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))
-				{
-					mixin("raw", op,"= (b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
-					return this; 
-				} 
-				
-				private long timeZoneOffset_raw() const
-				{
-					//Todo: rename to utcOffset (read aboit it on web first!)
-					if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL"); 
-					DateTime dt = void; dt.utcFileTime = localFileTime; 
-					return dt.raw-this.raw; 
-				} 
-				
-				Time timeZoneOffset() const
-				{
-					if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL"); 
-					DateTime dt = void; dt.utcFileTime = localFileTime; 
-					return dt-this; 
-				} 
-				
-				static currentTimeZoneOffset()
-				{ return now.timeZoneOffset; } 
-				
-				static currentTimeZoneName()
-				{
-					TIME_ZONE_INFORMATION tzi; 
-					switch(GetTimeZoneInformation(&tzi))
-					{
-						case 2: return tzi.DaylightName.text; 
-						default: return tzi.StandardName.text; 
-					}
-				} 
-				
-				@property
-				{
-					//dayOfWeek stuff
-					//Note: 0=sun, 6=sat
-					int localDayOfWeek()
-					{ return localSystemTime.wDayOfWeek; } 	int utcDayOfWeek()
-					{ return utcSystemTime.wDayOfWeek; } 
-					bool localIsWeekend()
-					{ return localDayOfWeek.among(0, 6)!=0; } 	bool utcIsWeekend()
-					{ return utcDayOfWeek.among(0, 6)!=0; } 
-					bool localIsWeekday()
-					{ return !localIsWeekend; } 	bool utcIsWeekday()
-					{ return !utcIsWeekend; } 
-				} 
-			}version(/+$DIDE_REGION+/all)
+				switch(tz.shift) {
+					case 0: utcFileTime = a; break; 
+					case 127: localFileTime = a; break; 
+					default: throw new Exception("Invalid "~tz.text); 
+				}
+			} 
+			
+			void set(in TimeZone tz, in string s)
+			{ this = parseDateTime(tz, s); } 
+			
+			void set(in TimeZone tz, in ISC_TIMESTAMP ts)
 			{
-				/// This is the hash for bitmap objects
-				ulong toId_deprecated() const
+				with(decodeIscDate(ts.date))
+				with(decodeIscTime(ts.time))
+				this = DateTime(tz, iscYear, iscMonth, iscDay, iscHour, iscMin, iscSec); 
+			} 
+			
+			this(TimeZone tz, int y, int m, int d, int h, int mi, int s, int ms)
+			{
+				//Todo: adjust carry overflow or check errors
+				this(
+					tz, SYSTEMTIME(
+						year2k(y).to!ushort, m.to!ushort, 0, d.to!ushort, h.to!ushort, 
+						mi.to!ushort, s.to!ushort, ms.to!ushort
+					)
+				); 
+			} 
+			this(S)(TimeZone tz, int y, int m, int d, int h, int mi, S s)
+			{
+				static if(isFloatingPoint!S)	{ this(tz, y, m, d, h, mi, 0); this += s*second; }
+				else	{ this(tz, y, m, d, h, mi, s, 0); }
+			} 
+			this(M)(TimeZone tz, int y, int m, int d, int h, M mi)
+			{
+				static if(isFloatingPoint!M)	{ this(tz, y, m, d, h, 0); this += mi*minute; }
+				else	{ this(tz, y, m, d, h, mi, 0, 0); }
+			} 
+			this(H)(TimeZone tz, int y, int m, int d, H h)
+			{
+				static if(isFloatingPoint!H)	{ this(tz, y, m, d, 0); this += h*hour; }
+				else	{ this(tz, y, m, d, h, 0, 0, 0); }
+			} 
+			this(TimeZone tz, int y, int m, int d, Time t)
+			{ this(tz, y, m, d); this += t; } 
+			this(D)(TimeZone tz, int y, int m, D d)
+			{
+				static if(isFloatingPoint!D)	{ this(tz, y, m, 1); this += d*day-day; }
+				else	{ this(tz, y, m, d, 0, 0, 0, 0); }
+			} 
+			this(TimeZone tz, int y, int m)
+			{ this(tz, y, m, 1, 0, 0, 0, 0); } 
+			this(T)(TimeZone tz, T a)
+			{ set(tz, a); } 
+			
+			this(int y, int m, int d, int h, int mi, int s, int ms) { this(Local, __traits(parameters)); } 
+			this(S)(int y, int m, int d, int h, int mi, S s) { this(Local, __traits(parameters)); } 
+			this(M)(int y, int m, int d, int h, M mi) { this(Local, __traits(parameters)); } 
+			this(H)(int y, int m, int d, H h) { this(Local, __traits(parameters)); } 
+			this(int y, int m, int d, Time t) { this(Local, __traits(parameters)); } 
+			this(D)(int y, int m, D d) { this(Local, __traits(parameters)); } 
+			this(int y, int m) { this(Local, __traits(parameters)); } 
+			this(T)(T a) { this(Local, __traits(parameters)); } 
+			
+			
+			bool isNull() const
+			{ return raw==0; } 
+			bool opCast() const
+			{ return !isNull(); } 
+			nothrow @safe {
+				int opCmp(in DateTime b) const
+				{ return cmp(raw, b.raw); } 
+				bool opEquals(in DateTime b) const
+				{ return raw==b.raw; } 
+				size_t toHash() const
 				{ return raw; } 
+			} 
+			
+			enum RawShift = 6; 
+			enum RawUnit : ulong 
+			{
+				//37ns is the fastest measurable interval. Using Windown 10 QPC
+				_100ns	= 1<<RawShift	, //100ns = Unit of FILETIME. ***
+				us	= 10 * _100ns	, μs = us,
+				ms	= 1000 * us 	,
+				sec	= 1000 * ms 	, //1 sec = Unit of quantities.SI
+				min	= 60 * sec 	,
+				hour	= 60 * min 	,
+				day	= 24 * hour	,
+				week	= 7 * day	,
+				month	= cast(ulong)(gregorianDaysInMonth * day)	, //Gregorian average
+				year	= cast(ulong)(gregorianDaysInYear * day)	,
+				_minYear	= 1601,
+				_maxYear	= _minYear + ulong.max/year - 1,
+				_numYears	= _maxYear - _minYear + 1
 				
-				/// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
-				auto actualize()
+				//*** 6 extra bits of precision below 100ns. Useful time based unique id generation.
+			} 
+			
+			//lock the above calculations
+			static assert(RawUnit._numYears==913); //these are all the full years covered
+			static assert(RawUnit._numYears * RawUnit.year == 0xffe78926_3bb40000); 
+			static assert(format!"%.16f"(double(DateTime.RawUnit.year) / DateTime.RawUnit.day) == "365.2524000000000228"); 
+			
+			private enum UnixShift_sec = 11644473600; 
+			private enum UnixShift_unit = UnixShift_sec*RawUnit.sec; 
+			
+			static private
+			{
+				//Conversions between windows local/utc/filetime/systemtime/raw. Also throw exceptions.
+				
+				double rawToSeconds(in ulong a)
+				{ return a*(1.0/RawUnit.sec); } 
+				ulong secondsToRaw(in double a)
+				{ return (a*RawUnit.sec).to!ulong; } 
+				
+				auto fileTimeToRaw(in FILETIME ft)
 				{
-					auto c = now.raw; 
-					if(isNull || c>raw) raw = c; 
-					else raw++; //now it's the exact same as the previous one. Just increment.
-					
-					return this; 
+					if(ft.dwHighDateTime > (uint.max>>>RawShift)) throw new ConvException("FileTimeToRaw() overflow."); 
+					return ((cast(ulong)ft.dwLowDateTime )<<(RawShift))|
+						((cast(ulong)ft.dwHighDateTime)<<(RawShift+32)); 
+					//Opt: optimize this. one shift should be enough. High and LowDateTime is in order anyways.
 				} 
 				
-				string dateText(alias fun = localSystemTime)() const
+				auto rawToFileTime(in ulong raw)
 				{
-					//Todo: format
-					if(isNull) return "NULL Date"; 
-					with(fun) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay); 
+					return FILETIME(
+						cast(uint)(raw>>>(RawShift   )),
+						cast(uint)(raw>>>(RawShift+32))
+					); 
 				} 
 				
-				string timeText(alias fun = localSystemTime)() const
+				import core.sys.windows.windows :
+					FileTimeToSystemTime, SystemTimeToFileTime, 
+					SystemTimeToTzSpecificLocalTime, TzSpecificLocalTimeToSystemTime; 
+				
+				//unify 2 parameter form by adding a default null parameter in front
+				int MySystemTimeToTzSpecificLocalTime(in SYSTEMTIME* a, SYSTEMTIME* b)
+				{ return SystemTimeToTzSpecificLocalTime(null, cast(SYSTEMTIME*)a, b); } 
+				int MyTzSpecificLocalTimeToSystemTime(in SYSTEMTIME* a, SYSTEMTIME* b)
+				{ return TzSpecificLocalTimeToSystemTime(null, cast(SYSTEMTIME*)a, b); } 
+				
+				template tmpl(SRC, alias fun, DST)
 				{
-					//todo format
-					if(isNull) return "NULL Time"; 
-					with(fun) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds); 
+					auto tmpl()(in SRC src)
+					{
+						DST dst = void; 
+						if(!fun(&src, &dst)) throw new ConvException(__traits(identifier, fun)~"() error.  src: "~src.text); 
+						return dst; 
+					} 
 				} 
 				
-				string toString(alias fun = localSystemTime)()const
+				alias systemTimeToLocalTzSystemTime	= tmpl!(SYSTEMTIME, MySystemTimeToTzSpecificLocalTime, SYSTEMTIME); 
+				alias localTzSystemTimeToSystemTime	= tmpl!(SYSTEMTIME, MyTzSpecificLocalTimeToSystemTime, SYSTEMTIME); 
+				alias fileTimeToSystemTime	= tmpl!(FILETIME  , FileTimeToSystemTime, SYSTEMTIME); 
+				alias systemTimeToFileTime	= tmpl!(SYSTEMTIME, SystemTimeToFileTime, FILETIME  ); 
+			} 
+			private
+			{
+				///unified way of getting/setting Local/UTC FILETIME/SYSTEMTIME
+				T _get(bool isLocal, T)() const
 				{
-					if(isNull) return "NULL DateTime"; 
-					with(fun) return format("%.4d.%.2d.%.2d %.2d:%.2d:%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds); 
+					const ft = rawToFileTime(raw); 
+					static if(isLocal)
+					{
+						const st = systemTimeToLocalTzSystemTime(fileTimeToSystemTime(ft)); 
+						static if(is(T==FILETIME  )) return systemTimeToFileTime(st); 
+						static if(is(T==SYSTEMTIME)) return st; 
+					}
+					else
+					{
+						static if(is(T==FILETIME  )) return ft; 
+						static if(is(T==SYSTEMTIME)) return fileTimeToSystemTime(ft); 
+					}
 				} 
 				
-				string timestamp(alias fun = localSystemTime)(in Flag!"shortened" shortened = No.shortened)const
+				void _set(bool isLocal, T)(in T src)
 				{
-					//Note: ⚠TimeView depends on this format!!!!
-					//Todo: make a proper datetimeformatter tool.
+					static if(isLocal)
+					{
+						static if(is(T==FILETIME  )) const st = fileTimeToSystemTime(src); 
+						static if(is(T==SYSTEMTIME)) const st = src; 
+						_set!false(localTzSystemTimeToSystemTime(st)); //recursion
+					}
+					else
+					{
+						static if(is(T==FILETIME  )) const ft = src; 
+						static if(is(T==SYSTEMTIME)) const ft = systemTimeToFileTime(src); 
+						raw = fileTimeToRaw(ft); 
+					}
+				} 
+			} 
+			
+			@property
+			{
+				auto utcFileTime() const
+				{ return _get!(false, FILETIME)(); } 	void utcFileTime	(in FILETIME	a)
+				{ _set!false(a); } 
+				auto utcSystemTime() const
+				{ return _get!(false, SYSTEMTIME	)(); } 	void utcSystemTime	(in SYSTEMTIME	a)
+				{ _set!false(a); } 
+				auto localFileTime() const
+				{ return _get!(true , FILETIME	)(); } 	void localFileTime	(in FILETIME	a)
+				{ _set!true(a); } 
+				auto localSystemTime() const
+				{ return _get!(true , SYSTEMTIME	)(); } 	void localSystemTime	(in SYSTEMTIME	a)
+				{ _set!true(a); } 
+				
+				double unixTime() const
+				{ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; } 
+				void unixTime(in double a)
+				{ raw = a.isnan ? 0 : secondsToRaw(a)+UnixShift_unit; } 
+				
+				private enum RawDelphiShift = 109205*RawUnit.day; 
+				double localDelphiTime() const
+				{
+					return isNull	? 0
+						: double(fileTimeToRaw(localFileTime)-RawDelphiShift)/RawUnit.day; 
+				} 
+				void localDelphiTime(double d)
+				{
+					if(d.isnan || d==0)
+					raw = 0; 
+					else
+					localFileTime = rawToFileTime((d*RawUnit.day).to!ulong + RawDelphiShift); 
+				} 
+				
+				DateTime utcDayStart() const
+				{ if(isNull) return this; return RawDateTime(raw - raw%RawUnit.day); } 
+				DateTime utcDayEnd	() const
+				{ if(isNull) return this; return RawDateTime(utcDayStart.raw + RawUnit.day); } 
+				
+				DateTime localDayStart() const
+				{
+					if(isNull) return this; 
+					auto st = localSystemTime; 
+					st.wHour	= 0; 
+					st.wMinute	= 0; 
+					st.wSecond	= 0; 
+					st.wMilliseconds	= 0; 
+					return DateTime(st); 
+				} 
+				
+				DateTime localDayEnd() const
+				{
+					if(isNull) return this; 
 					
-					if(isNull) return "null"; 
-					//4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
-					//return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
+					auto	res	= localDayStart + day	,
+						st	= res.localSystemTime	,
+						diff_ms	= ((st.wHour*60L + st.wMinute)*60 + st.wSecond)*1000L + st.wMilliseconds	; 
 					
-					//windows timestamp format (inserts it after duplicate files)
-					string s; 
-					with(fun) s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds); 
+					if(diff_ms<12L*60*60*1000) res -= 	diff_ms*milli(second); 
+					else res += day - 	diff_ms*milli(second); 
 					
-					if(shortened) {
-						 //Todo: not so fast
-						if(s.endsWith(".000")) {
-							s = s[0..$-4]; 
-							if(s.endsWith("00")) {
-								s = s[0..$-2]; 
-								if(s.endsWith("0000")) { s = s[0..$-4]; }
-							}
+					return res; 
+					
+					/+
+						Todo: unittest assert(iota(366)	.map!(a => DateTime(2022, 1, 1) + a*day)
+							.map!(a => (a.localDayEnd - a.localDayStart).value(hour))
+							.uniq
+							.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); 
+					+/
+								
+				} 
+				
+				Time utcTime  () const
+				{ return this-utcDayStart; } 
+				Time localTime() const
+				{ return this-localDayStart; } 
+				
+				Time time() const
+				{ return localTime; } 
+				DateTime dayStart() const
+				{ return localDayStart; } 
+				
+				Date date() const
+				=> Date(this); 
+			} 
+			
+			///calculate the difference between DateTimes
+			Time opBinary(string op : "-")(in DateTime b) const
+			{ return long(raw-b.raw)*(1.0/RawUnit.sec)*het.quantities.second; } 
+			
+			///adjust DateTime by si.Time
+			DateTime opBinary(string op)(in Time b) const if(op.among("+", "-"))
+			{
+				DateTime res = this; 
+				mixin("res.raw", op, "=(b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
+				return res; 
+			} 
+			
+			DateTime add_raw(in ulong delta) const
+			{ return RawDateTime(raw + delta); } 
+			
+			///adjust this DateTime by si.Time
+			DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))
+			{
+				mixin("raw", op,"= (b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
+				return this; 
+			} 
+			
+			private long timeZoneOffset_raw() const
+			{
+				//Todo: rename to utcOffset (read aboit it on web first!)
+				if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL"); 
+				DateTime dt = void; dt.utcFileTime = localFileTime; 
+				return dt.raw-this.raw; 
+			} 
+			
+			Time timeZoneOffset() const
+			{
+				if(raw<RawUnit.day) throw new Exception("Unable to calculate timeZone for NULL"); 
+				DateTime dt = void; dt.utcFileTime = localFileTime; 
+				return dt-this; 
+			} 
+			
+			static currentTimeZoneOffset()
+			{ return now.timeZoneOffset; } 
+			
+			static currentTimeZoneName()
+			{
+				TIME_ZONE_INFORMATION tzi; 
+				switch(GetTimeZoneInformation(&tzi))
+				{
+					case 2: return tzi.DaylightName.text; 
+					default: return tzi.StandardName.text; 
+				}
+			} 
+			
+			@property
+			{
+				//dayOfWeek stuff
+				//Note: 0=sun, 6=sat
+				int localDayOfWeek()
+				{ return localSystemTime.wDayOfWeek; } 	int utcDayOfWeek()
+				{ return utcSystemTime.wDayOfWeek; } 
+				bool localIsWeekend()
+				{ return localDayOfWeek.among(0, 6)!=0; } 	bool utcIsWeekend()
+				{ return utcDayOfWeek.among(0, 6)!=0; } 
+				bool localIsWeekday()
+				{ return !localIsWeekend; } 	bool utcIsWeekday()
+				{ return !utcIsWeekend; } 
+			} 
+			
+			/// This is the hash for bitmap objects
+			ulong toId_deprecated() const
+			{ return raw; } 
+			
+			/// Sets to now. Makes sure it will greater than the actual value. Used for change notification.
+			auto actualize()
+			{
+				auto c = now.raw; 
+				if(isNull || c>raw) raw = c; 
+				else raw++; //now it's the exact same as the previous one. Just increment.
+				
+				return this; 
+			} 
+			
+			string dateText(alias fun = localSystemTime)() const
+			{
+				//Todo: format
+				if(isNull) return "NULL Date"; 
+				with(fun) return format!"%.4d.%.2d.%.2d"(wYear, wMonth, wDay); 
+			} 
+			
+			string timeText(alias fun = localSystemTime)() const
+			{
+				//todo format
+				if(isNull) return "NULL Time"; 
+				with(fun) return format!"%.2d:%.2d:%.2d.%.3d"(wHour, wMinute, wSecond, wMilliseconds); 
+			} 
+			
+			string toString(alias fun = localSystemTime)()const
+			{
+				if(isNull) return "NULL DateTime"; 
+				with(fun) return format("%.4d.%.2d.%.2d %.2d:%.2d:%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds); 
+			} 
+			
+			string timestamp(alias fun = localSystemTime)(in Flag!"shortened" shortened = No.shortened)const
+			{
+				//Note: ⚠TimeView depends on this format!!!!
+				//Todo: make a proper datetimeformatter tool.
+				
+				if(isNull) return "null"; 
+				//4 digit year is better. return format("%.2d%.2d%.2d-%.2d%.2d%.2d-%.3d", year%100, month, day, hour, min, sec, ms);
+				//return format("%.4d%.2d%.2d-%.2d%.2d%.2d-%.3d", year, month, day, hour, min, sec, ms);
+				
+				//windows timestamp format (inserts it after duplicate files)
+				string s; 
+				with(fun) s = format("%.4d-%.2d-%.2dT%.2d%.2d%.2d.%.3d", wYear, wMonth, wDay, wHour, wMinute, wSecond, wMilliseconds); 
+				
+				if(shortened) {
+					 //Todo: not so fast
+					if(s.endsWith(".000")) {
+						s = s[0..$-4]; 
+						if(s.endsWith("00")) {
+							s = s[0..$-2]; 
+							if(s.endsWith("0000")) { s = s[0..$-4]; }
 						}
 					}
-					
-					return s; 
-				} 
+				}
 				
-				string timestamp_compact(alias fun = localSystemTime)()const
-				{ return timestamp!fun(Yes.shortened); } 
+				return s; 
+			} 
+			
+			string timestamp_compact(alias fun = localSystemTime)()const
+			{ return timestamp!fun(Yes.shortened); } 
+			
+			string utcDateText() const
+			{ return dateText!utcSystemTime; } 
+			string utcTimeText() const
+			{ return timeText!utcSystemTime; } 
+			string utcToString() const
+			{ return toString!utcSystemTime; } 
+			string utcText() const
+			{ return utcToString; } 
+			string utcTimestamp(in Flag!"shortened" shortened = No.shortened)const
+			{ return timestamp!utcSystemTime(shortened); } 
+			string utcTimestamp_compact()const
+			{ return utcTimestamp(Yes.shortened); } 
+			
+			@property int utcYearMonth(DateTime d)
+			{ if(!this) return 0; with(utcSystemTime) return wYear*100 + wMonth; } 
+			
+			@property int utcYearQuarter(DateTime d)
+			{ if(!this) return 0; with(utcSystemTime) return wYear*10 + ((wMonth-1)/3)+1; } 
+			
+			@property int utcYear(DateTime d)
+			{ if(!this) return 0; with(utcSystemTime) return wYear; } 
+			
+			
+			
+			static
+			{
+				//self diagnostics
 				
-				//Todo: utcXXX not good! should ude TimeZone as first param
-				string utcDateText() const
-				{ return dateText!utcSystemTime; } 
-				string utcTimeText() const
-				{ return timeText!utcSystemTime; } 
-				string utcToString() const
-				{ return toString!utcSystemTime; } 
-				string utcText() const
-				{ return utcToString; } 
-				string utcTimestamp(in Flag!"shortened" shortened = No.shortened)const
-				{ return timestamp!utcSystemTime(shortened); } 
-				string utcTimestamp_compact()const
-				{ return utcTimestamp(Yes.shortened); } 
+				void selftest()
+				{ enforce(DateTime(2000, 1, 2) - DateTime(RawUnit._minYear, 1, 2) == 145731 * day); } 
 				
-				@property int utcYearMonth(DateTime d)
-				{ if(!this) return 0; with(utcSystemTime) return wYear*100 + wMonth; } 
-				
-				@property int utcYearQuarter(DateTime d)
-				{ if(!this) return 0; with(utcSystemTime) return wYear*10 + ((wMonth-1)/3)+1; } 
-				
-				@property int utcYear(DateTime d)
-				{ if(!this) return 0; with(utcSystemTime) return wYear; } 
-				
-				static
+				void benchmark()
 				{
-					//self diagnostics
+					print("DateTime RawUnits"); 
+					foreach(a; EnumMembers!(DateTime.RawUnit))
+					format!"%-10s %29d %16x"(a, a, a).replace(' ', '_').print; 
 					
-					void selftest()
-					{ enforce(DateTime(2000, 1, 2) - DateTime(RawUnit._minYear, 1, 2) == 145731 * day); } 
+					print; 
+					print("now() call frequency: "); 
+					20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; } ); 
 					
-					void benchmark()
+					void bench(string code, size_t N=1000)()
 					{
-						print("DateTime RawUnits"); 
-						foreach(a; EnumMembers!(DateTime.RawUnit))
-						format!"%-10s %29d %16x"(a, a, a).replace(' ', '_').print; 
-						
-						print; 
-						print("now() call frequency: "); 
-						20.iota.map!(a => now).array.slide(2).each!((a){ (a[1]-a[0]).siFormat!"%8.0f ns".print; } ); 
-						
-						void bench(string code, size_t N=1000)()
-						{
-							write(code, "   //"); 
-							const t0 = now; 
-							mixin(code); 
-							((now-t0)/N).siFormat!"%8.0f ns".print; 
-						} 
-						
-						print; 
-						bench!q{foreach(i; 0..N) cast(void)now; 	}; 
-						bench!q{N.iota.each!((i){ cast(void)now; } ); 	}; 
-						bench!q{foreach(i; 0..N) cast(void)(now-now); 	}; 
-						bench!q{foreach(i; 0..N) cast(void).today; 	}; 
-						bench!q{foreach(i; 0..N) cast(void).time; 	}; 
-						
-						void dstTest()
-						{
-							void doit(bool summer)
-							{
-								const m = summer ? 7 : 1; 
-								print; 
-								print((m?"Winter":"Summer")~" DST test:"); 
-								print("  UTC   -> UTC   ", DateTime(UTC	 ,	21, m,30,12).toString!(DateTime.utcSystemTime)); 
-								print("  UTC   -> Local ", DateTime(UTC	 ,	21, m,30,12)); 
-								print("  Local -> UTC   ", DateTime(21, m,30,12).toString!(DateTime.utcSystemTime)); 
-								print("  Local -> Local ", DateTime(21, m,30,12)); 
-							} 
-							doit(0); doit(1); 
-							
-							print; 
-							print("Test local-utc for 12 31*24hour steps."); 
-							foreach(u; [UTC, Local])
-							iota(12)	.map!(i => DateTime(u, 21, 1, 30, 12) + i*31*day)
-								.enumerate.map!(
-								a => //A month is not a real month!!!! it's 32*24 hours!!!!
-								format!"%2s %2s %2s"
-								(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour)
-							)
-								.each!print; 
-						} 
-						dstTest; 
+						write(code, "   //"); 
+						const t0 = now; 
+						mixin(code); 
+						((now-t0)/N).siFormat!"%8.0f ns".print; 
 					} 
 					
+					print; 
+					bench!q{foreach(i; 0..N) cast(void)now; 	}; 
+					bench!q{N.iota.each!((i){ cast(void)now; } ); 	}; 
+					bench!q{foreach(i; 0..N) cast(void)(now-now); 	}; 
+					bench!q{foreach(i; 0..N) cast(void).today; 	}; 
+					bench!q{foreach(i; 0..N) cast(void).time; 	}; 
+					
+					void dstTest()
+					{
+						void doit(bool summer)
+						{
+							const m = summer ? 7 : 1; 
+							print; 
+							print((m?"Winter":"Summer")~" DST test:"); 
+							print("  UTC   -> UTC   ", DateTime(UTC	 ,	21, m,30,12).toString!(DateTime.utcSystemTime)); 
+							print("  UTC   -> Local ", DateTime(UTC	 ,	21, m,30,12)); 
+							print("  Local -> UTC   ", DateTime(21, m,30,12).toString!(DateTime.utcSystemTime)); 
+							print("  Local -> Local ", DateTime(21, m,30,12)); 
+						} 
+						doit(0); doit(1); 
+						
+						print; 
+						print("Test local-utc for 12 31*24hour steps."); 
+						foreach(u; [UTC, Local])
+						iota(12)	.map!(i => DateTime(u, 21, 1, 30, 12) + i*31*day)
+							.enumerate.map!(
+							a => //A month is not a real month!!!! it's 32*24 hours!!!!
+							format!"%2s %2s %2s"
+							(a[0], a[1].utcSystemTime.wHour, a[1].localSystemTime.wHour)
+						)
+							.each!print; 
+					} 
+					dstTest; 
 				} 
-			}
+				
+			} 
 		} 
 	}version(/+$DIDE_REGION+/all)
 	{
@@ -12082,35 +12280,47 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			else
 			{
 				//Todo: check for digits here, not any chars!
-				if(str.isWild("????-??-??T??????.???"))
+				if(str.isWild("????-??-??T??????.???Z"))
+				{
+					 //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
+					return DateTime(UTC, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4)); 
+				}
+				else if(str.isWild("????-??-??T??????.???"))
 				{
 					 //windows timestamp.zzz   //!!!!!! todo: What if ends with a Z!!!!! Then it's ITC!!!!!!
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int, wild.ints(4)); 
-				}else if(str.isWild("????-??-??T??????"))
+				}
+				else if(str.isWild("????-??-??T??????"))
 				{
 					 //windows timestamp
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int, wild[3][4..6].to!int); 
-				}else if(str.isWild("????-??-??T????"))
+				}
+				else if(str.isWild("????-??-??T????"))
 				{
 					 //windows timestamp, no seconds
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2), wild[3][0..2].to!int, wild[3][2..4].to!int); 
-				}else if(str.isWild("????-??-??T"))
+				}
+				else if(str.isWild("????-??-??T"))
 				{
 					 //windows timestamp, no time
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2)); 
-				}else if(str.isWild("????-??-??"))
+				}
+				else if(str.isWild("????-??-??"))
 				{
 					 //windows timestamp, no time, no T
 					return DateTime(tz, wild.ints(0), wild.ints(1), wild.ints(2)); 
-				}else if(str.isWild("????????-??????-???"))
+				}
+				else if(str.isWild("????????-??????-???"))
 				{
 					 //timestamp 4 digit year
 					return DateTime(tz,        str[0..4].to!int,  str[4..6].to!int, str[6..8].to!int, str[9..11].to!int, str[11..13].to!int, str[13..15].to!int, str[16..19].to!int); 
-				}else if(str.isWild("??????-??????-???"))
+				}
+				else if(str.isWild("??????-??????-???"))
 				{
 					 //timestamp 2 digit year
 					return DateTime(tz, year2k(str[0..2].to!int), str[2..4].to!int, str[4..6].to!int, str[7.. 9].to!int, str[9..11].to!int, str[11..13].to!int, str[14..17].to!int); //Todo: ugly but works
-				}else
+				}
+				else
 				{
 					return parseDate(tz, str); //Date only
 				}
