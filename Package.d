@@ -256,6 +256,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			_unittest_pack8bitTo1bit; 
 			
+			test_singularize; 
+			
 			//startup
 			
 			CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
@@ -1017,7 +1019,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8BC30C876135).檢((update間(_間)))); 
+				((0x8BDF0C876135).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -3288,15 +3290,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D3D0C876135})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D590C876135})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19E050C876135})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19E210C876135})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19EAF0C876135})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F240C876135})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19ECB0C876135})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F400C876135})); 
 						+/
 					+/
 				+/
@@ -7437,11 +7439,11 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 		
 		//Makes an identifier that can come from an external language, compatible with the D environment.
-		string sanitizeDLangIdentifier(string s, string defaultName = "field", sizediff_t idx=-1)
+		string sanitizeDLangIdentifier(string s, string defaultName = "identifier", sizediff_t idx=-1)
 		{
-			if(s.empty) return defaultName~((idx>=0)?(idx.text):("")); 
-			if(s[0].isDigit) s = "_" ~ s; 
-			if(s.isImportantDlangKeyword) s ~= "_"; 
+			if(s.empty) return defaultName~((idx>=0)?('_'~idx.text):("")); 
+			if(s[0].isDigit)	s = '_' ~ s; 
+			else if(s.isImportantDlangKeyword)	s = s ~ '_'; 
 			return s; 
 		} 
 		
@@ -8927,6 +8929,78 @@ version(/+$DIDE_REGION Containers+/all)
 		=> AnsiEncoding.decTable[ch];  auto toAnsi(R)(R src)
 		=> src.byDchar.map!toAnsiChar;  auto fromAnsi(R)(R src)
 		=> src.map!fromAnsiChar; 
+	}
+	
+	version(/+$DIDE_REGION+/all) {
+		/+
+			+Function: singularize
+			Purpose: Convert plural names to singular form
+			Parameters:
+				name - Input string that may be plural
+			Returns: Singular form of the name
+		+/
+		string singularize(string name)
+		{
+			static immutable 
+			pluralRules = 
+			[
+				["ies", "y"],
+				["ees", "ee"],
+				["ses", "s"],
+				["xes", "x"],
+				["zzes", "z"],
+				["zes", "z"],
+				["ches", "ch"],
+				["shes", "sh"],
+				["men", "man"],
+				["ves", "f"]
+			]; 
+			
+			// Check if the word ends with any plural suffix
+			foreach(rule; pluralRules)
+			{
+				const suffix = rule[0], replacement = rule[1]; 
+				if(name.endsWith(suffix))
+				{ return name[0..$-suffix.length] ~ replacement; }
+			}
+			
+			if(
+				name.length>=2
+				&& name[$-1]=='s' 
+				&& name[$-2]!='s'
+			) return name[0..$-1]; 
+			
+			// If no plural suffix found, return the original name
+			return name; 
+		} 
+		
+		/+Example usage and test cases+/ 
+		private void test_singularize()
+		{
+			static immutable testCases = 
+			[
+				["Employees", "Employee"],
+				["Cats", "Cat"],
+				["Boxes", "Box"],
+				["Babies", "Baby"],
+				["Buses", "Bus"],
+				["Quizzes", "Quiz"],
+				["Churches", "Church"],
+				["Dishes", "Dish"],
+				["Women", "Woman"],
+				["Leaves", "Leaf"]
+			]; 
+			
+			static foreach(a; testCases)
+			{
+				//print(a[0], a[0].singularize); 
+				enforce(a[0].singularize==a[1]); 
+				/+
+					enforce(a[1].singularize==a[1]); 
+					   can't guarantee...
+				+/
+			}
+		} 
 	}
 }version(/+$DIDE_REGION Hashing+/all)
 {

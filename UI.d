@@ -783,7 +783,9 @@ version(/+$DIDE_REGION+/all)
 		textStyles["c" ] = &tsCode; 
 		
 		textStyles.rehash; 
-	} 
+	} 
+	
+	
 	
 	bool updateTextStyles()
 	{
