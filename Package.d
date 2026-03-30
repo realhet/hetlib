@@ -1019,7 +1019,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8BDF0C876135).檢((update間(_間)))); 
+				((0x8BDF59F156A1).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -3290,15 +3290,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D590C876135})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D5959F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19E210C876135})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19E2159F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19ECB0C876135})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F400C876135})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19ECB59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F4059F156A1})); 
 						+/
 					+/
 				+/
@@ -3399,8 +3399,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			/+Note: The decoder is here: /+$DIDE_LOC DIDE\didebuilder.d+/ / struct ExternalCodeIES+/
 		} 
-		
-		
 	}
 	
 }
