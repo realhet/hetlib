@@ -1839,8 +1839,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			if(chkSet(animStarted)) at = 1; 
 			
 			bool res; 
-			res |= ((0xDF264577F489).檢(follow(m_origin_anim, origin, at, invScale*1e-2f))); 
-			res |= ((0xDF7D4577F489).檢(follow(m_logScale_anim, logScale, at, 1e-2f))); 
+			res |= follow(m_origin_anim, origin, at, invScale*1e-2f); 
+			res |= follow(m_logScale_anim, logScale, at, 1e-2f); 
 			return res; 
 			
 			/+

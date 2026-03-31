@@ -25,7 +25,7 @@ version(/+$DIDE_REGION+/all)
 		
 		version(OpenGLUI)
 		{
-			//public import het.opengl: GLWindow, gl, GL_COLOR_BUFFER_BIT; import het.opengl: oldTextures = textures, DefaultFont_subTexIdxMap; 
+			public import het.opengl: GLWindow, gl, GL_COLOR_BUFFER_BIT; import het.opengl: oldTextures = textures, DefaultFont_subTexIdxMap; 
 			
 			alias UIWindow = GLWindow; 
 			
@@ -66,7 +66,7 @@ version(/+$DIDE_REGION+/all)
 		
 		version(VulkanUI)
 		{
-			public import het.vulkanwin; 
+			//public import het.vulkanwin; 
 			
 			alias UIWindow = VulkanWindow; 
 			
@@ -3269,6 +3269,13 @@ version(/+$DIDE_REGION+/all)
 				[q{bool},q{1},q{"dontStretchSubCells"},q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
 				[q{bool},q{1},q{"columnIsTable"},q{},q{/+At the moment it is only used by DIDE+/}],
 				[q{bool},q{1},q{"removed"},q{},q{/+At the moment it is only used by DIDE: SearchResults, BuildMessages can detect validity+/}],
+				[q{uint},q{3},q{"languageId"},q{},q{/+
+					At the moment it is only used by DIDE: 
+					0: DLang/GLSL (Default)
+					1: SQL
+					//2: Console - no syntax, \33 coloring
+					//3: Arduino 
+				+/}],
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 

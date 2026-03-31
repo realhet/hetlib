@@ -2855,39 +2855,47 @@ version(/+$DIDE_REGION Keywords+/all)
 	} 
 	
 	static if(0)
-	class SyntaxPreset_future
 	{
-		 //future
-		SyntaxStyle
-		//standard language things
-			whitespace, number, binary1, string_, keyword, symbol, directive, label, attribute, basicType,
-		//editor functionality
-			selected, foundAct, foundAlso, navLink,
-		//development stuff
-			comment, error, warning, deprecation, todo, optimize,
-		//extra language things
-			identifier1, identifier2, identifier3, identifier4, identifier5, identifier6; 
-		
-		
-		//testCode
-		
-		immutable testCode = q{
-			@directive void get() const
-			{
-				 //comment
-				return value + 123 + 5.6 + 0b1100101 * "42".to!int; 
-			} 
-			/*comment*/ /*Todo: ...*/ /*Opt: ...*/
-			selected  foundAct	foundAlso  navLink
-			error  warning  deprecation
-			
-			//GLSL
-			
-			//GCN ASM
+		struct SyntaxPreset
+		{
+			string name; 
+			SyntaxStyle
+			//standard language things
+				whitespace, number, binary1, string_, keyword, symbol, directive, label, attribute, basicType,
+			//editor functionality
+				selected, foundAct, foundAlso, navLink,
+			//development stuff
+				comment, error, warning, deprecation, todo, optimize,
+			//extra language things
+				identifier1, identifier2, identifier3, identifier4, identifier5, identifier6; 
+		} 
+		class SyntaxPreset_future
+		{
+			//future
+			Preset preset; 
+			alias this = preset; 
 			
 			
-		}; 
-	} 
+			//testCode
+			
+			immutable testCode = q{
+				@directive void get() const
+				{
+					 //comment
+					return value + 123 + 5.6 + 0b1100101 * "42".to!int; 
+				} 
+				/*comment*/ /*Todo: ...*/ /*Opt: ...*/
+				selected  foundAct	foundAlso  navLink
+				error  warning  deprecation
+				
+				//GLSL
+				
+				//GCN ASM
+				
+				
+			}; 
+		} 
+	}
 	
 	
 	struct SyntaxStyleRow
@@ -2900,6 +2908,7 @@ version(/+$DIDE_REGION Keywords+/all)
 	//Todo: these should be uploaded to the gpu
 	//Todo: from the program this is NOT extendable
 	//Todo: Get the accent color from WM_DWMCOLORIZATIONCOLORCHANGED 
+	
 	
 	version(none)
 	{
@@ -2944,40 +2953,40 @@ version(/+$DIDE_REGION Keywords+/all)
 	
 	immutable syntaxPresetNames =	             ["Default"             , "Classic"                         , "C64"                   , "Dark"                     ]; 
 	immutable SyntaxStyleRow[] syntaxTable =[
-		{"Whitespace"	, [{ clBlack	,clWhite	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { 0xc7c5c5	,0x2f2f2f ,0}]},
-		{"Selected"	, [{ clWhite	,10841427	,0}, { clEgaLowBlue	,clEgaLightGray	,0}, { clC64Blue	,clC64LBlue	,0}, { clBlack	,clPink ,0}]},
-		{"FoundAct"	, [{ 0xFCFDCD	,clBlack	,0}, { clEgaLightGray	,clEgaBlack	,0}, { clC64LGrey	,clC64Black	,0}, { clBlack	,clPink ,0}]},
+		{"Whitespace"	, [{(RGB(clBlack))	,(RGB(clWhite))	,0}, { (RGB(clEgaYellow))	,(RGB(clEgaLowBlue))	,0}, { (RGB(clC64LBlue))	,(RGB(clC64Blue))	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2f2f2f)) ,0}]},
+		{"Selected"	, [{ (RGB(clWhite))	,(RGB(10841427))	,0}, { (RGB(clEgaLowBlue))	,(RGB(clEgaLightGray))	,0}, { (RGB(clC64Blue))	,(RGB(clC64LBlue))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
+		{"FoundAct"	, [{ (RGB(0xFCFDCD))	,clBlack	,0}, { (RGB(clEgaLightGray))	,(RGB(clEgaBlack))	,0}, { (RGB(clC64LGrey))	,(RGB(clC64Black))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
 		{"FoundAlso"	, [{ clBlack	,0x78AAFF	,0}, { clEgaLightGray	,clEgaBrown	,0}, { clC64LGrey	,clC64DGrey	,0}, { clBlack	,clPink.darken(.25) ,0}]},
-		{"NavLink"	, [{ clBlue	,clWhite	,4}, { clEgaHighRed	,clEgaLowBlue	,4}, { clC64Red	,clC64Blue	,0}, { 0xFF8888	,0x2d2d2d ,4}]},
-		{"Number"	, [{ clBlue	,clWhite	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0x0094FA	,0x2d2d2d ,0}]},
+		{"NavLink"	, [{ clBlue	,(RGB(clWhite))	,4}, { clEgaHighRed	,clEgaLowBlue	,4}, { clC64Red	,clC64Blue	,0}, { 0xFF8888	,0x2d2d2d ,4}]},
+		{"Number"	, [{ clBlue	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0x0094FA	,0x2d2d2d ,0}]},
 		{"String"	, [{ clBlue	,clSkyBlue	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { 0x64E000	,0x283f28 ,0}]},
-		{"Keyword"	, [{ clNavy	,clWhite	,1}, { clEgaWhite	,clEgaLowBlue	,1}, { clC64White	,clC64Blue	,0}, { 0x5C00F6	,0x2d2d2d ,1}]},
-		{"Symbol"	, [{ clBlack	,clWhite	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0x00E2E1	,0x2d2d2d ,0}]},
+		{"Keyword"	, [{ clNavy	,(RGB(clWhite))	,1}, { clEgaWhite	,clEgaLowBlue	,1}, { clC64White	,clC64Blue	,0}, { 0x5C00F6	,0x2d2d2d ,1}]},
+		{"Symbol"	, [{ clBlack	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0x00E2E1	,0x2d2d2d ,0}]},
 		{"Comment"	, [{ clNavy	,clYellow	,2}, { clEgaLightGray	,clEgaLowBlue	,2}, { clC64LGrey	,clC64Blue	,0}, { 0xf75Dd5	,0x442d44 ,2}]},
-		{"Directive"	, [{ clTeal	,clWhite	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64Green	,clC64Blue	,0}, { 0x4Db5e6	,0x2d4444 ,0}]},
-		{"Identifier1"	, [{ clBlack	,clWhite	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0xc7c5c5	,0x2d2d2d ,0}]},
-		{"Identifier2"	, [{ clGreen	,clWhite	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { clGreen	,0x2d2d2d ,0}]},
-		{"Identifier3"	, [{ clTeal	,clWhite	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { clTeal	,0x2d2d2d ,0}]},
-		{"Identifier4"	, [{ clPurple	,clWhite	,0}, { clEgaHighMagenta	,clEgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { 0x9136AA, 0x2d2d2d ,0}]},
-		{"Identifier5"	, [{ 0x0040b0	,clWhite	,0}, { clEgaBrown	,clEgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { 0x0060f0	,0x2d2d2d ,0}]},
-		{"Identifier6"	, [{ 0xb04000	,clWhite	,0}, { clEgaHighBlue	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { 0xf06000	,0x2d2d2d ,0}]},
+		{"Directive"	, [{ clTeal	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64Green	,clC64Blue	,0}, { 0x4Db5e6	,0x2d4444 ,0}]},
+		{"Identifier1"	, [{ clBlack	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0xc7c5c5))	,0x2d2d2d ,0}]},
+		{"Identifier2"	, [{ clGreen	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { clGreen	,0x2d2d2d ,0}]},
+		{"Identifier3"	, [{ clTeal	,(RGB(clWhite))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { clTeal	,0x2d2d2d ,0}]},
+		{"Identifier4"	, [{ clPurple	,(RGB(clWhite))	,0}, { clEgaHighMagenta	,clEgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { (RGB(0x9136AA)), 0x2d2d2d ,0}]},
+		{"Identifier5"	, [{ 0x0040b0	,(RGB(clWhite))	,0}, { clEgaBrown	,clEgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { (RGB(0x0060f0))	,0x2d2d2d ,0}]},
+		{"Identifier6"	, [{ 0xb04000	,(RGB(clWhite))	,0}, { clEgaHighBlue	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { (RGB(0xf06000))	,0x2d2d2d ,0}]},
 		{"Label"	, [{ clBlack	,0xDDFFEE	,4}, { clBlack	,clEgaHighCyan	,0}, { clBlack	,clC64Cyan	,0}, { 0xFFA43B	,0x2d2d2d ,2}]},
-		{"Attribute"	, [{ clPurple	,clWhite	,1}, { clEgaHighMagenta	,clEgaLowBlue	,1}, { clC64Purple	,clC64Blue	,1}, { 0xAAB42B	,0x2d2d2d ,1}]},
-		{"BasicType"	, [{ clTeal	,clWhite	,1}, { clEgaHighCyan	,clEgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { clWhite	,0x2d2d2d ,1}]},
-		{"Binary1"	, [{ clWhite	,clBlue	,0}, { clEgaLowBlue	,clEgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
-		{"Error"	, [SyntaxStyle(clWhite	,clRed     ,0)].replicate(4)},
+		{"Attribute"	, [{ clPurple	,(RGB(clWhite))	,1}, { clEgaHighMagenta	,clEgaLowBlue	,1}, { clC64Purple	,clC64Blue	,1}, { 0xAAB42B	,0x2d2d2d ,1}]},
+		{"BasicType"	, [{ clTeal	,(RGB(clWhite))	,1}, { clEgaHighCyan	,clEgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { (RGB(clWhite))	,0x2d2d2d ,1}]},
+		{"Binary1"	, [{ (RGB(clWhite))	,clBlue	,0}, { clEgaLowBlue	,clEgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
+		{"Error"	, [SyntaxStyle((RGB(clWhite))	,clRed     ,0)].replicate(4)},
 		{"Exception"	, [SyntaxStyle(clYellow	,clRed     ,0)].replicate(4)},
 		{"Warning"	, [SyntaxStyle(clBlack	,clYellow     ,0)].replicate(4)},
 		{"Deprecation"	, [SyntaxStyle(clBlack	,clAqua      ,0)].replicate(4)},
 		{"Note"	, [SyntaxStyle(clBlack	,clPostit,2)].replicate(4)},
-		{"Todo"	, [SyntaxStyle(clWhite	,clWowBlue   ,2)].replicate(4)},
-		{"Opt"	, [SyntaxStyle(clWhite	,clWowPurple	,2)].replicate(4)},
-		{"Bug"	, [SyntaxStyle(clWhite	,clOrange	,2)].replicate(4)},
-		{"Link"	, [SyntaxStyle(clWowBlue	,clWhite    ,4)].replicate(4)},
+		{"Todo"	, [SyntaxStyle((RGB(clWhite))	,clWowBlue   ,2)].replicate(4)},
+		{"Opt"	, [SyntaxStyle((RGB(clWhite))	,clWowPurple	,2)].replicate(4)},
+		{"Bug"	, [SyntaxStyle((RGB(clWhite))	,clOrange	,2)].replicate(4)},
+		{"Link"	, [SyntaxStyle(clWowBlue	,(RGB(clWhite))    ,4)].replicate(4)},
 		{"Code"	, [SyntaxStyle((RGB(0xc7c5c5))	, mix((RGB(0x2f2f2f)), (RGB(0x442d44)), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
-		{"Console"	, [SyntaxStyle(clWhite ,clBlack,0)].replicate(4)},
-		{"Interact"	, [SyntaxStyle(clBlack ,clWhite,0)].replicate(4)},
-		{"Inherit"	, [SyntaxStyle(clBlack ,clWhite,0)].replicate(4)},
+		{"Console"	, [SyntaxStyle((RGB(clWhite)) ,clBlack,0)].replicate(4)},
+		{"Interact"	, [SyntaxStyle(clBlack ,(RGB(clWhite)),0)].replicate(4)},
+		{"Inherit"	, [SyntaxStyle(clBlack ,(RGB(clWhite)),0)].replicate(4)},
 	]; 
 	
 	mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(','))); 
@@ -3015,6 +3024,119 @@ version(/+$DIDE_REGION Keywords+/all)
 	{ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .1f); } 
 	auto clGroupBorder    ()
 	{ return mix(syntaxBkColor("Whitespace"), syntaxFontColor("Whitespace"), .4f); } 
+	
+	version(/+$DIDE_REGION SQL syntax+/all)
+	{
+		/+Link: https://firebirdsql.org/file/documentation/chunk/en/refdocs/fblangref25/fblangref25-appx03-reskeywords.html+/
+		/+Link: https://firebirdsql.org/file/documentation/chunk/en/refdocs/fblangref25/fblangref25-reskeywords-allkeywords.html+/
+		
+		static immutable FB25_CORE_KEYWORDS = 
+		[
+			/+DDL+/ "CREATE", "TABLE", "ALTER", "ADD", "DROP", "RECREATE", "INDEX", "VIEW", "TRIGGER", "PROCEDURE",
+			/+DML+/ "INSERT", "UPDATE", "DELETE", "MERGE", "INTO", "VALUES",
+			/+DQL+/ "SELECT", "FROM", "WHERE", "ORDER", "GROUP", "BY", "HAVING", "DISTINCT", "UNION", "ROWS", 
+			/+TCL+/ "COMMIT", "ROLLBACK", "SAVEPOINT",
+			/+DCL+/ "GRANT", "REVOKE",
+			/+Conn+/ "CONNECT", "DISCONNECT",
+			/+Keys+/ "PRIMARY", "RDB$DB_KEY", "UNIQUE", "KEY", "CONSTRAINT",
+			/+Proc+/ "DECLARE", "BEGIN", "END", "FOR", "WHILE", "EXECUTE", "FETCH", "OPEN", "CLOSE", "RETURNS",
+			/+Expr+/ "WITH", "AS", "CASE", "WHEN", "IF", "THEN", "ELSE", 
+			/+Joins+/ "JOIN", "INNER", "OUTER", "LEFT", "RIGHT", "FULL", "CROSS", "NATURAL", "ON",
+		]; 
+		
+		string[] FB25_SECURITY_WORDS = 
+			["DATABASE", "ADMIN", "USER", "ROLE", "PASSWORD", "PRIVILEGES"]; 
+		
+		static immutable FB25_TYPES = 
+		[
+			"BIGINT", "BLOB", "CHAR", "CHARACTER", "DATE", "DEC", "DECIMAL", "DOUBLE", "FLOAT", 
+			"INT", "INTEGER", "NCHAR", "NUMERIC", "PRECISION", "REAL", "SMALLINT", "TIME", "TIMESTAMP", 
+			"VARYING", "VARCHAR", "LONG", "NULL"
+		]; 
+		
+		static immutable FB25_VARIABLES = 
+		[
+			"CURRENT_CONNECTION","CURRENT_DATE","CURRENT_ROLE",
+			"CURRENT_TIME","CURRENT_TIMESTAMP","CURRENT_TRANSACTION","CURRENT_USER"
+		]; 
+		
+		static immutable FB25_OPERATORS = 
+		["AND", "OR", "NOT", "IN", "BETWEEN", "LIKE", "SIMILAR", "IS", "ANY", "ALL", "SOME", "TO"]; 
+		
+		static immutable FB25_FUNCTIONS = 
+		[
+			"LOWER", "UPPER", "CAST", "POSITION", "TRIM", "COALESCE",
+			"EXTRACT", "YEAR", "YEARDAY", "MONTH", "DAY", "WEEK", "WEEKDAY", "HOUR", "MINUTE", "SECOND", "MILLISECOND",
+			"ABS", "ACOS", "ASC", "ASCII_CHAR", "ASCII_VAL", "ASIN", "ATAN", "ATAN2", "BIN_AND", "BIN_NOT", "BIN_OR", 
+			"BIN_SHL", "BIN_SHR", "BIN_XOR", "CEIL", "CEILING", "CHAR_TO_UUID", "CONTAINING", "COS", "COSH", 
+			"COT", "CSTRING", "DATEDIFF", 
+			"EXP", "FLOOR", "LN", "LOG", "LOG10", "MOD", "PAD", "PI", "POWER", "RAND", "ROUND", "SIGN", "SIN", "SINH", 
+			"SQRT", "SUBSTRING", "TAN", "TANH", "TRUNC", "UUID_TO_CHAR", 
+		]; 
+		
+		static immutable FB25_AGGRFUNCTIONS = 
+		["COUNT", "SUM", "AVG", "MIN", "MAX", ]; 
+		
+		static immutable FB25_RESERVED_WORDS = 
+		
+		[
+			"AT",
+			"BIT_LENGTH","BOTH","CHAR_LENGTH",
+			"CHARACTER_LENGTH","CHECK","COLLATE","COLUMN",
+			"CURRENT","CURSOR",
+			"DEFAULT","DELETING",
+			"ESCAPE","EXISTS","EXTERNAL",
+			"FILTER","FOREIGN","FUNCTION","GDSCODE","GLOBAL",
+			"INSENSITIVE","INSERTING",
+			"LEADING",
+			"MAXIMUM_SEGMENT","NATIONAL","NO",
+			"OCTET_LENGTH","OF","ONLY",
+			"PARAMETER","PLAN","POST_EVENT",
+			"RECORD_VERSION","RECURSIVE","REFERENCES","RELEASE","RETURNING_VALUES",
+			"ROW_COUNT",
+			"SENSITIVE","SET","SQLCODE","SQLSTATE","START",
+			"TRAILING",
+			"UPDATING","USING","VALUE","VARIABLE",
+		]; 
+		
+		static immutable FB25_IMPORTANT_WORDS =
+		[
+			"ACCENT","ACTION","ACTIVE","AFTER","ALWAYS","ASCENDING",
+			"AUTO","AUTONOMOUS","BACKUP","BEFORE",
+			"BLOCK","BREAK","CALLER","CASCADE",
+			"COLLATION","COMMENT","COMMITTED","COMMON","COMPUTED","CONDITIONAL",
+			"DATA","DATEADD","DECODE","DESC","DESCENDING","DESCRIPTOR",
+			"DIFFERENCE","DO","DOMAIN","ENTRY_POINT","EXCEPTION","EXIT","FILE","FIRST","FIRSTNAME",
+			"FREE_IT","GEN_ID","GEN_UUID","GENERATED","GENERATOR","GRANTED","HASH","IGNORE","IIF","INACTIVE",
+			"INPUT_TYPE","ISOLATION","LAST","LASTNAME","LEAVE","LENGTH","LEVEL","LIMBO","LIST","LOCK",
+			"LPAD","MANUAL","MAPPING","MATCHED","MATCHING","MAXVALUE","MIDDLENAME",
+			"MINVALUE","MODULE_NAME","NAMES","NEXT","NULLIF","NULLS","OPTION","OS_NAME","OUTPUT_TYPE",
+			"OVERFLOW","OVERLAY","PAGE","PAGE_SIZE","PAGES","PLACING","PRESERVE",
+			"PRIVILEGES","PROTECTED","READ","REPLACE","REQUESTS","RESERV","RESERVING","RESTART","RESTRICT",
+			"RETAIN","RETURNING","REVERSE","RPAD","SCALAR_ARRAY","SCHEMA","SEGMENT","SEQUENCE",
+			"SHADOW","SHARED","SINGULAR","SIZE","SKIP","SNAPSHOT","SORT","SOURCE","SPACE",
+			"STABILITY","STARTING","STARTS","STATEMENT","STATISTICS","SUB_TYPE","SUSPEND",
+			"TEMPORARY","TIMEOUT","TRANSACTION","TWO_PHASE","TYPE","UNCOMMITTED","UNDO",
+			"WAIT","WORK","WRITE",
+		]; 
+		SyntaxKind sqlSyntaxOf(string s)
+		{
+			/+Opt: This is fucking slow+/
+			s = s.uc; 
+			if(FB25_CORE_KEYWORDS.canFind(s))	return skKeyword; 
+			else if(FB25_SECURITY_WORDS.canFind(s))	return skIdentifier6; 
+			else if(FB25_TYPES.canFind(s))	return skBasicType; 
+			else if(FB25_AGGRFUNCTIONS.canFind(s))	return skAttribute; 
+			else if(FB25_VARIABLES.canFind(s))	return skSymbol; 
+			else if(FB25_OPERATORS.canFind(s))	return skSymbol; 
+			else if(FB25_FUNCTIONS.canFind(s))	return skSymbol; 
+			else if(FB25_RESERVED_WORDS.canFind(s))	return skIdentifier2; 
+			else if(FB25_IMPORTANT_WORDS.canFind(s))	return skIdentifier3; 
+			return skIdentifier1; 
+		} 
+		
+		
+	}
 }version(/+$DIDE_REGION D Parser+/all)
 {
 	struct CodeLocation
@@ -4133,7 +4255,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1E746287CC3DD).檢(0x1D64BFDEAC48D)); 
+			((0x1FD90899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
