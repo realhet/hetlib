@@ -25,7 +25,7 @@ version(/+$DIDE_REGION+/all)
 		
 		version(OpenGLUI)
 		{
-			public import het.opengl: GLWindow, gl, GL_COLOR_BUFFER_BIT; import het.opengl: oldTextures = textures, DefaultFont_subTexIdxMap; 
+			//public import het.opengl: GLWindow, gl, GL_COLOR_BUFFER_BIT; import het.opengl: oldTextures = textures, DefaultFont_subTexIdxMap; 
 			
 			alias UIWindow = GLWindow; 
 			
@@ -66,7 +66,7 @@ version(/+$DIDE_REGION+/all)
 		
 		version(VulkanUI)
 		{
-			//public import het.vulkanwin; 
+			public import het.vulkanwin; 
 			
 			alias UIWindow = VulkanWindow; 
 			

@@ -183,19 +183,30 @@ class AiChat
 			{
 				const 	st 	= now.localSystemTime, 
 					hour	= st.wHour + st.wMinute/60.0,
-					scale 	= ((mixin(界3(q{1.5},q{hour},q{17.5})))?(1.0/+Note: normal+/):(0.5/+Note: discount+/)); 
+					scale 	= /+((mixin(界3(q{1.5},q{hour},q{17.5})))?(1.0/+Note: normal+/):(0.5/+Note: discount+/)) before 260402+/
+						  1.0; 
 				//Todo: model dependent prices.  this is chat only
 				return i"Usage(prompt_hit: $(cached_prompt_tokens), ".text~
 				i"prompt_miss: $(prompt_tokens), ".text~
 				i"completion: $(completion_tokens), ".text~
 				format!"HUF: %.2f, "
+				/+
+					(
+						(
+							cached_prompt_tokens	*0.07*scale+
+							(prompt_tokens-cached_prompt_tokens)	*0.27*scale+
+							completion_tokens	*1.10*scale
+						)
+						/ 1e6 * 380 /+Todo: more accurate usd to huf+/
+					)~ before 260402
+				+/
 				(
 					(
-						cached_prompt_tokens	*0.07*scale+
-						(prompt_tokens-cached_prompt_tokens)	*0.27*scale+
-						completion_tokens	*1.10*scale
+						cached_prompt_tokens	*0.028*scale+
+						(prompt_tokens-cached_prompt_tokens)	*0.28*scale+
+						completion_tokens	*0.42*scale
 					)
-					/ 1e6 * 380 /+Todo: more accurate usd to huf+/
+					/ 1e6 * 333 /+Todo: more accurate usd to huf+/
 				)~
 				format!"price: %3d%%)"((scale*100).iround); 
 			} 
