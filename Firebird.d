@@ -1749,13 +1749,13 @@ version(/+$DIDE_REGION+/all) {
 	
 	class FbFuncts
 	{
-		private: 
+		enum LOG_enabled = (常!(bool)(0)); 
 		
-		enum LOG_enabled = (常!(bool)(1)); 
+		private: 
 		
 		version(/+$DIDE_REGION Core stuff+/all)
 		{
-			private void _loadFuncts() //must be called right after it got an active opengl contect
+			void _loadFuncts() //must be called right after it got an active opengl contect
 			{
 				if(!&isc_attach_database) return; //already loaded
 				
@@ -2203,7 +2203,7 @@ version(/+$DIDE_REGION+/all) {
 					}
 					catch(Exception e)
 					{
-						((0xDD916FCAA195).檢 (global_status_vector[1])); 
+						((0xDD896FCAA195).檢 (global_status_vector[1])); 
 						if(global_status_vector[1].among(mixin(舉!((ISC_STATUS),q{db_or_file_exists})), mixin(舉!((ISC_STATUS),q{io_error}))))
 						{
 							static if(LOG_enabled) print(i"  \33\16DB already exists, attaching to it...\33\7".text); 
@@ -2230,8 +2230,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xE1246FCAA195).檢((update間(_間)))); 
-					((0xE1566FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xE11C6FCAA195).檢((update間(_間)))); 
+					((0xE14E6FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 
@@ -2399,1622 +2399,8 @@ version(/+$DIDE_REGION+/all) {
 		
 		
 		
-	} 
-	class FbFields
-	{
-		enum align_enabled = (常!(bool)(0))/+Todo: Benchmark the effect of this!+/; 
-		
-		private { ubyte[] infoBuf, dataBuf; } 
-		
-		@property XSQLDA* xsqlda() => (cast(XSQLDA*)(infoBuf.ptr)); 
-		@property XSQLVAR[] vars() => xsqlda.sqlvar.ptr[0 .. xsqlda.sqld]; 
-		private XSQLVAR*[string] pvarByName; 
-		
-		ref opIndex(size_t i)
-		=> vars[i]; size_t length()
-		=> vars.length; 
-		
-		XSQLVAR* opIndex(string s)
-		=> pvarByName.get(s, null); XSQLVAR* opDispatch(string name)()
-		=> this[name]; 
-		
-		
-		string sqlText /+prepared sql thext after input+/; 
-		size_t inputSignature; 
-		
-		/+
-			Use cases:
-			 1. Create data buffer layout for statement output
-				/+Code: f = new FbFields(NumFields); ...; f.reallocInfoIfNeeded; f.prepareOutput;+/
-			 2. Create input layout for statement parameters and fill it with data
-				/+Code: f = new FbFields; f.prepareInput((i"SELECT $(1+1)")); /+use /+Code: f.sqlText+/+/+/
-			And then give /+Code: f.xsqlda+/ to isc_dsql_ functions!
-		+/
-		
-		this()
-		{} 	 this(uint n)
-		{ allocInfo(n); } 
-		
-		void allocInfo(uint n)
-		{
-			infoBuf.length = XSQLDA_LENGTH(n.to!int); 
-			with(xsqlda)
-			{
-				version_ = SQLDA_VERSION1; 
-				sqldaid[] = "SQLDA   "; 
-				sqln = n.to!short; 
-				sqld = 0; 
-			}
-		}  bool reallocInfoIfNeeded()
-		{
-			if(!xsqlda) return false; 
-			if(xsqlda.sqld<=xsqlda.sqln) return false; 
-			auto need = xsqlda.sqld; 
-			allocInfo(need.to!uint); 
-			return true; 
-		} 
-		
-		void prepareOutput()
-		{ prepareDataBuf; 	/+allocate and layout data buffer+/} 
-		
-		void reset()
-		{
-			allocInfo(0); dataBuf = []; 
-			sqlText = ""; inputSignature = 0; 
-		} 
-		
-		static size_t calcInputSignature(Args...)(string[] literals)
-		{
-			size_t h = "XSQLDA_INPUT_SIGNATURE".hashOf; 
-			static foreach(T; Args) {
-				{
-					static if(!is(Unqual!T==InterpolatedExpression!e, string e))
-					h = h.mix64(T.stringof.hashOf); 
-				}
-			}
-			foreach(lit; literals) h = h.mix64(lit.hashOf); 
-			return h; 
-		} 
-		static assert(
-				calcInputSignature!(InterpolatedExpression!"ignored1")(["x"])
-			==	calcInputSignature!(InterpolatedExpression!"ignored2")(["x"])
-		); 
-		
-		private void fieldsToXsqlda(bool[] nullables, SQL_TYPE[] types, ushort[] lens)
-		{
-			allocInfo(types.length.to!uint); 
-			with(xsqlda) sqld = sqln; 
-			
-			foreach(i, ref var; vars)
-			with(vars[i]) {
-				sqltype 	= (cast(short)(types[i] + (nullables[i] ? 1 : 0))),
-				sqllen 	= lens[i]; 
-			}
-		} 
-		
-		private void prepareDataBuf()
-		{
-			uint[] nullOffsets, dataOffsets; uint totalSize = 0; 
-			
-			static short requiredSize(in SQL_TYPE type, short len)
-			{
-				with(SQL_TYPE)
-				final switch(type)
-				{
-					case VARYING: 	return (2 + len)
-					.to!short; 
-					case TEXT: 	return len; 
-					case SHORT: 	return 2; 
-					case LONG: 	return 4; 
-					case INT64: 	return 8; 
-					case FLOAT: 	return 4; 
-					case DOUBLE: 	return 8; 
-					case D_FLOAT: 	return 8; 
-					case DATE: 	return 4; 
-					case TIME: 	return 4; 
-					case TIMESTAMP: 	return 8; 
-					case QUAD: 	return 8; 
-					case BLOB: 	return 8; 
-					case ARRAY: 	return 8; 
-						
-					case NULL: 	return 2; 
-				}
-			} 
-			
-			static auto layoutField(in bool isNullable, in SQL_TYPE type, in ushort len, ref uint actOfs)
-			{
-				enforce(len.inRange(1, 0x7fff), "`len` out of range"); 
-				
-				void alignOfs(uint n)
-				{ if(align_enabled) actOfs = actOfs.alignUp(n); } 
-				void alignOfs16_back2()
-				{ if(align_enabled) while(actOfs % 16 != 16-2) actOfs++; } 
-				
-				version(/+$DIDE_REGION Null indicator (optional)+/all)
-				{
-					if(isNullable) actOfs = actOfs.alignUp(2); 
-					uint nullOfs = actOfs; 
-					if(isNullable) actOfs += 2; 
-				}
-				
-				version(/+$DIDE_REGION Actual data+/all)
-				{
-					/+The 1st char of strings must be 16byte aligned. Other data is aligned to its size.+/
-					with(SQL_TYPE)
-					final switch(type)
-					{
-						case VARYING: 	alignOfs16_back2; 	break; 
-						case TEXT: 	alignOfs(16); 	break; 
-						case SHORT, NULL: 	alignOfs(2); 	break; 
-						case 	DATE, TIME, LONG, 	FLOAT: 	alignOfs(4); 	break; 
-						case 	INT64, DOUBLE, D_FLOAT, 
-							TIMESTAMP, QUAD, BLOB, ARRAY: 	alignOfs(8); 	break; 
-					}
-					uint dataOfs = actOfs; 
-					actOfs += requiredSize(type, len); 
-				}
-				struct Res { uint nullOfs, dataOfs; } 
-				return Res(nullOfs, dataOfs); 
-			} 
-			
-			{
-				uint actOfs = 0; 
-				foreach(ref var; vars)
-				{
-					const layout = layoutField(var.isNullable, var.type, var.sqllen.to!ushort, actOfs); 
-					nullOffsets ~= layout.nullOfs; 
-					dataOffsets ~= layout.dataOfs; 
-				}
-				totalSize = actOfs.alignUp(align_enabled ? 16 : 1); 
-			}
-			
-			{
-				dataBuf = new ubyte[totalSize]; 
-				uint actOfs = 0; 
-				foreach(i, ref var; vars)
-				{
-					var.sqldata = dataBuf.ptr + dataOffsets[i],
-					var.sqlind = ((var.isNullable)?((cast(short*)(dataBuf.ptr + nullOffsets[i]))):(null)); 
-				}
-			}
-			
-			{
-				pvarByName.clear; 
-				foreach(ref v; vars) pvarByName[v.aliasName] = &v; 
-				pvarByName.rehash; 
-			}
-		} 
-		
-		void prepareInput(Args...)(string[] literals)
-		{
-			reset; 
-			void appendSql(string s) { sqlText ~= s; } 
-			
-			version(/+$DIDE_REGION Internal state for functions+/all)
-			{ bool[] nullables; SQL_TYPE[] types; ushort[] lens; auto literalIdx=0; }
-			
-			void appendField(bool isNullable, SQL_TYPE type, size_t len)
-			{
-				nullables ~= isNullable; 
-				types ~= type; 
-				lens ~= len.to!ushort; 
-			} 
-			
-			void processParam(T_)()
-			{
-				static if(is(Unqual!T_==Nullable!NT, NT))
-				{
-					enum isNullable = true; 
-					alias T = Unqual!NT; 
-				}else {
-					enum isNullable = false; 
-					alias T = Unqual!T_; 
-				}
-				
-				void append(string s, SQL_TYPE type, size_t len)
-				{ appendSql(s); appendField(isNullable, type, len); } 
-				
-				enum DefaultVarcharLength = 80; 
-				void prepareVarchar(size_t N)
-				{
-					enforce(mixin(界3(q{1},q{N},q{0x7FFF})), i"Invalid Varchar length. $(N)".text); 
-					append(i"CAST(? AS VARCHAR($(N)))".text, SQL_TYPE.VARYING, N); 
-				} 
-				
-				static if(isIntegral!T || is(T==bool))
-				{
-					static if(
-						is(T==ubyte) || 
-						is(T==byte) || 
-						is(T==short) || 
-						is(T==bool)
-					)	{ append("CAST(? AS SMALLINT)", SQL_TYPE.SHORT, 2); }
-					else static if(
-						is(T==ushort) || 
-						is(T==int)
-					)	{ append("CAST(? AS INT)", SQL_TYPE.LONG, 4); }
-					else static if(
-						is(T==uint) || 
-						is(T==long)
-					)	{ append("CAST(? AS BIGINT)", SQL_TYPE.INT64, 8); }
-					else static if(is(T==ulong))
-					static assert(0, "ULONG is not safely representable as a Firebird integer."); 
-					else static assert(0, "Unhandled integral IES type: " ~ T.stringof); 
-				}
-				else static if(isFloatingPoint!T)
-				{
-					static if(is(T==float))	{ append("CAST(? AS FLOAT)", SQL_TYPE.FLOAT, 4); }
-					else static if(is(T==double))	{ append("CAST(? AS DOUBLE PRECISION)", SQL_TYPE.DOUBLE, 8); }
-					else static assert(0, "Unhandled floating IES type: " ~ T.stringof); 
-				}
-				else static if(is(T==Varchar!N, uint N))	{ prepareVarchar(N); }
-				else static if(is(T==string))	{ prepareVarchar(DefaultVarcharLength); }
-				else static if(is(T==Date))	{ append("CAST(? AS DATE)", SQL_TYPE.DATE, 4); }
-				else static if(is(T==Time))	{ append("CAST(? AS TIME)", SQL_TYPE.TIME, 4); }
-				else static if(is(T==DateTime))	{ append("CAST(? AS TIMESTAMP)", SQL_TYPE.TIMESTAMP, 8); }
-				else static assert(0, "Unhandled IES type: " ~ T.stringof); 
-			} 
-			
-			version(/+$DIDE_REGION Prepare field metadata+/all)
-			{
-				{
-					uint actIdx=0; 
-					static foreach(A; Args)
-					{
-						{
-							alias T = Unqual!(A); 
-							static if(is(T==InterpolationHeader))	{}
-							else static if(is(T==InterpolationFooter))	{}
-							else static if(
-								is(
-									T==InterpolatedLiteral!str,
-									string str
-								)
-							)	{ appendSql(str); }
-							else static if(
-								is(
-									T==InterpolatedExpression!expr,
-									string expr
-								)
-							)	{ actIdx++; }
-							else static if(isLiteral!T)	{ appendSql(literals[literalIdx++]); }
-							else	{ processParam!T; }
-						}
-					}
-				}
-			}
-			
-			sqlText = sqlText.convertTokenStringToSQL; 
-			
-			fieldsToXsqlda(nullables, types, lens); 
-			prepareDataBuf; 
-			
-			inputSignature = calcInputSignature!(Args)(literals); 
-		} 
-			
-		void fillInput(Args...)(Args args)
-		{
-			version(/+$DIDE_REGION Internal state for functions+/all)
-			{ uint paramIdx=0; }
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			void placeParam(T_)(T_ arg)
-			{
-				static if(is(Unqual!T_==Nullable!NT, NT))
-				{
-					enum isNullable = true; 
-					auto isNull() => arg.isNull; 
-					auto get() => arg.get; 
-					alias T = Unqual!NT; 
-				}else {
-					enum isNullable = false; 
-					enum isNull = false; 
-					auto get() => arg; 
-					alias T = Unqual!T_; 
-				}
-				
-				ref var = vars[paramIdx]; 
-				static if(isNullable) *var.sqlind = ((isNull)?(-1):(0)); 
-				
-				if(!isNullable || !isNull)
-				{
-					void placeVarchar(string str)
-					{
-						enforce(
-							str.length<=var.sqllen,
-							i"String too long for VARCHAR: $(str.length) > $(var.sqllen)".text
-						); 
-						*(cast(short*)(var.sqldata)) = (cast(short)(str.length)); 
-						(cast(char*)(var.sqldata))[2..2+str.length] = str; 
-					} 
-					
-					static if(isIntegral!T || is(T==bool))
-					{
-						static if(
-							is(T==ubyte) || 
-							is(T==byte) || 
-							is(T==short) || 
-							is(T==bool)
-						)	{ *(cast(short*)(var.sqldata)) = get.to!short; }
-						else static if(
-							is(T==ushort) || 
-							is(T==int)
-						)	{ *(cast(int*)(var.sqldata)) = get.to!int; }
-						else static if(
-							is(T==uint) || 
-							is(T==long)
-						)	{ *(cast(long*)(var.sqldata)) = get.to!long; }
-						else static if(is(T==ulong))
-						static assert(0, "ULONG is not safely representable as a Firebird integer."); 
-						else static assert(0, "Unhandled integral IES type: " ~ T.stringof); 
-					}
-					else static if(isFloatingPoint!T)
-					{
-						static if(is(T==float))	{ *(cast(float*)(var.sqldata)) = 	get.to!float; }
-						else static if(is(T==double))	{ *(cast(double*)(var.sqldata)) = 	get.to!double; }
-						else static assert(0, "Unhandled floating IES type: " ~ T.stringof); 
-					}
-					else static if(is(T==Varchar!N, uint N)) { placeVarchar(get.value); }
-					else static if(is(T==string))	{ placeVarchar(get); }
-					else static if(is(T==Date))	{ *(cast(ISC_DATE*)(var.sqldata)) = get.toIscDate; }
-					else static if(is(T==Time))	{ *(cast(ISC_TIME*)(var.sqldata)) = get.toIscTime; }
-					else static if(is(T==DateTime))	{
-						*(cast(ISC_TIMESTAMP*)(var.sqldata)) = 
-							get.localFileTime.toIscTimestamp; 
-					}
-					else static assert(0, "Unhandled IES type: " ~ T.stringof); 
-				}
-			} 
-			
-			version(/+$DIDE_REGION Append actual data+/all)
-			{
-				{
-					uint actIdx=0; 
-					static foreach(i, arg; args)
-					{
-						{
-							alias T = Unqual!(typeof(arg)); 
-							static if(is(T==InterpolationHeader))	{}
-							else static if(is(T==InterpolationFooter))	{}
-							else static if(
-								is(
-									T==InterpolatedLiteral!str,
-									string str
-								)
-							)	{}
-							else static if(
-								is(
-									T==InterpolatedExpression!expr, 
-									string expr
-								)
-							)	{ paramIdx = actIdx++; }
-							else static if(isLiteral!T)	{}
-							else	{ placeParam(arg); }
-						}
-					}
-				}
-			}
-		} 
-	} 
-	public class FbDatabase
-	{
-		/+NOT THREADSAFE!+/
-		
-		isc_db_handle db_handle; 
-		this(isc_db_handle db_handle)
-		{ this.db_handle = db_handle.enforce("NULL db_handle."); } 
-		
-		this(string dbPath, string user, string pass, bool create=false)
-		{ this(fb.attach_database(dbPath, user, pass, create: create)); } 
-		
-		~this()
-		{
-			if(activeTransactionCount)
-			ERR(i"There were active transactions: amount: $(activeTransactionCount) db_handle:$(db_handle)"); 
-			//ignore cached statements: those will be freed by the server.
-			fb.detach_database(db_handle); 
-		} 
-		
-		version(/+$DIDE_REGION StatementCache+/all)
-		{
-			struct Statement {
-				isc_stmt_handle stmt_handle; 
-				FbFields inputFields, outputFields; 
-			} 
-			Statement[ulong] statementCache; 
-			
-			void clearStatementCache()
-			{
-				foreach(ref s; statementCache.byValue) fb.dsql_drop_statement(s.stmt_handle); 
-				statementCache.clear; 
-			} 
-			
-			private auto accessStatement(Args...)(ref isc_tr_handle trans_handle, string[] literals)
-			{
-				const inputSignature = FbFields.calcInputSignature!Args(literals); 
-				
-				Statement statement = statementCache.get(inputSignature); 
-				if(!statement.stmt_handle)
-				{
-					with(fb)
-					{
-						isc_stmt_handle stmt_handle; 
-						stmt_handle = dsql_allocate_statement(db_handle); 
-						scope(failure) dsql_drop_statement(stmt_handle); 
-						
-						auto inputFields = new FbFields; 
-						inputFields.prepareInput!Args(literals); 
-						const sqlText = inputFields.sqlText; 
-						dsql_prepare(trans_handle, stmt_handle, sqlText); 
-						dsql_describe_bind(stmt_handle, inputFields.xsqlda); 
-						
-						FbFields outputFields = null /+not for all statements+/; 
-						if(
-							sql_info_stmt_type(stmt_handle).among
-								(mixin(舉!((isc_info_sql_stmt_),q{select})), mixin(舉!((isc_info_sql_stmt_),q{exec_procedure})))
-						)
-						{
-							outputFields = new FbFields(1); 
-							dsql_describe(stmt_handle, outputFields.xsqlda); 
-							if(outputFields.reallocInfoIfNeeded)
-							dsql_describe(stmt_handle, outputFields.xsqlda); 
-							outputFields.prepareOutput; 
-						}
-						
-						//print("SQL INFO:\n"~sql_info(stmt_handle).split("\n").map!`"  "~a`.join('\n')); 
-						
-						statement = Statement(stmt_handle, inputFields, outputFields); 
-						statementCache[inputSignature] = statement; 
-					}
-				}
-				return statement; 
-			} 
-		}
-		
-		Transaction startTransaction(bool modify = false)
-		{ return new Transaction(modify: modify); } 
-		
-		private static void freeTransaction(ref Transaction tr)
-		{
-			if(tr) {
-				scope(exit) tr.free; 
-				if(tr.active)	{ ((tr.errorCount>0)?(tr.rollback) :(tr.commit)); }
-			}
-		} 
-		
-		static struct ScopedTransaction
-		{
-			private Transaction transaction_; 
-			@property Transaction transaction() => transaction_; 
-			alias this = transaction_; 
-			
-			@disable this(this); 
-			this(Transaction transaction)
-			{ transaction_ = transaction; } 
-			
-			~this()
-			{ freeTransaction(transaction_); } 
-		} 
-		
-		scope auto transaction(bool modify = false)
-		=> ScopedTransaction(startTransaction(modify: modify)); 
-		
-		scope FbResultSet 查(Args...)(LOCATION_t loc, Args args)
-		{
-			auto tr = startTransaction, res = tr.查!Args(loc, args); 
-			res.ownedTransaction = tr; return res; 
-		} 
-		
-		protected {
-			size_t activeTransactionCount;  void _notifyTransactionCreated(Transaction tr)
-			{ activeTransactionCount++; }  void _notifyTransactionDestroyed(Transaction tr)
-			{ activeTransactionCount--; } 
-		} 
-		
-		class Transaction
-		{
-			isc_tr_handle trans_handle; 
-			uint errorCount=0; 
-			
-			bool active()const => !!trans_handle; 
-			
-			this(bool modify = false)
-			{
-				trans_handle = fb.start_transaction	(db_handle, fb.createTPB(modify: modify)); 
-				_notifyTransactionCreated(this); 
-			} 
-			
-			~this()
-			{ if(active) { rollback; WARN("Dangling active transaction."); }} 
-			
-			void enforceActive()
-			{ enforce(active, "Transaction must be active."); } 
-			
-			void commit()
-			{
-				if(active) {
-					fb.commit_transaction(trans_handle); assert(!active); 
-					_notifyTransactionDestroyed(this); 
-				}
-			} 
-			
-			void rollback()
-			{
-				if(active) {
-					fb.rollback_transaction(trans_handle); assert(!active); 
-					_notifyTransactionDestroyed(this); 
-				}
-			} 
-			
-			static struct ResultSet
-			{
-				private {
-					FbFields fields_; 
-					isc_stmt_handle handle_; 
-					Transaction ownedTransaction; 
-				} 
-				
-				@property fields() => fields_; 
-				@property empty() => !handle_; 
-				//This is NOT an InputRange, it has opApply() with empty().
-				
-				@disable this(this); 
-				this(FbFields fields, isc_stmt_handle handle)
-				{
-					fields_ = fields, handle_ = handle; 
-					if(fields is null)
-					{ close; /+it has no result set.+/}
-					else
-					{
-						//fetch the very first row
-						scope(failure) close; 
-						if(!fb.dsql_fetch(handle_, fields.xsqlda)) close; 
-					}
-				} 
-				
-				~this() { close; } 
-				
-				void close()
-				{
-					if(handle_) {
-						scope(exit) { handle_ = 0; }
-						fb.dsql_close_statement(handle_); 
-					}
-					freeTransaction(ownedTransaction); 
-				} 
-				
-				int opApply(scope int delegate(FbFields) dg)
-				{
-					scope(exit) close(); 
-					while(handle_)
-					{
-						const res = dg(fields_); 
-						if(res) return res; 
-						if(!fb.dsql_fetch(handle_, fields.xsqlda)) break; 
-					}
-					return 0; 
-				} 
-			} 
-			
-			scope ResultSet execute(Args...)(Args args)
-			{
-				enforceActive; 
-				scope(failure) errorCount++; 
-				
-				version(/+$DIDE_REGION Collect literal SQL strings+/all)
-				{
-					enum numLiterals = Filter!(isLiteral, Args).length; 
-					string[numLiterals] literals; 
-					static if(numLiterals)
-					{
-						{
-							auto literalIdx = 0; 
-							static foreach(a; args)
-							static if(isLiteral!(typeof(a)))
-							literals[literalIdx++] = a.value; 
-						}
-					}
-				}
-				
-				auto statement = accessStatement!(Args)(trans_handle, literals[]); 
-				statement.inputFields.fillInput(args); 
-				fb.dsql_execute(
-					trans_handle, statement.stmt_handle, 
-					statement.inputFields.xsqlda
-				); 
-				return ResultSet(statement.outputFields, statement.stmt_handle); 
-			} 
-			
-			scope ResultSet 查(Args...)(LOCATION_t loc, Args args)
-			{
-				/+
-					Example input:
-					/+
-						Code: c:\codex\d\firebird\firebird.d(3276,1),
-						(
-							InterpolationHeader, 
-								InterpolatedLiteral!"options", 
-							InterpolationFooter, 
-							InterpolationHeader, 
-								InterpolatedLittoStringeral!"SELECT ", 
-								InterpolatedExpression!"1", int, 
-								InterpolatedLiteral!"+", 
-								InterpolatedExpression!"2", int, 
-								InterpolatedLiteral!" FROM RDB$DATABASE", 
-							InterpolationFooter
-						)
-					+/
-				+/
-				
-				enum endIdx = staticIndexOf!(InterpolationFooter, Args); 
-				static assert(endIdx>=1); 
-				alias optionArgs 	= args[1..endIdx /+no header/footer+/], 
-				queryArgs 	= args[endIdx+1..$]; 
-				
-				static if(optionArgs.length<=1)
-				{
-					static if(optionArgs.length)
-					{
-						static if(
-							is(
-								typeof(optionArgs[0])==
-								InterpolatedLiteral!str, string str
-							)
-						)
-						enum queryOptions = str; 
-					}
-					else	enum queryOptions = ""; 
-				}
-				static assert(
-					__traits(compiles, queryOptions), 
-					"Invalid options format. Only static options are valid."
-				); 
-				
-				//print(loc); print(queryOptions.stringof); 
-				try
-				{ return execute(queryArgs); }
-				catch(Exception e)
-				{
-					auto 	cl = CodeLocation(loc.text),
-						file = cl.file.fullName, line = cl.lineIdx,
-						msg = e.simpleMsg; 
-					if(msg.isWild("`Dynamic SQL Error`, `SQL error code = ?*`, `?* - line ?*, column ?*`*"))
-					{
-						msg = i"Dynamic SQL Error($(wild[0])): $(wild[1])$(wild[4])".text; 
-						line += wild.ints(2)-1; 
-					}
-					else if(msg.isWild("`Dynamic SQL Error`, `SQL error code = ?*`, ?*, `At line ?*, column ?*`"))
-					{
-						msg = i"Dynamic SQL Error($(wild[0])): $(wild[1])".text; 
-						line += wild.ints(2)-1; 
-					}
-					else if(msg.isWild("`Dynamic SQL Error`, `SQL error code = ?*`, ?*"))
-					{ msg = i"Dynamic SQL Error($(wild[0])): $(wild[1])".text; }
-					enforce(0, msg, file, line); assert(0); 
-				}
-			} 
-		} 
-		
-		/+
-			RDB$RELATIONS columns (2.5):
-			
-			 - RDB$RELATION_NAME (CHAR(31)) 	table/view name
-			 - RDB$RELATION_ID (SMALLINT) 	internal id
-			 - RDB$RELATION_TYPE (SMALLINT) 	relation type (table, view, GTT, etc.)
-			 - RDB$VIEW_BLR (BLOB BLR) 	view BLR; NULL for tables
-			 - RDB$VIEW_SOURCE (BLOB TEXT) 	view SQL source; NULL for tables
-			 - RDB$DESCRIPTION (BLOB TEXT) 	comment/description
-			 - RDB$SYSTEM_FLAG (SMALLINT) 	system vs user (0 = user)
-			 - RDB$DBKEY_LENGTH (SMALLINT) 	size of dbkey
-			 - RDB$FORMAT (SMALLINT) 	internal, points into RDB$FORMATS
-			 - RDB$FIELD_ID (SMALLINT) 	next field id for new columns
-			 - RDB$SECURITY_CLASS (CHAR(31)) 	security class
-			 - RDB$EXTERNAL_FILE (VARCHAR(255)) 	external file path (if external table)
-			 - RDB$RUNTIME (BLOB) 	internal metadata
-			 - RDB$EXTERNAL_DESCRIPTION (BLOB) 	comments for external file
-			 - RDB$OWNER_NAME (CHAR(31)) 	creator user
-			 - RDB$DEFAULT_CLASS (CHAR(31)) 	default security class for new cols
-			 - RDB$FLAGS (SMALLINT) 	internal flags
-			
-			Source: Firebird language reference, system tables appendix.
-			/+
-				Link: https://www.firebirdsql.org/file/documentation/chunk/en/refdocs/fblangref30/
-				fblangref-appx04-relations.html?utm_source=openai)
-			+/
-		+/
-		
-		auto allTablesAndViews(string mask="*", bool tables=true, bool views=true)
-		{
-			with(transaction)
-			return (查((位!()),iq{},iq{
-				SELECT rdb$relation_name FROM rdb$relations
-				WHERE rdb$system_flag=0
-				AND(
-						$(tables)	=1 AND rdb$view_blr IS NULL
-					OR	$(views)	=1 AND rdb$view_blr IS NOT NULL
-				)
-			}))
-			.toArray!string.filter!((a)=>(a.isWild(mask))).array; 
-		} 
-		auto allTables(string mask="*")
-		=> allTablesAndViews(mask, views: false); auto allViews(string mask="*")
-		=> allTablesAndViews(mask, false); 
-		
-		scope FbResultSet fetchTable(string tableName)
-		{
-			auto tr = new Transaction; scope(failure) tr.free; 
-			FbResultSet res; 
-			with(tr) res = (查((位!()),iq{},iq{SELECT * FROM $(Literal(tableName))})); 
-			res.ownedTransaction = tr; /+
-				The Resultset owns this transaction.
-				It will close it when it's done.
-			+/
-			return res; 
-		} 
-		
-		string fetchHeaders(string mask="*")
-		=> mixin(求map(q{name},q{allTablesAndViews(mask)},q{fetchTable(name).formatTable (TableStyle.struct_hdr)})).join; 
 	} 
-}
-version(/+$DIDE_REGION+/all) {
-	alias FbResultSet = FbDatabase.Transaction.ResultSet; 
-	
-	enum TableStyle : ubyte
-	{hex, json, csv, txt, struct_, struct_hdr, struct_data, struct_hdr_ex, ascii, ansi, ansi_thick, ansi_round, turbo, norton} 
-	
-	TableStyle toTableStyle(string s)()
-	=> ((sameText(s, "struct"))?(TableStyle.struct_):(s.lc.to!TableStyle)); 
-	
-	string formatTable(string style="json")(auto ref FbResultSet rows, TableStyle style=toTableStyle!style)
-	{
-		if(!rows.fields) return ""; 
-		/+
-			rows: This range returns an FbFields reference containing the binary data of the 
-			most recent fetched row, and all the metadata in `xsqlda` / `vars[]`.
-		+/
-		auto vars = rows.fields.vars; 
-		
-		version(/+$DIDE_REGION Result string building+/all)
-		{
-			auto res = appender!string; 
-			void appendStr(string s) { res ~= s; } 
-			void appendLine(string s) { res ~= ((res.empty)?(""):("\n"))~s; } 
-		}
-		
-		
-		
-		void appendSeparatedRow(string varField, string delim, string invalidChars)()
-		{
-			string quoteIfNeeded(string s)
-			=> ((
-				s.map!(
-					iq{
-						a<32 || a.among(
-							'"', '\'', '`' $(
-								((invalidChars!="")?(","):(""))
-								~ invalidChars
-							)
-						)
-					}.text
-				).any
-			) ?(s.quoted):(s)); 
-			appendLine(mixin(求map(q{v},q{vars},q{quoteIfNeeded(mixin("v."~varField))})).join(delim)); 
-		} 
-		
-		static struct GridStyle { string[3] horiz; string[3][3] box; string[3] vert; string[2][2] pad; } 
-		void formatGrid(in GridStyle g)
-		{
-			auto 	isNumeric 	= vars.map!((v)=>(v.isSomeNumber)).array,
-				data 	= [vars.map!((v)=>(v.aliasName)).array],
-				widths 	= data[0].map!"a.length".array; 
-			
-			foreach(row; rows) {
-				auto line = vars.map!((v)=>(v.toPlainText)).array; data ~= line; 
-				foreach(i, s; line) widths[i].maximize(s.length); 
-			}
-			
-			string padCell(string s, size_t w, bool alignRight)
-			=> ((alignRight)?(s.padLeft(' ', w).text):(s.padRight(' ', w).text)); 
-			
-			void appendRow(string[] data, bool header=false)
-			{
-				appendLine(
-					g.vert[0] ~ (
-						iota(data.length).map!
-						((i)=>(
-							g.pad[1-header][0]~
-							padCell(
-								data[i], widths[i], 
-								isNumeric[i]&~header
-							)~
-							g.pad[1-header][1]
-						)).join(g.vert[1])
-					) ~ g.vert[2]
-				); 
-			} 
-			
-			string buildHLine(int i)
-			=> g.box[i][0] ~ widths.map!((w)=>(g.horiz[i].replicate(w))).join(g.box[i][1]) ~ g.box[i][2]; 
-			const hLines = iota(3).map!buildHLine.array; 
-			
-			appendLine(hLines[0]); appendRow(data[0], header: true); 
-			appendLine(hLines[1]); data[1..$].each!appendRow; appendLine(hLines[2]); 
-		} 
-		
-		void appendStructDefinition(R1, R2, R3, R4)(
-			string relName, string structName, 
-			R1 fieldTypes, R2 origFieldNames, R3 fieldNames, R4 comments
-		)
-		{
-			appendLine(i"@$(relName.quoted) struct $(structName)".text); 
-			appendLine("{"); 
-				foreach(orig, type, name, comment; zip(origFieldNames, fieldTypes, fieldNames, comments))
-			appendLine(i"\t@$(orig.quoted) $(type) $(name);$(comment)".text); 
-			appendLine("}"); 
-		} 
-		
-		final switch(style)
-		{
-			case mixin(舉!((TableStyle),q{hex})): 	{ foreach(row; rows) appendLine(row.dataBuf.hexDump); }	break; 
-			case mixin(舉!((TableStyle),q{json})): 	{
-				appendLine("["); bool running; 
-				foreach(row; rows)
-				{
-					if(!running.chkSet) appendStr(","); 
-					const jsonField =
-					mixin(求map(q{v},q{vars},q{i"\t\t$(v.aliasName.quoted)\t: $(v.toJsonText)".text})).join(",\n"); 
-					appendLine("\t{\n" ~ jsonField ~ "\n\t}"); 
-				}
-				appendLine("]"); 
-			}	break; 
-			case mixin(舉!((TableStyle),q{csv})): 	{
-				alias doit(string v) = appendSeparatedRow!(v, ";", q{';', ','}); 
-				doit!q{aliasName}; foreach(row; rows) doit!q{toPlainText}; 
-			}	break; 	
-			case mixin(舉!((TableStyle),q{txt})): 	{
-				alias doit(string v) = appendSeparatedRow!(v, "\t", q{}); 
-				doit!q{aliasName}; foreach(row; rows) doit!q{toPlainText}; 
-			}	break; 
-			case mixin(舉!((TableStyle),q{struct_})),
-			mixin(舉!((TableStyle),q{struct_hdr})),
-			mixin(舉!((TableStyle),q{struct_data})),
-			mixin(舉!((TableStyle),q{struct_hdr_ex})): 	{
-				auto 	relName 	= vars.front.relName,
-					structName 	= vars.front.tableIdentifier,
-					origFieldNames 	= vars.enumerate.map!((a)=>(a.value.aliasName)).array,
-					fieldNames 	= vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
-					fieldTypes	= vars.map!((v)=>(v.DType)).array; 
-				if(style==mixin(舉!((TableStyle),q{struct_hdr_ex})))
-				{
-					auto examples = new string[][vars.length]; 
-					foreach(row; rows) foreach(i, var; vars) examples[i] ~= var.DLiteral; 
-					auto comments = examples.map!
-						((e)=>(
-						i"\t/+Structured:$(chain(e, only("...")).join(", ")
-.safeDCommentBody)+/".text
-					)).array; 
-					appendStructDefinition(
-						relName, structName, 
-						fieldTypes, origFieldNames, fieldNames, comments
-					); 
-				}
-				else
-				{
-					const hasHeader = style!=mixin(舉!((TableStyle),q{struct_data})), hasData = style!=mixin(舉!((TableStyle),q{struct_hdr})); 
-					if(hasHeader)
-					appendStructDefinition(
-						relName, structName, 
-						fieldTypes, origFieldNames, fieldNames, "".repeat
-					); 
-					if(hasData)
-					{
-						appendLine("["); bool running; 
-						foreach(row; rows)
-						{
-							if(!running.chkSet) appendStr(","); 
-							appendLine(i"\t$(structName)(".text); 
-							foreach(i, v; vars)
-							{
-								if(i) appendStr(","); 
-								appendLine(i"\t\t$(fieldNames[i]): $(v.DLiteral)".text); 
-							}
-							appendLine("\t)"); 
-						}
-						appendLine("]"); 
-					}
-				}
-			}	break; 
-			
-			case mixin(舉!((TableStyle),q{ascii})): 	{
-				formatGrid(
-					GridStyle(
-						[
-							"-",
-							"-",
-							"-"
-						],	[
-							["+-","-+-","-+"],
-							["+-","-+-","-+"],
-							["+-","-+-","-+"]
-						],
-							  ["| "," | "," |"]
-					)
-				); 
-			}	break; 
-			case mixin(舉!((TableStyle),q{ansi})): 	{
-				formatGrid(
-					GridStyle(
-						[
-							"─",
-							"─",
-							"─"
-						],	[
-							["┌─","─┬─","─┐"],
-							["├─","─┼─","─┤"],
-							["└─","─┴─","─┘"]
-						],
-							  ["│ "," │ "," │"]
-					)
-				); 
-			}	break; 
-			case mixin(舉!((TableStyle),q{ansi_thick})): 	{
-				formatGrid(
-					GridStyle(
-						[
-							"═",
-							"─",
-							"═"
-						],	[
-							["╔═","═╤═","═╗"],
-							["╟─","─┼─","─╢"],
-							["╚═","═╧═","═╝"]
-						],
-							  ["║ "," │ "," ║"]
-					)
-				); 
-			}	break; 
-			case mixin(舉!((TableStyle),q{ansi_round})): 	{
-				formatGrid(
-					GridStyle(
-						[
-							"─",
-							"─",
-							"─"
-						],	[
-							["╭─","─┬─","─╮"],
-							["├─","─┼─","─┤"],
-							["╰─","─┴─","─╯"]
-						],
-							  ["│ "," │ "," │"]
-					)
-				); 
-			}	break; 
-			case mixin(舉!((TableStyle),q{turbo})): 	{
-				const f = "\34\7\33\0", d = "\34\0\33\7"; 
-				formatGrid(
-					GridStyle(
-						[
-							"─",
-							"─",
-							"─"
-						],	[
-							[f~" ┌─","─┬─","─┐ "~d],
-							[f~" ├─","─┼─","─┤ "~d],
-							[f~" └─","─┴─","─┘ "~d]
-						],
-							  [f~" │ "," │ "," │ "~d],
-						[["\33\1","\33\0"],["",""]]
-					)
-				); 
-			}	break; 
-			case mixin(舉!((TableStyle),q{norton})): 	{
-				const f = "\34\1\33\13", d = "\34\0\33\7"; 
-				formatGrid(
-					GridStyle(
-						[
-							"═",
-							"─",
-							"═"
-						],	[
-							[f~"╔","╤","╗"~d],
-							[f~"╟","┼","╢"~d],
-							[f~"╚","╧","╝"~d]
-						],
-							  [f~"║","│","║"~d],
-						[["\33\16","\33\13"],["",""]]
-					)
-				); 
-			}	break; 
-		}
-		
-		return res[]; 
-	} 
-	
-	version(/+$DIDE_REGION+/all) {
-		T[] toStructArray(T)(auto ref FbResultSet rows, bool strict = true, string FILE = __FILE__, size_t LINE = __LINE__)
-		{
-			try
-			{
-				if(!rows.fields) return []; auto vars = rows.fields.vars; 
-				
-				enum structFieldNames = [FieldNamesWithUDA!(T, STORED, true)]; 
-				const 	varFieldNames = vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
-					colIdx = structFieldNames.map!
-						((sName){
-					const vIdx = varFieldNames.countUntil!sameText(sName); 
-					enforce(
-						!strict || vIdx>=0, 
-						i"Missing column for field $(sName)".text
-					); return vIdx; 
-				}).array; 
-				
-				auto res = appender!(T[]); 
-				foreach(row; rows)
-				{
-					T item; 
-					static foreach(i, name; structFieldNames)
-					{
-						if(colIdx[i]>=0)
-						{
-							alias FieldT = typeof(__traits(getMember, item, name)); 
-							__traits(getMember, item, name) = vars[colIdx[i]].readValue!FieldT; 
-						}
-					}
-					res ~= item; 
-				}
-				return res[]; 
-			}
-			catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
-		} 
-		T[] toArray(T)(auto ref FbResultSet rows, bool strict = true, string FILE = __FILE__, size_t LINE = __LINE__)
-		{
-			enum isValue = __traits(compiles, { XSQLVAR v; auto x = v.readValue!T; }); 
-			static if(!isValue)
-			{ return toStructArray!T(rows, strict, FILE, LINE); }
-			else
-			{
-				try
-				{
-					if(!rows.fields) return []; auto vars = rows.fields.vars; 
-					enforce(rows.fields.length>=1, "No columns in FbResultSet."); 
-					
-					auto res = appender!(T[]); 
-					foreach(row; rows) res ~= vars[0].readValue!T; 
-					return res[]; 
-				}
-				catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
-			}
-		} 
-	}
-	
-	
 	
-	void test_FbDatabase()
-	{
-		static if((常!(bool)(1)))
-		{
-			auto db = new FbDatabase(File(appPath, "EXAMPLE.FDB").fullName, "SYSDBA", "masterkey", create: true); 
-			scope(exit) db.free; 
-			
-			void dumpRow(Row)(Row row)
-			{ static if(FbFuncts.LOG_enabled) row.dataBuf.hexDump.print; } 
-			void dumpTable(Table)(Table resultSet)
-			{ static if(FbFuncts.LOG_enabled) foreach(row; resultSet) dumpRow(row); } 
-			auto _間=init間; 
-			static if((常!(bool)(1)))
-			version(/+$DIDE_REGION Input binding tests+/all)
-			{
-				with(db.transaction)
-				{
-					foreach(i; 0..1)
-					{
-						execute(iq{SELECT $(1)+$(2) FROM RDB$DATABASE}).each!((r){ dumpRow(r); }); 
-						(查((位!()),iq{},iq{SELECT $(1)+$(2) FROM RDB$DATABASE})).each!((r){ dumpRow(r); }); 
-						dumpTable (查((位!()),iq{},iq{SELECT $(1)+$(4) FROM RDB$DATABASE})); 
-						dumpTable (查 ((位!()),iq{},iq{
-							SELECT 
-								$(Nullable!int.init),	$(nullable(true)), 
-								$(nullable(ubyte(1)))	,$(nullable(byte(-128))),
-								$(short(32767)), 	$(ushort(65535)), 
-								$(-12345), 	$(4000000000U), 
-								$(-1234567890123), 
-								$(1.25f), $(π),
-								$("Hello Wörld!".Varchar!30), $(`Default 80 char string`)
-							FROM RDB$DATABASE
-						})); 
-					}
-				}
-			}
-			((0x179A96FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			{
-				version(/+$DIDE_REGION DateTime+/all)
-				{
-					with(db.transaction)
-					{
-						auto q(string style)()
-						=> (查 ((位!()),iq{},iq{
-							SELECT 
-								CURRENT_TIMESTAMP AS "dateTime",
-								CAST(CURRENT_TIMESTAMP AS DATE) AS "date",
-								CAST(CURRENT_TIMESTAMP AS TIME) AS "time",
-								CAST(`2026-03-25 12:34:56.1234` AS TIMESTAMP) AS "dateTime2",
-								$(now) AS "dateTimeNow",
-								$(now.date) AS "dateNow",
-								$(now.time) AS "timeNow"
-							FROM RDB$DATABASE
-						}))
-						.formatTable!style; 
-						((0x17C286FCAA195).檢 (q!"json")); 
-						((0x17C546FCAA195).檢 (q!"txt")); 
-						((0x17C7F6FCAA195).檢 (q!"struct")); 
-						{
-							struct Struct
-							{
-								DateTime	dateTime; 
-								DateTime	date; 
-								Time	time; 
-								DateTime	dateTime2; 
-							} 
-							auto rows = [
-								Struct(
-									dateTime: DateTime(2026, 3, 25, 17, 25, 53.439),
-									date: DateTime(2026, 3, 25),
-									time: toTime(17, 25, 53.439),
-									dateTime2: DateTime(2026, 3, 25, 12, 34, 56.1234)
-								)
-							]; 
-							((0x17E4F6FCAA195).檢(rows[0].text)); 
-							((0x17E7F6FCAA195).檢(DateTime(2026, 3, 25, 12, 34, 56.1234).time.value(second).format!"%.4f")); 
-						}
-					}
-				}
-			}
-			((0x17F056FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			{
-				version(/+$DIDE_REGION Create test table, Insert test data+/all)
-				{
-					if((常!(bool)(1)))
-					{
-						ignoreExceptions
-						(
-							{
-								/+Important: Must free all statement/transaction handles around metadata modifications!+/
-								db.clearStatementCache; 
-								with(db.transaction(modify: true)) (查((位!()),iq{},iq{DROP TABLE test_employees})); 
-								db.clearStatementCache; 
-							}
-						); 
-					}
-					
-					if((常!(bool)(1)))
-					{
-						with(db.transaction(modify: true))
-						(查((位!()),iq{},iq{
-							CREATE TABLE test_employees
-							(
-								emp_id 	INTEGER 	PRIMARY KEY,
-								first_name 	VARCHAR(50) 	NOT NULL,
-								last_name 	VARCHAR(50) 	NOT NULL,
-								department 	VARCHAR(50) 	NOT NULL,
-								hire_date 	DATE 	NOT NULL,
-								salary 	DECIMAL(10,2) 	NOT NULL,
-								null_int	INT
-							)
-						})); 
-					}
-					
-					if((常!(bool)(1)))
-					{
-						with(db.transaction(modify: true))
-						{
-							(查((位!()),iq{},iq{
-								INSERT INTO test_employees (emp_id, first_name, last_name, department, hire_date, salary)
-								VALUES (1, `John`, `Smith`, `IT`, `2023-01-15`, 65000.00)
-							})); 
-							(查((位!()),iq{},iq{
-								INSERT INTO test_employees (emp_id, first_name, last_name, department, hire_date, salary)
-								VALUES (2, `Maria`, `Garcia`, `HR`, `2023-03-20`, 55000.00)
-							})); 
-							(查((位!()),iq{},iq{
-								INSERT INTO test_employees (emp_id, first_name, last_name, department, hire_date, salary)
-								VALUES (3, `David`, `Johnson`, `IT`, `2023-02-10`, 72000.00)
-							})); 
-							(查((位!()),iq{},iq{
-								INSERT INTO test_employees (emp_id, first_name, last_name, department, hire_date, salary)
-								VALUES (4, `Sarah`, `Williams`, `Finance`, `2023-04-05`, 58000.00)
-							})); 
-							(查((位!()),iq{},iq{
-								INSERT INTO test_employees (emp_id, first_name, last_name, department, hire_date, salary)
-								VALUES (5, `Michael`, `Brown`, `IT`, `2023-01-30`, 69000.00)
-							})); 
-							(查((位!()),iq{},iq{UPDATE test_employees SET null_int = 1234 WHERE emp_id IN (2, 3)})); 
-						}
-					}
-					
-					if((常!(bool)(1)))
-					{
-						try { with(db.transaction) { (查((位!()),iq{},iq{SELECT * FROM test_employees})); }}
-						catch(Exception e) ((0x188856FCAA195).檢(e.simpleMsg)); 
-					}
-				}
-			}
-			((0x188C56FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			{
-				version(/+$DIDE_REGION Select speed tests+/all)
-				{
-					static void verifyDataHash(R)
-						(R resultSet)
-					{
-						size_t h=123; 
-						foreach(row; resultSet)
-						h = h.mix64(row.dataBuf.hashOf); 
-						static size_t h0; 
-						if(!h0) h0 = h; 
-						enforce(h==h0); 
-					} 
-					
-					
-					if((常!(bool)(1)))
-					with(db.transaction)
-					foreach(i; 0..10_000)
-					{
-						size_t h=123; 
-						foreach(
-							row; (查 ((位!()),iq{},iq{
-								SELECT * FROM test_employees
-								ORDER BY emp_id
-							}))
-						)
-						{ h = h.mix64(row.dataBuf.hashOf); }
-						static size_t h0; if(!h0) h0 = h; 
-						enforce(h==h0); 
-					}
-					((0x18BC86FCAA195).檢((update間(_間)))); 
-					if((常!(bool)(1)))
-					with(db.transaction)
-					foreach(i; 0..10_000)
-					{
-						verifyDataHash
-						(查 ((位!()),iq{},iq{
-							SELECT * FROM test_employees
-							ORDER BY emp_id
-						})); 
-					}
-					((0x18CDB6FCAA195).檢((update間(_間)))); 
-					if((常!(bool)(1)))
-					foreach(i; 0..1000)
-					with(db.transaction)
-					{
-						size_t h=123; 
-						foreach(
-							row; (查 ((位!()),iq{},iq{
-								SELECT * FROM test_employees
-								ORDER BY emp_id
-							}))
-						)
-						{ h = h.mix64(row.dataBuf.hashOf); }
-						static size_t h0; if(!h0) h0 = h; 
-						enforce(h==h0); 
-					}
-					((0x18E7B6FCAA195).檢((update間(_間)))); 
-					if((常!(bool)(1)))
-					foreach(i; 0..1000)
-					with(db.transaction)
-					{
-						verifyDataHash
-						(查 ((位!()),iq{},iq{
-							SELECT * FROM test_employees
-							ORDER BY emp_id
-						})); 
-					}
-					((0x18F8C6FCAA195).檢((update間(_間)))); 
-					
-					if((常!(bool)(1)))
-					foreach(i; 0..100)
-					with(db.transaction)
-					foreach(j; 0..100)
-					{
-						size_t h=123; 
-						foreach(
-							row; (查 ((位!()),iq{},iq{
-								SELECT * FROM test_employees
-								ORDER BY emp_id
-							}))
-						)
-						{ h = h.mix64(row.dataBuf.hashOf); }
-						static size_t h0; if(!h0) h0 = h; 
-						enforce(h==h0); 
-					}
-					((0x1914B6FCAA195).檢((update間(_間)))); 
-					if((常!(bool)(1)))
-					foreach(i; 0..100)
-					with(db.transaction)
-					foreach(j; 0..100)
-					{
-						verifyDataHash
-						(查 ((位!()),iq{},iq{
-							SELECT * FROM test_employees
-							ORDER BY emp_id
-						})); 
-					}
-					((0x192746FCAA195).檢((update間(_間)))); 
-				}
-			}
-			((0x192B26FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			{
-				version(/+$DIDE_REGION Create/Insert/Select/Drop test+/all)
-				{
-					foreach(i; 0..100)
-					{
-						if((常!(bool)(1)))
-						{
-							with(db.transaction(modify: true))
-							(查((位!()),iq{},iq{
-								CREATE TABLE test_employees2
-								(
-									emp_id 	INTEGER 	PRIMARY KEY,
-									first_name 	VARCHAR(50) 	NOT NULL,
-									last_name 	VARCHAR(50) 	NOT NULL,
-									department 	VARCHAR(50) 	NOT NULL,
-									hire_date 	DATE 	NOT NULL,
-									salary 	DECIMAL(10,2) 	NOT NULL
-								)
-							})); 
-						}
-						
-						if((常!(bool)(1)))
-						{
-							with(db.transaction(modify: true))
-							{
-								(查((位!()),iq{},iq{
-									INSERT INTO test_employees2 (emp_id, first_name, last_name, department, hire_date, salary)
-									VALUES (1, `John`, `Smith`, `IT`, `2023-01-15`, 65000.00)
-								})); 
-								(查((位!()),iq{},iq{
-									INSERT INTO test_employees2 (emp_id, first_name, last_name, department, hire_date, salary)
-									VALUES (2, `Maria`, `Garcia`, `HR`, `2023-03-20`, 55000.00)
-								})); 
-								(查((位!()),iq{},iq{
-									INSERT INTO test_employees2 (emp_id, first_name, last_name, department, hire_date, salary)
-									VALUES (3, `David`, `Johnson`, `IT`, `2023-02-10`, 72000.00)
-								})); 
-								(查((位!()),iq{},iq{
-									INSERT INTO test_employees2 (emp_id, first_name, last_name, department, hire_date, salary)
-									VALUES (4, `Sarah`, `Williams`, `Finance`, `2023-04-05`, 58000.00)
-								})); 
-								(查((位!()),iq{},iq{
-									INSERT INTO test_employees2 (emp_id, first_name, last_name, department, hire_date, salary)
-									VALUES (5, `Michael`, `Brown`, `IT`, `2023-01-30`, 69000.00)
-								})); 
-							}
-						}
-						if((常!(bool)(1)))
-						{
-							with(db.transaction)
-							{
-								(查((位!()),iq{},iq{SELECT * FROM test_employees2})); 
-								dumpTable
-								(查 ((位!()),iq{},iq{
-									SELECT 
-										department,
-										COUNT(*) AS employee_count,
-										AVG(salary) AS avg_salary,
-										MIN(salary) AS min_salary,
-										MAX(salary) AS max_salary
-									FROM test_employees2
-									GROUP BY department
-									ORDER BY department
-								})); dumpTable
-								(查 ((位!()),iq{},iq{
-									SELECT 
-										emp_id,
-										first_name AS "First name",
-										last_name,
-										department,
-										hire_date,
-										salary
-									FROM test_employees2
-									ORDER BY emp_id
-								})); 
-							}
-						}
-						
-						if((常!(bool)(1)))
-						{
-							/+Important: Must free all statement/transaction handles around metadata modifications!+/
-							db.clearStatementCache; 
-							with(db.transaction(modify: true)) { (查((位!()),iq{},iq{DROP TABLE test_employees2})); }
-							db.clearStatementCache; 
-						}
-						
-						if((常!(bool)(1)))
-						{
-							try { with(db.transaction) { (查((位!()),iq{},iq{SELECT * FROM test_employees2})); }}
-							catch(Exception e) ((0x19EDF6FCAA195).檢(e.simpleMsg)); 
-						}
-					}
-				}
-			}
-			((0x19F286FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			version(/+$DIDE_REGION formatTable tests+/all)
-			{
-				with(db.transaction)
-				{
-					version(/+$DIDE_REGION+/all) {
-						((0x19FFB6FCAA195).檢(
-							(查 ((位!()),iq{},iq{
-								SELECT 
-									$(Nullable!int.init),
-									$(nullable(true)),
-									$(nullable(ubyte(1))),
-									$(nullable(byte(-128))),
-									$(short(32767)) 	as "i16",
-									$(ushort(65535)) 	as "u16",
-									$(-12345) 	as "i32",
-									$(4000000000U) 	as "u32",
-									$(-1234567890123) 	as "i64",
-									$(1.25f) /*CCmt*/	as "float",
-									$(π) /+DCmt+/	as "double",
-									$("Hello Wörld!".Varchar!30), 
-									$(`Default 80 char`) || `'str'`
-								FROM RDB$DATABASE //lineComment
-							}))
-							.formatTable!"struct"
-						)); 
-						
-						((0x1A28B6FCAA195).檢(
-							(查 ((位!()),iq{},iq{
-								SELECT 
-									$(`NUMERIC tests`),
-									CAST(1.23456 AS NUMERIC(8, 0)),
-									CAST(1.23456 AS NUMERIC(8, 1)),
-									CAST(1.23456 AS NUMERIC(8, 2)),
-									CAST(1.23456 AS NUMERIC(8, 3)),
-									$(`FLOAT tests`),
-									CAST(1.2345678e-7 AS FLOAT),
-									CAST(1.2345678e-6 AS FLOAT),
-									CAST(1.2345678e-5 AS FLOAT),
-									CAST(1.2345678e-4 AS FLOAT),
-									CAST(1.2345678e-3 AS FLOAT),
-									CAST(1.2345678e-2 AS FLOAT),
-									CAST(1.2345678e-1 AS FLOAT),
-									CAST(1.2345678 AS FLOAT),
-									CAST(1.2345678e1 AS FLOAT),
-									CAST(1.2345678e2 AS FLOAT),
-									CAST(1.2345678e3 AS FLOAT),
-									CAST(1.2345678e4 AS FLOAT),
-									CAST(1.2345678e5 AS FLOAT),
-									CAST(1.2345678e6 AS FLOAT),
-									CAST(1.2345678e7 AS FLOAT),
-									$(`DOUBLE tests`),
-									CAST(1.23456789012345678e-7 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e-6 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e-5 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e-4 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e-3 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e-2 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e-1 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e1 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e2 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e3 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e4 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e5 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e6 AS DOUBLE PRECISION),
-									CAST(1.23456789012345678e7 AS DOUBLE PRECISION)
-								FROM RDB$DATABASE
-							}))
-							.formatTable!"json"
-						)); 
-					}
-					version(/+$DIDE_REGION+/all) {
-						static foreach(style; EnumMemberNames!TableStyle)
-						{ print!style; (查((位!()),iq{},iq{SELECT e.*, e.null_int+1000 FROM test_employees e; })).formatTable!(style.text).print; print; }
-					}
-				}
-			}
-			((0x1AAE56FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			{
-				version(/+$DIDE_REGION 3 ways to do a query+/all)
-				{
-					with(db.transaction)
-					{
-						db.clearStatementCache; 
-						string[] tables; 
-						void verify() {
-							static size_t firstHash; const h = tables.hashOf; 
-							if(!firstHash) firstHash = h; enforce(h==firstHash); 
-						} 
-						foreach(i; 0..3)
-						{
-							if((常!(bool)(1))) {
-								tables = []; foreach(
-									row; (查((位!()),iq{},iq{
-										SELECT rdb$relation_name /+1+/
-											FROM rdb$relations
-											ORDER BY rdb$relation_name
-									}))
-								)
-								tables ~= row[0].text; 
-							}verify; 
-							if((常!(bool)(1))) {
-								tables = []; mixin(求each(q{row},q{
-									(查((位!()),iq{},iq{
-										SELECT rdb$relation_name /+2+/
-											FROM rdb$relations
-											ORDER BY rdb$relation_name
-									}))
-								},q{tables ~= row[0].text})); 
-							}verify; 
-							if((常!(bool)(1))) {
-								tables = (查((位!()),iq{},iq{
-									SELECT rdb$relation_name /+3+/
-										FROM rdb$relations
-										ORDER BY rdb$relation_name
-								})).toArray!string; 
-								print(tables); 
-							}verify; 
-						}
-						enforce(db.statementCache.length==3 /+The 3 query texts are different because of indenting.+/); 
-					}
-				}
-			}
-			((0x1B0576FCAA195).檢((update間(_間)))); 
-			static if((常!(bool)(1)))
-			{
-				version(/+$DIDE_REGION toStringArray() test+/all)
-				{
-					with(db.transaction)
-					{
-						auto query() 
-						=> (查 ((位!()),iq{},iq{
-							SELECT
-								emp_id AS "alias",
-								first_name,
-								last_name,
-								department,
-								hire_date,
-								salary,
-								null_int
-							FROM test_employees
-						})); 
-						((0x1B2116FCAA195).檢 (query.formatTable!"struct")); 
-						
-						
-						struct Employee
-						{
-							int alias_; 
-							string first_name; 
-							string last_name; 
-							string department; 
-							Date hire_date; 
-							double salary; 
-							Nullable!int null_int; 
-						} 
-						
-						
-						((0x1B3536FCAA195).檢 (query.toArray!Employee.toJson)); 
-					}
-				}
-			}
-			((0x1B3A66FCAA195).檢((update間(_間)))); 
-			if((常!(bool)(0))) { console.hide; }if((常!(bool)(0))) { application.exit; }
-		}
-	} 
 	/+
 		AI: /+User: Please summarize the syntax of Firebird 2.5 SQL language! Do a very dense cheat sheets prefer examples, only write desciptions when necessary!+/
 		/+
@@ -4431,7 +2817,1120 @@ version(/+$DIDE_REGION+/all) {
 				);
 			+/
 		+/
-	+/
+	+/
+}
+version(/+$DIDE_REGION+/all) {
+	class FbFields
+	{
+		enum align_enabled = (常!(bool)(0))/+Todo: Benchmark the effect of this!+/; 
+		
+		ubyte[] infoBuf, dataBuf; 
+		
+		@property XSQLDA* xsqlda() => (cast(XSQLDA*)(infoBuf.ptr)); 
+		@property XSQLVAR[] vars() => xsqlda.sqlvar.ptr[0 .. xsqlda.sqld]; 
+		private XSQLVAR*[string] pvarByName; 
+		
+		ref opIndex(size_t i)
+		=> vars[i]; size_t length()
+		=> vars.length; 
+		
+		XSQLVAR* opIndex(string s)
+		=> pvarByName.get(s, null); XSQLVAR* opDispatch(string name)()
+		=> this[name]; 
+		
+		
+		string sqlText /+prepared sql thext after input+/; 
+		size_t inputSignature; 
+		
+		/+
+			Use cases:
+			 1. Create data buffer layout for statement output
+				/+Code: f = new FbFields(NumFields); ...; f.reallocInfoIfNeeded; f.prepareOutput;+/
+			 2. Create input layout for statement parameters and fill it with data
+				/+Code: f = new FbFields; f.prepareInput((i"SELECT $(1+1)")); /+use /+Code: f.sqlText+/+/+/
+			And then give /+Code: f.xsqlda+/ to isc_dsql_ functions!
+		+/
+		
+		this()
+		{} 	 this(uint n)
+		{ allocInfo(n); } 
+		
+		void allocInfo(uint n)
+		{
+			infoBuf.length = XSQLDA_LENGTH(n.to!int); 
+			with(xsqlda)
+			{
+				version_ = SQLDA_VERSION1; 
+				sqldaid[] = "SQLDA   "; 
+				sqln = n.to!short; 
+				sqld = 0; 
+			}
+		}  bool reallocInfoIfNeeded()
+		{
+			if(!xsqlda) return false; 
+			if(xsqlda.sqld<=xsqlda.sqln) return false; 
+			auto need = xsqlda.sqld; 
+			allocInfo(need.to!uint); 
+			return true; 
+		} 
+		
+		void prepareOutput()
+		{ prepareDataBuf; 	/+allocate and layout data buffer+/} 
+		
+		void reset()
+		{
+			allocInfo(0); dataBuf = []; 
+			sqlText = ""; inputSignature = 0; 
+		} 
+		
+		static size_t calcInputSignature(Args...)(string[] literals)
+		{
+			size_t h = "XSQLDA_INPUT_SIGNATURE".hashOf; 
+			static foreach(T; Args) {
+				{
+					static if(!is(Unqual!T==InterpolatedExpression!e, string e))
+					h = h.mix64(T.stringof.hashOf); 
+				}
+			}
+			foreach(lit; literals) h = h.mix64(lit.hashOf); 
+			return h; 
+		} 
+		static assert(
+				calcInputSignature!(InterpolatedExpression!"ignored1")(["x"])
+			==	calcInputSignature!(InterpolatedExpression!"ignored2")(["x"])
+		); 
+		
+		private void fieldsToXsqlda(bool[] nullables, SQL_TYPE[] types, ushort[] lens)
+		{
+			allocInfo(types.length.to!uint); 
+			with(xsqlda) sqld = sqln; 
+			
+			foreach(i, ref var; vars)
+			with(vars[i]) {
+				sqltype 	= (cast(short)(types[i] + (nullables[i] ? 1 : 0))),
+				sqllen 	= lens[i]; 
+			}
+		} 
+		
+		private void prepareDataBuf()
+		{
+			uint[] nullOffsets, dataOffsets; uint totalSize = 0; 
+			
+			static short requiredSize(in SQL_TYPE type, short len)
+			{
+				with(SQL_TYPE)
+				final switch(type)
+				{
+					case VARYING: 	return (2 + len)
+					.to!short; 
+					case TEXT: 	return len; 
+					case SHORT: 	return 2; 
+					case LONG: 	return 4; 
+					case INT64: 	return 8; 
+					case FLOAT: 	return 4; 
+					case DOUBLE: 	return 8; 
+					case D_FLOAT: 	return 8; 
+					case DATE: 	return 4; 
+					case TIME: 	return 4; 
+					case TIMESTAMP: 	return 8; 
+					case QUAD: 	return 8; 
+					case BLOB: 	return 8; 
+					case ARRAY: 	return 8; 
+						
+					case NULL: 	return 2; 
+				}
+			} 
+			
+			static auto layoutField(in bool isNullable, in SQL_TYPE type, in ushort len, ref uint actOfs)
+			{
+				enforce(len.inRange(1, 0x7fff), "`len` out of range"); 
+				
+				void alignOfs(uint n)
+				{ if(align_enabled) actOfs = actOfs.alignUp(n); } 
+				void alignOfs16_back2()
+				{ if(align_enabled) while(actOfs % 16 != 16-2) actOfs++; } 
+				
+				version(/+$DIDE_REGION Null indicator (optional)+/all)
+				{
+					if(isNullable) actOfs = actOfs.alignUp(2); 
+					uint nullOfs = actOfs; 
+					if(isNullable) actOfs += 2; 
+				}
+				
+				version(/+$DIDE_REGION Actual data+/all)
+				{
+					/+The 1st char of strings must be 16byte aligned. Other data is aligned to its size.+/
+					with(SQL_TYPE)
+					final switch(type)
+					{
+						case VARYING: 	alignOfs16_back2; 	break; 
+						case TEXT: 	alignOfs(16); 	break; 
+						case SHORT, NULL: 	alignOfs(2); 	break; 
+						case 	DATE, TIME, LONG, 	FLOAT: 	alignOfs(4); 	break; 
+						case 	INT64, DOUBLE, D_FLOAT, 
+							TIMESTAMP, QUAD, BLOB, ARRAY: 	alignOfs(8); 	break; 
+					}
+					uint dataOfs = actOfs; 
+					actOfs += requiredSize(type, len); 
+				}
+				struct Res { uint nullOfs, dataOfs; } 
+				return Res(nullOfs, dataOfs); 
+			} 
+			
+			{
+				uint actOfs = 0; 
+				foreach(ref var; vars)
+				{
+					const layout = layoutField(var.isNullable, var.type, var.sqllen.to!ushort, actOfs); 
+					nullOffsets ~= layout.nullOfs; 
+					dataOffsets ~= layout.dataOfs; 
+				}
+				totalSize = actOfs.alignUp(align_enabled ? 16 : 1); 
+			}
+			
+			{
+				dataBuf = new ubyte[totalSize]; 
+				uint actOfs = 0; 
+				foreach(i, ref var; vars)
+				{
+					var.sqldata = dataBuf.ptr + dataOffsets[i],
+					var.sqlind = ((var.isNullable)?((cast(short*)(dataBuf.ptr + nullOffsets[i]))):(null)); 
+				}
+			}
+			
+			{
+				pvarByName.clear; 
+				foreach(ref v; vars) pvarByName[v.aliasName] = &v; 
+				pvarByName.rehash; 
+			}
+		} 
+		
+		void prepareInput(Args...)(string[] literals)
+		{
+			reset; 
+			void appendSql(string s) { sqlText ~= s; } 
+			
+			version(/+$DIDE_REGION Internal state for functions+/all)
+			{ bool[] nullables; SQL_TYPE[] types; ushort[] lens; auto literalIdx=0; }
+			
+			void appendField(bool isNullable, SQL_TYPE type, size_t len)
+			{
+				nullables ~= isNullable; 
+				types ~= type; 
+				lens ~= len.to!ushort; 
+			} 
+			
+			void processParam(T_)()
+			{
+				static if(is(Unqual!T_==Nullable!NT, NT))
+				{
+					enum isNullable = true; 
+					alias T = Unqual!NT; 
+				}else {
+					enum isNullable = false; 
+					alias T = Unqual!T_; 
+				}
+				
+				void append(string s, SQL_TYPE type, size_t len)
+				{ appendSql(s); appendField(isNullable, type, len); } 
+				
+				enum DefaultVarcharLength = 80; 
+				void prepareVarchar(size_t N)
+				{
+					enforce(mixin(界3(q{1},q{N},q{0x7FFF})), i"Invalid Varchar length. $(N)".text); 
+					append(i"CAST(? AS VARCHAR($(N)))".text, SQL_TYPE.VARYING, N); 
+				} 
+				
+				static if(isIntegral!T || is(T==bool))
+				{
+					static if(
+						is(T==ubyte) || 
+						is(T==byte) || 
+						is(T==short) || 
+						is(T==bool)
+					)	{ append("CAST(? AS SMALLINT)", SQL_TYPE.SHORT, 2); }
+					else static if(
+						is(T==ushort) || 
+						is(T==int)
+					)	{ append("CAST(? AS INT)", SQL_TYPE.LONG, 4); }
+					else static if(
+						is(T==uint) || 
+						is(T==long)
+					)	{ append("CAST(? AS BIGINT)", SQL_TYPE.INT64, 8); }
+					else static if(is(T==ulong))
+					static assert(0, "ULONG is not safely representable as a Firebird integer."); 
+					else static assert(0, "Unhandled integral IES type: " ~ T.stringof); 
+				}
+				else static if(isFloatingPoint!T)
+				{
+					static if(is(T==float))	{ append("CAST(? AS FLOAT)", SQL_TYPE.FLOAT, 4); }
+					else static if(is(T==double))	{ append("CAST(? AS DOUBLE PRECISION)", SQL_TYPE.DOUBLE, 8); }
+					else static assert(0, "Unhandled floating IES type: " ~ T.stringof); 
+				}
+				else static if(is(T==Varchar!N, uint N))	{ prepareVarchar(N); }
+				else static if(is(T==string))	{ prepareVarchar(DefaultVarcharLength); }
+				else static if(is(T==Date))	{ append("CAST(? AS DATE)", SQL_TYPE.DATE, 4); }
+				else static if(is(T==Time))	{ append("CAST(? AS TIME)", SQL_TYPE.TIME, 4); }
+				else static if(is(T==DateTime))	{ append("CAST(? AS TIMESTAMP)", SQL_TYPE.TIMESTAMP, 8); }
+				else static assert(0, "Unhandled IES type: " ~ T.stringof); 
+			} 
+			
+			version(/+$DIDE_REGION Prepare field metadata+/all)
+			{
+				{
+					uint actIdx=0; 
+					static foreach(A; Args)
+					{
+						{
+							alias T = Unqual!(A); 
+							static if(is(T==InterpolationHeader))	{}
+							else static if(is(T==InterpolationFooter))	{}
+							else static if(
+								is(
+									T==InterpolatedLiteral!str,
+									string str
+								)
+							)	{ appendSql(str); }
+							else static if(
+								is(
+									T==InterpolatedExpression!expr,
+									string expr
+								)
+							)	{ actIdx++; }
+							else static if(isLiteral!T)	{ appendSql(literals[literalIdx++]); }
+							else	{ processParam!T; }
+						}
+					}
+				}
+			}
+			
+			sqlText = sqlText.convertTokenStringToSQL; 
+			
+			fieldsToXsqlda(nullables, types, lens); 
+			prepareDataBuf; 
+			
+			inputSignature = calcInputSignature!(Args)(literals); 
+		} 
+			
+		void fillInput(Args...)(Args args)
+		{
+			version(/+$DIDE_REGION Internal state for functions+/all)
+			{ uint paramIdx=0; }
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			void placeParam(T_)(T_ arg)
+			{
+				static if(is(Unqual!T_==Nullable!NT, NT))
+				{
+					enum isNullable = true; 
+					auto isNull() => arg.isNull; 
+					auto get() => arg.get; 
+					alias T = Unqual!NT; 
+				}else {
+					enum isNullable = false; 
+					enum isNull = false; 
+					auto get() => arg; 
+					alias T = Unqual!T_; 
+				}
+				
+				ref var = vars[paramIdx]; 
+				static if(isNullable) *var.sqlind = ((isNull)?(-1):(0)); 
+				
+				if(!isNullable || !isNull)
+				{
+					void placeVarchar(string str)
+					{
+						enforce(
+							str.length<=var.sqllen,
+							i"String too long for VARCHAR: $(str.length) > $(var.sqllen)".text
+						); 
+						*(cast(short*)(var.sqldata)) = (cast(short)(str.length)); 
+						(cast(char*)(var.sqldata))[2..2+str.length] = str; 
+					} 
+					
+					static if(isIntegral!T || is(T==bool))
+					{
+						static if(
+							is(T==ubyte) || 
+							is(T==byte) || 
+							is(T==short) || 
+							is(T==bool)
+						)	{ *(cast(short*)(var.sqldata)) = get.to!short; }
+						else static if(
+							is(T==ushort) || 
+							is(T==int)
+						)	{ *(cast(int*)(var.sqldata)) = get.to!int; }
+						else static if(
+							is(T==uint) || 
+							is(T==long)
+						)	{ *(cast(long*)(var.sqldata)) = get.to!long; }
+						else static if(is(T==ulong))
+						static assert(0, "ULONG is not safely representable as a Firebird integer."); 
+						else static assert(0, "Unhandled integral IES type: " ~ T.stringof); 
+					}
+					else static if(isFloatingPoint!T)
+					{
+						static if(is(T==float))	{ *(cast(float*)(var.sqldata)) = 	get.to!float; }
+						else static if(is(T==double))	{ *(cast(double*)(var.sqldata)) = 	get.to!double; }
+						else static assert(0, "Unhandled floating IES type: " ~ T.stringof); 
+					}
+					else static if(is(T==Varchar!N, uint N)) { placeVarchar(get.value); }
+					else static if(is(T==string))	{ placeVarchar(get); }
+					else static if(is(T==Date))	{ *(cast(ISC_DATE*)(var.sqldata)) = get.toIscDate; }
+					else static if(is(T==Time))	{ *(cast(ISC_TIME*)(var.sqldata)) = get.toIscTime; }
+					else static if(is(T==DateTime))	{
+						*(cast(ISC_TIMESTAMP*)(var.sqldata)) = 
+							get.localFileTime.toIscTimestamp; 
+					}
+					else static assert(0, "Unhandled IES type: " ~ T.stringof); 
+				}
+			} 
+			
+			version(/+$DIDE_REGION Append actual data+/all)
+			{
+				{
+					uint actIdx=0; 
+					static foreach(i, arg; args)
+					{
+						{
+							alias T = Unqual!(typeof(arg)); 
+							static if(is(T==InterpolationHeader))	{}
+							else static if(is(T==InterpolationFooter))	{}
+							else static if(
+								is(
+									T==InterpolatedLiteral!str,
+									string str
+								)
+							)	{}
+							else static if(
+								is(
+									T==InterpolatedExpression!expr, 
+									string expr
+								)
+							)	{ paramIdx = actIdx++; }
+							else static if(isLiteral!T)	{}
+							else	{ placeParam(arg); }
+						}
+					}
+				}
+			}
+		} 
+	} 
+	
+	class FbDatabase
+	{
+		/+NOT THREADSAFE!+/
+		
+		isc_db_handle db_handle; 
+		this(isc_db_handle db_handle)
+		{ this.db_handle = db_handle.enforce("NULL db_handle."); } 
+		
+		this(string dbPath, string user, string pass, bool create=false)
+		{ this(fb.attach_database(dbPath, user, pass, create: create)); } 
+		
+		~this()
+		{
+			if(activeTransactionCount)
+			ERR(i"There were active transactions: amount: $(activeTransactionCount) db_handle:$(db_handle)"); 
+			//ignore cached statements: those will be freed by the server.
+			fb.detach_database(db_handle); 
+		} 
+		
+		version(/+$DIDE_REGION StatementCache+/all)
+		{
+			struct Statement {
+				isc_stmt_handle stmt_handle; 
+				FbFields inputFields, outputFields; 
+			} 
+			Statement[ulong] statementCache; 
+			
+			void clearStatementCache()
+			{
+				foreach(ref s; statementCache.byValue) fb.dsql_drop_statement(s.stmt_handle); 
+				statementCache.clear; 
+			} 
+			
+			private auto accessStatement(Args...)(ref isc_tr_handle trans_handle, string[] literals)
+			{
+				const inputSignature = FbFields.calcInputSignature!Args(literals); 
+				
+				Statement statement = statementCache.get(inputSignature); 
+				if(!statement.stmt_handle)
+				{
+					with(fb)
+					{
+						isc_stmt_handle stmt_handle; 
+						stmt_handle = dsql_allocate_statement(db_handle); 
+						scope(failure) dsql_drop_statement(stmt_handle); 
+						
+						auto inputFields = new FbFields; 
+						inputFields.prepareInput!Args(literals); 
+						const sqlText = inputFields.sqlText; 
+						dsql_prepare(trans_handle, stmt_handle, sqlText); 
+						dsql_describe_bind(stmt_handle, inputFields.xsqlda); 
+						
+						FbFields outputFields = null /+not for all statements+/; 
+						if(
+							sql_info_stmt_type(stmt_handle).among
+								(mixin(舉!((isc_info_sql_stmt_),q{select})), mixin(舉!((isc_info_sql_stmt_),q{exec_procedure})))
+						)
+						{
+							outputFields = new FbFields(1); 
+							dsql_describe(stmt_handle, outputFields.xsqlda); 
+							if(outputFields.reallocInfoIfNeeded)
+							dsql_describe(stmt_handle, outputFields.xsqlda); 
+							outputFields.prepareOutput; 
+						}
+						
+						//print("SQL INFO:\n"~sql_info(stmt_handle).split("\n").map!`"  "~a`.join('\n')); 
+						
+						statement = Statement(stmt_handle, inputFields, outputFields); 
+						statementCache[inputSignature] = statement; 
+					}
+				}
+				return statement; 
+			} 
+		}
+		
+		protected {
+			size_t activeTransactionCount;  void _notifyTransactionCreated(Transaction tr)
+			{ activeTransactionCount++; }  void _notifyTransactionDestroyed(Transaction tr)
+			{ activeTransactionCount--; } 
+		} 
+		
+		class Transaction
+		{
+			isc_tr_handle trans_handle; 
+			uint errorCount=0; 
+			
+			bool active()const => !!trans_handle; 
+			
+			this(bool modify = false)
+			{
+				trans_handle = fb.start_transaction	(db_handle, fb.createTPB(modify: modify)); 
+				_notifyTransactionCreated(this); 
+			} 
+			
+			~this()
+			{ if(active) { rollback; WARN("Dangling active transaction."); }} 
+			
+			void enforceActive()
+			{ enforce(active, "Transaction must be active."); } 
+			
+			void commit()
+			{
+				if(active) {
+					fb.commit_transaction(trans_handle); assert(!active); 
+					_notifyTransactionDestroyed(this); 
+				}
+			} 
+			
+			void rollback()
+			{
+				if(active) {
+					fb.rollback_transaction(trans_handle); assert(!active); 
+					_notifyTransactionDestroyed(this); 
+				}
+			} 
+			
+			static struct ResultSet
+			{
+				private {
+					FbFields fields_; 
+					isc_stmt_handle handle_; 
+					Transaction ownedTransaction; 
+				} 
+				
+				@property fields() => fields_; 
+				@property empty() => !handle_; 
+				//This is NOT an InputRange, it has opApply() with empty().
+				
+				@disable this(this); 
+				this(FbFields fields, isc_stmt_handle handle)
+				{
+					fields_ = fields, handle_ = handle; 
+					if(fields is null)
+					{ close; /+it has no result set.+/}
+					else
+					{
+						//fetch the very first row
+						scope(failure) close; 
+						if(!fb.dsql_fetch(handle_, fields.xsqlda)) close; 
+					}
+				} 
+				
+				~this() { close; } 
+				
+				void close()
+				{
+					if(handle_) {
+						scope(exit) { handle_ = 0; }
+						fb.dsql_close_statement(handle_); 
+					}
+					freeTransaction(ownedTransaction); 
+				} 
+				
+				int opApply(scope int delegate(FbFields) dg)
+				{
+					scope(exit) close(); 
+					while(handle_)
+					{
+						const res = dg(fields_); 
+						if(res) return res; 
+						if(!fb.dsql_fetch(handle_, fields.xsqlda)) break; 
+					}
+					return 0; 
+				} 
+			} 
+			
+			scope ResultSet execute(Args...)(Args args)
+			{
+				enforceActive; 
+				scope(failure) errorCount++; 
+				
+				version(/+$DIDE_REGION Collect literal SQL strings+/all)
+				{
+					enum numLiterals = Filter!(isLiteral, Args).length; 
+					string[numLiterals] literals; 
+					static if(numLiterals)
+					{
+						{
+							auto literalIdx = 0; 
+							static foreach(a; args)
+							static if(isLiteral!(typeof(a)))
+							literals[literalIdx++] = a.value; 
+						}
+					}
+				}
+				
+				auto statement = accessStatement!(Args)(trans_handle, literals[]); 
+				statement.inputFields.fillInput(args); 
+				fb.dsql_execute(
+					trans_handle, statement.stmt_handle, 
+					statement.inputFields.xsqlda
+				); 
+				return ResultSet(statement.outputFields, statement.stmt_handle); 
+			} 
+			
+			scope ResultSet 查(Args...)(LOCATION_t loc, Args args)
+			{
+				/+
+					Example input:
+					/+
+						Code: c:\codex\d\firebird\firebird.d(3276,1),
+						(
+							InterpolationHeader, 
+								InterpolatedLiteral!"options", 
+							InterpolationFooter, 
+							InterpolationHeader, 
+								InterpolatedLittoStringeral!"SELECT ", 
+								InterpolatedExpression!"1", int, 
+								InterpolatedLiteral!"+", 
+								InterpolatedExpression!"2", int, 
+								InterpolatedLiteral!" FROM RDB$DATABASE", 
+							InterpolationFooter
+						)
+					+/
+				+/
+				
+				enum endIdx = staticIndexOf!(InterpolationFooter, Args); 
+				static assert(endIdx>=1); 
+				alias optionArgs 	= args[1..endIdx /+no header/footer+/], 
+				queryArgs 	= args[endIdx+1..$]; 
+				
+				static if(optionArgs.length<=1)
+				{
+					static if(optionArgs.length)
+					{
+						static if(
+							is(
+								typeof(optionArgs[0])==
+								InterpolatedLiteral!str, string str
+							)
+						)
+						enum queryOptions = str; 
+					}
+					else	enum queryOptions = ""; 
+				}
+				static assert(
+					__traits(compiles, queryOptions), 
+					"Invalid options format. Only static options are valid."
+				); 
+				
+				//print(loc); print(queryOptions.stringof); 
+				try
+				{ return execute(queryArgs); }
+				catch(Exception e)
+				{
+					auto 	cl = CodeLocation(loc.text),
+						file = cl.file.fullName, line = cl.lineIdx,
+						msg = e.simpleMsg; 
+					if(msg.isWild("`Dynamic SQL Error`, `SQL error code = ?*`, `?* - line ?*, column ?*`*"))
+					{
+						msg = i"Dynamic SQL Error($(wild[0])): $(wild[1])$(wild[4])".text; 
+						line += wild.ints(2)-1; 
+					}
+					else if(msg.isWild("`Dynamic SQL Error`, `SQL error code = ?*`, ?*, `At line ?*, column ?*`"))
+					{
+						msg = i"Dynamic SQL Error($(wild[0])): $(wild[1])".text; 
+						line += wild.ints(2)-1; 
+					}
+					else if(msg.isWild("`Dynamic SQL Error`, `SQL error code = ?*`, ?*"))
+					{ msg = i"Dynamic SQL Error($(wild[0])): $(wild[1])".text; }
+					enforce(0, msg, file, line); assert(0); 
+				}
+			} 
+		} 
+		
+		Transaction startTransaction(bool modify = false)
+		{ return new Transaction(modify: modify); } 
+		
+		private static void freeTransaction(ref Transaction tr)
+		{
+			if(tr) {
+				scope(exit) tr.free; 
+				if(tr.active)	{ ((tr.errorCount>0)?(tr.rollback) :(tr.commit)); }
+			}
+		} 
+		
+		static struct ScopedTransaction
+		{
+			private Transaction transaction_; 
+			@property Transaction transaction() => transaction_; 
+			
+			/+
+				//alias this = transaction_; 
+				This FAILS when using with() in another module.
+			+/
+			@property active() => transaction.active; 
+			void enforceActive() { transaction.enforceActive; } 
+			void commit() { transaction.commit; } 
+			void rollback() { transaction.rollback; } 
+			scope execute(Args...)(Args args) => transaction.execute!(Args)(args); 
+			scope 查(Args...)(LOCATION_t loc, Args args) => transaction.查!(Args)(loc, args); 
+			/+
+				Todo: Ask DLang forum.
+				/+Link: https://forum.dlang.org/post/ocqmunwfsfackkducocn@forum.dlang.org+/
+			+/
+			
+			@disable this(this); 
+			this(Transaction transaction)
+			{ transaction_ = transaction; } 
+			
+			~this()
+			{ freeTransaction(transaction_); } 
+		} 
+		
+		scope transaction(bool modify = false)
+		=> ScopedTransaction(startTransaction(modify: modify)); 
+		
+		scope FbResultSet 查(Args...)(LOCATION_t loc, Args args)
+		{
+			auto tr = startTransaction, res = tr.查!Args(loc, args); 
+			res.ownedTransaction = tr; return res; 
+		} 
+		
+		/+
+			RDB$RELATIONS columns (2.5):
+			
+			 - RDB$RELATION_NAME (CHAR(31)) 	table/view name
+			 - RDB$RELATION_ID (SMALLINT) 	internal id
+			 - RDB$RELATION_TYPE (SMALLINT) 	relation type (table, view, GTT, etc.)
+			 - RDB$VIEW_BLR (BLOB BLR) 	view BLR; NULL for tables
+			 - RDB$VIEW_SOURCE (BLOB TEXT) 	view SQL source; NULL for tables
+			 - RDB$DESCRIPTION (BLOB TEXT) 	comment/description
+			 - RDB$SYSTEM_FLAG (SMALLINT) 	system vs user (0 = user)
+			 - RDB$DBKEY_LENGTH (SMALLINT) 	size of dbkey
+			 - RDB$FORMAT (SMALLINT) 	internal, points into RDB$FORMATS
+			 - RDB$FIELD_ID (SMALLINT) 	next field id for new columns
+			 - RDB$SECURITY_CLASS (CHAR(31)) 	security class
+			 - RDB$EXTERNAL_FILE (VARCHAR(255)) 	external file path (if external table)
+			 - RDB$RUNTIME (BLOB) 	internal metadata
+			 - RDB$EXTERNAL_DESCRIPTION (BLOB) 	comments for external file
+			 - RDB$OWNER_NAME (CHAR(31)) 	creator user
+			 - RDB$DEFAULT_CLASS (CHAR(31)) 	default security class for new cols
+			 - RDB$FLAGS (SMALLINT) 	internal flags
+			
+			Source: Firebird language reference, system tables appendix.
+			/+
+				Link: https://www.firebirdsql.org/file/documentation/chunk/en/refdocs/fblangref30/
+				fblangref-appx04-relations.html?utm_source=openai)
+			+/
+		+/
+		
+		auto allTablesAndViews(string mask="*", bool tables=true, bool views=true)
+		{
+			with(transaction)
+			return (查((位!()),iq{},iq{
+				SELECT rdb$relation_name FROM rdb$relations
+				WHERE rdb$system_flag=0
+				AND(
+						$(tables)	=1 AND rdb$view_blr IS NULL
+					OR	$(views)	=1 AND rdb$view_blr IS NOT NULL
+				)
+			}))
+			.toArray!string.filter!((a)=>(a.isWild(mask))).array; 
+		} 
+		auto allTables(string mask="*")
+		=> allTablesAndViews(mask, views: false); auto allViews(string mask="*")
+		=> allTablesAndViews(mask, false); 
+		
+		scope FbResultSet fetchTable(string tableName)
+		{
+			auto tr = new Transaction; scope(failure) tr.free; 
+			FbResultSet res; 
+			with(tr) res = (查((位!()),iq{},iq{SELECT * FROM $(Literal(tableName))})); 
+			res.ownedTransaction = tr; /+
+				The Resultset owns this transaction.
+				It will close it when it's done.
+			+/
+			return res; 
+		} 
+		
+		string fetchHeaders(string mask="*")
+		=> mixin(求map(q{name},q{allTablesAndViews(mask)},q{fetchTable(name).formatTable (TableStyle.struct_hdr)})).join; 
+	} 
+	
+	alias FbResultSet = FbDatabase.Transaction.ResultSet; 
+	
+	enum TableStyle : ubyte
+	{hex, json, csv, txt, struct_, struct_hdr, struct_data, struct_hdr_ex, ascii, ansi, ansi_thick, ansi_round, turbo, norton} 
+	
+	TableStyle toTableStyle(string s)()
+	=> ((sameText(s, "struct"))?(TableStyle.struct_):(s.lc.to!TableStyle)); 
+	
+	string formatTable(string style="json")(auto ref FbResultSet rows, TableStyle style=toTableStyle!style)
+	{
+		if(!rows.fields) return ""; 
+		/+
+			rows: This range returns an FbFields reference containing the binary data of the 
+			most recent fetched row, and all the metadata in `xsqlda` / `vars[]`.
+		+/
+		auto vars = rows.fields.vars; 
+		
+		version(/+$DIDE_REGION Result string building+/all)
+		{
+			auto res = appender!string; 
+			void appendStr(string s) { res ~= s; } 
+			void appendLine(string s) { res ~= ((res.empty)?(""):("\n"))~s; } 
+		}
+		
+		
+		
+		void appendSeparatedRow(string varField, string delim, string invalidChars)()
+		{
+			string quoteIfNeeded(string s)
+			=> ((
+				s.map!(
+					iq{
+						a<32 || a.among(
+							'"', '\'', '`' $(
+								((invalidChars!="")?(","):(""))
+								~ invalidChars
+							)
+						)
+					}.text
+				).any
+			) ?(s.quoted):(s)); 
+			appendLine(mixin(求map(q{v},q{vars},q{quoteIfNeeded(mixin("v."~varField))})).join(delim)); 
+		} 
+		
+		static struct GridStyle { string[3] horiz; string[3][3] box; string[3] vert; string[2][2] pad; } 
+		void formatGrid(in GridStyle g)
+		{
+			auto 	isNumeric 	= vars.map!((v)=>(v.isSomeNumber)).array,
+				data 	= [vars.map!((v)=>(v.aliasName)).array],
+				widths 	= data[0].map!"a.length".array; 
+			
+			foreach(row; rows) {
+				auto line = vars.map!((v)=>(v.toPlainText)).array; data ~= line; 
+				foreach(i, s; line) widths[i].maximize(s.length); 
+			}
+			
+			string padCell(string s, size_t w, bool alignRight)
+			=> ((alignRight)?(s.padLeft(' ', w).text):(s.padRight(' ', w).text)); 
+			
+			void appendRow(string[] data, bool header=false)
+			{
+				appendLine(
+					g.vert[0] ~ (
+						iota(data.length).map!
+						((i)=>(
+							g.pad[1-header][0]~
+							padCell(
+								data[i], widths[i], 
+								isNumeric[i]&~header
+							)~
+							g.pad[1-header][1]
+						)).join(g.vert[1])
+					) ~ g.vert[2]
+				); 
+			} 
+			
+			string buildHLine(int i)
+			=> g.box[i][0] ~ widths.map!((w)=>(g.horiz[i].replicate(w))).join(g.box[i][1]) ~ g.box[i][2]; 
+			const hLines = iota(3).map!buildHLine.array; 
+			
+			appendLine(hLines[0]); appendRow(data[0], header: true); 
+			appendLine(hLines[1]); data[1..$].each!appendRow; appendLine(hLines[2]); 
+		} 
+		
+		void appendStructDefinition(R1, R2, R3, R4)(
+			string relName, string structName, 
+			R1 fieldTypes, R2 origFieldNames, R3 fieldNames, R4 comments
+		)
+		{
+			appendLine(i"@$(relName.quoted) struct $(structName)".text); 
+			appendLine("{"); 
+				foreach(orig, type, name, comment; zip(origFieldNames, fieldTypes, fieldNames, comments))
+			appendLine(i"\t@$(orig.quoted) $(type) $(name);$(comment)".text); 
+			appendLine("}"); 
+		} 
+		
+		final switch(style)
+		{
+			case mixin(舉!((TableStyle),q{hex})): 	{ foreach(row; rows) appendLine(row.dataBuf.hexDump); }	break; 
+			case mixin(舉!((TableStyle),q{json})): 	{
+				appendLine("["); bool running; 
+				foreach(row; rows)
+				{
+					if(!running.chkSet) appendStr(","); 
+					const jsonField =
+					mixin(求map(q{v},q{vars},q{i"\t\t$(v.aliasName.quoted)\t: $(v.toJsonText)".text})).join(",\n"); 
+					appendLine("\t{\n" ~ jsonField ~ "\n\t}"); 
+				}
+				appendLine("]"); 
+			}	break; 
+			case mixin(舉!((TableStyle),q{csv})): 	{
+				alias doit(string v) = appendSeparatedRow!(v, ";", q{';', ','}); 
+				doit!q{aliasName}; foreach(row; rows) doit!q{toPlainText}; 
+			}	break; 	
+			case mixin(舉!((TableStyle),q{txt})): 	{
+				alias doit(string v) = appendSeparatedRow!(v, "\t", q{}); 
+				doit!q{aliasName}; foreach(row; rows) doit!q{toPlainText}; 
+			}	break; 
+			case mixin(舉!((TableStyle),q{struct_})),
+			mixin(舉!((TableStyle),q{struct_hdr})),
+			mixin(舉!((TableStyle),q{struct_data})),
+			mixin(舉!((TableStyle),q{struct_hdr_ex})): 	{
+				auto 	relName 	= vars.front.relName,
+					structName 	= vars.front.tableIdentifier,
+					origFieldNames 	= vars.enumerate.map!((a)=>(a.value.aliasName)).array,
+					fieldNames 	= vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
+					fieldTypes	= vars.map!((v)=>(v.DType)).array; 
+				if(style==mixin(舉!((TableStyle),q{struct_hdr_ex})))
+				{
+					auto examples = new string[][vars.length]; 
+					foreach(row; rows) foreach(i, var; vars) examples[i] ~= var.DLiteral; 
+					auto comments = examples.map!
+						((e)=>(
+						i"\t/+Structured:$(chain(e, only("...")).join(", ")
+.safeDCommentBody)+/".text
+					)).array; 
+					appendStructDefinition(
+						relName, structName, 
+						fieldTypes, origFieldNames, fieldNames, comments
+					); 
+				}
+				else
+				{
+					const hasHeader = style!=mixin(舉!((TableStyle),q{struct_data})), hasData = style!=mixin(舉!((TableStyle),q{struct_hdr})); 
+					if(hasHeader)
+					appendStructDefinition(
+						relName, structName, 
+						fieldTypes, origFieldNames, fieldNames, "".repeat
+					); 
+					if(hasData)
+					{
+						appendLine("["); bool running; 
+						foreach(row; rows)
+						{
+							if(!running.chkSet) appendStr(","); 
+							appendLine(i"\t$(structName)(".text); 
+							foreach(i, v; vars)
+							{
+								if(i) appendStr(","); 
+								appendLine(i"\t\t$(fieldNames[i]): $(v.DLiteral)".text); 
+							}
+							appendLine("\t)"); 
+						}
+						appendLine("]"); 
+					}
+				}
+			}	break; 
+			
+			case mixin(舉!((TableStyle),q{ascii})): 	{
+				formatGrid(
+					GridStyle(
+						[
+							"-",
+							"-",
+							"-"
+						],	[
+							["+-","-+-","-+"],
+							["+-","-+-","-+"],
+							["+-","-+-","-+"]
+						],
+							  ["| "," | "," |"]
+					)
+				); 
+			}	break; 
+			case mixin(舉!((TableStyle),q{ansi})): 	{
+				formatGrid(
+					GridStyle(
+						[
+							"─",
+							"─",
+							"─"
+						],	[
+							["┌─","─┬─","─┐"],
+							["├─","─┼─","─┤"],
+							["└─","─┴─","─┘"]
+						],
+							  ["│ "," │ "," │"]
+					)
+				); 
+			}	break; 
+			case mixin(舉!((TableStyle),q{ansi_thick})): 	{
+				formatGrid(
+					GridStyle(
+						[
+							"═",
+							"─",
+							"═"
+						],	[
+							["╔═","═╤═","═╗"],
+							["╟─","─┼─","─╢"],
+							["╚═","═╧═","═╝"]
+						],
+							  ["║ "," │ "," ║"]
+					)
+				); 
+			}	break; 
+			case mixin(舉!((TableStyle),q{ansi_round})): 	{
+				formatGrid(
+					GridStyle(
+						[
+							"─",
+							"─",
+							"─"
+						],	[
+							["╭─","─┬─","─╮"],
+							["├─","─┼─","─┤"],
+							["╰─","─┴─","─╯"]
+						],
+							  ["│ "," │ "," │"]
+					)
+				); 
+			}	break; 
+			case mixin(舉!((TableStyle),q{turbo})): 	{
+				const f = "\34\7\33\0", d = "\34\0\33\7"; 
+				formatGrid(
+					GridStyle(
+						[
+							"─",
+							"─",
+							"─"
+						],	[
+							[f~" ┌─","─┬─","─┐ "~d],
+							[f~" ├─","─┼─","─┤ "~d],
+							[f~" └─","─┴─","─┘ "~d]
+						],
+							  [f~" │ "," │ "," │ "~d],
+						[["\33\1","\33\0"],["",""]]
+					)
+				); 
+			}	break; 
+			case mixin(舉!((TableStyle),q{norton})): 	{
+				const f = "\34\1\33\13", d = "\34\0\33\7"; 
+				formatGrid(
+					GridStyle(
+						[
+							"═",
+							"─",
+							"═"
+						],	[
+							[f~"╔","╤","╗"~d],
+							[f~"╟","┼","╢"~d],
+							[f~"╚","╧","╝"~d]
+						],
+							  [f~"║","│","║"~d],
+						[["\33\16","\33\13"],["",""]]
+					)
+				); 
+			}	break; 
+		}
+		
+		return res[]; 
+	} 
+	
+	version(/+$DIDE_REGION+/all) {
+		T[] toStructArray(T)(auto ref FbResultSet rows, bool strict = true, string FILE = __FILE__, size_t LINE = __LINE__)
+		{
+			try
+			{
+				if(!rows.fields) return []; auto vars = rows.fields.vars; 
+				
+				enum structFieldNames = [FieldNamesWithUDA!(T, STORED, true)]; 
+				const 	varFieldNames = vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
+					colIdx = structFieldNames.map!
+						((sName){
+					const vIdx = varFieldNames.countUntil!sameText(sName); 
+					enforce(
+						!strict || vIdx>=0, 
+						i"Missing column for field $(sName)".text
+					); return vIdx; 
+				}).array; 
+				
+				auto res = appender!(T[]); 
+				foreach(row; rows)
+				{
+					T item; 
+					static foreach(i, name; structFieldNames)
+					{
+						if(colIdx[i]>=0)
+						{
+							alias FieldT = typeof(__traits(getMember, item, name)); 
+							__traits(getMember, item, name) = vars[colIdx[i]].readValue!FieldT; 
+						}
+					}
+					res ~= item; 
+				}
+				return res[]; 
+			}
+			catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
+		} 
+		T[] toArray(T)(auto ref FbResultSet rows, bool strict = true, string FILE = __FILE__, size_t LINE = __LINE__)
+		{
+			enum isValue = __traits(compiles, { XSQLVAR v; auto x = v.readValue!T; }); 
+			static if(!isValue)
+			{ return toStructArray!T(rows, strict, FILE, LINE); }
+			else
+			{
+				try
+				{
+					if(!rows.fields) return []; auto vars = rows.fields.vars; 
+					enforce(rows.fields.length>=1, "No columns in FbResultSet."); 
+					
+					auto res = appender!(T[]); 
+					foreach(row; rows) res ~= vars[0].readValue!T; 
+					return res[]; 
+				}
+				catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
+			}
+		} 
+	}
+	
+	
+	
 	/+
 		Prompt for AI to discover relationships:
 		

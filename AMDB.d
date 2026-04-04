@@ -565,15 +565,15 @@ version(/+$DIDE_REGION+/all) {
 		with(SER)
 		{
 			auto 試(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, args); return arr[].hexDump; } 
-			((0x49F85466AF86).檢 (試("a"w))),((0x4A1B5466AF86).檢 (試("abcá"))),((0x4A415466AF86).檢 (試("Hello 🌍!\0"w.replicate(2)))),
-			((0x4A825466AF86).檢 (試(false))),((0x4AA65466AF86).檢 (試(true))),((0x4AC95466AF86).檢 (試(Null()))),
-			((0x4AF35466AF86).檢 (試(42))),((0x4B145466AF86).檢 (試(7848))),((0x4B375466AF86).檢 (試(437928932))),((0x4B5F5466AF86).檢 (試(437928932437928932))),
-			((0x4B955466AF86).檢 (試(-42))),((0x4BB75466AF86).檢 (試(-7848))),((0x4BDB5466AF86).檢 (試(-437928932))),((0x4C045466AF86).檢 (試(-437928932437928932))),
-			((0x4C3B5466AF86).檢 (試(1.5))),((0x4C5D5466AF86).檢 (試(1.51))),((0x4C805466AF86).檢 (試(1.51f))),
-			((0x4CA95466AF86).檢 (試(now))),((0x4CCB5466AF86).檢 (試(now.date))),
-			((0x4CF75466AF86).檢 (試(vec2(1, 2)))),((0x4D205466AF86).檢 (試((RGB(54,60,175))))),((0x4D4F5466AF86).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D7F5466AF86).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
-			((0x4DC15466AF86).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF45466AF86).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2A5466AF86).檢 (試(EType!uint(7, 8, 65536)))),
-			((0x4E655466AF86).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E985466AF86).檢 (試(EType!ushort(4, 5, 6)))),((0x4ECC5466AF86).檢 (試(AType!uint(7, 8, 9)))); 
+			((0x49FCEB4AA1C7).檢 (試("a"w))),((0x4A1FEB4AA1C7).檢 (試("abcá"))),((0x4A45EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
+			((0x4A86EB4AA1C7).檢 (試(false))),((0x4AAAEB4AA1C7).檢 (試(true))),((0x4ACDEB4AA1C7).檢 (試(Null()))),
+			((0x4AF7EB4AA1C7).檢 (試(42))),((0x4B18EB4AA1C7).檢 (試(7848))),((0x4B3BEB4AA1C7).檢 (試(437928932))),((0x4B63EB4AA1C7).檢 (試(437928932437928932))),
+			((0x4B99EB4AA1C7).檢 (試(-42))),((0x4BBBEB4AA1C7).檢 (試(-7848))),((0x4BDFEB4AA1C7).檢 (試(-437928932))),((0x4C08EB4AA1C7).檢 (試(-437928932437928932))),
+			((0x4C3FEB4AA1C7).檢 (試(1.5))),((0x4C61EB4AA1C7).檢 (試(1.51))),((0x4C84EB4AA1C7).檢 (試(1.51f))),
+			((0x4CADEB4AA1C7).檢 (試(now))),((0x4CCFEB4AA1C7).檢 (試(now.date))),
+			((0x4CFBEB4AA1C7).檢 (試(vec2(1, 2)))),((0x4D24EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x4D53EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D83EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
+			((0x4DC5EB4AA1C7).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF8EB4AA1C7).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2EEB4AA1C7).檢 (試(EType!uint(7, 8, 65536)))),
+			((0x4E69EB4AA1C7).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E9CEB4AA1C7).檢 (試(EType!ushort(4, 5, 6)))),((0x4ED0EB4AA1C7).檢 (試(AType!uint(7, 8, 9)))); 
 		}
 	} 
 	
@@ -734,10 +734,11 @@ Mary Davis  customer of  Amazon
 			auto am = new AMDBTest; 
 			am.schema(schemaSrc); 
 			am.data(dataSrc); 
-			((0x5E835466AF86).檢 (am.dump)); 
+			((0x5E87EB4AA1C7).檢 (am.dump)); 
 		}
 	} 
-}version(/+$DIDE_REGION+/all) {
+}
+version(/+$DIDE_REGION+/all) {
 	private static sortKeywords(R)(R r) => r.sort!((a,b)=>(a.length>b.length ? true : a.length<b.length ? false : a>b))/+longer comes first, the alphabetical order.+/; 
 	class AMDB
 	{

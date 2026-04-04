@@ -6573,7 +6573,7 @@ version(/+$DIDE_REGION+/all)
 				const tempFileDst = File(tempPath, `$` ~ s ~ ".webp"); scope(exit) tempFileDst.remove; 
 				
 				tempFileSrc.write(stream); 
-				auto res = execute(["cwebp", "-preset", "photo", "-q", "85", tempFileSrc.fullName, "-o", tempFileDst.fullName]); 
+				auto res = executeProcess(["cwebp", "-preset", "photo", "-q", "85", tempFileSrc.fullName, "-o", tempFileDst.fullName]); 
 				if(res.status==0) {
 					LOG("\n"~res.output); 
 					bmp = deserialize!Bitmap(tempFileDst); 
