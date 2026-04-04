@@ -101,7 +101,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			public import std.utf; 
 			public import std.uni : byCodePoint, isAlpha, isNumber, isAlphaNum; 
 			public import std.uri: urlEncode = encode, urlDecode = decode; 
-			public import std.process : environment, thisThreadID, execute, executeShell, ExecuteConfig = Config, Pid, escapeWindowsArgument; 
+			public import std.process : environment, thisThreadID, executeProcess = execute, executeShell, ExecuteConfig = Config, Pid, escapeWindowsArgument; 
 			public import std.zlib : compress, uncompress; 
 			public import std.stdio : stdin, stdout, stderr, readln, StdFile = File, stdWrite = write; 
 			//public import std.bitmanip : swapEndian, BitArray, bitfields, bitsSet;
@@ -1019,7 +1019,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8BDF0C876135).檢((update間(_間)))); 
+				((0x8BF059F156A1).檢((update間(_間)))); 
 				return res*100; 
 			} 
 			
@@ -1794,6 +1794,13 @@ version(/+$DIDE_REGION Global System stuff+/all)
 }version(/+$DIDE_REGION Meta programming       +/all)
 {
 	
+	mixin template StaticAssertEQ(string a, string b)
+	{
+		/+Todo: This should be done properly, look for existing solutions!+/
+		enum value = mixin(a); 
+		static assert(value==mixin(b), i"$(value) must== $(b)".text); 
+	} 
+	
 	template packAliasSeq(A...) { alias unpack=A; } 
 	
 	void free(O)(ref O o)
@@ -2005,6 +2012,19 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	enum EnumBits(T) = float(T.max+1).log2.iceil; 
 	enum EnumAssocArray(alias T) = /+keys = enumMember.text, values = enumMember+/
 	((){ T[string] o; static foreach(t; EnumMemberNames!T) o[t]=mixin("T."~t); return o; })(); 
+	
+	size_t hashOfEnum(T)()
+	{ size_t h=2347890201238928092; foreach(e; [EnumMembers!T]) h = mix64(e.text.hashOf, h+(cast(size_t)(e))); return h; } 
+	
+	string makeDenseEnum(T)()
+	{
+		string res; uint idx; foreach(s; [EnumMembers!T])
+		{
+			res ~= s.text; const i = s.to!uint; 
+			if(idx.chkSet(s.to!uint)) { res ~= " ="~idx.text; }
+			idx++; res~=",\n"; 
+		}return res; 
+	} 
 	
 	mixin template InjectEnumMembers(E)
 	{
@@ -3290,15 +3310,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19D590C876135})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19FD159F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19E210C876135})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A09959F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x19ECB0C876135})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x19F400C876135})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A14359F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A1B859F156A1})); 
 						+/
 					+/
 				+/
@@ -6962,6 +6982,9 @@ version(/+$DIDE_REGION Containers+/all)
 		string lc(string s) pure
 		{ return s.toLower; } 
 		
+		string lcIfAllCaps(string s)
+		=> ((s==s.uc)?(s.lc):(s)); 
+		
 		///generates D source string format from values
 		string escape(T)(T s)
 		{ return format!"%(%s%)"([s]); } 
@@ -7444,6 +7467,13 @@ version(/+$DIDE_REGION Containers+/all)
 			else if(s.isImportantDlangKeyword)	s = s ~ '_'; 
 			return s; 
 		} 
+		
+		string sanitizeDLangTypeIdentifier(string s, string defaultName = "Type", sizediff_t idx=-1)
+		=> s.lcIfAllCaps.capitalize.sanitizeDLangIdentifier(defaultName, idx); 
+		
+		string sanitizeDLangFieldIdentifier(string s, string defaultName = "field", sizediff_t idx=-1)
+		=> s.lcIfAllCaps.decapitalize.sanitizeDLangIdentifier(defaultName, idx); 
+		
 		
 	}version(/+$DIDE_REGION+/all) {
 		string replaceWords(alias fun = isWordChar)(string str, string from, string to)
@@ -14841,7 +14871,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				{
 					
 					Path actPath; 
-					foreach(line; execute([`cmd`,	`/c`, `dir`, path.fullPath, `/s`, `/-c`]).output.splitLines)
+					foreach(line; executeProcess([`cmd`,	`/c`, `dir`, path.fullPath, `/s`, `/-c`]).output.splitLines)
 					{
 						//2011-01-03	01:05             93407 10-5.jpg
 						if(line.isWild("????-??-??  ??:??     ????????????? *"))
