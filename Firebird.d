@@ -3506,20 +3506,7 @@ version(/+$DIDE_REGION+/all) {
 			private Transaction transaction_; 
 			@property Transaction transaction() => transaction_; 
 			
-			/+
-				//alias this = transaction_; 
-				This FAILS when using with() in another module.
-			+/
-			@property active() => transaction.active; 
-			void enforceActive() { transaction.enforceActive; } 
-			void commit() { transaction.commit; } 
-			void rollback() { transaction.rollback; } 
-			scope execute(Args...)(Args args) => transaction.execute!(Args)(args); 
-			scope 查(Args...)(LOCATION_t loc, Args args) => transaction.查!(Args)(loc, args); 
-			/+
-				Todo: Ask DLang forum.
-				/+Link: https://forum.dlang.org/post/ocqmunwfsfackkducocn@forum.dlang.org+/
-			+/
+			alias this = transaction; 
 			
 			@disable this(this); 
 			this(Transaction transaction)
@@ -3998,54 +3985,6 @@ version(/+$DIDE_REGION+/all) {
 		+/
 	+/
 	
-	struct DBSchema
-	{
-		struct Name { string orig, new_; } 
-		enum KeyType { none, primary, secondary } 
-		struct Field
-		{
-			Name fieldName; 
-			string type; 
-			KeyType keyType; 
-			string[] examples; 
-			
-			@property isKey() => !!keyType; 
-		} 
-		struct Key
-		{
-			Field[] fields; 
-			string constraintName; 
-		} 
-		struct Table
-		{
-			Name tableName; 
-			Field[] fields; 
-			Key primaryKey; 
-			Key[] foreignKeys; 
-		} 
-		
-		Name databaseName; 
-		Table[] tables; 
-	} 
-	
-	auto makeDbSchema(FbDatabase db)
-	{
-		DBSchema res; 
-		with(res)
-		{}
-		return res; 
-	} 
-	
-	struct DBSchemaImporter
-	{
-		FbDatabase db; 
-		
-		void 查(Args...)(LOCATION_t loc, Args args)
-		{
-			auto rows = db.查!(Args)(loc, args); 
-			rows.formatTable!"turbo".print; 
-		} 
-	} 
 	
 	void test_makeDBSchema()
 	{

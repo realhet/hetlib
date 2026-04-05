@@ -16,7 +16,111 @@
 	/+Todo: default attributes+/
 +/
 
-import het.ui, amdb; 
+enum TREEVIEW_GUI_APP 	= (常!(bool)(0)); 
+
+static if(!TREEVIEW_GUI_APP)
+{ void main() { console({ testCases.firebird_test; print("DONE"); }); } }
+
+
+import het.ui, het.amdb, het.firebird; 
+
+version(/+$DIDE_REGION+/all) {
+	struct DBSchema
+	{
+		struct Name
+		{
+			string orig, renamed; 
+			
+			private enum separ = "->"; 
+			this(string orig, string renamed)
+			{
+				this.orig	= orig.strip,
+				this.renamed	= renamed.strip; if(renamed=="") renamed = orig; 
+			} 
+			
+			this(string nameSpec)
+			{
+				const idx = nameSpec.indexOf(separ); 
+				if(idx>=0)	this(nameSpec[0..idx], nameSpec[idx+separ.length..$]); 
+				else	this(nameSpec, ""); 
+			} 
+			
+			string toString() const
+			{
+				if(renamed!="" && renamed!=orig)	return orig~" -> "~renamed; 
+				else	return orig; 
+			} 
+		} 
+		
+		enum KeyType { none, primary, secondary } 
+		struct Field
+		{
+			Name fieldName; 
+			string type; 
+			KeyType keyType; 
+			string[] examples; 
+			
+			@property isKey() => !!keyType; 
+		} 
+		
+		struct Key
+		{
+			Field[] fields; 
+			string constraintName; 
+		} 
+		
+		struct Table
+		{
+			Name tableName; 
+			Field[] fields; 
+			Key primaryKey; 
+			Key[] foreignKeys; 
+		} 
+		
+		Name databaseName; 
+		Table[] tables; 
+		
+		void importTable(FbDatabase db, string nameSpec)
+		{} 
+	} 
+	
+	auto makeDbSchema(FbDatabase db)
+	{
+		DBSchema res; 
+		with(res)
+		{}
+		return res; 
+	} 
+	
+	struct DBSchemaImporter
+	{
+		FbDatabase db; bool owned; 
+		DBSchema schema; 
+		
+		this(Args...)(Args args)
+		{
+			static if(is(Args[0]==FbDatabase))
+			{
+				static assert(Args.length==1); 
+				owned==false; db = args[0]; 
+			}
+			else
+			{ owned = true; db = new FbDatabase(args); }
+		} 
+		
+		~this()
+		{ if(owned) db.free; } 
+		
+		void 查(Args...)(LOCATION_t loc, Args args)
+		{
+			auto rows = db.查!(Args)(loc, args); 
+			rows.formatTable!"turbo".print; 
+		} 
+	} 
+}
+
+
+
 
 struct TestCase
 { string schema, data; } 
@@ -504,9 +608,34 @@ PS-016  is a  ProductionSchedule
 	{
 		auto firebird_test()
 		{
-			import firebird; 
+			with(
+				DBSchemaImporter
+				(
+					`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, 
+					"SYSDBA", "masterkey"
+				)
+			)
+			{
+				string script; 
+				foreach(tableName; db.allTablesAndViews)
+				{
+					
+					
+					with(db)
+					{
+						foreach(row; (查((位!()),iq{},iq{SELECT * FROM $(tableName.Literal)})))
+						{}
+					}
+					
+					auto s = i`SELECT$("*")
+FROM $(tableName)="$(tableName)"`.text; 
+					script ~= q{(查((位!()),iq{},iq{$}))}.replace("$", s)~"\n"; 
+				}
+				
+				print(script); 
+				clipboard.text = script; 
+			}
 			
-			test_makeDBSchema; 
 			
 			
 			return TestCase(
@@ -520,321 +649,409 @@ PS-016  is a  ProductionSchedule
 		
 	}
 } 
-string replaceNonLeadingTabsWithDoubleSpaces(string s)
-=> s.splitLines.map!((s){
-	const tabs = s.countUntil!`a!='\t'`.max(0); 
-	return s[0..tabs]~s[tabs..$].replace("\t", "  "); 
-}).join("\n"); 
-
-struct AMDBNode
+static if(TREEVIEW_GUI_APP)
 {
-	enum showETypeInEntity 	= (常!(bool)(0)),
-	showEntitiesInEType	= (常!(bool)(1)), /+Todo: implement this with a custom node!+/
-	showTargetEntityInAssociation 	= (常!(bool)(1)); 
+	string replaceNonLeadingTabsWithDoubleSpaces(string s)
+	=> s.splitLines.map!((s){
+		const tabs = s.countUntil!`a!='\t'`.max(0); 
+		return s[0..tabs]~s[tabs..$].replace("\t", "  "); 
+	}).join("\n"); 
 	
-	AMDB.Explorer assoc; //contains `db` and `idx`
-	
-	auto db()
-	=> assoc.db; auto idx()
-	=> assoc.idx; 
-	
-	//Todo: Generate the is* functions by a mixin automatically!  `alias this` seems too dangerous here.
-	
-	bool isRoot()
-	=> assoc.isNull; /+
-		Todo: This must go. 
-		Null is just null null. And the root subnode is populated from outside.
-	+/
-	
-	string name()
-	=> assoc.sourceOrThis.text; string verb()
-	=> assoc.verb.text; string typeName()
-	=> assoc.target.sourceOrThis.text; 
-	bool isEType()
-	=> assoc.isEType; bool isDType()
-	=> assoc.isDType; bool isType()
-	=> assoc.isType; bool isAType()
-	=> assoc.isAType; bool isInverseVerb()
-	=> assoc.isInverseVerb; 
-	
-	bool isEntity()
-	=> assoc.isEntity; bool isAttribute()
-	=> assoc.isAttribute; 
-	
-	bool opened; 
-	AMDBNode[] subNodes; 
-	
-	/+
-		Todo: There is a matrix here:
-			Rows: AType, EType, DType, etc
-			Columns:  canOpen(), open(), UI()
-	+/
-	
-	void close()
+	struct AMDBNode
 	{
-		opened = false; 
-		subNodes = []; 
-	} 	 void toggle()
-	{
-		if(opened)	close; 
-		else	open; 
-	} 	
-	
-	@property bool canOpen()
-	{
-		if(isRoot)	{ return db.hasAnyTypes; }
-		else if(isAType)	{
-			return assoc.target.isAssociation ||
-			db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any; 
-		}
-		else if(isEType)	{
-			return db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any ||
-			db.exploreETypes.filter!((a)=>(a.target.idx==this.idx)).any ||
-			assoc.hasInverseVerbs
-			/+
-				Todo: Must optimize all these searches 
-				and make it clearer/centralized.
-			+/; 
-		}
-		else if(isDType)	{ return db.exploreDTypes.filter!((a)=>(a.target.idx==this.idx)).any; }
-		else if(isInverseVerb)	{ return true; }
-		else if(isEntity)	{
-			return showETypeInEntity 
-			|| !db.findAssociationsBySource(idx).empty; 
-		}
-		else if(isAttribute)	{
-			return showTargetEntityInAssociation && assoc.target.isEntity
-			|| !db.findAssociationsBySource(idx).empty; 
-		}
-		return false; 
-	} 
-	
-	static auto sortedNodes(alias sortBy, R)(R input)
-	=> input	.array/+Opt: This allocates the db too! Uses 4x more memory+/
-		.sort!((a, b)=>(sortBy(a) < sortBy(b)))
-		.map!((a)=>(AMDBNode(a)))/+Opt: This uses even more, but it's the final form.+/
-		.array; 
-	static auto sortByIdx(R)(R input) => sortedNodes!((a)=>(a.source.idx))(input); 
-	static auto sortByText(R)(R input) => sortedNodes!((a)=>(a.sourceOrThis.text))(input); 
-	
-	void open()
-	{
-		if(/+canOpen && +/opened.chkSet)
+		enum showETypeInEntity 	= (常!(bool)(0)),
+		showEntitiesInEType	= (常!(bool)(1)), /+Todo: implement this with a custom node!+/
+		showTargetEntityInAssociation 	= (常!(bool)(1)); 
+		
+		AMDB.Explorer assoc; //contains `db` and `idx`
+		
+		auto db()
+		=> assoc.db; auto idx()
+		=> assoc.idx; 
+		
+		//Todo: Generate the is* functions by a mixin automatically!  `alias this` seems too dangerous here.
+		
+		bool isRoot()
+		=> assoc.isNull; /+
+			Todo: This must go. 
+			Null is just null null. And the root subnode is populated from outside.
+		+/
+		
+		string name()
+		=> assoc.sourceOrThis.text; string verb()
+		=> assoc.verb.text; string typeName()
+		=> assoc.target.sourceOrThis.text; 
+		bool isEType()
+		=> assoc.isEType; bool isDType()
+		=> assoc.isDType; bool isType()
+		=> assoc.isType; bool isAType()
+		=> assoc.isAType; bool isInverseVerb()
+		=> assoc.isInverseVerb; 
+		
+		bool isEntity()
+		=> assoc.isEntity; bool isAttribute()
+		=> assoc.isAttribute; 
+		
+		bool opened; 
+		AMDBNode[] subNodes; 
+		
+		/+
+			Todo: There is a matrix here:
+				Rows: AType, EType, DType, etc
+				Columns:  canOpen(), open(), UI()
+		+/
+		
+		void close()
 		{
-			if(isRoot)
-			{
-				subNodes 	= sortByText(db.exploreDTypes.filter!((a)=>(!a.target.isAssociation)))
-					~ sortByIdx(db.exploreETypes.filter!((a)=>(!a.target.isAssociation))); 
-			}
-			else if(isAType)
-			{
-				subNodes = []; 
-				subNodes ~= sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx))); 
-				if(assoc.target.isAssociation) subNodes ~= AMDBNode(assoc.target); 
-			}
-			else if(isEType)
-			{
-				subNodes 	= sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)))
-					~ sortByIdx(db.exploreETypes.filter!((a)=>(a.target.idx==this.idx))); 
-				if(auto inverseVerbIndices = db.getInverseVerbATypes_of_EType(this.idx))
-				subNodes ~= (*inverseVerbIndices).map!((a)=>(AMDBNode(db.explore(a)))).array; 
-			}
-			else if(isDType)
-			{ subNodes 	= sortByIdx(db.exploreDTypes.filter!((a)=>(a.target.idx==this.idx))); }
-			else if(isInverseVerb)
-			{ subNodes = [AMDBNode(assoc.source.source)]; }
-			else if(isEntity)
-			{
-				subNodes 	= ((showETypeInEntity)?([AMDBNode(assoc.target)]):([]))
-					~ sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx)))); 
-			}
-			else if(isAttribute)
-			{
-				subNodes = 	((
-					showTargetEntityInAssociation &&
-					assoc.target.isEntity
-				)?([AMDBNode(assoc.target)]):([]))
-					~ sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx)))); 
-				/+Todo: Do inverse attributes too!+/
-				//Todo: Handle single/multiple cardinality too with custom attribute list nodes
-				//Todo: Research way of storage for ordered, unordered and sorted sequences!
-			}
-		}
-	} 
-	
-	void UI(void delegate() onEntitiesClicked)
-	{
-		with(im)
+			opened = false; 
+			subNodes = []; 
+		} 	 void toggle()
 		{
-			void Icon(string name, int hue)
-			{ Img(File(i`c:\dl\red_$(name).png?shiftHUE=$(hue)`.text)); Spacer(fh/4); } 
-			if(isRoot)	{ Icon(`brick`, -60); Text("Types"); }
+			if(opened)	close; 
+			else	open; 
+		} 	
+		
+		@property bool canOpen()
+		{
+			if(isRoot)	{ return db.hasAnyTypes; }
 			else if(isAType)	{
-				Icon(`right_down_arrow`, assoc.target.isDType ? -120 : -60); 
-				Text(assoc.verb.text, ", ", assoc.target.sourceOrThis.text); 
+				return assoc.target.isAssociation ||
+				db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any; 
 			}
 			else if(isEType)	{
-				Icon(`brick`, -60); Text(name); Spacer(fh/4); 
-				if(Btn(i" $(db.getEntityCount_of_EType(idx, true)) ".text))
-				{ onEntitiesClicked(); }
+				return db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any ||
+				db.exploreETypes.filter!((a)=>(a.target.idx==this.idx)).any ||
+				assoc.hasInverseVerbs
+				/+
+					Todo: Must optimize all these searches 
+					and make it clearer/centralized.
+				+/; 
 			}
-			else if(isDType)	{ Icon(`brick`, -120); Text(name); }
-			else if(isInverseVerb)	{
-				Icon(`left_up_arrow`, -60); 
-				Text(assoc.target.text, ", ", assoc.source.source.source.text); 
-			}
+			else if(isDType)	{ return db.exploreDTypes.filter!((a)=>(a.target.idx==this.idx)).any; }
+			else if(isInverseVerb)	{ return true; }
 			else if(isEntity)	{
-				Icon(`brick`, 60); Text(assoc.source); 
-				if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }
+				return showETypeInEntity 
+				|| !db.findAssociationsBySource(idx).empty; 
 			}
 			else if(isAttribute)	{
-				Icon(`right_down_arrow`, 30); 
-				Text(assoc.verb.verb, ", ", assoc.target.sourceOrThis); 
-				if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }
+				return showTargetEntityInAssociation && assoc.target.isEntity
+				|| !db.findAssociationsBySource(idx).empty; 
 			}
-			else	{ Text({ style.fontColor = clGray; }, i" (assoc: $(assoc.idx))"); }
-		}
-	} 
-	
-	
-} 
-
-class AMDBTreeView : VirtualTreeView!AMDBNode
-{} 
-
-class AMDBSchemaTreeView : AMDBTreeView
-{
-	this(AMDB db)
-	{
-		AMDBNode rootNode; rootNode.assoc.db = db; rootNode.opened = true; 
-		auto rootEType = db.explore(db.get("Entity")); 
-		rootNode.subNodes = 	AMDBNode.sortByText(db.exploreDTypes.filter!((a)=>(!a.target.isAssociation)))
-			~((rootEType)?([AMDBNode(rootEType)]):([])); 
+			return false; 
+		} 
 		
-		showBullet = true, showRoot = false; 
-		root = rootNode; 
+		static auto sortedNodes(alias sortBy, R)(R input)
+		=> input	.array/+Opt: This allocates the db too! Uses 4x more memory+/
+			.sort!((a, b)=>(sortBy(a) < sortBy(b)))
+			.map!((a)=>(AMDBNode(a)))/+Opt: This uses even more, but it's the final form.+/
+			.array; 
+		static auto sortByIdx(R)(R input) => sortedNodes!((a)=>(a.source.idx))(input); 
+		static auto sortByText(R)(R input) => sortedNodes!((a)=>(a.sourceOrThis.text))(input); 
 		
-		if(rootEType) root.subNodes.back.open; 
-	} 
-} 
-
-class AMDBDataTreeView : AMDBTreeView
-{
-	this(R)(AMDB db, R indices)
-	{
-		AMDBNode rootNode; rootNode.assoc.db = db; rootNode.opened = true; 
-		rootNode.subNodes = indices.map!((idx)=>(AMDBNode(db.explore(idx)))).array; 
-		
-		showBullet = true, showRoot = false; 
-		root = rootNode; 
-	} 
-} 
-
-class MainForm : UIWindow
-{
-	mixin autoCreate; mixin SetupMegaShader!""; 
-	
-	enum NumPanels = 1; 
-	AMDB db; 
-	AMDBTreeView[NumPanels] schemaTreeView, dataTreeView; 
-	
-	override void onCreate()
-	{
-		caption = "AMDB Management Studio"; 
-		
-		static if((常!(bool)(1))) testSER, testSentenceProcessor; 
-		
-		
-		const 	cases 	= mixin((
-			(表([
-				[q{(常!(bool)(1))},q{types}],
-				[q{(常!(bool)(0))},q{cars}],
-				[q{(常!(bool)(1))},q{animals}],
-				[q{(常!(bool)(1))},q{leds}],
-				[q{(常!(bool)(1))},q{factory}],
-				[q{(常!(bool)(1))},q{firebird_test}],
-			]))
-		).調!(GEN_Selection!testCases)),
-			batches 	= 2; 
-		db = new AMDB; 
-		foreach(batch; 0..batches)
-		{ db.schema(cases.map!((a)=>(a.schema)).join("\n").replaceNonLeadingTabsWithDoubleSpaces/+Todo: implement nonleading tab handling in sentence parser+/); }
-		if((常!(bool)(0))) db.streamDump.print; 
-		if((常!(bool)(0))) db.streamBytes.saveTo(File(`c:\dl\test.amdb`)); 
-		
-		foreach(batch; 0..batches)
+		void open()
 		{
-			db.data(cases.retro.map!((a)=>(a.data)).join("\n").replaceNonLeadingTabsWithDoubleSpaces/+Todo: implement nonleading tab handling in sentence parser+/); 
-			if((常!(bool)(0))) db.streamBytes.saveTo(File(i`c:\dl\test_data_$(batch).amdb`.text)); 
-		}
-		if((常!(bool)(0))) db.streamDump.print; 
+			if(/+canOpen && +/opened.chkSet)
+			{
+				if(isRoot)
+				{
+					subNodes 	= sortByText(db.exploreDTypes.filter!((a)=>(!a.target.isAssociation)))
+						~ sortByIdx(db.exploreETypes.filter!((a)=>(!a.target.isAssociation))); 
+				}
+				else if(isAType)
+				{
+					subNodes = []; 
+					subNodes ~= sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx))); 
+					if(assoc.target.isAssociation) subNodes ~= AMDBNode(assoc.target); 
+				}
+				else if(isEType)
+				{
+					subNodes 	= sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)))
+						~ sortByIdx(db.exploreETypes.filter!((a)=>(a.target.idx==this.idx))); 
+					if(auto inverseVerbIndices = db.getInverseVerbATypes_of_EType(this.idx))
+					subNodes ~= (*inverseVerbIndices).map!((a)=>(AMDBNode(db.explore(a)))).array; 
+				}
+				else if(isDType)
+				{ subNodes 	= sortByIdx(db.exploreDTypes.filter!((a)=>(a.target.idx==this.idx))); }
+				else if(isInverseVerb)
+				{ subNodes = [AMDBNode(assoc.source.source)]; }
+				else if(isEntity)
+				{
+					subNodes 	= ((showETypeInEntity)?([AMDBNode(assoc.target)]):([]))
+						~ sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx)))); 
+				}
+				else if(isAttribute)
+				{
+					subNodes = 	((
+						showTargetEntityInAssociation &&
+						assoc.target.isEntity
+					)?([AMDBNode(assoc.target)]):([]))
+						~ sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx)))); 
+					/+Todo: Do inverse attributes too!+/
+					//Todo: Handle single/multiple cardinality too with custom attribute list nodes
+					//Todo: Research way of storage for ordered, unordered and sorted sequences!
+				}
+			}
+		} 
 		
-		foreach(panelIdx; 0..NumPanels)
+		void UI(void delegate() onEntitiesClicked)
 		{
-			schemaTreeView[panelIdx] 	= new AMDBSchemaTreeView(db),
-			dataTreeView[panelIdx] 	= new AMDBDataTreeView(db, AMDB.Idx[].init); 
-		}
+			with(im)
+			{
+				void Icon(string name, int hue)
+				{ Img(File(i`c:\dl\red_$(name).png?shiftHUE=$(hue)`.text)); Spacer(fh/4); } 
+				if(isRoot)	{ Icon(`brick`, -60); Text("Types"); }
+				else if(isAType)	{
+					Icon(`right_down_arrow`, assoc.target.isDType ? -120 : -60); 
+					Text(assoc.verb.text, ", ", assoc.target.sourceOrThis.text); 
+				}
+				else if(isEType)	{
+					Icon(`brick`, -60); Text(name); Spacer(fh/4); 
+					if(Btn(i" $(db.getEntityCount_of_EType(idx, true)) ".text))
+					{ onEntitiesClicked(); }
+				}
+				else if(isDType)	{ Icon(`brick`, -120); Text(name); }
+				else if(isInverseVerb)	{
+					Icon(`left_up_arrow`, -60); 
+					Text(assoc.target.text, ", ", assoc.source.source.source.text); 
+				}
+				else if(isEntity)	{
+					Icon(`brick`, 60); Text(assoc.source); 
+					if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }
+				}
+				else if(isAttribute)	{
+					Icon(`right_down_arrow`, 30); 
+					Text(assoc.verb.verb, ", ", assoc.target.sourceOrThis); 
+					if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }
+				}
+				else	{ Text({ style.fontColor = clGray; }, i" (assoc: $(assoc.idx))"); }
+			}
+		} 
+		
+		
 	} 
-	override void onUpdate()
+	
+	class AMDBTreeView : VirtualTreeView!AMDBNode
+	{} 
+	
+	class AMDBSchemaTreeView : AMDBTreeView
 	{
-		showFPS = (互!((bool),(0),(0x5BD83898B722))); 
-		with(im)
+		this(AMDB db)
 		{
+			AMDBNode rootNode; rootNode.assoc.db = db; rootNode.opened = true; 
+			auto rootEType = db.explore(db.get("Entity")); 
+			rootNode.subNodes = 	AMDBNode.sortByText(db.exploreDTypes.filter!((a)=>(!a.target.isAssociation)))
+				~((rootEType)?([AMDBNode(rootEType)]):([])); 
+			
+			showBullet = true, showRoot = false; 
+			root = rootNode; 
+			
+			if(rootEType) root.subNodes.back.open; 
+		} 
+	} 
+	
+	class AMDBDataTreeView : AMDBTreeView
+	{
+		this(R)(AMDB db, R indices)
+		{
+			AMDBNode rootNode; rootNode.assoc.db = db; rootNode.opened = true; 
+			rootNode.subNodes = indices.map!((idx)=>(AMDBNode(db.explore(idx)))).array; 
+			
+			showBullet = true, showRoot = false; 
+			root = rootNode; 
+		} 
+	} 
+	
+	
+	class MainForm : UIWindow
+	{
+		mixin autoCreate; mixin SetupMegaShader!""; 
+		
+		enum NumPanels = 1; 
+		AMDB db; 
+		AMDBTreeView[NumPanels] schemaTreeView, dataTreeView; 
+		
+		override void onCreate()
+		{
+			caption = "AMDB Management Studio"; 
+			
+			static if((常!(bool)(1))) testSER, testSentenceProcessor; 
+			
+			
+			const 	cases 	= mixin((
+				(表([
+					[q{(常!(bool)(0))},q{types}],
+					[q{(常!(bool)(0))},q{cars}],
+					[q{(常!(bool)(0))},q{animals}],
+					[q{(常!(bool)(0))},q{leds}],
+					[q{(常!(bool)(0))},q{factory}],
+					[q{(常!(bool)(1))},q{firebird_test}],
+				]))
+			).調!(GEN_Selection!testCases)),
+				batches 	= 2; 
+			db = new AMDB; 
+			foreach(batch; 0..batches)
+			{ db.schema(cases.map!((a)=>(a.schema)).join("\n").replaceNonLeadingTabsWithDoubleSpaces/+Todo: implement nonleading tab handling in sentence parser+/); }
+			if((常!(bool)(0))) db.streamDump.print; 
+			if((常!(bool)(0))) db.streamBytes.saveTo(File(`c:\dl\test.amdb`)); 
+			
+			foreach(batch; 0..batches)
+			{
+				db.data(cases.retro.map!((a)=>(a.data)).join("\n").replaceNonLeadingTabsWithDoubleSpaces/+Todo: implement nonleading tab handling in sentence parser+/); 
+				if((常!(bool)(0))) db.streamBytes.saveTo(File(i`c:\dl\test_data_$(batch).amdb`.text)); 
+			}
+			if((常!(bool)(0))) db.streamDump.print; 
+			
 			foreach(panelIdx; 0..NumPanels)
 			{
-				Panel(
-					PanelPosition.leftClient, ((panelIdx).名!q{id}),
-					{
-						void initTreeView()
-						{
-							with(flags) {
-								clipSubCells 	= (常!(bool)(1)),
-								wordWrap 	= (常!(bool)(0)),
-								hScrollState 	= mixin(舉!((ScrollState),q{auto_})),
-								vScrollState 	= mixin(舉!((ScrollState),q{auto_})); 
-							}
-							width 	= (clientWidth/2-1.35*fh)/NumPanels * .92, 
-							height 	= clientHeight-2*fh; 
-						} 
-						
-						Row(
-							{
-								Grp(
-									"Schema",
-									{
-										schemaTreeView[panelIdx].UI
-										(
-											{ initTreeView; },
-											((AMDBNode* node) {
-												node.UI(
-													onEntitiesClicked: 
-													{
-														with(node.db)
-														dataTreeView[panelIdx] = new AMDBDataTreeView
-															(node.db, findAssociationsByVerbTarget(get(mixin(舉!((SysVerb),q{instance_of}))), node.idx)); 
-													}
-												); 
-											})
-										); 
-									}
-									,((1).名!q{id})
-								); 
-								Grp(
-									"Data",
-									{
-										dataTreeView[panelIdx].UI
-										(
-											{ initTreeView; },
-											((AMDBNode* node) { node.UI(onEntitiesClicked : { beep; }); })
-										); 
-									}
-									,((2).名!q{id})
-								); 
-							}
-						); 
-					}
-				); 
+				schemaTreeView[panelIdx] 	= new AMDBSchemaTreeView(db),
+				dataTreeView[panelIdx] 	= new AMDBDataTreeView(db, AMDB.Idx[].init); 
 			}
-		}
+		} 
+		override void onUpdate()
+		{
+			showFPS = (互!((bool),(0),(0x669E3898B722))); 
+			with(im)
+			{
+				foreach(panelIdx; 0..NumPanels)
+				{
+					Panel(
+						PanelPosition.leftClient, ((panelIdx).名!q{id}),
+						{
+							void initTreeView()
+							{
+								with(flags) {
+									clipSubCells 	= (常!(bool)(1)),
+									wordWrap 	= (常!(bool)(0)),
+									hScrollState 	= mixin(舉!((ScrollState),q{auto_})),
+									vScrollState 	= mixin(舉!((ScrollState),q{auto_})); 
+								}
+								width 	= (clientWidth/2-1.35*fh)/NumPanels * .92, 
+								height 	= clientHeight-2*fh; 
+							} 
+							
+							Row(
+								{
+									Grp(
+										"Schema",
+										{
+											schemaTreeView[panelIdx].UI
+											(
+												{ initTreeView; },
+												((AMDBNode* node) {
+													node.UI(
+														onEntitiesClicked: 
+														{
+															with(node.db)
+															dataTreeView[panelIdx] = new AMDBDataTreeView
+																(node.db, findAssociationsByVerbTarget(get(mixin(舉!((SysVerb),q{instance_of}))), node.idx)); 
+														}
+													); 
+												})
+											); 
+										}
+										,((1).名!q{id})
+									); 
+									Grp(
+										"Data",
+										{
+											dataTreeView[panelIdx].UI
+											(
+												{ initTreeView; },
+												((AMDBNode* node) { node.UI(onEntitiesClicked : { beep; }); })
+											); 
+										}
+										,((2).名!q{id})
+									); 
+								}
+							); 
+						}
+					); 
+				}
+			}
+		} 
 	} 
-} 
+}
+
+/+
+	Assistant: Plan: FBDB → AMDB Workflow
+	
+	  Phase 1 — Input Spec
+	
+	  1. Define a DLang spec structure that describes:
+						 - Connection info (db handle or DSN)
+						 - A list of sources (tables/views/queries)
+						 - Optional overrides:
+										 - Entity name override (uppercase first letter)
+										 - Field name override (lowercase, spaces allowed)
+	      - PK/FK rules:
+										 - Auto‑detect for tables
+										 - Manual for views/queries
+	  2.	Create a loader function per source, or a single registry function that returns all sources as an array.
+		Keep it static so it’s compile‑time friendly.
+	
+	  ———
+	
+		 Phase 2 — Schema Extraction
+		 3. Connect + introspect
+	
+	  - For each source:
+						 - Get field list (from XSQLDA)
+						 - For tables: query PK/FK metadata (RDB$...)
+						 - For views/queries: use provided manual PK/FK rules
+	
+	  4. Normalize names
+						 - Entity names → Uppercase first char
+						 - Field names → lowercase first char
+						 - Apply optional custom overrides
+	
+	  ———
+	
+		 Phase 3 — AMDB Schema Creation
+		 5. Create all entities first
+	
+		 - No fields yet
+		 - This guarantees FK targets exist
+	
+	  6. Create all fields
+						 - Simple scalar fields
+						 - FK fields as references to entities (already created)
+	  7. Lock + serialize schema
+						 - Save AMDB schema
+						 - Save FBDB → AMDB mapping
+						 - These become stable artifacts for future runs
+	
+	  ———
+	
+		 Phase 4 — Data Load
+		 8. Row fetch for each source
+	
+		 - Use query order from input list
+		 - For each row:
+						 - Ensure entity instance exists
+						 - Create associations (fields) separately
+	
+	  9. Deferred association queue
+						 - If association fails due to missing target entity, enqueue
+						 - After first pass, retry queue until stable or error
+	
+	  ———
+	
+		 Phase 5 — Validate + Output
+		 10. Consistency checks
+		 - Check unresolved FK queue
+		 - Check missing PKs
+		 - Check field type mismatches
+	
+	  11.	Write AMDB output
+		- Schema + data in AMDB byte stream
+		- Human‑readable text export (for debugging)
+	
+	  ———
+	
+		 Phase 6 — First UI integration
+		 12. Load AMDB in tree view
+		 - Use your existing viewer
+		 - Begin with text interaction only
+	
+	  ———
++/
