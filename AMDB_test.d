@@ -16,7 +16,7 @@
 	/+Todo: default attributes+/
 +/
 
-enum TREEVIEW_GUI_APP 	= (常!(bool)(0)); 
+enum TREEVIEW_GUI_APP 	= (常!(bool)(1)); 
 
 static if(!TREEVIEW_GUI_APP)
 { void main() { console({ testCases.firebird_test; print("DONE"); }); } }
@@ -35,7 +35,8 @@ version(/+$DIDE_REGION+/all) {
 			this(string orig, string renamed)
 			{
 				this.orig	= orig.strip,
-				this.renamed	= renamed.strip; if(renamed=="") renamed = orig; 
+				this.renamed	= renamed.strip; 
+				if(this.renamed=="") this.renamed = orig; 
 			} 
 			
 			this(string nameSpec)
@@ -50,17 +51,37 @@ version(/+$DIDE_REGION+/all) {
 				if(renamed!="" && renamed!=orig)	return orig~" -> "~renamed; 
 				else	return orig; 
 			} 
+			
+			string toSql(bool complete=false, char separ=' ')() const
+			{
+				if(
+					complete || 
+					renamed!="" && renamed!=orig
+				)	{
+					return orig~separ~"AS "
+					~renamed.quoted; 
+				}
+				else	return orig; 
+			} 
+			
+			string toSqlComplete() const
+			=> toSql!true; 
+			string toSqlCompleteWithTab() const
+			=> toSql!(true, '\t'); 
 		} 
 		
 		enum KeyType { none, primary, secondary } 
 		struct Field
 		{
-			Name fieldName; 
+			Name name; 
 			string type; 
-			KeyType keyType; 
-			string[] examples; 
 			
-			@property isKey() => !!keyType; 
+			//1 baser primary and foreign keyIndices
+			ushort primaryKeyIdx; @property isPrimaryKey() => primaryKeyIdx>0; 
+			ushort foreignKeyIdx; @property isForeignKey() => foreignKeyIdx>0; 
+			string foreignTarget; 
+			
+			string[] examples; 
 		} 
 		
 		struct Key
@@ -71,31 +92,27 @@ version(/+$DIDE_REGION+/all) {
 		
 		struct Table
 		{
-			Name tableName; 
+			Name name; 
 			Field[] fields; 
 			Key primaryKey; 
 			Key[] foreignKeys; 
 		} 
 		
-		Name databaseName; 
+		Name name; 
 		Table[] tables; 
 		
-		void importTable(FbDatabase db, string nameSpec)
+		void importTable(FbDatabase db)
 		{} 
 	} 
-	
-	auto makeDbSchema(FbDatabase db)
-	{
-		DBSchema res; 
-		with(res)
-		{}
-		return res; 
-	} 
-	
+	
 	struct DBSchemaImporter
 	{
-		FbDatabase db; bool owned; 
+		FbDatabase db; private bool owned; 
 		DBSchema schema; 
+		
+		private sizediff_t actTableIdx = -1; 
+		auto actTable()
+		=> ((actTableIdx.inRange(schema.tables))?(&schema.tables[actTableIdx]):(null)); 
 		
 		this(Args...)(Args args)
 		{
@@ -106,15 +123,381 @@ version(/+$DIDE_REGION+/all) {
 			}
 			else
 			{ owned = true; db = new FbDatabase(args); }
+			discoverOrigKeys; 
 		} 
 		
 		~this()
 		{ if(owned) db.free; } 
 		
-		void 查(Args...)(LOCATION_t loc, Args args)
+		void addTable(ref DBSchema.Table table)
 		{
-			auto rows = db.查!(Args)(loc, args); 
-			rows.formatTable!"turbo".print; 
+			actTableIdx = schema.tables.map!((t)=>(t.name.renamed)).countUntil(table.name.renamed); 
+			if(actTableIdx<0) actTableIdx = schema.tables.length++; 
+			*actTable = table; 
+		} 
+		
+		void addTable(FbResultSet resultSet)
+		{
+			DBSchema.Table table; bool running; 
+			foreach(row; resultSet)
+			{
+				if(running.chkSet)
+				{
+					table.fields.length = row.vars.length; 
+					table.name = DBSchema.Name(row[0].relName); 
+					foreach(i, var; row.vars)
+					{
+						ref field = table.fields[i]; 
+						field.name = DBSchema.Name(var.sqlName, var.aliasName); 
+						field.type = var.DType; 
+					}
+				}
+				enum requiredExamples = 3; 
+				auto gotAllExamples = true; 
+				foreach(i, var; row.vars)
+				{
+					ref examples = table.fields[i].examples; 
+					if(examples.length<requiredExamples) examples.addIfCan(var.DLiteral); 
+					if(examples.length<requiredExamples) gotAllExamples = false; 
+				}
+				if(gotAllExamples) break; 
+			}
+			
+			if(auto pk = table.name.orig in origPrimaryKeys)
+			{
+				foreach(ref field; table.fields)
+				{
+					if(const idx = pk.fields.countUntil(field.name.orig)+1)
+					field.primaryKeyIdx = idx.to!ushort; 
+				}
+			}
+			
+			if(auto fkMap = table.name.orig in origForeignKeys)
+			foreach(const fk; fkMap.values)
+			foreach(ref field; table.fields)
+			{
+				if(const idx = fk.srcFields.countUntil(field.name.orig)+1)
+				field.foreignKeyIdx 	= idx.to!ushort,
+				field.foreignTarget 	= fk.dstTable~'.'~fk.dstFields[idx-1]; 
+			}; 
+			
+			table.name.renamed = sanitizeDLangTypeIdentifier(table.name.orig).singularize; 
+			foreach(ref f; table.fields) f.name.renamed = sanitizeDLangFieldIdentifier(f.name.orig); 
+			
+			addTable(table); 
+		} 
+		
+		void 查(Args...)(LOCATION_t loc, Args args)
+		{ addTable(db.查!(Args)(loc, args)); } 
+		
+		string generateScript()
+		{
+			string script; 
+			foreach(tableName; db.allTablesAndViews.take(222))
+			{
+				(查((位!()),iq{},iq{SELECT * FROM $(tableName.Literal)})); 
+				
+				actTable.toJson.print; 
+				
+				static fieldLine(F)(F f)
+				{
+					const 
+					pk 	= ((f.isPrimaryKey) ?(i"PrimaryKey($(f.primaryKeyIdx-1))".text):("")),
+					fk 	= ((f.isForeignKey) ?(i"ForeignKey($(f.foreignKeyIdx-1), $(f.foreignTarget))".text):("")),
+					type 	= i"Type: /+code:$(f.type)+/".text,
+					ex 	= i"Examples: /+code:$(f.examples.join(", "))+/".text; 
+					return "\t"~f.name.toSqlCompleteWithTab~
+					"\t/+"~only(type, pk, fk, ex).filter!"a.length".join(' ')~"+/"; 
+				} 
+				
+				const 	fields = 	actTable.fields.map!((f)=>(fieldLine(f))).join(",\n"),
+					query = i"\nSELECT $(fields)\nFROM $(actTable.name.toSqlComplete)\n".text; 
+				script ~= q{(查((位!()),iq{},iq{$}))}.replace("$", query)~"\n"; 
+			}
+			/+
+				Code: 
+				/+
+					Code: schema(
+						`Country is an Entity
+	... currency String`
+					); 
+					
+					data(); 
+				+/
+				
+				(查((位!()),iq{},iq{
+					SELECT 	COUNTRY	AS "country"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "USA", "England", "Canada"+/+/,
+						CURRENCY	AS "currency"	/+Type: /+Code: string+/ Examples: /+Code: "Dollar", "Pound", "CdnDlr"+/+/
+					FROM COUNTRY AS "Country"
+				}))
+				schema(
+					`Country is an Entity
+	... currency String`
+				) data(
+					i`$(q{COUNTRY}) is a Country
+	... currency $(q{CURRENCY})`, iq{
+						(查((位!()),iq{},iq{COUNTRY})) is a Country
+							...currency (查((位!()),iq{},iq{CURRENCY}))
+						(查((位!()),iq{},iq{FROM COUNTRY}))
+					}, 
+				)
+				
+				(查((位!()),iq{},iq{
+					SELECT 	JOB_CODE	AS "job_code"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "CEO", "CFO", "VP"+/+/,
+						JOB_GRADE	AS "job_grade"	/+Type: /+Code: short+/ PrimaryKey(1) Examples: /+Code: short(1), short(2), short(3)+/+/,
+						JOB_COUNTRY	AS "job_country"	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: "USA", "England", "Japan"+/+/,
+						JOB_TITLE	AS "job_title"	/+Type: /+Code: string+/ Examples: /+Code: "Chief Executive Officer", "Chief Financial Officer", "Vice President"+/+/,
+						MIN_SALARY	AS "min_salary"	/+Type: /+Code: double+/ Examples: /+Code: 130000.00, 85000.00, 80000.00+/+/,
+						MAX_SALARY	AS "max_salary"	/+Type: /+Code: double+/ Examples: /+Code: 250000.00, 140000.00, 130000.00+/+/,
+						JOB_REQUIREMENT	AS "job_requirement"	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(129:241)), Nullable!(ISC_BLOB)(ISC_BLOB(129:243)), Nullable!(ISC_BLOB)(ISC_BLOB(129:251))+/+/,
+						LANGUAGE_REQ	AS "language_req"	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY).init, Nullable!(ISC_ARRAY)(ISC_ARRAY(129:31)), Nullable!(ISC_ARRAY)(ISC_ARRAY(129:33))+/+/
+					FROM JOB AS "Job"
+				}))
+				schema(
+					`Job is an Entity
+	...title String
+	...grade Int
+		...country Country
+			...min salary  Double
+			...max salary  Double`
+				) data(
+					i`$(q{JOB_CODE}) is an Entity
+	...title $(q{JOB_TITLE})
+	...grade $(q{JOB_GRADE})
+		...country $(q{JOB_COUNTRY})
+			...min salary  $(q{MIN_SALARY})
+			...max salary  $(q{MAX_SALARY})`
+				)
+				
+				(查((位!()),iq{},iq{
+					SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
+						FIRST_NAME	AS "first_name"	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
+						LAST_NAME	AS "last_name"	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
+						PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
+						HIRE_DATE	AS "hire_date"	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
+						DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
+						JOB_CODE	AS "job_code"	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
+						JOB_GRADE	AS "job_grade"	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
+						JOB_COUNTRY	AS "job_country"	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
+						SALARY	AS "salary"	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
+						FULL_NAME	AS "full_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+					FROM EMPLOYEE AS "Employee"
+				}))
+				schema(
+					q{
+						Employee is an  Entity
+							...first name  String
+							...last name  String
+							...phone ext  String
+							...department  Department
+							...job Job
+								...grade Int
+									...country Country
+							...salady Double
+							...full name  String
+					}
+				) data(
+					iq{
+						$(q{`EMP_` || EMP_NO}) is an  Entity
+							...first name  $(q{FIRST_NAME})
+							...last name  $(q{LAST_NAME})
+							...phone ext  $(q{PHONE_EXT})
+							...department  $(q{HIRE_DATE})
+							...job $(q{JOB_CODE})
+								...grade $(q{JOB_GRADE})
+									...country $(q{JOB_COUNTRY})
+							...salady $(q{SALARY})
+							...full name  $(q{FULL_NAME})
+					}
+				)
+				
+				(查((位!()),iq{},iq{
+					SELECT 	DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "000", "100", "600"+/+/,
+						DEPARTMENT	AS "department"	/+Type: /+Code: string+/ Examples: /+Code: "Corporate Headquarters", "Sales and Marketing", "Engineering"+/+/,
+						HEAD_DEPT	AS "head_dept"	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: Nullable!(string).init, Nullable!(string)("000"), Nullable!(string)("100")+/+/,
+						MNGR_NO	AS "mngr_no"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(105)), Nullable!(short)(short(85)), Nullable!(short)(short(2))+/+/,
+						BUDGET	AS "budget"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1000000.00), Nullable!(double)(2000000.00), Nullable!(double)(1100000.00)+/+/,
+						LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+						PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+					FROM DEPARTMENT AS "Department"
+				}))
+				schema(
+					`Department is an Entity
+	...title  String
+	...head department  Department
+	...manager  Employee
+	...budget  Double
+	...location  String
+	...phone no  String`
+				) data(
+					i`$(q{DEPT_NO}) is an Entity
+	...title  $(q{DEPARTMENT})
+	...head department  $(q{HEAD_DEPT})
+	...manager  $(q{MNGR_NO})
+	...budget  $(q{BUDGET})
+	...location  $(q{LOCATION})
+	...phone no  $(q{PHONE_NO})`
+				)
+				
+				(查((位!()),iq{},iq{
+					SELECT 	PO_NUMBER	AS "po_number"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "V91E0210", "V92E0340", "V92J1003"+/+/,
+						CUST_NO	AS "cust_no"	/+Type: /+Code: int+/ ForeignKey(0, CUSTOMER.CUST_NO) Examples: /+Code: 1004, 1010, 1012+/+/,
+						SALES_REP	AS "sales_rep"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(11)), Nullable!(short)(short(61)), Nullable!(short)(short(118))+/+/,
+						ORDER_STATUS	AS "order_status"	/+Type: /+Code: string+/ Examples: /+Code: "shipped", "open", "waiting"+/+/,
+						ORDER_DATE	AS "order_date"	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1991, 3, 4, 0, 0, 0), DateTime(1992, 10, 15, 0, 0, 0), DateTime(1992, 7, 26, 0, 0, 0)+/+/,
+						SHIP_DATE	AS "ship_date"	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime)(DateTime(1991, 3, 5, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 10, 16, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 8, 4, 0, 0, 0))+/+/,
+						DATE_NEEDED	AS "date_needed"	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime).init, Nullable!(DateTime)(DateTime(1992, 10, 17, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 9, 15, 0, 0, 0))+/+/,
+						PAID	AS "paid"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("y"), Nullable!(string)("n")+/+/,
+						QTY_ORDERED	AS "qty_ordered"	/+Type: /+Code: int+/ Examples: /+Code: 10, 7, 15+/+/,
+						TOTAL_VALUE	AS "total_value"	/+Type: /+Code: double+/ Examples: /+Code: 5000.00, 70000.00, 2985.00+/+/,
+						DISCOUNT	AS "discount"	/+Type: /+Code: float+/ Examples: /+Code: 0.1f, 0f, 0.2f+/+/,
+						ITEM_TYPE	AS "item_type"	/+Type: /+Code: string+/ Examples: /+Code: "hardware", "software", "other"+/+/,
+						AGED	AS "aged"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1.000000000), Nullable!(double)(9.000000000), Nullable!(double)(33.000000000)+/+/
+					FROM SALES AS "Sale"
+				}))
+				(查((位!()),iq{},iq{
+					SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: Nullable!(short)+/ Examples: /+Code: Nullable!(short)(short(12)), Nullable!(short)(short(105)), Nullable!(short)(short(85))+/+/,
+						FIRST_NAME	AS "first_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Terri"), Nullable!(string)("Oliver H."), Nullable!(string)("Mary S.")+/+/,
+						LAST_NAME	AS "last_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Lee"), Nullable!(string)("Bender"), Nullable!(string)("MacDonald")+/+/,
+						PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("256"), Nullable!(string)("255"), Nullable!(string)("477")+/+/,
+						LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+						PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+					FROM PHONE_LIST AS "Phone_list"
+				}))
+				(查((位!()),iq{},iq{
+					SELECT 	PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "VBASE", "DGPII", "GUIDE"+/+/,
+						PROJ_NAME	AS "proj_name"	/+Type: /+Code: string+/ Examples: /+Code: "Video Database", "DigiPizza", "AutoMap"+/+/,
+						PROJ_DESC	AS "proj_desc"	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(133:6)), Nullable!(ISC_BLOB)(ISC_BLOB(133:8)), Nullable!(ISC_BLOB)(ISC_BLOB(133:10))+/+/,
+						TEAM_LEADER	AS "team_leader"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(45)), Nullable!(short)(short(24)), Nullable!(short)(short(20))+/+/,
+						PRODUCT	AS "product"	/+Type: /+Code: string+/ Examples: /+Code: "software", "other", "hardware"+/+/
+					FROM PROJECT AS "Project"
+				}))
+				(查((位!()),iq{},iq{
+					SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(144), short(113), short(24)+/+/,
+						PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "DGPII", "VBASE", "GUIDE"+/+/
+					FROM EMPLOYEE_PROJECT AS "Employee_project"
+				}))
+				(查((位!()),iq{},iq{
+					SELECT 	FISCAL_YEAR	AS "fiscal_year"	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1994, 1993, 1995+/+/,
+						PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "GUIDE", "MAPDB", "HWRII"+/+/,
+						DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "100", "671", "621"+/+/,
+						QUART_HEAD_CNT	AS "quart_head_cnt"	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY)(ISC_ARRAY(135:24)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:26)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:28))+/+/,
+						PROJECTED_BUDGET	AS "projected_budget"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(200000.00), Nullable!(double)(450000.00), Nullable!(double)(20000.00)+/+/
+					FROM PROJ_DEPT_BUDGET AS "Proj_dept_budget"
+				}))
+				(查((位!()),iq{},iq{
+					SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(28), short(2), short(4)+/+/,
+						CHANGE_DATE	AS "change_date"	/+Type: /+Code: DateTime+/ PrimaryKey(1) Examples: /+Code: DateTime(1992, 12, 15, 0, 0, 0), DateTime(1993, 9, 8, 0, 0, 0), DateTime(1993, 12, 20, 0, 0, 0)+/+/,
+						UPDATER_ID	AS "updater_id"	/+Type: /+Code: string+/ PrimaryKey(2) Examples: /+Code: "admin2", "elaine", "tj"+/+/,
+						OLD_SALARY	AS "old_salary"	/+Type: /+Code: double+/ Examples: /+Code: 20000.00, 98000.00, 90000.00+/+/,
+						PERCENT_CHANGE	AS "percent_change"	/+Type: /+Code: double+/ Examples: /+Code: 10, 8.061199999999999, 8.333299999999999+/+/,
+						NEW_SALARY	AS "new_salary"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(22000), Nullable!(double)(105899.976), Nullable!(double)(97499.97)+/+/
+					FROM SALARY_HISTORY AS "Salary_history"
+				}))
+				(查((位!()),iq{},iq{
+					SELECT 	CUST_NO	AS "cust_no"	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1001, 1002, 1003+/+/,
+						CUSTOMER	AS "customer"	/+Type: /+Code: string+/ Examples: /+Code: "Signature Design", "Dallas Technologies", "Buttle, Griffith and Co."+/+/,
+						CONTACT_FIRST	AS "contact_first"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Dale J."), Nullable!(string)("Glen"), Nullable!(string)("James")+/+/,
+						CONTACT_LAST	AS "contact_last"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Little"), Nullable!(string)("Brown"), Nullable!(string)("Buttle")+/+/,
+						PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(619) 530-2710"), Nullable!(string)("(214) 960-2233"), Nullable!(string)("(617) 488-1864")+/+/,
+						ADDRESS_LINE1	AS "address_line1"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("15500 Pacific Heights Blvd."), Nullable!(string)("P. O. Box 47000"), Nullable!(string)("2300 Newbury Street")+/+/,
+						ADDRESS_LINE2	AS "address_line2"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("Suite 101"), Nullable!(string)("Suite 150")+/+/,
+						CITY	AS "city"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("San Diego"), Nullable!(string)("Dallas"), Nullable!(string)("Boston")+/+/,
+						STATE_PROVINCE	AS "state_province"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("CA"), Nullable!(string)("TX"), Nullable!(string)("MA")+/+/,
+						COUNTRY	AS "country"	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: Nullable!(string)("USA"), Nullable!(string)("England"), Nullable!(string)("Hong Kong")+/+/,
+						POSTAL_CODE	AS "postal_code"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("92121"), Nullable!(string)("75205"), Nullable!(string)("02115")+/+/,
+						ON_HOLD	AS "on_hold"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("*")+/+/
+					FROM CUSTOMER AS "Customer"
+				}))
+				
+			+/
+			print(script); 
+			clipboard.text = script; 
+			return script; 
+		} 
+		
+		private
+		{
+			struct PrimaryKey { string constraint, table; string[] fields; } 
+			struct ForeignKey { string constraint, srcTable, dstTable; string[] srcFields, dstFields; } 
+			PrimaryKey[string] origPrimaryKeys; 
+			ForeignKey[string][string] origForeignKeys; 
+			
+			bool isOrigPrimaryKey(string table, string field)
+			{
+				if(auto pk = table in origPrimaryKeys)
+				if(pk.fields.canFind(field)) return true; return false; 
+			} 
+			
+			private void discoverOrigKeys()
+			{
+				with(db.transaction)
+				{
+					PrimaryKey[] pk; 
+					foreach(
+						row; (查 ((位!()),iq{},iq{
+							SELECT
+								rc.rdb$constraint_name 	AS "constraint",
+								iseg.rdb$field_position 	AS "position",
+								rc.rdb$relation_name	AS "table",
+								iseg.rdb$field_name	AS "field"
+							FROM rdb$relation_constraints rc
+							JOIN rdb$index_segments iseg
+								ON iseg.rdb$index_name = rc.rdb$index_name
+							WHERE rc.rdb$constraint_type = `PRIMARY KEY`
+							ORDER BY rc.rdb$relation_name, iseg.rdb$field_position
+						}))
+					)
+					{
+						const 	constraint 	= row.constraint.to!string,
+							position 	= row.position.to!int,
+							table 	= row.table.to!string,
+							field 	= row.field.to!string; 
+						if(position==0)	pk ~= PrimaryKey(constraint, table); 
+						pk.back.fields ~= field; 
+					}
+					foreach(p; pk) origPrimaryKeys[p.table] = p; 
+					
+					ForeignKey[] fk; 
+					foreach(
+						row; (查 ((位!()),iq{},iq{
+							SELECT
+								rc.rdb$constraint_name 	AS "constraint",
+								iseg.rdb$field_position	AS "position",
+								rc.rdb$relation_name	AS "srcTable",
+								iseg.rdb$field_name	AS "srcField",
+								rc2.rdb$relation_name	AS "dstTable",
+								iseg2.rdb$field_name	AS "dstField"
+							FROM rdb$relation_constraints rc
+							JOIN rdb$ref_constraints ref
+								ON ref.rdb$constraint_name = rc.rdb$constraint_name
+							JOIN rdb$relation_constraints rc2
+								ON rc2.rdb$constraint_name = ref.rdb$const_name_uq
+							JOIN rdb$index_segments iseg
+								ON iseg.rdb$index_name = rc.rdb$index_name
+							JOIN rdb$index_segments iseg2
+								ON iseg2.rdb$index_name = rc2.rdb$index_name
+								AND iseg2.rdb$field_position = iseg.rdb$field_position
+							WHERE rc.rdb$constraint_type = `FOREIGN KEY`
+							ORDER BY rc.rdb$relation_name, iseg.rdb$field_position
+						}))
+					)
+					{
+						const 	constraint 	= row.constraint.to!string,
+							position 	= row.position.to!int,
+							srcTable 	= row.srcTable.to!string,
+							srcField 	= row.srcField.to!string,
+							dstTable 	= row.dstTable.to!string,
+							dstField 	= row.dstField.to!string; 
+						if(position==0)
+						fk ~= ForeignKey(constraint, srcTable, dstTable); 
+						ref a = fk.back; 
+						enforce(a.srcTable==srcTable && a.dstTable==dstTable); 
+						a.srcFields ~= srcField, a.dstFields ~= dstField; 
+					}
+					foreach(f; fk) origForeignKeys[f.srcTable][f.dstTable] = f; 
+				}
+			} 
 		} 
 	} 
 }
@@ -616,34 +999,174 @@ PS-016  is a  ProductionSchedule
 				)
 			)
 			{
-				string script; 
-				foreach(tableName; db.allTablesAndViews)
-				{
-					
-					
-					with(db)
-					{
-						foreach(row; (查((位!()),iq{},iq{SELECT * FROM $(tableName.Literal)})))
-						{}
-					}
-					
-					auto s = i`SELECT$("*")
-FROM $(tableName)="$(tableName)"`.text; 
-					script ~= q{(查((位!()),iq{},iq{$}))}.replace("$", s)~"\n"; 
-				}
+				clipboard.text = generateScript; 
 				
-				print(script); 
-				clipboard.text = script; 
+				with(db) (查((位!()),iq{},iq{select * from employee})).formatTable(mixin(舉!((TableStyle),q{norton}))).print; 
 			}
 			
+			string amdbSchema, amdbData; 
 			
+			{
+				auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
+				auto tr = db.startTransaction; scope(exit) tr.free; 
+				DBSchemaImporter sch; 
+				
+				void 查(Args...)(LOCATION_t loc, Args args)
+				{
+					if(0) { sch.addTable(tr.查!Args(loc, args)); (*sch.actTable).print; }
+					
+					
+					
+					//print; 
+					//res.formatTable(TableStyle.norton).print; 
+					
+					auto res = tr.查!Args(loc, args); 
+					string ETypeName = res.fields[0].relName.sanitizeDLangTypeIdentifier.singularize; 
+					amdbSchema ~= ETypeName~" is an Entity\n"; 
+					foreach(f; res.fields.vars)
+					{ amdbSchema ~= "\t..."~f.aliasName.sanitizeDLangFieldIdentifier~"  "~f.baseDType.capitalize~"\n"; }
+					amdbSchema ~= "\n"; 
+					
+					int idx; 
+					foreach(row; res)
+					{
+						amdbData ~= i"$(ETypeName)_$(idx++)  is a  $(ETypeName)\n".text; 
+						foreach(f; res.fields.vars)
+						{ if(!f.isNull) amdbData ~= i"\t...$(f.aliasName.sanitizeDLangFieldIdentifier)  $(f.toPlainText.quoted)\n".text; }
+					}
+				} 
+				{
+					(查((位!()),iq{},iq{
+						SELECT 	COUNTRY	AS "country"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "USA", "England", "Canada"+/+/,
+							CURRENCY	AS "currency"	/+Type: /+Code: string+/ Examples: /+Code: "Dollar", "Pound", "CdnDlr"+/+/
+						FROM COUNTRY AS "Country"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	JOB_CODE	AS "job_code"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "CEO", "CFO", "VP"+/+/,
+							JOB_GRADE	AS "job_grade"	/+Type: /+Code: short+/ PrimaryKey(1) Examples: /+Code: short(1), short(2), short(3)+/+/,
+							JOB_COUNTRY	AS "job_country"	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: "USA", "England", "Japan"+/+/,
+							JOB_TITLE	AS "job_title"	/+Type: /+Code: string+/ Examples: /+Code: "Chief Executive Officer", "Chief Financial Officer", "Vice President"+/+/,
+							MIN_SALARY	AS "min_salary"	/+Type: /+Code: double+/ Examples: /+Code: 130000.00, 85000.00, 80000.00+/+/,
+							MAX_SALARY	AS "max_salary"	/+Type: /+Code: double+/ Examples: /+Code: 250000.00, 140000.00, 130000.00+/+/,
+							JOB_REQUIREMENT	AS "job_requirement"	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(129:241)), Nullable!(ISC_BLOB)(ISC_BLOB(129:243)), Nullable!(ISC_BLOB)(ISC_BLOB(129:251))+/+/,
+							LANGUAGE_REQ	AS "language_req"	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY).init, Nullable!(ISC_ARRAY)(ISC_ARRAY(129:31)), Nullable!(ISC_ARRAY)(ISC_ARRAY(129:33))+/+/
+						FROM JOB AS "Job"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "000", "100", "600"+/+/,
+							DEPARTMENT	AS "department"	/+Type: /+Code: string+/ Examples: /+Code: "Corporate Headquarters", "Sales and Marketing", "Engineering"+/+/,
+							HEAD_DEPT	AS "head_dept"	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: Nullable!(string).init, Nullable!(string)("000"), Nullable!(string)("100")+/+/,
+							MNGR_NO	AS "mngr_no"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(105)), Nullable!(short)(short(85)), Nullable!(short)(short(2))+/+/,
+							BUDGET	AS "budget"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1000000.00), Nullable!(double)(2000000.00), Nullable!(double)(1100000.00)+/+/,
+							LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+							PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+						FROM DEPARTMENT AS "Department"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
+							FIRST_NAME	AS "first_name"	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
+							LAST_NAME	AS "last_name"	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
+							PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
+							HIRE_DATE	AS "hire_date"	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
+							DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
+							JOB_CODE	AS "job_code"	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
+							JOB_GRADE	AS "job_grade"	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
+							JOB_COUNTRY	AS "job_country"	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
+							SALARY	AS "salary"	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
+							FULL_NAME	AS "full_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+						FROM EMPLOYEE AS "Employee"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	PO_NUMBER	AS "po_number"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "V91E0210", "V92E0340", "V92J1003"+/+/,
+							CUST_NO	AS "cust_no"	/+Type: /+Code: int+/ ForeignKey(0, CUSTOMER.CUST_NO) Examples: /+Code: 1004, 1010, 1012+/+/,
+							SALES_REP	AS "sales_rep"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(11)), Nullable!(short)(short(61)), Nullable!(short)(short(118))+/+/,
+							ORDER_STATUS	AS "order_status"	/+Type: /+Code: string+/ Examples: /+Code: "shipped", "open", "waiting"+/+/,
+							ORDER_DATE	AS "order_date"	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1991, 3, 4, 0, 0, 0), DateTime(1992, 10, 15, 0, 0, 0), DateTime(1992, 7, 26, 0, 0, 0)+/+/,
+							SHIP_DATE	AS "ship_date"	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime)(DateTime(1991, 3, 5, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 10, 16, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 8, 4, 0, 0, 0))+/+/,
+							DATE_NEEDED	AS "date_needed"	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime).init, Nullable!(DateTime)(DateTime(1992, 10, 17, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 9, 15, 0, 0, 0))+/+/,
+							PAID	AS "paid"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("y"), Nullable!(string)("n")+/+/,
+							QTY_ORDERED	AS "qty_ordered"	/+Type: /+Code: int+/ Examples: /+Code: 10, 7, 15+/+/,
+							TOTAL_VALUE	AS "total_value"	/+Type: /+Code: double+/ Examples: /+Code: 5000.00, 70000.00, 2985.00+/+/,
+							DISCOUNT	AS "discount"	/+Type: /+Code: float+/ Examples: /+Code: 0.1f, 0f, 0.2f+/+/,
+							ITEM_TYPE	AS "item_type"	/+Type: /+Code: string+/ Examples: /+Code: "hardware", "software", "other"+/+/,
+							AGED	AS "aged"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1.000000000), Nullable!(double)(9.000000000), Nullable!(double)(33.000000000)+/+/
+						FROM SALES AS "Sale"
+					})); 
+					
+					(查((位!()),iq{},iq{
+						SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: Nullable!(short)+/ Examples: /+Code: Nullable!(short)(short(12)), Nullable!(short)(short(105)), Nullable!(short)(short(85))+/+/,
+							FIRST_NAME	AS "first_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Terri"), Nullable!(string)("Oliver H."), Nullable!(string)("Mary S.")+/+/,
+							LAST_NAME	AS "last_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Lee"), Nullable!(string)("Bender"), Nullable!(string)("MacDonald")+/+/,
+							PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("256"), Nullable!(string)("255"), Nullable!(string)("477")+/+/,
+							LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+							PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+						FROM PHONE_LIST AS "Phone_list"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "VBASE", "DGPII", "GUIDE"+/+/,
+							PROJ_NAME	AS "proj_name"	/+Type: /+Code: string+/ Examples: /+Code: "Video Database", "DigiPizza", "AutoMap"+/+/,
+							PROJ_DESC	AS "proj_desc"	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(133:6)), Nullable!(ISC_BLOB)(ISC_BLOB(133:8)), Nullable!(ISC_BLOB)(ISC_BLOB(133:10))+/+/,
+							TEAM_LEADER	AS "team_leader"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(45)), Nullable!(short)(short(24)), Nullable!(short)(short(20))+/+/,
+							PRODUCT	AS "product"	/+Type: /+Code: string+/ Examples: /+Code: "software", "other", "hardware"+/+/
+						FROM PROJECT AS "Project"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(144), short(113), short(24)+/+/,
+							PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "DGPII", "VBASE", "GUIDE"+/+/
+						FROM EMPLOYEE_PROJECT AS "Employee_project"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	FISCAL_YEAR	AS "fiscal_year"	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1994, 1993, 1995+/+/,
+							PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "GUIDE", "MAPDB", "HWRII"+/+/,
+							DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "100", "671", "621"+/+/,
+							QUART_HEAD_CNT	AS "quart_head_cnt"	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY)(ISC_ARRAY(135:24)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:26)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:28))+/+/,
+							PROJECTED_BUDGET	AS "projected_budget"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(200000.00), Nullable!(double)(450000.00), Nullable!(double)(20000.00)+/+/
+						FROM PROJ_DEPT_BUDGET AS "Proj_dept_budget"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(28), short(2), short(4)+/+/,
+							CHANGE_DATE	AS "change_date"	/+Type: /+Code: DateTime+/ PrimaryKey(1) Examples: /+Code: DateTime(1992, 12, 15, 0, 0, 0), DateTime(1993, 9, 8, 0, 0, 0), DateTime(1993, 12, 20, 0, 0, 0)+/+/,
+							UPDATER_ID	AS "updater_id"	/+Type: /+Code: string+/ PrimaryKey(2) Examples: /+Code: "admin2", "elaine", "tj"+/+/,
+							OLD_SALARY	AS "old_salary"	/+Type: /+Code: double+/ Examples: /+Code: 20000.00, 98000.00, 90000.00+/+/,
+							PERCENT_CHANGE	AS "percent_change"	/+Type: /+Code: double+/ Examples: /+Code: 10, 8.061199999999999, 8.333299999999999+/+/,
+							NEW_SALARY	AS "new_salary"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(22000), Nullable!(double)(105899.976), Nullable!(double)(97499.97)+/+/
+						FROM SALARY_HISTORY AS "Salary_history"
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	CUST_NO	AS "cust_no"	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1001, 1002, 1003+/+/,
+							CUSTOMER	AS "customer"	/+Type: /+Code: string+/ Examples: /+Code: "Signature Design", "Dallas Technologies", "Buttle, Griffith and Co."+/+/,
+							CONTACT_FIRST	AS "contact_first"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Dale J."), Nullable!(string)("Glen"), Nullable!(string)("James")+/+/,
+							CONTACT_LAST	AS "contact_last"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Little"), Nullable!(string)("Brown"), Nullable!(string)("Buttle")+/+/,
+							PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(619) 530-2710"), Nullable!(string)("(214) 960-2233"), Nullable!(string)("(617) 488-1864")+/+/,
+							ADDRESS_LINE1	AS "address_line1"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("15500 Pacific Heights Blvd."), Nullable!(string)("P. O. Box 47000"), Nullable!(string)("2300 Newbury Street")+/+/,
+							ADDRESS_LINE2	AS "address_line2"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("Suite 101"), Nullable!(string)("Suite 150")+/+/,
+							CITY	AS "city"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("San Diego"), Nullable!(string)("Dallas"), Nullable!(string)("Boston")+/+/,
+							STATE_PROVINCE	AS "state_province"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("CA"), Nullable!(string)("TX"), Nullable!(string)("MA")+/+/,
+							COUNTRY	AS "country"	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: Nullable!(string)("USA"), Nullable!(string)("England"), Nullable!(string)("Hong Kong")+/+/,
+							POSTAL_CODE	AS "postal_code"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("92121"), Nullable!(string)("75205"), Nullable!(string)("02115")+/+/,
+							ON_HOLD	AS "on_hold"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("*")+/+/
+						FROM CUSTOMER AS "Customer"
+					})); 
+					
+				}
+				
+				
+				print(amdbSchema); print(amdbData); 
+				
+			}
 			
-			return TestCase(
+			auto testCase = TestCase(
 				schema:
-				`TestEntity is an Entity`,
+				`TestEntity is an Entity
+	
+	Short is an Int
+	ISC_BLOB is a String
+	ISC_ARRAY is a String`~"\n"~amdbSchema,
 				data:
-				`"Hello World" is a TestEntity`
+				`"Hello World" is a TestEntity`~"\n"~amdbData
 			); 
+			(testCase.schema ~"\n\n"~ testCase.data).saveTo(`c:\dl\test.txt.amdb`); 
+			return testCase; 
 		} 
 		
 		
@@ -892,7 +1415,7 @@ static if(TREEVIEW_GUI_APP)
 			foreach(batch; 0..batches)
 			{ db.schema(cases.map!((a)=>(a.schema)).join("\n").replaceNonLeadingTabsWithDoubleSpaces/+Todo: implement nonleading tab handling in sentence parser+/); }
 			if((常!(bool)(0))) db.streamDump.print; 
-			if((常!(bool)(0))) db.streamBytes.saveTo(File(`c:\dl\test.amdb`)); 
+			if((常!(bool)(0))) db.streamBytes.saveTo(File(`c:\dl\test.raw.amdb`)); 
 			
 			foreach(batch; 0..batches)
 			{
@@ -900,6 +1423,7 @@ static if(TREEVIEW_GUI_APP)
 				if((常!(bool)(0))) db.streamBytes.saveTo(File(i`c:\dl\test_data_$(batch).amdb`.text)); 
 			}
 			if((常!(bool)(0))) db.streamDump.print; 
+			if((常!(bool)(1))) db.streamBytes.saveTo(File(`c:\dl\test.raw.amdb`)); 
 			
 			foreach(panelIdx; 0..NumPanels)
 			{
@@ -909,7 +1433,7 @@ static if(TREEVIEW_GUI_APP)
 		} 
 		override void onUpdate()
 		{
-			showFPS = (互!((bool),(0),(0x669E3898B722))); 
+			showFPS = (互!((bool),(0),(0xF1B83898B722))); 
 			with(im)
 			{
 				foreach(panelIdx; 0..NumPanels)

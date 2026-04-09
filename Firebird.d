@@ -1897,12 +1897,14 @@ version(/+$DIDE_REGION+/all) {
 				try
 				{
 					version(/+$DIDE_REGION+/all) {
-						ubyte[1] inBuf; inBuf[0] = info; 
-						ubyte[outBufSize] outBuf = void; outBuf[0] = 0; 
+						ubyte[1] inBuf = [info]; 
+						ubyte[outBufSize] outBuf /+= void+/; outBuf[0] = 0; 
 						CALL!info_fun(
 							&db_handle, 	short(1)	, inBuf.ptr,  
 								short(outBufSize)	, outBuf.ptr
 						); 
+						static if((常!(bool)(0))) { print("inBuf:", inBuf[]); print("outBuf:", outBuf[]); }
+						
 						enum :ubyte {
 							isc_info_end	=1,
 							isc_info_truncated	=2,
@@ -1917,17 +1919,27 @@ version(/+$DIDE_REGION+/all) {
 								In practice, you treat it like a control byte that precedes a length field.
 							info_flag_end: 	It marks the end of a set of flags (a flag list terminator).
 						+/
-						
+						
 						string res; void append(T)(T a) { res ~= ((res=="")?(""):(", ")) ~ a.text; } 
+						
 						auto buf = outBuf[]; 
 						ubyte[] fetchDynBytes()
 						{
 							if(buf.length<2) { buf = []; return []; }
 							uint len = buf[0] | buf[1]<<8; 
 							if(len>buf.length+2) { buf = []; return []; }
-							ubyte[] res = buf[2..$][0..len]; 
-							buf = buf[2+len..$]; 
-							return res; 
+							ubyte[] res = buf[2..$][0..len]; buf = buf[2+len..$]; return res; 
+						} 
+						
+						string fetchErrorMsg()
+						{
+							auto bytes = fetchDynBytes; string str; 
+							if(bytes.length==5)
+							{
+								auto a =  (cast(ISC_STATUS)((cast(uint[])(bytes[1..5]))[0])).text; 
+								if(!a.startsWith("cast(")) str = " ISC_STATUS."~a; 
+							}
+							return bytes.text ~ str; 
 						} 
 					}
 					
@@ -1952,7 +1964,7 @@ version(/+$DIDE_REGION+/all) {
 								(i"Error: Truncated (larger than $(outBufSize))".text); 	break; 
 								case 
 								isc_info_error: 	append
-								(i"Error: $(fetchDynBytes)".text); 	break; 
+								(i"Error: $(fetchErrorMsg)".text); 	break; 
 								case 
 								isc_info_data_not_ready: 	append
 								(i"Error: Data not ready".text); 	break; 
@@ -2087,6 +2099,9 @@ version(/+$DIDE_REGION+/all) {
 				return (cast(isc_info_sql_stmt_)(outBuf[3])); 
 			} 
 			
+			public string sql_info_relation_alias(ref isc_stmt_handle stmt)
+			=> sql_info(stmt, isc_info_sql_.relation_alias); 
+			
 			
 		}
 		
@@ -2203,7 +2218,7 @@ version(/+$DIDE_REGION+/all) {
 					}
 					catch(Exception e)
 					{
-						((0xDD896FCAA195).檢 (global_status_vector[1])); 
+						((0xDFA46FCAA195).檢 (global_status_vector[1])); 
 						if(global_status_vector[1].among(mixin(舉!((ISC_STATUS),q{db_or_file_exists})), mixin(舉!((ISC_STATUS),q{io_error}))))
 						{
 							static if(LOG_enabled) print(i"  \33\16DB already exists, attaching to it...\33\7".text); 
@@ -2230,8 +2245,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xE11C6FCAA195).檢((update間(_間)))); 
-					((0xE14E6FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xE3376FCAA195).檢((update間(_間)))); 
+					((0xE3696FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 
@@ -3290,8 +3305,6 @@ version(/+$DIDE_REGION+/all) {
 							outputFields.prepareOutput; 
 						}
 						
-						//print("SQL INFO:\n"~sql_info(stmt_handle).split("\n").map!`"  "~a`.join('\n')); 
-						
 						statement = Statement(stmt_handle, inputFields, outputFields); 
 						statementCache[inputSignature] = statement; 
 					}
@@ -3310,17 +3323,28 @@ version(/+$DIDE_REGION+/all) {
 		{
 			isc_tr_handle trans_handle; 
 			uint errorCount=0; 
+			const bool modify; 
 			
 			bool active()const => !!trans_handle; 
 			
 			this(bool modify = false)
 			{
+				this.modify = modify; 
 				trans_handle = fb.start_transaction	(db_handle, fb.createTPB(modify: modify)); 
 				_notifyTransactionCreated(this); 
 			} 
 			
 			~this()
-			{ if(active) { rollback; WARN("Dangling active transaction."); }} 
+			{
+				if(active) {
+					rollback; if(modify) 
+						WARN(
+							"Dangling active transaction."
+							~" All changes were lost."
+						); 
+					
+				}
+			} 
 			
 			void enforceActive()
 			{ enforce(active, "Transaction must be active."); } 
@@ -3352,6 +3376,9 @@ version(/+$DIDE_REGION+/all) {
 				@property fields() => fields_; 
 				@property empty() => !handle_; 
 				//This is NOT an InputRange, it has opApply() with empty().
+				
+				@property string relation_alias()
+				=> fb.sql_info_relation_alias(handle_)/+Todo: It returns `infunk` error.+/; 
 				
 				@disable this(this); 
 				this(FbFields fields, isc_stmt_handle handle)
