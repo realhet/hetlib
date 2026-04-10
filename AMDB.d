@@ -978,6 +978,7 @@ version(/+$DIDE_REGION+/all) {
 				+/
 				
 				Idx[Idx[2]] ATypeIdx_by_sourceVerbIdx; Idx[2][Idx] ATypeSourceVerbIdx_by_idx; 
+				bool[Idx] ATypeIsCompositeKey; 
 				Idx[Idx] inverseVerbIdx_by_ATypeIdx, ATypeIdx_by_inverseVerbIdx; 
 				Idx[][Idx] inverseVerbs_by_EType; 
 				
@@ -1054,15 +1055,19 @@ version(/+$DIDE_REGION+/all) {
 						=> !!(idx in indices.ATypeSourceVerbIdx_by_idx); 
 						bool isInverseVerb(Idx idx)
 						=> !!(idx in indices.ATypeIdx_by_inverseVerbIdx); 
+						
+						bool isATypeCompositeKey(Idx idx)
+						=> !!(idx in indices.ATypeIsCompositeKey); 
 					}
 					
 					bool isEntity(Idx idx)
 					{ if(const verbIdx = get(mixin(舉!((SysVerb),q{instance_of})))) return explore(idx).verb.idx==verbIdx; return 0; } 
 					
 					bool isAttribute(Idx idx)
-					{ return !!(explore(idx).verb.idx in indices.ATypeSourceVerbIdx_by_idx); } 
+					=> !!(explore(idx).verb.idx in indices.ATypeSourceVerbIdx_by_idx); 
 					
-					bool hasInverseVerbs(Idx idx/+idx must be an EType+/) => !!(idx in indices.inverseVerbs_by_EType); 
+					bool hasInverseVerbs(Idx idx/+idx must be an EType+/) 
+					=> !!(idx in indices.inverseVerbs_by_EType); 
 				} 
 			}
 		} 
@@ -1739,28 +1744,204 @@ version(/+$DIDE_REGION+/all) {
 					Idx access_AType(in Idx sourceIdx, in string verbStr, in AMToken targetToken)
 					{
 						enforce(sourceIdx, "AType source must be non-null"); 
-						const targetIdx = expectType(targetToken); 
+						
 						enforceValidVerbName(verbStr); const verbIdx = access(verbStr); 
 						
-						Idx idx; 
-						if(auto aidx = [sourceIdx, verbIdx] in indices.ATypeIdx_by_sourceVerbIdx)
+						const 	targetName 	= asName(targetToken), 
+							targetNameFirstChar 	= targetName.byDchar.frontOr,
+							targetIsType 	= targetNameFirstChar==targetNameFirstChar.toUpper; 
+						
+						Idx doit(Idx targetIdx, bool isCompositeKey=false)
 						{
-							idx = *aidx; auto existingTarget = explore(*aidx).target; 
-							enforce(
-								existingTarget.idx==targetIdx, 
-								i"AType `$(explore(sourceIdx).sourceOrThis)` [$(verbStr)]".text ~
-								" cannot be redefined with another type: " ~
-								i"$(existingTarget.sourceOrThis)` -> `$(explore(targetIdx).sourceOrThis)`".text
-							); 
+							Idx idx; 
+							if(auto aidx = [sourceIdx, verbIdx] in indices.ATypeIdx_by_sourceVerbIdx)
+							{
+								idx = *aidx; auto existingTarget = explore(idx).target; 
+								enforce(
+									existingTarget.idx==targetIdx, 
+									i"AType `$(explore(sourceIdx).sourceOrThis)` [$(verbStr)]".text ~
+									" cannot be redefined with another type: " ~
+									i"$(existingTarget.sourceOrThis)` -> `$(explore(targetIdx).sourceOrThis)`".text
+								); 
+							}
+							else
+							{
+								idx = access(sourceIdx, verbIdx, targetIdx); 
+								indices.addAType([sourceIdx, verbIdx], idx); 
+								if(isCompositeKey) indices.ATypeIsCompositeKey[idx] = true; 
+							}
+							assert(idx); return idx; 
+						} 
+						
+						if(targetIsType)
+						{
+							const targetIdx = expectType(targetToken); 
+							return doit(targetIdx); 
 						}
 						else
 						{
-							idx = access(sourceIdx, verbIdx, targetIdx); 
-							indices.addAType([sourceIdx, verbIdx], idx); 
+							/+Target is a verb. It can be a composite key.+/
+							enforceValidVerbName(targetName); 
+							
+							Idx parentIdx; 
+							with(explore(sourceIdx))
+							{
+								/+
+									Parent association example: 
+									- Must be an AType and .target must be an EType
+									/+
+										Code: assoc(
+											assoc(
+												"Employee",
+												"is a subtype of",
+												"Entity"
+											), "job", assoc(
+												"Job",
+												"is a subtype of",
+												"Entity"
+											)
+										)
+									+/
+								+/
+								
+								if(!(isAType && (target.isEType || target.isAType)))
+								((0xDEB4EB4AA1C7).檢(dump)); 
+								
+								/+
+									AI: /+
+										User: Reformat this, so I can see the structure better!
+										/+Code: (128):assoc((124):assoc((116):assoc((107):"Employee", (16):"is a subtype of", (1):"Entity"), (120):"job", (40):assoc((36):"Job", (16):"is a subtype of", (1):"Entity")), (44):"grade", (54):assoc((40):assoc((36):"Job", (16):"is a subtype of", (1):"Entity"), (44):"grade", (50):"Int"))+/
+									+/
+									/+
+										Assistant: /+
+											Structured: /+
+												Code: assoc(
+													assoc(
+														assoc(
+															(107):"Employee",
+															(16):"is a subtype of",
+															(1):"Entity"
+														),
+														"job",
+														assoc(
+															(36):"Job",
+															(16):"is a subtype of",
+															(1):"Entity"
+														)
+													),
+													"grade",
+													assoc(
+														assoc(
+															(36):"Job",
+															(16):"is a subtype of",
+															(1):"Entity"
+														),
+														"grade",
+														"Int"
+													)
+												)
+											+/
+										+/
+										
+										/+Note: Usage(prompt_hit: 64, prompt_miss: 254, completion: 178, HUF: 0.04, price: 100%)+/
+									+/
+								+/
+								
+								enforce(isAType && (target.isEType || target.isAType), "Expected a source property that points to an EType."); 
+								parentIdx = target.idx; 
+							}
+							
+							const targetVerbIdx = get(targetName); 
+							enforce(targetVerbIdx, i"Target verb $(targetName.quoted) must exist already. ".text); 
+							const parentATypeIdx = indices.ATypeIdx_by_sourceVerbIdx.get([parentIdx, targetVerbIdx]); 
+							enforce(
+								parentATypeIdx, i"Target verb $(targetName.quoted) not found ".text ~
+								i"in EType $(explore(parentIdx).sourceOrThis.text.quoted)".text
+							); 
+							
+							/+The target of this AType is a field ATtype in the source Entity+/
+							const retIdx = doit(parentATypeIdx, isCompositeKey: true); 
+							
+							((0xE6DBEB4AA1C7).檢(explore(retIdx).dump)); 
+							/+
+								Expected result:
+								/+
+									Code: assoc(
+										assoc(
+											assoc(
+												"Employee",
+												"is a subtype of",
+												"Entity"
+											),
+											"job",
+											assoc(
+												"Job",
+												"is a subtype of",
+												"Entity"
+											)
+										), "grade", assoc(
+											assoc(
+												"Job",
+												"is a subtype of",
+												"Entity"
+											),
+											"grade",
+											"Int"
+										)
+									)
+								+/
+								2nd level:
+								/+
+									Code: assoc(
+										assoc(
+											assoc(
+												assoc(
+													"Employee",
+													"is a subtype of",
+													"Entity"
+												),
+												"job",
+												assoc(
+													"Job",
+													"is a subtype of",
+													"Entity"
+												)
+											), 
+											"grade", 
+											assoc(
+												assoc(
+													"Job",
+													"is a subtype of",
+													"Entity"
+												),
+												"grade",
+												"Int"
+											)
+										), "country", assoc(
+											assoc(
+												assoc(
+													"Job",
+													"is a subtype of",
+													"Entity"
+												),
+												"grade",
+												"Int"
+											), 
+											"country", 
+											assoc(
+												"Country",
+												"is a subtype of",
+												"Entity"
+											)
+										)
+									)
+								+/
+							+/
+							
+							return retIdx; 
 						}
-						assert(idx); return idx; 
 					} 
-					
+					
 					Idx access_inverse_verb(Idx aTypeIdx, in AMToken targetToken)
 					{
 						/+
@@ -1802,7 +1983,7 @@ version(/+$DIDE_REGION+/all) {
 						}
 						assert(idx); return idx; 
 					} 
-					
+					
 					void processSchemaAssociation(bool canCreate)
 						(in AMToken sourceToken, in AMToken verbToken, in AMToken targetToken)
 					{

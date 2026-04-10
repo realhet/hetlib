@@ -682,18 +682,25 @@ ISC_ARRAY is a String`~"\n";
 				schema:
 				q{
 					Country is an Entity
+						...currency String
 					
 					Job is an Entity
+						...title String
 						...grade Int
 							...country Country
 								...min salary  Double
 								...max salary  Double
 					
 					Employee is an Entity
-						...job Job
-							...grade grade
-								...country country
+						...first name  String
+						...last name  String
+						...job key  Job
+							...grade key  grade
+								...country key  country
+						...salary  Double
 					
+					Employee2 is an Entity
+						...job link  Job
 				}
 				.outdent,
 				data:
@@ -714,11 +721,17 @@ ISC_ARRAY is a String`~"\n";
 								...min salary  60000
 								...max salary  70000
 					
-					Aladár is an Employee
-						...job CEO...grade 4...country USA
+					EMP_0 is an Employee
+						...first name  Példa
+						...last name  Béla
+						...job key  CEO...grade key  4...country key  USA
+						...salary 90000
 					
-					Béla is an Employee
-						...job CEO...grade 5...country Germany
+					EMP_1 is an Employee
+						...first name  Teszt
+						...last name  Elek
+						...job key  CEO...grade key  5...country key  Germany
+						...salary 80000
 					
 				}
 				.outdent
@@ -742,11 +755,12 @@ static if(TREEVIEW_GUI_APP)
 	
 	struct AMDBNode
 	{
-		enum showETypeInEntity 	= (常!(bool)(0)),
+		enum showETypeInEntity 	= (常!(bool)(1)),
 		showEntitiesInEType	= (常!(bool)(1)), /+Todo: implement this with a custom node!+/
 		showTargetEntityInAssociation 	= (常!(bool)(1)); 
 		
 		AMDB.Explorer assoc; //contains `db` and `idx`
+		bool isReferenced; 
 		
 		auto db()
 		=> assoc.db; auto idx()
@@ -798,8 +812,35 @@ static if(TREEVIEW_GUI_APP)
 		{
 			if(isRoot)	{ return db.hasAnyTypes; }
 			else if(isAType)	{
-				return assoc.target.isAssociation ||
-				db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any; 
+				/+
+					auto base = ((assoc.target.isATypeCompositeKey)?(assoc.target):(assoc)); 
+					return db.exploreATypes.filter!((a)=>(a.source.idx==base.idx)).any ||
+					base.target.isAssociation && !base.target.isATypeCompositeKey; 
+				+/
+				if(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any) return true; 
+				/+
+					if(assoc.target.isAssociation)
+					{
+						if(assoc.target.isATypeCompositeKey)
+						{
+							if(assoc.target.target.isAssociation)
+							return true; 
+						}
+						else
+						{ return true; }
+					}
+				+/
+				if(assoc.isATypeCompositeKey)
+				{
+					if(assoc.target.target.isAssociation)
+					return true; 
+				}
+				else
+				{
+					if(assoc.target.isAssociation)
+					return true; 
+				}
+				return false; 
 			}
 			else if(isEType)	{
 				return db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any ||
@@ -842,9 +883,183 @@ static if(TREEVIEW_GUI_APP)
 				}
 				else if(isAType)
 				{
-					subNodes = []; 
-					subNodes ~= sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx))); 
-					if(assoc.target.isAssociation) subNodes ~= AMDBNode(assoc.target); 
+					if(assoc.verb.text=="job key")
+					{
+						((0x8BFE3898B722).檢(assoc.isATypeCompositeKey)); 
+						((0x8C393898B722).檢(assoc.target.isATypeCompositeKey)); 
+						((0x8C7B3898B722).檢(assoc.dump)); 
+						/+
+							AI: /+
+								User: Please reformat this so I can see the structure:
+								/+Code: (2038):assoc((1988):assoc((1979):"Employee", (14):"is a subtype of", (66):"Entity"), (2030):"job key", (1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"))+/
+							+/
+							/+
+								Assistant: /+
+									Structured: /+
+										Code: (2038):assoc(
+											(1988):assoc(
+												(1979):"Employee",
+												(14):"is a subtype of",
+												(66):"Entity"
+											),
+											(2030):"job key",
+											(1888):assoc(
+												(1884):"Job",
+												(14):"is a subtype of",
+												(66):"Entity"
+											)
+										)
+									+/
+								+/
+								
+								/+Note: Usage(prompt_hit: 0, prompt_miss: 205, completion: 101, HUF: 0.03, price: 100%)+/
+							+/
+						+/
+					}
+					
+					if(assoc.verb.text=="grade key")
+					{
+						((0x90323898B722).檢(assoc.isATypeCompositeKey)); 
+						((0x906D3898B722).檢(assoc.target.isATypeCompositeKey)); 
+						((0x90AF3898B722).檢(assoc.dump)); 
+						/+
+							AI: /+
+								User: Please reformat this so I can see the structure:
+								/+Code: (2055):assoc((2038):assoc((1988):assoc((1979):"Employee", (14):"is a subtype of", (66):"Entity"), (2030):"job key", (1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity")), (2045):"grade key", (1914):assoc((1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"), (1908):"grade", (1):"Int"))+/
+							+/
+							/+
+								Assistant: /+
+									Structured: /+
+										Code: (2055): assoc(
+											(2038): assoc(
+												(1988): assoc(
+													(1979): "Employee",
+													(14): "is a subtype of",
+													(66): "Entity"
+												),
+												(2030): "job key",
+												(1888): assoc(
+													(1884): "Job",
+													(14): "is a subtype of",
+													(66): "Entity"
+												)
+											),
+											(2045): "grade key",
+											(1914): assoc(
+												(1888): assoc(
+													(1884): "Job",
+													(14): "is a subtype of",
+													(66): "Entity"
+												),
+												(1908): "grade",
+												(1): "Int"
+											)
+										) 
+									+/
+								+/
+								
+								/+Note: Usage(prompt_hit: 128, prompt_miss: 267, completion: 193, HUF: 0.04, price: 100%)+/
+							+/
+						+/
+					}
+					
+					if(assoc.verb.text=="country key")
+					{
+						((0x96453898B722).檢(assoc.isATypeCompositeKey)); 
+						((0x96803898B722).檢(assoc.target.isATypeCompositeKey)); 
+						((0x96C23898B722).檢(assoc.dump)); 
+						/+
+							AI: /+
+								User: Please reformat this so I can see the structure:
+								/+Code: (2074):assoc((2055):assoc((2038):assoc((1988):assoc((1979):"Employee", (14):"is a subtype of", (66):"Entity"), (2030):"job key", (1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity")), (2045):"grade key", (1914):assoc((1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"), (1908):"grade", (1):"Int")), (2062):"country key", (1929):assoc((1914):assoc((1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"), (1908):"grade", (1):"Int"), (1921):"country", (1861):assoc((1853):"Country", (14):"is a subtype of", (66):"Entity")))+/
+							+/
+							/+
+								Assistant: /+
+									Structured: /+
+										Code: (2074):assoc(
+											(2055):assoc(
+												(2038):assoc(
+													(1988):assoc(
+														(1979):"Employee",
+														(14):"is a subtype of",
+														(66):"Entity"
+													),
+													(2030):"job key",
+													(1888):assoc(
+														(1884):"Job",
+														(14):"is a subtype of",
+														(66):"Entity"
+													)
+												),
+												(2045):"grade key",
+												(1914):assoc(
+													(1888):assoc(
+														(1884):"Job",
+														(14):"is a subtype of",
+														(66):"Entity"
+													),
+													(1908):"grade",
+													(1):"Int"
+												)
+											),
+											(2062):"country key",
+											(1929):assoc(
+												(1914):assoc(
+													(1888):assoc(
+														(1884):"Job",
+														(14):"is a subtype of",
+														(66):"Entity"
+													),
+													(1908):"grade",
+													(1):"Int"
+												),
+												(1921):"country",
+												(1861):assoc(
+													(1853):"Country",
+													(14):"is a subtype of",
+													(66):"Entity"
+												)
+											)
+										)
+									+/
+								+/
+								
+								/+Note: Usage(prompt_hit: 128, prompt_miss: 371, completion: 344, HUF: 0.07, price: 100%)+/
+							+/
+						+/
+					}
+					
+					/+
+						auto base = ((assoc.target.isATypeCompositeKey)?(assoc.target):(assoc)); 
+						subNodes = sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==base.idx))); 
+						if(base.target.isAssociation && !base.target.isATypeCompositeKey)
+						subNodes ~= AMDBNode(base.target); 
+					+/
+					
+					subNodes = sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx))); 
+					/+
+						if(assoc.target.isAssociation)
+						{
+							if(assoc.target.isATypeCompositeKey)
+							{
+								if(assoc.target.target.isAssociation)
+								subNodes ~= AMDBNode(assoc.target.target); 
+							}
+							else
+							{ subNodes ~= AMDBNode(assoc.target); }
+						}
+					+/
+					
+					if(assoc.isATypeCompositeKey)
+					{
+						if(assoc.target.target.isAssociation)
+						subNodes ~= AMDBNode(assoc.target.target, isReferenced: true); 
+					}
+					else
+					{
+						if(assoc.target.isAssociation)
+						subNodes ~= AMDBNode(assoc.target, isReferenced: true); 
+					}
 				}
 				else if(isEType)
 				{
@@ -859,16 +1074,16 @@ static if(TREEVIEW_GUI_APP)
 				{ subNodes = [AMDBNode(assoc.source.source)]; }
 				else if(isEntity)
 				{
-					subNodes 	= ((showETypeInEntity)?([AMDBNode(assoc.target)]):([]))
-						~ sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx)))); 
+					subNodes = 	sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx))))
+						~((showETypeInEntity)?([AMDBNode(assoc.target, isReferenced: true)]):([])); 
 				}
 				else if(isAttribute)
 				{
-					subNodes = 	((
+					subNodes = 	sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx))))
+						~((
 						showTargetEntityInAssociation &&
 						assoc.target.isEntity
-					)?([AMDBNode(assoc.target)]):([]))
-						~ sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx)))); 
+					)?([AMDBNode(assoc.target, isReferenced: true)]):([])); 
 					/+Todo: Do inverse attributes too!+/
 					//Todo: Handle single/multiple cardinality too with custom attribute list nodes
 					//Todo: Research way of storage for ordered, unordered and sorted sequences!
@@ -882,10 +1097,20 @@ static if(TREEVIEW_GUI_APP)
 			{
 				void Icon(string name, int hue)
 				{ Img(File(i`c:\dl\red_$(name).png?shiftHUE=$(hue)`.text)); Spacer(fh/4); } 
+				if(isReferenced) Text("👉"); 
 				if(isRoot)	{ Icon(`brick`, -60); Text("Types"); }
 				else if(isAType)	{
-					Icon(`right_down_arrow`, assoc.target.isDType ? -120 : -60); 
-					Text(assoc.verb.text, ", ", assoc.target.sourceOrThis.text); 
+					if(assoc.isATypeCompositeKey)
+					{
+						Text("🔑"); 
+						Icon(`right_down_arrow`, assoc.target.target.isDType ? -120 : -60); 
+						Text(assoc.verb.text, ", ", assoc.target.target.sourceOrThis.text); 
+					}
+					else
+					{
+						Icon(`right_down_arrow`, assoc.target.isDType ? -120 : -60); 
+						Text(assoc.verb.text, ", ", assoc.target.sourceOrThis.text); 
+					}
 				}
 				else if(isEType)	{
 					Icon(`brick`, -60); Text(name); Spacer(fh/4); 
@@ -899,12 +1124,12 @@ static if(TREEVIEW_GUI_APP)
 				}
 				else if(isEntity)	{
 					Icon(`brick`, 60); Text(assoc.source); 
-					if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }
+					/+if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }+/
 				}
 				else if(isAttribute)	{
 					Icon(`right_down_arrow`, 30); 
 					Text(assoc.verb.verb, ", ", assoc.target.sourceOrThis); 
-					if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }
+					/+if(Btn("Dump")) { clipboard.text = assoc.dump; beep; }+/
 				}
 				else	{ Text({ style.fontColor = clGray; }, i" (assoc: $(assoc.idx))"); }
 			}
@@ -962,11 +1187,11 @@ static if(TREEVIEW_GUI_APP)
 			
 			const 	cases 	= mixin((
 				(表([
-					[q{(常!(bool)(0))},q{types}],
-					[q{(常!(bool)(0))},q{cars}],
-					[q{(常!(bool)(0))},q{animals}],
-					[q{(常!(bool)(0))},q{leds}],
-					[q{(常!(bool)(0))},q{factory}],
+					[q{(常!(bool)(1))},q{types}],
+					[q{(常!(bool)(1))},q{cars}],
+					[q{(常!(bool)(1))},q{animals}],
+					[q{(常!(bool)(1))},q{leds}],
+					[q{(常!(bool)(1))},q{factory}],
 					[q{(常!(bool)(1))},q{firebird_test}],
 				]))
 			).調!(GEN_Selection!testCases)),
@@ -993,7 +1218,7 @@ static if(TREEVIEW_GUI_APP)
 		} 
 		override void onUpdate()
 		{
-			showFPS = (互!((bool),(0),(0x9BE13898B722))); 
+			showFPS = (互!((bool),(0),(0xB7EF3898B722))); 
 			with(im)
 			{
 				foreach(panelIdx; 0..NumPanels)
@@ -1055,7 +1280,6 @@ static if(TREEVIEW_GUI_APP)
 		} 
 	} 
 }
-
 /+
 	Assistant: Plan: FBDB → AMDB Workflow
 	
