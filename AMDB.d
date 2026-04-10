@@ -357,7 +357,7 @@ version(/+$DIDE_REGION+/all) {
 		}
 		catch(Exception e) {
 			const lineIdx = sourceText.byChar.take(tokenPos).count('\n') + 1; 
-			//throw e; 
+			throw e; 
 			throw new Exception(i"AMDB Error: $(sourceFile)($(lineIdx)): $(e.simpleMsg) $(sentence[])".text); 
 		}
 	} 
@@ -565,15 +565,15 @@ version(/+$DIDE_REGION+/all) {
 		with(SER)
 		{
 			auto 試(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, args); return arr[].hexDump; } 
-			((0x49FCEB4AA1C7).檢 (試("a"w))),((0x4A1FEB4AA1C7).檢 (試("abcá"))),((0x4A45EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
-			((0x4A86EB4AA1C7).檢 (試(false))),((0x4AAAEB4AA1C7).檢 (試(true))),((0x4ACDEB4AA1C7).檢 (試(Null()))),
-			((0x4AF7EB4AA1C7).檢 (試(42))),((0x4B18EB4AA1C7).檢 (試(7848))),((0x4B3BEB4AA1C7).檢 (試(437928932))),((0x4B63EB4AA1C7).檢 (試(437928932437928932))),
-			((0x4B99EB4AA1C7).檢 (試(-42))),((0x4BBBEB4AA1C7).檢 (試(-7848))),((0x4BDFEB4AA1C7).檢 (試(-437928932))),((0x4C08EB4AA1C7).檢 (試(-437928932437928932))),
-			((0x4C3FEB4AA1C7).檢 (試(1.5))),((0x4C61EB4AA1C7).檢 (試(1.51))),((0x4C84EB4AA1C7).檢 (試(1.51f))),
-			((0x4CADEB4AA1C7).檢 (試(now))),((0x4CCFEB4AA1C7).檢 (試(now.date))),
-			((0x4CFBEB4AA1C7).檢 (試(vec2(1, 2)))),((0x4D24EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x4D53EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D83EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
-			((0x4DC5EB4AA1C7).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF8EB4AA1C7).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2EEB4AA1C7).檢 (試(EType!uint(7, 8, 65536)))),
-			((0x4E69EB4AA1C7).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E9CEB4AA1C7).檢 (試(EType!ushort(4, 5, 6)))),((0x4ED0EB4AA1C7).檢 (試(AType!uint(7, 8, 9)))); 
+			((0x49FAEB4AA1C7).檢 (試("a"w))),((0x4A1DEB4AA1C7).檢 (試("abcá"))),((0x4A43EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
+			((0x4A84EB4AA1C7).檢 (試(false))),((0x4AA8EB4AA1C7).檢 (試(true))),((0x4ACBEB4AA1C7).檢 (試(Null()))),
+			((0x4AF5EB4AA1C7).檢 (試(42))),((0x4B16EB4AA1C7).檢 (試(7848))),((0x4B39EB4AA1C7).檢 (試(437928932))),((0x4B61EB4AA1C7).檢 (試(437928932437928932))),
+			((0x4B97EB4AA1C7).檢 (試(-42))),((0x4BB9EB4AA1C7).檢 (試(-7848))),((0x4BDDEB4AA1C7).檢 (試(-437928932))),((0x4C06EB4AA1C7).檢 (試(-437928932437928932))),
+			((0x4C3DEB4AA1C7).檢 (試(1.5))),((0x4C5FEB4AA1C7).檢 (試(1.51))),((0x4C82EB4AA1C7).檢 (試(1.51f))),
+			((0x4CABEB4AA1C7).檢 (試(now))),((0x4CCDEB4AA1C7).檢 (試(now.date))),
+			((0x4CF9EB4AA1C7).檢 (試(vec2(1, 2)))),((0x4D22EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x4D51EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D81EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
+			((0x4DC3EB4AA1C7).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF6EB4AA1C7).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2CEB4AA1C7).檢 (試(EType!uint(7, 8, 65536)))),
+			((0x4E67EB4AA1C7).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E9AEB4AA1C7).檢 (試(EType!ushort(4, 5, 6)))),((0x4ECEEB4AA1C7).檢 (試(AType!uint(7, 8, 9)))); 
 		}
 	} 
 	
@@ -734,7 +734,7 @@ Mary Davis  customer of  Amazon
 			auto am = new AMDBTest; 
 			am.schema(schemaSrc); 
 			am.data(dataSrc); 
-			((0x5E87EB4AA1C7).檢 (am.dump)); 
+			((0x5E85EB4AA1C7).檢 (am.dump)); 
 		}
 	} 
 }

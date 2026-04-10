@@ -3337,11 +3337,11 @@ version(/+$DIDE_REGION+/all) {
 			~this()
 			{
 				if(active) {
-					rollback; if(modify) 
-						WARN(
-							"Dangling active transaction."
-							~" All changes were lost."
-						); 
+					rollback; if(modify)
+					WARN(
+						"Dangling active transaction."
+						~" All changes were lost."
+					); 
 					
 				}
 			} 
@@ -3416,8 +3416,7 @@ version(/+$DIDE_REGION+/all) {
 					}
 					return 0; 
 				} 
-			} 
-			
+			} 
 			scope ResultSet execute(Args...)(Args args)
 			{
 				enforceActive; 
@@ -3445,7 +3444,7 @@ version(/+$DIDE_REGION+/all) {
 					statement.inputFields.xsqlda
 				); 
 				return ResultSet(statement.outputFields, statement.stmt_handle); 
-			} 
+			} 
 			
 			scope ResultSet 查(Args...)(LOCATION_t loc, Args args)
 			{
@@ -3885,161 +3884,249 @@ version(/+$DIDE_REGION+/all) {
 		
 		return res[]; 
 	} 
+	
+	T[] toStructArray(T)(
+		auto ref FbResultSet rows, bool strict = true, 
+		string FILE = __FILE__, size_t LINE = __LINE__
+	)
+	{
+		try
+		{
+			if(!rows.fields) return []; auto vars = rows.fields.vars; 
+			
+			enum structFieldNames = [FieldNamesWithUDA!(T, STORED, true)]; 
+			const 	varFieldNames = vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
+				colIdx = structFieldNames.map!
+					((sName){
+				const vIdx = varFieldNames.countUntil!sameText(sName); 
+				enforce(
+					!strict || vIdx>=0, 
+					i"Missing column for field $(sName)".text
+				); return vIdx; 
+			}).array; 
+			
+			auto res = appender!(T[]); 
+			foreach(row; rows)
+			{
+				T item; 
+				static foreach(i, name; structFieldNames)
+				{
+					if(colIdx[i]>=0)
+					{
+						alias FieldT = typeof(__traits(getMember, item, name)); 
+						__traits(getMember, item, name) = vars[colIdx[i]].readValue!FieldT; 
+					}
+				}
+				res ~= item; 
+			}
+			return res[]; 
+		}
+		catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
+	} 
 	
-	version(/+$DIDE_REGION+/all) {
-		T[] toStructArray(T)(auto ref FbResultSet rows, bool strict = true, string FILE = __FILE__, size_t LINE = __LINE__)
+	T[] toArray(T)(
+		auto ref FbResultSet rows, bool strict = true, 
+		string FILE = __FILE__, size_t LINE = __LINE__
+	)
+	{
+		enum isValue = __traits(compiles, { XSQLVAR v; auto x = v.readValue!T; }); 
+		static if(!isValue)
+		{ return toStructArray!T(rows, strict, FILE, LINE); }
+		else
 		{
 			try
 			{
 				if(!rows.fields) return []; auto vars = rows.fields.vars; 
-				
-				enum structFieldNames = [FieldNamesWithUDA!(T, STORED, true)]; 
-				const 	varFieldNames = vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
-					colIdx = structFieldNames.map!
-						((sName){
-					const vIdx = varFieldNames.countUntil!sameText(sName); 
-					enforce(
-						!strict || vIdx>=0, 
-						i"Missing column for field $(sName)".text
-					); return vIdx; 
-				}).array; 
+				enforce(rows.fields.length>=1, "No columns in FbResultSet."); 
 				
 				auto res = appender!(T[]); 
-				foreach(row; rows)
-				{
-					T item; 
-					static foreach(i, name; structFieldNames)
-					{
-						if(colIdx[i]>=0)
-						{
-							alias FieldT = typeof(__traits(getMember, item, name)); 
-							__traits(getMember, item, name) = vars[colIdx[i]].readValue!FieldT; 
-						}
-					}
-					res ~= item; 
-				}
+				foreach(row; rows) res ~= vars[0].readValue!T; 
 				return res[]; 
 			}
 			catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
-		} 
-		T[] toArray(T)(auto ref FbResultSet rows, bool strict = true, string FILE = __FILE__, size_t LINE = __LINE__)
-		{
-			enum isValue = __traits(compiles, { XSQLVAR v; auto x = v.readValue!T; }); 
-			static if(!isValue)
-			{ return toStructArray!T(rows, strict, FILE, LINE); }
-			else
-			{
-				try
-				{
-					if(!rows.fields) return []; auto vars = rows.fields.vars; 
-					enforce(rows.fields.length>=1, "No columns in FbResultSet."); 
-					
-					auto res = appender!(T[]); 
-					foreach(row; rows) res ~= vars[0].readValue!T; 
-					return res[]; 
-				}
-				catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
-			}
-		} 
-	}
-	
-	
-	
-	/+
-		Prompt for AI to discover relationships:
-		
-		/+
-			Code: string prompt; 
-			foreach(table; tables)
-			{
-				prompt ~= 	(查((位!()),iq{},iq{SELECT * FROM $(Literal(table)) ROWS 3}))
-					.formatTable!"struct_hdr_ex"~"\n\n"; 
-			}
-		+/
-		
-		/+
-			User: /+
-				Code: struct EmployeeDatabase
-				{
-					/+
-						Notes: 
-						 *	Each struct here represents a database table or view.
-						 *	The user defined attributes are representing the original SQL identifiers: @"FIELD"
-						 *	The field names in the structs are proper DLang identifiers.
-						 *	There are additional examples after the fields in the comments to help 
-							identify the meaning of each field.
-					+/
-					
-					/+
-						Your task is to examine the structure of this database schema, and make a list of 
-						relations between the tables!
-						Example output:
-						/+
-							Code: struct Relationship {
-								bool isNullable; 
-								string fromTable; string[] fromFields; 
-								string toTable; string[] toFields; 
-							} 
-							static immutable _relationships =
-							[
-								Relationship(false, "CUSTOMER", ["COUNTRY"], "COUNTRY", ["COUNTRY"]),
-								Relationship(true, "EMPLOYEE", ["DEPT_NO"], "DEPARTMENT", ["DEPT_NO"]),
-								Relationship(
-									false, "EMPLOYEE", [
-										"JOB_CODE", 
-										"JOB_GRADE", 
-										"JOB_COUNTRY"
-									], "JOB", [
-										"JOB_CODE",
-										"JOB_GRADE", 
-										"JOB_COUNTRY"
-									]
-								)
-								/+and so on+/
-							]; 
-						+/
-						
-						Also please make an order to load the tables optimally, 
-						put the tables in the front where there are minimal connections going towards other tables!
-						It must be not perfect because circular references are allowed, but should be quite optimal.
-						Example:
-						/+Code: static immutable _loadOrder = ["COUNTRY", ..., "SALES"]; +/
-					+/
-					
-					/+header_ex comes here!!!!!!!!!!!!!+/
-				} 
-			+/
-		+/
-	+/
-	
-	
-	void test_makeDBSchema()
-	{
-		auto dbFaszom = new FbDatabase(
-			`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, 
-			"SYSDBA", "masterkey"
-		); 
-		scope(exit) dbFaszom.free; 
-		static if((常!(bool)(0)))
-		with(DBSchemaImporter(dbFaszom))
-		{
-			foreach(tableName; db.allTablesAndViews)
-			(查((位!()),iq{},iq{SELECT * FROM $(tableName.Literal)})); 
 		}
-		
-		
-		/+
+	} 
+	
+	struct DBSchema
+	{
+		struct Name
+		{
+			string orig, renamed; 
 			
+			private enum separ = "->"; 
+			this(string orig, string renamed)
+			{
+				this.orig	= orig.strip,
+				this.renamed	= renamed.strip; 
+				if(this.renamed=="") this.renamed = orig; 
+			} 
 			
-			with(db) {
-				allTablesAndViews.map!((a)=>(fetchTable(a).formatTable!"txt")).join("\n").saveTo(`c:\dl\b.b`); 
-				db.fetchHeaders.saveTo(`c:\dl\a.a`); 
-				
-				struct PrimaryKey { string constraint, table; string[] fields; } 
-				struct ForeignKey { string constraint, srcTable, dstTable; string[] srcFields, dstFields; } 
-				PrimaryKey[] pk; 
-				with(transaction)
+			this(string nameSpec)
+			{
+				const idx = nameSpec.indexOf(separ); 
+				if(idx>=0)	this(nameSpec[0..idx], nameSpec[idx+separ.length..$]); 
+				else	this(nameSpec, ""); 
+			} 
+			
+			string toString() const
+			{
+				if(renamed!="" && renamed!=orig)	return orig~" -> "~renamed; 
+				else	return orig; 
+			} 
+			
+			string toSql(bool complete=false, char separ=' ')() const
+			{
+				if(
+					complete || 
+					renamed!="" && renamed!=orig
+				)	{
+					return orig~separ~"AS "
+					~renamed.quoted; 
+				}
+				else	return orig; 
+			} 
+			
+			string toSqlComplete() const
+			=> toSql!true; 
+			string toSqlCompleteWithTab() const
+			=> toSql!(true, '\t'); 
+		} 
+		
+		enum KeyType { none, primary, secondary } 
+		struct Field
+		{
+			Name name; 
+			string type; 
+			
+			//1 baser primary and foreign keyIndices
+			ushort primaryKeyIdx; @property isPrimaryKey() => primaryKeyIdx>0; 
+			ushort foreignKeyIdx; @property isForeignKey() => foreignKeyIdx>0; 
+			string foreignTarget; 
+			
+			string[] examples; 
+		} 
+		
+		struct Key
+		{
+			Field[] fields; 
+			string constraintName; 
+		} 
+		
+		struct Table
+		{
+			Name name; 
+			Field[] fields; 
+			Key primaryKey; 
+			Key[] foreignKeys; 
+		} 
+		
+		Name name; 
+		Table[] tables; 
+		
+		void importTable(FbDatabase db)
+		{} 
+	} 
+	
+	struct DBSchemaImporter
+	{
+		FbDatabase db; private bool owned; 
+		DBSchema schema; 
+		
+		private sizediff_t actTableIdx = -1; 
+		auto actTable()
+		=> ((actTableIdx.inRange(schema.tables))?(&schema.tables[actTableIdx]):(null)); 
+		
+		this(Args...)(Args args)
+		{
+			static if(is(Args[0]==FbDatabase))
+			{
+				static assert(Args.length==1); 
+				owned==false; db = args[0]; 
+			}
+			else
+			{ owned = true; db = new FbDatabase(args); }
+			discoverOrigKeys; 
+		} 
+		
+		~this()
+		{ if(owned) db.free; } 
+		
+		void addTable(ref DBSchema.Table table)
+		{
+			actTableIdx = schema.tables.map!((t)=>(t.name.renamed)).countUntil(table.name.renamed); 
+			if(actTableIdx<0) actTableIdx = schema.tables.length++; 
+			*actTable = table; 
+		} 
+		
+		void addTable(FbResultSet resultSet)
+		{
+			DBSchema.Table table; bool running; 
+			foreach(row; resultSet)
+			{
+				if(running.chkSet)
 				{
+					table.fields.length = row.vars.length; 
+					table.name = DBSchema.Name(row[0].relName); 
+					foreach(i, var; row.vars)
+					{
+						ref field = table.fields[i]; 
+						field.name = DBSchema.Name(var.sqlName, var.aliasName); 
+						field.type = var.DType; 
+					}
+				}
+				enum requiredExamples = 3; 
+				auto gotAllExamples = true; 
+				foreach(i, var; row.vars)
+				{
+					ref examples = table.fields[i].examples; 
+					if(examples.length<requiredExamples) examples.addIfCan(var.DLiteral); 
+					if(examples.length<requiredExamples) gotAllExamples = false; 
+				}
+				if(gotAllExamples) break; 
+			}
+			
+			if(auto pk = table.name.orig in origPrimaryKeys)
+			{
+				foreach(ref field; table.fields)
+				{
+					if(const idx = pk.fields.countUntil(field.name.orig)+1)
+					field.primaryKeyIdx = idx.to!ushort; 
+				}
+			}
+			
+			if(auto fkMap = table.name.orig in origForeignKeys)
+			foreach(const fk; fkMap.values)
+			foreach(ref field; table.fields)
+			{
+				if(const idx = fk.srcFields.countUntil(field.name.orig)+1)
+				field.foreignKeyIdx 	= idx.to!ushort,
+				field.foreignTarget 	= fk.dstTable~'.'~fk.dstFields[idx-1]; 
+			}; 
+			
+			table.name.renamed = sanitizeDLangTypeIdentifier(table.name.orig).singularize; 
+			foreach(ref f; table.fields) f.name.renamed = sanitizeDLangFieldIdentifier(f.name.orig); 
+			
+			addTable(table); 
+		} 
+		
+		private
+		{
+			struct PrimaryKey { string constraint, table; string[] fields; } 
+			struct ForeignKey { string constraint, srcTable, dstTable; string[] srcFields, dstFields; } 
+			PrimaryKey[string] origPrimaryKeys; 
+			ForeignKey[string][string] origForeignKeys; 
+			
+			bool isOrigPrimaryKey(string table, string field)
+			{
+				if(auto pk = table in origPrimaryKeys)
+				if(pk.fields.canFind(field)) return true; return false; 
+			} 
+			
+			private void discoverOrigKeys()
+			{
+				with(db.transaction)
+				{
+					PrimaryKey[] pk; 
 					foreach(
 						row; (查 ((位!()),iq{},iq{
 							SELECT
@@ -4062,6 +4149,8 @@ version(/+$DIDE_REGION+/all) {
 						if(position==0)	pk ~= PrimaryKey(constraint, table); 
 						pk.back.fields ~= field; 
 					}
+					foreach(p; pk) origPrimaryKeys[p.table] = p; 
+					
 					ForeignKey[] fk; 
 					foreach(
 						row; (查 ((位!()),iq{},iq{
@@ -4092,22 +4181,46 @@ version(/+$DIDE_REGION+/all) {
 							srcTable 	= row.srcTable.to!string,
 							srcField 	= row.srcField.to!string,
 							dstTable 	= row.dstTable.to!string,
-							dstField 	= row.dstField.to!string;  
-						if(position==0) fk ~= ForeignKey(constraint, srcTable, dstTable); 
+							dstField 	= row.dstField.to!string; 
+						if(position==0)
+						fk ~= ForeignKey(constraint, srcTable, dstTable); 
 						ref a = fk.back; 
 						enforce(a.srcTable==srcTable && a.dstTable==dstTable); 
 						a.srcFields ~= srcField, a.dstFields ~= dstField; 
 					}
-					pk.each!print; 
-					fk.each!print; 
+					foreach(f; fk) origForeignKeys[f.srcTable][f.dstTable] = f; 
 				}
+			} 
+		} 
+		
+		void 查(Args...)(LOCATION_t loc, Args args)
+		{ addTable(db.查!(Args)(loc, args)); } 
+		
+		string generateScript(string mask = "*")
+		{
+			string script; 
+			foreach(tableName; db.allTablesAndViews(mask))
+			{
+				(查((位!()),iq{},iq{SELECT * FROM $(tableName.Literal)})); 
 				
+				actTable.toJson.print; 
+				
+				static fieldLine(F)(F f)
+				{
+					const 
+					pk 	= ((f.isPrimaryKey) ?(i"PrimaryKey($(f.primaryKeyIdx-1))".text):("")),
+					fk 	= ((f.isForeignKey) ?(i"ForeignKey($(f.foreignKeyIdx-1), $(f.foreignTarget))".text):("")),
+					type 	= i"Type: /+code:$(f.type)+/".text,
+					ex 	= i"Examples: /+code:$(f.examples.join(", "))+/".text; 
+					return "\t"~f.name.toSqlCompleteWithTab~
+					"\t/+"~only(type, pk, fk, ex).filter!"a.length".join(' ')~"+/"; 
+				} 
+				
+				const 	fields = 	actTable.fields.map!((f)=>(fieldLine(f))).join(",\n"),
+					query = i"\nSELECT $(fields)\nFROM $(actTable.name.toSqlComplete)\n".text; 
+				script ~= q{(查((位!()),iq{},iq{$})); }.replace("$", query)~"\n"; 
 			}
-			
-			
-			
-		+/
-		if((常!(bool)(0))) { console.hide; }
-		if((常!(bool)(0))) { application.exit; }
+			return script; 
+		} 
 	} 
 }
