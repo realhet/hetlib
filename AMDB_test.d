@@ -529,7 +529,7 @@ PS-016  is a  ProductionSchedule
 			}
 			
 			string amdbSchema, amdbData; 
-			static if((常!(bool)(1)))
+			static if((常!(bool)(0)))
 			{
 				{
 					auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
@@ -678,7 +678,9 @@ ISC_ARRAY is a String`~"\n";
 				}
 			}
 			
-			auto testCase = TestCase(
+			static if((常!(bool)(0)))
+			auto testCase = TestCase
+			(
 				schema:
 				q{
 					Country is an Entity
@@ -732,13 +734,520 @@ ISC_ARRAY is a String`~"\n";
 						...last name  Elek
 						...job key  CEO...grade key  5...country key  Germany
 						...salary 80000
-					
 				}
 				.outdent
-			); 
+			); 
+			
+			static if((常!(bool)(1)))
+			{
+				TestCase testCase; 
+				{
+					auto _間=init間; scope(exit) ((0x7C223898B722).檢((update間(_間)))); 
+					auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
+					auto tr = db.startTransaction; scope(exit) tr.free; 
+					DBSchemaImporter sch; 
+					
+					void schema(string s) { s=s.outdent.strip; if(s.length) testCase.schema~="\n"~s~"\n"; } 
+					void data(string s) { s=s.outdent.strip; if(s.length) testCase.data~="\n"~s~"\n"; } 
+					
+					with(tr)
+					{
+						schema(
+							q{
+								Short is an Int
+									ISC_BLOB is a String
+									ISC_ARRAY is a String
+							}
+						); 
+						version(/+$DIDE_REGION Country+/all)
+						{
+							schema
+							(
+								q{
+									Country is an Entity
+										...currency String
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	COUNTRY	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "USA", "England", "Canada"+/+/,
+										CURRENCY	/+Type: /+Code: string+/ Examples: /+Code: "Dollar", "Pound", "CdnDlr"+/+/
+									FROM COUNTRY
+								}))
+							) {
+								data
+								(
+									iq{
+										$(row[0].DLiteral)  is a  Country
+											...currency  $(row[1])
+									}.text
+								); 
+							}
+						}
+						version(/+$DIDE_REGION Job+/all)
+						{
+							schema
+							(
+								q{
+									Job  is an  Entity
+										...grade  Int
+											...country  Country
+												...min salary  Double
+												...max salary  Double
+												...job requirement  ISC_BLOB
+												...language requirement  ISC_ARRAY
+										...title  String
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	JOB_CODE	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "CEO", "CFO", "VP"+/+/,
+										JOB_GRADE	/+Type: /+Code: short+/ PrimaryKey(1) Examples: /+Code: short(1), short(2), short(3)+/+/,
+										JOB_COUNTRY	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: "USA", "England", "Japan"+/+/,
+										JOB_TITLE	/+Type: /+Code: string+/ Examples: /+Code: "Chief Executive Officer", "Chief Financial Officer", "Vice President"+/+/,
+										MIN_SALARY	/+Type: /+Code: double+/ Examples: /+Code: 130000.00, 85000.00, 80000.00+/+/,
+										MAX_SALARY	/+Type: /+Code: double+/ Examples: /+Code: 250000.00, 140000.00, 130000.00+/+/,
+										JOB_REQUIREMENT	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(129:241)), Nullable!(ISC_BLOB)(ISC_BLOB(129:243)), Nullable!(ISC_BLOB)(ISC_BLOB(129:251))+/+/,
+										LANGUAGE_REQ	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY).init, Nullable!(ISC_ARRAY)(ISC_ARRAY(129:31)), Nullable!(ISC_ARRAY)(ISC_ARRAY(129:33))+/+/
+									FROM JOB
+								}))
+							) {
+								data
+								(
+									iq{
+										$(row["JOB_CODE"].toPlainText.quoted)  is a  Job
+											...grade  $(row["JOB_GRADE"].toPlainText)
+												...country  $(row["JOB_COUNTRY"].toPlainText.quoted)
+													...min salary  $(row["MIN_SALARY"].toPlainText)
+													...max salary  $(row["MAX_SALARY"].toPlainText)
+													...job requirement  $(row["JOB_REQUIREMENT"].toPlainText.quoted)
+													...language requirement  $(row["LANGUAGE_REQ"].toPlainText.quoted)
+											...title  $(row["JOB_TITLE"].toPlainText.quoted)
+									}.text
+								); 
+							}
+						}
+						version(/+$DIDE_REGION Department+/all)
+						{
+							schema
+							(
+								q{
+									Employee is an Entity//fowrard decl
+									
+									Department is an Entity
+										...name	String
+										...head department 	Department
+										...manager	Employee
+										...budget	Double
+										...location	String
+										...phone no	String
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	DEPT_NO	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "000", "100", "600"+/+/,
+										DEPARTMENT	/+Type: /+Code: string+/ Examples: /+Code: "Corporate Headquarters", "Sales and Marketing", "Engineering"+/+/,
+										BUDGET	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1000000.00), Nullable!(double)(2000000.00), Nullable!(double)(1100000.00)+/+/,
+										LOCATION	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+										PHONE_NO	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+									FROM DEPARTMENT
+								}))
+							) {
+								auto s = iq{
+									$("DEP_"~row.DEPT_NO.toPlainText) is a Department
+										...name $(row.DEPARTMENT.DLiteral)
+								}.text.outdent; 
+								with(row.BUDGET) if(!isNull) s~="\n	...budget "~toPlainText; 
+								with(row.LOCATION) if(!isNull) s~="\n	...location "~toPlainText.quoted; 
+								with(row.PHONE_NO) if(!isNull) s~="\n	...phone no  "~toPlainText.quoted; 
+								data(s); 
+							}
+						}
+						version(/+$DIDE_REGION Employee+/all)
+						{
+							schema
+							(
+								q{
+									Employee is an Entity
+										...first name	String
+										...last name	String
+										...phone ext	String
+										...hired at	Date
+										...department	Department
+										...job Job
+											...grade grade
+												...country country
+										...salary Double
+										...full name  String
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	EMP_NO	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
+										FIRST_NAME	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
+										LAST_NAME	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
+										PHONE_EXT	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
+										HIRE_DATE	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
+										DEPT_NO	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
+										JOB_CODE	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
+										JOB_GRADE	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
+										JOB_COUNTRY	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
+										SALARY	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
+										FULL_NAME	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+									FROM EMPLOYEE
+								}))
+							) {
+								data
+								(
+									iq{
+										$("EMP_"~row.EMP_NO.toPlainText) is an Employee
+											...first name $(row.FIRST_NAME.toPlainText.quoted)
+											...last name $(row.LAST_NAME.toPlainText.quoted)
+											...phone ext $(((row.PHONE_EXT.isNull)?(""):(row.PHONE_EXT.toPlainText)).quoted)
+											...hired at $(row.HIRE_DATE.toPlainText.quoted)
+											...department $(("DEP_"~row.DEPT_NO.toPlainText).quoted)
+											...job $(row.JOB_CODE.toPlainText)
+												...grade $(row.JOB_GRADE.toPlainText)
+													...country $(row.JOB_COUNTRY.toPlainText)
+											...salary $(row.SALARY.toPlainText)
+											...full name $(row.FULL_NAME.toPlainText.quoted)
+									}.text
+								); 
+							}
+						}
+						static if(0)
+						{
+							version(/+$DIDE_REGION Employee: variant 1+/all)
+							{
+								/+
+									Code: with((查((位!()),iq{},iq{SELECT * FROM EMPLOYEE})))
+									{
+										importSchemaAndData
+										(
+											q{
+												$("EMP_"~EMP_NO) is an Employee/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/
+													...first name	$(FIRST_NAME)	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/
+													...last name	$(LAST_NAME)	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/
+													...phone ext	$(((PHONE_EXT.isNull)?(""):(PHONE_EXT.text)))	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/
+													...hired at	$(HIRE_DATE)	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/
+													...department	$("DEP_"~DEPT_NO)	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/
+													...job $(link("Job", JOB_CODE))/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/
+														...grade $(link("grade", JOB_GRADE))/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/
+															...country $(link("country", JOB_COUNTRY))	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/
+													...salary $(SALARY)/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/
+													...full name  $(FULL_NAME)	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+											}
+										); 
+									}
+								+/
+							}
+							version(/+$DIDE_REGION Employee: variant 2+/all)
+							{
+								(查((位!()),iq{},iq{
+									SELECT 	"EMP_" || EMP_NO	/+Structured: $  is an  Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
+										FIRST_NAME	/+Structured: 	...first name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
+										LAST_NAME	/+Structured: 	...last name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
+										COALESCE(PHONE_EXT, ``)	/+Structured: 	...phone ext  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
+										HIRE_DATE	/+Structured: 	...hire date  $+/	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
+										"DEP_" || DEPT_NO	/+Structured: 	...department  $:Department+/	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
+										JOB_CODE	/+Structured: 	...job  $:Job+/	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
+										JOB_GRADE	/+Structured: 		...grade  $:grade+/	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
+										JOB_COUNTRY	/+Structured: 			...country  $:country+/	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
+										SALARY AS DOUBLE PRECISION	/+Structured: 	...salary  $+/	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
+										FULL_NAME	/+Structured: 	...full name  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+									FROM EMPLOYEE
+								})); 
+							}
+							version(/+$DIDE_REGION Employee: variant 2b+/all)
+							{
+								(查((位!()),iq{},iq{
+									SELECT 	"EMP_" || EMP_NO	/+Structured/amdb: $  is an  Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
+										FIRST_NAME	/+Structured/amdb: 	...first name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
+										LAST_NAME	/+Structured/amdb: 	...last name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
+										COALESCE(PHONE_EXT, ``)	/+Structured/amdb: 	...phone ext  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
+										HIRE_DATE	/+Structured/amdb: 	...hire date  $+/	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
+										"DEP_" || DEPT_NO	/+Structured/amdb: 	...department  $:Department+/	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
+										JOB_CODE	/+Structured/amdb: 	...job  $:Job+/	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
+										JOB_GRADE	/+Structured/amdb: 		...grade  $:grade+/	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
+										JOB_COUNTRY	/+Structured/amdb: 			...country  $:country+/	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
+										SALARY AS DOUBLE PRECISION	/+Structured/amdb: 	...salary  $+/	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
+										FULL_NAME	/+Structured/amdb: 	...full name  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+									FROM EMPLOYEE
+								})); 
+							}
+						}
+						version(/+$DIDE_REGION Department links+/all)
+						{
+							foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	DEPT_NO	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "000", "100", "600"+/+/,
+										HEAD_DEPT	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: Nullable!(string).init, Nullable!(string)("000"), Nullable!(string)("100")+/+/,
+										MNGR_NO	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(105)), Nullable!(short)(short(85)), Nullable!(short)(short(2))+/+/
+									FROM DEPARTMENT
+								}))
+							) {
+								auto s = iq{$("DEP_"~row.DEPT_NO.toPlainText) is a Department}.text.outdent; 
+								with(row.HEAD_DEPT) if(!isNull) s~="\n	...head department  "~"DEP_"~toPlainText; 
+								with(row.MNGR_NO) if(!isNull) s~="\n	...manager  "~"EMP_"~toPlainText; 
+								data(s); 
+							}
+						}
+						version(/+$DIDE_REGION SalaryHistory+/all)
+						{
+							schema
+							(
+								q{
+									SalaryHistory is an Entity
+										...employee	Employee
+										...change date	Date
+										...updater id	String
+										...old salary	Double
+										...percent change	Double
+										...new salary	Double
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(28), short(2), short(4)+/+/,
+										CHANGE_DATE	AS "change_date"	/+Type: /+Code: DateTime+/ PrimaryKey(1) Examples: /+Code: DateTime(1992, 12, 15, 0, 0, 0), DateTime(1993, 9, 8, 0, 0, 0), DateTime(1993, 12, 20, 0, 0, 0)+/+/,
+										UPDATER_ID	AS "updater_id"	/+Type: /+Code: string+/ PrimaryKey(2) Examples: /+Code: "admin2", "elaine", "tj"+/+/,
+										OLD_SALARY	AS "old_salary"	/+Type: /+Code: double+/ Examples: /+Code: 20000.00, 98000.00, 90000.00+/+/,
+										PERCENT_CHANGE	AS "percent_change"	/+Type: /+Code: double+/ Examples: /+Code: 10, 8.061199999999999, 8.333299999999999+/+/,
+										NEW_SALARY	AS "new_salary"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(22000), Nullable!(double)(105899.976), Nullable!(double)(97499.97)+/+/
+									FROM SALARY_HISTORY AS "Salary_history"
+								}))
+							) {
+								auto s = iq{
+									$("SALHIST_"~row["emp_no"].toPlainText~"_"~row["change_date"].toPlainText~"_"~row["updater_id"].toPlainText) is a SalaryHistory
+										...employee  $("EMP_"~row["emp_no"].toPlainText)
+										...change date  $(row["change_date"].toPlainText.quoted)
+										...updater id  $(row["updater_id"].toPlainText.quoted)
+										...old salary  $(row["old_salary"].toPlainText)
+										...percent change  $(row["percent_change"].toPlainText)
+								}.text.outdent; 
+								
+								with(row["new_salary"]) if(!isNull) s~="\n	...new salary  "~toPlainText; 
+								
+								data(s); 
+							}
+						}
+						version(/+$DIDE_REGION Customer+/all)
+						{
+							schema
+							(
+								q{
+									Customer is an Entity
+										...name	String
+										...contact first name	String
+										...contact last name	String
+										...phone no	String
+										...address line 1	String
+										...address line 2	String
+										...city	String
+										...state	String
+										...country	Country
+										...postal code	String
+										...on hold	String
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	CUST_NO	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1001, 1002, 1003+/+/,
+										CUSTOMER	/+Type: /+Code: string+/ Examples: /+Code: "Signature Design", "Dallas Technologies", "Buttle, Griffith and Co."+/+/,
+										CONTACT_FIRST	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Dale J."), Nullable!(string)("Glen"), Nullable!(string)("James")+/+/,
+										CONTACT_LAST	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Little"), Nullable!(string)("Brown"), Nullable!(string)("Buttle")+/+/,
+										PHONE_NO	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(619) 530-2710"), Nullable!(string)("(214) 960-2233"), Nullable!(string)("(617) 488-1864")+/+/,
+										ADDRESS_LINE1	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("15500 Pacific Heights Blvd."), Nullable!(string)("P. O. Box 47000"), Nullable!(string)("2300 Newbury Street")+/+/,
+										ADDRESS_LINE2	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("Suite 101"), Nullable!(string)("Suite 150")+/+/,
+										CITY	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("San Diego"), Nullable!(string)("Dallas"), Nullable!(string)("Boston")+/+/,
+										STATE_PROVINCE	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("CA"), Nullable!(string)("TX"), Nullable!(string)("MA")+/+/,
+										COUNTRY	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: Nullable!(string)("USA"), Nullable!(string)("England"), Nullable!(string)("Hong Kong")+/+/,
+										POSTAL_CODE	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("92121"), Nullable!(string)("75205"), Nullable!(string)("02115")+/+/,
+										ON_HOLD	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("*")+/+/
+									FROM CUSTOMER
+								}))
+							) {
+								auto s = iq{
+									$("CUS_"~row.CUST_NO.toPlainText) is a Customer
+										...name  $(row.CUSTOMER.toPlainText.quoted)
+								}.text.outdent; 
+								with(row.CONTACT_FIRST) if(!isNull) s~="\n	...contact first name  "~toPlainText.quoted; 
+								with(row.CONTACT_LAST) if(!isNull) s~="\n	...contact last name  "~toPlainText.quoted; 
+								with(row.PHONE_NO) if(!isNull) s~="\n	...phone no  "~toPlainText.quoted; 
+								with(row.ADDRESS_LINE1) if(!isNull) s~="\n	...address line 1  "~toPlainText.quoted; 
+								with(row.ADDRESS_LINE2) if(!isNull) s~="\n	...address line 2  "~toPlainText.quoted; 
+								with(row.CITY) if(!isNull) s~="\n	...city  "~toPlainText.quoted; 
+								with(row.STATE_PROVINCE) if(!isNull) s~="\n	...state  "~toPlainText.quoted; 
+								with(row.COUNTRY) if(!isNull) s~="\n	...country  "~toPlainText; 
+								with(row.POSTAL_CODE) if(!isNull) s~="\n	...postal code  "~toPlainText.quoted; 
+								with(row.ON_HOLD) if(!isNull) s~="\n	...on hold  "~toPlainText.quoted; 
+								data(s); 
+							}
+						}
+						version(/+$DIDE_REGION Sales+/all)
+						{
+							schema
+							(
+								q{
+									Sale is an Entity
+										...customer	Customer
+										...sales rep	Employee
+										...order status	String
+										...order date	Date
+										...ship date	Date
+										...date needed	Date
+										...paid	String
+										...quantity ordered 	Int
+										...total value	Double
+										...discount	Double
+										...item type	String
+										...aged	Double
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	PO_NUMBER	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "V91E0210", "V92E0340", "V92J1003"+/+/,
+										CUST_NO	/+Type: /+Code: int+/ ForeignKey(0, CUSTOMER.CUST_NO) Examples: /+Code: 1004, 1010, 1012+/+/,
+										SALES_REP	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(11)), Nullable!(short)(short(61)), Nullable!(short)(short(118))+/+/,
+										ORDER_STATUS	/+Type: /+Code: string+/ Examples: /+Code: "shipped", "open", "waiting"+/+/,
+										ORDER_DATE	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1991, 3, 4, 0, 0, 0), DateTime(1992, 10, 15, 0, 0, 0), DateTime(1992, 7, 26, 0, 0, 0)+/+/,
+										SHIP_DATE	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime)(DateTime(1991, 3, 5, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 10, 16, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 8, 4, 0, 0, 0))+/+/,
+										DATE_NEEDED	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime).init, Nullable!(DateTime)(DateTime(1992, 10, 17, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 9, 15, 0, 0, 0))+/+/,
+										PAID	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("y"), Nullable!(string)("n")+/+/,
+										QTY_ORDERED	/+Type: /+Code: int+/ Examples: /+Code: 10, 7, 15+/+/,
+										TOTAL_VALUE	/+Type: /+Code: double+/ Examples: /+Code: 5000.00, 70000.00, 2985.00+/+/,
+										DISCOUNT	/+Type: /+Code: float+/ Examples: /+Code: 0.1f, 0f, 0.2f+/+/,
+										ITEM_TYPE	/+Type: /+Code: string+/ Examples: /+Code: "hardware", "software", "other"+/+/,
+										AGED	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1.000000000), Nullable!(double)(9.000000000), Nullable!(double)(33.000000000)+/+/
+									FROM SALES
+								}))
+							) {
+								auto s = iq{
+									$(row.PO_NUMBER.toPlainText) is a Sale
+										...customer  $("CUS_"~row.CUST_NO.toPlainText)
+										...order status  $(row.ORDER_STATUS.toPlainText.quoted)
+										...order date  $(row.ORDER_DATE.toPlainText.quoted)
+										...quantity ordered  $(row.QTY_ORDERED.toPlainText)
+										...total value  $(row.TOTAL_VALUE.toPlainText)
+										...discount  $(row.DISCOUNT.toPlainText)
+										...item type  $(row.ITEM_TYPE.toPlainText.quoted)
+								}.text.outdent; 
+								
+								with(row.SALES_REP) if(!isNull) s~="\n	...sales rep  "~"EMP_"~toPlainText; 
+								with(row.SHIP_DATE) if(!isNull) s~="\n	...ship date  "~toPlainText.quoted; 
+								with(row.DATE_NEEDED) if(!isNull) s~="\n	...date needed  "~toPlainText.quoted; 
+								with(row.PAID) if(!isNull) s~="\n	...paid  "~toPlainText.quoted; 
+								with(row.AGED) if(!isNull) s~="\n	...aged  "~toPlainText; 
+								
+								data(s); 
+							}
+						}
+						version(/+$DIDE_REGION Project+/all)
+						{
+							schema
+							(
+								q{
+									Project is an Entity
+										...name	String
+										...description	ISC_BLOB
+										...team leader	Employee
+										...product	String
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "VBASE", "DGPII", "GUIDE"+/+/,
+										PROJ_NAME	AS "proj_name"	/+Type: /+Code: string+/ Examples: /+Code: "Video Database", "DigiPizza", "AutoMap"+/+/,
+										PROJ_DESC	AS "proj_desc"	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(133:6)), Nullable!(ISC_BLOB)(ISC_BLOB(133:8)), Nullable!(ISC_BLOB)(ISC_BLOB(133:10))+/+/,
+										TEAM_LEADER	AS "team_leader"	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(45)), Nullable!(short)(short(24)), Nullable!(short)(short(20))+/+/,
+										PRODUCT	AS "product"	/+Type: /+Code: string+/ Examples: /+Code: "software", "other", "hardware"+/+/
+									FROM PROJECT AS "Project"
+								}))
+							) {
+								auto s = iq{
+									$(row["proj_id"].toPlainText) is a Project
+										...name $(row["proj_name"].toPlainText.quoted)
+										...product $(row["product"].toPlainText.quoted)
+								}.text.outdent; 
+								
+								with(row["proj_desc"]) if(!isNull) s~="\n	...description  "~toPlainText.quoted; 
+								with(row["team_leader"]) if(!isNull) s~="\n	...team leader  "~("EMP_"~toPlainText); 
+								
+								data(s); 
+							}
+						}
+						version(/+$DIDE_REGION EmployeeProject+/all)
+						{
+							schema
+							(
+								q{
+									EmployeeProject is an Entity
+										...employee	Employee
+										...project	Project
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(144), short(113), short(24)+/+/,
+										PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "DGPII", "VBASE", "GUIDE"+/+/
+									FROM EMPLOYEE_PROJECT AS "Employee_project"
+								}))
+							) {
+								data
+								(
+									iq{
+										$("EMP_"~row["emp_no"].toPlainText~"_"~row["proj_id"].toPlainText) is an EmployeeProject
+											...employee $("EMP_"~row["emp_no"].toPlainText)
+											...project $(row["proj_id"].toPlainText)
+									}.text
+								); 
+							}
+						}
+						version(/+$DIDE_REGION ProjectDepartmentBudget+/all)
+						{
+							schema
+							(
+								q{
+									ProjectDepartmentBudget is an Entity
+										...fiscal year	Int
+										...project	Project
+										...department	Department
+										...quarter head count	ISC_ARRAY
+										...projected budget	Double
+								}
+							); foreach(
+								row; (查((位!()),iq{},iq{
+									SELECT 	FISCAL_YEAR	AS "fiscal_year"	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1994, 1993, 1995+/+/,
+										PROJ_ID	AS "proj_id"	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "GUIDE", "MAPDB", "HWRII"+/+/,
+										DEPT_NO	AS "dept_no"	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "100", "671", "621"+/+/,
+										QUART_HEAD_CNT	AS "quart_head_cnt"	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY)(ISC_ARRAY(135:24)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:26)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:28))+/+/,
+										PROJECTED_BUDGET	AS "projected_budget"	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(200000.00), Nullable!(double)(450000.00), Nullable!(double)(20000.00)+/+/
+									FROM PROJ_DEPT_BUDGET AS "Proj_dept_budget"
+								}))
+							) {
+								auto s = iq{
+									$(row["fiscal_year"].toPlainText~"_"~row["proj_id"].toPlainText~"_"~row["dept_no"].toPlainText) is a ProjectDepartmentBudget
+										...fiscal year  $(row["fiscal_year"].toPlainText)
+										...project  $(row["proj_id"].toPlainText)
+										...department  $("DEP_"~row["dept_no"].toPlainText)
+								}.text.outdent; 
+								with(row["quart_head_cnt"]) if(!isNull) s~="\n	...quarter head count  "~toPlainText.quoted; 
+								with(row["projected_budget"]) if(!isNull) s~="\n	...projected budget  "~toPlainText; 
+								data(s); 
+							}
+						}
+						/+
+							Todo: PHONE_LIST, which is a query
+							/+
+								Code: (查((位!()),iq{},iq{
+									SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: Nullable!(short)+/ Examples: /+Code: Nullable!(short)(short(12)), Nullable!(short)(short(105)), Nullable!(short)(short(85))+/+/,
+										FIRST_NAME	AS "first_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Terri"), Nullable!(string)("Oliver H."), Nullable!(string)("Mary S.")+/+/,
+										LAST_NAME	AS "last_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Lee"), Nullable!(string)("Bender"), Nullable!(string)("MacDonald")+/+/,
+										PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("256"), Nullable!(string)("255"), Nullable!(string)("477")+/+/,
+										LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+										PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+									FROM PHONE_LIST AS "Phone_list"
+								}))
+							+/
+						+/
+					}
+				}
+			}
 			//auto testCase = TestCase(schema: amdbSchema, data:`"Hello World" is a TestEntity`); 
 			
-			(testCase.schema ~"\n\n"~ testCase.data).saveTo(`c:\dl\test.txt.amdb`); 
+			(testCase.schema).saveTo(`c:\dl\test.schema.amdb.txt`); 
+			(testCase.data).saveTo(`c:\dl\test.data.amdb.txt`); 
 			return testCase; 
 		} 
 		
@@ -755,12 +1264,12 @@ static if(TREEVIEW_GUI_APP)
 	
 	struct AMDBNode
 	{
-		enum showETypeInEntity 	= (常!(bool)(1)),
+		enum showETypeInEntity 	= (常!(bool)(0)),
 		showEntitiesInEType	= (常!(bool)(1)), /+Todo: implement this with a custom node!+/
 		showTargetEntityInAssociation 	= (常!(bool)(1)); 
 		
 		AMDB.Explorer assoc; //contains `db` and `idx`
-		bool isReferenced; 
+		bool isRelevant; 
 		
 		auto db()
 		=> assoc.db; auto idx()
@@ -812,35 +1321,8 @@ static if(TREEVIEW_GUI_APP)
 		{
 			if(isRoot)	{ return db.hasAnyTypes; }
 			else if(isAType)	{
-				/+
-					auto base = ((assoc.target.isATypeCompositeKey)?(assoc.target):(assoc)); 
-					return db.exploreATypes.filter!((a)=>(a.source.idx==base.idx)).any ||
-					base.target.isAssociation && !base.target.isATypeCompositeKey; 
-				+/
-				if(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any) return true; 
-				/+
-					if(assoc.target.isAssociation)
-					{
-						if(assoc.target.isATypeCompositeKey)
-						{
-							if(assoc.target.target.isAssociation)
-							return true; 
-						}
-						else
-						{ return true; }
-					}
-				+/
-				if(assoc.isATypeCompositeKey)
-				{
-					if(assoc.target.target.isAssociation)
-					return true; 
-				}
-				else
-				{
-					if(assoc.target.isAssociation)
-					return true; 
-				}
-				return false; 
+				return db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any ||
+				assoc.relevantEType; 
 			}
 			else if(isEType)	{
 				return db.exploreATypes.filter!((a)=>(a.source.idx==this.idx)).any ||
@@ -862,7 +1344,7 @@ static if(TREEVIEW_GUI_APP)
 				|| !db.findAssociationsBySource(idx).empty; 
 			}
 			return false; 
-		} 
+		} 
 		
 		static auto sortedNodes(alias sortBy, R)(R input)
 		=> input	.array/+Opt: This allocates the db too! Uses 4x more memory+/
@@ -883,183 +1365,8 @@ static if(TREEVIEW_GUI_APP)
 				}
 				else if(isAType)
 				{
-					if(assoc.verb.text=="job key")
-					{
-						((0x8BFE3898B722).檢(assoc.isATypeCompositeKey)); 
-						((0x8C393898B722).檢(assoc.target.isATypeCompositeKey)); 
-						((0x8C7B3898B722).檢(assoc.dump)); 
-						/+
-							AI: /+
-								User: Please reformat this so I can see the structure:
-								/+Code: (2038):assoc((1988):assoc((1979):"Employee", (14):"is a subtype of", (66):"Entity"), (2030):"job key", (1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"))+/
-							+/
-							/+
-								Assistant: /+
-									Structured: /+
-										Code: (2038):assoc(
-											(1988):assoc(
-												(1979):"Employee",
-												(14):"is a subtype of",
-												(66):"Entity"
-											),
-											(2030):"job key",
-											(1888):assoc(
-												(1884):"Job",
-												(14):"is a subtype of",
-												(66):"Entity"
-											)
-										)
-									+/
-								+/
-								
-								/+Note: Usage(prompt_hit: 0, prompt_miss: 205, completion: 101, HUF: 0.03, price: 100%)+/
-							+/
-						+/
-					}
-					
-					if(assoc.verb.text=="grade key")
-					{
-						((0x90323898B722).檢(assoc.isATypeCompositeKey)); 
-						((0x906D3898B722).檢(assoc.target.isATypeCompositeKey)); 
-						((0x90AF3898B722).檢(assoc.dump)); 
-						/+
-							AI: /+
-								User: Please reformat this so I can see the structure:
-								/+Code: (2055):assoc((2038):assoc((1988):assoc((1979):"Employee", (14):"is a subtype of", (66):"Entity"), (2030):"job key", (1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity")), (2045):"grade key", (1914):assoc((1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"), (1908):"grade", (1):"Int"))+/
-							+/
-							/+
-								Assistant: /+
-									Structured: /+
-										Code: (2055): assoc(
-											(2038): assoc(
-												(1988): assoc(
-													(1979): "Employee",
-													(14): "is a subtype of",
-													(66): "Entity"
-												),
-												(2030): "job key",
-												(1888): assoc(
-													(1884): "Job",
-													(14): "is a subtype of",
-													(66): "Entity"
-												)
-											),
-											(2045): "grade key",
-											(1914): assoc(
-												(1888): assoc(
-													(1884): "Job",
-													(14): "is a subtype of",
-													(66): "Entity"
-												),
-												(1908): "grade",
-												(1): "Int"
-											)
-										) 
-									+/
-								+/
-								
-								/+Note: Usage(prompt_hit: 128, prompt_miss: 267, completion: 193, HUF: 0.04, price: 100%)+/
-							+/
-						+/
-					}
-					
-					if(assoc.verb.text=="country key")
-					{
-						((0x96453898B722).檢(assoc.isATypeCompositeKey)); 
-						((0x96803898B722).檢(assoc.target.isATypeCompositeKey)); 
-						((0x96C23898B722).檢(assoc.dump)); 
-						/+
-							AI: /+
-								User: Please reformat this so I can see the structure:
-								/+Code: (2074):assoc((2055):assoc((2038):assoc((1988):assoc((1979):"Employee", (14):"is a subtype of", (66):"Entity"), (2030):"job key", (1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity")), (2045):"grade key", (1914):assoc((1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"), (1908):"grade", (1):"Int")), (2062):"country key", (1929):assoc((1914):assoc((1888):assoc((1884):"Job", (14):"is a subtype of", (66):"Entity"), (1908):"grade", (1):"Int"), (1921):"country", (1861):assoc((1853):"Country", (14):"is a subtype of", (66):"Entity")))+/
-							+/
-							/+
-								Assistant: /+
-									Structured: /+
-										Code: (2074):assoc(
-											(2055):assoc(
-												(2038):assoc(
-													(1988):assoc(
-														(1979):"Employee",
-														(14):"is a subtype of",
-														(66):"Entity"
-													),
-													(2030):"job key",
-													(1888):assoc(
-														(1884):"Job",
-														(14):"is a subtype of",
-														(66):"Entity"
-													)
-												),
-												(2045):"grade key",
-												(1914):assoc(
-													(1888):assoc(
-														(1884):"Job",
-														(14):"is a subtype of",
-														(66):"Entity"
-													),
-													(1908):"grade",
-													(1):"Int"
-												)
-											),
-											(2062):"country key",
-											(1929):assoc(
-												(1914):assoc(
-													(1888):assoc(
-														(1884):"Job",
-														(14):"is a subtype of",
-														(66):"Entity"
-													),
-													(1908):"grade",
-													(1):"Int"
-												),
-												(1921):"country",
-												(1861):assoc(
-													(1853):"Country",
-													(14):"is a subtype of",
-													(66):"Entity"
-												)
-											)
-										)
-									+/
-								+/
-								
-								/+Note: Usage(prompt_hit: 128, prompt_miss: 371, completion: 344, HUF: 0.07, price: 100%)+/
-							+/
-						+/
-					}
-					
-					/+
-						auto base = ((assoc.target.isATypeCompositeKey)?(assoc.target):(assoc)); 
-						subNodes = sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==base.idx))); 
-						if(base.target.isAssociation && !base.target.isATypeCompositeKey)
-						subNodes ~= AMDBNode(base.target); 
-					+/
-					
 					subNodes = sortByIdx(db.exploreATypes.filter!((a)=>(a.source.idx==this.idx))); 
-					/+
-						if(assoc.target.isAssociation)
-						{
-							if(assoc.target.isATypeCompositeKey)
-							{
-								if(assoc.target.target.isAssociation)
-								subNodes ~= AMDBNode(assoc.target.target); 
-							}
-							else
-							{ subNodes ~= AMDBNode(assoc.target); }
-						}
-					+/
-					
-					if(assoc.isATypeCompositeKey)
-					{
-						if(assoc.target.target.isAssociation)
-						subNodes ~= AMDBNode(assoc.target.target, isReferenced: true); 
-					}
-					else
-					{
-						if(assoc.target.isAssociation)
-						subNodes ~= AMDBNode(assoc.target, isReferenced: true); 
-					}
+					if(auto a = assoc.relevantEType) subNodes ~= AMDBNode(a, isRelevant: true); 
 				}
 				else if(isEType)
 				{
@@ -1075,7 +1382,7 @@ static if(TREEVIEW_GUI_APP)
 				else if(isEntity)
 				{
 					subNodes = 	sortByIdx(db.findAssociationsBySource(idx).map!((idx)=>(db.explore(idx))))
-						~((showETypeInEntity)?([AMDBNode(assoc.target, isReferenced: true)]):([])); 
+						~((showETypeInEntity)?([AMDBNode(assoc.target, isRelevant: true)]):([])); 
 				}
 				else if(isAttribute)
 				{
@@ -1083,21 +1390,21 @@ static if(TREEVIEW_GUI_APP)
 						~((
 						showTargetEntityInAssociation &&
 						assoc.target.isEntity
-					)?([AMDBNode(assoc.target, isReferenced: true)]):([])); 
+					)?([AMDBNode(assoc.target, isRelevant: true)]):([])); 
 					/+Todo: Do inverse attributes too!+/
 					//Todo: Handle single/multiple cardinality too with custom attribute list nodes
 					//Todo: Research way of storage for ordered, unordered and sorted sequences!
 				}
 			}
 		} 
-		
+		
 		void UI(void delegate() onEntitiesClicked)
 		{
 			with(im)
 			{
 				void Icon(string name, int hue)
 				{ Img(File(i`c:\dl\red_$(name).png?shiftHUE=$(hue)`.text)); Spacer(fh/4); } 
-				if(isReferenced) Text("👉"); 
+				if(isRelevant) Text("👉"); 
 				if(isRoot)	{ Icon(`brick`, -60); Text("Types"); }
 				else if(isAType)	{
 					if(assoc.isATypeCompositeKey)
@@ -1134,8 +1441,6 @@ static if(TREEVIEW_GUI_APP)
 				else	{ Text({ style.fontColor = clGray; }, i" (assoc: $(assoc.idx))"); }
 			}
 		} 
-		
-		
 	} 
 	
 	class AMDBTreeView : VirtualTreeView!AMDBNode
@@ -1187,11 +1492,11 @@ static if(TREEVIEW_GUI_APP)
 			
 			const 	cases 	= mixin((
 				(表([
-					[q{(常!(bool)(1))},q{types}],
-					[q{(常!(bool)(1))},q{cars}],
-					[q{(常!(bool)(1))},q{animals}],
-					[q{(常!(bool)(1))},q{leds}],
-					[q{(常!(bool)(1))},q{factory}],
+					[q{(常!(bool)(0))},q{types}],
+					[q{(常!(bool)(0))},q{cars}],
+					[q{(常!(bool)(0))},q{animals}],
+					[q{(常!(bool)(0))},q{leds}],
+					[q{(常!(bool)(0))},q{factory}],
 					[q{(常!(bool)(1))},q{firebird_test}],
 				]))
 			).調!(GEN_Selection!testCases)),
@@ -1208,7 +1513,7 @@ static if(TREEVIEW_GUI_APP)
 				if((常!(bool)(0))) db.streamBytes.saveTo(File(i`c:\dl\test_data_$(batch).amdb`.text)); 
 			}
 			if((常!(bool)(0))) db.streamDump.print; 
-			if((常!(bool)(1))) db.streamBytes.saveTo(File(`c:\dl\test.raw.amdb`)); 
+			if((常!(bool)(1))) db.streamBytes.saveTo(File(`c:\dl\test.full.amdb.raw`)); 
 			
 			foreach(panelIdx; 0..NumPanels)
 			{
@@ -1218,7 +1523,7 @@ static if(TREEVIEW_GUI_APP)
 		} 
 		override void onUpdate()
 		{
-			showFPS = (互!((bool),(0),(0xB7EF3898B722))); 
+			showFPS = (互!((bool),(0),(0x113733898B722))); 
 			with(im)
 			{
 				foreach(panelIdx; 0..NumPanels)

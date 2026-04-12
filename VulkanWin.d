@@ -3288,7 +3288,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D75193E5266)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D7582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -5377,18 +5377,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x29480193E5266).檢(
+					((0x2948082886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x294F2193E5266))))
+				if((互!((bool),(0),(0x294F282886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x29586193E5266).檢((互!((float/+w=12+/),(1.000),(0x2959D193E5266))).iremap(0, 1, 4, ma))); 
+					((0x2958682886ADB).檢((互!((float/+w=12+/),(1.000),(0x2959D82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5401,8 +5401,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x29772193E5266).檢 (imVG)),
-					((0x29798193E5266).檢 (imFPS)); 
+					((0x2977282886ADB).檢 (imVG)),
+					((0x2979882886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5436,7 +5436,7 @@ $(V_size+G_size)".text
 							t4=QPS; 
 							{
 								const double globalScale2 = 1; 
-								const double fovY_deg = ((0x29B99193E5266).檢((互!((float/+w=6 min=.1 max=120+/),(60.000),(0x29BB0193E5266))))); 
+								const double fovY_deg = 60; 
 								const double fovY_rad = radians(fovY_deg); 
 								
 								const extents = dvec2(viewGUI.clientSize * viewGUI.invScale_anim); 

@@ -357,7 +357,7 @@ version(/+$DIDE_REGION+/all) {
 		}
 		catch(Exception e) {
 			const lineIdx = sourceText.byChar.take(tokenPos).count('\n') + 1; 
-			throw e; 
+			//throw e; 
 			throw new Exception(i"AMDB Error: $(sourceFile)($(lineIdx)): $(e.simpleMsg) $(sentence[])".text); 
 		}
 	} 
@@ -565,15 +565,15 @@ version(/+$DIDE_REGION+/all) {
 		with(SER)
 		{
 			auto 試(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, args); return arr[].hexDump; } 
-			((0x49FAEB4AA1C7).檢 (試("a"w))),((0x4A1DEB4AA1C7).檢 (試("abcá"))),((0x4A43EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
-			((0x4A84EB4AA1C7).檢 (試(false))),((0x4AA8EB4AA1C7).檢 (試(true))),((0x4ACBEB4AA1C7).檢 (試(Null()))),
-			((0x4AF5EB4AA1C7).檢 (試(42))),((0x4B16EB4AA1C7).檢 (試(7848))),((0x4B39EB4AA1C7).檢 (試(437928932))),((0x4B61EB4AA1C7).檢 (試(437928932437928932))),
-			((0x4B97EB4AA1C7).檢 (試(-42))),((0x4BB9EB4AA1C7).檢 (試(-7848))),((0x4BDDEB4AA1C7).檢 (試(-437928932))),((0x4C06EB4AA1C7).檢 (試(-437928932437928932))),
-			((0x4C3DEB4AA1C7).檢 (試(1.5))),((0x4C5FEB4AA1C7).檢 (試(1.51))),((0x4C82EB4AA1C7).檢 (試(1.51f))),
-			((0x4CABEB4AA1C7).檢 (試(now))),((0x4CCDEB4AA1C7).檢 (試(now.date))),
-			((0x4CF9EB4AA1C7).檢 (試(vec2(1, 2)))),((0x4D22EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x4D51EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D81EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
-			((0x4DC3EB4AA1C7).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF6EB4AA1C7).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2CEB4AA1C7).檢 (試(EType!uint(7, 8, 65536)))),
-			((0x4E67EB4AA1C7).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E9AEB4AA1C7).檢 (試(EType!ushort(4, 5, 6)))),((0x4ECEEB4AA1C7).檢 (試(AType!uint(7, 8, 9)))); 
+			((0x49FCEB4AA1C7).檢 (試("a"w))),((0x4A1FEB4AA1C7).檢 (試("abcá"))),((0x4A45EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
+			((0x4A86EB4AA1C7).檢 (試(false))),((0x4AAAEB4AA1C7).檢 (試(true))),((0x4ACDEB4AA1C7).檢 (試(Null()))),
+			((0x4AF7EB4AA1C7).檢 (試(42))),((0x4B18EB4AA1C7).檢 (試(7848))),((0x4B3BEB4AA1C7).檢 (試(437928932))),((0x4B63EB4AA1C7).檢 (試(437928932437928932))),
+			((0x4B99EB4AA1C7).檢 (試(-42))),((0x4BBBEB4AA1C7).檢 (試(-7848))),((0x4BDFEB4AA1C7).檢 (試(-437928932))),((0x4C08EB4AA1C7).檢 (試(-437928932437928932))),
+			((0x4C3FEB4AA1C7).檢 (試(1.5))),((0x4C61EB4AA1C7).檢 (試(1.51))),((0x4C84EB4AA1C7).檢 (試(1.51f))),
+			((0x4CADEB4AA1C7).檢 (試(now))),((0x4CCFEB4AA1C7).檢 (試(now.date))),
+			((0x4CFBEB4AA1C7).檢 (試(vec2(1, 2)))),((0x4D24EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x4D53EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D83EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
+			((0x4DC5EB4AA1C7).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF8EB4AA1C7).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2EEB4AA1C7).檢 (試(EType!uint(7, 8, 65536)))),
+			((0x4E69EB4AA1C7).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E9CEB4AA1C7).檢 (試(EType!ushort(4, 5, 6)))),((0x4ED0EB4AA1C7).檢 (試(AType!uint(7, 8, 9)))); 
 		}
 	} 
 	
@@ -734,7 +734,7 @@ Mary Davis  customer of  Amazon
 			auto am = new AMDBTest; 
 			am.schema(schemaSrc); 
 			am.data(dataSrc); 
-			((0x5E85EB4AA1C7).檢 (am.dump)); 
+			((0x5E87EB4AA1C7).檢 (am.dump)); 
 		}
 	} 
 }
@@ -1408,17 +1408,24 @@ version(/+$DIDE_REGION+/all) {
 					auto source() => Explorer(db, assoc.source); 
 					auto verb() => Explorer(db, assoc.verb); 
 					auto target() => Explorer(db, assoc.target); 
-					
 					auto sourceOrThis() => ((isAssociation)?(source):(this)); 
 					auto verbOrThis() => ((isAssociation)?(verb):(this)); 
 					auto targetOrThis() => ((isAssociation)?(target):(this)); 
 				}
 				
-				ref indices() 
+				ref indices()
 				=> db.indices; 
 				
 				static foreach(fn; FieldAndFunctionNamesWithUDA!(AMDB, AMDB._IS_FUNCTIONS, false))
 				mixin(iq{bool $(fn)() => db.$(fn)(idx); }.text); 
+				
+				Explorer relevantEType()
+				{
+					if(isAType) {
+						auto a = ((isATypeCompositeKey)?(target.target) :(target)); 
+						return ((a.isEType)?(a):(Explorer.init)); 
+					}return Explorer.init; 
+				} 
 				
 				string toString() const
 				{
@@ -1803,50 +1810,6 @@ version(/+$DIDE_REGION+/all) {
 										)
 									+/
 								+/
-								
-								if(!(isAType && (target.isEType || target.isAType)))
-								((0xDEB4EB4AA1C7).檢(dump)); 
-								
-								/+
-									AI: /+
-										User: Reformat this, so I can see the structure better!
-										/+Code: (128):assoc((124):assoc((116):assoc((107):"Employee", (16):"is a subtype of", (1):"Entity"), (120):"job", (40):assoc((36):"Job", (16):"is a subtype of", (1):"Entity")), (44):"grade", (54):assoc((40):assoc((36):"Job", (16):"is a subtype of", (1):"Entity"), (44):"grade", (50):"Int"))+/
-									+/
-									/+
-										Assistant: /+
-											Structured: /+
-												Code: assoc(
-													assoc(
-														assoc(
-															(107):"Employee",
-															(16):"is a subtype of",
-															(1):"Entity"
-														),
-														"job",
-														assoc(
-															(36):"Job",
-															(16):"is a subtype of",
-															(1):"Entity"
-														)
-													),
-													"grade",
-													assoc(
-														assoc(
-															(36):"Job",
-															(16):"is a subtype of",
-															(1):"Entity"
-														),
-														"grade",
-														"Int"
-													)
-												)
-											+/
-										+/
-										
-										/+Note: Usage(prompt_hit: 64, prompt_miss: 254, completion: 178, HUF: 0.04, price: 100%)+/
-									+/
-								+/
-								
 								enforce(isAType && (target.isEType || target.isAType), "Expected a source property that points to an EType."); 
 								parentIdx = target.idx; 
 							}
@@ -1860,85 +1823,7 @@ version(/+$DIDE_REGION+/all) {
 							); 
 							
 							/+The target of this AType is a field ATtype in the source Entity+/
-							const retIdx = doit(parentATypeIdx, isCompositeKey: true); 
-							
-							((0xE6DBEB4AA1C7).檢(explore(retIdx).dump)); 
-							/+
-								Expected result:
-								/+
-									Code: assoc(
-										assoc(
-											assoc(
-												"Employee",
-												"is a subtype of",
-												"Entity"
-											),
-											"job",
-											assoc(
-												"Job",
-												"is a subtype of",
-												"Entity"
-											)
-										), "grade", assoc(
-											assoc(
-												"Job",
-												"is a subtype of",
-												"Entity"
-											),
-											"grade",
-											"Int"
-										)
-									)
-								+/
-								2nd level:
-								/+
-									Code: assoc(
-										assoc(
-											assoc(
-												assoc(
-													"Employee",
-													"is a subtype of",
-													"Entity"
-												),
-												"job",
-												assoc(
-													"Job",
-													"is a subtype of",
-													"Entity"
-												)
-											), 
-											"grade", 
-											assoc(
-												assoc(
-													"Job",
-													"is a subtype of",
-													"Entity"
-												),
-												"grade",
-												"Int"
-											)
-										), "country", assoc(
-											assoc(
-												assoc(
-													"Job",
-													"is a subtype of",
-													"Entity"
-												),
-												"grade",
-												"Int"
-											), 
-											"country", 
-											assoc(
-												"Country",
-												"is a subtype of",
-												"Entity"
-											)
-										)
-									)
-								+/
-							+/
-							
-							return retIdx; 
+							return doit(parentATypeIdx, isCompositeKey: true); 
 						}
 					} 
 					
