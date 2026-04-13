@@ -1376,7 +1376,7 @@ version(/+$DIDE_REGION+/all) {
 	} 
 	
 	version(/+$DIDE_REGION+/all) {
-		string convertTokenStringToSQL(string input)
+		string convertTokenStringToSQL(string input, string[]* amdbScripts)
 		{
 			string output; void put(T)(T s) { output~=s; } 
 			char peek() => input.get(0, '\0'); 
@@ -1400,14 +1400,31 @@ version(/+$DIDE_REGION+/all) {
 			{ while(loop) { if(peek2==`*/`) { break; }transfer; }} 
 			void transferDCmt()
 			{
+				bool isAmdbScript; 
+				if(amdbScripts !is null)
+				{
+					enum kw = "amdb:"; 
+					const i = s.byChar.countUntil('/'); 
+					if(
+						i>0 && s[i+1..$].map!toLower.startsWith(kw) 
+						&& s[0..i].lc.among("structured", "highlighted", "code")
+					)
+					isAmdbScript = true; 
+				}
+				string actAmdbScript; 
+				void transferAmdb(int n=1) { if(isAmdbScript) actAmdbScript ~= input[0..n]; } 
+				
 				int level=1; 
 				while(loop) {
-					if(peek2==`*/`) { skip(2); put(`x/`); continue; }
-					if(peek2==`/*`) { skip(2); put(`/x`); continue; }
-					if(peek2==`/+`) { ++level; transfer(2); continue; }
-					if(peek2==`+/`) { if(!--level) break; transfer(2); continue; }
-					transfer; 
+					if(peek2==`*/`) { transferAmdb(2); skip(2); put(`x/`); continue; }
+					if(peek2==`/*`) { transferAmdb(2); skip(2); put(`/x`); continue; }
+					if(peek2==`/+`) { ++level; transferAmdb(2); transfer(2); continue; }
+					if(peek2==`+/`) { if(!--level) break; transferAmdb(2); transfer(2); continue; }
+					transferAmdb; transfer; 
 				}
+				
+				if(isAmdbScript) amdbScripts ~= actAmdbScript; 
+				//Note: Note: This is not a safe and perfect parser! Avoid mixing string literals with comments in AMDB scripts!
 			} 
 			
 			while(loop)
@@ -1441,7 +1458,13 @@ version(/+$DIDE_REGION+/all) {
 			test(
 				q{`SELECT 'O''Reilly' FROM users`},
 				"'SELECT ''O''''Reilly'' FROM users'"
-			); 
+			); 
+			
+			string sa; 
+			q{/+Structured/amdb: 1+//+Code/amdb: 2+//+Highlighted/amdb: 3+/}
+			.convertTokenStringToSQL(&sa); 
+			enforce(sa.equals(["1", "2", "3"])); 
+			
 			// Test 4: Line comment conversion
 			test(
 				"// This is a line comment\ncode",
@@ -2218,7 +2241,7 @@ version(/+$DIDE_REGION+/all) {
 					}
 					catch(Exception e)
 					{
-						((0xDFA46FCAA195).檢 (global_status_vector[1])); 
+						((0xE30D6FCAA195).檢 (global_status_vector[1])); 
 						if(global_status_vector[1].among(mixin(舉!((ISC_STATUS),q{db_or_file_exists})), mixin(舉!((ISC_STATUS),q{io_error}))))
 						{
 							static if(LOG_enabled) print(i"  \33\16DB already exists, attaching to it...\33\7".text); 
@@ -2245,8 +2268,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xE3376FCAA195).檢((update間(_間)))); 
-					((0xE3696FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xE6A06FCAA195).檢((update間(_間)))); 
+					((0xE6D26FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 
@@ -2855,6 +2878,8 @@ version(/+$DIDE_REGION+/all) {
 		
 		
 		string sqlText /+prepared sql thext after input+/; 
+		string[] amdbScripts; /+Am array of /+Code/amdb:+/ comments found inside sqlText+/
+		
 		size_t inputSignature; 
 		
 		/+
@@ -3119,7 +3144,7 @@ version(/+$DIDE_REGION+/all) {
 				}
 			}
 			
-			sqlText = sqlText.convertTokenStringToSQL; 
+			sqlText = sqlText.convertTokenStringToSQL(&amdbScripts); 
 			
 			fieldsToXsqlda(nullables, types, lens); 
 			prepareDataBuf; 

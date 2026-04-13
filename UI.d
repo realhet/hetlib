@@ -23,7 +23,7 @@ version(/+$DIDE_REGION+/all)
 	{
 		version(VulkanUI) {}else version = OpenGLUI; 
 		
-		//Todo: I have to manualli comment these out because the buildSystem is lame and imports EVERYTHING
+		//Todo: I have to manually comment these out because the buildSystem is lame and imports EVERYTHING
 		public import het.opengl: GLWindow, gl, GL_COLOR_BUFFER_BIT; import het.opengl: oldTextures = textures, DefaultFont_subTexIdxMap; 
 		//public import het.vulkanwin; 
 		
