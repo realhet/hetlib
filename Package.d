@@ -1249,6 +1249,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		alias enforce = stdEnforce/+Todo: should work with interpolated strings!!!+/; 
 		
+		void iesEnforce(Args...)(LOCATION_t loc, Args args)
+		{
+			static if(
+				args.length==7 && Args[3].toString.strip=="=="
+				&& is(Args[1]==InterpolatedExpression!expr1, string expr1)
+				&& is(Args[4]==InterpolatedExpression!expr2, string expr2)
+			)
+			{ enforce(args[2]==args[5], i"$(expr1) ($(args[2])) != ($(args[5])) $(expr2)".text, loc.file, loc.line); }
+			else static assert(0, "unhandled"); 
+		} 
+		
 		///this version compares 2 values and shows the difference too
 		void enforceDiff(T)(in T expected, in T actual, lazy string caption="", string file = __FILE__, int line = __LINE__)
 		{
@@ -3310,15 +3321,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x19FD159F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A17859F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A09959F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A24059F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A14359F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A1B859F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A2EA59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A35F59F156A1})); 
 						+/
 					+/
 				+/
@@ -3373,6 +3384,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		struct LOCATION_t {
 			string location; 
 			string toString() const => location; 
+			string file() const => location.until("(").text; 
+			size_t line() const => location[file.length+1..$].until(',').to!size_t; 
 		} 
 		
 		enum _LOCATION_(string FILE=__FILE__, size_t LINE=__LINE__) = LOCATION_t(FILE~'('~LINE.text~",1)"); 

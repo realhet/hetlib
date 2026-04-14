@@ -515,6 +515,7 @@ PS-016  is a  ProductionSchedule
 	{
 		auto firebird_test()
 		{
+			static if((常!(bool)(0)))
 			with(
 				DBSchemaImporter
 				(
@@ -525,7 +526,7 @@ PS-016  is a  ProductionSchedule
 			{
 				clipboard.text = generateScript; 
 				
-				with(db) (查((位!()),iq{},iq{select * from employee})).formatTable(mixin(舉!((TableStyle),q{norton}))).print; 
+				if(0) with(db) (查((位!()),iq{},iq{select * from employee})).formatTable(mixin(舉!((TableStyle),q{norton}))).print; 
 			}
 			
 			string amdbSchema, amdbData; 
@@ -673,7 +674,20 @@ ISC_ARRAY is a String`~"\n";
 								ON_HOLD	AS "on_hold"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("*")+/+/
 							FROM CUSTOMER AS "Customer"
 						})); 
-						
+						/+
+							Todo: PHONE_LIST, which is a query
+							/+
+								Code: (查((位!()),iq{},iq{
+									SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: Nullable!(short)+/ Examples: /+Code: Nullable!(short)(short(12)), Nullable!(short)(short(105)), Nullable!(short)(short(85))+/+/,
+										FIRST_NAME	AS "first_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Terri"), Nullable!(string)("Oliver H."), Nullable!(string)("Mary S.")+/+/,
+										LAST_NAME	AS "last_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Lee"), Nullable!(string)("Bender"), Nullable!(string)("MacDonald")+/+/,
+										PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("256"), Nullable!(string)("255"), Nullable!(string)("477")+/+/,
+										LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+										PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+									FROM PHONE_LIST AS "Phone_list"
+								}))
+							+/
+						+/
 					}
 				}
 			}
@@ -738,14 +752,14 @@ ISC_ARRAY is a String`~"\n";
 				.outdent
 			); 
 			
-			static if((常!(bool)(1)))
+			static if((常!(bool)(0)))
 			{
 				TestCase testCase; 
 				{
-					auto _間=init間; scope(exit) ((0x7C223898B722).檢((update間(_間)))); 
+					auto _間=init間; scope(exit) ((0x81503898B722).檢((update間(_間)))); 
 					auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
 					auto tr = db.startTransaction; scope(exit) tr.free; 
-					DBSchemaImporter sch; 
+					//DBSchemaImporter sch; 
 					
 					void schema(string s) { s=s.outdent.strip; if(s.length) testCase.schema~="\n"~s~"\n"; } 
 					void data(string s) { s=s.outdent.strip; if(s.length) testCase.data~="\n"~s~"\n"; } 
@@ -909,67 +923,6 @@ ISC_ARRAY is a String`~"\n";
 											...full name $(row.FULL_NAME.toPlainText.quoted)
 									}.text
 								); 
-							}
-						}
-						static if(0)
-						{
-							version(/+$DIDE_REGION Employee: variant 1+/all)
-							{
-								/+
-									Code: with((查((位!()),iq{},iq{SELECT * FROM EMPLOYEE})))
-									{
-										importSchemaAndData
-										(
-											q{
-												$("EMP_"~EMP_NO) is an Employee/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/
-													...first name	$(FIRST_NAME)	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/
-													...last name	$(LAST_NAME)	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/
-													...phone ext	$(((PHONE_EXT.isNull)?(""):(PHONE_EXT.text)))	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/
-													...hired at	$(HIRE_DATE)	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/
-													...department	$("DEP_"~DEPT_NO)	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/
-													...job $(link("Job", JOB_CODE))/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/
-														...grade $(link("grade", JOB_GRADE))/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/
-															...country $(link("country", JOB_COUNTRY))	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/
-													...salary $(SALARY)/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/
-													...full name  $(FULL_NAME)	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
-											}
-										); 
-									}
-								+/
-							}
-							version(/+$DIDE_REGION Employee: variant 2+/all)
-							{
-								(查((位!()),iq{},iq{
-									SELECT 	"EMP_" || EMP_NO	/+Structured: $  is an  Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
-										FIRST_NAME	/+Structured: 	...first name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
-										LAST_NAME	/+Structured: 	...last name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
-										COALESCE(PHONE_EXT, ``)	/+Structured: 	...phone ext  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
-										HIRE_DATE	/+Structured: 	...hire date  $+/	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
-										"DEP_" || DEPT_NO	/+Structured: 	...department  $:Department+/	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
-										JOB_CODE	/+Structured: 	...job  $:Job+/	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
-										JOB_GRADE	/+Structured: 		...grade  $:grade+/	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
-										JOB_COUNTRY	/+Structured: 			...country  $:country+/	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
-										SALARY AS DOUBLE PRECISION	/+Structured: 	...salary  $+/	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
-										FULL_NAME	/+Structured: 	...full name  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
-									FROM EMPLOYEE
-								})); 
-							}
-							version(/+$DIDE_REGION Employee: variant 2b+/all)
-							{
-								(查((位!()),iq{},iq{
-									SELECT 	"EMP_" || EMP_NO	/+Structured/amdb: $  is an  Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
-										FIRST_NAME	/+Structured/amdb: 	...first name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
-										LAST_NAME	/+Structured/amdb: 	...last name  $+/	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
-										COALESCE(PHONE_EXT, ``)	/+Structured/amdb: 	...phone ext  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
-										HIRE_DATE	/+Structured/amdb: 	...hire date  $+/	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
-										"DEP_" || DEPT_NO	/+Structured/amdb: 	...department  $:Department+/	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
-										JOB_CODE	/+Structured/amdb: 	...job  $:Job+/	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
-										JOB_GRADE	/+Structured/amdb: 		...grade  $:grade+/	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
-										JOB_COUNTRY	/+Structured/amdb: 			...country  $:country+/	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
-										SALARY AS DOUBLE PRECISION	/+Structured/amdb: 	...salary  $+/	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
-										FULL_NAME	/+Structured/amdb: 	...full name  $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
-									FROM EMPLOYEE
-								})); 
 							}
 						}
 						version(/+$DIDE_REGION Department links+/all)
@@ -1242,6 +1195,491 @@ ISC_ARRAY is a String`~"\n";
 							+/
 						+/
 					}
+				}
+			}
+			static if((常!(bool)(0)))
+			{
+				TestCase testCase; 
+				{
+					auto _間=init間; scope(exit) ((0xDE423898B722).檢((update間(_間)))); 
+					auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
+					auto tr = db.startTransaction; scope(exit) tr.free; 
+					
+					void schema(string s) { s=s.outdent.strip; if(s.length) testCase.schema~="\n"~s~"\n"; } 
+					void data(string s) { s=s.outdent.strip; if(s.length) testCase.data~="\n"~s~"\n"; } 
+					
+					void 查(Args...)(LOCATION_t loc, Args args)
+					{
+						auto res = tr.查!Args(loc, args); 
+						//Todo: This IES enforce should go into the IDE. It's basically a template mixin.
+						iesEnforce(_LOCATION_!(), iq{$(res.fields.amdbScripts.length)==$(res.fields.length)}); 
+						
+						static struct Info
+						{ string schema, data; bool isEntity; bool valid() => schema!=""; } Info[] infos; 
+						
+						foreach(idx, script; res.fields.amdbScripts)
+						{
+							ref var = res.fields[idx]; 
+							//import het.amdb.
+							//parseAMSentences(script);
+							if(
+								script.strip=="" || 
+								script.stripLeft.startsWith("/+") && 
+								script.stripRight.endsWith("+/")
+							)	{ infos ~= Info(); /+ignored+/}
+							else if(
+								script.isWild("$ *") ||
+								script.isWild("$\t*")
+							)	{
+								auto s = wild[0].strip; 
+								if(s.startsWith("is a") && s[4].among(' ', '\t')) s = s[5..$]; 
+								else if(s.startsWith("is an") && s[5].among(' ', '\t')) s = s[6..$]; 
+								else enforce(0, "invalid"); 
+								/+Todo: ultra-gány!+/
+								const eName = s.strip; 
+								infos ~= Info(
+									i"$(eName)  is an  Entity".text, 
+									i"  is a  $(eName)".text, isEntity: true
+								); 
+							}
+							else if(
+								script.isWild("\t* $:*") ||
+								script.isWild("\t*\t$:*")
+							)	{
+								infos ~= Info(
+									i"\t$(wild[0].stripRight)  $(wild[1].strip)".text,
+									i"\t$(wild[0].stripRight)  ".text
+								); 
+							}
+							else if(
+								script.isWild("\t* $") || 
+								script.isWild("\t*\t$")
+							)	{
+								infos ~= Info(
+									i"\t$(wild[0].stripRight)  $(var.baseDType.capitalize)".text,
+									i"\t$(wild[0].stripRight)  ".text
+								); 
+							}
+							else enforce(0, i"Invalid amdb script format $(script.quoted)".text); 
+						}
+						schema(infos.map!"a.schema".join('\n')); 
+						
+						foreach(row; res)
+						{
+							string[] lines; 
+							foreach(fieldIdx, info; infos)
+							if(info.valid)
+							{
+								ref var = row[fieldIdx]; 
+								if(!var.isNull)
+								{
+									auto s = var.toPlainText.quoted
+										/+Todo: Make a proper data converter+/; 
+									if(info.isEntity)	s = s ~ info.data; 
+									else	s = info.data ~ s; 
+									lines ~= s; 
+								}
+							}
+							data(lines.join('\n')); 
+						}
+					} 
+					
+					schema(
+						q{
+							Short is an Int
+							ISC_BLOB is a String
+							ISC_ARRAY is a String
+						}
+					); 
+					version(/+$DIDE_REGION Country+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	COUNTRY	/+Structured/amdb: $ is a Country+/	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "USA", "England", "Canada"+/+/,
+								CURRENCY	/+Structured/amdb: 	...currency $+/	/+Type: /+Code: string+/ Examples: /+Code: "Dollar", "Pound", "CdnDlr"+/+/
+							FROM COUNTRY
+						})); 
+					}
+					version(/+$DIDE_REGION Job+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	JOB_CODE	/+Structured/amdb: $ is a Job+/	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "CEO", "CFO", "VP"+/+/,
+								JOB_TITLE	/+Structured/amdb: 	...title $+/	/+Type: /+Code: string+/ Examples: /+Code: "Chief Executive Officer", "Chief Financial Officer", "Vice President"+/+/,
+								JOB_GRADE	/+Structured/amdb: 	...grade $+/	/+Type: /+Code: short+/ PrimaryKey(1) Examples: /+Code: short(1), short(2), short(3)+/+/,
+								JOB_COUNTRY	/+Structured/amdb: 		...country $:Country+/	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: "USA", "England", "Japan"+/+/,
+								MIN_SALARY	/+Structured/amdb: 			...min salary $+/	/+Type: /+Code: double+/ Examples: /+Code: 130000.00, 85000.00, 80000.00+/+/,
+								MAX_SALARY	/+Structured/amdb: 			...max salary $+/	/+Type: /+Code: double+/ Examples: /+Code: 250000.00, 140000.00, 130000.00+/+/,
+								JOB_REQUIREMENT	/+Structured/amdb: 			...job requirement $+/	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(129:241)), Nullable!(ISC_BLOB)(ISC_BLOB(129:243)), Nullable!(ISC_BLOB)(ISC_BLOB(129:251))+/+/,
+								LANGUAGE_REQ	/+Structured/amdb: 			...language requirement $+/	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY).init, Nullable!(ISC_ARRAY)(ISC_ARRAY(129:31)), Nullable!(ISC_ARRAY)(ISC_ARRAY(129:33))+/+/
+							FROM JOB
+						})); 
+					}
+					version(/+$DIDE_REGION Department+/all)
+					{
+						schema(q{Employee is an Entity/+fowrard decl+/}); 
+						(查((位!()),iq{},iq{
+							SELECT 	`DEP_` || DEPT_NO	/+Structured/amdb: $ is a Department+/	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "000", "100", "600"+/+/,
+								DEPARTMENT	/+Structured/amdb: 	...name $+/	/+Type: /+Code: string+/ Examples: /+Code: "Corporate Headquarters", "Sales and Marketing", "Engineering"+/+/,
+								BUDGET	/+Structured/amdb: 	...budget $+/	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1000000.00), Nullable!(double)(2000000.00), Nullable!(double)(1100000.00)+/+/,
+								LOCATION	/+Structured/amdb: 	...location $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+								PHONE_NO	/+Structured/amdb: 	...phone no $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+							FROM DEPARTMENT
+						})); 
+					}
+					version(/+$DIDE_REGION Employee+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) Examples: /+Code: short(2), short(4), short(5)+/+/,
+								FIRST_NAME	/+Structured/amdb: 	...first name $+/	/+Type: /+Code: string+/ Examples: /+Code: "Robert", "Bruce", "Kim"+/+/,
+								LAST_NAME	/+Structured/amdb: 	...last name $+/	/+Type: /+Code: string+/ Examples: /+Code: "Nelson", "Young", "Lambert"+/+/,
+								PHONE_EXT	/+Structured/amdb: 	...phone ext $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("250"), Nullable!(string)("233"), Nullable!(string)("22")+/+/,
+								HIRE_DATE	/+Structured/amdb: 	...hired at $+/	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1988, 12, 28, 0, 0, 0), DateTime(1989, 2, 6, 0, 0, 0), DateTime(1989, 4, 5, 0, 0, 0)+/+/,
+								`DEP_` || DEPT_NO	/+Structured/amdb: 	...department $:Department+/	/+Type: /+Code: string+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "600", "621", "130"+/+/,
+								JOB_CODE	/+Structured/amdb: 	...job $:Job+/	/+Type: /+Code: string+/ ForeignKey(0, JOB.JOB_CODE) Examples: /+Code: "VP", "Eng", "Mktg"+/+/,
+								JOB_GRADE	/+Structured/amdb: 		...grade $:grade+/	/+Type: /+Code: short+/ ForeignKey(1, JOB.JOB_GRADE) Examples: /+Code: short(2), short(3), short(4)+/+/,
+								JOB_COUNTRY	/+Structured/amdb: 			...country $:country+/	/+Type: /+Code: string+/ ForeignKey(2, JOB.JOB_COUNTRY) Examples: /+Code: "USA", "England", "Canada"+/+/,
+								SALARY	/+Structured/amdb: 	...salary $+/	/+Type: /+Code: double+/ Examples: /+Code: 105900.00, 97500.00, 102750.00+/+/,
+								FULL_NAME	/+Structured/amdb: 	...full name $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Nelson, Robert"), Nullable!(string)("Young, Bruce"), Nullable!(string)("Lambert, Kim")+/+/
+							FROM EMPLOYEE
+						})); 
+					}
+					version(/+$DIDE_REGION Department links+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	`DEP_` || DEPT_NO	/+Structured/amdb: $ is a Department+/	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "000", "100", "600"+/+/,
+								`DEP_` || HEAD_DEPT	/+Structured/amdb: 	...head department $:Department+/	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: Nullable!(string).init, Nullable!(string)("000"), Nullable!(string)("100")+/+/,
+								`EMP_` || MNGR_NO	/+Structured/amdb: 	...manager $:Employee+/	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(105)), Nullable!(short)(short(85)), Nullable!(short)(short(2))+/+/
+							FROM DEPARTMENT
+						})); 
+					}
+					version(/+$DIDE_REGION SalaryHistory+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(28), short(2), short(4)+/+/,
+								CHANGE_DATE	/+Structured/amdb: 	...salary changed at $+/	/+Type: /+Code: DateTime+/ PrimaryKey(1) Examples: /+Code: DateTime(1992, 12, 15, 0, 0, 0), DateTime(1993, 9, 8, 0, 0, 0), DateTime(1993, 12, 20, 0, 0, 0)+/+/,
+								OLD_SALARY	/+Structured/amdb: 		...old salary $+/	/+Type: /+Code: double+/ Examples: /+Code: 20000.00, 98000.00, 90000.00+/+/,
+								NEW_SALARY	/+Structured/amdb: 		...new salary $+/	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(22000), Nullable!(double)(105899.976), Nullable!(double)(97499.97)+/+/,
+								PERCENT_CHANGE	/+Structured/amdb: 		...percent change $+/	/+Type: /+Code: double+/ Examples: /+Code: 10, 8.061199999999999, 8.333299999999999+/+/,
+								UPDATER_ID	/+Structured/amdb: 		...updater id $+/	/+Type: /+Code: string+/ PrimaryKey(2) Examples: /+Code: "admin2", "elaine", "tj"+/+/
+							FROM SALARY_HISTORY
+						})); 
+					}
+					version(/+$DIDE_REGION Customer+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	`CUS_` || CUST_NO	/+Structured/amdb: $ is a Customer+/	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1001, 1002, 1003+/+/,
+								CUSTOMER	/+Structured/amdb: 	...name $+/	/+Type: /+Code: string+/ Examples: /+Code: "Signature Design", "Dallas Technologies", "Buttle, Griffith and Co."+/+/,
+								CONTACT_FIRST	/+Structured/amdb: 	...contact first name $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Dale J."), Nullable!(string)("Glen"), Nullable!(string)("James")+/+/,
+								CONTACT_LAST	/+Structured/amdb: 	...contact last name $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Little"), Nullable!(string)("Brown"), Nullable!(string)("Buttle")+/+/,
+								PHONE_NO	/+Structured/amdb: 	...phone no $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(619) 530-2710"), Nullable!(string)("(214) 960-2233"), Nullable!(string)("(617) 488-1864")+/+/,
+								ADDRESS_LINE1	/+Structured/amdb: 	...address line 1 $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("15500 Pacific Heights Blvd."), Nullable!(string)("P. O. Box 47000"), Nullable!(string)("2300 Newbury Street")+/+/,
+								ADDRESS_LINE2	/+Structured/amdb: 	...address line 2 $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("Suite 101"), Nullable!(string)("Suite 150")+/+/,
+								CITY	/+Structured/amdb: 	...city $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("San Diego"), Nullable!(string)("Dallas"), Nullable!(string)("Boston")+/+/,
+								STATE_PROVINCE	/+Structured/amdb: 	...state $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("CA"), Nullable!(string)("TX"), Nullable!(string)("MA")+/+/,
+								COUNTRY	/+Structured/amdb: 	...country $:Country+/	/+Type: /+Code: Nullable!(string)+/ ForeignKey(0, COUNTRY.COUNTRY) Examples: /+Code: Nullable!(string)("USA"), Nullable!(string)("England"), Nullable!(string)("Hong Kong")+/+/,
+								POSTAL_CODE	/+Structured/amdb: 	...postal code $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("92121"), Nullable!(string)("75205"), Nullable!(string)("02115")+/+/,
+								ON_HOLD	/+Structured/amdb: 	...on hold $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string).init, Nullable!(string)("*")+/+/
+							FROM CUSTOMER
+						})); 
+					}
+					version(/+$DIDE_REGION Sales+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	PO_NUMBER	/+Structured/amdb: $ is a Sale+/	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "V91E0210", "V92E0340", "V92J1003"+/+/,
+								`CUS_` || CUST_NO	/+Structured/amdb: 	... customer $:Customer+/	/+Type: /+Code: int+/ ForeignKey(0, CUSTOMER.CUST_NO) Examples: /+Code: 1004, 1010, 1012+/+/,
+								`EMP_` || SALES_REP	/+Structured/amdb: 	... sales rep $:Employee+/	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(11)), Nullable!(short)(short(61)), Nullable!(short)(short(118))+/+/,
+								ORDER_STATUS	/+Structured/amdb: 	... order status $+/	/+Type: /+Code: string+/ Examples: /+Code: "shipped", "open", "waiting"+/+/,
+								ORDER_DATE	/+Structured/amdb: 	... order date $+/	/+Type: /+Code: DateTime+/ Examples: /+Code: DateTime(1991, 3, 4, 0, 0, 0), DateTime(1992, 10, 15, 0, 0, 0), DateTime(1992, 7, 26, 0, 0, 0)+/+/,
+								SHIP_DATE	/+Structured/amdb: 	... ship date $+/	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime)(DateTime(1991, 3, 5, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 10, 16, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 8, 4, 0, 0, 0))+/+/,
+								DATE_NEEDED	/+Structured/amdb: 	... date needed $+/	/+Type: /+Code: Nullable!(DateTime)+/ Examples: /+Code: Nullable!(DateTime).init, Nullable!(DateTime)(DateTime(1992, 10, 17, 0, 0, 0)), Nullable!(DateTime)(DateTime(1992, 9, 15, 0, 0, 0))+/+/,
+								PAID	/+Structured/amdb: 	... paid $+/	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("y"), Nullable!(string)("n")+/+/,
+								QTY_ORDERED	/+Structured/amdb: 	... quantity ordered  $+/	/+Type: /+Code: int+/ Examples: /+Code: 10, 7, 15+/+/,
+								TOTAL_VALUE	/+Structured/amdb: 	... total value $+/	/+Type: /+Code: double+/ Examples: /+Code: 5000.00, 70000.00, 2985.00+/+/,
+								DISCOUNT	/+Structured/amdb: 	... discount $+/	/+Type: /+Code: float+/ Examples: /+Code: 0.1f, 0f, 0.2f+/+/,
+								ITEM_TYPE	/+Structured/amdb: 	... item type $+/	/+Type: /+Code: string+/ Examples: /+Code: "hardware", "software", "other"+/+/,
+								AGED	/+Structured/amdb: 	... aged $+/	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(1.000000000), Nullable!(double)(9.000000000), Nullable!(double)(33.000000000)+/+/
+							FROM SALES
+						})); 
+					}
+					version(/+$DIDE_REGION Project+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	PROJ_ID	/+Structured/amdb: $ is a Project+/	/+Type: /+Code: string+/ PrimaryKey(0) Examples: /+Code: "VBASE", "DGPII", "GUIDE"+/+/,
+								PROJ_NAME	/+Structured/amdb: 	...name $+/	/+Type: /+Code: string+/ Examples: /+Code: "Video Database", "DigiPizza", "AutoMap"+/+/,
+								PROJ_DESC	/+Structured/amdb: 	...description $+/	/+Type: /+Code: Nullable!(ISC_BLOB)+/ Examples: /+Code: Nullable!(ISC_BLOB)(ISC_BLOB(133:6)), Nullable!(ISC_BLOB)(ISC_BLOB(133:8)), Nullable!(ISC_BLOB)(ISC_BLOB(133:10))+/+/,
+								`EMP_` || TEAM_LEADER	/+Structured/amdb: 	...team leader $:Employee+/	/+Type: /+Code: Nullable!(short)+/ ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: Nullable!(short)(short(45)), Nullable!(short)(short(24)), Nullable!(short)(short(20))+/+/,
+								PRODUCT	/+Structured/amdb: 	...product $+/	/+Type: /+Code: string+/ Examples: /+Code: "software", "other", "hardware"+/+/
+							FROM PROJECT
+						})); 
+					}
+					version(/+$DIDE_REGION EmployeeProject+/all)
+					{
+						schema
+						(
+							q{
+								Employee is an Entity
+									...involed in  Project
+										...inverse verb  involves
+							}
+						); (查((位!()),iq{},iq{
+							SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/	/+Type: /+Code: short+/ PrimaryKey(0) ForeignKey(0, EMPLOYEE.EMP_NO) Examples: /+Code: short(144), short(113), short(24)+/+/,
+								PROJ_ID	/+Structured/amdb: 	...involved in $:Project+/	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "DGPII", "VBASE", "GUIDE"+/+/
+							FROM EMPLOYEE_PROJECT
+						})); 
+					}
+					version(/+$DIDE_REGION ProjectDepartmentBudget+/all)
+					{
+						(查((位!()),iq{},iq{
+							SELECT 	FISCAL_YEAR || `_` || PROJ_ID || `_` || DEPT_NO	/+Structured/amdb: $ is a ProjectDepartmentBudget+/,
+								FISCAL_YEAR	/+Structured/amdb: 	...fiscal year $+/	/+Type: /+Code: int+/ PrimaryKey(0) Examples: /+Code: 1994, 1993, 1995+/+/,
+								PROJ_ID	/+Structured/amdb: 	...project $:Project+/	/+Type: /+Code: string+/ PrimaryKey(1) ForeignKey(0, PROJECT.PROJ_ID) Examples: /+Code: "GUIDE", "MAPDB", "HWRII"+/+/,
+								`DEP_` || DEPT_NO	/+Structured/amdb: 	...department $:Department+/	/+Type: /+Code: string+/ PrimaryKey(2) ForeignKey(0, DEPARTMENT.DEPT_NO) Examples: /+Code: "100", "671", "621"+/+/,
+								QUART_HEAD_CNT	/+Structured/amdb: 	...quarter head count $+/	/+Type: /+Code: Nullable!(ISC_ARRAY)+/ Examples: /+Code: Nullable!(ISC_ARRAY)(ISC_ARRAY(135:24)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:26)), Nullable!(ISC_ARRAY)(ISC_ARRAY(135:28))+/+/,
+								PROJECTED_BUDGET	/+Structured/amdb: 	...projected budget $+/	/+Type: /+Code: Nullable!(double)+/ Examples: /+Code: Nullable!(double)(200000.00), Nullable!(double)(450000.00), Nullable!(double)(20000.00)+/+/
+							FROM PROJ_DEPT_BUDGET
+						})); 
+					}
+					/+
+						Todo: PHONE_LIST, which is a query
+						/+
+							Code: (查((位!()),iq{},iq{
+								SELECT 	EMP_NO	AS "emp_no"	/+Type: /+Code: Nullable!(short)+/ Examples: /+Code: Nullable!(short)(short(12)), Nullable!(short)(short(105)), Nullable!(short)(short(85))+/+/,
+									FIRST_NAME	AS "first_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Terri"), Nullable!(string)("Oliver H."), Nullable!(string)("Mary S.")+/+/,
+									LAST_NAME	AS "last_name"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Lee"), Nullable!(string)("Bender"), Nullable!(string)("MacDonald")+/+/,
+									PHONE_EXT	AS "phone_ext"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("256"), Nullable!(string)("255"), Nullable!(string)("477")+/+/,
+									LOCATION	AS "location"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("Monterey"), Nullable!(string)("San Francisco"), Nullable!(string)("Burlington, VT")+/+/,
+									PHONE_NO	AS "phone_no"	/+Type: /+Code: Nullable!(string)+/ Examples: /+Code: Nullable!(string)("(408) 555-1234"), Nullable!(string)("(415) 555-1234"), Nullable!(string)("(802) 555-1234")+/+/
+								FROM PHONE_LIST AS "Phone_list"
+							}))
+						+/
+					+/
+				}
+			}
+			
+			static if((常!(bool)(1)))
+			{
+				TestCase testCase; 
+				{
+					auto _間=init間; scope(exit) ((0x129A73898B722).檢((update間(_間)))); 
+					auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
+					auto tr = db.startTransaction; scope(exit) tr.free; 
+					
+					void schema(string s) { s=s.outdent.strip; if(s.length) testCase.schema~="\n"~s~"\n"; } 
+					void data(string s) { s=s.outdent.strip; if(s.length) testCase.data~="\n"~s~"\n"; } 
+					
+					void 查(Args...)(LOCATION_t loc, Args args)
+					{
+						auto res = tr.查!Args(loc, args); 
+						//Todo: This IES enforce should go into the IDE. It's basically a template mixin.
+						iesEnforce(_LOCATION_!(), iq{$(res.fields.amdbScripts.length)==$(res.fields.length)}); 
+						
+						static struct Info
+						{ string schema, data; bool isEntity; bool valid() => schema!=""; } Info[] infos; 
+						
+						foreach(idx, script; res.fields.amdbScripts)
+						{
+							ref var = res.fields[idx]; 
+							//import het.amdb.
+							//parseAMSentences(script);
+							if(
+								script.strip=="" || 
+								script.stripLeft.startsWith("/+") && 
+								script.stripRight.endsWith("+/")
+							)	{ infos ~= Info(); /+ignored+/}
+							else if(
+								script.isWild("$ *") ||
+								script.isWild("$\t*")
+							)	{
+								auto s = wild[0].strip; 
+								if(s.startsWith("is a") && s[4].among(' ', '\t')) s = s[5..$]; 
+								else if(s.startsWith("is an") && s[5].among(' ', '\t')) s = s[6..$]; 
+								else enforce(0, "invalid"); 
+								/+Todo: ultra-gány!+/
+								const eName = s.strip; 
+								infos ~= Info(
+									i"$(eName)  is an  Entity".text, 
+									i"  is a  $(eName)".text, isEntity: true
+								); 
+							}
+							else if(
+								script.isWild("\t* $:*") ||
+								script.isWild("\t*\t$:*")
+							)	{
+								infos ~= Info(
+									i"\t$(wild[0].stripRight)  $(wild[1].strip)".text,
+									i"\t$(wild[0].stripRight)  ".text
+								); 
+							}
+							else if(
+								script.isWild("\t* $") || 
+								script.isWild("\t*\t$")
+							)	{
+								infos ~= Info(
+									i"\t$(wild[0].stripRight)  $(var.baseDType.capitalize)".text,
+									i"\t$(wild[0].stripRight)  ".text
+								); 
+							}
+							else enforce(0, i"Invalid amdb script format $(script.quoted)".text); 
+						}
+						schema(infos.map!"a.schema".join('\n')); 
+						
+						foreach(row; res)
+						{
+							string[] lines; 
+							foreach(fieldIdx, info; infos)
+							if(info.valid)
+							{
+								ref var = row[fieldIdx]; 
+								if(!var.isNull)
+								{
+									auto s = var.toPlainText.quoted
+										/+Todo: Make a proper data converter+/; 
+									if(info.isEntity)	s = s ~ info.data; 
+									else	s = info.data ~ s; 
+									lines ~= s; 
+								}
+							}
+							data(lines.join('\n')); 
+						}
+					} 
+					
+					schema(
+						q{
+							Short is an Int
+							ISC_BLOB is a String
+							ISC_ARRAY is a String
+						}
+					); 
+					(查((位!()),iq{},iq{
+						SELECT 	COUNTRY	/+Structured/amdb: $ is a Country+/,
+							CURRENCY	/+Structured/amdb: 	...currency $+/
+						FROM COUNTRY
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	JOB_CODE	/+Structured/amdb: $ is a Job+/,
+							JOB_TITLE	/+Structured/amdb: 	...title $+/,
+							JOB_GRADE	/+Structured/amdb: 	...grade $+/,
+							JOB_COUNTRY	/+Structured/amdb: 		...country $:Country+/,
+							MIN_SALARY	/+Structured/amdb: 			...min salary $+/,
+							MAX_SALARY	/+Structured/amdb: 			...max salary $+/,
+							JOB_REQUIREMENT	/+Structured/amdb: 			...job requirement $+/,
+							LANGUAGE_REQ	/+Structured/amdb: 			...language requirement $+/
+						FROM JOB
+					})); 
+					schema(q{Employee is an Entity/+fowrard decl+/}); 
+					(查((位!()),iq{},iq{
+						SELECT 	`DEP_` || DEPT_NO	/+Structured/amdb: $ is a Department+/,
+							DEPARTMENT	/+Structured/amdb: 	...name $+/,
+							BUDGET	/+Structured/amdb: 	...budget $+/,
+							LOCATION	/+Structured/amdb: 	...location $+/,
+							PHONE_NO	/+Structured/amdb: 	...phone no $+/
+						FROM DEPARTMENT
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/,
+							FIRST_NAME	/+Structured/amdb: 	...first name $+/,
+							LAST_NAME	/+Structured/amdb: 	...last name $+/,
+							PHONE_EXT	/+Structured/amdb: 	...phone ext $+/,
+							HIRE_DATE	/+Structured/amdb: 	...hired at $+/,
+							`DEP_` || DEPT_NO	/+Structured/amdb: 	...department $:Department+/,
+							JOB_CODE	/+Structured/amdb: 	...job $:Job+/,
+							JOB_GRADE	/+Structured/amdb: 		...grade $:grade+/,
+							JOB_COUNTRY	/+Structured/amdb: 			...country $:country+/,
+							SALARY	/+Structured/amdb: 	...salary $+/,
+							FULL_NAME	/+Structured/amdb: 	...full name $+/
+						FROM EMPLOYEE
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	`DEP_` || DEPT_NO	/+Structured/amdb: $ is a Department+/,
+							`DEP_` || HEAD_DEPT	/+Structured/amdb: 	...head department $:Department+/,
+							`EMP_` || MNGR_NO	/+Structured/amdb: 	...manager $:Employee+/
+						FROM DEPARTMENT
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/,
+							CHANGE_DATE	/+Structured/amdb: 	...salary changed at $+/,
+							OLD_SALARY	/+Structured/amdb: 		...old salary $+/,
+							NEW_SALARY	/+Structured/amdb: 		...new salary $+/,
+							PERCENT_CHANGE	/+Structured/amdb: 		...percent change $+/,
+							UPDATER_ID	/+Structured/amdb: 		...updater id $+/
+						FROM SALARY_HISTORY
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	`CUS_` || CUST_NO	/+Structured/amdb: $ is a Customer+/,
+							CUSTOMER	/+Structured/amdb: 	...name $+/,
+							CONTACT_FIRST	/+Structured/amdb: 	...contact first name $+/,
+							CONTACT_LAST	/+Structured/amdb: 	...contact last name $+/,
+							PHONE_NO	/+Structured/amdb: 	...phone no $+/,
+							ADDRESS_LINE1	/+Structured/amdb: 	...address line 1 $+/,
+							ADDRESS_LINE2	/+Structured/amdb: 	...address line 2 $+/,
+							CITY	/+Structured/amdb: 	...city $+/,
+							STATE_PROVINCE	/+Structured/amdb: 	...state $+/,
+							COUNTRY	/+Structured/amdb: 	...country $:Country+/,
+							POSTAL_CODE	/+Structured/amdb: 	...postal code $+/,
+							ON_HOLD	/+Structured/amdb: 	...on hold $+/
+						FROM CUSTOMER
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	PO_NUMBER	/+Structured/amdb: $ is a Sale+/,
+							`CUS_` || CUST_NO	/+Structured/amdb: 	... customer $:Customer+/,
+							`EMP_` || SALES_REP	/+Structured/amdb: 	... sales rep $:Employee+/,
+							ORDER_STATUS	/+Structured/amdb: 	... order status $+/,
+							ORDER_DATE	/+Structured/amdb: 	... order date $+/,
+							SHIP_DATE	/+Structured/amdb: 	... ship date $+/,
+							DATE_NEEDED	/+Structured/amdb: 	... date needed $+/,
+							PAID	/+Structured/amdb: 	... paid $+/,
+							QTY_ORDERED	/+Structured/amdb: 	... quantity ordered  $+/,
+							TOTAL_VALUE	/+Structured/amdb: 	... total value $+/,
+							DISCOUNT	/+Structured/amdb: 	... discount $+/,
+							ITEM_TYPE	/+Structured/amdb: 	... item type $+/,
+							AGED	/+Structured/amdb: 	... aged $+/
+						FROM SALES
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	PROJ_ID	/+Structured/amdb: $ is a Project+/,
+							PROJ_NAME	/+Structured/amdb: 	...name $+/,
+							PROJ_DESC	/+Structured/amdb: 	...description $+/,
+							`EMP_` || TEAM_LEADER	/+Structured/amdb: 	...team leader $:Employee+/,
+							PRODUCT	/+Structured/amdb: 	...product $+/
+						FROM PROJECT
+					})); 
+					schema(
+						q{
+							Employee is an Entity
+								...involed in  Project
+									...inverse verb  involves
+						}
+					); 
+					(查((位!()),iq{},iq{
+						SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/,
+							PROJ_ID	/+Structured/amdb: 	...involved in $:Project+/
+						FROM EMPLOYEE_PROJECT
+					})); 
+					(查((位!()),iq{},iq{
+						SELECT 	(
+							FISCAL_YEAR || `_` || 
+							PROJ_ID || `_` || DEPT_NO
+						)	/+Structured/amdb: $ is a ProjectDepartmentBudget+/,
+							FISCAL_YEAR	/+Structured/amdb: 	...fiscal year $+/,
+							PROJ_ID	/+Structured/amdb: 	...project $:Project+/,
+							`DEP_` || DEPT_NO	/+Structured/amdb: 	...department $:Department+/,
+							QUART_HEAD_CNT	/+Structured/amdb: 	...quarter head count $+/,
+							PROJECTED_BUDGET	/+Structured/amdb: 	...projected budget $+/
+						FROM PROJ_DEPT_BUDGET
+					})); 
+					/+
+						Todo: PHONE_LIST, which is a query
+						/+
+							Code: (查((位!()),iq{},iq{
+								SELECT 	EMP_NO,
+									FIRST_NAME,
+									LAST_NAME,
+									PHONE_EXT,
+									LOCATION,
+									PHONE_NO
+								FROM PHONE_LIST
+							}))
+						+/
+					+/
 				}
 			}
 			//auto testCase = TestCase(schema: amdbSchema, data:`"Hello World" is a TestEntity`); 
@@ -1523,7 +1961,7 @@ static if(TREEVIEW_GUI_APP)
 		} 
 		override void onUpdate()
 		{
-			showFPS = (互!((bool),(0),(0x113733898B722))); 
+			showFPS = (互!((bool),(0),(0x16F0A3898B722))); 
 			with(im)
 			{
 				foreach(panelIdx; 0..NumPanels)
