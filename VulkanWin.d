@@ -3482,7 +3482,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 					clipBounds = clipBoundsStack[$-1]; 
 					clipBoundsStack = clipBoundsStack[0..$-1]; 
 				} 
-			}
+			}
 			
 			version(/+$DIDE_REGION DrawState+/all)
 			{
@@ -3515,7 +3515,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				{ gfx.LW = inputTransformSize(lineWidth); gfx.PC = color; } 
 				private void setupPoint()
 				{ gfx.LW = inputTransformSize(pointSize); gfx.PC = color; } 
-			}
+			}
 			
 			
 			void point(in vec2 p)
@@ -3665,7 +3665,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 					); 
 				}
 			} 
-			
+			
 			FontSpec!FontFace stickFont; 
 			
 			float textWidth(string text)
@@ -3913,10 +3913,10 @@ class VulkanWindow: Window, IGfxContentDestination
 				im._endFrame; 
 			} 
 			
-			void beforeImDraw()
+			void beforeImDraw(IDrawing)
 			{} 
 			
-			void afterImDraw()
+			void afterImDraw(IDrawing)
 			{} 
 			
 			protected DrawingProxy staticDr, staticDrGUI; 
@@ -3949,34 +3949,40 @@ class VulkanWindow: Window, IGfxContentDestination
 				resetBuilders; 
 				
 				import het.ui: im; //this is a nasty entry point to imgui
+				
+				void bugFix()
+				{
+					staticDrGUI.gfx.begin; 
+					/+
+						Todo: /+H1: BUG!!!! 🐞+/
+						This is a bugfix because the 
+						very last item is sometimes deterministically lost.
+						
+						Fiddling with MaxVertexLimit changes this behavior.
+					+/
+				} 
+				
 				im._drawFrame!"system call only"
 				(
 					staticDr, staticDrGUI,
-					{ beforeImDraw(); }, 
 					{
-						afterImDraw(); 
+						bugFix; 
+						beforeImDraw(staticDrGUI); 
+						bugFix; 
+					}, 
+					{
+						bugFix; 
+						afterImDraw(staticDrGUI); 
+						bugFix; 
 						version(/+$DIDE_REGION Draw optional overlay stuff+/all)
 						{
 							//Todo: implement these later
 							version(/+$DIDE_REGION+/none) { if(showMegaTextures) drawMegaTextures(staticDr); }
 							if(showFPS) drawFPSGraph(staticDrGUI); 
 						}
+						bugFix; 
 					}
 				); 
-				
-				//Todo: afterPaint can come here!
-				
-				
-				staticDrGUI.gfx.begin; 
-				/+
-					Todo: /+H1: BUG!!!! 🐞+/
-					This is a bugfix because the 
-					very last item is sometimes deterministically lost.
-					
-					Fiddling with MaxVertexLimit changes this behavior.
-				+/
-				
-				
 				
 				version(/+$DIDE_REGION RGNFraw main ang GUI surfaces+/all)
 				{
@@ -5377,18 +5383,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2948082886ADB).檢(
+					((0x294F682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x294F282886ADB))))
+				if((互!((bool),(0),(0x2956882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2958682886ADB).檢((互!((float/+w=12+/),(1.000),(0x2959D82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x295FC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2961382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5401,8 +5407,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2977282886ADB).檢 (imVG)),
-					((0x2979882886ADB).檢 (imFPS)); 
+					((0x297E882886ADB).檢 (imVG)),
+					((0x2980E82886ADB).檢 (imFPS)); 
 				}
 			}
 			

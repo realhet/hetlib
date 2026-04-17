@@ -7026,7 +7026,6 @@ struct im
 			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
 			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
 			
-			version(OpenGLUI) { bitmaps(f); /+need to pull this crap+/}
 			version(VulkanUI) {
 				bitmaps[f]; /+
 					Todo: In vulkan there is no delayed refresh of images.
@@ -7034,6 +7033,8 @@ struct im
 					26.02.03 It is temporarily fixed.
 				+/
 			}
+			else { bitmaps(f); }
+			
 			append(new .Img(f)); 
 		} 
 		

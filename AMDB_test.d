@@ -1460,8 +1460,8 @@ ISC_ARRAY is a String`~"\n";
 				TestCase testCase; 
 				{
 					auto _間=init間; scope(exit) ((0x129A73898B722).檢((update間(_間)))); 
-					auto db = new FbDatabase(`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, "SYSDBA", "masterkey"); scope(exit) db.free; 
-					auto tr = db.startTransaction; scope(exit) tr.free; 
+					FbDatabase db; 
+					FbDatabase.Transaction tr; 
 					
 					void schema(string s) { s=s.outdent.strip; if(s.length) testCase.schema~="\n"~s~"\n"; } 
 					void data(string s) { s=s.outdent.strip; if(s.length) testCase.data~="\n"~s~"\n"; } 
@@ -1541,7 +1541,28 @@ ISC_ARRAY is a String`~"\n";
 							data(lines.join('\n')); 
 						}
 					} 
+					
+					/+
+						Todo: PHONE_LIST, which is a query
+						/+
+							Code: (查((位!()),iq{},iq{
+								SELECT 	EMP_NO,
+									FIRST_NAME,
+									LAST_NAME,
+									PHONE_EXT,
+									LOCATION,
+									PHONE_NO
+								FROM PHONE_LIST
+							}))
+						+/
+					+/
 					
+					db = new FbDatabase	(
+						`c:\Program Files\Firebird\Firebird_2_5\examples\empbuild\EMPLOYEE.FDB`, 
+						"SYSDBA", "masterkey"
+					); 
+					tr = db.startTransaction; scope(exit) { tr.free; db.free; }
+					
 					schema(
 						q{
 							Short is an Int
@@ -1587,13 +1608,13 @@ ISC_ARRAY is a String`~"\n";
 							SALARY	/+Structured/amdb: 	...salary $+/,
 							FULL_NAME	/+Structured/amdb: 	...full name $+/
 						FROM EMPLOYEE
-					})); 
+					})); 
 					(查((位!()),iq{},iq{
 						SELECT 	`DEP_` || DEPT_NO	/+Structured/amdb: $ is a Department+/,
 							`DEP_` || HEAD_DEPT	/+Structured/amdb: 	...head department $:Department+/,
 							`EMP_` || MNGR_NO	/+Structured/amdb: 	...manager $:Employee+/
 						FROM DEPARTMENT
-					})); 
+					})); 
 					(查((位!()),iq{},iq{
 						SELECT 	`EMP_` || EMP_NO	/+Structured/amdb: $ is an Employee+/,
 							CHANGE_DATE	/+Structured/amdb: 	...salary changed at $+/,
@@ -1666,20 +1687,7 @@ ISC_ARRAY is a String`~"\n";
 							PROJECTED_BUDGET	/+Structured/amdb: 	...projected budget $+/
 						FROM PROJ_DEPT_BUDGET
 					})); 
-					/+
-						Todo: PHONE_LIST, which is a query
-						/+
-							Code: (查((位!()),iq{},iq{
-								SELECT 	EMP_NO,
-									FIRST_NAME,
-									LAST_NAME,
-									PHONE_EXT,
-									LOCATION,
-									PHONE_NO
-								FROM PHONE_LIST
-							}))
-						+/
-					+/
+					
 				}
 			}
 			//auto testCase = TestCase(schema: amdbSchema, data:`"Hello World" is a TestEntity`); 
@@ -1927,7 +1935,6 @@ static if(TREEVIEW_GUI_APP)
 			
 			static if((常!(bool)(1))) testSER, testSentenceProcessor; 
 			
-			
 			const 	cases 	= mixin((
 				(表([
 					[q{(常!(bool)(0))},q{types}],
@@ -1961,7 +1968,7 @@ static if(TREEVIEW_GUI_APP)
 		} 
 		override void onUpdate()
 		{
-			showFPS = (互!((bool),(0),(0x16F0A3898B722))); 
+			showFPS = ((0x16F573898B722).檢((互!((bool),(0),(0x16F6E3898B722))))); 
 			with(im)
 			{
 				foreach(panelIdx; 0..NumPanels)
