@@ -10079,7 +10079,7 @@ version(/+$DIDE_REGION Colors+/all)
 			}
 			else {
 				static if(is(A.ComponentType == float)) return hsv2rgb(val.xyz); 
-				else return val.rgbToFloat.hsvToRgb.floatToRgb; 
+				else return val.from_unorm.hsvToRgb.to_unorm; 
 			}
 		} 
 		auto rgbToHsv(A)(in A val) if(isColor!A)
@@ -10089,7 +10089,7 @@ version(/+$DIDE_REGION Colors+/all)
 			}
 			else {
 				static if(is(A.ComponentType == float)) return rgb2hsv(val.xyz); 
-				else return val.rgbToFloat.hsvToRgb.floatToRgb; 
+				else return val.from_unorm.hsvToRgb.to_unorm; 
 			}
 		} 
 		

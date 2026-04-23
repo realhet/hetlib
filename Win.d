@@ -1426,6 +1426,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		void bezier2(in vec2 A, in vec2 B, in vec2 C); //DIDE/message arrows
 		void fillTriangle(in vec2 a, in vec2 b, in vec2 c); //not important
 		
+		void* getGfxBuilder(); 
 		
 	} 
 	struct RectAlign

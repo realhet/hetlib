@@ -2818,7 +2818,7 @@ version(/+$DIDE_REGION+/all) {
 			
 			protected void svgSetup() { synch_transform, synch_colors, synch_LW; } 
 			
-			protected void svgBegin()
+			/+protected+/ void svgBegin()
 			{
 				with(svgState)
 				{
@@ -2842,7 +2842,7 @@ version(/+$DIDE_REGION+/all) {
 			
 			protected enum svgNOP = assemble(mixin(舉!((Opcode),q{drawPathM})), mixin(舉!((XYFormat),q{relX})), mixin(舉!((CoordFormat),q{i8})), byte(0)); 
 			
-			protected void svgEnd()
+			/+protected+/ void svgEnd()
 			{
 				with(svgState)
 				{
@@ -3288,7 +3288,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D7582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D7D82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3397,6 +3397,8 @@ Use SvgParser to prepare absolute SVG command stream!"
 		final
 		{
 			GfxBuilder gfx; 
+			void* getGfxBuilder() => (cast(void*)(gfx)); 
+			
 			deprecated: 
 			void reset()
 			{
@@ -3913,10 +3915,10 @@ class VulkanWindow: Window, IGfxContentDestination
 				im._endFrame; 
 			} 
 			
-			void beforeImDraw(IDrawing)
+			void beforeImDraw(IDrawing drWorld, IDrawing drGui)
 			{} 
 			
-			void afterImDraw(IDrawing)
+			void afterImDraw(IDrawing drWorld, IDrawing drGui)
 			{} 
 			
 			protected DrawingProxy staticDr, staticDrGUI; 
@@ -3967,12 +3969,12 @@ class VulkanWindow: Window, IGfxContentDestination
 					staticDr, staticDrGUI,
 					{
 						bugFix; 
-						beforeImDraw(staticDrGUI); 
+						beforeImDraw(staticDr, staticDrGUI); 
 						bugFix; 
 					}, 
 					{
 						bugFix; 
-						afterImDraw(staticDrGUI); 
+						afterImDraw(staticDr, staticDrGUI); 
 						bugFix; 
 						version(/+$DIDE_REGION Draw optional overlay stuff+/all)
 						{
@@ -5383,18 +5385,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x294F682886ADB).檢(
+					((0x2957982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2956882886ADB))))
+				if((互!((bool),(0),(0x295EB82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x295FC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2961382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2967F82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2969682886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5407,8 +5409,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x297E882886ADB).檢 (imVG)),
-					((0x2980E82886ADB).檢 (imFPS)); 
+					((0x2986B82886ADB).檢 (imVG)),
+					((0x2989182886ADB).檢 (imFPS)); 
 				}
 			}
 			
