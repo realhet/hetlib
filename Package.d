@@ -12035,10 +12035,10 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				{
 					if(isNull) return this; 
 					auto st = localSystemTime; 
-					st.wHour	= 0; 
-					st.wMinute	= 0; 
-					st.wSecond	= 0; 
-					st.wMilliseconds	= 0; 
+					st.wHour 	= 0, 
+					st.wMinute 	= 0, 
+					st.wSecond 	= 0,
+					st.wMilliseconds 	= 0; 
 					return DateTime(st); 
 				} 
 				
@@ -12061,7 +12061,6 @@ version(/+$DIDE_REGION Date Time handling+/all)
 							.uniq
 							.equal([24, 23, 24, 25, 24]), "localDayStart/End is bad."); 
 					+/
-								
 				} 
 				
 				Time utcTime  () const

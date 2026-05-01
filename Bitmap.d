@@ -7757,6 +7757,26 @@ version(/+$DIDE_REGION+/all)
 			//extern(Windows): 
 			void GetFactory(out ID2D1Factory factory) const; 
 		} 
+			
+			/+
+			Todo: Do DirectWrite Font Fallback Analysis
+			
+			This tells you which actual font file provides each character:
+			/+
+				Code: //Pseudo-code for Windows DirectWrite analysis
+				IDWriteFactory* factory; 
+				IDWriteTextFormat* textFormat; 
+				IDWriteFontFallback* fallback; 
+				
+				//Request fallback analysis
+				IDWriteFontFallback: : MapCharacters(
+					L"Segoe UI",	//Requested font
+					L"中",	//Character
+					&matchingFont,	//OUTPUT: Actual font used (e.g., Microsoft YaHei)
+					&scale	//OUTPUT: Font scaling factor
+				); 
+			+/
+		+/
 		
 			mixin(uuid!(ID2D1RenderTarget, "2cd90694-12e2-11dc-9fed-001143a055f9")); 
 			interface ID2D1RenderTarget : ID2D1Resource

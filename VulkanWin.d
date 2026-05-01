@@ -31,21 +31,21 @@ version(/+$DIDE_REGION+/all)
 	
 	/+
 		Code: (表([
-			[q{/+Note: Limits/Cards+/},q{/+Note: MAX+/},q{/+Note: R9 Fury X+/},q{/+Note: R9 280+/},q{/+Note: GTX 1060+/},q{/+Note: RX 580+/},q{/+Note: RTX 5090+/},q{/+Note: RX 9070+/}],
-			[q{maxPushConstantsSize},q{128},q{256},q{128},q{256},q{256},q{256},q{256}],
-			[q{maxVertexInputAttributes},q{32},q{32},q{64},q{32},q{32},q{32},q{64}],
-			[q{maxGeometryInputComponents},q{64},q{64},q{128},q{128},q{64},q{128},q{128}],
-			[q{maxGeometryOutputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
-			[q{maxGeometryOutputVertices},q{256},q{1024},q{1024},q{1024},q{256},q{1024},q{256}],
+			[q{/+Note: Limits/Cards+/},q{/+Note: MAX+/},q{/+Note: R9 Fury X+/},q{/+Note: R9 280+/},q{/+Note: Quadro K420+/},q{/+Note: GTX 1050 Ti+/},q{/+Note: GTX 1060+/},q{/+Note: RX 580+/},q{/+Note: RTX 5090+/},q{/+Note: RX 9070+/}],
+			[q{maxPushConstantsSize},q{128},q{256},q{128},q{256},q{256},q{256},q{256},q{256},q{256}],
+			[q{maxVertexInputAttributes},q{32},q{32},q{64},q{32},q{32},q{32},q{32},q{32},q{64}],
+			[q{maxGeometryInputComponents},q{64},q{64},q{128},q{128},q{128},q{128},q{64},q{128},q{128}],
+			[q{maxGeometryOutputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
+			[q{maxGeometryOutputVertices},q{256},q{1024},q{1024},q{1024},q{1024},q{1024},q{256},q{1024},q{256}],
 			[q{maxGeometryTotalOutputComponents},q{1024},q{
 				16384
 				/*bug?!!*/
 			},q{
 				16384
 				/*bug?!!*/
-			},q{1024},q{1024},q{1024},q{1024}],
-			[q{maxGeometryShaderInvocations},q{32},q{127},q{127},q{32},q{32},q{32},q{32}],
-			[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
+			},q{1024},q{1024},q{1024},q{1024},q{1024},q{1024}],
+			[q{maxGeometryShaderInvocations},q{32},q{127},q{127},q{32},q{32},q{32},q{32},q{32},q{32}],
+			[q{maxFragmentInputComponents},q{128},q{128},q{128},q{128},q{128},q{128},q{128},q{128},q{128}],
 		]))
 	+/
 	
@@ -3288,7 +3288,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19D7D82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19E1F82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -5385,18 +5385,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2957982886ADB).檢(
+					((0x2961B82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x295EB82886ADB))))
+				if((互!((bool),(0),(0x2968D82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2967F82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2969682886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2972182886ADB).檢((互!((float/+w=12+/),(1.000),(0x2973882886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5409,8 +5409,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2986B82886ADB).檢 (imVG)),
-					((0x2989182886ADB).檢 (imFPS)); 
+					((0x2990D82886ADB).檢 (imVG)),
+					((0x2993382886ADB).檢 (imFPS)); 
 				}
 			}
 			

@@ -12,6 +12,42 @@
 
 import het.ui; 
 
+static immutable testChars = "😵‍💫 躺平 摆烂 老鼠人 😤😡"; 
+
+void downloadSvgExamples()
+{
+	static immutable svgDemoItems = 
+	[
+		"ABlogix", "Adder", "Alogix", "AmpTable", "Antennas", "Arresters", 
+		"Audio", "AudioAmp", "AudioAmpDPV", "Bip", "Btree", "Buttons",
+		"Byte", "ByteDPV", "CanLogic", "Capacitors", "cbresistor", "Chips",
+		"ColdControl1", "Conn", "Contact", "Contacts", "control", "controlDPV",
+		"Crow", "csc", "Csource", "CsourceDPV", "Decoder", "Demultiplexer",
+		"diamond", "Dini", "Diodes", "Drive", "EEP", "EEPDPV", "Emarrows",
+		"Escher", "EVplugs", "ex01", "ex01DPV", "ex03", "ex04", "ex05",
+		"ex08", "ex09", "ex10", "ex11", "ex12", "ex15", "ex16", "ex18",
+		"ex21", "exp", "fet", "Flow", "FlowDPV", "FontsDPV",
+		"Fuses", "Geometry", "GrayCode", "graysurf", "Grounds", "Headers",
+		"Heathkit", "HeathkitDPV", "I2L", "Incleps", "Inductors", "Jack",
+		"keyboard", "Ladder", "lcct", "Logic", "Loglog", "LT3724", "MC",
+		"Mixer", "MoreTable", "MotorControl", "Multiplexer", "NLG", "NPDT",
+		"Nport", "NportDPV", "OneLine", "Opamp", "Optoiso", "paletteDPV",
+		"Pconn", "Plate", "PS50", "PushPull", "pwrsupply", "Quantum",
+		"quick", "quickDPV", "random", "recycle", "Reg723", "Relay",
+		"relaycoil", "Resistors", "rose", "RotarySwitch", "Rotbox", "Schottky",
+		"Sevensegment", "SevensegmentDPV", "sfg", "Shadowed", "shapes",
+		"ShiftR", "Sierpinski", "Sixpole", "Smithchart", "Sockets", "SocketsDPV",
+		"Sources", "Switches", "Tgate", "Three", "Thyristor", "Tstrip", 
+		"TTLnand", "Tubediags", "ujt", "UNO", "Variable", "Windings", 
+		"worm", "Xform", "XOR"
+	]; 
+	foreach(s; svgDemoItems)
+	{
+		const url = "https://ece.uwaterloo.ca/~aplevich/Circuit_macros/html/"~s~".svg"; 
+		auto res = executeProcess(["curl", url, "-o", s~".svg"]); 
+		print(res.status, url); 
+	}
+} 
 vec2[4][] makeBezierSegments(vec2[] points)
 {
 	auto result = appender!(vec2[4][]); 

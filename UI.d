@@ -2828,10 +2828,10 @@ version(/+$DIDE_REGION+/all)
 		
 		void hideLeftSpace()
 		{
-			if(cells.length && isWhite(cells[0]))
+			if(cells.length && isWhite(cells.front))
 			{
-				auto w = cells[0].outerWidth; 
-				cells[0].outerWidth = 0; 
+				auto w = cells.front.outerWidth; 
+				cells.front.outerWidth = 0; 
 				foreach(c; cells[1..$])
 				c.outerPos.x -= w; //shift back the remaining ones
 			}
@@ -2840,7 +2840,7 @@ version(/+$DIDE_REGION+/all)
 		void hideRightSpace()
 		{
 			if(cells.length && isWhite(cells.back))
-			cells[0].outerWidth = 0; 
+			cells.back.outerWidth = 0; 
 		} 
 		
 		void hideBothSpaces()
@@ -5360,6 +5360,7 @@ version(/+$DIDE_REGION+/all)
 	//Todo: Unqual is not needed to check a type. Try to push this idea through a whole testApp.
 	//Todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
 	//Todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
+	//Todo: Hint should move in realtime with the mouse, not just popup and stay.
 	//! FieldProps stdUI /////////////////////////////
 	
 	

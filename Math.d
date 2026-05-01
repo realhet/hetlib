@@ -26,7 +26,7 @@ version(/+$DIDE_REGION+/all)
 	public import std.math : E, PI;  enum Ef = float(E), PIf = float(PI); 
 	enum π = PIf, ℯ = Ef; 
 	
-	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly, isClose; 
+	public import std.math: NaN, getNaNPayload, hypot, evalPoly = poly, isClose, stdQuantize = quantize; 
 	
 	static import std.complex; 
 	public import std.complex : Complex, norm, arg, fromPolar, expi; 
@@ -3713,7 +3713,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			return generateVector!(
 				CommonScalarType!(T, U),
-								(a, b) => isMin ? std.algorithm.min(a, b) : std.algorithm.max(a, b)
+				(a, b) => isMin ? std.algorithm.min(a, b) : std.algorithm.max(a, b)
 			)(a, b); 
 		} 
 		
