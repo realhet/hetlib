@@ -11605,7 +11605,6 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		
 		auto RawDateTime(ulong t) { DateTime a; a.raw = t; return a; } 
 		
-		
 		version(/+$DIDE_REGION ISC/Firebird+/all)
 		{
 			alias ISC_DATE 	= Typedef!(uint, 0, "ISC_DATE"), 
@@ -12007,6 +12006,29 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				{ return _get!(true , SYSTEMTIME	)(); } 	void localSystemTime	(in SYSTEMTIME	a)
 				{ _set!true(a); } 
 				
+				auto localSystemTime_fullRange() const
+				{
+					/+
+						This handles negative GMT offsets properly at the very start.
+						So the whole ulong range is valid.
+					+/
+					if(raw<DateTime.RawUnit.day)
+					{
+						DateTime dt = this; 
+						dt.raw += 365*DateTime.RawUnit.day; 
+						auto st = dt.localSystemTime; 
+						st.wYear -= 1; 
+						/+
+							Adjust day of week: 365 days = 52 weeks + 1 day
+							So adding 365 days shifts the day of week forward by 1
+							We need to shift it back by 1 to compensate
+						+/
+						st.wDayOfWeek = (st.wDayOfWeek + 6) % 7; 
+						return st; 
+					}
+					else { return localSystemTime; }
+				} 
+				
 				double unixTime() const
 				{ return raw ? rawToSeconds(raw-UnixShift_unit) : double.nan; } 
 				void unixTime(in double a)
@@ -12079,25 +12101,25 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			
 			///calculate the difference between DateTimes
 			Time opBinary(string op : "-")(in DateTime b) const
-			{ return long(raw-b.raw)*(1.0/RawUnit.sec)*het.quantities.second; } 
+			=> ((((raw>=b.raw)?((double(raw-b.raw))):(-(double(b.raw-raw)))))/(RawUnit.sec)) * het.quantities.second; 
 			
 			///adjust DateTime by si.Time
 			DateTime opBinary(string op)(in Time b) const if(op.among("+", "-"))
 			{
-				DateTime res = this; 
-				mixin("res.raw", op, "=(b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
-				return res; 
+				auto diff = b.value(het.quantities.second)*RawUnit.sec; 
+				if(diff==0) return this; 
+				const	positive = 	(diff>=0) == (op=="+"),
+					absDiff = 	abs(diff).to!ulong; 
+				if(positive)	{ auto x = raw + absDiff; enforce(x>=raw, "DateTime overflow"); return RawDateTime(x); }
+				else	{ auto x = raw - absDiff; enforce(x<=raw, "DateTime underflow"); return RawDateTime(x); }
 			} 
-			
-			DateTime add_raw(in ulong delta) const
-			{ return RawDateTime(raw + delta); } 
 			
 			///adjust this DateTime by si.Time
 			DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))
-			{
-				mixin("raw", op,"= (b.value(het.quantities.second)*RawUnit.sec).to!long;"); 
-				return this; 
-			} 
+			{ this = this + b; return this; } 
+			
+			DateTime add_raw(in ulong delta) const
+			{ return RawDateTime(raw + delta); } 
 			
 			private long timeZoneOffset_raw() const
 			{
