@@ -11416,7 +11416,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		bool isLeapYear(int year)
 		{ return year%4==0 && (year%100!=0 || year%400==0); } 
 		
-		 //Todo: delete old crap from datetime
+		//Todo: delete old crap from datetime
 		
 		version(/+$DIDE_REGION Old routines+/all)
 		{
