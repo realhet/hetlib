@@ -1207,16 +1207,28 @@ version(/+$DIDE_REGION+/all) {
 			auto time_(int ofs=0) => iscTimeToStr(*(cast(ISC_TIME*)(sqldata+ofs)), 2, 6); 
 			auto quad(string prefix)
 			{ with(*(cast(ISC_QUAD*)(sqldata))) return i"$(prefix)($(high):$(low))".text; } 
+			
+			string dup2(string s) {
+				//return s.dup.safeUTF8; 
+				
+				import std.encoding; 
+				string res; (cast(Windows1250String)(s)).transcode(res); 
+				return res; 
+			} 
 			with(SQL_TYPE)
 			final switch(type)
 			{
-				case VARYING: 	return (cast(immutable(char)*)(sqldata+2))
-				[
-					0 .. (*(cast(short*)(sqldata)))
-						.min(sqllen).clamp(0, 0x7fff)
-				].dup; 
-				case TEXT: 	return (cast(immutable(char)*)(sqldata))
-					.toStr(sqllen.clamp(0, 0x7fff)).dup
+				case VARYING: 	return dup2(
+					(cast(immutable(char)*)(sqldata+2))
+							[
+						0 .. (*(cast(short*)(sqldata)))
+							.min(sqllen).clamp(0, 0x7fff)
+					]
+				); 
+				case TEXT: 	return dup2(
+					(cast(immutable(char)*)(sqldata))
+						.toStr(sqllen.clamp(0, 0x7fff))
+				)
 					.stripRight; 
 				case SHORT: 	return formatScaled(*(cast(short*)(sqldata)), sqlscale); 
 				case LONG: 	return formatScaled(*(cast(int*)(sqldata)), sqlscale); 
@@ -2249,7 +2261,6 @@ version(/+$DIDE_REGION+/all) {
 					}
 					catch(Exception e)
 					{
-						((0xE46D6FCAA195).檢 (global_status_vector[1])); 
 						if(global_status_vector[1].among(mixin(舉!((ISC_STATUS),q{db_or_file_exists})), mixin(舉!((ISC_STATUS),q{io_error}))))
 						{
 							static if(LOG_enabled) print(i"  \33\16DB already exists, attaching to it...\33\7".text); 
@@ -2276,8 +2287,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xE8006FCAA195).檢((update間(_間)))); 
-					((0xE8326FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xE8A46FCAA195).檢((update間(_間)))); 
+					((0xE8D66FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 

@@ -132,7 +132,56 @@ template YearMonthDayIterator()
 	{ mixin(decodeYMD); return cachedLocalDateTime(y, m, d); } 
 	
 	string str(uint ymd, uint dayStep)
-	{ mixin(decodeYMD); return format!"%d.%02d.%02d"(y, m, d); } 
+	{
+		mixin(decodeYMD); return /+format!"%d.%02d.%02d"(y, m, d)+/
+		format!"%d %s %d"(y, MonthNames[m-1], d); 
+	} 
+} 
+
+template HourIterator()
+{
+	/+
+		Todo: Itt tartok!!!!!!!!!!!!!!!!!!!
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+	+/
+	
+	
+	DateTime init(DateTime dt, uint hourStep)
+	{
+		
+		
+		const h = dt.localSystemTime_fullRange.wHour; 
+		return quantize(h, hourStep); 
+	} 
+	
+	void inc(ref uint h, uint hourStep)
+	{ h += hourStep; } 
+	
+	DateTime dt(uint y)
+	=> cachedLocalDateTime(y); 
+	
+	string str(uint y, uint yearStep)
+	=> y.text; 
 } 
 
 void testYMD()
@@ -178,9 +227,9 @@ mixin((
 		[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/}],
 		[q{year},q{[1, 2, 5, 10, 20, 50, 100, 500, 1000]},q{gregorianDaysInYear*day},q{5}],
 		[q{month},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{8}],
-		[q{day},q{[1, 2, 3, 5, 10, 15]},q{day},q{3}],
-		[q{hour},q{[1, 2, 3, 6, 12]},q{hour},q{3}],
-		[q{minute},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{6}],
+		[q{day},q{[1, 2, 3, 5, 10, 15]},q{day},q{11}],
+		[q{hour},q{[1, 2, 3, 6, 12]},q{hour},q{11+3}],
+		[q{minute},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{11+6}],
 		[q{second},q{[1, 2, 5, 10, 15, 20, 30]},q{second},q{3}],
 		[q{millisecond},q{[1, 2, 5, 10, 20, 50, 100, 500]},q{milli(second)},q{4}],
 		[q{microsecond},q{[1, 2, 5, 10, 20, 50, 100, 500]},q{micro(second)},q{4}],
@@ -207,7 +256,10 @@ struct DateTimeGranularities
 			
 		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
 		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
-		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
+		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond,
+		
+		
+		test = [_.year, _.month, _.day, _.hour]; 
 } 
 
 
@@ -218,31 +270,44 @@ struct DateTimeIteratedRange
 	string label; 
 	uint internalIndex; 
 	DateTimeGranularity granularity; 
-	ushort step; 
+	ushort step; bool isFirst; 
 } 
 
-auto iterateLocalDateTimeRange(
+auto iterateLocalDateTimeRanges(
 	DateTime start, DateTime end, 
-	float p0, float p1, float avgCharWidth,
-	in DateTimeGranularity[] granularities
+	float left, float right, float avgCharWidth,
+	in DateTimeGranularity[] granularities,
+	void delegate(ref DateTimeIteratedRange) callback, 
+	bool noLabel=false
 )
 {
-	if(!(start<end) || !(p0<p1)) return; 
+	if(start>=end) return; 
+	if(left>=right) return; 
+	
 	DateTimeIteratedRange state; 
 	
+	
 	const Time 	fullSpan 	= end - start,
-		charTime 	= ((fullSpan * avgCharWidth)/(p1 - p0)); 
+		charTime 	= ((fullSpan * avgCharWidth)/(right - left)); 
+	
+	const trScale = ((right - left)/((float(end.raw - start.raw)))); 
+	float tr(DateTime dt)
+	=> ((dt.raw>=start.raw)?( (float(dt.raw - start.raw)) * trScale) :(-(float(start.raw - dt.raw)) * trScale)) + left; 
+	
+	float avgSize=0; 
 	findGranularity: 
 	foreach(gr; granularities.retro)
 	{
-		const 	avgTime = dateTimeGranularityAvgTime[gr],
-			numChars = dateTimeGranularityNumChars[gr]; 
+		const avgTime = dateTimeGranularityAvgTime[gr]; 
+		const numChars = dateTimeGranularityNumChars[gr]; 
 		const float target = numChars * ((charTime)/(avgTime)); 
 		foreach(step; dateTimeGranularitySteps[gr])
 		{
 			if(target < step) {
 				state.granularity 	= gr, 
 				state.step 	= step.to!ushort; 
+				avgSize = step * avgTime.value(second) * 
+					DateTime.RawUnit.sec * trScale; 
 				break findGranularity; 
 			}
 		}
@@ -252,19 +317,57 @@ auto iterateLocalDateTimeRange(
 	{
 		void iterate(alias ITER)()
 		{
-			auto idx = ITER.init(start, state.step); state.t0 = ITER.dt(idx); 
-			string[] s; 
-			while(state.t0<end)
+			with(ITER)
+			with(state)
 			{
-				state.label = ITER.str(idx, state.step); 
-				ITER.inc(idx, state.step); state.t1 = ITER.dt(idx); 
+				version(/+$DIDE_REGION Fetch first boundary+/all)
+				{
+					auto idx = init(start, step); 
+					t0 = dt(idx); p0 = tr(t0); 
+				}
 				
-				s ~= state.label; 
-				
-				state.t0 = state.t1; 
+				if(t0<end)
+				{
+					
+					
+					label = str(idx, step); 
+					
+					version(/+$DIDE_REGION Fetch second boundary+/all)
+					{
+						inc(idx, step); 
+						t1 = dt(idx); p1 = tr(t1); 
+					}
+					
+					if(t0.raw==0)
+					{ p0.minimize(p1-avgSize); }
+					
+					isFirst = true; callback(state); 
+					isFirst = false; 
+					
+					version(/+$DIDE_REGION Shift+/all)
+					{ t0 = t1, p0 = p1; }
+					while(t0<end)
+					{
+						label = str(idx, step); 
+						
+						version(/+$DIDE_REGION Fetch next+/all)
+						{
+							inc(idx, step); 
+							t1 = dt(idx); p1 = tr(t1); 
+						}
+						
+						if(t1.raw==ulong.max)
+						p1.maximize(p0+avgSize); 
+						
+						callback(state); 
+						
+						
+						
+						version(/+$DIDE_REGION Shift+/all)
+						{ t0 = t1, p0 = p1; }
+					}
+				}
 			}
-			
-			print(s); 
 		} 
 		switch(state.granularity)
 		{
@@ -277,26 +380,6 @@ auto iterateLocalDateTimeRange(
 	}
 	
 } 
-
-
-/*
-	auto evaluateLocalDateTimeRanges(in DateTime dt_start, in DateTime dt_end, in DateTimeGranularity granularity)
-	{
-		//Link: https://forum.dlang.org/post/ivskeghrhbuhpiytesas@forum.dlang.org -> Ali's solution
-		
-		static struct Result
-		{
-			DateTime current, end; 
-			DateTimeGranularity granularity; 
-			
-			@property bool empty() { return current >= end; } 
-			@property auto front() { return current; } 
-			void popFront() { assert(!empty); current += step; } 
-		} 
-		
-		return Result(begin, end, step); 
-	} 
-*/
 
 static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 {
@@ -386,8 +469,16 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 		}
 	} 
 	
-	iterateLocalDateTimeRange(start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.full); 
+	if(!inputs.Shift.down)
+	iterateLocalDateTimeRanges(
+		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.yearMonthDay, 
+		((a){
+			dr.color = clMajorTick; if(a.isFirst) drawTick(a.p0, 6); drawTick(a.p1, 6); 
+			dr.color = clText; dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
+		})
+	); 
 	
+	if(inputs.Shift.down)
 	{
 		uint dayStep; 
 		{
@@ -506,7 +597,7 @@ class FrmHelloGUI: UIWindow
 			textOut(vec2(0,-100), "Hello"); 
 			
 			
-			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.125; 
+			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.125     *1; 
 			foreach(i; 0..100)
 			{
 				static if(0)
