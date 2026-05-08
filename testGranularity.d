@@ -271,7 +271,7 @@ template HourMinuteSecondIterator()
 
 template ThousandIterator(string unitStr, ulong unit1000)
 {
-	enum unit = unit1000/1000.0; 
+	enum unit = unit1000/1000.0f; 
 	
 	struct State { ulong base; uint counter; } 
 	
@@ -286,15 +286,29 @@ template ThousandIterator(string unitStr, ulong unit1000)
 	
 	void inc(ref State st, uint thousandStep)
 	{
-		with(st) {
-			counter += thousandStep; 
-			if(counter>=1000)
-			{
-				counter = 0; 
-				const next = base+unit1000; 
-				base = next>=base ? next : ulong.max; 
+		void doit()
+		{
+			with(st) {
+				counter += thousandStep; 
+				if(counter>=1000)
+				{
+					counter = 0; 
+					const next = base+unit1000; 
+					base = next>=base ? next : ulong.max; 
+				}
 			}
+		} 
+		enum mustFixRoundingErrors = unit<10; 
+		static if(mustFixRoundingErrors)
+		{
+			/+
+				repeat the increment operation if the raw DateTime 
+				was not changed.
+			+/
+			const prev = dt(st); 
+			doit; if(prev==dt(st)) doit; 
 		}
+		else { doit;  /+It has enough precision, just do it once.+/}
 	} 
 	
 	DateTime dt(in State st)
@@ -310,7 +324,7 @@ template ThousandIterator(string unitStr, ulong unit1000)
 } 
 
 alias MilliSecIterator 	= ThousandIterator!("ms", DateTime.RawUnit.sec),
-MicroSecIterator 	= ThousandIterator!("us", DateTime.RawUnit.ms),
+MicroSecIterator 	= ThousandIterator!("µs", DateTime.RawUnit.ms),
 NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us); 
 
 
@@ -350,10 +364,7 @@ struct DateTimeGranularities
 			
 		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
 		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
-		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond,
-		
-		
-		test = [_.year, _.month, _.day]~ hourMinSec ~ subSecond; 
+		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
 } 
 
 
@@ -409,6 +420,8 @@ auto iterateLocalDateTimeRanges(
 	
 	if(state.step)
 	{
+		//print(start, end, state.granularity, state.step); ulong COUNT; 
+		
 		void iterate(alias ITER)()
 		{
 			with(ITER)
@@ -434,7 +447,7 @@ auto iterateLocalDateTimeRanges(
 						p1.maximize(p0+avgSize); 
 					}
 					
-					callback(state); 
+					callback(state); /+COUNT++; +/
 					
 					version(/+$DIDE_REGION Shift+/all)
 					{ t0 = t1, p0 = p1; }first = false; 
@@ -455,6 +468,8 @@ auto iterateLocalDateTimeRanges(
 			
 			default: 
 		}
+		
+		//print(COUNT); 
 	}
 	
 } 
@@ -463,7 +478,8 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 {
 	enum lineWidthScale	= 1.5f,
 	clMajorTick 	= clBlue/+(RGB(0x202020))+/,
-	clText 	= (RGB(0x000000)); 
+	clText 	= (RGB(0x000000)),
+	clBackground	= (RGB(0x00E0FF)); 
 	
 	if(start>=end || bnd.empty) return; 
 	const float 	h = bnd.height,
@@ -478,176 +494,24 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 	=> ((dt.raw>=start.raw)?( (float(dt.raw-start.raw))*sc) :(-(float(start.raw-dt.raw))*sc))+bnd.left; 
 	
 	dr.lineWidth = lw * lineWidthScale, dr.fontHeight = fh; 
-	dr.color = clWhite; dr.fillRect(bnd); 
+	dr.color = clBackground; dr.fillRect(bnd); 
 	
 	void drawTick(float x, int size/+1..6+/)
 	{ dr.vLine(x, bnd.bottom-size*th, bnd.bottom); } 
 	
 	
-	const fullSpan 	= end-start; 
-	
-	auto targetLabelSpan(float chars)
-	{
-		const targetLabelWidth 	= fh*(9/16.0)*chars+6*lw, 
-		targetLabelCount 	= (bnd.width/targetLabelWidth).max(1),
-		targetLabelSpan 	= fullSpan/targetLabelCount; 
-		return targetLabelSpan; 
-	} 
-	
-	T quantize(T)(T m, int q=1)
-	=> 
-	((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
-	
-	auto evalMonthBoundaries(int monthStep, out int startYM)
-	{
-		int toLocalYearMonth(DateTime dt)
-		{
-			const 	st = dt.localSystemTime_fullRange,
-				y = st.wYear,  m = st.wMonth-1 /+0 based!+/; 
-			return y*12 + quantize(m, monthStep); 
-		} 
-		
-		startYM = toLocalYearMonth(start); 
-		const endYM = toLocalYearMonth(end); 
-		
-		return iota(startYM, endYM+monthStep+1, monthStep)
-			.map!((ym){
-			const y = ym/12, m = (ym%12)+1; 
-			return cachedLocalDateTime(y, m); 
-		})	.array; 
-	}  auto evalYearBoundaries(int yearStep, out int startYear)
-	{
-		int toLocalYear(DateTime dt)
-		{
-			const y = dt.localSystemTime_fullRange.wYear; 
-			return quantize(y, yearStep); 
-		} 
-		
-		startYear = toLocalYear(start); 
-		const endYear 	= toLocalYear(end); 
-		
-		return iota(startYear, endYear+yearStep+1, yearStep)
-			.map!((y)=>(cachedLocalDateTime(y)))	.array; 
-	} 
-	
-	void extrapolateEnds(in DateTime[] t, ref float[] p)
-	{
-		if(t.length>=3 /+extrapolate both ends+/)
-		{
-			void extend(size_t a, size_t b, size_t c)
-			{
-				const newc = p[a] + (p[b]-p[a])*2; 
-				if((p[c] < newc)==(p[c] > p[b])) p[c] = newc; 
-			} 
-			if(t[0].raw==0) { extend(2, 1, 0); }
-			if(t[$-1].raw==ulong.max) {
-				const len = t.length; 
-				extend(len-3, len-2, len-1); 
-			}
-		}
-	} 
-	
-	if(!inputs.Shift.down)
-	iterateLocalDateTimeRanges(
-		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.test, 
+	iterateLocalDateTimeRanges
+	(
+		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.full, 
 		((a){
-			dr.color = clMajorTick; if(a.isFirst) drawTick(a.p0, 6); drawTick(a.p1, 6); 
+			dr.color = clMajorTick; 
+			if(a.isFirst) drawTick(a.p0, 6); drawTick(a.p1, 6); 
+			
 			dr.color = clText; dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
 		})
 	); 
-	
-	if(inputs.Shift.down)
-	{
-		uint dayStep; 
-		{
-			const float target = ((targetLabelSpan(3))/(day)); 
-			foreach(step; [1, 2, 5, 10, 15])
-			{ if(target < step) { dayStep = step; break; }}
-		}
-		
-		if(dayStep)
-		{
-			int startYM; 
-			const tMonths = evalMonthBoundaries(1, startYM); 
-			
-			
-			
-			goto done; 
-		}
-		
-		uint monthStep; 
-		{
-			const float target = ((targetLabelSpan(4+4))/(gregorianDaysInMonth * day)); 
-			foreach(step; [1, 2, 3, 6])
-			{ if(target < step) { monthStep = step; break; }}
-		}
-		
-		if(monthStep)
-		{
-			int startYM; 
-			const t = evalMonthBoundaries(monthStep, startYM); 
-			if(t.length>=2)
-			{
-				auto p = t.map!((dt)=>(tr(dt))).array; 
-				extrapolateEnds(t, p); 
-				
-				dr.color = clMajorTick; foreach(x; p) drawTick(x, 6); 
-				
-				dr.color = clText; 
-				foreach(i; 0..t.length-1)
-				{
-					const 	ym = startYM+i*monthStep, 
-						y = ym/12, m = ym%12; 
-					const s = y.text~'.'~monthStep.predSwitch
-						(
-						3, format!"Q%d"(m/3+1),
-						6, format!"H%d"(m/6+1),
-						/+format!"%02d"(m+1)+/
-						MonthNames[m]
-					); 
-					dr.textOut(vec2(p[i]+lw*3, bnd.top), s); 
-				}
-			}
-			
-			goto done; 
-		}
-		
-		uint yearStep; 
-		
-		Time charTime = fullSpan * avgCharWidth / bnd.width; 
-		{
-			const float target = 5/+chars+/ * ((charTime)/(gregorianDaysInYear * day)); 
-			foreach(step; [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000])
-			{ if(target < step) { yearStep = step; break; }}
-		}
-		
-		if(yearStep)
-		{
-			int startY; const t = evalYearBoundaries(yearStep, startY); 
-			
-			if(t.length>=2)
-			{
-				auto p = t.map!((dt)=>(tr(dt))).array; 
-				extrapolateEnds(t, p); 
-				
-				dr.color = clMajorTick; foreach(x; p) drawTick(x, 6); 
-				
-				dr.color = clText; 
-				foreach(i; 0..t.length-1)
-				{
-					dr.textOut(
-						vec2(p[i]+lw*3, bnd.top), 
-						text(startY+i*yearStep)
-					); 
-				}
-			}
-			
-			goto done; 
-		}
-	}
-	done: 
 } 
-
+
 class FrmHelloGUI: UIWindow
 {
 	mixin autoCreate; mixin SetupMegaShader!q{}; 
