@@ -6,45 +6,48 @@
 
 import het.ui; 
 
-auto extremeDateTime(int year)
-=> RawDateTime(((year<2000)?(0):(ulong.max))); 
-
-struct PackedDateTime
+private
 {
-	ushort year; 
-	ubyte month, day, hour, minute, second, hsec; 
-	this(int year, int month, int day)
+	auto extremeDateTime(int year)
+	=> RawDateTime(((year<2000)?(0):(ulong.max))); 
+	
+	struct PackedDateTime
 	{
-		this.year 	= (cast(ushort)(year)),
-		this.month 	= (cast(ubyte)(month)),
-		this.day 	= (cast(ubyte)(day)); 
+		ushort year; 
+		ubyte month, day, hour, minute, second, hsec; 
+		this(int year, int month, int day)
+		{
+			this.year 	= (cast(ushort)(year)),
+			this.month 	= (cast(ubyte)(month)),
+			this.day 	= (cast(ubyte)(day)); 
+		} 
+		this(
+			int year, int month, int day, 
+			int hour, int minute=0, int second=0, int hsec=0
+		)
+		{
+			this(year, month, day); 
+			this.hour 	= (cast(ubyte)(hour)),
+			this.minute 	= (cast(ubyte)(minute)),
+			this.second 	= (cast(ubyte)(second)),
+			this.hsec 	= (cast(ubyte)(hsec)); 
+		} 
 	} 
-	this(
-		int year, int month, int day, 
-		int hour, int minute=0, int second=0, int hsec=0
-	)
-	{
-		this(year, month, day); 
-		this.hour 	= (cast(ubyte)(hour)),
-		this.minute 	= (cast(ubyte)(minute)),
-		this.second 	= (cast(ubyte)(second)),
-		this.hsec 	= (cast(ubyte)(hsec)); 
-	} 
+	
+	
+	DateTime localDateTime(PackedDateTime dt)
+	=> DateTime(Local, dt.year, dt.month, dt.day)
+	.ifThrown(extremeDateTime(dt.year)); 
+	
+	alias cachedLocalDateTime = memoize!localDateTime; 
+	
+	DateTime cachedLocalDateTime(int year, int month=1, int day=1)
+	=> cachedLocalDateTime(PackedDateTime(year, month, day)); 
+	
+	private T quantize(T)(T m, uint q=1)
+	=> 
+	((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
 } 
-
-
-DateTime localDateTime(PackedDateTime dt)
-=> DateTime(Local, dt.year, dt.month, dt.day)
-.ifThrown(extremeDateTime(dt.year)); 
-
-alias cachedLocalDateTime = memoize!localDateTime; 
-
-DateTime cachedLocalDateTime(int year, int month=1, int day=1)
-=> cachedLocalDateTime(PackedDateTime(year, month, day)); 
-
-private T quantize(T)(T m, uint q=1)
-=> 
-((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
 
 template YearIterator()
 {
@@ -136,53 +139,7 @@ template YearMonthDayIterator()
 		mixin(decodeYMD); return /+format!"%d.%02d.%02d"(y, m, d)+/
 		format!"%d %s %d"(y, MonthNames[m-1], d); 
 	} 
-} 
-
-template HourIterator()
-{
-	/+
-		Todo: Itt tartok!!!!!!!!!!!!!!!!!!!
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-	+/
-	
-	
-	DateTime init(DateTime dt, uint hourStep)
-	{
-		
-		
-		const h = dt.localSystemTime_fullRange.wHour; 
-		return quantize(h, hourStep); 
-	} 
-	
-	void inc(ref uint h, uint hourStep)
-	{ h += hourStep; } 
-	
-	DateTime dt(uint y)
-	=> cachedLocalDateTime(y); 
-	
-	string str(uint y, uint yearStep)
-	=> y.text; 
-} 
+} 
 
 void testYMD()
 {
@@ -221,6 +178,143 @@ void testYMD()
 	}
 } 
 
+template HourIterator()
+{
+	enum unit = DateTime.RawUnit.hour; 
+	
+	void adjust(ref long raw, uint hourStep)
+	{
+		if(raw<=hourStep || hourStep<=1) return; 
+		
+		foreach(i; 0..hourStep-1)
+		{
+			const h = dt(raw).localSystemTime.wHour; 
+			if(h%hourStep==0) break; 
+			raw++; 
+		}
+	} 
+	
+	long init(DateTime dt, uint hourStep)
+	{
+		long raw = dt.raw / unit % hourStep; 
+		
+		raw -= hourStep-1; 
+		adjust(raw, hourStep); 
+		return raw; 
+	} 
+	
+	void inc(ref long raw, uint hourStep)
+	{
+		raw += hourStep; 
+		adjust(raw, hourStep); 
+	} 
+	
+	DateTime dt(long raw)
+	{
+		if(raw<=0) return RawDateTime(0); 
+		if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+		return RawDateTime((cast(ulong)(raw)) * unit); 
+	} 
+	
+	string str(long raw, uint hourStep)
+	{
+		const h = dt(raw).localSystemTime.wHour; 
+		return h.format!"%02d:"; 
+	} 
+} 
+
+template HourMinuteIterator()
+{
+	enum unit = DateTime.RawUnit.min; 
+	
+	long init(DateTime dt, uint minuteStep)
+	=> dt.raw / unit % minuteStep; 
+	
+	void inc(ref long raw, uint minuteStep)
+	{ raw += minuteStep; } 
+	
+	DateTime dt(long raw)
+	{
+		if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+		return RawDateTime((cast(ulong)(raw))*unit); 
+	} 
+	
+	string str(long raw, uint minuteStep)
+	{
+		with(dt(raw).localSystemTime)
+		return format!"%02d:%02d"(wHour, wMinute); 
+	} 
+} 
+
+template HourMinuteSecondIterator()
+{
+	enum unit = DateTime.RawUnit.sec; 
+	
+	long init(DateTime dt, uint secondStep)
+	=> dt.raw / unit % secondStep; 
+	
+	void inc(ref long raw, uint secondStep)
+	{ raw += secondStep; } 
+	
+	DateTime dt(long raw)
+	{
+		if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+		return RawDateTime((cast(ulong)(raw))*unit); 
+	} 
+	
+	string str(long raw, uint secondStep)
+	{
+		with(dt(raw).localSystemTime)
+		return format!"%02d:%02d:%02d"(wHour, wMinute, wSecond); 
+	} 
+} 
+
+template ThousandIterator(string unitStr, ulong unit1000)
+{
+	enum unit = unit1000/1000.0; 
+	
+	struct State { ulong base; uint counter; } 
+	
+	State init(DateTime dt, uint thousandStep)
+	{
+		ulong m = dt.raw % unit1000; 
+		return State(
+			dt.raw - m, 
+			(ifloor(m / unit)).clamp(0, 999) % thousandStep
+		); 
+	} 
+	
+	void inc(ref State st, uint thousandStep)
+	{
+		with(st) {
+			counter += thousandStep; 
+			if(counter>=1000)
+			{
+				counter = 0; 
+				const next = base+unit1000; 
+				base = next>=base ? next : ulong.max; 
+			}
+		}
+	} 
+	
+	DateTime dt(in State st)
+	{
+		with(st) {
+			const ulong cur = base + (iround(counter * unit)); 
+			return RawDateTime(cur>=base ? cur : ulong.max); 
+		}
+	} 
+	
+	string str(in State st, uint thousandStep)
+	=> st.counter.text ~ unitStr; 
+} 
+
+alias MilliSecIterator 	= ThousandIterator!("ms", DateTime.RawUnit.sec),
+MicroSecIterator 	= ThousandIterator!("us", DateTime.RawUnit.ms),
+NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us); 
+
+
+
 
 mixin((
 	(表([
@@ -228,12 +322,12 @@ mixin((
 		[q{year},q{[1, 2, 5, 10, 20, 50, 100, 500, 1000]},q{gregorianDaysInYear*day},q{5}],
 		[q{month},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{8}],
 		[q{day},q{[1, 2, 3, 5, 10, 15]},q{day},q{11}],
-		[q{hour},q{[1, 2, 3, 6, 12]},q{hour},q{11+3}],
-		[q{minute},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{11+6}],
-		[q{second},q{[1, 2, 5, 10, 15, 20, 30]},q{second},q{3}],
-		[q{millisecond},q{[1, 2, 5, 10, 20, 50, 100, 500]},q{milli(second)},q{4}],
-		[q{microsecond},q{[1, 2, 5, 10, 20, 50, 100, 500]},q{micro(second)},q{4}],
-		[q{nanosecond},q{[1, 2, 5, 10, 20, 50, 100, 500]},q{nano(second)},q{4}],
+		[q{hour},q{[1, 2, 3, 4, 6, 8]},q{hour},q{4}],
+		[q{minute},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{6}],
+		[q{second},q{[1, 2, 5, 10, 15, 20, 30]},q{second},q{9}],
+		[q{milliSecond},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6}],
+		[q{microSecond},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6}],
+		[q{nanoSecond},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6}],
 		[q{yearWeek},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
 		[q{yearWeek_iso},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
 		[q{yearDay},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4}],
@@ -252,14 +346,14 @@ struct DateTimeGranularities
 		hourMin	= [_.hour, _.minute],
 		hourMinSec	= hourMin ~ _.second,
 			
-		subSecond	= [_.millisecond, _.microsecond, _.nanosecond],
+		subSecond	= [_.milliSecond, _.microSecond, _.nanoSecond],
 			
 		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
 		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
 		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond,
 		
 		
-		test = [_.year, _.month, _.day, _.hour]; 
+		test = [_.year, _.month, _.day]~ hourMinSec ~ subSecond; 
 } 
 
 
@@ -321,51 +415,29 @@ auto iterateLocalDateTimeRanges(
 			with(state)
 			{
 				version(/+$DIDE_REGION Fetch first boundary+/all)
-				{
-					auto idx = init(start, step); 
-					t0 = dt(idx); p0 = tr(t0); 
-				}
+				{ auto idx = init(start, step); t0 = dt(idx); p0 = tr(t0); }
 				
-				if(t0<end)
+				bool first = true; 
+				while(t0<end)
 				{
-					
-					
 					label = str(idx, step); 
 					
 					version(/+$DIDE_REGION Fetch second boundary+/all)
-					{
-						inc(idx, step); 
-						t1 = dt(idx); p1 = tr(t1); 
+					{ inc(idx, step); t1 = dt(idx); p1 = tr(t1); }
+					
+					if(first)	{
+						if(t0.raw==0)
+						p0.minimize(p1-avgSize); 
 					}
-					
-					if(t0.raw==0)
-					{ p0.minimize(p1-avgSize); }
-					
-					isFirst = true; callback(state); 
-					isFirst = false; 
-					
-					version(/+$DIDE_REGION Shift+/all)
-					{ t0 = t1, p0 = p1; }
-					while(t0<end)
-					{
-						label = str(idx, step); 
-						
-						version(/+$DIDE_REGION Fetch next+/all)
-						{
-							inc(idx, step); 
-							t1 = dt(idx); p1 = tr(t1); 
-						}
-						
+					else	{
 						if(t1.raw==ulong.max)
 						p1.maximize(p0+avgSize); 
-						
-						callback(state); 
-						
-						
-						
-						version(/+$DIDE_REGION Shift+/all)
-						{ t0 = t1, p0 = p1; }
 					}
+					
+					callback(state); 
+					
+					version(/+$DIDE_REGION Shift+/all)
+					{ t0 = t1, p0 = p1; }first = false; 
 				}
 			}
 		} 
@@ -374,6 +446,12 @@ auto iterateLocalDateTimeRanges(
 			case DateTimeGranularity.year: 	iterate!(YearIterator!()); 	break; 
 			case DateTimeGranularity.month: 	iterate!(YearMonthIterator!()); 	break; 
 			case DateTimeGranularity.day: 	iterate!(YearMonthDayIterator!()); 	break; 
+			case DateTimeGranularity.hour: 	iterate!(HourIterator!()); 	break; 
+			case DateTimeGranularity.minute: 	iterate!(HourMinuteIterator!()); 	break; 
+			case DateTimeGranularity.second: 	iterate!(HourMinuteSecondIterator!()); 	break; 
+			case DateTimeGranularity.milliSecond: 	iterate!(MilliSecIterator); 	break; 
+			case DateTimeGranularity.microSecond: 	iterate!(MicroSecIterator); 	break; 
+			case DateTimeGranularity.nanoSecond: 	iterate!(NanoSecIterator); 	break; 
 			
 			default: 
 		}
@@ -471,7 +549,7 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 	
 	if(!inputs.Shift.down)
 	iterateLocalDateTimeRanges(
-		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.yearMonthDay, 
+		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.test, 
 		((a){
 			dr.color = clMajorTick; if(a.isFirst) drawTick(a.p0, 6); drawTick(a.p1, 6); 
 			dr.color = clText; dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
@@ -597,8 +675,8 @@ class FrmHelloGUI: UIWindow
 			textOut(vec2(0,-100), "Hello"); 
 			
 			
-			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.125     *1; 
-			foreach(i; 0..100)
+			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.125     *0.01  -.155; 
+			foreach(i; 0..128)
 			{
 				static if(0)
 				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i))).min(h),
