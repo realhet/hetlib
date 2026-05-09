@@ -34,19 +34,18 @@ private
 		} 
 	} 
 	
-	
 	DateTime localDateTime(PackedDateTime dt)
 	=> DateTime(Local, dt.year, dt.month, dt.day)
 	.ifThrown(extremeDateTime(dt.year)); 
 	
 	alias cachedLocalDateTime = memoize!localDateTime; 
+	/+Opt: This uses AssocArray so it is bad for the GC.+/
 	
 	DateTime cachedLocalDateTime(int year, int month=1, int day=1)
 	=> cachedLocalDateTime(PackedDateTime(year, month, day)); 
 	
-	private T quantize(T)(T m, uint q=1)
-	=> 
-	((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
+	T quantize(T)(T m, uint q=1)
+	=> ((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
 } 
 
 template YearIterator()
@@ -97,6 +96,7 @@ template YearMonthIterator()
 	} 
 } 
 
+
 template YearMonthDayIterator()
 {
 	uint init(DateTime dt, uint dayStep)
@@ -140,44 +140,6 @@ template YearMonthDayIterator()
 		format!"%d %s %d"(y, MonthNames[m-1], d); 
 	} 
 } 
-
-void testYMD()
-{
-	alias ITER = YearMonthDayIterator!(); 
-	foreach(step; [1, 2, 3, 5, 10, 15])
-	{
-		print!step; 
-		auto state = ITER.init(RawDateTime(0), step); 
-		DateTime prev; 
-		size_t[ulong] diffHist; 
-		foreach(i; 0..int.max)
-		{
-			const act = ITER.dt(state); 
-			const ulong diff = act.raw-prev.raw; 
-			
-			if(i>0) diffHist[diff]++; 
-			if(0)
-			print(
-				i.format!"%6d", state, ITER.str(state, step), 
-				format!"%12.2f"((double(act.raw))/DateTime.RawUnit.day), 
-				format!"%12.2f"((double(diff))/DateTime.RawUnit.day), 
-				act.raw.format!"%016X", 
-				(diff).format!"%16X", 
-				ITER.dt(state).utcText
-			); 
-			
-			ITER.inc(state, step); 
-			if(act.raw==ulong.max) break; 
-			prev = act; 
-		}
-		foreach(k; diffHist.keys.sort)
-		print(
-			diffHist[k].format!"%6d x", k.format!"%16X", 
-			((double(k))/DateTime.RawUnit.day).format!"%18.12f"
-		); 
-	}
-} 
-
 template HourIterator()
 {
 	enum unit = DateTime.RawUnit.hour; 
@@ -196,11 +158,9 @@ template HourIterator()
 	
 	long init(DateTime dt, uint hourStep)
 	{
-		long raw = dt.raw / unit % hourStep; 
-		
+		long raw = dt.raw / unit; 
 		raw -= hourStep-1; 
-		adjust(raw, hourStep); 
-		return raw; 
+		adjust(raw, hourStep); return raw; 
 	} 
 	
 	void inc(ref long raw, uint hourStep)
@@ -228,7 +188,10 @@ template HourMinuteIterator()
 	enum unit = DateTime.RawUnit.min; 
 	
 	long init(DateTime dt, uint minuteStep)
-	=> dt.raw / unit % minuteStep; 
+	{
+		long raw = dt.raw / unit; 
+		if(minuteStep>1) raw -= raw.modw(minuteStep); return raw; 
+	} 
 	
 	void inc(ref long raw, uint minuteStep)
 	{ raw += minuteStep; } 
@@ -251,7 +214,10 @@ template HourMinuteSecondIterator()
 	enum unit = DateTime.RawUnit.sec; 
 	
 	long init(DateTime dt, uint secondStep)
-	=> dt.raw / unit % secondStep; 
+	{
+		long raw = dt.raw / unit; 
+		if(secondStep>1) raw -= raw.modw(secondStep); return raw; 
+	} 
 	
 	void inc(ref long raw, uint secondStep)
 	{ raw += secondStep; } 
@@ -278,10 +244,9 @@ template ThousandIterator(string unitStr, ulong unit1000)
 	State init(DateTime dt, uint thousandStep)
 	{
 		ulong m = dt.raw % unit1000; 
-		return State(
-			dt.raw - m, 
-			(ifloor(m / unit)).clamp(0, 999) % thousandStep
-		); 
+		int fr = (ifloor(m / unit)).clamp(0, 999); 
+		fr -= fr % thousandStep; 
+		return State(dt.raw - m, fr); 
 	} 
 	
 	void inc(ref State st, uint thousandStep)
@@ -332,19 +297,19 @@ NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us);
 
 mixin((
 	(表([
-		[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/}],
-		[q{year},q{[1, 2, 5, 10, 20, 50, 100, 500, 1000]},q{gregorianDaysInYear*day},q{5}],
-		[q{month},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{8}],
-		[q{day},q{[1, 2, 3, 5, 10, 15]},q{day},q{11}],
-		[q{hour},q{[1, 2, 3, 4, 6, 8]},q{hour},q{4}],
-		[q{minute},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{6}],
-		[q{second},q{[1, 2, 5, 10, 15, 20, 30]},q{second},q{9}],
-		[q{milliSecond},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6}],
-		[q{microSecond},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6}],
-		[q{nanoSecond},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6}],
-		[q{yearWeek},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
-		[q{yearWeek_iso},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
-		[q{yearDay},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4}],
+		[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Iterator#+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/}],
+		[q{year},q{YearIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]},q{gregorianDaysInYear*day},q{5}],
+		[q{month},q{YearMonthIterator},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{8}],
+		[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{11}],
+		[q{hour},q{HourIterator},q{[1, 2, 3, 4, 6, 8]},q{hour},q{4}],
+		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{6}],
+		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 20, 30]},q{second},q{9}],
+		[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6}],
+		[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6}],
+		[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6}],
+		[q{yearWeek},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
+		[q{yearWeek_iso},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
+		[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4}],
 	]))
 ).調!(GEN_enumTable)); 
 
@@ -365,17 +330,14 @@ struct DateTimeGranularities
 		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
 		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
 		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
-} 
-
-
-struct DateTimeIteratedRange
+}  struct DateTimeIteratedRange
 {
 	DateTime t0, t1; 
 	float p0=0, p1=0; 
 	string label; 
-	uint internalIndex; 
+	uint idx; 
 	DateTimeGranularity granularity; 
-	ushort step; bool isFirst; 
+	ushort step; 
 } 
 
 auto iterateLocalDateTimeRanges(
@@ -422,23 +384,25 @@ auto iterateLocalDateTimeRanges(
 	{
 		//print(start, end, state.granularity, state.step); ulong COUNT; 
 		
-		void iterate(alias ITER)()
+		void iterate(alias Iterator)()
 		{
+			static if(__traits(compiles, &Iterator.inc))
+			alias ITER = Iterator; else alias ITER = Iterator!(); 
 			with(ITER)
 			with(state)
 			{
 				version(/+$DIDE_REGION Fetch first boundary+/all)
-				{ auto idx = init(start, step); t0 = dt(idx); p0 = tr(t0); }
+				{ auto iState = init(start, step); t0 = dt(iState); p0 = tr(t0); }
 				
-				bool first = true; 
+				idx = 0; 
 				while(t0<end)
 				{
-					label = str(idx, step); 
+					label = str(iState, step); 
 					
 					version(/+$DIDE_REGION Fetch second boundary+/all)
-					{ inc(idx, step); t1 = dt(idx); p1 = tr(t1); }
+					{ inc(iState, step); t1 = dt(iState); p1 = tr(t1); }
 					
-					if(first)	{
+					if(idx==0)	{
 						if(t0.raw==0)
 						p0.minimize(p1-avgSize); 
 					}
@@ -450,30 +414,72 @@ auto iterateLocalDateTimeRanges(
 					callback(state); /+COUNT++; +/
 					
 					version(/+$DIDE_REGION Shift+/all)
-					{ t0 = t1, p0 = p1; }first = false; 
+					{ t0 = t1, p0 = p1; }idx++; 
 				}
 			}
 		} 
-		switch(state.granularity)
-		{
-			case DateTimeGranularity.year: 	iterate!(YearIterator!()); 	break; 
-			case DateTimeGranularity.month: 	iterate!(YearMonthIterator!()); 	break; 
-			case DateTimeGranularity.day: 	iterate!(YearMonthDayIterator!()); 	break; 
-			case DateTimeGranularity.hour: 	iterate!(HourIterator!()); 	break; 
-			case DateTimeGranularity.minute: 	iterate!(HourMinuteIterator!()); 	break; 
-			case DateTimeGranularity.second: 	iterate!(HourMinuteSecondIterator!()); 	break; 
-			case DateTimeGranularity.milliSecond: 	iterate!(MilliSecIterator); 	break; 
-			case DateTimeGranularity.microSecond: 	iterate!(MicroSecIterator); 	break; 
-			case DateTimeGranularity.nanoSecond: 	iterate!(NanoSecIterator); 	break; 
-			
-			default: 
-		}
 		
-		//print(COUNT); 
+		sw: final switch(state.granularity)
+		{
+			static foreach(g; EnumMembers!DateTimeGranularity)
+			{
+				case g: 
+				static if(dateTimeGranularityIterator[g]!="")
+				mixin(iq{iterate!$(dateTimeGranularityIterator[g]); }.text); 
+				break sw; 
+			}
+		}
 	}
 	
+} 
+
+void dumpIteratorStats(alias Iterator)(int[] steps)
+{
+	static if(__traits(compiles, &Iterator.inc))
+	alias ITER = Iterator; else alias ITER = Iterator!(); 
+	print("DateTime Iterator statistics for:", ITER.stringof); 
+	foreach(step; steps)
+	{
+		print("Step:", step); 
+		auto state = ITER.init(RawDateTime(0), step); 
+		DateTime prev; 
+		size_t[ulong] diffHist; 
+		foreach(i; 0..int.max)
+		{
+			const act = ITER.dt(state); 
+			const ulong diff = act.raw-prev.raw; 
+			
+			if(i>0) diffHist[diff]++; 
+			if(0)
+			print(
+				i.format!"%6d", state, ITER.str(state, step), 
+				format!"%12.2f"((double(act.raw))/DateTime.RawUnit.day), 
+				format!"%12.2f"((double(diff))/DateTime.RawUnit.day), 
+				act.raw.format!"%016X", 
+				(diff).format!"%16X", 
+				ITER.dt(state).utcText
+			); 
+			
+			ITER.inc(state, step); 
+			if(act.raw==ulong.max) break; 
+			prev = act; 
+		}
+		foreach(k; diffHist.keys.sort)
+		print(
+			diffHist[k].format!"%9d *", k.format!"%16X", 
+			((double(k))/DateTime.RawUnit.day).format!"%18.12f"
+		); 
+		print; 
+	}
+	print; 
 } 
-
+
+void dumpDateTimeIteratorStats()
+{
+	dumpIteratorStats!YearMonthDayIterator([1, 2, 3, 5, 10, 15]); 
+	dumpIteratorStats!HourIterator([1, 2, 3, 4, 6, 8]); 
+} 
+
 static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 {
 	enum lineWidthScale	= 1.5f,
@@ -505,20 +511,20 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.full, 
 		((a){
 			dr.color = clMajorTick; 
-			if(a.isFirst) drawTick(a.p0, 6); drawTick(a.p1, 6); 
+			if(a.idx==0) drawTick(a.p0, 6); drawTick(a.p1, 6); 
 			
 			dr.color = clText; dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
 		})
 	); 
 } 
-
+
 class FrmHelloGUI: UIWindow
 {
 	mixin autoCreate; mixin SetupMegaShader!q{}; 
 	
 	override void onCreate()
 	{
-		testYMD; 
+		//dumpDateTimeIteratorStats; 
 		backgroundColor = (RGB(0)); showFPS = true; 
 	} 
 	
@@ -538,15 +544,15 @@ class FrmHelloGUI: UIWindow
 			fontHeight = 100; 
 			textOut(vec2(0,-100), "Hello"); 
 			
-			
 			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.125     *0.01  -.155; 
-			foreach(i; 0..128)
+			if(0)
+			foreach(i; 0..128/4)
 			{
-				static if(0)
-				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i))).min(h),
+				static if(1)
+				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*4))).min(h),
 					st = RawDateTime(h-n), en = RawDateTime(h+n+1); 
 				
-				static if(1)
+				static if(0)
 				const st = RawDateTime(0), en = RawDateTime((cast(ulong)((ulong.max * pow(ramp, i)).min(ulong.max)))); 
 				
 				drawHRuler(drWorld, bounds2(vec2(50, 10+26*i), ((vec2(clientWidth, 24)).名!q{size})), st, en); 
@@ -603,10 +609,9 @@ class FrmHelloGUI: UIWindow
 			
 			
 			const x0 = -1000, x1 = 10000; 
-			//do1(x0, x1); 
-			//do2(x0, x1); 
-			//do5(x0, x1); 
-			
+				do1(x0, x1); 
+				do2(x0, x1); 
+				do5(x0, x1); 
 		}
 	} 
 } 
