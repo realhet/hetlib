@@ -298,12 +298,13 @@ NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us);
 mixin((
 	(表([
 		[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Iterator#+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/}],
+		[q{none},q{},q{[]},q{0*second},q{1}],
 		[q{year},q{YearIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]},q{gregorianDaysInYear*day},q{5}],
 		[q{month},q{YearMonthIterator},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{8}],
 		[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{11}],
-		[q{hour},q{HourIterator},q{[1, 2, 3, 4, 6, 8]},q{hour},q{4}],
-		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 20, 30]},q{minute},q{6}],
-		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 20, 30]},q{second},q{9}],
+		[q{hour},q{HourIterator},q{[1, 2, 3, 6, 12]},q{hour},q{4}],
+		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 30]},q{minute},q{6}],
+		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 30]},q{second},q{9}],
 		[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6}],
 		[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6}],
 		[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6}],
@@ -312,6 +313,95 @@ mixin((
 		[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4}],
 	]))
 ).調!(GEN_enumTable)); 
+
+DateTimeGranularity successorOf(DateTimeGranularity g)
+{
+	with(DateTimeGranularity)
+	{
+		static immutable sequence = [year, month, day, hour, minute, second, milliSecond, microSecond, nanoSecond]; 
+		const idx = sequence.countUntil(g); 
+		if(mixin(界1(q{0},q{idx+1},q{sequence.length}))) return sequence[idx+1]; 
+		return DateTimeGranularity.none; 
+	}
+} 
+
+struct DateTimeGranularityStep
+{
+	DateTimeGranularity granularity; 
+	ubyte tickLevel; 
+	ushort step; 
+	
+	bool valid()const => granularity&&step; 
+	bool opCast(B: bool)()const => valid; 
+	
+	bool isTick()const => !!tickLevel; 
+} 
+
+DateTimeGranularityStep[] selectTickGranularities(in DateTimeGranularityStep a)
+{
+	alias G = DateTimeGranularity, GS = DateTimeGranularityStep; 
+	auto level1(int l)
+	=> [GS(a.granularity, 1, (cast(ushort)(l)))]; 
+	
+	auto level2(int l1, int l2)
+	=> [
+		GS(a.granularity, 2, (cast(ushort)(l1))),
+		GS(a.granularity, 1, (cast(ushort)(l2)))
+	]; 
+	
+	auto level2succ(int l1, int l2)
+	=> [
+		GS(a.granularity          , 2, (cast(ushort)(l1))),
+		GS(a.granularity.successorOf, 1, (cast(ushort)(l2)))
+	]; 
+	
+	auto level2succ2(int l1, int l2)
+	=> [
+		GS(a.granularity.successorOf, 2, (cast(ushort)(l1))),
+		GS(a.granularity.successorOf, 1, (cast(ushort)(l2)))
+	]; 
+	
+	if(a.step<=0) return []; 
+	
+	if(a.step==1000) return level2(500, 100); 
+	if(a.step==500) return level2(100, 50); 
+	if(a.step==200) return level2(100, 20); 
+	if(a.step==100) return level2(50, 10); 
+	if(a.step==50) return level2(10, 5); 
+	if(a.step==20) return level2(10, 2); 
+	if(a.step==30) return level1(10); 
+	if(a.step==15) return level2(5, 1); 
+	if(a.step==12) return level2(6, 1); 
+	if(a.step==10) return level2(5, 1); 
+	if(a.step==8) return level2(4, 1); 
+	if(a.step==5)
+	{
+		if(a.granularity==G.year) return level2succ(1, 6/+month+/); 
+		if(a.granularity==G.day) return level2succ(1, 12/+hour+/); 
+		if(a.granularity==G.minute) return level2succ(1, 30/+second+/); 
+		if(mixin(界3(q{G.second},q{a.granularity},q{G.nanoSecond})))
+		return level2succ(1, 500/+thousandth+/); 
+	}
+	if(a.step==2)
+	{
+		if(a.granularity==G.year) return level2succ(1, 3/+month+/); 
+		if(a.granularity==G.day) return level2succ(1, 6/+hour+/); 
+		if(a.granularity==G.minute) return level2succ(1, 15/+second+/); 
+		if(mixin(界3(q{G.second},q{a.granularity},q{G.nanoSecond})))
+		return level2succ(1, 200/+thousandth+/); 
+	}
+	if(a.step==1)
+	{
+		if(a.granularity==G.year) return level2succ2(3, 1/+month+/); 
+		if(a.granularity==G.day) return level2succ2(6, 2/+hour+/); 
+		if(a.granularity==G.hour) return level2succ2(30, 10/+minute+/); 
+		if(a.granularity==G.minute) return level2succ2(30, 10/+second+/); 
+		if(mixin(界3(q{G.second},q{a.granularity},q{G.nanoSecond})))
+		return level2succ2(500, 100/+thousandth+/); 
+	}
+	if(mixin(界0(q{1},q{a.step},q{10}))) return level1(1); 
+	return []; 
+} 
 
 struct DateTimeGranularities
 {
@@ -330,29 +420,33 @@ struct DateTimeGranularities
 		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
 		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
 		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
-}  struct DateTimeIteratedRange
+} 
+
+struct DateTimeIteratedRange
 {
 	DateTime t0, t1; 
 	float p0=0, p1=0; 
-	string label; 
+	string label; //only if tickLevel!=0
 	uint idx; 
-	DateTimeGranularity granularity; 
-	ushort step; 
+	
+	DateTimeGranularityStep granularityStep; 
+	ref granularity() => granularityStep.granularity; 
+	ref step() => granularityStep.step; 
+	ref tickLevel() => granularityStep.tickLevel; 
 } 
 
 auto iterateLocalDateTimeRanges(
 	DateTime start, DateTime end, 
 	float left, float right, float avgCharWidth,
 	in DateTimeGranularity[] granularities,
-	void delegate(ref DateTimeIteratedRange) callback, 
-	bool noLabel=false
+	void delegate(ref DateTimeIteratedRange) onLabel, 
+	void delegate(ref DateTimeIteratedRange) onTick=null
 )
 {
 	if(start>=end) return; 
 	if(left>=right) return; 
 	
 	DateTimeIteratedRange state; 
-	
 	
 	const Time 	fullSpan 	= end - start,
 		charTime 	= ((fullSpan * avgCharWidth)/(right - left)); 
@@ -380,8 +474,9 @@ auto iterateLocalDateTimeRanges(
 		}
 	}
 	
-	if(state.step)
+	void doit()
 	{
+		if(!state.step) return; 
 		//print(start, end, state.granularity, state.step); ulong COUNT; 
 		
 		void iterate(alias Iterator)()
@@ -397,7 +492,7 @@ auto iterateLocalDateTimeRanges(
 				idx = 0; 
 				while(t0<end)
 				{
-					label = str(iState, step); 
+					if(tickLevel==0) label = str(iState, step); 
 					
 					version(/+$DIDE_REGION Fetch second boundary+/all)
 					{ inc(iState, step); t1 = dt(iState); p1 = tr(t1); }
@@ -411,7 +506,7 @@ auto iterateLocalDateTimeRanges(
 						p1.maximize(p0+avgSize); 
 					}
 					
-					callback(state); /+COUNT++; +/
+					if(tickLevel==0) onLabel(state); else onTick(state); 
 					
 					version(/+$DIDE_REGION Shift+/all)
 					{ t0 = t1, p0 = p1; }idx++; 
@@ -429,8 +524,18 @@ auto iterateLocalDateTimeRanges(
 				break sw; 
 			}
 		}
-	}
+	} 
 	
+	if(state.step)
+	{
+		doit; 
+		
+		if(onTick !is null)
+		{
+			foreach(gs; state.granularityStep.selectTickGranularities)
+			if(gs) { state.granularityStep = gs; doit; }
+		}
+	}
 } 
 
 void dumpIteratorStats(alias Iterator)(int[] steps)
@@ -482,10 +587,11 @@ void dumpDateTimeIteratorStats()
 
 static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 {
-	enum lineWidthScale	= 1.5f,
-	clMajorTick 	= clBlue/+(RGB(0x202020))+/,
+	enum lineWidthScale	= 1.1f,
+	clMajorTick 	= (RGB(0x000000)),
+	clMinorTick 	= (RGB(0x000000)),
 	clText 	= (RGB(0x000000)),
-	clBackground	= (RGB(0x00E0FF)); 
+	clBackground	= (RGB(0xFFFFFF)); 
 	
 	if(start>=end || bnd.empty) return; 
 	const float 	h = bnd.height,
@@ -503,7 +609,7 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 	dr.color = clBackground; dr.fillRect(bnd); 
 	
 	void drawTick(float x, int size/+1..6+/)
-	{ dr.vLine(x, bnd.bottom-size*th, bnd.bottom); } 
+	{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
 	
 	
 	iterateLocalDateTimeRanges
@@ -514,7 +620,8 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 			if(a.idx==0) drawTick(a.p0, 6); drawTick(a.p1, 6); 
 			
 			dr.color = clText; dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
-		})
+		}),
+		((a){ dr.color = clMinorTick; drawTick(a.p1, a.tickLevel); })
 	); 
 } 
 
@@ -544,12 +651,12 @@ class FrmHelloGUI: UIWindow
 			fontHeight = 100; 
 			textOut(vec2(0,-100), "Hello"); 
 			
-			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.125     *0.01  -.155; 
-			if(0)
-			foreach(i; 0..128/4)
+			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.0000125     *0.01  -.155; 
+			if(1)
+			foreach(i; 0..128/1)
 			{
 				static if(1)
-				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*4))).min(h),
+				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*1))).min(h),
 					st = RawDateTime(h-n), en = RawDateTime(h+n+1); 
 				
 				static if(0)
@@ -609,9 +716,11 @@ class FrmHelloGUI: UIWindow
 			
 			
 			const x0 = -1000, x1 = 10000; 
+				/+
 				do1(x0, x1); 
 				do2(x0, x1); 
 				do5(x0, x1); 
+			+/
 		}
 	} 
 } 
