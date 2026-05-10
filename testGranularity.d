@@ -11,38 +11,34 @@ private
 	auto extremeDateTime(int year)
 	=> RawDateTime(((year<2000)?(0):(ulong.max))); 
 	
-	struct PackedDateTime
-	{
-		ushort year; 
-		ubyte month, day, hour, minute, second, hsec; 
-		this(int year, int month, int day)
-		{
-			this.year 	= (cast(ushort)(year)),
-			this.month 	= (cast(ubyte)(month)),
-			this.day 	= (cast(ubyte)(day)); 
-		} 
-		this(
-			int year, int month, int day, 
-			int hour, int minute=0, int second=0, int hsec=0
-		)
-		{
-			this(year, month, day); 
-			this.hour 	= (cast(ubyte)(hour)),
-			this.minute 	= (cast(ubyte)(minute)),
-			this.second 	= (cast(ubyte)(second)),
-			this.hsec 	= (cast(ubyte)(hsec)); 
-		} 
-	} 
+	struct YearMonthDay
+	{ ushort year; ubyte month, day; } 
 	
-	DateTime localDateTime(PackedDateTime dt)
-	=> DateTime(Local, dt.year, dt.month, dt.day)
-	.ifThrown(extremeDateTime(dt.year)); 
-	
-	alias cachedLocalDateTime = memoize!localDateTime; 
+	DateTime localDateTime_impl(in YearMonthDay dt)
+	=> DateTime(Local, dt.year, dt.month, dt.day).ifThrown(extremeDateTime(dt.year)); 
+	alias cachedLocalDateTime_impl = memoize!localDateTime_impl; 
 	/+Opt: This uses AssocArray so it is bad for the GC.+/
 	
 	DateTime cachedLocalDateTime(int year, int month=1, int day=1)
-	=> cachedLocalDateTime(PackedDateTime(year, month, day)); 
+	=> cachedLocalDateTime_impl(YearMonthDay((cast(ushort)(year)), (cast(ubyte)(month)), (cast(ubyte)(day)))); 
+	
+	ubyte dayOfWeek_impl(in YearMonthDay dt)
+	{
+		int y = dt.year, m = dt.month, d = dt.day; 
+		/+
+			Tomohiko Sakamoto's algorithm
+			Returns: 0=Sunday, 1=Monday, ..., 6=Saturday
+			Works for Gregorian calendar (after 1582)
+		+/
+		static immutable t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]; 
+		if(m < 3) y -= 1; 
+		return (cast(ubyte)((y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7)); 
+	} 
+	alias cachedDayOfWeek_impl = memoize!dayOfWeek_impl; 
+	
+	ubyte cachedDayOfWeek(int year, int month, int day)
+	=> cachedDayOfWeek_impl(YearMonthDay((cast(ushort)(year)), (cast(ubyte)(month)), (cast(ubyte)(day)))); 
+	
 	
 	T quantize(T)(T m, uint q=1)
 	=> ((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
@@ -62,6 +58,7 @@ template YearIterator()
 	DateTime dt(uint y)
 	=> cachedLocalDateTime(y); 
 	
+	bool isRed(uint y) => false; 
 	string str(uint y, uint yearStep)
 	=> y.text; 
 } 
@@ -83,6 +80,7 @@ template YearMonthIterator()
 	DateTime dt(uint ym)
 	{ mixin(decodeYM); return cachedLocalDateTime(y, m); } 
 	
+	bool isRed(uint ym) => false; 
 	string str(uint ym, uint monthStep)
 	{
 		mixin(decodeYM); 
@@ -134,6 +132,8 @@ template YearMonthDayIterator()
 	DateTime dt(uint ymd)
 	{ mixin(decodeYMD); return cachedLocalDateTime(y, m, d); } 
 	
+	bool isRed(uint ymd)
+	{ mixin(decodeYMD); return !!cachedDayOfWeek(y, m, d).among(0, 6); } 
 	string str(uint ymd, uint dayStep)
 	{
 		mixin(decodeYMD); return /+format!"%d.%02d.%02d"(y, m, d)+/
@@ -176,6 +176,7 @@ template HourIterator()
 		return RawDateTime((cast(ulong)(raw)) * unit); 
 	} 
 	
+	bool isRed(long raw) => false; 
 	string str(long raw, uint hourStep)
 	{
 		const h = dt(raw).localSystemTime.wHour; 
@@ -202,6 +203,7 @@ template HourMinuteIterator()
 		return RawDateTime((cast(ulong)(raw))*unit); 
 	} 
 	
+	bool isRed(long raw) => false; 
 	string str(long raw, uint minuteStep)
 	{
 		with(dt(raw).localSystemTime)
@@ -228,6 +230,7 @@ template HourMinuteSecondIterator()
 		return RawDateTime((cast(ulong)(raw))*unit); 
 	} 
 	
+	bool isRed(long raw) => false; 
 	string str(long raw, uint secondStep)
 	{
 		with(dt(raw).localSystemTime)
@@ -284,6 +287,7 @@ template ThousandIterator(string unitStr, ulong unit1000)
 		}
 	} 
 	
+	bool isRed(in State st) => false; 
 	string str(in State st, uint thousandStep)
 	=> st.counter.text ~ unitStr; 
 } 
@@ -426,13 +430,14 @@ struct DateTimeIteratedRange
 {
 	DateTime t0, t1; 
 	float p0=0, p1=0; 
-	string label; //only if tickLevel!=0
 	uint idx; 
-	
 	DateTimeGranularityStep granularityStep; 
 	ref granularity() => granularityStep.granularity; 
 	ref step() => granularityStep.step; 
 	ref tickLevel() => granularityStep.tickLevel; 
+	
+	//only if tickLevel!=0
+	bool isRed; string label; 
 } 
 
 auto iterateLocalDateTimeRanges(
@@ -492,7 +497,10 @@ auto iterateLocalDateTimeRanges(
 				idx = 0; 
 				while(t0<end)
 				{
-					if(tickLevel==0) label = str(iState, step); 
+					if(tickLevel==0) {
+						label = str(iState, step); 
+						state.isRed = ITER.isRed(iState); 
+					}
 					
 					version(/+$DIDE_REGION Fetch second boundary+/all)
 					{ inc(iState, step); t1 = dt(iState); p1 = tr(t1); }
@@ -619,7 +627,8 @@ static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 			dr.color = clMajorTick; 
 			if(a.idx==0) drawTick(a.p0, 6); drawTick(a.p1, 6); 
 			
-			dr.color = clText; dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
+			dr.color = a.isRed ? clRed : clText; 
+			dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
 		}),
 		((a){ dr.color = clMinorTick; drawTick(a.p1, a.tickLevel); })
 	); 
