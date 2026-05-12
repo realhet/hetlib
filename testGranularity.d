@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@/release
+//@release
 
 //@compile --d-version=VulkanUI
 
@@ -42,276 +42,309 @@ private
 	
 	T quantize(T)(T m, uint q=1)
 	=> ((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
-} 
-
-template YearIterator()
-{
-	uint init(DateTime dt, uint yearStep)
+	
+	string formatYMD(int y, int m, int d)
+	=> format!"%d %s %d"(y, MonthNames[m-1], d); 
+	/+format!"%d.%02d.%02d"(y, m, d)+/
+	
+	string formatH(int h)
+	=> format!"%02d:"(h); 
+	string formatHM(int h, int m)
+	=> format!"%02d:%02d"(h, m); 
+	string formatHMS(int h, int m, int s)
+	=> format!"%02d:%02d:%02d"(h, m, s); 
+	
+	enum FULL_YMD = 
+	q{((isFull)?(formatYMD(wYear, wMonth, wDay)~" "):(""))},
+	FULL_YMDHMS = 
+	q{
+		((isFull)?(
+			mixin(FULL_YMD) ~ 
+			formatHMS(wHour, wMinute, wSecond)~" "
+		):(""))
+	}; 
+	template YearIterator()
 	{
-		const y = dt.localSystemTime_fullRange.wYear; 
-		return quantize(y, yearStep); 
-	} 
-	
-	void inc(ref uint y, uint yearStep)
-	{ y += yearStep; } 
-	
-	DateTime dt(uint y)
-	=> cachedLocalDateTime(y); 
-	
-	bool isRed(uint y) => false; 
-	string str(uint y, uint yearStep)
-	=> y.text; 
-} 
-
-template YearMonthIterator()
-{
-	uint init(DateTime dt, uint monthStep)
-	{
-		const 	st = dt.localSystemTime_fullRange,
-			y = st.wYear,  m = st.wMonth-1; 
-		return y*12 + quantize(m, monthStep); 
-	} 
-	
-	enum decodeYM = q{const y = ym/12, m = (ym%12)+1; }; 
-	
-	void inc(ref uint ym, uint monthStep)
-	{ ym += monthStep; } 
-	
-	DateTime dt(uint ym)
-	{ mixin(decodeYM); return cachedLocalDateTime(y, m); } 
-	
-	bool isRed(uint ym) => false; 
-	string str(uint ym, uint monthStep)
-	{
-		mixin(decodeYM); 
-		return y.text~monthStep.predSwitch
-		(
-			3, format!" Q%d"((m-1)/3+1),
-			6, format!" H%d"((m-1)/6+1),
-			/+format!".%02d"(m)+/
-			' '~MonthNames[m-1]
-		); 
-	} 
-} 
-
-
-template YearMonthDayIterator()
-{
-	uint init(DateTime dt, uint dayStep)
-	{
-		const 	st = dt.localSystemTime_fullRange,
-			y = st.wYear,  m = st.wMonth-1, d = st.wDay-1; 
-		return (y*16 + m)*32 + quantize(d, dayStep)+1; 
-	} 
-	
-	enum decodeYMD = q{
-		uint 	ym 	= ymd / 32, 	d 	= ymd % 32,
-			y 	= ym / 16, 	m 	= ym % 16 + 1; 
-	}; 
-	
-	void inc(ref uint ymd, uint dayStep)
-	{
-		mixin(decodeYMD); 
-		int daysInMonth_fast() 
-		=> monthDays[m-1];  int daysInMonth_precise() 
-		=> daysInMonth_fast + (cast(uint)((m==2 && isLeapYear(y)))); 
-		
-		void nextMonth() { if(m>=12)	{ y++; m=1; }	else	m++; d=1; } 
-		
-		switch(dayStep)
+		uint init(DateTime dt, uint yearStep)
 		{
-			case 1: 	{ d+=dayStep; if(d>daysInMonth_precise) nextMonth; }	break; 
-			case 2: 	{ d+=dayStep; if((m==2 && d>27) || d>29) nextMonth; }	break; 
-			case 3: 	{ d+=dayStep; if((m==2 && d>25) || d>28) nextMonth; }	break; 
-			default: 	{ d = ((d==1)?(0):(d))+dayStep; if(d>25) nextMonth; }	break; 
-		}
+			const y = dt.localSystemTime_fullRange.wYear; 
+			return quantize(y, yearStep); 
+		} 
 		
-		ymd = (y*16 + m-1)*32 + d; 
-	} 
-	
-	DateTime dt(uint ymd)
-	{ mixin(decodeYMD); return cachedLocalDateTime(y, m, d); } 
-	
-	bool isRed(uint ymd)
-	{ mixin(decodeYMD); return !!cachedDayOfWeek(y, m, d).among(0, 6); } 
-	string str(uint ymd, uint dayStep)
-	{
-		mixin(decodeYMD); return /+format!"%d.%02d.%02d"(y, m, d)+/
-		format!"%d %s %d"(y, MonthNames[m-1], d); 
-	} 
-} 
-template HourIterator()
-{
-	enum unit = DateTime.RawUnit.hour; 
-	
-	void adjust(ref long raw, uint hourStep)
-	{
-		if(raw<=hourStep || hourStep<=1) return; 
+		void inc(ref uint y, uint yearStep)
+		{ y += yearStep; } 
 		
-		foreach(i; 0..hourStep-1)
+		DateTime dt(uint y)
+		=> cachedLocalDateTime(y); 
+		
+		bool isRed(uint y) => false; 
+		string str(uint y, uint yearStep, bool isFull)
+		=> y.text; 
+	} 
+	
+	template YearMonthIterator()
+	{
+		uint init(DateTime dt, uint monthStep)
 		{
-			const h = dt(raw).localSystemTime.wHour; 
-			if(h%hourStep==0) break; 
-			raw++; 
-		}
-	} 
-	
-	long init(DateTime dt, uint hourStep)
-	{
-		long raw = dt.raw / unit; 
-		raw -= hourStep-1; 
-		adjust(raw, hourStep); return raw; 
-	} 
-	
-	void inc(ref long raw, uint hourStep)
-	{
-		raw += hourStep; 
-		adjust(raw, hourStep); 
-	} 
-	
-	DateTime dt(long raw)
-	{
-		if(raw<=0) return RawDateTime(0); 
-		if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
-		return RawDateTime((cast(ulong)(raw)) * unit); 
-	} 
-	
-	bool isRed(long raw) => false; 
-	string str(long raw, uint hourStep)
-	{
-		const h = dt(raw).localSystemTime.wHour; 
-		return h.format!"%02d:"; 
-	} 
-} 
-
-template HourMinuteIterator()
-{
-	enum unit = DateTime.RawUnit.min; 
-	
-	long init(DateTime dt, uint minuteStep)
-	{
-		long raw = dt.raw / unit; 
-		if(minuteStep>1) raw -= raw.modw(minuteStep); return raw; 
-	} 
-	
-	void inc(ref long raw, uint minuteStep)
-	{ raw += minuteStep; } 
-	
-	DateTime dt(long raw)
-	{
-		if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
-		return RawDateTime((cast(ulong)(raw))*unit); 
-	} 
-	
-	bool isRed(long raw) => false; 
-	string str(long raw, uint minuteStep)
-	{
-		with(dt(raw).localSystemTime)
-		return format!"%02d:%02d"(wHour, wMinute); 
-	} 
-} 
-
-template HourMinuteSecondIterator()
-{
-	enum unit = DateTime.RawUnit.sec; 
-	
-	long init(DateTime dt, uint secondStep)
-	{
-		long raw = dt.raw / unit; 
-		if(secondStep>1) raw -= raw.modw(secondStep); return raw; 
-	} 
-	
-	void inc(ref long raw, uint secondStep)
-	{ raw += secondStep; } 
-	
-	DateTime dt(long raw)
-	{
-		if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
-		return RawDateTime((cast(ulong)(raw))*unit); 
-	} 
-	
-	bool isRed(long raw) => false; 
-	string str(long raw, uint secondStep)
-	{
-		with(dt(raw).localSystemTime)
-		return format!"%02d:%02d:%02d"(wHour, wMinute, wSecond); 
-	} 
-} 
-
-template ThousandIterator(string unitStr, ulong unit1000)
-{
-	enum unit = unit1000/1000.0f; 
-	
-	struct State { ulong base; uint counter; } 
-	
-	State init(DateTime dt, uint thousandStep)
-	{
-		ulong m = dt.raw % unit1000; 
-		int fr = (ifloor(m / unit)).clamp(0, 999); 
-		fr -= fr % thousandStep; 
-		return State(dt.raw - m, fr); 
-	} 
-	
-	void inc(ref State st, uint thousandStep)
-	{
-		void doit()
+			const 	st = dt.localSystemTime_fullRange,
+				y = st.wYear,  m = st.wMonth-1; 
+			return y*12 + quantize(m, monthStep); 
+		} 
+		
+		enum decodeYM = q{const y = ym/12, m = (ym%12)+1; }; 
+		
+		void inc(ref uint ym, uint monthStep)
+		{ ym += monthStep; } 
+		
+		DateTime dt(uint ym)
+		{ mixin(decodeYM); return cachedLocalDateTime(y, m); } 
+		
+		bool isRed(uint ym) => false; 
+		string str(uint ym, uint monthStep, bool isFull)
 		{
-			with(st) {
-				counter += thousandStep; 
-				if(counter>=1000)
-				{
-					counter = 0; 
-					const next = base+unit1000; 
-					base = next>=base ? next : ulong.max; 
-				}
+			mixin(decodeYM); 
+			return y.text~monthStep.predSwitch
+			(
+				3, format!" Q%d"((m-1)/3+1),
+				6, format!" H%d"((m-1)/6+1),
+				/+format!".%02d"(m)+/
+				' '~MonthNames[m-1]
+			); 
+		} 
+	} 
+	
+	
+	template YearMonthDayIterator()
+	{
+		uint init(DateTime dt, uint dayStep)
+		{
+			const 	st = dt.localSystemTime_fullRange,
+				y = st.wYear,  m = st.wMonth-1, d = st.wDay-1; 
+			return (y*16 + m)*32 + quantize(d, dayStep)+1; 
+		} 
+		
+		enum decodeYMD = q{
+			uint 	ym 	= ymd / 32, 	d 	= ymd % 32,
+				y 	= ym / 16, 	m 	= ym % 16 + 1; 
+		}; 
+		
+		void inc(ref uint ymd, uint dayStep)
+		{
+			mixin(decodeYMD); 
+			int daysInMonth_fast() 
+			=> monthDays[m-1];  int daysInMonth_precise() 
+			=> daysInMonth_fast + (cast(uint)((m==2 && isLeapYear(y)))); 
+			
+			void nextMonth() { if(m>=12)	{ y++; m=1; }	else	m++; d=1; } 
+			
+			switch(dayStep)
+			{
+				case 1: 	{ d+=dayStep; if(d>daysInMonth_precise) nextMonth; }	break; 
+				case 2: 	{ d+=dayStep; if((m==2 && d>27) || d>29) nextMonth; }	break; 
+				case 3: 	{ d+=dayStep; if((m==2 && d>25) || d>28) nextMonth; }	break; 
+				default: 	{ d = ((d==1)?(0):(d))+dayStep; if(d>25) nextMonth; }	break; 
+			}
+			
+			ymd = (y*16 + m-1)*32 + d; 
+		} 
+		
+		DateTime dt(uint ymd)
+		{ mixin(decodeYMD); return cachedLocalDateTime(y, m, d); } 
+		
+		bool isRed(uint ymd)
+		{ mixin(decodeYMD); return !!cachedDayOfWeek(y, m, d).among(0, 6); } 
+		string str(uint ymd, uint dayStep, bool isFull)
+		{ mixin(decodeYMD); return formatYMD(y, m, d); } 
+	} 
+	template HourIterator()
+	{
+		enum unit = DateTime.RawUnit.hour; 
+		
+		void adjust(ref long raw, uint hourStep)
+		{
+			if(raw<=hourStep || hourStep<=1) return; 
+			
+			foreach(i; 0..hourStep-1)
+			{
+				const h = dt(raw).localSystemTime.wHour; 
+				if(h%hourStep==0) break; 
+				raw++; 
 			}
 		} 
-		enum mustFixRoundingErrors = unit<10; 
-		static if(mustFixRoundingErrors)
+		
+		long init(DateTime dt, uint hourStep)
 		{
-			/+
-				repeat the increment operation if the raw DateTime 
-				was not changed.
-			+/
-			const prev = dt(st); 
-			doit; if(prev==dt(st)) doit; 
-		}
-		else { doit;  /+It has enough precision, just do it once.+/}
+			long raw = dt.raw / unit; 
+			raw -= hourStep-1; 
+			adjust(raw, hourStep); return raw; 
+		} 
+		
+		void inc(ref long raw, uint hourStep)
+		{
+			raw += hourStep; 
+			adjust(raw, hourStep); 
+		} 
+		
+		DateTime dt(long raw)
+		{
+			if(raw<=0) return RawDateTime(0); 
+			if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+			return RawDateTime((cast(ulong)(raw)) * unit); 
+		} 
+		
+		bool isRed(long raw) => false; 
+		string str(long raw, uint minuteStep, bool isFull)
+		{
+			with(dt(raw).localSystemTime)
+			return mixin(FULL_YMD)~formatH(wHour); 
+		} 
 	} 
 	
-	DateTime dt(in State st)
+	template HourMinuteIterator()
 	{
-		with(st) {
-			const ulong cur = base + (iround(counter * unit)); 
-			return RawDateTime(cur>=base ? cur : ulong.max); 
-		}
+		enum unit = DateTime.RawUnit.min; 
+		
+		long init(DateTime dt, uint minuteStep)
+		{
+			long raw = dt.raw / unit; 
+			if(minuteStep>1) raw -= raw.modw(minuteStep); return raw; 
+		} 
+		
+		void inc(ref long raw, uint minuteStep)
+		{ raw += minuteStep; } 
+		
+		DateTime dt(long raw)
+		{
+			if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+			return RawDateTime((cast(ulong)(raw))*unit); 
+		} 
+		
+		bool isRed(long raw) => false; 
+		string str(long raw, uint minuteStep, bool isFull)
+		{
+			with(dt(raw).localSystemTime)
+			return mixin(FULL_YMD)~formatHM(wHour, wMinute); 
+		} 
 	} 
 	
-	bool isRed(in State st) => false; 
-	string str(in State st, uint thousandStep)
-	=> st.counter.text ~ unitStr; 
+	template HourMinuteSecondIterator()
+	{
+		enum unit = DateTime.RawUnit.sec; 
+		
+		long init(DateTime dt, uint secondStep)
+		{
+			long raw = dt.raw / unit; 
+			if(secondStep>1) raw -= raw.modw(secondStep); return raw; 
+		} 
+		
+		void inc(ref long raw, uint secondStep)
+		{ raw += secondStep; } 
+		
+		DateTime dt(long raw)
+		{
+			if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+			return RawDateTime((cast(ulong)(raw))*unit); 
+		} 
+		
+		bool isRed(long raw) => false; 
+		string str(long raw, uint secondStep, bool isFull)
+		{
+			with(dt(raw).localSystemTime)
+			return mixin(FULL_YMD)~
+			formatHMS(wHour, wMinute, wSecond); 
+		} 
+	} 
+	
+	template ThousandIterator(string unitStr, ulong unit1000)
+	{
+		enum unit = unit1000/1000.0f; 
+		
+		struct State { ulong base; uint counter; } 
+		
+		State init(DateTime dt, uint thousandStep)
+		{
+			ulong m = dt.raw % unit1000; 
+			int fr = (ifloor(m / unit)).clamp(0, 999); 
+			fr -= fr % thousandStep; 
+			return State(dt.raw - m, fr); 
+		} 
+		
+		void inc(ref State st, uint thousandStep)
+		{
+			void doit()
+			{
+				with(st) {
+					counter += thousandStep; 
+					if(counter>=1000)
+					{
+						counter = 0; 
+						const next = base+unit1000; 
+						base = next>=base ? next : ulong.max; 
+					}
+				}
+			} 
+			enum mustFixRoundingErrors = unit<10; 
+			static if(mustFixRoundingErrors)
+			{
+				/+
+					repeat the increment operation if the raw DateTime 
+					was not changed.
+				+/
+				const prev = dt(st); 
+				doit; if(prev==dt(st)) doit; 
+			}
+			else { doit; /+It has enough precision, just do it once.+/}
+		} 
+		
+		DateTime dt(in State st)
+		{
+			with(st) {
+				const ulong cur = base + (iround(counter * unit)); 
+				return RawDateTime(cur>=base ? cur : ulong.max); 
+			}
+		} 
+		
+		bool isRed(in State st) => false; 
+		string str(in State st, uint thousandStep, bool isFull)
+		{
+			string s; 
+			if(isFull)
+			with(st.base.RawDateTime.localSystemTime)
+			{
+				s = mixin(FULL_YMDHMS); 
+				if(unit1000<=DateTime.RawUnit.ms)
+				{
+					s ~= (st.base/DateTime.RawUnit.ms%1000).text~"ms "; 
+					if(unit1000<=DateTime.RawUnit.us)
+					{ s ~= (st.base/DateTime.RawUnit.us%1000).text~"µs "; }
+				}
+			}
+			return s ~ st.counter.text ~ unitStr; 
+		} 
+	} 
+	alias MilliSecIterator 	= ThousandIterator!("ms", DateTime.RawUnit.sec),
+	MicroSecIterator 	= ThousandIterator!("µs", DateTime.RawUnit.ms),
+	NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us); 
 } 
-
-alias MilliSecIterator 	= ThousandIterator!("ms", DateTime.RawUnit.sec),
-MicroSecIterator 	= ThousandIterator!("µs", DateTime.RawUnit.ms),
-NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us); 
 
+
+
 mixin((
 	(表([
-		[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Iterator#+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/}],
-		[q{none},q{},q{[]},q{0*second},q{1}],
-		[q{year},q{YearIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]},q{gregorianDaysInYear*day},q{5}],
-		[q{month},q{YearMonthIterator},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{8}],
-		[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{11}],
-		[q{hour},q{HourIterator},q{[1, 2, 3, 6, 12]},q{hour},q{4}],
-		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 30]},q{minute},q{6}],
-		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 30]},q{second},q{9}],
-		[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6}],
-		[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6}],
-		[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6}],
-		[q{yearWeek},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
-		[q{yearWeek_iso},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4}],
-		[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4}],
+		[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Iterator#+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/},q{/+Note: FullChars+/}],
+		[q{none},q{},q{[]},q{0*second},q{1},q{0}],
+		[q{year},q{YearIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]},q{gregorianDaysInYear*day},q{5},q{0}],
+		[q{month},q{YearMonthIterator},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{9},q{0}],
+		[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{13},q{0}],
+		[q{hour},q{HourIterator},q{[1, 2, 3, 6, 12]},q{hour},q{4},q{13}],
+		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 30]},q{minute},q{6},q{13}],
+		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 30]},q{second},q{9},q{13}],
+		[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6},q{23}],
+		[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6},q{29}],
+		[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6},q{34}],
+		[q{yearWeek},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4},q{0}],
+		[q{yearWeek_iso},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4},q{0}],
+		[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4},q{0}],
 	]))
 ).調!(GEN_enumTable)); 
 
@@ -443,7 +476,8 @@ void iterateLocalDateTimeRanges(
 	float left, float right, float avgCharWidth,
 	in DateTimeGranularity[] granularities,
 	void delegate(ref DateTimeIteratedRange) onLabel, 
-	void delegate(ref DateTimeIteratedRange) onTick=null
+	void delegate(ref DateTimeIteratedRange) onTick=null,
+	bool fullLabel = false
 )
 {
 	if(start>=end) return; 
@@ -463,7 +497,8 @@ void iterateLocalDateTimeRanges(
 	foreach(gr; granularities.retro)
 	{
 		const avgTime = dateTimeGranularityAvgTime[gr]; 
-		const numChars = dateTimeGranularityNumChars[gr]; 
+		const numChars = 	dateTimeGranularityNumChars[gr] +
+			((fullLabel)?(dateTimeGranularityFullChars[gr]):(0)); 
 		const float target = numChars * ((charTime)/(avgTime)); 
 		foreach(step; dateTimeGranularitySteps[gr])
 		{
@@ -496,7 +531,7 @@ void iterateLocalDateTimeRanges(
 				while(t0<end)
 				{
 					if(tickLevel==0) {
-						label = str(iState, step); 
+						label = str(iState, step, fullLabel); 
 						state.isRed = ITER.isRed(iState); 
 					}
 					
@@ -563,7 +598,7 @@ void dumpIteratorStats(alias Iterator)(int[] steps)
 			if(i>0) diffHist[diff]++; 
 			if(0)
 			print(
-				i.format!"%6d", state, ITER.str(state, step), 
+				i.format!"%6d", state, ITER.str(state, step, isFull:false), 
 				format!"%12.2f"((double(act.raw))/DateTime.RawUnit.day), 
 				format!"%12.2f"((double(diff))/DateTime.RawUnit.day), 
 				act.raw.format!"%016X", 
@@ -629,7 +664,8 @@ struct HRulerLayout
 HRulerLayout generateHRulerLayout
 	(
 	bounds2 bnd, DateTime start, DateTime end, 
-	in DateTimeGranularity[] granularities = DateTimeGranularities.full
+	in DateTimeGranularity[] granularities = DateTimeGranularities.full,
+	bool fullLabel
 )
 {
 	HRulerLayout res; 
@@ -650,15 +686,19 @@ HRulerLayout generateHRulerLayout
 			}
 			
 			res.labels ~= a.label, res.isRed ~= a.isRed; 
-			res.p ~= a.p0, res.t ~= a.t0; 
+			res.p ~= a.p1, res.t ~= a.t1; 
 		}),
-		((a){ res.ticks ~= HRulerLayout.Tick(a.p1, a.tickLevel); })
+		((a){ res.ticks ~= HRulerLayout.Tick(a.p1, a.tickLevel); }),
+		fullLabel : fullLabel
 	); 
 	
 	return res; 
 } 
 
-void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler)
+void drawHRuler(
+	IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler,
+	bool enableTicks = true
+)
 {
 	enum lineWidthScale	= 1.05f,
 	clMajorTick 	= (RGB(0x101010)),
@@ -678,33 +718,80 @@ void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler)
 	
 	if(!ruler.valid) return; 
 	
-	void drawTick(float x, int size/+1..6+/)
-	{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
+	if(enableTicks)
+	{
+		void drawTick(float x, int size/+1..6+/)
+		{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
+		
+		dr.color = clMinorTick; foreach(t; ruler.ticks) drawTick(t.p, t.level); 
+		dr.color = clMajorTick; foreach(x; ruler.p) drawTick(x, 6); 
+	}
 	
-	dr.color = clMinorTick; foreach(t; ruler.ticks) drawTick(t.p, t.level); 
-	dr.color = clMajorTick; foreach(x; ruler.p) drawTick(x, 6); 
-	
-	dr.color = clText; bool lastIsRed=false; 
+	dr.color = clText; bool lastIsRed = false; 
 	void drawLabel(bool isRed, float x, string str)
 	{
 		if(lastIsRed.chkSet(isRed))
-		dr.color = ((lastIsRed)?(clRedText):(clText)); 
+		dr.color = ((isRed)?(clRedText):(clText)); 
 		dr.textOut(vec2(x, bnd.top), str); 
 	} 
 	
-	const pad = lw*3; 
-	foreach(i, s; ruler.labels)
-	{ drawLabel(ruler.isRed[i], ruler.p[i] + pad, s); }
+	const pad = lw*3, N = ruler.labels.length; 
+	if(N>=3)
+	{
+		foreach(i, s; ruler.labels)
+		{ drawLabel(ruler.isRed[i], ruler.p[i] + pad, s); }
+	}
+	else if(N==2)
+	{
+		const 	s = ruler.labels[0], tw = dr.textWidth(s),
+			x = min(bnd.left+pad, ruler.p[1] - pad - tw); 
+		drawLabel(ruler.isRed[0], x, s); 
+		drawLabel(ruler.isRed[1], ruler.p[1] + pad, ruler.labels[1]); 
+	}
+	else if(N==1)
+	{
+		const 	s = ruler.labels[0],
+			x = bnd.left + pad; 
+		drawLabel(ruler.isRed[0], x, s); 
+	}
 } 
 
-DateTimeGranularityStep drawHRuler
-	(
-	IDrawing dr, bounds2 bnd, DateTime start, DateTime end, 
-	in DateTimeGranularity[] granularities = DateTimeGranularities.full
-)
+void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 {
-	auto r = generateHRulerLayout(bnd, start, end, granularities); 
-	drawHRuler(dr, bnd, r); return r.gr; 
+	bounds2 coarseBnd = bnd, fineBnd = bnd; 
+	coarseBnd.bottom = fineBnd.top = bnd.center.y; 
+	
+	alias G = DateTimeGranularity, GS = DateTimeGranularities; 
+	static immutable granularitySets = 
+		[
+		GS.yearMonthDay, GS.hourMinSec, 
+		[G.milliSecond], [G.microSecond], [G.nanoSecond]
+	]; 
+	
+	HRulerLayout fineLayout, coarseLayout; 
+	foreach_reverse(gsIdx; 0..granularitySets.length)
+	{
+		fineLayout = generateHRulerLayout
+			(
+			fineBnd, start, end, 
+			granularitySets[gsIdx], fullLabel: false
+		); 
+		if(fineLayout)
+		{
+			if(gsIdx>0)
+			{
+				coarseLayout = generateHRulerLayout
+					(
+					coarseBnd, start, end, 
+					granularitySets[gsIdx-1], fullLabel: true
+				); 
+			}
+			break; 
+		}
+	}
+	
+	drawHRuler(dr, coarseBnd, coarseLayout); 
+	drawHRuler(dr, fineBnd, fineLayout); 
 } 
 
 class FrmHelloGUI: UIWindow
@@ -724,7 +811,14 @@ class FrmHelloGUI: UIWindow
 		if(canProcessUserInput) navigateView(!im.wantKeys, !im.wantMouse); 
 		invalidate; 
 		
-		with(im) { Panel(PanelPosition.topLeft, { Text("param1"); Slider(param1, range(0, 1), { width = fh*24; } ); }); }
+		with(im) {
+			Panel(
+				PanelPosition.topLeft, {
+					Text("param1"); 
+					Slider(param1, range(0, 1), { width = clientWidth-100; } ); 
+				}
+			); 
+		}
 	} 
 	
 	override void beforeImDraw(IDrawing drWorld, IDrawing drGui)
@@ -732,32 +826,19 @@ class FrmHelloGUI: UIWindow
 		with(drWorld)
 		{
 			color = clWhite; alpha = 1; 
-			fontHeight = 100; 
-			textOut(vec2(0,-100), "Hello"); 
+			//fontHeight = 100; 
+			//textOut(vec2(0,-100), "Hello"); 
 			
-			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.0000125     *0.01  -.155; 
+			const ramp = 0.875 + sin(2*π*time.value(120*second))*0.0000125     *0.01  -.155; 
 			if(1)
 			{
-				const i = (((1)?(param1*2):(cos(2*π*time.value(20*second))+1)))*32; 
+				const i = (((0)?(param1*2):(cos(2*π*time.value(60*second))+1)))*32; 
 				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*2))).min(h),
 					st = RawDateTime(h-n), en = RawDateTime(h+n+1); 
+				const bnd = bounds2(vec2(50, 0), ((vec2(clientWidth, 48*2)).名!q{size})); 
 				
-				alias G = DateTimeGranularity, GS = DateTimeGranularities; 
-				static immutable granularities = [
-					GS.yearMonthDay, GS.hourMinSec, 
-					[G.milliSecond], [G.microSecond], [G.nanoSecond]
-				]; 
 				
-				HRulerLayout[] layouts; 
-				foreach(gr; granularities)
-				{
-					auto layout = generateHRulerLayout(bounds2(vec2(50, 0), ((vec2(clientWidth, 24)).名!q{size})), st, en, gr); 
-					if(layout) layouts ~= layout; else break; 
-				}
-				if(false && layouts.length>2) layouts = layouts[$-2..$]; //only take the last 2
-				
-				foreach(idx, ref layout; layouts)
-				{ drawHRuler(drWorld, bounds2(vec2(50, 10+26*idx), ((vec2(clientWidth, 24)).名!q{size})), layout); }
+				drawHRuler(drWorld, bnd, st, en); 
 			}
 		}
 	} 
