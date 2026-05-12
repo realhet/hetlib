@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+//@/release
 
 //@compile --d-version=VulkanUI
 
@@ -295,9 +295,6 @@ template ThousandIterator(string unitStr, ulong unit1000)
 alias MilliSecIterator 	= ThousandIterator!("ms", DateTime.RawUnit.sec),
 MicroSecIterator 	= ThousandIterator!("µs", DateTime.RawUnit.ms),
 NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us); 
-
-
-
 
 mixin((
 	(表([
@@ -317,6 +314,25 @@ mixin((
 		[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4}],
 	]))
 ).調!(GEN_enumTable)); 
+
+struct DateTimeGranularities
+{
+	private alias _ = DateTimeGranularity; 
+	static immutable
+		yearMonthDay 	= [_.year, _.month, _.day],
+		yearWeek 	= [_.year, _.yearWeek],
+		yearWeek_iso 	= [_.year, _.yearWeek_iso],
+		yearDay 	= [_.year, _.yearDay],
+			
+		hourMin	= [_.hour, _.minute],
+		hourMinSec	= hourMin ~ _.second,
+			
+		subSecond	= [_.milliSecond, _.microSecond, _.nanoSecond],
+			
+		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
+		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
+		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
+} 
 
 DateTimeGranularity successorOf(DateTimeGranularity g)
 {
@@ -406,25 +422,7 @@ DateTimeGranularityStep[] selectTickGranularities(in DateTimeGranularityStep a)
 	if(mixin(界0(q{1},q{a.step},q{10}))) return level1(1); 
 	return []; 
 } 
-
-struct DateTimeGranularities
-{
-	private alias _ = DateTimeGranularity; 
-	static immutable
-		yearMonthDay 	= [_.year, _.month, _.day],
-		yearWeek 	= [_.year, _.yearWeek],
-		yearWeek_iso 	= [_.year, _.yearWeek_iso],
-		yearDay 	= [_.year, _.yearDay],
-			
-		hourMin	= [_.hour, _.minute],
-		hourMinSec	= hourMin ~ _.second,
-			
-		subSecond	= [_.milliSecond, _.microSecond, _.nanoSecond],
-			
-		full	= yearMonthDay 	~ hourMinSec ~ subSecond,
-		full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
-		full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
-} 
+
 
 struct DateTimeIteratedRange
 {
@@ -440,7 +438,7 @@ struct DateTimeIteratedRange
 	bool isRed; string label; 
 } 
 
-auto iterateLocalDateTimeRanges(
+void iterateLocalDateTimeRanges(
 	DateTime start, DateTime end, 
 	float left, float right, float avgCharWidth,
 	in DateTimeGranularity[] granularities,
@@ -593,50 +591,127 @@ void dumpDateTimeIteratorStats()
 	dumpIteratorStats!HourIterator([1, 2, 3, 4, 6, 8]); 
 } 
 
-static void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
+struct HRulerLayout
 {
-	enum lineWidthScale	= 1.1f,
-	clMajorTick 	= (RGB(0x000000)),
-	clMinorTick 	= (RGB(0x000000)),
+	DateTimeGranularityStep gr; 
+	
+	float p0, p1, avgCharWidth; 
+	DateTime t0, t1; 
+	
+	bool opEquals(const ref HRulerLayout b) const 
+	=> gr.granularity==b.gr.granularity && gr.step==b.gr.step
+	
+	/+Screen coords match loosely.+/
+	&& isClose(p0, b.p0) && isClose(p1, b.p1) 
+	&& avgCharWidth.isClose(b.avgCharWidth)
+	
+	/+Time points match exactly+/
+	&& t0==b.t0 && t1==b.t1; 
+	
+	size_t toHash() const
+	{
+		auto h = hashOf((cast(int)(gr.granularity)) | gr.step<<8); 
+		h = p0.hashOf(p1.hashOf(avgCharWidth.hashOf(h))); 
+		return t0.hashOf(t1.hashOf(h)); 
+	} 
+	
+	bool valid()const => gr.valid && t1>t0 && p1>p0 && avgCharWidth!=0; 
+	bool opCast(B: bool)()const => valid; 
+	
+	string[] labels; bool[] isRed; 
+	float[] p; DateTime[] t; 
+	
+	struct Tick { align(1): float p; ubyte level; } 
+	Tick[] ticks; 
+} 
+
+
+HRulerLayout generateHRulerLayout
+	(
+	bounds2 bnd, DateTime start, DateTime end, 
+	in DateTimeGranularity[] granularities = DateTimeGranularities.full
+)
+{
+	HRulerLayout res; 
+	if(start>=end || bnd.empty) return res; 
+	const float 	h = bnd.height, fh = h*(16.0f/24), 	//fontHeight
+		avgCharWidth = fh * 9.0f/16; 
+	
+	res.p0 = bnd.left, res.p1 = bnd.right, res.avgCharWidth = avgCharWidth, 
+	res.t0 = start, res.t1 = end; 
+	
+	iterateLocalDateTimeRanges
+	(
+		start, end, bnd.left, bnd.right, avgCharWidth, granularities, 
+		((a){
+			if(a.idx==0) {
+				res.gr = a.granularityStep; 
+				res.p ~= a.p0, res.t ~= a.t0; 
+			}
+			
+			res.labels ~= a.label, res.isRed ~= a.isRed; 
+			res.p ~= a.p0, res.t ~= a.t0; 
+		}),
+		((a){ res.ticks ~= HRulerLayout.Tick(a.p1, a.tickLevel); })
+	); 
+	
+	return res; 
+} 
+
+void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler)
+{
+	enum lineWidthScale	= 1.05f,
+	clMajorTick 	= (RGB(0x101010)),
+	clMinorTick 	= (RGB(0x202020)),
 	clText 	= (RGB(0x000000)),
+	clRedText 	= (RGB(0x0000FF)),
 	clBackground	= (RGB(0xFFFFFF)); 
 	
-	if(start>=end || bnd.empty) return; 
+	if(bnd.empty) return; 
 	const float 	h = bnd.height,
 		lw = h/24, 	//lineWidth;
 		fh = h*(16.0f/24), 	//fontHeight
-		th = h/6,	/+tickHeigh+/
-		avgCharWidth = fh * 9.0f/16,
-		totalChars = bnd.width / avgCharWidth; 
-	
-	const sc = (float(((bnd.width)/(end.raw-start.raw)))); 
-	float tr(DateTime dt)
-	=> ((dt.raw>=start.raw)?( (float(dt.raw-start.raw))*sc) :(-(float(start.raw-dt.raw))*sc))+bnd.left; 
+		th = h/6	/+tickHeigh+/; 
 	
 	dr.lineWidth = lw * lineWidthScale, dr.fontHeight = fh; 
 	dr.color = clBackground; dr.fillRect(bnd); 
 	
+	if(!ruler.valid) return; 
+	
 	void drawTick(float x, int size/+1..6+/)
 	{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
 	
+	dr.color = clMinorTick; foreach(t; ruler.ticks) drawTick(t.p, t.level); 
+	dr.color = clMajorTick; foreach(x; ruler.p) drawTick(x, 6); 
 	
-	iterateLocalDateTimeRanges
+	dr.color = clText; bool lastIsRed=false; 
+	void drawLabel(bool isRed, float x, string str)
+	{
+		if(lastIsRed.chkSet(isRed))
+		dr.color = ((lastIsRed)?(clRedText):(clText)); 
+		dr.textOut(vec2(x, bnd.top), str); 
+	} 
+	
+	const pad = lw*3; 
+	foreach(i, s; ruler.labels)
+	{ drawLabel(ruler.isRed[i], ruler.p[i] + pad, s); }
+} 
+
+DateTimeGranularityStep drawHRuler
 	(
-		start, end, bnd.left, bnd.right, avgCharWidth, DateTimeGranularities.full, 
-		((a){
-			dr.color = clMajorTick; 
-			if(a.idx==0) drawTick(a.p0, 6); drawTick(a.p1, 6); 
-			
-			dr.color = a.isRed ? clRed : clText; 
-			dr.textOut(vec2(a.p0+lw*3, bnd.top), a.label); 
-		}),
-		((a){ dr.color = clMinorTick; drawTick(a.p1, a.tickLevel); })
-	); 
+	IDrawing dr, bounds2 bnd, DateTime start, DateTime end, 
+	in DateTimeGranularity[] granularities = DateTimeGranularities.full
+)
+{
+	auto r = generateHRulerLayout(bnd, start, end, granularities); 
+	drawHRuler(dr, bnd, r); return r.gr; 
 } 
 
 class FrmHelloGUI: UIWindow
 {
 	mixin autoCreate; mixin SetupMegaShader!q{}; 
+	
+	float param1 = 0; 
 	
 	override void onCreate()
 	{
@@ -649,7 +724,7 @@ class FrmHelloGUI: UIWindow
 		if(canProcessUserInput) navigateView(!im.wantKeys, !im.wantMouse); 
 		invalidate; 
 		
-		with(im) { Panel(PanelPosition.topLeft, { Text("Hello"); }); }
+		with(im) { Panel(PanelPosition.topLeft, { Text("param1"); Slider(param1, range(0, 1), { width = fh*24; } ); }); }
 	} 
 	
 	override void beforeImDraw(IDrawing drWorld, IDrawing drGui)
@@ -662,74 +737,28 @@ class FrmHelloGUI: UIWindow
 			
 			const ramp = 0.875 + sin(2*π*time.value(20*second))*0.0000125     *0.01  -.155; 
 			if(1)
-			foreach(i; 0..128/1)
 			{
-				static if(1)
-				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*1))).min(h),
+				const i = (((1)?(param1*2):(cos(2*π*time.value(20*second))+1)))*32; 
+				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*2))).min(h),
 					st = RawDateTime(h-n), en = RawDateTime(h+n+1); 
 				
-				static if(0)
-				const st = RawDateTime(0), en = RawDateTime((cast(ulong)((ulong.max * pow(ramp, i)).min(ulong.max)))); 
+				alias G = DateTimeGranularity, GS = DateTimeGranularities; 
+				static immutable granularities = [
+					GS.yearMonthDay, GS.hourMinSec, 
+					[G.milliSecond], [G.microSecond], [G.nanoSecond]
+				]; 
 				
-				drawHRuler(drWorld, bounds2(vec2(50, 10+26*i), ((vec2(clientWidth, 24)).名!q{size})), st, en); 
+				HRulerLayout[] layouts; 
+				foreach(gr; granularities)
+				{
+					auto layout = generateHRulerLayout(bounds2(vec2(50, 0), ((vec2(clientWidth, 24)).名!q{size})), st, en, gr); 
+					if(layout) layouts ~= layout; else break; 
+				}
+				if(false && layouts.length>2) layouts = layouts[$-2..$]; //only take the last 2
+				
+				foreach(idx, ref layout; layouts)
+				{ drawHRuler(drWorld, bounds2(vec2(50, 10+26*idx), ((vec2(clientWidth, 24)).名!q{size})), layout); }
 			}
-			
-			void do1(int x0, int x1)
-			{
-				translate(vec2(0, 0)); scope(exit) pop; 
-				
-				const float h = 6; 
-				lineWidth = h/24.0; fontHeight = h*(16.0/24); const th = h/6; 
-				
-				x0 = x0-x0.modw(10); 
-				x1 += (10-1); x1 = x1-x1.modw(10); 
-				
-				for(int x=x0; x<=x1; x+=1) { vLine(x, h, h-th); }
-				for(int x=x0; x<=x1; x+=5) { vLine(x, h, h-th*2); }
-				for(int x=x0; x<=x1; x+=10) {
-					vLine(x, h, 0); 
-					if(x%100==0) color = clRed; 
-					textOut(vec2(x+lineWidth*3, 0), text(x/10)); 
-					color = clWhite; 
-				}
-			} 
-			void do2(int x0, int x1)
-			{
-				translate(vec2(0, 7)); scope(exit) pop; 
-				const float h = 12; 
-				lineWidth = h/24.0; fontHeight = h*(16.0/24); const th = h/6; 
-				
-				for(int x=x0; x<=x1; x+=2) { vLine(x, h, h-th); }
-				for(int x=x0; x<=x1; x+=10) { vLine(x, h, h-th*2); }
-				for(int x=x0; x<=x1; x+=20) {
-					vLine(x, h, 0); 
-					if(x%100==0) color = clRed; 
-					textOut(vec2(x+lineWidth*3, 0), text(x/10)); 
-					color = clWhite; 
-				}
-			} 
-			void do5(int x0, int x1)
-			{
-				translate(vec2(0, 21)); scope(exit) pop; 
-				const float h = 30; 
-				lineWidth = h/24.0; fontHeight = h*(16.0/24); const th = h/6; 
-				for(int x=x0; x<=x1; x+=5) { vLine(x, h, h-th); }
-				for(int x=x0; x<=x1; x+=10) { vLine(x, h, h-th*2); }
-				for(int x=x0; x<=x1; x+=50) {
-					vLine(x, h, 0); 
-					if(x%100==0) color = clRed; 
-					textOut(vec2(x+lineWidth*3, 0), text(x/10)); 
-					color = clWhite; 
-				}
-			} 
-			
-			
-			const x0 = -1000, x1 = 10000; 
-				/+
-				do1(x0, x1); 
-				do2(x0, x1); 
-				do5(x0, x1); 
-			+/
 		}
 	} 
 } 
