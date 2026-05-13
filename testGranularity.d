@@ -846,21 +846,9 @@ class FrmHelloGUI: UIWindow
 				auto 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*2))).min(h),
 					st = RawDateTime(h-n), en = RawDateTime(h+n+1); 
 				
-				if(testCase==TestCase.test0) st = RawDateTime(9221923640942195658), en = RawDateTime(9224820432767355957); 
-				if(testCase==TestCase.test1) st = RawDateTime(9221827658959954546), en = RawDateTime(9224916414749597069); 
-				
-				if(inputs.F1.down) clipboard.text = iq{st = RawDateTime($(st.raw)), en = RawDateTime($(en.raw))}.text; 
-				
-				((0x5D79CF610056).檢(RawDateTime(9221923640942195658))); 
-				((0x5DB9CF610056).檢(RawDateTime(9221827658959954546))); 
-				
 				st += param2 * day; 
 				
-				//2057 aug 11 st = RawDateTime(9221923640942195658), en = RawDateTime(9224820432767355957)
-				//2057 aug 10 st = RawDateTime(9221827658959954546), en = RawDateTime(9224916414749597069)
-				
 				const bnd = bounds2(vec2(50, 0), ((vec2(clientWidth, 48*2)).名!q{size})); 
-				
 				
 				drawHRuler(drWorld, bnd, st, en); 
 			}
