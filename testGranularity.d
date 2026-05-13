@@ -113,14 +113,22 @@ private
 		} 
 	} 
 	
+	__gshared DayQuantizeBug=false; 
 	
 	template YearMonthDayIterator()
 	{
 		uint init(DateTime dt, uint dayStep)
 		{
 			const 	st = dt.localSystemTime_fullRange,
-				y = st.wYear,  m = st.wMonth-1, d = st.wDay-1; 
-			return (y*16 + m)*32 + quantize(d, dayStep)+1; 
+				y = st.wYear,  m = st.wMonth, d = st.wDay; 
+			
+			version(/+$DIDE_REGION Apply human quantization "logic"+/all)
+			{
+				int dq = ((dayStep<5)?(quantize(d-1, dayStep)+1) :(quantize(d, dayStep).max(1))); 
+				if(dq>=((m==2)?(28):(30))) dq -= dayStep; 
+			}
+			
+			return (y*16 + m-1/+0based!+/)*32 + dq; 
 		} 
 		
 		enum decodeYMD = q{
@@ -335,13 +343,13 @@ mixin((
 		[q{none},q{},q{[]},q{0*second},q{1},q{0}],
 		[q{year},q{YearIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]},q{gregorianDaysInYear*day},q{5},q{0}],
 		[q{month},q{YearMonthIterator},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{9},q{0}],
-		[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{13},q{0}],
-		[q{hour},q{HourIterator},q{[1, 2, 3, 6, 12]},q{hour},q{4},q{13}],
-		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 30]},q{minute},q{6},q{13}],
-		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 30]},q{second},q{9},q{13}],
-		[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6},q{23}],
-		[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6},q{29}],
-		[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6},q{34}],
+		[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{15},q{3}],
+		[q{hour},q{HourIterator},q{[1, 2, 3, 6, 12]},q{hour},q{4},q{0}],
+		[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 30]},q{minute},q{6},q{0}],
+		[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 30]},q{second},q{9},q{22}],
+		[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6},q{33}],
+		[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6},q{42}],
+		[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6},q{0}],
 		[q{yearWeek},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4},q{0}],
 		[q{yearWeek_iso},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4},q{0}],
 		[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4},q{0}],
@@ -569,7 +577,7 @@ void iterateLocalDateTimeRanges(
 	
 	if(state.step)
 	{
-		doit; 
+		doit; DayQuantizeBug=false; 
 		
 		if(onTick !is null)
 		{
@@ -695,22 +703,20 @@ HRulerLayout generateHRulerLayout
 	return res; 
 } 
 
-void drawHRuler(
-	IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler,
-	bool enableTicks = true
-)
+void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler, bool isFine)
 {
 	enum lineWidthScale	= 1.05f,
 	clMajorTick 	= (RGB(0x101010)),
 	clMinorTick 	= (RGB(0x202020)),
-	clText 	= (RGB(0x000000)),
+	clText 	= (RGB(0xFF0000)),
 	clRedText 	= (RGB(0x0000FF)),
 	clBackground	= (RGB(0xFFFFFF)); 
 	
 	if(bnd.empty) return; 
 	const float 	h = bnd.height,
-		lw = h/24, 	//lineWidth;
-		fh = h*(16.0f/24), 	//fontHeight
+		defH = ((isFine)?(24):(16)),
+		lw = h/defH, 	//lineWidth;
+		fh = h*(16.0f/defH), 	//fontHeight
 		th = h/6	/+tickHeigh+/; 
 	
 	dr.lineWidth = lw * lineWidthScale, dr.fontHeight = fh; 
@@ -718,14 +724,12 @@ void drawHRuler(
 	
 	if(!ruler.valid) return; 
 	
-	if(enableTicks)
-	{
-		void drawTick(float x, int size/+1..6+/)
-		{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
-		
-		dr.color = clMinorTick; foreach(t; ruler.ticks) drawTick(t.p, t.level); 
-		dr.color = clMajorTick; foreach(x; ruler.p) drawTick(x, 6); 
-	}
+	void drawTick(float x, int size/+1..6+/)
+	{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
+	
+	if(isFine)
+	{ dr.color = clMinorTick; foreach(t; ruler.ticks) drawTick(t.p, t.level); }
+	dr.color = clMajorTick; foreach(x; ruler.p) drawTick(x, 6); 
 	
 	dr.color = clText; bool lastIsRed = false; 
 	void drawLabel(bool isRed, float x, string str)
@@ -759,7 +763,7 @@ void drawHRuler(
 void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 {
 	bounds2 coarseBnd = bnd, fineBnd = bnd; 
-	coarseBnd.bottom = fineBnd.top = bnd.center.y; 
+	coarseBnd.bottom = fineBnd.top = bnd.top + bnd.height * (2.0f/5); 
 	
 	alias G = DateTimeGranularity, GS = DateTimeGranularities; 
 	static immutable granularitySets = 
@@ -771,6 +775,7 @@ void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 	HRulerLayout fineLayout, coarseLayout; 
 	foreach_reverse(gsIdx; 0..granularitySets.length)
 	{
+		DayQuantizeBug = true; 
 		fineLayout = generateHRulerLayout
 			(
 			fineBnd, start, end, 
@@ -790,15 +795,18 @@ void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 		}
 	}
 	
-	drawHRuler(dr, coarseBnd, coarseLayout); 
-	drawHRuler(dr, fineBnd, fineLayout); 
+	drawHRuler(dr, coarseBnd, coarseLayout, isFine: false); 
+	drawHRuler(dr, fineBnd, fineLayout, isFine: true); 
 } 
 
 class FrmHelloGUI: UIWindow
 {
 	mixin autoCreate; mixin SetupMegaShader!q{}; 
 	
-	float param1 = 0; 
+	float param1 = 0, param2 = 0; 
+	
+	enum TestCase { off, test0, test1 } TestCase testCase; 
+	
 	
 	override void onCreate()
 	{
@@ -813,9 +821,11 @@ class FrmHelloGUI: UIWindow
 		
 		with(im) {
 			Panel(
-				PanelPosition.topLeft, {
-					Text("param1"); 
-					Slider(param1, range(0, 1), { width = clientWidth-100; } ); 
+				PanelPosition.topLeft, 
+				{
+					Row({ Text("param1"); Slider(param1, range(0, 1), { width = clientWidth-100; } ); }); 
+					Row({ Text("TestCases"); BtnRow(testCase); }); 
+					Row({ Text("param2"); Slider(param2, range(-1, 1), { width = clientWidth-100; } ); }); 
 				}
 			); 
 		}
@@ -832,9 +842,23 @@ class FrmHelloGUI: UIWindow
 			const ramp = 0.875 + sin(2*π*time.value(120*second))*0.0000125     *0.01  -.155; 
 			if(1)
 			{
-				const i = (((0)?(param1*2):(cos(2*π*time.value(60*second))+1)))*32; 
-				const 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*2))).min(h),
+				const i = (((0)?(param1*2):(cos(2*π*time.value(180*second))+1)))*32; 
+				auto 	h = ulong.max/2,  n = (cast(ulong)(h * pow(ramp, i*2))).min(h),
 					st = RawDateTime(h-n), en = RawDateTime(h+n+1); 
+				
+				if(testCase==TestCase.test0) st = RawDateTime(9221923640942195658), en = RawDateTime(9224820432767355957); 
+				if(testCase==TestCase.test1) st = RawDateTime(9221827658959954546), en = RawDateTime(9224916414749597069); 
+				
+				if(inputs.F1.down) clipboard.text = iq{st = RawDateTime($(st.raw)), en = RawDateTime($(en.raw))}.text; 
+				
+				((0x5D79CF610056).檢(RawDateTime(9221923640942195658))); 
+				((0x5DB9CF610056).檢(RawDateTime(9221827658959954546))); 
+				
+				st += param2 * day; 
+				
+				//2057 aug 11 st = RawDateTime(9221923640942195658), en = RawDateTime(9224820432767355957)
+				//2057 aug 10 st = RawDateTime(9221827658959954546), en = RawDateTime(9224916414749597069)
+				
 				const bnd = bounds2(vec2(50, 0), ((vec2(clientWidth, 48*2)).名!q{size})); 
 				
 				
