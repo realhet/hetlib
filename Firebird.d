@@ -1244,7 +1244,7 @@ version(/+$DIDE_REGION+/all) {
 					NULL: 	return "UNSUPPORTED_"~type.text; 
 			}
 		} 
-		
+		
 		string toJsonText() const
 		{
 			if(isNull) return "null"; 
@@ -1269,7 +1269,7 @@ version(/+$DIDE_REGION+/all) {
 		=> relName.sanitizeDLangTypeIdentifier(id, idx).singularize; 
 		
 		string fieldIdentifier(sizediff_t idx=-1, string id = "field")
-		=> aliasName.sanitizeDLangFieldIdentifier(id, idx); 
+		=> aliasName.sanitizeDLangFieldIdentifier(id, idx); 
 		
 		string baseDType() const
 		{
@@ -1323,14 +1323,13 @@ version(/+$DIDE_REGION+/all) {
 		string DLiteral() const
 		=> /+((isNullable && isNull)?(iq{Nullable!($(baseDType)).init}.text):(baseDLiteral))+/
 		((isNullable)?(((isNull)?(iq{$(DType).init}.text) :(iq{$(DType)($(baseDLiteral))}.text))) :(baseDLiteral)); 
-		
+		
 		FT to(FT)() => readValue!FT; 
 		FT readValue(FT)()
 		{
 			auto loc() => i"readValue!$(FT.stringof) Error:  [$(relName)].[$(aliasName)]: ".text; 
 			auto convError(string type="")()
 			{ enforce(0, loc ~ i"Unhandled $(type) conversion: $(type.text) -> $(FT.stringof)".text); } 
-			
 			static if(is(FT == Nullable!NT, NT))
 			{
 				if(isNull)	return Nullable!NT.init; 
@@ -1339,11 +1338,31 @@ version(/+$DIDE_REGION+/all) {
 			}
 			else
 			{
-				if(isNull) enforce(0, loc ~ i"Null recieved but field is not nullable.".text); 
+				if(isNull)
+				{
+					static if(is(FT == string))	{ return ""; }
+					else static if(is(FT == DateTime))	{ return DateTime.init; }
+					else static if(is(FT == float))	{ return float.nan; }
+					else static if(is(FT == double))	{ return float.nan; }
+					else { enforce(0, loc ~ i"Null recieved but field is not nullable.".text); }
+				}
+				
 				static if(is(FT == string))	{ return toPlainText; }
-				else static if(is(FT == Date))	{ return Date(*(cast(ISC_DATE*)(sqldata))); }
-				else static if(is(FT == Time))	{ return iscTimeToTime(*(cast(ISC_TIME*)(sqldata))); }
-				else static if(is(FT == DateTime))	{ return DateTime(Local, *(cast(ISC_TIMESTAMP*)(sqldata))); }
+				else static if(is(FT == Date))	{
+					enforce(type==SQL_TYPE.DATE, loc ~ "DATE expected"); 
+					return Date(*(cast(ISC_DATE*)(sqldata))); 
+				}
+				else static if(is(FT == Time))	{
+					enforce(type==SQL_TYPE.TIME, loc ~ "TIME expected"); 
+					return iscTimeToTime(*(cast(ISC_TIME*)(sqldata))); 
+				}
+				else static if(is(FT == DateTime))	{
+					if(type==SQL_TYPE.DATE)
+					return DateTime(Local, ISC_TIMESTAMP(*(cast(ISC_DATE*)(sqldata)))); 
+					
+					enforce(type==SQL_TYPE.TIMESTAMP, loc ~ "TIMESTAMP expected"); 
+					return DateTime(Local, *(cast(ISC_TIMESTAMP*)(sqldata))); 
+				}
 				else static if(isIntegral!FT)
 				{
 					auto scale(T)(T* a)
@@ -2287,8 +2306,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xE8A46FCAA195).檢((update間(_間)))); 
-					((0xE8D66FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xEB016FCAA195).檢((update間(_間)))); 
+					((0xEB336FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 
@@ -3930,19 +3949,19 @@ version(/+$DIDE_REGION+/all) {
 		return res[]; 
 	} 
 	
-	T[] toStructArray(T)(
-		auto ref FbResultSet rows, bool strict = true, 
+	void byStruct(T)(
+		auto ref FbResultSet rows, void delegate(ref T) onStruct, bool strict = true, 
 		string FILE = __FILE__, size_t LINE = __LINE__
 	)
 	{
 		try
 		{
-			if(!rows.fields) return []; auto vars = rows.fields.vars; 
+			if(!rows.fields) return; auto vars = rows.fields.vars; 
 			
 			enum structFieldNames = [FieldNamesWithUDA!(T, STORED, true)]; 
 			const 	varFieldNames = vars.enumerate.map!((a)=>(a.value.fieldIdentifier(a.index))).array,
 				colIdx = structFieldNames.map!
-					((sName){
+				((sName){
 				const vIdx = varFieldNames.countUntil!sameText(sName); 
 				enforce(
 					!strict || vIdx>=0, 
@@ -3950,7 +3969,6 @@ version(/+$DIDE_REGION+/all) {
 				); return vIdx; 
 			}).array; 
 			
-			auto res = appender!(T[]); 
 			foreach(row; rows)
 			{
 				T item; 
@@ -3962,11 +3980,20 @@ version(/+$DIDE_REGION+/all) {
 						__traits(getMember, item, name) = vars[colIdx[i]].readValue!FieldT; 
 					}
 				}
-				res ~= item; 
+				onStruct(item); 
 			}
-			return res[]; 
 		}
 		catch(Exception e) { enforce(0, e.simpleMsg, FILE, LINE); assert(0); }
+	} 
+	
+	T[] toStructArray(T)(
+		auto ref FbResultSet rows, bool strict = true, 
+		string FILE = __FILE__, size_t LINE = __LINE__
+	)
+	{
+		auto res = appender!(T[]); 
+		byStruct(rows, ((ref T a){ res ~= a; }), strict, FILE, LINE); return res[]; 
+		/+Opt: There may be an extra copy... Can't get a delegate pointer for res.put.+/
 	} 
 	
 	T[] toArray(T)(

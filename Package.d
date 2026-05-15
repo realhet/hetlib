@@ -1007,7 +1007,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			private auto GetCPULoadPercent_internal()
 			{
 				//get tick counters
-				auto _間=init間; 
 				ulong idle, kernel, user; 
 				auto ft(ref ulong a) { return cast(FILETIME*)(&a); } 
 				if(!GetSystemTimes(ft(idle), ft(kernel), ft(user))) return float.nan; 
@@ -1019,7 +1018,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//Bug: can divide by zero when called too frequently
 				prevTotal	= total; 
 				prevIdle	= idle; 
-				((0x8BF059F156A1).檢((update間(_間)))); 
+				//performance: 0.02ms
+				
 				return res*100; 
 			} 
 			
@@ -3321,15 +3321,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A17859F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A14F59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A24059F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A21759F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A2EA59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A35F59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A2C159F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A33659F156A1})); 
 						+/
 					+/
 				+/
@@ -11616,11 +11616,32 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			
 			auto decodeIscTime(ISC_TIME t_)
 			{
-				static struct IscTime { int iscHour, iscMin; double iscSec; } 
+				static struct IscTime { int iscHour, iscMin; float iscSec; } 
 				uint t = (cast(uint)(t_)); IscTime res; 
 				res.iscSec = (t % 60_0000)*1e-4; 	t /= 60_0000; 
 				res.iscMin = t % 60; 	t /= 60; 
-				res.iscHour = t; 	return res; 
+				res.iscHour = t; 	
+				
+				//1 = 0.1ms
+				/+
+					/+
+						Link: https://www.firebirdsql.org/file/documentation/html/en
+						/refdocs/fblangref25/firebird-25-language-reference.html
+					+/
+					If fractions of seconds are stored in date and time data types, 
+					Firebird stores them to ten-thousandths of a second. 
+					If a lower granularity is preferred, the fraction can be specified 
+					explicitly as thousandths, hundredths or tenths of a second 
+					in Dialect 3 databases of ODS 11 or higher.
+				+/
+				
+				if(res.iscHour>=24)
+				{
+					WARN(i"ISC_TIME overflow: $(res.iscHour):$(res.iscMin):$(res.iscSec)"); 
+					res = IscTime(23, 59, 59.9999); 
+				}
+				
+				return res; 
 			} 
 			
 			auto decodeIscDate(ISC_DATE d)
