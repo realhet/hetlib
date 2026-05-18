@@ -1032,6 +1032,8 @@ version(/+$DIDE_REGION+/all) {
 	+/
 	alias fb = Singleton!FbFuncts; 
 	
+	__gshared bool Firebird_ForceCharmap1250 /+Todo: This is a nasty system wide flag+/; 
+	
 	private ubyte[] toPascalString(string s)
 	=> s.length.to!ubyte ~ (cast(ubyte[])(s)); 
 	private string fetchPascalString(ref ubyte[] raw)
@@ -1208,24 +1210,29 @@ version(/+$DIDE_REGION+/all) {
 			auto quad(string prefix)
 			{ with(*(cast(ISC_QUAD*)(sqldata))) return i"$(prefix)($(high):$(low))".text; } 
 			
-			string dup2(string s) {
-				//return s.dup.safeUTF8; 
-				
-				import std.encoding; 
-				string res; (cast(Windows1250String)(s)).transcode(res); 
-				return res; 
+			string acquireStr(string s)
+			{
+				if(Firebird_ForceCharmap1250)
+				{
+					import std.encoding; 
+					string res; (cast(Windows1250String)(s)).transcode(res); 
+					return res; 
+				}
+				else
+				{ return s.dup.safeUTF8; }
 			} 
+			
 			with(SQL_TYPE)
 			final switch(type)
 			{
-				case VARYING: 	return dup2(
+				case VARYING: 	return acquireStr(
 					(cast(immutable(char)*)(sqldata+2))
-							[
+					[
 						0 .. (*(cast(short*)(sqldata)))
 							.min(sqllen).clamp(0, 0x7fff)
 					]
 				); 
-				case TEXT: 	return dup2(
+				case TEXT: 	return acquireStr(
 					(cast(immutable(char)*)(sqldata))
 						.toStr(sqllen.clamp(0, 0x7fff))
 				)
@@ -2306,8 +2313,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xEB016FCAA195).檢((update間(_間)))); 
-					((0xEB336FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xEBAE6FCAA195).檢((update間(_間)))); 
+					((0xEBE06FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 
@@ -2915,8 +2922,12 @@ version(/+$DIDE_REGION+/all) {
 		=> this[name]; 
 		
 		
-		string sqlText /+prepared sql thext after input+/; 
-		string[] amdbScripts; /+Am array of /+Code/amdb:+/ comments found inside sqlText+/
+		string sqlText /+
+			prepared sql thext after input
+			⚠	Warning! If /+Code: Firebird_ForceCharmap1250+/==true, 
+				it can contain INVALID UTF8 chars!!!
+		+/; 
+		string[] amdbScripts; /+An array of /+Code/amdb:+/ comments found inside sqlText+/
 		
 		size_t inputSignature; 
 		
@@ -3086,7 +3097,14 @@ version(/+$DIDE_REGION+/all) {
 		void prepareInput(Args...)(string[] literals)
 		{
 			reset; 
-			void appendSql(string s) { sqlText ~= s; } 
+			void appendSql(string str) {
+				if(Firebird_ForceCharmap1250)
+				{
+					import std.encoding; 
+					Windows1250String res; str.transcode(res); str = (cast(string)(res)); 
+				}
+				sqlText ~= str; 
+			} 
 			
 			version(/+$DIDE_REGION Internal state for functions+/all)
 			{ bool[] nullables; SQL_TYPE[] types; ushort[] lens; auto literalIdx=0; }
@@ -3226,6 +3244,11 @@ version(/+$DIDE_REGION+/all) {
 				{
 					void placeVarchar(string str)
 					{
+						if(Firebird_ForceCharmap1250)
+						{
+							import std.encoding; 
+							Windows1250String res; str.transcode(res); str = (cast(string)(res)); 
+						}
 						enforce(
 							str.length<=var.sqllen,
 							i"String too long for VARCHAR: $(str.length) > $(var.sqllen)".text
