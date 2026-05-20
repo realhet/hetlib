@@ -28,11 +28,57 @@ class FrmHelloGUI: UIWindow
 		
 		with(im) {
 			Panel(
-				PanelPosition.topLeft, 
+				PanelPosition.topClient, 
 				{
-					Row({ Text("param1"); Slider(param1, range(0, 1), { width = clientWidth-100; } ); }); 
-					Row({ Text("TestCases"); BtnRow(testCase); }); 
-					Row({ Text("param2"); Slider(param2, range(-1, 1), { width = clientWidth-100; } ); }); 
+					Row({ flags.wordWrap=false; Text("param1"); Slider(param1, range(0, 1), { width = clientWidth-100; } ); }); 
+					Row({ flags.wordWrap=false; Text("TestCases"); BtnRow(testCase); }); 
+					Row({ flags.wordWrap=false; Text("param2"); Slider(param2, range(-1, 1), { width = clientWidth-100; } ); }); 
+				}
+			); 
+		}
+		with(im) {
+			Panel(
+				PanelPosition.leftClient, 
+				{
+					outerSize.x = fh*30; 
+					Text("Grafikon címke oszlop"); 
+				}
+			); 
+		}
+		with(im) {
+			Panel(
+				PanelPosition.rightClient, 
+				{
+					outerSize.x = fh*30; 
+					Text("Projektek, Munkalapok"); 
+				}
+			); 
+		}
+		with(im) {
+			Panel(
+				PanelPosition.topClient, 
+				{
+					Container(
+						{
+							height = 4*fh; 
+							Row({ Text("Idôvonalzó"); }); 
+						}
+					); 
+				}
+			); 
+		}
+		
+		foreach(capt; ["gép1", "gép2", "gép3", "összes gép"])
+		with(im) {
+			Panel(
+				PanelPosition.topClient, 
+				{
+					Container(
+						{
+							height = 4*fh; 
+							Row({ Text(capt); }); 
+						}
+					); 
 				}
 			); 
 		}

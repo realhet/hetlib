@@ -3814,11 +3814,11 @@ version(/+$DIDE_REGION Numeric+/all)
 		//Bitwise //////////////////////////////////////////////
 		
 		public import core.bitop : rol, ror,
-			bitCount	= popcnt	,
+		bitCount = popcnt	,
 		//	bitSwap	= bitswap	,
-			byteSwap	= bswap	,
-			bitScan	= bsf	,
-			bitScan_reverse	= bsr	; 
+		byteSwap	= bswap	,
+		bitScan	= bsf	,
+		bitScan_reverse	= bsr	; 
 		
 		T swapBits(T)(in T a) if(isIntegral!T || isSomeChar!T)
 		{
