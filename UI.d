@@ -8962,1045 +8962,1160 @@ struct im
 			return res; 
 		} 
 	}
-	version(/+$DIDE_REGION+/all)
-	{
-			//------------------------------->>>>>>>>>>    Slider ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-		
-			enum SliderOrientation
-		{ horz, vert, round, auto_} 
-			private pure bool isLinear(in SliderOrientation o)
+	version(/+$DIDE_REGION+/all) {
+		version(/+$DIDE_REGION+/all)
 		{
-			with(SliderOrientation)
-			return o==horz || o==vert; 
-		} 
-			private pure bool isRound (in SliderOrientation o)
-		{
-			with(SliderOrientation)
-			return o==round; 
-		} 
-		
-			enum SliderStyle
-		{ slider, scrollBar} 
-		
-			struct ScrollBarOptions
-		{
-			float pageSize = 0; //pageSize in win32
-			int thickness = 13; 
-			int margin = 2; 
-			int minThumbSize_pixels = 5; 
-		} 
-		
-			pure static auto getActualSliderOrientation(SliderOrientation orientation, in bounds2 r, SliderStyle style)
-		{
-			//scrollbar can only be horz or vert.
-			if(style==SliderStyle.scrollBar && !isLinear(orientation))
-			orientation = SliderOrientation.auto_; 
+				//------------------------------->>>>>>>>>>    Slider ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 			
-			if(orientation != SliderOrientation.auto_)
-			return orientation; 
-			
-			immutable THRESHOLD = 1.5f; 
-			float aspect = safeDiv(r.width/r.height, 1); 
-			return aspect>=THRESHOLD	? SliderOrientation.horz:
-						 aspect<=(1/THRESHOLD)	? SliderOrientation.vert:
-																		 SliderOrientation.round; 
-		} 
-		
-			private struct SliderState
-		{
-			 //information about the current slider being modified
-			
-			//information generated and maintained in update
-			Id pressed_id; 
-			vec2 pressed_thumbMouseOfs, pressed_rawMousePos; 
-			float pressed_nPos; //normalized pos
-			int lockedDirection; //0:unknown, 1:h, 2:v
-			
-			void onPress(in Id id, ref float nPos, in vec2 mousePos)
+				enum SliderOrientation
+			{ horz, vert, round, auto_} 
+				private pure bool isLinear(in SliderOrientation o)
 			{
-				//mouse was pressed, initialize values
-				pressed_id = id; 
-				pressed_rawMousePos = rawMousePos; 
-				pressed_nPos = nPos; 
+				with(SliderOrientation)
+				return o==horz || o==vert; 
+			} 
+				private pure bool isRound (in SliderOrientation o)
+			{
+				with(SliderOrientation)
+				return o==round; 
+			} 
+			
+				enum SliderStyle
+			{ slider, scrollBar} 
+			
+				struct ScrollBarOptions
+			{
+				float pageSize = 0; //pageSize in win32
+				int thickness = 13; 
+				int margin = 2; 
+				int minThumbSize_pixels = 5; 
+			} 
+			
+				pure static auto getActualSliderOrientation(SliderOrientation orientation, in bounds2 r, SliderStyle style)
+			{
+				//scrollbar can only be horz or vert.
+				if(style==SliderStyle.scrollBar && !isLinear(orientation))
+				orientation = SliderOrientation.auto_; 
 				
-				//remember the thumb-mouse offset at the time of press
-				pressed_thumbMouseOfs = drawn_thumbRect.center-mousePos;  //
+				if(orientation != SliderOrientation.auto_)
+				return orientation; 
 				
-				//if pressed on a round knob, first it must decide if up/down or left/right
-				lockedDirection = 0; 
-			} 
-			
-			//information saved in draw(). All vectors are transformed into view space.
-			Id drawn_id; 
-			SliderOrientation drawn_orientation; 
-			vec2 drawn_p0, drawn_p1; 
-			bounds2 drawn_thumbRect; 
-			
-			void afterDraw(in Id id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob)
-			{
-				drawn_id = id; 
-				drawn_orientation = ori; 
-				drawn_p0 = p0; 
-				drawn_p1 = p1; 
-				drawn_thumbRect = bKnob; 
-			} 
-			
-			//after onPress() it can jump to the mouse
-			void jumpToPoint(ref float nPos, in vec2 mousePos, bool isEndless)
-			{
-				if(drawn_orientation==SliderOrientation.horz)
-				{
-					pressed_thumbMouseOfs.x = 0; 
-					nPos = remap_clamp(mousePos.x, drawn_p0.x, drawn_p1.x, 0, 1); 
-					if(mousePos.x<drawn_p0.x)
-					pressed_thumbMouseOfs.x = drawn_p0.x-mousePos.x; 
-					if(mousePos.x>drawn_p1.x)
-					pressed_thumbMouseOfs.x = drawn_p1.x-mousePos.x - (isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
-				}else if(drawn_orientation==SliderOrientation.vert)
-				{
-					pressed_thumbMouseOfs.y = 0; 
-					nPos = remap_clamp(mousePos.y, drawn_p0.y, drawn_p1.y, 0, 1); 
-					//Note: p1 and p0 are intentionally swapped!!!
-					if(mousePos.y<drawn_p1.y)
-					pressed_thumbMouseOfs.y = drawn_p1.y-mousePos.y; //Todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
-					if(mousePos.y>drawn_p0.y)
-					pressed_thumbMouseOfs.y = drawn_p0.y-mousePos.y - (isEndless ? 1 : 0); 
-				}else
-				{ NOTIMPL; }
-			} 
-			
-			void mouseAdjust(ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, ref int wrapCnt, float adjustSpeed)
-			{
-				if(drawn_orientation==SliderOrientation.horz)
-				{
-					slowMouse(adjustSpeed!=1, adjustSpeed); 
-					auto p = mousePos.x+pressed_thumbMouseOfs.x; 
-					if(isCircular || isEndless)
-					mouseMoveRelX(wrapInRange(p, drawn_p0.x, drawn_p1.x, wrapCnt)); //circular wrap around
-					nPos = remap(p, drawn_p0.x, drawn_p1.x, 0, 1); 
-					if(isClamped)
-					nPos = nPos.clamp(0, 1); 
-				}else if(drawn_orientation==SliderOrientation.vert)
-				{
-					slowMouse(adjustSpeed!=1, adjustSpeed); 
-					auto p = mousePos.y+pressed_thumbMouseOfs.y; 
-					if(isCircular || isEndless)
-					mouseMoveRelY(wrapInRange(p, drawn_p0.y, drawn_p1.y, wrapCnt)); //circular wrap around
-					nPos = remap(p, drawn_p0.y, drawn_p1.y, 0, 1); 
-					if(isClamped)
-					nPos = nPos.clamp(0, 1); 
-				}else if(drawn_orientation==SliderOrientation.round)
-				{
-					auto diff = rawMousePos-pressed_rawMousePos; 
-					auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2; 
-					if(lockedDirection==0 && length(diff)>=3)
-					lockedDirection = act_dir; 
-					
-					const omniDirection = true; //right or up is the positive side
-					auto delta = omniDirection 	? inputs.MXraw.delta -inputs.MYraw.delta
-						: (lockedDirection ? lockedDirection : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta; 
-					
-					pressed_nPos += delta*(adjustSpeed*(1.0f/180)); //it adds small delta's, so it could be overdriven
-					pressed_nPos = pressed_nPos.clamp(0, 1); 
-					nPos = pressed_nPos; //Todo: it can't modify npos because npos can be an integer too. In this case, the pressed_nPos name is bad.
-					//Todo: endless????
-					//Todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
-					//Todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
-				}else
-				{ raise("Invalid orientation"); }
+				immutable THRESHOLD = 1.5f; 
+				float aspect = safeDiv(r.width/r.height, 1); 
+				return aspect>=THRESHOLD	? SliderOrientation.horz:
+							 aspect<=(1/THRESHOLD)	? SliderOrientation.vert:
+																			 SliderOrientation.round; 
 			} 
 			
-			void mouseAdjust(ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt, float adjustSpeed)
-			{ mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed); } 
-			
-			bool handleKeyboard(ref float nPos, in range range_, float pageSize)
+				private struct SliderState
 			{
-				if(nPos.isnan)
-				return false; 
+				 //information about the current slider being modified
 				
-				bool userModified; 
+				//information generated and maintained in update
+				Id pressed_id; 
+				vec2 pressed_thumbMouseOfs, pressed_rawMousePos; 
+				float pressed_nPos; //normalized pos
+				int lockedDirection; //0:unknown, 1:h, 2:v
 				
-				void set(float n)
+				void onPress(in Id id, ref float nPos, in vec2 mousePos)
 				{
-					nPos = n.clamp(0, 1); 
-					userModified = true; 
+					//mouse was pressed, initialize values
+					pressed_id = id; 
+					pressed_rawMousePos = rawMousePos; 
+					pressed_nPos = nPos; 
+					
+					//remember the thumb-mouse offset at the time of press
+					pressed_thumbMouseOfs = drawn_thumbRect.center-mousePos;  //
+					
+					//if pressed on a round knob, first it must decide if up/down or left/right
+					lockedDirection = 0; 
 				} 
 				
-				void delta(float scale)
+				//information saved in draw(). All vectors are transformed into view space.
+				Id drawn_id; 
+				SliderOrientation drawn_orientation; 
+				vec2 drawn_p0, drawn_p1; 
+				bounds2 drawn_thumbRect; 
+				
+				void afterDraw(in Id id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob)
 				{
-					//modifiers
-					if(scale)
-					{
-						if(inputs.Shift) scale*=10; 
-						if(inputs.Ctrl) scale/=10; 
-						if(inputs.Alt) scale/=100; 
-					}
-					/+Todo: this layout is incompatible with the mouse Shift = slow behavior.+/
-					
-					auto nStep()
-					{ return range_.step / (range_.max-range_.min); } 
-					set(nPos + nStep *scale); 
+					drawn_id = id; 
+					drawn_orientation = ori; 
+					drawn_p0 = p0; 
+					drawn_p1 = p1; 
+					drawn_thumbRect = bKnob; 
 				} 
 				
-				const horz = drawn_orientation != SliderOrientation.vert, //round knobs are working for both
-							vert = drawn_orientation != SliderOrientation.horz; 
-				
-				if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated)
-				delta(-1); 
-				if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated)
-				delta(1); 
-				version(none)
+				//after onPress() it can jump to the mouse
+				void jumpToPoint(ref float nPos, in vec2 mousePos, bool isEndless)
 				{
-					/+
-						Todo: Make a forking focused control system that only sends these keys to only the focused control.
-						Until that only the arrows will work.
-						A mouse click somewhere else should also loce focus automatically
-					+/
-					if(inputs.PgDn.repeated)
-					delta(-pageSize); 
-					if(inputs.PgUp.repeated)
-					delta(pageSize); 
-					if(inputs.Home.down)
-					set(0); 
-					if(inputs.End .down)
-					set(1); 
-				}
-				
-				return userModified; 
-			} 
-			
-			bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt)
-			{
-				if(nPos.isnan)
-				return false; 
-				
-				bool userModified; 
-				
-				if(hit.pressed && enabled)
-				{
-					//Todo: enabled handling
-					userModified = true; 
-					
-					onPress(id, nPos, mousePos); 
-					
-					//decide wether the knob has to jump to the mouse position or not
-					const doJump = isLinear(drawn_orientation) && !drawn_thumbRect.contains!"[)"(mousePos); 
-					if(doJump)
-					{ jumpToPoint(nPos, mousePos, range_.isEndless); }
-					
-					//round knob: lock the mouse and start measuring delta movement
-					if(isRound(drawn_orientation))
+					if(drawn_orientation==SliderOrientation.horz)
 					{
-						 //Todo: "round" knob never jumps
-						mouseLock;  //Bug: possible bug when the slider disappears, amd the mouse stays locked forever
-					}
-				}
+						pressed_thumbMouseOfs.x = 0; 
+						nPos = remap_clamp(mousePos.x, drawn_p0.x, drawn_p1.x, 0, 1); 
+						if(mousePos.x<drawn_p0.x)
+						pressed_thumbMouseOfs.x = drawn_p0.x-mousePos.x; 
+						if(mousePos.x>drawn_p1.x)
+						pressed_thumbMouseOfs.x = drawn_p1.x-mousePos.x - (isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
+					}else if(drawn_orientation==SliderOrientation.vert)
+					{
+						pressed_thumbMouseOfs.y = 0; 
+						nPos = remap_clamp(mousePos.y, drawn_p0.y, drawn_p1.y, 0, 1); 
+						//Note: p1 and p0 are intentionally swapped!!!
+						if(mousePos.y<drawn_p1.y)
+						pressed_thumbMouseOfs.y = drawn_p1.y-mousePos.y; //Todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+						if(mousePos.y>drawn_p0.y)
+						pressed_thumbMouseOfs.y = drawn_p0.y-mousePos.y - (isEndless ? 1 : 0); 
+					}else
+					{ NOTIMPL; }
+				} 
 				
-				//continuous update if active
-				if(id==pressed_id)
+				void mouseAdjust(ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, ref int wrapCnt, float adjustSpeed)
 				{
-					userModified = true; 
-					const adjustSpeed = inputs.Shift.active ? 10 : inputs.Ctrl.active ? 0.1f : inputs.Alt.active ? 0.01f : 1; //Note: this is a scaling factor...
-					mouseAdjust(nPos, mousePos, range_, wrapCnt, adjustSpeed); 
-				}
+					if(drawn_orientation==SliderOrientation.horz)
+					{
+						slowMouse(adjustSpeed!=1, adjustSpeed); 
+						auto p = mousePos.x+pressed_thumbMouseOfs.x; 
+						if(isCircular || isEndless)
+						mouseMoveRelX(wrapInRange(p, drawn_p0.x, drawn_p1.x, wrapCnt)); //circular wrap around
+						nPos = remap(p, drawn_p0.x, drawn_p1.x, 0, 1); 
+						if(isClamped)
+						nPos = nPos.clamp(0, 1); 
+					}else if(drawn_orientation==SliderOrientation.vert)
+					{
+						slowMouse(adjustSpeed!=1, adjustSpeed); 
+						auto p = mousePos.y+pressed_thumbMouseOfs.y; 
+						if(isCircular || isEndless)
+						mouseMoveRelY(wrapInRange(p, drawn_p0.y, drawn_p1.y, wrapCnt)); //circular wrap around
+						nPos = remap(p, drawn_p0.y, drawn_p1.y, 0, 1); 
+						if(isClamped)
+						nPos = nPos.clamp(0, 1); 
+					}else if(drawn_orientation==SliderOrientation.round)
+					{
+						auto diff = rawMousePos-pressed_rawMousePos; 
+						auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2; 
+						if(lockedDirection==0 && length(diff)>=3)
+						lockedDirection = act_dir; 
+						
+						const omniDirection = true; //right or up is the positive side
+						auto delta = omniDirection 	? inputs.MXraw.delta -inputs.MYraw.delta
+							: (lockedDirection ? lockedDirection : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta; 
+						
+						pressed_nPos += delta*(adjustSpeed*(1.0f/180)); //it adds small delta's, so it could be overdriven
+						pressed_nPos = pressed_nPos.clamp(0, 1); 
+						nPos = pressed_nPos; //Todo: it can't modify npos because npos can be an integer too. In this case, the pressed_nPos name is bad.
+						//Todo: endless????
+						//Todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
+						//Todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
+					}else
+					{ raise("Invalid orientation"); }
+				} 
 				
-				//hit.released
-				if(hit.released)
+				void mouseAdjust(ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt, float adjustSpeed)
+				{ mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed); } 
+				
+				bool handleKeyboard(ref float nPos, in range range_, float pageSize)
 				{
-					pressed_id = Id.init; 
+					if(nPos.isnan)
+					return false; 
 					
-					//Todo: this isn't safe! what if the control disappears!!!
-					if(isLinear(drawn_orientation))
-					{ slowMouse(false); }else
-					{ mouseUnlock; }
-				}
+					bool userModified; 
+					
+					void set(float n)
+					{
+						nPos = n.clamp(0, 1); 
+						userModified = true; 
+					} 
+					
+					void delta(float scale)
+					{
+						//modifiers
+						if(scale)
+						{
+							if(inputs.Shift) scale*=10; 
+							if(inputs.Ctrl) scale/=10; 
+							if(inputs.Alt) scale/=100; 
+						}
+						/+Todo: this layout is incompatible with the mouse Shift = slow behavior.+/
+						
+						auto nStep()
+						{ return range_.step / (range_.max-range_.min); } 
+						set(nPos + nStep *scale); 
+					} 
+					
+					const horz = drawn_orientation != SliderOrientation.vert, //round knobs are working for both
+								vert = drawn_orientation != SliderOrientation.horz; 
+					
+					if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated)
+					delta(-1); 
+					if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated)
+					delta(1); 
+					version(none)
+					{
+						/+
+							Todo: Make a forking focused control system that only sends these keys to only the focused control.
+							Until that only the arrows will work.
+							A mouse click somewhere else should also loce focus automatically
+						+/
+						if(inputs.PgDn.repeated)
+						delta(-pageSize); 
+						if(inputs.PgUp.repeated)
+						delta(pageSize); 
+						if(inputs.Home.down)
+						set(0); 
+						if(inputs.End .down)
+						set(1); 
+					}
+					
+					return userModified; 
+				} 
 				
-				return userModified; 
-			} 
-			
-		} 
-		
+				bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt)
+				{
+					if(nPos.isnan)
+					return false; 
+					
+					bool userModified; 
+					
+					if(hit.pressed && enabled)
+					{
+						//Todo: enabled handling
+						userModified = true; 
+						
+						onPress(id, nPos, mousePos); 
+						
+						//decide wether the knob has to jump to the mouse position or not
+						const doJump = isLinear(drawn_orientation) && !drawn_thumbRect.contains!"[)"(mousePos); 
+						if(doJump)
+						{ jumpToPoint(nPos, mousePos, range_.isEndless); }
+						
+						//round knob: lock the mouse and start measuring delta movement
+						if(isRound(drawn_orientation))
+						{
+							 //Todo: "round" knob never jumps
+							mouseLock;  //Bug: possible bug when the slider disappears, amd the mouse stays locked forever
+						}
+					}
+					
+					//continuous update if active
+					if(id==pressed_id)
+					{
+						userModified = true; 
+						const adjustSpeed = inputs.Shift.active ? 10 : inputs.Ctrl.active ? 0.1f : inputs.Alt.active ? 0.01f : 1; //Note: this is a scaling factor...
+						mouseAdjust(nPos, mousePos, range_, wrapCnt, adjustSpeed); 
+					}
+					
+					//hit.released
+					if(hit.released)
+					{
+						pressed_id = Id.init; 
+						
+						//Todo: this isn't safe! what if the control disappears!!!
+						if(isLinear(drawn_orientation))
+						{ slowMouse(false); }else
+						{ mouseUnlock; }
+					}
+					
+					return userModified; 
+				} 
+				
+			} 
 			SliderState sliderState; 
-		
+			
 			class SliderClass : .Container
-		{
-			//Note: must be a Container because hitTest works on Containers only.
-			
-			//Todo: shift precise mode: must use float knob position to improve the precision
-			
-			SliderOrientation orientation; 
-			SliderStyle sliderStyle; 
-			RGB bkColor, clLine, clThumb, clRuler; 
-			float baseSize; //this is calculated from current fontHeight and theme.
-			float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
-			//these are the derived sizes
-			float rulerOfs	()
-			{ return baseSize*0.5f; } 
-			float lwLine	()
-			{ return baseSize*(2.0f*InvDefaultFontHeight); } 
-			float lwRuler	()
-			{ return lwLine*0.5f; } 
-			
-			/// this is the half thickness of the thumb in the active direction
-			float calcLwThumb	(SliderOrientation ori)
 			{
-				if(sliderStyle ==	SliderStyle.scrollBar && !isnan(normThumbSize))
+				//Note: must be a Container because hitTest works on Containers only.
+				
+				//Todo: shift precise mode: must use float knob position to improve the precision
+				
+				SliderOrientation orientation; 
+				SliderStyle sliderStyle; 
+				RGB bkColor, clLine, clThumb, clRuler; 
+				float baseSize; //this is calculated from current fontHeight and theme.
+				float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
+				//these are the derived sizes
+				float rulerOfs	()
+				{ return baseSize*0.5f; } 
+				float lwLine	()
+				{ return baseSize*(2.0f*InvDefaultFontHeight); } 
+				float lwRuler	()
+				{ return lwLine*0.5f; } 
+				
+				/// this is the half thickness of the thumb in the active direction
+				float calcLwThumb	(SliderOrientation ori)
 				{
-					const minSizePixels = min(innerWidth, MinScrollThumbSize); 
-					return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
-				}else
-				{ return baseSize*(1.0f/3); }
-			} 
-			
-			
-			int rulerDiv0 = 9, rulerDiv1 = 4; 
-			ubyte rulerSides=3; 
-			
-			float nPos, nCenter=0;  //center is the start of the marking on the line
-			int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
-			
-			bounds2 hitBounds; 
-			
-			bool focused; 
-			
-			this(
-				in Id id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, 
-				TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
-			)
-			{
-				this.id = id; 
-				this.orientation = orientation; 
-				this.sliderStyle = sliderStyle; 
-				this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
-				this.normThumbSize = normThumbSize; 
-				
-				if(sliderStyle==SliderStyle.scrollBar)
-				padding = "2"; 
-				
-				hit = im.hitTest(this, enabled); 
-				hitBounds = hit.hitBounds; 
-				
-				if(1 || sliderStyle==SliderStyle.slider)
-				focused = im.focusUpdate(
-					this, id,
-					enabled,
-					hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-					inputs["Esc"].pressed,  //when to exit
-					/*onEnter	*/ {},
-					/*onFocus	*/ {},
-					/*onExit	*/ {}
-				); 
-				
-				//res.focused = focused;
-				
-				if(focused && mainWindow.isForeground)
-				userModified |= sliderState.handleKeyboard(nPos, range_, 8); 
-				
-				bkColor = ts.bkColor; 
-				const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
-				
-				final switch(sliderStyle)
-				{
-					case SliderStyle.slider: 
-						clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
-						clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
-						clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
-						
-						if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
-						
-						rulerSides = 0; 
-					break; 
-					case SliderStyle.scrollBar: 
-						clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
-						bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
-						
-						if(focused) { clThumb = clBlack; }//Todo: lame logic
-						
-						//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
-						rulerSides = 0; 
-					break; 
-				}
-				
-				if(!enabled)
-				clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
-				
-				baseSize = ts.fontHeight*fhScale*0.8f; 
-				outerSize = vec2(baseSize*6, baseSize); //default size
-				
-				userModified |= sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
-				
-				if(userModified)
-				nPos_ = nPos; 
-			} 
-			
-			override bounds2 getHitBounds()
-			{ return outerBounds; } 
-			
-			private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
-			{
-				final switch(sliderStyle)
-				{
-					case SliderStyle.slider: 
-						dr.lineWidth = lwThumb; dr.color = clThumb; 
-						const t90 = t.rotate90; 
-						dr.line(a-t90, a+t90); 
-					break; 
-					case SliderStyle.scrollBar: 
-						dr.color = clThumb; 
-						const horz = orientation==SliderOrientation.horz,
-									halfSize = horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
-									bnd = bounds2(a, a).inflated(halfSize); 
-						dr.fillRect(bnd); 
-					break; 
-				}
-			} 
-			
-			private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
-			{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
-			
-			override void draw(Drawing dr)
-			{
-				const mod_update = !hitBounds.empty && !inputs.LMB.value; 
-				
-				dr.color = bkColor; dr.fillRect(borderBounds_inner); 
-				drawBorder(dr); 
-				
-				dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
-				
-				auto b = innerBounds; 
-				const 	actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
-					lwThumb = calcLwThumb(actOrientation); 
-				
-				if(isLinear(actOrientation))
-				{
-					const horz = actOrientation == SliderOrientation.horz,
-								thumbOfs = (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
-								p0 = (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
-								p1 = (horz ? b.rightCenter	: b.topCenter   ) - thumbOfs; 
-					
-					if(sliderStyle==SliderStyle.slider && rulerSides)
+					if(sliderStyle ==	SliderStyle.scrollBar && !isnan(normThumbSize))
 					{
-						const rp0 = horz ? p0 : p1,
-									rp1 = horz ? p1 : p0,
-									ro0 = horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
-									ro1 = ro0*.4f; 
-						if(rulerSides&1)
-						drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
-						if(rulerSides&2)
-						drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
+						const minSizePixels = min(innerWidth, MinScrollThumbSize); 
+						return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
+					}else
+					{ return baseSize*(1.0f/3); }
+				} 
+				
+				
+				int rulerDiv0 = 9, rulerDiv1 = 4; 
+				ubyte rulerSides=3; 
+				
+				float nPos, nCenter=0;  //center is the start of the marking on the line
+				int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
+				
+				bounds2 hitBounds; 
+				
+				bool focused; 
+				
+				this(
+					in Id id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, 
+					TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
+				)
+				{
+					this.id = id; 
+					this.orientation = orientation; 
+					this.sliderStyle = sliderStyle; 
+					this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
+					this.normThumbSize = normThumbSize; 
+					
+					if(sliderStyle==SliderStyle.scrollBar)
+					padding = "2"; 
+					
+					hit = im.hitTest(this, enabled); 
+					hitBounds = hit.hitBounds; 
+					
+					if(1 || sliderStyle==SliderStyle.slider)
+					focused = im.focusUpdate(
+						this, id,
+						enabled,
+						hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+						inputs["Esc"].pressed,  //when to exit
+						/*onEnter	*/ {},
+						/*onFocus	*/ {},
+						/*onExit	*/ {}
+					); 
+					
+					//res.focused = focused;
+					
+					if(focused && mainWindow.isForeground)
+					userModified |= sliderState.handleKeyboard(nPos, range_, 8); 
+					
+					bkColor = ts.bkColor; 
+					const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
+					
+					final switch(sliderStyle)
+					{
+						case SliderStyle.slider: 
+							clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
+							clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
+							clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
+							
+							if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
+							
+							rulerSides = 0; 
+						break; 
+						case SliderStyle.scrollBar: 
+							clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
+							bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
+							
+							if(focused) { clThumb = clBlack; }//Todo: lame logic
+							
+							//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
+							rulerSides = 0; 
+						break; 
 					}
 					
-					if(sliderStyle==SliderStyle.slider)
-					drawLine(dr, p0, p1, clLine); 
+					if(!enabled)
+					clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
 					
-					if(!isnan(nPos))
-					{
-						auto p = mix(p0, p1, nPos); 
-						if(!isnan(nCenter) && sliderStyle==SliderStyle.slider)
-						drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
-						
-						drawThumb(dr, p, thumbOfs, lwThumb); 
-						
-						if(mod_update)
-						{
-							vec2 thumbHalfSize; 
-							if(sliderStyle==SliderStyle.slider)
-							{
-								thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
-								if(!horz)
-								swap(thumbHalfSize.x, thumbHalfSize.y); 
-							}else
-							{ thumbHalfSize = horz ? vec2(lwThumb, outerHeight*.5f) : vec2(outerWidth*.5f, lwThumb); }
-							const thumbRect = bounds2(p, p).inflated(thumbHalfSize); 
-							sliderState.afterDraw(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(thumbRect)); 
-						}
-					}
+					baseSize = ts.fontHeight*fhScale*0.8f; 
+					outerSize = vec2(baseSize*6, baseSize); //default size
 					
-				}else if(isRound(actOrientation))
+					userModified |= sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
+					
+					if(userModified)
+					nPos_ = nPos; 
+				} 
+				
+				override bounds2 getHitBounds()
+				{ return outerBounds; } 
+				
+				private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
 				{
-					//center square
-					bool endless = false; 
-					
-					b = b.fittingSquare; 
-					if(mod_update)
-					sliderState.afterDraw(id, actOrientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b)); 
-					
-					auto c = b.center, r = b.width*0.4f; 
-					
-					if(rulerSides)
-					drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless); 
-					r *= 0.8f; 
-					
-					float a0 = (endless ? 0 : 0.25f)*PIf; 
-					float a1 = (endless ? 2 : 1.75f)*PIf; 
-					
-					dr.lineWidth = lwLine; 
-					dr.color = clLine; 
-					dr.circle(c, r, a0, a1); 
-					
-					if(!isnan(nPos))
+					final switch(sliderStyle)
 					{
-						float n = 1-nPos; 
-						n = endless ? n.fract : n.clamp(0, 1);  //Todo: ezt megcsinalni a range-val
-						float a = mix(a0, a1, n); 
-						if(!endless && !isnan(nCenter))
-						{
-							float ac = mix(a0, a1, (1-nCenter).clamp(0, 1)); 
+						case SliderStyle.slider: 
+							dr.lineWidth = lwThumb; dr.color = clThumb; 
+							const t90 = t.rotate90; 
+							dr.line(a-t90, a+t90); 
+						break; 
+						case SliderStyle.scrollBar: 
 							dr.color = clThumb; 
-							if(ac>=a)
-							dr.circle(c, r, a, ac); 
-							else dr.circle(c, r, ac, a); 
+							const horz = orientation==SliderOrientation.horz,
+										halfSize = horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
+										bnd = bounds2(a, a).inflated(halfSize); 
+							dr.fillRect(bnd); 
+						break; 
+					}
+				} 
+				
+				private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
+				{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
+				
+				override void draw(Drawing dr)
+				{
+					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
+					
+					dr.color = bkColor; dr.fillRect(borderBounds_inner); 
+					drawBorder(dr); 
+					
+					dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
+					
+					auto b = innerBounds; 
+					const 	actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
+						lwThumb = calcLwThumb(actOrientation); 
+					
+					if(isLinear(actOrientation))
+					{
+						const horz = actOrientation == SliderOrientation.horz,
+									thumbOfs = (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
+									p0 = (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
+									p1 = (horz ? b.rightCenter	: b.topCenter   ) - thumbOfs; 
+						
+						if(sliderStyle==SliderStyle.slider && rulerSides)
+						{
+							const rp0 = horz ? p0 : p1,
+										rp1 = horz ? p1 : p0,
+										ro0 = horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
+										ro1 = ro0*.4f; 
+							if(rulerSides&1)
+							drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
+							if(rulerSides&2)
+							drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
 						}
 						
-						dr.lineWidth = lwThumb; 
-						dr.color = clThumb; 
-						auto v = vec2(sin(a), cos(a)); 
-						dr.line(c, c+v*r); 
+						if(sliderStyle==SliderStyle.slider)
+						drawLine(dr, p0, p1, clLine); 
+						
+						if(!isnan(nPos))
+						{
+							auto p = mix(p0, p1, nPos); 
+							if(!isnan(nCenter) && sliderStyle==SliderStyle.slider)
+							drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
+							
+							drawThumb(dr, p, thumbOfs, lwThumb); 
+							
+							if(mod_update)
+							{
+								vec2 thumbHalfSize; 
+								if(sliderStyle==SliderStyle.slider)
+								{
+									thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
+									if(!horz)
+									swap(thumbHalfSize.x, thumbHalfSize.y); 
+								}else
+								{ thumbHalfSize = horz ? vec2(lwThumb, outerHeight*.5f) : vec2(outerWidth*.5f, lwThumb); }
+								const thumbRect = bounds2(p, p).inflated(thumbHalfSize); 
+								sliderState.afterDraw(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(thumbRect)); 
+							}
+						}
+						
+					}else if(isRound(actOrientation))
+					{
+						//center square
+						bool endless = false; 
+						
+						b = b.fittingSquare; 
+						if(mod_update)
+						sliderState.afterDraw(id, actOrientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b)); 
+						
+						auto c = b.center, r = b.width*0.4f; 
+						
+						if(rulerSides)
+						drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless); 
+						r *= 0.8f; 
+						
+						float a0 = (endless ? 0 : 0.25f)*PIf; 
+						float a1 = (endless ? 2 : 1.75f)*PIf; 
+						
+						dr.lineWidth = lwLine; 
+						dr.color = clLine; 
+						dr.circle(c, r, a0, a1); 
+						
+						if(!isnan(nPos))
+						{
+							float n = 1-nPos; 
+							n = endless ? n.fract : n.clamp(0, 1);  //Todo: ezt megcsinalni a range-val
+							float a = mix(a0, a1, n); 
+							if(!endless && !isnan(nCenter))
+							{
+								float ac = mix(a0, a1, (1-nCenter).clamp(0, 1)); 
+								dr.color = clThumb; 
+								if(ac>=a)
+								dr.circle(c, r, a, ac); 
+								else dr.circle(c, r, ac, a); 
+							}
+							
+							dr.lineWidth = lwThumb; 
+							dr.color = clThumb; 
+							auto v = vec2(sin(a), cos(a)); 
+							dr.line(c, c+v*r); 
+						}
 					}
-				}
+					
+					drawDebug(dr); 
+				} 
 				
-				drawDebug(dr); 
-			} 
-			
-			//Draw Rulers
-			protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true)
-			{
-				cnt--; 
-				if(cnt<=0)
-				return; 
-				if(cnt2<0)
-				cnt2 = cnt; 
-				dr.color = clRuler; dr.lineWidth = lwRuler; 
-				if(r.height < r.width)
+				//Draw Rulers
+				protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true)
 				{
-					float c = r.center.y,
-								b = r.top,
-								t = r.bottom,
-								j = r.left,
-								ja = r.width/cnt; 
-					if(!topleft)
-					swap(b, t); 
-					foreach(i; 0..cnt+1)
-					{
-						dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
-						j += ja; 
-					}
-				}else
-				{
-					float c = r.center.x,
-								b = r.left,
-								t = r.right,
-								j = r.top,
-								ja = r.height/cnt; 
-					if(!topleft)
-					swap(b, t); 
-					foreach(i; 0..cnt+1)
-					{
-						dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
-						j += ja; 
-					}
-				}
-			} 
-			
-			protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false)
-			{
 					cnt--; 
 					if(cnt<=0)
-				return; 
+					return; 
 					if(cnt2<0)
-				cnt2 = cnt; 
-				//radius *= (1/1.25f);
+					cnt2 = cnt; 
 					dr.color = clRuler; dr.lineWidth = lwRuler; 
-					foreach(i; 0..cnt+1)
-				{
-					float a = endless ? 2*PIf*i/cnt
-														: -0.25f*PIf + 1.5f*PIf*i/cnt; 
-					float co = -cos(a), si = -sin(a); 
-					dr.moveTo(center.x+co*radius, center.y+si*radius); 
-					float radius2 = radius*(!endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f); 
-					dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
-				}
-			} 
-		} 
-		
-		
-			auto Slider(string srcModule=__MODULE__, size_t srcLine=__LINE__, V, T...)(ref V value, T args)
-			if(isFloatingPoint!V || isIntegral!V)
-		{
-			mixin(prepareId, enable.M, selected.M, range.M);  //Todo: selected???
-			
-			//flipped range interval. Needed for vertical scrollbar
-			const flipped = !_range.isOrdered; 
-			if(flipped)
-			swap(_range.min, _range.max); 
-			
-			//string props;
-			static foreach(a; args)
-			{
-				{
-					alias t = Unqual!(typeof(a)); 
-					static if(isSomeString!t)
+					if(r.height < r.width)
 					{
-						//props = a; //todo: ennek is
-						static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!"); 
+						float c = r.center.y,
+									b = r.top,
+									t = r.bottom,
+									j = r.left,
+									ja = r.width/cnt; 
+						if(!topleft)
+						swap(b, t); 
+						foreach(i; 0..cnt+1)
+						{
+							dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
+							j += ja; 
+						}
+					}else
+					{
+						float c = r.center.x,
+									b = r.left,
+									t = r.right,
+									j = r.top,
+									ja = r.height/cnt; 
+						if(!topleft)
+						swap(b, t); 
+						foreach(i; 0..cnt+1)
+						{
+							dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
+							j += ja; 
+						}
+					}
+				} 
+				
+				protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false)
+				{
+						cnt--; 
+						if(cnt<=0)
+					return; 
+						if(cnt2<0)
+					cnt2 = cnt; 
+					//radius *= (1/1.25f);
+						dr.color = clRuler; dr.lineWidth = lwRuler; 
+						foreach(i; 0..cnt+1)
+					{
+						float a = endless ? 2*PIf*i/cnt
+															: -0.25f*PIf + 1.5f*PIf*i/cnt; 
+						float co = -cos(a), si = -sin(a); 
+						dr.moveTo(center.x+co*radius, center.y+si*radius); 
+						float radius2 = radius*(!endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f); 
+						dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
+					}
+				} 
+			} 
+			
+			auto Slider(string srcModule=__MODULE__, size_t srcLine=__LINE__, V, T...)(ref V value, T args)
+				if(isFloatingPoint!V || isIntegral!V)
+			{
+				mixin(prepareId, enable.M, selected.M, range.M);  //Todo: selected???
+				
+				//flipped range interval. Needed for vertical scrollbar
+				const flipped = !_range.isOrdered; 
+				if(flipped)
+				swap(_range.min, _range.max); 
+				
+				//string props;
+				static foreach(a; args)
+				{
+					{
+						alias t = Unqual!(typeof(a)); 
+						static if(isSomeString!t)
+						{
+							//props = a; //todo: ennek is
+							static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!"); 
+						}
 					}
 				}
-			}
-			
-			float normValue = _range.normalize(flipped ? _range.max-value : value); //FLIP
-			
-			int wrapCnt; 
-			if(_range.isEndless)
-			{
-				wrapCnt = normValue.floor.iround;  //Todo: refactor endless wrapCnt stuff
-				normValue = normValue-normValue.floor; 
-			}
-			
-			bool userModified; 
-			HitInfo hit; 
-			auto sl = new SliderClass(
-				id_, enabled, normValue, _range, userModified, targetView.mousePos.vec2, 
-				style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
-				getStaticParamDef(SliderStyle.slider, args), theme=="tool" ? 1 : 1.4f
-			); 
-			
-			append(sl); push(sl, id_); scope(exit) pop; 
-			
-			mixin(hintHandler); 
-			static foreach(a; args)
-			static if(__traits(compiles, a()))
-			a(); 
-			
-			if(userModified && enabled)
-			{
 				
+				float normValue = _range.normalize(flipped ? _range.max-value : value); //FLIP
+				
+				int wrapCnt; 
 				if(_range.isEndless)
-				normValue += wrapCnt-sl.wrapCnt; 
+				{
+					wrapCnt = normValue.floor.iround;  //Todo: refactor endless wrapCnt stuff
+					normValue = normValue-normValue.floor; 
+				}
 				
-				float f = _range.denormalize(normValue); 
-				static if(isIntegral!V)
-				f = round(f); 
-				value = f.to!V; 
-				if(flipped)
-				value = (_range.max-value).to!V; //UNFLIP
-			}
+				bool userModified; 
+				HitInfo hit; 
+				auto sl = new SliderClass(
+					id_, enabled, normValue, _range, userModified, targetView.mousePos.vec2, 
+					style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
+					getStaticParamDef(SliderStyle.slider, args), theme=="tool" ? 1 : 1.4f
+				); 
+				
+				append(sl); push(sl, id_); scope(exit) pop; 
+				
+				mixin(hintHandler); 
+				static foreach(a; args)
+				static if(__traits(compiles, a()))
+				a(); 
+				
+				if(userModified && enabled)
+				{
+					
+					if(_range.isEndless)
+					normValue += wrapCnt-sl.wrapCnt; 
+					
+					float f = _range.denormalize(normValue); 
+					static if(isIntegral!V)
+					f = round(f); 
+					value = f.to!V; 
+					if(flipped)
+					value = (_range.max-value).to!V; //UNFLIP
+				}
+				
+				//Todo: what to return on from slider
+				return userModified; 
+			} 
 			
-			//Todo: what to return on from slider
-			return userModified; 
-		} 
-		
 			//AdvancedSlider //////////////////////////////
 			void AdvancedSlider_impl(T)(T prop, void delegate() fun=null) if(is(T==FloatProperty) || is(T==IntProperty))
-		{
-			//slider, min/max/act value display, default, edit/inc/dec
-			
-			const postFix = (" "~prop.unit).stripRight; 
-			const caption = prop.name.camelToCaption; 
-			
-			const variant = 0; 
-			
-			auto range = im.range(prop.min, prop.max, prop.step); 
-			auto hint = im.hint(prop.hint); 
-			
-			const last = prop.act; 
-			
-			if(variant == 0)
 			{
-				Column(
-					genericId(prop.name), 
-					{
-						width = 300; 
-						Row(
-							{
-								Text(/*bold*/(caption)); 
-								//Spacer;
-								Row(
-									{
-										flex = 1; 
-										actContainer.flags.hAlign = HAlign.right; 
-										Text(" "); 
-									}
-								); 
-								Flex; 
-								
-								if(fun !is null)
-								{
-									fun(); 
-									Spacer; 
-								}
-								Edit(prop.act, range, hint, { width = fh*3.5; }); 
-								Text(postFix~" "); 
-								if(prop.step>0)
-								{
-									IncDecBtn(prop.act, range); //Todo: hint is annoying here
-								}
-							}
-						); 
-						Slider(prop.act, range, hint, { flex = 1; }); 
-						Row(
-							{
-								if(Link(prop.min.text ~ postFix))
-								prop.act = prop.min; 
-								Row(
-									{
-										flex = 1; 
-										flags.hAlign = HAlign.center; //Todo: not precise center!!!
-										if(Link("default: " ~ prop.def.text ~ postFix))
-										prop.act = prop.def; 
-									}
-								); 
-								if(Link(prop.max.text ~ postFix))
-								prop.act = prop.max; 
-							}
-						); 
-					}
-				); 
-			}
-			
-			prop.uiChanged |= last != prop.act; 
-		} 
-		
-			void AdvancedSlider(Property prop, void delegate() fun=null)
-		{
-			//this just casts the Property and	calls the appropriate implementation
-			if(auto p = cast(IntProperty	)prop)
-			AdvancedSlider_impl(p, fun); 
-			else if(auto p = cast(FloatProperty)prop) AdvancedSlider_impl(p, fun); 
-			else raise("Invalid type"); 
-		} 
-		
-			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
-		{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
-		
-			auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
-		{
-			 //Node ////////////////////////////
-			HitInfo hit; 
-			Column!(srcModule, srcLine)(
+				//slider, min/max/act value display, default, edit/inc/dec
+				
+				const postFix = (" "~prop.unit).stripRight; 
+				const caption = prop.name.camelToCaption; 
+				
+				const variant = 0; 
+				
+				auto range = im.range(prop.min, prop.max, prop.step); 
+				auto hint = im.hint(prop.hint); 
+				
+				const last = prop.act; 
+				
+				if(variant == 0)
 				{
-					border.width = 1; //Todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
-					border.color = mix(style.bkColor, style.fontColor, state ? .1f : 0); 
-					
-					Row(
+					Column(
+						genericId(prop.name), 
 						{
-							hit = ToolBtn(symbol("Caret"~(state ? "Down" : "Right")~"Solid8")); 
-							if(hit.pressed)
-							state.toggle; 
-							Text("\t"); 
-							if(title)
-							title(); 
+							width = 300; 
+							Row(
+								{
+									Text(/*bold*/(caption)); 
+									//Spacer;
+									Row(
+										{
+											flex = 1; 
+											actContainer.flags.hAlign = HAlign.right; 
+											Text(" "); 
+										}
+									); 
+									Flex; 
+									
+									if(fun !is null)
+									{
+										fun(); 
+										Spacer; 
+									}
+									Edit(prop.act, range, hint, { width = fh*3.5; }); 
+									Text(postFix~" "); 
+									if(prop.step>0)
+									{
+										IncDecBtn(prop.act, range); //Todo: hint is annoying here
+									}
+								}
+							); 
+							Slider(prop.act, range, hint, { flex = 1; }); 
+							Row(
+								{
+									if(Link(prop.min.text ~ postFix))
+									prop.act = prop.min; 
+									Row(
+										{
+											flex = 1; 
+											flags.hAlign = HAlign.center; //Todo: not precise center!!!
+											if(Link("default: " ~ prop.def.text ~ postFix))
+											prop.act = prop.def; 
+										}
+									); 
+									if(Link(prop.max.text ~ postFix))
+									prop.act = prop.max; 
+								}
+							); 
 						}
 					); 
+				}
+				
+				prop.uiChanged |= last != prop.act; 
+			} 
+			
+			void AdvancedSlider(Property prop, void delegate() fun=null)
+			{
+				//this just casts the Property and	calls the appropriate implementation
+				if(auto p = cast(IntProperty	)prop)
+				AdvancedSlider_impl(p, fun); 
+				else if(auto p = cast(FloatProperty)prop) AdvancedSlider_impl(p, fun); 
+				else raise("Invalid type"); 
+			} 
+			
+			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
+			{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
+			class DateTimeRuler : .Container
+			{
+				//Note: must be a Container because hitTest works on Containers only.
+				
+				RGB clText, clRedText, clMajorTick, clMinorTick; 
+				DateTime t0_outer, t1_outer, t0, t1; 
+				bounds2 hitBounds; 
+				bool focused; 
+				
+				this(
+					in Id id, bool enabled, 	const DateTime t0_outer, 	const DateTime t1_outer, 
+						ref DateTime t0, 	ref DateTime t1, 
+					const ref TextStyle ts, vec2 mousePos, ref bool userModified, out HitInfo hit
+				)
+				{
+					this.id = id; 
+					this.t0_outer 	= t0_outer,
+					this.t1_outer 	= t1_outer,
+					this.t0 	= t0,
+					this.t1 	= t1; 
 					
-					if(state && contents)
-					Row(
-						{
-							Text("\t"); 
-							Column({ contents(); }); 
-						}
+					hit = im.hitTest(this, enabled); 
+					hitBounds = hit.hitBounds; 
+					
+					enum canFocus = true; 
+					if(canFocus)
+					focused = im.focusUpdate
+					(
+						this, id, enabled,
+						hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+						inputs["Esc"].pressed, //when to exit
+						/*onEnter*/ {},
+						/*onFocus*/ {},
+						/*onExit*/ {}
 					); 
 					
+					if(focused && mainWindow.isForeground)
+					{
+						bool handleKeyboard()
+						{ return false; /+Todo: implement DateTimeRuler.keyboardHandling+/} 
+						userModified |= handleKeyboard; 
+					}
 					
-				}, args
-			); 
-			return hit; 
-		} 
-		
+					bkColor = ts.bkColor; 
+					clText = ts.fontColor; 
+					
+					const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
+					bkColor = mix(bkColor, clText, hoverOrFocus*.25f); 
+					
+					clRedText = clRed; 
+					clMajorTick = clText; 
+					clMinorTick = mix(clMajorTick, bkColor, .125f); 
+					
+					const fh = ts.fontHeight; 
+					innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
+					
+					bool handleMouse()
+					{ return false; /+Todo: implement Ruler mouse handling+/} 
+					userModified |= handleMouse(); 
+				} 
+				
+				override void draw(Drawing dr)
+				{
+					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
+					
+					{
+						dr.pushClipBounds(bounds2(vec2(0), outerSize)); scope(exit) dr.popClipBounds; 
+						
+						
+						{
+							import het.ui_ruler; 
+							const b = innerBounds + innerPos; const fh = b.height/5.625f, rh = fh*5/2; 
+							auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
+								bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
+							const 	topIsFine 	= drawHRuler(dr, bTop, t0_outer, t1_outer, shiftUpwards: true),
+								bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
+							if(!topIsFine) bTop.bottom -= fh; 
+							if(!bottomIsFine) bBottom.top += fh; 
+							auto bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
+							dr.color = clFuchsia; dr.fillRect(bCenter); 
+						}
+					}
+					
+					drawBorder(dr); drawDebug(dr); 
+				} 
+			} 
+			
+			auto HRuler(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
+				(
+				const DateTime t0_outer, 	const DateTime t1_outer, 
+				ref T t0, 	ref T t1, 
+				Args args
+			)
+			{
+				mixin(prepareId, enable.M); 
+				
+				static if(is(T==DateTime))
+				{
+					{
+						bool userModified; HitInfo hit; 
+						auto ruler = new DateTimeRuler(
+							id_, enabled, t0_outer, t1_outer, t0, t1,
+							style, targetView.mousePos.vec2, userModified, hit
+						); 
+						
+						append(ruler); push(ruler, id_); scope(exit) pop; 
+						
+						ruler.flags.clipSubCells = true; 
+					}
+				}
+				else static assert(0, "Unsupported type: "~T.stringof); 
+			} 
+			
+			auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
+			{
+				 //Node ////////////////////////////
+				HitInfo hit; 
+				Column!(srcModule, srcLine)(
+					{
+						border.width = 1; //Todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
+						border.color = mix(style.bkColor, style.fontColor, state ? .1f : 0); 
+						
+						Row(
+							{
+								hit = ToolBtn(symbol("Caret"~(state ? "Down" : "Right")~"Solid8")); 
+								if(hit.pressed)
+								state.toggle; 
+								Text("\t"); 
+								if(title)
+								title(); 
+							}
+						); 
+						
+						if(state && contents)
+						Row(
+							{
+								Text("\t"); 
+								Column({ contents(); }); 
+							}
+						); 
+						
+						
+					}, args
+				); 
+				return hit; 
+			} 
+			
 			auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, string title, void delegate() contents, Args args)
-		{ return Node!(srcModule, srcLine)(state, { Text(title); }, contents, args); } 
-		
+			{ return Node!(srcModule, srcLine)(state, { Text(title); }, contents, args); } 
+			
 			/// A node header that usually connects to a server, can have an error message and a state of refreshing. It can has a refresh button too
 			void RefreshableNodeHeader(THeader)(THeader header, string error, bool refreshing, void delegate() onRefresh)
-		{
-			 //RefreshableNodeHeader ////////////////////////////
-			static if(isSomeString!THeader)
-			Text(header); 
-			else header(); 
-			//Todo: node header click = open/close node
-			
-			if(refreshing)
-			{ Text(" "); ProgressSpinner(1); }
-			
-			if(error.length)
-			Text(" \u26a0"); //warning symbol
-			//Todo: warning symbol click = open node
-			//Todo: warning symbol hint: error message
-			
-			Flex; 
-			if(onRefresh !is null)
 			{
-				if(ToolBtn(symbol("Refresh"), enable(!refreshing)))
-				onRefresh(); 
-			}
-		} 
-		
-		
+				 //RefreshableNodeHeader ////////////////////////////
+				static if(isSomeString!THeader)
+				Text(header); 
+				else header(); 
+				//Todo: node header click = open/close node
+				
+				if(refreshing)
+				{ Text(" "); ProgressSpinner(1); }
+				
+				if(error.length)
+				Text(" \u26a0"); //warning symbol
+				//Todo: warning symbol click = open node
+				//Todo: warning symbol hint: error message
+				
+				Flex; 
+				if(onRefresh !is null)
+				{
+					if(ToolBtn(symbol("Refresh"), enable(!refreshing)))
+					onRefresh(); 
+				}
+			} 
+			
+			
 			private void FileIcon_internal(int iconHeight)(string ext)
-		{
-			with(im)
 			{
-				  //Todo: this could go inside het.ui.im
-				if(ext.empty)
-				return; 
-				
-				static Cell[][string] cache;  //Todo: when megatexture is reallocated, the texture id's of icons become invalid.
-				
-				Cell[] cells; 
-				
-				cache.update(
-					ext, 
-					{
-						Container(
-							{
-								Text(tag(format!`img "icon:\%s" height=%f`(ext, iconHeight)));  //Note: this is fucking slow, but works
-							}
-						); 
-						auto cntr = removeLastContainer; 
-						cells = cntr.subCells;  //Note: this retirns the last char or a whole error string produced by text markup processor.
-						return cells; 
-					},
-					(ref Cell[] c){ cells = c; }
-				); 
-				
-				CellRef(cells); 
-			}
-		} 
-		
-			void FileIcon_small (string ext)
-		{ FileIcon_internal!(DefaultFontHeight*1-2)(ext); } 
-			void FileIcon_normal(string ext)
-		{ FileIcon_internal!(DefaultFontHeight*2-2)(ext); } 
-			void FileIcon_large (string ext)
-		{ FileIcon_internal!(DefaultFontHeight*4-2)(ext); } 
-			alias FileIcon = FileIcon_normal; 
-		
-		
-			//Document ////////////////////////
-			void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(string title, void delegate() contents = null)
-		{
-			auto doc = new .Document; 
-			doc.title = title; 
-			doc.lastChapterLevel = 0; 
-			append(doc); push(doc, srcId!(srcModule, srcLine)); scope(exit) pop; 
-			
-			if(!title.empty)
-			{
-				Text(doc.getChapterTextStyle, title); 
-				Spacer(1.5f*fh); 
-			}
-			if(contents)
-			contents(); 
-		} 
-		
-			void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() contents = null)
-		{ Document!(srcModule, srcLine)("", contents); } 
-		
-			//Chapter /////////////////////////
-			void Chapter(string title, void delegate() contents = null)
-		{
-			auto doc = find!(.Document); 
-			enforce(doc, "Document container not found"); 
-			
-			auto baseLevel = doc.lastChapterLevel; 
-			doc.addChapter(title, baseLevel); 
-			doc.lastChapterLevel = baseLevel+1; 
-			scope(exit) doc.lastChapterLevel = baseLevel; 
-			
-			//Spacer(1*fh);
-			
-			Text(doc.getChapterTextStyle, title); 
-			//Spacer(0.5*fh);
-			
-			if(contents)
-			contents(); 
-		} 
-		
-			//CrashTestMarker /////////////////////////
-			void CrashTestMarker(double angle, RGB c1 = clYellow)
-		{
-			const
-				c2 = style.fontColor,
-				f = fh,
-				oldBkColor = bkColor; //Todo: it has to be inherited
-			
-			Container(
+				with(im)
 				{
-					flags.clickable = false; 
-					width = f; 
-					height = f; 
-					bkColor = oldBkColor; 
-					//Todo: make mouse clicks fall throug this to the parent container
+					  //Todo: this could go inside het.ui.im
+					if(ext.empty)
+					return; 
 					
+					static Cell[][string] cache;  //Todo: when megatexture is reallocated, the texture id's of icons become invalid.
 					
-					void customDraw(Drawing dr, .Container cntr)
-					{
-						auto p = vec2(f*.5), r = f*.45; 
-						
-						dr.color = c2; 
-						dr.pointSize = r*2;  dr.point(p); 
-						
-						r -= f/12; 
-						
-						void pie(double angle)
+					Cell[] cells; 
+					
+					cache.update(
+						ext, 
 						{
-							enum N=8; 
-							dr.color = c1; 
-							iota(N+1).map!(i => p + vec2(r, 0).rotate(i*(PI/2/N)+angle))
-											 .slide(2)
-											 .each!((a){ dr.fillTriangle(p, a[1], a[0]); }); 
-						} 
-						
-						pie(angle); pie(angle+PI); 
-					} 
-					addDrawCallback(&customDraw); 
+							Container(
+								{
+									Text(tag(format!`img "icon:\%s" height=%f`(ext, iconHeight)));  //Note: this is fucking slow, but works
+								}
+							); 
+							auto cntr = removeLastContainer; 
+							cells = cntr.subCells;  //Note: this retirns the last char or a whole error string produced by text markup processor.
+							return cells; 
+						},
+						(ref Cell[] c){ cells = c; }
+					); 
+					
+					CellRef(cells); 
 				}
-			); 
-		} 
-		
-	}version(/+$DIDE_REGION Flash meggages+/all)
-	{
-		///Brings up an error message on the center of the screen for a short duration
-		struct FlashMessage {
-			DateTime when; 
-			enum Type { info, warning, error, exception} 
-			Type type; 
-			string msg; 
-			int count=1; 
+			} 
 			
-			RGB color() const
+			void FileIcon_small (string ext)
+			{ FileIcon_internal!(DefaultFontHeight*1-2)(ext); } 
+			void FileIcon_normal(string ext)
+			{ FileIcon_internal!(DefaultFontHeight*2-2)(ext); } 
+			void FileIcon_large (string ext)
+			{ FileIcon_internal!(DefaultFontHeight*4-2)(ext); } 
+			alias FileIcon = FileIcon_normal; 
+			
+			
+				//Document ////////////////////////
+				void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(string title, void delegate() contents = null)
 			{
-				with(Type)
-				final switch(type)
+				auto doc = new .Document; 
+				doc.title = title; 
+				doc.lastChapterLevel = 0; 
+				append(doc); push(doc, srcId!(srcModule, srcLine)); scope(exit) pop; 
+				
+				if(!title.empty)
 				{
-					case info: 	return clWhite; 
-					case warning: 	return clYellow; 
-					case error, exception: 	return clRed; 
+					Text(doc.getChapterTextStyle, title); 
+					Spacer(1.5f*fh); 
 				}
+				if(contents)
+				contents(); 
 			} 
 			
-			RGB fontColor() const
+				void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() contents = null)
+			{ Document!(srcModule, srcLine)("", contents); } 
+			
+				//Chapter /////////////////////////
+				void Chapter(string title, void delegate() contents = null)
 			{
-				if(type==Type.exception) return clYellow; 
-				return blackOrWhiteFor(color); 
+				auto doc = find!(.Document); 
+				enforce(doc, "Document container not found"); 
+				
+				auto baseLevel = doc.lastChapterLevel; 
+				doc.addChapter(title, baseLevel); 
+				doc.lastChapterLevel = baseLevel+1; 
+				scope(exit) doc.lastChapterLevel = baseLevel; 
+				
+				//Spacer(1*fh);
+				
+				Text(doc.getChapterTextStyle, title); 
+				//Spacer(0.5*fh);
+				
+				if(contents)
+				contents(); 
 			} 
-		} 
-		
-		FlashMessage[] flashMessages; 
-		
-		protected void appendMessage(FlashMessage.Type type, string msg, int count)
-		{
-			enum maxLen = 10; 
-			if(flashMessages.length>maxLen)
-			flashMessages = flashMessages[$-maxLen..$]; 
-			flashMessages ~= FlashMessage(now, type, msg, count); 
 			
-			with(FlashMessage.Type)
-			final switch(type)
+				//CrashTestMarker /////////////////////////
+				void CrashTestMarker(double angle, RGB c1 = clYellow)
 			{
-				case error, exception: 	winSnd("Windows Critical Stop"); 	break; 
-				case warning: 	if(count==1) winSnd("Windows Default"); 	break; 
-				case info: 	if(count==1) winSnd("Windows Information Bar"); 	
-			}
-		} 
-		
-		void flashMessage(FlashMessage.Type type, string msg)
-		{
-			if(msg=="") return; 
-			
-			//duplicated item
-			auto count = 1; 
-			
-			const duplicatedIdx = flashMessages.countUntil!((m)=>(m.type==type && m.msg==msg)); 
-			if(duplicatedIdx>=0)
-			{
-				auto duplicatedItem = flashMessages[duplicatedIdx]; 
-				count = duplicatedItem.count+1; 
-				flashMessages = flashMessages.remove(duplicatedIdx); 
-			}
-			
-			appendMessage(type, msg, count); 
-		} 
-		
-		void flashMessage(FlashMessage.Type type, string prefix, string msg)
-		{
-			if(prefix=="") return; 
-			
-			const duplicatedIdx = flashMessages.countUntil!((m)=>(m.msg.startsWith(prefix))); 
-			DateTime when = now; 
-			if(duplicatedIdx>=0)
-			{
-				when = flashMessages[duplicatedIdx].when; 
-				flashMessages = flashMessages.remove(duplicatedIdx); 
-			}
-			
-			appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
-			
-			if(flashMessages.length) flashMessages.back.when = when; 
-		} 
-		
-		void flashInfo(string msg)
-		{ flashMessage(FlashMessage.Type.info, msg); } 	void flashInfo(string prefix, string msg)
-		{ flashMessage(FlashMessage.Type.info, prefix, msg); } 
-		void flashWarning(string msg)
-		{ flashMessage(FlashMessage.Type.warning, msg); } 	void flashWarning(string prefix, string msg)
-		{ flashMessage(FlashMessage.Type.warning, prefix, msg); } 
-		void flashError(string msg)
-		{ flashMessage(FlashMessage.Type.error, msg); } 	void flashError(string prefix, string msg)
-		{ flashMessage(FlashMessage.Type.error, prefix, msg); } 
-		
-		void flashException(string msg)
-		{ flashMessage(FlashMessage.Type.exception, msg); } 
-		
-		enum flashMessageDuration = 4*second; 
-		
-		private bool flashMessagesInvoked; 
-		
-		private void updateFlashMessages_internal_onEndFrame()
-		{
-			const t = now-flashMessageDuration; 
-			flashMessages = flashMessages.remove!(a => a.when<t); 
-			
-			if(!flashMessagesInvoked)
-			UI_FlashMessages; 
-			flashMessagesInvoked = false; 
-		} 
-		
-		void UI_FlashMessages()
-		{
-			flashMessagesInvoked = true; 
-			//Note: User can call it wherever, but if not, it will drawn automatically.
-			with(im) {
-				if(flashMessages.empty) return; 
-				Panel(
-					PanelPosition.bottomCenter, 
+				const
+					c2 = style.fontColor,
+					f = fh,
+					oldBkColor = bkColor; //Todo: it has to be inherited
+				
+				Container(
 					{
-						bkColor = clWhite; 
-						style.bold = true; 
-						foreach(m; flashMessages)
-						Row(
+						flags.clickable = false; 
+						width = f; 
+						height = f; 
+						bkColor = oldBkColor; 
+						//Todo: make mouse clicks fall throug this to the parent container
+						
+						
+						void customDraw(Drawing dr, .Container cntr)
+						{
+							auto p = vec2(f*.5), r = f*.45; 
+							
+							dr.color = c2; 
+							dr.pointSize = r*2;  dr.point(p); 
+							
+							r -= f/12; 
+							
+							void pie(double angle)
 							{
-								style.bkColor = m.color; 
-								style.fontColor = m.fontColor; 
-								
-								if(m.type == FlashMessage.Type.error)
-								style.fontColor = mix(style.fontColor, style.bkColor, blink^^2); 
-								
-								padding = "4 24"; 
-								flags.hAlign = HAlign.center; 
-								const 	tIn = (now-m.when).value(.5f*second),
-									tOut = (m.when+flashMessageDuration-now).value(.25f*second); 
-								
-								fh = DefaultFontHeight*1.68f 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
-									* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
-								
-								const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : ""); 
-								Text(s); 
-							}
-						); 
+								enum N=8; 
+								dr.color = c1; 
+								iota(N+1).map!(i => p + vec2(r, 0).rotate(i*(PI/2/N)+angle))
+												 .slide(2)
+												 .each!((a){ dr.fillTriangle(p, a[1], a[0]); }); 
+							} 
+							
+							pie(angle); pie(angle+PI); 
+						} 
+						addDrawCallback(&customDraw); 
 					}
 				); 
-			}
-		} 
+			} 
+			
+		}
+		version(/+$DIDE_REGION Flash meggages+/all)
+		{
+			///Brings up an error message on the center of the screen for a short duration
+			struct FlashMessage {
+				DateTime when; 
+				enum Type { info, warning, error, exception} 
+				Type type; 
+				string msg; 
+				int count=1; 
+				
+				RGB color() const
+				{
+					with(Type)
+					final switch(type)
+					{
+						case info: 	return clWhite; 
+						case warning: 	return clYellow; 
+						case error, exception: 	return clRed; 
+					}
+				} 
+				
+				RGB fontColor() const
+				{
+					if(type==Type.exception) return clYellow; 
+					return blackOrWhiteFor(color); 
+				} 
+			} 
+			
+			FlashMessage[] flashMessages; 
+			
+			protected void appendMessage(FlashMessage.Type type, string msg, int count)
+			{
+				enum maxLen = 10; 
+				if(flashMessages.length>maxLen)
+				flashMessages = flashMessages[$-maxLen..$]; 
+				flashMessages ~= FlashMessage(now, type, msg, count); 
+				
+				with(FlashMessage.Type)
+				final switch(type)
+				{
+					case error, exception: 	winSnd("Windows Critical Stop"); 	break; 
+					case warning: 	if(count==1) winSnd("Windows Default"); 	break; 
+					case info: 	if(count==1) winSnd("Windows Information Bar"); 	
+				}
+			} 
+			
+			void flashMessage(FlashMessage.Type type, string msg)
+			{
+				if(msg=="") return; 
+				
+				//duplicated item
+				auto count = 1; 
+				
+				const duplicatedIdx = flashMessages.countUntil!((m)=>(m.type==type && m.msg==msg)); 
+				if(duplicatedIdx>=0)
+				{
+					auto duplicatedItem = flashMessages[duplicatedIdx]; 
+					count = duplicatedItem.count+1; 
+					flashMessages = flashMessages.remove(duplicatedIdx); 
+				}
+				
+				appendMessage(type, msg, count); 
+			} 
+			
+			void flashMessage(FlashMessage.Type type, string prefix, string msg)
+			{
+				if(prefix=="") return; 
+				
+				const duplicatedIdx = flashMessages.countUntil!((m)=>(m.msg.startsWith(prefix))); 
+				DateTime when = now; 
+				if(duplicatedIdx>=0)
+				{
+					when = flashMessages[duplicatedIdx].when; 
+					flashMessages = flashMessages.remove(duplicatedIdx); 
+				}
+				
+				appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
+				
+				if(flashMessages.length) flashMessages.back.when = when; 
+			} 
+			
+			void flashInfo(string msg)
+			{ flashMessage(FlashMessage.Type.info, msg); } 	void flashInfo(string prefix, string msg)
+			{ flashMessage(FlashMessage.Type.info, prefix, msg); } 
+			void flashWarning(string msg)
+			{ flashMessage(FlashMessage.Type.warning, msg); } 	void flashWarning(string prefix, string msg)
+			{ flashMessage(FlashMessage.Type.warning, prefix, msg); } 
+			void flashError(string msg)
+			{ flashMessage(FlashMessage.Type.error, msg); } 	void flashError(string prefix, string msg)
+			{ flashMessage(FlashMessage.Type.error, prefix, msg); } 
+			
+			void flashException(string msg)
+			{ flashMessage(FlashMessage.Type.exception, msg); } 
+			
+			enum flashMessageDuration = 4*second; 
+			
+			private bool flashMessagesInvoked; 
+			
+			private void updateFlashMessages_internal_onEndFrame()
+			{
+				const t = now-flashMessageDuration; 
+				flashMessages = flashMessages.remove!(a => a.when<t); 
+				
+				if(!flashMessagesInvoked)
+				UI_FlashMessages; 
+				flashMessagesInvoked = false; 
+			} 
+			
+			void UI_FlashMessages()
+			{
+				flashMessagesInvoked = true; 
+				//Note: User can call it wherever, but if not, it will drawn automatically.
+				with(im) {
+					if(flashMessages.empty) return; 
+					Panel(
+						PanelPosition.bottomCenter, 
+						{
+							bkColor = clWhite; 
+							style.bold = true; 
+							foreach(m; flashMessages)
+							Row(
+								{
+									style.bkColor = m.color; 
+									style.fontColor = m.fontColor; 
+									
+									if(m.type == FlashMessage.Type.error)
+									style.fontColor = mix(style.fontColor, style.bkColor, blink^^2); 
+									
+									padding = "4 24"; 
+									flags.hAlign = HAlign.center; 
+									const 	tIn = (now-m.when).value(.5f*second),
+										tOut = (m.when+flashMessageDuration-now).value(.25f*second); 
+									
+									fh = DefaultFontHeight*1.68f 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
+										* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
+									
+									const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : ""); 
+									Text(s); 
+								}
+							); 
+						}
+					); 
+				}
+			} 
+		}
+		
+		
 	}
 } 
 version(/+$DIDE_REGION Dead code+/none)

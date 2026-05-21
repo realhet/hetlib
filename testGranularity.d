@@ -58,12 +58,18 @@ class FrmHelloGUI: UIWindow
 			Panel(
 				PanelPosition.topClient, 
 				{
-					Container(
-						{
-							height = 4*fh; 
-							Row({ Text("Idôvonalzó"); }); 
-						}
-					); 
+					padding = "1 1 1 0"; /+bkColor = (RGB(0xFFCCDD)); +/
+					
+					static DateTime t0_outer, t1_outer, t0, t1; 
+					if(!t1_outer) {
+						t0_outer = DateTime(2026, 1, 1), 
+						t1_outer = DateTime(2026, 12, 31, 23, 59, 59, 999); 
+					}
+					
+					t0 = now, 
+					t1 = t0 + ((2+sin((now-today).value(((10)*(second))) * ((2)*(π))))*(2*day)) * 5; 
+					
+					HRuler(t0/+_outer+/, t1 + (t1-t0)/2/+_outer+/, t0, t1, {}); 
 				}
 			); 
 		}

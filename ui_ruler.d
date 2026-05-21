@@ -758,10 +758,17 @@ void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler, bool isF
 	}
 } 
 
-void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
+//returns true it the top rows is filled
+bool drawHRuler(
+	IDrawing dr, bounds2 bnd, DateTime start, DateTime end,
+	
+	bool shiftUpwards = false
+	/+If there is no coarse text, if goes up 1 fh+/
+)
 {
+	const fh = bnd.height * (2.0f/5); 
 	bounds2 coarseBnd = bnd, fineBnd = bnd; 
-	coarseBnd.bottom = fineBnd.top = bnd.top + bnd.height * (2.0f/5); 
+	coarseBnd.bottom = fineBnd.top = bnd.top + fh; 
 	
 	alias G = DateTimeGranularity, GS = DateTimeGranularities; 
 	static immutable granularitySets = 
@@ -793,6 +800,14 @@ void drawHRuler(IDrawing dr, bounds2 bnd, DateTime start, DateTime end)
 		}
 	}
 	
+	const hasCoarse = !!coarseLayout; 
+	if(shiftUpwards && !hasCoarse) {
+		coarseBnd 	-= vec2(0, fh),
+		fineBnd 	-= vec2(0, fh); 
+	}
+	
 	drawHRuler(dr, coarseBnd, coarseLayout, isFine: false); 
 	drawHRuler(dr, fineBnd, fineLayout, isFine: true); 
+	
+	return hasCoarse; 
 } 
