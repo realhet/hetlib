@@ -69,7 +69,7 @@ class FrmHelloGUI: UIWindow
 					t0 = now, 
 					t1 = t0 + ((2+sin((now-today).value(((10)*(second))) * ((2)*(π))))*(2*day)) * 5; 
 					
-					HRuler(t0/+_outer+/, t1 + (t1-t0)/2/+_outer+/, t0, t1, {}); 
+					HRuler(t0_outer, t1_outer, t0, t1, {}); 
 				}
 			); 
 		}

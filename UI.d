@@ -9749,7 +9749,35 @@ struct im
 							if(!topIsFine) bTop.bottom -= fh; 
 							if(!bottomIsFine) bBottom.top += fh; 
 							auto bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
-							dr.color = clFuchsia; dr.fillRect(bCenter); 
+							//bCenter.top = b.top; bCenter.bottom = b.bottom; 
+							
+							{
+								dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
+								void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
+								{
+									const step = 1.0f/(y1-y0); float t=step/2; 
+									foreach(i; 0..y1-y0)
+									{
+										const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+										dr.fillRect(
+											bounds2(
+												mix(leftX0 , leftX1 , tt), y, 
+												mix(rightX0, rightX1, tt), y+1
+											)
+										); 
+										t += step; 
+									}
+								} 
+								
+								float remap(DateTime t)
+								=> b.left + ((b.width*(t.raw.clamp(t0_outer.raw, t1_outer.raw) - t0_outer.raw))/(t1_outer.raw - t0_outer.raw)); 
+								const t0x = remap(t0), t1x = remap(t1); 
+								
+								dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
+								dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
+								fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
+								fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
+							}
 						}
 					}
 					

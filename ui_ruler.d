@@ -706,7 +706,7 @@ void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler, bool isF
 	enum lineWidthScale	= 1.05f,
 	clMajorTick 	= (RGB(0x101010)),
 	clMinorTick 	= (RGB(0x202020)),
-	clText 	= (RGB(0xFF0000)),
+	clText 	= (RGB(0x000000)),
 	clRedText 	= (RGB(0x0000FF)),
 	clBackground	= (RGB(0xFFFFFF)); 
 	

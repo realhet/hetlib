@@ -3351,6 +3351,9 @@ version(/+$DIDE_REGION+/all)
 			return a.generateVector!(CT, a => a<0 ? -(a ^^ 2) : a ^^ 2); 
 		} 
 		
+		float signedpow(float a, float b)
+		=> ((a<0)?(-pow(-a, b)):(pow(a, b))); 
+		
 		auto inversesqrt(A)(in A a)
 		{
 			alias CT = CommonScalarType!(A, float); 
