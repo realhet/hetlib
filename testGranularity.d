@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@/release
+//@release
 
 //@compile --d-version=VulkanUI
 
@@ -66,8 +66,15 @@ class FrmHelloGUI: UIWindow
 						t1_outer = DateTime(2026, 12, 31, 23, 59, 59, 999); 
 					}
 					
-					t0 = now, 
-					t1 = t0 + ((2+sin((now-today).value(((10)*(second))) * ((2)*(π))))*(2*day)) * 5; 
+					mixin(
+						ONCE(
+							q{
+								t0 = now, 
+								t1 = t0 + ((2+sin((now-today).value(((10)*(second))) * ((2)*(π))))*(2*day)) * 5; 
+							}
+						)
+					); 
+					
 					
 					HRuler(t0_outer, t1_outer, t0, t1, {}); 
 				}

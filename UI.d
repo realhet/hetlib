@@ -457,7 +457,7 @@ version(/+$DIDE_REGION+/all)
 			with(mainWindow)
 			{
 				//Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
-				if(topId && mouse.LMB && mouse.justPressed && isForeground)
+				if(topId && mouse.LMB && mouse.justPressed && canProcessUserInput)
 				{
 					 //Note: isForeground will not work with a toolwindow
 					pressedId = capturedId = topId; 
@@ -6279,7 +6279,7 @@ struct im
 			if(textEditorState.active)
 			{
 				 //an edit control is active.
-				//Todo: mainWindow.isForeground check
+				//Todo: mainWindow.canProcessUserInput check
 				auto err = textEditorState.processQueue; 
 			}
 			wantKeys = textEditorState.active; 
@@ -9009,7 +9009,7 @@ struct im
 			
 				private struct SliderState
 			{
-				 //information about the current slider being modified
+				//information about the current slider being modified
 				
 				//information generated and maintained in update
 				Id pressed_id; 
@@ -9293,7 +9293,7 @@ struct im
 					
 					//res.focused = focused;
 					
-					if(focused && mainWindow.isForeground)
+					if(focused && mainWindow.canProcessUserInput)
 					userModified |= sliderState.handleKeyboard(nPos, range_, 8); 
 					
 					bkColor = ts.bkColor; 
@@ -9677,7 +9677,7 @@ struct im
 				RGB clText, clRedText, clMajorTick, clMinorTick; 
 				DateTime t0_outer, t1_outer, t0, t1; 
 				bounds2 hitBounds; 
-				bool focused; 
+				bool focused; float hoverOrFocus=0; 
 				
 				this(
 					in Id id, bool enabled, 	const DateTime t0_outer, 	const DateTime t1_outer, 
@@ -9706,18 +9706,32 @@ struct im
 						/*onExit*/ {}
 					); 
 					
-					if(focused && mainWindow.isForeground)
+					if(focused && mainWindow.canProcessUserInput)
 					{
-						bool handleKeyboard()
-						{ return false; /+Todo: implement DateTimeRuler.keyboardHandling+/} 
-						userModified |= handleKeyboard; 
+						const w = t1.raw - t0.raw, w_outer = t1_outer.raw - t0_outer.raw; 
+						float 	nPos = (((float(t0.raw - t0_outer.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
+						const changed = sliderState.handleKeyboard(nPos, im.range(0, 1, pageSize/8), pageSize); 
+						
+						((0x447F2EB16D5C4).檢(
+							i"$(nPos) 
+$(w_outer) 
+$(w) 
+$(w_outer - w)".text
+						)); 
+						if(changed)
+						{
+							auto dt(ulong u) => u.clamp(t0_outer.raw, t1_outer.raw).RawDateTime; 
+							t0 = dt(t0_outer.raw + (cast(ulong)(nPos * (w_outer - w))) /+Todo: must do safe ulong addition!!!+/); 
+							t1 = dt(t0.raw + w /+Todo: must do safe ulong addition!!!+/); 
+						}
+						
+						userModified |= changed; 
 					}
 					
 					bkColor = ts.bkColor; 
 					clText = ts.fontColor; 
 					
-					const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
-					bkColor = mix(bkColor, clText, hoverOrFocus*.25f); 
+					hoverOrFocus = enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
 					
 					clRedText = clRed; 
 					clMajorTick = clText; 
@@ -9726,62 +9740,96 @@ struct im
 					const fh = ts.fontHeight; 
 					innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
 					
-					bool handleMouse()
-					{ return false; /+Todo: implement Ruler mouse handling+/} 
-					userModified |= handleMouse(); 
+					if(focused && mainWindow.canProcessUserInput)
+					{
+						const w = t1.raw - t0.raw, w_outer = t1_outer.raw - t0_outer.raw; 
+						float 	nPos = (((float(t0.raw - t0_outer.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
+						int wrapCnt; 
+						const changed = sliderState.handleMouse(id, hit, nPos, mousePos, im.range(0, 1, pageSize/8), wrapCnt); 
+						
+						((0x44CB0EB16D5C4).檢(
+							i"$(nPos) 
+$(w_outer) 
+$(w) 
+$(w_outer - w)".text
+						)); 
+						
+						if(changed)
+						{
+							auto dt(ulong u) => u.clamp(t0_outer.raw, t1_outer.raw).RawDateTime; 
+							t0 = dt(t0_outer.raw + (cast(ulong)(nPos * (w_outer - w))) /+Todo: must do safe ulong addition!!!+/); 
+							t1 = dt(t0.raw + w /+Todo: must do safe ulong addition!!!+/); 
+						}
+						
+						userModified |= changed; 
+					}
 				} 
 				
 				override void draw(Drawing dr)
 				{
 					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
 					
+					const b = innerBounds + innerPos; 
+					const fh = b.height/5.625f, rh = fh*5/2; 
+					auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
+						bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
+					bounds2 bCenter, bThumb; 
+					float t0x, t1x; 
+					
 					{
 						dr.pushClipBounds(bounds2(vec2(0), outerSize)); scope(exit) dr.popClipBounds; 
 						
+						import het.ui_ruler; 
+						const 	topIsFine 	= drawHRuler(dr, bTop, t0_outer, t1_outer, shiftUpwards: true),
+							bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
+						if(!topIsFine) bTop.bottom -= fh; 
+						if(!bottomIsFine) bBottom.top += fh; 
+						bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
 						
 						{
-							import het.ui_ruler; 
-							const b = innerBounds + innerPos; const fh = b.height/5.625f, rh = fh*5/2; 
-							auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
-								bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
-							const 	topIsFine 	= drawHRuler(dr, bTop, t0_outer, t1_outer, shiftUpwards: true),
-								bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
-							if(!topIsFine) bTop.bottom -= fh; 
-							if(!bottomIsFine) bBottom.top += fh; 
-							auto bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
-							//bCenter.top = b.top; bCenter.bottom = b.bottom; 
-							
+							dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
+							void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
 							{
-								dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
-								void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
+								const step = 1.0f/(y1-y0); float t=step/2; 
+								foreach(i; 0..y1-y0)
 								{
-									const step = 1.0f/(y1-y0); float t=step/2; 
-									foreach(i; 0..y1-y0)
-									{
-										const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
-										dr.fillRect(
-											bounds2(
-												mix(leftX0 , leftX1 , tt), y, 
-												mix(rightX0, rightX1, tt), y+1
-											)
-										); 
-										t += step; 
-									}
-								} 
-								
-								float remap(DateTime t)
-								=> b.left + ((b.width*(t.raw.clamp(t0_outer.raw, t1_outer.raw) - t0_outer.raw))/(t1_outer.raw - t0_outer.raw)); 
-								const t0x = remap(t0), t1x = remap(t1); 
-								
-								dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
-								dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
-								fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
-								fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
-							}
+									const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+									dr.fillRect(
+										bounds2(
+											mix(leftX0 , leftX1 , tt), y, 
+											mix(rightX0, rightX1, tt), y+1
+										)
+									); 
+									t += step; 
+								}
+							} 
+							
+							float remap(DateTime t)
+							=> b.left + ((b.width*(t.raw.clamp(t0_outer.raw, t1_outer.raw) - t0_outer.raw))/(t1_outer.raw - t0_outer.raw)); 
+							t0x = remap(t0), t1x = remap(t1); 
+							
+							dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
+							dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
+							fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
+							fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
+							
+							bThumb = bounds2(t0x, bTop.top, t1x, bTop.bottom); 
 						}
 					}
 					
-					drawBorder(dr); drawDebug(dr); 
+					drawBorder(dr); 
+					if(hoverOrFocus)
+					{
+						dr.alpha = hoverOrFocus; scope(exit) dr.alpha = 1; 
+						dr.color = clBlack; dr.lineWidth = 2; 
+						dr.drawRect(b.inflated(vec2(-1, 0/+Todo: A bit lame, but looks good+/))); 
+						with(bThumb.inflated(vec2(-1,0))) {
+							dr.line(topLeft, bottomLeft); 
+							dr.line(topRight, bottomRight); 
+							dr.line(bottomLeft, bottomRight); 
+						}
+					}
+					drawDebug(dr); 
 				} 
 			} 
 			
