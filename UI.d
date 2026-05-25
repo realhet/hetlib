@@ -9686,22 +9686,71 @@ struct im
 				//Note: must be a Container because hitTest works on Containers only.
 				
 				RGB clText, clRedText, clMajorTick, clMinorTick; 
-				DateTime t0_outer, t1_outer, t0, t1; 
+				DateTime tMin, tMax, t0, t1; 
 				bounds2 hitBounds; bool mouseAtTopHalf; @property mouseAtBottomHalf() => !mouseAtTopHalf; 
 				bool focused; float hoverOrFocus=0; 
 				
 				DateTime highlighted_t; 
 				bool show_highlighted_t; 
 				
+				protected
+				{
+					auto dt(ulong u) => u.clamp(tMin.raw, tMax.raw).RawDateTime; 
+					
+					import core.int128; enum fixp = 16; 
+					
+					DateTime safeClamp(Cent x)
+					{
+						if(gt(x, Cent(tMax.raw))) return tMax; 
+						if(lt(x, Cent(tMin.raw))) return tMin; 
+						return x.lo.RawDateTime; 
+					} 
+					
+					DateTime safeShift(DateTime t, ulong width, float sc)
+					{
+						Cent x = 	Cent(width)
+							.mul(Cent(cast(long)((1<<fixp)*sc))).sar(fixp)
+							.add(Cent(t.raw)); 
+						return safeClamp(x); 
+					} 
+					
+					DateTime safeScale(DateTime t, DateTime center, float sc)
+					{
+						Cent x = 	sub(Cent(t.raw), Cent(center.raw))
+							.mul(Cent(cast(long)((1<<fixp)*sc))).sar(fixp)
+							.add(Cent(center.raw)); 
+						return safeClamp(x); 
+					} 
+					
+					DateTime safeScroll(DateTime base, Time delta, ulong mi, ulong ma)
+					{
+						Cent x = 	Cent(base.raw); 
+						double d = delta.value(het.quantities.second/DateTime.RawUnit.sec); 
+						if(d>=0)
+						{
+							if(d>ulong.max) d = ulong.max.to!double; 
+							x = x.add(Cent(cast(ulong)(d))); 
+						}
+						else
+						{
+							d = -d; 
+							if(d>ulong.max) d = ulong.max.to!double; 
+							x = x.sub(Cent(cast(ulong)(d))); 
+						}
+						
+						return ((gt(x, ma.Cent))?(ma):(((lt(x, mi.Cent))?(mi):(x.lo)))).RawDateTime; 
+					} 
+				} 
+				
 				this(
-					in Id id, bool enabled, 	const DateTime t0_outer, 	const DateTime t1_outer, 
+					in Id id, bool enabled, 	const DateTime tMin, 	const DateTime tMax, 
 						ref DateTime t0, 	ref DateTime t1, 
 					const ref TextStyle ts, vec2 mousePos, ref bool userModified, out HitInfo hit
 				)
 				{
 					this.id = id; 
-					this.t0_outer 	= t0_outer,
-					this.t1_outer 	= t1_outer,
+					this.tMin 	= tMin,
+					this.tMax 	= tMax,
 					this.t0 	= t0,
 					this.t1 	= t1; 
 					
@@ -9710,11 +9759,12 @@ struct im
 					
 					mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
 					
-					const float norm_mouseX = hitBounds ? (mousePos.x-hitBounds.left) / hitBounds.width : 0; 
-					const t_hovered_top = hitBounds ? RawDateTime(t0_outer.raw + (cast(ulong)((t1_outer.raw - t0_outer.raw) * norm_mouseX))) : t0_outer; 
-					const t_hovered_bottom = hitBounds ? RawDateTime(t0.raw + (cast(ulong)((t1.raw - t0.raw) * norm_mouseX))) : t0; 
-					
-					const lockedAtTopHalf = sliderState.pressed_id == id ? sliderState.drawn_orientation==SliderOrientation.horz : mouseAtTopHalf; 
+					const 	norm_mouseX 	= ((
+						hitBounds && 
+						hitBounds.width
+					)?(((mousePos.x-hitBounds.left)/(hitBounds.width))):(0)),
+						t_hovered_top 	= safeShift(tMin, tMax.raw-tMin.raw, norm_mouseX),
+						t_hovered_bottom 	= safeShift(t0, t1.raw-t0.raw, norm_mouseX); 
 					
 					show_highlighted_t = mouseAtBottomHalf; 
 					highlighted_t = t_hovered_bottom; 
@@ -9724,7 +9774,11 @@ struct im
 					focused = im.focusUpdate
 					(
 						this, id, enabled,
-						hit.pressed || hit.hover && (inputs.RMB.pressed || inputs.MMB.pressed || inputs.MW.delta), //when to enter
+						hit.pressed || hit.hover && (
+							inputs.RMB.pressed ||
+							inputs.MMB.pressed ||
+							inputs.MW.delta
+						), //when to enter
 						inputs["Esc"].pressed, //when to exit
 						/*onEnter*/ {},
 						/*onFocus*/ {},
@@ -9735,39 +9789,40 @@ struct im
 					
 					if(focused && mainWindow.canProcessUserInput)
 					{
-						const w = t1.raw - t0.raw, w_outer = t1_outer.raw - t0_outer.raw; 
-						float 	nPos = (((float(t0.raw - t0_outer.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
+						const w = t1.raw - t0.raw, w_outer = tMax.raw - tMin.raw; 
+						float 	nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
+						const rng = im.range(0, 1, pageSize/8); 
 						
-						const changed_kb = sliderState.handleKeyboard(nPos, im.range(0, 1, pageSize/8), pageSize); 
+						const changed_kb = sliderState.handleKeyboard(nPos, rng, pageSize); 
 						
 						bool changed_m; int wrapCnt/+ignored+/; 
 						if(hit.pressed && mouseAtBottomHalf)
 						{ beep; /+left button pressed at t_hovered_bottom+/}
-						else { changed_m = sliderState.handleMouse(id, hit, nPos, mousePos, im.range(0, 1, pageSize/8), wrapCnt); }
+						else {
+							changed_m = sliderState.handleMouse(
+								id, hit, nPos, 
+								mousePos, rng, wrapCnt
+							); 
+						}
 						
 						const changed = changed_kb || changed_m; 
-						auto dt(ulong u) => u.clamp(t0_outer.raw, t1_outer.raw).RawDateTime; 
-						
 						if(changed)
 						{
-							t0 = dt(
-								t0_outer.raw + (cast(ulong)(nPos * (w_outer - w))) 
-								/+Todo: must do safe ulong addition!!!+/
-							); 
-							t1 = dt(t0.raw + w /+Todo: must do safe ulong addition!!!+/); 
+							t0 = safeShift(tMin, w_outer - w, nPos); 
+							t1 = safeShift(t0, w, 1); 
 						}
 						
 						userModified |= changed; 
 						
-						
 						//Zooming
 						if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
 						{
-							double sc = 1 + inputs.MW.delta.abs * .25; 
+							float sc = 1 + inputs.MW.delta.abs * .25; 
 							if(inputs.MW.delta>0) sc = 1/sc; 
-							const c = t_hovered_bottom.raw; 
-							t0 = dt(c-(cast(ulong)((c-t0.raw)/+Todo: unsafe ulong+/*sc))); 
-							t1 = dt(c+(cast(ulong)((t1.raw-c)/+Todo: unsafe ulong+/*sc))); 
+							t0 = safeScale(t0, t_hovered_bottom, sc); 
+							t1 = safeScale(t1, t_hovered_bottom, sc); 
+							
+							userModified = true; 
 						}
 						
 						//Scrolling
@@ -9783,11 +9838,14 @@ struct im
 						
 						if(dateTimeRulerState.scrolling)
 						{
-							const d = dateTimeRulerState.actDelta * -(mousePos.x - dateTimeRulerState.startMousePos.x); 
-							const len = dateTimeRulerState.startT0 - dateTimeRulerState.startT1; 
-							t0 = min(dateTimeRulerState.startT0 + d /+unsafe!+/, t1_outer - len); 
-							t1 = max(dateTimeRulerState.startT1 + d /+unsafe!+/, t0_outer + len); 
-							t1 = dt(t1.raw); t0 = dt(t0.raw); 
+							const d = dateTimeRulerState.actDelta * 
+								-(mousePos.x - dateTimeRulerState.startMousePos.x); 
+							const len = dateTimeRulerState.startT1.raw - dateTimeRulerState.startT0.raw; 
+							const t0_prev = t0, t1_prev = t1; 
+							t0 = safeScroll(dateTimeRulerState.startT0, d, tMin.raw, tMax.raw-len); 
+							t1 = safeScroll(dateTimeRulerState.startT1, d, tMin.raw+len, tMax.raw); 
+							
+							userModified |= (t0!=t0_prev) || (t1!=t1_prev); 
 						}
 					}
 					
@@ -9819,7 +9877,7 @@ struct im
 						dr.pushClipBounds(bounds2(vec2(0), outerSize)); scope(exit) dr.popClipBounds; 
 						
 						import het.ui_ruler; 
-						const 	topIsFine 	= drawHRuler(dr, bTop, t0_outer, t1_outer, shiftUpwards: true),
+						const 	topIsFine 	= drawHRuler(dr, bTop, tMin, tMax, shiftUpwards: true),
 							bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
 						if(!topIsFine) bTop.bottom -= fh; 
 						if(!bottomIsFine) bBottom.top += fh; 
@@ -9844,7 +9902,7 @@ struct im
 							} 
 							
 							float remap(DateTime t)
-							=> b.left + ((b.width*(t.raw.clamp(t0_outer.raw, t1_outer.raw) - t0_outer.raw))/(t1_outer.raw - t0_outer.raw)); 
+							=> b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
 							t0x = remap(t0), t1x = remap(t1); 
 							
 							dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
@@ -9877,7 +9935,7 @@ struct im
 							dr.alpha = hoverOrFocus; 
 							
 							const t = highlighted_t; 
-							const xTop = b.left + ((b.width*(t.raw.clamp(t0_outer.raw, t1_outer.raw) - t0_outer.raw))/(t1_outer.raw - t0_outer.raw)); 
+							const xTop = b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
 							const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
 							
 							dr.lineWidth = 1.02f; dr.color = clText; 
@@ -9912,7 +9970,7 @@ struct im
 			
 			auto HRuler(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
 				(
-				const DateTime t0_outer, 	const DateTime t1_outer, 
+				const DateTime tMin, 	const DateTime tMax, 
 				ref T t0, 	ref T t1, 
 				Args args
 			)
@@ -9924,7 +9982,7 @@ struct im
 					{
 						bool userModified; HitInfo hit; 
 						auto ruler = new DateTimeRuler(
-							id_, enabled, t0_outer, t1_outer, t0, t1,
+							id_, enabled, tMin, tMax, t0, t1,
 							style, targetView.mousePos.vec2, userModified, hit
 						); 
 						

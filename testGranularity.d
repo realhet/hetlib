@@ -60,10 +60,13 @@ class FrmHelloGUI: UIWindow
 				{
 					padding = "1 1 1 0"; /+bkColor = (RGB(0xFFCCDD)); +/
 					
-					static DateTime t0_outer, t1_outer, t0, t1; 
-					if(!t1_outer) {
-						t0_outer = DateTime(2026, 1, 1), 
-						t1_outer = DateTime(2026, 12, 31, 23, 59, 59, 999); 
+					static DateTime tMin, tMax, t0, t1; 
+					if(!tMax) {
+						/+
+							tMin = DateTime(2026, 1, 1), 
+							tMax = DateTime(2026, 12, 31, 23, 59, 59, 999); 
+						+/
+						tMin = RawDateTime(0), tMax = RawDateTime(ulong.max); 
 					}
 					
 					mixin(
@@ -76,7 +79,7 @@ class FrmHelloGUI: UIWindow
 					); 
 					
 					
-					HRuler(t0_outer, t1_outer, t0, t1, {}); 
+					HRuler(tMin, tMax, t0, t1, {}); 
 				}
 			); 
 		}
