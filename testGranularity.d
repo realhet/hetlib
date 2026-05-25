@@ -1,6 +1,6 @@
 //@exe
 //@debug
-//@release
+///@release
 
 //@compile --d-version=VulkanUI
 

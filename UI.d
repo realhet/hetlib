@@ -9011,6 +9011,8 @@ struct im
 			{
 				//information about the current slider being modified
 				
+				/+Usage: Call handleKeyboard(), handleMouse() and don't forget to call afterDraw()!!!+/
+				
 				//information generated and maintained in update
 				Id pressed_id; 
 				vec2 pressed_thumbMouseOfs, pressed_rawMousePos; 
@@ -9670,14 +9672,26 @@ struct im
 			
 			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
 			{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
+			struct DateTimeRulerState
+			{
+				bool scrolling; 
+				vec2 startMousePos; 
+				DateTime startT0, startT1; 
+				Time actDelta; 
+			} 
+			DateTimeRulerState dateTimeRulerState; 
+			
 			class DateTimeRuler : .Container
 			{
 				//Note: must be a Container because hitTest works on Containers only.
 				
 				RGB clText, clRedText, clMajorTick, clMinorTick; 
 				DateTime t0_outer, t1_outer, t0, t1; 
-				bounds2 hitBounds; 
+				bounds2 hitBounds; bool mouseAtTopHalf; @property mouseAtBottomHalf() => !mouseAtTopHalf; 
 				bool focused; float hoverOrFocus=0; 
+				
+				DateTime highlighted_t; 
+				bool show_highlighted_t; 
 				
 				this(
 					in Id id, bool enabled, 	const DateTime t0_outer, 	const DateTime t1_outer, 
@@ -9694,38 +9708,87 @@ struct im
 					hit = im.hitTest(this, enabled); 
 					hitBounds = hit.hitBounds; 
 					
+					mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
+					
+					const float norm_mouseX = hitBounds ? (mousePos.x-hitBounds.left) / hitBounds.width : 0; 
+					const t_hovered_top = hitBounds ? RawDateTime(t0_outer.raw + (cast(ulong)((t1_outer.raw - t0_outer.raw) * norm_mouseX))) : t0_outer; 
+					const t_hovered_bottom = hitBounds ? RawDateTime(t0.raw + (cast(ulong)((t1.raw - t0.raw) * norm_mouseX))) : t0; 
+					
+					const lockedAtTopHalf = sliderState.pressed_id == id ? sliderState.drawn_orientation==SliderOrientation.horz : mouseAtTopHalf; 
+					
+					show_highlighted_t = mouseAtBottomHalf; 
+					highlighted_t = t_hovered_bottom; 
+					
 					enum canFocus = true; 
 					if(canFocus)
 					focused = im.focusUpdate
 					(
 						this, id, enabled,
-						hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+						hit.pressed || hit.hover && (inputs.RMB.pressed || inputs.MMB.pressed || inputs.MW.delta), //when to enter
 						inputs["Esc"].pressed, //when to exit
 						/*onEnter*/ {},
 						/*onFocus*/ {},
 						/*onExit*/ {}
 					); 
 					
+					if(!focused || !inputs.MMB.down) dateTimeRulerState.scrolling = false; 
+					
 					if(focused && mainWindow.canProcessUserInput)
 					{
 						const w = t1.raw - t0.raw, w_outer = t1_outer.raw - t0_outer.raw; 
 						float 	nPos = (((float(t0.raw - t0_outer.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
-						const changed = sliderState.handleKeyboard(nPos, im.range(0, 1, pageSize/8), pageSize); 
 						
-						((0x447F2EB16D5C4).檢(
-							i"$(nPos) 
-$(w_outer) 
-$(w) 
-$(w_outer - w)".text
-						)); 
+						const changed_kb = sliderState.handleKeyboard(nPos, im.range(0, 1, pageSize/8), pageSize); 
+						
+						bool changed_m; int wrapCnt/+ignored+/; 
+						if(hit.pressed && mouseAtBottomHalf)
+						{ beep; /+left button pressed at t_hovered_bottom+/}
+						else { changed_m = sliderState.handleMouse(id, hit, nPos, mousePos, im.range(0, 1, pageSize/8), wrapCnt); }
+						
+						const changed = changed_kb || changed_m; 
+						auto dt(ulong u) => u.clamp(t0_outer.raw, t1_outer.raw).RawDateTime; 
+						
 						if(changed)
 						{
-							auto dt(ulong u) => u.clamp(t0_outer.raw, t1_outer.raw).RawDateTime; 
-							t0 = dt(t0_outer.raw + (cast(ulong)(nPos * (w_outer - w))) /+Todo: must do safe ulong addition!!!+/); 
+							t0 = dt(
+								t0_outer.raw + (cast(ulong)(nPos * (w_outer - w))) 
+								/+Todo: must do safe ulong addition!!!+/
+							); 
 							t1 = dt(t0.raw + w /+Todo: must do safe ulong addition!!!+/); 
 						}
 						
 						userModified |= changed; 
+						
+						
+						//Zooming
+						if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
+						{
+							double sc = 1 + inputs.MW.delta.abs * .25; 
+							if(inputs.MW.delta>0) sc = 1/sc; 
+							const c = t_hovered_bottom.raw; 
+							t0 = dt(c-(cast(ulong)((c-t0.raw)/+Todo: unsafe ulong+/*sc))); 
+							t1 = dt(c+(cast(ulong)((t1.raw-c)/+Todo: unsafe ulong+/*sc))); 
+						}
+						
+						//Scrolling
+						if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
+						{
+							dateTimeRulerState.scrolling = true; 
+							dateTimeRulerState.startMousePos = mousePos; 
+							dateTimeRulerState.startT0 = t0; 
+							dateTimeRulerState.startT1 = t1; 
+						}
+						
+						if(hitBounds) dateTimeRulerState.actDelta = (t1-t0)/hitBounds.width; 
+						
+						if(dateTimeRulerState.scrolling)
+						{
+							const d = dateTimeRulerState.actDelta * -(mousePos.x - dateTimeRulerState.startMousePos.x); 
+							const len = dateTimeRulerState.startT0 - dateTimeRulerState.startT1; 
+							t0 = min(dateTimeRulerState.startT0 + d /+unsafe!+/, t1_outer - len); 
+							t1 = max(dateTimeRulerState.startT1 + d /+unsafe!+/, t0_outer + len); 
+							t1 = dt(t1.raw); t0 = dt(t0.raw); 
+						}
 					}
 					
 					bkColor = ts.bkColor; 
@@ -9739,32 +9802,8 @@ $(w_outer - w)".text
 					
 					const fh = ts.fontHeight; 
 					innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
-					
-					if(focused && mainWindow.canProcessUserInput)
-					{
-						const w = t1.raw - t0.raw, w_outer = t1_outer.raw - t0_outer.raw; 
-						float 	nPos = (((float(t0.raw - t0_outer.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
-						int wrapCnt; 
-						const changed = sliderState.handleMouse(id, hit, nPos, mousePos, im.range(0, 1, pageSize/8), wrapCnt); 
-						
-						((0x44CB0EB16D5C4).檢(
-							i"$(nPos) 
-$(w_outer) 
-$(w) 
-$(w_outer - w)".text
-						)); 
-						
-						if(changed)
-						{
-							auto dt(ulong u) => u.clamp(t0_outer.raw, t1_outer.raw).RawDateTime; 
-							t0 = dt(t0_outer.raw + (cast(ulong)(nPos * (w_outer - w))) /+Todo: must do safe ulong addition!!!+/); 
-							t1 = dt(t0.raw + w /+Todo: must do safe ulong addition!!!+/); 
-						}
-						
-						userModified |= changed; 
-					}
 				} 
-				
+				
 				override void draw(Drawing dr)
 				{
 					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
@@ -9823,12 +9862,50 @@ $(w_outer - w)".text
 						dr.alpha = hoverOrFocus; scope(exit) dr.alpha = 1; 
 						dr.color = clBlack; dr.lineWidth = 2; 
 						dr.drawRect(b.inflated(vec2(-1, 0/+Todo: A bit lame, but looks good+/))); 
-						with(bThumb.inflated(vec2(-1,0))) {
+						
+						
+						if(!mouseAtTopHalf) dr.alpha = hoverOrFocus/2; 
+						with(bThumb.inflated(vec2(-1,0)))
+						{
 							dr.line(topLeft, bottomLeft); 
 							dr.line(topRight, bottomRight); 
 							dr.line(bottomLeft, bottomRight); 
 						}
+						
+						if(show_highlighted_t)
+						{
+							dr.alpha = hoverOrFocus; 
+							
+							const t = highlighted_t; 
+							const xTop = b.left + ((b.width*(t.raw.clamp(t0_outer.raw, t1_outer.raw) - t0_outer.raw))/(t1_outer.raw - t0_outer.raw)); 
+							const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
+							
+							dr.lineWidth = 1.02f; dr.color = clText; 
+							
+							const 	A = vec2(xTop, bTop.top), 
+								B = vec2(xTop, bCenter.top),
+								C = vec2(xBottom, bCenter.bottom), 
+								D = vec2(xBottom, bBottom.bottom); 
+							/+dr.line(A, B); dr.line(B, C); dr.line(C, D); +/
+							dr.line(A, B); 
+							enum N = 10; 
+							const P = iota(N).map!((i){
+								const t = i*(1.0f/(N-1)); 
+								const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+								return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
+							}).array; 
+							foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
+							dr.line(C, D); 
+						}
 					}
+					
+					sliderState.afterDraw(
+						id, SliderOrientation.horz, 
+						dr.inputTransform(bTop.topLeft     + bThumb.size/2), 
+						dr.inputTransform(bTop.bottomRight - bThumb.size/2), 
+						dr.inputTransform(bThumb)
+					); 
+					
 					drawDebug(dr); 
 				} 
 			} 

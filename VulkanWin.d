@@ -3747,6 +3747,9 @@ Use SvgParser to prepare absolute SVG command stream!"
 			void bezier2(in vec2 A, in vec2 B, in vec2 C)
 			{ setupLine; gfx.drawPath(i"M$(A.x) $(A.y)Q$(B.x) $(B.y),$(C.x) $(C.y)".text); } 
 			
+			void bezier3(in vec2 A, in vec2 B, in vec2 C, in vec2 D)
+			{ setupLine; gfx.drawPath(i"M$(A.x) $(A.y)C$(B.x) $(B.y),$(C.x) $(C.y),$(D.x) $(D.y)".text); } 
+			
 			void fillTriangle(in vec2 a, in vec2 b, in vec2 c)
 			{
 				gfx.PC = color; 
@@ -5385,18 +5388,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2961B82886ADB).檢(
+					((0x296C182886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2968D82886ADB))))
+				if((互!((bool),(0),(0x2973382886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2972182886ADB).檢((互!((float/+w=12+/),(1.000),(0x2973882886ADB))).iremap(0, 1, 4, ma))); 
+					((0x297C782886ADB).檢((互!((float/+w=12+/),(1.000),(0x297DE82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5409,8 +5412,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2990D82886ADB).檢 (imVG)),
-					((0x2993382886ADB).檢 (imFPS)); 
+					((0x299B382886ADB).檢 (imVG)),
+					((0x299D982886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5747,7 +5750,7 @@ $(V_size+G_size)".text
 				q{
 					/*
 						--------------------------------------------------------------
-							Cubic bezier approx distance 2 
+							Cubic bezier approx distance 2
 						--------------------------------------------------------------
 							Created by NinjaKoala in 2019-07-17
 							https://www.shadertoy.com/view/3lsSzS
