@@ -9672,14 +9672,42 @@ struct im
 			
 			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
 			{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
-			struct DateTimeRulerState
-			{
-				bool scrolling; 
-				vec2 startMousePos; 
-				DateTime startT0, startT1; 
-				Time actDelta; 
-			} 
-			DateTimeRulerState dateTimeRulerState; 
+			version(/+$DIDE_REGION+/all) {
+				struct DateTimeRulerState
+				{
+					bool scrolling; 
+					vec2 startMousePos; 
+					DateTime startT0, startT1; 
+					Time actDelta; 
+				} 
+				DateTimeRulerState dateTimeRulerState; 
+				
+				auto HRuler(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
+					(
+					const DateTime tMin, 	const DateTime tMax, 
+					ref T t0, 	ref T t1, 
+					Args args
+				)
+				{
+					mixin(prepareId, enable.M); 
+					
+					static if(is(T==DateTime))
+					{
+						{
+							bool userModified; HitInfo hit; 
+							auto ruler = new DateTimeRuler(
+								id_, enabled, tMin, tMax, t0, t1,
+								style, targetView.mousePos.vec2, userModified, hit
+							); 
+							
+							append(ruler); push(ruler, id_); scope(exit) pop; 
+							
+							ruler.flags.clipSubCells = true; 
+						}
+					}
+					else static assert(0, "Unsupported type: "~T.stringof); 
+				} 
+			}
 			
 			class DateTimeRuler : .Container
 			{
@@ -9740,19 +9768,36 @@ struct im
 						
 						return ((gt(x, ma.Cent))?(ma):(((lt(x, mi.Cent))?(mi):(x.lo)))).RawDateTime; 
 					} 
-				} 
+				} 
+				
+				void sanitizeRanges()
+				{
+					//both ranges must be always valid
+					if(tMax<=tMin)
+					{
+						tMax = tMin; 
+						if(tMin.raw==ulong.max) tMin.raw--; 
+						tMax.raw = tMin.raw+1; 
+					}
+					t0 = t0.clamp(tMin, tMax); 
+					t1 = t1.clamp(t0, tMax); 
+					if(t0==t1)
+					{ if(t0==tMax) t0.raw--; else t1.raw++; }
+				} 
+				
 				
 				this(
-					in Id id, bool enabled, 	const DateTime tMin, 	const DateTime tMax, 
-						ref DateTime t0, 	ref DateTime t1, 
+					in Id id, bool enabled, 	const DateTime tMin_, 	const DateTime tMax_, 
+						ref DateTime t0_, 	ref DateTime t1_, 
 					const ref TextStyle ts, vec2 mousePos, ref bool userModified, out HitInfo hit
 				)
 				{
 					this.id = id; 
-					this.tMin 	= tMin,
-					this.tMax 	= tMax,
-					this.t0 	= t0,
-					this.t1 	= t1; 
+					tMin 	= tMin_,
+					tMax 	= tMax_,
+					t0 	= t0_,
+					t1 	= t1_; 
+					sanitizeRanges; 
 					
 					hit = im.hitTest(this, enabled); 
 					hitBounds = hit.hitBounds; 
@@ -9810,6 +9855,7 @@ struct im
 						{
 							t0 = safeShift(tMin, w_outer - w, nPos); 
 							t1 = safeShift(t0, w, 1); 
+							sanitizeRanges; 
 						}
 						
 						userModified |= changed; 
@@ -9817,10 +9863,41 @@ struct im
 						//Zooming
 						if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
 						{
+							DateTime center = t_hovered_bottom; 
 							float sc = 1 + inputs.MW.delta.abs * .25; 
 							if(inputs.MW.delta>0) sc = 1/sc; 
-							t0 = safeScale(t0, t_hovered_bottom, sc); 
-							t1 = safeScale(t1, t_hovered_bottom, sc); 
+							
+							bool tryZoom()
+							{
+								auto calcLen() => t1.raw-t0.raw; 
+								const len = calcLen; 
+								t0 = safeScale(t0, center, sc); 
+								t1 = safeScale(t1, center, sc); 
+								sanitizeRanges; 
+								return len!=calcLen; 
+							} 
+							
+							
+							if(!tryZoom)
+							{
+								if(sc>1/+zoom out attempt failed?+/)
+								{
+									sc = 2/+increase coom out amount+/; 
+									if(!tryZoom)
+									{
+										/+
+											Maybe it is next to tMax, then 
+											zoom away from t1.
+										+/
+										center = t1; 
+										if(!tryZoom)
+										{
+											t0 = tMin, t1 = tMax; 
+											/+return home as a last resort.+/
+										}
+									}
+								}
+							}
 							
 							userModified = true; 
 						}
@@ -9844,6 +9921,7 @@ struct im
 							const t0_prev = t0, t1_prev = t1; 
 							t0 = safeScroll(dateTimeRulerState.startT0, d, tMin.raw, tMax.raw-len); 
 							t1 = safeScroll(dateTimeRulerState.startT1, d, tMin.raw+len, tMax.raw); 
+							sanitizeRanges; 
 							
 							userModified |= (t0!=t0_prev) || (t1!=t1_prev); 
 						}
@@ -9860,6 +9938,9 @@ struct im
 					
 					const fh = ts.fontHeight; 
 					innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
+					
+					if(userModified)
+					{ t0_ = t0, t1_ = t1; }
 				} 
 				
 				override void draw(Drawing dr)
@@ -9966,32 +10047,6 @@ struct im
 					
 					drawDebug(dr); 
 				} 
-			} 
-			
-			auto HRuler(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
-				(
-				const DateTime tMin, 	const DateTime tMax, 
-				ref T t0, 	ref T t1, 
-				Args args
-			)
-			{
-				mixin(prepareId, enable.M); 
-				
-				static if(is(T==DateTime))
-				{
-					{
-						bool userModified; HitInfo hit; 
-						auto ruler = new DateTimeRuler(
-							id_, enabled, tMin, tMax, t0, t1,
-							style, targetView.mousePos.vec2, userModified, hit
-						); 
-						
-						append(ruler); push(ruler, id_); scope(exit) pop; 
-						
-						ruler.flags.clipSubCells = true; 
-					}
-				}
-				else static assert(0, "Unsupported type: "~T.stringof); 
 			} 
 			
 			auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)

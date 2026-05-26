@@ -12135,6 +12135,10 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				else	{ auto x = raw - absDiff; enforce(x<=raw, "DateTime underflow"); return RawDateTime(x); }
 			} 
 			
+			DateTime clamp(in DateTime mi, in DateTime ma) const
+			=> RawDateTime(raw.clamp(mi.raw, ma.raw)); 
+			
+			
 			///adjust this DateTime by si.Time
 			DateTime opOpAssign(string op)(in Time b) if(op.among("+", "-"))
 			{ this = this + b; return this; } 
