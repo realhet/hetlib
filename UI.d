@@ -9673,14 +9673,27 @@ struct im
 			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
 			{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
 			version(/+$DIDE_REGION+/all) {
-				struct DateTimeRulerState
+				struct DateTimeRulerScrollState
 				{
 					bool scrolling; 
 					vec2 startMousePos; 
 					DateTime startT0, startT1; 
-					Time actDelta; 
+					
+					Time pixelDuration /+Must update this regularly+/; 
+					
+					void startScroll(vec2 mousePos, DateTime t0, DateTime t1)
+					{
+						scrolling = true; startMousePos = mousePos; 
+						startT0 = t0; startT1 = t1; 
+					} 
+					
+					void updateScroll(Time pixelDuration)
+					{ this.pixelDuration = pixelDuration; } 
+					
+					@property currentDelta(in vec2 mousePos)
+					=> pixelDuration * (startMousePos.x - mousePos.x); 
 				} 
-				DateTimeRulerState dateTimeRulerState; 
+				DateTimeRulerScrollState dateTimeRulerScrollState; 
 				
 				auto HRuler(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
 					(
@@ -9752,7 +9765,7 @@ struct im
 					
 					DateTime safeScroll(DateTime base, Time delta, ulong mi, ulong ma)
 					{
-						Cent x = 	Cent(base.raw); 
+						Cent x = Cent(base.raw); 
 						double d = delta.value(het.quantities.second/DateTime.RawUnit.sec); 
 						if(d>=0)
 						{
@@ -9783,7 +9796,114 @@ struct im
 					t1 = t1.clamp(t0, tMax); 
 					if(t0==t1)
 					{ if(t0==tMax) t0.raw--; else t1.raw++; }
+				} 
+				
+				static struct NormalizedSliderData
+				{
+					ulong w, w_outer; 
+					float nPos; 
+					float pageSize; 
+					im.range rng; 
+					
+					int wrapCnt; 
+					
+					bool changed_kb, changed_m; 
+					
+					this(
+						DateTime tMin, DateTime tMax, 
+						DateTime t0, DateTime t1
+					)
+					{
+						w = t1.raw - t0.raw; 
+						w_outer = tMax.raw - tMin.raw; 
+						
+						nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)); 
+						pageSize = (((float(w)))/(w_outer)); 
+						rng = im.range(0, 1, pageSize / 8); 
+					} 
+					
+					bool handleKeyboard()
+					{
+						const b = sliderState.handleKeyboard(nPos, rng, pageSize); 
+						if(b) changed_kb = true; return b; 
+					} 
+					
+					bool handleMouse(in Id id, in HitInfo hit, in vec2 mousePos)
+					{
+						const b = sliderState.handleMouse	(
+							id, hit, nPos, mousePos,
+							rng, wrapCnt
+						); 
+						if(b) changed_m = true; return b; 
+					} 
+					
+					@property changed() => changed_kb || changed_m; 
 				} 
+				
+				auto getNormalizedSliderData()
+				=> NormalizedSliderData(tMin, tMax, t0, t1); 
+				
+				bool jumpTo(float nPos)
+				{
+					if(nPos.isnan) return false; nPos = nPos.clamp(0, 1); 
+					const 	w 	= t1.raw 	- t0.raw,
+						w_outer 	= tMax.raw 	- tMin.raw; 
+					const t0_prev = t0, t1_prev = t1; 
+					t0 = safeShift(tMin, w_outer - w, nPos), 
+					t1 = safeShift(t0, w, 1); 
+					sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
+				} 
+				
+				bool scrollByTime(DateTime startT0, Time Δt)
+				{
+					const len = t1.raw - t0.raw; const t0_prev = t0, t1_prev = t1; 
+					t0 = safeScroll(startT0             , Δt, tMin.raw, tMax.raw-len),
+					t1 = safeScroll(startT0.add_raw(len), Δt, tMin.raw+len, tMax.raw); 
+					sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
+				} 
+				
+				bool zoomAround(DateTime center, float amount)
+				{
+					if(amount.isnan || !amount) return false; 
+					
+					float sc = 1 + inputs.MW.delta.abs * .25; 
+					if(inputs.MW.delta>0) sc = 1/sc; 
+					
+					bool tryZoom()
+					{
+						auto calcLen() => t1.raw-t0.raw; 
+						const len = calcLen; 
+						t0 = safeScale(t0, center, sc); 
+						t1 = safeScale(t1, center, sc); 
+						sanitizeRanges; 
+						return len!=calcLen; 
+					} 
+					
+					if(!tryZoom)
+					{
+						if(sc>1/+zoom out attempt failed?+/)
+						{
+							sc = 2/+increase coom out amount+/; 
+							if(!tryZoom)
+							{
+								/+
+									Maybe it is next to tMax, then 
+									zoom away from t1.
+								+/
+								center = t1; 
+								if(!tryZoom)
+								{
+									t0 = tMin, t1 = tMax; 
+									/+return home as a last resort.+/
+								}
+							}
+						}
+					}
+					
+					return true; 
+				} 
+				
+				
 				
 				
 				this(
@@ -9830,102 +9950,56 @@ struct im
 						/*onExit*/ {}
 					); 
 					
-					if(!focused || !inputs.MMB.down) dateTimeRulerState.scrolling = false; 
+					ref rss = dateTimeRulerScrollState; 
 					
 					if(focused && mainWindow.canProcessUserInput)
 					{
-						const w = t1.raw - t0.raw, w_outer = tMax.raw - tMin.raw; 
-						float 	nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)), 	pageSize = (((float(w)))/(w_outer)); 
-						const rng = im.range(0, 1, pageSize/8); 
-						
-						const changed_kb = sliderState.handleKeyboard(nPos, rng, pageSize); 
-						
-						bool changed_m; int wrapCnt/+ignored+/; 
-						if(hit.pressed && mouseAtBottomHalf)
-						{ beep; /+left button pressed at t_hovered_bottom+/}
-						else {
-							changed_m = sliderState.handleMouse(
-								id, hit, nPos, 
-								mousePos, rng, wrapCnt
-							); 
-						}
-						
-						const changed = changed_kb || changed_m; 
-						if(changed)
+						//mouse and kbd handling on the top half as a scrollbar slider
 						{
-							t0 = safeShift(tMin, w_outer - w, nPos); 
-							t1 = safeShift(t0, w, 1); 
-							sanitizeRanges; 
+							auto nsd = getNormalizedSliderData; 
+							
+							nsd.handleKeyboard; 
+							
+							if(hit.pressed && mouseAtBottomHalf)
+							{/+beep; +//+left button pressed at t_hovered_bottom+/}
+							else { nsd.handleMouse(id, hit, mousePos); }
+							
+							if(nsd.changed)
+							{ if(jumpTo(nsd.nPos)) userModified = true; }
 						}
-						
-						userModified |= changed; 
 						
 						//Zooming
 						if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
 						{
-							DateTime center = t_hovered_bottom; 
-							float sc = 1 + inputs.MW.delta.abs * .25; 
-							if(inputs.MW.delta>0) sc = 1/sc; 
-							
-							bool tryZoom()
-							{
-								auto calcLen() => t1.raw-t0.raw; 
-								const len = calcLen; 
-								t0 = safeScale(t0, center, sc); 
-								t1 = safeScale(t1, center, sc); 
-								sanitizeRanges; 
-								return len!=calcLen; 
-							} 
-							
-							
-							if(!tryZoom)
-							{
-								if(sc>1/+zoom out attempt failed?+/)
-								{
-									sc = 2/+increase coom out amount+/; 
-									if(!tryZoom)
-									{
-										/+
-											Maybe it is next to tMax, then 
-											zoom away from t1.
-										+/
-										center = t1; 
-										if(!tryZoom)
-										{
-											t0 = tMin, t1 = tMax; 
-											/+return home as a last resort.+/
-										}
-									}
-								}
-							}
-							
+							if(zoomAround(t_hovered_bottom, inputs.MW.delta))
 							userModified = true; 
 						}
 						
 						//Scrolling
-						if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
 						{
-							dateTimeRulerState.scrolling = true; 
-							dateTimeRulerState.startMousePos = mousePos; 
-							dateTimeRulerState.startT0 = t0; 
-							dateTimeRulerState.startT1 = t1; 
-						}
-						
-						if(hitBounds) dateTimeRulerState.actDelta = (t1-t0)/hitBounds.width; 
-						
-						if(dateTimeRulerState.scrolling)
-						{
-							const d = dateTimeRulerState.actDelta * 
-								-(mousePos.x - dateTimeRulerState.startMousePos.x); 
-							const len = dateTimeRulerState.startT1.raw - dateTimeRulerState.startT0.raw; 
-							const t0_prev = t0, t1_prev = t1; 
-							t0 = safeScroll(dateTimeRulerState.startT0, d, tMin.raw, tMax.raw-len); 
-							t1 = safeScroll(dateTimeRulerState.startT1, d, tMin.raw+len, tMax.raw); 
-							sanitizeRanges; 
+							if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
+							{ rss.startScroll(mousePos, t0, t1); }
 							
-							userModified |= (t0!=t0_prev) || (t1!=t1_prev); 
+							if(hitBounds && rss.scrolling)
+							{
+								//It can be only measured inside the hitbox.
+								rss.updateScroll((t1-t0)/hitBounds.width); 
+							}
+							
+							if(rss.scrolling)
+							{
+								if(
+									scrollByTime(
+										rss.startT0,
+										rss.currentDelta(mousePos)
+									)
+								)
+								userModified = true; 
+							}
 						}
 					}
+					
+					if(!focused || !inputs.MMB.down) rss.scrolling = false; 
 					
 					bkColor = ts.bkColor; 
 					clText = ts.fontColor; 
@@ -10004,7 +10078,11 @@ struct im
 						
 						
 						if(!mouseAtTopHalf) dr.alpha = hoverOrFocus/2; 
-						with(bThumb.inflated(vec2(-1,0)))
+						const bt = bThumb.inflated(vec2(-1,0)); 
+						if(false)
+						{ dr.color = clAccent; dr.drawRect(bt); }
+						else
+						with(bt)
 						{
 							dr.line(topLeft, bottomLeft); 
 							dr.line(topRight, bottomRight); 
@@ -10019,22 +10097,26 @@ struct im
 							const xTop = b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
 							const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
 							
-							dr.lineWidth = 1.02f; dr.color = clText; 
+							dr.lineWidth = 1.05f; dr.color = clRedText; 
 							
 							const 	A = vec2(xTop, bTop.top), 
 								B = vec2(xTop, bCenter.top),
-								C = vec2(xBottom, bCenter.bottom), 
+								C = vec2(xBottom, bCenter.center.y), 
 								D = vec2(xBottom, bBottom.bottom); 
-							/+dr.line(A, B); dr.line(B, C); dr.line(C, D); +/
-							dr.line(A, B); 
-							enum N = 10; 
-							const P = iota(N).map!((i){
-								const t = i*(1.0f/(N-1)); 
-								const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
-								return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
-							}).array; 
-							foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
-							dr.line(C, D); 
+							dr.line(A, B); /+dr.line(B, C);+/ dr.line(C, D); 
+							
+							version(/+$DIDE_REGION+/none) {
+								//curver line is ugly
+								dr.line(A, B); 
+								enum N = 10; 
+								const P = iota(N).map!((i){
+									const t = i*(1.0f/(N-1)); 
+									const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+									return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
+								}).array; 
+								foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
+								dr.line(C, D); 
+							}
 						}
 					}
 					

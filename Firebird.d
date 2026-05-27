@@ -3330,6 +3330,11 @@ version(/+$DIDE_REGION+/all) {
 	{
 		/+NOT THREADSAFE!+/
 		
+		/+
+			Bug: Cant put database initioalization inside a window onCreate event: 
+				produces memory error a few seconds later!
+		+/
+		
 		isc_db_handle db_handle; 
 		this(isc_db_handle db_handle)
 		{ this.db_handle = db_handle.enforce("NULL db_handle."); } 
