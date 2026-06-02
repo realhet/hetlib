@@ -33,6 +33,7 @@ private
 		return (cast(ubyte)((y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7)); 
 	} 
 	alias cachedDayOfWeek_impl = memoize!dayOfWeek_impl; 
+	/+Opt: This uses AssocArray so it is bad for the GC.+/
 	
 	ubyte cachedDayOfWeek(int year, int month, int day)
 	=> cachedDayOfWeek_impl(YearMonthDay((cast(ushort)(year)), (cast(ubyte)(month)), (cast(ubyte)(day)))); 
