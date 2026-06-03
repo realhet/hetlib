@@ -392,11 +392,20 @@ version(/+$DIDE_REGION+/all)
 		@property ivec3 size() const
 		=> decodeDimSize(dim, _rawSize0, _rawSize12); 
 		@property size(int a)
-		{ dim = TexDim._1D; _rawSize0 = 0; _rawSize12 = a; } 
+		{
+			assert(a > 0); 
+			dim = TexDim._1D; _rawSize0 = 0; _rawSize12 = a; 
+		} 
 		@property size(ivec2 a)
-		{ dim = TexDim._2D; _rawSize0 = a.x & 0xFFFF; _rawSize12 = ((a.x>>16) & 0xFF) | (a.y << 8); } 
+		{
+			assert(a[].map!((a)=>(mixin(界0(q{0},q{a},q{1<<24})))).all); 
+			dim = TexDim._2D; _rawSize0 = a.x & 0xFFFF; _rawSize12 = ((a.x>>16) & 0xFF) | (a.y << 8); 
+		} 
 		@property size(ivec3 a)
-		{ dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); } 
+		{
+			assert(a[].map!((a)=>(mixin(界0(q{0},q{a},q{1<<16})))).all); 
+			dim = TexDim._3D; _rawSize0 = a.x; _rawSize12 = (a.y & 0xFFFF) | (a.z << 16); 
+		} 
 		
 		@property flags() const
 		=> mixin(幟!((TexInfoFlag),q{getBits(*(cast(ubyte*)(&this)), TexInfoBitOfs, TexInfoBits)})); 
@@ -3288,7 +3297,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19E1F82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19ED182886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -5388,18 +5397,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x296C182886ADB).檢(
+					((0x2977382886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2973382886ADB))))
+				if((互!((bool),(0),(0x297E582886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x297C782886ADB).檢((互!((float/+w=12+/),(1.000),(0x297DE82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2987982886ADB).檢((互!((float/+w=12+/),(1.000),(0x2989082886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5412,8 +5421,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x299B382886ADB).檢 (imVG)),
-					((0x299D982886ADB).檢 (imFPS)); 
+					((0x29A6582886ADB).檢 (imVG)),
+					((0x29A8B82886ADB).檢 (imFPS)); 
 				}
 			}
 			

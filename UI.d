@@ -6445,10 +6445,7 @@ struct im
 					border = "1 normal silver"; 
 					
 					//call the delegates
-					static foreach(a; args)
-					static if(__traits(compiles, a()))
-					if(a)
-					a(); //delegate/function
+					static foreach(a; args) static if(__traits(compiles, a())) a(); //delegate/function
 				}
 			); 
 			
@@ -6766,6 +6763,8 @@ struct im
 			actContainer = c; 
 		} 
 		
+		public void imPush(T : .Container)(T c, in Id newId) { push(c, newId); } 
+		
 		private void pop()
 		{
 			enforce(stack.length>1); //stack[0] is always null and it is never popped.
@@ -6783,7 +6782,9 @@ struct im
 			//actContainer is the top of the stack or null
 			actContainer = stack.empty ? null : stack.back.container; 
 			//Todo: the first stack container is always 0.
-		} 
+		} 
+		
+		public void imPop() { pop; } 
 		
 		void dump()
 		{
@@ -6807,6 +6808,8 @@ struct im
 			actContainer.appendCell(c); 
 			else root ~= c; 
 		} 
+		
+		public void imAppend(Cell c) { append(c); } 
 		
 		.Container removeLastContainer()
 		{
@@ -6906,9 +6909,9 @@ struct im
 		immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
 		
 		struct enable 
-		{ bool val; 	 private enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled	= enabled && a.val; 	}; } 
+		{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled	= enabled && a.val; 	}; } 
 		struct selected
-		{ bool val; 	 private enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
+		{ bool val; 	 enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
 		enum RangeType
 		{ linear, log, circular, endless} 
@@ -9716,6 +9719,8 @@ struct im
 							append(ruler); push(ruler, id_); scope(exit) pop; 
 							
 							ruler.flags.clipSubCells = true; 
+							
+							static foreach(a; args) static if(__traits(compiles, a())) a(); 
 						}
 					}
 					else static assert(0, "Unsupported type: "~T.stringof); 
