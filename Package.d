@@ -12275,6 +12275,70 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			@property int utcYear(DateTime d)
 			{ if(!this) return 0; with(utcSystemTime) return wYear; } 
 			
+			version(/+$DIDE_REGION Precise 128bit functions to adjust DateTime+/all)
+			{
+				private
+				{ import core.int128; private enum centFixp = 16; } 
+				
+				private static DateTime centClamp(Cent x, DateTime tMin, DateTime tMax)
+				{
+					if(gt(x, Cent(tMax.raw))) return tMax; 
+					if(lt(x, Cent(tMin.raw))) return tMin; 
+					return x.lo.RawDateTime; 
+				} 
+				
+				DateTime shift(ulong width, float sc, DateTime tMin, DateTime tMax)
+				{
+					Cent x = 	Cent(width)
+						.mul(Cent(cast(long)((1<<centFixp)*sc))).sar(centFixp)
+						.add(Cent(raw)); 
+					return centClamp(x, tMin, tMax); 
+				} 
+				
+				DateTime scale(DateTime center, float sc, DateTime tMin, DateTime tMax)
+				{
+					Cent x = 	sub(Cent(raw), Cent(center.raw))
+						.mul(Cent(cast(long)((1<<centFixp)*sc))).sar(centFixp)
+						.add(Cent(center.raw)); 
+					return centClamp(x, tMin, tMax); 
+				} 
+				
+				DateTime scroll(Time delta, ulong tMin, ulong tMax)
+				=> scroll(delta, tMin.RawDateTime, tMax.RawDateTime); 
+				
+				DateTime scroll(Time delta, DateTime tMin, DateTime tMax)
+				{
+					Cent x = Cent(raw); 
+					double d = delta.value(het.quantities.second / DateTime.RawUnit.sec); 
+					if(d>=0)	{
+						if(d>ulong.max) d = ulong.max.to!double; 
+						x = x.add(Cent(cast(ulong)(d))); 
+					}
+					else	{
+						d = -d; 
+						if(d>ulong.max) d = ulong.max.to!double; 
+						x = x.sub(Cent(cast(ulong)(d))); 
+					}
+					return centClamp(x, tMin, tMax); 
+				} 
+				
+				bool follow(DateTime target, float a)
+				{
+					auto t = this; 
+					if(t!=target && a>0)
+					{
+						enum maxf = (cast(float)(ulong.max)); 
+						static assert((cast(ulong)(maxf))==ulong.max); 
+						
+						ulong 	total = ((t < target)?(target.raw - t.raw) :(t.raw - target.raw)), 
+							adjust = mul(Cent(total), (cast(ulong)((a*maxf).clamp(0, maxf))).Cent).hi; 
+						if(adjust==0) adjust++; 
+						if(t<target)	t.raw += adjust; 
+						else	t.raw -= adjust; 
+					}
+					const chg = t!=this; this = t; return chg; 
+				} 
+			}
 			
 			
 			static

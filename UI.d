@@ -9705,12 +9705,12 @@ struct im
 					Args args
 				)
 				{
-					mixin(prepareId, enable.M); 
+					mixin(prepareId, enable.M); bool userModified; 
 					
 					static if(is(T==DateTime))
 					{
 						{
-							bool userModified; HitInfo hit; 
+							HitInfo hit; 
 							auto ruler = new DateTimeRuler(
 								id_, enabled, tMin, tMax, t0, t1,
 								style, targetView.mousePos.vec2, userModified, hit
@@ -9724,6 +9724,8 @@ struct im
 						}
 					}
 					else static assert(0, "Unsupported type: "~T.stringof); 
+					
+					return userModified; 
 				} 
 			}
 			
@@ -9738,55 +9740,6 @@ struct im
 				
 				DateTime highlighted_t; 
 				bool show_highlighted_t; 
-				
-				protected
-				{
-					auto dt(ulong u) => u.clamp(tMin.raw, tMax.raw).RawDateTime; 
-					
-					import core.int128; enum fixp = 16; 
-					
-					DateTime safeClamp(Cent x)
-					{
-						if(gt(x, Cent(tMax.raw))) return tMax; 
-						if(lt(x, Cent(tMin.raw))) return tMin; 
-						return x.lo.RawDateTime; 
-					} 
-					
-					DateTime safeShift(DateTime t, ulong width, float sc)
-					{
-						Cent x = 	Cent(width)
-							.mul(Cent(cast(long)((1<<fixp)*sc))).sar(fixp)
-							.add(Cent(t.raw)); 
-						return safeClamp(x); 
-					} 
-					
-					DateTime safeScale(DateTime t, DateTime center, float sc)
-					{
-						Cent x = 	sub(Cent(t.raw), Cent(center.raw))
-							.mul(Cent(cast(long)((1<<fixp)*sc))).sar(fixp)
-							.add(Cent(center.raw)); 
-						return safeClamp(x); 
-					} 
-					
-					DateTime safeScroll(DateTime base, Time delta, ulong mi, ulong ma)
-					{
-						Cent x = Cent(base.raw); 
-						double d = delta.value(het.quantities.second/DateTime.RawUnit.sec); 
-						if(d>=0)
-						{
-							if(d>ulong.max) d = ulong.max.to!double; 
-							x = x.add(Cent(cast(ulong)(d))); 
-						}
-						else
-						{
-							d = -d; 
-							if(d>ulong.max) d = ulong.max.to!double; 
-							x = x.sub(Cent(cast(ulong)(d))); 
-						}
-						
-						return ((gt(x, ma.Cent))?(ma):(((lt(x, mi.Cent))?(mi):(x.lo)))).RawDateTime; 
-					} 
-				} 
 				
 				void sanitizeRanges()
 				{
@@ -9854,16 +9807,16 @@ struct im
 					const 	w 	= t1.raw 	- t0.raw,
 						w_outer 	= tMax.raw 	- tMin.raw; 
 					const t0_prev = t0, t1_prev = t1; 
-					t0 = safeShift(tMin, w_outer - w, nPos), 
-					t1 = safeShift(t0, w, 1); 
+					t0 = tMin .shift(w_outer - w, nPos, tMin, tMax), 
+					t1 = t0   .shift(w, 1, tMin, tMax); 
 					sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
 				} 
 				
 				bool scrollByTime(DateTime startT0, Time Δt)
 				{
 					const len = t1.raw - t0.raw; const t0_prev = t0, t1_prev = t1; 
-					t0 = safeScroll(startT0             , Δt, tMin.raw, tMax.raw-len),
-					t1 = safeScroll(startT0.add_raw(len), Δt, tMin.raw+len, tMax.raw); 
+					t0 = startT0             .scroll(Δt, tMin.raw, tMax.raw-len),
+					t1 = startT0.add_raw(len).scroll(Δt, tMin.raw+len, tMax.raw); 
 					sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
 				} 
 				
@@ -9878,8 +9831,8 @@ struct im
 					{
 						auto calcLen() => t1.raw-t0.raw; 
 						const len = calcLen; 
-						t0 = safeScale(t0, center, sc); 
-						t1 = safeScale(t1, center, sc); 
+						t0 = t0.scale(center, sc, tMin, tMax); 
+						t1 = t1.scale(center, sc, tMin, tMax); 
 						sanitizeRanges; 
 						return len!=calcLen; 
 					} 
@@ -9933,8 +9886,8 @@ struct im
 						hitBounds && 
 						hitBounds.width
 					)?(((mousePos.x-hitBounds.left)/(hitBounds.width))):(0)),
-						t_hovered_top 	= safeShift(tMin, tMax.raw-tMin.raw, norm_mouseX),
-						t_hovered_bottom 	= safeShift(t0, t1.raw-t0.raw, norm_mouseX); 
+						t_hovered_top 	= tMin.shift(tMax.raw-tMin.raw, norm_mouseX, tMin, tMax),
+						t_hovered_bottom 	= t0.shift(t1.raw-t0.raw, norm_mouseX, tMin, tMax); 
 					
 					show_highlighted_t = mouseAtBottomHalf; 
 					highlighted_t = t_hovered_bottom; 
