@@ -12287,7 +12287,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					return x.lo.RawDateTime; 
 				} 
 				
-				DateTime shift(ulong width, float sc, DateTime tMin, DateTime tMax)
+				DateTime shift(ulong width, float sc, DateTime tMin, DateTime tMax) const
 				{
 					Cent x = 	Cent(width)
 						.mul(Cent(cast(long)((1<<centFixp)*sc))).sar(centFixp)
@@ -12295,7 +12295,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					return centClamp(x, tMin, tMax); 
 				} 
 				
-				DateTime scale(DateTime center, float sc, DateTime tMin, DateTime tMax)
+				DateTime scale(DateTime center, float sc, DateTime tMin, DateTime tMax) const
 				{
 					Cent x = 	sub(Cent(raw), Cent(center.raw))
 						.mul(Cent(cast(long)((1<<centFixp)*sc))).sar(centFixp)
@@ -12303,10 +12303,10 @@ version(/+$DIDE_REGION Date Time handling+/all)
 					return centClamp(x, tMin, tMax); 
 				} 
 				
-				DateTime scroll(Time delta, ulong tMin, ulong tMax)
+				DateTime scroll(Time delta, ulong tMin, ulong tMax) const
 				=> scroll(delta, tMin.RawDateTime, tMax.RawDateTime); 
 				
-				DateTime scroll(Time delta, DateTime tMin, DateTime tMax)
+				DateTime scroll(Time delta, DateTime tMin, DateTime tMax) const
 				{
 					Cent x = Cent(raw); 
 					double d = delta.value(het.quantities.second / DateTime.RawUnit.sec); 
@@ -12337,6 +12337,22 @@ version(/+$DIDE_REGION Date Time handling+/all)
 						else	t.raw -= adjust; 
 					}
 					const chg = t!=this; this = t; return chg; 
+				} 
+				
+				float remap(DateTime t0, DateTime t1, float x0, float x1) const
+				=> x0 + (x1-x0) * (((double(this.raw)) - t0.raw)/(t1.raw - t0.raw)); 
+				
+				double remap_precise(DateTime t0, DateTime t1, float x0, float x1) const
+				{
+					const 	q = udiv(
+						mul(
+							Cent((this>=t0)?(this.raw - t0.raw) :(t0.raw - this.raw)), 
+							(cast(ulong)((x1-x0)*0x1p32)).Cent, 
+						),
+						Cent(t1.raw - t0.raw)
+					),
+						d = q.hi * 0x1p32 + q.lo * 0x1p-32; 
+					return x0 + d * ((this>=t0)?(1):(-1)); 
 				} 
 			}
 			
