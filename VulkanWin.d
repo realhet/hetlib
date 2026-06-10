@@ -1995,8 +1995,11 @@ version(/+$DIDE_REGION+/all) {
 							1028/28=36 En meg 88-at hasznalok.
 					+/
 					
+					//113
+					/+20251026: TextOut bug fixed, now 113 seems OK again.+/
+					
 					113
-					/+20251026: TextOut bug fixed, now 113 seems OK again.+/; 
+					/+20260610: text fails again...+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
 					static @property int maxVertexCount()
@@ -3297,7 +3300,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19ED182886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19F0C82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -5397,18 +5400,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2977382886ADB).檢(
+					((0x297AE82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x297E582886ADB))))
+				if((互!((bool),(0),(0x2982082886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2987982886ADB).檢((互!((float/+w=12+/),(1.000),(0x2989082886ADB))).iremap(0, 1, 4, ma))); 
+					((0x298B482886ADB).檢((互!((float/+w=12+/),(1.000),(0x298CB82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5421,8 +5424,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x29A6582886ADB).檢 (imVG)),
-					((0x29A8B82886ADB).檢 (imFPS)); 
+					((0x29AA082886ADB).檢 (imVG)),
+					((0x29AC682886ADB).檢 (imFPS)); 
 				}
 			}
 			

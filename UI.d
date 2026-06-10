@@ -9682,7 +9682,8 @@ struct im
 					vec2 startMousePos; 
 					DateTime startT0, startT1; 
 					
-					Time pixelDuration /+Must update this regularly+/; 
+					Time pixelDuration /+Must update this regularly+/; 
+					
 					
 					void startScroll(vec2 mousePos, DateTime t0, DateTime t1)
 					{
@@ -9696,13 +9697,53 @@ struct im
 					@property currentDelta(in vec2 mousePos)
 					=> pixelDuration * (startMousePos.x - mousePos.x); 
 				} 
-				DateTimeRulerScrollState dateTimeRulerScrollState; 
+				DateTimeRulerScrollState dateTimeRulerScrollState; 
 				
-				auto HRuler(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
+				struct RangeFollower(T)
+				{
+					T[2] act, last, smooth, target, bounds; 
+					bool started, chg_app, chg_user; 
+					
+					void follow(float rate)
+					{
+						void clamp(ref T t) { t = t.clamp(bounds[0], bounds[1]); } 
+						clamp(target[0]); clamp(target[1]); 
+						clamp(smooth[0]); clamp(smooth[1]); 
+						
+						smooth[0].follow(target[0], rate); 
+						smooth[1].follow(target[1], rate); 
+					} 
+					
+					void beforeUpdate(bool appChanged, T t0, T t1, T tMin, T tMax)
+					{
+						act 	= [t0, t1], 
+						bounds 	= [tMin, tMax]; 
+						
+						chg_app = appChanged || last!=act || !started; 
+						
+						if(chg_app) target = smooth = act; 
+						
+						last = act; started = true; 
+					} 
+					
+					void afterUpdate(bool userChanged, T t0, T t1, float rate)
+					{
+						act = [t0, t1]; 
+						
+						chg_user = userChanged || act!=last; 
+						
+						if(chg_user) target = act; 
+						
+						follow(rate); 
+						
+						last = act; 
+					} 
+				} 
+				
+				auto HRuler_smooth(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
 					(
-					const DateTime tMin, 	const DateTime tMax, 
-					ref T t0, 	ref T t1, 
-					Args args
+					const T tMin, const T tMax, ref T t0, ref T t1,
+					Args args /+optional: /+Structured: &t0_smooth, &t1_smooth+/+/
 				)
 				{
 					mixin(prepareId, enable.M); bool userModified; 
@@ -9711,14 +9752,34 @@ struct im
 					{
 						{
 							HitInfo hit; 
+							
+							enum isSmooth = Args.length>=2 	&& is(Args[0]==DateTime*) 
+								&& is(Args[1]==DateTime*); 
+							
+							static if(isSmooth)
+							{
+								ref rangeFollower = ImStorage!(RangeFollower!DateTime).access(id_); 
+								rangeFollower.beforeUpdate(false, t0, t1, tMin, tMax); 
+							}
+							
 							auto ruler = new DateTimeRuler(
 								id_, enabled, tMin, tMax, t0, t1,
 								style, targetView.mousePos.vec2, userModified, hit
 							); 
 							
-							append(ruler); push(ruler, id_); scope(exit) pop; 
+							static if(isSmooth)
+							{
+								rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime, .7)); 
+								ruler.t0_draw = *(args[0]) = rangeFollower.smooth[0],
+								ruler.t1_draw = *(args[1]) = rangeFollower.smooth[1]; 
+							}
+							else
+							{
+								ruler.t0_draw = t0,
+								ruler.t1_draw = t1; 
+							}
 							
-							ruler.flags.clipSubCells = true; 
+							append(ruler); push(ruler, id_); scope(exit) pop; 
 							
 							static foreach(a; args) static if(__traits(compiles, a())) a(); 
 						}
@@ -9728,14 +9789,18 @@ struct im
 					return userModified; 
 				} 
 			}
-			
+			
 			class DateTimeRuler : .Container
 			{
 				//Note: must be a Container because hitTest works on Containers only.
 				
 				RGB clText, clRedText, clMajorTick, clMinorTick; 
-				DateTime tMin, tMax, t0, t1; 
-				bounds2 hitBounds; bool mouseAtTopHalf; @property mouseAtBottomHalf() => !mouseAtTopHalf; 
+				DateTime tMin, tMax, t0, t1, t0_draw, t1_draw; 
+				bounds2 hitBounds; 
+				
+				bool mouseAtTopHalf; 
+				@property mouseAtBottomHalf() => !mouseAtTopHalf; 
+				
 				bool focused; float hoverOrFocus=0; 
 				
 				DateTime highlighted_t; 
@@ -9754,7 +9819,7 @@ struct im
 					t1 = t1.clamp(t0, tMax); 
 					if(t0==t1)
 					{ if(t0==tMax) t0.raw--; else t1.raw++; }
-				} 
+				} 
 				
 				static struct NormalizedSliderData
 				{
@@ -9863,7 +9928,6 @@ struct im
 				
 				
 				
-				
 				this(
 					in Id id, bool enabled, 	const DateTime tMin_, 	const DateTime tMax_, 
 						ref DateTime t0_, 	ref DateTime t1_, 
@@ -9977,6 +10041,9 @@ struct im
 				
 				override void draw(Drawing dr)
 				{
+					const t0 = t0_draw, t1 = t1_draw; 
+					
+					
 					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
 					
 					const b = innerBounds + innerPos; 
