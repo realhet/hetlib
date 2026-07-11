@@ -1115,23 +1115,23 @@ version(/+$DIDE_REGION+/all) {
 		} 
 		
 		private bool inUpdate; 
-		protected final void internalUpdate()
+		protected final bool internalUpdate()
 		{
 			//handle debug.kill
 			if(dbg.forceExit_check) {
 				import core.sys.windows.windows; 
 				PostMessage(hwnd, WM_CLOSE, 0, 0); 
-				return; 
+				return false; 
 			}
 			
-			if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return; }
+			if(inUpdate) { if(showWarnings) WARN("Already in internalUpdate()"); return false; }
 			inUpdate = true; 
 			scope(exit) { inUpdate = false; }
 			
 			enforce(isMain, "Window.internalUpdate() called from non main window."); 
 			
 			//lock
-			if(disableCounter) return; 
+			if(disableCounter) return false; 
 			disableUpdate; 
 			scope(exit) { enableUpdate; }
 			
@@ -1213,7 +1213,9 @@ version(/+$DIDE_REGION+/all) {
 				//if there was an actual update cycle, update the canSleep state. It can only sleep when tere was no invalidate() calls
 				
 				internalUpdateMouseCursor; 
+				return true; 
 			}
+			return false; 
 		} 
 		
 		

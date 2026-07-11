@@ -38,6 +38,8 @@ version(/+$DIDE_REGION+/all)
 		/+Link: https://nikitablack.github.io/post/how_to_use_vulkan_timestamp_queries/ +/
 	+/
 	
+	enum LOG_WAITIDLE = false; 
+	
 	//Extensions used by hetlib.
 	version = DVulkan_VK_VERSION_1_0; 
 	
@@ -3615,8 +3617,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				auto opBinary(string op : "<<")(VkCommandBuffer[] b) { submit(b); return this; } 
 			+/
 			
-			void waitIdle()
-			{ device.vkQueueWaitIdle(handle).vkEnforce; } 
+			static if(LOG_WAITIDLE)
+			{
+				void waitIdle(
+					string file = __FILE__, int line = __LINE__, 
+					string funct = __FUNCTION__
+				)()
+				{
+					LOG!(file, line, funct)("queue waitIdle.start", handle, queueFamily.properties); 
+					device.vkQueueWaitIdle(handle).vkEnforce; 
+					LOG!(file, line, funct)("queue waitIdle.end", handle, queueFamily.properties); 
+				} 
+			}
+			else
+			{
+				void waitIdle()
+				{ device.vkQueueWaitIdle(handle).vkEnforce; } 
+			}
 			
 			auto present(VulkanSemaphore[] renderingFinishedSemaphores, VulkanSwapchain swapchain, uint imageIndex)
 			{
@@ -3962,8 +3979,23 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue* queueRef; //optional output
 			} 
 			
-			void waitIdle()
-			{ vkDeviceWaitIdle(handle).vkEnforce; } 
+			static if(LOG_WAITIDLE)
+			{
+				void waitIdle(
+					string file = __FILE__, int line = __LINE__, 
+					string funct = __FUNCTION__
+				)()
+				{
+					LOG!(file, line, funct)("device waitIdle.start", handle); 
+					vkDeviceWaitIdle(handle).vkEnforce; 
+					LOG!(file, line, funct)("device waitIdle.end", handle); 
+				} 
+			}
+			else
+			{
+				void waitIdle()
+				{ vkDeviceWaitIdle(handle).vkEnforce; } 
+			}
 			
 			void _construct()
 			{
@@ -5883,9 +5915,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x334A84F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3350E4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x335714F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x337D54F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3383B4F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x3389E4F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

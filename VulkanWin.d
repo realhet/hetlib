@@ -5434,25 +5434,35 @@ $(V_size+G_size)".text
 			
 			try
 			{
+				/+
+					260711: Freeze after second OpenDialog bug fixed by Codex.
+						-> When internalUpdate is called recursively from the blocking modal dialog, 
+						it will not touch the swapchain, it will do nothing.
+				+/
 				//Link: https://vulkan-tutorial.com/Drawing_a_triangle/Swap_chain_recreation#page_Fixing-a-deadlock
 				/+
 					Link: https://www.intel.com/content/www/us/en/developer/articles/
 					training/api-without-secrets-introduction-to-vulkan-part-2.html
 				+/
+				
+				t1=QPS; 
+				
+				// Build the CPU/UI frame before touching the swapchain.  Modal Win32
+				// loops may dispatch paint/timer messages where no update frame is due.
+				if(!internalUpdate) { return; }//This calls: im.beginFrame(), onUpdate(), im.endFrame()
+				t2=QPS; 
+				
 				swapchain.acquireAndPresent
 					(
 					queue, imageAvailableSemaphore, renderingFinishedSemaphore, 
 					{
 						try
 						{
-							t1=QPS; 
-							
 							//remove textures right BEFORE drawing anything.
 							foreach(th; Texture.destroyedResidentTexHandles) { TB.remove(th); }
 							
 							VB.reset; GB.reset; 
-							internalUpdate; //This will call: im.beginFrame(), onUpdate(), im.endFrame()
-							t2=QPS; 
+							
 							imDrawFrame; 
 							t3=QPS; 
 							VB.upload; GB.upload; 
