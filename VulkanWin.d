@@ -616,7 +616,10 @@ version(/+$DIDE_REGION+/all)
 				[q{/+	unused+/}],
 				[q{},q{"10"},q{"00"},q{drawFilledTri},q{/+a, b, c+/}],
 				[q{},q{},q{"01"},q{unused1},q{/++/}],
-				[q{},q{},q{"10"},q{unused2},q{/++/}],
+				[q{},q{},q{"10"},q{drawTexRectStretchY},q{/+
+					CoordFormat Coords HandleFormat Handle
+					 ty0, ty1 (ubyte, ubyte)
+				+/}],
 				[q{},q{},q{"11"},q{drawTexRectCustom},q{/+
 					CoordFormat Coords HandleFormat Handle
 					 CustomBits CustomData
@@ -3131,7 +3134,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				}
 			} 
 			
-			void drawC64Rect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
+			void drawTexRect(B)(in B bnd, in TexHandle texHandle = TexHandle(0))
 			{
 				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
 				emit(
@@ -3141,12 +3144,22 @@ Use SvgParser to prepare absolute SVG command stream!"
 				); 
 			} 
 			
+			void drawTexRectStretchY(B)(in B bnd, in TexHandle texHandle, in float ty0, in float ty1)
+			{
+				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
+				emit(
+					mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
+					mixin(舉!((Opcode),q{drawTexRectStretchY}))	, assemblePoint(bnd.bottomRight),
+					assembleHandle(texHandle), vec2(ty0, ty1).to_unorm
+				); 
+			} 
+			
 			void drawC64Border(ivec2 pos)
 			{
 				void r(int x0, int y0, int x1, int y1)
 				{
 					auto p(int x, int y) => (ivec2(x, y)+pos)*8; 
-					drawC64Rect(ibounds2(p(x0, y0), p(x1, y1))); 
+					drawTexRect(ibounds2(p(x0, y0), p(x1, y1))); 
 				} 
 				r(0, 0, 4+40+4, 4); r(0, 4+25, 4+40+4, 4+25+4); 
 				r(0, 4, 4, 4+25); r(4+40, 4, 4+40+4, 4+25); 
@@ -3300,7 +3313,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x19F0C82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1A10782886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3588,7 +3601,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 			{ line(b.topLeft, b.bottomRight); line(b.topRight, b.bottomLeft); } 
 			
 			void fillRect(in bounds2 b)
-			{ gfx.PC = color; gfx.drawC64Rect(b, TexHandle(0)); } 
+			{ gfx.PC = color; gfx.drawTexRect(b, TexHandle(0)); } 
 			
 			void fillRect(float x0, float y0, float x1, float y1)
 			{ fillRect(bounds2(x0, y0, x1, y1)); } 
@@ -3653,7 +3666,9 @@ Use SvgParser to prepare absolute SVG command stream!"
 					else	gfx.SC = bkColor; 
 					gfx.PC = ((hasAlpha)?(clWhite):(color)); 
 				}
-				gfx.drawC64Rect(b, h); 
+				
+				if(ySubRange==vec2(1, 0)) gfx.drawTexRect(b, h); 
+				else gfx.drawTexRectStretchY(b, h, ySubRange.x, ySubRange.y); 
 			} 
 			
 			void drawTexture(int idx, in bounds2 b, Flag!"nearest" nearest = Yes.nearest)
@@ -5400,18 +5415,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x297AE82886ADB).檢(
+					((0x29A0D82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2982082886ADB))))
+				if((互!((bool),(0),(0x29A7F82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x298B482886ADB).檢((互!((float/+w=12+/),(1.000),(0x298CB82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x29B1382886ADB).檢((互!((float/+w=12+/),(1.000),(0x29B2A82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5424,8 +5439,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x29AA082886ADB).檢 (imVG)),
-					((0x29AC682886ADB).檢 (imFPS)); 
+					((0x29CFF82886ADB).檢 (imVG)),
+					((0x29D2582886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -6927,12 +6942,15 @@ $(V_size+G_size)".text
 						EmitVertex(); 
 					} 
 					
-					void emitTexturedPointPointRect2D(in vec2 p, in vec2 q)
+					void emitTexturedPointPointRect2D(
+						in vec2 p, in vec2 q, 
+						in float ty0, in float ty1
+					)
 					{
-						fragTexCoordXY = vec2(0,0); emitVertex2D(p); 
-						fragTexCoordXY = vec2(0,1); emitVertex2D(vec2(p.x, q.y)); 
-						fragTexCoordXY = vec2(1,0); emitVertex2D(vec2(q.x, p.y)); 
-						fragTexCoordXY = vec2(1,1); emitVertex2D(q); 
+						fragTexCoordXY = vec2(0, ty0); emitVertex2D(p); 
+						fragTexCoordXY = vec2(0, ty1); emitVertex2D(vec2(p.x, q.y)); 
+						fragTexCoordXY = vec2(1, ty0); emitVertex2D(vec2(q.x, p.y)); 
+						fragTexCoordXY = vec2(1, ty1); emitVertex2D(q); 
 						EndPrimitive(); 
 					} 
 					
@@ -7635,7 +7653,7 @@ $(V_size+G_size)".text
 							case PathCode_C2: 	PC = vec4(0,.5,1,1); 	break; 
 							case PathCode_C3: 	PC = vec4(0,1,1,1); 	break; 
 						}
-						emitTexturedPointPointRect2D(P4-r, P4+r); 
+						emitTexturedPointPointRect2D(P4-r, P4+r, 0.0, 1.0); 
 					} 
 					
 					void latchP(vec2 newP)
@@ -7798,12 +7816,19 @@ $(V_size+G_size)".text
 					void drawMove(inout BitStream bitStream)
 					{ P4 = fetchFormattedPoint2D(bitStream); } 
 					
-					void drawTexturedRect(inout BitStream bitStream, in bool isCustom)
+					void drawTexturedRect(inout BitStream bitStream, in bool isCustom, in bool isStretchY)
 					{
 						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
 						
 						const uint handleFmt = fetchHandleFormat(bitStream); 
 						const uint texHandle = fetchHandle(bitStream, handleFmt); 
+						
+						float ty0 = 0.0, ty1 = 1.0; 
+						if(isStretchY)
+						{
+							const vec2 ySubRange = unpackUnorm4x8(fetch_uint(bitStream, 16)).xy; 
+							ty0 = ySubRange.x; ty1 = ySubRange.y; 
+						}
 						
 						if(isCustom)
 						{
@@ -7817,7 +7842,7 @@ $(V_size+G_size)".text
 						setFragTexHandle(texHandle); 
 						fragTexCoordZ = 0; //Todo: should optionally come from the outside
 						
-						emitTexturedPointPointRect2D(P3.xy, P4.xy); 
+						emitTexturedPointPointRect2D(P3.xy, P4.xy, ty0, ty1); 
 					} 
 					
 					void drawFilledTri(inout BitStream bitStream)
@@ -7842,7 +7867,7 @@ $(V_size+G_size)".text
 						vec2 size = vec2(getTexSize(FMH).xy); 
 						size *= FH*(1.0/size.y); 
 						fragTexCoordZ = ch; 
-						emitTexturedPointPointRect2D(P4.xy, P4.xy+size); 
+						emitTexturedPointPointRect2D(P4.xy, P4.xy+size, 0.0, 1.0); 
 						
 						P4.x += size.x; //advance cursor
 					} 
@@ -7995,15 +8020,15 @@ $(V_size+G_size)".text
 									{
 										case 0: 	drawFilledTri(bitStream); 	break; 
 										case 1: 	/**/	break; 
-										case 2: 	/**/	break; 
-										case 3: 	drawTexturedRect(bitStream, /*custom*/true); 	break; 
+										case 2: 	drawTexturedRect(bitStream, /*custom*/false, /*stretchY*/true); 	break; 
+										case 3: 	drawTexturedRect(bitStream, /*custom*/true, /*stretchY*/false); 	break; 
 									}
 									break; 
 									case 3: 
 										switch(cmd)
 									{
 										case 0: 	drawMove(bitStream); 	break; 
-										case 1: 	drawTexturedRect(bitStream, false); 	break; 
+										case 1: 	drawTexturedRect(bitStream, false, false); 	break; 
 										case 2: 	drawChars(bitStream, false); 	break; 
 										case 3: 	drawChars(bitStream, /*repeat*/true); 	break; 
 									}
