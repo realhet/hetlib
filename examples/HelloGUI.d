@@ -20,13 +20,13 @@ class FrmHelloGUI: UIWindow
 		with(im) { Panel(PanelPosition.topLeft, { Text("Hello"); }); }
 	} 
 	
-	override void beforeImDraw()
+	override void beforeImDraw(IDrawing drWorld, IDrawing drGui)
 	{
-		with(staticDr)
+		with(drWorld)
 		{
 			color = clWhite; 
 			fontHeight = 100; 
 			textOut(vec2(0), "Hello"); 
 		}
-	} 
+	}
 } 

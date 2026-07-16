@@ -615,7 +615,7 @@ version(/+$DIDE_REGION+/all)
 				[q{},q{},q{"11"},q{drawPathTG},q{/+tangents at curve split points+/}],
 				[q{/+	unused+/}],
 				[q{},q{"10"},q{"00"},q{drawFilledTri},q{/+a, b, c+/}],
-				[q{},q{},q{"01"},q{unused1},q{/++/}],
+				[q{},q{},q{"01"},q{drawShapeRect},q{/++/}],
 				[q{},q{},q{"10"},q{drawTexRectStretchY},q{/+
 					CoordFormat Coords HandleFormat Handle
 					 ty0, ty1 (ubyte, ubyte)
@@ -3154,6 +3154,28 @@ Use SvgParser to prepare absolute SVG command stream!"
 				); 
 			} 
 			
+			void drawShapeRect(B)(in B bnd, uint shape, float chamfer=0, float aspect=0, float p0=0)
+			{
+				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
+				
+				uint extraFlags = (chamfer?1:0)|(aspect?2:0)|(p0?4:0)|((shape<<3)&7); 
+				auto extra = assemble(bits(extraFlags, 3), bits(shape, 3)); 
+				if(chamfer) extra = assemble(extra, bits((iround(chamfer.clamp(0, 1)*15)), 4)); 
+				if(aspect) extra = assemble(extra, aspect.to_snorm); 
+				
+				emit(
+					mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
+					mixin(舉!((Opcode),q{drawShapeRect}))	, assemblePoint(bnd.bottomRight),
+					extra
+				); 
+				
+				/+
+					if(extraFlags&1) emit(bits(chamfer.to_unorm)); 
+					if(extraFlags&2) emit(bits(iround((aspect+1) * (15.0f/2)).clamp(0, 15), 4)); 
+					if(extraFlags&4) emit(p0); 
+				+/
+			} 
+			
 			void drawC64Border(ivec2 pos)
 			{
 				void r(int x0, int y0, int x1, int y1)
@@ -3313,7 +3335,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1A10782886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1A46382886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3539,9 +3561,9 @@ Use SvgParser to prepare absolute SVG command stream!"
 			version(/+$DIDE_REGION Setup+/all)
 			{
 				private void setupLine()
-				{ gfx.LW = inputTransformSize(lineWidth); gfx.PC = color; } 
+				{ gfx.LW = inputTransformSize(lineWidth); gfx.PC = color; gfx.synch_LW; gfx.synch_PC; } 
 				private void setupPoint()
-				{ gfx.LW = inputTransformSize(pointSize); gfx.PC = color; } 
+				{ gfx.LW = inputTransformSize(pointSize); gfx.PC = color; gfx.synch_LW; gfx.synch_PC; } 
 			}
 			
 			
@@ -3601,10 +3623,26 @@ Use SvgParser to prepare absolute SVG command stream!"
 			{ line(b.topLeft, b.bottomRight); line(b.topRight, b.bottomLeft); } 
 			
 			void fillRect(in bounds2 b)
-			{ gfx.PC = color; gfx.drawTexRect(b, TexHandle(0)); } 
+			{ gfx.PC = color; gfx.synch_PC; gfx.drawTexRect(b, TexHandle(0)); } 
 			
 			void fillRect(float x0, float y0, float x1, float y1)
 			{ fillRect(bounds2(x0, y0, x1, y1)); } 
+			
+			void shapeRect(in bounds2 b, uint shape, float chamfer=0, float aspect=0, float p0=0)
+			{
+				{
+					gfx.PS = pointSize; 
+					gfx.LW = lineWidth; 
+					gfx.PC = color; 
+				}{
+					gfx.synch_PS; 
+					gfx.synch_LW; 
+					gfx.synch_PC; 
+				}
+				gfx.drawShapeRect(b, shape, chamfer, aspect, p0); 
+			} 
+			
+			
 			
 			void circle(in vec2 p, float r, float arc0 = 0, float arc1 = 2 * PI)
 			{
@@ -5415,18 +5453,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x29A0D82886ADB).檢(
+					((0x29EFF82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x29A7F82886ADB))))
+				if((互!((bool),(0),(0x29F7182886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x29B1382886ADB).檢((互!((float/+w=12+/),(1.000),(0x29B2A82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2A00582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2A01C82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5439,8 +5477,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x29CFF82886ADB).檢 (imVG)),
-					((0x29D2582886ADB).檢 (imFPS)); 
+					((0x2A1F182886ADB).檢 (imVG)),
+					((0x2A21782886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -6629,7 +6667,15 @@ $(V_size+G_size)".text
 					
 					#define PI 3.14159265359
 					
-					vec2 rotate90(in vec2 v) { return vec2(-v.y, v.x); } 
+					#define sqr(a) ((a)*(a))
+					float dot2(in vec2 v ) { return dot(v,v); } 
+					mat2 rotZ(float angle)
+					{
+						float ca = cos(angle); 
+						float sa = sin(angle); 
+						return mat2(ca, sa, -sa, ca); 
+					} 
+					vec2 rot90(in vec2 v) { return vec2(-v.y, v.x); } 
 					float crossZ(in vec2 a, vec2 b) { return a.x*b.y - b.x*a.y; } 
 					
 					struct seg2
@@ -6660,22 +6706,34 @@ $(V_size+G_size)".text
 					
 					//fragment attributes
 					
+					#define FragTexHandle_ofs 0
+					#define FragTexHandle_bits 24
+					
+					#define FragCustomShaderIdx_ofs 24
+					#define FragCustomShaderIdx_bits 4
+					
+					#define FragMode_ofs 28
+					#define FragMode_bits 4
+					
+					
 					#define FragMode_fullyFilled 0
 					#define FragMode_cubicBezier 1
 					#define FragMode_glyphStrip 2
 					#define FragMode_customRect 3
+					#define FragMode_shapeRect 4
+					
+					
 					
 					/*Todo: This dword struct must be automated...*/
 					
-					#define getFragTexHandle getBits(fragTexHandleAndMode, 0, 24)
-					#define setFragTexHandle(a) setBits(fragTexHandleAndMode, 0, 24, a)
+					#define getFragTexHandle getBits(fragTexHandleAndMode, FragTexHandle_ofs, FragTexHandle_bits)
+					#define setFragTexHandle(a) setBits(fragTexHandleAndMode, FragTexHandle_ofs, FragTexHandle_bits, a)
 					
-					#define getFragCustomShaderIdx getBits(fragTexHandleAndMode, 24, 4)
-					#define setFragCustomShaderIdx(a) setBits(fragTexHandleAndMode, 24, 4, a)
+					#define getFragCustomShaderIdx getBits(fragTexHandleAndMode, FragCustomShaderIdx_ofs, FragCustomShaderIdx_bits)
+					#define setFragCustomShaderIdx(a) setBits(fragTexHandleAndMode, FragCustomShaderIdx_ofs, FragCustomShaderIdx_bits, a)
 					
-					#define getFragMode getBits(fragTexHandleAndMode, 28, 4)
-					#define setFragMode(a) setBits(fragTexHandleAndMode, 28, 4, a)
-					
+					#define getFragMode getBits(fragTexHandleAndMode, FragMode_ofs, FragMode_bits)
+					#define setFragMode(a) setBits(fragTexHandleAndMode, FragMode_ofs, FragMode_bits, a)
 					
 					$(
 						(表([
@@ -6714,6 +6772,7 @@ $(V_size+G_size)".text
 							* Lines:
 								* fragTexCoordZ: is used for lineWidth/2
 								* fragFloats0..1 contain 2D cubic bezier control points
+								* fragFloats0..1 contain rect shape params
 					*/
 					
 					@vert: 
@@ -6854,7 +6913,7 @@ $(V_size+G_size)".text
 					
 					float PS = 1; 	/* Point size */
 					float LW = 1; 	/* Line width */
-					float DL = 1; 	/* Dot lenthg */
+					float DL = 1; 	/* Dot length */
 					float FH = $(GSP_DefaultFontHeight); /* Font height */
 					
 					uint FMH = 0; 	/* Font map handle */
@@ -7069,7 +7128,7 @@ $(V_size+G_size)".text
 					{ return evalCubicBezier2D(P0, P1, P2, P3, cubicBezierTangentWeights(t)); } 
 					
 					vec2 cubicBezierNormal2D(in vec2 P0, in vec2 P1, in vec2 P2, in vec2 P3, in float t)
-					{ return rotate90(normalize(cubicBezierTangent2D(P0, P1, P2, P3, t))); } 
+					{ return rot90(normalize(cubicBezierTangent2D(P0, P1, P2, P3, t))); } 
 					
 					void emitCubicBezierAt(
 						in float t, in 
@@ -7086,7 +7145,7 @@ $(V_size+G_size)".text
 					void emitBezierAtStart(vec2 P0, in vec2 P1, in float r)
 					{
 						const vec2 	p = P0,
-							n = rotate90(normalize(P1-P0)) * r; 
+							n = rot90(normalize(P1-P0)) * r; 
 						fragTexCoordXY = vec2(0, 0); emitVertex2D(p-n); 
 						fragTexCoordXY = vec2(0, 1); emitVertex2D(p+n); 
 					} 
@@ -7315,6 +7374,9 @@ $(V_size+G_size)".text
 					
 					float fetch_float(inout BitStream bitStream)
 					{ return uintBitsToFloat(fetch_uint(bitStream, 32)); } 
+					
+					#define fetch_unorm(bitStream, bitCnt)(float(fetch_uint(bitStream, bitCnt))*(1.0/((1<<bitCnt)-1)))
+					#define fetch_snorm(bitStream, bitCnt)(max(float(fetch_int(bitStream, bitCnt))*(1.0/((1<<(bitCnt-1))-1)), -1))
 					
 					vec2 fetch_vec2(inout BitStream bitStream)
 					{ return vec2(fetch_float(bitStream), fetch_float(bitStream)); } 
@@ -7845,6 +7907,30 @@ $(V_size+G_size)".text
 						emitTexturedPointPointRect2D(P3.xy, P4.xy, ty0, ty1); 
 					} 
 					
+					void drawShapeRect(inout BitStream bitStream)
+					{
+						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
+						
+						const uint extra = fetch_uint(bitStream, 3+3); 
+						const uint shape = extra >> 3; 
+						const uint extraFlags = extra; 
+						const float chamfer = (extraFlags & 1)!=0 ? fetch_unorm(bitStream, 4) : 0.0; 
+						const float aspect = (extraFlags & 2)!=0 ? fetch_snorm(bitStream, 8) : 0.0; 
+						/*const float p0 = (flags & 4)!=0 ? fetch_float(bitStream) : 0.0; */
+						
+						setFragMode(FragMode_shapeRect); 
+						fragFloats0.xy 	/*size*/	 = P4-P3,
+						fragFloats0.z 	/*roundingRadius*/	 = PS,
+						fragFloats0.w 	/*border*/	 = LW,
+						fragFloats1.x		 = chamfer,
+						fragFloats1.y		 = aspect,
+						fragFloats1.z 	/*param0*/	 = 0/*Todo:*/,
+						fragFloats1.w		 = uintBitsToFloat(shape); 
+						
+						
+						emitTexturedPointPointRect2D(P3.xy, P4.xy, 0.0, 1.0); 
+					} 
+					
 					void drawFilledTri(inout BitStream bitStream)
 					{
 						setFragMode(FragMode_fullyFilled); 
@@ -8019,7 +8105,7 @@ $(V_size+G_size)".text
 										switch(cmd)
 									{
 										case 0: 	drawFilledTri(bitStream); 	break; 
-										case 1: 	/**/	break; 
+										case 1: 	drawShapeRect(bitStream); 	break; 
 										case 2: 	drawTexturedRect(bitStream, /*custom*/false, /*stretchY*/true); 	break; 
 										case 3: 	drawTexturedRect(bitStream, /*custom*/true, /*stretchY*/false); 	break; 
 									}
@@ -8124,7 +8210,7 @@ $(V_size+G_size)".text
 						const ivec3 size = decodeDimSize(dim, _rawSize0, _rawSize12); 
 						return size; 
 					} 
-					
+					
 					vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 					{
 						//if((INLINE_PREVENTION & UB.zero)!=0) return vec4(0); 
@@ -8339,7 +8425,7 @@ $(V_size+G_size)".text
 						}
 						else
 						{ return readSample(fragTexHandle, vec3(texCoordXY, fragTexCoordZ), true, false); }
-					} 
+					}   
 					
 					vec4 defaultShader()
 					{
@@ -8349,7 +8435,212 @@ $(V_size+G_size)".text
 						return resultColor; 
 					} 
 					
-					vec4 customShader(); 
+					vec4 customShader(); 
+					float sdBox( in vec2 p, in vec2 b )
+					{
+						vec2 d = abs(p)-b; 
+						return length(max(d,0.0)) + min(max(d.x,d.y),0.0); 
+					} 
+					
+					float sdChamferBox( in vec2 p, in vec2 b, in float chamfer )
+					{
+						p = abs(p)-b; 
+						
+						p = (p.y>p.x) ? p.yx : p.xy; 
+						p.y += chamfer; 
+						
+						const float k = 1.0-sqrt(2.0); 
+						if(p.y<0.0 && p.y+p.x*k<0.0)
+						return p.x; 
+						
+						if(p.x<p.y)
+						return (p.x+p.y)*sqrt(0.5); 
+						
+						return length(p); 
+					} 
+					
+					float sdRhombus( in vec2 p, in vec2 b ) 
+					{
+						b.y = -b.y; 
+						p = abs(p); 
+						float h = clamp( (dot(b,p)+b.y*b.y)/dot(b,b), 0.0, 1.0 ); 
+						p -= b*vec2(h,h-1.0); 
+						return length(p)*sign(p.x); 
+					} 
+					
+					float sdTrapezoid( in vec2 p, in float r1, float r2, float he )
+					{
+						vec2 k1 = vec2(r2,he); 
+						vec2 k2 = vec2(r2-r1,2.0*he); 
+						p.x = abs(p.x); 
+						vec2 ca = vec2(p.x-min(p.x,(p.y<0.0)?r1:r2), abs(p.y)-he); 
+						vec2 cb = p - k1 + k2*clamp( dot(k1-p,k2)/dot2(k2), 0.0, 1.0 ); 
+						float s = (cb.x<0.0 && ca.y<0.0) ? -1.0 : 1.0; 
+						return s*sqrt(min(dot2(ca),dot2(cb))); 
+					} /*Todo:*/
+					
+					float sdParallelogram( in vec2 p, float wi, float he, float sk )
+					{
+						vec2 e = vec2(sk,he); 
+						p = (p.y<0.0)?-p:p; 
+						vec2  w = p - e; w.x -= clamp(w.x,-wi,wi); 
+						vec2  d = vec2(dot(w,w), -w.y); 
+						float s = p.x*e.y - p.y*e.x; 
+						p = (s<0.0)?-p:p; 
+						vec2  v = p - vec2(wi,0); v -= e*clamp(dot(v,e)/dot(e,e),-1.0,1.0); 
+						d = min(d, vec2(dot(v,v), wi*he-abs(s))); 
+						return sqrt(d.x)*sign(-d.y); 
+					} /*Todo:*/
+					
+					
+					#define Shape_indexMask 7
+					
+					#define Shape_box 0
+					#define Shape_chamferBox 1
+					#define Shape_rhombus 2
+					
+					float sdShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float p0)
+					{
+						vec2 halfSize = size/2.; 
+						vec2 pp = p-(topLeft + halfSize); 
+						switch(shape & Shape_indexMask)
+						{
+							case Shape_box: 	return sdBox(pp, halfSize); 
+							case Shape_chamferBox: 	return sdChamferBox(pp, halfSize, p0); 
+							case Shape_rhombus: 	return sdRhombus(pp, halfSize); 
+							default: 	return 1e30; 
+						}
+					} 
+					
+					float depthShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, float chamfer, float aspect_, float p0)
+					{
+						float sharpBorder = chamfer * border; 
+						
+						vec2 aspect = vec2(1,1); 
+						if(aspect_!=0)
+						{
+							const float a = pow(2048, abs(aspect_)); 
+							if(aspect_>0) aspect[0] = a; else aspect[1] = a; 
+						}
+						
+						vec2 correction = (vec2(1)-vec2(1)/aspect)*(mix(roundingRadius, roundingRadius-border,chamfer)); 
+						float sd = sdShape(
+							shape, aspect*p, 	aspect*(topLeft-sharpBorder-correction), 
+								aspect*(size+sharpBorder*2.+correction*2.), p0
+						)+sharpBorder; 
+						float nsd = (sd - (roundingRadius-border)) / border; //0..1 range is in the border area
+						
+						bool isOutside = nsd >= 1.; if(isOutside) return border*-2.; //Todo: if border = 0, it will not return anything
+						bool isInside = nsd <= 0.; if(isInside) nsd = 0; 
+						
+						//nsd = 1.-nsd; 
+						
+						nsd = 1.0-sqrt(1.0-sqr(nsd)); 
+						//nsd = 0.37*sqr(nsd) + 0.63*sqr(sqr(nsd)); //approximated quarter cicrle
+						
+						nsd = 1.-nsd; 
+						
+						return nsd*border; 
+					} 
+					
+					//'nd' means normal and depth: vec4(nx, ny, nz, d)
+					vec4 ndShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, float chamfer, float aspect, float p0)
+					{
+						const float nearZero = 1e-7; 
+						roundingRadius = clamp(roundingRadius, nearZero, min(size.x, size.y)/2.0); 
+						border = clamp(border, nearZero, roundingRadius); 
+						
+						size -= roundingRadius * 2.0; 
+						topLeft += roundingRadius; 
+						//size += border * 2.0;
+						//topLeft -= border;
+						float depth = depthShape(shape, p, topLeft, size, roundingRadius, border, chamfer, aspect, p0); 
+						
+						float microStep = border/1024.; 
+						
+						/*
+							//2 samples: It's fast, but bugs with 45deg chamfers
+							vec2 d = microStep * vec2(p.x>topLeft.x+size.x/2.0 ? -1. : 1., p.y>topLeft.y+size.y/2.0 ? -1. : 1.);
+							float nx = sign(d.x) * (depth - depthShape(shp, p + vec2(d.x, 0), topLeft, size, roundingRadius, border, p0));
+							float ny = sign(d.y) * (depth - depthShape(shp, p + vec2(0, d.y), topLeft, size, roundingRadius, border, p0));
+						*/
+						
+						//this samplig fixes problems with 45deg chamfers when the light comes from the topLeft.
+						float nx, ny; 
+						float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, chamfer, aspect, p0); 
+						if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, chamfer, aspect, p0); nx = depthx-depth; }else nx = depth-depthx; 
+						float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, chamfer, aspect, p0); 
+						if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, chamfer, aspect, p0); ny = depthy-depth; }else ny = depth-depthy; 
+						
+						
+						/*Todo: When cleartype is on, it could be low quality using dfdx() and dfdy()*/
+						vec3 n = depth<-border ? vec3(0) : normalize(vec3(nx, ny, microStep)); 
+						return vec4(n, depth); 
+					} 
+					
+					vec4 doShapeRect()
+					{
+						const vec2 size = fragFloats0.xy; 
+						const vec2 p = fragTexCoordXY * size; 
+						const float roundingRadius = fragFloats0.z; 
+						const float border        = fragFloats0.w; 
+						const float chamfer     = fragFloats1.x; 
+						const float aspect        = fragFloats1.y; 
+						const float param0        = fragFloats1.z; 
+						const uint flags           = floatBitsToUint(fragFloats1.w); 
+						
+						const uint shape = getBits(flags, 0, 3); 
+						
+						const vec4 nd = ndShape(
+							shape, p, vec2(0, 0), size, 
+							roundingRadius, border, chamfer, aspect, param0
+						); 
+						const vec3 n = nd.xyz; 
+						
+						// If normal is zero (outside), return black
+						if(n == vec3(0))
+						{ return vec4(0); }
+						else
+						{
+							// Lighting
+							vec3 lightDir = normalize(vec3(vec2(-.6, -.9), 1.0)); 
+							
+							// Ambient
+							float ambientStrength = .2; 
+							float ambient = ambientStrength; 
+							
+							// Diffuse
+							float diffuseStrength = .8; 
+							float diffuse = diffuseStrength * max(dot(n, lightDir), 0.0); 
+							
+							// Specular
+							lightDir = normalize(vec3(rotZ(UB.iTime*4.)*vec2(-.6, -.9), 1.0)); 
+							vec3 viewDir = vec3(0.0, 0.0, 1.0); 
+							vec3 halfDir = normalize(lightDir + viewDir); 
+							float specStrength = 0.5; 
+							float shininess = (sin(UB.iTime*19.)/2.+.5)*32.+1.0; 
+							float specular = specStrength * pow(max(dot(n, halfDir), 0.0), shininess); 
+							
+							// Combine
+							vec3 finalColor = (ambient + diffuse)*fragColor.rgb + specular * vec3(1.0, 0, .0); 
+							
+							return vec4(finalColor, fragColor.a); 
+						}
+					} 
+					
+					bool doCubicBezier()
+					{
+						const vec4 ndcPos = vec4(
+							2*(gl_FragCoord.xy-UB.viewport.xy)/(UB.viewport.zw)-1,
+							gl_FragCoord.z, 1
+						); 
+						const vec4 clipPos = UB.inv_mvp * ndcPos; 
+						const vec3 objPos = clipPos.xyz / clipPos.w; 
+						const float dst = cubicBezierDist(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
+						const float t = fract(texCoordXY.x); 
+						const float r = uintBitsToFloat(fragTexCoordZ); 
+						return dst<=r; 
+					} 
 					
 					void main()
 					{
@@ -8361,22 +8652,18 @@ $(V_size+G_size)".text
 							texCoordXY.x = fract(texCoordXY.x); 
 						}
 						
-						const vec4 ndcPos = vec4(
-							2*(gl_FragCoord.xy-UB.viewport.xy)/(UB.viewport.zw)-1,
-							gl_FragCoord.z, 1
-						); 
-						const vec4 clipPos = UB.inv_mvp * ndcPos; 
-						const vec3 objPos = clipPos.xyz / clipPos.w; 
-						
 						if(fragMode==FragMode_cubicBezier)
 						{
-							float dst = cubicBezierDist(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
-							float t = fract(texCoordXY.x); 
-							float r = uintBitsToFloat(fragTexCoordZ); 
-							if(dst>r) discard; 
+							if(doCubicBezier())	outColor = defaultShader(); 
+							else	discard; 
 						}
-						
-						if(fragMode==FragMode_customRect)
+						else if(fragMode==FragMode_shapeRect)
+						{
+							const vec4 c = doShapeRect(); 
+							if(c.a>0)	outColor = c; 
+							else	discard; 
+						}
+						else if(fragMode==FragMode_customRect)
 						{ outColor = customShader(); }
 						else
 						{ outColor = defaultShader(); }

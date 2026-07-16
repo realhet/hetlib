@@ -1431,6 +1431,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		
 		void* getGfxBuilder(); 
 		
+		void shapeRect(in bounds2 b, uint shape, float chamfer=0, float aspect=0, float p0=0); 
+		
 	} 
 	struct RectAlign
 	{
