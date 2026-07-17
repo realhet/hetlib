@@ -895,7 +895,82 @@ version(/+$DIDE_REGION+/all)
 			assert(assembleAngle_deg(-512.5f) == assemble(mixin(舉!((AngleFormat),q{f32})), -512.5f)); 
 			assert(assembleAngle_deg(600.0f) == assemble(mixin(舉!((AngleFormat),q{f32})), 600.0f)); 
 		} 
+		Bits!ulong assemblePoint(in byte p)
+		{ return assemble(mixin(舉!((CoordFormat),q{i8})), p); } 
 		
+		Bits!ulong assemblePoint(in short p)
+		{
+			if(mixin(界1(q{-128},q{p},q{128})))
+			return assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p))); 
+			else return assemble(mixin(舉!((CoordFormat),q{i16})), p); 
+		} 
+		
+		Bits!ulong assemblePoint(in int p)
+		{
+			if(mixin(界1(q{-128},q{p},q{128})))
+			return assemble(mixin(舉!((CoordFormat),q{i8})), (cast(ubyte)(p))); 
+			else if(mixin(界1(q{-32768},q{p},q{32768})))
+			return assemble(mixin(舉!((CoordFormat),q{i16})), (cast(ushort)(p))); 
+			else return assemble(mixin(舉!((CoordFormat),q{i32})), p); 
+		} 
+		
+		Bits!ulong assemblePoint(in float p)
+		{
+			const i = (itrunc(p)); 
+			if(p==i) return assemblePoint(i); 
+			else return assemble(mixin(舉!((CoordFormat),q{f32})), p); 
+		} 
+		
+		void unittest_assemblePoint1D()
+		{
+			void test(alias val, alias fmt, int len)()
+			{
+				const p = assemblePoint(val); 
+				enum fmtBitCnt = EnumBits!(typeof(fmt)); 
+				assert(p.data.getBits(0, fmtBitCnt) == fmt, "bad fmtCode"); 
+				assert(p.bitCnt - fmtBitCnt == len, "bad len"); 
+			} 
+			
+			version(/+$DIDE_REGION+/all) {
+				// byte tests
+				test!(cast(byte)0, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(cast(byte)-128, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(cast(byte)127, mixin(舉!((CoordFormat),q{i8})), 8); 
+				
+				// short tests
+				test!(cast(short)-128, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(cast(short)127, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(cast(short)-129, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(cast(short)128, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(cast(short)-32768, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(cast(short)32767, mixin(舉!((CoordFormat),q{i16})), 16); 
+				
+				
+				// int tests
+				test!(0, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(-128, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(127, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(-129, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(128, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(-32768, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(32767, mixin(舉!((CoordFormat),q{i16})), 16); 
+				test!(-32769, mixin(舉!((CoordFormat),q{i32})), 32); 
+				test!(32768, mixin(舉!((CoordFormat),q{i32})), 32); 
+				test!(int.min, mixin(舉!((CoordFormat),q{i32})), 32); 
+				test!(int.max, mixin(舉!((CoordFormat),q{i32})), 32); 
+				
+				// float tests
+				test!(0.0f, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(-128.0f, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(127.0f, mixin(舉!((CoordFormat),q{i8})), 8); 
+				test!(1.5f, mixin(舉!((CoordFormat),q{f32})), 32); 
+				test!(-2.25f, mixin(舉!((CoordFormat),q{f32})), 32); 
+				test!(3.14159f, mixin(舉!((CoordFormat),q{f32})), 32); 
+			}
+		} 
+		
+		
+		
 		Bits!ulong assemblePoint(in Vector!(byte, 2) p)
 		{ return assemble(mixin(舉!((CoordFormat),q{i8})), p); } 
 		
@@ -922,7 +997,7 @@ version(/+$DIDE_REGION+/all)
 			else return [assemble(mixin(舉!((CoordFormat),q{f32}))), assemble(p)]; 
 		} 
 		
-		void unittest_assemblePoint()
+		void unittest_assemblePoint2D()
 		{
 			void test(alias vec, alias fmt, int len)()
 			{
@@ -3154,27 +3229,29 @@ Use SvgParser to prepare absolute SVG command stream!"
 				); 
 			} 
 			
-			void drawShapeRect(B)(in B bnd, uint shape, float chamfer=0, float aspect=0, float p0=0)
+			void drawShapeRect(B)(
+				in B bnd, uint shape, float chamfer=0, float aspect=0, 
+				float p0=0, float p1=0, float p2=0
+			)
 			{
 				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
 				
-				uint extraFlags = (chamfer?1:0)|(aspect?2:0)|(p0?4:0)|((shape<<3)&7); 
-				auto extra = assemble(bits(extraFlags, 3), bits(shape, 3)); 
+				uint extraFlags = 	(chamfer?1:0)|(aspect?2:0)|(p0?4:0)|(p1?8:0)|(p2?16:0)|
+					((shape&7)<<5); 
+				auto extra = assemble(bits(extraFlags, 5+3)); 
 				if(chamfer) extra = assemble(extra, bits((iround(chamfer.clamp(0, 1)*15)), 4)); 
 				if(aspect) extra = assemble(extra, aspect.to_snorm); 
 				
 				emit(
 					mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
-					mixin(舉!((Opcode),q{drawShapeRect}))	, assemblePoint(bnd.bottomRight),
-					extra
+					mixin(舉!((Opcode),q{drawShapeRect}))	, assemblePoint(bnd.bottomRight), extra
 				); 
-				
-				/+
-					if(extraFlags&1) emit(bits(chamfer.to_unorm)); 
-					if(extraFlags&2) emit(bits(iround((aspect+1) * (15.0f/2)).clamp(0, 15), 4)); 
-					if(extraFlags&4) emit(p0); 
-				+/
+				if(p0) emit(assemblePoint(p0)); 
+				if(p1) emit(assemblePoint(p1)); 
+				if(p2) emit(assemblePoint(p2)); 
 			} 
+			
+			
 			
 			void drawC64Border(ivec2 pos)
 			{
@@ -3335,7 +3412,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1A46382886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1AFD482886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3628,7 +3705,10 @@ Use SvgParser to prepare absolute SVG command stream!"
 			void fillRect(float x0, float y0, float x1, float y1)
 			{ fillRect(bounds2(x0, y0, x1, y1)); } 
 			
-			void shapeRect(in bounds2 b, uint shape, float chamfer=0, float aspect=0, float p0=0)
+			void shapeRect(
+				in bounds2 b, uint shape, float chamfer=0, float aspect=0, 
+				float p0=0, float p1=0, float p2=0
+			)
 			{
 				{
 					gfx.PS = pointSize; 
@@ -5353,7 +5433,8 @@ class VulkanWindow: Window, IGfxContentDestination
 			TexSizeFormat.selfTest; 
 			unittest_assembleSize; 
 			unittest_assembleAngle; 
-			unittest_assemblePoint; 
+			unittest_assemblePoint1D; 
+			unittest_assemblePoint2D; 
 		} 
 		
 		
@@ -5453,18 +5534,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x29EFF82886ADB).檢(
+					((0x2AABA82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x29F7182886ADB))))
+				if((互!((bool),(0),(0x2AB2C82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2A00582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2A01C82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2ABC082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2ABD782886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5477,8 +5558,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2A1F182886ADB).檢 (imVG)),
-					((0x2A21782886ADB).檢 (imFPS)); 
+					((0x2ADAC82886ADB).檢 (imVG)),
+					((0x2ADD282886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -7526,6 +7607,13 @@ $(V_size+G_size)".text
 						/*Opt: Do it with single fetch*/
 					} 
 					
+					float fetchFormattedPoint1D(inout BitStream bitStream)
+					{
+						//fetches absolute 1D point
+						const uint coordFmt = fetchCoordFormat(bitStream); 
+						return fetchCoord(bitStream, coordFmt); 
+					} 
+					
 					vec2 fetchFormattedPoint2D(inout BitStream bitStream)
 					{
 						//fetches absolute 2D point
@@ -7911,22 +7999,22 @@ $(V_size+G_size)".text
 					{
 						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
 						
-						const uint extra = fetch_uint(bitStream, 3+3); 
-						const uint shape = extra >> 3; 
-						const uint extraFlags = extra; 
-						const float chamfer = (extraFlags & 1)!=0 ? fetch_unorm(bitStream, 4) : 0.0; 
-						const float aspect = (extraFlags & 2)!=0 ? fetch_snorm(bitStream, 8) : 0.0; 
-						/*const float p0 = (flags & 4)!=0 ? fetch_float(bitStream) : 0.0; */
+						uint shapeFlags = fetch_uint(bitStream, 5+3); 
+						if((shapeFlags & 1)!=0) setBits(shapeFlags,  8, 4, fetch_uint(bitStream, 4)); //chamfer
+						if((shapeFlags & 2)!=0) setBits(shapeFlags, 12, 8, fetch_uint(bitStream, 8)); //aspect
+						
+						const float param0 = (shapeFlags &  4)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
+						const float param1 = (shapeFlags &  8)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
+						const float param2 = (shapeFlags & 16)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
 						
 						setFragMode(FragMode_shapeRect); 
 						fragFloats0.xy 	/*size*/	 = P4-P3,
 						fragFloats0.z 	/*roundingRadius*/	 = PS,
 						fragFloats0.w 	/*border*/	 = LW,
-						fragFloats1.x		 = chamfer,
-						fragFloats1.y		 = aspect,
-						fragFloats1.z 	/*param0*/	 = 0/*Todo:*/,
-						fragFloats1.w		 = uintBitsToFloat(shape); 
-						
+						fragFloats1.x		 = param0,
+						fragFloats1.y		 = param1,
+						fragFloats1.z 		 = param2,
+						fragFloats1.w		 = uintBitsToFloat(shapeFlags); 
 						
 						emitTexturedPointPointRect2D(P3.xy, P4.xy, 0.0, 1.0); 
 					} 
@@ -8584,12 +8672,23 @@ $(V_size+G_size)".text
 						const vec2 p = fragTexCoordXY * size; 
 						const float roundingRadius = fragFloats0.z; 
 						const float border        = fragFloats0.w; 
-						const float chamfer     = fragFloats1.x; 
-						const float aspect        = fragFloats1.y; 
-						const float param0        = fragFloats1.z; 
-						const uint flags           = floatBitsToUint(fragFloats1.w); 
 						
-						const uint shape = getBits(flags, 0, 3); 
+						const float param0        = fragFloats1.x; 
+						const float param1        = fragFloats1.y; 
+						const float param2        = fragFloats1.z; 
+						
+						const uint shapeFlags = floatBitsToUint(fragFloats1.w); 
+						const uint shape = getBits(shapeFlags, 5, 3); 
+						const float chamfer = (((shapeFlags & 1)!=0) ?(
+							(float(getBits(shapeFlags, 8, 4)))
+							* (1.0/((1<<4)-1))
+						):(0.0)); 
+						const float aspect = (((shapeFlags & 2)!=0) ?(
+							max(
+								(float(getBits(int(shapeFlags), 12, 8)))
+								* (1.0/((1<<(8-1))-1)), -1
+							)
+						):(0.0)); 
 						
 						const vec4 nd = ndShape(
 							shape, p, vec2(0, 0), size, 
