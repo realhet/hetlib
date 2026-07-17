@@ -3787,6 +3787,23 @@ version(/+$DIDE_REGION Numeric+/all)
 			+/
 		} 
 		
+		/+
+			Super Elliptic Ramp
+			Symmetric transition between linear, circular, and sharp corners.
+				p=0: Linear,  p=±0.5: Circular quadrant,  p=±0.6709: Squirtle,  p=±1: Sharp 90° corner
+				p>0: up then right,  p<0: right then up
+				/+Link: https://www.desmos.com/calculator/9l49oao4sm+/
+		+/
+		float superEllipticRamp(float x, float p)
+		{
+			float s = min((4*p*p)/3, 0.999f); 
+			float q = ((1 + s)/(1 - s)), invQ = ((1)/(q)); 
+			bool sel = p>=0; 
+			float a = sel ? 1-x : x; 
+			float b = pow(1 - pow(a, q), invQ); 
+			return sel ? b : 1-b; 
+		} 
+		
 		unittest
 		{
 			string s; 

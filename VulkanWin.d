@@ -8600,6 +8600,18 @@ $(V_size+G_size)".text
 						}
 					} 
 					
+					float superEllipticRamp(float x, float p)
+					{
+						float s = min((4.0 * p * p) / 3.0, 0.999); 
+						float q = (1.0 + s) / (1.0 - s); 
+						float invQ = 1.0 / q; 
+						
+						bool sel = p>=0.0; 
+						float a = sel ? 1.0 - x : x; 
+						float b = pow(1.0 - pow(a, q), invQ); 
+						return sel ? b : 1.0 - b; 
+					} 
+					
 					float depthShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, float chamfer, float aspect_, float p0)
 					{
 						float sharpBorder = chamfer * border; 
@@ -8623,10 +8635,12 @@ $(V_size+G_size)".text
 						
 						//nsd = 1.-nsd; 
 						
-						nsd = 1.0-sqrt(1.0-sqr(nsd)); 
+						//nsd = 1.0-sqrt(1.0-sqr(nsd)); 
 						//nsd = 0.37*sqr(nsd) + 0.63*sqr(sqr(nsd)); //approximated quarter cicrle
 						
-						nsd = 1.-nsd; 
+						nsd = superEllipticRamp(1.0-nsd, 0.7); 
+						
+						//nsd = 1.-nsd; 
 						
 						return nsd*border; 
 					} 
